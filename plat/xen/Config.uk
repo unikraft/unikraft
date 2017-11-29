@@ -1,0 +1,12 @@
+menuconfig PLAT_XEN
+       bool "Xen guest image"
+       default n
+       depends on (ARCH_X86_32 || ARCH_X86_64 || ARCH_ARM_32)
+       select LIBUKDEBUG
+       select LIBNOLIBC if !HAVE_LIBC
+       select LIBFDT if ARCH_ARM_32
+       help
+                Create a Unikraft image that runs as a Xen guest
+
+if (PLAT_XEN)
+endif

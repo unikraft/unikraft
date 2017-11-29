@@ -1,0 +1,61 @@
+XEN_INTERFACE_VERSION := 0x00030205
+
+##
+## Xen platform registration
+##
+$(eval $(call addplat_s,xen,$(PLAT_XEN)))
+
+##
+## Xen platform library registration
+##
+$(eval $(call addplatlib,xen,libxenplat))
+$(eval $(call addplatlib_s,xen,libxenbus,$(XEN_XENBUS)))
+
+##
+## Xen platform compilation settings
+##
+LIBXENPLAT_ASFLAGS-y     += -D__XEN_INTERFACE_VERSION__=$(XEN_INTERFACE_VERSION)
+LIBXENPLAT_CFLAGS-y      += -D__XEN_INTERFACE_VERSION__=$(XEN_INTERFACE_VERSION)
+LIBXENPLAT_CXXFLAGS-y    += -D__XEN_INTERFACE_VERSION__=$(XEN_INTERFACE_VERSION)
+
+##
+## Platform library definitions
+##
+LIBXENPLAT_ASINCLUDES-y        += -I$(LIBXENPLAT_BASE)/include
+LIBXENPLAT_CINCLUDES-y         += -I$(LIBXENPLAT_BASE)/include
+LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/hypervisor.c
+LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/memory.c
+
+ifneq (,$(filter x86_32 x86_64,$(UK_ARCH)))
+LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/x86/setup.c
+LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/x86/traps.c
+LIBXENPLAT_SRCS-$(ARCH_X86_32) += $(LIBXENPLAT_BASE)/x86/entry32.S
+LIBXENPLAT_SRCS-$(ARCH_X86_64) += $(LIBXENPLAT_BASE)/x86/entry64.S
+LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/x86/mm.c
+LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/x86/arch_events.c
+LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/x86/arch_time.c
+LIBXENPLAT_SRCS-$(LIBUKSCHED)  += $(LIBXENPLAT_BASE)/x86/arch_thread.c
+
+ifneq ($(XEN_HVMLITE),y)
+LIBXENPLAT_ASFLAGS-y           += -DCONFIG_PARAVIRT
+LIBXENPLAT_CFLAGS-y            += -DCONFIG_PARAVIRT
+endif
+endif
+
+ifneq (,$(filter arm arm_64,$(UK_ARCH)))
+LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/arm/setup.c
+LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/arm/traps.c
+LIBXENPLAT_SRCS-$(ARCH_ARM_32) += $(LIBXENPLAT_BASE)/arm/entry32.S
+LIBXENPLAT_SRCS-$(ARCH_ARM_64) += $(LIBXENPLAT_BASE)/arm/entry64.S
+LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/arm/arch_events.c
+LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/arm/arch_time.c
+LIBXENPLAT_SRCS-$(ARCH_ARM_32) += $(LIBXENPLAT_BASE)/arm/hypercalls32.S
+LIBXENPLAT_SRCS-$(ARCH_ARM_64) += $(LIBXENPLAT_BASE)/arm/hypercalls64.S
+endif
+
+LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/lcpu.c
+LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/console.c
+LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/shutdown.c
+LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/events.c
+LIBXENPLAT_SRCS-$(LIBUKSCHED)  += $(LIBXENPLAT_BASE)/thread.c
+LIBXENPLAT_SRCS-$(LIBUKSCHED)  += $(LIBXENPLAT_BASE)/sched.c
