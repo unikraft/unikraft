@@ -1,0 +1,11 @@
+menuconfig PLAT_KVM
+       bool "KVM guest"
+       default n
+       depends on (ARCH_X86_64)
+       select LIBUKDEBUG
+       select LIBNOLIBC if !HAVE_LIBC
+       help
+                Create a Unikraft image that runs as a KVM guest
+
+#if (PLAT_KVM)
+#endif

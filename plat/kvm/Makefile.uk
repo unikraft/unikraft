@@ -1,0 +1,24 @@
+##
+## KVM platform registration
+##
+$(eval $(call addplat_s,kvm,$(PLAT_KVM)))
+
+##
+## KVM platform library registration
+##
+$(eval $(call addplatlib,kvm,libkvmplat))
+
+##
+## Platform library definitions
+##
+LIBKVMPLAT_ASINCLUDES-y        += -I$(LIBKVMPLAT_BASE)/include
+LIBKVMPLAT_CINCLUDES-y         += -I$(LIBKVMPLAT_BASE)/include
+
+LIBKVMPLAT_SRCS-$(ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/entry64.S
+LIBKVMPLAT_SRCS-$(ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/cpu_x86_64.c
+LIBKVMPLAT_SRCS-$(ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/setup.c
+LIBKVMPLAT_SRCS-$(ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/console.c
+LIBKVMPLAT_SRCS-$(ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/lcpu.c
+LIBKVMPLAT_SRCS-$(ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/time.c
+LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/shutdown.c
+LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/memory.c
