@@ -1,0 +1,25 @@
+##
+## Linux user platform registration
+##
+$(eval $(call addplat_s,linuxu,$(PLAT_LINUXU)))
+
+##
+## Linux user platform library registration
+##
+$(eval $(call addplatlib,linuxu,liblinuxuplat))
+
+##
+## Platform library definitions
+##
+LIBLINUXUPLAT_CINCLUDES-y += -I$(LIBLINUXUPLAT_BASE)/include
+
+LIBLINUXUPLAT_SRCS-$(ARCH_X86_32) += $(LIBLINUXUPLAT_BASE)/x86/entry32.S
+LIBLINUXUPLAT_SRCS-$(ARCH_X86_64) += $(LIBLINUXUPLAT_BASE)/x86/entry64.S
+LIBLINUXUPLAT_SRCS-$(ARCH_ARM_32) += $(LIBLINUXUPLAT_BASE)/arm/entry32.S
+LIBLINUXUPLAT_SRCS-$(ARCH_ARM_64) += $(LIBLINUXUPLAT_BASE)/arm/entry64.S
+LIBLINUXUPLAT_SRCS-y              += $(LIBLINUXUPLAT_BASE)/setup.c
+LIBLINUXUPLAT_SRCS-y              += $(LIBLINUXUPLAT_BASE)/console.c
+LIBLINUXUPLAT_SRCS-y              += $(LIBLINUXUPLAT_BASE)/shutdown.c
+LIBLINUXUPLAT_SRCS-y              += $(LIBLINUXUPLAT_BASE)/memory.c
+LIBLINUXUPLAT_SRCS-y              += $(LIBLINUXUPLAT_BASE)/lcpu.c
+LIBLINUXUPLAT_SRCS-y              += $(LIBLINUXUPLAT_BASE)/time.c

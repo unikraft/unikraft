@@ -1,0 +1,17 @@
+menuconfig PLAT_LINUXU
+       bool "Linux user space"
+       default n
+       depends on (ARCH_X86_64) || (ARCH_ARM_32)
+       select LIBUKDEBUG
+       select LIBNOLIBC if !HAVE_LIBC
+       help
+                Create a Unikraft image that runs as a Linux user space program
+
+if (PLAT_LINUXU)
+	config LINUXU_DEFAULT_HEAPMB
+	int "Default heap size (MB)"
+	default 4
+	help
+		Default size of heap memory to be allocated when no
+		'-m' parameter was given to the linuxu executable
+endif

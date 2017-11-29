@@ -1,0 +1,30 @@
+LINUXU_LDFLAGS-y += -e_liblinuxuplat_start
+
+##
+## Link image
+##
+LINUXU_IMAGE := $(BUILD_DIR)/$(UK_NAME)_linuxu-$(UK_ARCH)
+
+$(LINUXU_IMAGE): $(LINUXU_LINK) $(LINUXU_LINK-y) $(UK_LINK) $(UK_LINK-y)
+	$(call build_cmd,LD,,$@,\
+	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(LINUXU_LDFLAGS) $(LINUXU_LDFLAGS-y) $^ -o $@)
+ifeq ($(OPTIMIZE_DBGFILE),y)
+	$(call build_cmd,OBJCOPY,,$@.dbg,\
+	       $(OBJCOPY) --only-keep-debug $@ $@.dbg)
+endif
+ifeq ($(OPTIMIZE_SYMFILE),y)
+	$(call build_cmd,NM,,$@.sym,\
+	       $(NM) -n $@ > $@.sym)
+endif
+ifeq ($(OPTIMIZE_STRIP),y)
+	$(call verbose_cmd,STRIP,$(notdir $@),\
+	       $(STRIP) -s $@)
+endif
+
+# register image to the build
+UK_IMAGES-$(PLAT_LINUXU) += $(LINUXU_IMAGE)
+
+# ...for cleaning:
+LIBLINUXUPLAT_CLEAN += $(call build_clean,$(LINUXU_IMAGE))
+LIBLINUXUPLAT_CLEAN += $(call build_clean,$(LINUXU_IMAGE).dbg)
+LIBLINUXUPLAT_CLEAN += $(call build_clean,$(LINUXU_IMAGE).sym)
