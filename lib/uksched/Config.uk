@@ -1,0 +1,7 @@
+menuconfig LIBUKSCHED
+	bool "uksched: Abstraction for schedulers"
+	default n
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKDEBUG
+	select LIBUKALLOC
+	select HAVE_SCHED
