@@ -1,0 +1,6 @@
+$(eval $(call addlib_s,libukalloc,$(LIBUKALLOC)))
+
+CINCLUDES-$(LIBUKALLOC)		+= -I$(LIBUKALLOC_BASE)/include
+CXXINCLUDES-$(LIBUKALLOC)	+= -I$(LIBUKALLOC_BASE)/include
+
+LIBUKALLOC_SRCS-y += $(LIBUKALLOC_BASE)/alloc.c
