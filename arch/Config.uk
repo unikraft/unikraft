@@ -1,0 +1,20 @@
+choice
+	prompt "Architecture"
+	default ARCH_ARM_32 if (UK_ARCH = "arm")
+	default ARCH_X86_64
+	help
+	  Select the target CPU architecture.
+
+config ARCH_X86_64
+       bool "x86 compatible (64 bits)"
+config ARCH_ARM_32
+       bool "ARMv7 compatible (32 bits)"
+
+endchoice
+
+if (ARCH_X86_64)
+	source "arch/x86_64/Config.uk"
+endif
+if (ARCH_ARM_32)
+	source "arch/arm/Config.uk"
+endif

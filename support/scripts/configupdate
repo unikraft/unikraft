@@ -1,0 +1,42 @@
+#!/bin/bash
+UK_CONFIG="${1:-.config}"
+UK_CONFIG_OLD="${2:-.config.old}"
+
+_subconfig()
+{
+	grep -e "^#\?[[:space:]]*$1.*$" "$2" | sort
+}
+
+_comparesym()
+{
+	local _SUBCONFIG=$( _subconfig "${1}" "${2}" )
+	local _SUBCONFIG_OLD=$( _subconfig "${1}" "${3}" )
+	[ "$_SUBCONFIG" == "$_SUBCONFIG_OLD" ] || return 1
+
+	return 0
+}
+
+UPDATES=
+NL=$'\n'
+
+[ -z "${UK_CONFIG}" -o ! -e "${UK_CONFIG}" ] && exit 0
+[ -z "${UK_CONFIG_OLD}" -o ! -e "${UK_CONFIG_OLD}" ] && exit 0
+
+# Change of architecture?
+_comparesym "ARCH_" "${UK_CONFIG}" "${UK_CONFIG_OLD}" || UPDATES+="***  - CPU architecture changed${NL}"
+
+# Change of CPU options?
+_comparesym "MARCH_" "${UK_CONFIG}" "${UK_CONFIG_OLD}" || UPDATES+="***  - CPU optimization changed${NL}"
+
+# Change of optimizations?
+_comparesym "OPTIMIZE_" "${UK_CONFIG}" "${UK_CONFIG_OLD}" || UPDATES+="*** - Code optimization changed${NL}"
+
+if [ ! -z "$UPDATES" ]; then
+	echo "*** The following configuration changes were detected:"
+	echo -n "${UPDATES}"
+	echo "*** Execute 'make clean' before executing 'make'."
+	echo "*** This is to ensure that the new setting is applied"
+	echo "*** to every compilation unit."
+	echo ""
+fi
+exit 0

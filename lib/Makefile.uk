@@ -1,0 +1,15 @@
+################################################################################
+#
+# Internal library registrations
+#
+################################################################################
+
+$(eval $(call _import_lib,$(UK_BASE)/lib/ukboot))
+$(eval $(call _import_lib,$(UK_BASE)/lib/ukdebug))
+$(eval $(call _import_lib,$(UK_BASE)/lib/ukargparse))
+$(eval $(call _import_lib,$(UK_BASE)/lib/nolibc))
+$(eval $(call _import_lib,$(UK_BASE)/lib/ukalloc))
+$(eval $(call _import_lib,$(UK_BASE)/lib/ukallocbbuddy))
+$(eval $(call _import_lib,$(UK_BASE)/lib/uksched))
+$(eval $(call _import_lib,$(UK_BASE)/lib/ukschedcoop))
+$(eval $(call _import_lib,$(UK_BASE)/lib/fdt))

@@ -1,0 +1,47 @@
+# Makefile for Unikraft
+#
+# Copyright (C) 2016-2017 by NEC Europe Ltd. <simon.kuenzer@neclab.eu>
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+#
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU
+# General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License
+# along with this program; if not, write to the Free Software
+# Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
+#
+
+#################################################
+#
+# Install clean rules for each enabled library
+#
+#################################################
+
+ifneq ($(call qstrip,$(UK_LIBS) $(UK_LIBS-y)),)
+$(foreach L,$(UK_LIBS) $(UK_LIBS-y), \
+$(eval $(call cleanrule_lib,$(L))); \
+)
+endif
+
+
+#################################################
+#
+# Install clean rules for each enabled platform
+#
+#################################################
+
+ifneq ($(call qstrip,$(UK_PLATS) $(UK_PLATS-y)),)
+$(foreach P,$(UK_PLATS) $(UK_PLATS-y), \
+$(if $(call qstrip,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y)), \
+$(foreach L,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y), \
+$(eval $(call cleanrule_lib,$(L))); \
+) \
+) \
+)
+endif

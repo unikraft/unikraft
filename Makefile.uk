@@ -1,0 +1,52 @@
+################################################################################
+#
+# Global Unikraft definitions
+#
+################################################################################
+
+ASFLAGS     += -U __linux__ -U __FreeBSD__ -U __sun__ -D__ASSEMBLY__
+ASINCLUDES  += -nostdinc -nostdlib -I$(UK_BASE)/include
+
+CFLAGS      += -U __linux__ -U __FreeBSD__ -U __sun__
+CFLAGS      += -fno-stack-protector -fno-omit-frame-pointer -fno-tree-sra
+CFLAGS      += -Wall -Wextra
+CINCLUDES   += -nostdinc -nostdlib -I$(UK_BASE)/include
+
+CXXFLAGS    += -U __linux__ -U __FreeBSD__ -U __sun__
+CXXFLAGS    += -fno-stack-protector -fno-omit-frame-pointer -fno-tree-sra
+CXXFLAGS    += -Wall -Wextra
+CXXINCLUDES += -nostdinc -nostdlib -I$(UK_BASE)/include
+
+# Set the text and data sections to be readable and writable. Also,
+# do not page-align the data segment. If the output format supports
+# Unix style magic numbers, mark the output as OMAGIC.
+LIBLDFLAGS  += --omagic -r
+LDFLAGS	    += --omagic
+
+CFLAGS-$(OPTIMIZE_NONE)            += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
+CXXFLAGS-$(OPTIMIZE_NONE)          += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
+CFLAGS-$(OPTIMIZE_PERF)            += -O2
+CXXFLAGS-$(OPTIMIZE_PERF)          += -O2
+CFLAGS-$(OPTIMIZE_SIZE)            += -Os
+CXXFLAGS-$(OPTIMIZE_SIZE)          += -Os
+
+CFLAGS-$(OPTIMIZE_DEADELIM)        += -fdata-sections -ffunction-sections
+CXXFLAGS-$(OPTIMIZE_DEADELIM)      += -fdata-sections -ffunction-sections
+LDFLAGS-$(OPTIMIZE_DEADELIM)       += --gc-sections
+
+ifneq ($(DEBUG_SYMBOLS),y)
+CFLAGS                             += -g0
+CXXFLAGS                           += -g0
+LDFLAGS-y		           += --strip-debug
+else
+CFLAGS-$(DEBUG_SYMBOLS_LVL1)       += -g1
+CXXFLAGS-$(DEBUG_SYMBOLS_LVL1)     += -g1
+CFLAGS-$(DEBUG_SYMBOLS_LVL2)       += -g2
+CXXFLAGS-$(DEBUG_SYMBOLS_LVL2)     += -g2
+CFLAGS-$(DEBUG_SYMBOLS_LVL3)       += -g3
+CXXFLAGS-$(DEBUG_SYMBOLS_LVL3)     += -g3
+endif
+
+ASFLAGS  += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION) -DUK_FULLVERSION=$(UK_FULLVERSION) -DUK_CODENAME="$(UK_CODENAME)"
+CFLAGS   += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION) -DUK_FULLVERSION=$(UK_FULLVERSION) -DUK_CODENAME="$(UK_CODENAME)"
+CXXFLAGS += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION) -DUK_FULLVERSION=$(UK_FULLVERSION) -DUK_CODENAME="$(UK_CODENAME)"

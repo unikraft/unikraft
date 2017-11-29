@@ -1,0 +1,3 @@
+$(eval $(call _import_lib,$(UK_BASE)/plat/xen))
+$(eval $(call _import_lib,$(UK_BASE)/plat/kvm))
+$(eval $(call _import_lib,$(UK_BASE)/plat/linuxu))

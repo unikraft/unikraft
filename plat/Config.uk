@@ -1,0 +1,3 @@
+source "plat/xen/Config.uk"
+source "plat/kvm/Config.uk"
+source "plat/linuxu/Config.uk"

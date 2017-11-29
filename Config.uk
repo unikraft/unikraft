@@ -1,0 +1,189 @@
+#
+# For a description of the syntax of this configuration file,
+# see https://www.kernel.org/doc/Documentation/kbuild/Config.in-language.txt.
+#
+mainmenu "Unikraft/$UK_FULLVERSION Configuration"
+config KCONFIG_APP_IN
+	string
+	option env="KCONFIG_APP_IN"
+config KCONFIG_ELIB_IN
+	string
+	option env="KCONFIG_ELIB_IN"
+config UK_FULLVERSION
+	string
+	option env="UK_FULLVERSION"
+config UK_CODENAME
+	string
+	option env="UK_CODENAME"
+config UK_ARCH
+	string
+	option env="UK_ARCH"
+config UK_BASE
+	string
+	option env="UK_BASE"
+config UK_APP
+	string
+	option env="UK_APP"
+config UK_DEFNAME
+	string
+	option env="UK_NAME"
+
+menu "Architecture Selection"
+	source "arch/Config.uk"
+endmenu
+
+menu "Platform Support"
+	source "plat/Config.uk"
+endmenu
+
+menu "Library Configuration"
+	source "lib/Config.uk"
+	source "$KCONFIG_ELIB_IN"
+endmenu
+
+menu "Build Options"
+choice
+	prompt "Optimization level"
+	default OPTIMIZE_PERF
+	help
+	  Set the optimization level for gcc
+
+config OPTIMIZE_NONE
+	bool "No optimizations"
+	help
+		Do not optimize, use -O0.
+
+config OPTIMIZE_PERF
+	bool "Optimize for performance"
+	help
+		Optimize code for performance,
+
+config OPTIMIZE_SIZE
+	bool "Optimize for size"
+	help
+		Optimize code for size.
+endchoice
+
+comment "Hint: Specify a CPU type to get most benefits from performance optimization"
+	depends on OPTIMIZE_PERF && MARCH_GENERIC
+
+config OPTIMIZE_DEADELIM
+	bool "Drop unused functions and data"
+	default n
+	help
+		Drop unused functions and data. They will not be copied
+		into the final binary. This might save further space but linking time
+		will increase.
+
+comment "Hint: Enable dropping of unused code to further reduce target image size"
+	depends on OPTIMIZE_SIZE && !OPTIMIZE_DEADELIM
+
+config DEBUG_SYMBOLS
+	bool "Debugging information"
+	default n
+	help
+		Build with debugging information.
+
+if DEBUG_SYMBOLS
+choice
+	prompt "Debug information level"
+	default DEBUG_SYMBOLS_LVL3
+	help
+		Set the level of available debugging information.
+
+config DEBUG_SYMBOLS_LVL1
+	bool "Level 1 (-g1)"
+	help
+		Minimal debugging information, enough
+		for making backtraces in parts of the program that
+		you don't plan to debug. This includes descriptions
+		of functions and external variables, but no information
+		about local variables and no line numbers.
+
+config DEBUG_SYMBOLS_LVL2
+	bool "Level 2 (-g2)"
+	help
+		gcc's default setting
+
+config DEBUG_SYMBOLS_LVL3
+	bool "Level 3 (-g3)"
+	help
+		Level 3 includes extra information, such as all the
+		macro definitions present in the program. Some debuggers
+		support macro expansion.
+endchoice
+
+config OPTIMIZE_DBGFILE
+	bool "Create a debugging information file"
+	default y
+	help
+		Create a separate file with debugging information
+
+config OPTIMIZE_SYMFILE
+	bool "Create a symbols file"
+	default n
+	help
+		Create a separate file with all symbol locations
+endif
+
+config OPTIMIZE_STRIP
+	bool "Strip final image"
+	default y
+	help
+		Strip any extra information from image
+
+config RECORD_BUILDTIME
+	bool "Keep track of Building time"
+	default n
+	help
+		Record time (and resources) used by each build step
+
+if RECORD_BUILDTIME
+	choice
+		prompt "Tool for recording"
+	        default RECORD_BUILDTIME_TIME
+		help
+			Select which tool is used for recording the build steps
+
+	config RECORD_BUILDTIME_TIME
+	bool "time"
+	help
+		Use time command to record process statistics during building
+
+	config RECORD_BUILDTIME_LIFTOFF
+	bool "liftoff"
+	help
+		Use liftoff to record process statistics during building
+		Get it from https://github.com/sysml/liftoff
+
+	endchoice
+endif
+
+config CROSS_COMPILE
+	string "Custom cross-compiler tool prefix (optional)"
+	help
+		Same as running 'make CROSS_COMPILE=prefix-' but stored for
+		default make runs in this build directory.  You don't
+		need to set this unless you want the configured build
+		directory to select the cross-compiler automatically.
+
+#config PARALLEL_JOBS
+#	int "Number of jobs to run simultaneously (0 for auto)"
+#	default "0"
+#	help
+#	  Number of jobs to run simultaneously.  If 0, determine
+#	  automatically according to number of CPUs on the host
+#	  system.
+endmenu
+
+if UK_APP != UK_BASE
+	menu "Application Options"
+		source "$KCONFIG_APP_IN"
+	endmenu
+endif
+
+config UK_NAME
+	string "Image name"
+	default $UK_DEFNAME
+	help
+	  Name to be used for final image

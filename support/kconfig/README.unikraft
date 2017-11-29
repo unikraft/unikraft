@@ -1,0 +1,21 @@
+This is a copy of the kconfig code in the kernel (currently 3.13-rc5) tweaked
+to suit Unikraft. It was retrieved and modified from buildroot 2016.05-git
+(c0293c3).
+
+To update (from linux):
+	cp -r /usr/src/linux/scripts/kconfig support/kconfig.new
+	cd support/kconfig.new
+	cp -a ../kconfig/patches ../kconfig/README.unikraft ../kconfig/.gitignore .
+	quilt push -a
+	# Fix any conflict
+	cd ..
+	rm -rf kconfig
+	mv kconfig.new kconfig
+
+Then verify the toplevel targets work:
+	config
+	defconfig
+	menuconfig
+	xconfig
+	gconfig
+	oldconfig
