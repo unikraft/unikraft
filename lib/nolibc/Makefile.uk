@@ -1,0 +1,32 @@
+$(eval $(call addlib_s,libnolibc,$(LIBNOLIBC)))
+
+LIBNOLIBC_NO_BUILTINS		+= -fno-builtin-printf
+LIBNOLIBC_NO_BUILTINS		+= -fno-builtin-fprintf
+LIBNOLIBC_NO_BUILTINS		+= -fno-builtin-sprintf
+LIBNOLIBC_NO_BUILTINS		+= -fno-builtin-snprintf
+LIBNOLIBC_NO_BUILTINS		+= -fno-builtin-vprintf
+LIBNOLIBC_NO_BUILTINS		+= -fno-builtin-vfprintf
+LIBNOLIBC_NO_BUILTINS		+= -fno-builtin-vsprintf
+LIBNOLIBC_NO_BUILTINS		+= -fno-builtin-vsnprintf
+LIBNOLIBC_NO_BUILTINS		+= -fno-builtin-scanf
+LIBNOLIBC_NO_BUILTINS		+= -fno-builtin-fscanf
+LIBNOLIBC_NO_BUILTINS		+= -fno-builtin-sscanf
+LIBNOLIBC_NO_BUILTINS		+= -fno-builtin-vscanf
+LIBNOLIBC_NO_BUILTINS		+= -fno-builtin-vfscanf
+LIBNOLIBC_NO_BUILTINS		+= -fno-builtin-vsscanf
+
+CFLAGS-$(LIBNOLIBC)		+= $(LIBNOLIBC_NO_BUILTINS)
+CXXFLAGS-$(LIBNOLIBC)		+= $(LIBNOLIBC_NO_BUILTINS)
+CINCLUDES-$(LIBNOLIBC)		+= -I$(LIBNOLIBC_BASE)/include
+CXXINCLUDES-$(LIBNOLIBC)	+= -I$(LIBNOLIBC_BASE)/include
+
+LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/errno.c
+LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/stdio.c
+LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/ctype.c
+LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/stdlib.c
+LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/string.c
+LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/getopt.c
+LIBNOLIBC_SRCS-$(LIBUKALLOC) += $(LIBNOLIBC_BASE)/malloc.c
+
+# Localize internal symbols (starting with __*)
+LIBNOLIBC_OBJCFLAGS-y += -w -L __*
