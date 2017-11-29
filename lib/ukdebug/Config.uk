@@ -1,0 +1,73 @@
+menuconfig LIBUKDEBUG
+	bool "ukdebug: Debugging and tracing"
+	depends on (HAVE_LIBC || LIBNOLIBC)
+	default y
+
+if LIBUKDEBUG
+config LIBUKDEBUG_PRINTK
+	bool "Enable kernel messages (uk_printk)"
+	default y
+	help
+	  Build with debugging symbols enabled.
+
+config LIBUKDEBUG_PRINTD
+	bool "Enable debug messages (uk_printd)"
+	default y
+	help
+	  Build with debugging symbols enabled.
+
+choice
+	prompt "Debug message level"
+	default LIBUKDEBUG_PRINTD_ERR
+	depends on LIBUKDEBUG_PRINTD
+	help
+	  Set the level of detail of debug messages
+
+config LIBUKDEBUG_PRINTD_EXTRA
+	bool "Show all types of debug messages"
+
+config LIBUKDEBUG_PRINTD_INFO
+	bool "Show critical, error, warning, and information messages"
+
+config LIBUKDEBUG_PRINTD_WARN
+	bool "Show critical, error, and warning messages"
+
+config LIBUKDEBUG_PRINTD_ERR
+	bool "Show critical, and error messages (default)"
+
+config LIBUKDEBUG_PRINTD_CRIT
+	bool "Show critical messages only"
+endchoice
+
+choice
+	prompt "Message redirection"
+	default LIBUKDEBUG_NOREDIR
+	depends on LIBUKDEBUG_PRINTD || LIBUKDEBUG_PRINTK
+	help
+	  Output for uk_printk() and uk_printd()
+
+config LIBUKDEBUG_NOREDIR
+	bool "No redirection"
+	help
+	  Keep debug and kernel output separated
+
+config LIBUKDEBUG_REDIR_PRINTD
+	bool "Debug messages on kernel output"
+	depends on LIBUKDEBUG_PRINTD
+	help
+	  Debug message are redirected to standard kernel output
+
+config LIBUKDEBUG_REDIR_PRINTK
+	bool "Kernel messages on debug output"
+	depends on LIBUKDEBUG_PRINTK
+	help
+	  Kernel message are redirected to the standard debug output
+endchoice
+
+config LIBUKDEBUG_ENABLE_ASSERT
+	bool "Enable assertions"
+	default y
+	help
+	  Build code with assertions.
+
+endif
