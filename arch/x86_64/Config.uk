@@ -1,0 +1,89 @@
+choice
+	prompt "Processor Optimization"
+	default MARCH_GENERIC
+	help
+		Optimize the code for selected target processor
+		Generic x86_64 does not enable any additional CPU features
+		(e.g., SSE, 3DNow!) and produces highly protable code for x86.
+
+config MARCH_NATIVE
+	bool "Auto-detect host CPU"
+	help
+		Optimize compilation to host CPU
+		Please note that this option will fail in case of cross-compilation
+
+config MARCH_GENERIC
+	bool "Generic 64-bit"
+	help
+		Compile for 64-bit compatible x86 CPUs
+
+config MARCH_NOCONA
+	bool "Intel Pentium 4/Xeon (Nocona)"
+	help
+		Improved version of Intel Pentium 4 CPU with 64-bit extensions, MMX, SSE, SSE2 and SSE3 instruction set support.
+
+config MARCH_CORE2
+	bool "Intel Core 2/Xeon"
+	help
+		Intel Core 2 CPU with 64-bit extensions, MMX, SSE, SSE2, SSE3 and SSSE3 instruction set support.
+
+config MARCH_COREI7
+	bool "Intel Core i7/Xeon"
+	help
+		Intel Core i7 CPU with 64-bit extensions, MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1 and SSE4.2 instruction set support.
+
+config MARCH_COREI7AVX
+	bool "Intel Core i7/Xeon +AVX"
+	help
+		Intel Core i7 CPU with 64-bit extensions, MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, AES and PCLMUL instruction set support.
+
+config MARCH_COREI7AVXI
+	bool "Intel Core/Xeon +AVX +RDRND"
+	help
+		Intel Core CPU with 64-bit extensions, MMX, SSE, SSE2, SSE3, SSSE3, SSE4.1, SSE4.2, AVX, AES, PCLMUL, FSGSBASE, RDRND and F16C instruction set support.
+
+config MARCH_ATOM
+	bool "Intel Atom 64-bit"
+	help
+		Intel Atom CPU with 64-bit extensions, MMX, SSE, SSE2, SSE3 and SSSE3 instruction set support.
+
+config MARCH_K8
+	bool "AMD Athlon64/Opteron"
+	help
+		Processors based on the AMD K8 core with x86-64 instruction set support, including the AMD Opteron, Athlon 64, and Athlon 64 FX processors. (This supersets MMX, SSE, SSE2, 3DNow!, enhanced 3DNow! and 64-bit instruction set extensions.)
+
+config MARCH_K8SSE3
+	bool "AMD Athlon64/Opteron +SSE3"
+	help
+		Improved versions of AMD K8 cores with SSE3 instruction set support.
+
+config MARCH_AMDFAM10
+	bool "AMD Family 10h cores"
+	help
+		CPUs based on AMD Family 10h cores with x86-64 instruction set support. (This supersets MMX, SSE, SSE2, SSE3, SSE4A, 3DNow!, enhanced 3DNow!, ABM and 64-bit instruction set extensions.)
+
+config MARCH_BTVER1
+	bool "AMD Family 14h cores"
+	help
+		CPUs based on AMD Family 14h cores with x86-64 instruction set support. (This supersets MMX, SSE, SSE2, SSE3, SSSE3, SSE4A, CX16, ABM and 64-bit instruction set extensions.)
+
+config MARCH_BDVER1
+	bool "AMD Family 15h cores (bdver1)"
+	help
+		CPUs based on AMD Family 15h cores with x86-64 instruction set support. (This supersets FMA4, AVX, XOP, LWP, AES, PCL_MUL, CX16, MMX, SSE, SSE2, SSE3, SSE4A, SSSE3, SSE4.1, SSE4.2, ABM and 64-bit instruction set extensions.)
+
+config MARCH_BDVER2
+	bool "AMD Family 15h cores (bdver2)"
+	help
+		AMD Family 15h core based CPUs with x86-64 instruction set support. (This supersets BMI, TBM, F16C, FMA, AVX, XOP, LWP, AES, PCL_MUL, CX16, MMX, SSE, SSE2, SSE3, SSE4A, SSSE3, SSE4.1, SSE4.2, ABM and 64-bit instruction set extensions.)
+
+config MARCH_BDVER3
+	bool "AMD Family 15h cores (bdver3)"
+	help
+		AMD Family 15h core based CPUs with x86-64 instruction set support. (This supersets BMI, TBM, F16C, FMA, AVX, XOP, LWP, AES, PCL_MUL, CX16, MMX, SSE, SSE2, SSE3, SSE4A, SSSE3, SSE4.1, SSE4.2, ABM and 64-bit instruction set extensions.
+
+config MARCH_BTVER2
+	bool "AMD Family 16h cores"
+	help
+		CPUs based on AMD Family 16h cores with x86-64 instruction set support. This includes MOVBE, F16C, BMI, AVX, PCL_MUL, AES, SSE4.2, SSE4.1, CX16, ABM, SSE4A, SSSE3, SSE3, SSE2, SSE, MMX and 64-bit instruction set extensions.
+endchoice
