@@ -1,0 +1,6 @@
+$(eval $(call addlib_s,libukboot,$(LIBUKBOOT)))
+
+CINCLUDES-$(LIBUKBOOT)		+= -I$(LIBUKBOOT_BASE)/include
+CXXINCLUDES-$(LIBUKBOOT)	+= -I$(LIBUKBOOT_BASE)/include
+
+LIBUKBOOT_SRCS-y += $(LIBUKBOOT_BASE)/boot.c

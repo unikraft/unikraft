@@ -1,0 +1,23 @@
+menuconfig LIBUKBOOT
+	bool "ukboot: Unikraft bootstrapping"
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKDEBUG
+	select LIBUKARGPARSE
+	default y
+
+	# FIXME: binary buddy allocator is hard-coded for now
+
+if LIBUKBOOT
+	config LIBUKBOOT_BANNER
+	bool "Show Unikraft banner"
+	default y
+
+	config LIBUKBOOT_MAXNBARGS
+	int "Maximum number of arguments (max. size of argv)"
+	default 60
+
+	config LIBUKBOOT_INITALLOC
+	bool "Initialize ukallocbbuddy as allocator"
+	default y
+	select LIBUKALLOCBBUDDY
+endif
