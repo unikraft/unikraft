@@ -1,0 +1,7 @@
+config LIBUKALLOCBBUDDY
+	bool "ukallocbbuddy: Binary buddy page allocator"
+	default n
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKDEBUG
+	select LIBUKALLOC
+	select LIBUKALLOC_IFPAGES
