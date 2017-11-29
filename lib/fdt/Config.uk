@@ -1,0 +1,5 @@
+config LIBFDT
+	bool "fdt: Flat Device Tree manipulation"
+	default n
+	select LIBNOLIBC if !HAVE_LIBC
+

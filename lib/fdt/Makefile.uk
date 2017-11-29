@@ -1,0 +1,19 @@
+$(eval $(call addlib_s,libfdt,$(LIBFDT)))
+
+CINCLUDES-$(LIBFDT)	+= -I$(LIBFDT_BASE)/include
+CXXINCLUDES-$(LIBFDT)	+= -I$(LIBFDT_BASE)/include
+
+LIBFDT_CFLAGS-y += -Wno-sign-compare
+
+LIBFDT_SRCS-y += $(LIBFDT_BASE)/fdt.c
+LIBFDT_SRCS-y += $(LIBFDT_BASE)/fdt_addresses.c
+LIBFDT_SRCS-y += $(LIBFDT_BASE)/fdt_empty_tree.c
+LIBFDT_SRCS-y += $(LIBFDT_BASE)/fdt_overlay.c
+LIBFDT_SRCS-y += $(LIBFDT_BASE)/fdt_ro.c
+LIBFDT_SRCS-y += $(LIBFDT_BASE)/fdt_rw.c
+LIBFDT_SRCS-y += $(LIBFDT_BASE)/fdt_strerror.c
+LIBFDT_SRCS-y += $(LIBFDT_BASE)/fdt_sw.c
+LIBFDT_SRCS-y += $(LIBFDT_BASE)/fdt_wip.c
+
+# Globalize only symbols defined in global.syms
+LIBFDT_OBJCFLAGS-y += --globalize-symbols=$(LIBFDT_BASE)/global.syms
