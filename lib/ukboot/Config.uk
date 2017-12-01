@@ -3,6 +3,7 @@ menuconfig LIBUKBOOT
 	select LIBNOLIBC if !HAVE_LIBC
 	select LIBUKDEBUG
 	select LIBUKARGPARSE
+	select HAVE_BOOTENTRY
 	default y
 
 	# FIXME: binary buddy allocator is hard-coded for now

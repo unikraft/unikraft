@@ -5,6 +5,10 @@
 ################################################################################
 # set to true when an according feature library was selected
 
+config HAVE_BOOTENTRY
+       bool
+       default n
+
 config HAVE_LIBC
        bool
        default n
