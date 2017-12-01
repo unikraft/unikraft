@@ -4,7 +4,7 @@ User's Guide
 To begin using Unikraft you'll need to have gcc, make and git
 installed. First clone the Unikraft main repo: ::
 
-  git clone http://xenbits.xen.org/gitweb/unikraft/unikraft.git
+  git clone http://xenbits.xen.org/git-http/unikraft/unikraft.git
 
 If you'll be using Unikraft external libraries, this would be the time
 to clone those too. You can see a list of available libraries at
@@ -16,7 +16,7 @@ Finally, you'll need to create a Unikraft application. To get quickly
 started, the easiest is to clone the hello world app (once again, each
 Unikraft app has its own repo): ::
 
-  git clone http://xenbits.xen.org/gitweb/unikraft/apps/helloworld.git
+  git clone http://xenbits.xen.org/git-http/unikraft/apps/helloworld.git
 
 Now edit the Makefile in the app directory. In particular, set the
 ``UK_ROOT`` and ``UK_LIBS`` variables to point to the directories where you
