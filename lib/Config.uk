@@ -1,14 +1,14 @@
 ################################################################################
 #
-# Invisible global options
+# Invisible feature flags
 #
 ################################################################################
+# set to true when an according feature library was selected
 
-# set to true when a libc was selected
 config HAVE_LIBC
        bool
        default n
-       
+
 config HAVE_SCHED
        bool
        default n
