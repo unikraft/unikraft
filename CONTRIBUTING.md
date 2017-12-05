@@ -70,9 +70,15 @@ case use a comma separated list of identifiers and/or use an asterisk for
 The short message part should start with a capital and be formulated in simple
 present.
 
-The actual subject line of the patch email should be prefixed with `[PATCH]`.
-Re-submissions append a version number: For instance `[PATCH v2]`.
-`git format-patch` and `git send-email` are you friends. ;-)
+The actual subject line of the patch email should be prefixed with
+`[UNIKRAFT PATCH]` (use `--subject-prefix 'UNIKRAFT PATCH'` for
+`git format-patch`). Re-submissions append a version number:
+For instance `[UNIKRAFT PATCH v2]` for the first re-submission (use
+`--subject-prefix 'UNIKRAFT PATCH v2'`). Patch series have to have a
+cover-letter (use `--cover-letter` when creating patch series with
+`git-format-patch`). We highly recommend using `git send-email`
+to send out your patches. Please check out the git documentation for setting
+up email connectivity.
 
 The long message part is pretty free form but should be used to
 explain the reasons for the patch, what has been changed and why. It
@@ -119,21 +125,31 @@ creating commit messages.
 ### Patch for a Repository other than `unikraft/unikraft.git`
 
 Since we use the same mailing list also for repositories of external libraries
-(e.g., `newlib`, `lwip`), a subject prefix has to be added for those. Use the
-name of the library repository name in capital letters. For example, for
-`unikraft/libs/lwip.git` use `LWIP`.
+(e.g., `newlib`, `lwip`), the subject prefix has to include the name of the
+library instead of `UNIKRAFT`. As example: for `unikraft/libs/lwip.git`
+use `LWIP`; the actual subject line of the patch emails should be prefixed with
+`[LWIP PATCH]` (use `--subject-prefix 'LWIP PATCH'`). Re-submissions append
+a version number: For instance `[LWIP PATCH v2]` for the first re-submission.
+Patch series have to have a cover-letter (use `--cover-letter` when creating
+patch series with `git-format-patch`). Once again, we highly recommend using
+`git send-email` to send out your patches.
+
+The format of the short and the long messages are free-form as long as the
+corresponding library does not define anything. However, it is also here
+important to provide enough information to allow reviewers and other developers
+to understand the patch's purpose.
 
 ### Examples of subject lines:
 - A patch for the Xen platform library:
-  `[PATCH] plat/xen: Add support for ARM64`
+  `[UNIKRAFT PATCH] plat/xen: Add support for ARM64`
 - A patch for libukboot:
-  `[PATCH] lib/ukboot: Shutdown system after main() returns`
+  `[UNIKRAFT PATCH] lib/ukboot: Shutdown system after main() returns`
 - A patch for the external library newlib:
-  `[PATCH NEWLIB] Implement glue for pthread_create()`
+  `[NEWLIB PATCH] Implement glue for pthread_create()`
 
 ### Example of a commit message
 
-	[PATCH] lib/ukdebug: Add new trondle calls
+	[UNIKRAFT PATCH] lib/ukdebug: Add new trondle calls
 
 	Add some new trondle calls to the foobar interface to support
 	the new zot feature.
