@@ -4,8 +4,8 @@ Contributing to Unikraft
 First of all, welcome to Unikraft! We are happy that you are interested
 in contributing to this project. Unikraft is mailing-list driven,
 meaning that you should submit your patches to
-<minios-devel@lists.xen.org> and CC the corresponding library
-maintainer(s).
+<minios-devel@lists.xen.org> and CC the corresponding maintainer(s)
+(have a look at `MAINTAINERS.md`).
 
 We basically follow the patch submission procedure from the [Xen
 project](https://wiki.xenproject.org/wiki/Submitting_Xen_Project_Patches).
