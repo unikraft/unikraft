@@ -2,36 +2,36 @@ ASFLAGS  += -D__X86_64__
 ASFLAGS  += -m64
 CFLAGS   += -D__X86_64__
 CFLAGS   += -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables
-CPPFLAGS += -D__X86_64__
-CPPFLAGS += -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables
+CXXFLAGS += -D__X86_64__
+CXXFLAGS += -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables
 
 CFLAGS-$(MARCH_GENERIC)      += -mtune=generic
-CPPFLAGS-$(MARCH_GENERIC)    += -mtune=generic
+CXXFLAGS-$(MARCH_GENERIC)    += -mtune=generic
 CFLAGS-$(MARCH_NOCONA)       += -march=nocona
-CPPFLAGS-$(MARCH_NOCONA)     += -march=nocona
+CXXFLAGS-$(MARCH_NOCONA)     += -march=nocona
 CFLAGS-$(MARCH_CORE2)        += -march=core2
-CPPFLAGS-$(MARCH_CORE2)      += -march=core2
+CXXFLAGS-$(MARCH_CORE2)      += -march=core2
 CFLAGS-$(MARCH_COREI7)       += -march=corei7
-CPPFLAGS-$(MARCH_COREI7)     += -march=corei7
+CXXFLAGS-$(MARCH_COREI7)     += -march=corei7
 CFLAGS-$(MARCH_COREI7AVX)    += -march=corei7-avx
-CPPFLAGS-$(MARCH_COREI7AVX)  += -march=corei7-avx
+CXXFLAGS-$(MARCH_COREI7AVX)  += -march=corei7-avx
 CFLAGS-$(MARCH_COREI7AVXI)   += -march=core-avx-i
-CPPFLAGS-$(MARCH_COREI7AVXI) += -march=core-avx-i
+CXXFLAGS-$(MARCH_COREI7AVXI) += -march=core-avx-i
 CFLAGS-$(MARCH_ATOM)         += -march=atom
-CPPFLAGS-$(MARCH_ATOM)       += -march=atom
+CXXFLAGS-$(MARCH_ATOM)       += -march=atom
 CFLAGS-$(MARCH_K8)           += -march=k8
-CPPFLAGS-$(MARCH_K8)         += -march=k8
+CXXFLAGS-$(MARCH_K8)         += -march=k8
 CFLAGS-$(MARCH_K8SSE3)       += -march=k8-sse3
-CPPFLAGS-$(MARCH_K8SSE3)     += -march=k8-sse3
+CXXFLAGS-$(MARCH_K8SSE3)     += -march=k8-sse3
 CFLAGS-$(MARCH_AMDFAM10)     += -march=amdfam10
-CPPFLAGS-$(MARCH_AMDFAM10)   += -march=amdfam10
+CXXFLAGS-$(MARCH_AMDFAM10)   += -march=amdfam10
 CFLAGS-$(MARCH_BDVER1)       += -march=bdver1
-CPPFLAGS-$(MARCH_BDVER1)     += -march=bdver1
+CXXFLAGS-$(MARCH_BDVER1)     += -march=bdver1
 CFLAGS-$(MARCH_BDVER2)       += -march=bdver2
-CPPFLAGS-$(MARCH_BDVER2)     += -march=bdver2
+CXXFLAGS-$(MARCH_BDVER2)     += -march=bdver2
 CFLAGS-$(MARCH_BDVER3)       += -march=bdver3
-CPPFLAGS-$(MARCH_BDVER3)     += -march=bdver3
+CXXFLAGS-$(MARCH_BDVER3)     += -march=bdver3
 CFLAGS-$(MARCH_BTVER1)       += -march=btver1
-CPPFLAGS-$(MARCH_BTVER1)     += -march=btver1
+CXXFLAGS-$(MARCH_BTVER1)     += -march=btver1
 CFLAGS-$(MARCH_BTVER2)       += -march=btver2
-CPPFLAGS-$(MARCH_BTVER2)     += -march=btver2
+CXXFLAGS-$(MARCH_BTVER2)     += -march=btver2
