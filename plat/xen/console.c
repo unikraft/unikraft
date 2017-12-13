@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: BSD-3-Clause */
+/* SPDX-License-Identifier: BSD-3-Clause and MIT */
 /*
  * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
  *
@@ -32,38 +32,188 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
+/*
+ * Some of this code was ported from Mini-OS:
+ *  console/xencons_ring.c and console/console.c
+ */
+/*
+ ****************************************************************************
+ * (C) 2006 - Grzegorz Milos - Cambridge University
+ ****************************************************************************
+ *
+ *        File: console.h
+ *      Author: Grzegorz Milos
+ *     Changes:
+ *
+ *        Date: Mar 2006
+ *
+ * Environment: Xen Minimal OS
+ * Description: Console interface.
+ *
+ * Handles console I/O. Defines printk.
+ *
+ ****************************************************************************
+ * Permission is hereby granted, free of charge, to any person obtaining a copy
+ * of this software and associated documentation files (the "Software"), to
+ * deal in the Software without restriction, including without limitation the
+ * rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+ * sell copies of the Software, and to permit persons to whom the Software is
+ * furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
+
 #include <inttypes.h>
 #include <string.h>
 #include <uk/plat/console.h>
 #include <uk/arch/lcpu.h>
+#include <uk/assert.h>
 #include <uk/essentials.h>
 
+#include <common/console.h>
+#include <common/events.h>
+#include <common/hypervisor.h>
 #include <xen/xen.h>
 
+#if (defined __X86_32__) || (defined __X86_64__)
+#include <xen-x86/setup.h>
+#include <xen-x86/mm.h>
 #if defined __X86_32__
 #include <xen-x86/hypercall32.h>
 #elif defined __X86_64__
 #include <xen-x86/hypercall64.h>
+#endif
 #elif (defined __ARM_32__) || (defined __ARM_64__)
+#include <xen-arm/mm.h>
 #include <xen-arm/hypercall.h>
 #endif
+#include <xen/io/console.h>
+#include <xen/io/protocols.h>
+#include <xen/io/ring.h>
+#ifndef CONFIG_PARAVIRT
+#include <xen/hvm/params.h>
+#endif
 
-int ukplat_coutd(const char *str, unsigned int len)
+static struct xencons_interface *console_ring;
+static uint32_t console_evtchn;
+static int console_ready;
+
+#ifdef CONFIG_PARAVIRT
+void _libxenplat_prepare_console(void)
+{
+	console_ring = mfn_to_virt(HYPERVISOR_start_info->console.domU.mfn);
+	console_evtchn = HYPERVISOR_start_info->console.domU.evtchn;
+}
+#else
+void _libxenplat_prepare_console(void)
+{
+	/* NOT IMPLEMENTED YET */
+}
+#endif
+
+#if XEN_DBGEMERGENCY
+static int emergency_output(const char *str, unsigned int len)
 {
 	int rc;
-
-	if (unlikely(len == 0))
-		len = strnlen(str, len);
 
 	rc = HYPERVISOR_console_io(CONSOLEIO_write, len, DECONST(char *, str));
 	if (unlikely(rc < 0))
 		return rc;
 	return len;
 }
+#endif
+
+static int hvconsole_output(const char *str, unsigned int len)
+{
+	unsigned int sent = 0;
+	XENCONS_RING_IDX cons, prod;
+
+	if (unlikely(!console_ring))
+		return sent;
+
+	cons = console_ring->out_cons;
+	prod = console_ring->out_prod;
+
+	mb(); /* make sure we have cons & prod before touching the ring */
+	UK_BUGON((prod - cons) > sizeof(console_ring->out));
+
+	while ((sent < len) && ((prod - cons) < sizeof(console_ring->out))) {
+		if (str[sent] == '\n') {
+			/* Convert: '\n' -> '\r''\n' */
+			console_ring->out[MASK_XENCONS_IDX(prod++,
+							   console_ring->out)] =
+				'\r';
+			if ((prod - cons) >= sizeof(console_ring->out))
+				break; /* no more space left */
+		}
+
+		console_ring->out[MASK_XENCONS_IDX(prod++, console_ring->out)] =
+			str[sent];
+		sent++;
+	}
+	wmb(); /* ensure characters are written before increasing out_prod */
+	console_ring->out_prod = prod;
+
+	if (likely(console_ready && console_evtchn))
+		notify_remote_via_evtchn(console_evtchn);
+	return sent;
+}
+
+static void hvconsole_input(evtchn_port_t port __unused,
+			    struct __regs *regs __unused,
+			    void *data __unused)
+{
+	/* NOT IMPLEMENTED YET */
+}
+
+
+void _libxenplat_init_console(void)
+{
+	int err;
+
+	UK_ASSERT(console_ring != NULL);
+
+	uk_printd(DLVL_EXTRA, "hvconsole @ %p (evtchn: %"PRIu32")\n",
+		  console_ring, console_evtchn);
+
+	err = bind_evtchn(console_evtchn, hvconsole_input, NULL);
+	if (err <= 0)
+		UK_CRASH("Failed to bind event channel for hvconsole: %i\n",
+			 err);
+	unmask_evtchn(console_evtchn);
+
+	console_ready = 1; /* enable notification of backend */
+	/* flush queued output */
+	notify_remote_via_evtchn(console_evtchn);
+}
+
+int ukplat_coutd(const char *str, unsigned int len)
+{
+	if (unlikely(len == 0))
+		len = strnlen(str, len);
+
+#if XEN_DBGEMERGENCY
+	return emergency_output(str, len);
+#else
+	return hvconsole_output(str, len);
+#endif
+}
 
 int ukplat_coutk(const char *str __unused, unsigned int len __unused)
 {
-	return 0;
+	if (unlikely(len == 0))
+		len = strnlen(str, len);
+
+	return hvconsole_output(str, len);
 }
 
 int ukplat_cink(char *str __unused, unsigned int maxlen __unused)

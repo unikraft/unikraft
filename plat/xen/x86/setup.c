@@ -76,6 +76,7 @@
 #include <uk/plat/bootstrap.h>
 
 #include <xen/xen.h>
+#include <common/console.h>
 #include <common/events.h>
 #if LIBUKSCHED
 #include <common/sched.h>
@@ -171,12 +172,15 @@ void _libxenplat_x86entry(void *start_info) __noreturn;
 
 void _libxenplat_x86entry(void *start_info)
 {
-	uk_printd(DLVL_INFO, "Entering from Xen (x86, PV)...\n");
-
 	_init_traps();
 	_init_cpufeatures();
 	HYPERVISOR_start_info = (start_info_t *)start_info;
+	_libxenplat_prepare_console(); /* enables buffering for console */
+
+	uk_printd(DLVL_INFO, "Entering from Xen (x86, PV)...\n");
+
 	_init_shared_info(); /* remaps shared info */
+
 	strncpy(cmdline, (char *)HYPERVISOR_start_info->cmd_line,
 		MAX_CMDLINE_SIZE);
 
@@ -191,6 +195,8 @@ void _libxenplat_x86entry(void *start_info)
 	uk_printd(DLVL_INFO, "hypercall_page: %p\n", hypercall_page);
 
 	_init_mem();
+
+	_libxenplat_init_console();
 
 	ukplat_entry_argp(UK_NAME, cmdline, MAX_CMDLINE_SIZE);
 }
