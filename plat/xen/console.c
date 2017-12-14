@@ -132,6 +132,21 @@ static int emergency_output(const char *str, unsigned int len)
 }
 #endif
 
+/*
+ * hvconsole_output can operate in two modes: buffered and initialized.
+ * The buffered mode is automatically activated after
+ * _libxenplat_prepare_console() was called and we know where the console ring
+ * is. The output string is put to the console ring until the ring is full. Any
+ * further characters are discarded. Since the event channel is not initialized
+ * yet, the backend is not notified. This mode is introduced to support early
+ * printing, even before events are not initialized.
+ * _libxenplat_init_console() finalizes the initialization and enables
+ * the event channel. From now on, the console backend is notified whenever
+ * we put characters on the console ring. Whenever this ring is full and there
+ * are still characters that should be printed, we are entering a busy loop and
+ * wait for the backend to make us space again. Of course this is slow: do not
+ * print so much! ;-)
+ */
 static int hvconsole_output(const char *str, unsigned int len)
 {
 	unsigned int sent = 0;
@@ -140,6 +155,7 @@ static int hvconsole_output(const char *str, unsigned int len)
 	if (unlikely(!console_ring))
 		return sent;
 
+retry:
 	cons = console_ring->out_cons;
 	prod = console_ring->out_prod;
 
@@ -148,12 +164,13 @@ static int hvconsole_output(const char *str, unsigned int len)
 
 	while ((sent < len) && ((prod - cons) < sizeof(console_ring->out))) {
 		if (str[sent] == '\n') {
-			/* Convert: '\n' -> '\r''\n' */
+			/* prepend '\r' for converting '\n' to '\r''\n' */
+			if ((prod + 1 - cons) >= sizeof(console_ring->out))
+				break; /* not enough space for '\r' and '\n'! */
+
 			console_ring->out[MASK_XENCONS_IDX(prod++,
 							   console_ring->out)] =
 				'\r';
-			if ((prod - cons) >= sizeof(console_ring->out))
-				break; /* no more space left */
 		}
 
 		console_ring->out[MASK_XENCONS_IDX(prod++, console_ring->out)] =
@@ -163,8 +180,18 @@ static int hvconsole_output(const char *str, unsigned int len)
 	wmb(); /* ensure characters are written before increasing out_prod */
 	console_ring->out_prod = prod;
 
-	if (likely(console_ready && console_evtchn))
+	/* Is the console fully initialized?
+	 * Are we able to notify the backend?
+	 */
+	if (likely(console_ready && console_evtchn)) {
 		notify_remote_via_evtchn(console_evtchn);
+
+		/* There are still bytes left to send out? If yes, do not
+		 * discard them, retry sending (enters busy waiting)
+		 */
+		if (sent < len)
+			goto retry;
+	}
 	return sent;
 }
 
