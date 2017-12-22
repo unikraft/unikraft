@@ -78,6 +78,7 @@
 #include <uk/arch/lcpu.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
+#include <uk/config.h>
 
 #include <common/console.h>
 #include <common/events.h>
