@@ -172,11 +172,17 @@ static inline void _dtb_init_mem(uint32_t physical_offset)
 	_libxenplat_mrd[0].len   = (size_t) to_virt(max_pfn_p << __PAGE_SHIFT)
 		- (size_t) to_virt(start_pfn_p << __PAGE_SHIFT);
 	_libxenplat_mrd[0].flags = (UKPLAT_MEMRF_ALLOCATABLE);
+#if UKPLAT_MEMRNAME
+	_libxenplat_mrd[0].name  = "heap";
+#endif
 	/* dtb */
 	_libxenplat_mrd[1].base  = HYPERVISOR_dtb;
 	_libxenplat_mrd[1].len   = fdt_size;
 	_libxenplat_mrd[1].flags = (UKPLAT_MEMRF_RESERVED
 				    | UKPLAT_MEMRF_READABLE);
+#if UKPLAT_MEMRNAME
+	_libxenplat_mrd[1].name  = "dtb";
+#endif
 	_libxenplat_mrd_num = 2;
 }
 

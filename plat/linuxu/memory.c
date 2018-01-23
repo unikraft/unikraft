@@ -52,12 +52,18 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->base  = _liblinuxuplat_opts.heap.base;
 		m->len   = _liblinuxuplat_opts.heap.len;
 		m->flags = UKPLAT_MEMRF_ALLOCATABLE;
+#if UKPLAT_MEMRNAME
+		m->name  = "heap";
+#endif
 		ret = 0;
 	} else {
 		/* invalid memory region index or no heap allocated */
 		m->base  = __NULL;
 		m->len   = 0;
 		m->flags = 0x0;
+#if UKPLAT_MEMRNAME
+		m->name  = __NULL;
+#endif
 		ret = -1;
 	}
 

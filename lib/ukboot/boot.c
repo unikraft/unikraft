@@ -142,17 +142,31 @@ void ukplat_entry(int argc, char *argv[])
 
 			if ((md.flags & UKPLAT_MEMRF_ALLOCATABLE)
 			    != UKPLAT_MEMRF_ALLOCATABLE) {
+#if UKPLAT_MEMRNAME
+				uk_printd(DLVL_EXTRA, "Skip memory region %d: %p - %p (flags: 0x%02x, name: %s)\n",
+					  i, md.base, (void *)((size_t)md.base
+							       + md.len),
+					  md.flags, md.name);
+#else
 				uk_printd(DLVL_EXTRA, "Skip memory region %d: %p - %p (flags: 0x%02x)\n",
 					  i, md.base, (void *)((size_t)md.base
 							       + md.len),
 					  md.flags);
+#endif
 				continue;
 			}
 
+#if UKPLAT_MEMRNAME
+			uk_printd(DLVL_EXTRA, "Try  memory region %d: %p - %p (flags: 0x%02x, name: %s)...\n",
+				  i, md.base, (void *)((size_t)md.base
+						       + md.len),
+				  md.flags, md.name);
+#else
 			uk_printd(DLVL_EXTRA, "Try  memory region %d: %p - %p (flags: 0x%02x)...\n",
 				  i, md.base, (void *)((size_t)md.base
 						       + md.len),
 				  md.flags);
+#endif
 			/* try to use memory region to initialize allocator
 			 * if it fails, we will try  again with the next region.
 			 * As soon we have an allocator, we simply add every

@@ -165,6 +165,9 @@ static inline void _init_mem(void)
 	_libxenplat_mrd[0].len   = (size_t) to_virt(max_pfn << __PAGE_SHIFT)
 		- (size_t) to_virt(start_pfn << __PAGE_SHIFT);
 	_libxenplat_mrd[0].flags = (UKPLAT_MEMRF_ALLOCATABLE);
+#if UKPLAT_MEMRNAME
+	_libxenplat_mrd[0].name  = "heap";
+#endif
 	_libxenplat_mrd_num = 1;
 }
 

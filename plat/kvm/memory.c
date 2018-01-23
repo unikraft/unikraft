@@ -48,6 +48,9 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->len   = (size_t) &_etext - (size_t) &_stext;
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE);
+#if UKPLAT_MEMRNAME
+		m->name  = "text";
+#endif
 		ret = 0;
 		break;
 	case 1: /* rodata */
@@ -55,6 +58,9 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->len   = (size_t) &_erodata - (size_t) &_etext;
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE);
+#if UKPLAT_MEMRNAME
+		m->name  = "rodata";
+#endif
 		ret = 0;
 		break;
 	case 2: /* data */
@@ -63,6 +69,9 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE
 			    | UKPLAT_MEMRF_WRITABLE);
+#if UKPLAT_MEMRNAME
+		m->name  = "data";
+#endif
 		ret = 0;
 		break;
 	case 3: /* heap */
@@ -70,6 +79,9 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->len   = (size_t) _libkvmplat_stack_top
 			   - (size_t) _libkvmplat_heap_start;
 		m->flags = UKPLAT_MEMRF_ALLOCATABLE;
+#if UKPLAT_MEMRNAME
+		m->name  = "heap";
+#endif
 		ret = 0;
 		break;
 	case 4: /* stack */
@@ -80,11 +92,17 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 			    | UKPLAT_MEMRF_READABLE
 			    | UKPLAT_MEMRF_WRITABLE);
 		ret = 0;
+#if UKPLAT_MEMRNAME
+		m->name  = "bstack";
+#endif
 		break;
 	default:
 		m->base  = __NULL;
 		m->len   = 0;
 		m->flags = 0x0;
+#if UKPLAT_MEMRNAME
+		m->name  = __NULL;
+#endif
 		ret = -1;
 		break;
 	}

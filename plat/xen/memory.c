@@ -60,18 +60,27 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->len   = (size_t) &_etext - (size_t) &_text;
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE);
+#if UKPLAT_MEMRNAME
+		m->name  = "text";
+#endif
 		break;
 	case 1:	/* ro data */
 		m->base  = &_rodata;
 		m->len   = (size_t) &_erodata - (size_t) &_rodata;
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			       | UKPLAT_MEMRF_READABLE);
+#if UKPLAT_MEMRNAME
+		m->name  = "rodata";
+#endif
 		break;
 	case 2: /* ctors, dtors */
 		m->base  = &_erodata;
 		m->len   = (size_t) &_data - (size_t) &_erodata;
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE);
+#if UKPLAT_MEMRNAME
+		m->name  = "ctors+dtors";
+#endif
 		break;
 	case 3: /* data */
 		m->base  = &_data;
@@ -79,6 +88,9 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE
 			    | UKPLAT_MEMRF_WRITABLE);
+#if UKPLAT_MEMRNAME
+		m->name  = "data";
+#endif
 		break;
 	case 4: /* bss */
 		m->base  = &__bss_start;
@@ -86,12 +98,18 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE
 			    | UKPLAT_MEMRF_WRITABLE);
+#if UKPLAT_MEMRNAME
+		m->name  = "bss";
+#endif
 		break;
 	default:
 		if (i < 0 || i >= ukplat_memregion_count()) {
 			m->base  = __NULL;
 			m->len   = 0;
 			m->flags = 0x0;
+#if UKPLAT_MEMRNAME
+			m->name  = __NULL;
+#endif
 			return -1;
 		} else {
 			memcpy(m, &_libxenplat_mrd[i - 5], sizeof(*m));

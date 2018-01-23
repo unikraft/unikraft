@@ -37,6 +37,7 @@
 #define __UKPLAT_MEMORY_H__
 
 #include <uk/arch/types.h>
+#include <uk/config.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -57,6 +58,9 @@ struct ukplat_memregion_desc {
 	void *base;
 	__sz len;
 	int flags;
+#if UKPLAT_MEMRNAME
+	const char *name;
+#endif
 };
 
 /**
