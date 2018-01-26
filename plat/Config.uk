@@ -2,8 +2,11 @@ source "plat/xen/Config.uk"
 source "plat/kvm/Config.uk"
 source "plat/linuxu/Config.uk"
 
+menu "Platform Interface Options"
 config UKPLAT_MEMRNAME
 	bool "Memory region names"
 	default n
 	help
 		Enable name field in memory region descriptors
+
+endmenu

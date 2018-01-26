@@ -32,7 +32,7 @@ menu "Architecture Selection"
 	source "arch/Config.uk"
 endmenu
 
-menu "Platform Support"
+menu "Platform Configuration"
 	source "plat/Config.uk"
 endmenu
 
