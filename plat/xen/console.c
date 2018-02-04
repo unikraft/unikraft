@@ -244,7 +244,26 @@ int ukplat_coutk(const char *str __unused, unsigned int len __unused)
 	return hvconsole_output(str, len);
 }
 
-int ukplat_cink(char *str __unused, unsigned int maxlen __unused)
+int ukplat_cink(char *str, unsigned int maxlen)
 {
-	return 0;
+	int read = 0;
+	XENCONS_RING_IDX cons, prod;
+
+	cons = console_ring->in_cons;
+	prod = console_ring->in_prod;
+	rmb(); /* make sure in_cons, in_prod are read before enqueuing */
+	UK_BUGON((prod - cons) > sizeof(console_ring->in));
+
+	while (cons != prod && maxlen > 0) {
+		*(str + read) = *(console_ring->in+
+				  MASK_XENCONS_IDX(cons, console_ring->in));
+		read++;
+		cons++;
+		maxlen--;
+	}
+
+	wmb(); /* ensure finished operation before updating in_cons */
+	console_ring->in_cons = cons;
+
+	return read;
 }
