@@ -156,7 +156,7 @@ static inline void _init_mem(void)
 	uk_printd(DLVL_INFO, "       max_pfn: %lx\n", max_pfn);
 
 	_init_mem_build_pagetable(&start_pfn, &max_pfn);
-	//_init_mem_clear_bootstrap(); /* FIXME - stack or text screwed up? */
+	_init_mem_clear_bootstrap();
 	_init_mem_set_readonly(&_text, &_erodata);
 
 	/* Fill out mrd array */

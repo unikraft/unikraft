@@ -32,6 +32,7 @@ SECTIONS
 	. = 0x0;
 	_text = .;			/* Text and read-only data */
 	.text : {
+		*(.text.boot)
 		*(.text)
 		*(.gnu.warning)
 	} = 0x2000
