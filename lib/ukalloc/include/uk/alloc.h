@@ -210,7 +210,7 @@ static inline void uk_do_pfree(struct uk_alloc *a, void *ptr, size_t order)
 }
 static inline void uk_pfree(struct uk_alloc *a, void *ptr, size_t order)
 {
-	a->pfree(a, ptr, order);
+	uk_do_pfree(a, ptr, order);
 }
 #endif
 static inline int uk_alloc_addmem(struct uk_alloc *a, void *base,
