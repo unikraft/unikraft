@@ -114,6 +114,12 @@ static void *uk_get_real_start(const void *ptr)
 {
 	void *intptr;
 
+	/* a ptr less or equal to page size
+	 * would mean that the actual allocated
+	 * object started at 0x0, so it was NULL
+	 */
+	UK_ASSERT((uintptr_t) ptr > __PAGE_SIZE);
+
 	intptr = (void *) ALIGN_DOWN((uintptr_t) ptr,
 				     (uintptr_t) __PAGE_SIZE);
 	if (intptr == ptr) {
