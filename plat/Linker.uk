@@ -1,3 +1,3 @@
-include $(XEN_BASE)/Linker.uk
-include $(KVM_BASE)/Linker.uk
-include $(LINUXU_BASE)/Linker.uk
+include $(UK_PLAT_XEN_BASE)/Linker.uk
+include $(UK_PLAT_KVM_BASE)/Linker.uk
+include $(UK_PLAT_LINUXU_BASE)/Linker.uk

@@ -105,7 +105,7 @@ endef
 # Register a platform to the build system
 define addplat =
 UK_PLATS += $(1)
-$(eval $(call uc,$(1))_BASE  := $(_IMPORT_BASE))
+$(eval UK_PLAT_$(call uc,$(1))_BASE  := $(_IMPORT_BASE))
 endef
 
 # addplat_s $platname,$switch
