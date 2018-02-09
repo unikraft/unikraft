@@ -76,6 +76,7 @@ SECTIONS {
     .bss :
     {
         *(.bss)
+        *(.bss.*)
         *(COMMON)
     }
 
