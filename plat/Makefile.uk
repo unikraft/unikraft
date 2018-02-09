@@ -1,3 +1,6 @@
-$(eval $(call _import_lib,$(UK_BASE)/plat/xen))
-$(eval $(call _import_lib,$(UK_BASE)/plat/kvm))
-$(eval $(call _import_lib,$(UK_BASE)/plat/linuxu))
+UK_PLAT_BASE        := $(UK_BASE)/plat
+UK_PLAT_COMMON_BASE := $(UK_PLAT_BASE)/common
+
+$(eval $(call _import_lib,$(UK_PLAT_BASE)/xen))
+$(eval $(call _import_lib,$(UK_PLAT_BASE)/kvm))
+$(eval $(call _import_lib,$(UK_PLAT_BASE)/linuxu))
