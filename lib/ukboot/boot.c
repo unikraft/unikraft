@@ -48,6 +48,7 @@
 #endif
 #include <uk/arch/lcpu.h>
 #include <uk/plat/bootstrap.h>
+#include <uk/plat/ctors.h>
 #include <uk/plat/memory.h>
 #include <uk/plat/time.h>
 #include <uk/essentials.h>
@@ -107,13 +108,13 @@ void ukplat_entry(int argc, char *argv[])
 {
 	int i;
 	struct thread_main_arg tma;
-#if LIBUKALLOC || LIBUKSCHED
+#if LIBUKALLOC
 	struct uk_alloc *a = NULL;
 #endif
 #if LIBUKALLOC && LIBUKALLOCBBUDDY && LIBUKBOOT_INITALLOC
 	struct ukplat_memregion_desc md;
 #endif
-#if HAVE_SCHED
+#if LIBUKSCHED
 	struct uk_sched *s = NULL;
 	struct uk_thread *main_thread = NULL;
 #endif
@@ -127,7 +128,30 @@ void ukplat_entry(int argc, char *argv[])
 		  STRINGIFY(UK_CODENAME) " " STRINGIFY(UK_FULLVERSION));
 #endif
 
+	uk_printd(DLVL_INFO, "Initialize platform time...\n");
 	ukplat_time_init();
+
+	uk_printd(DLVL_INFO, "Pre-init table at %p - %p\n",
+		  __preinit_array_start, &__preinit_array_end);
+	ukplat_ctor_foreach(__preinit_array_start, __preinit_array_end, i) {
+		if (__preinit_array_start[i]) {
+			uk_printd(DLVL_EXTRA, "Call pre-init constructor (entry %d (%p): %p())...\n",
+				  i, &__preinit_array_start[i],
+				  __preinit_array_start[i]);
+			__preinit_array_start[i]();
+		}
+	}
+
+	uk_printd(DLVL_INFO, "Constructor table at %p - %p\n",
+		  __init_array_start, &__init_array_end);
+	ukplat_ctor_foreach(__init_array_start, __init_array_end, i) {
+		if (__init_array_start[i]) {
+			uk_printd(DLVL_EXTRA, "Call constructor (entry %d (%p): %p())...\n",
+				  i, &__init_array_start[i],
+				  __init_array_start[i]);
+			__init_array_start[i]();
+		}
+	}
 
 #if LIBUKALLOC && LIBUKALLOCBBUDDY && LIBUKBOOT_INITALLOC
 	/* initialize memory allocator
@@ -182,7 +206,7 @@ void ukplat_entry(int argc, char *argv[])
 		uk_printd(DLVL_WARN, "No suitable memory region for memory allocator. Continue without heap\n");
 #endif
 
-#if HAVE_SCHED
+#if LIBUKSCHED
 	/* Init scheduler. */
 	s = uk_schedcoop_init(a);
 	if (unlikely(!s))
@@ -192,7 +216,7 @@ void ukplat_entry(int argc, char *argv[])
 	tma.argc = argc;
 	tma.argv = argv;
 
-#if HAVE_SCHED
+#if LIBUKSCHED
 	main_thread = uk_thread_create("main", main_thread_func, &tma);
 	if (unlikely(!main_thread))
 		UK_CRASH("Could not create main thread.");
