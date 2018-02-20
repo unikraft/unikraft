@@ -225,7 +225,7 @@ int uk_posix_memalign_ifpages(struct uk_alloc *a,
 
 	if (!size) {
 		*memptr = NULL;
-		return 0;
+		return EINVAL;
 	}
 
 	/* For page-aligned memory blocks, the size information is not stored
@@ -244,7 +244,8 @@ int uk_posix_memalign_ifpages(struct uk_alloc *a,
 		return ENOMEM;
 
 	*intptr = order;
-	return ALIGN_UP((uintptr_t)intptr + sizeof(order), align);
+	*memptr = (void *) ALIGN_UP((uintptr_t)intptr + sizeof(order), align);
+	return 0;
 }
 
 #endif
@@ -268,7 +269,7 @@ void *uk_memalign_compat(struct uk_alloc *a, size_t align, size_t size)
 	void *ptr;
 
 	UK_ASSERT(a);
-	if (!uk_posix_memalign(a, &ptr, align, size))
+	if (uk_posix_memalign(a, &ptr, align, size) != 0)
 		return NULL;
 
 	return ptr;
