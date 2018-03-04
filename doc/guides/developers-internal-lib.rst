@@ -38,11 +38,11 @@ looks as follows: ::
   ├── [category].c
   ├── Config.uk
   ├── include
-  │   └── uc
+  │   └── uk
   │       └── [category].h
   └── Makefile.uk
 
-The ``Config.uk`` and ``Makefile.uc`` files are fairly
+The ``Config.uk`` and ``Makefile.uk`` files are fairly
 straightforward, you can refer to an existing API in the repo to see
 what they look like. The header file contains the API itself and
 follows a generic structure that all APIs should follow; please refer
