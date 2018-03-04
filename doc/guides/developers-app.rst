@@ -6,7 +6,7 @@ relatively painless given that the available Unikraft libraries
 provide all of the application's dependencies. In most cases, the
 porting effort requires no changes (or in the worst case small
 patches) to the actual application code. At a high level, most of the
-work consists of creating a Unikraft makefile callled **Makefile.uk**
+work consists of creating a Unikraft makefile called **Makefile.uk**
 that Unikraft uses to compile the application's source code (i.e.,
 generally we avoid using an application's native Makefile(s), if any,
 and rely on Unikraft's build system to build the necessary objects with
@@ -265,7 +265,7 @@ Make Targets
 ============================
 Unikraft provides a number of make targets to help you in porting and
 developing applications and libraries. You can see a listing of them
-by typiing ``make help``; for convenience they're also listed here
+by typing ``make help``; for convenience they're also listed here
 below: ::
 
   Cleaning:

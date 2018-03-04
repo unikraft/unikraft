@@ -14,7 +14,7 @@ Unikraft, you get support for these platforms and architectures for
   (e.g., a small library providing a proof-of-concept scheduler) or as
   large as standard libraries like libc.
 
-* **Configuration Menu**. Inspired by Linux's Kconfig sytem, this menu
+* **Configuration Menu**. Inspired by Linux's Kconfig system, this menu
   allows users to pick and choose which libraries to include in the
   build process, as well as to configure options for each of them,
   where available. Like Kconfig, the menu keeps track of dependencies
