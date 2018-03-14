@@ -541,7 +541,10 @@ HOSTCFLAGS = $(CFLAGS_FOR_BUILD)
 export HOSTCFLAGS
 
 # auto-generated KConfig files for including external app
-$(KCONFIG_APP_IN):
+$(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN): %: %.new
+	@cmp -s $^ $@; if [ $$? -ne 0 ]; then cp $^ $@; fi
+
+$(KCONFIG_APP_IN).new:
 	@echo '# external application' > $@
 ifneq ($(UK_BASE),$(UK_APP))
 	@echo 'source "$(APP_DIR)/Config.uk"' >> $@
@@ -550,14 +553,14 @@ else
 endif
 
 # auto-generated KConfig files for including external libraries
-$(KCONFIG_ELIB_IN):
+$(KCONFIG_ELIB_IN).new:
 	@echo '# external libraries' > $@
 	@$(foreach E,$(ELIB_DIR), \
 		echo 'source "$(E)/Config.uk"' >> $@; \
 	)
 
 # enforce execution
-.PHONY: $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN)
+.PHONY: $(KCONFIG_APP_IN).new $(KCONFIG_ELIB_IN).new
 
 $(KCONFIG_DIR)/%onf:
 	mkdir -p $(@D)/lxdialog
