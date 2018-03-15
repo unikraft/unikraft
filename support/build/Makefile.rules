@@ -296,14 +296,7 @@ $(3): $(2) | prepare
 		       $(ASFLAGS) $(ASFLAGS-y) \
 		       $($(call vprefix_lib,$(1),ASFLAGS)) $($(call vprefix_lib,$(1),ASFLAGS-y)) \
 		       $(4) -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) \
-		       -c $(2) -o $(3) && \
-		$(AS)  $(ASINCLUDES) $(ASINCLUDES-y) \
-		       $($(call vprefix_lib,$(1),ASINCLUDES)) $($(call vprefix_lib,$(1),ASINCLUDES-y)) \
-		       $(ASFLAGS) $(ASFLAGS-y) \
-		       $($(call vprefix_lib,$(1),ASFLAGS)) $($(call vprefix_lib,$(1),ASFLAGS-y)) \
-		       $(4) -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) \
-		       -c $(2) -MM | \
-		$(SED) -e 's|^.\+:|$(3):|' > $(call obj2dep,$(3)) \
+		       -c $(2) -o $(3) -MD
 	)
 
 UK_SRCS-y += $(2)
@@ -321,14 +314,7 @@ $(3): $(2) | prepare
 		       $(CFLAGS) $(CFLAGS-y) \
 		       $($(call vprefix_lib,$(1),CFLAGS)) $($(call vprefix_lib,$(1),CFLAGS-y)) \
 		       $(4) -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) \
-		       -c $(2) -o $(3) && \
-		$(CC)  $(CINCLUDES) $(CINCLUDES-y) \
-		       $($(call vprefix_lib,$(1),CINCLUDES)) $($(call vprefix_lib,$(1),CINCLUDES-y)) \
-		       $(CFLAGS) $(CFLAGS-y) \
-		       $($(call vprefix_lib,$(1),CFLAGS)) $($(call vprefix_lib,$(1),CFLAGS-y)) \
-		       $(4) -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) \
-		       -c $(2) -MM | \
-		$(SED) -e 's|^.\+:|$(3):|' > $(call obj2dep,$(3)) \
+		       -c $(2) -o $(3) -MD
 	)
 
 UK_SRCS-y += $(2)
@@ -346,14 +332,7 @@ $(3): $(2) | prepare
 		       $(CXXFLAGS) $(CXXFLAGS-y) \
 		       $($(call vprefix_lib,$(1),CXXFLAGS)) $($(call vprefix_lib,$(1),CXXFLAGS-y)) \
 		       $(4) -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) \
-		       -c $(2) -o $(3) && \
-		$(CXX) $(CXXINCLUDES) $(CXXINCLUDES-y) \
-		       $($(call vprefix_lib,$(1),CXXINCLUDES)) $($(call vprefix_lib,$(1),CXXINCLUDES-y)) \
-		       $(CXXFLAGS) $(CXXFLAGS-y) \
-		       $($(call vprefix_lib,$(1),CXXFLAGS)) $($(call vprefix_lib,$(1),CXXFLAGS-y)) \
-		       $(4) -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) \
-		       -c $(2) -MM | \
-		$(SED) -e 's|^.\+:|$(3):|' > $(call obj2dep,$(3)) \
+		       -c $(2) -o $(3) -MD
 	)
 
 UK_SRCS-y += $(2)
