@@ -42,6 +42,7 @@
 #include <stdarg.h>
 
 #include <uk/plat/console.h>
+#include <uk/plat/time.h>
 #include <uk/print.h>
 #include <uk/arch/lcpu.h>
 
@@ -73,6 +74,22 @@ static inline void _vprintk(const char *fmt, va_list ap)
 #define _ukplat_coutd(lbuf, len) ukplat_coutk((lbuf), (len))
 #else
 #define _ukplat_coutd(lbuf, len) ukplat_coutd((lbuf), (len))
+#endif
+
+#if LIBUKDEBUG_PRINTD_TIME
+static void _printd_timestamp(void)
+{
+	char buf[BUFLEN];
+	int len;
+	__nsec nansec =  ukplat_monotonic_clock();
+	__nsec sec = ukarch_time_nsec_to_sec(nansec);
+	__nsec rem_usec = ukarch_time_subsec(nansec);
+
+	rem_usec = ukarch_time_nsec_to_usec(rem_usec);
+	len = snprintf(buf, BUFLEN, "[%5" __PRInsec ".%06" __PRInsec "] ",
+			sec, rem_usec);
+	_ukplat_coutd((char *)buf, len);
+}
 #endif
 
 static inline void _vprintd(int lvl, const char *libname, const char *srcname,
@@ -129,6 +146,9 @@ static inline void _vprintd(int lvl, const char *libname, const char *srcname,
 	lptr = lbuf;
 	while (len > 0) {
 		if (newline) {
+#if LIBUKDEBUG_PRINTD_TIME
+			_printd_timestamp();
+#endif
 			_ukplat_coutd(DECONST(char *, msghdr), 6);
 			if (libname) {
 				_ukplat_coutd("[", 1);

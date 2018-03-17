@@ -39,6 +39,11 @@ config LIBUKDEBUG_PRINTD_CRIT
 	bool "Show critical messages only"
 endchoice
 
+config LIBUKDEBUG_PRINTD_TIME
+	bool "Show timestamp in debug messages"
+	default y
+	depends on LIBUKDEBUG_PRINTD
+
 choice
 	prompt "Message redirection"
 	default LIBUKDEBUG_NOREDIR
