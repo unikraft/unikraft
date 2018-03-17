@@ -44,6 +44,11 @@ config LIBUKDEBUG_PRINTD_TIME
 	default y
 	depends on LIBUKDEBUG_PRINTD
 
+config LIBUKDEBUG_PRINTD_THREAD
+	bool "Show name of thread in debug messages"
+	default y
+	depends on LIBUKDEBUG_PRINTD && LIBUKSCHED
+
 choice
 	prompt "Message redirection"
 	default LIBUKDEBUG_NOREDIR
