@@ -60,6 +60,7 @@ typedef __s64 __snsec;
 #define ukarch_time_nsec_to_sec(ns)      ((ns) / 1000000000ULL)
 #define ukarch_time_nsec_to_msec(ns)     ((ns) / 1000000ULL)
 #define ukarch_time_nsec_to_usec(ns)     ((ns) / 1000UL)
+#define ukarch_time_subsec(ns)           ((ns) % 1000000000ULL)
 
 #define ukarch_time_sec_to_nsec(sec)     ((sec)  * 1000000000UL)
 #define ukarch_time_msec_to_nsec(msec)   ((msec) * 1000000UL)
