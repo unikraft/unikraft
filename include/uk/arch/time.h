@@ -50,6 +50,9 @@
 typedef __u64 __nsec;
 typedef __s64 __snsec;
 
+#define __PRInsec __PRIu64
+#define __PRIsnsec __PRIs64
+
 #define __NSEC_MAX (__U64_MAX)
 #define __SNSEC_MAX (__S64_MAX)
 #define __SNSEC_MIN (__S64_MIN)
