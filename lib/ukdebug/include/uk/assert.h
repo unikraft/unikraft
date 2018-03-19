@@ -48,7 +48,8 @@
 #define UK_ASSERT(x)							\
 	do {								\
 		if (unlikely(!(x))) {					\
-			uk_printd(DLVL_CRIT, "Assertion failure: " STRINGIFY(x) "\n"); \
+			uk_printd(DLVL_CRIT, "Assertion failure: %s\n",	\
+				  STRINGIFY(x));			\
 			/* TODO: stack trace */				\
 			ukplat_terminate(UKPLAT_CRASH);			\
 		}							\
@@ -57,7 +58,8 @@
 #define UK_WARNIF(x)							\
 	do {								\
 		if (unlikely(x)) {					\
-			uk_printd(DLVL_WARN, "Condition warning: " STRINGIFY(x) "\n"); \
+			uk_printd(DLVL_WARN, "Condition warning: %s\n",	\
+				  STRINGIFY(x));			\
 		}							\
 	} while (0)
 
