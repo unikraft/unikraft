@@ -32,18 +32,22 @@
 #ifdef HAVE_LIBC
 #include <sys/reent.h>
 #endif
-#include <uk/arch/thread.h>
+#include <uk/arch/lcpu.h>
 #include <uk/arch/time.h>
 #include <uk/plat/thread.h>
 #include <uk/list.h>
 #include <uk/essentials.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct uk_sched;
 
 struct uk_thread {
-	char *name;
-	char *stack;
-	struct ukplat_thread_ctx plat_ctx;
+	const char *name;
+	void *stack;
+	void *ctx;
 	UK_TAILQ_ENTRY(struct uk_thread) thread_list;
 	uint32_t flags;
 	__snsec wakeup_time;
@@ -59,23 +63,16 @@ UK_TAILQ_HEAD(uk_thread_list, struct uk_thread);
 	uk_sched_thread_create(uk_sched_get_default(), name, function, data)
 #define uk_thread_destroy(thread) \
 	uk_sched_thread_destroy(thread->sched, thread)
-#define uk_thread_start(thread) \
-	uk_sched_thread_start(thread->sched, thread)
-#define uk_thread_stop(thread) \
-	uk_sched_thread_stop(thread->sched, thread)
 
 static inline
 struct uk_thread *uk_thread_current(void)
 {
-	struct ukplat_thread_ctx *ctx = ukplat_thread_ctx_current();
+	struct uk_thread **current;
+	unsigned long sp = ukarch_read_sp();
 
-	return __containerof(ctx, struct uk_thread, plat_ctx);
-}
+	current = (struct uk_thread **) (sp & ~(__STACK_SIZE - 1));
 
-static inline
-void uk_thread_switch(struct uk_thread *prev, struct uk_thread *next)
-{
-	ukplat_thread_ctx_switch(&prev->plat_ctx, &next->plat_ctx);
+	return *current;
 }
 
 #define RUNNABLE_FLAG   0x00000001
@@ -84,8 +81,18 @@ void uk_thread_switch(struct uk_thread *prev, struct uk_thread *next)
 #define set_runnable(_thread)   ((_thread)->flags |=  RUNNABLE_FLAG)
 #define clear_runnable(_thread) ((_thread)->flags &= ~RUNNABLE_FLAG)
 
-void uk_thread_block_millis(struct uk_thread *thread, uint32_t millis);
+int uk_thread_init(struct uk_thread *thread,
+		struct ukplat_ctx_callbacks *cbs, struct uk_alloc *allocator,
+		const char *name, void *stack,
+		void (*function)(void *), void *arg);
+void uk_thread_fini(struct uk_thread *thread,
+		struct uk_alloc *allocator);
+void uk_thread_block_timeout(struct uk_thread *thread, __nsec nsec);
 void uk_thread_block(struct uk_thread *thread);
 void uk_thread_wake(struct uk_thread *thread);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __UK_THREAD_H__ */

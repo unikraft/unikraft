@@ -34,10 +34,26 @@
 
 #include <stdlib.h>
 #include <uk/plat/config.h>
+#include <uk/plat/thread.h>
 #include <uk/alloc.h>
 #include <uk/sched.h>
+#if LIBUKSCHEDCOOP
+#include <uk/schedcoop.h>
+#endif
 
 struct uk_sched *uk_sched_head;
+
+/* FIXME Support for external schedulers */
+struct uk_sched *uk_sched_default_init(struct uk_alloc *a)
+{
+	struct uk_sched *s = NULL;
+
+#if LIBUKSCHEDCOOP
+	s = uk_schedcoop_init(a);
+#endif
+
+	return s;
+}
 
 int uk_sched_register(struct uk_sched *s)
 {
@@ -93,60 +109,114 @@ int uk_sched_set_default(struct uk_sched *s)
 	return 0;
 }
 
-struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
-		char *name, void (*function)(void *), void *data)
+void uk_sched_start(struct uk_sched *sched)
 {
-	struct uk_thread *thread;
+	UK_ASSERT(sched != NULL);
+	ukplat_thread_ctx_start(&sched->plat_ctx_cbs, sched->idle.ctx);
+}
+
+static void *create_stack(struct uk_alloc *allocator)
+{
+	void *stack;
+
+	stack = uk_palloc(allocator, STACK_SIZE_PAGE_ORDER);
+	if (stack == NULL) {
+		uk_printd(DLVL_WARN, "Error allocating thread stack.");
+		return NULL;
+	}
+
+	return stack;
+}
+
+void uk_sched_idle_init(struct uk_sched *sched,
+		void *stack, void (*function)(void *))
+{
+	struct uk_thread *idle;
+	int rc;
+
+	UK_ASSERT(sched != NULL);
+
+	if (stack == NULL)
+		stack = create_stack(sched->allocator);
+	UK_ASSERT(stack != NULL);
+
+	idle = &sched->idle;
+
+	rc = uk_thread_init(idle,
+			&sched->plat_ctx_cbs, sched->allocator,
+			"Idle", stack, function, NULL);
+	if (rc)
+		UK_CRASH("Error initializing idle thread.");
+
+	idle->sched = sched;
+}
+
+struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
+		const char *name, void (*function)(void *), void *arg)
+{
+	struct uk_thread *thread = NULL;
+	void *stack;
+	int rc;
 
 	thread = uk_malloc(sched->allocator, sizeof(struct uk_thread));
 	if (thread == NULL) {
 		uk_printd(DLVL_WARN, "Error allocating memory for thread.");
-		goto out;
+		goto err;
 	}
 
 	/* We can't use lazy allocation here
 	 * since the trap handler runs on the stack
 	 */
-	thread->stack = uk_palloc(sched->allocator, STACK_SIZE_PAGE_ORDER);
-	if (thread->stack == NULL) {
-		uk_printd(DLVL_WARN, "Error allocating thread stack.");
-		free(thread);
-		thread = NULL;
-		goto out;
-	}
+	stack = create_stack(sched->allocator);
+	if (stack == NULL)
+		goto err;
 
-	thread->name = name;
-	uk_printd(DLVL_EXTRA, "Thread \"%s\": pointer: %p, stack: %p\n",
-			name, thread, thread->stack);
+	rc = uk_thread_init(thread,
+			&sched->plat_ctx_cbs, sched->allocator,
+			name, stack, function, arg);
+	if (rc)
+		goto err;
 
-	/* Not runnable, not exited, not sleeping */
-	thread->flags = 0;
-	thread->wakeup_time = 0LL;
+	uk_sched_thread_add(sched, thread);
 
-	/* Call platform specific setup. */
-	ukplat_thread_ctx_init(&thread->plat_ctx, thread->stack,
-			       function, data);
-#ifdef HAVE_LIBC
-	//TODO _REENT_INIT_PTR(&thread->reent);
-#endif
-
-	thread->sched = sched;
-
-out:
 	return thread;
+
+err:
+	if (stack)
+		uk_free(sched->allocator, stack);
+	if (thread)
+		uk_free(sched->allocator, thread);
+
+	return NULL;
 }
 
 void uk_sched_thread_destroy(struct uk_sched *sched, struct uk_thread *thread)
 {
+	UK_ASSERT(sched != NULL);
+	UK_ASSERT(thread != NULL);
+	uk_thread_fini(thread, sched->allocator);
 	uk_pfree(sched->allocator, thread->stack, STACK_SIZE_PAGE_ORDER);
 	uk_free(sched->allocator, thread);
 }
 
-void uk_sched_sleep(uint32_t millis)
+void uk_sched_thread_sleep(__nsec nsec)
 {
 	struct uk_thread *thread;
 
 	thread = uk_thread_current();
-	uk_thread_block_millis(thread, millis);
+	uk_thread_block_timeout(thread, nsec);
 	uk_sched_yield();
+}
+
+void uk_sched_thread_exit(void)
+{
+	struct uk_thread *thread;
+
+	thread = uk_thread_current();
+
+	uk_printd(DLVL_INFO, "Thread \"%s\" exited.\n", thread->name);
+
+	UK_ASSERT(thread->sched);
+	uk_sched_thread_remove(thread->sched, thread);
+	UK_CRASH("Error stopping thread.");
 }

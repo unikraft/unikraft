@@ -42,86 +42,128 @@
 #include <uk/essentials.h>
 #include <errno.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct uk_sched;
+
+struct uk_sched *uk_sched_default_init(struct uk_alloc *a);
 
 extern struct uk_sched *uk_sched_head;
 int uk_sched_register(struct uk_sched *s);
 struct uk_sched *uk_sched_get_default(void);
 int uk_sched_set_default(struct uk_sched *s);
 
-typedef void  (*uk_sched_run_func_t)
-		(struct uk_sched *s) __noreturn;
-typedef void  (*uk_sched_schedule_func_t)
+
+typedef void  (*uk_sched_yield_func_t)
 		(struct uk_sched *s);
 
-typedef void  (*uk_sched_thread_start_func_t)
+typedef void  (*uk_sched_thread_add_func_t)
 		(struct uk_sched *s, struct uk_thread *t);
-typedef void  (*uk_sched_thread_stop_func_t)
+typedef void  (*uk_sched_thread_remove_func_t)
 		(struct uk_sched *s, struct uk_thread *t);
 
 struct uk_sched {
-	uk_sched_schedule_func_t schedule;
+	uk_sched_yield_func_t yield;
 
-	uk_sched_run_func_t run;
-
-	uk_sched_thread_start_func_t thread_start;
-	uk_sched_thread_stop_func_t  thread_stop;
+	uk_sched_thread_add_func_t      thread_add;
+	uk_sched_thread_remove_func_t   thread_remove;
 
 	/* internal */
+	struct uk_thread idle;
+	struct ukplat_ctx_callbacks plat_ctx_cbs;
 	struct uk_alloc *allocator;
 	struct uk_sched *next;
-	void *private;
+	void *prv;
 };
 
-/* wrapper functions */
-
-static inline void uk_sched_schedule(struct uk_sched *s)
-{
-	UK_ASSERT(s);
-	s->schedule(s);
-}
-
+/* wrapper functions over scheduler callbacks */
 static inline void uk_sched_yield(void)
 {
-	uk_sched_schedule(uk_sched_get_default());
-}
+	struct uk_sched *s;
+	struct uk_thread *current = uk_thread_current();
 
-static inline void uk_sched_run(struct uk_sched *s) __noreturn;
-static inline void uk_sched_run(struct uk_sched *s)
-{
+	UK_ASSERT(current);
+
+	s = current->sched;
 	UK_ASSERT(s);
-	s->run(s);
+	s->yield(s);
 }
 
-static inline void uk_sched_thread_start(struct uk_sched *s,
+static inline void uk_sched_thread_add(struct uk_sched *s,
 		struct uk_thread *t)
 {
 	UK_ASSERT(s);
-	s->thread_start(s, t);
+	UK_ASSERT(t);
+	t->sched = s;
+	s->thread_add(s, t);
 }
 
-static inline void uk_sched_thread_stop(struct uk_sched *s,
+static inline void uk_sched_thread_remove(struct uk_sched *s,
 		struct uk_thread *t)
 {
 	UK_ASSERT(s);
-	s->thread_stop(s, t);
+	UK_ASSERT(t);
+	s->thread_remove(s, t);
+	t->sched = NULL;
 }
+
+
+/*
+ * Internal scheduler functions
+ */
+
+void uk_sched_idle_init(struct uk_sched *sched,
+		void *stack, void (*function)(void *));
+
+static inline struct uk_thread *uk_sched_get_idle(struct uk_sched *s)
+{
+	UK_ASSERT(s);
+	return &s->idle;
+}
+
+/*
+ * Public scheduler functions
+ */
+
+void uk_sched_start(struct uk_sched *sched) __noreturn;
+
+#define uk_sched_init(s, yield_func, \
+		thread_add_func, thread_remove_func) \
+	do { \
+		(s)->yield           = yield_func; \
+		(s)->thread_add      = thread_add_func; \
+		(s)->thread_remove   = thread_remove_func; \
+		uk_sched_register((s)); \
+	} while (0)
+
+
+/*
+ * Internal thread scheduling functions
+ */
 
 struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
-		char *name, void (*function)(void *), void *data);
+		const char *name, void (*function)(void *), void *arg);
 void uk_sched_thread_destroy(struct uk_sched *sched,
 		struct uk_thread *thread);
 
-void uk_sched_sleep(uint32_t millis);
+static inline
+void uk_sched_thread_switch(struct uk_sched *sched,
+		struct uk_thread *prev, struct uk_thread *next)
+{
+	ukplat_thread_ctx_switch(&sched->plat_ctx_cbs, prev->ctx, next->ctx);
+}
 
-#define uk_sched_init(s, sched_func, run_func, \
-			start_thread_func, stop_thread_func) \
-	do { \
-		(s)->schedule      = sched_func; \
-		(s)->run           = run_func; \
-		(s)->thread_start  = start_thread_func; \
-		(s)->thread_stop   = stop_thread_func; \
-		uk_sched_register((s)); \
-	} while (0)
+/*
+ * Public thread scheduling functions
+ */
+
+void uk_sched_thread_sleep(__nsec nsec);
+void uk_sched_thread_exit(void) __noreturn;
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __UK_SCHED_H__ */

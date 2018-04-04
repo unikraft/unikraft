@@ -29,9 +29,77 @@
  * Thread definitions
  * Ported from Mini-OS
  */
+#include <stdlib.h>
+#include <uk/plat/config.h>
 #include <uk/plat/time.h>
 #include <uk/thread.h>
+#include <uk/print.h>
+#include <uk/assert.h>
 
+
+/* Pushes the specified value onto the stack of the specified thread */
+static void stack_push(unsigned long *sp, unsigned long value)
+{
+	*sp -= sizeof(unsigned long);
+	*((unsigned long *) *sp) = value;
+}
+
+static void init_sp(unsigned long *sp, char *stack,
+		void (*function)(void *), void *data)
+{
+	*sp = (unsigned long) stack + STACK_SIZE;
+
+	/* Must ensure that (%rsp + 8) is 16-byte aligned
+	 * at the start of thread_starter.
+	 */
+	stack_push(sp, 0);
+
+	stack_push(sp, (unsigned long) function);
+	stack_push(sp, (unsigned long) data);
+}
+
+int uk_thread_init(struct uk_thread *thread,
+		struct ukplat_ctx_callbacks *cbs, struct uk_alloc *allocator,
+		const char *name, void *stack,
+		void (*function)(void *), void *arg)
+{
+	unsigned long sp;
+
+	UK_ASSERT(thread != NULL);
+	UK_ASSERT(stack != NULL);
+
+	/* Save pointer to the thread on the stack to get current thread */
+	*((unsigned long *) stack) = (unsigned long) thread;
+
+	init_sp(&sp, stack, function, arg);
+
+	/* Call platform specific setup. */
+	thread->ctx = ukplat_thread_ctx_create(cbs, allocator, sp);
+	if (thread->ctx == NULL)
+		return -1;
+
+	thread->name = name;
+	thread->stack = stack;
+
+	/* Not runnable, not exited, not sleeping */
+	thread->flags = 0;
+	thread->wakeup_time = 0LL;
+
+#ifdef HAVE_LIBC
+	//TODO _REENT_INIT_PTR(&thread->reent);
+#endif
+
+	uk_printd(DLVL_INFO, "Thread \"%s\": pointer: %p, stack: %p\n",
+			name, thread, thread->stack);
+
+	return 0;
+}
+
+void uk_thread_fini(struct uk_thread *thread, struct uk_alloc *allocator)
+{
+	UK_ASSERT(thread != NULL);
+	ukplat_thread_ctx_destroy(allocator, thread->ctx);
+}
 
 static void uk_thread_block_until(struct uk_thread *thread, __snsec until)
 {
@@ -39,10 +107,9 @@ static void uk_thread_block_until(struct uk_thread *thread, __snsec until)
 	clear_runnable(thread);
 }
 
-void uk_thread_block_millis(struct uk_thread *thread, uint32_t millis)
+void uk_thread_block_timeout(struct uk_thread *thread, __nsec nsec)
 {
-	__snsec until = (__snsec) ukplat_monotonic_clock() +
-			ukarch_time_msec_to_nsec(millis);
+	__snsec until = (__snsec) ukplat_monotonic_clock() + nsec;
 
 	uk_thread_block_until(thread, until);
 }
@@ -54,6 +121,9 @@ void uk_thread_block(struct uk_thread *thread)
 
 void uk_thread_wake(struct uk_thread *thread)
 {
+	if (is_runnable(thread))
+		return;
+
 	thread->wakeup_time = 0LL;
 	set_runnable(thread);
 }
