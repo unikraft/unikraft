@@ -113,7 +113,7 @@ struct ukplat_memregion_desc _libxenplat_mrd[UKPLAT_MEMRD_MAX_ENTRIES];
 
 static inline void _init_traps(void)
 {
-	trap_init();
+	traps_init();
 }
 
 static inline void _init_cpufeatures(void)

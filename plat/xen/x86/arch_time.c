@@ -235,7 +235,7 @@ void block_domain(__snsec until)
 }
 
 static void timer_handler(evtchn_port_t ev __unused,
-		struct pt_regs *regs __unused, void *ign __unused)
+		struct __regs *regs __unused, void *ign __unused)
 {
 	__nsec until = ukplat_monotonic_clock() + ukarch_time_msec_to_nsec(1);
 

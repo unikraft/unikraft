@@ -35,18 +35,23 @@
 #ifndef _TRAPS_H_
 #define _TRAPS_H_
 
-#include <x86/regs.h>
+#include <stdint.h>
+#include <x86/traps.h>
 
-#define pt_regs __regs
+#include <xen/xen.h>
 
-void dump_regs(struct pt_regs *regs);
-void stack_walk(void);
+#define TRAP_coproc_seg_overrun  9
+#define TRAP_spurious_int        15
+#define TRAP_xen_callback        32
 
-#define TRAP_PF_PROT   0x1
-#define TRAP_PF_WRITE  0x2
-#define TRAP_PF_USER   0x4
+/* Assembler stubs */
+DECLARE_ASM_TRAP(coproc_seg_overrun);
+DECLARE_ASM_TRAP(spurious_int);
+DECLARE_ASM_TRAP(hypervisor_callback);
+void asm_failsafe_callback(void);
 
-void trap_init(void);
-void trap_fini(void);
+#define __KERNEL_CS     FLAT_KERNEL_CS
+#define __KERNEL_DS     FLAT_KERNEL_DS
+#define __KERNEL_SS     FLAT_KERNEL_SS
 
 #endif /* _TRAPS_H_ */

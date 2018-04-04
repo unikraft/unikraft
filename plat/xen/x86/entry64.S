@@ -25,7 +25,7 @@
 
 #include <uk/arch/types.h>
 #include <uk/arch/limits.h>
-#include <x86/regs.h>
+#include <x86/traps.h>
 #include <uk/config.h>
 #include <xen/xen.h>
 #include <xen/elfnote.h>
@@ -115,6 +115,15 @@ KERNEL_CS_MASK = 0xfc
 	jmp error_entry
 .endm
 
+.macro TRAP_ENTRY trapname, has_ec
+ENTRY(ASM_TRAP_SYM(\trapname))
+.if \has_ec
+	errorentry do_\trapname
+.else
+	zeroentry  do_\trapname
+.endif
+.endm
+
 .macro RESTORE_ALL
 	movq OFFSETOF_REGS_R15(%rsp), %r15
 	movq OFFSETOF_REGS_R14(%rsp), %r14
@@ -194,7 +203,7 @@ error_entry:
 /*
  * Xen event (virtual interrupt) entry point.
  */
-ENTRY(hypervisor_callback)
+ENTRY(ASM_TRAP_SYM(hypervisor_callback))
 	zeroentry hypervisor_callback2
 
 hypervisor_callback2:
@@ -250,7 +259,7 @@ ecrit:  /**** END OF CRITICAL REGION ****/
 hypervisor_prologue:
 	pushq %r11
 	pushq %rcx
-	jmp hypervisor_callback
+	jmp ASM_TRAP_SYM(hypervisor_callback)
 
 # [How we do the fixup]. We want to merge the current stack frame with the
 # just-interrupted frame. How we do this depends on where in the critical
@@ -297,13 +306,10 @@ error_exit:
 /*
  * Xen event (virtual interrupt) entry point.
  */
-ENTRY(hypervisor_callback)
-	zeroentry do_hypervisor_callback
-
-
+TRAP_ENTRY hypervisor_callback, 0
 #endif
 
-ENTRY(failsafe_callback)
+ENTRY(asm_failsafe_callback)
 #ifdef CONFIG_PARAVIRT
         popq  %rcx
         popq  %r11
@@ -311,72 +317,28 @@ ENTRY(failsafe_callback)
         iretq
 
 
-ENTRY(coprocessor_error)
-        zeroentry do_coprocessor_error
+TRAP_ENTRY divide_error,        0
+TRAP_ENTRY debug,               0
+/* no NMI */
+TRAP_ENTRY int3,                0
+TRAP_ENTRY overflow,            0
+TRAP_ENTRY bounds,              0
+TRAP_ENTRY invalid_op,          0
+TRAP_ENTRY no_device,           0
+/* no Double Fault */
+TRAP_ENTRY coproc_seg_overrun,  0
+TRAP_ENTRY invalid_tss,         1
+TRAP_ENTRY no_segment,          1
+TRAP_ENTRY stack_error,         1 /* runs on exception stack */
+TRAP_ENTRY gp_fault,            1
+TRAP_ENTRY page_fault,          1
+TRAP_ENTRY spurious_int,        1
+TRAP_ENTRY coproc_error,        0
+TRAP_ENTRY alignment_check,     1
+/* no Machine Check */
+TRAP_ENTRY simd_error,          0
+/* no Virtualization Exception */
 
-
-ENTRY(simd_coprocessor_error)
-        zeroentry do_simd_coprocessor_error
-
-
-ENTRY(device_not_available)
-        zeroentry do_device_not_available
-
-
-ENTRY(debug)
-        zeroentry do_debug
-
-
-ENTRY(int3)
-        zeroentry do_int3
-
-ENTRY(overflow)
-        zeroentry do_overflow
-
-
-ENTRY(bounds)
-        zeroentry do_bounds
-
-
-ENTRY(invalid_op)
-        zeroentry do_invalid_op
-
-
-ENTRY(coprocessor_segment_overrun)
-        zeroentry do_coprocessor_segment_overrun
-
-
-ENTRY(invalid_TSS)
-        errorentry do_invalid_TSS
-
-
-ENTRY(segment_not_present)
-        errorentry do_segment_not_present
-
-
-/* runs on exception stack */
-ENTRY(stack_segment)
-        errorentry do_stack_segment
-
-
-ENTRY(general_protection)
-        errorentry do_general_protection
-
-
-ENTRY(alignment_check)
-        errorentry do_alignment_check
-
-
-ENTRY(divide_error)
-        zeroentry do_divide_error
-
-
-ENTRY(spurious_interrupt_bug)
-        zeroentry do_spurious_interrupt_bug
-
-
-ENTRY(page_fault)
-        errorentry do_page_fault
 
 #if HAVE_SCHED
 ENTRY(thread_starter)
