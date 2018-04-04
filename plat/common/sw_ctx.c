@@ -2,7 +2,7 @@
 /*
  * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
  *
- * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,36 +31,67 @@
  *
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
-/*
- * Platform specific thread functions
- * Ported from Mini-OS
- */
 
-#include <uk/sched.h>
+#include <stdlib.h>
 #include <uk/plat/thread.h>
-#include <common/sched.h>
+#include <uk/alloc.h>
+#include <sw_ctx.h>
+#include <uk/assert.h>
 
-int ukplat_thread_ctx_init(struct ukplat_thread_ctx *ctx, void *stack,
-		void (*function)(void *), void *data)
+
+static void *sw_ctx_create(struct uk_alloc *allocator, unsigned long sp);
+static void  sw_ctx_start(void *ctx) __noreturn;
+static void  sw_ctx_switch(void *prevctx, void *nextctx);
+
+
+/* Gets run when a new thread is scheduled the first time ever,
+ * defined in x86_[32/64].S
+ */
+extern void asm_thread_starter(void);
+
+static void *sw_ctx_create(struct uk_alloc *allocator, unsigned long sp)
 {
-	/* Call architecture specific setup. */
-	arch_thread_init(ctx, stack, function, data);
+	struct sw_ctx *ctx;
 
-	return 0;
+	UK_ASSERT(allocator != NULL);
+
+	ctx = uk_malloc(allocator, sizeof(struct sw_ctx));
+	if (ctx == NULL) {
+		uk_printd(DLVL_WARN, "Error allocating software context.");
+		return NULL;
+	}
+
+	ctx->sp = sp;
+	ctx->ip = (unsigned long) asm_thread_starter;
+
+	return ctx;
 }
 
-void ukplat_thread_ctx_switch(struct ukplat_thread_ctx *prev,
-		struct ukplat_thread_ctx *next)
+extern void asm_ctx_start(unsigned long sp, unsigned long ip) __noreturn;
+
+static void sw_ctx_start(void *ctx)
 {
-	switch_threads(prev, next);
+	struct sw_ctx *sw_ctx = ctx;
+
+	UK_ASSERT(sw_ctx != NULL);
+
+	/* Switch stacks and run the thread */
+	asm_ctx_start(sw_ctx->sp, sw_ctx->ip);
+
+	UK_CRASH("Thread did not start.");
 }
 
-struct ukplat_thread_ctx *ukplat_thread_ctx_current(void)
+extern void asm_sw_ctx_switch(void *prevctx, void *nextctx);
+
+static void sw_ctx_switch(void *prevctx, void *nextctx)
 {
-	return get_current_ctx();
+	asm_sw_ctx_switch(prevctx, nextctx);
 }
 
-void ukplat_thread_ctx_run_idle(struct ukplat_thread_ctx *ctx)
+void sw_ctx_callbacks_init(struct ukplat_ctx_callbacks *ctx_cbs)
 {
-	arch_run_idle_thread(ctx);
+	UK_ASSERT(ctx_cbs != NULL);
+	ctx_cbs->create_cb = sw_ctx_create;
+	ctx_cbs->start_cb = sw_ctx_start;
+	ctx_cbs->switch_cb = sw_ctx_switch;
 }

@@ -32,6 +32,11 @@ LIBXENPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/lcpu.c|common
 ifneq (,$(filter x86_32 x86_64,$(UK_ARCH)))
 LIBXENPLAT_SRCS-$(ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/trace.c|common
 LIBXENPLAT_SRCS-$(ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/traps.c|common
+ifeq ($(HAVE_SCHED),y)
+LIBXENPLAT_SRCS-$(ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/thread_start.S|common
+LIBXENPLAT_SRCS-$(ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/thread.c|common
+LIBXENPLAT_SRCS-$(ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/sw_ctx.c|common
+endif
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/x86/setup.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/x86/traps.c
 LIBXENPLAT_SRCS-$(ARCH_X86_32) += $(LIBXENPLAT_BASE)/x86/entry32.S
@@ -39,7 +44,6 @@ LIBXENPLAT_SRCS-$(ARCH_X86_64) += $(LIBXENPLAT_BASE)/x86/entry64.S
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/x86/mm.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/x86/arch_events.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/x86/arch_time.c
-LIBXENPLAT_SRCS-$(LIBUKSCHED)  += $(LIBXENPLAT_BASE)/x86/arch_thread.c
 
 ifneq ($(XEN_HVMLITE),y)
 LIBXENPLAT_ASFLAGS-y           += -DCONFIG_PARAVIRT
@@ -65,5 +69,3 @@ LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/lcpu.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/console.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/shutdown.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/events.c
-LIBXENPLAT_SRCS-$(LIBUKSCHED)  += $(LIBXENPLAT_BASE)/thread.c
-LIBXENPLAT_SRCS-$(LIBUKSCHED)  += $(LIBXENPLAT_BASE)/sched.c

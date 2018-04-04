@@ -38,17 +38,73 @@
 #ifndef __UKPLAT_THREAD_H__
 #define __UKPLAT_THREAD_H__
 
-#include <uk/arch/thread.h>
+#include <stdlib.h>
 #include <uk/essentials.h>
+#include <uk/assert.h>
 
-int ukplat_thread_ctx_init(struct ukplat_thread_ctx *ctx, void *stack,
-		void (*function)(void *), void *data);
+enum ukplat_ctx_type {
+	ukplat_ctx_none,
+	ukplat_ctx_hw,
+	ukplat_ctx_sw,
+};
 
-void ukplat_thread_ctx_switch(struct ukplat_thread_ctx *prev,
-			      struct ukplat_thread_ctx *next);
+struct uk_alloc;
 
-struct ukplat_thread_ctx *ukplat_thread_ctx_current(void);
+typedef void *(*ukplat_ctx_create_func_t)
+		(struct uk_alloc *allocator, unsigned long sp);
+typedef void  (*ukplat_ctx_start_func_t)
+		(void *ctx);
+typedef void  (*ukplat_ctx_switch_func_t)
+		(void *prevctx, void *nextctx);
 
-void ukplat_thread_ctx_run_idle(struct ukplat_thread_ctx *ctx) __noreturn;
+struct ukplat_ctx_callbacks {
+	/* callback for creating thread context */
+	ukplat_ctx_create_func_t create_cb;
+	/* callback for starting thread context */
+	ukplat_ctx_start_func_t start_cb __noreturn;
+	/* callback for switching contexts */
+	ukplat_ctx_switch_func_t switch_cb;
+};
+
+int ukplat_ctx_callbacks_init(struct ukplat_ctx_callbacks *ctx_cbs,
+		enum ukplat_ctx_type ctx_type);
+
+
+static inline
+void *ukplat_thread_ctx_create(struct ukplat_ctx_callbacks *cbs,
+		struct uk_alloc *allocator, unsigned long sp)
+{
+	UK_ASSERT(cbs != NULL);
+	UK_ASSERT(allocator != NULL);
+
+	return cbs->create_cb(allocator, sp);
+}
+
+void ukplat_thread_ctx_destroy(struct uk_alloc *allocator, void *ctx);
+
+static inline
+void ukplat_thread_ctx_start(struct ukplat_ctx_callbacks *cbs,
+		void *ctx) __noreturn;
+
+static inline
+void ukplat_thread_ctx_start(struct ukplat_ctx_callbacks *cbs,
+		void *ctx)
+{
+	UK_ASSERT(cbs != NULL);
+	UK_ASSERT(ctx != NULL);
+
+	cbs->start_cb(ctx);
+}
+
+static inline
+void ukplat_thread_ctx_switch(struct ukplat_ctx_callbacks *cbs,
+		void *prevctx, void *nextctx)
+{
+	UK_ASSERT(cbs != NULL);
+	UK_ASSERT(prevctx != NULL);
+	UK_ASSERT(nextctx != NULL);
+
+	cbs->switch_cb(prevctx, nextctx);
+}
 
 #endif /* __UKPLAT_THREAD_H__ */

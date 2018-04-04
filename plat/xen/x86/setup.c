@@ -78,9 +78,6 @@
 #include <xen/xen.h>
 #include <common/console.h>
 #include <common/events.h>
-#if LIBUKSCHED
-#include <common/sched.h>
-#endif
 #ifdef __X86_64__
 #include <xen-x86/hypercall64.h>
 #else

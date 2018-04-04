@@ -2,8 +2,7 @@
 /*
  * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
  *
- *
- * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,21 +32,35 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#ifndef __UKARCH_THREAD_H__
-#define __UKARCH_THREAD_H__
+#include <stdlib.h>
+#include <uk/plat/thread.h>
+#include <uk/alloc.h>
+#include <sw_ctx.h>
+#include <uk/assert.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+void ukplat_thread_ctx_destroy(struct uk_alloc *allocator, void *ctx)
+{
+	UK_ASSERT(allocator != NULL);
+	UK_ASSERT(ctx != NULL);
 
-struct ukplat_thread_ctx {
-	/* keep in that order */
-	unsigned long sp;  /* Stack pointer */
-	unsigned long ip;  /* Instruction pointer */
-};
-
-#ifdef __cplusplus
+	uk_free(allocator, ctx);
 }
-#endif
 
-#endif /* __UKARCH_THREAD_H__ */
+int ukplat_ctx_callbacks_init(struct ukplat_ctx_callbacks *ctx_cbs,
+		enum ukplat_ctx_type ctx_type)
+{
+	int err = 0;
+
+	UK_ASSERT(ctx_cbs != NULL);
+
+	switch (ctx_type) {
+	case ukplat_ctx_sw:
+		sw_ctx_callbacks_init(ctx_cbs);
+		break;
+	default:
+		err = EINVAL;
+		break;
+	}
+
+	return err;
+}

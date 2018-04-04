@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
- * Copyright (c) 2009 Citrix Systems, Inc. All rights reserved.
+ * Copyright (c) 2009, Citrix Systems, Inc.
+ * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -23,30 +24,42 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/*
- * Port from Mini-OS: include/sched.h
- */
+/* Taken from Mini-OS arch/x86/x86_64.S */
 
-#ifndef __SCHED_H__
-#define __SCHED_H__
+#include <sw_ctx.h>
 
-#include <stdint.h>
-#ifdef HAVE_LIBC
-#include <sys/reent.h>
-#endif
-#include <xen-x86/arch_sched.h>
-#include <uk/essentials.h>
-#include <uk/list.h>
-#include <uk/thread.h>
+#define ENTRY(X) .globl X ; X :
 
-#define switch_threads(prev, next) arch_switch_threads(prev, next)
+ENTRY(asm_thread_starter)
+	popq %rdi
+	popq %rbx
+	pushq $0
+	xorq %rbp,%rbp
+	call *%rbx
+	call uk_sched_thread_exit
 
-/* Architecture specific setup of thread creation. */
-void arch_thread_init(struct ukplat_thread_ctx *thread, void *stack,
-		      void (*function)(void *), void *data);
-void arch_run_idle_thread(struct ukplat_thread_ctx *idle_thread) __noreturn;
+ENTRY(asm_ctx_start)
+	mov %rdi, %rsp      /* set SP */
+	push %rsi           /* push IP and return */
+	ret
 
-/* TODO revisit for other schedulers */
-void exit_thread(void) __noreturn;
-
-#endif /* __SCHED_H__ */
+ENTRY(asm_sw_ctx_switch)
+	pushq %rbp
+	pushq %rbx
+	pushq %r12
+	pushq %r13
+	pushq %r14
+	pushq %r15
+	movq %rsp, OFFSETOF_SW_CTX_SP(%rdi)       /* save ESP */
+	movq OFFSETOF_SW_CTX_SP(%rsi), %rsp       /* restore ESP */
+	movq $1f, OFFSETOF_SW_CTX_IP(%rdi)        /* save EIP */
+	pushq OFFSETOF_SW_CTX_IP(%rsi)            /* restore EIP */
+	ret
+1:
+	popq %r15
+	popq %r14
+	popq %r13
+	popq %r12
+	popq %rbx
+	popq %rbp
+	ret
