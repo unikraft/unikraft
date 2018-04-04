@@ -187,9 +187,6 @@ void _libxenplat_x86entry(void *start_info)
 	/* Set up events. */
 	init_events();
 
-	/* ENABLE EVENT DELIVERY. This is disabled at start of day. */
-	__sti();
-
 	uk_printd(DLVL_INFO, "    start_info: %p\n", HYPERVISOR_start_info);
 	uk_printd(DLVL_INFO, "   shared_info: %p\n", HYPERVISOR_shared_info);
 	uk_printd(DLVL_INFO, "hypercall_page: %p\n", hypercall_page);
