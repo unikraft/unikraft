@@ -25,6 +25,7 @@
 
 #include <uk/arch/types.h>
 #include <uk/arch/limits.h>
+#include <x86/regs.h>
 #include <uk/config.h>
 #include <xen/xen.h>
 #include <xen/elfnote.h>
@@ -91,15 +92,6 @@ hypercall_page:
 NMI_MASK = 0x80000000
 KERNEL_CS_MASK = 0xfc
 
-#define RAX       80
-#define RDI      112
-#define ORIG_RAX 120       /* + error_code */
-#define RIP      128
-#define CS       136
-#define RFLAGS   144
-#define RSP      152
-
-
 /* Macros */
 .macro SAVE_PARAVIRT
 #ifdef CONFIG_PARAVIRT
@@ -124,44 +116,44 @@ KERNEL_CS_MASK = 0xfc
 .endm
 
 .macro RESTORE_ALL
-	movq (%rsp),%r15
-	movq 1*8(%rsp),%r14
-	movq 2*8(%rsp),%r13
-	movq 3*8(%rsp),%r12
-	movq 4*8(%rsp),%rbp
-	movq 5*8(%rsp),%rbx
-	movq 6*8(%rsp),%r11
-	movq 7*8(%rsp),%r10
-	movq 8*8(%rsp),%r9
-	movq 9*8(%rsp),%r8
-	movq 10*8(%rsp),%rax
-	movq 11*8(%rsp),%rcx
-	movq 12*8(%rsp),%rdx
-	movq 13*8(%rsp),%rsi
-	movq 14*8(%rsp),%rdi
-	addq $15*8+8,%rsp
+	movq OFFSETOF_REGS_R15(%rsp), %r15
+	movq OFFSETOF_REGS_R14(%rsp), %r14
+	movq OFFSETOF_REGS_R13(%rsp), %r13
+	movq OFFSETOF_REGS_R12(%rsp), %r12
+	movq OFFSETOF_REGS_RBP(%rsp), %rbp
+	movq OFFSETOF_REGS_RBX(%rsp), %rbx
+	movq OFFSETOF_REGS_R11(%rsp), %r11
+	movq OFFSETOF_REGS_R10(%rsp), %r10
+	movq OFFSETOF_REGS_R9(%rsp),  %r9
+	movq OFFSETOF_REGS_R8(%rsp),  %r8
+	movq OFFSETOF_REGS_RAX(%rsp), %rax
+	movq OFFSETOF_REGS_RCX(%rsp), %rcx
+	movq OFFSETOF_REGS_RDX(%rsp), %rdx
+	movq OFFSETOF_REGS_RSI(%rsp), %rsi
+	movq OFFSETOF_REGS_RDI(%rsp), %rdi
+	addq $OFFSETOF_REGS_RIP,%rsp
 .endm
 
 .macro SAVE_ALL
 	/* rdi slot contains rax, oldrax contains error code */
 	cld
-	subq $14*8,%rsp
-	movq %rsi,13*8(%rsp)
-	movq 14*8(%rsp),%rsi	/* load rax from rdi slot */
-	movq %rdx,12*8(%rsp)
-	movq %rcx,11*8(%rsp)
-	movq %rsi,10*8(%rsp)	/* store rax */
-	movq %r8, 9*8(%rsp)
-	movq %r9, 8*8(%rsp)
-	movq %r10,7*8(%rsp)
-	movq %r11,6*8(%rsp)
-	movq %rbx,5*8(%rsp)
-	movq %rbp,4*8(%rsp)
-	movq %r12,3*8(%rsp)
-	movq %r13,2*8(%rsp)
-	movq %r14,1*8(%rsp)
-	movq %r15,(%rsp)
-	movq %rdi, RDI(%rsp)	/* put rdi into the slot */
+	subq $OFFSETOF_REGS_RDI, %rsp
+	movq %rsi, OFFSETOF_REGS_RSI(%rsp)
+	movq OFFSETOF_REGS_RDI(%rsp), %rsi    /* load rax from rdi slot */
+	movq %rdx, OFFSETOF_REGS_RDX(%rsp)
+	movq %rcx, OFFSETOF_REGS_RCX(%rsp)
+	movq %rsi, OFFSETOF_REGS_RAX(%rsp)    /* store rax */
+	movq %r8,  OFFSETOF_REGS_R8(%rsp)
+	movq %r9,  OFFSETOF_REGS_R9(%rsp)
+	movq %r10, OFFSETOF_REGS_R10(%rsp)
+	movq %r11, OFFSETOF_REGS_R11(%rsp)
+	movq %rbx, OFFSETOF_REGS_RBX(%rsp)
+	movq %rbp, OFFSETOF_REGS_RBP(%rsp)
+	movq %r12, OFFSETOF_REGS_R12(%rsp)
+	movq %r13, OFFSETOF_REGS_R13(%rsp)
+	movq %r14, OFFSETOF_REGS_R14(%rsp)
+	movq %r15, OFFSETOF_REGS_R15(%rsp)
+	movq %rdi, OFFSETOF_REGS_RDI(%rsp)    /* put rdi into the slot */
 .endm
 
 .macro HYPERVISOR_IRET
@@ -192,8 +184,8 @@ error_entry:
 	SAVE_ALL
 
 	movq %rsp,%rdi
-	movq ORIG_RAX(%rsp),%rsi	# get error code
-	movq $-1,ORIG_RAX(%rsp)
+	movq OFFSETOF_REGS_ORIG_RAX(%rsp),%rsi	# get error code
+	movq $-1,OFFSETOF_REGS_ORIG_RAX(%rsp)
 	call *%rax
 	jmp error_exit
 
@@ -209,7 +201,7 @@ hypervisor_callback2:
 	movq %rdi, %rsp
 
 	/* check against event re-entrant */
-	movq RIP(%rsp),%rax
+	movq OFFSETOF_REGS_RIP(%rsp),%rax
 	cmpq $scrit,%rax
 	jb 11f
 	cmpq $ecrit,%rax
@@ -224,7 +216,7 @@ hypervisor_callback2:
 	decl %gs:0
 
 error_exit:
-	movl RFLAGS(%rsp), %eax
+	movl OFFSETOF_REGS_EFLAGS(%rsp), %eax
 	shr $9, %eax			# EAX[0] == IRET_RFLAGS.IF
 	XEN_GET_VCPU_INFO(%rsi)
 	andb evtchn_upcall_mask(%rsi),%al
@@ -270,11 +262,11 @@ hypervisor_prologue:
 
 critical_region_fixup:
 	# Set up source and destination region pointers
-	leaq RIP(%rsp),%rsi   # esi points at end of src region
+	leaq OFFSETOF_REGS_RIP(%rsp),%rsi   # esi points at end of src region
 	# Acquire interrupted rsp which was saved-on-stack. This points to
 	# the end of dst region. Note that it is not necessarily current rsp
 	# plus 0xb0, because the second interrupt might align the stack frame.
-	movq RSP(%rsp),%rdi   # edi points at end of dst region
+	movq OFFSETOF_REGS_RSP(%rsp),%rdi   # edi points at end of dst region
 
 	cmpq $restore_end,%rax
 	jae  13f
@@ -282,11 +274,11 @@ critical_region_fixup:
 	# If interrupted rip is before restore_end
 	# then rax hasn't been restored yet
 	movq (%rdi),%rax
-	movq %rax, RAX(%rsp)  # save rax
+	movq %rax, OFFSETOF_REGS_RAX(%rsp)  # save rax
 	addq $RSP_OFFSET,%rdi
 
 	# Set up the copy
-13:	movq $RIP,%rcx
+13:	movq $OFFSETOF_REGS_RIP,%rcx
 	shr  $3,%rcx          # convert bytes into count of 64-bit entities
 15:	subq $8,%rsi          # pre-decrementing copy loop
 	subq $8,%rdi
@@ -294,7 +286,7 @@ critical_region_fixup:
 	movq %rax,(%rdi)
 	loop 15b
 16:	movq %rdi,%rsp        # final rdi is top of merged stack
-	andb $KERNEL_CS_MASK,CS(%rsp)      # CS might have changed
+	andb $KERNEL_CS_MASK,OFFSETOF_REGS_CS(%rsp)      # CS might have changed
 	jmp  11b
 
 #else

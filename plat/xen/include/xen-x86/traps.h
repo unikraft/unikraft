@@ -35,7 +35,7 @@
 #ifndef _TRAPS_H_
 #define _TRAPS_H_
 
-#include <uk/arch/lcpu.h>
+#include <x86/regs.h>
 
 #define pt_regs __regs
 
