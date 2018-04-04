@@ -60,14 +60,7 @@ typedef unsigned long u_long;
 #include <xen/xsm/flask_op.h>
 #endif
 
-#define MSR_EFER        0xc0000080
-#define _EFER_LME       8           /* Long mode enable */
-
-#define X86_CR0_PG      0x80000000  /* Paging */
-#define X86_CR4_PAE     0x00000020  /* enable physical address extensions */
-#define X86_CR4_OSFXSR  0x00000200  /* enable fast FPU save and restore */
-
-#define X86_EFLAGS_IF   0x00000200
+#include <x86/cpu_defs.h>
 
 #define __KERNEL_CS     FLAT_KERNEL_CS
 #define __KERNEL_DS     FLAT_KERNEL_DS

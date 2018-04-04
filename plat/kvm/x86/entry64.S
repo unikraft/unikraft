@@ -27,8 +27,8 @@
  * SUCH DAMAGE.
  */
 
+#include <x86/cpu_defs.h>
 #include <kvm-x86/multiboot_defs.h>
-#include <kvm-x86/cpu_x86_64_defs.h>
 
 #define ENTRY(x) .globl x; .type x,%function; x:
 #define END(x)   .size x, . - x
