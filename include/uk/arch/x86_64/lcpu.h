@@ -47,3 +47,11 @@
 #ifndef nop
 #define nop()   __asm__ __volatile__ ("nop" : : : "memory")
 #endif
+
+static inline unsigned long ukarch_read_sp(void)
+{
+	unsigned long sp;
+
+	__asm__ __volatile__("mov %%rsp, %0" : "=r"(sp));
+	return sp;
+}
