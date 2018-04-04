@@ -100,61 +100,14 @@
 #define irqs_disabled()                                                        \
 	HYPERVISOR_shared_info->vcpu_info[smp_processor_id()].evtchn_upcall_mask
 
-#else
-
-#ifdef __X64_32__
-#define __SZ "l"
-#define __REG "e"
-#else
-#define __SZ "q"
-#define __REG "r"
-#endif
-
-#define __cli() \
-({ \
-	asm volatile("cli" : : : "memory"); \
-})
-
-#define __sti() \
-({ \
-	asm volatile("sti" : : : "memory"); \
-})
-
-#define __save_flags(x)                                                        \
-	do {                                                                   \
-		unsigned long __f;                                             \
-		asm volatile("pushf" __SZ " ; pop" __SZ " %0" : "=g"(__f));    \
-		x = (__f & X86_EFLAGS_IF) ? 1 : 0;                             \
-	} while (0)
-
-#define __restore_flags(x)                                                     \
-	do {                                                                   \
-		if (x)                                                         \
-			__sti();                                               \
-		else                                                           \
-			__cli();                                               \
-	} while (0)
-
-#define __save_and_cli(x)                                                      \
-	do {                                                                   \
-		__save_flags(x);                                               \
-		__cli();                                                       \
-	} while (0)
-
-static inline int irqs_disabled(void)
-{
-	int flag;
-
-	__save_flags(flag);
-	return !flag;
-}
-
-#endif
-
 #define local_irq_save(x)        __save_and_cli(x)
 #define local_irq_restore(x)     __restore_flags(x)
 #define local_save_flags(x)      __save_flags(x)
 #define local_irq_disable()      __cli()
 #define local_irq_enable()       __sti()
+
+#else
+#include <x86/irq.h>
+#endif
 
 #endif /* PLAT_XEN_INCLUDE_XEN_X86_IRQ_H_ */
