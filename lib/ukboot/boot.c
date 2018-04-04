@@ -43,13 +43,15 @@
 #if LIBUKALLOC && LIBUKALLOCBBUDDY && LIBUKBOOT_INITALLOC
 #include <uk/allocbbuddy.h>
 #endif
-#if LIBUKSCHED && LIBUKSCHEDCOOP
-#include <uk/schedcoop.h>
+#if LIBUKSCHED
+#include <uk/sched.h>
 #endif
 #include <uk/arch/lcpu.h>
 #include <uk/plat/bootstrap.h>
 #include <uk/plat/ctors.h>
 #include <uk/plat/memory.h>
+#include <uk/plat/lcpu.h>
+#include <uk/plat/irq.h>
 #include <uk/plat/time.h>
 #include <uk/essentials.h>
 #include <uk/print.h>
@@ -110,6 +112,7 @@ void ukplat_entry(int argc, char *argv[])
 	struct thread_main_arg tma;
 #if LIBUKALLOC
 	struct uk_alloc *a = NULL;
+	int rc;
 #endif
 #if LIBUKALLOC && LIBUKALLOCBBUDDY && LIBUKBOOT_INITALLOC
 	struct ukplat_memregion_desc md;
@@ -204,11 +207,15 @@ void ukplat_entry(int argc, char *argv[])
 	}
 	if (unlikely(!a))
 		uk_printd(DLVL_WARN, "No suitable memory region for memory allocator. Continue without heap\n");
+
+	rc = ukplat_irq_init(a);
+	if (unlikely(rc != 0))
+		UK_CRASH("Could not initialize the platform IRQ subsystem.");
 #endif
 
 #if LIBUKSCHED
 	/* Init scheduler. */
-	s = uk_schedcoop_init(a);
+	s = uk_sched_default_init(a);
 	if (unlikely(!s))
 		UK_CRASH("Could not initialize the scheduler.");
 #endif
@@ -220,9 +227,10 @@ void ukplat_entry(int argc, char *argv[])
 	main_thread = uk_thread_create("main", main_thread_func, &tma);
 	if (unlikely(!main_thread))
 		UK_CRASH("Could not create main thread.");
-	uk_thread_start(main_thread);
-	uk_sched_run(s);
+	uk_sched_start(s);
 #else
+	/* Enable interrupts before starting the application */
+	ukplat_lcpu_enable_irq();
 	main_thread_func(&tma);
 #endif
 }
