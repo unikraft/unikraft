@@ -20,11 +20,6 @@
  */
 #include <inttypes.h>
 
-struct gdtptr {
-	uint16_t limit;
-	uint64_t base;
-} __packed;
-
 /* accessing devices via port space */
 static inline void outb(uint16_t port, uint8_t v)
 {

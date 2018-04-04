@@ -25,11 +25,12 @@
  */
 
 #include <string.h>
+#include <x86/desc.h>
 #include <kvm/setup.h>
 #include <kvm-x86/cpu_x86_64_defs.h>
 #include <kvm-x86/cpu_x86_64.h>
 
-static uint64_t cpu_gdt64[GDT_NUM_ENTRIES] ALIGN_64_BIT;
+static struct seg_desc32 cpu_gdt64[GDT_NUM_ENTRIES] ALIGN_64_BIT;
 
 /*
  * The monitor (ukvm) or bootloader + bootstrap (virtio) starts us up with a
@@ -41,14 +42,14 @@ static uint64_t cpu_gdt64[GDT_NUM_ENTRIES] ALIGN_64_BIT;
  */
 static void gdt_init(void)
 {
-	volatile struct gdtptr gdtptr;
+	volatile struct desc_table_ptr64 gdtptr;
 
 	memset(cpu_gdt64, 0, sizeof(cpu_gdt64));
-	cpu_gdt64[GDT_DESC_CODE] = GDT_DESC_CODE_VAL;
-	cpu_gdt64[GDT_DESC_DATA] = GDT_DESC_DATA_VAL;
+	cpu_gdt64[GDT_DESC_CODE].raw = GDT_DESC_CODE_VAL;
+	cpu_gdt64[GDT_DESC_DATA].raw = GDT_DESC_DATA_VAL;
 
 	gdtptr.limit = sizeof(cpu_gdt64) - 1;
-	gdtptr.base = (uint64_t)&cpu_gdt64;
+	gdtptr.base = (__u64) &cpu_gdt64;
 	__asm__ __volatile__("lgdt (%0)" ::"r"(&gdtptr));
 	/*
 	 * TODO: Technically we should reload all segment registers here, in

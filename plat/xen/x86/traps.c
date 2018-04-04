@@ -317,18 +317,17 @@ hw_tss tss __attribute__((aligned(16))) = {
 
 static void setup_gate(unsigned int entry, void *addr, unsigned int dpl)
 {
-	idt[entry].offset0 = (unsigned long)addr & 0xffff;
+	idt[entry].offset_lo = (unsigned long) addr & 0xffff;
 	idt[entry].selector = __KERN_CS;
-	idt[entry]._r0 = 0;
-	idt[entry].type = 14;
+	idt[entry].reserved = 0;
+	idt[entry].type = 14; /* == 0b1110 */
 	idt[entry].s = 0;
 	idt[entry].dpl = dpl;
 	idt[entry].p = 1;
-	idt[entry].offset1 = ((unsigned long)addr >> 16) & 0xffff;
+	idt[entry].offset_hi = (unsigned long) addr >> 16;
 #ifdef __X86_64__
 	idt[entry].ist = 0;
-	idt[entry].offset2 = ((unsigned long)addr >> 32) & 0xffffffffu;
-	idt[entry]._r1 = 0;
+	idt[entry].reserved1 = 0;
 #endif
 }
 
