@@ -49,6 +49,16 @@ __u8 ukplat_lcpu_count(void);
 #endif
 
 /**
+ * Enables interrupts
+ */
+void ukplat_lcpu_enable_irq(void);
+
+/**
+ * Disables interrupts
+ */
+void ukplat_lcpu_disable_irq(void);
+
+/**
  * Returns current interrupt flags and disables them
  * @return interrupt flags (Note that the format is unspecified)
  */

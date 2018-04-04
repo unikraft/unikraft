@@ -44,6 +44,16 @@
 #include <uk/plat/lcpu.h>
 #include <uk/plat/time.h>
 
+void ukplat_lcpu_enable_irq(void)
+{
+	local_irq_enable();
+}
+
+void ukplat_lcpu_disable_irq(void)
+{
+	local_irq_disable();
+}
+
 unsigned long ukplat_lcpu_save_irqf(void)
 {
 	unsigned long flags;
