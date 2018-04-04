@@ -327,3 +327,11 @@ inline void clear_evtchn(uint32_t port)
 
 	ukarch_clr_bit_sync(port, &s->evtchn_pending[0]);
 }
+
+struct uk_alloc;
+
+int ukplat_irq_init(struct uk_alloc *a __unused)
+{
+	/* Nothing for now */
+	return 0;
+}
