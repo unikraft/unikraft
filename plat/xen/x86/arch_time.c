@@ -35,8 +35,9 @@
 
 #include <stdint.h>
 #include <sys/time.h>
-#include <x86/cpu.h>
 #include <uk/plat/time.h>
+#include <x86/cpu.h>
+#include <_time.h>
 #include <common/hypervisor.h>
 #include <common/events.h>
 #include <xen-x86/irq.h>
@@ -217,19 +218,13 @@ int gettimeofday(struct timeval *tv, void *tz)
 #endif
 
 
-void block_domain(__snsec until)
+void time_block_until(__snsec until)
 {
 	UK_ASSERT(irqs_disabled());
 
 	if ((__snsec) ukplat_monotonic_clock() < until) {
 		HYPERVISOR_set_timer_op(until);
-#ifdef CONFIG_PARAVIRT
-		HYPERVISOR_sched_op(SCHEDOP_block, 0);
-#else
-		local_irq_enable();
-		asm volatile("hlt" : : : "memory");
-#endif
-		local_irq_disable();
+		ukplat_lcpu_halt_irq();
 		HYPERVISOR_set_timer_op(0);
 	}
 }

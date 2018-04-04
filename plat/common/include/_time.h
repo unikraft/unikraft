@@ -1,9 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
  *
- *
- * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,74 +32,11 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#ifndef __UKPLAT_LCPU_H__
-#define __UKPLAT_LCPU_H__
+#ifndef __PLAT_CMN_TIME_H__
+#define __PLAT_CMN_TIME_H__
 
-#include <uk/arch/time.h>
+#include <uk/plat/time.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+void time_block_until(__snsec until);
 
-#if UKPLAT_LCPU_MULTICORE
-__u8 ukplat_lcpu_id(void);
-__u8 ukplat_lcpu_count(void);
-#else
-#define ukplat_lcpu_id()    (0)
-#define ukplat_lcpu_count() (1)
-#endif
-
-/**
- * Enables interrupts
- */
-void ukplat_lcpu_enable_irq(void);
-
-/**
- * Disables interrupts
- */
-void ukplat_lcpu_disable_irq(void);
-
-/**
- * Returns current interrupt flags and disables them
- * @return interrupt flags (Note that the format is unspecified)
- */
-unsigned long ukplat_lcpu_save_irqf(void);
-
-/**
- * Loads interrupt flags
- * @param flags interrupt flags (Note that the format is unspecified)
- */
-void ukplat_lcpu_restore_irqf(unsigned long flags);
-
-/**
- * Checks if interrupts are disabled
- * @return non-zero value if interrupts are disabled
- */
-int ukplat_lcpu_irqs_disabled(void);
-
-void ukplat_lcpu_irqs_handle_pending(void);
-
-/**
- * Halts the current logical CPU execution
- */
-void ukplat_lcpu_halt(void);
-
-/**
- * Halts the current logical CPU execution
- * Execution is returned when an interrupt/signal arrived or
- * the specified deadline expired
- * @param until deadline in nanoseconds
- */
-void ukplat_lcpu_halt_to(__snsec until);
-
-/**
- * Halts the current logical CPU execution
- * Execution is returned when an interrupt/signal arrived
- */
-void ukplat_lcpu_halt_irq(void);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* __UKPLAT_LCPU_H__ */
+#endif /* __PLAT_CMN_TIME_H__ */

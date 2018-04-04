@@ -72,20 +72,3 @@ int ukplat_lcpu_irqs_disabled(void)
 {
 	return irqs_disabled();
 }
-
-void ukplat_lcpu_halt_to(unsigned long millis)
-{
-	__snsec until;
-	unsigned long flags;
-
-	until = ukplat_monotonic_clock() + ukarch_time_msec_to_nsec(millis);
-
-	flags = ukplat_lcpu_save_irqf();
-	block_domain(until);
-	ukplat_lcpu_restore_irqf(flags);
-}
-
-void ukplat_lcpu_halt(void)
-{
-	//TODO
-}

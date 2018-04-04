@@ -34,9 +34,3 @@
 
 #include <stdint.h>
 #include <uk/plat/lcpu.h>
-#include <uk/essentials.h>
-
-void ukplat_lcpu_halt_to(unsigned long millis __unused)
-{
-	//TODO
-}
