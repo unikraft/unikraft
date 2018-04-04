@@ -43,3 +43,7 @@
 #ifndef wmb
 #define wmb()   __asm__ __volatile__ ("sfence" : : : "memory")
 #endif
+
+#ifndef nop
+#define nop()   __asm__ __volatile__ ("nop" : : : "memory")
+#endif
