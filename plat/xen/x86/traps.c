@@ -54,36 +54,6 @@ void machine_check(void);
 	for (;;) {                                                             \
 	}
 
-void dump_regs(struct __regs *regs)
-{
-// uk_printk("Thread: %s\n", current ? current->name : "*NONE*");
-#ifdef __X86_64__
-	uk_printk("RIP: %04lx:[<%016lx>] ", regs->cs & 0xffff, regs->rip);
-	uk_printk("\nRSP: %04lx:%016lx  EFLAGS: %08lx\n", regs->ss, regs->rsp,
-		  regs->eflags);
-	uk_printk("RAX: %016lx RBX: %016lx RCX: %016lx\n", regs->rax, regs->rbx,
-		  regs->rcx);
-	uk_printk("RDX: %016lx RSI: %016lx RDI: %016lx\n", regs->rdx, regs->rsi,
-		  regs->rdi);
-	uk_printk("RBP: %016lx R08: %016lx R09: %016lx\n", regs->rbp, regs->r8,
-		  regs->r9);
-	uk_printk("R10: %016lx R11: %016lx R12: %016lx\n", regs->r10, regs->r11,
-		  regs->r12);
-	uk_printk("R13: %016lx R14: %016lx R15: %016lx\n", regs->r13, regs->r14,
-		  regs->r15);
-#else
-	uk_printk("EIP: %lx, EFLAGS %lx.\n", regs->eip, regs->eflags);
-	uk_printk("EBX: %08lx ECX: %08lx EDX: %08lx\n", regs->ebx, regs->ecx,
-		  regs->edx);
-	uk_printk("ESI: %08lx EDI: %08lx EBP: %08lx EAX: %08lx\n", regs->esi,
-		  regs->edi, regs->ebp, regs->eax);
-	uk_printk("DS: %04x ES: %04x orig_eax: %08lx, eip: %08lx\n", regs->xds,
-		  regs->xes, regs->orig_eax, regs->eip);
-	uk_printk("CS: %04x EFLAGS: %08lx esp: %08lx ss: %04x\n", regs->xcs,
-		  regs->eflags, regs->esp, regs->xss);
-#endif
-}
-
 static void do_trap(int trapnr, char *str, struct __regs *regs,
 		    unsigned long error_code)
 {
@@ -118,42 +88,6 @@ DO_ERROR(12, "stack segment", stack_segment)
 DO_ERROR_INFO(17, "alignment check", alignment_check, BUS_ADRALN, 0)
 DO_ERROR(18, "machine check", machine_check)
 
-static void do_stack_walk(unsigned long frame_base)
-{
-	unsigned long *frame = (void *)frame_base;
-
-	uk_printk("base is %#lx ", frame_base);
-	uk_printk("caller is %#lx\n", frame[1]);
-	if (frame[0])
-		do_stack_walk(frame[0]);
-}
-
-void stack_walk(void)
-{
-	unsigned long bp;
-#ifdef __x86_64__
-	asm("movq %%rbp, %0" : "=r"(bp));
-#else
-	asm("movl %%ebp, %0" : "=r"(bp));
-#endif
-	do_stack_walk(bp);
-}
-
-static void dump_mem(unsigned long addr)
-{
-	unsigned long i;
-
-	if (addr < PAGE_SIZE)
-		return;
-
-	for (i = ((addr)-16) & ~15; i < (((addr) + 48) & ~15); i++) {
-		if (!(i % 16))
-			uk_printk("\n%lx:", i);
-		uk_printk(" %02x", *(unsigned char *)i);
-	}
-	uk_printk("\n");
-}
-
 static int handling_pg_fault;
 
 void do_page_fault(struct __regs *regs, unsigned long error_code)
@@ -182,7 +116,7 @@ void do_page_fault(struct __regs *regs, unsigned long error_code)
 
 	dump_regs(regs);
 #ifdef __X86_64__
-	do_stack_walk(regs->rbp);
+	stack_walk_for_frame(regs->rbp);
 	dump_mem(regs->rsp);
 	dump_mem(regs->rbp);
 	dump_mem(regs->rip);
@@ -207,7 +141,7 @@ void do_general_protection(struct __regs *regs, long error_code)
 #endif
 	dump_regs(regs);
 #ifdef __X86_64__
-	do_stack_walk(regs->rbp);
+	stack_walk_for_frame(regs->rbp);
 	dump_mem(regs->rsp);
 	dump_mem(regs->rbp);
 	dump_mem(regs->rip);
