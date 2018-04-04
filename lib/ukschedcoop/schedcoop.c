@@ -35,7 +35,6 @@
 #include <uk/schedcoop.h>
 
 struct schedcoop_private {
-	struct uk_thread *idle_thread;
 	struct uk_thread_list thread_list;
 	struct uk_thread_list exited_threads;
 	int threads_started;
@@ -56,7 +55,7 @@ static void print_runqueue(struct uk_sched *s)
 
 static void schedcoop_schedule(struct uk_sched *s)
 {
-	struct schedcoop_private *prv = s->private;
+	struct schedcoop_private *prv = s->prv;
 	struct uk_thread *prev, *next, *thread, *tmp;
 	unsigned long flags;
 
@@ -122,7 +121,7 @@ static void schedcoop_schedule(struct uk_sched *s)
 	 * interrupted at the return instruction. And therefore at safe point.
 	 */
 	if (prev != next)
-		uk_thread_switch(prev, next);
+		uk_sched_thread_switch(s, prev, next);
 
 	UK_TAILQ_FOREACH_SAFE(thread, &prv->exited_threads, thread_list, tmp) {
 		if (thread != prev) {
@@ -133,10 +132,10 @@ static void schedcoop_schedule(struct uk_sched *s)
 	}
 }
 
-static void schedcoop_thread_start(struct uk_sched *s, struct uk_thread *t)
+static void schedcoop_thread_add(struct uk_sched *s, struct uk_thread *t)
 {
 	unsigned long flags;
-	struct schedcoop_private *prv = s->private;
+	struct schedcoop_private *prv = s->prv;
 
 	set_runnable(t);
 
@@ -145,10 +144,10 @@ static void schedcoop_thread_start(struct uk_sched *s, struct uk_thread *t)
 	ukplat_lcpu_restore_irqf(flags);
 }
 
-static void schedcoop_thread_stop(struct uk_sched *s, struct uk_thread *t)
+static void schedcoop_thread_remove(struct uk_sched *s, struct uk_thread *t)
 {
 	unsigned long flags;
-	struct schedcoop_private *prv = s->private;
+	struct schedcoop_private *prv = s->prv;
 
 	flags = ukplat_lcpu_save_irqf();
 
@@ -172,24 +171,20 @@ static void idle_thread_fn(void *unused __unused)
 {
 	struct uk_thread *current = uk_thread_current();
 	struct uk_sched *s = current->sched;
-	struct schedcoop_private *prv = s->private;
-
-	UK_ASSERT(current == prv->idle_thread);
+	struct schedcoop_private *prv = s->prv;
 
 	prv->threads_started = 1;
+	ukplat_lcpu_enable_irq();
+
 	while (1) {
 		uk_thread_block(current);
-		uk_sched_schedule(s);
+		schedcoop_schedule(s);
 	}
 }
 
-static void schedcoop_run(struct uk_sched *s) __noreturn;
-static void schedcoop_run(struct uk_sched *s)
+static void schedcoop_yield(struct uk_sched *s)
 {
-	struct schedcoop_private *prv = s->private;
-	struct uk_thread *idle_thread = prv->idle_thread;
-
-	ukplat_thread_ctx_run_idle(&idle_thread->plat_ctx);
+	schedcoop_schedule(s);
 }
 
 struct uk_sched *uk_schedcoop_init(struct uk_alloc *a)
@@ -207,6 +202,8 @@ struct uk_sched *uk_schedcoop_init(struct uk_alloc *a)
 
 	sched->allocator = a;
 
+	ukplat_ctx_callbacks_init(&sched->plat_ctx_cbs, ukplat_ctx_sw);
+
 	prv = uk_malloc(a, sizeof(struct schedcoop_private));
 	if (prv == NULL) {
 		uk_printd(DLVL_WARN,
@@ -217,16 +214,14 @@ struct uk_sched *uk_schedcoop_init(struct uk_alloc *a)
 	UK_TAILQ_INIT(&prv->exited_threads);
 	UK_TAILQ_INIT(&prv->thread_list);
 	prv->threads_started = 0;
-	sched->private = prv;
+	sched->prv = prv;
 
-	uk_sched_init(sched, schedcoop_schedule, schedcoop_run,
-			schedcoop_thread_start, schedcoop_thread_stop);
+	uk_sched_idle_init(sched, NULL, idle_thread_fn);
 
-	prv->idle_thread = uk_thread_create("Idle", idle_thread_fn, NULL);
-	if (prv->idle_thread == NULL)
-		goto out_err;
-
-	uk_thread_start(prv->idle_thread);
+	uk_sched_init(sched,
+			schedcoop_yield,
+			schedcoop_thread_add,
+			schedcoop_thread_remove);
 
 	return sched;
 
