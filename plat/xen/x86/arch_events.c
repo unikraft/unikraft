@@ -28,8 +28,8 @@
  * Ported from Mini-OS
  */
 #include <stdint.h>
+#include <x86/cpu.h>
 #include <uk/plat/config.h>
-#include <xen-x86/cpu.h>
 
 #if defined(__x86_64__)
 static char irqstack[2 * STACK_SIZE];

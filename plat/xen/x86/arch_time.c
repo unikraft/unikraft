@@ -35,10 +35,10 @@
 
 #include <stdint.h>
 #include <sys/time.h>
+#include <x86/cpu.h>
 #include <uk/plat/time.h>
 #include <common/hypervisor.h>
 #include <common/events.h>
-#include <xen-x86/cpu.h>
 #include <xen-x86/irq.h>
 #include <uk/assert.h>
 
@@ -134,7 +134,7 @@ static unsigned long get_nsec_offset(void)
 {
 	uint64_t now, delta;
 
-	rdtscll(now);
+	now = rdtsc();
 	delta = now - shadow.tsc_timestamp;
 
 	return scale_delta(delta, shadow.tsc_to_nsec_mul, shadow.tsc_shift);

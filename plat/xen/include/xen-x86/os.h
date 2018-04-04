@@ -111,7 +111,6 @@ typedef struct {
 	volatile int counter;
 } atomic_t;
 
-#include <xen-x86/cpu.h>
 
 /********************* common i386 and x86_64  ****************************/
 #define xen_mb() mb()

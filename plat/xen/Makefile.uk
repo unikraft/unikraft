@@ -41,6 +41,9 @@ LIBXENPLAT_SRCS-$(LIBUKSCHED)  += $(LIBXENPLAT_BASE)/x86/arch_thread.c
 ifneq ($(XEN_HVMLITE),y)
 LIBXENPLAT_ASFLAGS-y           += -DCONFIG_PARAVIRT
 LIBXENPLAT_CFLAGS-y            += -DCONFIG_PARAVIRT
+LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/x86/cpu_pv.c
+else
+LIBXENPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/x86/cpu_native.c
 endif
 endif
 

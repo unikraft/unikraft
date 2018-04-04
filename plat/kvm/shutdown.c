@@ -22,7 +22,7 @@
  */
 
 #include <errno.h>
-#include <kvm-x86/cpu_x86_64.h>
+#include <x86/cpu.h>
 #include <uk/print.h>
 #include <uk/plat/bootstrap.h>
 

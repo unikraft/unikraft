@@ -25,8 +25,8 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <x86/cpu.h>
 #include <kvm/console.h>
-#include <kvm-x86/cpu_x86_64.h>
 #include <uk/plat/console.h>
 #include <uk/essentials.h>
 #include <uk/print.h>
