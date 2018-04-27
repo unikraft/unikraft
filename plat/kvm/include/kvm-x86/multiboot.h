@@ -23,6 +23,8 @@
 #ifndef MULTIBOOT_HEADER
 #define MULTIBOOT_HEADER 1
 
+#include <uk/essentials.h>
+
 typedef unsigned char multiboot_uint8_t;
 typedef unsigned short multiboot_uint16_t;
 typedef unsigned int multiboot_uint32_t;
