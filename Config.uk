@@ -78,6 +78,14 @@ config OPTIMIZE_DEADELIM
 comment "Hint: Enable dropping of unused code to further reduce target image size"
 	depends on OPTIMIZE_SIZE && !OPTIMIZE_DEADELIM
 
+config OPTIMIZE_LTO
+	bool "Link time optimizations (LTO)"
+	default n
+	help
+		Enables GCC to do code optimizations during linking. This option
+		will increase overall building time but creates more efficient
+		Unikraft binaries.
+
 config DEBUG_SYMBOLS
 	bool "Debugging information"
 	default n

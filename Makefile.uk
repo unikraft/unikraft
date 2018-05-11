@@ -34,6 +34,12 @@ CFLAGS-$(OPTIMIZE_DEADELIM)        += -fdata-sections -ffunction-sections
 CXXFLAGS-$(OPTIMIZE_DEADELIM)      += -fdata-sections -ffunction-sections
 LDFLAGS-$(OPTIMIZE_DEADELIM)       += -Wl,--gc-sections
 
+# LTO requires the compiler flags to be handed over also for linking
+CFLAGS-$(OPTIMIZE_LTO)             += -flto
+CXXFLAGS-$(OPTIMIZE_LTO)           += -flto
+LIBLDFLAGS-$(OPTIMIZE_LTO)         += $(CFLAGS) $(CFLAGS-y)
+LDFLAGS-$(OPTIMIZE_LTO)            += $(CFLAGS) $(CFLAGS-y)
+
 ifneq ($(DEBUG_SYMBOLS),y)
 CFLAGS                             += -g0
 CXXFLAGS                           += -g0
