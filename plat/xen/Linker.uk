@@ -1,16 +1,16 @@
 ifeq (x86_64,$(UK_ARCH))
-XEN_LDSCRIPT  := $(UK_BASE)/plat/xen/x86/link64.ld
-XEN_LDFLAGS-y += -m elf_x86_64
+XEN_LDSCRIPT  := -Wl,-T,$(UK_BASE)/plat/xen/x86/link64.ld
+XEN_LDFLAGS-y += -Wl,-m,elf_x86_64
 endif
 ifeq (x86_32,$(UK_ARCH))
-XEN_LDSCRIPT  := $(UK_BASE)/plat/xen/x86/link32.ld
-XEN_LDFLAGS-y += -m elf_x86_32
+XEN_LDSCRIPT  := -Wl,-T,$(UK_BASE)/plat/xen/x86/link32.ld
+XEN_LDFLAGS-y += -Wl,-m,elf_x86_32
 endif
 ifeq (arm_64,$(UK_ARCH))
-XEN_LDSCRIPT  := $(UK_BASE)/plat/xen/arm/link64.ld
+XEN_LDSCRIPT  := -Wl,-T,$(UK_BASE)/plat/xen/arm/link64.ld
 endif
 ifeq (arm,$(UK_ARCH))
-XEN_LDSCRIPT  := $(UK_BASE)/plat/xen/arm/link32.ld
+XEN_LDSCRIPT  := -Wl,-T,$(UK_BASE)/plat/xen/arm/link32.ld
 endif
 
 ##
@@ -25,7 +25,7 @@ $(XEN_IMAGE): $(XEN_LINK) $(XEN_LINK-y) $(UK_LINK) $(UK_LINK-y)
 	       $(OBJCOPY) -w -G xenos_* -G _libxenplat_start $@.ld.o $@.o)
 ifeq (arm,$(UK_ARCH))
 	$(call build_cmd,LD,,$@.elf,\
-	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(XEN_LDFLAGS) $(XEN_LDFLAGS-y) -T $(XEN_LDSCRIPT) $@.o -o $@.elf)
+	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(XEN_LDFLAGS) $(XEN_LDFLAGS-y) $(XEN_LDSCRIPT) $@.o -o $@.elf)
 ifeq ($(OPTIMIZE_DBGFILE),y)
 	$(call build_cmd,OBJCOPY,,$@.dbg,\
 	       $(OBJCOPY) --only-keep-debug $@.elf $@.dbg)
@@ -44,7 +44,7 @@ endif
 	       $(GZIP) -f -9 -c $@ >$@.gz)
 else
 	$(call build_cmd,LD,,$@,\
-	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(XEN_LDFLAGS) $(XEN_LDFLAGS-y) -T $(XEN_LDSCRIPT) $@.o -o $@)
+	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(XEN_LDFLAGS) $(XEN_LDFLAGS-y) $(XEN_LDSCRIPT) $@.o -o $@)
 ifeq ($(OPTIMIZE_DBGFILE),y)
 	$(call build_cmd,OBJCOPY,,$@.dbg,\
 	       $(OBJCOPY) --only-keep-debug $@ $@.dbg)

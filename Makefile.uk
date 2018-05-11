@@ -20,8 +20,8 @@ CXXINCLUDES += -nostdinc -nostdlib -I$(UK_BASE)/include
 # Set the text and data sections to be readable and writable. Also,
 # do not page-align the data segment. If the output format supports
 # Unix style magic numbers, mark the output as OMAGIC.
-LIBLDFLAGS  += --omagic -r
-LDFLAGS	    += --omagic
+LIBLDFLAGS  += -nostdinc -nostdlib -Wl,--omagic -Wl,-r
+LDFLAGS     += -nostdinc -nostdlib -Wl,--omagic -Wl,--build-id=none
 
 CFLAGS-$(OPTIMIZE_NONE)            += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
 CXXFLAGS-$(OPTIMIZE_NONE)          += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
@@ -32,12 +32,12 @@ CXXFLAGS-$(OPTIMIZE_SIZE)          += -Os
 
 CFLAGS-$(OPTIMIZE_DEADELIM)        += -fdata-sections -ffunction-sections
 CXXFLAGS-$(OPTIMIZE_DEADELIM)      += -fdata-sections -ffunction-sections
-LDFLAGS-$(OPTIMIZE_DEADELIM)       += --gc-sections
+LDFLAGS-$(OPTIMIZE_DEADELIM)       += -Wl,--gc-sections
 
 ifneq ($(DEBUG_SYMBOLS),y)
 CFLAGS                             += -g0
 CXXFLAGS                           += -g0
-LDFLAGS-y		           += --strip-debug
+LDFLAGS-y		           += -Wl,--strip-debug
 else
 CFLAGS-$(DEBUG_SYMBOLS_LVL1)       += -g1
 CXXFLAGS-$(DEBUG_SYMBOLS_LVL1)     += -g1

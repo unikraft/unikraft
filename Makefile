@@ -387,13 +387,13 @@ CROSS_COMPILE := $(CROSS_COMPILE:"%"=%)
 include $(UK_BASE)/arch/$(UK_ARCH)/Compiler.uk
 
 # Make variables (CC, etc...)
-LD		:= $(CROSS_COMPILE)ld
+LD		:= $(CROSS_COMPILE)gcc
 CC		:= $(CROSS_COMPILE)gcc
 CPP		:= $(CC)
 CXX		:= $(CPP)
 AS		:= $(CC)
-AR		:= $(CROSS_COMPILE)ar
-NM		:= $(CROSS_COMPILE)nm
+AR		:= $(CROSS_COMPILE)gcc-ar
+NM		:= $(CROSS_COMPILE)gcc-nm
 READELF		:= $(CROSS_COMPILE)readelf
 STRIP		:= $(CROSS_COMPILE)strip
 OBJCOPY		:= $(CROSS_COMPILE)objcopy

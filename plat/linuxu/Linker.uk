@@ -1,4 +1,4 @@
-LINUXU_LDFLAGS-y += -e_liblinuxuplat_start
+LINUXU_LDFLAGS-y += -Wl,-e,_liblinuxuplat_start
 
 ##
 ## Link image
