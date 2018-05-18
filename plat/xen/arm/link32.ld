@@ -47,37 +47,32 @@ SECTIONS
 
 	_etext = .;			/* End of text section */
 
+	/* Read-only data */
 	_rodata = .;
-	.rodata : { *(.rodata) *(.rodata.*) }
+	.rodata :
+	{
+		*(.rodata)
+		*(.rodata.*)
+	}
 	. = ALIGN(4096);
 	_erodata = .;
 
-	/* newlib initialization functions */
-	. = ALIGN(32 / 8);
-	PROVIDE (__preinit_array_start = .);
-	.preinit_array : { *(.preinit_array) }
-	PROVIDE (__preinit_array_end = .);
-	PROVIDE (__init_array_start = .);
-	.init_array : { *(.init_array) }
-	PROVIDE (__init_array_end = .);
-	PROVIDE (__fini_array_start = .);
-	.fini_array : { *(.fini_array) }
-	PROVIDE (__fini_array_end = .);
-
-	.ctors : {
-		__CTOR_LIST__ = .;
-		*(.ctors)
-		CONSTRUCTORS
-		LONG(0)
-		__CTOR_END__ = .;
+	_ctors = .;
+	.preinit_array : {
+		. = ALIGN(0x8);
+		PROVIDE_HIDDEN (__preinit_array_start = .);
+		KEEP (*(.preinit_array))
+		PROVIDE_HIDDEN (__preinit_array_end = .);
 	}
 
-	.dtors : {
-		__DTOR_LIST__ = .;
-		*(.dtors)
-		LONG(0)
-		__DTOR_END__ = .;
+	.init_array : {
+		. = ALIGN(0x8);
+		PROVIDE_HIDDEN (__init_array_start = .);
+		KEEP (*(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*)))
+		KEEP (*(.init_array .ctors))
+		PROVIDE_HIDDEN (__init_array_end = .);
 	}
+	_ectors = .;
 
 	.data : {			/* Data */
 		_data = .;

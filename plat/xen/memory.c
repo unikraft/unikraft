@@ -50,7 +50,7 @@ int ukplat_memregion_count(void)
 
 int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 {
-	extern char _text, _etext, _data, _edata, _rodata, _erodata, _end, __bss_start;
+	extern char _text, _etext, _data, _edata, _rodata, _erodata, _ctors, _ectors, _end, __bss_start;
 
 	UK_ASSERT(m);
 
@@ -73,13 +73,13 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->name  = "rodata";
 #endif
 		break;
-	case 2: /* ctors, dtors */
-		m->base  = &_erodata;
-		m->len   = (size_t) &_data - (size_t) &_erodata;
+	case 2: /* ctors */
+		m->base  = &_ctors;
+		m->len   = (size_t) &_ectors - (size_t) &_ctors;
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE);
 #if UKPLAT_MEMRNAME
-		m->name  = "ctors+dtors";
+		m->name  = "ctors";
 #endif
 		break;
 	case 3: /* data */
