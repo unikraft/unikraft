@@ -32,20 +32,21 @@ extern void *_libkvmplat_mem_end;
 
 int ukplat_memregion_count(void)
 {
-	return 5;
+	return 6;
 }
 
 int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 {
-	extern char _stext[], _etext[], _erodata[], _end[];
+	extern char _text, _etext, _data, _edata, _rodata, _erodata,
+		    __bss_start, _end;
 	int ret;
 
 	UK_ASSERT(m);
 
 	switch (i) {
 	case 0: /* text */
-		m->base  = &_stext;
-		m->len   = (size_t) &_etext - (size_t) &_stext;
+		m->base  = &_text;
+		m->len   = (size_t) &_etext - (size_t) &_text;
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE);
 #if UKPLAT_MEMRNAME
@@ -54,8 +55,8 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		ret = 0;
 		break;
 	case 1: /* rodata */
-		m->base  = &_etext;
-		m->len   = (size_t) &_erodata - (size_t) &_etext;
+		m->base  = &_rodata;
+		m->len   = (size_t) &_erodata - (size_t) &_rodata;
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE);
 #if UKPLAT_MEMRNAME
@@ -64,8 +65,8 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		ret = 0;
 		break;
 	case 2: /* data */
-		m->base  = &_erodata;
-		m->len   = (size_t) &_end - (size_t) &_erodata;
+		m->base  = &_data;
+		m->len   = (size_t) &_edata - (size_t) &_data;
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE
 			    | UKPLAT_MEMRF_WRITABLE);
@@ -74,7 +75,18 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 #endif
 		ret = 0;
 		break;
-	case 3: /* heap */
+	case 3: /* bss */
+		m->base  = &__bss_start;
+		m->len   = (size_t) &_end - (size_t) &__bss_start;
+		m->flags = (UKPLAT_MEMRF_RESERVED
+			    | UKPLAT_MEMRF_READABLE
+			    | UKPLAT_MEMRF_WRITABLE);
+#if UKPLAT_MEMRNAME
+		m->name  = "bss";
+#endif
+		ret = 0;
+		break;
+	case 4: /* heap */
 		m->base  = _libkvmplat_heap_start;
 		m->len   = (size_t) _libkvmplat_stack_top
 			   - (size_t) _libkvmplat_heap_start;
@@ -84,7 +96,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 #endif
 		ret = 0;
 		break;
-	case 4: /* stack */
+	case 5: /* stack */
 		m->base  = _libkvmplat_stack_top;
 		m->len   = (size_t) _libkvmplat_mem_end
 			   - (size_t) _libkvmplat_stack_top;

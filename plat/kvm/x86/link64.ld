@@ -6,7 +6,7 @@
  *
  * Copyright (c) 2016, IBM
  *           (c) 2016-2017 Docker, Inc.
- *           (c) 2017, NEC Europe Ltd.
+ *           (c) 2017-2018, NEC Europe Ltd.
  *
  * Permission to use, copy, modify, and/or distribute this software
  * for any purpose with or without fee is hereby granted, provided
@@ -24,63 +24,52 @@
  */
 
 ENTRY(_libkvmplat_entry)
+SECTIONS
+{
+	. = 0x100000;
 
-SECTIONS {
-    . = 0x100000;
+	/* Code */
+	_text = .;
+	.text :
+	{
+		/* prevent linker gc from removing multiboot header */
+		KEEP (*(.data.multiboot))
 
-    /* Code */
-    _stext = .;
+		*(.text)
+		*(.text.*)
+	}
+	_etext = .;
 
-    .text :
-    {
-        *(.data.multiboot)
-        /* prevent linker gc from removing multiboot header */
-        KEEP(*(.data.multiboot))
-        *(.text)
-        *(.text.*)
-    }
+	/* Read-only data */
+	. = ALIGN(0x1000);
+	_rodata = .;
+	.rodata :
+	{
+		*(.rodata)
+		*(.rodata.*)
+	}
+	_erodata = .;
 
-    _etext = .;
+	/* Read-write data (initialized) */
+	. = ALIGN(0x1000);
+	_data = .;
+	.data :
+	{
+		*(.data)
+		*(.data.*)
+	}
+	_edata = .;
 
-    . = ALIGN(0x1000);
-    /* Read-only data */
-    .rodata :
-    {
-        *(.rodata)
-        *(.rodata.*)
-    }
-    .eh_frame :
-    {
-        *(.eh_frame)
-    }
+	/* Read-write data (uninitialized) */
+	. = ALIGN(0x1000);
+	__bss_start = .;
+	.bss :
+	{
+		*(.bss)
+		*(.bss.*)
+		*(COMMON)
+		. = ALIGN(0x1000);
+	}
 
-    _erodata = .;
-
-    . = ALIGN(0x1000);
-    /* Read-write data (initialized) */
-    .got :
-    {
-        *(.got.plt)
-        *(.got)
-    }
-    .data :
-    {
-        *(.data)
-        *(.data.*)
-    }
-
-    _edata = .;
-
-    . = ALIGN(0x1000);
-    /* Read-write data (uninitialized) */
-    .bss :
-    {
-        *(.bss)
-        *(.bss.*)
-        *(COMMON)
-    }
-
-    . = ALIGN(0x1000);
-    _ebss = .;
-    _end = .;
+	_end = .;
 }

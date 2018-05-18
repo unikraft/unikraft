@@ -78,7 +78,7 @@ static inline void _mb_get_cmdline(struct multiboot_info *mi, char *cmdline,
 
 static inline void _mb_init_mem(struct multiboot_info *mi)
 {
-	extern char _end[];
+	extern char _end;
 	multiboot_memory_map_t *m;
 	size_t offset, max_addr;
 

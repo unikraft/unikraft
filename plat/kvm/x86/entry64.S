@@ -46,7 +46,7 @@ _multiboot_header:
 .long _multiboot_header
 .long 0x100000
 .long _edata
-.long _ebss
+.long _end
 .long _libkvmplat_start32
 
 .section .bss
