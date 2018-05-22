@@ -52,8 +52,14 @@ extern "C" {
 #ifndef __weak
 #define __weak                 __attribute__((weak))
 #endif
+#ifndef __used
+#define __used                 __attribute__((used))
+#endif
 #ifndef __unused
 #define __unused               __attribute__((unused))
+#endif
+#ifndef __section
+#define __section(s)           __attribute__((section(s)))
 #endif
 #ifndef __nonnull
 #define __nonnull              __attribute__((nonnull))
