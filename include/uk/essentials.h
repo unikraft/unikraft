@@ -73,6 +73,30 @@ extern "C" {
 #ifndef __align
 #define __align(bytes)         __attribute__((aligned(bytes)))
 #endif
+
+/**
+  * Mark a function as constructor
+  * The compiler/linker will populate a function pointer
+  * to the init_array section
+  */
+#ifndef __constructor
+#define __constructor __attribute__ ((constructor))
+#endif
+
+/**
+  * Mark a function as constructor with priority
+  * The compiler/linker will populate a function pointer
+  * (sorted by priority) to the init_array section
+  * Prioritized constructors are called before
+  * non-prioritized ones
+  *
+  * @param lvl
+  *   Priority level (101 (earliest)...onwards (latest))
+  */
+#ifndef __constructor_prio
+#define __constructor_prio(lvl) __attribute__ ((constructor (lvl)))
+#endif
+
 #else
 /* TO BE DEFINED */
 #endif /* __GNUC__ */
