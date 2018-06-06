@@ -56,7 +56,7 @@ Where `[selector]` can be one of the following:
            `[component]` is optional
 
 If no `[selector]` applies, define your own and cross your fingers that the
-reviewer(s) do(es) not complain.
+reviewer(s) do(es) not complain. :-)
 
 Sometimes a single change required multiple commit identifiers. In general this
 should be avoided by splitting a patch into multiple ones. But for the rare
