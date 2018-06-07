@@ -48,6 +48,12 @@ unsigned long strtoul(const char *nptr, char **endptr, int base);
 long long strtoll(const char *nptr, char **endptr, int base);
 unsigned long long strtoull(const char *nptr, char **endptr, int base);
 
+/**
+ * Convert a string to an integer
+ * @s: The start of the string
+ */
+int atoi(const char *s);
+
 #if CONFIG_LIBUKALLOC
 /* Allocate size bytes of memory. Returns pointer to start of allocated memory,
  * or NULL on failure.

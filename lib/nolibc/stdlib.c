@@ -276,3 +276,14 @@ unsigned long long strtoull(const char *nptr, char **endptr, int base)
 		*endptr = __DECONST(char *, any ? s - 1 : nptr);
 	return acc;
 }
+
+int atoi(const char *s)
+{
+	long long atoll;
+
+	atoll = strtoll(s, NULL, 10);
+	atoll = (atoll > __I_MAX) ? __I_MAX : atoll;
+	atoll = (atoll < __I_MIN) ? __I_MIN : atoll;
+
+	return (int) atoll;
+}
