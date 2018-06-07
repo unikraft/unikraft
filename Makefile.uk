@@ -4,15 +4,15 @@
 #
 ################################################################################
 
-ASFLAGS     += -U __linux__ -U __FreeBSD__ -U __sun__ -D__ASSEMBLY__
+ASFLAGS     += -U __linux__ -U __FreeBSD__ -U __sun__ -D__ASSEMBLY__ -no-pie
 ASINCLUDES  += -nostdinc -nostdlib -I$(UK_BASE)/include
 
-CFLAGS      += -U __linux__ -U __FreeBSD__ -U __sun__
+CFLAGS      += -U __linux__ -U __FreeBSD__ -U __sun__ -no-pie
 CFLAGS      += -fno-stack-protector -fno-omit-frame-pointer -fno-tree-sra
 CFLAGS      += -Wall -Wextra
 CINCLUDES   += -nostdinc -nostdlib -I$(UK_BASE)/include
 
-CXXFLAGS    += -U __linux__ -U __FreeBSD__ -U __sun__
+CXXFLAGS    += -U __linux__ -U __FreeBSD__ -U __sun__ -no-pie
 CXXFLAGS    += -fno-stack-protector -fno-omit-frame-pointer -fno-tree-sra
 CXXFLAGS    += -Wall -Wextra
 CXXINCLUDES += -nostdinc -nostdlib -I$(UK_BASE)/include
@@ -20,8 +20,8 @@ CXXINCLUDES += -nostdinc -nostdlib -I$(UK_BASE)/include
 # Set the text and data sections to be readable and writable. Also,
 # do not page-align the data segment. If the output format supports
 # Unix style magic numbers, mark the output as OMAGIC.
-LIBLDFLAGS  += -nostdinc -nostdlib -Wl,--omagic -Wl,-r
-LDFLAGS     += -nostdinc -nostdlib -Wl,--omagic -Wl,--build-id=none
+LIBLDFLAGS  += -nostdinc -nostdlib -Wl,--omagic -Wl,-r -no-pie
+LDFLAGS     += -nostdinc -nostdlib -Wl,--omagic -Wl,--build-id=none -no-pie
 
 CFLAGS-$(OPTIMIZE_NONE)            += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
 CXXFLAGS-$(OPTIMIZE_NONE)          += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
