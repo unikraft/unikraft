@@ -1,0 +1,18 @@
+menuconfig LIBUKMPI
+	bool "ukmpi: Message Passing Interface"
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKDEBUG
+	default n
+	help
+		Provide inter-thread communication primitives
+
+if LIBUKMPI
+	config LIBUKMPI_MBOX
+	bool "Mailboxes"
+	select LIBUKALLOC
+	select LIBUKLOCK
+	select LIBUKLOCK_SEMAPHORE
+	default n
+	help
+		Provide mailbox communication interface
+endif
