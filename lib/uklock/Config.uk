@@ -1,0 +1,20 @@
+menuconfig LIBUKLOCK
+	bool "uklock: Multi-task synchronization primitives"
+	select LIBUKDEBUG
+	default n
+
+if LIBUKLOCK
+	config LIBUKLOCK_SEMAPHORE
+		bool "Semaphores"
+		select LIBUKSCHED
+		default y
+		help
+			Enable semaphore based synchornization
+
+	config LIBUKLOCK_MUTEX
+		bool "Mutexes"
+		select LIBUKSCHED
+		default y
+		help
+			Enable mutex based synchornization
+endif
