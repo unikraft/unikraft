@@ -47,7 +47,6 @@
 
 void _libkvmplat_init_console(void)
 {
-	uk_printd(DLVL_INFO, "initializing serial\n");
 	outb(COM1_INTR, 0x00);  /* Disable all interrupts */
 	outb(COM1_CTRL, DLAB);  /* Enable DLAB (set baudrate divisor) */
 	outb(COM1_DIV_LO, 0x01);/* Set div to 1 (lo byte) 115200 baud */
