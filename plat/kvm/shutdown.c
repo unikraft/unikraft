@@ -26,6 +26,8 @@
 #include <uk/print.h>
 #include <uk/plat/bootstrap.h>
 
+static void cpu_halt(void) __noreturn;
+
 /* TODO: implement CPU reset */
 void ukplat_terminate(enum ukplat_gstate request __unused)
 {
@@ -43,6 +45,13 @@ void ukplat_terminate(enum ukplat_gstate request __unused)
 	 * without ACPI, so just halt.
 	 */
 	cpu_halt();
+}
+
+static void cpu_halt(void)
+{
+	__asm__ __volatile__("cli; hlt");
+	for (;;)
+		;
 }
 
 int ukplat_suspend(void)

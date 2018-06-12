@@ -1,0 +1,100 @@
+/* SPDX-License-Identifier: ISC */
+/*
+ * Authors: Dan Williams
+ *          Martin Lucina
+ *          Ricardo Koller
+ *          Costin Lupu <costin.lupu@cs.pub.ro>
+ *
+ * Copyright (c) 2015-2017 IBM
+ * Copyright (c) 2016-2017 Docker, Inc.
+ * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation
+ *
+ * Permission to use, copy, modify, and/or distribute this software
+ * for any purpose with or without fee is hereby granted, provided
+ * that the above copyright notice and this permission notice appear
+ * in all copies.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL
+ * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE
+ * AUTHOR BE LIABLE FOR ANY SPECIAL, DIRECT, INDIRECT, OR
+ * CONSEQUENTIAL DAMAGES OR ANY DAMAGES WHATSOEVER RESULTING FROM LOSS
+ * OF USE, DATA OR PROFITS, WHETHER IN AN ACTION OF CONTRACT,
+ * NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+ * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+/* Taken from solo5 intr.c */
+
+#include <stdlib.h>
+#include <uk/alloc.h>
+#include <uk/list.h>
+#include <uk/plat/lcpu.h>
+#include <x86/cpu.h>
+#include <kvm/irq.h>
+#include <kvm/intctrl.h>
+#include <uk/assert.h>
+#include <errno.h>
+
+
+static struct uk_alloc *allocator;
+
+struct irq_handler {
+	irq_handler_func_t func;
+	void *arg;
+
+	UK_SLIST_ENTRY(struct irq_handler) entries;
+};
+
+UK_SLIST_HEAD(irq_handler_head, struct irq_handler);
+static struct irq_handler_head irq_handlers[16];
+
+int ukplat_irq_register(unsigned long irq, irq_handler_func_t func, void *arg)
+{
+	struct irq_handler *h;
+	unsigned long flags;
+
+	UK_ASSERT(irq < 16);
+	UK_ASSERT(allocator != NULL);
+
+	h = uk_malloc(allocator, sizeof(struct irq_handler));
+	if (!h)
+		return -ENOMEM;
+
+	h->func = func;
+	h->arg = arg;
+
+	flags = ukplat_lcpu_save_irqf();
+	UK_SLIST_INSERT_HEAD(&irq_handlers[irq], h, entries);
+	ukplat_lcpu_restore_irqf(flags);
+
+	intctrl_clear_irq(irq);
+	return 0;
+}
+
+void _ukplat_irq_handle(unsigned long irq)
+{
+	struct irq_handler *h;
+	int handled = 0;
+
+	UK_SLIST_FOREACH(h, &irq_handlers[irq], entries) {
+		if (h->func(h->arg) == 1) {
+			handled = 1;
+			break;
+		}
+	}
+
+	if (!handled)
+		UK_CRASH("Unhandled irq=%lu\n", irq);
+	else
+		/* Only ACK the IRQ if handled; we only need to know
+		 * about an unhandled IRQ the first time round.
+		 */
+		intctrl_ack_irq(irq);
+}
+
+int ukplat_irq_init(struct uk_alloc *a)
+{
+	UK_ASSERT(allocator == NULL);
+	allocator = a;
+	return 0;
+}

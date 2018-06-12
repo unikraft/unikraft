@@ -27,10 +27,11 @@
  */
 
 #include <string.h>
+#include <x86/traps.h>
 #include <kvm/console.h>
+#include <kvm/intctrl.h>
 #include <kvm-x86/multiboot.h>
 #include <kvm-x86/multiboot_defs.h>
-#include <kvm-x86/cpu_x86_64.h>
 #include <uk/arch/limits.h>
 #include <uk/arch/types.h>
 #include <uk/plat/console.h>
@@ -134,7 +135,8 @@ void _libkvmplat_entry(void *arg)
 
 	_libkvmplat_init_console();
 	_init_cpufeatures();
-	cpu_init();
+	traps_init();
+	intctrl_init();
 
 	uk_printd(DLVL_INFO, "Entering from KVM (x86)...\n");
 	uk_printd(DLVL_INFO, "     multiboot: %p\n", mi);

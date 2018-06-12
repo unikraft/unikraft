@@ -28,6 +28,7 @@
  */
 
 #include <x86/cpu_defs.h>
+#include <kvm-x86/traps.h>
 #include <kvm-x86/multiboot_defs.h>
 
 #define ENTRY(x) .globl x; .type x,%function; x:

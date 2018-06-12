@@ -1,9 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
- *          Costin Lupu <costin.lupu@cs.pub.ro>
+ * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
  *
- * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,41 +32,12 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#include <stdint.h>
-#include <uk/plat/lcpu.h>
-#include <x86/irq.h>
+#ifndef __KVM_IRQ_H_
+#define __KVM_IRQ_H_
 
+#include <sys/types.h>
+#include <uk/plat/irq.h>
 
-void ukplat_lcpu_enable_irq(void)
-{
-	local_irq_enable();
-}
+void _ukplat_irq_handle(unsigned long irq);
 
-void ukplat_lcpu_disable_irq(void)
-{
-	local_irq_disable();
-}
-
-unsigned long ukplat_lcpu_save_irqf(void)
-{
-	unsigned long flags;
-
-	local_irq_save(flags);
-
-	return flags;
-}
-
-void ukplat_lcpu_restore_irqf(unsigned long flags)
-{
-	local_irq_restore(flags);
-}
-
-int ukplat_lcpu_irqs_disabled(void)
-{
-	return irqs_disabled();
-}
-
-void ukplat_lcpu_irqs_handle_pending(void)
-{
-
-}
+#endif /* __KVM_IRQ_H_ */
