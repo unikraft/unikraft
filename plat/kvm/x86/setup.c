@@ -27,12 +27,12 @@
  */
 
 #include <string.h>
-#include <kvm/setup.h>
 #include <kvm/console.h>
 #include <kvm-x86/multiboot.h>
 #include <kvm-x86/multiboot_defs.h>
 #include <kvm-x86/cpu_x86_64.h>
 #include <uk/arch/limits.h>
+#include <uk/arch/types.h>
 #include <uk/plat/console.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
@@ -47,7 +47,7 @@ void *_libkvmplat_heap_start;
 void *_libkvmplat_stack_top;
 void *_libkvmplat_mem_end;
 
-extern void _libkvmplat_newstack(uint64_t stack_start, void (*tramp)(void *),
+extern void _libkvmplat_newstack(__u64 stack_start, void (*tramp)(void *),
 				void *arg);
 
 static inline void _mb_get_cmdline(struct multiboot_info *mi, char *cmdline,
@@ -57,7 +57,7 @@ static inline void _mb_get_cmdline(struct multiboot_info *mi, char *cmdline,
 	char *mi_cmdline;
 
 	if (mi->flags & MULTIBOOT_INFO_CMDLINE) {
-		mi_cmdline = (char *)(uint64_t)mi->cmdline;
+		mi_cmdline = (char *)(__u64)mi->cmdline;
 		cmdline_len = strlen(mi_cmdline);
 
 		if (cmdline_len >= maxlen) {
@@ -87,7 +87,7 @@ static inline void _mb_init_mem(struct multiboot_info *mi)
 	 */
 	for (offset = 0; offset < mi->mmap_length;
 	     offset += m->size + sizeof(m->size)) {
-		m = (void *)(uintptr_t)(mi->mmap_addr + offset);
+		m = (void *)(__uptr)(mi->mmap_addr + offset);
 		if (m->addr == PLATFORM_MEM_START
 		    && m->type == MULTIBOOT_MEMORY_AVAILABLE) {
 			break;
@@ -154,6 +154,6 @@ void _libkvmplat_entry(void *arg)
 	 */
 	uk_printd(DLVL_INFO, "Switch from bootstrap stack to stack @%p\n",
 				_libkvmplat_mem_end);
-	_libkvmplat_newstack((uint64_t) _libkvmplat_mem_end,
+	_libkvmplat_newstack((__u64) _libkvmplat_mem_end,
 				_libkvmplat_entry2, 0);
 }
