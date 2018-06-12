@@ -235,7 +235,7 @@ define patch =
 $(BUILD_DIR)/$(1)/.patched: $(BUILD_DIR)/$(1)/.origin
 	@$(foreach P,$(sort $(wildcard $(2)/*)), \
 	  $(call verbose_cmd_inner,PATCH,$(1)':' $(notdir $(P)), \
-	  $(PATCH) -sd $(BUILD_DIR)/$(1)/origin/$(3)/ -p0 < $(P)) &&)\
+	  $(PATCH) -sd $(BUILD_DIR)/$(1)/origin/$(3)/ -p1 < $(P)) &&)\
 	$(TOUCH) $(BUILD_DIR)/$(1)/.patched
 UK_FETCH-y += $(BUILD_DIR)/$(1)/.patched
 endef

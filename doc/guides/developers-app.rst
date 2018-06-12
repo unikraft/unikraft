@@ -313,14 +313,33 @@ below: ::
 ============================
 Patch Creation
 ============================
-To create a patch, go to the base directory for your sources and run
-the ``diff`` command below. If you'll be using Unikraft's built-in
-``patch`` command make sure to place patches in the
-``LIBLIBNAME_BASE/patches`` directory. For the patch's name, as a
-convention, we use the format
-``[nnn]-[dash-separated-description].patch`` (e.g.,
-``001-ipv6-on.patch``). Putting all of this together, the following
-command creates a Unikraft patch: ::
 
-  diff -Uanm /path_to_file/source.c.orig /path_to_file/source.c >
-        LIBLIBNAME_BASE/patches/[nnn]-[description].patch
+Go to the directory containing sources of the application you are
+porting (e.g. ``build/libnewlibc/origin``). Copy over the folder with
+unmodified sources::
+
+  cp -r newlib-2.5.0.20170922 newlib.orig
+
+Do necessary modifications, test it and run ``diff`` tool::
+
+  diff -urNp newlib.orig newlib-2.5.0.20170922 >
+          LIBLIBNAME_BASE/patches/[nnnn]-[description].patch
+
+Open the generated patch in your favorite editor and add a short
+header to the patch. Start it with a ``From:`` field, and put your
+name in it. On the next line add a one-liner description of the patch
+in the ``Subject:`` filed. Optionally, write a little longer
+description after an empty line. And, finally, add ``---`` line at the
+end of the header.
+
+This should help people to get an idea why does this patch
+exist, and whom they should address questions. Header example::
+
+  From: Zaphod Beeblebrox <z.beeblebrox@gmail.com>
+  Subject: subject of an example patch
+
+  This is an example patch description
+  ---
+  diff -urNp newlib.orig/ChangeLog newlib-2.5.0.20170922/ChangeLog
+
+Or just use git to generate patches for you.
