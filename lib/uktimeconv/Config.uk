@@ -1,0 +1,4 @@
+config LIBUKTIMECONV
+       bool "uktimeconv: Time conversion functions"
+       default n
+       select LIBUKDEBUG

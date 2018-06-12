@@ -7,6 +7,7 @@
 $(eval $(call _import_lib,$(UK_BASE)/lib/ukboot))
 $(eval $(call _import_lib,$(UK_BASE)/lib/ukdebug))
 $(eval $(call _import_lib,$(UK_BASE)/lib/ukargparse))
+$(eval $(call _import_lib,$(UK_BASE)/lib/uktimeconv))
 $(eval $(call _import_lib,$(UK_BASE)/lib/nolibc))
 $(eval $(call _import_lib,$(UK_BASE)/lib/ukalloc))
 $(eval $(call _import_lib,$(UK_BASE)/lib/ukallocbbuddy))
