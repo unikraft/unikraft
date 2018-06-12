@@ -155,7 +155,7 @@ struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
 		const char *name, void (*function)(void *), void *arg)
 {
 	struct uk_thread *thread = NULL;
-	void *stack;
+	void *stack = NULL;
 	int rc;
 
 	thread = uk_malloc(sched->allocator, sizeof(struct uk_thread));
