@@ -47,6 +47,17 @@ struct uk_alloc;
  */
 int ukplat_irq_init(struct uk_alloc *a);
 
+typedef int (*irq_handler_func_t)(void *);
+
+/**
+ * Registers an interrupt handler
+ * @param irq Interrupt number
+ * @param func Interrupt funciton
+ * @param arg Extra argument to be handover to interrupt function
+ * @return 0 on success, a negative errno value on errors
+ */
+int ukplat_irq_register(unsigned long irq, irq_handler_func_t func, void *arg);
+
 #ifdef __cplusplus
 }
 #endif
