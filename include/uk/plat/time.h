@@ -38,9 +38,17 @@
 
 #include <uk/arch/time.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void ukplat_time_init(void);
 void ukplat_time_fini(void);
 
 __nsec ukplat_monotonic_clock(void);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __UKPLAT_TIME_H__ */
