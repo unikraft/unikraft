@@ -4,6 +4,7 @@ menuconfig PLAT_KVM
        depends on (ARCH_X86_64)
        select LIBUKDEBUG
        select LIBUKALLOC
+       select LIBUKTIMECONV
        select LIBNOLIBC if !HAVE_LIBC
        help
                 Create a Unikraft image that runs as a KVM guest

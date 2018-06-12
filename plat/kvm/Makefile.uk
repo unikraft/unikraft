@@ -34,4 +34,6 @@ LIBKVMPLAT_SRCS-$(ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/intctrl.c
 LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/shutdown.c
 LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/memory.c
 LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/irq.c
+LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/time.c
+LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/tscclock.c
 LIBKVMPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/lcpu.c|common

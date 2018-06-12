@@ -34,6 +34,7 @@
 #include <kvm/intctrl.h>
 #include <uk/assert.h>
 #include <errno.h>
+#include <uk/arch/atomic.h>
 
 
 static struct uk_alloc *allocator;
@@ -71,12 +72,32 @@ int ukplat_irq_register(unsigned long irq, irq_handler_func_t func, void *arg)
 	return 0;
 }
 
+/*
+ * TODO: This is a temporary solution used to identify non TSC clock
+ * interrupts in order to stop waiting for interrupts with deadline.
+ */
+extern long sched_have_pending_events;
+
 void _ukplat_irq_handle(unsigned long irq)
 {
 	struct irq_handler *h;
 	int handled = 0;
 
 	UK_SLIST_FOREACH(h, &irq_handlers[irq], entries) {
+		/* TODO define platform wise macro for timer IRQ number */
+		if (irq != 0)
+			/* IRQ 0 is reserved for a timer, responsible to
+			 * wake up cpu from halt, so it can check if
+			 * it has something to do. Effectively it is OS ticks.
+			 *
+			 * If interrupt comes not from the timer, the
+			 * chances are some work have just
+			 * arrived. Let's kick the scheduler out of
+			 * the halting loop, and let it take care of
+			 * that work.
+			 */
+			ukarch_test_and_set_bit(0, &sched_have_pending_events);
+
 		if (h->func(h->arg) == 1) {
 			handled = 1;
 			break;
