@@ -131,9 +131,6 @@ void ukplat_entry(int argc, char *argv[])
 		  STRINGIFY(UK_CODENAME) " " STRINGIFY(UK_FULLVERSION));
 #endif
 
-	uk_printd(DLVL_INFO, "Initialize platform time...\n");
-	ukplat_time_init();
-
 	uk_printd(DLVL_INFO, "Pre-init table at %p - %p\n",
 		  __preinit_array_start, &__preinit_array_end);
 	ukplat_ctor_foreach(__preinit_array_start, __preinit_array_end, i) {
@@ -207,11 +204,18 @@ void ukplat_entry(int argc, char *argv[])
 	}
 	if (unlikely(!a))
 		uk_printd(DLVL_WARN, "No suitable memory region for memory allocator. Continue without heap\n");
+#endif
 
+#if LIBUKALLOC
+	uk_printd(DLVL_INFO, "Initialize IRQ subsystem...\n");
 	rc = ukplat_irq_init(a);
 	if (unlikely(rc != 0))
 		UK_CRASH("Could not initialize the platform IRQ subsystem.");
 #endif
+
+	/* On most platforms the timer depend on an initialized IRQ subsystem */
+	uk_printd(DLVL_INFO, "Initialize platform time...\n");
+	ukplat_time_init();
 
 #if LIBUKSCHED
 	/* Init scheduler. */
