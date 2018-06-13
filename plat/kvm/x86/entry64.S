@@ -30,24 +30,24 @@
 #include <kvm-x86/multiboot_defs.h>
 #include <kvm-x86/cpu_x86_64_defs.h>
 
-#define ENTRY(x) .text; .globl x; .type x,%function; x:
+#define ENTRY(x) .globl x; .type x,%function; x:
 #define END(x)   .size x, . - x
 
 #define MYMULTIBOOT_FLAGS \
     (MULTIBOOT_PAGE_ALIGN | MULTIBOOT_MEMORY_INFO | MULTIBOOT_AOUT_KLUDGE)
 
-.section .data.multiboot
+.section .data.boot
 
 .align 4
 _multiboot_header:
 .long MULTIBOOT_HEADER_MAGIC
 .long MYMULTIBOOT_FLAGS
-.long -(MULTIBOOT_HEADER_MAGIC+MYMULTIBOOT_FLAGS)
-.long _multiboot_header
-.long 0x100000
-.long _edata
-.long _end
-.long _libkvmplat_start32
+.long -(MULTIBOOT_HEADER_MAGIC+MYMULTIBOOT_FLAGS) /* checksum */
+.long _multiboot_header                           /* header addr */
+.long 0x100000                                    /* load addr */
+.long _edata                                      /* load end addr */
+.long _end                                        /* bss end addr */
+.long _libkvmplat_start32                         /* entry addr */
 
 .section .bss
 
@@ -63,6 +63,7 @@ bootstack:
  * we've switched to long mode.
  */
 .code32
+.section .text.boot
 
 ENTRY(_libkvmplat_start32)
 	cld
@@ -139,7 +140,7 @@ END(_libkvmplat_start32)
  * Uuuyea, exceptions.
  */
 
-.data
+.section .data.boot
 .align 64
 gdt64:
 	.quad 0x0000000000000000
@@ -165,6 +166,7 @@ mxcsr_ptr:
 #include "pagetable.S"
 
 .code64
+.section .text.boot
 
 ENTRY(_libkvmplat_start64)
 	movq $bootstack, %rsp
@@ -192,6 +194,7 @@ ENTRY(_libkvmplat_start64)
 	hlt
 END(_libkvmplat_start64)
 
+.text
 ENTRY(_libkvmplat_newstack)
 	movq %rdi, %rsp
 	movq %rdx, %rdi

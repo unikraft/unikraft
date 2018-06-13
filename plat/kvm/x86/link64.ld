@@ -33,7 +33,8 @@ SECTIONS
 	.text :
 	{
 		/* prevent linker gc from removing multiboot header */
-		KEEP (*(.data.multiboot))
+		KEEP (*(.data.boot))
+		*(.text.boot)
 
 		*(.text)
 		*(.text.*)
