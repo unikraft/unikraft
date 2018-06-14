@@ -857,7 +857,14 @@ static int conf_split_config(void)
 		res = 1;
 		goto err;
 	}
-	if (chdir(dir)) {
+
+	snprintf(path, sizeof(path), "%s/%s", dir, "depinclude");
+	if (stat(path, &sb) && mkdir(path, 0755)) {
+		res = 1;
+		goto err;
+	}
+
+	if (chdir(path)) {
 		res = 1;
 		goto err;
 	}
