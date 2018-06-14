@@ -1,7 +1,7 @@
 ##
 ## Linux user platform registration
 ##
-$(eval $(call addplat_s,linuxu,$(PLAT_LINUXU)))
+$(eval $(call addplat_s,linuxu,$(CONFIG_PLAT_LINUXU)))
 
 ##
 ## Linux user platform library registration
@@ -14,8 +14,8 @@ $(eval $(call addplatlib,linuxu,liblinuxuplat))
 LIBLINUXUPLAT_CINCLUDES-y += -I$(LIBLINUXUPLAT_BASE)/include
 
 LIBLINUXUPLAT_SRCS-$(ARCH_X86_32) += $(LIBLINUXUPLAT_BASE)/x86/entry32.S
-LIBLINUXUPLAT_SRCS-$(ARCH_X86_64) += $(LIBLINUXUPLAT_BASE)/x86/entry64.S
-LIBLINUXUPLAT_SRCS-$(ARCH_ARM_32) += $(LIBLINUXUPLAT_BASE)/arm/entry32.S
+LIBLINUXUPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBLINUXUPLAT_BASE)/x86/entry64.S
+LIBLINUXUPLAT_SRCS-$(CONFIG_ARCH_ARM_32) += $(LIBLINUXUPLAT_BASE)/arm/entry32.S
 LIBLINUXUPLAT_SRCS-$(ARCH_ARM_64) += $(LIBLINUXUPLAT_BASE)/arm/entry64.S
 LIBLINUXUPLAT_SRCS-y              += $(LIBLINUXUPLAT_BASE)/setup.c
 LIBLINUXUPLAT_SRCS-y              += $(LIBLINUXUPLAT_BASE)/console.c

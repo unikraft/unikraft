@@ -51,10 +51,10 @@
 enum _hxd_output_type {
 	UK_HXDOUT_FILE = 0,
 	UK_HXDOUT_BUFFER,
-#if LIBUKDEBUG_PRINTK
+#if CONFIG_LIBUKDEBUG_PRINTK
 	UK_HXDOUT_KERN,
 #endif
-#if LIBUKDEBUG_PRINTD
+#if CONFIG_LIBUKDEBUG_PRINTD
 	UK_HXDOUT_DEBUG,
 #endif
 };
@@ -63,7 +63,7 @@ struct _hxd_output {
 	enum _hxd_output_type type;
 
 	union {
-#if LIBUKDEBUG_PRINTD
+#if CONFIG_LIBUKDEBUG_PRINTD
 		struct {
 			int lvl;
 			const char *libname;
@@ -106,12 +106,12 @@ static int _hxd_outf(struct _hxd_output *o, const char *fmt, ...)
 			o->buffer.left -= (ret - 1);
 		}
 		break;
-#if LIBUKDEBUG_PRINTK
+#if CONFIG_LIBUKDEBUG_PRINTK
 	case UK_HXDOUT_KERN:
 		uk_vprintk(fmt, ap);
 		break;
 #endif
-#if LIBUKDEBUG_PRINTD
+#if CONFIG_LIBUKDEBUG_PRINTD
 	case UK_HXDOUT_DEBUG:
 		_uk_vprintd(o->debug.lvl, o->debug.libname, o->debug.srcname,
 			    o->debug.srcline, fmt, ap);
@@ -326,7 +326,7 @@ int uk_hexdumpf(FILE *fp, const void *data, size_t len, size_t addr0, int flags,
 void uk_hexdumpk(const void *data, size_t len, int flags,
 		 unsigned int grps_per_line)
 {
-#if LIBUKDEBUG_PRINTK
+#if CONFIG_LIBUKDEBUG_PRINTK
 	struct _hxd_output o = {.type = UK_HXDOUT_KERN};
 
 	_hxd(&o, data, len, (size_t)data, flags, grps_per_line, "");
@@ -340,7 +340,7 @@ void _uk_hexdumpd(int lvl, const char *libname, const char *srcname,
 		  size_t addr0, int flags, unsigned int grps_per_line,
 		  const char *line_prefix)
 {
-#if LIBUKDEBUG_PRINTD
+#if CONFIG_LIBUKDEBUG_PRINTD
 	struct _hxd_output o = {.type = UK_HXDOUT_DEBUG,
 				.debug.lvl = lvl,
 				.debug.libname = libname,

@@ -100,7 +100,7 @@ static inline void _dtb_get_cmdline(char *cmdline, size_t maxlen)
 
 enocmdl:
 	uk_printd(DLVL_INFO, "No command line found\n");
-	strcpy(cmdline, UK_NAME);
+	strcpy(cmdline, CONFIG_UK_NAME);
 }
 
 static inline void _dtb_init_mem(uint32_t physical_offset)
@@ -172,7 +172,7 @@ static inline void _dtb_init_mem(uint32_t physical_offset)
 	_libxenplat_mrd[0].len   = (size_t) to_virt(max_pfn_p << __PAGE_SHIFT)
 		- (size_t) to_virt(start_pfn_p << __PAGE_SHIFT);
 	_libxenplat_mrd[0].flags = (UKPLAT_MEMRF_ALLOCATABLE);
-#if UKPLAT_MEMRNAME
+#if CONFIG_UKPLAT_MEMRNAME
 	_libxenplat_mrd[0].name  = "heap";
 #endif
 	/* dtb */
@@ -180,7 +180,7 @@ static inline void _dtb_init_mem(uint32_t physical_offset)
 	_libxenplat_mrd[1].len   = fdt_size;
 	_libxenplat_mrd[1].flags = (UKPLAT_MEMRF_RESERVED
 				    | UKPLAT_MEMRF_READABLE);
-#if UKPLAT_MEMRNAME
+#if CONFIG_UKPLAT_MEMRNAME
 	_libxenplat_mrd[1].name  = "dtb";
 #endif
 	_libxenplat_mrd_num = 2;
@@ -205,7 +205,7 @@ void _libxenplat_armentry(void *dtb_pointer, uint32_t physical_offset)
 
 	_dtb_get_cmdline(cmdline, sizeof(cmdline));
 
-	ukplat_entry_argp(UK_NAME, cmdline, sizeof(cmdline));
+	ukplat_entry_argp(CONFIG_UK_NAME, cmdline, sizeof(cmdline));
 }
 
 void _libxenplat_armpanic(int *saved_regs) __noreturn;

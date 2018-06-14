@@ -49,20 +49,20 @@
  * in the configuration. This is required for linking with
  * pre-compiled objects that built by using a different configuration.
  */
-#if !LIBUKDEBUG_PRINTK
-#undef LIBUKDEBUG_PRINTK
-#define LIBUKDEBUG_PRINTK 1
+#if !CONFIG_LIBUKDEBUG_PRINTK
+#undef CONFIG_LIBUKDEBUG_PRINTK
+#define CONFIG_LIBUKDEBUG_PRINTK 1
 #endif
-#if !LIBUKDEBUG_PRINTD
-#undef LIBUKDEBUG_PRINTD
-#define LIBUKDEBUG_PRINTD 1
+#if !CONFIG_LIBUKDEBUG_PRINTD
+#undef CONFIG_LIBUKDEBUG_PRINTD
+#define CONFIG_LIBUKDEBUG_PRINTD 1
 #endif
 #endif /* __IN_LIBUKDEBUG__ */
 
 /*
  * KERNEL CONSOLE
  */
-#if LIBUKDEBUG_PRINTK
+#if CONFIG_LIBUKDEBUG_PRINTK
 void uk_vprintk(const char *fmt, va_list ap);
 void uk_printk(const char *fmt, ...) __printf(1, 2);
 #else
@@ -84,21 +84,21 @@ static inline void uk_printk(const char *fmt, ...)
 #define DLVL_ERR   (1)
 #define DLVL_CRIT  (0)
 
-#if LIBUKDEBUG_PRINTD_CRIT
+#if CONFIG_LIBUKDEBUG_PRINTD_CRIT
 #define DLVL_MAX DLVL_CRIT
-#elif LIBUKDEBUG_PRINTD_ERR
+#elif CONFIG_LIBUKDEBUG_PRINTD_ERR
 #define DLVL_MAX DLVL_ERR
-#elif LIBUKDEBUG_PRINTD_WARN
+#elif CONFIG_LIBUKDEBUG_PRINTD_WARN
 #define DLVL_MAX DLVL_WARN
-#elif LIBUKDEBUG_PRINTD_INFO
+#elif CONFIG_LIBUKDEBUG_PRINTD_INFO
 #define DLVL_MAX DLVL_INFO
-#elif LIBUKDEBUG_PRINTD_EXTRA
+#elif CONFIG_LIBUKDEBUG_PRINTD_EXTRA
 #define DLVL_MAX DLVL_EXTRA
 #else
 #define DLVL_MAX DLVL_ERR /* default level */
 #endif
 
-#if LIBUKDEBUG_PRINTD
+#if CONFIG_LIBUKDEBUG_PRINTD
 /* please use the uk_printd(), uk_vprintd() macros because
  * they compile in the function calls only if the configured
  * debug level requires it
@@ -142,7 +142,7 @@ static inline void uk_printd(int lvl, const char *fmt, ...) __printf(2, 3);
 static inline void uk_printd(int lvl __unused, const char *fmt __unused, ...)
 {
 }
-#endif /* LIBUKDEBUG_PRINTD */
+#endif /* CONFIG_LIBUKDEBUG_PRINTD */
 
 /* Print a message on both: Kernel console and Debug console */
 #define uk_printkd(dlvl, fmt, ...)                                             \

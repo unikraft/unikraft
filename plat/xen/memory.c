@@ -60,7 +60,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->len   = (size_t) &_etext - (size_t) &_text;
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE);
-#if UKPLAT_MEMRNAME
+#if CONFIG_UKPLAT_MEMRNAME
 		m->name  = "text";
 #endif
 		break;
@@ -69,7 +69,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->len   = (size_t) &_erodata - (size_t) &_rodata;
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			       | UKPLAT_MEMRF_READABLE);
-#if UKPLAT_MEMRNAME
+#if CONFIG_UKPLAT_MEMRNAME
 		m->name  = "rodata";
 #endif
 		break;
@@ -78,7 +78,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->len   = (size_t) &_ectors - (size_t) &_ctors;
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE);
-#if UKPLAT_MEMRNAME
+#if CONFIG_UKPLAT_MEMRNAME
 		m->name  = "ctors";
 #endif
 		break;
@@ -88,7 +88,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE
 			    | UKPLAT_MEMRF_WRITABLE);
-#if UKPLAT_MEMRNAME
+#if CONFIG_UKPLAT_MEMRNAME
 		m->name  = "data";
 #endif
 		break;
@@ -98,7 +98,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE
 			    | UKPLAT_MEMRF_WRITABLE);
-#if UKPLAT_MEMRNAME
+#if CONFIG_UKPLAT_MEMRNAME
 		m->name  = "bss";
 #endif
 		break;
@@ -107,7 +107,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 			m->base  = __NULL;
 			m->len   = 0;
 			m->flags = 0x0;
-#if UKPLAT_MEMRNAME
+#if CONFIG_UKPLAT_MEMRNAME
 			m->name  = __NULL;
 #endif
 			return -1;

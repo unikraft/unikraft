@@ -3,7 +3,7 @@ XEN_INTERFACE_VERSION := 0x00030205
 ##
 ## Xen platform registration
 ##
-$(eval $(call addplat_s,xen,$(PLAT_XEN)))
+$(eval $(call addplat_s,xen,$(CONFIG_PLAT_XEN)))
 
 ##
 ## Xen platform library registration
@@ -29,18 +29,18 @@ LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/hypervisor.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/memory.c
 LIBXENPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/lcpu.c|common
 
-ifneq (,$(filter x86_32 x86_64,$(UK_ARCH)))
-LIBXENPLAT_SRCS-$(ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/trace.c|common
-LIBXENPLAT_SRCS-$(ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/traps.c|common
-ifeq ($(HAVE_SCHED),y)
-LIBXENPLAT_SRCS-$(ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/thread_start.S|common
-LIBXENPLAT_SRCS-$(ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/thread.c|common
-LIBXENPLAT_SRCS-$(ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/sw_ctx.c|common
+ifneq (,$(filter x86_32 x86_64,$(CONFIG_UK_ARCH)))
+LIBXENPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/trace.c|common
+LIBXENPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/traps.c|common
+ifeq ($(CONFIG_HAVE_SCHED),y)
+LIBXENPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/thread_start.S|common
+LIBXENPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/thread.c|common
+LIBXENPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/sw_ctx.c|common
 endif
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/x86/setup.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/x86/traps.c
 LIBXENPLAT_SRCS-$(ARCH_X86_32) += $(LIBXENPLAT_BASE)/x86/entry32.S
-LIBXENPLAT_SRCS-$(ARCH_X86_64) += $(LIBXENPLAT_BASE)/x86/entry64.S
+LIBXENPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBXENPLAT_BASE)/x86/entry64.S
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/x86/mm.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/x86/arch_events.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/x86/arch_time.c
@@ -54,14 +54,14 @@ LIBXENPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/x86/cpu_native.c
 endif
 endif
 
-ifneq (,$(filter arm arm_64,$(UK_ARCH)))
+ifneq (,$(filter arm arm_64,$(CONFIG_UK_ARCH)))
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/arm/setup.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/arm/traps.c
-LIBXENPLAT_SRCS-$(ARCH_ARM_32) += $(LIBXENPLAT_BASE)/arm/entry32.S
+LIBXENPLAT_SRCS-$(CONFIG_ARCH_ARM_32) += $(LIBXENPLAT_BASE)/arm/entry32.S
 LIBXENPLAT_SRCS-$(ARCH_ARM_64) += $(LIBXENPLAT_BASE)/arm/entry64.S
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/arm/arch_events.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/arm/arch_time.c
-LIBXENPLAT_SRCS-$(ARCH_ARM_32) += $(LIBXENPLAT_BASE)/arm/hypercalls32.S
+LIBXENPLAT_SRCS-$(CONFIG_ARCH_ARM_32) += $(LIBXENPLAT_BASE)/arm/hypercalls32.S
 LIBXENPLAT_SRCS-$(ARCH_ARM_64) += $(LIBXENPLAT_BASE)/arm/hypercalls64.S
 endif
 

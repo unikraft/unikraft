@@ -1,6 +1,6 @@
 # set cross compile
-ifeq ($(CROSS_COMPILE),)
-ifneq ($(UK_ARCH),$(HOSTARCH))
-	CROSS_COMPILE := arm-linux-gnueabihf-
+ifeq ($(CONFIG_CROSS_COMPILE),)
+ifneq ($(CONFIG_UK_ARCH),$(HOSTARCH))
+	CONFIG_CROSS_COMPILE := arm-linux-gnueabihf-
 endif
 endif

@@ -58,7 +58,7 @@ struct ukplat_memregion_desc {
 	void *base;
 	__sz len;
 	int flags;
-#if UKPLAT_MEMRNAME
+#if CONFIG_UKPLAT_MEMRNAME
 	const char *name;
 #endif
 };

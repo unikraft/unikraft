@@ -29,7 +29,7 @@
 #define __UK_THREAD_H__
 
 #include <stdint.h>
-#ifdef HAVE_LIBC
+#ifdef CONFIG_HAVE_LIBC
 #include <sys/reent.h>
 #endif
 #include <uk/arch/lcpu.h>
@@ -52,7 +52,7 @@ struct uk_thread {
 	uint32_t flags;
 	__snsec wakeup_time;
 	struct uk_sched *sched;
-#ifdef HAVE_LIBC
+#ifdef CONFIG_HAVE_LIBC
 	struct _reent reent;
 #endif
 };

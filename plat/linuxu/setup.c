@@ -87,7 +87,7 @@ static int parseopts(int argc, char *argv[], struct liblinuxuplat_opts *opts)
 	 * Clear & set default options
 	 */
 	memset(opts, 0, sizeof(*opts));
-	_liblinuxuplat_opts.heap.len = (size_t)(LINUXU_DEFAULT_HEAPMB)
+	_liblinuxuplat_opts.heap.len = (size_t)(CONFIG_LINUXU_DEFAULT_HEAPMB)
 					* 1024 * 1024;
 
 	/*

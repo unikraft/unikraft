@@ -121,7 +121,7 @@ void _libxenplat_prepare_console(void)
 }
 #endif
 
-#if XEN_DBGEMERGENCY
+#if CONFIG_XEN_DBGEMERGENCY
 static int emergency_output(const char *str, unsigned int len)
 {
 	int rc;
@@ -229,7 +229,7 @@ int ukplat_coutd(const char *str, unsigned int len)
 	if (unlikely(len == 0))
 		len = strnlen(str, len);
 
-#if XEN_DBGEMERGENCY
+#if CONFIG_XEN_DBGEMERGENCY
 	return emergency_output(str, len);
 #else
 	return hvconsole_output(str, len);

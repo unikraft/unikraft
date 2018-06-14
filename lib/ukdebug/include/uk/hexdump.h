@@ -51,7 +51,7 @@
 
 #define UK_HXDF_COMPRESS (64) /* suppress repeated lines */
 
-#if LIBUKDEBUG_PRINTK
+#if CONFIG_LIBUKDEBUG_PRINTK
 /**
  * Plots an hexdump for a given data region to kernel output
  * The absolute address is plotted when UK_HXDF_ADDR is set
@@ -72,7 +72,7 @@ static inline void uk_hexdumpk(const void *data, size_t len, int flags,
 }
 #endif
 
-#if LIBUKDEBUG_PRINTD
+#if CONFIG_LIBUKDEBUG_PRINTD
 void _uk_hexdumpd(int lvl, const char *libname, const char *srcname,
 		  unsigned int srcline, const void *data, size_t len,
 		  size_t addr0, int flags, unsigned int grps_per_line,

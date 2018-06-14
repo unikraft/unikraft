@@ -1,7 +1,7 @@
-$(eval $(call addlib_s,libuksched,$(LIBUKSCHED)))
+$(eval $(call addlib_s,libuksched,$(CONFIG_LIBUKSCHED)))
 
-CINCLUDES-$(LIBUKSCHED)     += -I$(LIBUKSCHED_BASE)/include
-CXXINCLUDES-$(LIBUKSCHED)   += -I$(LIBUKSCHED_BASE)/include
+CINCLUDES-$(CONFIG_LIBUKSCHED)     += -I$(LIBUKSCHED_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBUKSCHED)   += -I$(LIBUKSCHED_BASE)/include
 
 LIBUKSCHED_SRCS-y += $(LIBUKSCHED_BASE)/sched.c
 LIBUKSCHED_SRCS-y += $(LIBUKSCHED_BASE)/thread.c

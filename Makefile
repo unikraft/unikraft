@@ -62,16 +62,16 @@ space := $(empty) $(empty)
 export CDPATH :=
 
 # Use current directory as base
-UK_BASE := $(CURDIR)
-override UK_BASE := $(realpath $(UK_BASE))
-ifeq ($(UK_BASE),)
-$(error "Invalid base directory (UK_BASE)")
+CONFIG_UK_BASE := $(CURDIR)
+override CONFIG_UK_BASE := $(realpath $(CONFIG_UK_BASE))
+ifeq ($(CONFIG_UK_BASE),)
+$(error "Invalid base directory (CONFIG_UK_BASE)")
 endif
 
 # A // APP_DIR
 # Set A variable if not already done on the command line;
 ifneq ("$(origin A)", "command line")
-A := $(UK_BASE)
+A := $(CONFIG_UK_BASE)
 endif
 # Remove the trailing '/.'
 # Also remove the trailing '/' the user can set when on the command line.
@@ -79,14 +79,14 @@ override A := $(realpath $(patsubst %/,%,$(patsubst %.,%,$(A))))
 ifeq ($(A),)
 $(error "Invalid app directory (A)")
 endif
-override UK_APP   := $(A)
+override CONFIG_UK_APP   := $(A)
 override APP_DIR  := $(A)
 override APP_BASE := $(A)
 
 # BUILD_DIR
 # Use O variable if set on the command line, otherwise use $(A)/build;
 ifneq ("$(origin O)", "command line")
-BUILD_DIR := $(shell mkdir -p $(UK_APP)/build && cd $(UK_APP)/build >/dev/null && pwd)
+BUILD_DIR := $(shell mkdir -p $(CONFIG_UK_APP)/build && cd $(CONFIG_UK_APP)/build >/dev/null && pwd)
 $(if $(BUILD_DIR),, $(error could not create directory "$(A)/build"))
 else
 BUILD_DIR := $(shell mkdir -p $(O) && cd $(O) >/dev/null && pwd)
@@ -109,9 +109,9 @@ endif
 ELIB_DIR := $(realpath $(patsubst %/,%,$(patsubst %.,%,$(ELIB_DIR))))
 
 # KConfig settings
-CONFIG_DIR            := $(UK_APP)
-CONFIG_CONFIG_IN      := $(UK_BASE)/Config.uk
-CONFIG                := $(UK_BASE)/support/kconfig
+CONFIG_DIR            := $(CONFIG_UK_APP)
+CONFIG_CONFIG_IN      := $(CONFIG_UK_BASE)/Config.uk
+CONFIG                := $(CONFIG_UK_BASE)/support/kconfig
 UK_CONFIG             := $(CONFIG_DIR)/.config
 UK_CONFIG_OUT         := $(BUILD_DIR)/config
 UK_GENERATED_INCLUDES := $(BUILD_DIR)/include
@@ -124,17 +124,17 @@ KCONFIG_APP_IN        := $(KCONFIG_DIR)/app.uk
 KCONFIG_ELIB_IN       := $(KCONFIG_DIR)/elib.uk
 
 # Makefile support scripts
-SCRIPTS_DIR := $(UK_BASE)/support/scripts
+SCRIPTS_DIR := $(CONFIG_UK_BASE)/support/scripts
 
 # # Set and export the version string
-include $(UK_BASE)/version.mk
+include $(CONFIG_UK_BASE)/version.mk
 
 # Compute the full local version string so packages can use it as-is
 # Need to export it, so it can be got from environment in children (eg. mconf)
 export UK_FULLVERSION := $(UK_VERSION).$(UK_SUBVERSION)$(UK_EXTRAVERSION)$(shell $(SCRIPTS_DIR)/gitsha1)
 
 # Default image name
-export UK_NAME ?= $(notdir $(APP_DIR))
+export CONFIG_UK_NAME ?= $(notdir $(APP_DIR))
 
 export DATE := $(shell date +%Y%m%d)
 
@@ -225,8 +225,8 @@ UK_HAVE_DOT_CONFIG := y
 endif
 endif
 
-# remove quotes from UK_NAME
-UK_NAME := $(call qstrip,$(UK_NAME))
+# remove quotes from CONFIG_UK_NAME
+CONFIG_UK_NAME := $(call qstrip,$(CONFIG_UK_NAME))
 
 ################################################################################
 # Host compiler and linker tools
@@ -304,11 +304,11 @@ export HOSTCC_NOCCACHE HOSTCXX_NOCCACHE
 # Unikraft Architecture
 ################################################################################
 # Set target archicture as set in config
-include $(UK_BASE)/arch/Arch.uk
-ifeq ($(UK_ARCH),)
+include $(CONFIG_UK_BASE)/arch/Arch.uk
+ifeq ($(CONFIG_UK_ARCH),)
 # Set target archicture as set in environment
 ifneq ($(ARCH),)
-export UK_ARCH	?= $(shell echo "$(call qstrip,$(ARCH))" | \
+export CONFIG_UK_ARCH	?= $(shell echo "$(call qstrip,$(ARCH))" | \
 		   sed -e "s/-.*//" \
 		       -e 's//\1/' \
 		       -e 's/i.86/x86/' \
@@ -322,7 +322,7 @@ export UK_ARCH	?= $(shell echo "$(call qstrip,$(ARCH))" | \
 		       -e 's/sh.*/sh/' )
 else
 # Nothing set, use detected host architecture
-export UK_ARCH	?= $(shell echo "$(HOSTARCH)" | \
+export CONFIG_UK_ARCH	?= $(shell echo "$(HOSTARCH)" | \
 		   sed -e "s/-.*//" \
 		       -e 's//\1/' \
 		       -e 's/i.86/x86/' \
@@ -336,17 +336,17 @@ export UK_ARCH	?= $(shell echo "$(HOSTARCH)" | \
 		       -e 's/sh.*/sh/' )
 endif
 endif
-override ARCH := $(UK_ARCH)
-export UK_ARCH ARCH
+override ARCH := $(CONFIG_UK_ARCH)
+export CONFIG_UK_ARCH ARCH
 
 # Quick-check if architecture exists
 ifeq ($(filter $(null_targets) print-vars,$(MAKECMDGOALS)),)
-ifeq ($(wildcard $(UK_BASE)/arch/$(ARCH)/Makefile.uk),)
-$(error Target architecture ($(ARCH)) is currently not supported (could not find $(UK_BASE)/arch/$(ARCH)/Makefile.uk).)
+ifeq ($(wildcard $(CONFIG_UK_BASE)/arch/$(ARCH)/Makefile.uk),)
+$(error Target architecture ($(ARCH)) is currently not supported (could not find $(CONFIG_UK_BASE)/arch/$(ARCH)/Makefile.uk).)
 endif
 
 ifeq ($(wildcard arch/$(ARCH)/Compiler.uk),)
-$(error Target architecture ($(ARCH)) is currently not supported (could not find $(UK_BASE)/arch/$(ARCH)/Compiler.uk).)
+$(error Target architecture ($(ARCH)) is currently not supported (could not find $(CONFIG_UK_BASE)/arch/$(ARCH)/Compiler.uk).)
 endif
 endif
 
@@ -355,7 +355,7 @@ endif
 ################################################################################
 ifeq ($(UK_HAVE_DOT_CONFIG),y)
 # Hide troublesome environment variables from sub processes
-unexport CROSS_COMPILE
+unexport CONFIG_CROSS_COMPILE
 #unexport CC
 #unexport LD
 #unexport AR
@@ -373,32 +373,32 @@ unexport TERMINFO
 unexport MACHINE
 #unexport O
 
-# CROSS_COMPILE specify the prefix used for all executables used
+# CONFIG_CROSS_COMPILE specify the prefix used for all executables used
 # during compilation. Only gcc and related bin-utils executables
-# are prefixed with $(CROSS_COMPILE).
-# CROSS_COMPILE can be set on the command line
+# are prefixed with $(CONFIG_CROSS_COMPILE).
+# CONFIG_CROSS_COMPILE can be set on the command line
 # make CROSS_COMPILE=ia64-linux-
-# Alternatively CROSS_COMPILE can be set in the environment.
+# Alternatively CONFIG_CROSS_COMPILE can be set in the environment.
 # A third alternative is to store a setting in .config so that plain
 # "make" in the configured kernel build directory always uses that.
-# Default value for CROSS_COMPILE is not to prefix executables
-# Note: Some architectures assign CROSS_COMPILE in their arch/*/Makefile.uk
-CROSS_COMPILE := $(CROSS_COMPILE:"%"=%)
+# Default value for CONFIG_CROSS_COMPILE is not to prefix executables
+# Note: Some architectures assign CONFIG_CROSS_COMPILE in their arch/*/Makefile.uk
+CONFIG_CROSS_COMPILE := $(CROSS_COMPILE:"%"=%)
 
-include $(UK_BASE)/arch/$(UK_ARCH)/Compiler.uk
+include $(CONFIG_UK_BASE)/arch/$(CONFIG_UK_ARCH)/Compiler.uk
 
 # Make variables (CC, etc...)
-LD		:= $(CROSS_COMPILE)gcc
-CC		:= $(CROSS_COMPILE)gcc
+LD		:= $(CONFIG_CROSS_COMPILE)gcc
+CC		:= $(CONFIG_CROSS_COMPILE)gcc
 CPP		:= $(CC)
 CXX		:= $(CPP)
 AS		:= $(CC)
-AR		:= $(CROSS_COMPILE)gcc-ar
-NM		:= $(CROSS_COMPILE)gcc-nm
-READELF		:= $(CROSS_COMPILE)readelf
-STRIP		:= $(CROSS_COMPILE)strip
-OBJCOPY		:= $(CROSS_COMPILE)objcopy
-OBJDUMP		:= $(CROSS_COMPILE)objdump
+AR		:= $(CONFIG_CROSS_COMPILE)gcc-ar
+NM		:= $(CONFIG_CROSS_COMPILE)gcc-nm
+READELF		:= $(CONFIG_CROSS_COMPILE)readelf
+STRIP		:= $(CONFIG_CROSS_COMPILE)strip
+OBJCOPY		:= $(CONFIG_CROSS_COMPILE)objcopy
+OBJDUMP		:= $(CONFIG_CROSS_COMPILE)objdump
 AR		:= ar
 MV		:= mv -f
 RM		:= rm -rf
@@ -425,7 +425,7 @@ CFLAGS		+= -DCC_VERSION=$(CC_VERSION)
 CXXFLAGS	+= -DCC_VERSION=$(CC_VERSION)
 
 # Common Makefile definitions we need for building Unikraft
-include $(UK_BASE)/support/build/Makefile.rules
+include $(CONFIG_UK_BASE)/support/build/Makefile.rules
 
 # ensure $(BUILD_DIR)/include and $(BUILD_DIR)/include/uk exists
 $(call mk_sub_build_dir,include)
@@ -439,35 +439,35 @@ CXXINCLUDES           += -I$(UK_GENERATED_INCLUDES)
 # Build rules
 ################################################################################
 # external application
-ifneq ($(UK_BASE),$(UK_APP))
-$(eval $(call _import_lib,$(UK_APP)));
+ifneq ($(CONFIG_UK_BASE),$(CONFIG_UK_APP))
+$(eval $(call _import_lib,$(CONFIG_UK_APP)));
 endif
 
 # external libraries
 $(foreach E,$(ELIB_DIR), \
 	$(eval $(call _import_lib,$(E))); \
 )
-$(eval $(call _import_lib,$(UK_BASE)/arch/$(UK_ARCH))) # architecture libraries
-include $(UK_BASE)/plat/Makefile.uk # platform libraries
-include $(UK_BASE)/lib/Makefile.uk # libraries
-include $(UK_BASE)/Makefile.uk # Unikraft base
+$(eval $(call _import_lib,$(CONFIG_UK_BASE)/arch/$(CONFIG_UK_ARCH))) # architecture libraries
+include $(CONFIG_UK_BASE)/plat/Makefile.uk # platform libraries
+include $(CONFIG_UK_BASE)/lib/Makefile.uk # libraries
+include $(CONFIG_UK_BASE)/Makefile.uk # Unikraft base
 
 ifeq ($(call qstrip,$(UK_PLATS) $(UK_PLATS-y)),)
 $(warning You did not choose any target platform.)
 $(warning Please choose at least one target platform in the configuration!)
 endif
-ifneq ($(HAVE_BOOTENTRY),y)
+ifneq ($(CONFIG_HAVE_BOOTENTRY),y)
 $(error You did not select a library that handles bootstrapping! (e.g., ukboot))
 endif
 
 # Generate build rules
-include $(UK_BASE)/support/build/Makefile.build
+include $(CONFIG_UK_BASE)/support/build/Makefile.build
 
 ifneq ($(call qstrip,$(UK_DEPS) $(UK_DEPS-y)),)
 -include $(UK_DEPS) $(UK_DEPS-y) # include header dependencies
 endif
 
-include $(UK_BASE)/plat/Linker.uk
+include $(CONFIG_UK_BASE)/plat/Linker.uk
 
 .PHONY: prepare image libs objs clean
 
@@ -494,7 +494,7 @@ all: images
 # Cleanup rules
 ################################################################################
 # Generate cleaning rules
-include $(UK_BASE)/support/build/Makefile.clean
+include $(CONFIG_UK_BASE)/support/build/Makefile.clean
 
 clean: $(addprefix clean-,\
 	$(foreach P,$(UK_PLATS) $(UK_PLATS-y),\
@@ -548,7 +548,7 @@ $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN): %: %.new
 
 $(KCONFIG_APP_IN).new:
 	@echo '# external application' > $@
-ifneq ($(UK_BASE),$(UK_APP))
+ifneq ($(CONFIG_UK_BASE),$(CONFIG_UK_APP))
 	@echo 'source "$(APP_DIR)/Config.uk"' >> $@
 else
 	@echo 'comment "No external application specified"' >> $@
@@ -577,28 +577,29 @@ DEFCONFIG = $(call qstrip,$(UK_DEFCONFIG))
 # We don't want to fully expand UK_DEFCONFIG here, so Kconfig will
 # recognize that if it's still at its default $(CONFIG_DIR)/defconfig
 COMMON_CONFIG_ENV = \
+	CONFIG_="CONFIG_" \
 	BR2_CONFIG="$(UK_CONFIG)" \
 	KCONFIG_AUTOCONFIG="$(KCONFIG_AUTOCONFIG)" \
 	KCONFIG_AUTOHEADER="$(KCONFIG_AUTOHEADER)" \
 	KCONFIG_TRISTATE="$(KCONFIG_TRISTATE)" \
 	HOST_GCC_VERSION="$(HOSTCC_VERSION)" \
 	BUILD_DIR="$(BUILD_DIR)" \
-	UK_BASE="$(UK_BASE)" \
-	UK_APP="$(UK_APP)" \
+	UK_BASE="$(CONFIG_UK_BASE)" \
+	UK_APP="$(CONFIG_UK_APP)" \
 	UK_CONFIG="$(UK_CONFIG)" \
 	UK_FULLVERSION="$(UK_FULLVERSION)" \
 	UK_CODENAME="$(UK_CODENAME)" \
-	UK_ARCH="$(UK_ARCH)" \
+	UK_ARCH="$(CONFIG_UK_ARCH)" \
 	KCONFIG_APP_IN="$(KCONFIG_APP_IN)" \
 	KCONFIG_ELIB_IN="$(KCONFIG_ELIB_IN)" \
-	UK_NAME="$(UK_NAME)"
+	UK_NAME="$(CONFIG_UK_NAME)"
 
 xconfig: $(KCONFIG_DIR)/qconf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN)
 	@$(COMMON_CONFIG_ENV) $< $(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 gconfig: $(KCONFIG_DIR)/gconf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN)
-	@$(COMMON_CONFIG_ENV) srctree=$(UK_BASE) $< $(CONFIG_CONFIG_IN)
+	@$(COMMON_CONFIG_ENV) srctree=$(CONFIG_UK_BASE) $< $(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 menuconfig: $(KCONFIG_DIR)/mconf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN)

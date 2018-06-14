@@ -1,7 +1,7 @@
-$(eval $(call addlib_s,libfdt,$(LIBFDT)))
+$(eval $(call addlib_s,libfdt,$(CONFIG_LIBFDT)))
 
-CINCLUDES-$(LIBFDT)	+= -I$(LIBFDT_BASE)/include
-CXXINCLUDES-$(LIBFDT)	+= -I$(LIBFDT_BASE)/include
+CINCLUDES-$(CONFIG_LIBFDT)	+= -I$(LIBFDT_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBFDT)	+= -I$(LIBFDT_BASE)/include
 
 LIBFDT_CFLAGS-y += -Wno-sign-compare
 

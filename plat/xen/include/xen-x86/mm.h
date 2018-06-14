@@ -144,7 +144,7 @@ typedef unsigned long pgentry_t;
 
 #endif
 
-#ifndef HAVE_LIBC
+#ifndef CONFIG_HAVE_LIBC
 #define HEAP_PAGES 0
 #else
 #define HEAP_PAGES   HEAP_PAGES_MAX

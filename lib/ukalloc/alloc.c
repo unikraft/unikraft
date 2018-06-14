@@ -109,7 +109,7 @@ int uk_alloc_set_default(struct uk_alloc *a)
 	return 0;
 }
 
-#if LIBUKALLOC_IFPAGES
+#if CONFIG_LIBUKALLOC_IFPAGES
 static void *uk_get_real_start(const void *ptr)
 {
 	void *intptr;

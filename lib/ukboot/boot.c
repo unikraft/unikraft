@@ -40,10 +40,10 @@
 #include <stddef.h>
 #include <errno.h>
 
-#if LIBUKALLOC && LIBUKALLOCBBUDDY && LIBUKBOOT_INITALLOC
+#if CONFIG_LIBUKALLOC && CONFIG_LIBUKALLOCBBUDDY && CONFIG_LIBUKBOOT_INITALLOC
 #include <uk/allocbbuddy.h>
 #endif
-#if LIBUKSCHED
+#if CONFIG_LIBUKSCHED
 #include <uk/sched.h>
 #endif
 #include <uk/arch/lcpu.h>
@@ -90,7 +90,7 @@ static void main_thread_func(void *arg)
 /* defined in <uk/plat.h> */
 void ukplat_entry_argp(char *arg0, char *argb, __sz argb_len)
 {
-	char *argv[LIBUKBOOT_MAXNBARGS];
+	char *argv[CONFIG_LIBUKBOOT_MAXNBARGS];
 	int argc = 0;
 
 	if (arg0) {
@@ -99,8 +99,8 @@ void ukplat_entry_argp(char *arg0, char *argb, __sz argb_len)
 	}
 	if (argb && argb_len) {
 		argc += uk_argnparse(argb, argb_len, arg0 ? &argv[1] : &argv[0],
-				     arg0 ? (LIBUKBOOT_MAXNBARGS - 1)
-					  : LIBUKBOOT_MAXNBARGS);
+				     arg0 ? (CONFIG_LIBUKBOOT_MAXNBARGS - 1)
+					  : CONFIG_LIBUKBOOT_MAXNBARGS);
 	}
 	ukplat_entry(argc, argv);
 }
@@ -110,19 +110,19 @@ void ukplat_entry(int argc, char *argv[])
 {
 	int i;
 	struct thread_main_arg tma;
-#if LIBUKALLOC
+#if CONFIG_LIBUKALLOC
 	struct uk_alloc *a = NULL;
 	int rc;
 #endif
-#if LIBUKALLOC && LIBUKALLOCBBUDDY && LIBUKBOOT_INITALLOC
+#if CONFIG_LIBUKALLOC && CONFIG_LIBUKALLOCBBUDDY && CONFIG_LIBUKBOOT_INITALLOC
 	struct ukplat_memregion_desc md;
 #endif
-#if LIBUKSCHED
+#if CONFIG_LIBUKSCHED
 	struct uk_sched *s = NULL;
 	struct uk_thread *main_thread = NULL;
 #endif
 
-#if LIBUKBOOT_BANNER
+#if CONFIG_LIBUKBOOT_BANNER
 	uk_printk("Welcome to  _ __             _____\n");
 	uk_printk(" __ _____  (_) /__ _______ _/ _/ /_\n");
 	uk_printk("/ // / _ \\/ /  '_// __/ _ `/ _/ __/\n");
@@ -153,7 +153,7 @@ void ukplat_entry(int argc, char *argv[])
 		}
 	}
 
-#if LIBUKALLOC && LIBUKALLOCBBUDDY && LIBUKBOOT_INITALLOC
+#if CONFIG_LIBUKALLOC && CONFIG_LIBUKALLOCBBUDDY && CONFIG_LIBUKBOOT_INITALLOC
 	/* initialize memory allocator
 	 * FIXME: ukallocbbuddy is hard-coded for now
 	 */
@@ -166,7 +166,7 @@ void ukplat_entry(int argc, char *argv[])
 
 			if ((md.flags & UKPLAT_MEMRF_ALLOCATABLE)
 			    != UKPLAT_MEMRF_ALLOCATABLE) {
-#if UKPLAT_MEMRNAME
+#if CONFIG_UKPLAT_MEMRNAME
 				uk_printd(DLVL_EXTRA, "Skip memory region %d: %p - %p (flags: 0x%02x, name: %s)\n",
 					  i, md.base, (void *)((size_t)md.base
 							       + md.len),
@@ -180,7 +180,7 @@ void ukplat_entry(int argc, char *argv[])
 				continue;
 			}
 
-#if UKPLAT_MEMRNAME
+#if CONFIG_UKPLAT_MEMRNAME
 			uk_printd(DLVL_EXTRA, "Try  memory region %d: %p - %p (flags: 0x%02x, name: %s)...\n",
 				  i, md.base, (void *)((size_t)md.base
 						       + md.len),
@@ -206,7 +206,7 @@ void ukplat_entry(int argc, char *argv[])
 		uk_printd(DLVL_WARN, "No suitable memory region for memory allocator. Continue without heap\n");
 #endif
 
-#if LIBUKALLOC
+#if CONFIG_LIBUKALLOC
 	uk_printd(DLVL_INFO, "Initialize IRQ subsystem...\n");
 	rc = ukplat_irq_init(a);
 	if (unlikely(rc != 0))
@@ -217,7 +217,7 @@ void ukplat_entry(int argc, char *argv[])
 	uk_printd(DLVL_INFO, "Initialize platform time...\n");
 	ukplat_time_init();
 
-#if LIBUKSCHED
+#if CONFIG_LIBUKSCHED
 	/* Init scheduler. */
 	s = uk_sched_default_init(a);
 	if (unlikely(!s))
@@ -227,7 +227,7 @@ void ukplat_entry(int argc, char *argv[])
 	tma.argc = argc;
 	tma.argv = argv;
 
-#if LIBUKSCHED
+#if CONFIG_LIBUKSCHED
 	main_thread = uk_thread_create("main", main_thread_func, &tma);
 	if (unlikely(!main_thread))
 		UK_CRASH("Could not create main thread.");

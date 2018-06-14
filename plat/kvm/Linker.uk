@@ -1,30 +1,30 @@
-ifeq (x86_64,$(UK_ARCH))
-KVM_LDSCRIPT  := -Wl,-T,$(UK_BASE)/plat/kvm/x86/link64.ld
+ifeq (x86_64,$(CONFIG_UK_ARCH))
+KVM_LDSCRIPT  := -Wl,-T,$(CONFIG_UK_BASE)/plat/kvm/x86/link64.ld
 KVM_LDFLAGS-y += -Wl,-m,elf_x86_64
 endif
 
 ##
 ## Link image
 ##
-KVM_IMAGE := $(BUILD_DIR)/$(UK_NAME)_kvm-$(UK_ARCH)
+KVM_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_kvm-$(CONFIG_UK_ARCH)
 
 $(KVM_IMAGE): $(KVM_LINK) $(KVM_LINK-y) $(UK_LINK) $(UK_LINK-y)
 	$(call build_cmd,LD,,$@.ld.o,\
 	       $(LD) -r $(LIBLDFLAGS) $(LIBLDFLAGS-y) $(KVM_LDFLAGS) $(KVM_LDFLAGS-y) $^ -o $@.ld.o)
 	$(call build_cmd,OBJCOPY,,$@.o,\
 	       $(OBJCOPY) -w -G kvmos_* -G _libkvmplat_entry $@.ld.o $@.o)
-ifeq (x86_64,$(UK_ARCH))
+ifeq (x86_64,$(CONFIG_UK_ARCH))
 	$(call build_cmd,LD,,$@,\
 	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(KVM_LDFLAGS) $(KVM_LDFLAGS-y) $(KVM_LDSCRIPT) $@.o -o $@)
-ifeq ($(OPTIMIZE_DBGFILE),y)
+ifeq ($(CONFIG_OPTIMIZE_DBGFILE),y)
 	$(call build_cmd,OBJCOPY,,$@.dbg,\
 	       $(OBJCOPY) --only-keep-debug $@ $@.dbg)
 endif
-ifeq ($(OPTIMIZE_SYMFILE),y)
+ifeq ($(CONFIG_OPTIMIZE_SYMFILE),y)
 	$(call build_cmd,NM,,$@.sym,\
 	       $(NM) -n $@ > $@.sym)
 endif
-ifeq ($(OPTIMIZE_STRIP),y)
+ifeq ($(CONFIG_OPTIMIZE_STRIP),y)
 	$(call verbose_cmd,STRIP,$(notdir $@),\
 	       $(STRIP) -s $@)
 endif
@@ -33,7 +33,7 @@ endif
 endif
 
 # register image to the build
-UK_IMAGES-$(PLAT_KVM) += $(KVM_IMAGE)
+UK_IMAGES-$(CONFIG_PLAT_KVM) += $(KVM_IMAGE)
 
 # ...for cleaning:
 LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_IMAGE))

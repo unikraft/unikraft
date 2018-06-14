@@ -44,7 +44,7 @@
 #include <uk/print.h>
 #include <uk/config.h>
 
-#if LIBUKDEBUG_ENABLE_ASSERT
+#if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
 #define UK_ASSERT(x)							\
 	do {								\
 		if (unlikely(!(x))) {					\

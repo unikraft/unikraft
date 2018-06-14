@@ -85,7 +85,7 @@ int uk_thread_init(struct uk_thread *thread,
 	thread->flags = 0;
 	thread->wakeup_time = 0LL;
 
-#ifdef HAVE_LIBC
+#ifdef CONFIG_HAVE_LIBC
 	//TODO _REENT_INIT_PTR(&thread->reent);
 #endif
 

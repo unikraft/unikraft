@@ -49,7 +49,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->len   = (size_t) &_etext - (size_t) &_text;
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE);
-#if UKPLAT_MEMRNAME
+#if CONFIG_UKPLAT_MEMRNAME
 		m->name  = "text";
 #endif
 		ret = 0;
@@ -59,7 +59,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->len   = (size_t) &_erodata - (size_t) &_rodata;
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE);
-#if UKPLAT_MEMRNAME
+#if CONFIG_UKPLAT_MEMRNAME
 		m->name  = "rodata";
 #endif
 		ret = 0;
@@ -69,7 +69,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->len   = (size_t) &_ectors - (size_t) &_ctors;
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE);
-#if UKPLAT_MEMRNAME
+#if CONFIG_UKPLAT_MEMRNAME
 		m->name  = "ctors";
 #endif
 		ret = 0;
@@ -80,7 +80,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE
 			    | UKPLAT_MEMRF_WRITABLE);
-#if UKPLAT_MEMRNAME
+#if CONFIG_UKPLAT_MEMRNAME
 		m->name  = "data";
 #endif
 		ret = 0;
@@ -91,7 +91,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE
 			    | UKPLAT_MEMRF_WRITABLE);
-#if UKPLAT_MEMRNAME
+#if CONFIG_UKPLAT_MEMRNAME
 		m->name  = "bss";
 #endif
 		ret = 0;
@@ -101,7 +101,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->len   = (size_t) _libkvmplat_stack_top
 			   - (size_t) _libkvmplat_heap_start;
 		m->flags = UKPLAT_MEMRF_ALLOCATABLE;
-#if UKPLAT_MEMRNAME
+#if CONFIG_UKPLAT_MEMRNAME
 		m->name  = "heap";
 #endif
 		ret = 0;
@@ -114,7 +114,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 			    | UKPLAT_MEMRF_READABLE
 			    | UKPLAT_MEMRF_WRITABLE);
 		ret = 0;
-#if UKPLAT_MEMRNAME
+#if CONFIG_UKPLAT_MEMRNAME
 		m->name  = "bstack";
 #endif
 		break;
@@ -122,7 +122,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->base  = __NULL;
 		m->len   = 0;
 		m->flags = 0x0;
-#if UKPLAT_MEMRNAME
+#if CONFIG_UKPLAT_MEMRNAME
 		m->name  = __NULL;
 #endif
 		ret = -1;

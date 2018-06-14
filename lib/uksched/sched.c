@@ -37,7 +37,7 @@
 #include <uk/plat/thread.h>
 #include <uk/alloc.h>
 #include <uk/sched.h>
-#if LIBUKSCHEDCOOP
+#if CONFIG_LIBUKSCHEDCOOP
 #include <uk/schedcoop.h>
 #endif
 
@@ -48,7 +48,7 @@ struct uk_sched *uk_sched_default_init(struct uk_alloc *a)
 {
 	struct uk_sched *s = NULL;
 
-#if LIBUKSCHEDCOOP
+#if CONFIG_LIBUKSCHEDCOOP
 	s = uk_schedcoop_init(a);
 #endif
 

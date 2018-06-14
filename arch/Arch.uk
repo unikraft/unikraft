@@ -1,6 +1,6 @@
 # Selects architecture according to .config
-ifeq ($(ARCH_X86_64),y)
-UK_ARCH := x86_64
-else ifeq ($(ARCH_ARM_32),y)
-UK_ARCH := arm
+ifeq ($(CONFIG_ARCH_X86_64),y)
+CONFIG_UK_ARCH := x86_64
+else ifeq ($(CONFIG_ARCH_ARM_32),y)
+CONFIG_UK_ARCH := arm
 endif

@@ -30,7 +30,7 @@
 
 __u64 __qdivrem(__u64 u, __u64 v, __u64 *rem);
 
-#ifndef HAVE_LIBC
+#ifndef CONFIG_HAVE_LIBC
 __s64 __divdi3(__s64 a, __s64 b)
 {
 	__u64 ua, ub, uq;

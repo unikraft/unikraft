@@ -169,12 +169,12 @@ endif
 # Calls a command that creates an object
 #
 # build_cmd $quietlabel,$libname(optional),$target,$command
-ifeq ($(RECORD_BUILDTIME_TIME),y)
+ifeq ($(CONFIG_RECORD_BUILDTIME_TIME),y)
 define build_cmd =
 $(call verbose_cmd,$(1),$(if $(2),$(2)':' ,)$(notdir $(3)),$(TIME) $(TIMEFLAGS) -o $(addsuffix .time,$(3)) $(4))
 endef
 else
-ifeq ($(RECORD_BUILDTIME_LIFTOFF),y)
+ifeq ($(CONFIG_RECORD_BUILDTIME_LIFTOFF),y)
 define build_cmd =
 $(call verbose_cmd,$(1),$(if $(2),$(2)':' ,)$(notdir $(3)),$(LIFTOFF) $(LITFOFFFLAGS) -o $(addsuffix .liftoff,$(3)) -- $(4))
 endef
@@ -188,10 +188,10 @@ endif
 # Returns a list of files to be cleaned when build_cmd was used
 #
 # build_clean $target
-ifeq ($(RECORD_BUILDTIME_TIME),y)
+ifeq ($(CONFIG_RECORD_BUILDTIME_TIME),y)
 build_clean = $(1) $(addsuffix .time,$(1))
 else
-ifeq ($(RECORD_BUILDTIME_LIFTOFF),y)
+ifeq ($(CONFIG_RECORD_BUILDTIME_LIFTOFF),y)
 build_clean = $(1) $(addsuffix .liftoff,$(1))
 else
 build_clean = $(1)

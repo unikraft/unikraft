@@ -1,4 +1,4 @@
-UK_PLAT_BASE        := $(UK_BASE)/plat
+UK_PLAT_BASE        := $(CONFIG_UK_BASE)/plat
 UK_PLAT_COMMON_BASE := $(UK_PLAT_BASE)/common
 
 $(eval $(call _import_lib,$(UK_PLAT_BASE)/xen))

@@ -73,7 +73,7 @@ static inline void _mb_get_cmdline(struct multiboot_info *mi, char *cmdline,
 			: (maxlen - 1)] = '\0';
 	} else {
 		uk_printd(DLVL_INFO, "No command line found\n");
-		strcpy(cmdline, UK_NAME);
+		strcpy(cmdline, CONFIG_UK_NAME);
 	}
 }
 

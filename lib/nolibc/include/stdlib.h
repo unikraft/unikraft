@@ -48,7 +48,7 @@ unsigned long strtoul(const char *nptr, char **endptr, int base);
 long long strtoll(const char *nptr, char **endptr, int base);
 unsigned long long strtoull(const char *nptr, char **endptr, int base);
 
-#if LIBUKALLOC
+#if CONFIG_LIBUKALLOC
 /* Allocate size bytes of memory. Returns pointer to start of allocated memory,
  * or NULL on failure.
  */
@@ -75,7 +75,7 @@ int posix_memalign(void **memptr, size_t align, size_t size);
  * start of allocated memory, or NULL on failure.
  */
 void *memalign(size_t align, size_t size);
-#endif /* LIBUKALLOC */
+#endif /* CONFIG_LIBUKALLOC */
 
 #ifdef __cplusplus
 }

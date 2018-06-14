@@ -201,7 +201,7 @@ static void map_free(struct uk_bbpalloc *b, uintptr_t first_page,
 	b->nr_free_pages += nr_pages;
 }
 
-#if LIBUKALLOC_IFSTATS
+#if CONFIG_LIBUKALLOC_IFSTATS
 static ssize_t bbuddy_availmem(struct uk_alloc *a)
 {
 	struct uk_bbpalloc *b;
@@ -439,7 +439,7 @@ struct uk_alloc *uk_allocbbuddy_init(void *base, size_t len)
 	/* initialize and register allocator interface */
 	uk_alloc_init_palloc(a, bbuddy_palloc, bbuddy_pfree,
 			     bbuddy_addmem);
-#if LIBUKALLOC_IFSTATS
+#if CONFIG_LIBUKALLOC_IFSTATS
 	a->availmem = bbuddy_availmem;
 #endif
 

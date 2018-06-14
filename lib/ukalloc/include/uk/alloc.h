@@ -66,7 +66,7 @@ typedef void* (*uk_alloc_realloc_func_t)
 		(struct uk_alloc *a, void *ptr, size_t size);
 typedef void  (*uk_alloc_free_func_t)
 		(struct uk_alloc *a, void *ptr);
-#if LIBUKALLOC_IFPAGES
+#if CONFIG_LIBUKALLOC_IFPAGES
 typedef void* (*uk_alloc_palloc_func_t)
 		(struct uk_alloc *a, size_t order);
 typedef void  (*uk_alloc_pfree_func_t)
@@ -74,7 +74,7 @@ typedef void  (*uk_alloc_pfree_func_t)
 #endif
 typedef int   (*uk_alloc_addmem_func_t)
 		(struct uk_alloc *a, void *base, size_t size);
-#if LIBUKALLOC_IFSTATS
+#if CONFIG_LIBUKALLOC_IFSTATS
 typedef ssize_t (*uk_alloc_availmem_func_t)
 		(struct uk_alloc *a);
 #endif
@@ -88,12 +88,12 @@ struct uk_alloc {
 	uk_alloc_memalign_func_t memalign;
 	uk_alloc_free_func_t free;
 
-#if LIBUKALLOC_IFPAGES
+#if CONFIG_LIBUKALLOC_IFPAGES
 	/* page allocation interface */
 	uk_alloc_palloc_func_t palloc;
 	uk_alloc_pfree_func_t pfree;
 #endif
-#if LIBUKALLOC_IFSTATS
+#if CONFIG_LIBUKALLOC_IFSTATS
 	/* optional interface */
 	uk_alloc_availmem_func_t availmem;
 #endif
@@ -191,7 +191,7 @@ static inline void uk_free(struct uk_alloc *a, void *ptr)
 	uk_do_free(a, ptr);
 }
 
-#if LIBUKALLOC_IFPAGES
+#if CONFIG_LIBUKALLOC_IFPAGES
 static inline void *uk_do_palloc(struct uk_alloc *a, size_t order)
 {
 	UK_ASSERT(a);
@@ -222,7 +222,7 @@ static inline int uk_alloc_addmem(struct uk_alloc *a, void *base,
 	else
 		return -ENOTSUP;
 }
-#if LIBUKALLOC_IFSTATS
+#if CONFIG_LIBUKALLOC_IFSTATS
 static inline ssize_t uk_alloc_availmem(struct uk_alloc *a)
 {
 	UK_ASSERT(a);
@@ -230,9 +230,9 @@ static inline ssize_t uk_alloc_availmem(struct uk_alloc *a)
 		return (ssize_t) -ENOTSUP;
 	return a->availmem(a);
 }
-#endif /* LIBUKALLOC_IFSTATS */
+#endif /* CONFIG_LIBUKALLOC_IFSTATS */
 
-#if LIBUKALLOC_IFPAGES
+#if CONFIG_LIBUKALLOC_IFPAGES
 /* uses palloc(), pfree() */
 void *uk_malloc_ifpages(struct uk_alloc *a, size_t size);
 void *uk_realloc_ifpages(struct uk_alloc *a, void *ptr, size_t size);
@@ -246,7 +246,7 @@ void uk_free_ifpages(struct uk_alloc *a, void *ptr);
 void *uk_calloc_compat(struct uk_alloc *a, size_t num, size_t len);
 void *uk_memalign_compat(struct uk_alloc *a, size_t align, size_t len);
 
-#if LIBUKALLOC_IFPAGES
+#if CONFIG_LIBUKALLOC_IFPAGES
 #define uk_alloc_init_palloc(a, palloc_func, pfree_func, addmem_func)	\
 	do {								\
 		(a)->malloc         = uk_malloc_ifpages;		\
