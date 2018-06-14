@@ -156,8 +156,10 @@ kxgettext-objs	:= kxgettext.o zconf.tab.o
 qconf-cxxobjs	:= qconf.o
 qconf-objs	:= zconf.tab.o
 gconf-objs	:= gconf.o zconf.tab.o
+fixdep-obj	:= fixdep.o
 
 hostprogs-y := conf
+hostprogs-y += fixdep
 
 ifeq ($(MAKECMDGOALS),nconf)
 	hostprogs-y += nconf

@@ -287,16 +287,24 @@ endef
 # Adds library-specific (AS/C/CXX)FLAGS to the build
 #
 # buildrule_* $libname,$source,$target,$extraflags(optional)
+tmp_depfile = $(dir $1).$(notdir $1).d
+depflags = -Wp$(comma)-MD$(comma)$(call tmp_depfile,$(3))
+define fixdep_and_cmd =
+	$(call build_cmd,$1,$2,$3,$4)
+	$Q $(UK_FIXDEP) $(call tmp_depfile,$3) $3 '$(call strip,$4)' \
+		$(BUILD_DIR) 	> $(call obj2dep,$3) && \
+		rm -f $(call tmp_depfile,$3)
+endef
 
 define buildrule_S =
 $(3): $(2) | prepare
-	$(call build_cmd,AS,$(1),$(3),\
+	$(call fixdep_and_cmd,AS,$(1),$(3),\
 		$(AS)  $(ASINCLUDES) $(ASINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),ASINCLUDES)) $($(call vprefix_lib,$(1),ASINCLUDES-y)) \
 		       $(ASFLAGS) $(ASFLAGS-y) \
 		       $($(call vprefix_lib,$(1),ASFLAGS)) $($(call vprefix_lib,$(1),ASFLAGS-y)) \
 		       $(4) -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) \
-		       -c $(2) -o $(3) -MD
+		       -c $(2) -o $(3) $(depflags)
 	)
 
 UK_SRCS-y += $(2)
@@ -308,14 +316,14 @@ endef
 
 define buildrule_c =
 $(3): $(2) | prepare
-	$(call build_cmd,CC,$(1),$(3),\
+	$(call fixdep_and_cmd,CC,$(1),$(3),\
 		$(CC)  $(CINCLUDES) $(CINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),CINCLUDES)) $($(call vprefix_lib,$(1),CINCLUDES-y)) \
 		       $(CFLAGS) $(CFLAGS-y) \
 		       $($(call vprefix_lib,$(1),CFLAGS)) $($(call vprefix_lib,$(1),CFLAGS-y)) \
 		       $(4) -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) \
-		       -c $(2) -o $(3) -MD
-	)
+		       -c $(2) -o $(3) $(depflags)
+)
 
 UK_SRCS-y += $(2)
 UK_DEPS-y += $(call obj2dep,$(3))
@@ -326,13 +334,13 @@ endef
 
 define buildrule_cc =
 $(3): $(2) | prepare
-	$(call build_cmd,CXX,$(1),$(3),\
+	$(call fixdep_and_cmd,CXX,$(1),$(3),\
 		$(CXX) $(CXXINCLUDES) $(CXXINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),CXXINCLUDES)) $($(call vprefix_lib,$(1),CXXINCLUDES-y)) \
 		       $(CXXFLAGS) $(CXXFLAGS-y) \
 		       $($(call vprefix_lib,$(1),CXXFLAGS)) $($(call vprefix_lib,$(1),CXXFLAGS-y)) \
 		       $(4) -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) \
-		       -c $(2) -o $(3) -MD
+		       -c $(2) -o $(3) $(depflags)
 	)
 
 UK_SRCS-y += $(2)

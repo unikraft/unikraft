@@ -107,9 +107,15 @@
 #include <stdio.h>
 #include <ctype.h>
 
+/* The global variable is a bit against the style of fixdep. But this
+ * reduces number of changed lines significantly. Which hopefully will
+ * make it easier to merge with newer version from linux source tree.
+ */
+static const char *builddir;
+
 static void usage(void)
 {
-	fprintf(stderr, "Usage: fixdep [-e] <depfile> <target> <cmdline>\n");
+	fprintf(stderr, "Usage: fixdep [-e] <depfile> <target> <cmdline> <builddir>\n");
 	fprintf(stderr, " -e  insert extra dependencies given on stdin\n");
 	exit(1);
 }
@@ -121,7 +127,7 @@ static void print_dep(const char *m, int slen, const char *dir)
 {
 	int c, i;
 
-	printf("    $(wildcard %s/", dir);
+	printf("    $(wildcard %s/%s/", builddir, dir);
 	for (i = 0; i < slen; i++) {
 		c = m[i];
 		if (c == '_')
@@ -212,7 +218,7 @@ static void use_config(const char *m, int slen)
 		return;
 
 	define_config(m, slen, hash);
-	print_dep(m, slen, "include/config");
+	print_dep(m, slen, "kconfig/depinclude");
 }
 
 /* test if s ends in sub */
@@ -285,9 +291,7 @@ static void *read_file(const char *filename)
 /* Ignore certain dependencies */
 static int is_ignored_file(const char *s, int len)
 {
-	return str_ends_with(s, len, "include/generated/autoconf.h") ||
-	       str_ends_with(s, len, "include/generated/autoksyms.h") ||
-	       str_ends_with(s, len, ".ver");
+	return str_ends_with(s, len, "build/include/uk/_config.h");
 }
 
 /*
@@ -384,15 +388,16 @@ int main(int argc, char *argv[])
 	int insert_extra_deps = 0;
 	void *buf;
 
-	if (argc == 5 && !strcmp(argv[1], "-e")) {
+	if (argc == 6 && !strcmp(argv[1], "-e")) {
 		insert_extra_deps = 1;
 		argv++;
-	} else if (argc != 4)
+	} else if (argc != 5)
 		usage();
 
 	depfile = argv[1];
 	target = argv[2];
 	cmdline = argv[3];
+	builddir = argv[4];
 
 	printf("cmd_%s := %s\n\n", target, cmdline);
 

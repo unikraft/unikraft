@@ -116,6 +116,7 @@ UK_CONFIG             := $(CONFIG_DIR)/.config
 UK_CONFIG_OUT         := $(BUILD_DIR)/config
 UK_GENERATED_INCLUDES := $(BUILD_DIR)/include
 KCONFIG_DIR           := $(BUILD_DIR)/kconfig
+UK_FIXDEP             := $(KCONFIG_DIR)/fixdep
 KCONFIG_AUTOCONFIG    := $(KCONFIG_DIR)/auto.conf
 KCONFIG_TRISTATE      := $(KCONFIG_DIR)/tristate.config
 KCONFIG_AUTOHEADER    := $(UK_GENERATED_INCLUDES)/uk/_config.h
@@ -478,7 +479,8 @@ $(UK_CONFIG_OUT): $(UK_CONFIG)
 		$(UK_CONFIG) \
 		$(UK_CONFIG_OUT))
 
-prepare: $(KCONFIG_AUTOHEADER) $(UK_CONFIG_OUT) $(UK_PREPARE) $(UK_PREPARE-y) | fetch
+prepare: $(KCONFIG_AUTOHEADER) $(UK_CONFIG_OUT) $(UK_PREPARE) $(UK_PREPARE-y)
+prepare: $(UK_FIXDEP) | fetch
 
 objs: $(UK_OBJS) $(UK_OBJS-y)
 
@@ -562,7 +564,10 @@ $(KCONFIG_ELIB_IN).new:
 # enforce execution
 .PHONY: $(KCONFIG_APP_IN).new $(KCONFIG_ELIB_IN).new
 
-$(KCONFIG_DIR)/%onf:
+KCONFIG_TOOLS = conf mconf gconf nconf fixdep
+KCONFIG_TOOLS := $(addprefix $(KCONFIG_DIR)/,$(KCONFIG_TOOLS))
+
+$(KCONFIG_TOOLS):
 	mkdir -p $(@D)/lxdialog
 	$(MAKE) CC="$(HOSTCC_NOCCACHE)" HOSTCC="$(HOSTCC_NOCCACHE)" \
 	    obj=$(@D) -C $(CONFIG) -f Makefile.br $(@F)
