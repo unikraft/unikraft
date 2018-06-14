@@ -1,0 +1,20 @@
+menuconfig LIBUKSWRAND
+	bool "ukswrand: Software random number generator"
+	select LIBUKDEBUG
+	default n
+
+if LIBUKSWRAND
+choice
+	prompt "Algorithm"
+	default LIBUKSWRAND_MWC
+
+config LIBUKSWRAND_MWC
+	bool "Multiply-with-carry"
+	help
+		Use multiply-with-carry algorithm
+endchoice
+
+config LIBUKSWRAND_INITIALSEED
+	int "Initial random seed"
+	default 23
+endif
