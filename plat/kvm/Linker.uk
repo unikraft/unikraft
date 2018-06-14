@@ -24,10 +24,14 @@ ifeq ($(CONFIG_OPTIMIZE_SYMFILE),y)
 	$(call build_cmd,NM,,$@.sym,\
 	       $(NM) -n $@ > $@.sym)
 endif
-ifeq ($(CONFIG_OPTIMIZE_STRIP),y)
-	$(call verbose_cmd,STRIP,$(notdir $@),\
-	       $(STRIP) -s $@)
-endif
+# TODO: We have to revisit stripping of KVM binaries. We noticed that sometimes
+#       the images are broken and cannot be boot with QEMU's direct kernel boot
+#       option (fread() error is returned).
+#
+#ifeq ($(CONFIG_OPTIMIZE_STRIP),y)
+#	$(call verbose_cmd,STRIP,$(notdir $@),\
+#	       $(STRIP) -s $@)
+#endif
 	$(call build_cmd,GZ,,$@.gz,\
 	       $(GZIP) -f -9 -c $@ >$@.gz)
 endif
