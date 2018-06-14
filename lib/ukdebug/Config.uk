@@ -44,10 +44,10 @@ config LIBUKDEBUG_PRINTD_TIME
 	default y
 	depends on LIBUKDEBUG_PRINTD
 
-config LIBUKDEBUG_PRINTD_THREAD
-	bool "Show name of thread in debug messages"
-	default y
-	depends on LIBUKDEBUG_PRINTD && LIBUKSCHED
+config LIBUKDEBUG_PRINTD_STACK
+	bool "Print bottom address of stack in debug messages"
+	default n
+	depends on LIBUKDEBUG_PRINTD
 
 choice
 	prompt "Message redirection"

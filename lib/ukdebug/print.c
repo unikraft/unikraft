@@ -44,9 +44,6 @@
 #include <uk/plat/console.h>
 #include <uk/plat/time.h>
 #include <uk/print.h>
-#if LIBUKSCHED
-#include <uk/thread.h>
-#endif
 #include <uk/errptr.h>
 #include <uk/arch/lcpu.h>
 
@@ -96,24 +93,17 @@ static void _printd_timestamp(void)
 }
 #endif
 
-#if LIBUKDEBUG_PRINTD_THREAD
-static void _printd_thread(void)
+#if LIBUKDEBUG_PRINTD_STACK
+static void _printd_stack(void)
 {
-	struct uk_thread *thread;
+	unsigned long stackb;
+	char buf[BUFLEN];
+	int len;
 
-	thread = uk_thread_current();
-	if (!PTRISERR(thread) && thread->name) {
-		_ukplat_coutd("<", 1);
-		_ukplat_coutd((char *)thread->name,
-				strlen(thread->name));
-		_ukplat_coutd("> ", 2);
-	} else {
-		char buf[BUFLEN];
-		int len;
+	stackb = (ukarch_read_sp() & ~(__STACK_SIZE - 1)) + __STACK_SIZE;
 
-		len = snprintf(buf, BUFLEN, "<%p> ", thread);
-		_ukplat_coutd((char *)buf, len);
-	}
+	len = snprintf(buf, BUFLEN, "<%p> ", (void *) stackb);
+	_ukplat_coutd((char *)buf, len);
 }
 #endif
 
@@ -175,8 +165,8 @@ static inline void _vprintd(int lvl, const char *libname, const char *srcname,
 			_printd_timestamp();
 #endif
 			_ukplat_coutd(DECONST(char *, msghdr), 6);
-#if LIBUKDEBUG_PRINTD_THREAD
-			_printd_thread();
+#if LIBUKDEBUG_PRINTD_STACK
+			_printd_stack();
 #endif
 			if (libname) {
 				_ukplat_coutd("[", 1);
