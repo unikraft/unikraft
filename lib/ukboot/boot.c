@@ -58,6 +58,9 @@
 #include <uk/argparse.h>
 
 int main(int argc, char *argv[]) __weak;
+#ifdef CONFIG_LIBLWIP
+extern int liblwip_init(void);
+#endif /* CONFIG_LIBLWIP */
 
 static void main_thread_func(void *arg) __noreturn;
 
@@ -79,6 +82,16 @@ static void main_thread_func(void *arg)
 			uk_printd(DLVL_INFO, ", ");
 	}
 	uk_printd(DLVL_INFO, "])\n");
+
+#ifdef CONFIG_LIBLWIP
+	/*
+	 * TODO: This is an initial implementation where we call the
+	 * initialization of lwip directly. We will remove this call
+	 * as soon as we introduced a more generic scheme for
+	 * (external) library initializations.
+	 */
+	liblwip_init();
+#endif /* CONFIG_LIBLWIP */
 
 	/* call main */
 	ret = main(tma->argc, tma->argv);
