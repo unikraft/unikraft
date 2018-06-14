@@ -10,7 +10,7 @@ treated as libraries in Unikraft but there are a few differences:
 2. You need to register the platform **and** the library with Unikraft
    using the following commands: ::
 
-     $(eval $(call addplat_s,platname,$(PLAT_PLATNAME)))
+     $(eval $(call addplat_s,platname,$(CONFIG_PLAT_PLATNAME)))
      $(eval $(call addplatlib,platname,libplatnameplat))
 
 3. You need to provide a linker script and name the file ``Linker.uk``.

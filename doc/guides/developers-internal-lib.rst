@@ -64,7 +64,7 @@ on the library API. For instance, for a new scheduler you would write:
 
 Like other Unikraft libraries, you'll need a simple ``Makefile.uk``: ::
 
-  $(eval $(call addlib_s,libucschedmysched,$(LIBUKSCHEDMYSCHED)))
+  $(eval $(call addlib_s,libucschedmysched,$(CONFIG_LIBUKSCHEDMYSCHED)))
   CINCLUDES-$(LIBUKSCHEDMYSCHED)     += -I$(LIBUKSCHEDMYSCHED_BASE)/include
   CXXINCLUDES-$(LIBUKSCHEDMYSCHED)   += -I$(LIBUKSCHEDMYSCHED_BASE)/include
   LIBUKSCHEDMYSCHED_SRCS-y += $(LIBUKSCHEDMYSCHED_BASE)/mysched.c

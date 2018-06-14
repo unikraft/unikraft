@@ -32,7 +32,7 @@ This also means that the library should be off on default.
 Since the library can be switched on and off for the build, you should use the
 following registration command for libraries instead (Makefile.uk): ::
 
-  $(eval $(call addlib_s,libname,$(LIBNAME)))
+  $(eval $(call addlib_s,libname,$(CONFIG_LIBNAME)))
 
 Among the same set of reserved of variable names, libraries most likely forward
 some includes and flags to the whole build, meaning also to other libraries and
