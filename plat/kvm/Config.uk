@@ -9,5 +9,12 @@ menuconfig PLAT_KVM
        help
                 Create a Unikraft image that runs as a KVM guest
 
-#if (PLAT_KVM)
-#endif
+if (PLAT_KVM)
+config KVM_PCI
+       bool "PCI Bus Driver"
+       default y
+       depends on (ARCH_X86_64)
+       select LIBUKBUS
+       help
+                PCI bus driver for probing and operating PCI devices
+endif
