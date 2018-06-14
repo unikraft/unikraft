@@ -56,6 +56,9 @@
 #include <uk/essentials.h>
 #include <uk/print.h>
 #include <uk/argparse.h>
+#if CONFIG_LIBUKBUS
+#include <uk/bus.h>
+#endif /* CONFIG_LIBUKBUS */
 
 int main(int argc, char *argv[]) __weak;
 #ifdef CONFIG_LIBLWIP
@@ -82,6 +85,13 @@ static void main_thread_func(void *arg)
 			uk_printd(DLVL_INFO, ", ");
 	}
 	uk_printd(DLVL_INFO, "])\n");
+
+#ifdef CONFIG_LIBUKBUS
+	uk_printd(DLVL_INFO, "Initialize bus handlers...\n");
+	uk_bus_init_all(uk_alloc_get_default());
+	uk_printd(DLVL_INFO, "Probe buses...\n");
+	uk_bus_probe_all();
+#endif /* CONFIG_LIBUKBUS */
 
 #ifdef CONFIG_LIBLWIP
 	/*

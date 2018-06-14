@@ -1,0 +1,8 @@
+menuconfig LIBUKBUS
+	bool "ukbus: Abstraction for device buses"
+	default n
+	select LIBUKDEBUG
+	select LIBUKALLOC
+
+if LIBUKBUS
+endif
