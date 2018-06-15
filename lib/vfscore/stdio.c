@@ -33,85 +33,34 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#include <string.h>
-#include <uk/essentials.h>
-#include <uk/arch/atomic.h>
-#include <uk/assert.h>
 #include <vfscore/file.h>
-#include <uk/plat/lcpu.h>
-#include <errno.h>
+#include <uk/plat/console.h>
 
-#define FDTABLE_MAX_FILES (sizeof(uint64_t) * 8)
+/* One function for stderr and stdout */
+static ssize_t stdout_write(struct vfscore_file *vfscore_file, const void *buf,
+			     size_t count)
+{
+	(void) vfscore_file;
+	return ukplat_coutk(buf, count);
+}
 
-void init_stdio(void);
-
-struct fdtable {
-	uint64_t bitmap;
-	uint32_t fd_start;
-	struct vfscore_file *files[FDTABLE_MAX_FILES];
+static struct vfscore_fops stdout_fops = {
+	.write = stdout_write,
 };
-struct fdtable fdtable;
 
-int vfscore_alloc_fd(void)
+static struct vfscore_file  stdout_file = {
+	.fd = 1,
+	.fops = &stdout_fops,
+};
+
+static struct vfscore_file  stderr_file = {
+	.fd = 2,
+	.fops = &stdout_fops,
+};
+
+
+void init_stdio(void)
 {
-	unsigned long flags;
-	int ret;
-
-	flags = ukplat_lcpu_save_irqf();
-	ret = ukarch_find_lsbit(~fdtable.bitmap);
-
-	if (!ret) {
-		ret = -ENFILE;
-		goto exit;
-	}
-
-	fdtable.bitmap |= (uint64_t) 1 << ret;
-
-exit:
-	ukplat_lcpu_restore_irqf(flags);
-	return ret;
-}
-
-void vfscore_put_fd(int fd)
-{
-	UK_ASSERT(fd < (int) FDTABLE_MAX_FILES);
-	/* Currently it is not allowed to free std(in|out|err) */
-	UK_ASSERT(fd > 2);
-
-	ukarch_test_and_clr_bit(fd, &fdtable.bitmap);
-}
-
-void vfscore_install_fd(int fd, struct vfscore_file *file)
-{
-	UK_ASSERT(fd < (int) FDTABLE_MAX_FILES);
-	UK_ASSERT(file);
-
-	file->fd = fd;
-	fdtable.files[fd] = file;
-}
-
-struct vfscore_file *vfscore_get_file(int fd)
-{
-	unsigned long flags;
-	struct vfscore_file *ret = NULL;
-
-	UK_ASSERT(fd < (int) FDTABLE_MAX_FILES);
-
-	flags = ukplat_lcpu_save_irqf();
-	if (!(fdtable.bitmap & ((uint64_t) 1 << fd)))
-		goto exit;
-	ret = fdtable.files[fd];
-
-exit:
-	ukplat_lcpu_restore_irqf(flags);
-	return ret;
-}
-
-__constructor static void fdtable_init(void)
-{
-	memset(&fdtable, 0, sizeof(fdtable));
-
-	/* reserve stdin, stdout and stderr */
-	fdtable.bitmap = 7;
-	init_stdio();
+	vfscore_install_fd(1, &stdout_file);
+	vfscore_install_fd(2, &stderr_file);
 }
