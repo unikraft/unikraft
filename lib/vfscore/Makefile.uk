@@ -1,0 +1,6 @@
+$(eval $(call addlib,libvfscore))
+
+CINCLUDES-y += -I$(LIBVFSCORE_BASE)/include
+
+LIBVFSCORE_SRCS-y += $(LIBVFSCORE_BASE)/fd.c
+LIBVFSCORE_SRCS-y += $(LIBVFSCORE_BASE)/file.c
