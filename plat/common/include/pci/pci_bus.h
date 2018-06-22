@@ -163,7 +163,7 @@ UK_TAILQ_HEAD(pci_device_list, struct pci_device);
 
 #define _PCI_REGISTER_DRIVER(libname, b)				\
 	static void __constructor_prio(103)				\
-	PCI_REGFNNAME(libname, _pci_register_driver)(void)		\
+	_PCI_REGFNNAME(libname, _pci_register_driver)(void)		\
 	{								\
 		_pci_register_driver((b));				\
 	}
