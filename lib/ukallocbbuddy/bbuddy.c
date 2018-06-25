@@ -69,7 +69,7 @@ struct uk_bbpalloc_memr {
 	unsigned long first_page;
 	unsigned long nr_pages;
 	unsigned long mm_alloc_bitmap_size;
-	unsigned long mm_alloc_bitmap[];
+	unsigned long *mm_alloc_bitmap;
 };
 
 struct uk_bbpalloc {
@@ -93,10 +93,12 @@ struct uk_bbpalloc {
  *  *_idx == Index into `mm_alloc_bitmap' array.
  *  *_off == Bit offset within an element of the `mm_alloc_bitmap' array.
  */
-#define PAGES_PER_MAPWORD (sizeof(unsigned long) * 8)
+#define BITS_PER_BYTE       8
+#define BYTES_PER_MAPWORD   (sizeof(unsigned long))
+#define PAGES_PER_MAPWORD   (BYTES_PER_MAPWORD * BITS_PER_BYTE)
 
 static inline struct uk_bbpalloc_memr *map_get_memr(struct uk_bbpalloc *b,
-						    unsigned long page_num)
+						    unsigned long page_va)
 {
 	struct uk_bbpalloc_memr *memr = NULL;
 
@@ -106,8 +108,9 @@ static inline struct uk_bbpalloc_memr *map_get_memr(struct uk_bbpalloc *b,
 	 * of them. It should be just one region in most cases
 	 */
 	for (memr = b->memr_head; memr != NULL; memr = memr->next) {
-		if ((page_num >= memr->first_page)
-		    && (page_num < (memr->first_page + memr->nr_pages)))
+		if ((page_va >= memr->first_page)
+		    && (page_va < (memr->first_page +
+		    (memr->nr_pages << __PAGE_SHIFT))))
 			return memr;
 	}
 
@@ -117,24 +120,29 @@ static inline struct uk_bbpalloc_memr *map_get_memr(struct uk_bbpalloc *b,
 	return NULL;
 }
 
-static inline int allocated_in_map(struct uk_bbpalloc *b,
-				   unsigned long page_num)
+static inline unsigned long allocated_in_map(struct uk_bbpalloc *b,
+				   unsigned long page_va)
 {
-	struct uk_bbpalloc_memr *memr = map_get_memr(b, page_num);
+	struct uk_bbpalloc_memr *memr = map_get_memr(b, page_va);
+	unsigned long page_idx;
+	unsigned long bm_idx, bm_off;
 
 	/* treat pages outside of region as allocated */
 	if (!memr)
 		return 1;
 
-	page_num -= memr->first_page;
-	return ((memr)->mm_alloc_bitmap[(page_num) / PAGES_PER_MAPWORD]
-		& (1UL << ((page_num) & (PAGES_PER_MAPWORD - 1))));
+	page_idx = (page_va - memr->first_page) >> __PAGE_SHIFT;
+	bm_idx = page_idx / PAGES_PER_MAPWORD;
+	bm_off = page_idx & (PAGES_PER_MAPWORD - 1);
+
+	return ((memr)->mm_alloc_bitmap[bm_idx] & (1UL << bm_off));
 }
 
 static void map_alloc(struct uk_bbpalloc *b, uintptr_t first_page,
 		      unsigned long nr_pages)
 {
 	struct uk_bbpalloc_memr *memr;
+	unsigned long first_page_idx, end_page_idx;
 	unsigned long start_off, end_off, curr_idx, end_idx;
 
 	/*
@@ -144,14 +152,16 @@ static void map_alloc(struct uk_bbpalloc *b, uintptr_t first_page,
 	 */
 	memr = map_get_memr(b, first_page);
 	UK_ASSERT(memr != NULL);
-	UK_ASSERT((first_page + nr_pages)
-		  <= (memr->first_page + memr->nr_pages));
+	UK_ASSERT((first_page + (nr_pages << __PAGE_SHIFT))
+		  <= (memr->first_page + (memr->nr_pages << __PAGE_SHIFT)));
 
 	first_page -= memr->first_page;
-	curr_idx = first_page / PAGES_PER_MAPWORD;
-	start_off = first_page & (PAGES_PER_MAPWORD - 1);
-	end_idx = (first_page + nr_pages) / PAGES_PER_MAPWORD;
-	end_off = (first_page + nr_pages) & (PAGES_PER_MAPWORD - 1);
+	first_page_idx = first_page >> __PAGE_SHIFT;
+	curr_idx = first_page_idx / PAGES_PER_MAPWORD;
+	start_off = first_page_idx & (PAGES_PER_MAPWORD - 1);
+	end_page_idx = first_page_idx + nr_pages;
+	end_idx = end_page_idx / PAGES_PER_MAPWORD;
+	end_off = end_page_idx & (PAGES_PER_MAPWORD - 1);
 
 	if (curr_idx == end_idx) {
 		memr->mm_alloc_bitmap[curr_idx] |=
@@ -170,6 +180,7 @@ static void map_free(struct uk_bbpalloc *b, uintptr_t first_page,
 		     unsigned long nr_pages)
 {
 	struct uk_bbpalloc_memr *memr;
+	unsigned long first_page_idx, end_page_idx;
 	unsigned long start_off, end_off, curr_idx, end_idx;
 
 	/*
@@ -179,14 +190,16 @@ static void map_free(struct uk_bbpalloc *b, uintptr_t first_page,
 	 */
 	memr = map_get_memr(b, first_page);
 	UK_ASSERT(memr != NULL);
-	UK_ASSERT((first_page + nr_pages)
-		  <= (memr->first_page + memr->nr_pages));
+	UK_ASSERT((first_page + (nr_pages << __PAGE_SHIFT))
+		  <= (memr->first_page + (memr->nr_pages << __PAGE_SHIFT)));
 
 	first_page -= memr->first_page;
-	curr_idx = first_page / PAGES_PER_MAPWORD;
-	start_off = first_page & (PAGES_PER_MAPWORD - 1);
-	end_idx = (first_page + nr_pages) / PAGES_PER_MAPWORD;
-	end_off = (first_page + nr_pages) & (PAGES_PER_MAPWORD - 1);
+	first_page_idx = first_page >> __PAGE_SHIFT;
+	curr_idx = first_page_idx / PAGES_PER_MAPWORD;
+	start_off = first_page_idx & (PAGES_PER_MAPWORD - 1);
+	end_page_idx = first_page_idx + nr_pages;
+	end_idx = end_page_idx / PAGES_PER_MAPWORD;
+	end_off = end_page_idx & (PAGES_PER_MAPWORD - 1);
 
 	if (curr_idx == end_idx) {
 		memr->mm_alloc_bitmap[curr_idx] &=
@@ -344,28 +357,61 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 
 	min = round_pgup((uintptr_t)base);
 	max = round_pgdown((uintptr_t)base + (uintptr_t)len);
-	range = max - min;
-	memr_size =
-	    round_pgup(sizeof(*memr) + DIV_ROUND_UP(range >> __PAGE_SHIFT, 8));
-
-	memr = (struct uk_bbpalloc_memr *)min;
-	min += memr_size;
-	range -= memr_size;
 	if (max < min) {
-		uk_printd(DLVL_ERR, "%"__PRIuptr": Failed to add memory region %"__PRIuptr"-%"__PRIuptr": Not enough space after applying page alignments\n",
-			  (uintptr_t)a, (uintptr_t)base,
-			  (uintptr_t)base + (uintptr_t)len);
+		uk_printd(DLVL_ERR,
+			"%"__PRIuptr": Failed to add memory region %"__PRIuptr"-%"__PRIuptr": Invalid range after applying page alignments\n",
+			(uintptr_t) a, (uintptr_t) base,
+			(uintptr_t) base + (uintptr_t) len);
 		return -EINVAL;
 	}
+
+	range = max - min;
+
+	/* We should have at least one page for bitmap tracking
+	 * and one page for data.
+	 */
+	if (range < round_pgup(sizeof(*memr) + BYTES_PER_MAPWORD) +
+			__PAGE_SIZE) {
+		uk_printd(DLVL_ERR,
+			"%"__PRIuptr": Failed to add memory region %"__PRIuptr"-%"__PRIuptr": Not enough space after applying page alignments\n",
+			(uintptr_t) a, (uintptr_t) base,
+			(uintptr_t) base + (uintptr_t) len);
+		return -EINVAL;
+	}
+
+	memr = (struct uk_bbpalloc_memr *)min;
+
+	/*
+	 * The number of pages is found by solving the inequality:
+	 *
+	 * sizeof(*memr) + bitmap_size + page_num * page_size <= range
+	 *
+	 * where: bitmap_size = page_num / BITS_PER_BYTE
+	 *
+	 */
+	memr->nr_pages =
+		BITS_PER_BYTE * (range - sizeof(*memr)) /
+		(BITS_PER_BYTE * __PAGE_SIZE + 1);
+	memr->mm_alloc_bitmap = (unsigned long *) (min + sizeof(*memr));
+	memr_size = round_pgup(sizeof(*memr) +
+		DIV_ROUND_UP(memr->nr_pages, BITS_PER_BYTE));
+	memr->mm_alloc_bitmap_size = memr_size - sizeof(*memr);
+
+	min += memr_size;
+	range -= memr_size;
 
 	/*
 	 * Initialize region's bitmap
 	 */
 	memr->first_page = min;
-	memr->nr_pages = max - min;
 	/* add to list */
 	memr->next = b->memr_head;
 	b->memr_head = memr;
+
+	/* All allocated by default. */
+	memset(memr->mm_alloc_bitmap, (unsigned char) ~0,
+			memr->mm_alloc_bitmap_size);
+
 	/* free up the memory we've been given to play with */
 	map_free(b, min, (unsigned long)(range >> __PAGE_SHIFT));
 
