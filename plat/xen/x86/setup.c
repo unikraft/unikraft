@@ -165,7 +165,18 @@ static inline void _init_mem(void)
 #if CONFIG_UKPLAT_MEMRNAME
 	_libxenplat_mrd[0].name  = "heap";
 #endif
-	_libxenplat_mrd_num = 1;
+
+	/* demand area */
+	_libxenplat_mrd[1].base  = (void *) VIRT_DEMAND_AREA;
+	_libxenplat_mrd[1].len   = DEMAND_MAP_PAGES * PAGE_SIZE;
+	_libxenplat_mrd[1].flags = UKPLAT_MEMRF_RESERVED;
+#if CONFIG_UKPLAT_MEMRNAME
+	_libxenplat_mrd[1].name  = "demand";
+#endif
+	_init_mem_demand_area((unsigned long) _libxenplat_mrd[1].base,
+			DEMAND_MAP_PAGES);
+
+	_libxenplat_mrd_num = 2;
 }
 
 void _libxenplat_x86entry(void *start_info) __noreturn;

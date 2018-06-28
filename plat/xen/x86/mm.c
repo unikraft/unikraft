@@ -36,7 +36,9 @@
  */
 
 #include <string.h>
-#include <xen-x86/os.h>
+#include <errno.h>
+#include <uk/alloc.h>
+#include <uk/plat/config.h>
 #include <xen-x86/mm.h>
 #include <xen/memory.h>
 #include <uk/print.h>
@@ -224,6 +226,348 @@ void _init_mem_build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
 }
 
 /*
+ * Get the PTE for virtual address va if it exists. Otherwise NULL.
+ */
+static pgentry_t *get_pte(unsigned long va)
+{
+	unsigned long mfn;
+	pgentry_t *tab;
+	unsigned int offset;
+
+	tab = pt_base;
+
+#if defined(__x86_64__)
+	offset = l4_table_offset(va);
+	if (!(tab[offset] & _PAGE_PRESENT))
+		return NULL;
+
+	mfn = pte_to_mfn(tab[offset]);
+	tab = mfn_to_virt(mfn);
+#endif
+	offset = l3_table_offset(va);
+	if (!(tab[offset] & _PAGE_PRESENT))
+		return NULL;
+
+	mfn = pte_to_mfn(tab[offset]);
+	tab = mfn_to_virt(mfn);
+	offset = l2_table_offset(va);
+	if (!(tab[offset] & _PAGE_PRESENT))
+		return NULL;
+
+	if (tab[offset] & _PAGE_PSE)
+		return &tab[offset];
+
+	mfn = pte_to_mfn(tab[offset]);
+	tab = mfn_to_virt(mfn);
+	offset = l1_table_offset(va);
+
+	return &tab[offset];
+}
+
+/*
+ * Return a valid PTE for a given virtual address.
+ * If PTE does not exist, allocate page-table pages.
+ */
+static pgentry_t *need_pte(unsigned long va, struct uk_alloc *a)
+{
+	unsigned long pt_mfn;
+	pgentry_t *tab;
+	unsigned long pt_pfn;
+	unsigned int offset;
+
+	tab = pt_base;
+	pt_mfn = virt_to_mfn(pt_base);
+#if defined(__x86_64__)
+	offset = l4_table_offset(va);
+	if (!(tab[offset] & _PAGE_PRESENT)) {
+		pt_pfn = virt_to_pfn(uk_malloc_page(a));
+		if (!pt_pfn)
+			return NULL;
+		new_pt_frame(&pt_pfn, pt_mfn, offset, L3_FRAME);
+	}
+	UK_ASSERT(tab[offset] & _PAGE_PRESENT);
+
+	pt_mfn = pte_to_mfn(tab[offset]);
+	tab = mfn_to_virt(pt_mfn);
+#endif
+	offset = l3_table_offset(va);
+	if (!(tab[offset] & _PAGE_PRESENT)) {
+		pt_pfn = virt_to_pfn(uk_malloc_page(a));
+		if (!pt_pfn)
+			return NULL;
+		new_pt_frame(&pt_pfn, pt_mfn, offset, L2_FRAME);
+	}
+	UK_ASSERT(tab[offset] & _PAGE_PRESENT);
+
+	pt_mfn = pte_to_mfn(tab[offset]);
+	tab = mfn_to_virt(pt_mfn);
+	offset = l2_table_offset(va);
+	if (!(tab[offset] & _PAGE_PRESENT)) {
+		pt_pfn = virt_to_pfn(uk_malloc_page(a));
+		if (!pt_pfn)
+			return NULL;
+		new_pt_frame(&pt_pfn, pt_mfn, offset, L1_FRAME);
+	}
+	UK_ASSERT(tab[offset] & _PAGE_PRESENT);
+
+	if (tab[offset] & _PAGE_PSE)
+		return &tab[offset];
+
+	pt_mfn = pte_to_mfn(tab[offset]);
+	tab = mfn_to_virt(pt_mfn);
+	offset = l1_table_offset(va);
+
+	return &tab[offset];
+}
+
+/**
+ * do_map_frames - Map an array of MFNs contiguously into virtual
+ * address space starting at va.
+ * @va: Starting address of the virtual address range
+ * @mfns: Array of MFNs
+ * @n: Number of MFNs
+ * @stride: Stride used for selecting the MFNs on each iteration
+ * @incr: Increment added to MFNs on each iteration
+ * @id: Domain id
+ * @err: Array of errors statuses
+ * @prot: Page protection flags
+ * @a: Memory allocator used when new page table entries are needed
+ *
+ * Note that either @stride or @incr must be non-zero, not both of
+ * them. One should use a non-zero value for @stride when providing
+ * an array of MFNs. @incr parameter should be used when only the
+ * first MFN is provided and the subsequent MFNs values are simply
+ * derived by adding @incr.
+ */
+#define MAP_BATCH ((STACK_SIZE / 4) / sizeof(mmu_update_t))
+int do_map_frames(unsigned long va,
+		const unsigned long *mfns, unsigned long n,
+		unsigned long stride, unsigned long incr,
+		domid_t id, int *err, unsigned long prot,
+		struct uk_alloc *a)
+{
+	pgentry_t *pte = NULL;
+	unsigned long mapped = 0;
+
+	if (!mfns) {
+		uk_printd(DLVL_WARN, "do_map_frames: no mfns supplied\n");
+		return -EINVAL;
+	}
+
+	uk_printd(DLVL_EXTRA,
+		"Mapping va=%p n=%lu, mfns[0]=0x%lx stride=%lu incr=%lu prot=0x%lx\n",
+		(void *) va, n, mfns[0], stride, incr, prot);
+
+	if (err)
+		memset(err, 0, n * sizeof(int));
+
+	while (mapped < n) {
+#ifdef CONFIG_PARAVIRT
+		unsigned long i;
+		int rc;
+		unsigned long batched;
+
+		if (err)
+			batched = 1;
+		else
+			batched = n - mapped;
+
+		if (batched > MAP_BATCH)
+			batched = MAP_BATCH;
+
+		mmu_update_t mmu_updates[batched];
+
+		for (i = 0; i < batched; i++, va += PAGE_SIZE, pte++) {
+			if (!pte || !(va & L1_MASK))
+				pte = need_pte(va, a);
+			if (!pte)
+				return -ENOMEM;
+
+			mmu_updates[i].ptr =
+				virt_to_mach(pte) | MMU_NORMAL_PT_UPDATE;
+			mmu_updates[i].val =
+				((pgentry_t) (mfns[(mapped + i) * stride]
+				+ (mapped + i) * incr) << PAGE_SHIFT) | prot;
+		}
+
+		rc = HYPERVISOR_mmu_update(mmu_updates, batched, NULL, id);
+		if (rc < 0) {
+			if (err)
+				err[mapped * stride] = rc;
+			else
+				UK_CRASH(
+					"Map %ld (%lx, ...) at %lx failed: %d.\n",
+					batched,
+					mfns[mapped * stride] + mapped * incr,
+					va, rc);
+		}
+		mapped += batched;
+#else
+		if (!pte || !(va & L1_MASK))
+			pte = need_pte(va & ~L1_MASK, a);
+		if (!pte)
+			return -ENOMEM;
+
+		UK_ASSERT(!(*pte & _PAGE_PSE));
+		pte[l1_table_offset(va)] =
+			(pgentry_t) (((mfns[mapped * stride]
+			+ mapped * incr) << PAGE_SHIFT) | prot);
+		mapped++;
+#endif
+	}
+
+	return 0;
+}
+
+static unsigned long demand_map_area_start;
+static unsigned long demand_map_area_end;
+
+unsigned long allocate_ondemand(unsigned long n, unsigned long align)
+{
+	unsigned long page_idx, contig = 0;
+
+	/* Find a properly aligned run of n contiguous frames */
+	for (page_idx = 0;
+		page_idx <= DEMAND_MAP_PAGES - n;
+		page_idx = (page_idx + contig + 1 + align - 1) & ~(align - 1)) {
+
+		unsigned long addr =
+			demand_map_area_start + page_idx * PAGE_SIZE;
+		pgentry_t *pte = get_pte(addr);
+
+		for (contig = 0; contig < n; contig++, addr += PAGE_SIZE) {
+			if (!(addr & L1_MASK))
+				pte = get_pte(addr);
+
+			if (pte) {
+				if (*pte & _PAGE_PRESENT)
+					break;
+
+				pte++;
+			}
+		}
+
+		if (contig == n)
+			break;
+	}
+
+	if (contig != n) {
+		uk_printd(DLVL_ERR, "Failed to find %ld frames!\n", n);
+		return 0;
+	}
+
+	return demand_map_area_start + page_idx * PAGE_SIZE;
+}
+
+/**
+ * map_frames_ex - Map an array of MFNs contiguously into virtual
+ * address space. Virtual addresses are allocated from the on demand
+ * area.
+ * @mfns: Array of MFNs
+ * @n: Number of MFNs
+ * @stride: Stride used for selecting the MFNs on each iteration
+ * (e.g. 1 for every element, 0 always first element)
+ * @incr: Increment added to MFNs on each iteration
+ * @alignment: Alignment
+ * @id: Domain id
+ * @err: Array of errors statuses
+ * @prot: Page protection flags
+ * @a: Memory allocator used when new page table entries are needed
+ *
+ * Note that either @stride or @incr must be non-zero, not both of
+ * them. One should use a non-zero value for @stride when providing
+ * an array of MFNs. @incr parameter should be used when only the
+ * first MFN is provided and the subsequent MFNs values are simply
+ * derived by adding @incr.
+ */
+void *map_frames_ex(const unsigned long *mfns, unsigned long n,
+		unsigned long stride, unsigned long incr,
+		unsigned long alignment,
+		domid_t id, int *err, unsigned long prot,
+		struct uk_alloc *a)
+{
+	unsigned long va = allocate_ondemand(n, alignment);
+
+	if (!va)
+		return NULL;
+
+	if (do_map_frames(va, mfns, n, stride, incr, id, err, prot, a))
+		return NULL;
+
+	return (void *) va;
+}
+
+/*
+ * Unmap num_frames frames mapped at virtual address va.
+ */
+#define UNMAP_BATCH ((STACK_SIZE / 4) / sizeof(multicall_entry_t))
+int unmap_frames(unsigned long va, unsigned long num_frames)
+{
+#ifdef CONFIG_PARAVIRT
+	unsigned long i, n = UNMAP_BATCH;
+	multicall_entry_t call[n];
+	int ret;
+#else
+	pgentry_t *pte;
+#endif
+
+	UK_ASSERT(!((unsigned long) va & ~PAGE_MASK));
+
+	uk_printd(DLVL_EXTRA,
+		"Unmapping va=%p, num=%lu\n", (void *) va, num_frames);
+
+	while (num_frames) {
+#ifdef CONFIG_PARAVIRT
+		if (n > num_frames)
+			n = num_frames;
+
+		for (i = 0; i < n; i++) {
+			int arg = 0;
+			/*
+			 * simply update the PTE for the VA and
+			 * invalidate TLB
+			 */
+			call[i].op = __HYPERVISOR_update_va_mapping;
+			call[i].args[arg++] = va;
+			call[i].args[arg++] = 0;
+#ifdef __i386__
+			call[i].args[arg++] = 0;
+#endif
+			call[i].args[arg++] = UVMF_INVLPG;
+
+			va += PAGE_SIZE;
+		}
+
+		ret = HYPERVISOR_multicall(call, n);
+		if (ret) {
+			uk_printd(DLVL_ERR,
+				"update_va_mapping hypercall failed with rc=%d.\n", ret);
+			return -ret;
+		}
+
+		for (i = 0; i < n; i++) {
+			if (call[i].result) {
+				uk_printd(DLVL_ERR,
+					"update_va_mapping failed for with rc=%d.\n", ret);
+				return -(call[i].result);
+			}
+		}
+		num_frames -= n;
+#else
+		pte = get_pte(va);
+		if (pte) {
+			UK_ASSERT(!(*pte & _PAGE_PSE));
+			*pte = 0;
+			invlpg(va);
+		}
+		va += PAGE_SIZE;
+		num_frames--;
+#endif
+	}
+	return 0;
+}
+
+/*
  * Mark portion of the address space read only.
  */
 extern struct shared_info _libxenplat_shared_info;
@@ -351,4 +695,17 @@ void _init_mem_prepare(unsigned long *start_pfn, unsigned long *max_pfn)
 #else
 #error "Please port (see Mini-OS's arch_mm_preinit())"
 #endif
+}
+
+/*
+ * Reserve an area of virtual address space for mappings
+ */
+
+void _init_mem_demand_area(unsigned long start, unsigned long page_num)
+{
+	demand_map_area_start = start;
+	demand_map_area_end = demand_map_area_start + page_num * PAGE_SIZE;
+
+	uk_printd(DLVL_INFO, "Demand map pfns at %lx-%lx.\n",
+		demand_map_area_start, demand_map_area_end);
 }

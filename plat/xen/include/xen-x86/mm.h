@@ -275,11 +275,18 @@ static __inline__ paddr_t machine_to_phys(maddr_t machine)
 })
 #define virtual_to_mfn(_virt)	   pte_to_mfn(virtual_to_pte(_virt))
 
-#define map_frames(f, n) map_frames_ex(f, n, 1, 0, 1, DOMID_SELF, NULL, L1_PROT)
-#define map_zero(n, a) map_frames_ex(&mfn_zero, n, 0, 0, a, DOMID_SELF, NULL, L1_PROT_RO)
-#define do_map_zero(start, n) do_map_frames(start, &mfn_zero, n, 0, 0, DOMID_SELF, NULL, L1_PROT_RO)
+void *map_frames_ex(const unsigned long *mfns, unsigned long n,
+		unsigned long stride, unsigned long incr,
+		unsigned long alignment,
+		domid_t id, int *err, unsigned long prot,
+		struct uk_alloc *a);
+#define map_frames(f, n, a) \
+	map_frames_ex(f, n, 1, 0, 1, DOMID_SELF, NULL, L1_PROT, a)
+#define map_zero(n, a) \
+	map_frames_ex(&mfn_zero, n, 0, 0, a, DOMID_SELF, NULL, L1_PROT_RO, a)
+#define do_map_zero(start, n, a) \
+	do_map_frames(start, &mfn_zero, n, 0, 0, DOMID_SELF, NULL, L1_PROT_RO, a)
 
-pgentry_t *need_pgt(unsigned long addr);
 void arch_mm_preinit(void *p);
 unsigned long alloc_virt_kernel(unsigned n_pages);
 
@@ -294,5 +301,6 @@ void _init_mem_build_pagetable(unsigned long *start_pfn,
 							   unsigned long *max_pfn);
 void _init_mem_set_readonly(void *text, void *etext);
 void _init_mem_clear_bootstrap(void);
+void _init_mem_demand_area(unsigned long start, unsigned long page_num);
 
 #endif /* _ARCH_MM_H_ */
