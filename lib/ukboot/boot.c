@@ -227,6 +227,11 @@ void ukplat_entry(int argc, char *argv[])
 	}
 	if (unlikely(!a))
 		uk_printd(DLVL_WARN, "No suitable memory region for memory allocator. Continue without heap\n");
+	else {
+		rc = ukplat_memallocator_set(a);
+		if (unlikely(rc != 0))
+			UK_CRASH("Could not set the platform memory allocator.");
+	}
 #endif
 
 #if CONFIG_LIBUKALLOC
