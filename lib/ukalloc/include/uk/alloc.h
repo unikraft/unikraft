@@ -203,6 +203,10 @@ static inline void *uk_palloc(struct uk_alloc *a, size_t order)
 		return NULL;
 	return a->palloc(a, order);
 }
+static inline void *uk_malloc_page(struct uk_alloc *a)
+{
+	return uk_palloc(a, 0);
+}
 static inline void uk_do_pfree(struct uk_alloc *a, void *ptr, size_t order)
 {
 	UK_ASSERT(a);
@@ -211,6 +215,10 @@ static inline void uk_do_pfree(struct uk_alloc *a, void *ptr, size_t order)
 static inline void uk_pfree(struct uk_alloc *a, void *ptr, size_t order)
 {
 	uk_do_pfree(a, ptr, order);
+}
+static inline void uk_free_page(struct uk_alloc *a, void *ptr)
+{
+	return uk_pfree(a, ptr, 0);
 }
 #endif
 static inline int uk_alloc_addmem(struct uk_alloc *a, void *base,
