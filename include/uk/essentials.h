@@ -168,6 +168,10 @@ extern "C" {
 #define ALIGN_DOWN(v, a) ((v) & ~((a)-1))
 #endif
 
+#ifndef ARRAY_SIZE
+#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
+#endif
+
 #ifndef DECONST
 #include <uk/arch/types.h>
 #define DECONST(t, a) ((t)((__uptr)((const void *)(a))))
