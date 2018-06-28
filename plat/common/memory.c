@@ -1,9 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
  *
- *
- * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,44 +32,26 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#include <linuxu/setup.h>
 #include <uk/plat/memory.h>
-#include <uk/assert.h>
+#include <memory.h>
 
-int ukplat_memregion_count(void)
+static struct uk_alloc *plat_allocator;
+
+int ukplat_memallocator_set(struct uk_alloc *a)
 {
-	return _liblinuxuplat_opts.heap.base ? 1 : 0;
-}
+	UK_ASSERT(a != NULL);
 
-int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
-{
-	int ret;
+	if (plat_allocator != NULL)
+		return -1;
 
-	UK_ASSERT(m);
+	plat_allocator = a;
 
-	if (i == 0 && _liblinuxuplat_opts.heap.base) {
-		m->base  = _liblinuxuplat_opts.heap.base;
-		m->len   = _liblinuxuplat_opts.heap.len;
-		m->flags = UKPLAT_MEMRF_ALLOCATABLE;
-#if CONFIG_UKPLAT_MEMRNAME
-		m->name  = "heap";
-#endif
-		ret = 0;
-	} else {
-		/* invalid memory region index or no heap allocated */
-		m->base  = __NULL;
-		m->len   = 0;
-		m->flags = 0x0;
-#if CONFIG_UKPLAT_MEMRNAME
-		m->name  = __NULL;
-#endif
-		ret = -1;
-	}
+	_ukplat_mem_mappings_init();
 
-	return ret;
-}
-
-int _ukplat_mem_mappings_init(void)
-{
 	return 0;
+}
+
+struct uk_alloc *ukplat_memallocator_get(void)
+{
+	return plat_allocator;
 }

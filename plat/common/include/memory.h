@@ -1,9 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
  *
- *
- * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,44 +32,16 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#include <linuxu/setup.h>
-#include <uk/plat/memory.h>
-#include <uk/assert.h>
+#ifndef __PLAT_CMN_MEMORY_H__
+#define __PLAT_CMN_MEMORY_H__
 
-int ukplat_memregion_count(void)
-{
-	return _liblinuxuplat_opts.heap.base ? 1 : 0;
-}
+/**
+ * Initializes the platform memory mappings which require an allocator. This
+ * function must always be called after initializing a memory allocator and
+ * before initializing the subsystems that require memory allocation. It is an
+ * internal function common to all platforms.
+ * @return 0 on success, < 0 otherwise
+ */
+int _ukplat_mem_mappings_init(void);
 
-int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
-{
-	int ret;
-
-	UK_ASSERT(m);
-
-	if (i == 0 && _liblinuxuplat_opts.heap.base) {
-		m->base  = _liblinuxuplat_opts.heap.base;
-		m->len   = _liblinuxuplat_opts.heap.len;
-		m->flags = UKPLAT_MEMRF_ALLOCATABLE;
-#if CONFIG_UKPLAT_MEMRNAME
-		m->name  = "heap";
-#endif
-		ret = 0;
-	} else {
-		/* invalid memory region index or no heap allocated */
-		m->base  = __NULL;
-		m->len   = 0;
-		m->flags = 0x0;
-#if CONFIG_UKPLAT_MEMRNAME
-		m->name  = __NULL;
-#endif
-		ret = -1;
-	}
-
-	return ret;
-}
-
-int _ukplat_mem_mappings_init(void)
-{
-	return 0;
-}
+#endif /* __PLAT_CMN_MEMORY_H__ */

@@ -37,6 +37,7 @@
 #define __UKPLAT_MEMORY_H__
 
 #include <uk/arch/types.h>
+#include <uk/alloc.h>
 #include <uk/config.h>
 
 #ifdef __cplusplus
@@ -76,6 +77,20 @@ int ukplat_memregion_count(void);
  * @return 0 on success, < 0 otherwise
  */
 int ukplat_memregion_get(int i, struct ukplat_memregion_desc *mrd);
+
+/**
+ * Sets the platform memory allocator and triggers the platform memory mappings
+ * for which an allocator is needed.
+ * @param a Memory allocator
+ * @return 0 on success, < 0 otherwise
+ */
+int ukplat_memallocator_set(struct uk_alloc *a);
+
+/**
+ * Returns the platform memory allocator
+ * @return Platform memory allocator address
+ */
+struct uk_alloc *ukplat_memallocator_get(void);
 
 #ifdef __cplusplus
 }

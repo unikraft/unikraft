@@ -119,3 +119,8 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 
 	return 0;
 }
+
+int _ukplat_mem_mappings_init(void)
+{
+	return 0;
+}
