@@ -35,6 +35,7 @@
 
 #include <string.h>
 
+#include <common/gnttab.h>
 #if (defined __X86_32__) || (defined __X86_64__)
 #include <xen-x86/setup.h>
 #elif (defined __ARM_32__) || (defined __ARM_64__)
@@ -122,5 +123,6 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 
 int _ukplat_mem_mappings_init(void)
 {
+	gnttab_init();
 	return 0;
 }
