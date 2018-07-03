@@ -156,3 +156,13 @@ int strncmp(const char *str1, const char *str2, size_t len)
 	}
 	return 0;
 }
+
+int strcmp(const char *str1, const char *str2)
+{
+	register signed char __res;
+
+	while ((__res = *str1 - *str2++) == 0 && *str1++)
+		;
+
+	return __res;
+}
