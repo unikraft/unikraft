@@ -46,6 +46,8 @@ extern "C" {
 #define va_arg(va, t)	__builtin_va_arg((va), t)
 #define va_end(va)	__builtin_va_end((va))
 
+#define va_copy(d, s)	__builtin_va_copy((d), (s))
+
 #ifdef __cplusplus
 }
 #endif
