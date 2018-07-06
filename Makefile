@@ -338,6 +338,16 @@ endif
 override ARCH := $(CONFIG_UK_ARCH)
 export CONFIG_UK_ARCH ARCH
 
+export UK_FAMILY ?= $(shell echo "$(CONFIG_UK_ARCH)" | \
+		   sed -e "s/-.*//" \
+		       -e 's//\1/' \
+		       -e 's/x86.*/x86/' \
+		       -e 's/sparc64/sparc/' \
+		       -e 's/arm.*/arm/' \
+		       -e 's/powerpc.*/powerpc/' \
+		       -e 's/sh.*/sh/' )
+
+
 # Quick-check if architecture exists
 ifeq ($(filter $(null_targets) print-vars,$(MAKECMDGOALS)),)
 ifeq ($(wildcard $(CONFIG_UK_BASE)/arch/$(ARCH)/Makefile.uk),)
