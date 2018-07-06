@@ -289,13 +289,12 @@ export HOSTARCH := $(shell LC_ALL=C $(HOSTCC_NOCCACHE) -v 2>&1 | \
 		       -e 's/i.86/x86/' \
 		       -e 's/sun4u/sparc64/' \
 		       -e 's/arm64.*/arm64/' -e 's/aarch64.*/arm64/' \
-		       -e 's/arm.*/arm/' \
+		       -e '/arm64/! s/arm.*/arm/' \
 		       -e 's/sa110/arm/' \
 		       -e 's/ppc64/powerpc64/' \
 		       -e 's/ppc/powerpc/' \
 		       -e 's/macppc/powerpc/' \
 		       -e 's/sh.*/sh/' )
-
 export HOSTAR HOSTAS HOSTCC HOSTCC_VERSION HOSTCXX HOSTLD HOSTARCH
 export HOSTCC_NOCCACHE HOSTCXX_NOCCACHE
 
@@ -314,7 +313,7 @@ export CONFIG_UK_ARCH	?= $(shell echo "$(call qstrip,$(ARCH))" | \
 		       -e 's/i.86/x86/' \
 		       -e 's/sun4u/sparc64/' \
 		       -e 's/arm64.*/arm64/' -e 's/aarch64.*/arm64/' \
-		       -e 's/arm.*/arm/' \
+		       -e '/arm64/! s/arm.*/arm/' \
 		       -e 's/sa110/arm/' \
 		       -e 's/ppc64/powerpc64/' \
 		       -e 's/ppc/powerpc/' \
@@ -328,7 +327,7 @@ export CONFIG_UK_ARCH	?= $(shell echo "$(HOSTARCH)" | \
 		       -e 's/i.86/x86/' \
 		       -e 's/sun4u/sparc64/' \
 		       -e 's/arm64.*/arm64/' -e 's/aarch64.*/arm64/' \
-		       -e 's/arm.*/arm/' \
+		       -e '/arm64/! s/arm.*/arm/' \
 		       -e 's/sa110/arm/' \
 		       -e 's/ppc64/powerpc64/' \
 		       -e 's/ppc/powerpc/' \
