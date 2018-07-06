@@ -211,6 +211,20 @@ typedef __uptr __sz;  /* size_t  equivalent */
 typedef __sptr __ssz; /* ssize_t equivalent */
 typedef __sptr __off; /* off_t equivalent */
 
+#if (defined __PHY_ADDR_IS_16)
+typedef __u16 __phys_addr;
+#define __PRIpaddr __PRIx16
+#define __HAVE_PHYS_ADDR__
+#elif (defined __PHY_ADDR_IS_32)
+typedef __u32 __phys_addr;
+#define __PRIpaddr __PRIx32
+#define __HAVE_PHYS_ADDR__
+#elif (defined __PHY_ADDR_IS_64)
+typedef __u64 __phys_addr;
+#define __PRIpaddr __PRIx64
+#define __HAVE_PHYS_ADDR__
+#endif
+
 /* Sanity check */
 #ifndef __HAVE_INT8__
 #error Missing 8-bit integer definitions
@@ -236,6 +250,11 @@ typedef __sptr __off; /* off_t equivalent */
 #error Missing pointer integer definitions
 #else
 #undef __HAVE_PTR__
+#endif
+#ifndef __HAVE_PHYS_ADDR__
+#error Missing physical address definitions
+#else
+#undef __HAVE_PHYS_ADDR__
 #endif
 
 #ifndef __NULL

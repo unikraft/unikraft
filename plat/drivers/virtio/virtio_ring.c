@@ -28,6 +28,7 @@
 #include <string.h>
 #include <uk/print.h>
 #include <cpu.h>
+#include <io.h>
 #include <pci/virtio/virtio_pci.h>
 #include <pci/virtio/virtio_ring.h>
 #include <uk/arch/atomic.h>
@@ -106,6 +107,7 @@ int virtq_rings_init(struct virtq *vq, __u16 pci_base,
 	__u8 *data = NULL;
 	__u16 vq_num;
 	__sz vq_size;
+	__phys_addr pa;
 
 	UK_ASSERT(vq != NULL);
 	UK_ASSERT(a != NULL);
@@ -141,9 +143,10 @@ int virtq_rings_init(struct virtq *vq, __u16 pci_base,
 	/* set queue memory */
 	outw(pci_base + VIRTIO_PCI_QUEUE_SEL, queue_select);
 
-	/* TODO use physical address */
+	/* use physical address */
+	pa = ukplat_virt_to_phys(data);
 	outl(pci_base + VIRTIO_PCI_QUEUE_PFN,
-		(__u64) data >> VIRTIO_PCI_QUEUE_ADDR_SHIFT);
+		(pa >> VIRTIO_PCI_QUEUE_ADDR_SHIFT));
 
 	return 0;
 }

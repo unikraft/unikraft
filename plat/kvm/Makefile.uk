@@ -38,6 +38,7 @@ LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/memory.c
 LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/irq.c
 LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/time.c
 LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/tscclock.c
+LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/io.c
 LIBKVMPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/lcpu.c|common
 LIBKVMPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/memory.c|common
 

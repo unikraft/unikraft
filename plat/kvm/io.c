@@ -1,9 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ * Authors: Sharan Santhanam <sharan.santhanam@neclab.eu>
  *
- *
- * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,14 +32,9 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#if ((!defined __UKARCH_TYPES_H__) && (!defined __UKARCH_LIMITS_H__))
-#error Do not include this header directly
-#endif
+#include <io.h>
 
-#define __C_IS_8     /* char */
-#define __S_IS_16    /* short */
-#define __I_IS_32    /* int */
-#define __L_IS_32    /* long */
-#define __LL_IS_64   /* long long */
-#define __PTR_IS_32 /* void * */
-#define __PHY_ADDR_IS_32 /* phys_addr */
+__phys_addr ukplat_virt_to_phys(const volatile void *address)
+{
+	return (__phys_addr)address;
+}
