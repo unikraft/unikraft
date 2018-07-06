@@ -1,5 +1,6 @@
 UK_PLAT_BASE        := $(CONFIG_UK_BASE)/plat
 UK_PLAT_COMMON_BASE := $(UK_PLAT_BASE)/common
+UK_PLAT_DRIVERS_BASE:= $(UK_PLAT_BASE)/drivers
 
 $(eval $(call _import_lib,$(UK_PLAT_BASE)/xen))
 $(eval $(call _import_lib,$(UK_PLAT_BASE)/kvm))

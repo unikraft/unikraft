@@ -50,6 +50,11 @@ extern "C" {
 #endif
 
 /**
+ * Perform a atomic load operation.
+ */
+#define ukarch_load_n(src) \
+	__atomic_load_n(src, __ATOMIC_SEQ_CST)
+/**
  * Writes *src into *dst, and returns the previous contents of *dst.
  */
 #define ukarch_exchange(dst, src) \
