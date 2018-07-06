@@ -54,7 +54,8 @@
 
 #include <string.h>
 #include <uk/print.h>
-#include <pci_bus.h>
+#include <cpu.h>
+#include <pci/pci_bus.h>
 
 struct pci_bus_handler {
 	struct uk_bus b;

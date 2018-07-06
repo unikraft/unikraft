@@ -14,10 +14,8 @@ $(eval $(call addplatlib_s,kvm,libkvmpci,$(CONFIG_KVM_PCI)))
 ##
 LIBKVMPLAT_ASINCLUDES-y        += -I$(LIBKVMPLAT_BASE)/include
 LIBKVMPLAT_ASINCLUDES-y        += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMPCI_ASINCLUDES-$(CONFIG_ARCH_X86_64)  += -I$(UK_PLAT_COMMON_BASE)/include/pci
 LIBKVMPLAT_CINCLUDES-y         += -I$(LIBKVMPLAT_BASE)/include
 LIBKVMPLAT_CINCLUDES-y         += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMPCI_CINCLUDES-$(CONFIG_ARCH_X86_64)   += -I$(UK_PLAT_COMMON_BASE)/include/pci
 
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/trace.c|common
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/traps.c|common
@@ -42,4 +40,9 @@ LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/tscclock.c
 LIBKVMPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/lcpu.c|common
 LIBKVMPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/memory.c|common
 
+##
+## PCI library definitions
+##
+LIBKVMPCI_ASINCLUDES-$(CONFIG_ARCH_X86_64)  += -I$(UK_PLAT_COMMON_BASE)/include
+LIBKVMPCI_CINCLUDES-$(CONFIG_ARCH_X86_64)   += -I$(UK_PLAT_COMMON_BASE)/include
 LIBKVMPCI_SRCS-y                     += $(UK_PLAT_COMMON_BASE)/pci_bus.c|common

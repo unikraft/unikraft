@@ -84,6 +84,33 @@ static inline __u8 inb(__u16 port)
 	return v;
 }
 
+static inline __u16 inw(__u16 port)
+{
+	__u16 v;
+
+	__asm__ __volatile__("inw %1,%0" : "=a" (v) : "dN" (port));
+	return v;
+}
+
+static inline __u32 inl(__u16 port)
+{
+	__u32 v;
+
+	__asm__ __volatile__("inl %1,%0" : "=a" (v) : "dN" (port));
+	return v;
+}
+
+static inline __u64 inq(__u16 port_lo)
+{
+	__u16 port_hi = port_lo + 4;
+	__u32 lo, hi;
+
+	__asm__ __volatile__("inl %1,%0" : "=a" (lo) : "dN" (port_lo));
+	__asm__ __volatile__("inl %1,%0" : "=a" (hi) : "dN" (port_hi));
+
+	return ((__u64) lo) | ((__u64) hi << 32);
+}
+
 static inline void outb(__u16 port, __u8 v)
 {
 	__asm__ __volatile__("outb %0,%1" : : "a"(v), "dN"(port));
@@ -92,6 +119,11 @@ static inline void outb(__u16 port, __u8 v)
 static inline void outw(__u16 port, __u16 v)
 {
 	__asm__ __volatile__("outw %0,%1" : : "a"(v), "dN"(port));
+}
+
+static inline void outl(__u16 port, __u32 v)
+{
+	__asm__ __volatile__("outl %0,%1" : : "a" (v), "dN" (port));
 }
 
 static inline __u64 mul64_32(__u64 a, __u32 b)
