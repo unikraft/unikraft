@@ -22,4 +22,15 @@
 \#_*\#
 .\#_*
 *.pyc
-.gitignore
+!.gitignore
+.*
+
+# gnu global files
+GPATH
+GRTAGS
+GSYMS
+GTAGS
+
+# cscope files
+cscope.*
+ncscope.*
