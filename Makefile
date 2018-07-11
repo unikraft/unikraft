@@ -350,12 +350,12 @@ export UK_FAMILY ?= $(shell echo "$(CONFIG_UK_ARCH)" | \
 
 # Quick-check if architecture exists
 ifeq ($(filter $(null_targets) print-vars,$(MAKECMDGOALS)),)
-ifeq ($(wildcard $(CONFIG_UK_BASE)/arch/$(ARCH)/Makefile.uk),)
-$(error Target architecture ($(ARCH)) is currently not supported (could not find $(CONFIG_UK_BASE)/arch/$(ARCH)/Makefile.uk).)
+ifeq ($(wildcard $(CONFIG_UK_BASE)/arch/$(UK_FAMILY)/$(ARCH)/Makefile.uk),)
+$(error Target architecture ($(ARCH)) is currently not supported (could not find $(CONFIG_UK_BASE)/arch/$(UK_FAMILY)/$(ARCH)/Makefile.uk).)
 endif
 
-ifeq ($(wildcard arch/$(ARCH)/Compiler.uk),)
-$(error Target architecture ($(ARCH)) is currently not supported (could not find $(CONFIG_UK_BASE)/arch/$(ARCH)/Compiler.uk).)
+ifeq ($(wildcard $(CONFIG_UK_BASE)/arch/$(UK_FAMILY)/$(ARCH)/Compiler.uk),)
+$(error Target architecture ($(ARCH)) is currently not supported (could not find $(CONFIG_UK_BASE)/arch/$(UK_FAMILY)/$(ARCH)/Compiler.uk).)
 endif
 endif
 
@@ -394,7 +394,7 @@ unexport MACHINE
 # Note: Some architectures assign CONFIG_CROSS_COMPILE in their arch/*/Makefile.uk
 CONFIG_CROSS_COMPILE := $(CROSS_COMPILE:"%"=%)
 
-include $(CONFIG_UK_BASE)/arch/$(CONFIG_UK_ARCH)/Compiler.uk
+include $(CONFIG_UK_BASE)/arch/$(UK_FAMILY)/Compiler.uk
 
 # Make variables (CC, etc...)
 LD		:= $(CONFIG_CROSS_COMPILE)gcc
@@ -456,7 +456,7 @@ endif
 $(foreach E,$(ELIB_DIR), \
 	$(eval $(call _import_lib,$(E))); \
 )
-$(eval $(call _import_lib,$(CONFIG_UK_BASE)/arch/$(CONFIG_UK_ARCH))) # architecture libraries
+$(eval $(call _import_lib,$(CONFIG_UK_BASE)/arch/$(UK_FAMILY))) # architecture libraries
 include $(CONFIG_UK_BASE)/plat/Makefile.uk # platform libraries
 include $(CONFIG_UK_BASE)/lib/Makefile.uk # libraries
 include $(CONFIG_UK_BASE)/Makefile.uk # Unikraft base

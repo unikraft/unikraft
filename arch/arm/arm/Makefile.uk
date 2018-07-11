@@ -1,0 +1,19 @@
+ASFLAGS  += -D__ARM_32__
+ASFLAGS  += -marm
+CFLAGS   += -D__ARM_32__
+CFLAGS   += -marm -fms-extensions
+CXXFLAGS += -D__ARM_32__
+CXXFLAGS += -marm -fms-extensions
+
+#-march=armv7-a
+
+CFLAGS-$(CONFIG_MARCH_A20NEON)    += -mcpu=cortex-a7 -mtune=cortex-a7 -mfpu=vfpv4-d16 -mfpu=neon-vfpv4 -funsafe-math-optimizations
+CXXFLAGS-$(CONFIG_MARCH_A20NEON)  += -mcpu=cortex-a7 -mtune=cortex-a7 -mfpu=vfpv4-d16 -mfpu=neon-vfpv4 -funsafe-math-optimizations
+CFLAGS-$(CONFIG_MARCH_CORTEXA7)   += -mcpu=cortex-a7 -mtune=cortex-a7
+CXXFLAGS-$(CONFIG_MARCH_CORTEXA7) += -mcpu=cortex-a7 -mtune=cortex-a
+
+$(eval $(call addlib,libarmmath))
+LIBARMMATH_SRCS-$(CONFIG_ARCH_ARM_32) += $(CONFIG_UK_BASE)/arch/arm/divsi3.S
+LIBARMMATH_SRCS-$(CONFIG_ARCH_ARM_32) += $(CONFIG_UK_BASE)/arch/arm/ldivmod.S
+LIBARMMATH_SRCS-$(CONFIG_ARCH_ARM_32) += $(CONFIG_UK_BASE)/arch/arm/ldivmod_helper.c
+LIBARMMATH_SRCS-$(CONFIG_ARCH_ARM_32) += $(CONFIG_UK_BASE)/arch/arm/qdivrem.c
