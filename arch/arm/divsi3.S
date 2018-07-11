@@ -20,7 +20,7 @@
 
 #define END(symbol)
 
-/* 
+/*
  * stack is aligned as there's a possibility of branching to L_overflow
  * which makes a C call
  */
@@ -55,9 +55,9 @@ ENTRY_NP(__aeabi_uidivmod)
 #endif
 ENTRY_NP(__udivsi3)
 .L_udivide:				/* r0 = r0 / r1; r1 = r0 % r1 */
-	eor     r0, r1, r0 
-	eor     r1, r0, r1 
-	eor     r0, r1, r0 
+	eor     r0, r1, r0
+	eor     r1, r0, r1
+	eor     r0, r1, r0
 					/* r0 = r1 / r0; r1 = r1 % r0 */
 	cmp	r0, #1
 	bcc	.L_overflow
@@ -86,9 +86,9 @@ ENTRY_NP(__aeabi_idivmod)
 #endif
 ENTRY_NP(__divsi3)
 .L_divide:				/* r0 = r0 / r1; r1 = r0 % r1 */
-	eor     r0, r1, r0 
-	eor     r1, r0, r1 
-	eor     r0, r1, r0 
+	eor     r0, r1, r0
+	eor     r1, r0, r1
+	eor     r0, r1, r0
 					/* r0 = r1 / r0; r1 = r1 % r0 */
 	cmp	r0, #1
 	bcc	.L_overflow
@@ -107,7 +107,7 @@ ENTRY_NP(__divsi3)
 
 	/*
 	 * If the highest bit of the dividend is set, we have to be
-	 * careful when shifting the divisor. Test this. 
+	 * careful when shifting the divisor. Test this.
 	 */
 	movs	r1,r1
 	bpl	.L_old_code
@@ -401,4 +401,3 @@ ENTRY_NP(__divsi3)
 END(__aeabi_idiv)
 END(__aeabi_idivmod)
 END(__divsi3)
-

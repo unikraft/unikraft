@@ -34,7 +34,7 @@
 
 /*
  * These calculate:
- * q = n / m 
+ * q = n / m
  * With a remainer r.
  *
  * They take n in {r0, r1} and m in {r2, r3} then pass them into the
