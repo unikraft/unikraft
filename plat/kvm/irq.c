@@ -36,7 +36,6 @@
 #include <errno.h>
 #include <uk/arch/atomic.h>
 
-
 static struct uk_alloc *allocator;
 
 struct irq_handler {
@@ -105,11 +104,8 @@ void _ukplat_irq_handle(unsigned long irq)
 	}
 
 	if (!handled)
-		UK_CRASH("Unhandled irq=%lu\n", irq);
+		uk_printd(DLVL_CRIT, "Unhandled irq=%lu\n", irq);
 	else
-		/* Only ACK the IRQ if handled; we only need to know
-		 * about an unhandled IRQ the first time round.
-		 */
 		intctrl_ack_irq(irq);
 }
 
