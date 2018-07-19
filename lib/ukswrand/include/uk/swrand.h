@@ -37,12 +37,20 @@
 
 #include <uk/arch/types.h>
 #include <uk/plat/lcpu.h>
+#include <uk/config.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-struct uk_swrand;
+struct uk_swrand {
+#ifdef CONFIG_LIBUKSWRAND_MWC
+        __u32 Q[4096];
+        __u32 c;
+        __u32 i;
+#endif
+};
+
 extern struct uk_swrand uk_swrand_def;
 
 void uk_swrand_init_r(struct uk_swrand *r, __u32 seed);

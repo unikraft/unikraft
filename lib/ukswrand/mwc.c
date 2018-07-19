@@ -42,12 +42,6 @@
 #define PHI 0x9e3779b9
 #define UK_SWRAND_CTOR_PRIO    (200U)
 
-struct uk_swrand {
-	__u32 Q[4096];
-	__u32 c;
-	__u32 i;
-};
-
 struct uk_swrand uk_swrand_def;
 
 /*
