@@ -124,7 +124,7 @@ static void *uk_get_real_start(const void *ptr)
 				     (uintptr_t) __PAGE_SIZE);
 	if (intptr == ptr) {
 		/* special case: the memory was page-aligned.
-		 * In this cas,e the size information lies at the start of the
+		 * In this case the size information lies at the start of the
 		 * previous page, with the rest of that page unused.
 		 */
 		intptr -= __PAGE_SIZE;
@@ -135,8 +135,24 @@ static void *uk_get_real_start(const void *ptr)
 static size_t uk_getmallocsize(const void *ptr)
 {
 	size_t *intptr = uk_get_real_start(ptr);
+	size_t mallocsize = __PAGE_SIZE << (*intptr);
 
-	return *intptr;
+	if (((uintptr_t) ptr & (~__PAGE_MASK)) == 0) {
+		/*
+		 * special case: the memory was page-aligned
+		 * In this case the allocated size should not account for the
+		 * previous page which was used for storing the order
+		 */
+		mallocsize -= __PAGE_SIZE;
+	} else {
+		/*
+		 * If pointer is not page aligned it means the header is
+		 * on the same page. This will break if metadata size increases
+		 */
+		mallocsize -= sizeof(*intptr);
+	}
+
+	return mallocsize;
 }
 
 /* return the smallest order (1<<order pages) that can fit size bytes */
