@@ -37,7 +37,6 @@
 #define __STDIO_H__
 
 #include <stddef.h>
-#include <stdarg.h>
 #include <uk/essentials.h>
 
 #ifdef __cplusplus
@@ -50,6 +49,14 @@ typedef struct _nolibc_fd FILE;
 extern FILE *stdin;
 extern FILE *stdout;
 extern FILE *stderr;
+
+/* stdio.h shall not define va_list if it is included, but it shall
+ * declare functions that use va_list.
+ */
+#ifndef va_list
+#define __STDIO_H_DEFINED_va_list
+#define va_list __builtin_va_list
+#endif
 
 int vsnprintf(char *str, size_t size, const char *fmt, va_list ap);
 int  snprintf(char *str, size_t size, const char *fmt, ...) __printf(3, 4);
@@ -69,6 +76,10 @@ int  sscanf(const char *str, const char *fmt, ...)          __scanf(2, 3);
 
 int vasprintf(char **str, const char *fmt, va_list ap);
 int  asprintf(char **str, const char *fmt, ...)             __printf(2, 3);
+
+#ifdef __STDIO_H_DEFINED_va_list
+#undef va_list
+#endif
 
 #ifdef __cplusplus
 }
