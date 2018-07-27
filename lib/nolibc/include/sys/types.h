@@ -43,9 +43,10 @@
 extern "C" {
 #endif
 
-typedef __sz   size_t;
-typedef __ssz  ssize_t;
-typedef __off  off_t;
+#define __NEED_size_t
+#define __NEED_ssize_t
+#define __NEED_off_t
+#include <nolibc-internal/shareddefs.h>
 
 #ifdef __cplusplus
 }

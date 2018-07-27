@@ -36,12 +36,14 @@
 #ifndef __STDIO_H__
 #define __STDIO_H__
 
-#include <stddef.h>
 #include <uk/essentials.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define __NEED_size_t
+#include <nolibc-internal/shareddefs.h>
 
 struct _nolibc_fd;
 typedef struct _nolibc_fd FILE;
