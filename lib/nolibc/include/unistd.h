@@ -35,7 +35,6 @@
 
 #ifndef __UNISTD_H__
 #define __UNISTD_H__
-#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {

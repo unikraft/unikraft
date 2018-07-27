@@ -32,8 +32,6 @@
 #ifndef __SYS_SELECT_H__
 #define __SYS_SELECT_H__
 
-#include <sys/time.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
