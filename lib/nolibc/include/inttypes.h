@@ -43,10 +43,14 @@
 extern "C" {
 #endif
 
-#define PRIs8  __PRIs8
-#define PRIs16 __PRIs16
-#define PRIs32 __PRIs32
-#define PRIs64 __PRIs64
+#define PRId8  __PRIs8
+#define PRId16 __PRIs16
+#define PRId32 __PRIs32
+#define PRId64 __PRIs64
+#define PRIi8  __PRIs8
+#define PRIi16 __PRIs16
+#define PRIi32 __PRIs32
+#define PRIi64 __PRIs64
 #define PRIu8  __PRIu8
 #define PRIu16 __PRIu16
 #define PRIu32 __PRIu32
@@ -56,10 +60,14 @@ extern "C" {
 #define PRIx32 __PRIx32
 #define PRIx64 __PRIx64
 
-#define SCNs8  __SCNs8
-#define SCNs16 __SCNs16
-#define SCNs32 __SCNs32
-#define SCNs64 __SCNs64
+#define SCNd8  __SCNs8
+#define SCNd16 __SCNs16
+#define SCNd32 __SCNs32
+#define SCNd64 __SCNs64
+#define SCNi8  __SCNs8
+#define SCNi16 __SCNs16
+#define SCNi32 __SCNs32
+#define SCNi64 __SCNs64
 #define SCNu8  __SCNu8
 #define SCNu16 __SCNu16
 #define SCNu32 __SCNu32
