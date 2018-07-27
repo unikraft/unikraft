@@ -44,6 +44,7 @@ extern "C" {
 
 #define __NEED_NULL
 #define __NEED_size_t
+#define __NEED_ssize_t
 #include <nolibc-internal/shareddefs.h>
 
 struct _nolibc_fd;

@@ -27,13 +27,15 @@
 #ifndef __STDLIB_H__
 #define __STDLIB_H__
 
-#include <stdint.h>
 #include <uk/config.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#define __NEED_NULL
+#define __NEED_size_t
+#include <nolibc-internal/shareddefs.h>
 
 /**
  * Convert a string to an unsigned long integer.

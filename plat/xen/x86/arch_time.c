@@ -33,6 +33,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+#include <stddef.h>
 #include <stdint.h>
 #include <sys/time.h>
 #include <uk/plat/time.h>

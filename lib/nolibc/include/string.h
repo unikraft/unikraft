@@ -36,12 +36,13 @@
 #ifndef __STRING_H__
 #define __STRING_H__
 
-#include <sys/types.h>
-#include <stddef.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define __NEED_NULL
+#define __NEED_size_t
+#include <nolibc-internal/shareddefs.h>
 
 void *memcpy(void *dst, const void *src, size_t len);
 void *memset(void *ptr, int val, size_t len);

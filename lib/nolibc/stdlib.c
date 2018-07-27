@@ -51,6 +51,7 @@
  * SUCH DAMAGE.
  */
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <limits.h>
 #include <ctype.h>
