@@ -41,6 +41,15 @@
 
 #include <uk/arch/types.h>
 
+#if (defined __NEED_NULL && !defined __DEFINED_NULL)
+#ifdef __cplusplus
+#define NULL 0L
+#else
+#define NULL ((void *) 0)
+#endif
+#define __DEFINED__NULL
+#endif
+
 #if (defined __NEED_size_t && !defined __DEFINED_size_t)
 typedef __sz size_t;
 #define __DEFINED_size_t

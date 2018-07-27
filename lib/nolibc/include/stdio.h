@@ -42,6 +42,7 @@
 extern "C" {
 #endif
 
+#define __NEED_NULL
 #define __NEED_size_t
 #include <nolibc-internal/shareddefs.h>
 

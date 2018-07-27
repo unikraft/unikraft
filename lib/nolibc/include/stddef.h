@@ -44,14 +44,11 @@ extern "C" {
 
 typedef __sptr ptrdiff_t;
 
-#ifndef NULL
-#define NULL ((void *) 0)
-#endif
-
 #ifndef offsetof
 #define offsetof(t, d) __offsetof(t, d)
 #endif
 
+#define __NEED_NULL
 #define __NEED_size_t
 #include <nolibc-internal/shareddefs.h>
 
