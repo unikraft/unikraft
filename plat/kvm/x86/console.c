@@ -25,89 +25,65 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <x86/cpu.h>
-#include <kvm/console.h>
 #include <uk/plat/console.h>
+#include <uk/config.h>
 #include <uk/essentials.h>
-#include <uk/print.h>
-
-#define COM1 0x3f8
-
-#define COM1_DATA (COM1 + 0)
-#define COM1_INTR (COM1 + 1)
-#define COM1_CTRL (COM1 + 3)
-#define COM1_STATUS (COM1 + 5)
-
-/* only when DLAB is set */
-#define COM1_DIV_LO (COM1 + 0)
-#define COM1_DIV_HI (COM1 + 1)
-
-#define DLAB 0x80
-#define PROT 0x03 /* 8N1 (8 bits, no parity, one stop bit) */
+#if (CONFIG_KVM_DEBUG_VGA_CONSOLE || CONFIG_KVM_KERNEL_VGA_CONSOLE)
+#include <kvm-x86/vga_console.h>
+#endif
+#if (CONFIG_KVM_DEBUG_SERIAL_CONSOLE || CONFIG_KVM_KERNEL_SERIAL_CONSOLE)
+#include <kvm-x86/serial_console.h>
+#endif
 
 void _libkvmplat_init_console(void)
 {
-	outb(COM1_INTR, 0x00);  /* Disable all interrupts */
-	outb(COM1_CTRL, DLAB);  /* Enable DLAB (set baudrate divisor) */
-	outb(COM1_DIV_LO, 0x01);/* Set div to 1 (lo byte) 115200 baud */
-	outb(COM1_DIV_HI, 0x00);/*              (hi byte) */
-	outb(COM1_CTRL, PROT);  /* Set 8N1, clear DLAB */
+#if (CONFIG_KVM_DEBUG_VGA_CONSOLE || CONFIG_KVM_KERNEL_VGA_CONSOLE)
+	_libkvmplat_init_vga_console();
+#endif
+#if (CONFIG_KVM_DEBUG_SERIAL_CONSOLE || CONFIG_KVM_KERNEL_SERIAL_CONSOLE)
+	_libkvmplat_init_serial_console();
+#endif
+
 }
 
-int ukplat_coutd(const char *str, unsigned int len)
+int ukplat_coutd(const char *buf __maybe_unused, unsigned int len)
 {
-	return ukplat_coutk(str, len);
-}
-
-static int serial_tx_empty(void)
-{
-	return inb(COM1_STATUS) & 0x20;
-}
-
-static void serial_write(char a)
-{
-	while (!serial_tx_empty())
-		;
-
-	outb(COM1_DATA, a);
-}
-
-static void serial_putc(char a)
-{
-	if (a == '\n')
-		serial_write('\r');
-	serial_write(a);
-}
-
-static int serial_rx_ready(void)
-{
-	return inb(COM1_STATUS) & 0x01;
-}
-
-static int serial_getc(void)
-{
-	if (!serial_rx_ready())
-		return -1;
-	return (int) inb(COM1_DATA);
-}
-
-int ukplat_coutk(const char *buf, unsigned int len)
-{
-	for (unsigned int i = 0; i < len; i++)
-		serial_putc(buf[i]);
+	for (unsigned int i = 0; i < len; i++) {
+#if CONFIG_KVM_DEBUG_SERIAL_CONSOLE
+		_libkvmplat_serial_putc(buf[i]);
+#endif
+#if CONFIG_KVM_DEBUG_VGA_CONSOLE
+		_libkvmplat_vga_putc(buf[i]);
+#endif
+	}
 	return len;
 }
 
-int ukplat_cink(char *buf, unsigned int maxlen)
+
+int ukplat_coutk(const char *buf __maybe_unused, unsigned int len)
 {
-	int ret;
+	for (unsigned int i = 0; i < len; i++) {
+#if CONFIG_KVM_KERNEL_SERIAL_CONSOLE
+		_libkvmplat_serial_putc(buf[i]);
+#endif
+#if CONFIG_KVM_KERNEL_VGA_CONSOLE
+		_libkvmplat_vga_putc(buf[i]);
+#endif
+	}
+	return len;
+}
+
+int ukplat_cink(char *buf __maybe_unused, unsigned int maxlen __maybe_unused)
+{
+	int ret __maybe_unused;
 	unsigned int num = 0;
 
+#if CONFIG_KVM_KERNEL_SERIAL_CONSOLE
 	while (num < maxlen
-	       && (ret = serial_getc()) >= 0) {
+	       && (ret = _libkvmplat_serial_getc()) >= 0) {
 		*(buf++) = (char) ret;
 		num++;
 	}
-
+#endif
 	return (int) num;
 }
