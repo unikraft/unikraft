@@ -28,6 +28,7 @@
 
 #include <sys/types.h>
 #include <stdint.h>
+#include <string.h>
 #include <kvm-x86/vga_console.h>
 
 /* Hardware text mode color constants. */
@@ -95,6 +96,26 @@ static void terminal_putentryat(char c, uint8_t color, size_t x, size_t y)
 
 	terminal_buffer[index] = vga_entry(c, color);
 }
+static void vga_scroll(void)
+{
+	size_t i;
+
+	for (i = 1; i < VGA_HEIGHT; i++) {
+		memcpy(terminal_buffer + ((i - 1) * VGA_WIDTH),
+			terminal_buffer + (i * VGA_WIDTH), VGA_WIDTH * 2);
+	}
+	for (i = 0; i < VGA_WIDTH; i++)
+		terminal_buffer[((VGA_HEIGHT - 1) * VGA_WIDTH) + i]
+			= vga_entry(' ', terminal_color);
+}
+
+static void vga_newline(void)
+{
+	if (terminal_row == VGA_HEIGHT - 1)
+		vga_scroll();
+	else
+		terminal_row++;
+}
 
 void _libkvmplat_vga_putc(char c)
 {
@@ -114,8 +135,7 @@ void _libkvmplat_vga_putc(char c)
 		break;
 	case '\n':
 		_libkvmplat_vga_putc('\r');
-		if (++terminal_row == VGA_HEIGHT)
-			terminal_row = 0;
+		vga_newline();
 		break;
 	case '\r':
 		terminal_column = 0;
@@ -128,8 +148,7 @@ void _libkvmplat_vga_putc(char c)
 
 		if (terminal_column == VGA_WIDTH) {
 			terminal_column = 0;
-			if (++terminal_row == VGA_HEIGHT)
-				terminal_row = 0;
+			vga_newline();
 		}
 		break;
 	default:
@@ -137,8 +156,7 @@ void _libkvmplat_vga_putc(char c)
 				terminal_column, terminal_row);
 		if (++terminal_column == VGA_WIDTH) {
 			terminal_column = 0;
-			if (++terminal_row == VGA_HEIGHT)
-				terminal_row = 0;
+			vga_newline();
 		}
 		break;
 	}
