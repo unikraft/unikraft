@@ -50,7 +50,7 @@ __FBSDID("$FreeBSD$");
  */
 #include <machine/stdarg.h>
 
-#define	BUF		32 	/* Maximum length of numeric string. */
+#define	BUF		32	/* Maximum length of numeric string. */
 
 /*
  * Flags used during conversion.
@@ -107,7 +107,7 @@ __sccl(char *tab, const u_char *fmt)
 
 	/* XXX: Will not work if sizeof(tab*) > sizeof(char) */
 	for (n = 0; n < 256; n++)
-		     tab[n] = v;	/* memset(tab, v, 256) */
+		tab[n] = v;	/* memset(tab, v, 256) */
 
 	if (c == 0)
 		return (fmt - 1);/* format ended before closing ] */
@@ -156,7 +156,7 @@ doswitch:
 			fmt++;
 			/* fill in the range */
 			do {
-			    tab[++c] = v;
+				tab[++c] = v;
 			} while (c < n);
 			c = n;
 			/*
@@ -198,11 +198,13 @@ vsscanf(const char *inp, char const *fmt0, va_list ap)
 	char buf[BUF];		/* buffer for numeric conversions */
 
 	/* `basefix' is used to avoid `if' tests in the integer scanner */
-	static short basefix[17] =
-		{ 10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
+	static short basefix[17] = {
+			10, 1, 2, 3, 4, 5, 6, 7, 8, 9,
+			10, 11, 12, 13, 14, 15, 16
+		};
 
 	inr = strlen(inp);
-	
+
 	nassigned = 0;
 	nconversions = 0;
 	nread = 0;
@@ -241,7 +243,7 @@ literal:
 			flags |= SUPPRESS;
 			goto again;
 		case 'l':
-			if (flags & LONG){
+			if (flags & LONG) {
 				flags &= ~LONG;
 				flags |= QUAD;
 			} else {
@@ -252,7 +254,7 @@ literal:
 			flags |= QUAD;
 			goto again;
 		case 'h':
-			if (flags & SHORT){
+			if (flags & SHORT) {
 				flags &= ~SHORT;
 				flags |= SHORTSHORT;
 			} else {
@@ -354,7 +356,7 @@ literal:
 				nread++;
 				if (--inr > 0)
 					inp++;
-				else 
+				else
 					goto input_failure;
 			}
 			/*
@@ -375,6 +377,7 @@ literal:
 				width = 1;
 			if (flags & SUPPRESS) {
 				size_t sum = 0;
+
 				for (;;) {
 					if ((n = inr) < width) {
 						sum += n;
@@ -512,9 +515,13 @@ literal:
 						flags |= PFXOK;
 					}
 					if (flags & NZDIGITS)
-					    flags &= ~(SIGNOK|NZDIGITS|NDIGITS);
+						flags &= ~(SIGNOK |
+							   NZDIGITS |
+							   NDIGITS);
 					else
-					    flags &= ~(SIGNOK|PFXOK|NDIGITS);
+						flags &= ~(SIGNOK |
+							   PFXOK |
+							   NDIGITS);
 					goto ok;
 
 				/* 1 through 7 always legal */
@@ -566,14 +573,14 @@ literal:
 				 * for a number.  Stop accumulating digits.
 				 */
 				break;
-		ok:
+ok:
 				/*
 				 * c is legal: store it and look at the next.
 				 */
 				*p++ = c;
 				if (--inr > 0)
 					inp++;
-				else 
+				else
 					break;		/* end of input */
 			}
 			/*
@@ -632,9 +639,9 @@ sscanf(const char *ibuf, const char *fmt, ...)
 {
 	va_list ap;
 	int ret;
-	
+
 	va_start(ap, fmt);
 	ret = vsscanf(ibuf, fmt, ap);
 	va_end(ap);
-	return(ret);
+	return ret;
 }
