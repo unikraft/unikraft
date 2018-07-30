@@ -64,6 +64,9 @@ int   fflush(FILE *fp);
 int vprintf(const char *fmt, va_list ap);
 int  printf(const char *fmt, ...)                           __printf(1, 2);
 
+int vsscanf(const char *str, const char *fmt, va_list ap);
+int  sscanf(const char *str, const char *fmt, ...)          __scanf(2, 3);
+
 #ifdef __cplusplus
 }
 #endif

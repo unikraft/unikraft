@@ -31,24 +31,17 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  *
- * From: Id: vfscanf.c,v 1.13 1998/09/25 12:20:27 obrien Exp 
+ * From: Id: vfscanf.c,v 1.13 1998/09/25 12:20:27 obrien Exp
  * From: static char sccsid[] = "@(#)strtol.c	8.1 (Berkeley) 6/4/93";
  * From: static char sccsid[] = "@(#)strtoul.c	8.1 (Berkeley) 6/4/93";
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
-#include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/ctype.h>
-#include <sys/limits.h>
-
-/*
- * Note that stdarg.h and the ANSI style va_start macro is used for both
- * ANSI and traditional C compilers.
- */
-#include <machine/stdarg.h>
+#include <stdarg.h>
+#include <sys/types.h>
+#include <stdint.h>
+#include <string.h>
+#include <ctype.h>
+#include <stdlib.h>
 
 #define	BUF		32	/* Maximum length of numeric string. */
 
@@ -83,8 +76,8 @@ __FBSDID("$FreeBSD$");
 #define	CT_CHAR		0	/* %c conversion */
 #define	CT_CCL		1	/* %[...] conversion */
 #define	CT_STRING	2	/* %s conversion */
-#define	CT_INT		3	/* integer, i.e., strtoq or strtouq */
-typedef u_quad_t (*ccfntype)(const char *, char **, int);
+#define	CT_INT		3	/* integer, i.e., strtoll or strtoull */
+typedef uint64_t (*ccfntype)(const char *, char **, int);
 
 /*
  * Fill in the given table from the scanset at the given format
@@ -92,8 +85,8 @@ typedef u_quad_t (*ccfntype)(const char *, char **, int);
  * closing `]'.  The table has a 1 wherever characters should be
  * considered part of the scanset.
  */
-static const u_char *
-__sccl(char *tab, const u_char *fmt)
+static const unsigned char *
+__sccl(char *tab, const unsigned char *fmt)
 {
 	int c, n, v;
 
@@ -182,7 +175,7 @@ int
 vsscanf(const char *inp, char const *fmt0, va_list ap)
 {
 	int inr;
-	const u_char *fmt = (const u_char *)fmt0;
+	const unsigned char *fmt = (const unsigned char *)fmt0;
 	int c;			/* character from format, or conversion */
 	size_t width;		/* field width, or 0 */
 	char *p;		/* points into all kinds of strings */
@@ -192,8 +185,8 @@ vsscanf(const char *inp, char const *fmt0, va_list ap)
 	int nassigned;		/* number of fields assigned */
 	int nconversions;	/* number of conversions */
 	int nread;		/* number of characters consumed from fp */
-	int base;		/* base argument to strtoq/strtouq */
-	ccfntype ccfn;		/* conversion function (strtoq/strtouq) */
+	int base;		/* base argument to strtoll/strtoull */
+	ccfntype ccfn;		/* conversion function (strtoll/strtoull) */
 	char ccltab[256];	/* character class table for %[...] */
 	char buf[BUF];		/* buffer for numeric conversions */
 
@@ -273,32 +266,32 @@ literal:
 		 */
 		case 'd':
 			c = CT_INT;
-			ccfn = (ccfntype)strtoq;
+			ccfn = (ccfntype) strtoll;
 			base = 10;
 			break;
 
 		case 'i':
 			c = CT_INT;
-			ccfn = (ccfntype)strtoq;
+			ccfn = (ccfntype) strtoll;
 			base = 0;
 			break;
 
 		case 'o':
 			c = CT_INT;
-			ccfn = strtouq;
+			ccfn = (ccfntype) strtoull;
 			base = 8;
 			break;
 
 		case 'u':
 			c = CT_INT;
-			ccfn = strtouq;
+			ccfn = (ccfntype) strtoull;
 			base = 10;
 			break;
 
 		case 'x':
 			flags |= PFXOK;	/* enable 0x prefixing */
 			c = CT_INT;
-			ccfn = strtouq;
+			ccfn = (ccfntype) strtoull;
 			base = 16;
 			break;
 
@@ -320,7 +313,7 @@ literal:
 		case 'p':	/* pointer format is like hex */
 			flags |= POINTER | PFXOK;
 			c = CT_INT;
-			ccfn = strtouq;
+			ccfn = (ccfntype) strtoull;
 			base = 16;
 			break;
 
@@ -335,7 +328,7 @@ literal:
 			else if (flags & LONG)
 				*va_arg(ap, long *) = nread;
 			else if (flags & QUAD)
-				*va_arg(ap, quad_t *) = nread;
+				*va_arg(ap, int64_t *) = nread;
 			else
 				*va_arg(ap, int *) = nread;
 			continue;
@@ -379,7 +372,7 @@ literal:
 				size_t sum = 0;
 
 				for (;;) {
-					if ((n = inr) < width) {
+					if ((n = inr) < (int) width) {
 						sum += n;
 						width -= n;
 						inp += n;
@@ -395,7 +388,7 @@ literal:
 				}
 				nread += sum;
 			} else {
-				bcopy(inp, va_arg(ap, char *), width);
+				memmove(va_arg(ap, char *), inp, width);
 				inr -= width;
 				inp += width;
 				nread += width;
@@ -478,7 +471,7 @@ literal:
 			continue;
 
 		case CT_INT:
-			/* scan an integer as if by strtoq/strtouq */
+			/* scan an integer as if by strtoll/strtoull */
 #ifdef hardway
 			if (width == 0 || width > sizeof(buf) - 1)
 				width = sizeof(buf) - 1;
@@ -596,14 +589,14 @@ ok:
 				}
 				goto match_failure;
 			}
-			c = ((u_char *)p)[-1];
+			c = ((unsigned char *)p)[-1];
 			if (c == 'x' || c == 'X') {
 				--p;
 				inp--;
 				inr++;
 			}
 			if ((flags & SUPPRESS) == 0) {
-				u_quad_t res;
+				uint64_t res;
 
 				*p = 0;
 				res = (*ccfn)(buf, (char **)NULL, base);
@@ -617,7 +610,7 @@ ok:
 				else if (flags & LONG)
 					*va_arg(ap, long *) = res;
 				else if (flags & QUAD)
-					*va_arg(ap, quad_t *) = res;
+					*va_arg(ap, int64_t *) = res;
 				else
 					*va_arg(ap, int *) = res;
 				nassigned++;
