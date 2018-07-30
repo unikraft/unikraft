@@ -74,9 +74,9 @@ int uk_argnparse(char *argb, __sz maxlen, char *argv[], int maxcount)
 				break;
 			}
 			in_quote = argb[i];
-
-		/* any character */
+			/* Fall through */
 		default:
+			/* any character */
 			if (prev_wspace) {
 				argv[argc++] = &argb[i];
 				prev_wspace = 0;

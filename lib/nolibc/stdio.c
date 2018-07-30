@@ -290,6 +290,7 @@ reswitch:
 			goto handle_nosign;
 		case 'X':
 			upper = 1;
+			/* Fall through */
 		case 'x':
 			base = 16;
 			goto handle_nosign;
