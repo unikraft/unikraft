@@ -46,10 +46,10 @@ typedef void (*ukplat_ctor_func_t)(void);
 
 /* Function pointer arrays of constructors; provided by
  * the platform's linker script */
-extern const ukplat_ctor_func_t const __preinit_array_start[];
-extern const ukplat_ctor_func_t const __preinit_array_end;
-extern const ukplat_ctor_func_t const __init_array_start[];
-extern const ukplat_ctor_func_t const __init_array_end;
+extern const ukplat_ctor_func_t __preinit_array_start[];
+extern const ukplat_ctor_func_t __preinit_array_end;
+extern const ukplat_ctor_func_t __init_array_start[];
+extern const ukplat_ctor_func_t __init_array_end;
 
 /**
  * Helper macro for iterating over constructor pointer arrays
