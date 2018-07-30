@@ -66,15 +66,6 @@ struct pci_bus_handler {
 };
 static struct pci_bus_handler ph;
 
-#define FOREACH_DRIVER(drv) \
-	UK_TAILQ_FOREACH(drv, &ph.drv_list, next)
-
-#define FOREACH_DRIVER_SAFE(drv, drv_next) \
-	UK_TAILQ_FOREACH_SAFE(drv, &ph.drv_list, next, drv_next)
-
-#define FOREACH_DEVICE(dev) \
-	UK_TAILQ_FOREACH(dev, &ph.dev_list, ph_next)
-
 #define PCI_INVALID_ID              (0xFFFF)
 #define PCI_DEVICE_ID_MASK          (0xFFFF)
 
@@ -158,7 +149,7 @@ static inline struct pci_driver *pci_find_driver(struct pci_device_id *id)
 	struct pci_driver *drv;
 	const struct pci_device_id *drv_id;
 
-	FOREACH_DRIVER(drv) {
+	UK_TAILQ_FOREACH(drv, &ph.drv_list, next) {
 		for (drv_id = drv->device_ids;
 		     !pci_device_id_is_any(drv_id);
 		     drv_id++) {
@@ -291,7 +282,7 @@ static int pci_init(struct uk_alloc *a)
 	}
 	UK_TAILQ_INIT(&ph.dev_list);
 
-	FOREACH_DRIVER_SAFE(drv, drv_next) {
+	UK_TAILQ_FOREACH_SAFE(drv, &ph.drv_list, next, drv_next) {
 		if (drv->init) {
 			ret = drv->init(a);
 			if (ret == 0)
