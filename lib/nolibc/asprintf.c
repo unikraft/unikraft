@@ -28,18 +28,22 @@
 int vasprintf(char **s, const char *fmt, va_list ap)
 {
 	va_list ap2;
+	int l;
+
 	va_copy(ap2, ap);
-	int l = vsnprintf(0, 0, fmt, ap2);
+	l = vsnprintf(0, 0, fmt, ap2);
 	va_end(ap2);
 
-	if (l<0 || !(*s=malloc(l+1U))) return -1;
-	return vsnprintf(*s, l+1U, fmt, ap);
+	if (l < 0 || !(*s = malloc(l + 1U)))
+		return -1;
+	return vsnprintf(*s, l + 1U, fmt, ap);
 }
 
 int asprintf(char **s, const char *fmt, ...)
 {
 	int ret;
 	va_list ap;
+
 	va_start(ap, fmt);
 	ret = vasprintf(s, fmt, ap);
 	va_end(ap);
