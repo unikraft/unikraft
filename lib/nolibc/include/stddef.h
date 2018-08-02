@@ -49,6 +49,10 @@ typedef __sptr ptrdiff_t;
 #define NULL ((void *) 0)
 #endif
 
+#ifndef offsetof
+#define offsetof(t, d) __offsetof(t, d)
+#endif
+
 #ifdef __cplusplus
 }
 #endif
