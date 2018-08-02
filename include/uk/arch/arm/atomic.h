@@ -32,12 +32,12 @@
 #endif
 
 /**
- * ukarch_find_lsbit - find first (lowest) set bit in word.
+ * ukarch_ffsl - find first (lowest) set bit in word.
  * @word: The word to search
  *
  * Undefined if no bit exists, so code should check against 0 first.
  */
-static inline unsigned long ukarch_find_lsbit(unsigned long word)
+static inline unsigned long ukarch_ffsl(unsigned long word)
 {
 	int clz;
 

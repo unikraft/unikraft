@@ -70,11 +70,11 @@ void do_hypervisor_callback(struct __regs *regs)
 #endif
 	l1 = ukarch_exchange_n(&vcpu_info->evtchn_pending_sel, 0);
 	while (l1 != 0) {
-		l1i = ukarch_find_lsbit(l1);
+		l1i = ukarch_ffsl(l1);
 		l1 &= ~(1UL << l1i);
 
 		while ((l2 = active_evtchns(cpu, s, l1i)) != 0) {
-			l2i = ukarch_find_lsbit(l2);
+			l2i = ukarch_ffsl(l2);
 			l2 &= ~(1UL << l2i);
 
 			port = (l1i * (sizeof(unsigned long) * 8)) + l2i;

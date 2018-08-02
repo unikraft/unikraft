@@ -58,7 +58,7 @@ int vfscore_alloc_fd(void)
 	int ret;
 
 	flags = ukplat_lcpu_save_irqf();
-	ret = ukarch_find_lsbit(~fdtable.bitmap);
+	ret = ukarch_ffsl(~fdtable.bitmap);
 
 	if (!ret) {
 		ret = -ENFILE;
