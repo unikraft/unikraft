@@ -35,6 +35,13 @@ define gcc_version_ge =
 $(shell if [ $(CC_VER_MAJOR) -gt $(1) ] || ([ $(CC_VER_MAJOR) -eq $(1) ] && [ $(CC_VER_MINOR) -ge $(2) ]) ; then echo y ; fi)
 endef
 
+# print error and stop build when GCC version doesn't meet the minimum requirement
+# error_if_gcc_version_lt $gcc_major,$gcc_minor.
+define error_if_gcc_version_lt =
+$(if $(call gcc_version_ge,$(1),$(2)),,\
+     $(error Require GCC version >= $(1).$(2) found $(CC_VER_MAJOR).$(CC_VER_MINOR)))
+endef
+
 ################################################################################
 #
 # Paths and Filenames
