@@ -1,15 +1,15 @@
 choice
 	prompt "Processor Optimization"
-	default MARCH_CORTEXA7
+	default MARCH_ARM32_CORTEXA7
 	help
 		Optimize the code for selected target processor
 
-config MARCH_CORTEXA7
+config MARCH_ARM32_CORTEXA7
 	bool "Generic Cortex A7"
 	help
 		Compile for Cortex-A7 CPUs, no hardware FPU support
 
-config MARCH_A20NEON
+config MARCH_ARM32_A20NEON
 	bool "Cortex A7: AllWinner A20"
 	help
 		Compile for AllWinner A20 (Cortex-A7) CPUs
