@@ -1,0 +1,59 @@
+ASFLAGS  += -D__ARM_64__
+CFLAGS   += -D__ARM_64__ -fms-extensions
+CXXFLAGS += -D__ARM_64__ -fms-extensions
+
+# GCC support -mcpu=native for arm64 from 6.0
+ifeq ($(CONFIG_MARCH_ARM64_NATIVE),y)
+$(call error_if_gcc_version_lt,6,0)
+CFLAGS-$(call gcc_version_ge,6,0)	+= -mcpu=native
+CXXFLAGS-$(call gcc_version_ge,6,0)	+= -mcpu=native
+endif
+
+# GCC support -mcpu=generic for arm64 from 4.8
+ifeq ($(CONFIG_MARCH_ARM64_GENERIC),y)
+$(call error_if_gcc_version_lt,4,8)
+CFLAGS-$(call gcc_version_ge,4,8)	+= -march=armv8-a -mcpu=generic -mtune=generic
+CXXFLAGS-$(call gcc_version_ge,4,8)	+= -march=armv8-a -mcpu=generic -mtune=generic
+endif
+
+# GCC support -mcpu=cortex-a53 for arm64 from 4.9
+ifeq ($(CONFIG_MARCH_ARM64_CORTEXA53),y)
+$(call error_if_gcc_version_lt,4,9)
+CFLAGS-$(call gcc_version_ge,4,9)	+= -march=armv8-a -mcpu=cortex-a53 -mtune=cortex-a53
+CXXFLAGS-$(call gcc_version_ge,4,9)	+= -march=armv8-a -mcpu=cortex-a53 -mtune=cortex-a53
+endif
+
+# GCC support -mcpu=cortex-a57 for arm64 from 4.9
+ifeq ($(CONFIG_MARCH_ARM64_CORTEXA57),y)
+$(call error_if_gcc_version_lt,4,9)
+CFLAGS-$(call gcc_version_ge,4,9)	+= -march=armv8-a -mcpu=cortex-a57 -mtune=cortex-a57
+CXXFLAGS-$(call gcc_version_ge,4,9)	+= -march=armv8-a -mcpu=cortex-a57 -mtune=cortex-a57
+endif
+
+# GCC support -mcpu=cortex-a72 for arm64 from 5.0
+ifeq ($(CONFIG_MARCH_ARM64_CORTEXA72),y)
+$(call error_if_gcc_version_lt,5,0)
+CFLAGS-$(call gcc_version_ge,5,0)	+= -march=armv8-a -mcpu=cortex-a72 -mtune=cortex-a72
+CXXFLAGS-$(call gcc_version_ge,5,0)	+= -march=armv8-a -mcpu=cortex-a72 -mtune=cortex-a72
+endif
+
+# GCC support -mcpu=cortex-a73 for arm64 from 7.0
+ifeq ($(CONFIG_MARCH_ARM64_CORTEXA73),y)
+$(call error_if_gcc_version_lt,7,0)
+CFLAGS-$(call gcc_version_ge,7,0)	+= -march=armv8-a -mcpu=cortex-a73 -mtune=cortex-a73
+CXXFLAGS-$(call gcc_version_ge,7,0)	+= -march=armv8-a -mcpu=cortex-a73 -mtune=cortex-a73
+endif
+
+# GCC support -mcpu=cortex-a55 for arm64 from 8.0
+ifeq ($(CONFIG_MARCH_ARM64_CORTEXA55),y)
+$(call error_if_gcc_version_lt,8,0)
+CFLAGS-$(call gcc_version_ge,8,0)	+= -march=armv8.2-a -mcpu=cortex-a55 -mtune=cortex-a55
+CXXFLAGS-$(call gcc_version_ge,8,0)	+= -march=armv8.2-a -mcpu=cortex-a55 -mtune=cortex-a55
+endif
+
+# GCC support -mcpu=cortex-a75 for arm64 from 8.0
+ifeq ($(CONFIG_MARCH_ARM64_CORTEXA75),y)
+$(call error_if_gcc_version_lt,8,0)
+CFLAGS-$(call gcc_version_ge,8,0)	+= -march=armv8.2-a -mcpu=cortex-a75 -mtune=cortex-a75
+CXXFLAGS-$(call gcc_version_ge,8,0)	+= -march=armv8.2-a -mcpu=cortex-a75 -mtune=cortex-a75
+endif
