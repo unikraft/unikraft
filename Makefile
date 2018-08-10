@@ -428,6 +428,10 @@ LIFTOFF		:= liftoff -e -s
 override ARFLAGS:= rcs
 CC_VERSION	:= $(shell $(CC) --version | \
 		   sed -n -r 's/^.* ([0-9]*)\.([0-9]*)\.([0-9]*)[ ]*.*/\1.\2/p')
+# Retrieve GCC major and minor number from CC_VERSION. They would be used
+# to select correct optimization parameters for target CPUs.
+CC_VER_MAJOR   := $(word 1,$(subst ., ,$(CC_VERSION)))
+CC_VER_MINOR   := $(word 2,$(subst ., ,$(CC_VERSION)))
 
 ASFLAGS		+= -DCC_VERSION=$(CC_VERSION)
 CFLAGS		+= -DCC_VERSION=$(CC_VERSION)
