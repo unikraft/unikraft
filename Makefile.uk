@@ -4,15 +4,15 @@
 #
 ################################################################################
 
-ASFLAGS     += -U __linux__ -U __FreeBSD__ -U __sun__ -D__ASSEMBLY__ -no-pie
+ASFLAGS     += -U __linux__ -U __FreeBSD__ -U __sun__ -D__ASSEMBLY__
 ASINCLUDES  += -nostdinc -nostdlib -I$(CONFIG_UK_BASE)/include
 
-CFLAGS      += -U __linux__ -U __FreeBSD__ -U __sun__ -no-pie
+CFLAGS      += -U __linux__ -U __FreeBSD__ -U __sun__
 CFLAGS      += -fno-stack-protector -fno-omit-frame-pointer -fno-tree-sra
 CFLAGS      += -Wall -Wextra
 CINCLUDES   += -nostdinc -nostdlib -I$(CONFIG_UK_BASE)/include
 
-CXXFLAGS    += -U __linux__ -U __FreeBSD__ -U __sun__ -no-pie
+CXXFLAGS    += -U __linux__ -U __FreeBSD__ -U __sun__
 CXXFLAGS    += -fno-stack-protector -fno-omit-frame-pointer -fno-tree-sra
 CXXFLAGS    += -Wall -Wextra
 CXXINCLUDES += -nostdinc -nostdlib -I$(CONFIG_UK_BASE)/include
@@ -20,8 +20,8 @@ CXXINCLUDES += -nostdinc -nostdlib -I$(CONFIG_UK_BASE)/include
 # Set the text and data sections to be readable and writable. Also,
 # do not page-align the data segment. If the output format supports
 # Unix style magic numbers, mark the output as OMAGIC.
-LIBLDFLAGS  += -nostdinc -nostdlib -Wl,--omagic -Wl,-r -no-pie
-LDFLAGS     += -nostdinc -nostdlib -Wl,--omagic -Wl,--build-id=none -no-pie
+LIBLDFLAGS  += -nostdinc -nostdlib -Wl,--omagic -Wl,-r
+LDFLAGS     += -nostdinc -nostdlib -Wl,--omagic -Wl,--build-id=none
 
 CFLAGS-$(CONFIG_OPTIMIZE_NONE)            += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
 CXXFLAGS-$(CONFIG_OPTIMIZE_NONE)          += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
@@ -56,3 +56,14 @@ endif
 ASFLAGS  += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION) -DUK_FULLVERSION=$(UK_FULLVERSION) -DUK_CODENAME="$(UK_CODENAME)"
 CFLAGS   += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION) -DUK_FULLVERSION=$(UK_FULLVERSION) -DUK_CODENAME="$(UK_CODENAME)"
 CXXFLAGS += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION) -DUK_FULLVERSION=$(UK_FULLVERSION) -DUK_CODENAME="$(UK_CODENAME)"
+
+# Check whether the pie option is enabled by default. If possible,
+# add -no-pie to link flags to override default pie option.
+PIE_ON = $(shell $(CC) -v 2>&1 | grep -Fo "enable-default-pie")
+ifneq ($(PIE_ON),)
+ASFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
+CFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
+CXXFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
+LIBLDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
+LDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
+endif
