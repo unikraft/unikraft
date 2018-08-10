@@ -1,0 +1,48 @@
+choice
+	prompt "Processor Optimization"
+	default MARCH_ARM64_GENERIC
+	help
+		Optimize the code for selected target processor
+
+config MARCH_ARM64_NATIVE
+	bool "Auto-detect host CPU"
+	help
+		Optimize compilation to host CPU. Please note that this
+		option will fail in case of cross-compilation
+
+config MARCH_ARM64_GENERIC
+	bool "Generic Armv8 CPU"
+	help
+		Compile for Generic Armv8 compatible CPUs
+
+config MARCH_ARM64_CORTEXA53
+	bool "Generic Armv8 Cortex A53"
+	help
+		Compile for Armv8 Cortex-A53 (and compatible) CPUs
+
+config MARCH_ARM64_CORTEXA57
+	bool "Generic Armv8 Cortex A57"
+	help
+		Compile for Armv8 Cortex-A57 (and compatible) CPUs
+
+config MARCH_ARM64_CORTEXA72
+	bool "Generic Armv8 Cortex A72"
+	help
+		Compile for Armv8 Cortex-A72 (and compatible) CPUs
+
+config MARCH_ARM64_CORTEXA73
+	bool "Generic Armv8 Cortex A73"
+	help
+		Compile for Armv8 Cortex-A73 (and compatible) CPUs
+
+config MARCH_ARM64_CORTEXA55
+	bool "Generic Armv8.2 Cortex A55"
+	help
+		Compile for Armv8.2 Cortex-A55 (and compatible) CPUs
+
+config MARCH_ARM64_CORTEXA75
+	bool "Generic Armv8.2 Cortex A75"
+	help
+		Compile for Armv8.2 Cortex-A75 (and compatible) CPUs
+
+endchoice
