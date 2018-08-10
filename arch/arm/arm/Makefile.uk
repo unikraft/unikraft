@@ -5,12 +5,19 @@ CFLAGS   += -marm -fms-extensions
 CXXFLAGS += -D__ARM_32__
 CXXFLAGS += -marm -fms-extensions
 
-#-march=armv7-a
+# Set GCC flags for MARCH_ARM32_A20NEON. GCC supports -mcpu=cortex-a7 from 4.7
+ifeq ($(CONFIG_MARCH_ARM32_A20NEON),y)
+$(call error_if_gcc_version_lt,4,7)
+CFLAGS-$(call gcc_version_ge,4,7)	+= -mcpu=cortex-a7 -mtune=cortex-a7 -mfpu=vfpv4-d16 -mfpu=neon-vfpv4 -funsafe-math-optimizations
+CXXFLAGS-$(call gcc_version_ge,4,7)	+= -mcpu=cortex-a7 -mtune=cortex-a7 -mfpu=vfpv4-d16 -mfpu=neon-vfpv4 -funsafe-math-optimizations
+endif
 
-CFLAGS-$(CONFIG_MARCH_ARM32_A20NEON)    += -mcpu=cortex-a7 -mtune=cortex-a7 -mfpu=vfpv4-d16 -mfpu=neon-vfpv4 -funsafe-math-optimizations
-CXXFLAGS-$(CONFIG_MARCH_ARM32_A20NEON)  += -mcpu=cortex-a7 -mtune=cortex-a7 -mfpu=vfpv4-d16 -mfpu=neon-vfpv4 -funsafe-math-optimizations
-CFLAGS-$(CONFIG_MARCH_ARM32_CORTEXA7)   += -mcpu=cortex-a7 -mtune=cortex-a7
-CXXFLAGS-$(CONFIG_MARCH_ARM32_CORTEXA7) += -mcpu=cortex-a7 -mtune=cortex-a
+# Set GCC flags for MARCH_ARM32_CORTEXA7. GCC supports -mcpu=cortex-a7 from 4.7
+ifeq ($(CONFIG_MARCH_ARM32_CORTEXA7),y)
+$(call error_if_gcc_version_lt,4,7)
+CFLAGS-$(call gcc_version_ge,4,7)	+= -mcpu=cortex-a7 -mtune=cortex-a7
+CXXFLAGS-$(call gcc_version_ge,4,7)	+= -mcpu=cortex-a7 -mtune=cortex-a7
+endif
 
 $(eval $(call addlib,libarmmath))
 LIBARMMATH_SRCS-$(CONFIG_ARCH_ARM_32) += $(CONFIG_UK_BASE)/arch/arm/divsi3.S
