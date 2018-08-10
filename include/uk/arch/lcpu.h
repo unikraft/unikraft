@@ -43,16 +43,16 @@ extern "C" {
 #endif
 
 #ifdef __X86_32__
-#include <uk/arch/x86/lcpu.h>
+#include <uk/arch/x86/x86/lcpu.h>
 #endif
 #ifdef __X86_64__
-#include <uk/arch/x86_64/lcpu.h>
+#include <uk/arch/x86/x86_64/lcpu.h>
 #endif
 #ifdef __ARM_32__
-#include <uk/arch/arm/lcpu.h>
+#include <uk/arch/arm/arm/lcpu.h>
 #endif
 #ifdef __ARM_64__
-#include <uk/arch/arm64/lcpu.h>
+#include <uk/arch/arm/arm64/lcpu.h>
 #endif
 
 #ifndef likely

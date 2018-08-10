@@ -41,20 +41,20 @@ extern "C" {
 #endif
 
 #ifdef __X86_32__
-#include <uk/arch/x86/intsizes.h>
-#include <uk/arch/x86/types.h>
+#include <uk/arch/x86/x86/intsizes.h>
+#include <uk/arch/x86/x86/types.h>
 #endif
 #ifdef __X86_64__
-#include <uk/arch/x86_64/intsizes.h>
-#include <uk/arch/x86_64/types.h>
+#include <uk/arch/x86/x86_64/intsizes.h>
+#include <uk/arch/x86/x86_64/types.h>
 #endif
 #ifdef __ARM_32__
-#include <uk/arch/arm/intsizes.h>
-#include <uk/arch/arm/types.h>
+#include <uk/arch/arm/arm/intsizes.h>
+#include <uk/arch/arm/arm/types.h>
 #endif
 #ifdef __ARM_64__
-#include <uk/arch/arm64/intsizes.h>
-#include <uk/arch/arm64/types.h>
+#include <uk/arch/arm/arm64/intsizes.h>
+#include <uk/arch/arm/arm64/types.h>
 #endif
 
 #ifndef __ASSEMBLY__

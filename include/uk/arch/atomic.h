@@ -37,16 +37,16 @@ extern "C" {
 #endif
 
 #ifdef __X86_32__
-#include <uk/arch/x86/atomic.h>
+#include <uk/arch/x86/x86/atomic.h>
 #endif
 #ifdef __X86_64__
-#include <uk/arch/x86_64/atomic.h>
+#include <uk/arch/x86/x86_64/atomic.h>
 #endif
 #ifdef __ARM_32__
-#include <uk/arch/arm/atomic.h>
+#include <uk/arch/arm/arm/atomic.h>
 #endif
 #ifdef __ARM_64__
-#include <uk/arch/arm64/atomic.h>
+#include <uk/arch/arm/arm64/atomic.h>
 #endif
 
 /**
