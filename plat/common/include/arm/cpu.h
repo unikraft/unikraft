@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
+ * Authors: Wei Chen <wei.chen@arm.com>
  *
- * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2018, Arm Ltd. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,17 +32,13 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#ifndef __PLAT_CMN_CPU_H__
-#define __PLAT_CMN_CPU_H__
+#ifndef __PLAT_CMN_ARM_CPU_H__
+#define __PLAT_CMN_ARM_CPU_H__
 
-#include <uk/arch/lcpu.h>
-#if defined(__X86_64__)
-#include <x86/cpu.h>
-#elif defined(__ARM_64__)
-#include <arm/cpu.h>
+#if defined(__ARM_64__)
+#include <arm/arm64/cpu.h>
 #else
 #error "Add cpu.h for current architecture."
 #endif
 
-
-#endif /* __PLAT_CMN_CPU_H__ */
+#endif /* __PLAT_CMN_ARM_CPU_H__ */

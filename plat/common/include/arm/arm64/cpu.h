@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
+ * Authors: Wei Chen <wei.chen@arm.com>
  *
- * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2018, Arm Ltd. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,17 +32,61 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#ifndef __PLAT_CMN_CPU_H__
-#define __PLAT_CMN_CPU_H__
+#include <inttypes.h>
 
-#include <uk/arch/lcpu.h>
-#if defined(__X86_64__)
-#include <x86/cpu.h>
-#elif defined(__ARM_64__)
-#include <arm/cpu.h>
-#else
-#error "Add cpu.h for current architecture."
-#endif
+static inline uint8_t ioreg_read8(const volatile uint8_t *addr)
+{
+	return *addr;
+}
 
+static inline void ioreg_write8(volatile uint8_t *addr, uint8_t value)
+{
+	*addr = value;
+}
 
-#endif /* __PLAT_CMN_CPU_H__ */
+static inline uint16_t ioreg_read16(const volatile uint16_t *addr)
+{
+	return *addr;
+}
+
+static inline void ioreg_write16(volatile uint16_t *addr, uint16_t value)
+{
+	*addr = value;
+}
+
+static inline uint32_t ioreg_read32(const volatile uint32_t *addr)
+{
+	return *addr;
+}
+
+static inline void ioreg_write32(volatile uint32_t *addr, uint32_t value)
+{
+	*addr = value;
+}
+
+static inline uint64_t ioreg_read64(const volatile uint64_t *addr)
+{
+	return *addr;
+}
+
+static inline void ioreg_write64(volatile uint64_t *addr, uint64_t value)
+{
+	*addr = value;
+}
+
+/* Define compatibility IO macros */
+#define outb(addr, v)   UK_BUG()
+#define outw(addr, v)   UK_BUG()
+#define inb(addr)       UK_BUG()
+
+/* Macros to access system registers */
+#define SYSREG_READ(reg) \
+({	uint64_t val; \
+	__asm__ __volatile__("mrs %0, " __STRINGIFY(reg) \
+			: "=&r" (val)); \
+	val; \
+})
+
+#define SYSREG_WRITE(reg, val) \
+	__asm__ __volatile__("msr " __STRINGIFY(reg) ", %0" \
+			: : "r" ((uint64_t)(val)))
