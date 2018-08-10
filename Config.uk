@@ -65,7 +65,7 @@ config OPTIMIZE_SIZE
 endchoice
 
 comment "Hint: Specify a CPU type to get most benefits from performance optimization"
-	depends on OPTIMIZE_PERF && MARCH_GENERIC
+	depends on OPTIMIZE_PERF && MARCH_X86_64_GENERIC
 
 config OPTIMIZE_DEADELIM
 	bool "Drop unused functions and data"
