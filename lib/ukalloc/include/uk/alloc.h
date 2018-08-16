@@ -102,7 +102,7 @@ struct uk_alloc {
 
 	/* internal */
 	struct uk_alloc *next;
-	int8_t private[];
+	int8_t priv[];
 };
 
 /* wrapper functions */

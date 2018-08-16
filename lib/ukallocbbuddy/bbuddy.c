@@ -220,7 +220,7 @@ static ssize_t bbuddy_availmem(struct uk_alloc *a)
 	struct uk_bbpalloc *b;
 
 	UK_ASSERT(a != NULL);
-	b = (struct uk_bbpalloc *)&a->private;
+	b = (struct uk_bbpalloc *)&a->priv;
 	return (ssize_t) b->nr_free_pages << __PAGE_SHIFT;
 }
 #endif
@@ -236,7 +236,7 @@ static void *bbuddy_palloc(struct uk_alloc *a, size_t order)
 	chunk_tail_t *spare_ct;
 
 	UK_ASSERT(a != NULL);
-	b = (struct uk_bbpalloc *)&a->private;
+	b = (struct uk_bbpalloc *)&a->priv;
 
 	/* Find smallest order which can satisfy the request. */
 	for (i = order; i < FREELIST_SIZE; i++) {
@@ -289,7 +289,7 @@ static void bbuddy_pfree(struct uk_alloc *a, void *obj, size_t order)
 	unsigned long mask;
 
 	UK_ASSERT(a != NULL);
-	b = (struct uk_bbpalloc *)&a->private;
+	b = (struct uk_bbpalloc *)&a->priv;
 
 	/* if the object is not page aligned it was clearly not from us */
 	UK_ASSERT((((uintptr_t)obj) & (__PAGE_SIZE - 1)) == 0);
@@ -353,7 +353,7 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 
 	UK_ASSERT(a != NULL);
 	UK_ASSERT(base != NULL);
-	b = (struct uk_bbpalloc *)&a->private;
+	b = (struct uk_bbpalloc *)&a->priv;
 
 	min = round_pgup((uintptr_t)base);
 	max = round_pgdown((uintptr_t)base + (uintptr_t)len);
@@ -473,7 +473,7 @@ struct uk_alloc *uk_allocbbuddy_init(void *base, size_t len)
 		  (uintptr_t)a);
 	min += metalen;
 	memset(a, 0, metalen);
-	b = (struct uk_bbpalloc *)&a->private;
+	b = (struct uk_bbpalloc *)&a->priv;
 
 	for (i = 0; i < FREELIST_SIZE; i++) {
 		b->free_head[i] = &b->free_tail[i];
