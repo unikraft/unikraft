@@ -1,9 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
- *          Simon Kuenzer <simon.kuenzer@neclab.eu>
+ * Authors: Florian Schmidt <florian.schmidt@neclab.eu>
  *
- * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,31 +32,25 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#ifndef __SYS_TIME_H__
-#define __SYS_TIME_H__
-
-#include <uk/plat/time.h>
-#include <sys/select.h>
+#ifndef __TIME_H__
+#define __TIME_H__
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#define __NEED_NULL
 #define __NEED_time_t
-#define __NEED_suseconds_t
-#define __NEED_struct_timeval
+#define __NEED_struct_timespec
 #include <nolibc-internal/shareddefs.h>
 
-struct itimerval {
-	struct timeval it_interval;
-	struct timeval it_value;
+struct itimerspec {
+	struct timespec it_interval;
+	struct timespec it_value;
 };
-
-/* TODO: Implement */
-int gettimeofday(struct timeval *tv, void *tz);
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __SYS_TIME_H__ */
+#endif /* __TIME_H__ */

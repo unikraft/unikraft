@@ -36,9 +36,9 @@
 #ifndef __SYSCALL_H__
 #define __SYSCALL_H__
 
+#include <time.h>
 #include <sys/types.h>
 #include <sys/select.h>
-#include <sys/time.h>
 
 #if defined __X86_64__
 #include <linuxu/syscall-x86_64.h>
