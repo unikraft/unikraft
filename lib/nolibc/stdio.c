@@ -102,8 +102,9 @@ int vsnprintf(char *str, size_t size, const char *fmt, va_list ap)
 {
 #define PCHAR(c)                                                               \
 	{                                                                      \
+		int cc = (c);                                                  \
 		if (size >= 2) {                                               \
-			*str++ = c;                                            \
+			*str++ = cc;                                           \
 			size--;                                                \
 		}                                                              \
 		retval++;                                                      \
