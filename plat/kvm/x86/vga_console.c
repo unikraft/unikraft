@@ -119,9 +119,6 @@ static void vga_newline(void)
 
 void _libkvmplat_vga_putc(char c)
 {
-	if (terminal_column == 0 && terminal_row == 0)
-		clear_terminal();
-
 	switch (c) {
 	case '\a':
 		break; //ascii bel (0x07) - ignore
