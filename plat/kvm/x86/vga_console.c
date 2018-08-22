@@ -29,6 +29,8 @@
 #include <sys/types.h>
 #include <stdint.h>
 #include <string.h>
+#include <x86/cpu.h>
+#include <x86/irq.h>
 #include <kvm-x86/vga_console.h>
 
 /* Hardware text mode color constants. */
@@ -69,6 +71,8 @@ static size_t terminal_row;
 static size_t terminal_column;
 static uint8_t terminal_color;
 static uint16_t *terminal_buffer;
+static uint16_t areg;   /* VGA address register */
+static uint16_t dreg;   /* VGA data register */
 
 static void clear_terminal(void)
 {
@@ -83,9 +87,36 @@ static void clear_terminal(void)
 
 void _libkvmplat_init_vga_console(void)
 {
+	unsigned long irq_flags;
+
 	terminal_row = 0;
 	terminal_column = 0;
 	terminal_color = vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+
+	local_irq_save(irq_flags);
+	/* Location of the address and data registers is variable and denoted
+	 * by the least significant bit in the Input/Output register located
+	 * at 0x3cc. For our emulated color display, they should always be
+	 * 0x3d{4,5}, but better safe than sorry, so let's check at init time.
+	 */
+	if (inb(0x3cc) & 0x1) {
+		areg = 0x3d4;
+		dreg = 0x3d5;
+	} else {
+		areg = 0x3b4;
+		dreg = 0x3b5;
+	}
+
+	/* Initialize cursor appearance. Setting CURSOR_START (0x0a) to 0x0e
+	 * and CURSOR_END (0x0b) to 0x0f enables the cursor and produces
+	 * a blinking underscore.
+	 */
+	outb(areg, 0x0a);
+	outb(dreg, 0x0e);
+	outb(areg, 0x0b);
+	outb(dreg, 0x0f);
+	local_irq_restore(irq_flags);
+
 	terminal_buffer = (uint16_t *) 0xb8000;
 	clear_terminal();
 }
@@ -107,6 +138,21 @@ static void vga_scroll(void)
 	for (i = 0; i < VGA_WIDTH; i++)
 		terminal_buffer[((VGA_HEIGHT - 1) * VGA_WIDTH) + i]
 			= vga_entry(' ', terminal_color);
+}
+
+static void vga_update_cursor(void)
+{
+	unsigned long irq_flags;
+	uint8_t old;
+
+	local_irq_save(irq_flags);
+	old = inb(areg);
+	outb(areg, 0x0e); // Cursor Location High
+	outb(dreg, ((terminal_row * VGA_WIDTH) + terminal_column) >> 8);
+	outb(areg, 0x0f); // Cursor Location Low
+	outb(dreg, ((terminal_row * VGA_WIDTH) + terminal_column) & 0xff);
+	outb(areg, old);
+	local_irq_restore(irq_flags);
 }
 
 static void vga_newline(void)
@@ -157,4 +203,5 @@ void _libkvmplat_vga_putc(char c)
 		}
 		break;
 	}
+	vga_update_cursor();
 }
