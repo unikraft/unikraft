@@ -1,8 +1,11 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Florian Schmidt <florian.schmidt@neclab.eu>
+ * libnewlib glue code
  *
- * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Authors: Felipe Huici <felipe.huici@neclab.eu>
+ *          Florian Schmidt <florian.schmidt@neclab.eu>
+ *
+ * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,29 +35,43 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#ifndef __TIME_H__
-#define __TIME_H__
-
-#include <sys/time.h>
-
-#ifdef __cplusplus
-extern "C" {
+#include <time.h>
+#include <uk/config.h>
+#if CONFIG_HAVE_SCHED
+#include <uk/sched.h>
+#else
+#include <uk/plat/lcpu.h>
+#include <uk/plat/time.h>
 #endif
 
-#define __NEED_NULL
-#define __NEED_time_t
-#define __NEED_struct_timespec
-#include <nolibc-internal/shareddefs.h>
+#ifndef CONFIG_HAVE_SCHED
+/* Workaround until Unikraft changes interface for something more
+ * sensible
+ */
+static void __spin_wait(__nsec nsec)
+{
+	__nsec until = ukplat_monotonic_clock() + nsec;
 
-struct itimerspec {
-	struct timespec it_interval;
-	struct timespec it_value;
-};
-
-int nanosleep(const struct timespec *req, struct timespec *rem);
-
-#ifdef __cplusplus
+	while (until > ukplat_monotonic_clock())
+		ukplat_lcpu_halt_to(until);
 }
 #endif
 
-#endif /* __TIME_H__ */
+int nanosleep(const struct timespec *req, struct timespec *rem)
+{
+	__nsec nsec = (__nsec) req->tv_sec * 1000000000L;
+
+	nsec += req->tv_nsec;
+
+#if CONFIG_HAVE_SCHED
+	uk_sched_thread_sleep(nsec);
+#else
+	__spin_wait(nsec);
+#endif
+
+	if (rem) {
+		rem->tv_sec = 0;
+		rem->tv_nsec = 0;
+	}
+	return 0;
+}
