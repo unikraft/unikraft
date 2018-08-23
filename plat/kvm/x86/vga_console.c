@@ -155,53 +155,75 @@ static void vga_update_cursor(void)
 	local_irq_restore(irq_flags);
 }
 
-static void vga_newline(void)
-{
-	if (terminal_row == VGA_HEIGHT - 1)
-		vga_scroll();
-	else
-		terminal_row++;
-}
-
 void _libkvmplat_vga_putc(char c)
 {
+#define NEWLINE()                           \
+	do {                                \
+		if (row == VGA_HEIGHT - 1)  \
+			vga_scroll();       \
+		else                        \
+			row++;              \
+	} while (0)
+
+	unsigned long irq_flags;
+	size_t row;
+	size_t column;
+
+	/* Make a consistent copy of the global state variables (row, column).
+	 * This way, we can work on them consistently in this function and
+	 * and prevent race conditions on them that could lead to writing
+	 * outside the video memory. This doesn't make the function behave
+	 * perfectly on reentrance (lines can still be overwritten by
+	 * code paths running through this function concurrently), but at
+	 * least we stay inside the video memory.
+	 */
+	local_irq_save(irq_flags);
+	row = terminal_row;
+	column = terminal_column;
+	local_irq_restore(irq_flags);
+
 	switch (c) {
 	case '\a':
 		break; //ascii bel (0x07) - ignore
 	case '\b':
-		if (terminal_column > 0) {
-			terminal_column--;
-		} else if (terminal_row > 0) {
-			terminal_column = VGA_WIDTH - 1;
-			terminal_row--;
+		if (column > 0) {
+			column--;
+		} else if (row > 0) {
+			column = VGA_WIDTH - 1;
+			row--;
 		}
 		break;
 	case '\n':
-		_libkvmplat_vga_putc('\r');
-		vga_newline();
-		break;
+		NEWLINE();
+		/* fall through */
 	case '\r':
-		terminal_column = 0;
+		column = 0;
 		break;
 	case '\t':
 		do {
-			terminal_column++;
-		} while (terminal_column % TAB_ALIGNMENT != 0
-				&& terminal_column != VGA_WIDTH);
+			column++;
+		} while (column % TAB_ALIGNMENT != 0
+				&& column != VGA_WIDTH);
 
-		if (terminal_column == VGA_WIDTH) {
-			terminal_column = 0;
-			vga_newline();
+		if (column == VGA_WIDTH) {
+			column = 0;
+			NEWLINE();
 		}
 		break;
 	default:
 		terminal_putentryat(c, terminal_color,
-				terminal_column, terminal_row);
-		if (++terminal_column == VGA_WIDTH) {
-			terminal_column = 0;
-			vga_newline();
+				column, row);
+		if (++column == VGA_WIDTH) {
+			column = 0;
+			NEWLINE();
 		}
 		break;
 	}
+
+	local_irq_save(irq_flags);
+	terminal_row = row;
+	terminal_column = column;
+	local_irq_restore(irq_flags);
+
 	vga_update_cursor();
 }
