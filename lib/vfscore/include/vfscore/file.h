@@ -53,7 +53,7 @@ struct vfscore_fops {
 
 struct vfscore_file {
 	int fd;
-	struct vfscore_fops *fops;
+	const struct vfscore_fops *fops;
 };
 
 int vfscore_alloc_fd(void);
