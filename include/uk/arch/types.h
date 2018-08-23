@@ -261,6 +261,10 @@ typedef __u64 __phys_addr;
 #define __NULL ((void *) 0)
 #endif
 
+typedef struct {
+	__u32 counter;
+} __atomic;
+
 #endif /* !__ASSEMBLY__ */
 
 #ifdef	__cplusplus

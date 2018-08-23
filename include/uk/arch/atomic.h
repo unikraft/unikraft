@@ -54,6 +54,25 @@ extern "C" {
  */
 #define ukarch_load_n(src) \
 	__atomic_load_n(src, __ATOMIC_SEQ_CST)
+
+/**
+ * Perform a atomic store operation.
+ */
+#define ukarch_store_n(src, value) \
+	__atomic_store_n(src, value, __ATOMIC_SEQ_CST)
+
+/**
+ * Perform a atomic fetch and add operation.
+ */
+#define ukarch_fetch_add(src, value) \
+	__atomic_fetch_add(src, value, __ATOMIC_SEQ_CST)
+
+/**
+ * Perform a atomic increment operation.
+ */
+#define ukarch_inc(src) \
+	ukarch_fetch_add(src, 1)
+
 /**
  * Writes *src into *dst, and returns the previous contents of *dst.
  */
