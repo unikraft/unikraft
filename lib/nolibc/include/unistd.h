@@ -36,6 +36,8 @@
 #ifndef __UNISTD_H__
 #define __UNISTD_H__
 
+#include <uk/config.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -45,9 +47,11 @@ extern "C" {
 #define __NEED_ssize_t
 #include <nolibc-internal/shareddefs.h>
 
+#if CONFIG_LIBVFSCORE
 int close(int fd);
 ssize_t write(int fd, const void *buf, size_t count);
 ssize_t read(int fd, void *buf, size_t count);
+#endif
 
 #ifdef __cplusplus
 }

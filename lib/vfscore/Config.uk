@@ -1,0 +1,5 @@
+config LIBVFSCORE
+	bool "vfscore: VFS Core Interface"
+	default n
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKDEBUG

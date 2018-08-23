@@ -1,4 +1,4 @@
-$(eval $(call addlib,libvfscore))
+$(eval $(call addlib_s,libvfscore,$(CONFIG_LIBVFSCORE)))
 
 CINCLUDES-y += -I$(LIBVFSCORE_BASE)/include
 
