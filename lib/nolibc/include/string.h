@@ -54,9 +54,13 @@ char *strncpy(char *dst, const char *src, size_t len);
 char *strcpy(char *dst, const char *src);
 size_t strnlen(const char *str, size_t maxlen);
 size_t strlen(const char *str);
-const char *strchr(const char *str, int c);
+char *strchrnul(const char *s, int c);
+char *strchr(const char *str, int c);
 int strncmp(const char *str1, const char *str2, size_t len);
 int strcmp(const char *str1, const char *str2);
+size_t strcspn(const char *s, const char *c);
+size_t strspn(const char *s, const char *c);
+char *strtok(char *restrict s, const char *restrict sep);
 
 #ifdef __cplusplus
 }
