@@ -180,70 +180,87 @@ int strcmp(const char *str1, const char *str2)
 
 /* The following code is taken from musl libc */
 #define ALIGN (sizeof(size_t))
-#define ONES ((size_t)-1/UCHAR_MAX)
-#define HIGHS (ONES * (UCHAR_MAX/2+1))
-#define HASZERO(x) ((x)-ONES & ~(x) & HIGHS)
-#define BITOP(a,b,op) \
- ((a)[(size_t)(b)/(8*sizeof *(a))] op (size_t)1<<((size_t)(b)%(8*sizeof *(a))))
+#define ONES ((size_t) -1 / UCHAR_MAX)
+#define HIGHS (ONES * (UCHAR_MAX / 2 + 1))
+#define HASZERO(x) (((x) - ONES) & ~(x) & HIGHS)
+#define BITOP(a, b, op) \
+		((a)[(size_t)(b) / (8*sizeof *(a))] op \
+		(size_t)1 << ((size_t)(b) % (8 * sizeof *(a))))
 
 char *strchrnul(const char *s, int c)
 {
 	size_t *w, k;
 
 	c = (unsigned char)c;
-	if (!c) return (char *)s + strlen(s);
+	if (!c)
+		return (char *)s + strlen(s);
 
 	for (; (uintptr_t)s % ALIGN; s++)
-		if (!*s || *(unsigned char *)s == c) return (char *)s;
+		if (!*s || *(unsigned char *)s == c)
+			return (char *)s;
 	k = ONES * c;
-	for (w = (void *)s; !HASZERO(*w) && !HASZERO(*w^k); w++);
-	for (s = (void *)w; *s && *(unsigned char *)s != c; s++);
+	for (w = (void *)s; !HASZERO(*w) && !HASZERO(*w ^ k); w++)
+		;
+	for (s = (void *)w; *s && *(unsigned char *)s != c; s++)
+		;
 	return (char *)s;
 }
 
-char *strchr(const char *s, int c)
+char *strchr(const char *str, int c)
 {
-	char *r = strchrnul(s, c);
+	char *r = strchrnul(str, c);
 	return *(unsigned char *)r == (unsigned char)c ? r : 0;
 }
 
 size_t strcspn(const char *s, const char *c)
 {
 	const char *a = s;
-	size_t byteset[32/sizeof(size_t)];
+	size_t byteset[32 / sizeof(size_t)];
 
-	if (!c[0] || !c[1]) return strchrnul(s, *c)-a;
+	if (!c[0] || !c[1])
+		return strchrnul(s, *c)-a;
 
-	memset(byteset, 0, sizeof byteset);
-	for (; *c && BITOP(byteset, *(unsigned char *)c, |=); c++);
-	for (; *s && !BITOP(byteset, *(unsigned char *)s, &); s++);
+	memset(byteset, 0, sizeof(byteset));
+	for (; *c && BITOP(byteset, *(unsigned char *)c, |=); c++)
+		;
+	for (; *s && !BITOP(byteset, *(unsigned char *)s, &); s++)
+		;
 	return s-a;
 }
 
 size_t strspn(const char *s, const char *c)
 {
 	const char *a = s;
-	size_t byteset[32/sizeof(size_t)] = { 0 };
+	size_t byteset[32 / sizeof(size_t)] = { 0 };
 
-	if (!c[0]) return 0;
+	if (!c[0])
+		return 0;
 	if (!c[1]) {
-		for (; *s == *c; s++);
+		for (; *s == *c; s++)
+			;
 		return s-a;
 	}
 
-	for (; *c && BITOP(byteset, *(unsigned char *)c, |=); c++);
-	for (; *s && BITOP(byteset, *(unsigned char *)s, &); s++);
+	for (; *c && BITOP(byteset, *(unsigned char *)c, |=); c++)
+		;
+	for (; *s && BITOP(byteset, *(unsigned char *)s, &); s++)
+		;
 	return s-a;
 }
 
 char *strtok(char *restrict s, const char *restrict sep)
 {
 	static char *p;
-	if (!s && !(s = p)) return NULL;
+
+	if (!s && !(s = p))
+		return NULL;
 	s += strspn(s, sep);
-	if (!*s) return p = 0;
+	if (!*s)
+		return p = 0;
 	p = s + strcspn(s, sep);
-	if (*p) *p++ = 0;
-	else p = 0;
+	if (*p)
+		*p++ = 0;
+	else
+		p = 0;
 	return s;
 }
