@@ -167,7 +167,7 @@ static inline size_t uk_alloc_size_to_order(size_t size)
 
 void *uk_malloc_ifpages(struct uk_alloc *a, size_t size)
 {
-	size_t *intptr;
+	uintptr_t intptr;
 	size_t order;
 	size_t realsize = sizeof(order) + size;
 
@@ -176,13 +176,13 @@ void *uk_malloc_ifpages(struct uk_alloc *a, size_t size)
 		return NULL;
 
 	order = uk_alloc_size_to_order(realsize);
-	intptr = uk_palloc(a, order);
+	intptr = (uintptr_t)uk_palloc(a, order);
 
 	if (!intptr)
 		return NULL;
 
-	*intptr = order;
-	return intptr + sizeof(order);
+	*(size_t *)intptr = order;
+	return (void *)(intptr + sizeof(order));
 }
 
 void uk_free_ifpages(struct uk_alloc *a, void *ptr)
@@ -229,7 +229,7 @@ void *uk_realloc_ifpages(struct uk_alloc *a, void *ptr, size_t size)
 int uk_posix_memalign_ifpages(struct uk_alloc *a,
 				void **memptr, size_t align, size_t size)
 {
-	size_t *intptr;
+	uintptr_t *intptr;
 	size_t realsize;
 	size_t order;
 
@@ -259,7 +259,7 @@ int uk_posix_memalign_ifpages(struct uk_alloc *a,
 	if (!intptr)
 		return ENOMEM;
 
-	*intptr = order;
+	*(size_t *)intptr = order;
 	*memptr = (void *) ALIGN_UP((uintptr_t)intptr + sizeof(order), align);
 	return 0;
 }
