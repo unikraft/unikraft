@@ -36,6 +36,11 @@
 extern "C" {
 #endif
 
+#define __NEED_time_t
+#define __NEED_suseconds_t
+#define __NEED_struct_timespec
+#include <nolibc-internal/shareddefs.h>
+
 typedef unsigned long __fd_mask;
 
 /*

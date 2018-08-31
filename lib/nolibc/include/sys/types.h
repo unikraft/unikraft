@@ -46,6 +46,8 @@ extern "C" {
 #define __NEED_size_t
 #define __NEED_ssize_t
 #define __NEED_off_t
+#define __NEED_time_t
+#define __NEED_suseconds_t
 #include <nolibc-internal/shareddefs.h>
 
 #ifdef __cplusplus
