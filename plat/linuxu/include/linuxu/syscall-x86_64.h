@@ -44,6 +44,8 @@
 #define __SC_CLOSE   3
 #define __SC_MMAP    9
 #define __SC_MUNMAP 11
+#define __SC_RT_SIGACTION   13
+#define __SC_RT_SIGPROCMASK 14
 #define __SC_IOCTL  16
 #define __SC_EXIT   60
 #define __SC_PSELECT6 270

@@ -33,36 +33,36 @@
  */
 
 #include <stdlib.h>
+#include <errno.h>
+#include <uk/plat/lcpu.h>
+#include <_time.h>
 #include <linuxu/syscall.h>
 #include <uk/print.h>
-#include <uk/plat/lcpu.h>
 
-void ukplat_lcpu_halt(void)
+static void do_pselect(struct timespec *timeout)
 {
 	int ret;
 	int nfds = 0;
-	fd_set *readfds = NULL;
-	fd_set *writefds = NULL;
-	fd_set *exceptfds = NULL;
+	k_fd_set *readfds = NULL;
+	k_fd_set *writefds = NULL;
+	k_fd_set *exceptfds = NULL;
 
-	ret = sys_pselect6(nfds, readfds, writefds, exceptfds, NULL, NULL);
-	if (ret < 0)
+	ret = sys_pselect6(nfds, readfds, writefds, exceptfds, timeout, NULL);
+	if (ret < 0 && ret != -EINTR)
 		uk_printd(DLVL_WARN, "Failed to halt LCPU: %d\n", ret);
 }
 
-void ukplat_lcpu_halt_to(unsigned long millis)
+void halt(void)
 {
-	int ret;
-	int nfds = 0;
-	fd_set *readfds = NULL;
-	fd_set *writefds = NULL;
-	fd_set *exceptfds = NULL;
+	do_pselect(NULL);
+}
+
+void time_block_until(__snsec until)
+{
 	struct timespec timeout;
 
-	timeout.tv_sec  = millis / 1000;
-	timeout.tv_nsec = millis % 1000 * 1000000;
+	timeout.tv_sec  = until / ukarch_time_sec_to_nsec(1);
+	timeout.tv_nsec = until % ukarch_time_sec_to_nsec(1);
 
-	ret = sys_pselect6(nfds, readfds, writefds, exceptfds, &timeout, NULL);
-	if (ret < 0)
-		uk_printd(DLVL_WARN, "Failed to halt LCPU: %d\n", ret);
+	do_pselect(&timeout);
 }

@@ -38,7 +38,7 @@
 
 #include <time.h>
 #include <sys/types.h>
-#include <sys/select.h>
+#include <linuxu/signal.h>
 
 #if defined __X86_64__
 #include <linuxu/syscall-x86_64.h>
@@ -80,7 +80,7 @@ static inline int sys_exit(int status)
 #define PROT_WRITE    (0x2)
 #define PROT_EXEC     (0x4)
 static inline void *sys_mmap(void *addr, size_t len, int prot, int flags,
-	       int fd, off_t offset)
+		int fd, off_t offset)
 {
 	return (void *) syscall6(__SC_MMAP,
 				 (long) (addr),
@@ -95,8 +95,29 @@ static inline void *sys_mmap(void *addr, size_t len, int prot, int flags,
 	sys_mmap((addr), (len), (PROT_READ | PROT_WRITE), \
 		 (MAP_SHARED | MAP_ANONYMOUS), -1, 0)
 
+
+static inline int sys_sigaction(int signum, const struct uk_sigaction *action,
+		struct uk_sigaction *oldaction)
+{
+	return (int) syscall4(__SC_RT_SIGACTION,
+			      (long) signum,
+			      (long) action,
+			      (long) oldaction,
+			      sizeof(k_sigset_t));
+}
+
+static inline int sys_sigprocmask(int how,
+		const k_sigset_t *set, k_sigset_t *oldset)
+{
+	return (int) syscall4(__SC_RT_SIGPROCMASK,
+			      (long) how,
+			      (long) set,
+			      (long) oldset,
+			      sizeof(k_sigset_t));
+}
+
 static inline int sys_pselect6(int nfds,
-		fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
+		k_fd_set *readfds, k_fd_set *writefds, k_fd_set *exceptfds,
 		const struct timespec *timeout, const void *sigmask)
 {
 	return (int) syscall6(__SC_PSELECT6,
