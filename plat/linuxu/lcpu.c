@@ -61,7 +61,12 @@ void halt(void)
 void time_block_until(__snsec until)
 {
 	struct k_timespec timeout;
+	__nsec now = ukplat_monotonic_clock();
 
+	if (until < 0 || (__nsec) until < now)
+		return; /* timeout expired already */
+
+	until -= now;
 	timeout.tv_sec  = until / ukarch_time_sec_to_nsec(1);
 	timeout.tv_nsec = until % ukarch_time_sec_to_nsec(1);
 
