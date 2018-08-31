@@ -33,3 +33,4 @@ LIBLINUXUPLAT_SRCS-y              += $(LIBLINUXUPLAT_BASE)/lcpu.c
 LIBLINUXUPLAT_SRCS-y              += $(LIBLINUXUPLAT_BASE)/irq.c
 LIBLINUXUPLAT_SRCS-y              += $(LIBLINUXUPLAT_BASE)/time.c
 LIBLINUXUPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/lcpu.c|common
+LIBLINUXUPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/memory.c|common
