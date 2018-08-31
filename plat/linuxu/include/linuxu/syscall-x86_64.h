@@ -48,6 +48,11 @@
 #define __SC_RT_SIGPROCMASK 14
 #define __SC_IOCTL  16
 #define __SC_EXIT   60
+#define __SC_TIMER_CREATE     222
+#define __SC_TIMER_SETTIME    223
+#define __SC_TIMER_GETTIME    224
+#define __SC_TIMER_GETOVERRUN 225
+#define __SC_TIMER_DELETE     226
 #define __SC_PSELECT6 270
 
 /* NOTE: from linux-4.6.3 (arch/x86/entry/entry_64.S):

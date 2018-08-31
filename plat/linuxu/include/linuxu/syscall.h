@@ -36,7 +36,7 @@
 #ifndef __SYSCALL_H__
 #define __SYSCALL_H__
 
-#include <time.h>
+#include <linuxu/time.h>
 #include <sys/types.h>
 #include <linuxu/signal.h>
 
@@ -118,7 +118,7 @@ static inline int sys_sigprocmask(int how,
 
 static inline int sys_pselect6(int nfds,
 		k_fd_set *readfds, k_fd_set *writefds, k_fd_set *exceptfds,
-		const struct timespec *timeout, const void *sigmask)
+		const struct k_timespec *timeout, const void *sigmask)
 {
 	return (int) syscall6(__SC_PSELECT6,
 			      (long) nfds,
@@ -127,6 +127,34 @@ static inline int sys_pselect6(int nfds,
 			      (long) exceptfds,
 			      (long) timeout,
 			      (long) sigmask);
+}
+
+static inline int sys_timer_create(k_clockid_t which_clock,
+		struct uk_sigevent *timer_event_spec,
+		k_timer_t *created_timer_id)
+{
+	return (int) syscall3(__SC_TIMER_CREATE,
+			      (long) which_clock,
+			      (long) timer_event_spec,
+			      (long) created_timer_id);
+
+}
+
+static inline int sys_timer_settime(k_timer_t timerid, int flags,
+		const struct k_itimerspec *value, struct k_itimerspec *oldvalue)
+{
+	return (int) syscall4(__SC_TIMER_SETTIME,
+			      (long) timerid,
+			      (long) flags,
+			      (long) value,
+			      (long) oldvalue);
+
+}
+
+static inline int sys_timer_delete(k_timer_t timerid)
+{
+	return (int) syscall1(__SC_TIMER_DELETE,
+			      (long) timerid);
 }
 
 #endif /* __SYSCALL_H__ */

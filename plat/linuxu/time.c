@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ *          Costin Lupu <costin.lupu@cs.pub.ro>
  *
  * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
  *
@@ -32,13 +33,62 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
+#include <string.h>
 #include <uk/plat/time.h>
+#include <uk/plat/irq.h>
+#include <uk/assert.h>
+#include <linuxu/syscall.h>
+#include <linuxu/time.h>
+
+#define TIMER_INTVAL_NSEC    ukarch_time_msec_to_nsec(TIMER_INTVAL_MSEC)
+
+static k_timer_t timerid;
+
+
+__nsec ukplat_monotonic_clock(void)
+{
+	/* TODO */
+	return 0;
+}
+
+static int timer_handler(void *arg __unused)
+{
+	/* We only use the timer interrupt to wake up. As we end up here, the
+	 * timer interrupt has already done its job and we can acknowledge
+	 * receiving it.
+	 */
+	return 1;
+}
 
 void ukplat_time_init(void)
 {
-	/* TODO */
+	struct uk_sigevent sigev;
+	struct k_itimerspec its;
+	int rc;
+
+	ukplat_irq_register(TIMER_SIGNUM, timer_handler, NULL);
+
+	memset(&sigev, 0, sizeof(sigev));
+	sigev.sigev_notify = 0;
+	sigev.sigev_signo = TIMER_SIGNUM;
+	sigev.sigev_value.sival_ptr = &timerid;
+
+	rc = sys_timer_create(CLOCK_REALTIME, &sigev, &timerid);
+	if (unlikely(rc != 0))
+		UK_CRASH("Failed to create timer: %d\n", rc);
+
+	/* Initial expiration */
+	its.it_value.tv_sec  = TIMER_INTVAL_NSEC / ukarch_time_sec_to_nsec(1);
+	its.it_value.tv_nsec = TIMER_INTVAL_NSEC % ukarch_time_sec_to_nsec(1);
+	/* Timer interval */
+	its.it_interval = its.it_value;
+
+	rc = sys_timer_settime(timerid, 0, &its, NULL);
+	if (unlikely(rc != 0))
+		UK_CRASH("Failed to setup timer: %d\n", rc);
 }
 
 void ukplat_time_fini(void)
 {
+	sys_timer_delete(timerid);
 }

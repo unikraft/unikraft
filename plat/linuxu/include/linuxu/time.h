@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
+ *          Florian Schmidt <florian.schmidt@neclab.eu>
  *
- * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,39 +32,31 @@
  *
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
+#ifndef __LINUXU_TIME_H__
+#define __LINUXU_TIME_H__
 
-#include <stdlib.h>
-#include <errno.h>
-#include <uk/plat/lcpu.h>
-#include <_time.h>
-#include <linuxu/time.h>
-#include <linuxu/syscall.h>
-#include <uk/print.h>
+#include <linuxu/signal.h>
 
-static void do_pselect(struct k_timespec *timeout)
-{
-	int ret;
-	int nfds = 0;
-	k_fd_set *readfds = NULL;
-	k_fd_set *writefds = NULL;
-	k_fd_set *exceptfds = NULL;
+#define TIMER_INTVAL_MSEC    10
+#define TIMER_SIGNUM         SIGALRM
 
-	ret = sys_pselect6(nfds, readfds, writefds, exceptfds, timeout, NULL);
-	if (ret < 0 && ret != -EINTR)
-		uk_printd(DLVL_WARN, "Failed to halt LCPU: %d\n", ret);
-}
 
-void halt(void)
-{
-	do_pselect(NULL);
-}
+/* POSIX definitions */
 
-void time_block_until(__snsec until)
-{
-	struct k_timespec timeout;
+#define CLOCK_REALTIME       0
 
-	timeout.tv_sec  = until / ukarch_time_sec_to_nsec(1);
-	timeout.tv_nsec = until % ukarch_time_sec_to_nsec(1);
+typedef int k_clockid_t;
 
-	do_pselect(&timeout);
-}
+typedef int k_timer_t;
+
+struct k_timespec {
+	long tv_sec;
+	long tv_nsec;
+};
+
+struct k_itimerspec {
+	struct k_timespec it_interval;
+	struct k_timespec it_value;
+};
+
+#endif /* __LINUXU_TIME_H__ */
