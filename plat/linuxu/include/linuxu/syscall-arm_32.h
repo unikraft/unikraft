@@ -48,6 +48,11 @@
 #define __SC_IOCTL     54
 #define __SC_RT_SIGPROCMASK   126
 #define __SC_RT_SIGACTION     174
+#define __SC_TIMER_CREATE     257
+#define __SC_TIMER_SETTIME    258
+#define __SC_TIMER_GETTIME    259
+#define __SC_TIMER_GETOVERRUN 260
+#define __SC_TIMER_DELETE     261
 #define __SC_PSELECT6 335
 
 /* NOTE: from `man syscall`:
