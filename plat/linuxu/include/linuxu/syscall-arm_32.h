@@ -46,6 +46,8 @@
 #define __SC_MUNMAP    91
 #define __SC_EXIT       1
 #define __SC_IOCTL     54
+#define __SC_RT_SIGPROCMASK   126
+#define __SC_RT_SIGACTION     174
 #define __SC_PSELECT6 335
 
 /* NOTE: from `man syscall`:

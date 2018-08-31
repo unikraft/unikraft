@@ -112,7 +112,13 @@ void ukplat_lcpu_irqs_handle_pending(void)
 }
 
 void __restorer(void);
+#if defined __X86_64__
 asm("__restorer:mov $15,%rax\nsyscall");
+#elif defined __ARM_32__
+asm("__restorer:mov r7, #0x77\nsvc 0x0");
+#else
+#error "Unsupported architecture"
+#endif
 
 static void _irq_handle(int irq)
 {
