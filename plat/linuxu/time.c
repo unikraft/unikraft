@@ -47,8 +47,18 @@ static k_timer_t timerid;
 
 __nsec ukplat_monotonic_clock(void)
 {
-	/* TODO */
-	return 0;
+	struct k_timespec tp;
+	__nsec ret;
+	int rc;
+
+	rc = sys_clock_gettime(CLOCK_MONOTONIC, &tp);
+	if (unlikely(rc != 0))
+		return 0;
+
+	ret = ukarch_time_sec_to_nsec((__nsec) tp.tv_sec);
+	ret += (__nsec) tp.tv_nsec;
+
+	return ret;
 }
 
 static int timer_handler(void *arg __unused)

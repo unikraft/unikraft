@@ -53,6 +53,7 @@
 #define __SC_TIMER_GETTIME    259
 #define __SC_TIMER_GETOVERRUN 260
 #define __SC_TIMER_DELETE     261
+#define __SC_CLOCK_GETTIME    263
 #define __SC_PSELECT6 335
 
 /* NOTE: from `man syscall`:

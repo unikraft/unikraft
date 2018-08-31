@@ -53,6 +53,7 @@
 #define __SC_TIMER_GETTIME    224
 #define __SC_TIMER_GETOVERRUN 225
 #define __SC_TIMER_DELETE     226
+#define __SC_CLOCK_GETTIME    228
 #define __SC_PSELECT6 270
 
 /* NOTE: from linux-4.6.3 (arch/x86/entry/entry_64.S):

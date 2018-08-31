@@ -70,6 +70,13 @@ static inline int sys_exit(int status)
 			      (long) (status));
 }
 
+static inline int sys_clock_gettime(k_clockid_t clk_id, struct k_timespec *tp)
+{
+	return (int) syscall2(__SC_CLOCK_GETTIME,
+			      (long) clk_id,
+			      (long) tp);
+}
+
 /*
  * Please note that on failure sys_mmap() is returning -errno
  */

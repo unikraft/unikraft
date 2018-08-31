@@ -44,6 +44,7 @@
 /* POSIX definitions */
 
 #define CLOCK_REALTIME       0
+#define CLOCK_MONOTONIC      1
 
 typedef int k_clockid_t;
 
