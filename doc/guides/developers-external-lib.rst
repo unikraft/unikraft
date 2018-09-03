@@ -2,10 +2,11 @@
 External Library Development
 ****************************
 Porting an external library (e.g., openssl) isn't too different from
-porting an application: in this case, no Makefile is needed, and
-Makefile.uk follows the same format described above except that for naming
-``lib`` is prefixed instead of ``app`` (``lib[name]`` instead of ``app[name]``;
-e.g., ``libnewlib`` for ``newlib``).
+porting an :doc:`application <developers-app>`: in this case, no
+Makefile is needed, and Makefile.uk follows the same format described
+above except that for naming ``lib`` is prefixed instead of ``app``
+(``lib[name]`` instead of ``app[name]``; e.g., ``libnewlib`` for
+``newlib``).
 
 Another difference relates to Config.uk: You surround your settings with
 ``menuconfig`` that enables selecting and deselecting the library. The name of

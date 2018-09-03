@@ -13,7 +13,7 @@ and rely on Unikraft's build system to build the necessary objects with
 correct and compatible compiler and linker flags).
 
 In greater detail, in order for an application to work with Unikraft
-you need to provide at least the following three files:
+you need to provide at least the following four files:
 
  * **Makefile**: Used to specify where the main Unikraft repo is with
    respect to the application's repo, as well as repos for any external
@@ -25,6 +25,11 @@ you need to provide at least the following three files:
 
  * **Config.uk**: A Kconfig-like snippet used to populate Unikraft's
    menu with application-specific options.
+
+ * **exportsyms.uk**: A text file where each line contains the name
+   of one symbol that should be exported to other libraries. This file
+   usually contains only `main` for an application that is developed/ported
+   as a single library to Unikraft.
 
 The Makefile is generally short and simple and might remind you to
 Linux kernel modules that are built off-tree. For most applications
@@ -42,6 +47,8 @@ the Makefile should contain no more than the following: ::
 
 We cover the format of the other two files in turn next, followed by
 an explanation of the build process.
+
+.. _lib-essential-files:
 
 ============================
 Config.uk
@@ -229,6 +236,8 @@ Reserved variable names in the name scope are so far: ::
 
   APPNAME_BASE                              - Path to source base
   APPNAME_BUILD                             - Path to target build dir
+  APPNAME_EXPORTS                           - Path to the list of exported symbols
+                                              (default is '$(APPNAME_BASE)/exportsyms.uk')
   APPNAME_ORIGIN                            - Path to extracted archive
                                               (when fetch or unarchive was used)
   APPNAME_CLEAN APPNAME_CLEAN-y             - List of files to clean additional
@@ -259,6 +268,31 @@ Reserved variable names in the name scope are so far: ::
   APPNAME_FILENAME_VARIANT_FLAGS-y            and variant of the library
   APPNAME_FILENAME_VARIANT_INCLUDES         - Includes for a *specific* source
   APPNAME_FILENAME_VARIANT_INCLUDES-y         file and variant of the library
+
+
+============================
+exportsyms.uk
+============================
+Unikraft provides separate namespaces for each library. This means that
+every function and variable will only be visible and linkable internally.
+
+To make a symbol visible for other libraries, add it to this
+``exportsyms.uk`` file. It is simply a flat file, with one symbol name per
+line. Line comments may be introduced by the hash character ('#'). This
+option may be given more than once.
+
+If you are writing an application, you need to add your program entry point
+to this file (this is ``main`` if you use ``libukboot``). Most likely nothing
+else should be there. For a library, all external API functions must be listed.
+
+For the sake of file structure consistency, it is not recommended to
+change the default path of this symbols file, unless it is really necessary
+(e.g., multiple libraries are sharing the same base folder, this symbols file
+is part of a remotely fetched archive). You can override it by defining the
+``APPNAME_EXPORTS`` variable. The path must be either absolute (you can refer
+with ``$(APPNAME_BASE)`` to the base directory of your application sources) or
+relative to the Unikraft sources directory.
+
 
 ============================
 Make Targets

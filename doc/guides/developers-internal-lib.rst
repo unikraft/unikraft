@@ -1,8 +1,8 @@
 ****************************
 Internal Library Development
 ****************************
-Unikraft libraries are no different than external ones, except for the
-fact that
+Unikraft libraries are no different than :doc:`external ones
+<developers-external-lib>`, except for the fact that
 
 1. they are part of the main Unikraft repo and live under the
    ``lib/name/`` directories.
@@ -40,14 +40,19 @@ looks as follows: ::
   ├── include
   │   └── uk
   │       └── [category].h
-  └── Makefile.uk
+  ├── Makefile.uk
+  └── exportsyms.uk
 
-The ``Config.uk`` and ``Makefile.uk`` files are fairly
-straightforward, you can refer to an existing API in the repo to see
-what they look like. The header file contains the API itself and
-follows a generic structure that all APIs should follow; please refer
-to existing API header files if you'd like to see what these look
-like (e.g., ``libukalloc``, ``libuksched``).
+
+The ``Config.uk``, ``Makefile.uk`` and ``exportsyms.uk`` files are
+fairly straightforward. You can refer to an existing API in the repo
+to see what they look like. Also check the corresponding sections
+:ref:`Application Development and Porting <lib-essential-files>`
+
+The header file contains the API itself
+and follows a generic structure that all APIs should follow; please
+refer to existing API header files if you'd like to see what these
+look like (e.g., ``libukalloc``, ``libuksched``).
 
 To implement a library that complies with an API, we begin by creating
 a similar directory structure as above, using ``uk[category][name]``
