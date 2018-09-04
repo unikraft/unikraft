@@ -59,9 +59,16 @@ static void __spin_wait(__nsec nsec)
 
 int nanosleep(const struct timespec *req, struct timespec *rem)
 {
-	__nsec nsec = (__nsec) req->tv_sec * 1000000000L;
+	__nsec before, after, diff, nsec;
 
+	if (!req || req->tv_nsec < 0 || req->tv_nsec > 999999999) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	nsec = (__nsec) req->tv_sec * 1000000000L;
 	nsec += req->tv_nsec;
+	before = ukplat_monotonic_clock();
 
 #if CONFIG_HAVE_SCHED
 	uk_sched_thread_sleep(nsec);
@@ -69,9 +76,16 @@ int nanosleep(const struct timespec *req, struct timespec *rem)
 	__spin_wait(nsec);
 #endif
 
-	if (rem) {
-		rem->tv_sec = 0;
-		rem->tv_nsec = 0;
+	after = ukplat_monotonic_clock();
+	diff = after - before;
+
+	if (diff < nsec) {
+		if (rem) {
+			rem->tv_sec = ukarch_time_nsec_to_sec(nsec - diff);
+			rem->tv_nsec = ukarch_time_subsec(nsec - diff);
+		}
+		errno = EINTR;
+		return -1;
 	}
 	return 0;
 }
