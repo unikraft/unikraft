@@ -42,6 +42,10 @@
 #include <uk/essentials.h>
 #include <uk/config.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifdef __IN_LIBUKDEBUG__
 /*
  * These defines are doing the trick to compile the functions
@@ -150,5 +154,9 @@ static inline void uk_printd(int lvl __unused, const char *fmt __unused, ...)
 		uk_printk((fmt), ##__VA_ARGS__);                               \
 		uk_printd((dlvl), (fmt), ##__VA_ARGS__);                       \
 	} while (0)
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __UKDEBUG_PRINT_H__ */

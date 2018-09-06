@@ -44,6 +44,10 @@
 #include <uk/print.h>
 #include <uk/config.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #if CONFIG_LIBUKDEBUG_ENABLE_ASSERT
 #define UK_ASSERT(x)							\
 	do {								\
@@ -85,5 +89,9 @@
 		/* TODO: stack trace */					\
 		ukplat_terminate(UKPLAT_CRASH);				\
 	} while (0)
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __UKDEBUG_ASSERT_H__ */

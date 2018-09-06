@@ -31,6 +31,9 @@
 #include <uk/sched.h>
 #include <uk/wait_types.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 static inline
 void uk_waitq_init(struct uk_waitq *wq)
@@ -134,5 +137,9 @@ void uk_waitq_wake_up(struct uk_waitq *wq)
 		uk_thread_wake(curr->thread);
 	ukplat_lcpu_restore_irqf(flags);
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __UK_SCHED_WAIT_H__ */

@@ -41,6 +41,10 @@
 #include <stdio.h>
 #include <uk/print.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #define UK_HXDF_ADDR (1)     /* show address column */
 #define UK_HXDF_ASCIISEC (2) /* show ascii section */
 
@@ -214,4 +218,9 @@ int uk_hexdumpsn(char *str, size_t size, const void *data, size_t len,
 		    (UK_HXDF_ADDR | UK_HXDF_ASCIISEC | UK_HXDF_GRPQWORD        \
 		     | UK_HXDF_COMPRESS),                                      \
 		    2, NULL)
+
+#ifdef __cplusplus
+}
+#endif
+
 #endif /* __UKDEBUG_HEXDUMP_H__ */

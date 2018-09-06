@@ -39,6 +39,10 @@
 #include <stdint.h>
 #include <sys/types.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct vfscore_file;
 
 struct vfscore_fops {
@@ -56,5 +60,9 @@ int vfscore_alloc_fd(void);
 void vfscore_put_fd(int fd);
 void vfscore_install_fd(int fd, struct vfscore_file *file);
 struct vfscore_file *vfscore_get_file(int fd);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __VFSCORE_FILE_H__ */

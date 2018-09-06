@@ -57,6 +57,10 @@
 #include <stdlib.h>
 #include <string.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #ifdef __CHECKER__
 #define FDT_FORCE __attribute__((force))
 #define FDT_BITWISE __attribute__((bitwise))
@@ -108,5 +112,9 @@ static inline fdt64_t cpu_to_fdt64(uint64_t x)
 #undef CPU_TO_FDT32
 #undef CPU_TO_FDT16
 #undef EXTRACT_BYTE
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* _LIBFDT_ENV_H */

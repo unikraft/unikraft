@@ -28,6 +28,10 @@
 
 #include <uk/list.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct uk_waitq_entry {
 	int waiting;
 	struct uk_thread *thread;
@@ -44,8 +48,12 @@ UK_STAILQ_HEAD(uk_waitq, struct uk_waitq_entry);
 
 #define DEFINE_WAIT(name) \
 struct uk_waitq_entry name = { \
-	.thread       = uk_thread_current(), \
 	.waiting      = 0, \
+	.thread       = uk_thread_current(), \
 }
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __UK_SCHED_WAIT_TYPES_H__ */
