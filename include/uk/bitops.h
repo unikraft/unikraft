@@ -65,30 +65,6 @@
 #define	hweight_long(x)	bitcountl(x)
 
 static inline int
-__ffs(int mask)
-{
-	return (ffs(mask) - 1);
-}
-
-static inline int
-__fls(int mask)
-{
-	return (fls(mask) - 1);
-}
-
-static inline int
-__ffsl(long mask)
-{
-	return (ffsl(mask) - 1);
-}
-
-static inline int
-__flsl(long mask)
-{
-	return (flsl(mask) - 1);
-}
-
-static inline int
 fls64(uint64_t mask)
 {
 	return flsll(mask);
@@ -100,13 +76,11 @@ ror32(uint32_t word, unsigned int shift)
 	return ((word >> shift) | (word << (32 - shift)));
 }
 
-#define	ffz(mask)	__ffs(~(mask))
-
 static inline int get_count_order(unsigned int count)
 {
 	int order;
 
-	order = fls(count) - 1;
+	order = ukarch_fls(count);
 	if (count & (count - 1))
 		order++;
 	return order;
@@ -122,12 +96,12 @@ find_first_bit(const unsigned long *addr, unsigned long size)
 		size -= BITS_PER_LONG, bit += BITS_PER_LONG, addr++) {
 		if (*addr == 0)
 			continue;
-		return (bit + __ffsl(*addr));
+		return (bit + ukarch_ffsl(*addr));
 	}
 	if (size) {
 		mask = (*addr) & BITMAP_LAST_WORD_MASK(size);
 		if (mask)
-			bit += __ffsl(mask);
+			bit += ukarch_ffsl(mask);
 		else
 			bit += size;
 	}
@@ -144,12 +118,12 @@ find_first_zero_bit(const unsigned long *addr, unsigned long size)
 		size -= BITS_PER_LONG, bit += BITS_PER_LONG, addr++) {
 		if (~(*addr) == 0)
 			continue;
-		return (bit + __ffsl(~(*addr)));
+		return (bit + ukarch_ffsl(~(*addr)));
 	}
 	if (size) {
 		mask = ~(*addr) & BITMAP_LAST_WORD_MASK(size);
 		if (mask)
-			bit += __ffsl(mask);
+			bit += ukarch_ffsl(mask);
 		else
 			bit += size;
 	}
@@ -171,13 +145,13 @@ find_last_bit(const unsigned long *addr, unsigned long size)
 	if (offs) {
 		mask = (*addr) & BITMAP_LAST_WORD_MASK(offs);
 		if (mask)
-			return (bit + __flsl(mask));
+			return (bit + ukarch_flsl(mask));
 	}
 	while (pos--) {
 		addr--;
 		bit -= BITS_PER_LONG;
 		if (*addr)
-			return (bit + __flsl(*addr));
+			return (bit + ukarch_flsl(*addr));
 	}
 	return (size);
 }
@@ -200,7 +174,7 @@ find_next_bit(const unsigned long *addr, unsigned long size,
 	if (offs) {
 		mask = (*addr) & ~BITMAP_LAST_WORD_MASK(offs);
 		if (mask)
-			return (bit + __ffsl(mask));
+			return (bit + ukarch_ffsl(mask));
 		if (size - bit <= BITS_PER_LONG)
 			return (size);
 		bit += BITS_PER_LONG;
@@ -210,12 +184,12 @@ find_next_bit(const unsigned long *addr, unsigned long size,
 		size -= BITS_PER_LONG, bit += BITS_PER_LONG, addr++) {
 		if (*addr == 0)
 			continue;
-		return (bit + __ffsl(*addr));
+		return (bit + ukarch_ffsl(*addr));
 	}
 	if (size) {
 		mask = (*addr) & BITMAP_LAST_WORD_MASK(size);
 		if (mask)
-			bit += __ffsl(mask);
+			bit += ukarch_ffsl(mask);
 		else
 			bit += size;
 	}
@@ -240,7 +214,7 @@ find_next_zero_bit(const unsigned long *addr, unsigned long size,
 	if (offs) {
 		mask = ~(*addr) & ~BITMAP_LAST_WORD_MASK(offs);
 		if (mask)
-			return (bit + __ffsl(mask));
+			return (bit + ukarch_ffsl(mask));
 		if (size - bit <= BITS_PER_LONG)
 			return (size);
 		bit += BITS_PER_LONG;
@@ -250,12 +224,12 @@ find_next_zero_bit(const unsigned long *addr, unsigned long size,
 		size -= BITS_PER_LONG, bit += BITS_PER_LONG, addr++) {
 		if (~(*addr) == 0)
 			continue;
-		return (bit + __ffsl(~(*addr)));
+		return (bit + ukarch_ffsl(~(*addr)));
 	}
 	if (size) {
 		mask = ~(*addr) & BITMAP_LAST_WORD_MASK(size);
 		if (mask)
-			bit += __ffsl(mask);
+			bit += ukarch_ffsl(mask);
 		else
 			bit += size;
 	}
