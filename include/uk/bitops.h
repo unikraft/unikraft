@@ -39,8 +39,9 @@
 #include <uk/arch/lcpu.h>
 #include <uk/arch/atomic.h>
 
-#define	BIT(nr)			(1UL << (nr))
-#define	BIT_ULL(nr)		(1ULL << (nr))
+#define	UK_BIT(nr)			(1UL << (nr))
+#define	UK_BIT_ULL(nr)		(1ULL << (nr))
+
 #ifdef __LP64__
 #define	BITS_PER_LONG		64
 #else
@@ -52,11 +53,12 @@
 #define	BITMAP_FIRST_WORD_MASK(start)  (~0UL << ((start) % BITS_PER_LONG))
 #define	BITMAP_LAST_WORD_MASK(n)       (~0UL >> (BITS_PER_LONG - (n)))
 #define	BITS_TO_LONGS(n)               howmany((n), BITS_PER_LONG)
-#define	BIT_MASK(nr)                   (1UL << ((nr) & (BITS_PER_LONG - 1)))
+#define	UK_BIT_MASK(nr) \
+	(1UL << ((nr) & (BITS_PER_LONG - 1)))
 #define BIT_WORD(nr)                   ((nr) / BITS_PER_LONG)
-#define	GENMASK(h, l) \
+#define	UK_GENMASK(h, l) \
 	(((~0UL) >> (BITS_PER_LONG - (h) - 1)) & ((~0UL) << (l)))
-#define	GENMASK_ULL(h, l) \
+#define	UK_GENMASK_ULL(h, l) \
 	(((~0ULL) >> (BITS_PER_LONG_LONG - (h) - 1)) & ((~0ULL) << (l)))
 #define BITS_PER_BYTE  8
 
@@ -75,12 +77,12 @@ fls64(__u64 mask)
 #endif
 
 static inline __u32
-ror32(__u32 word, unsigned int shift)
+uk_ror32(__u32 word, unsigned int shift)
 {
 	return ((word >> shift) | (word << (32 - shift)));
 }
 
-static inline int get_count_order(unsigned int count)
+static inline int uk_get_count_order(unsigned int count)
 {
 	int order;
 
@@ -91,7 +93,7 @@ static inline int get_count_order(unsigned int count)
 }
 
 static inline unsigned long
-find_first_bit(const unsigned long *addr, unsigned long size)
+uk_find_first_bit(const unsigned long *addr, unsigned long size)
 {
 	long mask;
 	int bit;
@@ -113,7 +115,7 @@ find_first_bit(const unsigned long *addr, unsigned long size)
 }
 
 static inline unsigned long
-find_first_zero_bit(const unsigned long *addr, unsigned long size)
+uk_find_first_zero_bit(const unsigned long *addr, unsigned long size)
 {
 	long mask;
 	int bit;
@@ -135,7 +137,7 @@ find_first_zero_bit(const unsigned long *addr, unsigned long size)
 }
 
 static inline unsigned long
-find_last_bit(const unsigned long *addr, unsigned long size)
+uk_find_last_bit(const unsigned long *addr, unsigned long size)
 {
 	long mask;
 	int offs;
@@ -161,7 +163,7 @@ find_last_bit(const unsigned long *addr, unsigned long size)
 }
 
 static inline unsigned long
-find_next_bit(const unsigned long *addr, unsigned long size,
+uk_find_next_bit(const unsigned long *addr, unsigned long size,
 	unsigned long offset)
 {
 	long mask;
@@ -201,7 +203,7 @@ find_next_bit(const unsigned long *addr, unsigned long size,
 }
 
 static inline unsigned long
-find_next_zero_bit(const unsigned long *addr, unsigned long size,
+uk_find_next_zero_bit(const unsigned long *addr, unsigned long size,
 	unsigned long offset)
 {
 	long mask;
@@ -240,35 +242,35 @@ find_next_zero_bit(const unsigned long *addr, unsigned long size,
 	return (bit);
 }
 
-/* set_bit and clear_bit are atomic and protected against
+/* uk_set_bit and uk_clear_bit are atomic and protected against
  * reordering (do barriers), while the underscored (__*) versions of
  * them don't (not atomic).
  */
-#define __set_bit(i, a)        ukarch_set_bit(i, a)
-#define set_bit(i, a)          ukarch_set_bit_sync(i, a)
-#define __clear_bit(i, a)      ukarch_clr_bit(i, a)
-#define clear_bit(i, a)        ukarch_clr_bit_sync(i, a)
+#define __uk_set_bit(i, a)        ukarch_set_bit(i, a)
+#define uk_set_bit(i, a)          ukarch_set_bit_sync(i, a)
+#define __uk_clear_bit(i, a)      ukarch_clr_bit(i, a)
+#define uk_clear_bit(i, a)        ukarch_clr_bit_sync(i, a)
 
 static inline int
-test_and_clear_bit(long bit, volatile unsigned long *var)
+uk_test_and_clear_bit(long bit, volatile unsigned long *var)
 {
 	return ukarch_test_and_clr_bit_sync(bit, (volatile void *) var);
 }
 
 static inline int
-__test_and_clear_bit(long bit, volatile unsigned long *var)
+__uk_test_and_clear_bit(long bit, volatile unsigned long *var)
 {
 	return ukarch_test_and_clr_bit(bit, (volatile void *) var);
 }
 
 static inline int
-test_and_set_bit(long bit, volatile unsigned long *var)
+uk_test_and_set_bit(long bit, volatile unsigned long *var)
 {
 	return ukarch_test_and_set_bit_sync(bit, (volatile void *) var);
 }
 
 static inline int
-__test_and_set_bit(long bit, volatile unsigned long *var)
+__uk_test_and_set_bit(long bit, volatile unsigned long *var)
 {
 	return ukarch_test_and_set_bit(bit, (volatile void *) var);
 }
@@ -324,18 +326,18 @@ done:
 	return ret;
 }
 
-#define for_each_set_bit(bit, addr, size) \
-	for ((bit) = find_first_bit((addr), (size));		\
+#define uk_for_each_set_bit(bit, addr, size) \
+	for ((bit) = uk_find_first_bit((addr), (size));		\
 	     (bit) < (size);					\
-	     (bit) = find_next_bit((addr), (size), (bit) + 1))
+	     (bit) = uk_find_next_bit((addr), (size), (bit) + 1))
 
-#define	for_each_clear_bit(bit, addr, size) \
-	for ((bit) = find_first_zero_bit((addr), (size));		\
+#define	uk_for_each_clear_bit(bit, addr, size) \
+	for ((bit) = uk_find_first_zero_bit((addr), (size));		\
 	     (bit) < (size);						\
-	     (bit) = find_next_zero_bit((addr), (size), (bit) + 1))
+	     (bit) = uk_find_next_zero_bit((addr), (size), (bit) + 1))
 
 static inline __u64
-sign_extend64(__u64 value, int index)
+uk_sign_extend64(__u64 value, int index)
 {
 	__u8 shift = 63 - index;
 
