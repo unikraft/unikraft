@@ -47,14 +47,16 @@
 
 #define	BITS_PER_LONG_LONG	64
 
-#define	BITMAP_FIRST_WORD_MASK(start)	(~0UL << ((start) % BITS_PER_LONG))
-#define	BITMAP_LAST_WORD_MASK(n)	(~0UL >> (BITS_PER_LONG - (n)))
-#define	BITS_TO_LONGS(n)	howmany((n), BITS_PER_LONG)
-#define	BIT_MASK(nr)		(1UL << ((nr) & (BITS_PER_LONG - 1)))
-#define BIT_WORD(nr)		((nr) / BITS_PER_LONG)
-#define	GENMASK(h, l)		(((~0UL) >> (BITS_PER_LONG - (h) - 1)) & ((~0UL) << (l)))
-#define	GENMASK_ULL(h, l)	(((~0ULL) >> (BITS_PER_LONG_LONG - (h) - 1)) & ((~0ULL) << (l)))
-#define BITS_PER_BYTE		8
+#define	BITMAP_FIRST_WORD_MASK(start)  (~0UL << ((start) % BITS_PER_LONG))
+#define	BITMAP_LAST_WORD_MASK(n)       (~0UL >> (BITS_PER_LONG - (n)))
+#define	BITS_TO_LONGS(n)               howmany((n), BITS_PER_LONG)
+#define	BIT_MASK(nr)                   (1UL << ((nr) & (BITS_PER_LONG - 1)))
+#define BIT_WORD(nr)                   ((nr) / BITS_PER_LONG)
+#define	GENMASK(h, l) \
+	(((~0UL) >> (BITS_PER_LONG - (h) - 1)) & ((~0UL) << (l)))
+#define	GENMASK_ULL(h, l) \
+	(((~0ULL) >> (BITS_PER_LONG_LONG - (h) - 1)) & ((~0ULL) << (l)))
+#define BITS_PER_BYTE  8
 
 #define	hweight8(x)	bitcount((uint8_t)(x))
 #define	hweight16(x)	bitcount16(x)
@@ -102,12 +104,12 @@ ror32(uint32_t word, unsigned int shift)
 
 static inline int get_count_order(unsigned int count)
 {
-        int order;
+	int order;
 
-        order = fls(count) - 1;
-        if (count & (count - 1))
-                order++;
-        return order;
+	order = fls(count) - 1;
+	if (count & (count - 1))
+		order++;
+	return order;
 }
 
 static inline unsigned long
@@ -117,7 +119,7 @@ find_first_bit(const unsigned long *addr, unsigned long size)
 	int bit;
 
 	for (bit = 0; size >= BITS_PER_LONG;
-	    size -= BITS_PER_LONG, bit += BITS_PER_LONG, addr++) {
+		size -= BITS_PER_LONG, bit += BITS_PER_LONG, addr++) {
 		if (*addr == 0)
 			continue;
 		return (bit + __ffsl(*addr));
@@ -139,7 +141,7 @@ find_first_zero_bit(const unsigned long *addr, unsigned long size)
 	int bit;
 
 	for (bit = 0; size >= BITS_PER_LONG;
-	    size -= BITS_PER_LONG, bit += BITS_PER_LONG, addr++) {
+		size -= BITS_PER_LONG, bit += BITS_PER_LONG, addr++) {
 		if (~(*addr) == 0)
 			continue;
 		return (bit + __ffsl(~(*addr)));
@@ -181,7 +183,8 @@ find_last_bit(const unsigned long *addr, unsigned long size)
 }
 
 static inline unsigned long
-find_next_bit(const unsigned long *addr, unsigned long size, unsigned long offset)
+find_next_bit(const unsigned long *addr, unsigned long size,
+	unsigned long offset)
 {
 	long mask;
 	int offs;
@@ -204,7 +207,7 @@ find_next_bit(const unsigned long *addr, unsigned long size, unsigned long offse
 		addr++;
 	}
 	for (size -= bit; size >= BITS_PER_LONG;
-	    size -= BITS_PER_LONG, bit += BITS_PER_LONG, addr++) {
+		size -= BITS_PER_LONG, bit += BITS_PER_LONG, addr++) {
 		if (*addr == 0)
 			continue;
 		return (bit + __ffsl(*addr));
@@ -221,7 +224,7 @@ find_next_bit(const unsigned long *addr, unsigned long size, unsigned long offse
 
 static inline unsigned long
 find_next_zero_bit(const unsigned long *addr, unsigned long size,
-    unsigned long offset)
+	unsigned long offset)
 {
 	long mask;
 	int offs;
@@ -244,7 +247,7 @@ find_next_zero_bit(const unsigned long *addr, unsigned long size,
 		addr++;
 	}
 	for (size -= bit; size >= BITS_PER_LONG;
-	    size -= BITS_PER_LONG, bit += BITS_PER_LONG, addr++) {
+		size -= BITS_PER_LONG, bit += BITS_PER_LONG, addr++) {
 		if (~(*addr) == 0)
 			continue;
 		return (bit + __ffsl(~(*addr)));
@@ -260,19 +263,19 @@ find_next_zero_bit(const unsigned long *addr, unsigned long size,
 }
 
 #define	__set_bit(i, a)							\
-    atomic_set_long(&((volatile unsigned long *)(a))[BIT_WORD(i)], BIT_MASK(i))
+	atomic_set_long(&((volatile unsigned long *)(a))[BIT_WORD(i)], BIT_MASK(i))
 
 #define	set_bit(i, a)							\
-    atomic_set_long(&((volatile unsigned long *)(a))[BIT_WORD(i)], BIT_MASK(i))
+	atomic_set_long(&((volatile unsigned long *)(a))[BIT_WORD(i)], BIT_MASK(i))
 
 #define	__clear_bit(i, a)						\
-    atomic_clear_long(&((volatile unsigned long *)(a))[BIT_WORD(i)], BIT_MASK(i))
+	atomic_clear_long(&((volatile unsigned long *)(a))[BIT_WORD(i)], BIT_MASK(i))
 
 #define	clear_bit(i, a)							\
-    atomic_clear_long(&((volatile unsigned long *)(a))[BIT_WORD(i)], BIT_MASK(i))
+	atomic_clear_long(&((volatile unsigned long *)(a))[BIT_WORD(i)], BIT_MASK(i))
 
 #define	test_bit(i, a)							\
-    !!(READ_ONCE(((volatile unsigned long *)(a))[BIT_WORD(i)]) & BIT_MASK(i))
+	!!(READ_ONCE(((volatile unsigned long *)(a))[BIT_WORD(i)]) & BIT_MASK(i))
 
 static inline int
 test_and_clear_bit(long bit, volatile unsigned long *var)
@@ -335,54 +338,54 @@ __test_and_set_bit(long bit, volatile unsigned long *var)
 }
 
 enum {
-        REG_OP_ISFREE,
-        REG_OP_ALLOC,
-        REG_OP_RELEASE,
+	REG_OP_ISFREE,
+	REG_OP_ALLOC,
+	REG_OP_RELEASE,
 };
 
 static inline int
 linux_reg_op(unsigned long *bitmap, int pos, int order, int reg_op)
 {
-        int nbits_reg;
-        int index;
-        int offset;
-        int nlongs_reg;
-        int nbitsinlong;
-        unsigned long mask;
-        int i;
-        int ret = 0;
+	int nbits_reg;
+	int index;
+	int offset;
+	int nlongs_reg;
+	int nbitsinlong;
+	unsigned long mask;
+	int i;
+	int ret = 0;
 
-        nbits_reg = 1 << order;
-        index = pos / BITS_PER_LONG;
-        offset = pos - (index * BITS_PER_LONG);
-        nlongs_reg = BITS_TO_LONGS(nbits_reg);
-        nbitsinlong = min(nbits_reg,  BITS_PER_LONG);
+	nbits_reg = 1 << order;
+	index = pos / BITS_PER_LONG;
+	offset = pos - (index * BITS_PER_LONG);
+	nlongs_reg = BITS_TO_LONGS(nbits_reg);
+	nbitsinlong = min(nbits_reg,  BITS_PER_LONG);
 
-        mask = (1UL << (nbitsinlong - 1));
-        mask += mask - 1;
-        mask <<= offset;
+	mask = (1UL << (nbitsinlong - 1));
+	mask += mask - 1;
+	mask <<= offset;
 
-        switch (reg_op) {
-        case REG_OP_ISFREE:
-                for (i = 0; i < nlongs_reg; i++) {
-                        if (bitmap[index + i] & mask)
-                                goto done;
-                }
-                ret = 1;
-                break;
+	switch (reg_op) {
+	case REG_OP_ISFREE:
+		for (i = 0; i < nlongs_reg; i++) {
+			if (bitmap[index + i] & mask)
+				goto done;
+		}
+		ret = 1;
+		break;
 
-        case REG_OP_ALLOC:
-                for (i = 0; i < nlongs_reg; i++)
-                        bitmap[index + i] |= mask;
-                break;
+	case REG_OP_ALLOC:
+		for (i = 0; i < nlongs_reg; i++)
+			bitmap[index + i] |= mask;
+		break;
 
-        case REG_OP_RELEASE:
-                for (i = 0; i < nlongs_reg; i++)
-                        bitmap[index + i] &= ~mask;
-                break;
-        }
+	case REG_OP_RELEASE:
+		for (i = 0; i < nlongs_reg; i++)
+			bitmap[index + i] &= ~mask;
+		break;
+	}
 done:
-        return ret;
+	return ret;
 }
 
 #define for_each_set_bit(bit, addr, size) \

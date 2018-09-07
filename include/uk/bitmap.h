@@ -138,9 +138,9 @@ bitmap_clear(unsigned long *map, unsigned int start, int nr)
 
 static inline unsigned int
 bitmap_find_next_zero_area_off(const unsigned long *map,
-    const unsigned int size, unsigned int start,
-    unsigned int nr, unsigned int align_mask,
-    unsigned int align_offset)
+	const unsigned int size, unsigned int start,
+	unsigned int nr, unsigned int align_mask,
+	unsigned int align_offset)
 {
 	unsigned int index;
 	unsigned int end;
@@ -149,7 +149,8 @@ bitmap_find_next_zero_area_off(const unsigned long *map,
 retry:
 	index = find_next_zero_bit(map, size, start);
 
-	index = (((index + align_offset) + align_mask) & ~align_mask) - align_offset;
+	index = (((index + align_offset) + align_mask) & ~align_mask) -
+		align_offset;
 
 	end = index + nr;
 	if (end > size)
@@ -165,11 +166,11 @@ retry:
 
 static inline unsigned int
 bitmap_find_next_zero_area(const unsigned long *map,
-    const unsigned int size, unsigned int start,
-    unsigned int nr, unsigned int align_mask)
+	const unsigned int size, unsigned int start,
+	unsigned int nr, unsigned int align_mask)
 {
 	return (bitmap_find_next_zero_area_off(map, size,
-	    start, nr, align_mask, 0));
+		start, nr, align_mask, 0));
 }
 
 static inline int
@@ -223,7 +224,7 @@ bitmap_weight(unsigned long *addr, const unsigned int size)
 
 static inline int
 bitmap_equal(const unsigned long *pa,
-    const unsigned long *pb, unsigned size)
+	const unsigned long *pb, unsigned int size)
 {
 	const unsigned int end = BIT_WORD(size);
 	const unsigned int tail = size & (BITS_PER_LONG - 1);
@@ -245,7 +246,7 @@ bitmap_equal(const unsigned long *pa,
 
 static inline void
 bitmap_complement(unsigned long *dst, const unsigned long *src,
-    const unsigned int size)
+	const unsigned int size)
 {
 	const unsigned int end = BITS_TO_LONGS(size);
 	unsigned int i;
@@ -256,7 +257,7 @@ bitmap_complement(unsigned long *dst, const unsigned long *src,
 
 static inline void
 bitmap_or(unsigned long *dst, const unsigned long *src1,
-    const unsigned long *src2, const unsigned int size)
+	const unsigned long *src2, const unsigned int size)
 {
 	const unsigned int end = BITS_TO_LONGS(size);
 	unsigned int i;
@@ -267,7 +268,7 @@ bitmap_or(unsigned long *dst, const unsigned long *src1,
 
 static inline void
 bitmap_and(unsigned long *dst, const unsigned long *src1,
-    const unsigned long *src2, const unsigned int size)
+	const unsigned long *src2, const unsigned int size)
 {
 	const unsigned int end = BITS_TO_LONGS(size);
 	unsigned int i;
@@ -278,7 +279,7 @@ bitmap_and(unsigned long *dst, const unsigned long *src1,
 
 static inline void
 bitmap_xor(unsigned long *dst, const unsigned long *src1,
-    const unsigned long *src2, const unsigned int size)
+	const unsigned long *src2, const unsigned int size)
 {
 	const unsigned int end = BITS_TO_LONGS(size);
 	unsigned int i;
