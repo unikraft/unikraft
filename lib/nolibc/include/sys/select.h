@@ -32,6 +32,7 @@
 #ifndef __SYS_SELECT_H__
 #define __SYS_SELECT_H__
 
+#include <sys/param.h>
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -55,12 +56,8 @@ typedef unsigned long __fd_mask;
 
 #define _NFDBITS (sizeof(__fd_mask) * 8) /* bits per mask */
 
-#ifndef _howmany
-#define _howmany(x, y) (((x) + ((y) - 1)) / (y))
-#endif
-
 typedef struct fd_set {
-	__fd_mask __fds_bits[_howmany(FD_SETSIZE, _NFDBITS)];
+	__fd_mask __fds_bits[howmany(FD_SETSIZE, _NFDBITS)];
 } fd_set;
 
 #ifdef __cplusplus
