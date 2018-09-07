@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: BSD-2-Clause */
 /*-
  * Copyright (c) 2010 Isilon Systems, Inc.
  * Copyright (c) 2010 iX Systems, Inc.
@@ -32,10 +33,11 @@
 #define	_LINUX_BITOPS_H_
 
 #include <sys/param.h>
-#include <sys/types.h>
-#include <sys/systm.h>
-#include <sys/errno.h>
-#include <sys/libkern.h>
+#include <errno.h>
+#include <uk/essentials.h>
+#include <uk/bitcount.h>
+#include <uk/arch/lcpu.h>
+#include <uk/arch/atomic.h>
 
 #define	BIT(nr)			(1UL << (nr))
 #define	BIT_ULL(nr)		(1ULL << (nr))
@@ -64,14 +66,16 @@
 #define	hweight64(x)	uk_bitcount64(x)
 #define	hweight_long(x)	uk_bitcountl(x)
 
+#if 0 /* TODO revisit when needed */
 static inline int
-fls64(uint64_t mask)
+fls64(__u64 mask)
 {
 	return flsll(mask);
 }
+#endif
 
-static inline uint32_t
-ror32(uint32_t word, unsigned int shift)
+static inline __u32
+ror32(__u32 word, unsigned int shift)
 {
 	return ((word >> shift) | (word << (32 - shift)));
 }
@@ -291,7 +295,7 @@ linux_reg_op(unsigned long *bitmap, int pos, int order, int reg_op)
 	index = pos / BITS_PER_LONG;
 	offset = pos - (index * BITS_PER_LONG);
 	nlongs_reg = BITS_TO_LONGS(nbits_reg);
-	nbitsinlong = min(nbits_reg,  BITS_PER_LONG);
+	nbitsinlong = MIN(nbits_reg,  BITS_PER_LONG);
 
 	mask = (1UL << (nbitsinlong - 1));
 	mask += mask - 1;
@@ -330,12 +334,12 @@ done:
 	     (bit) < (size);						\
 	     (bit) = find_next_zero_bit((addr), (size), (bit) + 1))
 
-static inline uint64_t
-sign_extend64(uint64_t value, int index)
+static inline __u64
+sign_extend64(__u64 value, int index)
 {
-	uint8_t shift = 63 - index;
+	__u8 shift = 63 - index;
 
-	return ((int64_t)(value << shift) >> shift);
+	return ((__s64)(value << shift) >> shift);
 }
 
 #endif	/* _LINUX_BITOPS_H_ */

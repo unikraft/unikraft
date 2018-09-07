@@ -1,3 +1,4 @@
+/* SPDX-License-Identifier: BSD-2-Clause */
 /*
  * Copyright (c) 2013-2017 Mellanox Technologies, Ltd.
  * All rights reserved.
@@ -29,7 +30,7 @@
 #ifndef _LINUX_BITMAP_H_
 #define	_LINUX_BITMAP_H_
 
-#include <linux/bitops.h>
+#include <uk/bitops.h>
 
 static inline void
 bitmap_zero(unsigned long *addr, const unsigned int size)
