@@ -58,11 +58,11 @@
 	(((~0ULL) >> (BITS_PER_LONG_LONG - (h) - 1)) & ((~0ULL) << (l)))
 #define BITS_PER_BYTE  8
 
-#define	hweight8(x)	bitcount((uint8_t)(x))
-#define	hweight16(x)	bitcount16(x)
-#define	hweight32(x)	bitcount32(x)
-#define	hweight64(x)	bitcount64(x)
-#define	hweight_long(x)	bitcountl(x)
+#define	hweight8(x)	uk_bitcount((uint8_t)(x))
+#define	hweight16(x)	uk_bitcount16(x)
+#define	hweight32(x)	uk_bitcount32(x)
+#define	hweight64(x)	uk_bitcount64(x)
+#define	hweight_long(x)	uk_bitcountl(x)
 
 static inline int
 fls64(uint64_t mask)
@@ -236,79 +236,37 @@ find_next_zero_bit(const unsigned long *addr, unsigned long size,
 	return (bit);
 }
 
-#define	__set_bit(i, a)							\
-	atomic_set_long(&((volatile unsigned long *)(a))[BIT_WORD(i)], BIT_MASK(i))
-
-#define	set_bit(i, a)							\
-	atomic_set_long(&((volatile unsigned long *)(a))[BIT_WORD(i)], BIT_MASK(i))
-
-#define	__clear_bit(i, a)						\
-	atomic_clear_long(&((volatile unsigned long *)(a))[BIT_WORD(i)], BIT_MASK(i))
-
-#define	clear_bit(i, a)							\
-	atomic_clear_long(&((volatile unsigned long *)(a))[BIT_WORD(i)], BIT_MASK(i))
-
-#define	test_bit(i, a)							\
-	!!(READ_ONCE(((volatile unsigned long *)(a))[BIT_WORD(i)]) & BIT_MASK(i))
+/* set_bit and clear_bit are atomic and protected against
+ * reordering (do barriers), while the underscored (__*) versions of
+ * them don't (not atomic).
+ */
+#define __set_bit(i, a)        ukarch_set_bit(i, a)
+#define set_bit(i, a)          ukarch_set_bit_sync(i, a)
+#define __clear_bit(i, a)      ukarch_clr_bit(i, a)
+#define clear_bit(i, a)        ukarch_clr_bit_sync(i, a)
 
 static inline int
 test_and_clear_bit(long bit, volatile unsigned long *var)
 {
-	long val;
-
-	var += BIT_WORD(bit);
-	bit %= BITS_PER_LONG;
-	bit = (1UL << bit);
-	do {
-		val = *var;
-	} while (atomic_cmpset_long(var, val, val & ~bit) == 0);
-
-	return !!(val & bit);
+	return ukarch_test_and_clr_bit_sync(bit, (volatile void *) var);
 }
 
 static inline int
 __test_and_clear_bit(long bit, volatile unsigned long *var)
 {
-	long val;
-
-	var += BIT_WORD(bit);
-	bit %= BITS_PER_LONG;
-	bit = (1UL << bit);
-
-	val = *var;
-	*var &= ~bit;
-
-	return !!(val & bit);
+	return ukarch_test_and_clr_bit(bit, (volatile void *) var);
 }
 
 static inline int
 test_and_set_bit(long bit, volatile unsigned long *var)
 {
-	long val;
-
-	var += BIT_WORD(bit);
-	bit %= BITS_PER_LONG;
-	bit = (1UL << bit);
-	do {
-		val = *var;
-	} while (atomic_cmpset_long(var, val, val | bit) == 0);
-
-	return !!(val & bit);
+	return ukarch_test_and_set_bit_sync(bit, (volatile void *) var);
 }
 
 static inline int
 __test_and_set_bit(long bit, volatile unsigned long *var)
 {
-	long val;
-
-	var += BIT_WORD(bit);
-	bit %= BITS_PER_LONG;
-	bit = (1UL << bit);
-
-	val = *var;
-	*var |= bit;
-
-	return !!(val & bit);
+	return ukarch_test_and_set_bit(bit, (volatile void *) var);
 }
 
 enum {
