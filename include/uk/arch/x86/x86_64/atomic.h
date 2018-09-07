@@ -31,6 +31,34 @@
 #endif
 
 /**
+ * ukarch_ffs - find first (lowest) set bit in word.
+ * @word: The word to search
+ *
+ * Undefined if no bit exists, so code should check against 0 first.
+ */
+static inline unsigned int ukarch_ffs(unsigned int word)
+{
+	__asm__("bsfl %1,%0"
+		: "=r" (word)
+		: "rm" (word));
+	return word;
+}
+
+/**
+ * ukarch_fls - find last (highest) set bit in word.
+ * @word: The word to search
+ *
+ * Undefined if no bit exists, so code should check against 0 first.
+ */
+static inline unsigned int ukarch_fls(unsigned int word)
+{
+	__asm__("bsrl %1,%0"
+		: "=r" (word)
+		: "rm" (word));
+	return word;
+}
+
+/**
  * ukarch_ffsl - find first (lowest) set bit in word.
  * @word: The word to search
  *
@@ -39,7 +67,21 @@
 static inline unsigned long ukarch_ffsl(unsigned long word)
 {
 	__asm__("bsfq %1,%0"
-		:"=r" (word)
-		:"rm" (word));
+		: "=r" (word)
+		: "rm" (word));
+	return word;
+}
+
+/**
+ * ukarch_flsl - find last (highest) set bit in word.
+ * @word: The word to search
+ *
+ * Undefined if no bit exists, so code should check against 0 first.
+ */
+static inline unsigned long ukarch_flsl(unsigned long word)
+{
+	__asm__("bsrq %1,%0"
+		: "=r" (word)
+		: "rm" (word));
 	return word;
 }
