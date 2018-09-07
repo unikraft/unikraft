@@ -1,16 +1,16 @@
 ifeq (x86_64,$(CONFIG_UK_ARCH))
-XEN_LDSCRIPT  := -Wl,-T,$(CONFIG_UK_BASE)/plat/xen/x86/link64.ld
+XEN_LDSCRIPT  := $(CONFIG_UK_BASE)/plat/xen/x86/link64.ld
 XEN_LDFLAGS-y += -Wl,-m,elf_x86_64
 endif
 ifeq (x86_32,$(CONFIG_UK_ARCH))
-XEN_LDSCRIPT  := -Wl,-T,$(CONFIG_UK_BASE)/plat/xen/x86/link32.ld
+XEN_LDSCRIPT  := $(CONFIG_UK_BASE)/plat/xen/x86/link32.ld
 XEN_LDFLAGS-y += -Wl,-m,elf_x86_32
 endif
 ifeq (arm_64,$(CONFIG_UK_ARCH))
-XEN_LDSCRIPT  := -Wl,-T,$(CONFIG_UK_BASE)/plat/xen/arm/link64.ld
+XEN_LDSCRIPT  := $(CONFIG_UK_BASE)/plat/xen/arm/link64.ld
 endif
 ifeq (arm,$(CONFIG_UK_ARCH))
-XEN_LDSCRIPT  := -Wl,-T,$(CONFIG_UK_BASE)/plat/xen/arm/link32.ld
+XEN_LDSCRIPT  := $(CONFIG_UK_BASE)/plat/xen/arm/link32.ld
 endif
 
 ##
@@ -18,14 +18,19 @@ endif
 ##
 XEN_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_xen-$(CONFIG_UK_ARCH)
 
-$(XEN_IMAGE): $(XEN_LINK) $(XEN_LINK-y) $(UK_LINK) $(UK_LINK-y)
+$(XEN_IMAGE): $(XEN_LINK) $(XEN_LINK-y) $(UK_LINK) $(UK_LINK-y) $(XEN_LDSCRIPT)
 	$(call build_cmd,LD,,$@.ld.o,\
-	       $(LD) -r $(LIBLDFLAGS) $(LIBLDFLAGS-y) $(XEN_LDFLAGS) $(XEN_LDFLAGS-y) $^ -o $@.ld.o)
+	       $(LD) -r $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
+			$(XEN_LDFLAGS) $(XEN_LDFLAGS-y) \
+			$(XEN_LINK) $(XEN_LINK-y) \
+			$(UK_LINK) $(UK_LINK-y) -o $@.ld.o)
 	$(call build_cmd,OBJCOPY,,$@.o,\
 	       $(OBJCOPY) -w -G xenos_* -G _libxenplat_start $@.ld.o $@.o)
 ifeq (arm,$(CONFIG_UK_ARCH))
 	$(call build_cmd,LD,,$@.elf,\
-	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(XEN_LDFLAGS) $(XEN_LDFLAGS-y) $(XEN_LDSCRIPT) $@.o -o $@.elf)
+	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(XEN_LDFLAGS) $(XEN_LDFLAGS-y) \
+		     -Wl$(comma)-T$(comma)$(call strip,$(XEN_LDSCRIPT)) \
+		     $@.o -o $@.elf)
 ifeq ($(CONFIG_OPTIMIZE_DBGFILE),y)
 	$(call build_cmd,OBJCOPY,,$@.dbg,\
 	       $(OBJCOPY) --only-keep-debug $@.elf $@.dbg)
@@ -44,7 +49,9 @@ endif
 	       $(GZIP) -f -9 -c $@ >$@.gz)
 else
 	$(call build_cmd,LD,,$@,\
-	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(XEN_LDFLAGS) $(XEN_LDFLAGS-y) $(XEN_LDSCRIPT) $@.o -o $@)
+	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(XEN_LDFLAGS) $(XEN_LDFLAGS-y) \
+		     -Wl$(comma)-T$(comma)$(call strip,$(XEN_LDSCRIPT)) \
+		     $@.o -o $@)
 ifeq ($(CONFIG_OPTIMIZE_DBGFILE),y)
 	$(call build_cmd,OBJCOPY,,$@.dbg,\
 	       $(OBJCOPY) --only-keep-debug $@ $@.dbg)

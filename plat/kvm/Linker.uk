@@ -1,5 +1,5 @@
 ifeq (x86_64,$(CONFIG_UK_ARCH))
-KVM_LDSCRIPT  := -Wl,-T,$(CONFIG_UK_BASE)/plat/kvm/x86/link64.ld
+KVM_LDSCRIPT  := $(CONFIG_UK_BASE)/plat/kvm/x86/link64.ld
 KVM_LDFLAGS-y += -Wl,-m,elf_x86_64
 endif
 
@@ -8,14 +8,20 @@ endif
 ##
 KVM_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_kvm-$(CONFIG_UK_ARCH)
 
-$(KVM_IMAGE): $(KVM_LINK) $(KVM_LINK-y) $(UK_LINK) $(UK_LINK-y)
+$(KVM_IMAGE): $(KVM_LINK) $(KVM_LINK-y) $(UK_LINK) $(UK_LINK-y) $(KVM_LDSCRIPT)
 	$(call build_cmd,LD,,$@.ld.o,\
-	       $(LD) -r $(LIBLDFLAGS) $(LIBLDFLAGS-y) $(KVM_LDFLAGS) $(KVM_LDFLAGS-y) $^ -o $@.ld.o)
+	       $(LD) -r $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
+			$(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
+			$(KVM_LINK) $(KVM_LINK-y) \
+			$(UK_LINK) $(UK_LINK-y) -o $@.ld.o)
 	$(call build_cmd,OBJCOPY,,$@.o,\
 	       $(OBJCOPY) -w -G kvmos_* -G _libkvmplat_entry $@.ld.o $@.o)
 ifeq (x86_64,$(CONFIG_UK_ARCH))
 	$(call build_cmd,LD,,$@,\
-	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(KVM_LDFLAGS) $(KVM_LDFLAGS-y) $(KVM_LDSCRIPT) $@.o -o $@)
+	       $(LD) $(LDFLAGS) $(LDFLAGS-y) \
+		     $(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
+		     -Wl$(comma)-T$(comma)$(call strip,$(KVM_LDSCRIPT)) \
+		     $@.o -o $@)
 ifeq ($(CONFIG_OPTIMIZE_DBGFILE),y)
 	$(call build_cmd,OBJCOPY,,$@.dbg,\
 	       $(OBJCOPY) --only-keep-debug $@ $@.dbg)
