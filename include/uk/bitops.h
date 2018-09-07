@@ -43,23 +43,23 @@
 #define	UK_BIT_ULL(nr)		(1ULL << (nr))
 
 #ifdef __LP64__
-#define	BITS_PER_LONG		64
+#define	UK_BITS_PER_LONG		64
 #else
-#define	BITS_PER_LONG		32
+#define	UK_BITS_PER_LONG		32
 #endif
 
-#define	BITS_PER_LONG_LONG	64
+#define	UK_BITS_PER_LONG_LONG	64
 
-#define	BITMAP_FIRST_WORD_MASK(start)  (~0UL << ((start) % BITS_PER_LONG))
-#define	BITMAP_LAST_WORD_MASK(n)       (~0UL >> (BITS_PER_LONG - (n)))
-#define	BITS_TO_LONGS(n)               howmany((n), BITS_PER_LONG)
+#define	BITMAP_FIRST_WORD_MASK(start)  (~0UL << ((start) % UK_BITS_PER_LONG))
+#define	BITMAP_LAST_WORD_MASK(n)       (~0UL >> (UK_BITS_PER_LONG - (n)))
+#define	BITS_TO_LONGS(n)               howmany((n), UK_BITS_PER_LONG)
 #define	UK_BIT_MASK(nr) \
-	(1UL << ((nr) & (BITS_PER_LONG - 1)))
-#define BIT_WORD(nr)                   ((nr) / BITS_PER_LONG)
+	(1UL << ((nr) & (UK_BITS_PER_LONG - 1)))
+#define BIT_WORD(nr)                   ((nr) / UK_BITS_PER_LONG)
 #define	UK_GENMASK(h, l) \
-	(((~0UL) >> (BITS_PER_LONG - (h) - 1)) & ((~0UL) << (l)))
+	(((~0UL) >> (UK_BITS_PER_LONG - (h) - 1)) & ((~0UL) << (l)))
 #define	UK_GENMASK_ULL(h, l) \
-	(((~0ULL) >> (BITS_PER_LONG_LONG - (h) - 1)) & ((~0ULL) << (l)))
+	(((~0ULL) >> (UK_BITS_PER_LONG_LONG - (h) - 1)) & ((~0ULL) << (l)))
 #define BITS_PER_BYTE  8
 
 #define	hweight8(x)	uk_bitcount((uint8_t)(x))
@@ -98,8 +98,8 @@ uk_find_first_bit(const unsigned long *addr, unsigned long size)
 	long mask;
 	int bit;
 
-	for (bit = 0; size >= BITS_PER_LONG;
-		size -= BITS_PER_LONG, bit += BITS_PER_LONG, addr++) {
+	for (bit = 0; size >= UK_BITS_PER_LONG;
+		size -= UK_BITS_PER_LONG, bit += UK_BITS_PER_LONG, addr++) {
 		if (*addr == 0)
 			continue;
 		return (bit + ukarch_ffsl(*addr));
@@ -120,8 +120,8 @@ uk_find_first_zero_bit(const unsigned long *addr, unsigned long size)
 	long mask;
 	int bit;
 
-	for (bit = 0; size >= BITS_PER_LONG;
-		size -= BITS_PER_LONG, bit += BITS_PER_LONG, addr++) {
+	for (bit = 0; size >= UK_BITS_PER_LONG;
+		size -= UK_BITS_PER_LONG, bit += UK_BITS_PER_LONG, addr++) {
 		if (~(*addr) == 0)
 			continue;
 		return (bit + ukarch_ffsl(~(*addr)));
@@ -144,9 +144,9 @@ uk_find_last_bit(const unsigned long *addr, unsigned long size)
 	int bit;
 	int pos;
 
-	pos = size / BITS_PER_LONG;
-	offs = size % BITS_PER_LONG;
-	bit = BITS_PER_LONG * pos;
+	pos = size / UK_BITS_PER_LONG;
+	offs = size % UK_BITS_PER_LONG;
+	bit = UK_BITS_PER_LONG * pos;
 	addr += pos;
 	if (offs) {
 		mask = (*addr) & BITMAP_LAST_WORD_MASK(offs);
@@ -155,7 +155,7 @@ uk_find_last_bit(const unsigned long *addr, unsigned long size)
 	}
 	while (pos--) {
 		addr--;
-		bit -= BITS_PER_LONG;
+		bit -= UK_BITS_PER_LONG;
 		if (*addr)
 			return (bit + ukarch_flsl(*addr));
 	}
@@ -173,21 +173,21 @@ uk_find_next_bit(const unsigned long *addr, unsigned long size,
 
 	if (offset >= size)
 		return (size);
-	pos = offset / BITS_PER_LONG;
-	offs = offset % BITS_PER_LONG;
-	bit = BITS_PER_LONG * pos;
+	pos = offset / UK_BITS_PER_LONG;
+	offs = offset % UK_BITS_PER_LONG;
+	bit = UK_BITS_PER_LONG * pos;
 	addr += pos;
 	if (offs) {
 		mask = (*addr) & ~BITMAP_LAST_WORD_MASK(offs);
 		if (mask)
 			return (bit + ukarch_ffsl(mask));
-		if (size - bit <= BITS_PER_LONG)
+		if (size - bit <= UK_BITS_PER_LONG)
 			return (size);
-		bit += BITS_PER_LONG;
+		bit += UK_BITS_PER_LONG;
 		addr++;
 	}
-	for (size -= bit; size >= BITS_PER_LONG;
-		size -= BITS_PER_LONG, bit += BITS_PER_LONG, addr++) {
+	for (size -= bit; size >= UK_BITS_PER_LONG;
+		size -= UK_BITS_PER_LONG, bit += UK_BITS_PER_LONG, addr++) {
 		if (*addr == 0)
 			continue;
 		return (bit + ukarch_ffsl(*addr));
@@ -213,21 +213,21 @@ uk_find_next_zero_bit(const unsigned long *addr, unsigned long size,
 
 	if (offset >= size)
 		return (size);
-	pos = offset / BITS_PER_LONG;
-	offs = offset % BITS_PER_LONG;
-	bit = BITS_PER_LONG * pos;
+	pos = offset / UK_BITS_PER_LONG;
+	offs = offset % UK_BITS_PER_LONG;
+	bit = UK_BITS_PER_LONG * pos;
 	addr += pos;
 	if (offs) {
 		mask = ~(*addr) & ~BITMAP_LAST_WORD_MASK(offs);
 		if (mask)
 			return (bit + ukarch_ffsl(mask));
-		if (size - bit <= BITS_PER_LONG)
+		if (size - bit <= UK_BITS_PER_LONG)
 			return (size);
-		bit += BITS_PER_LONG;
+		bit += UK_BITS_PER_LONG;
 		addr++;
 	}
-	for (size -= bit; size >= BITS_PER_LONG;
-		size -= BITS_PER_LONG, bit += BITS_PER_LONG, addr++) {
+	for (size -= bit; size >= UK_BITS_PER_LONG;
+		size -= UK_BITS_PER_LONG, bit += UK_BITS_PER_LONG, addr++) {
 		if (~(*addr) == 0)
 			continue;
 		return (bit + ukarch_ffsl(~(*addr)));
@@ -294,10 +294,10 @@ linux_reg_op(unsigned long *bitmap, int pos, int order, int reg_op)
 	int ret = 0;
 
 	nbits_reg = 1 << order;
-	index = pos / BITS_PER_LONG;
-	offset = pos - (index * BITS_PER_LONG);
+	index = pos / UK_BITS_PER_LONG;
+	offset = pos - (index * UK_BITS_PER_LONG);
 	nlongs_reg = BITS_TO_LONGS(nbits_reg);
-	nbitsinlong = MIN(nbits_reg,  BITS_PER_LONG);
+	nbitsinlong = MIN(nbits_reg,  UK_BITS_PER_LONG);
 
 	mask = (1UL << (nbitsinlong - 1));
 	mask += mask - 1;
