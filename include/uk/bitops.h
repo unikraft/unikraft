@@ -52,10 +52,10 @@
 
 #define	UK_BITMAP_FIRST_WORD_MASK(start)  (~0UL << ((start) % UK_BITS_PER_LONG))
 #define	UK_BITMAP_LAST_WORD_MASK(n)       (~0UL >> (UK_BITS_PER_LONG - (n)))
-#define	BITS_TO_LONGS(n)               howmany((n), UK_BITS_PER_LONG)
+#define	UK_BITS_TO_LONGS(n)               howmany((n), UK_BITS_PER_LONG)
 #define	UK_BIT_MASK(nr) \
 	(1UL << ((nr) & (UK_BITS_PER_LONG - 1)))
-#define BIT_WORD(nr)                   ((nr) / UK_BITS_PER_LONG)
+#define UK_BIT_WORD(nr)                   ((nr) / UK_BITS_PER_LONG)
 #define	UK_GENMASK(h, l) \
 	(((~0UL) >> (UK_BITS_PER_LONG - (h) - 1)) & ((~0UL) << (l)))
 #define	UK_GENMASK_ULL(h, l) \
@@ -296,7 +296,7 @@ linux_reg_op(unsigned long *bitmap, int pos, int order, int reg_op)
 	nbits_reg = 1 << order;
 	index = pos / UK_BITS_PER_LONG;
 	offset = pos - (index * UK_BITS_PER_LONG);
-	nlongs_reg = BITS_TO_LONGS(nbits_reg);
+	nlongs_reg = UK_BITS_TO_LONGS(nbits_reg);
 	nbitsinlong = MIN(nbits_reg,  UK_BITS_PER_LONG);
 
 	mask = (1UL << (nbitsinlong - 1));

@@ -35,7 +35,7 @@
 static inline void
 uk_bitmap_zero(unsigned long *addr, const unsigned int size)
 {
-	memset(addr, 0, BITS_TO_LONGS(size) * sizeof(long));
+	memset(addr, 0, UK_BITS_TO_LONGS(size) * sizeof(long));
 }
 
 static inline void
@@ -43,16 +43,16 @@ uk_bitmap_fill(unsigned long *addr, const unsigned int size)
 {
 	const unsigned int tail = size & (UK_BITS_PER_LONG - 1);
 
-	memset(addr, 0xff, BIT_WORD(size) * sizeof(long));
+	memset(addr, 0xff, UK_BIT_WORD(size) * sizeof(long));
 
 	if (tail)
-		addr[BIT_WORD(size)] = UK_BITMAP_LAST_WORD_MASK(tail);
+		addr[UK_BIT_WORD(size)] = UK_BITMAP_LAST_WORD_MASK(tail);
 }
 
 static inline int
 uk_bitmap_full(unsigned long *addr, const unsigned int size)
 {
-	const unsigned int end = BIT_WORD(size);
+	const unsigned int end = UK_BIT_WORD(size);
 	const unsigned int tail = size & (UK_BITS_PER_LONG - 1);
 	unsigned int i;
 
@@ -73,7 +73,7 @@ uk_bitmap_full(unsigned long *addr, const unsigned int size)
 static inline int
 uk_bitmap_empty(unsigned long *addr, const unsigned int size)
 {
-	const unsigned int end = BIT_WORD(size);
+	const unsigned int end = UK_BIT_WORD(size);
 	const unsigned int tail = size & (UK_BITS_PER_LONG - 1);
 	unsigned int i;
 
@@ -98,7 +98,7 @@ uk_bitmap_set(unsigned long *map, unsigned int start, int nr)
 	int bits_to_set = UK_BITS_PER_LONG - (start % UK_BITS_PER_LONG);
 	unsigned long mask_to_set = UK_BITMAP_FIRST_WORD_MASK(start);
 
-	map += BIT_WORD(start);
+	map += UK_BIT_WORD(start);
 
 	while (nr - bits_to_set >= 0) {
 		*map |= mask_to_set;
@@ -121,7 +121,7 @@ uk_bitmap_clear(unsigned long *map, unsigned int start, int nr)
 	int bits_to_clear = UK_BITS_PER_LONG - (start % UK_BITS_PER_LONG);
 	unsigned long mask_to_clear = UK_BITMAP_FIRST_WORD_MASK(start);
 
-	map += BIT_WORD(start);
+	map += UK_BIT_WORD(start);
 
 	while (nr - bits_to_clear >= 0) {
 		*map &= ~mask_to_clear;
@@ -207,7 +207,7 @@ uk_bitmap_release_region(unsigned long *bitmap, int pos, int order)
 static inline unsigned int
 uk_bitmap_weight(unsigned long *addr, const unsigned int size)
 {
-	const unsigned int end = BIT_WORD(size);
+	const unsigned int end = UK_BIT_WORD(size);
 	const unsigned int tail = size & (UK_BITS_PER_LONG - 1);
 	unsigned int retval = 0;
 	unsigned int i;
@@ -227,7 +227,7 @@ static inline int
 uk_bitmap_equal(const unsigned long *pa,
 	const unsigned long *pb, unsigned int size)
 {
-	const unsigned int end = BIT_WORD(size);
+	const unsigned int end = UK_BIT_WORD(size);
 	const unsigned int tail = size & (UK_BITS_PER_LONG - 1);
 	unsigned int i;
 
@@ -249,7 +249,7 @@ static inline void
 uk_bitmap_complement(unsigned long *dst, const unsigned long *src,
 	const unsigned int size)
 {
-	const unsigned int end = BITS_TO_LONGS(size);
+	const unsigned int end = UK_BITS_TO_LONGS(size);
 	unsigned int i;
 
 	for (i = 0; i != end; i++)
@@ -260,7 +260,7 @@ static inline void
 uk_bitmap_or(unsigned long *dst, const unsigned long *src1,
 	const unsigned long *src2, const unsigned int size)
 {
-	const unsigned int end = BITS_TO_LONGS(size);
+	const unsigned int end = UK_BITS_TO_LONGS(size);
 	unsigned int i;
 
 	for (i = 0; i != end; i++)
@@ -271,7 +271,7 @@ static inline void
 uk_bitmap_and(unsigned long *dst, const unsigned long *src1,
 	const unsigned long *src2, const unsigned int size)
 {
-	const unsigned int end = BITS_TO_LONGS(size);
+	const unsigned int end = UK_BITS_TO_LONGS(size);
 	unsigned int i;
 
 	for (i = 0; i != end; i++)
@@ -282,7 +282,7 @@ static inline void
 uk_bitmap_xor(unsigned long *dst, const unsigned long *src1,
 	const unsigned long *src2, const unsigned int size)
 {
-	const unsigned int end = BITS_TO_LONGS(size);
+	const unsigned int end = UK_BITS_TO_LONGS(size);
 	unsigned int i;
 
 	for (i = 0; i != end; i++)
