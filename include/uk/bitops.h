@@ -282,7 +282,7 @@ enum {
 };
 
 static inline int
-linux_reg_op(unsigned long *bitmap, int pos, int order, int reg_op)
+__uk_bitopts_reg_op(unsigned long *bitmap, int pos, int order, int reg_op)
 {
 	int nbits_reg;
 	int index;

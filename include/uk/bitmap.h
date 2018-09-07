@@ -181,9 +181,9 @@ uk_bitmap_find_free_region(unsigned long *bitmap, int bits, int order)
 	int end;
 
 	for (pos = 0; (end = pos + (1 << order)) <= bits; pos = end) {
-		if (!linux_reg_op(bitmap, pos, order, REG_OP_ISFREE))
+		if (!__uk_bitopts_reg_op(bitmap, pos, order, REG_OP_ISFREE))
 			continue;
-		linux_reg_op(bitmap, pos, order, REG_OP_ALLOC);
+		__uk_bitopts_reg_op(bitmap, pos, order, REG_OP_ALLOC);
 		return pos;
 	}
 	return (-ENOMEM);
@@ -192,16 +192,16 @@ uk_bitmap_find_free_region(unsigned long *bitmap, int bits, int order)
 static inline int
 uk_bitmap_allocate_region(unsigned long *bitmap, int pos, int order)
 {
-	if (!linux_reg_op(bitmap, pos, order, REG_OP_ISFREE))
+	if (!__uk_bitopts_reg_op(bitmap, pos, order, REG_OP_ISFREE))
 		return (-EBUSY);
-	linux_reg_op(bitmap, pos, order, REG_OP_ALLOC);
+	__uk_bitopts_reg_op(bitmap, pos, order, REG_OP_ALLOC);
 	return 0;
 }
 
 static inline void
 uk_bitmap_release_region(unsigned long *bitmap, int pos, int order)
 {
-	linux_reg_op(bitmap, pos, order, REG_OP_RELEASE);
+	__uk_bitopts_reg_op(bitmap, pos, order, REG_OP_RELEASE);
 }
 
 static inline unsigned int
