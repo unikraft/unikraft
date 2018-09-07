@@ -62,11 +62,11 @@
 	(((~0ULL) >> (UK_BITS_PER_LONG_LONG - (h) - 1)) & ((~0ULL) << (l)))
 #define BITS_PER_BYTE  8
 
-#define	hweight8(x)	uk_bitcount((uint8_t)(x))
-#define	hweight16(x)	uk_bitcount16(x)
-#define	hweight32(x)	uk_bitcount32(x)
-#define	hweight64(x)	uk_bitcount64(x)
-#define	hweight_long(x)	uk_bitcountl(x)
+#define	uk_hweight8(x)	uk_bitcount((uint8_t)(x))
+#define	uk_hweight16(x)	uk_bitcount16(x)
+#define	uk_hweight32(x)	uk_bitcount32(x)
+#define	uk_hweight64(x)	uk_bitcount64(x)
+#define	uk_hweight_long(x)	uk_bitcountl(x)
 
 #if 0 /* TODO revisit when needed */
 static inline int
