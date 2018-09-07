@@ -183,7 +183,7 @@ bitmap_find_free_region(unsigned long *bitmap, int bits, int order)
 		if (!linux_reg_op(bitmap, pos, order, REG_OP_ISFREE))
 			continue;
 		linux_reg_op(bitmap, pos, order, REG_OP_ALLOC);
-		return (pos);
+		return pos;
 	}
 	return (-ENOMEM);
 }
@@ -194,7 +194,7 @@ bitmap_allocate_region(unsigned long *bitmap, int pos, int order)
 	if (!linux_reg_op(bitmap, pos, order, REG_OP_ISFREE))
 		return (-EBUSY);
 	linux_reg_op(bitmap, pos, order, REG_OP_ALLOC);
-	return (0);
+	return 0;
 }
 
 static inline void

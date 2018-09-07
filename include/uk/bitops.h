@@ -91,7 +91,7 @@ __flsl(long mask)
 static inline int
 fls64(uint64_t mask)
 {
-	return (flsll(mask));
+	return flsll(mask);
 }
 
 static inline uint32_t
