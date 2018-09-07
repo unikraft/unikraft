@@ -1,16 +1,16 @@
 ifeq (x86_64,$(CONFIG_UK_ARCH))
-XEN_LDSCRIPT  := $(CONFIG_UK_BASE)/plat/xen/x86/link64.ld
+XEN_LDSCRIPT  := $(CONFIG_UK_BASE)/plat/xen/x86/link64.lds
 XEN_LDFLAGS-y += -Wl,-m,elf_x86_64
 endif
 ifeq (x86_32,$(CONFIG_UK_ARCH))
-XEN_LDSCRIPT  := $(CONFIG_UK_BASE)/plat/xen/x86/link32.ld
+XEN_LDSCRIPT  := $(CONFIG_UK_BASE)/plat/xen/x86/link32.lds
 XEN_LDFLAGS-y += -Wl,-m,elf_x86_32
 endif
 ifeq (arm_64,$(CONFIG_UK_ARCH))
-XEN_LDSCRIPT  := $(CONFIG_UK_BASE)/plat/xen/arm/link64.ld
+XEN_LDSCRIPT  := $(CONFIG_UK_BASE)/plat/xen/arm/link64.lds
 endif
 ifeq (arm,$(CONFIG_UK_ARCH))
-XEN_LDSCRIPT  := $(CONFIG_UK_BASE)/plat/xen/arm/link32.ld
+XEN_LDSCRIPT  := $(CONFIG_UK_BASE)/plat/xen/arm/link32.lds
 endif
 
 ##

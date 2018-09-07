@@ -1,5 +1,5 @@
 ifeq (x86_64,$(CONFIG_UK_ARCH))
-KVM_LDSCRIPT  := $(CONFIG_UK_BASE)/plat/kvm/x86/link64.ld
+KVM_LDSCRIPT  := $(CONFIG_UK_BASE)/plat/kvm/x86/link64.lds
 KVM_LDFLAGS-y += -Wl,-m,elf_x86_64
 endif
 
