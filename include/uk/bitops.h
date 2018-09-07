@@ -50,8 +50,8 @@
 
 #define	UK_BITS_PER_LONG_LONG	64
 
-#define	BITMAP_FIRST_WORD_MASK(start)  (~0UL << ((start) % UK_BITS_PER_LONG))
-#define	BITMAP_LAST_WORD_MASK(n)       (~0UL >> (UK_BITS_PER_LONG - (n)))
+#define	UK_BITMAP_FIRST_WORD_MASK(start)  (~0UL << ((start) % UK_BITS_PER_LONG))
+#define	UK_BITMAP_LAST_WORD_MASK(n)       (~0UL >> (UK_BITS_PER_LONG - (n)))
 #define	BITS_TO_LONGS(n)               howmany((n), UK_BITS_PER_LONG)
 #define	UK_BIT_MASK(nr) \
 	(1UL << ((nr) & (UK_BITS_PER_LONG - 1)))
@@ -105,7 +105,7 @@ uk_find_first_bit(const unsigned long *addr, unsigned long size)
 		return (bit + ukarch_ffsl(*addr));
 	}
 	if (size) {
-		mask = (*addr) & BITMAP_LAST_WORD_MASK(size);
+		mask = (*addr) & UK_BITMAP_LAST_WORD_MASK(size);
 		if (mask)
 			bit += ukarch_ffsl(mask);
 		else
@@ -127,7 +127,7 @@ uk_find_first_zero_bit(const unsigned long *addr, unsigned long size)
 		return (bit + ukarch_ffsl(~(*addr)));
 	}
 	if (size) {
-		mask = ~(*addr) & BITMAP_LAST_WORD_MASK(size);
+		mask = ~(*addr) & UK_BITMAP_LAST_WORD_MASK(size);
 		if (mask)
 			bit += ukarch_ffsl(mask);
 		else
@@ -149,7 +149,7 @@ uk_find_last_bit(const unsigned long *addr, unsigned long size)
 	bit = UK_BITS_PER_LONG * pos;
 	addr += pos;
 	if (offs) {
-		mask = (*addr) & BITMAP_LAST_WORD_MASK(offs);
+		mask = (*addr) & UK_BITMAP_LAST_WORD_MASK(offs);
 		if (mask)
 			return (bit + ukarch_flsl(mask));
 	}
@@ -178,7 +178,7 @@ uk_find_next_bit(const unsigned long *addr, unsigned long size,
 	bit = UK_BITS_PER_LONG * pos;
 	addr += pos;
 	if (offs) {
-		mask = (*addr) & ~BITMAP_LAST_WORD_MASK(offs);
+		mask = (*addr) & ~UK_BITMAP_LAST_WORD_MASK(offs);
 		if (mask)
 			return (bit + ukarch_ffsl(mask));
 		if (size - bit <= UK_BITS_PER_LONG)
@@ -193,7 +193,7 @@ uk_find_next_bit(const unsigned long *addr, unsigned long size,
 		return (bit + ukarch_ffsl(*addr));
 	}
 	if (size) {
-		mask = (*addr) & BITMAP_LAST_WORD_MASK(size);
+		mask = (*addr) & UK_BITMAP_LAST_WORD_MASK(size);
 		if (mask)
 			bit += ukarch_ffsl(mask);
 		else
@@ -218,7 +218,7 @@ uk_find_next_zero_bit(const unsigned long *addr, unsigned long size,
 	bit = UK_BITS_PER_LONG * pos;
 	addr += pos;
 	if (offs) {
-		mask = ~(*addr) & ~BITMAP_LAST_WORD_MASK(offs);
+		mask = ~(*addr) & ~UK_BITMAP_LAST_WORD_MASK(offs);
 		if (mask)
 			return (bit + ukarch_ffsl(mask));
 		if (size - bit <= UK_BITS_PER_LONG)
@@ -233,7 +233,7 @@ uk_find_next_zero_bit(const unsigned long *addr, unsigned long size,
 		return (bit + ukarch_ffsl(~(*addr)));
 	}
 	if (size) {
-		mask = ~(*addr) & BITMAP_LAST_WORD_MASK(size);
+		mask = ~(*addr) & UK_BITMAP_LAST_WORD_MASK(size);
 		if (mask)
 			bit += ukarch_ffsl(mask);
 		else

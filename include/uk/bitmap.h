@@ -46,7 +46,7 @@ uk_bitmap_fill(unsigned long *addr, const unsigned int size)
 	memset(addr, 0xff, BIT_WORD(size) * sizeof(long));
 
 	if (tail)
-		addr[BIT_WORD(size)] = BITMAP_LAST_WORD_MASK(tail);
+		addr[BIT_WORD(size)] = UK_BITMAP_LAST_WORD_MASK(tail);
 }
 
 static inline int
@@ -62,7 +62,7 @@ uk_bitmap_full(unsigned long *addr, const unsigned int size)
 	}
 
 	if (tail) {
-		const unsigned long mask = BITMAP_LAST_WORD_MASK(tail);
+		const unsigned long mask = UK_BITMAP_LAST_WORD_MASK(tail);
 
 		if ((addr[end] & mask) != mask)
 			return (0);
@@ -83,7 +83,7 @@ uk_bitmap_empty(unsigned long *addr, const unsigned int size)
 	}
 
 	if (tail) {
-		const unsigned long mask = BITMAP_LAST_WORD_MASK(tail);
+		const unsigned long mask = UK_BITMAP_LAST_WORD_MASK(tail);
 
 		if ((addr[end] & mask) != 0)
 			return (0);
@@ -96,7 +96,7 @@ uk_bitmap_set(unsigned long *map, unsigned int start, int nr)
 {
 	const unsigned int size = start + nr;
 	int bits_to_set = UK_BITS_PER_LONG - (start % UK_BITS_PER_LONG);
-	unsigned long mask_to_set = BITMAP_FIRST_WORD_MASK(start);
+	unsigned long mask_to_set = UK_BITMAP_FIRST_WORD_MASK(start);
 
 	map += BIT_WORD(start);
 
@@ -109,7 +109,7 @@ uk_bitmap_set(unsigned long *map, unsigned int start, int nr)
 	}
 
 	if (nr) {
-		mask_to_set &= BITMAP_LAST_WORD_MASK(size);
+		mask_to_set &= UK_BITMAP_LAST_WORD_MASK(size);
 		*map |= mask_to_set;
 	}
 }
@@ -119,7 +119,7 @@ uk_bitmap_clear(unsigned long *map, unsigned int start, int nr)
 {
 	const unsigned int size = start + nr;
 	int bits_to_clear = UK_BITS_PER_LONG - (start % UK_BITS_PER_LONG);
-	unsigned long mask_to_clear = BITMAP_FIRST_WORD_MASK(start);
+	unsigned long mask_to_clear = UK_BITMAP_FIRST_WORD_MASK(start);
 
 	map += BIT_WORD(start);
 
@@ -132,7 +132,7 @@ uk_bitmap_clear(unsigned long *map, unsigned int start, int nr)
 	}
 
 	if (nr) {
-		mask_to_clear &= BITMAP_LAST_WORD_MASK(size);
+		mask_to_clear &= UK_BITMAP_LAST_WORD_MASK(size);
 		*map &= ~mask_to_clear;
 	}
 }
@@ -216,7 +216,7 @@ uk_bitmap_weight(unsigned long *addr, const unsigned int size)
 		retval += hweight_long(addr[i]);
 
 	if (tail) {
-		const unsigned long mask = BITMAP_LAST_WORD_MASK(tail);
+		const unsigned long mask = UK_BITMAP_LAST_WORD_MASK(tail);
 
 		retval += hweight_long(addr[end] & mask);
 	}
@@ -237,7 +237,7 @@ uk_bitmap_equal(const unsigned long *pa,
 	}
 
 	if (tail) {
-		const unsigned long mask = BITMAP_LAST_WORD_MASK(tail);
+		const unsigned long mask = UK_BITMAP_LAST_WORD_MASK(tail);
 
 		if ((pa[end] ^ pb[end]) & mask)
 			return (0);
