@@ -75,8 +75,8 @@ endef
 obj2dep = $(patsubst %.o,%.d,$(1))
 
 # converts a list of sources (.S, .c, .cc, .cpp) to paths pointing to their corresponding dependency file
-# src2dep $libname,$source(s)
-src2dep = $(call obj2dep,$(call src2obj,$(1),$(2)))
+# src2dep $libname,$source(s),$variant(optional)
+src2dep = $(call obj2dep,$(call src2obj,$(1),$(2),$(3)))
 
 
 ################################################################################
