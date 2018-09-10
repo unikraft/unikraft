@@ -199,6 +199,21 @@ endef
 endif
 endif
 
+# Like build_cmd but also executes Kbuild's fixdep on a temporary
+# created dependency file. Within the GCC command (passed with
+# $command) `$(call debflags,$target)` should be used to let the
+# compiler create this temporary dependency file.
+#
+# build_cmd_fixdep $quietlabel,$libname(optional),$target,$command
+tmp_depfile = $(dir $1).$(notdir $1).d
+depflags = -Wp$(comma)-MD$(comma)$(call tmp_depfile,$(3))
+define build_cmd_fixdep =
+	$(call build_cmd,$1,$2,$3,$4)
+	$Q $(UK_FIXDEP) $(call tmp_depfile,$3) $3 '$(call strip,$4)' \
+		$(BUILD_DIR) 	> $(call obj2dep,$3) && \
+		rm -f $(call tmp_depfile,$3)
+endef
+
 # Returns a list of files to be cleaned when build_cmd was used
 #
 # build_clean $target
@@ -301,18 +316,10 @@ endef
 # Adds library-specific (AS/C/CXX)FLAGS to the build
 #
 # buildrule_* $libname,$source,$target,$extraflags(optional)
-tmp_depfile = $(dir $1).$(notdir $1).d
-depflags = -Wp$(comma)-MD$(comma)$(call tmp_depfile,$(3))
-define fixdep_and_cmd =
-	$(call build_cmd,$1,$2,$3,$4)
-	$Q $(UK_FIXDEP) $(call tmp_depfile,$3) $3 '$(call strip,$4)' \
-		$(BUILD_DIR) 	> $(call obj2dep,$3) && \
-		rm -f $(call tmp_depfile,$3)
-endef
 
 define buildrule_S =
 $(3): $(2) | prepare
-	$(call fixdep_and_cmd,AS,$(1),$(3),\
+	$(call build_cmd_fixdep,AS,$(1),$(3),\
 		$(AS)  $(ASINCLUDES) $(ASINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),ASINCLUDES)) $($(call vprefix_lib,$(1),ASINCLUDES-y)) \
 		       $(ASFLAGS) $(ASFLAGS-y) \
@@ -348,7 +355,7 @@ endef
 
 define buildrule_c =
 $(3): $(2) | prepare
-	$(call fixdep_and_cmd,CC,$(1),$(3),\
+	$(call build_cmd_fixdep,CC,$(1),$(3),\
 		$(CC)  $(CINCLUDES) $(CINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),CINCLUDES)) $($(call vprefix_lib,$(1),CINCLUDES-y)) \
 		       $(CFLAGS) $(CFLAGS-y) \
@@ -366,7 +373,7 @@ endef
 
 define buildrule_cc =
 $(3): $(2) | prepare
-	$(call fixdep_and_cmd,CXX,$(1),$(3),\
+	$(call build_cmd_fixdep,CXX,$(1),$(3),\
 		$(CXX) $(CXXINCLUDES) $(CXXINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),CXXINCLUDES)) $($(call vprefix_lib,$(1),CXXINCLUDES-y)) \
 		       $(CXXFLAGS) $(CXXFLAGS-y) \
