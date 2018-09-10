@@ -9,7 +9,7 @@ $(eval $(call addplat_s,xen,$(CONFIG_PLAT_XEN)))
 ## Xen platform library registration
 ##
 $(eval $(call addplatlib,xen,libxenplat))
-$(eval $(call addplatlib_s,xen,libxenbus,$(XEN_XENBUS)))
+$(eval $(call addplatlib_s,xen,libxenbus,$(CONFIG_XEN_XENBUS)))
 
 ##
 ## Xen platform compilation settings
@@ -72,3 +72,11 @@ LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/console.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/shutdown.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/events.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/gnttab.c
+
+ifeq ($(CONFIG_XEN_XENBUS),y)
+LIBXENBUS_ASFLAGS-y            += $(LIBXENPLAT_ASFLAGS-y)
+LIBXENBUS_ASINCLUDES-y         += $(LIBXENPLAT_ASINCLUDES-y)
+LIBXENBUS_CFLAGS-y             += $(LIBXENPLAT_CFLAGS-y)
+LIBXENBUS_CINCLUDES-y          += $(LIBXENPLAT_CINCLUDES-y)
+LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/xenbus.c
+endif

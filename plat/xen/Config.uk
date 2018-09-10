@@ -20,4 +20,12 @@ if (PLAT_XEN)
 		instead of the hypervisor console. When this
 		option is enabled the hypervisor console is used
 		for kernel messages only.
+
+menuconfig XEN_XENBUS
+	bool "Xenbus Driver"
+	default n
+	depends on (ARCH_X86_64)
+	select LIBUKBUS
+	help
+		Register a Xenbus driver as uk_bus
 endif
