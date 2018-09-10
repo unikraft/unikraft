@@ -60,7 +60,7 @@
  */
 #ifndef PTR2ERR
 #define PTR2ERR(ptr)					\
-	((int) -((__sptr)(ptr)))
+	((int) ((__sptr)(ptr)))
 #endif
 
 /**
@@ -70,7 +70,7 @@
  */
 #ifndef ERR2PTR
 #define ERR2PTR(err)					\
-	((void *) -((__sptr)(err)))
+	((void *) ((__sptr)(err)))
 #endif
 
 #endif /* __UK_ERRPTR_H__ */
