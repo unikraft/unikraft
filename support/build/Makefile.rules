@@ -221,7 +221,7 @@ define build_cmd_fixdep =
 	$(call build_cmd,$1,$2,$3,$4)
 	$Q $(UK_FIXDEP) $(call tmp_depfile,$3) $3 '$(call strip,$4)' \
 		$(BUILD_DIR) 	> $(call out2dep,$3) && \
-		rm -f $(call tmp_depfile,$3)
+		$(RM) $(call tmp_depfile,$3)
 endef
 
 # Returns a list of files to be cleaned when build_cmd was used
