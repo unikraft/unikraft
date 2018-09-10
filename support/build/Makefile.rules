@@ -421,13 +421,19 @@ endef
 # buildrule $libname,$source,$target,$extraflags(optional)
 define buildrule =
 $(if $(filter %.lds.S,$(2)),$(call buildrule_lds,$(1),$(2),$(3),$(4)),\
-$(if $(filter %.S,  $(2)),$(call buildrule_S ,$(1),$(2),$(3),$(4)),\
-$(if $(filter %.s,  $(2)),$(call buildrule_s ,$(1),$(2),$(3),$(4)),\
-$(if $(filter %.c,  $(2)),$(call buildrule_c ,$(1),$(2),$(3),$(4)),\
-$(if $(filter %.cc, $(2)),$(call buildrule_cc,$(1),$(2),$(3),$(4)),\
-$(if $(filter %.cpp,$(2)),$(call buildrule_cc,$(1),$(2),$(3),$(4)),\
+$(if $(filter %.S,    $(2)),$(call buildrule_S  ,$(1),$(2),$(3),$(4)),\
+$(if $(filter %.sx,   $(2)),$(call buildrule_S  ,$(1),$(2),$(3),$(4)),\
+$(if $(filter %.s,    $(2)),$(call buildrule_s  ,$(1),$(2),$(3),$(4)),\
+$(if $(filter %.c,    $(2)),$(call buildrule_c  ,$(1),$(2),$(3),$(4)),\
+$(if $(filter %.cc,   $(2)),$(call buildrule_cc ,$(1),$(2),$(3),$(4)),\
+$(if $(filter %.cp,   $(2)),$(call buildrule_cc ,$(1),$(2),$(3),$(4)),\
+$(if $(filter %.cxx,  $(2)),$(call buildrule_cc ,$(1),$(2),$(3),$(4)),\
+$(if $(filter %.cpp,  $(2)),$(call buildrule_cc ,$(1),$(2),$(3),$(4)),\
+$(if $(filter %.CPP,  $(2)),$(call buildrule_cc ,$(1),$(2),$(3),$(4)),\
+$(if $(filter %.c++,  $(2)),$(call buildrule_cc ,$(1),$(2),$(3),$(4)),\
+$(if $(filter %.C,    $(2)),$(call buildrule_cc ,$(1),$(2),$(3),$(4)),\
 $(error $(3): missing build rule for source type $(suffix $(2))) \
-))))))
+))))))))))))
 endef
 
 
