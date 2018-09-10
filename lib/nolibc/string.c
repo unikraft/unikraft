@@ -57,6 +57,7 @@
  * ----------------------------------------------------------------------
  */
 
+#include <stdlib.h>
 #include <stdint.h>
 #include <string.h>
 #include <limits.h>
@@ -263,4 +264,25 @@ char *strtok(char *restrict s, const char *restrict sep)
 	else
 		p = 0;
 	return s;
+}
+
+char *strndup(const char *str, size_t len)
+{
+	char *__res;
+	int __len;
+
+	__len = strnlen(str, len);
+
+	__res = malloc(__len + 1);
+	if (__res) {
+		memcpy(__res, str, __len);
+		__res[__len] = '\0';
+	}
+
+	return __res;
+}
+
+char *strdup(const char *str)
+{
+	return strndup(str, SIZE_MAX);
 }

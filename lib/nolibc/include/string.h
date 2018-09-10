@@ -61,6 +61,8 @@ int strcmp(const char *str1, const char *str2);
 size_t strcspn(const char *s, const char *c);
 size_t strspn(const char *s, const char *c);
 char *strtok(char *restrict s, const char *restrict sep);
+char *strndup(const char *str, size_t len);
+char *strdup(const char *str);
 
 #ifdef __cplusplus
 }

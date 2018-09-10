@@ -62,6 +62,8 @@ strcmp
 strcspn
 strspn
 strtok
+strndup
+strdup
 
 # time
 nanosleep
