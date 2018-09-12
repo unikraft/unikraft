@@ -410,7 +410,7 @@ OBJCOPY		:= $(CONFIG_CROSS_COMPILE)objcopy
 OBJDUMP		:= $(CONFIG_CROSS_COMPILE)objdump
 AR		:= ar
 MV		:= mv -f
-RM		:= rm -rf
+RM		:= rm -f
 CP		:= cp -f
 MKDIR		:= mkdir
 CAT		:= cat
@@ -540,7 +540,7 @@ endif
 
 .PHONY: distclean properclean
 properclean:
-	$(call verbose_cmd,RM,build/,$(RM) \
+	$(call verbose_cmd,RM,build/,$(RM) -r \
 		$(BUILD_DIR))
 
 distclean: properclean
