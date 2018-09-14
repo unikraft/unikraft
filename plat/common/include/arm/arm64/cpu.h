@@ -104,3 +104,12 @@ static inline void ioreg_write64(volatile uint64_t *addr, uint64_t value)
 
 #define SYSREG_READ64(reg) SYSREG_READ(reg)
 #define SYSREG_WRITE64(reg, val) SYSREG_WRITE(reg, val)
+
+/*
+ * PSCI conduit method to call functions, based on the SMC Calling
+ * Convention.
+ */
+typedef int (*smcc_psci_callfn_t)(uint32_t, uint64_t, uint64_t, uint64_t);
+extern smcc_psci_callfn_t smcc_psci_call;
+int32_t smcc_psci_hvc_call(uint32_t, uint64_t, uint64_t, uint64_t);
+int32_t smcc_psci_smc_call(uint32_t, uint64_t, uint64_t, uint64_t);
