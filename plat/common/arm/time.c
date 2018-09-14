@@ -139,6 +139,21 @@ static int generic_timer_init(void)
 	return 0;
 }
 
+long sched_have_pending_events;
+
+void time_block_until(__snsec until)
+{
+	while ((__snsec) ukplat_monotonic_clock() < until) {
+		/*
+		 * TODO:
+		 * As we haven't support interrupt on Arm, so we just
+		 * use busy polling for now.
+		 */
+		if (ukarch_test_and_clr_bit(0, &sched_have_pending_events))
+		break;
+	}
+}
+
 /* return ns since time_init() */
 __nsec ukplat_monotonic_clock(void)
 {
