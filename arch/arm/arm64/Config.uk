@@ -46,3 +46,11 @@ config MARCH_ARM64_CORTEXA75
 		Compile for Armv8.2 Cortex-A75 (and compatible) CPUs
 
 endchoice
+
+config ARM64_ERRATUM_858921
+	bool "Workaround for Cortex-A73 erratum 858921"
+	default y
+	help
+	  This option enables a workaround for Cortex-A73 (r0p0 - r0p2),
+	  whose counter may return a wrong value when the counter crosses
+	  a 32-bit boundary. The newer Cortex-A73 are not affected.

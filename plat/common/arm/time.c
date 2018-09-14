@@ -63,10 +63,30 @@ static inline uint32_t get_counter_frequency(void)
 	return SYSREG_READ32(cntfrq_el0);
 }
 
+#ifdef CONFIG_ARM64_ERRATUM_858921
+/*
+ * The errata #858921 describes that Cortex-A73 (r0p0 - r0p2) counter
+ * read can return a wrong value when the counter crosses a 32bit boundary.
+ * But newer Cortex-A73 are not affected.
+ *
+ * The workaround involves performing the read twice, compare bit[32] of
+ * the two read values. If bit[32] is different, keep the first value,
+ * otherwise keep the second value.
+ */
+static uint64_t read_virtual_count(void)
+{
+    uint64_t val_1st, val_2nd;
+
+    val_1st = SYSREG_READ64(cntvct_el0);
+    val_2nd = SYSREG_READ64(cntvct_el0);
+    return (((val_1st ^ val_2nd) >> 32) & 1) ? val_1st : val_2nd;
+}
+#else
 static inline uint64_t read_virtual_count(void)
 {
 	return SYSREG_READ64(cntvct_el0);
 }
+#endif
 
 /*
  * monotonic_clock(): returns # of nanoseconds passed since
