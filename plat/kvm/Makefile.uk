@@ -79,7 +79,7 @@ LIBKVMPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/memory.c|common
 ##
 LIBKVMPCI_ASINCLUDES-$(CONFIG_ARCH_X86_64)  += -I$(UK_PLAT_COMMON_BASE)/include
 LIBKVMPCI_CINCLUDES-$(CONFIG_ARCH_X86_64)   += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMPCI_SRCS-y                     += $(UK_PLAT_COMMON_BASE)/pci_bus.c|common
+LIBKVMPCI_SRCS-$(CONFIG_ARCH_X86_64)        += $(UK_PLAT_COMMON_BASE)/pci_bus.c|common
 
 ##
 ## Virtio library definitions
