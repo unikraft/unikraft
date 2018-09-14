@@ -59,3 +59,18 @@ void reset(void)
 
 	smcc_psci_call(PSCI_FNID_SYSTEM_RESET, 0, 0, 0);
 }
+
+/* Systems support PSCI >= 0.2 can do system off from PSCI */
+void system_off(void)
+{
+	/*
+	 * NO PSCI or invalid PSCI method, we can't do shutdown, just
+	 * halt the CPU.
+	 */
+	if (!smcc_psci_call) {
+		uk_printd(DLVL_CRIT, "Couldn't shutdown system, HALT!\n");
+		__CPU_HALT();
+	}
+
+	smcc_psci_call(PSCI_FNID_SYSTEM_OFF, 0, 0, 0);
+}
