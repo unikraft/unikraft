@@ -2,3 +2,7 @@
 ifeq ($(CONFIG_UK_ARCH),arm)
 	include $(CONFIG_UK_BASE)/arch/arm/arm/Makefile.uk
 endif
+
+ifeq ($(CONFIG_UK_ARCH),arm64)
+	include $(CONFIG_UK_BASE)/arch/arm/arm64/Makefile.uk
+endif

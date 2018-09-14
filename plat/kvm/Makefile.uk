@@ -18,6 +18,10 @@ LIBKVMPLAT_ASINCLUDES-y        += -I$(UK_PLAT_COMMON_BASE)/include
 LIBKVMPLAT_CINCLUDES-y         += -I$(LIBKVMPLAT_BASE)/include
 LIBKVMPLAT_CINCLUDES-y         += -I$(UK_PLAT_COMMON_BASE)/include
 
+##
+## Architecture library definitions for x86_64
+##
+ifeq ($(CONFIG_ARCH_X86_64),y)
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/trace.c|common
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/traps.c|common
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/cpu_native.c|common
@@ -39,6 +43,16 @@ endif
 ifeq ($(findstring y,$(CONFIG_KVM_KERNEL_SERIAL_CONSOLE) $(CONFIG_KVM_DEBUG_SERIAL_CONSOLE)),y)
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/serial_console.c
 endif
+endif
+
+##
+## Architecture library definitions for arm64
+##
+ifeq ($(CONFIG_ARCH_ARM_64),y)
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/entry64.S
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/setup.c
+endif
+
 LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/shutdown.c
 LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/memory.c
 LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/irq.c

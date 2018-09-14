@@ -1,3 +1,7 @@
 ifeq ($(CONFIG_UK_ARCH),arm)
 	include $(CONFIG_UK_BASE)/arch/arm/arm/Compiler.uk
 endif
+
+ifeq ($(CONFIG_UK_ARCH),arm64)
+	include $(CONFIG_UK_BASE)/arch/arm/arm64/Compiler.uk
+endif
