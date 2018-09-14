@@ -49,6 +49,9 @@ endif
 ## Architecture library definitions for arm64
 ##
 ifeq ($(CONFIG_ARCH_ARM_64),y)
+ifeq ($(findstring y,$(CONFIG_KVM_KERNEL_SERIAL_CONSOLE) $(CONFIG_KVM_DEBUG_SERIAL_CONSOLE)),y)
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/pl011.c|common
+endif
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/entry64.S
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/setup.c
 endif
