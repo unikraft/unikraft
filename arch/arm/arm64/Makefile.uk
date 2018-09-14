@@ -1,6 +1,11 @@
-ASFLAGS  += -D__ARM_64__
-CFLAGS   += -D__ARM_64__ -fms-extensions
-CXXFLAGS += -D__ARM_64__ -fms-extensions
+# TODO:
+# Before we include the FP & SIMD registers in context switch,
+# we should not enable the FP & SIMD access for kernel. As GCC will
+# the FP & SIMD registers to pass parameters, we use -mgeneral-regs-only
+# flag to force GCC to use generic registers
+ASFLAGS  += -D__ARM_64__ -mgeneral-regs-only
+CFLAGS   += -D__ARM_64__ -fms-extensions -mgeneral-regs-only
+CXXFLAGS += -D__ARM_64__ -fms-extensions -mgeneral-regs-only
 
 # GCC support -mcpu=native for arm64 from 6.0
 ifeq ($(CONFIG_MARCH_ARM64_NATIVE),y)
