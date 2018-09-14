@@ -18,6 +18,7 @@
  * NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+#include <libfdt.h>
 #include <uk/plat/console.h>
 #include <uk/assert.h>
 #include <arm/cpu.h>
@@ -81,6 +82,62 @@ static uint64_t pl011_uart_bas = 0;
 #define PL011_REG(r)		((uint16_t *)(pl011_uart_bas + (r)))
 #define PL011_REG_READ(r)	ioreg_read16(PL011_REG(r))
 #define PL011_REG_WRITE(r, v)	ioreg_write16(PL011_REG(r), v)
+
+extern void *_libkvmplat_dtb;
+
+static void init_pl011(uint64_t bas)
+{
+	pl011_uart_bas = bas;
+
+	/* Mask all interrupts */
+	PL011_REG_WRITE(REG_UARTIMSC_OFFSET, \
+		PL011_REG_READ(REG_UARTIMSC_OFFSET) & 0xf800);
+
+	/* Clear all interrupts */
+	PL011_REG_WRITE(REG_UARTICR_OFFSET, 0x07ff);
+
+	/* Disable UART for configuration */
+	PL011_REG_WRITE(REG_UARTCR_OFFSET, 0);
+
+	/* Select 8-bits data transmit and receive */
+	PL011_REG_WRITE(REG_UARTLCR_H_OFFSET, \
+		(PL011_REG_READ(REG_UARTLCR_H_OFFSET) & 0xff00) | LCR_H_WLEN8);
+
+	/* Just enable UART and data transmit/receive */
+	PL011_REG_WRITE(REG_UARTCR_OFFSET, CR_TXE | CR_UARTEN);
+}
+
+void _libkvmplat_init_console(void)
+{
+	int offset, len, naddr, nsize;
+	const uint64_t *regs;
+	uint64_t reg_uart_bas;
+
+	uk_printd(DLVL_INFO, "Serial initializing\n");
+
+	offset = fdt_node_offset_by_compatible(_libkvmplat_dtb, \
+					-1, "arm,pl011");
+	if (offset < 0)
+		UK_CRASH("No console UART found!\n");
+
+	naddr = fdt_address_cells(_libkvmplat_dtb, offset);
+	if (naddr < 0 || naddr >= FDT_MAX_NCELLS)
+		UK_CRASH("Could not find proper address cells!\n");
+
+	nsize = fdt_size_cells(_libkvmplat_dtb, offset);
+	if (nsize < 0 || nsize >= FDT_MAX_NCELLS)
+		UK_CRASH("Could not find proper size cells!\n");
+
+	regs = fdt_getprop(_libkvmplat_dtb, offset, "reg", &len);
+	if (regs == NULL || (len < (int)sizeof(fdt32_t) * (naddr + nsize)))
+		UK_CRASH("Bad 'reg' property: %p %d\n", regs, len);
+
+	reg_uart_bas = fdt64_to_cpu(regs[0]);
+	uk_printd(DLVL_INFO, "Found PL011 UART on: 0x%lx\n", reg_uart_bas);
+
+	init_pl011(reg_uart_bas);
+	uk_printd(DLVL_INFO, "PL011 UART initialized\n");
+}
 
 int ukplat_coutd(const char *str, uint32_t len)
 {

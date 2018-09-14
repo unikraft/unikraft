@@ -19,6 +19,7 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 #include <libfdt.h>
+#include <kvm/console.h>
 #include <uk/assert.h>
 
 void *_libkvmplat_dtb;
@@ -37,5 +38,7 @@ static void _init_dtb(void *dtb_pointer)
 void _libkvmplat_start(void *dtb_pointer)
 {
 	_init_dtb(dtb_pointer);
+	_libkvmplat_init_console();
+
 	UK_BUG();
 }
