@@ -188,6 +188,66 @@ ENTRY(create_pagetables)
 	ret
 END(create_pagetables)
 
+ENTRY(start_mmu)
+	/*
+	 * Using dsb here to guarantee the create_pagetables has
+	 * been done.
+	 */
+	dsb sy
+
+	/* Load ttbr0, pagetable starts from _end */
+	ldr x27, =_end
+	msr ttbr0_el1, x27
+	isb
+
+	/* Clear the Monitor Debug System control register */
+	msr mdscr_el1, xzr
+
+	/* Invalidate the TLB to avoid stale one */
+	tlbi vmalle1
+	dsb nsh
+
+	ldr x2, =MAIR_INIT_ATTR
+	msr mair_el1, x2
+
+	/*
+	 * Setup TCR according to PARange bits from ID_AA64MMFR0_EL1.
+	 */
+	ldr x2, =TCR_INIT_FLAGS
+	mrs x3, id_aa64mmfr0_el1
+	bfi x2, x3, #32, #3
+	msr tcr_el1, x2
+
+	/* save lr */
+	mov x22, x30
+
+        /*
+	 * Invalidate the I/D cache to avoid using invalid data that existed
+	 * in I/D cache. Invalidate ranges: DTB, TEXT, DATA, BSS, PAGETABLE
+	 * and BOOTSTACK.
+	 */
+	ldr x0, =_dtb
+	ldr x1, =_end
+	add x1, x1, #PAGE_TABLE_SIZE
+	add x1, x1, #__STACK_SIZE
+	sub x1, x1, x0
+	bl invalidate_idcache_range
+
+	/* Setup SCTLR */
+	ldr x2, =SCTLR_SET_BITS
+	ldr x3, =SCTLR_CLEAR_BITS
+	mrs x1, sctlr_el1
+	bic x1, x1, x3	/* Clear the required bits */
+	orr x1, x1, x2	/* Set the required bits */
+	msr sctlr_el1, x1
+	isb
+
+	/* restore lr */
+	mov x30, x22
+
+	ret
+END(start_mmu)
+
 /*
  * Builds an L0 -> L1 table descriptor
  *

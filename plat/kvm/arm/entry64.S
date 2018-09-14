@@ -34,6 +34,7 @@
 #include <uk/arch/limits.h>
 #include <uk/asm.h>
 #include <kvm-arm/mm.h>
+#include <arm/cpu_defs.h>
 
 /*
  * The registers used by _libkvmplat_start:
@@ -63,9 +64,31 @@ ENTRY(_libkvmplat_entry)
 
 	mov sp, x27
 
-	/* Setup excetpion vector table address before enable MMU */
+	/*
+	 * Disable the MMU. We may have entered the kernel with it on and
+	 * will need to update the tables later. If this has been set up
+	 * with anything other than a VA == PA map then this will fail,
+	 * but in this case the code to find where we are running from
+	 * would have also failed.
+	 */
+	dsb sy
+	mrs x2, sctlr_el1
+	bic x2, x2, #SCTLR_M
+	msr sctlr_el1, x2
+	isb
+
+	/* Set the context id */
+	msr contextidr_el1, xzr
+
+	/* Create a pagetable to do PA == VA mapping */
+	bl create_pagetables
+
+	/* Setup exception vector table address before enable MMU */
 	ldr x29, =vector_table
 	msr VBAR_EL1, x29
+
+	/* Enable the mmu */
+	bl start_mmu
 
 	/* Load dtb address to x0 as a parameter */
 	ldr x0, =_dtb
