@@ -36,6 +36,7 @@
  */
 
 #include <time.h>
+#include <errno.h>
 #include <uk/config.h>
 #if CONFIG_HAVE_SCHED
 #include <uk/sched.h>
