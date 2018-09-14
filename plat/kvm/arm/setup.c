@@ -36,6 +36,9 @@ static char cmdline[MAX_CMDLINE_SIZE];
 
 smcc_psci_callfn_t smcc_psci_call;
 
+extern void _libkvmplat_newstack(uint64_t stack_start,
+			void (*tramp)(void *), void *arg);
+
 static void _init_dtb(void *dtb_pointer)
 {
 	int ret;
@@ -178,6 +181,11 @@ enocmdl:
 	strcpy(cmdline, CONFIG_UK_NAME);
 }
 
+static void _libkvmplat_entry2(void *arg __attribute__((unused)))
+{
+       ukplat_entry_argp(NULL, (char *)cmdline, strlen(cmdline));
+}
+
 void _libkvmplat_start(void *dtb_pointer)
 {
 	_init_dtb(dtb_pointer);
@@ -198,4 +206,13 @@ void _libkvmplat_start(void *dtb_pointer)
 	uk_printd(DLVL_INFO, "pagetable start: %p\n", _libkvmplat_pagetable);
 	uk_printd(DLVL_INFO, "     heap start: %p\n", _libkvmplat_heap_start);
 	uk_printd(DLVL_INFO, "      stack top: %p\n", _libkvmplat_stack_top);
+
+	/*
+	 * Switch away from the bootstrap stack as early as possible.
+	 */
+	uk_printd(DLVL_INFO, "Switch from bootstrap stack to stack @%p\n",
+				_libkvmplat_stack_top);
+
+	_libkvmplat_newstack((uint64_t) _libkvmplat_stack_top,
+				_libkvmplat_entry2, NULL);
 }
