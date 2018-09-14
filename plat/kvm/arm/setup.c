@@ -18,9 +18,24 @@
  * NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+#include <libfdt.h>
 #include <uk/assert.h>
+
+void *_libkvmplat_dtb;
+
+static void _init_dtb(void *dtb_pointer)
+{
+	int ret;
+
+	if ((ret = fdt_check_header(dtb_pointer)))
+		UK_CRASH("Invalid DTB: %s\n", fdt_strerror(ret));
+
+	_libkvmplat_dtb = dtb_pointer;
+	uk_printd(DLVL_INFO, "Found device tree on: %p\n", dtb_pointer);
+}
 
 void _libkvmplat_start(void *dtb_pointer)
 {
+	_init_dtb(dtb_pointer);
 	UK_BUG();
 }
