@@ -30,6 +30,18 @@
 #error Do not include this header directly
 #endif
 
+#ifdef __ASSEMBLY__
+/*
+ * Stack size to save general purpose registers and essential system
+ * registers. 8 * (30 + lr + elr_el1 + spsr_el1 + esr_el1) = 272.
+ * From exceptions come from EL0, we have to save sp_el0. So the
+ * TRAP_STACK_SIZE should be 272 + 8 = 280
+ *
+ * TODO: We'd better to calculate this size automatically later.
+ */
+#define __TRAP_STACK_SIZE 280
+#else
+/* Change this structure must update TRAP_STACK_SIZE at the same time */
 struct __regs {
 	/* Generic Purpose registers, from x0 ~ x29 */
 	unsigned long x[30];
@@ -87,3 +99,5 @@ struct __regs {
 #ifndef wmb
 #define wmb()   dsb(st) /* Full system memory barrier store */
 #endif
+
+#endif /* __ASSEMBLY__ */

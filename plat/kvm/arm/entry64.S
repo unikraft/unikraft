@@ -63,6 +63,10 @@ ENTRY(_libkvmplat_entry)
 
 	mov sp, x27
 
+	/* Setup excetpion vector table address before enable MMU */
+	ldr x29, =vector_table
+	msr VBAR_EL1, x29
+
 	/* Load dtb address to x0 as a parameter */
 	ldr x0, =_dtb
 	b _libkvmplat_start
