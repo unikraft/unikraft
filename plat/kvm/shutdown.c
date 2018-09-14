@@ -22,7 +22,8 @@
  */
 
 #include <errno.h>
-#include <x86/cpu.h>
+#include <cpu.h>
+#include <irq.h>
 #include <uk/print.h>
 #include <uk/plat/bootstrap.h>
 
@@ -31,14 +32,10 @@ static void cpu_halt(void) __noreturn;
 /* TODO: implement CPU reset */
 void ukplat_terminate(enum ukplat_gstate request __unused)
 {
-	/*
-	 * Poke the QEMU "isa-debug-exit" device to "shutdown". Should be
-	 * harmless if it is not present. This is used to enable automated
-	 * tests on virtio.  Note that the actual QEMU exit() status will
-	 * be 83 ('S', 41 << 1 | 1).
-	 */
 	uk_printk("Unikraft halted\n");
-	outw(0x501, 41);
+
+	/* Try to make system off */
+	system_off();
 
 	/*
 	 * If we got here, there is no way to initiate "shutdown" on virtio
@@ -49,9 +46,7 @@ void ukplat_terminate(enum ukplat_gstate request __unused)
 
 static void cpu_halt(void)
 {
-	__asm__ __volatile__("cli; hlt");
-	for (;;)
-		;
+	__CPU_HALT();
 }
 
 int ukplat_suspend(void)
