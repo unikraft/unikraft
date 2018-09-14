@@ -113,3 +113,6 @@ typedef int (*smcc_psci_callfn_t)(uint32_t, uint64_t, uint64_t, uint64_t);
 extern smcc_psci_callfn_t smcc_psci_call;
 int32_t smcc_psci_hvc_call(uint32_t, uint64_t, uint64_t, uint64_t);
 int32_t smcc_psci_smc_call(uint32_t, uint64_t, uint64_t, uint64_t);
+
+/* CPU native APIs */
+void halt(void);

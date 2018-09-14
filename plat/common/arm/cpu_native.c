@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
+ * Authors: Wei Chen <wei.chen@arm.com>
  *
- * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2018, Arm Ltd., All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,24 +31,15 @@
  *
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
+#include <cpu.h>
+#include <uk/assert.h>
+#include <arm/cpu_defs.h>
 
-#ifndef __PLAT_CMN_CPU_H__
-#define __PLAT_CMN_CPU_H__
-
-#include <uk/arch/lcpu.h>
-#if defined(__X86_64__)
-#include <x86/cpu.h>
-#elif defined(__ARM_64__)
-#include <arm/cpu.h>
-#else
-#error "Add cpu.h for current architecture."
-#endif
-
-#define __CPU_HALT()		\
-({				\
-	local_irq_disable();	\
-		for (;;)	\
-			halt();	\
-})
-
-#endif /* __PLAT_CMN_CPU_H__ */
+/*
+ * Halts the CPU until the next external interrupt is fired. For Arm,
+ * we can use WFI to implement this feature.
+ */
+void halt(void)
+{
+	__asm__ __volatile__("wfi");
+}
