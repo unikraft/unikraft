@@ -22,6 +22,7 @@
 #include <kvm/console.h>
 #include <uk/assert.h>
 #include <kvm-arm/mm.h>
+#include <arm/cpu.h>
 #include <uk/arch/limits.h>
 
 void *_libkvmplat_pagetable;
@@ -33,6 +34,8 @@ void *_libkvmplat_dtb;
 #define MAX_CMDLINE_SIZE 1024
 static char cmdline[MAX_CMDLINE_SIZE];
 
+smcc_psci_callfn_t smcc_psci_call;
+
 static void _init_dtb(void *dtb_pointer)
 {
 	int ret;
@@ -42,6 +45,49 @@ static void _init_dtb(void *dtb_pointer)
 
 	_libkvmplat_dtb = dtb_pointer;
 	uk_printd(DLVL_INFO, "Found device tree on: %p\n", dtb_pointer);
+}
+
+static void _dtb_get_psci_method(void)
+{
+	int fdtpsci, len;
+	const char *fdtmethod;
+
+	/*
+	 * We just support PSCI-0.2 and PSCI-1.0, the PSCI-0.1 would not
+	 * be supported.
+	 */
+	fdtpsci = fdt_node_offset_by_compatible(_libkvmplat_dtb,
+						-1, "arm,psci-1.0");
+	if (fdtpsci < 0)
+		fdtpsci = fdt_node_offset_by_compatible(_libkvmplat_dtb,
+							-1, "arm,psci-0.2");
+	if (fdtpsci < 0) {
+		uk_printd(DLVL_INFO, "No PSCI conduit found in DTB\n");
+		goto enomethod;
+	}
+
+	fdtmethod = fdt_getprop(_libkvmplat_dtb, fdtpsci, "method", &len);
+	if (!fdtmethod || (len <= 0)) {
+		uk_printd(DLVL_INFO, "No PSCI method found\n");
+		goto enomethod;
+	}
+
+	if (!strcmp(fdtmethod, "hvc"))
+		smcc_psci_call = smcc_psci_hvc_call;
+	else if (!strcmp(fdtmethod, "smc"))
+		smcc_psci_call = smcc_psci_smc_call;
+	else {
+		uk_printd(DLVL_INFO,
+		"Invalid PSCI conduit method: %s\n", fdtmethod);
+		goto enomethod;
+	}
+
+	uk_printd(DLVL_INFO, "PSCI method: %s\n", fdtmethod);
+	return;
+
+enomethod:
+	uk_printd(DLVL_INFO, "Support PSCI from PSCI-0.2\n");
+	smcc_psci_call = NULL;
 }
 
 static void _init_dtb_mem(void)
@@ -142,6 +188,9 @@ void _libkvmplat_start(void *dtb_pointer)
 	/* Get command line from DTB */
 
 	_dtb_get_cmdline(cmdline, sizeof(cmdline));
+
+	/* Get PSCI method from DTB */
+	_dtb_get_psci_method();
 
 	/* Initialize memory from DTB */
 	_init_dtb_mem();
