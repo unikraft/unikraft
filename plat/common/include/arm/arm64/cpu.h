@@ -90,3 +90,17 @@ static inline void ioreg_write64(volatile uint64_t *addr, uint64_t value)
 #define SYSREG_WRITE(reg, val) \
 	__asm__ __volatile__("msr " __STRINGIFY(reg) ", %0" \
 			: : "r" ((uint64_t)(val)))
+
+#define SYSREG_READ32(reg) \
+({	uint32_t val; \
+	__asm__ __volatile__("mrs %0, " __STRINGIFY(reg) \
+			: "=&r" (val)); \
+	val; \
+})
+
+#define SYSREG_WRITE32(reg, val) \
+	__asm__ __volatile__("msr " __STRINGIFY(reg) ", %0" \
+			: : "r" ((uint32_t)(val)))
+
+#define SYSREG_READ64(reg) SYSREG_READ(reg)
+#define SYSREG_WRITE64(reg, val) SYSREG_WRITE(reg, val)
