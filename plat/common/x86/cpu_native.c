@@ -47,3 +47,14 @@ unsigned long read_cr2(void)
 
 	return cr2;
 }
+
+void system_off(void)
+{
+	/*
+	 * Poke the QEMU "isa-debug-exit" device to "shutdown". Should be
+	 * harmless if it is not present. This is used to enable automated
+	 * tests on virtio.  Note that the actual QEMU exit() status will
+	 * be 83 ('S', 41 << 1 | 1).
+	 */
+	outw(0x501, 41);
+}

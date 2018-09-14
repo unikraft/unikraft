@@ -31,6 +31,7 @@
 
 
 void halt(void);
+void system_off(void);
 
 static inline void cpuid(__u32 leaf, __u32 *eax, __u32 *ebx,
 		__u32 *ecx, __u32 *edx)
