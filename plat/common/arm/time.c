@@ -32,6 +32,7 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 #include <stdlib.h>
+#include <libfdt.h>
 #include <uk/assert.h>
 #include <uk/plat/time.h>
 #include <uk/plat/irq.h>
@@ -40,6 +41,7 @@
 
 static uint64_t boot_ticks;
 static uint32_t counter_freq;
+extern void *_libkvmplat_dtb;
 
 /*
  * Shift factor for counter scaling multiplier; referred to as S in the
@@ -58,8 +60,40 @@ static inline uint64_t ticks_to_ns(uint64_t ticks)
 	return (ns_per_tick * ticks) >> counter_shift;
 }
 
-static inline uint32_t get_counter_frequency(void)
+/*
+ * On a few platforms the frequency is not configured correctly
+ * by the firmware. A property in the DT (clock-frequency) has
+ * been introduced to workaround those firmware. So, we will try
+ * to get clock-frequency from DT first, if failed we will read
+ * the register directly.
+ */
+static uint32_t get_counter_frequency(void)
 {
+	int fdt_archtimer, len;
+	const uint64_t *fdt_freq;
+
+	/* Try to find arm,armv8-timer first */
+	fdt_archtimer = fdt_node_offset_by_compatible(_libkvmplat_dtb,
+						-1, "arm,armv8-timer");
+	/* If failed, try to find arm,armv7-timer */
+	if (fdt_archtimer < 0)
+		fdt_archtimer = fdt_node_offset_by_compatible(_libkvmplat_dtb,
+							-1, "arm,armv7-timer");
+	/* DT doesn't provide arch timer information */
+	if (fdt_archtimer < 0)
+		goto endnofreq;
+
+	fdt_freq = fdt_getprop(_libkvmplat_dtb,
+			fdt_archtimer, "clock-frequency", &len);
+	if (!fdt_freq || (len <= 0)) {
+		uk_printd(DLVL_INFO,
+		"No clock-frequency found, reading from register directly.\n");
+		goto endnofreq;
+	}
+
+	return fdt32_to_cpu(fdt_freq[0]);
+
+endnofreq:
 	return SYSREG_READ32(cntfrq_el0);
 }
 
