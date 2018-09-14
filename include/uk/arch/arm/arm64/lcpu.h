@@ -100,4 +100,13 @@ struct __regs {
 #define wmb()   dsb(st) /* Full system memory barrier store */
 #endif
 
+static inline unsigned long ukarch_read_sp(void)
+{
+	unsigned long sp;
+
+	__asm__ __volatile("mov %0, sp": "=&r"(sp));
+
+	return sp;
+}
+
 #endif /* __ASSEMBLY__ */
