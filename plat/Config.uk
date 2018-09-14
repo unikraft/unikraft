@@ -9,4 +9,11 @@ config UKPLAT_MEMRNAME
 	help
 		Enable name field in memory region descriptors
 
+config EARLY_PRINT_PL011_UART_ADDR
+	hex "Early debug console pl011 serial address"
+	default 0x09000000
+	depends on (KVM_DEBUG_SERIAL_CONSOLE && ARCH_ARM_64)
+	help
+		Pl011 serial address used by early debug console.
+
 endmenu
