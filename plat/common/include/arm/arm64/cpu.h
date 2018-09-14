@@ -116,3 +116,4 @@ int32_t smcc_psci_smc_call(uint32_t, uint64_t, uint64_t, uint64_t);
 
 /* CPU native APIs */
 void halt(void);
+void reset(void);

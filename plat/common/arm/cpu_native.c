@@ -32,6 +32,7 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 #include <cpu.h>
+#include <irq.h>
 #include <uk/assert.h>
 #include <arm/cpu_defs.h>
 
@@ -42,4 +43,19 @@
 void halt(void)
 {
 	__asm__ __volatile__("wfi");
+}
+
+/* Systems support PSCI >= 0.2 can do system reset from PSCI */
+void reset(void)
+{
+	/*
+	 * NO PSCI or invalid PSCI method, we can't do reset, just
+	 * halt the CPU.
+	 */
+	if (!smcc_psci_call) {
+		uk_printd(DLVL_CRIT, "Couldn't reset system, HALT!\n");
+		__CPU_HALT();
+	}
+
+	smcc_psci_call(PSCI_FNID_SYSTEM_RESET, 0, 0, 0);
 }
