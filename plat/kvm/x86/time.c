@@ -1,8 +1,16 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ * Authors: Dan Williams
+ *          Martin Lucina
+ *          Ricardo Koller
+ *          Costin Lupu <costin.lupu@cs.pub.ro>
+ *          Simon Kuenzer <simon.kuenzer@neclab.eu>
+ *          Wei Chen <wei.chen@arm.com>
  *
- * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2015-2017 IBM
+ * Copyright (c) 2016-2017 Docker, Inc.
+ * Copyright (c) 2017-2018, NEC Europe Ltd., NEC Corporation
+ * Copyright (c) 2018, Arm Ltd. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,11 +40,42 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
+#include <stdlib.h>
 #include <uk/plat/time.h>
+#include <uk/plat/irq.h>
+#include <kvm/tscclock.h>
+#include <uk/assert.h>
 
+/* return ns since time_init() */
+__nsec ukplat_monotonic_clock(void)
+{
+	return tscclock_monotonic();
+}
+
+/* return wall time in nsecs */
+__nsec ukplat_clock_wall(void)
+{
+	return tscclock_monotonic() + tscclock_epochoffset();
+}
+
+static int timer_handler(void *arg __unused)
+{
+	/* Yes, we handled the irq. */
+	return 1;
+}
+
+/* must be called before interrupts are enabled */
 void ukplat_time_init(void)
 {
-	/* TODO */
+	int rc;
+
+	rc = ukplat_irq_register(0, timer_handler, NULL);
+	if (rc < 0)
+		UK_CRASH("Failed to register timer interrupt handler\n");
+
+	rc = tscclock_init();
+	if (rc < 0)
+		UK_CRASH("Failed to initialize TSCCLOCK\n");
 }
 
 void ukplat_time_fini(void)
