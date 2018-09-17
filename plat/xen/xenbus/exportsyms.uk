@@ -1,0 +1,21 @@
+# Xenstore API
+xs_read
+xs_write
+xs_ls
+xs_rm
+xs_char_to_perm
+xs_perm_to_char
+xs_str_to_perm
+xs_perm_to_str
+xs_get_acl
+xs_set_acl
+xs_get_perm
+xs_set_perm
+xs_del_perm
+xs_transaction_start
+xs_transaction_end
+xs_debug_msg
+xs_read_integer
+xs_scanf
+xs_printf
+xs_get_self_id

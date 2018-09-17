@@ -74,10 +74,12 @@ LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/events.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/gnttab.c
 
 ifeq ($(CONFIG_XEN_XENBUS),y)
+LIBXENBUS_EXPORTS               = $(LIBXENPLAT_BASE)/xenbus/exportsyms.uk
 LIBXENBUS_ASFLAGS-y            += $(LIBXENPLAT_ASFLAGS-y)
 LIBXENBUS_ASINCLUDES-y         += $(LIBXENPLAT_ASINCLUDES-y)
 LIBXENBUS_CFLAGS-y             += $(LIBXENPLAT_CFLAGS-y)
 LIBXENBUS_CINCLUDES-y          += $(LIBXENPLAT_CINCLUDES-y)
 LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/xenbus.c
 LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/xs_comms.c
+LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/xs.c
 endif
