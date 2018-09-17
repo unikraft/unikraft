@@ -32,97 +32,33 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <inttypes.h>
-#include <string.h>
-#include <uk/essentials.h>
-#include <uk/list.h>
-#include <uk/bus.h>
-#include <uk/print.h>
-#include <uk/errptr.h>
-#include <uk/assert.h>
+#ifndef __XS_COMMS_H__
+#define __XS_COMMS_H__
+
+#include <xen/io/xs_wire.h>
 #include <xenbus/xenbus.h>
-#include "xs_comms.h"
 
-static struct xenbus_handler xbh;
+int  xs_comms_init(void);
+void xs_comms_fini(void);
 
-
-/* Helper functions for Xenbus related allocations */
-void *uk_xb_malloc(size_t size)
-{
-	UK_ASSERT(xbh.a != NULL);
-	return uk_malloc(xbh.a, size);
-}
-
-void *uk_xb_calloc(size_t nmemb, size_t size)
-{
-	UK_ASSERT(xbh.a != NULL);
-	return uk_calloc(xbh.a, nmemb, size);
-}
-
-void uk_xb_free(void *ptr)
-{
-	UK_ASSERT(xbh.a != NULL);
-	uk_free(xbh.a, ptr);
-}
-
-static int xenbus_probe(void)
-{
-	int err = 0;
-
-	uk_printd(DLVL_INFO, "Probe Xenbus\n");
-
-	/* TODO */
-
-	return err;
-}
-
-static int xenbus_init(struct uk_alloc *a)
-{
-	struct xenbus_driver *drv, *drv_next;
-	int ret = 0;
-
-	UK_ASSERT(a != NULL);
-
-	xbh.a = a;
-
-	ret = xs_comms_init();
-	if (ret) {
-		uk_printd(DLVL_ERR,
-			"Error initializing Xenstore communication.");
-		return ret;
-	}
-
-	UK_TAILQ_FOREACH_SAFE(drv, &xbh.drv_list, next, drv_next) {
-		if (drv->init) {
-			ret = drv->init(a);
-			if (ret == 0)
-				continue;
-			uk_printd(DLVL_ERR,
-				"Failed to initialize driver %p: %d\n",
-				drv, ret);
-			UK_TAILQ_REMOVE(&xbh.drv_list, drv, next);
-		}
-	}
-
-	return 0;
-}
-
-void _xenbus_register_driver(struct xenbus_driver *drv)
-{
-	UK_ASSERT(drv != NULL);
-	UK_TAILQ_INSERT_TAIL(&xbh.drv_list, drv, next);
-}
-
-/*
- * Register this bus driver to libukbus:
- */
-static struct xenbus_handler xbh = {
-	.b.init  = xenbus_init,
-	.b.probe = xenbus_probe,
-	.drv_list = UK_TAILQ_HEAD_INITIALIZER(xbh.drv_list),
-	.dev_list = UK_TAILQ_HEAD_INITIALIZER(xbh.dev_list),
+struct xs_iovec {
+	void *data;
+	unsigned int len;
 };
 
-UK_BUS_REGISTER(&xbh.b);
+/*
+ * Sends a message to Xenstore and blocks waiting for a reply.
+ * The reply is malloc'ed and should be freed by the caller.
+ *
+ * @param msg_type Xenstore message type
+ * @param xbt Xenbus transaction id
+ * @param req_iovecs Array of request strings buffers
+ * @param req_iovecs_num Request strings buffers number
+ * @param rep_iovec Incoming reply string buffer (optional)
+ * @return 0 on success, a negative errno value on error.
+ */
+int xs_msg_reply(enum xsd_sockmsg_type msg_type, xenbus_transaction_t xbt,
+	const struct xs_iovec *req_iovecs, int req_iovecs_num,
+	struct xs_iovec *rep_iovec);
+
+#endif /* __XS_COMMS_H__ */
