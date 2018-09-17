@@ -110,7 +110,22 @@ UK_TAILQ_HEAD(xenbus_watch_list, struct xenbus_watch);
  */
 
 struct xenbus_device {
-
+	/**< in use by Xenbus handler */
+	UK_TAILQ_ENTRY(struct xenbus_device) next;
+	/**< Device state */
+	XenbusState state;
+	/**< Device type */
+	enum xenbus_dev_type devtype;
+	/**< Xenstore path of the device */
+	char *nodename;
+	/**< Xenstore path of the device peer (e.g. backend for frontend) */
+	char *otherend;
+	/**< Domain id of the other end */
+	domid_t otherend_id;
+	/**< Watch for monitoring changes on other end */
+	struct xenbus_watch *otherend_watch;
+	/**< Xenbus driver */
+	struct xenbus_driver *drv;
 };
 UK_TAILQ_HEAD(xenbus_device_list, struct xenbus_device);
 

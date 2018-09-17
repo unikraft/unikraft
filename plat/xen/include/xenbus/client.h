@@ -86,4 +86,16 @@ int xenbus_watch_wait_event(struct xenbus_watch *watch);
  */
 int xenbus_watch_notify_event(struct xenbus_watch *watch);
 
+/*
+ * Driver states
+ */
+
+/*
+ * Returns the driver state found at the given Xenstore path.
+ *
+ * @param path Xenstore path
+ * @return The Xenbus driver state
+ */
+XenbusState xenbus_read_driver_state(const char *path);
+
 #endif /* __XENBUS_CLIENT_H__ */

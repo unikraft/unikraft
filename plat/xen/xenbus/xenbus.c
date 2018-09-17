@@ -43,7 +43,11 @@
 #include <uk/errptr.h>
 #include <uk/assert.h>
 #include <xenbus/xenbus.h>
+#include <xenbus/xs.h>
+#include <xenbus/client.h>
 #include "xs_comms.h"
+
+#define XS_DEV_PATH "device"
 
 static struct xenbus_handler xbh;
 
@@ -67,13 +71,138 @@ void uk_xb_free(void *ptr)
 	uk_free(xbh.a, ptr);
 }
 
+
+static struct xenbus_driver *xenbus_find_driver(xenbus_dev_type_t devtype)
+{
+	struct xenbus_driver *drv;
+	const xenbus_dev_type_t *pdevtype;
+
+	UK_TAILQ_FOREACH(drv, &xbh.drv_list, next) {
+		for (pdevtype = drv->device_types;
+				*pdevtype != xenbus_dev_none; pdevtype++) {
+			if (*pdevtype == devtype)
+				return drv;
+		}
+	}
+
+	return NULL; /* no driver found */
+}
+
+static int xenbus_probe_device(struct xenbus_driver *drv,
+		xenbus_dev_type_t type, const char *name)
+{
+	int err;
+	struct xenbus_device *dev;
+	char *nodename = NULL;
+	XenbusState state;
+
+	/* device/type/name */
+	err = asprintf(&nodename, "%s/%s/%s",
+		XS_DEV_PATH, xenbus_devtype_to_str(type), name);
+	if (err < 0)
+		goto out;
+
+	state = xenbus_read_driver_state(nodename);
+	if (state != XenbusStateInitialising)
+		return 0;
+
+	uk_printd(DLVL_INFO, "Xenbus device: %s\n", nodename);
+
+	dev = uk_xb_calloc(1, sizeof(*dev) + strlen(nodename) + 1);
+	if (!dev) {
+		uk_printd(DLVL_ERR, "Failed to initialize: Out of memory!\n");
+		err = -ENOMEM;
+		goto out;
+	}
+
+	dev->state = XenbusStateInitialising;
+	dev->devtype = type;
+	dev->nodename = (char *) (dev + 1);
+	strcpy(dev->nodename, nodename);
+
+	err = drv->add_dev(dev);
+	if (err) {
+		uk_printd(DLVL_ERR, "Failed to add device.\n");
+		uk_xb_free(dev);
+	}
+
+out:
+	if (nodename)
+		free(nodename);
+
+	return err;
+}
+
+static int xenbus_probe_device_type(const char *devtype_str)
+{
+	struct xenbus_driver *drv;
+	xenbus_dev_type_t devtype;
+	char dirname[sizeof(XS_DEV_PATH) + strlen(devtype_str)];
+	char **devices = NULL;
+	int err = 0;
+
+	devtype = xenbus_str_to_devtype(devtype_str);
+	if (!devtype) {
+		uk_printd(DLVL_WARN,
+			"Unsupported device type: %s\n", devtype_str);
+		goto out;
+	}
+
+	drv = xenbus_find_driver(devtype);
+	if (!drv) {
+		uk_printd(DLVL_WARN,
+			"No driver for device type: %s\n", devtype_str);
+		goto out;
+	}
+
+	sprintf(dirname, "%s/%s", XS_DEV_PATH, devtype_str);
+
+	/* Get device list */
+	devices = xs_ls(XBT_NIL, dirname);
+	if (PTRISERR(devices)) {
+		err = PTR2ERR(devices);
+		uk_printd(DLVL_ERR,
+			"Error reading %s devices: %d\n", devtype_str, err);
+		goto out;
+	}
+
+	for (int i = 0; devices[i] != NULL; i++) {
+		/* Probe only if no prior error */
+		if (err == 0)
+			err = xenbus_probe_device(drv, devtype, devices[i]);
+	}
+
+out:
+	if (!PTRISERR(devices))
+		free(devices);
+
+	return err;
+}
+
 static int xenbus_probe(void)
 {
+	char **devtypes;
 	int err = 0;
 
 	uk_printd(DLVL_INFO, "Probe Xenbus\n");
 
-	/* TODO */
+	/* Get device types list */
+	devtypes = xs_ls(XBT_NIL, XS_DEV_PATH);
+	if (PTRISERR(devtypes)) {
+		err = PTR2ERR(devtypes);
+		uk_printd(DLVL_ERR, "Error reading device types: %d\n", err);
+		goto out;
+	}
+
+	for (int i = 0; devtypes[i] != NULL; i++) {
+		/* Probe only if no previous error */
+		if (err == 0)
+			err = xenbus_probe_device_type(devtypes[i]);
+	}
+
+out:
+	if (!PTRISERR(devtypes))
+		free(devtypes);
 
 	return err;
 }

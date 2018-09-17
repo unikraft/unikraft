@@ -44,6 +44,7 @@
 #include <string.h>
 #include <uk/errptr.h>
 #include <uk/wait.h>
+#include <xenbus/xs.h>
 #include <xenbus/client.h>
 
 
@@ -129,4 +130,15 @@ int xenbus_watch_notify_event(struct xenbus_watch *watch)
 	ukarch_spin_unlock(&watch->lock);
 
 	return 0;
+}
+
+XenbusState xenbus_read_driver_state(const char *path)
+{
+	char state_path[strlen(path) + sizeof("/state")];
+	XenbusState state = XenbusStateUnknown;
+
+	sprintf(state_path, "%s/state", path);
+	xs_read_integer(XBT_NIL, state_path, (int *) &state);
+
+	return state;
 }
