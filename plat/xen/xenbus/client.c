@@ -90,3 +90,43 @@ enum xenbus_dev_type xenbus_str_to_devtype(const char *devtypestr)
 
 	return xenbus_dev_none;
 }
+
+/*
+ * Watches
+ */
+
+int xenbus_watch_wait_event(struct xenbus_watch *watch)
+{
+	if (watch == NULL)
+		return -EINVAL;
+
+	while (1) {
+		ukarch_spin_lock(&watch->lock);
+
+		if (watch->pending_events > 0)
+			break;
+
+		ukarch_spin_unlock(&watch->lock);
+
+		uk_waitq_wait_event(&watch->wq,
+			(watch->pending_events > 0));
+	}
+
+	watch->pending_events--;
+	ukarch_spin_unlock(&watch->lock);
+
+	return 0;
+}
+
+int xenbus_watch_notify_event(struct xenbus_watch *watch)
+{
+	if (watch == NULL)
+		return -EINVAL;
+
+	ukarch_spin_lock(&watch->lock);
+	watch->pending_events++;
+	uk_waitq_wake_up(&watch->wq);
+	ukarch_spin_unlock(&watch->lock);
+
+	return 0;
+}

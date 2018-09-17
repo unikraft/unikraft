@@ -88,6 +88,22 @@ void _xenbus_register_driver(struct xenbus_driver *drv);
 typedef unsigned long xenbus_transaction_t;
 #define XBT_NIL ((xenbus_transaction_t) 0)
 
+/*
+ * Xenbus watch
+ */
+
+struct xenbus_watch {
+	/**< in use internally */
+	UK_TAILQ_ENTRY(struct xenbus_watch) watch_list;
+	/**< Lock */
+	spinlock_t lock;
+	/**< Number of pending events */
+	int pending_events;
+	/**< Watch waiting queue */
+	struct uk_waitq wq;
+};
+UK_TAILQ_HEAD(xenbus_watch_list, struct xenbus_watch);
+
 
 /*
  * Xenbus device

@@ -24,4 +24,4 @@ xs_get_self_id
 xenbus_state_to_str
 xenbus_devtype_to_str
 xenbus_str_to_devtype
-
+xenbus_watch_wait_event

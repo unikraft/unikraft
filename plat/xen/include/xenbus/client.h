@@ -65,4 +65,25 @@ const char *xenbus_devtype_to_str(enum xenbus_dev_type devtype);
  */
 enum xenbus_dev_type xenbus_str_to_devtype(const char *devtypestr);
 
+
+/*
+ * Watches
+ */
+
+/*
+ * Waits for a watch event. Called by a client driver.
+ *
+ * @param watch Xenbus watch
+ * @return 0 on success, a negative errno value on error.
+ */
+int xenbus_watch_wait_event(struct xenbus_watch *watch);
+
+/*
+ * Notifies a client driver waiting for watch events.
+ *
+ * @param watch Xenbus watch
+ * @return 0 on success, a negative errno value on error.
+ */
+int xenbus_watch_notify_event(struct xenbus_watch *watch);
+
 #endif /* __XENBUS_CLIENT_H__ */
