@@ -19,3 +19,9 @@ xs_read_integer
 xs_scanf
 xs_printf
 xs_get_self_id
+
+# Client API
+xenbus_state_to_str
+xenbus_devtype_to_str
+xenbus_str_to_devtype
+
