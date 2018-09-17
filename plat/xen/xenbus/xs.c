@@ -47,6 +47,7 @@
 #include <uk/errptr.h>
 #include <xen/io/xs_wire.h>
 #include <xenbus/xs.h>
+#include "xs_watch.h"
 #include "xs_comms.h"
 
 
@@ -514,6 +515,68 @@ int xs_del_perm(xenbus_transaction_t xbt, const char *path,
 
 out_acl:
 	free(acl);
+out:
+	return err;
+}
+
+/*
+ * Watches
+ */
+
+struct xenbus_watch *xs_watch_path(xenbus_transaction_t xbt, const char *path)
+{
+	struct xs_watch *xsw;
+	struct xs_iovec req[2];
+	int err;
+
+	if (path == NULL)
+		return ERR2PTR(-EINVAL);
+
+	xsw = xs_watch_create(path);
+	if (PTRISERR(xsw))
+		return (struct xenbus_watch *) xsw;
+
+	req[0] = XS_IOVEC_STR_NULL(xsw->xs.path);
+	req[1] = XS_IOVEC_STR_NULL(xsw->xs.token);
+
+	err = xs_msg(XS_WATCH, xbt, req, ARRAY_SIZE(req));
+	if (err) {
+		xs_watch_destroy(xsw);
+		return ERR2PTR(err);
+	}
+
+	return &xsw->base;
+}
+
+int xs_unwatch(xenbus_transaction_t xbt, struct xenbus_watch *watch)
+{
+	struct xs_watch *xsw, *_xsw;
+	struct xs_iovec req[2];
+	int err;
+
+	if (watch == NULL) {
+		err = -EINVAL;
+		goto out;
+	}
+
+	xsw = __containerof(watch, struct xs_watch, base);
+
+	_xsw = xs_watch_find(xsw->xs.path, xsw->xs.token);
+	if (_xsw != xsw) {
+		/* this watch was not registered */
+		err = -ENOENT;
+		goto out;
+	}
+
+	req[0] = XS_IOVEC_STR_NULL(xsw->xs.path);
+	req[1] = XS_IOVEC_STR_NULL(xsw->xs.token);
+
+	err = xs_msg(XS_UNWATCH, xbt, req, ARRAY_SIZE(req));
+	if (err)
+		goto out;
+
+	err = xs_watch_destroy(xsw);
+
 out:
 	return err;
 }

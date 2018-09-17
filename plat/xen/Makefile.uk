@@ -82,5 +82,6 @@ LIBXENBUS_CINCLUDES-y          += $(LIBXENPLAT_CINCLUDES-y)
 LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/xenbus.c
 LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/client.c
 LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/xs_comms.c
+LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/xs_watch.c
 LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/xs.c
 endif

@@ -209,6 +209,25 @@ int xs_del_perm(xenbus_transaction_t xbt, const char *path,
 	domid_t domid);
 
 /*
+ * Creates and registers a Xenbus watch
+ *
+ * @param xbt Xenbus transaction id
+ * @param path Xenstore path
+ * @return On success, returns a malloc'd Xenbus watch. On error, returns
+ * a negative error number which should be checked using PTRISERR.
+ */
+struct xenbus_watch *xs_watch_path(xenbus_transaction_t xbt, const char *path);
+
+/*
+ * Unregisters and destroys a Xenbus watch
+ *
+ * @param xbt Xenbus transaction id
+ * @param watch Xenbus watch
+ * @return 0 on success, a negative errno value on error.
+ */
+int xs_unwatch(xenbus_transaction_t xbt, struct xenbus_watch *watch);
+
+/*
  * Start a xenbus transaction. Returns the transaction in xbt on
  * success or an error number otherwise.
  *

@@ -12,6 +12,8 @@ xs_set_acl
 xs_get_perm
 xs_set_perm
 xs_del_perm
+xs_watch_path
+xs_unwatch
 xs_transaction_start
 xs_transaction_end
 xs_debug_msg

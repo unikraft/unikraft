@@ -48,7 +48,9 @@
 #include <common/events.h>
 #include <xen-x86/mm.h>
 #include <xen-x86/setup.h>
+#include <xenbus/client.h>
 #include "xs_comms.h"
+#include "xs_watch.h"
 
 
 /*
@@ -459,7 +461,19 @@ static void process_reply(struct xsd_sockmsg *hdr, char *payload)
 /* Process an incoming xs watch event */
 static void process_watch_event(char *watch_msg)
 {
-	/* TODO */
+	struct xs_watch *watch;
+	char *path, *token;
+
+	path  = watch_msg;
+	token = watch_msg + strlen(path) + 1;
+
+	watch = xs_watch_find(path, token);
+	free(watch_msg);
+
+	if (watch)
+		xenbus_watch_notify_event(&watch->base);
+	else
+		uk_printd(DLVL_ERR, "Invalid watch event.");
 }
 
 static void memcpy_from_ring(const char *ring, char *dest, int off, int len)
