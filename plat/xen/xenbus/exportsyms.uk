@@ -28,3 +28,5 @@ xenbus_devtype_to_str
 xenbus_str_to_devtype
 xenbus_watch_wait_event
 xenbus_read_driver_state
+xenbus_switch_state
+xenbus_wait_for_state_change

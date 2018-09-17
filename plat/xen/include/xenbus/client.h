@@ -98,4 +98,28 @@ int xenbus_watch_notify_event(struct xenbus_watch *watch);
  */
 XenbusState xenbus_read_driver_state(const char *path);
 
+/*
+ * Changes the state of a Xen PV driver
+ *
+ * @param xbt Xenbus transaction id
+ * @param xendev Xenbus device
+ * @param state The new Xenbus state
+ * @return 0 on success, a negative errno value on error.
+ */
+int xenbus_switch_state(xenbus_transaction_t xbt,
+	struct xenbus_device *xendev, XenbusState state);
+
+/*
+ * Waits for the driver state found at the given Xenstore path to change by
+ * using watches.
+ *
+ * @param path Xenstore path
+ * @param state The returned Xenbus state
+ * @param watch Xenbus watch. It may be NULL, in which case a local watch
+ * will be created.
+ * @return 0 on success, a negative errno value on error.
+ */
+int xenbus_wait_for_state_change(const char *path, XenbusState *state,
+	struct xenbus_watch *watch);
+
 #endif /* __XENBUS_CLIENT_H__ */

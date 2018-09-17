@@ -142,3 +142,98 @@ XenbusState xenbus_read_driver_state(const char *path)
 
 	return state;
 }
+
+int xenbus_switch_state(xenbus_transaction_t xbt,
+	struct xenbus_device *xendev, XenbusState state)
+{
+	char state_path[strlen(xendev->nodename) + sizeof("/state")];
+	char new_state_str[2];
+	XenbusState crnt_state;
+	int need_transaction_end = 0; /* non-zero if local transaction */
+	int abort;
+	int err;
+
+	if (xendev == NULL)
+		return -EINVAL;
+
+	sprintf(state_path, "%s/state", xendev->nodename);
+
+	do {
+		abort = 1;
+
+		if (xbt == XBT_NIL) {
+			err = xs_transaction_start(&xbt);
+			if (err)
+				goto exit;
+			need_transaction_end = 1;
+		}
+
+		/* check if state is already set */
+		err = xs_read_integer(xbt, xendev->nodename,
+			(int *) &crnt_state);
+		if (err || crnt_state == state)
+			goto exit;
+
+		/* set new state */
+		snprintf(new_state_str, sizeof(new_state_str), "%d", state);
+		err = xs_write(xbt, state_path, NULL, new_state_str);
+
+		abort = 0;
+exit:
+		if (need_transaction_end) {
+			int _err;
+
+			_err = xs_transaction_end(xbt, abort);
+			if (!err)
+				err = _err;
+			xbt = XBT_NIL;
+		}
+	} while (err == -EAGAIN);
+
+	if (err)
+		uk_printd(DLVL_ERR, "Error switching state to %s: %d\n",
+			xenbus_state_to_str(state), err);
+
+	return err;
+}
+
+int xenbus_wait_for_state_change(const char *path, XenbusState *state,
+	struct xenbus_watch *watch)
+{
+	XenbusState crnt_state;
+	int err = 0, watch_is_local = 0;
+
+	if (path == NULL || state == NULL) {
+		err = -EINVAL;
+		goto out;
+	}
+
+	if (watch == NULL) {
+		/* create a local watch */
+		watch = xs_watch_path(XBT_NIL, path);
+		if (PTRISERR(watch)) {
+			err = PTR2ERR(watch);
+			goto out;
+		}
+		watch_is_local = 1;
+	}
+
+	for (;;) {
+		err = xs_read_integer(XBT_NIL, path, (int *) &crnt_state);
+		if (err)
+			break;
+
+		if (crnt_state != *state) {
+			*state = crnt_state;
+			break;
+		}
+
+		xenbus_watch_wait_event(watch);
+	}
+
+out:
+	if (watch_is_local)
+		xs_unwatch(XBT_NIL, watch);
+
+	return err;
+}
