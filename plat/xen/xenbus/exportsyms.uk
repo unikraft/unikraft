@@ -1,3 +1,6 @@
+# Xenbus API
+_xenbus_register_driver
+
 # Xenstore API
 xs_read
 xs_write
