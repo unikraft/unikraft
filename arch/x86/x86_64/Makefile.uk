@@ -5,6 +5,11 @@ CFLAGS   += -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tabl
 CXXFLAGS += -D__X86_64__
 CXXFLAGS += -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables
 
+CINCLUDES   += -I$(CONFIG_UK_BASE)/arch/x86/x86_64/include
+ASINCLUDES  += -I$(CONFIG_UK_BASE)/arch/x86/x86_64/include
+CXXINCLUDES += -I$(CONFIG_UK_BASE)/arch/x86/x86_64/include
+
+
 CFLAGS-$(CONFIG_MARCH_X86_64_GENERIC)      += -mtune=generic
 CXXFLAGS-$(CONFIG_MARCH_X86_64_GENERIC)    += -mtune=generic
 CFLAGS-$(CONFIG_MARCH_X86_64_NOCONA)       += -march=nocona

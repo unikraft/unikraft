@@ -5,6 +5,10 @@ CFLAGS   += -marm -fms-extensions
 CXXFLAGS += -D__ARM_32__
 CXXFLAGS += -marm -fms-extensions
 
+CINCLUDES   += -I$(CONFIG_UK_BASE)/arch/arm/arm/include
+ASINCLUDES  += -I$(CONFIG_UK_BASE)/arch/arm/arm/include
+CXXINCLUDES += -I$(CONFIG_UK_BASE)/arch/arm/arm/include
+
 # Set GCC flags for MARCH_ARM32_GENERICV7. GCC supports -mtune=generic-armv7-a from 4.7
 ifeq ($(CONFIG_MARCH_ARM32_GENERICV7),y)
 $(call error_if_gcc_version_lt,4,7)

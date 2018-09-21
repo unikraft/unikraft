@@ -36,33 +36,11 @@
 #ifndef __UKARCH_LIMITS_H__
 #define __UKARCH_LIMITS_H__
 
-#ifdef __X86_32__
-#include <uk/arch/x86/x86/limits.h>
-#endif
-#ifdef __X86_64__
-#include <uk/arch/x86/x86_64/limits.h>
-#endif
-#ifdef __ARM_32__
-#include <uk/arch/arm/arm/limits.h>
-#endif
-#ifdef __ARM_64__
-#include <uk/arch/arm/arm64/limits.h>
-#endif
+#include <uk/asm/limits.h>
 
 #ifndef __ASSEMBLY__
 
-#ifdef __X86_32__
-#include <uk/arch/x86/x86/intsizes.h>
-#endif
-#ifdef __X86_64__
-#include <uk/arch/x86/x86_64/intsizes.h>
-#endif
-#ifdef __ARM_32__
-#include <uk/arch/arm/arm/intsizes.h>
-#endif
-#ifdef __ARM_64__
-#include <uk/arch/arm/arm64/intsizes.h>
-#endif
+#include <uk/asm/intsizes.h>
 
 #if (defined __C_IS_8)
 #define __C_MAX             (127)

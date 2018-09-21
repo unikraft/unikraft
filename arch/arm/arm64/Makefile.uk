@@ -7,6 +7,10 @@ ASFLAGS  += -D__ARM_64__ -mgeneral-regs-only
 CFLAGS   += -D__ARM_64__ -fms-extensions -mgeneral-regs-only
 CXXFLAGS += -D__ARM_64__ -fms-extensions -mgeneral-regs-only
 
+CINCLUDES   += -I$(CONFIG_UK_BASE)/arch/arm/arm64/include
+ASINCLUDES  += -I$(CONFIG_UK_BASE)/arch/arm/arm64/include
+CXXINCLUDES += -I$(CONFIG_UK_BASE)/arch/arm/arm64/include
+
 # GCC support -mcpu=native for arm64 from 6.0
 ifeq ($(CONFIG_MARCH_ARM64_NATIVE),y)
 $(call error_if_gcc_version_lt,6,0)

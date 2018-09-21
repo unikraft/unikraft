@@ -42,18 +42,7 @@
 extern "C" {
 #endif
 
-#ifdef __X86_32__
-#include <uk/arch/x86/x86/lcpu.h>
-#endif
-#ifdef __X86_64__
-#include <uk/arch/x86/x86_64/lcpu.h>
-#endif
-#ifdef __ARM_32__
-#include <uk/arch/arm/arm/lcpu.h>
-#endif
-#ifdef __ARM_64__
-#include <uk/arch/arm/arm64/lcpu.h>
-#endif
+#include <uk/asm/lcpu.h>
 
 #ifndef likely
 #define likely(x)   (__builtin_expect((!!(x)), 1))
