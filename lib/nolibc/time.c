@@ -36,13 +36,13 @@
  */
 
 #include <time.h>
+#include <uk/plat/time.h>
 #include <errno.h>
 #include <uk/config.h>
 #if CONFIG_HAVE_SCHED
 #include <uk/sched.h>
 #else
 #include <uk/plat/lcpu.h>
-#include <uk/plat/time.h>
 #endif
 
 #ifndef CONFIG_HAVE_SCHED

@@ -36,7 +36,6 @@
 #ifndef __SYS_TIME_H__
 #define __SYS_TIME_H__
 
-#include <uk/plat/time.h>
 #include <sys/select.h>
 
 #ifdef __cplusplus
