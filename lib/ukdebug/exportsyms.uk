@@ -1,8 +1,8 @@
-uk_vprintk
-uk_printk
-_uk_vprintd
-_uk_printd
+uk_vprintd
+uk_printd
+_uk_vprintk
+_uk_printk
 uk_hexdumpsn
 uk_hexdumpf
-uk_hexdumpk
-_uk_hexdumpd
+uk_hexdumpd
+_uk_hexdumdk

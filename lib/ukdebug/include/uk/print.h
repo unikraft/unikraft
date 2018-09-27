@@ -46,70 +46,61 @@
 extern "C" {
 #endif
 
+/*
+ * DEBUG PRINTING
+ */
 #ifdef __IN_LIBUKDEBUG__
 /*
- * These defines are doing the trick to compile the functions
- * in print.c always in although printing was disabled
- * in the configuration. This is required for linking with
- * pre-compiled objects that built by using a different configuration.
+ * This redefinition of CONFIG_LIBUKDEBUG_PRINTD is doing the trick to avoid
+ * multiple declarations of uk_{v}printd() when we are compiling this library
+ * and have the global debug switch CONFIG_LIBUKDEBUG_PRINTD not enabled.
  */
-#if !CONFIG_LIBUKDEBUG_PRINTK
-#undef CONFIG_LIBUKDEBUG_PRINTK
-#define CONFIG_LIBUKDEBUG_PRINTK 1
-#endif
-#if !CONFIG_LIBUKDEBUG_PRINTD
+#if !defined CONFIG_LIBUKDEBUG_PRINTD || !CONFIG_LIBUKDEBUG_PRINTD
 #undef CONFIG_LIBUKDEBUG_PRINTD
 #define CONFIG_LIBUKDEBUG_PRINTD 1
 #endif
 #endif /* __IN_LIBUKDEBUG__ */
 
+#if defined UK_DEBUG || CONFIG_LIBUKDEBUG_PRINTD
+void uk_vprintd(const char *fmt, va_list ap);
+void uk_printd(const char *fmt, ...) __printf(1, 2);
+#else
+static inline void uk_vprintd(const char *fmt __unused, va_list ap __unused)
+{}
+
+static inline void uk_printd(const char *fmt, ...) __printf(1, 2);
+static inline void uk_printd(const char *fmt __unused, ...)
+{}
+#endif
+
 /*
  * KERNEL CONSOLE
  */
+#define KLVL_INFO  (3)
+#define KLVL_WARN  (2)
+#define KLVL_ERR   (1)
+#define KLVL_CRIT  (0)
+
+#if CONFIG_LIBUKDEBUG_PRINTK_CRIT
+#define KLVL_MAX KLVL_CRIT
+#elif CONFIG_LIBUKDEBUG_PRINTK_ERR
+#define KLVL_MAX KLVL_ERR
+#elif CONFIG_LIBUKDEBUG_PRINTK_WARN
+#define KLVL_MAX KLVL_WARN
+#elif CONFIG_LIBUKDEBUG_PRINTK_INFO
+#define KLVL_MAX KLVL_INFO
+#else
+#define KLVL_MAX KLVL_ERR /* default level */
+#endif
+
 #if CONFIG_LIBUKDEBUG_PRINTK
-void uk_vprintk(const char *fmt, va_list ap);
-void uk_printk(const char *fmt, ...) __printf(1, 2);
-#else
-static inline void uk_vprintk(const char *fmt, va_list ap)
-{
-}
-static inline void uk_printk(const char *fmt, ...) __printf(1, 2);
-static inline void uk_printk(const char *fmt, ...)
-{
-}
-#endif
-
-/*
- * DEBUG CONSOLE
- */
-#define DLVL_EXTRA (4)
-#define DLVL_INFO  (3)
-#define DLVL_WARN  (2)
-#define DLVL_ERR   (1)
-#define DLVL_CRIT  (0)
-
-#if CONFIG_LIBUKDEBUG_PRINTD_CRIT
-#define DLVL_MAX DLVL_CRIT
-#elif CONFIG_LIBUKDEBUG_PRINTD_ERR
-#define DLVL_MAX DLVL_ERR
-#elif CONFIG_LIBUKDEBUG_PRINTD_WARN
-#define DLVL_MAX DLVL_WARN
-#elif CONFIG_LIBUKDEBUG_PRINTD_INFO
-#define DLVL_MAX DLVL_INFO
-#elif CONFIG_LIBUKDEBUG_PRINTD_EXTRA
-#define DLVL_MAX DLVL_EXTRA
-#else
-#define DLVL_MAX DLVL_ERR /* default level */
-#endif
-
-#if CONFIG_LIBUKDEBUG_PRINTD
 /* please use the uk_printd(), uk_vprintd() macros because
  * they compile in the function calls only if the configured
  * debug level requires it
  */
-void _uk_vprintd(int lvl, const char *libname, const char *srcname,
+void _uk_vprintk(int lvl, const char *libname, const char *srcname,
 		 unsigned int srcline, const char *fmt, va_list ap);
-void _uk_printd(int lvl, const char *libname, const char *srcname,
+void _uk_printk(int lvl, const char *libname, const char *srcname,
 		unsigned int srcline, const char *fmt, ...) __printf(5, 6);
 
 #ifdef __LIBNAME__
@@ -124,39 +115,38 @@ void _uk_printd(int lvl, const char *libname, const char *srcname,
 #define __STR_BASENAME__ (NULL)
 #endif
 
-#define uk_vprintd(lvl, fmt, ap)                                               \
+#define uk_vprintk(lvl, fmt, ap)                                               \
 	do {                                                                   \
-		if ((lvl) <= DLVL_MAX)                                         \
-			_uk_vprintd((lvl), __STR_LIBNAME__, __STR_BASENAME__,  \
+		if ((lvl) <= KLVL_MAX)                                         \
+			_uk_vprintk((lvl), __STR_LIBNAME__, __STR_BASENAME__,  \
 				    __LINE__, (fmt), ap);                      \
 	} while (0)
 
-#define uk_printd(lvl, fmt, ...)                                               \
+#define uk_printk(lvl, fmt, ...)                                               \
 	do {                                                                   \
-		if ((lvl) <= DLVL_MAX)                                         \
-			_uk_printd((lvl), __STR_LIBNAME__, __STR_BASENAME__,   \
+		if ((lvl) <= KLVL_MAX)                                         \
+			_uk_printk((lvl), __STR_LIBNAME__, __STR_BASENAME__,   \
 				   __LINE__, (fmt), ##__VA_ARGS__);            \
 	} while (0)
 #else
-static inline void uk_vprintd(int lvl __unused, const char *fmt __unused,
+static inline void uk_vprintk(int lvl __unused, const char *fmt __unused,
 				va_list ap __unused)
-{
-}
-static inline void uk_printd(int lvl, const char *fmt, ...) __printf(2, 3);
-static inline void uk_printd(int lvl __unused, const char *fmt __unused, ...)
-{
-}
-#endif /* CONFIG_LIBUKDEBUG_PRINTD */
+{}
+
+static inline void uk_printk(int lvl, const char *fmt, ...) __printf(2, 3);
+static inline void uk_printk(int lvl __unused, const char *fmt __unused, ...)
+{}
+#endif /* CONFIG_LIBUKDEBUG_PRINTK */
 
 /*
- * Convenience wrapper for uk_printd()
+ * Convenience wrapper for uk_printk() and uk_printd()
  * This is similar to the pr_* variants that you find in the Linux kernel
  */
-#define uk_pr_debug(fmt, ...) uk_printd(DLVL_EXTRA, (fmt), ##__VA_ARGS__)
-#define uk_pr_info(fmt, ...)  uk_printd(DLVL_INFO,  (fmt), ##__VA_ARGS__)
-#define uk_pr_warn(fmt, ...)  uk_printd(DLVL_WARN,  (fmt), ##__VA_ARGS__)
-#define uk_pr_err(fmt, ...)   uk_printd(DLVL_ERR,   (fmt), ##__VA_ARGS__)
-#define uk_pr_crit(fmt, ...)  uk_printd(DLVL_CRIT,  (fmt), ##__VA_ARGS__)
+#define uk_pr_debug(fmt, ...) uk_printd((fmt), ##__VA_ARGS__)
+#define uk_pr_info(fmt, ...)  uk_printk(KLVL_INFO,  (fmt), ##__VA_ARGS__)
+#define uk_pr_warn(fmt, ...)  uk_printk(KLVL_WARN,  (fmt), ##__VA_ARGS__)
+#define uk_pr_err(fmt, ...)   uk_printk(KLVL_ERR,   (fmt), ##__VA_ARGS__)
+#define uk_pr_crit(fmt, ...)  uk_printk(KLVL_CRIT,  (fmt), ##__VA_ARGS__)
 
 #ifdef __cplusplus
 }

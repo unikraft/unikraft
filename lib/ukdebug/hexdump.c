@@ -54,22 +54,20 @@ enum _hxd_output_type {
 #if CONFIG_LIBUKDEBUG_PRINTK
 	UK_HXDOUT_KERN,
 #endif
-#if CONFIG_LIBUKDEBUG_PRINTD
 	UK_HXDOUT_DEBUG,
-#endif
 };
 
 struct _hxd_output {
 	enum _hxd_output_type type;
 
 	union {
-#if CONFIG_LIBUKDEBUG_PRINTD
+#if CONFIG_LIBUKDEBUG_PRINTK
 		struct {
 			int lvl;
 			const char *libname;
 			const char *srcname;
 			unsigned int srcline;
-		} debug;
+		} kern;
 #endif
 		struct {
 			FILE *fp;
@@ -106,15 +104,13 @@ static int _hxd_outf(struct _hxd_output *o, const char *fmt, ...)
 			o->buffer.left -= (ret - 1);
 		}
 		break;
+	case UK_HXDOUT_DEBUG:
+		uk_vprintd(fmt, ap);
+		break;
 #if CONFIG_LIBUKDEBUG_PRINTK
 	case UK_HXDOUT_KERN:
-		uk_vprintk(fmt, ap);
-		break;
-#endif
-#if CONFIG_LIBUKDEBUG_PRINTD
-	case UK_HXDOUT_DEBUG:
-		_uk_vprintd(o->debug.lvl, o->debug.libname, o->debug.srcname,
-			    o->debug.srcline, fmt, ap);
+		_uk_vprintk(o->kern.lvl, o->kern.libname, o->kern.srcname,
+			    o->kern.srcline, fmt, ap);
 		break;
 #endif
 	default:
@@ -323,11 +319,11 @@ int uk_hexdumpf(FILE *fp, const void *data, size_t len, size_t addr0, int flags,
 	return _hxd(&o, data, len, addr0, flags, grps_per_line, line_prefix);
 }
 
-void uk_hexdumpk(const void *data, size_t len, int flags,
+void uk_hexdumpd(const void *data, size_t len, int flags,
 		 unsigned int grps_per_line)
 {
-#if CONFIG_LIBUKDEBUG_PRINTK
-	struct _hxd_output o = {.type = UK_HXDOUT_KERN};
+#if CONFIG_LIBUKDEBUG_PRINTD
+	struct _hxd_output o = {.type = UK_HXDOUT_DEBUG};
 
 	_hxd(&o, data, len, (size_t)data, flags, grps_per_line, "");
 #else
@@ -335,19 +331,18 @@ void uk_hexdumpk(const void *data, size_t len, int flags,
 #endif
 }
 
-void _uk_hexdumpd(int lvl, const char *libname, const char *srcname,
+#if CONFIG_LIBUKDEBUG_PRINTK
+void _uk_hexdumpk(int lvl, const char *libname, const char *srcname,
 		  unsigned int srcline, const void *data, size_t len,
 		  size_t addr0, int flags, unsigned int grps_per_line,
 		  const char *line_prefix)
 {
-#if CONFIG_LIBUKDEBUG_PRINTD
-	struct _hxd_output o = {.type = UK_HXDOUT_DEBUG,
-				.debug.lvl = lvl,
-				.debug.libname = libname,
-				.debug.srcname = srcname,
-				.debug.srcline = srcline};
+	struct _hxd_output o = {.type = UK_HXDOUT_KERN,
+				.kern.lvl = lvl,
+				.kern.libname = libname,
+				.kern.srcname = srcname,
+				.kern.srcline = srcline};
+
 	_hxd(&o, data, len, addr0, flags, grps_per_line, line_prefix);
-#else
-	return;
-#endif
 }
+#endif

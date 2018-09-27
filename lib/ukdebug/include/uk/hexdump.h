@@ -55,9 +55,9 @@ extern "C" {
 
 #define UK_HXDF_COMPRESS (64) /* suppress repeated lines */
 
-#if CONFIG_LIBUKDEBUG_PRINTK
+#if defined UK_DEBUG || CONFIG_LIBUKDEBUG_PRINTD
 /**
- * Plots an hexdump for a given data region to kernel output
+ * Plots an hexdump for a given data region to debug output
  * The absolute address is plotted when UK_HXDF_ADDR is set
  *
  * @param data Start of data region to plot
@@ -67,23 +67,23 @@ extern "C" {
  *        Number of groups (UK_HXDF_GRP*) shown per line
  * @return Returns the number of printed characters to output fp
  */
-void uk_hexdumpk(const void *data, size_t len, int flags,
+void uk_hexdumpd(const void *data, size_t len, int flags,
 		 unsigned int grps_per_line);
 #else
-static inline void uk_hexdumpk(const void *data, size_t len, int flags,
-			       unsigned int grps_per_line)
-{
-}
+static inline void uk_hexdumpd(const void *data __unused, size_t len __unused,
+			       int flags __unused,
+			       unsigned int grps_per_line __unused)
+{}
 #endif
 
-#if CONFIG_LIBUKDEBUG_PRINTD
-void _uk_hexdumpd(int lvl, const char *libname, const char *srcname,
+#if CONFIG_LIBUKDEBUG_PRINTK
+void _uk_hexdumpk(int lvl, const char *libname, const char *srcname,
 		  unsigned int srcline, const void *data, size_t len,
 		  size_t addr0, int flags, unsigned int grps_per_line,
 		  const char *line_prefix);
 
 /**
- * Plots an hexdump for a given data region to debug output
+ * Plots an hexdump for a given data region to kernel output
  * The absolute address is plotted when UK_HXDF_ADDR is set
  *
  * @param lvl Debug level
@@ -94,19 +94,19 @@ void _uk_hexdumpd(int lvl, const char *libname, const char *srcname,
  *        Number of groups (UK_HXDF_GRP*) shown per line
  * @return Returns the number of printed characters to output fp
  */
-#define uk_hexdumpd(lvl, data, len, flags, grps_per_line)                      \
+#define uk_hexdumpk(lvl, data, len, flags, grps_per_line)                      \
 	do {                                                                   \
-		if ((lvl) <= DLVL_MAX)                                         \
+		if ((lvl) <= KLVL_MAX)                                         \
 			_uk_hexdumpd((lvl), __STR_LIBNAME__, __STR_BASENAME__, \
 				     __LINE__, (data), (len),                  \
 				     ((size_t)(data)), (flags),                \
 				     (grps_per_line), STRINGIFY(data) ": ");   \
 	} while (0)
 #else
-static inline void uk_hexdumpd(int lvl, const void *data, size_t len, int flags,
-			       unsigned int grps_per_line)
-{
-}
+static inline void uk_hexdumpk(int lvl __unused, const void *data __unused,
+			       size_t len __unused, int flags __unused,
+			       unsigned int grps_per_line __unused)
+{}
 #endif
 
 /**
@@ -184,13 +184,13 @@ int uk_hexdumpsn(char *str, size_t size, const void *data, size_t len,
  * Shortcuts for all hexdump variants ahead. The shortcuts use a similar style
  * as the hexdump Unix command using -C parameter: hexdump -C
  */
-#define uk_hexdumpCk(data, len)                                                \
-	uk_hexdumpk((data), (len), (UK_HXDF_ADDR | UK_HXDF_ASCIISEC            \
+#define uk_hexdumpCd(data, len)                                                \
+	uk_hexdumpd((data), (len), (UK_HXDF_ADDR | UK_HXDF_ASCIISEC            \
 				    | UK_HXDF_GRPQWORD | UK_HXDF_COMPRESS),    \
 		    2)
 
-#define uk_hexdumpCd(lvl, data, len)                                           \
-	uk_hexdumpd((lvl), (data), (len),                                      \
+#define uk_hexdumpCk(lvl, data, len)                                           \
+	uk_hexdumpk((lvl), (data), (len),                                      \
 		    (UK_HXDF_ADDR | UK_HXDF_ASCIISEC | UK_HXDF_GRPQWORD        \
 		     | UK_HXDF_COMPRESS),                                      \
 		    2)

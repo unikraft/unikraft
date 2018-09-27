@@ -57,10 +57,10 @@
 
 #define BUFLEN 192
 /* special level for printk redirection, used internally only */
-#define DLVL_CONS (-1)
+#define KLVL_DEBUG (-1)
 
-#if !CONFIG_LIBUKDEBUG_REDIR_PRINTK
-static inline void _vprintk(const char *fmt, va_list ap)
+#if !CONFIG_LIBUKDEBUG_REDIR_PRINTD
+static inline void _vprintd(const char *fmt, va_list ap)
 {
 	char lbuf[BUFLEN];
 	int len;
@@ -71,14 +71,14 @@ static inline void _vprintk(const char *fmt, va_list ap)
 }
 #endif
 
-#if CONFIG_LIBUKDEBUG_REDIR_PRINTD
-#define _ukplat_coutd(lbuf, len) ukplat_coutk((lbuf), (len))
+#if CONFIG_LIBUKDEBUG_REDIR_PRINTK
+#define _ukplat_coutk(lbuf, len) ukplat_coutd((lbuf), (len))
 #else
-#define _ukplat_coutd(lbuf, len) ukplat_coutd((lbuf), (len))
+#define _ukplat_coutk(lbuf, len) ukplat_coutk((lbuf), (len))
 #endif
 
-#if CONFIG_LIBUKDEBUG_PRINTD_TIME
-static void _printd_timestamp(void)
+#if CONFIG_LIBUKDEBUG_PRINTK_TIME
+static void _printk_timestamp(void)
 {
 	char buf[BUFLEN];
 	int len;
@@ -89,12 +89,12 @@ static void _printd_timestamp(void)
 	rem_usec = ukarch_time_nsec_to_usec(rem_usec);
 	len = snprintf(buf, BUFLEN, "[%5" __PRInsec ".%06" __PRInsec "] ",
 			sec, rem_usec);
-	_ukplat_coutd((char *)buf, len);
+	_ukplat_coutk((char *)buf, len);
 }
 #endif
 
-#if CONFIG_LIBUKDEBUG_PRINTD_STACK
-static void _printd_stack(void)
+#if CONFIG_LIBUKDEBUG_PRINTK_STACK
+static void _printk_stack(void)
 {
 	unsigned long stackb;
 	char buf[BUFLEN];
@@ -103,12 +103,13 @@ static void _printd_stack(void)
 	stackb = (ukarch_read_sp() & ~(__STACK_SIZE - 1)) + __STACK_SIZE;
 
 	len = snprintf(buf, BUFLEN, "<%p> ", (void *) stackb);
-	_ukplat_coutd((char *)buf, len);
+	_ukplat_coutk((char *)buf, len);
 }
 #endif
 
-static inline void _vprintd(int lvl, const char *libname, const char *srcname,
-			    unsigned int srcline, const char *fmt, va_list ap)
+#if CONFIG_LIBUKDEBUG_REDIR_PRINTD || CONFIG_LIBUKDEBUG_PRINTK
+static void _vprintk(int lvl, const char *libname, const char *srcname,
+		     unsigned int srcline, const char *fmt, va_list ap)
 {
 	static int newline = 1;
 	static int prevlvl = INT_MIN;
@@ -120,25 +121,22 @@ static inline void _vprintd(int lvl, const char *libname, const char *srcname,
 	const char *nlptr = NULL;
 
 	switch (lvl) {
-#if CONFIG_LIBUKDEBUG_REDIR_PRINTK
-	case DLVL_CONS:
-		msghdr = "Kern: ";
+#if CONFIG_LIBUKDEBUG_REDIR_PRINTD
+	case KLVL_DEBUG:
+		msghdr = "dbg:  ";
 		break;
 #endif
-	case DLVL_CRIT:
+	case KLVL_CRIT:
 		msghdr = "CRIT: ";
 		break;
-	case DLVL_ERR:
+	case KLVL_ERR:
 		msghdr = "ERR:  ";
 		break;
-	case DLVL_WARN:
+	case KLVL_WARN:
 		msghdr = "Warn: ";
 		break;
-	case DLVL_INFO:
+	case KLVL_INFO:
 		msghdr = "Info: ";
-		break;
-	case DLVL_EXTRA:
-		msghdr = "EInf: ";
 		break;
 	default:
 		/* unknown type: ignore */
@@ -151,7 +149,7 @@ static inline void _vprintd(int lvl, const char *libname, const char *srcname,
 			/* level changed without closing with '\n',
 			 * enforce printing '\n', before the new message header
 			 */
-			_ukplat_coutd("\n", 1);
+			_ukplat_coutk("\n", 1);
 		}
 		prevlvl = lvl;
 		newline = 1; /* enforce printing the message header */
@@ -161,29 +159,29 @@ static inline void _vprintd(int lvl, const char *libname, const char *srcname,
 	lptr = lbuf;
 	while (len > 0) {
 		if (newline) {
-#if CONFIG_LIBUKDEBUG_PRINTD_TIME
-			_printd_timestamp();
+#if CONFIG_LIBUKDEBUG_PRINTK_TIME
+			_printk_timestamp();
 #endif
-			_ukplat_coutd(DECONST(char *, msghdr), 6);
-#if CONFIG_LIBUKDEBUG_PRINTD_STACK
-			_printd_stack();
+			_ukplat_coutk(DECONST(char *, msghdr), 6);
+#if CONFIG_LIBUKDEBUG_PRINTK_STACK
+			_printk_stack();
 #endif
 			if (libname) {
-				_ukplat_coutd("[", 1);
-				_ukplat_coutd(DECONST(char *, libname),
+				_ukplat_coutk("[", 1);
+				_ukplat_coutk(DECONST(char *, libname),
 					      strlen(libname));
-				_ukplat_coutd("] ", 2);
+				_ukplat_coutk("] ", 2);
 			}
 			if (srcname) {
 				char lnobuf[6];
 
-				_ukplat_coutd(DECONST(char *, srcname),
+				_ukplat_coutk(DECONST(char *, srcname),
 					      strlen(srcname));
-				_ukplat_coutd(" @ ", 3);
-				_ukplat_coutd(lnobuf,
+				_ukplat_coutk(" @ ", 3);
+				_ukplat_coutk(lnobuf,
 					      snprintf(lnobuf, sizeof(lnobuf),
 						       "%-5u", srcline));
-				_ukplat_coutd(": ", 2);
+				_ukplat_coutk(": ", 2);
 			}
 			newline = 0;
 		}
@@ -195,59 +193,57 @@ static inline void _vprintd(int lvl, const char *libname, const char *srcname,
 		} else {
 			llen = len;
 		}
-		_ukplat_coutd((char *)lptr, llen);
+		_ukplat_coutk((char *)lptr, llen);
 		len -= llen;
 		lptr = nlptr + 1;
 	}
 }
+#endif /* CONFIG_LIBUKDEBUG_REDIR_PRINTD || CONFIG_LIBUKDEBUG_PRINTK */
 
-/* ensures that function is always compiled */
-void uk_vprintk(const char *fmt, va_list ap)
+/*
+ * DEBUG PRINTING ENTRY
+ *  uk_printd() and uk_vprintd are always compiled in.
+ *  We rely on OPTIMIZE_DEADELIM: These symbols are automatically
+ *  removed from the final image when there was no usage.
+ */
+void uk_vprintd(const char *fmt __maybe_unused, va_list ap __maybe_unused)
 {
-#if CONFIG_LIBUKDEBUG_PRINTK
-#if CONFIG_LIBUKDEBUG_REDIR_PRINTK
-	_vprintd(DLVL_CONS, NULL, NULL, 0, fmt, ap);
+#if CONFIG_LIBUKDEBUG_REDIR_PRINTD
+	_vprintk(KLVL_DEBUG, NULL, NULL, 0, fmt, ap);
 #else
-	_vprintk(fmt, ap);
+	_vprintd(fmt, ap);
 #endif
-#endif /* CONFIG_LIBUKDEBUG_PRINTK */
 }
 
-/* ensures that function is always compiled */
-void uk_printk(const char *fmt, ...)
+void uk_printd(const char *fmt, ...)
 {
-#if CONFIG_LIBUKDEBUG_PRINTK
 	va_list ap;
 
 	va_start(ap, fmt);
-	uk_vprintk(fmt, ap);
+	uk_vprintd(fmt, ap);
 	va_end(ap);
-#endif /* CONFIG_LIBUKDEBUG_PRINTK */
 }
 
-/* ensures that function is always compiled */
-void _uk_vprintd(int lvl, const char *libname, const char *srcname,
+/*
+ * KERNEL PRINT ENTRY
+ *  Different to uk_printd(), we have a global switch that disables kernel
+ *  messages. We compile these entry points only in when the kernel console is
+ *  enabled.
+ */
+#if CONFIG_LIBUKDEBUG_PRINTK
+void _uk_vprintk(int lvl, const char *libname, const char *srcname,
 		 unsigned int srcline, const char *fmt, va_list ap)
 {
-#if CONFIG_LIBUKDEBUG_PRINTD
-	if (likely(lvl > DLVL_MAX))
-		return;
-	_vprintd(lvl, libname, srcname, srcline, fmt, ap);
-#endif /* CONFIG_LIBUKDEBUG_PRINTD */
+	_vprintk(lvl, libname, srcname, srcline, fmt, ap);
 }
 
-/* ensures that function is always compiled */
-void _uk_printd(int lvl, const char *libname, const char *srcname,
+void _uk_printk(int lvl, const char *libname, const char *srcname,
 		unsigned int srcline, const char *fmt, ...)
 {
-#if CONFIG_LIBUKDEBUG_PRINTD
 	va_list ap;
 
-	if (likely(lvl > DLVL_MAX))
-		return;
-
 	va_start(ap, fmt);
-	_uk_vprintd(lvl, libname, srcname, srcline, fmt, ap);
+	_uk_vprintk(lvl, libname, srcname, srcline, fmt, ap);
 	va_end(ap);
-#endif /* CONFIG_LIBUKDEBUG_PRINTD */
 }
+#endif /* CONFIG_LIBUKDEBUG_PRINTD */
