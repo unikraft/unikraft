@@ -80,9 +80,9 @@ static void main_thread_func(void *arg)
 	struct thread_main_arg *tma = arg;
 
 #ifdef CONFIG_LIBUKBUS
-	uk_printd(DLVL_INFO, "Initialize bus handlers...\n");
+	uk_pr_info("Initialize bus handlers...\n");
 	uk_bus_init_all(uk_alloc_get_default());
-	uk_printd(DLVL_INFO, "Probe buses...\n");
+	uk_pr_info("Probe buses...\n");
 	uk_bus_probe_all();
 #endif /* CONFIG_LIBUKBUS */
 
@@ -105,16 +105,16 @@ static void main_thread_func(void *arg)
 	       STRINGIFY(UK_CODENAME) " " STRINGIFY(UK_FULLVERSION));
 #endif
 
-	uk_printd(DLVL_INFO, "Calling main(%d, [", tma->argc);
+	uk_pr_info("Calling main(%d, [", tma->argc);
 	for (i = 0; i < tma->argc; ++i) {
-		uk_printd(DLVL_INFO, "'%s'", tma->argv[i]);
+		uk_pr_info("'%s'", tma->argv[i]);
 		if ((i + 1) < tma->argc)
-			uk_printd(DLVL_INFO, ", ");
+			uk_pr_info(", ");
 	}
-	uk_printd(DLVL_INFO, "])\n");
+	uk_pr_info("])\n");
 
 	ret = main(tma->argc, tma->argv);
-	uk_printd(DLVL_INFO, "main returned %d, halting system\n", ret);
+	uk_pr_info("main returned %d, halting system\n", ret);
 	ret = (ret != 0) ? UKPLAT_CRASH : UKPLAT_HALT;
 	ukplat_terminate(ret); /* does not return */
 }
@@ -154,24 +154,24 @@ void ukplat_entry(int argc, char *argv[])
 	struct uk_thread *main_thread = NULL;
 #endif
 
-	uk_printd(DLVL_INFO, "Pre-init table at %p - %p\n",
-		  __preinit_array_start, &__preinit_array_end);
+	uk_pr_info("Pre-init table at %p - %p\n",
+		   __preinit_array_start, &__preinit_array_end);
 	ukplat_ctor_foreach(__preinit_array_start, __preinit_array_end, i) {
 		if (__preinit_array_start[i]) {
-			uk_printd(DLVL_EXTRA, "Call pre-init constructor (entry %d (%p): %p())...\n",
-				  i, &__preinit_array_start[i],
-				  __preinit_array_start[i]);
+			uk_pr_debug("Call pre-init constructor (entry %d (%p): %p())...\n",
+				    i, &__preinit_array_start[i],
+				    __preinit_array_start[i]);
 			__preinit_array_start[i]();
 		}
 	}
 
-	uk_printd(DLVL_INFO, "Constructor table at %p - %p\n",
-		  __init_array_start, &__init_array_end);
+	uk_pr_info("Constructor table at %p - %p\n",
+		   __init_array_start, &__init_array_end);
 	ukplat_ctor_foreach(__init_array_start, __init_array_end, i) {
 		if (__init_array_start[i]) {
-			uk_printd(DLVL_EXTRA, "Call constructor (entry %d (%p): %p())...\n",
-				  i, &__init_array_start[i],
-				  __init_array_start[i]);
+			uk_pr_debug("Call constructor (entry %d (%p): %p())...\n",
+				    i, &__init_array_start[i],
+				    __init_array_start[i]);
 			__init_array_start[i]();
 		}
 	}
@@ -181,7 +181,7 @@ void ukplat_entry(int argc, char *argv[])
 	 * FIXME: ukallocbbuddy is hard-coded for now
 	 */
 	if (ukplat_memregion_count() > 0) {
-		uk_printd(DLVL_INFO, "Initialize memory allocator...\n");
+		uk_pr_info("Initialize memory allocator...\n");
 		for (i = 0; i < ukplat_memregion_count(); ++i) {
 			/* Check if memory region is usable for allocators */
 			if (ukplat_memregion_get(i, &md) < 0)
@@ -190,29 +190,29 @@ void ukplat_entry(int argc, char *argv[])
 			if ((md.flags & UKPLAT_MEMRF_ALLOCATABLE)
 			    != UKPLAT_MEMRF_ALLOCATABLE) {
 #if CONFIG_UKPLAT_MEMRNAME
-				uk_printd(DLVL_EXTRA, "Skip memory region %d: %p - %p (flags: 0x%02x, name: %s)\n",
-					  i, md.base, (void *)((size_t)md.base
-							       + md.len),
-					  md.flags, md.name);
+				uk_pr_debug("Skip memory region %d: %p - %p (flags: 0x%02x, name: %s)\n",
+					    i, md.base, (void *)((size_t)md.base
+								 + md.len),
+					    md.flags, md.name);
 #else
-				uk_printd(DLVL_EXTRA, "Skip memory region %d: %p - %p (flags: 0x%02x)\n",
-					  i, md.base, (void *)((size_t)md.base
-							       + md.len),
-					  md.flags);
+				uk_pr_debug("Skip memory region %d: %p - %p (flags: 0x%02x)\n",
+					    i, md.base, (void *)((size_t)md.base
+								 + md.len),
+					    md.flags);
 #endif
 				continue;
 			}
 
 #if CONFIG_UKPLAT_MEMRNAME
-			uk_printd(DLVL_EXTRA, "Try  memory region %d: %p - %p (flags: 0x%02x, name: %s)...\n",
-				  i, md.base, (void *)((size_t)md.base
-						       + md.len),
-				  md.flags, md.name);
+			uk_pr_debug("Try  memory region %d: %p - %p (flags: 0x%02x, name: %s)...\n",
+				    i, md.base, (void *)((size_t)md.base
+							 + md.len),
+				    md.flags, md.name);
 #else
-			uk_printd(DLVL_EXTRA, "Try  memory region %d: %p - %p (flags: 0x%02x)...\n",
-				  i, md.base, (void *)((size_t)md.base
-						       + md.len),
-				  md.flags);
+			uk_pr_debug("Try  memory region %d: %p - %p (flags: 0x%02x)...\n",
+				    i, md.base, (void *)((size_t)md.base
+							 + md.len),
+				    md.flags);
 #endif
 			/* try to use memory region to initialize allocator
 			 * if it fails, we will try  again with the next region.
@@ -226,7 +226,7 @@ void ukplat_entry(int argc, char *argv[])
 		}
 	}
 	if (unlikely(!a))
-		uk_printd(DLVL_WARN, "No suitable memory region for memory allocator. Continue without heap\n");
+		uk_pr_warn("No suitable memory region for memory allocator. Continue without heap\n");
 	else {
 		rc = ukplat_memallocator_set(a);
 		if (unlikely(rc != 0))
@@ -235,14 +235,14 @@ void ukplat_entry(int argc, char *argv[])
 #endif
 
 #if CONFIG_LIBUKALLOC
-	uk_printd(DLVL_INFO, "Initialize IRQ subsystem...\n");
+	uk_pr_info("Initialize IRQ subsystem...\n");
 	rc = ukplat_irq_init(a);
 	if (unlikely(rc != 0))
 		UK_CRASH("Could not initialize the platform IRQ subsystem.");
 #endif
 
 	/* On most platforms the timer depend on an initialized IRQ subsystem */
-	uk_printd(DLVL_INFO, "Initialize platform time...\n");
+	uk_pr_info("Initialize platform time...\n");
 	ukplat_time_init();
 
 #if CONFIG_LIBUKSCHED

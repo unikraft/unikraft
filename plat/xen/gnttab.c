@@ -125,8 +125,8 @@ int gnttab_end_access(grant_ref_t gref)
 	nflags = *pflags;
 	do {
 		if ((flags = nflags) & (GTF_reading | GTF_writing)) {
-			uk_printd(DLVL_WARN,
-				"gref=%u still in use! (0x%x)\n", gref, flags);
+			uk_pr_warn("gref=%u still in use! (0x%x)\n",
+				   gref, flags);
 			return 0;
 		}
 	} while ((nflags = ukarch_compare_exchange_sync(pflags, flags, 0)) != flags);
@@ -148,8 +148,7 @@ unsigned long gnttab_end_transfer(grant_ref_t gref)
 	pflags = &gnttab.table[gref].flags;
 	while (!((flags = *pflags) & GTF_transfer_committed)) {
 		if (ukarch_compare_exchange_sync(pflags, flags, 0) == flags) {
-			uk_printd(DLVL_INFO,
-				"Release unused transfer grant.\n");
+			uk_pr_info("Release unused transfer grant.\n");
 			put_free_entry(gref);
 			return 0;
 		}
@@ -218,7 +217,7 @@ void gnttab_init(void)
 	if (gnttab.table == NULL)
 		UK_CRASH("Failed to initialize grant table\n");
 
-	uk_printd(DLVL_INFO, "Grant table mapped at %p.\n", gnttab.table);
+	uk_pr_info("Grant table mapped at %p.\n", gnttab.table);
 
 	gnttab.initialized = 1;
 }
@@ -233,7 +232,7 @@ void gnttab_fini(void)
 
 	rc = HYPERVISOR_grant_table_op(GNTTABOP_setup_table, &setup, 1);
 	if (rc) {
-		uk_printd(DLVL_ERR, "Hypercall error: %d\n", rc);
+		uk_pr_err("Hypercall error: %d\n", rc);
 		return;
 	}
 

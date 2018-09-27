@@ -55,8 +55,8 @@ int virtq_add_descriptor_chain(struct virtq *vq, __u16 head, __u16 num)
 		return -EINVAL;
 
 	if (vq->num_avail < num) {
-		uk_printd(DLVL_WARN, "virtq full! next_avail:%"__PRIu16" last_used:%"__PRIu16"\n",
-				vq->next_avail, vq->last_used);
+		uk_pr_warn("virtq full! next_avail:%"__PRIu16" last_used:%"__PRIu16"\n",
+			   vq->next_avail, vq->last_used);
 		return -ENOMEM;
 	}
 
@@ -117,8 +117,8 @@ int virtq_rings_init(struct virtq *vq, __u16 pci_base,
 	vq_num = inw(pci_base + VIRTIO_PCI_QUEUE_SIZE);
 
 	if (vq_num == 0) {
-		uk_printd(DLVL_ERR, "No such queue: pci_base=%"__PRIx16" selector=%"__PRIx16"\n",
-				pci_base, queue_select);
+		uk_pr_err("No such queue: pci_base=%"__PRIx16" selector=%"__PRIx16"\n",
+			  pci_base, queue_select);
 		return -EINVAL;
 	}
 

@@ -318,7 +318,7 @@ static int xs_msg_write(struct xsd_sockmsg *xsd_req,
 		}
 	}
 
-	uk_printd(DLVL_EXTRA, "Complete main loop of %s.\n", __func__);
+	uk_pr_debug("Complete main loop of %s.\n", __func__);
 	UK_ASSERT(buf_off == 0);
 	UK_ASSERT(req_off == req_size);
 	UK_ASSERT(prod <= xsh.buf->req_cons + XENSTORE_RING_SIZE);
@@ -388,8 +388,8 @@ void xs_send(void)
 		err = xs_msg_write(&xs_req->hdr, xs_req->payload_iovecs);
 		if (err) {
 			if (err != -ENOSPC)
-				uk_printd(DLVL_WARN,
-					"Error sending message err=%d\n", err);
+				uk_pr_warn("Error sending message err=%d\n",
+					   err);
 			break;
 		}
 
@@ -415,7 +415,7 @@ static int reply_to_errno(const char *reply)
 		}
 	}
 
-	uk_printd(DLVL_WARN, "Unknown Xenstore error: %s\n", reply);
+	uk_pr_warn("Unknown Xenstore error: %s\n", reply);
 	err = EINVAL;
 
 out:
@@ -428,7 +428,7 @@ static void process_reply(struct xsd_sockmsg *hdr, char *payload)
 	struct xs_request *xs_req;
 
 	if (!ukarch_test_bit(hdr->req_id, xs_req_pool.entries_bm)) {
-		uk_printd(DLVL_WARN, "Invalid reply id=%d\n", hdr->req_id);
+		uk_pr_warn("Invalid reply id=%d\n", hdr->req_id);
 		free(payload);
 		return;
 	}
@@ -440,8 +440,7 @@ static void process_reply(struct xsd_sockmsg *hdr, char *payload)
 		free(payload);
 
 	} else if (hdr->type != xs_req->hdr.type) {
-		uk_printd(DLVL_WARN,
-			"Mismatching message type: %d\n", hdr->type);
+		uk_pr_warn("Mismatching message type: %d\n", hdr->type);
 		free(payload);
 		return;
 
@@ -473,7 +472,7 @@ static void process_watch_event(char *watch_msg)
 	if (watch)
 		xenbus_watch_notify_event(&watch->base);
 	else
-		uk_printd(DLVL_ERR, "Invalid watch event.");
+		uk_pr_err("Invalid watch event.");
 }
 
 static void memcpy_from_ring(const char *ring, char *dest, int off, int len)
@@ -495,8 +494,7 @@ static void xs_msg_read(struct xsd_sockmsg *hdr)
 
 	payload = malloc(hdr->len + 1);
 	if (payload == NULL) {
-		uk_printd(DLVL_WARN,
-			"No memory available for saving Xenstore message!\n");
+		uk_pr_warn("No memory available for saving Xenstore message!\n");
 		return;
 	}
 
@@ -529,8 +527,8 @@ static void xs_recv(void)
 	struct xsd_sockmsg msg;
 
 	while (1) {
-		uk_printd(DLVL_EXTRA, "Rsp_cons %d, rsp_prod %d.\n",
-			xsh.buf->rsp_cons, xsh.buf->rsp_prod);
+		uk_pr_debug("Rsp_cons %d, rsp_prod %d.\n",
+			    xsh.buf->rsp_cons, xsh.buf->rsp_prod);
 
 		if (!xs_avail_space_for_read(sizeof(msg)))
 			break;
@@ -546,10 +544,10 @@ static void xs_recv(void)
 			sizeof(msg)
 		);
 
-		uk_printd(DLVL_EXTRA, "Msg len %lu, %u avail, id %u.\n",
-			msg.len + sizeof(msg),
-			xsh.buf->rsp_prod - xsh.buf->rsp_cons,
-			msg.req_id);
+		uk_pr_debug("Msg len %lu, %u avail, id %u.\n",
+			    msg.len + sizeof(msg),
+			    xsh.buf->rsp_prod - xsh.buf->rsp_cons,
+			    msg.req_id);
 
 		if (!xs_avail_space_for_read(sizeof(msg) + msg.len))
 			break;
@@ -557,7 +555,7 @@ static void xs_recv(void)
 		/* Make sure data is read after reading the indexes */
 		rmb();
 
-		uk_printd(DLVL_EXTRA, "Message is good.\n");
+		uk_pr_debug("Message is good.\n");
 		xs_msg_read(&msg);
 	}
 }
@@ -604,9 +602,8 @@ int xs_comms_init(void)
 	UK_ASSERT(port == xsh.evtchn);
 	unmask_evtchn(xsh.evtchn);
 
-	uk_printd(DLVL_INFO,
-		"Xenstore connection initialised on port %d, buf %p (mfn %#lx)\n",
-		port, xsh.buf, HYPERVISOR_start_info->store_mfn);
+	uk_pr_info("Xenstore connection initialised on port %d, buf %p (mfn %#lx)\n",
+		   port, xsh.buf, HYPERVISOR_start_info->store_mfn);
 
 	return 0;
 }

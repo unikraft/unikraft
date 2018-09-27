@@ -107,7 +107,7 @@ void write_timer_ctl(uint32_t value)
 
 void set_vtimer_compare(uint64_t value)
 {
-	uk_printd(DLVL_EXTRA, "New CompareValue : %llx\n", value);
+	uk_pr_debug("New CompareValue : %llx\n", value);
 
 	__asm__ __volatile__("mcrr p15, 3, %0, %H0, c14"
 			     ::"r"(value));
@@ -142,12 +142,12 @@ void block_domain(__snsec until)
 
 void ukplat_time_init(void)
 {
-	uk_printd(DLVL_INFO, "Initialising timer interface\n");
+	uk_pr_info("Initialising timer interface\n");
 
 	__asm__ __volatile__("mrc p15, 0, %0, c14, c0, 0":"=r"(counter_freq));
 	cntvct_at_init = read_virtual_count();
-	uk_printd(DLVL_EXTRA, "Virtual Count register is %llx, freq = %d Hz\n",
-			cntvct_at_init, counter_freq);
+	uk_pr_debug("Virtual Count register is %llx, freq = %d Hz\n",
+		    cntvct_at_init, counter_freq);
 }
 
 void ukplat_time_fini(void)

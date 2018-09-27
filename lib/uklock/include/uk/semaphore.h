@@ -65,7 +65,7 @@ static inline void uk_semaphore_down(struct uk_semaphore *s)
 		ukplat_lcpu_restore_irqf(irqf);
 	}
 	--s->count;
-	uk_printd(DLVL_EXTRA, "Decreased semaphore %p to %ld\n", s, s->count);
+	uk_pr_debug("Decreased semaphore %p to %ld\n", s, s->count);
 	ukplat_lcpu_restore_irqf(irqf);
 }
 
@@ -80,8 +80,8 @@ static inline int uk_semaphore_down_try(struct uk_semaphore *s)
 	if (s->count > 0) {
 		ret = 1;
 		--s->count;
-		uk_printd(DLVL_EXTRA, "Decreased semaphore %p to %ld\n",
-			  s, s->count);
+		uk_pr_debug("Decreased semaphore %p to %ld\n",
+			    s, s->count);
 	}
 	ukplat_lcpu_restore_irqf(irqf);
 	return ret;
@@ -112,14 +112,14 @@ static inline __nsec uk_semaphore_down_to(struct uk_semaphore *s,
 	}
 	if (s->count > 0) {
 		s->count--;
-		uk_printd(DLVL_EXTRA, "Decreased semaphore %p to %ld\n",
-			  s, s->count);
+		uk_pr_debug("Decreased semaphore %p to %ld\n",
+			    s, s->count);
 		ukplat_lcpu_restore_irqf(irqf);
 		return ukplat_monotonic_clock() - then;
 	}
 
 	ukplat_lcpu_restore_irqf(irqf);
-	uk_printd(DLVL_EXTRA, "Timed out while waiting for semaphore %p\n", s);
+	uk_pr_debug("Timed out while waiting for semaphore %p\n", s);
 	return __NSEC_MAX;
 }
 
@@ -131,8 +131,8 @@ static inline void uk_semaphore_up(struct uk_semaphore *s)
 
 	irqf = ukplat_lcpu_save_irqf();
 	++s->count;
-	uk_printd(DLVL_EXTRA, "Increased semaphore %p to %ld\n",
-		  s, s->count);
+	uk_pr_debug("Increased semaphore %p to %ld\n",
+		    s, s->count);
 	uk_waitq_wake_up(&s->wait);
 	ukplat_lcpu_restore_irqf(irqf);
 }

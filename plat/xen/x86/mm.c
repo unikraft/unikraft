@@ -74,9 +74,9 @@ static void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn,
     int rc;
 #endif
 
-    uk_printd(DLVL_EXTRA, "Allocating new L%lu pt frame for pfn=%lx, "
-	      "prev_l_mfn=%lx, offset=%lx\n",
-	      level, *pt_pfn, prev_l_mfn, offset);
+    uk_pr_debug("Allocating new L%lu pt frame for pfn=%lx, "
+		"prev_l_mfn=%lx, offset=%lx\n",
+		level, *pt_pfn, prev_l_mfn, offset);
 
     /* We need to clear the page, otherwise we might fail to map it
        as a page table page */
@@ -139,14 +139,14 @@ void _init_mem_build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
 #ifdef CONFIG_PARAVIRT
     if ( *max_pfn >= virt_to_pfn(HYPERVISOR_VIRT_START) )
     {
-	    uk_printd(DLVL_WARN, "Trying to use Xen virtual space. "
-		      "Truncating memory from %luMB to ",
-		      ((unsigned long)pfn_to_virt(*max_pfn) -
-		       (unsigned long)&_text)>>20);
+	    uk_pr_warn("Trying to use Xen virtual space. "
+		       "Truncating memory from %luMB to ",
+		       ((unsigned long)pfn_to_virt(*max_pfn) -
+			(unsigned long)&_text)>>20);
 	    *max_pfn = virt_to_pfn(HYPERVISOR_VIRT_START - PAGE_SIZE);
-	    uk_printd(DLVL_WARN, "%luMB\n",
-		      ((unsigned long)pfn_to_virt(*max_pfn) - 
-		       (unsigned long)&_text)>>20);
+	    uk_pr_warn("%luMB\n",
+		       ((unsigned long)pfn_to_virt(*max_pfn) -
+			(unsigned long)&_text)>>20);
     }
 #else
     /* Round up to next 2MB boundary as we are using 2MB pages on HVMlite. */
@@ -158,8 +158,8 @@ void _init_mem_build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
     end_address = (unsigned long)pfn_to_virt(*max_pfn);
 
     /* We worked out the virtual memory range to map, now mapping loop */
-    uk_printd(DLVL_INFO, "Mapping memory range 0x%lx - 0x%lx\n",
-	      start_address, end_address);
+    uk_pr_info("Mapping memory range 0x%lx - 0x%lx\n",
+	       start_address, end_address);
 
     while ( start_address < end_address )
     {
@@ -350,13 +350,12 @@ int do_map_frames(unsigned long va,
 	unsigned long mapped = 0;
 
 	if (!mfns) {
-		uk_printd(DLVL_WARN, "do_map_frames: no mfns supplied\n");
+		uk_pr_warn("do_map_frames: no mfns supplied\n");
 		return -EINVAL;
 	}
 
-	uk_printd(DLVL_EXTRA,
-		"Mapping va=%p n=%lu, mfns[0]=0x%lx stride=%lu incr=%lu prot=0x%lx\n",
-		(void *) va, n, mfns[0], stride, incr, prot);
+	uk_pr_debug("Mapping va=%p n=%lu, mfns[0]=0x%lx stride=%lu incr=%lu prot=0x%lx\n",
+		    (void *) va, n, mfns[0], stride, incr, prot);
 
 	if (err)
 		memset(err, 0, n * sizeof(int));
@@ -452,7 +451,7 @@ unsigned long allocate_ondemand(unsigned long n, unsigned long align)
 	}
 
 	if (contig != n) {
-		uk_printd(DLVL_ERR, "Failed to find %ld frames!\n", n);
+		uk_pr_err("Failed to find %ld frames!\n", n);
 		return 0;
 	}
 
@@ -513,8 +512,8 @@ int unmap_frames(unsigned long va, unsigned long num_frames)
 
 	UK_ASSERT(!((unsigned long) va & ~PAGE_MASK));
 
-	uk_printd(DLVL_EXTRA,
-		"Unmapping va=%p, num=%lu\n", (void *) va, num_frames);
+	uk_pr_debug("Unmapping va=%p, num=%lu\n",
+		    (void *) va, num_frames);
 
 	while (num_frames) {
 #ifdef CONFIG_PARAVIRT
@@ -540,15 +539,15 @@ int unmap_frames(unsigned long va, unsigned long num_frames)
 
 		ret = HYPERVISOR_multicall(call, n);
 		if (ret) {
-			uk_printd(DLVL_ERR,
-				"update_va_mapping hypercall failed with rc=%d.\n", ret);
+			uk_pr_err("update_va_mapping hypercall failed with rc=%d.\n",
+				  ret);
 			return -ret;
 		}
 
 		for (i = 0; i < n; i++) {
 			if (call[i].result) {
-				uk_printd(DLVL_ERR,
-					"update_va_mapping failed for with rc=%d.\n", ret);
+				uk_pr_err("update_va_mapping failed for with rc=%d.\n",
+					  ret);
 				return -(call[i].result);
 			}
 		}
@@ -586,7 +585,7 @@ void _init_mem_set_readonly(void *text, void *etext)
     int rc;
 #endif
 
-    uk_printd(DLVL_EXTRA, "Set %p-%p readonly\n", text, etext);
+    uk_pr_debug("Set %p-%p readonly\n", text, etext);
     mfn = pfn_to_mfn(virt_to_pfn(pt_base));
 
     while ( start_address + page_size <= end_address )
@@ -625,7 +624,7 @@ void _init_mem_set_readonly(void *text, void *etext)
             tab[offset] &= ~_PAGE_RW;
 #endif
         } else {
-            uk_printd(DLVL_EXTRA, "skipped %lx\n", start_address);
+            uk_pr_debug("skipped %lx\n", start_address);
 	}
 
         start_address += page_size;
@@ -670,14 +669,14 @@ void _init_mem_clear_bootstrap(void)
     pgentry_t *pgt;
 #endif
 
-    uk_printd(DLVL_EXTRA, "Clear bootstrapping memory: %p\n", &_text);
+    uk_pr_debug("Clear bootstrapping memory: %p\n", &_text);
 
     /* Use first page as the CoW zero page */
     memset(&_text, 0, PAGE_SIZE);
     mfn_zero = virt_to_mfn((unsigned long) &_text);
 #ifdef CONFIG_PARAVIRT
     if ( (rc = HYPERVISOR_update_va_mapping(0, nullpte, UVMF_INVLPG)) )
-	    uk_printd(DLVL_ERR, "Unable to unmap NULL page. rc=%d\n", rc);
+	    uk_pr_err("Unable to unmap NULL page. rc=%d\n", rc);
 #else
     pgt = get_pgt((unsigned long)&_text);
     *pgt = 0;
@@ -706,6 +705,6 @@ void _init_mem_demand_area(unsigned long start, unsigned long page_num)
 	demand_map_area_start = start;
 	demand_map_area_end = demand_map_area_start + page_num * PAGE_SIZE;
 
-	uk_printd(DLVL_INFO, "Demand map pfns at %lx-%lx.\n",
-		demand_map_area_start, demand_map_area_end);
+	uk_pr_info("Demand map pfns at %lx-%lx.\n",
+		   demand_map_area_start, demand_map_area_end);
 }

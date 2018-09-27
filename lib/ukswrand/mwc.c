@@ -92,6 +92,6 @@ __u32 uk_swrand_randr_r(struct uk_swrand *r)
 
 static void _uk_swrand_ctor(void)
 {
-	uk_printd(DLVL_INFO, "Initialize random number generator...\n");
+	uk_pr_info("Initialize random number generator...\n");
 	uk_swrand_init_r(&uk_swrand_def, CONFIG_LIBUKSWRAND_INITIALSEED);
 }

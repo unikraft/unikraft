@@ -59,7 +59,7 @@ __noreturn void ukplat_terminate(enum ukplat_gstate request)
 		break;
 	}
 
-	uk_printd(DLVL_CRIT, "sys_exit() failed: %d\n", ret);
+	uk_pr_crit("sys_exit() failed: %d\n", ret);
 	for (;;)
 		; /* syscall failed, loop forever */
 }

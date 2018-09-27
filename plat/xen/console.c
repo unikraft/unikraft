@@ -210,8 +210,8 @@ void _libxenplat_init_console(void)
 
 	UK_ASSERT(console_ring != NULL);
 
-	uk_printd(DLVL_EXTRA, "hvconsole @ %p (evtchn: %"PRIu32")\n",
-		  console_ring, console_evtchn);
+	uk_pr_debug("hvconsole @ %p (evtchn: %"PRIu32")\n",
+		    console_ring, console_evtchn);
 
 	err = bind_evtchn(console_evtchn, hvconsole_input, NULL);
 	if (err <= 0)

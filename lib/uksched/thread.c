@@ -89,8 +89,8 @@ int uk_thread_init(struct uk_thread *thread,
 	//TODO _REENT_INIT_PTR(&thread->reent);
 #endif
 
-	uk_printd(DLVL_INFO, "Thread \"%s\": pointer: %p, stack: %p\n",
-			name, thread, thread->stack);
+	uk_pr_info("Thread \"%s\": pointer: %p, stack: %p\n",
+		   name, thread, thread->stack);
 
 	return 0;
 }

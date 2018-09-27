@@ -99,7 +99,7 @@ static inline void _dtb_get_cmdline(char *cmdline, size_t maxlen)
 	return;
 
 enocmdl:
-	uk_printd(DLVL_INFO, "No command line found\n");
+	uk_pr_info("No command line found\n");
 	strcpy(cmdline, CONFIG_UK_NAME);
 }
 
@@ -122,13 +122,13 @@ static inline void _dtb_init_mem(uint32_t physical_offset)
 
 	/* search for assigned VM memory in DTB */
 	if (fdt_num_mem_rsv(HYPERVISOR_dtb) != 0)
-		uk_printd(DLVL_WARN, "Reserved memory is not supported\n");
+		uk_pr_warn("Reserved memory is not supported\n");
 
 	memory = fdt_node_offset_by_prop_value(HYPERVISOR_dtb, -1,
 					       "device_type",
 					       "memory", sizeof("memory"));
 	if (memory < 0) {
-		uk_printd(DLVL_WARN, "No memory found in DTB\n");
+		uk_pr_warn("No memory found in DTB\n");
 		return;
 	}
 
@@ -151,8 +151,8 @@ static inline void _dtb_init_mem(uint32_t physical_offset)
 	start_pfn_p = PFN_UP(to_phys(end));
 	heap_len = mem_size - (PFN_PHYS(start_pfn_p) - mem_base);
 	max_pfn_p = start_pfn_p + PFN_DOWN(heap_len);
-	uk_printd(DLVL_INFO, "    heap start: %p\n",
-		  to_virt(start_pfn_p << __PAGE_SHIFT));
+	uk_pr_info("    heap start: %p\n",
+		   to_virt(start_pfn_p << __PAGE_SHIFT));
 
 	/* The device tree is probably in memory that we're about to hand over
 	 * to the page allocator, so move it to the end and reserve that space.
@@ -191,11 +191,11 @@ void _libxenplat_armentry(void *dtb_pointer,
 
 void _libxenplat_armentry(void *dtb_pointer, uint32_t physical_offset)
 {
-	uk_printd(DLVL_INFO, "Entering from Xen (arm)...\n");
+	uk_pr_info("Entering from Xen (arm)...\n");
 
 	_init_dtb(dtb_pointer);
 	_dtb_init_mem(physical_offset); /* relocates dtb */
-	uk_printd(DLVL_INFO, "           dtb: %p\n", HYPERVISOR_dtb);
+	uk_pr_info("           dtb: %p\n", HYPERVISOR_dtb);
 
 	/* Set up events. */
 	//init_events();

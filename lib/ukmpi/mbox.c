@@ -30,7 +30,7 @@ struct uk_mbox *uk_mbox_create(struct uk_alloc *a, size_t size)
 	uk_semaphore_init(&m->writesem, (long) size);
 	m->writepos = 0;
 
-	uk_printd(DLVL_EXTRA, "Created mailbox %p\n", m);
+	uk_pr_debug("Created mailbox %p\n", m);
 	return m;
 }
 
@@ -40,7 +40,7 @@ struct uk_mbox *uk_mbox_create(struct uk_alloc *a, size_t size)
  */
 void uk_mbox_free(struct uk_alloc *a, struct uk_mbox *m)
 {
-	uk_printd(DLVL_EXTRA, "Release mailbox %p\n", m);
+	uk_pr_debug("Release mailbox %p\n", m);
 
 	UK_ASSERT(a);
 	UK_ASSERT(m);
@@ -67,7 +67,7 @@ static inline void _do_mbox_post(struct uk_mbox *m, void *msg)
 	m->writepos = (m->writepos + 1) % m->len;
 	UK_ASSERT(m->readpos != m->writepos);
 	ukplat_lcpu_restore_irqf(irqf);
-	uk_printd(DLVL_EXTRA, "Posted message %p to mailbox %p\n", msg, m);
+	uk_pr_debug("Posted message %p to mailbox %p\n", msg, m);
 
 	uk_semaphore_up(&m->readsem);
 }
@@ -115,7 +115,7 @@ static inline void *_do_mbox_recv(struct uk_mbox *m)
 	unsigned long irqf;
 	void *ret;
 
-	uk_printd(DLVL_EXTRA, "Receive message from mailbox %p\n", m);
+	uk_pr_debug("Receive message from mailbox %p\n", m);
 	irqf = ukplat_lcpu_save_irqf();
 	UK_ASSERT(m->readpos != m->writepos);
 	ret = m->msgs[m->readpos];

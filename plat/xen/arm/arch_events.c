@@ -35,7 +35,7 @@ static void virq_debug(evtchn_port_t port __unused,
 		       struct __regs *regs __unused,
 		       void *params __unused)
 {
-	uk_printd(DLVL_EXTRA, "Received a virq_debug event\n");
+	uk_pr_debug("Received a virq_debug event\n");
 }
 
 static evtchn_port_t debug_port = -1;

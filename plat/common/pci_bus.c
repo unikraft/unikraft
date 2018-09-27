@@ -175,11 +175,10 @@ static inline int pci_driver_add_device(struct pci_driver *drv,
 
 	dev = (struct pci_device *) uk_calloc(ph.a, 1, sizeof(*dev));
 	if (!dev) {
-		uk_printd(DLVL_ERR,
-				"PCI %02x:%02x.%02x: Failed to initialize: Out of memory!\n",
-				(int) addr->bus,
-				(int) addr->devid,
-				(int) addr->function);
+		uk_pr_err("PCI %02x:%02x.%02x: Failed to initialize: Out of memory!\n",
+			  (int) addr->bus,
+			  (int) addr->devid,
+			  (int) addr->function);
 		return -ENOMEM;
 	}
 
@@ -195,11 +194,10 @@ static inline int pci_driver_add_device(struct pci_driver *drv,
 
 	ret = drv->add_dev(dev);
 	if (ret < 0) {
-		uk_printd(DLVL_ERR,
-			  "PCI %02x:%02x.%02x: Failed to initialize device driver\n",
-			(int) addr->bus,
-			(int) addr->devid,
-			(int) addr->function);
+		uk_pr_err("PCI %02x:%02x.%02x: Failed to initialize device driver\n",
+			  (int) addr->bus,
+			  (int) addr->devid,
+			  (int) addr->function);
 		uk_free(ph.a, dev);
 	}
 	return 0;
@@ -214,7 +212,7 @@ static int pci_probe(void)
 	uint32_t bus;
 	uint8_t dev;
 
-	uk_printd(DLVL_EXTRA, "Probe PCI\n");
+	uk_pr_debug("Probe PCI\n");
 
 	for (bus = 0; bus < PCI_MAX_BUSES; ++bus) {
 		for (dev = 0; dev < PCI_MAX_DEVICES; ++dev) {
@@ -247,19 +245,19 @@ static int pci_probe(void)
 			PCI_CONF_READ(uint16_t, &devid.subsystem_device_id,
 					config_addr, SUBSYS_ID);
 
-			uk_printd(DLVL_INFO, "PCI %02x:%02x.%02x (%04x %04x:%04x): ",
-				(int) addr.bus,
-				(int) addr.devid,
-				(int) addr.function,
-				(int) devid.class_id,
-				(int) devid.vendor_id,
-				(int) devid.device_id);
+			uk_pr_info("PCI %02x:%02x.%02x (%04x %04x:%04x): ",
+				   (int) addr.bus,
+				   (int) addr.devid,
+				   (int) addr.function,
+				   (int) devid.class_id,
+				   (int) devid.vendor_id,
+				   (int) devid.device_id);
 			drv = pci_find_driver(&devid);
 			if (!drv) {
-				uk_printd(DLVL_INFO, "<no driver>\n");
+				uk_pr_info("<no driver>\n");
 				continue;
 			}
-			uk_printd(DLVL_INFO, "driver %p\n", drv);
+			uk_pr_info("driver %p\n", drv);
 			pci_driver_add_device(drv, &addr, &devid);
 		}
 	}
@@ -287,7 +285,7 @@ static int pci_init(struct uk_alloc *a)
 			ret = drv->init(a);
 			if (ret == 0)
 				continue;
-			uk_printd(DLVL_ERR, "Failed to initialize driver %p: %d\n",
+			uk_pr_err("Failed to initialize driver %p: %d\n",
 				  drv, ret);
 			UK_TAILQ_REMOVE(&ph.drv_list, drv, next);
 		}

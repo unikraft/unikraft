@@ -106,11 +106,11 @@ static int xenbus_probe_device(struct xenbus_driver *drv,
 	if (state != XenbusStateInitialising)
 		return 0;
 
-	uk_printd(DLVL_INFO, "Xenbus device: %s\n", nodename);
+	uk_pr_info("Xenbus device: %s\n", nodename);
 
 	dev = uk_xb_calloc(1, sizeof(*dev) + strlen(nodename) + 1);
 	if (!dev) {
-		uk_printd(DLVL_ERR, "Failed to initialize: Out of memory!\n");
+		uk_pr_err("Failed to initialize: Out of memory!\n");
 		err = -ENOMEM;
 		goto out;
 	}
@@ -122,7 +122,7 @@ static int xenbus_probe_device(struct xenbus_driver *drv,
 
 	err = drv->add_dev(dev);
 	if (err) {
-		uk_printd(DLVL_ERR, "Failed to add device.\n");
+		uk_pr_err("Failed to add device.\n");
 		uk_xb_free(dev);
 	}
 
@@ -143,15 +143,13 @@ static int xenbus_probe_device_type(const char *devtype_str)
 
 	devtype = xenbus_str_to_devtype(devtype_str);
 	if (!devtype) {
-		uk_printd(DLVL_WARN,
-			"Unsupported device type: %s\n", devtype_str);
+		uk_pr_warn("Unsupported device type: %s\n", devtype_str);
 		goto out;
 	}
 
 	drv = xenbus_find_driver(devtype);
 	if (!drv) {
-		uk_printd(DLVL_WARN,
-			"No driver for device type: %s\n", devtype_str);
+		uk_pr_warn("No driver for device type: %s\n", devtype_str);
 		goto out;
 	}
 
@@ -161,8 +159,7 @@ static int xenbus_probe_device_type(const char *devtype_str)
 	devices = xs_ls(XBT_NIL, dirname);
 	if (PTRISERR(devices)) {
 		err = PTR2ERR(devices);
-		uk_printd(DLVL_ERR,
-			"Error reading %s devices: %d\n", devtype_str, err);
+		uk_pr_err("Error reading %s devices: %d\n", devtype_str, err);
 		goto out;
 	}
 
@@ -184,13 +181,13 @@ static int xenbus_probe(void)
 	char **devtypes;
 	int err = 0;
 
-	uk_printd(DLVL_INFO, "Probe Xenbus\n");
+	uk_pr_info("Probe Xenbus\n");
 
 	/* Get device types list */
 	devtypes = xs_ls(XBT_NIL, XS_DEV_PATH);
 	if (PTRISERR(devtypes)) {
 		err = PTR2ERR(devtypes);
-		uk_printd(DLVL_ERR, "Error reading device types: %d\n", err);
+		uk_pr_err("Error reading device types: %d\n", err);
 		goto out;
 	}
 
@@ -218,8 +215,7 @@ static int xenbus_init(struct uk_alloc *a)
 
 	ret = xs_comms_init();
 	if (ret) {
-		uk_printd(DLVL_ERR,
-			"Error initializing Xenstore communication.");
+		uk_pr_err("Error initializing Xenstore communication.");
 		return ret;
 	}
 
@@ -228,8 +224,7 @@ static int xenbus_init(struct uk_alloc *a)
 			ret = drv->init(a);
 			if (ret == 0)
 				continue;
-			uk_printd(DLVL_ERR,
-				"Failed to initialize driver %p: %d\n",
+			uk_pr_err("Failed to initialize driver %p: %d\n",
 				drv, ret);
 			UK_TAILQ_REMOVE(&xbh.drv_list, drv, next);
 		}

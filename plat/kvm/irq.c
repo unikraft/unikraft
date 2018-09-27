@@ -104,7 +104,7 @@ void _ukplat_irq_handle(unsigned long irq)
 	}
 
 	if (!handled)
-		uk_printd(DLVL_CRIT, "Unhandled irq=%lu\n", irq);
+		uk_pr_crit("Unhandled irq=%lu\n", irq);
 	else
 		intctrl_ack_irq(irq);
 }

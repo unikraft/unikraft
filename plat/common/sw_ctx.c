@@ -57,7 +57,7 @@ static void *sw_ctx_create(struct uk_alloc *allocator, unsigned long sp)
 
 	ctx = uk_malloc(allocator, sizeof(struct sw_ctx));
 	if (ctx == NULL) {
-		uk_printd(DLVL_WARN, "Error allocating software context.");
+		uk_pr_warn("Error allocating software context.");
 		return NULL;
 	}
 

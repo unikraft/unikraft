@@ -61,8 +61,8 @@ DECLARE_TRAP   (simd_error,        "SIMD coprocessor error")
 void do_unhandled_trap(int trapnr, char *str, struct __regs *regs,
 		unsigned long error_code)
 {
-	uk_printd(DLVL_CRIT, "Unhandled Trap %d (%s), error code=0x%lx\n",
-			trapnr, str, error_code);
+	uk_pr_crit("Unhandled Trap %d (%s), error code=0x%lx\n",
+		   trapnr, str, error_code);
 	uk_pr_info("Regs address %p\n", regs);
 	/* TODO revisit when UK_CRASH will also dump the registers */
 	dump_regs(regs);
@@ -79,7 +79,7 @@ static void fault_prologue(void)
 	 */
 	if (handling_fault == 1) {
 		UK_CRASH("Page fault in pagetable walk "
-				"(access to invalid memory?).\n");
+			 "(access to invalid memory?).\n");
 	}
 	handling_fault++;
 	barrier();
@@ -88,8 +88,8 @@ static void fault_prologue(void)
 void do_gp_fault(struct __regs *regs, long error_code)
 {
 	fault_prologue();
-	uk_printd(DLVL_CRIT, "GPF rip: %lx, error_code=%lx\n",
-			regs->rip, error_code);
+	uk_pr_crit("GPF rip: %lx, error_code=%lx\n",
+		   regs->rip, error_code);
 	dump_regs(regs);
 	stack_walk_for_frame(regs->rbp);
 	dump_mem(regs->rsp);
@@ -103,9 +103,9 @@ void do_page_fault(struct __regs *regs, unsigned long error_code)
 	unsigned long addr = read_cr2();
 
 	fault_prologue();
-	uk_printd(DLVL_CRIT, "Page fault at linear address %lx, rip %lx, "
-			"regs %p, sp %lx, our_sp %p, code %lx\n",
-			addr, regs->rip, regs, regs->rsp, &addr, error_code);
+	uk_pr_crit("Page fault at linear address %lx, rip %lx, "
+		   "regs %p, sp %lx, our_sp %p, code %lx\n",
+		   addr, regs->rip, regs, regs->rsp, &addr, error_code);
 
 	dump_regs(regs);
 	stack_walk_for_frame(regs->rbp);

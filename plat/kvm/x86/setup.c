@@ -63,8 +63,7 @@ static inline void _mb_get_cmdline(struct multiboot_info *mi, char *cmdline,
 
 		if (cmdline_len >= maxlen) {
 			cmdline_len = maxlen - 1;
-			uk_printd(DLVL_INFO,
-				  "Command line too long, truncated\n");
+			uk_pr_info("Command line too long, truncated\n");
 		}
 		memcpy(cmdline, mi_cmdline, cmdline_len);
 
@@ -72,7 +71,7 @@ static inline void _mb_get_cmdline(struct multiboot_info *mi, char *cmdline,
 		cmdline[cmdline_len <= (maxlen - 1) ? cmdline_len
 			: (maxlen - 1)] = '\0';
 	} else {
-		uk_printd(DLVL_INFO, "No command line found\n");
+		uk_pr_info("No command line found\n");
 		strcpy(cmdline, CONFIG_UK_NAME);
 	}
 }
@@ -138,8 +137,8 @@ void _libkvmplat_entry(void *arg)
 	traps_init();
 	intctrl_init();
 
-	uk_printd(DLVL_INFO, "Entering from KVM (x86)...\n");
-	uk_printd(DLVL_INFO, "     multiboot: %p\n", mi);
+	uk_pr_info("Entering from KVM (x86)...\n");
+	uk_pr_info("     multiboot: %p\n", mi);
 
 	/*
 	 * The multiboot structures may be anywhere in memory, so take a copy of
@@ -148,14 +147,14 @@ void _libkvmplat_entry(void *arg)
 	_mb_get_cmdline(mi, cmdline, sizeof(cmdline));
 	_mb_init_mem(mi);
 
-	uk_printd(DLVL_INFO, "    heap start: %p\n", _libkvmplat_heap_start);
-	uk_printd(DLVL_INFO, "     stack top: %p\n", _libkvmplat_stack_top);
+	uk_pr_info("    heap start: %p\n", _libkvmplat_heap_start);
+	uk_pr_info("     stack top: %p\n", _libkvmplat_stack_top);
 
 	/*
 	 * Switch away from the bootstrap stack as early as possible.
 	 */
-	uk_printd(DLVL_INFO, "Switch from bootstrap stack to stack @%p\n",
-				_libkvmplat_mem_end);
+	uk_pr_info("Switch from bootstrap stack to stack @%p\n",
+		   _libkvmplat_mem_end);
 	_libkvmplat_newstack((__u64) _libkvmplat_mem_end,
 				_libkvmplat_entry2, 0);
 }

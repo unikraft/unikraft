@@ -50,7 +50,7 @@ static void do_pselect(struct k_timespec *timeout)
 
 	ret = sys_pselect6(nfds, readfds, writefds, exceptfds, timeout, NULL);
 	if (ret < 0 && ret != -EINTR)
-		uk_printd(DLVL_WARN, "Failed to halt LCPU: %d\n", ret);
+		uk_pr_warn("Failed to halt LCPU: %d\n", ret);
 }
 
 void halt(void)

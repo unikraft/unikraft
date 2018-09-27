@@ -47,7 +47,7 @@ void _uk_bus_register(struct uk_bus *b)
 	if (bus_count == 0)
 		UK_TAILQ_INIT(&uk_bus_list);
 
-	uk_printd(DLVL_EXTRA, "Register bus handler: %p\n", b);
+	uk_pr_debug("Register bus handler: %p\n", b);
 	UK_TAILQ_INSERT_TAIL(&uk_bus_list, b, next);
 	++bus_count;
 }
@@ -57,7 +57,7 @@ void _uk_bus_unregister(struct uk_bus *b)
 	UK_ASSERT(b != NULL);
 	UK_ASSERT(bus_count > 0);
 
-	uk_printd(DLVL_EXTRA, "Unregister bus handler: %p\n", b);
+	uk_pr_debug("Unregister bus handler: %p\n", b);
 	UK_TAILQ_REMOVE(&uk_bus_list, b, next);
 	bus_count--;
 }
@@ -71,7 +71,7 @@ int uk_bus_init(struct uk_bus *b, struct uk_alloc *a)
 {
 	UK_ASSERT(b != NULL);
 
-	uk_printd(DLVL_EXTRA, "Initialize bus handler %p...\n", b);
+	uk_pr_debug("Initialize bus handler %p...\n", b);
 	if (!b->init)
 		return 0;
 	return b->init(a);
@@ -83,6 +83,6 @@ int uk_bus_probe(struct uk_bus *b)
 	UK_ASSERT(b != NULL);
 	UK_ASSERT(b->probe != NULL);
 
-	uk_printd(DLVL_EXTRA, "Probe bus %p...\n", b);
+	uk_pr_debug("Probe bus %p...\n", b);
 	return b->probe();
 }

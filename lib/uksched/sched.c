@@ -121,7 +121,7 @@ static void *create_stack(struct uk_alloc *allocator)
 
 	stack = uk_palloc(allocator, STACK_SIZE_PAGE_ORDER);
 	if (stack == NULL) {
-		uk_printd(DLVL_WARN, "Error allocating thread stack.");
+		uk_pr_warn("Error allocating thread stack.");
 		return NULL;
 	}
 
@@ -160,7 +160,7 @@ struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
 
 	thread = uk_malloc(sched->allocator, sizeof(struct uk_thread));
 	if (thread == NULL) {
-		uk_printd(DLVL_WARN, "Error allocating memory for thread.");
+		uk_pr_warn("Error allocating memory for thread.");
 		goto err;
 	}
 
@@ -214,7 +214,7 @@ void uk_sched_thread_exit(void)
 
 	thread = uk_thread_current();
 
-	uk_printd(DLVL_INFO, "Thread \"%s\" exited.\n", thread->name);
+	uk_pr_info("Thread \"%s\" exited.\n", thread->name);
 
 	UK_ASSERT(thread->sched);
 	uk_sched_thread_remove(thread->sched, thread);

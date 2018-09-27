@@ -47,7 +47,7 @@ static void _init_dtb(void *dtb_pointer)
 		UK_CRASH("Invalid DTB: %s\n", fdt_strerror(ret));
 
 	_libkvmplat_dtb = dtb_pointer;
-	uk_printd(DLVL_INFO, "Found device tree on: %p\n", dtb_pointer);
+	uk_pr_info("Found device tree on: %p\n", dtb_pointer);
 }
 
 static void _dtb_get_psci_method(void)
@@ -65,13 +65,13 @@ static void _dtb_get_psci_method(void)
 		fdtpsci = fdt_node_offset_by_compatible(_libkvmplat_dtb,
 							-1, "arm,psci-0.2");
 	if (fdtpsci < 0) {
-		uk_printd(DLVL_INFO, "No PSCI conduit found in DTB\n");
+		uk_pr_info("No PSCI conduit found in DTB\n");
 		goto enomethod;
 	}
 
 	fdtmethod = fdt_getprop(_libkvmplat_dtb, fdtpsci, "method", &len);
 	if (!fdtmethod || (len <= 0)) {
-		uk_printd(DLVL_INFO, "No PSCI method found\n");
+		uk_pr_info("No PSCI method found\n");
 		goto enomethod;
 	}
 
@@ -80,16 +80,16 @@ static void _dtb_get_psci_method(void)
 	else if (!strcmp(fdtmethod, "smc"))
 		smcc_psci_call = smcc_psci_smc_call;
 	else {
-		uk_printd(DLVL_INFO,
-		"Invalid PSCI conduit method: %s\n", fdtmethod);
+		uk_pr_info("Invalid PSCI conduit method: %s\n",
+			   fdtmethod);
 		goto enomethod;
 	}
 
-	uk_printd(DLVL_INFO, "PSCI method: %s\n", fdtmethod);
+	uk_pr_info("PSCI method: %s\n", fdtmethod);
 	return;
 
 enomethod:
-	uk_printd(DLVL_INFO, "Support PSCI from PSCI-0.2\n");
+	uk_pr_info("Support PSCI from PSCI-0.2\n");
 	smcc_psci_call = NULL;
 }
 
@@ -104,13 +104,13 @@ static void _init_dtb_mem(void)
 
 	/* search for assigned VM memory in DTB */
 	if (fdt_num_mem_rsv(_libkvmplat_dtb) != 0)
-		uk_printd(DLVL_WARN, "Reserved memory is not supported\n");
+		uk_pr_warn("Reserved memory is not supported\n");
 
 	fdt_mem = fdt_node_offset_by_prop_value(_libkvmplat_dtb, -1,
 						"device_type",
 						"memory", sizeof("memory"));
 	if (fdt_mem < 0) {
-		uk_printd(DLVL_WARN, "No memory found in DTB\n");
+		uk_pr_warn("No memory found in DTB\n");
 		return;
 	}
 
@@ -138,8 +138,7 @@ static void _init_dtb_mem(void)
 
 	/* If we have more than one memory bank, give a warning messasge */
 	if (prop_len > prop_min_len)
-		uk_printd(DLVL_WARN,
-			"Currently, we support only one memory bank!\n");
+		uk_pr_warn("Currently, we support only one memory bank!\n");
 
 	mem_base = fdt64_to_cpu(regs[0]);
 	mem_size = fdt64_to_cpu(regs[1]);
@@ -173,11 +172,11 @@ static void _dtb_get_cmdline(char *cmdline, size_t maxlen)
 	cmdline[((unsigned int) len - 1) <= (maxlen - 1) ?
 		((unsigned int) len - 1) : (maxlen - 1)] = '\0';
 
-	uk_printd(DLVL_INFO, "Command line: %s\n", cmdline);
+	uk_pr_info("Command line: %s\n", cmdline);
 	return;
 
 enocmdl:
-	uk_printd(DLVL_INFO, "No command line found\n");
+	uk_pr_info("No command line found\n");
 	strcpy(cmdline, CONFIG_UK_NAME);
 }
 
@@ -191,7 +190,7 @@ void _libkvmplat_start(void *dtb_pointer)
 	_init_dtb(dtb_pointer);
 	_libkvmplat_init_console();
 
-	uk_printd(DLVL_INFO, "Entering from KVM (arm64)...\n");
+	uk_pr_info("Entering from KVM (arm64)...\n");
 
 	/* Get command line from DTB */
 
@@ -203,15 +202,15 @@ void _libkvmplat_start(void *dtb_pointer)
 	/* Initialize memory from DTB */
 	_init_dtb_mem();
 
-	uk_printd(DLVL_INFO, "pagetable start: %p\n", _libkvmplat_pagetable);
-	uk_printd(DLVL_INFO, "     heap start: %p\n", _libkvmplat_heap_start);
-	uk_printd(DLVL_INFO, "      stack top: %p\n", _libkvmplat_stack_top);
+	uk_pr_info("pagetable start: %p\n", _libkvmplat_pagetable);
+	uk_pr_info("     heap start: %p\n", _libkvmplat_heap_start);
+	uk_pr_info("      stack top: %p\n", _libkvmplat_stack_top);
 
 	/*
 	 * Switch away from the bootstrap stack as early as possible.
 	 */
-	uk_printd(DLVL_INFO, "Switch from bootstrap stack to stack @%p\n",
-				_libkvmplat_stack_top);
+	uk_pr_info("Switch from bootstrap stack to stack @%p\n",
+		   _libkvmplat_stack_top);
 
 	_libkvmplat_newstack((uint64_t) _libkvmplat_stack_top,
 				_libkvmplat_entry2, NULL);

@@ -45,7 +45,7 @@ int close(int fd)
 	struct vfscore_file *file = vfscore_get_file(fd);
 
 	if (!file) {
-		uk_printd(DLVL_WARN, "no such file descriptor: %d\n", fd);
+		uk_pr_warn("no such file descriptor: %d\n", fd);
 		errno = EBADF;
 		return -1;
 	}
@@ -63,13 +63,13 @@ ssize_t write(int fd, const void *buf, size_t count)
 	struct vfscore_file *file = vfscore_get_file(fd);
 
 	if (!file) {
-		uk_printd(DLVL_WARN, "no such file descriptor: %d\n", fd);
+		uk_pr_warn("no such file descriptor: %d\n", fd);
 		errno = EBADF;
 		return -1;
 	}
 
 	if (!file->fops->write) {
-		uk_printd(DLVL_WARN, "file does not have write op: %d\n", fd);
+		uk_pr_warn("file does not have write op: %d\n", fd);
 		errno = EINVAL;
 		return -1;
 	}
@@ -82,13 +82,13 @@ ssize_t read(int fd, void *buf, size_t count)
 	struct vfscore_file *file = vfscore_get_file(fd);
 
 	if (!file) {
-		uk_printd(DLVL_WARN, "no such file descriptor: %d\n", fd);
+		uk_pr_warn("no such file descriptor: %d\n", fd);
 		errno = EBADF;
 		return -1;
 	}
 
 	if (!file->fops->read) {
-		uk_printd(DLVL_WARN, "file does not have read op: %d\n", fd);
+		uk_pr_warn("file does not have read op: %d\n", fd);
 		errno = EINVAL;
 		return -1;
 	}

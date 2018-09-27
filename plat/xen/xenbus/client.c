@@ -191,7 +191,7 @@ exit:
 	} while (err == -EAGAIN);
 
 	if (err)
-		uk_printd(DLVL_ERR, "Error switching state to %s: %d\n",
+		uk_pr_err("Error switching state to %s: %d\n",
 			xenbus_state_to_str(state), err);
 
 	return err;

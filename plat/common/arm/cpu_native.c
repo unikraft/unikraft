@@ -53,7 +53,7 @@ void reset(void)
 	 * halt the CPU.
 	 */
 	if (!smcc_psci_call) {
-		uk_printd(DLVL_CRIT, "Couldn't reset system, HALT!\n");
+		uk_pr_crit("Couldn't reset system, HALT!\n");
 		__CPU_HALT();
 	}
 
@@ -68,7 +68,7 @@ void system_off(void)
 	 * halt the CPU.
 	 */
 	if (!smcc_psci_call) {
-		uk_printd(DLVL_CRIT, "Couldn't shutdown system, HALT!\n");
+		uk_pr_crit("Couldn't shutdown system, HALT!\n");
 		__CPU_HALT();
 	}
 

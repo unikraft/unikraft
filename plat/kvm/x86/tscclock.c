@@ -232,9 +232,8 @@ int tscclock_init(void)
 	tsc_base = rdtsc();
 	i8254_delay(100000);
 	tsc_freq = (rdtsc() - tsc_base) * 10;
-	uk_printd(DLVL_INFO,
-		  "Clock source: TSC, frequency estimate is %llu Hz\n",
-		  (unsigned long long) tsc_freq);
+	uk_pr_info("Clock source: TSC, frequency estimate is %llu Hz\n",
+		   (unsigned long long) tsc_freq);
 
 	/*
 	 * Calculate TSC scaling multiplier.

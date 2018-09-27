@@ -91,7 +91,7 @@ static inline unsigned int uk_bus_init_all(struct uk_alloc *a)
 		if ((status = uk_bus_init(b, a)) >= 0) {
 			++ret;
 		} else {
-			uk_printd(DLVL_ERR, "Failed to initialize bus driver %p: %d\n",
+			uk_pr_err("Failed to initialize bus driver %p: %d\n",
 				  b, status);
 
 			/* Remove the failed driver from the list */

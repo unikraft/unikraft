@@ -639,8 +639,7 @@ int xs_debug_msg(const char *msg)
 	if (err)
 		goto out;
 
-	uk_printd(DLVL_EXTRA,
-		"Got a debug reply %s\n", (char *) rep.data);
+	uk_pr_debug("Got a debug reply %s\n", (char *) rep.data);
 	free(rep.data);
 
 out:

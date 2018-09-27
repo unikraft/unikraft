@@ -35,36 +35,35 @@ static void dump_registers(struct __regs *regs, uint64_t far)
 {
 	unsigned char idx;
 
-	uk_printd(DLVL_CRIT, "Unikraft: Dump registers:\n");
-	uk_printd(DLVL_CRIT, "\t SP       : 0x%016lx\n", regs->sp);
-	uk_printd(DLVL_CRIT, "\t ESR_EL1  : 0x%016lx\n", regs->esr_el1);
-	uk_printd(DLVL_CRIT, "\t ELR_EL1  : 0x%016lx\n", regs->elr_el1);
-	uk_printd(DLVL_CRIT, "\t LR (x30) : 0x%016lx\n", regs->lr);
-	uk_printd(DLVL_CRIT, "\t PSTATE   : 0x%016lx\n", regs->spsr_el1);
-	uk_printd(DLVL_CRIT, "\t FAR_EL1  : 0x%016lx\n", far);
+	uk_pr_crit("Unikraft: Dump registers:\n");
+	uk_pr_crit("\t SP       : 0x%016lx\n", regs->sp);
+	uk_pr_crit("\t ESR_EL1  : 0x%016lx\n", regs->esr_el1);
+	uk_pr_crit("\t ELR_EL1  : 0x%016lx\n", regs->elr_el1);
+	uk_pr_crit("\t LR (x30) : 0x%016lx\n", regs->lr);
+	uk_pr_crit("\t PSTATE   : 0x%016lx\n", regs->spsr_el1);
+	uk_pr_crit("\t FAR_EL1  : 0x%016lx\n", far);
 
 	for (idx = 0; idx < 28; idx += 4)
-		uk_printd(DLVL_CRIT,
-			"\t x%02d ~ x%02d: 0x%016lx 0x%016lx 0x%016lx 0x%016lx\n",
-			idx, idx + 3, regs->x[idx], regs->x[idx + 1],
-			regs->x[idx + 2], regs->x[idx + 3]);
+		uk_pr_crit("\t x%02d ~ x%02d: 0x%016lx 0x%016lx 0x%016lx 0x%016lx\n",
+			   idx, idx + 3, regs->x[idx], regs->x[idx + 1],
+			   regs->x[idx + 2], regs->x[idx + 3]);
 
-	uk_printd(DLVL_CRIT, "\t x28 ~ x29: 0x%016lx 0x%016lx\n",
-				regs->x[28], regs->x[29]);
+	uk_pr_crit("\t x28 ~ x29: 0x%016lx 0x%016lx\n",
+		   regs->x[28], regs->x[29]);
 }
 
 void invalid_trap_handler(struct __regs *regs, uint32_t el,
 				uint32_t reason, uint64_t far)
 {
-	uk_printd(DLVL_CRIT, "Unikraft: EL%d invalid %s trap caught\n",
-				el, exception_modes[reason]);
+	uk_pr_crit("Unikraft: EL%d invalid %s trap caught\n",
+		   el, exception_modes[reason]);
 	dump_registers(regs, far);
 	ukplat_crash();
 }
 
 void trap_el1_sync(struct __regs *regs, uint64_t far)
 {
-	uk_printd(DLVL_CRIT, "Unikraft: EL1 sync trap caught\n");
+	uk_pr_crit("Unikraft: EL1 sync trap caught\n");
 
 	dump_registers(regs, far);
 	ukplat_crash();

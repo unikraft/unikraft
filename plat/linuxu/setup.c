@@ -175,7 +175,7 @@ void _liblinuxuplat_entry(int argc, char *argv[])
 	if (_liblinuxuplat_opts.heap.len > 0) {
 		pret = sys_mapmem(NULL, _liblinuxuplat_opts.heap.len);
 		if (PTRISERR(pret))
-			uk_printd(DLVL_ERR, "Failed to allocate memory for heap: %d\n", PTR2ERR(pret));
+			uk_pr_err("Failed to allocate memory for heap: %d\n", PTR2ERR(pret));
 		else
 			_liblinuxuplat_opts.heap.base = pret;
 	}

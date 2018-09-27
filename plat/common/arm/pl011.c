@@ -113,7 +113,7 @@ void _libkvmplat_init_console(void)
 	const uint64_t *regs;
 	uint64_t reg_uart_bas;
 
-	uk_printd(DLVL_INFO, "Serial initializing\n");
+	uk_pr_info("Serial initializing\n");
 
 	offset = fdt_node_offset_by_compatible(_libkvmplat_dtb, \
 					-1, "arm,pl011");
@@ -133,10 +133,10 @@ void _libkvmplat_init_console(void)
 		UK_CRASH("Bad 'reg' property: %p %d\n", regs, len);
 
 	reg_uart_bas = fdt64_to_cpu(regs[0]);
-	uk_printd(DLVL_INFO, "Found PL011 UART on: 0x%lx\n", reg_uart_bas);
+	uk_pr_info("Found PL011 UART on: 0x%lx\n", reg_uart_bas);
 
 	init_pl011(reg_uart_bas);
-	uk_printd(DLVL_INFO, "PL011 UART initialized\n");
+	uk_pr_info("PL011 UART initialized\n");
 }
 
 int ukplat_coutd(const char *str, uint32_t len)

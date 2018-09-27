@@ -47,8 +47,8 @@ static void print_runqueue(struct uk_sched *s)
 	struct uk_thread *th;
 
 	UK_TAILQ_FOREACH(th, &prv->thread_list, thread_list) {
-		uk_printd(DLVL_EXTRA, "   Thread \"%s\", runnable=%d\n",
-				th->name, is_runnable(th));
+		uk_pr_debug("   Thread \"%s\", runnable=%d\n",
+			    th->name, is_runnable(th));
 	}
 }
 #endif
@@ -163,7 +163,7 @@ static void schedcoop_thread_remove(struct uk_sched *s, struct uk_thread *t)
 	/* Schedule will free the resources */
 	while (1) {
 		schedcoop_schedule(s);
-		uk_printd(DLVL_WARN, "schedule() returned! Trying again\n");
+		uk_pr_warn("schedule() returned! Trying again\n");
 	}
 }
 
@@ -192,11 +192,11 @@ struct uk_sched *uk_schedcoop_init(struct uk_alloc *a)
 	struct schedcoop_private *prv = NULL;
 	struct uk_sched *sched = NULL;
 
-	uk_printd(DLVL_INFO, "Initializing cooperative scheduler\n");
+	uk_pr_info("Initializing cooperative scheduler\n");
 
 	sched = uk_malloc(a, sizeof(struct uk_sched));
 	if (sched == NULL) {
-		uk_printd(DLVL_WARN, "Could not allocate memory for scheduler.");
+		uk_pr_warn("Could not allocate memory for scheduler.\n");
 		goto out_err;
 	}
 
@@ -206,8 +206,7 @@ struct uk_sched *uk_schedcoop_init(struct uk_alloc *a)
 
 	prv = uk_malloc(a, sizeof(struct schedcoop_private));
 	if (prv == NULL) {
-		uk_printd(DLVL_WARN,
-				"Could not allocate memory for scheduler private data.");
+		uk_pr_warn("Could not allocate memory for scheduler private data.\n");
 		goto out_err;
 	}
 

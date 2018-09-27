@@ -64,7 +64,7 @@
 
 /* error messages to debug output */
 #define warnx(fmt, ...)					\
-	uk_printd(DLVL_WARN, (fmt), __VA_ARGS__)
+	uk_pr_warn((fmt), __VA_ARGS__)
 
 #define GNU_COMPATIBLE		/* Be more compatible, configure's use us! */
 

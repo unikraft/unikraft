@@ -243,7 +243,7 @@ static void timer_handler(evtchn_port_t ev __unused,
 static evtchn_port_t port;
 void ukplat_time_init(void)
 {
-	uk_printd(DLVL_EXTRA, "Initializing timer interface\n");
+	uk_pr_debug("Initializing timer interface\n");
 	port = bind_virq(VIRQ_TIMER, &timer_handler, NULL);
 	unmask_evtchn(port);
 }

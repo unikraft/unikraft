@@ -44,11 +44,11 @@ grant_entry_v1_t *gnttab_arch_init(int grant_frames_num)
 
 	rc = HYPERVISOR_grant_table_op(GNTTABOP_setup_table, &setup, 1);
 	if (rc) {
-		uk_printd(DLVL_ERR, "Hypercall error: %d\n", rc);
+		uk_pr_err("Hypercall error: %d\n", rc);
 		goto out;
 	}
 	if (setup.status != GNTST_okay) {
-		uk_printd(DLVL_ERR, "Hypercall status: %d\n", setup.status);
+		uk_pr_err("Hypercall status: %d\n", setup.status);
 		goto out;
 	}
 

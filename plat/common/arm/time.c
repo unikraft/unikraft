@@ -86,8 +86,7 @@ static uint32_t get_counter_frequency(void)
 	fdt_freq = fdt_getprop(_libkvmplat_dtb,
 			fdt_archtimer, "clock-frequency", &len);
 	if (!fdt_freq || (len <= 0)) {
-		uk_printd(DLVL_INFO,
-		"No clock-frequency found, reading from register directly.\n");
+		uk_pr_info("No clock-frequency found, reading from register directly.\n");
 		goto endnofreq;
 	}
 

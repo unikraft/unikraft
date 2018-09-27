@@ -149,8 +149,8 @@ static inline void _init_mem(void)
 	if (max_pfn >= MAX_MEM_SIZE / __PAGE_SIZE)
 		max_pfn = MAX_MEM_SIZE / __PAGE_SIZE - 1;
 
-	uk_printd(DLVL_INFO, "     start_pfn: %lx\n", start_pfn);
-	uk_printd(DLVL_INFO, "       max_pfn: %lx\n", max_pfn);
+	uk_pr_info("     start_pfn: %lx\n", start_pfn);
+	uk_pr_info("       max_pfn: %lx\n", max_pfn);
 
 	_init_mem_build_pagetable(&start_pfn, &max_pfn);
 	_init_mem_clear_bootstrap();
@@ -188,7 +188,7 @@ void _libxenplat_x86entry(void *start_info)
 	HYPERVISOR_start_info = (start_info_t *)start_info;
 	_libxenplat_prepare_console(); /* enables buffering for console */
 
-	uk_printd(DLVL_INFO, "Entering from Xen (x86, PV)...\n");
+	uk_pr_info("Entering from Xen (x86, PV)...\n");
 
 	_init_shared_info(); /* remaps shared info */
 
@@ -198,9 +198,9 @@ void _libxenplat_x86entry(void *start_info)
 	/* Set up events. */
 	init_events();
 
-	uk_printd(DLVL_INFO, "    start_info: %p\n", HYPERVISOR_start_info);
-	uk_printd(DLVL_INFO, "   shared_info: %p\n", HYPERVISOR_shared_info);
-	uk_printd(DLVL_INFO, "hypercall_page: %p\n", hypercall_page);
+	uk_pr_info("    start_info: %p\n", HYPERVISOR_start_info);
+	uk_pr_info("   shared_info: %p\n", HYPERVISOR_shared_info);
+	uk_pr_info("hypercall_page: %p\n", hypercall_page);
 
 	_init_mem();
 

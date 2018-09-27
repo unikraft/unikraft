@@ -275,8 +275,8 @@ static void *bbuddy_palloc(struct uk_alloc *a, size_t order)
 	return ((void *)alloc_ch);
 
 no_memory:
-	uk_printd(DLVL_WARN, "%"__PRIuptr": Cannot handle palloc request of order %"__PRIsz": Out of memory\n",
-		  (uintptr_t)a, order);
+	uk_pr_warn("%"__PRIuptr": Cannot handle palloc request of order %"__PRIsz": Out of memory\n",
+		   (uintptr_t)a, order);
 	errno = ENOMEM;
 	return NULL;
 }
@@ -358,10 +358,9 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 	min = round_pgup((uintptr_t)base);
 	max = round_pgdown((uintptr_t)base + (uintptr_t)len);
 	if (max < min) {
-		uk_printd(DLVL_ERR,
-			"%"__PRIuptr": Failed to add memory region %"__PRIuptr"-%"__PRIuptr": Invalid range after applying page alignments\n",
-			(uintptr_t) a, (uintptr_t) base,
-			(uintptr_t) base + (uintptr_t) len);
+		uk_pr_err("%"__PRIuptr": Failed to add memory region %"__PRIuptr"-%"__PRIuptr": Invalid range after applying page alignments\n",
+			  (uintptr_t) a, (uintptr_t) base,
+			  (uintptr_t) base + (uintptr_t) len);
 		return -EINVAL;
 	}
 
@@ -372,10 +371,9 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 	 */
 	if (range < round_pgup(sizeof(*memr) + BYTES_PER_MAPWORD) +
 			__PAGE_SIZE) {
-		uk_printd(DLVL_ERR,
-			"%"__PRIuptr": Failed to add memory region %"__PRIuptr"-%"__PRIuptr": Not enough space after applying page alignments\n",
-			(uintptr_t) a, (uintptr_t) base,
-			(uintptr_t) base + (uintptr_t) len);
+		uk_pr_err("%"__PRIuptr": Failed to add memory region %"__PRIuptr"-%"__PRIuptr": Not enough space after applying page alignments\n",
+			  (uintptr_t) a, (uintptr_t) base,
+			  (uintptr_t) base + (uintptr_t) len);
 		return -EINVAL;
 	}
 
@@ -425,9 +423,9 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 			if (min & (1UL << i))
 				break;
 
-		uk_printd(DLVL_EXTRA, "%"__PRIuptr": Add allocate unit %"__PRIuptr" - %"__PRIuptr" (order %lu)\n",
-			  (uintptr_t)a, min, (uintptr_t)(min + (1UL << i)),
-			  (i - __PAGE_SHIFT));
+		uk_pr_debug("%"__PRIuptr": Add allocate unit %"__PRIuptr" - %"__PRIuptr" (order %lu)\n",
+			    (uintptr_t)a, min, (uintptr_t)(min + (1UL << i)),
+			    (i - __PAGE_SHIFT));
 
 		ch = (chunk_head_t *)min;
 		min += 1UL << i;
@@ -463,14 +461,14 @@ struct uk_alloc *uk_allocbbuddy_init(void *base, size_t len)
 
 	/* enough space for allocator available? */
 	if (min + metalen > max) {
-		uk_printd(DLVL_ERR, "Not enough space for allocator: %"__PRIsz" B required but only %"__PRIuptr" B usable\n",
+		uk_pr_err("Not enough space for allocator: %"__PRIsz" B required but only %"__PRIuptr" B usable\n",
 			  metalen, (max - min));
 		return NULL;
 	}
 
 	a = (struct uk_alloc *)min;
-	uk_printd(DLVL_INFO, "Initialize binary buddy allocator %"__PRIuptr"\n",
-		  (uintptr_t)a);
+	uk_pr_info("Initialize binary buddy allocator %"__PRIuptr"\n",
+		   (uintptr_t)a);
 	min += metalen;
 	memset(a, 0, metalen);
 	b = (struct uk_bbpalloc *)&a->priv;
