@@ -155,6 +155,16 @@ static inline void uk_printd(int lvl __unused, const char *fmt __unused, ...)
 		uk_printd((dlvl), (fmt), ##__VA_ARGS__);                       \
 	} while (0)
 
+/*
+ * Convenience wrapper for uk_printd()
+ * This is similar to the pr_* variants that you find in the Linux kernel
+ */
+#define uk_pr_debug(fmt, ...) uk_printd(DLVL_EXTRA, (fmt), ##__VA_ARGS__)
+#define uk_pr_info(fmt, ...)  uk_printd(DLVL_INFO,  (fmt), ##__VA_ARGS__)
+#define uk_pr_warn(fmt, ...)  uk_printd(DLVL_WARN,  (fmt), ##__VA_ARGS__)
+#define uk_pr_err(fmt, ...)   uk_printd(DLVL_ERR,   (fmt), ##__VA_ARGS__)
+#define uk_pr_crit(fmt, ...)  uk_printd(DLVL_CRIT,  (fmt), ##__VA_ARGS__)
+
 #ifdef __cplusplus
 }
 #endif

@@ -52,8 +52,8 @@ extern "C" {
 #define UK_ASSERT(x)							\
 	do {								\
 		if (unlikely(!(x))) {					\
-			uk_printd(DLVL_CRIT, "Assertion failure: %s\n",	\
-				  STRINGIFY(x));			\
+			uk_pr_crit("Assertion failure: %s\n",		\
+				   STRINGIFY(x));			\
 			/* TODO: stack trace */				\
 			ukplat_terminate(UKPLAT_CRASH);			\
 		}							\
@@ -62,8 +62,8 @@ extern "C" {
 #define UK_WARNIF(x)							\
 	do {								\
 		if (unlikely(x)) {					\
-			uk_printd(DLVL_WARN, "Condition warning: %s\n",	\
-				  STRINGIFY(x));			\
+			uk_pr_warn("Condition warning: %s\n",		\
+				   STRINGIFY(x));			\
 		}							\
 	} while (0)
 
@@ -85,7 +85,7 @@ extern "C" {
 
 #define UK_CRASH(fmt, ...)						\
 	do {								\
-		uk_printd(DLVL_CRIT, (fmt), ##__VA_ARGS__);		\
+		uk_pr_crit((fmt), ##__VA_ARGS__);			\
 		/* TODO: stack trace */					\
 		ukplat_terminate(UKPLAT_CRASH);				\
 	} while (0)
