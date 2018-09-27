@@ -41,11 +41,17 @@
 #include <linuxu/setup.h>
 #include <linuxu/console.h>
 #include <linuxu/syscall.h>
+#include <uk/plat/console.h>
 #include <uk/plat/bootstrap.h>
 #include <uk/assert.h>
 #include <uk/errptr.h>
 
 struct liblinuxuplat_opts _liblinuxuplat_opts = { 0 };
+
+#define _coutk_chr(c)				\
+	ukplat_coutk((char *) &(c), 1)
+#define _coutk_str(str)				\
+	ukplat_coutk((str), strlen(str))
 
 static const char *sopts = "h?Vm:";
 static struct option lopts[] = {
@@ -57,20 +63,21 @@ static struct option lopts[] = {
 
 static void version(void)
 {
-	uk_printk("Unikraft "
-		  STRINGIFY(UK_CODENAME) " "
-		  STRINGIFY(UK_FULLVERSION) "\n");
+	_coutk_str("Unikraft "
+		   STRINGIFY(UK_CODENAME) " "
+		   STRINGIFY(UK_FULLVERSION) "\n");
 }
 
 static void usage(const char *progname)
 {
-	uk_printk("Usage: %s [[LINUXU PLATFORM ARGUMENT]].. -- [[ARGUMENT]]..\n", progname);
-	uk_printk("\n");
-	uk_printk("Unikraft LinuxU platform arguments:\n");
-	uk_printk("Mandatory arguments to long options are mandatory for short options too.\n");
-	uk_printk("  -h, --help                 display this help and exit\n");
-	uk_printk("  -V, --version              display Unikraft version and exit\n");
-	uk_printk("  -m, --heapmem [MBYTES]     allocate MBYTES as heap memory\n");
+	_coutk_str("Usage: ");
+	_coutk_str(progname);
+	_coutk_str(" [[LINUXU PLATFORM ARGUMENT]].. -- [[ARGUMENT]]..\n\n");
+	_coutk_str("Unikraft LinuxU platform arguments:\n");
+	_coutk_str("Mandatory arguments to long options are mandatory for short options too.\n");
+	_coutk_str("  -h, --help                 display this help and exit\n");
+	_coutk_str("  -V, --version              display Unikraft version and exit\n");
+	_coutk_str("  -m, --heapmem [MBYTES]     allocate MBYTES as heap memory\n");
 }
 
 static int parseopts(int argc, char *argv[], struct liblinuxuplat_opts *opts)
@@ -114,7 +121,10 @@ static int parseopts(int argc, char *argv[], struct liblinuxuplat_opts *opts)
 							* 1024 * 1024);
 			break;
 		default:
-			uk_printk("%s: invalid option: -%c\n", progname, opt);
+			_coutk_str(progname);
+			_coutk_str(": invalid option: -");
+			_coutk_chr(opt);
+			_coutk_str("\n");
 			usage(progname);
 			ret = -EINVAL;
 			goto out;
