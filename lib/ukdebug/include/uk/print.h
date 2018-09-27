@@ -148,13 +148,6 @@ static inline void uk_printd(int lvl __unused, const char *fmt __unused, ...)
 }
 #endif /* CONFIG_LIBUKDEBUG_PRINTD */
 
-/* Print a message on both: Kernel console and Debug console */
-#define uk_printkd(dlvl, fmt, ...)                                             \
-	do {                                                                   \
-		uk_printk((fmt), ##__VA_ARGS__);                               \
-		uk_printd((dlvl), (fmt), ##__VA_ARGS__);                       \
-	} while (0)
-
 /*
  * Convenience wrapper for uk_printd()
  * This is similar to the pr_* variants that you find in the Linux kernel
