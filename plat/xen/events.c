@@ -70,7 +70,7 @@ void unbind_all_ports(void)
 #endif
 
 		if (ukarch_test_and_clr_bit(i, bound_ports)) {
-			uk_printk("port %d still bound!\n", i);
+			uk_pr_warn("Port %d still bound!\n", i);
 			unbind_evtchn(i);
 		}
 	}
@@ -88,7 +88,7 @@ int do_event(evtchn_port_t port, struct __regs *regs)
 	clear_evtchn(port);
 
 	if (port >= NR_EVS) {
-		uk_printk("WARN: %s: Port number too large: %d\n", __func__, port);
+		uk_pr_err("%s: Port number too large: %d\n", __func__, port);
 		return 1;
 	}
 
@@ -106,8 +106,8 @@ evtchn_port_t bind_evtchn(evtchn_port_t port, evtchn_handler_t handler,
 			  void *data)
 {
 	if (ev_actions[port].handler != default_handler)
-		uk_printk("WARN: Handler for port %d already registered, replacing\n",
-				port);
+		uk_pr_warn("Handler for port %d already registered, replacing\n",
+			   port);
 
 	ev_actions[port].data = data;
 	wmb();
@@ -123,7 +123,7 @@ void unbind_evtchn(evtchn_port_t port)
 	int rc;
 
 	if (ev_actions[port].handler == default_handler)
-		uk_printk("WARN: No handler for port %d when unbinding\n", port);
+		uk_pr_warn("No handler for port %d when unbinding\n", port);
 	mask_evtchn(port);
 	clear_evtchn(port);
 
@@ -135,7 +135,7 @@ void unbind_evtchn(evtchn_port_t port)
 	close.port = port;
 	rc = HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
 	if (rc)
-		uk_printk("WARN: close_port %u failed rc=%d. ignored\n", port, rc);
+		uk_pr_warn("close_port %u failed rc=%d. ignored\n", port, rc);
 
 }
 
@@ -150,7 +150,8 @@ evtchn_port_t bind_virq(uint32_t virq, evtchn_handler_t handler, void *data)
 
 	rc = HYPERVISOR_event_channel_op(EVTCHNOP_bind_virq, &op);
 	if (rc != 0) {
-		uk_printk("Failed to bind virtual IRQ %d with rc=%d\n", virq, rc);
+		uk_pr_err("Failed to bind virtual IRQ %d with rc=%d\n",
+			  virq, rc);
 		return -1;
 	}
 	bind_evtchn(op.port, handler, data);
@@ -169,7 +170,8 @@ evtchn_port_t bind_pirq(uint32_t pirq, int will_share,
 
 	rc = HYPERVISOR_event_channel_op(EVTCHNOP_bind_pirq, &op);
 	if (rc != 0) {
-		uk_printk("Failed to bind physical IRQ %d with rc=%d\n", pirq, rc);
+		uk_pr_err("Failed to bind physical IRQ %d with rc=%d\n",
+			  pirq, rc);
 		return -1;
 	}
 	bind_evtchn(op.port, handler, data);
@@ -210,7 +212,7 @@ void suspend_events(void)
 static void default_handler(evtchn_port_t port, struct __regs *regs __unused,
 			    void *ignore __unused)
 {
-	uk_printk("[Port %d] - event received\n", port);
+	uk_pr_info("[Port %d] - event received\n", port);
 }
 
 /* Create a port available to the pal for exchanging notifications.
@@ -232,7 +234,7 @@ int evtchn_alloc_unbound(domid_t pal, evtchn_handler_t handler,
 	op.remote_dom = pal;
 	rc = HYPERVISOR_event_channel_op(EVTCHNOP_alloc_unbound, &op);
 	if (rc) {
-		uk_printk("ERROR: alloc_unbound failed with rc=%d", rc);
+		uk_pr_err("alloc_unbound failed with rc=%d\n", rc);
 		return rc;
 	}
 
@@ -256,7 +258,7 @@ int evtchn_bind_interdomain(domid_t pal, evtchn_port_t remote_port,
 	op.remote_port = remote_port;
 	rc = HYPERVISOR_event_channel_op(EVTCHNOP_bind_interdomain, &op);
 	if (rc) {
-		uk_printk("ERROR: bind_interdomain failed with rc=%d", rc);
+		uk_pr_err("bind_interdomain failed with rc=%d\n", rc);
 		return rc;
 	}
 

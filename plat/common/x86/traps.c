@@ -63,7 +63,7 @@ void do_unhandled_trap(int trapnr, char *str, struct __regs *regs,
 {
 	uk_printd(DLVL_CRIT, "Unhandled Trap %d (%s), error code=0x%lx\n",
 			trapnr, str, error_code);
-	uk_printk("Regs address %p\n", regs);
+	uk_pr_info("Regs address %p\n", regs);
 	/* TODO revisit when UK_CRASH will also dump the registers */
 	dump_regs(regs);
 	UK_CRASH("Crashing\n");

@@ -40,19 +40,18 @@
 
 void dump_regs(struct __regs *regs)
 {
-	/* TODO uk_printd() instead of uk_printk() */
-	uk_printk("RIP: %016lx CS: %04lx\n", regs->rip, regs->cs & 0xffff);
-	uk_printk("RSP: %016lx SS: %04lx EFLAGS: %08lx\n",
+	uk_pr_info("RIP: %016lx CS: %04lx\n", regs->rip, regs->cs & 0xffff);
+	uk_pr_info("RSP: %016lx SS: %04lx EFLAGS: %08lx\n",
 			regs->rsp, regs->ss, regs->eflags);
-	uk_printk("RAX: %016lx RBX: %016lx RCX: %016lx\n",
+	uk_pr_info("RAX: %016lx RBX: %016lx RCX: %016lx\n",
 			regs->rax, regs->rbx, regs->rcx);
-	uk_printk("RDX: %016lx RSI: %016lx RDI: %016lx\n",
+	uk_pr_info("RDX: %016lx RSI: %016lx RDI: %016lx\n",
 			regs->rdx, regs->rsi, regs->rdi);
-	uk_printk("RBP: %016lx R08: %016lx R09: %016lx\n",
+	uk_pr_info("RBP: %016lx R08: %016lx R09: %016lx\n",
 			regs->rbp, regs->r8, regs->r9);
-	uk_printk("R10: %016lx R11: %016lx R12: %016lx\n",
+	uk_pr_info("R10: %016lx R11: %016lx R12: %016lx\n",
 			regs->r10, regs->r11, regs->r12);
-	uk_printk("R13: %016lx R14: %016lx R15: %016lx\n",
+	uk_pr_info("R13: %016lx R14: %016lx R15: %016lx\n",
 			regs->r13, regs->r14, regs->r15);
 }
 
@@ -66,10 +65,10 @@ void dump_mem(unsigned long addr)
 
 	for (i = ((addr) - 16) & ~15; i < (((addr) + 48) & ~15); i++) {
 		if (!(i % 16))
-			uk_printk("\n%lx:", i);
-		uk_printk(" %02x", *(unsigned char *) i);
+			uk_pr_info("\n%lx:", i);
+		uk_pr_info(" %02x", *(unsigned char *) i);
 	}
-	uk_printk("\n");
+	uk_pr_info("\n");
 }
 
 void stack_walk(void)
@@ -85,8 +84,8 @@ void stack_walk_for_frame(unsigned long frame_base)
 {
 	unsigned long *frame = (void *) frame_base;
 
-	uk_printk("base is %#lx ", frame_base);
-	uk_printk("caller is %#lx\n", frame[1]);
+	uk_pr_info("base is %#lx ", frame_base);
+	uk_pr_info("caller is %#lx\n", frame[1]);
 	if (frame[0])
 		stack_walk_for_frame(frame[0]);
 }
