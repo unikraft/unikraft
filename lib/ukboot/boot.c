@@ -79,14 +79,6 @@ static void main_thread_func(void *arg)
 	int ret;
 	struct thread_main_arg *tma = arg;
 
-	uk_printd(DLVL_INFO, "Calling main(%d, [", tma->argc);
-	for (i = 0; i < tma->argc; ++i) {
-		uk_printd(DLVL_INFO, "'%s'", tma->argv[i]);
-		if ((i + 1) < tma->argc)
-			uk_printd(DLVL_INFO, ", ");
-	}
-	uk_printd(DLVL_INFO, "])\n");
-
 #ifdef CONFIG_LIBUKBUS
 	uk_printd(DLVL_INFO, "Initialize bus handlers...\n");
 	uk_bus_init_all(uk_alloc_get_default());
@@ -113,7 +105,14 @@ static void main_thread_func(void *arg)
 	       STRINGIFY(UK_CODENAME) " " STRINGIFY(UK_FULLVERSION));
 #endif
 
-	/* call main */
+	uk_printd(DLVL_INFO, "Calling main(%d, [", tma->argc);
+	for (i = 0; i < tma->argc; ++i) {
+		uk_printd(DLVL_INFO, "'%s'", tma->argv[i]);
+		if ((i + 1) < tma->argc)
+			uk_printd(DLVL_INFO, ", ");
+	}
+	uk_printd(DLVL_INFO, "])\n");
+
 	ret = main(tma->argc, tma->argv);
 	uk_printd(DLVL_INFO, "main returned %d, halting system\n", ret);
 	ret = (ret != 0) ? UKPLAT_CRASH : UKPLAT_HALT;
