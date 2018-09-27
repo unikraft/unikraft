@@ -38,6 +38,7 @@
 #include <uk/config.h>
 
 #include <stddef.h>
+#include <stdio.h>
 #include <errno.h>
 
 #if CONFIG_LIBUKALLOC && CONFIG_LIBUKALLOCBBUDDY && CONFIG_LIBUKBOOT_INITALLOC
@@ -103,6 +104,15 @@ static void main_thread_func(void *arg)
 	liblwip_init();
 #endif /* CONFIG_LIBLWIP */
 
+#if CONFIG_LIBUKBOOT_BANNER
+	printf("Welcome to  _ __             _____\n");
+	printf(" __ _____  (_) /__ _______ _/ _/ /_\n");
+	printf("/ // / _ \\/ /  '_// __/ _ `/ _/ __/\n");
+	printf("\\_,_/_//_/_/_/\\_\\/_/  \\_,_/_/ \\__/\n");
+	printf("%35s\n",
+	       STRINGIFY(UK_CODENAME) " " STRINGIFY(UK_FULLVERSION));
+#endif
+
 	/* call main */
 	ret = main(tma->argc, tma->argv);
 	uk_printd(DLVL_INFO, "main returned %d, halting system\n", ret);
@@ -143,15 +153,6 @@ void ukplat_entry(int argc, char *argv[])
 #if CONFIG_LIBUKSCHED
 	struct uk_sched *s = NULL;
 	struct uk_thread *main_thread = NULL;
-#endif
-
-#if CONFIG_LIBUKBOOT_BANNER
-	uk_printk("Welcome to  _ __             _____\n");
-	uk_printk(" __ _____  (_) /__ _______ _/ _/ /_\n");
-	uk_printk("/ // / _ \\/ /  '_// __/ _ `/ _/ __/\n");
-	uk_printk("\\_,_/_//_/_/_/\\_\\/_/  \\_,_/_/ \\__/\n");
-	uk_printk("%35s\n",
-		  STRINGIFY(UK_CODENAME) " " STRINGIFY(UK_FULLVERSION));
 #endif
 
 	uk_printd(DLVL_INFO, "Pre-init table at %p - %p\n",
@@ -270,6 +271,6 @@ void ukplat_entry(int argc, char *argv[])
 /* Internal main */
 int main(int argc __unused, char *argv[] __unused)
 {
-	uk_printkd(DLVL_ERR, "weak main() called. Symbol was not replaced!\n");
+	printf("weak main() called. Symbol was not replaced!\n");
 	return -EINVAL;
 }
