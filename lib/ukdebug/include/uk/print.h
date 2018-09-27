@@ -46,6 +46,18 @@
 extern "C" {
 #endif
 
+#ifdef __LIBNAME__
+#define __STR_LIBNAME__ STRINGIFY(__LIBNAME__)
+#else
+#define __STR_LIBNAME__ (NULL)
+#endif
+
+#ifdef __BASENAME__
+#define __STR_BASENAME__ STRINGIFY(__BASENAME__)
+#else
+#define __STR_BASENAME__ (NULL)
+#endif
+
 /*
  * DEBUG PRINTING
  */
@@ -62,8 +74,26 @@ extern "C" {
 #endif /* __IN_LIBUKDEBUG__ */
 
 #if defined UK_DEBUG || CONFIG_LIBUKDEBUG_PRINTD
-void uk_vprintd(const char *fmt, va_list ap);
-void uk_printd(const char *fmt, ...) __printf(1, 2);
+/* please use the uk_printd(), uk_vprintd() macros because
+ * they compile in the function calls only if debugging
+ * is enabled
+ */
+void _uk_vprintd(const char *libname, const char *srcname,
+		 unsigned int srcline, const char *fmt, va_list ap);
+void _uk_printd(const char *libname, const char *srcname,
+		unsigned int srcline, const char *fmt, ...) __printf(4, 5);
+
+#define uk_vprintd(fmt, ap)						\
+	do {								\
+		_uk_vprintd(__STR_LIBNAME__, __STR_BASENAME__,		\
+			    __LINE__, (fmt), ap);			\
+	} while (0)
+
+#define uk_printd(fmt, ...)						\
+	do {								\
+		_uk_printd(__STR_LIBNAME__, __STR_BASENAME__,		\
+			   __LINE__, (fmt), ##__VA_ARGS__);		\
+	} while (0)
 #else
 static inline void uk_vprintd(const char *fmt __unused, va_list ap __unused)
 {}
@@ -102,18 +132,6 @@ void _uk_vprintk(int lvl, const char *libname, const char *srcname,
 		 unsigned int srcline, const char *fmt, va_list ap);
 void _uk_printk(int lvl, const char *libname, const char *srcname,
 		unsigned int srcline, const char *fmt, ...) __printf(5, 6);
-
-#ifdef __LIBNAME__
-#define __STR_LIBNAME__ STRINGIFY(__LIBNAME__)
-#else
-#define __STR_LIBNAME__ (NULL)
-#endif
-
-#ifdef __BASENAME__
-#define __STR_BASENAME__ STRINGIFY(__BASENAME__)
-#else
-#define __STR_BASENAME__ (NULL)
-#endif
 
 #define uk_vprintk(lvl, fmt, ap)                                               \
 	do {                                                                   \

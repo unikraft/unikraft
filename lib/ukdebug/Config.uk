@@ -30,16 +30,6 @@ config LIBUKDEBUG_PRINTK_CRIT
 	bool "Show critical messages only"
 endchoice
 
-config LIBUKDEBUG_PRINTK_TIME
-	bool "Show timestamp in kernel messages"
-	default y
-	depends on LIBUKDEBUG_PRINTK
-
-config LIBUKDEBUG_PRINTK_STACK
-	bool "Print bottom address of stack in kernel messages"
-	default n
-	depends on LIBUKDEBUG_PRINTK
-
 config LIBUKDEBUG_PRINTD
 	bool "Enable debug messages globally (uk_printd)"
 	default n
@@ -71,6 +61,14 @@ config LIBUKDEBUG_REDIR_PRINTK
 	help
 	  Kernel message are redirected to the standard debug output
 endchoice
+
+config LIBUKDEBUG_PRINT_TIME
+	bool "Show timestamp in messages"
+	default y
+
+config LIBUKDEBUG_PRINT_STACK
+	bool "Print bottom address of stack in messages"
+	default n
 
 config LIBUKDEBUG_ENABLE_ASSERT
 	bool "Enable assertions"
