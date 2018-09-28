@@ -230,7 +230,7 @@ void ukplat_entry(int argc, char *argv[])
 	else {
 		rc = ukplat_memallocator_set(a);
 		if (unlikely(rc != 0))
-			UK_CRASH("Could not set the platform memory allocator.");
+			UK_CRASH("Could not set the platform memory allocator\n");
 	}
 #endif
 
@@ -238,7 +238,7 @@ void ukplat_entry(int argc, char *argv[])
 	uk_pr_info("Initialize IRQ subsystem...\n");
 	rc = ukplat_irq_init(a);
 	if (unlikely(rc != 0))
-		UK_CRASH("Could not initialize the platform IRQ subsystem.");
+		UK_CRASH("Could not initialize the platform IRQ subsystem\n");
 #endif
 
 	/* On most platforms the timer depend on an initialized IRQ subsystem */
@@ -249,7 +249,7 @@ void ukplat_entry(int argc, char *argv[])
 	/* Init scheduler. */
 	s = uk_sched_default_init(a);
 	if (unlikely(!s))
-		UK_CRASH("Could not initialize the scheduler.");
+		UK_CRASH("Could not initialize the scheduler\n");
 #endif
 
 	tma.argc = argc;
@@ -258,7 +258,7 @@ void ukplat_entry(int argc, char *argv[])
 #if CONFIG_LIBUKSCHED
 	main_thread = uk_thread_create("main", main_thread_func, &tma);
 	if (unlikely(!main_thread))
-		UK_CRASH("Could not create main thread.");
+		UK_CRASH("Could not create main thread\n");
 	uk_sched_start(s);
 #else
 	/* Enable interrupts before starting the application */
