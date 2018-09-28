@@ -1,0 +1,9 @@
+config LIBUKSGLIST
+	bool "uksglist: Scatter Gather List"
+	default n
+	select LIBUKDEBUG
+	help
+		A scatter/gather list is a list of vectors with each describing
+		the location and length of one contiguous physical memory region.
+		Scatter gather lists are helpful for setting up I/O requests
+		with devices.
