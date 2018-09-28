@@ -28,7 +28,7 @@
 #include <string.h>
 #include <uk/print.h>
 #include <cpu.h>
-#include <io.h>
+#include <uk/plat/io.h>
 #include <pci/virtio/virtio_pci.h>
 #include <pci/virtio/virtio_ring.h>
 #include <uk/arch/atomic.h>

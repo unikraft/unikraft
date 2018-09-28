@@ -27,6 +27,7 @@ LIBXENPLAT_CINCLUDES-y         += -I$(LIBXENPLAT_BASE)/include
 LIBXENPLAT_CINCLUDES-y         += -I$(UK_PLAT_COMMON_BASE)/include
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/hypervisor.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/memory.c
+LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/io.c
 LIBXENPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/lcpu.c|common
 LIBXENPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/memory.c|common
 

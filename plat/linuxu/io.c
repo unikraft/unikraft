@@ -33,11 +33,9 @@
  */
 
 #include <uk/plat/io.h>
-
 /**
  * TODO:
- * For our kvm platform, the guest virtual address == guest physical address.
- * We may have to reconsider this implementation when condition changes.
+ * Replace the stub with an implementation for the linuxu platform.
  */
 __phys_addr ukplat_virt_to_phys(const volatile void *address)
 {

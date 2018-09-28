@@ -32,14 +32,19 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
+#include <stdint.h>
+#if (defined __X86_32__) || (defined __X86_64__)
+#include <xen-x86/mm.h>
+#elif (defined __ARM_32__) || (defined __ARM_64__)
+#include <xen-arm/mm.h>
+#endif
 #include <uk/plat/io.h>
 
 /**
- * TODO:
- * For our kvm platform, the guest virtual address == guest physical address.
- * We may have to reconsider this implementation when condition changes.
+ * Implementation support for the guest physical address conversion.
+ * The function support only Para-Virtualized guest.
  */
 __phys_addr ukplat_virt_to_phys(const volatile void *address)
 {
-	return (__phys_addr)address;
+	return (__phys_addr)virt_to_mfn(address);
 }
