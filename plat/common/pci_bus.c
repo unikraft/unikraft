@@ -80,6 +80,22 @@ static struct pci_bus_handler ph;
 #define PCI_DEVICE_SHIFT            (11)
 #define PCI_ENABLE_BIT              (1 << 31)
 
+#define PCI_CONF_CLASS_ID          (0x08)
+#define PCI_CONF_CLASS_ID_SHFT     (8)
+#define PCI_CONF_CLASS_ID_MASK     (0x00FFFFFF)
+
+#define PCI_CONF_VENDOR_ID          (0x00)
+#define PCI_CONF_VENDOR_ID_SHFT     (0)
+#define PCI_CONF_VENDOR_ID_MASK     (0x0000FFFF)
+
+#define PCI_CONF_DEVICE_ID          (0x00)
+#define PCI_CONF_DEVICE_ID_SHFT     (16)
+#define PCI_CONF_DEVICE_ID_MASK     (0x0000FFFF)
+
+#define PCI_CONF_SUBSYSVEN_ID          (0x2c)
+#define PCI_CONF_SUBSYSVEN_ID_SHFT     (0)
+#define PCI_CONF_SUBSYSVEN_ID_MASK     (0xFFFF)
+
 #define PCI_CONF_SUBSYS_ID          (0x2c)
 #define PCI_CONF_SUBSYS_ID_SHFT     (16)
 #define PCI_CONF_SUBSYS_ID_MASK     (0xFFFF)
@@ -236,14 +252,16 @@ static int pci_probe(void)
 				continue;
 			}
 
-			/* TODO: Implement fetch more information from PCI */
-			devid.class_id            = PCI_CLASS_ANY_ID;
-			/* TODO: Implement fetch more information from PCI */
-			devid.device_id           = PCI_ANY_ID;
-			/* TODO: Implement fetch more information from PCI */
-			devid.subsystem_vendor_id = PCI_ANY_ID;
+			PCI_CONF_READ(uint32_t, &devid.class_id,
+					config_addr, CLASS_ID);
+			PCI_CONF_READ(uint16_t, &devid.vendor_id,
+					config_addr, VENDOR_ID);
+			PCI_CONF_READ(uint16_t, &devid.device_id,
+					config_addr, DEVICE_ID);
 			PCI_CONF_READ(uint16_t, &devid.subsystem_device_id,
 					config_addr, SUBSYS_ID);
+			PCI_CONF_READ(uint16_t, &devid.subsystem_vendor_id,
+					config_addr, SUBSYSVEN_ID);
 
 			uk_pr_info("PCI %02x:%02x.%02x (%04x %04x:%04x): ",
 				   (int) addr.bus,
