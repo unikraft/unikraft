@@ -34,7 +34,7 @@
 #include <kvm/intctrl.h>
 #include <uk/assert.h>
 #include <errno.h>
-#include <uk/arch/atomic.h>
+#include <uk/bitops.h>
 
 static struct uk_alloc *allocator;
 
@@ -75,7 +75,7 @@ int ukplat_irq_register(unsigned long irq, irq_handler_func_t func, void *arg)
  * TODO: This is a temporary solution used to identify non TSC clock
  * interrupts in order to stop waiting for interrupts with deadline.
  */
-extern long sched_have_pending_events;
+extern unsigned long sched_have_pending_events;
 
 void _ukplat_irq_handle(unsigned long irq)
 {
@@ -95,7 +95,7 @@ void _ukplat_irq_handle(unsigned long irq)
 			 * the halting loop, and let it take care of
 			 * that work.
 			 */
-			ukarch_test_and_set_bit(0, &sched_have_pending_events);
+			__uk_test_and_set_bit(0, &sched_have_pending_events);
 
 		if (h->func(h->arg) == 1) {
 			handled = 1;

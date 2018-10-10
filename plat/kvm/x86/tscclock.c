@@ -58,7 +58,7 @@
 #include <uk/timeconv.h>
 #include <uk/print.h>
 #include <uk/assert.h>
-#include <uk/arch/atomic.h>
+#include <uk/bitops.h>
 
 #define NSEC_PER_SEC         1000000000ULL
 
@@ -346,14 +346,14 @@ static void tscclock_cpu_block(__u64 until)
 	ukplat_lcpu_halt_irq();
 }
 
-long sched_have_pending_events;
+unsigned long sched_have_pending_events;
 
 void time_block_until(__snsec until)
 {
 	while ((__snsec) ukplat_monotonic_clock() < until) {
 		tscclock_cpu_block(until);
 
-		if (ukarch_test_and_clr_bit(0, &sched_have_pending_events))
+		if (__uk_test_and_clear_bit(0, &sched_have_pending_events))
 			break;
 	}
 }

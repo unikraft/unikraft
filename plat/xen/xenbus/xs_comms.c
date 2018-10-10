@@ -186,7 +186,7 @@ static void xs_request_put(struct xs_request *xs_req)
 
 	ukarch_spin_lock(&xs_req_pool.lock);
 
-	UK_ASSERT(ukarch_test_bit(reqid, xs_req_pool.entries_bm) == 1);
+	UK_ASSERT(uk_test_bit(reqid, xs_req_pool.entries_bm) == 1);
 
 	uk_clear_bit(reqid, xs_req_pool.entries_bm);
 	xs_req_pool.num_live--;
@@ -427,7 +427,7 @@ static void process_reply(struct xsd_sockmsg *hdr, char *payload)
 {
 	struct xs_request *xs_req;
 
-	if (!ukarch_test_bit(hdr->req_id, xs_req_pool.entries_bm)) {
+	if (!uk_test_bit(hdr->req_id, xs_req_pool.entries_bm)) {
 		uk_pr_warn("Invalid reply id=%d\n", hdr->req_id);
 		free(payload);
 		return;

@@ -35,7 +35,7 @@
 
 #include <string.h>
 #include <uk/essentials.h>
-#include <uk/arch/atomic.h>
+#include <uk/bitops.h>
 #include <uk/assert.h>
 #include <vfscore/file.h>
 #include <uk/plat/lcpu.h>
@@ -78,7 +78,7 @@ void vfscore_put_fd(int fd)
 	/* Currently it is not allowed to free std(in|out|err) */
 	UK_ASSERT(fd > 2);
 
-	ukarch_test_and_clr_bit(fd, &fdtable.bitmap);
+	__uk_clear_bit(fd, &fdtable.bitmap);
 }
 
 void vfscore_install_fd(int fd, struct vfscore_file *file)

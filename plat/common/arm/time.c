@@ -172,7 +172,7 @@ static int generic_timer_init(void)
 	return 0;
 }
 
-long sched_have_pending_events;
+unsigned long sched_have_pending_events;
 
 void time_block_until(__snsec until)
 {
@@ -182,8 +182,8 @@ void time_block_until(__snsec until)
 		 * As we haven't support interrupt on Arm, so we just
 		 * use busy polling for now.
 		 */
-		if (ukarch_test_and_clr_bit(0, &sched_have_pending_events))
-		break;
+		if (__uk_test_and_clear_bit(0, &sched_have_pending_events))
+			break;
 	}
 }
 

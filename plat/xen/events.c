@@ -38,7 +38,7 @@
 #include <common/events.h>
 #include <xen/xen.h>
 #include <uk/print.h>
-#include <uk/arch/atomic.h>
+#include <uk/bitops.h>
 
 #define NR_EVS 1024
 
@@ -69,7 +69,7 @@ void unbind_all_ports(void)
 			continue;
 #endif
 
-		if (ukarch_test_and_clr_bit(i, bound_ports)) {
+		if (__uk_test_and_clear_bit(i, bound_ports)) {
 			uk_pr_warn("Port %d still bound!\n", i);
 			unbind_evtchn(i);
 		}
@@ -112,7 +112,7 @@ evtchn_port_t bind_evtchn(evtchn_port_t port, evtchn_handler_t handler,
 	ev_actions[port].data = data;
 	wmb();
 	ev_actions[port].handler = handler;
-	ukarch_set_bit(port, bound_ports);
+	__uk_set_bit(port, bound_ports);
 
 	return port;
 }
@@ -130,7 +130,7 @@ void unbind_evtchn(evtchn_port_t port)
 	ev_actions[port].handler = default_handler;
 	wmb();
 	ev_actions[port].data = NULL;
-	ukarch_clr_bit(port, bound_ports);
+	__uk_clear_bit(port, bound_ports);
 
 	close.port = port;
 	rc = HYPERVISOR_event_channel_op(EVTCHNOP_close, &close);
@@ -297,7 +297,7 @@ inline void mask_evtchn(uint32_t port)
 {
 	shared_info_t *s = HYPERVISOR_shared_info;
 
-	ukarch_set_bit_sync(port, &s->evtchn_mask[0]);
+	uk_set_bit(port, &s->evtchn_mask[0]);
 }
 
 inline void unmask_evtchn(uint32_t port)
@@ -305,15 +305,15 @@ inline void unmask_evtchn(uint32_t port)
 	shared_info_t *s = HYPERVISOR_shared_info;
 	vcpu_info_t *vcpu_info = &s->vcpu_info[smp_processor_id()];
 
-	ukarch_clr_bit_sync(port, &s->evtchn_mask[0]);
+	uk_clear_bit(port, &s->evtchn_mask[0]);
 
 	/*
 	 * The following is basically the equivalent of 'hw_resend_irq'.
 	 * Just like a real IO-APIC we 'lose the interrupt edge' if the
 	 * channel is masked.
 	 */
-	if (ukarch_test_bit_sync(port,    &s->evtchn_pending[0]) &&
-	    !ukarch_test_and_set_bit_sync(port / (sizeof(unsigned long) * 8),
+	if (uk_test_bit(port, &s->evtchn_pending[0]) &&
+	    !uk_test_and_set_bit(port / (sizeof(unsigned long) * 8),
 				    &vcpu_info->evtchn_pending_sel)) {
 		vcpu_info->evtchn_upcall_pending = 1;
 #ifdef XEN_HAVE_PV_UPCALL_MASK
@@ -327,7 +327,7 @@ inline void clear_evtchn(uint32_t port)
 {
 	shared_info_t *s = HYPERVISOR_shared_info;
 
-	ukarch_clr_bit_sync(port, &s->evtchn_pending[0]);
+	uk_clear_bit(port, &s->evtchn_pending[0]);
 }
 
 struct uk_alloc;
