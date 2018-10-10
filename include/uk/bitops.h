@@ -242,38 +242,92 @@ uk_find_next_zero_bit(const unsigned long *addr, unsigned long size,
 	return (bit);
 }
 
-/* uk_set_bit and uk_clear_bit are atomic and protected against
- * reordering (do barriers), while the underscored (__*) versions of
- * them don't (not atomic).
+/**
+ * uk_test_and_clear_bit - Atomically clear a bit and return its old value
+ * @nr: Bit to clear
+ * @addr: Address to count from
+ *
+ * Note that @nr may be almost arbitrarily large; this function is not
+ * restricted to acting on a single-word quantity.
  */
-#define __uk_set_bit(i, a)        ukarch_set_bit(i, a)
-#define uk_set_bit(i, a)          ukarch_set_bit_sync(i, a)
-#define __uk_clear_bit(i, a)      ukarch_clr_bit(i, a)
-#define uk_clear_bit(i, a)        ukarch_clr_bit_sync(i, a)
-#define uk_test_bit(i, a)         ukarch_test_bit(i, a)
-
 static inline int
-uk_test_and_clear_bit(long bit, volatile unsigned long *var)
+uk_test_and_clear_bit(long nr, volatile unsigned long *addr)
 {
-	return ukarch_test_and_clr_bit_sync(bit, (volatile void *) var);
+	volatile __u8 *ptr = ((__u8 *) addr) + (nr >> 3);
+	__u8 mask = 1 << (nr & 7);
+	__u8 orig;
+
+	orig = __atomic_fetch_and(ptr, ~mask, __ATOMIC_SEQ_CST);
+
+	return (orig & mask) != 0;
 }
 
+/**
+ * __uk_test_and_clear_bit - Clear a bit and return its old value
+ * @nr: Bit to clear
+ * @addr: Address to count from
+ *
+ * Note that @nr may be almost arbitrarily large; this function is not
+ * restricted to acting on a single-word quantity.
+ *
+ * This operation is not atomic and can be reordered. If two
+ * __uk_test_and_clear_bit are executing in parallel, it could be that
+ * only one of them will be successful.
+ */
 static inline int
-__uk_test_and_clear_bit(long bit, volatile unsigned long *var)
+__uk_test_and_clear_bit(long nr, volatile unsigned long *addr)
 {
-	return ukarch_test_and_clr_bit(bit, (volatile void *) var);
+	volatile __u8 *ptr = ((__u8 *) addr) + (nr >> 3);
+	__u8 mask = 1 << (nr & 7);
+	__u8 orig;
+
+	orig = __atomic_fetch_and(ptr, ~mask, __ATOMIC_RELAXED);
+
+	return (orig & mask) != 0;
 }
 
+/**
+ * uk_test_and_set_bit - Atomically set a bit and return its old value
+ * @nr: Bit to clear
+ * @addr: Address to count from
+ *
+ * Note that @nr may be almost arbitrarily large; this function is not
+ * restricted to acting on a single-word quantity.
+ */
 static inline int
-uk_test_and_set_bit(long bit, volatile unsigned long *var)
+uk_test_and_set_bit(long nr, volatile unsigned long *addr)
 {
-	return ukarch_test_and_set_bit_sync(bit, (volatile void *) var);
+	volatile __u8 *ptr = ((__u8 *) addr) + (nr >> 3);
+	__u8 mask = 1 << (nr & 7);
+	__u8 orig;
+
+	orig = __atomic_fetch_or(ptr, mask, __ATOMIC_SEQ_CST);
+
+	return (orig & mask) != 0;
 }
 
+/**
+ * __uk_test_and_set_bit - Set a bit and return its old value
+ * @nr: Bit to clear
+ * @addr: Address to count from
+ *
+ * Note that @nr may be almost arbitrarily large; this function is not
+ * restricted to acting on a single-word quantity.
+ *
+ * This operation is not atomic and can be reordered. If two
+ * __uk_test_and_set_bit are executing in parallel, it could be that
+ * only one of them will be successful.
+ */
 static inline int
-__uk_test_and_set_bit(long bit, volatile unsigned long *var)
+__uk_test_and_set_bit(long nr, volatile unsigned long *addr)
 {
-	return ukarch_test_and_set_bit(bit, (volatile void *) var);
+	volatile __u8 *ptr = ((__u8 *) addr) + (nr >> 3);
+	__u8 mask = 1 << (nr & 7);
+	__u8 orig;
+
+	orig = __atomic_fetch_or(ptr, mask, __ATOMIC_RELAXED);
+
+	return (orig & mask) != 0;
 }
 
 enum {
@@ -281,6 +335,38 @@ enum {
 	REG_OP_ALLOC,
 	REG_OP_RELEASE,
 };
+
+/* uk_set_bit and uk_clear_bit are atomic and protected against
+ * reordering (do barriers), while the underscored (__*) versions of
+ * them are not (not atomic).
+ */
+static inline void uk_set_bit(long nr, volatile unsigned long *addr)
+{
+	uk_test_and_set_bit(nr, addr);
+}
+
+static inline void __uk_set_bit(long nr, volatile unsigned long *addr)
+{
+	__uk_test_and_set_bit(nr, addr);
+}
+
+static inline void uk_clear_bit(long nr, volatile unsigned long *addr)
+{
+	uk_test_and_clear_bit(nr, addr);
+}
+
+static inline void __uk_clear_bit(long nr, volatile unsigned long *addr)
+{
+	__uk_test_and_clear_bit(nr, addr);
+}
+
+static inline int uk_test_bit(int nr, const volatile unsigned long *addr)
+{
+	const volatile __u8 *ptr = (const __u8 *) addr;
+	int ret =  ((1 << (nr & 7)) & (ptr[nr >> 3])) != 0;
+
+	return ret;
+}
 
 static inline int
 __uk_bitopts_reg_op(unsigned long *bitmap, int pos, int order, int reg_op)
