@@ -96,7 +96,7 @@ extern "C" {
  */
 static inline int ukarch_test_and_clr_bit(unsigned int nr, volatile void *byte)
 {
-	__u8 *addr = ((__u8 *)byte) + (nr >> 3);
+	volatile __u8 *addr = ((__u8 *)byte) + (nr >> 3);
 	__u8 bit = 1 << (nr & 7);
 	__u8 orig;
 
@@ -111,7 +111,7 @@ static inline int ukarch_test_and_clr_bit(unsigned int nr, volatile void *byte)
  */
 static inline int ukarch_test_and_set_bit(unsigned int nr, volatile void *byte)
 {
-	__u8 *addr = ((__u8 *)byte) + (nr >> 3);
+	volatile __u8 *addr = ((__u8 *)byte) + (nr >> 3);
 	__u8 bit = 1 << (nr & 7);
 	__u8 orig;
 
@@ -126,7 +126,7 @@ static inline int ukarch_test_and_set_bit(unsigned int nr, volatile void *byte)
 static inline int ukarch_test_bit(unsigned int nr,
 					const volatile unsigned long *byte)
 {
-	const __u8 *ptr = (const __u8 *)byte;
+	const volatile __u8 *ptr = (const __u8 *)byte;
 
 	return ((1 << (nr & 7)) & (ptr[nr >> 3])) != 0;
 }
@@ -154,7 +154,7 @@ static inline void ukarch_clr_bit(unsigned int nr,
 static inline int ukarch_test_and_clr_bit_sync(unsigned int nr,
 						volatile void *byte)
 {
-	__u8 *addr = ((__u8 *)byte) + (nr >> 3);
+	volatile __u8 *addr = ((__u8 *)byte) + (nr >> 3);
 	__u8 bit = 1 << (nr & 7);
 	__u8 orig;
 
@@ -167,7 +167,7 @@ static inline int ukarch_test_and_clr_bit_sync(unsigned int nr,
 static inline int ukarch_test_and_set_bit_sync(unsigned int nr,
 						volatile void *byte)
 {
-	__u8 *addr = ((__u8 *)byte) + (nr >> 3);
+	volatile __u8 *addr = ((__u8 *)byte) + (nr >> 3);
 	__u8 bit = 1 << (nr & 7);
 	__u8 orig;
 
