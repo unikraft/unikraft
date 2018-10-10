@@ -127,8 +127,9 @@ static inline int ukarch_test_bit(unsigned int nr,
 					const volatile unsigned long *byte)
 {
 	const volatile __u8 *ptr = (const __u8 *)byte;
+	int ret =  ((1 << (nr & 7)) & (ptr[nr >> 3])) != 0;
 
-	return ((1 << (nr & 7)) & (ptr[nr >> 3])) != 0;
+	return ret;
 }
 
 /**
@@ -186,16 +187,6 @@ static inline void ukarch_set_bit_sync(unsigned int nr, volatile void *byte)
 static inline void ukarch_clr_bit_sync(unsigned int nr, volatile void *byte)
 {
 	ukarch_test_and_clr_bit_sync(nr, byte);
-}
-
-/* As test_bit, but with a following memory barrier. */
-static inline int ukarch_test_bit_sync(unsigned int nr, volatile void *byte)
-{
-	int result;
-
-	result = ukarch_test_bit(nr, byte);
-	barrier();
-	return result;
 }
 
 #ifdef __cplusplus

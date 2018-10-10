@@ -250,6 +250,7 @@ uk_find_next_zero_bit(const unsigned long *addr, unsigned long size,
 #define uk_set_bit(i, a)          ukarch_set_bit_sync(i, a)
 #define __uk_clear_bit(i, a)      ukarch_clr_bit(i, a)
 #define uk_clear_bit(i, a)        ukarch_clr_bit_sync(i, a)
+#define uk_test_bit(i, a)         ukarch_test_bit(i, a)
 
 static inline int
 uk_test_and_clear_bit(long bit, volatile unsigned long *var)
