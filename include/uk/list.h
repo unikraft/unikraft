@@ -125,6 +125,9 @@
  * _SWAP			+	+	+	+
  *
  */
+#if (defined(_KERNEL) && defined(INVARIANTS))
+    #include <uk/assert.h>
+#endif
 #ifdef UK_QUEUE_MACRO_DEBUG
 #warn Use UK_QUEUE_MACRO_DEBUG_TRACE and/or UK_QUEUE_MACRO_DEBUG_TRASH
 #define	UK_QUEUE_MACRO_DEBUG_TRACE
@@ -219,7 +222,7 @@ struct {								\
 #if (defined(_KERNEL) && defined(INVARIANTS))
 #define	UK__QMD_SLIST_CHECK_PREVPTR(prevp, elm) do {			\
 	if (*(prevp) != (elm))						\
-		panic("Bad prevptr *(%p) == %p != %p",			\
+		UK_CRASH("Bad prevptr *(%p) == %p != %p",			\
 		    (prevp), *(prevp), (elm));				\
 } while (0)
 #else
@@ -495,7 +498,7 @@ struct {								\
 	if (UK_LIST_FIRST((head)) != 0 &&				\
 	    UK_LIST_FIRST((head))->field.le_prev !=			\
 	     &UK_LIST_FIRST((head)))					\
-		panic("Bad list head %p first->prev != head", (head));	\
+            	UK_CRASH("Bad list head %p first->prev != head", (head));	\
 } while (0)
 
 /*
@@ -508,7 +511,7 @@ struct {								\
 	if (UK_LIST_NEXT((elm), field) != 0 &&				\
 	    UK_LIST_NEXT((elm), field)->field.le_prev !=			\
 	     &((elm)->field.le_next))					\
-	     	panic("Bad link elm %p next->prev != elm", (elm));	\
+	        UK_CRASH("Bad link elm %p next->prev != elm", (elm));	\
 } while (0)
 
 /*
@@ -518,7 +521,7 @@ struct {								\
  */
 #define	UK__QMD_LIST_CHECK_PREV(elm, field) do {				\
 	if (*(elm)->field.le_prev != (elm))				\
-		panic("Bad link elm %p prev->next != elm", (elm));	\
+		UK_CRASH("Bad link elm %p prev->next != elm", (elm));	\
 } while (0)
 #else
 #define	UK__QMD_LIST_CHECK_HEAD(head, field)
@@ -670,11 +673,12 @@ struct {								\
  * If the tailq is non-empty, validates that the first element of the tailq
  * points back at 'head.'
  */
+
 #define	UK__QMD_TAILQ_CHECK_HEAD(head, field) do {				\
 	if (!UK_TAILQ_EMPTY(head) &&					\
 	    UK_TAILQ_FIRST((head))->field.tqe_prev !=			\
 	     &UK_TAILQ_FIRST((head)))					\
-		panic("Bad tailq head %p first->prev != head", (head));	\
+		UK_CRASH("Bad tailq head %p first->prev != head", (head));	\
 } while (0)
 
 /*
@@ -684,7 +688,7 @@ struct {								\
  */
 #define	UK__QMD_TAILQ_CHECK_TAIL(head, field) do {				\
 	if (*(head)->tqh_last != 0)					\
-	    	panic("Bad tailq NEXT(%p->tqh_last) != 0", (head)); 	\
+	    	UK_CRASH("Bad tailq NEXT(%p->tqh_last) != 0", (head)); 	\
 } while (0)
 
 /*
@@ -697,7 +701,7 @@ struct {								\
 	if (UK_TAILQ_NEXT((elm), field) != 0 &&				\
 	    UK_TAILQ_NEXT((elm), field)->field.tqe_prev !=			\
 	     &((elm)->field.tqe_next))					\
-		panic("Bad link elm %p next->prev != elm", (elm));	\
+		UK_CRASH("Bad link elm %p next->prev != elm", (elm));	\
 } while (0)
 
 /*
@@ -707,7 +711,7 @@ struct {								\
  */
 #define	UK__QMD_TAILQ_CHECK_PREV(elm, field) do {				\
 	if (*(elm)->field.tqe_prev != (elm))				\
-		panic("Bad link elm %p prev->next != elm", (elm));	\
+		UK_CRASH("Bad link elm %p prev->next != elm", (elm));	\
 } while (0)
 #else
 #define	UK__QMD_TAILQ_CHECK_HEAD(head, field)
