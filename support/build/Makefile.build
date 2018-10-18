@@ -35,8 +35,6 @@ $(eval UK_OLIBS-y += $(call libname2olib,$(L))); \
 )
 endif
 
-UK_LINK-y += $(UK_OLIBS-y)
-
 
 #################################################
 #
@@ -57,6 +55,5 @@ $(eval $(call uc,$(P))_OLIBS-y    += $(call libname2olib,$(L))); \
 ) \
 ) \
 ); \
-$(eval $(call uc,$(P))_LINK-y += $($(call uc,$(P))_OLIBS-y)) \
 )
 endif

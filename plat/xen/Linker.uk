@@ -18,12 +18,19 @@ endif
 ##
 XEN_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_xen-$(CONFIG_UK_ARCH)
 
-$(XEN_IMAGE): $(XEN_LINK) $(XEN_LINK-y) $(UK_LINK) $(UK_LINK-y) $(XEN_LDSCRIPT)
+$(XEN_IMAGE): $(XEN_ALIBS) $(XEN_ALIBS-y) $(XEN_OLIBS) $(XEN_OLIBS-y) \
+              $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) \
+              $(XEN_LDSCRIPT)
 	$(call build_cmd,LD,,$@.ld.o,\
 	       $(LD) -r $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
 			$(XEN_LDFLAGS) $(XEN_LDFLAGS-y) \
-			$(XEN_LINK) $(XEN_LINK-y) \
-			$(UK_LINK) $(UK_LINK-y) -o $@.ld.o)
+			$(XEN_OLIBS) $(XEN_OLIBS-y) \
+			$(UK_OLIBS) $(UK_OLIBS-y) \
+			-Wl$(comma)--start-group \
+			$(XEN_ALIBS) $(XEN_ALIBS-y) \
+			$(UK_ALIBS) $(UK_ALIBS-y) \
+			-Wl$(comma)--end-group \
+			-o $@.ld.o)
 	$(call build_cmd,OBJCOPY,,$@.o,\
 	       $(OBJCOPY) -w -G xenos_* -G _libxenplat_start $@.ld.o $@.o)
 ifeq (arm,$(CONFIG_UK_ARCH))

@@ -13,12 +13,19 @@ endif
 ##
 KVM_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_kvm-$(CONFIG_UK_ARCH)
 
-$(KVM_IMAGE): $(KVM_LINK) $(KVM_LINK-y) $(UK_LINK) $(UK_LINK-y) $(KVM_LDSCRIPT)
+$(KVM_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
+              $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) \
+              $(KVM_LDSCRIPT)
 	$(call build_cmd,LD,,$@.ld.o,\
 	       $(LD) -r $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
 			$(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
-			$(KVM_LINK) $(KVM_LINK-y) \
-			$(UK_LINK) $(UK_LINK-y) -o $@.ld.o)
+			$(KVM_OLIBS) $(KVM_OLIBS-y) \
+			$(UK_OLIBS) $(UK_OLIBS-y) \
+			-Wl$(comma)--start-group \
+			$(KVM_ALIBS) $(KVM_ALIBS-y) \
+			$(UK_ALIBS) $(UK_ALIBS-y) \
+			-Wl$(comma)--end-group \
+			-o $@.ld.o)
 	$(call build_cmd,OBJCOPY,,$@.o,\
 	       $(OBJCOPY) -w -G kvmos_* -G _libkvmplat_entry $@.ld.o $@.o)
 ifneq ($(filter x86_64 arm64,$(CONFIG_UK_ARCH)),)
