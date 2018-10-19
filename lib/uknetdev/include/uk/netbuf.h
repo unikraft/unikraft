@@ -121,6 +121,17 @@ struct uk_netbuf {
 	struct uk_alloc *_a;   /**< @internal Allocator for free'ing */
 };
 
+/*
+ * Iterator helpers for netbuf chains
+ */
+/* head -> tail */
+#define UK_NETBUF_CHAIN_FOREACH(var, head)				\
+	for ((var) = (head); (var) != NULL; (var) = (var)->next)
+
+/* tail -> head (reverse) */
+#define UK_NETBUF_CHAIN_FOREACH_R(var, tail)				\
+	for ((var) = (tail); (var) != NULL; (var) = (var)->prev)
+
 /**
  * Initializes an external allocated netbuf.
  * This netbuf has no data area assigned. It is intended
@@ -281,6 +292,75 @@ struct uk_netbuf *uk_netbuf_alloc_buf(struct uk_alloc *a, size_t buflen,
 struct uk_netbuf *uk_netbuf_prepare_buf(void *mem, size_t size,
 					uint16_t headroom,
 					size_t privlen, uk_netbuf_dtor_t dtor);
+
+/**
+ * Retrieves the last element of a netbuf chain
+ * @param m
+ *   uk_netbuf that is part of a chain
+ * @returns
+ *   Last uk_netbuf of the chain
+ */
+#define uk_netbuf_chain_last(m)						\
+	({								\
+		struct uk_netbuf *__ret = NULL;				\
+		struct uk_netbuf *__iter;				\
+		UK_NETBUF_CHAIN_FOREACH(__iter, (m))			\
+			__ret = __iter;					\
+									\
+		(__ret);						\
+	})
+
+/**
+ * Retrieves the first element of a netbuf chain
+ * @param m
+ *   uk_netbuf that is part of a chain
+ * @returns
+ *   First uk_netbuf of the chain
+ */
+#define uk_netbuf_chain_first(m)					\
+	({								\
+		struct uk_netbuf *__ret = NULL;				\
+		struct uk_netbuf *__iter;				\
+		UK_NETBUF_CHAIN_FOREACH_R(__iter, (m))			\
+			__ret = __iter;					\
+									\
+		(__ret);						\
+	})
+
+/**
+ * Connects two netbuf chains
+ * @param headtail
+ *   Last netbuf element of chain that should come first.
+ *   It can also be just a single netbuf.
+ * @param tail
+ *   Head element of the second netbuf chain.
+ *   It can also be just a single netbuf.
+ */
+void uk_netbuf_connect(struct uk_netbuf *headtail,
+		       struct uk_netbuf *tail);
+
+/**
+ * Connects two netbuf chains
+ * @param head
+ *   Heading netbuf element of chain that should come first.
+ *   It can also be just a single netbuf.
+ * @param tail
+ *   Head element of the second netbuf chain.
+ *   It can also be just a single netbuf.
+ */
+void uk_netbuf_append(struct uk_netbuf *head,
+		      struct uk_netbuf *tail);
+
+/**
+ * Disconnects a netbuf from its chain. The chain will remain
+ * without the removed element.
+ * @param m
+ *   uk_netbuf to be removed from its chain
+ * @returns
+ *   - (NULL) Chain consisted only of m
+ *   - Head of the remaining netbuf chain
+ */
+struct uk_netbuf *uk_netbuf_disconnect(struct uk_netbuf *m);
 
 #ifdef __cplusplus
 }

@@ -188,3 +188,56 @@ struct uk_netbuf *uk_netbuf_prepare_buf(void *mem, size_t size,
 			     dtor);
 	return m;
 }
+
+struct uk_netbuf *uk_netbuf_disconnect(struct uk_netbuf *m)
+{
+	struct uk_netbuf *remhead = NULL;
+
+	UK_ASSERT(m);
+
+	/* We want to return the next element of m as the
+	 * remaining head of the chain. If there is no next element
+	 * there was no chain.
+	 */
+	remhead = m->next;
+
+	/* Reconnect the chains before and after m. */
+	if (m->prev)
+		m->prev->next = m->next;
+	if (m->next)
+		m->next->prev = m->prev;
+
+	/* Disconnect m. */
+	m->prev = NULL;
+	m->next = NULL;
+
+	return remhead;
+}
+
+
+void uk_netbuf_connect(struct uk_netbuf *headtail,
+		       struct uk_netbuf *tail)
+{
+	UK_ASSERT(headtail);
+	UK_ASSERT(!headtail->next);
+	UK_ASSERT(tail);
+	UK_ASSERT(!tail->prev);
+
+	headtail->next = tail;
+	tail->prev = headtail;
+}
+
+void uk_netbuf_append(struct uk_netbuf *head,
+		      struct uk_netbuf *tail)
+{
+	struct uk_netbuf *headtail;
+
+	UK_ASSERT(head);
+	UK_ASSERT(!head->prev);
+	UK_ASSERT(tail);
+	UK_ASSERT(!tail->prev);
+
+	headtail = uk_netbuf_chain_last(head);
+	headtail->next = tail;
+	tail->prev = headtail;
+}
