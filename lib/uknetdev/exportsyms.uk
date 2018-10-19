@@ -7,3 +7,9 @@ uk_netbuf_free
 uk_netbuf_disconnect
 uk_netbuf_connect
 uk_netbuf_append
+uk_netdev_drv_register
+uk_netdev_count
+uk_netdev_get
+uk_netdev_id_get
+uk_netdev_drv_name_get
+uk_netdev_state_get
