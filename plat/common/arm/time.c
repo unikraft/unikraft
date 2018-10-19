@@ -36,7 +36,7 @@
 #include <uk/assert.h>
 #include <uk/plat/time.h>
 #include <uk/plat/irq.h>
-#include <uk/arch/atomic.h>
+#include <uk/bitops.h>
 #include <cpu.h>
 
 static uint64_t boot_ticks;
