@@ -1,0 +1,5 @@
+config LIBUKNETDEV
+	bool "uknetdev: Network driver interface"
+	default n
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKDEBUG
