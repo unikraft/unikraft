@@ -23,3 +23,5 @@ uk_netdev_txq_configure
 uk_netdev_start
 uk_netdev_hwaddr_set
 uk_netdev_hwaddr_get
+uk_netdev_promiscuous_get
+uk_netdev_promiscuous_set

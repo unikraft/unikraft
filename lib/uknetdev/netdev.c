@@ -78,6 +78,7 @@ int uk_netdev_drv_register(struct uk_netdev *dev, struct uk_alloc *a,
 	UK_ASSERT(dev->ops->txq_info_get);
 	UK_ASSERT(dev->ops->txq_configure);
 	UK_ASSERT(dev->ops->start);
+	UK_ASSERT(dev->ops->promiscuous_get);
 
 	dev->_data = _alloc_data(a, netdev_count,  drv_name);
 	if (!dev->_data)
@@ -448,4 +449,38 @@ const struct uk_hwaddr *uk_netdev_hwaddr_get(struct uk_netdev *dev)
 		return NULL;
 
 	return dev->ops->hwaddr_get(dev);
+}
+
+unsigned uk_netdev_promiscuous_get(struct uk_netdev *dev)
+{
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->_data);
+	UK_ASSERT(dev->ops);
+	UK_ASSERT(dev->ops->promiscuous_get);
+
+	/* We do support retrieving of promiscuous mode
+	 * only when device was configured
+	 */
+	UK_ASSERT(dev->_data->state == UK_NETDEV_CONFIGURED ||
+		  dev->_data->state == UK_NETDEV_RUNNING);
+
+	return dev->ops->promiscuous_get(dev);
+}
+
+int uk_netdev_promiscuous_set(struct uk_netdev *dev, unsigned mode)
+{
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->_data);
+	UK_ASSERT(dev->ops);
+
+	/* We do support setting of promiscuous mode
+	 * only when device was configured
+	 */
+	UK_ASSERT(dev->_data->state == UK_NETDEV_CONFIGURED
+		  || dev->_data->state == UK_NETDEV_RUNNING);
+
+	if (unlikely(!dev->ops->promiscuous_set))
+		return -ENOTSUP;
+
+	return dev->ops->promiscuous_set(dev, mode ? 1 : 0);
 }

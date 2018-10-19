@@ -241,6 +241,12 @@ typedef const struct uk_hwaddr *(*uk_netdev_hwaddr_get_t)(
 typedef int (*uk_netdev_hwaddr_set_t)(struct uk_netdev *dev,
 				      const struct uk_hwaddr *hwaddr);
 
+/** Driver callback type to get the current promiscuous mode */
+typedef unsigned (*uk_netdev_promiscuous_get_t)(struct uk_netdev *dev);
+
+/** Driver callback type to enable or disable promiscuous mode */
+typedef int (*uk_netdev_promiscuous_set_t)(struct uk_netdev *dev,
+					   unsigned mode);
 
 /**
  * A structure containing the functions exported by a driver.
@@ -249,6 +255,10 @@ struct uk_netdev_ops {
 	/** Set/Get hardware address. */
 	uk_netdev_hwaddr_get_t          hwaddr_get;       /* recommended */
 	uk_netdev_hwaddr_set_t          hwaddr_set;       /* optional */
+
+	/** Promiscuous mode. */
+	uk_netdev_promiscuous_set_t     promiscuous_set;  /* optional */
+	uk_netdev_promiscuous_get_t     promiscuous_get;
 
 	/** Device/driver capabilities and info. */
 	uk_netdev_info_get_t            info_get;

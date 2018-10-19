@@ -309,6 +309,32 @@ const struct uk_hwaddr *uk_netdev_hwaddr_get(struct uk_netdev *dev);
  */
 int uk_netdev_hwaddr_set(struct uk_netdev *dev, const struct uk_hwaddr *hwaddr);
 
+/**
+ * Returns if promiscuous mode is enabled for an Unikraft network device.
+ *
+ * @param dev
+ *   The Unikraft Network Device.
+ * @return
+ *   - (>0): if promiscuous is enabled
+ *   - (0): if promiscuous is disabled.
+ */
+unsigned uk_netdev_promiscuous_get(struct uk_netdev *dev);
+
+/**
+ * Enables or disables promiscuous mode for an Unikraft network device.
+ *
+ * @param dev
+ *   The Unikraft Network Device.
+ * @param mode
+ *   - (0): disable promiscuous mode
+ *   - (1): enable promiscuous mode
+ * @return
+ *   - (0): if successful.
+ *   - (-ENOTSUP): if operation is not supported.
+ *   - (<0): on error returned by driver
+ */
+int uk_netdev_promiscuous_set(struct uk_netdev *dev, unsigned mode);
+
 #ifdef __cplusplus
 }
 #endif
