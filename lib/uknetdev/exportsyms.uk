@@ -21,3 +21,5 @@ uk_netdev_configure
 uk_netdev_rxq_configure
 uk_netdev_txq_configure
 uk_netdev_start
+uk_netdev_hwaddr_set
+uk_netdev_hwaddr_get

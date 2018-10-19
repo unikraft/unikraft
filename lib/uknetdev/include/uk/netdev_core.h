@@ -69,6 +69,15 @@ struct uk_netdev;
 UK_TAILQ_HEAD(uk_netdev_list, struct uk_netdev);
 
 /**
+ * A structure used for Ethernet hardware addresses
+ */
+#define UK_NETDEV_HWADDR_LEN 6 /**< Length of Ethernet address. */
+
+struct uk_hwaddr {
+	uint8_t addr_bytes[UK_NETDEV_HWADDR_LEN];
+} __packed;
+
+/**
  * A structure used to describe network device capabilities.
  */
 struct uk_netdev_info {
@@ -224,10 +233,23 @@ typedef struct uk_netdev_rx_queue * (*uk_netdev_rxq_configure_t)(
 /** Driver callback type to start a configured Unikraft network device. */
 typedef int  (*uk_netdev_start_t)(struct uk_netdev *dev);
 
+/** Driver callback type to get the hardware address. */
+typedef const struct uk_hwaddr *(*uk_netdev_hwaddr_get_t)(
+	struct uk_netdev *dev);
+
+/** Driver callback type to set the hardware address. */
+typedef int (*uk_netdev_hwaddr_set_t)(struct uk_netdev *dev,
+				      const struct uk_hwaddr *hwaddr);
+
+
 /**
  * A structure containing the functions exported by a driver.
  */
 struct uk_netdev_ops {
+	/** Set/Get hardware address. */
+	uk_netdev_hwaddr_get_t          hwaddr_get;       /* recommended */
+	uk_netdev_hwaddr_set_t          hwaddr_set;       /* optional */
+
 	/** Device/driver capabilities and info. */
 	uk_netdev_info_get_t            info_get;
 	uk_netdev_txq_info_get_t        txq_info_get;

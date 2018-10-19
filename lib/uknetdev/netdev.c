@@ -411,3 +411,41 @@ int uk_netdev_start(struct uk_netdev *dev)
 	}
 	return ret;
 }
+
+int uk_netdev_hwaddr_set(struct uk_netdev *dev,
+			 const struct uk_hwaddr *hwaddr)
+{
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->_data);
+	UK_ASSERT(dev->ops);
+	UK_ASSERT(hwaddr);
+
+	/* We do support changing of hwaddr
+	 * only when device was configured
+	 */
+	UK_ASSERT(dev->_data->state == UK_NETDEV_CONFIGURED
+		  || dev->_data->state == UK_NETDEV_RUNNING);
+
+	if (dev->ops->hwaddr_set == NULL)
+		return -ENOTSUP;
+
+	return dev->ops->hwaddr_set(dev, hwaddr);
+}
+
+const struct uk_hwaddr *uk_netdev_hwaddr_get(struct uk_netdev *dev)
+{
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->_data);
+	UK_ASSERT(dev->ops);
+
+	/* We do support retrieving of hwaddr
+	 * only when device was configured
+	 */
+	UK_ASSERT(dev->_data->state == UK_NETDEV_CONFIGURED
+		  || dev->_data->state == UK_NETDEV_RUNNING);
+
+	if (!dev->ops->hwaddr_get)
+		return NULL;
+
+	return dev->ops->hwaddr_get(dev);
+}

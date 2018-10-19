@@ -284,6 +284,31 @@ int uk_netdev_txq_configure(struct uk_netdev *dev, uint16_t queue_id,
  */
 int uk_netdev_start(struct uk_netdev *dev);
 
+/**
+ * Returns the hardware address of the Unikraft network device.
+ *
+ * @param dev
+ *   The Unikraft Network Device.
+ * @return
+ *   - (NULL): no hardware address available
+ *   - (struct uk_hwaddr *): Reference to hardware address
+ */
+const struct uk_hwaddr *uk_netdev_hwaddr_get(struct uk_netdev *dev);
+
+/**
+ * Set the hardware address.
+ *
+ * @param dev
+ *   The Unikraft Network Device.
+ * @param hwaddr
+ *   Reference to new hardware address.
+ * @return
+ *   - (0): if successful.
+ *   - (-ENOTSUP): if hardware doesn't support.
+ *   - (-EINVAL): if address is invalid.
+ */
+int uk_netdev_hwaddr_set(struct uk_netdev *dev, const struct uk_hwaddr *hwaddr);
+
 #ifdef __cplusplus
 }
 #endif
