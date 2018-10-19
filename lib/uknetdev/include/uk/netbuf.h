@@ -329,6 +329,7 @@ struct uk_netbuf *uk_netbuf_prepare_buf(void *mem, size_t size,
 
 /**
  * Connects two netbuf chains
+ * Note: The reference count of each buffer is not checked nor modified.
  * @param headtail
  *   Last netbuf element of chain that should come first.
  *   It can also be just a single netbuf.
@@ -341,6 +342,7 @@ void uk_netbuf_connect(struct uk_netbuf *headtail,
 
 /**
  * Connects two netbuf chains
+ * Note: The reference count of each buffer is not checked nor modified.
  * @param head
  *   Heading netbuf element of chain that should come first.
  *   It can also be just a single netbuf.
@@ -354,6 +356,7 @@ void uk_netbuf_append(struct uk_netbuf *head,
 /**
  * Disconnects a netbuf from its chain. The chain will remain
  * without the removed element.
+ * Note: The reference count of each buffer is not checked nor modified.
  * @param m
  *   uk_netbuf to be removed from its chain
  * @returns
@@ -361,6 +364,76 @@ void uk_netbuf_append(struct uk_netbuf *head,
  *   - Head of the remaining netbuf chain
  */
 struct uk_netbuf *uk_netbuf_disconnect(struct uk_netbuf *m);
+
+/**
+ * Increase reference count of a single netbuf (irrespective of a chain)
+ * @param m
+ *   uk_netbuf to increase refcount of
+ * @returns
+ *   Reference to m
+ */
+static inline struct uk_netbuf *uk_netbuf_ref_single(struct uk_netbuf *m)
+{
+	UK_ASSERT(m);
+
+	uk_refcount_acquire(&m->refcount);
+	return m;
+}
+
+/**
+ * Increase reference count of a netbuf including each successive netbuf
+ * element of a chain. Note, preceding chain elements are not visited.
+ * @param m
+ *   head of the uk_netbuf chain to increase refcount of
+ * @returns
+ *   Reference to m
+ */
+static inline struct uk_netbuf *uk_netbuf_ref(struct uk_netbuf *m)
+{
+	struct uk_netbuf *iter;
+
+	UK_ASSERT(m);
+
+	UK_NETBUF_CHAIN_FOREACH(iter, m)
+		uk_netbuf_ref_single(iter);
+
+	return m;
+}
+
+/**
+ * Returns the current reference count of a single netbuf
+ * @param m
+ *   uk_netbuf to return the reference count of
+ */
+static inline uint32_t uk_netbuf_refcount_single_get(struct uk_netbuf *m)
+{
+	UK_ASSERT(m);
+
+	return uk_refcount_read(&m->refcount);
+}
+
+/**
+ * Decreases the reference count of each element of the chain.
+ * If a refcount becomes 0, the netbuf is disconnected from its chain,
+ * its destructor is called and the memory is free'd according to its
+ * allocation.
+ * @param m
+ *   head of uk_netbuf chain to release
+ * @returns
+ *   Reference to m
+ */
+void uk_netbuf_free(struct uk_netbuf *m);
+
+/**
+ * Decreases the reference count of a single netbuf. If refcount becomes 0,
+ * the netbuf is disconnected from its chain, its destructor is called and
+ * the memory is free'd according to its allocation.
+ * @param m
+ *   uk_netbuf to release
+ * @returns
+ *   Reference to m
+ */
+void uk_netbuf_free_single(struct uk_netbuf *m);
 
 #ifdef __cplusplus
 }

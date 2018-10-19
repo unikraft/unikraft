@@ -33,6 +33,7 @@
  */
 #include <uk/netbuf.h>
 #include <uk/essentials.h>
+#include <uk/print.h>
 
 /* Used to align netbuf's priv and data areas to `long long` data type */
 #define NETBUF_ADDR_ALIGNMENT (sizeof(long long))
@@ -240,4 +241,52 @@ void uk_netbuf_append(struct uk_netbuf *head,
 	headtail = uk_netbuf_chain_last(head);
 	headtail->next = tail;
 	tail->prev = headtail;
+}
+
+void uk_netbuf_free_single(struct uk_netbuf *m)
+{
+	struct uk_alloc *a;
+
+	UK_ASSERT(m);
+
+	/* Decrease refcount and call destructor and free up memory
+	 * when last reference was released.
+	 */
+	if (uk_refcount_release(&m->refcount) == 1) {
+		uk_pr_debug("Freeing netbuf %p (next: %p)\n", m, m->next);
+
+		/* Disconnect this netbuf from the chain. */
+		uk_netbuf_disconnect(m);
+
+		/* Copy the reference of the allocator in case
+		 * the destructor is free'ing up our memory
+		 * (e.g., uk_netbuf_init_indir() used).
+		 * In such a case `a` should be (NULL), however
+		 * we need to access it for a  check after we have
+		 * called the destructor.
+		 */
+		a = m->_a;
+
+		if (m->dtor)
+			m->dtor(m);
+		if (a)
+			uk_free(a, m);
+	} else {
+		uk_pr_debug("Not freeing netbuf %p (next: %p): refcount greater than 1",
+			    m, m->next);
+	}
+}
+
+void uk_netbuf_free(struct uk_netbuf *m)
+{
+	struct uk_netbuf *n;
+
+	UK_ASSERT(m);
+	UK_ASSERT(!m->prev);
+
+	while (m != NULL) {
+		n = m->next;
+		uk_netbuf_free_single(m);
+		m = n;
+	}
 }
