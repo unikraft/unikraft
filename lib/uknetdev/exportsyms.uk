@@ -25,3 +25,5 @@ uk_netdev_hwaddr_set
 uk_netdev_hwaddr_get
 uk_netdev_promiscuous_get
 uk_netdev_promiscuous_set
+uk_netdev_mtu_get
+uk_netdev_mtu_set

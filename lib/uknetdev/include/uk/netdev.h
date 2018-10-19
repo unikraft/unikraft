@@ -335,6 +335,30 @@ unsigned uk_netdev_promiscuous_get(struct uk_netdev *dev);
  */
 int uk_netdev_promiscuous_set(struct uk_netdev *dev, unsigned mode);
 
+/**
+ * Returns the current MTU of an Unikraft network device.
+ *
+ * @param dev
+ *   The Unikraft Network Device.
+ * @return
+ *   - MTU of the uk_netdev
+ */
+uint16_t uk_netdev_mtu_get(struct uk_netdev *dev);
+
+/**
+ * Change the MTU of an Unikraft network device.
+ *
+ * @param dev
+ *   The Unikraft Network Device.
+ * @param mtu
+ *   A uint16_t for the MTU to be applied.
+ * @return
+ *   - (0): if successful.
+ *   - (-ENOTSUP): if operation is not supported.
+ *   - (<0): on error returned by driver
+ */
+int uk_netdev_mtu_set(struct uk_netdev *dev, uint16_t mtu);
+
 #ifdef __cplusplus
 }
 #endif

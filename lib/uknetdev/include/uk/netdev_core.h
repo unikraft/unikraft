@@ -248,6 +248,12 @@ typedef unsigned (*uk_netdev_promiscuous_get_t)(struct uk_netdev *dev);
 typedef int (*uk_netdev_promiscuous_set_t)(struct uk_netdev *dev,
 					   unsigned mode);
 
+/** Driver callback type to get the MTU. */
+typedef uint16_t (*uk_netdev_mtu_get_t)(struct uk_netdev *dev);
+
+/** Driver callback type to set the MTU */
+typedef int (*uk_netdev_mtu_set_t)(struct uk_netdev *dev, uint16_t mtu);
+
 /**
  * A structure containing the functions exported by a driver.
  */
@@ -255,6 +261,10 @@ struct uk_netdev_ops {
 	/** Set/Get hardware address. */
 	uk_netdev_hwaddr_get_t          hwaddr_get;       /* recommended */
 	uk_netdev_hwaddr_set_t          hwaddr_set;       /* optional */
+
+	/** Set/Get MTU. */
+	uk_netdev_mtu_get_t             mtu_get;
+	uk_netdev_mtu_set_t             mtu_set;          /* optional */
 
 	/** Promiscuous mode. */
 	uk_netdev_promiscuous_set_t     promiscuous_set;  /* optional */
