@@ -3,3 +3,4 @@ config LIBUKNETDEV
 	default n
 	select LIBNOLIBC if !HAVE_LIBC
 	select LIBUKDEBUG
+	select LIBUKALLOC

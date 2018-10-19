@@ -1,0 +1,4 @@
+uk_netbuf_init_indir
+uk_netbuf_alloc_indir
+uk_netbuf_alloc_buf
+uk_netbuf_prepare_buf
