@@ -45,6 +45,10 @@
 #include <uk/list.h>
 #include <uk/alloc.h>
 #include <uk/essentials.h>
+#ifdef CONFIG_LIBUKNETDEV_DISPATCHERTHREADS
+#include <uk/sched.h>
+#include <uk/semaphore.h>
+#endif
 
 /**
  * Unikraft network API common declarations.
@@ -64,6 +68,42 @@ extern "C" {
 struct uk_netdev;
 UK_TAILQ_HEAD(uk_netdev_list, struct uk_netdev);
 
+/**
+ * A structure used to describe network device capabilities.
+ */
+struct uk_netdev_info {
+	uint16_t max_rx_queues;
+	uint16_t max_tx_queues;
+	int in_queue_pairs; /**< If true, allocate queues in pairs. */
+	uint16_t max_mtu;   /**< Maximum supported MTU size. */
+	uint16_t nb_encap;  /**< Number of bytes required as headroom for tx. */
+};
+
+/**
+ * A structure used to describe device descriptor ring limitations.
+ */
+struct uk_netdev_queue_info {
+	uint16_t nb_max;        /**< Max allowed number of descriptors. */
+	uint16_t nb_min;        /**< Min allowed number of descriptors. */
+	uint16_t nb_align;      /**< Number should be a multiple of nb_align. */
+	int nb_is_power_of_two; /**< Number should be a power of two. */
+};
+
+/**
+ * A structure used to configure a network device.
+ */
+struct uk_netdev_conf {
+	uint16_t nb_rx_queues;
+	uint16_t nb_tx_queues;
+};
+
+/**
+ * @internal Queue structs that are defined internally by each driver
+ * The datatype is introduced here for having type checking on the
+ * API code
+ */
+struct uk_netdev_tx_queue;
+struct uk_netdev_rx_queue;
 
 /**
  * Enum to describe possible states of an Unikraft network device.
@@ -75,6 +115,149 @@ enum uk_netdev_state {
 	UK_NETDEV_RUNNING,
 };
 
+/**
+ * Enum used by the extra information query interface.
+ *
+ * The purpose of this type is to allow drivers to forward extra configurations
+ * options such as IP information without parsing this data by themselves (e.g.,
+ * strings of IP address and mask found on XenStore by netfront).
+ * We do not want to introduce any additional parsing logic inside uknetdev API
+ * because we assume that most network stacks provide this functionality
+ * anyways. So one could forward this data within the glue code.
+ *
+ * This list is extensible in the future without needing the drivers to adopt
+ * any or all of the data types.
+ *
+ * The extra information can available in one of the following formats:
+ * - *_NINT16: Network-order raw int (4 bytes)
+ * - *_STR: Null-terminated string
+ */
+enum uk_netdev_einfo_type {
+	/* IPv4 address and mask */
+	UK_NETDEV_IPV4_ADDR_NINT16,
+	UK_NETDEV_IPV4_ADDR_STR,
+	UK_NETDEV_IPV4_MASK_NINT16,
+	UK_NETDEV_IPV4_MASK_STR,
+
+	/* IPv4 gateway */
+	UK_NETDEV_IPV4_GW_NINT16,
+	UK_NETDEV_IPV4_GW_STR,
+
+	/* IPv4 Primary DNS */
+	UK_NETDEV_IPV4_DNS0_NINT16,
+	UK_NETDEV_IPV4_DNS0_STR,
+
+	/* IPv4 Secondary DNS */
+	UK_NETDEV_IPV4_DNS1_NINT16,
+	UK_NETDEV_IPV4_DNS1_STR,
+};
+
+/**
+ * Function type used for queue event callbacks.
+ *
+ * @param dev
+ *   The Unikraft Network Device.
+ * @param queue
+ *   The queue on the Unikraft network device on which the event happened.
+ * @param argp
+ *   Extra argument that can be defined on callback registration.
+ */
+typedef void (*uk_netdev_queue_event_t)(struct uk_netdev *dev,
+					uint16_t queue_id, void *argp);
+
+/**
+ * A structure used to configure an Unikraft network device RX queue.
+ */
+struct uk_netdev_rxqueue_conf {
+	uk_netdev_queue_event_t callback; /**< Event callback function. */
+	void *callback_cookie;            /**< Argument pointer for callback. */
+
+	struct uk_alloc *a;               /**< Allocator for descriptors. */
+#ifdef CONFIG_LIBUKNETDEV_DISPATCHERTHREADS
+	struct uk_sched *s;               /**< Scheduler for dispatcher. */
+#endif
+};
+
+/**
+ * A structure used to configure an Unikraft network device TX queue.
+ */
+struct uk_netdev_txqueue_conf {
+	struct uk_alloc *a;               /* Allocator for descriptors. */
+};
+
+/** Driver callback type to read device/driver capabilities,
+ *  used for configuring the device
+ */
+typedef void (*uk_netdev_info_get_t)(struct uk_netdev *dev,
+				     struct uk_netdev_info *dev_info);
+
+/** Driver callback type to read any extra configuration. */
+typedef const void *(*uk_netdev_einfo_get_t)(struct uk_netdev *dev,
+					     enum uk_netdev_einfo_type econf);
+
+/** Driver callback type to configure a network device. */
+typedef int  (*uk_netdev_configure_t)(struct uk_netdev *dev,
+				      const struct uk_netdev_conf *conf);
+
+/** Driver callback type to retrieve RX queue limitations,
+ *  used for configuring the RX queue later
+ */
+typedef int (*uk_netdev_rxq_info_get_t)(struct uk_netdev *dev,
+	uint16_t queue_id, struct uk_netdev_queue_info *queue_info);
+
+/** Driver callback type to retrieve TX queue limitations,
+ *  used for configuring the TX queue later
+ */
+typedef int (*uk_netdev_txq_info_get_t)(struct uk_netdev *dev,
+	uint16_t queue_id, struct uk_netdev_queue_info *queue_info);
+
+/** Driver callback type to set up a RX queue of an Unikraft network device. */
+typedef struct uk_netdev_tx_queue * (*uk_netdev_txq_configure_t)(
+	struct uk_netdev *dev, uint16_t queue_id, uint16_t nb_desc,
+	struct uk_netdev_txqueue_conf *tx_conf);
+
+/** Driver callback type to set up a TX queue of an Unikraft network device. */
+typedef struct uk_netdev_rx_queue * (*uk_netdev_rxq_configure_t)(
+	struct uk_netdev *dev, uint16_t queue_id, uint16_t nb_desc,
+	struct uk_netdev_rxqueue_conf *rx_conf);
+
+/** Driver callback type to start a configured Unikraft network device. */
+typedef int  (*uk_netdev_start_t)(struct uk_netdev *dev);
+
+/**
+ * A structure containing the functions exported by a driver.
+ */
+struct uk_netdev_ops {
+	/** Device/driver capabilities and info. */
+	uk_netdev_info_get_t            info_get;
+	uk_netdev_txq_info_get_t        txq_info_get;
+	uk_netdev_rxq_info_get_t        rxq_info_get;
+	uk_netdev_einfo_get_t           einfo_get;        /* optional */
+
+	/** Device life cycle. */
+	uk_netdev_configure_t           configure;
+	uk_netdev_txq_configure_t       txq_configure;
+	uk_netdev_rxq_configure_t       rxq_configure;
+	uk_netdev_start_t               start;
+};
+
+/**
+ * @internal
+ * Event handler configuration (internal to libuknetdev)
+ */
+struct uk_netdev_event_handler {
+	uk_netdev_queue_event_t callback;
+	void                    *cookie;
+
+#ifdef CONFIG_LIBUKNETDEV_DISPATCHERTHREADS
+	struct uk_semaphore events;      /**< semaphore to trigger events */
+	struct uk_netdev    *dev;        /**< reference to net device */
+	uint16_t            queue_id;    /**< queue id which caused event */
+	struct uk_thread    *dispatcher; /**< dispatcher thread */
+	char                *dispatcher_name; /**< reference to thread name */
+	struct uk_sched     *dispatcher_s;    /**< Scheduler for dispatcher. */
+#endif
+};
 
 /**
  * @internal
@@ -83,6 +266,9 @@ enum uk_netdev_state {
 struct uk_netdev_data {
 	enum uk_netdev_state state;
 
+	struct uk_netdev_event_handler
+			     rxq_handler[CONFIG_LIBUKNETDEV_MAXNBQUEUES];
+
 	const uint16_t       id;    /**< ID is assigned during registration */
 	const char           *drv_name;
 };
@@ -90,10 +276,20 @@ struct uk_netdev_data {
 /**
  * NETDEV
  * A structure used to interact with a network device.
+ *
+ * Function callbacks (ops) are registered by the driver before
+ * registering the netdev. They change during device life time.
  */
 struct uk_netdev {
 	/** Pointer to API-internal state data. */
 	struct uk_netdev_data       *_data;
+
+	/** Functions callbacks by driver. */
+	const struct uk_netdev_ops  *ops;   /* by driver */
+
+	/** Pointers to queues (API-private) */
+	struct uk_netdev_rx_queue   *_rx_queue[CONFIG_LIBUKNETDEV_MAXNBQUEUES];
+	struct uk_netdev_tx_queue   *_tx_queue[CONFIG_LIBUKNETDEV_MAXNBQUEUES];
 
 	UK_TAILQ_ENTRY(struct uk_netdev) _list;
 };
