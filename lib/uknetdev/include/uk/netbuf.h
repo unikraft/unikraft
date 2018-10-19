@@ -328,6 +328,18 @@ struct uk_netbuf *uk_netbuf_prepare_buf(void *mem, size_t size,
 	})
 
 /**
+ * Returns the reference to private data of a netbuf
+ * @param m
+ *   uk_netbuf to return private data of
+ */
+static inline void *uk_netbuf_get_priv(struct uk_netbuf *m)
+{
+	UK_ASSERT(m);
+
+	return (m)->priv;
+}
+
+/**
  * Connects two netbuf chains
  * Note: The reference count of each buffer is not checked nor modified.
  * @param headtail
@@ -434,6 +446,80 @@ void uk_netbuf_free(struct uk_netbuf *m);
  *   Reference to m
  */
 void uk_netbuf_free_single(struct uk_netbuf *m);
+
+/**
+ * Calculates the current available headroom bytes of a netbuf
+ * @param m
+ *   uk_netbuf to return headroom bytes of
+ * @returns
+ *   available headroom bytes
+ */
+static inline size_t uk_netbuf_headroom(struct uk_netbuf *m)
+{
+	UK_ASSERT(m);
+	UK_ASSERT(m->buf);
+	UK_ASSERT(m->data);
+
+	return (size_t) ((uintptr_t) (m)->data - (uintptr_t) (m)->buf);
+}
+
+/**
+ * Calculates the current available tailroom bytes of a netbuf
+ * @param m
+ *   uk_netbuf to return tailroom bytes of
+ * @returns
+ *   available tailroom bytes
+ */
+static inline size_t uk_netbuf_tailroom(struct uk_netbuf *m)
+{
+	UK_ASSERT(m);
+	UK_ASSERT(m->buf);
+	UK_ASSERT(m->data);
+
+	return ((size_t) (((uintptr_t) (m)->buf + (uintptr_t) (m)->buflen)
+			  - ((uintptr_t) (m)->data + (uintptr_t) (m)->len)));
+}
+
+/**
+ * Prepends (or returns) bytes from the headroom (back) to the data area.
+ * It basically moves head->data.
+ * @param head
+ *   uk_netbuf to modify (has to be the first netbuf of a chain)
+ * @param len
+ *   If > 0 takes bytes from the headroom and prepends them to data
+ *   If < 0 releases the -len first bytes from data to headroom
+ * @returns
+ *   - (-ENOSPC): Operation could not be perform within buffer bounds
+ *   - (-EFAULT): Operation could not be performed because data would get > 64kB
+ *   - (1): netbuf successfully modified
+ */
+static inline int uk_netbuf_header(struct uk_netbuf *head, int16_t len)
+{
+	UK_ASSERT(head);
+	UK_ASSERT(head->buf);
+	UK_ASSERT(head->data);
+
+	/* head has to be the first element of a netbuf chain. */
+	UK_ASSERT(head->prev == NULL);
+
+	/* If len > 0, we take bytes from the headroom and add
+	 * them to data. We are limited to the available headroom size.
+	 * If len < 0, we return bytes back to the headroom.
+	 * We are limited to the available data length.
+	 */
+	if (unlikely((len > (ssize_t) uk_netbuf_headroom(head))
+		     || (-len > head->len)))
+		return -ENOSPC;
+
+	/* We should never make the packet bigger than 64kB */
+	if (unlikely((int32_t) len + (int32_t) head->len
+		     > (int32_t) UINT16_MAX))
+		return -EFAULT;
+
+	head->data   -= len;
+	head->len    += len;
+	return 1;
+}
 
 #ifdef __cplusplus
 }
