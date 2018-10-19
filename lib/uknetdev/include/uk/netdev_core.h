@@ -254,10 +254,34 @@ typedef uint16_t (*uk_netdev_mtu_get_t)(struct uk_netdev *dev);
 /** Driver callback type to set the MTU */
 typedef int (*uk_netdev_mtu_set_t)(struct uk_netdev *dev, uint16_t mtu);
 
+/** Driver callback type to enable interrupts of a RX queue */
+typedef int (*uk_netdev_rxq_intr_enable_t)(struct uk_netdev *dev,
+					   struct uk_netdev_rx_queue *queue);
+
+/** Driver callback type to disable interrupts of a RX queue */
+typedef int (*uk_netdev_rxq_intr_disable_t)(struct uk_netdev *dev,
+					    struct uk_netdev_rx_queue *queue);
+
+/** Driver callback type to retrieve one packet from a RX queue. */
+typedef int (*uk_netdev_rx_one_t)(struct uk_netdev *dev,
+				  struct uk_netdev_rx_queue *queue,
+				  struct uk_netbuf **pkt,
+				  struct uk_netbuf *fillup[],
+				  uint16_t *fillup_count);
+
+/** Driver callback type to submit one packet to a TX queue. */
+typedef int (*uk_netdev_tx_one_t)(struct uk_netdev *dev,
+				  struct uk_netdev_tx_queue *queue,
+				  struct uk_netbuf *pkt);
+
 /**
  * A structure containing the functions exported by a driver.
  */
 struct uk_netdev_ops {
+	/** RX queue interrupts. */
+	uk_netdev_rxq_intr_enable_t     rxq_intr_enable;  /* optional */
+	uk_netdev_rxq_intr_disable_t    rxq_intr_disable; /* optional */
+
 	/** Set/Get hardware address. */
 	uk_netdev_hwaddr_get_t          hwaddr_get;       /* recommended */
 	uk_netdev_hwaddr_set_t          hwaddr_set;       /* optional */
@@ -319,10 +343,18 @@ struct uk_netdev_data {
  * NETDEV
  * A structure used to interact with a network device.
  *
- * Function callbacks (ops) are registered by the driver before
- * registering the netdev. They change during device life time.
+ * Function callbacks (tx_one, rx_one, ops) are registered by the driver before
+ * registering the netdev. They change during device life time. Packet RX/TX
+ * functions are added directly to this structure for performance reasons.
+ * It prevents another indirection to ops.
  */
 struct uk_netdev {
+	/** Packet transmission. */
+	uk_netdev_tx_one_t          tx_one; /* by driver */
+
+	/** Packet reception. */
+	uk_netdev_rx_one_t          rx_one; /* by driver */
+
 	/** Pointer to API-internal state data. */
 	struct uk_netdev_data       *_data;
 

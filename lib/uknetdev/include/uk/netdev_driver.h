@@ -67,6 +67,34 @@ extern "C" {
 int uk_netdev_drv_register(struct uk_netdev *dev, struct uk_alloc *a,
 			   const char *drv_name);
 
+/**
+ * Forwards an RX queue event to the API user
+ * Can (and should) be called from device interrupt context
+ *
+ * @param dev
+ *   Unikraft network device to which the event relates to
+ * @param queue_id
+ *   receive queue ID to which the event relates to
+ */
+static inline void uk_netdev_drv_rx_event(struct uk_netdev *dev,
+					  uint16_t queue_id)
+{
+	struct uk_netdev_event_handler *rxq_handler;
+
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->_data);
+	UK_ASSERT(queue_id < CONFIG_LIBUKNETDEV_MAXNBQUEUES);
+
+	rxq_handler = &dev->_data->rxq_handler[queue_id];
+
+#ifdef CONFIG_LIBUKNETDEV_DISPATCHERTHREADS
+	uk_semaphore_up(&rxq_handler->events);
+#else
+	if (rxq_handler->callback)
+		rxq_handler->callback(dev, queue_id, rxq_handler->cookie);
+#endif
+}
+
 #ifdef __cplusplus
 }
 #endif

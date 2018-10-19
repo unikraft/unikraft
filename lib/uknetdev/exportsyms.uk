@@ -27,3 +27,5 @@ uk_netdev_promiscuous_get
 uk_netdev_promiscuous_set
 uk_netdev_mtu_get
 uk_netdev_mtu_set
+uk_netdev_rxq_intr_enable
+uk_netdev_rxq_intr_disable

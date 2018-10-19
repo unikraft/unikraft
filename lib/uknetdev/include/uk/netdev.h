@@ -359,6 +359,160 @@ uint16_t uk_netdev_mtu_get(struct uk_netdev *dev);
  */
 int uk_netdev_mtu_set(struct uk_netdev *dev, uint16_t mtu);
 
+/**
+ * Enable interrupts for an RX queue.
+ *
+ * @param dev
+ *   The Unikraft Network Device in running state.
+ * @param queue_id
+ *   The index of the receive queue to set up.
+ *   The value must be in the range [0, nb_rx_queue - 1] previously supplied
+ *   to uk_netdev_configure().
+ * @return
+ *   - (0): Success, interrupts enabled.
+ *   - (1): More packets are left on the queue, interrupts are NOT enabled yet.
+ *          Interrupts will be automatically enabled when all received packets
+ *          on the queue are consumed and the receive queue is empty.
+ *   - (-ENOTSUP): Driver does not support interrupts.
+ */
+static inline int uk_netdev_rxq_intr_enable(struct uk_netdev *dev,
+					    uint16_t queue_id)
+{
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->ops);
+	UK_ASSERT(dev->_data);
+	UK_ASSERT(dev->_data->state == UK_NETDEV_RUNNING);
+	UK_ASSERT(queue_id < CONFIG_LIBUKNETDEV_MAXNBQUEUES);
+	UK_ASSERT(!PTRISERR(dev->_rx_queue[queue_id]));
+
+	if (unlikely(!dev->ops->rxq_intr_enable))
+		return -ENOTSUP;
+	return dev->ops->rxq_intr_enable(dev, dev->_rx_queue[queue_id]);
+}
+
+/**
+ * Disable interrupts for an RX queue.
+ *
+ * @param dev
+ *   The Unikraft Network Device in running state.
+ * @param queue_id
+ *   The index of the receive queue to set up.
+ *   The value must be in the range [0, nb_tx_queue - 1] previously supplied
+ *   to uk_netdev_configure().
+ * @return
+ *   - (0): Success, interrupts disabled.
+ *   - (-ENOTSUP): Driver does not support interrupts.
+ */
+static inline int uk_netdev_rxq_intr_disable(struct uk_netdev *dev,
+					     uint16_t queue_id)
+{
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->ops);
+	UK_ASSERT(dev->_data);
+	UK_ASSERT(dev->_data->state == UK_NETDEV_RUNNING);
+	UK_ASSERT(queue_id < CONFIG_LIBUKNETDEV_MAXNBQUEUES);
+	UK_ASSERT(!PTRISERR(dev->_rx_queue[queue_id]));
+
+	if (unlikely(!dev->ops->rxq_intr_disable))
+		return -ENOTSUP;
+	return dev->ops->rxq_intr_disable(dev, dev->_rx_queue[queue_id]);
+}
+
+/**
+ * Receive one packet and re-program used receive descriptor
+ * Please note that before any packet can be received, the receive queue
+ * has to be filled up with empty netbufs (see fillup parameter).
+ *
+ * @param dev
+ *   The Unikraft Network Device.
+ * @param queue_id
+ *   The index of the receive queue to receive from.
+ *   The value must be in the range [0, nb_rx_queue - 1] previously supplied
+ *   to uk_netdev_configure().
+ * @param pkt
+ *   Reference to netbuf pointer which will be point to the received packet
+ *   after the function call. Can be NULL if function is used to program
+ *   receive descriptors only.
+ * @param fillup
+ *   Array of netbufs that should be used to program used descriptors again.
+ *   Each of the netbuf should be freshly allocated/initialized and not part
+ *   of any chain.
+ *   `fillup` can be `NULL` but without re-programming of used descriptors no
+ *   new packets can be received at some point.
+ * @param fillup_count
+ *   Length of `fillup` array. After the function call, `fillup_count` returns
+ *   the number of left and unused netbufs on the array. `fillup_count` has to
+ *   to 0 if `fillup` is `NULL`.
+ * @return
+ *   - (0): No packet available or `pkt` was set to NULL,
+ *          check `fillup_count` for used `fillup` netbufs
+ *   - (1): `pkt` points to received netbuf,
+ *          check `fillup_count` for used `fillup` netbufs
+ *   - (2): `pkt` points to received netbuf but more received packets are
+ *          available on the receive queue. When interrupts are used, they are
+ *          disabled until 1 is returned on subsequent calls,
+ *          check `fillup_count` for used `fillup` netbufs
+ *   - (<0): Error code from driver
+ */
+static inline int uk_netdev_rx_one(struct uk_netdev *dev, uint16_t queue_id,
+				   struct uk_netbuf **pkt,
+				   struct uk_netbuf *fillup[],
+				   uint16_t *fillup_count)
+{
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->rx_one);
+	UK_ASSERT(queue_id < CONFIG_LIBUKNETDEV_MAXNBQUEUES);
+	UK_ASSERT(dev->_data->state == UK_NETDEV_RUNNING);
+	UK_ASSERT(!PTRISERR(dev->_rx_queue[queue_id]));
+	UK_ASSERT((!fillup && fillup_count) || fillup);
+
+	return dev->rx_one(dev, dev->_rx_queue[queue_id], pkt,
+			   fillup, fillup_count);
+}
+
+/**
+ * Shortcut for only filling up a receive queue with empty netbufs
+ */
+#define uk_netdev_rx_fillup(dev, queue_id, fillup, fillup_count)	\
+	uk_netdev_rx_one((dev), (queue_id), NULL, (fillup), (fillup_count))
+
+/**
+ * Transmit one packet
+ *
+ * @param dev
+ *   The Unikraft Network Device.
+ * @param queue_id
+ *   The index of the receive queue to receive from.
+ *   The value must be in the range [0, nb_tx_queue - 1] previously supplied
+ *   to uk_netdev_configure().
+ * @param pkt
+ *   Reference to netbuf to sent. Packet is free'd by the driver after sending
+ *   was successfully finished by the device.
+ *   Please note that some drivers may require available headroom on the netbuf
+ *   for doing a transmission - inspect `nb_encap` with uk_netdev_info_get().
+ *   `pkt` has never to be `NULL`.
+ * @return
+ *   - (0): No space left on transmit queue, `pkt` is not sent
+ *   - (1): `pkt` was successfully put to the transmit queue,
+ *          queue is currently full
+ *   - (2): `pkt` was successfully put to the transmit queue,
+ *          there is still at least one descriptor available for a
+ *          subsequent transmission
+ *   - (<0): Error code from driver, `pkt` is not sent
+ */
+static inline int uk_netdev_tx_one(struct uk_netdev *dev, uint16_t queue_id,
+				   struct uk_netbuf *pkt)
+{
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->tx_one);
+	UK_ASSERT(queue_id < CONFIG_LIBUKNETDEV_MAXNBQUEUES);
+	UK_ASSERT(dev->_data->state == UK_NETDEV_RUNNING);
+	UK_ASSERT(!PTRISERR(dev->_tx_queue[queue_id]));
+	UK_ASSERT(pkt);
+
+	return dev->tx_one(dev, dev->_tx_queue[queue_id], pkt);
+}
+
 #ifdef __cplusplus
 }
 #endif
