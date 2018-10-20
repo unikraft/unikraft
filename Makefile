@@ -390,7 +390,10 @@ unexport MACHINE
 # "make" in the configured kernel build directory always uses that.
 # Default value for CONFIG_CROSS_COMPILE is not to prefix executables
 # Note: Some architectures assign CONFIG_CROSS_COMPILE in their arch/*/Makefile.uk
+
+ifneq ("$(origin CROSS_COMPILE)","undefined")
 CONFIG_CROSS_COMPILE := $(CROSS_COMPILE:"%"=%)
+endif
 
 include $(CONFIG_UK_BASE)/arch/$(UK_FAMILY)/Compiler.uk
 
