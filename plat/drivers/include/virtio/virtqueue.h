@@ -83,6 +83,19 @@ struct virtqueue {
 __phys_addr virtqueue_physaddr(struct virtqueue *vq);
 
 /**
+ * Ring interrupt handler. This function is invoked from the interrupt handler
+ * in the virtio device for interrupt specific to the ring.
+ *
+ * @param obj
+ *	Reference to the virtqueue.
+ *
+ * @return int
+ *	0, Interrupt was not for this virtqueue.
+ *	1, Virtqueue has handled the interrupt.
+ */
+int virtqueue_ring_interrupt(void *obj);
+
+/**
  * Negotiate with the virtqueue features.
  * @param feature_set
  *	The feature set the device request.
@@ -91,6 +104,17 @@ __phys_addr virtqueue_physaddr(struct virtqueue *vq);
  *	The negotiated feature set.
  */
 __u64 virtqueue_feature_negotiate(__u64 feature_set);
+
+/**
+ * Check if host notification is enabled.
+ *
+ * @param vq
+ *	Reference to the virtqueue.
+ * @return
+ *	Returns 1, host needs notification on new descriptors.
+ *		0, otherwise.
+ */
+int virtqueue_notify_enabled(struct virtqueue *vq);
 
 /**
  * Allocate a virtqueue.
@@ -137,6 +161,36 @@ int virtqueue_is_full(struct virtqueue *vq);
  *	Reference to the memory allocator
  */
 void virtqueue_destroy(struct virtqueue *vq, struct uk_alloc *a);
+
+/**
+ * Disable interrupts on the virtqueue.
+ * @param vq
+ *      Reference to the virtqueue.
+ */
+void virtqueue_intr_disable(struct virtqueue *vq);
+
+/**
+ * Enable interrupts on the virtqueue.
+ * @param vq
+ *      Reference to the virtqueue
+ * @return
+ *	0, On successful enabling of interrupt.
+ *	1, More packet in the ring to be processed.
+ */
+int virtqueue_intr_enable(struct virtqueue *vq);
+
+/**
+ * Notify the host of an event.
+ * @param vq
+ *      Reference to the virtual queue.
+ */
+static inline void virtqueue_host_notify(struct virtqueue *vq)
+{
+	UK_ASSERT(vq);
+
+	if (vq->vq_notify_host && virtqueue_notify_enabled(vq))
+		vq->vq_notify_host(vq->vdev, vq->queue_id);
+}
 
 #ifdef __cplusplus
 }

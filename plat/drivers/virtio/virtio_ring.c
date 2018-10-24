@@ -74,8 +74,73 @@ struct virtqueue_vring {
 /**
  * Static function Declaration(s).
  */
+static inline int virtqueue_hasdata(struct virtqueue_vring *vrq);
 static void virtqueue_vring_init(struct virtqueue_vring *vrq, __u16 nr_desc,
 				 __u16 align);
+
+void virtqueue_intr_disable(struct virtqueue *vq)
+{
+	struct virtqueue_vring *vrq;
+
+	UK_ASSERT(vq);
+
+	vrq = to_virtqueue_vring(vq);
+	vrq->vring.avail->flags |= (VRING_AVAIL_F_NO_INTERRUPT);
+}
+
+int virtqueue_intr_enable(struct virtqueue *vq)
+{
+	struct virtqueue_vring *vrq;
+	int rc = 0;
+
+	UK_ASSERT(vq);
+
+	vrq = to_virtqueue_vring(vq);
+	/* Check if there are no more packets enabled */
+	if (!virtqueue_hasdata(vrq)) {
+		if (vrq->vring.avail->flags | VRING_AVAIL_F_NO_INTERRUPT) {
+			vrq->vring.avail->flags &=
+				(~VRING_AVAIL_F_NO_INTERRUPT);
+			/**
+			 * We enabled the interrupts. We ensure it using the
+			 * memory barrier and check if there are any further
+			 * data available in the queue. The check for data
+			 * after enabling the interrupt is to make sure we do
+			 * not miss any interrupt while transitioning to enable
+			 * interrupt. This is inline with the requirement from
+			 * virtio specification section 3.2.2
+			 */
+			mb();
+			/* Check if there are further descriptors */
+			if (virtqueue_hasdata(vrq)) {
+				virtqueue_intr_disable(vq);
+				rc = 1;
+			}
+		}
+	} else {
+		/**
+		 * There are more packet in the virtqueue to be processed while
+		 * the interrupt was disabled.
+		 */
+		rc = 1;
+	}
+	return rc;
+}
+
+int virtqueue_notify_enabled(struct virtqueue *vq)
+{
+	struct virtqueue_vring *vrq;
+
+	UK_ASSERT(vq);
+	vrq = to_virtqueue_vring(vq);
+
+	return ((vrq->vring.used->flags & VRING_USED_F_NO_NOTIFY) == 0);
+}
+
+static inline int virtqueue_hasdata(struct virtqueue_vring *vrq)
+{
+	return (vrq->last_used_desc_idx != vrq->vring.used->idx);
+}
 
 /**
  * Driver implementation
@@ -90,6 +155,23 @@ __u64 virtqueue_feature_negotiate(__u64 feature_set)
 	 */
 	feature &= feature_set;
 	return feature;
+}
+
+int virtqueue_ring_interrupt(void *obj)
+{
+	struct virtqueue_vring *vrq = NULL;
+	struct virtqueue *vq = (struct virtqueue *)obj;
+	int rc = 0;
+
+	UK_ASSERT(vq);
+
+	vrq = to_virtqueue_vring(vq);
+	if (!virtqueue_hasdata(vrq))
+		return rc;
+
+	if (likely(vq->vq_callback))
+		rc = vq->vq_callback(vq, vq->priv);
+	return rc;
 }
 
 __phys_addr virtqueue_physaddr(struct virtqueue *vq)

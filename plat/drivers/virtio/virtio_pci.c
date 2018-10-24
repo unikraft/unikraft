@@ -96,6 +96,8 @@ static struct virtqueue *vpci_legacy_vq_setup(struct virtio_dev *vdev,
 static inline void virtio_device_id_add(struct virtio_dev *vdev,
 					__u16 pci_dev_id,
 					__u16 vpci_dev_id_start);
+static int virtio_pci_handle(void *arg);
+static int vpci_legacy_notify(struct virtio_dev *vdev, __u16 queue_id);
 static int virtio_pci_legacy_add_dev(struct pci_device *pci_dev,
 				     struct virtio_pci_dev *vpci_dev);
 
@@ -114,6 +116,43 @@ static struct virtio_config_ops vpci_legacy_ops = {
 	.vq_setup     = vpci_legacy_vq_setup,
 };
 
+static int vpci_legacy_notify(struct virtio_dev *vdev, __u16 queue_id)
+{
+	struct virtio_pci_dev *vpdev;
+
+	UK_ASSERT(vdev);
+	vpdev = to_virtiopcidev(vdev);
+	virtio_cwrite16((void *)(unsigned long) vpdev->pci_base_addr,
+			VIRTIO_PCI_QUEUE_NOTIFY, queue_id);
+
+	return 0;
+}
+
+static int virtio_pci_handle(void *arg)
+{
+	struct virtio_pci_dev *d = (struct virtio_pci_dev *) arg;
+	uint8_t isr_status;
+	struct virtqueue *vq;
+	int rc = 0;
+
+	UK_ASSERT(arg);
+
+	/* Reading the isr status is used to acknowledge the interrupt */
+	isr_status = virtio_cread8((void *)(unsigned long)d->pci_isr_addr, 0);
+	/* We don't support configuration interrupt on the device */
+	if (isr_status & VIRTIO_PCI_ISR_CONFIG) {
+		uk_pr_warn("Unsupported config change interrupt received on virtio-pci device %p\n",
+			   d);
+	}
+
+	if (isr_status & VIRTIO_PCI_ISR_HAS_INTR) {
+		UK_TAILQ_FOREACH(vq, &d->vdev.vqs, next) {
+			rc |= virtqueue_ring_interrupt(vq);
+		}
+	}
+	return rc;
+}
+
 static struct virtqueue *vpci_legacy_vq_setup(struct virtio_dev *vdev,
 					      __u16 queue_id,
 					      __u16 num_desc,
@@ -129,7 +168,7 @@ static struct virtqueue *vpci_legacy_vq_setup(struct virtio_dev *vdev,
 
 	vpdev = to_virtiopcidev(vdev);
 	vq = virtqueue_create(queue_id, num_desc, VIRTIO_PCI_VRING_ALIGN,
-			      callback, NULL, vdev, a);
+			      callback, vpci_legacy_notify, vdev, a);
 	if (PTRISERR(vq)) {
 		uk_pr_err("Failed to create the virtqueue: %d\n",
 			  PTR2ERR(vq));
@@ -157,10 +196,17 @@ static int vpci_legacy_pci_vq_find(struct virtio_dev *vdev, __u16 num_vqs,
 				   __u16 *qdesc_size)
 {
 	struct virtio_pci_dev *vpdev = NULL;
-	int vq_cnt = 0, i = 0;
+	int vq_cnt = 0, i = 0, rc = 0;
 
 	UK_ASSERT(vdev);
 	vpdev = to_virtiopcidev(vdev);
+
+	/* Registering the interrupt for the queue */
+	rc = ukplat_irq_register(vpdev->pdev->irq, virtio_pci_handle, vpdev);
+	if (rc != 0) {
+		uk_pr_err("Failed to register the interrupt\n");
+		return rc;
+	}
 
 	for (i = 0; i < num_vqs; i++) {
 		virtio_cwrite16((void *) (unsigned long)vpdev->pci_base_addr,
