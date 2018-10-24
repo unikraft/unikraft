@@ -50,12 +50,4 @@ config KVM_PCI
        select LIBUKBUS
        help
                 PCI bus driver for probing and operating PCI devices
-
-if (KVM_PCI)
-config KVM_PCI_VIRTIO
-       bool "Virtio Ring"
-       default n
-       help
-               Virtual queues to traverse host and guest transition
-endif
 endif
