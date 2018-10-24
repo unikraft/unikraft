@@ -2,6 +2,7 @@
 /*
  * Authors: Dan Williams
  *          Costin Lupu <costin.lupu@cs.pub.ro>
+ *          Sharan Santhanam <sharan.santhanam@neclab.eu>
  *
  * Copyright (c) 2015, IBM
  * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation
@@ -20,10 +21,18 @@
  * NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
-/* Taken and adapted from solo5 virtio_pci.h */
+/**
+ * Taken and adapted from solo5 virtio_pci.h
+ * kernel/virtio/virtio_pci.h
+ * Commit-id: 6e0e12133aa7
+ */
 
-#ifndef __PLAT_CMN_PCI_VIRTIO_PCI_H__
-#define __PLAT_CMN_PCI_VIRTIO_PCI_H__
+#ifndef __PLAT_DRV_VIRTIO_PCI_H__
+#define __PLAT_DRV_VIRTIO_PCI_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus __ */
 
 /* virtio config space layout */
 /* TODO we currently support only the legacy interface */
@@ -39,17 +48,11 @@
  */
 #define VIRTIO_PCI_QUEUE_ADDR_SHIFT     12
 
-
 /*
  * The status register lets us tell the device where we are in
  * initialization
  */
 #define VIRTIO_PCI_STATUS               18   /* 8-bit r/w */
-#define VIRTIO_PCI_STATUS_ACK           0x1  /* we recognize device as virtio */
-#define VIRTIO_PCI_STATUS_DRIVER        0x2  /* we want to drive it */
-#define VIRTIO_PCI_STATUS_DRIVER_OK     0x4  /* initialization is complete */
-#define VIRTIO_PCI_STATUS_DEVICE_RESET  0x40 /* device needs reset */
-#define VIRTIO_PCI_STATUS_FAIL          0x80 /* tell device something's wrong */
 
 /*
  * Reading the value will return the current contents of the interrupt
@@ -62,5 +65,10 @@
 
 /* TODO Revisit when adding MSI support. */
 #define VIRTIO_PCI_CONFIG_OFF           20
+#define VIRTIO_PCI_VRING_ALIGN          4096
 
-#endif /* __PLAT_CMN_PCI_VIRTIO_PCI_H__ */
+#ifdef __cplusplus
+}
+#endif /* __cplusplus __ */
+
+#endif /* __PLAT_DRV_VIRTIO_PCI_H__ */
