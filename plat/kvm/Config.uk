@@ -57,6 +57,7 @@ config VIRTIO_BUS
       depends on (ARCH_X86_64)
       depends on LIBUKBUS
       select LIBUKALLOC
+      select LIBUKSGLIST
       help
                Virtio bus driver for probing and operating virtio device and
                transport layer.

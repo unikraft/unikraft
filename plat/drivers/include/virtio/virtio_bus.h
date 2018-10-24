@@ -42,6 +42,7 @@
 #include <uk/arch/lcpu.h>
 #include <uk/alloc.h>
 #include <virtio/virtio_config.h>
+#include <virtio/virtqueue.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -94,6 +95,13 @@ struct virtio_config_ops {
 	/** Get and Set Status */
 	__u8 (*status_get)(struct virtio_dev *vdev);
 	void (*status_set)(struct virtio_dev *vdev, __u8 status);
+	/** Find the virtqueue */
+	int (*vqs_find)(struct virtio_dev *vdev, __u16 num_vq, __u16 *vq_size);
+	/** Setup the virtqueue */
+	struct virtqueue *(*vq_setup)(struct virtio_dev *vdev, __u16 num_desc,
+				      __u16 queue_id,
+				      virtqueue_callback_t callback,
+				      struct uk_alloc *a);
 };
 
 /**
@@ -116,6 +124,8 @@ struct virtio_driver {
 struct virtio_dev {
 	/* Feature bit describing the virtio device */
 	__u64 features;
+	/* List of the virtqueue for the device */
+	UK_TAILQ_HEAD(virtqueue_head, struct virtqueue) vqs;
 	/* Private data of the driver */
 	void *priv;
 	/* Virtio device identifier */
@@ -218,6 +228,68 @@ static inline int virtio_config_get(struct virtio_dev *vdev, __u16 offset,
 		rc = vdev->cops->config_get(vdev, offset, buf, len, type_len);
 
 	return rc;
+}
+
+/**
+ * The helper function to find the number of the vqs supported on the device.
+ * @param vdev
+ *	A reference to the virtio device.
+ * @param total_vqs
+ *	The total number of virtqueues requested.
+ * @param vq_size
+ *	An array of max descriptors on each virtqueue found on the
+ *	virtio device
+ * @return int
+ *	On success, the function return the number of available virtqueues
+ *	On error,
+ *		-ENOTSUP if the function is not supported.
+ */
+static inline int virtio_find_vqs(struct virtio_dev *vdev, __u16 total_vqs,
+				  __u16 *vq_size)
+{
+	int rc = -ENOTSUP;
+
+	UK_ASSERT(vdev);
+
+	if (likely(vdev->cops->vqs_find))
+		rc = vdev->cops->vqs_find(vdev, total_vqs, vq_size);
+
+	return rc;
+}
+
+/**
+ * A helper function to setup an individual virtqueue.
+ * @param vdev
+ *	Reference to the virtio device.
+ * @param vq_id
+ *	The virtqueue queue id.
+ * @param nr_desc
+ *	The count of the descriptor to be configured.
+ * @param callback
+ *	A reference to callback function to invoked by the virtio device on an
+ *	interrupt from the virtqueue.
+ * @param a
+ *	A reference to the allocator.
+ *
+ * @return struct virtqueue *
+ *	On success, a reference to the virtqueue.
+ *	On error,
+ *		-ENOTSUP operation not supported on the device.
+ *		-ENOMEM  Failed allocating the virtqueue.
+ */
+static inline struct virtqueue *virtio_vqueue_setup(struct virtio_dev *vdev,
+					    __u16 vq_id, __u16 nr_desc,
+					    virtqueue_callback_t  callback,
+					    struct uk_alloc *a)
+{
+	struct virtqueue *vq = ERR2PTR(-ENOTSUP);
+
+	UK_ASSERT(vdev && a);
+
+	if (likely(vdev->cops->vq_setup))
+		vq = vdev->cops->vq_setup(vdev, vq_id, nr_desc, callback, a);
+
+	return vq;
 }
 
 static inline int virtio_has_features(__u64 features, __u8 bpos)

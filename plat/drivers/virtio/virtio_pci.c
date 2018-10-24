@@ -42,6 +42,7 @@
 #include <pci/pci_bus.h>
 #include <virtio/virtio_config.h>
 #include <virtio/virtio_bus.h>
+#include <virtio/virtqueue.h>
 #include <virtio/virtio_pci.h>
 
 #define VENDOR_QUMRANET_VIRTIO           (0x1AF4)
@@ -65,11 +66,12 @@ struct virtio_pci_dev {
 };
 
 /**
- * Fetch the virtio pci information from the virtiodev.
+ * Fetch the virtio pci information from the virtio device.
+ * @param vdev
+ *	Reference to the virtio device.
  */
 #define to_virtiopcidev(vdev) \
 		__containerof(vdev, struct virtio_pci_dev, vdev)
-
 
 /**
  * Static function declaration.
@@ -82,8 +84,15 @@ static int vpci_legacy_pci_config_get(struct virtio_dev *vdev, __u16 offset,
 static __u64 vpci_legacy_pci_features_get(struct virtio_dev *vdev);
 static void vpci_legacy_pci_features_set(struct virtio_dev *vdev,
 					 __u64 features);
+static int vpci_legacy_pci_vq_find(struct virtio_dev *vdev, __u16 num_vq,
+				   __u16 *qdesc_size);
 static void vpci_legacy_pci_status_set(struct virtio_dev *vdev, __u8 status);
 static __u8 vpci_legacy_pci_status_get(struct virtio_dev *vdev);
+static struct virtqueue *vpci_legacy_vq_setup(struct virtio_dev *vdev,
+					      __u16 queue_id,
+					      __u16 num_desc,
+					      virtqueue_callback_t callback,
+					      struct uk_alloc *a);
 static inline void virtio_device_id_add(struct virtio_dev *vdev,
 					__u16 pci_dev_id,
 					__u16 vpci_dev_id_start);
@@ -101,7 +110,72 @@ static struct virtio_config_ops vpci_legacy_ops = {
 	.features_set = vpci_legacy_pci_features_set,
 	.status_get   = vpci_legacy_pci_status_get,
 	.status_set   = vpci_legacy_pci_status_set,
+	.vqs_find     = vpci_legacy_pci_vq_find,
+	.vq_setup     = vpci_legacy_vq_setup,
 };
+
+static struct virtqueue *vpci_legacy_vq_setup(struct virtio_dev *vdev,
+					      __u16 queue_id,
+					      __u16 num_desc,
+					      virtqueue_callback_t callback,
+					      struct uk_alloc *a)
+{
+	struct virtio_pci_dev *vpdev = NULL;
+	struct virtqueue *vq;
+	__phys_addr addr;
+	long flags;
+
+	UK_ASSERT(vdev != NULL);
+
+	vpdev = to_virtiopcidev(vdev);
+	vq = virtqueue_create(queue_id, num_desc, VIRTIO_PCI_VRING_ALIGN,
+			      callback, NULL, vdev, a);
+	if (PTRISERR(vq)) {
+		uk_pr_err("Failed to create the virtqueue: %d\n",
+			  PTR2ERR(vq));
+		goto err_exit;
+	}
+
+	/* Physical address of the queue */
+	addr = virtqueue_physaddr(vq);
+	/* Select the queue of interest */
+	virtio_cwrite16((void *)(unsigned long)vpdev->pci_base_addr,
+			VIRTIO_PCI_QUEUE_SEL, queue_id);
+	virtio_cwrite32((void *)(unsigned long)vpdev->pci_base_addr,
+			VIRTIO_PCI_QUEUE_PFN,
+			addr >> VIRTIO_PCI_QUEUE_ADDR_SHIFT);
+
+	flags = ukplat_lcpu_save_irqf();
+	UK_TAILQ_INSERT_TAIL(&vpdev->vdev.vqs, vq, next);
+	ukplat_lcpu_restore_irqf(flags);
+
+err_exit:
+	return vq;
+}
+
+static int vpci_legacy_pci_vq_find(struct virtio_dev *vdev, __u16 num_vqs,
+				   __u16 *qdesc_size)
+{
+	struct virtio_pci_dev *vpdev = NULL;
+	int vq_cnt = 0, i = 0;
+
+	UK_ASSERT(vdev);
+	vpdev = to_virtiopcidev(vdev);
+
+	for (i = 0; i < num_vqs; i++) {
+		virtio_cwrite16((void *) (unsigned long)vpdev->pci_base_addr,
+				VIRTIO_PCI_QUEUE_SEL, i);
+		qdesc_size[i] = virtio_cread16(
+				(void *) (unsigned long)vpdev->pci_base_addr,
+				VIRTIO_PCI_QUEUE_SIZE);
+		if (unlikely(!qdesc_size[i])) {
+			uk_pr_err("Virtqueue %d not available\n", i);
+			continue;
+		}
+		vq_cnt++;
+	}
+	return vq_cnt;
+}
 
 static int vpci_legacy_pci_config_set(struct virtio_dev *vdev, __u16 offset,
 				      const void *buf, __u32 len)
@@ -212,6 +286,8 @@ static void vpci_legacy_pci_features_set(struct virtio_dev *vdev,
 
 	UK_ASSERT(vdev);
 	vpdev = to_virtiopcidev(vdev);
+	/* Mask out features not supported by the virtqueue driver */
+	features = virtqueue_feature_negotiate(features);
 	virtio_cwrite32((void *) (unsigned long)vpdev->pci_base_addr,
 			VIRTIO_PCI_GUEST_FEATURES, (__u32)features);
 }
@@ -243,7 +319,7 @@ static int virtio_pci_legacy_add_dev(struct pci_device *pci_dev,
 
 	/* Mapping the virtio device identifier */
 	virtio_device_id_add(&vpci_dev->vdev, pci_dev->id.device_id,
-			VIRTIO_PCI_LEGACY_DEVICEID_START);
+			     VIRTIO_PCI_LEGACY_DEVICEID_START);
 	return 0;
 }
 
@@ -284,6 +360,7 @@ static int virtio_pci_add_dev(struct pci_device *pci_dev)
 
 exit:
 	return rc;
+
 free_pci_dev:
 	uk_free(a, vpci_dev);
 	goto exit;

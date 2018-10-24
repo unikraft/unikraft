@@ -151,6 +151,8 @@ int virtio_bus_register_device(struct virtio_dev *vdev)
 		return rc;
 	}
 
+	/* Initialize the virtqueue list */
+	UK_TAILQ_INIT(&vdev->vqs);
 
 	/* Calling the driver add device */
 	rc = drv->add_dev(vdev);
