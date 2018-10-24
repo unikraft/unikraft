@@ -52,8 +52,123 @@ static struct uk_alloc *a;
 /**
  *   Driver module local function(s).
  */
+static int virtio_device_reinit(struct virtio_dev *vdev);
+static struct virtio_driver *find_match_drv(struct virtio_dev *vdev);
 static int virtio_bus_init(struct uk_alloc *mem_alloc);
 static int virtio_bus_probe(void);
+
+static inline int virtio_device_id_match(const struct virtio_dev_id *id0,
+					 const struct virtio_dev_id *id1)
+{
+	int rc = 0;
+
+	if (id0->virtio_device_id == id1->virtio_device_id)
+		rc = 1;
+
+	return rc;
+}
+
+/**
+ * Find a match driver
+ * @param vdev
+ *	Reference to the virtio device.
+ */
+static struct virtio_driver *find_match_drv(struct virtio_dev *vdev)
+{
+	int i = 0;
+	struct virtio_driver *drv = NULL;
+
+	UK_TAILQ_FOREACH(drv, &virtio_drvs, next) {
+		while (drv->dev_ids[i].virtio_device_id != VIRTIO_ID_INVALID) {
+			if (virtio_device_id_match(&drv->dev_ids[i],
+						   &vdev->id)) {
+				return drv;
+			}
+		}
+	}
+	return NULL;
+}
+
+/**
+ * Reinitialize the virtio device
+ * @param vdev
+ *	Reference to the virtio device.
+ */
+static int virtio_device_reinit(struct virtio_dev *vdev)
+{
+	int rc = 0;
+
+	/**
+	 * Resetting the virtio device
+	 * This may not be necessary while initializing the device for the first
+	 * time.
+	 */
+	if (vdev->cops->device_reset) {
+		vdev->cops->device_reset(vdev);
+		/* Set the device status */
+		vdev->status = VIRTIO_DEV_RESET;
+	}
+	/* Acknowledge the virtio device */
+	rc = virtio_dev_status_update(vdev, VIRTIO_CONFIG_STATUS_ACK);
+	if (rc != 0) {
+		uk_pr_err("Failed to acknowledge the virtio device %p: %d\n",
+			  vdev, rc);
+		return rc;
+	}
+
+	/* Acknowledge the virtio driver */
+	rc = virtio_dev_status_update(vdev, VIRTIO_CONFIG_STATUS_DRIVER);
+	if (rc != 0) {
+		uk_pr_err("Failed to acknowledge the virtio driver %p: %d\n",
+			  vdev, rc);
+		return rc;
+	}
+	vdev->status = VIRTIO_DEV_INITIALIZED;
+	uk_pr_info("Virtio device %p initialized\n", vdev);
+	return rc;
+}
+
+int virtio_bus_register_device(struct virtio_dev *vdev)
+{
+	struct virtio_driver *drv = NULL;
+	int rc = 0;
+
+	UK_ASSERT(vdev);
+	/* Check for the dev with the driver list */
+	drv = find_match_drv(vdev);
+	if (!drv) {
+		uk_pr_err("Failed to find the driver for the virtio device %p (id:%"__PRIu16")\n",
+			  vdev, vdev->id.virtio_device_id);
+		return -EFAULT;
+	}
+	vdev->vdrv = drv;
+
+	/* Initialize the device */
+	rc = virtio_device_reinit(vdev);
+	if (rc != 0) {
+		uk_pr_err("Failed to initialize the virtio device %p (id:%"__PRIu16": %d\n",
+			  vdev, vdev->id.virtio_device_id, rc);
+		return rc;
+	}
+
+
+	/* Calling the driver add device */
+	rc = drv->add_dev(vdev);
+	if (rc != 0) {
+		uk_pr_err("Failed to add the virtio device %p: %d\n", vdev, rc);
+		goto virtio_dev_fail_set;
+	}
+exit:
+	return rc;
+
+virtio_dev_fail_set:
+	/**
+	 * We set the status to fail. We can ignore the exit status from the
+	 * status update.
+	 */
+	virtio_dev_status_update(vdev, VIRTIO_CONFIG_STATUS_FAIL);
+	goto exit;
+}
 
 /**
  * Probe for the virtio device.

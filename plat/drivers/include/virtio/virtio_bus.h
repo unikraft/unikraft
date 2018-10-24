@@ -76,6 +76,27 @@ struct virtio_dev_id {
 };
 
 /**
+ * The structure define a list of configuration operation on a virtio device.
+ */
+struct virtio_config_ops {
+	/** Resetting the device */
+	void (*device_reset)(struct virtio_dev *vdev);
+	/** Set configuration option */
+	int (*config_set)(struct virtio_dev *vdev, __u16 offset,
+			  const void *buf, __u32 len);
+	/** Get configuration option */
+	int (*config_get)(struct virtio_dev *vdev, __u16 offset, void *buf,
+			  __u32 len, __u8 type_len);
+	/** Get the feature */
+	__u64 (*features_get)(struct virtio_dev *vdev);
+	/** Set the feature */
+	void (*features_set)(struct virtio_dev *vdev, __u64 features);
+	/** Get and Set Status */
+	__u8 (*status_get)(struct virtio_dev *vdev);
+	void (*status_set)(struct virtio_dev *vdev, __u8 status);
+};
+
+/**
  * The structure define the virtio driver.
  */
 struct virtio_driver {
@@ -99,6 +120,8 @@ struct virtio_dev {
 	void *priv;
 	/* Virtio device identifier */
 	struct virtio_dev_id id;
+	/* List of the config operations */
+	struct virtio_config_ops *cops;
 	/* Reference to the virtio driver for the device */
 	struct virtio_driver *vdrv;
 	/* Status of the device */
@@ -108,7 +131,109 @@ struct virtio_dev {
 /**
  * Operation exported by the virtio device.
  */
+int virtio_bus_register_device(struct virtio_dev *vdev);
 void _virtio_bus_register_driver(struct virtio_driver *vdrv);
+
+/**
+ * The function updates the status of the virtio device
+ * @param vdev
+ *      Reference to the virtio device.
+ * @param status
+ *      The status to update.
+ * @return
+ *      0 on successful updating the status.
+ *      -ENOTSUP, if the operation is not supported on the virtio device.
+ */
+static inline int virtio_dev_status_update(struct virtio_dev *vdev, __u8 status)
+{
+	int rc = -ENOTSUP;
+
+	UK_ASSERT(vdev);
+
+	if (likely(vdev->cops->status_set)) {
+		vdev->cops->status_set(vdev, status);
+		rc = 0;
+	}
+	return rc;
+}
+
+/**
+ * The function to get the feature supported by the device.
+ * @param vdev
+ *	Reference to the virtio device.
+ *
+ * @return __u64
+ *	A bit map of the feature supported by the device.
+ */
+static inline __u64 virtio_feature_get(struct virtio_dev *vdev)
+{
+	__u64 features = 0;
+
+	UK_ASSERT(vdev);
+
+	if (likely(vdev->cops->features_get))
+		features = vdev->cops->features_get(vdev);
+	return features;
+}
+
+/**
+ * The function to set the negotiated features.
+ * @param vdev
+ *	Reference to the virtio device.
+ * @param feature
+ *	A bit map of the feature negotiated.
+ */
+static inline void virtio_feature_set(struct virtio_dev *vdev, __u32 feature)
+{
+	UK_ASSERT(vdev);
+
+	if (likely(vdev->cops->features_set))
+		vdev->cops->features_set(vdev, feature);
+}
+
+/**
+ * Get the configuration information from the virtio device.
+ * @param vdev
+ *	Reference to the virtio device.
+ * @param offset
+ *	Offset into the virtio device configuration space.
+ * @param buf
+ *	A buffer to store the configuration information.
+ * @param len
+ *	The length of the buffer.
+ * @param type_len
+ *	The data type of the configuration data.
+ * @return int
+ *	0, on successful reading the configuration space.
+ *	< 0, on error.
+ */
+static inline int virtio_config_get(struct virtio_dev *vdev, __u16 offset,
+				    void *buf, __u32 len, __u8 type_len)
+{
+	int rc = -ENOTSUP;
+
+	UK_ASSERT(vdev);
+
+	if (likely(vdev->cops->config_get))
+		rc = vdev->cops->config_get(vdev, offset, buf, len, type_len);
+
+	return rc;
+}
+
+static inline int virtio_has_features(__u64 features, __u8 bpos)
+{
+	__u64 tmp_feature = 0;
+
+	VIRTIO_FEATURES_UPDATE(tmp_feature, bpos);
+	tmp_feature &= features;
+
+	return tmp_feature ? 1 : 0;
+}
+
+static inline void virtio_dev_drv_up(struct virtio_dev *vdev)
+{
+	virtio_dev_status_update(vdev, VIRTIO_CONFIG_STATUS_DRIVER_OK);
+}
 
 #define VIRTIO_BUS_REGISTER_DRIVER(b)			\
 	_VIRTIO_BUS_REGISTER_DRIVER(__LIBNAME__, b)

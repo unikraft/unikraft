@@ -61,4 +61,14 @@ config VIRTIO_BUS
                Virtio bus driver for probing and operating virtio device and
                transport layer.
 
+menu "Virtio"
+config VIRTIO_PCI
+       bool "Virtio PCI device support"
+       default n
+       depends on KVM_PCI
+       select VIRTIO_BUS
+       help
+               Support virtio devices on PCI bus
+
+endmenu
 endif
