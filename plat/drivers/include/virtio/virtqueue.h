@@ -117,6 +117,46 @@ __u64 virtqueue_feature_negotiate(__u64 feature_set);
 int virtqueue_notify_enabled(struct virtqueue *vq);
 
 /**
+ * Remove the user buffer from the virtqueue.
+ *
+ * @param vq
+ *	Reference to the virtqueue.
+ * @param len
+ *	Reference to the length of the data packet.
+ * @return
+ *	On Success, returns a reference to cookie that was submitted with
+ *	descriptor.
+ *	On failure, returns NULL with the length unmodified.
+ */
+void *virtqueue_buffer_dequeue(struct virtqueue *vq, __u32 *len);
+
+/**
+ * Create a descriptor chain starting at index head,
+ * using vq->bufs also starting at index head.
+ * @param vq
+ *	Reference to the virtual queue
+ * @param cookie
+ *	Reference to the cookie to reconstruct the buffer.
+ * @param sg
+ *	Reference to the scatter gather list
+ * @param read_bufs
+ *	The number of read buffer.
+ * @param write_bufs
+ *	The number of write buffer.
+ *
+ * @return
+ *	> 0 The buffers were enqueued into the ring and the count indicates
+ *	the number of available slots in the ring.
+ *	0  The buffers were enqueued and there are no further descriptors
+ *	available.
+ *	< 0 Failed to enqueue the buffers.
+ *
+ */
+int virtqueue_buffer_enqueue(struct virtqueue *vq, void *cookie,
+			     struct uk_sglist *sg, __u16 read_bufs,
+			     __u16 write_bufs);
+
+/**
  * Allocate a virtqueue.
  * @param queue_id
  *	The virtqueue hw id.
