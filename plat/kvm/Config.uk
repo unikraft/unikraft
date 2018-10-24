@@ -50,4 +50,15 @@ config KVM_PCI
        select LIBUKBUS
        help
                 PCI bus driver for probing and operating PCI devices
+
+config VIRTIO_BUS
+      bool  "Virtio bus driver"
+      default y
+      depends on (ARCH_X86_64)
+      depends on LIBUKBUS
+      select LIBUKALLOC
+      help
+               Virtio bus driver for probing and operating virtio device and
+               transport layer.
+
 endif
