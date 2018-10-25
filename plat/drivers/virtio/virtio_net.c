@@ -692,7 +692,33 @@ static void virtio_net_info_get(struct uk_netdev *dev,
 
 static int virtio_net_start(struct uk_netdev *n)
 {
+	struct virtio_net_device *d;
+	int i = 0;
+
 	UK_ASSERT(n != NULL);
+	d = to_virtionetdev(n);
+
+	/*
+	 * By default, interrupts are disabled and it is up to the user or
+	 * network stack to manually enable them with a call to
+	 * enable_tx|rx_intr()
+	 */
+	for (i = 0; i < d->rx_vqueue_cnt; i++) {
+		virtqueue_intr_disable(d->rxqs[i].vq);
+		d->rxqs[i].intr_enabled = 0;
+	}
+
+	for (i = 0; i < d->tx_vqueue_cnt; i++) {
+		virtqueue_intr_disable(d->txqs[i].vq);
+		d->txqs[i].intr_enabled = 0;
+	}
+
+	/*
+	 * Set the DRIVER_OK status bit. At this point the device is "live".
+	 */
+	virtio_dev_drv_up(d->vdev);
+	uk_pr_info(DRIVER_NAME": %"__PRIu16" started\n", d->uid);
+
 	return 0;
 }
 
