@@ -168,6 +168,10 @@ static struct uk_netdev_tx_queue *virtio_netdev_tx_queue_setup(
 					struct uk_netdev *n, uint16_t queue_id,
 					uint16_t nb_desc,
 					struct uk_netdev_txqueue_conf *conf);
+static int virtio_netdev_vqueue_setup(struct virtio_net_device *vndev,
+				      uint16_t queue_id, uint16_t nr_desc,
+				      virtq_type_t queue_type,
+				      struct uk_alloc *a);
 static struct uk_netdev_rx_queue *virtio_netdev_rx_queue_setup(
 					struct uk_netdev *n,
 					uint16_t queue_id, uint16_t nb_desc,
@@ -191,6 +195,7 @@ static int virtio_netdev_rxq_info_get(struct uk_netdev *dev, __u16 queue_id,
 				      struct uk_netdev_queue_info *qinfo);
 static int virtio_netdev_txq_info_get(struct uk_netdev *dev, __u16 queue_id,
 				      struct uk_netdev_queue_info *qinfo);
+static int virtio_netdev_recv_done(struct virtqueue *vq, void *priv);
 
 /**
  * Static global constants
@@ -201,6 +206,23 @@ static struct uk_alloc *a;
 /**
  * The Driver method implementation.
  */
+static int virtio_netdev_recv_done(struct virtqueue *vq, void *priv)
+{
+	struct uk_netdev_rx_queue *rxq = NULL;
+
+	UK_ASSERT(vq && priv);
+
+	rxq = (struct uk_netdev_rx_queue *) priv;
+
+	/* Disable the interrupt for the ring */
+	virtqueue_intr_disable(vq);
+	rxq->intr_enabled &= ~(VTNET_INTR_EN);
+
+	/* Indicate to the network stack about an event */
+	uk_netdev_drv_rx_event(rxq->ndev, rxq->lqueue_id);
+	return 1;
+}
+
 static int virtio_netdev_xmit(struct uk_netdev *dev,
 			      struct uk_netdev_tx_queue *queue,
 			      struct uk_netbuf *pkt)
@@ -228,15 +250,111 @@ static int virtio_netdev_recv(struct uk_netdev *dev __unused,
 }
 
 static struct uk_netdev_rx_queue *virtio_netdev_rx_queue_setup(
-				struct uk_netdev *n, uint16_t queue_id __unused,
-				uint16_t nb_desc __unused,
-				struct uk_netdev_rxqueue_conf *conf __unused)
+				struct uk_netdev *n, uint16_t queue_id,
+				uint16_t nb_desc,
+				struct uk_netdev_rxqueue_conf *conf)
 {
+	struct virtio_net_device *vndev;
 	struct uk_netdev_rx_queue *rxq = NULL;
+	int rc;
 
 	UK_ASSERT(n);
+	UK_ASSERT(conf);
+	vndev = to_virtionetdev(n);
+	if (queue_id >= vndev->max_vqueue_pairs) {
+		uk_pr_err("Invalid virtqueue identifier: %"__PRIu16"\n",
+			  queue_id);
+		rc = -EINVAL;
+		goto err_exit;
+	}
+	/* Setup the virtqueue with the descriptor */
+	rc = virtio_netdev_vqueue_setup(vndev, queue_id, nb_desc, VNET_RX,
+					conf->a);
+	if (rc < 0) {
+		uk_pr_err("Failed to set up virtqueue %"__PRIu16": %d\n",
+			  queue_id, rc);
+		goto err_exit;
+	}
+	rxq  = &vndev->rxqs[rc];
 
+exit:
 	return rxq;
+
+err_exit:
+	rxq = ERR2PTR(rc);
+	goto exit;
+}
+
+/**
+ * This function setup the vring infrastructure.
+ * @param vndev
+ *	Reference to the virtio net device.
+ * @param queue_id
+ *	User queue identifier
+ * @param nr_desc
+ *	User configured number of descriptors.
+ * @param queue_type
+ *	Queue type.
+ * @param a
+ *	Reference to the allocator.
+ */
+static int virtio_netdev_vqueue_setup(struct virtio_net_device *vndev,
+		uint16_t queue_id, uint16_t nr_desc, virtq_type_t queue_type,
+		struct uk_alloc *a)
+{
+	int rc = 0;
+	int id = 0;
+	virtqueue_callback_t callback;
+	uint16_t max_desc, hwvq_id;
+	struct virtqueue *vq;
+
+	if (queue_type == VNET_RX) {
+		id = vndev->rx_vqueue_cnt;
+		callback = virtio_netdev_recv_done;
+		max_desc = vndev->rxqs[id].max_nb_desc;
+		hwvq_id = vndev->rxqs[id].hwvq_id;
+	} else {
+		id = vndev->tx_vqueue_cnt;
+		/* We don't support the callback from the txqueue yet */
+		callback = NULL;
+		max_desc = vndev->txqs[id].max_nb_desc;
+		hwvq_id = vndev->txqs[id].hwvq_id;
+	}
+
+	if (unlikely(max_desc < nr_desc)) {
+		uk_pr_err("Max allowed desc: %"__PRIu16" Requested desc:%"__PRIu16"\n",
+			  max_desc, nr_desc);
+		return -ENOBUFS;
+	}
+
+	/* Check if the descriptor is a power of 2 */
+	if (unlikely(nr_desc & (nr_desc - 1))) {
+		uk_pr_err("Expect descriptor count as a power 2\n");
+		return -EINVAL;
+	}
+	vq = virtio_vqueue_setup(vndev->vdev, hwvq_id, nr_desc, callback, a);
+	if (unlikely(PTRISERR(vq))) {
+		uk_pr_err("Failed to set up virtqueue %"__PRIu16"\n",
+			  queue_id);
+		rc = PTR2ERR(vq);
+		return rc;
+	}
+
+	if (queue_type == VNET_RX) {
+		vq->priv = &vndev->rxqs[id];
+		vndev->rxqs[id].ndev = &vndev->netdev;
+		vndev->rxqs[id].vq = vq;
+		vndev->rxqs[id].nb_desc = nr_desc;
+		vndev->rxqs[id].lqueue_id = queue_id;
+		vndev->rx_vqueue_cnt++;
+	} else {
+		vndev->txqs[id].vq = vq;
+		vndev->txqs[id].ndev = &vndev->netdev;
+		vndev->txqs[id].nb_desc = nr_desc;
+		vndev->txqs[id].lqueue_id = queue_id;
+		vndev->tx_vqueue_cnt++;
+	}
+	return id;
 }
 
 static struct uk_netdev_tx_queue *virtio_netdev_tx_queue_setup(
@@ -251,12 +369,29 @@ static struct uk_netdev_tx_queue *virtio_netdev_tx_queue_setup(
 }
 
 static int virtio_netdev_rxq_info_get(struct uk_netdev *dev,
-				      __u16 queue_id __unused,
+				      __u16 queue_id,
 				      struct uk_netdev_queue_info *qinfo)
 {
+	struct virtio_net_device *vndev;
+	struct uk_netdev_rx_queue *rxq;
+	int rc = 0;
+
 	UK_ASSERT(dev);
 	UK_ASSERT(qinfo);
-	return 0;
+	vndev = to_virtionetdev(dev);
+	if (unlikely(queue_id >= vndev->max_vqueue_pairs)) {
+		uk_pr_err("Invalid virtqueue id: %"__PRIu16"\n", queue_id);
+		rc = -EINVAL;
+		goto exit;
+	}
+	rxq = &vndev->rxqs[queue_id];
+	qinfo->nb_min = 1;
+	qinfo->nb_max = rxq->max_nb_desc;
+	qinfo->nb_is_power_of_two = 1;
+
+exit:
+	return rc;
+
 }
 
 static int virtio_netdev_txq_info_get(struct uk_netdev *dev,
