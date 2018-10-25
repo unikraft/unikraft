@@ -363,9 +363,32 @@ static struct uk_netdev_tx_queue *virtio_netdev_tx_queue_setup(
 				struct uk_netdev_txqueue_conf *conf __unused)
 {
 	struct uk_netdev_tx_queue *txq = NULL;
+	struct virtio_net_device *vndev;
+	int rc = 0;
 
 	UK_ASSERT(n);
+	vndev = to_virtionetdev(n);
+	if (queue_id >= vndev->max_vqueue_pairs) {
+		uk_pr_err("Invalid virtqueue identifier: %"__PRIu16"\n",
+			  queue_id);
+		rc = -EINVAL;
+		goto err_exit;
+	}
+	/* Setup the virtqueue */
+	rc = virtio_netdev_vqueue_setup(vndev, queue_id, nb_desc, VNET_TX,
+					conf->a);
+	if (rc < 0) {
+		uk_pr_err("Failed to set up virtqueue %"__PRIu16": %d\n",
+			  queue_id, rc);
+		goto err_exit;
+	}
+	txq = &vndev->txqs[rc];
+exit:
 	return txq;
+
+err_exit:
+	txq = ERR2PTR(rc);
+	goto exit;
 }
 
 static int virtio_netdev_rxq_info_get(struct uk_netdev *dev,
@@ -398,9 +421,26 @@ static int virtio_netdev_txq_info_get(struct uk_netdev *dev,
 				      __u16 queue_id __unused,
 				      struct uk_netdev_queue_info *qinfo)
 {
+	struct virtio_net_device *vndev;
+	struct uk_netdev_tx_queue *txq;
+	int rc = 0;
+
 	UK_ASSERT(dev);
 	UK_ASSERT(qinfo);
-	return 0;
+
+	vndev = to_virtionetdev(dev);
+	if (unlikely(queue_id >= vndev->max_vqueue_pairs)) {
+		uk_pr_err("Invalid queue_id %"__PRIu16"\n", queue_id);
+		rc = -EINVAL;
+		goto exit;
+	}
+	txq = &vndev->txqs[queue_id];
+	qinfo->nb_min = 1;
+	qinfo->nb_max = txq->max_nb_desc;
+	qinfo->nb_is_power_of_two = 1;
+
+exit:
+	return rc;
 }
 
 static unsigned virtio_net_promisc_get(struct uk_netdev *n)
