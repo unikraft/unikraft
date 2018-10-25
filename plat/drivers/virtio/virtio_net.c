@@ -642,19 +642,39 @@ err_negotiate_feature:
 }
 
 static int virtio_net_rx_intr_enable(struct uk_netdev *n,
-				     struct uk_netdev_rx_queue *queue __unused)
+				     struct uk_netdev_rx_queue *queue)
 {
+	struct virtio_net_device *d __unused;
 	int rc = 0;
 
 	UK_ASSERT(n);
+	d = to_virtionetdev(n);
+	/* If the interrupt is enabled */
+	if (queue->intr_enabled & VTNET_INTR_EN)
+		return 0;
+
+	/**
+	 * Enable the user configuration bit. This would cause the interrupt to
+	 * be enabled automatically, if the interrupt could not be enabled now
+	 * due to data in the queue.
+	 */
+	queue->intr_enabled = VTNET_INTR_USR_EN;
+	rc = virtqueue_intr_enable(queue->vq);
+	if (!rc)
+		queue->intr_enabled |= VTNET_INTR_EN;
 
 	return rc;
 }
 
 static int virtio_net_rx_intr_disable(struct uk_netdev *n,
-				      struct uk_netdev_rx_queue *queue __unused)
+				      struct uk_netdev_rx_queue *queue)
 {
+	struct virtio_net_device *vndev __unused;
+
 	UK_ASSERT(n);
+	vndev = to_virtionetdev(n);
+	virtqueue_intr_disable(queue->vq);
+	queue->intr_enabled &= ~(VTNET_INTR_USR_EN | VTNET_INTR_EN);
 	return 0;
 }
 
