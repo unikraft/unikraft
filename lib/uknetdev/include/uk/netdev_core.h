@@ -85,7 +85,8 @@ struct uk_netdev_info {
 	uint16_t max_tx_queues;
 	int in_queue_pairs; /**< If true, allocate queues in pairs. */
 	uint16_t max_mtu;   /**< Maximum supported MTU size. */
-	uint16_t nb_encap;  /**< Number of bytes required as headroom for tx. */
+	uint16_t nb_encap_tx;  /**< Number of bytes required as headroom for tx. */
+	uint16_t nb_encap_rx;  /**< Number of bytes required as headroom for rx. */
 };
 
 /**

@@ -688,6 +688,8 @@ static void virtio_net_info_get(struct uk_netdev *dev,
 
 	dev_info->max_rx_queues = vndev->max_vqueue_pairs;
 	dev_info->max_tx_queues = vndev->max_vqueue_pairs;
+	dev_info->nb_encap_tx = sizeof(struct virtio_net_hdr);
+	dev_info->nb_encap_rx = sizeof(struct virtio_net_rx_hdr);
 }
 
 static int virtio_net_start(struct uk_netdev *n)
