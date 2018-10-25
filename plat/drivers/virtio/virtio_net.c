@@ -161,6 +161,9 @@ static void virtio_net_info_get(struct uk_netdev *dev,
 static inline void virtio_netdev_feature_set(struct virtio_net_device *vndev);
 static int virtio_netdev_configure(struct uk_netdev *n,
 				   const struct uk_netdev_conf *conf);
+static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
+				    const struct uk_netdev_conf *conf);
+static int virtio_netdev_feature_negotiate(struct virtio_net_device *vndev);
 static struct uk_netdev_tx_queue *virtio_netdev_tx_queue_setup(
 					struct uk_netdev *n, uint16_t queue_id,
 					uint16_t nb_desc,
@@ -267,30 +270,200 @@ static int virtio_netdev_txq_info_get(struct uk_netdev *dev,
 
 static unsigned virtio_net_promisc_get(struct uk_netdev *n)
 {
+	struct virtio_net_device *d;
+
 	UK_ASSERT(n);
-	return 0;
+	d = to_virtionetdev(n);
+	return d->promisc;
 }
 
 static const struct uk_hwaddr *virtio_net_mac_get(struct uk_netdev *n)
 {
+	struct virtio_net_device *d;
+
 	UK_ASSERT(n);
-	return NULL;
+	d = to_virtionetdev(n);
+	return &d->hw_addr;
 }
 
 static __u16 virtio_net_mtu_get(struct uk_netdev *n)
 {
+	struct virtio_net_device *d;
+
 	UK_ASSERT(n);
-	return 0;
+	d = to_virtionetdev(n);
+	return d->mtu;
+}
+
+static int virtio_netdev_feature_negotiate(struct virtio_net_device *vndev)
+{
+	__u64 host_features = 0;
+	__u16 hw_len;
+	int rc = 0;
+
+	/**
+	 * Read device feature bits, and write the subset of feature bits
+	 * understood by the OS and driver to the device. During this step the
+	 * driver MAY read (but MUST NOT write) the device-specific
+	 * configuration fields to check that it can support the device before
+	 * accepting it.
+	 */
+	host_features = virtio_feature_get(vndev->vdev);
+	if (!virtio_has_features(host_features, VIRTIO_NET_F_MAC)) {
+		/**
+		 * The feature that aren't supported are usually masked out and
+		 * provided with default value. In this case we need to
+		 * report an error as we don't support  generation of random
+		 * MAC Address.
+		 */
+		uk_pr_err("Host system does not offer MAC feature\n");
+		rc = -EINVAL;
+		goto exit;
+	}
+
+	/**
+	 * According to Virtio specification, section 2.3.1. Config fields
+	 * greater than 32-bits cannot be atomically read. We may need to
+	 * reconsider providing generic read/write function for all these
+	 * virtio device in a separate header file which could be reused across
+	 * different virtio devices.
+	 */
+	hw_len = virtio_config_get(vndev->vdev,
+				   __offsetof(struct virtio_net_config, mac),
+				   &vndev->hw_addr.addr_bytes[0],
+				   UK_NETDEV_HWADDR_LEN, 1);
+	if (unlikely(hw_len != UK_NETDEV_HWADDR_LEN)) {
+		uk_pr_err("Failed to retrieve the mac address from device\n");
+		rc = -EAGAIN;
+		goto exit;
+	}
+	rc = 0;
+
+	/**
+	 * Mask out features supported by both driver and device.
+	 */
+	vndev->vdev->features &= host_features;
+	virtio_feature_set(vndev->vdev, vndev->vdev->features);
+exit:
+	return rc;
+}
+
+static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
+				    const struct uk_netdev_conf *conf)
+{
+	int rc = 0;
+	int i = 0;
+	int vq_avail = 0;
+	int total_vqs = conf->nb_rx_queues + conf->nb_tx_queues;
+	__u16 qdesc_size[total_vqs];
+
+	if (conf->nb_rx_queues != 1 || conf->nb_tx_queues != 1) {
+		uk_pr_err("Queue combination not supported: %"__PRIu16"/%"__PRIu16" rx/tx\n",
+			  conf->nb_rx_queues, conf->nb_tx_queues);
+
+		return -ENOTSUP;
+	}
+
+	/**
+	 * TODO:
+	 * The virtio device management data structure are allocated using the
+	 * allocator from the netdev configuration. In the future it might be
+	 * wiser to move it to the allocator of each individual queue. This
+	 * would better considering NUMA support.
+	 */
+	vndev->rxqs = uk_malloc(a, sizeof(*vndev->rxqs) * conf->nb_rx_queues);
+	vndev->txqs = uk_malloc(a, sizeof(*vndev->txqs) * conf->nb_tx_queues);
+	if (unlikely(!vndev->rxqs || !vndev->txqs)) {
+		uk_pr_err("Failed to allocate memory for queue management\n");
+		rc = -ENOMEM;
+		goto err_free_txrx;
+	}
+
+	vq_avail = virtio_find_vqs(vndev->vdev, total_vqs, qdesc_size);
+	if (unlikely(vq_avail != total_vqs)) {
+		uk_pr_err("Expected: %d queues, Found: %d queues\n",
+			  total_vqs, vq_avail);
+		rc = -ENOMEM;
+		goto err_free_txrx;
+	}
+
+	/**
+	 * The virtqueue are organized as:
+	 * Virtqueue-rx0
+	 * Virtqueue-tx0
+	 * Virtqueue-rx1
+	 * Virtqueue-tx1
+	 * ...
+	 * Virtqueue-ctrlq
+	 */
+	for (i = 0; i < vndev->max_vqueue_pairs; i++) {
+		/**
+		 * Initialize the received queue with the information received
+		 * from the device.
+		 */
+		vndev->rxqs[i].hwvq_id = 2 * i;
+		vndev->rxqs[i].max_nb_desc = qdesc_size[vndev->rxqs[i].hwvq_id];
+		uk_sglist_init(&vndev->rxqs[i].sg,
+			       (sizeof(vndev->rxqs[i].sgsegs) /
+				sizeof(vndev->rxqs[i].sgsegs[0])),
+			       &vndev->rxqs[i].sgsegs[0]);
+
+		/**
+		 * Initialize the transmit queue with the information received
+		 * from the device.
+		 */
+		vndev->txqs[i].hwvq_id = (2 * i) + 1;
+		vndev->txqs[i].max_nb_desc = qdesc_size[vndev->txqs[i].hwvq_id];
+		uk_sglist_init(&vndev->txqs[i].sg,
+			       (sizeof(vndev->txqs[i].sgsegs) /
+				sizeof(vndev->txqs[i].sgsegs[0])),
+			       &vndev->txqs[i].sgsegs[0]);
+	}
+exit:
+	return rc;
+
+err_free_txrx:
+	if (!vndev->rxqs)
+		uk_free(a, vndev->rxqs);
+	if (!vndev->txqs)
+		uk_free(a, vndev->txqs);
+	goto exit;
 }
 
 static int virtio_netdev_configure(struct uk_netdev *n,
-				   const struct uk_netdev_conf *conf __unused)
+				   const struct uk_netdev_conf *conf)
 {
 	int rc = 0;
+	struct virtio_net_device *vndev;
 
 	UK_ASSERT(n);
+	UK_ASSERT(conf);
+	vndev = to_virtionetdev(n);
 
+	rc = virtio_netdev_feature_negotiate(vndev);
+	if (rc != 0) {
+		uk_pr_err("Failed to negotiate the device feature %d\n", rc);
+		goto err_negotiate_feature;
+	}
+
+	rc = virtio_netdev_rxtx_alloc(vndev, conf);
+	if (rc != 0) {
+		uk_pr_err("Failed to probe the rx and tx rings %d\n", rc);
+		goto err_negotiate_feature;
+	}
+
+	/* Initialize the count of the virtio-net device */
+	vndev->rx_vqueue_cnt = 0;
+	vndev->tx_vqueue_cnt = 0;
+
+	uk_pr_info("Configured: features=0x%lx max_virtqueue_pairs=%"__PRIu16"\n",
+		   vndev->vdev->features, vndev->max_vqueue_pairs);
+exit:
 	return rc;
+
+err_negotiate_feature:
+	virtio_dev_status_update(vndev->vdev, VIRTIO_CONFIG_STATUS_FAIL);
+	goto exit;
 }
 
 static int virtio_net_rx_intr_enable(struct uk_netdev *n,
