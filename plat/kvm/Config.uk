@@ -71,5 +71,13 @@ config VIRTIO_PCI
        help
                Support virtio devices on PCI bus
 
+config VIRTIO_NET
+       bool "Virtio Net device"
+       default n
+       depends on LIBUKNETDEV
+       select VIRTIO
+       select LIBUKSGLIST
+       help
+              Virtual network driver.
 endmenu
 endif

@@ -96,3 +96,5 @@ LIBKVMVIRTIO_SRCS-$(CONFIG_VIRTIO_BUS) +=\
 							$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_ring.c
 LIBKVMVIRTIO_SRCS-$(CONFIG_VIRTIO_PCI) +=\
 							$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_pci.c
+LIBKVMVIRTIO_SRCS-$(CONFIG_VIRTIO_NET) +=\
+							$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_net.c
