@@ -40,6 +40,7 @@
 #include <errno.h>
 
 #include <xen/xen.h>
+#include <common/console.h>
 
 #if defined __X86_32__
 #include <xen-x86/hypercall32.h>
@@ -64,6 +65,8 @@ void ukplat_terminate(enum ukplat_gstate request)
 		reason = SHUTDOWN_crash;
 		break;
 	}
+
+	hvconsole_flush();
 
 	for (;;) {
 		struct sched_shutdown sched_shutdown = { .reason = reason };

@@ -203,6 +203,20 @@ static void hvconsole_input(evtchn_port_t port __unused,
 	/* NOT IMPLEMENTED YET */
 }
 
+void hvconsole_flush(void)
+{
+	struct xencons_interface *intf;
+
+	if (!console_ready)
+		return;
+
+	intf = console_ring;
+	if (unlikely(!intf))
+		return;
+
+	while (intf->out_cons < intf->out_prod)
+		barrier();
+}
 
 void _libxenplat_init_console(void)
 {

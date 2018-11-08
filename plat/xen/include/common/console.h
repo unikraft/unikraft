@@ -45,4 +45,7 @@ void _libxenplat_prepare_console(void);
  */
 void _libxenplat_init_console(void);
 
+
+void hvconsole_flush(void);
+
 #endif /* __CONSOLE_H__ */
