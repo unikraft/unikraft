@@ -42,8 +42,7 @@
 #include <uk/arch/lcpu.h>
 #include <uk/arch/atomic.h>
 
-// TODO revisit: move to evtchn; why cpu param?
-#define active_evtchns(cpu, sh, idx)				\
+#define active_evtchns(sh, idx)				\
 	((sh)->evtchn_pending[idx] & ~(sh)->evtchn_mask[idx])
 
 int in_callback;
@@ -69,7 +68,7 @@ void do_hypervisor_callback(struct __regs *regs)
 		l1i = ukarch_ffsl(l1);
 		l1 &= ~(1UL << l1i);
 
-		while ((l2 = active_evtchns(cpu, s, l1i)) != 0) {
+		while ((l2 = active_evtchns(s, l1i)) != 0) {
 			l2i = ukarch_ffsl(l2);
 			l2 &= ~(1UL << l2i);
 
