@@ -24,7 +24,6 @@
 #ifndef _MM_PV_H
 #define _MM_PV_H
 
-#include <xen-x86/os.h>
 #include <xen-x86/setup.h>
 
 #ifdef __x86_64__

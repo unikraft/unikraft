@@ -46,6 +46,7 @@
 #include <uk/wait.h>
 #include <uk/arch/spinlock.h>
 #include <common/events.h>
+#include <common/hypervisor.h>
 #include <xen-x86/mm.h>
 #include <xen-x86/setup.h>
 #include <xenbus/client.h>

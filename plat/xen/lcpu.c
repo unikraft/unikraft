@@ -34,7 +34,6 @@
 
 #include <stdint.h>
 #if defined(__X86_32__) || defined(__x86_64__)
-#include <xen-x86/os.h>
 #include <xen-x86/irq.h>
 #elif (defined __ARM_32__) || (defined __ARM_64__)
 #include <xen-arm/os.h>

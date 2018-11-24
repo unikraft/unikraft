@@ -27,6 +27,7 @@
 #include <common/gnttab.h>
 #include <xen-x86/mm.h>
 
+#include <xen-x86/hypercall.h>
 
 /* NR_GRANT_FRAMES must be less than or equal to that configured in Xen */
 #define NR_GRANT_FRAMES         4

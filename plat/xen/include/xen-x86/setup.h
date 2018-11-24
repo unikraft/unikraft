@@ -46,7 +46,6 @@ extern unsigned int _libxenplat_mrd_num;
 extern struct ukplat_memregion_desc _libxenplat_mrd[];
 extern char _libxenplat_bootstack[];
 
-/* Note: HYPERVISOR_shared_info is defined in os.h */
 extern start_info_t *HYPERVISOR_start_info;
 
 #endif /* __SETUP_H__ */
