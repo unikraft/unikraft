@@ -26,7 +26,6 @@
 
 #include <xen-arm/os.h>
 #include <common/events.h>
-#include <common/hypervisor.h>
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>

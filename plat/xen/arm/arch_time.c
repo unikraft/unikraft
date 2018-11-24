@@ -25,7 +25,6 @@
  */
 
 #include <xen-arm/os.h>
-#include <common/hypervisor.h>
 #include <common/events.h>
 #include <xen-arm/traps.h>
 #include <uk/print.h>

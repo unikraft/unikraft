@@ -291,16 +291,14 @@ int evtchn_get_peercontext(evtchn_port_t local_port, char *ctx, int size)
 	return rc;
 }
 
-/* TODO - these were moved from hypervisor.c; integrate into evtchn */
-
-inline void mask_evtchn(uint32_t port)
+inline void mask_evtchn(evtchn_port_t port)
 {
 	shared_info_t *s = HYPERVISOR_shared_info;
 
 	uk_set_bit(port, &s->evtchn_mask[0]);
 }
 
-inline void unmask_evtchn(uint32_t port)
+inline void unmask_evtchn(evtchn_port_t port)
 {
 	shared_info_t *s = HYPERVISOR_shared_info;
 	vcpu_info_t *vcpu_info = &s->vcpu_info[smp_processor_id()];
@@ -323,7 +321,7 @@ inline void unmask_evtchn(uint32_t port)
 	}
 }
 
-inline void clear_evtchn(uint32_t port)
+inline void clear_evtchn(evtchn_port_t port)
 {
 	shared_info_t *s = HYPERVISOR_shared_info;
 

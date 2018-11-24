@@ -65,6 +65,22 @@ evtchn_port_t bind_pirq(uint32_t pirq, int will_share,
 evtchn_port_t bind_evtchn(evtchn_port_t port, evtchn_handler_t handler,
 			  void *data);
 void unbind_evtchn(evtchn_port_t port);
+
+/* Disable events for <port> by setting the masking bit */
+void mask_evtchn(evtchn_port_t port);
+
+/*
+ * Enable events for <port> by unsetting the masking bit.
+ * If pending events are present, call ukplat_lcpu_irqs_handle_pending
+ */
+void unmask_evtchn(evtchn_port_t port);
+
+/*
+ * Clear pending events from <port> by unsetting the pending
+ * events bit
+ */
+void clear_evtchn(evtchn_port_t port);
+
 void init_events(void);
 int evtchn_alloc_unbound(domid_t pal, evtchn_handler_t handler,
 			 void *data, evtchn_port_t *port);

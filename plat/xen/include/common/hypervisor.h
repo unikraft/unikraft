@@ -71,9 +71,6 @@ shared_info_t *map_shared_info(void *p);
 //TODO START from here on we have to cleanup/refactor/move stuff
 /* hypervisor.c */
 void do_hypervisor_callback(struct __regs *regs);
-void mask_evtchn(uint32_t port);
-void unmask_evtchn(uint32_t port);
-void clear_evtchn(uint32_t port);
 //TODO END
 
 extern int in_callback;
