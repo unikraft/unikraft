@@ -48,30 +48,10 @@
 #else
 #error "Unsupported architecture"
 #endif
-#include <xen/hvm/hvm_op.h>
 #include <uk/arch/lcpu.h>
 #include <uk/plat/lcpu.h>
 
-#if 0 //TODO: cleanup
-/*
- * a placeholder for the start of day information passed up from the hypervisor
- */
-union start_info_union {
-	start_info_t start_info;
-	char padding[512];
-};
-extern union start_info_union start_info_union;
-#define start_info (start_info_union.start_info)
-#else
-int hvm_get_parameter(int idx, uint64_t *value);
-int hvm_set_parameter(int idx, uint64_t value);
-#endif
-shared_info_t *map_shared_info(void *p);
-
-//TODO START from here on we have to cleanup/refactor/move stuff
-/* hypervisor.c */
 void do_hypervisor_callback(struct __regs *regs);
-//TODO END
 
 extern int in_callback;
 

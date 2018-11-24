@@ -48,10 +48,6 @@
 
 int in_callback;
 
-#ifndef CONFIG_PARAVIRT
-extern shared_info_t shared_info;
-#endif /* !CONFIG_PARAVIRT */
-
 void do_hypervisor_callback(struct __regs *regs)
 {
 	unsigned long l1, l2, l1i, l2i;
