@@ -48,7 +48,7 @@ static struct uk_netdev_data *_alloc_data(struct uk_alloc *a,
 {
 	struct uk_netdev_data *data;
 
-	data = uk_malloc(a, sizeof(*data));
+	data = uk_calloc(a, 1, sizeof(*data));
 	if (!data)
 		return NULL;
 
