@@ -629,6 +629,9 @@ static int virtio_netdev_vqueue_setup(struct virtio_net_device *vndev,
 		return -ENOBUFS;
 	}
 
+	nr_desc = (nr_desc != 0) ? nr_desc : max_desc;
+	uk_pr_debug("Configuring the %d descriptors\n", nr_desc);
+
 	/* Check if the descriptor is a power of 2 */
 	if (unlikely(nr_desc & (nr_desc - 1))) {
 		uk_pr_err("Expect descriptor count as a power 2\n");
