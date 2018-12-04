@@ -53,6 +53,8 @@ void *memmove(void *dst, const void *src, size_t len);
 
 char *strncpy(char *dst, const char *src, size_t len);
 char *strcpy(char *dst, const char *src);
+size_t strlcpy(char *d, const char *s, size_t n);
+size_t strlcat(char *d, const char *s, size_t n);
 size_t strnlen(const char *str, size_t maxlen);
 size_t strlen(const char *str);
 char *strchrnul(const char *s, int c);
