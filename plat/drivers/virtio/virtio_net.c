@@ -1063,7 +1063,7 @@ static int virtio_net_add_dev(struct virtio_dev *vdev)
 
 	UK_ASSERT(vdev != NULL);
 
-	vndev = uk_malloc(a, sizeof(*vndev));
+	vndev = uk_calloc(a, 1, sizeof(*vndev));
 	if (!vndev) {
 		rc = -ENOMEM;
 		goto err_out;
