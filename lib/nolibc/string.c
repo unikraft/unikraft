@@ -143,7 +143,8 @@ size_t strlen(const char *str)
 
 size_t strnlen(const char *str, size_t len)
 {
-	return (size_t)((uintptr_t)memchr(str, '\0', len) - (uintptr_t)str);
+	const char *p = memchr(str, 0, len);
+	return p ? (size_t) (p - str) : len;
 }
 
 char *strncpy(char *dst, const char *src, size_t len)
