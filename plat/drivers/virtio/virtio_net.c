@@ -341,7 +341,7 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 	 * Fill the virtio-net-header with the necessary information.
 	 * Zero explicitly set.
 	 */
-	vhdr->flags = 0;
+	memset(vhdr, 0, sizeof(*vhdr));
 	vhdr->gso_type = VIRTIO_NET_HDR_GSO_NONE;
 
 	/**
