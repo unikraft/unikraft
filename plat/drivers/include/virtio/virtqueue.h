@@ -228,8 +228,10 @@ static inline void virtqueue_host_notify(struct virtqueue *vq)
 {
 	UK_ASSERT(vq);
 
-	if (vq->vq_notify_host && virtqueue_notify_enabled(vq))
+	if (vq->vq_notify_host && virtqueue_notify_enabled(vq)) {
+		uk_pr_debug("notify queue %d\n", vq->queue_id);
 		vq->vq_notify_host(vq->vdev, vq->queue_id);
+	}
 }
 
 #ifdef __cplusplus

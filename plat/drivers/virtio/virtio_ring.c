@@ -326,6 +326,9 @@ int virtqueue_buffer_enqueue(struct virtqueue *vq, void *cookie,
 	vrq->head_free_desc = idx;
 	vrq->desc_avail -= total_desc;
 
+	uk_pr_debug("Old head:%d, new head:%d, total_desc:%d\n",
+		    head_idx, idx, total_desc);
+
 	virtqueue_ring_update_avail(vrq, head_idx);
 	return vrq->desc_avail;
 }
