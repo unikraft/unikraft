@@ -79,11 +79,13 @@ static struct virtio_driver *find_match_drv(struct virtio_dev *vdev)
 	struct virtio_driver *drv = NULL;
 
 	UK_TAILQ_FOREACH(drv, &virtio_drvs, next) {
+		i = 0;
 		while (drv->dev_ids[i].virtio_device_id != VIRTIO_ID_INVALID) {
 			if (virtio_device_id_match(&drv->dev_ids[i],
 						   &vdev->id)) {
 				return drv;
 			}
+			i++;
 		}
 	}
 	return NULL;
