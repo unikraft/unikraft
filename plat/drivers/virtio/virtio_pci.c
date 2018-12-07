@@ -46,7 +46,6 @@
 #include <virtio/virtio_pci.h>
 
 #define VENDOR_QUMRANET_VIRTIO           (0x1AF4)
-#define VIRTIO_PCI_LEGACY_DEVICEID_START (0x0FFF)
 #define VIRTIO_PCI_MODERN_DEVICEID_START (0x1040)
 
 static struct uk_alloc *a;
@@ -93,9 +92,6 @@ static struct virtqueue *vpci_legacy_vq_setup(struct virtio_dev *vdev,
 					      __u16 num_desc,
 					      virtqueue_callback_t callback,
 					      struct uk_alloc *a);
-static inline void virtio_device_id_add(struct virtio_dev *vdev,
-					__u16 pci_dev_id,
-					__u16 vpci_dev_id_start);
 static int virtio_pci_handle(void *arg);
 static int vpci_legacy_notify(struct virtio_dev *vdev, __u16 queue_id);
 static int virtio_pci_legacy_add_dev(struct pci_device *pci_dev,
@@ -338,13 +334,6 @@ static void vpci_legacy_pci_features_set(struct virtio_dev *vdev,
 			VIRTIO_PCI_GUEST_FEATURES, (__u32)features);
 }
 
-static inline void virtio_device_id_add(struct virtio_dev *vdev,
-					__u16 pci_dev_id,
-					__u16 pci_dev_id_start)
-{
-	vdev->id.virtio_device_id = (pci_dev_id - pci_dev_id_start);
-}
-
 static int virtio_pci_legacy_add_dev(struct pci_device *pci_dev,
 				     struct virtio_pci_dev *vpci_dev)
 {
@@ -364,8 +353,7 @@ static int virtio_pci_legacy_add_dev(struct pci_device *pci_dev,
 		   pci_dev->id.device_id);
 
 	/* Mapping the virtio device identifier */
-	virtio_device_id_add(&vpci_dev->vdev, pci_dev->id.device_id,
-			     VIRTIO_PCI_LEGACY_DEVICEID_START);
+	vpci_dev->vdev.id.virtio_device_id = pci_dev->id.subsystem_device_id;
 	return 0;
 }
 
