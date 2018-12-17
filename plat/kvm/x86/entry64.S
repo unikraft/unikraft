@@ -160,8 +160,7 @@ gdt64_ptr:
 
 .type mxcsr_ptr, @object
 mxcsr_ptr:
-	.word 0x1f80			/* Intel SDM power-on default */
-
+	.long 0x1f80			/* Intel SDM power-on default */
 
 
 #include "pagetable.S"
