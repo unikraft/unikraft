@@ -52,6 +52,9 @@ extern "C" {
 #define VIRTIO_TRANSPORT_F_START    28
 #define VIRTIO_TRANSPORT_F_END      32
 
+/* v1.0 compliant. */
+#define VIRTIO_F_VERSION_1		32
+
 #ifdef __X86_64__
 static inline void _virtio_cwrite_bytes(const void *addr, const __u8 offset,
 					const void *buf, int len, int type_len)
@@ -108,7 +111,65 @@ static inline void _virtio_cread_bytes(const void *addr, const __u8 offset,
 	}
 }
 #else  /* __X86_64__ */
-#error "Virtio driver not supported for this architecture"
+
+/* IO barriers */
+#define __iormb()		rmb()
+#define __iowmb()		wmb()
+
+static inline void _virtio_cwrite_bytes(const void *addr, const __u8 offset,
+					const void *buf, int len, int type_len)
+{
+	int i = 0;
+	void *io_addr;
+	int count;
+
+	count  = len / type_len;
+	for (i = 0; i < count; i++) {
+		io_addr = (void *)addr + offset + (i * type_len);
+		__iowmb();
+		switch (type_len) {
+		case 1:
+			ioreg_write8(io_addr, ((__u8 *)buf)[i * type_len]);
+			break;
+		case 2:
+			ioreg_write16(io_addr, ((__u16 *)buf)[i * type_len]);
+			break;
+		case 4:
+			ioreg_write32(io_addr, ((__u32 *)buf)[i * type_len]);
+			break;
+		default:
+			UK_CRASH("Unsupported virtio write operation\n");
+		}
+	}
+}
+
+static inline void _virtio_cread_bytes(const void *addr, const __u8 offset,
+				       void *buf, int len, int type_len)
+{
+	int i = 0;
+	void *io_addr;
+	int count;
+
+	count = len / type_len;
+	for (i = 0; i < count; i++) {
+		io_addr = (void *)addr + offset + (i * type_len);
+		switch (type_len) {
+		case 1:
+			((__u8 *)buf)[i * type_len] = ioreg_read8(io_addr);
+			break;
+		case 2:
+			((__u16 *)buf)[i * type_len] = ioreg_read16(io_addr);
+			break;
+		case 4:
+			((__u32 *)buf)[i * type_len] = ioreg_read32(io_addr);
+			break;
+		default:
+			UK_CRASH("Unsupported virtio read operation\n");
+		}
+		__iormb();
+	}
+}
+
 #endif /* __X86_64__ */
 
 /**
