@@ -35,17 +35,53 @@
 
 #include <vfscore/file.h>
 #include <uk/plat/console.h>
+#include <uk/essentials.h>
+#include <termios.h>
 
 /* One function for stderr and stdout */
-static ssize_t stdout_write(struct vfscore_file *vfscore_file, const void *buf,
-			     size_t count)
+static ssize_t stdout_write(struct vfscore_file *vfscore_file __unused,
+			    const void *buf, size_t count)
 {
-	(void) vfscore_file;
 	return ukplat_coutk(buf, count);
 }
 
+static ssize_t stdin_read(struct vfscore_file *vfscore_file __unused,
+			  void *_buf, size_t count)
+{
+	int bytes_read;
+	size_t bytes_total = 0;
+	char *buf = (char *)_buf;
+
+	do {
+		while ((bytes_read = ukplat_cink(buf,
+			count - bytes_total)) <= 0)
+			;
+
+		buf = buf + bytes_read;
+		*(buf - 1) = *(buf - 1) == '\r' ?
+					'\n' : *(buf - 1);
+
+		stdout_write(vfscore_file, (buf - bytes_read),
+				bytes_read);
+		bytes_total += bytes_read;
+
+	} while (bytes_total < count && *(buf - 1) != '\n'
+			&& *(buf - 1) != VEOF);
+
+	return bytes_total;
+}
+
+static struct vfscore_fops stdin_fops = {
+	.read = stdin_read,
+};
+
 static struct vfscore_fops stdout_fops = {
 	.write = stdout_write,
+};
+
+static struct vfscore_file  stdin_file = {
+	.fd = 0,
+	.fops = &stdin_fops,
 };
 
 static struct vfscore_file  stdout_file = {
@@ -61,6 +97,7 @@ static struct vfscore_file  stderr_file = {
 
 void init_stdio(void)
 {
+	vfscore_install_fd(0, &stdin_file);
 	vfscore_install_fd(1, &stdout_file);
 	vfscore_install_fd(2, &stderr_file);
 }
