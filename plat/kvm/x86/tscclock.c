@@ -60,8 +60,6 @@
 #include <uk/assert.h>
 #include <uk/bitops.h>
 
-#define NSEC_PER_SEC         1000000000ULL
-
 #define TIMER_CNTR           0x40
 #define TIMER_MODE           0x43
 #define TIMER_SEL0           0x00
@@ -84,6 +82,15 @@
 #define	RTC_STATUS_A         0x0a
 #define	RTC_UIP              (1<<7)
 
+/*
+ * Compile-time check to make sure we don't tick faster than the PIT can go.
+ * This is really only a basic sanity check. We'll run into serious issues WAY
+ * earlier.
+ */
+#if TIMER_HZ / CONFIG_HZ < 1
+#error Timer tick frequency (CONFIG_HZ) cannot be higher than PIT frequency!
+#endif
+
 /* RTC wall time offset at monotonic time base. */
 static __u64 rtc_epochoffset;
 
@@ -103,11 +110,11 @@ static __u32 tsc_mult;
  *
  * Calculated as:
  *
- *     f = NSEC_PER_SEC / TIMER_HZ   (0.31) fixed point.
- *     pit_mult = 1 / f              (1.32) fixed point.
+ *     f = UKARCH_NSEC_PER_SEC / TIMER_HZ   (0.31) fixed point.
+ *     pit_mult = 1 / f                     (1.32) fixed point.
  */
 static const __u32 pit_mult =
-	(1ULL << 63) / ((NSEC_PER_SEC << 31) / TIMER_HZ);
+	(1ULL << 63) / ((UKARCH_NSEC_PER_SEC << 31) / TIMER_HZ);
 
 
 /*
@@ -131,7 +138,7 @@ static void i8254_delay(unsigned int n)
 {
 	unsigned int cur_tick, initial_tick;
 	int remaining;
-	const unsigned long timer_rval = TIMER_HZ / 100;
+	const unsigned long timer_rval = TIMER_HZ / CONFIG_HZ;
 
 	initial_tick = i8254_gettick();
 
@@ -211,10 +218,10 @@ int tscclock_init(void)
 {
 	__u64 tsc_freq, rtc_boot;
 
-	/* Initialise i8254 timer channel 0 to mode 2 at 100 Hz */
+	/* Initialise i8254 timer channel 0 to mode 2 at CONFIG_HZ frequency */
 	outb(TIMER_MODE, TIMER_SEL0 | TIMER_RATEGEN | TIMER_16BIT);
-	outb(TIMER_CNTR, (TIMER_HZ / 100) & 0xff);
-	outb(TIMER_CNTR, (TIMER_HZ / 100) >> 8);
+	outb(TIMER_CNTR, (TIMER_HZ / CONFIG_HZ) & 0xff);
+	outb(TIMER_CNTR, (TIMER_HZ / CONFIG_HZ) >> 8);
 
 	/*
 	 * Read RTC "time at boot". This must be done just before tsc_base is
@@ -238,9 +245,9 @@ int tscclock_init(void)
 	/*
 	 * Calculate TSC scaling multiplier.
 	 *
-	 * (0.32) tsc_mult = NSEC_PER_SEC (32.32) / tsc_freq (32.0)
+	 * (0.32) tsc_mult = UKARCH_NSEC_PER_SEC (32.32) / tsc_freq (32.0)
 	 */
-	tsc_mult = (NSEC_PER_SEC << 32) / tsc_freq;
+	tsc_mult = (UKARCH_NSEC_PER_SEC << 32) / tsc_freq;
 
 	/*
 	 * Monotonic time begins at tsc_base (first read of TSC before

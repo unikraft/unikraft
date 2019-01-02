@@ -233,7 +233,7 @@ void time_block_until(__snsec until)
 static void timer_handler(evtchn_port_t ev __unused,
 		struct __regs *regs __unused, void *ign __unused)
 {
-	__nsec until = ukplat_monotonic_clock() + ukarch_time_msec_to_nsec(1);
+	__nsec until = ukplat_monotonic_clock() + UKPLAT_TIME_TICK_NSEC;
 
 	HYPERVISOR_set_timer_op(until);
 }

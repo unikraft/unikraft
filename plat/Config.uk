@@ -17,3 +17,11 @@ config EARLY_PRINT_PL011_UART_ADDR
 		Pl011 serial address used by early debug console.
 
 endmenu
+
+config HZ
+	int
+	prompt "Timer frequency (Hz)"
+	default 100
+	help
+		Configure the timer interrupt frequency.
+		Only change this if you know what you're doing.

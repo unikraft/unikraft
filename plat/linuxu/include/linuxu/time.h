@@ -35,9 +35,10 @@
 #ifndef __LINUXU_TIME_H__
 #define __LINUXU_TIME_H__
 
+#include <uk/plat/time.h>
 #include <linuxu/signal.h>
 
-#define TIMER_INTVAL_MSEC    10
+#define TIMER_INTVAL_NSEC    UKPLAT_TIME_TICK_NSEC
 #define TIMER_SIGNUM         SIGALRM
 
 

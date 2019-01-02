@@ -47,6 +47,10 @@ void ukplat_time_fini(void);
 
 __nsec ukplat_monotonic_clock(void);
 
+/* Time tick length */
+#define UKPLAT_TIME_TICK_NSEC  (UKARCH_NSEC_PER_SEC / CONFIG_HZ)
+#define UKPLAT_TIME_TICK_MSEC  ukarch_time_nsec_to_msec(UKPLAT_TIME_TICK_NSEC)
+
 #ifdef __cplusplus
 }
 #endif

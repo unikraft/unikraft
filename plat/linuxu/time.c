@@ -40,8 +40,6 @@
 #include <linuxu/syscall.h>
 #include <linuxu/time.h>
 
-#define TIMER_INTVAL_NSEC    ukarch_time_msec_to_nsec(TIMER_INTVAL_MSEC)
-
 static k_timer_t timerid;
 
 
