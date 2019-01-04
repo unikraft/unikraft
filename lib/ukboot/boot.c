@@ -266,10 +266,3 @@ void ukplat_entry(int argc, char *argv[])
 	main_thread_func(&tma);
 #endif
 }
-
-/* Internal main */
-int main(int argc __unused, char *argv[] __unused)
-{
-	printf("weak main() called. Symbol was not replaced!\n");
-	return -EINVAL;
-}
