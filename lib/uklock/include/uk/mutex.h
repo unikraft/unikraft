@@ -58,6 +58,9 @@ struct uk_mutex {
 	struct uk_waitq wait;
 };
 
+#define	UK_MUTEX_INITIALIZER(name)				\
+	{ 0, __WAIT_QUEUE_INITIALIZER((name).wait) }
+
 void uk_mutex_init(struct uk_mutex *m);
 
 static inline void uk_mutex_lock(struct uk_mutex *m)
