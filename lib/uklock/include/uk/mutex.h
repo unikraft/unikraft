@@ -91,6 +91,11 @@ static inline int uk_mutex_trylock(struct uk_mutex *m)
 	return ret;
 }
 
+static inline int uk_mutex_is_locked(struct uk_mutex *m)
+{
+	return m->locked;
+}
+
 static inline void uk_mutex_unlock(struct uk_mutex *m)
 {
 	unsigned long irqf;
