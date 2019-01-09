@@ -257,6 +257,14 @@ $(BUILD_DIR)/$(1)/.origin: $(2)
 	  $(TOUCH) $(BUILD_DIR)/$(1)/.origin)
 endef
 
+define _extracttoorigin_tgz_xz =
+$(BUILD_DIR)/$(1)/.origin: $(2)
+	$(call verbose_cmd,UNTAR,$(1)':' $(notdir $(2)), \
+	  $(TAR) -xJf $(2) \
+	         -C $(BUILD_DIR)/$(1)/origin && \
+	  $(TOUCH) $(BUILD_DIR)/$(1)/.origin)
+endef
+
 define _extracttoorigin_zip =
 $(BUILD_DIR)/$(1)/.origin: $(2)
 	$(call verbose_cmd,UNZIP,$(1)':' $(notdir $(2)), \
@@ -290,9 +298,10 @@ endef
 # unarchive $libname,$archive_fname,$dir_with_patches(optional)
 define unarchive =
 $(if $(filter %.tar.gz %.tgz,$(2)),$(call _extracttoorigin_tgz,$(1),$(2)),\
+$(if $(filter %.tar.xz %.txz,$(2)),$(call _extracttoorigin_tgz_xz,$(1),$(2)),\
 $(if $(filter %.zip,$(2)),$(call          _extracttoorigin_zip,$(1),$(2)),\
 $(error $(2): missing extraction rule for archive type)\
-))
+)))
 UK_FETCH-y += $(BUILD_DIR)/$(1)/.origin \
 $(eval $(call vprefix_lib,$(1),ORIGIN) = $(BUILD_DIR)/$(1)/origin)
 $(call mk_sub_build_dir,$(1)/origin)
