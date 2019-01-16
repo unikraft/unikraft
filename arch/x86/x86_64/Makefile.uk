@@ -9,6 +9,9 @@ CINCLUDES   += -I$(CONFIG_UK_BASE)/arch/x86/x86_64/include
 ASINCLUDES  += -I$(CONFIG_UK_BASE)/arch/x86/x86_64/include
 CXXINCLUDES += -I$(CONFIG_UK_BASE)/arch/x86/x86_64/include
 
+# compiler flags to prevent use of extended (FP, SSE, AVX) registers.
+# This is for files that contain trap/exception/interrupt handlers
+NO_X86_EXTREGS_FLAGS := -mno-80387 -mno-fp-ret-in-387 -mno-mmx -mno-sse -mno-avx
 
 ASFLAGS-$(CONFIG_MARCH_X86_64_GENERIC)     += -mtune=generic
 CFLAGS-$(CONFIG_MARCH_X86_64_GENERIC)      += -mtune=generic

@@ -58,6 +58,10 @@ __nsec ukplat_clock_wall(void)
 	return tscclock_monotonic() + tscclock_epochoffset();
 }
 
+/* NB: If this ever does more than an immediate return, it will need to be
+ * compiled with NO_X86_EXTREGS_FLAGS to prevent potential clobbering of
+ * registers that are not saved on interrupt handling.
+ */
 static int timer_handler(void *arg __unused)
 {
 	/* Yes, we handled the irq. */
