@@ -40,6 +40,18 @@
 #include <uk/print.h>
 #include <uk/assert.h>
 
+/* A general word of caution when writing trap handlers. The platform trap
+ * entry code is set up to properly save general-purpose registers (e.g., rsi,
+ * rdi, rax, r8, ...), but it does NOT save any floating-point or SSE/AVX
+ * registers. (This would require figuring out in the trap handler code whether
+ * these are available to not risk a #UD trap inside the trap handler itself.)
+ * Hence, you need to be extra careful not to do anything that clobbers these
+ * registers if you intend to return from the handler. This includes calling
+ * other functions, which may clobber those registers.
+ * Of course, if you end your trap handler with a UK_CRASH, knock yourself out,
+ * it's not like the function you came from will ever have the chance to notice.
+ */
+
 /* Traps handled on both Xen and KVM */
 
 DECLARE_TRAP_EC(divide_error,      "divide error")
