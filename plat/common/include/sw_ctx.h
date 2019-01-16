@@ -35,11 +35,15 @@
 #define __PLAT_CMN_SW_CTX_H__
 
 #ifndef __ASSEMBLY__
+#include <stdint.h>
 #include <uk/plat/thread.h>
 
 struct sw_ctx {
-	unsigned long sp;  /* Stack pointer */
-	unsigned long ip;  /* Instruction pointer */
+	unsigned long sp;	/* Stack pointer */
+	unsigned long ip;	/* Instruction pointer */
+	uintptr_t extregs;	/* Pointer to an area to which extended
+				 * registers are saved on context switch.
+				 */
 };
 
 void sw_ctx_callbacks_init(struct ukplat_ctx_callbacks *ctx_cbs);

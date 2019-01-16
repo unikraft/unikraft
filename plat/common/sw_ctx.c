@@ -32,12 +32,13 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
+#include <stdint.h>
 #include <stdlib.h>
 #include <uk/plat/thread.h>
 #include <uk/alloc.h>
 #include <sw_ctx.h>
 #include <uk/assert.h>
-
+#include <x86/cpu.h>
 
 static void *sw_ctx_create(struct uk_alloc *allocator, unsigned long sp);
 static void  sw_ctx_start(void *ctx) __noreturn;
@@ -52,10 +53,14 @@ extern void asm_thread_starter(void);
 static void *sw_ctx_create(struct uk_alloc *allocator, unsigned long sp)
 {
 	struct sw_ctx *ctx;
+	size_t sz;
 
 	UK_ASSERT(allocator != NULL);
 
-	ctx = uk_malloc(allocator, sizeof(struct sw_ctx));
+	sz = ALIGN_UP(sizeof(struct sw_ctx), x86_cpu_features.extregs_align)
+		+ x86_cpu_features.extregs_size;
+	ctx = uk_malloc(allocator, sz);
+	uk_pr_debug("Allocating %lu bytes for sw ctx at %p\n", sz, ctx);
 	if (ctx == NULL) {
 		uk_pr_warn("Error allocating software context.");
 		return NULL;
@@ -63,6 +68,10 @@ static void *sw_ctx_create(struct uk_alloc *allocator, unsigned long sp)
 
 	ctx->sp = sp;
 	ctx->ip = (unsigned long) asm_thread_starter;
+	ctx->extregs = ALIGN_UP(((uintptr_t)ctx + sizeof(struct sw_ctx)),
+				x86_cpu_features.extregs_align);
+	// Initialize the extregs area by saving a valid register layout to it
+	save_extregs(ctx);
 
 	return ctx;
 }
@@ -85,6 +94,11 @@ extern void asm_sw_ctx_switch(void *prevctx, void *nextctx);
 
 static void sw_ctx_switch(void *prevctx, void *nextctx)
 {
+	struct sw_ctx *p = prevctx;
+	struct sw_ctx *n = nextctx;
+
+	save_extregs(p);
+	restore_extregs(n);
 	asm_sw_ctx_switch(prevctx, nextctx);
 }
 

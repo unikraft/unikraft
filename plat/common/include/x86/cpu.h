@@ -32,6 +32,7 @@
 
 #include <uk/arch/types.h>
 #include <x86/cpu_defs.h>
+#include <sw_ctx.h>
 #include <stdint.h>
 
 void halt(void);
@@ -54,6 +55,48 @@ struct _x86_features {
 };
 
 extern struct _x86_features x86_cpu_features;
+
+static inline void save_extregs(struct sw_ctx *ctx)
+{
+	switch (x86_cpu_features.save) {
+	case X86_SAVE_NONE:
+		/* nothing to do */
+		break;
+	case X86_SAVE_FSAVE:
+		asm volatile("fsave (%0)" :: "r"(ctx->extregs) : "memory");
+		break;
+	case X86_SAVE_FXSAVE:
+		asm volatile("fxsave (%0)" :: "r"(ctx->extregs) : "memory");
+		break;
+	case X86_SAVE_XSAVE:
+		asm volatile("xsave (%0)" :: "r"(ctx->extregs),
+				"a"(0xffffffff), "d"(0xffffffff) : "memory");
+		break;
+	case X86_SAVE_XSAVEOPT:
+		asm volatile("xsaveopt (%0)" :: "r"(ctx->extregs),
+				"a"(0xffffffff), "d"(0xffffffff) : "memory");
+		break;
+	}
+}
+static inline void restore_extregs(struct sw_ctx *ctx)
+{
+	switch (x86_cpu_features.save) {
+	case X86_SAVE_NONE:
+		/* nothing to do */
+		break;
+	case X86_SAVE_FSAVE:
+		asm volatile("frstor (%0)" :: "r"(ctx->extregs));
+		break;
+	case X86_SAVE_FXSAVE:
+		asm volatile("fxrstor (%0)" :: "r"(ctx->extregs));
+		break;
+	case X86_SAVE_XSAVE:
+	case X86_SAVE_XSAVEOPT:
+		asm volatile("xrstor (%0)" :: "r"(ctx->extregs),
+				"a"(0xffffffff), "d"(0xffffffff));
+		break;
+	}
+}
 
 static inline void _init_cpufeatures(void)
 {
