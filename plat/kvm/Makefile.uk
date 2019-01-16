@@ -18,6 +18,10 @@ LIBKVMPLAT_ASINCLUDES-y        += -I$(UK_PLAT_COMMON_BASE)/include
 LIBKVMPLAT_CINCLUDES-y         += -I$(LIBKVMPLAT_BASE)/include
 LIBKVMPLAT_CINCLUDES-y         += -I$(UK_PLAT_COMMON_BASE)/include
 
+LIBKVMPLAT_ASFLAGS             += -DKVMPLAT
+LIBKVMPLAT_CFLAGS              += -DKVMPLAT
+LIBKVMPLAT_CXXFLAGS            += -DKVMPLAT
+
 ##
 ## Architecture library definitions for x86_64
 ##
