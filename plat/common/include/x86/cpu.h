@@ -27,8 +27,10 @@
  * CPU related macros and definitions copied from mini-os/os.h
  */
 
-#include <uk/arch/types.h>
+#ifndef __PLAT_COMMON_X86_CPU_H__
+#define __PLAT_COMMON_X86_CPU_H__
 
+#include <uk/arch/types.h>
 
 void halt(void);
 void system_off(void);
@@ -140,3 +142,5 @@ static inline __u64 mul64_32(__u64 a, __u32 b)
 
 	return prod;
 }
+
+#endif /* __PLAT_COMMON_X86_CPU_H__ */
