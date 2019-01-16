@@ -58,6 +58,7 @@
  */
 #define X86_CR0_MP              (1 << 1)    /* Monitor Coprocessor */
 #define X86_CR0_EM              (1 << 2)    /* Emulation */
+#define X86_CR0_TS              (1 << 3)    /* Task Switched */
 #define X86_CR0_NE              (1 << 5)    /* Numeric Exception */
 #define X86_CR0_PG              (1 << 31)   /* Paging */
 
@@ -67,10 +68,31 @@
 #define X86_CR4_PAE             (1 << 5)    /* enable PAE */
 #define X86_CR4_OSFXSR          (1 << 9)    /* OS support for FXSAVE/FXRSTOR */
 #define X86_CR4_OSXMMEXCPT      (1 << 10)   /* OS support for FP exceptions */
+#define X86_CR4_FSGSBASE        (1 << 16)   /* enable FSGSBASE*/
+#define X86_CR4_OSXSAVE         (1 << 18)   /* enable XSAVE, extended states */
 
 /*
  * Intel CPU features in EFER
  */
 #define X86_EFER_LME            (1 << 8)    /* Long mode enable (R/W) */
+
+/* CPUID feature bits in ECX and EDX when EAX=1 */
+#define X86_CPUID1_ECX_XSAVE    (1 << 26)
+#define X86_CPUID1_ECX_OSXSAVE  (1 << 27)
+#define X86_CPUID1_ECX_AVX      (1 << 28)
+#define X86_CPUID1_EDX_FPU      (1 << 0)
+#define X86_CPUID1_EDX_FXSR     (1 << 24)
+#define X86_CPUID1_EDX_SSE      (1 << 25)
+/* CPUID feature bits in EBX and ECX when EAX=7, ECX=0 */
+#define X86_CPUID7_EBX_FSGSBASE (1 << 0)
+/* CPUID feature bits when EAX=0xd, ECX=1 */
+#define X86_CPUIDD1_EAX_XSAVEOPT (1<<0)
+
+/*
+ * Extended Control Register 0 (XCR0)
+ */
+#define X86_XCR0_X87            (1 << 0)
+#define X86_XCR0_SSE            (1 << 1)
+#define X86_XCR0_AVX            (1 << 2)
 
 #endif /* __PLAT_CMN_X86_CPU_DEFS_H__ */

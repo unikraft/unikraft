@@ -113,20 +113,6 @@ static inline void _init_traps(void)
 	traps_init();
 }
 
-static inline void _init_cpufeatures(void)
-{
-#if __SSE__
-	unsigned long sse_status = 0x1f80;
-#endif
-
-	/* FPU */
-	asm volatile("fninit");
-
-#if __SSE__
-	asm volatile("ldmxcsr %0" : : "m"(sse_status));
-#endif
-}
-
 static inline void _init_shared_info(void)
 {
 	int ret;
@@ -184,7 +170,6 @@ void _libxenplat_x86entry(void *start_info) __noreturn;
 void _libxenplat_x86entry(void *start_info)
 {
 	_init_traps();
-	_init_cpufeatures();
 	HYPERVISOR_start_info = (start_info_t *)start_info;
 	_libxenplat_prepare_console(); /* enables buffering for console */
 

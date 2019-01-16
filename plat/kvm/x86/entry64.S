@@ -172,15 +172,57 @@ ENTRY(_libkvmplat_start64)
 	movq $bootstack, %rsp
 	xorq %rbp, %rbp
 
-	/* enable FPU and SSE units */
-	movq %cr0, %rax
-	andq $(~X86_CR0_EM), %rax
-	orq $(X86_CR0_MP | X86_CR0_NE), %rax
-	movq %rax, %cr0
-	movq %cr4, %rax
-	orq $(X86_CR4_OSXMMEXCPT | X86_CR4_OSFXSR), %rax
-	movq %rax, %cr4
+	/* We will work on cr0 and cr4 multiple times.
+	 * We put cr0 into rsi and cr4 into rdi, because cpuid and
+	 * xgetbv/xsetbv work on eax/ebx/ecx/edx. */
+	movq %cr0, %rsi
+	movq %cr4, %rdi
+	/* FPU and SSE are part of base x86-64, so no need to check for their
+	 * availability before enabling and initializing. */
+	andl $(~(X86_CR0_EM | X86_CR0_TS)), %esi
+	orl $(X86_CR0_MP | X86_CR0_NE), %esi
+	movq %rsi, %cr0
+	fninit
+#if __SSE__
+	orl $(X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT), %edi
+	movq %rdi, %cr4
 	ldmxcsr (mxcsr_ptr)
+#endif /* __SSE__ */
+	/* Check capabilities subject to availability as indicated by cpuid.
+	 * First, start off with "standard features" */
+	movl $0x1, %eax
+	cpuid
+#if __AVX__
+	/* ecx and edx now contain capability information, so we can now
+	 * enable capabilities based on the indicated features */
+	/* OSXSAVE needs to be enabled before AVX */
+	testl $(X86_CPUID1_ECX_XSAVE), %ecx
+	jz noxsave
+	orl $(X86_CR4_OSXSAVE), %edi
+	movq %rdi, %cr4
+	/* now enable AVX. This needs to be last checking cpuid features from
+	 * the eax=1 cpuid call, because it clobbers ecx */
+	testl $(X86_CPUID1_ECX_AVX), %ecx
+	jz noavx
+	xorl %ecx, %ecx
+	xgetbv
+	orl $(X86_XCR0_SSE | X86_XCR0_AVX), %eax
+	xsetbv
+noavx:
+noxsave:
+#endif /* __AVX__ */
+	/* Now, check for extended features. */
+	movl $0x7, %eax
+	movl $0x0, %ecx
+	cpuid
+	/* ebx, ecx, edx now contain extended capabilities information. */
+	/* check for and enable FS/GSBASE */
+	testl $(X86_CPUID7_EBX_FSGSBASE), %ebx
+	jz nofsgsbase
+	orl $(X86_CR4_FSGSBASE), %edi
+	movq %rdi, %cr4
+nofsgsbase:
+	/* done setting up CPU capabilities */
 
 	/* read multiboot info pointer */
 	movq -8(%rsp), %rdi

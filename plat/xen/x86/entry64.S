@@ -25,6 +25,7 @@
 
 #include <uk/arch/types.h>
 #include <uk/arch/limits.h>
+#include <x86/cpu_defs.h>
 #include <x86/traps.h>
 #include <uk/config.h>
 #include <xen/xen.h>
@@ -60,11 +61,68 @@ _libxenplat_start:
 #include "entry_hvm.S"
 
 #endif
-        cld
-        movq stack_start(%rip),%rsp
-        andq $(~(__STACK_SIZE-1)), %rsp
-        movq %rsi,%rdi
-        call _libxenplat_x86entry
+	cld
+	movq stack_start(%rip),%rsp
+	andq $(~(__STACK_SIZE-1)), %rsp
+	movq %rsi, %r8 /* esi contains pointer to start_info page */
+	/* We will work on cr0 and cr4 multiple times.
+	 * We put cr0 into rsi and cr4 into rdi, because cpuid and
+	 * xgetbv/xsetbv work on eax/ebx/ecx/edx. */
+	movq %cr0, %rsi
+	movq %cr4, %rdi
+	/* FPU and SSE are part of base x86-64, so no need to check for their
+	 * availability before enabling and initializing. */
+	andl $(~(X86_CR0_EM | X86_CR0_TS)), %esi
+	orl $(X86_CR0_MP | X86_CR0_NE), %esi
+	movq %rsi, %cr0
+	fninit
+#if __SSE__
+	orl $(X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT), %edi
+	movq %rdi, %cr4
+	ldmxcsr (mxcsr_ptr)
+#endif /* __SSE__ */
+	/* Check capabilities subject to availability as indicated by cpuid.
+	 * First, start off with "standard features" */
+	movl $0x1, %eax
+	cpuid
+#if __AVX__
+	/* ecx and edx now contain capability information, so we can now
+	 * enable capabilities based on the indicated features */
+	/* OSXSAVE needs to be enabled before AVX */
+	testl $(X86_CPUID1_ECX_XSAVE), %ecx
+	jz noxsave
+	orl $(X86_CR4_OSXSAVE), %edi
+	movq %rdi, %cr4
+	/* now enable AVX. This needs to be last checking cpuid features from
+	 * the eax=1 cpuid call, because it clobbers ecx */
+	testl $(X86_CPUID1_ECX_AVX), %ecx
+	jz noavx
+	xorl %ecx, %ecx
+	xgetbv
+	orl $(X86_XCR0_SSE | X86_XCR0_AVX), %eax
+	xsetbv
+noavx:
+noxsave:
+#endif /* __AVX__ */
+	/* Now, check for extended features. */
+	movl $0x7, %eax
+	movl $0x0, %ecx
+	cpuid
+	/* ebx, ecx, edx now contain extended capabilities information. */
+	/* check for and enable FS/GSBASE */
+	testl $(X86_CPUID7_EBX_FSGSBASE), %ebx
+	jz nofsgsbase
+	orl $(X86_CR4_FSGSBASE), %edi
+	movq %rdi, %cr4
+nofsgsbase:
+	/* Done setting up CPU capabilities, hand over to C entry point. */
+	movq %r8, %rdi /* pass pointer to start_info page to C entry */
+	call _libxenplat_x86entry
+
+.type mxcsr_ptr, @object
+mxcsr_ptr:
+	.long 0x1f80			/* Intel SDM power-on default */
+
 
 stack_start:
         .quad _libxenplat_bootstack + (2*__STACK_SIZE)
