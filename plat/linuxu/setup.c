@@ -45,6 +45,9 @@
 #include <uk/plat/bootstrap.h>
 #include <uk/assert.h>
 #include <uk/errptr.h>
+#if defined __X86_64__
+#include <x86/cpu.h>
+#endif
 
 struct liblinuxuplat_opts _liblinuxuplat_opts = { 0 };
 
@@ -149,6 +152,8 @@ void _liblinuxuplat_entry(int argc, char *argv[])
 	char *progname = argv[0];
 	int ret;
 	void *pret;
+
+	_init_cpufeatures();
 
 	/*
 	 * Initialize platform console

@@ -27,6 +27,7 @@
  */
 
 #include <string.h>
+#include <x86/cpu.h>
 #include <x86/traps.h>
 #include <kvm/console.h>
 #include <kvm/intctrl.h>
@@ -118,6 +119,7 @@ void _libkvmplat_entry(void *arg)
 {
 	struct multiboot_info *mi = (struct multiboot_info *)arg;
 
+	_init_cpufeatures();
 	_libkvmplat_init_console();
 	traps_init();
 	intctrl_init();

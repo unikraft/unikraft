@@ -74,6 +74,7 @@
 #include <uk/plat/config.h>
 #include <uk/plat/console.h>
 #include <uk/plat/bootstrap.h>
+#include <x86/cpu.h>
 
 #include <xen/xen.h>
 #include <common/console.h>
@@ -170,6 +171,7 @@ void _libxenplat_x86entry(void *start_info) __noreturn;
 void _libxenplat_x86entry(void *start_info)
 {
 	_init_traps();
+	_init_cpufeatures();
 	HYPERVISOR_start_info = (start_info_t *)start_info;
 	_libxenplat_prepare_console(); /* enables buffering for console */
 

@@ -31,16 +31,62 @@
 #define __PLAT_COMMON_X86_CPU_H__
 
 #include <uk/arch/types.h>
+#include <x86/cpu_defs.h>
+#include <stdint.h>
 
 void halt(void);
 void system_off(void);
 
-static inline void cpuid(__u32 leaf, __u32 *eax, __u32 *ebx,
-		__u32 *ecx, __u32 *edx)
+enum save_cmd {
+	X86_SAVE_NONE,
+	X86_SAVE_FSAVE,
+	X86_SAVE_FXSAVE,
+	X86_SAVE_XSAVE,
+	X86_SAVE_XSAVEOPT
+};
+
+struct _x86_features {
+	unsigned long extregs_size;	/* Size of the extregs area */
+	unsigned long extregs_align;	/* Alignment of the extregs area */
+	enum save_cmd save;		/* which CPU instruction to use for
+					 * saving/restoring extregs.
+					 */
+};
+
+extern struct _x86_features x86_cpu_features;
+
+static inline void _init_cpufeatures(void)
 {
-	asm volatile("cpuid"
-		     : "=a"(*eax), "=b"(*ebx), "=c"(*ecx), "=d"(*edx)
-		     : "0"(leaf));
+	__u32 eax, ebx, ecx, edx;
+
+	/* Why are we saving the eax register content to the eax variable with
+	 * "=a(eax)", but then never use it?
+	 * Because gcc otherwise will assume that the eax register still
+	 * contains "1" after this asm expression. See the "Warning" note at
+	 * https://gcc.gnu.org/onlinedocs/gcc/Extended-Asm.html#InputOperands
+	 */
+	asm volatile("cpuid" : "=a"(eax), "=c"(ecx), "=d"(edx) : "a"(1)
+			: "ebx");
+	if (ecx & X86_CPUID1_ECX_OSXSAVE) {
+		asm volatile("cpuid" : "=a"(eax), "=c"(ecx) : "a"(0xd), "c"(1)
+				: "ebx", "edx");
+		if (eax & X86_CPUIDD1_EAX_XSAVEOPT)
+			x86_cpu_features.save = X86_SAVE_XSAVEOPT;
+		else
+			x86_cpu_features.save = X86_SAVE_XSAVE;
+		asm volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx)
+				: "a"(0xd), "c"(0) : "edx");
+		x86_cpu_features.extregs_size = ebx;
+		x86_cpu_features.extregs_align = 64;
+	} else if (edx & X86_CPUID1_EDX_FXSR) {
+		x86_cpu_features.save = X86_SAVE_FXSAVE;
+		x86_cpu_features.extregs_size = 512;
+		x86_cpu_features.extregs_align = 16;
+	} else {
+		x86_cpu_features.save = X86_SAVE_FSAVE;
+		x86_cpu_features.extregs_size = 108;
+		x86_cpu_features.extregs_align = 1;
+	}
 }
 
 unsigned long read_cr2(void);

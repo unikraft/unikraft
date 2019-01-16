@@ -74,6 +74,10 @@ static inline void ioreg_write64(volatile uint64_t *addr, uint64_t value)
 	*addr = value;
 }
 
+static inline void _init_cpufeatures(void)
+{
+}
+
 /* Define compatibility IO macros */
 #define outb(addr, v)   UK_BUG()
 #define outw(addr, v)   UK_BUG()
