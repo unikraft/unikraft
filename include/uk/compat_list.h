@@ -458,7 +458,7 @@ struct {								\
 /*
  * List declarations.
  */
-#define	UK_LIST_HEAD(name, type)						\
+#define	UK_COMPAT_LIST_HEAD(name, type)					\
 struct name {								\
 	type *lh_first;	/* first element */			\
 }
