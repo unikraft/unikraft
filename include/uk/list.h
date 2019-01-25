@@ -1,875 +1,485 @@
-/* SPDX-License-Identifier: BSD-3-Clause */
 /*-
- * Copyright (c) 1991, 1993
- *	The Regents of the University of California.  All rights reserved.
+ * Copyright (c) 2010 Isilon Systems, Inc.
+ * Copyright (c) 2010 iX Systems, Inc.
+ * Copyright (c) 2010 Panasas, Inc.
+ * Copyright (c) 2013-2016 Mellanox Technologies, Ltd.
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
  * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
+ *    notice unmodified, this list of conditions, and the following
+ *    disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the University nor the names of its contributors
- *    may be used to endorse or promote products derived from this software
- *    without specific prior written permission.
  *
- * THIS SOFTWARE IS PROVIDED BY THE REGENTS AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE REGENTS OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
+ * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
+ * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+ * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
+ * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+ * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
+ * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *
- *	@(#)queue.h	8.5 (Berkeley) 8/20/94
  * $FreeBSD$
  */
-/*
- * Generated automatically by bsd-sys-queue-h-seddery to
- *  - introduce UK_ and UK_ namespace prefixes
- *  - turn "struct type" into "type" so that type arguments
- *     to the macros are type names not struct tags
- *  - remove the reference to sys/cdefs.h, which is not needed
- *
- * The purpose of this seddery is to allow the resulting file to be
- * freely included by software which might also want to include other
- * list macros; to make it usable when struct tags are not being used
- * or not known; to make it more portable.
+#ifndef _LINUX_LIST_H_
+#define _LINUX_LIST_H_
+
+/* TODO: this code is just imported and needs modifications before it
+ * can be used in Unikraft. For now proxy directly to the existing
+ * implementation - "compat_list.h"
  */
-
-#ifndef UK__SYS_QUEUE_H_
-#define	UK__SYS_QUEUE_H_
-
-/* #include <sys/cdefs.h> */
+#if 0
 
 /*
- * This file defines four types of data structures: singly-linked lists,
- * singly-linked tail queues, lists and tail queues.
- *
- * A singly-linked list is headed by a single forward pointer. The elements
- * are singly linked for minimum space and pointer manipulation overhead at
- * the expense of O(n) removal for arbitrary elements. New elements can be
- * added to the list after an existing element or at the head of the list.
- * Elements being removed from the head of the list should use the explicit
- * macro for this purpose for optimum efficiency. A singly-linked list may
- * only be traversed in the forward direction.  Singly-linked lists are ideal
- * for applications with large datasets and few or no removals or for
- * implementing a LIFO queue.
- *
- * A singly-linked tail queue is headed by a pair of pointers, one to the
- * head of the list and the other to the tail of the list. The elements are
- * singly linked for minimum space and pointer manipulation overhead at the
- * expense of O(n) removal for arbitrary elements. New elements can be added
- * to the list after an existing element, at the head of the list, or at the
- * end of the list. Elements being removed from the head of the tail queue
- * should use the explicit macro for this purpose for optimum efficiency.
- * A singly-linked tail queue may only be traversed in the forward direction.
- * Singly-linked tail queues are ideal for applications with large datasets
- * and few or no removals or for implementing a FIFO queue.
- *
- * A list is headed by a single forward pointer (or an array of forward
- * pointers for a hash table header). The elements are doubly linked
- * so that an arbitrary element can be removed without a need to
- * traverse the list. New elements can be added to the list before
- * or after an existing element or at the head of the list. A list
- * may be traversed in either direction.
- *
- * A tail queue is headed by a pair of pointers, one to the head of the
- * list and the other to the tail of the list. The elements are doubly
- * linked so that an arbitrary element can be removed without a need to
- * traverse the list. New elements can be added to the list before or
- * after an existing element, at the head of the list, or at the end of
- * the list. A tail queue may be traversed in either direction.
- *
- * For details on the use of these macros, see the queue(3) manual page.
- *
- * Below is a summary of implemented functions where:
- *  +  means the macro is available
- *  -  means the macro is not available
- *  s  means the macro is available but is slow (runs in O(n) time)
- *
- *				UK_SLIST	UK_LIST	UK_STAILQ	UK_TAILQ
- * _HEAD			+	+	+	+
- * _CLASS_HEAD			+	+	+	+
- * _HEAD_INITIALIZER		+	+	+	+
- * _ENTRY			+	+	+	+
- * _CLASS_ENTRY			+	+	+	+
- * _INIT			+	+	+	+
- * _EMPTY			+	+	+	+
- * _FIRST			+	+	+	+
- * _NEXT			+	+	+	+
- * _PREV			-	+	-	+
- * _LAST			-	-	+	+
- * _FOREACH			+	+	+	+
- * _FOREACH_FROM		+	+	+	+
- * _FOREACH_SAFE		+	+	+	+
- * _FOREACH_FROM_SAFE		+	+	+	+
- * _FOREACH_REVERSE		-	-	-	+
- * _FOREACH_REVERSE_FROM	-	-	-	+
- * _FOREACH_REVERSE_SAFE	-	-	-	+
- * _FOREACH_REVERSE_FROM_SAFE	-	-	-	+
- * _INSERT_HEAD			+	+	+	+
- * _INSERT_BEFORE		-	+	-	+
- * _INSERT_AFTER		+	+	+	+
- * _INSERT_TAIL			-	-	+	+
- * _CONCAT			s	s	+	+
- * _REMOVE_AFTER		+	-	+	-
- * _REMOVE_HEAD			+	-	+	-
- * _REMOVE			s	+	s	+
- * _SWAP			+	+	+	+
- *
+ * Since LIST_HEAD conflicts with the linux definition we must include any
+ * FreeBSD header which requires it here so it is resolved with the correct
+ * definition prior to the undef.
  */
-#if (defined(_KERNEL) && defined(INVARIANTS))
-    #include <uk/assert.h>
-#endif
-#ifdef UK_QUEUE_MACRO_DEBUG
-#warn Use UK_QUEUE_MACRO_DEBUG_TRACE and/or UK_QUEUE_MACRO_DEBUG_TRASH
-#define	UK_QUEUE_MACRO_DEBUG_TRACE
-#define	UK_QUEUE_MACRO_DEBUG_TRASH
+#include <linux/types.h>
+
+#include <sys/param.h>
+#include <sys/kernel.h>
+#include <sys/queue.h>
+#include <sys/cpuset.h>
+#include <sys/jail.h>
+#include <sys/lock.h>
+#include <sys/mutex.h>
+#include <sys/proc.h>
+#include <sys/vnode.h>
+#include <sys/conf.h>
+#include <sys/socket.h>
+#include <sys/mbuf.h>
+
+#include <net/bpf.h>
+#include <net/if.h>
+#include <net/if_var.h>
+#include <net/if_types.h>
+#include <net/if_media.h>
+#include <net/vnet.h>
+
+#include <netinet/in.h>
+#include <netinet/in_pcb.h>
+#include <netinet/in_var.h>
+#include <netinet/tcp_lro.h>
+
+#include <netinet6/in6_var.h>
+#include <netinet6/nd6.h>
+
+#include <vm/vm.h>
+#include <vm/vm_object.h>
+#include <vm/pmap.h>
+
+#ifndef prefetch
+#define	prefetch(x)
 #endif
 
-#ifdef UK_QUEUE_MACRO_DEBUG_TRACE
-/* Store the last 2 places the queue element or head was altered */
-struct UK__qm_trace {
-	unsigned long	 lastline;
-	unsigned long	 prevline;
-	const char	*lastfile;
-	const char	*prevfile;
+#define LINUX_LIST_HEAD_INIT(name) { &(name), &(name) }
+
+#define LINUX_LIST_HEAD(name) \
+	struct list_head name = LINUX_LIST_HEAD_INIT(name)
+
+#ifndef LIST_HEAD_DEF
+#define	LIST_HEAD_DEF
+struct list_head {
+	struct list_head *next;
+	struct list_head *prev;
+};
+#endif
+
+static inline void
+INIT_LIST_HEAD(struct list_head *list)
+{
+
+	list->next = list->prev = list;
+}
+
+static inline int
+list_empty(const struct list_head *head)
+{
+
+	return (head->next == head);
+}
+
+static inline int
+list_empty_careful(const struct list_head *head)
+{
+	struct list_head *next = head->next;
+
+	return ((next == head) && (next == head->prev));
+}
+
+static inline void
+__list_del(struct list_head *prev, struct list_head *next)
+{
+	next->prev = prev;
+	WRITE_ONCE(prev->next, next);
+}
+
+static inline void
+__list_del_entry(struct list_head *entry)
+{
+
+	__list_del(entry->prev, entry->next);
+}
+
+static inline void
+list_del(struct list_head *entry)
+{
+
+	__list_del(entry->prev, entry->next);
+}
+
+static inline void
+list_replace(struct list_head *old, struct list_head *new)
+{
+	new->next = old->next;
+	new->next->prev = new;
+	new->prev = old->prev;
+	new->prev->next = new;
+}
+
+static inline void
+list_replace_init(struct list_head *old, struct list_head *new)
+{
+	list_replace(old, new);
+	INIT_LIST_HEAD(old);
+}
+
+static inline void
+linux_list_add(struct list_head *new, struct list_head *prev,
+    struct list_head *next)
+{
+
+	next->prev = new;
+	new->next = next;
+	new->prev = prev;
+	prev->next = new;
+}
+
+static inline void
+list_del_init(struct list_head *entry)
+{
+
+	list_del(entry);
+	INIT_LIST_HEAD(entry);
+}
+
+#define	list_entry(ptr, type, field)	container_of(ptr, type, field)
+
+#define	list_first_entry(ptr, type, member) \
+	list_entry((ptr)->next, type, member)
+
+#define	list_last_entry(ptr, type, member)	\
+	list_entry((ptr)->prev, type, member)
+
+#define	list_first_entry_or_null(ptr, type, member) \
+	(!list_empty(ptr) ? list_first_entry(ptr, type, member) : NULL)
+
+#define	list_next_entry(ptr, member)					\
+	list_entry(((ptr)->member.next), typeof(*(ptr)), member)
+
+#define	list_safe_reset_next(ptr, n, member) \
+	(n) = list_next_entry(ptr, member)
+
+#define	list_prev_entry(ptr, member)					\
+	list_entry(((ptr)->member.prev), typeof(*(ptr)), member)
+
+#define	list_for_each(p, head)						\
+	for (p = (head)->next; p != (head); p = (p)->next)
+
+#define	list_for_each_safe(p, n, head)					\
+	for (p = (head)->next, n = (p)->next; p != (head); p = n, n = (p)->next)
+
+#define list_for_each_entry(p, h, field)				\
+	for (p = list_entry((h)->next, typeof(*p), field); &(p)->field != (h); \
+	    p = list_entry((p)->field.next, typeof(*p), field))
+
+#define list_for_each_entry_safe(p, n, h, field)			\
+	for (p = list_entry((h)->next, typeof(*p), field),		\
+	    n = list_entry((p)->field.next, typeof(*p), field); &(p)->field != (h);\
+	    p = n, n = list_entry(n->field.next, typeof(*n), field))
+
+#define	list_for_each_entry_from(p, h, field) \
+	for ( ; &(p)->field != (h); \
+	    p = list_entry((p)->field.next, typeof(*p), field))
+
+#define	list_for_each_entry_continue(p, h, field)			\
+	for (p = list_next_entry((p), field); &(p)->field != (h);	\
+	    p = list_next_entry((p), field))
+
+#define	list_for_each_entry_safe_from(pos, n, head, member)			\
+	for (n = list_entry((pos)->member.next, typeof(*pos), member);		\
+	     &(pos)->member != (head);						\
+	     pos = n, n = list_entry(n->member.next, typeof(*n), member))
+
+#define	list_for_each_entry_reverse(p, h, field)			\
+	for (p = list_entry((h)->prev, typeof(*p), field); &(p)->field != (h); \
+	    p = list_entry((p)->field.prev, typeof(*p), field))
+
+#define	list_for_each_entry_safe_reverse(p, n, h, field)		\
+	for (p = list_entry((h)->prev, typeof(*p), field),		\
+	    n = list_entry((p)->field.prev, typeof(*p), field); &(p)->field != (h); \
+	    p = n, n = list_entry(n->field.prev, typeof(*n), field))
+
+#define	list_for_each_entry_continue_reverse(p, h, field) \
+	for (p = list_entry((p)->field.prev, typeof(*p), field); &(p)->field != (h); \
+	    p = list_entry((p)->field.prev, typeof(*p), field))
+
+#define	list_for_each_prev(p, h) for (p = (h)->prev; p != (h); p = (p)->prev)
+
+static inline void
+list_add(struct list_head *new, struct list_head *head)
+{
+
+	linux_list_add(new, head, head->next);
+}
+
+static inline void
+list_add_tail(struct list_head *new, struct list_head *head)
+{
+
+	linux_list_add(new, head->prev, head);
+}
+
+static inline void
+list_move(struct list_head *list, struct list_head *head)
+{
+
+	list_del(list);
+	list_add(list, head);
+}
+
+static inline void
+list_move_tail(struct list_head *entry, struct list_head *head)
+{
+
+	list_del(entry);
+	list_add_tail(entry, head);
+}
+
+static inline void
+linux_list_splice(const struct list_head *list, struct list_head *prev,
+    struct list_head *next)
+{
+	struct list_head *first;
+	struct list_head *last;
+
+	if (list_empty(list))
+		return;
+	first = list->next;
+	last = list->prev;
+	first->prev = prev;
+	prev->next = first;
+	last->next = next;
+	next->prev = last;
+}
+
+static inline void
+list_splice(const struct list_head *list, struct list_head *head)
+{
+
+	linux_list_splice(list, head, head->next);
+}
+
+static inline void
+list_splice_tail(struct list_head *list, struct list_head *head)
+{
+
+	linux_list_splice(list, head->prev, head);
+}
+
+static inline void
+list_splice_init(struct list_head *list, struct list_head *head)
+{
+
+	linux_list_splice(list, head, head->next);
+	INIT_LIST_HEAD(list);
+}
+
+static inline void
+list_splice_tail_init(struct list_head *list, struct list_head *head)
+{
+
+	linux_list_splice(list, head->prev, head);
+	INIT_LIST_HEAD(list);
+}
+
+#undef LIST_HEAD
+#define LIST_HEAD(name)	struct list_head name = { &(name), &(name) }
+
+
+struct hlist_head {
+	struct hlist_node *first;
 };
 
-#define	UK__TRACEBUF	struct UK__qm_trace trace;
-#define	UK__TRACEBUF_INITIALIZER	{ __LINE__, 0, __FILE__, 0 } ,
+struct hlist_node {
+	struct hlist_node *next, **pprev;
+};
 
-#define	UK__QMD_TRACE_HEAD(head) do {					\
-	(head)->trace.prevline = (head)->trace.lastline;		\
-	(head)->trace.prevfile = (head)->trace.lastfile;		\
-	(head)->trace.lastline = __LINE__;				\
-	(head)->trace.lastfile = __FILE__;				\
+#define	HLIST_HEAD_INIT { }
+#define	HLIST_HEAD(name) struct hlist_head name = HLIST_HEAD_INIT
+#define	INIT_HLIST_HEAD(head) (head)->first = NULL
+#define	INIT_HLIST_NODE(node)						\
+do {									\
+	(node)->next = NULL;						\
+	(node)->pprev = NULL;						\
 } while (0)
 
-#define	UK__QMD_TRACE_ELEM(elem) do {					\
-	(elem)->trace.prevline = (elem)->trace.lastline;		\
-	(elem)->trace.prevfile = (elem)->trace.lastfile;		\
-	(elem)->trace.lastline = __LINE__;				\
-	(elem)->trace.lastfile = __FILE__;				\
-} while (0)
+static inline int
+hlist_unhashed(const struct hlist_node *h)
+{
 
-#else	/* !UK_QUEUE_MACRO_DEBUG_TRACE */
-#define	UK__QMD_TRACE_ELEM(elem)
-#define	UK__QMD_TRACE_HEAD(head)
-#define	UK__TRACEBUF
-#define	UK__TRACEBUF_INITIALIZER
-#endif	/* UK_QUEUE_MACRO_DEBUG_TRACE */
-
-#ifdef UK_QUEUE_MACRO_DEBUG_TRASH
-#define	UK__TRASHIT(x)		do {(x) = (void *)-1;} while (0)
-#define	UK__QMD_IS_TRASHED(x)	((x) == (void *)(intptr_t)-1)
-#else	/* !UK_QUEUE_MACRO_DEBUG_TRASH */
-#define	UK__TRASHIT(x)
-#define	UK__QMD_IS_TRASHED(x)	0
-#endif	/* UK_QUEUE_MACRO_DEBUG_TRASH */
-
-#if defined(UK_QUEUE_MACRO_DEBUG_TRACE) || defined(UK_QUEUE_MACRO_DEBUG_TRASH)
-#define	UK__QMD_SAVELINK(name, link)	void **name = (void *)&(link)
-#else	/* !UK_QUEUE_MACRO_DEBUG_TRACE && !UK_QUEUE_MACRO_DEBUG_TRASH */
-#define	UK__QMD_SAVELINK(name, link)
-#endif	/* UK_QUEUE_MACRO_DEBUG_TRACE || UK_QUEUE_MACRO_DEBUG_TRASH */
-
-#ifdef __cplusplus
-/*
- * In C++ there can be structure lists and class lists:
- */
-#define	UK_QUEUE_TYPEOF(type) type
-#else
-#define	UK_QUEUE_TYPEOF(type) type
-#endif
-
-/*
- * Singly-linked List declarations.
- */
-#define	UK_SLIST_HEAD(name, type)						\
-struct name {								\
-	type *slh_first;	/* first element */			\
+	return !h->pprev;
 }
 
-#define	UK_SLIST_CLASS_HEAD(name, type)					\
-struct name {								\
-	class type *slh_first;	/* first element */			\
+static inline int
+hlist_empty(const struct hlist_head *h)
+{
+
+	return !READ_ONCE(h->first);
 }
 
-#define	UK_SLIST_HEAD_INITIALIZER(head)					\
-	{ 0 }
+static inline void
+hlist_del(struct hlist_node *n)
+{
 
-#define	UK_SLIST_ENTRY(type)						\
-struct {								\
-	type *sle_next;	/* next element */			\
+	WRITE_ONCE(*(n->pprev), n->next);
+	if (n->next != NULL)
+		n->next->pprev = n->pprev;
 }
 
-#define	UK_SLIST_CLASS_ENTRY(type)						\
-struct {								\
-	class type *sle_next;		/* next element */		\
+static inline void
+hlist_del_init(struct hlist_node *n)
+{
+
+	if (hlist_unhashed(n))
+		return;
+	hlist_del(n);
+	INIT_HLIST_NODE(n);
 }
 
-/*
- * Singly-linked List functions.
- */
-#if (defined(_KERNEL) && defined(INVARIANTS))
-#define	UK__QMD_SLIST_CHECK_PREVPTR(prevp, elm) do {			\
-	if (*(prevp) != (elm))						\
-		UK_CRASH("Bad prevptr *(%p) == %p != %p",			\
-		    (prevp), *(prevp), (elm));				\
-} while (0)
-#else
-#define	UK__QMD_SLIST_CHECK_PREVPTR(prevp, elm)
-#endif
+static inline void
+hlist_add_head(struct hlist_node *n, struct hlist_head *h)
+{
 
-#define UK_SLIST_CONCAT(head1, head2, type, field) do {			\
-	UK_QUEUE_TYPEOF(type) *curelm = UK_SLIST_FIRST(head1);		\
-	if (curelm == 0) {						\
-		if ((UK_SLIST_FIRST(head1) = UK_SLIST_FIRST(head2)) != 0)	\
-			UK_SLIST_INIT(head2);				\
-	} else if (UK_SLIST_FIRST(head2) != 0) {			\
-		while (UK_SLIST_NEXT(curelm, field) != 0)		\
-			curelm = UK_SLIST_NEXT(curelm, field);		\
-		UK_SLIST_NEXT(curelm, field) = UK_SLIST_FIRST(head2);		\
-		UK_SLIST_INIT(head2);					\
-	}								\
-} while (0)
-
-#define	UK_SLIST_EMPTY(head)	((head)->slh_first == 0)
-
-#define	UK_SLIST_FIRST(head)	((head)->slh_first)
-
-#define	UK_SLIST_FOREACH(var, head, field)					\
-	for ((var) = UK_SLIST_FIRST((head));				\
-	    (var);							\
-	    (var) = UK_SLIST_NEXT((var), field))
-
-#define	UK_SLIST_FOREACH_FROM(var, head, field)				\
-	for ((var) = ((var) ? (var) : UK_SLIST_FIRST((head)));		\
-	    (var);							\
-	    (var) = UK_SLIST_NEXT((var), field))
-
-#define	UK_SLIST_FOREACH_SAFE(var, head, field, tvar)			\
-	for ((var) = UK_SLIST_FIRST((head));				\
-	    (var) && ((tvar) = UK_SLIST_NEXT((var), field), 1);		\
-	    (var) = (tvar))
-
-#define	UK_SLIST_FOREACH_FROM_SAFE(var, head, field, tvar)			\
-	for ((var) = ((var) ? (var) : UK_SLIST_FIRST((head)));		\
-	    (var) && ((tvar) = UK_SLIST_NEXT((var), field), 1);		\
-	    (var) = (tvar))
-
-#define	UK_SLIST_FOREACH_PREVPTR(var, varp, head, field)			\
-	for ((varp) = &UK_SLIST_FIRST((head));				\
-	    ((var) = *(varp)) != 0;					\
-	    (varp) = &UK_SLIST_NEXT((var), field))
-
-#define	UK_SLIST_INIT(head) do {						\
-	UK_SLIST_FIRST((head)) = 0;					\
-} while (0)
-
-#define	UK_SLIST_INSERT_AFTER(slistelm, elm, field) do {			\
-	UK_SLIST_NEXT((elm), field) = UK_SLIST_NEXT((slistelm), field);	\
-	UK_SLIST_NEXT((slistelm), field) = (elm);				\
-} while (0)
-
-#define	UK_SLIST_INSERT_HEAD(head, elm, field) do {			\
-	UK_SLIST_NEXT((elm), field) = UK_SLIST_FIRST((head));			\
-	UK_SLIST_FIRST((head)) = (elm);					\
-} while (0)
-
-#define	UK_SLIST_NEXT(elm, field)	((elm)->field.sle_next)
-
-#define	UK_SLIST_REMOVE(head, elm, type, field) do {			\
-	UK__QMD_SAVELINK(oldnext, (elm)->field.sle_next);			\
-	if (UK_SLIST_FIRST((head)) == (elm)) {				\
-		UK_SLIST_REMOVE_HEAD((head), field);			\
-	}								\
-	else {								\
-		UK_QUEUE_TYPEOF(type) *curelm = UK_SLIST_FIRST(head);		\
-		while (UK_SLIST_NEXT(curelm, field) != (elm))		\
-			curelm = UK_SLIST_NEXT(curelm, field);		\
-		UK_SLIST_REMOVE_AFTER(curelm, field);			\
-	}								\
-	UK__TRASHIT(*oldnext);						\
-} while (0)
-
-#define UK_SLIST_REMOVE_AFTER(elm, field) do {				\
-	UK_SLIST_NEXT(elm, field) =					\
-	    UK_SLIST_NEXT(UK_SLIST_NEXT(elm, field), field);			\
-} while (0)
-
-#define	UK_SLIST_REMOVE_HEAD(head, field) do {				\
-	UK_SLIST_FIRST((head)) = UK_SLIST_NEXT(UK_SLIST_FIRST((head)), field);	\
-} while (0)
-
-#define	UK_SLIST_REMOVE_PREVPTR(prevp, elm, field) do {			\
-	UK__QMD_SLIST_CHECK_PREVPTR(prevp, elm);				\
-	*(prevp) = UK_SLIST_NEXT(elm, field);				\
-	UK__TRASHIT((elm)->field.sle_next);					\
-} while (0)
-
-#define UK_SLIST_SWAP(head1, head2, type) do {				\
-	UK_QUEUE_TYPEOF(type) *swap_first = UK_SLIST_FIRST(head1);		\
-	UK_SLIST_FIRST(head1) = UK_SLIST_FIRST(head2);			\
-	UK_SLIST_FIRST(head2) = swap_first;				\
-} while (0)
-
-/*
- * Singly-linked Tail queue declarations.
- */
-#define	UK_STAILQ_HEAD(name, type)						\
-struct name {								\
-	type *stqh_first;/* first element */			\
-	type **stqh_last;/* addr of last next element */		\
+	n->next = h->first;
+	if (h->first != NULL)
+		h->first->pprev = &n->next;
+	WRITE_ONCE(h->first, n);
+	n->pprev = &h->first;
 }
 
-#define	UK_STAILQ_CLASS_HEAD(name, type)					\
-struct name {								\
-	class type *stqh_first;	/* first element */			\
-	class type **stqh_last;	/* addr of last next element */		\
+static inline void
+hlist_add_before(struct hlist_node *n, struct hlist_node *next)
+{
+
+	n->pprev = next->pprev;
+	n->next = next;
+	next->pprev = &n->next;
+	WRITE_ONCE(*(n->pprev), n);
 }
 
-#define	UK_STAILQ_HEAD_INITIALIZER(head)					\
-	{ 0, &(head).stqh_first }
+static inline void
+hlist_add_behind(struct hlist_node *n, struct hlist_node *prev)
+{
 
-#define	UK_STAILQ_ENTRY(type)						\
-struct {								\
-	type *stqe_next;	/* next element */			\
+	n->next = prev->next;
+	WRITE_ONCE(prev->next, n);
+	n->pprev = &prev->next;
+
+	if (n->next != NULL)
+		n->next->pprev = &n->next;
 }
 
-#define	UK_STAILQ_CLASS_ENTRY(type)					\
-struct {								\
-	class type *stqe_next;	/* next element */			\
+static inline void
+hlist_move_list(struct hlist_head *old, struct hlist_head *new)
+{
+
+	new->first = old->first;
+	if (new->first)
+		new->first->pprev = &new->first;
+	old->first = NULL;
 }
 
-/*
- * Singly-linked Tail queue functions.
- */
-#define	UK_STAILQ_CONCAT(head1, head2) do {				\
-	if (!UK_STAILQ_EMPTY((head2))) {					\
-		*(head1)->stqh_last = (head2)->stqh_first;		\
-		(head1)->stqh_last = (head2)->stqh_last;		\
-		UK_STAILQ_INIT((head2));					\
-	}								\
-} while (0)
-
-#define	UK_STAILQ_EMPTY(head)	((head)->stqh_first == 0)
-
-#define	UK_STAILQ_FIRST(head)	((head)->stqh_first)
-
-#define	UK_STAILQ_FOREACH(var, head, field)				\
-	for((var) = UK_STAILQ_FIRST((head));				\
-	   (var);							\
-	   (var) = UK_STAILQ_NEXT((var), field))
-
-#define	UK_STAILQ_FOREACH_FROM(var, head, field)				\
-	for ((var) = ((var) ? (var) : UK_STAILQ_FIRST((head)));		\
-	   (var);							\
-	   (var) = UK_STAILQ_NEXT((var), field))
-
-#define	UK_STAILQ_FOREACH_SAFE(var, head, field, tvar)			\
-	for ((var) = UK_STAILQ_FIRST((head));				\
-	    (var) && ((tvar) = UK_STAILQ_NEXT((var), field), 1);		\
-	    (var) = (tvar))
-
-#define	UK_STAILQ_FOREACH_FROM_SAFE(var, head, field, tvar)		\
-	for ((var) = ((var) ? (var) : UK_STAILQ_FIRST((head)));		\
-	    (var) && ((tvar) = UK_STAILQ_NEXT((var), field), 1);		\
-	    (var) = (tvar))
-
-#define	UK_STAILQ_INIT(head) do {						\
-	UK_STAILQ_FIRST((head)) = 0;					\
-	(head)->stqh_last = &UK_STAILQ_FIRST((head));			\
-} while (0)
-
-#define	UK_STAILQ_INSERT_AFTER(head, tqelm, elm, field) do {		\
-	if ((UK_STAILQ_NEXT((elm), field) = UK_STAILQ_NEXT((tqelm), field)) == 0)\
-		(head)->stqh_last = &UK_STAILQ_NEXT((elm), field);		\
-	UK_STAILQ_NEXT((tqelm), field) = (elm);				\
-} while (0)
-
-#define	UK_STAILQ_INSERT_HEAD(head, elm, field) do {			\
-	if ((UK_STAILQ_NEXT((elm), field) = UK_STAILQ_FIRST((head))) == 0)	\
-		(head)->stqh_last = &UK_STAILQ_NEXT((elm), field);		\
-	UK_STAILQ_FIRST((head)) = (elm);					\
-} while (0)
-
-#define	UK_STAILQ_INSERT_TAIL(head, elm, field) do {			\
-	UK_STAILQ_NEXT((elm), field) = 0;				\
-	*(head)->stqh_last = (elm);					\
-	(head)->stqh_last = &UK_STAILQ_NEXT((elm), field);			\
-} while (0)
-
-#define	UK_STAILQ_LAST(head, type, field)				\
-	(UK_STAILQ_EMPTY((head)) ? 0 :				\
-	    __containerof((head)->stqh_last,			\
-	    UK_QUEUE_TYPEOF(type), field.stqe_next))
-
-#define	UK_STAILQ_NEXT(elm, field)	((elm)->field.stqe_next)
-
-#define	UK_STAILQ_REMOVE(head, elm, type, field) do {			\
-	UK__QMD_SAVELINK(oldnext, (elm)->field.stqe_next);			\
-	if (UK_STAILQ_FIRST((head)) == (elm)) {				\
-		UK_STAILQ_REMOVE_HEAD((head), field);			\
-	}								\
-	else {								\
-		UK_QUEUE_TYPEOF(type) *curelm = UK_STAILQ_FIRST(head);	\
-		while (UK_STAILQ_NEXT(curelm, field) != (elm))		\
-			curelm = UK_STAILQ_NEXT(curelm, field);		\
-		UK_STAILQ_REMOVE_AFTER(head, curelm, field);		\
-	}								\
-	UK__TRASHIT(*oldnext);						\
-} while (0)
-
-#define UK_STAILQ_REMOVE_AFTER(head, elm, field) do {			\
-	if ((UK_STAILQ_NEXT(elm, field) =					\
-	     UK_STAILQ_NEXT(UK_STAILQ_NEXT(elm, field), field)) == 0)	\
-		(head)->stqh_last = &UK_STAILQ_NEXT((elm), field);		\
-} while (0)
-
-#define	UK_STAILQ_REMOVE_HEAD(head, field) do {				\
-	if ((UK_STAILQ_FIRST((head)) =					\
-	     UK_STAILQ_NEXT(UK_STAILQ_FIRST((head)), field)) == 0)		\
-		(head)->stqh_last = &UK_STAILQ_FIRST((head));		\
-} while (0)
-
-#define UK_STAILQ_SWAP(head1, head2, type) do {				\
-	UK_QUEUE_TYPEOF(type) *swap_first = UK_STAILQ_FIRST(head1);		\
-	UK_QUEUE_TYPEOF(type) **swap_last = (head1)->stqh_last;		\
-	UK_STAILQ_FIRST(head1) = UK_STAILQ_FIRST(head2);			\
-	(head1)->stqh_last = (head2)->stqh_last;			\
-	UK_STAILQ_FIRST(head2) = swap_first;				\
-	(head2)->stqh_last = swap_last;					\
-	if (UK_STAILQ_EMPTY(head1))					\
-		(head1)->stqh_last = &UK_STAILQ_FIRST(head1);		\
-	if (UK_STAILQ_EMPTY(head2))					\
-		(head2)->stqh_last = &UK_STAILQ_FIRST(head2);		\
-} while (0)
-
-
-/*
- * List declarations.
- */
-#define	UK_LIST_HEAD(name, type)						\
-struct name {								\
-	type *lh_first;	/* first element */			\
+static inline int list_is_singular(const struct list_head *head)
+{
+	return !list_empty(head) && (head->next == head->prev);
 }
 
-#define	UK_LIST_CLASS_HEAD(name, type)					\
-struct name {								\
-	class type *lh_first;	/* first element */			\
+static inline void __list_cut_position(struct list_head *list,
+		struct list_head *head, struct list_head *entry)
+{
+	struct list_head *new_first = entry->next;
+	list->next = head->next;
+	list->next->prev = list;
+	list->prev = entry;
+	entry->next = list;
+	head->next = new_first;
+	new_first->prev = head;
 }
 
-#define	UK_LIST_HEAD_INITIALIZER(head)					\
-	{ 0 }
-
-#define	UK_LIST_ENTRY(type)						\
-struct {								\
-	type *le_next;	/* next element */			\
-	type **le_prev;	/* address of previous next element */	\
+static inline void list_cut_position(struct list_head *list,
+		struct list_head *head, struct list_head *entry)
+{
+	if (list_empty(head))
+		return;
+	if (list_is_singular(head) &&
+		(head->next != entry && head != entry))
+		return;
+	if (entry == head)
+		INIT_LIST_HEAD(list);
+	else
+		__list_cut_position(list, head, entry);
 }
 
-#define	UK_LIST_CLASS_ENTRY(type)						\
-struct {								\
-	class type *le_next;	/* next element */			\
-	class type **le_prev;	/* address of previous next element */	\
+static inline int list_is_last(const struct list_head *list,
+				const struct list_head *head)
+{
+	return list->next == head;
 }
 
-/*
- * List functions.
- */
+#define	hlist_entry(ptr, type, field)	container_of(ptr, type, field)
 
-#if (defined(_KERNEL) && defined(INVARIANTS))
-/*
- * UK__QMD_LIST_CHECK_HEAD(UK_LIST_HEAD *head, UK_LIST_ENTRY NAME)
- *
- * If the list is non-empty, validates that the first element of the list
- * points back at 'head.'
- */
-#define	UK__QMD_LIST_CHECK_HEAD(head, field) do {				\
-	if (UK_LIST_FIRST((head)) != 0 &&				\
-	    UK_LIST_FIRST((head))->field.le_prev !=			\
-	     &UK_LIST_FIRST((head)))					\
-            	UK_CRASH("Bad list head %p first->prev != head", (head));	\
-} while (0)
+#define	hlist_for_each(p, head)						\
+	for (p = (head)->first; p; p = (p)->next)
 
-/*
- * UK__QMD_LIST_CHECK_NEXT(TYPE *elm, UK_LIST_ENTRY NAME)
- *
- * If an element follows 'elm' in the list, validates that the next element
- * points back at 'elm.'
- */
-#define	UK__QMD_LIST_CHECK_NEXT(elm, field) do {				\
-	if (UK_LIST_NEXT((elm), field) != 0 &&				\
-	    UK_LIST_NEXT((elm), field)->field.le_prev !=			\
-	     &((elm)->field.le_next))					\
-	        UK_CRASH("Bad link elm %p next->prev != elm", (elm));	\
-} while (0)
+#define	hlist_for_each_safe(p, n, head)					\
+	for (p = (head)->first; p && ({ n = (p)->next; 1; }); p = n)
 
-/*
- * UK__QMD_LIST_CHECK_PREV(TYPE *elm, UK_LIST_ENTRY NAME)
- *
- * Validates that the previous element (or head of the list) points to 'elm.'
- */
-#define	UK__QMD_LIST_CHECK_PREV(elm, field) do {				\
-	if (*(elm)->field.le_prev != (elm))				\
-		UK_CRASH("Bad link elm %p prev->next != elm", (elm));	\
-} while (0)
-#else
-#define	UK__QMD_LIST_CHECK_HEAD(head, field)
-#define	UK__QMD_LIST_CHECK_NEXT(elm, field)
-#define	UK__QMD_LIST_CHECK_PREV(elm, field)
-#endif /* (_KERNEL && INVARIANTS) */
+#define	hlist_entry_safe(ptr, type, member) \
+	((ptr) ? hlist_entry(ptr, type, member) : NULL)
 
-#define UK_LIST_CONCAT(head1, head2, type, field) do {			      \
-	UK_QUEUE_TYPEOF(type) *curelm = UK_LIST_FIRST(head1);			      \
-	if (curelm == 0) {						      \
-		if ((UK_LIST_FIRST(head1) = UK_LIST_FIRST(head2)) != 0) {	      \
-			UK_LIST_FIRST(head2)->field.le_prev =		      \
-			    &UK_LIST_FIRST((head1));			      \
-			UK_LIST_INIT(head2);				      \
-		}							      \
-	} else if (UK_LIST_FIRST(head2) != 0) {				      \
-		while (UK_LIST_NEXT(curelm, field) != 0)		      \
-			curelm = UK_LIST_NEXT(curelm, field);		      \
-		UK_LIST_NEXT(curelm, field) = UK_LIST_FIRST(head2);		      \
-		UK_LIST_FIRST(head2)->field.le_prev = &UK_LIST_NEXT(curelm, field); \
-		UK_LIST_INIT(head2);					      \
-	}								      \
-} while (0)
+#define	hlist_for_each_entry(pos, head, member)				\
+	for (pos = hlist_entry_safe((head)->first, typeof(*(pos)), member);\
+	     pos;							\
+	     pos = hlist_entry_safe((pos)->member.next, typeof(*(pos)), member))
 
-#define	UK_LIST_EMPTY(head)	((head)->lh_first == 0)
+#define	hlist_for_each_entry_continue(pos, member)			\
+	for (pos = hlist_entry_safe((pos)->member.next, typeof(*(pos)), member); \
+	     (pos);							\
+	     pos = hlist_entry_safe((pos)->member.next, typeof(*(pos)), member))
 
-#define	UK_LIST_FIRST(head)	((head)->lh_first)
+#define	hlist_for_each_entry_from(pos, member)				\
+	for (; (pos);								\
+	     pos = hlist_entry_safe((pos)->member.next, typeof(*(pos)), member))
 
-#define	UK_LIST_FOREACH(var, head, field)					\
-	for ((var) = UK_LIST_FIRST((head));				\
-	    (var);							\
-	    (var) = UK_LIST_NEXT((var), field))
+#define	hlist_for_each_entry_safe(pos, n, head, member)			\
+	for (pos = hlist_entry_safe((head)->first, typeof(*(pos)), member); \
+	     (pos) && ({ n = (pos)->member.next; 1; });			\
+	     pos = hlist_entry_safe(n, typeof(*(pos)), member))
 
-#define	UK_LIST_FOREACH_FROM(var, head, field)				\
-	for ((var) = ((var) ? (var) : UK_LIST_FIRST((head)));		\
-	    (var);							\
-	    (var) = UK_LIST_NEXT((var), field))
+extern void list_sort(void *priv, struct list_head *head, int (*cmp)(void *priv,
+    struct list_head *a, struct list_head *b));
+#endif /* end of imported disabled code */
 
-#define	UK_LIST_FOREACH_SAFE(var, head, field, tvar)			\
-	for ((var) = UK_LIST_FIRST((head));				\
-	    (var) && ((tvar) = UK_LIST_NEXT((var), field), 1);		\
-	    (var) = (tvar))
+/* TODO: get rid of the old linked list implementation */
+#include <uk/compat_list.h>
 
-#define	UK_LIST_FOREACH_FROM_SAFE(var, head, field, tvar)			\
-	for ((var) = ((var) ? (var) : UK_LIST_FIRST((head)));		\
-	    (var) && ((tvar) = UK_LIST_NEXT((var), field), 1);		\
-	    (var) = (tvar))
-
-#define	UK_LIST_INIT(head) do {						\
-	UK_LIST_FIRST((head)) = 0;					\
-} while (0)
-
-#define	UK_LIST_INSERT_AFTER(listelm, elm, field) do {			\
-	UK__QMD_LIST_CHECK_NEXT(listelm, field);				\
-	if ((UK_LIST_NEXT((elm), field) = UK_LIST_NEXT((listelm), field)) != 0)\
-		UK_LIST_NEXT((listelm), field)->field.le_prev =		\
-		    &UK_LIST_NEXT((elm), field);				\
-	UK_LIST_NEXT((listelm), field) = (elm);				\
-	(elm)->field.le_prev = &UK_LIST_NEXT((listelm), field);		\
-} while (0)
-
-#define	UK_LIST_INSERT_BEFORE(listelm, elm, field) do {			\
-	UK__QMD_LIST_CHECK_PREV(listelm, field);				\
-	(elm)->field.le_prev = (listelm)->field.le_prev;		\
-	UK_LIST_NEXT((elm), field) = (listelm);				\
-	*(listelm)->field.le_prev = (elm);				\
-	(listelm)->field.le_prev = &UK_LIST_NEXT((elm), field);		\
-} while (0)
-
-#define	UK_LIST_INSERT_HEAD(head, elm, field) do {				\
-	UK__QMD_LIST_CHECK_HEAD((head), field);				\
-	if ((UK_LIST_NEXT((elm), field) = UK_LIST_FIRST((head))) != 0)	\
-		UK_LIST_FIRST((head))->field.le_prev = &UK_LIST_NEXT((elm), field);\
-	UK_LIST_FIRST((head)) = (elm);					\
-	(elm)->field.le_prev = &UK_LIST_FIRST((head));			\
-} while (0)
-
-#define	UK_LIST_NEXT(elm, field)	((elm)->field.le_next)
-
-#define	UK_LIST_PREV(elm, head, type, field)			\
-	((elm)->field.le_prev == &UK_LIST_FIRST((head)) ? 0 :	\
-	    __containerof((elm)->field.le_prev,			\
-	    UK_QUEUE_TYPEOF(type), field.le_next))
-
-#define	UK_LIST_REMOVE(elm, field) do {					\
-	UK__QMD_SAVELINK(oldnext, (elm)->field.le_next);			\
-	UK__QMD_SAVELINK(oldprev, (elm)->field.le_prev);			\
-	UK__QMD_LIST_CHECK_NEXT(elm, field);				\
-	UK__QMD_LIST_CHECK_PREV(elm, field);				\
-	if (UK_LIST_NEXT((elm), field) != 0)				\
-		UK_LIST_NEXT((elm), field)->field.le_prev = 		\
-		    (elm)->field.le_prev;				\
-	*(elm)->field.le_prev = UK_LIST_NEXT((elm), field);		\
-	UK__TRASHIT(*oldnext);						\
-	UK__TRASHIT(*oldprev);						\
-} while (0)
-
-#define UK_LIST_SWAP(head1, head2, type, field) do {			\
-	UK_QUEUE_TYPEOF(type) *swap_tmp = UK_LIST_FIRST(head1);		\
-	UK_LIST_FIRST((head1)) = UK_LIST_FIRST((head2));			\
-	UK_LIST_FIRST((head2)) = swap_tmp;					\
-	if ((swap_tmp = UK_LIST_FIRST((head1))) != 0)			\
-		swap_tmp->field.le_prev = &UK_LIST_FIRST((head1));		\
-	if ((swap_tmp = UK_LIST_FIRST((head2))) != 0)			\
-		swap_tmp->field.le_prev = &UK_LIST_FIRST((head2));		\
-} while (0)
-
-/*
- * Tail queue declarations.
- */
-#define	UK_TAILQ_HEAD(name, type)						\
-struct name {								\
-	type *tqh_first;	/* first element */			\
-	type **tqh_last;	/* addr of last next element */		\
-	UK__TRACEBUF							\
-}
-
-#define	UK_TAILQ_CLASS_HEAD(name, type)					\
-struct name {								\
-	class type *tqh_first;	/* first element */			\
-	class type **tqh_last;	/* addr of last next element */		\
-	UK__TRACEBUF							\
-}
-
-#define	UK_TAILQ_HEAD_INITIALIZER(head)					\
-	{ 0, &(head).tqh_first, UK__TRACEBUF_INITIALIZER }
-
-#define	UK_TAILQ_ENTRY(type)						\
-struct {								\
-	type *tqe_next;	/* next element */			\
-	type **tqe_prev;	/* address of previous next element */	\
-	UK__TRACEBUF							\
-}
-
-#define	UK_TAILQ_CLASS_ENTRY(type)						\
-struct {								\
-	class type *tqe_next;	/* next element */			\
-	class type **tqe_prev;	/* address of previous next element */	\
-	UK__TRACEBUF							\
-}
-
-/*
- * Tail queue functions.
- */
-#if (defined(_KERNEL) && defined(INVARIANTS))
-/*
- * UK__QMD_TAILQ_CHECK_HEAD(UK_TAILQ_HEAD *head, UK_TAILQ_ENTRY NAME)
- *
- * If the tailq is non-empty, validates that the first element of the tailq
- * points back at 'head.'
- */
-
-#define	UK__QMD_TAILQ_CHECK_HEAD(head, field) do {				\
-	if (!UK_TAILQ_EMPTY(head) &&					\
-	    UK_TAILQ_FIRST((head))->field.tqe_prev !=			\
-	     &UK_TAILQ_FIRST((head)))					\
-		UK_CRASH("Bad tailq head %p first->prev != head", (head));	\
-} while (0)
-
-/*
- * UK__QMD_TAILQ_CHECK_TAIL(UK_TAILQ_HEAD *head, UK_TAILQ_ENTRY NAME)
- *
- * Validates that the tail of the tailq is a pointer to pointer to 0.
- */
-#define	UK__QMD_TAILQ_CHECK_TAIL(head, field) do {				\
-	if (*(head)->tqh_last != 0)					\
-	    	UK_CRASH("Bad tailq NEXT(%p->tqh_last) != 0", (head)); 	\
-} while (0)
-
-/*
- * UK__QMD_TAILQ_CHECK_NEXT(TYPE *elm, UK_TAILQ_ENTRY NAME)
- *
- * If an element follows 'elm' in the tailq, validates that the next element
- * points back at 'elm.'
- */
-#define	UK__QMD_TAILQ_CHECK_NEXT(elm, field) do {				\
-	if (UK_TAILQ_NEXT((elm), field) != 0 &&				\
-	    UK_TAILQ_NEXT((elm), field)->field.tqe_prev !=			\
-	     &((elm)->field.tqe_next))					\
-		UK_CRASH("Bad link elm %p next->prev != elm", (elm));	\
-} while (0)
-
-/*
- * UK__QMD_TAILQ_CHECK_PREV(TYPE *elm, UK_TAILQ_ENTRY NAME)
- *
- * Validates that the previous element (or head of the tailq) points to 'elm.'
- */
-#define	UK__QMD_TAILQ_CHECK_PREV(elm, field) do {				\
-	if (*(elm)->field.tqe_prev != (elm))				\
-		UK_CRASH("Bad link elm %p prev->next != elm", (elm));	\
-} while (0)
-#else
-#define	UK__QMD_TAILQ_CHECK_HEAD(head, field)
-#define	UK__QMD_TAILQ_CHECK_TAIL(head, headname)
-#define	UK__QMD_TAILQ_CHECK_NEXT(elm, field)
-#define	UK__QMD_TAILQ_CHECK_PREV(elm, field)
-#endif /* (_KERNEL && INVARIANTS) */
-
-#define	UK_TAILQ_CONCAT(head1, head2, field) do {				\
-	if (!UK_TAILQ_EMPTY(head2)) {					\
-		*(head1)->tqh_last = (head2)->tqh_first;		\
-		(head2)->tqh_first->field.tqe_prev = (head1)->tqh_last;	\
-		(head1)->tqh_last = (head2)->tqh_last;			\
-		UK_TAILQ_INIT((head2));					\
-		UK__QMD_TRACE_HEAD(head1);					\
-		UK__QMD_TRACE_HEAD(head2);					\
-	}								\
-} while (0)
-
-#define	UK_TAILQ_EMPTY(head)	((head)->tqh_first == 0)
-
-#define	UK_TAILQ_FIRST(head)	((head)->tqh_first)
-
-#define	UK_TAILQ_FOREACH(var, head, field)					\
-	for ((var) = UK_TAILQ_FIRST((head));				\
-	    (var);							\
-	    (var) = UK_TAILQ_NEXT((var), field))
-
-#define	UK_TAILQ_FOREACH_FROM(var, head, field)				\
-	for ((var) = ((var) ? (var) : UK_TAILQ_FIRST((head)));		\
-	    (var);							\
-	    (var) = UK_TAILQ_NEXT((var), field))
-
-#define	UK_TAILQ_FOREACH_SAFE(var, head, field, tvar)			\
-	for ((var) = UK_TAILQ_FIRST((head));				\
-	    (var) && ((tvar) = UK_TAILQ_NEXT((var), field), 1);		\
-	    (var) = (tvar))
-
-#define	UK_TAILQ_FOREACH_FROM_SAFE(var, head, field, tvar)			\
-	for ((var) = ((var) ? (var) : UK_TAILQ_FIRST((head)));		\
-	    (var) && ((tvar) = UK_TAILQ_NEXT((var), field), 1);		\
-	    (var) = (tvar))
-
-#define	UK_TAILQ_FOREACH_REVERSE(var, head, headname, field)		\
-	for ((var) = UK_TAILQ_LAST((head), headname);			\
-	    (var);							\
-	    (var) = UK_TAILQ_PREV((var), headname, field))
-
-#define	UK_TAILQ_FOREACH_REVERSE_FROM(var, head, headname, field)		\
-	for ((var) = ((var) ? (var) : UK_TAILQ_LAST((head), headname));	\
-	    (var);							\
-	    (var) = UK_TAILQ_PREV((var), headname, field))
-
-#define	UK_TAILQ_FOREACH_REVERSE_SAFE(var, head, headname, field, tvar)	\
-	for ((var) = UK_TAILQ_LAST((head), headname);			\
-	    (var) && ((tvar) = UK_TAILQ_PREV((var), headname, field), 1);	\
-	    (var) = (tvar))
-
-#define	UK_TAILQ_FOREACH_REVERSE_FROM_SAFE(var, head, headname, field, tvar) \
-	for ((var) = ((var) ? (var) : UK_TAILQ_LAST((head), headname));	\
-	    (var) && ((tvar) = UK_TAILQ_PREV((var), headname, field), 1);	\
-	    (var) = (tvar))
-
-#define	UK_TAILQ_INIT(head) do {						\
-	UK_TAILQ_FIRST((head)) = 0;					\
-	(head)->tqh_last = &UK_TAILQ_FIRST((head));			\
-	UK__QMD_TRACE_HEAD(head);						\
-} while (0)
-
-#define	UK_TAILQ_INSERT_AFTER(head, listelm, elm, field) do {		\
-	UK__QMD_TAILQ_CHECK_NEXT(listelm, field);				\
-	if ((UK_TAILQ_NEXT((elm), field) = UK_TAILQ_NEXT((listelm), field)) != 0)\
-		UK_TAILQ_NEXT((elm), field)->field.tqe_prev = 		\
-		    &UK_TAILQ_NEXT((elm), field);				\
-	else {								\
-		(head)->tqh_last = &UK_TAILQ_NEXT((elm), field);		\
-		UK__QMD_TRACE_HEAD(head);					\
-	}								\
-	UK_TAILQ_NEXT((listelm), field) = (elm);				\
-	(elm)->field.tqe_prev = &UK_TAILQ_NEXT((listelm), field);		\
-	UK__QMD_TRACE_ELEM(&(elm)->field);					\
-	UK__QMD_TRACE_ELEM(&(listelm)->field);				\
-} while (0)
-
-#define	UK_TAILQ_INSERT_BEFORE(listelm, elm, field) do {			\
-	UK__QMD_TAILQ_CHECK_PREV(listelm, field);				\
-	(elm)->field.tqe_prev = (listelm)->field.tqe_prev;		\
-	UK_TAILQ_NEXT((elm), field) = (listelm);				\
-	*(listelm)->field.tqe_prev = (elm);				\
-	(listelm)->field.tqe_prev = &UK_TAILQ_NEXT((elm), field);		\
-	UK__QMD_TRACE_ELEM(&(elm)->field);					\
-	UK__QMD_TRACE_ELEM(&(listelm)->field);				\
-} while (0)
-
-#define	UK_TAILQ_INSERT_HEAD(head, elm, field) do {			\
-	UK__QMD_TAILQ_CHECK_HEAD(head, field);				\
-	if ((UK_TAILQ_NEXT((elm), field) = UK_TAILQ_FIRST((head))) != 0)	\
-		UK_TAILQ_FIRST((head))->field.tqe_prev =			\
-		    &UK_TAILQ_NEXT((elm), field);				\
-	else								\
-		(head)->tqh_last = &UK_TAILQ_NEXT((elm), field);		\
-	UK_TAILQ_FIRST((head)) = (elm);					\
-	(elm)->field.tqe_prev = &UK_TAILQ_FIRST((head));			\
-	UK__QMD_TRACE_HEAD(head);						\
-	UK__QMD_TRACE_ELEM(&(elm)->field);					\
-} while (0)
-
-#define	UK_TAILQ_INSERT_TAIL(head, elm, field) do {			\
-	UK__QMD_TAILQ_CHECK_TAIL(head, field);				\
-	UK_TAILQ_NEXT((elm), field) = 0;				\
-	(elm)->field.tqe_prev = (head)->tqh_last;			\
-	*(head)->tqh_last = (elm);					\
-	(head)->tqh_last = &UK_TAILQ_NEXT((elm), field);			\
-	UK__QMD_TRACE_HEAD(head);						\
-	UK__QMD_TRACE_ELEM(&(elm)->field);					\
-} while (0)
-
-#define	UK_TAILQ_LAST(head, headname)					\
-	(*(((struct headname *)((head)->tqh_last))->tqh_last))
-
-#define	UK_TAILQ_NEXT(elm, field) ((elm)->field.tqe_next)
-
-#define	UK_TAILQ_PREV(elm, headname, field)				\
-	(*(((struct headname *)((elm)->field.tqe_prev))->tqh_last))
-
-#define	UK_TAILQ_REMOVE(head, elm, field) do {				\
-	UK__QMD_SAVELINK(oldnext, (elm)->field.tqe_next);			\
-	UK__QMD_SAVELINK(oldprev, (elm)->field.tqe_prev);			\
-	UK__QMD_TAILQ_CHECK_NEXT(elm, field);				\
-	UK__QMD_TAILQ_CHECK_PREV(elm, field);				\
-	if ((UK_TAILQ_NEXT((elm), field)) != 0)				\
-		UK_TAILQ_NEXT((elm), field)->field.tqe_prev = 		\
-		    (elm)->field.tqe_prev;				\
-	else {								\
-		(head)->tqh_last = (elm)->field.tqe_prev;		\
-		UK__QMD_TRACE_HEAD(head);					\
-	}								\
-	*(elm)->field.tqe_prev = UK_TAILQ_NEXT((elm), field);		\
-	UK__TRASHIT(*oldnext);						\
-	UK__TRASHIT(*oldprev);						\
-	UK__QMD_TRACE_ELEM(&(elm)->field);					\
-} while (0)
-
-#define UK_TAILQ_SWAP(head1, head2, type, field) do {			\
-	UK_QUEUE_TYPEOF(type) *swap_first = (head1)->tqh_first;		\
-	UK_QUEUE_TYPEOF(type) **swap_last = (head1)->tqh_last;		\
-	(head1)->tqh_first = (head2)->tqh_first;			\
-	(head1)->tqh_last = (head2)->tqh_last;				\
-	(head2)->tqh_first = swap_first;				\
-	(head2)->tqh_last = swap_last;					\
-	if ((swap_first = (head1)->tqh_first) != 0)			\
-		swap_first->field.tqe_prev = &(head1)->tqh_first;	\
-	else								\
-		(head1)->tqh_last = &(head1)->tqh_first;		\
-	if ((swap_first = (head2)->tqh_first) != 0)			\
-		swap_first->field.tqe_prev = &(head2)->tqh_first;	\
-	else								\
-		(head2)->tqh_last = &(head2)->tqh_first;		\
-} while (0)
-
-#endif /* !UK__SYS_QUEUE_H_ */
+#endif /* _LINUX_LIST_H_ */
