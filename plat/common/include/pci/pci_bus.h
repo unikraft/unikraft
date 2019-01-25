@@ -130,13 +130,12 @@ typedef int (*pci_driver_add_func_t)(struct pci_device *);
 typedef int (*pci_driver_init_func_t)(struct uk_alloc *a);
 
 struct pci_driver {
-	UK_TAILQ_ENTRY(struct pci_driver) next;
+	struct uk_list_head list;
 	/**< ANY-ID terminated list of device IDs that the driver handles */
 	const struct pci_device_id *device_ids;
 	pci_driver_init_func_t init; /* optional */
 	pci_driver_add_func_t add_dev;
 };
-UK_TAILQ_HEAD(pci_driver_list, struct pci_driver);
 
 enum pci_device_state {
 	PCI_DEVICE_STATE_RESET = 0,
@@ -144,7 +143,7 @@ enum pci_device_state {
 };
 
 struct pci_device {
-	UK_TAILQ_ENTRY(struct pci_device) next; /**< used by pci_bus_handler */
+	struct uk_list_head list;
 	struct pci_device_id  id;
 	struct pci_address    addr;
 	struct pci_driver     *drv;
@@ -153,7 +152,6 @@ struct pci_device {
 	uint16_t base;
 	unsigned long irq;
 };
-UK_TAILQ_HEAD(pci_device_list, struct pci_device);
 
 
 #define PCI_REGISTER_DRIVER(b)                  \

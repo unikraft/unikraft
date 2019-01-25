@@ -60,9 +60,8 @@
 struct pci_bus_handler {
 	struct uk_bus b;
 	struct uk_alloc *a;
-	struct pci_driver_list drv_list;  /**< List of PCI drivers */
-	int drv_list_initialized;
-	struct pci_device_list dev_list;  /**< List of PCI devices */
+	struct uk_list_head drv_list;  /**< List of PCI drivers */
+	struct uk_list_head dev_list;  /**< List of PCI devices */
 };
 static struct pci_bus_handler ph;
 
@@ -165,7 +164,7 @@ static inline struct pci_driver *pci_find_driver(struct pci_device_id *id)
 	struct pci_driver *drv;
 	const struct pci_device_id *drv_id;
 
-	UK_TAILQ_FOREACH(drv, &ph.drv_list, next) {
+	uk_list_for_each_entry(drv, &ph.drv_list, list) {
 		for (drv_id = drv->device_ids;
 		     !pci_device_id_is_any(drv_id);
 		     drv_id++) {
@@ -292,20 +291,14 @@ static int pci_init(struct uk_alloc *a)
 
 	ph.a = a;
 
-	if (!ph.drv_list_initialized) {
-		UK_TAILQ_INIT(&ph.drv_list);
-		ph.drv_list_initialized = 1;
-	}
-	UK_TAILQ_INIT(&ph.dev_list);
-
-	UK_TAILQ_FOREACH_SAFE(drv, &ph.drv_list, next, drv_next) {
+	uk_list_for_each_entry_safe(drv, drv_next, &ph.drv_list, list) {
 		if (drv->init) {
 			ret = drv->init(a);
 			if (ret == 0)
 				continue;
 			uk_pr_err("Failed to initialize driver %p: %d\n",
 				  drv, ret);
-			UK_TAILQ_REMOVE(&ph.drv_list, drv, next);
+			uk_list_del_init(&drv->list);
 		}
 	}
 	return 0;
@@ -314,12 +307,7 @@ static int pci_init(struct uk_alloc *a)
 void _pci_register_driver(struct pci_driver *drv)
 {
 	UK_ASSERT(drv != NULL);
-
-	if (!ph.drv_list_initialized) {
-		UK_TAILQ_INIT(&ph.drv_list);
-		ph.drv_list_initialized = 1;
-	}
-	UK_TAILQ_INSERT_TAIL(&ph.drv_list, drv, next);
+	uk_list_add_tail(&drv->list, &ph.drv_list);
 }
 
 
@@ -327,6 +315,8 @@ void _pci_register_driver(struct pci_driver *drv)
  */
 static struct pci_bus_handler ph = {
 	.b.init = pci_init,
-	.b.probe = pci_probe
+	.b.probe = pci_probe,
+	.drv_list = UK_LIST_HEAD_INIT(ph.drv_list),
+	.dev_list = UK_LIST_HEAD_INIT(ph.dev_list),
 };
 UK_BUS_REGISTER(&ph.b);
