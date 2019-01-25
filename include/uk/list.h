@@ -38,22 +38,15 @@
 extern "C" {
 #endif
 
-#ifndef prefetch
-#define	prefetch(x)
-#endif
-
 #define LINUX_LIST_HEAD_INIT(name) { &(name), &(name) }
 
 #define LINUX_LIST_HEAD(name) \
 	struct list_head name = LINUX_LIST_HEAD_INIT(name)
 
-#ifndef LIST_HEAD_DEF
-#define	LIST_HEAD_DEF
 struct list_head {
 	struct list_head *next;
 	struct list_head *prev;
 };
-#endif
 
 static inline void
 INIT_LIST_HEAD(struct list_head *list)
@@ -272,9 +265,6 @@ list_splice_tail_init(struct list_head *list, struct list_head *head)
 	linux_list_splice(list, head->prev, head);
 	INIT_LIST_HEAD(list);
 }
-
-#undef LIST_HEAD
-#define LIST_HEAD(name)	struct list_head name = { &(name), &(name) }
 
 
 struct hlist_head {
