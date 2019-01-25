@@ -45,23 +45,16 @@ extern "C" {
 #endif
 
 struct uk_bus;
-UK_TAILQ_HEAD(uk_bus_list, struct uk_bus);
-extern struct uk_bus_list uk_bus_list;
+extern struct uk_list_head uk_bus_list;
 
 typedef int (*uk_bus_init_func_t)(struct uk_alloc *a);
 typedef int (*uk_bus_probe_func_t)(void);
 
 struct uk_bus {
-	UK_TAILQ_ENTRY(struct uk_bus) next;
+	struct uk_list_head list;
 	uk_bus_init_func_t init; /**< Initialize bus handler (optional) */
 	uk_bus_probe_func_t probe; /**< Probe for devices attached to the bus */
 };
-
-#define UK_BUS_LIST_FOREACH(b)			\
-	UK_TAILQ_FOREACH(b, &uk_bus_list, next)
-
-#define UK_BUS_LIST_FOREACH_SAFE(b, b_next)	\
-	UK_TAILQ_FOREACH_SAFE(b, &uk_bus_list, next, b_next)
 
 /* Returns the number of registered buses */
 unsigned int uk_bus_count(void);
@@ -87,7 +80,7 @@ static inline unsigned int uk_bus_init_all(struct uk_alloc *a)
 	if (uk_bus_count() == 0)
 		return 0;
 
-	UK_BUS_LIST_FOREACH_SAFE(b, b_next) {
+	uk_list_for_each_entry_safe(b, b_next, &uk_bus_list, list) {
 		if ((status = uk_bus_init(b, a)) >= 0) {
 			++ret;
 		} else {
@@ -110,7 +103,7 @@ static inline unsigned int uk_bus_probe_all(void)
 	if (uk_bus_count() == 0)
 		return 0;
 
-	UK_BUS_LIST_FOREACH(b) {
+	uk_list_for_each_entry(b, &uk_bus_list, list) {
 		if (uk_bus_probe(b) >= 0)
 			++ret;
 	}

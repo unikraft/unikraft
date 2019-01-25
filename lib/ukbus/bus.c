@@ -36,7 +36,7 @@
 #include <uk/assert.h>
 #include <uk/print.h>
 
-struct uk_bus_list uk_bus_list;
+UK_LIST_HEAD(uk_bus_list);
 static unsigned int bus_count;
 
 void _uk_bus_register(struct uk_bus *b)
@@ -44,11 +44,8 @@ void _uk_bus_register(struct uk_bus *b)
 	UK_ASSERT(b != NULL);
 	UK_ASSERT(b->probe != NULL);
 
-	if (bus_count == 0)
-		UK_TAILQ_INIT(&uk_bus_list);
-
 	uk_pr_debug("Register bus handler: %p\n", b);
-	UK_TAILQ_INSERT_TAIL(&uk_bus_list, b, next);
+	uk_list_add_tail(&b->list, &uk_bus_list);
 	++bus_count;
 }
 
@@ -58,7 +55,7 @@ void _uk_bus_unregister(struct uk_bus *b)
 	UK_ASSERT(bus_count > 0);
 
 	uk_pr_debug("Unregister bus handler: %p\n", b);
-	UK_TAILQ_REMOVE(&uk_bus_list, b, next);
+	uk_list_del_init(&b->list);
 	bus_count--;
 }
 
