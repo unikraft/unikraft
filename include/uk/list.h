@@ -31,50 +31,12 @@
 #ifndef _LINUX_LIST_H_
 #define _LINUX_LIST_H_
 
-/* TODO: this code is just imported and needs modifications before it
- * can be used in Unikraft. For now proxy directly to the existing
- * implementation - "compat_list.h"
- */
-#if 0
+#include <uk/arch/atomic.h>
+#include <stddef.h>
 
-/*
- * Since LIST_HEAD conflicts with the linux definition we must include any
- * FreeBSD header which requires it here so it is resolved with the correct
- * definition prior to the undef.
- */
-#include <linux/types.h>
-
-#include <sys/param.h>
-#include <sys/kernel.h>
-#include <sys/queue.h>
-#include <sys/cpuset.h>
-#include <sys/jail.h>
-#include <sys/lock.h>
-#include <sys/mutex.h>
-#include <sys/proc.h>
-#include <sys/vnode.h>
-#include <sys/conf.h>
-#include <sys/socket.h>
-#include <sys/mbuf.h>
-
-#include <net/bpf.h>
-#include <net/if.h>
-#include <net/if_var.h>
-#include <net/if_types.h>
-#include <net/if_media.h>
-#include <net/vnet.h>
-
-#include <netinet/in.h>
-#include <netinet/in_pcb.h>
-#include <netinet/in_var.h>
-#include <netinet/tcp_lro.h>
-
-#include <netinet6/in6_var.h>
-#include <netinet6/nd6.h>
-
-#include <vm/vm.h>
-#include <vm/vm_object.h>
-#include <vm/pmap.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 #ifndef prefetch
 #define	prefetch(x)
@@ -119,7 +81,7 @@ static inline void
 __list_del(struct list_head *prev, struct list_head *next)
 {
 	next->prev = prev;
-	WRITE_ONCE(prev->next, next);
+	UK_WRITE_ONCE(prev->next, next);
 }
 
 static inline void
@@ -137,30 +99,30 @@ list_del(struct list_head *entry)
 }
 
 static inline void
-list_replace(struct list_head *old, struct list_head *new)
+list_replace(struct list_head *old_entry, struct list_head *new_entry)
 {
-	new->next = old->next;
-	new->next->prev = new;
-	new->prev = old->prev;
-	new->prev->next = new;
+	new_entry->next = old_entry->next;
+	new_entry->next->prev = new_entry;
+	new_entry->prev = old_entry->prev;
+	new_entry->prev->next = new_entry;
 }
 
 static inline void
-list_replace_init(struct list_head *old, struct list_head *new)
+list_replace_init(struct list_head *old_entry, struct list_head *new_entry)
 {
-	list_replace(old, new);
-	INIT_LIST_HEAD(old);
+	list_replace(old_entry, new_entry);
+	INIT_LIST_HEAD(old_entry);
 }
 
 static inline void
-linux_list_add(struct list_head *new, struct list_head *prev,
+linux_list_add(struct list_head *new_entry, struct list_head *prev,
     struct list_head *next)
 {
 
-	next->prev = new;
-	new->next = next;
-	new->prev = prev;
-	prev->next = new;
+	next->prev = new_entry;
+	new_entry->next = next;
+	new_entry->prev = prev;
+	prev->next = new_entry;
 }
 
 static inline void
@@ -171,7 +133,7 @@ list_del_init(struct list_head *entry)
 	INIT_LIST_HEAD(entry);
 }
 
-#define	list_entry(ptr, type, field)	container_of(ptr, type, field)
+#define	list_entry(ptr, type, field)	__containerof(ptr, type, field)
 
 #define	list_first_entry(ptr, type, member) \
 	list_entry((ptr)->next, type, member)
@@ -235,17 +197,17 @@ list_del_init(struct list_head *entry)
 #define	list_for_each_prev(p, h) for (p = (h)->prev; p != (h); p = (p)->prev)
 
 static inline void
-list_add(struct list_head *new, struct list_head *head)
+list_add(struct list_head *new_entry, struct list_head *head)
 {
 
-	linux_list_add(new, head, head->next);
+	linux_list_add(new_entry, head, head->next);
 }
 
 static inline void
-list_add_tail(struct list_head *new, struct list_head *head)
+list_add_tail(struct list_head *new_entry, struct list_head *head)
 {
 
-	linux_list_add(new, head->prev, head);
+	linux_list_add(new_entry, head->prev, head);
 }
 
 static inline void
@@ -343,14 +305,14 @@ static inline int
 hlist_empty(const struct hlist_head *h)
 {
 
-	return !READ_ONCE(h->first);
+	return !UK_READ_ONCE(h->first);
 }
 
 static inline void
 hlist_del(struct hlist_node *n)
 {
 
-	WRITE_ONCE(*(n->pprev), n->next);
+	UK_WRITE_ONCE(*(n->pprev), n->next);
 	if (n->next != NULL)
 		n->next->pprev = n->pprev;
 }
@@ -372,7 +334,7 @@ hlist_add_head(struct hlist_node *n, struct hlist_head *h)
 	n->next = h->first;
 	if (h->first != NULL)
 		h->first->pprev = &n->next;
-	WRITE_ONCE(h->first, n);
+	UK_WRITE_ONCE(h->first, n);
 	n->pprev = &h->first;
 }
 
@@ -383,7 +345,7 @@ hlist_add_before(struct hlist_node *n, struct hlist_node *next)
 	n->pprev = next->pprev;
 	n->next = next;
 	next->pprev = &n->next;
-	WRITE_ONCE(*(n->pprev), n);
+	UK_WRITE_ONCE(*(n->pprev), n);
 }
 
 static inline void
@@ -391,7 +353,7 @@ hlist_add_behind(struct hlist_node *n, struct hlist_node *prev)
 {
 
 	n->next = prev->next;
-	WRITE_ONCE(prev->next, n);
+	UK_WRITE_ONCE(prev->next, n);
 	n->pprev = &prev->next;
 
 	if (n->next != NULL)
@@ -399,13 +361,13 @@ hlist_add_behind(struct hlist_node *n, struct hlist_node *prev)
 }
 
 static inline void
-hlist_move_list(struct hlist_head *old, struct hlist_head *new)
+hlist_move_list(struct hlist_head *old_entry, struct hlist_head *new_entry)
 {
 
-	new->first = old->first;
-	if (new->first)
-		new->first->pprev = &new->first;
-	old->first = NULL;
+	new_entry->first = old_entry->first;
+	if (new_entry->first)
+		new_entry->first->pprev = &new_entry->first;
+	old_entry->first = NULL;
 }
 
 static inline int list_is_singular(const struct list_head *head)
@@ -445,7 +407,7 @@ static inline int list_is_last(const struct list_head *list,
 	return list->next == head;
 }
 
-#define	hlist_entry(ptr, type, field)	container_of(ptr, type, field)
+#define	hlist_entry(ptr, type, field)	__containerof(ptr, type, field)
 
 #define	hlist_for_each(p, head)						\
 	for (p = (head)->first; p; p = (p)->next)
@@ -475,9 +437,9 @@ static inline int list_is_last(const struct list_head *list,
 	     (pos) && ({ n = (pos)->member.next; 1; });			\
 	     pos = hlist_entry_safe(n, typeof(*(pos)), member))
 
-extern void list_sort(void *priv, struct list_head *head, int (*cmp)(void *priv,
-    struct list_head *a, struct list_head *b));
-#endif /* end of imported disabled code */
+#ifdef __cplusplus
+}
+#endif
 
 /* TODO: get rid of the old linked list implementation */
 #include <uk/compat_list.h>
