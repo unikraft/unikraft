@@ -87,4 +87,21 @@ extern "C" {
 }
 #endif
 
+#define	UK_ACCESS_ONCE(x)			(*(volatile __typeof(x) *)&(x))
+
+#define	UK_WRITE_ONCE(x, v) do {	\
+	barrier();			\
+	UK_ACCESS_ONCE(x) = (v);	\
+	barrier();			\
+} while (0)
+
+#define	UK_READ_ONCE(x) ({		\
+	__typeof(x) __var = ({		\
+		barrier();		\
+		UK_ACCESS_ONCE(x);	\
+	});				\
+	barrier();			\
+	__var;				\
+})
+
 #endif /* __UKARCH_ATOMIC_H__ */
