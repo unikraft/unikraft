@@ -3,3 +3,4 @@ uk_bus_init
 uk_bus_probe
 _uk_bus_register
 _uk_bus_unregister
+uk_bus_list
