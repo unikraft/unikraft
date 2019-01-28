@@ -31,6 +31,9 @@ you need to provide at least the following four files:
    usually contains only `main` for an application that is developed/ported
    as a single library to Unikraft.
 
+ * **extra.ld**: Optional. Contains an amendment to the main linker
+   script
+
 The Makefile is generally short and simple and might remind you to
 Linux kernel modules that are built off-tree. For most applications
 the Makefile should contain no more than the following: ::
@@ -292,6 +295,29 @@ is part of a remotely fetched archive). You can override it by defining the
 ``APPNAME_EXPORTS`` variable. The path must be either absolute (you can refer
 with ``$(APPNAME_BASE)`` to the base directory of your application sources) or
 relative to the Unikraft sources directory.
+
+============================
+extra.ld
+============================
+If your library/application needs a section in the final elf, edit
+your Makefile.uk to add ::
+
+    EXTRA_LD_SCRIPT-$(CONFIG_LIBYOURAPPNAME) += $(LIBYOURAPPNAME_BASE)/extra.ld
+
+
+An example context of extra.ld: ::
+
+    SECTIONS
+    {
+        .uk_fs_list : {
+             PROVIDE(uk_fslist_start = .);
+             KEEP (*(.uk_fs_list))
+             PROVIDE(uk_fslist_end = .);
+        }
+    }
+    INSERT AFTER .text;
+
+This will add the section .uk_fs_list after the .text
 
 
 ============================

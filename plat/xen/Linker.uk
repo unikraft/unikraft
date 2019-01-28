@@ -18,6 +18,8 @@ endif
 ##
 XEN_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_xen-$(CONFIG_UK_ARCH)
 
+EXTRA_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-T,$(EXTRA_LD_SCRIPT-y))
+
 $(XEN_IMAGE): $(XEN_ALIBS) $(XEN_ALIBS-y) $(XEN_OLIBS) $(XEN_OLIBS-y) \
               $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) \
               $(XEN_LDSCRIPT)
@@ -36,7 +38,8 @@ $(XEN_IMAGE): $(XEN_ALIBS) $(XEN_ALIBS-y) $(XEN_OLIBS) $(XEN_OLIBS-y) \
 ifeq (arm,$(CONFIG_UK_ARCH))
 	$(call build_cmd,LD,,$@.elf,\
 	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(XEN_LDFLAGS) $(XEN_LDFLAGS-y) \
-		     -Wl$(comma)-T$(comma)$(call strip,$(XEN_LDSCRIPT)) \
+		     -Wl$(comma)-dT$(comma)$(call strip,$(XEN_LDSCRIPT)) \
+		     $(EXTRA_LD_SCRIPT_FLAGS) \
 		     $@.o -o $@.elf)
 ifeq ($(CONFIG_OPTIMIZE_DBGFILE),y)
 	$(call build_cmd,OBJCOPY,,$@.dbg,\
@@ -57,7 +60,8 @@ endif
 else
 	$(call build_cmd,LD,,$@,\
 	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(XEN_LDFLAGS) $(XEN_LDFLAGS-y) \
-		     -Wl$(comma)-T$(comma)$(call strip,$(XEN_LDSCRIPT)) \
+		     -Wl$(comma)-dT$(comma)$(call strip,$(XEN_LDSCRIPT)) \
+		     $(EXTRA_LD_SCRIPT_FLAGS) \
 		     $@.o -o $@)
 ifeq ($(CONFIG_OPTIMIZE_DBGFILE),y)
 	$(call build_cmd,OBJCOPY,,$@.dbg,\

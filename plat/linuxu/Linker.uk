@@ -4,6 +4,7 @@ LINUXU_LDFLAGS-y += -Wl,-e,_liblinuxuplat_start
 ## Link image
 ##
 LINUXU_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_linuxu-$(CONFIG_UK_ARCH)
+EXTRA_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-T,$(EXTRA_LD_SCRIPT-y))
 
 $(LINUXU_IMAGE): $(LINUXU_ALIBS) $(LINUXU_ALIBS-y) \
 		 $(LINUXU_OLIBS) $(LINUXU_OLIBS-y) \
@@ -17,6 +18,7 @@ $(LINUXU_IMAGE): $(LINUXU_ALIBS) $(LINUXU_ALIBS-y) \
 		     $(LINUXU_ALIBS) $(LINUXU_ALIBS-y) \
 		     $(UK_ALIBS) $(UK_ALIBS-y) \
 		     -Wl$(comma)--end-group \
+		     $(EXTRA_LD_SCRIPT_FLAGS) \
 		     -o $@)
 ifeq ($(CONFIG_OPTIMIZE_DBGFILE),y)
 	$(call build_cmd,OBJCOPY,,$@.dbg,\
