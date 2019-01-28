@@ -49,6 +49,7 @@ atoi
 memcpy
 memset
 memchr
+memrchr
 memmove
 memcmp
 strnlen
@@ -56,6 +57,7 @@ strlen
 strncpy
 strcpy
 strchr
+strrchr
 strchrnul
 strncmp
 strcmp

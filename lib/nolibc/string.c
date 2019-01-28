@@ -93,6 +93,17 @@ void *memchr(const void *ptr, int val, size_t len)
 	return NULL; /* did not find val */
 }
 
+void *memrchr(const void *m, int c, size_t n)
+{
+	const unsigned char *s = m;
+
+	c = (unsigned char) c;
+	while (n--)
+		if (s[n] == c)
+			return (void *) (s + n);
+	return 0;
+}
+
 void *memmove(void *dst, const void *src, size_t len)
 {
 	uint8_t *d = dst;
@@ -211,6 +222,11 @@ char *strchr(const char *str, int c)
 {
 	char *r = strchrnul(str, c);
 	return *(unsigned char *)r == (unsigned char)c ? r : 0;
+}
+
+char *strrchr(const char *s, int c)
+{
+	return memrchr(s, c, strlen(s) + 1);
 }
 
 size_t strcspn(const char *s, const char *c)
