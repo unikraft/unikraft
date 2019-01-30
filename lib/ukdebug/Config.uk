@@ -15,10 +15,10 @@ choice
 	default LIBUKDEBUG_PRINTK_ERR
 	depends on LIBUKDEBUG_PRINTK
 	help
-	  Set the level of detail of debug messages
+	  Set the level of detail of kernel messages
 
 config LIBUKDEBUG_PRINTK_INFO
-	bool "Show all types of debug messages"
+	bool "Show all types of messages"
 
 config LIBUKDEBUG_PRINTK_WARN
 	bool "Show critical, error, and warning messages"
@@ -41,7 +41,6 @@ config LIBUKDEBUG_PRINTD
 choice
 	prompt "Message redirection"
 	default LIBUKDEBUG_REDIR_PRINTD
-	depends on LIBUKDEBUG_PRINTD || LIBUKDEBUG_PRINTK
 	help
 	  Output for uk_printk() and uk_printd()
 
