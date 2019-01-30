@@ -5,8 +5,6 @@
 extern "C" {
 #endif
 
-#include <features.h>
-
 #define __NEED_off_t
 #define __NEED_pid_t
 #define __NEED_mode_t
@@ -17,8 +15,7 @@ extern "C" {
 #define __NEED_struct_iovec
 #endif
 
-#include <bits/alltypes.h>
-
+#include <nolibc-internal/shareddefs.h>
 #include <bits/fcntl.h>
 
 struct flock {
@@ -26,7 +23,7 @@ struct flock {
 	short l_whence;
 	off_t l_start;
 	off_t l_len;
-	pid_t l_pid;
+	/* pid_t l_pid; */
 };
 
 int creat(const char *, mode_t);
@@ -155,10 +152,14 @@ int lockf(int, int, off_t);
 #define F_OWNER_PID 1
 #define F_OWNER_PGRP 2
 #define F_OWNER_GID 2
+#if 0
+/* Not implemented */
 struct f_owner_ex {
 	int type;
 	pid_t pid;
 };
+#endif
+
 #define FALLOC_FL_KEEP_SIZE 1
 #define FALLOC_FL_PUNCH_HOLE 2
 #define SYNC_FILE_RANGE_WAIT_BEFORE 1

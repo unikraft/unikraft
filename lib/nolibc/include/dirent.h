@@ -5,15 +5,13 @@
 extern "C" {
 #endif
 
-#include <features.h>
-
 #define __NEED_ino_t
 #define __NEED_off_t
 #if defined(_BSD_SOURCE) || defined(_GNU_SOURCE)
 #define __NEED_size_t
 #endif
 
-#include <bits/alltypes.h>
+#include <nolibc-internal/shareddefs.h>
 
 typedef struct __dirstream DIR;
 

@@ -5,8 +5,6 @@
 extern "C" {
 #endif
 
-#include <features.h>
-
 #define __NEED_size_t
 #define __NEED_ssize_t
 #define __NEED_struct_iovec
@@ -19,7 +17,7 @@ extern "C" {
 #define __NEED_pid_t
 #endif
 
-#include <bits/alltypes.h>
+#include <nolibc-internal/shareddefs.h>
 
 #define UIO_MAXIOV 1024
 
@@ -34,11 +32,6 @@ ssize_t pwritev (int, const struct iovec *, int, off_t);
 #define pwritev64 pwritev
 #define off64_t off_t
 #endif
-#endif
-
-#ifdef _GNU_SOURCE
-ssize_t process_vm_writev(pid_t, const struct iovec *, unsigned long, const struct iovec *, unsigned long, unsigned long);
-ssize_t process_vm_readv(pid_t, const struct iovec *, unsigned long, const struct iovec *, unsigned long, unsigned long);
 #endif
 
 #ifdef __cplusplus

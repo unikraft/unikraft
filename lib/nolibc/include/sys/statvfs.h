@@ -5,13 +5,9 @@
 extern "C" {
 #endif
 
-#include <features.h>
-
 #define __NEED_fsblkcnt_t
 #define __NEED_fsfilcnt_t
-#include <bits/alltypes.h>
-
-#include <endian.h>
+#include <nolibc-internal/shareddefs.h>
 
 struct statvfs {
 	unsigned long f_bsize, f_frsize;

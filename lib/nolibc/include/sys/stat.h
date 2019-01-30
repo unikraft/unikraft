@@ -4,7 +4,7 @@
 extern "C" {
 #endif
 
-#include <features.h>
+/* #include <features.h> */
 
 #define __NEED_dev_t
 #define __NEED_ino_t
@@ -18,9 +18,26 @@ extern "C" {
 #define __NEED_blkcnt_t
 #define __NEED_struct_timespec
 
-#include <bits/alltypes.h>
+#include <nolibc-internal/shareddefs.h>
 
-#include <bits/stat.h>
+struct stat {
+	dev_t st_dev;
+	ino_t st_ino;
+	nlink_t st_nlink;
+
+	mode_t st_mode;
+	uid_t st_uid;
+	gid_t st_gid;
+	unsigned int    __pad0;
+	dev_t st_rdev;
+	off_t st_size;
+	blksize_t st_blksize;
+	blkcnt_t st_blocks;
+
+	struct timespec st_atim;
+	struct timespec st_mtim;
+	struct timespec st_ctim;
+};
 
 #define st_atime st_atim.tv_sec
 #define st_mtime st_mtim.tv_sec
