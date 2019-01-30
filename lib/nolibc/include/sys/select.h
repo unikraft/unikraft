@@ -28,6 +28,7 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
+/* Derived from FreeBSD commit 4736ccf (Nov 20, 2017) */
 
 #ifndef __SYS_SELECT_H__
 #define __SYS_SELECT_H__
@@ -59,6 +60,20 @@ typedef unsigned long __fd_mask;
 typedef struct fd_set {
 	__fd_mask __fds_bits[howmany(FD_SETSIZE, _NFDBITS)];
 } fd_set;
+
+#define	__fdset_mask(n)	((__fd_mask)1 << ((n) % _NFDBITS))
+#define	FD_CLR(n, p)	((p)->__fds_bits[(n)/_NFDBITS] &= ~__fdset_mask(n))
+#define	FD_ISSET(n, p)	(((p)->__fds_bits[(n)/_NFDBITS] & __fdset_mask(n)) != 0)
+#define	FD_SET(n, p)	((p)->__fds_bits[(n)/_NFDBITS] |= __fdset_mask(n))
+#define	FD_ZERO(p) do {					\
+	fd_set *_p;					\
+	__ssz _n;					\
+							\
+	_p = (p);					\
+	_n = howmany(FD_SETSIZE, _NFDBITS);		\
+	while (_n > 0)					\
+		_p->__fds_bits[--_n] = 0;		\
+} while (0)
 
 #ifdef __cplusplus
 }
