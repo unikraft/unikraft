@@ -87,6 +87,9 @@ extern "C" {
 #define INTMAX_MAX   __LL_MAX
 #define UINTMAX_MAX __ULL_MAX
 
+#define PATH_MAX 4096
+#define NAME_MAX 255
+
 #ifdef __cplusplus
 }
 #endif
