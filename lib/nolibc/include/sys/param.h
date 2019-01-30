@@ -1,52 +1,38 @@
-/* SPDX-License-Identifier: BSD-3-Clause */
-/*
- * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
- *
- *
- * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
+#ifndef _SYS_PARAM_H
+#define _SYS_PARAM_H
+
+#define MAXSYMLINKS 20
+#define MAXHOSTNAMELEN 64
+#define MAXNAMLEN 255
+#define MAXPATHLEN 4096
+#define NBBY 8
+#define NGROUPS 32
+#define CANBSIZ 255
+#define NOFILE 256
+#define NCARGS 131072
+#define DEV_BSIZE 512
+#define NOGROUP (-1)
+
+#undef MIN
+#undef MAX
+#define MIN(a, b) (((a) < (b)) ? (a) : (b))
+#define MAX(a, b) (((a) > (b)) ? (a) : (b))
+
+#define __bitop(x, i, o) ((x)[(i) / 8] o(1 << (i) % 8))
+#define setbit(x, i) __bitop(x, i, |=)
+#define clrbit(x, i) __bitop(x, i, &= ~)
+#define isset(x, i) __bitop(x, i, &)
+#define isclr(x, i) !isset(x, i)
+
+#define howmany(n, d) (((n) + ((d) - 1)) / (d))
+#define roundup(n, d) (howmany(n, d) * (d))
+#define powerof2(n) !(((n) - 1) & (n))
+
+/* TODO: This includes are not needed currently. Lets leave them
+ * commented out as a reminder
  */
+/* #include <sys/resource.h> */
+/* #include <endian.h> */
+#include <limits.h>
 
-
-#ifndef __SYS_PARAM_H__
-#define __SYS_PARAM_H__
-
-#ifdef __cplusplus
-extern "C" {
 #endif
-
-#ifndef howmany
-#define howmany(x, y)   (((x)+((y)-1))/(y))
-#endif
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* __SYS_PARAM_H__ */
