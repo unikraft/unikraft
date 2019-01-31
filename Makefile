@@ -556,7 +556,7 @@ clean:
 
 endif
 
-.PHONY: print-vars print-libs help outputmakefile list-defconfigs
+.PHONY: print-vars print-libs print-objs print-srcs help outputmakefile list-defconfigs
 
 # Configuration
 # ---------------------------------------------------------------------------
@@ -701,6 +701,7 @@ print-vars:
 print-version:
 	@echo $(UK_FULLVERSION)
 
+ifeq ($(UK_HAVE_DOT_CONFIG),y)
 print-libs:
 	@echo 	$(foreach P,$(UK_PLATS) $(UK_PLATS-y),\
 		$(if $(call qstrip,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y)),\
@@ -735,6 +736,16 @@ print-srcs:
 		$(if $(call qstrip,$($(call vprefix_lib,$(L),SRCS)) $($(call vprefix_lib,$(L),SRCS-y))),\
 		'$(L):\n   $($(call vprefix_lib,$(L),SRCS)) $($(call vprefix_lib,$(L),SRCS-y))\n'\
 		))
+else
+print-libs:
+	$(error Do not have a configuration. Please run one of the configuration targets first)
+
+print-objs:
+	$(error Do not have a configuration. Please run one of the configuration targets first)
+
+print-srcs:
+	$(error Do not have a configuration. Please run one of the configuration targets first)
+endif
 
 help:
 	@echo 'Cleaning:'
