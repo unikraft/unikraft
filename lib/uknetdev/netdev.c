@@ -333,6 +333,7 @@ int uk_netdev_rxq_configure(struct uk_netdev *dev, uint16_t queue_id,
 	UK_ASSERT(dev->ops->rxq_configure);
 	UK_ASSERT(queue_id < CONFIG_LIBUKNETDEV_MAXNBQUEUES);
 	UK_ASSERT(rx_conf);
+	UK_ASSERT(rx_conf->alloc_rxpkts);
 #ifdef CONFIG_LIBUKNETDEV_DISPATCHERTHREADS
 	UK_ASSERT((rx_conf->callback && rx_conf->s)
 		  || !rx_conf->callback);

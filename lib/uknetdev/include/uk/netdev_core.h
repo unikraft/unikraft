@@ -176,6 +176,25 @@ typedef void (*uk_netdev_queue_event_t)(struct uk_netdev *dev,
 					uint16_t queue_id, void *argp);
 
 /**
+ * User callback used by the driver to allocate netbufs
+ * that are used to setup receive descriptors.
+ *
+ * @param argp
+ *   User-provided argument.
+ * @param pkts
+ *   Array for netbuf pointers that the function should allocate.
+ * @param count
+ *   Number of netbufs requested (equal to length of pkts).
+ * @return
+ *   Number of successful allocated netbufs,
+ *   has to be in range [0, count].
+ *   References to allocated packets are placed to pkts[0]...pkts[count -1].
+ */
+typedef uint16_t (*uk_netdev_alloc_rxpkts)(void *argp,
+					   struct uk_netbuf *pkts[],
+					   uint16_t count);
+
+/**
  * A structure used to configure an Unikraft network device RX queue.
  */
 struct uk_netdev_rxqueue_conf {
@@ -183,6 +202,9 @@ struct uk_netdev_rxqueue_conf {
 	void *callback_cookie;            /**< Argument pointer for callback. */
 
 	struct uk_alloc *a;               /**< Allocator for descriptors. */
+
+	uk_netdev_alloc_rxpkts alloc_rxpkts; /**< Allocator for rx netbufs */
+	void *alloc_rxpkts_argp;             /**< Argument for alloc_rxpkts */
 #ifdef CONFIG_LIBUKNETDEV_DISPATCHERTHREADS
 	struct uk_sched *s;               /**< Scheduler for dispatcher. */
 #endif
@@ -266,9 +288,7 @@ typedef int (*uk_netdev_rxq_intr_disable_t)(struct uk_netdev *dev,
 /** Driver callback type to retrieve one packet from a RX queue. */
 typedef int (*uk_netdev_rx_one_t)(struct uk_netdev *dev,
 				  struct uk_netdev_rx_queue *queue,
-				  struct uk_netbuf **pkt,
-				  struct uk_netbuf *fillup[],
-				  uint16_t *fillup_count);
+				  struct uk_netbuf **pkt);
 
 /** Driver callback type to submit one packet to a TX queue. */
 typedef int (*uk_netdev_tx_one_t)(struct uk_netdev *dev,

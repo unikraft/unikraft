@@ -260,19 +260,19 @@ __phys_addr virtqueue_physaddr(struct virtqueue *vq)
 	return ukplat_virt_to_phys(vrq->vring_mem);
 }
 
-void *virtqueue_buffer_dequeue(struct virtqueue *vq, __u32 *len)
+int virtqueue_buffer_dequeue(struct virtqueue *vq, void **cookie, __u32 *len)
 {
 	struct virtqueue_vring *vrq = NULL;
 	__u16 used_idx, head_idx;
 	struct vring_used_elem *elem;
-	void *cookie;
 
 	UK_ASSERT(vq);
+	UK_ASSERT(cookie);
 	vrq = to_virtqueue_vring(vq);
 
 	/* No new descriptor since last dequeue operation */
 	if (!virtqueue_hasdata(vrq))
-		return NULL;
+		return -ENOMSG;
 	used_idx = vrq->last_used_desc_idx++ & (vrq->vring.num - 1);
 	elem = &vrq->vring.used->ring[used_idx];
 	/**
@@ -283,10 +283,10 @@ void *virtqueue_buffer_dequeue(struct virtqueue *vq, __u32 *len)
 	head_idx = elem->id;
 	if (len)
 		*len = elem->len;
-	cookie = vrq->vq_info[head_idx].cookie;
+	*cookie = vrq->vq_info[head_idx].cookie;
 	virtqueue_detach_desc(vrq, head_idx);
 	vrq->vq_info[head_idx].cookie = NULL;
-	return cookie;
+	return (vrq->vring.num - vrq->desc_avail);
 }
 
 int virtqueue_buffer_enqueue(struct virtqueue *vq, void *cookie,
