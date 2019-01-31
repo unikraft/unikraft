@@ -285,6 +285,19 @@ typedef int (*uk_netdev_rxq_intr_enable_t)(struct uk_netdev *dev,
 typedef int (*uk_netdev_rxq_intr_disable_t)(struct uk_netdev *dev,
 					    struct uk_netdev_rx_queue *queue);
 
+/**
+ * Status code flags returned by rx and tx functions
+ */
+/** Successful operation (packet received or transmitted). */
+#define UK_NETDEV_STATUS_SUCCESS  (0x1)
+/**
+ * More room available for operation (e.g., still space on queue for sending
+ * or more packets available on receive queue
+ */
+#define UK_NETDEV_STATUS_MORE     (0x2)
+/** Queue underrun (e.g., out-of-memory when allocating new receive buffers). */
+#define UK_NETDEV_STATUS_UNDERRUN (0x4)
+
 /** Driver callback type to retrieve one packet from a RX queue. */
 typedef int (*uk_netdev_rx_one_t)(struct uk_netdev *dev,
 				  struct uk_netdev_rx_queue *queue,
