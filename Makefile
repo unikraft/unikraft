@@ -142,7 +142,7 @@ export DATE := $(shell date +%Y%m%d)
 null_targets		:= print-version help
 noconfig_targets	:= menuconfig nconfig gconfig xconfig config oldconfig randconfig \
 			   defconfig %_defconfig allyesconfig allnoconfig silentoldconfig release \
-			   olddefconfig $(null_targets)
+			   olddefconfig properclean distclean $(null_targets)
 
 # To put more focus on warnings, be less verbose as default
 # Use 'make V=1' to see the full commands
@@ -168,9 +168,19 @@ SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
 	 else if [ -x /bin/bash ]; then echo /bin/bash; \
 	 else echo sh; fi; fi)
 
+# basic tools
+RM    := rm -f
+MV    := mv -f
+CP    := cp -f
+MKDIR := mkdir
+TOUCH := touch
+
 # kconfig uses CONFIG_SHELL
 CONFIG_SHELL := $(SHELL)
 export SHELL CONFIG_SHELL Q KBUILD_VERBOSE
+
+# Include common Makefile helpers early
+include $(CONFIG_UK_BASE)/support/build/Makefile.rules
 
 ################################################################################
 # .config
@@ -296,6 +306,20 @@ export HOSTARCH := $(shell LC_ALL=C $(HOSTCC_NOCCACHE) -v 2>&1 | \
 export HOSTAR HOSTAS HOSTCC HOSTCC_VERSION HOSTCXX HOSTLD HOSTARCH
 export HOSTCC_NOCCACHE HOSTCXX_NOCCACHE
 
+################################################################################
+# Clean targets that do not have any dependency on a configuration
+################################################################################
+# Declare them before we depend on having .config
+properclean:
+	$(call verbose_cmd,RM,build/,$(RM) -r \
+		$(BUILD_DIR))
+
+distclean: properclean
+	$(call verbose_cmd,RM,config,$(RM) \
+		$(UK_CONFIG) $(UK_CONFIG).old $(CONFIG_DIR)/..config.tmp \
+		$(CONFIG_DIR)/.auto.deps)
+
+.PHONY: distclean properclean
 
 ################################################################################
 # Unikraft Architecture
@@ -410,10 +434,6 @@ STRIP		:= $(CONFIG_CROSS_COMPILE)strip
 OBJCOPY		:= $(CONFIG_CROSS_COMPILE)objcopy
 OBJDUMP		:= $(CONFIG_CROSS_COMPILE)objdump
 AR		:= ar
-MV		:= mv -f
-RM		:= rm -f
-CP		:= cp -f
-MKDIR		:= mkdir
 CAT		:= cat
 SED		:= sed
 AWK		:= awk
@@ -422,7 +442,6 @@ GZIP		:= gzip
 TAR		:= tar
 UNZIP		:= unzip -qq -u
 WGET		:= wget
-TOUCH		:= touch
 # Time requires the full path so that subarguments are handled correctly
 TIME		:= $(shell which time)
 LIFTOFF		:= liftoff -e -s
@@ -437,9 +456,6 @@ CC_VER_MINOR   := $(word 2,$(subst ., ,$(CC_VERSION)))
 ASFLAGS		+= -DCC_VERSION=$(CC_VERSION)
 CFLAGS		+= -DCC_VERSION=$(CC_VERSION)
 CXXFLAGS	+= -DCC_VERSION=$(CC_VERSION)
-
-# Common Makefile definitions we need for building Unikraft
-include $(CONFIG_UK_BASE)/support/build/Makefile.rules
 
 # ensure $(BUILD_DIR)/include and $(BUILD_DIR)/include/uk exists
 $(call mk_sub_build_dir,include)
@@ -536,18 +552,9 @@ libs: menuconfig
 images: menuconfig
 
 clean:
+	$(error Do not know which files to clean without having a configuration. Did you mean 'properclean' or 'distclean'?)
 
 endif
-
-.PHONY: distclean properclean
-properclean:
-	$(call verbose_cmd,RM,build/,$(RM) -r \
-		$(BUILD_DIR))
-
-distclean: properclean
-	$(call verbose_cmd,RM,config,$(RM) \
-		$(UK_CONFIG) $(UK_CONFIG).old $(CONFIG_DIR)/..config.tmp \
-		$(CONFIG_DIR)/.auto.deps)
 
 .PHONY: print-vars print-libs help outputmakefile list-defconfigs
 
