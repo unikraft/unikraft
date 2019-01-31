@@ -139,7 +139,7 @@ export CONFIG_UK_NAME ?= $(notdir $(APP_DIR))
 export DATE := $(shell date +%Y%m%d)
 
 # Makefile targets
-null_targets		:= print-version help
+null_targets		:= print-version print-vars help
 noconfig_targets	:= menuconfig nconfig gconfig xconfig config oldconfig randconfig \
 			   defconfig %_defconfig allyesconfig allnoconfig silentoldconfig release \
 			   olddefconfig properclean distclean $(null_targets)
@@ -371,7 +371,7 @@ export UK_FAMILY ?= $(shell echo "$(CONFIG_UK_ARCH)" | \
 
 
 # Quick-check if architecture exists
-ifeq ($(filter $(null_targets) print-vars,$(MAKECMDGOALS)),)
+ifeq ($(filter $(null_targets),$(MAKECMDGOALS)),)
 ifeq ($(wildcard $(CONFIG_UK_BASE)/arch/$(UK_FAMILY)/$(ARCH)/Makefile.uk),)
 $(error Target architecture ($(ARCH)) is currently not supported (could not find $(CONFIG_UK_BASE)/arch/$(UK_FAMILY)/$(ARCH)/Makefile.uk).)
 endif
