@@ -422,7 +422,13 @@ static inline int uk_netdev_rxq_intr_disable(struct uk_netdev *dev,
 }
 
 /**
- * Receive one packet and re-program used receive descriptors
+ * Receive one packet and re-program used receive descriptors. In order to avoid
+ * race conditions, queue interrupts have to be off while executing this
+ * function. When operating the queue in interrupt mode, this is automatically
+ * the case as soon as an interrupt arrived or the return code of
+ * uk_netdev_rxq_intr_enable() indicated that packets are left on the queue.
+ * In both cases, uk_netdev_rx_one() is going to enable interrupts again as soon
+ * as the last packet was received from the queue.
  * If this function is called from interrupt context (e.g., within receive event
  * handler when no dispatcher threads are configured) make sure that the
  * provided receive buffer allocator function is interrupt-context-safe

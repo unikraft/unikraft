@@ -544,10 +544,8 @@ static int virtio_netdev_recv(struct uk_netdev *dev,
 	UK_ASSERT(dev && queue);
 	UK_ASSERT(pkt);
 
-	if (queue->intr_enabled & VTNET_INTR_USR_EN_MASK) {
-		virtqueue_intr_disable(queue->vq);
-		queue->intr_enabled &= ~(VTNET_INTR_EN);
-	}
+	/* Queue interrupts have to be off when calling receive */
+	UK_ASSERT(!(queue->intr_enabled & VTNET_INTR_EN));
 
 	rc = virtio_netdev_rxq_dequeue(queue, pkt);
 	if (unlikely(rc < 0)) {
