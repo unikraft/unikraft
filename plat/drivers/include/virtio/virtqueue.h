@@ -233,6 +233,13 @@ static inline void virtqueue_host_notify(struct virtqueue *vq)
 {
 	UK_ASSERT(vq);
 
+	/*
+	 * Before notifying the virtio backend on the host we should make sure
+	 * that the virtqueue index update operation happened. Note that this
+	 * function is declared as inline.
+	 */
+	mb();
+
 	if (vq->vq_notify_host && virtqueue_notify_enabled(vq)) {
 		uk_pr_debug("notify queue %d\n", vq->queue_id);
 		vq->vq_notify_host(vq->vdev, vq->queue_id);
