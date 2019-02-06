@@ -79,7 +79,7 @@ comment "Hint: Enable dropping of unused code to further reduce target image siz
 	depends on OPTIMIZE_SIZE && !OPTIMIZE_DEADELIM
 
 config OPTIMIZE_LTO
-	bool "Link time optimizations (LTO)"
+	bool "LTO - Link time optimizations (EXPERIMENTAL)"
 	default n
 	help
 		Enables GCC to do code optimizations during linking. This option
