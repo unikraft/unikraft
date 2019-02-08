@@ -45,9 +45,7 @@
 #include <uk/plat/bootstrap.h>
 #include <uk/assert.h>
 #include <uk/errptr.h>
-#if defined __X86_64__
-#include <x86/cpu.h>
-#endif
+#include <cpu.h>
 
 struct liblinuxuplat_opts _liblinuxuplat_opts = { 0 };
 

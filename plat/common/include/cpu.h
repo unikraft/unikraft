@@ -38,7 +38,7 @@
 #include <uk/arch/lcpu.h>
 #if defined(__X86_64__)
 #include <x86/cpu.h>
-#elif defined(__ARM_64__)
+#elif defined(__ARM_32__) || defined(__ARM_64__)
 #include <arm/cpu.h>
 #else
 #error "Add cpu.h for current architecture."
