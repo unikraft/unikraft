@@ -87,7 +87,7 @@ CXXFLAGS-$(call gcc_version_ge,4,7)	+= -mcpu=cortex-a7 -mtune=cortex-a7 -mfpu=vf
 endif
 
 $(eval $(call addlib,libarmmath))
-LIBARMMATH_SRCS-$(CONFIG_ARCH_ARM_32) += $(CONFIG_UK_BASE)/arch/arm/divsi3.S
-LIBARMMATH_SRCS-$(CONFIG_ARCH_ARM_32) += $(CONFIG_UK_BASE)/arch/arm/ldivmod.S
-LIBARMMATH_SRCS-$(CONFIG_ARCH_ARM_32) += $(CONFIG_UK_BASE)/arch/arm/ldivmod_helper.c
-LIBARMMATH_SRCS-$(CONFIG_ARCH_ARM_32) += $(CONFIG_UK_BASE)/arch/arm/qdivrem.c
+LIBARMMATH_SRCS-$(CONFIG_ARCH_ARM_32) += $(CONFIG_UK_BASE)/arch/arm/arm/divsi3.S
+LIBARMMATH_SRCS-$(CONFIG_ARCH_ARM_32) += $(CONFIG_UK_BASE)/arch/arm/arm/ldivmod.S
+LIBARMMATH_SRCS-$(CONFIG_ARCH_ARM_32) += $(CONFIG_UK_BASE)/arch/arm/arm/ldivmod_helper.c
+LIBARMMATH_SRCS-$(CONFIG_ARCH_ARM_32) += $(CONFIG_UK_BASE)/arch/arm/arm/qdivrem.c
