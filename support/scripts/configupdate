@@ -23,13 +23,13 @@ NL=$'\n'
 [ -z "${UK_CONFIG_OLD}" -o ! -e "${UK_CONFIG_OLD}" ] && exit 0
 
 # Change of architecture?
-_comparesym "ARCH_" "${UK_CONFIG}" "${UK_CONFIG_OLD}" || UPDATES+="***  - CPU architecture changed${NL}"
+_comparesym "CONFIG_ARCH_" "${UK_CONFIG}" "${UK_CONFIG_OLD}" || UPDATES+="*** - CPU architecture changed${NL}"
 
 # Change of CPU options?
-_comparesym "MARCH_" "${UK_CONFIG}" "${UK_CONFIG_OLD}" || UPDATES+="***  - CPU optimization changed${NL}"
+_comparesym "CONFIG_MARCH_" "${UK_CONFIG}" "${UK_CONFIG_OLD}" || UPDATES+="*** - CPU optimization changed${NL}"
 
 # Change of optimizations?
-_comparesym "OPTIMIZE_" "${UK_CONFIG}" "${UK_CONFIG_OLD}" || UPDATES+="*** - Code optimization changed${NL}"
+_comparesym "CONFIG_OPTIMIZE_" "${UK_CONFIG}" "${UK_CONFIG_OLD}" || UPDATES+="*** - Code optimization changed${NL}"
 
 if [ ! -z "$UPDATES" ]; then
 	echo "*** The following configuration changes were detected:"
