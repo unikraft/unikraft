@@ -62,24 +62,32 @@ SECTIONS
 		KEEP (*(.init_array .ctors))
 		PROVIDE_HIDDEN (__init_array_end = .);
 	}
+	. = ALIGN(4096);
 	_ectors = .;
 
+	/* Data */
 	_data = .;
-	.data : {			/* Data */
+	.data : {
 		*(.data)
+		*(.data.*)
 	}
+	_edata = .; /* End of data included in image */
 
-	_edata = .;			/* End of data section */
+	/*
+	 * NOTE: linker will insert any extra sections here,
+	 * just before .bss
+	 */
 
-	__bss_start = .;		/* BSS */
 	.bss : {
+		__bss_start = .;
 		*(.bss)
-		. = ALIGN(4096);
+		*(.bss.*)
 	}
+	. = ALIGN(4096);
 	_end = . ;
 
 	/* Sections to be discarded */
-	/* TODO revisit when we have a resolution for discarded sections
+	/* TODO: Revisit when we have a solution for discarded sections
 	/DISCARD/ : {
 		*(.text.exit)
 		*(.data.exit)

@@ -72,31 +72,39 @@ SECTIONS
 		KEEP (*(.init_array .ctors))
 		PROVIDE_HIDDEN (__init_array_end = .);
 	}
+	. = ALIGN(4096);
 	_ectors = .;
 
-	.data : {			/* Data */
-		_data = .;
+	/* Data */
+	_data = .;
+	.data : {
 		*(.data)
+		*(.data.*)
 	}
+	_edata = .; /* End of data included in image */
 
-	/* Note: linker will insert any extra sections here, just before .bss */
+	/*
+	 * NOTE: linker will insert any extra sections here,
+	 * just before .bss
+	 */
 
 	.bss : {
-		_edata = .;		/* End of data included in image */
-		/* Nothing after here is included in the zImage's size */
-
 		__bss_start = .;
 		*(.bss)
 		*(.bss.*)
 	}
+	. = ALIGN(4096);
 	_end = . ;
 
+
 	/* Sections to be discarded */
+	/* TODO: Revisit when we have a solution for discarded sections
 	/DISCARD/ : {
 		*(.text.exit)
 		*(.data.exit)
 		*(.exitcall.exit)
 	}
+	*/
 
 	/* Stabs debugging sections.  */
 	.stab 0 : { *(.stab) }
