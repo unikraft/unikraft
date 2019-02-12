@@ -3,8 +3,6 @@ menuconfig PLAT_XEN
        default n
        depends on (ARCH_X86_32 || ARCH_X86_64 || ARCH_ARM_32)
        select LIBUKDEBUG
-       select LIBUKLOCK
-       select LIBUKLOCK_SEMAPHORE
        select LIBNOLIBC if !HAVE_LIBC
        select LIBFDT if ARCH_ARM_32
        select XEN_DBGEMERGENCY if ARCH_ARM_32
@@ -21,11 +19,25 @@ if (PLAT_XEN)
 		option is enabled the hypervisor console is used
 		for kernel messages only.
 
+config XEN_GNTTAB
+	bool "Grant table support"
+	default y
+	depends on (ARCH_X86_64)
+	select LIBUKALLOC
+	select LIBUKLOCK
+	select LIBUKLOCK_SEMAPHORE
+	select LIBUKSCHED
+	help
+		Support grant table operations
+
 menuconfig XEN_XENBUS
-	bool "Xenbus Driver"
+	bool "Xenbus/XenStore driver"
 	default n
 	depends on (ARCH_X86_64)
+	select LIBUKALLOC
+	select LIBUKSCHED
 	select LIBUKBUS
 	help
-		Register a Xenbus driver as uk_bus
+		Registers Xenbus as bus driver to libukbus and provides a
+		XenStore communication API for Xen drivers
 endif

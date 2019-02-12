@@ -123,6 +123,8 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 
 int _ukplat_mem_mappings_init(void)
 {
+#ifdef CONFIG_XEN_GNTTAB
 	gnttab_init();
+#endif
 	return 0;
 }

@@ -26,6 +26,10 @@
 #ifndef __GNTTAB_H__
 #define __GNTTAB_H__
 
+#include <uk/config.h>
+
+#ifdef CONFIG_XEN_GNTTAB
+
 #include <uk/alloc.h>
 #include <xen/grant_table.h>
 
@@ -44,5 +48,7 @@ int gnttab_end_access(grant_ref_t gref);
 const char *gnttabop_error(__s16 status);
 
 grant_entry_v1_t *gnttab_arch_init(int nr_grant_frames);
+
+#endif /* CONFIG_XEN_GNTTAB */
 
 #endif /* !__GNTTAB_H__ */
