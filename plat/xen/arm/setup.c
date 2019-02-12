@@ -193,6 +193,13 @@ void _libxenplat_armentry(void *dtb_pointer, uint32_t physical_offset)
 {
 	uk_pr_info("Entering from Xen (arm)...\n");
 
+	/* Zero'ing out the bss section */
+	/*
+	 * TODO: It probably makes sense to move this to the early
+	 * platform entry assembly code.
+	 */
+	memset(&__bss_start, 0, &_end - &__bss_start);
+
 	_init_dtb(dtb_pointer);
 	_dtb_init_mem(physical_offset); /* relocates dtb */
 	uk_pr_info("           dtb: %p\n", HYPERVISOR_dtb);

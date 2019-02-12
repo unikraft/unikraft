@@ -87,7 +87,7 @@ SECTIONS
 
 		__bss_start = .;
 		*(.bss)
-		*(.app.bss)
+		*(.bss.*)
 	}
 	_end = . ;
 
