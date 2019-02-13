@@ -33,20 +33,33 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#ifndef __CONSOLE_H__
-#define __CONSOLE_H__
+#ifndef __XEN_EMG_CONSOLE_H__
+#define __XEN_EMG_CONSOLE_H__
 
-/* keeps buffering console message
- * (on PV: start_info need to be loaded)
- */
-void prepare_console(void);
+#include <errno.h>
 
-/* initializes the console, sends out buffered messages
- * (event system has to be initialized)
- */
-void init_console(void);
+#ifndef __XEN_CONSOLE_IMPL__
+#error Do not include this header directly, use <common/console.h> instead.
+#endif /* !__XEN_CONSOLE_IMPL__*/
 
+#if (CONFIG_XEN_KERNEL_EMG_CONSOLE || CONFIG_XEN_DEBUG_EMG_CONSOLE)
+int emg_console_output(const char *str, unsigned int len);
+#endif /* (CONFIG_XEN_KERNEL_EMG_CONSOLE || CONFIG_XEN_DEBUG_EMG_CONSOLE) */
 
-void flush_console(void);
+#if CONFIG_XEN_KERNEL_EMG_CONSOLE
+#define emg_console_output_k(str, len) \
+	emg_console_output((str), (len))
+#else
+#define emg_console_output_k(str, len) \
+	(-ENOTSUP)
+#endif /* CONFIG_XEN_KERNEL_EMG_CONSOLE */
 
-#endif /* __CONSOLE_H__ */
+#if CONFIG_XEN_DEBUG_EMG_CONSOLE
+#define emg_console_output_d(str, len) \
+	emg_console_output((str), (len))
+#else
+#define emg_console_output_d(str, len) \
+	(-ENOTSUP)
+#endif /* CONFIG_XEN_DEBUG_EMG_CONSOLE */
+
+#endif /* __XEN_EMG_CONSOLE_H__ */

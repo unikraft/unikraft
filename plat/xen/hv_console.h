@@ -33,20 +33,46 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#ifndef __CONSOLE_H__
-#define __CONSOLE_H__
+#ifndef __XEN_HV_CONSOLE_H__
+#define __XEN_HV_CONSOLE_H__
 
-/* keeps buffering console message
- * (on PV: start_info need to be loaded)
- */
-void prepare_console(void);
+#include <errno.h>
 
-/* initializes the console, sends out buffered messages
- * (event system has to be initialized)
- */
-void init_console(void);
+#ifndef __XEN_CONSOLE_IMPL__
+#error Do not include this header directly, use <common/console.h> instead
+#endif /* !__XEN_CONSOLE_IMPL__*/
 
+#if (CONFIG_XEN_KERNEL_HV_CONSOLE || CONFIG_XEN_DEBUG_HV_CONSOLE)
+void hv_console_prepare(void);
+void hv_console_init(void);
+int hv_console_output(const char *str, unsigned int len);
+void hv_console_flush(void);
+int hv_console_input(char *str, unsigned int maxlen);
+#else /* (CONFIG_XEN_KERNEL_HV_CONSOLE || CONFIG_XEN_DEBUG_HV_CONSOLE) */
+#define hv_console_prepare()			\
+	do {} while (0)
+#define hv_console_init() \
+	do {} while (0)
+#define hv_console_flush() \
+	do {} while (0)
+#define hv_console_input(str, maxlen) \
+	(-ENOTSUP)
+#endif /* (CONFIG_XEN_KERNEL_HV_CONSOLE || CONFIG_XEN_DEBUG_HV_CONSOLE) */
 
-void flush_console(void);
+#if CONFIG_XEN_KERNEL_HV_CONSOLE
+#define hv_console_output_k(str, len) \
+	hv_console_output((str), (len))
+#else
+#define hv_console_output_k(str, len) \
+	(-ENOTSUP)
+#endif /* CONFIG_XEN_KERNEL_HV_CONSOLE */
 
-#endif /* __CONSOLE_H__ */
+#if CONFIG_XEN_DEBUG_HV_CONSOLE
+#define hv_console_output_d(str, len) \
+	hv_console_output((str), (len))
+#else
+#define hv_console_output_d(str, len) \
+	(-ENOTSUP)
+#endif /* CONFIG_XEN_DEBUG_HV_CONSOLE */
+
+#endif /* __XEN_HV_CONSOLE_H__ */

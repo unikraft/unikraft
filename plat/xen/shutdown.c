@@ -66,7 +66,7 @@ void ukplat_terminate(enum ukplat_gstate request)
 		break;
 	}
 
-	hvconsole_flush();
+	flush_console();
 
 	for (;;) {
 		struct sched_shutdown sched_shutdown = { .reason = reason };

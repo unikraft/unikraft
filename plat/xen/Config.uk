@@ -10,14 +10,36 @@ menuconfig PLAT_XEN
                 Create a Unikraft image that runs as a Xen guest
 
 if (PLAT_XEN)
-	config XEN_DBGEMERGENCY
-	bool "Emergency console for debug output"
+menu "Console Options"
+
+config XEN_KERNEL_HV_CONSOLE
+	bool "Hypervisor console for kernel prints"
+	default y
+	depends on ARCH_X86_64
+	help
+		Send kernel messages to the hypervisor console.
+
+config XEN_KERNEL_EMG_CONSOLE
+	bool "Emergency console for kernel prints"
+	default y if ARCH_ARM_32
 	default n
 	help
-		Send debug messages to the emergency console
-		instead of the hypervisor console. When this
-		option is enabled the hypervisor console is used
-		for kernel messages only.
+		Send kernel messages to the emergency console.
+
+config XEN_DEBUG_HV_CONSOLE
+	bool "Hypervisor console for debug prints"
+	default y
+	depends on ARCH_X86_64
+	help
+		Send debug messages to the hypervisor console.
+
+config XEN_DEBUG_EMG_CONSOLE
+	bool "Emergency console for debug prints"
+	default y if ARCH_ARM_32
+	default n
+        help
+		Send debug messages to the emergency console.
+endmenu
 
 config XEN_GNTTAB
 	bool "Grant table support"

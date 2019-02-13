@@ -173,7 +173,7 @@ void _libxenplat_x86entry(void *start_info)
 	_init_traps();
 	_init_cpufeatures();
 	HYPERVISOR_start_info = (start_info_t *)start_info;
-	_libxenplat_prepare_console(); /* enables buffering for console */
+	prepare_console(); /* enables buffering for console */
 
 	uk_pr_info("Entering from Xen (x86, PV)...\n");
 
@@ -191,7 +191,7 @@ void _libxenplat_x86entry(void *start_info)
 
 	_init_mem();
 
-	_libxenplat_init_console();
+	init_console();
 
 	ukplat_entry_argp(CONFIG_UK_NAME, cmdline, MAX_CMDLINE_SIZE);
 }
