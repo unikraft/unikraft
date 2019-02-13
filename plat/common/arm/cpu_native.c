@@ -31,10 +31,14 @@
  *
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
+#include <uk/config.h>
 #include <cpu.h>
+#if !CONFIG_ARCH_ARM_32
+/* TODO: Not yet supported for Arm32 */
 #include <irq.h>
-#include <uk/assert.h>
 #include <arm/cpu_defs.h>
+#endif
+#include <uk/assert.h>
 
 /*
  * Halts the CPU until the next external interrupt is fired. For Arm,
@@ -45,6 +49,10 @@ void halt(void)
 	__asm__ __volatile__("wfi");
 }
 
+#if !CONFIG_ARCH_ARM_32
+/*
+ * TODO: Port the following functionality to Arm32
+ */
 /* Systems support PSCI >= 0.2 can do system reset from PSCI */
 void reset(void)
 {
@@ -74,3 +82,4 @@ void system_off(void)
 
 	smcc_psci_call(PSCI_FNID_SYSTEM_OFF, 0, 0, 0);
 }
+#endif /* !CONFIG_ARCH_ARM_32 */

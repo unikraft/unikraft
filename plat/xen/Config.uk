@@ -10,6 +10,12 @@ menuconfig PLAT_XEN
                 Create a Unikraft image that runs as a Xen guest
 
 if (PLAT_XEN)
+# Invisible option to switch between PV and PVH mode
+config XEN_HVMLITE
+	bool
+	default n if (ARCH_X86_64 || ARCH_X86_32)
+	default y
+
 menu "Console Options"
 
 config XEN_KERNEL_HV_CONSOLE

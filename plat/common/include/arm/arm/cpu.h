@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ * Authors: Wei Chen <wei.chen@arm.com>
  *
  *
+ * Copyright (c) 2018, Arm Ltd. All rights reserved.
  * Copyright (c) 2019, NEC Laboratories Europe GmbH, NEC Corporation.
  *                     All rights reserved.
  *
@@ -33,7 +35,14 @@
  *
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
+#ifndef _PLAT_COMMON_ARM_ARM_CPU_H_
+#define _PLAT_COMMON_ARM_ARM_CPU_H_
 
 static inline void _init_cpufeatures(void)
 {
 }
+
+/* CPU native APIs */
+void halt(void);
+
+#endif /* _PLAT_COMMON_ARM_ARM_CPU_H_ */
