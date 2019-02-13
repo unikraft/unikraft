@@ -17,6 +17,10 @@ config HAVE_SCHED
        bool
        default n
 
+config HAVE_NW_STACK
+       bool
+       default n
+
 
 ################################################################################
 #
