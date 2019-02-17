@@ -80,7 +80,6 @@ extern unsigned long sched_have_pending_events;
 void _ukplat_irq_handle(unsigned long irq)
 {
 	struct irq_handler *h;
-	int handled = 0;
 
 	UK_SLIST_FOREACH(h, &irq_handlers[irq], entries) {
 		/* TODO define platform wise macro for timer IRQ number */
@@ -97,16 +96,19 @@ void _ukplat_irq_handle(unsigned long irq)
 			 */
 			__uk_test_and_set_bit(0, &sched_have_pending_events);
 
-		if (h->func(h->arg) == 1) {
-			handled = 1;
-			break;
-		}
+		if (h->func(h->arg) == 1)
+			goto exit_ack;
 	}
+	/*
+	 * Acknowledge interrupts even in the case when there was no handler for
+	 * it. We do this to (1) compensate potential spurious interrupts of
+	 * devices, and (2) to minimize impact on drivers that share one
+	 * interrupt line that would then stay disabled.
+	 */
+	uk_pr_crit("Unhandled irq=%lu\n", irq);
 
-	if (!handled)
-		uk_pr_crit("Unhandled irq=%lu\n", irq);
-	else
-		intctrl_ack_irq(irq);
+exit_ack:
+	intctrl_ack_irq(irq);
 }
 
 int ukplat_irq_init(struct uk_alloc *a)
