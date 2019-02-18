@@ -62,20 +62,32 @@ UK_LIST_HEAD(mount_list);
  */
 static struct uk_mutex mount_lock = UK_MUTEX_INITIALIZER(mount_lock);
 
+extern const struct vfscore_fs_type *uk_fslist_start;
+extern const struct vfscore_fs_type *uk_fslist_end;
+
+#define for_each_fs(iter)			\
+	for (iter = &uk_fslist_start;	\
+	     iter < &uk_fslist_end;		\
+	     iter++)
+
 /*
  * Lookup file system.
  */
-static const struct vfssw *
+static const struct vfscore_fs_type *
 fs_getfs(const char *name)
 {
-	const struct vfssw *fs;
+	const struct vfscore_fs_type *fs = NULL, **__fs;
 
-	for (fs = vfssw; fs->vs_name; fs++) {
+	for_each_fs(__fs) {
+		fs = *__fs;
+		if (fs == NULL)
+			continue;
+
 		if (!strncmp(name, fs->vs_name, FSMAXNAMES))
 			break;
 	}
-	if (!fs->vs_name)
-		return nullptr;
+	if (!fs || !fs->vs_name)
+		return NULL;
 	return fs;
 }
 
@@ -96,7 +108,7 @@ int device_close(struct device *dev)
 int
 sys_mount(const char *dev, const char *dir, const char *fsname, int flags, const void *data)
 {
-	const struct vfssw *fs;
+	const struct vfscore_fs_type *fs;
 	struct mount *mp;
 	struct device *device;
 	struct dentry *dp_covered = NULL;
