@@ -53,7 +53,11 @@ struct vfscore_fops {
 
 struct vfscore_file {
 	int fd;
+	int		f_flags;	/* open flags */
 	int		f_count;	/* reference count */
+	off_t		f_offset;	/* current position in file */
+	void		*f_data;        /* file descriptor specific data */
+	struct dentry   *f_dentry;
 	const struct vfscore_fops *fops;
 };
 
