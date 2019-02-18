@@ -123,19 +123,20 @@ asm("__restorer:mov r7, #0x77\nsvc 0x0");
 static void _irq_handle(int irq)
 {
 	struct irq_handler *h;
-	int handled = 0;
 
 	UK_ASSERT(irq >= 0 && irq < IRQS_NUM);
 
 	UK_SLIST_FOREACH(h, &irq_handlers[irq], entries) {
-		if (h->func(h->arg) == 1) {
-			handled = 1;
-			break;
-		}
+		if (h->func(h->arg) == 1)
+			return;
 	}
-
-	if (!handled)
-		UK_CRASH("Unhandled irq=%d\n", irq);
+	/*
+	 * Just warn about unhandled interrupts. We do this to
+	 * (1) compensate potential spurious interrupts of
+	 * devices, and (2) to minimize impact on drivers that share
+	 * one interrupt line that would then stay disabled.
+	 */
+	uk_pr_crit("Unhandled irq=%d\n", irq);
 }
 
 int ukplat_irq_register(unsigned long irq, irq_handler_func_t func, void *arg)
