@@ -205,6 +205,20 @@ TRACEPOINT(trace_vfs_close, "%d", int);
 TRACEPOINT(trace_vfs_close_ret, "");
 TRACEPOINT(trace_vfs_close_err, "%d", int);
 
+int fdclose(int fd)
+{
+	struct vfscore_file *fp;
+
+	fp = vfscore_get_file(fd);
+	if (!fp)
+		return EBADF;
+
+	vfscore_put_fd(fd);
+	fdrop(fp);
+
+	return 0;
+}
+
 int close(int fd)
 {
 	int error;
