@@ -43,9 +43,7 @@
 
 #define DO_RDWR		0x2
 
-#define PAGE_SIZE	4096
-#define PAGE_MASK	(PAGE_SIZE-1)
-#define round_page(x)	(((x) + PAGE_MASK) & ~PAGE_MASK)
+#define round_page(x)	(((x) + __PAGE_MASK) & ~__PAGE_MASK)
 
 size_t strlcat(char *dst, const char *src, size_t siz);
 size_t strlcpy(char *dst, const char *src, size_t siz);

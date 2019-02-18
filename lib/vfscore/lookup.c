@@ -111,7 +111,7 @@ namei(const char *path, struct dentry **dpp)
 	struct vnode *dvp, *vp;
 	int error, i;
 	int links_followed;
-	bool need_continue;
+	int need_continue;
 
 	DPRINTF(VFSDB_VNODE, ("namei: path=%s\n", path));
 
@@ -119,7 +119,7 @@ namei(const char *path, struct dentry **dpp)
 	strlcpy(fp, path, PATH_MAX);
 
 	do {
-		need_continue = false;
+		need_continue = 0;
 		/*
 		 * Convert a full path name to its mount point and
 		 * the local node in the file system.
@@ -143,7 +143,7 @@ namei(const char *path, struct dentry **dpp)
 		 */
 		ddp = mp->m_root;
 		if (!ddp) {
-			sys_panic("VFS: no root");
+			UK_CRASH("VFS: no root");
 		}
 		dref(ddp);
 
@@ -177,7 +177,7 @@ namei(const char *path, struct dentry **dpp)
 			dvp = ddp->d_vnode;
 			vn_lock(dvp);
 			dp = dentry_lookup(mp, node);
-			if (dp == nullptr) {
+			if (dp == NULL) {
 				/* Find a vnode in this directory. */
 				error = VOP_LOOKUP(dvp, name, &vp);
 				if (error) {
@@ -209,17 +209,17 @@ namei(const char *path, struct dentry **dpp)
 				drele(dp);
 
 				p       = fp;
-				dp      = nullptr;
-				ddp     = nullptr;
-				vp      = nullptr;
-				dvp     = nullptr;
+				dp      = NULL;
+				ddp     = NULL;
+				vp      = NULL;
+				dvp     = NULL;
 				name[0] = 0;
 				node[0] = 0;
 
 				if (++links_followed >= MAXSYMLINKS) {
 					return (ELOOP);
 				}
-				need_continue = true;
+				need_continue = 1;
 				break;
 			}
 
@@ -228,7 +228,7 @@ namei(const char *path, struct dentry **dpp)
 				return ENOTDIR;
 			}
 		}
-	} while (need_continue == true);
+	} while (need_continue);
 
 	*dpp = dp;
 	return 0;
@@ -253,14 +253,14 @@ namei_last_nofollow(char *path, struct dentry *ddp, struct dentry **dpp)
 	struct vnode  *vp;
 	char node[PATH_MAX];
 
-	dvp  = nullptr;
+	dvp  = NULL;
 
 	if (path[0] != '/') {
 		return (ENOTDIR);
 	}
 
 	name = strrchr(path, '/');
-	if (name == nullptr) {
+	if (name == NULL) {
 		return (ENOENT);
 	}
 	name++;
@@ -283,7 +283,7 @@ namei_last_nofollow(char *path, struct dentry *ddp, struct dentry **dpp)
 	dvp = ddp->d_vnode;
 	vn_lock(dvp);
 	dp = dentry_lookup(mp, node);
-	if (dp == nullptr) {
+	if (dp == NULL) {
 		error = VOP_LOOKUP(dvp, name, &vp);
 		if (error != 0) {
 			goto out;
@@ -292,7 +292,7 @@ namei_last_nofollow(char *path, struct dentry *ddp, struct dentry **dpp)
 		dp = dentry_alloc(ddp, vp, node);
 		vput(vp);
 
-		if (dp == nullptr) {
+		if (dp == NULL) {
 			error = ENOMEM;
 			goto out;
 		}
@@ -301,7 +301,7 @@ namei_last_nofollow(char *path, struct dentry *ddp, struct dentry **dpp)
 	*dpp  = dp;
 	error = 0;
 out:
-	if (dvp != nullptr) {
+	if (dvp != NULL) {
 		vn_unlock(dvp);
 	}
 	return (error);

@@ -54,12 +54,13 @@
 /*
  * List for VFS mount points.
  */
-static std::list<mount*> mount_list;
+
+UK_LIST_HEAD(mount_list);
 
 /*
  * Global lock to access mount point.
  */
-static mutex mount_lock;
+static struct uk_mutex mount_lock = UK_MUTEX_INITIALIZER(mount_lock);
 
 /*
  * Lookup file system.
@@ -84,11 +85,11 @@ sys_mount(const char *dev, const char *dir, const char *fsname, int flags, const
 	const struct vfssw *fs;
 	struct mount *mp;
 	struct device *device;
-	struct dentry *dp_covered;
-	struct vnode *vp;
+	struct dentry *dp_covered = NULL;
+	struct vnode *vp = NULL;
 	int error;
 
-	kprintf("VFS: mounting %s at %s\n", fsname, dir);
+	uk_pr_info("VFS: mounting %s at %s\n", fsname, dir);
 
 	if (!dir || *dir == '\0')
 		return ENOENT;
@@ -97,7 +98,7 @@ sys_mount(const char *dev, const char *dir, const char *fsname, int flags, const
 	if (!(fs = fs_getfs(fsname)))
 		return ENODEV;  /* No such file system */
 
-	/* Open device. nullptr can be specified as a device. */
+	/* Open device. NULL can be specified as a device. */
 	// Allow device_open() to fail, in which case dev is interpreted
 	// by the file system mount routine (e.g zfs pools)
 	device = 0;
@@ -111,17 +112,22 @@ sys_mount(const char *dev, const char *dir, const char *fsname, int flags, const
 	// that only one sys_mount() runs at a time. We cannot reuse the existing
 	// mount_lock for this purpose: If we take mount_lock and then do
 	// lookups, this is lock order inversion and can result in deadlock.
-	static mutex sys_mount_lock;
-	SCOPE_LOCK(sys_mount_lock);
-	WITH_LOCK(mount_lock) {
-		for (auto&& mp : mount_list) {
-			if (!strcmp(mp->m_path, dir) ||
-				(device && mp->m_dev == device)) {
-				error = EBUSY;  /* Already mounted */
-				goto err1;
-			}
+
+	/* TODO: protect the function from reentrance, as described in
+	 * the comment above */
+	/* static mutex sys_mount_lock; */
+	/* SCOPE_LOCK(sys_mount_lock); */
+
+	uk_mutex_lock(&mount_lock);
+	uk_list_for_each_entry(mp, &mount_list, mnt_list) {
+		if (!strcmp(mp->m_path, dir) ||
+		    (device && mp->m_dev == device)) {
+			error = EBUSY;  /* Already mounted */
+			uk_mutex_unlock(&mount_lock);
+			goto err1;
 		}
 	}
+	uk_mutex_unlock(&mount_lock);
 	/*
 	 * Create VFS mount entry.
 	 */
@@ -134,7 +140,7 @@ sys_mount(const char *dev, const char *dir, const char *fsname, int flags, const
 	mp->m_op = fs->vs_op;
 	mp->m_flags = flags;
 	mp->m_dev = device;
-	mp->m_data = nullptr;
+	mp->m_data = NULL;
 	strlcpy(mp->m_path, dir, sizeof(mp->m_path));
 	strlcpy(mp->m_special, dev, sizeof(mp->m_special));
 
@@ -143,7 +149,7 @@ sys_mount(const char *dev, const char *dir, const char *fsname, int flags, const
 	 */
 	if (*dir == '/' && *(dir + 1) == '\0') {
 		/* Ignore if it mounts to global root directory. */
-		dp_covered = nullptr;
+		dp_covered = NULL;
 	} else {
 		if ((error = namei(dir, &dp_covered)) != 0) {
 
@@ -160,8 +166,8 @@ sys_mount(const char *dev, const char *dir, const char *fsname, int flags, const
 	/*
 	 * Create a root vnode for this file system.
 	 */
-	vget(mp, 0, &vp);
-	if (vp == nullptr) {
+	vfscore_vget(mp, 0, &vp);
+	if (vp == NULL) {
 		error = ENOMEM;
 		goto err3;
 	}
@@ -169,7 +175,7 @@ sys_mount(const char *dev, const char *dir, const char *fsname, int flags, const
 	vp->v_flags = VROOT;
 	vp->v_mode = S_IFDIR | S_IRUSR | S_IWUSR | S_IXUSR;
 
-	mp->m_root = dentry_alloc(nullptr, vp, "/");
+	mp->m_root = dentry_alloc(NULL, vp, "/");
 	if (!mp->m_root) {
 		vput(vp);
 		goto err3;
@@ -188,9 +194,9 @@ sys_mount(const char *dev, const char *dir, const char *fsname, int flags, const
 	/*
 	 * Insert to mount list
 	 */
-	WITH_LOCK(mount_lock) {
-		mount_list.push_back(mp);
-	}
+	uk_mutex_lock(&mount_lock);
+	uk_list_add_tail(&mp->mnt_list, &mount_list);
+	uk_mutex_unlock(&mount_lock);
 
 	return 0;   /* success */
  err4:
@@ -222,12 +228,12 @@ release_mp_dentries(struct mount *mp)
 int
 sys_umount2(const char *path, int flags)
 {
-	struct mount *mp;
+	struct mount *mp, *tmp;
 	int error, pathlen;
 
-	kprintf("VFS: unmounting %s\n", path);
+	uk_pr_info("VFS: unmounting %s\n", path);
 
-	SCOPE_LOCK(mount_lock);
+	uk_mutex_lock(&mount_lock);
 
 	pathlen = strlen(path);
 	if (pathlen >= MAXPATHLEN) {
@@ -236,7 +242,7 @@ sys_umount2(const char *path, int flags)
 	}
 
 	/* Get mount entry */
-	for (auto&& tmp : mount_list) {
+	uk_list_for_each_entry(tmp, &mount_list, mnt_list) {
 		if (!strcmp(path, tmp->m_path)) {
 			mp = tmp;
 			goto found;
@@ -250,14 +256,14 @@ found:
 	/*
 	 * Root fs can not be unmounted.
 	 */
-	if (mp->m_covered == nullptr && !(flags & MNT_FORCE)) {
+	if (mp->m_covered == NULL && !(flags & MNT_FORCE)) {
 		error = EINVAL;
 		goto out;
 	}
 
 	if ((error = VFS_UNMOUNT(mp, flags)) != 0)
 		goto out;
-	mount_list.remove(mp);
+	uk_list_del_init(&mp->mnt_list);
 
 #ifdef HAVE_BUFFERS
 	/* Flush all buffers */
@@ -268,6 +274,7 @@ found:
 		device_close(mp->m_dev);
 	free(mp);
  out:
+	uk_mutex_unlock(&mount_lock);
 	return error;
 }
 
@@ -281,7 +288,7 @@ sys_umount(const char *path)
 int
 sys_pivot_root(const char *new_root, const char *put_old)
 {
-	struct mount *newmp = nullptr, *oldmp = nullptr;
+	struct mount *newmp = NULL, *oldmp = NULL;
 	int error;
 
 	WITH_LOCK(mount_lock) {
@@ -314,12 +321,12 @@ sys_pivot_root(const char *new_root, const char *put_old)
 		if (newmp->m_covered) {
 			drele(newmp->m_covered);
 		}
-		newmp->m_covered = nullptr;
+		newmp->m_covered = NULL;
 
 		if (newmp->m_root->d_parent) {
 			drele(newmp->m_root->d_parent);
 		}
-		newmp->m_root->d_parent = nullptr;
+		newmp->m_root->d_parent = NULL;
 
 		strlcpy(newmp->m_path, "/", sizeof(newmp->m_path));
 	}
@@ -330,15 +337,17 @@ sys_pivot_root(const char *new_root, const char *put_old)
 int
 sys_sync(void)
 {
+	struct mount *mp;
+	uk_mutex_lock(&mount_lock);
+
 	/* Call each mounted file system. */
-	WITH_LOCK(mount_lock) {
-		for (auto&& mp : mount_list) {
-			VFS_SYNC(mp);
-		}
+	uk_list_for_each_entry(mp, &mount_list, mnt_list) {
+		VFS_SYNC(mp);
 	}
 #ifdef HAVE_BUFFERS
 	bio_sync();
 #endif
+	uk_mutex_unlock(&mount_lock);
 	return 0;
 }
 
@@ -380,22 +389,23 @@ count_match(const char *path, char *mount_root)
 int
 vfs_findroot(const char *path, struct mount **mp, char **root)
 {
-	struct mount *m = nullptr;
+	struct mount *m = NULL, *tmp;
 	size_t len, max_len = 0;
 
 	if (!path)
 		return -1;
 
 	/* Find mount point from nearest path */
-	SCOPE_LOCK(mount_lock);
-	for (auto&& tmp : mount_list) {
+	uk_mutex_lock(&mount_lock);
+	uk_list_for_each_entry(tmp, &mount_list, mnt_list) {
 		len = count_match(path, tmp->m_path);
 		if (len > max_len) {
 			max_len = len;
 			m = tmp;
 		}
 	}
-	if (m == nullptr)
+	uk_mutex_unlock(&mount_lock);
+	if (m == NULL)
 		return -1;
 	*root = (char *)(path + max_len);
 	if (**root == '/')
@@ -410,8 +420,10 @@ vfs_findroot(const char *path, struct mount **mp, char **root)
 void
 vfs_busy(struct mount *mp)
 {
-	SCOPE_LOCK(mount_lock);
-	mp->m_count++;
+	/* The m_count is not really checked anywhere
+	 * currently. Atomic is enough. But it could be that obtaining
+	 * mount_lock will be needed in the future */
+	ukarch_inc(&mp->m_count);
 }
 
 
@@ -421,8 +433,10 @@ vfs_busy(struct mount *mp)
 void
 vfs_unbusy(struct mount *mp)
 {
-	SCOPE_LOCK(mount_lock);
-	mp->m_count--;
+	/* The m_count is not really checked anywhere
+	 * currently. Atomic is enough. But it could be that obtaining
+	 * mount_lock will be needed in the future */
+	ukarch_dec(&mp->m_count);
 }
 
 int
@@ -441,14 +455,16 @@ vfs_einval(void)
 void
 mount_dump(void)
 {
-	SCOPE_LOCK(mount_lock);
+	struct mount *mp;
+	uk_mutex_lock(&mount_lock);
 
-	kprintf("mount_dump\n");
-	kprintf("dev      count root\n");
-	kprintf("-------- ----- --------\n");
+	uk_pr_debug("mount_dump\n");
+	uk_pr_debug("dev      count root\n");
+	uk_pr_debug("-------- ----- --------\n");
 
-	for (auto&& mp : mount_list) {
-		kprintf("%8x %5d %s\n", mp->m_dev, mp->m_count, mp->m_path);
+	uk_list_for_each_entry(mp, &mount_list, mnt_list) {
+		uk_pr_debug("%8p %5d %s\n", mp->m_dev, mp->m_count, mp->m_path);
 	}
+	uk_mutex_unlock(&mount_lock);
 }
 #endif

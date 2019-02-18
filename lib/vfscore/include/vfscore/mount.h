@@ -52,6 +52,7 @@ struct mount {
 	struct dentry	*m_root;	/* root vnode */
 	struct dentry	*m_covered;	/* vnode covered on parent fs */
 	void		*m_data;	/* private data for fs */
+	struct uk_list_head mnt_list;
 	fsid_t 		m_fsid; 	/* id that uniquely identifies the fs */
 };
 

@@ -42,16 +42,16 @@
 struct vnode;
 
 struct dentry {
-	LIST_ENTRY(dentry) d_link;	/* link for hash list */
+	struct uk_hlist_node d_link;	/* link for hash list */
 	int		d_refcnt;	/* reference count */
 	char		*d_path;	/* pointer to path in fs */
 	struct vnode	*d_vnode;
 	struct mount	*d_mount;
 	struct dentry   *d_parent; /* pointer to parent */
-	LIST_ENTRY(dentry) d_names_link; /* link fo vnode::d_names */
-	mutex_t		d_lock;
-	LIST_HEAD(, dentry) d_children;
-	LIST_ENTRY(dentry) d_children_link;
+	struct uk_list_head d_names_link; /* link fo vnode::d_names */
+	struct uk_mutex	d_lock;
+	struct uk_list_head d_child_list;
+	struct uk_list_head d_child_link;
 };
 
 #endif /* _OSV_DENTRY_H */

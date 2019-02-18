@@ -48,7 +48,7 @@
 int
 uiomove(void *cp, int n, struct uio *uio)
 {
-	assert(uio->uio_rw == UIO_READ || uio->uio_rw == UIO_WRITE);
+	UK_ASSERT(uio->uio_rw == UIO_READ || uio->uio_rw == UIO_WRITE);
 
 	while (n > 0 && uio->uio_resid) {
 		struct iovec *iov = uio->uio_iov;

@@ -77,24 +77,27 @@ int vttoif_tab[10] = {
  * All active (opened) vnodes are stored on this hash table.
  * They can be accessed by its path name.
  */
-static LIST_HEAD(vnode_hash_head, vnode) vnode_table[VNODE_BUCKETS];
+static struct uk_list_head vnode_table[VNODE_BUCKETS];
 
 /*
  * Global lock to access all vnodes and vnode table.
  * If a vnode is already locked, there is no need to
  * lock this global lock to access internal data.
  */
-static mutex_t vnode_lock = MUTEX_INITIALIZER;
-#define VNODE_LOCK()	mutex_lock(&vnode_lock)
-#define VNODE_UNLOCK()	mutex_unlock(&vnode_lock)
-#define VNODE_OWNED()	mutex_owned(&vnode_lock)
+static struct uk_mutex vnode_lock = UK_MUTEX_INITIALIZER(vnode_lock);
+#define VNODE_LOCK()	uk_mutex_lock(&vnode_lock)
+#define VNODE_UNLOCK()	uk_mutex_unlock(&vnode_lock)
+
+/* TODO: implement mutex_owned */
+#define VNODE_OWNED()	(1)
+/* #define VNODE_OWNED()	mutex_owned(&vnode_lock) */
+
 
 /*
  * Get the hash value from the mount point and path name.
  * XXX(hch): replace with a better hash for 64-bit pointers.
  */
-static u_int
-vn_hash(struct mount *mp, uint64_t ino)
+static unsigned int vn_hash(struct mount *mp, uint64_t ino)
 {
 	return (ino ^ (unsigned long)mp) & (VNODE_BUCKETS - 1);
 }
@@ -110,16 +113,15 @@ vn_lookup(struct mount *mp, uint64_t ino)
 {
 	struct vnode *vp;
 
-	assert(VNODE_OWNED());
-	LIST_FOREACH(vp, &vnode_table[vn_hash(mp, ino)], v_link) {
+	UK_ASSERT(VNODE_OWNED());
+	uk_list_for_each_entry(vp, &vnode_table[vn_hash(mp, ino)], v_link) {
 		if (vp->v_mount == mp && vp->v_ino == ino) {
 			vp->v_refcnt++;
-			mutex_lock(&vp->v_lock);
-			vp->v_nrlocks++;
+			uk_mutex_lock(&vp->v_lock);
 			return vp;
 		}
 	}
-	return nullptr;		/* not found */
+	return NULL;		/* not found */
 }
 
 #ifdef DEBUG_VFS
@@ -128,10 +130,10 @@ vn_path(struct vnode *vp)
 {
 	struct dentry *dp;
 
-	if (LIST_EMPTY(&vp->v_names) == 1) {
+	if (uk_list_empty(&vp->v_names) == 1) {
 		return (" ");
 	}
-	dp = LIST_FIRST(&vp->v_names);
+	dp = uk_list_first_entry(&vp->v_names, struct dentry, d_names_link);
 	return (dp->d_path);
 }
 #endif
@@ -142,11 +144,10 @@ vn_path(struct vnode *vp)
 void
 vn_lock(struct vnode *vp)
 {
-	ASSERT(vp);
-	ASSERT(vp->v_refcnt > 0);
+	UK_ASSERT(vp);
+	UK_ASSERT(vp->v_refcnt > 0);
 
-	mutex_lock(&vp->v_lock);
-	vp->v_nrlocks++;
+	uk_mutex_lock(&vp->v_lock);
 	DPRINTF(VFSDB_VNODE, ("vn_lock:   %s\n", vn_path(vp)));
 }
 
@@ -156,12 +157,10 @@ vn_lock(struct vnode *vp)
 void
 vn_unlock(struct vnode *vp)
 {
-	ASSERT(vp);
-	ASSERT(vp->v_refcnt > 0);
-	ASSERT(vp->v_nrlocks > 0);
+	UK_ASSERT(vp);
+	UK_ASSERT(vp->v_refcnt >= 0);
 
-	vp->v_nrlocks--;
-	mutex_unlock(&vp->v_lock);
+	uk_mutex_unlock(&vp->v_lock);
 	DPRINTF(VFSDB_VNODE, ("vn_lock:   %s\n", vn_path(vp)));
 }
 
@@ -176,7 +175,7 @@ vget(struct mount *mp, uint64_t ino, struct vnode **vpp)
 	struct vnode *vp;
 	int error;
 
-	*vpp = nullptr;
+	*vpp = NULL;
 
 	DPRINTF(VFSDB_VNODE, ("vget %LLu\n", ino));
 
@@ -195,26 +194,24 @@ vget(struct mount *mp, uint64_t ino, struct vnode **vpp)
 		return 0;
 	}
 
-	LIST_INIT(&vp->v_names);
+	UK_INIT_LIST_HEAD(&vp->v_names);
 	vp->v_ino = ino;
 	vp->v_mount = mp;
 	vp->v_refcnt = 1;
 	vp->v_op = mp->m_op->vfs_vnops;
-	vp->v_nrlocks = 0;
-
+	uk_mutex_init(&vp->v_lock);
 	/*
 	 * Request to allocate fs specific data for vnode.
 	 */
 	if ((error = VFS_VGET(mp, vp)) != 0) {
 		VNODE_UNLOCK();
-		delete vp;
+		free(vp);
 		return error;
 	}
 	vfs_busy(vp->v_mount);
-	mutex_lock(&vp->v_lock);
-	vp->v_nrlocks++;
+	uk_mutex_lock(&vp->v_lock);
 
-	LIST_INSERT_HEAD(&vnode_table[vn_hash(mp, ino)], vp, v_link);
+	uk_list_add(&vp->v_link, &vnode_table[vn_hash(mp, ino)]);
 	VNODE_UNLOCK();
 
 	*vpp = vp;
@@ -228,9 +225,8 @@ vget(struct mount *mp, uint64_t ino, struct vnode **vpp)
 void
 vput(struct vnode *vp)
 {
-	ASSERT(vp);
-	ASSERT(vp->v_nrlocks > 0);
-	ASSERT(vp->v_refcnt > 0);
+	UK_ASSERT(vp);
+	UK_ASSERT(vp->v_refcnt > 0);
 	DPRINTF(VFSDB_VNODE, ("vput: ref=%d %s\n", vp->v_refcnt, vn_path(vp)));
 
 	VNODE_LOCK();
@@ -240,7 +236,7 @@ vput(struct vnode *vp)
 		vn_unlock(vp);
 		return;
 	}
-	LIST_REMOVE(vp, v_link);
+	uk_list_del(&vp->v_link);
 	VNODE_UNLOCK();
 
 	/*
@@ -249,10 +245,8 @@ vput(struct vnode *vp)
 	if (vp->v_op->vop_inactive)
 		VOP_INACTIVE(vp);
 	vfs_unbusy(vp->v_mount);
-	vp->v_nrlocks--;
-	ASSERT(vp->v_nrlocks == 0);
-	mutex_unlock(&vp->v_lock);
-	delete vp;
+	uk_mutex_unlock(&vp->v_lock);
+	free(vp);
 }
 
 /*
@@ -261,8 +255,8 @@ vput(struct vnode *vp)
 void
 vref(struct vnode *vp)
 {
-	ASSERT(vp);
-	ASSERT(vp->v_refcnt > 0);	/* Need vget */
+	UK_ASSERT(vp);
+	UK_ASSERT(vp->v_refcnt > 0);	/* Need vfscore_vget */
 
 	VNODE_LOCK();
 	DPRINTF(VFSDB_VNODE, ("vref: ref=%d\n", vp->v_refcnt));
@@ -279,8 +273,8 @@ vref(struct vnode *vp)
 void
 vrele(struct vnode *vp)
 {
-	ASSERT(vp);
-	ASSERT(vp->v_refcnt > 0);
+	UK_ASSERT(vp);
+	UK_ASSERT(vp->v_refcnt > 0);
 
 	VNODE_LOCK();
 	DPRINTF(VFSDB_VNODE, ("vrele: ref=%d\n", vp->v_refcnt));
@@ -289,7 +283,7 @@ vrele(struct vnode *vp)
 		VNODE_UNLOCK();
 		return;
 	}
-	LIST_REMOVE(vp, v_link);
+	uk_list_del(&vp->v_link);
 	VNODE_UNLOCK();
 
 	/*
@@ -297,7 +291,7 @@ vrele(struct vnode *vp)
 	 */
 	VOP_INACTIVE(vp);
 	vfs_unbusy(vp->v_mount);
-	delete vp;
+	free(vp);
 }
 
 /*
@@ -456,21 +450,25 @@ vnode_dump(void)
 			   "VLNK ", "VSOCK", "VFIFO" };
 
 	VNODE_LOCK();
-	kprintf("Dump vnode\n");
-	kprintf(" vnode    mount    type  refcnt blkno    path\n");
-	kprintf(" -------- -------- ----- ------ -------- ------------------------------\n");
+
+	uk_pr_debug("Dump vnode\n");
+	uk_pr_debug(" vnode            mount            type  refcnt path\n");
+	uk_pr_debug(" ---------------- ---------------- ----- ------ ------------------------------\n");
 
 	for (i = 0; i < VNODE_BUCKETS; i++) {
-	        LIST_FOREACH(vp, &vnode_table[i], v_link) {
+		uk_list_for_each_entry(vp, &vnode_table[i], v_link) {
 			mp = vp->v_mount;
 
-			kprintf(" %08x %08x %s %6d %8d %s%s\n", (u_long)vp,
-				(u_long)mp, type[vp->v_type], vp->v_refcnt,
-				(strlen(mp->m_path) == 1) ? "\0" : mp->m_path,
-				vn_path(vp));
+
+			uk_pr_debug(" %016lx %016lx %s %6d %s%s\n",
+				    (unsigned long) vp,
+				    (unsigned long) mp, type[vp->v_type],
+				    vp->v_refcnt,
+				    (strlen(mp->m_path) == 1) ? "\0" : mp->m_path,
+				    vn_path(vp));
 		}
 	}
-	kprintf("\n");
+	uk_pr_debug("\n");
 	VNODE_UNLOCK();
 }
 #endif
@@ -509,20 +507,22 @@ vnode_init(void)
 	int i;
 
 	for (i = 0; i < VNODE_BUCKETS; i++)
-		LIST_INIT(&vnode_table[i]);
+		UK_INIT_LIST_HEAD(&vnode_table[i]);
 }
 
 void vn_add_name(struct vnode *vp, struct dentry *dp)
 {
-	vn_lock(vp);
-	LIST_INSERT_HEAD(&vp->v_names, dp, d_names_link);
-	vn_unlock(vp);
+	/* TODO: Re-enable this check when preemption and/or smp is
+	 * here */
+	/* UK_ASSERT(uk_mutex_is_locked(&vp->v_lock)); */
+	uk_list_add(&dp->d_names_link, &vp->v_names);
 }
 
 void vn_del_name(struct vnode *vp, struct dentry *dp)
 {
-	vn_lock(vp);
-	LIST_REMOVE(dp, d_names_link);
-	vn_unlock(vp);
+	/* TODO: Re-enable this check when preemption and/or smp is
+	 * here */
+	/* UK_ASSERT(uk_mutex_is_locked(&vp->v_lock)); */
+	uk_list_del(&dp->d_names_link);
 }
 

@@ -65,9 +65,9 @@ open_no_follow_chk(char *path)
 	struct dentry *dp;
 	struct vnode  *vp;
 
-	ddp = nullptr;
-	dp  = nullptr;
-	vp  = nullptr;
+	ddp = NULL;
+	dp  = NULL;
+	vp  = NULL;
 
 	error = lookup(path, &ddp, &name);
 	if (error) {
@@ -88,15 +88,15 @@ open_no_follow_chk(char *path)
 
 	error = 0;
 out:
-	if (vp != nullptr) {
+	if (vp != NULL) {
 		vn_unlock(vp);
 	}
 
-	if (dp != nullptr) {
+	if (dp != NULL) {
 		drele(dp);
 	}
 
-	if (ddp != nullptr) {
+	if (ddp != NULL) {
 		drele(ddp);
 	}
 
@@ -104,9 +104,9 @@ out:
 }
 
 int
-sys_open(char *path, int flags, mode_t mode, struct file **fpp)
+sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 {
-	file *fp;
+	struct vfscore_file *fp;
 	struct dentry *dp, *ddp;
 	struct vnode *vp;
 	char *filename;
@@ -115,11 +115,11 @@ sys_open(char *path, int flags, mode_t mode, struct file **fpp)
 	DPRINTF(VFSDB_SYSCALL, ("sys_open: path=%s flags=%x mode=%x\n",
 				path, flags, mode));
 
-	flags = fflags(flags);
+	flags = vfscore_fflags(flags);
 	if (flags & O_CREAT) {
 		error = namei(path, &dp);
 		if (error == ENOENT) {
-			/* Create new file. */
+			/* Create new struct vfscore_file. */
 			if ((error = lookup(path, &ddp, &filename)) != 0)
 				return error;
 
@@ -233,14 +233,14 @@ out_drele:
 }
 
 int
-sys_close(struct file *fp)
+sys_close(struct vfscore_file *fp __unused)
 {
 
 	return 0;
 }
 
 int
-sys_read(struct file *fp, const struct iovec *iov, size_t niov,
+sys_read(struct vfscore_file *fp, const struct iovec *iov, size_t niov,
 		off_t offset, size_t *count)
 {
 	int error = 0;
@@ -290,7 +290,7 @@ sys_read(struct file *fp, const struct iovec *iov, size_t niov,
 }
 
 int
-sys_write(struct file *fp, const struct iovec *iov, size_t niov,
+sys_write(struct vfscore_file *fp, const struct iovec *iov, size_t niov,
 		off_t offset, size_t *count)
 {
 	struct iovec *copy_iov;
@@ -337,12 +337,12 @@ sys_write(struct file *fp, const struct iovec *iov, size_t niov,
 }
 
 int
-sys_lseek(struct file *fp, off_t off, int type, off_t *origin)
+sys_lseek(struct vfscore_file *fp, off_t off, int type, off_t *origin)
 {
 	struct vnode *vp;
 
-	DPRINTF(VFSDB_SYSCALL, ("sys_seek: fp=%x off=%d type=%d\n",
-				(u_long)fp, (u_int)off, type));
+	DPRINTF(VFSDB_SYSCALL, ("sys_seek: fp=%p off=%ud type=%d\n",
+				fp, (unsigned int)off, type));
 
 	if (!fp->f_dentry) {
 	    // Linux doesn't implement lseek() on pipes, sockets, or ttys.
@@ -373,11 +373,11 @@ sys_lseek(struct file *fp, off_t off, int type, off_t *origin)
 }
 
 int
-sys_ioctl(struct file *fp, u_long request, void *buf)
+sys_ioctl(struct vfscore_file *fp, unsigned long request, void *buf)
 {
 	int error;
 
-	DPRINTF(VFSDB_SYSCALL, ("sys_ioctl: fp=%x request=%x\n", fp, request));
+	DPRINTF(VFSDB_SYSCALL, ("sys_ioctl: fp=%p request=%lux\n", fp, request));
 
 	if ((fp->f_flags & (FREAD | FWRITE)) == 0)
 		return EBADF;
@@ -389,7 +389,7 @@ sys_ioctl(struct file *fp, u_long request, void *buf)
 }
 
 int
-sys_fsync(struct file *fp)
+sys_fsync(struct vfscore_file *fp)
 {
 	struct vnode *vp;
 	int error;
@@ -407,7 +407,7 @@ sys_fsync(struct file *fp)
 }
 
 int
-sys_fstat(struct file *fp, struct stat *st)
+sys_fstat(struct vfscore_file *fp, struct stat *st)
 {
 	int error = 0;
 
@@ -425,7 +425,7 @@ static int
 check_dir_empty(char *path)
 {
 	int error;
-	struct file *fp;
+	struct vfscore_file *fp;
 	struct dirent dir;
 
 	DPRINTF(VFSDB_SYSCALL, ("check_dir_empty\n"));
@@ -453,7 +453,7 @@ out_error:
 }
 
 int
-sys_readdir(struct file *fp, struct dirent *dir)
+sys_readdir(struct vfscore_file *fp, struct dirent *dir)
 {
 	struct vnode *dvp;
 	int error;
@@ -477,7 +477,7 @@ sys_readdir(struct file *fp, struct dirent *dir)
 }
 
 int
-sys_rewinddir(struct file *fp)
+sys_rewinddir(struct vfscore_file *fp)
 {
 	struct vnode *dvp;
 
@@ -496,7 +496,7 @@ sys_rewinddir(struct file *fp)
 }
 
 int
-sys_seekdir(struct file *fp, long loc)
+sys_seekdir(struct vfscore_file *fp, long loc)
 {
 	struct vnode *dvp;
 
@@ -515,7 +515,7 @@ sys_seekdir(struct file *fp, long loc)
 }
 
 int
-sys_telldir(struct file *fp, long *loc)
+sys_telldir(struct vfscore_file *fp, long *loc)
 {
 	struct vnode *dvp;
 
@@ -662,14 +662,14 @@ sys_mknod(char *path, mode_t mode)
  *
  * Assumes both paths do not have trailing slashes.
  */
-static bool
+static int
 is_parent(const char *parent, const char *child)
 {
 	size_t p_len = strlen(parent);
 	return !strncmp(parent, child, p_len) && (parent[p_len-1] == '/' || child[p_len] == '/');
 }
 
-static bool
+static int
 has_trailing(const char *path, char ch)
 {
 	size_t len = strlen(path);
@@ -695,16 +695,16 @@ sys_rename(char *src, char *dest)
 	char *sname, *dname;
 	int error;
 	char root[] = "/";
-	bool ts; /* trailing slash */
+	int ts; /* trailing slash */
 
 	DPRINTF(VFSDB_SYSCALL, ("sys_rename: src=%s dest=%s\n", src, dest));
 
-	ts = false;
-	if (has_trailing(src, '/') == true) {
+	ts = 0;
+	if (has_trailing(src, '/')) {
 		if (strlen(src) != 1) {
 			/* remove trailing slash iff path is none root */
 			strip_trailing(src, '/');
-			ts = true;
+			ts = 1;
 		}
 	}
 
@@ -722,17 +722,17 @@ sys_rename(char *src, char *dest)
 	vp1 = dp1->d_vnode;
 	vn_lock(vp1);
 
-	if (vp1->v_type != VDIR && ts == true) {
+	if (vp1->v_type != VDIR && ts) {
 		error = ENOTDIR;
 		goto err1;
 	}
 
-	ts = false;
-	if (has_trailing(dest, '/') == true) {
+	ts = 0;
+	if (has_trailing(dest, '/')) {
 		if (strlen(dest) != 1) {
 			/* remove trailing slash iff path is none root */
 			strip_trailing(dest, '/');
-			ts = true;
+			ts = 1;
 		}
 	}
 
@@ -749,7 +749,7 @@ sys_rename(char *src, char *dest)
 		vn_lock(vp2);
 
 		if (vp2->v_type != VDIR && vp2->v_type != VLNK) {
-			if (vp1->v_type == VDIR || ts == true) {
+			if (vp1->v_type == VDIR || ts) {
 				error = ENOTDIR;
 				goto err2;
 			}
@@ -762,7 +762,7 @@ sys_rename(char *src, char *dest)
 			goto err2;
 		}
 	} else if (error == ENOENT) {
-		if (vp1->v_type != VDIR && ts == true) {
+		if (vp1->v_type != VDIR && ts) {
 			error = ENOTDIR;
 			goto err2;
 		}
@@ -787,7 +787,7 @@ sys_rename(char *src, char *dest)
 	}
 
 	dname = strrchr(dest, '/');
-	if (dname == nullptr) {
+	if (dname == NULL) {
 		error = ENOTDIR;
 		goto err2;
 	}
@@ -848,15 +848,15 @@ sys_symlink(const char *oldpath, const char *newpath)
 	struct dentry	*newdirdp;
 	char		*name;
 
-	if (oldpath == nullptr || newpath == nullptr) {
+	if (oldpath == NULL || newpath == NULL) {
 		return (EFAULT);
 	}
 
 	DPRINTF(VFSDB_SYSCALL, ("sys_link: oldpath=%s newpath=%s\n",
 				oldpath, newpath));
 
-	newdp		= nullptr;
-	newdirdp	= nullptr;
+	newdp		= NULL;
+	newdirdp	= NULL;
 
 	error = task_conv(t, newpath, VWRITE, np);
 	if (error != 0) {
@@ -892,7 +892,7 @@ sys_symlink(const char *oldpath, const char *newpath)
 	error = VOP_SYMLINK(newdirdp->d_vnode, name, op);
 
 out:
-	if (newdirdp != nullptr) {
+	if (newdirdp != NULL) {
 		vn_unlock(newdirdp->d_vnode);
 		drele(newdirdp);
 	}
@@ -972,9 +972,9 @@ sys_unlink(char *path)
 
 	DPRINTF(VFSDB_SYSCALL, ("sys_unlink: path=%s\n", path));
 
-	ddp   = nullptr;
-	dp    = nullptr;
-	vp    = nullptr;
+	ddp   = NULL;
+	dp    = NULL;
+	vp    = NULL;
 
 	error = lookup(path, &ddp, &name);
 	if (error != 0) {
@@ -1013,15 +1013,15 @@ sys_unlink(char *path)
 	drele(dp);
 	return error;
  out:
-	if (vp != nullptr) {
+	if (vp != NULL) {
 		vn_unlock(vp);
 	}
 
-	if (dp != nullptr) {
+	if (dp != NULL) {
 		drele(dp);
 	}
 
-	if (ddp != nullptr) {
+	if (ddp != NULL) {
 		drele(ddp);
 	}
 	return error;
@@ -1115,7 +1115,7 @@ sys_statfs(char *path, struct statfs *buf)
 }
 
 int
-sys_fstatfs(struct file *fp, struct statfs *buf)
+sys_fstatfs(struct vfscore_file *fp, struct statfs *buf)
 {
 	struct vnode *vp;
 	int error = 0;
@@ -1152,7 +1152,7 @@ sys_truncate(char *path, off_t length)
 }
 
 int
-sys_ftruncate(struct file *fp, off_t length)
+sys_ftruncate(struct vfscore_file *fp, off_t length)
 {
 	struct vnode *vp;
 	int error;
@@ -1169,7 +1169,7 @@ sys_ftruncate(struct file *fp, off_t length)
 }
 
 int
-sys_fchdir(struct file *fp, char *cwd)
+sys_fchdir(struct vfscore_file *fp, char *cwd)
 {
 	struct vnode *dvp;
 
@@ -1244,7 +1244,7 @@ sys_readlink(char *path, char *buf, size_t bufsize, ssize_t *size)
 /*
  * Check the validity of the members of a struct timeval.
  */
-static bool is_timeval_valid(const struct timeval *time)
+static int is_timeval_valid(const struct timeval *time)
 {
 	return (time->tv_sec >= 0) &&
 		   (time->tv_usec >= 0 && time->tv_usec < 1000000);
@@ -1276,18 +1276,18 @@ sys_utimes(char *path, const struct timeval times[2], int flags)
 		return EINVAL;
 
 	// Convert each element of timeval array to the timespec type
-	convert_timeval(timespec_times[0], times ? times + 0 : nullptr);
-	convert_timeval(timespec_times[1], times ? times + 1 : nullptr);
+	convert_timeval(timespec_times[0], times ? times + 0 : NULL);
+	convert_timeval(timespec_times[1], times ? times + 1 : NULL);
 
 	if (flags & AT_SYMLINK_NOFOLLOW) {
 		struct dentry *ddp;
-		error = lookup(path, &ddp, nullptr);
+		error = lookup(path, &ddp, NULL);
 		if (error) {
 			return error;
 		}
 
 		error = namei_last_nofollow(path, ddp, &dp);
-		if (ddp != nullptr) {
+		if (ddp != NULL) {
 			drele(ddp);
 		}
 		if (error) {
@@ -1312,7 +1312,7 @@ sys_utimes(char *path, const struct timeval times[2], int flags)
 /*
  * Check the validity of members of a struct timespec
  */
-static bool is_timespec_valid(const struct timespec &time)
+static int is_timespec_valid(const struct timespec &time)
 {
 	return (time.tv_sec >= 0) &&
 	   ((time.tv_nsec >= 0 && time.tv_nsec <= 999999999) ||
@@ -1322,7 +1322,7 @@ static bool is_timespec_valid(const struct timespec &time)
 
 void init_timespec(struct timespec &_times, const struct timespec *times)
 {
-	if (times == nullptr || times->tv_nsec == UTIME_NOW) {
+	if (times == NULL || times->tv_nsec == UTIME_NOW) {
 		clock_gettime(CLOCK_REALTIME, &_times);
 	} else {
 		_times.tv_sec = times->tv_sec;
@@ -1350,8 +1350,8 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 	if (times && (!is_timespec_valid(times[0]) || !is_timespec_valid(times[1])))
 		return EINVAL;
 
-	init_timespec(timespec_times[0], times ? times + 0 : nullptr);
-	init_timespec(timespec_times[1], times ? times + 1 : nullptr);
+	init_timespec(timespec_times[0], times ? times + 0 : NULL);
+	init_timespec(timespec_times[1], times ? times + 1 : NULL);
 
 	if (pathname && pathname[0] == '/') {
 	ap = pathname;
@@ -1360,7 +1360,7 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 	    return EFAULT;
 	ap = std::string(main_task->t_cwd) + "/" + pathname;
 	} else {
-		struct file *fp;
+		struct vfscore_file *fp;
 		fileref f(fileref_from_fd(dirfd));
 
 		if (!f)
@@ -1410,7 +1410,7 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 int
 sys_futimens(int fd, const struct timespec times[2])
 {
-	struct file *fp;
+	struct vfscore_file *fp;
 
 	fileref f(fileref_from_fd(fd));
 	if (!f)
@@ -1428,7 +1428,7 @@ sys_futimens(int fd, const struct timespec times[2])
 #endif
 
 int
-sys_fallocate(struct file *fp, int mode, loff_t offset, loff_t len)
+sys_fallocate(struct vfscore_file *fp, int mode, off_t offset, off_t len)
 {
 	int error;
 	struct vnode *vp;
@@ -1493,7 +1493,7 @@ sys_chmod(const char *path, mode_t mode)
 int
 sys_fchmod(int fd, mode_t mode)
 {
-	fileref f(fileref_from_fd(fd));
+	struct vfscore_file *f = vfscore_get_file(fd);
 	if (!f)
 		return EBADF;
 	// Posix is ambivalent on what fchmod() should do on an fd that does not

@@ -115,7 +115,7 @@ int vfs_write(struct vfscore_file *fp, struct uio *uio, int flags)
 	return error;
 }
 
-int vfs_ioctl(struct vfscore_file *fp, u_long com, void *data)
+int vfs_ioctl(struct vfscore_file *fp, unsigned long com, void *data)
 {
 	struct vnode *vp = fp->f_dentry->d_vnode;
 	int error;

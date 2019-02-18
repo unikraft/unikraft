@@ -57,7 +57,7 @@ extern int vfs_debug;
 
 #define VFSDB_FLAGS	0x00000013
 
-#define	DPRINTF(_m,X)	if (vfs_debug & (_m)) kprintf X
+#define	DPRINTF(_m,X)	if (vfs_debug & (_m)) uk_pr_debug X
 #else
 #define	DPRINTF(_m, X)
 #endif
@@ -71,28 +71,26 @@ extern int vfs_debug;
  */
 struct task {
 	char 	    t_cwd[PATH_MAX];	/* current working directory */
-	struct file *t_cwdfp;		/* directory for cwd */
+	struct vfscore_file *t_cwdfp;		/* directory for cwd */
 };
 
-extern const struct vfssw vfssw[];
-
-int	 sys_open(char *path, int flags, mode_t mode, struct file **fp);
-int	 sys_read(struct file *fp, const struct iovec *iov, size_t niov,
+int	 sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fp);
+int	 sys_read(struct vfscore_file *fp, const struct iovec *iov, size_t niov,
 		off_t offset, size_t *count);
-int	 sys_write(struct file *fp, const struct iovec *iov, size_t niov,
+int	 sys_write(struct vfscore_file *fp, const struct iovec *iov, size_t niov,
 		off_t offset, size_t *count);
-int	 sys_lseek(struct file *fp, off_t off, int type, off_t * cur_off);
-int	 sys_ioctl(struct file *fp, u_long request, void *buf);
-int	 sys_fstat(struct file *fp, struct stat *st);
-int	 sys_fstatfs(struct file *fp, struct statfs *buf);
-int	 sys_fsync(struct file *fp);
-int	 sys_ftruncate(struct file *fp, off_t length);
+int	 sys_lseek(struct vfscore_file *fp, off_t off, int type, off_t * cur_off);
+int	 sys_ioctl(struct vfscore_file *fp, unsigned long request, void *buf);
+int	 sys_fstat(struct vfscore_file *fp, struct stat *st);
+int	 sys_fstatfs(struct vfscore_file *fp, struct statfs *buf);
+int	 sys_fsync(struct vfscore_file *fp);
+int	 sys_ftruncate(struct vfscore_file *fp, off_t length);
 
-int	 sys_readdir(struct file *fp, struct dirent *dirent);
-int	 sys_rewinddir(struct file *fp);
-int	 sys_seekdir(struct file *fp, long loc);
-int	 sys_telldir(struct file *fp, long *loc);
-int	 sys_fchdir(struct file *fp, char *path);
+int	 sys_readdir(struct vfscore_file *fp, struct dirent *dirent);
+int	 sys_rewinddir(struct vfscore_file *fp);
+int	 sys_seekdir(struct vfscore_file *fp, long loc);
+int	 sys_telldir(struct vfscore_file *fp, long *loc);
+int	 sys_fchdir(struct vfscore_file *fp, char *path);
 
 int	 sys_mkdir(char *path, mode_t mode);
 int	 sys_rmdir(char *path);
@@ -111,7 +109,7 @@ int  sys_utimes(char *path, const struct timeval times[2], int flags);
 int  sys_utimensat(int dirfd, const char *pathname,
 				   const struct timespec times[2], int flags);
 int  sys_futimens(int fd, const struct timespec times[2]);
-int  sys_fallocate(struct file *fp, int mode, loff_t offset, loff_t len);
+int  sys_fallocate(struct vfscore_file *fp, int mode, loff_t offset, loff_t len);
 
 int	 sys_mount(const char *dev, const char *dir, const char *fsname, int flags, const void *data);
 int	 sys_umount2(const char *path, int flags);

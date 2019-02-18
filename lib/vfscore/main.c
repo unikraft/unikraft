@@ -79,7 +79,7 @@ int open(const char *pathname, int flags, ...)
 
 	struct task *t = main_task;
 	char path[PATH_MAX];
-	struct file *fp;
+	struct vfscore_file *fp;
 	int fd, error;
 	int acc;
 
@@ -135,7 +135,7 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 		return open(pathname, flags, mode);
 	}
 
-	struct file *fp;
+	struct vfscore_file *fp;
 	int error = fget(dirfd, &fp);
 	if (error) {
 		errno = error;
@@ -197,7 +197,7 @@ TRACEPOINT(trace_vfs_mknod_err, "%d", int);
 
 int __xmknod(int ver, const char *pathname, mode_t mode, dev_t *dev)
 {
-	assert(ver == 0); // On x86-64 Linux, _MKNOD_VER_LINUX is 0.
+	UK_ASSERT(ver == 0); // On x86-64 Linux, _MKNOD_VER_LINUX is 0.
 	struct task *t = main_task;
 	char path[PATH_MAX];
 	int error;
@@ -231,7 +231,7 @@ TRACEPOINT(trace_vfs_lseek_err, "%d", int);
 
 off_t lseek(int fd, off_t offset, int whence)
 {
-	struct file *fp;
+	struct vfscore_file *fp;
 	off_t org;
 	int error;
 
@@ -265,11 +265,12 @@ TRACEPOINT(trace_vfs_pread_err, "%d", int);
 // *and* a non-zero number of written bytes. In that case, we need to zero the
 // error, so the system call appear a successful partial read/write.
 // In FreeBSD, dofilewrite() and dofileread() (sys_generic.c) do this too.
-static inline bool has_error(int error, int bytes)
+static inline int has_error(int error, int bytes)
 {
+	/* TODO: OSv checks also for ERESTART */
 	return error && (
 			(bytes == 0) ||
-			(error != EWOULDBLOCK && error != EINTR && error != ERESTART));
+			(error != EWOULDBLOCK && error != EINTR));
 }
 
 
@@ -280,7 +281,7 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset)
 			.iov_base	= buf,
 			.iov_len	= count,
 	};
-	struct file *fp;
+	struct vfscore_file *fp;
 	size_t bytes;
 	int error;
 
@@ -320,7 +321,7 @@ ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset)
 			.iov_base	= (void *)buf,
 			.iov_len	= count,
 	};
-	struct file *fp;
+	struct vfscore_file *fp;
 	size_t bytes;
 	int error;
 
@@ -351,7 +352,7 @@ ssize_t write(int fd, const void *buf, size_t count)
 
 ssize_t preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset)
 {
-	struct file *fp;
+	struct vfscore_file *fp;
 	size_t bytes;
 	int error;
 
@@ -384,7 +385,7 @@ TRACEPOINT(trace_vfs_pwritev_err, "%d", int);
 
 ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
 {
-	struct file *fp;
+	struct vfscore_file *fp;
 	size_t bytes;
 	int error;
 
@@ -419,7 +420,7 @@ TRACEPOINT(trace_vfs_ioctl_err, "%d", int);
 
 int ioctl(int fd, unsigned long int request, ...)
 {
-	struct file *fp;
+	struct vfscore_file *fp;
 	int error;
 	va_list ap;
 	void* arg;
@@ -456,7 +457,7 @@ TRACEPOINT(trace_vfs_fsync_err, "%d", int);
 
 int fsync(int fd)
 {
-	struct file *fp;
+	struct vfscore_file *fp;
 	int error;
 
 	trace_vfs_fsync(fd);
@@ -490,7 +491,7 @@ TRACEPOINT(trace_vfs_fstat_err, "%d", int);
 
 int __fxstat(int ver, int fd, struct stat *st)
 {
-	struct file *fp;
+	struct vfscore_file *fp;
 	int error;
 
 	trace_vfs_fstat(fd, st);
@@ -526,7 +527,7 @@ int __fxstatat(int ver, int dirfd, const char *pathname, struct stat *st,
 		int flags)
 {
 	if (flags & AT_SYMLINK_NOFOLLOW) {
-		UNIMPLEMENTED("fstatat() with AT_SYMLINK_NOFOLLOW");
+		UK_CRASH("UNIMPLEMENTED: fstatat() with AT_SYMLINK_NOFOLLOW");
 	}
 
 	if (pathname[0] == '/' || dirfd == AT_FDCWD) {
@@ -538,7 +539,7 @@ int __fxstatat(int ver, int dirfd, const char *pathname, struct stat *st,
 		return fstat(dirfd, st);
 	}
 
-	struct file *fp;
+	struct vfscore_file *fp;
 	int error = fget(dirfd, &fp);
 	if (error) {
 		errno = error;
@@ -574,7 +575,9 @@ LFS64(fstatat);
 
 int flock(int fd, int operation)
 {
-	if (!fileref_from_fd(fd)) {
+	struct vfscore_file *file;
+
+	if (!fget(fd, &file)) {
 		return libc_error(EBADF);
 	}
 
@@ -592,7 +595,7 @@ int flock(int fd, int operation)
 	return 0;
 }
 
-TRACEPOINT(trace_vfs_readdir, "%d %p", int, dirent*);
+TRACEPOINT(trace_vfs_readdir, "%d %p", int, struct dirent*);
 TRACEPOINT(trace_vfs_readdir_ret, "");
 TRACEPOINT(trace_vfs_readdir_err, "%d", int);
 
@@ -611,7 +614,7 @@ DIR *opendir(const char *path)
 	dir->fd = open(path, O_RDONLY);
 	if (dir->fd < 0) {
 		free(dir);
-		return nullptr;
+		return NULL;
 	}
 	return dir;
 }
@@ -621,11 +624,11 @@ DIR *fdopendir(int fd)
 	DIR *dir;
 	struct stat st;
 	if (fstat(fd, &st) < 0) {
-		return nullptr;
+		return NULL;
 	}
 	if (!S_ISDIR(st.st_mode)) {
 		errno = ENOTDIR;
-		return nullptr;
+		return NULL;
 	}
 	dir = malloc(sizeof(*dir));
 	if (!dir) {
@@ -669,13 +672,11 @@ struct dirent *readdir(DIR *dir)
 int readdir_r(DIR *dir, struct dirent *entry, struct dirent **result)
 {
 	int error;
-	struct file *fp;
+	struct vfscore_file *fp;
 
 	trace_vfs_readdir(dir->fd, entry);
 	error = fget(dir->fd, &fp);
-	if (error) {
-		trace_vfs_readdir_err(error);
-	} else {
+	if (!error) {
 		error = sys_readdir(fp, entry);
 		fdrop(fp);
 		if (error) {
@@ -688,7 +689,7 @@ int readdir_r(DIR *dir, struct dirent *entry, struct dirent **result)
 	entry->d_reclen = sizeof(*entry);
 
 	if (error) {
-		*result = nullptr;
+		*result = NULL;
 	} else {
 		*result = entry;
 	}
@@ -706,7 +707,7 @@ struct dirent *readdir64(DIR *dir) __attribute__((alias("readdir")));
 
 void rewinddir(DIR *dirp)
 {
-	struct file *fp;
+	struct vfscore_file *fp;
 
 	int error = fget(dirp->fd, &fp);
 	if (error) {
@@ -722,7 +723,7 @@ void rewinddir(DIR *dirp)
 
 long telldir(DIR *dirp)
 {
-	struct file *fp;
+	struct vfscore_file *fp;
 	int error = fget(dirp->fd, &fp);
 	if (error) {
 		return libc_error(error);
@@ -739,7 +740,7 @@ long telldir(DIR *dirp)
 
 void seekdir(DIR *dirp, long loc)
 {
-	struct file *fp;
+	struct vfscore_file *fp;
 	int error = fget(dirp->fd, &fp);
 	if (error) {
 		// POSIX specifies seekdir() cannot return errors.
@@ -790,7 +791,7 @@ int rmdir(const char *pathname)
 
 	trace_vfs_rmdir(pathname);
 	error = ENOENT;
-	if (pathname == nullptr)
+	if (pathname == NULL)
 		goto out_errno;
 	if ((error = task_conv(t, pathname, VWRITE, path)) != 0)
 		goto out_errno;
@@ -826,9 +827,9 @@ get_last_component(const char *path, char *dst)
 	dst[len] = 0;
 }
 
-static bool null_or_empty(const char *str)
+static int null_or_empty(const char *str)
 {
-	return str == nullptr || *str == '\0';
+	return str == NULL || *str == '\0';
 }
 
 TRACEPOINT(trace_vfs_rename, "\"%s\" \"%s\"", const char*, const char*);
@@ -883,7 +884,7 @@ TRACEPOINT(trace_vfs_chdir_err, "%d", int);
 static int
 __do_fchdir(struct vfscore_file *fp, struct task *t)
 {
-	struct file *old = nullptr;
+	struct vfscore_file *old = NULL;
 
 	UK_ASSERT(t);
 
@@ -907,11 +908,11 @@ int chdir(const char *pathname)
 	trace_vfs_chdir(pathname);
 	struct task *t = main_task;
 	char path[PATH_MAX];
-	struct file *fp;
+	struct vfscore_file *fp;
 	int error;
 
 	error = ENOENT;
-	if (pathname == nullptr)
+	if (pathname == NULL)
 		goto out_errno;
 
 	if ((error = task_conv(t, pathname, VREAD, path)) != 0)
@@ -945,7 +946,7 @@ int fchdir(int fd)
 {
 	trace_vfs_fchdir(fd);
 	struct task *t = main_task;
-	struct file *fp;
+	struct vfscore_file *fp;
 	int error;
 
 	error = fget(fd, &fp);
@@ -981,7 +982,7 @@ int link(const char *oldpath, const char *newpath)
 	trace_vfs_link(oldpath, newpath);
 
 	error = ENOENT;
-	if (oldpath == nullptr || newpath == nullptr)
+	if (oldpath == NULL || newpath == NULL)
 		goto out_errno;
 	if ((error = task_conv(t, oldpath, VWRITE, path1)) != 0)
 		goto out_errno;
@@ -1011,7 +1012,7 @@ int symlink(const char *oldpath, const char *newpath)
 	trace_vfs_symlink(oldpath, newpath);
 
 	error = ENOENT;
-	if (oldpath == nullptr || newpath == nullptr) {
+	if (oldpath == NULL || newpath == NULL) {
 		errno = ENOENT;
 		trace_vfs_symlink_err(error);
 		return (-1);
@@ -1040,7 +1041,7 @@ int unlink(const char *pathname)
 	int error;
 
 	error = ENOENT;
-	if (pathname == nullptr)
+	if (pathname == NULL)
 		goto out_errno;
 	if ((error = task_conv(t, pathname, VWRITE, path)) != 0)
 		goto out_errno;
@@ -1156,7 +1157,7 @@ int __statfs(const char *pathname, struct statfs *buf)
 	errno = error;
 	return -1;
 }
-weak_alias(__statfs, statfs);
+__weak_alias(__statfs, statfs);
 
 LFS64(statfs);
 
@@ -1166,7 +1167,7 @@ TRACEPOINT(trace_vfs_fstatfs_err, "%d", int);
 
 int __fstatfs(int fd, struct statfs *buf)
 {
-	struct file *fp;
+	struct vfscore_file *fp;
 	int error;
 
 	trace_vfs_fstatfs(fd, buf);
@@ -1187,7 +1188,7 @@ int __fstatfs(int fd, struct statfs *buf)
 	errno = error;
 	return -1;
 }
-weak_alias(__fstatfs, fstatfs);
+__weak_alias(__fstatfs, fstatfs);
 
 LFS64(fstatfs);
 
@@ -1241,7 +1242,7 @@ char *getcwd(char *path, size_t size)
 {
 	trace_vfs_getcwd(path, size);
 	struct task *t = main_task;
-	int len = strlen(t->t_cwd) + 1;
+	size_t len = strlen(t->t_cwd) + 1;
 	int error;
 
 	if (!path) {
@@ -1271,7 +1272,7 @@ char *getcwd(char *path, size_t size)
 	out_errno:
 	trace_vfs_getcwd_err(error);
 	errno = error;
-	return nullptr;
+	return NULL;
 }
 
 TRACEPOINT(trace_vfs_dup, "%d", int);
@@ -1282,7 +1283,7 @@ TRACEPOINT(trace_vfs_dup_err, "%d", int);
  */
 int dup(int oldfd)
 {
-	struct file *fp;
+	struct vfscore_file *fp;
 	int newfd;
 	int error;
 
@@ -1315,7 +1316,7 @@ TRACEPOINT(trace_vfs_dup3_err, "%d", int);
  */
 int dup3(int oldfd, int newfd, int flags)
 {
-	struct file *fp;
+	struct vfscore_file *fp;
 	int error;
 
 	trace_vfs_dup3(oldfd, newfd, flags);
@@ -1337,7 +1338,7 @@ int dup3(int oldfd, int newfd, int flags)
 	if (error)
 		goto out_errno;
 
-	error = fdset(newfd, fp);
+	error = vfscore_install_fd(newfd, fp);
 	if (error) {
 		fdrop(fp);
 		goto out_errno;
@@ -1373,7 +1374,7 @@ TRACEPOINT(trace_vfs_fcntl_err, "%d", int);
 
 int fcntl(int fd, int cmd, int arg)
 {
-	struct file *fp;
+	struct vfscore_file *fp;
 	int ret = 0, error;
 	int tmp;
 
@@ -1490,14 +1491,14 @@ int access(const char *pathname, int mode)
 int faccessat(int dirfd, const char *pathname, int mode, int flags)
 {
 	if (flags & AT_SYMLINK_NOFOLLOW) {
-		UNIMPLEMENTED("faccessat() with AT_SYMLINK_NOFOLLOW");
+		UK_CRASH("UNIMPLEMENTED: faccessat() with AT_SYMLINK_NOFOLLOW");
 	}
 
 	if (pathname[0] == '/' || dirfd == AT_FDCWD) {
 		return access(pathname, mode);
 	}
 
-	struct file *fp;
+	struct vfscore_file *fp;
 	int error = fget(dirfd, &fp);
 	if (error) {
 		errno = error;
@@ -1528,7 +1529,7 @@ int euidaccess(const char *pathname, int mode)
 	return access(pathname, mode);
 }
 
-weak_alias(euidaccess,eaccess);
+__weak_alias(euidaccess,eaccess);
 
 #if 0
 /*
@@ -1536,7 +1537,7 @@ weak_alias(euidaccess,eaccess);
  */
 int isatty(int fd)
 {
-	struct file *fp;
+	struct vfscore_file *fp;
 	int istty = 0;
 
 	trace_vfs_isatty(fd);
@@ -1570,7 +1571,7 @@ int truncate(const char *pathname, off_t length)
 	int error;
 
 	error = ENOENT;
-	if (pathname == nullptr)
+	if (pathname == NULL)
 		goto out_errno;
 	if ((error = task_conv(t, pathname, VWRITE, path)) != 0)
 		goto out_errno;
@@ -1595,7 +1596,7 @@ TRACEPOINT(trace_vfs_ftruncate_err, "%d", int);
 int ftruncate(int fd, off_t length)
 {
 	trace_vfs_ftruncate(fd, length);
-	struct file *fp;
+	struct vfscore_file *fp;
 	int error;
 
 	error = fget(fd, &fp);
@@ -1630,7 +1631,7 @@ ssize_t readlink(const char *pathname, char *buf, size_t bufsize)
 		goto out_errno;
 
 	error = ENOENT;
-	if (pathname == nullptr)
+	if (pathname == NULL)
 		goto out_errno;
 	error = task_conv(t, pathname, VWRITE, path);
 	if (error)
@@ -1654,7 +1655,7 @@ TRACEPOINT(trace_vfs_fallocate_err, "%d", int);
 
 int fallocate(int fd, int mode, loff_t offset, loff_t len)
 {
-	struct file *fp;
+	struct vfscore_file *fp;
 	int error;
 
 	trace_vfs_fallocate(fd, mode, offset, len);
@@ -1682,14 +1683,14 @@ LFS64(fallocate);
 int futimesat(int dirfd, const char *pathname, const struct timeval times[2])
 {
 	struct stat st;
-	struct file *fp;
+	struct vfscore_file *fp;
 	int error;
 	char *absolute_path;
 
 	if ((pathname && pathname[0] == '/') || dirfd == AT_FDCWD)
 		return utimes(pathname, times);
 
-	// Note: if pathname == nullptr, futimesat operates on dirfd itself, and in
+	// Note: if pathname == NULL, futimesat operates on dirfd itself, and in
 	// that case it doesn't have to be a directory.
 	if (pathname) {
 		error = fstat(dirfd, &st);
@@ -1835,7 +1836,7 @@ int chmod(const char *pathname, mode_t mode)
 	struct task *t = main_task;
 	char path[PATH_MAX];
 	int error = ENOENT;
-	if (pathname == nullptr)
+	if (pathname == NULL)
 		goto out_errno;
 	if ((error = task_conv(t, pathname, VWRITE, path)) != 0)
 		goto out_errno;
@@ -1893,8 +1894,8 @@ int lchown(const char *path, uid_t owner, gid_t group)
 #if 0
 ssize_t sendfile(int out_fd, int in_fd, off_t *_offset, size_t count)
 {
-	struct file *in_fp;
-	struct file *out_fp;
+	struct vfscore_file *in_fp;
+	struct vfscore_file *out_fp;
 	fileref in_f{fileref_from_fd(in_fd)};
 	fileref out_f{fileref_from_fd(out_fd)};
 
