@@ -34,23 +34,37 @@
  */
 
 #include <vfscore/file.h>
+#include <vfscore/fs.h>
 #include <uk/plat/console.h>
 #include <uk/essentials.h>
 #include <termios.h>
+#include <vfscore/vnode.h>
+#include <unistd.h>
 
 /* One function for stderr and stdout */
-static ssize_t stdout_write(struct vfscore_file *vfscore_file __unused,
-			    const void *buf, size_t count)
+static ssize_t stdio_write(struct vnode *vp __unused,
+			   struct uio *uio,
+			   int ioflag __unused)
 {
-	return ukplat_coutk(buf, count);
+	UK_ASSERT(!uio->uio_offset);
+	UK_ASSERT(uio->uio_iovcnt == 1);
+	return ukplat_coutk(uio->uio_iov->iov_base, uio->uio_iov->iov_len);
 }
 
-static ssize_t stdin_read(struct vfscore_file *vfscore_file __unused,
-			  void *_buf, size_t count)
+static ssize_t stdio_read(struct vnode *vp __unused,
+		      struct vfscore_file *file __unused,
+		      struct uio *uio,
+		      int ioflag __unused)
 {
 	int bytes_read;
-	size_t bytes_total = 0;
-	char *buf = (char *)_buf;
+	size_t bytes_total = 0, count;
+	char *buf;
+
+	UK_ASSERT(!uio->uio_offset);
+	UK_ASSERT(uio->uio_iovcnt == 1);
+
+	buf = uio->uio_iov->iov_base;
+	count = uio->uio_iov->iov_len;
 
 	do {
 		while ((bytes_read = ukplat_cink(buf,
@@ -61,8 +75,8 @@ static ssize_t stdin_read(struct vfscore_file *vfscore_file __unused,
 		*(buf - 1) = *(buf - 1) == '\r' ?
 					'\n' : *(buf - 1);
 
-		stdout_write(vfscore_file, (buf - bytes_read),
-				bytes_read);
+		/* Echo the input */
+		ukplat_coutk(buf - bytes_read, bytes_read);
 		bytes_total += bytes_read;
 
 	} while (bytes_total < count && *(buf - 1) != '\n'
@@ -71,33 +85,38 @@ static ssize_t stdin_read(struct vfscore_file *vfscore_file __unused,
 	return bytes_total;
 }
 
-static struct vfscore_fops stdin_fops = {
-	.read = stdin_read,
+
+static struct vnops stdio_vnops = {
+	.vop_write = stdio_write,
+	.vop_read = stdio_read,
 };
 
-static struct vfscore_fops stdout_fops = {
-	.write = stdout_write,
+static struct vnode stdio_vnode = {
+	.v_ino = 1,
+	.v_op = &stdio_vnops,
+	.v_lock = UK_MUTEX_INITIALIZER(stdio_vnode.v_lock),
+	.v_refcnt = 1,
 };
 
-static struct vfscore_file  stdin_file = {
-	.fd = 0,
-	.fops = &stdin_fops,
+static struct dentry stdio_dentry = {
+	.d_vnode = &stdio_vnode,
 };
 
-static struct vfscore_file  stdout_file = {
+static struct vfscore_file  stdio_file = {
 	.fd = 1,
-	.fops = &stdout_fops,
+	.f_flags = FWRITE | FREAD,
+	.f_dentry = &stdio_dentry,
+	/* reference count is 2 because close(0) is a valid
+	 * operation. However it is not properly handled in the
+	 * current implementation. */
+	.f_count = 2,
 };
-
-static struct vfscore_file  stderr_file = {
-	.fd = 2,
-	.fops = &stdout_fops,
-};
-
 
 void init_stdio(void)
 {
-	vfscore_install_fd(0, &stdin_file);
-	vfscore_install_fd(1, &stdout_file);
-	vfscore_install_fd(2, &stderr_file);
+	vfscore_install_fd(0, &stdio_file);
+	if (dup2(0, 1) != 1)
+		uk_pr_err("failed to dup to stdin\n");
+	if (dup2(0, 2) != 2)
+		uk_pr_err("failed to dup to stderr\n");
 }

@@ -38,66 +38,7 @@
 #include <uk/print.h>
 #include <vfscore/file.h>
 #include <uk/assert.h>
-#include <uk/arch/atomic.h>
-
-int close(int fd)
-{
-	struct vfscore_file *file = vfscore_get_file(fd);
-
-	if (!file) {
-		uk_pr_warn("no such file descriptor: %d\n", fd);
-		errno = EBADF;
-		return -1;
-	}
-
-	if (!file->fops->close) {
-		errno = EIO;
-		return -1;
-	}
-
-	return file->fops->close(file);
-}
-
-ssize_t write(int fd, const void *buf, size_t count)
-{
-	struct vfscore_file *file = vfscore_get_file(fd);
-
-	if (!file) {
-		uk_pr_warn("no such file descriptor: %d\n", fd);
-		errno = EBADF;
-		return -1;
-	}
-
-	if (!file->fops->write) {
-		uk_pr_warn("file does not have write op: %d\n", fd);
-		errno = EINVAL;
-		return -1;
-	}
-
-	return file->fops->write(file, buf, count);
-}
-
-ssize_t read(int fd, void *buf, size_t count)
-{
-	struct vfscore_file *file = vfscore_get_file(fd);
-
-	if (!file) {
-		uk_pr_warn("no such file descriptor: %d\n", fd);
-		errno = EBADF;
-		return -1;
-	}
-
-	if (!file->fops->read) {
-		uk_pr_warn("file does not have read op: %d\n", fd);
-		errno = EINVAL;
-		return -1;
-	}
-
-	return file->fops->read(file, buf, count);
-}
-
-/* TODO: remove stub */
-#define vfs_close(fp) (0)
+#include "vfs.h"
 
 int fdrop(struct vfscore_file *fp)
 {

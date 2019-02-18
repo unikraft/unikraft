@@ -38,6 +38,7 @@
 
 #include <stdint.h>
 #include <sys/types.h>
+#include <vfscore/dentry.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -58,7 +59,6 @@ struct vfscore_file {
 	off_t		f_offset;	/* current position in file */
 	void		*f_data;        /* file descriptor specific data */
 	struct dentry   *f_dentry;
-	const struct vfscore_fops *fops;
 };
 
 int vfscore_alloc_fd(void);
