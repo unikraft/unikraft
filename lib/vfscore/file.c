@@ -38,7 +38,7 @@
 #include <uk/print.h>
 #include <vfscore/file.h>
 #include <uk/assert.h>
-
+#include <uk/arch/atomic.h>
 
 int close(int fd)
 {
@@ -94,4 +94,24 @@ ssize_t read(int fd, void *buf, size_t count)
 	}
 
 	return file->fops->read(file, buf, count);
+}
+
+/* TODO: remove stub */
+#define vfs_close(fp) (0)
+
+int fdrop(struct vfscore_file *fp)
+{
+	int ret = 0;
+	int prev = ukarch_dec(&fp->f_count);
+
+	if (prev == 0)
+		UK_CRASH("Unbalanced fhold/fdrop");
+
+	if (prev == 1)
+		ret = vfs_close(fp);
+	return ret;
+}
+void fhold(struct vfscore_file *fp)
+{
+	ukarch_inc(&fp->f_count);
 }

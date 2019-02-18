@@ -74,20 +74,45 @@ exit:
 
 void vfscore_put_fd(int fd)
 {
+	struct vfscore_file *fp;
+	unsigned long flags;
+
 	UK_ASSERT(fd < (int) FDTABLE_MAX_FILES);
 	/* Currently it is not allowed to free std(in|out|err) */
 	UK_ASSERT(fd > 2);
 
-	__uk_clear_bit(fd, &fdtable.bitmap);
+	flags = ukplat_lcpu_save_irqf();
+	__uk_clear_bit(fd, &fdtable.bitmap);\
+	fp = fdtable.files[fd];
+	fdtable.files[fd] = NULL;
+	ukplat_lcpu_restore_irqf(flags);
+
+	fdrop(fp);
 }
 
-void vfscore_install_fd(int fd, struct vfscore_file *file)
+int vfscore_install_fd(int fd, struct vfscore_file *file)
 {
-	UK_ASSERT(fd < (int) FDTABLE_MAX_FILES);
-	UK_ASSERT(file);
+	unsigned long flags;
+	struct vfscore_file *orig;
+
+	if ((fd >= (int) FDTABLE_MAX_FILES) || (!file))
+		return -EBADF;
+
+	fhold(file);
 
 	file->fd = fd;
+
+	flags = ukplat_lcpu_save_irqf();
+	orig = fdtable.files[fd];
 	fdtable.files[fd] = file;
+	ukplat_lcpu_restore_irqf(flags);
+
+	fdrop(file);
+
+	if (orig)
+		fdrop(orig);
+
+	return 0;
 }
 
 struct vfscore_file *vfscore_get_file(int fd)
@@ -101,12 +126,50 @@ struct vfscore_file *vfscore_get_file(int fd)
 	if (!(fdtable.bitmap & ((uint64_t) 1 << fd)))
 		goto exit;
 	ret = fdtable.files[fd];
+	fhold(ret);
 
 exit:
 	ukplat_lcpu_restore_irqf(flags);
 	return ret;
 }
 
+int fget(int fd, struct vfscore_file **out_fp)
+{
+	int ret = 0;
+	struct vfscore_file *fp = vfscore_get_file(fd);
+
+	if (!fp)
+		ret = EBADF;
+	else
+		*out_fp = fp;
+
+	return ret;
+}
+
+int fdalloc(struct vfscore_file *fp, int *newfd)
+{
+	int fd, ret = 0;
+
+	fhold(fp);
+
+	fd = vfscore_alloc_fd();
+	if (fd < 0) {
+		ret = fd;
+		goto exit;
+	}
+
+	ret = vfscore_install_fd(fd, fp);
+	if (ret)
+		fdrop(fp);
+	else
+		*newfd = fd;
+
+exit:
+	return ret;
+}
+
+
+/* TODO: move this constructor to main.c */
 __constructor static void fdtable_init(void)
 {
 	memset(&fdtable, 0, sizeof(fdtable));

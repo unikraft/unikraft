@@ -53,13 +53,20 @@ struct vfscore_fops {
 
 struct vfscore_file {
 	int fd;
+	int		f_count;	/* reference count */
 	const struct vfscore_fops *fops;
 };
 
 int vfscore_alloc_fd(void);
 void vfscore_put_fd(int fd);
-void vfscore_install_fd(int fd, struct vfscore_file *file);
+int vfscore_install_fd(int fd, struct vfscore_file *file);
 struct vfscore_file *vfscore_get_file(int fd);
+
+/*
+ * File descriptors reference count
+ */
+void fhold(struct vfscore_file* fp);
+int fdrop(struct vfscore_file* fp);
 
 #define FOF_OFFSET  0x0800    /* Use the offset in uio argument */
 
