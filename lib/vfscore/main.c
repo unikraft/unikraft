@@ -2040,3 +2040,14 @@ int chroot(const char *path __unused)
 	errno = ENOSYS;
 	return -1;
 }
+
+static struct task _main_task_impl;
+__constructor static void vfscore_init(void)
+{
+	memset(&_main_task_impl, 0, sizeof(_main_task_impl));
+	strcpy(_main_task_impl.t_cwd, "/");
+	main_task = &_main_task_impl;
+
+	vnode_init();
+	lookup_init();
+}
