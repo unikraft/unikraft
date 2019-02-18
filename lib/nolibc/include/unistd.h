@@ -51,6 +51,11 @@ extern "C" {
 int close(int fd);
 ssize_t write(int fd, const void *buf, size_t count);
 ssize_t read(int fd, void *buf, size_t count);
+int fsync(int fd);
+int dup(int oldfd);
+int dup2(int oldfd, int newfd);
+int dup3(int oldfd, int newfd, int flags);
+int unlink(const char *pathname);
 #endif
 
 #ifdef __cplusplus
