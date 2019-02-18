@@ -5,7 +5,7 @@ vfscore_get_file
 close
 write
 read
-sys_mount
+mount
 vfscore_nullop
 vfscore_release_mp_dentries
 vfscore_vget
@@ -27,8 +27,8 @@ dup
 dup2
 dup3
 vfscore_uiomove
-sys_sync
+sync
 vfscore_mount_dump
-sys_umount
-sys_umount2
+umount
+umount2
 unlink

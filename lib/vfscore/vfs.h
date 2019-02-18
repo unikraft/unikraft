@@ -111,11 +111,8 @@ int  sys_utimensat(int dirfd, const char *pathname,
 int  sys_futimens(int fd, const struct timespec times[2]);
 int  sys_fallocate(struct vfscore_file *fp, int mode, loff_t offset, loff_t len);
 
-int	 sys_mount(const char *dev, const char *dir, const char *fsname, int flags, const void *data);
-int	 sys_umount2(const char *path, int flags);
-int	 sys_umount(const char *path);
 int	 sys_pivot_root(const char *new_root, const char *old_put);
-int	 sys_sync(void);
+void	 sync(void);
 int	 sys_chmod(const char *path, mode_t mode);
 int	 sys_fchmod(int fd, mode_t mode);
 

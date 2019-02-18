@@ -106,7 +106,7 @@ int device_close(struct device *dev)
 }
 
 int
-sys_mount(const char *dev, const char *dir, const char *fsname, int flags, const void *data)
+mount(const char *dev, const char *dir, const char *fsname, int flags, const void *data)
 {
 	const struct vfscore_fs_type *fs;
 	struct mount *mp;
@@ -135,7 +135,7 @@ sys_mount(const char *dev, const char *dir, const char *fsname, int flags, const
 	// We need to avoid the situation where after we already verified that
 	// the mount point is free, but before we actually add it to mount_list,
 	// another concurrent mount adds it. So we use a new mutex to ensure
-	// that only one sys_mount() runs at a time. We cannot reuse the existing
+	// that only one mount() runs at a time. We cannot reuse the existing
 	// mount_lock for this purpose: If we take mount_lock and then do
 	// lookups, this is lock order inversion and can result in deadlock.
 
@@ -252,7 +252,7 @@ vfscore_release_mp_dentries(struct mount *mp)
 }
 
 int
-sys_umount2(const char *path, int flags)
+umount2(const char *path, int flags)
 {
 	struct mount *mp, *tmp;
 	int error, pathlen;
@@ -305,9 +305,9 @@ found:
 }
 
 int
-sys_umount(const char *path)
+umount(const char *path)
 {
-	return sys_umount2(path, 0);
+	return umount2(path, 0);
 }
 
 #if 0
@@ -360,8 +360,7 @@ sys_pivot_root(const char *new_root, const char *put_old)
 }
 #endif
 
-int
-sys_sync(void)
+void sync(void)
 {
 	struct mount *mp;
 	uk_mutex_lock(&mount_lock);
@@ -374,7 +373,6 @@ sys_sync(void)
 	bio_sync();
 #endif
 	uk_mutex_unlock(&mount_lock);
-	return 0;
 }
 
 /*
