@@ -1,5 +1,8 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Copyright (c) 2005-2008, Kohsuke Ohtani
+ * Copyright (C) 2014 Cloudius Systems, Ltd.
+ * Copyright (c) 2019, NEC Europe Ltd., NEC Corporation.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
