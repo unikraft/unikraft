@@ -371,22 +371,22 @@ vn_stat(struct vnode *vp, struct stat *st)
 int
 vn_settimes(struct vnode *vp, struct timespec times[2])
 {
-    struct vattr vattr;
-    struct vattr *vap;
-    int error;
+	struct vattr vattr;
+	struct vattr *vap;
+	int error;
 
-    vap = &vattr;
-    memset(vap, 0, sizeof(struct vattr));
+	vap = &vattr;
+	memset(vap, 0, sizeof(struct vattr));
 
-    vap->va_atime = times[0];
-    vap->va_mtime = times[1];
-    vap->va_mask = ((times[0].tv_nsec == UTIME_OMIT) ? 0 : AT_ATIME)
-                    | ((times[1].tv_nsec == UTIME_OMIT) ? 0 : AT_MTIME);
-    vn_lock(vp);
-    error = VOP_SETATTR(vp, vap);
-    vn_unlock(vp);
+	vap->va_atime = times[0];
+	vap->va_mtime = times[1];
+	vap->va_mask = ((times[0].tv_nsec == UTIME_OMIT) ? 0 : AT_ATIME)
+					| ((times[1].tv_nsec == UTIME_OMIT) ? 0 : AT_MTIME);
+	vn_lock(vp);
+	error = VOP_SETATTR(vp, vap);
+	vn_unlock(vp);
 
-    return error;
+	return error;
 }
 
 /*
@@ -395,15 +395,15 @@ vn_settimes(struct vnode *vp, struct timespec times[2])
 int
 vn_setmode(struct vnode *vp, mode_t new_mode)
 {
-    struct vattr vattr;
-    memset(&vattr, 0, sizeof(vattr));
-    vattr.va_mode = new_mode;
-    vattr.va_mask = AT_MODE;
-    vn_lock(vp);
-    vp->v_mode = new_mode;
-    int error = VOP_SETATTR(vp, &vattr);
-    vn_unlock(vp);
-    return error;
+	struct vattr vattr;
+	memset(&vattr, 0, sizeof(vattr));
+	vattr.va_mode = new_mode;
+	vattr.va_mask = AT_MODE;
+	vn_lock(vp);
+	vp->v_mode = new_mode;
+	int error = VOP_SETATTR(vp, &vattr);
+	vn_unlock(vp);
+	return error;
 }
 
 /*

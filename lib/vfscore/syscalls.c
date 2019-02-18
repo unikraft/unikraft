@@ -245,72 +245,72 @@ int
 sys_read(struct file *fp, const struct iovec *iov, size_t niov,
 		off_t offset, size_t *count)
 {
-    if ((fp->f_flags & FREAD) == 0)
-        return EBADF;
+	if ((fp->f_flags & FREAD) == 0)
+		return EBADF;
 
-    size_t bytes = 0;
-    auto iovp = iov;
-    for (unsigned i = 0; i < niov; i++) {
-        if (iovp->iov_len > IOSIZE_MAX - bytes) {
-            return EINVAL;
-        }
-        bytes += iovp->iov_len;
-        iovp++;
-    }
+	size_t bytes = 0;
+	auto iovp = iov;
+	for (unsigned i = 0; i < niov; i++) {
+		if (iovp->iov_len > IOSIZE_MAX - bytes) {
+			return EINVAL;
+		}
+		bytes += iovp->iov_len;
+		iovp++;
+	}
 
-    if (bytes == 0) {
-        *count = 0;
-        return 0;
-    }
+	if (bytes == 0) {
+		*count = 0;
+		return 0;
+	}
 
-    struct uio uio;
-    // Unfortunately, the current implementation of fp->read zeros the
-    // iov_len fields when it reads from disk, so we have to copy iov.
-    std::vector<iovec> copy_iov(iov, iov + niov);
-    uio.uio_iov = copy_iov.data();
-    uio.uio_iovcnt = niov;
-    uio.uio_offset = offset;
-    uio.uio_resid = bytes;
-    uio.uio_rw = UIO_READ;
-    auto error = fp->read(&uio, (offset == -1) ? 0 : FOF_OFFSET);
-    *count = bytes - uio.uio_resid;
-    return error;
+	struct uio uio;
+	// Unfortunately, the current implementation of fp->read zeros the
+	// iov_len fields when it reads from disk, so we have to copy iov.
+	std::vector<iovec> copy_iov(iov, iov + niov);
+	uio.uio_iov = copy_iov.data();
+	uio.uio_iovcnt = niov;
+	uio.uio_offset = offset;
+	uio.uio_resid = bytes;
+	uio.uio_rw = UIO_READ;
+	auto error = fp->read(&uio, (offset == -1) ? 0 : FOF_OFFSET);
+	*count = bytes - uio.uio_resid;
+	return error;
 }
 
 int
 sys_write(struct file *fp, const struct iovec *iov, size_t niov,
 		off_t offset, size_t *count)
 {
-    if ((fp->f_flags & FWRITE) == 0)
-        return EBADF;
+	if ((fp->f_flags & FWRITE) == 0)
+		return EBADF;
 
-    size_t bytes = 0;
-    auto iovp = iov;
-    for (unsigned i = 0; i < niov; i++) {
-        if (iovp->iov_len > IOSIZE_MAX - bytes) {
-            return EINVAL;
-        }
-        bytes += iovp->iov_len;
-        iovp++;
-    }
+	size_t bytes = 0;
+	auto iovp = iov;
+	for (unsigned i = 0; i < niov; i++) {
+		if (iovp->iov_len > IOSIZE_MAX - bytes) {
+			return EINVAL;
+		}
+		bytes += iovp->iov_len;
+		iovp++;
+	}
 
-    if (bytes == 0) {
-        *count = 0;
-        return 0;
-    }
+	if (bytes == 0) {
+		*count = 0;
+		return 0;
+	}
 
-    struct uio uio;
-    // Unfortunately, the current implementation of fp->write zeros the
-    // iov_len fields when it writes to disk, so we have to copy iov.
-    std::vector<iovec> copy_iov(iov, iov + niov);
-    uio.uio_iov = copy_iov.data();
-    uio.uio_iovcnt = niov;
-    uio.uio_offset = offset;
-    uio.uio_resid = bytes;
-    uio.uio_rw = UIO_WRITE;
-    auto error = fp->write(&uio, (offset == -1) ? 0 : FOF_OFFSET);
-    *count = bytes - uio.uio_resid;
-    return error;
+	struct uio uio;
+	// Unfortunately, the current implementation of fp->write zeros the
+	// iov_len fields when it writes to disk, so we have to copy iov.
+	std::vector<iovec> copy_iov(iov, iov + niov);
+	uio.uio_iov = copy_iov.data();
+	uio.uio_iovcnt = niov;
+	uio.uio_offset = offset;
+	uio.uio_resid = bytes;
+	uio.uio_rw = UIO_WRITE;
+	auto error = fp->write(&uio, (offset == -1) ? 0 : FOF_OFFSET);
+	*count = bytes - uio.uio_resid;
+	return error;
 }
 
 int
@@ -1221,8 +1221,8 @@ sys_readlink(char *path, char *buf, size_t bufsize, ssize_t *size)
  */
 static bool is_timeval_valid(const struct timeval *time)
 {
-    return (time->tv_sec >= 0) &&
-           (time->tv_usec >= 0 && time->tv_usec < 1000000);
+	return (time->tv_sec >= 0) &&
+		   (time->tv_usec >= 0 && time->tv_usec < 1000000);
 }
 
 /*
@@ -1230,58 +1230,58 @@ static bool is_timeval_valid(const struct timeval *time)
  */
 static void convert_timeval(struct timespec &to, const struct timeval *from)
 {
-    if (from) {
-        to.tv_sec = from->tv_sec;
-        to.tv_nsec = from->tv_usec * 1000; // Convert microseconds to nanoseconds
-    } else {
-        clock_gettime(CLOCK_REALTIME, &to);
-    }
+	if (from) {
+		to.tv_sec = from->tv_sec;
+		to.tv_nsec = from->tv_usec * 1000; // Convert microseconds to nanoseconds
+	} else {
+		clock_gettime(CLOCK_REALTIME, &to);
+	}
 }
 
 int
 sys_utimes(char *path, const struct timeval times[2], int flags)
 {
-    int error;
-    struct dentry *dp;
-    struct timespec timespec_times[2];
+	int error;
+	struct dentry *dp;
+	struct timespec timespec_times[2];
 
-    DPRINTF(VFSDB_SYSCALL, ("sys_utimes: path=%s\n", path));
+	DPRINTF(VFSDB_SYSCALL, ("sys_utimes: path=%s\n", path));
 
-    if (times && (!is_timeval_valid(&times[0]) || !is_timeval_valid(&times[1])))
-        return EINVAL;
+	if (times && (!is_timeval_valid(&times[0]) || !is_timeval_valid(&times[1])))
+		return EINVAL;
 
-    // Convert each element of timeval array to the timespec type
-    convert_timeval(timespec_times[0], times ? times + 0 : nullptr);
-    convert_timeval(timespec_times[1], times ? times + 1 : nullptr);
+	// Convert each element of timeval array to the timespec type
+	convert_timeval(timespec_times[0], times ? times + 0 : nullptr);
+	convert_timeval(timespec_times[1], times ? times + 1 : nullptr);
 
-    if (flags & AT_SYMLINK_NOFOLLOW) {
-        struct dentry *ddp;
-        error = lookup(path, &ddp, nullptr);
-        if (error) {
-            return error;
-        }
+	if (flags & AT_SYMLINK_NOFOLLOW) {
+		struct dentry *ddp;
+		error = lookup(path, &ddp, nullptr);
+		if (error) {
+			return error;
+		}
 
-        error = namei_last_nofollow(path, ddp, &dp);
-        if (ddp != nullptr) {
-            drele(ddp);
-        }
-        if (error) {
-            return error;
-        }
-    } else {
-        error = namei(path, &dp);
-        if (error)
-            return error;
-    }
+		error = namei_last_nofollow(path, ddp, &dp);
+		if (ddp != nullptr) {
+			drele(ddp);
+		}
+		if (error) {
+			return error;
+		}
+	} else {
+		error = namei(path, &dp);
+		if (error)
+			return error;
+	}
 
-    if (dp->d_mount->m_flags & MNT_RDONLY) {
-        error = EROFS;
-    } else {
-        error = vn_settimes(dp->d_vnode, timespec_times);
-    }
+	if (dp->d_mount->m_flags & MNT_RDONLY) {
+		error = EROFS;
+	} else {
+		error = vn_settimes(dp->d_vnode, timespec_times);
+	}
 
-    drele(dp);
-    return error;
+	drele(dp);
+	return error;
 }
 
 /*
@@ -1289,7 +1289,7 @@ sys_utimes(char *path, const struct timeval times[2], int flags)
  */
 static bool is_timespec_valid(const struct timespec &time)
 {
-    return (time.tv_sec >= 0) &&
+	return (time.tv_sec >= 0) &&
 	   ((time.tv_nsec >= 0 && time.tv_nsec <= 999999999) ||
 	    time.tv_nsec == UTIME_NOW ||
 	    time.tv_nsec == UTIME_OMIT);
@@ -1297,48 +1297,48 @@ static bool is_timespec_valid(const struct timespec &time)
 
 void init_timespec(struct timespec &_times, const struct timespec *times)
 {
-    if (times == nullptr || times->tv_nsec == UTIME_NOW) {
-        clock_gettime(CLOCK_REALTIME, &_times);
-    } else {
-        _times.tv_sec = times->tv_sec;
-        _times.tv_nsec = times->tv_nsec;
-    }
-    return;
+	if (times == nullptr || times->tv_nsec == UTIME_NOW) {
+		clock_gettime(CLOCK_REALTIME, &_times);
+	} else {
+		_times.tv_sec = times->tv_sec;
+		_times.tv_nsec = times->tv_nsec;
+	}
+	return;
 }
 
 int
 sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags)
 {
-    int error;
-    std::string ap;
-    struct timespec timespec_times[2];
-    extern struct task *main_task;
-    struct dentry *dp;
+	int error;
+	std::string ap;
+	struct timespec timespec_times[2];
+	extern struct task *main_task;
+	struct dentry *dp;
 
-    /* utimensat should return ENOENT when pathname is empty */
-    if(pathname && pathname[0] == 0)
-        return ENOENT;
+	/* utimensat should return ENOENT when pathname is empty */
+	if(pathname && pathname[0] == 0)
+		return ENOENT;
 
-    if (flags && !(flags & AT_SYMLINK_NOFOLLOW))
-        return EINVAL;
+	if (flags && !(flags & AT_SYMLINK_NOFOLLOW))
+		return EINVAL;
 
-    if (times && (!is_timespec_valid(times[0]) || !is_timespec_valid(times[1])))
-        return EINVAL;
+	if (times && (!is_timespec_valid(times[0]) || !is_timespec_valid(times[1])))
+		return EINVAL;
 
-    init_timespec(timespec_times[0], times ? times + 0 : nullptr);
-    init_timespec(timespec_times[1], times ? times + 1 : nullptr);
+	init_timespec(timespec_times[0], times ? times + 0 : nullptr);
+	init_timespec(timespec_times[1], times ? times + 1 : nullptr);
 
-    if (pathname && pathname[0] == '/') {
+	if (pathname && pathname[0] == '/') {
 	ap = pathname;
-    } else if (dirfd == AT_FDCWD) {
+	} else if (dirfd == AT_FDCWD) {
 	if (!pathname)
 	    return EFAULT;
 	ap = std::string(main_task->t_cwd) + "/" + pathname;
-    } else {
-        struct file *fp;
-        fileref f(fileref_from_fd(dirfd));
+	} else {
+		struct file *fp;
+		fileref f(fileref_from_fd(dirfd));
 
-        if (!f)
+		if (!f)
 	    return EBADF;
 
 	fp = f.get();
@@ -1355,132 +1355,132 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 	    ap = fp->f_dentry->d_path;
 
 	ap = std::string(fp->f_dentry->d_mount->m_path) + "/" + ap;
-    }
+	}
 
-    /* FIXME: Add support for AT_SYMLINK_NOFOLLOW */
+	/* FIXME: Add support for AT_SYMLINK_NOFOLLOW */
 
-    error = namei(ap.c_str(), &dp);
+	error = namei(ap.c_str(), &dp);
 
-    if (error)
-        return error;
+	if (error)
+		return error;
 
-    if (dp->d_mount->m_flags & MNT_RDONLY) {
-        error = EROFS;
-    } else {
-        if (vn_access(dp->d_vnode, VWRITE)) {
-            return EACCES;
-        }
+	if (dp->d_mount->m_flags & MNT_RDONLY) {
+		error = EROFS;
+	} else {
+		if (vn_access(dp->d_vnode, VWRITE)) {
+			return EACCES;
+		}
 	    if (times &&
-               (times[0].tv_nsec != UTIME_NOW || times[1].tv_nsec != UTIME_NOW) &&
-               (times[0].tv_nsec != UTIME_OMIT || times[1].tv_nsec != UTIME_OMIT) &&
+			   (times[0].tv_nsec != UTIME_NOW || times[1].tv_nsec != UTIME_NOW) &&
+			   (times[0].tv_nsec != UTIME_OMIT || times[1].tv_nsec != UTIME_OMIT) &&
 	       (!(dp->d_vnode->v_mode & ~VAPPEND)))
 	        return EPERM;
-        error = vn_settimes(dp->d_vnode, timespec_times);
-    }
+		error = vn_settimes(dp->d_vnode, timespec_times);
+	}
 
-    drele(dp);
-    return error;
+	drele(dp);
+	return error;
 }
 
 int
 sys_futimens(int fd, const struct timespec times[2])
 {
-    struct file *fp;
+	struct file *fp;
 
-    fileref f(fileref_from_fd(fd));
-    if (!f)
-        return EBADF;
+	fileref f(fileref_from_fd(fd));
+	if (!f)
+		return EBADF;
 
-    fp = f.get();
+	fp = f.get();
 
-    if (!fp->f_dentry)
-        return EBADF;
+	if (!fp->f_dentry)
+		return EBADF;
 
-    std::string pathname = fp->f_dentry->d_path;
-    auto error = sys_utimensat(AT_FDCWD, pathname.c_str(), times, 0);
-    return error;
+	std::string pathname = fp->f_dentry->d_path;
+	auto error = sys_utimensat(AT_FDCWD, pathname.c_str(), times, 0);
+	return error;
 }
 
 int
 sys_fallocate(struct file *fp, int mode, loff_t offset, loff_t len)
 {
-    int error;
-    struct vnode *vp;
+	int error;
+	struct vnode *vp;
 
-    DPRINTF(VFSDB_SYSCALL, ("sys_fallocate: fp=%x", fp));
+	DPRINTF(VFSDB_SYSCALL, ("sys_fallocate: fp=%x", fp));
 
-    if (!fp->f_dentry || !(fp->f_flags & FWRITE)) {
-        return EBADF;
-    }
+	if (!fp->f_dentry || !(fp->f_flags & FWRITE)) {
+		return EBADF;
+	}
 
-    if (offset < 0 || len <= 0) {
-        return EINVAL;
-    }
+	if (offset < 0 || len <= 0) {
+		return EINVAL;
+	}
 
-    // Strange, but that's what Linux returns.
-    if ((mode & FALLOC_FL_PUNCH_HOLE) && !(mode & FALLOC_FL_KEEP_SIZE)) {
-        return ENOTSUP;
-    }
+	// Strange, but that's what Linux returns.
+	if ((mode & FALLOC_FL_PUNCH_HOLE) && !(mode & FALLOC_FL_KEEP_SIZE)) {
+		return ENOTSUP;
+	}
 
-    vp = fp->f_dentry->d_vnode;
-    vn_lock(vp);
+	vp = fp->f_dentry->d_vnode;
+	vn_lock(vp);
 
-    // NOTE: It's not detected here whether or not the device underlying
-    // the fs is a block device. It's up to the fs itself tell us whether
-    // or not fallocate is supported. See below:
-    if (vp->v_type != VREG && vp->v_type != VDIR) {
-        error = ENODEV;
-        goto ret;
-    }
+	// NOTE: It's not detected here whether or not the device underlying
+	// the fs is a block device. It's up to the fs itself tell us whether
+	// or not fallocate is supported. See below:
+	if (vp->v_type != VREG && vp->v_type != VDIR) {
+		error = ENODEV;
+		goto ret;
+	}
 
-    // EOPNOTSUPP here means that the underlying file system
-    // referred by vp doesn't support fallocate.
-    if (!vp->v_op->vop_fallocate) {
-        error = EOPNOTSUPP;
-        goto ret;
-    }
+	// EOPNOTSUPP here means that the underlying file system
+	// referred by vp doesn't support fallocate.
+	if (!vp->v_op->vop_fallocate) {
+		error = EOPNOTSUPP;
+		goto ret;
+	}
 
-    error = VOP_FALLOCATE(vp, mode, offset, len);
+	error = VOP_FALLOCATE(vp, mode, offset, len);
 ret:
-    vn_unlock(vp);
-    return error;
+	vn_unlock(vp);
+	return error;
 }
 
 int
 sys_chmod(const char *path, mode_t mode)
 {
-    int error;
-    struct dentry *dp;
-    DPRINTF(VFSDB_SYSCALL, ("sys_chmod: path=%s\n", path));
-    error = namei(path, &dp);
-    if (error)
-        return error;
-    if (dp->d_mount->m_flags & MNT_RDONLY) {
-        error = EROFS;
-    } else {
-        error = vn_setmode(dp->d_vnode, mode);
-    }
-    drele(dp);
-    return error;
+	int error;
+	struct dentry *dp;
+	DPRINTF(VFSDB_SYSCALL, ("sys_chmod: path=%s\n", path));
+	error = namei(path, &dp);
+	if (error)
+		return error;
+	if (dp->d_mount->m_flags & MNT_RDONLY) {
+		error = EROFS;
+	} else {
+		error = vn_setmode(dp->d_vnode, mode);
+	}
+	drele(dp);
+	return error;
 }
 
 int
 sys_fchmod(int fd, mode_t mode)
 {
-    fileref f(fileref_from_fd(fd));
-    if (!f)
-        return EBADF;
-    // Posix is ambivalent on what fchmod() should do on an fd that does not
-    // refer to a real file. It suggests an implementation may (but not must)
-    // fail EINVAL on a pipe, can behave in an "unspecified" manner on a
-    // socket, and for a STREAM, it must succeed and do nothing. Linux seems
-    // to just do the last thing (do nothing and succeed).
-    if (!f->f_dentry) {
-        return 0;
-    }
-    if (f->f_dentry->d_mount->m_flags & MNT_RDONLY) {
-        return EROFS;
-    } else {
-        return vn_setmode(f->f_dentry->d_vnode, mode);
-    }
+	fileref f(fileref_from_fd(fd));
+	if (!f)
+		return EBADF;
+	// Posix is ambivalent on what fchmod() should do on an fd that does not
+	// refer to a real file. It suggests an implementation may (but not must)
+	// fail EINVAL on a pipe, can behave in an "unspecified" manner on a
+	// socket, and for a STREAM, it must succeed and do nothing. Linux seems
+	// to just do the last thing (do nothing and succeed).
+	if (!f->f_dentry) {
+		return 0;
+	}
+	if (f->f_dentry->d_mount->m_flags & MNT_RDONLY) {
+		return EROFS;
+	} else {
+		return vn_setmode(f->f_dentry->d_vnode, mode);
+	}
 }

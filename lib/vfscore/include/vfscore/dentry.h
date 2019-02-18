@@ -33,8 +33,8 @@ struct dentry {
 using dentry_ref = boost::intrusive_ptr<dentry>;
 
 extern "C" {
-    void dref(struct dentry* dp);
-    void drele(struct dentry* dp);
+	void dref(struct dentry* dp);
+	void drele(struct dentry* dp);
 };
 
 inline void intrusive_ptr_add_ref(dentry* dp) { dref(dp); }

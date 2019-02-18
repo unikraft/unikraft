@@ -140,17 +140,17 @@ int vfs_file::chmod(mode_t mode)
 
 bool vfs_file::map_page(uintptr_t off, mmu::hw_ptep<0> ptep, mmu::pt_element<0> pte, bool write, bool shared)
 {
-    return pagecache::get(this, off, ptep, pte, write, shared);
+	return pagecache::get(this, off, ptep, pte, write, shared);
 }
 
 bool vfs_file::put_page(void *addr, uintptr_t off, mmu::hw_ptep<0> ptep)
 {
-    return pagecache::release(this, addr, off, ptep);
+	return pagecache::release(this, addr, off, ptep);
 }
 
 void vfs_file::sync(off_t start, off_t end)
 {
-    pagecache::sync(this, start, end);
+	pagecache::sync(this, start, end);
 }
 
 // Locking: VOP_CACHE will call into the filesystem, and that can trigger an
@@ -159,23 +159,23 @@ void vfs_file::sync(off_t start, off_t end)
 // because not all invalidations will be synchronous.
 int vfs_file::get_arcbuf(void* key, off_t offset)
 {
-    struct vnode *vp = f_dentry->d_vnode;
+	struct vnode *vp = f_dentry->d_vnode;
 
-    iovec io[1];
+	iovec io[1];
 
-    io[0].iov_base = key;
-    uio data;
-    data.uio_iov = io;
-    data.uio_iovcnt = 1;
-    data.uio_offset = offset;
-    data.uio_resid = mmu::page_size;
-    data.uio_rw = UIO_READ;
+	io[0].iov_base = key;
+	uio data;
+	data.uio_iov = io;
+	data.uio_iovcnt = 1;
+	data.uio_offset = offset;
+	data.uio_resid = mmu::page_size;
+	data.uio_rw = UIO_READ;
 
-    vn_lock(vp);
-    assert(VOP_CACHE(vp, this, &data) == 0);
-    vn_unlock(vp);
+	vn_lock(vp);
+	assert(VOP_CACHE(vp, this, &data) == 0);
+	vn_unlock(vp);
 
-    return (data.uio_resid != 0) ? -1 : 0;
+	return (data.uio_resid != 0) ? -1 : 0;
 }
 
 std::unique_ptr<mmu::file_vma> vfs_file::mmap(addr_range range, unsigned flags, unsigned perm, off_t offset)

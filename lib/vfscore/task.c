@@ -48,7 +48,7 @@ task_alloc(struct task **pt)
 {
 	struct task *t;
 
-    // FIXME: where do we free task ?
+	// FIXME: where do we free task ?
 	if (!(t = new task))
 		return ENOMEM;
 	memset(t, 0, sizeof(struct task));
@@ -160,8 +160,8 @@ task_conv(struct task *t, const char *cpath, int acc, char *full)
  */
 int vfs_dname_copy(char *dest, const char *src, size_t size)
 {
-    if (strlcpy(dest, src, size) >= size) {
-        return -1;
-    }
-    return 0;
+	if (strlcpy(dest, src, size) >= size) {
+		return -1;
+	}
+	return 0;
 }

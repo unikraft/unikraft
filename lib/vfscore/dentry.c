@@ -55,180 +55,180 @@ static mutex dentry_hash_lock;
 static u_int
 dentry_hash(struct mount *mp, const char *path)
 {
-    u_int val = 0;
+	u_int val = 0;
 
-    if (path) {
-        while (*path) {
-            val = ((val << 5) + val) + *path++;
-        }
-    }
-    return (val ^ (unsigned long) mp) & (DENTRY_BUCKETS - 1);
+	if (path) {
+		while (*path) {
+			val = ((val << 5) + val) + *path++;
+		}
+	}
+	return (val ^ (unsigned long) mp) & (DENTRY_BUCKETS - 1);
 }
 
 
 struct dentry *
 dentry_alloc(struct dentry *parent_dp, struct vnode *vp, const char *path)
 {
-    struct mount *mp = vp->v_mount;
-    struct dentry *dp = (dentry*)calloc(sizeof(*dp), 1);
+	struct mount *mp = vp->v_mount;
+	struct dentry *dp = (dentry*)calloc(sizeof(*dp), 1);
 
-    if (!dp) {
-        return nullptr;
-    }
+	if (!dp) {
+		return nullptr;
+	}
 
-    vref(vp);
+	vref(vp);
 
-    dp->d_refcnt = 1;
-    dp->d_vnode = vp;
-    dp->d_mount = mp;
-    dp->d_path = strdup(path);
-    LIST_INIT(&dp->d_children);
+	dp->d_refcnt = 1;
+	dp->d_vnode = vp;
+	dp->d_mount = mp;
+	dp->d_path = strdup(path);
+	LIST_INIT(&dp->d_children);
 
-    if (parent_dp) {
-        dref(parent_dp);
-        WITH_LOCK(parent_dp->d_lock) {
-            // Insert dp into its parent's children list.
-            LIST_INSERT_HEAD(&parent_dp->d_children, dp, d_children_link);
-        }
-    }
-    dp->d_parent = parent_dp;
+	if (parent_dp) {
+		dref(parent_dp);
+		WITH_LOCK(parent_dp->d_lock) {
+			// Insert dp into its parent's children list.
+			LIST_INSERT_HEAD(&parent_dp->d_children, dp, d_children_link);
+		}
+	}
+	dp->d_parent = parent_dp;
 
-    vn_add_name(vp, dp);
+	vn_add_name(vp, dp);
 
-    mutex_lock(&dentry_hash_lock);
-    LIST_INSERT_HEAD(&dentry_hash_table[dentry_hash(mp, path)], dp, d_link);
-    mutex_unlock(&dentry_hash_lock);
-    return dp;
+	mutex_lock(&dentry_hash_lock);
+	LIST_INSERT_HEAD(&dentry_hash_table[dentry_hash(mp, path)], dp, d_link);
+	mutex_unlock(&dentry_hash_lock);
+	return dp;
 };
 
 struct dentry *
 dentry_lookup(struct mount *mp, char *path)
 {
-    struct dentry *dp;
+	struct dentry *dp;
 
-    mutex_lock(&dentry_hash_lock);
-    LIST_FOREACH(dp, &dentry_hash_table[dentry_hash(mp, path)], d_link) {
-        if (dp->d_mount == mp && !strncmp(dp->d_path, path, PATH_MAX)) {
-            dp->d_refcnt++;
-            mutex_unlock(&dentry_hash_lock);
-            return dp;
-        }
-    }
-    mutex_unlock(&dentry_hash_lock);
-    return nullptr;                /* not found */
+	mutex_lock(&dentry_hash_lock);
+	LIST_FOREACH(dp, &dentry_hash_table[dentry_hash(mp, path)], d_link) {
+		if (dp->d_mount == mp && !strncmp(dp->d_path, path, PATH_MAX)) {
+			dp->d_refcnt++;
+			mutex_unlock(&dentry_hash_lock);
+			return dp;
+		}
+	}
+	mutex_unlock(&dentry_hash_lock);
+	return nullptr;                /* not found */
 }
 
 static void dentry_children_remove(struct dentry *dp)
 {
-    struct dentry *entry = nullptr;
+	struct dentry *entry = nullptr;
 
-    WITH_LOCK(dp->d_lock) {
-        LIST_FOREACH(entry, &dp->d_children, d_children_link) {
-            ASSERT(entry);
-            ASSERT(entry->d_refcnt > 0);
-            LIST_REMOVE(entry, d_link);
-        }
-    }
+	WITH_LOCK(dp->d_lock) {
+		LIST_FOREACH(entry, &dp->d_children, d_children_link) {
+			ASSERT(entry);
+			ASSERT(entry->d_refcnt > 0);
+			LIST_REMOVE(entry, d_link);
+		}
+	}
 }
 
 void
 dentry_move(struct dentry *dp, struct dentry *parent_dp, char *path)
 {
-    struct dentry *old_pdp = dp->d_parent;
-    char *old_path = dp->d_path;
+	struct dentry *old_pdp = dp->d_parent;
+	char *old_path = dp->d_path;
 
-    if (old_pdp) {
-        WITH_LOCK(old_pdp->d_lock) {
-            // Remove dp from its old parent's children list.
-            LIST_REMOVE(dp, d_children_link);
-        }
-    }
+	if (old_pdp) {
+		WITH_LOCK(old_pdp->d_lock) {
+			// Remove dp from its old parent's children list.
+			LIST_REMOVE(dp, d_children_link);
+		}
+	}
 
-    if (parent_dp) {
-        dref(parent_dp);
-        WITH_LOCK(parent_dp->d_lock) {
-            // Insert dp into its new parent's children list.
-            LIST_INSERT_HEAD(&parent_dp->d_children, dp, d_children_link);
-        }
-    }
+	if (parent_dp) {
+		dref(parent_dp);
+		WITH_LOCK(parent_dp->d_lock) {
+			// Insert dp into its new parent's children list.
+			LIST_INSERT_HEAD(&parent_dp->d_children, dp, d_children_link);
+		}
+	}
 
-    WITH_LOCK(dentry_hash_lock) {
-        // Remove all dp's child dentries from the hashtable.
-        dentry_children_remove(dp);
-        // Remove dp with outdated hash info from the hashtable.
-        LIST_REMOVE(dp, d_link);
-        // Update dp.
-        dp->d_path = strdup(path);
-        dp->d_parent = parent_dp;
-        // Insert dp updated hash info into the hashtable.
-        LIST_INSERT_HEAD(&dentry_hash_table[dentry_hash(dp->d_mount, path)],
-            dp, d_link);
-    }
+	WITH_LOCK(dentry_hash_lock) {
+		// Remove all dp's child dentries from the hashtable.
+		dentry_children_remove(dp);
+		// Remove dp with outdated hash info from the hashtable.
+		LIST_REMOVE(dp, d_link);
+		// Update dp.
+		dp->d_path = strdup(path);
+		dp->d_parent = parent_dp;
+		// Insert dp updated hash info into the hashtable.
+		LIST_INSERT_HEAD(&dentry_hash_table[dentry_hash(dp->d_mount, path)],
+			dp, d_link);
+	}
 
-    if (old_pdp) {
-        drele(old_pdp);
-    }
+	if (old_pdp) {
+		drele(old_pdp);
+	}
 
-    free(old_path);
+	free(old_path);
 }
 
 void
 dentry_remove(struct dentry *dp)
 {
-    mutex_lock(&dentry_hash_lock);
-    LIST_REMOVE(dp, d_link);
-    /* put it on a fake list for drele() to work*/
-    LIST_INSERT_HEAD(&fake, dp, d_link);
-    mutex_unlock(&dentry_hash_lock);
+	mutex_lock(&dentry_hash_lock);
+	LIST_REMOVE(dp, d_link);
+	/* put it on a fake list for drele() to work*/
+	LIST_INSERT_HEAD(&fake, dp, d_link);
+	mutex_unlock(&dentry_hash_lock);
 }
 
 void
 dref(struct dentry *dp)
 {
-    ASSERT(dp);
-    ASSERT(dp->d_refcnt > 0);
+	ASSERT(dp);
+	ASSERT(dp->d_refcnt > 0);
 
-    mutex_lock(&dentry_hash_lock);
-    dp->d_refcnt++;
-    mutex_unlock(&dentry_hash_lock);
+	mutex_lock(&dentry_hash_lock);
+	dp->d_refcnt++;
+	mutex_unlock(&dentry_hash_lock);
 }
 
 void
 drele(struct dentry *dp)
 {
-    ASSERT(dp);
-    ASSERT(dp->d_refcnt > 0);
+	ASSERT(dp);
+	ASSERT(dp->d_refcnt > 0);
 
-    mutex_lock(&dentry_hash_lock);
-    if (--dp->d_refcnt) {
-        mutex_unlock(&dentry_hash_lock);
-        return;
-    }
-    LIST_REMOVE(dp, d_link);
-    vn_del_name(dp->d_vnode, dp);
+	mutex_lock(&dentry_hash_lock);
+	if (--dp->d_refcnt) {
+		mutex_unlock(&dentry_hash_lock);
+		return;
+	}
+	LIST_REMOVE(dp, d_link);
+	vn_del_name(dp->d_vnode, dp);
 
-    mutex_unlock(&dentry_hash_lock);
+	mutex_unlock(&dentry_hash_lock);
 
-    if (dp->d_parent) {
-        WITH_LOCK(dp->d_parent->d_lock) {
-            // Remove dp from its parent's children list.
-            LIST_REMOVE(dp, d_children_link);
-        }
-        drele(dp->d_parent);
-    }
+	if (dp->d_parent) {
+		WITH_LOCK(dp->d_parent->d_lock) {
+			// Remove dp from its parent's children list.
+			LIST_REMOVE(dp, d_children_link);
+		}
+		drele(dp->d_parent);
+	}
 
-    vrele(dp->d_vnode);
+	vrele(dp->d_vnode);
 
-    free(dp->d_path);
-    free(dp);
+	free(dp->d_path);
+	free(dp);
 }
 
 void
 dentry_init(void)
 {
-    int i;
+	int i;
 
-    for (i = 0; i < DENTRY_BUCKETS; i++) {
-        LIST_INIT(&dentry_hash_table[i]);
-    }
+	for (i = 0; i < DENTRY_BUCKETS; i++) {
+		LIST_INIT(&dentry_hash_table[i]);
+	}
 }

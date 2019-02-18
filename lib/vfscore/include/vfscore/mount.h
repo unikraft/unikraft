@@ -156,10 +156,10 @@ __END_DECLS
 namespace osv {
 
 struct mount_desc {
-    std::string special;
-    std::string path;
-    std::string type;
-    std::string options;
+	std::string special;
+	std::string path;
+	std::string type;
+	std::string options;
 };
 
 std::vector<mount_desc> current_mounts();
