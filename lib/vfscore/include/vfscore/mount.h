@@ -37,8 +37,6 @@
 #include <uk/list.h>
 #include <vfscore/vnode.h>
 
-#ifdef _KERNEL
-
 /*
  * Mount data
  */
@@ -56,7 +54,6 @@ struct mount {
 	fsid_t 		m_fsid; 	/* id that uniquely identifies the fs */
 };
 
-#endif
 
 /*
  * Mount flags.
@@ -94,8 +91,6 @@ struct mount {
  * Mask of flags that are visible to statfs()
  */
 #define	MNT_VISFLAGMASK	0x0000ffff
-
-#ifdef _KERNEL
 
 /*
  * Filesystem type switch table.
