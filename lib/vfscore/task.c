@@ -44,23 +44,6 @@
 #include <osv/prex.h>
 #include "vfs.h"
 
-/*
- * Allocate new task.
- */
-int
-task_alloc(struct task **pt)
-{
-	struct task *t;
-
-	// FIXME: where do we free task ?
-	if (!(t = new task))
-		return ENOMEM;
-	memset(t, 0, sizeof(struct task));
-	strlcpy(t->t_cwd, "/", sizeof(t->t_cwd));
-
-	*pt = t;
-	return 0;
-}
 
 /*
  * Convert to full path from the cwd of task and path.

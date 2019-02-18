@@ -43,8 +43,6 @@
 #include "file.h"
 #include "dirent.h"
 
-__BEGIN_DECLS
-
 struct vfsops;
 struct vnops;
 struct vnode;
@@ -241,8 +239,6 @@ static inline void vnode_pager_setsize(struct vnode *vp, off_t size)
 {
 	vp->v_size = size;
 }
-
-__END_DECLS
 
 #endif
 

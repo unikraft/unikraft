@@ -187,7 +187,8 @@ vget(struct mount *mp, uint64_t ino, struct vnode **vpp)
 		return 1;
 	}
 
-	if (!(vp = new vnode())) {
+	vp = malloc(sizeof(*vp));
+	if (!vp) {
 		VNODE_UNLOCK();
 		return 0;
 	}

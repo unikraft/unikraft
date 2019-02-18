@@ -54,20 +54,4 @@ struct dentry {
 	LIST_ENTRY(dentry) d_children_link;
 };
 
-#ifdef __cplusplus
-
-#include <boost/intrusive_ptr.hpp>
-
-using dentry_ref = boost::intrusive_ptr<dentry>;
-
-extern "C" {
-	void dref(struct dentry* dp);
-	void drele(struct dentry* dp);
-};
-
-inline void intrusive_ptr_add_ref(dentry* dp) { dref(dp); }
-inline void intrusive_ptr_release(dentry* dp) { drele(dp); }
-
-#endif
-
 #endif /* _OSV_DENTRY_H */

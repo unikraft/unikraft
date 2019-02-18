@@ -83,17 +83,6 @@ fs_getfs(const char *name)
 	return fs;
 }
 
-const char*
-fs_getfsname(vfsops* ops)
-{
-	for (auto fs = vfssw; fs->vs_name; fs++) {
-		if (fs->vs_op == ops) {
-			return fs->vs_name;
-		}
-	}
-	abort();
-}
-
 int
 sys_mount(const char *dev, const char *dir, const char *fsname, int flags, const void *data)
 {
@@ -141,7 +130,8 @@ sys_mount(const char *dev, const char *dir, const char *fsname, int flags, const
 	/*
 	 * Create VFS mount entry.
 	 */
-	if (!(mp = new mount)) {
+	mp = malloc(sizeof(struct mount));
+	if (!mp) {
 		error = ENOMEM;
 		goto err1;
 	}
@@ -214,7 +204,7 @@ sys_mount(const char *dev, const char *dir, const char *fsname, int flags, const
 	if (dp_covered)
 		drele(dp_covered);
  err2:
-	delete mp;
+	free(mp);
  err1:
 	if (device)
 		device_close(device);
@@ -281,7 +271,7 @@ found:
 
 	if (mp->m_dev)
 		device_close(mp->m_dev);
-	delete mp;
+	free(mp);
  out:
 	return error;
 }
@@ -292,6 +282,7 @@ sys_umount(const char *path)
 	return sys_umount2(path, 0);
 }
 
+#if 0
 int
 sys_pivot_root(const char *new_root, const char *put_old)
 {
@@ -339,6 +330,7 @@ sys_pivot_root(const char *new_root, const char *put_old)
 	}
 	return 0;
 }
+#endif
 
 int
 sys_sync(void)
@@ -448,33 +440,6 @@ int
 vfs_einval(void)
 {
 	return EINVAL;
-}
-
-namespace osv {
-
-mount_desc to_mount_desc(mount* m)
-{
-	mount_desc ret;
-	ret.special = m->m_special;
-	ret.path = m->m_path;
-	ret.type = fs_getfsname(m->m_op);
-	// FIXME: record options
-	ret.options = "";
-	return ret;
-}
-
-std::vector<mount_desc>
-current_mounts()
-{
-	WITH_LOCK(mount_lock) {
-		std::vector<mount_desc> ret;
-		for (auto&& mp : mount_list) {
-			ret.push_back(to_mount_desc(mp));
-		}
-		return ret;
-	}
-}
-
 }
 
 #ifdef DEBUG_VFS

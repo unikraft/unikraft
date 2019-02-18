@@ -37,8 +37,6 @@
 #include <osv/vnode.h>
 #include <bsd/sys/sys/queue.h>
 
-__BEGIN_DECLS
-
 #ifdef _KERNEL
 
 /*
@@ -143,29 +141,5 @@ void	 vfs_busy(struct mount *mp);
 void	 vfs_unbusy(struct mount *mp);
 
 void	 release_mp_dentries(struct mount *mp);
-
-#endif
-
-__END_DECLS
-
-#ifdef __cplusplus
-
-#include <vector>
-#include <string>
-
-namespace osv {
-
-struct mount_desc {
-	std::string special;
-	std::string path;
-	std::string type;
-	std::string options;
-};
-
-std::vector<mount_desc> current_mounts();
-
-}
-
-#endif
 
 #endif	/* !_SYS_MOUNT_H_ */

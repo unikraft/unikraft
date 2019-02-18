@@ -63,33 +63,31 @@ read_link(struct vnode *vp, char *buf, size_t bufsz, ssize_t *sz)
 int
 namei_follow_link(struct dentry *dp, char *node, char *name, char *fp, size_t mountpoint_len)
 {
-	std::unique_ptr<char []> link (new char[PATH_MAX]);
-	std::unique_ptr<char []> t (new char[PATH_MAX]);
-	char    *lp;
+	char link[PATH_MAX];
+	char t[PATH_MAX];
 	int     error;
 	ssize_t sz;
 	char    *p;
 	int     c;
 
-	lp    = link.get();
-	error = read_link(dp->d_vnode, lp, PATH_MAX, &sz);
+	error = read_link(dp->d_vnode, link, PATH_MAX, &sz);
 	if (error != 0) {
 		return (error);
 	}
-	lp[sz] = 0;
+	link[sz] = 0;
 
 	p = fp + mountpoint_len + strlen(node);
 	c = strlen(node) - strlen(name) - 1;
 	node[c] = 0;
 
-	if (lp[0] == '/') {
-		strlcat(lp, p, PATH_MAX);
-		strlcpy(fp, lp, PATH_MAX);
+	if (link[0] == '/') {
+		strlcat(link, p, PATH_MAX);
+		strlcpy(fp, link, PATH_MAX);
 	} else {
-		strlcpy(t.get(), p, PATH_MAX);
+		strlcpy(t, p, PATH_MAX);
 		strlcpy(node, fp, mountpoint_len + c + 1);
-		path_conv(node, lp, fp);
-		strlcat(fp, t.get(), PATH_MAX);
+		path_conv(node, link, fp);
+		strlcat(fp, t, PATH_MAX);
 	}
 	node[0] = 0;
 	name[0] = 0;
@@ -107,8 +105,7 @@ namei(const char *path, struct dentry **dpp)
 	char *p;
 	char node[PATH_MAX];
 	char name[PATH_MAX];
-	std::unique_ptr<char []> fp (new char [PATH_MAX]);
-	std::unique_ptr<char []> t (new char [PATH_MAX]);
+	char fp[PATH_MAX];
 	struct mount *mp;
 	struct dentry *dp, *ddp;
 	struct vnode *dvp, *vp;
@@ -119,7 +116,7 @@ namei(const char *path, struct dentry **dpp)
 	DPRINTF(VFSDB_VNODE, ("namei: path=%s\n", path));
 
 	links_followed = 0;
-	strlcpy(fp.get(), path, PATH_MAX);
+	strlcpy(fp, path, PATH_MAX);
 
 	do {
 		need_continue = false;
@@ -127,10 +124,10 @@ namei(const char *path, struct dentry **dpp)
 		 * Convert a full path name to its mount point and
 		 * the local node in the file system.
 		 */
-		if (vfs_findroot(fp.get(), &mp, &p)) {
+		if (vfs_findroot(fp, &mp, &p)) {
 			return ENOTDIR;
 		}
-		int mountpoint_len = p - fp.get() - 1;
+		int mountpoint_len = p - fp - 1;
 		strlcpy(node, "/", sizeof(node));
 		strlcat(node, p, sizeof(node));
 		dp = dentry_lookup(mp, node);
@@ -203,7 +200,7 @@ namei(const char *path, struct dentry **dpp)
 			ddp = dp;
 
 			if (dp->d_vnode->v_type == VLNK) {
-				error = namei_follow_link(dp, node, name, fp.get(), mountpoint_len);
+				error = namei_follow_link(dp, node, name, fp, mountpoint_len);
 				if (error) {
 					drele(dp);
 					return (error);
@@ -211,7 +208,7 @@ namei(const char *path, struct dentry **dpp)
 
 				drele(dp);
 
-				p       = fp.get();
+				p       = fp;
 				dp      = nullptr;
 				ddp     = nullptr;
 				vp      = nullptr;
@@ -254,7 +251,7 @@ namei_last_nofollow(char *path, struct dentry *ddp, struct dentry **dpp)
 	struct dentry *dp;
 	struct vnode  *dvp;
 	struct vnode  *vp;
-	std::unique_ptr<char []> node (new char[PATH_MAX]);
+	char node[PATH_MAX];
 
 	dvp  = nullptr;
 
@@ -273,26 +270,26 @@ namei_last_nofollow(char *path, struct dentry *ddp, struct dentry **dpp)
 		return (ENOTDIR);
 	}
 
-	strlcpy(node.get(), "/", PATH_MAX);
-	strlcat(node.get(), p, PATH_MAX);
+	strlcpy(node, "/", PATH_MAX);
+	strlcat(node, p, PATH_MAX);
 
 	// We want to treat things like /tmp/ the same as /tmp. Best way to do that
 	// is to ignore the last character, except when we're stating the root.
-	auto l = strlen(node.get()) - 1;
-	if (l && node.get()[l] == '/') {
-		node.get()[l] = '\0';
+	int l = strlen(node) - 1;
+	if (l && node[l] == '/') {
+		node[l] = '\0';
 	}
 
 	dvp = ddp->d_vnode;
 	vn_lock(dvp);
-	dp = dentry_lookup(mp, node.get());
+	dp = dentry_lookup(mp, node);
 	if (dp == nullptr) {
 		error = VOP_LOOKUP(dvp, name, &vp);
 		if (error != 0) {
 			goto out;
 		}
 
-		dp = dentry_alloc(ddp, vp, node.get());
+		dp = dentry_alloc(ddp, vp, node);
 		vput(vp);
 
 		if (dp == nullptr) {

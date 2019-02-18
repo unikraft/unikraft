@@ -42,14 +42,8 @@
 #include <osv/mmu.hh>
 #include <osv/pagecache.hh>
 
-vfs_file::vfs_file(unsigned flags)
-	: file(flags, DTYPE_VNODE)
+int vfs_close(struct vfscore_file *fp)
 {
-}
-
-int vfs_file::close()
-{
-	auto fp = this;
 	struct vnode *vp = fp->f_dentry->d_vnode;
 	int error;
 
@@ -60,13 +54,14 @@ int vfs_file::close()
 	if (error)
 		return error;
 
-	fp->f_dentry.reset();
+	/* Dentry stays forever in the dentry cache. Unless the
+	 * file/directory it refers to gets deleted/renamed */
+	fp->f_dentry = NULL;
 	return 0;
 }
 
-int vfs_file::read(struct uio *uio, int flags)
+int vfs_read(struct vfscore_file *fp, struct uio *uio, int flags)
 {
-	auto fp = this;
 	struct vnode *vp = fp->f_dentry->d_vnode;
 	int error;
 	size_t count;
@@ -90,9 +85,8 @@ int vfs_file::read(struct uio *uio, int flags)
 }
 
 
-int vfs_file::write(struct uio *uio, int flags)
+int vfs_write(struct vfscore_file *fp, struct uio *uio, int flags)
 {
-	auto fp = this;
 	struct vnode *vp = fp->f_dentry->d_vnode;
 	int ioflags = 0;
 	int error;
@@ -122,9 +116,8 @@ int vfs_file::write(struct uio *uio, int flags)
 	return error;
 }
 
-int vfs_file::ioctl(u_long com, void *data)
+int vfs_ioctl(struct vfscore_file *fp, u_long com, void *data)
 {
-	auto fp = this;
 	struct vnode *vp = fp->f_dentry->d_vnode;
 	int error;
 
@@ -135,9 +128,8 @@ int vfs_file::ioctl(u_long com, void *data)
 	return error;
 }
 
-int vfs_file::stat(struct stat *st)
+int vfs_stat(struct vfscore_file *fp, struct stat *st)
 {
-	auto fp = this;
 	struct vnode *vp = fp->f_dentry->d_vnode;
 	int error;
 
@@ -146,71 +138,4 @@ int vfs_file::stat(struct stat *st)
 	vn_unlock(vp);
 
 	return error;
-}
-
-int vfs_file::poll(int events)
-{
-	return poll_no_poll(events);
-}
-
-int vfs_file::truncate(off_t len)
-{
-	// somehow this is handled outside file ops
-	abort();
-}
-
-int vfs_file::chmod(mode_t mode)
-{
-	// somehow this is handled outside file ops
-	abort();
-}
-
-bool vfs_file::map_page(uintptr_t off, mmu::hw_ptep<0> ptep, mmu::pt_element<0> pte, bool write, bool shared)
-{
-	return pagecache::get(this, off, ptep, pte, write, shared);
-}
-
-bool vfs_file::put_page(void *addr, uintptr_t off, mmu::hw_ptep<0> ptep)
-{
-	return pagecache::release(this, addr, off, ptep);
-}
-
-void vfs_file::sync(off_t start, off_t end)
-{
-	pagecache::sync(this, start, end);
-}
-
-// Locking: VOP_CACHE will call into the filesystem, and that can trigger an
-// eviction that will hold the mmu-side lock that protects the mappings
-// Always follow that order. We however can't just get rid of the mmu-side lock,
-// because not all invalidations will be synchronous.
-int vfs_file::get_arcbuf(void* key, off_t offset)
-{
-	struct vnode *vp = f_dentry->d_vnode;
-
-	iovec io[1];
-
-	io[0].iov_base = key;
-	uio data;
-	data.uio_iov = io;
-	data.uio_iovcnt = 1;
-	data.uio_offset = offset;
-	data.uio_resid = mmu::page_size;
-	data.uio_rw = UIO_READ;
-
-	vn_lock(vp);
-	assert(VOP_CACHE(vp, this, &data) == 0);
-	vn_unlock(vp);
-
-	return (data.uio_resid != 0) ? -1 : 0;
-}
-
-std::unique_ptr<mmu::file_vma> vfs_file::mmap(addr_range range, unsigned flags, unsigned perm, off_t offset)
-{
-	auto fp = this;
-	struct vnode *vp = fp->f_dentry->d_vnode;
-	if (!vp->v_op->vop_cache || (vp->v_size < (off_t)mmu::page_size)) {
-		return mmu::default_file_mmap(this, range, flags, perm, offset);
-	}
-	return mmu::map_file_mmap(this, range, flags, perm, offset);
 }

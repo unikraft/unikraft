@@ -89,7 +89,6 @@ struct task {
 
 extern const struct vfssw vfssw[];
 
-__BEGIN_DECLS
 int	 sys_open(char *path, int flags, mode_t mode, struct file **fp);
 int	 sys_read(struct file *fp, const struct iovec *iov, size_t niov,
 		off_t offset, size_t *count);
@@ -165,28 +164,6 @@ void dentry_init(void);
 #ifdef DEBUG_VFS
 void	 vnode_dump(void);
 void	 mount_dump(void);
-#endif
-
-__END_DECLS
-
-#ifdef __cplusplus
-
-// Convert a path to a dentry_ref.  Returns an empty
-// reference if not found (ENOENT) for efficiency, throws
-// an error on other errors.
-inline dentry_ref namei(char* path)
-{
-	dentry* dp;
-	auto err = namei(path, &dp);
-	if (err == ENOENT) {
-		return dentry_ref();
-	} else if (err) {
-		throw make_error(err);
-	} else {
-		return dentry_ref(dp, false);
-	}
-}
-
 #endif
 
 #endif /* !_VFS_H */

@@ -40,10 +40,6 @@
 #include <unistd.h>
 #include <osv/fcntl.h>
 
-__BEGIN_DECLS
-
-#define __packed        __attribute__((__packed__))
-
 #define	BSIZE	512		/* size of secondary block (bytes) */
 
 #define DO_RDWR		0x2
@@ -56,7 +52,5 @@ size_t strlcat(char *dst, const char *src, size_t siz);
 size_t strlcpy(char *dst, const char *src, size_t siz);
 
 void sys_panic(const char *);
-
-__END_DECLS
 
 #endif /* _OSV_PREX_H */

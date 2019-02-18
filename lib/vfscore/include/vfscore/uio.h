@@ -38,8 +38,6 @@
 #include <sys/uio.h>
 #include <limits.h>
 
-__BEGIN_DECLS
-
 enum	uio_rw { UIO_READ, UIO_WRITE };
 
 /*
@@ -61,29 +59,5 @@ struct uio {
 };
 
 int	uiomove(void *cp, int n, struct uio *uio);
-
-__END_DECLS
-
-#ifdef __cplusplus
-
-template <typename F>
-static inline void linearize_uio_write(struct uio *uio, int ioflag, F f)
-{
-    while (uio->uio_resid > 0) {
-        struct iovec *iov = uio->uio_iov;
-
-        if (iov->iov_len) {
-            f(reinterpret_cast<const char *>(iov->iov_base),
-                iov->iov_len);
-        }
-
-        uio->uio_iov++;
-        uio->uio_iovcnt--;
-        uio->uio_resid -= iov->iov_len;
-        uio->uio_offset += iov->iov_len;
-    }
-}
-
-#endif
 
 #endif /* !_UIO_H_ */

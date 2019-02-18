@@ -77,18 +77,16 @@
 #include <api/utime.h>
 #include <chrono>
 
-using namespace std;
-
 
 #ifdef DEBUG_VFS
 int	vfs_debug = VFSDB_FLAGS;
 #endif
 
-std::atomic<mode_t> global_umask{S_IWGRP | S_IWOTH};
+static mode_t global_umask = S_IWGRP | S_IWOTH;
 
 static inline mode_t apply_umask(mode_t mode)
 {
-	return mode & ~global_umask.load(std::memory_order_relaxed);
+	return mode & ~ukarch_load_n(&global_umask);
 }
 
 TRACEPOINT(trace_vfs_open, "\"%s\" 0x%x 0%0o", const char*, int, mode_t);
@@ -97,7 +95,6 @@ TRACEPOINT(trace_vfs_open_err, "%d", int);
 
 struct task *main_task;	/* we only have a single process */
 
-extern "C"
 int open(const char *pathname, int flags, ...)
 {
 	mode_t mode = 0;
@@ -178,8 +175,7 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 	struct vnode *vp = fp->f_dentry->d_vnode;
 	vn_lock(vp);
 
-	std::unique_ptr<char []> up (new char[PATH_MAX]);
-	char *p = up.get();
+	char p[PATH_MAX];
 
 	/* build absolute path */
 	strlcpy(p, fp->f_dentry->d_mount->m_path, PATH_MAX);
@@ -195,26 +191,6 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 	return error;
 }
 LFS64(openat);
-
-// open() has an optional third argument, "mode", which is only needed in
-// some cases (when the O_CREAT mode is used). As a safety feature, recent
-// versions of Glibc add a feature where open() with two arguments is replaced
-// by a call to __open_2(), which verifies it isn't called with O_CREATE.
-extern "C" int __open_2(const char *pathname, int flags)
-{
-	assert(!(flags & O_CREAT));
-	return open(pathname, flags, 0);
-}
-
-extern "C" int __open64_2(const char *file, int flags)
-{
-	if (flags & O_CREAT) {
-		errno = EINVAL;
-		return -1;
-	}
-
-	return open64(file, flags);
-}
 
 int creat(const char *pathname, mode_t mode)
 {
@@ -249,7 +225,6 @@ TRACEPOINT(trace_vfs_mknod_ret, "");
 TRACEPOINT(trace_vfs_mknod_err, "%d", int);
 
 
-extern "C"
 int __xmknod(int ver, const char *pathname, mode_t mode, dev_t *dev)
 {
 	assert(ver == 0); // On x86-64 Linux, _MKNOD_VER_LINUX is 0.
@@ -543,7 +518,6 @@ TRACEPOINT(trace_vfs_fstat, "%d %p", int, struct stat*);
 TRACEPOINT(trace_vfs_fstat_ret, "");
 TRACEPOINT(trace_vfs_fstat_err, "%d", int);
 
-extern "C"
 int __fxstat(int ver, int fd, struct stat *st)
 {
 	struct file *fp;
@@ -571,7 +545,6 @@ int __fxstat(int ver, int fd, struct stat *st)
 
 LFS64(__fxstat);
 
-extern "C"
 int fstat(int fd, struct stat *st)
 {
 	return __fxstat(1, fd, st);
@@ -579,7 +552,6 @@ int fstat(int fd, struct stat *st)
 
 LFS64(fstat);
 
-extern "C"
 int __fxstatat(int ver, int dirfd, const char *pathname, struct stat *st,
 		int flags)
 {
@@ -606,8 +578,7 @@ int __fxstatat(int ver, int dirfd, const char *pathname, struct stat *st,
 	struct vnode *vp = fp->f_dentry->d_vnode;
 	vn_lock(vp);
 
-	std::unique_ptr<char []> up (new char[PATH_MAX]);
-	char *p = up.get();
+	char p[PATH_MAX];
 	/* build absolute path */
 	strlcpy(p, fp->f_dentry->d_mount->m_path, PATH_MAX);
 	strlcat(p, fp->f_dentry->d_path, PATH_MAX);
@@ -624,7 +595,6 @@ int __fxstatat(int ver, int dirfd, const char *pathname, struct stat *st,
 
 LFS64(__fxstatat);
 
-extern "C"
 int fstatat(int dirfd, const char *path, struct stat *st, int flags)
 {
 	return __fxstatat(1, dirfd, path, st, flags);
@@ -632,7 +602,7 @@ int fstatat(int dirfd, const char *path, struct stat *st, int flags)
 
 LFS64(fstatat);
 
-extern "C" int flock(int fd, int operation)
+int flock(int fd, int operation)
 {
 	if (!fileref_from_fd(fd)) {
 		return libc_error(EBADF);
@@ -663,14 +633,14 @@ struct __dirstream
 
 DIR *opendir(const char *path)
 {
-	DIR *dir = new DIR;
+	DIR *dir = malloc(sizeof(*dir));
 
 	if (!dir)
-		return libc_error_ptr<DIR>(ENOMEM);
+		return ERR2PTR(-ENOMEM);
 
 	dir->fd = open(path, O_RDONLY);
 	if (dir->fd < 0) {
-		delete dir;
+		free(dir);
 		return nullptr;
 	}
 	return dir;
@@ -687,7 +657,11 @@ DIR *fdopendir(int fd)
 		errno = ENOTDIR;
 		return nullptr;
 	}
-	dir = new DIR;
+	dir = malloc(sizeof(*dir));
+	if (!dir) {
+		errno = ENOMEM;
+		return NULL;
+	}
 	dir->fd = fd;
 	return dir;
 
@@ -705,7 +679,7 @@ int dirfd(DIR *dirp)
 int closedir(DIR *dir)
 {
 	close(dir->fd);
-	delete dir;
+	free(dir);
 	return 0;
 }
 
@@ -716,7 +690,7 @@ struct dirent *readdir(DIR *dir)
 
 	ret = readdir_r(dir, &entry, &result);
 	if (ret)
-		return libc_error_ptr<struct dirent>(ret);
+		return ERR2PTR(-ret);
 
 	errno = 0;
 	return result;
@@ -753,18 +727,18 @@ int readdir_r(DIR *dir, struct dirent *entry, struct dirent **result)
 
 // FIXME: in 64bit dirent64 and dirent are identical, so it's safe to alias
 #undef readdir64_r
-extern "C" int readdir64_r(DIR *dir, struct dirent64 *entry,
+int readdir64_r(DIR *dir, struct dirent64 *entry,
 		struct dirent64 **result)
 		__attribute__((alias("readdir_r")));
 
 #undef readdir64
-extern "C" struct dirent *readdir64(DIR *dir) __attribute__((alias("readdir")));
+struct dirent *readdir64(DIR *dir) __attribute__((alias("readdir")));
 
 void rewinddir(DIR *dirp)
 {
 	struct file *fp;
 
-	auto error = fget(dirp->fd, &fp);
+	int error = fget(dirp->fd, &fp);
 	if (error) {
 		// POSIX specifies that what rewinddir() does in the case of error
 		// is undefined...
@@ -936,23 +910,21 @@ TRACEPOINT(trace_vfs_chdir, "\"%s\"", const char*);
 TRACEPOINT(trace_vfs_chdir_ret, "");
 TRACEPOINT(trace_vfs_chdir_err, "%d", int);
 
-static int replace_cwd(struct task *t, struct file *new_cwdfp,
-					   std::function<int (void)> chdir_func)
+static int
+__do_fchdir(struct vfscore_file *fp, struct task *t)
 {
 	struct file *old = nullptr;
 
-	if (!t) {
-		return 0;
-	}
+	UK_ASSERT(t);
 
 	if (t->t_cwdfp) {
 		old = t->t_cwdfp;
 	}
 
 	/* Do the actual chdir operation here */
-	int error = chdir_func();
+	int error = sys_fchdir(fp, t->t_cwd);
 
-	t->t_cwdfp = new_cwdfp;
+	t->t_cwdfp = fp;
 	if (old) {
 		fdrop(old);
 	}
@@ -981,7 +953,11 @@ int chdir(const char *pathname)
 		goto out_errno;
 	}
 
-	replace_cwd(t, fp, [&]() { strlcpy(t->t_cwd, path, sizeof(t->t_cwd)); return 0; });
+	error = __do_fchdir(fp, t);
+	if (error) {
+		fdrop(fp);
+		goto out_errno;
+	}
 
 	trace_vfs_chdir_ret();
 	return 0;
@@ -1006,7 +982,7 @@ int fchdir(int fd)
 	if (error)
 		goto out_errno;
 
-	error = replace_cwd(t, fp, [&]() { return sys_fchdir(fp, t->t_cwd); });
+	error = __do_fchdir(fp, t);
 	if (error) {
 		fdrop(fp);
 		goto out_errno;
@@ -1114,7 +1090,6 @@ TRACEPOINT(trace_vfs_stat, "\"%s\" %p", const char*, struct stat*);
 TRACEPOINT(trace_vfs_stat_ret, "");
 TRACEPOINT(trace_vfs_stat_err, "%d", int);
 
-extern "C"
 int __xstat(int ver, const char *pathname, struct stat *st)
 {
 	struct task *t = main_task;
@@ -1151,7 +1126,6 @@ LFS64(stat);
 TRACEPOINT(trace_vfs_lstat, "pathname=%s, stat=%p", const char*, struct stat*);
 TRACEPOINT(trace_vfs_lstat_ret, "");
 TRACEPOINT(trace_vfs_lstat_err, "errno=%d", int);
-extern "C"
 int __lxstat(int ver, const char *pathname, struct stat *st)
 {
 	struct task *t = main_task;
@@ -1191,7 +1165,6 @@ TRACEPOINT(trace_vfs_statfs, "\"%s\" %p", const char*, struct statfs*);
 TRACEPOINT(trace_vfs_statfs_ret, "");
 TRACEPOINT(trace_vfs_statfs_err, "%d", int);
 
-extern "C"
 int __statfs(const char *pathname, struct statfs *buf)
 {
 	trace_vfs_statfs(pathname, buf);
@@ -1221,7 +1194,6 @@ TRACEPOINT(trace_vfs_fstatfs, "\"%s\" %p", int, struct statfs*);
 TRACEPOINT(trace_vfs_fstatfs_ret, "");
 TRACEPOINT(trace_vfs_fstatfs_err, "%d", int);
 
-extern "C"
 int __fstatfs(int fd, struct statfs *buf)
 {
 	struct file *fp;
@@ -1424,11 +1396,11 @@ int dup2(int oldfd, int newfd)
  */
 #define SETFL (O_APPEND | O_ASYNC | O_DIRECT | O_NOATIME | O_NONBLOCK)
 
+#if 0
 TRACEPOINT(trace_vfs_fcntl, "%d %d 0x%x", int, int, int);
 TRACEPOINT(trace_vfs_fcntl_ret, "\"%s\"", int);
 TRACEPOINT(trace_vfs_fcntl_err, "%d", int);
 
-extern "C"
 int fcntl(int fd, int cmd, int arg)
 {
 	struct file *fp;
@@ -1509,6 +1481,7 @@ int fcntl(int fd, int cmd, int arg)
 	errno = error;
 	return -1;
 }
+#endif
 
 TRACEPOINT(trace_vfs_access, "\"%s\" 0%0o", const char*, int);
 TRACEPOINT(trace_vfs_access_ret, "");
@@ -1564,8 +1537,7 @@ int faccessat(int dirfd, const char *pathname, int mode, int flags)
 	struct vnode *vp = fp->f_dentry->d_vnode;
 	vn_lock(vp);
 
-	std::unique_ptr<char []> up (new char[PATH_MAX]);
-	char *p = up.get();
+	char p[PATH_MAX];
 
 	/* build absolute path */
 	strlcpy(p, fp->f_dentry->d_mount->m_path, PATH_MAX);
@@ -1581,7 +1553,6 @@ int faccessat(int dirfd, const char *pathname, int mode, int flags)
 	return error;
 }
 
-extern "C" 
 int euidaccess(const char *pathname, int mode)
 {
 	return access(pathname, mode);
@@ -1590,54 +1561,6 @@ int euidaccess(const char *pathname, int mode)
 weak_alias(euidaccess,eaccess);
 
 #if 0
-static int
-fs_pipe(struct task *t, struct msg *msg)
-{
-#ifdef CONFIG_FIFOFS
-	char path[PATH_MAX];
-	file_t rfp, wfp;
-	int error, rfd, wfd;
-
-	DPRINTF(VFSDB_CORE, ("fs_pipe\n"));
-
-	if ((rfd = task_newfd(t)) == -1)
-		return EMFILE;
-	t->t_ofile[rfd] = (file_t)1; /* temp */
-
-	if ((wfd = task_newfd(t)) == -1) {
-		t->t_ofile[rfd] = nullptr;
-		return EMFILE;
-	}
-	sprintf(path, "/mnt/fifo/pipe-%x-%d", (u_int)t->t_taskid, rfd);
-
-	if ((error = sys_mknod(path, S_IFIFO)) != 0)
-		goto out;
-	if ((error = sys_open(path, O_RDONLY | O_NONBLOCK, 0, &rfp)) != 0) {
-		goto out;
-	}
-	if ((error = sys_open(path, O_WRONLY | O_NONBLOCK, 0, &wfp)) != 0) {
-		goto out;
-	}
-	t->t_ofile[rfd] = rfp;
-	t->t_ofile[wfd] = wfp;
-	t->t_nopens += 2;
-	msg->data[0] = rfd;
-	msg->data[1] = wfd;
-	return 0;
-	out:
-	t->t_ofile[rfd] = nullptr;
-	t->t_ofile[wfd] = nullptr;
-	return error;
-#else
-	return ENOSYS;
-#endif
-}
-#endif
-
-TRACEPOINT(trace_vfs_isatty, "%d", int);
-TRACEPOINT(trace_vfs_isatty_ret, "%d", int);
-TRACEPOINT(trace_vfs_isatty_err, "%d", int);
-
 /*
  * Return if specified file is a tty
  */
@@ -1663,6 +1586,7 @@ int isatty(int fd)
 	trace_vfs_isatty_ret(istty);
 	return istty;
 }
+#endif
 
 TRACEPOINT(trace_vfs_truncate, "\"%s\" 0x%x", const char*, off_t);
 TRACEPOINT(trace_vfs_truncate_ret, "");
@@ -1784,15 +1708,7 @@ int fallocate(int fd, int mode, loff_t offset, loff_t len)
 
 LFS64(fallocate);
 
-TRACEPOINT(trace_vfs_utimes, "\"%s\"", const char*);
-TRACEPOINT(trace_vfs_utimes_ret, "");
-TRACEPOINT(trace_vfs_utimes_err, "%d", int);
-
-int futimes(int fd, const struct timeval times[2])
-{
-	return futimesat(fd, nullptr, times);
-}
-
+#if 0
 int futimesat(int dirfd, const char *pathname, const struct timeval times[2])
 {
 	struct stat st;
@@ -1850,12 +1766,12 @@ TRACEPOINT(trace_vfs_utimensat, "\"%s\"", const char*);
 TRACEPOINT(trace_vfs_utimensat_ret, "");
 TRACEPOINT(trace_vfs_utimensat_err, "%d", int);
 
-extern "C"
 int utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags)
 {
 	trace_vfs_utimensat(pathname);
 
 	auto error = sys_utimensat(dirfd, pathname, times, flags);
+
 	if (error) {
 		trace_vfs_utimensat_err(error);
 		errno = error;
@@ -1870,12 +1786,11 @@ TRACEPOINT(trace_vfs_futimens, "%d", int);
 TRACEPOINT(trace_vfs_futimens_ret, "");
 TRACEPOINT(trace_vfs_futimens_err, "%d", int);
 
-extern "C"
 int futimens(int fd, const struct timespec times[2])
 {
 	trace_vfs_futimens(fd);
 
-	auto error = sys_futimens(fd, times);
+	int error = sys_futimens(fd, times);
 	if (error) {
 		trace_vfs_futimens_err(error);
 		errno = error;
@@ -1910,19 +1825,16 @@ static int do_utimes(const char *pathname, const struct timeval times[2], int fl
 	return 0;
 }
 
-extern "C"
 int utimes(const char *pathname, const struct timeval times[2])
 {
 	return do_utimes(pathname, times, 0);
 }
 
-extern "C"
 int lutimes(const char *pathname, const struct timeval times[2])
 {
 	return do_utimes(pathname, times, AT_SYMLINK_NOFOLLOW);
 }
 
-extern "C"
 int utime(const char *pathname, const struct utimbuf *t)
 {
 	using namespace std::chrono;
@@ -1941,6 +1853,7 @@ int utime(const char *pathname, const struct utimbuf *t)
 
 	return utimes(pathname, times);
 }
+#endif
 
 TRACEPOINT(trace_vfs_chmod, "\"%s\" 0%0o", const char*, mode_t);
 TRACEPOINT(trace_vfs_chmod_ret, "");
@@ -1973,7 +1886,7 @@ TRACEPOINT(trace_vfs_fchmod_ret, "");
 int fchmod(int fd, mode_t mode)
 {
 	trace_vfs_fchmod(fd, mode);
-	auto error = sys_fchmod(fd, mode & ALLPERMS);
+	int error = sys_fchmod(fd, mode & ALLPERMS);
 	trace_vfs_fchmod_ret();
 	if (error) {
 		errno = error;
@@ -2007,6 +1920,7 @@ int lchown(const char *path, uid_t owner, gid_t group)
 }
 
 
+#if 0
 ssize_t sendfile(int out_fd, int in_fd, off_t *_offset, size_t count)
 {
 	struct file *in_fp;
@@ -2070,7 +1984,7 @@ ssize_t sendfile(int out_fd, int in_fd, off_t *_offset, size_t count)
 		return -1;
 	}
 
-	auto ret = write(out_fd, src + (offset % PAGESIZE), count);
+	int ret = write(out_fd, src + (offset % PAGESIZE), count);
 
 	if (ret < 0) {
 		return libc_error(errno);
@@ -2087,12 +2001,13 @@ ssize_t sendfile(int out_fd, int in_fd, off_t *_offset, size_t count)
 
 #undef sendfile64
 LFS64(sendfile);
+#endif
 
 NO_SYS(int fchmodat(int dirfd, const char *pathname, mode_t mode, int flags));
 
 mode_t umask(mode_t newmask)
 {
-	return global_umask.exchange(newmask, std::memory_order_relaxed);
+	return ukarch_exchange_n(&global_umask, newmask);
 }
 
 int
@@ -2107,303 +2022,3 @@ int chroot(const char *path)
 	errno = ENOSYS;
 	return -1;
 }
-
-// unpack_bootfs() unpacks a collection of files stored as part of the OSv
-// executable (in memory location "bootfs_start") into the file system,
-// normally the in-memory filesystem ramfs.
-// The files are packed in the executable in an ad-hoc format defined here.
-// Code in scripts/mkbootfs.py packs files into this format.
-#define BOOTFS_PATH_MAX 111
-enum class bootfs_file_type : char { other = 0, symlink = 1 };
-struct bootfs_metadata {
-	uint64_t size;
-	uint64_t offset;
-	// The file's type. Can be "symlink" or "other". A directory is an "other"
-	// file with its name ending with a "/" (and no content).
-	bootfs_file_type type;
-	// name must end with a null. For symlink files, the content must end
-	// with a null as well.
-	char name[BOOTFS_PATH_MAX];
-};
-
-extern char bootfs_start;
-
-int ramfs_set_file_data(struct vnode *vp, const void *data, size_t size);
-void unpack_bootfs(void)
-{
-	struct bootfs_metadata *md = (struct bootfs_metadata *)&bootfs_start;
-	int fd, i;
-
-	for (i = 0; md[i].name[0]; i++) {
-		int ret;
-		char *p;
-
-		// mkdir() directories needed for this path name, as necessary
-		char tmp[BOOTFS_PATH_MAX];
-		strlcpy(tmp, md[i].name, BOOTFS_PATH_MAX);
-		for (p = tmp; *p; ++p) {
-			if (*p == '/') {
-				*p = '\0';
-				mkdir(tmp, 0666);  // silently ignore errors and existing dirs
-				*p = '/';
-			}
-		}
-
-		if (md[i].type == bootfs_file_type::symlink) {
-			// This is a symbolic link record. The file's content is the
-			// target path, and we assume ends with a null.
-			if (symlink(&bootfs_start + md[i].offset, md[i].name) != 0) {
-				kprintf("couldn't symlink %s: %d\n", md[i].name, errno);
-				sys_panic("unpack_bootfs failed");
-			}
-			continue;
-		}
-		if (*(p-1) == '/' && md[i].size == 0) {
-			// This is directory record. Nothing else to do
-			continue;
-		}
-
-		fd = creat(md[i].name, 0666);
-		if (fd < 0) {
-			kprintf("couldn't create %s: %d\n",
-					md[i].name, errno);
-			sys_panic("unpack_bootfs failed");
-		}
-
-		struct file *fp;
-		int error = fget(fd, &fp);
-		if (error) {
-			kprintf("couldn't fget %s: %d\n",
-					md[i].name, error);
-			sys_panic("unpack_bootfs failed");
-		}
-
-		struct vnode *vp = fp->f_dentry->d_vnode;
-		ret = ramfs_set_file_data(vp, &bootfs_start + md[i].offset, md[i].size);
-		if (ret) {
-			kprintf("ramfs_set_file_data failed, ret = %d\n", ret);
-			sys_panic("unpack_bootfs failed");
-		}
-
-		fdrop(fp);
-		close(fd);
-	}
-}
-
-void mount_rootfs(void)
-{
-	int ret;
-
-	ret = sys_mount("", "/", "ramfs", 0, nullptr);
-	if (ret)
-		kprintf("failed to mount rootfs, error = %s\n", strerror(ret));
-
-	if (mkdir("/dev", 0755) < 0)
-		kprintf("failed to create /dev, error = %s\n", strerror(errno));
-
-	ret = sys_mount("", "/dev", "devfs", 0, nullptr);
-	if (ret)
-		kprintf("failed to mount devfs, error = %s\n", strerror(ret));
-}
-
-extern "C"
-int nmount(struct iovec *iov, unsigned niov, int flags)
-{
-	struct args {
-		char* fstype = nullptr;
-		char* fspath = nullptr;
-		char* from = nullptr;
-	};
-	static unordered_map<string, char* args::*> argmap {
-		{ "fstype", &args::fstype },
-		{ "fspath", &args::fspath },
-		{ "from", &args::from },
-	};
-	args a;
-	for (size_t i = 0; i < niov; i += 2) {
-		std::string s(static_cast<const char*>(iov[i].iov_base));
-		if (argmap.count(s)) {
-			a.*(argmap[s]) = static_cast<char*>(iov[i+1].iov_base);
-		}
-	}
-	return sys_mount(a.from, a.fspath, a.fstype, flags, nullptr);
-}
-
-static void import_extra_zfs_pools(void)
-{
-	struct stat st;
-	int ret;
-
-	// The file '/etc/mnttab' is a LibZFS requirement and will not
-	// exist during cpiod phase. The functionality provided by this
-	// function isn't needed during that phase, so let's skip it.
-	if (stat("/etc/mnttab" , &st) != 0) {
-		return;
-	}
-
-	// Import extra pools mounting datasets there contained.
-	// Datasets from osv pool will not be mounted here.
-	if (access("zpool.so", X_OK) != 0) {
-		return;
-	}
-	vector<string> zpool_args = {"zpool", "import", "-f", "-a" };
-	auto ok = osv::run("zpool.so", zpool_args, &ret);
-	assert(ok);
-
-	if (!ret) {
-		debug("zfs: extra ZFS pool(s) found.\n");
-	}
-}
-
-void pivot_rootfs(const char* path)
-{
-	int ret = sys_pivot_root(path, "/");
-	if (ret)
-		kprintf("failed to pivot root, error = %s\n", strerror(ret));
-
-	auto ent = setmntent("/etc/fstab", "r");
-	if (!ent) {
-		return;
-	}
-
-	struct mntent *m = nullptr;
-	while ((m = getmntent(ent)) != nullptr) {
-		if (!strcmp(m->mnt_dir, "/")) {
-			continue;
-		}
-
-		if ((m->mnt_opts != nullptr) && strcmp(m->mnt_opts, MNTOPT_DEFAULTS)) {
-			printf("Warning: opts %s, ignored for fs %s\n", m->mnt_opts, m->mnt_type);
-		}
-
-		// FIXME: Right now, ignoring mntops. In the future we may have an option parser
-		ret = sys_mount(m->mnt_fsname, m->mnt_dir, m->mnt_type, 0, nullptr);
-		if (ret) {
-			printf("failed to mount %s, error = %s\n", m->mnt_type, strerror(ret));
-		}
-	}
-	endmntent(ent);
-}
-
-extern "C" void unmount_devfs()
-{
-	int ret = sys_umount("/dev");
-	if (ret)
-		kprintf("failed to unmount /dev, error = %s\n", strerror(ret));
-}
-
-extern "C" int mount_rofs_rootfs(bool pivot_root)
-{
-	int ret;
-
-	if (mkdir("/rofs", 0755) < 0)
-		kprintf("failed to create /rofs, error = %s\n", strerror(errno));
-
-	ret = sys_mount("/dev/vblk0.1", "/rofs", "rofs", MNT_RDONLY, 0);
-
-	if (ret) {
-		kprintf("failed to mount /rofs, error = %s\n", strerror(ret));
-		rmdir("/rofs");
-		return ret;
-	}
-
-	if (pivot_root) {
-		pivot_rootfs("/rofs");
-	}
-
-	return 0;
-}
-
-extern "C" void mount_zfs_rootfs(bool pivot_root)
-{
-	if (mkdir("/zfs", 0755) < 0)
-		kprintf("failed to create /zfs, error = %s\n", strerror(errno));
-
-	int ret = sys_mount("/dev/vblk0.1", "/zfs", "zfs", 0, (void *)"osv/zfs");
-
-	if (ret)
-		kprintf("failed to mount /zfs, error = %s\n", strerror(ret));
-
-	if (!pivot_root) {
-		return;
-	}
-
-	pivot_rootfs("/zfs");
-
-	import_extra_zfs_pools();
-}
-
-extern "C" void unmount_rootfs(void)
-{
-	int ret;
-
-	sys_umount("/dev");
-
-	ret = sys_umount("/proc");
-	if (ret) {
-		kprintf("Warning: unmount_rootfs: failed to unmount /proc, "
-			"error = %s\n", strerror(ret));
-	}
-
-	ret = sys_umount2("/", MNT_FORCE);
-	if (ret) {
-		kprintf("Warning: unmount_rootfs: failed to unmount /, "
-			"error = %s\n", strerror(ret));
-	}
-}
-
-extern "C" void bio_init(void);
-extern "C" void bio_sync(void);
-
-int vfs_initialized;
-
-extern "C"
-void
-vfs_init(void)
-{
-	const struct vfssw *fs;
-
-	bio_init();
-	lookup_init();
-	vnode_init();
-	task_alloc(&main_task);
-
-	/*
-	 * Initialize each file system.
-	 */
-	for (fs = vfssw; fs->vs_name; fs++) {
-		if (fs->vs_init) {
-			DPRINTF(VFSDB_CORE, ("VFS: initializing %s\n",
-					fs->vs_name));
-			fs->vs_init();
-		}
-	}
-
-	mount_rootfs();
-	unpack_bootfs();
-
-	//	if (open("/dev/console", O_RDWR, 0) != 0)
-	if (console::open() != 0)
-		kprintf("failed to open console, error = %d\n", errno);
-	if (dup(0) != 1)
-		kprintf("failed to dup console (1)\n");
-	if (dup(0) != 2)
-		kprintf("failed to dup console (2)\n");
-	vfs_initialized = 1;
-}
-
-void vfs_exit(void)
-{
-	/* Free up main_task (stores cwd data) resources */
-	replace_cwd(main_task, nullptr, []() { return 0; });
-	/* Unmount all file systems */
-	unmount_rootfs();
-	/* Finish with the bio layer */
-	bio_sync();
-}
-
-void sys_panic(const char *str)
-{
-	abort("panic: %s", str);
-}
-

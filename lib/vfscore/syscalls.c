@@ -195,17 +195,17 @@ sys_open(char *path, int flags, mode_t mode, struct file **fpp)
 			goto out_vn_unlock;
 	}
 
-	try {
-	    fileref f = make_file<vfs_file>(flags);
-	    fp = f.get();
-	    fhold(fp);
-	} catch (int err) {
-	    error = err;
+	fp = calloc(sizeof(struct vfscore_file), 1);
+	fhold(fp);
+	if (!fp) {
+	    error = ENOMEM;
 	    goto out_vn_unlock;
 	}
+	fp->f_flags = flags;
+
 	// change to std::move once dp is a dentry_ref
-	fp->f_dentry = dentry_ref(dp, false);
-	dp = nullptr;
+	fp->f_dentry = dp;
+	dp = NULL;
 
 	error = VOP_OPEN(vp, fp);
 	if (error) {
@@ -213,7 +213,7 @@ sys_open(char *path, int flags, mode_t mode, struct file **fpp)
 		// Note direct delete of fp instead of fdrop(fp). fp was never
 		// returned so cannot be in use, and because it wasn't opened
 		// it cannot be close()ed.
-		delete fp;
+		free(fp);
 		return error;
 	}
 	vn_unlock(vp);
@@ -241,11 +241,14 @@ int
 sys_read(struct file *fp, const struct iovec *iov, size_t niov,
 		off_t offset, size_t *count)
 {
+	int error = 0;
+	struct iovec *copy_iov;
 	if ((fp->f_flags & FREAD) == 0)
 		return EBADF;
 
 	size_t bytes = 0;
-	auto iovp = iov;
+	const struct iovec *iovp = iov;
+
 	for (unsigned i = 0; i < niov; i++) {
 		if (iovp->iov_len > IOSIZE_MAX - bytes) {
 			return EINVAL;
@@ -260,16 +263,27 @@ sys_read(struct file *fp, const struct iovec *iov, size_t niov,
 	}
 
 	struct uio uio;
-	// Unfortunately, the current implementation of fp->read zeros the
-	// iov_len fields when it reads from disk, so we have to copy iov.
-	std::vector<iovec> copy_iov(iov, iov + niov);
-	uio.uio_iov = copy_iov.data();
+	/* TODO: is it necessary to copy iov within Unikraft?
+	 * OSv did this, mentioning this reason:
+	 *
+	 * "Unfortunately, the current implementation of fp->read
+	 *  zeros the iov_len fields when it reads from disk, so we
+	 *  have to copy iov. "
+	 */
+	copy_iov = calloc(sizeof(struct iovec), niov);
+	if (!copy_iov)
+		return ENOMEM;
+	memcpy(copy_iov, iov, sizeof(struct iovec)*niov);
+
+	uio.uio_iov = copy_iov;
 	uio.uio_iovcnt = niov;
 	uio.uio_offset = offset;
 	uio.uio_resid = bytes;
 	uio.uio_rw = UIO_READ;
-	auto error = fp->read(&uio, (offset == -1) ? 0 : FOF_OFFSET);
+	error = vfs_read(fp, &uio, (offset == -1) ? 0 : FOF_OFFSET);
 	*count = bytes - uio.uio_resid;
+
+	free(copy_iov);
 	return error;
 }
 
@@ -277,11 +291,13 @@ int
 sys_write(struct file *fp, const struct iovec *iov, size_t niov,
 		off_t offset, size_t *count)
 {
+	struct iovec *copy_iov;
+	int error = 0;
 	if ((fp->f_flags & FWRITE) == 0)
 		return EBADF;
 
 	size_t bytes = 0;
-	auto iovp = iov;
+	const struct iovec *iovp = iov;
 	for (unsigned i = 0; i < niov; i++) {
 		if (iovp->iov_len > IOSIZE_MAX - bytes) {
 			return EINVAL;
@@ -296,15 +312,24 @@ sys_write(struct file *fp, const struct iovec *iov, size_t niov,
 	}
 
 	struct uio uio;
-	// Unfortunately, the current implementation of fp->write zeros the
-	// iov_len fields when it writes to disk, so we have to copy iov.
-	std::vector<iovec> copy_iov(iov, iov + niov);
-	uio.uio_iov = copy_iov.data();
+
+	/* TODO: same note as in sys_read. Original comment:
+	 *
+	 * "Unfortunately, the current implementation of fp->write zeros the
+	 *  iov_len fields when it writes to disk, so we have to copy iov.
+	 */
+	/* std::vector<iovec> copy_iov(iov, iov + niov); */
+	copy_iov = calloc(sizeof(struct iovec), niov);
+	if (!copy_iov)
+		return ENOMEM;
+	memcpy(copy_iov, iov, sizeof(struct iovec)*niov);
+
+	uio.uio_iov = copy_iov;
 	uio.uio_iovcnt = niov;
 	uio.uio_offset = offset;
 	uio.uio_resid = bytes;
 	uio.uio_rw = UIO_WRITE;
-	auto error = fp->write(&uio, (offset == -1) ? 0 : FOF_OFFSET);
+	vfs_write(fp, &uio, (offset == -1) ? 0 : FOF_OFFSET);
 	*count = bytes - uio.uio_resid;
 	return error;
 }
@@ -355,7 +380,7 @@ sys_ioctl(struct file *fp, u_long request, void *buf)
 	if ((fp->f_flags & (FREAD | FWRITE)) == 0)
 		return EBADF;
 
-	error = fp->ioctl(request, buf);
+	error = vfs_ioctl(fp, request, buf);
 
 	DPRINTF(VFSDB_SYSCALL, ("sys_ioctl: comp error=%d\n", error));
 	return error;
@@ -386,7 +411,7 @@ sys_fstat(struct file *fp, struct stat *st)
 
 	DPRINTF(VFSDB_SYSCALL, ("sys_fstat: fp=%x\n", fp));
 
-	error = fp->stat(st);
+	error = vfs_stat(fp, st);
 
 	return error;
 }
@@ -815,10 +840,8 @@ sys_symlink(const char *oldpath, const char *newpath)
 {
 	struct task	*t = main_task;
 	int		error;
-	std::unique_ptr<char []> up_op (new char[PATH_MAX]);
-	char		*op = up_op.get();
-	std::unique_ptr<char []> up_np (new char[PATH_MAX]);
-	char		*np = up_np.get();
+	char		op[PATH_MAX];
+	char		np[PATH_MAX];
 	struct dentry	*newdp;
 	struct dentry	*newdirdp;
 	char		*name;
@@ -1032,17 +1055,17 @@ sys_access(char *path, int mode)
 int
 sys_stat(char *path, struct stat *st)
 {
+	struct dentry *dp;
+	int error;
+
 	DPRINTF(VFSDB_SYSCALL, ("sys_stat: path=%s\n", path));
 
-	try {
-		dentry_ref dp = namei(path);
-		if (!dp) {
-			return ENOENT;
-		}
-		return vn_stat(dp->d_vnode, st);
-	} catch (error e) {
-		return e.get();
-	}
+	error = namei(path, &dp);
+	if (error)
+		return error;
+	error = vn_stat(dp->d_vnode, st);
+	drele(dp);
+	return error;
 }
 
 int sys_lstat(char *path, struct stat *st)
@@ -1074,16 +1097,19 @@ int sys_lstat(char *path, struct stat *st)
 int
 sys_statfs(char *path, struct statfs *buf)
 {
+	struct dentry *dp;
+	int error;
+
 	memset(buf, 0, sizeof(*buf));
-	try {
-		dentry_ref dp = namei(path);
-		if (!dp) {
-			return ENOENT;
-		}
-		return VFS_STATFS(dp->d_mount, buf);
-	} catch (error e) {
-		return e.get();
-	}
+
+	error = namei(path, &dp);
+	if (error)
+		return error;
+
+	error = VFS_STATFS(dp->d_mount, buf);
+	drele(dp);
+
+	return error;
 }
 
 int
@@ -1212,6 +1238,7 @@ sys_readlink(char *path, char *buf, size_t bufsize, ssize_t *size)
 	return (0);
 }
 
+#if 0
 /*
  * Check the validity of the members of a struct timeval.
  */
@@ -1396,6 +1423,7 @@ sys_futimens(int fd, const struct timespec times[2])
 	auto error = sys_utimensat(AT_FDCWD, pathname.c_str(), times, 0);
 	return error;
 }
+#endif
 
 int
 sys_fallocate(struct file *fp, int mode, loff_t offset, loff_t len)
