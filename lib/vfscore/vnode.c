@@ -66,7 +66,7 @@ int vttoif_tab[10] = {
  * ---------- --------- ----------
  * vn_lock     *        Lock
  * vn_unlock   *        Unlock
- * vget        1        Lock
+ * vfscore_vget        1        Lock
  * vput       -1        Unlock
  * vref       +1        *
  * vrele      -1        *
@@ -172,7 +172,7 @@ vn_unlock(struct vnode *vp)
  * Returns 1 if vnode was found in cache; otherwise returns 0.
  */
 int
-vget(struct mount *mp, uint64_t ino, struct vnode **vpp)
+vfscore_vget(struct mount *mp, uint64_t ino, struct vnode **vpp)
 {
 	struct vnode *vp;
 	int error;
@@ -476,25 +476,25 @@ vnode_dump(void)
 #endif
 
 int
-vop_nullop(void)
+vfscore_vop_nullop(void)
 {
 	return 0;
 }
 
 int
-vop_einval(void)
+vfscore_vop_einval(void)
 {
 	return EINVAL;
 }
 
 int
-vop_eperm(void)
+vfscore_vop_eperm(void)
 {
 	return EPERM;
 }
 
 int
-vop_erofs(void)
+vfscore_vop_erofs(void)
 {
 	return EROFS;
 }

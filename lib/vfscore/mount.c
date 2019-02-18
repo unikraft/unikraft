@@ -240,7 +240,7 @@ sys_mount(const char *dev, const char *dir, const char *fsname, int flags, const
 }
 
 void
-release_mp_dentries(struct mount *mp)
+vfscore_release_mp_dentries(struct mount *mp)
 {
 	/* Decrement referece count of root vnode */
 	if (mp->m_covered) {
@@ -465,8 +465,7 @@ vfs_unbusy(struct mount *mp)
 	ukarch_dec(&mp->m_count);
 }
 
-int
-vfs_nullop(void)
+int vfscore_nullop(void)
 {
 	return 0;
 }
@@ -479,12 +478,12 @@ vfs_einval(void)
 
 #ifdef DEBUG_VFS
 void
-mount_dump(void)
+vfscore_mount_dump(void)
 {
 	struct mount *mp;
 	uk_mutex_lock(&mount_lock);
 
-	uk_pr_debug("mount_dump\n");
+	uk_pr_debug("vfscore_mount_dump\n");
 	uk_pr_debug("dev      count root\n");
 	uk_pr_debug("-------- ----- --------\n");
 

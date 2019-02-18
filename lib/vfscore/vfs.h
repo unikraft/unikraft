@@ -148,7 +148,7 @@ void dentry_init(void);
 
 #ifdef DEBUG_VFS
 void	 vnode_dump(void);
-void	 mount_dump(void);
+void	 vfscore_mount_dump(void);
 #endif
 
 static void __attribute__((unused)) uk_vfscore_trace(int foo __unused, ...)

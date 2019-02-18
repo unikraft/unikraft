@@ -46,7 +46,7 @@
 #include <vfscore/uio.h>
 
 int
-uiomove(void *cp, int n, struct uio *uio)
+vfscore_uiomove(void *cp, int n, struct uio *uio)
 {
 	UK_ASSERT(uio->uio_rw == UIO_READ || uio->uio_rw == UIO_WRITE);
 

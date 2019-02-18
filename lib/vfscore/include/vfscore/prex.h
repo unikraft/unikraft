@@ -33,8 +33,8 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#ifndef _OSV_PREX_H
-#define _OSV_PREX_H 1
+#ifndef _UK_PREX_H
+#define _UK_PREX_H 1
 
 
 #include <unistd.h>
@@ -50,4 +50,4 @@ size_t strlcpy(char *dst, const char *src, size_t siz);
 
 void sys_panic(const char *);
 
-#endif /* _OSV_PREX_H */
+#endif /* _UK_PREX_H */

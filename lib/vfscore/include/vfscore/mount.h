@@ -139,12 +139,12 @@ typedef int (*vfsop_statfs_t)(struct mount *, struct statfs *);
 
 #define VFS_NULL		    ((void *)vfs_null)
 
-int	vfs_nullop(void);
+int	vfscore_nullop(void);
 int	vfs_einval(void);
 
 void	 vfs_busy(struct mount *mp);
 void	 vfs_unbusy(struct mount *mp);
 
-void	 release_mp_dentries(struct mount *mp);
+void	 vfscore_release_mp_dentries(struct mount *mp);
 
 #endif	/* !_SYS_MOUNT_H_ */

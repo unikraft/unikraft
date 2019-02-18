@@ -57,6 +57,6 @@ struct uio {
 	enum	uio_rw uio_rw;		/* operation */
 };
 
-int	uiomove(void *cp, int n, struct uio *uio);
+int	vfscore_uiomove(void *cp, int n, struct uio *uio);
 
 #endif /* !_UIO_H_ */
