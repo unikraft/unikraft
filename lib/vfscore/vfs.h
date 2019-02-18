@@ -146,6 +146,15 @@ void dref(struct dentry *dp);
 void drele(struct dentry *dp);
 void dentry_init(void);
 
+int vfs_close(struct vfscore_file *fp);
+int vfs_read(struct vfscore_file *fp, struct uio *uio, int flags);
+int vfs_write(struct vfscore_file *fp, struct uio *uio, int flags);
+int vfs_ioctl(struct vfscore_file *fp, unsigned long com, void *data);
+int vfs_stat(struct vfscore_file *fp, struct stat *st);
+
+int fget(int fd, struct vfscore_file **out_fp);
+int fdalloc(struct vfscore_file *fp, int *newfd);
+
 #ifdef DEBUG_VFS
 void	 vnode_dump(void);
 void	 vfscore_mount_dump(void);
