@@ -35,7 +35,8 @@
  *                  a VFS system call.
  */
 
-#include <sys/stat.h>
+#define _BSD_SOURCE
+#define _GNU_SOURCE
 #include <dirent.h>
 
 #include <limits.h>
@@ -46,11 +47,12 @@
 #include <errno.h>
 #include <fcntl.h>
 
-#include <osv/prex.h>
-#include <osv/vnode.h>
-#include <osv/vfs_file.hh>
+#include <vfscore/prex.h>
+#include <vfscore/vnode.h>
+#include <vfscore/file.h>
+
 #include "vfs.h"
-#include <fs/fs.hh>
+#include <vfscore/fs.h>
 
 extern struct task *main_task;
 

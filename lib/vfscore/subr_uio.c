@@ -39,11 +39,11 @@
  *	@(#)kern_subr.c	8.3 (Berkeley) 1/21/94
  */
 
-#include <assert.h>
+#include <uk/assert.h>
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-#include <osv/uio.h>
+#include <vfscore/uio.h>
 
 int
 uiomove(void *cp, int n, struct uio *uio)

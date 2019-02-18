@@ -35,13 +35,14 @@
 
 #ifdef _KERNEL
 
-#include <sys/cdefs.h>
 #include <sys/stat.h>
-#include <osv/prex.h>
-#include <osv/uio.h>
-#include <osv/mutex.h>
-#include "file.h"
-#include "dirent.h"
+#include <dirent.h>
+
+#include <uk/mutex.h>
+#include <uk/list.h>
+#include <time.h>
+#include <vfscore/uio.h>
+#include <vfscore/dentry.h>
 
 struct vfsops;
 struct vnops;

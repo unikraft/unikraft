@@ -33,14 +33,13 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
+#define _GNU_SOURCE
 #include <fcntl.h>
 #include <sys/stat.h>
-#include <osv/file.h>
-#include <osv/poll.h>
-#include <fs/vfs/vfs.h>
-#include <osv/vfs_file.hh>
-#include <osv/mmu.hh>
-#include <osv/pagecache.hh>
+#include <vfscore/file.h>
+#include "vfs.h"
+
+#include <uk/assert.h>
 
 int vfs_close(struct vfscore_file *fp)
 {

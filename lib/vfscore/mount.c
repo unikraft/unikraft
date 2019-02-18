@@ -34,27 +34,22 @@
  * vfs_mount.c - mount operations
  */
 
-#include <sys/stat.h>
 #include <sys/param.h>
-#include <dirent.h>
-
 #include <limits.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 #include <errno.h>
-#include <fcntl.h>
-
-#include <osv/prex.h>
-#include <osv/vnode.h>
-#include <osv/device.h>
-#include <osv/debug.h>
-#include <osv/mutex.h>
 #include "vfs.h"
-
-#include <memory>
-#include <list>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <time.h>
+#include <uk/list.h>
+#include <uk/mutex.h>
+#include <vfscore/prex.h>
+#include <vfscore/dentry.h>
+#include <vfscore/vnode.h>
 
 /*
  * List for VFS mount points.

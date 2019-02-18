@@ -36,8 +36,8 @@
 #ifndef _OSV_DENTRY_H
 #define _OSV_DENTRY_H 1
 
-#include <osv/mutex.h>
-#include <bsd/sys/sys/queue.h>
+#include <uk/mutex.h>
+#include <uk/list.h>
 
 struct vnode;
 

@@ -30,53 +30,23 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/param.h>
+#define _GNU_SOURCE
+
 #include <sys/statvfs.h>
 #include <sys/stat.h>
-#include <sys/time.h>
-#include <sys/sendfile.h>
-
 #include <limits.h>
-#include <unistd.h>
-#include <stdio.h>
-#include <stdint.h>
-#include <stdlib.h>
 #include <string.h>
 #include <errno.h>
-#include <signal.h>
-#define open __open_variadic
-#define fcntl __fcntl_variadic
 #include <fcntl.h>
-#undef open
-#undef fcntl
-
-#include <osv/prex.h>
-#include <osv/vnode.h>
-#include <osv/stubbing.hh>
-#include <osv/ioctl.h>
-#include <osv/trace.hh>
-#include <osv/run.hh>
-#include <drivers/console.hh>
-
+#include <vfscore/prex.h>
+#include <vfscore/vnode.h>
 #include "vfs.h"
-
-#include "libc/internal/libc.h"
-
-#include <algorithm>
-#include <unordered_map>
-
 #include <sys/file.h>
-
-#include "fs/fs.hh"
-#include "libc/libc.hh"
-
-#include <mntent.h>
-#include <sys/mman.h>
-
-#include <osv/clock.hh>
-#include <api/utime.h>
-#include <chrono>
-
+#include <stdarg.h>
+#include <vfscore/file.h>
+#include <vfscore/mount.h>
+#include <vfscore/fs.h>
+#include <uk/errptr.h>
 
 #ifdef DEBUG_VFS
 int	vfs_debug = VFSDB_FLAGS;

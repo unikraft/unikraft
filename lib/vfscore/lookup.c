@@ -36,8 +36,8 @@
 #include <stdlib.h>
 #include <sys/param.h>
 
-#include <osv/dentry.h>
-#include <osv/vnode.h>
+#include <vfscore/dentry.h>
+#include <vfscore/vnode.h>
 #include "vfs.h"
 
 static ssize_t

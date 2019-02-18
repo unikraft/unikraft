@@ -36,14 +36,16 @@
 
 #include <limits.h>
 #include <unistd.h>
+#include <stdint.h>
 #include <string.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <errno.h>
 #include <sys/stat.h>
 
-#include <osv/prex.h>
-#include <osv/vnode.h>
+#include <vfscore/prex.h>
+#include <vfscore/dentry.h>
+#include <vfscore/vnode.h>
 #include "vfs.h"
 
 enum vtype iftovt_tab[16] = {

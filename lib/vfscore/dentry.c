@@ -32,10 +32,11 @@
 
 #include <string.h>
 #include <stdlib.h>
-#include <sys/param.h>
 
-#include <osv/dentry.h>
-#include <osv/vnode.h>
+#include <uk/list.h>
+#include <vfscore/dentry.h>
+#include <vfscore/vnode.h>
+#include <uk/mutex.h>
 #include "vfs.h"
 
 #define DENTRY_BUCKETS 32

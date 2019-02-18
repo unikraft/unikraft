@@ -33,7 +33,6 @@
 #ifndef _UIO_H_
 #define	_UIO_H_
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 #include <sys/uio.h>
 #include <limits.h>

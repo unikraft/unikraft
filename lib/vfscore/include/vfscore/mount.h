@@ -32,10 +32,10 @@
 #ifndef _SYS_MOUNT_H_
 #define _SYS_MOUNT_H_
 
-#include <sys/cdefs.h>
 #include <sys/statfs.h>
-#include <osv/vnode.h>
-#include <bsd/sys/sys/queue.h>
+#include <limits.h>
+#include <uk/list.h>
+#include <vfscore/vnode.h>
 
 #ifdef _KERNEL
 

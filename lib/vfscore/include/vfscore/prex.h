@@ -38,7 +38,6 @@
 
 
 #include <unistd.h>
-#include <osv/fcntl.h>
 
 #define	BSIZE	512		/* size of secondary block (bytes) */
 

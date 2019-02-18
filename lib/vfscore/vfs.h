@@ -33,24 +33,12 @@
 #ifndef _VFS_H
 #define _VFS_H
 
-#include <sys/cdefs.h>
-#include <assert.h>
-#include <dirent.h>
+#define _GNU_SOURCE
+#include <vfscore/mount.h>
+
 #include <limits.h>
-
-#include <osv/prex.h>
-#include <osv/file.h>
-#include <osv/mount.h>
-#include <osv/vnode.h>
-#include <osv/dentry.h>
-#include <osv/error.h>
-
-/*
- * Import vnode attributes flags
- */
-#include <osv/vnode_attr.h>
-
-/* #define DEBUG_VFS 1 */
+#include <fcntl.h>
+#include <sys/statfs.h>
 
 /*
  * Tunable parameters
@@ -58,7 +46,6 @@
 #define FSMAXNAMES	16		/* max length of 'file system' name */
 
 #ifdef DEBUG_VFS
-#include <osv/debug.h>
 
 extern int vfs_debug;
 

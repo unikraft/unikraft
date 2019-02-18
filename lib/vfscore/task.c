@@ -41,7 +41,7 @@
 #include <stdio.h>
 #include <errno.h>
 
-#include <osv/prex.h>
+#include <vfscore/prex.h>
 #include "vfs.h"
 
 
