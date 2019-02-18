@@ -5,23 +5,22 @@
 extern "C" {
 #endif
 
-#include <sys/ioctl.h>
 
-#define BLKROSET   _IO(0x12, 93)
-#define BLKROGET   _IO(0x12, 94)
-#define BLKRRPART  _IO(0x12, 95)
-#define BLKGETSIZE _IO(0x12, 96)
-#define BLKFLSBUF  _IO(0x12, 97)
-#define BLKRASET   _IO(0x12, 98)
-#define BLKRAGET   _IO(0x12, 99)
-#define BLKFRASET  _IO(0x12,100)
-#define BLKFRAGET  _IO(0x12,101)
-#define BLKSECTSET _IO(0x12,102)
-#define BLKSECTGET _IO(0x12,103)
-#define BLKSSZGET  _IO(0x12,104)
-#define BLKBSZGET  _IOR(0x12,112,size_t)
-#define BLKBSZSET  _IOW(0x12,113,size_t)
-#define BLKGETSIZE64 _IOR(0x12,114,size_t)
+#define BLKROSET      _IO(0x12,  93)
+#define BLKROGET      _IO(0x12,  94)
+#define BLKRRPART     _IO(0x12,  95)
+#define BLKGETSIZE    _IO(0x12,  96)
+#define BLKFLSBUF     _IO(0x12,  97)
+#define BLKRASET      _IO(0x12,  98)
+#define BLKRAGET      _IO(0x12,  99)
+#define BLKFRASET     _IO(0x12, 100)
+#define BLKFRAGET     _IO(0x12, 101)
+#define BLKSECTSET    _IO(0x12, 102)
+#define BLKSECTGET    _IO(0x12, 103)
+#define BLKSSZGET     _IO(0x12, 104)
+#define BLKBSZGET    _IOR(0x12, 112, size_t)
+#define BLKBSZSET    _IOW(0x12, 113, size_t)
+#define BLKGETSIZE64 _IOR(0x12, 114, size_t)
 
 #define MS_RDONLY      1
 #define MS_NOSUID      2
@@ -63,9 +62,10 @@ extern "C" {
 #define MNT_EXPIRE      4
 #define UMOUNT_NOFOLLOW 8
 
-int mount(const char *, const char *, const char *, unsigned long, const void *);
-int umount(const char *);
-int umount2(const char *, int);
+int mount(const char *dev, const char *dir, const char *fsname,
+	  unsigned long flags, const void *data);
+int umount(const char *path);
+int umount2(const char *path, int flags);
 
 #ifdef __cplusplus
 }
