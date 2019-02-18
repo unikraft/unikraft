@@ -151,4 +151,13 @@ void	 vnode_dump(void);
 void	 mount_dump(void);
 #endif
 
+static void __attribute__((unused)) uk_vfscore_trace(int foo __unused, ...)
+{
+}
+
+#define TRACEPOINT(trace_name, fmt, ...)			\
+	static void trace_name(__VA_ARGS__ ) __attribute__((unused, alias("uk_vfscore_trace")))
+
+
+
 #endif /* !_VFS_H */

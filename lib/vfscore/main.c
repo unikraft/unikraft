@@ -52,7 +52,40 @@
 int	vfs_debug = VFSDB_FLAGS;
 #endif
 
+/* This macro is for defining an alias of the 64bit version of a
+ * syscall to the regular one. It seams we can make the logic which is
+ * choosing the right call simpler then in common libc.
+ *
+ * Let's keep LFS64 calls just in case in future we will find out that
+ * these aliases are need.
+ */
+#define LFS64(x)
+
 static mode_t global_umask = S_IWGRP | S_IWOTH;
+
+/* TODO: these macro does not belong here
+ * NOTE: borrowed from OSv
+ */
+#define DO_ONCE(thing) do {				\
+	static int _x;					\
+	if (!_x) {					\
+	    _x = 1;					\
+	    thing ;					\
+	}						\
+} while (0)
+#define WARN_STUBBED() DO_ONCE(uk_pr_warn("%s() stubbed\n", __func__))
+
+#define NO_SYS(decl) decl {				\
+    DO_ONCE(uk_pr_warn("%s not implemented\n", __func__));	\
+    errno = ENOSYS;					\
+    return -1;						\
+}
+
+static inline int libc_error(int err)
+{
+    errno = err;
+    return -1;
+}
 
 static inline mode_t apply_umask(mode_t mode)
 {

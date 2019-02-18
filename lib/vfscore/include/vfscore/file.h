@@ -61,6 +61,8 @@ void vfscore_put_fd(int fd);
 void vfscore_install_fd(int fd, struct vfscore_file *file);
 struct vfscore_file *vfscore_get_file(int fd);
 
+#define FOF_OFFSET  0x0800    /* Use the offset in uio argument */
+
 #ifdef __cplusplus
 }
 #endif

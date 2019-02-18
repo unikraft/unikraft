@@ -108,6 +108,27 @@ struct vattr {
 	off_t		va_size;
 };
 
+/* struct vattr is used to consolidate multiple types of file
+ * attributes for passing them as function parameters. Macros bellow
+ * are selectors, of what types of attributes are valid in particular
+ * struct vattr*/
+#define	AT_TYPE		0x00001
+#define	AT_MODE		0x00002
+#define	AT_UID		0x00004
+#define	AT_GID		0x00008
+#define	AT_FSID		0x00010
+#define	AT_NODEID	0x00020
+#define	AT_NLINK	0x00040
+#define	AT_SIZE		0x00080
+#define	AT_ATIME	0x00100
+#define	AT_MTIME	0x00200
+#define	AT_CTIME	0x00400
+#define	AT_RDEV		0x00800
+#define	AT_BLKSIZE	0x01000
+#define	AT_NBLOCKS	0x02000
+#define	AT_SEQ		0x08000
+#define	AT_XVATTR	0x10000
+
 /*
  *  Modes.
  */

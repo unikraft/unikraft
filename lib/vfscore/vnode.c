@@ -48,6 +48,8 @@
 #include <vfscore/vnode.h>
 #include "vfs.h"
 
+#define S_BLKSIZE 512
+
 enum vtype iftovt_tab[16] = {
 	VNON, VFIFO, VCHR, VNON, VDIR, VNON, VBLK, VNON,
 	VREG, VNON, VLNK, VNON, VSOCK, VNON, VNON, VBAD,
