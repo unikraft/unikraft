@@ -394,7 +394,7 @@ sys_fsync(struct vfscore_file *fp)
 	struct vnode *vp;
 	int error;
 
-	DPRINTF(VFSDB_SYSCALL, ("sys_fsync: fp=%x\n", fp));
+	DPRINTF(VFSDB_SYSCALL, ("sys_fsync: fp=%p\n", fp));
 
 	if (!fp->f_dentry)
 		return EINVAL;
@@ -411,7 +411,7 @@ sys_fstat(struct vfscore_file *fp, struct stat *st)
 {
 	int error = 0;
 
-	DPRINTF(VFSDB_SYSCALL, ("sys_fstat: fp=%x\n", fp));
+	DPRINTF(VFSDB_SYSCALL, ("sys_fstat: fp=%p\n", fp));
 
 	error = vfs_stat(fp, st);
 
@@ -458,7 +458,7 @@ sys_readdir(struct vfscore_file *fp, struct dirent *dir)
 	struct vnode *dvp;
 	int error;
 
-	DPRINTF(VFSDB_SYSCALL, ("sys_readdir: fp=%x\n", fp));
+	DPRINTF(VFSDB_SYSCALL, ("sys_readdir: fp=%p\n", fp));
 
 	if (!fp->f_dentry)
 		return ENOTDIR;
@@ -1433,7 +1433,7 @@ sys_fallocate(struct vfscore_file *fp, int mode, off_t offset, off_t len)
 	int error;
 	struct vnode *vp;
 
-	DPRINTF(VFSDB_SYSCALL, ("sys_fallocate: fp=%x", fp));
+	DPRINTF(VFSDB_SYSCALL, ("sys_fallocate: fp=%p", fp));
 
 	if (!fp->f_dentry || !(fp->f_flags & FWRITE)) {
 		return EBADF;

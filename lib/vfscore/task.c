@@ -129,7 +129,7 @@ path_conv(char *wd, const char *cpath, char *full)
  * @acc: access mode
  */
 int
-task_conv(struct task *t, const char *cpath, int acc, char *full)
+task_conv(struct task *t, const char *cpath, int acc __unused, char *full)
 {
 	int rc;
 

@@ -167,7 +167,7 @@ typedef	int (*vnop_truncate_t)	(struct vnode *, off_t);
 typedef	int (*vnop_link_t)      (struct vnode *, struct vnode *, char *);
 typedef int (*vnop_cache_t) (struct vnode *, struct vfscore_file *, struct uio *);
 typedef int (*vnop_fallocate_t) (struct vnode *, int, off_t, off_t);
-typedef int (*vnop_readlink_t)  (struct vnode *, struct uio *);
+typedef ssize_t (*vnop_readlink_t)  (struct vnode *, struct uio *);
 typedef int (*vnop_symlink_t)   (struct vnode *, char *, char *);
 
 /*

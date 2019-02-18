@@ -179,7 +179,7 @@ vfscore_vget(struct mount *mp, uint64_t ino, struct vnode **vpp)
 
 	*vpp = NULL;
 
-	DPRINTF(VFSDB_VNODE, ("vget %LLu\n", ino));
+	DPRINTF(VFSDB_VNODE, ("vfscore_vget %llu\n", (unsigned long long) ino));
 
 	VNODE_LOCK();
 
@@ -300,7 +300,7 @@ vrele(struct vnode *vp)
  * Remove all vnode in the vnode table for unmount.
  */
 void
-vflush(struct mount *mp)
+vflush(struct mount *mp __unused)
 {
 }
 
@@ -512,7 +512,7 @@ vnode_init(void)
 		UK_INIT_LIST_HEAD(&vnode_table[i]);
 }
 
-void vn_add_name(struct vnode *vp, struct dentry *dp)
+void vn_add_name(struct vnode *vp __unused, struct dentry *dp)
 {
 	/* TODO: Re-enable this check when preemption and/or smp is
 	 * here */
@@ -520,7 +520,7 @@ void vn_add_name(struct vnode *vp, struct dentry *dp)
 	uk_list_add(&dp->d_names_link, &vp->v_names);
 }
 
-void vn_del_name(struct vnode *vp, struct dentry *dp)
+void vn_del_name(struct vnode *vp __unused, struct dentry *dp)
 {
 	/* TODO: Re-enable this check when preemption and/or smp is
 	 * here */

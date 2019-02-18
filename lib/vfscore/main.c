@@ -241,8 +241,7 @@ TRACEPOINT(trace_vfs_mknod, "\"%s\" 0%0o 0x%x", const char*, mode_t, dev_t);
 TRACEPOINT(trace_vfs_mknod_ret, "");
 TRACEPOINT(trace_vfs_mknod_err, "%d", int);
 
-
-int __xmknod(int ver, const char *pathname, mode_t mode, dev_t *dev)
+int __xmknod(int ver, const char *pathname, mode_t mode, dev_t *dev __unused)
 {
 	UK_ASSERT(ver == 0); // On x86-64 Linux, _MKNOD_VER_LINUX is 0.
 	struct task *t = main_task;
@@ -536,7 +535,7 @@ TRACEPOINT(trace_vfs_fstat, "%d %p", int, struct stat*);
 TRACEPOINT(trace_vfs_fstat_ret, "");
 TRACEPOINT(trace_vfs_fstat_err, "%d", int);
 
-int __fxstat(int ver, int fd, struct stat *st)
+int __fxstat(int ver __unused, int fd, struct stat *st)
 {
 	struct vfscore_file *fp;
 	int error;
@@ -563,14 +562,14 @@ int __fxstat(int ver, int fd, struct stat *st)
 
 LFS64(__fxstat);
 
-int fstat(int fd, struct stat *st)
+int fstat(int fd __unused, struct stat *st)
 {
 	return __fxstat(1, fd, st);
 }
 
 LFS64(fstat);
 
-int __fxstatat(int ver, int dirfd, const char *pathname, struct stat *st,
+int __fxstatat(int ver __unused, int dirfd, const char *pathname, struct stat *st,
 		int flags)
 {
 	if (flags & AT_SYMLINK_NOFOLLOW) {
@@ -1108,7 +1107,7 @@ TRACEPOINT(trace_vfs_stat, "\"%s\" %p", const char*, struct stat*);
 TRACEPOINT(trace_vfs_stat_ret, "");
 TRACEPOINT(trace_vfs_stat_err, "%d", int);
 
-int __xstat(int ver, const char *pathname, struct stat *st)
+int __xstat(int ver __unused, const char *pathname, struct stat *st)
 {
 	struct task *t = main_task;
 	char path[PATH_MAX];
@@ -1144,7 +1143,8 @@ LFS64(stat);
 TRACEPOINT(trace_vfs_lstat, "pathname=%s, stat=%p", const char*, struct stat*);
 TRACEPOINT(trace_vfs_lstat_ret, "");
 TRACEPOINT(trace_vfs_lstat_err, "errno=%d", int);
-int __lxstat(int ver, const char *pathname, struct stat *st)
+
+int __lxstat(int ver __unused, const char *pathname, struct stat *st)
 {
 	struct task *t = main_task;
 	char path[PATH_MAX];
@@ -1917,7 +1917,7 @@ int fchmod(int fd, mode_t mode)
 TRACEPOINT(trace_vfs_fchown, "\"%d\" %d %d", int, uid_t, gid_t);
 TRACEPOINT(trace_vfs_fchown_ret, "");
 
-int fchown(int fd, uid_t owner, gid_t group)
+int fchown(int fd __unused, uid_t owner __unused, gid_t group __unused)
 {
 	trace_vfs_fchown(fd, owner, group);
 	WARN_STUBBED();
@@ -1925,13 +1925,13 @@ int fchown(int fd, uid_t owner, gid_t group)
 	return 0;
 }
 
-int chown(const char *path, uid_t owner, gid_t group)
+int chown(const char *path __unused, uid_t owner __unused, gid_t group __unused)
 {
 	WARN_STUBBED();
 	return 0;
 }
 
-int lchown(const char *path, uid_t owner, gid_t group)
+int lchown(const char *path __unused, uid_t owner __unused, gid_t group __unused)
 {
 	WARN_STUBBED();
 	return 0;
@@ -2021,7 +2021,7 @@ ssize_t sendfile(int out_fd, int in_fd, off_t *_offset, size_t count)
 LFS64(sendfile);
 #endif
 
-NO_SYS(int fchmodat(int dirfd, const char *pathname, mode_t mode, int flags));
+NO_SYS(int fchmodat(int dirfd __unused, const char *pathname __unused, mode_t mode __unused, int flags __unused));
 
 mode_t umask(mode_t newmask)
 {
@@ -2034,7 +2034,7 @@ fs_noop(void)
 	return 0;
 }
 
-int chroot(const char *path)
+int chroot(const char *path __unused)
 {
 	WARN_STUBBED();
 	errno = ENOSYS;
