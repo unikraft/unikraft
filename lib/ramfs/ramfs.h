@@ -33,7 +33,8 @@
 #ifndef _RAMFS_H
 #define _RAMFS_H
 
-#include <osv/prex.h>
+#include <vfscore/prex.h>
+#include <stdbool.h>
 
 /* #define DEBUG_RAMFS 1 */
 
@@ -42,8 +43,6 @@
 #else
 #define DPRINTF(a)    do {} while (0)
 #endif
-
-#define ASSERT(e)    assert(e)
 
 /*
  * File/directory node for RAMFS

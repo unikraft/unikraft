@@ -33,7 +33,9 @@
 /*
  * rmafs_vnops.c - vnode operations for RAM file system.
  */
+#define _GNU_SOURCE
 
+#include <uk/essentials.h>
 #include <sys/stat.h>
 #include <dirent.h>
 #include <sys/param.h>
@@ -41,24 +43,29 @@
 #include <errno.h>
 #include <string.h>
 #include <stdlib.h>
-#include <fcntl.h>
 
-#include <osv/prex.h>
-#include <osv/vnode.h>
-#include <osv/file.h>
-#include <osv/mount.h>
-#include <osv/vnode_attr.h>
+#include <vfscore/prex.h>
+#include <vfscore/vnode.h>
+#include <vfscore/mount.h>
+#include <vfscore/uio.h>
+#include <vfscore/file.h>
 
 #include "ramfs.h"
+#include <dirent.h>
+#include <fcntl.h>
+#include <vfscore/fs.h>
 
-static mutex_t ramfs_lock = MUTEX_INITIALIZER;
+static struct uk_mutex ramfs_lock = UK_MUTEX_INITIALIZER(ramfs_lock);
 static uint64_t inode_count = 1; /* inode 0 is reserved to root */
 
 static void
-set_times_to_now(struct timespec *time1, struct timespec *time2 = nullptr, struct timespec *time3 = nullptr)
+set_times_to_now(struct timespec *time1, struct timespec *time2,
+		 struct timespec *time3)
 {
-	struct timespec now;
-	clock_gettime(CLOCK_REALTIME, &now);
+	struct timespec now = {0, 0};
+
+	/* TODO: implement the real clock_gettime */
+	/* clock_gettime(CLOCK_REALTIME, &now); */
 	if (time1) {
 		memcpy(time1, &now, sizeof(struct timespec));
 	}
@@ -75,7 +82,7 @@ ramfs_allocate_node(const char *name, int type)
 {
 	struct ramfs_node *np;
 
-	np = (ramfs_node *) malloc(sizeof(struct ramfs_node));
+	np = malloc(sizeof(struct ramfs_node));
 	if (np == NULL)
 		return NULL;
 	memset(np, 0, sizeof(struct ramfs_node));
@@ -121,7 +128,7 @@ ramfs_add_node(struct ramfs_node *dnp, char *name, int type)
 	if (np == NULL)
 		return NULL;
 
-	mutex_lock(&ramfs_lock);
+	uk_mutex_lock(&ramfs_lock);
 
 	/* Link to the directory list */
 	if (dnp->rn_child == NULL) {
@@ -133,9 +140,9 @@ ramfs_add_node(struct ramfs_node *dnp, char *name, int type)
 		prev->rn_next = np;
 	}
 
-	set_times_to_now(&(dnp->rn_mtime), &(dnp->rn_ctime));
+	set_times_to_now(&(dnp->rn_mtime), &(dnp->rn_ctime), NULL);
 
-	mutex_unlock(&ramfs_lock);
+	uk_mutex_unlock(&ramfs_lock);
 	return np;
 }
 
@@ -147,7 +154,7 @@ ramfs_remove_node(struct ramfs_node *dnp, struct ramfs_node *np)
 	if (dnp->rn_child == NULL)
 		return EBUSY;
 
-	mutex_lock(&ramfs_lock);
+	uk_mutex_lock(&ramfs_lock);
 
 	/* Unlink from the directory list */
 	if (dnp->rn_child == np) {
@@ -156,7 +163,7 @@ ramfs_remove_node(struct ramfs_node *dnp, struct ramfs_node *np)
 		for (prev = dnp->rn_child; prev->rn_next != np;
 			 prev = prev->rn_next) {
 			if (prev->rn_next == NULL) {
-				mutex_unlock(&ramfs_lock);
+				uk_mutex_unlock(&ramfs_lock);
 				return ENOENT;
 			}
 		}
@@ -164,9 +171,9 @@ ramfs_remove_node(struct ramfs_node *dnp, struct ramfs_node *np)
 	}
 	ramfs_free_node(np);
 
-	set_times_to_now(&(dnp->rn_mtime), &(dnp->rn_ctime));
+	set_times_to_now(&(dnp->rn_mtime), &(dnp->rn_ctime), NULL);
 
-	mutex_unlock(&ramfs_lock);
+	uk_mutex_unlock(&ramfs_lock);
 	return 0;
 }
 
@@ -193,7 +200,7 @@ ramfs_rename_node(struct ramfs_node *np, char *name)
 		np->rn_name = tmp;
 	}
 	np->rn_namelen = len;
-	set_times_to_now(&(np->rn_ctime));
+	set_times_to_now(&(np->rn_ctime), NULL, NULL);
 	return 0;
 }
 
@@ -210,10 +217,10 @@ ramfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
 	if (*name == '\0')
 		return ENOENT;
 
-	mutex_lock(&ramfs_lock);
+	uk_mutex_lock(&ramfs_lock);
 
 	len = strlen(name);
-	dnp = (ramfs_node *) dvp->v_data;
+	dnp = dvp->v_data;
 	found = 0;
 	for (np = dnp->rn_child; np != NULL; np = np->rn_next) {
 		if (np->rn_namelen == len &&
@@ -223,17 +230,17 @@ ramfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
 		}
 	}
 	if (found == 0) {
-		mutex_unlock(&ramfs_lock);
+		uk_mutex_unlock(&ramfs_lock);
 		return ENOENT;
 	}
-	if (vget(dvp->v_mount, inode_count++, &vp)) {
+	if (vfscore_vget(dvp->v_mount, inode_count++, &vp)) {
 		/* found in cache */
 		*vpp = vp;
-		mutex_unlock(&ramfs_lock);
+		uk_mutex_unlock(&ramfs_lock);
 		return 0;
 	}
 	if (!vp) {
-		mutex_unlock(&ramfs_lock);
+		uk_mutex_unlock(&ramfs_lock);
 		return ENOMEM;
 	}
 	vp->v_data = np;
@@ -241,7 +248,7 @@ ramfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
 	vp->v_type = np->rn_type;
 	vp->v_size = np->rn_size;
 
-	mutex_unlock(&ramfs_lock);
+	uk_mutex_unlock(&ramfs_lock);
 
 	*vpp = vp;
 
@@ -261,7 +268,7 @@ ramfs_mkdir(struct vnode *dvp, char *name, mode_t mode)
 	if (!S_ISDIR(mode))
 		return EINVAL;
 
-	np = (ramfs_node *) ramfs_add_node((ramfs_node *) dvp->v_data, name, VDIR);
+	np = ramfs_add_node(dvp->v_data, name, VDIR);
 	if (np == NULL)
 		return ENOMEM;
 	np->rn_size = 0;
@@ -275,7 +282,7 @@ ramfs_symlink(struct vnode *dvp, char *name, char *link)
 	if (strlen(name) > NAME_MAX) {
 		return ENAMETOOLONG;
 	}
-	auto np = ramfs_add_node((ramfs_node *) dvp->v_data, name, VLNK);
+	struct ramfs_node *np = ramfs_add_node(dvp->v_data, name, VLNK);
 	if (np == NULL)
 		return ENOMEM;
 	// Save the link target without the final null, as readlink() wants it.
@@ -286,10 +293,10 @@ ramfs_symlink(struct vnode *dvp, char *name, char *link)
 	return 0;
 }
 
-static int
+static ssize_t
 ramfs_readlink(struct vnode *vp, struct uio *uio)
 {
-	struct ramfs_node *np = (ramfs_node *) vp->v_data;
+	struct ramfs_node *np = vp->v_data;
 	size_t len;
 
 	if (vp->v_type != VLNK) {
@@ -308,23 +315,23 @@ ramfs_readlink(struct vnode *vp, struct uio *uio)
 	else
 		len = uio->uio_resid;
 
-	set_times_to_now( &(np->rn_atime));
-	return uiomove(np->rn_buf + uio->uio_offset, len, uio);
+	set_times_to_now(&(np->rn_atime), NULL, NULL);
+	return vfscore_uiomove(np->rn_buf + uio->uio_offset, len, uio);
 }
 
 /* Remove a directory */
 static int
-ramfs_rmdir(struct vnode *dvp, struct vnode *vp, char *name)
+ramfs_rmdir(struct vnode *dvp, struct vnode *vp, char *name __unused)
 {
-	return ramfs_remove_node((ramfs_node *) dvp->v_data, (ramfs_node *) vp->v_data);
+	return ramfs_remove_node(dvp->v_data, vp->v_data);
 }
 
 /* Remove a file */
 static int
-ramfs_remove(struct vnode *dvp, struct vnode *vp, char *name)
+ramfs_remove(struct vnode *dvp, struct vnode *vp, char *name __unused)
 {
 	DPRINTF(("remove %s in %s\n", name, dvp->v_path));
-	return ramfs_remove_node((ramfs_node *) dvp->v_data, (ramfs_node *) vp->v_data);
+	return ramfs_remove_node(dvp->v_data, vp->v_data);
 }
 
 /* Truncate file */
@@ -336,7 +343,7 @@ ramfs_truncate(struct vnode *vp, off_t length)
 	size_t new_size;
 
 	DPRINTF(("truncate %s length=%d\n", vp->v_path, length));
-	np = (ramfs_node *) vp->v_data;
+	np = vp->v_data;
 
 	if (length == 0) {
 		if (np->rn_buf != NULL) {
@@ -345,8 +352,8 @@ ramfs_truncate(struct vnode *vp, off_t length)
 			np->rn_buf = NULL;
 			np->rn_bufsize = 0;
 		}
-	} else if (size_t(length) > np->rn_bufsize) {
-		// XXX: this could use a page level allocator
+	} else if ((size_t) length > np->rn_bufsize) {
+		/* TODO: this could use a page level allocator */
 		new_size = round_page(length);
 		new_buf = malloc(new_size);
 		if (!new_buf)
@@ -362,7 +369,7 @@ ramfs_truncate(struct vnode *vp, off_t length)
 	}
 	np->rn_size = length;
 	vp->v_size = length;
-	set_times_to_now(&(np->rn_mtime), &(np->rn_ctime));
+	set_times_to_now(&(np->rn_mtime), &(np->rn_ctime), NULL);
 	return 0;
 }
 
@@ -382,16 +389,17 @@ ramfs_create(struct vnode *dvp, char *name, mode_t mode)
 	if (!S_ISREG(mode))
 		return EINVAL;
 
-	np = ramfs_add_node((ramfs_node *) dvp->v_data, name, VREG);
+	np = ramfs_add_node(dvp->v_data, name, VREG);
 	if (np == NULL)
 		return ENOMEM;
 	return 0;
 }
 
-static int
-ramfs_read(struct vnode *vp, struct file *fp, struct uio *uio, int ioflag)
+static ssize_t
+ramfs_read(struct vnode *vp, struct vfscore_file *fp __unused,
+	   struct uio *uio, int ioflag __unused)
 {
-	struct ramfs_node *np = (ramfs_node *) vp->v_data;
+	struct ramfs_node *np =  vp->v_data;
 	size_t len;
 
 	if (vp->v_type == VDIR) {
@@ -415,15 +423,15 @@ ramfs_read(struct vnode *vp, struct file *fp, struct uio *uio, int ioflag)
 	else
 		len = uio->uio_resid;
 
-	set_times_to_now(&(np->rn_atime));
+	set_times_to_now(&(np->rn_atime), NULL, NULL);
 
-	return uiomove(np->rn_buf + uio->uio_offset, len, uio);
+	return vfscore_uiomove(np->rn_buf + uio->uio_offset, len, uio);
 }
 
 int
 ramfs_set_file_data(struct vnode *vp, const void *data, size_t size)
 {
-	struct ramfs_node *np = (ramfs_node *) vp->v_data;
+	struct ramfs_node *np =  vp->v_data;
 
 	if (vp->v_type == VDIR) {
 		return EISDIR;
@@ -444,10 +452,10 @@ ramfs_set_file_data(struct vnode *vp, const void *data, size_t size)
 	return 0;
 }
 
-static int
+static ssize_t
 ramfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 {
-	struct ramfs_node *np = (ramfs_node *) vp->v_data;
+	struct ramfs_node *np =  vp->v_data;
 
 	if (vp->v_type == VDIR) {
 		return EISDIR;
@@ -468,7 +476,7 @@ ramfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 	if (ioflag & IO_APPEND)
 		uio->uio_offset = np->rn_size;
 
-	if (size_t(uio->uio_offset + uio->uio_resid) > (size_t) vp->v_size) {
+	if ((size_t) uio->uio_offset + uio->uio_resid > (size_t) vp->v_size) {
 		/* Expand the file size before writing to it */
 		off_t end_pos = uio->uio_offset + uio->uio_resid;
 		if (end_pos > (off_t) np->rn_bufsize) {
@@ -490,12 +498,13 @@ ramfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 		np->rn_owns_buf = true;
 	}
 
-	set_times_to_now(&(np->rn_mtime), &(np->rn_ctime));
-	return uiomove(np->rn_buf + uio->uio_offset, uio->uio_resid, uio);
+	set_times_to_now(&(np->rn_mtime), &(np->rn_ctime), NULL);
+	return vfscore_uiomove(np->rn_buf + uio->uio_offset, uio->uio_resid,
+			       uio);
 }
 
 static int
-ramfs_rename(struct vnode *dvp1, struct vnode *vp1, char *name1,
+ramfs_rename(struct vnode *dvp1, struct vnode *vp1, char *name1 __unused,
 			 struct vnode *dvp2, struct vnode *vp2, char *name2)
 {
 	struct ramfs_node *np, *old_np;
@@ -503,20 +512,20 @@ ramfs_rename(struct vnode *dvp1, struct vnode *vp1, char *name1,
 
 	if (vp2) {
 		/* Remove destination file, first */
-		error = ramfs_remove_node((ramfs_node *) dvp2->v_data, (ramfs_node *) vp2->v_data);
+		error = ramfs_remove_node(dvp2->v_data, vp2->v_data);
 		if (error)
 			return error;
 	}
 	/* Same directory ? */
 	if (dvp1 == dvp2) {
 		/* Change the name of existing file */
-		error = ramfs_rename_node((ramfs_node *) vp1->v_data, name2);
+		error = ramfs_rename_node(vp1->v_data, name2);
 		if (error)
 			return error;
 	} else {
 		/* Create new file or directory */
-		old_np = (ramfs_node *) vp1->v_data;
-		np = ramfs_add_node((ramfs_node *) dvp2->v_data, name2, old_np->rn_type);
+		old_np = vp1->v_data;
+		np = ramfs_add_node(dvp2->v_data, name2, old_np->rn_type);
 		if (np == NULL)
 			return ENOMEM;
 
@@ -528,7 +537,7 @@ ramfs_rename(struct vnode *dvp1, struct vnode *vp1, char *name1,
 			old_np->rn_buf = NULL;
 		}
 		/* Remove source file */
-		ramfs_remove_node((ramfs_node *) dvp1->v_data, (ramfs_node *) vp1->v_data);
+		ramfs_remove_node(dvp1->v_data, vp1->v_data);
 	}
 	return 0;
 }
@@ -537,14 +546,15 @@ ramfs_rename(struct vnode *dvp1, struct vnode *vp1, char *name1,
  * @vp: vnode of the directory.
  */
 static int
-ramfs_readdir(struct vnode *vp, struct file *fp, struct dirent *dir)
+ramfs_readdir(struct vnode *vp, struct vfscore_file *fp, struct dirent *dir)
 {
 	struct ramfs_node *np, *dnp;
 	int i;
 
-	mutex_lock(&ramfs_lock);
+	uk_mutex_lock(&ramfs_lock);
 
-	set_times_to_now(&(((ramfs_node *) vp->v_data)->rn_atime));
+	set_times_to_now(&(((struct ramfs_node *) vp->v_data)->rn_atime),
+			 NULL, NULL);
 
 	if (fp->f_offset == 0) {
 		dir->d_type = DT_DIR;
@@ -553,17 +563,17 @@ ramfs_readdir(struct vnode *vp, struct file *fp, struct dirent *dir)
 		dir->d_type = DT_DIR;
 		strlcpy((char *) &dir->d_name, "..", sizeof(dir->d_name));
 	} else {
-		dnp = (ramfs_node *) vp->v_data;
+		dnp = vp->v_data;
 		np = dnp->rn_child;
 		if (np == NULL) {
-			mutex_unlock(&ramfs_lock);
+			uk_mutex_unlock(&ramfs_lock);
 			return ENOENT;
 		}
 
 		for (i = 0; i != (fp->f_offset - 2); i++) {
 			np = np->rn_next;
 			if (np == NULL) {
-				mutex_unlock(&ramfs_lock);
+				uk_mutex_unlock(&ramfs_lock);
 				return ENOENT;
 			}
 		}
@@ -581,7 +591,7 @@ ramfs_readdir(struct vnode *vp, struct file *fp, struct dirent *dir)
 
 	fp->f_offset++;
 
-	mutex_unlock(&ramfs_lock);
+	uk_mutex_unlock(&ramfs_lock);
 	return 0;
 }
 
@@ -594,11 +604,12 @@ ramfs_init(void)
 static int
 ramfs_getattr(struct vnode *vnode, struct vattr *attr)
 {
+	struct ramfs_node *np = vnode->v_data;
+
 	attr->va_nodeid = vnode->v_ino;
 	attr->va_size = vnode->v_size;
 
-	struct ramfs_node *np = (ramfs_node *) vnode->v_data;
-	attr->va_type = (vtype) np->rn_type;
+	attr->va_type = np->rn_type;
 
 	memcpy(&(attr->va_atime), &(np->rn_atime), sizeof(struct timespec));
 	memcpy(&(attr->va_ctime), &(np->rn_ctime), sizeof(struct timespec));
@@ -611,7 +622,7 @@ ramfs_getattr(struct vnode *vnode, struct vattr *attr)
 
 static int
 ramfs_setattr(struct vnode *vnode, struct vattr *attr) {
-	struct ramfs_node *np = (ramfs_node *) vnode->v_data;
+	struct ramfs_node *np = vnode->v_data;
 
 	if (attr->va_mask & AT_ATIME) {
 		memcpy(&(np->rn_atime), &(attr->va_atime), sizeof(struct timespec));
@@ -632,14 +643,14 @@ ramfs_setattr(struct vnode *vnode, struct vattr *attr) {
 	return 0;
 }
 
-#define ramfs_open      ((vnop_open_t)vop_nullop)
-#define ramfs_close     ((vnop_close_t)vop_nullop)
-#define ramfs_seek      ((vnop_seek_t)vop_nullop)
-#define ramfs_ioctl     ((vnop_ioctl_t)vop_einval)
-#define ramfs_fsync     ((vnop_fsync_t)vop_nullop)
-#define ramfs_inactive  ((vnop_inactive_t)vop_nullop)
-#define ramfs_link      ((vnop_link_t)vop_eperm)
-#define ramfs_fallocate ((vnop_fallocate_t)vop_nullop)
+#define ramfs_open      ((vnop_open_t)vfscore_vop_nullop)
+#define ramfs_close     ((vnop_close_t)vfscore_vop_nullop)
+#define ramfs_seek      ((vnop_seek_t)vfscore_vop_nullop)
+#define ramfs_ioctl     ((vnop_ioctl_t)vfscore_vop_einval)
+#define ramfs_fsync     ((vnop_fsync_t)vfscore_vop_nullop)
+#define ramfs_inactive  ((vnop_inactive_t)vfscore_vop_nullop)
+#define ramfs_link      ((vnop_link_t)vfscore_vop_eperm)
+#define ramfs_fallocate ((vnop_fallocate_t)vfscore_vop_nullop)
 
 /*
  * vnode operations
@@ -664,7 +675,7 @@ struct vnops ramfs_vnops = {
 		ramfs_inactive,         /* inactive */
 		ramfs_truncate,         /* truncate */
 		ramfs_link,             /* link */
-		(vnop_cache_t) nullptr, /* arc */
+		(vnop_cache_t) NULL,    /* arc */
 		ramfs_fallocate,        /* fallocate */
 		ramfs_readlink,         /* read link */
 		ramfs_symlink,          /* symbolic link */

@@ -32,9 +32,10 @@
 
 #include <errno.h>
 
-#include <osv/vnode.h>
-#include <osv/mount.h>
-#include <osv/dentry.h>
+#define _BSD_SOURCE
+#include <vfscore/vnode.h>
+#include <vfscore/mount.h>
+#include <vfscore/dentry.h>
 
 #include "ramfs.h"
 
@@ -44,9 +45,9 @@ static int ramfs_mount(struct mount *mp, const char *dev, int flags, const void 
 
 static int ramfs_unmount(struct mount *mp, int flags);
 
-#define ramfs_sync    ((vfsop_sync_t)vfs_nullop)
-#define ramfs_vget    ((vfsop_vget_t)vfs_nullop)
-#define ramfs_statfs    ((vfsop_statfs_t)vfs_nullop)
+#define ramfs_sync    ((vfsop_sync_t)vfscore_nullop)
+#define ramfs_vget    ((vfsop_vget_t)vfscore_nullop)
+#define ramfs_statfs    ((vfsop_statfs_t)vfscore_nullop)
 
 /*
  * File system operations
@@ -60,11 +61,20 @@ struct vfsops ramfs_vfsops = {
 		&ramfs_vnops,      /* vnops */
 };
 
+static struct vfscore_fs_type fs_ramfs = {
+	.vs_name = "ramfs",
+	.vs_init = NULL,
+	.vs_op = &ramfs_vfsops,
+};
+
+UK_FS_REGISTER(fs_ramfs);
+
 /*
  * Mount a file system.
  */
 static int
-ramfs_mount(struct mount *mp, const char *dev, int flags, const void *data)
+ramfs_mount(struct mount *mp, const char *dev __unused,
+	    int flags __unused, const void *data __unused)
 {
 	struct ramfs_node *np;
 
@@ -86,8 +96,8 @@ ramfs_mount(struct mount *mp, const char *dev, int flags, const void *data)
  *       directories, and it requires more work...
  */
 static int
-ramfs_unmount(struct mount *mp, int flags)
+ramfs_unmount(struct mount *mp, int flags __unused)
 {
-	release_mp_dentries(mp);
+	vfscore_release_mp_dentries(mp);
 	return 0;
 }
