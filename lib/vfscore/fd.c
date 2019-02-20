@@ -133,6 +133,11 @@ exit:
 	return ret;
 }
 
+void vfscore_put_file(struct vfscore_file *file)
+{
+	fdrop(file);
+}
+
 int fget(int fd, struct vfscore_file **out_fp)
 {
 	int ret = 0;

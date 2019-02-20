@@ -65,6 +65,7 @@ int vfscore_alloc_fd(void);
 void vfscore_put_fd(int fd);
 int vfscore_install_fd(int fd, struct vfscore_file *file);
 struct vfscore_file *vfscore_get_file(int fd);
+void vfscore_put_file(struct vfscore_file *file);
 
 /*
  * File descriptors reference count
