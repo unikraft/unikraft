@@ -41,7 +41,8 @@
 
 extern struct vnops ramfs_vnops;
 
-static int ramfs_mount(struct mount *mp, const char *dev, int flags, const void *data);
+static int ramfs_mount(struct mount *mp, const char *dev, int flags,
+		       const void *data);
 
 static int ramfs_unmount(struct mount *mp, int flags);
 
@@ -78,7 +79,7 @@ ramfs_mount(struct mount *mp, const char *dev __unused,
 {
 	struct ramfs_node *np;
 
-	uk_pr_debug("ramfs_mount: dev=%s\n", dev);
+	uk_pr_debug("%s: dev=%s\n", __func__, dev);
 
 	/* Create a root node */
 	np = ramfs_allocate_node("/", VDIR);

@@ -66,15 +66,12 @@ set_times_to_now(struct timespec *time1, struct timespec *time2,
 
 	/* TODO: implement the real clock_gettime */
 	/* clock_gettime(CLOCK_REALTIME, &now); */
-	if (time1) {
+	if (time1)
 		memcpy(time1, &now, sizeof(struct timespec));
-	}
-	if (time2) {
+	if (time2)
 		memcpy(time2, &now, sizeof(struct timespec));
-	}
-	if (time3) {
+	if (time3)
 		memcpy(time3, &now, sizeof(struct timespec));
-	}
 }
 
 struct ramfs_node *
@@ -184,9 +181,9 @@ ramfs_rename_node(struct ramfs_node *np, char *name)
 	char *tmp;
 
 	len = strlen(name);
-	if (len > NAME_MAX) {
+	if (len > NAME_MAX)
 		return ENAMETOOLONG;
-	}
+
 	if (len <= np->rn_namelen) {
 		/* Reuse current name buffer */
 		strlcpy(np->rn_name, name, np->rn_namelen + 1);
@@ -261,9 +258,8 @@ ramfs_mkdir(struct vnode *dvp, char *name, mode_t mode)
 	struct ramfs_node *np;
 
 	uk_pr_debug("mkdir %s\n", name);
-	if (strlen(name) > NAME_MAX) {
+	if (strlen(name) > NAME_MAX)
 		return ENAMETOOLONG;
-	}
 
 	if (!S_ISDIR(mode))
 		return EINVAL;
@@ -279,14 +275,19 @@ ramfs_mkdir(struct vnode *dvp, char *name, mode_t mode)
 static int
 ramfs_symlink(struct vnode *dvp, char *name, char *link)
 {
-	if (strlen(name) > NAME_MAX) {
+	struct ramfs_node *np;
+	size_t len;
+
+	if (strlen(name) > NAME_MAX)
 		return ENAMETOOLONG;
-	}
-	struct ramfs_node *np = ramfs_add_node(dvp->v_data, name, VLNK);
+
+	np = ramfs_add_node(dvp->v_data, name, VLNK);
+
 	if (np == NULL)
 		return ENOMEM;
 	// Save the link target without the final null, as readlink() wants it.
-	size_t len = strlen(link);
+	len = strlen(link);
+
 	np->rn_buf = strndup(link, len);
 	np->rn_bufsize = np->rn_size = len;
 
@@ -299,15 +300,12 @@ ramfs_readlink(struct vnode *vp, struct uio *uio)
 	struct ramfs_node *np = vp->v_data;
 	size_t len;
 
-	if (vp->v_type != VLNK) {
+	if (vp->v_type != VLNK)
 		return EINVAL;
-	}
-	if (uio->uio_offset < 0) {
+	if (uio->uio_offset < 0)
 		return EINVAL;
-	}
-	if (uio->uio_resid == 0) {
+	if (uio->uio_resid == 0)
 		return 0;
-	}
 	if (uio->uio_offset >= (off_t) vp->v_size)
 		return 0;
 	if (vp->v_size - uio->uio_offset < uio->uio_resid)
@@ -349,7 +347,7 @@ ramfs_truncate(struct vnode *vp, off_t length)
 
 	if (length == 0) {
 		if (np->rn_buf != NULL) {
-			if(np->rn_owns_buf)
+			if (np->rn_owns_buf)
 				free(np->rn_buf);
 			np->rn_buf = NULL;
 			np->rn_bufsize = 0;
@@ -362,7 +360,7 @@ ramfs_truncate(struct vnode *vp, off_t length)
 			return EIO;
 		if (np->rn_size != 0) {
 			memcpy(new_buf, np->rn_buf, vp->v_size);
-			if(np->rn_owns_buf)
+			if (np->rn_owns_buf)
 				free(np->rn_buf);
 		}
 		np->rn_buf = (char *) new_buf;
@@ -383,9 +381,8 @@ ramfs_create(struct vnode *dvp, char *name, mode_t mode)
 {
 	struct ramfs_node *np;
 
-	if (strlen(name) > NAME_MAX) {
+	if (strlen(name) > NAME_MAX)
 		return ENAMETOOLONG;
-	}
 
 	uk_pr_debug("create %s in %s\n", name, RAMFS_NODE(dvp)->rn_name);
 	if (!S_ISREG(mode))
@@ -404,18 +401,14 @@ ramfs_read(struct vnode *vp, struct vfscore_file *fp __unused,
 	struct ramfs_node *np =  vp->v_data;
 	size_t len;
 
-	if (vp->v_type == VDIR) {
+	if (vp->v_type == VDIR)
 		return EISDIR;
-	}
-	if (vp->v_type != VREG) {
+	if (vp->v_type != VREG)
 		return EINVAL;
-	}
-	if (uio->uio_offset < 0) {
+	if (uio->uio_offset < 0)
 		return EINVAL;
-	}
-	if (uio->uio_resid == 0) {
+	if (uio->uio_resid == 0)
 		return 0;
-	}
 
 	if (uio->uio_offset >= (off_t) vp->v_size)
 		return 0;
@@ -435,15 +428,12 @@ ramfs_set_file_data(struct vnode *vp, const void *data, size_t size)
 {
 	struct ramfs_node *np =  vp->v_data;
 
-	if (vp->v_type == VDIR) {
+	if (vp->v_type == VDIR)
 		return EISDIR;
-	}
-	if (vp->v_type != VREG) {
+	if (vp->v_type != VREG)
 		return EINVAL;
-	}
-	if (np->rn_buf) {
+	if (np->rn_buf)
 		return EINVAL;
-	}
 
 	np->rn_buf = (char *) data;
 	np->rn_bufsize = size;
@@ -459,21 +449,16 @@ ramfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 {
 	struct ramfs_node *np =  vp->v_data;
 
-	if (vp->v_type == VDIR) {
+	if (vp->v_type == VDIR)
 		return EISDIR;
-	}
-	if (vp->v_type != VREG) {
+	if (vp->v_type != VREG)
 		return EINVAL;
-	}
-	if (uio->uio_offset < 0) {
+	if (uio->uio_offset < 0)
 		return EINVAL;
-	}
-	if (uio->uio_offset >= LONG_MAX) {
+	if (uio->uio_offset >= LONG_MAX)
 		return EFBIG;
-	}
-	if (uio->uio_resid == 0) {
+	if (uio->uio_resid == 0)
 		return 0;
-	}
 
 	if (ioflag & IO_APPEND)
 		uio->uio_offset = np->rn_size;
@@ -481,15 +466,17 @@ ramfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 	if ((size_t) uio->uio_offset + uio->uio_resid > (size_t) vp->v_size) {
 		/* Expand the file size before writing to it */
 		off_t end_pos = uio->uio_offset + uio->uio_resid;
+
 		if (end_pos > (off_t) np->rn_bufsize) {
 			// XXX: this could use a page level allocator
 			size_t new_size = round_page(end_pos);
 			void *new_buf = malloc(new_size);
+
 			if (!new_buf)
 				return EIO;
 			if (np->rn_size != 0) {
 				memcpy(new_buf, np->rn_buf, vp->v_size);
-				if(np->rn_owns_buf)
+				if (np->rn_owns_buf)
 					free(np->rn_buf);
 			}
 			np->rn_buf = (char *) new_buf;
@@ -623,24 +610,27 @@ ramfs_getattr(struct vnode *vnode, struct vattr *attr)
 }
 
 static int
-ramfs_setattr(struct vnode *vnode, struct vattr *attr) {
+ramfs_setattr(struct vnode *vnode, struct vattr *attr)
+{
 	struct ramfs_node *np = vnode->v_data;
 
 	if (attr->va_mask & AT_ATIME) {
-		memcpy(&(np->rn_atime), &(attr->va_atime), sizeof(struct timespec));
+		memcpy(&(np->rn_atime), &(attr->va_atime),
+		       sizeof(struct timespec));
 	}
 
 	if (attr->va_mask & AT_CTIME) {
-		memcpy(&(np->rn_ctime), &(attr->va_ctime), sizeof(struct timespec));
+		memcpy(&(np->rn_ctime), &(attr->va_ctime),
+		       sizeof(struct timespec));
 	}
 
 	if (attr->va_mask & AT_MTIME) {
-		memcpy(&(np->rn_mtime), &(attr->va_mtime), sizeof(struct timespec));
+		memcpy(&(np->rn_mtime), &(attr->va_mtime),
+		       sizeof(struct timespec));
 	}
 
-	if (attr->va_mask & AT_MODE) {
+	if (attr->va_mask & AT_MODE)
 		np->rn_mode = attr->va_mode;
-	}
 
 	return 0;
 }
