@@ -333,6 +333,8 @@ sys_write(struct vfscore_file *fp, const struct iovec *iov, size_t niov,
 	uio.uio_rw = UIO_WRITE;
 	vfs_write(fp, &uio, (offset == -1) ? 0 : FOF_OFFSET);
 	*count = bytes - uio.uio_resid;
+
+	free(copy_iov);
 	return error;
 }
 
