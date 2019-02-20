@@ -36,14 +36,6 @@
 #include <vfscore/prex.h>
 #include <stdbool.h>
 
-/* #define DEBUG_RAMFS 1 */
-
-#ifdef DEBUG_RAMFS
-#define DPRINTF(a)	dprintf a
-#else
-#define DPRINTF(a)    do {} while (0)
-#endif
-
 /*
  * File/directory node for RAMFS
  */
@@ -66,5 +58,7 @@ struct ramfs_node {
 struct ramfs_node *ramfs_allocate_node(const char *name, int type);
 
 void ramfs_free_node(struct ramfs_node *node);
+
+#define RAMFS_NODE(vnode) ((struct ramfs_node *) vnode->v_data)
 
 #endif /* !_RAMFS_H */

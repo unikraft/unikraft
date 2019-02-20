@@ -260,7 +260,7 @@ ramfs_mkdir(struct vnode *dvp, char *name, mode_t mode)
 {
 	struct ramfs_node *np;
 
-	DPRINTF(("mkdir %s\n", name));
+	uk_pr_debug("mkdir %s\n", name);
 	if (strlen(name) > NAME_MAX) {
 		return ENAMETOOLONG;
 	}
@@ -328,9 +328,10 @@ ramfs_rmdir(struct vnode *dvp, struct vnode *vp, char *name __unused)
 
 /* Remove a file */
 static int
-ramfs_remove(struct vnode *dvp, struct vnode *vp, char *name __unused)
+ramfs_remove(struct vnode *dvp, struct vnode *vp, char *name __maybe_unused)
 {
-	DPRINTF(("remove %s in %s\n", name, dvp->v_path));
+	uk_pr_debug("remove %s in %s\n", name,
+		 RAMFS_NODE(dvp)->rn_name);
 	return ramfs_remove_node(dvp->v_data, vp->v_data);
 }
 
@@ -342,7 +343,8 @@ ramfs_truncate(struct vnode *vp, off_t length)
 	void *new_buf;
 	size_t new_size;
 
-	DPRINTF(("truncate %s length=%d\n", vp->v_path, length));
+	uk_pr_debug("truncate %s length=%lld\n", RAMFS_NODE(vp)->rn_name,
+		 (long long) length);
 	np = vp->v_data;
 
 	if (length == 0) {
@@ -385,7 +387,7 @@ ramfs_create(struct vnode *dvp, char *name, mode_t mode)
 		return ENAMETOOLONG;
 	}
 
-	DPRINTF(("create %s in %s\n", name, dvp->v_path));
+	uk_pr_debug("create %s in %s\n", name, RAMFS_NODE(dvp)->rn_name);
 	if (!S_ISREG(mode))
 		return EINVAL;
 

@@ -78,7 +78,7 @@ ramfs_mount(struct mount *mp, const char *dev __unused,
 {
 	struct ramfs_node *np;
 
-	DPRINTF(("ramfs_mount: dev=%s\n", dev));
+	uk_pr_debug("ramfs_mount: dev=%s\n", dev);
 
 	/* Create a root node */
 	np = ramfs_allocate_node("/", VDIR);
