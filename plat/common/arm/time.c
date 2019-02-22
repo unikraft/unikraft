@@ -194,7 +194,7 @@ __nsec ukplat_monotonic_clock(void)
 }
 
 /* return wall time in nsecs */
-__nsec ukplat_clock_wall(void)
+__nsec ukplat_wall_clock(void)
 {
 	return generic_timer_monotonic() + generic_timer_epochoffset();
 }

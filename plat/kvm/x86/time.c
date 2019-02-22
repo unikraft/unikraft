@@ -53,7 +53,7 @@ __nsec ukplat_monotonic_clock(void)
 }
 
 /* return wall time in nsecs */
-__nsec ukplat_clock_wall(void)
+__nsec ukplat_wall_clock(void)
 {
 	return tscclock_monotonic() + tscclock_epochoffset();
 }
