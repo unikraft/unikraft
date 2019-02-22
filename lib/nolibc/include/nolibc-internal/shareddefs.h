@@ -91,6 +91,11 @@ struct timespec {
 #define __DEFINED_struct_timespec
 #endif
 
+#if (defined __NEED_clockid_t && !defined __DEFINED_clockid_t)
+typedef int clockid_t;
+#define __DEFINED_clockid_t
+#endif
+
 #if (defined __NEED_mode_t && !defined __DEFINED_mode_t)
 typedef unsigned mode_t;
 #define __DEFINED_mode_t

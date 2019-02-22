@@ -105,3 +105,29 @@ int gettimeofday(struct timeval *tv, void *tz __unused)
 	tv->tv_usec = ukarch_time_nsec_to_usec(ukarch_time_subsec(now));
 	return 0;
 }
+
+int clock_gettime(clockid_t clk_id, struct timespec *tp)
+{
+	__nsec now;
+
+	if (!tp) {
+		errno = EFAULT;
+		return -1;
+	}
+
+	switch (clk_id) {
+	case CLOCK_MONOTONIC:
+		now = ukplat_monotonic_clock();
+		break;
+	case CLOCK_REALTIME:
+		now = ukplat_wall_clock();
+		break;
+	default:
+		errno = EINVAL;
+		return -1;
+	}
+
+	tp->tv_sec = ukarch_time_nsec_to_sec(now);
+	tp->tv_nsec = ukarch_time_subsec(now);
+	return 0;
+}

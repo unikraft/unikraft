@@ -44,7 +44,11 @@ extern "C" {
 #define __NEED_NULL
 #define __NEED_time_t
 #define __NEED_struct_timespec
+#define __NEED_clockid_t
 #include <nolibc-internal/shareddefs.h>
+
+#define CLOCK_REALTIME  0
+#define CLOCK_MONOTONIC 1
 
 struct itimerspec {
 	struct timespec it_interval;
@@ -52,6 +56,7 @@ struct itimerspec {
 };
 
 int nanosleep(const struct timespec *req, struct timespec *rem);
+int clock_gettime(clockid_t clk, struct timespec *tp);
 
 #ifdef __cplusplus
 }

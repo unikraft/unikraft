@@ -48,6 +48,7 @@ extern "C" {
 #define __NEED_off_t
 #define __NEED_time_t
 #define __NEED_suseconds_t
+#define __NEED_clockid_t
 #define __NEED_mode_t
 #define __NEED_uid_t
 #define __NEED_gid_t
