@@ -72,6 +72,9 @@ strlcat
 # time
 nanosleep
 
+# sys/time
+gettimeofday
+
 # ctype
 _nolibc_ctype
 

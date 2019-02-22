@@ -52,7 +52,6 @@ struct itimerval {
 	struct timeval it_value;
 };
 
-/* TODO: Implement */
 int gettimeofday(struct timeval *tv, void *tz);
 
 #ifdef __cplusplus

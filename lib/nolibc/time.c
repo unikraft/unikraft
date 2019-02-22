@@ -44,6 +44,7 @@
 #else
 #include <uk/plat/lcpu.h>
 #endif
+#include <uk/essentials.h>
 
 #ifndef CONFIG_HAVE_SCHED
 /* Workaround until Unikraft changes interface for something more
@@ -88,5 +89,19 @@ int nanosleep(const struct timespec *req, struct timespec *rem)
 		errno = EINTR;
 		return -1;
 	}
+	return 0;
+}
+
+int gettimeofday(struct timeval *tv, void *tz __unused)
+{
+	__nsec now = ukplat_wall_clock();
+
+	if (!tv) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	tv->tv_sec = ukarch_time_nsec_to_sec(now);
+	tv->tv_usec = ukarch_time_nsec_to_usec(ukarch_time_subsec(now));
 	return 0;
 }

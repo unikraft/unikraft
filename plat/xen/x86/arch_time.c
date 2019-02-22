@@ -209,25 +209,6 @@ __nsec ukplat_wall_clock(void)
 	return ret;
 }
 
-#if 0 /* TODO */
-int gettimeofday(struct timeval *tv, void *tz)
-{
-	uint64_t nsec = monotonic_clock();
-
-	if (!wc_values_up_to_date())
-		update_wallclock();
-
-	nsec += shadow_ts.tv_nsec;
-
-	tv->tv_sec = shadow_ts.tv_sec;
-	tv->tv_sec += NSEC_TO_SEC(nsec);
-	tv->tv_usec = NSEC_TO_USEC(nsec % 1000000000UL);
-
-	return 0;
-}
-#endif
-
-
 void time_block_until(__snsec until)
 {
 	UK_ASSERT(irqs_disabled());
