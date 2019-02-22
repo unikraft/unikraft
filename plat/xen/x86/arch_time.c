@@ -58,9 +58,8 @@ struct shadow_time_info {
 	uint32_t version;
 };
 
-#if 0 /* TODO */
 static struct timespec shadow_ts;
-#endif
+
 static uint32_t shadow_ts_version;
 
 static struct shadow_time_info shadow;
@@ -184,8 +183,6 @@ __nsec ukplat_monotonic_clock(void)
 	return time;
 }
 
-#if 0 /* TODO */
-
 static void update_wallclock(void)
 {
 	shared_info_t *s = HYPERVISOR_shared_info;
@@ -198,7 +195,19 @@ static void update_wallclock(void)
 		rmb();
 	} while ((s->wc_version & 1) | (shadow_ts_version ^ s->wc_version));
 }
-#endif
+
+__nsec ukplat_wall_clock(void)
+{
+	__nsec ret = ukplat_monotonic_clock();
+
+	if (!wc_values_up_to_date())
+		update_wallclock();
+
+	ret += ukarch_time_sec_to_nsec((__nsec) shadow_ts.tv_sec);
+	ret += (__nsec) shadow_ts.tv_nsec;
+
+	return ret;
+}
 
 #if 0 /* TODO */
 int gettimeofday(struct timeval *tv, void *tz)
