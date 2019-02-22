@@ -59,6 +59,22 @@ __nsec ukplat_monotonic_clock(void)
 	return ret;
 }
 
+__nsec ukplat_wall_clock(void)
+{
+	struct k_timespec tp;
+	__nsec ret;
+	int rc;
+
+	rc = sys_clock_gettime(CLOCK_REALTIME, &tp);
+	if (unlikely(rc != 0))
+		return 0;
+
+	ret = ukarch_time_sec_to_nsec((__nsec) tp.tv_sec);
+	ret += (__nsec) tp.tv_nsec;
+
+	return ret;
+}
+
 static int timer_handler(void *arg __unused)
 {
 	/* We only use the timer interrupt to wake up. As we end up here, the
