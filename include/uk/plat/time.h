@@ -46,6 +46,7 @@ void ukplat_time_init(void);
 void ukplat_time_fini(void);
 
 __nsec ukplat_monotonic_clock(void);
+__nsec ukplat_wall_clock(void);
 
 /* Time tick length */
 #define UKPLAT_TIME_TICK_NSEC  (UKARCH_NSEC_PER_SEC / CONFIG_HZ)
