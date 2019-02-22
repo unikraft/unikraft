@@ -97,6 +97,12 @@ __nsec ukplat_monotonic_clock(void)
 	return (__nsec) ticks_to_ns(read_virtual_count() - cntvct_at_init);
 }
 
+/* TODO: proper implementation of wall clock time */
+__nsec ukplat_wall_clock(void)
+{
+	return ukplat_monotonic_clock();
+}
+
 /* Set the timer and mask. */
 void write_timer_ctl(uint32_t value)
 {
