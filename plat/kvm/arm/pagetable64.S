@@ -427,7 +427,13 @@ link_l2_pagetable:
  *  x11, x12 and x13 are trashed
  */
 build_l3_pagetable:
-	/* Find the table index */
+	/* Find the first L3 table to be updated */
+	lsr x11, x8, #L2_SHIFT
+	and x11, x11, #Ln_ADDR_MASK
+	lsl x11, x11, #L3_SHIFT
+	add x6, x11, x6
+
+	/* Find the first entry index in L3 table */
 	lsr x11, x8, #L3_SHIFT
 	and x11, x11, #Ln_ADDR_MASK
 
@@ -446,10 +452,17 @@ build_l3_pagetable:
 
 	/* Store the entry */
 	str x13, [x6, x11, lsl #3]
-
-	sub x10, x10, #1
 	add x11, x11, #1
-	add x9, x9, #1
+
+	/* Cross L3 Page? */
+	and x11, x11, #Ln_ADDR_MASK
+	cbnz x11, 2f
+
+	/* To next L3 table */
+	add x6, x6, #__PAGE_SIZE
+
+2:	add x9, x9, #1
+	sub x10, x10, #1
 	cbnz x10, 1b
 
 	ret
