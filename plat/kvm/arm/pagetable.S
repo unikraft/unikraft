@@ -53,6 +53,13 @@
 #define PCIE_ADDR_SIZE    0x8000000000
 
 /*
+ * As we use VA == PA mapping, so the VIRT_BITS must be the same
+ * as PA_BITS. We can get PA_BITS from ID_AA64MMFR0_EL1.PARange.
+ */
+virt_bits:
+	.byte 32, 36, 40, 42, 44, 48
+
+/*
  * We will use a direct map for physical address and virtual address
  * (PA = VA 1:1 mapping)
  */
@@ -210,11 +217,20 @@ ENTRY(start_mmu)
 	ldr x2, =MAIR_INIT_ATTR
 	msr mair_el1, x2
 
-	/*
-	 * Setup TCR according to PARange bits from ID_AA64MMFR0_EL1.
-	 */
-	ldr x2, =TCR_INIT_FLAGS
+	/* Get VIRT_BITS from id_aa64mmfr0_el1.PARange */
 	mrs x3, id_aa64mmfr0_el1
+	ldr x5, =virt_bits
+	ubfx x4, x3, #0, #4
+	ldrb w4, [x5, x4]
+
+	/* Setup TCR_TxSZ(64 - VIRT_BITS) for TCR_INIT_FLAGS */
+	mov x5, #64
+	sub x5, x5, x4
+	mov x4, x5
+	lsl x5, x5, #TCR_T1SZ_SHIFT
+	orr x5, x4, x5
+	ldr x2, =TCR_INIT_FLAGS
+	orr x2, x5, x2
 	bfi x2, x3, #32, #3
 	msr tcr_el1, x2
 

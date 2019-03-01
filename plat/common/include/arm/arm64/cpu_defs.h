@@ -49,13 +49,6 @@
 #define PSCI_FNID_SYSTEM_RESET		0x84000009
 
 /*
- * The supported virtual address bits.
- * We will do 1:1 VA to PA Mapping, so we define the same address size
- * for VA and PA. 1TB size for Virtual and Physical Address Space.
- */
-#define VIRT_BITS 40
-
-/*
  * CTR_EL0, Cache Type Register
  * Provides information about the architecture of the caches.
  */
@@ -146,8 +139,13 @@
 #define TCR_T0SZ(x)	((x) << TCR_T0SZ_SHIFT)
 #define TCR_TxSZ(x)	(TCR_T1SZ(x) | TCR_T0SZ(x))
 
-#define TCR_INIT_FLAGS	(TCR_TxSZ(64 - VIRT_BITS) | TCR_ASID_16 | \
-			TCR_TG0_4K | TCR_CACHE_ATTRS | TCR_SMP_ATTRS)
+/*
+ * As we use VA == PA mapping, so the VIRT_BITS must be the same
+ * as PA_BITS. We can get PA_BITS from ID_AA64MMFR0_EL1.PARange.
+ * So the TxSZ will be calculate dynamically.
+ */
+#define TCR_INIT_FLAGS	(TCR_ASID_16 | TCR_TG0_4K | \
+			TCR_CACHE_ATTRS | TCR_SMP_ATTRS)
 
 /* SCTLR_EL1 - System Control Register */
 #define SCTLR_M		(_AC(1, UL) << 0)	/* MMU enable */
