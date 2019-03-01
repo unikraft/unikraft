@@ -222,8 +222,8 @@ ENTRY(start_mmu)
 	mov x22, x30
 
         /*
-	 * Invalidate the I/D cache to avoid using invalid data that existed
-	 * in I/D cache. Invalidate ranges: DTB, TEXT, DATA, BSS, PAGETABLE
+	 * Invalidate the D-Cache to avoid using invalid data that existed
+	 * in D-Cache. Invalidate ranges: DTB, TEXT, DATA, BSS, PAGETABLE
 	 * and BOOTSTACK.
 	 */
 	ldr x0, =_dtb
@@ -231,7 +231,7 @@ ENTRY(start_mmu)
 	add x1, x1, #PAGE_TABLE_SIZE
 	add x1, x1, #__STACK_SIZE
 	sub x1, x1, x0
-	bl invalidate_idcache_range
+	bl clean_and_invalidate_dcache_range
 
 	/* Setup SCTLR */
 	ldr x2, =SCTLR_SET_BITS

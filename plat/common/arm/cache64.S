@@ -38,25 +38,17 @@
 #include <arm/cpu_defs.h>
 
 /*
- * Function to invalidate I/D cache. This takes the start address in x0,
+ * Clean and invalidate data cache. This takes the start address in x0,
  * length in x1. It will corrupt x0 ~ x5.
  */
-ENTRY(invalidate_idcache_range)
+ENTRY(clean_and_invalidate_dcache_range)
 	/* Get information about the caches from CTR_EL0 */
-	mrs	x3, ctr_el0
+	mrs	x4, ctr_el0
 	mov	x2, #CTR_BYTES_PER_WORD
 
 	/* Get minimum D cache line size */
-	ubfx	x4, x3, #CTR_DMINLINE_SHIFT, #CTR_DMINLINE_WIDTH
-	lsl	x4, x2, x4
-
-	/* Get minimum I cache line size */
-	and	x5, x3, #CTR_IMINLINE_MASK
-	lsl	x5, x2, x5
-
-	/* Select the smaller one as I/D cache line size */
-	cmp	x5, x4
-	csel	x3, x5, x4, le
+	ubfx	x3, x4, #CTR_DMINLINE_SHIFT, #CTR_DMINLINE_WIDTH
+	lsl	x3, x2, x3
 
 	/* Align the start address to line size */
 	sub	x4, x3, #1
@@ -64,12 +56,8 @@ ENTRY(invalidate_idcache_range)
 	add	x1, x1, x2
 	bic	x0, x0, x4
 1:
-	/* clean and invalidate D cache by I/D cache line size */
+	/* clean and invalidate D cache by D cache line size */
 	dc	civac, x0
-	dsb	ish
-
-	/* clean and invalidate I cache by I/D cache line size */
-	ic	ivau, x0
 	dsb	ish
 
 	/* Move to next line and reduce the size */
@@ -82,4 +70,4 @@ ENTRY(invalidate_idcache_range)
 	isb
 
 	ret
-END(invalidate_idcache_range)
+END(clean_and_invalidate_dcache_range)
