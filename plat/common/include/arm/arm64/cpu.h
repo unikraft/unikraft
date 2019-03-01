@@ -34,45 +34,31 @@
 
 #include <inttypes.h>
 
-static inline uint8_t ioreg_read8(const volatile uint8_t *addr)
-{
-	return *addr;
-}
+/* Define macros to access IO registers */
+#define __IOREG_READ(bits) \
+static inline uint##bits##_t \
+	ioreg_read##bits(const volatile uint##bits##_t *addr) \
+		{ return *addr; }
 
-static inline void ioreg_write8(volatile uint8_t *addr, uint8_t value)
-{
-	*addr = value;
-}
+#define __IOREG_WRITE(bits) \
+static inline void \
+	ioreg_write##bits(volatile uint##bits##_t *addr, \
+						uint##bits##_t value) \
+		{ *addr = value; }
 
-static inline uint16_t ioreg_read16(const volatile uint16_t *addr)
-{
-	return *addr;
-}
 
-static inline void ioreg_write16(volatile uint16_t *addr, uint16_t value)
-{
-	*addr = value;
-}
+#define __IOREG_READ_ALL() __IOREG_READ(8)  \
+			   __IOREG_READ(16) \
+			   __IOREG_READ(32) \
+			   __IOREG_READ(64) \
 
-static inline uint32_t ioreg_read32(const volatile uint32_t *addr)
-{
-	return *addr;
-}
+#define __IOREG_WRITE_ALL()	__IOREG_WRITE(8)  \
+			   __IOREG_WRITE(16) \
+			   __IOREG_WRITE(32) \
+			   __IOREG_WRITE(64) \
 
-static inline void ioreg_write32(volatile uint32_t *addr, uint32_t value)
-{
-	*addr = value;
-}
-
-static inline uint64_t ioreg_read64(const volatile uint64_t *addr)
-{
-	return *addr;
-}
-
-static inline void ioreg_write64(volatile uint64_t *addr, uint64_t value)
-{
-	*addr = value;
-}
+__IOREG_READ_ALL()
+__IOREG_WRITE_ALL()
 
 static inline void _init_cpufeatures(void)
 {
