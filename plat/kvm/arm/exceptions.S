@@ -29,8 +29,50 @@
 #include <uk/arch/lcpu.h>
 #include <uk/asm.h>
 
+.macro EXCHANGE_SP_WITH_X0
+	add sp, sp, x0	// new_sp = sp + x0
+	sub x0, sp, x0	// new_x0 = new_sp - x0 = sp + x0 - x0 = sp
+	sub sp, sp, x0	// new_sp = new_sp - new_x0 = sp + x0 - sp = x0
+.endm
+
+.macro ALIGN_STACK
+	// First, exchange the SP with x0
+	EXCHANGE_SP_WITH_X0
+
+	// Check whether the stack is alignment
+	tst x0, #0xf
+	// If yes, save and go out. If not, align the stack
+	b.eq 0f
+
+	// Start to align the stack.
+
+	// We will use the x1 as temporary, save x1 to stack temporary
+	str x1, [x0]
+
+	// Align down sp to 16-byte, save old sp to aligned_sp[__SP_OFFSET]
+	bic x1, x0, #0xf
+	str x0, [x1, #__SP_OFFSET]
+
+	// Restore x1 before x0 is overridden
+	ldr x1, [x0]
+
+	// Save aligned_sp to x0
+	bic x0, x0, #0xf
+	b 1f
+0:
+	str x0, [x0, #__SP_OFFSET]
+1:
+	// Change back the SP from x0
+	EXCHANGE_SP_WITH_X0
+.endm
+
 .macro ENTER_TRAP, el
 	sub sp, sp, #__TRAP_STACK_SIZE
+
+.if	\el != 0
+	/* Force align the stack, and save SP to __SP_OFFSET */
+	ALIGN_STACK
+.endif
 
 	/* Save general purpose registers */
 	stp x0, x1, [sp, #16 * 0]
@@ -58,25 +100,17 @@
 	mrs x23, esr_el1
 	stp x22, x23, [sp, #16 * 16]
 
-	/* Save stack pointer for lower level exception */
 .if \el == 0
+	/* Save stack pointer for lower level exception */
 	mrs x18, sp_el0
-.else
-	add x18, sp, #__TRAP_STACK_SIZE
+	str x18, [sp, #__SP_EL0_OFFSET]
 .endif
-	str x18, [sp, #16 * 17]
+
 .endm
 
 .macro LEAVE_TRAP, el
 	/* Mask IRQ to make sure restore would not be interrupted by IRQ */
 	msr daifset, #2
-
-	/* Restore stack pointer for lower level exception */
-	ldr x18, [sp, #16 * 17]
-.if \el == 0
-	msr sp_el0, x18
-.endif
-
 	/* Restore pstate and exception status register */
 	ldp x22, x23, [sp, #16 * 16]
 	msr spsr_el1, x22
@@ -92,7 +126,6 @@
 	ldp x24, x25, [sp, #16 * 12]
 	ldp x22, x23, [sp, #16 * 11]
 	ldp x20, x21, [sp, #16 * 10]
-	ldp x18, x19, [sp, #16 * 9]
 	ldp x16, x17, [sp, #16 * 8]
 	ldp x14, x15, [sp, #16 * 7]
 	ldp x12, x13, [sp, #16 * 6]
@@ -103,7 +136,19 @@
 	ldp x2, x3, [sp, #16 * 1]
 	ldp x0, x1, [sp, #16 * 0]
 
+.if \el == 0
+	/* Restore stack pointer for exception from EL0 */
+	ldr x18, [sp, #__SP_EL0_OFFSET]
+	msr sp_el0, x18
+.else
+	/* Restore stack pointer for exception from EL1 */
+	ldr x18, [sp, #__SP_OFFSET]
+	mov sp, x18
+.endif
 	add sp, sp, #__TRAP_STACK_SIZE
+
+	/* Restore x18,x19 */
+	ldp x18, x19, [sp, #16 * 9]
 
 	eret
 .endm
