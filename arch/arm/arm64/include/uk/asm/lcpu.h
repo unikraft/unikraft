@@ -35,13 +35,20 @@
  * Stack size to save general purpose registers and essential system
  * registers. 8 * (30 + lr + elr_el1 + spsr_el1 + esr_el1) = 272.
  * From exceptions come from EL0, we have to save sp_el0. So the
- * TRAP_STACK_SIZE should be 272 + 8 = 280
+ * TRAP_STACK_SIZE should be 272 + 8 = 280. But we enable the stack
+ * alignment check, we will force align the stack for EL1 exceptions,
+ * so we add a sp to save original stack pointer: 280 + 8 = 288
  *
  * TODO: We'd better to calculate this size automatically later.
  */
-#define __TRAP_STACK_SIZE 280
+#define __TRAP_STACK_SIZE	288
+#define __SP_OFFSET		272
+#define __SP_EL0_OFFSET		280
 #else
-/* Change this structure must update TRAP_STACK_SIZE at the same time */
+/*
+ * Change this structure must update TRAP_STACK_SIZE at the same time.
+ * This data structure must be 16-byte alignment.
+ */
 struct __regs {
 	/* Generic Purpose registers, from x0 ~ x29 */
 	unsigned long x[30];
@@ -60,6 +67,9 @@ struct __regs {
 
 	/* Stack Pointer */
 	unsigned long sp;
+
+	/* Stack Pointer from el0 */
+	unsigned long sp_el0;
 };
 
 /*
