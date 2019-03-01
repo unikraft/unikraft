@@ -239,10 +239,10 @@ ENTRY(start_mmu)
 
         /*
 	 * Invalidate the D-Cache to avoid using invalid data that existed
-	 * in D-Cache. Invalidate ranges: DTB, TEXT, DATA, BSS, PAGETABLE
-	 * and BOOTSTACK.
+	 * in D-Cache. Invalidate ranges that may have been modified:
+	 * DATA, BSS, PAGETABLE and BOOTSTACK.
 	 */
-	ldr x0, =_dtb
+	ldr x0, =_data
 	ldr x1, =_end
 	add x1, x1, #PAGE_TABLE_SIZE
 	add x1, x1, #__STACK_SIZE
