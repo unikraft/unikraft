@@ -103,6 +103,8 @@
 	ldp x2, x3, [sp, #16 * 1]
 	ldp x0, x1, [sp, #16 * 0]
 
+	add sp, sp, #__TRAP_STACK_SIZE
+
 	eret
 .endm
 
