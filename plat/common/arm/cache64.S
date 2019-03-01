@@ -58,7 +58,7 @@ ENTRY(clean_and_invalidate_dcache_range)
 1:
 	/* clean and invalidate D cache by D cache line size */
 	dc	civac, x0
-	dsb	ish
+	dsb	nsh
 
 	/* Move to next line and reduce the size */
 	add	x0, x0, x3
