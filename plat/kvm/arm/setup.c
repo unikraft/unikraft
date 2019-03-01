@@ -146,7 +146,7 @@ static void _init_dtb_mem(void)
 
 	max_addr = mem_base + mem_size;
 	_libkvmplat_pagetable = (void *) ALIGN_DOWN((size_t)__END, __PAGE_SIZE);
-	_libkvmplat_heap_start = _libkvmplat_pagetable + PAGE_TABLE_SIZE;
+	_libkvmplat_heap_start = _libkvmplat_pagetable + page_table_size;
 	_libkvmplat_mem_end = (void *) max_addr;
 
 	/* AArch64 require stack be 16-bytes alignment by default */

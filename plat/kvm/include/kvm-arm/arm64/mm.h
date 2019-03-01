@@ -69,15 +69,17 @@
 #define L2_TABLE_SIZE   __PAGE_SIZE
 
 /*
- * As Unikraft image's size is very tiny, from tens to hundreds kilo
- * bytes. So one page for L3_TABLE is enough for us to manage section
- * attributes of image.
+ * We will use Unikraft image's size to caculate the L3_TABLE_SIZE.
+ * Because we allocate one page for L2 TABLE, fo the max image size
+ * would be 1GB. It would be enough for current stage.
  */
 #define L3_TABLE_OFFSET (L2_TABLE_OFFSET + L2_TABLE_SIZE)
-#define L3_TABLE_SIZE   __PAGE_SIZE
+
+#ifndef __ASSEMBLY__
 
 /* Total memory size that will be used by pagetable */
-#define PAGE_TABLE_SIZE (L0_TABLE_SIZE + L1_TABLE_SIZE + \
-				L2_TABLE_SIZE + L3_TABLE_SIZE)
+extern uint64_t page_table_size;
+
+#endif /*__ASSEMBLY__ */
 
 #endif /* __KVM_ARM_64_MM_H__ */

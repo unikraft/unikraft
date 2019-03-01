@@ -35,6 +35,12 @@
 #include <uk/asm.h>
 #include <kvm-arm/mm.h>
 #include <arm/cpu_defs.h>
+#include <sections.h>
+
+.global page_table_size
+.data
+page_table_size:
+	.dword 0x0
 
 /*
  * The registers used by _libkvmplat_start:
@@ -43,6 +49,28 @@
 
 .text
 ENTRY(_libkvmplat_entry)
+	/* Calculate the image size */
+	ldr x25, =_dtb
+	ldr x26, =_end
+	mov x15, x25
+	sub x15, x26, x15
+
+	/* Round up the size to 2MB */
+	mov x17, #(IMAGE_ROUNDUP_SIZE - 1)
+	add x15, x15, x17
+	lsr x15, x15, #IMAGE_ROUNDUP_SHIFT
+	lsl x15, x15, #IMAGE_ROUNDUP_SHIFT
+
+	/*
+	 * How many bytes would be used for L3_TABLE
+	 * ((x15 >> 21) << 12)
+	 */
+	lsr x17, x15, #9
+
+	/* Total bytes for pagetable */
+	add x17, x17, #L0_TABLE_SIZE
+	add x17, x17, #L1_TABLE_SIZE
+	add x17, x17, #L2_TABLE_SIZE
 
 	/*
 	 * Clean the boot stack and page table. As _end, PAGE_TABLE_SIZE and
@@ -50,8 +78,7 @@ ENTRY(_libkvmplat_entry)
 	 * 64-bytes alignment too. Execute 4 stp consecutively without boundary
 	 * check would be safe here.
 	 */
-	ldr x26, =_end
-	add x27, x26, #PAGE_TABLE_SIZE
+	add x27, x26, x17
 	add x27, x27, #__STACK_SIZE
 1:
 	stp xzr, xzr, [x26], #16
@@ -78,6 +105,10 @@ ENTRY(_libkvmplat_entry)
 
 	/* Set the context id */
 	msr contextidr_el1, xzr
+
+	/* Save page table size for later usage */
+	ldr x26, =page_table_size
+	str x17, [x26]
 
 	/* Create a pagetable to do PA == VA mapping */
 	bl create_pagetables

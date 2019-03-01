@@ -35,6 +35,7 @@
 #ifndef __PLAT_CMN_SECTIONS_H__
 #define __PLAT_CMN_SECTIONS_H__
 
+#ifndef __ASSEMBLY__
 /*
  * Following global variables are defined in image link scripts, and some
  * variables are optional and may be unavailable on some architectures
@@ -75,5 +76,35 @@ extern char _end[];
 #define __ECTORS	__uk_image_symbol(_ectors)
 #define __BSS_START	__uk_image_symbol(__bss_start)
 #define __END		__uk_image_symbol(_end)
+
+#endif /*__ASSEMBLY__*/
+
+/*
+ * Because the section is 4KB alignment, and we will assign different
+ * attributes for different sections. We roundup image size to 2MB to
+ * avoid making holes in L3 table
+ *
+ * L2 table
+ * |-----------|    L3 table
+ * |   2MB     |===>|-----------|
+ * |-----------|    |  4KB      | entry#0
+ *                  |-----------|
+ *                  |  ...      |
+ *                  |           |
+ *                  |-----------|
+ *                  |  4KB      | entry# for last page of real image
+ *                  |-----------|
+ *                  |  4KB      | entry# for round up memory
+ *                  |-----------|
+ *                  |  ...      |
+ *                  |-----------|
+ *                  |  4KB      | entry#511
+ *                  |-----------|
+ * If we don't roundup the image size to 2MB, some memory that is not
+ * occupied by image but shared the same 2MB block with image tail will
+ * not be mapped in page table.
+ */
+#define IMAGE_ROUNDUP_SHIFT 21
+#define IMAGE_ROUNDUP_SIZE (0x1 << (IMAGE_ROUNDUP_SHIFT))
 
 #endif /* __PLAT_CMN_SECTIONS_H__ */

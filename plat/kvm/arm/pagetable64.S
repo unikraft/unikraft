@@ -233,7 +233,9 @@ ENTRY(start_mmu)
 	 */
 	ldr x0, =_data
 	ldr x1, =_end
-	add x1, x1, #PAGE_TABLE_SIZE
+	ldr x2, =page_table_size
+	ldr x2, [x2]
+	add x1, x2, x1
 	add x1, x1, #__STACK_SIZE
 	sub x1, x1, x0
 	bl clean_and_invalidate_dcache_range
