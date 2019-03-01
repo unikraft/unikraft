@@ -73,13 +73,33 @@ ENTRY(_libkvmplat_entry)
 	add x17, x17, #L2_TABLE_SIZE
 
 	/*
+	 * We will disable MMU and CACHE before pagetable is ready. This
+	 * means we will change memory with cache disabled, so we need to
+	 * invalidate the cache to ensure there is no stall data in it.
+	 * But we don't know the size of the RAM either. And it would be
+	 * expensive to invalidate the whole cache. In this case, just
+	 * just need to invalidate what we are going to use:
+	 * DTB, TEXT, DATA, BSS, pagetables and bootstack.
+	 */
+	add x27, x26, x17
+	add x27, x27, #__STACK_SIZE
+	sub x1, x27, x25
+	bl clean_and_invalidate_dcache_range
+
+	/* Disable the MMU and D-Cache. */
+	dsb sy
+	mrs x2, sctlr_el1
+	mov x3, #SCTLR_M|SCTLR_C
+	bic x2, x2, x3
+	msr sctlr_el1, x2
+	isb
+
+	/*
 	 * Clean the boot stack and page table. As _end, PAGE_TABLE_SIZE and
 	 * BOOT_STACK_SIZE are page_size alignment, the boot stack can be
 	 * 64-bytes alignment too. Execute 4 stp consecutively without boundary
 	 * check would be safe here.
 	 */
-	add x27, x26, x17
-	add x27, x27, #__STACK_SIZE
 1:
 	stp xzr, xzr, [x26], #16
 	stp xzr, xzr, [x26], #16
@@ -89,19 +109,6 @@ ENTRY(_libkvmplat_entry)
 	b.lo 1b
 
 	mov sp, x27
-
-	/*
-	 * Disable the MMU. We may have entered the kernel with it on and
-	 * will need to update the tables later. If this has been set up
-	 * with anything other than a VA == PA map then this will fail,
-	 * but in this case the code to find where we are running from
-	 * would have also failed.
-	 */
-	dsb sy
-	mrs x2, sctlr_el1
-	bic x2, x2, #SCTLR_M
-	msr sctlr_el1, x2
-	isb
 
 	/* Set the context id */
 	msr contextidr_el1, xzr
