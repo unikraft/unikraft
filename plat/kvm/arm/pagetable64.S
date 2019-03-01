@@ -62,6 +62,7 @@ virt_bits:
 /*
  * We will use a direct map for physical address and virtual address
  * (PA = VA 1:1 mapping)
+ *  x15 = image size (trashed)
  */
 ENTRY(create_pagetables)
 	/* Save link address */
@@ -134,19 +135,29 @@ ENTRY(create_pagetables)
 	add x9, x14, #L2_TABLE_OFFSET;
 	bl  link_l1_pagetable
 
-	/* 3rd: Build a L3 pagetable for 0~2MB*/
-	add x6, x14, #L3_TABLE_OFFSET;
+	/* 3rd: Build a L3 pagetable for image occupied memory */
+	add x16, x14, #L3_TABLE_OFFSET
+	mov x17, #RAM_ADDR_START
+
+	mov x6, x16
 	ldr x7, =SECT_ATTR_NORMAL
-	mov x8, #RAM_ADDR_START
-	mov x9, x8
-	mov x10, 512
+	mov x8, x17
+	mov x9, x17
+	lsr x10, x15, L3_SHIFT
 	bl  build_l3_pagetable
 
 	/* 4th: Link this L3 pagetable to L2 entry */
-	add x6, x14, #L2_TABLE_OFFSET;
-	mov x8, #RAM_ADDR_START
-	add x9, x14, #L3_TABLE_OFFSET;
+	add x6, x14, #L2_TABLE_OFFSET
+1:
+	mov x8, x17
+	mov x9, x16
 	bl  link_l2_pagetable
+
+	/* Check whether the image mapping has been done */
+	add x16, x16, #__PAGE_SIZE
+	add x17, x17, #L2_SIZE
+	sub x15, x15, #L2_SIZE
+	cbnz x15, 1b
 
 	/* 5th: Update dtb section to readonly */
 	ldr x8, =_dtb
