@@ -43,17 +43,16 @@
 
 .text
 ENTRY(_libkvmplat_entry)
-	/* Boot stack is placed after pagetable area temporarily */
-	ldr x26, =_end
-	add x26, x26, #PAGE_TABLE_SIZE
-	add x27, x26, #__STACK_SIZE
 
 	/*
-	 * Clean the boot stack. As _end, PAGE_TABLE_SIZE and BOOT_STACK_SIZE
-	 * are page_size alignment, the boot stack can be 64-bytes alignment
-	 * too. Execute 4 stp consecutively without boundary check would be
-	 * safe here.
+	 * Clean the boot stack and page table. As _end, PAGE_TABLE_SIZE and
+	 * BOOT_STACK_SIZE are page_size alignment, the boot stack can be
+	 * 64-bytes alignment too. Execute 4 stp consecutively without boundary
+	 * check would be safe here.
 	 */
+	ldr x26, =_end
+	add x27, x26, #PAGE_TABLE_SIZE
+	add x27, x27, #__STACK_SIZE
 1:
 	stp xzr, xzr, [x26], #16
 	stp xzr, xzr, [x26], #16

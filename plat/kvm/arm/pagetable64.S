@@ -70,17 +70,6 @@ ENTRY(create_pagetables)
 	/* Pagetable starts from _end */
 	ldr x14, =_end
 
-	/* Clean the page table */
-	mov x6, x14
-	add x13, x14, #PAGE_TABLE_SIZE
-1:
-	stp  xzr, xzr, [x6], #16
-	stp  xzr, xzr, [x6], #16
-	stp  xzr, xzr, [x6], #16
-	stp  xzr, xzr, [x6], #16
-	cmp  x6, x13
-	b.lo 1b
-
 	/*
 	 * We have 2 L1 tables to map 0 ~ 512GB, 512 GB ~ 1TB.
 	 * Link these two tables to L0 entries#0, #1
