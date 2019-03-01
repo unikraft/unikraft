@@ -57,13 +57,11 @@ ASFLAGS  += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION) -DUK_FULLVERSION=$(UK_FU
 CFLAGS   += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION) -DUK_FULLVERSION=$(UK_FULLVERSION) -DUK_CODENAME="$(UK_CODENAME)"
 CXXFLAGS += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION) -DUK_FULLVERSION=$(UK_FULLVERSION) -DUK_CODENAME="$(UK_CODENAME)"
 
-# Check whether the pie option is enabled by default. If possible,
-# add -no-pie to link flags to override default pie option.
-PIE_ON = $(shell $(CC) -v 2>&1 | grep -Fo "enable-default-pie")
-ifneq ($(PIE_ON),)
+# If GCC supports "-no-pie" flag, we will add this flag to link flags to
+# override "pie" option, because some distributions will set
+# "--enable-default-pie" by default.
 ASFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 CFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 CXXFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 LIBLDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 LDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
-endif
