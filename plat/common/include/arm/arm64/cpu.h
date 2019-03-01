@@ -73,7 +73,7 @@ static inline void _init_cpufeatures(void)
 #define SYSREG_READ(reg) \
 ({	uint64_t val; \
 	__asm__ __volatile__("mrs %0, " __STRINGIFY(reg) \
-			: "=&r" (val)); \
+			: "=r" (val)); \
 	val; \
 })
 
@@ -84,7 +84,7 @@ static inline void _init_cpufeatures(void)
 #define SYSREG_READ32(reg) \
 ({	uint32_t val; \
 	__asm__ __volatile__("mrs %0, " __STRINGIFY(reg) \
-			: "=&r" (val)); \
+			: "=r" (val)); \
 	val; \
 })
 
