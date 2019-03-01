@@ -77,14 +77,14 @@ ENTRY(create_pagetables)
 	 */
 	mov x6, x14
 	mov x8, #0
-	add x9, x14, #L1_TABLE_OFFSET;
+	add x9, x14, #L1_TABLE_OFFSET
 	mov x10, #2
 	bl  link_l0_pagetable
 
 	/*
 	 * Using 1GiB block to map device address space (0x0 ~ 0x3fffffff)
 	 */
-	add x6, x14, #L1_TABLE_OFFSET;
+	add x6, x14, #L1_TABLE_OFFSET
 	ldr x7, =SECT_ATTR_DEVICE_nGnRE
 	mov x8, #DEVICE_ADDR_START
 	mov x9, x8
@@ -96,7 +96,7 @@ ENTRY(create_pagetables)
 	 * (0x40000000 ~ (256GiB -1)). The RAM areas that contain kernel
 	 * sections will be update later.
 	 */
-	add x6, x14, #L1_TABLE_OFFSET;
+	add x6, x14, #L1_TABLE_OFFSET
 	ldr x7, =SECT_ATTR_NORMAL
 	mov x8, #RAM_ADDR_START
 	mov x9, x8
@@ -107,7 +107,7 @@ ENTRY(create_pagetables)
 	 * Using 1GiB block to map high PCIe address space
 	 * (0x512GiB ~ (1TiB -1)).
 	 */
-	add x6, x14, #L1_TABLE_OFFSET;
+	add x6, x14, #L1_TABLE_OFFSET
 	add x6, x6, #__PAGE_SIZE
 	ldr x7, =SECT_ATTR_DEVICE_nGnRE
 	mov x8, #PCIE_ADDR_START
@@ -122,7 +122,7 @@ ENTRY(create_pagetables)
 	 * L1 -> L2 -> L3 (4K)
 	 */
 	/* 1st: Build a L2 block pagetable */
-	add x6, x14, #L2_TABLE_OFFSET;
+	add x6, x14, #L2_TABLE_OFFSET
 	ldr x7, =SECT_ATTR_NORMAL
 	mov x8, #RAM_ADDR_START
 	mov x9, x8
@@ -130,9 +130,9 @@ ENTRY(create_pagetables)
 	bl  build_l2_block_pagetable
 
 	/* 2nd: Link this L2 block pagetable to L1 entry */
-	add x6, x14, #L1_TABLE_OFFSET;
+	add x6, x14, #L1_TABLE_OFFSET
 	mov x8, #RAM_ADDR_START
-	add x9, x14, #L2_TABLE_OFFSET;
+	add x9, x14, #L2_TABLE_OFFSET
 	bl  link_l1_pagetable
 
 	/* 3rd: Build a L3 pagetable for image occupied memory */
@@ -163,7 +163,7 @@ ENTRY(create_pagetables)
 	ldr x8, =_dtb
 	ldr x9, =_text
 	sub x10, x9, x8
-	add x6, x14, #L3_TABLE_OFFSET;
+	add x6, x14, #L3_TABLE_OFFSET
 	ldr x7, =SECT_ATTR_NORMAL_RO
 	mov x9, x8
 	lsr x10, x10, L3_SHIFT
@@ -173,7 +173,7 @@ ENTRY(create_pagetables)
 	ldr x8, =_text
 	ldr x9, =_etext
 	sub x10, x9, x8
-	add x6, x14, #L3_TABLE_OFFSET;
+	add x6, x14, #L3_TABLE_OFFSET
 	ldr x7, =SECT_ATTR_NORMAL_EXEC
 	mov x9, x8
 	lsr x10, x10, L3_SHIFT
@@ -183,7 +183,7 @@ ENTRY(create_pagetables)
 	ldr x8, =_rodata
 	ldr x9, =_ectors
 	sub x10, x9, x8
-	add x6, x14, #L3_TABLE_OFFSET;
+	add x6, x14, #L3_TABLE_OFFSET
 	ldr x7, =SECT_ATTR_NORMAL_RO
 	mov x9, x8
 	lsr x10, x10, L3_SHIFT
