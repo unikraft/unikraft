@@ -36,6 +36,7 @@
  */
 
 #include <string.h>
+#include <sections.h>
 #include <errno.h>
 #include <uk/alloc.h>
 #include <uk/plat/config.h>
@@ -142,12 +143,10 @@ void _init_mem_build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
     {
 	    uk_pr_warn("Trying to use Xen virtual space. "
 		       "Truncating memory from %luMB to ",
-		       ((unsigned long)pfn_to_virt(*max_pfn) -
-			(unsigned long)&_text)>>20);
+		       ((unsigned long)pfn_to_virt(*max_pfn) - __TEXT)>>20);
 	    *max_pfn = virt_to_pfn(HYPERVISOR_VIRT_START - PAGE_SIZE);
 	    uk_pr_warn("%luMB\n",
-		       ((unsigned long)pfn_to_virt(*max_pfn) -
-			(unsigned long)&_text)>>20);
+		       ((unsigned long)pfn_to_virt(*max_pfn) - __TEXT)>>20);
     }
 #else
     /* Round up to next 2MB boundary as we are using 2MB pages on HVMlite. */
@@ -670,18 +669,18 @@ void _init_mem_clear_bootstrap(void)
     pgentry_t *pgt;
 #endif
 
-    uk_pr_debug("Clear bootstrapping memory: %p\n", &_text);
+	uk_pr_debug("Clear bootstrapping memory: %p\n", (void *)__TEXT);
 
     /* Use first page as the CoW zero page */
-    memset(&_text, 0, PAGE_SIZE);
-    mfn_zero = virt_to_mfn((unsigned long) &_text);
+	memset((void *)__TEXT, 0, PAGE_SIZE);
+	mfn_zero = virt_to_mfn(__TEXT);
 #ifdef CONFIG_PARAVIRT
     if ( (rc = HYPERVISOR_update_va_mapping(0, nullpte, UVMF_INVLPG)) )
 	    uk_pr_err("Unable to unmap NULL page. rc=%d\n", rc);
 #else
-    pgt = get_pgt((unsigned long)&_text);
+	pgt = get_pgt(__TEXT);
     *pgt = 0;
-    invlpg((unsigned long)&_text);
+	invlpg(__TEXT);
 #endif
 }
 

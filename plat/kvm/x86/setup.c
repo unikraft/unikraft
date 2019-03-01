@@ -27,6 +27,7 @@
  */
 
 #include <string.h>
+#include <sections.h>
 #include <x86/cpu.h>
 #include <x86/traps.h>
 #include <kvm/console.h>
@@ -79,7 +80,6 @@ static inline void _mb_get_cmdline(struct multiboot_info *mi, char *cmdline,
 
 static inline void _mb_init_mem(struct multiboot_info *mi)
 {
-	extern char _end;
 	multiboot_memory_map_t *m;
 	size_t offset, max_addr;
 
@@ -103,9 +103,9 @@ static inline void _mb_init_mem(struct multiboot_info *mi)
 	max_addr = m->addr + m->len;
 	if (max_addr > PLATFORM_MAX_MEM_ADDR)
 		max_addr = PLATFORM_MAX_MEM_ADDR;
-	UK_ASSERT((size_t)&_end <= max_addr);
+	UK_ASSERT((size_t)__END <= max_addr);
 
-	_libkvmplat_heap_start = (void *) ALIGN_UP((size_t)&_end, __PAGE_SIZE);
+	_libkvmplat_heap_start = (void *) ALIGN_UP((size_t)__END, __PAGE_SIZE);
 	_libkvmplat_mem_end    = (void *) max_addr;
 	_libkvmplat_stack_top  = (void *) (max_addr - __STACK_SIZE);
 }

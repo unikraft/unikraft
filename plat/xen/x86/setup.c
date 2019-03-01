@@ -141,7 +141,7 @@ static inline void _init_mem(void)
 
 	_init_mem_build_pagetable(&start_pfn, &max_pfn);
 	_init_mem_clear_bootstrap();
-	_init_mem_set_readonly(&_text, &_erodata);
+	_init_mem_set_readonly((void *)__TEXT, (void *)__ERODATA);
 
 	/* Fill out mrd array */
 	/* heap */

@@ -28,11 +28,10 @@
 #define _ARCH_MM_H_
 
 #include <stdint.h>
+#include <sections.h>
 #include <uk/arch/limits.h>
 
 typedef uint64_t paddr_t;
-
-extern char _text, _etext, _data, _edata, _rodata, _erodata, _end, __bss_start;
 extern int _boot_stack[];
 extern int _boot_stack_end[];
 /* Add this to a virtual address to get the physical address (wraps at 4GB) */

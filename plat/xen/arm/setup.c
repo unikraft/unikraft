@@ -25,7 +25,7 @@
 /* Ported from Mini-OS */
 
 #include <string.h>
-
+#include <sections.h>
 #include <xen-arm/os.h>
 #include <xen-arm/mm.h>
 #include <xen/xen.h>
@@ -142,10 +142,10 @@ static inline void _dtb_init_mem(uint32_t physical_offset)
 	if (regs == NULL && prop_len < 16)
 		UK_CRASH("Bad 'reg' property: %p %d\n", regs, prop_len);
 
-	end = (uintptr_t) &_end;
+	end = (uintptr_t) __END;
 	mem_base = fdt64_to_cpu(regs[0]);
 	mem_size = fdt64_to_cpu(regs[1]);
-	if (to_virt(mem_base) > (void *)&_text)
+	if (to_virt(mem_base) > (void *)__TEXT)
 		UK_CRASH("Fatal: Image outside of RAM\n");
 
 	start_pfn_p = PFN_UP(to_phys(end));

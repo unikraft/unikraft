@@ -19,6 +19,7 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <sections.h>
 #include <sys/types.h>
 #include <uk/plat/memory.h>
 #include <uk/assert.h>
@@ -37,16 +38,14 @@ int ukplat_memregion_count(void)
 
 int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 {
-	extern char _text, _etext, _data, _edata, _rodata, _erodata,
-		    _ctors, _ectors, __bss_start, _end;
 	int ret;
 
 	UK_ASSERT(m);
 
 	switch (i) {
 	case 0: /* text */
-		m->base  = &_text;
-		m->len   = (size_t) &_etext - (size_t) &_text;
+		m->base  = (void *) __TEXT;
+		m->len   = (size_t) __ETEXT - (size_t) __TEXT;
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE);
 #if CONFIG_UKPLAT_MEMRNAME
@@ -55,8 +54,8 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		ret = 0;
 		break;
 	case 1: /* rodata */
-		m->base  = &_rodata;
-		m->len   = (size_t) &_erodata - (size_t) &_rodata;
+		m->base  = (void *) __RODATA;
+		m->len   = (size_t) __ERODATA - (size_t) __RODATA;
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE);
 #if CONFIG_UKPLAT_MEMRNAME
@@ -65,8 +64,8 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		ret = 0;
 		break;
 	case 2: /* ctors */
-		m->base  = &_ctors;
-		m->len   = (size_t) &_ectors - (size_t) &_ctors;
+		m->base  = (void *) __CTORS;
+		m->len   = (size_t) __ECTORS - (size_t) __CTORS;
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE);
 #if CONFIG_UKPLAT_MEMRNAME
@@ -75,8 +74,8 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		ret = 0;
 		break;
 	case 3: /* data */
-		m->base  = &_data;
-		m->len   = (size_t) &_edata - (size_t) &_data;
+		m->base  = (void *) __DATA;
+		m->len   = (size_t) __EDATA - (size_t) __DATA;
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE
 			    | UKPLAT_MEMRF_WRITABLE);
@@ -86,8 +85,8 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		ret = 0;
 		break;
 	case 4: /* bss */
-		m->base  = &__bss_start;
-		m->len   = (size_t) &_end - (size_t) &__bss_start;
+		m->base  = (void *) __BSS_START;
+		m->len   = (size_t) __END - (size_t) __BSS_START;
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE
 			    | UKPLAT_MEMRF_WRITABLE);

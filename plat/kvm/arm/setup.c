@@ -19,6 +19,7 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 #include <libfdt.h>
+#include <sections.h>
 #include <kvm/console.h>
 #include <uk/assert.h>
 #include <kvm-arm/mm.h>
@@ -95,8 +96,6 @@ enomethod:
 
 static void _init_dtb_mem(void)
 {
-	extern char _text[];
-	extern char _end[];
 	int fdt_mem, prop_len = 0, prop_min_len;
 	int naddr, nsize;
 	const uint64_t *regs;
@@ -142,11 +141,11 @@ static void _init_dtb_mem(void)
 
 	mem_base = fdt64_to_cpu(regs[0]);
 	mem_size = fdt64_to_cpu(regs[1]);
-	if (mem_base > (uint64_t)&_text)
+	if (mem_base > __TEXT)
 		UK_CRASH("Fatal: Image outside of RAM\n");
 
 	max_addr = mem_base + mem_size;
-	_libkvmplat_pagetable =(void *) ALIGN_DOWN((size_t)&_end, __PAGE_SIZE);
+	_libkvmplat_pagetable = (void *) ALIGN_DOWN((size_t)__END, __PAGE_SIZE);
 	_libkvmplat_heap_start = _libkvmplat_pagetable + PAGE_TABLE_SIZE;
 	_libkvmplat_mem_end = (void *) max_addr;
 
