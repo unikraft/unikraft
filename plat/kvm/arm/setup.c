@@ -192,7 +192,6 @@ void _libkvmplat_start(void *dtb_pointer)
 	uk_pr_info("Entering from KVM (arm64)...\n");
 
 	/* Get command line from DTB */
-
 	_dtb_get_cmdline(cmdline, sizeof(cmdline));
 
 	/* Get PSCI method from DTB */
