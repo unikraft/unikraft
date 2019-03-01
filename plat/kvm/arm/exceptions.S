@@ -30,7 +30,7 @@
 #include <uk/asm.h>
 
 .macro ENTER_TRAP, el
-	sub  sp, sp, #__TRAP_STACK_SIZE
+	sub sp, sp, #__TRAP_STACK_SIZE
 
 	/* Save general purpose registers */
 	stp x0, x1, [sp, #16 * 0]
