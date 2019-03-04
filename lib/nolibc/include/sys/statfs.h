@@ -19,8 +19,8 @@ struct statfs {
 	unsigned long f_namelen, f_frsize, f_flags, f_spare[4];
 };
 
-int statfs (const char *, struct statfs *);
-int fstatfs (int, struct statfs *);
+int statfs(const char *path, struct statfs *buf);
+int fstatfs(int fd, struct statfs *buf);
 
 #if defined(_LARGEFILE64_SOURCE) || defined(_GNU_SOURCE)
 #define statfs64 statfs

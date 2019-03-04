@@ -56,12 +56,12 @@ extern "C" {
 
 #define UIO_MAXIOV 1024
 
-ssize_t readv (int, const struct iovec *, int);
-ssize_t writev (int, const struct iovec *, int);
+ssize_t readv(int fd, const struct iovec *iov, int iovcnt);
+ssize_t writev(int fd, const struct iovec *iov, int iovcnt);
 
 #if defined(_GNU_SOURCE) || defined(_BSD_SOURCE)
-ssize_t preadv (int, const struct iovec *, int, off_t);
-ssize_t pwritev (int, const struct iovec *, int, off_t);
+ssize_t preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset);
+ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset);
 #if defined(_LARGEFILE64_SOURCE) || defined(_GNU_SOURCE)
 #define preadv64 preadv
 #define pwritev64 pwritev
