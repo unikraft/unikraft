@@ -85,10 +85,16 @@ static ssize_t stdio_read(struct vnode *vp __unused,
 	return bytes_total;
 }
 
+static int
+stdio_getattr(struct vnode *vnode __unused, struct vattr *attr __unused)
+{
+	return 0;
+}
 
 static struct vnops stdio_vnops = {
 	.vop_write = stdio_write,
 	.vop_read = stdio_read,
+	.vop_getattr = stdio_getattr,
 };
 
 static struct vnode stdio_vnode = {
@@ -96,6 +102,7 @@ static struct vnode stdio_vnode = {
 	.v_op = &stdio_vnops,
 	.v_lock = UK_MUTEX_INITIALIZER(stdio_vnode.v_lock),
 	.v_refcnt = 1,
+	.v_type = VCHR,
 };
 
 static struct dentry stdio_dentry = {
