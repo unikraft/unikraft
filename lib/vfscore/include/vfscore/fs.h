@@ -13,16 +13,16 @@
 
 static inline int vfscore_fflags(int oflags)
 {
-    int rw = oflags & O_ACCMODE;
-    oflags &= ~O_ACCMODE;
-    return (rw + 1) | oflags;
+	int rw = oflags & O_ACCMODE;
+	oflags &= ~O_ACCMODE;
+	return (rw + 1) | oflags;
 }
 
 static inline int vfscore_oflags(int fflags)
 {
-    int rw = fflags & (FREAD|FWRITE);
-    fflags &= ~(FREAD|FWRITE);
-    return (rw - 1) | fflags;
+	int rw = fflags & (FREAD|FWRITE);
+	fflags &= ~(FREAD|FWRITE);
+	return (rw - 1) | fflags;
 }
 
 #endif /* _VFSCORE_FS_H_ */
