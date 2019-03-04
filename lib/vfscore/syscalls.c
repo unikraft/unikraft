@@ -37,8 +37,6 @@
 
 #define _BSD_SOURCE
 #define _GNU_SOURCE
-#include <dirent.h>
-
 #include <limits.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -47,6 +45,7 @@
 #include <errno.h>
 #include <fcntl.h>
 
+#include <dirent.h>
 #include <vfscore/prex.h>
 #include <vfscore/vnode.h>
 #include <vfscore/file.h>

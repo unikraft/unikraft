@@ -64,8 +64,6 @@ extern int vfs_debug;
 
 #define ASSERT(e)	assert(e)
 
-#define OPEN_MAX	256
-
 /*
  * per task data
  */

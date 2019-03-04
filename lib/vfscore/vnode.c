@@ -48,7 +48,7 @@
 #include <vfscore/vnode.h>
 #include "vfs.h"
 
-#define S_BLKSIZE 512
+#define __UK_S_BLKSIZE 512
 
 enum vtype iftovt_tab[16] = {
 	VNON, VFIFO, VCHR, VNON, VDIR, VNON, VBLK, VNON,
@@ -353,7 +353,7 @@ vn_stat(struct vnode *vp, struct stat *st)
 	st->st_mode = mode;
 	st->st_nlink = vap->va_nlink;
 	st->st_blksize = BSIZE;
-	st->st_blocks = vap->va_size / S_BLKSIZE;
+	st->st_blocks = vap->va_size / __UK_S_BLKSIZE;
 	st->st_uid = vap->va_uid;
 	st->st_gid = vap->va_gid;
 	st->st_dev = vap->va_fsid;
