@@ -104,7 +104,7 @@ static struct dentry stdio_dentry = {
 
 static struct vfscore_file  stdio_file = {
 	.fd = 1,
-	.f_flags = FWRITE | FREAD,
+	.f_flags = UK_FWRITE | UK_FREAD,
 	.f_dentry = &stdio_dentry,
 	/* reference count is 2 because close(0) is a valid
 	 * operation. However it is not properly handled in the

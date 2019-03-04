@@ -168,7 +168,7 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 
 		vp = dp->d_vnode;
 
-		if (flags & FWRITE || flags & O_TRUNC) {
+		if (flags & UK_FWRITE || flags & O_TRUNC) {
 			error = vn_access(vp, VWRITE);
 			if (error)
 				goto out_drele;
@@ -189,7 +189,7 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 	/* Process truncate request */
 	if (flags & O_TRUNC) {
 		error = EINVAL;
-		if (!(flags & FWRITE) || vp->v_type == VDIR)
+		if (!(flags & UK_FWRITE) || vp->v_type == VDIR)
 			goto out_vn_unlock;
 
 		error = VOP_TRUNCATE(vp, 0);
@@ -245,7 +245,7 @@ sys_read(struct vfscore_file *fp, const struct iovec *iov, size_t niov,
 {
 	int error = 0;
 	struct iovec *copy_iov;
-	if ((fp->f_flags & FREAD) == 0)
+	if ((fp->f_flags & UK_FREAD) == 0)
 		return EBADF;
 
 	size_t bytes = 0;
@@ -295,7 +295,7 @@ sys_write(struct vfscore_file *fp, const struct iovec *iov, size_t niov,
 {
 	struct iovec *copy_iov;
 	int error = 0;
-	if ((fp->f_flags & FWRITE) == 0)
+	if ((fp->f_flags & UK_FWRITE) == 0)
 		return EBADF;
 
 	size_t bytes = 0;
@@ -381,7 +381,7 @@ sys_ioctl(struct vfscore_file *fp, unsigned long request, void *buf)
 
 	DPRINTF(VFSDB_SYSCALL, ("sys_ioctl: fp=%p request=%lux\n", fp, request));
 
-	if ((fp->f_flags & (FREAD | FWRITE)) == 0)
+	if ((fp->f_flags & (UK_FREAD | UK_FWRITE)) == 0)
 		return EBADF;
 
 	error = vfs_ioctl(fp, request, buf);
@@ -1437,9 +1437,8 @@ sys_fallocate(struct vfscore_file *fp, int mode, off_t offset, off_t len)
 
 	DPRINTF(VFSDB_SYSCALL, ("sys_fallocate: fp=%p", fp));
 
-	if (!fp->f_dentry || !(fp->f_flags & FWRITE)) {
+	if (!fp->f_dentry || !(fp->f_flags & UK_FWRITE))
 		return EBADF;
-	}
 
 	if (offset < 0 || len <= 0) {
 		return EINVAL;

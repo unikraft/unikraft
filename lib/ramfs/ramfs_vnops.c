@@ -241,7 +241,7 @@ ramfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
 		return ENOMEM;
 	}
 	vp->v_data = np;
-	vp->v_mode = ALLPERMS;
+	vp->v_mode = UK_ALLPERMS;
 	vp->v_type = np->rn_type;
 	vp->v_size = np->rn_size;
 

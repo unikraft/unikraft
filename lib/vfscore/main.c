@@ -1887,7 +1887,7 @@ int chmod(const char *pathname, mode_t mode)
 		goto out_errno;
 	if ((error = task_conv(t, pathname, VWRITE, path)) != 0)
 		goto out_errno;
-	error = sys_chmod(path, mode & ALLPERMS);
+	error = sys_chmod(path, mode & UK_ALLPERMS);
 	if (error)
 		goto out_errno;
 	trace_vfs_chmod_ret();
@@ -1904,7 +1904,7 @@ TRACEPOINT(trace_vfs_fchmod_ret, "");
 int fchmod(int fd, mode_t mode)
 {
 	trace_vfs_fchmod(fd, mode);
-	int error = sys_fchmod(fd, mode & ALLPERMS);
+	int error = sys_fchmod(fd, mode & UK_ALLPERMS);
 	trace_vfs_fchmod_ret();
 	if (error) {
 		errno = error;
@@ -1957,16 +1957,14 @@ ssize_t sendfile(int out_fd, int in_fd, off_t *_offset, size_t count)
 		return libc_error(EBADF);
 	}
 
-	if (!(in_fp->f_flags & FREAD)) {
+	if (!(in_fp->f_flags & UK_FREAD))
 		return libc_error(EBADF);
-	}
 
 	if (out_fp->f_type & DTYPE_VNODE) {
-		if (!out_fp->f_dentry) {
+		if (!out_fp->f_dentry)
 			return libc_error(EBADF);
-	} else if (!(out_fp->f_flags & FWRITE)) {
+		else if (!(out_fp->f_flags & UK_FWRITE))
 			return libc_error(EBADF);
-	}
 	}
 
 	off_t offset ;
