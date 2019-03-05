@@ -106,6 +106,11 @@ typedef unsigned gid_t;
 #define __DEFINED_gid_t
 #endif
 
+#if defined(__NEED_pid_t) && !defined(__DEFINED_pid_t)
+typedef int pid_t;
+#define __DEFINED_pid_t
+#endif
+
 #if defined(__NEED_dev_t) && !defined(__DEFINED_dev_t)
 typedef __u64 dev_t;
 #define __DEFINED_dev_t
