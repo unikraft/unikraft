@@ -46,6 +46,7 @@ extern "C" {
  * @endptr: A pointer to the end of the parsed string will be placed here
  * @base:   The number base to use
  */
+long strtol(const char *nptr, char **endptr, int base);
 unsigned long strtoul(const char *nptr, char **endptr, int base);
 long long strtoll(const char *nptr, char **endptr, int base);
 unsigned long long strtoull(const char *nptr, char **endptr, int base);

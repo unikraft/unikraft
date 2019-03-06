@@ -51,6 +51,7 @@
  * SUCH DAMAGE.
  */
 
+#include <errno.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <limits.h>
@@ -123,6 +124,102 @@ unsigned long strtoul(const char *nptr, char **endptr, int base)
 		errno = ERANGE;
 	} else if (neg)
 		acc = -acc;
+exit:
+	if (endptr != 0)
+		*endptr = __DECONST(char *, any ? s - 1 : nptr);
+	return acc;
+}
+
+long strtol(const char *nptr, char **endptr, int base)
+{
+	const char *s;
+	unsigned long acc;
+	unsigned char c;
+	unsigned long qbase, cutoff;
+	int neg, any, cutlim;
+
+	s = nptr;
+	if (base < 0 || base == 1 || base > 36) {
+		errno = -EINVAL;
+		any = 0;
+		acc = 0;
+		goto exit;
+	}
+
+	/*
+	 * Skip white space and pick up leading +/- sign if any.
+	 * If base is 0, allow 0x for hex and 0 for octal, else
+	 * assume decimal; if base is already 16, allow 0x.
+	 */
+	do {
+		c = *s++;
+	} while (isspace(c));
+	if (c == '-') {
+		neg = 1;
+		c = *s++;
+	} else {
+		neg = 0;
+		if (c == '+')
+			c = *s++;
+	}
+	if ((base == 0 || base == 16) && c == '0' && (*s == 'x' || *s == 'X')) {
+		c = s[1];
+		s += 2;
+		base = 16;
+	}
+	if (base == 0)
+		base = c == '0' ? 8 : 10;
+
+	/*
+	 * Compute the cutoff value between legal numbers and illegal
+	 * numbers.  That is the largest legal value, divided by the
+	 * base.  An input number that is greater than this value, if
+	 * followed by a legal input character, is too big.  One that
+	 * is equal to this value may be valid or not; the limit
+	 * between valid and invalid numbers is then based on the last
+	 * digit.  For instance, if the range for quads is
+	 * [-2147483648..2147483647] and the input base
+	 * is 10, cutoff will be set to 2147483647 and cutlim to
+	 * either 7 (neg==0) or 8 (neg==1), meaning that if we have
+	 * accumulated a value > 2147483647, or equal but the
+	 * next digit is > 7 (or 8), the number is too big, and we will
+	 * return a range error.
+	 *
+	 * Set any if any `digits' consumed; make it negative to indicate
+	 * overflow.
+	 */
+	qbase = (unsigned int)base;
+	cutoff = neg
+		     ? (unsigned long)LONG_MAX
+			   - (unsigned long)(LONG_MIN + LONG_MAX)
+		     : LONG_MAX;
+	cutlim = cutoff % qbase;
+	cutoff /= qbase;
+	for (acc = 0, any = 0;; c = *s++) {
+		if (!isascii(c))
+			break;
+		if (isdigit(c))
+			c -= '0';
+		else if (isalpha(c))
+			c -= isupper(c) ? 'A' - 10 : 'a' - 10;
+		else
+			break;
+		if (c >= base)
+			break;
+		if (any < 0 || acc > cutoff || (acc == cutoff && c > cutlim))
+			any = -1;
+		else {
+			any = 1;
+			acc *= qbase;
+			acc += c;
+		}
+	}
+	if (any < 0) {
+		acc = neg ? LONG_MIN : LONG_MAX;
+		errno = ERANGE;
+	} else if (neg)
+		acc = -acc;
+
 exit:
 	if (endptr != 0)
 		*endptr = __DECONST(char *, any ? s - 1 : nptr);
