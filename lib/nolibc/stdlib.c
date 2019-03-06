@@ -72,6 +72,13 @@ unsigned long strtoul(const char *nptr, char **endptr, int base)
 	unsigned long cutoff;
 	int neg = 0, any, cutlim;
 
+	if (base < 0 || base == 1 || base > 36) {
+		errno = -EINVAL;
+		any = 0;
+		acc = 0;
+		goto exit;
+	}
+
 	/*
 	 * See strtol for comments as to the logic used.
 	 */
@@ -111,10 +118,12 @@ unsigned long strtoul(const char *nptr, char **endptr, int base)
 			acc += c;
 		}
 	}
-	if (any < 0)
+	if (any < 0) {
 		acc = ULONG_MAX;
-	else if (neg)
+		errno = ERANGE;
+	} else if (neg)
 		acc = -acc;
+exit:
 	if (endptr != 0)
 		*endptr = __DECONST(char *, any ? s - 1 : nptr);
 	return acc;
@@ -134,12 +143,18 @@ long long strtoll(const char *nptr, char **endptr, int base)
 	unsigned long long qbase, cutoff;
 	int neg, any, cutlim;
 
+	s = nptr;
+	if (base < 0 || base == 1 || base > 36) {
+		errno = -EINVAL;
+		any = 0;
+		acc = 0;
+		goto exit;
+	}
 	/*
 	 * Skip white space and pick up leading +/- sign if any.
 	 * If base is 0, allow 0x for hex and 0 for octal, else
 	 * assume decimal; if base is already 16, allow 0x.
 	 */
-	s = nptr;
 	do {
 		c = *s++;
 	} while (isspace(c));
@@ -203,10 +218,13 @@ long long strtoll(const char *nptr, char **endptr, int base)
 			acc += c;
 		}
 	}
-	if (any < 0)
+	if (any < 0) {
+		errno = ERANGE;
 		acc = neg ? LLONG_MIN : LLONG_MAX;
-	else if (neg)
+	} else if (neg)
 		acc = -acc;
+
+exit:
 	if (endptr != 0)
 		*endptr = __DECONST(char *, any ? s - 1 : nptr);
 	return acc;
@@ -226,6 +244,12 @@ unsigned long long strtoull(const char *nptr, char **endptr, int base)
 	unsigned long long qbase, cutoff;
 	int neg, any, cutlim;
 
+	if (base < 0 || base == 1 || base > 36) {
+		errno = -EINVAL;
+		any = 0;
+		acc = 0;
+		goto exit;
+	}
 	/*
 	 * See strtoq for comments as to the logic used.
 	 */
@@ -269,10 +293,13 @@ unsigned long long strtoull(const char *nptr, char **endptr, int base)
 			acc += c;
 		}
 	}
-	if (any < 0)
+	if (any < 0) {
+		errno = ERANGE;
 		acc = ULLONG_MAX;
-	else if (neg)
+	} else if (neg)
 		acc = -acc;
+
+exit:
 	if (endptr != 0)
 		*endptr = __DECONST(char *, any ? s - 1 : nptr);
 	return acc;
