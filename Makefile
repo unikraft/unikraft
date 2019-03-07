@@ -131,7 +131,11 @@ include $(CONFIG_UK_BASE)/version.mk
 
 # Compute the full local version string so packages can use it as-is
 # Need to export it, so it can be got from environment in children (eg. mconf)
-export UK_FULLVERSION := $(UK_VERSION).$(UK_SUBVERSION)$(UK_EXTRAVERSION)$(shell $(SCRIPTS_DIR)/gitsha1)
+ifdef UK_EXTRAVERSION
+export UK_FULLVERSION := $(UK_VERSION).$(UK_SUBVERSION).$(UK_EXTRAVERSION)$(shell $(SCRIPTS_DIR)/gitsha1)
+else
+export UK_FULLVERSION := $(UK_VERSION).$(UK_SUBVERSION)$(shell $(SCRIPTS_DIR)/gitsha1)
+endif
 
 # Default image name
 export CONFIG_UK_NAME ?= $(notdir $(APP_DIR))
