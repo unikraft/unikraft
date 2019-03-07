@@ -167,9 +167,7 @@ endef
 
 # addplatlib_s $platname,$libname,$switch
 define addplatlib_s =
-ifeq ($(3),y)
-$(call addplatlib,$(1),$(2))
-endif
+$(if $(filter y,$(3)),$(call addplatlib,$(1),$(2)),)
 endef
 
 
