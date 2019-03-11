@@ -39,7 +39,7 @@ Linux kernel modules that are built off-tree. For most applications
 the Makefile should contain no more than the following: ::
 
   UK_ROOT ?= $(PWD)/../../unikraft
-  UK_LIBS ?= $(PWD)/../../unikraft-libs
+  UK_LIBS ?= $(PWD)/../../libs
   LIBS := $(UK_LIBS)/lib1:$(UK_LIBS)/lib2:$(UK_LIBS)/libN
 
   all:

@@ -24,20 +24,20 @@ cloned the repos above. For instance, assuming the following directory
 structure ::
 
   ├── unikraft
-  ├── unikraft-apps
+  ├── apps
   │  ├── helloworld
   │  ├── app1
   │  ├── app2
-  └── unikraft-libs
+  └── libs
      ├── lib1
      ├── lib2
      └── libN
 
-where your app is located at ``unikraft-apps/helloworld``, you would set
+where your app is located at ``apps/helloworld``, you would set
 those variables as follows: ::
 
   UK_ROOT ?= $(PWD)/../../unikraft
-  UK_LIBS ?= $(PWD)/../../unikraft-libs
+  UK_LIBS ?= $(PWD)/../../libs
 
 Finally, if your app will be using external libraries, set the ``LIBS``
 variable to reflect this. For instance : ::
