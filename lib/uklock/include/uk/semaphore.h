@@ -97,10 +97,7 @@ static inline __nsec uk_semaphore_down_to(struct uk_semaphore *s,
 
 	UK_ASSERT(s);
 
-	if (timeout == 0)
-		deadline = 0;
-	else
-		deadline = then + timeout;
+	deadline = then + timeout;
 
 	for (;;) {
 		uk_waitq_wait_event_deadline(&s->wait, s->count > 0, deadline);
