@@ -68,29 +68,15 @@ bootstack:
 
 ENTRY(_libkvmplat_start32)
 	cld
-	movl $bootstack, %esp
-
-	/* save multiboot info pointer at top of stack, we pop it in 64bit */
-	pushl $0
-	pushl %ebx
 
 	/* only multiboot is supported for now */
 	cmpl $MULTIBOOT_BOOTLOADER_MAGIC, %eax
 	jne nomultiboot
 
-	lgdt (gdt64_ptr)
-
-	movl $(gdt64_ds-gdt64), %eax
-	movl %eax, %ds
-	movl %eax, %es
-	movl %eax, %ss
-
-	xorl %eax, %eax
-	movl %eax, %fs
-	movl %eax, %gs
-
 	/*
-	 * x86_64 switch to long mode
+	 * Multiboot drops us off in 32-bit protected mode with some sane
+	 * initial settings, good enough to go straight for the only thing
+	 * that we care about: go straight into long mode..
 	 */
 
 	/* 1: enable pae */
@@ -113,12 +99,7 @@ ENTRY(_libkvmplat_start32)
 	orl $X86_CR0_PG, %eax
 	movl %eax, %cr0
 
-	/* 5: poetically longjump to longmode,
-	 *    letting lret set %cs to the correct GDT entry on the way
-	 */
-	pushl $(gdt64_cs-gdt64)
-	pushl $_libkvmplat_start64
-	lret
+	jmp _libkvmplat_start64
 
 	/* NOTREACHED */
 	jmp haltme
@@ -168,8 +149,32 @@ mxcsr_ptr:
 .section .text.boot
 
 ENTRY(_libkvmplat_start64)
+	/* set up the boot stack */
 	movq $bootstack, %rsp
 	xorq %rbp, %rbp
+
+	lgdt (gdt64_ptr)
+	/* let lret jump just one instruction ahead, but set %cs
+	 * to the correect GDT entry while doing that.
+	 */
+	pushq $(gdt64_cs-gdt64)
+	pushq $1f
+	lretq
+1:
+	/* Set up the remaining segment registers */
+	movq $(gdt64_ds-gdt64), %rax
+	movq %rax, %ds
+	movq %rax, %es
+	movq %rax, %ss
+	xorq %rax, %rax
+	movq %rax, %fs
+	movq %rax, %gs
+
+	/* Multiboot gives us a pointer to its mutliboot information in ebx.
+	 * However, we need that for cpuid, so push it here and then
+	 * and pop it back at the end.
+	 */
+	pushq %rbx
 
 	/* We will work on cr0 and cr4 multiple times.
 	 * We put cr0 into rsi and cr4 into rdi, because cpuid and
@@ -224,7 +229,7 @@ nofsgsbase:
 	/* done setting up CPU capabilities */
 
 	/* read multiboot info pointer */
-	movq -8(%rsp), %rdi
+	popq %rdi
 
 	pushq $0x0
 	pushq $0x0
