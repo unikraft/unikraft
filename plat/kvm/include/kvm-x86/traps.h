@@ -29,14 +29,13 @@
  */
 #define GDT_DESC_NULL           0
 #define GDT_DESC_CODE           1
-#define GDT_DESC_CODE32         2 /* Used by _libkvmplat_start32 */
-#define GDT_DESC_DATA           3
-#define GDT_DESC_TSS_LO         4
-#define GDT_DESC_TSS_HI         5
+#define GDT_DESC_DATA           2
+#define GDT_DESC_TSS_LO         3
+#define GDT_DESC_TSS_HI         4
 #define GDT_DESC_TSS            GDT_DESC_TSS_LO
 
 #define GDT_DESC_OFFSET(n)      ((n) * 0x8)
-#define GDT_NUM_ENTRIES         6
+#define GDT_NUM_ENTRIES         5
 
 #define GDT_DESC_CODE_VAL       0x00af99000000ffff
 #define GDT_DESC_CODE32_VAL     0x00cf9b000000ffff
