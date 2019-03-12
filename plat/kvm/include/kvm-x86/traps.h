@@ -24,12 +24,12 @@
 /*
  * GDT layout
  *
- * This should be kept consistent with the layout used by the ukvm target (as
- * defined in ukvm/ukvm_cpu_x86_64.h.
+ * This must be kept consistent with the layout used by the kvm entry code (as
+ * defined in plat/kvm/x86/entry64.S)
  */
 #define GDT_DESC_NULL           0
 #define GDT_DESC_CODE           1
-#define GDT_DESC_CODE32         2 /* Used by boot.S on virtio targets */
+#define GDT_DESC_CODE32         2 /* Used by _libkvmplat_start32 */
 #define GDT_DESC_DATA           3
 #define GDT_DESC_TSS_LO         4
 #define GDT_DESC_TSS_HI         5
@@ -39,6 +39,7 @@
 #define GDT_NUM_ENTRIES         6
 
 #define GDT_DESC_CODE_VAL       0x00af99000000ffff
+#define GDT_DESC_CODE32_VAL     0x00cf9b000000ffff
 #define GDT_DESC_DATA_VAL       0x00cf93000000ffff
 
 

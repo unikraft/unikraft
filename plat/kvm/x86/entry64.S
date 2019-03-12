@@ -79,12 +79,14 @@ ENTRY(_libkvmplat_start32)
 	jne nomultiboot
 
 	lgdt (gdt64_ptr)
-	pushl $0x0
-	pushw $0x10
+	/* let lret jump just one instruction ahead, but set %cs
+	 * to the correct GDT entry while doing that.
+	 */
+	pushl $(gdt64_32cs-gdt64)
 	pushl $1f
 	lret
 
-1:	movl $0x18, %eax
+1:	movl $(gdt64_ds-gdt64), %eax
 	movl %eax, %ds
 	movl %eax, %es
 	movl %eax, %ss
@@ -117,8 +119,10 @@ ENTRY(_libkvmplat_start32)
 	orl $X86_CR0_PG, %eax
 	movl %eax, %cr0
 
-	/* 5: poetically longjump to longmode */
-	pushw $0x08
+	/* 5: poetically longjump to longmode,
+	 *    letting lret set %cs to the correct GDT entry on the way
+	 */
+	pushl $(gdt64_64cs-gdt64)
 	pushl $_libkvmplat_start64
 	lret
 
@@ -145,8 +149,11 @@ END(_libkvmplat_start32)
 .align 64
 gdt64:
 	.quad 0x0000000000000000
+gdt64_64cs:
 	.quad GDT_DESC_CODE_VAL		/* 64bit CS		*/
-	.quad 0x00cf9b000000ffff	/* 32bit CS		*/
+gdt64_32cs:
+	.quad GDT_DESC_CODE32_VAL	/* 32bit CS		*/
+gdt64_ds:
 	.quad GDT_DESC_DATA_VAL		/* DS			*/
 	.quad 0x0000000000000000	/* TSS part 1 (via C)	*/
 	.quad 0x0000000000000000	/* TSS part 2 (via C)	*/
