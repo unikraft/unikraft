@@ -231,9 +231,6 @@ nofsgsbase:
 	/* read multiboot info pointer */
 	popq %rdi
 
-	pushq $0x0
-	pushq $0x0
-
 	call _libkvmplat_entry
 
 	cli
