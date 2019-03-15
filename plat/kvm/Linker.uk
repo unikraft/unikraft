@@ -2,10 +2,8 @@ ifeq (x86_64,$(CONFIG_UK_ARCH))
 KVM_LDSCRIPT  := $(CONFIG_UK_BASE)/plat/kvm/x86/link64.lds
 KVM_LDFLAGS-y += -Wl,-m,elf_x86_64
 else ifeq (arm64,$(CONFIG_UK_ARCH))
-KVM_LDSCRIPT_SRC := $(CONFIG_UK_BASE)/plat/kvm/arm/link64.lds.S
-KVM_LDSCRIPT     := $(call src2lds,libkvmplat,$(KVM_LDSCRIPT_SRC))
 KVM_LDFLAGS-y	 += -Wl,-m,aarch64elf
-$(eval $(call buildrule,libkvmplat,$(KVM_LDSCRIPT_SRC),$(KVM_LDSCRIPT)))
+KVM_LDSCRIPT     := $(call src2lds,libkvmplat,$(KVM_LDSCRIPT_SRC))
 endif
 
 ##

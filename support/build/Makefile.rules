@@ -464,7 +464,10 @@ endef
 #
 # buildrule_libobj $libname,$source,$variant(optional)
 define buildrule_libobj =
-$(eval $(call buildrule,$(1),$(2),$(call src2obj,$(1),$(2),$(3)),\
+$(if $(filter %.lds.S,$(2)),\
+                  $(eval target=$(call src2lds,$(1),$(2))),\
+                  $(eval target=$(call src2obj,$(1),$(2),$(3))))
+$(eval $(call buildrule,$(1),$(2),$(target),\
   $($(call vprefix_src,$(1),$(2),INCLUDES))\
   $($(call vprefix_src,$(1),$(2),INCLUDES-y))\
   $($(call vprefix_src,$(1),$(2),FLAGS))\
