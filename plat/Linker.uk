@@ -1,3 +1,1 @@
-include $(UK_PLAT_XEN_BASE)/Linker.uk
-include $(UK_PLAT_KVM_BASE)/Linker.uk
-include $(UK_PLAT_LINUXU_BASE)/Linker.uk
+$(foreach plat,$(UK_PLATS),$(eval $(call _import_linker,$(plat))))

@@ -123,6 +123,10 @@ _IMPORT_BASE := $(1)
 include $(1)/Makefile.uk
 undefine _IMPORT_BASE
 endef
+# _import_linker $plat_name
+define _import_linker =
+ include $(UK_PLAT_$(call uc,$(1))_BASE)/Linker.uk
+endef
 
 # Register a platform to the build system
 define addplat =
@@ -132,9 +136,7 @@ endef
 
 # addplat_s $platname,$switch
 define addplat_s =
-ifeq ($(2),y)
-$(call addplat,$(1))
-endif
+$(if $(filter y,$(2)),$(call addplat,$(1)),)
 endef
 
 
