@@ -57,6 +57,7 @@ struct uk_thread {
 	bool detached;
 	struct uk_waitq waiting_threads;
 	struct uk_sched *sched;
+	void *prv;
 #ifdef CONFIG_LIBNEWLIBC
 	struct _reent reent;
 #endif

@@ -115,6 +115,7 @@ int uk_thread_init(struct uk_thread *thread,
 	thread->detached = false;
 	uk_waitq_init(&thread->waiting_threads);
 	thread->sched = NULL;
+	thread->prv = NULL;
 
 #ifdef CONFIG_LIBNEWLIBC
 	reent_init(&thread->reent);
