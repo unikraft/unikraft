@@ -87,6 +87,7 @@ struct uk_sched {
 
 	/* internal */
 	struct uk_thread idle;
+	struct uk_thread_list exited_threads;
 	struct ukplat_ctx_callbacks plat_ctx_cbs;
 	struct uk_alloc *allocator;
 	struct uk_sched *next;

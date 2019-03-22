@@ -36,7 +36,6 @@
 
 struct schedcoop_private {
 	struct uk_thread_list thread_list;
-	struct uk_thread_list exited_threads;
 	int threads_started;
 };
 
@@ -123,16 +122,13 @@ static void schedcoop_schedule(struct uk_sched *s)
 	if (prev != next)
 		uk_sched_thread_switch(s, prev, next);
 
-	UK_TAILQ_FOREACH_SAFE(thread, &prv->exited_threads, thread_list, tmp) {
+	UK_TAILQ_FOREACH_SAFE(thread, &s->exited_threads, thread_list, tmp) {
 		if (!thread->detached)
 			/* someone will eventually wait for it */
 			continue;
 
-		if (thread != prev) {
-			UK_TAILQ_REMOVE(&prv->exited_threads,
-					thread, thread_list);
+		if (thread != prev)
 			uk_thread_destroy(thread);
-		}
 	}
 }
 
@@ -163,7 +159,7 @@ static void schedcoop_thread_remove(struct uk_sched *s, struct uk_thread *t)
 	uk_thread_exit(t);
 
 	/* Put onto exited list */
-	UK_TAILQ_INSERT_HEAD(&prv->exited_threads, t, thread_list);
+	UK_TAILQ_INSERT_HEAD(&s->exited_threads, t, thread_list);
 
 	ukplat_lcpu_restore_irqf(flags);
 
@@ -208,7 +204,6 @@ struct uk_sched *uk_schedcoop_init(struct uk_alloc *a)
 	ukplat_ctx_callbacks_init(&sched->plat_ctx_cbs, ukplat_ctx_sw);
 
 	prv = sched->prv;
-	UK_TAILQ_INIT(&prv->exited_threads);
 	UK_TAILQ_INIT(&prv->thread_list);
 	prv->threads_started = 0;
 

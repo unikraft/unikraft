@@ -122,6 +122,7 @@ struct uk_sched *uk_sched_create(struct uk_alloc *a, size_t prv_size)
 	}
 
 	sched->allocator = a;
+	UK_TAILQ_INIT(&sched->exited_threads);
 	sched->prv = (void *) sched + sizeof(struct uk_sched);
 
 	return sched;
@@ -213,6 +214,9 @@ void uk_sched_thread_destroy(struct uk_sched *sched, struct uk_thread *thread)
 {
 	UK_ASSERT(sched != NULL);
 	UK_ASSERT(thread != NULL);
+	UK_ASSERT(is_exited(thread));
+
+	UK_TAILQ_REMOVE(&sched->exited_threads, thread, thread_list);
 	uk_thread_fini(thread, sched->allocator);
 	uk_pfree(sched->allocator, thread->stack, STACK_SIZE_PAGE_ORDER);
 	uk_free(sched->allocator, thread);
@@ -232,9 +236,6 @@ void uk_sched_thread_exit(void)
 	struct uk_thread *thread;
 
 	thread = uk_thread_current();
-
-	uk_pr_info("Thread \"%s\" exited.\n", thread->name);
-
 	UK_ASSERT(thread->sched);
 	uk_sched_thread_remove(thread->sched, thread);
 	UK_CRASH("Error stopping thread.");
