@@ -617,6 +617,6 @@ void xs_comms_fini(void)
 	xsh.buf = NULL;
 
 	/* TODO stop thread, instead of killing it */
-	uk_thread_destroy(xsh.thread);
+	uk_thread_kill(xsh.thread);
 	xsh.thread = NULL;
 }

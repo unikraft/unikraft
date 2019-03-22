@@ -7,6 +7,7 @@ uk_sched_start
 uk_sched_idle_init
 uk_sched_thread_create
 uk_sched_thread_destroy
+uk_sched_thread_kill
 uk_sched_thread_sleep
 uk_sched_thread_exit
 uk_thread_init

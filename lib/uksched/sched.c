@@ -222,6 +222,11 @@ void uk_sched_thread_destroy(struct uk_sched *sched, struct uk_thread *thread)
 	uk_free(sched->allocator, thread);
 }
 
+void uk_sched_thread_kill(struct uk_sched *sched, struct uk_thread *thread)
+{
+	uk_sched_thread_remove(sched, thread);
+}
+
 void uk_sched_thread_sleep(__nsec nsec)
 {
 	struct uk_thread *thread;

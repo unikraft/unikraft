@@ -217,6 +217,8 @@ struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
 		void (*function)(void *), void *arg);
 void uk_sched_thread_destroy(struct uk_sched *sched,
 		struct uk_thread *thread);
+void uk_sched_thread_kill(struct uk_sched *sched,
+		struct uk_thread *thread);
 
 static inline
 void uk_sched_thread_switch(struct uk_sched *sched,

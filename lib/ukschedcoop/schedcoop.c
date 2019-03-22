@@ -128,7 +128,7 @@ static void schedcoop_schedule(struct uk_sched *s)
 			continue;
 
 		if (thread != prev)
-			uk_thread_destroy(thread);
+			uk_sched_thread_destroy(s, thread);
 	}
 }
 
