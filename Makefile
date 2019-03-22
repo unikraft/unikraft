@@ -37,6 +37,9 @@ else # umask
 .PHONY: all
 all:
 
+# Disable built-in rules
+.SUFFIXES:
+
 # Save running make version
 RUNNING_MAKE_VERSION := $(MAKE_VERSION)
 
