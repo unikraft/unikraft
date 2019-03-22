@@ -194,26 +194,16 @@ struct uk_sched *uk_schedcoop_init(struct uk_alloc *a)
 
 	uk_pr_info("Initializing cooperative scheduler\n");
 
-	sched = uk_malloc(a, sizeof(struct uk_sched));
-	if (sched == NULL) {
-		uk_pr_warn("Could not allocate memory for scheduler.\n");
-		goto out_err;
-	}
-
-	sched->allocator = a;
+	sched = uk_sched_create(a, sizeof(struct schedcoop_private));
+	if (sched == NULL)
+		return NULL;
 
 	ukplat_ctx_callbacks_init(&sched->plat_ctx_cbs, ukplat_ctx_sw);
 
-	prv = uk_malloc(a, sizeof(struct schedcoop_private));
-	if (prv == NULL) {
-		uk_pr_warn("Could not allocate memory for scheduler private data.\n");
-		goto out_err;
-	}
-
+	prv = sched->prv;
 	UK_TAILQ_INIT(&prv->exited_threads);
 	UK_TAILQ_INIT(&prv->thread_list);
 	prv->threads_started = 0;
-	sched->prv = prv;
 
 	uk_sched_idle_init(sched, NULL, idle_thread_fn);
 
@@ -223,12 +213,4 @@ struct uk_sched *uk_schedcoop_init(struct uk_alloc *a)
 			schedcoop_thread_remove);
 
 	return sched;
-
-out_err:
-	if (prv)
-		uk_free(a, prv);
-	if (sched)
-		uk_free(a, sched);
-
-	return NULL;
 }

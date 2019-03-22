@@ -109,6 +109,24 @@ int uk_sched_set_default(struct uk_sched *s)
 	return 0;
 }
 
+struct uk_sched *uk_sched_create(struct uk_alloc *a, size_t prv_size)
+{
+	struct uk_sched *sched = NULL;
+
+	UK_ASSERT(a != NULL);
+
+	sched = uk_malloc(a, sizeof(struct uk_sched) + prv_size);
+	if (sched == NULL) {
+		uk_pr_warn("Could not allocate scheduler.");
+		return NULL;
+	}
+
+	sched->allocator = a;
+	sched->prv = (void *) sched + sizeof(struct uk_sched);
+
+	return sched;
+}
+
 void uk_sched_start(struct uk_sched *sched)
 {
 	UK_ASSERT(sched != NULL);

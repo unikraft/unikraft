@@ -114,6 +114,8 @@ static inline void uk_sched_thread_remove(struct uk_sched *s,
  * Internal scheduler functions
  */
 
+struct uk_sched *uk_sched_create(struct uk_alloc *a, size_t prv_size);
+
 void uk_sched_idle_init(struct uk_sched *sched,
 		void *stack, void (*function)(void *));
 
