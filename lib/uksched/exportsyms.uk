@@ -11,6 +11,8 @@ uk_sched_thread_sleep
 uk_sched_thread_exit
 uk_thread_init
 uk_thread_fini
+uk_thread_exit
+uk_thread_wait
 uk_thread_detach
 uk_thread_set_prio
 uk_thread_get_prio

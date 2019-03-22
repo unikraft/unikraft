@@ -124,6 +124,10 @@ static void schedcoop_schedule(struct uk_sched *s)
 		uk_sched_thread_switch(s, prev, next);
 
 	UK_TAILQ_FOREACH_SAFE(thread, &prv->exited_threads, thread_list, tmp) {
+		if (!thread->detached)
+			/* someone will eventually wait for it */
+			continue;
+
 		if (thread != prev) {
 			UK_TAILQ_REMOVE(&prv->exited_threads,
 					thread, thread_list);
@@ -155,6 +159,8 @@ static void schedcoop_thread_remove(struct uk_sched *s, struct uk_thread *t)
 	/* Remove from the thread list */
 	UK_TAILQ_REMOVE(&prv->thread_list, t, thread_list);
 	clear_runnable(t);
+
+	uk_thread_exit(t);
 
 	/* Put onto exited list */
 	UK_TAILQ_INSERT_HEAD(&prv->exited_threads, t, thread_list);

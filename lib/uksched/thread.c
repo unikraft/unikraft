@@ -35,6 +35,7 @@
 #include <uk/plat/time.h>
 #include <uk/thread.h>
 #include <uk/sched.h>
+#include <uk/wait.h>
 #include <uk/print.h>
 #include <uk/assert.h>
 
@@ -87,6 +88,7 @@ int uk_thread_init(struct uk_thread *thread,
 	thread->flags = 0;
 	thread->wakeup_time = 0LL;
 	thread->detached = false;
+	uk_waitq_init(&thread->waiting_threads);
 
 #ifdef CONFIG_HAVE_LIBC
 	//TODO _REENT_INIT_PTR(&thread->reent);
@@ -129,6 +131,36 @@ void uk_thread_wake(struct uk_thread *thread)
 
 	thread->wakeup_time = 0LL;
 	set_runnable(thread);
+}
+
+void uk_thread_exit(struct uk_thread *thread)
+{
+	UK_ASSERT(thread);
+
+	set_exited(thread);
+
+	if (!thread->detached)
+		uk_waitq_wake_up(&thread->waiting_threads);
+
+	uk_pr_debug("Thread \"%s\" exited.\n", thread->name);
+}
+
+int uk_thread_wait(struct uk_thread *thread)
+{
+	UK_ASSERT(thread);
+
+	/* TODO critical region */
+
+	if (thread->detached)
+		return -EINVAL;
+
+	uk_waitq_wait_event(&thread->waiting_threads, is_exited(thread));
+
+	thread->detached = true;
+
+	uk_sched_thread_destroy(thread->sched, thread);
+
+	return 0;
 }
 
 int uk_thread_detach(struct uk_thread *thread)

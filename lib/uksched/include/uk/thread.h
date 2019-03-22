@@ -37,6 +37,7 @@
 #include <uk/arch/time.h>
 #include <uk/plat/thread.h>
 #include <uk/thread_attr.h>
+#include <uk/wait_types.h>
 #include <uk/list.h>
 #include <uk/essentials.h>
 
@@ -54,6 +55,7 @@ struct uk_thread {
 	uint32_t flags;
 	__snsec wakeup_time;
 	bool detached;
+	struct uk_waitq waiting_threads;
 	struct uk_sched *sched;
 #ifdef CONFIG_HAVE_LIBC
 	struct _reent reent;
@@ -69,6 +71,10 @@ UK_TAILQ_HEAD(uk_thread_list, struct uk_thread);
 	uk_thread_create_attr(name, NULL, function, data)
 #define uk_thread_destroy(thread) \
 	uk_sched_thread_destroy(thread->sched, thread)
+void uk_thread_exit(struct uk_thread *thread);
+
+int uk_thread_wait(struct uk_thread *thread);
+int uk_thread_detach(struct uk_thread *thread);
 
 int uk_thread_set_prio(struct uk_thread *thread, prio_t prio);
 int uk_thread_get_prio(const struct uk_thread *thread, prio_t *prio);
@@ -88,10 +94,14 @@ struct uk_thread *uk_thread_current(void)
 }
 
 #define RUNNABLE_FLAG   0x00000001
+#define EXITED_FLAG     0x00000002
 
 #define is_runnable(_thread)    ((_thread)->flags &   RUNNABLE_FLAG)
 #define set_runnable(_thread)   ((_thread)->flags |=  RUNNABLE_FLAG)
 #define clear_runnable(_thread) ((_thread)->flags &= ~RUNNABLE_FLAG)
+
+#define is_exited(_thread)      ((_thread)->flags &   EXITED_FLAG)
+#define set_exited(_thread)     ((_thread)->flags |=  EXITED_FLAG)
 
 int uk_thread_init(struct uk_thread *thread,
 		struct ukplat_ctx_callbacks *cbs, struct uk_alloc *allocator,
