@@ -29,6 +29,7 @@
  * Thread definitions
  * Ported from Mini-OS
  */
+#include <string.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <uk/plat/config.h>
@@ -61,6 +62,30 @@ static void init_sp(unsigned long *sp, char *stack,
 	stack_push(sp, (unsigned long) data);
 }
 
+#ifdef CONFIG_LIBNEWLIBC
+static void reent_init(struct _reent *reent)
+{
+	_REENT_INIT_PTR(reent);
+#if 0
+	/* TODO initialize basic signal handling */
+	_init_signal_r(myreent);
+#endif
+}
+
+struct _reent *__getreent(void)
+{
+	struct _reent *_reent;
+	struct uk_sched *s = uk_sched_get_default();
+
+	if (!s || !uk_sched_started(s))
+		_reent = _impure_ptr;
+	else
+		_reent = &uk_thread_current()->reent;
+
+	return _reent;
+}
+#endif /* CONFIG_LIBNEWLIBC */
+
 int uk_thread_init(struct uk_thread *thread,
 		struct ukplat_ctx_callbacks *cbs, struct uk_alloc *allocator,
 		const char *name, void *stack,
@@ -91,8 +116,8 @@ int uk_thread_init(struct uk_thread *thread,
 	uk_waitq_init(&thread->waiting_threads);
 	thread->sched = NULL;
 
-#ifdef CONFIG_HAVE_LIBC
-	//TODO _REENT_INIT_PTR(&thread->reent);
+#ifdef CONFIG_LIBNEWLIBC
+	reent_init(&thread->reent);
 #endif
 
 	uk_pr_info("Thread \"%s\": pointer: %p, stack: %p\n",

@@ -30,7 +30,7 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#ifdef CONFIG_HAVE_LIBC
+#ifdef CONFIG_LIBNEWLIBC
 #include <sys/reent.h>
 #endif
 #include <uk/arch/lcpu.h>
@@ -57,7 +57,7 @@ struct uk_thread {
 	bool detached;
 	struct uk_waitq waiting_threads;
 	struct uk_sched *sched;
-#ifdef CONFIG_HAVE_LIBC
+#ifdef CONFIG_LIBNEWLIBC
 	struct _reent reent;
 #endif
 };
