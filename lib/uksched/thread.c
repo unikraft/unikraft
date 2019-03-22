@@ -30,9 +30,11 @@
  * Ported from Mini-OS
  */
 #include <stdlib.h>
+#include <errno.h>
 #include <uk/plat/config.h>
 #include <uk/plat/time.h>
 #include <uk/thread.h>
+#include <uk/sched.h>
 #include <uk/print.h>
 #include <uk/assert.h>
 
@@ -126,4 +128,36 @@ void uk_thread_wake(struct uk_thread *thread)
 
 	thread->wakeup_time = 0LL;
 	set_runnable(thread);
+}
+
+int uk_thread_set_prio(struct uk_thread *thread, prio_t prio)
+{
+	if (!thread)
+		return -EINVAL;
+
+	return uk_sched_thread_set_prio(thread->sched, thread, prio);
+}
+
+int uk_thread_get_prio(const struct uk_thread *thread, prio_t *prio)
+{
+	if (!thread)
+		return -EINVAL;
+
+	return uk_sched_thread_get_prio(thread->sched, thread, prio);
+}
+
+int uk_thread_set_timeslice(struct uk_thread *thread, int timeslice)
+{
+	if (!thread)
+		return -EINVAL;
+
+	return uk_sched_thread_set_timeslice(thread->sched, thread, timeslice);
+}
+
+int uk_thread_get_timeslice(const struct uk_thread *thread, int *timeslice)
+{
+	if (!thread)
+		return -EINVAL;
+
+	return uk_sched_thread_get_timeslice(thread->sched, thread, timeslice);
 }

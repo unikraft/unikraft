@@ -132,7 +132,8 @@ static void schedcoop_schedule(struct uk_sched *s)
 	}
 }
 
-static void schedcoop_thread_add(struct uk_sched *s, struct uk_thread *t)
+static void schedcoop_thread_add(struct uk_sched *s, struct uk_thread *t,
+	const uk_thread_attr_t *attr __unused)
 {
 	unsigned long flags;
 	struct schedcoop_private *prv = s->prv;
@@ -210,7 +211,8 @@ struct uk_sched *uk_schedcoop_init(struct uk_alloc *a)
 	uk_sched_init(sched,
 			schedcoop_yield,
 			schedcoop_thread_add,
-			schedcoop_thread_remove);
+			schedcoop_thread_remove,
+			NULL, NULL, NULL, NULL);
 
 	return sched;
 }

@@ -35,6 +35,7 @@
 #include <uk/arch/lcpu.h>
 #include <uk/arch/time.h>
 #include <uk/plat/thread.h>
+#include <uk/thread_attr.h>
 #include <uk/list.h>
 #include <uk/essentials.h>
 
@@ -59,10 +60,19 @@ struct uk_thread {
 
 UK_TAILQ_HEAD(uk_thread_list, struct uk_thread);
 
+#define uk_thread_create_attr(name, attr, function, data) \
+	uk_sched_thread_create(uk_sched_get_default(), \
+			name, attr, function, data)
 #define uk_thread_create(name, function, data) \
-	uk_sched_thread_create(uk_sched_get_default(), name, function, data)
+	uk_thread_create_attr(name, NULL, function, data)
 #define uk_thread_destroy(thread) \
 	uk_sched_thread_destroy(thread->sched, thread)
+
+int uk_thread_set_prio(struct uk_thread *thread, prio_t prio);
+int uk_thread_get_prio(const struct uk_thread *thread, prio_t *prio);
+
+int uk_thread_set_timeslice(struct uk_thread *thread, int timeslice);
+int uk_thread_get_timeslice(const struct uk_thread *thread, int *timeslice);
 
 static inline
 struct uk_thread *uk_thread_current(void)

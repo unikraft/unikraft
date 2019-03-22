@@ -170,7 +170,8 @@ void uk_sched_idle_init(struct uk_sched *sched,
 }
 
 struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
-		const char *name, void (*function)(void *), void *arg)
+		const char *name, const uk_thread_attr_t *attr,
+		void (*function)(void *), void *arg)
 {
 	struct uk_thread *thread = NULL;
 	void *stack = NULL;
@@ -195,7 +196,7 @@ struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
 	if (rc)
 		goto err;
 
-	uk_sched_thread_add(sched, thread);
+	uk_sched_thread_add(sched, thread, attr);
 
 	return thread;
 
