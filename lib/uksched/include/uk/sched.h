@@ -111,6 +111,8 @@ static inline void uk_sched_thread_add(struct uk_sched *s,
 {
 	UK_ASSERT(s);
 	UK_ASSERT(t);
+	if (attr)
+		t->detached = attr->detached;
 	t->sched = s;
 	s->thread_add(s, t, attr);
 }

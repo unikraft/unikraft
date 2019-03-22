@@ -86,6 +86,7 @@ int uk_thread_init(struct uk_thread *thread,
 	/* Not runnable, not exited, not sleeping */
 	thread->flags = 0;
 	thread->wakeup_time = 0LL;
+	thread->detached = false;
 
 #ifdef CONFIG_HAVE_LIBC
 	//TODO _REENT_INIT_PTR(&thread->reent);
@@ -128,6 +129,15 @@ void uk_thread_wake(struct uk_thread *thread)
 
 	thread->wakeup_time = 0LL;
 	set_runnable(thread);
+}
+
+int uk_thread_detach(struct uk_thread *thread)
+{
+	UK_ASSERT(thread);
+
+	thread->detached = true;
+
+	return 0;
 }
 
 int uk_thread_set_prio(struct uk_thread *thread, prio_t prio)

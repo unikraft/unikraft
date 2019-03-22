@@ -29,6 +29,7 @@
 #define __UK_THREAD_H__
 
 #include <stdint.h>
+#include <stdbool.h>
 #ifdef CONFIG_HAVE_LIBC
 #include <sys/reent.h>
 #endif
@@ -52,6 +53,7 @@ struct uk_thread {
 	UK_TAILQ_ENTRY(struct uk_thread) thread_list;
 	uint32_t flags;
 	__snsec wakeup_time;
+	bool detached;
 	struct uk_sched *sched;
 #ifdef CONFIG_HAVE_LIBC
 	struct _reent reent;
