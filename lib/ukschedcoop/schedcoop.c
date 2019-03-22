@@ -132,7 +132,7 @@ static void schedcoop_schedule(struct uk_sched *s)
 	}
 }
 
-static void schedcoop_thread_add(struct uk_sched *s, struct uk_thread *t,
+static int schedcoop_thread_add(struct uk_sched *s, struct uk_thread *t,
 	const uk_thread_attr_t *attr __unused)
 {
 	unsigned long flags;
@@ -143,6 +143,8 @@ static void schedcoop_thread_add(struct uk_sched *s, struct uk_thread *t,
 	flags = ukplat_lcpu_save_irqf();
 	UK_TAILQ_INSERT_TAIL(&prv->thread_list, t, thread_list);
 	ukplat_lcpu_restore_irqf(flags);
+
+	return 0;
 }
 
 static void schedcoop_thread_remove(struct uk_sched *s, struct uk_thread *t)

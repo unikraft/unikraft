@@ -89,6 +89,7 @@ int uk_thread_init(struct uk_thread *thread,
 	thread->wakeup_time = 0LL;
 	thread->detached = false;
 	uk_waitq_init(&thread->waiting_threads);
+	thread->sched = NULL;
 
 #ifdef CONFIG_HAVE_LIBC
 	//TODO _REENT_INIT_PTR(&thread->reent);

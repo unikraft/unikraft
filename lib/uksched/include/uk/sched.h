@@ -59,7 +59,7 @@ int uk_sched_set_default(struct uk_sched *s);
 typedef void  (*uk_sched_yield_func_t)
 		(struct uk_sched *s);
 
-typedef void  (*uk_sched_thread_add_func_t)
+typedef int   (*uk_sched_thread_add_func_t)
 		(struct uk_sched *s, struct uk_thread *t,
 			const uk_thread_attr_t *attr);
 typedef void  (*uk_sched_thread_remove_func_t)
@@ -107,24 +107,30 @@ static inline void uk_sched_yield(void)
 	s->yield(s);
 }
 
-static inline void uk_sched_thread_add(struct uk_sched *s,
+static inline int uk_sched_thread_add(struct uk_sched *s,
 		struct uk_thread *t, const uk_thread_attr_t *attr)
 {
+	int rc;
+
 	UK_ASSERT(s);
 	UK_ASSERT(t);
 	if (attr)
 		t->detached = attr->detached;
-	t->sched = s;
-	s->thread_add(s, t, attr);
+	rc = s->thread_add(s, t, attr);
+	if (rc == 0)
+		t->sched = s;
+	return rc;
 }
 
-static inline void uk_sched_thread_remove(struct uk_sched *s,
+static inline int uk_sched_thread_remove(struct uk_sched *s,
 		struct uk_thread *t)
 {
 	UK_ASSERT(s);
 	UK_ASSERT(t);
+	UK_ASSERT(t->sched == s);
 	s->thread_remove(s, t);
 	t->sched = NULL;
+	return 0;
 }
 
 static inline int uk_sched_thread_set_prio(struct uk_sched *s,

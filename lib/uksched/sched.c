@@ -197,10 +197,14 @@ struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
 	if (rc)
 		goto err;
 
-	uk_sched_thread_add(sched, thread, attr);
+	rc = uk_sched_thread_add(sched, thread, attr);
+	if (rc)
+		goto err_add;
 
 	return thread;
 
+err_add:
+	uk_thread_fini(thread, sched->allocator);
 err:
 	if (stack)
 		uk_free(sched->allocator, stack);
