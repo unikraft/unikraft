@@ -74,6 +74,9 @@ strlcat
 nanosleep
 clock_gettime
 
+# unistd
+sleep
+
 # sys/time
 gettimeofday
 

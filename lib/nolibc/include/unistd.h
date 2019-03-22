@@ -47,6 +47,8 @@ extern "C" {
 #define __NEED_ssize_t
 #include <nolibc-internal/shareddefs.h>
 
+unsigned int sleep(unsigned int seconds);
+
 #if CONFIG_LIBVFSCORE
 int close(int fd);
 ssize_t write(int fd, const void *buf, size_t count);

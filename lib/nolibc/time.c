@@ -92,6 +92,18 @@ int nanosleep(const struct timespec *req, struct timespec *rem)
 	return 0;
 }
 
+unsigned int sleep(unsigned int seconds)
+{
+	struct timespec ts;
+
+	ts.tv_sec = seconds;
+	ts.tv_nsec = 0;
+	if (nanosleep(&ts, &ts))
+		return ts.tv_sec;
+
+	return 0;
+}
+
 int gettimeofday(struct timeval *tv, void *tz __unused)
 {
 	__nsec now = ukplat_wall_clock();
