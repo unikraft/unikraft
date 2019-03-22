@@ -49,7 +49,7 @@ void arch_init_events(void)
 	cpu0_pda.irqcount = -1;
 	cpu0_pda.irqstackptr =
 			(void *) (((unsigned long)irqstack + 2 * STACK_SIZE)
-			& ~(STACK_SIZE - 1));
+			& STACK_MASK_TOP);
 #endif
 }
 

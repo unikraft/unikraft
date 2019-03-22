@@ -38,6 +38,8 @@
 
 #include <uk/asm/limits.h>
 
+#define STACK_MASK_TOP           (~(__STACK_SIZE - 1))
+
 #ifndef __ASSEMBLY__
 
 #include <uk/asm/intsizes.h>

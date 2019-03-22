@@ -70,7 +70,7 @@ struct uk_thread *uk_thread_current(void)
 	struct uk_thread **current;
 	unsigned long sp = ukarch_read_sp();
 
-	current = (struct uk_thread **) (sp & ~(__STACK_SIZE - 1));
+	current = (struct uk_thread **) (sp & STACK_MASK_TOP);
 
 	return *current;
 }

@@ -63,7 +63,7 @@ _libxenplat_start:
 #endif
 	cld
 	movq stack_start(%rip),%rsp
-	andq $(~(__STACK_SIZE-1)), %rsp
+	andq $STACK_MASK_TOP, %rsp
 	movq %rsi, %r8 /* esi contains pointer to start_info page */
 	/* We will work on cr0 and cr4 multiple times.
 	 * We put cr0 into rsi and cr4 into rdi, because cpuid and

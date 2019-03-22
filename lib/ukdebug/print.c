@@ -96,7 +96,7 @@ static void _print_stack(struct _vprint_console *cons)
 	char buf[BUFLEN];
 	int len;
 
-	stackb = (ukarch_read_sp() & ~(__STACK_SIZE - 1)) + __STACK_SIZE;
+	stackb = (ukarch_read_sp() & STACK_MASK_TOP) + __STACK_SIZE;
 
 	len = snprintf(buf, BUFLEN, "<%p> ", (void *) stackb);
 	cons->cout((char *)buf, len);
