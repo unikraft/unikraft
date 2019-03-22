@@ -36,7 +36,6 @@
 
 struct schedcoop_private {
 	struct uk_thread_list thread_list;
-	int threads_started;
 };
 
 #ifdef SCHED_DEBUG
@@ -176,9 +175,8 @@ static void idle_thread_fn(void *unused __unused)
 {
 	struct uk_thread *current = uk_thread_current();
 	struct uk_sched *s = current->sched;
-	struct schedcoop_private *prv = s->prv;
 
-	prv->threads_started = 1;
+	s->threads_started = true;
 	ukplat_lcpu_enable_irq();
 
 	while (1) {
@@ -207,7 +205,6 @@ struct uk_sched *uk_schedcoop_init(struct uk_alloc *a)
 
 	prv = sched->prv;
 	UK_TAILQ_INIT(&prv->thread_list);
-	prv->threads_started = 0;
 
 	uk_sched_idle_init(sched, NULL, idle_thread_fn);
 

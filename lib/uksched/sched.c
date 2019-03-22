@@ -121,6 +121,7 @@ struct uk_sched *uk_sched_create(struct uk_alloc *a, size_t prv_size)
 		return NULL;
 	}
 
+	sched->threads_started = false;
 	sched->allocator = a;
 	UK_TAILQ_INIT(&sched->exited_threads);
 	sched->prv = (void *) sched + sizeof(struct uk_sched);

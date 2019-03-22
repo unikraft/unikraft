@@ -86,6 +86,7 @@ struct uk_sched {
 	uk_sched_thread_get_tslice_func_t thread_get_tslice;
 
 	/* internal */
+	bool threads_started;
 	struct uk_thread idle;
 	struct uk_thread_list exited_threads;
 	struct ukplat_ctx_callbacks plat_ctx_cbs;
@@ -192,12 +193,6 @@ static inline struct uk_thread *uk_sched_get_idle(struct uk_sched *s)
 	return &s->idle;
 }
 
-/*
- * Public scheduler functions
- */
-
-void uk_sched_start(struct uk_sched *sched) __noreturn;
-
 #define uk_sched_init(s, yield_func, \
 		thread_add_func, thread_remove_func, \
 		thread_set_prio_func, thread_get_prio_func, \
@@ -212,6 +207,17 @@ void uk_sched_start(struct uk_sched *sched) __noreturn;
 		(s)->thread_get_tslice  = thread_get_tslice_func; \
 		uk_sched_register((s)); \
 	} while (0)
+
+/*
+ * Public scheduler functions
+ */
+
+void uk_sched_start(struct uk_sched *sched) __noreturn;
+
+static inline bool uk_sched_started(struct uk_sched *sched)
+{
+	return sched->threads_started;
+}
 
 
 /*
