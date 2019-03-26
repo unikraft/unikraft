@@ -34,6 +34,7 @@
 
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 #include <uk/plat/thread.h>
 #include <uk/alloc.h>
 #include <sw_ctx.h>
@@ -70,7 +71,8 @@ static void *sw_ctx_create(struct uk_alloc *allocator, unsigned long sp)
 	ctx->ip = (unsigned long) asm_thread_starter;
 	ctx->extregs = ALIGN_UP(((uintptr_t)ctx + sizeof(struct sw_ctx)),
 				x86_cpu_features.extregs_align);
-	// Initialize the extregs area by saving a valid register layout to it
+	// Initialize extregs area: zero out, then save a valid layout to it.
+	memset((void *)ctx->extregs, 0, x86_cpu_features.extregs_size);
 	save_extregs(ctx);
 
 	return ctx;
