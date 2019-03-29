@@ -51,10 +51,19 @@ unsigned long read_cr2(void)
 void system_off(void)
 {
 	/*
-	 * Poke the QEMU "isa-debug-exit" device to "shutdown". Should be
-	 * harmless if it is not present. This is used to enable automated
-	 * tests on virtio.  Note that the actual QEMU exit() status will
-	 * be 83 ('S', 41 << 1 | 1).
+	 * Perform an ACPI shutdown by writing (SLP_TYPa | SLP_EN) to PM1a_CNT.
+	 * Generally speaking, we'd have to jump through a lot of hoops to
+	 * collect those values, however, for QEMU, those are static. Should be
+	 * harmless if we're not running on QEMU, especially considering we're
+	 * already shutting down, so who cares if we crash.
+	 */
+	outw(0x604, 0x2000);
+
+	/*
+	 * If that didn't work for whatever reason, try poking the QEMU
+	 * "isa-debug-exit" device to "shutdown". Should be harmless if it is
+	 * not present. This is used to enable automated tests on virtio.  Note
+	 * that the actual QEMU exit() status will be 83 ('S', 41 << 1 | 1).
 	 */
 	outw(0x501, 41);
 }
