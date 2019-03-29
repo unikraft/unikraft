@@ -38,6 +38,20 @@
 #ifndef __UK_ESSENTIALS_H__
 #define __UK_ESSENTIALS_H__
 
+#include <uk/config.h>
+
+#if CONFIG_LIBNEWLIBC
+/*
+ * Needed for __used, __unused, __packed, __section,
+ *   __nonnull, __offsetof, __containerof
+ */
+#include <sys/cdefs.h>
+/* Needed for __STRINGIFY */
+#include <sys/param.h>
+/* Needed for MIN, MAX */
+#include <inttypes.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
