@@ -8,7 +8,7 @@ $(eval $(call addplat_s,kvm,$(CONFIG_PLAT_KVM)))
 ##
 $(eval $(call addplatlib,kvm,libkvmplat))
 $(eval $(call addplatlib_s,kvm,libkvmpci,$(CONFIG_KVM_PCI)))
-$(eval $(call addplatlib_s,kvm,libkvmvirtio,$(CONFIG_VIRTIO)))
+$(eval $(call addplatlib_s,kvm,libkvmvirtio,$(CONFIG_VIRTIO_BUS)))
 
 ##
 ## Platform library definitions
