@@ -9,6 +9,7 @@ $(eval $(call addplat_s,kvm,$(CONFIG_PLAT_KVM)))
 $(eval $(call addplatlib,kvm,libkvmplat))
 $(eval $(call addplatlib_s,kvm,libkvmpci,$(CONFIG_KVM_PCI)))
 $(eval $(call addplatlib_s,kvm,libkvmvirtio,$(CONFIG_VIRTIO_BUS)))
+$(eval $(call addplatlib_s,kvm,libkvmvirtionet,$(CONFIG_VIRTIO_NET)))
 
 ##
 ## Platform library definitions
@@ -102,5 +103,14 @@ LIBKVMVIRTIO_SRCS-$(CONFIG_VIRTIO_BUS) +=\
 							$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_ring.c
 LIBKVMVIRTIO_SRCS-$(CONFIG_VIRTIO_PCI) +=\
 							$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_pci.c
-LIBKVMVIRTIO_SRCS-$(CONFIG_VIRTIO_NET) +=\
-							$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_net.c
+##
+## Virtio Net library definition
+##
+LIBKVMVIRTIONET_ASINCLUDES-y   += -I$(LIBKVMPLAT_BASE)/include
+LIBKVMVIRTIONET_CINCLUDES-y    += -I$(LIBKVMPLAT_BASE)/include
+LIBKVMVIRTIONET_ASINCLUDES-y   += -I$(UK_PLAT_COMMON_BASE)/include
+LIBKVMVIRTIONET_CINCLUDES-y    += -I$(UK_PLAT_COMMON_BASE)/include
+LIBKVMVIRTIONET_ASINCLUDES-y   += -I$(UK_PLAT_DRIVERS_BASE)/include
+LIBKVMVIRTIONET_CINCLUDES-y    += -I$(UK_PLAT_DRIVERS_BASE)/include
+LIBKVMVIRTIONET_SRCS-y +=\
+			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_net.c
