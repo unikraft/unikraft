@@ -47,6 +47,27 @@ SECTIONS
 
 	_etext = .;			/* End of text section */
 
+	/* Exception frame */
+	. = ALIGN(4096);
+	__eh_frame_start = .;
+	.eh_frame :
+	{
+		*(.eh_frame)
+		*(.eh_frame.*)
+	}
+	__eh_frame_end = .;
+
+
+	/* Exception frame header */
+	__eh_frame_hdr_start = .;
+	.eh_frame_hdr :
+	{
+		*(.eh_frame_hdr)
+		*(.eh_frame_hdr.*)
+	}
+	. = ALIGN(4096);
+	__eh_frame_hdr_end = .;
+
 	/* Read-only data */
 	_rodata = .;
 	.rodata :

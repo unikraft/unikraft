@@ -68,6 +68,26 @@ SECTIONS {
 	. = ALIGN(__PAGE_SIZE);
 	_etext = .;
 
+	/* Exception frame */
+	__eh_frame_start = .;
+	.eh_frame :
+	{
+		*(.eh_frame)
+		*(.eh_frame.*)
+	}
+	__eh_frame_end = .;
+
+	/* Exception frame header */
+	__eh_frame_hdr_start = .;
+	.eh_frame_hdr :
+	{
+
+		*(.eh_frame_hdr)
+		*(.eh_frame_hdr.*)
+	}
+	. = ALIGN(__PAGE_SIZE);
+	__eh_frame_hdr_end = .;
+
 	/* Read-only data */
 	_rodata = .;
 	.rodata :
@@ -75,10 +95,8 @@ SECTIONS {
 		*(.rodata)
 		*(.rodata.*)
 	}
-	.eh_frame :
-	{
-		*(.eh_frame)
-	}
+
+
 	_erodata = .;
 
 	/* Constructor tables (read-only) */

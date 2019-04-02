@@ -41,6 +41,8 @@ SECTIONS
 	}
 	_etext = .;
 
+	INCLUDE plat/common/x86/link64.lds
+
 	/* Read-only data */
 	. = ALIGN(0x1000);
 	_rodata = .;
