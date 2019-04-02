@@ -47,7 +47,7 @@
 
 int ukplat_memregion_count(void)
 {
-	return (int) _libxenplat_mrd_num + 5;
+	return (int) _libxenplat_mrd_num + 7;
 }
 
 int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
@@ -55,7 +55,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 
 	UK_ASSERT(m);
 
-	switch(i) {
+	switch (i) {
 	case 0: /* text */
 		m->base  = (void *) __TEXT;
 		m->len   = (size_t) __ETEXT - (size_t) __TEXT;
@@ -65,7 +65,27 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->name  = "text";
 #endif
 		break;
-	case 1:	/* ro data */
+	case 1: /* eh_frame */
+		m->base  = (void *) __EH_FRAME_START;
+		m->len   = (size_t) __EH_FRAME_END
+				- (size_t) __EH_FRAME_START;
+		m->flags = (UKPLAT_MEMRF_RESERVED
+			    | UKPLAT_MEMRF_READABLE);
+#if CONFIG_UKPLAT_MEMRNAME
+		m->name  = "eh_frame";
+#endif
+		break;
+	case 2: /* eh_frame_hdr */
+		m->base  = (void *) __EH_FRAME_HDR_START;
+		m->len   = (size_t) __EH_FRAME_HDR_END
+				- (size_t) __EH_FRAME_HDR_START;
+		m->flags = (UKPLAT_MEMRF_RESERVED
+			    | UKPLAT_MEMRF_READABLE);
+#if CONFIG_UKPLAT_MEMRNAME
+		m->name  = "eh_frame_hdr";
+#endif
+		break;
+	case 3:	/* ro data */
 		m->base  = (void *) __RODATA;
 		m->len   = (size_t) __ERODATA - (size_t) __RODATA;
 		m->flags = (UKPLAT_MEMRF_RESERVED
@@ -74,7 +94,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->name  = "rodata";
 #endif
 		break;
-	case 2: /* ctors */
+	case 4: /* ctors */
 		m->base  = (void *) __CTORS;
 		m->len   = (size_t) __ECTORS - (size_t) __CTORS;
 		m->flags = (UKPLAT_MEMRF_RESERVED
@@ -83,7 +103,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->name  = "ctors";
 #endif
 		break;
-	case 3: /* data */
+	case 5: /* data */
 		m->base  = (void *) __DATA;
 		m->len   = (size_t) __EDATA - (size_t) __DATA;
 		m->flags = (UKPLAT_MEMRF_RESERVED
@@ -93,7 +113,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->name  = "data";
 #endif
 		break;
-	case 4: /* bss */
+	case 6: /* bss */
 		m->base  = (void *) __BSS_START;
 		m->len   = (size_t) __END - (size_t) __BSS_START;
 		m->flags = (UKPLAT_MEMRF_RESERVED

@@ -33,7 +33,7 @@ extern void *_libkvmplat_mem_end;
 
 int ukplat_memregion_count(void)
 {
-	return 7;
+	return 9;
 }
 
 int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
@@ -53,7 +53,29 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 #endif
 		ret = 0;
 		break;
-	case 1: /* rodata */
+	case 1: /* eh_frame */
+		m->base  = (void *) __EH_FRAME_START;
+		m->len   = (size_t) __EH_FRAME_END
+				- (size_t) __EH_FRAME_START;
+		m->flags = (UKPLAT_MEMRF_RESERVED
+			    | UKPLAT_MEMRF_READABLE);
+		ret = 0;
+#if CONFIG_UKPLAT_MEMRNAME
+		m->name  = "eh_frame";
+#endif
+		break;
+	case 2: /* eh_frame_hdr */
+		m->base  = (void *) __EH_FRAME_HDR_START;
+		m->len   = (size_t) __EH_FRAME_HDR_END
+			   - (size_t) __EH_FRAME_HDR_START;
+		m->flags = (UKPLAT_MEMRF_RESERVED
+			    | UKPLAT_MEMRF_READABLE);
+		ret = 0;
+#if CONFIG_UKPLAT_MEMRNAME
+		m->name  = "eh_frame_hdr";
+#endif
+		break;
+	case 3: /* rodata */
 		m->base  = (void *) __RODATA;
 		m->len   = (size_t) __ERODATA - (size_t) __RODATA;
 		m->flags = (UKPLAT_MEMRF_RESERVED
@@ -63,7 +85,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 #endif
 		ret = 0;
 		break;
-	case 2: /* ctors */
+	case 4: /* ctors */
 		m->base  = (void *) __CTORS;
 		m->len   = (size_t) __ECTORS - (size_t) __CTORS;
 		m->flags = (UKPLAT_MEMRF_RESERVED
@@ -73,7 +95,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 #endif
 		ret = 0;
 		break;
-	case 3: /* data */
+	case 5: /* data */
 		m->base  = (void *) __DATA;
 		m->len   = (size_t) __EDATA - (size_t) __DATA;
 		m->flags = (UKPLAT_MEMRF_RESERVED
@@ -84,7 +106,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 #endif
 		ret = 0;
 		break;
-	case 4: /* bss */
+	case 6: /* bss */
 		m->base  = (void *) __BSS_START;
 		m->len   = (size_t) __END - (size_t) __BSS_START;
 		m->flags = (UKPLAT_MEMRF_RESERVED
@@ -95,7 +117,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 #endif
 		ret = 0;
 		break;
-	case 5: /* heap */
+	case 7: /* heap */
 		m->base  = _libkvmplat_heap_start;
 		m->len   = (size_t) _libkvmplat_stack_top
 			   - (size_t) _libkvmplat_heap_start;
@@ -105,7 +127,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 #endif
 		ret = 0;
 		break;
-	case 6: /* stack */
+	case 8: /* stack */
 		m->base  = _libkvmplat_stack_top;
 		m->len   = (size_t) _libkvmplat_mem_end
 			   - (size_t) _libkvmplat_stack_top;

@@ -48,6 +48,12 @@ extern char _dtb[];
 /* [_text, _etext]: contains .text.* sections */
 extern char _text[], _etext[];
 
+/* [__eh_frame_start, __eh_frame_end]: contains .eh_frame section */
+extern char __eh_frame_start, __eh_frame_end;
+
+/* [__eh_frame_hdr_start, __eh_frame_hdr_end]: contains .eh_frame_hdr section */
+extern char __eh_frame_hdr_start, __eh_frame_hdr_end;
+
 /* [_rodata, _erodata]: contains .rodata.* sections */
 extern char _rodata[], _erodata[];
 
@@ -65,17 +71,21 @@ extern char _end[];
 
 #define __uk_image_symbol(addr)    ((unsigned long)(addr))
 
-#define __DTB		__uk_image_symbol(_dtb)
-#define __TEXT		__uk_image_symbol(_text)
-#define __ETEXT		__uk_image_symbol(_etext)
-#define __RODATA	__uk_image_symbol(_rodata)
-#define __ERODATA	__uk_image_symbol(_erodata)
-#define __DATA		__uk_image_symbol(_data)
-#define __EDATA		__uk_image_symbol(_edata)
-#define __CTORS		__uk_image_symbol(_ctors)
-#define __ECTORS	__uk_image_symbol(_ectors)
-#define __BSS_START	__uk_image_symbol(__bss_start)
-#define __END		__uk_image_symbol(_end)
+#define __DTB                   __uk_image_symbol(_dtb)
+#define __TEXT                  __uk_image_symbol(_text)
+#define __ETEXT                 __uk_image_symbol(_etext)
+#define __EH_FRAME_START        __uk_image_symbol(__eh_frame_start)
+#define __EH_FRAME_END          __uk_image_symbol(__eh_frame_end)
+#define __EH_FRAME_HDR_START    __uk_image_symbol(__eh_frame_hdr_start)
+#define __EH_FRAME_HDR_END      __uk_image_symbol(__eh_frame_hdr_end)
+#define __RODATA                __uk_image_symbol(_rodata)
+#define __ERODATA               __uk_image_symbol(_erodata)
+#define __DATA                  __uk_image_symbol(_data)
+#define __EDATA                 __uk_image_symbol(_edata)
+#define __CTORS                 __uk_image_symbol(_ctors)
+#define __ECTORS                __uk_image_symbol(_ectors)
+#define __BSS_START             __uk_image_symbol(__bss_start)
+#define __END                   __uk_image_symbol(_end)
 
 #endif /*__ASSEMBLY__*/
 
