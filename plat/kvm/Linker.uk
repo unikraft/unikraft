@@ -11,7 +11,8 @@ endif
 ##
 KVM_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_kvm-$(CONFIG_UK_ARCH)
 
-EXTRA_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-T,$(EXTRA_LD_SCRIPT-y))
+KVM_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-T$(comma),\
+			$(KVM_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y))
 
 $(KVM_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
               $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) \
@@ -33,7 +34,7 @@ ifneq ($(filter x86_64 arm64,$(CONFIG_UK_ARCH)),)
 	       $(LD) $(LDFLAGS) $(LDFLAGS-y) \
 		     $(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
 		     -Wl$(comma)-dT$(comma)$(call strip,$(KVM_LDSCRIPT)) \
-		     $(EXTRA_LD_SCRIPT_FLAGS) \
+		     $(KVM_LD_SCRIPT_FLAGS) \
 		     $@.o -o $@)
 ifeq ($(CONFIG_OPTIMIZE_DBGFILE),y)
 	$(call build_cmd,OBJCOPY,,$@.dbg,\
