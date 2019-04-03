@@ -410,7 +410,7 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 			memr->mm_alloc_bitmap_size);
 
 	/* free up the memory we've been given to play with */
-	map_free(b, min, (unsigned long)(range >> __PAGE_SHIFT));
+	map_free(b, min, memr->nr_pages);
 
 	count = 0;
 	while (range != 0) {
