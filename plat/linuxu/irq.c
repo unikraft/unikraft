@@ -159,9 +159,9 @@ int ukplat_irq_register(unsigned long irq, irq_handler_func_t func, void *arg)
 
 	/* Register signal action */
 	memset(&action, 0, sizeof(action));
-	action.sa_handler = _irq_handle;
-	action.sa_flags = SA_RESTORER;
-	action.sa_restorer = __restorer;
+	action.k_sa_handler = _irq_handle;
+	action.k_sa_flags = SA_RESTORER;
+	action.k_sa_restorer = __restorer;
 
 	rc = sys_sigaction((int) irq, &action, &h->oldaction);
 	if (rc != 0)

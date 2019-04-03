@@ -49,7 +49,7 @@ __nsec ukplat_monotonic_clock(void)
 	__nsec ret;
 	int rc;
 
-	rc = sys_clock_gettime(CLOCK_MONOTONIC, &tp);
+	rc = sys_clock_gettime(K_CLOCK_MONOTONIC, &tp);
 	if (unlikely(rc != 0))
 		return 0;
 
@@ -65,7 +65,7 @@ __nsec ukplat_wall_clock(void)
 	__nsec ret;
 	int rc;
 
-	rc = sys_clock_gettime(CLOCK_REALTIME, &tp);
+	rc = sys_clock_gettime(K_CLOCK_REALTIME, &tp);
 	if (unlikely(rc != 0))
 		return 0;
 
@@ -97,7 +97,7 @@ void ukplat_time_init(void)
 	sigev.sigev_signo = TIMER_SIGNUM;
 	sigev.sigev_value.sival_ptr = &timerid;
 
-	rc = sys_timer_create(CLOCK_REALTIME, &sigev, &timerid);
+	rc = sys_timer_create(K_CLOCK_REALTIME, &sigev, &timerid);
 	if (unlikely(rc != 0))
 		UK_CRASH("Failed to create timer: %d\n", rc);
 

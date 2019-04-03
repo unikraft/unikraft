@@ -56,10 +56,10 @@ typedef void (*uk_sighandler_t)(int);
 typedef void (*uk_sigrestore_t)(void);
 
 struct uk_sigaction {
-	uk_sighandler_t sa_handler;
-	int sa_flags;
-	uk_sigrestore_t sa_restorer;
-	k_sigset_t sa_mask;
+	uk_sighandler_t k_sa_handler;
+	int k_sa_flags;
+	uk_sigrestore_t k_sa_restorer;
+	k_sigset_t k_sa_mask;
 };
 
 /* sigaction flags */
