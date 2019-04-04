@@ -30,6 +30,7 @@ config HAVE_NW_STACK
 source "lib/ukboot/Config.uk"
 source "lib/ukdebug/Config.uk"
 source "lib/ukargparse/Config.uk"
+source "lib/ukunistd/Config.uk"
 source "lib/uktimeconv/Config.uk"
 source "lib/nolibc/Config.uk"
 source "lib/ukalloc/Config.uk"
