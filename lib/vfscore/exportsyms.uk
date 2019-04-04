@@ -22,6 +22,8 @@ read
 mkdir
 fsync
 fstat
+flock
+ftruncaate
 stat
 chmod
 dup
@@ -33,3 +35,17 @@ vfscore_mount_dump
 umount
 umount2
 unlink
+getcwd
+chown
+fstatat
+statfs
+lstat
+openat
+opendir
+readir
+pread
+pwrite
+pwritev
+readv
+writev
+truncate
