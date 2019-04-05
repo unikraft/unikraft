@@ -1,5 +1,9 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
+ * Authors: Cristian Banu <cristb@gmail.com>
+ *
+ * Copyright (c) 2019, Politehnica University of Bucharest. All rights reserved.
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -21,34 +25,35 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* Taken from Mini-OS */
 
-#ifndef __UKARCH_SPINLOCK_H__
-#define __UKARCH_SPINLOCK_H__
+#ifndef __UKPLAT_SPINLOCK_H__
+#define __UKPLAT_SPINLOCK_H__
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <uk/arch/spinlock.h>
+#include <uk/plat/lcpu.h>
 
-typedef struct {} spinlock_t;
+#define ukplat_spin_lock_irq(lock) \
+	do { \
+		ukplat_lcpu_disable_irq(); \
+		ukarch_spin_lock(lock); \
+	} while (0)
 
-#ifdef CONFIG_SMP
-#error "Define your spinlock operations!"
-#else
+#define ukplat_spin_unlock_irq(lock) \
+	do { \
+		ukarch_spin_unlock(lock); \
+		ukplat_lcpu_enable_irq(); \
+	} while (0)
 
-#define ukarch_spin_lock_init(lock)      (void)(lock)
-#define ukarch_spin_is_locked(lock)      (void)(lock)
-#define ukarch_spin_lock(lock)           (void)(lock)
-#define ukarch_spin_trylock(lock)        (void)(lock)
-#define ukarch_spin_unlock(lock)         (void)(lock)
+#define ukplat_spin_lock_irqsave(lock, flags) \
+	do { \
+		flags = ukplat_lcpu_save_irqf(); \
+		ukarch_spin_lock(lock); \
+	} while (0)
 
-/* Defines a preinitialized spin_lock in unlocked state */
-#define DEFINE_SPINLOCK(lock)            spinlock_t lock = {}
+#define ukplat_spin_unlock_irqrestore(lock, flags) \
+	do { \
+		ukarch_spin_unlock(lock); \
+		ukplat_lcpu_restore_irqf(flags); \
+	} while (0)
 
-#endif
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* __UKARCH_SPINLOCK_H__ */
+#endif /* __PLAT_SPINLOCK_H__ */
