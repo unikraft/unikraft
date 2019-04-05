@@ -133,7 +133,7 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 #endif
 			return -1;
 		} else {
-			memcpy(m, &_libxenplat_mrd[i - 5], sizeof(*m));
+			memcpy(m, &_libxenplat_mrd[i - 7], sizeof(*m));
 		}
 		break;
 	}
