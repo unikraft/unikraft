@@ -23,7 +23,7 @@ mkdir
 fsync
 fstat
 flock
-ftruncaate
+ftruncate
 stat
 chmod
 dup
