@@ -53,29 +53,25 @@ void *_libkvmplat_mem_end;
 extern void _libkvmplat_newstack(__u64 stack_start, void (*tramp)(void *),
 				void *arg);
 
-static inline void _mb_get_cmdline(struct multiboot_info *mi, char *cmdline,
-				   size_t maxlen)
+static inline void _mb_get_cmdline(struct multiboot_info *mi)
 {
-	size_t cmdline_len;
 	char *mi_cmdline;
 
 	if (mi->flags & MULTIBOOT_INFO_CMDLINE) {
 		mi_cmdline = (char *)(__u64)mi->cmdline;
-		cmdline_len = strlen(mi_cmdline);
 
-		if (cmdline_len >= maxlen) {
-			cmdline_len = maxlen - 1;
-			uk_pr_info("Command line too long, truncated\n");
-		}
-		memcpy(cmdline, mi_cmdline, cmdline_len);
-
-		/* ensure null termination */
-		cmdline[cmdline_len <= (maxlen - 1) ? cmdline_len
-			: (maxlen - 1)] = '\0';
+		if (strlen(mi_cmdline) > sizeof(cmdline) - 1)
+			uk_pr_err("Command line too long, truncated\n");
+		strncpy(cmdline, mi_cmdline,
+			sizeof(cmdline));
 	} else {
-		uk_pr_info("No command line found\n");
-		strcpy(cmdline, CONFIG_UK_NAME);
+		/* Use image name as cmdline to provide argv[0] */
+		uk_pr_debug("No command line present\n");
+		strncpy(cmdline, CONFIG_UK_NAME, sizeof(cmdline));
 	}
+
+	/* ensure null termination */
+	cmdline[(sizeof(cmdline) - 1)] = '\0';
 }
 
 static inline void _mb_init_mem(struct multiboot_info *mi)
@@ -131,7 +127,7 @@ void _libkvmplat_entry(void *arg)
 	 * The multiboot structures may be anywhere in memory, so take a copy of
 	 * everything necessary before we initialise memory allocation.
 	 */
-	_mb_get_cmdline(mi, cmdline, sizeof(cmdline));
+	_mb_get_cmdline(mi);
 	_mb_init_mem(mi);
 
 	uk_pr_info("    heap start: %p\n", _libkvmplat_heap_start);
