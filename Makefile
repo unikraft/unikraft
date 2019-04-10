@@ -464,7 +464,8 @@ ASFLAGS		+= -DCC_VERSION=$(CC_VERSION)
 CFLAGS		+= -DCC_VERSION=$(CC_VERSION)
 CXXFLAGS	+= -DCC_VERSION=$(CC_VERSION)
 
-# ensure $(BUILD_DIR)/include and $(BUILD_DIR)/include/uk exists
+# ensure $(BUILD_DIR)/kconfig, $(BUILD_DIR)/include and $(BUILD_DIR)/include/uk exists
+$(call mk_sub_build_dir,kconfig)
 $(call mk_sub_build_dir,include)
 $(call mk_sub_build_dir,include/uk)
 
@@ -581,7 +582,6 @@ $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN): %: %.new
 	@cmp -s $^ $@; if [ $$? -ne 0 ]; then cp $^ $@; fi
 
 $(KCONFIG_APP_IN).new:
-	mkdir -p $(@D)
 	@echo '# external application' > $@
 ifneq ($(CONFIG_UK_BASE),$(CONFIG_UK_APP))
 	@echo 'source "$(APP_DIR)/Config.uk"' >> $@
@@ -591,7 +591,6 @@ endif
 
 # auto-generated KConfig files for including external libraries
 $(KCONFIG_ELIB_IN).new:
-	mkdir -p $(@D)
 	@echo '# external libraries' > $@
 	@$(foreach E,$(ELIB_DIR), \
 		echo 'source "$(E)/Config.uk"' >> $@; \
