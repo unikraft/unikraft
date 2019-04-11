@@ -42,7 +42,7 @@ statfs
 lstat
 openat
 opendir
-readir
+readdir
 pread
 pwrite
 pwritev
