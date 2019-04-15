@@ -38,7 +38,7 @@
 #include <stddef.h>
 #include <uk/list.h>
 #include <uk/alloc.h>
-#include <uk/plat/ctors.h>
+#include <uk/ctors.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -116,12 +116,17 @@ static inline unsigned int uk_bus_probe_all(void)
 
 #define _UK_BUS_REGFNNAME(x, y)      x##y
 
+#define _UK_BUS_REGISTER_CTOR(CTOR)  \
+	UK_CTOR_FUNC(0, CTOR)
+
+
 #define _UK_BUS_REGISTER(libname, b)				\
-	static void __constructor_prio(102)			\
+	static void						\
 	_UK_BUS_REGFNNAME(libname, _uk_bus_register)(void)	\
 	{							\
 		_uk_bus_register((b));				\
-	}
+	}							\
+	_UK_BUS_REGISTER_CTOR(_UK_BUS_REGFNNAME(libname, _uk_bus_register))
 
 #ifdef __cplusplus
 }

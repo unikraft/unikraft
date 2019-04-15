@@ -47,6 +47,7 @@
 #include <vfscore/mount.h>
 #include <vfscore/fs.h>
 #include <uk/errptr.h>
+#include <uk/ctors.h>
 
 #ifdef DEBUG_VFS
 int	vfs_debug = VFSDB_FLAGS;
@@ -2040,7 +2041,7 @@ int chroot(const char *path __unused)
 }
 
 static struct task _main_task_impl;
-__constructor static void vfscore_init(void)
+static void vfscore_init(void)
 {
 	memset(&_main_task_impl, 0, sizeof(_main_task_impl));
 	strcpy(_main_task_impl.t_cwd, "/");
@@ -2049,3 +2050,5 @@ __constructor static void vfscore_init(void)
 	vnode_init();
 	lookup_init();
 }
+
+UK_CTOR_FUNC(1, vfscore_init);

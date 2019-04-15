@@ -40,6 +40,7 @@
 #include <vfscore/file.h>
 #include <uk/plat/lcpu.h>
 #include <errno.h>
+#include <uk/ctors.h>
 
 #define FDTABLE_MAX_FILES (sizeof(uint64_t) * 8)
 
@@ -175,7 +176,7 @@ exit:
 
 
 /* TODO: move this constructor to main.c */
-__constructor static void fdtable_init(void)
+static void fdtable_init(void)
 {
 	memset(&fdtable, 0, sizeof(fdtable));
 
@@ -183,3 +184,5 @@ __constructor static void fdtable_init(void)
 	fdtable.bitmap = 7;
 	init_stdio();
 }
+
+UK_CTOR_FUNC(1, fdtable_init);

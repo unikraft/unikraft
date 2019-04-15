@@ -36,18 +36,18 @@
 #include <uk/swrand.h>
 #include <uk/print.h>
 #include <uk/assert.h>
-#include <uk/plat/ctors.h>
+#include <uk/ctors.h>
 
 /* https://stackoverflow.com/questions/9492581/c-random-number-generation-pure-c-code-no-libraries-or-functions */
 #define PHI 0x9e3779b9
-#define UK_SWRAND_CTOR_PRIO    (200U)
+#define UK_SWRAND_CTOR_PRIO    (1)
 
 struct uk_swrand uk_swrand_def;
 
 /*
  * Declare the constructor function to initialize the swrand
  */
-static void _uk_swrand_ctor(void) __constructor_prio(UK_SWRAND_CTOR_PRIO);
+static void _uk_swrand_ctor(void);
 
 void uk_swrand_init_r(struct uk_swrand *r, __u32 seed)
 {
@@ -95,3 +95,5 @@ static void _uk_swrand_ctor(void)
 	uk_pr_info("Initialize random number generator...\n");
 	uk_swrand_init_r(&uk_swrand_def, CONFIG_LIBUKSWRAND_INITIALSEED);
 }
+
+UK_CTOR_FUNC(UK_SWRAND_CTOR_PRIO, _uk_swrand_ctor);

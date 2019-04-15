@@ -43,6 +43,7 @@
 #include <uk/alloc.h>
 #include <virtio/virtio_config.h>
 #include <virtio/virtqueue.h>
+#include <uk/ctors.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -307,17 +308,23 @@ static inline void virtio_dev_drv_up(struct virtio_dev *vdev)
 	virtio_dev_status_update(vdev, VIRTIO_CONFIG_STATUS_DRIVER_OK);
 }
 
-#define VIRTIO_BUS_REGISTER_DRIVER(b)			\
+#define VIRTIO_BUS_REGISTER_DRIVER(b)	\
 	_VIRTIO_BUS_REGISTER_DRIVER(__LIBNAME__, b)
 
 #define _VIRTIO_BUS_REGFNAME(x, y)       x##y
 
+#define _VIRTIO_REGISTER_CTOR(CTOR)	\
+	UK_CTOR_FUNC(1, CTOR)
+
 #define _VIRTIO_BUS_REGISTER_DRIVER(libname, b)				\
-	    static void __constructor_prio(104)				\
+	static void							\
 	_VIRTIO_BUS_REGFNAME(libname, _virtio_register_driver)(void)	\
 	{								\
 		_virtio_bus_register_driver((b));			\
-	}
+	}								\
+	_VIRTIO_REGISTER_CTOR(						\
+		_VIRTIO_BUS_REGFNAME(					\
+		libname, _virtio_register_driver))
 
 
 #ifdef __cplusplus

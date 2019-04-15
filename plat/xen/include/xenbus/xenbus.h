@@ -41,6 +41,7 @@
 #include <uk/wait.h>
 #include <xen/xen.h>
 #include <xen/io/xenbus.h>
+#include <uk/ctors.h>
 
 
 /*
@@ -75,12 +76,17 @@ UK_TAILQ_HEAD(xenbus_driver_list, struct xenbus_driver);
 
 #define _XENBUS_REGFNNAME(x, y)      x##y
 
-#define _XENBUS_REGISTER_DRIVER(libname, b) \
-	static void __constructor_prio(104) \
-	_XENBUS_REGFNNAME(libname, _xenbus_register_driver)(void) \
-	{ \
-		_xenbus_register_driver((b)); \
-	}
+#define _XENBUS_REGISTER_CTOR(CTOR)  \
+	UK_CTOR_FUNC(1, CTOR)
+
+#define _XENBUS_REGISTER_DRIVER(libname, b)				\
+	static void							\
+	_XENBUS_REGFNNAME(libname, _xenbus_register_driver)(void)	\
+	{								\
+		_xenbus_register_driver((b));				\
+	}								\
+	_XENBUS_REGISTER_CTOR(						\
+		_XENBUS_REGFNNAME(libname, _xenbus_register_driver))
 
 /* Do not use this function directly: */
 void _xenbus_register_driver(struct xenbus_driver *drv);

@@ -68,6 +68,7 @@
 
 #include <uk/bus.h>
 #include <uk/alloc.h>
+#include <uk/ctors.h>
 
 /**
  * A structure describing an ID for a PCI driver. Each driver provides a
@@ -159,12 +160,16 @@ struct pci_device {
 
 #define _PCI_REGFNNAME(x, y)      x##y
 
+#define PCI_REGISTER_CTOR(CTOR)				\
+		UK_CTOR_FUNC(1, CTOR)
+
 #define _PCI_REGISTER_DRIVER(libname, b)				\
-	static void __constructor_prio(103)				\
+	static void						\
 	_PCI_REGFNNAME(libname, _pci_register_driver)(void)		\
 	{								\
 		_pci_register_driver((b));				\
-	}
+	}								\
+	PCI_REGISTER_CTOR(_PCI_REGFNNAME(libname, _pci_register_driver))
 
 /* Do not use this function directly: */
 void _pci_register_driver(struct pci_driver *drv);
