@@ -46,12 +46,6 @@ extern "C" {
 
 struct vfscore_file;
 
-struct vfscore_fops {
-	int (*close)(struct vfscore_file *);
-	ssize_t (*write)(struct vfscore_file *, const void *, size_t);
-	ssize_t (*read)(struct vfscore_file *, void *, size_t);
-};
-
 struct vfscore_file {
 	int fd;
 	int		f_flags;	/* open flags */
