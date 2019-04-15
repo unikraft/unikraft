@@ -56,6 +56,7 @@
 #include <uk/plat/time.h>
 #include <uk/essentials.h>
 #include <uk/print.h>
+#include <uk/ctors.h>
 #include <uk/argparse.h>
 #if CONFIG_LIBUKBUS
 #include <uk/bus.h>
@@ -78,6 +79,28 @@ static void main_thread_func(void *arg)
 	int i;
 	int ret;
 	struct thread_main_arg *tma = arg;
+
+	uk_pr_info("Pre-init table at %p - %p\n",
+		   __preinit_array_start, &__preinit_array_end);
+	ukplat_ctor_foreach(__preinit_array_start, __preinit_array_end, i) {
+		if (__preinit_array_start[i]) {
+			uk_pr_debug("Call pre-init constructor (entry %d (%p): %p())...\n",
+				    i, &__preinit_array_start[i],
+				    __preinit_array_start[i]);
+			__preinit_array_start[i]();
+		}
+	}
+
+	uk_pr_info("Constructor table at %p - %p\n",
+			__init_array_start, &__init_array_end);
+	ukplat_ctor_foreach(__init_array_start, __init_array_end, i) {
+		if (__init_array_start[i]) {
+			uk_pr_debug("Call constructor (entry %d (%p): %p())...\n",
+					i, &__init_array_start[i],
+					__init_array_start[i]);
+			__init_array_start[i]();
+		}
+	}
 
 #ifdef CONFIG_LIBUKBUS
 	uk_pr_info("Initialize bus handlers...\n");
@@ -141,6 +164,7 @@ void ukplat_entry_argp(char *arg0, char *argb, __sz argb_len)
 void ukplat_entry(int argc, char *argv[])
 {
 	int i;
+	const uk_ctor_func_t *cfn;
 	struct thread_main_arg tma;
 #if CONFIG_LIBUKALLOC
 	struct uk_alloc *a = NULL;
@@ -154,26 +178,10 @@ void ukplat_entry(int argc, char *argv[])
 	struct uk_thread *main_thread = NULL;
 #endif
 
-	uk_pr_info("Pre-init table at %p - %p\n",
-		   __preinit_array_start, &__preinit_array_end);
-	ukplat_ctor_foreach(__preinit_array_start, __preinit_array_end, i) {
-		if (__preinit_array_start[i]) {
-			uk_pr_debug("Call pre-init constructor (entry %d (%p): %p())...\n",
-				    i, &__preinit_array_start[i],
-				    __preinit_array_start[i]);
-			__preinit_array_start[i]();
-		}
-	}
-
-	uk_pr_info("Constructor table at %p - %p\n",
-		   __init_array_start, &__init_array_end);
-	ukplat_ctor_foreach(__init_array_start, __init_array_end, i) {
-		if (__init_array_start[i]) {
-			uk_pr_debug("Call constructor (entry %d (%p): %p())...\n",
-				    i, &__init_array_start[i],
-				    __init_array_start[i]);
-			__init_array_start[i]();
-		}
+	uk_pr_info("Unikraft constructors table at %p\n", uk_ctortab);
+	for (cfn = uk_ctortab; *cfn != NULL; ++cfn) {
+		uk_pr_debug("Call constructor %p\n", *cfn);
+		(*cfn)();
 	}
 
 #if CONFIG_LIBUKALLOC && CONFIG_LIBUKALLOCBBUDDY && CONFIG_LIBUKBOOT_INITALLOC
