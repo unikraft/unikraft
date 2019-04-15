@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Vlad-Andrei Badoiu <vlad_andrei.badoiu@stud.acs.upb.ro>
+ * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ *			Vlad-Andrei Badoiu <vlad_andrei.badoiu@stud.acs.upb.ro>
  *
- * Copyright (c) 2019, Politehnica University of Bucharest. All rights reserved.
+ *
+ * Copyright (c) 2019, NEC Europe Ltd., NEC Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,28 +34,35 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-. = ALIGN(0x1000);
-__eh_frame_start = .;
-.eh_frame :
-{
-	*(.eh_frame)
-	*(.eh_frame.*)
-}
-__eh_frame_end = .;
+#ifndef __UK_CTORS_H__
+#define __UK_CTORS_H__
 
-__eh_frame_hdr_start = .;
-.eh_frame_hdr :
-{
-	*(.eh_frame_hdr)
-	*(.eh_frame_hdr.*)
-}
-__eh_frame_hdr_end = .;
+#include <uk/essentials.h>
 
-. = ALIGN(0x1000);
-uk_ctortab = .;
-.uk_ctortab :
-{
-    *(SORT_BY_NAME(.uk_ctortab[0-7]))
-    LONG(0)
-}
+#ifdef __cplusplus
+extern "C" {
+#endif
 
+typedef void (*uk_ctor_func_t)(void);
+extern const uk_ctor_func_t uk_ctortab[];
+
+/*
+ * Register a constructor function that is
+ * called during bootstrap
+ * @param lvl
+ *   Priority level (0 (higher) to 7 (least))
+ *   Note: Any other value for level will be ignored
+ * @param ctorf
+ *   Constructor function to be called
+ */
+#define UK_CTOR_FUNC(lvl, ctorf) \
+		static const uk_ctor_func_t	\
+		__used __section(".uk_ctortab" #lvl)	\
+		__uk_ctab ## lvl ## _ ## ctorf = (ctorf)
+
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __UK__CTORS_H__ */

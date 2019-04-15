@@ -4,6 +4,8 @@ LINUXU_LDFLAGS-y += -Wl,-e,_liblinuxuplat_start
 ## Link image
 ##
 LINUXU_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_linuxu-$(CONFIG_UK_ARCH)
+LINUXU_LD_SCRIPT-$(CONFIG_ARCH_X86_64) += $(LIBLINUXUPLAT_BASE)/x86/link64.lds
+LINUXU_LD_SCRIPT-$(CONFIG_ARCH_ARM_32) += $(LIBLINUXUPLAT_BASE)/arm/link.lds
 LINUXU_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-T$(comma),\
 			    $(LINUXU_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y))
 

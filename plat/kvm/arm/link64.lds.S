@@ -99,6 +99,14 @@ SECTIONS {
 
 	_erodata = .;
 
+	. = ALIGN(__PAGE_SIZE);
+	uk_ctortab = .;
+	.uk_ctortab :
+	{
+		*(SORT_BY_NAME(.uk_ctortab[0-7]))
+		LONG(0)
+	}
+
 	/* Constructor tables (read-only) */
 	_ctors = .;
 	.preinit_array : {
