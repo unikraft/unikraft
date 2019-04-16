@@ -198,7 +198,7 @@ void _libxenplat_armentry(void *dtb_pointer, uint32_t physical_offset)
 	 * TODO: It probably makes sense to move this to the early
 	 * platform entry assembly code.
 	 */
-	memset(&__bss_start, 0, &_end - &__bss_start);
+	memset(__bss_start, 0, _end - __bss_start);
 
 	_init_dtb(dtb_pointer);
 	_dtb_init_mem(physical_offset); /* relocates dtb */
