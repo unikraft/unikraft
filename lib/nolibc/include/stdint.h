@@ -37,6 +37,7 @@
 #define __STDINT_H__
 
 #include <uk/arch/types.h>
+#include <uk/arch/limits.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -54,6 +55,30 @@ typedef __u64 uint64_t;
 
 typedef __uptr uintptr_t;
 typedef __sptr intptr_t;
+
+#define INT8_MIN     __S8_MIN
+#define INT8_MAX     __S8_MAX
+#define UINT8_MAX    __U8_MAX
+
+#define INT16_MIN   __S16_MIN
+#define INT16_MAX   __S16_MAX
+#define UINT16_MAX  __U16_MAX
+
+#define INT32_MIN   __S32_MIN
+#define INT32_MAX   __S32_MAX
+#define UINT32_MAX  __U32_MAX
+
+#define INT64_MIN   __S64_MIN
+#define INT64_MAX   __S64_MAX
+#define UINT64_MAX  __U64_MAX
+
+#define SSIZE_MIN   __SSZ_MIN
+#define SSIZE_MAX   __SSZ_MAX
+#define SIZE_MAX     __SZ_MAX
+
+#define INTMAX_MIN   __LL_MIN
+#define INTMAX_MAX   __LL_MAX
+#define UINTMAX_MAX __ULL_MAX
 
 #ifdef __cplusplus
 }
