@@ -68,6 +68,9 @@ char *strtok(char *restrict s, const char *restrict sep);
 char *strndup(const char *str, size_t len);
 char *strdup(const char *str);
 
+char *strerror_r(int errnum, char *buf, size_t buflen);
+char *strerror(int errnum);
+
 #ifdef __cplusplus
 }
 #endif

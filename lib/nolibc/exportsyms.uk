@@ -69,6 +69,8 @@ strndup
 strdup
 strlcpy
 strlcat
+strerror_r
+strerror
 
 # time
 nanosleep
