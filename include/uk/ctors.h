@@ -55,11 +55,11 @@ extern const uk_ctor_func_t uk_ctortab[];
  * @param ctorf
  *   Constructor function to be called
  */
-#define UK_CTOR_FUNC(lvl, ctorf) \
+#define __UK_CTOR_FUNC(lvl, ctorf) \
 		static const uk_ctor_func_t	\
 		__used __section(".uk_ctortab" #lvl)	\
 		__uk_ctab ## lvl ## _ ## ctorf = (ctorf)
-
+#define UK_CTOR_FUNC(lvl, ctorf) __UK_CTOR_FUNC(lvl, ctorf)
 
 #ifdef __cplusplus
 }
