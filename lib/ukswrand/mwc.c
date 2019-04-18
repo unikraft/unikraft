@@ -40,7 +40,7 @@
 
 /* https://stackoverflow.com/questions/9492581/c-random-number-generation-pure-c-code-no-libraries-or-functions */
 #define PHI 0x9e3779b9
-#define UK_SWRAND_CTOR_PRIO    (1)
+#define UK_SWRAND_CTOR_PRIO    1
 
 struct uk_swrand uk_swrand_def;
 
