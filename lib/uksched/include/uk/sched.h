@@ -130,7 +130,6 @@ static inline int uk_sched_thread_remove(struct uk_sched *s,
 	UK_ASSERT(t);
 	UK_ASSERT(t->sched == s);
 	s->thread_remove(s, t);
-	t->sched = NULL;
 	return 0;
 }
 
