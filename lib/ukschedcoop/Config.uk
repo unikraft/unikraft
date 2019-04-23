@@ -1,4 +1,4 @@
 config LIBUKSCHEDCOOP
 	bool "ukschedcoop: Cooperative Round-Robin scheduler"
-	default n
-	select LIBUKSCHED
+	default y
+	depends on LIBUKSCHED
