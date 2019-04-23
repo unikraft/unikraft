@@ -312,8 +312,10 @@ static void _destroy_event_handler(struct uk_netdev_event_handler *h
 #ifdef CONFIG_LIBUKNETDEV_DISPATCHERTHREADS
 	UK_ASSERT(h->dispatcher_s);
 
-	if (h->dispatcher)
-		uk_sched_thread_destroy(h->dispatcher_s, h->dispatcher);
+	if (h->dispatcher) {
+		uk_thread_kill(h->dispatcher);
+		uk_thread_wait(h->dispatcher);
+	}
 	h->dispatcher = NULL;
 
 	if (h->dispatcher_name)
