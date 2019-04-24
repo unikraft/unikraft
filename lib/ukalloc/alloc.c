@@ -47,7 +47,7 @@
 
 #include <errno.h>
 #include <string.h>
-#include <uk/alloc.h>
+#include <uk/alloc_impl.h>
 #include <uk/config.h>
 #include <uk/essentials.h>
 #include <uk/assert.h>

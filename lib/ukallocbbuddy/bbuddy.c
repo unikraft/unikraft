@@ -42,6 +42,7 @@
 #include <errno.h>
 
 #include <uk/allocbbuddy.h>
+#include <uk/alloc_impl.h>
 #include <uk/arch/limits.h>
 #include <uk/print.h>
 #include <uk/assert.h>

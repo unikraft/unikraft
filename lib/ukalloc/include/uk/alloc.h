@@ -50,7 +50,6 @@ struct uk_alloc;
 extern "C" {
 #endif
 
-int uk_alloc_register(struct uk_alloc *a);
 struct uk_alloc *uk_alloc_get_default(void);
 int uk_alloc_set_default(struct uk_alloc *a);
 
@@ -239,37 +238,6 @@ static inline ssize_t uk_alloc_availmem(struct uk_alloc *a)
 	return a->availmem(a);
 }
 #endif /* CONFIG_LIBUKALLOC_IFSTATS */
-
-#if CONFIG_LIBUKALLOC_IFPAGES
-/* uses palloc(), pfree() */
-void *uk_malloc_ifpages(struct uk_alloc *a, size_t size);
-void *uk_realloc_ifpages(struct uk_alloc *a, void *ptr, size_t size);
-int uk_posix_memalign_ifpages(struct uk_alloc *a, void **memptr,
-				size_t align, size_t size);
-void *uk_memalign_ifpages(struct uk_alloc *a, size_t align, size_t size);
-void uk_free_ifpages(struct uk_alloc *a, void *ptr);
-#endif
-
-/* generic, use malloc() */
-void *uk_calloc_compat(struct uk_alloc *a, size_t num, size_t len);
-void *uk_memalign_compat(struct uk_alloc *a, size_t align, size_t len);
-
-#if CONFIG_LIBUKALLOC_IFPAGES
-#define uk_alloc_init_palloc(a, palloc_func, pfree_func, addmem_func)	\
-	do {								\
-		(a)->malloc         = uk_malloc_ifpages;		\
-		(a)->calloc         = uk_calloc_compat;			\
-		(a)->realloc        = uk_realloc_ifpages;		\
-		(a)->posix_memalign = uk_posix_memalign_ifpages;	\
-		(a)->memalign       = uk_memalign_compat;		\
-		(a)->free           = uk_free_ifpages;			\
-		(a)->palloc         = (palloc_func);			\
-		(a)->pfree          = (pfree_func);			\
-		(a)->addmem         = (addmem_func);			\
-									\
-		uk_alloc_register((a));					\
-	} while (0)
-#endif
 
 #ifdef __cplusplus
 }
