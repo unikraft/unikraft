@@ -1,9 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (C) 2013 Cloudius Systems, Ltd.
- * Copyright (c) 2019, NEC Europe Ltd., NEC Corporation.
+ * Authors: Vlad-Andrei Badoiu <vlad_andrei.badoiu@stud.acs.upb.ro>
  *
- * All rights reserved.
+ * Copyright (c) 2019, NEC Europe Ltd., NEC Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,19 +32,20 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#ifndef _UK_PREX_H
-#define _UK_PREX_H 1
+#ifndef __UK_PAGE_H__
+#define __UK_PAGE_H__
 
+#include <uk/essentials.h>
 
-#include <unistd.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#define	BSIZE	512		/* size of secondary block (bytes) */
+#define round_pgup(a)   ALIGN_UP((a), __PAGE_SIZE)
+#define round_pgdown(a) ALIGN_DOWN((a), __PAGE_SIZE)
 
-#define DO_RDWR		0x2
+#ifdef __cplusplus
+}
+#endif
 
-size_t strlcat(char *dst, const char *src, size_t siz);
-size_t strlcpy(char *dst, const char *src, size_t siz);
-
-void sys_panic(const char *);
-
-#endif /* _UK_PREX_H */
+#endif /* __UK_PAGE_H__ */

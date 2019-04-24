@@ -44,7 +44,7 @@
 #include <string.h>
 #include <stdlib.h>
 
-#include <vfscore/prex.h>
+#include <uk/page.h>
 #include <vfscore/vnode.h>
 #include <vfscore/mount.h>
 #include <vfscore/uio.h>
@@ -354,7 +354,7 @@ ramfs_truncate(struct vnode *vp, off_t length)
 		}
 	} else if ((size_t) length > np->rn_bufsize) {
 		/* TODO: this could use a page level allocator */
-		new_size = round_page(length);
+		new_size = round_pgup(length);
 		new_buf = malloc(new_size);
 		if (!new_buf)
 			return EIO;
@@ -469,7 +469,7 @@ ramfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 
 		if (end_pos > (off_t) np->rn_bufsize) {
 			// XXX: this could use a page level allocator
-			size_t new_size = round_page(end_pos);
+			size_t new_size = round_pgup(end_pos);
 			void *new_buf = malloc(new_size);
 
 			if (!new_buf)

@@ -45,6 +45,7 @@
 #include <uk/arch/limits.h>
 #include <uk/print.h>
 #include <uk/assert.h>
+#include <uk/page.h>
 
 typedef struct chunk_head_st chunk_head_t;
 typedef struct chunk_tail_st chunk_tail_t;
@@ -78,9 +79,6 @@ struct uk_bbpalloc {
 	chunk_head_t free_tail[FREELIST_SIZE];
 	struct uk_bbpalloc_memr *memr_head;
 };
-
-#define round_pgup(a)   ALIGN_UP((a), __PAGE_SIZE)
-#define round_pgdown(a) ALIGN_DOWN((a), __PAGE_SIZE)
 
 /*********************
  * ALLOCATION BITMAP
