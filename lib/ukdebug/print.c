@@ -179,7 +179,7 @@ static void _vprint(struct _vprint_console *cons,
 
 		nlptr = memchr(lptr, '\n', len);
 		if (nlptr) {
-			llen = (int)((uintptr_t)nlptr - (uintptr_t)lbuf) + 1;
+			llen = (int)((uintptr_t)nlptr - (uintptr_t)lptr) + 1;
 			cons->newline = 1;
 		} else {
 			llen = len;
