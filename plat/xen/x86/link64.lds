@@ -49,16 +49,16 @@ SECTIONS
 	. = ALIGN(4096);
 	_erodata = .;
 
+	. = ALIGN(0x8);
 	_ctors = .;
 	.preinit_array : {
-		. = ALIGN(0x8);
 		PROVIDE_HIDDEN (__preinit_array_start = .);
 		KEEP (*(.preinit_array))
 		PROVIDE_HIDDEN (__preinit_array_end = .);
 	}
 
+	. = ALIGN(0x8);
 	.init_array : {
-		. = ALIGN(0x8);
 		PROVIDE_HIDDEN (__init_array_start = .);
 		KEEP (*(SORT_BY_INIT_PRIORITY(.init_array.*) SORT_BY_INIT_PRIORITY(.ctors.*)))
 		KEEP (*(.init_array .ctors))
