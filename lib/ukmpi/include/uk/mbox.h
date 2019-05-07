@@ -56,6 +56,7 @@ void uk_mbox_post(struct uk_mbox *m, void *msg);
 int uk_mbox_post_try(struct uk_mbox *m, void *msg);
 __nsec uk_mbox_post_to(struct uk_mbox *m, void *msg, __nsec timeout);
 
+void uk_mbox_recv(struct uk_mbox *m, void **msg);
 int uk_mbox_recv_try(struct uk_mbox *m, void **msg);
 __nsec uk_mbox_recv_to(struct uk_mbox *m, void **msg, __nsec timeout);
 

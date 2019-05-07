@@ -127,6 +127,23 @@ static inline void *_do_mbox_recv(struct uk_mbox *m)
 	return ret;
 }
 
+/* Blocks the thread until a message arrives in the mailbox.
+ * The `*msg` argument will point to the received message.
+ * If the `msg` parameter was set to NULL, the received message is dropped.
+ */
+void uk_mbox_recv(struct uk_mbox *m, void **msg)
+{
+	void *rmsg;
+
+	UK_ASSERT(m);
+
+	uk_semaphore_down(&m->readsem);
+	rmsg =  _do_mbox_recv(m);
+	if (msg)
+		*msg = rmsg;
+}
+
+
 /* This is similar to uk_mbox_fetch, however if a message is not
  * present in the mailbox, it immediately returns with the code
  * SYS_MBOX_EMPTY. On success 0 is returned.
