@@ -163,7 +163,6 @@ void ukplat_entry_argp(char *arg0, char *argb, __sz argb_len)
 /* defined in <uk/plat.h> */
 void ukplat_entry(int argc, char *argv[])
 {
-	int i;
 	const uk_ctor_func_t *cfn;
 	struct thread_main_arg tma;
 #if CONFIG_LIBUKALLOC
@@ -188,50 +187,27 @@ void ukplat_entry(int argc, char *argv[])
 	/* initialize memory allocator
 	 * FIXME: ukallocbbuddy is hard-coded for now
 	 */
-	if (ukplat_memregion_count() > 0) {
-		uk_pr_info("Initialize memory allocator...\n");
-		for (i = 0; i < ukplat_memregion_count(); ++i) {
-			/* Check if memory region is usable for allocators */
-			if (ukplat_memregion_get(i, &md) < 0)
-				continue;
-
-			if ((md.flags & UKPLAT_MEMRF_ALLOCATABLE)
-			    != UKPLAT_MEMRF_ALLOCATABLE) {
+	uk_pr_info("Initialize memory allocator...\n");
+	ukplat_memregion_foreach(&md, UKPLAT_MEMRF_ALLOCATABLE) {
 #if CONFIG_UKPLAT_MEMRNAME
-				uk_pr_debug("Skip memory region %d: %p - %p (flags: 0x%02x, name: %s)\n",
-					    i, md.base, (void *)((size_t)md.base
-								 + md.len),
-					    md.flags, md.name);
+		uk_pr_debug("Try memory region: %p - %p (flags: 0x%02x, name: %s)...\n",
+			    md.base, (void *)((size_t)md.base + md.len),
+			    md.flags, md.name);
 #else
-				uk_pr_debug("Skip memory region %d: %p - %p (flags: 0x%02x)\n",
-					    i, md.base, (void *)((size_t)md.base
-								 + md.len),
-					    md.flags);
+		uk_pr_debug("Try memory region: %p - %p (flags: 0x%02x)...\n",
+			    md.base, (void *)((size_t)md.base + md.len),
+			    md.flags);
 #endif
-				continue;
-			}
 
-#if CONFIG_UKPLAT_MEMRNAME
-			uk_pr_debug("Try  memory region %d: %p - %p (flags: 0x%02x, name: %s)...\n",
-				    i, md.base, (void *)((size_t)md.base
-							 + md.len),
-				    md.flags, md.name);
-#else
-			uk_pr_debug("Try  memory region %d: %p - %p (flags: 0x%02x)...\n",
-				    i, md.base, (void *)((size_t)md.base
-							 + md.len),
-				    md.flags);
-#endif
-			/* try to use memory region to initialize allocator
-			 * if it fails, we will try  again with the next region.
-			 * As soon we have an allocator, we simply add every
-			 * subsequent region to it
-			 */
-			if (unlikely(!a))
-				a = uk_allocbbuddy_init(md.base, md.len);
-			else
-				uk_alloc_addmem(a, md.base, md.len);
-		}
+		/* try to use memory region to initialize allocator
+		 * if it fails, we will try  again with the next region.
+		 * As soon we have an allocator, we simply add every
+		 * subsequent region to it
+		 */
+		if (unlikely(!a))
+			a = uk_allocbbuddy_init(md.base, md.len);
+		else
+			uk_alloc_addmem(a, md.base, md.len);
 	}
 	if (unlikely(!a))
 		uk_pr_warn("No suitable memory region for memory allocator. Continue without heap\n");
