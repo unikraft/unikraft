@@ -50,6 +50,9 @@ struct kvmplat_config_memregion {
 struct kvmplat_config {
 	struct kvmplat_config_memregion heap;
 	struct kvmplat_config_memregion bstack;
+	struct kvmplat_config_memregion initrd;
+	/* `heap2` potentially exists only if `heap` exists */
+	struct kvmplat_config_memregion heap2;
 
 #ifdef CONFIG_ARCH_ARM_64
 	struct kvmplat_config_memregion pagetable;
