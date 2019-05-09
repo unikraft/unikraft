@@ -79,6 +79,55 @@ int ukplat_memregion_count(void);
 int ukplat_memregion_get(int i, struct ukplat_memregion_desc *mrd);
 
 /**
+ * Searches for the next memory region after `i` that has at least `sflags`
+ * flags set.
+ * @param i Memory region number to start searching
+ *        To start searching from the beginning, set `i` to `-1`
+ * @param sflags Find only memory regions that have at least `sflags` flags set.
+ *        If no flags are given (`0x0`), any found region is returned
+ * @Param mrd Pointer to memory region descriptor that will be filled out
+ * @return On success the function returns the next region number after `i`
+ *         that fulfills `sflags`. `mrd` is filled out with the memory region
+ *         details. A value < 0 is returned if no more region could be found
+ *         that fulfills the search criteria. `mrd` may be filled out with
+ *         undefined values.
+ */
+static inline int ukplat_memregion_find_next(int i, int sflags,
+					     struct ukplat_memregion_desc *mrd)
+{
+	int rc, count;
+
+	count = ukplat_memregion_count();
+
+	if (i >= count)
+		return -1;
+
+	do
+		rc = ukplat_memregion_get(++i, mrd);
+	while (i < count && (rc < 0 || ((mrd->flags & sflags) != sflags)));
+
+	if (i == count)
+		return -1;
+	return i;
+}
+
+/**
+ * Iterates over all memory regions that have at least `sflags` flags set.
+ * @param mrd Pointer to memory region descriptor that will be filled out
+ *        during iteration
+ * @param sflags Iterate only over memory regions that have at least `sflags`
+ *        flags set. If no flags are given (`0x0`), every existing region is
+ *        iterated.
+ */
+#define ukplat_memregion_foreach(mrd, sflags)				\
+	for (int __ukplat_memregion_foreach_i				\
+		     = ukplat_memregion_find_next(-1, (sflags), (mrd));	\
+	     __ukplat_memregion_foreach_i >= 0;				\
+	     __ukplat_memregion_foreach_i				\
+		     = ukplat_memregion_find_next(__ukplat_memregion_foreach_i,\
+						  (sflags), (mrd)))
+
+/**
  * Sets the platform memory allocator and triggers the platform memory mappings
  * for which an allocator is needed.
  * @param a Memory allocator
