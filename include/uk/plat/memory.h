@@ -45,14 +45,20 @@ extern "C" {
 #endif
 
 /* Memory region flags */
-#define UKPLAT_MEMRF_FREE        (0x1)
-#define UKPLAT_MEMRF_RESERVED    (0x2)
-#define UKPLAT_MEMRF_READABLE    (0x4)
-#define UKPLAT_MEMRF_WRITABLE    (0x8)
+#define UKPLAT_MEMRF_FREE	(0x1)	/* Region with uninitialized memory */
+#define UKPLAT_MEMRF_RESERVED	(0x2)	/* Region is in use by platform */
+#define UKPLAT_MEMRF_EXTRADATA	(0x4)	/* Contains additional loaded data
+					 * (e.g., initramdisk)
+					 */
+#define UKPLAT_MEMRF_READABLE	(0x10)	/* Region is readable */
+#define UKPLAT_MEMRF_WRITABLE	(0x20)	/* Region is writable */
 
 #define UKPLAT_MEMRF_ALLOCATABLE (UKPLAT_MEMRF_FREE \
 				  | UKPLAT_MEMRF_READABLE \
 				  | UKPLAT_MEMRF_WRITABLE)
+
+#define UKPLAT_MEMRF_INITRD      (UKPLAT_MEMRF_EXTRADATA \
+				  | UKPLAT_MEMRF_READABLE)
 
 /* Descriptor of a memory region */
 struct ukplat_memregion_desc {
