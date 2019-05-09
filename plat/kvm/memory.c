@@ -27,7 +27,9 @@
 
 int ukplat_memregion_count(void)
 {
-	return 9;
+	return (9
+		+ ((_libkvmplat_cfg.initrd.len > 0) ? 1 : 0)
+		+ ((_libkvmplat_cfg.heap2.len  > 0) ? 1 : 0));
 }
 
 int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
@@ -131,6 +133,33 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->name  = "bstack";
 #endif
 		break;
+	case 9: /* initrd */
+		if (_libkvmplat_cfg.initrd.len) {
+			m->base  = (void *) _libkvmplat_cfg.initrd.start;
+			m->len   = _libkvmplat_cfg.initrd.len;
+			m->flags = (UKPLAT_MEMRF_INITRD |
+				    UKPLAT_MEMRF_WRITABLE);
+#if CONFIG_UKPLAT_MEMRNAME
+			m->name  = "initrd";
+#endif
+			ret = 0;
+			break;
+		}
+		/* fall-through */
+	case 10: /* heap2
+		 *  NOTE: heap2 could only exist if initrd was there,
+		 *  otherwise we fall through */
+		if (_libkvmplat_cfg.initrd.len && _libkvmplat_cfg.heap2.len) {
+			m->base  = (void *) _libkvmplat_cfg.heap2.start;
+			m->len   = _libkvmplat_cfg.heap2.len;
+			m->flags = UKPLAT_MEMRF_ALLOCATABLE;
+#if CONFIG_UKPLAT_MEMRNAME
+			m->name  = "heap";
+#endif
+			ret = 0;
+			break;
+		}
+		/* fall-through */
 	default:
 		m->base  = __NULL;
 		m->len   = 0;

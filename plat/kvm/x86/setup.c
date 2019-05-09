@@ -115,6 +115,142 @@ static inline void _mb_init_mem(struct multiboot_info *mi)
 	_libkvmplat_cfg.bstack.len   = __STACK_SIZE;
 }
 
+static inline void _mb_init_initrd(struct multiboot_info *mi)
+{
+	multiboot_module_t *mod1;
+	uintptr_t heap0_start, heap0_end;
+	uintptr_t heap1_start, heap1_end;
+	size_t    heap0_len,   heap1_len;
+
+	/*
+	 * Search for initrd (called boot module according multiboot)
+	 */
+	if (mi->mods_count == 0) {
+		uk_pr_debug("No initrd present\n");
+		goto no_initrd;
+	}
+
+	/*
+	 * NOTE: We are only taking the first boot module as initrd.
+	 *       Initrd arguments and further modules are ignored.
+	 */
+	UK_ASSERT(mi->mods_addr);
+
+	mod1 = (multiboot_module_t *)((uintptr_t) mi->mods_addr);
+	UK_ASSERT(mod1->mod_end >= mod1->mod_start);
+
+	if (mod1->mod_end == mod1->mod_start) {
+		uk_pr_debug("Ignoring empty initrd\n");
+		goto no_initrd;
+	}
+
+	_libkvmplat_cfg.initrd.start = (uintptr_t) mod1->mod_start;
+	_libkvmplat_cfg.initrd.end = (uintptr_t) mod1->mod_end;
+	_libkvmplat_cfg.initrd.len = (size_t) (mod1->mod_end - mod1->mod_start);
+
+	/*
+	 * Check if initrd is part of heap
+	 * In such a case, we figure out the remaining pieces as heap
+	 */
+	if (_libkvmplat_cfg.heap.len == 0) {
+		/* We do not have a heap */
+		goto out;
+	}
+	heap0_start = 0;
+	heap0_end   = 0;
+	heap1_start = 0;
+	heap1_end   = 0;
+	if (RANGE_OVERLAP(_libkvmplat_cfg.heap.start,
+			  _libkvmplat_cfg.heap.len,
+			  _libkvmplat_cfg.initrd.start,
+			  _libkvmplat_cfg.initrd.len)) {
+		if (IN_RANGE(_libkvmplat_cfg.initrd.start,
+			     _libkvmplat_cfg.heap.start,
+			     _libkvmplat_cfg.heap.len)) {
+			/* Start of initrd within heap range;
+			 * Use the prepending left piece as heap */
+			heap0_start = _libkvmplat_cfg.heap.start;
+			heap0_end   = ALIGN_DOWN(_libkvmplat_cfg.initrd.start,
+						 __PAGE_SIZE);
+		}
+		if (IN_RANGE(_libkvmplat_cfg.initrd.start,
+
+			     _libkvmplat_cfg.heap.start,
+			     _libkvmplat_cfg.heap.len)) {
+			/* End of initrd within heap range;
+			 * Use the remaining left piece as heap */
+			heap1_start = ALIGN_UP(_libkvmplat_cfg.initrd.end,
+					       __PAGE_SIZE);
+			heap1_end   = _libkvmplat_cfg.heap.end;
+		}
+	} else {
+		/* Initrd is not overlapping with heap */
+		heap0_start = _libkvmplat_cfg.heap.start;
+		heap0_end   = _libkvmplat_cfg.heap.end;
+	}
+	heap0_len = heap0_end - heap0_start;
+	heap1_len = heap1_end - heap1_start;
+
+	/*
+	 * Update heap regions
+	 * We make sure that in we start filling left heap pieces at
+	 * `_libkvmplat_cfg.heap`. Any additional piece will then be
+	 * placed to `_libkvmplat_cfg.heap2`.
+	 */
+	if (heap0_len == 0) {
+		/* Heap piece 0 is empty, use piece 1 as only */
+		if (heap1_len != 0) {
+			_libkvmplat_cfg.heap.start = heap1_start;
+			_libkvmplat_cfg.heap.end   = heap1_end;
+			_libkvmplat_cfg.heap.len   = heap1_len;
+		} else {
+			_libkvmplat_cfg.heap.start = 0;
+			_libkvmplat_cfg.heap.end   = 0;
+			_libkvmplat_cfg.heap.len   = 0;
+		}
+		 _libkvmplat_cfg.heap2.start = 0;
+		 _libkvmplat_cfg.heap2.end   = 0;
+		 _libkvmplat_cfg.heap2.len   = 0;
+	} else {
+		/* Heap piece 0 has memory */
+		_libkvmplat_cfg.heap.start = heap0_start;
+		_libkvmplat_cfg.heap.end   = heap0_end;
+		_libkvmplat_cfg.heap.len   = heap0_len;
+		if (heap1_len != 0) {
+			_libkvmplat_cfg.heap2.start = heap1_start;
+			_libkvmplat_cfg.heap2.end   = heap1_end;
+			_libkvmplat_cfg.heap2.len   = heap1_len;
+		} else {
+			_libkvmplat_cfg.heap2.start = 0;
+			_libkvmplat_cfg.heap2.end   = 0;
+			_libkvmplat_cfg.heap2.len   = 0;
+		}
+	}
+
+	/*
+	 * Double-check that initrd is not overlapping with previously allocated
+	 * boot stack. We crash in such a case because we assume that multiboot
+	 * places the initrd close to the beginning of the heap region. One need
+	 * to assign just more memory in order to avoid this crash.
+	 */
+	if (RANGE_OVERLAP(_libkvmplat_cfg.heap.start,
+			  _libkvmplat_cfg.heap.len,
+			  _libkvmplat_cfg.initrd.start,
+			  _libkvmplat_cfg.initrd.len))
+		UK_CRASH("Not enough space at end of memory for boot stack\n");
+out:
+	return;
+
+no_initrd:
+	_libkvmplat_cfg.initrd.start = 0;
+	_libkvmplat_cfg.initrd.end   = 0;
+	_libkvmplat_cfg.initrd.len   = 0;
+	_libkvmplat_cfg.heap2.start  = 0;
+	_libkvmplat_cfg.heap2.end    = 0;
+	_libkvmplat_cfg.heap2.len    = 0;
+	return;
+}
+
 static void _libkvmplat_entry2(void *arg __attribute__((unused)))
 {
 	ukplat_entry_argp(NULL, cmdline, sizeof(cmdline));
@@ -138,9 +274,16 @@ void _libkvmplat_entry(void *arg)
 	 */
 	_mb_get_cmdline(mi);
 	_mb_init_mem(mi);
+	_mb_init_initrd(mi);
 
+	if (_libkvmplat_cfg.initrd.len)
+		uk_pr_info("        initrd: %p\n",
+			   (void *) _libkvmplat_cfg.initrd.start);
 	uk_pr_info("    heap start: %p\n",
 		   (void *) _libkvmplat_cfg.heap.start);
+	if (_libkvmplat_cfg.heap2.len)
+		uk_pr_info(" heap start (2): %p\n",
+			   (void *) _libkvmplat_cfg.heap2.start);
 	uk_pr_info("     stack top: %p\n",
 		   (void *) _libkvmplat_cfg.bstack.start);
 
