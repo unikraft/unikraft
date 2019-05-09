@@ -23,13 +23,7 @@
 #include <sys/types.h>
 #include <uk/plat/memory.h>
 #include <uk/assert.h>
-
-/*
- * Provided by setup.c
- */
-extern void *_libkvmplat_heap_start;
-extern void *_libkvmplat_stack_top;
-extern void *_libkvmplat_mem_end;
+#include <kvm/config.h>
 
 int ukplat_memregion_count(void)
 {
@@ -118,9 +112,8 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		ret = 0;
 		break;
 	case 7: /* heap */
-		m->base  = _libkvmplat_heap_start;
-		m->len   = (size_t) _libkvmplat_stack_top
-			   - (size_t) _libkvmplat_heap_start;
+		m->base  = (void *) _libkvmplat_cfg.heap.start;
+		m->len   = _libkvmplat_cfg.heap.len;
 		m->flags = UKPLAT_MEMRF_ALLOCATABLE;
 #if CONFIG_UKPLAT_MEMRNAME
 		m->name  = "heap";
@@ -128,9 +121,8 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		ret = 0;
 		break;
 	case 8: /* stack */
-		m->base  = _libkvmplat_stack_top;
-		m->len   = (size_t) _libkvmplat_mem_end
-			   - (size_t) _libkvmplat_stack_top;
+		m->base  = (void *) _libkvmplat_cfg.bstack.start;
+		m->len   = _libkvmplat_cfg.bstack.len;
 		m->flags = (UKPLAT_MEMRF_RESERVED
 			    | UKPLAT_MEMRF_READABLE
 			    | UKPLAT_MEMRF_WRITABLE);

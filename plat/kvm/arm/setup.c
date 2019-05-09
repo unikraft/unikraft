@@ -21,16 +21,13 @@
 #include <libfdt.h>
 #include <sections.h>
 #include <kvm/console.h>
+#include <kvm/config.h>
 #include <uk/assert.h>
 #include <kvm-arm/mm.h>
 #include <arm/cpu.h>
 #include <uk/arch/limits.h>
 
-void *_libkvmplat_pagetable;
-void *_libkvmplat_heap_start;
-void *_libkvmplat_stack_top;
-void *_libkvmplat_mem_end;
-void *_libkvmplat_dtb;
+struct kvmplat_config _libkvmplat_cfg = { 0 };
 
 #define MAX_CMDLINE_SIZE 1024
 static char cmdline[MAX_CMDLINE_SIZE];
@@ -47,7 +44,7 @@ static void _init_dtb(void *dtb_pointer)
 	if ((ret = fdt_check_header(dtb_pointer)))
 		UK_CRASH("Invalid DTB: %s\n", fdt_strerror(ret));
 
-	_libkvmplat_dtb = dtb_pointer;
+	_libkvmplat_cfg.dtb = dtb_pointer;
 	uk_pr_info("Found device tree on: %p\n", dtb_pointer);
 }
 
@@ -60,17 +57,17 @@ static void _dtb_get_psci_method(void)
 	 * We just support PSCI-0.2 and PSCI-1.0, the PSCI-0.1 would not
 	 * be supported.
 	 */
-	fdtpsci = fdt_node_offset_by_compatible(_libkvmplat_dtb,
+	fdtpsci = fdt_node_offset_by_compatible(_libkvmplat_cfg.dtb,
 						-1, "arm,psci-1.0");
 	if (fdtpsci < 0)
-		fdtpsci = fdt_node_offset_by_compatible(_libkvmplat_dtb,
+		fdtpsci = fdt_node_offset_by_compatible(_libkvmplat_cfg.dtb,
 							-1, "arm,psci-0.2");
 	if (fdtpsci < 0) {
 		uk_pr_info("No PSCI conduit found in DTB\n");
 		goto enomethod;
 	}
 
-	fdtmethod = fdt_getprop(_libkvmplat_dtb, fdtpsci, "method", &len);
+	fdtmethod = fdt_getprop(_libkvmplat_cfg.dtb, fdtpsci, "method", &len);
 	if (!fdtmethod || (len <= 0)) {
 		uk_pr_info("No PSCI method found\n");
 		goto enomethod;
@@ -102,10 +99,10 @@ static void _init_dtb_mem(void)
 	uint64_t mem_base, mem_size, max_addr;
 
 	/* search for assigned VM memory in DTB */
-	if (fdt_num_mem_rsv(_libkvmplat_dtb) != 0)
+	if (fdt_num_mem_rsv(_libkvmplat_cfg.dtb) != 0)
 		uk_pr_warn("Reserved memory is not supported\n");
 
-	fdt_mem = fdt_node_offset_by_prop_value(_libkvmplat_dtb, -1,
+	fdt_mem = fdt_node_offset_by_prop_value(_libkvmplat_cfg.dtb, -1,
 						"device_type",
 						"memory", sizeof("memory"));
 	if (fdt_mem < 0) {
@@ -113,11 +110,11 @@ static void _init_dtb_mem(void)
 		return;
 	}
 
-	naddr = fdt_address_cells(_libkvmplat_dtb, fdt_mem);
+	naddr = fdt_address_cells(_libkvmplat_cfg.dtb, fdt_mem);
 	if (naddr < 0 || naddr >= FDT_MAX_NCELLS)
 		UK_CRASH("Could not find proper address cells!\n");
 
-	nsize = fdt_size_cells(_libkvmplat_dtb, fdt_mem);
+	nsize = fdt_size_cells(_libkvmplat_cfg.dtb, fdt_mem);
 	if (nsize < 0 || nsize >= FDT_MAX_NCELLS)
 		UK_CRASH("Could not find proper size cells!\n");
 
@@ -125,7 +122,7 @@ static void _init_dtb_mem(void)
 	 * QEMU will always provide us at least one bank of memory.
 	 * unikraft will use the first bank for the time-being.
 	 */
-	regs = fdt_getprop(_libkvmplat_dtb, fdt_mem, "reg", &prop_len);
+	regs = fdt_getprop(_libkvmplat_cfg.dtb, fdt_mem, "reg", &prop_len);
 
 	/*
 	 * The property must contain at least the start address
@@ -145,12 +142,28 @@ static void _init_dtb_mem(void)
 		UK_CRASH("Fatal: Image outside of RAM\n");
 
 	max_addr = mem_base + mem_size;
-	_libkvmplat_pagetable = (void *) ALIGN_DOWN((size_t)__END, __PAGE_SIZE);
-	_libkvmplat_heap_start = _libkvmplat_pagetable + page_table_size;
-	_libkvmplat_mem_end = (void *) max_addr;
+	_libkvmplat_cfg.pagetable.start = ALIGN_DOWN((uintptr_t)__END,
+						     __PAGE_SIZE);
+	_libkvmplat_cfg.pagetable.len   = ALIGN_UP(page_table_size,
+						   __PAGE_SIZE);
+	_libkvmplat_cfg.pagetable.end   = _libkvmplat_cfg.pagetable.start
+					  + _libkvmplat_cfg.pagetable.len;
 
 	/* AArch64 require stack be 16-bytes alignment by default */
-	_libkvmplat_stack_top = (void *) ALIGN_UP(max_addr, __STACK_ALIGN_SIZE);
+	_libkvmplat_cfg.bstack.end   = ALIGN_DOWN(max_addr,
+						  __STACK_ALIGN_SIZE);
+	_libkvmplat_cfg.bstack.len   = ALIGN_UP(__STACK_SIZE,
+						__STACK_ALIGN_SIZE);
+	_libkvmplat_cfg.bstack.start = _libkvmplat_cfg.bstack.end
+				       - _libkvmplat_cfg.bstack.len;
+
+	_libkvmplat_cfg.heap.start = _libkvmplat_cfg.pagetable.end;
+	_libkvmplat_cfg.heap.end   = _libkvmplat_cfg.bstack.start;
+	_libkvmplat_cfg.heap.len   = _libkvmplat_cfg.heap.end
+				     - _libkvmplat_cfg.heap.start;
+
+	if (_libkvmplat_cfg.heap.start > _libkvmplat_cfg.heap.end)
+		UK_CRASH("Not enough memory, giving up...\n");
 }
 
 static void _dtb_get_cmdline(char *cmdline, size_t maxlen)
@@ -159,10 +172,11 @@ static void _dtb_get_cmdline(char *cmdline, size_t maxlen)
 	const char *fdtcmdline;
 
 	/* TODO: Proper error handling */
-	fdtchosen = fdt_path_offset(_libkvmplat_dtb, "/chosen");
+	fdtchosen = fdt_path_offset(_libkvmplat_cfg.dtb, "/chosen");
 	if (!fdtchosen)
 		goto enocmdl;
-	fdtcmdline = fdt_getprop(_libkvmplat_dtb, fdtchosen, "bootargs", &len);
+	fdtcmdline = fdt_getprop(_libkvmplat_cfg.dtb, fdtchosen, "bootargs",
+				 &len);
 	if (!fdtcmdline || (len <= 0))
 		goto enocmdl;
 
@@ -200,16 +214,19 @@ void _libkvmplat_start(void *dtb_pointer)
 	/* Initialize memory from DTB */
 	_init_dtb_mem();
 
-	uk_pr_info("pagetable start: %p\n", _libkvmplat_pagetable);
-	uk_pr_info("     heap start: %p\n", _libkvmplat_heap_start);
-	uk_pr_info("      stack top: %p\n", _libkvmplat_stack_top);
+	uk_pr_info("pagetable start: %p\n",
+		   (void *) _libkvmplat_cfg.pagetable.start);
+	uk_pr_info("     heap start: %p\n",
+		   (void *) _libkvmplat_cfg.heap.start);
+	uk_pr_info("      stack top: %p\n",
+		   (void *) _libkvmplat_cfg.bstack.start);
 
 	/*
 	 * Switch away from the bootstrap stack as early as possible.
 	 */
 	uk_pr_info("Switch from bootstrap stack to stack @%p\n",
-		   _libkvmplat_stack_top);
+		   (void *) _libkvmplat_cfg.bstack.end);
 
-	_libkvmplat_newstack((uint64_t) _libkvmplat_stack_top,
+	_libkvmplat_newstack((uint64_t) _libkvmplat_cfg.bstack.end,
 				_libkvmplat_entry2, NULL);
 }

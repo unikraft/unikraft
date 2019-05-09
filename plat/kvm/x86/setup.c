@@ -30,6 +30,7 @@
 #include <sections.h>
 #include <x86/cpu.h>
 #include <x86/traps.h>
+#include <kvm/config.h>
 #include <kvm/console.h>
 #include <kvm/intctrl.h>
 #include <kvm-x86/multiboot.h>
@@ -46,12 +47,10 @@
 #define MAX_CMDLINE_SIZE 8192
 static char cmdline[MAX_CMDLINE_SIZE];
 
-void *_libkvmplat_heap_start;
-void *_libkvmplat_stack_top;
-void *_libkvmplat_mem_end;
+struct kvmplat_config _libkvmplat_cfg = { 0 };
 
-extern void _libkvmplat_newstack(__u64 stack_start, void (*tramp)(void *),
-				void *arg);
+extern void _libkvmplat_newstack(uintptr_t stack_start, void (*tramp)(void *),
+				 void *arg);
 
 static inline void _mb_get_cmdline(struct multiboot_info *mi)
 {
@@ -99,11 +98,21 @@ static inline void _mb_init_mem(struct multiboot_info *mi)
 	max_addr = m->addr + m->len;
 	if (max_addr > PLATFORM_MAX_MEM_ADDR)
 		max_addr = PLATFORM_MAX_MEM_ADDR;
-	UK_ASSERT((size_t)__END <= max_addr);
+	UK_ASSERT((size_t) __END <= max_addr);
 
-	_libkvmplat_heap_start = (void *) ALIGN_UP((size_t)__END, __PAGE_SIZE);
-	_libkvmplat_mem_end    = (void *) max_addr;
-	_libkvmplat_stack_top  = (void *) (max_addr - __STACK_SIZE);
+	/*
+	 * Reserve space for boot stack at the end of found memory
+	 */
+	if ((max_addr - m->addr) < __STACK_SIZE)
+		UK_CRASH("Not enough memory to allocate boot stack\n");
+
+	_libkvmplat_cfg.heap.start = ALIGN_UP((uintptr_t) __END, __PAGE_SIZE);
+	_libkvmplat_cfg.heap.end   = (uintptr_t) max_addr - __STACK_SIZE;
+	_libkvmplat_cfg.heap.len   = _libkvmplat_cfg.heap.end
+				     - _libkvmplat_cfg.heap.start;
+	_libkvmplat_cfg.bstack.start = _libkvmplat_cfg.heap.end;
+	_libkvmplat_cfg.bstack.end   = max_addr;
+	_libkvmplat_cfg.bstack.len   = __STACK_SIZE;
 }
 
 static void _libkvmplat_entry2(void *arg __attribute__((unused)))
@@ -130,14 +139,16 @@ void _libkvmplat_entry(void *arg)
 	_mb_get_cmdline(mi);
 	_mb_init_mem(mi);
 
-	uk_pr_info("    heap start: %p\n", _libkvmplat_heap_start);
-	uk_pr_info("     stack top: %p\n", _libkvmplat_stack_top);
+	uk_pr_info("    heap start: %p\n",
+		   (void *) _libkvmplat_cfg.heap.start);
+	uk_pr_info("     stack top: %p\n",
+		   (void *) _libkvmplat_cfg.bstack.start);
 
 	/*
 	 * Switch away from the bootstrap stack as early as possible.
 	 */
 	uk_pr_info("Switch from bootstrap stack to stack @%p\n",
-		   _libkvmplat_mem_end);
-	_libkvmplat_newstack((__u64) _libkvmplat_mem_end,
-				_libkvmplat_entry2, 0);
+		   (void *) _libkvmplat_cfg.bstack.end);
+	_libkvmplat_newstack(_libkvmplat_cfg.bstack.end,
+			     _libkvmplat_entry2, 0);
 }

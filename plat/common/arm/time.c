@@ -39,9 +39,13 @@
 #include <uk/bitops.h>
 #include <cpu.h>
 
+/* TODO: For now this file is KVM dependent. As soon as we have more
+ * Arm platforms that are using this file, we need to introduce a
+ * portable way to handover the DTB entry point to common platform code */
+#include <kvm/config.h>
+
 static uint64_t boot_ticks;
 static uint32_t counter_freq;
-extern void *_libkvmplat_dtb;
 
 /*
  * Shift factor for counter scaling multiplier; referred to as S in the
@@ -73,17 +77,18 @@ static uint32_t get_counter_frequency(void)
 	const uint64_t *fdt_freq;
 
 	/* Try to find arm,armv8-timer first */
-	fdt_archtimer = fdt_node_offset_by_compatible(_libkvmplat_dtb,
+	fdt_archtimer = fdt_node_offset_by_compatible(_libkvmplat_cfg.dtb,
 						-1, "arm,armv8-timer");
 	/* If failed, try to find arm,armv7-timer */
 	if (fdt_archtimer < 0)
-		fdt_archtimer = fdt_node_offset_by_compatible(_libkvmplat_dtb,
+		fdt_archtimer = fdt_node_offset_by_compatible(
+							_libkvmplat_cfg.dtb,
 							-1, "arm,armv7-timer");
 	/* DT doesn't provide arch timer information */
 	if (fdt_archtimer < 0)
 		goto endnofreq;
 
-	fdt_freq = fdt_getprop(_libkvmplat_dtb,
+	fdt_freq = fdt_getprop(_libkvmplat_cfg.dtb,
 			fdt_archtimer, "clock-frequency", &len);
 	if (!fdt_freq || (len <= 0)) {
 		uk_pr_info("No clock-frequency found, reading from register directly.\n");
