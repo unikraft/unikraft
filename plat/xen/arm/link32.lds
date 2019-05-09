@@ -81,7 +81,7 @@ SECTIONS
 	uk_ctortab = .;
 	.uk_ctortab :
 	{
-		*(SORT_BY_NAME(.uk_ctortab[0-7]))
+		KEEP(*(SORT_BY_NAME(.uk_ctortab[0-7])))
 		LONG(0)
 	}
 	. = ALIGN(4096);
