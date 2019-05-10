@@ -454,6 +454,25 @@ endef
 
 #################################################
 #
+# Pre-process rules
+#
+#################################################
+# Generates a pre-process rule for a source file of a library
+# Adds library-specific (M4)FLAGS to the rule
+#
+# preprule_* $libname,$source,$preptarget,$extraflags(optional)
+
+# wrapper for preprule_*,
+# selects appropriate pre-process rule depending on file extension
+#
+# preprule $libname,$source,$preptarget,$extraflags(optional)
+define preprule =
+$(error $(3): missing pre-processing rule for source type $(suffix $(2)))
+endef
+
+
+#################################################
+#
 # Buildrules for libraries
 #
 #################################################
@@ -487,17 +506,52 @@ $(eval $(call buildrule,$(1),$(2),$(target),\
 ))
 endef
 
+# Calls the pre-process rule wrapper with translated source and target filename
+# Additional pre-processing flags & includes defined in the scope for the source
+# file (and variant) scope are appended. A corresponding buildrule is also
+# installed for the processed file.
+# Please note that global and library-wide pre-process flags & includes are
+# added by the particular preprule because this depends on the source type
+#
+# preprule_libobj $libname,$source,$preptarget,$variant(optional)
+define preprule_libobj =
+$(eval $(call preprule,$(1),$(2),$(3),\
+  $($(call vprefix_src,$(1),$(2),PREPINCLUDES))\
+  $($(call vprefix_src,$(1),$(2),PREPINCLUDES-y))\
+  $($(call vprefix_src,$(1),$(2),PREPFLAGS))\
+  $($(call vprefix_src,$(1),$(2),PREPFLAGS-y))\
+  $(if $(4),\
+   $($(call vprefix_srcv,$(1),$(2),$(4),PREPINCLUDES))\
+   $($(call vprefix_srcv,$(1),$(2),$(4),PREPINCLUDES-y))\
+   $($(call vprefix_srcv,$(1),$(2),$(4),PREPFLAGS))\
+   $($(call vprefix_srcv,$(1),$(2),$(4),PREPFLAGS-y))\
+  ,)\
+))
+
+$(eval $(call buildrule_libobj,$(1),$(3),$(4)))
+endef
+
+# Parses a pre-process definition (chains are not supported yet)
+# for a single source word (see docs)
+# buildrule_libobj_preproc $libname,$source_definition,$variant(optional)
+define buildrule_libobj_preproc =
+$(if $(wordlist 2,$(words $(subst >, ,$(2))),$(subst >, ,$(2))),\
+  $(eval $(call preprule_libobj,$(1),$(word 1,$(subst >, ,$(2))),$(call src2dst,$(1),$(word 1,$(subst >, ,$(2))),$(word 2,$(subst >, ,$(2))),$(3)),$(3))),\
+ $(eval $(call buildrule_libobj,$(1),$(2),$(3)))\
+)
+endef
+
 # Parses a multitarget definition for a single source word
 # (see docs) and iterates over all variants
-# It calls buildrule_libobj for each variant
+# It calls buildrule_libobj_preproc for each variant
 #
 # buildrule_libobj_multitarget $libname,$source_definition
 define buildrule_libobj_multitarget =
 $(if $(wordlist 2,$(words $(subst |, ,$(2))),$(subst |, ,$(2))),\
  $(foreach V,$(wordlist 2,$(words $(subst |, ,$(2))),$(subst |, ,$(2))),\
-  $(eval $(call buildrule_libobj,$(1),$(word 1,$(subst |, ,$(2))),$(V)))\
+  $(eval $(call buildrule_libobj_preproc,$(1),$(word 1,$(subst |, ,$(2))),$(V)))\
  ),\
- $(eval $(call buildrule_libobj,$(1),$(2),))\
+ $(eval $(call buildrule_libobj_preproc,$(1),$(2),))\
 )
 endef
 
