@@ -61,13 +61,19 @@ libname2olib = $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(1)))
 
 libname2preolib = $(addprefix $(BUILD_DIR)/,$(addsuffix .ld.o,$(1)))
 
+# converts a list of sources to paths pointing to their corresponding destination files
+# src2dst $libname,$source(s),$destsuffix,$variant(optional)
+define src2dst =
+$(if $(4),\
+$(addprefix $(call sub_build_dir,$(1))/,$(addsuffix .$(4)$(3),$(basename $(notdir $(2))))),\
+$(addprefix $(call sub_build_dir,$(1))/,$(addsuffix $(3),$(basename $(notdir $(2)))))\
+)
+endef
+
 # converts a list of sources to paths pointing to their corresponding object file
 # src2obj $libname,$source(s),$variant(optional)
 define src2obj =
-$(if $(3),\
-$(addprefix $(call sub_build_dir,$(1))/,$(addsuffix .$(3).o,$(basename $(notdir $(2))))),\
-$(addprefix $(call sub_build_dir,$(1))/,$(addsuffix .o,$(basename $(notdir $(2)))))\
-)
+$(call src2dst,$(1),$(2),.o,$(3))
 endef
 
 # converts a list of output file (object files or linker scripts) paths
