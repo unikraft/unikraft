@@ -250,6 +250,13 @@ extern "C" {
 #endif
 #endif /* !__containerof */
 
+#ifndef UK_CTASSERT
+#define UK_CTASSERT(x)             _UK_CTASSERT(x, __LINE__)
+#define _UK_CTASSERT(x, y)         __UK_CTASSERT(x, y)
+#define __UK_CTASSERT(x, y)        typedef __maybe_unused \
+	char __assert_ ## y [(x) ? 1 : -1]
+#endif /* UK_CTASSERT */
+
 #ifdef __cplusplus
 }
 #endif
