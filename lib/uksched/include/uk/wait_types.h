@@ -50,6 +50,7 @@ UK_STAILQ_HEAD(uk_waitq, struct uk_waitq_entry);
 struct uk_waitq_entry name = { \
 	.waiting      = 0, \
 	.thread       = uk_thread_current(), \
+	.thread_list  = { NULL } \
 }
 
 #ifdef __cplusplus
