@@ -440,6 +440,7 @@ READELF		:= $(CONFIG_CROSS_COMPILE)readelf
 STRIP		:= $(CONFIG_CROSS_COMPILE)strip
 OBJCOPY		:= $(CONFIG_CROSS_COMPILE)objcopy
 OBJDUMP		:= $(CONFIG_CROSS_COMPILE)objdump
+M4		:= m4
 AR		:= ar
 CAT		:= cat
 SED		:= sed

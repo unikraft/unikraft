@@ -62,6 +62,8 @@ CFLAGS   += -DUK_FULLVERSION=$(UK_FULLVERSION)
 CXXFLAGS += -D __Unikraft__ -DUK_CODENAME="$(UK_CODENAME)"
 CXXFLAGS += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
 CXXFLAGS += -DUK_FULLVERSION=$(UK_FULLVERSION)
+M4FLAGS  += -D __Unikraft__ -DUK_CODENAME="$(UK_CODENAME)"
+M4FLAGS  += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
 
 # If GCC supports "-no-pie" flag, we will add this flag to link flags to
 # override "pie" option, because some distributions will set
