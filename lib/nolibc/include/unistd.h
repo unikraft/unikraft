@@ -45,6 +45,7 @@ extern "C" {
 #define __NEED_NULL
 #define __NEED_size_t
 #define __NEED_ssize_t
+#define __NEED_off_t
 #include <nolibc-internal/shareddefs.h>
 
 unsigned int sleep(unsigned int seconds);
@@ -59,6 +60,7 @@ int dup(int oldfd);
 int dup2(int oldfd, int newfd);
 int dup3(int oldfd, int newfd, int flags);
 int unlink(const char *pathname);
+off_t lseek(int fd, off_t offset, int whence);
 #endif
 
 #ifdef __cplusplus

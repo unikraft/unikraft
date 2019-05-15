@@ -73,3 +73,4 @@ access
 faccessat
 readlink
 fallocate
+lseek
