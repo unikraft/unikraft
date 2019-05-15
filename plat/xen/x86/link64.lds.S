@@ -96,4 +96,5 @@ SECTIONS
 		*(.exitcall.exit)
 	}
 	*/
+	/DISCARD/ : { *(.note.gnu.build-id) }
 }

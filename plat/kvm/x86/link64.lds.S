@@ -93,4 +93,6 @@ SECTIONS
 	}
 
 	_end = .;
+
+	/DISCARD/ : { *(.note.gnu.build-id) }
 }
