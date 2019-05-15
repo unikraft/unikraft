@@ -31,6 +31,7 @@ LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/io.c
 LIBXENPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/lcpu.c|common
 LIBXENPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/memory.c|common
 
+XEN_LDSCRIPT_SRC-$(CONFIG_ARCH_X86_64) := $(CONFIG_UK_BASE)/plat/xen/x86/link64.lds.S
 LIBXENPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/trace.c|common
 LIBXENPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/traps.c|common
 LIBXENPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/cpu_features.c|common
@@ -55,6 +56,7 @@ LIBXENPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/cpu_native.c
 LIBXENPLAT_SRCS-$(CONFIG_ARCH_ARM_32) += $(UK_PLAT_COMMON_BASE)/arm/cpu_native.c
 endif
 
+XEN_LDSCRIPT_SRC-$(CONFIG_ARCH_ARM_32) := $(CONFIG_UK_BASE)/plat/xen/arm/link32.lds.S
 LIBXENPLAT_SRCS-$(CONFIG_ARCH_ARM_32) += $(LIBXENPLAT_BASE)/arm/setup.c
 LIBXENPLAT_SRCS-$(CONFIG_ARCH_ARM_32) += $(LIBXENPLAT_BASE)/arm/traps.c
 LIBXENPLAT_SRCS-$(CONFIG_ARCH_ARM_32) += $(LIBXENPLAT_BASE)/arm/entry32.S
@@ -79,6 +81,7 @@ LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/emg_console.c
 endif
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/shutdown.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/events.c
+LIBXENPLAT_SRCS-y              += $(XEN_LDSCRIPT_SRC-y)
 
 ifeq ($(CONFIG_XEN_GNTTAB),y)
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/gnttab.c
