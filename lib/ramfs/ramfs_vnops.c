@@ -470,7 +470,7 @@ ramfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 		if (end_pos > (off_t) np->rn_bufsize) {
 			// XXX: this could use a page level allocator
 			size_t new_size = round_pgup(end_pos);
-			void *new_buf = malloc(new_size);
+			void *new_buf = calloc(1, new_size);
 
 			if (!new_buf)
 				return EIO;
