@@ -1,1 +1,0 @@
-$(foreach plat,$(UK_PLATS),$(eval $(call _import_linker,$(plat))))

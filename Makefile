@@ -512,7 +512,8 @@ ifneq ($(call qstrip,$(UK_DEPS) $(UK_DEPS-y)),)
 -include $(UK_DEPS) $(UK_DEPS-y) # include header dependencies
 endif
 
-include $(CONFIG_UK_BASE)/plat/Linker.uk
+# include Makefile for platform linking (`Linker.uk`)
+$(foreach plat,$(UK_PLATS),$(eval $(call _import_linker,$(plat))))
 
 .PHONY: prepare image libs objs clean
 
