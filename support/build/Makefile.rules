@@ -131,13 +131,14 @@ undefine _IMPORT_BASE
 endef
 # _import_linker $plat_name
 define _import_linker =
- include $(UK_PLAT_$(call uc,$(1))_BASE)/Linker.uk
+ include $(UK_PLAT_$(call uc,$(1))_LINKER)
 endef
 
 # Register a platform to the build system
 define addplat =
 UK_PLATS += $(1)
-$(eval UK_PLAT_$(call uc,$(1))_BASE  := $(_IMPORT_BASE))
+$(eval UK_PLAT_$(call uc,$(1))_BASE   := $(_IMPORT_BASE))
+$(eval UK_PLAT_$(call uc,$(1))_LINKER := $(_IMPORT_BASE)/Linker.uk)
 endef
 
 # addplat_s $platname,$switch
