@@ -24,6 +24,8 @@
  */
 /* Taken from Mini-OS */
 
+#include <common.lds.h>
+
 OUTPUT_ARCH(arm)
 ENTRY(_libxenplat_start)
 SECTIONS
@@ -143,6 +145,8 @@ SECTIONS
 	.stab.index 0 : { *(.stab.index) }
 	.stab.indexstr 0 : { *(.stab.indexstr) }
 	.comment 0 : { *(.comment) }
+
+	DEBUG_SYMBOLS
 
 	/DISCARD/ : { *(.note.gnu.build-id) }
 }

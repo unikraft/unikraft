@@ -23,6 +23,8 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <common.lds.h>
+
 ENTRY(_libkvmplat_entry)
 SECTIONS
 {
@@ -93,6 +95,9 @@ SECTIONS
 	}
 
 	_end = .;
+
+	.comment       0 : { *(.comment) }
+	DEBUG_SYMBOLS
 
 	/DISCARD/ : { *(.note.gnu.build-id) }
 }

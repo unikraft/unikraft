@@ -23,6 +23,8 @@
  */
 /* Taken from Mini-OS */
 
+#include <common.lds.h>
+
 OUTPUT_FORMAT("elf64-x86-64")
 OUTPUT_ARCH(i386:x86-64)
 
@@ -96,5 +98,9 @@ SECTIONS
 		*(.exitcall.exit)
 	}
 	*/
+
+	.comment 0 : { *(.comment) }
+	DEBUG_SYMBOLS
+
 	/DISCARD/ : { *(.note.gnu.build-id) }
 }
