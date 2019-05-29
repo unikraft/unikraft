@@ -52,6 +52,7 @@ extern "C" {
 #define __NEED_mode_t
 #define __NEED_uid_t
 #define __NEED_gid_t
+#define __NEED_pid_t
 #define __NEED_dev_t
 #define __NEED_ino_t
 #define __NEED_nlink_t
