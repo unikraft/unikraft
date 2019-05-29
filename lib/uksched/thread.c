@@ -138,8 +138,13 @@ void uk_thread_fini(struct uk_thread *thread, struct uk_alloc *allocator)
 
 static void uk_thread_block_until(struct uk_thread *thread, __snsec until)
 {
+	unsigned long flags;
+
+	flags = ukplat_lcpu_save_irqf();
 	thread->wakeup_time = until;
 	clear_runnable(thread);
+	uk_sched_thread_blocked(thread->sched, thread);
+	ukplat_lcpu_restore_irqf(flags);
 }
 
 void uk_thread_block_timeout(struct uk_thread *thread, __nsec nsec)
@@ -156,11 +161,15 @@ void uk_thread_block(struct uk_thread *thread)
 
 void uk_thread_wake(struct uk_thread *thread)
 {
-	if (is_runnable(thread))
-		return;
+	unsigned long flags;
 
-	thread->wakeup_time = 0LL;
-	set_runnable(thread);
+	flags = ukplat_lcpu_save_irqf();
+	if (!is_runnable(thread)) {
+		uk_sched_thread_woken(thread->sched, thread);
+		thread->wakeup_time = 0LL;
+		set_runnable(thread);
+	}
+	ukplat_lcpu_restore_irqf(flags);
 }
 
 void uk_thread_exit(struct uk_thread *thread)

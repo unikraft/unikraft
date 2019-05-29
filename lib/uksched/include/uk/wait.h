@@ -106,6 +106,7 @@ do { \
 		uk_waitq_add(wq, &__wait); \
 		__current->wakeup_time = deadline; \
 		clear_runnable(__current); \
+		uk_sched_thread_blocked(__current->sched, __current); \
 		ukplat_lcpu_restore_irqf(flags); \
 		if ((condition) || (deadline_condition)) \
 			break; \
