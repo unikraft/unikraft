@@ -1,0 +1,3 @@
+$(eval $(call addlib_s,uksysinfo,$(CONFIG_UKSYSINFO)))
+
+UKSYSINFO_SRCS-$(CONFIG_UKSYSINFO) += $(UKSYSINFO_BASE)/sysinfo.c

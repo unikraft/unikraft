@@ -1,0 +1,3 @@
+menuconfig UKSYSINFO
+	bool "uksysinfo: info about system parameters"
+	default n

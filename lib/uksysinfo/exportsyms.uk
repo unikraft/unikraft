@@ -1,0 +1,6 @@
+fpathconf
+sysconf
+confstr
+pathconf
+getpagesize
+uname
