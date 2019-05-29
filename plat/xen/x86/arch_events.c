@@ -30,9 +30,10 @@
 #include <stdint.h>
 #include <x86/cpu.h>
 #include <uk/plat/config.h>
+#include <uk/essentials.h>
 
 #if defined(__x86_64__)
-static char irqstack[2 * STACK_SIZE];
+char irqstack[STACK_SIZE] __align(STACK_SIZE);
 
 static struct pda {
 	int irqcount;       /* offset 0 (used in x86_64.S) */
@@ -48,8 +49,7 @@ void arch_init_events(void)
 	wrmsrl(0xc0000101, (uint64_t) &cpu0_pda);
 	cpu0_pda.irqcount = -1;
 	cpu0_pda.irqstackptr =
-			(void *) (((unsigned long)irqstack + 2 * STACK_SIZE)
-			& STACK_MASK_TOP);
+			(void *) ((unsigned long) irqstack + STACK_SIZE);
 #endif
 }
 
