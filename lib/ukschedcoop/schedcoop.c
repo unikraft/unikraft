@@ -101,6 +101,9 @@ static void schedcoop_schedule(struct uk_sched *s)
 			if (is_runnable(prev))
 				UK_TAILQ_INSERT_TAIL(&prv->thread_list, prev,
 						thread_list);
+			else
+				set_queueable(prev);
+			clear_queueable(next);
 			ukplat_stack_set_current_thread(next);
 			break;
 		} else if (is_runnable(prev)) {
@@ -196,8 +199,10 @@ static void schedcoop_thread_woken(struct uk_sched *s, struct uk_thread *t)
 
 	if (t->wakeup_time > 0)
 		UK_TAILQ_REMOVE(&prv->sleeping_threads, t, thread_list);
-	if (t != uk_thread_current())
+	if (t != uk_thread_current() || is_queueable(t)) {
 		UK_TAILQ_INSERT_TAIL(&prv->thread_list, t, thread_list);
+		clear_queueable(t);
+	}
 }
 
 static void idle_thread_fn(void *unused __unused)

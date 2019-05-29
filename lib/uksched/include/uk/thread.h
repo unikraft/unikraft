@@ -97,6 +97,7 @@ struct uk_thread *uk_thread_current(void)
 
 #define RUNNABLE_FLAG   0x00000001
 #define EXITED_FLAG     0x00000002
+#define QUEUEABLE_FLAG  0x00000004
 
 #define is_runnable(_thread)    ((_thread)->flags &   RUNNABLE_FLAG)
 #define set_runnable(_thread)   ((_thread)->flags |=  RUNNABLE_FLAG)
@@ -104,6 +105,10 @@ struct uk_thread *uk_thread_current(void)
 
 #define is_exited(_thread)      ((_thread)->flags &   EXITED_FLAG)
 #define set_exited(_thread)     ((_thread)->flags |=  EXITED_FLAG)
+
+#define is_queueable(_thread)    ((_thread)->flags &   QUEUEABLE_FLAG)
+#define set_queueable(_thread)   ((_thread)->flags |=  QUEUEABLE_FLAG)
+#define clear_queueable(_thread) ((_thread)->flags &= ~QUEUEABLE_FLAG)
 
 int uk_thread_init(struct uk_thread *thread,
 		struct ukplat_ctx_callbacks *cbs, struct uk_alloc *allocator,
