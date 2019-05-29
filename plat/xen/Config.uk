@@ -58,7 +58,7 @@ config XEN_GNTTAB
 	help
 		Support grant table operations
 
-menuconfig XEN_XENBUS
+config XEN_XENBUS
 	bool "Xenbus/XenStore driver"
 	default n
 	depends on (ARCH_X86_64)
@@ -68,4 +68,9 @@ menuconfig XEN_XENBUS
 	help
 		Registers Xenbus as bus driver to libukbus and provides a
 		XenStore communication API for Xen drivers
+
+menu "Xenbus Drivers"
+        depends on XEN_XENBUS
+        depends on XEN_GNTTAB
+endmenu
 endif
