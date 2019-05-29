@@ -13,3 +13,12 @@ getpwuid_r
 getpwent
 setpwent
 endpwent
+getgid
+getegid
+getgroups
+getresgid
+setegid
+setgid
+setregid
+setgroups
+initgroups

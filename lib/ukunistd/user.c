@@ -114,3 +114,48 @@ void setpwent(void)
 void endpwent(void)
 {
 }
+
+gid_t getgid(void)
+{
+	return 0;
+}
+
+int setgid(gid_t gid __unused)
+{
+	return 0;
+}
+
+gid_t getegid(void)
+{
+	return 0;
+}
+
+int setegid(gid_t egid __unused)
+{
+	return 0;
+}
+
+int getresgid(gid_t *rgid __unused, gid_t *egid __unused, gid_t *sgid __unused)
+{
+	return 0;
+}
+
+int setregid(gid_t rgid __unused, gid_t egid __unused)
+{
+	return 0;
+}
+
+int initgroups(const char *user __unused, gid_t group __unused)
+{
+	return 0;
+}
+
+int getgroups(int size __unused, gid_t list[] __unused)
+{
+	return 0;
+}
+
+int setgroups(size_t size __unused, const gid_t *list __unused)
+{
+	return 0;
+}
