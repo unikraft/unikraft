@@ -34,8 +34,83 @@
  */
 
 #include <unistd.h>
+#include <pwd.h>
 #include <sys/types.h>
+#include <uk/essentials.h>
 
-uid_t getuid(void) {
+uid_t getuid(void)
+{
 	return 0;
+}
+
+int setuid(uid_t uid __unused)
+{
+	return 0;
+}
+
+uid_t geteuid(void)
+{
+	return 0;
+}
+
+int seteuid(uid_t euid __unused)
+{
+	return 0;
+}
+
+int getresuid(uid_t *ruid __unused, uid_t *euid __unused, uid_t *suid __unused)
+{
+	return 0;
+}
+
+int setresuid(uid_t ruid __unused, uid_t euid __unused, uid_t suid __unused)
+{
+	return 0;
+}
+
+int setreuid(uid_t ruid __unused, uid_t euid __unused)
+{
+	return 0;
+}
+
+char *getlogin(void)
+{
+	return 0;
+}
+
+struct passwd *getpwnam(const char *name __unused)
+{
+	return NULL;
+}
+
+struct passwd *getpwuid(uid_t uid __unused)
+{
+	return NULL;
+}
+
+int getpwnam_r(const char *name __unused, struct passwd *pwd __unused,
+	char *buf __unused, size_t buflen __unused,
+	struct passwd **result __unused)
+{
+	return 0;
+}
+
+int getpwuid_r(uid_t uid __unused, struct passwd *pwd __unused,
+	char *buf __unused, size_t buflen __unused,
+	struct passwd **result __unused)
+{
+	return 0;
+}
+
+struct passwd *getpwent(void)
+{
+	return NULL;
+}
+
+void setpwent(void)
+{
+}
+
+void endpwent(void)
+{
 }
