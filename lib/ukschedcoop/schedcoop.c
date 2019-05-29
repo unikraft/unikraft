@@ -30,6 +30,7 @@
  * to Round Robin algorithm.
  */
 #include <uk/plat/lcpu.h>
+#include <uk/plat/memory.h>
 #include <uk/plat/time.h>
 #include <uk/sched.h>
 #include <uk/schedcoop.h>
@@ -97,6 +98,7 @@ static void schedcoop_schedule(struct uk_sched *s)
 						thread_list);
 				UK_TAILQ_INSERT_TAIL(&prv->thread_list, thread,
 						thread_list);
+				ukplat_stack_set_current_thread(next);
 				break;
 			}
 		}
