@@ -184,7 +184,7 @@ ENTRY(_libkvmplat_start64)
 	/* FPU and SSE are part of base x86-64, so no need to check for their
 	 * availability before enabling and initializing. */
 	andl $(~(X86_CR0_EM | X86_CR0_TS)), %esi
-	orl $(X86_CR0_MP | X86_CR0_NE), %esi
+	orl $(X86_CR0_MP | X86_CR0_NE | X86_CR0_WP), %esi
 	movq %rsi, %cr0
 	fninit
 #if __SSE__

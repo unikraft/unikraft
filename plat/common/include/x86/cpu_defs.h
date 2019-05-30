@@ -60,6 +60,7 @@
 #define X86_CR0_EM              (1 << 2)    /* Emulation */
 #define X86_CR0_TS              (1 << 3)    /* Task Switched */
 #define X86_CR0_NE              (1 << 5)    /* Numeric Exception */
+#define X86_CR0_WP              (1 << 16)   /* Write Protect */
 #define X86_CR0_PG              (1 << 31)   /* Paging */
 
 /*
