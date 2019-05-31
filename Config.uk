@@ -86,13 +86,6 @@ config OPTIMIZE_LTO
 		will increase overall building time but creates more efficient
 		Unikraft binaries.
 
-config DEBUG_SYMBOLS
-	bool "Debugging information"
-	default n
-	help
-		Build with debugging information.
-
-if DEBUG_SYMBOLS
 choice
 	prompt "Debug information level"
 	default DEBUG_SYMBOLS_LVL3
@@ -121,24 +114,11 @@ config DEBUG_SYMBOLS_LVL3
 		support macro expansion.
 endchoice
 
-config OPTIMIZE_DBGFILE
-	bool "Create a debugging information file"
-	default y
-	help
-		Create a separate file with debugging information
-
 config OPTIMIZE_SYMFILE
 	bool "Create a symbols file"
 	default n
 	help
 		Create a separate file with all symbol locations
-endif
-
-config OPTIMIZE_STRIP
-	bool "Strip final image"
-	default y
-	help
-		Strip any extra information from image
 
 config RECORD_BUILDTIME
 	bool "Keep track of Building time"

@@ -30,28 +30,23 @@ $(KVM_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 	$(call build_cmd,OBJCOPY,,$@.o,\
 	       $(OBJCOPY) -w -G kvmos_* -G _libkvmplat_entry $@.ld.o $@.o)
 ifneq ($(filter x86_64 arm64,$(CONFIG_UK_ARCH)),)
-	$(call build_cmd,LD,,$@,\
+	$(call build_cmd,LD,,$@.dbg,\
 	       $(LD) $(LDFLAGS) $(LDFLAGS-y) \
 		     $(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
 		     -Wl$(comma)-dT$(comma)$(call strip,$(KVM_LDSCRIPT)) \
 		     $(KVM_LD_SCRIPT_FLAGS) \
-		     $@.o -o $@)
-ifeq ($(CONFIG_OPTIMIZE_DBGFILE),y)
-	$(call build_cmd,OBJCOPY,,$@.dbg,\
-	       $(OBJCOPY) --only-keep-debug $@ $@.dbg)
-endif
+		     $@.o -o $@.dbg)
+	$(call verbose_cmd,SCSTRIP,$(notdir $@),\
+		$(SCRIPTS_DIR)/sect-strip.py \
+			$(SECT_STRIP_FLAGS) $(SECT_STRIP_FLAGS-y) \
+			--with-objcopy=$(OBJCOPY) \
+			$@.dbg -o $@)
+	$(call verbose_cmd,STRIP,$(notdir $@), $(STRIP) -s $@)
+
 ifeq ($(CONFIG_OPTIMIZE_SYMFILE),y)
 	$(call build_cmd,NM,,$@.sym,\
-	       $(NM) -n $@ > $@.sym)
+	       $(NM) -n $@.dbg > $@.sym)
 endif
-# TODO: We have to revisit stripping of KVM binaries. We noticed that sometimes
-#       the images are broken and cannot be boot with QEMU's direct kernel boot
-#       option (fread() error is returned).
-#
-#ifeq ($(CONFIG_OPTIMIZE_STRIP),y)
-#	$(call verbose_cmd,STRIP,$(notdir $@),\
-#	       $(STRIP) -s $@)
-#endif
 	$(call build_cmd,GZ,,$@.gz,\
 	       $(GZIP) -f -9 -c $@ >$@.gz)
 endif

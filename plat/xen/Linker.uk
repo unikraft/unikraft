@@ -28,44 +28,39 @@ $(XEN_IMAGE): $(XEN_ALIBS) $(XEN_ALIBS-y) $(XEN_OLIBS) $(XEN_OLIBS-y) \
 	$(call build_cmd,OBJCOPY,,$@.o,\
 	       $(OBJCOPY) -w -G xenos_* -G _libxenplat_start $@.ld.o $@.o)
 ifeq (arm,$(CONFIG_UK_ARCH))
-	$(call build_cmd,LD,,$@.elf,\
+	$(call build_cmd,LD,,$@.elf.dbg,\
 	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(XEN_LDFLAGS) $(XEN_LDFLAGS-y) \
 		     -Wl$(comma)-dT$(comma)$(call strip,$(XEN_LDSCRIPT)) \
 		     $(XEN_LD_SCRIPT_FLAGS) \
-		     $@.o -o $@.elf)
-ifeq ($(CONFIG_OPTIMIZE_DBGFILE),y)
-	$(call build_cmd,OBJCOPY,,$@.dbg,\
-	       $(OBJCOPY) --only-keep-debug $@.elf $@.dbg)
-endif
+		     $@.o -o $@.elf.dbg)
+	$(call verbose_cmd,SCSTRIP,$(notdir $@.elf),\
+		$(SCRIPTS_DIR)/sect-strip.py \
+			$(SECT_STRIP_FLAGS) $(SECT_STRIP_FLAGS-y) \
+			--with-objcopy=$(OBJCOPY) \
+			$@.elf.dbg -o $@.elf)
+	$(call verbose_cmd,STRIP,$(notdir $@.elf), $(STRIP) -s $@.elf)
 ifeq ($(CONFIG_OPTIMIZE_SYMFILE),y)
 	$(call build_cmd,NM,,$@.sym,\
-	       $(NM) -n $@.elf > $@.sym)
-endif
-ifeq ($(CONFIG_OPTIMIZE_STRIP),y)
-	$(call verbose_cmd,STRIP,$(notdir $@),\
-	       $(STRIP) -s $@.elf)
+	       $(NM) -n $@.elf.dbg > $@.sym)
 endif
 	$(call build_cmd,OBJCOPY,,$@,\
 	       $(OBJCOPY) -O binary $@.elf $@)
 	$(call build_cmd,GZ,,$@.gz,\
 	       $(GZIP) -f -9 -c $@ >$@.gz)
 else
-	$(call build_cmd,LD,,$@,\
+	$(call build_cmd,LD,,$@.dbg,\
 	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(XEN_LDFLAGS) $(XEN_LDFLAGS-y) \
 		     -Wl$(comma)-dT$(comma)$(call strip,$(XEN_LDSCRIPT)) \
 		     $(XEN_LD_SCRIPT_FLAGS) \
-		     $@.o -o $@)
-ifeq ($(CONFIG_OPTIMIZE_DBGFILE),y)
-	$(call build_cmd,OBJCOPY,,$@.dbg,\
-	       $(OBJCOPY) --only-keep-debug $@ $@.dbg)
-endif
+		     $@.o -o $@.dbg)
+	$(call verbose_cmd,SCSTRIP,$(notdir $@),\
+		$(SCRIPTS_DIR)/sect-strip.py \
+			$(SECT_STRIP_FLAGS) $(SECT_STRIP_FLAGS-y) \
+			$@.dbg -o $@)
+	$(call verbose_cmd,STRIP,$(notdir $@), $(STRIP) -s $@)
 ifeq ($(CONFIG_OPTIMIZE_SYMFILE),y)
 	$(call build_cmd,NM,,$@.sym,\
-	       $(NM) -n $@ > $@.sym)
-endif
-ifeq ($(CONFIG_OPTIMIZE_STRIP),y)
-	$(call verbose_cmd,STRIP,$(notdir $@),\
-	       $(STRIP) -s $@)
+	       $(NM) -n $@.dbg > $@.sym)
 endif
 	$(call build_cmd,GZ,,$@.gz,\
 	       $(GZIP) -f -9 -c $@ >$@.gz)
@@ -78,6 +73,7 @@ UK_IMAGES-$(CONFIG_PLAT_XEN) += $(XEN_IMAGE)
 LIBXENPLAT_CLEAN += $(call build_clean,$(XEN_IMAGE).ld.o)
 LIBXENPLAT_CLEAN += $(call build_clean,$(XEN_IMAGE).o)
 LIBXENPLAT_CLEAN += $(call build_clean,$(XEN_IMAGE).elf)
+LIBXENPLAT_CLEAN += $(call build_clean,$(XEN_IMAGE).elf.dbg)
 LIBXENPLAT_CLEAN += $(call build_clean,$(XEN_IMAGE).gz)
 LIBXENPLAT_CLEAN += $(call build_clean,$(XEN_IMAGE).dbg)
 LIBXENPLAT_CLEAN += $(call build_clean,$(XEN_IMAGE).sym)
