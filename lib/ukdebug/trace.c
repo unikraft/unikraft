@@ -43,3 +43,21 @@ char uk_trace_buffer[UK_TRACE_BUFFER_SIZE];
 
 size_t uk_trace_buffer_free = UK_TRACE_BUFFER_SIZE;
 char *uk_trace_buffer_writep = uk_trace_buffer;
+
+
+/* Store a string in format "key = value" in the section
+ * .uk_trace_keyvals. This can be anything what you want trace.py
+ * script to know about, and what you do not want to consume any space
+ * in runtime memory.
+ *
+ * This section will be stripped at the final states of building, but
+ * the key-value data can be easily extracted by:
+ *
+ *     $ readelf -p .uk_trace_keyvals <your_image.gdb>
+ */
+#define TRACE_DEFINE_KEY(key, val)			\
+	__attribute((__section__(".uk_trace_keyvals")))	\
+	static const char key[] __used =		\
+		#key " = " #val
+
+TRACE_DEFINE_KEY(format_version, 1);

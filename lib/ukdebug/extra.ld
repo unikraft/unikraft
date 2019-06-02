@@ -5,6 +5,9 @@ SECTIONS
 		KEEP (*(.uk_tracepoints_list));
 		uk_tracepoints_end = .;
 	}
+	.uk_trace_keyvals : {
+		KEEP (*(.uk_trace_keyvals));
+	}
 }
 
 /* We do not want these section to be in the final image, they are
