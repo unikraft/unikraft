@@ -23,6 +23,7 @@
  */
 /* Taken from Mini-OS */
 
+#include <uk/arch/limits.h> /* for __PAGE_SIZE */
 #include <common.lds.h>
 
 OUTPUT_FORMAT("elf64-x86-64")
@@ -50,7 +51,7 @@ SECTIONS
 		*(.rodata)
 		*(.rodata.*)
 	}
-	. = ALIGN(4096);
+	. = ALIGN(__PAGE_SIZE);
 	_erodata = .;
 
 	. = ALIGN(0x8);
@@ -68,7 +69,7 @@ SECTIONS
 		KEEP (*(.init_array .ctors))
 		PROVIDE_HIDDEN (__init_array_end = .);
 	}
-	. = ALIGN(4096);
+	. = ALIGN(__PAGE_SIZE);
 	_ectors = .;
 
 	/* Data */
@@ -89,7 +90,7 @@ SECTIONS
 		*(.bss)
 		*(.bss.*)
 	}
-	. = ALIGN(4096);
+	. = ALIGN(__PAGE_SIZE);
 	_end = . ;
 
 	/* Sections to be discarded */

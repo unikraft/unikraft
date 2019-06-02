@@ -58,7 +58,7 @@ SECTIONS
 		*(.rodata)
 		*(.rodata.*)
 	}
-	. = ALIGN(4096);
+	. = ALIGN(__PAGE_SIZE);
 	_erodata = .;
 
 	CTORTAB_SECTION
@@ -78,7 +78,7 @@ SECTIONS
 		KEEP (*(.init_array .ctors))
 		PROVIDE_HIDDEN (__init_array_end = .);
 	}
-	. = ALIGN(4096);
+	. = ALIGN(__PAGE_SIZE);
 	_ectors = .;
 
 	/* Data */
@@ -99,7 +99,7 @@ SECTIONS
 		*(.bss)
 		*(.bss.*)
 	}
-	. = ALIGN(4096);
+	. = ALIGN(__PAGE_SIZE);
 	_end = . ;
 
 

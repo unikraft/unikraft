@@ -23,6 +23,7 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <uk/arch/limits.h> /* for __PAGE_SIZE */
 #include <common.lds.h>
 
 ENTRY(_libkvmplat_entry)
@@ -48,7 +49,7 @@ SECTIONS
 	CTORTAB_SECTION
 
 	/* Read-only data */
-	. = ALIGN(0x1000);
+	. = ALIGN(__PAGE_SIZE);
 	_rodata = .;
 	.rodata :
 	{
@@ -76,7 +77,7 @@ SECTIONS
 	_ectors = .;
 
 	/* Read-write data (initialized) */
-	. = ALIGN(0x1000);
+	. = ALIGN(__PAGE_SIZE);
 	_data = .;
 	.data :
 	{
@@ -86,14 +87,14 @@ SECTIONS
 	_edata = .;
 
 	/* Read-write data (uninitialized) */
-	. = ALIGN(0x1000);
+	. = ALIGN(__PAGE_SIZE);
 	__bss_start = .;
 	.bss :
 	{
 		*(.bss)
 		*(.bss.*)
 		*(COMMON)
-		. = ALIGN(0x1000);
+		. = ALIGN(__PAGE_SIZE);
 	}
 
 	_end = .;
