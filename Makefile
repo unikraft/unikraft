@@ -534,8 +534,18 @@ libs: $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y)
 
 images: $(UK_IMAGES) $(UK_IMAGES-y)
 
-all: images
+GDB_HELPER_LINKS := $(addsuffix  .dbg-gdb.py,$(UK_IMAGES-y) $(UK_IMAGES))
+$(GDB_HELPER_LINKS):
+	$(call verbose_cmd,LN,$(notdir $@), ln -sf uk-gdb.py $@)
 
+SCRIPTS_DIR_BACKSLASHED = $(subst /,\/,$(SCRIPTS_DIR))
+$(BUILD_DIR)/uk-gdb.py: $(SCRIPTS_DIR)/uk-gdb.py
+	$(call verbose_cmd,GEN,$(notdir $@), \
+	sed '/scripts_dir = / s/os.path.dirname(os.path.realpath(__file__))/"$(SCRIPTS_DIR_BACKSLASHED)"/g' $^ > $@)
+
+gdb_helpers: $(GDB_HELPER_LINKS) $(BUILD_DIR)/uk-gdb.py
+
+all: images gdb_helpers
 ################################################################################
 # Cleanup rules
 ################################################################################
