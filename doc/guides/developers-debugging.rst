@@ -72,3 +72,140 @@ You can then connect gdb within a separate console and you're ready to debug: ::
 You should be also able to use the debugging file
 (``build/helloworld_linuxu-x86_64.dbg``) for gdb instead passing the kernel
 image.
+
+============================
+Trace points
+============================
+
+----------------------------
+Dependencies
+----------------------------
+The ``support/scripts/uk_trace/trace.py`` depends on python modules
+click and tabulate. You can install them by running: ::
+
+  sudo apt-get install python3-click python3-tabulate
+
+Or, you can install trace.py into a local virtual environment: ::
+
+  python3 -m venv env
+  . env/bin/activate
+  cd support/scripts/uk_trace
+  pip install --upgrade pip setuptools wheel
+  pip install --editable .
+  deactivate
+  cd -
+
+All the dependencies will be installed in the 'env' folder, not to
+your machine. You do not have to enter your virtual environment, you
+can call the installed script directly: ::
+
+  env/bin/uk-trace --help
+
+Because of ``--editable`` flag, any modifications made to
+``support/scripts/uk_trace/trace.py`` will be reflected in the
+installed file.
+
+----------------------------
+Reading tracepoints
+----------------------------
+
+Tracepoints are provided by ``libukdebug``. To make Unikraft collect
+tracing data enable the option ``CONFIG_LIBUKDEBUG_TRACEPOINTS`` in your
+config (via ``make menuconfig``).
+
+Because tracepoints can noticeably affect performance, selective
+enabling is implemented. Option ``CONFIG_LIBUKDEBUG_TRACEPOINTS`` just
+enables the functionality, but all the tracepoints are compiled into
+nothing by default (have no effect). If you would like one library to
+collect tracing data, add to it's Makefile.uk
+
+.. code-block:: make
+
+   LIBAPPNAME_CFLAGS += -DUK_DEBUG_TRACE
+
+If you need just the information about tracepoints in one file, define
+``UK_DEBUG_TRACE`` **before** ``#include <uk/trace.h>``.
+
+If you wish to enable **ALL** existing tracepoints, enable
+``CONFIG_LIBUKDEBUG_ALL_TRACEPOINTS`` in menuconfig.
+
+When tracing is enabled, unikraft will write samples into internal
+trace buffer. Currently it is not a circular buffer, as soon as it
+overflows, unikraft will stop collecting data.
+
+To read the collected data you have 2 options:
+
+1. Inside gdb
+
+2. Using trace.py
+
+For the first option, you need the 'uk-gdb.py' helper loaded into the
+gdb session. To make this happen all you need to do is to add the
+following line into ~/.gdbinit: ::
+
+  add-auto-load-safe-path /path/to/your/build/directory
+
+With this, gdb will load helper automatically, each time you start gdb
+with a *.dbg image. For example ::
+
+  gdb helloworld/build/helloworld_kvm-x86_64.dbg
+
+Now you can print tracing log by issuing command ``uk
+trace``. Alternatively, you can save all trace data into a binary file
+with ``uk trace save <filename>``. This tracefile can be processed
+later offline using the trace.py script: ::
+
+  support/scripts/uk_trace/trace.py list <filename>
+
+Which brings us to the second option. Trace.py can run gdb and fetch
+the tracefile for you. Just run: ::
+
+  support/scripts/uk_trace/trace.py fetch  <your_unikraft_image>.dbg
+
+.. note:: The *.dbg image is required, as it have offline data needed
+          for parsing the trace buffer.
+
+----------------------------
+Adding your tracepoints
+----------------------------
+Bellow is a snippet for using tracepoints:
+
+.. code-block:: c
+
+  UK_TRACEPOINT(trace_vfs_open, "\"%s\" 0x%x 0%0o", const char*, int, mode_t);
+  int open(const char *pathname, int flags, ...)
+  {
+  	trace_vfs_open(pathname, flags, mode);
+
+  	/* lots of cool stuff */
+
+  	return 0;
+  }
+
+Macro ``UK_TRACEPOINT(trace_name, fmt, type1, type2, ... typeN)``
+generates a static function `trace_name()`, accepting N parameters, of
+types **type1**, **type2** and so on. Up to 7 parameters supported. The
+**fmt** is a printf-style format which will be used to form a message
+corresponding to the trace sample.
+
+The **fmt** is static and stored offline. Only parameters values are
+saved on the trace buffer. It is the job of the offline parser to
+match them together and print out resulting messages.
+
+Now you can call the generated function from the point of
+interest. You are expected to call one tracepoint from exactly one
+place in your code.
+
+----------------------------
+Troubleshooting
+----------------------------
+If you are getting a message::
+
+  Error getting the trace buffer. Is tracing enabled?
+
+This might be because:
+
+1. Because you indeed need to enable tracing
+
+2. Not a single tracepoint has been called, and dead-code elimination
+   removed (rightfully) the tracing functionality
