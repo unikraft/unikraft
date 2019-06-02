@@ -98,8 +98,13 @@ class uk_trace(gdb.Command):
         gdb.Command.__init__(self, 'uk trace',
                              gdb.COMMAND_USER, gdb.COMPLETE_COMMAND, True)
     def invoke(self, arg, from_tty):
-        # TODO
-        pass
+        elf = gdb.current_progspace().filename
+        samples = parse.sample_parser(parse.get_keyvals(elf),
+                                      parse.get_tp_sections(elf),
+                                      get_trace_buffer(), PTR_SIZE)
+        for sample in samples:
+            print(sample)
+
 
 class uk_trace_save(gdb.Command):
     def __init__(self):

@@ -36,6 +36,7 @@ import click
 import os, sys
 import pickle
 import subprocess
+from tabulate import tabulate
 
 import parse
 
@@ -63,6 +64,19 @@ def parse_tf(trace_file):
     return parse.sample_parser(keyvals, tp_defs, trace_buff, ptr_size)
 
 @cli.command()
+@click.argument('trace_file', type=click.Path(exists=True), default='tracefile')
+@click.option('--no-tabulate', is_flag=True,
+              help='No pretty printing')
+def list(trace_file, no_tabulate):
+    """Parse binary trace file fetched from Unikraft"""
+    if not no_tabulate:
+        print_data = [x.tabulate_fmt() for x in parse_tf(trace_file)]
+        print(tabulate(print_data, headers=['time', 'tp_name', 'msg']))
+    else:
+        for i in parse_tf(trace_file):
+            print(i)
+
+@cli.command()
 @click.argument('uk_img', type=click.Path(exists=True))
 @click.option('--out', '-o', type=click.Path(),
               default='tracefile', show_default=True,
@@ -71,8 +85,11 @@ def parse_tf(trace_file):
               default=':1234', show_default=True,
               help='How to connect to the gdb session '+
               '(parameters for "target remote" command)')
+@click.option('--list', 'do_list', is_flag=True,
+              default=False,
+              help='Parse the fetched tracefile and list events')
 @click.option('--verbose', is_flag=True, default=False)
-def fetch(uk_img, out, remote, verbose):
+def fetch(uk_img, out, remote, do_list, verbose):
     """Fetch binary trace file from Unikraft (using gdb)"""
 
     if os.path.exists(out):
@@ -98,6 +115,9 @@ def fetch(uk_img, out, remote, verbose):
     if verbose:
         print(_stdout)
 
+    if do_list:
+        for i in parse_tf(out):
+            print(i)
 
 if __name__ == '__main__':
     cli()
