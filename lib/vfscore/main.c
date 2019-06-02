@@ -48,6 +48,7 @@
 #include <vfscore/fs.h>
 #include <uk/errptr.h>
 #include <uk/ctors.h>
+#include <uk/trace.h>
 
 #ifdef DEBUG_VFS
 int	vfs_debug = VFSDB_FLAGS;
@@ -93,9 +94,9 @@ static inline mode_t apply_umask(mode_t mode)
 	return mode & ~ukarch_load_n(&global_umask);
 }
 
-TRACEPOINT(trace_vfs_open, "\"%s\" 0x%x 0%0o", const char*, int, mode_t);
-TRACEPOINT(trace_vfs_open_ret, "%d", int);
-TRACEPOINT(trace_vfs_open_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_open, "\"%s\" 0x%x 0%0o", const char*, int, mode_t);
+UK_TRACEPOINT(trace_vfs_open_ret, "%d", int);
+UK_TRACEPOINT(trace_vfs_open_err, "%d", int);
 
 struct task *main_task;	/* we only have a single process */
 
@@ -202,9 +203,9 @@ int creat(const char *pathname, mode_t mode)
 }
 LFS64(creat);
 
-TRACEPOINT(trace_vfs_close, "%d", int);
-TRACEPOINT(trace_vfs_close_ret, "");
-TRACEPOINT(trace_vfs_close_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_close, "%d", int);
+UK_TRACEPOINT(trace_vfs_close_ret, "");
+UK_TRACEPOINT(trace_vfs_close_err, "%d", int);
 
 int fdclose(int fd)
 {
@@ -238,9 +239,9 @@ int close(int fd)
 	return -1;
 }
 
-TRACEPOINT(trace_vfs_mknod, "\"%s\" 0%0o 0x%x", const char*, mode_t, dev_t);
-TRACEPOINT(trace_vfs_mknod_ret, "");
-TRACEPOINT(trace_vfs_mknod_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_mknod, "\"%s\" 0%0o 0x%x", const char*, mode_t, dev_t);
+UK_TRACEPOINT(trace_vfs_mknod_ret, "");
+UK_TRACEPOINT(trace_vfs_mknod_err, "%d", int);
 
 int __xmknod(int ver, const char *pathname, mode_t mode, dev_t *dev __unused)
 {
@@ -272,9 +273,9 @@ int mknod(const char *pathname, mode_t mode, dev_t dev)
 }
 
 
-TRACEPOINT(trace_vfs_lseek, "%d 0x%x %d", int, off_t, int);
-TRACEPOINT(trace_vfs_lseek_ret, "0x%x", off_t);
-TRACEPOINT(trace_vfs_lseek_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_lseek, "%d 0x%x %d", int, off_t, int);
+UK_TRACEPOINT(trace_vfs_lseek_ret, "0x%x", off_t);
+UK_TRACEPOINT(trace_vfs_lseek_err, "%d", int);
 
 off_t lseek(int fd, off_t offset, int whence)
 {
@@ -303,9 +304,9 @@ off_t lseek(int fd, off_t offset, int whence)
 
 LFS64(lseek);
 
-TRACEPOINT(trace_vfs_pread, "%d %p 0x%x 0x%x", int, void*, size_t, off_t);
-TRACEPOINT(trace_vfs_pread_ret, "0x%x", ssize_t);
-TRACEPOINT(trace_vfs_pread_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_pread, "%d %p 0x%x 0x%x", int, void*, size_t, off_t);
+UK_TRACEPOINT(trace_vfs_pread_ret, "0x%x", ssize_t);
+UK_TRACEPOINT(trace_vfs_pread_err, "%d", int);
 
 // In BSD's internal implementation of read() and write() code, for example
 // sosend_generic(), a partial read or write returns both an EWOULDBLOCK error
@@ -357,9 +358,10 @@ ssize_t read(int fd, void *buf, size_t count)
 	return pread(fd, buf, count, -1);
 }
 
-TRACEPOINT(trace_vfs_pwrite, "%d %p 0x%x 0x%x", int, const void*, size_t, off_t);
-TRACEPOINT(trace_vfs_pwrite_ret, "0x%x", ssize_t);
-TRACEPOINT(trace_vfs_pwrite_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_pwrite, "%d %p 0x%x 0x%x", int, const void*, size_t,
+	      off_t);
+UK_TRACEPOINT(trace_vfs_pwrite_ret, "0x%x", ssize_t);
+UK_TRACEPOINT(trace_vfs_pwrite_err, "%d", int);
 
 ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset)
 {
@@ -426,9 +428,10 @@ ssize_t readv(int fd, const struct iovec *iov, int iovcnt)
 	return preadv(fd, iov, iovcnt, -1);
 }
 
-TRACEPOINT(trace_vfs_pwritev, "%d %p 0x%x 0x%x", int, const struct iovec*, int, off_t);
-TRACEPOINT(trace_vfs_pwritev_ret, "0x%x", ssize_t);
-TRACEPOINT(trace_vfs_pwritev_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_pwritev, "%d %p 0x%x 0x%x", int, const struct iovec*,
+	      int, off_t);
+UK_TRACEPOINT(trace_vfs_pwritev_ret, "0x%x", ssize_t);
+UK_TRACEPOINT(trace_vfs_pwritev_err, "%d", int);
 
 ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
 {
@@ -461,9 +464,9 @@ ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
 	return pwritev(fd, iov, iovcnt, -1);
 }
 
-TRACEPOINT(trace_vfs_ioctl, "%d 0x%x", int, unsigned long);
-TRACEPOINT(trace_vfs_ioctl_ret, "");
-TRACEPOINT(trace_vfs_ioctl_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_ioctl, "%d 0x%x", int, unsigned long);
+UK_TRACEPOINT(trace_vfs_ioctl_ret, "");
+UK_TRACEPOINT(trace_vfs_ioctl_err, "%d", int);
 
 int ioctl(int fd, unsigned long int request, ...)
 {
@@ -498,9 +501,9 @@ int ioctl(int fd, unsigned long int request, ...)
 	return -1;
 }
 
-TRACEPOINT(trace_vfs_fsync, "%d", int);
-TRACEPOINT(trace_vfs_fsync_ret, "");
-TRACEPOINT(trace_vfs_fsync_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_fsync, "%d", int);
+UK_TRACEPOINT(trace_vfs_fsync_ret, "");
+UK_TRACEPOINT(trace_vfs_fsync_err, "%d", int);
 
 int fsync(int fd)
 {
@@ -532,9 +535,9 @@ int fdatasync(int fd)
 	return fsync(fd);
 }
 
-TRACEPOINT(trace_vfs_fstat, "%d %p", int, struct stat*);
-TRACEPOINT(trace_vfs_fstat_ret, "");
-TRACEPOINT(trace_vfs_fstat_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_fstat, "%d %p", int, struct stat*);
+UK_TRACEPOINT(trace_vfs_fstat_ret, "");
+UK_TRACEPOINT(trace_vfs_fstat_err, "%d", int);
 
 int __fxstat(int ver __unused, int fd, struct stat *st)
 {
@@ -642,9 +645,9 @@ int flock(int fd, int operation)
 	return 0;
 }
 
-TRACEPOINT(trace_vfs_readdir, "%d %p", int, struct dirent*);
-TRACEPOINT(trace_vfs_readdir_ret, "");
-TRACEPOINT(trace_vfs_readdir_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_readdir, "%d %p", int, struct dirent*);
+UK_TRACEPOINT(trace_vfs_readdir_ret, "");
+UK_TRACEPOINT(trace_vfs_readdir_err, "%d", int);
 
 struct __dirstream
 {
@@ -798,9 +801,9 @@ void seekdir(DIR *dirp, long loc)
 	fdrop(fp);
 }
 
-TRACEPOINT(trace_vfs_mkdir, "\"%s\" 0%0o", const char*, mode_t);
-TRACEPOINT(trace_vfs_mkdir_ret, "");
-TRACEPOINT(trace_vfs_mkdir_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_mkdir, "\"%s\" 0%0o", const char*, mode_t);
+UK_TRACEPOINT(trace_vfs_mkdir_ret, "");
+UK_TRACEPOINT(trace_vfs_mkdir_err, "%d", int);
 
 int
 mkdir(const char *pathname, mode_t mode)
@@ -826,9 +829,9 @@ mkdir(const char *pathname, mode_t mode)
 	return -1;
 }
 
-TRACEPOINT(trace_vfs_rmdir, "\"%s\"", const char*);
-TRACEPOINT(trace_vfs_rmdir_ret, "");
-TRACEPOINT(trace_vfs_rmdir_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_rmdir, "\"%s\"", const char*);
+UK_TRACEPOINT(trace_vfs_rmdir_ret, "");
+UK_TRACEPOINT(trace_vfs_rmdir_err, "%d", int);
 
 int rmdir(const char *pathname)
 {
@@ -879,9 +882,9 @@ static int null_or_empty(const char *str)
 	return str == NULL || *str == '\0';
 }
 
-TRACEPOINT(trace_vfs_rename, "\"%s\" \"%s\"", const char*, const char*);
-TRACEPOINT(trace_vfs_rename_ret, "");
-TRACEPOINT(trace_vfs_rename_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_rename, "\"%s\" \"%s\"", const char*, const char*);
+UK_TRACEPOINT(trace_vfs_rename_ret, "");
+UK_TRACEPOINT(trace_vfs_rename_err, "%d", int);
 
 int rename(const char *oldpath, const char *newpath)
 {
@@ -924,9 +927,9 @@ int rename(const char *oldpath, const char *newpath)
 	return -1;
 }
 
-TRACEPOINT(trace_vfs_chdir, "\"%s\"", const char*);
-TRACEPOINT(trace_vfs_chdir_ret, "");
-TRACEPOINT(trace_vfs_chdir_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_chdir, "\"%s\"", const char*);
+UK_TRACEPOINT(trace_vfs_chdir_ret, "");
+UK_TRACEPOINT(trace_vfs_chdir_err, "%d", int);
 
 static int
 __do_fchdir(struct vfscore_file *fp, struct task *t)
@@ -985,9 +988,9 @@ int chdir(const char *pathname)
 	return -1;
 }
 
-TRACEPOINT(trace_vfs_fchdir, "%d", int);
-TRACEPOINT(trace_vfs_fchdir_ret, "");
-TRACEPOINT(trace_vfs_fchdir_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_fchdir, "%d", int);
+UK_TRACEPOINT(trace_vfs_fchdir_ret, "");
+UK_TRACEPOINT(trace_vfs_fchdir_err, "%d", int);
 
 int fchdir(int fd)
 {
@@ -1015,9 +1018,9 @@ int fchdir(int fd)
 	return -1;
 }
 
-TRACEPOINT(trace_vfs_link, "\"%s\" \"%s\"", const char*, const char*);
-TRACEPOINT(trace_vfs_link_ret, "");
-TRACEPOINT(trace_vfs_link_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_link, "\"%s\" \"%s\"", const char*, const char*);
+UK_TRACEPOINT(trace_vfs_link_ret, "");
+UK_TRACEPOINT(trace_vfs_link_err, "%d", int);
 
 int link(const char *oldpath, const char *newpath)
 {
@@ -1048,9 +1051,10 @@ int link(const char *oldpath, const char *newpath)
 }
 
 
-TRACEPOINT(trace_vfs_symlink, "oldpath=%s, newpath=%s", const char*, const char*);
-TRACEPOINT(trace_vfs_symlink_ret, "");
-TRACEPOINT(trace_vfs_symlink_err, "errno=%d", int);
+UK_TRACEPOINT(trace_vfs_symlink, "oldpath=%s, newpath=%s", const char*,
+	      const char*);
+UK_TRACEPOINT(trace_vfs_symlink_ret, "");
+UK_TRACEPOINT(trace_vfs_symlink_err, "errno=%d", int);
 
 int symlink(const char *oldpath, const char *newpath)
 {
@@ -1076,9 +1080,9 @@ int symlink(const char *oldpath, const char *newpath)
 	return 0;
 }
 
-TRACEPOINT(trace_vfs_unlink, "\"%s\"", const char*);
-TRACEPOINT(trace_vfs_unlink_ret, "");
-TRACEPOINT(trace_vfs_unlink_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_unlink, "\"%s\"", const char*);
+UK_TRACEPOINT(trace_vfs_unlink_ret, "");
+UK_TRACEPOINT(trace_vfs_unlink_err, "%d", int);
 
 int unlink(const char *pathname)
 {
@@ -1104,9 +1108,9 @@ int unlink(const char *pathname)
 	return -1;
 }
 
-TRACEPOINT(trace_vfs_stat, "\"%s\" %p", const char*, struct stat*);
-TRACEPOINT(trace_vfs_stat_ret, "");
-TRACEPOINT(trace_vfs_stat_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_stat, "\"%s\" %p", const char*, struct stat*);
+UK_TRACEPOINT(trace_vfs_stat_ret, "");
+UK_TRACEPOINT(trace_vfs_stat_err, "%d", int);
 
 int __xstat(int ver __unused, const char *pathname, struct stat *st)
 {
@@ -1141,9 +1145,10 @@ int stat(const char *pathname, struct stat *st)
 
 LFS64(stat);
 
-TRACEPOINT(trace_vfs_lstat, "pathname=%s, stat=%p", const char*, struct stat*);
-TRACEPOINT(trace_vfs_lstat_ret, "");
-TRACEPOINT(trace_vfs_lstat_err, "errno=%d", int);
+UK_TRACEPOINT(trace_vfs_lstat, "pathname=%s, stat=%p", const char*,
+	      struct stat*);
+UK_TRACEPOINT(trace_vfs_lstat_ret, "");
+UK_TRACEPOINT(trace_vfs_lstat_err, "errno=%d", int);
 
 int __lxstat(int ver __unused, const char *pathname, struct stat *st)
 {
@@ -1180,9 +1185,9 @@ int lstat(const char *pathname, struct stat *st)
 
 LFS64(lstat);
 
-TRACEPOINT(trace_vfs_statfs, "\"%s\" %p", const char*, struct statfs*);
-TRACEPOINT(trace_vfs_statfs_ret, "");
-TRACEPOINT(trace_vfs_statfs_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_statfs, "\"%s\" %p", const char*, struct statfs*);
+UK_TRACEPOINT(trace_vfs_statfs_ret, "");
+UK_TRACEPOINT(trace_vfs_statfs_err, "%d", int);
 
 int __statfs(const char *pathname, struct statfs *buf)
 {
@@ -1209,9 +1214,9 @@ __weak_alias(__statfs, statfs);
 
 LFS64(statfs);
 
-TRACEPOINT(trace_vfs_fstatfs, "\"%s\" %p", int, struct statfs*);
-TRACEPOINT(trace_vfs_fstatfs_ret, "");
-TRACEPOINT(trace_vfs_fstatfs_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_fstatfs, "\"%s\" %p", int, struct statfs*);
+UK_TRACEPOINT(trace_vfs_fstatfs_ret, "");
+UK_TRACEPOINT(trace_vfs_fstatfs_err, "%d", int);
 
 int __fstatfs(int fd, struct statfs *buf)
 {
@@ -1282,9 +1287,9 @@ fstatvfs(int fd, struct statvfs *buf)
 LFS64(fstatvfs);
 
 
-TRACEPOINT(trace_vfs_getcwd, "%p %d", char*, size_t);
-TRACEPOINT(trace_vfs_getcwd_ret, "\"%s\"", const char*);
-TRACEPOINT(trace_vfs_getcwd_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_getcwd, "%p %d", char*, size_t);
+UK_TRACEPOINT(trace_vfs_getcwd_ret, "\"%s\"", const char*);
+UK_TRACEPOINT(trace_vfs_getcwd_err, "%d", int);
 
 char *getcwd(char *path, size_t size)
 {
@@ -1323,9 +1328,9 @@ char *getcwd(char *path, size_t size)
 	return NULL;
 }
 
-TRACEPOINT(trace_vfs_dup, "%d", int);
-TRACEPOINT(trace_vfs_dup_ret, "\"%s\"", int);
-TRACEPOINT(trace_vfs_dup_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_dup, "%d", int);
+UK_TRACEPOINT(trace_vfs_dup_ret, "\"%s\"", int);
+UK_TRACEPOINT(trace_vfs_dup_err, "%d", int);
 /*
  * Duplicate a file descriptor
  */
@@ -1356,9 +1361,9 @@ int dup(int oldfd)
 	return -1;
 }
 
-TRACEPOINT(trace_vfs_dup3, "%d %d 0x%x", int, int, int);
-TRACEPOINT(trace_vfs_dup3_ret, "%d", int);
-TRACEPOINT(trace_vfs_dup3_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_dup3, "%d %d 0x%x", int, int, int);
+UK_TRACEPOINT(trace_vfs_dup3_ret, "%d", int);
+UK_TRACEPOINT(trace_vfs_dup3_err, "%d", int);
 /*
  * Duplicate a file descriptor to a particular value.
  */
@@ -1416,9 +1421,9 @@ int dup2(int oldfd, int newfd)
 #define SETFL (O_APPEND | O_ASYNC | O_DIRECT | O_NOATIME | O_NONBLOCK)
 
 #if 0
-TRACEPOINT(trace_vfs_fcntl, "%d %d 0x%x", int, int, int);
-TRACEPOINT(trace_vfs_fcntl_ret, "\"%s\"", int);
-TRACEPOINT(trace_vfs_fcntl_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_fcntl, "%d %d 0x%x", int, int, int);
+UK_TRACEPOINT(trace_vfs_fcntl_ret, "\"%s\"", int);
+UK_TRACEPOINT(trace_vfs_fcntl_err, "%d", int);
 
 int fcntl(int fd, int cmd, int arg)
 {
@@ -1502,9 +1507,9 @@ int fcntl(int fd, int cmd, int arg)
 }
 #endif
 
-TRACEPOINT(trace_vfs_access, "\"%s\" 0%0o", const char*, int);
-TRACEPOINT(trace_vfs_access_ret, "");
-TRACEPOINT(trace_vfs_access_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_access, "\"%s\" 0%0o", const char*, int);
+UK_TRACEPOINT(trace_vfs_access_ret, "");
+UK_TRACEPOINT(trace_vfs_access_err, "%d", int);
 
 /*
  * Check permission for file access
@@ -1607,9 +1612,9 @@ int isatty(int fd)
 }
 #endif
 
-TRACEPOINT(trace_vfs_truncate, "\"%s\" 0x%x", const char*, off_t);
-TRACEPOINT(trace_vfs_truncate_ret, "");
-TRACEPOINT(trace_vfs_truncate_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_truncate, "\"%s\" 0x%x", const char*, off_t);
+UK_TRACEPOINT(trace_vfs_truncate_ret, "");
+UK_TRACEPOINT(trace_vfs_truncate_err, "%d", int);
 
 int truncate(const char *pathname, off_t length)
 {
@@ -1637,9 +1642,9 @@ int truncate(const char *pathname, off_t length)
 
 LFS64(truncate);
 
-TRACEPOINT(trace_vfs_ftruncate, "%d 0x%x", int, off_t);
-TRACEPOINT(trace_vfs_ftruncate_ret, "");
-TRACEPOINT(trace_vfs_ftruncate_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_ftruncate, "%d 0x%x", int, off_t);
+UK_TRACEPOINT(trace_vfs_ftruncate_ret, "");
+UK_TRACEPOINT(trace_vfs_ftruncate_err, "%d", int);
 
 int ftruncate(int fd, off_t length)
 {
@@ -1697,9 +1702,9 @@ ssize_t readlink(const char *pathname, char *buf, size_t bufsize)
 	return -1;
 }
 
-TRACEPOINT(trace_vfs_fallocate, "%d %d 0x%x 0x%x", int, int, loff_t, loff_t);
-TRACEPOINT(trace_vfs_fallocate_ret, "");
-TRACEPOINT(trace_vfs_fallocate_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_fallocate, "%d %d 0x%x 0x%x", int, int, loff_t, loff_t);
+UK_TRACEPOINT(trace_vfs_fallocate_ret, "");
+UK_TRACEPOINT(trace_vfs_fallocate_err, "%d", int);
 
 int fallocate(int fd, int mode, loff_t offset, loff_t len)
 {
@@ -1781,9 +1786,9 @@ int futimesat(int dirfd, const char *pathname, const struct timeval times[2])
 	return -1;
 }
 
-TRACEPOINT(trace_vfs_utimensat, "\"%s\"", const char*);
-TRACEPOINT(trace_vfs_utimensat_ret, "");
-TRACEPOINT(trace_vfs_utimensat_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_utimensat, "\"%s\"", const char*);
+UK_TRACEPOINT(trace_vfs_utimensat_ret, "");
+UK_TRACEPOINT(trace_vfs_utimensat_err, "%d", int);
 
 int utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags)
 {
@@ -1801,9 +1806,9 @@ int utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 	return 0;
 }
 
-TRACEPOINT(trace_vfs_futimens, "%d", int);
-TRACEPOINT(trace_vfs_futimens_ret, "");
-TRACEPOINT(trace_vfs_futimens_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_futimens, "%d", int);
+UK_TRACEPOINT(trace_vfs_futimens_ret, "");
+UK_TRACEPOINT(trace_vfs_futimens_err, "%d", int);
 
 int futimens(int fd, const struct timespec times[2])
 {
@@ -1874,9 +1879,9 @@ int utime(const char *pathname, const struct utimbuf *t)
 }
 #endif
 
-TRACEPOINT(trace_vfs_chmod, "\"%s\" 0%0o", const char*, mode_t);
-TRACEPOINT(trace_vfs_chmod_ret, "");
-TRACEPOINT(trace_vfs_chmod_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_chmod, "\"%s\" 0%0o", const char*, mode_t);
+UK_TRACEPOINT(trace_vfs_chmod_ret, "");
+UK_TRACEPOINT(trace_vfs_chmod_err, "%d", int);
 
 int chmod(const char *pathname, mode_t mode)
 {
@@ -1899,8 +1904,8 @@ out_errno:
 	return -1;
 }
 
-TRACEPOINT(trace_vfs_fchmod, "\"%d\" 0%0o", int, mode_t);
-TRACEPOINT(trace_vfs_fchmod_ret, "");
+UK_TRACEPOINT(trace_vfs_fchmod, "\"%d\" 0%0o", int, mode_t);
+UK_TRACEPOINT(trace_vfs_fchmod_ret, "");
 
 int fchmod(int fd, mode_t mode)
 {
@@ -1915,8 +1920,8 @@ int fchmod(int fd, mode_t mode)
 	}
 }
 
-TRACEPOINT(trace_vfs_fchown, "\"%d\" %d %d", int, uid_t, gid_t);
-TRACEPOINT(trace_vfs_fchown_ret, "");
+UK_TRACEPOINT(trace_vfs_fchown, "\"%d\" %d %d", int, uid_t, gid_t);
+UK_TRACEPOINT(trace_vfs_fchown_ret, "");
 
 int fchown(int fd __unused, uid_t owner __unused, gid_t group __unused)
 {
