@@ -63,6 +63,11 @@ extern char _data[], _edata[];
 /* [_ctors, _ectors]: contains constructor tables (read-only) */
 extern char _ctors[], _ectors[];
 
+/* [_tls_start, _tls_end]: contains .tdata.* and .tbss.* sections */
+extern char _tls_start[], _tls_end[];
+/* _etdata: denotes end of .tdata (and start of .tbss */
+extern char _etdata[];
+
 /* __bss_start: start of BSS sections */
 extern char __bss_start[];
 

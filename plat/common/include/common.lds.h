@@ -94,4 +94,23 @@
 		LONG(0)							\
 	}
 
+#define TLS_SECTIONS							\
+	. = ALIGN(0x8);							\
+	_tls_start = .;							\
+	.tdata :							\
+	{								\
+		*(.tdata)						\
+		*(.tdata.*)						\
+		*(.gnu.linkonce.td.*)					\
+	}								\
+	_etdata = .;							\
+	.tbss :								\
+	{								\
+		*(.tbss)						\
+		*(.tbss.*)						\
+		*(.gnu.linkonce.tb.*)					\
+		. = ALIGN(0x8);						\
+	}								\
+	_tls_end = . + SIZEOF(.tbss);
+
 #endif /* __UK_COMMON_LDS_H */

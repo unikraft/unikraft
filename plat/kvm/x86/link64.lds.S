@@ -76,6 +76,8 @@ SECTIONS
 	}
 	_ectors = .;
 
+	TLS_SECTIONS
+
 	/* Read-write data (initialized) */
 	. = ALIGN(__PAGE_SIZE);
 	_data = .;

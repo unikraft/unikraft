@@ -72,6 +72,8 @@ SECTIONS
 	. = ALIGN(__PAGE_SIZE);
 	_ectors = .;
 
+	TLS_SECTIONS
+
 	/* Data */
 	_data = .;
 	.data : {
