@@ -1,6 +1,3 @@
 $(eval $(call addlib_s,ukunistd,$(CONFIG_UKUNISTD)))
 
-CINCLUDES-$(CONFIG_UKUNISTD)    += -I$(UKUNISTD_BASE)/include
-CXXINCLUDES-$(CONFIG_UKUNISTD)  += -I$(UKUNISTD_BASE)/include
-
 UKUNISTD_SRCS-$(CONFIG_UKUNISTD) += $(UKUNISTD_BASE)/user.c
