@@ -41,7 +41,9 @@ SECTIONS
 
 	_etext = .;			/* End of text section */
 
-	INCLUDE plat/common/x86/link64.lds
+	EXCEPTION_SECTIONS
+
+	CTORTAB_SECTION
 
 	_rodata = .;
 	.rodata : {

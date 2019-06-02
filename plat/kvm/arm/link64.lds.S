@@ -69,25 +69,7 @@ SECTIONS {
 	. = ALIGN(__PAGE_SIZE);
 	_etext = .;
 
-	/* Exception frame */
-	__eh_frame_start = .;
-	.eh_frame :
-	{
-		*(.eh_frame)
-		*(.eh_frame.*)
-	}
-	__eh_frame_end = .;
-
-	/* Exception frame header */
-	__eh_frame_hdr_start = .;
-	.eh_frame_hdr :
-	{
-
-		*(.eh_frame_hdr)
-		*(.eh_frame_hdr.*)
-	}
-	. = ALIGN(__PAGE_SIZE);
-	__eh_frame_hdr_end = .;
+	EXCEPTION_SECTIONS
 
 	/* Read-only data */
 	_rodata = .;
@@ -100,13 +82,7 @@ SECTIONS {
 
 	_erodata = .;
 
-	. = ALIGN(__PAGE_SIZE);
-	uk_ctortab = .;
-	.uk_ctortab :
-	{
-		KEEP(*(SORT_BY_NAME(.uk_ctortab[0-7])))
-		LONG(0)
-	}
+	CTORTAB_SECTION
 
 	/* Constructor tables (read-only) */
 	. = ALIGN(0x8);

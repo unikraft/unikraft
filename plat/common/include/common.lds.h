@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2019, NEC Laboratories Europe GmbH, NEC Corporation.
+ * Copyright (c) 2019, NEC Laboratories Europe GmbH, NEC Corporation,
+ *                     University Politehnica of Bucharest.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,6 +31,8 @@
 
 #ifndef __UK_COMMON_LDS_H
 #define __UK_COMMON_LDS_H
+
+#include <uk/arch/limits.h> /* for __PAGE_SIZE */
 
 /* DWARF debug sections.  Symbols in the DWARF debugging sections are
  * relative to the beginning of the section so we begin them at 0.
@@ -63,5 +66,32 @@
 	/* DWARF Extension.  */						\
 	.debug_macro    0 : { *(.debug_macro) }				\
 	.gnu.attributes 0 : { KEEP (*(.gnu.attributes)) }
+
+#define EXCEPTION_SECTIONS						\
+	. = ALIGN(__PAGE_SIZE);						\
+	__eh_frame_start = .;						\
+	.eh_frame :							\
+	{								\
+		*(.eh_frame)						\
+		*(.eh_frame.*)						\
+	}								\
+	__eh_frame_end = .;						\
+									\
+	__eh_frame_hdr_start = .;					\
+	.eh_frame_hdr :							\
+	{								\
+		*(.eh_frame_hdr)					\
+		*(.eh_frame_hdr.*)					\
+	}								\
+	__eh_frame_hdr_end = .;
+
+#define CTORTAB_SECTION							\
+	. = ALIGN(__PAGE_SIZE);						\
+	uk_ctortab = .;							\
+	.uk_ctortab :							\
+	{								\
+		KEEP(*(SORT_BY_NAME(.uk_ctortab[0-7])))			\
+		LONG(0)							\
+	}
 
 #endif /* __UK_COMMON_LDS_H */

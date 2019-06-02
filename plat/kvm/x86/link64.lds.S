@@ -43,7 +43,9 @@ SECTIONS
 	}
 	_etext = .;
 
-	INCLUDE plat/common/x86/link64.lds
+	EXCEPTION_SECTIONS
+
+	CTORTAB_SECTION
 
 	/* Read-only data */
 	. = ALIGN(0x1000);

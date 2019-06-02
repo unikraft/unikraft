@@ -1,6 +1,10 @@
+#include <common.lds.h>
+
 SECTIONS
 {
-   INCLUDE plat/common/x86/link64.lds
+	EXCEPTION_SECTIONS
+
+	CTORTAB_SECTION
 }
 INSERT AFTER .rodata
 

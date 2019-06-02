@@ -49,26 +49,7 @@ SECTIONS
 
 	_etext = .;			/* End of text section */
 
-	/* Exception frame */
-	. = ALIGN(4096);
-	__eh_frame_start = .;
-	.eh_frame :
-	{
-		*(.eh_frame)
-		*(.eh_frame.*)
-	}
-	__eh_frame_end = .;
-
-
-	/* Exception frame header */
-	__eh_frame_hdr_start = .;
-	.eh_frame_hdr :
-	{
-		*(.eh_frame_hdr)
-		*(.eh_frame_hdr.*)
-	}
-	. = ALIGN(4096);
-	__eh_frame_hdr_end = .;
+	EXCEPTION_SECTIONS
 
 	/* Read-only data */
 	_rodata = .;
@@ -80,13 +61,7 @@ SECTIONS
 	. = ALIGN(4096);
 	_erodata = .;
 
-	uk_ctortab = .;
-	.uk_ctortab :
-	{
-		KEEP(*(SORT_BY_NAME(.uk_ctortab[0-7])))
-		LONG(0)
-	}
-	. = ALIGN(4096);
+	CTORTAB_SECTION
 
 	. = ALIGN(0x8);
 	_ctors = .;
