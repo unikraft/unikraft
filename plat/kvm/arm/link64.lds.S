@@ -103,6 +103,8 @@ SECTIONS {
 	_ectors = .;
 	. = ALIGN(__PAGE_SIZE);
 
+	TLS_SECTIONS
+
 	/* Read-write data that is initialized explicitly in code */
 	_data = .;
 	.data :
