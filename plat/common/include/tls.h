@@ -1,7 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Florian Schmidt <florian.schmidt@neclab.eu>
- *
  * Copyright (c) 2019, NEC Europe Ltd., NEC Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,43 +29,13 @@
  *
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
+#ifndef __PLAT_CMN_TLS_H__
+#define __PLAT_CMN_TLS_H__
 
-#ifndef __UKARCH_TLS_H__
-#error Do not include this header directly
+#if defined(__X86_64__)
+#include <x86/tls.h>
+#else
+#error "For thread-local storage support, add tls.h for current architecture."
 #endif
 
-#include <uk/arch/types.h>
-#include <string.h>
-
-extern char _tls_start[], _etdata[], _tls_end[];
-
-static inline __sz ukarch_tls_area_size(void)
-{
-	/* x86_64 ABI requires that fs:%0 contains the address of itself, to
-	 * allow certain optimizations. Hence, the overall size of the size of
-	 * the TLS area, plus 8 bytes.
-	 */
-	return _tls_end - _tls_start + 8;
-}
-
-static inline __sz ukarch_tls_area_align(void)
-{
-	return 8;
-}
-
-static inline void ukarch_tls_area_copy(void *tls_area)
-{
-	__sz tls_len = _tls_end - _tls_start;
-	__sz tls_data_len = _etdata - _tls_start;
-	__sz tls_bss_len = _tls_end - _etdata;
-
-	memcpy(tls_area, _tls_start, tls_data_len);
-	memset(tls_area + tls_data_len, 0, tls_bss_len);
-	/* x86_64 ABI requires that fs:%0 contains the address of itself. */
-	*((__uptr *)(tls_area + tls_len)) = (__uptr)(tls_area + tls_len);
-}
-
-static inline void *ukarch_tls_pointer(void *tls_area)
-{
-	return tls_area + (_tls_end - _tls_start);
-}
+#endif /* __PLAT_CMN_TLS_H__ */

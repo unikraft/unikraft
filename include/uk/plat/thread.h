@@ -51,7 +51,8 @@ enum ukplat_ctx_type {
 struct uk_alloc;
 
 typedef void *(*ukplat_ctx_create_func_t)
-		(struct uk_alloc *allocator, unsigned long sp);
+		(struct uk_alloc *allocator, unsigned long sp,
+		 unsigned long tlsp);
 typedef void  (*ukplat_ctx_start_func_t)
 		(void *ctx);
 typedef void  (*ukplat_ctx_switch_func_t)
@@ -72,12 +73,13 @@ int ukplat_ctx_callbacks_init(struct ukplat_ctx_callbacks *ctx_cbs,
 
 static inline
 void *ukplat_thread_ctx_create(struct ukplat_ctx_callbacks *cbs,
-		struct uk_alloc *allocator, unsigned long sp)
+		struct uk_alloc *allocator, unsigned long sp,
+		unsigned long tlsp)
 {
 	UK_ASSERT(cbs != NULL);
 	UK_ASSERT(allocator != NULL);
 
-	return cbs->create_cb(allocator, sp);
+	return cbs->create_cb(allocator, sp, tlsp);
 }
 
 void ukplat_thread_ctx_destroy(struct uk_alloc *allocator, void *ctx);

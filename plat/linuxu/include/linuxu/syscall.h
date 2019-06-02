@@ -123,6 +123,14 @@ static inline int sys_sigprocmask(int how,
 			      sizeof(k_sigset_t));
 }
 
+#define ARCH_SET_FS 0x1002
+static inline int sys_arch_prctl(int code, unsigned long addr)
+{
+	return (int) syscall2(__SC_ARCH_PRCTL,
+			      (long) code,
+			      (long) addr);
+}
+
 static inline int sys_pselect6(int nfds,
 		k_fd_set *readfds, k_fd_set *writefds, k_fd_set *exceptfds,
 		const struct k_timespec *timeout, const void *sigmask)

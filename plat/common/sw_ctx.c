@@ -39,9 +39,11 @@
 #include <uk/alloc.h>
 #include <sw_ctx.h>
 #include <uk/assert.h>
+#include <tls.h>
 #include <x86/cpu.h>
 
-static void *sw_ctx_create(struct uk_alloc *allocator, unsigned long sp);
+static void *sw_ctx_create(struct uk_alloc *allocator, unsigned long sp,
+				unsigned long tlsp);
 static void  sw_ctx_start(void *ctx) __noreturn;
 static void  sw_ctx_switch(void *prevctx, void *nextctx);
 
@@ -51,7 +53,8 @@ static void  sw_ctx_switch(void *prevctx, void *nextctx);
  */
 extern void asm_thread_starter(void);
 
-static void *sw_ctx_create(struct uk_alloc *allocator, unsigned long sp)
+static void *sw_ctx_create(struct uk_alloc *allocator, unsigned long sp,
+				unsigned long tlsp)
 {
 	struct sw_ctx *ctx;
 	size_t sz;
@@ -68,6 +71,7 @@ static void *sw_ctx_create(struct uk_alloc *allocator, unsigned long sp)
 	}
 
 	ctx->sp = sp;
+	ctx->tlsp = tlsp;
 	ctx->ip = (unsigned long) asm_thread_starter;
 	ctx->extregs = ALIGN_UP(((uintptr_t)ctx + sizeof(struct sw_ctx)),
 				x86_cpu_features.extregs_align);
@@ -86,6 +90,7 @@ static void sw_ctx_start(void *ctx)
 
 	UK_ASSERT(sw_ctx != NULL);
 
+	set_tls_pointer(sw_ctx->tlsp);
 	/* Switch stacks and run the thread */
 	asm_ctx_start(sw_ctx->sp, sw_ctx->ip);
 
@@ -101,6 +106,7 @@ static void sw_ctx_switch(void *prevctx, void *nextctx)
 
 	save_extregs(p);
 	restore_extregs(n);
+	set_tls_pointer(n->tlsp);
 	asm_sw_ctx_switch(prevctx, nextctx);
 }
 

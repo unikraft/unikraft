@@ -48,6 +48,7 @@
 #define __SC_RT_SIGPROCMASK 14
 #define __SC_IOCTL  16
 #define __SC_EXIT   60
+#define __SC_ARCH_PRCTL       158
 #define __SC_TIMER_CREATE     222
 #define __SC_TIMER_SETTIME    223
 #define __SC_TIMER_GETTIME    224

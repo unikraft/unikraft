@@ -96,4 +96,9 @@
 #define X86_XCR0_SSE            (1 << 1)
 #define X86_XCR0_AVX            (1 << 2)
 
+/*
+ * Model-specific register addresses
+ */
+#define X86_MSR_FS_BASE         0xc0000100
+
 #endif /* __PLAT_CMN_X86_CPU_DEFS_H__ */

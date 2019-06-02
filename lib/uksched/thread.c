@@ -39,7 +39,7 @@
 #include <uk/wait.h>
 #include <uk/print.h>
 #include <uk/assert.h>
-
+#include <uk/arch/tls.h>
 
 /* Pushes the specified value onto the stack of the specified thread */
 static void stack_push(unsigned long *sp, unsigned long value)
@@ -103,7 +103,8 @@ int uk_thread_init(struct uk_thread *thread,
 	init_sp(&sp, stack, function, arg);
 
 	/* Call platform specific setup. */
-	thread->ctx = ukplat_thread_ctx_create(cbs, allocator, sp);
+	thread->ctx = ukplat_thread_ctx_create(cbs, allocator, sp,
+			(uintptr_t)ukarch_tls_pointer(tls));
 	if (thread->ctx == NULL)
 		return -1;
 
