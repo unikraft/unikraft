@@ -34,3 +34,4 @@ GTAGS
 # cscope files
 cscope.*
 ncscope.*
+support/scripts/uk_trace/uk_trace.egg-info/
