@@ -50,6 +50,7 @@ struct uk_sched;
 struct uk_thread {
 	const char *name;
 	void *stack;
+	void *tls;
 	void *ctx;
 	UK_TAILQ_ENTRY(struct uk_thread) thread_list;
 	uint32_t flags;
@@ -106,7 +107,7 @@ struct uk_thread *uk_thread_current(void)
 
 int uk_thread_init(struct uk_thread *thread,
 		struct ukplat_ctx_callbacks *cbs, struct uk_alloc *allocator,
-		const char *name, void *stack,
+		const char *name, void *stack, void *tls,
 		void (*function)(void *), void *arg);
 void uk_thread_fini(struct uk_thread *thread,
 		struct uk_alloc *allocator);

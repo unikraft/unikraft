@@ -88,13 +88,14 @@ struct _reent *__getreent(void)
 
 int uk_thread_init(struct uk_thread *thread,
 		struct ukplat_ctx_callbacks *cbs, struct uk_alloc *allocator,
-		const char *name, void *stack,
+		const char *name, void *stack, void *tls,
 		void (*function)(void *), void *arg)
 {
 	unsigned long sp;
 
 	UK_ASSERT(thread != NULL);
 	UK_ASSERT(stack != NULL);
+	UK_ASSERT(!have_tls_area() || tls != NULL);
 
 	/* Save pointer to the thread on the stack to get current thread */
 	*((unsigned long *) stack) = (unsigned long) thread;
@@ -108,6 +109,7 @@ int uk_thread_init(struct uk_thread *thread,
 
 	thread->name = name;
 	thread->stack = stack;
+	thread->tls = tls;
 
 	/* Not runnable, not exited, not sleeping */
 	thread->flags = 0;
@@ -121,8 +123,8 @@ int uk_thread_init(struct uk_thread *thread,
 	reent_init(&thread->reent);
 #endif
 
-	uk_pr_info("Thread \"%s\": pointer: %p, stack: %p\n",
-		   name, thread, thread->stack);
+	uk_pr_info("Thread \"%s\": pointer: %p, stack: %p, tls: %p\n",
+		   name, thread, thread->stack, thread->tls);
 
 	return 0;
 }

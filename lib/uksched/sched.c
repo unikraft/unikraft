@@ -33,10 +33,12 @@
  */
 
 #include <stdlib.h>
+#include <string.h>
 #include <uk/plat/config.h>
 #include <uk/plat/thread.h>
 #include <uk/alloc.h>
 #include <uk/sched.h>
+#include <uk/arch/tls.h>
 #if CONFIG_LIBUKSCHEDCOOP
 #include <uk/schedcoop.h>
 #endif
@@ -148,27 +150,45 @@ static void *create_stack(struct uk_alloc *allocator)
 	return stack;
 }
 
+static void *uk_thread_tls_create(struct uk_alloc *allocator)
+{
+	void *tls;
+
+	if (uk_posix_memalign(allocator, &tls, ukarch_tls_area_align(),
+				ukarch_tls_area_size()))
+		return NULL;
+	ukarch_tls_area_copy(tls);
+	return tls;
+}
+
 void uk_sched_idle_init(struct uk_sched *sched,
 		void *stack, void (*function)(void *))
 {
 	struct uk_thread *idle;
 	int rc;
+	void *tls = NULL;
 
 	UK_ASSERT(sched != NULL);
 
 	if (stack == NULL)
 		stack = create_stack(sched->allocator);
 	UK_ASSERT(stack != NULL);
+	if (have_tls_area() && !(tls = uk_thread_tls_create(sched->allocator)))
+		goto out_crash;
 
 	idle = &sched->idle;
 
 	rc = uk_thread_init(idle,
 			&sched->plat_ctx_cbs, sched->allocator,
-			"Idle", stack, function, NULL);
+			"Idle", stack, tls, function, NULL);
 	if (rc)
-		UK_CRASH("Error initializing idle thread.");
+		goto out_crash;
 
 	idle->sched = sched;
+	return;
+
+out_crash:
+	UK_CRASH("Error initializing the idle thread.");
 }
 
 struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
@@ -178,6 +198,7 @@ struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
 	struct uk_thread *thread = NULL;
 	void *stack = NULL;
 	int rc;
+	void *tls = NULL;
 
 	thread = uk_malloc(sched->allocator, sizeof(struct uk_thread));
 	if (thread == NULL) {
@@ -191,10 +212,12 @@ struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
 	stack = create_stack(sched->allocator);
 	if (stack == NULL)
 		goto err;
+	if (have_tls_area() && !(tls = uk_thread_tls_create(sched->allocator)))
+		goto err;
 
 	rc = uk_thread_init(thread,
 			&sched->plat_ctx_cbs, sched->allocator,
-			name, stack, function, arg);
+			name, stack, tls, function, arg);
 	if (rc)
 		goto err;
 
@@ -207,6 +230,8 @@ struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
 err_add:
 	uk_thread_fini(thread, sched->allocator);
 err:
+	if (tls)
+		uk_free(sched->allocator, tls);
 	if (stack)
 		uk_free(sched->allocator, stack);
 	if (thread)
@@ -219,11 +244,15 @@ void uk_sched_thread_destroy(struct uk_sched *sched, struct uk_thread *thread)
 {
 	UK_ASSERT(sched != NULL);
 	UK_ASSERT(thread != NULL);
+	UK_ASSERT(thread->stack != NULL);
+	UK_ASSERT(!have_tls_area() || thread->tls != NULL);
 	UK_ASSERT(is_exited(thread));
 
 	UK_TAILQ_REMOVE(&sched->exited_threads, thread, thread_list);
 	uk_thread_fini(thread, sched->allocator);
 	uk_pfree(sched->allocator, thread->stack, STACK_SIZE_PAGE_ORDER);
+	if (thread->tls)
+		uk_free(sched->allocator, thread->tls);
 	uk_free(sched->allocator, thread);
 }
 
