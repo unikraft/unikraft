@@ -34,12 +34,29 @@
 
 #ifndef _UK_TRACE_H_
 #define _UK_TRACE_H_
+#include <uk/essentials.h>
+#include <stdint.h>
+
+#define UK_TP_DEF_MAGIC 0x65645054 /* TPde */
+
+enum __uk_trace_arg_type {
+	__UK_TRACE_ARG_INT = 0,
+	__UK_TRACE_ARG_STRING = 1,
+};
+
 /* TODO: consider to move UK_CONCAT into public headers */
 #define __UK_CONCAT_X(a, b) a##b
 #define UK_CONCAT(a, b) __UK_CONCAT_X(a, b)
 
 #define __UK_NARGS_X(a, b, c, d, e, f, g, h, n, ...) n
 #define UK_NARGS(...)  __UK_NARGS_X(, ##__VA_ARGS__, 7, 6, 5, 4, 3, 2, 1, 0)
+
+#define __UK_TRACE_GET_TYPE(arg) (					\
+	__builtin_types_compatible_p(typeof(arg), const char *) *	\
+		__UK_TRACE_ARG_STRING +					\
+	__builtin_types_compatible_p(typeof(arg), char *) *		\
+		__UK_TRACE_ARG_STRING +					\
+	0)
 
 #define __UK_GET_ARG1(a1, ...) a1
 #define __UK_GET_ARG2(a1, a2, ...) a2
@@ -75,5 +92,75 @@
 
 #define UK_FOREACH(f, ...)					\
 	UK_FOREACH_N(UK_NARGS(__VA_ARGS__), f, __VA_ARGS__)
+
+#define UK_FOREACH_SIZEOF(a, b) sizeof(b)
+#define __UK_TRACE_ARG_SIZES(n, ...)				\
+	{ UK_FOREACH(UK_FOREACH_SIZEOF, __VA_ARGS__) }
+
+#define __UK_TRACE_GET_TYPE_FOREACH(n, arg)	\
+	__UK_TRACE_GET_TYPE(arg)
+#define __UK_TRACE_ARG_TYPES(n, ...)					\
+	{ UK_FOREACH(__UK_TRACE_GET_TYPE_FOREACH, __VA_ARGS__) }
+
+#define __UK_TRACE_REG(NR, regname, trace_name, fmt, ...)	\
+	UK_CTASSERT(sizeof(#trace_name) < 255);			\
+	UK_CTASSERT(sizeof(fmt) < 255);				\
+	__attribute((__section__(".uk_tracepoints_list")))	\
+	static struct {						\
+		uint32_t magic;					\
+		uint32_t size;					\
+		uint64_t cookie;				\
+		uint8_t args_nr;				\
+		uint8_t name_len;				\
+		uint8_t format_len;				\
+		uint8_t sizes[NR];				\
+		uint8_t types[NR];				\
+		char name[sizeof(#trace_name)];			\
+		char format[sizeof(fmt)];			\
+	} regname __used = {					\
+		UK_TP_DEF_MAGIC,				\
+		sizeof(regname),				\
+		(uint64_t) &regname,				\
+		NR,						\
+		sizeof(#trace_name), sizeof(fmt),		\
+		__UK_TRACE_ARG_SIZES(NR, __VA_ARGS__),		\
+		__UK_TRACE_ARG_TYPES(NR, __VA_ARGS__),		\
+		#trace_name, fmt }
+
+/* Makes from "const char*" "const char* arg1".
+ */
+#define __UK_ARGS_MAP_FN(n, t) t UK_CONCAT(arg, n)
+#define __UK_TRACE_ARGS_MAP(n, ...) \
+	UK_FOREACH(__UK_ARGS_MAP_FN, __VA_ARGS__)
+
+#define __UK_ARGS_MAP_FN_UNUSED(n, t) t UK_CONCAT(arg, n) __unused
+#define __UK_TRACE_ARGS_MAP_UNUSED(n, ...) \
+	UK_FOREACH(__UK_ARGS_MAP_FN_UNUSED, __VA_ARGS__)
+
+
+#if (defined(CONFIG_LIBUKDEBUG_TRACEPOINTS) &&				\
+	(defined(UK_DEBUG_TRACE) || defined(CONFIG_LIBUKDEBUG_ALL_TRACEPOINTS)))
+#define ____UK_TRACEPOINT(n, regdata_name, trace_name, fmt, ...)	\
+	__UK_TRACE_REG(n, regdata_name, trace_name, fmt,		\
+		       __VA_ARGS__);					\
+	static inline void trace_name(__UK_TRACE_ARGS_MAP_UNUSED(n, __VA_ARGS__)) \
+	{								\
+	}
+#else
+#define ____UK_TRACEPOINT(n, regdata_name, trace_name, fmt, ...)	\
+	static inline void trace_name(					\
+		__UK_TRACE_ARGS_MAP_UNUSED(n, __VA_ARGS__))		\
+	{								\
+	}
+#endif
+
+#define __UK_TRACEPOINT(n, regdata_name, trace_name, fmt, ...)	\
+	____UK_TRACEPOINT(n, regdata_name, trace_name, fmt,	\
+			  __VA_ARGS__)
+#define UK_TRACEPOINT(trace_name, fmt, ...)				\
+	__UK_TRACEPOINT(UK_NARGS(__VA_ARGS__),				\
+			__ ## trace_name ## _regdata,			\
+			trace_name, fmt, __VA_ARGS__)
+
 
 #endif /* _UK_TRACE_H_ */

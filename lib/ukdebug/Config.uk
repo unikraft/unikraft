@@ -75,4 +75,13 @@ config LIBUKDEBUG_ENABLE_ASSERT
 	help
 	  Build code with assertions.
 
+menuconfig LIBUKDEBUG_TRACEPOINTS
+	bool "Enable tracepoints"
+	default n
+if LIBUKDEBUG_TRACEPOINTS
+config LIBUKDEBUG_ALL_TRACEPOINTS
+	bool "Enable all tracepoints at once"
+	default n
+endif
+
 endif
