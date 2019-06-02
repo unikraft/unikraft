@@ -36,13 +36,35 @@
 #define _UK_TRACE_H_
 #include <uk/essentials.h>
 #include <stdint.h>
+#include <stddef.h>
+#include <uk/plat/time.h>
+#include <string.h>
+#include <uk/arch/lcpu.h>
+#include <uk/plat/lcpu.h>
 
+/* There is no justification of the limit of 80 symbols. But there
+ * must be a limit anyways. Just number from the coding standard is
+ * used. Feel free to change this limit if you have the actual reason
+ * for another number
+ */
+#define __UK_TRACE_MAX_STRLEN 80
+#define UK_TP_HEADER_MAGIC 0x64685254 /* TRhd */
 #define UK_TP_DEF_MAGIC 0x65645054 /* TPde */
 
 enum __uk_trace_arg_type {
 	__UK_TRACE_ARG_INT = 0,
 	__UK_TRACE_ARG_STRING = 1,
 };
+
+struct uk_tracepoint_header {
+	uint32_t magic;
+	uint32_t size;
+	__nsec time;
+	void *cookie;
+};
+
+extern size_t uk_trace_buffer_free;
+extern char *uk_trace_buffer_writep;
 
 /* TODO: consider to move UK_CONCAT into public headers */
 #define __UK_CONCAT_X(a, b) a##b
@@ -51,12 +73,67 @@ enum __uk_trace_arg_type {
 #define __UK_NARGS_X(a, b, c, d, e, f, g, h, n, ...) n
 #define UK_NARGS(...)  __UK_NARGS_X(, ##__VA_ARGS__, 7, 6, 5, 4, 3, 2, 1, 0)
 
+
+static inline void __uk_trace_save_arg(char **pbuff,
+				      size_t *pfree,
+				      enum __uk_trace_arg_type type,
+				      int size,
+				      long arg)
+{
+	char *buff = *pbuff;
+	size_t free = *pfree;
+	int len;
+
+	if (type == __UK_TRACE_ARG_STRING) {
+		len = strnlen((char *) arg, __UK_TRACE_MAX_STRLEN);
+		/* The '+1' is for storing length of the string */
+		size = len + 1;
+	}
+
+	if (free < (size_t) size) {
+		/* Block the next invocations of trace points */
+		*pfree = 0;
+		uk_trace_buffer_free = 0;
+		return;
+	}
+
+	switch (type) {
+	case __UK_TRACE_ARG_INT:
+		/* for simplicity we do not care about alignment */
+		memcpy(buff, &arg, size);
+		break;
+	case __UK_TRACE_ARG_STRING:
+		*((uint8_t *) buff) = len;
+		memcpy(buff + 1, (char *) arg, len);
+		break;
+	}
+
+	*pbuff = buff + size;
+	*pfree -= size;
+}
+
 #define __UK_TRACE_GET_TYPE(arg) (					\
 	__builtin_types_compatible_p(typeof(arg), const char *) *	\
 		__UK_TRACE_ARG_STRING +					\
 	__builtin_types_compatible_p(typeof(arg), char *) *		\
 		__UK_TRACE_ARG_STRING +					\
 	0)
+
+#define __UK_TRACE_SAVE_ONE(arg) __uk_trace_save_arg(	\
+		&buff,					\
+		&free,					\
+		__UK_TRACE_GET_TYPE(arg),		\
+		sizeof(arg),				\
+		(long) arg)
+
+#define __UK_TRACE_SAVE_ARGS0()
+#define __UK_TRACE_SAVE_ARGS1() __UK_TRACE_SAVE_ONE(arg1)
+#define __UK_TRACE_SAVE_ARGS2() __UK_TRACE_SAVE_ARGS1(); __UK_TRACE_SAVE_ONE(arg2)
+#define __UK_TRACE_SAVE_ARGS3() __UK_TRACE_SAVE_ARGS2(); __UK_TRACE_SAVE_ONE(arg3)
+#define __UK_TRACE_SAVE_ARGS4() __UK_TRACE_SAVE_ARGS3(); __UK_TRACE_SAVE_ONE(arg4)
+#define __UK_TRACE_SAVE_ARGS5() __UK_TRACE_SAVE_ARGS4(); __UK_TRACE_SAVE_ONE(arg5)
+#define __UK_TRACE_SAVE_ARGS6() __UK_TRACE_SAVE_ARGS5(); __UK_TRACE_SAVE_ONE(arg6)
+#define __UK_TRACE_SAVE_ARGS7() __UK_TRACE_SAVE_ARGS6(); __UK_TRACE_SAVE_ONE(arg7)
 
 #define __UK_GET_ARG1(a1, ...) a1
 #define __UK_GET_ARG2(a1, a2, ...) a2
@@ -127,6 +204,40 @@ enum __uk_trace_arg_type {
 		__UK_TRACE_ARG_TYPES(NR, __VA_ARGS__),		\
 		#trace_name, fmt }
 
+static inline char *__uk_trace_get_buff(size_t *free)
+{
+	struct uk_tracepoint_header *ret;
+
+	if (uk_trace_buffer_free < sizeof(*ret))
+		return 0;
+	ret = (struct uk_tracepoint_header *) uk_trace_buffer_writep;
+
+	/* In case we fail to fill the tracepoint for any reason, make
+	 * sure we do not confuse parser. We fill the header only
+	 * after the full tracepoint is completed
+	 */
+	ret->magic = 0;
+	*free = uk_trace_buffer_free - sizeof(*ret);
+	return (char *) (ret + 1);
+}
+
+static inline void __uk_trace_finalize_buff(char *new_buff_pos, void *cookie)
+{
+	uint32_t size;
+	struct uk_tracepoint_header *head =
+		(struct uk_tracepoint_header *) uk_trace_buffer_writep;
+
+	size = new_buff_pos - uk_trace_buffer_writep;
+	uk_trace_buffer_writep += size;
+	uk_trace_buffer_free -= size;
+
+	head->time = ukplat_monotonic_clock();
+	head->size = size - sizeof(*head);
+	head->cookie = cookie;
+	barrier();
+	head->magic = UK_TP_HEADER_MAGIC;
+}
+
 /* Makes from "const char*" "const char* arg1".
  */
 #define __UK_ARGS_MAP_FN(n, t) t UK_CONCAT(arg, n)
@@ -143,8 +254,17 @@ enum __uk_trace_arg_type {
 #define ____UK_TRACEPOINT(n, regdata_name, trace_name, fmt, ...)	\
 	__UK_TRACE_REG(n, regdata_name, trace_name, fmt,		\
 		       __VA_ARGS__);					\
-	static inline void trace_name(__UK_TRACE_ARGS_MAP_UNUSED(n, __VA_ARGS__)) \
+	static inline void trace_name(__UK_TRACE_ARGS_MAP(n, __VA_ARGS__)) \
 	{								\
+		unsigned long flags = ukplat_lcpu_save_irqf();		\
+		size_t free __maybe_unused;				\
+		char *buff = __uk_trace_get_buff(&free);		\
+		if (buff) {						\
+			__UK_TRACE_SAVE_ARGS ## n();			\
+			__uk_trace_finalize_buff(			\
+				buff, &regdata_name);			\
+		}							\
+		ukplat_lcpu_restore_irqf(flags);			\
 	}
 #else
 #define ____UK_TRACEPOINT(n, regdata_name, trace_name, fmt, ...)	\
