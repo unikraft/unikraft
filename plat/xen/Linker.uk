@@ -45,8 +45,10 @@ ifeq ($(CONFIG_OPTIMIZE_SYMFILE),y)
 endif
 	$(call build_cmd,OBJCOPY,,$@,\
 	       $(OBJCOPY) -O binary $@.elf $@)
+ifeq ($(CONFIG_OPTIMIZE_COMPRESS),y)
 	$(call build_cmd,GZ,,$@.gz,\
 	       $(GZIP) -f -9 -c $@ >$@.gz)
+endif
 else
 	$(call build_cmd,LD,,$@.dbg,\
 	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(XEN_LDFLAGS) $(XEN_LDFLAGS-y) \
@@ -62,8 +64,10 @@ ifeq ($(CONFIG_OPTIMIZE_SYMFILE),y)
 	$(call build_cmd,NM,,$@.sym,\
 	       $(NM) -n $@.dbg > $@.sym)
 endif
+ifeq ($(CONFIG_OPTIMIZE_COMPRESS),y)
 	$(call build_cmd,GZ,,$@.gz,\
 	       $(GZIP) -f -9 -c $@ >$@.gz)
+endif
 endif
 
 # register image to the build

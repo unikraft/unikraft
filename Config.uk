@@ -126,6 +126,13 @@ config OPTIMIZE_SYMFILE
 	help
 		Create a separate file with all symbol locations
 
+config OPTIMIZE_COMPRESS
+	bool "Compress images"
+	default y
+	help
+		Create compressed images. Please note that not all platforms
+		support compressing.
+
 config RECORD_BUILDTIME
 	bool "Keep track of Building time"
 	default n

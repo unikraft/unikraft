@@ -47,8 +47,10 @@ ifeq ($(CONFIG_OPTIMIZE_SYMFILE),y)
 	$(call build_cmd,NM,,$@.sym,\
 	       $(NM) -n $@.dbg > $@.sym)
 endif
+ifeq ($(CONFIG_OPTIMIZE_COMPRESS),y)
 	$(call build_cmd,GZ,,$@.gz,\
 	       $(GZIP) -f -9 -c $@ >$@.gz)
+endif
 endif
 
 # register image to the build
