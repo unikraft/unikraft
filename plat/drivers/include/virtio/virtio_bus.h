@@ -146,6 +146,28 @@ int virtio_bus_register_device(struct virtio_dev *vdev);
 void _virtio_bus_register_driver(struct virtio_driver *vdrv);
 
 /**
+ * This function resets the virtio device .
+ * @param vdev
+ *	Reference to the virtio device
+ * @return
+ *	0 on successful updating the status.
+ *	-ENOTSUP, if the operation is not supported on the virtio device.
+ */
+static inline int virtio_dev_reset(struct virtio_dev *vdev)
+{
+	int rc = -ENOTSUP;
+
+	UK_ASSERT(vdev);
+
+	if (likely(vdev->cops->device_reset)) {
+		vdev->cops->device_reset(vdev);
+		rc = 0;
+	}
+
+	return rc;
+}
+
+/**
  * The function updates the status of the virtio device
  * @param vdev
  *      Reference to the virtio device.
