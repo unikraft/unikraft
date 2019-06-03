@@ -92,6 +92,12 @@ choice
 	help
 		Set the level of available debugging information.
 
+config DEBUG_SYMBOLS_LVL0
+	bool "Level 0 (-g0), None"
+	help
+		No debugging information. This option is not recommended.
+		Building time is reduced.
+
 config DEBUG_SYMBOLS_LVL1
 	bool "Level 1 (-g1)"
 	help
