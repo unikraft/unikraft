@@ -60,7 +60,7 @@ void uk_waitq_add(struct uk_waitq *wq,
 		struct uk_waitq_entry *entry)
 {
 	if (!entry->waiting) {
-		UK_STAILQ_INSERT_HEAD(wq, entry, thread_list);
+		UK_STAILQ_INSERT_TAIL(wq, entry, thread_list);
 		entry->waiting = 1;
 	}
 }
