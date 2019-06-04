@@ -77,12 +77,6 @@ static mode_t global_umask = S_IWGRP | S_IWOTH;
 } while (0)
 #define WARN_STUBBED() DO_ONCE(uk_pr_warn("%s() stubbed\n", __func__))
 
-#define NO_SYS(decl) decl {				\
-    DO_ONCE(uk_pr_warn("%s not implemented\n", __func__));	\
-    errno = ENOSYS;					\
-    return -1;						\
-}
-
 static inline int libc_error(int err)
 {
     errno = err;
@@ -2024,8 +2018,6 @@ ssize_t sendfile(int out_fd, int in_fd, off_t *_offset, size_t count)
 #undef sendfile64
 LFS64(sendfile);
 #endif
-
-NO_SYS(int fchmodat(int dirfd __unused, const char *pathname __unused, mode_t mode __unused, int flags __unused));
 
 mode_t umask(mode_t newmask)
 {
