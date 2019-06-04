@@ -46,12 +46,18 @@ extern "C" {
 
 struct vfscore_file;
 
+/* Set this flag if vfs should NOt hande POSition for this file. The
+ * file is not seek-able, updating f_offset does not make sense for
+ * it */
+#define UK_VFSCORE_NOPOS ((int) (1 << 0))
+
 struct vfscore_file {
 	int fd;
 	int		f_flags;	/* open flags */
 	int		f_count;	/* reference count */
 	off_t		f_offset;	/* current position in file */
 	void		*f_data;        /* file descriptor specific data */
+	int		f_vfs_flags;    /* internal implementation flags */
 	struct dentry   *f_dentry;
 };
 
