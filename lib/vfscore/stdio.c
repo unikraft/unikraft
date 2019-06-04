@@ -40,31 +40,41 @@
 #include <termios.h>
 #include <vfscore/vnode.h>
 #include <unistd.h>
+#include <vfscore/uio.h>
+
+static int __write_fn(void *dst __unused, void *src, size_t *cnt)
+{
+	int ret = ukplat_coutk(src, *cnt);
+
+	if (ret < 0)
+		/* TODO: remove -1 when vfscore switches to negative
+		 * error numbers
+		 */
+		return ret * -1;
+
+	*cnt = (size_t) ret;
+	return 0;
+}
 
 /* One function for stderr and stdout */
 static ssize_t stdio_write(struct vnode *vp __unused,
 			   struct uio *uio,
 			   int ioflag __unused)
 {
-	UK_ASSERT(!uio->uio_offset);
-	UK_ASSERT(uio->uio_iovcnt == 1);
-	return ukplat_coutk(uio->uio_iov->iov_base, uio->uio_iov->iov_len);
+	if (uio->uio_offset)
+		return ESPIPE;
+
+	return vfscore_uioforeach(__write_fn, NULL, uio->uio_resid, uio);
 }
 
-static ssize_t stdio_read(struct vnode *vp __unused,
-		      struct vfscore_file *file __unused,
-		      struct uio *uio,
-		      int ioflag __unused)
+
+static int __read_fn(void *dst, void *src __unused, size_t *cnt)
 {
 	int bytes_read;
 	size_t bytes_total = 0, count;
-	char *buf;
+	char *buf = dst;
 
-	UK_ASSERT(!uio->uio_offset);
-	UK_ASSERT(uio->uio_iovcnt == 1);
-
-	buf = uio->uio_iov->iov_base;
-	count = uio->uio_iov->iov_len;
+	count = *cnt;
 
 	do {
 		while ((bytes_read = ukplat_cink(buf,
@@ -82,7 +92,33 @@ static ssize_t stdio_read(struct vnode *vp __unused,
 	} while (bytes_total < count && *(buf - 1) != '\n'
 			&& *(buf - 1) != VEOF);
 
-	return bytes_total;
+	*cnt = bytes_total;
+
+	/* The INT_MIN here is a special return code. It makes the
+	 * vfscore_uioforeach to quit from the loop. But this is not
+	 * an error (for example a user hit Ctrl-C). That is why this
+	 * special return value is fixed up to 0 in the stdio_read.
+	 */
+	if (*(buf - 1) == '\n' || *(buf - 1) == VEOF)
+		return INT_MIN;
+
+	return 0;
+}
+
+static ssize_t stdio_read(struct vnode *vp __unused,
+		      struct vfscore_file *file __unused,
+		      struct uio *uio,
+		      int ioflag __unused)
+{
+	int ret;
+
+	if (uio->uio_offset)
+		return ESPIPE;
+
+	ret = vfscore_uioforeach(__read_fn, NULL, uio->uio_resid, uio);
+	ret = (ret == INT_MIN) ? 0 : ret;
+
+	return ret;
 }
 
 static int
