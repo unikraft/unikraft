@@ -39,6 +39,7 @@
 #include <limits.h>
 #include <fcntl.h>
 #include <sys/statfs.h>
+#include <sys/time.h>
 
 /*
  * Tunable parameters

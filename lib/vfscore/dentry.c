@@ -30,6 +30,8 @@
  * SUCH DAMAGE.
  */
 
+#define _BSD_SOURCE
+
 #include <string.h>
 #include <stdlib.h>
 

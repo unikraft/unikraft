@@ -34,6 +34,8 @@
  * vfs_mount.c - mount operations
  */
 
+#define _BSD_SOURCE
+
 #include <sys/param.h>
 #include <limits.h>
 #include <unistd.h>

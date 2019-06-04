@@ -32,6 +32,8 @@
 #ifndef _SYS_MOUNT_H_
 #define _SYS_MOUNT_H_
 
+#define _BSD_SOURCE
+
 #include <sys/statfs.h>
 #include <limits.h>
 #include <uk/list.h>

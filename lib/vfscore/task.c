@@ -34,6 +34,7 @@
  * vfs_task.c - Routines to manage the per task data.
  */
 
+#define _BSD_SOURCE
 
 #include <limits.h>
 #include <stdlib.h>
