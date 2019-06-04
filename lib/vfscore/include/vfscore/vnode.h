@@ -147,9 +147,11 @@ struct vattr {
 
 typedef	int (*vnop_open_t)	(struct vfscore_file *);
 typedef	int (*vnop_close_t)	(struct vnode *, struct vfscore_file *);
-typedef	ssize_t (*vnop_read_t)	(struct vnode *, struct vfscore_file *, struct uio *, int);
-typedef	ssize_t (*vnop_write_t)	(struct vnode *, struct uio *, int);
-typedef	off_t (*vnop_seek_t)	(struct vnode *, struct vfscore_file *, off_t, off_t);
+typedef	int (*vnop_read_t)	(struct vnode *, struct vfscore_file *,
+				 struct uio *, int);
+typedef	int (*vnop_write_t)	(struct vnode *, struct uio *, int);
+typedef	int (*vnop_seek_t)	(struct vnode *, struct vfscore_file *,
+				 off_t, off_t);
 typedef	int (*vnop_ioctl_t)	(struct vnode *, struct vfscore_file *, unsigned long, void *);
 typedef	int (*vnop_fsync_t)	(struct vnode *, struct vfscore_file *);
 typedef	int (*vnop_readdir_t)	(struct vnode *, struct vfscore_file *, struct dirent *);
@@ -167,7 +169,7 @@ typedef	int (*vnop_truncate_t)	(struct vnode *, off_t);
 typedef	int (*vnop_link_t)      (struct vnode *, struct vnode *, char *);
 typedef int (*vnop_cache_t) (struct vnode *, struct vfscore_file *, struct uio *);
 typedef int (*vnop_fallocate_t) (struct vnode *, int, off_t, off_t);
-typedef ssize_t (*vnop_readlink_t)  (struct vnode *, struct uio *);
+typedef int (*vnop_readlink_t)  (struct vnode *, struct uio *);
 typedef int (*vnop_symlink_t)   (struct vnode *, char *, char *);
 
 /*

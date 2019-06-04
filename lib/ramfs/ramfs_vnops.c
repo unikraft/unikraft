@@ -294,7 +294,7 @@ ramfs_symlink(struct vnode *dvp, char *name, char *link)
 	return 0;
 }
 
-static ssize_t
+static int
 ramfs_readlink(struct vnode *vp, struct uio *uio)
 {
 	struct ramfs_node *np = vp->v_data;
@@ -394,7 +394,7 @@ ramfs_create(struct vnode *dvp, char *name, mode_t mode)
 	return 0;
 }
 
-static ssize_t
+static int
 ramfs_read(struct vnode *vp, struct vfscore_file *fp __unused,
 	   struct uio *uio, int ioflag __unused)
 {
@@ -444,7 +444,7 @@ ramfs_set_file_data(struct vnode *vp, const void *data, size_t size)
 	return 0;
 }
 
-static ssize_t
+static int
 ramfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 {
 	struct ramfs_node *np =  vp->v_data;

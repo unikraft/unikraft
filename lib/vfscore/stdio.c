@@ -57,7 +57,7 @@ static int __write_fn(void *dst __unused, void *src, size_t *cnt)
 }
 
 /* One function for stderr and stdout */
-static ssize_t stdio_write(struct vnode *vp __unused,
+static int stdio_write(struct vnode *vp __unused,
 			   struct uio *uio,
 			   int ioflag __unused)
 {
@@ -105,7 +105,7 @@ static int __read_fn(void *dst, void *src __unused, size_t *cnt)
 	return 0;
 }
 
-static ssize_t stdio_read(struct vnode *vp __unused,
+static int stdio_read(struct vnode *vp __unused,
 		      struct vfscore_file *file __unused,
 		      struct uio *uio,
 		      int ioflag __unused)
