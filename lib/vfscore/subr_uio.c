@@ -45,34 +45,16 @@
 #include <string.h>
 #include <vfscore/uio.h>
 
+static int __memcpy_wrapper(void *dst, void *src, size_t *cnt)
+{
+	memcpy(dst, src, *cnt);
+	return 0;
+}
+
 int
 vfscore_uiomove(void *cp, int n, struct uio *uio)
 {
-	UK_ASSERT(uio->uio_rw == UIO_READ || uio->uio_rw == UIO_WRITE);
+	int ret = vfscore_uioforeach(__memcpy_wrapper, cp, n, uio);
 
-	while (n > 0 && uio->uio_resid) {
-		struct iovec *iov = uio->uio_iov;
-		int cnt = iov->iov_len;
-		if (cnt == 0) {
-			uio->uio_iov++;
-			uio->uio_iovcnt--;
-			continue;
-		}
-		if (cnt > n)
-			cnt = n;
-
-		if (uio->uio_rw == UIO_READ)
-			memcpy(iov->iov_base, cp, cnt);
-		else
-			memcpy(cp, iov->iov_base, cnt);
-
-		iov->iov_base = (char *)iov->iov_base + cnt;
-		iov->iov_len -= cnt;
-		uio->uio_resid -= cnt;
-		uio->uio_offset += cnt;
-		cp = (char *)cp + cnt;
-		n -= cnt;
-	}
-
-	return 0;
+	return ret;
 }

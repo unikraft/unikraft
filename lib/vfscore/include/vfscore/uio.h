@@ -57,6 +57,51 @@ struct uio {
 	enum	uio_rw uio_rw;		/* operation */
 };
 
+/* This is a wrapper for functions f with a "memcpy-like" signature
+ * "dst, src, cnt" to be executed over a scatter-gather list provided
+ * by a struct uio. f() might be called multiple times to read from or
+ * write to cp up to n bytes of data (or up to the capacity of the uio
+ * scatter-gather buffers).
+ */
+static inline
+int vfscore_uioforeach(int (*f)(void *, void *, size_t *), void *cp,
+		      size_t n, struct uio *uio)
+{
+	int ret = 0;
+
+	UK_ASSERT(uio->uio_rw == UIO_READ || uio->uio_rw == UIO_WRITE);
+
+	while (n > 0 && uio->uio_resid) {
+		struct iovec *iov = uio->uio_iov;
+		size_t cnt = iov->iov_len;
+
+		if (cnt == 0) {
+			uio->uio_iov++;
+			uio->uio_iovcnt--;
+			continue;
+		}
+		if (cnt > n)
+			cnt = n;
+
+		if (uio->uio_rw == UIO_READ)
+			ret = f(iov->iov_base, cp, &cnt);
+		else
+			ret = f(cp, iov->iov_base, &cnt);
+
+		iov->iov_base = (char *)iov->iov_base + cnt;
+		iov->iov_len -= cnt;
+		uio->uio_resid -= cnt;
+		uio->uio_offset += cnt;
+		cp = (char *)cp + cnt;
+		n -= cnt;
+
+		if (ret)
+			break;
+	}
+
+	return ret;
+}
+
 int	vfscore_uiomove(void *cp, int n, struct uio *uio);
 
 #endif /* !_UIO_H_ */
