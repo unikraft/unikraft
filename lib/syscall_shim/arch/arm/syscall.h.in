@@ -225,7 +225,6 @@
 #define __NR_tgkill	268
 #define __NR_utimes	269
 #define __NR_fadvise64_64	270
-#define __NR_arm_fadvise64_64	270
 #define __NR_pciconfig_iobase	271
 #define __NR_pciconfig_read	272
 #define __NR_pciconfig_write	273
@@ -297,7 +296,6 @@
 #define __NR_get_robust_list	339
 #define __NR_splice	340
 #define __NR_sync_file_range2	341
-#define __NR_arm_sync_file_range	341
 #define __NR_tee	342
 #define __NR_vmsplice	343
 #define __NR_move_pages	344
