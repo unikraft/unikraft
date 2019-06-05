@@ -68,14 +68,14 @@ Try to look for the most precise areas first. In case nothing fits use
 
 	LINUX USERSPACE PLATFORM (X86_64, ARM32)
 	M:	Simon Kuenzer <simon.kuenzer@neclab.eu>
-	M:	Florian Schmidt <florian.schmidt@neclab.eu>
+	M:	Sharan Santhanam <sharan.santhanam@neclab.eu>
 	L:	minios-devel@lists.xen.org
 	F: plat/linuxu/*
 
 	KVM PLATFORM (X86)
 	M:	Simon Kuenzer <simon.kuenzer@neclab.eu>
 	M:	Felipe Huici <felipe.huici@neclab.eu>
-	M:	Florian Schmidt <florian.schmidt@neclab.eu>
+	M:	Sharan Santhanam <sharan.santhanam@neclab.eu>
 	L:	minios-devel@lists.xen.org
 	F: plat/linuxu/*
 
@@ -86,19 +86,16 @@ Try to look for the most precise areas first. In case nothing fits use
 
 	LIBNOLIBC
 	M:	Simon Kuenzer <simon.kuenzer@neclab.eu>
-	M:	Florian Schmidt <florian.schmidt@neclab.eu>
 	L:	minios-devel@lists.xen.org
 	F: lib/nolibc/*
 
 	LIBUKALLOC
-	M:	Florian Schmidt <florian.schmidt@neclab.eu>
 	M:	Simon Kuenzer <simon.kuenzer@neclab.eu>
 	L:	minios-devel@lists.xen.org
 	F: lib/ukalloc/*
 
 	LIBUKALLOCBBUDDY
 	M:	Simon Kuenzer <simon.kuenzer@neclab.eu>
-	M:	Florian Schmidt <florian.schmidt@neclab.eu>
 	L:	minios-devel@lists.xen.org
 	F: lib/ukallocbbuddy/*
 
@@ -126,12 +123,11 @@ Try to look for the most precise areas first. In case nothing fits use
 
 	LIBUKDEBUG
 	M:	Simon Kuenzer <simon.kuenzer@neclab.eu>
-	M:	Florian Schmidt <florian.schmidt@neclab.eu>
 	L:	minios-devel@lists.xen.org
 	F: lib/ukdebug/*
 
 	UNIKRAFT GENERAL
 	M:	Simon Kuenzer <simon.kuenzer@neclab.eu>
-	M:	Florian Schmidt <florian.schmidt@neclab.eu>
+	M:	Sharan Santhanam <sharan.santhanam@neclab.eu>
 	M:	Felipe Huici <felipe.huici@neclab.eu>
 	L:	minios-devel@lists.xen.org
