@@ -1,0 +1,3 @@
+config LIBSYSCALL_SHIM
+	bool "syscall_shim: Syscall shim layer"
+	default n
