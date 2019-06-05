@@ -49,6 +49,7 @@
 #include <uk/errptr.h>
 #include <uk/ctors.h>
 #include <uk/trace.h>
+#include <uk/syscall.h>
 
 #ifdef DEBUG_VFS
 int	vfs_debug = VFSDB_FLAGS;
@@ -456,6 +457,12 @@ LFS64(pwritev);
 ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
 {
 	return pwritev(fd, iov, iovcnt, -1);
+}
+
+UK_SYSCALL_DEFINE(writev, unsigned long, fd, const struct iovec *, vec,
+		  unsigned long, vlen)
+{
+	return pwritev(fd, vec, vlen, -1);
 }
 
 UK_TRACEPOINT(trace_vfs_ioctl, "%d 0x%x", int, unsigned long);

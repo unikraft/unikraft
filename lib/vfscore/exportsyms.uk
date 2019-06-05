@@ -74,3 +74,4 @@ faccessat
 readlink
 fallocate
 lseek
+uk_syscall_writev
