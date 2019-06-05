@@ -147,6 +147,11 @@ extern "C" {
 #define STRINGIFY(x) __STRINGIFY(x)
 #endif
 
+#ifndef UK_CONCAT
+#define __UK_CONCAT_X(a, b) a##b
+#define UK_CONCAT(a, b) __UK_CONCAT_X(a, b)
+#endif
+
 #ifndef MIN
 #define MIN(a, b)                                                              \
 	({                                                                     \
