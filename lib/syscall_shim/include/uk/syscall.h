@@ -143,6 +143,8 @@ typedef long syscall_arg_t;
 #include <uk/bits/provided_syscalls.h>
 #include <uk/bits/syscall_stubs.h>
 
+long uk_syscall(long n, ...);
+
 #define syscall(...)							\
 	UK_CONCAT(__uk_syscall, __SYSCALL_NARGS(__VA_ARGS__))(__VA_ARGS__)
 #endif
