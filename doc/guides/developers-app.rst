@@ -323,6 +323,55 @@ An example context of extra.ld: ::
 
 This will add the section .uk_fs_list after the .text
 
+============================
+Syscall shim layer
+============================
+
+If you library provides a syscall, you need to inform Unikraft that it
+can use your implementation. Add a line in you Makefile.uk: ::
+
+    UK_PROVIDED_SYSCALLS-$(CONFIG_LIBYOURLIBNAME) += <syscall_name>-<number_of_arguments>
+
+Where `<number_of_arguments>` is how many arguments your syscall accepts.
+
+For example: ::
+
+    UK_PROVIDED_SYSCALLS-$(CONFIG_LIBVFSCORE) += writev-3
+
+.. note:: Please consult corresponding man page in order to keep API
+           matching to the equivalent linux syscall
+
+For the implementation of you syscall use the following template:
+
+.. code-block:: c
+
+  UK_SYSCALL_DEFINE(syscall_name, arg1_type, arg1_name, arg2_type, arg2_name, ..)
+  {
+  	ret = do_cool_stuff();
+  	if (ret) {
+  		errno = ERROR_CODE;
+  		return -1;
+  	}
+  	return 0;
+  }
+
+For example:
+
+.. code-block:: c
+
+  UK_SYSCALL_DEFINE(writev, unsigned long, fd, const struct iovec *, vec,
+  		  unsigned long, vlen)
+  {
+  	return pwritev(fd, vec, vlen, -1);
+  }
+
+Please note, that syscall_shim expects behavior as described in ``man 2
+syscall``. Namely: ::
+
+  The return value is defined by the system call being invoked.  In
+  general, a 0 return value indicates success.  A -1 return value
+  indicates an error, and an error code is stored in errno.
+
 
 ============================
 Make Targets
