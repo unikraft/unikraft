@@ -298,9 +298,9 @@ struct vfsops devfs_vfsops = {
 };
 
 static struct vfscore_fs_type fs_devfs = {
-    .vs_name = "devfs",
-    .vs_init = NULL,
-    .vs_op = &devfs_vfsops,
+	.vs_name = "devfs",
+	.vs_init = NULL,
+	.vs_op = &devfs_vfsops,
 };
 
 UK_FS_REGISTER(fs_devfs);

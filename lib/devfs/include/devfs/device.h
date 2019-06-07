@@ -102,13 +102,13 @@ struct driver {
  */
 
 typedef enum device_state {
-    DS_INACTIVE	    = 0x00,		/* driver is inactive */
-    DS_ALIVE	    = 0x01,		/* probe succeded */
-    DS_ACTIVE	    = 0x02,		/* intialized */
-    DS_DEBUG	    = 0x04,		/* debug */
-    DS_NOTPRESENT   = 0x08,     /* not probed or probe failed */
-    DS_ATTACHING    = 0x10,     /* currently attaching */
-    DS_ATTACHED     = 0x20,     /*attach method called */
+	DS_INACTIVE	    = 0x00,		/* driver is inactive */
+	DS_ALIVE	    = 0x01,		/* probe succeded */
+	DS_ACTIVE	    = 0x02,		/* intialized */
+	DS_DEBUG	    = 0x04,		/* debug */
+	DS_NOTPRESENT   = 0x08,     /* not probed or probe failed */
+	DS_ATTACHING    = 0x10,     /* currently attaching */
+	DS_ATTACHED     = 0x20,     /*attach method called */
 } device_state_t;
 
 /*
@@ -181,18 +181,18 @@ static inline void device_quiet(device_t dev __unused)
 static inline const char *
 devtoname(struct device *dev)
 {
-    return dev->name;
+	return dev->name;
 }
 
-int	 device_open(const char *, int, struct device **);
-int	 device_close(struct device *);
-int	 device_read(struct device *, struct uio *, int);
-int	 device_write(struct device *, struct uio *, int);
-int	 device_ioctl(struct device *, unsigned long, void *);
-int	 device_info(struct devinfo *);
+int device_open(const char *, int, struct device **);
+int device_close(struct device *);
+int device_read(struct device *, struct uio *, int);
+int device_write(struct device *, struct uio *, int);
+int device_ioctl(struct device *, unsigned long, void *);
+int device_info(struct devinfo *);
 
-int	 bdev_read(struct device *dev, struct uio *uio, int ioflags);
-int	 bdev_write(struct device *dev, struct uio *uio, int ioflags);
+int bdev_read(struct device *dev, struct uio *uio, int ioflags);
+int bdev_write(struct device *dev, struct uio *uio, int ioflags);
 
 int	enodev(void);
 int	nullop(void);
