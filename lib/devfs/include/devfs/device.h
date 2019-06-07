@@ -30,12 +30,9 @@
 #ifndef _DEVICE_H
 #define _DEVICE_H
 
-#include <sys/cdefs.h>
 #include <sys/types.h>
 
-#include <osv/uio.h>
-
-__BEGIN_DECLS
+#include <vfscore/uio.h>
 
 #define MAXDEVNAME	12
 #define DO_RWMASK	0x3
@@ -47,7 +44,7 @@ struct device;
  * Device information
  */
 struct devinfo {
-	u_long		cookie;		/* index cookie */
+	unsigned long		cookie;		/* index cookie */
 	struct device	*id;		/* device id */
 	int		flags;		/* device characteristics flags */
 	char		name[MAXDEVNAME]; /* device name */
@@ -65,8 +62,8 @@ typedef int (*devop_open_t)   (struct device *, int);
 typedef int (*devop_close_t)  (struct device *);
 typedef int (*devop_read_t)   (struct device *, struct uio *, int);
 typedef int (*devop_write_t)  (struct device *, struct uio *, int);
-typedef int (*devop_ioctl_t)  (struct device *, u_long, void *);
-typedef int (*devop_devctl_t) (struct device *, u_long, void *);
+typedef int (*devop_ioctl_t)  (struct device *, unsigned long, void *);
+typedef int (*devop_devctl_t) (struct device *, unsigned long, void *);
 typedef void (*devop_strategy_t)(struct bio *);
 
 /*
@@ -177,7 +174,7 @@ device_get_softc(device_t dev)
 	return dev->softc;
 }
 
-static inline void device_quiet(device_t dev)
+static inline void device_quiet(device_t dev __unused)
 {
 }
 
@@ -191,7 +188,7 @@ int	 device_open(const char *, int, struct device **);
 int	 device_close(struct device *);
 int	 device_read(struct device *, struct uio *, int);
 int	 device_write(struct device *, struct uio *, int);
-int	 device_ioctl(struct device *, u_long, void *);
+int	 device_ioctl(struct device *, unsigned long, void *);
 int	 device_info(struct devinfo *);
 
 int	 bdev_read(struct device *dev, struct uio *uio, int ioflags);
@@ -199,15 +196,11 @@ int	 bdev_write(struct device *dev, struct uio *uio, int ioflags);
 
 int	enodev(void);
 int	nullop(void);
-void multiplex_strategy(struct bio *);
-
-int	physio(struct device *dev, struct uio *uio, int ioflags);
 
 struct device *	device_create(struct driver *drv, const char *name, int flags);
 int device_destroy(struct device *dev);
+int device_destroy_locked(struct device *dev);
 void device_register(struct device *device, const char *name, int flags);
 void read_partition_table(struct device *device);
-
-__END_DECLS
 
 #endif /* !_DEVICE_H */

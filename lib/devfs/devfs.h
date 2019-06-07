@@ -30,7 +30,7 @@
 #ifndef _DEVFS_H
 #define _DEVFS_H
 
-#include <assert.h>
+#include <uk/assert.h>
 
 /* #define DEBUG_DEVFS 1 */
 

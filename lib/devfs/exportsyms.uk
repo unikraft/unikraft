@@ -1,0 +1,6 @@
+device_create
+device_open
+device_close
+device_read
+device_ioctl
+device_info

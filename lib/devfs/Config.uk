@@ -1,0 +1,10 @@
+config LIBDEVFS
+	bool "devfs: devfs file system"
+	default n
+	depends on LIBVFSCORE
+if LIBDEVFS
+        config LIBDEVFS_USE_RAMFS
+        bool "Use ramfs as root"
+        default n
+        select LIBRAMFS
+endif

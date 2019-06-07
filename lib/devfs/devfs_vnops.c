@@ -31,6 +31,10 @@
  * devfs - device file system.
  */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <sys/stat.h>
 
 #include <ctype.h>
@@ -41,48 +45,47 @@
 #include <limits.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <sys/mount.h>
 
-#include <osv/prex.h>
-#include <osv/device.h>
-#include <osv/vnode.h>
-#include <osv/mount.h>
-#include <osv/dentry.h>
+#include <dirent.h>
+#include <vfscore/prex.h>
+#include <vfscore/vnode.h>
+#include <vfscore/mount.h>
+#include <vfscore/dentry.h>
+#include <vfscore/file.h>
+
+#include <vfscore/fs.h>
+
+#include <uk/ctors.h>
 
 #include "devfs.h"
-
-#ifdef DEBUG_DEVFS
-#define DPRINTF(a)	dprintf a
-#else
-#define DPRINTF(a)	do {} while (0)
-#endif
-
-#define ASSERT(e)	assert(e)
+#include <devfs/device.h>
 
 static uint64_t inode_count = 1; /* inode 0 is reserved to root */
 
 static int
-devfs_open(struct file *fp)
+devfs_open(struct vfscore_file *fp)
 {
 	struct vnode *vp = fp->f_dentry->d_vnode;
 	char *path = fp->f_dentry->d_path;
 	struct device *dev;
 	int error;
 
-	DPRINTF(("devfs_open: path=%s\n", path));
+	uk_pr_debug("devfs_open: path=%s\n", path);
 
 	if (!strcmp(path, "/"))	/* root ? */
 		return 0;
 
 	if (vp->v_flags & VPROTDEV) {
-		DPRINTF(("devfs_open: failed to open protected device.\n"));
+		uk_pr_debug("devfs_open: failed to open protected device.\n");
 		return EPERM;
 	}
 	if (*path == '/')
 		path++;
 	error = device_open(path, fp->f_flags & DO_RWMASK, &dev);
 	if (error) {
-		DPRINTF(("devfs_open: can not open device = %s error=%d\n",
-			 path, error));
+		uk_pr_debug("devfs_open: can not open device = %s error=%d\n",
+			 path, error);
 		return error;
 	}
 	vp->v_data = (void *)dev;	/* Store private data */
@@ -90,36 +93,36 @@ devfs_open(struct file *fp)
 }
 
 static int
-devfs_close(struct vnode *vp, struct file *fp)
+devfs_close(struct vnode *vp, struct vfscore_file *fp)
 {
 
-	DPRINTF(("devfs_close: fp=%x\n", fp));
+	uk_pr_debug("devfs_close: fd=%d\n", fp->fd);
 
 	if (!strcmp(fp->f_dentry->d_path, "/"))	/* root ? */
 		return 0;
 
-	return device_close((device*)vp->v_data);
+	return device_close((struct device*)vp->v_data);
 }
 
 static int
-devfs_read(struct vnode *vp, struct file *fp, struct uio *uio, int ioflags)
+devfs_read(struct vnode *vp, struct vfscore_file *fp __unused, struct uio *uio, int ioflags)
 {
-	return device_read((device*)vp->v_data, uio, ioflags);
+	return device_read((struct device*)vp->v_data, uio, ioflags);
 }
 
 static int
 devfs_write(struct vnode *vp, struct uio *uio, int ioflags)
 {
-	return device_write((device*)vp->v_data, uio, ioflags);
+	return device_write((struct device*)vp->v_data, uio, ioflags);
 }
 
 static int
-devfs_ioctl(struct vnode *vp, struct file *fp, u_long cmd, void *arg)
+devfs_ioctl(struct vnode *vp, struct vfscore_file *fp __unused, unsigned long cmd, void *arg)
 {
 	int error;
 
-	error = device_ioctl((device*)vp->v_data, cmd, arg);
-	DPRINTF(("devfs_ioctl: cmd=%x\n", cmd));
+	error = device_ioctl((struct device*)vp->v_data, cmd, arg);
+	uk_pr_debug("devfs_ioctl: cmd=%lu\n", cmd);
 	return error;
 }
 
@@ -130,7 +133,7 @@ devfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
 	struct vnode *vp;
 	int error, i;
 
-	DPRINTF(("devfs_lookup:%s\n", name));
+	uk_pr_debug("devfs_lookup:%s\n", name);
 
 	*vpp = NULL;
 
@@ -149,7 +152,7 @@ devfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
 			break;
 		i++;
 	}
-	if (vget(dvp->v_mount, inode_count++, &vp)) {
+	if (vfscore_vget(dvp->v_mount, inode_count++, &vp)) {
 		/* found in cache */
 		*vpp = vp;
 		return 0;
@@ -157,6 +160,10 @@ devfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
 	if (!vp)
 		return ENOMEM;
 	vp->v_type = (info.flags & D_CHR) ? VCHR : VBLK;
+	/* vfscore_vget does not initialize v_flags and this may cause
+	 * devfs_open to fail at the vp->v_flags & VPROTDEV check
+	 */
+	vp->v_flags = 0;
 	if (info.flags & D_TTY)
 		vp->v_flags |= VISTTY;
 
@@ -171,12 +178,12 @@ devfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
  * @vp: vnode of the directory.
  */
 static int
-devfs_readdir(struct vnode *vp, struct file *fp, struct dirent *dir)
+devfs_readdir(struct vnode *vp __unused, struct vfscore_file *fp, struct dirent *dir)
 {
 	struct devinfo info;
 	int error, i;
 
-	DPRINTF(("devfs_readdir offset=%d\n", fp->f_offset));
+	uk_pr_debug("devfs_readdir offset=%li\n", fp->f_offset);
 
 	i = 0;
 	error = 0;
@@ -196,23 +203,18 @@ devfs_readdir(struct vnode *vp, struct file *fp, struct dirent *dir)
 	dir->d_fileno = fp->f_offset;
 //	dir->d_namlen = strlen(dir->d_name);
 
-	DPRINTF(("devfs_readdir: %s\n", dir->d_name));
+	uk_pr_debug("devfs_readdir: %s\n", dir->d_name);
 	fp->f_offset++;
 	return 0;
 }
 
 static int
-devfs_unmount(struct mount *mp, int flags)
+devfs_unmount(struct mount *mp, int flags __unused)
 {
-	release_mp_dentries(mp);
+	vfscore_release_mp_dentries(mp);
 	return 0;
 }
 
-int
-devfs_init(void)
-{
-	return 0;
-}
 
 static int
 devfs_getattr(struct vnode *vnode, struct vattr *attr)
@@ -222,25 +224,37 @@ devfs_getattr(struct vnode *vnode, struct vattr *attr)
 	return 0;
 }
 
-#define devfs_mount	((vfsop_mount_t)vfs_nullop)
-#define devfs_sync	((vfsop_sync_t)vfs_nullop)
-#define devfs_vget	((vfsop_vget_t)vfs_nullop)
-#define devfs_statfs	((vfsop_statfs_t)vfs_nullop)
+int
+vop_einval(void)
+{
+	return EINVAL;
+}
 
-#define devfs_seek	((vnop_seek_t)vop_nullop)
-#define devfs_fsync	((vnop_fsync_t)vop_nullop)
+int
+vop_eperm(void)
+{
+	return EPERM;
+}
+
+#define devfs_mount	((vfsop_mount_t)vfscore_nullop)
+#define devfs_sync	((vfsop_sync_t)vfscore_nullop)
+#define devfs_vget	((vfsop_vget_t)vfscore_nullop)
+#define devfs_statfs	((vfsop_statfs_t)vfscore_nullop)
+
+#define devfs_seek	((vnop_seek_t)vfscore_vop_nullop)
+#define devfs_fsync	((vnop_fsync_t)vfscore_vop_nullop)
 #define devfs_create	((vnop_create_t)vop_einval)
 #define devfs_remove	((vnop_remove_t)vop_einval)
 #define devfs_rename	((vnop_rename_t)vop_einval)
 #define devfs_mkdir	((vnop_mkdir_t)vop_einval)
 #define devfs_rmdir	((vnop_rmdir_t)vop_einval)
 #define devfs_setattr	((vnop_setattr_t)vop_eperm)
-#define devfs_inactive	((vnop_inactive_t)vop_nullop)
-#define devfs_truncate	((vnop_truncate_t)vop_nullop)
+#define devfs_inactive	((vnop_inactive_t)vfscore_vop_nullop)
+#define devfs_truncate	((vnop_truncate_t)vfscore_vop_nullop)
 #define devfs_link	((vnop_link_t)vop_eperm)
-#define devfs_fallocate ((vnop_fallocate_t)vop_nullop)
-#define devfs_readlink	((vnop_readlink_t)vop_nullop)
-#define devfs_symlink	((vnop_symlink_t)vop_nullop)
+#define devfs_fallocate ((vnop_fallocate_t)vfscore_vop_nullop)
+#define devfs_readlink	((vnop_readlink_t)vfscore_vop_nullop)
+#define devfs_symlink	((vnop_symlink_t)vfscore_vop_nullop)
 
 /*
  * vnode operations
@@ -265,7 +279,7 @@ struct vnops devfs_vnops = {
 	devfs_inactive,		/* inactive */
 	devfs_truncate,		/* truncate */
 	devfs_link,		/* link */
-	(vnop_cache_t) nullptr, /* arc */
+	(vnop_cache_t) NULL, /* arc */
 	devfs_fallocate,	/* fallocate */
 	devfs_readlink,		/* read link */
 	devfs_symlink,		/* symbolic link */
@@ -282,3 +296,36 @@ struct vfsops devfs_vfsops = {
 	devfs_statfs,		/* statfs */
 	&devfs_vnops,		/* vnops */
 };
+
+static struct vfscore_fs_type fs_devfs = {
+    .vs_name = "devfs",
+    .vs_init = NULL,
+    .vs_op = &devfs_vfsops,
+};
+
+UK_FS_REGISTER(fs_devfs);
+
+__constructor_prio(101) static void devfs_init(void)
+{
+#ifdef CONFIG_LIBDEVFS_USE_RAMFS
+	int ret;
+
+	ret = mount("", "/", "ramfs", 0, NULL);
+	if (ret != 0) {
+		uk_pr_debug("Failed to mount / in %s\n", __func__);
+		return;
+	}
+
+	ret =  mkdir("/dev", S_IRWXU);
+	if (ret != 0) {
+		uk_pr_debug("Failed to mkdir /dev in %s\n", __func__);
+		return;
+	}
+
+	ret = mount("", "/dev", "devfs", 0, NULL);
+	if (ret != 0) {
+		uk_pr_debug("Failed to mount /dev as devfs in %s\n", __func__);
+		return;
+	}
+#endif
+}

@@ -45,21 +45,16 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
-#include <assert.h>
+#include <uk/assert.h>
 #include <string.h>
 
-#include <osv/prex.h>
-#include <osv/mutex.h>
-#include <osv/device.h>
-#include <osv/debug.h>
-#include <osv/buf.h>
+#include <vfscore/prex.h>
+#include <uk/essentials.h>
+#include <uk/mutex.h>
 
-#include <geom/geom_disk.h>
+#include <devfs/device.h>
 
-mutex sched_mutex;
-#define sched_lock()	sched_mutex.lock()
-#define sched_unlock()	sched_mutex.unlock()
-
+static struct uk_mutex devfs_lock = UK_MUTEX_INITIALIZER(devfs_lock);
 
 /* list head of the devices */
 static struct device *device_list = NULL;
@@ -92,85 +87,31 @@ struct partition_table_entry {
 	uint32_t total_sectors;
 } __attribute__((packed));
 
-/*
- * read_partition_table - given a device @dev, create one subdevice per partition
- * found in that device.
- *
- * This function will read a partition table from the canonical location of the
- * device pointed by @dev. For each partition found, a new device will be
- * created. The newly created device will have most of its data copied from
- * @dev, except for its name, offset and size.
- */
-void read_partition_table(struct device *dev)
-{
-	struct buf *bp;
-	unsigned long offset;
-	int index;
-
-	if (bread(dev, 0, &bp) != 0) {
-		debugf("read_partition_table failed for %s\n", dev->name);
-		return;
-	}
-
-	sched_lock();
-	// A real partition table (MBR) ends in the two bytes 0x55, 0xAA (see
-	// arch/x64/boot16.S on where we put those on the OSv image). If we
-	// don't find those, this is an unpartitioned disk.
-	if (((unsigned char*)bp->b_data)[510] == 0x55 &&
-	    ((unsigned char*)bp->b_data)[511] == 0xAA)
-	for (offset = 0x1be, index = 0; offset < 0x1fe; offset += 0x10, index++) {
-		char dev_name[MAXDEVNAME];
-		struct device *new_dev;
-
-		auto* entry = static_cast<struct partition_table_entry*>(bp->b_data + offset);
-
-		if (entry->system_id == 0) {
-			continue;
-		}
-
-		if (entry->starting_sector == 0) {
-			continue;
-		}
-
-		snprintf(dev_name, MAXDEVNAME, "%s.%d", dev->name, index);
-		new_dev = device_create(dev->driver, dev_name, dev->flags);
-		free(new_dev->private_data);
-
-		new_dev->offset = (off_t)entry->rela_sector << 9;
-		new_dev->size = (off_t)entry->total_sectors << 9;
-		new_dev->max_io_size = dev->max_io_size;
-		new_dev->private_data = dev->private_data;
-		device_set_softc(new_dev, device_get_softc(dev));
-	}
-
-	sched_unlock();
-	brelse(bp);
-}
 
 void device_register(struct device *dev, const char *name, int flags)
 {
 	size_t len;
 	void *priv = NULL;
 
-	assert(dev->driver != NULL);
+	UK_ASSERT(dev->driver != NULL);
 
 	/* Check the length of name. */
 	len = strnlen(name, MAXDEVNAME);
 	if (len == 0 || len >= MAXDEVNAME)
 		return;
 
-	sched_lock();
+	uk_mutex_lock(&devfs_lock);
 
 	/* Check if specified name is already used. */
 	if (device_lookup(name) != NULL)
-		sys_panic("duplicate device");
+		UK_CRASH("duplicate device");
 
 	/*
 	 * Allocate a device and device private data.
 	 */
 	if (dev->driver->devsz != 0) {
 		if ((priv = malloc(dev->driver->devsz)) == NULL)
-			sys_panic("devsz");
+			UK_CRASH("devsz");
 		memset(priv, 0, dev->driver->devsz);
 	}
 
@@ -184,7 +125,7 @@ void device_register(struct device *dev, const char *name, int flags)
 	dev->max_io_size = UINT_MAX;
 	device_list = dev;
 
-	sched_unlock();
+	uk_mutex_unlock(&devfs_lock);
 }
 
 
@@ -201,7 +142,7 @@ device_create(struct driver *drv, const char *name, int flags)
 	struct device *dev;
 	size_t len;
 
-	assert(drv != NULL);
+	UK_ASSERT(drv != NULL);
 
 	/* Check the length of name. */
 	len = strnlen(name, MAXDEVNAME);
@@ -211,27 +152,14 @@ device_create(struct driver *drv, const char *name, int flags)
 	/*
 	 * Allocate a device structure.
 	 */
-	if ((dev = new device) == NULL)
-		sys_panic("device_create");
+	if ((dev = malloc(sizeof(struct device))) == NULL)
+		UK_CRASH("device_create");
 
-    dev->driver = drv;
-    device_register(dev, name, flags);
+	dev->driver = drv;
+	device_register(dev, name, flags);
 	return dev;
 }
 
-#if 0
-/*
- * Return device's private data.
- */
-static void *
-device_private(struct device *dev)
-{
-	assert(dev != NULL);
-	assert(dev->private_data != NULL);
-
-	return dev->private_data;
-}
-#endif
 
 /*
  * Return true if specified device is valid.
@@ -257,16 +185,33 @@ device_valid(struct device *dev)
  * Increment the reference count on an active device.
  */
 static int
-device_reference(struct device *dev)
+device_reference_locked(struct device *dev)
 {
+	UK_ASSERT(uk_mutex_is_locked(&devfs_lock));
 
-	sched_lock();
 	if (!device_valid(dev)) {
-		sched_unlock();
+		uk_mutex_unlock(&devfs_lock);
 		return ENODEV;
 	}
 	dev->refcnt++;
-	sched_unlock();
+	return 0;
+}
+
+/*
+ * Increment the reference count on an active device.
+ */
+static int
+device_reference(struct device *dev)
+{
+	int ret;
+
+	uk_mutex_lock(&devfs_lock);
+	ret = device_reference_locked(dev);
+	if (!ret) {
+		uk_mutex_unlock(&devfs_lock);
+		return ret;
+	}
+	uk_mutex_unlock(&devfs_lock);
 	return 0;
 }
 
@@ -279,9 +224,10 @@ device_release(struct device *dev)
 {
 	struct device **tmp;
 
-	sched_lock();
+	uk_mutex_lock(&devfs_lock);
+
 	if (--dev->refcnt > 0) {
-		sched_unlock();
+		uk_mutex_unlock(&devfs_lock);
 		return;
 	}
 	/*
@@ -293,22 +239,36 @@ device_release(struct device *dev)
 			break;
 		}
 	}
-	delete dev;
-	sched_unlock();
+	free(dev);
+	uk_mutex_unlock(&devfs_lock);
+}
+
+int
+device_destroy_locked(struct device *dev)
+{
+
+	UK_ASSERT(uk_mutex_is_locked(&devfs_lock));
+	if (!device_valid(dev)) {
+		uk_mutex_unlock(&devfs_lock);
+		return ENODEV;
+	}
+	dev->active = 0;
+	device_release(dev);
+	return 0;
 }
 
 int
 device_destroy(struct device *dev)
 {
 
-	sched_lock();
+	uk_mutex_lock(&devfs_lock);
 	if (!device_valid(dev)) {
-		sched_unlock();
+		uk_mutex_unlock(&devfs_lock);
 		return ENODEV;
 	}
 	dev->active = 0;
+	uk_mutex_unlock(&devfs_lock);
 	device_release(dev);
-	sched_unlock();
 	return 0;
 }
 
@@ -329,20 +289,21 @@ device_open(const char *name, int mode, struct device **devp)
 	struct device *dev;
 	int error;
 
-	sched_lock();
+	uk_mutex_lock(&devfs_lock);
 	if ((dev = device_lookup(name)) == NULL) {
-		sched_unlock();
+		uk_mutex_unlock(&devfs_lock);
 		return ENXIO;
 	}
-	error = device_reference(dev);
+
+	error = device_reference_locked(dev);
 	if (error) {
-		sched_unlock();
+		uk_mutex_unlock(&devfs_lock);
 		return error;
 	}
-	sched_unlock();
+	uk_mutex_unlock(&devfs_lock);
 
 	ops = dev->driver->devops;
-	assert(ops->open != NULL);
+	UK_ASSERT(ops->open != NULL);
 	error = (*ops->open)(dev, mode);
 	*devp = dev;
 
@@ -366,7 +327,7 @@ device_close(struct device *dev)
 		return error;
 
 	ops = dev->driver->devops;
-	assert(ops->close != NULL);
+	UK_ASSERT(ops->close != NULL);
 	error = (*ops->close)(dev);
 
 	device_release(dev);
@@ -383,7 +344,7 @@ device_read(struct device *dev, struct uio *uio, int ioflags)
 		return error;
 
 	ops = dev->driver->devops;
-	assert(ops->read != NULL);
+	UK_ASSERT(ops->read != NULL);
 	error = (*ops->read)(dev, uio, ioflags);
 
 	device_release(dev);
@@ -400,7 +361,7 @@ device_write(struct device *dev, struct uio *uio, int ioflags)
 		return error;
 
 	ops = dev->driver->devops;
-	assert(ops->write != NULL);
+	UK_ASSERT(ops->write != NULL);
 	error = (*ops->write)(dev, uio, ioflags);
 
 	device_release(dev);
@@ -415,7 +376,7 @@ device_write(struct device *dev, struct uio *uio, int ioflags)
  * pointed by the arg value.
  */
 int
-device_ioctl(struct device *dev, u_long cmd, void *arg)
+device_ioctl(struct device *dev, unsigned long cmd, void *arg)
 {
 	struct devops *ops;
 	int error;
@@ -424,79 +385,12 @@ device_ioctl(struct device *dev, u_long cmd, void *arg)
 		return error;
 
 	ops = dev->driver->devops;
-	assert(ops->ioctl != NULL);
+	UK_ASSERT(ops->ioctl != NULL);
 	error = (*ops->ioctl)(dev, cmd, arg);
 
 	device_release(dev);
 	return error;
 }
-
-#if 0
-/*
- * Device control - devctl is similar to ioctl, but is invoked from
- * other device driver rather than from user application.
- */
-static int
-device_control(struct device *dev, u_long cmd, void *arg)
-{
-	struct devops *ops;
-	int error;
-
-	assert(dev != NULL);
-
-	sched_lock();
-	ops = dev->driver->devops;
-	assert(ops->devctl != NULL);
-	error = (*ops->devctl)(dev, cmd, arg);
-	sched_unlock();
-	return error;
-}
-
-/*
- * device_broadcast - broadcast devctl command to all device objects.
- *
- * If "force" argument is true, we will continue command
- * notification even if some driver returns an error. In this
- * case, this routine returns EIO error if at least one driver
- * returns an error.
- *
- * If force argument is false, a kernel stops the command processing
- * when at least one driver returns an error. In this case,
- * device_broadcast will return the error code which is returned
- * by the driver.
- */
-static int
-device_broadcast(u_long cmd, void *arg, int force)
-{
-	struct device *dev;
-	struct devops *ops;
-	int error, retval = 0;
-
-	sched_lock();
-
-	for (dev = device_list; dev != NULL; dev = dev->next) {
-		/*
-		 * Call driver's devctl() routine.
-		 */
-		ops = dev->driver->devops;
-		if (ops == NULL)
-			continue;
-
-		assert(ops->devctl != NULL);
-		error = (*ops->devctl)(dev, cmd, arg);
-		if (error) {
-			if (force)
-				retval = EIO;
-			else {
-				retval = error;
-				break;
-			}
-		}
-	}
-	sched_unlock();
-	return retval;
-}
-#endif
 
 /*
  * Return device information.
@@ -504,12 +398,12 @@ device_broadcast(u_long cmd, void *arg, int force)
 int
 device_info(struct devinfo *info)
 {
-	u_long target = info->cookie;
-	u_long i = 0;
+	unsigned long target = info->cookie;
+	unsigned long i = 0;
 	struct device *dev;
 	int error = ESRCH;
 
-	sched_lock();
+	uk_mutex_lock(&devfs_lock);
 	for (dev = device_list; dev != NULL; dev = dev->next) {
 		if (i++ == target) {
 			info->cookie = i;
@@ -520,7 +414,7 @@ device_info(struct devinfo *info)
 			break;
 		}
 	}
-	sched_unlock();
+	uk_mutex_unlock(&devfs_lock);
 	return error;
 }
 
@@ -535,3 +429,4 @@ nullop(void)
 {
 	return 0;
 }
+
