@@ -122,7 +122,9 @@ struct device {
 	int		active;		/* device has not been destroyed */
 	int		refcnt;		/* reference count */
 	off_t		size;		/* device size */
-	off_t		offset; /* 0 for the main drive, if we have a partition, this is the start address */
+	off_t		offset; /* 0 for the main drive, if we have a
+				 *  partition, this is the start address
+				 */
 	size_t		max_io_size;
 	void		*private_data;	/* private storage */
 
@@ -157,13 +159,13 @@ device_get_desc(device_t dev)
 }
 
 static inline void
-device_set_desc(device_t dev, const char* desc)
+device_set_desc(device_t dev, const char *desc)
 {
 	dev->desc = desc;
 }
 
 static inline void
-device_set_softc(device_t dev, void* softc)
+device_set_softc(device_t dev, void *softc)
 {
 	dev->softc = softc;
 }
@@ -184,12 +186,12 @@ devtoname(struct device *dev)
 	return dev->name;
 }
 
-int device_open(const char *, int, struct device **);
-int device_close(struct device *);
-int device_read(struct device *, struct uio *, int);
-int device_write(struct device *, struct uio *, int);
-int device_ioctl(struct device *, unsigned long, void *);
-int device_info(struct devinfo *);
+int device_open(const char *name, int mode, struct device **devp);
+int device_close(struct device *dev);
+int device_read(struct device *dev, struct uio *uio, int ioflags);
+int device_write(struct device *dev, struct uio *uio, int ioflags);
+int device_ioctl(struct device *dev, unsigned long cmd, void *arg);
+int device_info(struct devinfo *info);
 
 int bdev_read(struct device *dev, struct uio *uio, int ioflags);
 int bdev_write(struct device *dev, struct uio *uio, int ioflags);
@@ -197,7 +199,7 @@ int bdev_write(struct device *dev, struct uio *uio, int ioflags);
 int	enodev(void);
 int	nullop(void);
 
-struct device *	device_create(struct driver *drv, const char *name, int flags);
+struct device *device_create(struct driver *drv, const char *name, int flags);
 int device_destroy(struct device *dev);
 int device_destroy_locked(struct device *dev);
 void device_register(struct device *device, const char *name, int flags);

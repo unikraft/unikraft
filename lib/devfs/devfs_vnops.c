@@ -71,21 +71,21 @@ devfs_open(struct vfscore_file *fp)
 	struct device *dev;
 	int error;
 
-	uk_pr_debug("devfs_open: path=%s\n", path);
+	uk_pr_debug("%s: path=%s\n", __func__, path);
 
 	if (!strcmp(path, "/"))	/* root ? */
 		return 0;
 
 	if (vp->v_flags & VPROTDEV) {
-		uk_pr_debug("devfs_open: failed to open protected device.\n");
+		uk_pr_debug("%s: failed to open protected device.\n", __func__);
 		return EPERM;
 	}
 	if (*path == '/')
 		path++;
 	error = device_open(path, fp->f_flags & DO_RWMASK, &dev);
 	if (error) {
-		uk_pr_debug("devfs_open: can not open device = %s error=%d\n",
-			 path, error);
+		uk_pr_debug("%s: can not open device = %s error=%d\n",
+			 __func__, path, error);
 		return error;
 	}
 	vp->v_data = (void *)dev;	/* Store private data */
@@ -96,33 +96,35 @@ static int
 devfs_close(struct vnode *vp, struct vfscore_file *fp)
 {
 
-	uk_pr_debug("devfs_close: fd=%d\n", fp->fd);
+	uk_pr_debug("%s: fd=%d\n", __func__, fp->fd);
 
 	if (!strcmp(fp->f_dentry->d_path, "/"))	/* root ? */
 		return 0;
 
-	return device_close((struct device*)vp->v_data);
+	return device_close((struct device *)vp->v_data);
 }
 
 static int
-devfs_read(struct vnode *vp, struct vfscore_file *fp __unused, struct uio *uio, int ioflags)
+devfs_read(struct vnode *vp, struct vfscore_file *fp __unused,
+			struct uio *uio, int ioflags)
 {
-	return device_read((struct device*)vp->v_data, uio, ioflags);
+	return device_read((struct device *)vp->v_data, uio, ioflags);
 }
 
 static int
 devfs_write(struct vnode *vp, struct uio *uio, int ioflags)
 {
-	return device_write((struct device*)vp->v_data, uio, ioflags);
+	return device_write((struct device *)vp->v_data, uio, ioflags);
 }
 
 static int
-devfs_ioctl(struct vnode *vp, struct vfscore_file *fp __unused, unsigned long cmd, void *arg)
+devfs_ioctl(struct vnode *vp, struct vfscore_file *fp __unused,
+			unsigned long cmd, void *arg)
 {
 	int error;
 
-	error = device_ioctl((struct device*)vp->v_data, cmd, arg);
-	uk_pr_debug("devfs_ioctl: cmd=%lu\n", cmd);
+	error = device_ioctl((struct device *)vp->v_data, cmd, arg);
+	uk_pr_debug("%s: cmd=%lu\n", __func__, cmd);
 	return error;
 }
 
@@ -133,7 +135,7 @@ devfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
 	struct vnode *vp;
 	int error, i;
 
-	uk_pr_debug("devfs_lookup:%s\n", name);
+	uk_pr_debug("%s:%s\n", __func__, name);
 
 	*vpp = NULL;
 
@@ -145,9 +147,9 @@ devfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
 	info.cookie = 0;
 	for (;;) {
 		error = device_info(&info);
-		if (error) {
+		if (error)
 			return ENOENT;
-		}
+
 		if (!strncmp(info.name, name, MAXDEVNAME))
 			break;
 		i++;
@@ -183,7 +185,7 @@ devfs_readdir(struct vnode *vp __unused, struct vfscore_file *fp, struct dirent 
 	struct devinfo info;
 	int error, i;
 
-	uk_pr_debug("devfs_readdir offset=%li\n", fp->f_offset);
+	uk_pr_debug("%s: offset=%li\n", __func__, fp->f_offset);
 
 	i = 0;
 	error = 0;
@@ -203,7 +205,7 @@ devfs_readdir(struct vnode *vp __unused, struct vfscore_file *fp, struct dirent 
 	dir->d_fileno = fp->f_offset;
 //	dir->d_namlen = strlen(dir->d_name);
 
-	uk_pr_debug("devfs_readdir: %s\n", dir->d_name);
+	uk_pr_debug("%s: %s\n", __func__, dir->d_name);
 	fp->f_offset++;
 	return 0;
 }

@@ -57,7 +57,7 @@
 static struct uk_mutex devfs_lock = UK_MUTEX_INITIALIZER(devfs_lock);
 
 /* list head of the devices */
-static struct device *device_list = NULL;
+static struct device *device_list;
 
 /*
  * Look up a device object by device name.
@@ -85,7 +85,7 @@ struct partition_table_entry {
 	uint16_t ending_cylinder:10;
 	uint32_t rela_sector;
 	uint32_t total_sectors;
-} __attribute__((packed));
+} __packed;
 
 
 void device_register(struct device *dev, const char *name, int flags)
