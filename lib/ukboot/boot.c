@@ -145,7 +145,7 @@ static void main_thread_func(void *arg)
 /* defined in <uk/plat.h> */
 void ukplat_entry_argp(char *arg0, char *argb, __sz argb_len)
 {
-	char *argv[CONFIG_LIBUKBOOT_MAXNBARGS];
+	static char *argv[CONFIG_LIBUKBOOT_MAXNBARGS];
 	int argc = 0;
 
 	if (arg0) {
