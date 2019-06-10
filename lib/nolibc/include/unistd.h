@@ -46,6 +46,12 @@ extern "C" {
 #define __NEED_size_t
 #define __NEED_ssize_t
 #define __NEED_off_t
+
+/*
+ * Sysconf name values
+ */
+#define _SC_NPROCESSORS_ONLN 10
+
 #include <nolibc-internal/shareddefs.h>
 
 unsigned int sleep(unsigned int seconds);
