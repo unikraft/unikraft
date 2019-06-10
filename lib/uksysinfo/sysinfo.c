@@ -34,6 +34,7 @@
 
 #include <stddef.h>
 #include <limits.h>
+#include <unistd.h>
 #include <sys/utsname.h>
 #include <uk/essentials.h>
 
@@ -47,8 +48,11 @@ long pathconf(const char *path __unused, int name __unused)
 	return 0;
 }
 
-long sysconf(int name __unused)
+long sysconf(int name)
 {
+	if (name == _SC_NPROCESSORS_ONLN)
+		return 1;
+
 	return 0;
 }
 
