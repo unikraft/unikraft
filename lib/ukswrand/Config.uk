@@ -17,4 +17,10 @@ endchoice
 config LIBUKSWRAND_INITIALSEED
 	int "Initial random seed"
 	default 23
+
+config DEV_RANDOM
+	bool "/dev/random device"
+	select LIBDEVFS
+	default n
+
 endif
