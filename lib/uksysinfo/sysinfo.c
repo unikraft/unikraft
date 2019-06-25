@@ -35,6 +35,8 @@
 #include <stddef.h>
 #include <limits.h>
 #include <unistd.h>
+#include <errno.h>
+#include <string.h>
 #include <sys/utsname.h>
 #include <uk/essentials.h>
 
@@ -68,5 +70,26 @@ int getpagesize(void)
 
 int uname(struct utsname *buf __unused)
 {
+	return 0;
+}
+
+int gethostname(char *name, size_t len)
+{
+	struct utsname buf;
+	size_t node_len;
+	int rc;
+
+	rc = uname(&buf);
+	if (rc)
+		return -1;
+
+	node_len = strlen(buf.nodename) + 1;
+	if (node_len > len) {
+		errno = ENAMETOOLONG;
+		return -1;
+	}
+
+	strncpy(name, buf.nodename, node_len);
+
 	return 0;
 }

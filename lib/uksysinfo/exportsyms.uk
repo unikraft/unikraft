@@ -4,3 +4,4 @@ confstr
 pathconf
 getpagesize
 uname
+gethostname
