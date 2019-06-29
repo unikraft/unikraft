@@ -42,7 +42,12 @@
 
 int fdrop(struct vfscore_file *fp)
 {
-	int prev = ukarch_dec(&fp->f_count);
+	int prev;
+
+	UK_ASSERT(fp);
+	UK_ASSERT(fp->f_count > 0);
+
+	prev = ukarch_dec(&fp->f_count);
 
 	if (prev == 0)
 		UK_CRASH("Unbalanced fhold/fdrop");
