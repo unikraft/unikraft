@@ -88,7 +88,12 @@ void vfscore_put_fd(int fd)
 	fdtable.files[fd] = NULL;
 	ukplat_lcpu_restore_irqf(flags);
 
-	fdrop(fp);
+	/*
+	 * Since we can alloc a fd without assigning a
+	 * vfsfile we must protect against NULL ptr
+	 */
+	if (fp)
+		fdrop(fp);
 }
 
 int vfscore_install_fd(int fd, struct vfscore_file *file)
