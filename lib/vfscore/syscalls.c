@@ -204,6 +204,8 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 	}
 	fp->f_flags = flags;
 
+	// OSv was using a intrusive_ptr which was increasing the refcount
+	dref(dp);
 	// change to std::move once dp is a dentry_ref
 	fp->f_dentry = dp;
 	dp = NULL;
@@ -214,6 +216,7 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 		// Note direct delete of fp instead of fdrop(fp). fp was never
 		// returned so cannot be in use, and because it wasn't opened
 		// it cannot be close()ed.
+		drele(fp->f_dentry);
 		free(fp);
 		return error;
 	}

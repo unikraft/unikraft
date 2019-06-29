@@ -42,15 +42,25 @@
 
 int fdrop(struct vfscore_file *fp)
 {
-	int ret = 0;
 	int prev = ukarch_dec(&fp->f_count);
 
 	if (prev == 0)
 		UK_CRASH("Unbalanced fhold/fdrop");
 
-	if (prev == 1)
-		ret = vfs_close(fp);
-	return ret;
+	if (prev == 1) {
+		/*
+		 * we free the file even in case of an error
+		 * so release the dentry too
+		 */
+		if (vfs_close(fp) != 0)
+			drele(fp->f_dentry);
+
+		free(fp);
+
+		return 1;
+	}
+
+	return 0;
 }
 void fhold(struct vfscore_file *fp)
 {

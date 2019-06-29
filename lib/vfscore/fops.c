@@ -53,9 +53,10 @@ int vfs_close(struct vfscore_file *fp)
 	if (error)
 		return error;
 
-	/* Dentry stays forever in the dentry cache. Unless the
-	 * file/directory it refers to gets deleted/renamed */
+	/* Release the dentry */
+	drele(fp->f_dentry);
 	fp->f_dentry = NULL;
+
 	return 0;
 }
 
@@ -103,7 +104,7 @@ int vfs_write(struct vfscore_file *fp, struct uio *uio, int flags)
 		ioflags |= IO_SYNC;
 
 	if ((flags & FOF_OFFSET) == 0)
-	        uio->uio_offset = fp->f_offset;
+		uio->uio_offset = fp->f_offset;
 
 	error = VOP_WRITE(vp, uio, ioflags);
 	if (!error) {
