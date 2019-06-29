@@ -36,6 +36,15 @@
 #include <uk/argparse.h>
 #include <uk/assert.h>
 
+
+static void left_shift(char *buf) 
+{
+	while(*buf != '\0') {
+		*buf = *(buf + 1);
+		buf++;
+	}
+}
+
 int uk_argnparse(char *argb, __sz maxlen, char *argv[], int maxcount)
 {
 	int argc = 0;
@@ -68,12 +77,20 @@ int uk_argnparse(char *argb, __sz maxlen, char *argv[], int maxcount)
 		/* quotes */
 		case '\'':
 		case '"':
-			if (in_quote) {
-				if (in_quote == argb[i])
-					in_quote = '\0';
+			if (!in_quote) {
+				in_quote = argb[i];
+				left_shift(&argb[i--]);
 				break;
 			}
-			in_quote = argb[i];
+			if (in_quote == argb[i]) {
+				in_quote = '\0';
+				left_shift(&argb[i--]);
+				break;
+			}
+				
+			
+
+			
 			/* Fall through */
 		default:
 			/* any character */
