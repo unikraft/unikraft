@@ -200,3 +200,44 @@ bail:
 	return result;
 }
 
+int fdt_get_address(const void *fdt, int nodeoffset, uint32_t index,
+			uint64_t *addr, uint64_t *size)
+{
+	int parent;
+	int len, prop_addr, prop_size;
+	int naddr, nsize, term_size;
+	const void *regs;
+
+	UK_ASSERT(addr && size);
+
+	/* Get address,size cell from parent */
+	parent = fdt_parent_offset(fdt, nodeoffset);
+	naddr = fdt_address_cells(fdt, parent);
+	if (naddr < 0 || naddr >= FDT_MAX_NCELLS)
+		return naddr;
+
+	nsize = fdt_size_cells(fdt, parent);
+	if (nsize < 0 || nsize >= FDT_MAX_NCELLS)
+		return nsize;
+
+	/* Get reg content */
+	regs = fdt_getprop(fdt, nodeoffset, "reg", &len);
+	if (regs == NULL)
+		return len;
+
+	term_size = sizeof(fdt32_t) * (nsize + naddr);
+	prop_addr = term_size * index;
+	prop_size = prop_addr + sizeof(fdt32_t) * naddr;
+
+	/* The reg content must cover the reg term[index] at least */
+	if (len < (prop_addr + term_size))
+		return -FDT_ERR_NOSPACE;
+
+	*size = fdt_reg_read_number(regs + prop_size, nsize);
+	/* Handle ranges property, currently only 1:1 mapping is supported */
+	*addr = fdt_translate_address_by_ranges(fdt, nodeoffset,
+						regs + prop_addr);
+	if (*addr == FDT_BAD_ADDR)
+		return -FDT_ERR_NOTFOUND;
+	return 0;
+}

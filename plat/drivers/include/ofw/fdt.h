@@ -73,4 +73,22 @@ static inline uint64_t fdt_reg_read_number(const fdt32_t *regs, uint32_t size)
 
 	return number;
 }
+
+/**
+ * fdt_get_address - retrieve device address of a given index
+ * @fdt: pointer to the device tree blob
+ * @nodeoffset: offset of the node to find the address for.
+ * @index: index of region
+ * @addr: return the region address
+ * @size: return the region size
+ *
+ * returns:
+ *     0, on success
+ *      -FDT_ERR_BADNCELLS, if the node has a badly formatted or invalid
+ *             address property
+ *      -FDT_ERR_NOTFOUND, if the node doesn't have address property
+ *      -FDT_ERR_NOSPACE, if the node doesn't have address for index
+ */
+int fdt_get_address(const void *fdt, int nodeoffset, uint32_t index,
+			uint64_t *addr, uint64_t *size);
 #endif
