@@ -35,6 +35,8 @@
 #ifndef _PLAT_DRIVER_OFW_FDT_H
 #define _PLAT_DRIVER_OFW_FDT_H
 
+#define FDT_BAD_ADDR (uint64_t)(-1)
+
 /**
  * fdt_interrupt_cells - retrieve the number of cells needed to encode an
  *                       interrupt source
@@ -55,4 +57,20 @@
  */
 int fdt_interrupt_cells(const void *fdt, int nodeoffset);
 
+/*
+ * read and combine the big number of reg, caller needs to make sure size
+ * is correct
+ */
+static inline uint64_t fdt_reg_read_number(const fdt32_t *regs, uint32_t size)
+{
+	uint64_t number = 0;
+
+	for (uint32_t i = 0; i < size; i++) {
+		number <<= 32;
+		number |= fdt32_to_cpu(*regs);
+		regs++;
+	}
+
+	return number;
+}
 #endif
