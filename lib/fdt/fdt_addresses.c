@@ -83,7 +83,7 @@ int fdt_size_cells(const void *fdt, int nodeoffset)
 
 	sc = fdt_getprop(fdt, nodeoffset, "#size-cells", &len);
 	if (!sc)
-		return 2;
+		return 1;
 
 	if (len != sizeof(*sc))
 		return -FDT_ERR_BADNCELLS;
