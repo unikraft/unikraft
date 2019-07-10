@@ -117,4 +117,24 @@ int fdt_get_address(const void *fdt, int nodeoffset, uint32_t index,
  */
 int fdt_node_offset_by_compatible_list(const void *fdt, int startoffset,
 					const char * const compatibles[]);
+
+/**
+ * fdt_get_interrupt - retrieve device interrupt of a given index
+ * @fdt: pointer to the device tree blob
+ * @nodeoffset: offset of the node to find the address for
+ * @index: the index of interrupt we want to retrieve
+ * @size: interrupt cell size in fdt32_t
+ * @prop: return the pointer to property
+ * returns:
+ *     0 on success , < 0 on failed
+ *     -FDT_ERR_NOTFOUND, node does not have named property
+ *     -FDT_ERR_BADOFFSET, nodeoffset did not point to FDT_BEGIN_NODE tag
+ *     -FDT_ERR_BADMAGIC,
+ *     -FDT_ERR_BADVERSION,
+ *     -FDT_ERR_BADSTATE,
+ *     -FDT_ERR_BADSTRUCTURE,
+ *     -FDT_ERR_TRUNCATED, standard meanings
+ */
+int fdt_get_interrupt(const void *fdt, int nodeoffset,
+				uint32_t index, int *size, fdt32_t **prop);
 #endif
