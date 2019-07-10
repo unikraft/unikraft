@@ -91,4 +91,30 @@ static inline uint64_t fdt_reg_read_number(const fdt32_t *regs, uint32_t size)
  */
 int fdt_get_address(const void *fdt, int nodeoffset, uint32_t index,
 			uint64_t *addr, uint64_t *size);
+
+/**
+ * fdt_node_offset_by_compatible_list - find nodes with a given
+ *                                     'compatible' list value
+ * @fdt: pointer to the device tree blob
+ * @startoffset: only find nodes after this offset
+ * @compatibles: a list of 'compatible' string to match, should be ended
+ * with NULL string.
+ * fdt_node_offset_by_compatible_list() returns the offset of the
+ * first matched node after startoffset, which has a 'compatible'
+ * property which lists the given compatible string; or if
+ * startoffset is -1, the very first such node in the tree.
+ *
+ * returns:
+ *     structure block offset of the located node (>= 0, >startoffset),
+ *              on success
+ *     -FDT_ERR_NOTFOUND, no node matching the criterion exists in the
+ *             tree after startoffset
+ *     -FDT_ERR_BADOFFSET, nodeoffset does not refer to a BEGIN_NODE tag
+ *     -FDT_ERR_BADMAGIC,
+ *     -FDT_ERR_BADVERSION,
+ *     -FDT_ERR_BADSTATE,
+ *     -FDT_ERR_BADSTRUCTURE, standard meanings
+ */
+int fdt_node_offset_by_compatible_list(const void *fdt, int startoffset,
+					const char * const compatibles[]);
 #endif

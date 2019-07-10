@@ -241,3 +241,18 @@ int fdt_get_address(const void *fdt, int nodeoffset, uint32_t index,
 		return -FDT_ERR_NOTFOUND;
 	return 0;
 }
+
+int fdt_node_offset_by_compatible_list(const void *fdt, int startoffset,
+				  const char * const compatibles[])
+{
+	int idx, offset;
+
+	for (idx = 0; compatibles[idx] != NULL; idx++) {
+		offset = fdt_node_offset_by_compatible(fdt, startoffset,
+				  compatibles[idx]);
+		if (offset >= 0)
+			return offset;
+	}
+
+	return -FDT_ERR_NOTFOUND;
+}
