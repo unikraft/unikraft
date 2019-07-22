@@ -532,9 +532,9 @@ objs: $(UK_OBJS) $(UK_OBJS-y)
 
 libs: $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y)
 
-images: $(UK_IMAGES) $(UK_IMAGES-y)
+images: $(UK_DEBUG_IMAGES) $(UK_DEBUG_IMAGES-y) $(UK_IMAGES) $(UK_IMAGES-y)
 
-GDB_HELPER_LINKS := $(addsuffix  .dbg-gdb.py,$(UK_IMAGES-y) $(UK_IMAGES))
+GDB_HELPER_LINKS := $(addsuffix .gdb.py,$(UK_DEBUG_IMAGES) $(UK_DEBUG_IMAGES-y))
 $(GDB_HELPER_LINKS):
 	$(call verbose_cmd,LN,$(notdir $@), ln -sf uk-gdb.py $@)
 
@@ -560,7 +560,10 @@ clean-libs: $(addprefix clean-,\
 clean: clean-libs
 	$(call verbose_cmd,CLEAN,build/,$(RM) \
 		$(UK_CONFIG_OUT) \
-		$(call build_clean,$(UK_IMAGES-y)) \
+		$(call build_clean,\
+			$(UK_DEBUG_IMAGES) $(UK_DEBUG_IMAGES-y) \
+			$(UK_IMAGES) $(UK_IMAGES-y)) \
+		$(GDB_HELPER_LINKS) $(BUILD_DIR)/uk-gdb.py \
 		$(UK_CLEAN) $(UK_CLEAN-y))
 
 else # !($(UK_HAVE_DOT_CONFIG),y)
