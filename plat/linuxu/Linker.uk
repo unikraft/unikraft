@@ -4,15 +4,16 @@ LINUXU_LDFLAGS-y += -Wl,-e,_liblinuxuplat_start
 ## Link image
 ##
 LINUXU_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_linuxu-$(CONFIG_UK_ARCH)
+LINUXU_DEBUG_IMAGE := $(LINUXU_IMAGE).dbg
 LINUXU_LDSCRIPT := $(call src2lds,liblinuxuplat,$(LINUXU_LDSCRIPT_SRC-y))
 LINUXU_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-T$(comma),\
 			    $(LINUXU_LDSCRIPT) $(EXTRA_LD_SCRIPT-y))
 
-$(LINUXU_IMAGE): $(LINUXU_ALIBS) $(LINUXU_ALIBS-y) \
-		 $(LINUXU_OLIBS) $(LINUXU_OLIBS-y) \
-		 $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) \
-		 $(LINUXU_LDSCRIPT)
-	$(call build_cmd,LD,,$@.dbg,\
+$(LINUXU_DEBUG_IMAGE): $(LINUXU_ALIBS) $(LINUXU_ALIBS-y) \
+		       $(LINUXU_OLIBS) $(LINUXU_OLIBS-y) \
+		       $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) \
+		       $(LINUXU_LDSCRIPT)
+	$(call build_cmd,LD,,$@,\
 	       $(LD) $(LDFLAGS) $(LDFLAGS-y) \
 		     $(LINUXU_LDFLAGS) $(LINUXU_LDFLAGS-y) \
 		     $(LINUXU_OLIBS) $(LINUXU_OLIBS-y) \
@@ -22,21 +23,22 @@ $(LINUXU_IMAGE): $(LINUXU_ALIBS) $(LINUXU_ALIBS-y) \
 		     $(UK_ALIBS) $(UK_ALIBS-y) \
 		     -Wl$(comma)--end-group \
 		     $(LINUXU_LD_SCRIPT_FLAGS) \
-		     -o $@.dbg)
-	$(call verbose_cmd,SCSTRIP,$(notdir $@),\
+		     -o $@)
+
+$(LINUXU_IMAGE): $(LINUXU_IMAGE).dbg
+	$(call build_cmd,SCSTRIP,,$@,\
 		$(SCRIPTS_DIR)/sect-strip.py \
 			$(SECT_STRIP_FLAGS) $(SECT_STRIP_FLAGS-y) \
 			--with-objcopy=$(OBJCOPY) \
-			$@.dbg -o $@)
-	$(call verbose_cmd,STRIP,$(notdir $@), $(STRIP) -s $@)
-ifeq ($(CONFIG_OPTIMIZE_SYMFILE),y)
-	$(call build_cmd,NM,,$@.sym,\
-	       $(NM) -n $@.dbg > $@.sym)
-endif
+			$< -o $@ && \
+		$(STRIP) -s $@)
+
+$(LINUXU_IMAGE).sym: $(LINUXU_DEBUG_IMAGE)
+	$(call build_cmd,NM,,$@, $(NM) -n $< > $@)
 
 # register image to the build
-UK_IMAGES-$(CONFIG_PLAT_LINUXU) += $(LINUXU_IMAGE)
-
-# ...for cleaning:
-LIBLINUXUPLAT_CLEAN += $(call build_clean,$(LINUXU_IMAGE).dbg)
-LIBLINUXUPLAT_CLEAN += $(call build_clean,$(LINUXU_IMAGE).sym)
+ifeq ($(CONFIG_PLAT_LINUXU),y)
+UK_DEBUG_IMAGES-y                     += $(LINUXU_DEBUG_IMAGE)
+UK_IMAGES-y                           += $(LINUXU_IMAGE)
+UK_IMAGES-$(CONFIG_OPTIMIZE_SYMFILE)  += $(LINUXU_IMAGE).sym
+endif
