@@ -32,23 +32,34 @@ standard application with gdb. A couple of hints that should help:
 ============================
 Using GDB
 ============================
+The build system always creates two image files for each selected
+platform: one that includes debugging information and symbols (`.dbg`
+file extension) and one that does not. Before using gdb, go to the
+menu under "Build Options" and select a "Debug information level" that
+is bigger than 0.  We recommend 3, the highest level: ::
 
-For gdb debugging, first go to the menu and under "Build Options" make
-sure you select/deselect the following options as shown: ::
+  ( ) Level 0 (-g0), None
+  ( ) Level 1 (-g1)
+  ( ) Level 2 (-g2)
+  (X) Level 3 (-g3)
 
-  [*] Debugging information
-  [*]   Create a debugging information file
-  [*]   Create a symbols file
-  [ ] Strip final image
+Once set, save the configuration and build your images. For the Linux
+user-space target simply point gdb to the resulting debug image, for
+example: ::
 
-Then save the configuration and build your image. For Linux user-space
-simply point gdb to the resulting image, for example: ::
+  gdb build/helloworld_linuxu-x86_64.gdb
 
-  gdb build/helloworld_linuxu-x86_64
-
-For KVM, use the command: ::
+For KVM, you can start the guest with the kernel image that includes debugging
+information, or the one that does not. We recommend creating the guest
+in a paused state (`-S` parameter): ::
 
   qemu-system-x86_64 -s -S -cpu host -enable-kvm -m 128 -nodefaults -no-acpi -display none -serial stdio -device isa-debug-exit -kernel build/helloworld_kvm-x86_64 -append verbose
+
+and connect gdb by using the debug image with: ::
+
+  gdb --eval-command="target remote :1234" build/helloworld_kvm-x86_64.dbg
+
+You can initiate qemu to start the guest's execution by typing `c` within gdb.
 
 For Xen the process is slightly more complicated and depends on Xen's
 gdbsx tool. First you'll need to make sure you have the tool on your
@@ -67,7 +78,7 @@ debugger backend: ::
 
 You can then connect gdb within a separate console and you're ready to debug: ::
 
-  gdb --eval-command="target remote :[PORT]" build/helloworld_xen-x86_64
+  gdb --eval-command="target remote :[PORT]" build/helloworld_xen-x86_64.dbg
 
 You should be also able to use the debugging file
 (``build/helloworld_linuxu-x86_64.dbg``) for gdb instead passing the kernel
