@@ -38,6 +38,5 @@ endif
 UK_IMAGES-$(CONFIG_PLAT_LINUXU) += $(LINUXU_IMAGE)
 
 # ...for cleaning:
-LIBLINUXUPLAT_CLEAN += $(call build_clean,$(LINUXU_IMAGE))
 LIBLINUXUPLAT_CLEAN += $(call build_clean,$(LINUXU_IMAGE).dbg)
 LIBLINUXUPLAT_CLEAN += $(call build_clean,$(LINUXU_IMAGE).sym)

@@ -57,7 +57,6 @@ endif
 UK_IMAGES-$(CONFIG_PLAT_KVM) += $(KVM_IMAGE)
 
 # ...for cleaning:
-LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_IMAGE))
 LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_IMAGE).gz)
 LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_IMAGE).dbg)
 LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_IMAGE).sym)

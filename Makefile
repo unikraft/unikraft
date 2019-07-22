@@ -552,10 +552,12 @@ all: images gdb_helpers
 # Generate cleaning rules
 include $(CONFIG_UK_BASE)/support/build/Makefile.clean
 
-clean: $(addprefix clean-,\
+clean-libs: $(addprefix clean-,\
 	$(foreach P,$(UK_PLATS) $(UK_PLATS-y),\
 	$(if $(call qstrip,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y)),\
 	$(foreach L,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y), $(L)))) $(UK_LIBS) $(UK_LIBS-y))
+
+clean: clean-libs
 	$(call verbose_cmd,CLEAN,build/,$(RM) \
 		$(UK_CONFIG_OUT) \
 		$(call build_clean,$(UK_IMAGES-y)) \
@@ -565,7 +567,7 @@ else # !($(UK_HAVE_DOT_CONFIG),y)
 
 all: menuconfig
 
-.PHONY: prepare image libs objs clean
+.PHONY: prepare image libs objs clean-libs clean
 
 fetch: menuconfig
 
@@ -577,7 +579,7 @@ libs: menuconfig
 
 images: menuconfig
 
-clean:
+clean-libs clean:
 	$(error Do not know which files to clean without having a configuration. Did you mean 'properclean' or 'distclean'?)
 
 endif
@@ -777,8 +779,10 @@ help:
 	@echo 'Cleaning:'
 	@echo '  clean-[LIBNAME]        - delete all files created by build for a single library'
 	@echo '                           (e.g., clean-libfdt)'
+	@echo '  clean-libs             - delete all files created by build for all libraries'
+	@echo '                           but keep final images and fetched files'
 	@echo '  clean                  - delete all files created by build for all libraries'
-	@echo '                           but keep fetched files'
+	@echo '                           including final images, but keep fetched files'
 	@echo '  properclean            - delete build directory'
 	@echo '  distclean              - delete build directory and configurations (including .config)'
 	@echo ''
