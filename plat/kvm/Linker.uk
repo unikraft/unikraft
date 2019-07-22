@@ -10,14 +10,15 @@ KVM_LDSCRIPT     := $(call src2lds,libkvmplat,$(KVM_LDSCRIPT_SRC-y))
 ## Link image
 ##
 KVM_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_kvm-$(CONFIG_UK_ARCH)
+KVM_DEBUG_IMAGE := $(KVM_IMAGE).dbg
 
 KVM_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-T$(comma),\
 			$(KVM_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y))
 
-$(KVM_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
-              $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) \
-              $(KVM_LDSCRIPT)
-	$(call build_cmd,LD,,$@.ld.o,\
+$(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
+		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) \
+		    $(KVM_LDSCRIPT)
+	$(call build_cmd,LD,,$(KVM_IMAGE).ld.o,\
 	       $(LD) -r $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
 			$(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
 			$(KVM_OLIBS) $(KVM_OLIBS-y) \
@@ -26,39 +27,39 @@ $(KVM_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 			$(KVM_ALIBS) $(KVM_ALIBS-y) \
 			$(UK_ALIBS) $(UK_ALIBS-y) \
 			-Wl$(comma)--end-group \
-			-o $@.ld.o)
-	$(call build_cmd,OBJCOPY,,$@.o,\
-	       $(OBJCOPY) -w -G kvmos_* -G _libkvmplat_entry $@.ld.o $@.o)
-ifneq ($(filter x86_64 arm64,$(CONFIG_UK_ARCH)),)
-	$(call build_cmd,LD,,$@.dbg,\
+			-o $(KVM_IMAGE).ld.o)
+	$(call build_cmd,OBJCOPY,,$(KVM_IMAGE).o,\
+		$(OBJCOPY) -w -G kvmos_* -G _libkvmplat_entry \
+			$(KVM_IMAGE).ld.o $(KVM_IMAGE).o)
+	$(call build_cmd,LD,,$@,\
 	       $(LD) $(LDFLAGS) $(LDFLAGS-y) \
 		     $(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
 		     -Wl$(comma)-dT$(comma)$(call strip,$(KVM_LDSCRIPT)) \
 		     $(KVM_LD_SCRIPT_FLAGS) \
-		     $@.o -o $@.dbg)
-	$(call verbose_cmd,SCSTRIP,$(notdir $@),\
+		     $(KVM_IMAGE).o -o $@)
+
+$(KVM_IMAGE): $(KVM_IMAGE).dbg
+	$(call build_cmd,SCSTRIP,,$@,\
 		$(SCRIPTS_DIR)/sect-strip.py \
 			$(SECT_STRIP_FLAGS) $(SECT_STRIP_FLAGS-y) \
 			--with-objcopy=$(OBJCOPY) \
-			$@.dbg -o $@)
-	$(call verbose_cmd,STRIP,$(notdir $@), $(STRIP) -s $@)
+			$< -o $@ && \
+		$(STRIP) -s $@)
 
-ifeq ($(CONFIG_OPTIMIZE_SYMFILE),y)
-	$(call build_cmd,NM,,$@.sym,\
-	       $(NM) -n $@.dbg > $@.sym)
-endif
-ifeq ($(CONFIG_OPTIMIZE_COMPRESS),y)
-	$(call build_cmd,GZ,,$@.gz,\
-	       $(GZIP) -f -9 -c $@ >$@.gz)
-endif
-endif
+$(KVM_IMAGE).sym: $(KVM_DEBUG_IMAGE)
+	$(call build_cmd,NM,,$@, $(NM) -n $< > $@)
 
-# register image to the build
-UK_IMAGES-$(CONFIG_PLAT_KVM) += $(KVM_IMAGE)
+$(KVM_IMAGE).gz: $(KVM_IMAGE)
+	$(call build_cmd,GZ,,$@, $(GZIP) -f -9 -c $< >$@)
+
+# register images to the build
+ifeq ($(CONFIG_PLAT_KVM),y)
+UK_DEBUG_IMAGES-y                     += $(KVM_DEBUG_IMAGE)
+UK_IMAGES-y                           += $(KVM_IMAGE)
+UK_IMAGES-$(CONFIG_OPTIMIZE_SYMFILE)  += $(KVM_IMAGE).sym
+UK_IMAGES-$(CONFIG_OPTIMIZE_COMPRESS) += $(KVM_IMAGE).gz
+endif
 
 # ...for cleaning:
-LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_IMAGE).gz)
-LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_IMAGE).dbg)
-LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_IMAGE).sym)
 LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_IMAGE).o)
 LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_IMAGE).ld.o)
