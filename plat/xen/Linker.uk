@@ -7,15 +7,21 @@ XEN_LDSCRIPT     := $(call src2lds,libxenplat,$(XEN_LDSCRIPT_SRC-y))
 ##
 ## Link image
 ##
-XEN_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_xen-$(CONFIG_UK_ARCH)
+ifeq (arm,$(CONFIG_UK_ARCH))
+XEN_RAW_IMAGE   := $(BUILD_DIR)/$(CONFIG_UK_NAME)_xen-$(CONFIG_UK_ARCH)
+XEN_IMAGE       := $(XEN_RAW_IMAGE).elf
+else
+XEN_IMAGE       := $(BUILD_DIR)/$(CONFIG_UK_NAME)_xen-$(CONFIG_UK_ARCH)
+endif
+XEN_DEBUG_IMAGE := $(XEN_IMAGE).dbg
 
 XEN_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-T$(comma),\
 			 $(XEN_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y))
 
-$(XEN_IMAGE): $(XEN_ALIBS) $(XEN_ALIBS-y) $(XEN_OLIBS) $(XEN_OLIBS-y) \
-              $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) \
-              $(XEN_LDSCRIPT)
-	$(call build_cmd,LD,,$@.ld.o,\
+$(XEN_DEBUG_IMAGE): $(XEN_ALIBS) $(XEN_ALIBS-y) $(XEN_OLIBS) $(XEN_OLIBS-y) \
+		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) \
+		    $(XEN_LDSCRIPT)
+	$(call build_cmd,LD,,$(XEN_IMAGE).ld.o,\
 	       $(LD) -r $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
 			$(XEN_LDFLAGS) $(XEN_LDFLAGS-y) \
 			$(XEN_OLIBS) $(XEN_OLIBS-y) \
@@ -24,49 +30,53 @@ $(XEN_IMAGE): $(XEN_ALIBS) $(XEN_ALIBS-y) $(XEN_OLIBS) $(XEN_OLIBS-y) \
 			$(XEN_ALIBS) $(XEN_ALIBS-y) \
 			$(UK_ALIBS) $(UK_ALIBS-y) \
 			-Wl$(comma)--end-group \
-			-o $@.ld.o)
-	$(call build_cmd,OBJCOPY,,$@.o,\
-	       $(OBJCOPY) -w -G xenos_* -G _libxenplat_start $@.ld.o $@.o)
-ifeq (arm,$(CONFIG_UK_ARCH))
-	$(call build_cmd,LD,,$@.elf.dbg,\
+			-o $(XEN_IMAGE).ld.o)
+	$(call build_cmd,OBJCOPY,,$(XEN_IMAGE).o,\
+		$(OBJCOPY) -w -G xenos_* -G _libxenplat_start \
+			$(XEN_IMAGE).ld.o $(XEN_IMAGE).o)
+	$(call build_cmd,LD,,$@,\
 	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(XEN_LDFLAGS) $(XEN_LDFLAGS-y) \
 		     -Wl$(comma)-dT$(comma)$(call strip,$(XEN_LDSCRIPT)) \
 		     $(XEN_LD_SCRIPT_FLAGS) \
-		     $@.o -o $@.elf.dbg)
-	$(call verbose_cmd,SCSTRIP,$(notdir $@.elf),\
+		     $(XEN_IMAGE).o -o $@)
+
+$(XEN_IMAGE): $(XEN_DEBUG_IMAGE)
+	$(call build_cmd,SCSTRIP,,$@,\
 		$(SCRIPTS_DIR)/sect-strip.py \
 			$(SECT_STRIP_FLAGS) $(SECT_STRIP_FLAGS-y) \
 			--with-objcopy=$(OBJCOPY) \
-			$@.elf.dbg -o $@.elf)
-	$(call verbose_cmd,STRIP,$(notdir $@.elf), $(STRIP) -s $@.elf)
-ifeq ($(CONFIG_OPTIMIZE_SYMFILE),y)
-	$(call build_cmd,NM,,$@.sym,\
-	       $(NM) -n $@.elf.dbg > $@.sym)
+			$< -o $@ && \
+		$(STRIP) -s $@)
+
+ifeq (arm,$(CONFIG_UK_ARCH))
+$(XEN_RAW_IMAGE): $(XEN_IMAGE)
+	$(call build_cmd,OBJCOPY,,$@,$(OBJCOPY) -O binary $< $@)
 endif
-	$(call build_cmd,OBJCOPY,,$@,\
-	       $(OBJCOPY) -O binary $@.elf $@)
-ifeq ($(CONFIG_OPTIMIZE_COMPRESS),y)
-	$(call build_cmd,GZ,,$@.gz,\
-	       $(GZIP) -f -9 -c $@ >$@.gz)
-endif
+
+$(XEN_IMAGE).sym: $(XEN_DEBUG_IMAGE)
+	$(call build_cmd,NM,,$@, $(NM) -n $< > $@)
+
+ifeq (arm,$(CONFIG_UK_ARCH))
+$(XEN_RAW_IMAGE).gz: $(XEN_RAW_IMAGE)
+	$(call build_cmd,GZ,,$@, $(GZIP) -f -9 -c $< >$@)
+
 else
-	$(call build_cmd,LD,,$@.dbg,\
-	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(XEN_LDFLAGS) $(XEN_LDFLAGS-y) \
-		     -Wl$(comma)-dT$(comma)$(call strip,$(XEN_LDSCRIPT)) \
-		     $(XEN_LD_SCRIPT_FLAGS) \
-		     $@.o -o $@.dbg)
-	$(call verbose_cmd,SCSTRIP,$(notdir $@),\
-		$(SCRIPTS_DIR)/sect-strip.py \
-			$(SECT_STRIP_FLAGS) $(SECT_STRIP_FLAGS-y) \
-			$@.dbg -o $@)
-	$(call verbose_cmd,STRIP,$(notdir $@), $(STRIP) -s $@)
-ifeq ($(CONFIG_OPTIMIZE_SYMFILE),y)
-	$(call build_cmd,NM,,$@.sym,\
-	       $(NM) -n $@.dbg > $@.sym)
+$(XEN_IMAGE).gz: $(XEN_IMAGE)
+	$(call build_cmd,GZ,,$@, $(GZIP) -f -9 -c $< >$@)
+
 endif
-ifeq ($(CONFIG_OPTIMIZE_COMPRESS),y)
-	$(call build_cmd,GZ,,$@.gz,\
-	       $(GZIP) -f -9 -c $@ >$@.gz)
+
+# register images to the build
+ifeq ($(CONFIG_PLAT_XEN),y)
+UK_DEBUG_IMAGES-y                     += $(XEN_DEBUG_IMAGE)
+UK_IMAGES-y                           += $(XEN_IMAGE)
+UK_IMAGES-$(CONFIG_OPTIMIZE_SYMFILE)  += $(XEN_IMAGE).sym
+
+ifeq (arm,$(CONFIG_UK_ARCH))
+UK_IMAGES-y                           += $(XEN_RAW_IMAGE)
+UK_IMAGES-$(CONFIG_OPTIMIZE_COMPRESS) += $(XEN_RAW_IMAGE).gz
+else
+UK_IMAGES-$(CONFIG_OPTIMIZE_COMPRESS) += $(XEN_IMAGE).gz
 endif
 endif
 
@@ -77,7 +87,3 @@ UK_IMAGES-$(CONFIG_PLAT_XEN) += $(XEN_IMAGE)
 LIBXENPLAT_CLEAN += $(call build_clean,$(XEN_IMAGE).ld.o)
 LIBXENPLAT_CLEAN += $(call build_clean,$(XEN_IMAGE).o)
 LIBXENPLAT_CLEAN += $(call build_clean,$(XEN_IMAGE).elf)
-LIBXENPLAT_CLEAN += $(call build_clean,$(XEN_IMAGE).elf.dbg)
-LIBXENPLAT_CLEAN += $(call build_clean,$(XEN_IMAGE).gz)
-LIBXENPLAT_CLEAN += $(call build_clean,$(XEN_IMAGE).dbg)
-LIBXENPLAT_CLEAN += $(call build_clean,$(XEN_IMAGE).sym)
