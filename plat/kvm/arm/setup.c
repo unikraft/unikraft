@@ -24,6 +24,7 @@
 #include <kvm/config.h>
 #include <uk/assert.h>
 #include <kvm-arm/mm.h>
+#include <kvm/intctrl.h>
 #include <arm/cpu.h>
 #include <uk/arch/limits.h>
 
@@ -213,6 +214,9 @@ void _libkvmplat_start(void *dtb_pointer)
 
 	/* Initialize memory from DTB */
 	_init_dtb_mem();
+
+	/* Initialize interrupt controller */
+	intctrl_init();
 
 	uk_pr_info("pagetable start: %p\n",
 		   (void *) _libkvmplat_cfg.pagetable.start);
