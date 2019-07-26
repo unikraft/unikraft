@@ -41,4 +41,6 @@
 #error "Add irq.h for current architecture."
 #endif
 
+#define __MAX_IRQ	1020
+
 #endif /* __PLAT_CMN_ARM_IRQ_H__ */

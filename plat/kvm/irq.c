@@ -29,7 +29,8 @@
 #include <uk/alloc.h>
 #include <uk/list.h>
 #include <uk/plat/lcpu.h>
-#include <x86/cpu.h>
+#include <cpu.h>
+#include <irq.h>
 #include <kvm/irq.h>
 #include <kvm/intctrl.h>
 #include <uk/assert.h>
@@ -46,14 +47,14 @@ struct irq_handler {
 };
 
 UK_SLIST_HEAD(irq_handler_head, struct irq_handler);
-static struct irq_handler_head irq_handlers[16];
+static struct irq_handler_head irq_handlers[__MAX_IRQ];
 
 int ukplat_irq_register(unsigned long irq, irq_handler_func_t func, void *arg)
 {
 	struct irq_handler *h;
 	unsigned long flags;
 
-	UK_ASSERT(irq < 16);
+	UK_ASSERT(irq < __MAX_IRQ);
 	UK_ASSERT(allocator != NULL);
 
 	h = uk_malloc(allocator, sizeof(struct irq_handler));

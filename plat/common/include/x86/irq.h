@@ -84,4 +84,6 @@ static inline int irqs_disabled(void)
 #define local_irq_disable()      __cli()
 #define local_irq_enable()       __sti()
 
+#define __MAX_IRQ	16
+
 #endif /* __PLAT_CMN_X86_IRQ_H__ */
