@@ -45,5 +45,20 @@
 #error "Add irq.h for current architecture."
 #endif
 
+/* define IRQ trigger types */
+enum uk_irq_trigger {
+	UK_IRQ_TRIGGER_NONE = 0,
+	UK_IRQ_TRIGGER_EDGE = 1,
+	UK_IRQ_TRIGGER_LEVEL = 2,
+	UK_IRQ_TRIGGER_MAX
+};
+
+/* define IRQ trigger polarities */
+enum uk_irq_polarity {
+	UK_IRQ_POLARITY_NONE = 0,
+	UK_IRQ_POLARITY_HIGH = 1,
+	UK_IRQ_POLARITY_LOW = 2,
+	UK_IRQ_POLARITY_MAX
+};
 
 #endif /* __PLAT_CMN_IRQ_H__ */
