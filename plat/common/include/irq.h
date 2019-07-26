@@ -35,6 +35,8 @@
 #ifndef __PLAT_CMN_IRQ_H__
 #define __PLAT_CMN_IRQ_H__
 
+#include <uk/plat/irq.h>
+
 #if defined(__X86_64__)
 #include <x86/irq.h>
 #elif defined(__ARM_64__)
