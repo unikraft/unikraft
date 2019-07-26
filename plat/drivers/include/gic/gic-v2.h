@@ -367,6 +367,9 @@ void gic_set_irq_type(uint32_t irq, int trigger);
 /* Translate to hwirq according to type e.g. PPI SPI SGI */
 uint32_t gic_irq_translate(uint32_t type, uint32_t hw_irq);
 
+/* Handle IRQ entry */
+void gic_handle_irq(void);
+
 /* Initialize GICv2 from device tree */
 int _dtb_init_gic(const void *fdt);
 

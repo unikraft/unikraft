@@ -23,6 +23,7 @@
 #include <string.h>
 #include <uk/print.h>
 #include <uk/assert.h>
+#include <gic/gic-v2.h>
 
 static const char *exception_modes[]= {
 	"Synchronous Abort",
@@ -67,4 +68,9 @@ void trap_el1_sync(struct __regs *regs, uint64_t far)
 
 	dump_registers(regs, far);
 	ukplat_crash();
+}
+
+void trap_el1_irq(void)
+{
+	gic_handle_irq();
 }
