@@ -32,8 +32,8 @@
  *
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
-#ifndef __PLAT_CMN_ARM_GIC_H__
-#define __PLAT_CMN_ARM_GIC_H__
+#ifndef __PLAT_DRV_ARM_GIC_H__
+#define __PLAT_DRV_ARM_GIC_H__
 
 /*
  * Distributor registers. Unikraft only support run on non-secure
@@ -364,7 +364,10 @@ int gic_is_irq_active(uint32_t irq);
 /* Config interrupt trigger type */
 void gic_set_irq_type(uint32_t irq, int trigger);
 
+/* Translate to hwirq according to type e.g. PPI SPI SGI */
+uint32_t gic_irq_translate(uint32_t type, uint32_t hw_irq);
+
 /* Initialize GICv2 from device tree */
 int _dtb_init_gic(const void *fdt);
 
-#endif //__PLAT_CMN_ARM_GICV2_H__
+#endif //__PLAT_DRV_ARM_GICV2_H__

@@ -49,10 +49,12 @@
 /* Max CPU interface for GICv2 */
 #define GIC_MAX_CPUIF		8
 
-/* SPI interrupt base ID */
+/* SPI interrupt definitions */
+#define GIC_SPI_TYPE		0
 #define GIC_SPI_BASE		32
 
-/* PPI interrupt base ID */
+/* PPI interrupt definitions */
+#define GIC_PPI_TYPE		1
 #define GIC_PPI_BASE		16
 
 /* Max support interrupt number for GICv2 */
@@ -63,6 +65,7 @@ static uint64_t gic_dist_size, gic_cpuif_size;
 
 #define GIC_DIST_REG(r)	((void *)(gic_dist_addr + (r)))
 #define GIC_CPU_REG(r)	((void *)(gic_cpuif_addr + (r)))
+#define IRQ_TYPE_MASK	0x0000000f
 
 static const char * const gic_device_list[] = {
 	"arm,cortex-a15-gic",
@@ -286,6 +289,29 @@ void gic_set_irq_type(uint32_t irq, int trigger)
 	val &= (~(GICD_ICFGR_MASK << (irq % GICD_I_PER_ICFGRn) * 2));
 	val |= (mask << (irq % GICD_I_PER_ICFGRn) * 2);
 	write_gicd32(GICD_ICFGR(irq), val);
+}
+
+uint32_t gic_irq_translate(uint32_t type, uint32_t hw_irq)
+{
+	uint32_t irq;
+
+	switch (type) {
+	case GIC_SPI_TYPE:
+		irq = hw_irq + GIC_SPI_BASE;
+		if (irq >= GIC_SPI_BASE && irq < __MAX_IRQ)
+			return irq;
+		break;
+	case GIC_PPI_TYPE:
+		irq = hw_irq + GIC_PPI_BASE;
+		if (irq >= GIC_PPI_BASE && irq < GIC_SPI_BASE)
+			return irq;
+		break;
+	default:
+		uk_pr_warn("Invalid IRQ type [%d]\n", type);
+	}
+
+	uk_pr_err("irq is out of range\n");
+	return -EINVAL;
 }
 
 static void gic_init_dist(void)
