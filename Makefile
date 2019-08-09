@@ -186,9 +186,6 @@ TOUCH := touch
 CONFIG_SHELL := $(SHELL)
 export SHELL CONFIG_SHELL Q KBUILD_VERBOSE
 
-# Include common Makefile helpers early
-include $(CONFIG_UK_BASE)/support/build/Makefile.rules
-
 ################################################################################
 # .config
 ################################################################################
@@ -312,6 +309,13 @@ export HOSTARCH := $(shell LC_ALL=C $(HOSTCC_NOCCACHE) -v 2>&1 | \
 		       -e 's/sh.*/sh/' )
 export HOSTAR HOSTAS HOSTCC HOSTCC_VERSION HOSTCXX HOSTLD HOSTARCH
 export HOSTCC_NOCCACHE HOSTCXX_NOCCACHE
+
+################################################################################
+# Makefile helpers
+################################################################################
+# We need to include this file early (before any rule is defined)
+# but after we have tried to load a .config and after having our tools defined
+include $(CONFIG_UK_BASE)/support/build/Makefile.rules
 
 ################################################################################
 # Clean targets that do not have any dependency on a configuration
