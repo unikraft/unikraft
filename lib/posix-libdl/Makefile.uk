@@ -1,0 +1,4 @@
+$(eval $(call addlib_s,posix_libdl,$(CONFIG_POSIX_LIBDL)))
+
+CINCLUDES-$(CONFIG_POSIX_LIBDL)    += -I$(POSIX_LIBDL_BASE)/include
+CXXINCLUDES-$(CONFIG_POSIX_LIBDL)  += -I$(POSIX_LIBDL_BASE)/include

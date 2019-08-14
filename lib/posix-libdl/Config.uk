@@ -1,0 +1,3 @@
+config POSIX_LIBDL
+	bool "libdl: POSIX libdl library"
+	default n
