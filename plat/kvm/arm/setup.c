@@ -18,6 +18,7 @@
  * NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
+#include <uk/config.h>
 #include <libfdt.h>
 #include <sections.h>
 #include <kvm/console.h>
@@ -32,6 +33,7 @@ struct kvmplat_config _libkvmplat_cfg = { 0 };
 
 #define MAX_CMDLINE_SIZE 1024
 static char cmdline[MAX_CMDLINE_SIZE];
+static const char *appname = CONFIG_UK_NAME;
 
 smcc_psci_callfn_t smcc_psci_call;
 
@@ -181,22 +183,26 @@ static void _dtb_get_cmdline(char *cmdline, size_t maxlen)
 	if (!fdtcmdline || (len <= 0))
 		goto enocmdl;
 
-	strncpy(cmdline, fdtcmdline, MIN(maxlen, (unsigned int) len));
+	if (likely(maxlen >= (unsigned int)len))
+		maxlen = len;
+	else
+		uk_pr_err("Command line too long, truncated\n");
+
+	strncpy(cmdline, fdtcmdline, maxlen);
 	/* ensure null termination */
-	cmdline[((unsigned int) len - 1) <= (maxlen - 1) ?
-		((unsigned int) len - 1) : (maxlen - 1)] = '\0';
+	cmdline[maxlen - 1] = '\0';
 
 	uk_pr_info("Command line: %s\n", cmdline);
 	return;
 
 enocmdl:
 	uk_pr_info("No command line found\n");
-	strcpy(cmdline, CONFIG_UK_NAME);
 }
 
 static void _libkvmplat_entry2(void *arg __attribute__((unused)))
 {
-	ukplat_entry_argp(NULL, (char *)cmdline, strlen(cmdline));
+	ukplat_entry_argp(DECONST(char *, appname),
+			  (char *)cmdline, strlen(cmdline));
 }
 
 void _libkvmplat_start(void *dtb_pointer)
