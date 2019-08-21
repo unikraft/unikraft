@@ -115,6 +115,14 @@ extern C {
  */
 #define UK_LIB_PARAM_STR(name)
 
+/**
+ * Declare an array of primitive.
+ * @param name
+ *	The name of the parameter.
+ * @param type
+ *	The type of the parameter.
+ */
+#define UK_LIB_PARAM_ARR(name, type)
 
 #else /* !CONFIG_LIBUKLIBPARAM */
 /**
@@ -412,6 +420,18 @@ void _uk_libparam_lib_add(struct uk_lib_section *lib_sec);
 	_LIB_PARAM_NAME_SET(name, _LIB_PARAM_STRING(UK_LIBPARAM_PREFIX,	\
 						    name));		\
 	_LIB_UK_PARAM_SET(name, type, 1)
+
+/**
+ * Declare an array of primitive.
+ * @param name
+ *	The name of the parameter.
+ * @param type
+ *	The type of the parameter.
+ */
+#define UK_LIB_PARAM_ARR(name, type)					\
+	_LIB_PARAM_NAME_SET(name, _LIB_PARAM_STRING(UK_LIBPARAM_PREFIX,	\
+						    name));		\
+	_LIB_UK_PARAM_SET(name, type, sizeof(name)/sizeof(type))	\
 
 /**
  * Declare a string library param.

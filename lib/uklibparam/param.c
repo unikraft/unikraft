@@ -42,6 +42,7 @@
 #include <uk/libparam.h>
 #include <uk/version.h>
 
+#define ARRAY_SEP	 ' '
 #define LIB_ARG_SEP	 "--"
 #define NUMBER_SET(fn, type, value, addr, max, min, errcode, result_type, fmt)\
 	do {								\
@@ -381,6 +382,8 @@ static int kernel_args_set(struct param_args *pargs,
 			   struct uk_param *param)
 {
 	int rc = 0;
+	int i  = 0;
+	char *start, *value;
 	int sign = (param->param_type >> PARAM_SIGN_SHIFT) & PARAM_SIGN_MASK;
 	int scopy = (param->param_type >> PARAM_SCOPY_SHIFT) & PARAM_SCOPY_MASK;
 	int param_type = (param->param_type >> PARAM_SIZE_SHIFT)
@@ -392,7 +395,40 @@ static int kernel_args_set(struct param_args *pargs,
 		/* Reference the pointer instead of copying the value */
 		*((__uptr *)param->addr) = (__uptr) pargs->value;
 	else {
-		if (param->param_size == 1) {
+		if (param->param_size > 1) {
+			/* Adding support for array */
+			i = 0;
+			value = &pargs->value[i];
+			uk_pr_debug("Value:%s length: %d\n", value,
+				     pargs->value_len);
+			while (value && i < param->param_size) {
+				start = value;
+				value = strchr(value, ARRAY_SEP);
+				if (value) {
+					uk_pr_debug("Delimiter: %p\n", value);
+					*value = '\0';
+					/* Search from the next index */
+					value++;
+				}
+				uk_pr_debug("Array index: %d contains %s\n",
+					    i, start);
+				rc = kernel_arg_set((void *)(param->addr +
+						    (i * param_type)),
+						    start, param_type, sign);
+				if (rc < 0)
+					break;
+				i++;
+			}
+			if (rc < 0)
+				uk_pr_err("Failed to read element at index: %d\n",
+					   i);
+			else if (value && i == param->param_size)
+				uk_pr_warn("Overflow detected! Max array size:%d\n",
+					   param->param_size);
+			else
+				uk_pr_debug("Converted value: %s into an array containing %d elements\n",
+					    pargs->value, i);
+		} else if (param->param_size == 1) {
 			rc = kernel_arg_set((void *)param->addr,
 					    pargs->value, param_type, sign);
 		} else {
