@@ -2,8 +2,7 @@ ifeq (x86_64,$(CONFIG_UK_ARCH))
 XEN_LDFLAGS-y += -Wl,-m,elf_x86_64
 endif
 
-XEN_LDSCRIPT     := $(call src2lds,libxenplat,$(XEN_LDSCRIPT_SRC-y))
-
+XEN_LDSCRIPT     := $(call src2lds,libxenplat,$(UK_PLAT_XEN_DEF_LDS))
 ##
 ## Link image
 ##
@@ -15,7 +14,9 @@ XEN_IMAGE       := $(BUILD_DIR)/$(CONFIG_UK_NAME)_xen-$(CONFIG_UK_ARCH)
 endif
 XEN_DEBUG_IMAGE := $(XEN_IMAGE).dbg
 
-XEN_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-T$(comma),\
+XEN_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-dT$(comma),\
+			 $(XEN_LDSCRIPT))
+XEN_LD_SCRIPT_FLAGS += $(addprefix -Wl$(comma)-T$(comma),\
 			 $(XEN_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y))
 
 $(XEN_DEBUG_IMAGE): $(XEN_ALIBS) $(XEN_ALIBS-y) $(XEN_OLIBS) $(XEN_OLIBS-y) \
@@ -36,7 +37,6 @@ $(XEN_DEBUG_IMAGE): $(XEN_ALIBS) $(XEN_ALIBS-y) $(XEN_OLIBS) $(XEN_OLIBS-y) \
 			$(XEN_IMAGE).ld.o $(XEN_IMAGE).o)
 	$(call build_cmd,LD,,$@,\
 	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(XEN_LDFLAGS) $(XEN_LDFLAGS-y) \
-		     -Wl$(comma)-dT$(comma)$(call strip,$(XEN_LDSCRIPT)) \
 		     $(XEN_LD_SCRIPT_FLAGS) \
 		     $(XEN_IMAGE).o -o $@)
 
