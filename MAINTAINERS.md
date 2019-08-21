@@ -126,6 +126,11 @@ Try to look for the most precise areas first. In case nothing fits use
 	L:	minios-devel@lists.xen.org
 	F: lib/ukdebug/*
 
+	LIBUKLIBPARAM
+	M: Sharan Santhanam <sharan.santhanam@neclab.eu>
+	L:	minios-devel@lists.xen.org
+	F: lib/uklibparam/*
+
 	UNIKRAFT GENERAL
 	M:	Simon Kuenzer <simon.kuenzer@neclab.eu>
 	M:	Sharan Santhanam <sharan.santhanam@neclab.eu>

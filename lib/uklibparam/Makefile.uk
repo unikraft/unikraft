@@ -1,0 +1,7 @@
+$(eval $(call addlib_s,libuklibparam,$(CONFIG_LIBUKLIBPARAM)))
+
+ASINCLUDES-y	+= -I$(LIBUKLIBPARAM_BASE)/include
+CINCLUDES-y	+= -I$(LIBUKLIBPARAM_BASE)/include
+CXXINCLUDES-y	+= -I$(LIBUKLIBPARAM_BASE)/include
+
+LIBUKLIBPARAM_SRCS-y += $(LIBUKLIBPARAM_BASE)/param.c
