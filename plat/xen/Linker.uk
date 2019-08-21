@@ -2,7 +2,6 @@ ifeq (x86_64,$(CONFIG_UK_ARCH))
 XEN_LDFLAGS-y += -Wl,-m,elf_x86_64
 endif
 
-XEN_LDSCRIPT     := $(call src2lds,libxenplat,$(UK_PLAT_XEN_DEF_LDS))
 ##
 ## Link image
 ##
@@ -15,7 +14,7 @@ endif
 XEN_DEBUG_IMAGE := $(XEN_IMAGE).dbg
 
 XEN_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-dT$(comma),\
-			 $(XEN_LDSCRIPT))
+			 $(UK_PLAT_XEN_DEF_LDS))
 XEN_LD_SCRIPT_FLAGS += $(addprefix -Wl$(comma)-T$(comma),\
 			 $(XEN_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y))
 
