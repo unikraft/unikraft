@@ -15,23 +15,30 @@ treated as libraries in Unikraft but there are a few differences:
 
 3. You need to provide a linker script and name the file ``Linker.uk``.
 
-4. You need to place all platform files in the Unikraft repo under
+4. The default linker script for a platform is provided using the
+   ``UK_PLAT_PLATNAME_DEF_LDS`` variable in the Makefile.uk of the platform
+   library. The default linker script is also added as a source file to the
+   platform library to be built. If the default linker script is not provided,
+   then Unikraft would rely on the default linker script provided by the compiler
+   tool chain.
+
+5. You need to place all platform files in the Unikraft repo under
    ``plat/platname/``.
 
-5. A platform have to implement interfaces defined in ``include/uk/plat``
+6. A platform have to implement interfaces defined in ``include/uk/plat``
    (this is analogue to architectures that have to implement interfaces in
    ``include/uk/arch``)
 
-6. They do not use any external source files, i.e., all source code is
+7. They do not use any external source files, i.e., all source code is
    within the Unikraft tree.
 
-7. They must not have dependencies on external libraries, i.e., the
+8. They must not have dependencies on external libraries, i.e., the
    Unikraft repo must be able to be built on its own. Remember that
    for such builds, ``libnolibc`` has to be sufficient ``libc`` replacement
    to compile, link, and execute internal libraries. This means that nolibc
    has to be extended from time to time.
 
-8. All changes/additions to ``include/uk/plat`` and ``include/uk/arch``
+9. All changes/additions to ``include/uk/plat`` and ``include/uk/arch``
    have to be completely independent of any library (internal and external).
    They do not include any header provided by any library and never conflict
    with any library. Most of the times this is challenging for defining data

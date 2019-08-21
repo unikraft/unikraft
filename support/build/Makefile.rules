@@ -137,8 +137,9 @@ endef
 # Register a platform to the build system
 define addplat =
 UK_PLATS += $(1)
-$(eval UK_PLAT_$(call uc,$(1))_BASE   := $(_IMPORT_BASE))
-$(eval UK_PLAT_$(call uc,$(1))_LINKER := $(_IMPORT_BASE)/Linker.uk)
+$(eval UK_PLAT_$(call uc,$(1))_BASE    := $(_IMPORT_BASE))
+$(eval UK_PLAT_$(call uc,$(1))_LINKER  := $(_IMPORT_BASE)/Linker.uk)
+$(eval UK_PLAT_$(call uc,$(1))_DEF_LDS :=)
 endef
 
 # addplat_s $platname,$switch

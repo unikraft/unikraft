@@ -19,12 +19,24 @@ LIBXENPLAT_CFLAGS-y      += -DXENPLAT -D__XEN_INTERFACE_VERSION__=$(XEN_INTERFAC
 LIBXENPLAT_CXXFLAGS-y    += -DXENPLAT -D__XEN_INTERFACE_VERSION__=$(XEN_INTERFACE_VERSION)
 
 ##
+## Default Linker script
+ifeq ($(CONFIG_ARCH_X86_64),y)
+UK_PLAT_XEN_DEF_LDS            := $(CONFIG_UK_BASE)/plat/xen/x86/link64.lds.S
+else
+ifeq ($(CONFIG_ARCH_ARM_32),y)
+UK_PLAT_XEN_DEF_LDS            := $(CONFIG_UK_BASE)/plat/xen/arm/link32.lds.S
+endif
+endif
+
+##
 ## Platform library definitions
 ##
 LIBXENPLAT_ASINCLUDES-y        += -I$(LIBXENPLAT_BASE)/include
 LIBXENPLAT_ASINCLUDES-y        += -I$(UK_PLAT_COMMON_BASE)/include
 LIBXENPLAT_CINCLUDES-y         += -I$(LIBXENPLAT_BASE)/include
 LIBXENPLAT_CINCLUDES-y         += -I$(UK_PLAT_COMMON_BASE)/include
+
+LIBXENPLAT_SRCS-y              += $(UK_PLAT_XEN_DEF_LDS)
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/hypervisor.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/memory.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/io.c

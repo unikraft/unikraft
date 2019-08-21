@@ -25,6 +25,17 @@ LIBKVMPLAT_CFLAGS              += -DKVMPLAT
 LIBKVMPLAT_CXXFLAGS            += -DKVMPLAT
 
 ##
+## Default Linker script
+ifeq ($(CONFIG_ARCH_X86_64),y)
+UK_PLAT_KVM_DEF_LDS            := $(CONFIG_UK_BASE)/plat/kvm/x86/link64.lds.S
+else
+ifeq ($(CONFIG_ARCH_ARM_64),y)
+UK_PLAT_KVM_DEF_LDS            := $(CONFIG_UK_BASE)/plat/kvm/arm/link64.lds.S
+endif
+endif
+
+
+##
 ## Architecture library definitions for x86_64
 ##
 KVM_LDSCRIPT_SRC-$(CONFIG_ARCH_X86_64) := $(CONFIG_UK_BASE)/plat/kvm/x86/link64.lds.S
@@ -81,7 +92,7 @@ LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/irq.c
 LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/io.c
 LIBKVMPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/lcpu.c|common
 LIBKVMPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/memory.c|common
-LIBKVMPLAT_SRCS-y              += $(KVM_LDSCRIPT_SRC-y)
+LIBKVMPLAT_SRCS-y              += $(UK_PLAT_KVM_DEF_LDS)
 
 ##
 ## PCI library definitions
