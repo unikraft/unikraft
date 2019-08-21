@@ -8,6 +8,8 @@ $(eval $(call addplat_s,linuxu,$(CONFIG_PLAT_LINUXU)))
 ##
 $(eval $(call addplatlib,linuxu,liblinuxuplat))
 
+## Adding libparam for the linuxu platform
+$(eval $(call addlib_paramprefix,liblinuxuplat,linuxu))
 ##
 ## Platform library definitions
 ##

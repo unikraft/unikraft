@@ -33,9 +33,20 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
+#include <errno.h>
+#include <uk/arch/types.h>
 #include <linuxu/setup.h>
-#include <uk/plat/memory.h>
+#include <uk/errptr.h>
 #include <uk/assert.h>
+#include <linuxu/syscall.h>
+#include <uk/plat/memory.h>
+#include <uk/libparam.h>
+
+#define MB2B		(1024 * 1024)
+
+static __u32 heap_size = CONFIG_LINUXU_DEFAULT_HEAPMB;
+UK_LIB_PARAM(heap_size, __u32);
+
 
 int ukplat_memregion_count(void)
 {
