@@ -165,7 +165,6 @@ $(call addlib,$(1))
 endif
 endef
 
-
 # addplatlib $platname,$libname
 define addplatlib =
 $(call mk_sub_build_dir,$(2))
@@ -437,6 +436,7 @@ $(3): $(2) | prepare
 	)
 
 UK_SRCS-y += $(2)
+UK_LDS-y += $(3)
 UK_DEPS-y += $(call out2dep,$(3))
 $(eval $(call vprefix_lib,$(1),LDS-y) += $(3))
 $(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(3)) $(call out2dep,$(3)))

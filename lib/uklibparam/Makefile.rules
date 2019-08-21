@@ -1,0 +1,15 @@
+# add_paramprefix $name $libname
+define _add_paramprefix =
+$(eval $(call uc,$(2))_CFLAGS += -DUK_LIBPARAM_PREFIX=$(1))
+$(eval $(call uc,$(2))_CXXFLAGS += -DUK_LIBPARAM_PREFIX=$(1))
+$(eval $(call uc,$(2))_ASFLAGS += -DUK_LIBPARAM_PREFIX=$(1))
+$(eval $(call uc,$(2))_SRCS-$(CONFIG_LIBUKLIBPARAM) += $$(LIBUKLIBPARAM_BASE)/libparam.lds.S)
+endef
+
+# addlib_paramprefix $libname,$paramname(optional)
+define addlib_paramprefix =
+$(if $(2),\
+$(eval name := $(2)),\
+$(eval name := $(1)))
+$(eval $(call _add_paramprefix,$(name),$(1),$(call uc,$(1))))
+endef
