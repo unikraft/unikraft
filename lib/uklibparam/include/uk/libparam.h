@@ -108,6 +108,14 @@ extern C {
  */
 #define UK_LIB_PARAM(name, type)
 
+/**
+ * Declare a string library param. This is a dummy implementation.
+ * @param name
+ *	The name of the parameter.
+ */
+#define UK_LIB_PARAM_STR(name)
+
+
 #else /* !CONFIG_LIBUKLIBPARAM */
 /**
  * Each parameter is bit-mapped as follows:
@@ -167,6 +175,8 @@ extern C {
 #define _LIB_PARAM___u32	PARAM_TYPE(0, 0, sizeof(__u32))
 #define _LIB_PARAM___s64	PARAM_TYPE(1, 0, sizeof(__s64))
 #define _LIB_PARAM___u64	PARAM_TYPE(0, 0, sizeof(__u64))
+#define _LIB_PARAM___uptr	PARAM_TYPE(0, 1, sizeof(__uptr))
+#define _LIB_PARAM_charp	_LIB_PARAM___uptr
 
 struct uk_param {
 	/* The name of the param */
@@ -402,6 +412,15 @@ void _uk_libparam_lib_add(struct uk_lib_section *lib_sec);
 	_LIB_PARAM_NAME_SET(name, _LIB_PARAM_STRING(UK_LIBPARAM_PREFIX,	\
 						    name));		\
 	_LIB_UK_PARAM_SET(name, type, 1)
+
+/**
+ * Declare a string library param.
+ * @param name
+ *	The name of the parameter.
+ */
+#define UK_LIB_PARAM_STR(name)						\
+	UK_LIB_PARAM(name, __uptr)
+
 #endif /* !__ASSEMBLY__ */
 #endif /* CONFIG_LIBUKLIBPARAM */
 
