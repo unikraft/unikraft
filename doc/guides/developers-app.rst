@@ -302,12 +302,7 @@ extra.ld
 If your library/application needs a section in the final elf, edit
 your Makefile.uk to add ::
 
-    EXTRA_LD_SCRIPT-$(CONFIG_LIBYOURAPPNAME) += $(LIBYOURAPPNAME_BASE)/extra.ld
-
-If your library is specific to a platform, edit your Makefile.uk to add ::
-
-	[PLATFORM]_LD_SCRIPT-$(CONFIG_LIBYOURAPPNAME) += $(LIBYOURAPPNAME_BASE)/extra.ld
-
+    LIBYOURAPPNAME_SRCS-$(CONFIG_LIBYOURAPPNAME) += $(LIBYOURAPPNAME_BASE)/extra.ld
 
 An example context of extra.ld: ::
 

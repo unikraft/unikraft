@@ -450,12 +450,28 @@ $(if $(strip $($(call uc,$(1))_PLATS)),\
 )
 endef
 
+## Add the linker file to the common variable used for linker script
+define buildrule_ld  =
+$(2): | prepare
+
+$(eval $(call vprefix_lib,$(1),LDS-y) += $(2))
+
+$(if $(strip $($(call uc,$(1))_PLATS)),\
+	$(foreach p,$($(call uc,$(1))_PLATS),\
+		$(if $(filter $(UK_PLAT_$(p)_DEF_LDS),$(2)),\
+			$(eval UK_PLAT_$(p)_DEF_LDS := $(2)),\
+			$(call add_lds_to_plat,$(2),$(p)))),\
+		$(call add_lds_to_lib,$(2))\
+ )
+endef
+
 # wrapper for buildrule_*,
 # selects appropriate buildrule depending on file extension
 #
 # buildrule $libname,$source,$target,$extraflags(optional)
 define buildrule =
 $(if $(filter %.lds.S,$(2)),$(call buildrule_lds,$(1),$(2),$(3),$(4)),\
+$(if $(filter %.ld   ,$(2)),$(call buildrule_ld ,$(1),$(2),$(3),$(4)),\
 $(if $(filter %.S,    $(2)),$(call buildrule_S  ,$(1),$(2),$(3),$(4)),\
 $(if $(filter %.sx,   $(2)),$(call buildrule_S  ,$(1),$(2),$(3),$(4)),\
 $(if $(filter %.s,    $(2)),$(call buildrule_s  ,$(1),$(2),$(3),$(4)),\
@@ -468,7 +484,7 @@ $(if $(filter %.CPP,  $(2)),$(call buildrule_cc ,$(1),$(2),$(3),$(4)),\
 $(if $(filter %.c++,  $(2)),$(call buildrule_cc ,$(1),$(2),$(3),$(4)),\
 $(if $(filter %.C,    $(2)),$(call buildrule_cc ,$(1),$(2),$(3),$(4)),\
 $(error $(3): missing build rule for source type $(suffix $(2))) \
-))))))))))))
+)))))))))))))
 endef
 
 
