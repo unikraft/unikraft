@@ -12,6 +12,8 @@ if (PLAT_LINUXU)
 	int "Default heap size (MB)"
 	default 4
 	help
-		Default size of heap memory to be allocated when no
-		'-m' parameter was given to the linuxu executable
+		Default size of heap memory to be allocated. The heap size may also be
+		changed by using linuxu.heap_size as a command line argument. For more
+		information refer to "Command line arguments in Unikraft" sections in 
+		the developers guide
 endif

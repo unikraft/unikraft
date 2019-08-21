@@ -367,6 +367,120 @@ syscall``. Namely: ::
   general, a 0 return value indicates success.  A -1 return value
   indicates an error, and an error code is stored in errno.
 
+==================================
+Command line arguments in Unikraft
+==================================
+Both a Unikraft application or library within Unikraft may need to be
+configured at instantiation time. Unikraft supports the ability to do
+so via command line paramters: the arguments for a Unikraft library
+come first, followed by the separator ``--``, followed by the
+application arguments.
+
+Type of parameters in a library
+--------------------------------
+Unikraft provides support to pass arguments of the following data
+types:
+
+========  ========================
+Type      Description
+========  ========================
+char      Single character value; an alias for __s8.
+__s8      Same as char
+__u8      Single byte value
+__s16     Short signed integer
+__u16     Short unsigned integer
+int       Integer; aan alias for __s32.
+__s32     Signed integer
+__u32     Unsigned integer
+__s64     Signed long integer
+__u64     Unsigned long integer
+charp     C strings.
+========  ========================
+
+Register a library parameter with Unikraft
+-----------------------------------------
+In order for a library to configure options at execution time, it needs
+to select the `uklibparam` library while configuring the Unikraft build.
+The library should also be registered  with the `uklibparam` library using 
+`addlib_paramprefix` in the Makefile.uk of your library.
+
+There are three interfaces through which a library registers a variable as a
+parameter; these are:
+
+* UK_LIB_PARAM     - Pass a scalar value of the above type to a variable.
+* UK_LIB_PARAM_STR - Pass a null terminated string to a variable.
+* UK_LIB_PARAM_ARR - Pass a space-separated list of values of the above type.
+
+Each library parameter is identified by the following format ::
+
+ [library name].[variable name]
+
+ where
+ 
+     library name is the name registered with the Unikraft build system.
+     variable name is the name of the global or static variable in the program.
+
+Examples
+--------
+If the library needs to configure a variable at execution time, it needs some
+configuration to be performed while building the library. A Unikraft library can
+be specific to a particular platform or common across all platforms.
+For the common library, one has to edit the Makefile.uk with
+
+.. code-block:: bash
+
+ $(eval $(call addlib_paramprefix,libukalloc,alloc))
+ 
+ where
+ 
+      libukalloc is the name of the library
+      alloc is the alias for the library name.
+
+As the next step, we define a variable and register it with the `uk_libparam`
+library. The example below shows a simple code snippet.
+
+.. code-block:: c
+
+    static __u32 heap_size = CONFIG_LINUXU_DEFAULT_HEAPMB;
+    UK_LIB_PARAM(heap_size, __u32);
+
+We can override the default value using the following command line:
+
+.. code-block:: bash
+
+  ./unikraft_linuxu-x86_64 linuxu.heap_size=10 --
+
+As a further example, we now show how to provide a parameter defined
+as a string. We define a char pointer pointing to a default value and
+register it with the `uk_libparam` library using the UK_LIB_PARAM_STR
+helper function:
+
+.. code-block:: c
+
+    static const char \*test_string = "Hello World";
+    UK_LIB_PARAM_STR(test_string);
+
+We can override the default value using the following command:
+
+.. code-block:: bash
+
+  ./unikraft_linuxu-x86_64 linuxu.test_string="Hello Unikraft!" --
+
+The example below demonstrates how to pass a list of scalar datatype
+as a parameter to a library. As in the previous example, we define an
+array variable and register it with the `uk_libparam` library using
+the UK_LIB_PARAM_ARR helper function.
+
+.. code-block:: c
+
+    static int test_array[5] = {0};
+    UK_LIB_PARAM_ARR(test_array, int);
+
+The elements in an array are delimited by ' ' :
+
+.. code-block:: bash
+
+  ./unikraft_linuxu-x86_64 linuxu.test_array="1 2 3 4 5" --
 
 ============================
 Make Targets
