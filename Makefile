@@ -751,6 +751,19 @@ print-libs:
 		)))) \
 		$(UK_LIBS) $(UK_LIBS-y)
 
+print-lds:
+	@echo -e \
+		$(foreach P,$(UK_PLATS) $(UK_PLATS-y),\
+		$(if $(call qstrip,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y)),\
+		$(foreach L,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y), \
+		$(if $(call qstrip,$($(call vprefix_lib,$(L),LDS)) $($(call vprefix_lib,$(L),LDS-y))), \
+		'$(L):\n   $($(call vprefix_lib,$(L),LDS)) $($(call vprefix_lib,$(L),LDS-y))\n'\
+		))))\
+		$(foreach L,$(UK_LIBS) $(UK_LIBS-y),\
+		$(if $(call qstrip,$($(call vprefix_lib,$(L),LDS)) $($(call vprefix_lib,$(L),LDS-y))),\
+		'$(L):\n   $($(call vprefix_lib,$(L),LDS)) $($(call vprefix_lib,$(L),LDS-y))\n'\
+		))
+
 print-objs:
 	@echo -e \
 		$(foreach P,$(UK_PLATS) $(UK_PLATS-y),\
@@ -826,6 +839,7 @@ help:
 	@echo 'Miscellaneous:'
 	@echo '  print-version          - print Unikraft version'
 	@echo '  print-libs             - print library names enabled for build'
+	@echo '  print-lds              - print linker script enabled for the build'
 	@echo '  print-objs             - print object file names enabled for build'
 	@echo '  print-srcs             - print source file names enabled for build'
 	@echo '  print-vars             - prints all the variables currently defined in Makefile'

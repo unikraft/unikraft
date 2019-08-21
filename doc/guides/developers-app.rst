@@ -417,6 +417,7 @@ below: ::
   Miscellaneous:
   print-version          - print Unikraft version
   print-libs             - print library names enabled for build
+  print-lds              - print linker script enabled for the build
   print-objs             - print object file names enabled for build
   print-srcs             - print source file names enabled for build
   print-vars             - prints all the variables currently defined in Makefile
