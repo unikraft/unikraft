@@ -315,7 +315,12 @@ export HOSTCC_NOCCACHE HOSTCXX_NOCCACHE
 ################################################################################
 # We need to include this file early (before any rule is defined)
 # but after we have tried to load a .config and after having our tools defined
-include $(CONFIG_UK_BASE)/support/build/Makefile.rules
+$(foreach M,$(strip $(wildcard $(addsuffix Makefile.rules,\
+	   $(CONFIG_UK_BASE)/support/build/ $(CONFIG_UK_BASE)/lib/*/\
+	   $(CONFIG_UK_BASE)/plat/*/ $(addsuffix /,$(ELIB_DIR)) $(APP_DIR)/)\
+	      )),\
+		$(info Include $(M));\
+		$(eval include $(M)))
 
 ################################################################################
 # Clean targets that do not have any dependency on a configuration
