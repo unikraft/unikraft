@@ -47,10 +47,37 @@
 static __u32 heap_size = CONFIG_LINUXU_DEFAULT_HEAPMB;
 UK_LIB_PARAM(heap_size, __u32);
 
+static int __linuxu_plat_heap_init(void)
+{
+	void *pret;
+	int rc = 0;
+
+	_liblinuxuplat_opts.heap.len = heap_size * MB2B;
+	uk_pr_info("Heap size %u\n", heap_size);
+
+	/**
+	 * Allocate heap memory
+	 */
+	if (_liblinuxuplat_opts.heap.len > 0) {
+		pret = sys_mapmem(NULL, _liblinuxuplat_opts.heap.len);
+		if (PTRISERR(pret)) {
+			rc = PTR2ERR(pret);
+			uk_pr_err("Failed to allocate memory for heap: %d\n",
+				   rc);
+		} else
+			_liblinuxuplat_opts.heap.base = pret;
+	}
+
+	return rc;
+
+}
 
 int ukplat_memregion_count(void)
 {
-	return _liblinuxuplat_opts.heap.base ? 1 : 0;
+	int rc = 0;
+
+	rc = __linuxu_plat_heap_init();
+	return (rc == 0) ? 1 : 0;
 }
 
 int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)

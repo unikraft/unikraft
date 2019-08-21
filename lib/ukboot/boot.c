@@ -61,6 +61,9 @@
 #if CONFIG_LIBUKBUS
 #include <uk/bus.h>
 #endif /* CONFIG_LIBUKBUS */
+#ifdef CONFIG_LIBUKLIBPARAM
+#include <uk/libparam.h>
+#endif /* CONFIG_LIBUKLIBPARAM */
 
 int main(int argc, char *argv[]) __weak;
 #ifdef CONFIG_LIBLWIP
@@ -165,9 +168,10 @@ void ukplat_entry(int argc, char *argv[])
 {
 	const uk_ctor_func_t *cfn;
 	struct thread_main_arg tma;
+	int kern_args = 0;
+	int rc __maybe_unused = 0;
 #if CONFIG_LIBUKALLOC
 	struct uk_alloc *a = NULL;
-	int rc;
 #endif
 #if CONFIG_LIBUKALLOC && CONFIG_LIBUKALLOCBBUDDY && CONFIG_LIBUKBOOT_INITALLOC
 	struct ukplat_memregion_desc md;
@@ -182,6 +186,16 @@ void ukplat_entry(int argc, char *argv[])
 		uk_pr_debug("Call constructor %p\n", *cfn);
 		(*cfn)();
 	}
+
+#ifdef CONFIG_LIBUKLIBPARAM
+	rc = (argc > 1) ? uk_libparam_parse(argv[0], argc - 1, &argv[1]) : 0;
+	if (unlikely(rc < 0))
+		uk_pr_crit("Failed to parse the kernel argument\n");
+	else {
+		kern_args = rc;
+		uk_pr_info("Found %d library args\n", kern_args);
+	}
+#endif /* CONFIG_LIBUKLIBPARAM */
 
 #if CONFIG_LIBUKALLOC && CONFIG_LIBUKALLOCBBUDDY && CONFIG_LIBUKBOOT_INITALLOC
 	/* initialize memory allocator
@@ -236,8 +250,8 @@ void ukplat_entry(int argc, char *argv[])
 		UK_CRASH("Could not initialize the scheduler\n");
 #endif
 
-	tma.argc = argc;
-	tma.argv = argv;
+	tma.argc = argc - kern_args;
+	tma.argv = &argv[kern_args];
 
 #if CONFIG_LIBUKSCHED
 	main_thread = uk_thread_create("main", main_thread_func, &tma);
