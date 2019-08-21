@@ -168,6 +168,7 @@ endef
 # addplatlib $platname,$libname
 define addplatlib =
 $(call mk_sub_build_dir,$(2))
+$(eval $(call uc,$(2))_PLATS   += $(call uc,$(1)))
 $(eval $(call uc,$(1))_LIBS    += $(2))
 $(eval $(call uc,$(2))_BASE    := $(_IMPORT_BASE))
 $(eval $(call uc,$(2))_BUILD   := $(BUILD_DIR)/$(2))
