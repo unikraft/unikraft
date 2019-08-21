@@ -4,6 +4,7 @@ CINCLUDES-$(CONFIG_LIBUKBOOT)		+= -I$(LIBUKBOOT_BASE)/include
 CXXINCLUDES-$(CONFIG_LIBUKBOOT)	+= -I$(LIBUKBOOT_BASE)/include
 
 LIBUKBOOT_SRCS-y += $(LIBUKBOOT_BASE)/boot.c
+LIBUKBOOT_SRCS-y += $(LIBUKBOOT_BASE)/version.c
 
 # The main() is in the separate library to fool the LTO. Which is
 # trying to resolve the main() function call to whatever is available
