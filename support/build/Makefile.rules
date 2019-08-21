@@ -430,6 +430,7 @@ $(3): $(2) | prepare
 
 UK_SRCS-y += $(2)
 UK_DEPS-y += $(call out2dep,$(3))
+$(eval $(call vprefix_lib,$(1),LDS-y) += $(3))
 $(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(3)) $(call out2dep,$(3)))
 endef
 
@@ -584,7 +585,9 @@ $(if $(wildcard $($(call vprefix_lib,$(1),EXPORTS))),,\
 $(call libname2preolib,$(1)): $($(call vprefix_lib,$(1),OBJS)) \
 			      $($(call vprefix_lib,$(1),OBJS-y)) \
 			      $($(call vprefix_lib,$(1),ALIBS)) \
-			      $($(call vprefix_lib,$(1),ALIBS-y))
+			      $($(call vprefix_lib,$(1),ALIBS-y)) \
+			      $($(call vprefix_lib,$(1),LDS)) \
+			      $($(call vprefix_lib,$(1),LDS-y))
 	$(call build_cmd,LD,,$(call libname2preolib,$(1)),\
 		$(LD) $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
 		      $($(call vprefix_lib,$(1),LDFLAGS)) \
