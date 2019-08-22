@@ -478,6 +478,7 @@ GZIP		:= gzip
 TAR		:= tar
 UNZIP		:= unzip -qq -u
 WGET		:= wget
+DTC		:= dtc
 # Time requires the full path so that subarguments are handled correctly
 TIME		:= $(shell which time)
 LIFTOFF		:= liftoff -e -s
