@@ -224,6 +224,10 @@ CXXFLAGS :=
 CXXFLAGS-y :=
 CXXINCLUDES :=
 CXXINCLUDES-y :=
+GOCFLAGS :=
+GOCFLAGS-y :=
+GOCINCLUDES :=
+GOCINCLUDES-y :=
 LDFLAGS :=
 LDFLAGS-y :=
 IMAGE_LDFLAGS :=
@@ -442,6 +446,7 @@ LD		:= $(CONFIG_CROSS_COMPILE)gcc
 CC		:= $(CONFIG_CROSS_COMPILE)gcc
 CPP		:= $(CC)
 CXX		:= $(CPP)
+GOC		:= $(CONFIG_CROSS_COMPILE)gccgo-7
 AS		:= $(CC)
 AR		:= $(CONFIG_CROSS_COMPILE)gcc-ar
 NM		:= $(CONFIG_CROSS_COMPILE)gcc-nm
@@ -473,6 +478,7 @@ CC_VER_MINOR   := $(word 2,$(subst ., ,$(CC_VERSION)))
 ASFLAGS		+= -DCC_VERSION=$(CC_VERSION)
 CFLAGS		+= -DCC_VERSION=$(CC_VERSION)
 CXXFLAGS	+= -DCC_VERSION=$(CC_VERSION)
+GOCFLAGS	+= -DCC_VERSION=$(CC_VERSION)
 
 # ensure $(BUILD_DIR)/kconfig, $(BUILD_DIR)/include and $(BUILD_DIR)/include/uk exists
 $(call mk_sub_build_dir,kconfig)
@@ -482,6 +488,7 @@ $(call mk_sub_build_dir,include/uk)
 ASINCLUDES            += -I$(UK_GENERATED_INCLUDES)
 CINCLUDES             += -I$(UK_GENERATED_INCLUDES)
 CXXINCLUDES           += -I$(UK_GENERATED_INCLUDES)
+GOCINCLUDES           += -I$(UK_GENERATED_INCLUDES)
 
 ################################################################################
 # Build rules

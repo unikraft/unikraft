@@ -17,6 +17,11 @@ CXXFLAGS    += -fno-stack-protector -fno-omit-frame-pointer -fno-tree-sra
 CXXFLAGS    += -Wall -Wextra
 CXXINCLUDES += -nostdinc -nostdlib -I$(CONFIG_UK_BASE)/include
 
+GOCFLAGS    += -U __linux__ -U __FreeBSD__ -U __sun__
+GOCFLAGS    += -fno-stack-protector -fno-omit-frame-pointer -fno-tree-sra
+GOCFLAGS    += -fno-split-stack -Wall -Wextra
+GOCINCLUDES += -nostdinc -nostdlib -I$(CONFIG_UK_BASE)/include
+
 # Set the text and data sections to be readable and writable. Also,
 # do not page-align the data segment. If the output format supports
 # Unix style magic numbers, mark the output as OMAGIC.
@@ -25,29 +30,38 @@ LDFLAGS     += -nostdinc -nostdlib -Wl,--omagic -Wl,--build-id=none
 
 CFLAGS-$(CONFIG_OPTIMIZE_NONE)            += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
 CXXFLAGS-$(CONFIG_OPTIMIZE_NONE)          += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
+GOCFLAGS-$(CONFIG_OPTIMIZE_NONE)          += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
 CFLAGS-$(CONFIG_OPTIMIZE_PERF)            += -O2
 CXXFLAGS-$(CONFIG_OPTIMIZE_PERF)          += -O2
+GOCFLAGS-$(CONFIG_OPTIMIZE_PERF)          += -O2
 CFLAGS-$(CONFIG_OPTIMIZE_SIZE)            += -Os
 CXXFLAGS-$(CONFIG_OPTIMIZE_SIZE)          += -Os
+GOCFLAGS-$(CONFIG_OPTIMIZE_SIZE)          += -Os
 
 CFLAGS-$(CONFIG_OPTIMIZE_DEADELIM)        += -fdata-sections -ffunction-sections
 CXXFLAGS-$(CONFIG_OPTIMIZE_DEADELIM)      += -fdata-sections -ffunction-sections
+GOCFLAGS-$(CONFIG_OPTIMIZE_DEADELIM)      += -fdata-sections -ffunction-sections
 LDFLAGS-$(CONFIG_OPTIMIZE_DEADELIM)       += -Wl,--gc-sections
 
 # LTO requires the compiler flags to be handed over also for linking
 CFLAGS-$(CONFIG_OPTIMIZE_LTO)             += -flto
 CXXFLAGS-$(CONFIG_OPTIMIZE_LTO)           += -flto
+GOCFLAGS-$(CONFIG_OPTIMIZE_LTO)           += -flto
 LIBLDFLAGS-$(CONFIG_OPTIMIZE_LTO)         += $(CFLAGS) $(CFLAGS-y)
 LDFLAGS-$(CONFIG_OPTIMIZE_LTO)            += $(CFLAGS) $(CFLAGS-y)
 
 CFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL0)       += -g0
 CXXFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL0)     += -g0
+GOCFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL0)     += -g0
 CFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL1)       += -g1
 CXXFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL1)     += -g1
+GOCFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL0)     += -g1
 CFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL2)       += -g2
 CXXFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL2)     += -g2
+GOCFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL0)     += -g2
 CFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL3)       += -g3
 CXXFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL3)     += -g3
+GOCFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL0)     += -g3
 
 ASFLAGS  += -D __Unikraft__ -DUK_CODENAME="$(UK_CODENAME)"
 ASFLAGS  += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
@@ -58,6 +72,9 @@ CFLAGS   += -DUK_FULLVERSION=$(UK_FULLVERSION)
 CXXFLAGS += -D __Unikraft__ -DUK_CODENAME="$(UK_CODENAME)"
 CXXFLAGS += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
 CXXFLAGS += -DUK_FULLVERSION=$(UK_FULLVERSION)
+GOCFLAGS += -D __Unikraft__ -DUK_CODENAME="$(UK_CODENAME)"
+GOCFLAGS += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
+GOCFLAGS += -DUK_FULLVERSION=$(UK_FULLVERSION)
 M4FLAGS  += -D __Unikraft__ -DUK_CODENAME="$(UK_CODENAME)"
 M4FLAGS  += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
 
