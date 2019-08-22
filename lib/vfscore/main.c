@@ -1141,6 +1141,10 @@ LFS64(__xstat);
 
 int stat(const char *pathname, struct stat *st)
 {
+	if (!pathname) {
+		errno = EINVAL;
+		return -1;
+	}
 	return __xstat(1, pathname, st);
 }
 
