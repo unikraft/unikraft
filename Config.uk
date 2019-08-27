@@ -9,6 +9,9 @@ config KCONFIG_APP_IN
 config KCONFIG_ELIB_IN
 	string
 	option env="KCONFIG_ELIB_IN"
+config KCONFIG_EPLAT_IN
+	string
+	option env="KCONFIG_EPLAT_IN"
 config UK_FULLVERSION
 	string
 	option env="UK_FULLVERSION"
@@ -34,6 +37,7 @@ endmenu
 
 menu "Platform Configuration"
 	source "plat/Config.uk"
+	source "$KCONFIG_EPLAT_IN"
 endmenu
 
 menu "Library Configuration"
