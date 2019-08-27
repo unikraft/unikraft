@@ -35,8 +35,39 @@
 
 #include <unistd.h>
 #include <pwd.h>
+#include <string.h>
 #include <sys/types.h>
 #include <uk/essentials.h>
+#include <uk/list.h>
+
+static struct passwd_entry {
+	struct passwd *passwd;
+
+	UK_SLIST_ENTRY(struct passwd_entry) entries;
+} *iter;
+
+UK_SLIST_HEAD(uk_entry_list, struct passwd_entry);
+
+static struct uk_entry_list passwds;
+
+void __constructor init_ukunistd()
+{
+	static struct passwd_entry p1;
+	static struct passwd passwd = {
+		.pw_name = "root",
+		.pw_passwd = "password",
+		.pw_uid = 0,
+		.pw_gid = 0,
+		.pw_gecos = "root",
+		.pw_dir = "/",
+		.pw_shell = NULL,
+	};
+
+	p1.passwd = &passwd;
+
+	UK_SLIST_INIT(&passwds);
+	UK_SLIST_INSERT_HEAD(&passwds, &p1, entries);
+}
 
 uid_t getuid(void)
 {
@@ -78,14 +109,37 @@ char *getlogin(void)
 	return 0;
 }
 
-struct passwd *getpwnam(const char *name __unused)
+void setpwent(void)
 {
-	return NULL;
+	iter = UK_SLIST_FIRST(&passwds);
 }
 
-struct passwd *getpwuid(uid_t uid __unused)
+void endpwent(void)
 {
-	return NULL;
+}
+
+struct passwd *getpwnam(const char *name)
+{
+	struct passwd *pwd;
+
+	setpwent();
+	while ((pwd = getpwent()) && strcmp(pwd->pw_name, name))
+		;
+	endpwent();
+
+	return pwd;
+}
+
+struct passwd *getpwuid(uid_t uid)
+{
+	struct passwd *pwd;
+
+	setpwent();
+	while ((pwd = getpwent()) && pwd->pw_uid != uid)
+		;
+	endpwent();
+
+	return pwd;
 }
 
 int getpwnam_r(const char *name __unused, struct passwd *pwd __unused,
@@ -104,15 +158,16 @@ int getpwuid_r(uid_t uid __unused, struct passwd *pwd __unused,
 
 struct passwd *getpwent(void)
 {
-	return NULL;
-}
+	struct passwd *pwd;
+	
+	if (iter == NULL)
+		return NULL;
 
-void setpwent(void)
-{
-}
+	pwd = iter->passwd;
 
-void endpwent(void)
-{
+	iter = UK_SLIST_NEXT(iter, entries);
+
+	return pwd;
 }
 
 gid_t getgid(void)
