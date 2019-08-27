@@ -38,15 +38,17 @@ The Makefile is generally short and simple and might remind you to
 Linux kernel modules that are built off-tree. For most applications
 the Makefile should contain no more than the following: ::
 
-  UK_ROOT ?= $(PWD)/../../unikraft
-  UK_LIBS ?= $(PWD)/../../libs
-  LIBS := $(UK_LIBS)/lib1:$(UK_LIBS)/lib2:$(UK_LIBS)/libN
+  UK_ROOT  ?= $(PWD)/../../unikraft
+  UK_LIBS  ?= $(PWD)/../../libs
+  UK_PLATS ?= $(PWD)/../../plats
+  LIBS  := $(UK_LIBS)/lib1:$(UK_LIBS)/lib2:$(UK_LIBS)/libN
+  PLATS ?=
 
   all:
-          @make -C $(UK_ROOT) A=$(PWD) L=$(LIBS)
+          @make -C $(UK_ROOT) A=$(PWD) L=$(LIBS) P=$(PLATS)
 
   $(MAKECMDGOALS):
-	  @make -C $(UK_ROOT) A=$(PWD) L=$(LIBS) $(MAKECMDGOALS)
+	  @make -C $(UK_ROOT) A=$(PWD) L=$(LIBS) P=$(PLATS) $(MAKECMDGOALS)
 
 We cover the format of the other two files in turn next, followed by
 an explanation of the build process.

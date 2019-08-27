@@ -1,6 +1,6 @@
-****************************
-Platform Library Development
-****************************
+*****************************
+Internal Platform Development
+*****************************
 Platforms (e.g., Xen, KVM, Linux user-space, etc.) are also
 treated as libraries in Unikraft but there are a few differences:
 
@@ -19,8 +19,8 @@ treated as libraries in Unikraft but there are a few differences:
    ``UK_PLAT_PLATNAME_DEF_LDS`` variable in the Makefile.uk of the platform
    library. The default linker script is also added as a source file to the
    platform library to be built. If the default linker script is not provided,
-   then Unikraft would rely on the default linker script provided by the compiler
-   tool chain.
+   then Unikraft would rely on the default linker script provided by the
+   compiler tool chain.
 
 5. You need to place all platform files in the Unikraft repo under
    ``plat/platname/``.

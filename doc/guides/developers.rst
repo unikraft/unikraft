@@ -11,6 +11,7 @@ any external libraries and applications you might want to work with.
    developers-app
    developers-external-lib
    developers-internal-lib
-   developers-platform
+   developers-internal-plat
+   developers-external-plat
    developers-debugging
 
