@@ -1,0 +1,26 @@
+diff --git a/support/kconfig.new/Makefile.br b/support/kconfig.new/Makefile.br
+index 0fdbe9a..c11f297 100644
+--- a/support/kconfig.new/Makefile.br
++++ b/support/kconfig.new/Makefile.br
+@@ -31,18 +31,6 @@ $(host-cmulti): %: $(host-cobjs) $(host-cshlib)
+ $(host-cxxmulti): %: $(host-cxxobjs) $(host-cobjs) $(host-cshlib)
+ 	$(HOSTCXX) $(HOST_EXTRACFLAGS) $(HOSTCFLAGS) $(HOSTCXXFLAGS_$@) $(addprefix $(obj)/,$($(@F)-objs) $($(@F)-cxxobjs)) $(HOSTLOADLIBES_$(@F)) -o $(obj)/$@
+ 
+-$(obj)/%.o: %.c
+-	$(HOSTCC) $(HOST_EXTRACFLAGS) $(HOSTCFLAGS) $(HOSTCFLAGS_$(@F)) -c $< -o $@
+-
+-$(obj)/%.o: $(obj)/%.c
+-	$(HOSTCC) $(HOST_EXTRACFLAGS) $(HOSTCFLAGS) $(HOSTCFLAGS_$(@F)) -c $< -o $@
+-
+-$(obj)/%.o: %.cc
+-	$(HOSTCC) $(HOST_EXTRACFLAGS) $(HOSTCFLAGS) $(HOSTCXXFLAGS_$(@F)) -c $< -o $@
+-
+-$(obj)/%:: $(src)/%_shipped
+-	$(Q)cat $< > $@
+-
+ clean:
+ 	$(Q)rm -f $(addprefix $(obj)/,$(clean-files))
+ distclean: clean
+diff --git a/support/kconfig.new/patches/04-remove-generic-rule b/support/kconfig.new/patches/04-remove-generic-rule
+new file mode 100644
+index 0000000..e69de29
