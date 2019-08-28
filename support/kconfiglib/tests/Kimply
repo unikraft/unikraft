@@ -1,0 +1,145 @@
+config MODULES
+    def_bool y
+    option modules
+
+#
+# Implied symbols with unmet and met direct dependencies
+#
+
+config IMPLY_DIRECT_DEPS
+    def_tristate y
+    imply UNMET_DIRECT_1
+    imply UNMET_DIRECT_2
+    imply UNMET_DIRECT_3
+    imply MET_DIRECT_1
+    imply MET_DIRECT_2
+    imply MET_DIRECT_3
+    imply MET_DIRECT_4
+
+config UNMET_DIRECT_1
+    tristate
+    depends on n
+
+if n
+config UNMET_DIRECT_2
+    tristate
+endif
+
+menu "menu"
+    depends on n
+
+config UNMET_DIRECT_3
+    tristate
+
+endmenu
+
+config MET_DIRECT_1
+    tristate
+
+config MET_DIRECT_2
+    depends on y
+    tristate
+
+if y
+config MET_DIRECT_3
+    tristate
+endif
+
+menu "menu"
+    depends on y
+
+config MET_DIRECT_4
+    tristate
+
+endmenu
+
+#
+# 'imply' with condition
+#
+
+config IMPLY_COND
+    def_tristate y
+    tristate
+    imply IMPLIED_N_COND if n
+    imply IMPLIED_M_COND if m
+    imply IMPLIED_Y_COND if y
+
+config IMPLIED_N_COND
+    tristate
+
+config IMPLIED_M_COND
+    tristate
+
+config IMPLIED_Y_COND
+    tristate
+
+#
+# Implying from symbol with value n
+#
+
+# Will default to 'n'
+config IMPLY_N_1
+    tristate
+    imply IMPLIED_FROM_N_1
+
+# This test also disables the imply, so it's kinda redundant, but why not
+if n
+config IMPLY_N_2
+    tristate
+    imply IMPLIED_FROM_N_2
+endif
+
+config IMPLIED_FROM_N_1
+    tristate
+
+config IMPLIED_FROM_N_2
+    tristate
+
+#
+# Implying from symbol with value m
+#
+
+config IMPLY_M
+    def_tristate m
+    imply IMPLIED_M
+    # Implying a bool to 'm' makes it default to 'y'
+    imply IMPLIED_M_BOOL
+
+config IMPLIED_M
+    tristate
+
+config IMPLIED_M_BOOL
+    bool
+
+#
+# 'imply' which should raise an 'm' default to 'y'
+#
+
+config IMPLY_M_TO_Y
+    tristate
+    default y
+    imply IMPLIED_M_TO_Y
+
+config IMPLIED_M_TO_Y
+    tristate
+    default m
+
+#
+# Used for testing user values
+#
+
+config DIRECT_DEP
+    tristate "direct dep"
+
+config IMPLY
+    tristate "imply"
+    imply IMPLIED_TRISTATE
+    imply IMPLIED_BOOL
+
+config IMPLIED_TRISTATE
+    tristate "implied tristate"
+    depends on DIRECT_DEP
+
+config IMPLIED_BOOL
+    bool "implied bool"
+    depends on DIRECT_DEP

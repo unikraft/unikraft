@@ -1,0 +1,11 @@
+choice
+    bool "choice"
+
+config FOO
+    bool "foo"
+    depends on BAR
+
+config BAR
+    bool "bar"
+
+endchoice

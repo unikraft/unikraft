@@ -1,0 +1,133 @@
+#
+# No ranges
+#
+
+config HEX_NO_RANGE
+    hex "hex no range"
+
+config INT_NO_RANGE
+    int "int no range"
+
+#
+# Disabled ranges
+#
+
+config HEX_ALL_RANGES_DISABLED
+    hex "hex all ranges disabled"
+    range 0x10 0x20 if n
+    range 0x30 0x40 if n
+
+config INT_ALL_RANGES_DISABLED
+    int "int all ranges disabled"
+    range 10 20 if n
+    range 30 40 if n
+
+#
+# Ranges with defaults
+#
+
+# hex
+
+config HEX_RANGE_10_20_LOW_DEFAULT
+    hex "int range 10-20 low default"
+    range 0x10 0x20
+    default 0x9
+
+config HEX_RANGE_10_20_HIGH_DEFAULT
+    hex "int range 10-20 high default"
+    range 0x10 0x20
+    default 0x21
+
+config HEX_RANGE_10_20_OK_DEFAULT
+    hex "int range 10-20 ok default"
+    range 0x10 0x20
+    default 0x15
+
+config HEX_RANGE_10_20_OK_DEFAULT_ALTERNATE
+    hex "int range 10-20 ok default alternate"
+    range 0x10 0x20
+    default 15
+
+# int
+
+config INT_RANGE_10_20_LOW_DEFAULT
+    int "int range 10-20 low default"
+    range 10 20
+    default 9
+
+config INT_RANGE_10_20_HIGH_DEFAULT
+    int "int range 10-20 high default"
+    range 10 20
+    default 21
+
+config INT_RANGE_10_20_OK_DEFAULT
+    int "int range 10-20 ok default"
+    range 10 20
+    default 15
+
+#
+# Ranges with no defaults (should default to low end of range if > 0)
+#
+
+config HEX_RANGE_10_20
+    hex "hex range 10-20"    
+    range 0x10 0x20
+
+config HEX_RANGE_0_10
+    hex "hex range 0-10"
+    range 0x0 0x10
+
+config INT_RANGE_10_20
+    int "int range 10-20"    
+    range 10 20
+
+config INT_RANGE_0_10
+    int "int range 0-10"
+    range 0 10
+
+config INT_RANGE_NEG_10_10
+    int "int range -10-10"
+    range -10 10
+
+#
+# Dependent ranges
+#
+
+config HEX_40
+    hex
+    default 40
+
+config HEX_RANGE_10_40_DEPENDENT
+    hex "hex range 10-40 dependent"
+    range HEX_RANGE_10_20 HEX_40
+
+config INT_40
+    int
+    default 40
+
+config INT_RANGE_10_40_DEPENDENT
+    int "int range 10-40 dependent"
+    range INT_RANGE_10_20 INT_40
+
+#
+# Ranges on symbols defined in multiple locations
+#
+
+if n
+config INACTIVE_RANGE
+    range 0 1
+endif
+
+config INACTIVE_RANGE
+    int
+    # Default will apply and should not get clamped,
+    # because the range does not apply
+    default 2
+
+config ACTIVE_RANGE
+    range 0 1
+
+config ACTIVE_RANGE
+    int
+    # Default will apply and should be clamped to 1
+    default 2

@@ -1,0 +1,35 @@
+config O
+	int "O"
+	default 0
+
+config R
+	int "R"
+	default 1
+
+config D
+	int "D"
+	default 2
+
+config E
+	int "E"
+	default 3
+
+# Defined twice
+config R
+	int "R"
+
+config R2
+	int "R2"
+	default 4
+
+config I
+	int "I"
+	default 5
+
+config N
+	int "N"
+	default 6
+
+config G
+	int "G"
+	default 7

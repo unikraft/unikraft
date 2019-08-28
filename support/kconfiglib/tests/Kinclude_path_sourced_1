@@ -1,0 +1,12 @@
+config ONE_DOWN
+	bool
+
+source "Kinclude_path_sourced_2"
+
+config ONE_DOWN
+	bool
+
+source "Kinclude_path_sourced_2"
+
+config ONE_DOWN
+	bool

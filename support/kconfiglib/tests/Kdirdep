@@ -1,0 +1,30 @@
+config NO_DEP_SYM
+    bool
+
+config DEP_SYM
+    bool
+    depends on A
+
+config DEP_SYM
+    depends on B && C
+
+config DEP_SYM
+    depends on !D
+
+
+choice NO_DEP_CHOICE
+    bool "no dep. choice"
+endchoice
+
+choice DEP_CHOICE
+    bool "dep. choice"
+    depends on A
+endchoice
+
+choice DEP_CHOICE
+    depends on B
+endchoice
+
+choice DEP_CHOICE
+    depends on C
+endchoice

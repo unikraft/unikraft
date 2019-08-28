@@ -1,0 +1,230 @@
+config MODULES
+	bool "modules"
+	option modules
+
+
+# Things that should never be .assignable
+
+if UNDEFINED && "const"
+endif
+
+config NO_PROMPT
+	bool
+
+config STRING
+	string "string"
+
+config INT
+	int "int"
+
+config HEX
+	hex "hex"
+
+
+# Non-selected symbols
+
+config Y_VIS_BOOL
+	bool "y-vis bool"
+
+config M_VIS_BOOL
+	bool "m-vis bool" if m
+
+config N_VIS_BOOL
+	bool "n-vis bool" if n
+
+config Y_VIS_TRI
+	tristate "y-vis tri"
+
+config M_VIS_TRI
+	tristate "m-vis tri" if m
+
+config N_VIS_TRI
+	tristate "n-vis tri" if n
+
+
+# Symbols selected to y
+
+config Y_SELECTOR
+	def_tristate y
+
+	select Y_SEL_Y_VIS_BOOL
+	select Y_SEL_M_VIS_BOOL
+	select Y_SEL_N_VIS_BOOL
+
+	select Y_SEL_Y_VIS_TRI
+	select Y_SEL_M_VIS_TRI
+	select Y_SEL_N_VIS_TRI
+
+config Y_SEL_Y_VIS_BOOL
+	bool "y-sel y-vis bool"
+
+config Y_SEL_M_VIS_BOOL
+	bool "y-sel m-vis bool" if m
+
+config Y_SEL_N_VIS_BOOL
+	bool "y-sel n-vis bool" if n
+
+config Y_SEL_Y_VIS_TRI
+	tristate "y-sel y-vis tri"
+
+config Y_SEL_M_VIS_TRI
+	tristate "y-sel m-vis tri" if m
+
+config Y_SEL_N_VIS_TRI
+	tristate "y-sel n-vis tri" if n
+
+
+# Symbols selected to m
+
+config M_SELECTOR
+	def_tristate m
+
+	select M_SEL_Y_VIS_BOOL
+	select M_SEL_M_VIS_BOOL
+	select M_SEL_N_VIS_BOOL
+
+	select M_SEL_Y_VIS_TRI
+	select M_SEL_M_VIS_TRI
+	select M_SEL_N_VIS_TRI
+
+config M_SEL_Y_VIS_BOOL
+	bool "m-sel y-vis bool"
+
+config M_SEL_M_VIS_BOOL
+	bool "m-sel m-vis bool" if m
+
+config M_SEL_N_VIS_BOOL
+	bool "m-sel n-vis bool" if n
+
+config M_SEL_Y_VIS_TRI
+	tristate "m-sel y-vis tri"
+
+config M_SEL_M_VIS_TRI
+	tristate "m-sel m-vis tri" if m
+
+config M_SEL_N_VIS_TRI
+	tristate "m-sel n-vis tri" if n
+
+
+# Symbols implied to y
+
+config Y_IMPLIER
+	def_tristate y
+
+	imply Y_IMP_Y_VIS_BOOL
+	imply Y_IMP_M_VIS_BOOL
+	imply Y_IMP_N_VIS_BOOL
+
+	imply Y_IMP_Y_VIS_TRI
+	imply Y_IMP_M_VIS_TRI
+	imply Y_IMP_N_VIS_TRI
+
+config Y_IMP_Y_VIS_BOOL
+	bool "y-imp y-vis bool"
+
+config Y_IMP_M_VIS_BOOL
+	bool "y-imp m-vis bool" if m
+
+config Y_IMP_N_VIS_BOOL
+	bool "y-imp n-vis bool" if n
+
+config Y_IMP_Y_VIS_TRI
+	tristate "y-imp y-vis tri"
+
+config Y_IMP_M_VIS_TRI
+	tristate "y-imp m-vis tri" if m
+
+config Y_IMP_N_VIS_TRI
+	tristate "y-imp n-vis tri" if n
+
+
+# Symbols implied to m (never affects assignable values)
+
+config M_IMPLIER
+	def_tristate m
+
+	imply M_IMP_Y_VIS_BOOL
+	imply M_IMP_M_VIS_BOOL
+	imply M_IMP_N_VIS_BOOL
+
+	imply M_IMP_Y_VIS_TRI
+	imply M_IMP_M_VIS_TRI
+	imply M_IMP_N_VIS_TRI
+
+config M_IMP_Y_VIS_BOOL
+	bool "m-imp y-vis bool"
+
+config M_IMP_M_VIS_BOOL
+	bool "m-imp m-vis bool" if m
+
+config M_IMP_N_VIS_BOOL
+	bool "m-imp n-vis bool" if n
+
+config M_IMP_Y_VIS_TRI
+	tristate "m-imp y-vis tri"
+
+config M_IMP_M_VIS_TRI
+	tristate "m-imp m-vis tri" if m
+
+config M_IMP_N_VIS_TRI
+	tristate "m-imp n-vis tri" if n
+
+
+# Symbols in y-mode choice
+
+choice Y_CHOICE
+	bool "y-mode choice"
+
+config Y_CHOICE_BOOL
+	bool "y-mode choice bool"
+
+config Y_CHOICE_TRISTATE
+	tristate "y-mode choice tristate"
+
+config Y_CHOICE_N_VIS_TRISTATE
+	tristate "y-mode choice tristate invisible" if n
+
+endchoice
+
+
+# Symbols in m/y-mode choice
+
+choice MY_CHOICE
+	tristate "m/y-mode choice"
+
+config MY_CHOICE_BOOL
+	bool "m/y-mode choice bool"
+
+config MY_CHOICE_TRISTATE
+	tristate "m/y-mode choice tristate"
+
+config MY_CHOICE_N_VIS_TRISTATE
+	tristate "m/y-mode choice tristate invisible" if n
+
+endchoice
+
+
+# Choices with some other possible modes
+
+choice NMY_CHOICE
+	tristate "n/m/y-mode choice"
+	optional
+endchoice
+
+choice NY_CHOICE
+	bool "n/y-mode choice"
+	optional
+endchoice
+
+choice NM_CHOICE
+	tristate "n/m-mode choice" if m
+	optional
+endchoice
+
+choice M_CHOICE
+	tristate "m-mode choice" if m
+endchoice
+
+choice N_CHOICE
+	tristate "n-mode choice" if n
+endchoice

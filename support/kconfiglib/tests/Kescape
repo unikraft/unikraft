@@ -1,0 +1,3 @@
+config STRING
+    string "string"
+    default "\"\\"

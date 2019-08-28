@@ -1,0 +1,342 @@
+config MODULES
+    bool "MODULES"
+    option modules
+
+#
+# Symbol visibility
+#
+
+config NO_PROMPT
+    bool
+
+# Not rewritten, so MOD will have the value 'y' when running without modules
+config MOD
+    def_tristate m
+
+config BOOL_N
+    bool "bool n" if n
+
+config BOOL_M
+    # Rewritten to m && MODULES
+    bool "bool m" if m
+
+config BOOL_MOD
+    bool "bool MOD"
+    # Not rewritten
+    depends on MOD
+
+config BOOL_Y
+    bool "bool y"
+    # Rewritten to m && MODULES
+    depends on y || m
+
+config TRISTATE_N
+    tristate "tristate n" if n
+
+config TRISTATE_M
+    # Rewritten to m && MODULES
+    tristate "tristate m" if m
+
+config TRISTATE_MOD
+    tristate "tristate MOD"
+    # Not rewritten
+    depends on MOD
+
+config TRISTATE_Y
+    bool "tristate y"
+    # Rewritten to m && MODULES
+    depends on y || m
+
+# Symbols nested in 'if'
+
+if n
+
+config BOOL_IF_N
+    bool "bool if n"
+
+config TRISTATE_IF_N
+    tristate "tristate if n"
+
+endif
+
+if m
+
+config BOOL_IF_M
+    bool "bool if m"
+
+config TRISTATE_IF_M
+    tristate "tristate if n"
+
+endif
+
+if y
+
+config BOOL_IF_Y
+    bool "bool if y"
+
+config TRISTATE_IF_Y
+    tristate "tristate if y"
+
+endif
+
+# Symbols nested in 'menu'
+
+menu "menu 1"
+    depends on n
+
+config BOOL_MENU_N
+    bool "bool menu n"
+
+config TRISTATE_MENU_N
+    tristate "tristate menu n"
+
+endmenu
+
+menu "menu 2"
+    depends on m
+
+config BOOL_MENU_M
+    bool "bool menu m"
+
+config TRISTATE_MENU_M
+    tristate "tristate menu n"
+
+endmenu
+
+menu "menu 3"
+    depends on y
+
+config BOOL_MENU_Y
+    bool "bool menu y"
+
+config TRISTATE_MENU_Y
+    tristate "tristate menu y"
+
+endmenu
+
+# Symbols nested in choices
+
+choice C1
+    tristate "choice n" if n
+
+config BOOL_CHOICE_N
+    bool "bool choice n"
+
+config TRISTATE_CHOICE_N
+    tristate "tristate choice n"
+
+endchoice
+
+choice C2
+    tristate "choice m" if m
+
+config BOOL_CHOICE_M
+    bool "bool choice m"
+
+config TRISTATE_CHOICE_M
+    tristate "tristate choice n"
+
+endchoice
+
+choice C3
+    tristate "choice y" if y
+
+config BOOL_CHOICE_Y
+    bool "bool choice y"
+
+config TRISTATE_CHOICE_Y
+    tristate "tristate choice y"
+
+endchoice
+
+#
+# Choice visibility
+#
+
+choice BOOL_CHOICE_N
+    bool "bool choice n" if n
+endchoice
+
+choice BOOL_CHOICE_M
+    bool "bool choice m" if m
+endchoice
+
+choice BOOL_CHOICE_Y
+    bool "bool choice y" if y
+endchoice
+
+choice TRISTATE_CHOICE_N
+    tristate "tristate choice n" if n
+endchoice
+
+choice TRISTATE_CHOICE_M
+    tristate "tristate choice m" if m
+endchoice
+
+choice TRISTATE_CHOICE_Y
+    tristate "tristate choice y" if y
+
+config K
+    tristate "K"
+
+config L
+    tristate "L"
+
+endchoice
+
+if m
+choice TRISTATE_CHOICE_IF_M_AND_Y
+    tristate "tristate choice if m and y" if y
+
+config M
+    bool "M"
+
+config N
+    bool "N"
+
+endchoice
+endif
+
+menu "choice-containing menu"
+    depends on n && y
+
+choice TRISTATE_CHOICE_MENU_N_AND_Y
+    tristate "tristate choice if n and y"
+
+config O
+    tristate "O"
+
+config P
+    tristate "P"
+
+endchoice
+
+endmenu
+
+#
+# Menu visibility
+#
+
+menu "menu n"
+    depends on n
+endmenu
+
+menu "menu m"
+    depends on m
+endmenu
+
+menu "menu y"
+    depends on y
+endmenu
+
+if n
+menu "menu if n"
+endmenu
+endif
+
+if m
+menu "menu if m"
+endmenu
+endif
+
+if y
+menu "menu if y"
+endmenu
+endif
+
+if m
+menu "menu if m and y"
+    depends on y
+endmenu
+endif
+
+#
+# Comment visibility
+#
+
+comment "comment n"
+    depends on n
+comment "comment m"
+    depends on m
+comment "comment y"
+    depends on y
+
+if n
+comment "comment if n"
+endif
+
+if m
+comment "comment if m"
+endif
+
+if y
+comment "comment if y"
+endif
+
+if "y"
+
+menu "menu with comment"
+    depends on m
+
+comment "double-nested m comment"
+    depends on y
+
+endmenu
+
+endif
+
+# Used to verify that string/int/hex symbols with m visibility accept a user
+# value
+
+if m
+
+config STRING_m
+    string "string"
+
+config INT_m
+    int "int"
+
+config HEX_m
+    hex "hex"
+
+endif
+
+# Menu 'visible if' visibility
+
+menu "n-visible menu"
+    visible if n
+
+config VISIBLE_IF_N
+    tristate "visible if n"
+
+endmenu
+
+menu "m-visible menu"
+    visible if m
+
+config VISIBLE_IF_M
+    tristate "visible if m"
+
+endmenu
+
+menu "y-visible menu"
+    visible if y
+
+config VISIBLE_IF_Y
+    tristate "visible if m"
+
+endmenu
+
+menu "m-visible menu 2"
+    visible if y || n
+    visible if m && y
+    visible if y
+
+if y
+
+config VISIBLE_IF_M_2
+    tristate "visible if m 2"
+
+endif
+
+endmenu

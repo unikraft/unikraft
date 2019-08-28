@@ -1,0 +1,34 @@
+# Enabled/disabled in the test
+config MODULES
+    bool "modules"
+    option modules
+
+config N
+    def_tristate n
+
+config M
+    def_tristate m
+
+menuconfig Y
+    def_tristate y
+    prompt "foo"
+
+config Y_STRING
+    string
+    default "y"
+
+config FOO_BAR_STRING
+    string
+    default "foo bar"
+
+config INT_37
+    int
+    default 37
+
+config HEX_0X37
+    hex
+    default 0x37
+
+config HEX_37
+    hex
+    default 37

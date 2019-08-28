@@ -1,0 +1,198 @@
+config MODULES
+    bool "modules"
+
+# bool/tristate and optional
+
+choice BOOL
+    bool "bool"
+config B_1
+    tristate "B_1"
+config B_2
+    tristate "B_2"
+endchoice
+
+choice BOOL_OPT
+    bool "bool optional"
+    optional
+config BO_1
+    tristate "BO_1"
+config BO_2
+    tristate "BO_2"
+endchoice
+
+choice TRISTATE
+    tristate "tristate"
+config T_1
+    tristate "T_1"
+config T_2
+    tristate "T_2"
+endchoice
+
+choice TRISTATE_OPT
+    tristate "tristate optional"
+    optional
+config TO_1
+    tristate "TO_1"
+config TO_2
+    tristate "TO_2"
+endchoice
+
+# m-visibility
+
+choice BOOL_M
+    bool "bool m" if m
+config BM_1
+    tristate "BM_1"
+config BM_2
+    tristate "BM_2"
+endchoice
+
+choice TRISTATE_M
+    tristate "tristate m" if m
+config TM_1
+    tristate "TM_1"
+config TM_2
+    tristate "TM_2"
+endchoice
+
+# Defaults
+
+config TRISTATE_SYM
+    tristate "tristate"
+
+choice DEFAULTS
+    bool "defaults"
+    default OPT_1 if n
+    default OPT_2 if TRISTATE_SYM
+    default OPT_4
+config OPT_1
+    tristate "OPT_1"
+config OPT_2
+    tristate "OPT_2"
+config OPT_3
+    tristate "OPT_3"
+config OPT_4
+    tristate "OPT_4"
+endchoice
+
+choice DEFAULTS_NOT_VISIBLE
+    bool "defaults not visible"
+    # Skipped due to condition
+    default OPT_6 if n
+    # Skipped because OPT_7 is not visible
+    default OPT_7
+    # This one should apply
+    default OPT_8
+config OPT_5
+    tristate "OPT_5"
+config OPT_6
+    tristate "OPT_6"
+config OPT_7
+    tristate "OPT_7" if n
+config OPT_8
+    tristate "OPT_8"
+config OPT_9
+    tristate "OPT_9"
+endchoice
+
+# Choices without an explicitly specified type should get the type of the first
+# symbol with a type
+
+choice NO_TYPE_BOOL
+    prompt "no type bool"
+config NTB_1
+    bool "NTB_1"
+config NTB_2
+    tristate "NTB_2"
+endchoice
+
+choice NO_TYPE_TRISTATE
+    prompt "no type tristate"
+config NTT_1
+config NTT_2
+    tristate "NTB_2"
+config NTT_3
+    bool "NTT_3"
+endchoice
+
+# Choice items without an explicitly specified type should get the type of the
+# choice
+
+choice MISSING_MEMBER_TYPES_1
+    bool "missing member types"
+config MMT_1
+config MMT_2
+config MMT_3
+    tristate
+endchoice
+
+choice MISSING_MEMBER_TYPES_2
+config MMT_4
+config MMT_5
+    bool
+endchoice
+
+# Choice where the default selection (the first symbol) depends on another
+# symbol. If that symbol becomes 'n', the default selection should change to
+# the first visible symbol in the choice.
+
+choice DEFAULT_WITH_DEP
+    bool "default with dep"
+
+config A
+    bool "A"
+    depends on DEP
+
+config B
+    bool "B"
+
+endchoice
+
+config DEP
+    bool "dep"
+
+# Choice with symbols that shouldn't be considered choice symbols because they
+# depend on the preceding symbol. This might be a kconfig bug, but some things
+# use it, so we need to emulate it.
+
+choice WEIRD_SYMS
+    bool "weird symbols that aren't considered part of the choice"
+
+# Only WS1 is part of the choice
+config WS1
+    bool "WS1"
+
+config WS2
+    bool "WS2"
+    depends on WS1
+
+config WS3
+    bool
+    depends on WS2
+
+config WS4
+    bool
+    depends on WS1
+
+config WS5
+    bool "WS5" if WS1
+
+# 'if' has the same effect, so only WS6 is part of the choice
+config WS6
+    bool "WS6"
+
+if WS6
+
+config WS7
+    bool
+
+config WS8
+    bool "WS8"
+
+endif
+
+# Should also be part of the choice
+config WS9
+    bool "WS9"
+
+endchoice

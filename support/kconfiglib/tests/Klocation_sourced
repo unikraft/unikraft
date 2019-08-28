@@ -1,0 +1,18 @@
+
+
+config MULTI_DEF
+
+choice CHOICE
+	bool "choice"
+endchoice
+
+config MENU_HOOK
+	bool
+
+menu "menu"
+endmenu
+
+config COMMENT_HOOK
+	bool
+
+comment "comment"

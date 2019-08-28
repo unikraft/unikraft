@@ -1,0 +1,11 @@
+add-zero  = $(add)
+add-one   = $(add,1)
+add-three = $(add,1,-1,2,1)
+
+one-zero = $(one)
+one-one  = $(one,foo bar)
+one-two  = $(one,foo bar,baz)
+
+one-or-more-zero  = $(one-or-more)
+one-or-more-one   = $(one-or-more,foo)
+one-or-more-three = $(one-or-more,foo,bar,baz)

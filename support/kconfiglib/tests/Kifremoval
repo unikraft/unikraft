@@ -1,0 +1,99 @@
+# Test some tricky cases that give consecutive 'if' nodes even after
+# flattening. Simple cases are exercised a ton elsewhere.
+
+if X
+endif
+if X
+endif
+
+config A
+
+if X
+endif
+if X
+endif
+
+config B
+
+if X
+endif
+if X
+endif
+if X
+endif
+
+config C
+
+if X
+  if X
+    if X
+    endif
+    if X
+    endif
+  endif
+  if X
+    if X
+    endif
+    if X
+    endif
+  endif
+  config D
+endif
+if X
+endif
+
+menu "E"
+  if X
+    if X
+    endif
+  endif
+  if X
+    if X
+    endif
+  endif
+endmenu
+
+menu "F"
+  if X
+  endif
+  if X
+  endif
+  if X
+    if X
+    endif
+    if X
+    endif
+    menu "G"
+    endmenu
+  endif
+endmenu
+
+choice H
+  if X
+    if X
+    endif
+  endif
+  if X
+    if X
+    endif
+  endif
+endchoice
+
+choice I
+  if X
+  endif
+  if X
+  endif
+  if X
+    if X
+    endif
+    if X
+    endif
+    config J
+  endif
+endchoice
+
+if X
+endif
+if X
+endif

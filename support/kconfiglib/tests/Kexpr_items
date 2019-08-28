@@ -1,0 +1,11 @@
+config TEST
+    bool
+    default A && (B || !C && D = "E") || F > G || !!!H
+
+choice CHOICE
+    bool "choice"
+
+config TEST_CHOICE
+    bool "test choice" if A
+
+endchoice

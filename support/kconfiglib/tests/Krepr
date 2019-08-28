@@ -1,0 +1,64 @@
+config MODULES
+    bool
+    option modules
+    default y
+
+if UNDEFINED
+endif
+
+config BASIC
+    bool
+    default y
+    ---help---
+
+config VISIBLE
+    bool "visible"
+
+config STRING
+    string "visible"
+
+config DIR_DEP_N
+    depends on n
+
+config OPTIONS
+    option allnoconfig_y
+    option defconfig_list
+    option env="ENV"
+
+config MULTI_DEF
+config MULTI_DEF
+
+menuconfig MENUCONFIG
+
+choice CHOICE
+    tristate "choice"
+
+config CHOICE_1
+    tristate "choice sym"
+
+config CHOICE_2
+    tristate "choice sym"
+
+endchoice
+
+config CHOICE_HOOK
+
+choice
+    tristate "optional choice" if n
+    optional
+endchoice
+
+config NO_VISIBLE_IF_HOOK
+
+menu "no visible if"
+endmenu
+
+config VISIBLE_IF_HOOK
+
+menu "visible if"
+    visible if m
+endmenu
+
+config COMMENT_HOOK
+
+comment "comment"

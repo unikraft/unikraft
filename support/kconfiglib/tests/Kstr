@@ -1,0 +1,293 @@
+if UNDEFINED
+endif
+
+config NO_TYPE
+
+config BASIC_NO_PROMPT
+    bool
+    help
+      blah blah
+
+        blah blah blah
+
+       blah
+
+config BASIC_PROMPT
+    bool "basic"
+
+config ADVANCED
+    tristate "prompt" if DEP
+    default DEFAULT_1
+    default DEFAULT_2 if DEP
+    select SELECTED_1
+    select SELECTED_2 if DEP
+    imply IMPLIED_1
+    imply IMPLIED_2 if DEP
+    help
+      first help text
+
+config ADVANCED
+    prompt "prompt 2"
+
+menuconfig ADVANCED
+    prompt "prompt 3"
+
+if DEP3
+
+menu "foo"
+    depends on DEP4
+    visible if VIS
+
+config ADVANCED
+    help
+      second help text
+    depends on A || !B || (C && D) || !(E && F) || G = H || \
+              (I && !J && (K || L) && !(M || N) && O = P)
+
+config ADVANCED
+    # Used to verify that the direct dependencies appear to the right of VIS
+    prompt "prompt 4"
+
+endmenu
+
+endif
+
+config ONLY_DIRECT_DEPS
+    int
+    depends on DEP1
+    depends on DEP2
+
+config STRING
+    def_string "foo"
+    default "bar" if DEP
+    default STRING2
+    default STRING3 if DEP
+
+config INT
+    def_int 7 if DEP
+    range 1 2
+    range FOO BAR
+    range BAZ QAZ if DEP
+
+config HEX
+    def_hex 0x123
+    range 0x100 0x200
+    range FOO BAR
+    range BAZ QAZ if DEP
+
+config MODULES
+    bool "MODULES"
+    option modules
+
+config OPTIONS
+    option allnoconfig_y
+    option defconfig_list
+    option env="ENV"
+
+if LOC_1
+config CORRECT_PROP_LOCS_BOOL
+    prompt "prompt 1"
+    default DEFAULT_1
+    default DEFAULT_2
+    select SELECT_1
+    select SELECT_2
+    imply IMPLY_1
+    imply IMPLY_2
+    help
+      help 1
+endif
+
+if LOC_2
+menuconfig CORRECT_PROP_LOCS_BOOL
+    bool "prompt 2"
+    default DEFAULT_3
+    default DEFAULT_4
+    select SELECT_3
+    select SELECT_4
+    imply IMPLY_3
+    imply IMPLY_4
+    help
+      help 2
+endif
+
+if LOC_3
+config CORRECT_PROP_LOCS_BOOL
+    prompt "prompt 3"
+    default DEFAULT_5
+    default DEFAULT_6
+    select SELECT_5
+    select SELECT_6
+    imply IMPLY_5
+    imply IMPLY_6
+    help
+      help 2
+endif
+
+if LOC_1
+config CORRECT_PROP_LOCS_INT
+    int
+    range 1 2
+    range 3 4
+endif
+
+if LOC_2
+config CORRECT_PROP_LOCS_INT
+    range 5 6
+    range 7 8
+endif
+
+choice CHOICE
+    tristate "foo"
+    default CHOICE_1
+    default CHOICE_2 if dep
+
+config CHOICE_1
+    tristate "choice 1"
+
+config CHOICE_2
+    tristate "choice 2"
+
+endchoice
+
+choice
+    tristate "no name"
+    optional
+endchoice
+
+if LOC_1
+choice CORRECT_PROP_LOCS_CHOICE
+    bool
+    default CHOICE_3
+
+config CHOICE_3
+    bool "choice 3"
+
+config CHOICE_4
+    bool "choice 3"
+
+config CHOICE_5
+    bool "choice 3"
+
+endchoice
+endif
+
+if LOC_2
+choice CORRECT_PROP_LOCS_CHOICE
+    default CHOICE_4
+endchoice
+endif
+
+if LOC_3
+choice CORRECT_PROP_LOCS_CHOICE
+    default CHOICE_5
+endchoice
+endif
+
+config SIMPLE_MENU_HOOK
+menu "simple menu"
+endmenu
+
+config ADVANCED_MENU_HOOK
+menu "advanced menu"
+    depends on A
+    visible if B
+    visible if C || D
+endmenu
+
+config SIMPLE_COMMENT_HOOK
+comment "simple comment"
+
+config ADVANCED_COMMENT_HOOK
+comment "advanced comment"
+    depends on A
+    depends on B
+
+# Corner cases when removing direct dependencies
+
+config DEP_REM_CORNER_CASES
+    bool
+    default A
+    depends on n
+
+config DEP_REM_CORNER_CASES
+    default B if n
+
+config DEP_REM_CORNER_CASES
+    default C
+    depends on m
+
+config DEP_REM_CORNER_CASES
+    default D if A && y
+    depends on y
+
+config DEP_REM_CORNER_CASES
+    default E if !E1
+    default F if F1 = F2
+    default G if G1 || H1
+    depends on !H
+
+config DEP_REM_CORNER_CASES
+    default H
+    depends on "foo" = "bar"
+
+menu "menu"
+    visible if FOO || BAR
+
+config DEP_REM_CORNER_CASES
+    prompt "prompt"
+    depends on BAZ && QAZ
+
+endmenu
+
+# Only prompt, no type
+config PROMPT_ONLY
+    prompt "prompt only"
+
+# {Symbol,Choice}.orig_*
+
+if BASE_DEP
+
+config BOOL_SYM_ORIG
+    bool
+    default D1 if DEP
+    default D2
+    select S1
+    select S2 if DEP
+    imply I1
+    imply I1
+
+config BOOL_SYM_ORIG
+    default D3
+    select S3
+    imply I3 if DEP
+
+config INT_SYM_ORIG
+    int
+    range 1 2 if DEP
+    range 3 4
+
+config INT_SYM_ORIG
+    range 5 6 if DEP
+
+choice CHOICE_ORIG
+    bool "choice orig"
+    default A
+    default B if DEP
+
+config A
+    bool
+
+config B
+    bool
+
+endchoice
+
+choice CHOICE_ORIG
+    default C if DEP
+
+config C
+    bool
+
+endchoice
+
+endif

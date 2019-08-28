@@ -1,0 +1,11 @@
+config TWO_DOWN
+	bool
+
+menu "menu"
+endmenu
+
+comment "comment"
+
+choice
+	bool "choice"
+endchoice

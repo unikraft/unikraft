@@ -1,0 +1,72 @@
+if UNDEFINED
+endif
+
+config SINGLE_DEF
+    bool
+
+config MULTI_DEF
+    bool
+
+# Throw in some line continuations too to make sure it doesn't mess up the line
+# numbers
+if y && \
+   y
+if y && \
+   y && \
+   y
+
+# Throw in some help texts too
+
+config HELP_1
+    bool "help 1"
+    help
+config HELP_2
+    bool "help 2"
+    help
+      foo
+      bar
+
+        baz
+
+config HELP_3
+    help
+      foo
+      bar
+    bool
+config \
+MULTI_DEF
+
+config MULTI_DEF
+
+endif
+endif
+
+# Expands to "tests/Klocation_sourced"
+source "$TESTS_DIR_FROM_ENV/Klocation$_SOURCED"
+
+# Expands to "sub/Klocation_rsourced"
+rsource "$SUB_DIR_FROM_ENV/Klocation$_RSOURCED"
+
+# Expands to "tests/*ub/Klocation_gsourced[12]", matching
+# tests/sub/Klocation_gsourced{1,2}
+source "$TESTS_DIR_FROM_ENV/*ub/Klocation$_GSOURCED[12]"
+# Test old syntax too
+gsource "$TESTS_DIR_FROM_ENV/*ub/Klocation$_GSOURCED[12]"
+
+# Expands to "sub/Klocation_grsourced[12]", matching
+# tests/sub/Klocation_grsourced{1,2}
+rsource "$SUB_DIR_FROM_ENV/Klocation$_GRSOURCED[12]"
+# Test old syntax too
+grsource "$SUB_DIR_FROM_ENV/Klocation$_GRSOURCED[12]"
+
+# No-ops
+osource "nonexistent"
+osource "nonexistent*"
+gsource "nonexistent"
+gsource "nonexistent*"
+orsource "nonexistent"
+orsource "nonexistent*"
+grsource "nonexistent"
+grsource "nonexistent*"
+
+config MULTI_DEF

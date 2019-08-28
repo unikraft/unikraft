@@ -1,0 +1,48 @@
+config A
+    bool
+    depends on B
+
+config B
+    bool
+    depends on C = 7
+
+config C
+    int
+    range D 8
+
+config D
+    int
+    default 3 if E
+    default 8
+
+config E
+    bool
+
+config F
+    bool
+    select E if G
+
+config G
+    bool
+    depends on H
+
+choice
+    bool "choice"
+
+config H
+    bool "H"
+    depends on I
+
+endchoice
+
+choice
+    bool "choice" if J
+
+config I
+    bool "I"
+
+endchoice
+
+config J
+    bool
+    depends on A

@@ -1,0 +1,3 @@
+# Indented assignments should be ignored to be compatible with the C
+# implementation
+ CONFIG_IGNOREME=n

@@ -1,0 +1,147 @@
+# Simple assignments (with bad formatting, as an additional test)
+
+simple-recursive=foo
+simple-immediate:=bar
+# Should become recursive
+simple-recursive-2+=baz
+
+	 whitespaced	 =	 foo
+
+
+# Simple += test. += should preserve the flavor of the variable (simple vs.
+# recursive).
+
+preserve-recursive = foo
+preserve-recursive += bar
+
+preserve-immediate := foo
+preserve-immediate += bar
+
+
+# Recursive substitution
+
+recursive = $(foo) $(bar) $($(b-char)a$(z-char))
+recursive += $(indir)
+
+foo = abc
+bar = def
+baz = ghi
+
+b-char = b
+z-char = z
+
+indir = jkl $(indir-2)
+indir-2 = mno
+
+
+# Immediate substitution
+
+def = foo
+immediate := $(undef)$(def)$(undef)$(def)
+def = bar
+undef = bar
+
+
+# Function calls
+
+# Chained function call
+quote = "$(1)" "$(2)"
+rev-quote = $(quote,$(2),$(1))
+surround-rev-quote = $(0) $(rev-quote,$(1),$(2)) $(0)
+surround-rev-quote-unused-arg = $(surround-rev-quote,$(1),$(2)) $(3)
+# No value is passed for $(3), so it expands to nothing
+fn-indir = surround-rev-quote
+messy-fn-res = $($(fn-indir)-unused-arg, a  b , c  d )
+
+# Special characters in function call
+comma = ,
+right-paren = )
+dollar = $
+left-paren = (
+fn = "$(1)"
+special-chars-fn-res = $(fn,$(comma)$(dollar)$(left-paren)foo$(right-paren))
+
+
+# Variable expansions in various locations (verified by checking how the symbol
+# prints)
+
+qaz = QAZ
+echo = $(1)
+ignore-first = $(2)
+
+config PRINT_ME
+	string "$(ENV_1)" if ($(echo,FOO) && $(echo,BAR)) || !$(echo,BAZ) || !(($(qaz)))
+	default "$(echo,"foo")" if "foo $(echo,"bar") baz" = "$(undefined)"
+
+# Expansion within a symbol token, with deliberate sloppiness
+config PRINT_$(ignore-first,  ,ME)_TOO
+	bool "foo"
+	default FOO$(ignore-first,    ,BAR)BAZ$(qaz) if $(qaz)&&$(qaz)FOO&&x$(ignore-first,  ,xx)
+
+
+# Recursive expansion (throws an exception)
+
+rec-1 = x $(rec-2) y
+rec-2 = x $(rec-3) y
+rec-3 = x $(rec-1) y
+
+# Functions are allowed to reference themselves, but an exception is thrown if
+# the function seems to be stuck (the recursion gets too deep)
+safe-fn-rec = $($(1))
+safe-fn-rec-2 = $(safe-fn-rec,safe-fn-rec-3)
+safe-fn-rec-3 = foo
+safe-fn-rec-res = $(safe-fn-rec,safe-fn-rec-2)
+
+unsafe-fn-rec = $(unsafe-fn-rec,$(1))
+
+
+# Expansion in the left-hand side of assignments
+
+dummy-arg-fn = bar
+lhs-indir-1 = lhs-indir-2
+lhs-indir-2 = -baz
+rhs = value
+# LHS expands to foo-bar-baz
+foo-$(dummy-arg-fn, ignored argument )$($(lhs-indir-1)) = $(rhs)
+# Expands to empty string, accepted
+  $(undefined)  
+
+# Variable with a space in its name
+empty =
+space = $(empty) $(empty)
+foo$(space)bar = value
+space-var-res = $(foo bar)
+
+
+# Built-in functions
+
+# Expands to "baz qaz"
+shell-res = $(shell,false && echo foo bar || echo baz qaz)
+
+# Warns about output on stderr, expands to nothing
+shell-stderr-res := $(shell,echo message on stderr >&2)
+
+# Expands to the current location
+location-res := $(filename):$(lineno)
+
+# Adds one warning, expands to nothing
+$(warning-if,,no warning)
+$(warning-if,n,no warning)
+warning-res := $(warning-if,y,a warning)
+
+# Does not cause an error, expands to nothing
+error-n-res := $(error-if,n,oops)
+
+# Causes an error when expanded
+error-y-res = $(error-if,y,oops)
+
+
+# Environment variables (for testing Kconfig.env_vars). ENV_1 is already
+# referenced above.
+env_ref_1 := xxx $(ENV_2) xxx
+env_ref_2 := $(shell,echo $(ENV_3))
+env_ref_3 :=
+env_ref_3 += $(ENV_4)
+$(warning-if,$(ENV_5),$(ENV_UNDEFINED))
+source "$(ENV_6)"
+env_ref_4 = $(ENV_7)  # Never evaluated

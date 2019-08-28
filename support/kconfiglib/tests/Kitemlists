@@ -1,0 +1,36 @@
+comment "comment 1"
+
+choice
+    bool "choice 1"
+endchoice
+
+menu "menu 1"
+
+choice NAMED
+    bool "choice 2"
+endchoice
+
+menu "menu 2"
+menu "menu 3"
+comment "comment 2"
+endmenu
+
+choice
+    bool "choice 3"
+endchoice
+
+choice NAMED
+    bool
+endchoice
+
+endmenu
+
+menu "menu 4"
+endmenu
+
+comment "comment 3"
+
+endmenu
+
+menu "menu 5"
+endmenu

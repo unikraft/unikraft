@@ -1,0 +1,8 @@
+choice
+    bool "choice"
+    default FOO if FOO
+
+config FOO
+    bool "foo"
+
+endchoice

@@ -1,0 +1,37 @@
+# Menu nodes with is_menuconfig False
+
+config NOT_MENUCONFIG_1
+	bool
+
+config NOT_MENUCONFIG_2
+	bool "not menuconfig 2"
+
+config MENUCONFIG_MULTI_DEF
+	bool "menuconfig multi def 1"
+
+config COMMENT_HOOK
+	bool
+
+comment "not menuconfig 3"
+
+
+# Menu nodes with is_menuconfig True
+
+menuconfig MENUCONFIG_1
+	bool "menuconfig 1"
+
+menuconfig MENUCONFIG_MULTI_DEF
+	bool "menuconfig multi def 2"
+
+config MENU_HOOK
+	bool
+
+menu "menuconfig 2"
+endmenu
+
+config CHOICE_HOOK
+	bool
+
+choice
+	bool "menuconfig 3"
+endchoice

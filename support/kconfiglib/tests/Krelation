@@ -1,0 +1,36 @@
+config A
+    bool
+    depends on UNDEFINED
+
+choice CHOICE_1
+    bool "C"
+config B
+    bool "B"
+config C
+    bool "C" if B
+config D
+    bool "D"
+endchoice
+
+menu "m1"
+config E
+    bool
+menu "m2"
+config F
+    bool
+choice CHOICE_2
+    tristate "foo"
+config G
+    bool "g"
+config H
+    bool "h"
+endchoice
+endmenu
+config I
+    bool
+endmenu
+
+menu "m3"
+endmenu
+menu "m4"
+endmenu

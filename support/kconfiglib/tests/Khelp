@@ -1,0 +1,50 @@
+config TWO_HELP_STRINGS
+    bool
+    help
+      first help string
+
+
+
+
+config TWO_HELP_STRINGS
+    help
+      second help string
+
+config NO_BLANK_AFTER_HELP
+    bool
+    help
+      help for
+      NO_BLANK_AFTER_HELP
+choice CHOICE_HELP
+    bool "choice with help"
+    help
+  help for
+  CHOICE_HELP
+endchoice
+
+config HELP_TERMINATED_BY_COMMENT
+  bool
+  help
+ a
+ b
+ c
+#
+
+config TRICKY_HELP
+  bool
+  -help---
+
+
+  a
+   b
+    c
+
+   d
+    e
+     f
+
+
+  g
+   h
+    i
+#

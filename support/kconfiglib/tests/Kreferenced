@@ -1,0 +1,63 @@
+config NO_REFS
+    bool
+
+config JUST_DEPENDS_ON_REFS
+    bool
+    depends on A && B
+
+if A
+
+menu "menu"
+    depends on B
+    visible if C
+    visible if D
+
+config LOTS_OF_REFS
+    bool "lots" if C || D
+    default E || F if G || H
+    default I || J if K || L
+    select M if N || O
+    select P if Q || R
+    imply S if T || U
+    imply V if W || X
+    depends on Y || Z
+
+endmenu
+
+endif
+
+config INT_REFS
+    int "int"
+    range A B if C && D
+    range E F if G && H
+
+choice CHOICE
+    bool "choice"
+
+config CHOICE_REF
+    bool "choice ref"
+
+endchoice
+
+comment "comment"
+    depends on A || B
+
+
+config MULTI_DEF_SYM
+    def_bool A && B
+
+config MULTI_DEF_SYM
+    depends on C
+
+
+choice MULTI_DEF_CHOICE
+    bool "choice"
+    depends on A && B
+
+endchoice
+
+choice MULTI_DEF_CHOICE
+    bool "choice"
+    depends on C
+
+endchoice

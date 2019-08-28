@@ -1,0 +1,7 @@
+config FOO
+    bool
+    depends on BAR
+
+config BAR
+    bool
+    depends on FOO

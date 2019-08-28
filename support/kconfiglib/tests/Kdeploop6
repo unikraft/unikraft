@@ -1,0 +1,6 @@
+config FOO
+    bool
+
+config BAR
+    bool
+    select FOO if FOO

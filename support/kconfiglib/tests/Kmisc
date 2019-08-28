@@ -1,0 +1,82 @@
+# For testing various minor APIs
+
+# optional choices
+
+choice NOT_OPTIONAL
+    bool "not optional"
+config A
+    bool "A"
+config B
+    bool "B"
+endchoice
+
+choice OPTIONAL
+    tristate "optional"
+    optional
+config C
+    tristate "C"
+config D
+    tristate "D"
+# Quirky symbols - not proper choice symbol
+
+config Q1
+    tristate "Q1"
+    depends on D
+
+config Q2
+    tristate "Q2"
+    depends on Q1
+
+config Q3
+    tristate "Q3"
+    depends on D
+
+endchoice
+
+# User values
+
+config BOOL
+    bool "bool" if NOT_DEFINED_1
+
+config TRISTATE
+    tristate # Visibility should not affect user value
+
+config STRING
+    string "string"
+
+config INT
+    int # Visibility should not affect user value
+
+config HEX
+    hex "hex"
+    depends on NOT_DEFINED_2
+
+config COMMENT_HOOK
+comment "comment"
+
+config MENU_HOOK
+menu "menu"
+    depends on NOT_DEFINED_3 || NOT_DEFINED_2
+    depends on !NOT_DEFINED_4
+endmenu
+
+config FROM_ENV
+    string "from env"
+    option env="ENV_VAR"
+
+config FROM_ENV_MISSING
+    string "from env missing"
+    option env="MISSING_ENV_VAR"
+    default "missing"
+
+config FROM_ENV_WEIRD
+    string
+    default "weird"
+    option env="ENV_VAR"
+
+config NOT_ALLNOCONFIG_Y
+    bool "not allnoconfig_y"
+
+config ALLNOCONFIG_Y
+    bool "allnoconfig_y"
+    option allnoconfig_y

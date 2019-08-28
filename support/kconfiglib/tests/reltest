@@ -1,0 +1,51 @@
+#!/usr/bin/env bash
+
+# Runs the test suite and all examples scripts with Python 2 and Python 3,
+# bailing immediately if anything fails. For the examples that aren't tested in
+# the test suite, we just confirm that they at least run.
+#
+# Should be run from the kernel root with  $ Kconfiglib/tests/reltest
+
+test_script() {
+    echo -e "\n================= $1 with $py =================\n"
+    if (($# == 1)); then
+        make scriptconfig PYTHONCMD=$py SCRIPT=$1
+    else
+        make scriptconfig PYTHONCMD=$py SCRIPT=$1 SCRIPT_ARG="$2"
+    fi
+
+    if (($?)); then
+        echo "$1 failed to run with $py"
+        exit 1
+    fi
+}
+
+for py in python2 python3; do
+    echo -e "\n================= Test suite with $py =================\n"
+
+    if ! $py Kconfiglib/testsuite.py; then
+        echo "test suite failed for $py"
+        exit 1
+    fi
+
+    # Check that the example scripts that aren't tested by the test suite run
+    # at least
+
+    test_script Kconfiglib/examples/defconfig_oldconfig.py
+    test_script Kconfiglib/examples/eval_expr.py MODULES
+    test_script Kconfiglib/examples/find_symbol.py X86
+    test_script Kconfiglib/examples/help_grep.py general
+    test_script Kconfiglib/examples/print_sym_info.py MODULES
+    test_script Kconfiglib/examples/print_tree.py
+
+    $py Kconfiglib/examples/menuconfig_example.py Kconfiglib/examples/Kmenuconfig <<END
+BOOL
+n
+END
+    if (($?)); then
+        echo "menuconfig_example.py failed with $py"
+        exit 1
+    fi
+done
+
+echo "everything okay"

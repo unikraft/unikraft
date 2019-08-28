@@ -1,0 +1,12 @@
+config MODULES
+    def_bool y
+
+config BOOL
+    bool "bool 1"
+
+config STRING
+    string "string"
+
+config IGNOREME
+    bool "ignore me"
+    default y

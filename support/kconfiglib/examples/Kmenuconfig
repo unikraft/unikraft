@@ -1,0 +1,102 @@
+mainmenu "Example Kconfig configuration"
+
+config MODULES
+	bool "Enable loadable module support"
+	option modules
+	default y
+
+menu "Bool and tristate symbols"
+
+config BOOL
+	bool "Bool symbol"
+	default y
+
+config BOOL_DEP
+	bool "Dependent bool symbol"
+	depends on BOOL
+
+# Mix it up a bit with an 'if' instead of a 'depends on'
+if BOOL
+
+config TRI_DEP
+	tristate "Dependent tristate symbol"
+	select SELECTED_BY_TRI_DEP
+	imply IMPLIED_BY_TRI_DEP
+
+endif
+
+config TWO_MENU_NODES
+	bool "First prompt"
+	depends on BOOL
+
+config TRI
+	tristate "Tristate symbol"
+
+config TWO_MENU_NODES
+	bool "Second prompt"
+
+comment "These are selected by TRI_DEP"
+
+config SELECTED_BY_TRI_DEP
+	tristate "Tristate selected by TRI_DEP"
+
+config IMPLIED_BY_TRI_DEP
+	tristate "Tristate implied by TRI_DEP"
+
+endmenu
+
+
+menu "String, int, and hex symbols"
+
+config STRING
+	string "String symbol"
+	default "foo"
+
+config INT
+	int "Int symbol"
+	default 747
+
+config HEX
+	hex "Hex symbol"
+	default 0xABC
+
+endmenu
+
+
+menu "Various choices"
+
+choice BOOL_CHOICE
+	bool "Bool choice"
+
+config BOOL_CHOICE_SYM_1
+	bool "Bool choice sym 1"
+
+config BOOL_CHOICE_SYM_2
+	bool "Bool choice sym 2"
+
+endchoice
+
+choice TRI_CHOICE
+	tristate "Tristate choice"
+
+config TRI_CHOICE_SYM_1
+	tristate "Tristate choice sym 1"
+
+config TRI_CHOICE_SYM_2
+	tristate "Tristate choice sym 2"
+
+endchoice
+
+choice OPT_BOOL_CHOICE
+	bool "Optional bool choice"
+	optional
+
+config OPT_BOOL_CHOICE_SYM_1
+	bool "Optional bool choice sym 1"
+
+config OPT_BOOL_CHOICE_SYM_2
+	bool "Optional bool choice sym 2"
+
+endchoice
+
+endmenu

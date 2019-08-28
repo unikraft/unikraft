@@ -1,0 +1,10 @@
+# $FOO is "defconfig_2"
+# Should produce None due to the "depends on n"
+
+config A
+    string
+    depends on n
+    option defconfig_list
+    default "Kconfiglib/tests/defconfig_1" if y && !n && n
+    default "Kconfiglib/tests/$FOO"
+    default "Kconfiglib/tests/defconfig_1"

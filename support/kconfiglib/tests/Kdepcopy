@@ -1,0 +1,173 @@
+# We verify that the properties below end up in definition order
+
+config MULTIDEF
+    bool
+    default A
+    default B
+    select AA
+    imply AA
+
+if FOO
+
+config MULTIDEF
+    default C
+    default D
+    select BB
+    imply BB
+
+if BAR
+
+config MULTIDEF
+    default E
+    default F
+    select CC
+    imply CC
+
+menu "menu"
+
+config MULTIDEF
+    default G
+    default H
+    select DD
+    imply DD
+
+config MULTIDEF
+    default I
+    default J
+    select EE
+    imply EE
+
+endmenu
+
+config MULTIDEF
+    default K
+    default L
+    select FF
+    imply FF
+
+config MULTIDEF
+    default M
+    default N
+    select GG
+    imply GG
+
+endif
+
+config MULTIDEF
+    default O
+    default P
+    select HH
+    select II
+    imply HH
+    imply II
+
+endif
+
+config MULTIDEF
+    default Q
+    default R
+    select JJ
+    imply JJ
+
+
+# Same test with choice symbols involved
+
+config MULTIDEF_CHOICE
+    bool
+    select A
+
+choice
+    bool "choice"
+
+config MULTIDEF_CHOICE
+    bool "multidef choice"
+    select B
+
+endchoice
+
+config MULTIDEF_CHOICE
+    bool
+    select C
+
+
+# Same test with ranges involved
+
+config MULTIDEF_RANGE
+    int
+    range A _
+
+menu "menu"
+
+config MULTIDEF_RANGE
+    int
+    range B _
+
+if FOO
+
+config MULTIDEF_RANGE
+    int
+    range C _
+
+endif
+
+config MULTIDEF_RANGE
+    int
+    range D _
+
+endmenu
+
+config MULTIDEF_RANGE
+    int
+    range E _
+
+config MULTIDEF_RANGE
+    int
+    range F _
+
+
+# Same test for a choice
+
+choice MULTICHOICE
+    bool "choice"
+    default A
+
+config A
+    bool "A"
+
+config B
+    bool "B"
+
+config C
+    bool "C"
+
+config D
+    bool "C"
+
+config E
+    bool "C"
+
+endchoice
+
+if FOO
+
+choice MULTICHOICE
+    default B
+endchoice
+
+menu "menu"
+
+choice MULTICHOICE
+    default C
+endchoice
+
+endmenu
+
+choice MULTICHOICE
+    default D
+endchoice
+
+endif
+
+choice MULTICHOICE
+    default E
+endchoice

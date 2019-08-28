@@ -1,0 +1,5 @@
+config A
+    string
+    option defconfig_list
+    default "Kconfiglib/tests/non_existent_1"
+    default "Kconfiglib/tests/non_existent_2"

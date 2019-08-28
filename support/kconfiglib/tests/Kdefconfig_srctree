@@ -1,0 +1,5 @@
+config A
+    string
+    option defconfig_list
+    default "sub/defconfig_in_sub" # Assume this doesn't exist
+    default "Kconfiglib/tests/defconfig_2"
