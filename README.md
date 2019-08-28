@@ -33,7 +33,15 @@ images.
 For more information information about Unikraft, including user and
 developer guides, please refer to the `docs/guides` directory.
 
-Further resources
+Open Projects
+-----------------
+
+If you're interested in contributing please take a look at the list of
+[open projects](https://github.com/unikraft/unikraft/issues). If one
+of these interests you please drop us a line via the mailing list (see
+below).
+
+Further Resources
 -----------------
 * [Sources at Xenbits](http://xenbits.xen.org/gitweb/?a=project_list;pf=unikraft)
 * [Project Wiki](https://wiki.xenproject.org/wiki/Category:Unikraft)
