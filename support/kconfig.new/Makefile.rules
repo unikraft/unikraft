@@ -1,0 +1,84 @@
+kecho := echo
+comma := ,
+
+
+dot-target = $(dir $@).$(notdir $@)
+
+any-prereq = $(filter-out $(PHONY),$?) $(filter-out $(PHONY) $(wildcard $^),$^)
+
+arg-check = $(if $(strip $(cmd_$@)),,1)
+
+make-cmd = $(call escsq,$(subst $(pound),$$(pound),$(subst $$,$$$$,$(cmd_$(1)))))
+
+# printing commands
+cmd = @set -e; $(echo-cmd) $(cmd_$(1))
+
+depfile = $(subst $(comma),_,$(dot-target).d)
+depflags = -Wp$(comma)-MD$(comma)$(call dot-target)
+
+cmd_and_fixdep =                                                \
+	$(cmd);                                                       \
+	$(obj)/fixdep $(depfile) $@ '$(make-cmd)' > $(dot-target).cmd;\
+	rm -f $(depfile)
+
+if_changed_dep = $(if $(strip $(any-prereq) $(arg-check)),$(cmd_and_fixdep),@:)
+
+define multi_depend
+$(foreach m, $(notdir $1), \
+    $(eval $(obj)/$m: \
+    $(addprefix $(obj)/, $(foreach s, $3, $($(m:%$(strip $2)=%$(s)))))))
+endef
+
+###
+# filechk is used to check if the content of a generated file is updated.
+# Sample usage:
+#
+# filechk_sample = echo $(KERNELRELEASE)
+# version.h: FORCE
+#   $(call filechk,sample)
+#
+# The rule defined shall write to stdout the content of the new file.
+# The existing file will be compared with the new one.
+# - If no file exist it is created
+# - If the content differ the new file is used
+# - If they are equal no change, and no timestamp update
+# - stdin is piped in from the first prerequisite ($<) so one has
+#   to specify a valid file as first prerequisite (often the kbuild file)
+define filechk
+	$(Q)set -e;             \
+	mkdir -p $(dir $@);         \
+	{ $(filechk_$(1)); } > $@.tmp;      \
+	if [ -r $@ ] && cmp -s $@ $@.tmp; then  \
+	    rm -f $@.tmp;           \
+	else                    \
+	    $(kecho) '  UPD     $@';    \
+	    mv -f $@.tmp $@;        \
+	fi
+endef
+
+# Execute command if command has changed or prerequisite(s) are updated.
+if_changed = $(if $(strip $(any-prereq) $(arg-check)),		\
+	$(cmd);\
+	printf '%s\n' 'cmd_$@ := $(make-cmd)' > $(dot-target).cmd, @:)
+
+# LEX
+# ---------------------------------------------------------------------------
+quiet_cmd_flex = LEX $@
+cmd_flex = $(LEX) -o$@ -L $<
+
+$(obj)/%.lex.c: $(src)/%.l FORCE
+	$(call if_changed,flex)
+
+# YACC
+# ---------------------------------------------------------------------------
+quiet_cmd_bison = YACC    $@
+cmd_bison = $(YACC) -o$@ -t -l $<
+
+$(obj)/%.tab.c: $(src)/%.y FORCE
+	$(call if_changed,bison)
+
+quiet_cmd_bison_h = YACC    $@
+cmd_bison_h = $(YACC) -o/dev/null --defines=$@ -t -l $<
+
+$(obj)/%.tab.h: $(src)/%.y FORCE
+	$(call if_changed,bison_h)

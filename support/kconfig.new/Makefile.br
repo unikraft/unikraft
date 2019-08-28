@@ -4,6 +4,7 @@ top_builddir=../../
 srctree := .
 obj ?= .
 
+include Makefile.rules
 include Makefile
 #HOSTCFLAGS+=-Dinline="" -include foo.h
 -include $(obj)/.depend
