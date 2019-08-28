@@ -29,7 +29,7 @@ static const char nconf_global_help[] =
 "Menu entries\n"
 "------------\n"
 "This interface lets you select features and parameters for the kernel\n"
-"build.  Kernel features can either be built-in, modularized, or removed.\n"
+"build.  Unikraft features can either be selected or deselected.\n"
 "Parameters must be entered as text or decimal or hexadecimal numbers.\n"
 "\n"
 "Menu entries beginning with following braces represent features that\n"

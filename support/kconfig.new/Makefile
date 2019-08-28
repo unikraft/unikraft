@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: GPL-2.0
 # ===========================================================================
-# Kernel configuration targets
+# Unikraft configuration targets
 # These targets are used from top-level makefile
 
 PHONY += xconfig gconfig menuconfig config localmodconfig localyesconfig \

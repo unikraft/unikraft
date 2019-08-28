@@ -46,7 +46,7 @@ static inline QString qgettext(const char* str)
 }
 
 ConfigSettings::ConfigSettings()
-	: QSettings("kernel.org", "qconf")
+	: QSettings("unikraft.org", "qconf")
 {
 }
 

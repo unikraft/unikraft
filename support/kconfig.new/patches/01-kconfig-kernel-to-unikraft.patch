@@ -1,0 +1,76 @@
+diff --git a/support/kconfig.new/Makefile b/support/kconfig.new/Makefile
+index 3f327e2..7b532c5 100644
+--- a/support/kconfig.new/Makefile
++++ b/support/kconfig.new/Makefile
+@@ -1,6 +1,6 @@
+ # SPDX-License-Identifier: GPL-2.0
+ # ===========================================================================
+-# Kernel configuration targets
++# Unikraft configuration targets
+ # These targets are used from top-level makefile
+ 
+ PHONY += xconfig gconfig menuconfig config localmodconfig localyesconfig \
+diff --git a/support/kconfig.new/gconf.glade b/support/kconfig.new/gconf.glade
+index aa483cb..03e97d7 100644
+--- a/support/kconfig.new/gconf.glade
++++ b/support/kconfig.new/gconf.glade
+@@ -4,7 +4,7 @@
+ 
+ <widget class="GtkWindow" id="window1">
+   <property name="visible">True</property>
+-  <property name="title" translatable="yes">Gtk Kernel Configurator</property>
++  <property name="title" translatable="yes">Gtk Unikraft Configurator</property>
+   <property name="type">GTK_WINDOW_TOPLEVEL</property>
+   <property name="window_position">GTK_WIN_POS_NONE</property>
+   <property name="modal">False</property>
+diff --git a/support/kconfig.new/mconf.c b/support/kconfig.new/mconf.c
+index 694091f..53c4a62 100644
+--- a/support/kconfig.new/mconf.c
++++ b/support/kconfig.new/mconf.c
+@@ -175,9 +175,9 @@ menu_instructions[] =
+ 	"Arrow keys navigate the menu.  "
+ 	"<Enter> selects submenus ---> (or empty submenus ----).  "
+ 	"Highlighted letters are hotkeys.  "
+-	"Pressing <Y> includes, <N> excludes, <M> modularizes features.  "
++	"Pressing <Y> selects a feature, while <N> will exclude a feature.  "
+ 	"Press <Esc><Esc> to exit, <?> for Help, </> for Search.  "
+-	"Legend: [*] built-in  [ ] excluded  <M> module  < > module capable",
++	"Legend: [*] feature is selected  [ ] feature is excluded",
+ radiolist_instructions[] =
+ 	"Use the arrow keys to navigate this window or "
+ 	"press the hotkey of the item you wish to select "
+@@ -957,7 +957,7 @@ static int handle_exit(void)
+ 	if (conf_get_changed())
+ 		res = dialog_yesno(NULL,
+ 				   "Do you wish to save your new configuration?\n"
+-				     "(Press <ESC><ESC> to continue kernel configuration.)",
++				     "(Press <ESC><ESC> to continue Unikraft configuration.)",
+ 				   6, 60);
+ 	else
+ 		res = -1;
+diff --git a/support/kconfig.new/nconf.c b/support/kconfig.new/nconf.c
+index cbafe3b..d3d908c 100644
+--- a/support/kconfig.new/nconf.c
++++ b/support/kconfig.new/nconf.c
+@@ -29,7 +29,7 @@ static const char nconf_global_help[] =
+ "Menu entries\n"
+ "------------\n"
+ "This interface lets you select features and parameters for the kernel\n"
+-"build.  Kernel features can either be built-in, modularized, or removed.\n"
++"build.  Unikraft features can either be selected or deselected.\n"
+ "Parameters must be entered as text or decimal or hexadecimal numbers.\n"
+ "\n"
+ "Menu entries beginning with following braces represent features that\n"
+diff --git a/support/kconfig.new/qconf.cc b/support/kconfig.new/qconf.cc
+index ce7fc87..0021aa6 100644
+--- a/support/kconfig.new/qconf.cc
++++ b/support/kconfig.new/qconf.cc
+@@ -46,7 +46,7 @@ static inline QString qgettext(const char* str)
+ }
+ 
+ ConfigSettings::ConfigSettings()
+-	: QSettings("kernel.org", "qconf")
++	: QSettings("unikraft.org", "qconf")
+ {
+ }
+ 
