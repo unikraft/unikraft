@@ -99,6 +99,16 @@ SECTIONS
 		. = ALIGN(__PAGE_SIZE);
 	}
 
+	/* We keep the interrupt stack on a different section
+	 * given that it may have a big alignment and it would
+	 * change the entire binary layout
+	 */
+	.intrstack :
+	{
+		*(.intrstack)
+		. = ALIGN(__PAGE_SIZE);
+	}
+
 	_end = .;
 
 	.comment       0 : { *(.comment) }

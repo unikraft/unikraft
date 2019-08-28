@@ -178,9 +178,3 @@ int _ukplat_mem_mappings_init(void)
 {
 	return 0;
 }
-
-void ukplat_stack_set_current_thread(void *thread_addr)
-{
-	*((unsigned long *) _libkvmplat_cfg.bstack.end) =
-		(unsigned long) thread_addr;
-}

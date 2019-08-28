@@ -25,7 +25,9 @@
  */
 
 #include <string.h>
+#include <uk/essentials.h>
 #include <uk/arch/lcpu.h>
+#include <uk/plat/config.h>
 #include <x86/desc.h>
 #include <kvm-x86/traps.h>
 
@@ -59,8 +61,10 @@ static void gdt_init(void)
 
 static struct tss64 cpu_tss;
 
-static char cpu_intr_stack[4096]; /* IST1 */
-static char cpu_trap_stack[4096]; /* IST2 */
+__section(".intrstack")  __align(STACK_SIZE)
+char cpu_intr_stack[STACK_SIZE];  /* IST1 */
+__section(".intrstack")  __align(STACK_SIZE)
+char cpu_trap_stack[STACK_SIZE];  /* IST2 */
 static char cpu_nmi_stack[4096];  /* IST3 */
 
 static void tss_init(void)
