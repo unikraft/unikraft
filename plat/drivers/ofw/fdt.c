@@ -39,7 +39,6 @@
 #include <ofw/fdt.h>
 #include <uk/print.h>
 #include <uk/assert.h>
-#include <uk/print.h>
 
 #define FDT_MAX_ADDR_CELLS FDT_MAX_NCELLS
 #define FDT_CHECK_COUNTS(na, ns)  ((na) > 0 && (na) <= FDT_MAX_ADDR_CELLS && \
@@ -286,26 +285,6 @@ int fdt_get_interrupt(const void *fdt, int nodeoffset,
 
 	*size = nintr;
 	*prop = (fdt32_t *)(regs + term_size * index);
-
-	return 0;
-}
-
-int gic_get_irq_from_dtb(const void *fdt, int nodeoffset, int index,
-			uint32_t *irq_type, uint32_t *hwirq,
-			uint32_t *trigger_type)
-{
-	fdt32_t *prop;
-	int ret, size;
-
-	UK_ASSERT(irq_type != NULL && hwirq != NULL && trigger_type != NULL);
-
-	ret = fdt_get_interrupt(fdt, nodeoffset, index, &size, &prop);
-	if (ret < 0)
-		return ret;
-
-	*irq_type = fdt32_to_cpu(prop[0]);
-	*hwirq = fdt32_to_cpu(prop[1]);
-	*trigger_type = fdt32_to_cpu(prop[2]);
 
 	return 0;
 }
