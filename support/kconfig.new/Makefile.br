@@ -4,6 +4,8 @@ top_builddir=../../
 srctree := .
 obj ?= .
 
+.SUFFIXES :
+
 include Makefile.rules
 include Makefile
 #HOSTCFLAGS+=-Dinline="" -include foo.h

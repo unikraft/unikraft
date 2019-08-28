@@ -1,0 +1,13 @@
+diff --git a/support/kconfig.new/Makefile.br b/support/kconfig.new/Makefile.br
+index 58e6e75..afe94ee 100644
+--- a/support/kconfig.new/Makefile.br
++++ b/support/kconfig.new/Makefile.br
+@@ -4,6 +4,8 @@ top_builddir=../../
+ srctree := .
+ obj ?= .
+ 
++.SUFFIXES :
++
+ include Makefile.rules
+ include Makefile
+ #HOSTCFLAGS+=-Dinline="" -include foo.h
