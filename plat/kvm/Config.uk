@@ -84,6 +84,12 @@ endmenu
 config LIBGICV2
        bool "Arm GIC (generic interrupt controller) v2 library support"
        default y if ARCH_ARM_64
+       select LIBOFW
        depends on ARCH_ARM_64
+
+config LIBOFW
+       bool "Open Firmware library support"
+       default n
+       select LIBFDT
 
 endif
