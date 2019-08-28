@@ -19,6 +19,7 @@ host-cxxmulti := $(foreach m,$(__hostprogs),\
            $(if $($(m)-cxxobjs),$(m),$(if $($(m)-objs),)))
 host-cobjs := $(addprefix $(obj)/,$(sort $(foreach m,$(__hostprogs),$($(m)-objs))))
 host-cxxobjs := $(addprefix $(obj)/,$(sort $(foreach m,$(__hostprogs),$($(m)-cxxobjs))))
+fixdep-objs := $(obj)/fixdep.o
 
 HOST_EXTRACFLAGS += -I$(obj) -DCONFIG_=\"\"
 
@@ -30,6 +31,12 @@ $(host-cmulti): %: $(host-cobjs) $(host-cshlib)
 
 $(host-cxxmulti): %: $(host-cxxobjs) $(host-cobjs) $(host-cshlib)
 	$(HOSTCXX) $(HOST_EXTRACFLAGS) $(HOSTCFLAGS) $(HOSTCXXFLAGS_$@) $(addprefix $(obj)/,$($(@F)-objs) $($(@F)-cxxobjs)) $(HOSTLOADLIBES_$(@F)) -o $(obj)/$@
+
+$(obj)/fixdep: $(fixdep-objs)
+	$(HOSTCC) $(HOST_EXTRACFLAGS) $(HOSTCFLAGS) $(HOSTCFLAGS_$(@F)) $< -o $@
+
+$(fixdep-objs): $(src)/fixdep.c
+	$(HOSTCC) $(HOST_EXTRACFLAGS) $(HOSTCFLAGS) $(HOSTCFLAGS_$(@F)) -c $< -o $@
 
 clean:
 	$(Q)rm -f $(addprefix $(obj)/,$(clean-files))
