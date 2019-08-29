@@ -88,8 +88,19 @@ static int __read_fn(void *dst, void *src __unused, size_t *cnt)
 					'\n' : *(buf - 1);
 
 		/* Echo the input */
-		ukplat_coutk(buf - bytes_read, bytes_read);
-		bytes_total += bytes_read;
+		if (*(buf - 1) == '\177') {
+			/* DELETE control character */
+			if (buf - 1 != dst) {
+				/* If this is not the first byte */
+				ukplat_coutk("\b \b", 3);
+				buf -= 1;
+				bytes_total -= 1;
+			}
+			buf -= 1;
+		} else {
+			ukplat_coutk(buf - bytes_read, bytes_read);
+			bytes_total += bytes_read;
+		}
 
 	} while (bytes_total < count && *(buf - 1) != '\n'
 			&& *(buf - 1) != VEOF);
