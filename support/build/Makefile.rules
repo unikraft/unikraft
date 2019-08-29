@@ -234,7 +234,7 @@ depflags = -Wp$(comma)-MD$(comma)$(call tmp_depfile,$(3))
 define build_cmd_fixdep =
 	$(call build_cmd,$1,$2,$3,$4)
 	$Q $(UK_FIXDEP) $(call tmp_depfile,$3) $3 '$(call strip,$4)' \
-		$(BUILD_DIR) 	> $(call out2dep,$3) && \
+		> $(call out2dep,$3) && \
 		$(RM) $(call tmp_depfile,$3)
 endef
 

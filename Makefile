@@ -127,11 +127,11 @@ ELIB_DIR := $(realpath $(patsubst %/,%,$(patsubst %.,%,$(ELIB_DIR))))
 # KConfig settings
 CONFIG_DIR            := $(CONFIG_UK_APP)
 CONFIG_CONFIG_IN      := $(CONFIG_UK_BASE)/Config.uk
-CONFIG                := $(CONFIG_UK_BASE)/support/kconfig
+CONFIG                := $(CONFIG_UK_BASE)/support/kconfig.new
 UK_CONFIG             := $(CONFIG_DIR)/.config
 UK_CONFIG_OUT         := $(BUILD_DIR)/config
 UK_GENERATED_INCLUDES := $(BUILD_DIR)/include
-KCONFIG_DIR           := $(BUILD_DIR)/kconfig
+KCONFIG_DIR           := $(BUILD_DIR)/kconfig.new
 UK_FIXDEP             := $(KCONFIG_DIR)/fixdep
 KCONFIG_AUTOCONFIG    := $(KCONFIG_DIR)/auto.conf
 KCONFIG_TRISTATE      := $(KCONFIG_DIR)/tristate.config
@@ -473,6 +473,8 @@ AR		:= ar
 CAT		:= cat
 SED		:= sed
 AWK		:= awk
+YACC		:= bison
+LEX     	:= flex
 PATCH		:= patch
 GZIP		:= gzip
 TAR		:= tar
@@ -496,7 +498,7 @@ CXXFLAGS	+= -DCC_VERSION=$(CC_VERSION)
 GOCFLAGS	+= -DCC_VERSION=$(CC_VERSION)
 
 # ensure $(BUILD_DIR)/kconfig, $(BUILD_DIR)/include and $(BUILD_DIR)/include/uk exists
-$(call mk_sub_build_dir,kconfig)
+$(call mk_sub_build_dir,kconfig.new)
 $(call mk_sub_build_dir,include)
 $(call mk_sub_build_dir,include/uk)
 
@@ -661,13 +663,13 @@ $(KCONFIG_EPLAT_IN).new:
 # enforce execution
 .PHONY: $(KCONFIG_APP_IN).new $(KCONFIG_ELIB_IN).new $(KCONFIG_EPLAT_IN).new
 
-KCONFIG_TOOLS = conf mconf gconf nconf fixdep
+KCONFIG_TOOLS = conf mconf gconf nconf qconf fixdep
 KCONFIG_TOOLS := $(addprefix $(KCONFIG_DIR)/,$(KCONFIG_TOOLS))
 
 $(KCONFIG_TOOLS):
 	mkdir -p $(@D)/lxdialog
 	$(MAKE) CC="$(HOSTCC_NOCCACHE)" HOSTCC="$(HOSTCC_NOCCACHE)" \
-	    obj=$(@D) -C $(CONFIG) -f Makefile.br $(@F)
+	    obj=$(@D) -C $(CONFIG) -f Makefile.br $(@)
 
 DEFCONFIG = $(call qstrip,$(UK_DEFCONFIG))
 
@@ -675,7 +677,7 @@ DEFCONFIG = $(call qstrip,$(UK_DEFCONFIG))
 # recognize that if it's still at its default $(CONFIG_DIR)/defconfig
 COMMON_CONFIG_ENV = \
 	CONFIG_="CONFIG_" \
-	BR2_CONFIG="$(UK_CONFIG)" \
+	KCONFIG_CONFIG="$(UK_CONFIG)" \
 	KCONFIG_AUTOCONFIG="$(KCONFIG_AUTOCONFIG)" \
 	KCONFIG_AUTOHEADER="$(KCONFIG_AUTOHEADER)" \
 	KCONFIG_TRISTATE="$(KCONFIG_TRISTATE)" \
@@ -763,7 +765,7 @@ savedefconfig: $(KCONFIG_DIR)/conf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFI
 
 # Regenerate $(KCONFIG_AUTOHEADER) whenever $(UK_CONFIG) changed
 $(KCONFIG_AUTOHEADER): $(UK_CONFIG) $(KCONFIG_DIR)/conf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
-	@$(COMMON_CONFIG_ENV) $(KCONFIG_DIR)/conf --silentoldconfig $(CONFIG_CONFIG_IN)
+	@$(COMMON_CONFIG_ENV) $(KCONFIG_DIR)/conf --syncconfig $(CONFIG_CONFIG_IN)
 
 
 # Misc stuff
