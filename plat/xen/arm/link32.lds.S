@@ -51,6 +51,8 @@ SECTIONS
 
 	EXCEPTION_SECTIONS
 
+	CTORTAB_SECTION
+
 	/* Read-only data */
 	_rodata = .;
 	.rodata :
@@ -60,8 +62,6 @@ SECTIONS
 	}
 	. = ALIGN(__PAGE_SIZE);
 	_erodata = .;
-
-	CTORTAB_SECTION
 
 	. = ALIGN(0x8);
 	_ctors = .;

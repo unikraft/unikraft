@@ -71,7 +71,10 @@ SECTIONS {
 
 	EXCEPTION_SECTIONS
 
+	CTORTAB_SECTION
+
 	/* Read-only data */
+	. = ALIGN(__PAGE_SIZE);
 	_rodata = .;
 	.rodata :
 	{
@@ -81,8 +84,6 @@ SECTIONS {
 
 
 	_erodata = .;
-
-	CTORTAB_SECTION
 
 	/* Constructor tables (read-only) */
 	. = ALIGN(0x8);
