@@ -44,12 +44,22 @@ extern "C" {
 #endif
 
 typedef void (*uk_ctor_func_t)(void);
+
+/*
+ * Function pointer arrays of constructors; provided by
+ * the platform's linker script
+ */
+extern const uk_ctor_func_t __preinit_array_start[];
+extern const uk_ctor_func_t __preinit_array_end;
+extern const uk_ctor_func_t __init_array_start[];
+extern const uk_ctor_func_t __init_array_end;
 extern const uk_ctor_func_t uk_ctortab[];
 extern const uk_ctor_func_t uk_ctortab_end;
 
-/*
- * Register a constructor function that is
- * called during bootstrap
+/**
+ * Register a Unikraft constructor function that is
+ * called during bootstrap (uk_ctortab)
+ *
  * @param lvl
  *   Priority level (0 (higher) to 7 (least))
  *   Note: Any other value for level will be ignored
@@ -61,6 +71,23 @@ extern const uk_ctor_func_t uk_ctortab_end;
 		__used __section(".uk_ctortab" #lvl)	\
 		__uk_ctab ## lvl ## _ ## ctorf = (ctorf)
 #define UK_CTOR_FUNC(lvl, ctorf) __UK_CTOR_FUNC(lvl, ctorf)
+
+/**
+ * Helper macro for iterating over constructor pointer arrays
+ * Please note that the array may contain NULL pointer entries
+ *
+ * @param arr_start
+ *   Start address of pointer array (type: const uk_ctor_func_t const [])
+ * @param arr_end
+ *   End address of pointer array
+ * @param i
+ *   Iterator variable (integer) which should be used to access the
+ *   individual fields
+ */
+#define uk_ctor_foreach(arr_start, arr_end, i)			\
+	for ((i) = 0;						\
+	     &((arr_start)[i]) < &(arr_end);			\
+	     ++(i))
 
 #ifdef __cplusplus
 }

@@ -49,7 +49,6 @@
 #endif
 #include <uk/arch/lcpu.h>
 #include <uk/plat/bootstrap.h>
-#include <uk/plat/ctors.h>
 #include <uk/plat/memory.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/irq.h>
@@ -85,7 +84,7 @@ static void main_thread_func(void *arg)
 
 	uk_pr_info("Pre-init table at %p - %p\n",
 		   __preinit_array_start, &__preinit_array_end);
-	ukplat_ctor_foreach(__preinit_array_start, __preinit_array_end, i) {
+	uk_ctor_foreach(__preinit_array_start, __preinit_array_end, i) {
 		if (__preinit_array_start[i]) {
 			uk_pr_debug("Call pre-init constructor (entry %d (%p): %p())...\n",
 				    i, &__preinit_array_start[i],
@@ -96,7 +95,7 @@ static void main_thread_func(void *arg)
 
 	uk_pr_info("Constructor table at %p - %p\n",
 			__init_array_start, &__init_array_end);
-	ukplat_ctor_foreach(__init_array_start, __init_array_end, i) {
+	uk_ctor_foreach(__init_array_start, __init_array_end, i) {
 		if (__init_array_start[i]) {
 			uk_pr_debug("Call constructor (entry %d (%p): %p())...\n",
 					i, &__init_array_start[i],
@@ -182,7 +181,7 @@ void ukplat_entry(int argc, char *argv[])
 #endif
 
 	uk_pr_info("Unikraft constructors table at %p\n", uk_ctortab);
-	ukplat_ctor_foreach(uk_ctortab, uk_ctortab_end, i) {
+	uk_ctor_foreach(uk_ctortab, uk_ctortab_end, i) {
 		uk_pr_debug("Call constructor %p\n", uk_ctortab[i]);
 		uk_ctortab[i]();
 	}
