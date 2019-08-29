@@ -155,8 +155,11 @@ device_create(struct driver *drv, const char *name, int flags)
 	/*
 	 * Allocate a device structure.
 	 */
-	if ((dev = malloc(sizeof(struct device))) == NULL)
-		UK_CRASH("device_create");
+	dev = malloc(sizeof(struct device));
+	if (!dev) {
+		uk_pr_err("Failed to allocate device memory, creation failed\n");
+		return NULL;
+	}
 
 	dev->driver = drv;
 	device_register(dev, name, flags);
