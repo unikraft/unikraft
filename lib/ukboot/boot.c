@@ -166,8 +166,8 @@ void ukplat_entry_argp(char *arg0, char *argb, __sz argb_len)
 /* defined in <uk/plat.h> */
 void ukplat_entry(int argc, char *argv[])
 {
-	const uk_ctor_func_t *cfn;
 	struct thread_main_arg tma;
+	int i;
 	int kern_args = 0;
 	int rc __maybe_unused = 0;
 #if CONFIG_LIBUKALLOC
@@ -182,9 +182,9 @@ void ukplat_entry(int argc, char *argv[])
 #endif
 
 	uk_pr_info("Unikraft constructors table at %p\n", uk_ctortab);
-	for (cfn = uk_ctortab; *cfn != NULL; ++cfn) {
-		uk_pr_debug("Call constructor %p\n", *cfn);
-		(*cfn)();
+	ukplat_ctor_foreach(uk_ctortab, uk_ctortab_end, i) {
+		uk_pr_debug("Call constructor %p\n", uk_ctortab[i]);
+		uk_ctortab[i]();
 	}
 
 #ifdef CONFIG_LIBUKLIBPARAM

@@ -45,6 +45,7 @@ extern "C" {
 
 typedef void (*uk_ctor_func_t)(void);
 extern const uk_ctor_func_t uk_ctortab[];
+extern const uk_ctor_func_t uk_ctortab_end;
 
 /*
  * Register a constructor function that is
