@@ -1,0 +1,70 @@
+diff --git a/support/kconfig.new/lexer.l b/support/kconfig.new/lexer.l
+index 6354c90..c5acb32 100644
+--- a/support/kconfig.new/lexer.l
++++ b/support/kconfig.new/lexer.l
+@@ -8,6 +8,7 @@
+ %{
+ 
+ #include <assert.h>
++#include <glob.h>
+ #include <limits.h>
+ #include <stdio.h>
+ #include <stdlib.h>
+@@ -442,6 +443,32 @@ void zconf_nextfile(const char *name)
+ 	current_file = file;
+ }
+ 
++void zconf_nextfiles(const char *wildcard)
++{
++	glob_t g = {0};
++	char **w;
++	int i;
++
++	if (glob(wildcard, 0, NULL, &g) != 0) {
++		return;
++	}
++	if (g.gl_pathv == NULL) {
++		globfree(&g);
++		return;
++	}
++
++	/* working through files backwards, since
++	 * we're first pushing them on a stack
++	 * before actually handling them.
++	 */
++	for (i = g.gl_pathc; i > 0; i--) {
++		w = &g.gl_pathv[i - 1];
++		zconf_nextfile(*w);
++	}
++
++	globfree(&g);
++}
++
+ static void zconf_endfile(void)
+ {
+ 	struct buffer *parent;
+diff --git a/support/kconfig.new/lkc.h b/support/kconfig.new/lkc.h
+index cbc7658..69d2c77 100644
+--- a/support/kconfig.new/lkc.h
++++ b/support/kconfig.new/lkc.h
+@@ -44,6 +44,7 @@ void zconf_starthelp(void);
+ FILE *zconf_fopen(const char *name);
+ void zconf_initscan(const char *name);
+ void zconf_nextfile(const char *name);
++void zconf_nextfiles(const char *name);
+ int zconf_lineno(void);
+ const char *zconf_curname(void);
+ 
+diff --git a/support/kconfig.new/parser.y b/support/kconfig.new/parser.y
+index 60936c7..95700f8 100644
+--- a/support/kconfig.new/parser.y
++++ b/support/kconfig.new/parser.y
+@@ -366,7 +366,7 @@ menu_option_list:
+ source_stmt: T_SOURCE prompt T_EOL
+ {
+ 	printd(DEBUG_PARSE, "%s:%d:source %s\n", zconf_curname(), zconf_lineno(), $2);
+-	zconf_nextfile($2);
++	zconf_nextfiles($2);
+ 	free($2);
+ };
+ 

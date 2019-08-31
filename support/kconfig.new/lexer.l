@@ -8,6 +8,7 @@
 %{
 
 #include <assert.h>
+#include <glob.h>
 #include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -440,6 +441,32 @@ void zconf_nextfile(const char *name)
 
 	yylineno = 1;
 	current_file = file;
+}
+
+void zconf_nextfiles(const char *wildcard)
+{
+	glob_t g = {0};
+	char **w;
+	int i;
+
+	if (glob(wildcard, 0, NULL, &g) != 0) {
+		return;
+	}
+	if (g.gl_pathv == NULL) {
+		globfree(&g);
+		return;
+	}
+
+	/* working through files backwards, since
+	 * we're first pushing them on a stack
+	 * before actually handling them.
+	 */
+	for (i = g.gl_pathc; i > 0; i--) {
+		w = &g.gl_pathv[i - 1];
+		zconf_nextfile(*w);
+	}
+
+	globfree(&g);
 }
 
 static void zconf_endfile(void)
