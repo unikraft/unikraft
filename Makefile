@@ -128,6 +128,7 @@ ELIB_DIR := $(realpath $(patsubst %/,%,$(patsubst %.,%,$(ELIB_DIR))))
 CONFIG_DIR            := $(CONFIG_UK_APP)
 CONFIG_CONFIG_IN      := $(CONFIG_UK_BASE)/Config.uk
 CONFIG                := $(CONFIG_UK_BASE)/support/kconfig.new
+CONFIGLIB	      := $(CONFIG_UK_BASE)/support/kconfiglib
 UK_CONFIG             := $(CONFIG_DIR)/.config
 UK_CONFIG_OUT         := $(BUILD_DIR)/config
 UK_GENERATED_INCLUDES := $(BUILD_DIR)/include
@@ -161,9 +162,13 @@ export DATE := $(shell date +%Y%m%d)
 
 # Makefile targets
 null_targets		:= print-version print-vars help
-noconfig_targets	:= menuconfig nconfig gconfig xconfig config oldconfig randconfig \
-			   defconfig %_defconfig allyesconfig allnoconfig silentoldconfig release \
-			   olddefconfig properclean distclean $(null_targets)
+noconfig_targets	:= ukconfig menuconfig nconfig gconfig xconfig config \
+			   oldconfig randconfig \
+			   defconfig %_defconfig allyesconfig allnoconfig \
+			   silentoldconfig \
+			   release olddefconfig properclean distclean \
+			   scriptconfig iscriptconfig kmenuconfig guiconfig \
+			   dumpvarsconfig $(null_targets)
 
 # To put more focus on warnings, be less verbose as default
 # Use 'make V=1' to see the full commands
@@ -694,6 +699,38 @@ COMMON_CONFIG_ENV = \
 	KCONFIG_EPLAT_IN="$(KCONFIG_EPLAT_IN)" \
 	UK_NAME="$(CONFIG_UK_NAME)"
 
+PHONY += scriptconfig iscriptconfig kmenuconfig guiconfig dumpvarsconfig
+
+PYTHONCMD ?= python
+kpython := PYTHONPATH=$(UK_CONFIGLIB):$$PYTHONPATH $(PYTHONCMD)
+
+ifneq ($(filter scriptconfig,$(MAKECMDGOALS)),)
+ifndef SCRIPT
+$(error Use "make scriptconfig SCRIPT=<path to script> [SCRIPT_ARG=<argument>]")
+endif
+endif
+
+scriptconfig: $(KCONFIG_DIR)/fixdep
+	$(Q)$(COMMON_CONFIG_ENV) $(kpython) $(SCRIPT) $(Kconfig) $(if $(SCRIPT_ARG),"$(SCRIPT_ARG)")
+
+iscriptconfig: $(KCONFIG_DIR)/fixdep
+	$(Q)$(COMMON_CONFIG_ENV) $(kpython) -i -c \
+	  "import kconfiglib; \
+	   kconf = kconfiglib.Kconfig('$(UK_CONFIG)'); \
+	   print('A Kconfig instance \'kconf\' for the architecture $(ARCH) has been created.')"
+
+kmenuconfig:$(KCONFIG_DIR)/fixdep $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
+	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/menuconfig.py $(CONFIG_CONFIG_IN)
+	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+
+guiconfig: $(KCONFIG_DIR)/fixdep $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
+	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/guiconfig.py $(CONFIG_CONFIG_IN)
+	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+
+dumpvarsconfig:$(KCONFIG_DIR)/fixdep
+	$(Q)$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/examples/dumpvars.py $(CONFIG_CONFIG_IN)
+	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+
 xconfig: $(KCONFIG_DIR)/qconf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
 	@$(COMMON_CONFIG_ENV) $< $(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
@@ -862,6 +899,8 @@ help:
 	@echo 'Configuration:'
 	@echo '* menuconfig             - interactive curses-based configurator'
 	@echo '                           (default target when no config exists)'
+	@echo '  kmenuconfig            - interactive python based configurator'
+	@echo '  guiconfig              - interactive python based configurator'
 	@echo '  nconfig                - interactive ncurses-based configurator'
 	@echo '  xconfig                - interactive Qt-based configurator'
 	@echo '  gconfig                - interactive GTK-based configurator'
