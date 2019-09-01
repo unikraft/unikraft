@@ -774,8 +774,8 @@ allnoconfig: $(KCONFIG_DIR)/conf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_
 	@$(COMMON_CONFIG_ENV) $< --olddefconfig $(CONFIG_CONFIG_IN) >/dev/null
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
-silentoldconfig: $(KCONFIG_DIR)/conf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
-	@$(COMMON_CONFIG_ENV) $< --silentoldconfig $(CONFIG_CONFIG_IN)
+syncconfig: $(KCONFIG_DIR)/conf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
+	@$(COMMON_CONFIG_ENV) $< --syncconfig $(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 olddefconfig: $(KCONFIG_DIR)/conf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
@@ -905,7 +905,7 @@ help:
 	@echo '  xconfig                - interactive Qt-based configurator'
 	@echo '  gconfig                - interactive GTK-based configurator'
 	@echo '  oldconfig              - resolve any unresolved symbols in .config'
-	@echo '  silentoldconfig        - Same as oldconfig, but quietly, additionally update deps'
+	@echo '  syncconfig             - Same as oldconfig, but quietly, additionally update deps'
 	@echo '  olddefconfig           - Same as silentoldconfig but sets new symbols to their default value'
 	@echo '  randconfig             - New config with random answer to all options'
 	@echo '  defconfig              - New config with default answer to all options'
