@@ -125,6 +125,8 @@ endif
 ELIB_DIR := $(realpath $(patsubst %/,%,$(patsubst %.,%,$(ELIB_DIR))))
 
 # KConfig settings
+
+CONFIG_UK_PLAT        := $(CONFIG_UK_BASE)/plat/
 CONFIG_DIR            := $(CONFIG_UK_APP)
 CONFIG_CONFIG_IN      := $(CONFIG_UK_BASE)/Config.uk
 CONFIG                := $(CONFIG_UK_BASE)/support/kconfig.new
@@ -137,9 +139,12 @@ UK_FIXDEP             := $(KCONFIG_DIR)/fixdep
 KCONFIG_AUTOCONFIG    := $(KCONFIG_DIR)/auto.conf
 KCONFIG_TRISTATE      := $(KCONFIG_DIR)/tristate.config
 KCONFIG_AUTOHEADER    := $(UK_GENERATED_INCLUDES)/uk/_config.h
-KCONFIG_APP_IN        := $(KCONFIG_DIR)/app.uk
-KCONFIG_EPLAT_IN      := $(KCONFIG_DIR)/eplat.uk
-KCONFIG_ELIB_IN       := $(KCONFIG_DIR)/elib.uk
+KCONFIG_APP_DIR       := $(CONFIG_UK_APP)
+KCONFIG_LIB_IN        := $(KCONFIG_DIR)/libs.uk
+KCONFIG_DEF_PLATS     := $(addprefix $(CONFIG_UK_PLAT),linuxu kvm xen)
+KCONFIG_LIB_DIR       := $(CONFIG_UK_BASE)/lib $(ELIB_DIR)
+KCONFIG_PLAT_DIR      := $(KCONFIG_DEF_PLATS) $(EPLAT_DIR) $(CONFIG_UK_PLAT)
+KCONFIG_PLAT_IN       := $(KCONFIG_DIR)/plat.uk
 
 # Makefile support scripts
 SCRIPTS_DIR := $(CONFIG_UK_BASE)/support/scripts
@@ -638,36 +643,6 @@ endif
 HOSTCFLAGS = $(CFLAGS_FOR_BUILD)
 export HOSTCFLAGS
 
-# auto-generated KConfig files for including external app
-$(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN): %: %.new
-	@cmp -s $^ $@; if [ $$? -ne 0 ]; then cp $^ $@; fi
-
-$(KCONFIG_APP_IN).new:
-	@echo '# external application' > $@
-ifneq ($(CONFIG_UK_BASE),$(CONFIG_UK_APP))
-	@echo 'source "$(APP_DIR)/Config.uk"' >> $@
-else
-	@echo 'comment "No external application specified"' >> $@
-endif
-
-# auto-generated KConfig files for including external libraries
-$(KCONFIG_ELIB_IN).new:
-	@echo '# external libraries' > $@
-	@$(foreach E,$(ELIB_DIR), \
-		echo 'source "$(E)/Config.uk"' >> $@; \
-	)
-
-# auto-generated KConfig file for including
-# external platform libraries to the menu
-$(KCONFIG_EPLAT_IN).new:
-	@echo '# external platform libraries' > $@
-	@$(foreach E,$(EPLAT_DIR), \
-		echo 'source "$(E)/Config.uk"' >> $@; \
-	)
-
-# enforce execution
-.PHONY: $(KCONFIG_APP_IN).new $(KCONFIG_ELIB_IN).new $(KCONFIG_EPLAT_IN).new
-
 KCONFIG_TOOLS = conf mconf gconf nconf qconf fixdep
 KCONFIG_TOOLS := $(addprefix $(KCONFIG_DIR)/,$(KCONFIG_TOOLS))
 
@@ -694,9 +669,11 @@ COMMON_CONFIG_ENV = \
 	UK_FULLVERSION="$(UK_FULLVERSION)" \
 	UK_CODENAME="$(UK_CODENAME)" \
 	UK_ARCH="$(CONFIG_UK_ARCH)" \
-	KCONFIG_APP_IN="$(KCONFIG_APP_IN)" \
-	KCONFIG_ELIB_IN="$(KCONFIG_ELIB_IN)" \
-	KCONFIG_EPLAT_IN="$(KCONFIG_EPLAT_IN)" \
+	KCONFIG_APP_DIR="$(KCONFIG_APP_DIR)" \
+	KCONFIG_LIB_DIR="$(KCONFIG_LIB_DIR)" \
+	KCONFIG_LIB_IN="$(KCONFIG_LIB_IN)" \
+	KCONFIG_PLAT_DIR="$(KCONFIG_PLAT_DIR)" \
+	KCONFIG_PLAT_IN="$(KCONFIG_PLAT_IN)" \
 	UK_NAME="$(CONFIG_UK_NAME)"
 
 PHONY += scriptconfig iscriptconfig kmenuconfig guiconfig dumpvarsconfig
@@ -719,11 +696,12 @@ iscriptconfig: $(KCONFIG_DIR)/fixdep
 	   kconf = kconfiglib.Kconfig('$(UK_CONFIG)'); \
 	   print('A Kconfig instance \'kconf\' for the architecture $(ARCH) has been created.')"
 
-kmenuconfig:$(KCONFIG_DIR)/fixdep $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
-	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/menuconfig.py $(CONFIG_CONFIG_IN)
+kmenuconfig:$(KCONFIG_DIR)/fixdep
+	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/menuconfig.py \
+		$(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
-guiconfig: $(KCONFIG_DIR)/fixdep $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
+guiconfig: $(KCONFIG_DIR)/fixdep
 	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/guiconfig.py $(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
@@ -731,23 +709,23 @@ dumpvarsconfig:$(KCONFIG_DIR)/fixdep
 	$(Q)$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/examples/dumpvars.py $(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
-xconfig: $(KCONFIG_DIR)/qconf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
+xconfig: $(KCONFIG_DIR)/qconf
 	@$(COMMON_CONFIG_ENV) $< $(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
-gconfig: $(KCONFIG_DIR)/gconf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
+gconfig: $(KCONFIG_DIR)/gconf
 	@$(COMMON_CONFIG_ENV) srctree=$(CONFIG_UK_BASE) $< $(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
-menuconfig: $(KCONFIG_DIR)/mconf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
+menuconfig: $(KCONFIG_DIR)/mconf
 	@$(COMMON_CONFIG_ENV) $< $(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
-nconfig: $(KCONFIG_DIR)/nconf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
+nconfig: $(KCONFIG_DIR)/nconf
 	@$(COMMON_CONFIG_ENV) $< $(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
-config: $(KCONFIG_DIR)/conf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
+config: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) $< $(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
@@ -755,43 +733,43 @@ config: $(KCONFIG_DIR)/conf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT
 # SKIP_LEGACY=y to disable the legacy options. However, in that case
 # no values are set for the legacy options so a subsequent oldconfig
 # will query them. Therefore, run an additional olddefconfig.
-oldconfig: $(KCONFIG_DIR)/conf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
+oldconfig: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) $< --oldconfig $(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
-randconfig: $(KCONFIG_DIR)/conf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
+randconfig: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) SKIP_LEGACY=y $< --randconfig $(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $< --olddefconfig $(CONFIG_CONFIG_IN) >/dev/null
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
-allyesconfig: $(KCONFIG_DIR)/conf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
+allyesconfig: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) SKIP_LEGACY=y $< --allyesconfig $(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $< --olddefconfig $(CONFIG_CONFIG_IN) >/dev/null
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
-allnoconfig: $(KCONFIG_DIR)/conf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
+allnoconfig: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) SKIP_LEGACY=y $< --allnoconfig $(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $< --olddefconfig $(CONFIG_CONFIG_IN) >/dev/null
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
-syncconfig: $(KCONFIG_DIR)/conf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
+syncconfig: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) $< --syncconfig $(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
-olddefconfig: $(KCONFIG_DIR)/conf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
+olddefconfig: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) $< --olddefconfig $(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
-defconfig: $(KCONFIG_DIR)/conf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
+defconfig: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) $< --defconfig$(if $(DEFCONFIG),=$(DEFCONFIG)) $(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 # Override the UK_DEFCONFIG from COMMON_CONFIG_ENV with the new defconfig
-%_defconfig: $(KCONFIG_DIR)/conf $(A)/configs/%_defconfig $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
+%_defconfig: $(KCONFIG_DIR)/conf $(A)/configs/%_defconfig
 	@$(COMMON_CONFIG_ENV) UK_DEFCONFIG=$(A)/configs/$@ \
 		$< --defconfig=$(A)/configs/$@ $(CONFIG_CONFIG_IN)
 
-savedefconfig: $(KCONFIG_DIR)/conf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
+savedefconfig: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) $< \
 		--savedefconfig=$(if $(DEFCONFIG),$(DEFCONFIG),$(CONFIG_DIR)/defconfig) \
 		$(CONFIG_CONFIG_IN)
@@ -801,7 +779,7 @@ savedefconfig: $(KCONFIG_DIR)/conf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFI
 .PHONY: defconfig savedefconfig silentoldconfig
 
 # Regenerate $(KCONFIG_AUTOHEADER) whenever $(UK_CONFIG) changed
-$(KCONFIG_AUTOHEADER): $(UK_CONFIG) $(KCONFIG_DIR)/conf $(KCONFIG_APP_IN) $(KCONFIG_ELIB_IN) $(KCONFIG_EPLAT_IN)
+$(KCONFIG_AUTOHEADER): $(UK_CONFIG) $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) $(KCONFIG_DIR)/conf --syncconfig $(CONFIG_CONFIG_IN)
 
 

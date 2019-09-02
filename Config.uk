@@ -3,16 +3,6 @@
 # see https://www.kernel.org/doc/Documentation/kbuild/Config.in-language.txt.
 #
 mainmenu "Unikraft/$(UK_FULLVERSION) Configuration"
-config KCONFIG_APP_IN
-	string
-	default "$(KCONFIG_APP_IN)"
-config KCONFIG_ELIB_IN
-	string
-	default "$(KCONFIG_ELIB_IN)"
-config KCONFIG_EPLAT_IN
-	string
-	default "$(KCONFIG_EPLAT_IN)"
-
 config UK_FULLVERSION
 	string
 	default "$(UK_FULLVERSION)"
@@ -22,6 +12,9 @@ config UK_CODENAME
 config UK_ARCH
 	string
 	default "$(UK_ARCH)"
+config NO_APP
+	def_bool $(shell,test $(UK_BASE) = $(UK_APP) && echo y || echo n)
+
 config UK_BASE
 	string
 	default "$(UK_BASE)"
@@ -37,13 +30,11 @@ menu "Architecture Selection"
 endmenu
 
 menu "Platform Configuration"
-	source "plat/Config.uk"
-	source "$(KCONFIG_EPLAT_IN)"
+	source "$(shell,$(UK_BASE)/support/scripts/uk_build_configure.sh -p '$(KCONFIG_PLAT_DIR)' -o '$(KCONFIG_PLAT_IN)')"
 endmenu
 
 menu "Library Configuration"
-	source "lib/Config.uk"
-	source "$(KCONFIG_ELIB_IN)"
+	source "$(shell,$(UK_BASE)/support/scripts/uk_build_configure.sh -e '$(KCONFIG_LIB_DIR)' -o '$(KCONFIG_LIB_IN)')"
 endmenu
 
 menu "Build Options"
@@ -182,9 +173,9 @@ config CROSS_COMPILE
 #	  system.
 endmenu
 
-if UK_APP != UK_BASE
+if !NO_APP
 	menu "Application Options"
-		source "$(KCONFIG_APP_IN)"
+		source "$(shell,$(UK_BASE)/support/scripts/uk_build_configure.sh -a '$(KCONFIG_APP_DIR)')"
 	endmenu
 endif
 
