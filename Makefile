@@ -676,7 +676,8 @@ COMMON_CONFIG_ENV = \
 	KCONFIG_PLAT_IN="$(KCONFIG_PLAT_IN)" \
 	UK_NAME="$(CONFIG_UK_NAME)"
 
-PHONY += scriptconfig iscriptconfig kmenuconfig guiconfig dumpvarsconfig
+PHONY += scriptconfig scriptsyncconfig iscriptconfig kmenuconfig guiconfig \
+		 dumpvarsconfig
 
 PYTHONCMD ?= python
 kpython := PYTHONPATH=$(UK_CONFIGLIB):$$PYTHONPATH $(PYTHONCMD)
@@ -699,6 +700,12 @@ iscriptconfig: $(KCONFIG_DIR)/fixdep
 kmenuconfig:$(KCONFIG_DIR)/fixdep
 	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/menuconfig.py \
 		$(CONFIG_CONFIG_IN)
+	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+
+scriptsyncconfig: $(KCONFIG_DIR)/fixdep
+	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/genconfig.py \
+		--sync-deps=$(BUILD_DIR)/include/config \
+		--header-path=$(KCONFIG_AUTOHEADER) $(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 guiconfig: $(KCONFIG_DIR)/fixdep
@@ -884,6 +891,7 @@ help:
 	@echo '  gconfig                - interactive GTK-based configurator'
 	@echo '  oldconfig              - resolve any unresolved symbols in .config'
 	@echo '  syncconfig             - Same as oldconfig, but quietly, additionally update deps'
+	@echo '  scriptsyncconfig       - Same as oldconfig, but quietly, additionally update deps'
 	@echo '  olddefconfig           - Same as silentoldconfig but sets new symbols to their default value'
 	@echo '  randconfig             - New config with random answer to all options'
 	@echo '  defconfig              - New config with default answer to all options'
