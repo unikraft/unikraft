@@ -16,13 +16,13 @@ config ARCH_ARM_32
 endchoice
 
 if (ARCH_X86_64)
-	source "arch/x86/x86_64/Config.uk"
+	source "$(UK_BASE)/arch/x86/x86_64/Config.uk"
 endif
 if (ARCH_ARM_32)
-	source "arch/arm/arm/Config.uk"
+	source "$(UK_BASE)/arch/arm/arm/Config.uk"
 endif
 if (ARCH_ARM_64)
-	source "arch/arm/arm64/Config.uk"
+	source "$(UK_BASE)/arch/arm/arm64/Config.uk"
 endif
 
 config STACK_SIZE_PAGE_ORDER

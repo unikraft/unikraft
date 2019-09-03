@@ -65,7 +65,7 @@ space := $(empty) $(empty)
 export CDPATH :=
 
 # Use current directory as base
-CONFIG_UK_BASE := $(CURDIR)
+CONFIG_UK_BASE ?= $(CURDIR)
 override CONFIG_UK_BASE := $(realpath $(CONFIG_UK_BASE))
 ifeq ($(CONFIG_UK_BASE),)
 $(error "Invalid base directory (CONFIG_UK_BASE)")
@@ -103,12 +103,20 @@ ifeq ("$(origin P)", "command line")
 $(foreach E,$(subst :, ,$(P)), \
 $(if $(wildcard $(E)), \
 	$(eval EPLAT_DIR += $(E)) \
-, \
+, $(if $(wildcard $(CONFIG_UK_BASE)/$(E)),\
+	$(eval EPLAT_DIR += $(CONFIG_UK_BASE)/$(E)), \
 	$(error Cannot find platform library: $(E)) \
+   ) \
 ) \
 )
 endif
 EPLAT_DIR := $(realpath $(patsubst %/,%,$(patsubst %.,%,$(EPLAT_DIR))))
+build_dir_make  := 0
+ifneq ($(BUILD_DIR),$(UK_BASE))
+	build_dir_make := 1;
+else
+	sub_make_exec := 1;
+endif
 
 # ELIB_DIR (list of external libraries)
 # Retrieved from L variable from the command line (paths separated by colon)
@@ -117,8 +125,10 @@ ifeq ("$(origin L)", "command line")
 $(foreach E,$(subst :, ,$(L)), \
 $(if $(wildcard $(E)), \
 	$(eval ELIB_DIR += $(E)) \
-, \
+, $(if $(wildcard $(CONFIG_UK_BASE)/$(E)),\
+	$(eval ELIB_DIR += $(CONFIG_UK_BASE)/$(E)), \
 	$(error Cannot find library: $(E)) \
+   )\
 ) \
 )
 endif
@@ -428,6 +438,7 @@ endif
 ################################################################################
 # Compiler and linker tools
 ################################################################################
+ifeq ($(sub_make_exec), 1)
 ifeq ($(UK_HAVE_DOT_CONFIG),y)
 # Hide troublesome environment variables from sub processes
 unexport CONFIG_CROSS_COMPILE
@@ -617,19 +628,25 @@ clean: clean-libs
 
 else # !($(UK_HAVE_DOT_CONFIG),y)
 
-all: menuconfig
 
-.PHONY: prepare image libs objs clean-libs clean
+$(filter %config,$(MAKECMDGOALS)): $(BUILD_DIR)/Makefile
 
-fetch: menuconfig
+## ukconfig
+ukconfig: $(BUILD_DIR)/Makefile menuconfig
 
-prepare: menuconfig
+all: ukconfig
 
-objs: menuconfig
+.PHONY: prepare image libs objs clean-libs clean ukconfig
 
-libs: menuconfig
+fetch: ukconfig
 
-images: menuconfig
+prepare: ukconfig
+
+objs: ukconfig
+
+libs: ukconfig
+
+images: ukconfig
 
 clean-libs clean:
 	$(error Do not know which files to clean without having a configuration. Did you mean 'properclean' or 'distclean'?)
@@ -700,13 +717,13 @@ iscriptconfig: $(KCONFIG_DIR)/fixdep
 kmenuconfig:$(KCONFIG_DIR)/fixdep
 	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/menuconfig.py \
 		$(CONFIG_CONFIG_IN)
-	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 scriptsyncconfig: $(KCONFIG_DIR)/fixdep
 	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/genconfig.py \
 		--sync-deps=$(BUILD_DIR)/include/config \
 		--header-path=$(KCONFIG_AUTOHEADER) $(CONFIG_CONFIG_IN)
-	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 guiconfig: $(KCONFIG_DIR)/fixdep
 	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/guiconfig.py $(CONFIG_CONFIG_IN)
@@ -718,23 +735,23 @@ dumpvarsconfig:$(KCONFIG_DIR)/fixdep
 
 xconfig: $(KCONFIG_DIR)/qconf
 	@$(COMMON_CONFIG_ENV) $< $(CONFIG_CONFIG_IN)
-	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 gconfig: $(KCONFIG_DIR)/gconf
 	@$(COMMON_CONFIG_ENV) srctree=$(CONFIG_UK_BASE) $< $(CONFIG_CONFIG_IN)
-	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 menuconfig: $(KCONFIG_DIR)/mconf
 	@$(COMMON_CONFIG_ENV) $< $(CONFIG_CONFIG_IN)
-	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 nconfig: $(KCONFIG_DIR)/nconf
 	@$(COMMON_CONFIG_ENV) $< $(CONFIG_CONFIG_IN)
-	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 config: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) $< $(CONFIG_CONFIG_IN)
-	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 # For the config targets that automatically select options, we pass
 # SKIP_LEGACY=y to disable the legacy options. However, in that case
@@ -742,34 +759,34 @@ config: $(KCONFIG_DIR)/conf
 # will query them. Therefore, run an additional olddefconfig.
 oldconfig: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) $< --oldconfig $(CONFIG_CONFIG_IN)
-	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 randconfig: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) SKIP_LEGACY=y $< --randconfig $(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $< --olddefconfig $(CONFIG_CONFIG_IN) >/dev/null
-	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 allyesconfig: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) SKIP_LEGACY=y $< --allyesconfig $(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $< --olddefconfig $(CONFIG_CONFIG_IN) >/dev/null
-	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 allnoconfig: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) SKIP_LEGACY=y $< --allnoconfig $(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $< --olddefconfig $(CONFIG_CONFIG_IN) >/dev/null
-	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 syncconfig: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) $< --syncconfig $(CONFIG_CONFIG_IN)
-	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 olddefconfig: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) $< --olddefconfig $(CONFIG_CONFIG_IN)
-	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 defconfig: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) $< --defconfig$(if $(DEFCONFIG),=$(DEFCONFIG)) $(CONFIG_CONFIG_IN)
-	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 # Override the UK_DEFCONFIG from COMMON_CONFIG_ENV with the new defconfig
 %_defconfig: $(KCONFIG_DIR)/conf $(A)/configs/%_defconfig
@@ -781,7 +798,7 @@ savedefconfig: $(KCONFIG_DIR)/conf
 		--savedefconfig=$(if $(DEFCONFIG),$(DEFCONFIG),$(CONFIG_DIR)/defconfig) \
 		$(CONFIG_CONFIG_IN)
 	@$(SED) '/UK_DEFCONFIG=/d' $(if $(DEFCONFIG),$(DEFCONFIG),$(CONFIG_DIR)/defconfig)
-	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 .PHONY: defconfig savedefconfig silentoldconfig
 
@@ -859,6 +876,20 @@ print-objs:
 
 print-srcs:
 	$(error Do not have a configuration. Please run one of the configuration targets first)
+endif
+else #!($(sub_make_exec),)
+export sub_make_exec:=1
+
+$(BUILD_DIR)/Makefile:
+	ln -sn $(CONFIG_UK_BASE)/Makefile $(@)
+
+$(filter-out _all $(BUILD_DIR)/Makefile sub-make distclean properclean help $(lastword $(MAKEFILE_LIST)), \
+  $(MAKECMDGOALS)) all: sub-make
+	@:
+
+sub-make: $(BUILD_DIR)/Makefile
+	$(Q)$(MAKE) CONFIG_UK_BASE=$(CONFIG_UK_BASE) -C $(BUILD_DIR) -f $(BUILD_DIR)/Makefile $(MAKECMDGOALS)
+
 endif
 
 help:
