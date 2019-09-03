@@ -60,7 +60,7 @@ int dev_random_read(struct device *dev __unused, struct uio *uio,
 	chunk_size = count % step;
 
 	for (i = 0; i < count - chunk_size; i += step)
-		*((__u32 *)buf + i) = uk_swrand_randr();
+		*(buf + i) = uk_swrand_randr();
 
 	/* fill the remaining bytes of the buffer */
 	if (chunk_size > 0) {
