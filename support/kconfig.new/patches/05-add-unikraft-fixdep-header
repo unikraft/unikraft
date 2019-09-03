@@ -1,0 +1,12 @@
+diff --git a/support/kconfig.new/fixdep.c b/support/kconfig.new/fixdep.c
+index facbd60..97afb70 100644
+--- a/support/kconfig.new/fixdep.c
++++ b/support/kconfig.new/fixdep.c
+@@ -269,6 +269,7 @@ static int is_ignored_file(const char *s, int len)
+ {
+ 	return str_ends_with(s, len, "include/generated/autoconf.h") ||
+ 	       str_ends_with(s, len, "include/generated/autoksyms.h") ||
++	       str_ends_with(s, len, "build/include/uk/_config.h") ||
+ 	       str_ends_with(s, len, ".ver");
+ }
+ 
