@@ -41,6 +41,8 @@
 #include <vfscore/vnode.h>
 #include <unistd.h>
 #include <vfscore/uio.h>
+#include <vfscore/vnode.h>
+#include <vfscore/mount.h>
 
 static int __write_fn(void *dst __unused, void *src, size_t *cnt)
 {
@@ -127,10 +129,50 @@ stdio_getattr(struct vnode *vnode __unused, struct vattr *attr __unused)
 	return 0;
 }
 
+#define stdio_open	((vnop_open_t)vfscore_nullop)
+#define stdio_close	((vnop_close_t)vfscore_nullop)
+#define stdio_seek	((vnop_seek_t)vfscore_vop_nullop)
+#define stdio_ioctl	((vnop_ioctl_t)vfscore_nullop)
+#define stdio_fsync	((vnop_fsync_t)vfscore_vop_nullop)
+#define stdio_readdir	((vnop_readdir_t)vfscore_vop_einval)
+#define stdio_lookup	((vnop_lookup_t)vfscore_nullop)
+#define stdio_create	((vnop_create_t)vfscore_vop_einval)
+#define stdio_remove	((vnop_remove_t)vfscore_vop_einval)
+#define stdio_rename	((vnop_rename_t)vfscore_vop_einval)
+#define stdio_mkdir	((vnop_mkdir_t)vfscore_vop_einval)
+#define stdio_rmdir	((vnop_rmdir_t)vfscore_vop_einval)
+#define stdio_setattr	((vnop_setattr_t)vfscore_vop_eperm)
+#define stdio_inactive	((vnop_inactive_t)vfscore_vop_nullop)
+#define stdio_truncate	((vnop_truncate_t)vfscore_vop_nullop)
+#define stdio_link	((vnop_link_t)vfscore_vop_eperm)
+#define stdio_fallocate	((vnop_fallocate_t)vfscore_vop_nullop)
+#define stdio_readlink	((vnop_readlink_t)vfscore_vop_nullop)
+#define stdio_symlink	((vnop_symlink_t)vfscore_vop_nullop)
+
 static struct vnops stdio_vnops = {
-	.vop_write = stdio_write,
-	.vop_read = stdio_read,
-	.vop_getattr = stdio_getattr,
+	stdio_open,		/* open */
+	stdio_close,		/* close */
+	stdio_read,		/* read */
+	stdio_write,		/* write */
+	stdio_seek,		/* seek */
+	stdio_ioctl,		/* ioctl */
+	stdio_fsync,		/* fsync */
+	stdio_readdir,		/* readdir */
+	stdio_lookup,		/* lookup */
+	stdio_create,		/* create */
+	stdio_remove,		/* remove */
+	stdio_rename,		/* remame */
+	stdio_mkdir,		/* mkdir */
+	stdio_rmdir,		/* rmdir */
+	stdio_getattr,		/* getattr */
+	stdio_setattr,		/* setattr */
+	stdio_inactive,		/* inactive */
+	stdio_truncate,		/* truncate */
+	stdio_link,		/* link */
+	(vnop_cache_t) NULL, /* arc */
+	stdio_fallocate,	/* fallocate */
+	stdio_readlink,		/* read link */
+	stdio_symlink,		/* symbolic link */
 };
 
 static struct vnode stdio_vnode = {
