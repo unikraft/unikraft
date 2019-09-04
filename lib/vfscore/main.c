@@ -1425,16 +1425,21 @@ int dup2(int oldfd, int newfd)
  */
 #define SETFL (O_APPEND | O_ASYNC | O_DIRECT | O_NOATIME | O_NONBLOCK)
 
-#if 0
 UK_TRACEPOINT(trace_vfs_fcntl, "%d %d 0x%x", int, int, int);
 UK_TRACEPOINT(trace_vfs_fcntl_ret, "\"%s\"", int);
 UK_TRACEPOINT(trace_vfs_fcntl_err, "%d", int);
 
-int fcntl(int fd, int cmd, int arg)
+int fcntl(int fd, int cmd, ...)
 {
+	int arg;
+	va_list ap;
 	struct vfscore_file *fp;
 	int ret = 0, error;
 	int tmp;
+
+	va_start(ap, cmd);
+	arg = va_arg(ap, int);
+	va_end(ap);
 
 	trace_vfs_fcntl(fd, cmd, arg);
 	error = fget(fd, &fp);
@@ -1450,7 +1455,7 @@ int fcntl(int fd, int cmd, int arg)
 	// ignored in OSv anyway, as it doesn't support exec().
 	switch (cmd) {
 	case F_DUPFD:
-		error = _fdalloc(fp, &ret, arg);
+		error = fdalloc(fp, &ret);
 		if (error)
 			goto out_errno;
 		break;
@@ -1467,35 +1472,42 @@ int fcntl(int fd, int cmd, int arg)
 		// As explained above, the O_CLOEXEC should have been in f_flags,
 		// and shouldn't be returned. Linux always returns 0100000 ("the
 		// flag formerly known as O_LARGEFILE) so let's do it too.
-		ret = (oflags(fp->f_flags) & ~O_CLOEXEC) | 0100000;
+		ret = (vfscore_oflags(fp->f_flags) & ~O_CLOEXEC) | 0100000;
 		break;
 	case F_SETFL:
 		FD_LOCK(fp);
-		fp->f_flags = fflags((oflags(fp->f_flags) & ~SETFL) |
+		fp->f_flags = vfscore_fflags((vfscore_oflags(fp->f_flags) & ~SETFL) |
 				(arg & SETFL));
 		FD_UNLOCK(fp);
 
+#if defined(FIONBIO) && defined(FIOASYNC)
 		/* Sync nonblocking/async state with file flags */
 		tmp = fp->f_flags & FNONBLOCK;
-		fp->ioctl(FIONBIO, &tmp);
+		vfs_ioctl(fp, FIONBIO, &tmp);
 		tmp = fp->f_flags & FASYNC;
-		fp->ioctl(FIOASYNC, &tmp);
-
+		vfs_ioctl(fp, FIOASYNC, &tmp);
+#endif
+		break;
+	case F_DUPFD_CLOEXEC:
+		error = fdalloc(fp, &ret);
+		if (error)
+			goto out_errno;
+		fp->f_flags |= O_CLOEXEC;
 		break;
 	case F_SETLK:
-		WARN_ONCE("fcntl(F_SETLK) stubbed\n");
+		uk_pr_warn("fcntl(F_SETLK) stubbed\n");
 		break;
 	case F_GETLK:
-		WARN_ONCE("fcntl(F_GETLK) stubbed\n");
+		uk_pr_warn("fcntl(F_GETLK) stubbed\n");
 		break;
 	case F_SETLKW:
-		WARN_ONCE("fcntl(F_SETLKW) stubbed\n");
+		uk_pr_warn("fcntl(F_SETLKW) stubbed\n");
 		break;
 	case F_SETOWN:
-		WARN_ONCE("fcntl(F_SETOWN) stubbed\n");
+		uk_pr_warn("fcntl(F_SETOWN) stubbed\n");
 		break;
 	default:
-		kprintf("unsupported fcntl cmd 0x%x\n", cmd);
+		uk_pr_err("unsupported fcntl cmd 0x%x\n", cmd);
 		error = EINVAL;
 	}
 
@@ -1505,12 +1517,11 @@ int fcntl(int fd, int cmd, int arg)
 	trace_vfs_fcntl_ret(ret);
 	return ret;
 
-	out_errno:
+out_errno:
 	trace_vfs_fcntl_err(error);
 	errno = error;
 	return -1;
 }
-#endif
 
 UK_TRACEPOINT(trace_vfs_access, "\"%s\" 0%0o", const char*, int);
 UK_TRACEPOINT(trace_vfs_access_ret, "");

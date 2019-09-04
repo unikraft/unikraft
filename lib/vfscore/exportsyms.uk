@@ -78,3 +78,4 @@ uk_syscall_writev
 dentry_alloc
 drele
 vrele
+fcntl

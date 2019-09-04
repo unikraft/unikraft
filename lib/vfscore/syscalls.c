@@ -210,6 +210,8 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 	fp->f_dentry = dp;
 	dp = NULL;
 
+	uk_mutex_init(&fp->f_lock);
+
 	error = VOP_OPEN(vp, fp);
 	if (error) {
 		vn_unlock(vp);

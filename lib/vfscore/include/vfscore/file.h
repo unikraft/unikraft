@@ -59,7 +59,11 @@ struct vfscore_file {
 	void		*f_data;        /* file descriptor specific data */
 	int		f_vfs_flags;    /* internal implementation flags */
 	struct dentry   *f_dentry;
+	struct uk_mutex f_lock;
 };
+
+#define FD_LOCK(fp)       uk_mutex_lock(&(fp->f_lock))
+#define FD_UNLOCK(fp)     uk_mutex_unlock(&(fp->f_lock))
 
 int vfscore_alloc_fd(void);
 void vfscore_put_fd(int fd);
