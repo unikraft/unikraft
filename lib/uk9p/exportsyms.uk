@@ -2,3 +2,14 @@ uk_9pdev_trans_register
 uk_9pdev_trans_by_name
 uk_9pdev_trans_get_default
 uk_9pdev_trans_set_default
+uk_9preq_get
+uk_9preq_put
+uk_9preq_vserialize
+uk_9preq_serialize
+uk_9preq_vdeserialize
+uk_9preq_deserialize
+uk_9preq_copy_to
+uk_9preq_copy_from
+uk_9preq_receive_cb
+uk_9preq_waitreply
+uk_9preq_error
