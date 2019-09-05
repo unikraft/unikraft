@@ -176,6 +176,29 @@ struct uk_9preq *uk_9pdev_req_lookup(struct uk_9pdev *dev, uint16_t tag);
 int uk_9pdev_req_remove(struct uk_9pdev *dev, struct uk_9preq *req);
 
 /**
+ * Creates a FID associated with the given 9P device.
+ *
+ * @param dev
+ *   The Unikraft 9P Device.
+ * @return
+ *   If not an error pointer, the created fid.
+ *   Otherwise, the error in creating the fid:
+ *   - ENOMEM: No memory for the request or no available tags.
+ */
+struct uk_9pfid *uk_9pdev_fid_create(struct uk_9pdev *dev);
+
+/**
+ * @internal
+ * Releases a FID when its reference count goes to 0.
+ *
+ * Should not be called directly, but rather via uk_9pfid_put().
+ *
+ * @param fid
+ *   The FID to be released.
+ */
+void uk_9pdev_fid_release(struct uk_9pfid *fid);
+
+/**
  * Sets the maximum allowed message size.
  *
  * @param dev

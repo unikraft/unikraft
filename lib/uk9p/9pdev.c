@@ -45,10 +45,86 @@
 #include <uk/9pdev.h>
 #include <uk/9pdev_trans.h>
 #include <uk/9preq.h>
+#include <uk/9pfid.h>
 #if CONFIG_LIBUKSCHED
 #include <uk/sched.h>
 #include <uk/wait.h>
 #endif
+
+static void _fid_mgmt_init(struct uk_9pdev_fid_mgmt *fid_mgmt)
+{
+	ukarch_spin_lock_init(&fid_mgmt->spinlock);
+	fid_mgmt->next_fid = 0;
+	UK_INIT_LIST_HEAD(&fid_mgmt->fid_free_list);
+	UK_INIT_LIST_HEAD(&fid_mgmt->fid_active_list);
+}
+
+static int _fid_mgmt_next_fid_locked(struct uk_9pdev_fid_mgmt *fid_mgmt,
+				struct uk_9pdev *dev,
+				struct uk_9pfid **fid)
+{
+	struct uk_9pfid *result = NULL;
+
+	if (!uk_list_empty(&fid_mgmt->fid_free_list)) {
+		result = uk_list_first_entry(&fid_mgmt->fid_free_list,
+				struct uk_9pfid, _list);
+		uk_list_del(&result->_list);
+	} else {
+		result = uk_9pfid_alloc(dev);
+		if (!result)
+			return -ENOMEM;
+		result->fid = fid_mgmt->next_fid++;
+	}
+
+	uk_refcount_init(&result->refcount, 1);
+	result->was_removed = 0;
+	*fid = result;
+
+	return 0;
+}
+
+static void _fid_mgmt_add_fid_locked(struct uk_9pdev_fid_mgmt *fid_mgmt,
+				struct uk_9pfid *fid)
+{
+	uk_list_add(&fid->_list, &fid_mgmt->fid_active_list);
+}
+
+static void _fid_mgmt_del_fid_locked(struct uk_9pdev_fid_mgmt *fid_mgmt,
+				struct uk_9pfid *fid,
+				bool move_to_freelist)
+{
+	uk_list_del(&fid->_list);
+
+	if (move_to_freelist)
+		uk_list_add(&fid->_list, &fid_mgmt->fid_free_list);
+	else {
+		/*
+		 * Free the memory associated. This fid will never be used
+		 * again.
+		 */
+		uk_pr_warn("Could not move fid to freelist, freeing memory.\n");
+		uk_free(fid->_dev->a, fid);
+	}
+}
+
+static void _fid_mgmt_cleanup(struct uk_9pdev_fid_mgmt *fid_mgmt)
+{
+	unsigned long flags;
+	struct uk_9pfid *fid, *fidn;
+
+	ukplat_spin_lock_irqsave(&fid_mgmt->spinlock, flags);
+	/*
+	 * Every fid should have been clunked *before* destroying the
+	 * connection.
+	 */
+	UK_ASSERT(uk_list_empty(&fid_mgmt->fid_active_list));
+	uk_list_for_each_entry_safe(fid, fidn, &fid_mgmt->fid_free_list,
+			_list) {
+		uk_list_del(&fid->_list);
+		uk_free(fid->_dev->a, fid);
+	}
+	ukplat_spin_unlock_irqrestore(&fid_mgmt->spinlock, flags);
+}
 
 static void _req_mgmt_init(struct uk_9pdev_req_mgmt *req_mgmt)
 {
@@ -122,6 +198,7 @@ struct uk_9pdev *uk_9pdev_connect(const struct uk_9pdev_trans *trans,
 #endif
 
 	_req_mgmt_init(&dev->_req_mgmt);
+	_fid_mgmt_init(&dev->_fid_mgmt);
 
 	rc = dev->ops->connect(dev, device_identifier, mount_args);
 	if (rc < 0)
@@ -139,6 +216,7 @@ struct uk_9pdev *uk_9pdev_connect(const struct uk_9pdev_trans *trans,
 	return dev;
 
 free_dev:
+	_fid_mgmt_cleanup(&dev->_fid_mgmt);
 	_req_mgmt_cleanup(&dev->_req_mgmt);
 	uk_free(a, dev);
 out:
@@ -155,6 +233,7 @@ int uk_9pdev_disconnect(struct uk_9pdev *dev)
 	dev->state = UK_9PDEV_DISCONNECTING;
 
 	/* Clean up the requests before closing the channel. */
+	_fid_mgmt_cleanup(&dev->_fid_mgmt);
 	_req_mgmt_cleanup(&dev->_req_mgmt);
 
 	/*
@@ -313,6 +392,36 @@ int uk_9pdev_req_remove(struct uk_9pdev *dev, struct uk_9preq *req)
 	ukplat_spin_unlock_irqrestore(&dev->_req_mgmt.spinlock, flags);
 
 	return uk_9preq_put(req);
+}
+
+struct uk_9pfid *uk_9pdev_fid_create(struct uk_9pdev *dev)
+{
+	struct uk_9pfid *fid = NULL;
+	int rc = 0;
+	unsigned long flags;
+
+	ukplat_spin_lock_irqsave(&dev->_fid_mgmt.spinlock, flags);
+	rc = _fid_mgmt_next_fid_locked(&dev->_fid_mgmt, dev, &fid);
+	if (rc < 0)
+		goto out;
+
+	_fid_mgmt_add_fid_locked(&dev->_fid_mgmt, fid);
+
+out:
+	ukplat_spin_unlock_irqrestore(&dev->_fid_mgmt.spinlock, flags);
+	if (rc == 0)
+		return fid;
+	return ERR2PTR(rc);
+}
+
+void uk_9pdev_fid_release(struct uk_9pfid *fid)
+{
+	struct uk_9pdev *dev = fid->_dev;
+	unsigned long flags;
+
+	ukplat_spin_lock_irqsave(&dev->_fid_mgmt.spinlock, flags);
+	_fid_mgmt_del_fid_locked(&dev->_fid_mgmt, fid, 1);
+	ukplat_spin_unlock_irqrestore(&dev->_fid_mgmt.spinlock, flags);
 }
 
 bool uk_9pdev_set_msize(struct uk_9pdev *dev, uint32_t msize)

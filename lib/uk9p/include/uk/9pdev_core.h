@@ -124,6 +124,24 @@ struct uk_9pdev_req_mgmt {
 
 /**
  * @internal
+ * A structure used to describe the availability of 9P fids.
+ */
+struct uk_9pdev_fid_mgmt {
+	/* Spinlock protecting fids. */
+	spinlock_t			spinlock;
+	/* Next available fid. */
+	uint32_t			next_fid;
+	/* Free-list of fids that can be reused. */
+	struct uk_list_head		fid_free_list;
+	/*
+	 * List of fids that are currently active, to be clunked at the end of
+	 * a 9pfs session.
+	 */
+	struct uk_list_head		fid_active_list;
+};
+
+/**
+ * @internal
  * 9PDEV transport state
  *
  * - CONNECTED: Default state after initialization and during normal operation.
@@ -153,6 +171,8 @@ struct uk_9pdev {
 	uint32_t                        max_msize;
 	/* Transport-allocated data. */
 	void                            *priv;
+	/* @internal Fid management. */
+	struct uk_9pdev_fid_mgmt	_fid_mgmt;
 	/* @internal Request management. */
 	struct uk_9pdev_req_mgmt        _req_mgmt;
 #if CONFIG_LIBUKSCHED
