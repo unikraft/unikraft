@@ -1,0 +1,6 @@
+config LIBUK9P
+	bool "uk9p: 9p client"
+	default n
+	select LIBUKALLOC
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKDEBUG

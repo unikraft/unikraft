@@ -1,0 +1,4 @@
+$(eval $(call addlib_s,libuk9p,$(CONFIG_LIBUK9P)))
+
+CINCLUDES-$(CONFIG_LIBUK9P)		+= -I$(LIBUK9P_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBUK9P)		+= -I$(LIBUK9P_BASE)/include
