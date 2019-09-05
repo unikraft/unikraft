@@ -37,6 +37,7 @@
 
 #include <stdbool.h>
 #include <uk/config.h>
+#include <uk/9pdev_core.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,6 +52,8 @@ struct uk_9pdev_trans {
 	 * specific transport.
 	 */
 	const char                              *name;
+	/* Supported operations. */
+	const struct uk_9pdev_trans_ops         *ops;
 	/* Allocator used for devices which use this transport layer. */
 	struct uk_alloc                         *a;
 	/* @internal Entry in the list of available transports. */

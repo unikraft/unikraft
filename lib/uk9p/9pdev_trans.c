@@ -47,6 +47,10 @@ int uk_9pdev_trans_register(struct uk_9pdev_trans *trans)
 {
 	UK_ASSERT(trans);
 	UK_ASSERT(trans->name);
+	UK_ASSERT(trans->ops);
+	UK_ASSERT(trans->ops->connect);
+	UK_ASSERT(trans->ops->disconnect);
+	UK_ASSERT(trans->ops->request);
 	UK_ASSERT(trans->a);
 
 	uk_list_add_tail(&trans->_list, &uk_9pdev_trans_list);
