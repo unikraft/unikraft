@@ -42,6 +42,7 @@
 #include <uk/bitmap.h>
 #include <uk/refcount.h>
 #include <uk/wait.h>
+#include <uk/9p.h>
 #include <uk/9pdev.h>
 #include <uk/9pdev_trans.h>
 #include <uk/9preq.h>
@@ -418,9 +419,23 @@ void uk_9pdev_fid_release(struct uk_9pfid *fid)
 {
 	struct uk_9pdev *dev = fid->_dev;
 	unsigned long flags;
+	bool move_to_freelist = false;
+	int rc;
 
+	/* First clunk the fid. */
+	rc = uk_9p_clunk(fid->_dev, fid);
+	if (rc < 0) {
+		uk_pr_warn("Could not clunk fid %d: %d\n", fid->fid, rc);
+		goto out;
+	}
+
+	/* If successfully clunked, move it to a freelist. */
+	move_to_freelist = true;
+
+out:
+	/* Then remove it from any internal data structures. */
 	ukplat_spin_lock_irqsave(&dev->_fid_mgmt.spinlock, flags);
-	_fid_mgmt_del_fid_locked(&dev->_fid_mgmt, fid, 1);
+	_fid_mgmt_del_fid_locked(&dev->_fid_mgmt, fid, move_to_freelist);
 	ukplat_spin_unlock_irqrestore(&dev->_fid_mgmt.spinlock, flags);
 }
 
