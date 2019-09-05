@@ -11,7 +11,11 @@ config UK_CODENAME
 	default "$(UK_CODENAME)"
 config UK_ARCH
 	string
-	default "$(UK_ARCH)"
+	default "x86_64" if ARCH_X86_64
+	default "arm64"  if ARCH_ARM_64
+	default "arm"	if ARCH_ARM_32
+	default $(UK_ARCH)
+
 config NO_APP
 	def_bool $(shell,test $(UK_BASE) = $(UK_APP) && echo y || echo n)
 

@@ -673,6 +673,7 @@ DEFCONFIG = $(call qstrip,$(UK_DEFCONFIG))
 # We don't want to fully expand UK_DEFCONFIG here, so Kconfig will
 # recognize that if it's still at its default $(CONFIG_DIR)/defconfig
 COMMON_CONFIG_ENV = \
+	CC=$(CC)\
 	CONFIG_="CONFIG_" \
 	KCONFIG_CONFIG="$(UK_CONFIG)" \
 	KCONFIG_AUTOCONFIG="$(KCONFIG_AUTOCONFIG)" \
