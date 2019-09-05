@@ -20,6 +20,8 @@ uk_9pdev_disconnect
 uk_9pdev_request
 uk_9pdev_xmit_notify
 uk_9pdev_call
+uk_9pdev_set_msize
+uk_9pdev_get_msize
 
 uk_9pdev_req_create
 uk_9pdev_req_lookup
@@ -31,3 +33,16 @@ uk_9pdev_get_msize
 uk_9pdev_fid_create
 uk_9pfid_get
 uk_9pfid_put
+
+uk_9p_version
+uk_9p_attach
+uk_9p_flush
+uk_9p_walk
+uk_9p_open
+uk_9p_create
+uk_9p_remove
+uk_9p_clunk
+uk_9p_read
+uk_9p_write
+uk_9p_stat
+uk_9p_wstat
