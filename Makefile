@@ -139,12 +139,12 @@ ELIB_DIR := $(realpath $(patsubst %/,%,$(patsubst %.,%,$(ELIB_DIR))))
 CONFIG_UK_PLAT        := $(CONFIG_UK_BASE)/plat/
 CONFIG_DIR            := $(CONFIG_UK_APP)
 CONFIG_CONFIG_IN      := $(CONFIG_UK_BASE)/Config.uk
-CONFIG                := $(CONFIG_UK_BASE)/support/kconfig.new
+CONFIG                := $(CONFIG_UK_BASE)/support/kconfig
 CONFIGLIB	      := $(CONFIG_UK_BASE)/support/kconfiglib
 UK_CONFIG             := $(CONFIG_DIR)/.config
 UK_CONFIG_OUT         := $(BUILD_DIR)/config
 UK_GENERATED_INCLUDES := $(BUILD_DIR)/include
-KCONFIG_DIR           := $(BUILD_DIR)/kconfig.new
+KCONFIG_DIR           := $(BUILD_DIR)/kconfig
 UK_FIXDEP             := $(KCONFIG_DIR)/fixdep
 KCONFIG_AUTOCONFIG    := $(KCONFIG_DIR)/auto.conf
 KCONFIG_TRISTATE      := $(KCONFIG_DIR)/tristate.config
@@ -519,7 +519,7 @@ CXXFLAGS	+= -DCC_VERSION=$(CC_VERSION)
 GOCFLAGS	+= -DCC_VERSION=$(CC_VERSION)
 
 # ensure $(BUILD_DIR)/kconfig, $(BUILD_DIR)/include and $(BUILD_DIR)/include/uk exists
-$(call mk_sub_build_dir,kconfig.new)
+$(call mk_sub_build_dir,kconfig)
 $(call mk_sub_build_dir,include)
 $(call mk_sub_build_dir,include/uk)
 
