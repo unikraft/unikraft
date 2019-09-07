@@ -10,6 +10,7 @@ $(eval $(call addplat_s,xen,$(CONFIG_PLAT_XEN)))
 ##
 $(eval $(call addplatlib,xen,libxenplat))
 $(eval $(call addplatlib_s,xen,libxenbus,$(CONFIG_XEN_XENBUS)))
+$(eval $(call addplatlib_s,xen,libxen9pfront,$(CONFIG_XEN_9PFRONT)))
 
 ##
 ## Xen platform compilation settings
@@ -109,4 +110,13 @@ LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/client.c
 LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/xs_comms.c
 LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/xs_watch.c
 LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/xs.c
+endif
+
+ifeq ($(CONFIG_XEN_9PFRONT),y)
+LIBXEN9PFRONT_EXPORTS           = $(LIBXENPLAT_BASE)/drivers/9p/exportsyms.uk
+LIBXEN9PFRONT_ASFLAGS-y        += $(LIBXENPLAT_ASFLAGS-y)
+LIBXEN9PFRONT_ASINCLUDES-y     += $(LIBXENPLAT_ASINCLUDES-y)
+LIBXEN9PFRONT_CFLAGS-y         += $(LIBXENPLAT_CFLAGS-y)
+LIBXEN9PFRONT_CINCLUDES-y      += $(LIBXENPLAT_CINCLUDES-y)
+LIBXEN9PFRONT_SRCS-y           += $(LIBXENPLAT_BASE)/drivers/9p/9pfront.c
 endif

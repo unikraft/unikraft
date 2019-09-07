@@ -72,5 +72,12 @@ config XEN_XENBUS
 menu "Xenbus Drivers"
         depends on XEN_XENBUS
         depends on XEN_GNTTAB
+
+config XEN_9PFRONT
+	bool "Xenbus 9pfront Driver"
+	default n
+	depends on LIBUK9P
+	help
+		Driver for 9pfs devices
 endmenu
 endif
