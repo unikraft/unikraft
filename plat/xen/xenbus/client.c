@@ -74,6 +74,7 @@ const char *xenbus_state_to_str(XenbusState state)
 
 static const char *const xb_devtype_tbl[] = {
 	XENBUS_DEVTYPE_ENTRY(none),
+	XENBUS_DEVTYPE_ENTRY(9pfs),
 };
 
 const char *xenbus_devtype_to_str(enum xenbus_dev_type devtype)
