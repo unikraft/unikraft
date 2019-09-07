@@ -41,4 +41,13 @@
 #include <virtio/virtio_config.h>
 #include <virtio/virtio_types.h>
 
+/* Feature bitmap for virtio 9P. */
+#define VIRTIO_9P_F_MOUNT_TAG 0
+
+/* Virtio 9P PCI configuration space layout. */
+struct virtio_9p_config {
+	__u16 tag_len;
+	__u8 tag[0];
+} __packed;
+
 #endif /* __PLAT_DRV_VIRTIO_9P_H */

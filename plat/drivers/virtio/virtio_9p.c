@@ -32,17 +32,143 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
+#include <uk/alloc.h>
+#include <uk/essentials.h>
 #include <virtio/virtio_bus.h>
 #include <virtio/virtio_9p.h>
+#include <uk/plat/spinlock.h>
 
-static int virtio_9p_add_dev(struct virtio_dev *vdev __unused)
+#define DRIVER_NAME	"virtio-9p"
+static struct uk_alloc *a;
+
+/* List of initialized virtio 9p devices. */
+static UK_LIST_HEAD(virtio_9p_device_list);
+static DEFINE_SPINLOCK(virtio_9p_device_list_lock);
+
+struct virtio_9p_device {
+	/* Virtio device. */
+	struct virtio_dev *vdev;
+	/* Mount tag for this virtio device. */
+	char *tag;
+	/* Entry within the virtio devices' list. */
+	struct uk_list_head _list;
+};
+
+static int virtio_9p_feature_negotiate(struct virtio_9p_device *d)
 {
+	__u64 host_features;
+	__u16 tag_len;
+	int rc = 0;
+
+	host_features = virtio_feature_get(d->vdev);
+	if (!virtio_has_features(host_features, VIRTIO_9P_F_MOUNT_TAG)) {
+		uk_pr_err(DRIVER_NAME": Host system does not offer MOUNT_TAG feature\n");
+		rc = -EINVAL;
+		goto out;
+	}
+
+	virtio_config_get(d->vdev,
+			  __offsetof(struct virtio_9p_config, tag_len),
+			  &tag_len, 1, sizeof(tag_len));
+
+	d->tag = uk_calloc(a, tag_len + 1, sizeof(*d->tag));
+	if (!d->tag) {
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	virtio_config_get(d->vdev,
+			  __offsetof(struct virtio_9p_config, tag),
+			  d->tag, tag_len, 1);
+	d->tag[tag_len] = '\0';
+
+	d->vdev->features &= host_features;
+	virtio_feature_set(d->vdev, d->vdev->features);
+
+out:
+	return rc;
+}
+
+static inline void virtio_9p_feature_set(struct virtio_9p_device *d)
+{
+	d->vdev->features = 0;
+	VIRTIO_FEATURES_UPDATE(d->vdev->features, VIRTIO_9P_F_MOUNT_TAG);
+}
+
+static int virtio_9p_configure(struct virtio_9p_device *d)
+{
+	int rc = 0;
+
+	rc = virtio_9p_feature_negotiate(d);
+	if (rc != 0) {
+		uk_pr_err(DRIVER_NAME": Failed to negotiate the device feature %d\n",
+			rc);
+		rc = -EINVAL;
+		goto out_status_fail;
+	}
+
+	uk_pr_info(DRIVER_NAME": Configured: features=0x%lx tag=%s\n",
+			d->vdev->features, d->tag);
+out:
+	return rc;
+
+out_status_fail:
+	virtio_dev_status_update(d->vdev, VIRTIO_CONFIG_STATUS_FAIL);
+	goto out;
+}
+
+static int virtio_9p_start(struct virtio_9p_device *d)
+{
+	virtio_dev_drv_up(d->vdev);
+	uk_pr_info(DRIVER_NAME": %s started\n", d->tag);
+
 	return 0;
 }
 
-static int virtio_9p_drv_init(struct uk_alloc *drv_allocator __unused)
+static int virtio_9p_add_dev(struct virtio_dev *vdev)
 {
-	return 0;
+	struct virtio_9p_device *d;
+	unsigned long flags;
+	int rc = 0;
+
+	UK_ASSERT(vdev != NULL);
+
+	d = uk_calloc(a, 1, sizeof(*d));
+	if (!d) {
+		rc = -ENOMEM;
+		goto out;
+	}
+	d->vdev = vdev;
+	virtio_9p_feature_set(d);
+	rc = virtio_9p_configure(d);
+	if (rc)
+		goto out_free;
+	rc = virtio_9p_start(d);
+	if (rc)
+		goto out_free;
+
+	ukplat_spin_lock_irqsave(&virtio_9p_device_list_lock, flags);
+	uk_list_add(&d->_list, &virtio_9p_device_list);
+	ukplat_spin_unlock_irqrestore(&virtio_9p_device_list_lock, flags);
+out:
+	return rc;
+out_free:
+	uk_free(a, d);
+	goto out;
+}
+
+static int virtio_9p_drv_init(struct uk_alloc *drv_allocator)
+{
+	int rc = 0;
+
+	if (!drv_allocator) {
+		rc = -EINVAL;
+		goto out;
+	}
+
+	a = drv_allocator;
+out:
+	return rc;
 }
 
 static const struct virtio_dev_id v9p_dev_id[] = {
