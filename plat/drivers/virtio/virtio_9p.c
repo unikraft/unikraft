@@ -35,6 +35,9 @@
 #include <inttypes.h>
 #include <uk/alloc.h>
 #include <uk/essentials.h>
+#include <uk/sglist.h>
+#include <uk/9pdev.h>
+#include <uk/9preq.h>
 #include <uk/9pdev_trans.h>
 #include <virtio/virtio_bus.h>
 #include <virtio/virtio_9p.h>
@@ -61,6 +64,11 @@ struct virtio_9p_device {
 	uint16_t hwvq_id;
 	/* libuk9p associated device (NULL if the device is not in use). */
 	struct uk_9pdev *p9dev;
+	/* Scatter-gather list. */
+	struct uk_sglist sg;
+	struct uk_sglist_seg sgsegs[NUM_SEGMENTS];
+	/* Spinlock protecting the sg list and the vq. */
+	spinlock_t spinlock;
 };
 
 static int virtio_9p_connect(struct uk_9pdev *p9dev,
@@ -120,10 +128,96 @@ static int virtio_9p_disconnect(struct uk_9pdev *p9dev)
 	return 0;
 }
 
-static int virtio_9p_request(struct uk_9pdev *p9dev __unused,
-			     struct uk_9preq *req __unused)
+static int virtio_9p_request(struct uk_9pdev *p9dev,
+			     struct uk_9preq *req)
 {
-	return -EOPNOTSUPP;
+	struct virtio_9p_device *dev;
+	int rc, host_notified = 0;
+	unsigned long flags;
+	size_t read_segs, write_segs;
+	bool failed = false;
+
+	UK_ASSERT(p9dev);
+	UK_ASSERT(req);
+	UK_ASSERT(UK_READ_ONCE(req->state) == UK_9PREQ_READY);
+
+	/*
+	 * Get the request such that it won't get freed while it's
+	 * used as a cookie for the virtqueue.
+	 */
+	uk_9preq_get(req);
+	dev = p9dev->priv;
+	ukplat_spin_lock_irqsave(&dev->spinlock, flags);
+	uk_sglist_reset(&dev->sg);
+
+	rc = uk_sglist_append(&dev->sg, req->xmit.buf, req->xmit.size);
+	if (rc < 0) {
+		failed = true;
+		goto out_unlock;
+	}
+
+	if (req->xmit.zc_buf) {
+		rc = uk_sglist_append(&dev->sg, req->xmit.zc_buf,
+				req->xmit.zc_size);
+		if (rc < 0) {
+			failed = true;
+			goto out_unlock;
+		}
+	}
+
+	read_segs = dev->sg.sg_nseg;
+
+	rc = uk_sglist_append(&dev->sg, req->recv.buf, req->recv.size);
+	if (rc < 0) {
+		failed = true;
+		goto out_unlock;
+	}
+
+	if (req->recv.zc_buf) {
+		uint32_t recv_size = req->recv.size + req->recv.zc_size;
+
+		rc = uk_sglist_append(&dev->sg, req->recv.zc_buf,
+				req->recv.zc_size);
+		if (rc < 0) {
+			failed = true;
+			goto out_unlock;
+		}
+
+		/* Make eure there is sufficient space for Rerror replies. */
+		if (recv_size < UK_9P_RERROR_MAXSIZE) {
+			uint32_t leftover = UK_9P_RERROR_MAXSIZE - recv_size;
+
+			rc = uk_sglist_append(&dev->sg,
+					req->recv.buf + recv_size, leftover);
+			if (rc < 0) {
+				failed = true;
+				goto out_unlock;
+			}
+		}
+	}
+
+	write_segs = dev->sg.sg_nseg - read_segs;
+
+	rc = virtqueue_buffer_enqueue(dev->vq, req, &dev->sg,
+				      read_segs, write_segs);
+	if (likely(rc >= 0)) {
+		UK_WRITE_ONCE(req->state, UK_9PREQ_SENT);
+		virtqueue_host_notify(dev->vq);
+		host_notified = 1;
+		rc = 0;
+	}
+
+out_unlock:
+	if (failed)
+		uk_pr_err(DRIVER_NAME": Failed to append to the sg list.\n");
+	ukplat_spin_unlock_irqrestore(&dev->spinlock, flags);
+	/*
+	 * Release the reference to the 9P request if it was not successfully
+	 * sent.
+	 */
+	if (!host_notified)
+		uk_9preq_put(req);
+	return rc;
 }
 
 static const struct uk_9pdev_trans_ops v9p_trans_ops = {
@@ -138,9 +232,63 @@ static struct uk_9pdev_trans v9p_trans = {
 	.a              = NULL /* Set by the driver initialization. */
 };
 
-static int virtio_9p_recv(struct virtqueue *vq __unused, void *priv __unused)
+static int virtio_9p_recv(struct virtqueue *vq, void *priv)
 {
-	return 0;
+	struct virtio_9p_device *dev;
+	struct uk_9preq *req = NULL;
+	uint32_t len;
+	int rc = 0;
+	int handled = 0;
+
+	UK_ASSERT(vq);
+	UK_ASSERT(priv);
+
+	dev = priv;
+	UK_ASSERT(vq == dev->vq);
+
+	while (1) {
+		/*
+		 * Protect against data races with virtio_9p_request() calls
+		 * which are trying to enqueue to the same vq.
+		 */
+		ukarch_spin_lock(&dev->spinlock);
+		rc = virtqueue_buffer_dequeue(dev->vq, (void **)&req, &len);
+		ukarch_spin_unlock(&dev->spinlock);
+		if (rc < 0)
+			break;
+
+		/*
+		 * Notify the 9P API that this request has been successfully
+		 * received, release the reference to the request.
+		 */
+		uk_9preq_receive_cb(req, len);
+
+		/*
+		 * Check for Rerror messages, fixup the error message if
+		 * needed.
+		 */
+		if (req->recv.type == UK_9P_RERROR) {
+			memcpy(req->recv.buf + req->recv.zc_offset,
+			       req->recv.zc_buf,
+			       MIN(req->recv.zc_size, len - UK_9P_HEADER_SIZE));
+		}
+
+		uk_9preq_put(req);
+		handled = 1;
+
+		/* Break if there are no more buffers on the virtqueue. */
+		if (rc == 0)
+			break;
+	}
+
+	/*
+	 * As the virtqueue might have empty slots now, notify any threads
+	 * blocked on ENOSPC errors.
+	 */
+	if (handled)
+		uk_9pdev_xmit_notify(dev->p9dev);
+
+	return handled;
 }
 
 static int virtio_9p_vq_alloc(struct virtio_9p_device *d)
@@ -164,6 +312,8 @@ static int virtio_9p_vq_alloc(struct virtio_9p_device *d)
 		rc = -EINVAL;
 		goto exit;
 	}
+
+	uk_sglist_init(&d->sg, ARRAY_SIZE(d->sgsegs), &d->sgsegs[0]);
 
 	d->vq = virtio_vqueue_setup(d->vdev,
 				    d->hwvq_id,
@@ -272,6 +422,7 @@ static int virtio_9p_add_dev(struct virtio_dev *vdev)
 		rc = -ENOMEM;
 		goto out;
 	}
+	ukarch_spin_lock_init(&d->spinlock);
 	d->vdev = vdev;
 	virtio_9p_feature_set(d);
 	rc = virtio_9p_configure(d);
