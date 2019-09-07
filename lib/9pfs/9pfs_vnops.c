@@ -62,6 +62,17 @@ static int uk_9pfs_posix_perm_from_mode(int mode)
 	return res;
 }
 
+static uint32_t uk_9pfs_perm_from_posix_mode(mode_t mode)
+{
+	int res;
+
+	res = mode & 0777;
+	if (S_ISDIR(mode))
+		res |= UK_9P_DMDIR;
+
+	return res;
+}
+
 static int uk_9pfs_posix_mode_from_mode(int mode)
 {
 	int res;
@@ -189,6 +200,69 @@ static int uk_9pfs_inactive(struct vnode *vp)
 	return 0;
 }
 
+static int uk_9pfs_create_generic(struct vnode *dvp, char *name, mode_t mode)
+{
+	struct uk_9pdev *dev = UK_9PFS_MD(dvp->v_mount)->dev;
+	struct uk_9pfid *fid;
+	int rc;
+
+	if (strlen(name) > NAME_MAX)
+		return ENAMETOOLONG;
+
+	/* Clone parent fid. */
+	fid = uk_9p_walk(dev, UK_9PFS_VFID(dvp), NULL);
+
+	rc = uk_9p_create(dev, fid, name, uk_9pfs_perm_from_posix_mode(mode),
+			UK_9P_OTRUNC | UK_9P_OWRITE, NULL);
+
+	uk_9pfid_put(fid);
+	return -rc;
+}
+
+static int uk_9pfs_create(struct vnode *dvp, char *name, mode_t mode)
+{
+	if (!S_ISREG(mode))
+		return EINVAL;
+
+	return uk_9pfs_create_generic(dvp, name, mode);
+}
+
+static int uk_9pfs_remove_generic(struct vnode *dvp, struct vnode *vp)
+{
+	struct uk_9pdev *dev = UK_9PFS_MD(dvp->v_mount)->dev;
+	struct uk_9pfs_node_data *nd = UK_9PFS_ND(vp);
+	int rc = 0;
+
+	if (!nd->removed && !nd->nb_open_files)
+		rc = uk_9p_remove(dev, nd->fid);
+	else
+		nd->removed = true;
+
+	uk_9pfs_free_vnode_data(vp);
+
+	return -rc;
+}
+
+static int uk_9pfs_remove(struct vnode *dvp, struct vnode *vp,
+		char *name __unused)
+{
+	return uk_9pfs_remove_generic(dvp, vp);
+}
+
+static int uk_9pfs_mkdir(struct vnode *dvp, char *name, mode_t mode)
+{
+	if (!S_ISDIR(mode))
+		return EINVAL;
+
+	return uk_9pfs_create_generic(dvp, name, mode);
+}
+
+static int uk_9pfs_rmdir(struct vnode *dvp, struct vnode *vp,
+		char *name __unused)
+{
+	return uk_9pfs_remove_generic(dvp, vp);
+}
+
 static int uk_9pfs_readdir(struct vnode *vp, struct vfscore_file *fp,
 		struct dirent *dir)
 {
@@ -206,11 +280,7 @@ static int uk_9pfs_readdir(struct vnode *vp, struct vfscore_file *fp,
 #define uk_9pfs_readlink	((vnop_readlink_t)vfscore_vop_einval)
 #define uk_9pfs_symlink		((vnop_symlink_t)vfscore_vop_eperm)
 #define uk_9pfs_fallocate	((vnop_fallocate_t)vfscore_vop_nullop)
-#define uk_9pfs_create		((vnop_create_t)vfscore_vop_einval)
-#define uk_9pfs_remove		((vnop_remove_t)vfscore_vop_einval)
 #define uk_9pfs_rename		((vnop_rename_t)vfscore_vop_einval)
-#define uk_9pfs_mkdir		((vnop_mkdir_t)vfscore_vop_einval)
-#define uk_9pfs_rmdir		((vnop_rmdir_t)vfscore_vop_einval)
 #define uk_9pfs_open		((vnop_open_t)vfscore_vop_einval)
 #define uk_9pfs_close		((vnop_close_t)vfscore_vop_einval)
 #define uk_9pfs_read		((vnop_read_t)vfscore_vop_einval)
