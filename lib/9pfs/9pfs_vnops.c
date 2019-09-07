@@ -47,6 +47,26 @@
 
 #include "9pfs.h"
 
+static uint8_t uk_9pfs_open_mode_from_posix_flags(unsigned long flags)
+{
+	uint8_t mode = 0;
+	uint8_t flags_rw = flags & (UK_FREAD | UK_FWRITE);
+
+	if (flags_rw == UK_FREAD)
+		mode = UK_9P_OREAD;
+	else if (flags_rw == UK_FWRITE)
+		mode = UK_9P_OWRITE;
+	else if (flags_rw == (UK_FREAD | UK_FWRITE))
+		mode = UK_9P_ORDWR;
+
+	if (flags & O_EXCL)
+		mode |= UK_9P_OEXCL;
+	if (flags & O_TRUNC)
+		mode |= UK_9P_OTRUNC;
+
+	return mode;
+}
+
 static int uk_9pfs_posix_perm_from_mode(int mode)
 {
 	int res;
@@ -71,6 +91,13 @@ static uint32_t uk_9pfs_perm_from_posix_mode(mode_t mode)
 		res |= UK_9P_DMDIR;
 
 	return res;
+}
+
+static int uk_9pfs_dttype_from_mode(int mode)
+{
+	if (mode & UK_9P_DMDIR)
+		return DT_DIR;
+	return DT_REG;
 }
 
 static int uk_9pfs_posix_mode_from_mode(int mode)
@@ -129,6 +156,75 @@ void uk_9pfs_free_vnode_data(struct vnode *vp)
 	uk_9pfid_put(nd->fid);
 	free(nd);
 	vp->v_data = NULL;
+}
+
+/*
+ * The closing variant of the function will enforce freeing the associated
+ * resources only if the vnode was removed via an unlink/rmdir operation.
+ */
+static void uk_9pfs_free_vnode_data_closing(struct vnode *vp)
+{
+	struct uk_9pfs_node_data *nd = UK_9PFS_ND(vp);
+
+	if (!nd->removed)
+		return;
+
+	uk_9pfs_free_vnode_data(vp);
+}
+
+static int uk_9pfs_open(struct vfscore_file *file)
+{
+	struct uk_9pdev *dev = UK_9PFS_MD(file->f_dentry->d_mount)->dev;
+	struct uk_9pfid *openedfid;
+	struct uk_9pfs_file_data *fd;
+	int rc;
+
+	/* Allocate memory for file data. */
+	fd = calloc(1, sizeof(*fd));
+	if (!fd)
+		return ENOMEM;
+
+	/* Clone fid. */
+	openedfid = uk_9p_walk(dev, UK_9PFS_VFID(file->f_dentry->d_vnode),
+			NULL);
+	if (PTRISERR(openedfid)) {
+		rc = PTR2ERR(openedfid);
+		goto out;
+	}
+
+	/* Open cloned fid. */
+	rc = uk_9p_open(dev, openedfid,
+		uk_9pfs_open_mode_from_posix_flags(file->f_flags));
+
+	if (rc)
+		goto out_err;
+
+	fd->fid = openedfid;
+	file->f_data = fd;
+ 	UK_9PFS_ND(file->f_dentry->d_vnode)->nb_open_files++;
+
+	return 0;
+
+out_err:
+	uk_9pfid_put(openedfid);
+out:
+	free(fd);
+	return -rc;
+}
+
+static int uk_9pfs_close(struct vnode *vn __unused, struct vfscore_file *file)
+{
+	struct uk_9pfs_file_data *fd = UK_9PFS_FD(file);
+
+	if (fd->readdir_buf)
+		free(fd->readdir_buf);
+
+	uk_9pfid_put(fd->fid);
+	free(fd);
+	UK_9PFS_ND(file->f_dentry->d_vnode)->nb_open_files--;
+	uk_9pfs_free_vnode_data_closing(file->f_dentry->d_vnode);
+
+	return 0;
 }
 
 static int uk_9pfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
@@ -266,7 +362,85 @@ static int uk_9pfs_rmdir(struct vnode *dvp, struct vnode *vp,
 static int uk_9pfs_readdir(struct vnode *vp, struct vfscore_file *fp,
 		struct dirent *dir)
 {
-	return ENOENT;
+	struct uk_9pdev *dev = UK_9PFS_MD(vp->v_mount)->dev;
+	struct uk_9pfs_file_data *fd = UK_9PFS_FD(fp);
+	int rc;
+	struct uk_9p_stat stat;
+	struct uk_9preq fake_request;
+
+again:
+	if (!fd->readdir_buf) {
+		fd->readdir_buf = malloc(UK_9PFS_READDIR_BUFSZ);
+		if (!fd->readdir_buf)
+			return ENOMEM;
+
+		/* Currently the readdir() buffer is empty. */
+		fd->readdir_off = 0;
+		fd->readdir_sz = 0;
+	}
+
+	if (fd->readdir_off == fd->readdir_sz) {
+		fd->readdir_off = 0;
+		fd->readdir_sz = uk_9p_read(dev, fd->fid, fp->f_offset,
+				UK_9PFS_READDIR_BUFSZ, fd->readdir_buf);
+		if (fd->readdir_sz < 0) {
+			rc = fd->readdir_sz;
+			goto out;
+		}
+
+		/* End of directory. */
+		if (fd->readdir_sz == 0) {
+			rc = -ENOENT;
+			goto out;
+		}
+
+		/*
+		 * Update offset for the next readdir() call which requires
+		 * the next chunk of data to be transferred.
+		 */
+		fp->f_offset += fd->readdir_sz;
+	}
+
+	/*
+	 * Build a fake request to use the 9P request API to read from the
+	 * buffer the stat structure.
+	 */
+	fake_request.recv.buf = fd->readdir_buf;
+	fake_request.recv.size = fd->readdir_sz;
+	fake_request.recv.offset = fd->readdir_off;
+	fake_request.state = UK_9PREQ_RECEIVED;
+	rc = uk_9preq_deserialize(&fake_request, "S", &stat);
+
+	if (rc == -ENOBUFS) {
+		/*
+		 * Retry with a clean buffer, maybe the stat structure got
+		 * chunked and is not whole, although the RFC says this should
+		 * not happen.
+		 */
+		fd->readdir_off = 0;
+		fd->readdir_sz = 0;
+		goto again;
+	}
+
+	/* Update the readdir() offset to the offset after deserialization. */
+	fd->readdir_off = fake_request.recv.offset;
+
+	/*
+	 * Any other error besides ENOBUFS when deserializing is considered
+	 * an IO error.
+	 */
+	if (rc) {
+		rc = -EIO;
+		goto out;
+	}
+
+	dir->d_type = uk_9pfs_dttype_from_mode(stat.mode);
+	dir->d_ino = uk_9pfs_ino(&stat);
+	strlcpy((char *) &dir->d_name, stat.name.data,
+			MIN(sizeof(dir->d_name), stat.name.size + 1U));
+
+out:
+	return -rc;
 }
 
 #define uk_9pfs_seek		((vnop_seek_t)vfscore_vop_nullop)
@@ -281,8 +455,6 @@ static int uk_9pfs_readdir(struct vnode *vp, struct vfscore_file *fp,
 #define uk_9pfs_symlink		((vnop_symlink_t)vfscore_vop_eperm)
 #define uk_9pfs_fallocate	((vnop_fallocate_t)vfscore_vop_nullop)
 #define uk_9pfs_rename		((vnop_rename_t)vfscore_vop_einval)
-#define uk_9pfs_open		((vnop_open_t)vfscore_vop_einval)
-#define uk_9pfs_close		((vnop_close_t)vfscore_vop_einval)
 #define uk_9pfs_read		((vnop_read_t)vfscore_vop_einval)
 #define uk_9pfs_write		((vnop_write_t)vfscore_vop_einval)
 
