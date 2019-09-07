@@ -79,6 +79,15 @@ config VIRTIO_NET
        select LIBUKSGLIST
        help
               Virtual network driver.
+
+config VIRTIO_9P
+       bool "Virtio 9P device"
+       default n
+       depends on LIBUK9P
+       select VIRTIO_BUS
+       select LIBUKSGLIST
+       help
+              Virtio 9P driver.
 endmenu
 
 config LIBGICV2
