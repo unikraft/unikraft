@@ -443,6 +443,112 @@ out:
 	return -rc;
 }
 
+static int uk_9pfs_read(struct vnode *vp, struct vfscore_file *fp,
+			struct uio *uio, int ioflag __unused)
+{
+	struct uk_9pdev *dev = UK_9PFS_MD(vp->v_mount)->dev;
+	struct uk_9pfid *fid = UK_9PFS_FD(fp)->fid;
+	struct iovec *iov;
+	int rc;
+
+	if (vp->v_type == VDIR)
+		return EISDIR;
+	if (vp->v_type != VREG)
+		return EINVAL;
+	if (uio->uio_offset < 0)
+		return EINVAL;
+	if (uio->uio_offset >= (off_t) vp->v_size)
+		return 0;
+
+	if (!uio->uio_resid)
+		return 0;
+
+	iov = uio->uio_iov;
+	while (!iov->iov_len) {
+		uio->uio_iov++;
+		uio->uio_iovcnt--;
+	}
+
+	rc = uk_9p_read(dev, fid, uio->uio_offset,
+			   iov->iov_len, iov->iov_base);
+	if (rc < 0)
+		return -rc;
+
+	iov->iov_base = (char *)iov->iov_base + rc;
+	iov->iov_len -= rc;
+	uio->uio_resid -= rc;
+	uio->uio_offset += rc;
+
+	return 0;
+}
+
+static int uk_9pfs_write(struct vnode *vp, struct uio *uio, int ioflag)
+{
+	struct uk_9pdev *dev = UK_9PFS_MD(vp->v_mount)->dev;
+	struct uk_9pfid *fid;
+	struct iovec *iov;
+	int rc;
+
+	if (vp->v_type == VDIR)
+		return EISDIR;
+	if (vp->v_type != VREG)
+		return EINVAL;
+	if (uio->uio_offset < 0)
+		return EINVAL;
+	if (uio->uio_offset >= LONG_MAX)
+		return EFBIG;
+	if (uio->uio_resid == 0)
+		return 0;
+
+	if (ioflag & IO_APPEND)
+		uio->uio_offset = vp->v_size;
+
+	/* Clone vnode fid. */
+	fid = uk_9p_walk(dev, UK_9PFS_VFID(vp), NULL);
+	if (PTRISERR(fid))
+		return -PTR2ERR(fid);
+
+	rc = uk_9p_open(dev, fid, UK_9P_OWRITE);
+	if (rc < 0)
+		goto out;
+
+	if (!uio->uio_resid)
+		return 0;
+
+	iov = uio->uio_iov;
+	while (!iov->iov_len) {
+		uio->uio_iov++;
+		uio->uio_iovcnt--;
+	}
+
+	rc = uk_9p_write(dev, fid, uio->uio_offset,
+			    iov->iov_len, iov->iov_base);
+	if (rc < 0)
+		return -rc;
+
+	iov->iov_base = (char *)iov->iov_base + rc;
+	iov->iov_len -= rc;
+	uio->uio_resid -= rc;
+	uio->uio_offset += rc;
+
+	if (rc < 0)
+		goto out;
+
+	rc = 0;
+
+	/*
+	 * If the uio offset after completion of the write requests is bigger
+	 * than the vnode's associated size, then the size must be updated
+	 * accordingly.
+	 */
+	if (uio->uio_offset > vp->v_size)
+		vp->v_size = uio->uio_offset;
+
+out:
+	uk_9pfid_put(fid);
+	return -rc;
+}
+
 #define uk_9pfs_seek		((vnop_seek_t)vfscore_vop_nullop)
 #define uk_9pfs_ioctl		((vnop_ioctl_t)vfscore_vop_einval)
 #define uk_9pfs_fsync		((vnop_fsync_t)vfscore_vop_nullop)
@@ -455,8 +561,6 @@ out:
 #define uk_9pfs_symlink		((vnop_symlink_t)vfscore_vop_eperm)
 #define uk_9pfs_fallocate	((vnop_fallocate_t)vfscore_vop_nullop)
 #define uk_9pfs_rename		((vnop_rename_t)vfscore_vop_einval)
-#define uk_9pfs_read		((vnop_read_t)vfscore_vop_einval)
-#define uk_9pfs_write		((vnop_write_t)vfscore_vop_einval)
 
 struct vnops uk_9pfs_vnops = {
 	.vop_open	= uk_9pfs_open,
