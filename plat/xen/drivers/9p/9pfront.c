@@ -37,6 +37,7 @@
 #include <uk/alloc.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
+#include <uk/errptr.h>
 #include <uk/list.h>
 #include <uk/9pdev.h>
 #include <uk/9preq.h>
@@ -54,10 +55,96 @@ static struct uk_alloc *a;
 static UK_LIST_HEAD(p9front_device_list);
 static DEFINE_SPINLOCK(p9front_device_list_lock);
 
-static void p9front_handler(evtchn_port_t evtchn __unused,
-			    struct __regs *regs __unused,
-			    void *arg __unused)
+struct p9front_header {
+	uint32_t size;
+	uint8_t type;
+	uint16_t tag;
+} __packed;
+
+static void p9front_recv(struct p9front_dev_ring *ring)
 {
+	struct p9front_dev *p9fdev = ring->dev;
+	evtchn_port_t evtchn = ring->evtchn;
+	RING_IDX cons, prod, masked_cons, masked_prod;
+	int ring_size, rc;
+	struct p9front_header hdr;
+	struct uk_9preq *req;
+	uint32_t buf_cnt, zc_buf_cnt;
+
+	ring_size = XEN_FLEX_RING_SIZE(p9fdev->ring_order);
+
+	while (1) {
+		cons = ring->intf->in_cons;
+		prod = ring->intf->in_prod;
+		xen_rmb();
+
+		if (xen_9pfs_queued(prod, cons, ring_size) < sizeof(hdr)) {
+			notify_remote_via_evtchn(evtchn);
+			return;
+		}
+
+		masked_prod = xen_9pfs_mask(prod, ring_size);
+		masked_cons = xen_9pfs_mask(cons, ring_size);
+
+		xen_9pfs_read_packet(&hdr, ring->data.in, sizeof(hdr),
+				masked_prod, &masked_cons, ring_size);
+
+		req = uk_9pdev_req_lookup(p9fdev->p9dev, hdr.tag);
+		if (PTRISERR(req)) {
+			uk_pr_warn("Found invalid tag=%u\n", hdr.tag);
+			cons += hdr.size;
+			xen_mb();
+			ring->intf->in_cons = cons;
+			continue;
+		}
+
+		masked_cons = xen_9pfs_mask(cons, ring_size);
+
+		/*
+		 * Compute amount of data to read into request buffer and into
+		 * zero-copy buffer.
+		 */
+		buf_cnt = hdr.size;
+		if (hdr.type != UK_9P_RERROR && req->recv.zc_buf)
+			buf_cnt = MIN(buf_cnt, req->recv.zc_offset);
+		zc_buf_cnt = hdr.size - buf_cnt;
+
+		xen_9pfs_read_packet(req->recv.buf, ring->data.in, buf_cnt,
+				masked_prod, &masked_cons, ring_size);
+		xen_9pfs_read_packet(req->recv.zc_buf, ring->data.in,
+				zc_buf_cnt, masked_prod, &masked_cons,
+				ring_size);
+		cons += hdr.size;
+		xen_mb();
+		ring->intf->in_cons = cons;
+
+		rc = uk_9preq_receive_cb(req, hdr.size);
+		if (rc)
+			uk_pr_warn("Could not receive reply: %d\n", rc);
+
+		/* Release reference held by uk_9pdev_req_lookup(). */
+		uk_9preq_put(req);
+	}
+}
+
+static void p9front_handler(evtchn_port_t evtchn,
+			    struct __regs *regs __unused,
+			    void *arg)
+{
+	struct p9front_dev_ring *ring = arg;
+
+	UK_ASSERT(ring);
+	UK_ASSERT(ring->evtchn == evtchn);
+
+	/*
+	 * A new interrupt means that there is a response to be received, which
+	 * means that a previously sent request has been removed from the out
+	 * ring. Thus, the API can be notified of the possibility of retrying to
+	 * send requests blocked on ENOSPC errors.
+	 */
+	if (ring->dev->p9dev)
+		uk_9pdev_xmit_notify(ring->dev->p9dev);
+	p9front_recv(ring);
 }
 
 static void p9front_free_dev_ring(struct p9front_dev *p9fdev, int idx)
@@ -242,9 +329,52 @@ static int p9front_disconnect(struct uk_9pdev *p9dev __unused)
 	return 0;
 }
 
-static int p9front_request(struct uk_9pdev *p9dev __unused,
-			   struct uk_9preq *req __unused)
+static int p9front_request(struct uk_9pdev *p9dev,
+			   struct uk_9preq *req)
 {
+	struct p9front_dev *p9fdev;
+	struct p9front_dev_ring *ring;
+	int ring_idx, ring_size;
+	RING_IDX masked_prod, masked_cons, prod, cons;
+
+	UK_ASSERT(p9dev);
+	UK_ASSERT(req);
+	UK_ASSERT(req->state == UK_9PREQ_READY);
+
+	p9fdev = p9dev->priv;
+
+	ring_size = XEN_FLEX_RING_SIZE(p9fdev->ring_order);
+
+	ring_idx = req->tag % p9fdev->nb_rings;
+	ring = &p9fdev->rings[ring_idx];
+
+	/* Protect against concurrent writes to the out ring. */
+	ukarch_spin_lock(&ring->spinlock);
+	cons = ring->intf->out_cons;
+	prod = ring->intf->out_prod;
+	xen_mb();
+
+	masked_prod = xen_9pfs_mask(prod, ring_size);
+	masked_cons = xen_9pfs_mask(cons, ring_size);
+
+	if (ring_size - xen_9pfs_queued(prod, cons, ring_size) <
+			req->xmit.size + req->xmit.zc_size) {
+		ukarch_spin_unlock(&ring->spinlock);
+		return -ENOSPC;
+	}
+
+	xen_9pfs_write_packet(ring->data.out, req->xmit.buf, req->xmit.size,
+			      &masked_prod, masked_cons, ring_size);
+	xen_9pfs_write_packet(ring->data.out, req->xmit.zc_buf, req->xmit.zc_size,
+			      &masked_prod, masked_cons, ring_size);
+	req->state = UK_9PREQ_SENT;
+	xen_wmb();
+	prod += req->xmit.size + req->xmit.zc_size;
+	ring->intf->out_prod = prod;
+
+	ukarch_spin_unlock(&ring->spinlock);
+	notify_remote_via_evtchn(ring->evtchn);
+
 	return 0;
 }
 
