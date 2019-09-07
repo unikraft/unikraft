@@ -64,6 +64,8 @@ struct p9front_dev_ring {
 struct p9front_dev {
 	/* Xenbus device. */
 	struct xenbus_device *xendev;
+	/* 9P API device. */
+	struct uk_9pdev *p9dev;
 	/* Entry within the 9pfront device list. */
 	struct uk_list_head _list;
 	/* Number of maximum rings, read from xenstore. */
@@ -72,7 +74,6 @@ struct p9front_dev {
 	int max_ring_page_order;
 	/* Mount tag for this device, read from xenstore. */
 	char *tag;
-
 	/* Number of rings to use. */
 	int nb_rings;
 	/* Ring page order. */

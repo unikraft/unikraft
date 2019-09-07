@@ -190,15 +190,55 @@ out:
 	return rc;
 }
 
-static int p9front_connect(struct uk_9pdev *p9dev __unused,
-			   const char *device_identifier __unused,
+static int p9front_connect(struct uk_9pdev *p9dev,
+			   const char *device_identifier,
 			   const char *mount_args __unused)
 {
-	return 0;
+	struct p9front_dev *p9fdev = NULL;
+	int rc = 0;
+	int found = 0;
+
+	ukarch_spin_lock(&p9front_device_list_lock);
+	uk_list_for_each_entry(p9fdev, &p9front_device_list, _list) {
+		if (!strcmp(p9fdev->tag, device_identifier)) {
+			if (p9fdev->p9dev != NULL) {
+				rc = -EBUSY;
+				goto out;
+			}
+			found = 1;
+			break;
+		}
+	}
+
+	if (!found) {
+		rc = -ENODEV;
+		goto out;
+	}
+
+	/* The msize is given by the size of the flex ring. */
+	p9dev->max_msize = XEN_FLEX_RING_SIZE(p9fdev->ring_order);
+
+	p9fdev->p9dev = p9dev;
+	p9dev->priv = p9fdev;
+	rc = 0;
+	found = 1;
+
+out:
+	ukarch_spin_unlock(&p9front_device_list_lock);
+	return rc;
 }
 
 static int p9front_disconnect(struct uk_9pdev *p9dev __unused)
 {
+	struct p9front_dev *p9fdev;
+
+	UK_ASSERT(p9dev);
+	p9fdev = p9dev->priv;
+
+	ukarch_spin_lock(&p9front_device_list_lock);
+	p9fdev->p9dev = NULL;
+	ukarch_spin_unlock(&p9front_device_list_lock);
+
 	return 0;
 }
 
@@ -236,7 +276,6 @@ static int p9front_add_dev(struct xenbus_device *xendev)
 {
 	struct p9front_dev *p9fdev;
 	int rc;
-	unsigned long flags;
 
 	p9fdev = uk_calloc(a, 1, sizeof(*p9fdev));
 	if (!p9fdev) {
@@ -271,9 +310,9 @@ static int p9front_add_dev(struct xenbus_device *xendev)
 	}
 
 	rc = 0;
-	ukplat_spin_lock_irqsave(&p9front_device_list_lock, flags);
+	ukarch_spin_lock(&p9front_device_list_lock);
 	uk_list_add(&p9fdev->_list, &p9front_device_list);
-	ukplat_spin_unlock_irqrestore(&p9front_device_list_lock, flags);
+	ukarch_spin_unlock(&p9front_device_list_lock);
 
 	uk_pr_info(DRIVER_NAME": Connected 9pfront dev: tag=%s,rings=%d,order=%d\n",
 		p9fdev->tag, p9fdev->nb_rings, p9fdev->ring_order);
