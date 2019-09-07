@@ -42,9 +42,13 @@ host-cobjs := $(addprefix $(obj)/,$(host-cobjs))
 host-cxxobjs := $(addprefix $(obj)/,$(host-cxxobjs))
 fixdep-objs := $(obj)/fixdep.o
 
-HOST_EXTRACFLAGS += -I$(obj) -DCONFIG_=\"\"
+HOST_EXTRACFLAGS += -I$(src) -I$(obj) -DCONFIG_=\"\"
 
+_hostc_flags = $(HOSTCFLAGS) $(HOST_EXTRACFLAGS) $(HOSTCFLAGS_$(basetarget).o)
+_hostcxx_flags = $(HOSTCXXFLAGS) $(HOST_EXTRACFLAGS) $(HOSTCXXFLAGS_$(basetarget).o)
 
+hostc_flags    = -Wp,-MD,$(depfile) $(_hostc_flags)
+hostcxx_flags  = -Wp,-MD,$(depfile) $(_hostcxx_flags)
 
 $(obj)/fixdep: $(fixdep-objs)
 	$(HOSTCC) $(HOST_EXTRACFLAGS) $(HOSTCFLAGS) $(HOSTCFLAGS_$(@F)) $< -o $@
