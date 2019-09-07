@@ -40,6 +40,9 @@
 #include <uk/essentials.h>
 #include <uk/list.h>
 #include <uk/plat/spinlock.h>
+#if CONFIG_LIBUKSCHED
+#include <uk/sched.h>
+#endif
 #include <xen/io/9pfs.h>
 #include <common/events.h>
 #include <common/gnttab.h>
@@ -59,6 +62,16 @@ struct p9front_dev_ring {
 	spinlock_t spinlock;
 	/* Tracks if this ring was initialized. */
 	bool initialized;
+#if CONFIG_LIBUKSCHED
+	/* Tracks if there is any data available on this ring. */
+	bool data_avail;
+	/* Bottom-half thread. */
+	struct uk_thread *bh_thread;
+	/* Bottom-half thread name. */
+	char *bh_thread_name;
+	/* Wait-queue on which the thread waits for available data. */
+	struct uk_waitq bh_wq;
+#endif
 };
 
 struct p9front_dev {

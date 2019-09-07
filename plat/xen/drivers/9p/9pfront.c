@@ -33,12 +33,16 @@
  */
 
 #include <stdbool.h>
+#include <stdio.h>
 #include <uk/config.h>
 #include <uk/alloc.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include <uk/errptr.h>
 #include <uk/list.h>
+#if CONFIG_LIBUKSCHED
+#include <uk/thread.h>
+#endif
 #include <uk/9pdev.h>
 #include <uk/9preq.h>
 #include <uk/9pdev_trans.h>
@@ -61,6 +65,23 @@ struct p9front_header {
 	uint16_t tag;
 } __packed;
 
+static void p9front_recv(struct p9front_dev_ring *ring);
+
+#if CONFIG_LIBUKSCHED
+
+static void p9front_bh_handler(void *arg)
+{
+	struct p9front_dev_ring *ring = arg;
+
+	while (1) {
+		uk_waitq_wait_event(&ring->bh_wq,
+				UK_READ_ONCE(ring->data_avail));
+		p9front_recv(ring);
+	}
+}
+
+#endif
+
 static void p9front_recv(struct p9front_dev_ring *ring)
 {
 	struct p9front_dev *p9fdev = ring->dev;
@@ -79,6 +100,9 @@ static void p9front_recv(struct p9front_dev_ring *ring)
 		xen_rmb();
 
 		if (xen_9pfs_queued(prod, cons, ring_size) < sizeof(hdr)) {
+#if CONFIG_LIBUKSCHED
+			UK_WRITE_ONCE(ring->data_avail, false);
+#endif
 			notify_remote_via_evtchn(evtchn);
 			return;
 		}
@@ -144,7 +168,12 @@ static void p9front_handler(evtchn_port_t evtchn,
 	 */
 	if (ring->dev->p9dev)
 		uk_9pdev_xmit_notify(ring->dev->p9dev);
+#if CONFIG_LIBUKSCHED
+	UK_WRITE_ONCE(ring->data_avail, true);
+	uk_waitq_wake_up(&ring->bh_wq);
+#else
 	p9front_recv(ring);
+#endif
 }
 
 static void p9front_free_dev_ring(struct p9front_dev *p9fdev, int idx)
@@ -154,6 +183,9 @@ static void p9front_free_dev_ring(struct p9front_dev *p9fdev, int idx)
 
 	UK_ASSERT(ring->initialized);
 
+	if (ring->bh_thread_name)
+		free(ring->bh_thread_name);
+	uk_thread_kill(ring->bh_thread);
 	unbind_evtchn(ring->evtchn);
 	for (i = 0; i < (1 << p9fdev->ring_order); i++)
 		gnttab_end_access(ring->intf->ref[i]);
@@ -226,12 +258,27 @@ static int p9front_allocate_dev_ring(struct p9front_dev *p9fdev, int idx)
 	ring->data.in = data_bytes;
 	ring->data.out = data_bytes + XEN_FLEX_RING_SIZE(p9fdev->ring_order);
 
+#if CONFIG_LIBUKSCHED
+	/* Allocate bottom-half thread. */
+	ring->data_avail = false;
+	uk_waitq_init(&ring->bh_wq);
+
+	rc = asprintf(&ring->bh_thread_name, DRIVER_NAME"-recv-%s-%u",
+			p9fdev->tag, idx);
+	ring->bh_thread = uk_thread_create(ring->bh_thread_name,
+			p9front_bh_handler, ring);
+	if (!ring->bh_thread) {
+		rc = -ENOMEM;
+		goto out_free_grants;
+	}
+#endif
+
 	/* Allocate event channel. */
 	rc = evtchn_alloc_unbound(xendev->otherend_id, p9front_handler, ring,
 				&ring->evtchn);
 	if (rc) {
 		uk_pr_err(DRIVER_NAME": Error creating evt channel: %d\n", rc);
-		goto out_free_grants;
+		goto out_free_thread;
 	}
 
 	unmask_evtchn(ring->evtchn);
@@ -241,6 +288,10 @@ static int p9front_allocate_dev_ring(struct p9front_dev *p9fdev, int idx)
 
 	return 0;
 
+out_free_thread:
+	if (ring->bh_thread_name)
+		free(ring->bh_thread_name);
+	uk_thread_kill(ring->bh_thread);
 out_free_grants:
 	for (i = 0; i < (1 << p9fdev->ring_order); i++)
 		gnttab_end_access(ring->intf->ref[i]);
