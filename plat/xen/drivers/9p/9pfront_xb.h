@@ -50,4 +50,16 @@
  */
 int p9front_xb_init(struct p9front_dev *p9fdev);
 
+/**
+ * Connects to the backend by setting up the communication between
+ * frontend and backend.
+ *
+ * @param p9fdev
+ *   9P frontend device
+ * @return
+ *   - (0): Successful.
+ *   - (< 0): Error while committing XenStore transaction.
+ */
+int p9front_xb_connect(struct p9front_dev *p9fdev);
+
 #endif /* __9PFRONT_XB_H__ */

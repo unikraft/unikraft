@@ -35,9 +35,31 @@
 #ifndef __9PFRONT_H__
 #define __9PFRONT_H__
 
+#include <string.h>
 #include <uk/config.h>
 #include <uk/essentials.h>
 #include <uk/list.h>
+#include <uk/plat/spinlock.h>
+#include <xen/io/9pfs.h>
+#include <common/events.h>
+#include <common/gnttab.h>
+
+struct p9front_dev_ring {
+	/* Backpointer to the p9front device. */
+	struct p9front_dev *dev;
+	/* The 9pfs data interface, as dedfined by the xen headers. */
+	struct xen_9pfs_data_intf *intf;
+	/* The 9pfs data, as defined by the xen headers. */
+	struct xen_9pfs_data data;
+	/* The event channel for this ring. */
+	evtchn_port_t evtchn;
+	/* Grant reference for the interface. */
+	grant_ref_t ref;
+	/* Per-ring spinlock. */
+	spinlock_t spinlock;
+	/* Tracks if this ring was initialized. */
+	bool initialized;
+};
 
 struct p9front_dev {
 	/* Xenbus device. */
@@ -50,6 +72,13 @@ struct p9front_dev {
 	int max_ring_page_order;
 	/* Mount tag for this device, read from xenstore. */
 	char *tag;
+
+	/* Number of rings to use. */
+	int nb_rings;
+	/* Ring page order. */
+	int ring_order;
+	/* Device data rings. */
+	struct p9front_dev_ring *rings;
 };
 
 #endif /* __9PFRONT_H__ */

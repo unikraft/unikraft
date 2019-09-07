@@ -32,12 +32,15 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
+#include <stdbool.h>
 #include <uk/config.h>
 #include <uk/alloc.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include <uk/list.h>
 #include <uk/plat/spinlock.h>
+#include <xen-x86/mm.h>
+#include <xen-x86/irq.h>
 #include <xenbus/xenbus.h>
 
 #include "9pfront_xb.h"
@@ -47,6 +50,142 @@
 static struct uk_alloc *a;
 static UK_LIST_HEAD(p9front_device_list);
 static DEFINE_SPINLOCK(p9front_device_list_lock);
+
+static void p9front_handler(evtchn_port_t evtchn __unused,
+			    struct __regs *regs __unused,
+			    void *arg __unused)
+{
+}
+
+static void p9front_free_dev_ring(struct p9front_dev *p9fdev, int idx)
+{
+	struct p9front_dev_ring *ring = &p9fdev->rings[idx];
+	int i;
+
+	UK_ASSERT(ring->initialized);
+
+	unbind_evtchn(ring->evtchn);
+	for (i = 0; i < (1 << p9fdev->ring_order); i++)
+		gnttab_end_access(ring->intf->ref[i]);
+	uk_pfree(a, ring->data.in,
+		p9fdev->ring_order + XEN_PAGE_SHIFT - PAGE_SHIFT);
+	gnttab_end_access(ring->ref);
+	uk_pfree(a, ring->intf, 0);
+	ring->initialized = false;
+}
+
+static void p9front_free_dev_rings(struct p9front_dev *p9fdev)
+{
+	int i;
+
+	for (i = 0; i < p9fdev->nb_rings; i++) {
+		if (!p9fdev->rings[i].initialized)
+			continue;
+		p9front_free_dev_ring(p9fdev, i);
+	}
+
+	uk_free(a, p9fdev->rings);
+}
+
+static int p9front_allocate_dev_ring(struct p9front_dev *p9fdev, int idx)
+{
+	struct xenbus_device *xendev = p9fdev->xendev;
+	struct p9front_dev_ring *ring;
+	int rc, i;
+	void *data_bytes;
+
+	/* Sanity checks. */
+	UK_ASSERT(idx >= 0 && idx < p9fdev->nb_rings);
+
+	ring = &p9fdev->rings[idx];
+	UK_ASSERT(!ring->initialized);
+
+	ukarch_spin_lock_init(&ring->spinlock);
+	ring->dev = p9fdev;
+
+	/* Allocate ring intf page. */
+	ring->intf = uk_palloc(a, 0);
+	if (!ring->intf) {
+		rc = -ENOMEM;
+		goto out;
+	}
+	memset(ring->intf, 0, PAGE_SIZE);
+
+	/* Grant access to the allocated page to the backend. */
+	ring->ref = gnttab_grant_access(xendev->otherend_id,
+			virt_to_mfn(ring->intf), 0);
+	UK_ASSERT(ring->ref != GRANT_INVALID_REF);
+
+	/* Allocate memory for the data. */
+	data_bytes = uk_palloc(a,
+			p9fdev->ring_order + XEN_PAGE_SHIFT - PAGE_SHIFT);
+	if (!data_bytes) {
+		rc = -ENOMEM;
+		goto out_free_intf;
+	}
+	memset(data_bytes, 0, XEN_FLEX_RING_SIZE(p9fdev->ring_order) * 2);
+
+	/* Grant refs to the entire data. */
+	for (i = 0; i < (1 << p9fdev->ring_order); i++) {
+		ring->intf->ref[i] = gnttab_grant_access(xendev->otherend_id,
+				virt_to_mfn(data_bytes) + i, 0);
+		UK_ASSERT(ring->intf->ref[i] != GRANT_INVALID_REF);
+	}
+
+	ring->intf->ring_order = p9fdev->ring_order;
+	ring->data.in = data_bytes;
+	ring->data.out = data_bytes + XEN_FLEX_RING_SIZE(p9fdev->ring_order);
+
+	/* Allocate event channel. */
+	rc = evtchn_alloc_unbound(xendev->otherend_id, p9front_handler, ring,
+				&ring->evtchn);
+	if (rc) {
+		uk_pr_err(DRIVER_NAME": Error creating evt channel: %d\n", rc);
+		goto out_free_grants;
+	}
+
+	unmask_evtchn(ring->evtchn);
+
+	/* Mark ring as initialized. */
+	ring->initialized = true;
+
+	return 0;
+
+out_free_grants:
+	for (i = 0; i < (1 << p9fdev->ring_order); i++)
+		gnttab_end_access(ring->intf->ref[i]);
+	uk_pfree(a, data_bytes,
+		p9fdev->ring_order + XEN_PAGE_SHIFT - PAGE_SHIFT);
+out_free_intf:
+	gnttab_end_access(ring->ref);
+	uk_pfree(a, ring->intf, 0);
+out:
+	return rc;
+}
+
+static int p9front_allocate_dev_rings(struct p9front_dev *p9fdev)
+{
+	int rc, i;
+
+	p9fdev->rings = uk_calloc(a, p9fdev->nb_rings, sizeof(*p9fdev->rings));
+	if (!p9fdev->rings) {
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	for (i = 0; i < p9fdev->nb_rings; i++) {
+		rc = p9front_allocate_dev_ring(p9fdev, i);
+		if (rc)
+			goto out_free;
+	}
+
+	return 0;
+
+out_free:
+	p9front_free_dev_rings(p9fdev);
+out:
+	return rc;
+}
 
 static int p9front_drv_init(struct uk_alloc *drv_allocator)
 {
@@ -75,11 +214,39 @@ static int p9front_add_dev(struct xenbus_device *xendev)
 	if (rc)
 		goto out_free;
 
+	uk_pr_info("Initialized 9pfront dev: tag=%s,maxrings=%d,maxorder=%d\n",
+		p9fdev->tag, p9fdev->nb_max_rings, p9fdev->max_ring_page_order);
+
+	p9fdev->nb_rings = MIN(CONFIG_XEN_9PFRONT_NB_RINGS,
+				p9fdev->nb_max_rings);
+	p9fdev->ring_order = MIN(CONFIG_XEN_9PFRONT_RING_ORDER,
+				p9fdev->max_ring_page_order);
+
+	rc = p9front_allocate_dev_rings(p9fdev);
+	if (rc) {
+		uk_pr_err(DRIVER_NAME": Could not initialize device rings: %d\n",
+			rc);
+		goto out_free;
+	}
+
+	rc = p9front_xb_connect(p9fdev);
+	if (rc) {
+		uk_pr_err(DRIVER_NAME": Could not connect: %d\n", rc);
+		goto out_free_rings;
+	}
+
 	rc = 0;
 	ukplat_spin_lock_irqsave(&p9front_device_list_lock, flags);
 	uk_list_add(&p9fdev->_list, &p9front_device_list);
 	ukplat_spin_unlock_irqrestore(&p9front_device_list_lock, flags);
 
+	uk_pr_info(DRIVER_NAME": Connected 9pfront dev: tag=%s,rings=%d,order=%d\n",
+		p9fdev->tag, p9fdev->nb_rings, p9fdev->ring_order);
+
+	goto out;
+
+out_free_rings:
+	p9front_free_dev_rings(p9fdev);
 out_free:
 	uk_free(a, p9fdev);
 out:
