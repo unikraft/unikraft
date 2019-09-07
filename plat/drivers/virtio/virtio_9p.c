@@ -35,6 +35,7 @@
 #include <inttypes.h>
 #include <uk/alloc.h>
 #include <uk/essentials.h>
+#include <uk/9pdev_trans.h>
 #include <virtio/virtio_bus.h>
 #include <virtio/virtio_9p.h>
 #include <uk/plat/spinlock.h>
@@ -58,6 +59,83 @@ struct virtio_9p_device {
 	struct virtqueue *vq;
 	/* Hw queue identifier. */
 	uint16_t hwvq_id;
+	/* libuk9p associated device (NULL if the device is not in use). */
+	struct uk_9pdev *p9dev;
+};
+
+static int virtio_9p_connect(struct uk_9pdev *p9dev,
+			     const char *device_identifier,
+			     const char *mount_args __unused)
+{
+	struct virtio_9p_device *dev = NULL;
+	int rc = 0;
+	int found = 0;
+
+	ukarch_spin_lock(&virtio_9p_device_list_lock);
+	uk_list_for_each_entry(dev, &virtio_9p_device_list, _list) {
+		if (!strcmp(dev->tag, device_identifier)) {
+			if (dev->p9dev != NULL) {
+				rc = -EBUSY;
+				goto out;
+			}
+			found = 1;
+			break;
+		}
+	}
+
+	if (!found) {
+		rc = -EINVAL;
+		goto out;
+	}
+
+	/*
+	 * The maximum message size is given by the number of segments.
+	 *
+	 * For read requests, the reply will be able to make use of the large
+	 * msize, and the request will not exceed one segment.
+	 * Similarly for write requests, but in reverse. Other requests should
+	 * not exceed one page for both recv and xmit fcalls.
+	 */
+	p9dev->max_msize = (NUM_SEGMENTS - 1) * __PAGE_SIZE;
+
+	dev->p9dev = p9dev;
+	p9dev->priv = dev;
+
+out:
+	ukarch_spin_unlock(&virtio_9p_device_list_lock);
+	return rc;
+}
+
+static int virtio_9p_disconnect(struct uk_9pdev *p9dev)
+{
+	struct virtio_9p_device *dev;
+
+	UK_ASSERT(p9dev);
+	dev = p9dev->priv;
+
+	ukarch_spin_lock(&virtio_9p_device_list_lock);
+	dev->p9dev = NULL;
+	ukarch_spin_unlock(&virtio_9p_device_list_lock);
+
+	return 0;
+}
+
+static int virtio_9p_request(struct uk_9pdev *p9dev __unused,
+			     struct uk_9preq *req __unused)
+{
+	return -EOPNOTSUPP;
+}
+
+static const struct uk_9pdev_trans_ops v9p_trans_ops = {
+	.connect        = virtio_9p_connect,
+	.disconnect     = virtio_9p_disconnect,
+	.request        = virtio_9p_request
+};
+
+static struct uk_9pdev_trans v9p_trans = {
+	.name           = "virtio",
+	.ops            = &v9p_trans_ops,
+	.a              = NULL /* Set by the driver initialization. */
 };
 
 static int virtio_9p_recv(struct virtqueue *vq __unused, void *priv __unused)
@@ -185,7 +263,6 @@ static int virtio_9p_start(struct virtio_9p_device *d)
 static int virtio_9p_add_dev(struct virtio_dev *vdev)
 {
 	struct virtio_9p_device *d;
-	unsigned long flags;
 	int rc = 0;
 
 	UK_ASSERT(vdev != NULL);
@@ -204,9 +281,9 @@ static int virtio_9p_add_dev(struct virtio_dev *vdev)
 	if (rc)
 		goto out_free;
 
-	ukplat_spin_lock_irqsave(&virtio_9p_device_list_lock, flags);
+	ukarch_spin_lock(&virtio_9p_device_list_lock);
 	uk_list_add(&d->_list, &virtio_9p_device_list);
-	ukplat_spin_unlock_irqrestore(&virtio_9p_device_list_lock, flags);
+	ukarch_spin_unlock(&virtio_9p_device_list_lock);
 out:
 	return rc;
 out_free:
@@ -224,6 +301,9 @@ static int virtio_9p_drv_init(struct uk_alloc *drv_allocator)
 	}
 
 	a = drv_allocator;
+	v9p_trans.a = a;
+
+	rc = uk_9pdev_trans_register(&v9p_trans);
 out:
 	return rc;
 }
