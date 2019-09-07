@@ -1,0 +1,1 @@
+$(eval $(call addlib_s,lib9pfs,$(CONFIG_LIB9PFS)))

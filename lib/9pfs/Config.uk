@@ -1,0 +1,5 @@
+config LIB9PFS
+	bool "9pfs: 9p filesystem"
+	default y
+	depends on LIBVFSCORE
+	depends on LIBUK9P
