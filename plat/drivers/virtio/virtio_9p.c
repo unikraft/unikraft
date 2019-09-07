@@ -32,6 +32,7 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
+#include <inttypes.h>
 #include <uk/alloc.h>
 #include <uk/essentials.h>
 #include <virtio/virtio_bus.h>
@@ -39,6 +40,7 @@
 #include <uk/plat/spinlock.h>
 
 #define DRIVER_NAME	"virtio-9p"
+#define NUM_SEGMENTS	128 /** The number of virtqueue descriptors. */
 static struct uk_alloc *a;
 
 /* List of initialized virtio 9p devices. */
@@ -52,7 +54,55 @@ struct virtio_9p_device {
 	char *tag;
 	/* Entry within the virtio devices' list. */
 	struct uk_list_head _list;
+	/* Virtqueue reference. */
+	struct virtqueue *vq;
+	/* Hw queue identifier. */
+	uint16_t hwvq_id;
 };
+
+static int virtio_9p_recv(struct virtqueue *vq __unused, void *priv __unused)
+{
+	return 0;
+}
+
+static int virtio_9p_vq_alloc(struct virtio_9p_device *d)
+{
+	int vq_avail = 0;
+	int rc = 0;
+	__u16 qdesc_size;
+
+	vq_avail = virtio_find_vqs(d->vdev, 1, &qdesc_size);
+	if (unlikely(vq_avail != 1)) {
+		uk_pr_err(DRIVER_NAME": Expected: %d queues, found %d\n",
+			  1, vq_avail);
+		rc = -ENOMEM;
+		goto exit;
+	}
+
+	d->hwvq_id = 0;
+	if (unlikely(qdesc_size != NUM_SEGMENTS)) {
+		uk_pr_err(DRIVER_NAME": Expected %d descriptors, found %d (virtqueue %"
+			  PRIu16")\n", NUM_SEGMENTS, qdesc_size, d->hwvq_id);
+		rc = -EINVAL;
+		goto exit;
+	}
+
+	d->vq = virtio_vqueue_setup(d->vdev,
+				    d->hwvq_id,
+				    qdesc_size,
+				    virtio_9p_recv,
+				    a);
+	if (unlikely(PTRISERR(d->vq))) {
+		uk_pr_err(DRIVER_NAME": Failed to set up virtqueue %"PRIu16"\n",
+			  d->hwvq_id);
+		rc = PTR2ERR(d->vq);
+	}
+
+	d->vq->priv = d;
+
+exit:
+	return rc;
+}
 
 static int virtio_9p_feature_negotiate(struct virtio_9p_device *d)
 {
@@ -107,6 +157,12 @@ static int virtio_9p_configure(struct virtio_9p_device *d)
 		goto out_status_fail;
 	}
 
+	rc = virtio_9p_vq_alloc(d);
+	if (rc) {
+		uk_pr_err(DRIVER_NAME": Could not allocate virtqueue\n");
+		goto out_status_fail;
+	}
+
 	uk_pr_info(DRIVER_NAME": Configured: features=0x%lx tag=%s\n",
 			d->vdev->features, d->tag);
 out:
@@ -119,6 +175,7 @@ out_status_fail:
 
 static int virtio_9p_start(struct virtio_9p_device *d)
 {
+	virtqueue_intr_enable(d->vq);
 	virtio_dev_drv_up(d->vdev);
 	uk_pr_info(DRIVER_NAME": %s started\n", d->tag);
 
