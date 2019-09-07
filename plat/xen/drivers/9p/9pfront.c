@@ -38,6 +38,9 @@
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include <uk/list.h>
+#include <uk/9pdev.h>
+#include <uk/9preq.h>
+#include <uk/9pdev_trans.h>
 #include <uk/plat/spinlock.h>
 #include <xen-x86/mm.h>
 #include <xen-x86/irq.h>
@@ -187,14 +190,46 @@ out:
 	return rc;
 }
 
+static int p9front_connect(struct uk_9pdev *p9dev __unused,
+			   const char *device_identifier __unused,
+			   const char *mount_args __unused)
+{
+	return 0;
+}
+
+static int p9front_disconnect(struct uk_9pdev *p9dev __unused)
+{
+	return 0;
+}
+
+static int p9front_request(struct uk_9pdev *p9dev __unused,
+			   struct uk_9preq *req __unused)
+{
+	return 0;
+}
+
+static const struct uk_9pdev_trans_ops p9front_trans_ops = {
+	.connect        = p9front_connect,
+	.disconnect     = p9front_disconnect,
+	.request        = p9front_request
+};
+
+static struct uk_9pdev_trans p9front_trans = {
+	.name           = "xen",
+	.ops            = &p9front_trans_ops,
+	.a              = NULL /* Set below. */
+};
+
+
 static int p9front_drv_init(struct uk_alloc *drv_allocator)
 {
 	if (!drv_allocator)
 		return -EINVAL;
 
 	a = drv_allocator;
+	p9front_trans.a = a;
 
-	return 0;
+	return uk_9pdev_trans_register(&p9front_trans);
 }
 
 static int p9front_add_dev(struct xenbus_device *xendev)
