@@ -1,0 +1,142 @@
+diff --git a/support/kconfig.new/Makefile.br b/support/kconfig.new/Makefile.br
+index afe94ee..8e64a9b 100644
+--- a/support/kconfig.new/Makefile.br
++++ b/support/kconfig.new/Makefile.br
+@@ -10,29 +10,41 @@ include Makefile.rules
+ include Makefile
+ #HOSTCFLAGS+=-Dinline="" -include foo.h
+ -include $(obj)/.depend
+-$(obj)/.depend: $(wildcard *.h *.c)
+-	$(HOSTCC) $(HOST_EXTRACFLAGS) $(HOSTCFLAGS) -MM *.c > $@ 2>/dev/null || :
+ 
+ __hostprogs := $(sort $(hostprogs-y) $(hostprogs-m))
+-host-csingle := $(foreach m,$(__hostprogs),$(if $($(m)-objs),,$(m)))
++host-cshlib := $(sort $(hostlibs-y) $(hostlibs-m))
++host-cxxshlib := $(sort $(hostcxxlibs-y) $(hostcxxlibs-m))
++
++# C code
++# Executables compiled from a single .c file
++host-csingle:= $(foreach m,$(__hostprogs), \
++             $(if $($(m)-objs)$($(m)-cxxobjs),,$(m)))
+ host-cmulti := $(foreach m,$(__hostprogs),\
+-           $(if $($(m)-cxxobjs),,$(if $($(m)-objs),$(m))))
+-host-cxxmulti := $(foreach m,$(__hostprogs),\
+-           $(if $($(m)-cxxobjs),$(m),$(if $($(m)-objs),)))
+-host-cobjs := $(addprefix $(obj)/,$(sort $(foreach m,$(__hostprogs),$($(m)-objs))))
+-host-cxxobjs := $(addprefix $(obj)/,$(sort $(foreach m,$(__hostprogs),$($(m)-cxxobjs))))
++		            $(if $($(m)-cxxobjs),,$(if $($(m)-objs),$(m))))
++# Object (.o) files compiled from .c files
++host-cobjs  := $(sort $(foreach m,$(__hostprogs),$($(m)-objs)))
++
++# C++ code
++# C++ executables compiled from at least one .cc file
++# and zero or more .c files
++ host-cxxmulti   := $(foreach m,$(__hostprogs),$(if $($(m)-cxxobjs),$(m)))
++# C++ Object (.o) files compiled from .cc files
++host-cxxobjs    := $(sort $(foreach m,$(host-cxxmulti),$($(m)-cxxobjs)))
++#Object (.o) files used by the shared libaries
++host-cshobjs    := $(sort $(foreach m,$(host-cshlib),$($(m:.so=-objs))))
++host-cxxshobjs  := $(sort $(foreach m,$(host-cxxshlib),$($(m:.so=-objs))))
++
++
++host-csingle := $(addprefix $(obj)/,$(host-csingle))
++host-cmulti  := $(addprefix $(obj)/,$(host-cmulti))
++host-cxxmulti  := $(addprefix $(obj)/,$(host-cxxmulti))
++host-cobjs := $(addprefix $(obj)/,$(host-cobjs))
++host-cxxobjs := $(addprefix $(obj)/,$(host-cxxobjs))
+ fixdep-objs := $(obj)/fixdep.o
+ 
+ HOST_EXTRACFLAGS += -I$(obj) -DCONFIG_=\"\"
+ 
+-$(host-csingle): %: %.c
+-	$(HOSTCC) $(HOST_EXTRACFLAGS) $(HOSTCFLAGS) $(HOSTCFLAGS_$@) $< -o $(obj)/$@
+-
+-$(host-cmulti): %: $(host-cobjs) $(host-cshlib)
+-	$(HOSTCC) $(HOST_EXTRACFLAGS) $(HOSTCFLAGS) $(HOSTCFLAGS_$@) $(addprefix $(obj)/,$($(@F)-objs)) $(HOSTLOADLIBES_$(@F)) -o $(obj)/$@
+ 
+-$(host-cxxmulti): %: $(host-cxxobjs) $(host-cobjs) $(host-cshlib)
+-	$(HOSTCXX) $(HOST_EXTRACFLAGS) $(HOSTCFLAGS) $(HOSTCXXFLAGS_$@) $(addprefix $(obj)/,$($(@F)-objs) $($(@F)-cxxobjs)) $(HOSTLOADLIBES_$(@F)) -o $(obj)/$@
+ 
+ $(obj)/fixdep: $(fixdep-objs)
+ 	$(HOSTCC) $(HOST_EXTRACFLAGS) $(HOSTCFLAGS) $(HOSTCFLAGS_$(@F)) $< -o $@
+@@ -40,6 +52,80 @@ $(obj)/fixdep: $(fixdep-objs)
+ $(fixdep-objs): $(src)/fixdep.c
+ 	$(HOSTCC) $(HOST_EXTRACFLAGS) $(HOSTCFLAGS) $(HOSTCFLAGS_$(@F)) -c $< -o $@
+ 
++#####
++# Compile programs on the host
++
++# Create executable from a single .c file
++# host-csingle -> Executable
++quiet_cmd_host-csingle 	= HOSTCC  $@
++      cmd_host-csingle	= $(HOSTCC) $(hostc_flags) $(HOSTLDFLAGS) -o $@ $< \
++		$(HOSTLDLIBS) $(HOSTLDLIBS_$(@F))
++$(host-csingle): $(obj)/%: $(src)/%.c $(obj)/fixdep FORCE
++	$(call if_changed_dep,host-csingle)
++
++# Link an executable based on list of .o files, all plain c
++# host-cmulti -> executable
++quiet_cmd_host-cmulti	= HOSTLD  $@
++      cmd_host-cmulti	= $(HOSTCC) $(hostc_flags) -o $@ \
++			  $(addprefix $(obj)/,$($(@F)-objs)) \
++			  $(HOST_LDFLAGS) $(HOSTLDLIBS_$(@F))
++$(host-cmulti): $(obj)/fixdep FORCE
++	$(call if_changed,host-cmulti)
++$(call multi_depend,$(host-cmulti), , -objs)
++
++
++# Create .o file from a single .c file
++# host-cobjs -> .o
++quiet_cmd_host-cobjs	= HOSTCC  $@
++      cmd_host-cobjs	= $(HOSTCC) $(hostc_flags) $(HOSTCFLAGS_$(@F))\
++			  -c -o $@ $<
++$(filter-out %.tab.o, $(filter-out %.lex.o,$(host-cobjs))): $(obj)/%.o:\
++		$(src)/%.c $(obj)/fixdep FORCE
++	$(call if_changed_dep,host-cobjs)
++
++$(filter %.lex.o,$(host-cobjs)): $(obj)/%.lex.o:  $(obj)/%.lex.c $(obj)/fixdep FORCE
++	$(call if_changed_dep,host-cobjs)
++
++$(filter %.tab.o,$(host-cobjs)): $(obj)/%.tab.o:  $(obj)/%.tab.c $(obj)/fixdep FORCE
++	$(call if_changed_dep,host-cobjs)
++
++# Link an executable based on list of .o files, a mixture of .c and .cc
++# host-cxxmulti -> executable
++quiet_cmd_host-cxxmulti	= HOSTLD  $@
++      cmd_host-cxxmulti	= $(HOSTCXX) $(HOSTLDFLAGS) -o $@\
++			  $(foreach o,objs cxxobjs,\
++			  $(addprefix $(obj)/,$($(@F)-$(o)))) \
++			  $(HOSTLDLIBS) $(HOSTLDLIBS_$(@F))
++$(host-cxxmulti): FORCE
++	$(call if_changed,host-cxxmulti)
++$(call multi_depend,$(host-cxxmulti), , -objs -cxxobjs)
++
++
++# Create .o file from a single .cc (C++) file
++quiet_cmd_host-cxxobjs	= HOSTCXX $@
++      cmd_host-cxxobjs	= $(HOSTCXX) $(hostcxx_flags) $(HOSTCXXFLAGS_$(@F)) \
++			  -c -o $@ $<
++$(host-cxxobjs): $(obj)/%.o: $(src)/%.cc FORCE
++	$(call if_changed_dep,host-cxxobjs)
++
++# Compile .c file, create position independent .o file
++# host-cshobjs -> .o
++quiet_cmd_host-cshobjs	= HOSTCC  -fPIC $@
++      cmd_host-cshobjs	= $(HOSTCC) $(hostc_flags) -fPIC -c -o $@ $<
++$(host-cshobjs): $(obj)/%.o: $(src)/%.c FORCE
++	$(call if_changed_dep,host-cshobjs)
++
++# Compile .c file, create position independent .o file
++# Note that plugin capable gcc versions can be either C or C++ based
++# therefore plugin source files have to be compilable in both C and C++ mode.
++# This is why a C++ compiler is invoked on a .c file.
++# host-cxxshobjs -> .o
++quiet_cmd_host-cxxshobjs	= HOSTCXX -fPIC $@
++      cmd_host-cxxshobjs	= $(HOSTCXX) $(hostcxx_flags) -fPIC -c -o $@ $<
++$(host-cxxshobjs): $(obj)/%.o: $(src)/%.c $(obj)/fixdep FORCE
++	@echo test--$@
++	$(call if_changed_dep,host-cxxshobjs)
++
+ clean:
+ 	$(Q)rm -f $(addprefix $(obj)/,$(clean-files))
+ distclean: clean
