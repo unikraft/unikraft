@@ -32,18 +32,58 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
+#include <uk/config.h>
+#include <uk/alloc.h>
+#include <uk/assert.h>
+#include <uk/essentials.h>
+#include <uk/list.h>
+#include <uk/plat/spinlock.h>
 #include <xenbus/xenbus.h>
+
+#include "9pfront_xb.h"
 
 #define DRIVER_NAME	"xen-9pfront"
 
-static int p9front_drv_init(struct uk_alloc *drv_allocator __unused)
+static struct uk_alloc *a;
+static UK_LIST_HEAD(p9front_device_list);
+static DEFINE_SPINLOCK(p9front_device_list_lock);
+
+static int p9front_drv_init(struct uk_alloc *drv_allocator)
 {
+	if (!drv_allocator)
+		return -EINVAL;
+
+	a = drv_allocator;
+
 	return 0;
 }
 
-static int p9front_add_dev(struct xenbus_device *xendev __unused)
+static int p9front_add_dev(struct xenbus_device *xendev)
 {
-	return 0;
+	struct p9front_dev *p9fdev;
+	int rc;
+	unsigned long flags;
+
+	p9fdev = uk_calloc(a, 1, sizeof(*p9fdev));
+	if (!p9fdev) {
+		rc = -ENOMEM;
+		goto out;
+	}
+
+	p9fdev->xendev = xendev;
+	rc = p9front_xb_init(p9fdev);
+	if (rc)
+		goto out_free;
+
+	rc = 0;
+	ukplat_spin_lock_irqsave(&p9front_device_list_lock, flags);
+	uk_list_add(&p9fdev->_list, &p9front_device_list);
+	ukplat_spin_unlock_irqrestore(&p9front_device_list_lock, flags);
+
+out_free:
+	uk_free(a, p9fdev);
+out:
+	return rc;
 }
 
 static const xenbus_dev_type_t p9front_devtypes[] = {
