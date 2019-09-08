@@ -24,3 +24,12 @@ endif
 if (ARCH_ARM_64)
 	source "arch/arm/arm64/Config.uk"
 endif
+
+config STACK_SIZE_PAGE_ORDER
+	int
+	prompt "Stack size page order"
+	default 4
+	help
+		Indirectly configures the stack size by changing the stack size page
+		order. Stack size is equal with 2^order * page size (e.g. 4KB).
+		Only change this if you know what you're doing.

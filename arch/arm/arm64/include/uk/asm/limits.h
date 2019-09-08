@@ -40,7 +40,7 @@
 #define __PAGE_MASK		(~((__PAGE_SIZE) - 1))
 #endif
 
-#define __STACK_SIZE_PAGE_ORDER	4
+#define __STACK_SIZE_PAGE_ORDER	CONFIG_STACK_SIZE_PAGE_ORDER
 #define __STACK_SIZE	(__PAGE_SIZE * (1 << __STACK_SIZE_PAGE_ORDER))
 #define __STACK_ALIGN_SIZE	16
 
