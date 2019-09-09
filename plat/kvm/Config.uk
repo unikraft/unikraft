@@ -99,6 +99,7 @@ config LIBGICV2
 config LIBOFW
        bool "Open Firmware library support"
        default n
+       depends on ARCH_ARM_64
        select LIBFDT
 
 endif
