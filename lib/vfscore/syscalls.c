@@ -44,6 +44,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <sys/ioctl.h>
 
 #include <dirent.h>
 #include <vfscore/prex.h>
@@ -381,14 +382,24 @@ sys_lseek(struct vfscore_file *fp, off_t off, int type, off_t *origin)
 int
 sys_ioctl(struct vfscore_file *fp, unsigned long request, void *buf)
 {
-	int error;
+	int error = 0;
 
 	DPRINTF(VFSDB_SYSCALL, ("sys_ioctl: fp=%p request=%lux\n", fp, request));
 
 	if ((fp->f_flags & (UK_FREAD | UK_FWRITE)) == 0)
 		return EBADF;
 
-	error = vfs_ioctl(fp, request, buf);
+	switch (request) {
+	case FIOCLEX:
+		fp->f_flags |= O_CLOEXEC;
+		break;
+	case FIONCLEX:
+		fp->f_flags &= ~O_CLOEXEC;
+		break;
+	default:
+		error = vfs_ioctl(fp, request, buf);
+		break;
+	}
 
 	DPRINTF(VFSDB_SYSCALL, ("sys_ioctl: comp error=%d\n", error));
 	return error;
