@@ -1,0 +1,4 @@
+$(eval $(call addlib_s,libuktime,$(CONFIG_LIBUKTIME)))
+
+CINCLUDES-$(CONFIG_LIBUKTIME)    += -I$(LIBUKTIME_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBUKTIME)  += -I$(LIBUKTIME_BASE)/include

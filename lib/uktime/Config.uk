@@ -1,0 +1,3 @@
+config LIBUKTIME
+       bool "uktime: Time functions"
+       default n
