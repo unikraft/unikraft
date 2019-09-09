@@ -35,19 +35,19 @@
 
 #include <string.h>
 #include <uk/essentials.h>
-#include <uk/bitops.h>
+#include <uk/bitmap.h>
 #include <uk/assert.h>
 #include <vfscore/file.h>
 #include <uk/plat/lcpu.h>
 #include <errno.h>
 #include <uk/ctors.h>
 
-#define FDTABLE_MAX_FILES (sizeof(uint64_t) * 8)
+#define FDTABLE_MAX_FILES 1024
 
 void init_stdio(void);
 
 struct fdtable {
-	uint64_t bitmap;
+	unsigned long bitmap[UK_BITS_TO_LONGS(FDTABLE_MAX_FILES)];
 	uint32_t fd_start;
 	struct vfscore_file *files[FDTABLE_MAX_FILES];
 };
@@ -59,14 +59,14 @@ int vfscore_alloc_fd(void)
 	int ret;
 
 	flags = ukplat_lcpu_save_irqf();
-	ret = ukarch_ffsl(~fdtable.bitmap);
+	ret = uk_find_next_zero_bit(fdtable.bitmap, FDTABLE_MAX_FILES, 0);
 
 	if (!ret) {
 		ret = -ENFILE;
 		goto exit;
 	}
 
-	fdtable.bitmap |= (uint64_t) 1 << ret;
+	uk_bitmap_set(fdtable.bitmap, ret, 1);
 
 exit:
 	ukplat_lcpu_restore_irqf(flags);
@@ -83,7 +83,7 @@ void vfscore_put_fd(int fd)
 	UK_ASSERT(fd > 2);
 
 	flags = ukplat_lcpu_save_irqf();
-	__uk_clear_bit(fd, &fdtable.bitmap);\
+	uk_bitmap_clear(fdtable.bitmap, fd, 1);
 	fp = fdtable.files[fd];
 	fdtable.files[fd] = NULL;
 	ukplat_lcpu_restore_irqf(flags);
@@ -129,7 +129,7 @@ struct vfscore_file *vfscore_get_file(int fd)
 	UK_ASSERT(fd < (int) FDTABLE_MAX_FILES);
 
 	flags = ukplat_lcpu_save_irqf();
-	if (!(fdtable.bitmap & ((uint64_t) 1 << fd)))
+	if (!uk_test_bit(fd, fdtable.bitmap))
 		goto exit;
 	ret = fdtable.files[fd];
 	fhold(ret);
@@ -186,7 +186,7 @@ static void fdtable_init(void)
 	memset(&fdtable, 0, sizeof(fdtable));
 
 	/* reserve stdin, stdout and stderr */
-	fdtable.bitmap = 7;
+	uk_bitmap_set(fdtable.bitmap, 0, 3);
 	init_stdio();
 }
 
