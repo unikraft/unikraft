@@ -39,6 +39,23 @@
 #include <string.h>
 #include <sys/utsname.h>
 #include <uk/essentials.h>
+#include <uk/config.h>
+
+static struct utsname utsname = {
+	.sysname	= "Unikraft",
+	.nodename	= "unikraft",
+	.release	= STRINGIFY(UK_CODENAME),
+	.version	= STRINGIFY(UK_FULLVERSION),
+#ifdef CONFIG_ARCH_X86_64
+	.machine	= "x86_64"
+#elif CONFIG_ARCH_ARM_64
+	.machine	= "arm64"
+#elif CONFIG_ARCH_ARM_32
+	.machine	= "arm32"
+#else
+#error "Set your machine architecture!"
+#endif
+};
 
 long fpathconf(int fd __unused, int name __unused)
 {
@@ -70,6 +87,30 @@ int getpagesize(void)
 
 int uname(struct utsname *buf __unused)
 {
+	if (buf == NULL) {
+		errno = EFAULT;
+		return -1;
+	}
+
+	memcpy(buf, &utsname, sizeof(struct utsname));
+	return 0;
+}
+
+int sethostname(const char *name, size_t len)
+{
+	if (name == NULL) {
+		errno = EFAULT;
+		return -1;
+	}
+
+	if (len > sizeof(utsname.nodename)) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	strncpy(utsname.nodename, name, len);
+	if (len < sizeof(utsname.nodename))
+		utsname.nodename[len] = 0;
 	return 0;
 }
 
