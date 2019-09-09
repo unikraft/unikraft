@@ -73,14 +73,15 @@ exit:
 	return ret;
 }
 
-void vfscore_put_fd(int fd)
+int vfscore_put_fd(int fd)
 {
 	struct vfscore_file *fp;
 	unsigned long flags;
 
 	UK_ASSERT(fd < (int) FDTABLE_MAX_FILES);
 	/* Currently it is not allowed to free std(in|out|err) */
-	UK_ASSERT(fd > 2);
+	if (fd <= 2)
+		return -EBUSY;
 
 	flags = ukplat_lcpu_save_irqf();
 	uk_bitmap_clear(fdtable.bitmap, fd, 1);
@@ -94,6 +95,8 @@ void vfscore_put_fd(int fd)
 	 */
 	if (fp)
 		fdrop(fp);
+
+	return 0;
 }
 
 int vfscore_install_fd(int fd, struct vfscore_file *file)

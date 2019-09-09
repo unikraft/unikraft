@@ -205,15 +205,17 @@ UK_TRACEPOINT(trace_vfs_close_err, "%d", int);
 int fdclose(int fd)
 {
 	struct vfscore_file *fp;
+	int error;
 
 	fp = vfscore_get_file(fd);
 	if (!fp)
 		return EBADF;
 
-	vfscore_put_fd(fd);
-	fdrop(fp);
+	error = vfscore_put_fd(fd);
+	if (!error)
+		fdrop(fp);
 
-	return 0;
+	return error;
 }
 
 int close(int fd)
