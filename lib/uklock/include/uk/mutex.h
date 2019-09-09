@@ -54,49 +54,61 @@ extern "C" {
  * uses wait queues for threads
  */
 struct uk_mutex {
-	int locked;
+	int lock_count;
+	struct uk_thread *owner;
 	struct uk_waitq wait;
 };
 
 #define	UK_MUTEX_INITIALIZER(name)				\
-	{ 0, __WAIT_QUEUE_INITIALIZER((name).wait) }
+	{ 0, NULL, __WAIT_QUEUE_INITIALIZER((name).wait) }
 
 void uk_mutex_init(struct uk_mutex *m);
 
 static inline void uk_mutex_lock(struct uk_mutex *m)
 {
+	struct uk_thread *current;
 	unsigned long irqf;
 
 	UK_ASSERT(m);
 
+	current = uk_thread_current();
+
 	for (;;) {
-		uk_waitq_wait_event(&m->wait, m->locked == 0);
+		uk_waitq_wait_event(&m->wait,
+			m->lock_count == 0 || m->owner == current);
 		irqf = ukplat_lcpu_save_irqf();
-		if (!m->locked)
+		if (m->lock_count == 0 || m->owner == current)
 			break;
 		ukplat_lcpu_restore_irqf(irqf);
 	}
-	m->locked = 1;
+	m->lock_count++;
+	m->owner = current;
 	ukplat_lcpu_restore_irqf(irqf);
 }
 
 static inline int uk_mutex_trylock(struct uk_mutex *m)
 {
+	struct uk_thread *current;
 	unsigned long irqf;
 	int ret = 0;
 
 	UK_ASSERT(m);
 
+	current = uk_thread_current();
+
 	irqf = ukplat_lcpu_save_irqf();
-	if (!m->locked)
-		ret = m->locked = 1;
+	if (m->lock_count == 0 || m->owner == current) {
+		ret = 1;
+		m->lock_count++;
+		m->owner = current;
+	}
 	ukplat_lcpu_restore_irqf(irqf);
 	return ret;
 }
 
 static inline int uk_mutex_is_locked(struct uk_mutex *m)
 {
-	return m->locked;
+	return m->lock_count > 0;
 }
 
 static inline void uk_mutex_unlock(struct uk_mutex *m)
@@ -106,9 +118,11 @@ static inline void uk_mutex_unlock(struct uk_mutex *m)
 	UK_ASSERT(m);
 
 	irqf = ukplat_lcpu_save_irqf();
-	UK_ASSERT(m->locked);
-	m->locked = 0;
-	uk_waitq_wake_up(&m->wait);
+	UK_ASSERT(m->lock_count > 0);
+	if (--m->lock_count == 0) {
+		m->owner = NULL;
+		uk_waitq_wake_up(&m->wait);
+	}
 	ukplat_lcpu_restore_irqf(irqf);
 }
 
