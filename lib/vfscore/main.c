@@ -659,17 +659,33 @@ struct __dirstream
 
 DIR *opendir(const char *path)
 {
-	DIR *dir = malloc(sizeof(*dir));
+	DIR *dir;
+	struct stat st;
 
-	if (!dir)
-		return ERR2PTR(-ENOMEM);
+	dir = malloc(sizeof(*dir));
+	if (!dir) {
+		errno = ENOMEM;
+		goto out_err;
+	}
 
 	dir->fd = open(path, O_RDONLY);
-	if (dir->fd < 0) {
-		free(dir);
-		return NULL;
+	if (dir->fd < 0)
+		goto out_free_dir;
+
+	if (fstat(dir->fd, &st) < 0)
+		goto out_free_dir;
+
+	if (!S_ISDIR(st.st_mode)) {
+		errno = ENOTDIR;
+		goto out_free_dir;
 	}
+
 	return dir;
+
+out_free_dir:
+	free(dir);
+out_err:
+	return NULL;
 }
 
 DIR *fdopendir(int fd)
