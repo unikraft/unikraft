@@ -103,8 +103,10 @@
 #define SIOCSPGRP       0x8902
 #define FIOGETOWN       0x8903
 #define SIOCGPGRP       0x8904
+#ifndef CONFIG_LIBLWIP
 #define SIOCATMARK      0x8905
+#endif
 #define SIOCGSTAMP      0x8906
 #define SIOCGSTAMPNS    0x8907
 
-#include <bits/ioctl_fix.h>
+/* TODO #include <bits/ioctl_fix.h> */
