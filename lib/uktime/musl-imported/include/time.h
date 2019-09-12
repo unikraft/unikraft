@@ -1,10 +1,11 @@
-#ifndef	_TIME_H
-#define _TIME_H
+#ifndef _UKTIME_TIME_H
+#define _UKTIME_TIME_H
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
+#if 0
 #include <features.h>
 
 #ifdef __cplusplus
@@ -122,6 +123,7 @@ extern int daylight;
 extern long timezone;
 extern int getdate_err;
 struct tm *getdate (const char *);
+#endif
 #endif
 
 
