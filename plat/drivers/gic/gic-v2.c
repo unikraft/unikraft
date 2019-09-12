@@ -320,7 +320,7 @@ void gic_handle_irq(void)
 		stat = gic_ack_irq();
 		irq = stat & GICC_IAR_INTID_MASK;
 
-		uk_pr_info("Unikraft: EL1 IRQ#%d trap caught\n", irq);
+		uk_pr_debug("Unikraft: EL1 IRQ#%d trap caught\n", irq);
 
 		/*
 		 * TODO: Handle IPI&SGI interrupts here
