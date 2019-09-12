@@ -15,7 +15,7 @@ int __secs_to_tm(long long t, struct tm *tm)
 	int qc_cycles, c_cycles, q_cycles;
 	int months;
 	int wday, yday, leap;
-	static const char days_in_month[] = {31,30,31,30,31,31,30,31,30,31,31,29};
+	static const char days_in_month[] = {31, 30, 31, 30, 31, 31, 30, 31, 30, 31, 31, 29};
 
 	/* Reject time_t values whose year would overflow int */
 	if (t < INT_MIN * 31622400LL || t > INT_MAX * 31622400LL)
@@ -57,7 +57,7 @@ int __secs_to_tm(long long t, struct tm *tm)
 
 	years = remyears + 4*q_cycles + 100*c_cycles + 400LL*qc_cycles;
 
-	for (months=0; days_in_month[months] <= remdays; months++)
+	for (months = 0; days_in_month[months] <= remdays; months++)
 		remdays -= days_in_month[months];
 
 	if (months >= 10) {
