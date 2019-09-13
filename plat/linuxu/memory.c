@@ -53,7 +53,7 @@ static int __linuxu_plat_heap_init(void)
 	int rc = 0;
 
 	_liblinuxuplat_opts.heap.len = heap_size * MB2B;
-	uk_pr_info("Heap size %u\n", heap_size);
+	uk_pr_info("Allocate memory for heap (%u MiB)\n", heap_size);
 
 	/**
 	 * Allocate heap memory
@@ -74,10 +74,21 @@ static int __linuxu_plat_heap_init(void)
 
 int ukplat_memregion_count(void)
 {
+	static int have_heap = 0;
 	int rc = 0;
 
-	rc = __linuxu_plat_heap_init();
-	return (rc == 0) ? 1 : 0;
+	if (!have_heap) {
+		/*
+		 * NOTE: The heap size can be changed by a library parameter.
+		 * We assume that those ones are processed by the boot library
+		 * shortly before memory regions are scanned. This is why
+		 * we initialize the heap here.
+		 */
+		rc = __linuxu_plat_heap_init();
+		have_heap = (rc == 0) ? 1 : 0;
+	}
+
+	return (have_heap) ? 1 : 0;
 }
 
 int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
