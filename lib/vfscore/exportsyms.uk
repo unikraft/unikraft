@@ -79,3 +79,5 @@ dentry_alloc
 drele
 vrele
 fcntl
+readdir_r
+fstatfs
