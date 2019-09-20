@@ -4,8 +4,6 @@
 extern "C" {
 #endif
 
-#include <features.h>
-
 #define __NEED_mode_t
 #define __NEED_size_t
 #define __NEED_off_t
@@ -14,7 +12,7 @@ extern "C" {
 #define __NEED_ssize_t
 #endif
 
-#include <bits/alltypes.h>
+#include <nolibc-internal/shareddefs.h>
 
 #define MAP_FAILED ((void *) -1)
 
@@ -106,8 +104,6 @@ extern "C" {
 #define MFD_ALLOW_SEALING 0x0002U
 #define MFD_HUGETLB 0x0004U
 #endif
-
-#include <bits/mman.h>
 
 void *mmap (void *, size_t, int, int, int, off_t);
 int munmap (void *, size_t);
