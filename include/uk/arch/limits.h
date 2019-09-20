@@ -36,6 +36,7 @@
 #ifndef __UKARCH_LIMITS_H__
 #define __UKARCH_LIMITS_H__
 
+#include <uk/config.h>
 #include <uk/asm/limits.h>
 
 #define STACK_MASK_TOP           (~(__STACK_SIZE - 1))
