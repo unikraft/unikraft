@@ -1,0 +1,5 @@
+config LIBUKMMAP
+	bool "ukmmap: mmap system call"
+	default n
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKALLOC
