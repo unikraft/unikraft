@@ -56,6 +56,7 @@
 #include <uk/essentials.h>
 #include <uk/print.h>
 #include <uk/ctors.h>
+#include <uk/init.h>
 #include <uk/argparse.h>
 #if CONFIG_LIBUKBUS
 #include <uk/bus.h>
@@ -81,6 +82,22 @@ static void main_thread_func(void *arg)
 	int i;
 	int ret;
 	struct thread_main_arg *tma = arg;
+	uk_init_t *itr;
+
+	/**
+	 * Run init table
+	 */
+	uk_pr_info("Init Table @ %p - %p\n", &uk_inittab_start[0],
+		   &uk_inittab_end);
+	uk_inittab_foreach(uk_inittab_start, uk_inittab_end, itr) {
+		ret = (*itr)();
+		if (ret < 0) {
+			uk_pr_err("Init function at %p returned error %d\n",
+				  itr, ret);
+			ret = UKPLAT_CRASH;
+			goto exit;
+		}
+	}
 
 #ifdef CONFIG_LIBUKBUS
 	uk_pr_info("Initialize bus handlers...\n");
@@ -149,6 +166,8 @@ static void main_thread_func(void *arg)
 	ret = main(tma->argc, tma->argv);
 	uk_pr_info("main returned %d, halting system\n", ret);
 	ret = (ret != 0) ? UKPLAT_CRASH : UKPLAT_HALT;
+
+exit:
 	ukplat_terminate(ret); /* does not return */
 }
 

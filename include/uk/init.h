@@ -92,6 +92,12 @@ typedef int (*uk_init_t)(void);
 #define uk_sys_initcall(fn)       uk_sys_initcall_prio(fn, 9)
 #define uk_late_initcall(fn)      uk_late_initcall_prio(fn, 9)
 
+extern const uk_init_t uk_inittab_start[];
+extern const uk_init_t uk_inittab_end;
+
+#define uk_inittab_foreach(init_start, init_end, itr)		\
+	for (itr = DECONST(uk_init_t*, init_start); itr < &init_end; itr++)
+
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
