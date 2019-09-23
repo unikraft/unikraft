@@ -82,28 +82,6 @@ static void main_thread_func(void *arg)
 	int ret;
 	struct thread_main_arg *tma = arg;
 
-	uk_pr_info("Pre-init table at %p - %p\n",
-		   __preinit_array_start, &__preinit_array_end);
-	uk_ctor_foreach(__preinit_array_start, __preinit_array_end, i) {
-		if (__preinit_array_start[i]) {
-			uk_pr_debug("Call pre-init constructor (entry %d (%p): %p())...\n",
-				    i, &__preinit_array_start[i],
-				    __preinit_array_start[i]);
-			__preinit_array_start[i]();
-		}
-	}
-
-	uk_pr_info("Constructor table at %p - %p\n",
-			__init_array_start, &__init_array_end);
-	uk_ctor_foreach(__init_array_start, __init_array_end, i) {
-		if (__init_array_start[i]) {
-			uk_pr_debug("Call constructor (entry %d (%p): %p())...\n",
-					i, &__init_array_start[i],
-					__init_array_start[i]);
-			__init_array_start[i]();
-		}
-	}
-
 #ifdef CONFIG_LIBUKBUS
 	uk_pr_info("Initialize bus handlers...\n");
 	uk_bus_init_all(uk_alloc_get_default());
@@ -129,6 +107,36 @@ static void main_thread_func(void *arg)
 	printf("%35s\n",
 	       STRINGIFY(UK_CODENAME) " " STRINGIFY(UK_FULLVERSION));
 #endif
+	/*
+	 * Application
+	 *
+	 * We are calling the application constructors right before calling
+	 * the application's main(). All of our Unikraft systems, VFS,
+	 * networking stack is initialized at this point. This way we closely
+	 * mimic what a regular user application (e.g., BSD, Linux) would expect
+	 * from its OS being initialized.
+	 */
+	uk_pr_info("Pre-init table at %p - %p\n",
+		   __preinit_array_start, &__preinit_array_end);
+	uk_ctor_foreach(__preinit_array_start, __preinit_array_end, i) {
+		if (__preinit_array_start[i]) {
+			uk_pr_debug("Call pre-init constructor (entry %d (%p): %p())...\n",
+				    i, &__preinit_array_start[i],
+				    __preinit_array_start[i]);
+			__preinit_array_start[i]();
+		}
+	}
+
+	uk_pr_info("Constructor table at %p - %p\n",
+			__init_array_start, &__init_array_end);
+	uk_ctor_foreach(__init_array_start, __init_array_end, i) {
+		if (__init_array_start[i]) {
+			uk_pr_debug("Call constructor (entry %d (%p): %p())...\n",
+					i, &__init_array_start[i],
+					__init_array_start[i]);
+			__init_array_start[i]();
+		}
+	}
 
 	uk_pr_info("Calling main(%d, [", tma->argc);
 	for (i = 0; i < tma->argc; ++i) {
