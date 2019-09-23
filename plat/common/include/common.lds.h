@@ -94,6 +94,14 @@
 	}								\
 	uk_ctortab_end = .;
 
+#define INITTAB_SECTION							\
+	uk_inittab_start = .;						\
+	.uk_inittab :							\
+	{								\
+		KEEP(*(SORT_BY_NAME(.uk_inittab_[1-6][0-9])))		\
+	}								\
+	uk_inittab_end = .;
+
 #define TLS_SECTIONS							\
 	. = ALIGN(0x8);							\
 	_tls_start = .;							\

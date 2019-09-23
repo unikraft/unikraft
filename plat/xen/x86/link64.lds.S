@@ -46,6 +46,8 @@ SECTIONS
 
 	CTORTAB_SECTION
 
+	INITTAB_SECTION
+
 	_rodata = .;
 	.rodata : {
 		*(.rodata)

@@ -53,6 +53,8 @@ SECTIONS
 
 	CTORTAB_SECTION
 
+	INITTAB_SECTION
+
 	/* Read-only data */
 	_rodata = .;
 	.rodata :

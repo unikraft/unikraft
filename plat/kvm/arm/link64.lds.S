@@ -73,6 +73,8 @@ SECTIONS {
 
 	CTORTAB_SECTION
 
+	INITTAB_SECTION
+
 	/* Read-only data */
 	. = ALIGN(__PAGE_SIZE);
 	_rodata = .;
