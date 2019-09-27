@@ -355,7 +355,7 @@ $(3): $(2) | prepare
 	$(call build_cmd_fixdep,AS,$(1),$(3),\
 		$(AS)  $(ASINCLUDES) $(ASINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),ASINCLUDES)) $($(call vprefix_lib,$(1),ASINCLUDES-y)) \
-		       $(ASFLAGS) $(ASFLAGS-y) \
+		       $(ASFLAGS) $(ASFLAGS-y) $(DBGFLAGS) $(DBGFLAGS-y) \
 		       $($(call vprefix_lib,$(1),ASFLAGS)) $($(call vprefix_lib,$(1),ASFLAGS-y)) \
 		       $(4) -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) \
 		       -c $(2) -o $(3) $(depflags)
@@ -373,7 +373,7 @@ $(3): $(2) | prepare
 	$(call build_cmd,AS,$(1),$(3),\
 		$(AS)  $(ASINCLUDES) $(ASINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),ASINCLUDES)) $($(call vprefix_lib,$(1),ASINCLUDES-y)) \
-		       $(ASFLAGS) $(ASFLAGS-y) \
+		       $(ASFLAGS) $(ASFLAGS-y) $(DBGFLAGS) $(DBGFLAGS-y) \
 		       $($(call vprefix_lib,$(1),ASFLAGS)) $($(call vprefix_lib,$(1),ASFLAGS-y)) \
 		       $(4) -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) \
 		       -c $(2) -o $(3)
@@ -391,7 +391,7 @@ $(3): $(2) | prepare
 	$(call build_cmd_fixdep,CC,$(1),$(3),\
 		$(CC)  $(CINCLUDES) $(CINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),CINCLUDES)) $($(call vprefix_lib,$(1),CINCLUDES-y)) \
-		       $(CFLAGS) $(CFLAGS-y) \
+		       $(CFLAGS) $(CFLAGS-y) $(DBGFLAGS) $(DBGFLAGS-y) \
 		       $($(call vprefix_lib,$(1),CFLAGS)) $($(call vprefix_lib,$(1),CFLAGS-y)) \
 		       $(4) -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) \
 		       -c $(2) -o $(3) $(depflags)
@@ -409,7 +409,7 @@ $(3): $(2) | prepare
 	$(call build_cmd_fixdep,CXX,$(1),$(3),\
 		$(CXX) $(CXXINCLUDES) $(CXXINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),CXXINCLUDES)) $($(call vprefix_lib,$(1),CXXINCLUDES-y)) \
-		       $(CXXFLAGS) $(CXXFLAGS-y) \
+		       $(CXXFLAGS) $(CXXFLAGS-y) $(DBGFLAGS) $(DBGFLAGS-y) \
 		       $($(call vprefix_lib,$(1),CXXFLAGS)) $($(call vprefix_lib,$(1),CXXFLAGS-y)) \
 		       $(4) -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) \
 		       -c $(2) -o $(3) $(depflags)
@@ -427,7 +427,7 @@ $(3): $(2) | prepare
 	$(call build_cmd,GOC,$(1),$(3),\
 		$(GOC) $(GOCINCLUDES) $(GOCINCLUDES-y) \
 			$($(call vprefix_lib,$(1),GOCINCLUDES)) $($(call vprefix_lib,$(1),GOCINCLUDES-y)) \
-			$(GOCFLAGS) $(GOCFLAGS-y) \
+			$(GOCFLAGS) $(GOCFLAGS-y) $(DBGFLAGS) $(DBGFLAGS-y) \
 			$($(call vprefix_lib,$(1),GOCFLAGS)) $($(call vprefix_lib,$(1),GOCFLAGS-y)) \
 			$(4) -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) \
 			-c $(2) -o $(3) $(depflags)
