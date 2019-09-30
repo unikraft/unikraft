@@ -1,4 +1,6 @@
 $(eval $(call addlib_s,libramfs,$(CONFIG_LIBRAMFS)))
 
+LIBRAMFS_CFLAGS-$(call gcc_version_ge,8,0) += -Wno-cast-function-type
+
 LIBRAMFS_SRCS-y += $(LIBRAMFS_BASE)/ramfs_vfsops.c
 LIBRAMFS_SRCS-y += $(LIBRAMFS_BASE)/ramfs_vnops.c

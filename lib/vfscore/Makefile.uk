@@ -2,6 +2,8 @@ $(eval $(call addlib_s,libvfscore,$(CONFIG_LIBVFSCORE)))
 
 CINCLUDES-y += -I$(LIBVFSCORE_BASE)/include
 
+LIBVFSCORE_CFLAGS-$(call gcc_version_ge,8,0) += -Wno-cast-function-type
+
 LIBVFSCORE_SRCS-y += $(LIBVFSCORE_BASE)/fd.c
 LIBVFSCORE_SRCS-y += $(LIBVFSCORE_BASE)/file.c
 LIBVFSCORE_SRCS-y += $(LIBVFSCORE_BASE)/stdio.c
@@ -15,7 +17,6 @@ LIBVFSCORE_SRCS-y += $(LIBVFSCORE_BASE)/lookup.c
 LIBVFSCORE_SRCS-y += $(LIBVFSCORE_BASE)/fops.c
 LIBVFSCORE_SRCS-y += $(LIBVFSCORE_BASE)/subr_uio.c
 LIBVFSCORE_SRCS-y += $(LIBVFSCORE_BASE)/pipe.c
-LIBVFSCORE_PIPE_FLAGS-y += -Wno-cast-function-type
 LIBVFSCORE_SRCS-y += $(LIBVFSCORE_BASE)/extra.ld
 
 
