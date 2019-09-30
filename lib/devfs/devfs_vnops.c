@@ -59,7 +59,8 @@
 
 #include <vfscore/fs.h>
 
-#include <uk/ctors.h>
+#include <uk/init.h>
+#include <uk/print.h>
 
 #include "devfs.h"
 #include <devfs/device.h>
@@ -310,21 +311,32 @@ static struct vfscore_fs_type fs_devfs = {
 
 UK_FS_REGISTER(fs_devfs);
 
-__constructor_prio(101) static void devfs_init(void)
-{
 #ifdef CONFIG_LIBDEVFS_AUTOMOUNT
+static int devfs_automount(void)
+{
 	int ret;
 
+	uk_pr_info("Mount devfs to /dev...");
+
+	/*
+	 * Try to create target mountpoint `/dev`. If creation fails
+	 * because it already exists, we are continuing.
+	 */
 	ret =  mkdir("/dev", S_IRWXU);
-	if (ret != 0) {
-		uk_pr_debug("Failed to mkdir /dev in %s\n", __func__);
-		return;
+	if (ret != 0 && errno != EEXIST) {
+		uk_pr_err("Failed to create /dev: %d\n", errno);
+		return -1;
 	}
 
 	ret = mount("", "/dev", "devfs", 0, NULL);
 	if (ret != 0) {
-		uk_pr_debug("Failed to mount /dev as devfs in %s\n", __func__);
-		return;
+		uk_pr_err("Failed to mount devfs to /dev: %d\n", errno);
+		return -1;
 	}
-#endif
+
+	return 0;
 }
+
+/* after vfscore mounted '/' (priority 4): */
+uk_rootfs_initcall_prio(devfs_automount, 5);
+#endif

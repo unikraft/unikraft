@@ -34,6 +34,7 @@
 #define _DEVICE_H
 
 #include <sys/types.h>
+#include <uk/init.h>
 
 #include <vfscore/uio.h>
 
@@ -207,5 +208,13 @@ int device_destroy(struct device *dev);
 int device_destroy_locked(struct device *dev);
 void device_register(struct device *device, const char *name, int flags);
 void read_partition_table(struct device *device);
+
+/*
+ * Ideally, any dev node registration should happen before we mount devfs.
+ * vfscore mounts '/' at priority 4, '/dev' is mounted at priority 5.
+ * To be on the safe side, we do the registration to devfs before both,
+ * at priority '3'.
+ */
+#define devfs_initcall(fn) uk_rootfs_initcall_prio(devfs_automount, 3)
 
 #endif /* !_DEVICE_H */
