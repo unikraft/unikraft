@@ -1,4 +1,4 @@
-menuconfig LIBVFSCORE
+config LIBVFSCORE
 	bool "vfscore: VFS Core Interface"
 	default n
 	select LIBNOLIBC if !HAVE_LIBC
@@ -6,6 +6,7 @@ menuconfig LIBVFSCORE
 	select LIBUKLOCK
 
 if LIBVFSCORE
+menu "vfscore: Configuration"
 
 config LIBVFSCORE_PIPE_SIZE_ORDER
 	int "Pipe size order"
@@ -13,4 +14,82 @@ config LIBVFSCORE_PIPE_SIZE_ORDER
 	help
 		The size of the internal buffer for anonymous pipes is 2^order.
 
+config LIBVFSCORE_AUTOMOUNT_ROOTFS
+bool "Automatically mount a root filesysytem (/)"
+default n
+help
+	Automatically mounts '/' during boot. If `libuklibparam` is
+	compiled in, the default root filesystem and mount options can
+	be changed with the following library parameters:
+	'vfs.rootfs', 'vfs.rootdev', 'vfs.rootflags', and 'vfs.rootopts'
+
+if LIBVFSCORE_AUTOMOUNT_ROOTFS
+	choice LIBVFSCORE_ROOTFS
+	prompt "Default root filesystem"
+	default LIBVFSCORE_ROOTFS_RAMFS
+
+		config LIBVFSCORE_ROOTFS_RAMFS
+		bool "RamFS"
+		select LIBRAMFS
+
+		config LIBVFSCORE_ROOTFS_9PFS
+		bool "9PFS"
+		select LIBUK9P
+		select LIB9PFS
+
+		config LIBVFSCORE_ROOTFS_CUSTOM
+		bool "Custom argument"
+		help
+			Please set LIBVFSCORE_ROOTFS_CUSTOM_ARG
+			to a filesystem name that should be used
+			as default.
+	endchoice
+
+	config LIBVFSCORE_ROOTFS_CUSTOM_ARG
+	string "Default custom root filesystem"
+	default ""
+	depends on LIBVFSCORE_ROOTFS_CUSTOM
+	help
+		Custom name of a filesystem to mount (e.g., ramfs,
+		9pfs). Make sure that the specified filesystem
+		is available for libvfscore.
+
+	# Hidden configuration option that gets automatically filled
+	# with the selected filesystem name
+	config LIBVFSCORE_ROOTFS
+	string
+	default "ramfs" if LIBVFSCORE_ROOTFS_RAMFS
+	default "9pfs" if LIBVFSCORE_ROOTFS_9PFS
+	default LIBVFSCORE_ROOTFS_CUSTOM_ARG if LIBVFSCORE_ROOTFS_CUSTOM
+	default ""
+
+	# The root device option is hidden for RamFS and 9PFS
+	config LIBVFSCORE_ROOTDEV
+	string "Default root device"
+	depends on !LIBVFSCORE_ROOTFS_RAMFS && !LIBVFSCORE_ROOTFS_9PFS
+	default ""
+	help
+		Device to mount the filesystem from. Depending on the
+		selected filesystem, this option may not be required.
+
+	# The root flags is hidden for RamFS
+	config LIBVFSCORE_ROOTFLAGS
+	hex "Default root mount flags"
+	depends on !LIBVFSCORE_ROOTFS_RAMFS
+	default 0x0
+	help
+		Mount flags.
+
+	# The root options are hidden for RamFS
+	config LIBVFSCORE_ROOTOPTS
+	string "Default root mount options"
+	depends on !LIBVFSCORE_ROOTFS_RAMFS
+	default ""
+	help
+		Usually a comma-separated list of additional mount
+		options that are directly interpreted by the target
+		filesystem.
+endif
+
+endmenu
 endif

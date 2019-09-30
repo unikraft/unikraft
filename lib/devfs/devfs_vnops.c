@@ -312,14 +312,8 @@ UK_FS_REGISTER(fs_devfs);
 
 __constructor_prio(101) static void devfs_init(void)
 {
-#ifdef CONFIG_LIBDEVFS_USE_RAMFS
+#ifdef CONFIG_LIBDEVFS_AUTOMOUNT
 	int ret;
-
-	ret = mount("", "/", "ramfs", 0, NULL);
-	if (ret != 0) {
-		uk_pr_debug("Failed to mount / in %s\n", __func__);
-		return;
-	}
 
 	ret =  mkdir("/dev", S_IRWXU);
 	if (ret != 0) {

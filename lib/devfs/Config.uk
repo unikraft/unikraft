@@ -1,10 +1,11 @@
-config LIBDEVFS
+menuconfig LIBDEVFS
 	bool "devfs: devfs file system"
 	default n
 	depends on LIBVFSCORE
+
 if LIBDEVFS
-        config LIBDEVFS_USE_RAMFS
-        bool "Use ramfs as root"
+	config LIBDEVFS_AUTOMOUNT
+        bool "Mount /dev during boot"
+	depends on LIBVFSCORE_AUTOMOUNT_ROOTFS
         default n
-        select LIBRAMFS
 endif

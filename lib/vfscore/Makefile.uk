@@ -1,5 +1,8 @@
 $(eval $(call addlib_s,libvfscore,$(CONFIG_LIBVFSCORE)))
 
+# Register to uklibparam, sets "vfs" as parameter prefix (vfs.*)
+$(eval $(call addlib_paramprefix,libvfscore,vfs))
+
 CINCLUDES-y += -I$(LIBVFSCORE_BASE)/include
 
 LIBVFSCORE_CFLAGS-$(call gcc_version_ge,8,0) += -Wno-cast-function-type
@@ -18,6 +21,8 @@ LIBVFSCORE_SRCS-y += $(LIBVFSCORE_BASE)/fops.c
 LIBVFSCORE_SRCS-y += $(LIBVFSCORE_BASE)/subr_uio.c
 LIBVFSCORE_SRCS-y += $(LIBVFSCORE_BASE)/pipe.c
 LIBVFSCORE_SRCS-y += $(LIBVFSCORE_BASE)/extra.ld
+LIBVFSCORE_SRCS-$(CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS) += \
+	$(LIBVFSCORE_BASE)/rootfs.c
 
 
 UK_PROVIDED_SYSCALLS-$(CONFIG_LIBVFSCORE) += writev-3
