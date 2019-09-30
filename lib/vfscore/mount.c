@@ -80,17 +80,18 @@ fs_getfs(const char *name)
 {
 	const struct vfscore_fs_type *fs = NULL, **__fs;
 
+	UK_ASSERT(name != NULL);
+
 	for_each_fs(__fs) {
 		fs = *__fs;
-		if (fs == NULL)
+		if (!fs || !fs->vs_name)
 			continue;
 
-		if (!strncmp(name, fs->vs_name, FSMAXNAMES))
-			break;
+		if (strncmp(name, fs->vs_name, FSMAXNAMES) == 0)
+			return fs;
 	}
-	if (!fs || !fs->vs_name)
-		return NULL;
-	return fs;
+
+	return NULL;
 }
 
 int device_open(const char *name __unused, int mode __unused,
