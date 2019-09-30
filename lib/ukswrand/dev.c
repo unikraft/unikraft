@@ -101,19 +101,30 @@ static struct driver drv_urandom = {
 	.name = DEV_URANDOM_NAME
 };
 
-__constructor_prio(102) static void _uk_dev_swrand_ctor(void)
+static int devfs_register(void)
 {
 	struct device *dev;
 
-	uk_pr_info("Add /dev/random and /dev/urandom\n");
+	uk_pr_info("Register '%s' and '%s' to devfs\n",
+		   DEV_URANDOM_NAME, DEV_RANDOM_NAME);
 
 	/* register /dev/urandom */
 	dev = device_create(&drv_urandom, DEV_URANDOM_NAME, D_CHR);
-	if (dev == NULL)
-		uk_pr_info("Failed to register /dev/urandom\n");
+	if (dev == NULL) {
+		uk_pr_err("Failed to register '%s' to devfs\n",
+			  DEV_URANDOM_NAME);
+		return -1;
+	}
 
 	/* register /dev/random */
 	dev = device_create(&drv_random, DEV_RANDOM_NAME, D_CHR);
-	if (dev == NULL)
-		uk_pr_info("Failed to register /dev/random\n");
+	if (dev == NULL) {
+		uk_pr_err("Failed to register '%s' to devfs\n",
+			  DEV_RANDOM_NAME);
+		return -1;
+	}
+
+	return 0;
 }
+
+devfs_initcall(devfs_register);

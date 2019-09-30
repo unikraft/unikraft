@@ -18,9 +18,10 @@ config LIBUKSWRAND_INITIALSEED
 	int "Initial random seed"
 	default 23
 
-config DEV_RANDOM
-	bool "/dev/random device"
+config LIBUKSWRAND_DEVFS
+	bool "Register random and urandom device to devfs"
 	select LIBDEVFS
+	select LIBVFSCORE
 	default n
 
 endif
