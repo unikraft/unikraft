@@ -72,6 +72,9 @@ long sysconf(int name)
 	if (name == _SC_NPROCESSORS_ONLN)
 		return 1;
 
+	if (name == _SC_PAGESIZE)
+		return __PAGE_SIZE;
+
 	return 0;
 }
 
