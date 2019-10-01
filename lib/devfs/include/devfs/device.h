@@ -215,6 +215,6 @@ void read_partition_table(struct device *device);
  * To be on the safe side, we do the registration to devfs before both,
  * at priority '3'.
  */
-#define devfs_initcall(fn) uk_rootfs_initcall_prio(devfs_automount, 3)
+#define devfs_initcall(fn) uk_rootfs_initcall_prio(fn, 3)
 
 #endif /* !_DEVICE_H */
