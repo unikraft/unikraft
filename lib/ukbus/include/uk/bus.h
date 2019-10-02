@@ -64,52 +64,6 @@ void _uk_bus_register(struct uk_bus *b);
 /* Do not use this function directly: */
 void _uk_bus_unregister(struct uk_bus *b);
 
-/* Initializes a bus driver */
-int uk_bus_init(struct uk_bus *b, struct uk_alloc *a);
-
-/* Scan for devices on the bus */
-int uk_bus_probe(struct uk_bus *b);
-
-/* Returns the number of successfully initialized device buses */
-static inline unsigned int uk_bus_init_all(struct uk_alloc *a)
-{
-	struct uk_bus *b, *b_next;
-	unsigned int ret = 0;
-	int status = 0;
-
-	if (uk_bus_count() == 0)
-		return 0;
-
-	uk_list_for_each_entry_safe(b, b_next, &uk_bus_list, list) {
-		if ((status = uk_bus_init(b, a)) >= 0) {
-			++ret;
-		} else {
-			uk_pr_err("Failed to initialize bus driver %p: %d\n",
-				  b, status);
-
-			/* Remove the failed driver from the list */
-			_uk_bus_unregister(b);
-		}
-	}
-	return ret;
-}
-
-/* Returns the number of successfully probed device buses */
-static inline unsigned int uk_bus_probe_all(void)
-{
-	struct uk_bus *b;
-	unsigned int ret = 0;
-
-	if (uk_bus_count() == 0)
-		return 0;
-
-	uk_list_for_each_entry(b, &uk_bus_list, list) {
-		if (uk_bus_probe(b) >= 0)
-			++ret;
-	}
-	return ret;
-}
-
 /* registers a bus driver to the bus system */
 #define UK_BUS_REGISTER(b) \
 	_UK_BUS_REGISTER(__LIBNAME__, b)

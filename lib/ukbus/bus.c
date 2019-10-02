@@ -35,9 +35,16 @@
 #include <uk/bus.h>
 #include <uk/assert.h>
 #include <uk/print.h>
+#include <uk/init.h>
 
 UK_LIST_HEAD(uk_bus_list);
 static unsigned int bus_count;
+
+static int uk_bus_init(struct uk_bus *b, struct uk_alloc *a);
+static int uk_bus_probe(struct uk_bus *b);
+static unsigned int uk_bus_init_all(struct uk_alloc *a);
+static unsigned int uk_bus_probe_all(void);
+static int uk_bus_lib_init(void);
 
 void _uk_bus_register(struct uk_bus *b)
 {
@@ -64,7 +71,7 @@ unsigned int uk_bus_count(void)
 	return bus_count;
 }
 
-int uk_bus_init(struct uk_bus *b, struct uk_alloc *a)
+static int uk_bus_init(struct uk_bus *b, struct uk_alloc *a)
 {
 	UK_ASSERT(b != NULL);
 
@@ -75,7 +82,7 @@ int uk_bus_init(struct uk_bus *b, struct uk_alloc *a)
 }
 
 
-int uk_bus_probe(struct uk_bus *b)
+static int uk_bus_probe(struct uk_bus *b)
 {
 	UK_ASSERT(b != NULL);
 	UK_ASSERT(b->probe != NULL);
@@ -83,3 +90,53 @@ int uk_bus_probe(struct uk_bus *b)
 	uk_pr_debug("Probe bus %p...\n", b);
 	return b->probe();
 }
+
+/* Returns the number of successfully initialized device buses */
+static unsigned int uk_bus_init_all(struct uk_alloc *a)
+{
+	struct uk_bus *b, *b_next;
+	unsigned int ret = 0;
+	int status = 0;
+
+	if (uk_bus_count() == 0)
+		return 0;
+
+	uk_list_for_each_entry_safe(b, b_next, &uk_bus_list, list) {
+		if ((status = uk_bus_init(b, a)) >= 0) {
+			++ret;
+		} else {
+			uk_pr_err("Failed to initialize bus driver %p: %d\n",
+				  b, status);
+
+			/* Remove the failed driver from the list */
+			_uk_bus_unregister(b);
+		}
+	}
+	return ret;
+}
+
+/* Returns the number of successfully probed device buses */
+static unsigned int uk_bus_probe_all(void)
+{
+	struct uk_bus *b;
+	unsigned int ret = 0;
+
+	if (uk_bus_count() == 0)
+		return 0;
+
+	uk_list_for_each_entry(b, &uk_bus_list, list) {
+		if (uk_bus_probe(b) >= 0)
+			++ret;
+	}
+	return ret;
+}
+
+static int uk_bus_lib_init(void)
+{
+	uk_pr_info("Initialize bus handlers...\n");
+	uk_bus_init_all(uk_alloc_get_default());
+	uk_pr_info("Probe buses...\n");
+	uk_bus_probe_all();
+	return 0;
+}
+uk_early_initcall_prio(uk_bus_lib_init, 0);

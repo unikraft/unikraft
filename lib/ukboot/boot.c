@@ -58,9 +58,6 @@
 #include <uk/ctors.h>
 #include <uk/init.h>
 #include <uk/argparse.h>
-#if CONFIG_LIBUKBUS
-#include <uk/bus.h>
-#endif /* CONFIG_LIBUKBUS */
 #ifdef CONFIG_LIBUKLIBPARAM
 #include <uk/libparam.h>
 #endif /* CONFIG_LIBUKLIBPARAM */
@@ -98,13 +95,6 @@ static void main_thread_func(void *arg)
 			goto exit;
 		}
 	}
-
-#ifdef CONFIG_LIBUKBUS
-	uk_pr_info("Initialize bus handlers...\n");
-	uk_bus_init_all(uk_alloc_get_default());
-	uk_pr_info("Probe buses...\n");
-	uk_bus_probe_all();
-#endif /* CONFIG_LIBUKBUS */
 
 #ifdef CONFIG_LIBLWIP
 	/*
