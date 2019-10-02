@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
  *
- * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2019, University Politehnica of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,50 +32,13 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#ifndef __UK_SWRAND__
-#define __UK_SWRAND__
+#include <string.h>
+#include <sys/random.h>
+#include <uk/essentials.h>
+#include <uk/swrand.h>
 
-#include <sys/types.h>
-#include <uk/arch/types.h>
-#include <uk/plat/lcpu.h>
-#include <uk/config.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-struct uk_swrand {
-#ifdef CONFIG_LIBUKSWRAND_MWC
-        __u32 Q[4096];
-        __u32 c;
-        __u32 i;
-#endif
-};
-
-extern struct uk_swrand uk_swrand_def;
-
-void uk_swrand_init_r(struct uk_swrand *r, __u32 seed);
-__u32 uk_swrand_randr_r(struct uk_swrand *r);
-
-/* Uses the pre-initialized default generator  */
-/* TODO: Add assertion when we can test if we are in interrupt context */
-/* TODO: Revisit with multi-CPU support */
-static inline __u32 uk_swrand_randr(void)
+ssize_t getrandom(void *buf, size_t buflen, unsigned int flags __unused)
 {
-	unsigned long iflags;
-	__u32 ret;
-
-	iflags = ukplat_lcpu_save_irqf();
-	ret = uk_swrand_randr_r(&uk_swrand_def);
-	ukplat_lcpu_restore_irqf(iflags);
-
-	return ret;
+	return uk_swrand_fill_buffer(buf, buflen);
 }
-
-ssize_t uk_swrand_fill_buffer(void *buf, size_t buflen);
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* __UK_SWRAND__ */

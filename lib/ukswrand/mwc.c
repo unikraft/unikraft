@@ -90,6 +90,26 @@ __u32 uk_swrand_randr_r(struct uk_swrand *r)
 	return (r->Q[i] = y - x);
 }
 
+ssize_t uk_swrand_fill_buffer(void *buf, size_t buflen)
+{
+	size_t step, chunk_size, i;
+	__u32 rd;
+
+	step = sizeof(__u32);
+	chunk_size = buflen % step;
+
+	for (i = 0; i < buflen - chunk_size; i += step)
+		*((char *) buf + i) = uk_swrand_randr();
+
+	/* fill the remaining bytes of the buffer */
+	if (chunk_size > 0) {
+		rd = uk_swrand_randr();
+		memcpy(buf + i, &rd, chunk_size);
+	}
+
+	return buflen;
+}
+
 static void _uk_swrand_ctor(void)
 {
 	uk_pr_info("Initialize random number generator...\n");

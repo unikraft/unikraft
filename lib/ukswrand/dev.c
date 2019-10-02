@@ -56,17 +56,7 @@ int dev_random_read(struct device *dev __unused, struct uio *uio,
 	buf = uio->uio_iov->iov_base;
 	count = uio->uio_iov->iov_len;
 
-	step = sizeof(__u32);
-	chunk_size = count % step;
-
-	for (i = 0; i < count - chunk_size; i += step)
-		*(buf + i) = uk_swrand_randr();
-
-	/* fill the remaining bytes of the buffer */
-	if (chunk_size > 0) {
-		rd = uk_swrand_randr();
-		memcpy(buf + i, &rd, chunk_size);
-	}
+	uk_swrand_fill_buffer(buf, count);
 
 	uio->uio_resid = 0;
 	return 0;
