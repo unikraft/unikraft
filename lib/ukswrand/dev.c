@@ -49,9 +49,8 @@
 int dev_random_read(struct device *dev __unused, struct uio *uio,
 			int flags __unused)
 {
-	size_t count, step, chunk_size, i;
+	size_t count;
 	char *buf;
-	__u32 rd;
 
 	buf = uio->uio_iov->iov_base;
 	count = uio->uio_iov->iov_len;

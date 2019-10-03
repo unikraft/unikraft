@@ -33,6 +33,7 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
+#include <string.h>
 #include <uk/swrand.h>
 #include <uk/print.h>
 #include <uk/assert.h>
