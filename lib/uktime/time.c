@@ -35,16 +35,23 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#include <time.h>
-#include <uk/plat/time.h>
 #include <errno.h>
+#include <time.h>
+#include <utime.h>
+#include <unistd.h>
+#include <sys/time.h>
+#include <uk/plat/time.h>
 #include <uk/config.h>
 #if CONFIG_HAVE_SCHED
 #include <uk/sched.h>
 #else
 #include <uk/plat/lcpu.h>
 #endif
-#include <uk/essentials.h>
+
+int utime(const char *filename __unused, const struct utimbuf *times __unused)
+{
+	return 0;
+}
 
 #ifndef CONFIG_HAVE_SCHED
 /* Workaround until Unikraft changes interface for something more
@@ -92,6 +99,18 @@ int nanosleep(const struct timespec *req, struct timespec *rem)
 	return 0;
 }
 
+int usleep(useconds_t usec)
+{
+	struct timespec ts;
+
+	ts.tv_sec = (long int) (usec / 1000000);
+	ts.tv_nsec = (long int) ukarch_time_usec_to_nsec(usec % 1000000);
+	if (nanosleep(&ts, &ts))
+		return -1;
+
+	return 0;
+}
+
 unsigned int sleep(unsigned int seconds)
 {
 	struct timespec ts;
@@ -118,7 +137,12 @@ int gettimeofday(struct timeval *tv, void *tz __unused)
 	return 0;
 }
 
-int clock_gettime(clockid_t clk_id, struct timespec *tp)
+int clock_getres(clockid_t clk_id __unused, struct timespec *res __unused)
+{
+	return 0;
+}
+
+int clock_gettime(clockid_t clk_id __unused, struct timespec *tp __unused)
 {
 	__nsec now;
 
@@ -142,4 +166,15 @@ int clock_gettime(clockid_t clk_id, struct timespec *tp)
 	tp->tv_sec = ukarch_time_nsec_to_sec(now);
 	tp->tv_nsec = ukarch_time_subsec(now);
 	return 0;
+}
+
+int clock_settime(clockid_t clk_id __unused, const struct timespec *tp __unused)
+{
+	return 0;
+}
+
+int times(struct tm *buf __unused)
+{
+	errno = ENODATA;
+	return -1;
 }

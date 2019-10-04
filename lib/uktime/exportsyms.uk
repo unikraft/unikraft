@@ -1,5 +1,10 @@
+clock_getres
 clock_gettime
+clock_settime
 gettimeofday
 nanosleep
 sleep
 timegm
+times
+usleep
+utime
