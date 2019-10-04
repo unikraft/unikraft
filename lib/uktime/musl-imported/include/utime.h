@@ -7,7 +7,7 @@ extern "C" {
 
 #define __NEED_time_t
 
-#include <bits/alltypes.h>
+#include <sys/types.h>
 
 struct utimbuf {
 	time_t actime;
