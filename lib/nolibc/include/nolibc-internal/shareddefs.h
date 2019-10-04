@@ -91,9 +91,19 @@ struct timespec {
 #define __DEFINED_struct_timespec
 #endif
 
+#if defined(__NEED_timer_t) && !defined(__DEFINED_timer_t)
+typedef void *timer_t;
+#define __DEFINED_timer_t
+#endif
+
 #if (defined __NEED_clockid_t && !defined __DEFINED_clockid_t)
 typedef int clockid_t;
 #define __DEFINED_clockid_t
+#endif
+
+#if defined(__NEED_clock_t) && !defined(__DEFINED_clock_t)
+typedef long clock_t;
+#define __DEFINED_clock_t
 #endif
 
 #if (defined __NEED_mode_t && !defined __DEFINED_mode_t)
@@ -109,6 +119,11 @@ typedef unsigned uid_t;
 #if defined(__NEED_gid_t) && !defined(__DEFINED_gid_t)
 typedef unsigned gid_t;
 #define __DEFINED_gid_t
+#endif
+
+#if defined(__NEED_useconds_t) && !defined(__DEFINED_useconds_t)
+typedef unsigned useconds_t;
+#define __DEFINED_useconds_t
 #endif
 
 #if defined(__NEED_pid_t) && !defined(__DEFINED_pid_t)
@@ -139,6 +154,11 @@ typedef __s64 blkcnt_t;
 #if defined(__NEED_blksize_t) && !defined(__DEFINED_blksize_t)
 typedef long blksize_t;
 #define __DEFINED_blksize_t
+#endif
+
+#if defined(__NEED_locale_t) && !defined(__DEFINED_locale_t)
+typedef struct __locale_struct *locale_t;
+#define __DEFINED_locale_t
 #endif
 
 #if defined(__NEED_struct_iovec) && !defined(__DEFINED_struct_iovec)

@@ -175,6 +175,6 @@ int clock_settime(clockid_t clk_id __unused, const struct timespec *tp __unused)
 
 int times(struct tm *buf __unused)
 {
-	errno = ENODATA;
+	errno = ENOTSUP;
 	return -1;
 }

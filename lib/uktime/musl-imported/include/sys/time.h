@@ -4,6 +4,9 @@
 extern "C" {
 #endif
 
+#define __NEED_time_t
+#define __NEED_suseconds_t
+#define __NEED_struct_timeval
 #include <sys/types.h>
 #include <sys/select.h>
 
