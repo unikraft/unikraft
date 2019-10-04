@@ -5,31 +5,16 @@
 extern "C" {
 #endif
 
-#if 0
-#include <features.h>
-
-#ifdef __cplusplus
-#define NULL 0L
-#else
-#define NULL ((void*)0)
-#endif
-
-
 #define __NEED_size_t
 #define __NEED_time_t
 #define __NEED_clock_t
 #define __NEED_struct_timespec
-
-#if defined(_POSIX_SOURCE) || defined(_POSIX_C_SOURCE) \
- || defined(_XOPEN_SOURCE) || defined(_GNU_SOURCE) \
- || defined(_BSD_SOURCE)
 #define __NEED_clockid_t
 #define __NEED_timer_t
 #define __NEED_pid_t
 #define __NEED_locale_t
-#endif
 
-#include <bits/alltypes.h>
+#include <sys/types.h>
 
 #if defined(_BSD_SOURCE) || defined(_GNU_SOURCE)
 #define __tm_gmtoff tm_gmtoff
@@ -64,10 +49,6 @@ int timespec_get(struct timespec *, int);
 #define CLOCKS_PER_SEC 1000000L
 
 #define TIME_UTC 1
-
-#if defined(_POSIX_SOURCE) || defined(_POSIX_C_SOURCE) \
- || defined(_XOPEN_SOURCE) || defined(_GNU_SOURCE) \
- || defined(_BSD_SOURCE)
 
 size_t strftime_l (char *  __restrict, size_t, const char *  __restrict, const struct tm *  __restrict, locale_t);
 
@@ -114,16 +95,12 @@ int timer_getoverrun (timer_t);
 
 extern char *tzname[2];
 
-#endif
-
-
 #if defined(_XOPEN_SOURCE) || defined(_BSD_SOURCE) || defined(_GNU_SOURCE)
 char *strptime (const char *__restrict, const char *__restrict, struct tm *__restrict);
 extern int daylight;
 extern long timezone;
 extern int getdate_err;
 struct tm *getdate (const char *);
-#endif
 #endif
 
 
