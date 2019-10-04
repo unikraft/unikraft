@@ -1,1 +1,5 @@
+clock_gettime
+gettimeofday
+nanosleep
+sleep
 timegm

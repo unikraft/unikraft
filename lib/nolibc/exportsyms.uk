@@ -72,16 +72,6 @@ strlcat
 strerror_r
 strerror
 
-# time
-nanosleep
-clock_gettime
-
-# unistd
-sleep
-
-# sys/time
-gettimeofday
-
 # ctype
 _nolibc_ctype
 
