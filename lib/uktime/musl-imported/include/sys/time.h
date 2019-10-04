@@ -4,8 +4,7 @@
 extern "C" {
 #endif
 
-#include <features.h>
-
+#include <sys/types.h>
 #include <sys/select.h>
 
 int gettimeofday (struct timeval *__restrict, void *__restrict);
