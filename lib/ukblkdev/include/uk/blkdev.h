@@ -421,6 +421,56 @@ int uk_blkdev_queue_submit_one(struct uk_blkdev *dev, uint16_t queue_id,
  */
 int uk_blkdev_queue_finish_reqs(struct uk_blkdev *dev, uint16_t queue_id);
 
+#if CONFIG_LIBUKBLKDEV_SYNC_IO_BLOCKED_WAITING
+/**
+ * Make a sync io request on a specific queue.
+ * `uk_blkdev_queue_finish_reqs()` must be called in queue interrupt context
+ * or another thread context in order to avoid blocking of the thread forever.
+ *
+ * @param dev
+ *	The Unikraft Block Device
+ * @param queue_id
+ *	queue_id
+ * @param op
+ *	Type of operation
+ * @param sector
+ *	Start Sector
+ * @param nb_sectors
+ *	Number of sectors
+ * @param buf
+ *	Buffer where data is found
+ * @return
+ *	- 0: Success
+ *	- (<0): on error returned by driver
+ */
+int uk_blkdev_sync_io(struct uk_blkdev *dev,
+		uint16_t queue_id,
+		enum uk_blkreq_op op,
+		__sector sector,
+		__sector nb_sectors,
+		void *buf);
+
+/*
+ * Wrappers for uk_blkdev_sync_io
+ */
+#define uk_blkdev_sync_write(blkdev,\
+		queue_id,	\
+		sector,		\
+		nb_sectors,	\
+		buf)		\
+	uk_blkdev_sync_io(blkdev, queue_id, UK_BLKDEV_WRITE, sector, \
+			nb_sectors, buf) \
+
+#define uk_blkdev_sync_read(blkdev,\
+		queue_id,	\
+		sector,		\
+		nb_sectors,	\
+		buf)		\
+	uk_blkdev_sync_io(blkdev, queue_id, UK_BLKDEV_READ, sector, \
+			nb_sectors, buf) \
+
+#endif
+
 #ifdef __cplusplus
 }
 #endif

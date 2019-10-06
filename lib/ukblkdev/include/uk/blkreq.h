@@ -105,6 +105,46 @@ struct uk_blkreq {
 
 };
 
+/**
+ * Initializes a request structure.
+ *
+ * @param req
+ *	The request structure
+ * @param op
+ *	The operation
+ * @param start
+ *	The start sector
+ * @param nb_sectors
+ *	Number of sectors
+ * @param aio_buf
+ *	Data buffer
+ * @param cb
+ *	Request callback
+ * @param cb_cookie
+ *	Request callback parameters
+ **/
+static inline void uk_blkreq_init(struct uk_blkreq *req,
+		enum uk_blkreq_op op, __sector start, __sector nb_sectors,
+		void *aio_buf, uk_blkreq_event_t cb, void *cb_cookie)
+{
+	req->operation = op;
+	req->start_sector = start;
+	req->nb_sectors = nb_sectors;
+	req->aio_buf = aio_buf;
+	ukarch_store_n(&req->state.counter, UK_BLKDEV_REQ_UNFINISHED);
+	req->cb = cb;
+	req->cb_cookie = cb_cookie;
+}
+
+/**
+ * Checks if request is finished.
+ *
+ * @param req
+ *	uk_blkreq structure
+ **/
+#define uk_blkreq_is_done(req) \
+		(ukarch_load_n(&(req)->state.counter) == UK_BLKDEV_REQ_FINISHED)
+
 #ifdef __cplusplus
 }
 #endif

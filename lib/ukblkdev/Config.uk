@@ -25,4 +25,13 @@ if LIBUKBLKDEV
 			When this option is enabled a dispatcher thread is
 			allocated for each configured queue.
 			libuksched is required for this option.
+
+        config LIBUKBLKDEV_SYNC_IO_BLOCKED_WAITING
+                bool "Synchronous I/O API"
+                default n
+                select LIBUKSCHED
+                select LIBUKLOCK
+		 select LIBUKLOCK_SEMAPHORE
+                help
+                        Use semaphore for waiting after a request I/O is done.
 endif

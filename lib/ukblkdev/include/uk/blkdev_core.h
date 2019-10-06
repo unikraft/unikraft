@@ -40,7 +40,8 @@
 #include <uk/config.h>
 #include <uk/blkreq.h>
 #include <fcntl.h>
-#if defined(CONFIG_LIBUKBLKDEV_DISPATCHERTHREADS)
+#if defined(CONFIG_LIBUKBLKDEV_DISPATCHERTHREADS) || \
+		defined(CONFIG_LIBUKBLKDEV_SYNC_IO_BLOCKED_WAITING)
 #include <uk/sched.h>
 #include <uk/semaphore.h>
 #endif

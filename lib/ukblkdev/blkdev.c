@@ -408,3 +408,61 @@ int uk_blkdev_queue_finish_reqs(struct uk_blkdev *dev,
 
 	return dev->finish_reqs(dev, dev->_queue[queue_id]);
 }
+
+#if CONFIG_LIBUKBLKDEV_SYNC_IO_BLOCKED_WAITING
+/**
+ * Used for sending a synchronous request.
+ */
+struct uk_blkdev_sync_io_request {
+	struct uk_blkreq req;	/* Request structure. */
+
+	/* Semaphore used for waiting after the response is done. */
+	struct uk_semaphore s;
+};
+
+static void __sync_io_callback(struct uk_blkreq *req,
+		void *cookie_callback)
+{
+	struct uk_blkdev_sync_io_request *sync_io_req;
+
+	UK_ASSERT(req);
+	UK_ASSERT(cookie_callback);
+
+	sync_io_req = (struct uk_blkdev_sync_io_request *)cookie_callback;
+	uk_semaphore_up(&sync_io_req->s);
+}
+
+int uk_blkdev_sync_io(struct uk_blkdev *dev,
+		uint16_t queue_id,
+		enum uk_blkreq_op operation,
+		__sector start_sector,
+		__sector nb_sectors,
+		void *buf)
+{
+	struct uk_blkreq *req;
+	int rc = 0;
+	struct uk_blkdev_sync_io_request sync_io_req;
+
+	UK_ASSERT(dev != NULL);
+	UK_ASSERT(queue_id < CONFIG_LIBUKBLKDEV_MAXNBQUEUES);
+	UK_ASSERT(dev->_data);
+	UK_ASSERT(dev->submit_one);
+	UK_ASSERT(dev->_data->state == UK_BLKDEV_RUNNING);
+	UK_ASSERT(!PTRISERR(dev->_queue[queue_id]));
+
+	req = &sync_io_req.req;
+	uk_blkreq_init(req, operation, start_sector, nb_sectors, buf,
+			__sync_io_callback, (void *)&sync_io_req);
+	uk_semaphore_init(&sync_io_req.s, 0);
+
+	rc = uk_blkdev_queue_submit_one(dev, queue_id, req);
+	if (unlikely(!uk_blkdev_status_successful(rc))) {
+		uk_pr_err("blkdev%"PRIu16"-q%"PRIu16": Failed to submit I/O req: %d\n",
+				dev->_data->id, queue_id, rc);
+		return rc;
+	}
+
+	uk_semaphore_down(&sync_io_req.s);
+	return req->result;
+}
+#endif
