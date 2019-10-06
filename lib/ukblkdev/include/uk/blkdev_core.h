@@ -38,6 +38,8 @@
 
 #include <uk/list.h>
 #include <uk/config.h>
+#include <uk/blkreq.h>
+#include <fcntl.h>
 #if defined(CONFIG_LIBUKBLKDEV_DISPATCHERTHREADS)
 #include <uk/sched.h>
 #include <uk/semaphore.h>
@@ -121,6 +123,9 @@ struct uk_blkdev_queue;
  *   The queue on the Unikraft block device on which the event happened.
  * @param argp
  *   Extra argument that can be defined on callback registration.
+ *
+ * Note: This should call dev->finish_reqs function in order to process the
+ *   received responses.
  */
 typedef void (*uk_blkdev_queue_event_t)(struct uk_blkdev *dev,
 		uint16_t queue_id, void *argp);
@@ -163,12 +168,64 @@ typedef struct uk_blkdev_queue * (*uk_blkdev_queue_configure_t)(
 /** Driver callback type to start a configured Unikraft block device. */
 typedef int (*uk_blkdev_start_t)(struct uk_blkdev *dev);
 
+/**
+ * Driver callback type to enable interrupts
+ * for a queue on Unikraft block device.
+ **/
+typedef int (*uk_blkdev_queue_intr_enable_t)(struct uk_blkdev *dev,
+		struct uk_blkdev_queue *queue);
+
+/**
+ * Driver callback type to disable interrupts
+ *	for a queue on Unikraft block device.
+ **/
+typedef int (*uk_blkdev_queue_intr_disable_t)(struct uk_blkdev *dev,
+		struct uk_blkdev_queue *queue);
+/**
+ * Status code flags returned queue_submit_one function
+ */
+/** Successful operation. */
+#define UK_BLKDEV_STATUS_SUCCESS  (0x1)
+/**
+ * More room available for operation (e.g., still space on queue for sending
+ * a request.
+ */
+#define UK_BLKDEV_STATUS_MORE     (0x2)
+
+/** Driver callback type to submit a request to Unikraft block device. */
+typedef int (*uk_blkdev_queue_submit_one_t)(struct uk_blkdev *dev,
+		struct uk_blkdev_queue *queue, struct uk_blkreq *req);
+/**
+ * Driver callback type to finish
+ * a bunch of requests to Unikraft block device.
+ **/
+typedef int (*uk_blkdev_queue_finish_reqs_t)(struct uk_blkdev *dev,
+		struct uk_blkdev_queue *queue);
+
 struct uk_blkdev_ops {
 	uk_blkdev_get_info_t				get_info;
 	uk_blkdev_configure_t				dev_configure;
 	uk_blkdev_queue_get_info_t			queue_get_info;
 	uk_blkdev_queue_configure_t			queue_setup;
 	uk_blkdev_start_t				dev_start;
+	uk_blkdev_queue_intr_enable_t			queue_intr_enable;
+	uk_blkdev_queue_intr_disable_t			queue_intr_disable;
+};
+
+/**
+ * Device info
+ */
+struct uk_blkdev_cap {
+	/* Number of sectors */
+	__sector sectors;
+	/* Sector size */
+	size_t ssize;
+	/* Access mode (O_RDONLY, O_RDWR, O_WRONLY) */
+	int mode;
+	/* Max nb of supported sectors for an op */
+	__sector max_sectors_per_req;
+	/* Alignment (number of bytes) for data used in future requests */
+	uint16_t ioalign;
 };
 
 /**
@@ -216,8 +273,14 @@ struct uk_blkdev_data {
 };
 
 struct uk_blkdev {
+	/* Pointer to submit request function */
+	uk_blkdev_queue_submit_one_t submit_one;
+	/* Pointer to handle_responses function */
+	uk_blkdev_queue_finish_reqs_t finish_reqs;
 	/* Pointer to API-internal state data. */
 	struct uk_blkdev_data *_data;
+	/* Capabilities. */
+	struct uk_blkdev_cap capabilities;
 	/* Functions callbacks by driver. */
 	const struct uk_blkdev_ops *dev_ops;
 	/* Pointers to queues (API-private) */

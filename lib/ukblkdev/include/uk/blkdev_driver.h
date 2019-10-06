@@ -69,6 +69,43 @@ extern "C" {
 int uk_blkdev_drv_register(struct uk_blkdev *dev, struct uk_alloc *a,
 		const char *drv_name);
 
+/**
+ * Forwards a queue event to the API user
+ * Can (and should) be called from device interrupt context
+ *
+ * @param dev
+ *	Unikraft block device to which the event relates to
+ * @param queue_id
+ *	receive queue ID to which the event relates to
+ */
+static inline void uk_blkdev_drv_queue_event(struct uk_blkdev *dev,
+		uint16_t queue_id)
+{
+	struct uk_blkdev_event_handler *queue_handler;
+
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->_data);
+	UK_ASSERT(queue_id < CONFIG_LIBUKBLKDEV_MAXNBQUEUES);
+
+	queue_handler = &dev->_data->queue_handler[queue_id];
+
+#if CONFIG_LIBUKBLKDEV_DISPATCHERTHREADS
+	uk_semaphore_up(&queue_handler->events);
+#else
+	if (queue_handler->callback)
+		queue_handler->callback(dev, queue_id, queue_handler->cookie);
+#endif
+}
+
+/**
+ * Sets a request as finished.
+ *
+ * @param req
+ *	uk_blkreq structure
+ */
+#define uk_blkreq_finished(req) \
+	(ukarch_store_n(&(req)->state.counter, UK_BLKDEV_REQ_FINISHED))
+
 #ifdef __cplusplus
 }
 #endif

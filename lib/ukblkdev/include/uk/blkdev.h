@@ -222,6 +222,205 @@ int uk_blkdev_queue_configure(struct uk_blkdev *dev, uint16_t queue_id,
  */
 int uk_blkdev_start(struct uk_blkdev *dev);
 
+/**
+ * Get the capabilities info which stores info about the device,
+ * like nb_of_sectors, sector_size etc
+ * The device state has to be UK_BLKDEV_RUNNING.
+ *
+ * @param dev
+ *	The Unikraft Block Device.
+ *
+ * @return
+ *	A pointer to a structure of type *uk_blkdev_capabilities*.
+ **/
+static inline const struct uk_blkdev_cap *uk_blkdev_capabilities(
+		struct uk_blkdev *blkdev)
+{
+	UK_ASSERT(blkdev);
+	UK_ASSERT(blkdev->_data->state >= UK_BLKDEV_RUNNING);
+
+	return &blkdev->capabilities;
+}
+
+#define uk_blkdev_ssize(blkdev) \
+	(uk_blkdev_capabilities(blkdev)->ssize)
+
+#define uk_blkdev_max_sec_per_req(blkdev) \
+	(uk_blkdev_capabilities(blkdev)->max_sectors_per_req)
+
+#define uk_blkdev_mode(blkdev) \
+	(uk_blkdev_capabilities(blkdev)->mode)
+
+#define uk_blkdev_sectors(blkdev) \
+	(uk_blkdev_capabilities(blkdev)->sectors)
+
+#define uk_blkdev_ioalign(blkdev) \
+	(uk_blkdev_capabilities(blkdev)->ioalign)
+/**
+ * Enable interrupts for a queue.
+ *
+ * @param dev
+ *	The Unikraft Block Device in running state.
+ * @param queue_id
+ *	The index of the queue to set up.
+ *	The value must be in the range [0, nb_queue - 1] previously supplied
+ *	to uk_blkdev_configure().
+ * @return
+ *	- (0): Success, interrupts enabled.
+ *	- (-ENOTSUP): Driver does not support interrupts.
+ */
+static inline int uk_blkdev_queue_intr_enable(struct uk_blkdev *dev,
+		uint16_t queue_id)
+{
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->dev_ops);
+	UK_ASSERT(dev->_data);
+	UK_ASSERT(queue_id < CONFIG_LIBUKBLKDEV_MAXNBQUEUES);
+	UK_ASSERT(!PTRISERR(dev->_queue[queue_id]));
+
+	if (unlikely(!dev->dev_ops->queue_intr_enable))
+		return -ENOTSUP;
+
+	return dev->dev_ops->queue_intr_enable(dev, dev->_queue[queue_id]);
+}
+
+/**
+ * Disable interrupts for a queue.
+ *
+ * @param dev
+ *	The Unikraft Block Device in running state.
+ * @param queue_id
+ *	The index of the queue to set up.
+ *	The value must be in the range [0, nb_queue - 1] previously supplied
+ *	to uk_blkdev_configure().
+ * @return
+ *	- (0): Success, interrupts disabled.
+ *	- (-ENOTSUP): Driver does not support interrupts.
+ */
+static inline int uk_blkdev_queue_intr_disable(struct uk_blkdev *dev,
+		uint16_t queue_id)
+{
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->dev_ops);
+	UK_ASSERT(dev->_data);
+	UK_ASSERT(queue_id < CONFIG_LIBUKBLKDEV_MAXNBQUEUES);
+	UK_ASSERT(!PTRISERR(dev->_queue[queue_id]));
+
+	if (unlikely(!dev->dev_ops->queue_intr_disable))
+		return -ENOTSUP;
+
+	return dev->dev_ops->queue_intr_disable(dev, dev->_queue[queue_id]);
+}
+
+/**
+ * Make an aio request to the device
+ *
+ * @param dev
+ *	The Unikraft Block Device
+ * @param queue_id
+ *	The index of the receive queue to receive from.
+ *	The value must be in the range [0, nb_queue - 1] previously supplied
+ *	to uk_blkdev_configure().
+ * @param req
+ *	Request structure
+ * @return
+ *	- (>=0): Positive value with status flags
+ *		- UK_BLKDEV_STATUS_SUCCESS: `req` was successfully put to the
+ *		queue.
+ *		- UK_BLKDEV_STATUS_MORE: Indicates there is still at least
+ *		one descriptor available for a subsequent transmission.
+ *		If the flag is unset means that the queue is full.
+ *		This may only be set together with UK_BLKDEV_STATUS_SUCCESS.
+ *	- (<0): Negative value with error code from driver, no request was sent.
+ */
+int uk_blkdev_queue_submit_one(struct uk_blkdev *dev, uint16_t queue_id,
+		struct uk_blkreq *req);
+
+/**
+ * Tests for status flags returned by `uk_blkdev_submit_one`
+ * When the function returned an error code or one of the selected flags is
+ * unset, this macro returns False.
+ *
+ * @param status
+ *	Return status (int)
+ * @param flag
+ *	Flag(s) to test
+ * @return
+ *	- (True):  All flags are set and status is not negative
+ *	- (False): At least one flag is not set or status is negative
+ */
+#define uk_blkdev_status_test_set(status, flag)			\
+	(((int)(status) & ((int)(flag) | INT_MIN)) == (flag))
+
+/**
+ * Tests for unset status flags returned by `uk_blkdev_submit_one`
+ * When the function returned an error code or one of the
+ * selected flags is set, this macro returns False.
+ *
+ * @param status
+ *	Return status (int)
+ * @param flag
+ *	Flag(s) to test
+ * @return
+ *	- (True):  Flags are not set and status is not negative
+ *	- (False): At least one flag is set or status is negative
+ */
+#define uk_blkdev_status_test_unset(status, flag)			\
+	(((int)(status) & ((int)(flag) | INT_MIN)) == (0x0))
+
+/**
+ * Tests if the return status of `uk_blkdev_submit_one`
+ * indicates a successful operation.
+ *
+ * @param status
+ *	Return status (int)
+ * @return
+ *	- (True):  Operation was successful
+ *	- (False): Operation was unsuccessful or error happened
+ */
+#define uk_blkdev_status_successful(status)			\
+	uk_blkdev_status_test_set((status), UK_BLKDEV_STATUS_SUCCESS)
+
+/**
+ * Tests if the return status of `uk_blkdev_submit_one`
+ * indicates that the operation should be retried/
+ *
+ * @param status
+ *	Return status (int)
+ * @return
+ *	- (True):  Operation should be retried
+ *	- (False): Operation was successful or error happened
+ */
+#define uk_blkdev_status_notready(status)				\
+	uk_blkdev_status_test_unset((status), UK_BLKDEV_STATUS_SUCCESS)
+
+/**
+ * Tests if the return status of `uk_blkdev_submit_one`
+ * indicates that the last operation can be successfully repeated again.
+ *
+ * @param status
+ *	Return status (int)
+ * @return
+ *	- (True):  Flag UK_BLKDEV_STATUS_MORE is set
+ *	- (False): Operation was successful or error happened
+ */
+#define uk_blkdev_status_more(status)					\
+	uk_blkdev_status_test_set((status), (UK_BLKDEV_STATUS_SUCCESS	\
+					     | UK_BLKDEV_STATUS_MORE))
+
+/**
+ * Get responses from the queue
+ *
+ * @param dev
+ *	The Unikraft Block Device
+ * @param queue_id
+ *	queue id
+ * @return
+ *	- 0: Success
+ *	- (<0): on error returned by driver
+ */
+int uk_blkdev_queue_finish_reqs(struct uk_blkdev *dev, uint16_t queue_id);
+
 #ifdef __cplusplus
 }
 #endif

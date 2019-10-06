@@ -9,3 +9,5 @@ uk_blkdev_configure
 uk_blkdev_queue_get_info
 uk_blkdev_queue_configure
 uk_blkdev_start
+uk_blkdev_queue_submit_one
+uk_blkdev_queue_finish_reqs

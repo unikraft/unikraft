@@ -84,6 +84,12 @@ int uk_blkdev_drv_register(struct uk_blkdev *dev, struct uk_alloc *a,
 	UK_ASSERT(dev->dev_ops->queue_setup);
 	UK_ASSERT(dev->dev_ops->get_info);
 	UK_ASSERT(dev->dev_ops->queue_get_info);
+	UK_ASSERT(dev->submit_one);
+	UK_ASSERT(dev->finish_reqs);
+	UK_ASSERT((dev->dev_ops->queue_intr_enable &&
+				dev->dev_ops->queue_intr_disable)
+			|| (!dev->dev_ops->queue_intr_enable
+				&& !dev->dev_ops->queue_intr_disable));
 
 	dev->_data = _alloc_data(a, blkdev_count,  drv_name);
 	if (!dev->_data)
@@ -373,4 +379,32 @@ int uk_blkdev_start(struct uk_blkdev *dev)
 	}
 
 	return rc;
+}
+
+int uk_blkdev_queue_submit_one(struct uk_blkdev *dev,
+		uint16_t queue_id,
+		struct uk_blkreq *req)
+{
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->_data);
+	UK_ASSERT(dev->submit_one);
+	UK_ASSERT(queue_id < CONFIG_LIBUKBLKDEV_MAXNBQUEUES);
+	UK_ASSERT(dev->_data->state == UK_BLKDEV_RUNNING);
+	UK_ASSERT(!PTRISERR(dev->_queue[queue_id]));
+	UK_ASSERT(req != NULL);
+
+	return dev->submit_one(dev, dev->_queue[queue_id], req);
+}
+
+int uk_blkdev_queue_finish_reqs(struct uk_blkdev *dev,
+		uint16_t queue_id)
+{
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->finish_reqs);
+	UK_ASSERT(dev->_data);
+	UK_ASSERT(queue_id < CONFIG_LIBUKBLKDEV_MAXNBQUEUES);
+	UK_ASSERT(dev->_data->state == UK_BLKDEV_RUNNING);
+	UK_ASSERT(!PTRISERR(dev->_queue[queue_id]));
+
+	return dev->finish_reqs(dev, dev->_queue[queue_id]);
 }
