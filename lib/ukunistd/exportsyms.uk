@@ -19,6 +19,7 @@ getgroups
 getresgid
 setegid
 setgid
+issetugid
 setregid
 setgroups
 initgroups

@@ -180,6 +180,11 @@ int setgid(gid_t gid __unused)
 	return 0;
 }
 
+int issetugid(void)
+{
+	return 0;
+}
+
 gid_t getegid(void)
 {
 	return 0;
