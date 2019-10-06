@@ -77,6 +77,13 @@ int uk_blkdev_drv_register(struct uk_blkdev *dev, struct uk_alloc *a,
 
 	/* Data must be unallocated. */
 	UK_ASSERT(PTRISERR(dev->_data));
+	/* Assert mandatory configuration. */
+	UK_ASSERT(dev->dev_ops);
+	UK_ASSERT(dev->dev_ops->dev_configure);
+	UK_ASSERT(dev->dev_ops->dev_start);
+	UK_ASSERT(dev->dev_ops->queue_setup);
+	UK_ASSERT(dev->dev_ops->get_info);
+	UK_ASSERT(dev->dev_ops->queue_get_info);
 
 	dev->_data = _alloc_data(a, blkdev_count,  drv_name);
 	if (!dev->_data)
@@ -130,4 +137,240 @@ enum uk_blkdev_state uk_blkdev_state_get(struct uk_blkdev *dev)
 	UK_ASSERT(dev->_data);
 
 	return dev->_data->state;
+}
+
+int uk_blkdev_get_info(struct uk_blkdev *dev,
+		struct uk_blkdev_info *dev_info)
+{
+	int rc = 0;
+
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->dev_ops);
+	UK_ASSERT(dev->dev_ops->get_info);
+	UK_ASSERT(dev_info);
+
+	/* Clear values before querying driver for capabilities */
+	memset(dev_info, 0, sizeof(*dev_info));
+	dev->dev_ops->get_info(dev, dev_info);
+
+	/* Limit the maximum number of queues
+	 * according to the API configuration
+	 */
+	dev_info->max_queues = MIN(CONFIG_LIBUKBLKDEV_MAXNBQUEUES,
+			dev_info->max_queues);
+
+	return rc;
+}
+
+int uk_blkdev_configure(struct uk_blkdev *dev,
+		const struct uk_blkdev_conf *conf)
+{
+	int rc = 0;
+	struct uk_blkdev_info dev_info;
+
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->_data);
+	UK_ASSERT(dev->dev_ops);
+	UK_ASSERT(dev->dev_ops->dev_configure);
+	UK_ASSERT(conf);
+
+	rc = uk_blkdev_get_info(dev, &dev_info);
+	if (rc) {
+		uk_pr_err("blkdev-%"PRIu16": Failed to get initial info: %d\n",
+				dev->_data->id, rc);
+		return rc;
+	}
+
+	if (conf->nb_queues > dev_info.max_queues)
+		return -EINVAL;
+
+	rc = dev->dev_ops->dev_configure(dev, conf);
+	if (!rc) {
+		uk_pr_info("blkdev%"PRIu16": Configured interface\n",
+				dev->_data->id);
+		dev->_data->state = UK_BLKDEV_CONFIGURED;
+	} else
+		uk_pr_err("blkdev%"PRIu16": Failed to configure interface %d\n",
+				dev->_data->id, rc);
+
+	return rc;
+}
+
+#if CONFIG_LIBUKBLKDEV_DISPATCHERTHREADS
+static void _dispatcher(void *args)
+{
+	struct uk_blkdev_event_handler *handler =
+		(struct uk_blkdev_event_handler *) args;
+
+	UK_ASSERT(handler);
+	UK_ASSERT(handler->callback);
+
+	while (1) {
+		uk_semaphore_down(&handler->events);
+		handler->callback(handler->dev,
+				handler->queue_id, handler->cookie);
+	}
+}
+#endif
+
+static int _create_event_handler(uk_blkdev_queue_event_t callback,
+		void *cookie,
+#if CONFIG_LIBUKBLKDEV_DISPATCHERTHREADS
+		struct uk_blkdev *dev, uint16_t queue_id,
+		struct uk_sched *s,
+#endif
+		struct uk_blkdev_event_handler *event_handler)
+{
+	UK_ASSERT(event_handler);
+	UK_ASSERT(callback || (!callback && !cookie));
+
+	event_handler->callback = callback;
+	event_handler->cookie = cookie;
+
+#if CONFIG_LIBUKBLKDEV_DISPATCHERTHREADS
+	/* If we do not have a callback, we do not need a thread */
+	if (!callback)
+		return 0;
+
+	event_handler->dev = dev;
+	event_handler->queue_id = queue_id;
+	uk_semaphore_init(&event_handler->events, 0);
+	event_handler->dispatcher_s = s;
+
+	/* Create a name for the dispatcher thread.
+	 * In case of errors, we just continue without a name
+	 */
+	if (asprintf(&event_handler->dispatcher_name,
+				"blkdev%"PRIu16"-q%"PRIu16"]",
+				dev->_data->id, queue_id) < 0) {
+		event_handler->dispatcher_name = NULL;
+	}
+
+	/* Create thread */
+	event_handler->dispatcher = uk_sched_thread_create(
+			event_handler->dispatcher_s,
+			event_handler->dispatcher_name, NULL,
+			_dispatcher, (void *)event_handler);
+	if (event_handler->dispatcher == NULL) {
+		if (event_handler->dispatcher_name) {
+			free(event_handler->dispatcher);
+			event_handler->dispatcher = NULL;
+		}
+
+		return -ENOMEM;
+	}
+#endif
+
+	return 0;
+}
+
+static void _destroy_event_handler(struct uk_blkdev_event_handler *h
+		__maybe_unused)
+{
+	UK_ASSERT(h);
+
+#if CONFIG_LIBUKBLKDEV_DISPATCHERTHREADS
+	if (h->dispatcher) {
+		uk_semaphore_up(&h->events);
+		UK_ASSERT(h->dispatcher_s);
+		uk_thread_kill(h->dispatcher);
+		uk_thread_wait(h->dispatcher);
+		h->dispatcher = NULL;
+	}
+
+	if (h->dispatcher_name) {
+		free(h->dispatcher_name);
+		h->dispatcher_name = NULL;
+	}
+#endif
+}
+
+int uk_blkdev_queue_get_info(struct uk_blkdev *dev, uint16_t queue_id,
+		struct uk_blkdev_queue_info *q_info)
+{
+	UK_ASSERT(dev);
+	UK_ASSERT(queue_id < CONFIG_LIBUKBLKDEV_MAXNBQUEUES);
+	UK_ASSERT(q_info);
+
+	/* Clear values before querying driver for queue capabilities */
+	memset(q_info, 0, sizeof(*q_info));
+	return dev->dev_ops->queue_get_info(dev, queue_id, q_info);
+}
+
+int uk_blkdev_queue_configure(struct uk_blkdev *dev, uint16_t queue_id,
+		uint16_t nb_desc,
+		const struct uk_blkdev_queue_conf *queue_conf)
+{
+	int err = 0;
+
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->_data);
+	UK_ASSERT(dev->dev_ops);
+	UK_ASSERT(dev->dev_ops->queue_setup);
+	UK_ASSERT(dev->finish_reqs);
+	UK_ASSERT(queue_id < CONFIG_LIBUKBLKDEV_MAXNBQUEUES);
+	UK_ASSERT(queue_conf);
+
+#if CONFIG_LIBUKBLKDEV_DISPATCHERTHREADS
+	UK_ASSERT((queue_conf->callback && queue_conf->s)
+			|| !queue_conf->callback);
+#endif
+
+	if (dev->_data->state != UK_BLKDEV_CONFIGURED)
+		return -EINVAL;
+
+	/* Make sure that we are not initializing this queue a second time */
+	if (!PTRISERR(dev->_queue[queue_id]))
+		return -EBUSY;
+
+	err = _create_event_handler(queue_conf->callback,
+			queue_conf->callback_cookie,
+#if CONFIG_LIBUKBLKDEV_DISPATCHERTHREADS
+			dev, queue_id, queue_conf->s,
+#endif
+			&dev->_data->queue_handler[queue_id]);
+	if (err)
+		goto err_out;
+
+	dev->_queue[queue_id] = dev->dev_ops->queue_setup(dev, queue_id,
+			nb_desc,
+			queue_conf);
+	if (PTRISERR(dev->_queue[queue_id])) {
+		err = PTR2ERR(dev->_queue[queue_id]);
+		uk_pr_err("blkdev%"PRIu16"-q%"PRIu16": Failed to configure: %d\n",
+				dev->_data->id, queue_id, err);
+		goto err_destroy_handler;
+	}
+
+	uk_pr_info("blkdev%"PRIu16": Configured queue %"PRIu16"\n",
+			dev->_data->id, queue_id);
+	return 0;
+
+err_destroy_handler:
+	_destroy_event_handler(&dev->_data->queue_handler[queue_id]);
+err_out:
+	return err;
+}
+
+int uk_blkdev_start(struct uk_blkdev *dev)
+{
+	int rc = 0;
+
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->_data);
+	UK_ASSERT(dev->dev_ops);
+	UK_ASSERT(dev->dev_ops->dev_start);
+	UK_ASSERT(dev->_data->state == UK_BLKDEV_CONFIGURED);
+
+	rc = dev->dev_ops->dev_start(dev);
+	if (rc)
+		uk_pr_err("blkdev%"PRIu16": Failed to start interface %d\n",
+				dev->_data->id, rc);
+	else {
+		uk_pr_info("blkdev%"PRIu16": Started interface\n",
+				dev->_data->id);
+		dev->_data->state = UK_BLKDEV_RUNNING;
+	}
+
+	return rc;
 }

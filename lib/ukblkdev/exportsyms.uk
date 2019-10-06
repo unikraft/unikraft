@@ -4,3 +4,8 @@ uk_blkdev_get
 uk_blkdev_id_get
 uk_blkdev_drv_name_get
 uk_blkdev_state_get
+uk_blkdev_get_info
+uk_blkdev_configure
+uk_blkdev_queue_get_info
+uk_blkdev_queue_configure
+uk_blkdev_start

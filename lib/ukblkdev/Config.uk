@@ -1,6 +1,28 @@
-config LIBUKBLKDEV
+menuconfig LIBUKBLKDEV
 	bool "ukblkdev: Block driver interface"
 	default n
 	select LIBUKALLOC
 	select LIBNOLIBC if !HAVE_LIBC
 	select LIBUKDEBUG
+
+if LIBUKBLKDEV
+	config LIBUKBLKDEV_MAXNBQUEUES
+                int "Maximum number of request-response queues"
+                default 1
+		help
+			Upper limit for supported number of request-response
+			queues with the ukblkdev API.
+
+	config LIBUKBLKDEV_DISPATCHERTHREADS
+                bool "Dispatcher threads for event callbacks"
+                default n
+                select LIBUKSCHED
+                select LIBUKLOCK
+		select LIBUKLOCK_SEMAPHORE
+		help
+			Event callbacks are dispatched in a bottom half
+			thread context instead of the device interrupt context.
+			When this option is enabled a dispatcher thread is
+			allocated for each configured queue.
+			libuksched is required for this option.
+endif
