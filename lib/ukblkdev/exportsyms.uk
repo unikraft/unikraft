@@ -1,0 +1,6 @@
+uk_blkdev_drv_register
+uk_blkdev_count
+uk_blkdev_get
+uk_blkdev_id_get
+uk_blkdev_drv_name_get
+uk_blkdev_state_get
