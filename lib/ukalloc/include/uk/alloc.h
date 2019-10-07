@@ -50,6 +50,9 @@ struct uk_alloc;
 extern "C" {
 #endif
 
+#define uk_zalloc(a, size)  uk_calloc(a, 1, size)
+#define uk_do_zalloc(a, size) uk_do_calloc(a, 1, size)
+
 struct uk_alloc *uk_alloc_get_default(void);
 int uk_alloc_set_default(struct uk_alloc *a);
 
