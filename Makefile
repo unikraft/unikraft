@@ -151,7 +151,10 @@ KCONFIG_TRISTATE      := $(KCONFIG_DIR)/tristate.config
 KCONFIG_AUTOHEADER    := $(UK_GENERATED_INCLUDES)/uk/_config.h
 KCONFIG_APP_DIR       := $(CONFIG_UK_APP)
 KCONFIG_LIB_IN        := $(KCONFIG_DIR)/libs.uk
-KCONFIG_DEF_PLATS     := $(addprefix $(CONFIG_UK_PLAT),linuxu kvm xen)
+KCONFIG_DEF_PLATS     := $(shell find $(CONFIG_UK_PLAT)/* -maxdepth 0 \
+			   -type d \( -path $(CONFIG_UK_PLAT)/common -o \
+			   -path $(CONFIG_UK_PLAT)/drivers \
+			   \) -prune -o  -type d -print)
 KCONFIG_LIB_DIR       := $(CONFIG_UK_BASE)/lib $(ELIB_DIR)
 KCONFIG_PLAT_DIR      := $(KCONFIG_DEF_PLATS) $(EPLAT_DIR) $(CONFIG_UK_PLAT)
 KCONFIG_PLAT_IN       := $(KCONFIG_DIR)/plat.uk
