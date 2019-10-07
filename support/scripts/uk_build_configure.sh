@@ -24,13 +24,13 @@ fetch_plats() {
 
 fetch_libs() {
 	local files=;
-	files=`find ${@} -name "Config.uk"`
+	files=`find ${@} -maxdepth 1 -name "Config.uk"`
 	echo ${files}
 }
 
 fetch_app() {
 	local files=;
-	files=`find ${1} -name "Config.uk"`
+	files=`find ${1} -maxdepth 1 -name "Config.uk"`
 	echo ${files}
 }
 

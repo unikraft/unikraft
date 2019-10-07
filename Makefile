@@ -137,6 +137,7 @@ ELIB_DIR := $(realpath $(patsubst %/,%,$(patsubst %.,%,$(ELIB_DIR))))
 # KConfig settings
 
 CONFIG_UK_PLAT        := $(CONFIG_UK_BASE)/plat/
+CONFIG_UK_LIB         := $(CONFIG_UK_BASE)/lib/
 CONFIG_DIR            := $(CONFIG_UK_APP)
 CONFIG_CONFIG_IN      := $(CONFIG_UK_BASE)/Config.uk
 CONFIG                := $(CONFIG_UK_BASE)/support/kconfig
@@ -155,7 +156,8 @@ KCONFIG_DEF_PLATS     := $(shell find $(CONFIG_UK_PLAT)/* -maxdepth 0 \
 			   -type d \( -path $(CONFIG_UK_PLAT)/common -o \
 			   -path $(CONFIG_UK_PLAT)/drivers \
 			   \) -prune -o  -type d -print)
-KCONFIG_LIB_DIR       := $(CONFIG_UK_BASE)/lib $(ELIB_DIR)
+KCONFIG_LIB_DIR       := $(shell find $(CONFIG_UK_LIB)/* -maxdepth 0 -type d) \
+			 $(CONFIG_UK_BASE)/lib $(ELIB_DIR)
 KCONFIG_PLAT_DIR      := $(KCONFIG_DEF_PLATS) $(EPLAT_DIR) $(CONFIG_UK_PLAT)
 KCONFIG_PLAT_IN       := $(KCONFIG_DIR)/plat.uk
 
