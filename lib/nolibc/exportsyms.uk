@@ -65,6 +65,7 @@ strcmp
 strcspn
 strspn
 strtok
+strtok_r
 strndup
 strdup
 strlcpy
