@@ -291,7 +291,7 @@ void gic_set_irq_type(uint32_t irq, int trigger)
 	write_gicd32(GICD_ICFGR(irq), val);
 }
 
-uint32_t gic_irq_translate(uint32_t type, uint32_t hw_irq)
+int32_t gic_irq_translate(uint32_t type, uint32_t hw_irq)
 {
 	uint32_t irq;
 

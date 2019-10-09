@@ -36,9 +36,18 @@
 #include <ofw/fdt.h>
 #include <uk/assert.h>
 #include <uk/plat/time.h>
+#include <uk/plat/lcpu.h>
 #include <uk/plat/irq.h>
 #include <uk/bitops.h>
 #include <cpu.h>
+#include <ofw/gic_fdt.h>
+#include <irq.h>
+#include <gic/gic-v2.h>
+
+/* Bits definition of cntv_ctl_el0 register */
+#define GT_TIMER_ENABLE        0x01
+#define GT_TIMER_MASK_IRQ      0x02
+#define GT_TIMER_IRQ_STATUS    0x04
 
 /* TODO: For now this file is KVM dependent. As soon as we have more
  * Arm platforms that are using this file, we need to introduce a
@@ -139,6 +148,50 @@ static void calculate_mult_shift(uint32_t *mult, uint8_t *shift,
 	*shift = sft;
 }
 
+static inline void generic_timer_enable(void)
+{
+	SYSREG_WRITE32(cntv_ctl_el0,
+		       SYSREG_READ32(cntv_ctl_el0) | GT_TIMER_ENABLE);
+
+	/* Ensure the write of sys register is visible */
+	isb();
+}
+
+static inline void generic_timer_disable(void)
+{
+	SYSREG_WRITE32(cntv_ctl_el0,
+		SYSREG_READ32(cntv_ctl_el0) & ~GT_TIMER_ENABLE);
+
+	/* Ensure the write of sys register is visible */
+	isb();
+}
+
+static inline void generic_timer_mask_irq(void)
+{
+	SYSREG_WRITE32(cntv_ctl_el0,
+		SYSREG_READ32(cntv_ctl_el0) | GT_TIMER_MASK_IRQ);
+
+	/* Ensure the write of sys register is visible */
+	isb();
+}
+
+static inline void generic_timer_unmask_irq(void)
+{
+	SYSREG_WRITE32(cntv_ctl_el0,
+		SYSREG_READ32(cntv_ctl_el0) & (~GT_TIMER_MASK_IRQ));
+
+	/* Ensure the write of sys register is visible */
+	isb();
+}
+
+static inline void generic_timer_update_compare(uint64_t new_val)
+{
+	SYSREG_WRITE64(cntv_cval_el0, new_val);
+
+	/* Ensure the write of sys register is visible */
+	isb();
+}
+
 static uint32_t generic_timer_get_frequency(int fdt_timer)
 {
 	int len;
@@ -233,16 +286,28 @@ static int generic_timer_init(int fdt_timer)
 	return 0;
 }
 
+static int generic_timer_irq_handler(void *arg __unused)
+{
+	/*
+	 * We just mask the IRQ here, the scheduler will call
+	 * generic_timer_cpu_block, and then unmask the IRQ.
+	 */
+	generic_timer_mask_irq();
+
+	/* Yes, we handled the irq. */
+	return 1;
+}
+
 unsigned long sched_have_pending_events;
 
 void time_block_until(__snsec until)
 {
+	/*
+	 * TODO:
+	 * As we haven't support interrupt on Arm, so we just
+	 * use busy polling for now.
+	 */
 	while ((__snsec) ukplat_monotonic_clock() < until) {
-		/*
-		 * TODO:
-		 * As we haven't support interrupt on Arm, so we just
-		 * use busy polling for now.
-		 */
 		if (__uk_test_and_clear_bit(0, &sched_have_pending_events))
 			break;
 	}
@@ -260,16 +325,12 @@ __nsec ukplat_wall_clock(void)
 	return generic_timer_monotonic() + generic_timer_epochoffset();
 }
 
-static int timer_handler(void *arg __unused)
-{
-	/* Yes, we handled the irq. */
-	return 1;
-}
-
 /* must be called before interrupts are enabled */
 void ukplat_time_init(void)
 {
-	int rc, fdt_timer;
+	int rc, irq, fdt_timer;
+	uint32_t irq_type, hwirq;
+	uint32_t trigger_type;
 
 	/*
 	 * Monotonic time begins at boot_ticks (first read of counter
@@ -283,11 +344,30 @@ void ukplat_time_init(void)
 	if (fdt_timer < 0)
 		UK_CRASH("Could not find arch timer!\n");
 
-	rc = ukplat_irq_register(0, timer_handler, NULL);
-	if (rc < 0)
-		UK_CRASH("Failed to register timer interrupt handler\n");
-
 	rc = generic_timer_init(fdt_timer);
 	if (rc < 0)
 		UK_CRASH("Failed to initialize platform time\n");
+
+	rc = gic_get_irq_from_dtb(_libkvmplat_cfg.dtb, fdt_timer, 2,
+			&irq_type, &hwirq, &trigger_type);
+	if (rc < 0)
+		UK_CRASH("Failed to find IRQ number from DTB\n");
+
+	irq = gic_irq_translate(irq_type, hwirq);
+	if (irq < 0 || irq >= __MAX_IRQ)
+		UK_CRASH("Failed to translate IRQ number, type=%u, hwirq=%u\n",
+			irq_type, hwirq);
+
+	rc = ukplat_irq_register(irq, generic_timer_irq_handler, NULL);
+	if (rc < 0)
+		UK_CRASH("Failed to register timer interrupt handler\n");
+
+	/*
+	 * Mask IRQ before scheduler start working. Otherwise we will get
+	 * unexpected timer interrupts when system is booting.
+	 */
+	generic_timer_mask_irq();
+
+	/* Enable timer */
+	generic_timer_enable();
 }

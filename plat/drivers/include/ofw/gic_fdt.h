@@ -47,5 +47,5 @@
  */
 int gic_get_irq_from_dtb(const void *fdt, int nodeoffset, int index,
 			uint32_t *irq_type, uint32_t *hwirq,
-			uint32_t *trigger_type)
+			uint32_t *trigger_type);
 #endif /* __PLAT_DRV_GIC_FDT_H__ */
