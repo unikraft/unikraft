@@ -33,6 +33,7 @@
  */
 #include <stdlib.h>
 #include <libfdt.h>
+#include <ofw/fdt.h>
 #include <uk/assert.h>
 #include <uk/plat/time.h>
 #include <uk/plat/irq.h>
@@ -43,6 +44,12 @@
  * Arm platforms that are using this file, we need to introduce a
  * portable way to handover the DTB entry point to common platform code */
 #include <kvm/config.h>
+
+static const char * const arch_timer_list[] = {
+	"arm,armv8-timer",
+	"arm,armv7-timer",
+	NULL
+};
 
 static uint64_t boot_ticks;
 static uint32_t counter_freq;
@@ -132,41 +139,26 @@ static void calculate_mult_shift(uint32_t *mult, uint8_t *shift,
 	*shift = sft;
 }
 
-/*
- * On a few platforms the frequency is not configured correctly
- * by the firmware. A property in the DT (clock-frequency) has
- * been introduced to workaround those firmware. So, we will try
- * to get clock-frequency from DT first, if failed we will read
- * the register directly.
- */
-static uint32_t get_counter_frequency(void)
+static uint32_t generic_timer_get_frequency(int fdt_timer)
 {
-	int fdt_archtimer, len;
+	int len;
 	const uint64_t *fdt_freq;
 
-	/* Try to find arm,armv8-timer first */
-	fdt_archtimer = fdt_node_offset_by_compatible(_libkvmplat_cfg.dtb,
-						-1, "arm,armv8-timer");
-	/* If failed, try to find arm,armv7-timer */
-	if (fdt_archtimer < 0)
-		fdt_archtimer = fdt_node_offset_by_compatible(
-							_libkvmplat_cfg.dtb,
-							-1, "arm,armv7-timer");
-	/* DT doesn't provide arch timer information */
-	if (fdt_archtimer < 0)
-		goto endnofreq;
-
+	/*
+	 * On a few platforms the frequency is not configured correctly
+	 * by the firmware. A property in the DT (clock-frequency) has
+	 * been introduced to workaround those firmware.
+	 */
 	fdt_freq = fdt_getprop(_libkvmplat_cfg.dtb,
-			fdt_archtimer, "clock-frequency", &len);
+			fdt_timer, "clock-frequency", &len);
 	if (!fdt_freq || (len <= 0)) {
 		uk_pr_info("No clock-frequency found, reading from register directly.\n");
-		goto endnofreq;
+
+		/* No workaround, get from register directly */
+		return SYSREG_READ32(cntfrq_el0);
 	}
 
 	return fdt32_to_cpu(fdt_freq[0]);
-
-endnofreq:
-	return SYSREG_READ32(cntfrq_el0);
 }
 
 #ifdef CONFIG_ARM64_ERRATUM_858921
@@ -211,9 +203,10 @@ static uint64_t generic_timer_epochoffset(void)
 	return 0;
 }
 
-static int generic_timer_init(void)
+static int generic_timer_init(int fdt_timer)
 {
-	counter_freq = get_counter_frequency();
+	/* Get counter frequency from DTB or register */
+	counter_freq = generic_timer_get_frequency(fdt_timer);
 
 	/*
 	 * Calculate the shift factor and scaling multiplier for
@@ -276,7 +269,7 @@ static int timer_handler(void *arg __unused)
 /* must be called before interrupts are enabled */
 void ukplat_time_init(void)
 {
-	int rc;
+	int rc, fdt_timer;
 
 	/*
 	 * Monotonic time begins at boot_ticks (first read of counter
@@ -284,11 +277,17 @@ void ukplat_time_init(void)
 	 */
 	boot_ticks = generic_timer_get_ticks();
 
+	/* Currently, we only support 1 timer per system */
+	fdt_timer = fdt_node_offset_by_compatible_list(_libkvmplat_cfg.dtb,
+				-1, arch_timer_list);
+	if (fdt_timer < 0)
+		UK_CRASH("Could not find arch timer!\n");
+
 	rc = ukplat_irq_register(0, timer_handler, NULL);
 	if (rc < 0)
 		UK_CRASH("Failed to register timer interrupt handler\n");
 
-	rc = generic_timer_init();
+	rc = generic_timer_init(fdt_timer);
 	if (rc < 0)
 		UK_CRASH("Failed to initialize platform time\n");
 }
