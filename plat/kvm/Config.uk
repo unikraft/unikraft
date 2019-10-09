@@ -65,6 +65,7 @@ config VIRTIO_BUS
 menu "Virtio"
 config VIRTIO_PCI
        bool "Virtio PCI device support"
+       default y if (VIRTIO_NET || VIRTIO_9P)
        default n
        depends on KVM_PCI
        select VIRTIO_BUS
@@ -73,6 +74,7 @@ config VIRTIO_PCI
 
 config VIRTIO_NET
        bool "Virtio Net device"
+       default y if LIBUKNETDEV
        default n
        depends on LIBUKNETDEV
        select VIRTIO_BUS
@@ -82,6 +84,7 @@ config VIRTIO_NET
 
 config VIRTIO_9P
        bool "Virtio 9P device"
+       default y if LIBUK9P
        default n
        depends on LIBUK9P
        select VIRTIO_BUS
