@@ -43,11 +43,7 @@
 #include <ofw/gic_fdt.h>
 #include <irq.h>
 #include <gic/gic-v2.h>
-
-/* Bits definition of cntv_ctl_el0 register */
-#define GT_TIMER_ENABLE        0x01
-#define GT_TIMER_MASK_IRQ      0x02
-#define GT_TIMER_IRQ_STATUS    0x04
+#include <arm/time.h>
 
 /* TODO: For now this file is KVM dependent. As soon as we have more
  * Arm platforms that are using this file, we need to introduce a
@@ -150,8 +146,7 @@ static void calculate_mult_shift(uint32_t *mult, uint8_t *shift,
 
 static inline void generic_timer_enable(void)
 {
-	SYSREG_WRITE32(cntv_ctl_el0,
-		       SYSREG_READ32(cntv_ctl_el0) | GT_TIMER_ENABLE);
+	set_el0(cntv_ctl, get_el0(cntv_ctl) | GT_TIMER_ENABLE);
 
 	/* Ensure the write of sys register is visible */
 	isb();
@@ -159,8 +154,7 @@ static inline void generic_timer_enable(void)
 
 static inline void generic_timer_disable(void)
 {
-	SYSREG_WRITE32(cntv_ctl_el0,
-		SYSREG_READ32(cntv_ctl_el0) & ~GT_TIMER_ENABLE);
+	set_el0(cntv_ctl, get_el0(cntv_ctl) & ~GT_TIMER_ENABLE);
 
 	/* Ensure the write of sys register is visible */
 	isb();
@@ -168,8 +162,7 @@ static inline void generic_timer_disable(void)
 
 static inline void generic_timer_mask_irq(void)
 {
-	SYSREG_WRITE32(cntv_ctl_el0,
-		SYSREG_READ32(cntv_ctl_el0) | GT_TIMER_MASK_IRQ);
+	set_el0(cntv_ctl, get_el0(cntv_ctl) | GT_TIMER_MASK_IRQ);
 
 	/* Ensure the write of sys register is visible */
 	isb();
@@ -177,8 +170,7 @@ static inline void generic_timer_mask_irq(void)
 
 static inline void generic_timer_unmask_irq(void)
 {
-	SYSREG_WRITE32(cntv_ctl_el0,
-		SYSREG_READ32(cntv_ctl_el0) & (~GT_TIMER_MASK_IRQ));
+	set_el0(cntv_ctl, get_el0(cntv_ctl) & ~GT_TIMER_MASK_IRQ);
 
 	/* Ensure the write of sys register is visible */
 	isb();
@@ -186,11 +178,36 @@ static inline void generic_timer_unmask_irq(void)
 
 static inline void generic_timer_update_compare(uint64_t new_val)
 {
-	SYSREG_WRITE64(cntv_cval_el0, new_val);
+	set_el0(cntv_cval, new_val);
 
 	/* Ensure the write of sys register is visible */
 	isb();
 }
+
+#ifdef CONFIG_ARM64_ERRATUM_858921
+/*
+ * The errata #858921 describes that Cortex-A73 (r0p0 - r0p2) counter
+ * read can return a wrong value when the counter crosses a 32bit boundary.
+ * But newer Cortex-A73 are not affected.
+ *
+ * The workaround involves performing the read twice, compare bit[32] of
+ * the two read values. If bit[32] is different, keep the first value,
+ * otherwise keep the second value.
+ */
+static uint64_t generic_timer_get_ticks(void)
+{
+	uint64_t val_1st, val_2nd;
+
+	val_1st = get_el0(cntvct);
+	val_2nd = get_el0(cntvct);
+	return (((val_1st ^ val_2nd) >> 32) & 1) ? val_1st : val_2nd;
+}
+#else
+static inline uint64_t generic_timer_get_ticks(void)
+{
+	return get_el0(cntvct);
+}
+#endif
 
 static uint32_t generic_timer_get_frequency(int fdt_timer)
 {
@@ -208,36 +225,11 @@ static uint32_t generic_timer_get_frequency(int fdt_timer)
 		uk_pr_info("No clock-frequency found, reading from register directly.\n");
 
 		/* No workaround, get from register directly */
-		return SYSREG_READ32(cntfrq_el0);
+		return get_el0(cntfrq);
 	}
 
 	return fdt32_to_cpu(fdt_freq[0]);
 }
-
-#ifdef CONFIG_ARM64_ERRATUM_858921
-/*
- * The errata #858921 describes that Cortex-A73 (r0p0 - r0p2) counter
- * read can return a wrong value when the counter crosses a 32bit boundary.
- * But newer Cortex-A73 are not affected.
- *
- * The workaround involves performing the read twice, compare bit[32] of
- * the two read values. If bit[32] is different, keep the first value,
- * otherwise keep the second value.
- */
-static uint64_t generic_timer_get_ticks(void)
-{
-    uint64_t val_1st, val_2nd;
-
-    val_1st = SYSREG_READ64(cntvct_el0);
-    val_2nd = SYSREG_READ64(cntvct_el0);
-    return (((val_1st ^ val_2nd) >> 32) & 1) ? val_1st : val_2nd;
-}
-#else
-static inline uint64_t generic_timer_get_ticks(void)
-{
-	return SYSREG_READ64(cntvct_el0);
-}
-#endif
 
 /*
  * monotonic_clock(): returns # of nanoseconds passed since
