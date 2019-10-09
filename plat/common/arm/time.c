@@ -256,6 +256,43 @@ static uint64_t generic_timer_epochoffset(void)
 	return 0;
 }
 
+/*
+ * Returns early if any interrupts are serviced, or if the requested delay is
+ * too short. Must be called with interrupts disabled, will enable interrupts
+ * "atomically" during idle loop.
+ *
+ * This function must be called only from the scheduler. It will screw
+ * your system if you do otherwise. And, there is no reason you
+ * actually want to use it anywhere else. THIS IS NOT A YIELD or any
+ * kind of mutex_lock. It will simply halt the cpu, not allowing any
+ * other thread to execute.
+ */
+static void generic_timer_cpu_block_until(uint64_t until_ns)
+{
+	uint64_t now_ns, until_ticks;
+
+	UK_ASSERT(ukplat_lcpu_irqs_disabled());
+
+	/* Record current ns and until_ticks for timer */
+	now_ns = ukplat_monotonic_clock();
+	until_ticks = generic_timer_get_ticks()
+				+ ns_to_ticks(until_ns - now_ns);
+
+	if (now_ns < until_ns) {
+		generic_timer_update_compare(until_ticks);
+		generic_timer_enable();
+		generic_timer_unmask_irq();
+		__asm__ __volatile__("wfi");
+		generic_timer_mask_irq();
+
+		/* Give the IRQ handler a chance to handle whatever woke
+		 * us up
+		 */
+		ukplat_lcpu_enable_irq();
+		ukplat_lcpu_disable_irq();
+	}
+}
+
 static int generic_timer_init(int fdt_timer)
 {
 	/* Get counter frequency from DTB or register */
@@ -290,7 +327,7 @@ static int generic_timer_irq_handler(void *arg __unused)
 {
 	/*
 	 * We just mask the IRQ here, the scheduler will call
-	 * generic_timer_cpu_block, and then unmask the IRQ.
+	 * generic_timer_cpu_block_until, and then unmask the IRQ.
 	 */
 	generic_timer_mask_irq();
 
@@ -302,12 +339,8 @@ unsigned long sched_have_pending_events;
 
 void time_block_until(__snsec until)
 {
-	/*
-	 * TODO:
-	 * As we haven't support interrupt on Arm, so we just
-	 * use busy polling for now.
-	 */
 	while ((__snsec) ukplat_monotonic_clock() < until) {
+		generic_timer_cpu_block_until(until);
 		if (__uk_test_and_clear_bit(0, &sched_have_pending_events))
 			break;
 	}
