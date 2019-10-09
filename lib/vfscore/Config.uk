@@ -67,10 +67,12 @@ if LIBVFSCORE_AUTOMOUNT_ROOTFS
 	# The root device option is hidden for RamFS and 9PFS
 	config LIBVFSCORE_ROOTDEV
 	string "Default root device"
-	depends on !LIBVFSCORE_ROOTFS_RAMFS && !LIBVFSCORE_ROOTFS_9PFS
+	depends on !LIBVFSCORE_ROOTFS_RAMFS
+	default "rootfs" if LIBVFSCORE_ROOTFS_9PFS
 	default ""
 	help
-		Device to mount the filesystem from. Depending on the
+		Device to mount the filesystem from (e.g., on 9PFS this
+		is the name of the shared filesystem). Depending on the
 		selected filesystem, this option may not be required.
 
 	# The root flags is hidden for RamFS
