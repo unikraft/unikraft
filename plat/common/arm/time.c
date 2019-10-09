@@ -179,7 +179,7 @@ endnofreq:
  * the two read values. If bit[32] is different, keep the first value,
  * otherwise keep the second value.
  */
-static uint64_t read_virtual_count(void)
+static uint64_t generic_timer_get_ticks(void)
 {
     uint64_t val_1st, val_2nd;
 
@@ -188,7 +188,7 @@ static uint64_t read_virtual_count(void)
     return (((val_1st ^ val_2nd) >> 32) & 1) ? val_1st : val_2nd;
 }
 #else
-static inline uint64_t read_virtual_count(void)
+static inline uint64_t generic_timer_get_ticks(void)
 {
 	return SYSREG_READ64(cntvct_el0);
 }
@@ -200,13 +200,13 @@ static inline uint64_t read_virtual_count(void)
  */
 static __nsec generic_timer_monotonic(void)
 {
-	return (__nsec)ticks_to_ns(read_virtual_count() - boot_ticks);
+	return (__nsec)ticks_to_ns(generic_timer_get_ticks() - boot_ticks);
 }
 
 /*
  * Return epoch offset (wall time offset to monotonic clock start).
  */
-static __u64  generic_timer_epochoffset(void)
+static uint64_t generic_timer_epochoffset(void)
 {
 	return 0;
 }
@@ -240,7 +240,7 @@ static int generic_timer_init(void)
 	 * Monotonic time begins at boot_ticks (first read of counter
 	 * before calibration).
 	 */
-	boot_ticks = read_virtual_count();
+	boot_ticks = generic_timer_get_ticks();
 
 	return 0;
 }
