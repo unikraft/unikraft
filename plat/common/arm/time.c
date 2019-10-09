@@ -236,11 +236,6 @@ static int generic_timer_init(void)
 	UK_BUGON(!tick_per_ns);
 
 	max_convert_ticks = __MAX_CONVERT_SECS*counter_freq;
-	/*
-	 * Monotonic time begins at boot_ticks (first read of counter
-	 * before calibration).
-	 */
-	boot_ticks = generic_timer_get_ticks();
 
 	return 0;
 }
@@ -282,6 +277,12 @@ static int timer_handler(void *arg __unused)
 void ukplat_time_init(void)
 {
 	int rc;
+
+	/*
+	 * Monotonic time begins at boot_ticks (first read of counter
+	 * before calibration).
+	 */
+	boot_ticks = generic_timer_get_ticks();
 
 	rc = ukplat_irq_register(0, timer_handler, NULL);
 	if (rc < 0)
