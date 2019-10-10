@@ -47,6 +47,7 @@
 #else
 #include <uk/plat/lcpu.h>
 #endif
+#include <uk/essentials.h>
 
 int utime(const char *filename __unused, const struct utimbuf *times __unused)
 {
