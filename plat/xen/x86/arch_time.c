@@ -35,7 +35,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include <sys/time.h>
+#include <time.h>
 #include <uk/plat/time.h>
 #include <x86/cpu.h>
 #include <_time.h>

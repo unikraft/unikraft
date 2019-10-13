@@ -5,6 +5,8 @@
 extern "C" {
 #endif
 
+#include <uk/config.h>
+
 #define __NEED_size_t
 #define __NEED_time_t
 #define __NEED_clock_t
@@ -15,6 +17,11 @@ extern "C" {
 #define __NEED_locale_t
 
 #include <sys/types.h>
+
+#ifndef CONFIG_LIBNOLIBC
+/* Allow custom definitions */
+#include_next <time.h>
+#endif
 
 #if defined(_BSD_SOURCE) || defined(_GNU_SOURCE)
 #define __tm_gmtoff tm_gmtoff
