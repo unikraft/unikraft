@@ -39,6 +39,7 @@
 #include <sys/types.h>
 #include <uk/essentials.h>
 #include <uk/list.h>
+#include <uk/user.h>
 
 static struct passwd_entry {
 	struct passwd *passwd;
