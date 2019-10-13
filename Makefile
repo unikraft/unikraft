@@ -541,6 +541,8 @@ ifneq ($(CONFIG_UK_BASE),$(CONFIG_UK_APP))
 $(eval $(call _import_lib,$(CONFIG_UK_APP)));
 endif
 
+include $(CONFIG_UK_BASE)/lib/Makefile.uk # libraries
+
 # external libraries
 $(foreach E,$(ELIB_DIR), \
 	$(eval $(call _import_lib,$(E))); \
@@ -553,7 +555,6 @@ include $(CONFIG_UK_BASE)/plat/Makefile.uk # platform libraries
 $(foreach E,$(EPLAT_DIR), \
 	$(eval $(call _import_lib,$(E))); \
 )
-include $(CONFIG_UK_BASE)/lib/Makefile.uk # libraries
 include $(CONFIG_UK_BASE)/Makefile.uk # Unikraft base
 
 ifeq ($(call qstrip,$(UK_PLATS) $(UK_PLATS-y)),)
