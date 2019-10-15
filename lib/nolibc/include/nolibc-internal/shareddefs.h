@@ -65,7 +65,9 @@ typedef __off off_t;
 #define __DEFINED_off_t
 #endif
 
+#if CONFIG_HAVE_TIME
 #include <uk/time_types.h>
+#endif
 
 #if (defined __NEED_mode_t && !defined __DEFINED_mode_t)
 typedef unsigned mode_t;

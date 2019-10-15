@@ -1,3 +1,4 @@
 config LIBUKTIME
        bool "uktime: Time functions"
        default n
+       select HAVE_TIME
