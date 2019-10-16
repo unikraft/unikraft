@@ -39,6 +39,7 @@
  * this file.
  */
 
+#include <uk/config.h>
 #include <uk/arch/types.h>
 
 #if (defined __NEED_NULL && !defined __DEFINED_NULL)
