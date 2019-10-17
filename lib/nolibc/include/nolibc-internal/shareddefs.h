@@ -95,6 +95,11 @@ typedef int pid_t;
 #define __DEFINED_pid_t
 #endif
 
+#if defined(__NEED_id_t) && !defined(__DEFINED_id_t)
+typedef unsigned id_t;
+#define __DEFINED_id_t
+#endif
+
 #if defined(__NEED_dev_t) && !defined(__DEFINED_dev_t)
 typedef __u64 dev_t;
 #define __DEFINED_dev_t

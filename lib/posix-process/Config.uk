@@ -2,3 +2,4 @@ config LIBPOSIX_PROCESS
 	bool "POSIX process-related functions"
 	default n
 	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKTIME

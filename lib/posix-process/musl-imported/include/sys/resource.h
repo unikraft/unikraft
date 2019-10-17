@@ -5,7 +5,6 @@
 extern "C" {
 #endif
 
-#include <features.h>
 #include <sys/time.h>
 
 #define __NEED_id_t
@@ -14,7 +13,7 @@ extern "C" {
 #define __NEED_pid_t
 #endif
 
-#include <bits/alltypes.h>
+#include <sys/types.h>
 #include <bits/resource.h>
 
 typedef unsigned long long rlim_t;
