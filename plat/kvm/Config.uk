@@ -77,6 +77,7 @@ config VIRTIO_NET
        default y if LIBUKNETDEV
        default n
        depends on LIBUKNETDEV
+       imply VIRTIO_PCI if ARCH_X86_64
        select VIRTIO_BUS
        select LIBUKSGLIST
        help
@@ -87,6 +88,7 @@ config VIRTIO_9P
        default y if LIBUK9P
        default n
        depends on LIBUK9P
+       imply VIRTIO_PCI if ARCH_X86_64
        select VIRTIO_BUS
        select LIBUKSGLIST
        help
