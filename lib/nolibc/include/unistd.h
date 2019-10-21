@@ -55,7 +55,9 @@ extern "C" {
 
 #include <nolibc-internal/shareddefs.h>
 
+#if CONFIG_HAVE_TIME
 unsigned int sleep(unsigned int seconds);
+#endif
 
 #if CONFIG_LIBVFSCORE
 int close(int fd);
