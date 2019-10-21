@@ -81,6 +81,39 @@ struct virtqueue {
 __phys_addr virtqueue_physaddr(struct virtqueue *vq);
 
 /**
+ * Fetch the avail address of the descriptor ring.
+ * @param vq
+ *	Reference to the virtqueue.
+ *
+ * @return
+ *	Return the guest avail address of the vring.
+ */
+__phys_addr virtqueue_get_avail_addr(struct virtqueue *vq);
+
+/**
+ * Fetch the used address of the descriptor ring.
+ * @param vq
+ *	Reference to the virtqueue.
+ *
+ * @return
+ *	Return the guest used address of the vring.
+ */
+__phys_addr virtqueue_get_used_addr(struct virtqueue *vq);
+
+/**
+ * Get the number of vring for virtqueue
+ *
+ * @param vq
+ *	Reference to the virtual queue
+ *
+ * @return
+ *	the number of vring for virtqueue
+ *
+ */
+unsigned int virtqueue_vring_get_num(struct virtqueue *vq);
+
+
+/**
  * Ring interrupt handler. This function is invoked from the interrupt handler
  * in the virtio device for interrupt specific to the ring.
  *
