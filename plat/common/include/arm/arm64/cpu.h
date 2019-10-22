@@ -32,6 +32,9 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
+#ifndef __PLAT_COMMON_ARM64_CPU_H__
+#define __PLAT_COMMON_ARM64_CPU_H__
+
 #include <inttypes.h>
 #include <uk/essentials.h>
 #include <sw_ctx.h>
@@ -136,3 +139,5 @@ static inline void arch_init_extregs(struct sw_ctx *ctx)
 {
 	ctx->extregs = (uintptr_t)ctx + sizeof(struct sw_ctx);
 }
+
+#endif /* __PLAT_COMMON_ARM64_CPU_H__ */
