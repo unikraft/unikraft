@@ -34,6 +34,9 @@
 #include <x86/cpu_defs.h>
 #include <sw_ctx.h>
 #include <stdint.h>
+#include <uk/assert.h>
+#include <uk/alloc.h>
+#include <string.h>
 
 void halt(void);
 void system_off(void);
@@ -96,6 +99,27 @@ static inline void restore_extregs(struct sw_ctx *ctx)
 				"a"(0xffffffff), "d"(0xffffffff));
 		break;
 	}
+}
+
+static inline struct sw_ctx *arch_alloc_sw_ctx(struct uk_alloc *allocator)
+{
+	struct sw_ctx *ctx;
+	size_t sz;
+
+	sz = ALIGN_UP(sizeof(struct sw_ctx), x86_cpu_features.extregs_align)
+		+ x86_cpu_features.extregs_size;
+	ctx = uk_malloc(allocator, sz);
+	uk_pr_debug("Allocating %lu bytes for sw ctx at %p\n", sz, ctx);
+
+	return ctx;
+}
+
+static inline void arch_init_extregs(struct sw_ctx *ctx)
+{
+	ctx->extregs = ALIGN_UP(((uintptr_t)ctx + sizeof(struct sw_ctx)),
+				x86_cpu_features.extregs_align);
+	// Initialize extregs area: zero out, then save a valid layout to it.
+	memset((void *)ctx->extregs, 0, x86_cpu_features.extregs_size);
 }
 
 static inline void _init_cpufeatures(void)

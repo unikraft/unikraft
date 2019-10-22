@@ -33,6 +33,10 @@
  */
 
 #include <inttypes.h>
+#include <uk/essentials.h>
+#include <sw_ctx.h>
+#include <uk/alloc.h>
+#include <uk/assert.h>
 
 /* Define macros to access IO registers */
 #define __IOREG_READ(bits) \
@@ -108,3 +112,27 @@ int32_t smcc_psci_smc_call(uint32_t, uint64_t, uint64_t, uint64_t);
 void halt(void);
 void reset(void);
 void system_off(void);
+
+static inline void save_extregs(struct sw_ctx *ctx __unused)
+{
+}
+
+static inline void restore_extregs(struct sw_ctx *ctx __unused)
+{
+}
+
+static inline struct sw_ctx *arch_alloc_sw_ctx(struct uk_alloc *allocator)
+{
+	struct sw_ctx *ctx;
+
+	ctx = uk_malloc(allocator, sizeof(struct sw_ctx));
+	uk_pr_debug("Allocating %lu bytes for sw ctx at %p\n",
+		   sizeof(struct sw_ctx), ctx);
+
+	return ctx;
+}
+
+static inline void arch_init_extregs(struct sw_ctx *ctx)
+{
+	ctx->extregs = (uintptr_t)ctx + sizeof(struct sw_ctx);
+}

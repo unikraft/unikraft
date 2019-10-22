@@ -34,13 +34,11 @@
 
 #include <stdint.h>
 #include <stdlib.h>
-#include <string.h>
 #include <uk/plat/thread.h>
-#include <uk/alloc.h>
 #include <sw_ctx.h>
 #include <uk/assert.h>
 #include <tls.h>
-#include <x86/cpu.h>
+#include <cpu.h>
 
 static void *sw_ctx_create(struct uk_alloc *allocator, unsigned long sp,
 				unsigned long tlsp);
@@ -57,14 +55,10 @@ static void *sw_ctx_create(struct uk_alloc *allocator, unsigned long sp,
 				unsigned long tlsp)
 {
 	struct sw_ctx *ctx;
-	size_t sz;
 
 	UK_ASSERT(allocator != NULL);
 
-	sz = ALIGN_UP(sizeof(struct sw_ctx), x86_cpu_features.extregs_align)
-		+ x86_cpu_features.extregs_size;
-	ctx = uk_malloc(allocator, sz);
-	uk_pr_debug("Allocating %lu bytes for sw ctx at %p\n", sz, ctx);
+	ctx = arch_alloc_sw_ctx(allocator);
 	if (ctx == NULL) {
 		uk_pr_warn("Error allocating software context.");
 		return NULL;
@@ -73,10 +67,8 @@ static void *sw_ctx_create(struct uk_alloc *allocator, unsigned long sp,
 	ctx->sp = sp;
 	ctx->tlsp = tlsp;
 	ctx->ip = (unsigned long) asm_thread_starter;
-	ctx->extregs = ALIGN_UP(((uintptr_t)ctx + sizeof(struct sw_ctx)),
-				x86_cpu_features.extregs_align);
-	// Initialize extregs area: zero out, then save a valid layout to it.
-	memset((void *)ctx->extregs, 0, x86_cpu_features.extregs_size);
+	arch_init_extregs(ctx);
+
 	save_extregs(ctx);
 
 	return ctx;
