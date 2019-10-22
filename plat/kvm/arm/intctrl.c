@@ -37,6 +37,7 @@
 #include <arm/irq.h>
 #include <gic/gic-v2.h>
 #include <kvm/config.h>
+#include <uk/essentials.h>
 
 void intctrl_init(void)
 {
@@ -49,7 +50,7 @@ void intctrl_init(void)
 
 }
 
-void intctrl_ack_irq(unsigned int irq)
+void intctrl_ack_irq(unsigned int irq __unused)
 {
 	//NOP
 }
