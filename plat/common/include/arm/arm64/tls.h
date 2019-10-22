@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2019, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2019, NEC Laboratories Europe GmbH. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,15 +29,9 @@
  *
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
-#ifndef __PLAT_CMN_TLS_H__
-#define __PLAT_CMN_TLS_H__
+#ifndef __PLAT_CMN_ARM64_TLS_H__
+#define __PLAT_CMN_ARM64_TLS_H__
 
-#if defined(__X86_64__)
-#include <x86/tls.h>
-#elif defined(__ARM_64__)
-#include <arm/arm64/tls.h>
-#else
-#error "For thread-local storage support, add tls.h for current architecture."
-#endif
+#define set_tls_pointer(ptr) do { } while (0)
 
-#endif /* __PLAT_CMN_TLS_H__ */
+#endif /* __PLAT_CMN_ARM64_TLS_H__ */

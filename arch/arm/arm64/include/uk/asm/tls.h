@@ -2,7 +2,7 @@
 /*
  * Authors: Florian Schmidt <florian.schmidt@neclab.eu>
  *
- * Copyright (c) 2019, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2019, NEC Laboratories Europe GmbH. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
