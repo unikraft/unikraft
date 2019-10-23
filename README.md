@@ -31,21 +31,21 @@ time-consuming, expert work that is required today to build such
 images.
 
 For more information information about Unikraft, including user and
-developer guides, please refer to the `docs/guides` directory.
+developer guides, please refer to the `docs/guides` directory or point
+your browser to the Unikraft
+[documentation](http://docs.unikraft.org/)
 
-Open Projects
+Contributing
 -----------------
 
 If you're interested in contributing please take a look at the list of
 [open projects](https://github.com/unikraft/unikraft/issues). If one
-of these interests you please drop us a line via the mailing list (see
-below).
+of these interests you please drop us a line via the mailing list or
+directly at unikraft@listserv.neclab.eu .
 
 Further Resources
 -----------------
-* [Sources at Xenbits](http://xenbits.xen.org/gitweb/?a=project_list;pf=unikraft)
-* [Project Wiki](https://wiki.xenproject.org/wiki/Category:Unikraft)
-* [Unikraft Team](https://www.xenproject.org/developers/teams/unikraft.html)
+* [Unikraft Core Team](https://www.xenproject.org/developers/teams/unikraft.html)
 * [Mailing List Archive](https://lists.xenproject.org/archives/html/minios-devel)
 * [Mailing List Subscription](mailto:minios-devel-request@lists.xenproject.org)
-* [Research Project at NEC Labs Europe](http://sysml.neclab.eu/projects/unikraft/)
+* [Patchwork](https://patchwork.unikraft.org/project/unikraft/list/)

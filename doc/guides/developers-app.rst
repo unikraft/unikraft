@@ -1,6 +1,6 @@
-****************************
+************************************
 Application Development and Porting
-****************************
+************************************
 Porting an application to Unikraft should be for the most part
 relatively painless given that the available Unikraft libraries
 provide all of the application's dependencies. In most cases, the
@@ -400,7 +400,7 @@ charp     C strings.
 ========  ========================
 
 Register a library parameter with Unikraft
------------------------------------------
+--------------------------------------------
 In order for a library to configure options at execution time, it needs
 to select the `uklibparam` library while configuring the Unikraft build.
 The library should also be registered  with the `uklibparam` library using 
@@ -459,7 +459,7 @@ helper function:
 
 .. code-block:: c
 
-    static const char \*test_string = "Hello World";
+    static const char *test_string = "Hello World";
     UK_LIB_PARAM_STR(test_string);
 
 We can override the default value using the following command:

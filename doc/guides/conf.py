@@ -49,8 +49,8 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Unikraft'
-copyright = u'2017, NEC Europe Ltd.'
-author = u'Simon Kuenzer, Felipe Huici, Florian Schmidt'
+copyright = u'2019, NEC Laboratories Europe GmbH'
+author = u'Simon Kuenzer, Felipe Huici'
 
 # The version info for the project you're documenting, acts as replacement for
 # |version| and |release|, also used in various other places throughout the
@@ -226,7 +226,7 @@ latex_elements = {
 #  author, documentclass [howto, manual, or own class]).
 latex_documents = [
     (master_doc, 'Unikraft.tex', u'Unikraft Documentation',
-     u'Simon Kuenzer, Felipe Huici, Florian Schmidt', 'manual'),
+     u'Simon Kuenzer, Felipe Huici', 'manual'),
 ]
 
 # The name of an image file (relative to this directory) to place at the top of
