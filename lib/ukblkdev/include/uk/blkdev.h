@@ -471,6 +471,50 @@ int uk_blkdev_sync_io(struct uk_blkdev *dev,
 
 #endif
 
+/**
+ * Stop a Unikraft block device, and set its state to UK_BLKDEV_CONFIGURED
+ * state. From now on, users cannot send any requests.
+ * If there are pending requests, this function will return -EBUSY because
+ * the queues are not empty. If polling is used instead of interrupts,
+ * make sure to clean the queue and process all the responses before this
+ * operation is called.
+ * The device can be restarted with a call to uk_blkdev_start().
+ *
+ * @param dev
+ *	The Unikraft Block Device.
+ * @return
+ *	- 0: Success
+ *	- (<0): on error returned by driver
+ */
+int uk_blkdev_stop(struct uk_blkdev *dev);
+
+/**
+ * Free a queue and its descriptors for an Unikraft block device.
+ * @param dev
+ *	The Unikraft Block Device.
+ * @param queue_id
+ *	The index of the queue to release.
+ *	The value must be in range [0, nb_queue -1] previously supplied
+ *	to uk_blkdev_configure()
+ *	@return
+ *	- 0: Success
+ *	- (<0): on error returned by driver
+ */
+int uk_blkdev_queue_release(struct uk_blkdev *dev, uint16_t queue_id);
+
+/**
+ * Close a stopped Unikraft block device.
+ * The function frees all resources except for
+ * the ones needed by the UK_BLKDEV_UNCONFIGURED state.
+ * The device can be reconfigured with a call to uk_blkdev_configure().
+ * @param dev
+ *	The Unikraft Block Device.
+ * @return
+ *	- 0: Success
+ *	- (<0): on error returned by driver
+ */
+int uk_blkdev_unconfigure(struct uk_blkdev *dev);
+
 #ifdef __cplusplus
 }
 #endif

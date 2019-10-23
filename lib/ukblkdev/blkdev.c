@@ -466,3 +466,101 @@ int uk_blkdev_sync_io(struct uk_blkdev *dev,
 	return req->result;
 }
 #endif
+
+int uk_blkdev_stop(struct uk_blkdev *dev)
+{
+	int rc = 0;
+
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->_data);
+	UK_ASSERT(dev->dev_ops);
+	UK_ASSERT(dev->dev_ops->dev_stop);
+	UK_ASSERT(dev->_data->state == UK_BLKDEV_RUNNING);
+
+	uk_pr_info("Trying to stop blkdev%"PRIu16" device\n",
+			dev->_data->id);
+	rc = dev->dev_ops->dev_stop(dev);
+	if (rc)
+		uk_pr_err("Failed to stop blkdev%"PRIu16" device %d\n",
+				dev->_data->id, rc);
+	else {
+		uk_pr_info("Stopped blkdev%"PRIu16" device\n",
+				dev->_data->id);
+		dev->_data->state = UK_BLKDEV_CONFIGURED;
+	}
+
+	return rc;
+}
+
+int uk_blkdev_queue_release(struct uk_blkdev *dev, uint16_t queue_id)
+{
+	int rc = 0;
+
+	UK_ASSERT(dev != NULL);
+	UK_ASSERT(dev->_data);
+	UK_ASSERT(dev->dev_ops);
+	UK_ASSERT(dev->dev_ops->queue_release);
+	UK_ASSERT(queue_id < CONFIG_LIBUKBLKDEV_MAXNBQUEUES);
+	UK_ASSERT(dev->_data->state == UK_BLKDEV_CONFIGURED);
+	UK_ASSERT(!PTRISERR(dev->_queue[queue_id]));
+
+	rc = dev->dev_ops->queue_release(dev, dev->_queue[queue_id]);
+	if (rc)
+		uk_pr_err("Failed to release blkdev%"PRIu16"-q%"PRIu16": %d\n",
+				dev->_data->id, queue_id, rc);
+	else {
+#if CONFIG_LIBUKBLKDEV_DISPATCHERTHREADS
+		if (dev->_data->queue_handler[queue_id].callback)
+			_destroy_event_handler(
+					&dev->_data->queue_handler[queue_id]);
+#endif
+		uk_pr_info("Released blkdev%"PRIu16"-q%"PRIu16"\n",
+				dev->_data->id, queue_id);
+		dev->_queue[queue_id] = NULL;
+	}
+
+	return rc;
+}
+
+void uk_blkdev_drv_unregister(struct uk_blkdev *dev)
+{
+	uint16_t id;
+
+	UK_ASSERT(dev != NULL);
+	UK_ASSERT(dev->_data);
+	UK_ASSERT(dev->_data->state == UK_BLKDEV_UNCONFIGURED);
+
+	id = dev->_data->id;
+
+	uk_free(dev->_data->a, dev->_data);
+	UK_TAILQ_REMOVE(&uk_blkdev_list, dev, _list);
+	blkdev_count--;
+
+	uk_pr_info("Unregistered blkdev%"PRIu16": %p\n",
+			id, dev);
+}
+
+int uk_blkdev_unconfigure(struct uk_blkdev *dev)
+{
+	uint16_t q_id;
+	int rc;
+
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->_data);
+	UK_ASSERT(dev->dev_ops);
+	UK_ASSERT(dev->dev_ops->dev_unconfigure);
+	UK_ASSERT(dev->_data->state == UK_BLKDEV_CONFIGURED);
+	for (q_id = 0; q_id < CONFIG_LIBUKBLKDEV_MAXNBQUEUES; ++q_id)
+		UK_ASSERT(PTRISERR(dev->_queue[q_id]));
+
+	rc = dev->dev_ops->dev_unconfigure(dev);
+	if (rc)
+		uk_pr_err("Failed to unconfigure blkdev%"PRIu16": %d\n",
+				dev->_data->id, rc);
+	else {
+		uk_pr_info("Unconfigured blkdev%"PRIu16"\n", dev->_data->id);
+		dev->_data->state = UK_BLKDEV_UNCONFIGURED;
+	}
+
+	return rc;
+}
