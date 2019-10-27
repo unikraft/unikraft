@@ -228,3 +228,9 @@ int nice(int inc __unused)
 	errno = EPERM;
 	return -1;
 }
+
+int setpriority(int which __unused, id_t who __unused, int prio __unused)
+{
+	WARN_STUBBED();
+	return 0;
+}
