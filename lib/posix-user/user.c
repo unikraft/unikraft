@@ -34,11 +34,13 @@
  */
 
 #include <unistd.h>
+#include <grp.h>
 #include <pwd.h>
 #include <string.h>
 #include <sys/types.h>
 #include <uk/essentials.h>
 #include <uk/list.h>
+#include <uk/print.h>
 #include <uk/user.h>
 
 static struct passwd_entry {
@@ -219,4 +221,14 @@ int getgroups(int size __unused, gid_t list[] __unused)
 int setgroups(size_t size __unused, const gid_t *list __unused)
 {
 	return 0;
+}
+
+struct group *getgrnam(const char *name __unused)
+{
+	static struct group g__ = {
+		.gr_gid = 0
+	};
+
+	WARN_STUBBED();
+	return &g__;
 }
