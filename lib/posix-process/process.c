@@ -38,6 +38,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <sys/prctl.h>
 #include <sys/resource.h>
 #include <uk/print.h>
 
@@ -230,6 +231,12 @@ int nice(int inc __unused)
 }
 
 int setpriority(int which __unused, id_t who __unused, int prio __unused)
+{
+	WARN_STUBBED();
+	return 0;
+}
+
+int prctl(int option __unused, ...)
 {
 	WARN_STUBBED();
 	return 0;
