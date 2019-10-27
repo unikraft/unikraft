@@ -166,6 +166,19 @@ static inline void uk_printk(int lvl __unused, const char *fmt __unused, ...)
 #define uk_pr_err(fmt, ...)   uk_printk(KLVL_ERR,   (fmt), ##__VA_ARGS__)
 #define uk_pr_crit(fmt, ...)  uk_printk(KLVL_CRIT,  (fmt), ##__VA_ARGS__)
 
+/* NOTE: borrowed from OSv */
+#define WARN_STUBBED_ONCE(thing) do { \
+	static int _x; \
+	if (!_x) { \
+		_x = 1; \
+		thing; \
+	} \
+} while (0)
+
+/* Warning for stubbed functions */
+#define WARN_STUBBED() \
+	WARN_STUBBED_ONCE(uk_pr_warn("%s() stubbed\n", __func__))
+
 #ifdef __cplusplus
 }
 #endif

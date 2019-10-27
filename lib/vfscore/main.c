@@ -66,18 +66,6 @@ int	vfs_debug = VFSDB_FLAGS;
 
 static mode_t global_umask = S_IWGRP | S_IWOTH;
 
-/* TODO: these macro does not belong here
- * NOTE: borrowed from OSv
- */
-#define DO_ONCE(thing) do {				\
-	static int _x;					\
-	if (!_x) {					\
-	    _x = 1;					\
-	    thing ;					\
-	}						\
-} while (0)
-#define WARN_STUBBED() DO_ONCE(uk_pr_warn("%s() stubbed\n", __func__))
-
 static inline int libc_error(int err)
 {
     errno = err;
