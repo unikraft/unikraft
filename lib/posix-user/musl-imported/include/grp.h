@@ -5,8 +5,6 @@
 extern "C" {
 #endif
 
-#include <features.h>
-
 #define __NEED_size_t
 #define __NEED_gid_t
 
@@ -14,7 +12,7 @@ extern "C" {
 #define __NEED_FILE
 #endif
 
-#include <bits/alltypes.h>
+#include <sys/types.h>
 
 struct group {
 	char *gr_name;
