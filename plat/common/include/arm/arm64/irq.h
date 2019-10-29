@@ -93,7 +93,7 @@ static inline int irqs_disabled(void)
 {
 	uint64_t flags;
 	__save_flags(flags);
-	return !(flags & PSR_I);
+	return (flags & PSR_I);
 }
 
 #define local_irq_save(x)	__save_and_disable_irq(x)
