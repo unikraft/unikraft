@@ -44,32 +44,59 @@
 #define __TRAP_STACK_SIZE	288
 #define __SP_OFFSET		272
 #define __SP_EL0_OFFSET		280
+
+/*
+ * In thread context switch, we will save the callee-saved registers
+ * (x19 ~ x28) and Frame Point Register and Link Register to prev's
+ * thread stack:
+ * http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055b/IHI0055B_aapcs64.pdf
+ */
+#define __CALLEE_SAVED_SIZE    96
+
 #else
+
+#include <stdint.h>
+
 /*
  * Change this structure must update TRAP_STACK_SIZE at the same time.
  * This data structure must be 16-byte alignment.
  */
 struct __regs {
 	/* Generic Purpose registers, from x0 ~ x29 */
-	unsigned long x[30];
+	uint64_t x[30];
 
 	/* Link Register (x30) */
-	unsigned long lr;
+	uint64_t lr;
 
 	/* Exception Link Register */
-	unsigned long elr_el1;
+	uint64_t elr_el1;
 
 	/* Processor State Register */
-	unsigned long spsr_el1;
+	uint64_t spsr_el1;
 
 	/* Exception Status Register */
-	unsigned long esr_el1;
+	uint64_t esr_el1;
 
 	/* Stack Pointer */
-	unsigned long sp;
+	uint64_t sp;
 
 	/* Stack Pointer from el0 */
-	unsigned long sp_el0;
+	uint64_t sp_el0;
+};
+
+/*
+ * Change this structure must update __CALLEE_SAVED_SIZE at the
+ * same time.
+ */
+struct __callee_saved_regs {
+	/* Callee-saved registers, from x19 ~ x28 */
+	uint64_t callee[10];
+
+	/* Frame Point Register (x29) */
+	uint64_t fp;
+
+	/* Link Register (x30) */
+	uint64_t lr;
 };
 
 /*
