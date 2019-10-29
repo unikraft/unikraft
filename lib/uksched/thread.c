@@ -53,10 +53,12 @@ static void init_sp(unsigned long *sp, char *stack,
 {
 	*sp = (unsigned long) stack + STACK_SIZE;
 
+#if defined(__X86_64__)
 	/* Must ensure that (%rsp + 8) is 16-byte aligned
 	 * at the start of thread_starter.
 	 */
 	stack_push(sp, 0);
+#endif
 
 	stack_push(sp, (unsigned long) function);
 	stack_push(sp, (unsigned long) data);
