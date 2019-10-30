@@ -42,10 +42,33 @@
  * implementation.
  */
 #include <uk/blkdev.h>
+#if CONFIG_XEN_BLKFRONT_GREFPOOL
+#include <uk/list.h>
+#include <uk/semaphore.h>
+#include <stdbool.h>
+#endif
+
 #include <xen/io/blkif.h>
 #include <common/gnttab.h>
 #include <common/events.h>
 
+#if CONFIG_XEN_BLKFRONT_GREFPOOL
+/**
+ * Structure used to describe a list of blkfront_gref elements.
+ */
+UK_STAILQ_HEAD(blkfront_gref_list, struct blkfront_gref);
+
+/*
+ * Structure used to describe a pool of grant refs for each queue.
+ * It contains max BLKIF_MAX_SEGMENTS_PER_REQUEST elems.
+ **/
+struct blkfront_grefs_pool {
+	/* List of grefs. */
+	struct blkfront_gref_list grefs_list;
+	/* Semaphore for synchronization. */
+	struct uk_semaphore sem;
+};
+#endif
 
 /**
  * Structure used to describe a grant ref element.
@@ -53,6 +76,14 @@
 struct blkfront_gref {
 	/* Grant ref number. */
 	grant_ref_t ref;
+#if CONFIG_XEN_BLKFRONT_GREFPOOL
+	/* Entry for pool. */
+	UK_STAILQ_ENTRY(struct blkfront_gref) _list;
+	/* It is True if it was pulled from the pool.
+	 * Otherwise this structure was allocated during the request.
+	 **/
+	bool reusable_gref;
+#endif
 };
 
 /**
@@ -87,6 +118,10 @@ struct uk_blkdev_queue {
 	int intr_enabled;
 	/* Reference to the Blkfront Device */
 	struct blkfront_dev *dev;
+#if CONFIG_XEN_BLKFRONT_GREFPOOL
+	/* Grant refs pool. */
+	struct blkfront_grefs_pool ref_pool;
+#endif
 };
 
 /**

@@ -65,6 +65,8 @@
 
 static struct uk_alloc *drv_allocator;
 
+/* This function gets from pool gref_elems or allocates new ones
+ */
 static int blkfront_request_set_grefs(struct blkfront_request *blkfront_req)
 {
 	struct blkfront_gref *ref_elem;
@@ -72,9 +74,28 @@ static int blkfront_request_set_grefs(struct blkfront_request *blkfront_req)
 	int grefi = 0, grefj;
 	int err = 0;
 
+#if CONFIG_XEN_BLKFRONT_GREFPOOL
+	struct uk_blkdev_queue *queue;
+	struct blkfront_grefs_pool *grefs_pool;
+	int rc = 0;
+#endif
+
 	UK_ASSERT(blkfront_req != NULL);
 	nb_segments = blkfront_req->nb_segments;
 
+#if CONFIG_XEN_BLKFRONT_GREFPOOL
+	queue = blkfront_req->queue;
+	grefs_pool = &queue->ref_pool;
+	uk_semaphore_down(&grefs_pool->sem);
+	for (grefi = 0; grefi < nb_segments &&
+		!UK_STAILQ_EMPTY(&grefs_pool->grefs_list); ++grefi) {
+		ref_elem = UK_STAILQ_FIRST(&grefs_pool->grefs_list);
+		UK_STAILQ_REMOVE_HEAD(&grefs_pool->grefs_list, _list);
+		blkfront_req->gref[grefi] = ref_elem;
+	}
+
+	uk_semaphore_up(&grefs_pool->sem);
+#endif
 	/* we allocate new ones */
 	for (; grefi < nb_segments; ++grefi) {
 		ref_elem = uk_malloc(drv_allocator, sizeof(*ref_elem));
@@ -83,6 +104,9 @@ static int blkfront_request_set_grefs(struct blkfront_request *blkfront_req)
 			goto err;
 		}
 
+#if CONFIG_XEN_BLKFRONT_GREFPOOL
+		ref_elem->reusable_gref = false;
+#endif
 		blkfront_req->gref[grefi] = ref_elem;
 	}
 
@@ -92,21 +116,52 @@ err:
 	/* Free all the elements from 0 index to where the error happens */
 	for (grefj = 0; grefj < grefi; ++grefj) {
 		ref_elem = blkfront_req->gref[grefj];
+#if CONFIG_XEN_BLKFRONT_GREFPOOL
+		if (ref_elem->reusable_gref) {
+			rc = gnttab_end_access(ref_elem->ref);
+			UK_ASSERT(rc);
+		}
+#endif
 		uk_free(drv_allocator, ref_elem);
 	}
 	goto out;
 }
 
+/* First gref_elems from blkfront_request were popped from the pool.
+ * All this elements has the reusable_gref flag set.
+ * We continue transferring elements from blkfront_request to the pool
+ * of grant_refs until we encounter an element with the reusable flag unset.
+ **/
 static void blkfront_request_reset_grefs(struct blkfront_request *req)
 {
 	uint16_t gref_id = 0;
 	struct blkfront_gref *gref_elem;
 	uint16_t nb_segments;
 	int rc;
+#if CONFIG_XEN_BLKFRONT_GREFPOOL
+	struct uk_blkdev_queue *queue;
+	struct blkfront_grefs_pool *grefs_pool;
+#endif
 
 	UK_ASSERT(req);
 	nb_segments = req->nb_segments;
 
+#if CONFIG_XEN_BLKFRONT_GREFPOOL
+	queue = req->queue;
+	grefs_pool = &queue->ref_pool;
+	uk_semaphore_down(&grefs_pool->sem);
+	for (; gref_id < nb_segments; ++gref_id) {
+		gref_elem = req->gref[gref_id];
+		if (!gref_elem->reusable_gref)
+			break;
+
+		UK_STAILQ_INSERT_TAIL(&grefs_pool->grefs_list,
+			gref_elem,
+			_list);
+	}
+
+	uk_semaphore_up(&grefs_pool->sem);
+#endif
 	for (; gref_id < nb_segments; ++gref_id) {
 		gref_elem = req->gref[gref_id];
 		if (gref_elem->ref != GRANT_INVALID_REF) {
@@ -118,6 +173,11 @@ static void blkfront_request_reset_grefs(struct blkfront_request *req)
 	}
 }
 
+/* This function sets the grant references from pool to point to
+ * data set at request.
+ * Otherwise, new blkfront_gref elems are allocated and new grant refs
+ * as well.
+ **/
 static void blkfront_request_map_grefs(struct blkif_request *ring_req,
 		domid_t otherend_id)
 {
@@ -128,6 +188,9 @@ static void blkfront_request_map_grefs(struct blkif_request *ring_req,
 	uintptr_t data;
 	uintptr_t start_sector;
 	struct blkfront_gref *ref_elem;
+#if CONFIG_XEN_BLKFRONT_GREFPOOL
+	int rc;
+#endif
 
 	UK_ASSERT(ring_req);
 
@@ -139,6 +202,14 @@ static void blkfront_request_map_grefs(struct blkif_request *ring_req,
 	for (gref_index = 0; gref_index < nb_segments; ++gref_index) {
 		data = start_sector + gref_index * PAGE_SIZE;
 		ref_elem = blkfront_req->gref[gref_index];
+
+#if CONFIG_XEN_BLKFRONT_GREFPOOL
+		if (ref_elem->reusable_gref) {
+			rc = gnttab_update_grant(ref_elem->ref, otherend_id,
+				virtual_to_mfn(data), ring_req->operation);
+			UK_ASSERT(rc);
+		} else
+#endif
 		ref_elem->ref = gnttab_grant_access(otherend_id,
 				virtual_to_mfn(data), ring_req->operation);
 
@@ -519,6 +590,63 @@ static void blkfront_ring_fini(struct uk_blkdev_queue *queue)
 		uk_free_page(queue->a, queue->ring.sring);
 }
 
+#if CONFIG_XEN_BLKFRONT_GREFPOOL
+static void blkfront_queue_gref_pool_release(struct uk_blkdev_queue *queue)
+{
+	struct blkfront_grefs_pool *grefs_pool;
+	struct blkfront_gref *ref_elem;
+	int rc;
+
+	UK_ASSERT(queue);
+	grefs_pool = &queue->ref_pool;
+
+	while (!UK_STAILQ_EMPTY(&grefs_pool->grefs_list)) {
+		ref_elem = UK_STAILQ_FIRST(&grefs_pool->grefs_list);
+		if (ref_elem->ref != GRANT_INVALID_REF) {
+			rc = gnttab_end_access(ref_elem->ref);
+			UK_ASSERT(rc);
+		}
+
+		uk_free(queue->a, ref_elem);
+		UK_STAILQ_REMOVE_HEAD(&grefs_pool->grefs_list, _list);
+	}
+}
+
+static int blkfront_queue_gref_pool_setup(struct uk_blkdev_queue *queue)
+{
+	int ref_idx;
+	struct blkfront_gref *gref_elem;
+	struct blkfront_dev *dev;
+	int rc = 0;
+
+	UK_ASSERT(queue);
+	dev = queue->dev;
+	uk_semaphore_init(&queue->ref_pool.sem, 1);
+	UK_STAILQ_INIT(&queue->ref_pool.grefs_list);
+
+	for (ref_idx = 0; ref_idx < BLKIF_MAX_SEGMENTS_PER_REQUEST; ++ref_idx) {
+		gref_elem = uk_malloc(queue->a, sizeof(*gref_elem));
+		if (!gref_elem) {
+			rc = -ENOMEM;
+			goto err;
+		}
+
+		gref_elem->ref = gnttab_grant_access(dev->xendev->otherend_id,
+				0, 1);
+		UK_ASSERT(gref_elem->ref != GRANT_INVALID_REF);
+		gref_elem->reusable_gref = true;
+		UK_STAILQ_INSERT_TAIL(&queue->ref_pool.grefs_list, gref_elem,
+				_list);
+	}
+
+out:
+	return rc;
+err:
+	blkfront_queue_gref_pool_release(queue);
+	goto out;
+}
+#endif
+
 /* Handler for event channel notifications */
 static void blkfront_handler(evtchn_port_t port __unused,
 		struct __regs *regs __unused, void *arg)
@@ -572,6 +700,12 @@ static struct uk_blkdev_queue *blkfront_queue_setup(struct uk_blkdev *blkdev,
 		goto err_out;
 	}
 
+#if CONFIG_XEN_BLKFRONT_GREFPOOL
+	err = blkfront_queue_gref_pool_setup(queue);
+	if (err)
+		goto err_out;
+#endif
+
 	return queue;
 
 err_out:
@@ -589,6 +723,12 @@ static int blkfront_queue_release(struct uk_blkdev *blkdev,
 	unbind_evtchn(queue->evtchn);
 	blkfront_ring_fini(queue);
 
+#if CONFIG_XEN_BLKFRONT_GREFPOOL
+	blkfront_queue_gref_pool_release(queue);
+#endif
+
+	return 0;
+}
 
 static int blkfront_queue_intr_enable(struct uk_blkdev *blkdev,
 		struct uk_blkdev_queue *queue)
