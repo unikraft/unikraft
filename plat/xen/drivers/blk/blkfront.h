@@ -53,6 +53,8 @@ struct blkfront_dev {
 	struct uk_blkdev blkdev;
 	/* Blkfront device number from Xenstore path. */
 	blkif_vdev_t	handle;
+	/* Number of configured queues used for requests */
+	uint16_t nb_queues;
 	/* The blkdev identifier */
 	__u16 uid;
 };

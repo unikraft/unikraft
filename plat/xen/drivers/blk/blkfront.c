@@ -55,6 +55,56 @@
 static struct uk_alloc *drv_allocator;
 
 
+static int blkfront_configure(struct uk_blkdev *blkdev,
+		const struct uk_blkdev_conf *conf)
+{
+	struct blkfront_dev *dev;
+	int err = 0;
+
+	UK_ASSERT(blkdev != NULL);
+	UK_ASSERT(conf != NULL);
+
+	dev = to_blkfront(blkdev);
+	dev->nb_queues = conf->nb_queues;
+	err = blkfront_xb_write_nb_queues(dev);
+	if (err) {
+		uk_pr_err("Failed to write nb of queues: %d.\n", err);
+		goto out;
+	}
+
+	uk_pr_info(DRIVER_NAME": %"PRIu16" configured\n", dev->uid);
+out:
+	return err;
+}
+
+static int blkfront_unconfigure(struct uk_blkdev *blkdev)
+{
+	struct blkfront_dev *dev;
+
+	UK_ASSERT(blkdev != NULL);
+	dev = to_blkfront(blkdev);
+
+	return 0;
+}
+
+static void blkfront_get_info(struct uk_blkdev *blkdev,
+		struct uk_blkdev_info *dev_info)
+{
+	struct blkfront_dev *dev = NULL;
+
+	UK_ASSERT(blkdev);
+	UK_ASSERT(dev_info);
+
+	dev = to_blkfront(blkdev);
+	dev_info->max_queues = dev->nb_queues;
+}
+
+static const struct uk_blkdev_ops blkfront_ops = {
+	.get_info = blkfront_get_info,
+	.dev_configure = blkfront_configure,
+	.dev_unconfigure = blkfront_unconfigure,
+};
+
 /**
  * Assign callbacks to uk_blkdev
  */
@@ -70,6 +120,7 @@ static int blkfront_add_dev(struct xenbus_device *dev)
 		return -ENOMEM;
 
 	d->xendev = dev;
+	d->blkdev.dev_ops = &blkfront_ops;
 
 	/* Xenbus initialization */
 	rc = blkfront_xb_init(d);

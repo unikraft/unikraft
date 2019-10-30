@@ -46,7 +46,7 @@
 
 /*
  * Get initial info from the xenstore.
- * Ex: backend path, handle.
+ * Ex: backend path, handle, max-queues.
  *
  * Return 0 on success, a negative errno value on error.
  */
@@ -57,4 +57,9 @@ int blkfront_xb_init(struct blkfront_dev *dev);
  */
 void blkfront_xb_fini(struct blkfront_dev *dev);
 
+/**
+ * Write nb of queues for further use to Xenstore.
+ * Return 0 on success, a negative errno value on error.
+ */
+int blkfront_xb_write_nb_queues(struct blkfront_dev *dev);
 #endif /* __BLKFRONT_XB_H__ */

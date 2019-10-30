@@ -66,6 +66,25 @@ out:
 	return err;
 }
 
+static int blkfront_xb_get_nb_max_queues(struct blkfront_dev *dev)
+{
+	int err = 0;
+	struct xenbus_device *xendev;
+
+	UK_ASSERT(dev != NULL);
+	xendev = dev->xendev;
+
+	err = xs_scanf(XBT_NIL, xendev->otherend, "multi-queue-max-queues",
+				"%"PRIu16,
+				&dev->nb_queues);
+	if (err < 0) {
+		uk_pr_err("Failed to read multi-queue-max-queues: %d\n", err);
+		return err;
+	}
+
+	return 0;
+}
+
 int blkfront_xb_init(struct blkfront_dev *dev)
 {
 	struct xenbus_device *xendev;
@@ -101,6 +120,11 @@ int blkfront_xb_init(struct blkfront_dev *dev)
 		goto out;
 	}
 
+	err = blkfront_xb_get_nb_max_queues(dev);
+	if (err) {
+		uk_pr_err("Failed to read multi-queue-max-queues: %d\n", err);
+		goto out;
+	}
 out:
 	return err;
 }
@@ -116,4 +140,27 @@ void blkfront_xb_fini(struct blkfront_dev *dev)
 		free(xendev->otherend);
 		xendev->otherend = NULL;
 	}
+}
+
+int blkfront_xb_write_nb_queues(struct blkfront_dev *dev)
+{
+	int err;
+	struct xenbus_device *xendev;
+
+	UK_ASSERT(dev);
+
+	xendev = dev->xendev;
+	err = xs_printf(XBT_NIL, xendev->nodename,
+			"multi-queue-num-queues",
+			"%u",
+			dev->nb_queues);
+	if (err < 0) {
+		uk_pr_err("Failed to write multi-queue-num-queue: %d\n", err);
+		goto out;
+	}
+
+	err = 0;
+
+out:
+	return err;
 }
