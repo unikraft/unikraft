@@ -65,6 +65,87 @@
 
 static struct uk_alloc *drv_allocator;
 
+static int blkfront_request_set_grefs(struct blkfront_request *blkfront_req)
+{
+	struct blkfront_gref *ref_elem;
+	uint16_t nb_segments;
+	int grefi = 0, grefj;
+	int err = 0;
+
+	UK_ASSERT(blkfront_req != NULL);
+	nb_segments = blkfront_req->nb_segments;
+
+	/* we allocate new ones */
+	for (; grefi < nb_segments; ++grefi) {
+		ref_elem = uk_malloc(drv_allocator, sizeof(*ref_elem));
+		if (!ref_elem) {
+			err = -ENOMEM;
+			goto err;
+		}
+
+		blkfront_req->gref[grefi] = ref_elem;
+	}
+
+out:
+	return err;
+err:
+	/* Free all the elements from 0 index to where the error happens */
+	for (grefj = 0; grefj < grefi; ++grefj) {
+		ref_elem = blkfront_req->gref[grefj];
+		uk_free(drv_allocator, ref_elem);
+	}
+	goto out;
+}
+
+static void blkfront_request_reset_grefs(struct blkfront_request *req)
+{
+	uint16_t gref_id = 0;
+	struct blkfront_gref *gref_elem;
+	uint16_t nb_segments;
+	int rc;
+
+	UK_ASSERT(req);
+	nb_segments = req->nb_segments;
+
+	for (; gref_id < nb_segments; ++gref_id) {
+		gref_elem = req->gref[gref_id];
+		if (gref_elem->ref != GRANT_INVALID_REF) {
+			rc = gnttab_end_access(gref_elem->ref);
+			UK_ASSERT(rc);
+		}
+
+		uk_free(drv_allocator, gref_elem);
+	}
+}
+
+static void blkfront_request_map_grefs(struct blkif_request *ring_req,
+		domid_t otherend_id)
+{
+	uint16_t gref_index;
+	struct blkfront_request *blkfront_req;
+	struct uk_blkreq *req;
+	uint16_t nb_segments;
+	uintptr_t data;
+	uintptr_t start_sector;
+	struct blkfront_gref *ref_elem;
+
+	UK_ASSERT(ring_req);
+
+	blkfront_req = (struct blkfront_request *)ring_req->id;
+	req = blkfront_req->req;
+	start_sector = round_pgdown((uintptr_t)req->aio_buf);
+	nb_segments = blkfront_req->nb_segments;
+
+	for (gref_index = 0; gref_index < nb_segments; ++gref_index) {
+		data = start_sector + gref_index * PAGE_SIZE;
+		ref_elem = blkfront_req->gref[gref_index];
+		ref_elem->ref = gnttab_grant_access(otherend_id,
+				virtual_to_mfn(data), ring_req->operation);
+
+		UK_ASSERT(ref_elem->ref != GRANT_INVALID_REF);
+		ring_req->seg[gref_index].gref = ref_elem->ref;
+	}
+}
 
 static void blkif_request_init(struct blkif_request *ring_req,
 		__sector sector_size)
@@ -147,6 +228,15 @@ static int blkfront_request_write(struct blkfront_request *blkfront_req,
 	blkif_request_init(ring_req, sector_size);
 	blkfront_req->nb_segments = ring_req->nr_segments;
 
+	/* Get blkfront_grefs from pool or allocate new ones */
+	rc = blkfront_request_set_grefs(blkfront_req);
+	if (rc)
+		goto out;
+
+	/* Map grant references to ring_req */
+	blkfront_request_map_grefs(ring_req, dev->xendev->otherend_id);
+
+out:
 	return rc;
 }
 
@@ -318,9 +408,11 @@ static int blkfront_queue_dequeue(struct uk_blkdev_queue *queue,
 	switch (rsp->operation) {
 	case BLKIF_OP_READ:
 		CHECK_STATUS(req_from_q, status, "read");
+		blkfront_request_reset_grefs(blkfront_req);
 		break;
 	case BLKIF_OP_WRITE:
 		CHECK_STATUS(req_from_q, status, "write");
+		blkfront_request_reset_grefs(blkfront_req);
 		break;
 	case BLKIF_OP_WRITE_BARRIER:
 		if (status != BLKIF_RSP_OKAY)

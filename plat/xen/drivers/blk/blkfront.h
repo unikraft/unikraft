@@ -48,11 +48,21 @@
 
 
 /**
+ * Structure used to describe a grant ref element.
+ */
+struct blkfront_gref {
+	/* Grant ref number. */
+	grant_ref_t ref;
+};
+
+/**
  * Structure used to describe a front device request.
  */
 struct blkfront_request {
 	/* Request from the API. */
 	struct uk_blkreq *req;
+	/* List with maximum number of blkfront_grefs for a request. */
+	struct blkfront_gref *gref[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 	/* Number of segments. */
 	uint16_t nb_segments;
 	/* Queue in which the request will be stored */
