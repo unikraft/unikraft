@@ -41,6 +41,8 @@
 #include <uk/essentials.h>
 #include <uk/arch/limits.h>
 #include <uk/blkdev_driver.h>
+#include <xen-x86/mm.h>
+#include <xen-x86/mm_pv.h>
 #include <xenbus/xenbus.h>
 #include "blkfront.h"
 #include "blkfront_xb.h"
@@ -48,12 +50,34 @@
 #define DRIVER_NAME		"xen-blkfront"
 
 
+/* TODO Same interrupt macros we use in virtio-blk */
+#define BLKFRONT_INTR_EN             (1 << 0)
+#define BLKFRONT_INTR_EN_MASK        (1)
+#define BLKFRONT_INTR_USR_EN         (1 << 1)
+#define BLKFRONT_INTR_USR_EN_MASK    (2)
+
 /* Get blkfront_dev* which contains blkdev */
 #define to_blkfront(blkdev) \
 	__containerof(blkdev, struct blkfront_dev, blkdev)
 
 static struct uk_alloc *drv_allocator;
 
+
+/* Returns 1 if more responses available */
+static int blkfront_xen_ring_intr_enable(struct uk_blkdev_queue *queue)
+{
+	int more;
+
+	/* Check if there are no more responses enabled */
+	RING_FINAL_CHECK_FOR_RESPONSES(&queue->ring, more);
+	if (!more) {
+		/* No more responses, we can enable interrupts */
+		queue->intr_enabled |= BLKFRONT_INTR_EN;
+		unmask_evtchn(queue->evtchn);
+	}
+
+	return (more > 0);
+}
 static int blkfront_ring_init(struct uk_blkdev_queue *queue)
 {
 	struct blkif_sring *sring = NULL;
@@ -98,6 +122,10 @@ static void blkfront_handler(evtchn_port_t port __unused,
 	UK_ASSERT(arg);
 	queue = (struct uk_blkdev_queue *)arg;
 
+	/* Disable the interrupt for the ring */
+	queue->intr_enabled &= ~(BLKFRONT_INTR_EN);
+	mask_evtchn(queue->evtchn);
+
 	uk_blkdev_drv_queue_event(&queue->dev->blkdev, queue->queue_id);
 }
 
@@ -122,6 +150,7 @@ static struct uk_blkdev_queue *blkfront_queue_setup(struct uk_blkdev *blkdev,
 	queue->a = queue_conf->a;
 	queue->queue_id = queue_id;
 	queue->dev = dev;
+	queue->intr_enabled = 0;
 	err = blkfront_ring_init(queue);
 	if (err) {
 		uk_pr_err("Failed to init ring: %d.\n", err);
@@ -153,6 +182,41 @@ static int blkfront_queue_release(struct uk_blkdev *blkdev,
 	mask_evtchn(queue->evtchn);
 	unbind_evtchn(queue->evtchn);
 	blkfront_ring_fini(queue);
+
+
+static int blkfront_queue_intr_enable(struct uk_blkdev *blkdev,
+		struct uk_blkdev_queue *queue)
+{
+	int rc = 0;
+
+	UK_ASSERT(blkdev != NULL);
+	UK_ASSERT(queue != NULL);
+
+	/* If the interrupt is enabled */
+	if (queue->intr_enabled & BLKFRONT_INTR_EN)
+		return 0;
+
+	/**
+	 * Enable the user configuration bit. This would cause the interrupt to
+	 * be enabled automatically if the interrupt could not be enabled now
+	 * due to data in the queue.
+	 */
+	queue->intr_enabled = BLKFRONT_INTR_USR_EN;
+	rc = blkfront_xen_ring_intr_enable(queue);
+	if (!rc)
+		queue->intr_enabled |= BLKFRONT_INTR_EN;
+
+	return rc;
+}
+
+static int blkfront_queue_intr_disable(struct uk_blkdev *blkdev,
+		struct uk_blkdev_queue *queue)
+{
+	UK_ASSERT(blkdev);
+	UK_ASSERT(queue);
+
+	queue->intr_enabled &= ~(BLKFRONT_INTR_USR_EN | BLKFRONT_INTR_EN);
+	mask_evtchn(queue->evtchn);
 
 	return 0;
 }
@@ -239,6 +303,8 @@ static const struct uk_blkdev_ops blkfront_ops = {
 	.queue_setup = blkfront_queue_setup,
 	.queue_release = blkfront_queue_release,
 	.dev_unconfigure = blkfront_unconfigure,
+	.queue_intr_enable = blkfront_queue_intr_enable,
+	.queue_intr_disable = blkfront_queue_intr_disable,
 };
 
 /**

@@ -60,6 +60,8 @@ struct uk_blkdev_queue {
 	struct uk_alloc *a;
 	/* The libukblkdev queue identifier */
 	uint16_t queue_id;
+	/* The flag to interrupt on the queue */
+	int intr_enabled;
 	/* Reference to the Blkfront Device */
 	struct blkfront_dev *dev;
 };
