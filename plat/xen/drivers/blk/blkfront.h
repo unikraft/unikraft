@@ -43,6 +43,18 @@
  */
 #include <uk/blkdev.h>
 
+/*
+ * Structure used to describe a queue used for both requests and responses
+ */
+struct uk_blkdev_queue {
+	/* Allocator for this queue. */
+	struct uk_alloc *a;
+	/* The libukblkdev queue identifier */
+	uint16_t queue_id;
+	/* Reference to the Blkfront Device */
+	struct blkfront_dev *dev;
+};
+
 /**
  * Structure used to describe the Blkfront device.
  */
@@ -55,6 +67,8 @@ struct blkfront_dev {
 	blkif_vdev_t	handle;
 	/* Number of configured queues used for requests */
 	uint16_t nb_queues;
+	/* Vector of queues used for communication with backend */
+	struct uk_blkdev_queue *queues;
 	/* The blkdev identifier */
 	__u16 uid;
 };

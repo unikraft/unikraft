@@ -66,14 +66,24 @@ static int blkfront_configure(struct uk_blkdev *blkdev,
 
 	dev = to_blkfront(blkdev);
 	dev->nb_queues = conf->nb_queues;
+	dev->queues = uk_calloc(drv_allocator, dev->nb_queues,
+				sizeof(*dev->queues));
+	if (!dev->queues)
+		return -ENOMEM;
+
 	err = blkfront_xb_write_nb_queues(dev);
 	if (err) {
 		uk_pr_err("Failed to write nb of queues: %d.\n", err);
-		goto out;
+		goto out_err;
 	}
 
 	uk_pr_info(DRIVER_NAME": %"PRIu16" configured\n", dev->uid);
 out:
+	return err;
+out_err:
+	uk_free(drv_allocator, dev->queues);
+	goto out;
+}
 	return err;
 }
 
@@ -83,6 +93,7 @@ static int blkfront_unconfigure(struct uk_blkdev *blkdev)
 
 	UK_ASSERT(blkdev != NULL);
 	dev = to_blkfront(blkdev);
+	uk_free(drv_allocator, dev->queues);
 
 	return 0;
 }
