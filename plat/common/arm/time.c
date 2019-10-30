@@ -56,111 +56,7 @@ static const char * const arch_timer_list[] = {
 	NULL
 };
 
-static uint64_t boot_ticks;
-static uint32_t counter_freq;
-
-
-/* Shift factor for converting ticks to ns */
-static uint8_t counter_shift_to_ns;
-
-/* Shift factor for converting ns to ticks */
-static uint8_t counter_shift_to_tick;
-
-/* Multiplier for converting counter ticks to nsecs */
-static uint32_t ns_per_tick;
-
-/* Multiplier for converting nsecs to counter ticks */
-static uint32_t tick_per_ns;
-
-/*
- * The maximum time range in seconds which can be converted by multiplier
- * and shift factors. This will guarantee the converted value not to exceed
- * 64-bit unsigned integer. Increase the time range will reduce the accuracy
- * of conversion, because we will get smaller multiplier and shift factors.
- * In this case, we selected 3600s as the time range.
- */
-#define __MAX_CONVERT_SECS	(3600UL)
-#define __MAX_CONVERT_NS	(3600UL*NSEC_PER_SEC)
-static uint64_t max_convert_ticks = ~0UL;
-
-/* How many nanoseconds per second */
-#define NSEC_PER_SEC ukarch_time_sec_to_nsec(1)
-
-static inline uint64_t ticks_to_ns(uint64_t ticks)
-{
-	UK_ASSERT(ticks <= max_convert_ticks);
-
-	return (ns_per_tick * ticks) >> counter_shift_to_ns;
-}
-
-static inline uint64_t ns_to_ticks(uint64_t ns)
-{
-	UK_ASSERT(ns <= __MAX_CONVERT_NS);
-
-	return (tick_per_ns * ns) >> counter_shift_to_tick;
-}
-
-/*
- * Calculate multiplier/shift factors for scaled math.
- */
-static void calculate_mult_shift(uint32_t *mult, uint8_t *shift,
-		uint64_t from, uint64_t to)
-{
-	uint64_t tmp;
-	uint32_t sft, sftacc = 32;
-
-	/*
-	 * Calculate the shift factor which is limiting the conversion
-	 * range:
-	 */
-	tmp = ((uint64_t)__MAX_CONVERT_SECS * from) >> 32;
-	while (tmp) {
-		tmp >>= 1;
-		sftacc--;
-	}
-
-
-	/*
-	 * Calculate shift factor (S) and scaling multiplier (M).
-	 *
-	 * (S) needs to be the largest shift factor (<= max_shift) where
-	 * the result of the M calculation below fits into uint32_t
-	 * without truncation.
-	 *
-	 * multiplier = (target << shift) / source
-	 */
-	for (sft = 32; sft > 0; sft--) {
-		tmp = (uint64_t) to << sft;
-
-		/* Ensuring we round to nearest when calculating the
-		 * multiplier
-		 */
-		tmp += from / 2;
-		tmp /= from;
-		if ((tmp >> sftacc) == 0)
-			break;
-	}
-	*mult = tmp;
-	*shift = sft;
-}
-
-static inline void generic_timer_enable(void)
-{
-	set_el0(cntv_ctl, get_el0(cntv_ctl) | GT_TIMER_ENABLE);
-
-	/* Ensure the write of sys register is visible */
-	isb();
-}
-
-static inline void generic_timer_disable(void)
-{
-	set_el0(cntv_ctl, get_el0(cntv_ctl) & ~GT_TIMER_ENABLE);
-
-	/* Ensure the write of sys register is visible */
-	isb();
-}
-
-static inline void generic_timer_mask_irq(void)
+void generic_timer_mask_irq(void)
 {
 	set_el0(cntv_ctl, get_el0(cntv_ctl) | GT_TIMER_MASK_IRQ);
 
@@ -168,7 +64,7 @@ static inline void generic_timer_mask_irq(void)
 	isb();
 }
 
-static inline void generic_timer_unmask_irq(void)
+void generic_timer_unmask_irq(void)
 {
 	set_el0(cntv_ctl, get_el0(cntv_ctl) & ~GT_TIMER_MASK_IRQ);
 
@@ -176,49 +72,16 @@ static inline void generic_timer_unmask_irq(void)
 	isb();
 }
 
-static inline void generic_timer_update_compare(uint64_t new_val)
-{
-	set_el0(cntv_cval, new_val);
-
-	/* Ensure the write of sys register is visible */
-	isb();
-}
-
-#ifdef CONFIG_ARM64_ERRATUM_858921
-/*
- * The errata #858921 describes that Cortex-A73 (r0p0 - r0p2) counter
- * read can return a wrong value when the counter crosses a 32bit boundary.
- * But newer Cortex-A73 are not affected.
- *
- * The workaround involves performing the read twice, compare bit[32] of
- * the two read values. If bit[32] is different, keep the first value,
- * otherwise keep the second value.
- */
-static uint64_t generic_timer_get_ticks(void)
-{
-	uint64_t val_1st, val_2nd;
-
-	val_1st = get_el0(cntvct);
-	val_2nd = get_el0(cntvct);
-	return (((val_1st ^ val_2nd) >> 32) & 1) ? val_1st : val_2nd;
-}
-#else
-static inline uint64_t generic_timer_get_ticks(void)
-{
-	return get_el0(cntvct);
-}
-#endif
-
-static uint32_t generic_timer_get_frequency(int fdt_timer)
+uint32_t generic_timer_get_frequency(int fdt_timer)
 {
 	int len;
 	const uint64_t *fdt_freq;
 
 	/*
-	 * On a few platforms the frequency is not configured correctly
-	 * by the firmware. A property in the DT (clock-frequency) has
-	 * been introduced to workaround those firmware.
-	 */
+	* On a few platforms the frequency is not configured correctly
+	* by the firmware. A property in the DT (clock-frequency) has
+	* been introduced to workaround those firmware.
+	*/
 	fdt_freq = fdt_getprop(_libkvmplat_cfg.dtb,
 			fdt_timer, "clock-frequency", &len);
 	if (!fdt_freq || (len <= 0)) {
@@ -229,102 +92,6 @@ static uint32_t generic_timer_get_frequency(int fdt_timer)
 	}
 
 	return fdt32_to_cpu(fdt_freq[0]);
-}
-
-/*
- * monotonic_clock(): returns # of nanoseconds passed since
- * generic_timer_time_init()
- */
-static __nsec generic_timer_monotonic(void)
-{
-	return (__nsec)ticks_to_ns(generic_timer_get_ticks() - boot_ticks);
-}
-
-/*
- * Return epoch offset (wall time offset to monotonic clock start).
- */
-static uint64_t generic_timer_epochoffset(void)
-{
-	return 0;
-}
-
-/*
- * Returns early if any interrupts are serviced, or if the requested delay is
- * too short. Must be called with interrupts disabled, will enable interrupts
- * "atomically" during idle loop.
- *
- * This function must be called only from the scheduler. It will screw
- * your system if you do otherwise. And, there is no reason you
- * actually want to use it anywhere else. THIS IS NOT A YIELD or any
- * kind of mutex_lock. It will simply halt the cpu, not allowing any
- * other thread to execute.
- */
-static void generic_timer_cpu_block_until(uint64_t until_ns)
-{
-	uint64_t now_ns, until_ticks;
-
-	UK_ASSERT(ukplat_lcpu_irqs_disabled());
-
-	/* Record current ns and until_ticks for timer */
-	now_ns = ukplat_monotonic_clock();
-	until_ticks = generic_timer_get_ticks()
-				+ ns_to_ticks(until_ns - now_ns);
-
-	if (now_ns < until_ns) {
-		generic_timer_update_compare(until_ticks);
-		generic_timer_enable();
-		generic_timer_unmask_irq();
-		__asm__ __volatile__("wfi");
-		generic_timer_mask_irq();
-
-		/* Give the IRQ handler a chance to handle whatever woke
-		 * us up
-		 */
-		ukplat_lcpu_enable_irq();
-		ukplat_lcpu_disable_irq();
-	}
-}
-
-static int generic_timer_init(int fdt_timer)
-{
-	/* Get counter frequency from DTB or register */
-	counter_freq = generic_timer_get_frequency(fdt_timer);
-
-	/*
-	 * Calculate the shift factor and scaling multiplier for
-	 * converting ticks to ns.
-	 */
-	calculate_mult_shift(&ns_per_tick, &counter_shift_to_ns,
-				counter_freq, NSEC_PER_SEC);
-
-	/* We disallow zero ns_per_tick */
-	UK_BUGON(!ns_per_tick);
-
-	/*
-	 * Calculate the shift factor and scaling multiplier for
-	 * converting ns to ticks.
-	 */
-	calculate_mult_shift(&tick_per_ns, &counter_shift_to_tick,
-				NSEC_PER_SEC, counter_freq);
-
-	/* We disallow zero ns_per_tick */
-	UK_BUGON(!tick_per_ns);
-
-	max_convert_ticks = __MAX_CONVERT_SECS*counter_freq;
-
-	return 0;
-}
-
-static int generic_timer_irq_handler(void *arg __unused)
-{
-	/*
-	 * We just mask the IRQ here, the scheduler will call
-	 * generic_timer_cpu_block_until, and then unmask the IRQ.
-	 */
-	generic_timer_mask_irq();
-
-	/* Yes, we handled the irq. */
-	return 1;
 }
 
 unsigned long sched_have_pending_events;
@@ -338,18 +105,6 @@ void time_block_until(__snsec until)
 	}
 }
 
-/* return ns since time_init() */
-__nsec ukplat_monotonic_clock(void)
-{
-	return generic_timer_monotonic();
-}
-
-/* return wall time in nsecs */
-__nsec ukplat_wall_clock(void)
-{
-	return generic_timer_monotonic() + generic_timer_epochoffset();
-}
-
 /* must be called before interrupts are enabled */
 void ukplat_time_init(void)
 {
@@ -361,7 +116,7 @@ void ukplat_time_init(void)
 	 * Monotonic time begins at boot_ticks (first read of counter
 	 * before calibration).
 	 */
-	boot_ticks = generic_timer_get_ticks();
+	generic_timer_update_boot_ticks();
 
 	/* Currently, we only support 1 timer per system */
 	fdt_timer = fdt_node_offset_by_compatible_list(_libkvmplat_cfg.dtb,
