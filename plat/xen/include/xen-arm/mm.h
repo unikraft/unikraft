@@ -56,4 +56,6 @@ extern uint32_t _libxenplat_paddr_offset;
 
 #define virtual_to_mfn(_virt)  virt_to_mfn(_virt)
 
+#define arch_mm_init(a)
+
 #endif

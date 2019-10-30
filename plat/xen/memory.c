@@ -39,8 +39,10 @@
 #include <common/gnttab.h>
 #if (defined __X86_32__) || (defined __X86_64__)
 #include <xen-x86/setup.h>
+#include <xen-x86/mm_pv.h>
 #elif (defined __ARM_32__) || (defined __ARM_64__)
 #include <xen-arm/setup.h>
+#include <xen-arm/mm.h>
 #endif
 
 #include <uk/assert.h>
@@ -141,8 +143,14 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 	return 0;
 }
 
+void mm_init(void)
+{
+	arch_mm_init(ukplat_memallocator_get());
+}
+
 int _ukplat_mem_mappings_init(void)
 {
+	mm_init();
 #ifdef CONFIG_XEN_GNTTAB
 	gnttab_init();
 #endif

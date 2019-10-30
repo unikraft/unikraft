@@ -34,6 +34,7 @@
 #define pfn_to_mfn(_pfn) (phys_to_machine_mapping[(_pfn)])
 
 /* for P2M */
+#ifdef CONFIG_XEN_PV_BUILD_P2M
 #ifdef __x86_64__
 #define P2M_SHIFT       9
 #else
@@ -49,13 +50,17 @@
 #define L3_P2M_IDX(pfn) (((pfn) >> L2_P2M_SHIFT) & P2M_MASK)
 #define INVALID_P2M_ENTRY (~0UL)
 
-void p2m_chk_pfn(unsigned long pfn);
-
 static inline unsigned long p2m_pages(unsigned long pages)
 {
 	return (pages + P2M_ENTRIES - 1) >> L1_P2M_SHIFT;
 }
 
-void arch_init_p2m(unsigned long max_pfn_p);
+void arch_mm_init(struct uk_alloc *a);
+
+#ifdef CONFIG_MIGRATION
+void arch_mm_pre_suspend(void);
+void arch_mm_post_suspend(int canceled);
+#endif /* CONFIG_MIGRATION */
+#endif /* CONFIG_XEN_PV_BUILD_P2M */
 
 #endif /* _MM_PV_H */

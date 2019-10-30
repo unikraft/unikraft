@@ -47,6 +47,7 @@
 #include <uk/assert.h>
 
 #ifdef CONFIG_PARAVIRT
+#include <xen-x86/mm_pv.h>
 unsigned long *phys_to_machine_mapping;
 #endif
 unsigned long mfn_zero;
@@ -681,6 +682,76 @@ void _init_mem_clear_bootstrap(void)
 	pgt = get_pgt(__TEXT);
     *pgt = 0;
 	invlpg(__TEXT);
+#endif
+}
+
+#ifdef CONFIG_XEN_PV_BUILD_P2M
+static unsigned long max_pfn;
+static unsigned long *l3_list;
+static unsigned long *l2_list_pages[P2M_ENTRIES];
+
+void _arch_init_p2m(struct uk_alloc *a)
+{
+	unsigned long pfn;
+	unsigned long *l2_list = NULL;
+
+	max_pfn = HYPERVISOR_start_info->nr_pages;
+
+	if (((max_pfn - 1) >> L3_P2M_SHIFT) > 0)
+		UK_CRASH("Error: Too many pfns.\n");
+
+	l3_list = uk_malloc_page(a);
+	for (pfn = 0; pfn < max_pfn; pfn += P2M_ENTRIES) {
+		if (!(pfn % (P2M_ENTRIES * P2M_ENTRIES))) {
+			l2_list = uk_malloc_page(a);
+			l3_list[L3_P2M_IDX(pfn)] = virt_to_mfn(l2_list);
+			l2_list_pages[L3_P2M_IDX(pfn)] = l2_list;
+		}
+
+		l2_list[L2_P2M_IDX(pfn)] =
+			virt_to_mfn(phys_to_machine_mapping + pfn);
+	}
+	HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
+		virt_to_mfn(l3_list);
+	HYPERVISOR_shared_info->arch.max_pfn = max_pfn;
+}
+
+void _arch_rebuild_p2m(void)
+{
+	unsigned long pfn;
+	unsigned long *l2_list = NULL;
+
+	for (pfn = 0; pfn < max_pfn; pfn += P2M_ENTRIES) {
+		if (!(pfn % (P2M_ENTRIES * P2M_ENTRIES))) {
+			l2_list = l2_list_pages[L3_P2M_IDX(pfn)];
+			l3_list[L3_P2M_IDX(pfn)] = virt_to_mfn(l2_list);
+		}
+
+		l2_list[L2_P2M_IDX(pfn)] =
+				virt_to_mfn(phys_to_machine_mapping + pfn);
+	}
+	HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
+			virt_to_mfn(l3_list);
+	HYPERVISOR_shared_info->arch.max_pfn = max_pfn;
+}
+
+#ifdef CONFIG_MIGRATION
+void arch_mm_pre_suspend(void)
+{
+
+}
+void arch_mm_post_suspend(int canceled)
+{
+	if (!canceled)
+		arch_rebuild_p2m();
+}
+#endif
+#endif /* CONFIG_XEN_PV_BUILD_P2M */
+
+void arch_mm_init(struct uk_alloc *a)
+{
+#ifdef CONFIG_XEN_PV_BUILD_P2M
+	_arch_init_p2m(a);
 #endif
 }
 
