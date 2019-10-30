@@ -40,6 +40,7 @@
 #include <uk/alloc.h>
 #include <uk/essentials.h>
 #include <uk/arch/limits.h>
+#include <uk/page.h>
 #include <uk/blkdev_driver.h>
 #include <xen-x86/mm.h>
 #include <xen-x86/mm_pv.h>
@@ -49,6 +50,8 @@
 
 #define DRIVER_NAME		"xen-blkfront"
 
+#define SECTOR_INDEX_IN_PAGE(a, sector_size) \
+	(((a) & ~PAGE_MASK) / (sector_size))
 
 /* TODO Same interrupt macros we use in virtio-blk */
 #define BLKFRONT_INTR_EN             (1 << 0)
@@ -62,6 +65,173 @@
 
 static struct uk_alloc *drv_allocator;
 
+
+static void blkif_request_init(struct blkif_request *ring_req,
+		__sector sector_size)
+{
+	uintptr_t start_sector, end_sector;
+	uint16_t nb_segments;
+	struct blkfront_request *blkfront_req;
+	struct uk_blkreq *req;
+	uintptr_t start_data, end_data;
+	uint16_t seg;
+
+	UK_ASSERT(ring_req);
+	blkfront_req = (struct blkfront_request *)ring_req->id;
+	req = blkfront_req->req;
+	start_data = (uintptr_t)req->aio_buf;
+	end_data = (uintptr_t)req->aio_buf + req->nb_sectors * sector_size;
+
+	/* Can't io non-sector-aligned buffer */
+	UK_ASSERT(!(start_data & (sector_size - 1)));
+
+	/*
+	 * Find number of segments (pages)
+	 * Being sector-size aligned buffer, it may not be aligned
+	 * to page_size. If so, it is necessary to find the start and end
+	 * of the pages the buffer is allocated, in order to calculate the
+	 * number of pages the request has.
+	 **/
+	start_sector = round_pgdown(start_data);
+	end_sector = round_pgup(end_data);
+	nb_segments = (end_sector - start_sector) / PAGE_SIZE;
+	UK_ASSERT(nb_segments <= BLKIF_MAX_SEGMENTS_PER_REQUEST);
+
+	/* Set ring request */
+	ring_req->operation = (req->operation == UK_BLKDEV_WRITE) ?
+			BLKIF_OP_WRITE : BLKIF_OP_READ;
+	ring_req->nr_segments = nb_segments;
+	ring_req->sector_number = req->start_sector;
+
+	/* Set for each page the offset of sectors used for request */
+	for (seg = 0; seg < nb_segments; ++seg) {
+		ring_req->seg[seg].first_sect = 0;
+		ring_req->seg[seg].last_sect = PAGE_SIZE / sector_size - 1;
+	}
+
+	ring_req->seg[0].first_sect =
+			SECTOR_INDEX_IN_PAGE(start_data, sector_size);
+	ring_req->seg[nb_segments - 1].last_sect =
+			SECTOR_INDEX_IN_PAGE(end_data - 1, sector_size);
+}
+
+static int blkfront_request_write(struct blkfront_request *blkfront_req,
+		struct blkif_request *ring_req)
+{
+	struct blkfront_dev *dev;
+	struct uk_blkreq *req;
+	struct uk_blkdev_cap *cap;
+	__sector sector_size;
+	int rc = 0;
+
+	UK_ASSERT(blkfront_req);
+	req = blkfront_req->req;
+	dev = blkfront_req->queue->dev;
+	cap = &dev->blkdev.capabilities;
+	sector_size = cap->ssize;
+	if (req->operation == UK_BLKDEV_WRITE && cap->mode == O_RDONLY)
+		return -EPERM;
+
+	if (req->aio_buf == NULL)
+		return -EINVAL;
+
+	if (req->nb_sectors == 0)
+		return -EINVAL;
+
+	if (req->start_sector + req->nb_sectors > cap->sectors)
+		return -EINVAL;
+
+	if (req->nb_sectors > cap->max_sectors_per_req)
+		return -EINVAL;
+
+	blkif_request_init(ring_req, sector_size);
+	blkfront_req->nb_segments = ring_req->nr_segments;
+
+	return rc;
+}
+
+static int blkfront_queue_enqueue(struct uk_blkdev_queue *queue,
+		struct uk_blkreq *req)
+{
+	struct blkfront_request *blkfront_req;
+	struct blkfront_dev *dev;
+	RING_IDX ring_idx;
+	struct blkif_request *ring_req;
+	struct blkif_front_ring *ring;
+	int rc = 0;
+
+	UK_ASSERT(queue);
+	UK_ASSERT(req);
+
+	blkfront_req = uk_malloc(drv_allocator, sizeof(*blkfront_req));
+	if (!blkfront_req)
+		return -ENOMEM;
+
+	blkfront_req->req = req;
+	blkfront_req->queue = queue;
+	dev = queue->dev;
+	ring = &queue->ring;
+	ring_idx = ring->req_prod_pvt;
+	ring_req = RING_GET_REQUEST(ring, ring_idx);
+	ring_req->id = (uintptr_t) blkfront_req;
+	ring_req->handle = dev->handle;
+
+	if (req->operation == UK_BLKDEV_READ ||
+			req->operation == UK_BLKDEV_WRITE)
+		rc = blkfront_request_write(blkfront_req, ring_req);
+	else
+		rc = -EINVAL;
+
+	if (rc)
+		goto err_out;
+
+	ring->req_prod_pvt = ring_idx + 1;
+
+	/* Memory barrier */
+	wmb();
+out:
+	return rc;
+
+err_out:
+	uk_free(drv_allocator, blkfront_req);
+	goto out;
+}
+
+static int blkfront_submit_request(struct uk_blkdev *blkdev,
+		struct uk_blkdev_queue *queue,
+		struct uk_blkreq *req)
+{
+	int err = 0;
+	int notify;
+	int status = 0x0;
+
+	UK_ASSERT(blkdev != NULL);
+	UK_ASSERT(req != NULL);
+	UK_ASSERT(queue != NULL);
+
+	if (RING_FULL(&queue->ring)) {
+		uk_pr_err("Queue %p is full\n", queue);
+		return -EBUSY;
+	}
+
+	err = blkfront_queue_enqueue(queue, req);
+	if (err) {
+		uk_pr_err("Failed to set ring req for %d op: %d\n",
+				req->operation, err);
+		return err;
+	}
+
+	status |= UK_BLKDEV_STATUS_SUCCESS;
+	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&queue->ring, notify);
+	if (notify) {
+		err = notify_remote_via_evtchn(queue->evtchn);
+		if (err)
+			return err;
+	}
+
+	status |= (!RING_FULL(&queue->ring)) ? UK_BLKDEV_STATUS_MORE : 0x0;
+	return status;
+}
 
 /* Returns 1 if more responses available */
 static int blkfront_xen_ring_intr_enable(struct uk_blkdev_queue *queue)
@@ -369,6 +539,7 @@ static int blkfront_add_dev(struct xenbus_device *dev)
 		return -ENOMEM;
 
 	d->xendev = dev;
+	d->blkdev.submit_one = blkfront_submit_request;
 	d->blkdev.dev_ops = &blkfront_ops;
 
 	/* Xenbus initialization */

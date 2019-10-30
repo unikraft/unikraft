@@ -198,6 +198,10 @@ static int blkfront_xb_get_capabilities(struct blkfront_dev *blkdev)
 	}
 
 	blkdev->blkdev.capabilities.mode = (*mode == 'r') ? O_RDONLY : O_RDWR;
+	blkdev->blkdev.capabilities.max_sectors_per_req =
+			(BLKIF_MAX_SEGMENTS_PER_REQUEST - 1) *
+			(PAGE_SIZE / blkdev->blkdev.capabilities.ssize) + 1;
+	blkdev->blkdev.capabilities.ioalign = blkdev->blkdev.capabilities.ssize;
 
 	free(mode);
 	return 0;

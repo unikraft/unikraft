@@ -46,6 +46,19 @@
 #include <common/gnttab.h>
 #include <common/events.h>
 
+
+/**
+ * Structure used to describe a front device request.
+ */
+struct blkfront_request {
+	/* Request from the API. */
+	struct uk_blkreq *req;
+	/* Number of segments. */
+	uint16_t nb_segments;
+	/* Queue in which the request will be stored */
+	struct uk_blkdev_queue *queue;
+};
+
 /*
  * Structure used to describe a queue used for both requests and responses
  */
