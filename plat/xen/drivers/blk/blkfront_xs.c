@@ -191,6 +191,21 @@ static int blkfront_xb_get_capabilities(struct blkfront_dev *blkdev)
 		return err;
 	}
 
+	err = xs_scanf(XBT_NIL, xendev->otherend, "feature-flush-cache",
+					"%d", &blkdev->flush);
+	if (err < 0) {
+		uk_pr_err("Failed to read feature-flush-cache from xs: %d\n",
+				err);
+		return err;
+	}
+
+	err = xs_scanf(XBT_NIL, xendev->otherend, "feature-barrier",
+					"%d", &blkdev->barrier);
+	if (err < 0) {
+		uk_pr_err("Failed to read feature-barrier from xs: %d\n", err);
+		return err;
+	}
+
 	mode = xs_read(XBT_NIL, xendev->otherend, "mode");
 	if (PTRISERR(mode)) {
 		uk_pr_err("Failed to read mode from xs: %d.\n", err);

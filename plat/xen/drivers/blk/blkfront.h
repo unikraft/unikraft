@@ -89,6 +89,14 @@ struct blkfront_dev {
 	struct uk_blkdev blkdev;
 	/* Blkfront device number from Xenstore path. */
 	blkif_vdev_t	handle;
+	/* Value which indicates that the backend can process requests with the
+	 * BLKIF_OP_WRITE_BARRIER request opcode.
+	 */
+	int barrier;
+	/* Value which indicates that the backend can process requests with the
+	 * BLKIF_OP_WRITE_FLUSH_DISKCACHE request opcode.
+	 */
+	int flush;
 	/* Number of configured queues used for requests */
 	uint16_t nb_queues;
 	/* Vector of queues used for communication with backend */

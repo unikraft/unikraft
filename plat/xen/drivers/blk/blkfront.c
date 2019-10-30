@@ -150,6 +150,29 @@ static int blkfront_request_write(struct blkfront_request *blkfront_req,
 	return rc;
 }
 
+static int blkfront_request_flush(struct blkfront_request *blkfront_req,
+		struct blkif_request *ring_req)
+{
+	struct blkfront_dev *dev;
+	struct uk_blkdev_queue *queue;
+
+	UK_ASSERT(ring_req);
+
+	queue = blkfront_req->queue;
+	dev = queue->dev;
+	if (dev->barrier)
+		ring_req->operation = BLKIF_OP_WRITE_BARRIER;
+	else if (dev->flush)
+		ring_req->operation = BLKIF_OP_FLUSH_DISKCACHE;
+	else
+		return -ENOTSUP;
+
+	ring_req->nr_segments = 0;
+	ring_req->sector_number = 0;
+
+	return 0;
+}
+
 static int blkfront_queue_enqueue(struct uk_blkdev_queue *queue,
 		struct uk_blkreq *req)
 {
@@ -179,6 +202,8 @@ static int blkfront_queue_enqueue(struct uk_blkdev_queue *queue,
 	if (req->operation == UK_BLKDEV_READ ||
 			req->operation == UK_BLKDEV_WRITE)
 		rc = blkfront_request_write(blkfront_req, ring_req);
+	else if (req->operation == UK_BLKDEV_FFLUSH)
+		rc =  blkfront_request_flush(blkfront_req, ring_req);
 	else
 		rc = -EINVAL;
 
