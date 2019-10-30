@@ -165,6 +165,43 @@ out:
 	return err;
 }
 
+/*
+ * Get device capabilities (sector_size, etc)
+ * from the backend after it switched to Connected State.
+ */
+static int blkfront_xb_get_capabilities(struct blkfront_dev *blkdev)
+{
+	struct xenbus_device *xendev;
+	char *mode;
+	int err = 0;
+
+	UK_ASSERT(blkdev != NULL);
+	xendev = blkdev->xendev;
+	err = xs_scanf(XBT_NIL, xendev->otherend, "sectors",
+		"%lu", &blkdev->blkdev.capabilities.sectors);
+	if (err < 0) {
+		uk_pr_err("Failed to read nb_sectors from xs: %d\n", err);
+		return err;
+	}
+
+	err = xs_scanf(XBT_NIL, xendev->otherend, "sector-size",
+			"%lu", &blkdev->blkdev.capabilities.ssize);
+	if (err < 0) {
+		uk_pr_err("Failed to read ssize from xs: %d\n", err);
+		return err;
+	}
+
+	mode = xs_read(XBT_NIL, xendev->otherend, "mode");
+	if (PTRISERR(mode)) {
+		uk_pr_err("Failed to read mode from xs: %d.\n", err);
+		return PTR2ERR(mode);
+	}
+
+	blkdev->blkdev.capabilities.mode = (*mode == 'r') ? O_RDONLY : O_RDWR;
+
+	free(mode);
+	return 0;
+}
 
 /* Write info for a specific queue in xenstore.
  * If there is only one queue, the path does not
@@ -451,6 +488,12 @@ int blkfront_xb_connect(struct blkfront_dev *blkdev)
 	err = blkfront_xb_wait_be_connect(blkdev);
 	if (err)
 		goto err;
+
+	err = blkfront_xb_get_capabilities(blkdev);
+	if (err) {
+		uk_pr_err("Failed to extract info from backend: %d.\n", err);
+		goto err;
+	}
 
 err:
 	return err;
