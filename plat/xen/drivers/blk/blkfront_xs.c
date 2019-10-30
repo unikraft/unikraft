@@ -32,89 +32,88 @@
  *
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
+#define _GNU_SOURCE /* for asprintf() */
 #include <inttypes.h>
+#include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
-#include <uk/assert.h>
+#include <uk/errptr.h>
 #include <uk/print.h>
-#include <uk/alloc.h>
-#include <uk/essentials.h>
-#include <uk/arch/limits.h>
-#include <uk/blkdev_driver.h>
-#include <xenbus/xenbus.h>
-#include "blkfront.h"
+#include <uk/assert.h>
+#include <xenbus/client.h>
+#include <xenbus/xs.h>
 #include "blkfront_xb.h"
 
-#define DRIVER_NAME		"xen-blkfront"
-
-
-/* Get blkfront_dev* which contains blkdev */
-#define to_blkfront(blkdev) \
-	__containerof(blkdev, struct blkfront_dev, blkdev)
-
-static struct uk_alloc *drv_allocator;
-
-
-/**
- * Assign callbacks to uk_blkdev
- */
-static int blkfront_add_dev(struct xenbus_device *dev)
+static int xs_read_backend_id(const char *nodename, domid_t *domid)
 {
-	struct blkfront_dev *d = NULL;
-	int rc = 0;
+	char *path = NULL;
+	int value, err;
+
+	UK_ASSERT(nodename != NULL);
+
+	err = asprintf(&path, "%s/backend-id", nodename);
+	if (err <= 0) {
+		uk_pr_err("Failed to allocate and format path: %d.\n", err);
+		goto out;
+	}
+
+	err = xs_read_integer(XBT_NIL, path, &value);
+	if (err == 0)
+		*domid = (domid_t) value;
+
+out:
+	free(path);
+	return err;
+}
+
+int blkfront_xb_init(struct blkfront_dev *dev)
+{
+	struct xenbus_device *xendev;
+	char *nodename;
+	int err = 0;
+
+	UK_ASSERT(dev != NULL);
+	xendev = dev->xendev;
+
+	err = xs_read_backend_id(xendev->nodename, &xendev->otherend_id);
+	if (err)
+		goto out;
+
+	/* Get handle */
+	nodename = strrchr(xendev->nodename, '/');
+	if (!nodename) {
+		err = -EINVAL;
+		goto out;
+	}
+
+	dev->handle = strtoul(nodename + 1, NULL, 0);
+	if (!dev->handle) {
+		err = -EINVAL;
+		goto out;
+	}
+
+	/* Read otherend path */
+	xendev->otherend = xs_read(XBT_NIL, xendev->nodename, "backend");
+	if (PTRISERR(xendev->otherend)) {
+		uk_pr_err("Failed to read backend path: %d.\n", err);
+		err = PTR2ERR(xendev->otherend);
+		xendev->otherend = NULL;
+		goto out;
+	}
+
+out:
+	return err;
+}
+
+void blkfront_xb_fini(struct blkfront_dev *dev)
+{
+	struct xenbus_device *xendev;
 
 	UK_ASSERT(dev != NULL);
 
-	d = uk_calloc(drv_allocator, 1, sizeof(struct blkfront_dev));
-	if (!d)
-		return -ENOMEM;
-
-	d->xendev = dev;
-
-	/* Xenbus initialization */
-	rc = blkfront_xb_init(d);
-	if (rc) {
-		uk_pr_err("Error initializing Xenbus data: %d\n", rc);
-		goto err_xenbus;
+	xendev = dev->xendev;
+	if (xendev->otherend) {
+		free(xendev->otherend);
+		xendev->otherend = NULL;
 	}
-
-	rc = uk_blkdev_drv_register(&d->blkdev, drv_allocator, "blkdev");
-	if (rc < 0) {
-		uk_pr_err("Failed to register blkfront with libukblkdev %d",
-				rc);
-		goto err_register;
-	}
-
-	d->uid = rc;
-	uk_pr_info("Blkfront device registered with libukblkdev: %d\n", rc);
-	rc = 0;
-out:
-	return rc;
-err_register:
-	blkfront_xb_fini(d);
-err_xenbus:
-	uk_free(drv_allocator, d);
-	goto out;
 }
-
-static int blkfront_drv_init(struct uk_alloc *allocator)
-{
-	/* driver initialization */
-	if (!allocator)
-		return -EINVAL;
-
-	drv_allocator = allocator;
-	return 0;
-}
-
-static const xenbus_dev_type_t blkfront_devtypes[] = {
-	xenbus_dev_vbd,
-};
-
-static struct xenbus_driver blkfront_driver = {
-	.device_types = blkfront_devtypes,
-	.init = blkfront_drv_init,
-	.add_dev = blkfront_add_dev
-};
-
-XENBUS_REGISTER_DRIVER(&blkfront_driver);

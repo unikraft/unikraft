@@ -32,89 +32,29 @@
  *
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
-#include <inttypes.h>
-#include <string.h>
-#include <fcntl.h>
-#include <uk/assert.h>
-#include <uk/print.h>
-#include <uk/alloc.h>
-#include <uk/essentials.h>
-#include <uk/arch/limits.h>
-#include <uk/blkdev_driver.h>
-#include <xenbus/xenbus.h>
-#include "blkfront.h"
-#include "blkfront_xb.h"
-
-#define DRIVER_NAME		"xen-blkfront"
-
-
-/* Get blkfront_dev* which contains blkdev */
-#define to_blkfront(blkdev) \
-	__containerof(blkdev, struct blkfront_dev, blkdev)
-
-static struct uk_alloc *drv_allocator;
-
+#ifndef __BLKFRONT_XB_H__
+#define __BLKFRONT_XB_H__
 
 /**
- * Assign callbacks to uk_blkdev
+ * Blkfront interface for xenstore operations.
+ *
+ * This header contains all the functions needed by the blkfront driver
+ * in order to access Xenstore data.
  */
-static int blkfront_add_dev(struct xenbus_device *dev)
-{
-	struct blkfront_dev *d = NULL;
-	int rc = 0;
 
-	UK_ASSERT(dev != NULL);
+#include "blkfront.h"
 
-	d = uk_calloc(drv_allocator, 1, sizeof(struct blkfront_dev));
-	if (!d)
-		return -ENOMEM;
+/*
+ * Get initial info from the xenstore.
+ * Ex: backend path, handle.
+ *
+ * Return 0 on success, a negative errno value on error.
+ */
+int blkfront_xb_init(struct blkfront_dev *dev);
 
-	d->xendev = dev;
+/*
+ * It deallocates the xendev structure members allocated during initialization.
+ */
+void blkfront_xb_fini(struct blkfront_dev *dev);
 
-	/* Xenbus initialization */
-	rc = blkfront_xb_init(d);
-	if (rc) {
-		uk_pr_err("Error initializing Xenbus data: %d\n", rc);
-		goto err_xenbus;
-	}
-
-	rc = uk_blkdev_drv_register(&d->blkdev, drv_allocator, "blkdev");
-	if (rc < 0) {
-		uk_pr_err("Failed to register blkfront with libukblkdev %d",
-				rc);
-		goto err_register;
-	}
-
-	d->uid = rc;
-	uk_pr_info("Blkfront device registered with libukblkdev: %d\n", rc);
-	rc = 0;
-out:
-	return rc;
-err_register:
-	blkfront_xb_fini(d);
-err_xenbus:
-	uk_free(drv_allocator, d);
-	goto out;
-}
-
-static int blkfront_drv_init(struct uk_alloc *allocator)
-{
-	/* driver initialization */
-	if (!allocator)
-		return -EINVAL;
-
-	drv_allocator = allocator;
-	return 0;
-}
-
-static const xenbus_dev_type_t blkfront_devtypes[] = {
-	xenbus_dev_vbd,
-};
-
-static struct xenbus_driver blkfront_driver = {
-	.device_types = blkfront_devtypes,
-	.init = blkfront_drv_init,
-	.add_dev = blkfront_add_dev
-};
-
-XENBUS_REGISTER_DRIVER(&blkfront_driver);
+#endif /* __BLKFRONT_XB_H__ */

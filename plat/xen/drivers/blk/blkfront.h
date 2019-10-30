@@ -47,8 +47,12 @@
  * Structure used to describe the Blkfront device.
  */
 struct blkfront_dev {
+	/* Xenbus Device. */
+	struct xenbus_device *xendev;
 	/* Blkdev Device. */
 	struct uk_blkdev blkdev;
+	/* Blkfront device number from Xenstore path. */
+	blkif_vdev_t	handle;
 	/* The blkdev identifier */
 	__u16 uid;
 };
