@@ -165,6 +165,189 @@ out:
 	return err;
 }
 
+
+/* Write info for a specific queue in xenstore.
+ * If there is only one queue, the path does not
+ * include queue-<queue-id>.
+ **/
+static int blkfront_xb_write_ring_info(struct blkfront_dev *dev,
+		uint16_t queue_id,
+		xenbus_transaction_t xbt)
+{
+	struct xenbus_device *xendev;
+	char *node_ring_ref = NULL;
+	char *node_evtchn = NULL;
+	int err = 0;
+
+	UK_ASSERT(dev != NULL);
+	xendev = dev->xendev;
+
+	if (queue_id == 0 && dev->nb_queues == 1) {
+		err = asprintf(&node_ring_ref, "ring-ref");
+		if (err <= 0) {
+			uk_pr_err("Failed to format ring_ref path: %d\n", err);
+			goto out;
+		}
+
+		err = asprintf(&node_evtchn, "event-channel");
+		if (err <= 0) {
+			uk_pr_err("Failed to format event-channel path: %d\n",
+					err);
+			goto out;
+		}
+	} else {
+		err = asprintf(&node_ring_ref, "queue-%"PRIu16"/ring-ref",
+				queue_id);
+		if (err <= 0) {
+			uk_pr_err("Failed to format ring_ref path: %d\n", err);
+			goto out;
+		}
+
+		err = asprintf(&node_evtchn, "queue-%"PRIu16"/event-channel",
+				queue_id);
+		if (err <= 0) {
+			uk_pr_err("Failed to format event-channel path: %d\n",
+					err);
+			goto out;
+		}
+	}
+
+	err = xs_printf(xbt, xendev->nodename,
+				node_evtchn,
+				"%u",
+				dev->blkdev._queue[queue_id]->evtchn);
+	if (err <= 0) {
+		uk_pr_err("Failed to write event-channel: %d\n", err);
+		goto out;
+	}
+
+	err = xs_printf(xbt, xendev->nodename,
+			node_ring_ref,
+			"%u",
+			dev->blkdev._queue[queue_id]->ring_ref);
+	if (err <= 0) {
+		uk_pr_err("Failed to write ring_ref: %d\n", err);
+		goto out;
+	}
+
+	err = 0;
+
+out:
+	free(node_evtchn);
+	free(node_ring_ref);
+	return err;
+}
+
+/* Delete ring entry */
+static int blkfront_xb_delete_ring_info(struct blkfront_dev *dev,
+		uint16_t queue_id)
+{
+	struct xenbus_device *xendev;
+	char *node_ring_ref = NULL;
+	char *node_evtchn = NULL;
+	int err = 0;
+
+	UK_ASSERT(dev);
+	xendev = dev->xendev;
+
+	if (queue_id == 0 && dev->nb_queues == 1) {
+		err = asprintf(&node_ring_ref, "%s/ring-ref",
+				xendev->nodename);
+		if (err <= 0) {
+			uk_pr_err("Failed to format ring_ref_path: %d\n", err);
+			goto out;
+		}
+
+		err = asprintf(&node_evtchn, "%s/event-channel",
+				xendev->nodename);
+		if (err <= 0) {
+			uk_pr_err("Failed to format event-channel path: %d\n",
+					err);
+			goto out;
+		}
+	} else {
+		err = asprintf(&node_ring_ref, "%s/queue-%"PRIu16"/ring-ref",
+				xendev->nodename,
+				queue_id);
+		if (err <= 0) {
+			uk_pr_err("Failed to format ring_ref_path: %d\n", err);
+			goto out;
+		}
+
+		err = asprintf(&node_evtchn, "%s/queue-%"PRIu16"/event-channel",
+				xendev->nodename,
+				queue_id);
+		if (err <= 0) {
+			uk_pr_err("Failed to format event-channel path: %d\n",
+					err);
+			goto out;
+		}
+	}
+
+	err = xs_rm(XBT_NIL, node_ring_ref);
+	if (err)
+		uk_pr_err("Failed to remove ring_ref from xs: %d\n", err);
+
+	err = xs_rm(XBT_NIL, node_evtchn);
+	if (err)
+		uk_pr_err("Failed to remove event-channel from xs: %d\n", err);
+out:
+	free(node_evtchn);
+	free(node_ring_ref);
+	return err;
+}
+
+static int blkfront_xb_write_rings_info(struct blkfront_dev *dev)
+{
+	xenbus_transaction_t xbt = 0;
+	int err = 0;
+
+	UK_ASSERT(dev != NULL);
+
+	err = xs_transaction_start(&xbt);
+	if (err)
+		goto abort_transaction;
+
+	for (uint16_t queue_id = 0; queue_id < dev->nb_queues; ++queue_id) {
+		err = blkfront_xb_write_ring_info(dev, queue_id, xbt);
+		if (err) {
+			uk_pr_err("Failed to write queue%"PRIu16" to xs: %d\n",
+					queue_id,
+					err);
+			goto abort_transaction;
+		}
+	}
+
+	err = xs_transaction_end(xbt, 0);
+	if (err)
+		uk_pr_err("Failed to end transaction: %d\n", err);
+
+	return err;
+
+abort_transaction:
+	xs_transaction_end(xbt, 1);
+	return err;
+}
+
+static int blkfront_xb_delete_rings_info(struct blkfront_dev *dev)
+{
+	int err = 0;
+
+	UK_ASSERT(dev != NULL);
+
+	for (uint16_t queue_id = 0; queue_id < dev->nb_queues; ++queue_id) {
+		err = blkfront_xb_delete_ring_info(dev, queue_id);
+		if (err) {
+			uk_pr_err("Failed to delete ring_info for q-%"
+					PRIu16 ": %d\n",
+					queue_id, err);
+			return err;
+		}
+	}
+
+	return err;
+}
+
 #define WAIT_BE_STATE_CHANGE_WHILE_COND(state_cond) \
 	do { \
 		err = xs_read_integer(XBT_NIL, back_state_path,\
@@ -254,6 +437,13 @@ int blkfront_xb_connect(struct blkfront_dev *blkdev)
 	UK_ASSERT(blkdev != NULL);
 	xendev = blkdev->xendev;
 
+	err = blkfront_xb_write_rings_info(blkdev);
+	if (err) {
+		uk_pr_err("Failed to write rings info to xenstore: %d\n.",
+				err);
+		return err;
+	}
+
 	err = xenbus_switch_state(XBT_NIL, xendev, XenbusStateConnected);
 	if (err)
 		goto err;
@@ -287,6 +477,12 @@ int blkfront_xb_disconnect(struct blkfront_dev *blkdev)
 	err = blkfront_xb_wait_be_disconnect(blkdev);
 	if (err) {
 		uk_pr_err("Failed to disconnect: %d\n", err);
+		goto out;
+	}
+
+	err = blkfront_xb_delete_rings_info(blkdev);
+	if (err) {
+		uk_pr_err("Failed to delete rings info: %d\n", err);
 		goto out;
 	}
 
