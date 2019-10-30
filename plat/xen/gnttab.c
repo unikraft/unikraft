@@ -86,51 +86,93 @@ static void put_free_entry(grant_ref_t gref)
 	uk_semaphore_up(&gnttab.sem);
 }
 
+static void gnttab_grant_init(grant_ref_t gref, domid_t domid,
+		unsigned long mfn)
+{
+	gnttab.table[gref].frame = mfn;
+	gnttab.table[gref].domid = domid;
+
+	/* Memory barrier */
+	wmb();
+}
+
+static void gnttab_grant_permit_access(grant_ref_t gref, domid_t domid,
+		unsigned long mfn, int readonly)
+{
+	gnttab_grant_init(gref, domid, mfn);
+	readonly *= GTF_readonly;
+	gnttab.table[gref].flags = GTF_permit_access | readonly;
+}
+
 grant_ref_t gnttab_grant_access(domid_t domid, unsigned long mfn,
 		int readonly)
 {
-	grant_ref_t gref;
+	grant_ref_t gref = get_free_entry();
 
-	gref = get_free_entry();
-	gnttab.table[gref].frame = mfn;
-	gnttab.table[gref].domid = domid;
-	wmb();
-	readonly *= GTF_readonly;
-	gnttab.table[gref].flags = GTF_permit_access | readonly;
+	gnttab_grant_permit_access(gref, domid, mfn, readonly);
 
 	return gref;
 }
 
 grant_ref_t gnttab_grant_transfer(domid_t domid, unsigned long mfn)
 {
-	grant_ref_t gref;
+	grant_ref_t gref = get_free_entry();
 
-	gref = get_free_entry();
-	gnttab.table[gref].frame = mfn;
-	gnttab.table[gref].domid = domid;
-	wmb();
+	gnttab_grant_init(gref, domid, mfn);
 	gnttab.table[gref].flags = GTF_accept_transfer;
 
 	return gref;
 }
 
-int gnttab_end_access(grant_ref_t gref)
+/* Reset flags to zero in order to stop using the grant */
+static int gnttab_reset_flags(grant_ref_t gref)
 {
 	__u16 flags, nflags;
 	__u16 *pflags;
 
-	UK_ASSERT(gref >= GNTTAB_NR_RESERVED_ENTRIES &&
-		gref < NR_GRANT_ENTRIES);
-
 	pflags = &gnttab.table[gref].flags;
 	nflags = *pflags;
+
 	do {
 		if ((flags = nflags) & (GTF_reading | GTF_writing)) {
 			uk_pr_warn("gref=%u still in use! (0x%x)\n",
 				   gref, flags);
 			return 0;
 		}
-	} while ((nflags = ukarch_compare_exchange_sync(pflags, flags, 0)) != flags);
+	} while ((nflags = ukarch_compare_exchange_sync(pflags, flags, 0))
+			!= flags);
+
+	return 1;
+}
+
+int gnttab_update_grant(grant_ref_t gref,
+		domid_t domid, unsigned long mfn,
+		int readonly)
+{
+	int rc;
+
+	UK_ASSERT(gref >= GNTTAB_NR_RESERVED_ENTRIES &&
+		gref < NR_GRANT_ENTRIES);
+
+	rc = gnttab_reset_flags(gref);
+	if (!rc)
+		return rc;
+
+	gnttab_grant_permit_access(gref, domid, mfn, readonly);
+
+	return 1;
+}
+
+int gnttab_end_access(grant_ref_t gref)
+{
+	int rc;
+
+	UK_ASSERT(gref >= GNTTAB_NR_RESERVED_ENTRIES &&
+		gref < NR_GRANT_ENTRIES);
+
+	rc = gnttab_reset_flags(gref);
+	if (!rc)
+		return rc;
 
 	put_free_entry(gref);
 
