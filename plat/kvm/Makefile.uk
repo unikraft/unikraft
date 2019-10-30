@@ -106,6 +106,14 @@ LIBKVMPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/memory.c|common
 LIBKVMPLAT_SRCS-y              += $(UK_PLAT_KVM_DEF_LDS)
 
 ##
+## Support dumping backtrace
+##
+ifeq ($(CONFIG_DEBUG_BACK_TRACE),y)
+LIBKVMPLAT_SRCS-y += $(UK_PLAT_COMMON_BASE)/read_allsymbol.c|common
+endif
+
+
+##
 ## PCI library definitions
 ##
 LIBKVMPCI_ASINCLUDES-$(CONFIG_ARCH_X86_64)  += -I$(LIBKVMPLAT_BASE)/include
