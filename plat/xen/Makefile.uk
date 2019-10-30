@@ -10,6 +10,7 @@ $(eval $(call addplat_s,xen,$(CONFIG_PLAT_XEN)))
 ##
 $(eval $(call addplatlib,xen,libxenplat))
 $(eval $(call addplatlib_s,xen,libxenbus,$(CONFIG_XEN_XENBUS)))
+$(eval $(call addplatlib_s,xen,libxenblkfront,$(CONFIG_XEN_BLKFRONT)))
 $(eval $(call addplatlib_s,xen,libxen9pfront,$(CONFIG_XEN_9PFRONT)))
 
 ##
@@ -110,6 +111,15 @@ LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/client.c
 LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/xs_comms.c
 LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/xs_watch.c
 LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/xs.c
+endif
+
+ifeq ($(CONFIG_XEN_BLKFRONT),y)
+LIBXENBLKFRONT_EXPORTS           = $(LIBXENPLAT_BASE)/drivers/blk/exportsyms.uk
+LIBXENBLKFRONT_ASFLAGS-y        += $(LIBXENPLAT_ASFLAGS-y)
+LIBXENBLKFRONT_ASINCLUDES-y     += $(LIBXENPLAT_ASINCLUDES-y)
+LIBXENBLKFRONT_CFLAGS-y         += $(LIBXENPLAT_CFLAGS-y)
+LIBXENBLKFRONT_CINCLUDES-y      += $(LIBXENPLAT_CINCLUDES-y)
+LIBXENBLKFRONT_SRCS-y           += $(LIBXENPLAT_BASE)/drivers/blk/blkfront.c
 endif
 
 ifeq ($(CONFIG_XEN_9PFRONT),y)

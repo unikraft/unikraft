@@ -82,6 +82,13 @@ menu "Xenbus Drivers"
         depends on XEN_XENBUS
         depends on XEN_GNTTAB
 
+config XEN_BLKFRONT
+	bool "Xenbus Blkfront Driver"
+	default n
+	depends on LIBUKBLKDEV
+	help
+		Driver for block devices
+
 menuconfig XEN_9PFRONT
 	bool "Xenbus 9pfront Driver"
 	default n
