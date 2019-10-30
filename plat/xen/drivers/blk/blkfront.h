@@ -42,11 +42,20 @@
  * implementation.
  */
 #include <uk/blkdev.h>
+#include <xen/io/blkif.h>
+#include <common/gnttab.h>
+#include <common/events.h>
 
 /*
  * Structure used to describe a queue used for both requests and responses
  */
 struct uk_blkdev_queue {
+	/* Front_ring structure */
+	struct blkif_front_ring ring;
+	/* Grant ref pointing at the front ring. */
+	grant_ref_t ring_ref;
+	/* Event channel for the front ring. */
+	evtchn_port_t evtchn;
 	/* Allocator for this queue. */
 	struct uk_alloc *a;
 	/* The libukblkdev queue identifier */

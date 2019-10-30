@@ -54,6 +54,128 @@
 
 static struct uk_alloc *drv_allocator;
 
+static int blkfront_ring_init(struct uk_blkdev_queue *queue)
+{
+	struct blkif_sring *sring = NULL;
+	struct blkfront_dev *dev;
+
+	UK_ASSERT(queue);
+	dev = queue->dev;
+	sring = uk_malloc_page(queue->a);
+	if (!sring)
+		return -ENOMEM;
+
+	memset(sring, 0, PAGE_SIZE);
+	SHARED_RING_INIT(sring);
+	FRONT_RING_INIT(&queue->ring, sring, PAGE_SIZE);
+
+	queue->ring_ref = gnttab_grant_access(dev->xendev->otherend_id,
+			virt_to_mfn(sring), 0);
+	UK_ASSERT(queue->ring_ref != GRANT_INVALID_REF);
+
+	return 0;
+}
+
+static void blkfront_ring_fini(struct uk_blkdev_queue *queue)
+{
+	int rc;
+
+	if (queue->ring_ref != GRANT_INVALID_REF) {
+		rc = gnttab_end_access(queue->ring_ref);
+		UK_ASSERT(rc);
+	}
+
+	if (queue->ring.sring != NULL)
+		uk_free_page(queue->a, queue->ring.sring);
+}
+
+/* Handler for event channel notifications */
+static void blkfront_handler(evtchn_port_t port __unused,
+		struct __regs *regs __unused, void *arg)
+{
+	struct uk_blkdev_queue *queue;
+
+	UK_ASSERT(arg);
+	queue = (struct uk_blkdev_queue *)arg;
+
+	uk_blkdev_drv_queue_event(&queue->dev->blkdev, queue->queue_id);
+}
+
+static struct uk_blkdev_queue *blkfront_queue_setup(struct uk_blkdev *blkdev,
+		uint16_t queue_id,
+		uint16_t nb_desc __unused,
+		const struct uk_blkdev_queue_conf *queue_conf)
+{
+	struct blkfront_dev *dev;
+	struct uk_blkdev_queue *queue;
+	int err = 0;
+
+	UK_ASSERT(blkdev != NULL);
+
+	dev = to_blkfront(blkdev);
+	if (queue_id >= dev->nb_queues) {
+		uk_pr_err("Invalid queue identifier: %"__PRIu16"\n", queue_id);
+		return ERR2PTR(-EINVAL);
+	}
+
+	queue = &dev->queues[queue_id];
+	queue->a = queue_conf->a;
+	queue->queue_id = queue_id;
+	queue->dev = dev;
+	err = blkfront_ring_init(queue);
+	if (err) {
+		uk_pr_err("Failed to init ring: %d.\n", err);
+		return ERR2PTR(err);
+	}
+
+	err = evtchn_alloc_unbound(dev->xendev->otherend_id,
+			blkfront_handler, queue,
+			&queue->evtchn);
+	if (err) {
+		uk_pr_err("Failed to create event-channel: %d.\n", err);
+		err *= -1;
+		goto err_out;
+	}
+
+	return queue;
+
+err_out:
+	blkfront_ring_fini(queue);
+	return ERR2PTR(err);
+}
+
+static int blkfront_queue_release(struct uk_blkdev *blkdev,
+		struct uk_blkdev_queue *queue)
+{
+	UK_ASSERT(blkdev != NULL);
+	UK_ASSERT(queue != NULL);
+
+	mask_evtchn(queue->evtchn);
+	unbind_evtchn(queue->evtchn);
+	blkfront_ring_fini(queue);
+
+	return 0;
+}
+
+static int blkfront_queue_get_info(struct uk_blkdev *blkdev,
+		uint16_t queue_id,
+		struct uk_blkdev_queue_info *qinfo)
+{
+	struct blkfront_dev *dev;
+
+	UK_ASSERT(blkdev);
+	UK_ASSERT(qinfo);
+
+	dev = to_blkfront(blkdev);
+	if (queue_id >= dev->nb_queues) {
+		uk_pr_err("Invalid queue identifier: %"__PRIu16"\n", queue_id);
+		return -EINVAL;
+	}
+
+	qinfo->nb_is_power_of_two = 1;
+
+	return 0;
+}
 
 static int blkfront_configure(struct uk_blkdev *blkdev,
 		const struct uk_blkdev_conf *conf)
@@ -113,6 +235,9 @@ static void blkfront_get_info(struct uk_blkdev *blkdev,
 static const struct uk_blkdev_ops blkfront_ops = {
 	.get_info = blkfront_get_info,
 	.dev_configure = blkfront_configure,
+	.queue_get_info = blkfront_queue_get_info,
+	.queue_setup = blkfront_queue_setup,
+	.queue_release = blkfront_queue_release,
 	.dev_unconfigure = blkfront_unconfigure,
 };
 
