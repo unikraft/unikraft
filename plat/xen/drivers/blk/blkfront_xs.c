@@ -164,3 +164,132 @@ int blkfront_xb_write_nb_queues(struct blkfront_dev *dev)
 out:
 	return err;
 }
+
+#define WAIT_BE_STATE_CHANGE_WHILE_COND(state_cond) \
+	do { \
+		err = xs_read_integer(XBT_NIL, back_state_path,\
+			(int *) &back_state); \
+		if (err) \
+			goto out; \
+		while (!err && (state_cond)) \
+			err = xenbus_wait_for_state_change(back_state_path, \
+				&back_state, \
+				xendev->otherend_watch); \
+		if (err) \
+			goto out; \
+	} while (0)
+
+
+static int blkfront_xb_wait_be_connect(struct blkfront_dev *blkdev)
+{
+	struct xenbus_device *xendev;
+	char *back_state_path = NULL;
+	XenbusState back_state;
+	int err = 0;
+
+	UK_ASSERT(blkdev != NULL);
+	xendev = blkdev->xendev;
+	err = asprintf(&back_state_path, "%s/state", xendev->otherend);
+	if (err <= 0) {
+		uk_pr_err("Failed to format back_state_path: %d\n", err);
+		goto out;
+	}
+
+	WAIT_BE_STATE_CHANGE_WHILE_COND(back_state < XenbusStateConnected);
+	if (back_state != XenbusStateConnected) {
+		uk_pr_err("Backend not available, state=%s\n",
+				xenbus_state_to_str(back_state));
+		err = -1;
+		goto out;
+	}
+
+out:
+	free(back_state_path);
+	return err;
+}
+
+static int blkfront_xb_wait_be_disconnect(struct blkfront_dev *blkdev)
+{
+	struct xenbus_device *xendev;
+	char *back_state_path = NULL;
+	XenbusState back_state;
+	int err = 0;
+
+	UK_ASSERT(blkdev != NULL);
+	xendev = blkdev->xendev;
+
+	err = asprintf(&back_state_path, "%s/state", xendev->otherend);
+	if (err <= 0) {
+		uk_pr_err("Failed to format back_state_path: %d\n", err);
+		goto out;
+	}
+
+	WAIT_BE_STATE_CHANGE_WHILE_COND(back_state < XenbusStateClosing);
+	err = xenbus_switch_state(XBT_NIL, xendev, XenbusStateClosed);
+	if (err) {
+		uk_pr_err("Failed to switch state to Closed: %d\n", err);
+		goto out;
+	}
+
+	WAIT_BE_STATE_CHANGE_WHILE_COND(back_state < XenbusStateClosed);
+	err = xenbus_switch_state(XBT_NIL, xendev, XenbusStateInitialising);
+	if (err) {
+		uk_pr_err("Failed to switch state to Initialising: %d\n", err);
+		goto out;
+	}
+
+	WAIT_BE_STATE_CHANGE_WHILE_COND(back_state < XenbusStateInitWait ||
+			back_state >= XenbusStateClosed);
+
+out:
+	free(back_state_path);
+	return err;
+}
+
+int blkfront_xb_connect(struct blkfront_dev *blkdev)
+{
+	int err;
+	struct xenbus_device *xendev;
+
+	UK_ASSERT(blkdev != NULL);
+	xendev = blkdev->xendev;
+
+	err = xenbus_switch_state(XBT_NIL, xendev, XenbusStateConnected);
+	if (err)
+		goto err;
+
+	err = blkfront_xb_wait_be_connect(blkdev);
+	if (err)
+		goto err;
+
+err:
+	return err;
+}
+
+int blkfront_xb_disconnect(struct blkfront_dev *blkdev)
+{
+	struct xenbus_device *xendev;
+	int err;
+
+	UK_ASSERT(blkdev != NULL);
+
+	xendev = blkdev->xendev;
+
+	uk_pr_info("Disconnect blkfront: backend at %s\n",
+			xendev->otherend);
+
+	err = xenbus_switch_state(XBT_NIL, xendev, XenbusStateClosing);
+	if (err) {
+		uk_pr_err("Failed to switch state to Closing: %d\n", err);
+		goto out;
+	}
+
+	err = blkfront_xb_wait_be_disconnect(blkdev);
+	if (err) {
+		uk_pr_err("Failed to disconnect: %d\n", err);
+		goto out;
+	}
+
+out:
+	return err;
+}

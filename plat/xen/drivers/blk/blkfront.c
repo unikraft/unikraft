@@ -270,6 +270,51 @@ out_err:
 	uk_free(drv_allocator, dev->queues);
 	goto out;
 }
+
+static int blkfront_start(struct uk_blkdev *blkdev)
+{
+	struct blkfront_dev *dev;
+	int err = 0;
+
+	UK_ASSERT(blkdev != NULL);
+	dev = to_blkfront(blkdev);
+	err = blkfront_xb_connect(dev);
+	if (err) {
+		uk_pr_err("Failed to connect to backend: %d.\n", err);
+		return err;
+	}
+
+	uk_pr_info(DRIVER_NAME": %"PRIu16" started\n", dev->uid);
+
+	return err;
+}
+
+/* If one queue has unconsumed responses it returns -EBUSY */
+static int blkfront_stop(struct uk_blkdev *blkdev)
+{
+	struct blkfront_dev *dev;
+	uint16_t q_id;
+	int err;
+
+	UK_ASSERT(blkdev != NULL);
+	dev = to_blkfront(blkdev);
+	for (q_id = 0; q_id < dev->nb_queues; ++q_id) {
+		if (RING_HAS_UNCONSUMED_RESPONSES(&dev->queues[q_id].ring)) {
+			uk_pr_err("Queue:%"PRIu16" has unconsumed responses\n",
+					q_id);
+			return -EBUSY;
+		}
+	}
+
+	err = blkfront_xb_disconnect(dev);
+	if (err) {
+		uk_pr_err(
+			"Failed to disconnect: %d.\n", err);
+		return err;
+	}
+
+	uk_pr_info(DRIVER_NAME": %"PRIu16" stopped\n", dev->uid);
+
 	return err;
 }
 
@@ -302,6 +347,8 @@ static const struct uk_blkdev_ops blkfront_ops = {
 	.queue_get_info = blkfront_queue_get_info,
 	.queue_setup = blkfront_queue_setup,
 	.queue_release = blkfront_queue_release,
+	.dev_start = blkfront_start,
+	.dev_stop = blkfront_stop,
 	.dev_unconfigure = blkfront_unconfigure,
 	.queue_intr_enable = blkfront_queue_intr_enable,
 	.queue_intr_disable = blkfront_queue_intr_disable,

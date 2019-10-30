@@ -62,4 +62,22 @@ void blkfront_xb_fini(struct blkfront_dev *dev);
  * Return 0 on success, a negative errno value on error.
  */
 int blkfront_xb_write_nb_queues(struct blkfront_dev *dev);
+
+/**
+ * Device changes its state to Connected.
+ * It waits until the backend is connected.
+ *
+ * Return 0 on success, a negative errno value on error.
+ */
+int blkfront_xb_connect(struct blkfront_dev *dev);
+
+/**
+ * Reinitialize the connection with the backend.
+ * The following states are:
+ *	Connected -> Closing -> Closed -> Initializing.
+ *
+ * Return 0 on success, a negative errno value on error.
+ */
+int blkfront_xb_disconnect(struct blkfront_dev *dev);
+
 #endif /* __BLKFRONT_XB_H__ */
