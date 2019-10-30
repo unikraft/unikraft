@@ -120,6 +120,12 @@ config DEBUG_SYMBOLS_LVL3
 		support macro expansion.
 endchoice
 
+config DEBUG_BACK_TRACE
+	bool "Dumping the backtrace"
+	default n
+	help
+		Dump the backtrace of fuction-call
+
 config OPTIMIZE_SYMFILE
 	bool "Create a symbols file"
 	default n
