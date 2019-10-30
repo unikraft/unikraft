@@ -32,73 +32,25 @@
  *
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
-#include <inttypes.h>
-#include <string.h>
-#include <fcntl.h>
-#include <uk/assert.h>
-#include <uk/print.h>
-#include <uk/alloc.h>
-#include <uk/essentials.h>
-#include <uk/arch/limits.h>
-#include <uk/blkdev_driver.h>
-#include <xenbus/xenbus.h>
-#include "blkfront.h"
+#ifndef __BLKFRONT_H__
+#define __BLKFRONT_H__
 
-#define DRIVER_NAME		"xen-blkfront"
+/**
+ * Unikraft Blockfront interface.
+ *
+ * This header contains all the information needed by the block device driver
+ * implementation.
+ */
+#include <uk/blkdev.h>
 
-
-/* Get blkfront_dev* which contains blkdev */
-#define to_blkfront(blkdev) \
-	__containerof(blkdev, struct blkfront_dev, blkdev)
-
-static struct uk_alloc *drv_allocator;
-
-static int blkfront_add_dev(struct xenbus_device *dev)
-{
-	struct blkfront_dev *d = NULL;
-	int rc = 0;
-
-	UK_ASSERT(dev != NULL);
-
-	d = uk_calloc(drv_allocator, 1, sizeof(struct blkfront_dev));
-	if (!d)
-		return -ENOMEM;
-
-	rc = uk_blkdev_drv_register(&d->blkdev, drv_allocator, "blkdev");
-	if (rc < 0) {
-		uk_pr_err("Failed to register blkfront with libukblkdev %d",
-				rc);
-		goto err_register;
-	}
-
-	d->uid = rc;
-	uk_pr_info("Blkfront device registered with libukblkdev: %d\n", rc);
-	rc = 0;
-out:
-	return rc;
-err_register:
-	uk_free(drv_allocator, d);
-	goto out;
-}
-
-static int blkfront_drv_init(struct uk_alloc *allocator)
-{
-	/* driver initialization */
-	if (!allocator)
-		return -EINVAL;
-
-	drv_allocator = allocator;
-	return 0;
-}
-
-static const xenbus_dev_type_t blkfront_devtypes[] = {
-	xenbus_dev_vbd,
+/**
+ * Structure used to describe the Blkfront device.
+ */
+struct blkfront_dev {
+	/* Blkdev Device. */
+	struct uk_blkdev blkdev;
+	/* The blkdev identifier */
+	__u16 uid;
 };
 
-static struct xenbus_driver blkfront_driver = {
-	.device_types = blkfront_devtypes,
-	.init = blkfront_drv_init,
-	.add_dev = blkfront_add_dev
-};
-
-XENBUS_REGISTER_DRIVER(&blkfront_driver);
+#endif /* __BLKFRONT_H__ */
