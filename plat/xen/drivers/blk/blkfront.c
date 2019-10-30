@@ -273,6 +273,125 @@ static int blkfront_xen_ring_intr_enable(struct uk_blkdev_queue *queue)
 
 	return (more > 0);
 }
+
+#define CHECK_STATUS(req, status, operation) \
+	do { \
+		if (status != BLKIF_RSP_OKAY) \
+			uk_pr_err("Failed to "operation" %lu sector: %d\n", \
+				req->start_sector,	\
+				status);	\
+		else	\
+			uk_pr_debug("Succeed to "operation " %lu sector: %d\n",\
+				req->start_sector, \
+				status); \
+	} while (0)
+
+static int blkfront_queue_dequeue(struct uk_blkdev_queue *queue,
+		struct uk_blkreq **req)
+{
+	RING_IDX prod, cons;
+	struct blkif_response *rsp;
+	struct uk_blkreq *req_from_q = NULL;
+	struct blkfront_request *blkfront_req;
+	struct blkif_front_ring *ring;
+	uint8_t status;
+	int rc = 0;
+
+	UK_ASSERT(queue);
+	UK_ASSERT(req);
+
+	ring = &queue->ring;
+	prod = ring->sring->rsp_prod;
+	rmb(); /* Ensure we see queued responses up to 'rp'. */
+	cons = ring->rsp_cons;
+
+	/* No new descriptor since last dequeue operation */
+	if (cons == prod)
+		goto out;
+
+	rsp = RING_GET_RESPONSE(ring, cons);
+	blkfront_req = (struct blkfront_request *) rsp->id;
+	UK_ASSERT(blkfront_req);
+	req_from_q = blkfront_req->req;
+	UK_ASSERT(req_from_q);
+	status = rsp->status;
+	switch (rsp->operation) {
+	case BLKIF_OP_READ:
+		CHECK_STATUS(req_from_q, status, "read");
+		break;
+	case BLKIF_OP_WRITE:
+		CHECK_STATUS(req_from_q, status, "write");
+		break;
+	case BLKIF_OP_WRITE_BARRIER:
+		if (status != BLKIF_RSP_OKAY)
+			uk_pr_err("Write barrier error %d\n", status);
+		break;
+	case BLKIF_OP_FLUSH_DISKCACHE:
+		if (status != BLKIF_RSP_OKAY)
+			uk_pr_err("Flush_diskcache error %d\n", status);
+		break;
+	default:
+		uk_pr_err("Unrecognized block operation %d (rsp %d)\n",
+				rsp->operation, status);
+		break;
+	}
+
+	req_from_q->result = -status;
+	uk_free(drv_allocator, blkfront_req);
+	ring->rsp_cons++;
+
+out:
+	*req = req_from_q;
+	return rc;
+}
+
+static int blkfront_complete_reqs(struct uk_blkdev *blkdev,
+		struct uk_blkdev_queue *queue)
+{
+	struct uk_blkreq *req;
+	int rc;
+	int more;
+
+	UK_ASSERT(blkdev);
+	UK_ASSERT(queue);
+
+	/* Queue interrupts have to be off when calling receive */
+	UK_ASSERT(!(queue->intr_enabled & BLKFRONT_INTR_EN));
+moretodo:
+	for (;;) {
+		rc = blkfront_queue_dequeue(queue, &req);
+		if (rc < 0) {
+			uk_pr_err("Failed to dequeue the request: %d\n", rc);
+			goto err_exit;
+		}
+
+		if (!req)
+			break;
+
+		uk_blkreq_finished(req);
+		if (req->cb)
+			req->cb(req, req->cb_cookie);
+	}
+
+	/* Enable interrupt only when user had previously enabled it */
+	if (queue->intr_enabled & BLKFRONT_INTR_USR_EN_MASK) {
+		/* Need to enable the interrupt on the last packet */
+		rc = blkfront_xen_ring_intr_enable(queue);
+		if (rc == 1)
+			goto moretodo;
+	} else {
+		RING_FINAL_CHECK_FOR_RESPONSES(&queue->ring, more);
+		if (more)
+			goto moretodo;
+	}
+
+	return 0;
+
+err_exit:
+	return rc;
+
+}
+
 static int blkfront_ring_init(struct uk_blkdev_queue *queue)
 {
 	struct blkif_sring *sring = NULL;
@@ -565,6 +684,7 @@ static int blkfront_add_dev(struct xenbus_device *dev)
 
 	d->xendev = dev;
 	d->blkdev.submit_one = blkfront_submit_request;
+	d->blkdev.finish_reqs = blkfront_complete_reqs;
 	d->blkdev.dev_ops = &blkfront_ops;
 
 	/* Xenbus initialization */
