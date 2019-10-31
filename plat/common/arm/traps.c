@@ -24,6 +24,7 @@
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <gic/gic-v2.h>
+#include "read_allsymbol.h"
 
 static const char *exception_modes[]= {
 	"Synchronous Abort",
@@ -59,6 +60,7 @@ void invalid_trap_handler(struct __regs *regs, uint32_t el,
 	uk_pr_crit("Unikraft: EL%d invalid %s trap caught\n",
 		   el, exception_modes[reason]);
 	dump_registers(regs, far);
+	uk_dump_backtrace();
 	ukplat_crash();
 }
 
@@ -67,6 +69,7 @@ void trap_el1_sync(struct __regs *regs, uint64_t far)
 	uk_pr_crit("Unikraft: EL1 sync trap caught\n");
 
 	dump_registers(regs, far);
+	uk_dump_backtrace();
 	ukplat_crash();
 }
 
