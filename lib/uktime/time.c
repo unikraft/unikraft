@@ -42,6 +42,7 @@
 #include <sys/time.h>
 #include <uk/plat/time.h>
 #include <uk/config.h>
+#include <uk/print.h>
 #if CONFIG_HAVE_SCHED
 #include <uk/sched.h>
 #else
