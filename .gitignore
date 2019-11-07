@@ -1,5 +1,7 @@
 /build
 /doc/build
+/doc/guides/_static
+/doc/guides/_templates
 /.auto.deps
 /.config.cmd
 /.config.old
