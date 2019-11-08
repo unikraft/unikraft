@@ -549,10 +549,42 @@ out:
 	return -rc;
 }
 
+static int uk_9pfs_getattr(struct vnode *vp, struct vattr *attr)
+{
+	struct uk_9pdev *dev = UK_9PFS_MD(vp->v_mount)->dev;
+	struct uk_9pfid *fid = UK_9PFS_VFID(vp);
+	struct uk_9p_stat stat;
+	struct uk_9preq *stat_req;
+	int rc = 0;
+
+	stat_req = uk_9p_stat(dev, fid, &stat);
+	if (PTRISERR(stat_req)) {
+		rc = PTR2ERR(stat_req);
+		goto out;
+	}
+
+	/* No stat string fields are used below. */
+	uk_9pdev_req_remove(dev, stat_req);
+
+	attr->va_type = uk_9pfs_vtype_from_mode(stat.mode);
+	attr->va_mode = uk_9pfs_posix_mode_from_mode(stat.mode);
+	attr->va_nodeid = vp->v_ino;
+	attr->va_size = stat.length;
+
+	attr->va_atime.tv_sec = stat.atime;
+	attr->va_atime.tv_nsec = 0;
+	attr->va_mtime.tv_sec = stat.mtime;
+	attr->va_mtime.tv_nsec = 0;
+	attr->va_ctime.tv_sec = 0;
+	attr->va_ctime.tv_nsec = 0;
+
+out:
+	return -rc;
+}
+
 #define uk_9pfs_seek		((vnop_seek_t)vfscore_vop_nullop)
 #define uk_9pfs_ioctl		((vnop_ioctl_t)vfscore_vop_einval)
 #define uk_9pfs_fsync		((vnop_fsync_t)vfscore_vop_nullop)
-#define uk_9pfs_getattr		((vnop_getattr_t)vfscore_vop_nullop)
 #define uk_9pfs_setattr		((vnop_setattr_t)vfscore_vop_nullop)
 #define uk_9pfs_truncate	((vnop_truncate_t)vfscore_vop_nullop)
 #define uk_9pfs_link		((vnop_link_t)vfscore_vop_eperm)
