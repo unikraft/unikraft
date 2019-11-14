@@ -1,4 +1,4 @@
-#include <common.lds.h>
+#include <uk/plat/common/common.lds.h>
 
 SECTIONS
 {

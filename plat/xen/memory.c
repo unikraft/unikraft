@@ -34,7 +34,7 @@
  */
 
 #include <string.h>
-#include <sections.h>
+#include <uk/plat/common/sections.h>
 
 #include <common/gnttab.h>
 #if (defined __X86_32__) || (defined __X86_64__)

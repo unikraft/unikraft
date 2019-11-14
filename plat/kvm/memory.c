@@ -19,7 +19,7 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <sections.h>
+#include <uk/plat/common/sections.h>
 #include <sys/types.h>
 #include <uk/plat/memory.h>
 #include <uk/assert.h>

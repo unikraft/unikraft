@@ -39,7 +39,7 @@
 #include <uk/assert.h>
 #include <uk/bitops.h>
 #include <uk/asm.h>
-#include <irq.h>
+#include <uk/plat/common/irq.h>
 #include <kvm/irq.h>
 #include <uk/plat/lcpu.h>
 #include <arm/cpu.h>

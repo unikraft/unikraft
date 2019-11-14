@@ -29,8 +29,8 @@
 #include <uk/alloc.h>
 #include <uk/list.h>
 #include <uk/plat/lcpu.h>
-#include <cpu.h>
-#include <irq.h>
+#include <uk/plat/common/cpu.h>
+#include <uk/plat/common/irq.h>
 #include <kvm/irq.h>
 #include <kvm/intctrl.h>
 #include <uk/assert.h>

@@ -36,7 +36,7 @@
  */
 
 #include <string.h>
-#include <sections.h>
+#include <uk/plat/common/sections.h>
 #include <errno.h>
 #include <uk/alloc.h>
 #include <uk/plat/config.h>

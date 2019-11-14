@@ -36,7 +36,7 @@
 #define __PLAT_DRV_VIRTIO_CONFIG_H
 
 #include <uk/arch/types.h>
-#include <cpu.h>
+#include <uk/plat/common/cpu.h>
 
 #ifdef __cplusplus
 extern "C" {

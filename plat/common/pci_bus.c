@@ -54,7 +54,7 @@
 
 #include <string.h>
 #include <uk/print.h>
-#include <cpu.h>
+#include <uk/plat/common/cpu.h>
 #include <pci/pci_bus.h>
 
 struct pci_bus_handler {

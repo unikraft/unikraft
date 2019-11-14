@@ -38,7 +38,7 @@
 #include <time.h>
 #include <uk/plat/time.h>
 #include <x86/cpu.h>
-#include <_time.h>
+#include <uk/plat/common/_time.h>
 #include <common/hypervisor.h>
 #include <common/events.h>
 #include <xen-x86/irq.h>

@@ -32,7 +32,7 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 #include <uk/arch/limits.h>
-#include <common.lds.h>
+#include <uk/plat/common/common.lds.h>
 
 /* QEMU-AArch64 virt platform's ram base address */
 #define RAM_BASE_ADDR 0x40000000

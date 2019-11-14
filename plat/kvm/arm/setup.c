@@ -20,7 +20,7 @@
  */
 #include <uk/config.h>
 #include <libfdt.h>
-#include <sections.h>
+#include <uk/plat/common/sections.h>
 #include <kvm/console.h>
 #include <kvm/config.h>
 #include <uk/assert.h>

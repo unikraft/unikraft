@@ -33,8 +33,8 @@
  */
 
 #include <uk/plat/lcpu.h>
-#include <cpu.h>
-#include <_time.h>
+#include <uk/plat/common/cpu.h>
+#include <uk/plat/common/_time.h>
 
 
 void ukplat_lcpu_halt(void)

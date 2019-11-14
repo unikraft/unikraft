@@ -35,10 +35,10 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <uk/plat/thread.h>
-#include <sw_ctx.h>
+#include <uk/plat/common/sw_ctx.h>
 #include <uk/assert.h>
-#include <tls.h>
-#include <cpu.h>
+#include <uk/plat/common/tls.h>
+#include <uk/plat/common/cpu.h>
 
 static void *sw_ctx_create(struct uk_alloc *allocator, unsigned long sp,
 				unsigned long tlsp);

@@ -31,7 +31,7 @@
  *
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
-#include <sw_ctx.h>
+#include <uk/plat/common/sw_ctx.h>
 #include <uk/arch/lcpu.h>
 #include <uk/asm.h>
 

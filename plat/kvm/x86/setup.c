@@ -27,7 +27,7 @@
  */
 
 #include <string.h>
-#include <sections.h>
+#include <uk/plat/common/sections.h>
 #include <x86/cpu.h>
 #include <x86/traps.h>
 #include <kvm/config.h>

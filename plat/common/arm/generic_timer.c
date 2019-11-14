@@ -37,9 +37,9 @@
 #include <uk/plat/lcpu.h>
 #include <uk/plat/irq.h>
 #include <uk/bitops.h>
-#include <cpu.h>
+#include <uk/plat/common/cpu.h>
 #include <ofw/gic_fdt.h>
-#include <irq.h>
+#include <uk/plat/common/irq.h>
 #include <gic/gic-v2.h>
 #include <arm/time.h>
 

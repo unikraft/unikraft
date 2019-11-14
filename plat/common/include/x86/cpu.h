@@ -32,7 +32,7 @@
 
 #include <uk/arch/types.h>
 #include <x86/cpu_defs.h>
-#include <sw_ctx.h>
+#include <uk/plat/common/sw_ctx.h>
 #include <stdint.h>
 #include <uk/assert.h>
 #include <uk/alloc.h>

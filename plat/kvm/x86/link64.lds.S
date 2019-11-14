@@ -24,7 +24,7 @@
  */
 
 #include <uk/arch/limits.h> /* for __PAGE_SIZE */
-#include <common.lds.h>
+#include <uk/plat/common/common.lds.h>
 
 ENTRY(_libkvmplat_entry)
 SECTIONS

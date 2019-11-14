@@ -43,7 +43,7 @@
 #include <uk/plat/bootstrap.h>
 #include <uk/assert.h>
 #include <uk/errptr.h>
-#include <cpu.h>
+#include <uk/plat/common/cpu.h>
 
 struct liblinuxuplat_opts _liblinuxuplat_opts = { 0 };
 

@@ -24,7 +24,7 @@
  */
 /* Taken from Mini-OS */
 
-#include <common.lds.h>
+#include <uk/plat/common/common.lds.h>
 
 OUTPUT_ARCH(arm)
 ENTRY(_libxenplat_start)

@@ -34,7 +34,7 @@
 /* Ported from Mini-OS */
 
 #include <uk/arch/lcpu.h>
-#include <trace.h>
+#include <uk/plat/common/trace.h>
 #include <x86/cpu.h>
 #include <x86/traps.h>
 #include <uk/print.h>

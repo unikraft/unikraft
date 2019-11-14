@@ -32,7 +32,7 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#include <trace.h>
+#include <uk/plat/common/trace.h>
 #include <uk/print.h>
 
 #define PAGE_SIZE 4096 /* TODO take this from another header */

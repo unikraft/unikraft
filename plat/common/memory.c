@@ -33,7 +33,7 @@
  */
 
 #include <uk/plat/memory.h>
-#include <memory.h>
+#include <uk/plat/common/memory.h>
 
 static struct uk_alloc *plat_allocator;
 

@@ -37,7 +37,7 @@
 
 #include <inttypes.h>
 #include <uk/essentials.h>
-#include <sw_ctx.h>
+#include <uk/plat/common/sw_ctx.h>
 #include <uk/alloc.h>
 #include <uk/assert.h>
 

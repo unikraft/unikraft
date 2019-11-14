@@ -35,7 +35,7 @@
 #include <stdlib.h>
 #include <errno.h>
 #include <uk/plat/lcpu.h>
-#include <_time.h>
+#include <uk/plat/common/_time.h>
 #include <linuxu/time.h>
 #include <linuxu/syscall.h>
 #include <uk/print.h>

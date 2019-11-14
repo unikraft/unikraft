@@ -24,7 +24,7 @@
 /* Taken from Mini-OS */
 
 #include <uk/arch/limits.h> /* for __PAGE_SIZE */
-#include <common.lds.h>
+#include <uk/plat/common/common.lds.h>
 
 OUTPUT_FORMAT("elf64-x86-64")
 OUTPUT_ARCH(i386:x86-64)

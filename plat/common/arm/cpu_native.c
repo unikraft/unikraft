@@ -32,10 +32,10 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 #include <uk/config.h>
-#include <cpu.h>
+#include <uk/plat/common/cpu.h>
 #if !CONFIG_ARCH_ARM_32
 /* TODO: Not yet supported for Arm32 */
-#include <irq.h>
+#include <uk/plat/common/irq.h>
 #include <arm/cpu_defs.h>
 #endif
 #include <uk/assert.h>

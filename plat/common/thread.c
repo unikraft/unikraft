@@ -35,7 +35,7 @@
 #include <stdlib.h>
 #include <uk/plat/thread.h>
 #include <uk/alloc.h>
-#include <sw_ctx.h>
+#include <uk/plat/common/sw_ctx.h>
 #include <uk/assert.h>
 
 void ukplat_thread_ctx_destroy(struct uk_alloc *allocator, void *ctx)

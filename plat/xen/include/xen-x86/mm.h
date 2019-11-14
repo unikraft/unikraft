@@ -25,7 +25,7 @@
 #ifndef _ARCH_MM_H_
 #define _ARCH_MM_H_
 
-#include <sections.h>
+#include <uk/plat/common/sections.h>
 #ifndef __ASSEMBLY__
 #include <xen/xen.h>
 #if defined(__i386__)

@@ -39,7 +39,7 @@
 #include <string.h>
 #include <uk/print.h>
 #include <uk/errptr.h>
-#include <cpu.h>
+#include <uk/plat/common/cpu.h>
 #include <uk/sglist.h>
 #include <uk/arch/atomic.h>
 #include <uk/plat/io.h>
