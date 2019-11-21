@@ -657,9 +657,6 @@ struct blkif_request_indirect {
     blkif_sector_t sector_number;/* start sector idx on disk (r/w only)  */
     blkif_vdev_t   handle;       /* same as for read/write requests      */
     grant_ref_t    indirect_grefs[BLKIF_MAX_INDIRECT_PAGES_PER_REQUEST];
-#ifdef __i386__
-    uint64_t       pad;          /* Make it 64 byte aligned on i386      */
-#endif
 };
 typedef struct blkif_request_indirect blkif_request_indirect_t;
 

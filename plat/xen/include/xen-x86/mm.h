@@ -208,13 +208,8 @@ typedef unsigned long pgentry_t;
 
 #ifndef __ASSEMBLY__
 /* Definitions for machine and pseudophysical addresses. */
-#ifdef __i386__
-typedef unsigned long long paddr_t;
-typedef unsigned long long maddr_t;
-#else
 typedef unsigned long paddr_t;
 typedef unsigned long maddr_t;
-#endif
 
 extern pgentry_t *pt_base;
 #ifdef CONFIG_PARAVIRT
