@@ -51,6 +51,7 @@ extern "C" {
 /*
  * Sysconf name values
  */
+#define _SC_PAGESIZE 8
 #define _SC_NPROCESSORS_ONLN 10
 
 #include <nolibc-internal/shareddefs.h>
