@@ -49,9 +49,15 @@ extern "C" {
 /*
  * Sysconf name values
  */
-#define _SC_OPEN_MAX 4
-#define _SC_PAGESIZE 8
-#define _SC_NPROCESSORS_ONLN 10
+#if CONFIG_LIBPOSIX_SYSINFO
+#define _SC_OPEN_MAX          4
+#define _SC_PAGE_SIZE        30
+#define _SC_PAGESIZE         _SC_PAGE_SIZE
+#define _SC_PHYS_PAGES       85
+#define _SC_AVPHYS_PAGES     86
+#define _SC_NPROCESSORS_CONF 83
+#define _SC_NPROCESSORS_ONLN 84
+#endif
 
 #include <nolibc-internal/shareddefs.h>
 
