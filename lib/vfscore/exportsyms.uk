@@ -110,3 +110,9 @@ vn_stat
 vn_unlock
 vfs_busy
 pipe
+futimes
+futimesat
+utimensat
+futimens
+utimes
+lutimes

@@ -1754,7 +1754,15 @@ int fallocate(int fd, int mode, loff_t offset, loff_t len)
 
 LFS64(fallocate);
 
-#if 0
+UK_TRACEPOINT(trace_vfs_utimes, "\"%s\"", const char*);
+UK_TRACEPOINT(trace_vfs_utimes_ret, "");
+UK_TRACEPOINT(trace_vfs_utimes_err, "%d", int);
+
+int futimes(int fd, const struct timeval times[2])
+{
+    return futimesat(fd, NULL, times);
+}
+
 int futimesat(int dirfd, const char *pathname, const struct timeval times[2])
 {
 	struct stat st;
@@ -1814,9 +1822,11 @@ UK_TRACEPOINT(trace_vfs_utimensat_err, "%d", int);
 
 int utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags)
 {
+	int error;
+
 	trace_vfs_utimensat(pathname);
 
-	auto error = sys_utimensat(dirfd, pathname, times, flags);
+	error = sys_utimensat(dirfd, pathname, times, flags);
 
 	if (error) {
 		trace_vfs_utimensat_err(error);
@@ -1881,6 +1891,7 @@ int lutimes(const char *pathname, const struct timeval times[2])
 	return do_utimes(pathname, times, AT_SYMLINK_NOFOLLOW);
 }
 
+#if 0
 int utime(const char *pathname, const struct utimbuf *t)
 {
 	using namespace std::chrono;

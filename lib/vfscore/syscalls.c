@@ -1257,7 +1257,6 @@ sys_readlink(char *path, char *buf, size_t bufsize, ssize_t *size)
 	return (0);
 }
 
-#if 0
 /*
  * Check the validity of the members of a struct timeval.
  */
@@ -1270,13 +1269,13 @@ static int is_timeval_valid(const struct timeval *time)
 /*
  * Convert a timeval struct to a timespec one.
  */
-static void convert_timeval(struct timespec &to, const struct timeval *from)
+static void convert_timeval(struct timespec *to, const struct timeval *from)
 {
 	if (from) {
-		to.tv_sec = from->tv_sec;
-		to.tv_nsec = from->tv_usec * 1000; // Convert microseconds to nanoseconds
+		to->tv_sec = from->tv_sec;
+		to->tv_nsec = from->tv_usec * 1000; // Convert microseconds to nanoseconds
 	} else {
-		clock_gettime(CLOCK_REALTIME, &to);
+		clock_gettime(CLOCK_REALTIME, to);
 	}
 }
 
@@ -1293,8 +1292,8 @@ sys_utimes(char *path, const struct timeval times[2], int flags)
 		return EINVAL;
 
 	// Convert each element of timeval array to the timespec type
-	convert_timeval(timespec_times[0], times ? times + 0 : NULL);
-	convert_timeval(timespec_times[1], times ? times + 1 : NULL);
+	convert_timeval(&timespec_times[0], times ? times + 0 : NULL);
+	convert_timeval(&timespec_times[1], times ? times + 1 : NULL);
 
 	if (flags & AT_SYMLINK_NOFOLLOW) {
 		struct dentry *ddp;
@@ -1329,21 +1328,21 @@ sys_utimes(char *path, const struct timeval times[2], int flags)
 /*
  * Check the validity of members of a struct timespec
  */
-static int is_timespec_valid(const struct timespec &time)
+static int is_timespec_valid(const struct timespec *time)
 {
-	return (time.tv_sec >= 0) &&
-	   ((time.tv_nsec >= 0 && time.tv_nsec <= 999999999) ||
-	    time.tv_nsec == UTIME_NOW ||
-	    time.tv_nsec == UTIME_OMIT);
+	return (time->tv_sec >= 0) &&
+	   ((time->tv_nsec >= 0 && time->tv_nsec <= 999999999) ||
+	    time->tv_nsec == UTIME_NOW ||
+	    time->tv_nsec == UTIME_OMIT);
 }
 
-void init_timespec(struct timespec &_times, const struct timespec *times)
+void init_timespec(struct timespec *_times, const struct timespec *times)
 {
 	if (times == NULL || times->tv_nsec == UTIME_NOW) {
-		clock_gettime(CLOCK_REALTIME, &_times);
+		clock_gettime(CLOCK_REALTIME, _times);
 	} else {
-		_times.tv_sec = times->tv_sec;
-		_times.tv_nsec = times->tv_nsec;
+		_times->tv_sec = times->tv_sec;
+		_times->tv_nsec = times->tv_nsec;
 	}
 	return;
 }
@@ -1352,7 +1351,7 @@ int
 sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags)
 {
 	int error;
-	std::string ap;
+	char *ap;
 	struct timespec timespec_times[2];
 	extern struct task *main_task;
 	struct dentry *dp;
@@ -1364,44 +1363,51 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 	if (flags && !(flags & AT_SYMLINK_NOFOLLOW))
 		return EINVAL;
 
-	if (times && (!is_timespec_valid(times[0]) || !is_timespec_valid(times[1])))
+	if (times && (!is_timespec_valid(&times[0]) || !is_timespec_valid(&times[1])))
 		return EINVAL;
 
-	init_timespec(timespec_times[0], times ? times + 0 : NULL);
-	init_timespec(timespec_times[1], times ? times + 1 : NULL);
+	init_timespec(&timespec_times[0], times ? times + 0 : NULL);
+	init_timespec(&timespec_times[1], times ? times + 1 : NULL);
 
 	if (pathname && pathname[0] == '/') {
-	ap = pathname;
+		ap = strdup(pathname);
+		if (!ap)
+			return ENOMEM;
+
 	} else if (dirfd == AT_FDCWD) {
-	if (!pathname)
-	    return EFAULT;
-	ap = std::string(main_task->t_cwd) + "/" + pathname;
+		if (!pathname)
+			return EFAULT;
+		error = asprintf(&ap, "%s/%s", main_task->t_cwd, pathname);
+		if (error || !ap)
+			return ENOMEM;
+
 	} else {
 		struct vfscore_file *fp;
-		fileref f(fileref_from_fd(dirfd));
 
-		if (!f)
-	    return EBADF;
+		fp = vfscore_get_file(dirfd);
+		if (!fp)
+			return EBADF;
 
-	fp = f.get();
+		if (!fp->f_dentry)
+			return EBADF;
 
-	if(!fp->f_dentry)
-	    return EBADF;
+		if (!(fp->f_dentry->d_vnode->v_type & VDIR))
+			return ENOTDIR;
 
-	if (!(fp->f_dentry->d_vnode->v_type & VDIR))
-	    return ENOTDIR;
-
-	if (pathname)
-	    ap = std::string(fp->f_dentry->d_path) + "/" + pathname;
-	else
-	    ap = fp->f_dentry->d_path;
-
-	ap = std::string(fp->f_dentry->d_mount->m_path) + "/" + ap;
+		if (pathname)
+			error = asprintf(&ap, "%s/%s/%s", fp->f_dentry->d_mount->m_path,
+					fp->f_dentry->d_path, pathname);
+		else
+			error = asprintf(&ap, "%s/%s", fp->f_dentry->d_mount->m_path,
+					fp->f_dentry->d_path);
+		if (error || !ap)
+			return ENOMEM;
 	}
 
 	/* FIXME: Add support for AT_SYMLINK_NOFOLLOW */
 
-	error = namei(ap.c_str(), &dp);
+	error = namei(ap, &dp);
+	free(ap);
 
 	if (error)
 		return error;
@@ -1412,11 +1418,11 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 		if (vn_access(dp->d_vnode, VWRITE)) {
 			return EACCES;
 		}
-	    if (times &&
-			   (times[0].tv_nsec != UTIME_NOW || times[1].tv_nsec != UTIME_NOW) &&
-			   (times[0].tv_nsec != UTIME_OMIT || times[1].tv_nsec != UTIME_OMIT) &&
-	       (!(dp->d_vnode->v_mode & ~VAPPEND)))
-	        return EPERM;
+		if (times &&
+			(times[0].tv_nsec != UTIME_NOW || times[1].tv_nsec != UTIME_NOW) &&
+			(times[0].tv_nsec != UTIME_OMIT || times[1].tv_nsec != UTIME_OMIT) &&
+			(!(dp->d_vnode->v_mode & ~VAPPEND)))
+			return EPERM;
 		error = vn_settimes(dp->d_vnode, timespec_times);
 	}
 
@@ -1427,22 +1433,21 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 int
 sys_futimens(int fd, const struct timespec times[2])
 {
+	int error;
 	struct vfscore_file *fp;
+	char *pathname;
 
-	fileref f(fileref_from_fd(fd));
-	if (!f)
+	fp = vfscore_get_file(fd);
+	if (!fp)
 		return EBADF;
-
-	fp = f.get();
 
 	if (!fp->f_dentry)
 		return EBADF;
 
-	std::string pathname = fp->f_dentry->d_path;
-	auto error = sys_utimensat(AT_FDCWD, pathname.c_str(), times, 0);
+	pathname = fp->f_dentry->d_path;
+	error = sys_utimensat(AT_FDCWD, pathname, times, 0);
 	return error;
 }
-#endif
 
 int
 sys_fallocate(struct vfscore_file *fp, int mode, off_t offset, off_t len)
