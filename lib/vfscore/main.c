@@ -2058,6 +2058,23 @@ ssize_t sendfile(int out_fd, int in_fd, off_t *_offset, size_t count)
 LFS64(sendfile);
 #endif
 
+int posix_fadvise(int fd __unused, off_t offset __unused, off_t len __unused,
+		int advice)
+{
+	switch (advice) {
+	case POSIX_FADV_NORMAL:
+	case POSIX_FADV_SEQUENTIAL:
+	case POSIX_FADV_RANDOM:
+	case POSIX_FADV_NOREUSE:
+	case POSIX_FADV_WILLNEED:
+	case POSIX_FADV_DONTNEED:
+		return 0;
+	default:
+		return EINVAL;
+	}
+}
+LFS64(posix_fadvise);
+
 mode_t umask(mode_t newmask)
 {
 	return ukarch_exchange_n(&global_umask, newmask);
