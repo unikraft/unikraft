@@ -571,3 +571,31 @@ ERR_EXIT:
 	UK_ASSERT(ret < 0);
 	return ret;
 }
+
+/* TODO find a more efficient way to implement pipe2() */
+int pipe2(int pipefd[2], int flags)
+{
+	int rc;
+
+	rc = pipe(pipefd);
+	if (rc)
+		return rc;
+
+	if (flags & O_CLOEXEC) {
+		fcntl(pipefd[0], F_SETFD, FD_CLOEXEC);
+		fcntl(pipefd[1], F_SETFD, FD_CLOEXEC);
+	}
+	if (flags & O_NONBLOCK) {
+		fcntl(pipefd[0], F_SETFL, O_NONBLOCK);
+		fcntl(pipefd[1], F_SETFL, O_NONBLOCK);
+	}
+	return 0;
+}
+
+/* TODO maybe find a better place for this when it will be implemented */
+int mkfifo(const char *path __unused, mode_t mode __unused)
+{
+	WARN_STUBBED();
+	errno = ENOTSUP;
+	return -1;
+}

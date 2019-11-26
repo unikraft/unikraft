@@ -110,6 +110,8 @@ vn_stat
 vn_unlock
 vfs_busy
 pipe
+pipe2
+mkfifo
 futimes
 futimesat
 utimensat
