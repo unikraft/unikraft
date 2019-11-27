@@ -205,8 +205,27 @@ int setegid(gid_t egid __unused)
 	return 0;
 }
 
-int getresgid(gid_t *rgid __unused, gid_t *egid __unused, gid_t *sgid __unused)
+int getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid)
 {
+	if (!rgid || !egid || !sgid) {
+		errno = EFAULT;
+		return -1;
+	}
+
+	*rgid = *egid = *sgid = UK_DEFAULT_GID;
+
+	return 0;
+}
+
+int setresgid(gid_t rgid, gid_t egid, gid_t sgid)
+{
+	/* We allow only UK_DEFAULT_GID */
+	if (rgid != UK_DEFAULT_GID || egid != UK_DEFAULT_GID ||
+			sgid != UK_DEFAULT_GID) {
+		errno = EINVAL;
+		return -1;
+	}
+
 	return 0;
 }
 
