@@ -32,7 +32,9 @@
 #ifndef __PLAT_CMN_TLS_H__
 #define __PLAT_CMN_TLS_H__
 
-#if defined(__X86_64__)
+#if defined(LINUXUPLAT)
+#include <linuxu/tls.h>
+#elif defined(__X86_64__)
 #include <x86/tls.h>
 #elif defined(__ARM_64__)
 #include <arm/arm64/tls.h>
