@@ -66,7 +66,7 @@ ssize_t uk_swrand_fill_buffer(void *buf, size_t buflen)
 	chunk_size = buflen % step;
 
 	for (i = 0; i < buflen - chunk_size; i += step)
-		*((char *) buf + i) = uk_swrand_randr();
+		*(__u32 *)((char *) buf + i) = uk_swrand_randr();
 
 	/* fill the remaining bytes of the buffer */
 	if (chunk_size > 0) {
