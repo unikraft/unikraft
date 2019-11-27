@@ -37,6 +37,26 @@
 
 #define UK_SWRAND_CTOR_PRIO    1
 
+__u32 uk_swrandr_gen_seed32(void)
+{
+	__u32 val;
+
+#ifdef CONFIG_LIBUKSWRAND_INITIALSEED_TIME
+	val = (__u32)ukplat_wall_clock();
+#endif
+
+#ifdef CONFIG_LIBUKSWRAND_INITIALSEED_RDRAND
+	asm volatile ("rdrand %%eax;"
+		: "=a" (val));
+#endif
+
+#ifdef CONFIG_LIBUKSWRAND_INITIALSEED_USECONSTANT
+	val = CONFIG_LIBUKSWRAND_INITIALSEED_CONSTANT;
+#endif
+
+	return val;
+}
+
 ssize_t uk_swrand_fill_buffer(void *buf, size_t buflen)
 {
 	size_t step, chunk_size, i;
@@ -59,8 +79,15 @@ ssize_t uk_swrand_fill_buffer(void *buf, size_t buflen)
 
 static void _uk_swrand_ctor(void)
 {
+	unsigned int i;
+	unsigned int seedc = 2;
+	__u32 seedv[2];
+
+	for (i = 0; i < seedc; i++)
+		seedv[i] = uk_swrandr_gen_seed32();
+
 	uk_pr_info("Initialize random number generator...\n");
-	uk_swrand_init_r(&uk_swrand_def, CONFIG_LIBUKSWRAND_INITIALSEED);
+	uk_swrand_init_r(&uk_swrand_def, seedc, seedv);
 }
 
 UK_CTOR_FUNC(UK_SWRAND_CTOR_PRIO, _uk_swrand_ctor);

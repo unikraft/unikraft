@@ -14,9 +14,25 @@ config LIBUKSWRAND_MWC
 		Use multiply-with-carry algorithm
 endchoice
 
-config LIBUKSWRAND_INITIALSEED
-	int "Initial random seed"
-	default 23
+choice
+    prompt "Initial seed"
+    default LIBUKSWRANDR_INITIALSEED_TIME
+
+config LIBUKSWRAND_INITIALSEED_TIME
+    bool "Platform timestamp"
+
+config LIBUKSWRAND_INITIALSEED_RDRAND
+    depends on ARCH_X86_64 && (MARCH_X86_64_COREI7AVXI)
+    bool "`rdrand` instruction"
+
+config LIBUKSWRAND_INITIALSEED_USECONSTANT
+    bool "Compiled-in constant"
+endchoice
+
+config LIBUKSWRAND_INITIALSEED_CONSTANT
+    int "Initial seed constant"
+    depends on LIBUKSWRAND_INITIALSEED_USECONSTANT
+    default 23
 
 config LIBUKSWRAND_DEVFS
 	bool "Register random and urandom device to devfs"

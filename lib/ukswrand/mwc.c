@@ -48,15 +48,17 @@ struct uk_swrand {
 
 struct uk_swrand uk_swrand_def;
 
-void uk_swrand_init_r(struct uk_swrand *r, __u32 seed)
+void uk_swrand_init_r(struct uk_swrand *r, unsigned int seedc,
+		const __u32 seedv[])
 {
 	__u32 i;
 
 	UK_ASSERT(r);
+	UK_ASSERT(seedc > 0);
 
-	r->Q[0] = seed;
-	r->Q[1] = seed + PHI;
-	r->Q[2] = seed + PHI + PHI;
+	r->Q[0] = seedv[0];
+	r->Q[1] = seedv[0] + PHI;
+	r->Q[2] = seedv[0] + PHI + PHI;
 	for (i = 3; i < 4096; i++)
 		r->Q[i] = r->Q[i - 3] ^ r->Q[i - 2] ^ PHI ^ i;
 
@@ -88,4 +90,3 @@ __u32 uk_swrand_randr_r(struct uk_swrand *r)
 	r->c = c;
 	return (r->Q[i] = y - x);
 }
-
