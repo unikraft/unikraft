@@ -6,12 +6,17 @@ menuconfig LIBUKSWRAND
 if LIBUKSWRAND
 choice
 	prompt "Algorithm"
-	default LIBUKSWRAND_MWC
+	default LIBUKSWRAND_CHACHA
 
 config LIBUKSWRAND_MWC
 	bool "Multiply-with-carry"
 	help
 		Use multiply-with-carry algorithm
+
+config LIBUKSWRAND_CHACHA
+	bool "ChaCha20"
+	help
+		Use ChaCha20 algorithm
 endchoice
 
 choice

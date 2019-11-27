@@ -80,13 +80,18 @@ ssize_t uk_swrand_fill_buffer(void *buf, size_t buflen)
 static void _uk_swrand_ctor(void)
 {
 	unsigned int i;
+#ifdef CONFIG_LIBUKSWRAND_CHACHA
+	unsigned int seedc = 10;
+	__u32 seedv[10];
+#else
 	unsigned int seedc = 2;
 	__u32 seedv[2];
+#endif
+	uk_pr_info("Initialize random number generator...\n");
 
 	for (i = 0; i < seedc; i++)
 		seedv[i] = uk_swrandr_gen_seed32();
 
-	uk_pr_info("Initialize random number generator...\n");
 	uk_swrand_init_r(&uk_swrand_def, seedc, seedv);
 }
 
