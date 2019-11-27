@@ -37,11 +37,18 @@
 #include <grp.h>
 #include <pwd.h>
 #include <string.h>
+#include <errno.h>
 #include <sys/types.h>
 #include <uk/essentials.h>
 #include <uk/list.h>
 #include <uk/print.h>
 #include <uk/user.h>
+
+#define UK_DEFAULT_UID    0
+#define UK_DEFAULT_GID    0
+#define UK_DEFAULT_USER   "root"
+#define UK_DEFAULT_GROUP  "root"
+#define UK_DEFAULT_PASS   "x"
 
 static struct passwd_entry {
 	struct passwd *passwd;
@@ -57,11 +64,11 @@ void __constructor init_ukunistd()
 {
 	static struct passwd_entry p1;
 	static struct passwd passwd = {
-		.pw_name = "root",
-		.pw_passwd = "password",
-		.pw_uid = 0,
-		.pw_gid = 0,
-		.pw_gecos = "root",
+		.pw_name = UK_DEFAULT_USER,
+		.pw_passwd = UK_DEFAULT_PASS,
+		.pw_uid = UK_DEFAULT_UID,
+		.pw_gid = UK_DEFAULT_GID,
+		.pw_gecos = UK_DEFAULT_USER,
 		.pw_dir = "/",
 		.pw_shell = NULL,
 	};
@@ -223,12 +230,82 @@ int setgroups(size_t size __unused, const gid_t *list __unused)
 	return 0;
 }
 
-struct group *getgrnam(const char *name __unused)
-{
-	static struct group g__ = {
-		.gr_gid = 0
-	};
+/* Group members */
+static char *g_members__[] = { UK_DEFAULT_USER, NULL };
 
-	WARN_STUBBED();
-	return &g__;
+/* Group entry */
+static struct group g__ = {
+	.gr_name = UK_DEFAULT_GROUP,
+	.gr_passwd = UK_DEFAULT_PASS,
+	.gr_gid = UK_DEFAULT_GID,
+	.gr_mem = g_members__,
+};
+
+struct group *getgrnam(const char *name)
+{
+	struct group *res;
+
+	if (name && !strcmp(name, g__.gr_name))
+		res = &g__;
+	else {
+		res = NULL;
+		errno = ENOENT;
+	}
+
+	return res;
+}
+
+int getgrnam_r(const char *name, struct group *grp,
+		char *buf, size_t buflen, struct group **result)
+{
+	size_t needed;
+	int i, members;
+
+	if (!name || strcmp(name, g__.gr_name)) {
+		*result = NULL;
+		return 0;
+	}
+
+	/* check if provided buffer is big enough */
+	needed = strlen(g__.gr_name) + 1
+			+ strlen(g__.gr_passwd) + 1
+			+ sizeof(g__.gr_gid);
+	i = 0;
+	while (g__.gr_mem[i])
+		needed += strlen(g__.gr_mem[i++]) + 1;
+	members = i;
+
+	if (buflen < needed) {
+		*result = NULL;
+		return ERANGE;
+	}
+
+	/* set name */
+	strlcpy(buf, g__.gr_name, strlen(g__.gr_name) + 1);
+	grp->gr_name = buf;
+	buf += strlen(g__.gr_name) + 1;
+
+	/* set passwd */
+	strlcpy(buf, g__.gr_passwd, strlen(g__.gr_passwd) + 1);
+	grp->gr_passwd = buf;
+	buf += strlen(g__.gr_passwd) + 1;
+
+	/* set gid */
+	grp->gr_gid = g__.gr_gid;
+
+	/* set members */
+	i = 0;
+	grp->gr_mem = (char **) buf;
+	buf += (members + 1) * sizeof(char *);
+	while (g__.gr_mem[i]) {
+		strlcpy(buf, g__.gr_mem[i], strlen(g__.gr_mem[i]) + 1);
+		grp->gr_mem[i] = buf;
+		buf += strlen(g__.gr_mem[i]) + 1;
+		i++;
+	}
+	grp->gr_mem[i] = NULL;
+
+	*result = grp;
+
+	return 0;
 }
