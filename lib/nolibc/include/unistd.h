@@ -60,6 +60,21 @@ extern "C" {
 unsigned int sleep(unsigned int seconds);
 #endif
 
+#if CONFIG_LIBPOSIX_PROCESS
+int execl(const char *path, const char *arg, ...
+		/* (char  *) NULL */);
+int execlp(const char *file, const char *arg, ...
+		/* (char  *) NULL */);
+int execle(const char *path, const char *arg, ...
+		/*, (char *) NULL, char * const envp[] */);
+int execv(const char *path, char *const argv[]);
+int execvp(const char *file, char *const argv[]);
+int execvpe(const char *file, char *const argv[],
+		char *const envp[]);
+int execve(const char *filename, char *const argv[],
+		char *const envp[]);
+#endif
+
 #if CONFIG_LIBVFSCORE
 int close(int fd);
 ssize_t write(int fd, const void *buf, size_t count);

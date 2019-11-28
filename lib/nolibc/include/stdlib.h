@@ -86,6 +86,10 @@ int posix_memalign(void **memptr, size_t align, size_t size);
 void *memalign(size_t align, size_t size);
 #endif /* CONFIG_LIBUKALLOC */
 
+#if CONFIG_LIBPOSIX_PROCESS
+int system(const char *command);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

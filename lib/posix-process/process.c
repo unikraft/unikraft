@@ -33,13 +33,12 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#include "../posix-process/include/uk/process.h"
-
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <sys/prctl.h>
 #include <sys/resource.h>
+#include <uk/process.h>
 #include <uk/print.h>
 
 
@@ -50,47 +49,118 @@ int fork(void)
 	return -1;
 }
 
-static
-void exec_warn(const char *func,
-		const char *path, char *const argv[], char *const envp[])
+int vfork(void)
 {
-	int i;
+	/* vfork() is not supported on this platform */
+	errno = ENOSYS;
+	return -1;
+}
 
-	uk_pr_warn("%s(): path=%s", func, path);
+static void exec_warn_argv_variadic(const char *arg, va_list args)
+{
+	int i = 1;
+	char *argi;
 
-	/* print arguments */
-	i = 0;
-	uk_pr_warn(" argv=[");
-	while (argv[i]) {
-		uk_pr_warn("%s%s", (i > 0 ? ", " : ""), argv[i]);
+	uk_pr_warn(" argv=[%s", arg);
+
+	argi = va_arg(args, char *);
+	while (argi) {
+		uk_pr_warn("%s%s", (i > 0 ? ", " : ""), argi);
 		i++;
+		argi = va_arg(args, char *);
 	}
-	uk_pr_warn("]");
+	uk_pr_warn("]\n");
+}
 
-	/* print environment variables */
-	if (envp) {
-		i = 0;
-		uk_pr_warn(" envp=[");
-		while (envp[i]) {
-			uk_pr_warn("%s%s", (i > 0 ? ", " : ""), envp[i]);
+static void __exec_warn_array(const char *name, char *const argv[])
+{
+	int i = 0;
+
+	uk_pr_warn(" %s=[", name);
+
+	if (argv) {
+		while (argv[i]) {
+			uk_pr_warn("%s%s", (i > 0 ? ", " : ""), argv[i]);
 			i++;
 		}
-		uk_pr_warn("]");
 	}
+	uk_pr_warn("]\n");
+}
+#define exec_warn_argv(values) __exec_warn_array("argv", values)
+#define exec_warn_envp(values) __exec_warn_array("envp", values)
 
-	uk_pr_warn("\n");
+int execl(const char *path, const char *arg, ...
+		/* (char  *) NULL */)
+{
+	va_list args;
+
+	uk_pr_warn("%s(): path=%s\n", __func__, path);
+	va_start(args, arg);
+	exec_warn_argv_variadic(arg, args);
+	va_end(args);
+	errno = ENOSYS;
+	return -1;
+}
+
+int execlp(const char *file, const char *arg, ...
+		/* (char  *) NULL */)
+{
+	va_list args;
+
+	uk_pr_warn("%s(): file=%s\n", __func__, file);
+	va_start(args, arg);
+	exec_warn_argv_variadic(arg, args);
+	va_end(args);
+	errno = ENOSYS;
+	return -1;
+}
+
+int execle(const char *path, const char *arg, ...
+		/*, (char *) NULL, char * const envp[] */)
+{
+	va_list args;
+	char * const *envp;
+
+	uk_pr_warn("%s(): path=%s\n", __func__, path);
+	va_start(args, arg);
+	exec_warn_argv_variadic(arg, args);
+	envp = va_arg(args, char * const *);
+	exec_warn_envp(envp);
+	va_end(args);
+	errno = ENOSYS;
+	return -1;
 }
 
 int execve(const char *path, char *const argv[], char *const envp[])
 {
-	exec_warn(__func__, path, argv, envp);
+	uk_pr_warn("%s(): path=%s\n", __func__, path);
+	exec_warn_argv(argv);
+	exec_warn_envp(envp);
 	errno = ENOSYS;
 	return -1;
 }
 
 int execv(const char *path, char *const argv[])
 {
-	exec_warn(__func__, path, argv, NULL);
+	uk_pr_warn("%s(): path=%s\n", __func__, path);
+	exec_warn_argv(argv);
+	errno = ENOSYS;
+	return -1;
+}
+
+int execvp(const char *file, char *const argv[])
+{
+	uk_pr_warn("%s(): file=%s\n", __func__, file);
+	exec_warn_argv(argv);
+	errno = ENOSYS;
+	return -1;
+}
+
+int execvpe(const char *file, char *const argv[], char *const envp[])
+{
+	uk_pr_warn("%s(): file=%s\n", __func__, file);
+	exec_warn_argv(argv);
+	exec_warn_envp(envp);
 	errno = ENOSYS;
 	return -1;
 }
