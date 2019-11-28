@@ -300,10 +300,58 @@ int nice(int inc __unused)
 	return -1;
 }
 
-int setpriority(int which __unused, id_t who __unused, int prio __unused)
+int getpriority(int which, id_t who)
 {
-	WARN_STUBBED();
-	return 0;
+	int rc = 0;
+
+	switch (which) {
+	case PRIO_PROCESS:
+	case PRIO_PGRP:
+	case PRIO_USER:
+		if (who == 0)
+			/* Allow only for the calling "process" */
+			rc = UNIKRAFT_PROCESS_PRIO;
+		else {
+			errno = ESRCH;
+			rc = -1;
+		}
+		break;
+	default:
+		errno = EINVAL;
+		rc = -1;
+		break;
+	}
+
+	return rc;
+}
+
+int setpriority(int which, id_t who, int prio)
+{
+	int rc = 0;
+
+	switch (which) {
+	case PRIO_PROCESS:
+	case PRIO_PGRP:
+	case PRIO_USER:
+		if (who == 0) {
+			/* Allow only for the calling "process" */
+			if (prio != UNIKRAFT_PROCESS_PRIO) {
+				/* Allow setting only the default prio */
+				errno = EACCES;
+				rc = -1;
+			}
+		} else {
+			errno = ESRCH;
+			rc = -1;
+		}
+		break;
+	default:
+		errno = EINVAL;
+		rc = -1;
+		break;
+	}
+
+	return rc;
 }
 
 int prctl(int option __unused, ...)
