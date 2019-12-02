@@ -49,6 +49,7 @@ lchown
 openat
 opendir
 readdir
+readdir_r
 readdir64
 closedir
 pread
