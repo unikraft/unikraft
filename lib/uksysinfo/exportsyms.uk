@@ -1,5 +1,6 @@
 fpathconf
 sysconf
+sysinfo
 confstr
 pathconf
 getpagesize

@@ -40,6 +40,7 @@
 #include <sys/utsname.h>
 #include <uk/essentials.h>
 #include <uk/config.h>
+#include <sys/sysinfo.h>
 
 static struct utsname utsname = {
 	.sysname	= "Unikraft",
@@ -56,6 +57,11 @@ static struct utsname utsname = {
 #error "Set your machine architecture!"
 #endif
 };
+
+int sysinfo(struct sysinfo *info __unused)
+{
+	return -1;
+}
 
 long fpathconf(int fd __unused, int name __unused)
 {
