@@ -287,6 +287,10 @@ void _libkvmplat_entry(void *arg)
 	uk_pr_info("     stack top: %p\n",
 		   (void *) _libkvmplat_cfg.bstack.start);
 
+#ifdef CONFIG_HAVE_SYSCALL
+	_init_syscall();
+#endif /* CONFIG_HAVE_SYSCALL */
+
 	/*
 	 * Switch away from the bootstrap stack as early as possible.
 	 */
