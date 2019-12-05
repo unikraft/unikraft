@@ -175,6 +175,20 @@ static inline void invlpg(unsigned long va)
 }
 
 
+static inline void rdmsr(unsigned int msr, __u32 *lo, __u32 *hi)
+{
+	asm volatile("rdmsr" : "=a"(*lo), "=d"(*hi)
+			     : "c"(msr));
+}
+
+static inline __u64 rdmsrl(unsigned int msr)
+{
+	__u32 lo, hi;
+
+	rdmsr(msr, &lo, &hi);
+	return ((__u64) lo | (__u64) hi << 32);
+}
+
 static inline void wrmsr(unsigned int msr, __u32 lo, __u32 hi)
 {
 	asm volatile("wrmsr"
