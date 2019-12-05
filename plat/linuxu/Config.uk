@@ -2,6 +2,7 @@ menuconfig PLAT_LINUXU
        bool "Linux user space"
        default n
        depends on (ARCH_X86_64) || (ARCH_ARM_32)
+       depends on !HAVE_SYSCALL
        select LIBUKDEBUG
        select LIBNOLIBC if !HAVE_LIBC
        help

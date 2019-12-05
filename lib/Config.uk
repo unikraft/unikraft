@@ -24,3 +24,7 @@ config HAVE_SCHED
 config HAVE_NW_STACK
        bool
        default n
+
+config HAVE_SYSCALL
+       bool
+       default n

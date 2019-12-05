@@ -3,6 +3,7 @@ menuconfig PLAT_XEN
        default n
        depends on (ARCH_X86_32 || ARCH_X86_64 || ARCH_ARM_32)
        imply XEN_PV_BUILD_P2M
+       depends on !HAVE_SYSCALL
        select LIBUKDEBUG
        select LIBNOLIBC if !HAVE_LIBC
        select LIBUKTIME if !HAVE_LIBC && ARCH_X86_64
