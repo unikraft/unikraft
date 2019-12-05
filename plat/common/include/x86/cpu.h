@@ -59,6 +59,15 @@ struct _x86_features {
 
 extern struct _x86_features x86_cpu_features;
 
+static inline void cpuid(__u32 fn, __u32 subfn,
+			 __u32 *eax, __u32 *ebx,
+			 __u32 *ecx, __u32 *edx)
+{
+	asm volatile("cpuid"
+		     : "=a"(*eax), "=b"(*ebx), "=c"(*ecx), "=d"(*edx)
+		     : "a"(fn), "c" (subfn));
+}
+
 static inline void save_extregs(struct sw_ctx *ctx)
 {
 	switch (x86_cpu_features.save) {
@@ -132,17 +141,14 @@ static inline void _init_cpufeatures(void)
 	 * contains "1" after this asm expression. See the "Warning" note at
 	 * https://gcc.gnu.org/onlinedocs/gcc/Extended-Asm.html#InputOperands
 	 */
-	asm volatile("cpuid" : "=a"(eax), "=c"(ecx), "=d"(edx) : "a"(1)
-			: "ebx");
+	cpuid(1, 0, &eax, &ebx, &ecx, &edx);
 	if (ecx & X86_CPUID1_ECX_OSXSAVE) {
-		asm volatile("cpuid" : "=a"(eax), "=c"(ecx) : "a"(0xd), "c"(1)
-				: "ebx", "edx");
+		cpuid(0xd, 1, &eax, &ebx, &ecx, &edx);
 		if (eax & X86_CPUIDD1_EAX_XSAVEOPT)
 			x86_cpu_features.save = X86_SAVE_XSAVEOPT;
 		else
 			x86_cpu_features.save = X86_SAVE_XSAVE;
-		asm volatile("cpuid" : "=a"(eax), "=b"(ebx), "=c"(ecx)
-				: "a"(0xd), "c"(0) : "edx");
+		cpuid(0xd, 0, &eax, &ebx, &ecx, &edx);
 		x86_cpu_features.extregs_size = ebx;
 		x86_cpu_features.extregs_align = 64;
 	} else if (edx & X86_CPUID1_EDX_FXSR) {
