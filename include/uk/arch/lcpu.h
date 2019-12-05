@@ -36,7 +36,9 @@
 #ifndef __UKARCH_LCPU_H__
 #define __UKARCH_LCPU_H__
 
+#ifndef __ASSEMBLY__
 #include <uk/arch/types.h>
+#endif /* !__ASSEMBLY__ */
 
 #ifdef __cplusplus
 extern "C" {
@@ -44,6 +46,7 @@ extern "C" {
 
 #include <uk/asm/lcpu.h>
 
+#ifndef __ASSEMBLY__
 #ifndef likely
 #define likely(x)   (__builtin_expect((!!(x)), 1))
 #endif
@@ -67,6 +70,7 @@ extern "C" {
 #ifndef wmb
 #define wmb()     barrier()
 #endif
+#endif /* !__ASSEMBLY__ */
 
 #ifdef __cplusplus
 }

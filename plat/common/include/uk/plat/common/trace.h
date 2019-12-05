@@ -34,11 +34,7 @@
 #ifndef __PLAT_CMN_TRACE_H__
 #define __PLAT_CMN_TRACE_H__
 
-#ifdef __X86_64__
-#include <x86/regs.h> /* TODO include a generic header */
-#else
-#error "Create regs.h for current architecture"
-#endif
+#include <uk/arch/lcpu.h>
 
 void dump_regs(struct __regs *regs);
 void dump_mem(unsigned long addr);

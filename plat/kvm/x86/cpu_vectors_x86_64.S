@@ -25,7 +25,6 @@
 /* Taken from solo5 */
 
 #include <x86/traps.h>
-#include <x86/regs.h>
 
 #define ENTRY(X)     .global X ; .type X, @function ; X:
 
@@ -73,13 +72,13 @@ ENTRY(ASM_TRAP_SYM(\trapname))
 	pushq $0                            /* no error code, pass 0 */
 .endif
 	PUSH_CALLER_SAVE
-	subq $REGS_PAD_SIZE, %rsp           /* we have some padding */
+	subq $__REGS_PAD_SIZE, %rsp         /* we have some padding */
 
 	movq %rsp, %rdi
-	movq OFFSETOF_REGS_ORIG_RAX(%rsp), %rsi
+	movq __REGS_OFFSETOF_ORIG_RAX(%rsp), %rsi
 	call do_\trapname
 
-	addq $REGS_PAD_SIZE, %rsp           /* we have some padding */
+	addq $__REGS_PAD_SIZE, %rsp         /* we have some padding */
 	POP_CALLER_SAVE
 	addq $8, %rsp                       /* discard error code */
 
@@ -92,12 +91,12 @@ ENTRY(cpu_irq_\irqno)
 
 	pushq $0                            /* no error code */
 	PUSH_CALLER_SAVE
-	subq $REGS_PAD_SIZE, %rsp           /* we have some padding */
+	subq $__REGS_PAD_SIZE, %rsp         /* we have some padding */
 
 	movq $\irqno, %rdi
 	call _ukplat_irq_handle
 
-	addq $REGS_PAD_SIZE, %rsp           /* we have some padding */
+	addq $__REGS_PAD_SIZE, %rsp         /* we have some padding */
 	POP_CALLER_SAVE
 	addq $8, %rsp
 

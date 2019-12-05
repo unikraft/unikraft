@@ -36,7 +36,7 @@
 #ifndef __UKARCH_TRAPS_X86_64_H__
 #define __UKARCH_TRAPS_X86_64_H__
 
-#include <x86/regs.h>
+#include <uk/arch/lcpu.h>
 
 #define TRAP_divide_error        0
 #define TRAP_debug               1
