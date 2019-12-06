@@ -211,6 +211,10 @@ static struct vfscore_file  stdio_file = {
 
 void init_stdio(void)
 {
+	int fd;
+
+	fd = vfscore_alloc_fd();
+	UK_ASSERT(fd == 0);
 	vfscore_install_fd(0, &stdio_file);
 	if (dup2(0, 1) != 1)
 		uk_pr_err("failed to dup to stdin\n");

@@ -61,12 +61,30 @@ int vfscore_alloc_fd(void)
 	flags = ukplat_lcpu_save_irqf();
 	ret = uk_find_next_zero_bit(fdtable.bitmap, FDTABLE_MAX_FILES, 0);
 
-	if (!ret) {
+	if (ret == FDTABLE_MAX_FILES) {
 		ret = -ENFILE;
 		goto exit;
 	}
 
 	uk_bitmap_set(fdtable.bitmap, ret, 1);
+
+exit:
+	ukplat_lcpu_restore_irqf(flags);
+	return ret;
+}
+
+int vfscore_reserve_fd(int fd)
+{
+	unsigned long flags;
+	int ret = 0;
+
+	flags = ukplat_lcpu_save_irqf();
+	if (uk_test_bit(fd, fdtable.bitmap)) {
+		ret = -EBUSY;
+		goto exit;
+	}
+
+	uk_bitmap_set(fdtable.bitmap, fd, 1);
 
 exit:
 	ukplat_lcpu_restore_irqf(flags);
@@ -188,8 +206,6 @@ static void fdtable_init(void)
 {
 	memset(&fdtable, 0, sizeof(fdtable));
 
-	/* reserve stdin, stdout and stderr */
-	uk_bitmap_set(fdtable.bitmap, 0, 3);
 	init_stdio();
 }
 

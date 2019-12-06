@@ -1379,7 +1379,7 @@ UK_TRACEPOINT(trace_vfs_dup3_err, "%d", int);
  */
 int dup3(int oldfd, int newfd, int flags)
 {
-	struct vfscore_file *fp;
+	struct vfscore_file *fp, *fp_new;
 	int error;
 
 	trace_vfs_dup3(oldfd, newfd, flags);
@@ -1398,6 +1398,18 @@ int dup3(int oldfd, int newfd, int flags)
 	}
 
 	error = fget(oldfd, &fp);
+	if (error)
+		goto out_errno;
+
+	error = fget(newfd, &fp_new);
+	if (error == 0) {
+		/* if newfd is open, then close it */
+		error = close(newfd);
+		if (error)
+			goto out_errno;
+	}
+
+	error = vfscore_reserve_fd(newfd);
 	if (error)
 		goto out_errno;
 
