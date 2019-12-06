@@ -567,10 +567,6 @@ LFS64(fstat);
 int __fxstatat(int ver __unused, int dirfd, const char *pathname, struct stat *st,
 		int flags)
 {
-	if (flags & AT_SYMLINK_NOFOLLOW) {
-		UK_CRASH("UNIMPLEMENTED: fstatat() with AT_SYMLINK_NOFOLLOW");
-	}
-
 	if (pathname[0] == '/' || dirfd == AT_FDCWD) {
 		return stat(pathname, st);
 	}
@@ -597,7 +593,10 @@ int __fxstatat(int ver __unused, int dirfd, const char *pathname, struct stat *s
 	strlcat(p, "/", PATH_MAX);
 	strlcat(p, pathname, PATH_MAX);
 
-	error = stat(p, st);
+	if (flags & AT_SYMLINK_NOFOLLOW)
+		error = lstat(p, st);
+	else
+		error = stat(p, st);
 
 	vn_unlock(vp);
 	fdrop(fp);
