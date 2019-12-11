@@ -7,8 +7,10 @@ LIBSYSCALL_SHIM_PHONY_SRC := $(addprefix $(LIBSYSCALL_SHIM_INCLUDES_PATH)/, $(LI
 LIBSYSCALL_SHIM_PHONY_SRC += $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in
 LIBSYSCALL_SHIM_PHONY_SRC_NEW := $(addsuffix .new, $(LIBSYSCALL_SHIM_PHONY_SRC))
 
-LIBSYSCALL_SHIM_GEN_SRC := $(LIBSYSCALL_SHIM_INCLUDES_PATH)/provided_syscalls.h \
-		$(LIBSYSCALL_SHIM_BUILD)/syscall_entry.c
+LIBSYSCALL_SHIM_GEN_SRC := $(LIBSYSCALL_SHIM_INCLUDES_PATH)/provided_syscalls.h
+LIBSYSCALL_SHIM_GEN_SRC += $(LIBSYSCALL_SHIM_BUILD)/syscall_entry.c
+LIBSYSCALL_SHIM_GEN_SRC += $(LIBSYSCALL_SHIM_BUILD)/uk_syscall_name.c
+LIBSYSCALL_SHIM_GEN_SRC += $(LIBSYSCALL_SHIM_BUILD)/uk_syscall_name_p.c
 
 UK_PREPARE-$(CONFIG_LIBSYSCALL_SHIM) += $(LIBSYSCALL_SHIM_PHONY_SRC) $(LIBSYSCALL_SHIM_GEN_SRC)
 
@@ -43,6 +45,15 @@ $(LIBSYSCALL_SHIM_BUILD)/syscall_entry.c: $(LIBSYSCALL_SHIM_BUILD)/provided_sysc
 		$(AWK) -F '-' -f $(LIBSYSCALL_SHIM_BASE)/gen_entry.awk $< > $@ && \
 		cat $(LIBSYSCALL_SHIM_BASE)/entry.c.in_end >> $@)
 
+$(LIBSYSCALL_SHIM_BUILD)/uk_syscall_name.c: $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall_name.awk $(LIBSYSCALL_SHIM_TEMPL)
+	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
+		$(AWK) -f $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall_name.awk \
+		$(LIBSYSCALL_SHIM_TEMPL) > $@)
+
+$(LIBSYSCALL_SHIM_BUILD)/uk_syscall_name_p.c: $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall_name_p.awk
+	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
+		$(AWK) -F '-' -f $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall_name_p.awk $< > $@)
+
 $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in.new:
 	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
 		echo $(UK_PROVIDED_SYSCALLS-y) | tr ' ' '\n' > $@)
@@ -58,5 +69,7 @@ CINCLUDES-y   += -I$(LIBSYSCALL_SHIM_BASE)/include
 CXXINCLUDES-y += -I$(LIBSYSCALL_SHIM_BASE)/include
 
 LIBSYSCALL_SHIM_SRCS-y += $(LIBSYSCALL_SHIM_BUILD)/syscall_entry.c
+LIBSYSCALL_SHIM_SRCS-y += $(LIBSYSCALL_SHIM_BUILD)/uk_syscall_name.c
+LIBSYSCALL_SHIM_SRCS-y += $(LIBSYSCALL_SHIM_BUILD)/uk_syscall_name_p.c
 
 LIBSYSCALL_SHIM_CLEAN = $(LIBSYSCALL_SHIM_PHONY_SRC) $(LIBSYSCALL_SHIM_PHONY_SRC_NEW) $(LIBSYSCALL_SHIM_GEN_SRC) $(LIBSYSCALL_SHIM_GEN_SRC)

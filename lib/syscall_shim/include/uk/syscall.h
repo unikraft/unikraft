@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Yuri Volchkov <yuri.volchkov@neclab.eu>
+ *          Simon Kuenzer <simon.kuenzer@neclab.eu>
  *
  *
  * Copyright (c) 2019, NEC Laboratories Europe GmbH, NEC Corporation.
@@ -154,6 +155,32 @@ long uk_syscall(long n, ...);
  */
 #define uk_syscall_static(...)						\
 	UK_CONCAT(__uk_syscall, __UK_SYSCALL_NARGS(__VA_ARGS__))(__VA_ARGS__)
-#endif
+
+/**
+ * Returns a string with the name of the system call number `nr`.
+ *
+ * @param nr
+ *  System call number of current architecture
+ * @return
+ *  - (const char *): name of system call
+ *  - (NULL): if system call number is unknown
+ */
+const char *uk_syscall_name(long nr);
+
+/**
+ * Returns a string with the name of the system call number `nr`.
+ * This function is similar to `uk_syscall_name` but it uses
+ * a smaller lookup table internally. This table contains only
+ * system call name mappings of provided calls.
+ *
+ * @param nr
+ *  System call number of current architecture
+ * @return
+ *  - (const char *): name of provided system call
+ *  - (NULL): if system call is not provided
+ */
+const char *uk_syscall_name_p(long nr);
+
+#endif /* CONFIG_LIBSYSCALL_SHIM */
 
 #endif /* __UK_SYSCALL_H__ */
