@@ -23,22 +23,22 @@ $(if $(shell mkdir -p $(LIBSYSCALL_SHIM_INCLUDES_PATH) && \
 $(LIBSYSCALL_SHIM_PHONY_SRC): %: %.new
 	@cmp -s $^ $@; if [ $$? -ne 0 ]; then cp $^ $@; fi
 
-$(LIBSYSCALL_SHIM_INCLUDES_PATH)/syscall_nrs.h.new:
+$(LIBSYSCALL_SHIM_INCLUDES_PATH)/syscall_nrs.h.new: $(LIBSYSCALL_SHIM_BASE)/gen_syscall_nrs.awk $(LIBSYSCALL_SHIM_TEMPL)
 	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
 		$(AWK) -f $(LIBSYSCALL_SHIM_BASE)/gen_syscall_nrs.awk \
 		$(LIBSYSCALL_SHIM_TEMPL) > $@)
 
-$(LIBSYSCALL_SHIM_INCLUDES_PATH)/syscall_map.h.new:
+$(LIBSYSCALL_SHIM_INCLUDES_PATH)/syscall_map.h.new: $(LIBSYSCALL_SHIM_BASE)/gen_syscall_map.awk $(LIBSYSCALL_SHIM_TEMPL)
 	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
 		$(AWK) -f  $(LIBSYSCALL_SHIM_BASE)/gen_syscall_map.awk \
 		$(LIBSYSCALL_SHIM_TEMPL) > $@)
 
-$(LIBSYSCALL_SHIM_INCLUDES_PATH)/provided_syscalls.h: $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in
+$(LIBSYSCALL_SHIM_INCLUDES_PATH)/provided_syscalls.h: $(LIBSYSCALL_SHIM_BASE)/gen_provided.awk $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in
 	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
 		$(AWK) -F '-' -f  $(LIBSYSCALL_SHIM_BASE)/gen_provided.awk \
-		$^ > $@)
+		$(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in > $@)
 
-$(LIBSYSCALL_SHIM_BUILD)/syscall_entry.c: $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in $(LIBSYSCALL_SHIM_BASE)/gen_entry.awk
+$(LIBSYSCALL_SHIM_BUILD)/syscall_entry.c: $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in $(LIBSYSCALL_SHIM_BASE)/gen_entry.awk $(LIBSYSCALL_SHIM_BASE)/entry.c.in_end
 	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
 		$(AWK) -F '-' -f $(LIBSYSCALL_SHIM_BASE)/gen_entry.awk $< > $@ && \
 		cat $(LIBSYSCALL_SHIM_BASE)/entry.c.in_end >> $@)
@@ -47,7 +47,7 @@ $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in.new:
 	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
 		echo $(UK_PROVIDED_SYSCALLS-y) | tr ' ' '\n' > $@)
 
-$(LIBSYSCALL_SHIM_INCLUDES_PATH)/syscall_stubs.h.new:
+$(LIBSYSCALL_SHIM_INCLUDES_PATH)/syscall_stubs.h.new: $(LIBSYSCALL_SHIM_BASE)/gen_stubs.awk $(LIBSYSCALL_SHIM_TEMPL)
 	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
 		$(AWK) -f $(LIBSYSCALL_SHIM_BASE)/gen_stubs.awk \
 		$(LIBSYSCALL_SHIM_TEMPL) > $@)
