@@ -77,7 +77,8 @@ faccessat
 readlink
 fallocate
 lseek
-uk_syscall_writev
+uk_syscall_e_writev
+uk_syscall_r_writev
 umask
 dentry_alloc
 dentry_init

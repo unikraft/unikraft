@@ -46,6 +46,8 @@ typedef long uk_syscall_arg_t;
 
 #define __uk_syscall_fn(syscall_nr, ...) \
 	UK_CONCAT(uk_syscall_fn_, syscall_nr) (__VA_ARGS__)
+#define __uk_syscall_r_fn(syscall_nr, ...) \
+	UK_CONCAT(uk_syscall_r_fn_, syscall_nr) (__VA_ARGS__)
 
 #define __uk_syscall0(n) __uk_syscall_fn(n)
 #define __uk_syscall1(n,a) __uk_syscall_fn(n,__uk_scc(a))
@@ -56,6 +58,14 @@ typedef long uk_syscall_arg_t;
 #define __uk_syscall6(n,a,b,c,d,e,f) __uk_syscall_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e),__uk_scc(f))
 #define __uk_syscall7(n,a,b,c,d,e,f,g) __uk_syscall_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e),__uk_scc(f),__uk_scc(g))
 
+#define __uk_syscall0_r(n) __uk_syscall_r_fn(n)
+#define __uk_syscall1_r(n,a) __uk_syscall_r_fn(n,__uk_scc(a))
+#define __uk_syscall2_r(n,a,b) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b))
+#define __uk_syscall3_r(n,a,b,c) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c))
+#define __uk_syscall4_r(n,a,b,c,d) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d))
+#define __uk_syscall5_r(n,a,b,c,d,e) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e))
+#define __uk_syscall6_r(n,a,b,c,d,e,f) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e),__uk_scc(f))
+#define __uk_syscall7_r(n,a,b,c,d,e,f,g) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e),__uk_scc(f),__uk_scc(g))
 
 #define __UK_SYSCALL_NARGS_X(a,b,c,d,e,f,g,h,n,...) n
 #define __UK_SYSCALL_NARGS(...) __UK_SYSCALL_NARGS_X(__VA_ARGS__,7,6,5,4,3,2,1,0,)
@@ -63,7 +73,8 @@ typedef long uk_syscall_arg_t;
 #define __UK_SYSCALL_DEF_NARGS_X(z, a1,a2, b1,b2, c1,c2, d1,d2, e1,e2, f1,f2, g1,g2, nr, ...) nr
 #define __UK_SYSCALL_DEF_NARGS(...) __UK_SYSCALL_DEF_NARGS_X(__VA_ARGS__, 7,7, 6,6, 5,5, 4,4, 3,3, 2,2, 1,1,0)
 
-#define __UK_NAME2SCALL_FN(name) UK_CONCAT(uk_syscall_, name)
+#define __UK_NAME2SCALLE_FN(name) UK_CONCAT(uk_syscall_e_, name)
+#define __UK_NAME2SCALLR_FN(name) UK_CONCAT(uk_syscall_r_, name)
 
 #define UK_ARG_MAP1(m, type, arg) m(type, arg)
 #define UK_ARG_MAP2(m, type, arg, ...) m(type, arg), UK_ARG_MAP1(m, __VA_ARGS__)
@@ -74,49 +85,86 @@ typedef long uk_syscall_arg_t;
 #define UK_ARG_MAP7(m, type, arg, ...) m(type, arg), UK_ARG_MAP6(m, __VA_ARGS__)
 #define UK_ARG_MAPx(nr_args, ...) UK_CONCAT(UK_ARG_MAP, nr_args)(__VA_ARGS__)
 
-#define UK_S_ARG_LONG(type, arg)   unsigned long arg
+#define UK_S_ARG_LONG(type, arg)   long arg
 #define UK_S_ARG_ACTUAL(type, arg) type arg
-#define UK_S_ARG_CAST(type, arg)   (type) arg
+#define UK_S_ARG_CAST_LONG(type, arg)   (long) arg
+#define UK_S_ARG_CAST_ACTUAL(type, arg) (type) arg
 
-
-/* NOTE and TODO:
- *	Currently all the functions in unikraft which are mimicking
- *	libc behavior (writev, open, mount, etc) are handling 'errno'
- *	on their own. To comply with that syscall_shim expects syscall
- *	implementation to set errno, and return 0 in case of success
- *	or -1 (or whatever the man page says) in case of failure.
- *
- *	This has to be reconsidered later. The corresponding functions
- *	in unikraft should not touch errno, and syscall_shim should
- *	provide 2 syscall functions - one that handles return and the
- *	one which does not.
- *
- *	A good reference would be musl implementation.
+/* System call implementation that uses errno and returns -1 on errors */
+/* TODO: `void` as return type is currently not supported.
+ * NOTE: Workaround is to use `int` instead.
  */
-#ifdef CONFIG_LIBSYSCALL_SHIM
-#define __UK_SYSCALL_DEFINE(x, name, ...)				\
-	static inline long __##name(UK_ARG_MAPx(x, UK_S_ARG_ACTUAL,	\
-						__VA_ARGS__));		\
-	long name(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__))		\
+#define __UK_SYSCALL_DEFINE(x, rtype, name, ename, rname, ...)		\
+	rtype name(UK_ARG_MAPx(x, UK_S_ARG_ACTUAL, __VA_ARGS__));	\
+	long rname(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__))		\
 	{								\
-		long ret = __##name(					\
-			UK_ARG_MAPx(x, UK_S_ARG_CAST, __VA_ARGS__));	\
+		int _errno = errno;					\
+		long ret;						\
+									\
+		errno = 0;						\
+		ret = (long) name(					\
+			UK_ARG_MAPx(x, UK_S_ARG_CAST_ACTUAL, __VA_ARGS__)); \
+		if (ret == -1)						\
+			ret = errno ? -errno : -EFAULT;			\
+		errno = _errno;						\
 		return ret;						\
 	}								\
-	static inline long __##name(UK_ARG_MAPx(x, UK_S_ARG_ACTUAL,	\
-						__VA_ARGS__))
-#else
-#define __UK_SYSCALL_DEFINE(x, name, ...)				\
-	static inline long name(UK_ARG_MAPx(x, UK_S_ARG_ACTUAL, __VA_ARGS__))
-#endif
-
+	long ename(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__))		\
+	{								\
+		return (long) name(					\
+			UK_ARG_MAPx(x, UK_S_ARG_CAST_ACTUAL, __VA_ARGS__)); \
+	}								\
+	rtype name(UK_ARG_MAPx(x, UK_S_ARG_ACTUAL, __VA_ARGS__))
 #define _UK_SYSCALL_DEFINE(...) __UK_SYSCALL_DEFINE(__VA_ARGS__)
-#define UK_SYSCALL_DEFINE(name, ...)				\
-	_UK_SYSCALL_DEFINE(__UK_SYSCALL_DEF_NARGS(__VA_ARGS__),	\
-			    __UK_NAME2SCALL_FN(name),		\
-			    __VA_ARGS__)
+#define UK_SYSCALL_DEFINE(rtype, name, ...)			       \
+	_UK_SYSCALL_DEFINE(__UK_SYSCALL_DEF_NARGS(__VA_ARGS__),	       \
+			   rtype,				       \
+			   name,				       \
+			   __UK_NAME2SCALLE_FN(name),		       \
+			   __UK_NAME2SCALLR_FN(name),		       \
+			   __VA_ARGS__)
 
-#define __UK_SPROTO_ARGS_TYPE unsigned long
+/* Raw system call implementation that is returning negative codes on errors */
+/* TODO: `void` as return type is currently not supported.
+ * NOTE: Workaround is to use `int` instead.
+ */
+#define __UK_SYSCALL_R_DEFINE(x, rtype, name, ename, rname, ...)	\
+	long rname(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__));		\
+	rtype name(UK_ARG_MAPx(x, UK_S_ARG_ACTUAL, __VA_ARGS__))	\
+	{								\
+		long ret = rname(					\
+			UK_ARG_MAPx(x, UK_S_ARG_CAST_LONG, __VA_ARGS__)); \
+		if (ret < 0) {						\
+			errno = (int) -ret;				\
+			return (rtype) -1;				\
+		}							\
+		return (rtype) ret;					\
+	}								\
+	long ename(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__))		\
+	{								\
+		return (long) name(					\
+			UK_ARG_MAPx(x, UK_S_ARG_CAST_ACTUAL, __VA_ARGS__)); \
+	}								\
+	static inline long __##rname(UK_ARG_MAPx(x, UK_S_ARG_ACTUAL,	\
+						 __VA_ARGS__));		\
+	long rname(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__))		\
+	{								\
+		return __##rname(					\
+			UK_ARG_MAPx(x, UK_S_ARG_CAST_ACTUAL, __VA_ARGS__)); \
+	}								\
+	static inline long __##rname(UK_ARG_MAPx(x, UK_S_ARG_ACTUAL,	\
+						 __VA_ARGS__))
+#define _UK_SYSCALL_R_DEFINE(...) __UK_SYSCALL_R_DEFINE(__VA_ARGS__)
+#define UK_SYSCALL_R_DEFINE(rtype, name, ...)				\
+	_UK_SYSCALL_R_DEFINE(__UK_SYSCALL_DEF_NARGS(__VA_ARGS__),	\
+			     rtype,					\
+			     name,					\
+			     __UK_NAME2SCALLE_FN(name),			\
+			     __UK_NAME2SCALLR_FN(name),			\
+			     __VA_ARGS__)
+
+
+#define __UK_SPROTO_ARGS_TYPE long
 #define __UK_SPROTO_ARGS0()  void
 #define __UK_SPROTO_ARGS1()  __UK_SPROTO_ARGS_TYPE a
 #define __UK_SPROTO_ARGS2()  __UK_SPROTO_ARGS1(), __UK_SPROTO_ARGS_TYPE b
@@ -128,15 +176,22 @@ typedef long uk_syscall_arg_t;
 #define __UK_SPROTO_ARGSx(args_nr)  \
 	UK_CONCAT(__UK_SPROTO_ARGS, args_nr)()
 
-#define UK_SYSCALL_PROTO(args_nr, syscall_name)			\
-	long __UK_NAME2SCALLE_FN(syscall_name)(			\
-		__UK_SPROTO_ARGSx(args_nr))
+#define UK_SYSCALL_E_PROTO(args_nr, syscall_name)			\
+	long __UK_NAME2SCALLE_FN(syscall_name)(__UK_SPROTO_ARGSx(args_nr))
+#define UK_SYSCALL_R_PROTO(args_nr, syscall_name)			\
+	long __UK_NAME2SCALLR_FN(syscall_name)(__UK_SPROTO_ARGSx(args_nr))
 
-#define uk_syscall_stub(syscall_name) ({			\
-			uk_pr_debug("syscall \"" syscall_name	\
-				    "\" is not implemented\n");	\
-			errno = -ENOSYS;			\
-			-1;					\
+#define uk_syscall_e_stub(syscall_name) ({				\
+			uk_pr_debug("System call \"" syscall_name	\
+				    "\" is not available (-ENOSYS)\n");	\
+			errno = -ENOSYS;				\
+			-1;						\
+		})
+
+#define uk_syscall_r_stub(syscall_name) ({				\
+			uk_pr_debug("System call \"" syscall_name	\
+				    "\" is not available (-ENOSYS)\n");	\
+			-ENOSYS;					\
 		})
 
 
@@ -146,6 +201,7 @@ typedef long uk_syscall_arg_t;
 #include <uk/bits/provided_syscalls.h>
 #include <uk/bits/syscall_stubs.h>
 
+/* System call, returns -1 and sets errno on errors */
 long uk_syscall(long n, ...);
 
 /*
@@ -155,6 +211,18 @@ long uk_syscall(long n, ...);
  */
 #define uk_syscall_static(...)						\
 	UK_CONCAT(__uk_syscall, __UK_SYSCALL_NARGS(__VA_ARGS__))(__VA_ARGS__)
+
+/* Raw system call, returns negative codes on errors */
+long uk_syscall_r(long n, ...);
+
+/*
+ * Use this variant instead of `uk_syscall_r()` whenever the system call number
+ * is a constant. This macro maps the function call directly to the target
+ * handler instead of doing a look-up at runtime
+ */
+#define uk_syscall_r_static(...)					\
+	UK_CONCAT(__uk_syscall,						\
+		  UK_CONCAT(__UK_SYSCALL_NARGS(__VA_ARGS__)), _r)(__VA_ARGS__)
 
 /**
  * Returns a string with the name of the system call number `nr`.

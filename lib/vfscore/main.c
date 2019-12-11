@@ -444,13 +444,8 @@ ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
 }
 LFS64(pwritev);
 
-ssize_t writev(int fd, const struct iovec *iov, int iovcnt)
-{
-	return pwritev(fd, iov, iovcnt, -1);
-}
-
-UK_SYSCALL_DEFINE(writev, unsigned long, fd, const struct iovec *, vec,
-		  unsigned long, vlen)
+UK_SYSCALL_DEFINE(ssize_t, writev,
+		  int, fd, const struct iovec *, vec, int, vlen)
 {
 	return pwritev(fd, vec, vlen, -1);
 }
