@@ -1,3 +1,16 @@
-config LIBSYSCALL_SHIM
+menuconfig LIBSYSCALL_SHIM
 	bool "syscall_shim: Syscall shim layer"
 	default n
+
+if LIBSYSCALL_SHIM
+	config LIBSYSCALL_SHIM_HANDLER
+		bool "Binary system call handler (Linux ABI)"
+		default n
+		depends on ARCH_X86_64
+		select HAVE_SYSCALL
+		help
+			Enables a system call handler for binary system call
+			requests (e.g., sysenter/sysexit). The handler maps
+			register values accordingly to the Linux ABI standard
+			(see: man syscalls[2]).
+endif
