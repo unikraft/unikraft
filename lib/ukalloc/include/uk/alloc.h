@@ -201,7 +201,7 @@ static inline void *uk_do_palloc(struct uk_alloc *a, size_t order)
 }
 static inline void *uk_palloc(struct uk_alloc *a, size_t order)
 {
-	if (unlikely(!a))
+	if (unlikely(!a || !a->palloc))
 		return NULL;
 	return a->palloc(a, order);
 }
