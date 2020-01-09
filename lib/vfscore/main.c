@@ -379,7 +379,7 @@ ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset)
 
 LFS64(pwrite);
 
-ssize_t write(int fd, const void *buf, size_t count)
+UK_SYSCALL_DEFINE(ssize_t, write, int, fd, const void *, buf, size_t, count)
 {
 	return pwrite(fd, buf, count, -1);
 }
