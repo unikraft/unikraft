@@ -338,7 +338,7 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset)
 
 LFS64(pread);
 
-ssize_t read(int fd, void *buf, size_t count)
+UK_SYSCALL_DEFINE(ssize_t, read, int, fd, void *, buf, size_t, count)
 {
 	return pread(fd, buf, count, -1);
 }
@@ -408,7 +408,8 @@ ssize_t preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset)
 
 LFS64(preadv);
 
-ssize_t readv(int fd, const struct iovec *iov, int iovcnt)
+UK_SYSCALL_DEFINE(ssize_t, readv,
+		  int, fd, const struct iovec *, iov, int, iovcnt)
 {
 	return preadv(fd, iov, iovcnt, -1);
 }

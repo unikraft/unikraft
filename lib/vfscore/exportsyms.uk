@@ -19,6 +19,8 @@ uk_syscall_e_write
 uk_syscall_r_write
 close
 read
+uk_syscall_e_read
+uk_syscall_r_read
 mkdir
 fsync
 fstat
@@ -58,6 +60,8 @@ pread
 pwrite
 pwritev
 readv
+uk_syscall_e_readv
+uk_syscall_r_readv
 writev
 truncate
 mknod
