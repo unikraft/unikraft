@@ -1701,7 +1701,7 @@ int ftruncate(int fd, off_t length)
 
 LFS64(ftruncate);
 
-ssize_t readlink(const char *pathname, char *buf, size_t bufsize)
+UK_SYSCALL_DEFINE(ssize_t, readlink, const char *, pathname, char *, buf, size_t, bufsize)
 {
 	struct task *t = main_task;
 	char path[PATH_MAX];
