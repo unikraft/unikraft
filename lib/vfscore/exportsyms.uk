@@ -24,6 +24,8 @@ uk_syscall_r_read
 mkdir
 fsync
 fstat
+uk_syscall_e_fstat
+uk_syscall_r_fstat
 flock
 fhold
 fdrop

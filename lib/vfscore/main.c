@@ -553,7 +553,7 @@ int __fxstat(int ver __unused, int fd, struct stat *st)
 
 LFS64(__fxstat);
 
-int fstat(int fd __unused, struct stat *st)
+UK_SYSCALL_DEFINE(int, fstat, int, fd, struct stat *, st)
 {
 	return __fxstat(1, fd, st);
 }
