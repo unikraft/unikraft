@@ -41,6 +41,7 @@
 #include <uk/essentials.h>
 #include <uk/config.h>
 #include <sys/sysinfo.h>
+#include <uk/syscall.h>
 
 static struct utsname utsname = {
 	.sysname	= "Unikraft",
@@ -94,12 +95,10 @@ int getpagesize(void)
 	return __PAGE_SIZE;
 }
 
-int uname(struct utsname *buf __unused)
+UK_SYSCALL_R_DEFINE(int, uname, struct utsname *, buf)
 {
-	if (buf == NULL) {
-		errno = EFAULT;
-		return -1;
-	}
+	if (buf == NULL)
+		return -EFAULT;
 
 	memcpy(buf, &utsname, sizeof(struct utsname));
 	return 0;

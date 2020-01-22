@@ -5,5 +5,7 @@ confstr
 pathconf
 getpagesize
 uname
+uk_syscall_e_uname
+uk_syscall_r_uname
 gethostname
 sethostname
