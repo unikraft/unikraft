@@ -1,0 +1,4 @@
+config LIBPOSIX_SYSINFO
+	bool "POSIX sysinfo: Information about system parameters"
+	select LIBNOLIBC if !HAVE_LIBC
+	default n
