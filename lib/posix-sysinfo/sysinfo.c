@@ -46,7 +46,10 @@
 static struct utsname utsname = {
 	.sysname	= "Unikraft",
 	.nodename	= "unikraft",
-	.release	= STRINGIFY(UK_CODENAME),
+	/* glibc looks into the release field to check the kernel version:
+	 * We prepend '5-' in order to be "new enough" for it.
+	 */
+	.release	= "5-" STRINGIFY(UK_CODENAME),
 	.version	= STRINGIFY(UK_FULLVERSION),
 #ifdef CONFIG_ARCH_X86_64
 	.machine	= "x86_64"
