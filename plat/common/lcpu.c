@@ -40,7 +40,7 @@ void ukplat_lcpu_halt(void)
 	halt();
 }
 
-void ukplat_lcpu_halt_to(__snsec until)
+void ukplat_lcpu_halt_to(__nsec until)
 {
 	unsigned long flags;
 

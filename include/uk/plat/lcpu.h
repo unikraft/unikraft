@@ -89,7 +89,7 @@ void ukplat_lcpu_halt(void);
  * the specified deadline expired
  * @param until deadline in nanoseconds
  */
-void ukplat_lcpu_halt_to(__snsec until);
+void ukplat_lcpu_halt_to(__nsec until);
 
 /**
  * Halts the current logical CPU execution
