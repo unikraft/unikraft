@@ -212,6 +212,12 @@ static inline uint64_t generic_timer_epochoffset(void)
 	return 0;
 }
 
+static inline __nsec generic_timer_monotonic_ticks(uint64_t *ticks)
+{
+	*ticks = generic_timer_get_ticks();
+	return ticks_to_ns(*ticks - boot_ticks);
+}
+
 /*
  * Returns early if any interrupts are serviced, or if the requested delay is
  * too short. Must be called with interrupts disabled, will enable interrupts
@@ -225,16 +231,17 @@ static inline uint64_t generic_timer_epochoffset(void)
  */
 void generic_timer_cpu_block_until(uint64_t until_ns)
 {
-	uint64_t now_ns, until_ticks;
+	uint64_t now_ns, now_ticks, until_ticks;
 
 	UK_ASSERT(ukplat_lcpu_irqs_disabled());
 
-	/* Record current ns and until_ticks for timer */
-	now_ns = ukplat_monotonic_clock();
-	until_ticks = generic_timer_get_ticks()
-				+ ns_to_ticks(until_ns - now_ns);
+	/* Record current ns */
+	now_ns = generic_timer_monotonic_ticks(&now_ticks);
 
 	if (now_ns < until_ns) {
+		/* Calculate until_ticks for timer */
+		until_ticks = now_ticks
+			+ ns_to_ticks(until_ns - now_ns);
 		generic_timer_update_compare(until_ticks);
 		generic_timer_enable();
 		generic_timer_unmask_irq();
