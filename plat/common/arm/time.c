@@ -94,9 +94,9 @@ uint32_t generic_timer_get_frequency(int fdt_timer)
 
 unsigned long sched_have_pending_events;
 
-void time_block_until(__snsec until)
+void time_block_until(__nsec until)
 {
-	while ((__snsec) ukplat_monotonic_clock() < until) {
+	while (ukplat_monotonic_clock() < until) {
 		generic_timer_cpu_block_until(until);
 		if (__uk_test_and_clear_bit(0, &sched_have_pending_events))
 			break;
