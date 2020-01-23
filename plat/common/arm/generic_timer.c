@@ -56,6 +56,9 @@ static uint32_t ns_per_tick;
 /* Multiplier for converting nsecs to counter ticks */
 static uint32_t tick_per_ns;
 
+/* Total (absolute) number of nanoseconds per tick */
+static uint64_t tot_ns_per_tick;
+
 /*
  * The maximum time range in seconds which can be converted by multiplier
  * and shift factors. This will guarantee the converted value not to exceed
@@ -65,23 +68,33 @@ static uint32_t tick_per_ns;
  */
 #define __MAX_CONVERT_SECS	(3600UL)
 #define __MAX_CONVERT_NS	(3600UL*NSEC_PER_SEC)
-static uint64_t max_convert_ticks = ~0UL;
+static uint64_t max_convert_ticks;
 
 /* How many nanoseconds per second */
 #define NSEC_PER_SEC ukarch_time_sec_to_nsec(1)
 
 static inline uint64_t ticks_to_ns(uint64_t ticks)
 {
-	UK_ASSERT(ticks <= max_convert_ticks);
-
-	return (ns_per_tick * ticks) >> counter_shift_to_ns;
+	if (ticks > max_convert_ticks) {
+		/* We have reached the maximum number of ticks to convert using
+		 * the shift factor
+		 */
+		return (ticks * tot_ns_per_tick);
+	} else {
+		return (ns_per_tick * ticks) >> counter_shift_to_ns;
+	}
 }
 
 static inline uint64_t ns_to_ticks(uint64_t ns)
 {
-	UK_ASSERT(ns <= __MAX_CONVERT_NS);
-
-	return (tick_per_ns * ns) >> counter_shift_to_tick;
+	if (ns > __MAX_CONVERT_NS) {
+		/* We have reached the maximum number of ns to convert using the
+		 * shift factor
+		 */
+		return (ns / tot_ns_per_tick);
+	} else {
+		return (tick_per_ns * ns) >> counter_shift_to_tick;
+	}
 }
 
 /*
@@ -237,8 +250,11 @@ void generic_timer_cpu_block_until(uint64_t until_ns)
 
 int generic_timer_init(int fdt_timer)
 {
-	/* Get counter frequency from DTB or register */
+	/* Get counter frequency from DTB or register (in Hz) */
 	counter_freq = generic_timer_get_frequency(fdt_timer);
+
+	/* Absolute number of ns per tick */
+	tot_ns_per_tick = NSEC_PER_SEC / counter_freq;
 
 	/*
 	 * Calculate the shift factor and scaling multiplier for
