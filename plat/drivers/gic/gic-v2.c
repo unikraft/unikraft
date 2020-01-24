@@ -224,7 +224,7 @@ void gic_set_irq_prio(uint32_t irq, uint8_t priority)
 
 /*
  * Enable an irq in distributor, each irq occupies one bit
- * to configure in corresponding registor
+ * to configure in corresponding register
  */
 void gic_enable_irq(uint32_t irq)
 {
