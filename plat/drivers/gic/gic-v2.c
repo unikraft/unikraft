@@ -60,6 +60,9 @@
 
 static uint64_t gic_dist_addr, gic_cpuif_addr;
 static uint64_t gic_dist_size, gic_cpuif_size;
+#ifdef CONFIG_HAVE_SMP
+static char gic_is_initialized;
+#endif
 
 #define GIC_DIST_REG(r)	((void *)(gic_dist_addr + (r)))
 #define GIC_CPU_REG(r)	((void *)(gic_cpuif_addr + (r)))
@@ -320,7 +323,12 @@ void gic_handle_irq(void)
 		stat = gic_ack_irq();
 		irq = stat & GICC_IAR_INTID_MASK;
 
+#ifndef CONFIG_HAVE_SMP
 		uk_pr_debug("Unikraft: EL1 IRQ#%d trap caught\n", irq);
+#else
+		uk_pr_debug("Unikraft (Core %ld): EL1 IRQ#%d trap caught\n",
+				ukplat_lcpu_id(), irq);
+#endif
 
 		/*
 		 * TODO: Handle IPI&SGI interrupts here
@@ -356,6 +364,7 @@ static void gic_init_dist(void)
 	if (irq_number > GIC_MAX_IRQ)
 		irq_number = GIC_MAX_IRQ;
 	uk_pr_info("GICv2 Max interrupt lines:%d\n", irq_number);
+
 	/*
 	 * Set all SPI interrupts targets to all CPU.
 	 */
@@ -417,6 +426,17 @@ static void gic_init_cpuif(void)
 int _dtb_init_gic(const void *fdt)
 {
 	int fdt_gic, ret;
+
+#ifdef CONFIG_HAVE_SMP
+	if (gic_is_initialized) {
+		/* GIC is already initialized, we just need to initialize
+		 * the CPU interface
+		 */
+		gic_init_cpuif();
+		return 0;
+	}
+	gic_is_initialized = 1;
+#endif
 
 	uk_pr_info("Probing GICv2...\n");
 
