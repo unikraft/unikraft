@@ -35,7 +35,7 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#include <stdio.h>
+#include "snprintf.h"
 #include <stdint.h>
 #include <limits.h>
 #include <string.h>
@@ -83,8 +83,8 @@ static void _print_timestamp(struct _vprint_console *cons)
 	__nsec rem_usec = ukarch_time_subsec(nansec);
 
 	rem_usec = ukarch_time_nsec_to_usec(rem_usec);
-	len = snprintf(buf, BUFLEN, "[%5" __PRInsec ".%06" __PRInsec "] ",
-			sec, rem_usec);
+	len = __uk_snprintf(buf, BUFLEN, "[%5" __PRInsec ".%06" __PRInsec "] ",
+			    sec, rem_usec);
 	cons->cout((char *)buf, len);
 }
 #endif
@@ -98,7 +98,7 @@ static void _print_stack(struct _vprint_console *cons)
 
 	stackb = (ukarch_read_sp() & STACK_MASK_TOP) + __STACK_SIZE;
 
-	len = snprintf(buf, BUFLEN, "<%p> ", (void *) stackb);
+	len = __uk_snprintf(buf, BUFLEN, "<%p> ", (void *) stackb);
 	cons->cout((char *)buf, len);
 }
 #endif
@@ -146,7 +146,7 @@ static void _vprint(struct _vprint_console *cons,
 		cons->newline = 1; /* enforce printing the message header */
 	}
 
-	len = vsnprintf(lbuf, BUFLEN, fmt, ap);
+	len = __uk_vsnprintf(lbuf, BUFLEN, fmt, ap);
 	lptr = lbuf;
 	while (len > 0) {
 		if (cons->newline) {
@@ -170,8 +170,8 @@ static void _vprint(struct _vprint_console *cons,
 					   strlen(srcname));
 				cons->cout(" @ ", 3);
 				cons->cout(lnobuf,
-					   snprintf(lnobuf, sizeof(lnobuf),
-						    "%-5u", srcline));
+					   __uk_snprintf(lnobuf, sizeof(lnobuf),
+							 "%-5u", srcline));
 				cons->cout(": ", 2);
 			}
 			cons->newline = 0;

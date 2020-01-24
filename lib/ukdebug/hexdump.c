@@ -38,6 +38,7 @@
 #include <string.h>
 #include <inttypes.h>
 #include <stdarg.h>
+#include "snprintf.h"
 
 #include <uk/arch/types.h>
 #include <uk/essentials.h>
@@ -93,10 +94,11 @@ static int _hxd_outf(struct _hxd_output *o, const char *fmt, ...)
 	va_start(ap, fmt);
 	switch (o->type) {
 	case UK_HXDOUT_FILE:
+		/* Use standard libc approach when printing to a file */
 		ret = vfprintf(o->file.fp, fmt, ap);
 		break;
 	case UK_HXDOUT_BUFFER:
-		ret = vsnprintf(o->buffer.pos, o->buffer.left, fmt, ap);
+		ret = __uk_vsnprintf(o->buffer.pos, o->buffer.left, fmt, ap);
 
 		if (ret > 0) {
 			/* in order to overwrite '\0' by successive calls,
