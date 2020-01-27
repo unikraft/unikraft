@@ -1448,7 +1448,9 @@ int fcntl(int fd, int cmd, ...)
 	va_list ap;
 	struct vfscore_file *fp;
 	int ret = 0, error;
+#if defined(FIONBIO) && defined(FIOASYNC)
 	int tmp;
+#endif
 
 	va_start(ap, cmd);
 	arg = va_arg(ap, int);
