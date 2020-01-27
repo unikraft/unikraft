@@ -100,6 +100,7 @@ static void main_thread_func(void *arg)
 	printf("\\_,_/_//_/_/_/\\_\\/_/  \\_,_/_/ \\__/\n");
 	printf("%35s\n",
 	       STRINGIFY(UK_CODENAME) " " STRINGIFY(UK_FULLVERSION));
+	fflush(stdout);
 #endif
 	/*
 	 * Application
