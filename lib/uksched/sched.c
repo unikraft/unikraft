@@ -141,7 +141,7 @@ static void *create_stack(struct uk_alloc *allocator)
 {
 	void *stack;
 
-	stack = uk_palloc(allocator, 1ul << STACK_SIZE_PAGE_ORDER);
+	uk_posix_memalign(allocator, &stack, STACK_SIZE, STACK_SIZE);
 	if (stack == NULL) {
 		uk_pr_warn("Error allocating thread stack.");
 		return NULL;
@@ -250,7 +250,7 @@ void uk_sched_thread_destroy(struct uk_sched *sched, struct uk_thread *thread)
 
 	UK_TAILQ_REMOVE(&sched->exited_threads, thread, thread_list);
 	uk_thread_fini(thread, sched->allocator);
-	uk_pfree(sched->allocator, thread->stack, 1ul << STACK_SIZE_PAGE_ORDER);
+	uk_free(sched->allocator, thread->stack);
 	if (thread->tls)
 		uk_free(sched->allocator, thread->tls);
 	uk_free(sched->allocator, thread);
