@@ -69,9 +69,9 @@ typedef void* (*uk_alloc_realloc_func_t)
 typedef void  (*uk_alloc_free_func_t)
 		(struct uk_alloc *a, void *ptr);
 typedef void* (*uk_alloc_palloc_func_t)
-		(struct uk_alloc *a, size_t order);
+		(struct uk_alloc *a, unsigned long num_pages);
 typedef void  (*uk_alloc_pfree_func_t)
-		(struct uk_alloc *a, void *ptr, size_t order);
+		(struct uk_alloc *a, void *ptr, unsigned long num_pages);
 typedef int   (*uk_alloc_addmem_func_t)
 		(struct uk_alloc *a, void *base, size_t size);
 #if CONFIG_LIBUKALLOC_IFSTATS
@@ -195,28 +195,30 @@ static inline void uk_free(struct uk_alloc *a, void *ptr)
 	uk_do_free(a, ptr);
 }
 
-static inline void *uk_do_palloc(struct uk_alloc *a, size_t order)
+static inline void *uk_do_palloc(struct uk_alloc *a, unsigned long num_pages)
 {
 	UK_ASSERT(a);
-	return a->palloc(a, order);
+	return a->palloc(a, num_pages);
 }
 
-static inline void *uk_palloc(struct uk_alloc *a, size_t order)
+static inline void *uk_palloc(struct uk_alloc *a, unsigned long num_pages)
 {
 	if (unlikely(!a || !a->palloc))
 		return NULL;
-	return uk_do_palloc(a, order);
+	return uk_do_palloc(a, num_pages);
 }
 
-static inline void uk_do_pfree(struct uk_alloc *a, void *ptr, size_t order)
+static inline void uk_do_pfree(struct uk_alloc *a, void *ptr,
+			       unsigned long num_pages)
 {
 	UK_ASSERT(a);
-	a->pfree(a, ptr, order);
+	a->pfree(a, ptr, num_pages);
 }
 
-static inline void uk_pfree(struct uk_alloc *a, void *ptr, size_t order)
+static inline void uk_pfree(struct uk_alloc *a, void *ptr,
+			    unsigned long num_pages)
 {
-	uk_do_pfree(a, ptr, order);
+	uk_do_pfree(a, ptr, num_pages);
 }
 
 static inline int uk_alloc_addmem(struct uk_alloc *a, void *base,

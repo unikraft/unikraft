@@ -190,9 +190,9 @@ static void p9front_free_dev_ring(struct p9front_dev *p9fdev, int idx)
 	for (i = 0; i < (1 << p9fdev->ring_order); i++)
 		gnttab_end_access(ring->intf->ref[i]);
 	uk_pfree(a, ring->data.in,
-		p9fdev->ring_order + XEN_PAGE_SHIFT - PAGE_SHIFT);
+		 1ul << (p9fdev->ring_order + XEN_PAGE_SHIFT - PAGE_SHIFT));
 	gnttab_end_access(ring->ref);
-	uk_pfree(a, ring->intf, 0);
+	uk_pfree(a, ring->intf, 1);
 	ring->initialized = false;
 }
 
@@ -226,7 +226,7 @@ static int p9front_allocate_dev_ring(struct p9front_dev *p9fdev, int idx)
 	ring->dev = p9fdev;
 
 	/* Allocate ring intf page. */
-	ring->intf = uk_palloc(a, 0);
+	ring->intf = uk_palloc(a, 1);
 	if (!ring->intf) {
 		rc = -ENOMEM;
 		goto out;
@@ -239,8 +239,8 @@ static int p9front_allocate_dev_ring(struct p9front_dev *p9fdev, int idx)
 	UK_ASSERT(ring->ref != GRANT_INVALID_REF);
 
 	/* Allocate memory for the data. */
-	data_bytes = uk_palloc(a,
-			p9fdev->ring_order + XEN_PAGE_SHIFT - PAGE_SHIFT);
+	data_bytes = uk_palloc(a, 1ul << (p9fdev->ring_order +
+					  XEN_PAGE_SHIFT - PAGE_SHIFT));
 	if (!data_bytes) {
 		rc = -ENOMEM;
 		goto out_free_intf;
@@ -296,10 +296,10 @@ out_free_grants:
 	for (i = 0; i < (1 << p9fdev->ring_order); i++)
 		gnttab_end_access(ring->intf->ref[i]);
 	uk_pfree(a, data_bytes,
-		p9fdev->ring_order + XEN_PAGE_SHIFT - PAGE_SHIFT);
+		 1ul << (p9fdev->ring_order + XEN_PAGE_SHIFT - PAGE_SHIFT));
 out_free_intf:
 	gnttab_end_access(ring->ref);
-	uk_pfree(a, ring->intf, 0);
+	uk_pfree(a, ring->intf, 1);
 out:
 	return rc;
 }

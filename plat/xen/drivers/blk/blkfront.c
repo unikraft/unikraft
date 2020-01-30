@@ -562,7 +562,7 @@ static int blkfront_ring_init(struct uk_blkdev_queue *queue)
 
 	UK_ASSERT(queue);
 	dev = queue->dev;
-	sring = uk_palloc(queue->a, 0);
+	sring = uk_palloc(queue->a, 1);
 	if (!sring)
 		return -ENOMEM;
 

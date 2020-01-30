@@ -53,6 +53,9 @@
 #include <uk/assert.h>
 #include <uk/arch/limits.h>
 
+#define size_to_num_pages(size) \
+	(ALIGN_UP((unsigned long)(size), __PAGE_SIZE) / __PAGE_SIZE)
+
 static struct uk_alloc *uk_alloc_head;
 
 int uk_alloc_register(struct uk_alloc *a)
@@ -140,7 +143,7 @@ static size_t uk_getmallocsize(const void *ptr)
 		/*
 		 * special case: the memory was page-aligned
 		 * In this case the allocated size should not account for the
-		 * previous page which was used for storing the order
+		 * previous page which was used for storing the number of pages
 		 */
 		mallocsize -= __PAGE_SIZE;
 	} else {
@@ -154,34 +157,24 @@ static size_t uk_getmallocsize(const void *ptr)
 	return mallocsize;
 }
 
-/* return the smallest order (1<<order pages) that can fit size bytes */
-static inline size_t uk_alloc_size_to_order(size_t size)
-{
-	size_t order = 0;
-
-	while ((__PAGE_SIZE << order) < size)
-		order++;
-	return order;
-}
-
 void *uk_malloc_ifpages(struct uk_alloc *a, size_t size)
 {
 	uintptr_t intptr;
-	size_t order;
-	size_t realsize = sizeof(order) + size;
+	unsigned long num_pages;
+	size_t realsize = sizeof(num_pages) + size;
 
 	UK_ASSERT(a);
 	if (!size)
 		return NULL;
 
-	order = uk_alloc_size_to_order(realsize);
-	intptr = (uintptr_t)uk_palloc(a, order);
+	num_pages = size_to_num_pages(realsize);
+	intptr = (uintptr_t)uk_palloc(a, num_pages);
 
 	if (!intptr)
 		return NULL;
 
-	*(size_t *)intptr = order;
-	return (void *)(intptr + sizeof(order));
+	*(unsigned long *)intptr = num_pages;
+	return (void *)(intptr + sizeof(num_pages));
 }
 
 void uk_free_ifpages(struct uk_alloc *a, void *ptr)
@@ -230,7 +223,7 @@ int uk_posix_memalign_ifpages(struct uk_alloc *a,
 {
 	uintptr_t *intptr;
 	size_t realsize;
-	size_t order;
+	unsigned long num_pages;
 
 	UK_ASSERT(a);
 	if (((align - 1) & align) != 0
@@ -250,16 +243,17 @@ int uk_posix_memalign_ifpages(struct uk_alloc *a,
 	if (align == __PAGE_SIZE)
 		realsize = ALIGN_UP(size + __PAGE_SIZE, align);
 	else
-		realsize = ALIGN_UP(size + sizeof(order), align);
+		realsize = ALIGN_UP(size + sizeof(num_pages), align);
 
-	order = uk_alloc_size_to_order(realsize);
-	intptr = uk_palloc(a, order);
+	num_pages = size_to_num_pages(realsize);
+	intptr = uk_palloc(a, num_pages);
 
 	if (!intptr)
 		return ENOMEM;
 
-	*(size_t *)intptr = order;
-	*memptr = (void *) ALIGN_UP((uintptr_t)intptr + sizeof(order), align);
+	*(size_t *)intptr = num_pages;
+	*memptr = (void *) ALIGN_UP((uintptr_t)intptr + sizeof(num_pages),
+				    align);
 	return 0;
 }
 

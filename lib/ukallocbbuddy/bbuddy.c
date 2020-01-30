@@ -44,6 +44,7 @@
 #include <uk/allocbbuddy.h>
 #include <uk/alloc_impl.h>
 #include <uk/arch/limits.h>
+#include <uk/arch/atomic.h>
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <uk/page.h>
@@ -224,10 +225,27 @@ static ssize_t bbuddy_availmem(struct uk_alloc *a)
 }
 #endif
 
+/* return log of the next power of two of passed number */
+static inline unsigned long num_pages_to_order(unsigned long num_pages)
+{
+	UK_ASSERT(num_pages != 0);
+
+	/* ukarch_flsl has undefined behavior when called with zero */
+	if (num_pages == 1)
+		return 0;
+
+	/* ukarch_flsl(num_pages - 1) returns log of the previous power of two
+	 * of num_pages. ukarch_flsl is called with `num_pages - 1` and not
+	 * `num_pages` to handle the case where num_pages is already a power
+	 * of two.
+	 */
+	return ukarch_flsl(num_pages - 1) + 1;
+}
+
 /*********************
  * BINARY BUDDY PAGE ALLOCATOR
  */
-static void *bbuddy_palloc(struct uk_alloc *a, size_t order)
+static void *bbuddy_palloc(struct uk_alloc *a, unsigned long num_pages)
 {
 	struct uk_bbpalloc *b;
 	size_t i;
@@ -236,6 +254,8 @@ static void *bbuddy_palloc(struct uk_alloc *a, size_t order)
 
 	UK_ASSERT(a != NULL);
 	b = (struct uk_bbpalloc *)&a->priv;
+
+	size_t order = (size_t)num_pages_to_order(num_pages);
 
 	/* Find smallest order which can satisfy the request. */
 	for (i = order; i < FREELIST_SIZE; i++) {
@@ -280,7 +300,7 @@ no_memory:
 	return NULL;
 }
 
-static void bbuddy_pfree(struct uk_alloc *a, void *obj, size_t order)
+static void bbuddy_pfree(struct uk_alloc *a, void *obj, unsigned long num_pages)
 {
 	struct uk_bbpalloc *b;
 	chunk_head_t *freed_ch, *to_merge_ch;
@@ -289,6 +309,8 @@ static void bbuddy_pfree(struct uk_alloc *a, void *obj, size_t order)
 
 	UK_ASSERT(a != NULL);
 	b = (struct uk_bbpalloc *)&a->priv;
+
+	size_t order = (size_t)num_pages_to_order(num_pages);
 
 	/* if the object is not page aligned it was clearly not from us */
 	UK_ASSERT((((uintptr_t)obj) & (__PAGE_SIZE - 1)) == 0);
