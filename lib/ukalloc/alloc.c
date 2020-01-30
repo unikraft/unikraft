@@ -109,7 +109,6 @@ int uk_alloc_set_default(struct uk_alloc *a)
 	return 0;
 }
 
-#if CONFIG_LIBUKALLOC_IFPAGES
 static void *uk_get_real_start(const void *ptr)
 {
 	void *intptr;
@@ -263,8 +262,6 @@ int uk_posix_memalign_ifpages(struct uk_alloc *a,
 	*memptr = (void *) ALIGN_UP((uintptr_t)intptr + sizeof(order), align);
 	return 0;
 }
-
-#endif
 
 void *uk_calloc_compat(struct uk_alloc *a, size_t nmemb, size_t size)
 {

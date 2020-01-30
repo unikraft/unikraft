@@ -219,7 +219,7 @@ grant_ref_t gnttab_alloc_and_grant(void **map, struct uk_alloc *a)
 	UK_ASSERT(map != NULL);
 	UK_ASSERT(a != NULL);
 
-	page = uk_malloc_page(a);
+	page = uk_palloc(a, 0);
 	if (page == NULL)
 		return GRANT_INVALID_REF;
 

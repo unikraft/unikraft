@@ -5,12 +5,6 @@ menuconfig LIBUKALLOC
 	select LIBUKDEBUG
 
 if LIBUKALLOC
-	config LIBUKALLOC_IFPAGES
-		bool "Page allocation interface"
-		default n
-		help
-			Provide uk_palloc() and uk_pfree() calls
-
 	config LIBUKALLOC_IFSTATS
 		bool "Statistics interface"
 		default n

@@ -281,7 +281,7 @@ static pgentry_t *need_pte(unsigned long va, struct uk_alloc *a)
 #if defined(__x86_64__)
 	offset = l4_table_offset(va);
 	if (!(tab[offset] & _PAGE_PRESENT)) {
-		pt_pfn = virt_to_pfn(uk_malloc_page(a));
+		pt_pfn = virt_to_pfn(uk_palloc(a, 0));
 		if (!pt_pfn)
 			return NULL;
 		new_pt_frame(&pt_pfn, pt_mfn, offset, L3_FRAME);
@@ -293,7 +293,7 @@ static pgentry_t *need_pte(unsigned long va, struct uk_alloc *a)
 #endif
 	offset = l3_table_offset(va);
 	if (!(tab[offset] & _PAGE_PRESENT)) {
-		pt_pfn = virt_to_pfn(uk_malloc_page(a));
+		pt_pfn = virt_to_pfn(uk_palloc(a, 0));
 		if (!pt_pfn)
 			return NULL;
 		new_pt_frame(&pt_pfn, pt_mfn, offset, L2_FRAME);
@@ -304,7 +304,7 @@ static pgentry_t *need_pte(unsigned long va, struct uk_alloc *a)
 	tab = mfn_to_virt(pt_mfn);
 	offset = l2_table_offset(va);
 	if (!(tab[offset] & _PAGE_PRESENT)) {
-		pt_pfn = virt_to_pfn(uk_malloc_page(a));
+		pt_pfn = virt_to_pfn(uk_palloc(a, 0));
 		if (!pt_pfn)
 			return NULL;
 		new_pt_frame(&pt_pfn, pt_mfn, offset, L1_FRAME);
@@ -700,10 +700,10 @@ void _arch_init_p2m(struct uk_alloc *a)
 	if (((max_pfn - 1) >> L3_P2M_SHIFT) > 0)
 		UK_CRASH("Error: Too many pfns.\n");
 
-	l3_list = uk_malloc_page(a);
+	l3_list = uk_palloc(a, 0);
 	for (pfn = 0; pfn < max_pfn; pfn += P2M_ENTRIES) {
 		if (!(pfn % (P2M_ENTRIES * P2M_ENTRIES))) {
-			l2_list = uk_malloc_page(a);
+			l2_list = uk_palloc(a, 0);
 			l3_list[L3_P2M_IDX(pfn)] = virt_to_mfn(l2_list);
 			l2_list_pages[L3_P2M_IDX(pfn)] = l2_list;
 		}

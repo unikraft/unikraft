@@ -55,21 +55,17 @@ int uk_alloc_register(struct uk_alloc *a);
  * API functionality is actually implemented.
  */
 
-#if CONFIG_LIBUKALLOC_IFPAGES
 /* Functions that can be used by allocators that implement palloc(), pfree() only */
 void *uk_malloc_ifpages(struct uk_alloc *a, size_t size);
 void *uk_realloc_ifpages(struct uk_alloc *a, void *ptr, size_t size);
 int uk_posix_memalign_ifpages(struct uk_alloc *a, void **memptr,
 				size_t align, size_t size);
-void *uk_memalign_ifpages(struct uk_alloc *a, size_t align, size_t size);
 void uk_free_ifpages(struct uk_alloc *a, void *ptr);
-#endif /* CONFIG_LIBUKALLOC_IFPAGES */
 
 /* Functionality that is provided based on malloc() */
 void *uk_calloc_compat(struct uk_alloc *a, size_t num, size_t len);
 void *uk_memalign_compat(struct uk_alloc *a, size_t align, size_t len);
 
-#if CONFIG_LIBUKALLOC_IFPAGES
 /* Shortcut for doing a registration of an allocator that only
  * implements palloc(), pfree(), addmem() */
 #define uk_alloc_init_palloc(a, palloc_func, pfree_func, addmem_func)	\
@@ -86,7 +82,6 @@ void *uk_memalign_compat(struct uk_alloc *a, size_t align, size_t len);
 									\
 		uk_alloc_register((a));					\
 	} while (0)
-#endif /* CONFIG_LIBUKALLOC_IFPAGES */
 
 #ifdef __cplusplus
 }
