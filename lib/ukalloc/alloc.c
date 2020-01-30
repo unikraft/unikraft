@@ -55,6 +55,7 @@
 
 #define size_to_num_pages(size) \
 	(ALIGN_UP((unsigned long)(size), __PAGE_SIZE) / __PAGE_SIZE)
+#define page_off(x) ((unsigned long)(x) & (__PAGE_SIZE - 1))
 
 static struct uk_alloc *uk_alloc_head;
 
@@ -284,6 +285,52 @@ int uk_posix_memalign_ifpages(struct uk_alloc *a,
 	metadata->base = intptr;
 
 	return 0;
+}
+
+void uk_pfree_compat(struct uk_alloc *a, void *ptr,
+		     unsigned long num_pages __unused)
+{
+	UK_ASSERT(a);
+
+	/* if the object is not page aligned it was clearly not from us */
+	UK_ASSERT(page_off(ptr) == 0);
+
+	uk_free(a, ptr);
+}
+
+void *uk_palloc_compat(struct uk_alloc *a, unsigned long num_pages)
+{
+	void *ptr;
+
+	UK_ASSERT(a);
+
+	if (uk_posix_memalign(a, &ptr, __PAGE_SIZE, num_pages * __PAGE_SIZE))
+		return NULL;
+
+	return ptr;
+}
+
+void *uk_realloc_compat(struct uk_alloc *a, void *ptr, size_t size)
+{
+	void *retptr;
+
+	UK_ASSERT(a);
+	if (!ptr)
+		return uk_malloc(a, size);
+
+	if (ptr && !size) {
+		uk_free(a, ptr);
+		return NULL;
+	}
+
+	retptr = uk_malloc(a, size);
+	if (!retptr)
+		return NULL;
+
+	memcpy(retptr, ptr, size);
+
+	uk_free(a, ptr);
+	return retptr;
 }
 
 void *uk_calloc_compat(struct uk_alloc *a, size_t nmemb, size_t size)

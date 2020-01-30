@@ -7,3 +7,6 @@ uk_realloc_ifpages
 uk_posix_memalign_ifpages
 uk_calloc_compat
 uk_memalign_compat
+uk_realloc_compat
+uk_palloc_compat
+uk_pfree_compat
