@@ -112,56 +112,60 @@ int uk_alloc_set_default(struct uk_alloc *a)
 	return 0;
 }
 
-static void *uk_get_real_start(const void *ptr)
+struct metadata_ifpages {
+	unsigned long	num_pages;
+	void		*base;
+};
+
+/* METADATA_IFPAGES_SIZE_POW2 is a power of two larger or equal to
+ * sizeof(struct metadata_ifpages). The optimal value for this is
+ * architecture specific. If the actual sizeof(struct metadata_ifpages) is
+ * smaller, we will just waste a few negligible bytes. If it is larger, the
+ * compile time assertion will abort the compilation and this value will have
+ * to be increased.
+ */
+#define METADATA_IFPAGES_SIZE_POW2 16
+UK_CTASSERT(!(sizeof(struct metadata_ifpages) > METADATA_IFPAGES_SIZE_POW2));
+
+static struct metadata_ifpages *uk_get_metadata(const void *ptr)
 {
-	void *intptr;
+	uintptr_t metadata;
 
-	/* a ptr less or equal to page size
-	 * would mean that the actual allocated
-	 * object started at 0x0, so it was NULL
+	/* a ptr less or equal to page size would mean that the actual allocated
+	 * object started at 0x0, so it was NULL.
+	 * any value between page size and page size + size of metadata would
+	 * also imply that the actual allocated object started at 0x0 because
+	 * we need space to store metadata.
 	 */
-	UK_ASSERT((uintptr_t) ptr > __PAGE_SIZE);
+	UK_ASSERT((uintptr_t) ptr >= __PAGE_SIZE +
+		  sizeof(struct metadata_ifpages));
 
-	intptr = (void *) ALIGN_DOWN((uintptr_t) ptr,
-				     (uintptr_t) __PAGE_SIZE);
-	if (intptr == ptr) {
+	metadata = ALIGN_DOWN((uintptr_t) ptr, (uintptr_t) __PAGE_SIZE);
+	if (metadata == (uintptr_t) ptr) {
 		/* special case: the memory was page-aligned.
-		 * In this case the size information lies at the start of the
+		 * In this case the metadata lies at the start of the
 		 * previous page, with the rest of that page unused.
 		 */
-		intptr -= __PAGE_SIZE;
+		metadata -= __PAGE_SIZE;
 	}
-	return intptr;
+
+	return (struct metadata_ifpages *) metadata;
 }
 
 static size_t uk_getmallocsize(const void *ptr)
 {
-	size_t *intptr = uk_get_real_start(ptr);
-	size_t mallocsize = __PAGE_SIZE << (*intptr);
+	struct metadata_ifpages *metadata = uk_get_metadata(ptr);
 
-	if (((uintptr_t) ptr & (~__PAGE_MASK)) == 0) {
-		/*
-		 * special case: the memory was page-aligned
-		 * In this case the allocated size should not account for the
-		 * previous page which was used for storing the number of pages
-		 */
-		mallocsize -= __PAGE_SIZE;
-	} else {
-		/*
-		 * If pointer is not page aligned it means the header is
-		 * on the same page. This will break if metadata size increases
-		 */
-		mallocsize -= sizeof(*intptr);
-	}
-
-	return mallocsize;
+	return (size_t)metadata->base + (size_t)(metadata->num_pages) *
+	       __PAGE_SIZE - (size_t)ptr;
 }
 
 void *uk_malloc_ifpages(struct uk_alloc *a, size_t size)
 {
 	uintptr_t intptr;
 	unsigned long num_pages;
-	size_t realsize = sizeof(num_pages) + size;
+	struct metadata_ifpages *metadata;
+	size_t realsize = sizeof(*metadata) + size;
 
 	UK_ASSERT(a);
 	if (!size)
@@ -173,20 +177,26 @@ void *uk_malloc_ifpages(struct uk_alloc *a, size_t size)
 	if (!intptr)
 		return NULL;
 
-	*(unsigned long *)intptr = num_pages;
-	return (void *)(intptr + sizeof(num_pages));
+	metadata = (struct metadata_ifpages *) intptr;
+	metadata->num_pages = num_pages;
+	metadata->base = (void *) intptr;
+
+	return (void *)(intptr + sizeof(*metadata));
 }
 
 void uk_free_ifpages(struct uk_alloc *a, void *ptr)
 {
-	size_t *intptr;
+	struct metadata_ifpages *metadata;
 
 	UK_ASSERT(a);
 	if (!ptr)
 		return;
 
-	intptr = uk_get_real_start(ptr);
-	uk_pfree(a, intptr, *intptr);
+	metadata = uk_get_metadata(ptr);
+
+	UK_ASSERT(metadata->base != NULL);
+	UK_ASSERT(metadata->num_pages != 0);
+	uk_pfree(a, metadata->base, metadata->num_pages);
 }
 
 void *uk_realloc_ifpages(struct uk_alloc *a, void *ptr, size_t size)
@@ -221,14 +231,14 @@ void *uk_realloc_ifpages(struct uk_alloc *a, void *ptr, size_t size)
 int uk_posix_memalign_ifpages(struct uk_alloc *a,
 				void **memptr, size_t align, size_t size)
 {
-	uintptr_t *intptr;
-	size_t realsize;
+	struct metadata_ifpages *metadata;
 	unsigned long num_pages;
+	uintptr_t *intptr;
+	size_t realsize, metadata_space;
 
 	UK_ASSERT(a);
 	if (((align - 1) & align) != 0
-	    || (align % sizeof(void *)) != 0
-	    || (align > __PAGE_SIZE))
+	    || (align % sizeof(void *)) != 0)
 		return EINVAL;
 
 	if (!size) {
@@ -236,24 +246,43 @@ int uk_posix_memalign_ifpages(struct uk_alloc *a,
 		return EINVAL;
 	}
 
-	/* For page-aligned memory blocks, the size information is not stored
-	 * immediately preceding the memory block, but instead at the
-	 * beginning of the page preceeding the memory handed out via malloc.
+	/* For page-aligned memory blocks (align is a power of two, this is true
+	 * for any align >= __PAGE_SIZE), metadata are not stored immediately
+	 * preceding the memory block, but instead at the beginning of the page
+	 * preceding the memory returned by this function.
+	 *
+	 * align < sizeof(*metadata) implies that metadata are too large to be
+	 * stored preceding the first memory block at given alignment. In this
+	 * case, set align to the next power of two >= sizeof(*metadata). Since
+	 * it is a power of two, the returned pointer will still be aligned at
+	 * the requested alignment.
 	 */
-	if (align == __PAGE_SIZE)
-		realsize = ALIGN_UP(size + __PAGE_SIZE, align);
-	else
-		realsize = ALIGN_UP(size + sizeof(num_pages), align);
+	if (align >= __PAGE_SIZE) {
+		metadata_space = __PAGE_SIZE;
+	} else if (align < sizeof(*metadata)) {
+		metadata_space = 0;
+		align = METADATA_IFPAGES_SIZE_POW2;
+	} else {
+		metadata_space = sizeof(*metadata);
+	}
 
+	/* In addition to metadata space, allocate `align` more bytes in
+	 * order to be sure to find an aligned pointer preceding `size` bytes.
+	 */
+	realsize = size + metadata_space + align;
 	num_pages = size_to_num_pages(realsize);
 	intptr = uk_palloc(a, num_pages);
 
 	if (!intptr)
 		return ENOMEM;
 
-	*(size_t *)intptr = num_pages;
-	*memptr = (void *) ALIGN_UP((uintptr_t)intptr + sizeof(num_pages),
-				    align);
+	*memptr = (void *) ALIGN_UP((uintptr_t)intptr + metadata_space,
+				    (uintptr_t)align);
+
+	metadata = uk_get_metadata(*memptr);
+	metadata->num_pages = num_pages;
+	metadata->base = intptr;
+
 	return 0;
 }
 
