@@ -90,7 +90,7 @@
 	uk_ctortab = .;							\
 	.uk_ctortab :							\
 	{								\
-		KEEP(*(SORT_BY_NAME(.uk_ctortab[0-7])))			\
+		KEEP(*(SORT_BY_NAME(.uk_ctortab[0-9])))			\
 	}								\
 	uk_ctortab_end = .;
 

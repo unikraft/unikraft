@@ -61,7 +61,7 @@ extern const uk_ctor_func_t uk_ctortab_end;
  * called during bootstrap (uk_ctortab)
  *
  * @param lvl
- *   Priority level (0 (higher) to 7 (least))
+ *   Priority level (0 (higher) to 9 (least))
  *   Note: Any other value for level will be ignored
  * @param ctorf
  *   Constructor function to be called
