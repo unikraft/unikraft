@@ -300,7 +300,7 @@ void _uk_libparam_lib_add(struct uk_lib_section *lib_sec);
 #define UK_LIB_CTOR_PRIO	1
 
 #define UK_LIB_CONSTRUCTOR_SETUP(prio, name)				\
-	__UK_CTOR_FUNC(prio, name)
+	UK_CTOR_PRIO(name, prio)
 
 /**
  * Create a constructor to initialize the parameters in the library.

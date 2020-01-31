@@ -77,6 +77,7 @@ static void main_thread_func(void *arg)
 	int ret;
 	struct thread_main_arg *tma = arg;
 	uk_init_t *itr;
+	uk_ctor_func_t *ctorfn;
 
 	/**
 	 * Run init table
@@ -112,25 +113,24 @@ static void main_thread_func(void *arg)
 	 * from its OS being initialized.
 	 */
 	uk_pr_info("Pre-init table at %p - %p\n",
-		   __preinit_array_start, &__preinit_array_end);
-	uk_ctor_foreach(__preinit_array_start, __preinit_array_end, i) {
-		if (__preinit_array_start[i]) {
-			uk_pr_debug("Call pre-init constructor (entry %d (%p): %p())...\n",
-				    i, &__preinit_array_start[i],
-				    __preinit_array_start[i]);
-			__preinit_array_start[i]();
-		}
+		   &__preinit_array_start[0], &__preinit_array_end);
+	uk_ctortab_foreach(ctorfn,
+			   __preinit_array_start, __preinit_array_end) {
+		if (!*ctorfn)
+			continue;
+
+		uk_pr_debug("Call pre-init constructor: %p()...\n", *ctorfn);
+		(*ctorfn)();
 	}
 
 	uk_pr_info("Constructor table at %p - %p\n",
-			__init_array_start, &__init_array_end);
-	uk_ctor_foreach(__init_array_start, __init_array_end, i) {
-		if (__init_array_start[i]) {
-			uk_pr_debug("Call constructor (entry %d (%p): %p())...\n",
-					i, &__init_array_start[i],
-					__init_array_start[i]);
-			__init_array_start[i]();
-		}
+		   &__init_array_start[0], &__init_array_end);
+	uk_ctortab_foreach(ctorfn, __init_array_start, __init_array_end) {
+		if (!*ctorfn)
+			continue;
+
+		uk_pr_debug("Call constructor: %p()...\n", *ctorfn);
+		(*ctorfn)();
 	}
 
 	uk_pr_info("Calling main(%d, [", tma->argc);
@@ -171,7 +171,6 @@ void ukplat_entry_argp(char *arg0, char *argb, __sz argb_len)
 void ukplat_entry(int argc, char *argv[])
 {
 	struct thread_main_arg tma;
-	int i;
 	int kern_args = 0;
 	int rc __maybe_unused = 0;
 #if CONFIG_LIBUKALLOC
@@ -184,11 +183,14 @@ void ukplat_entry(int argc, char *argv[])
 	struct uk_sched *s = NULL;
 	struct uk_thread *main_thread = NULL;
 #endif
+	uk_ctor_func_t *ctorfn;
 
-	uk_pr_info("Unikraft constructors table at %p\n", uk_ctortab);
-	uk_ctor_foreach(uk_ctortab, uk_ctortab_end, i) {
-		uk_pr_debug("Call constructor %p\n", uk_ctortab[i]);
-		uk_ctortab[i]();
+	uk_pr_info("Unikraft constructor table at %p - %p\n",
+		   &uk_ctortab_start[0], &uk_ctortab_end);
+	uk_ctortab_foreach(ctorfn, uk_ctortab_start, uk_ctortab_end) {
+		UK_ASSERT(*ctorfn);
+		uk_pr_debug("Call constructor: %p())...\n", *ctorfn);
+		(*ctorfn)();
 	}
 
 #ifdef CONFIG_LIBUKLIBPARAM

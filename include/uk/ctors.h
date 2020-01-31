@@ -53,41 +53,55 @@ extern const uk_ctor_func_t __preinit_array_start[];
 extern const uk_ctor_func_t __preinit_array_end;
 extern const uk_ctor_func_t __init_array_start[];
 extern const uk_ctor_func_t __init_array_end;
-extern const uk_ctor_func_t uk_ctortab[];
+extern const uk_ctor_func_t uk_ctortab_start[];
 extern const uk_ctor_func_t uk_ctortab_end;
 
 /**
  * Register a Unikraft constructor function that is
  * called during bootstrap (uk_ctortab)
  *
- * @param lvl
- *   Priority level (0 (higher) to 9 (least))
- *   Note: Any other value for level will be ignored
- * @param ctorf
+ * @param fn
  *   Constructor function to be called
+ * @param prio
+ *   Priority level (0 (earliest) to 9 (latest))
+ *   Note: Any other value for level will be ignored
  */
-#define __UK_CTOR_FUNC(lvl, ctorf) \
-		static const uk_ctor_func_t	\
-		__used __section(".uk_ctortab" #lvl)	\
-		__uk_ctab ## lvl ## _ ## ctorf = (ctorf)
-#define UK_CTOR_FUNC(lvl, ctorf) __UK_CTOR_FUNC(lvl, ctorf)
+#define __UK_CTORTAB(fn, prio)				\
+	static const uk_ctor_func_t			\
+	__used __section(".uk_ctortab" #prio)		\
+	__uk_ctortab ## prio ## _ ## fn = (fn)
+
+#define _UK_CTORTAB(fn, prio)				\
+	__UK_CTORTAB(fn, prio)
+
+#define UK_CTOR_PRIO(fn, prio)				\
+	_UK_CTORTAB(fn, prio)
 
 /**
- * Helper macro for iterating over constructor pointer arrays
- * Please note that the array may contain NULL pointer entries
- *
- * @param arr_start
- *   Start address of pointer array (type: const uk_ctor_func_t const [])
- * @param arr_end
- *   End address of pointer array
- * @param i
- *   Iterator variable (integer) which should be used to access the
- *   individual fields
+ * Similar interface without priority.
  */
-#define uk_ctor_foreach(arr_start, arr_end, i)			\
-	for ((i) = 0;						\
-	     &((arr_start)[i]) < &(arr_end);			\
-	     ++(i))
+#define UK_CTOR(fn) UK_CTOR_PRIO(fn, 9)
+
+/* DELETEME: Compatibility wrapper for existing code, to be removed! */
+#define UK_CTOR_FUNC(lvl, ctorf) \
+	_UK_CTORTAB(ctorf, lvl)
+
+/**
+ * Helper macro for iterating over constructor pointer tables
+ * Please note that the table may contain NULL pointer entries
+ *
+ * @param itr
+ *   Iterator variable (uk_ctor_func_t *) which points to the individual
+ *   table entries during iteration
+ * @param ctortab_start
+ *   Start address of table (type: const uk_ctor_func_t[])
+ * @param ctortab_end
+ *   End address of table (type: const uk_ctor_func_t)
+ */
+#define uk_ctortab_foreach(itr, ctortab_start, ctortab_end)	\
+	for ((itr) = DECONST(uk_ctor_func_t*, ctortab_start);	\
+	     (itr) < &(ctortab_end);				\
+	     (itr)++)
 
 #ifdef __cplusplus
 }

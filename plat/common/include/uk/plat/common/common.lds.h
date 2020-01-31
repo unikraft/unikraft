@@ -87,7 +87,7 @@
 
 #define CTORTAB_SECTION							\
 	. = ALIGN(__PAGE_SIZE);						\
-	uk_ctortab = .;							\
+	uk_ctortab_start = .;						\
 	.uk_ctortab :							\
 	{								\
 		KEEP(*(SORT_BY_NAME(.uk_ctortab[0-9])))			\
