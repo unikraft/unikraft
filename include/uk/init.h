@@ -73,35 +73,41 @@ typedef int (*uk_init_func_t)(void);
  * component may not be initialized, so it wise to initializes those component
  * to initialized.
  */
+#define UK_INIT_CLASS_EARLY 1
 #define uk_early_initcall_prio(fn, prio) \
-	uk_initcall_class_prio(fn, 1, prio)
+	uk_initcall_class_prio(fn, UK_INIT_CLASS_EARLY, prio)
 /**
  * Define a stage for platform initialization. Platform at this point read
  * all the device and device are initialized.
  */
+#define UK_INIT_CLASS_PLAT 2
 #define uk_plat_initcall_prio(fn, prio) \
-	uk_initcall_class_prio(fn, 2, prio)
+	uk_initcall_class_prio(fn, UK_INIT_CLASS_PLAT, prio)
 /**
  * Define a stage for performing library initialization. This library
  * initialization is performed after the platform is completely initialized.
  */
+#define UK_INIT_CLASS_LIB 3
 #define uk_lib_initcall_prio(fn, prio) \
-	uk_initcall_class_prio(fn, 3, prio)
+	uk_initcall_class_prio(fn, UK_INIT_CLASS_LIB, prio)
 /**
  * Define a stage for filesystem initialization.
  */
+#define UK_INIT_CLASS_ROOTFS 4
 #define uk_rootfs_initcall_prio(fn, prio) \
-	uk_initcall_class_prio(fn, 4, prio)
+	uk_initcall_class_prio(fn, UK_INIT_CLASS_ROOTFS, prio)
 /**
  * Define a stage for device initialization
  */
+#define UK_INIT_CLASS_SYS 5
 #define uk_sys_initcall_prio(fn, prio) \
-	uk_initcall_class_prio(fn, 5, prio)
+	uk_initcall_class_prio(fn, UK_INIT_CLASS_SYS, prio)
 /**
  * Define a stage for application pre-initialization
  */
+#define UK_INIT_CLASS_LATE 6
 #define uk_late_initcall_prio(fn, prio) \
-	uk_initcall_class_prio(fn, 6, prio)
+	uk_initcall_class_prio(fn, UK_INIT_CLASS_LATE, prio)
 
 /**
  * Similar interface without priority.
