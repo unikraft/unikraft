@@ -95,4 +95,4 @@ static void _uk_swrand_ctor(void)
 	uk_swrand_init_r(&uk_swrand_def, seedc, seedv);
 }
 
-UK_CTOR_FUNC(UK_SWRAND_CTOR_PRIO, _uk_swrand_ctor);
+UK_CTOR_PRIO(_uk_swrand_ctor, UK_SWRAND_CTOR_PRIO);
