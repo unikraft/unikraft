@@ -36,6 +36,7 @@
 
 #include <uk/config.h>
 #include <uk/essentials.h>
+#include <uk/prio.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -53,6 +54,7 @@ typedef int (*uk_init_func_t)(void);
  *   Initialization class (1 (earliest) to 6 (latest))
  * @param prio
  *   Priority level (0 (earliest) to 9 (latest)), must be a constant.
+ *   Use the UK_PRIO_AFTER() helper macro for computing priority dependencies.
  *   Note: Any other value for level will be ignored
  */
 #define __UK_INITTAB(fn, base, prio)					\
@@ -104,12 +106,12 @@ typedef int (*uk_init_func_t)(void);
 /**
  * Similar interface without priority.
  */
-#define uk_early_initcall(fn)     uk_early_initcall_prio(fn, 9)
-#define uk_plat_initcall(fn)      uk_plat_initcall_prio(fn, 9)
-#define uk_lib_initcall(fn)       uk_lib_initcall_prio(fn, 9)
-#define uk_rootfs_initcall(fn)    uk_rootfs_initcall_prio(fn, 9)
-#define uk_sys_initcall(fn)       uk_sys_initcall_prio(fn, 9)
-#define uk_late_initcall(fn)      uk_late_initcall_prio(fn, 9)
+#define uk_early_initcall(fn)     uk_early_initcall_prio(fn, UK_PRIO_LATEST)
+#define uk_plat_initcall(fn)      uk_plat_initcall_prio(fn, UK_PRIO_LATEST)
+#define uk_lib_initcall(fn)       uk_lib_initcall_prio(fn, UK_PRIO_LATEST)
+#define uk_rootfs_initcall(fn)    uk_rootfs_initcall_prio(fn, UK_PRIO_LATEST)
+#define uk_sys_initcall(fn)       uk_sys_initcall_prio(fn, UK_PRIO_LATEST)
+#define uk_late_initcall(fn)      uk_late_initcall_prio(fn, UK_PRIO_LATEST)
 
 extern const uk_init_func_t uk_inittab_start[];
 extern const uk_init_func_t uk_inittab_end;

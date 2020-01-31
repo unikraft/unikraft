@@ -38,6 +38,7 @@
 #define __UK_CTORS_H__
 
 #include <uk/essentials.h>
+#include <uk/prio.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -64,6 +65,7 @@ extern const uk_ctor_func_t uk_ctortab_end;
  *   Constructor function to be called
  * @param prio
  *   Priority level (0 (earliest) to 9 (latest))
+ *   Use the UK_PRIO_AFTER() helper macro for computing priority dependencies.
  *   Note: Any other value for level will be ignored
  */
 #define __UK_CTORTAB(fn, prio)				\
@@ -80,7 +82,7 @@ extern const uk_ctor_func_t uk_ctortab_end;
 /**
  * Similar interface without priority.
  */
-#define UK_CTOR(fn) UK_CTOR_PRIO(fn, 9)
+#define UK_CTOR(fn) UK_CTOR_PRIO(fn, UK_PRIO_LATEST)
 
 /* DELETEME: Compatibility wrapper for existing code, to be removed! */
 #define UK_CTOR_FUNC(lvl, ctorf) \
