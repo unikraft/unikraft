@@ -1,5 +1,5 @@
 config LIBUKLIBPARAM
-       bool "uk library parameter: Pass arguments to a unikraft library"
+       bool "uklibparam: Library arguments"
        default n
        select LIBUKDEBUG
        select LIBNOLIBC if !HAVE_LIBC
