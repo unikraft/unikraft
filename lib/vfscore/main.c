@@ -2113,4 +2113,4 @@ static void vfscore_init(void)
 	lookup_init();
 }
 
-UK_CTOR_FUNC(1, vfscore_init);
+UK_CTOR_PRIO(vfscore_init, 1);

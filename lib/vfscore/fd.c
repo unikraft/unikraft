@@ -209,4 +209,4 @@ static void fdtable_init(void)
 	init_stdio();
 }
 
-UK_CTOR_FUNC(1, fdtable_init);
+UK_CTOR_PRIO(fdtable_init, 1);
