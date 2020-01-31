@@ -160,8 +160,8 @@ struct pci_device {
 
 #define _PCI_REGFNNAME(x, y)      x##y
 
-#define PCI_REGISTER_CTOR(CTOR)				\
-		UK_CTOR_FUNC(1, CTOR)
+#define PCI_REGISTER_CTOR(ctor)				\
+	UK_CTOR_PRIO(ctor, UK_PRIO_AFTER(UK_BUS_REGISTER_PRIO))
 
 #define _PCI_REGISTER_DRIVER(libname, b)				\
 	static void						\

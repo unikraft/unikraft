@@ -41,6 +41,7 @@
 #include <uk/arch/types.h>
 #include <uk/arch/lcpu.h>
 #include <uk/alloc.h>
+#include <uk/bus.h>
 #include <virtio/virtio_config.h>
 #include <virtio/virtqueue.h>
 #include <uk/ctors.h>
@@ -335,8 +336,8 @@ static inline void virtio_dev_drv_up(struct virtio_dev *vdev)
 
 #define _VIRTIO_BUS_REGFNAME(x, y)       x##y
 
-#define _VIRTIO_REGISTER_CTOR(CTOR)	\
-	UK_CTOR_FUNC(1, CTOR)
+#define _VIRTIO_REGISTER_CTOR(ctor)	\
+	UK_CTOR_PRIO(ctor, UK_PRIO_AFTER(UK_BUS_REGISTER_PRIO))
 
 #define _VIRTIO_BUS_REGISTER_DRIVER(libname, b)				\
 	static void							\
