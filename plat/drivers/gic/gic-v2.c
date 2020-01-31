@@ -37,9 +37,12 @@
 #include <uk/assert.h>
 #include <uk/bitops.h>
 #include <uk/asm.h>
-#include <uk/plat/common/irq.h>
-#include <kvm/irq.h>
 #include <uk/plat/lcpu.h>
+#include <uk/plat/common/irq.h>
+#if defined(CONFIG_PLAT_KVM)
+#include <kvm/irq.h>
+#endif
+#include <uk/plat/spinlock.h>
 #include <arm/cpu.h>
 #include <gic/gic-v2.h>
 #include <ofw/fdt.h>
@@ -58,15 +61,21 @@
 /* Max support interrupt number for GICv2 */
 #define GIC_MAX_IRQ		__MAX_IRQ
 
+#define GIC_DIST_REG(r)	((void *)(gic_dist_addr + (r)))
+#define GIC_CPU_REG(r)	((void *)(gic_cpuif_addr + (r)))
+#define IRQ_TYPE_MASK	0x0000000f
+
 static uint64_t gic_dist_addr, gic_cpuif_addr;
 static uint64_t gic_dist_size, gic_cpuif_size;
 #ifdef CONFIG_HAVE_SMP
 static char gic_is_initialized;
+__spinlock gic_dist_lock;
+inline void dist_lock(void) { ukarch_spin_lock(&gic_dist_lock); };
+inline void dist_unlock(void) { ukarch_spin_unlock(&gic_dist_lock); };
+#else
+inline void dist_lock(void) {};
+inline void dist_unlock(void) {};
 #endif
-
-#define GIC_DIST_REG(r)	((void *)(gic_dist_addr + (r)))
-#define GIC_CPU_REG(r)	((void *)(gic_cpuif_addr + (r)))
-#define IRQ_TYPE_MASK	0x0000000f
 
 static const char * const gic_device_list[] = {
 	"arm,cortex-a15-gic",
@@ -163,7 +172,9 @@ static void gic_sgi_gen(uint32_t sgintid, enum sgi_filter targetfilter,
 	val |= sgintid;
 
 	/* Generate SGI */
+	dist_lock();
 	write_gicd32(GICD_SGIR, val);
+	dist_unlock();
 }
 
 /*
@@ -176,9 +187,11 @@ void gic_sgi_gen_to_list(uint32_t sgintid, uint8_t targetlist)
 	unsigned long irqf;
 
 	/* spin lock here is needed when smp is supported */
+	dist_lock();
 	irqf = ukplat_lcpu_save_irqf();
 	gic_sgi_gen(sgintid, GICD_SGI_FILTER_TO_LIST, targetlist);
 	ukplat_lcpu_restore_irqf(irqf);
+	dist_unlock();
 }
 
 /*
@@ -191,9 +204,11 @@ void gic_sgi_gen_to_others(uint32_t sgintid)
 	unsigned long irqf;
 
 	/* spin lock here is needed when smp is supported */
+	dist_lock();
 	irqf = ukplat_lcpu_save_irqf();
 	gic_sgi_gen(sgintid, GICD_SGI_FILTER_TO_OTHERS, 0);
 	ukplat_lcpu_restore_irqf(irqf);
+	dist_unlock();
 }
 
 /*
@@ -216,13 +231,17 @@ void gic_set_irq_target(uint32_t irq, uint8_t target)
 		UK_CRASH("Bad irq number: should not less than %u",
 			GIC_SPI_BASE);
 
+	dist_lock();
 	write_gicd8(GICD_ITARGETSR(irq), target);
+	dist_unlock();
 }
 
 /* set priority for irq in distributor */
 void gic_set_irq_prio(uint32_t irq, uint8_t priority)
 {
+	dist_lock();
 	write_gicd8(GICD_IPRIORITYR(irq), priority);
+	dist_unlock();
 }
 
 /*
@@ -231,8 +250,12 @@ void gic_set_irq_prio(uint32_t irq, uint8_t priority)
  */
 void gic_enable_irq(uint32_t irq)
 {
+	dist_lock();
+
 	write_gicd32(GICD_ISENABLER(irq),
 		UK_BIT(irq % GICD_I_PER_ISENABLERn));
+
+	dist_unlock();
 }
 
 /*
@@ -241,22 +264,28 @@ void gic_enable_irq(uint32_t irq)
  */
 void gic_disable_irq(uint32_t irq)
 {
+	dist_lock();
 	write_gicd32(GICD_ICENABLER(irq),
 		UK_BIT(irq % GICD_I_PER_ICENABLERn));
+	dist_unlock();
 }
 
 /* Enable distributor */
 static void gic_enable_dist(void)
 {
 	/* just set bit 0 to 1 to enable distributor */
+	dist_lock();
 	write_gicd32(GICD_CTLR, read_gicd32(GICD_CTLR) | GICD_CTLR_ENABLE);
+	dist_unlock();
 }
 
 /* disable distributor */
 static void gic_disable_dist(void)
 {
-	/* just clear bit 0 to 0 to enable distributor */
+	/* just clear bit 0 to 0 to disable distributor */
+	dist_lock();
 	write_gicd32(GICD_CTLR, read_gicd32(GICD_CTLR) & (~GICD_CTLR_ENABLE));
+	dist_unlock();
 }
 
 /* Config interrupt trigger type */
@@ -269,6 +298,8 @@ void gic_set_irq_type(uint32_t irq, int trigger)
 			GIC_PPI_BASE);
 	if (trigger >= UK_IRQ_TRIGGER_MAX)
 		return;
+
+	dist_lock();
 
 	val = read_gicd32(GICD_ICFGR(irq));
 	mask = oldmask = (val >> ((irq % GICD_I_PER_ICFGRn) * 2)) &
@@ -290,6 +321,8 @@ void gic_set_irq_type(uint32_t irq, int trigger)
 	val &= (~(GICD_ICFGR_MASK << (irq % GICD_I_PER_ICFGRn) * 2));
 	val |= (mask << (irq % GICD_I_PER_ICFGRn) * 2);
 	write_gicd32(GICD_ICFGR(irq), val);
+
+	dist_unlock();
 }
 
 int32_t gic_irq_translate(uint32_t type, uint32_t hw_irq)
