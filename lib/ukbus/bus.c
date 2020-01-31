@@ -139,4 +139,4 @@ static int uk_bus_lib_init(void)
 	uk_bus_probe_all();
 	return 0;
 }
-uk_early_initcall_prio(uk_bus_lib_init, 0);
+uk_initcall_class_prio(uk_bus_lib_init, UK_BUS_INIT_CLASS, UK_BUS_INIT_PRIO);
