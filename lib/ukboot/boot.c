@@ -76,19 +76,21 @@ static void main_thread_func(void *arg)
 	int i;
 	int ret;
 	struct thread_main_arg *tma = arg;
-	uk_init_t *itr;
 	uk_ctor_func_t *ctorfn;
+	uk_init_func_t *initfn;
 
 	/**
 	 * Run init table
 	 */
-	uk_pr_info("Init Table @ %p - %p\n", &uk_inittab_start[0],
-		   &uk_inittab_end);
-	uk_inittab_foreach(uk_inittab_start, uk_inittab_end, itr) {
-		ret = (*itr)();
+	uk_pr_info("Init Table @ %p - %p\n",
+		   &uk_inittab_start[0], &uk_inittab_end);
+	uk_inittab_foreach(initfn, uk_inittab_start, uk_inittab_end) {
+		UK_ASSERT(*initfn);
+		uk_pr_debug("Call init function: %p()...\n", *initfn);
+		ret = (*initfn)();
 		if (ret < 0) {
 			uk_pr_err("Init function at %p returned error %d\n",
-				  itr, ret);
+				  *initfn, ret);
 			ret = UKPLAT_CRASH;
 			goto exit;
 		}
