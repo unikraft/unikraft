@@ -45,6 +45,8 @@
 extern "C" {
 #endif
 
+#define UK_SWRAND_CTOR_PRIO	1
+
 struct uk_swrand;
 
 extern struct uk_swrand uk_swrand_def;

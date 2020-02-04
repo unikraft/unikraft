@@ -35,8 +35,6 @@
 #include <uk/config.h>
 #include <uk/print.h>
 
-#define UK_SWRAND_CTOR_PRIO    1
-
 __u32 uk_swrandr_gen_seed32(void)
 {
 	__u32 val;
