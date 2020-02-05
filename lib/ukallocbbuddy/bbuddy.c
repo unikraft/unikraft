@@ -508,8 +508,11 @@ struct uk_alloc *uk_allocbbuddy_init(void *base, size_t len)
 	a->availmem = bbuddy_availmem;
 #endif
 
-	/* add left memory - ignore return value */
-	bbuddy_addmem(a, (void *)(min + metalen),
-		      (size_t)(max - min - metalen));
+	if (max > min + metalen) {
+		/* add left memory - ignore return value */
+		bbuddy_addmem(a, (void *)(min + metalen),
+				 (size_t)(max - min - metalen));
+	}
+
 	return a;
 }
