@@ -235,7 +235,7 @@ int uk_posix_memalign_ifpages(struct uk_alloc *a,
 	struct metadata_ifpages *metadata;
 	unsigned long num_pages;
 	uintptr_t intptr;
-	size_t realsize, metadata_space;
+	size_t realsize, padding;
 
 	UK_ASSERT(a);
 	if (((align - 1) & align) != 0
@@ -259,27 +259,32 @@ int uk_posix_memalign_ifpages(struct uk_alloc *a,
 	 * the requested alignment.
 	 */
 	if (align >= __PAGE_SIZE) {
-		metadata_space = __PAGE_SIZE;
-	} else if (align < sizeof(*metadata)) {
-		metadata_space = 0;
+		padding = __PAGE_SIZE;
+	} else if (align < METADATA_IFPAGES_SIZE_POW2) {
 		align = METADATA_IFPAGES_SIZE_POW2;
+		padding = 0;
 	} else {
-		metadata_space = sizeof(*metadata);
+		padding = sizeof(*metadata);
 	}
 
 	/* In addition to metadata space, allocate `align` more bytes in
 	 * order to be sure to find an aligned pointer preceding `size` bytes.
 	 */
-	realsize = size + metadata_space + align;
+	realsize = size + padding + align;
 	num_pages = size_to_num_pages(realsize);
 	intptr = (uintptr_t) uk_palloc(a, num_pages);
 
 	if (!intptr)
 		return ENOMEM;
 
-	*memptr = (void *) ALIGN_UP(intptr + metadata_space, (uintptr_t) align);
+	*memptr = (void *) ALIGN_UP(intptr + sizeof(*metadata),
+				    (uintptr_t) align);
 
 	metadata = uk_get_metadata(*memptr);
+
+	/* check for underflow */
+	UK_ASSERT(intptr <= (uintptr_t) metadata);
+
 	metadata->num_pages = num_pages;
 	metadata->base = (void *) intptr;
 
