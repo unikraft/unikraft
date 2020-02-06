@@ -3,7 +3,13 @@
  * Port from Mini-OS: include/arm/os.h
  */
 /*
- * Copyright (c) 2009 Citrix Systems, Inc. All rights reserved.
+ * Authors: Karim Allah Ahmed <karim.allah.ahmed@gmail.com>
+ *          Thomas Leonard <talex5@gmail.com>
+ *          Wei Chen <Wei.Chen@arm.com>
+ *
+ * Copyright (c) 2014 Karim Allah Ahmed
+ * Copyright (c) 2014 Thomas Leonard
+ * Copyright (c) 2018, Arm Ltd., All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,33 +38,48 @@
 #endif
 
 /**
+ * ukarch_ffs - find first (lowest) set bit in word.
+ * @word: The word to search
+ *
+ * Returns one plus the index of the least significant 1-bit of x, or
+ * if x is zero, returns zero.
+ * ffs(1)=0, ffs(0x8000000)=31
+ */
+static inline unsigned int ukarch_ffs(unsigned int x)
+{
+	return __builtin_ffs(x) - 1;
+}
+
+/**
+ * ukarch_fls - find last (highest) set bit in word.
+ * @word: The word to search
+ *
+ * Undefined if no bit exists, so code should check against 0 first.
+ * fls(1)=0, fls(0x8000000)=31
+ */
+static inline unsigned int ukarch_fls(unsigned int x)
+{
+	return sizeof(x) * 8 - __builtin_clz(x) - 1;
+}
+
+/**
  * ukarch_ffsl - find first (lowest) set bit in word.
  * @word: The word to search
  *
  * Undefined if no bit exists, so code should check against 0 first.
  */
-static inline unsigned long ukarch_ffsl(unsigned long word)
+static inline unsigned long ukarch_ffsl(unsigned long x)
 {
-	int clz;
+	return __builtin_ffsl(x) - 1;
+}
 
-	/* xxxxx10000 = word
-	 * xxxxx01111 = word - 1
-	 * 0000011111 = word ^ (word - 1)
-	 *      4     = 31 - clz(word ^ (word - 1))
-	 */
-
-	__asm__("sub r0, %[word], #1\n"
-		"eor r0, r0, %[word]\n"
-		"clz %[clz], r0\n"
-		:
-		/* Outputs: */
-		[clz] "=r"(clz)
-		:
-		/* Inputs: */
-		[word] "r"(word)
-		:
-		/* Clobbers: */
-		"r0");
-
-	return 31 - clz;
+/**
+ * ukarch_flsl - find last (highest) set bit in word.
+ * @word: The word to search
+ *
+ * Undefined if no bit exists, so code should check against 0 first.
+ */
+static inline unsigned long ukarch_flsl(unsigned long x)
+{
+	return sizeof(x) * 8 - __builtin_clzl(x) - 1;
 }
