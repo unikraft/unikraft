@@ -234,7 +234,7 @@ int uk_posix_memalign_ifpages(struct uk_alloc *a,
 {
 	struct metadata_ifpages *metadata;
 	unsigned long num_pages;
-	uintptr_t *intptr;
+	uintptr_t intptr;
 	size_t realsize, metadata_space;
 
 	UK_ASSERT(a);
@@ -272,17 +272,16 @@ int uk_posix_memalign_ifpages(struct uk_alloc *a,
 	 */
 	realsize = size + metadata_space + align;
 	num_pages = size_to_num_pages(realsize);
-	intptr = uk_palloc(a, num_pages);
+	intptr = (uintptr_t) uk_palloc(a, num_pages);
 
 	if (!intptr)
 		return ENOMEM;
 
-	*memptr = (void *) ALIGN_UP((uintptr_t)intptr + metadata_space,
-				    (uintptr_t)align);
+	*memptr = (void *) ALIGN_UP(intptr + metadata_space, (uintptr_t) align);
 
 	metadata = uk_get_metadata(*memptr);
 	metadata->num_pages = num_pages;
-	metadata->base = intptr;
+	metadata->base = (void *) intptr;
 
 	return 0;
 }
