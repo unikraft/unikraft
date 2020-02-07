@@ -76,5 +76,6 @@ M4FLAGS  += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
 ASFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 CFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 CXXFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
+GOFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 LIBLDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 LDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
