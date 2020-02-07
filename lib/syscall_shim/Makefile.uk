@@ -2,7 +2,7 @@ $(eval $(call addlib_s,libsyscall_shim,$(CONFIG_LIBSYSCALL_SHIM)))
 
 LIBSYSCALL_SHIM_INCLUDES_PATH := $(LIBSYSCALL_SHIM_BUILD)/include/uk/bits
 
-LIBSYSCALL_SHIM_PHONY_SRC := syscall_map.h syscall_stubs.h syscall_nrs.h
+LIBSYSCALL_SHIM_PHONY_SRC := syscall_map.h syscall_stubs.h syscall_nrs.h syscall_nrs2.h
 LIBSYSCALL_SHIM_PHONY_SRC := $(addprefix $(LIBSYSCALL_SHIM_INCLUDES_PATH)/, $(LIBSYSCALL_SHIM_PHONY_SRC))
 LIBSYSCALL_SHIM_PHONY_SRC += $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in
 LIBSYSCALL_SHIM_PHONY_SRC_NEW := $(addsuffix .new, $(LIBSYSCALL_SHIM_PHONY_SRC))
@@ -29,6 +29,11 @@ $(LIBSYSCALL_SHIM_PHONY_SRC): %: %.new
 $(LIBSYSCALL_SHIM_INCLUDES_PATH)/syscall_nrs.h.new: $(LIBSYSCALL_SHIM_BASE)/gen_syscall_nrs.awk $(LIBSYSCALL_SHIM_TEMPL)
 	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
 		$(AWK) -f $(LIBSYSCALL_SHIM_BASE)/gen_syscall_nrs.awk \
+		$(LIBSYSCALL_SHIM_TEMPL) > $@)
+
+$(LIBSYSCALL_SHIM_INCLUDES_PATH)/syscall_nrs2.h.new: $(LIBSYSCALL_SHIM_BASE)/gen_syscall_nrs2.awk $(LIBSYSCALL_SHIM_TEMPL)
+	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
+		$(AWK) -f $(LIBSYSCALL_SHIM_BASE)/gen_syscall_nrs2.awk \
 		$(LIBSYSCALL_SHIM_TEMPL) > $@)
 
 $(LIBSYSCALL_SHIM_INCLUDES_PATH)/syscall_map.h.new: $(LIBSYSCALL_SHIM_BASE)/gen_syscall_map.awk $(LIBSYSCALL_SHIM_TEMPL)
