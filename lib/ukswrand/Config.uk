@@ -21,7 +21,7 @@ endchoice
 
 choice
     prompt "Initial seed"
-    default LIBUKSWRANDR_INITIALSEED_TIME
+    default LIBUKSWRAND_INITIALSEED_TIME
 
 config LIBUKSWRAND_INITIALSEED_TIME
     bool "Platform timestamp"
