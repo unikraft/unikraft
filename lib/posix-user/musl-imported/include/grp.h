@@ -10,6 +10,7 @@ extern "C" {
 
 #ifdef _GNU_SOURCE
 #define __NEED_FILE
+#include <stdio.h>
 #endif
 
 #include <sys/types.h>
