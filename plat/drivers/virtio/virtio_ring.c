@@ -379,8 +379,8 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 	vrq->vring_mem = NULL;
 
 	ring_size = vring_size(nr_descs, align);
-	uk_posix_memalign(a, (void **)&vrq->vring_mem, __PAGE_SIZE, ring_size);
-	if (!vrq->vring_mem) {
+	if (uk_posix_memalign(a, &vrq->vring_mem,
+			      __PAGE_SIZE, ring_size) != 0) {
 		uk_pr_err("Allocation of vring failed\n");
 		rc = -ENOMEM;
 		goto err_freevq;

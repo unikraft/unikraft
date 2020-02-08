@@ -141,8 +141,8 @@ static void *create_stack(struct uk_alloc *allocator)
 {
 	void *stack;
 
-	uk_posix_memalign(allocator, &stack, STACK_SIZE, STACK_SIZE);
-	if (stack == NULL) {
+	if (uk_posix_memalign(allocator, &stack,
+			      STACK_SIZE, STACK_SIZE) != 0) {
 		uk_pr_err("Failed to allocate thread stack\n");
 		return NULL;
 	}
@@ -155,7 +155,7 @@ static void *uk_thread_tls_create(struct uk_alloc *allocator)
 	void *tls;
 
 	if (uk_posix_memalign(allocator, &tls, ukarch_tls_area_align(),
-			      ukarch_tls_area_size())) {
+			      ukarch_tls_area_size()) != 0) {
 		uk_pr_err("Failed to allocate thread TLS area\n");
 		return NULL;
 	}
