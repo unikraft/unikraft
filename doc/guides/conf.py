@@ -50,7 +50,7 @@ master_doc = 'index'
 
 # General information about the project.
 project = u'Unikraft'
-copyright = u'2019, NEC Laboratories Europe GmbH'
+copyright = u'2020, NEC Laboratories Europe GmbH'
 author = u'Simon Kuenzer, Felipe Huici'
 
 # The version info for the project you're documenting, acts as replacement for
