@@ -682,7 +682,7 @@ KCONFIG_TOOLS := $(addprefix $(KCONFIG_DIR)/,$(KCONFIG_TOOLS))
 
 $(KCONFIG_TOOLS):
 	mkdir -p $(@D)/lxdialog
-	$(MAKE) CC="$(HOSTCC_NOCCACHE)" HOSTCC="$(HOSTCC_NOCCACHE)" \
+	$(MAKE) --no-print-directory CC="$(HOSTCC_NOCCACHE)" HOSTCC="$(HOSTCC_NOCCACHE)" \
 	    obj=$(@D) -C $(CONFIG) -f Makefile.br $(@)
 
 DEFCONFIG = $(call qstrip,$(UK_DEFCONFIG))
@@ -906,7 +906,7 @@ $(filter-out _all $(BUILD_DIR)/Makefile sub-make distclean properclean help $(la
 	@:
 
 sub-make: $(BUILD_DIR)/Makefile
-	$(Q)$(MAKE) CONFIG_UK_BASE=$(CONFIG_UK_BASE) -C $(BUILD_DIR) -f $(BUILD_DIR)/Makefile $(MAKECMDGOALS)
+	$(Q)$(MAKE) --no-print-directory CONFIG_UK_BASE=$(CONFIG_UK_BASE) -C $(BUILD_DIR) -f $(BUILD_DIR)/Makefile $(MAKECMDGOALS)
 
 endif
 
