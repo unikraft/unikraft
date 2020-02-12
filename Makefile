@@ -613,7 +613,7 @@ images: $(UK_DEBUG_IMAGES) $(UK_DEBUG_IMAGES-y) $(UK_IMAGES) $(UK_IMAGES-y)
 
 GDB_HELPER_LINKS := $(addsuffix .gdb.py,$(UK_DEBUG_IMAGES) $(UK_DEBUG_IMAGES-y))
 $(GDB_HELPER_LINKS):
-	$(call verbose_cmd,LN,$(notdir $@), ln -sf uk-gdb.py $@)
+	$(call verbose_cmd,LN,$(notdir $@),$(HOSTLN) -sf uk-gdb.py $@)
 
 SCRIPTS_DIR_BACKSLASHED = $(subst /,\/,$(SCRIPTS_DIR))
 $(BUILD_DIR)/uk-gdb.py: $(SCRIPTS_DIR)/uk-gdb.py
@@ -899,7 +899,7 @@ else #!($(sub_make_exec),)
 export sub_make_exec:=1
 
 $(BUILD_DIR)/Makefile:
-	ln -sn $(CONFIG_UK_BASE)/Makefile $(@)
+	$(call verbose_cmd,LN,$(notdir $@),$(HOSTLN) -sf $(CONFIG_UK_BASE)/Makefile $@)
 
 $(filter-out _all $(BUILD_DIR)/Makefile sub-make distclean properclean help $(lastword $(MAKEFILE_LIST)), \
   $(MAKECMDGOALS)) all: sub-make
