@@ -63,7 +63,7 @@ connect gdb by using the debug image with: ::
 Unless you're debugging early boot code (until ``_libkvmplat_start32``), you'll need to set a hardware break point: ::
 
   hbreak [location]
-  run
+  continue
 
 We'll now need to set the right CPU architecture: ::
 
@@ -188,7 +188,7 @@ buffer. You can print them by issuing the `gdb` command ``uk trace``: ::
 Alternatively, you can save all trace data to disk with
 ``uk trace save <filename>``: ::
 
-  (gdb) uk save traces.dat
+  (gdb) uk trace save traces.dat
 
 .. note:: It may make sense to connect with `gdb` after the guest execution has
 	  been finished (and the trace buffer got filled). For this purpose,
