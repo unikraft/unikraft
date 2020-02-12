@@ -659,7 +659,7 @@ endef
 # buildrule_olib $libname
 define buildrule_olib =
 $(if $(wildcard $($(call vprefix_lib,$(1),EXPORTS))),,\
-	$(warning Warning: Definition of exported symbols for $(1) missing: $($(call vprefix_lib,$(1),EXPORTS))) \
+	$(call verbose_info,Warning: Definition of exported symbols for $(1) missing: $($(call vprefix_lib,$(1),EXPORTS))) \
 )
 
 $(call libname2preolib,$(1)): $($(call vprefix_lib,$(1),OBJS)) \

@@ -64,6 +64,34 @@ space := $(empty) $(empty)
 # explictly throw away any output from 'cd' here.
 export CDPATH :=
 
+# To put more focus on warnings, be less verbose as default
+# Use 'make V=1' to see the full commands
+ifeq ("$(origin V)", "command line")
+  BUILD_VERBOSE = $(V)
+endif
+ifndef BUILD_VERBOSE
+  BUILD_VERBOSE = 0
+endif
+
+ifeq ($(KBUILD_VERBOSE),1)
+  Q =
+ifndef VERBOSE
+  VERBOSE = 1
+endif
+export VERBOSE
+else
+   Q = @
+endif
+
+# Helper that shows an `info` message only
+# when verbose mode is on
+# verbose_info $verbosemessage
+ifeq ($(BUILD_VERBOSE),1)
+verbose_info = $(info $(1))
+else
+verbose_info =
+endif
+
 # Use current directory as base
 CONFIG_UK_BASE ?= $(CURDIR)
 override CONFIG_UK_BASE := $(realpath $(CONFIG_UK_BASE))
@@ -189,25 +217,6 @@ noconfig_targets	:= ukconfig menuconfig nconfig gconfig xconfig config \
 			   release olddefconfig properclean distclean \
 			   scriptconfig iscriptconfig kmenuconfig guiconfig \
 			   dumpvarsconfig $(null_targets)
-
-# To put more focus on warnings, be less verbose as default
-# Use 'make V=1' to see the full commands
-ifeq ("$(origin V)", "command line")
-  BUILD_VERBOSE = $(V)
-endif
-ifndef BUILD_VERBOSE
-  BUILD_VERBOSE = 0
-endif
-
-ifeq ($(KBUILD_VERBOSE),1)
-  Q =
-ifndef VERBOSE
-  VERBOSE = 1
-endif
-export VERBOSE
-else
-   Q = @
-endif
 
 # we want bash as shell
 SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
