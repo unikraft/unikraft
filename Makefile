@@ -193,6 +193,7 @@ KCONFIG_PLAT_IN       := $(KCONFIG_DIR)/plat.uk
 SCRIPTS_DIR := $(CONFIG_UK_BASE)/support/scripts
 
 # # Set and export the version string
+$(call verbose_info,Including $(CONFIG_UK_BASE)/version.mk...)
 include $(CONFIG_UK_BASE)/version.mk
 
 # Compute the full local version string so packages can use it as-is
@@ -286,6 +287,7 @@ IMAGE_LDFLAGS-y :=
 # Pull in the user's configuration file
 ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 ifneq ("$(wildcard $(UK_CONFIG))","")
+$(call verbose_info,Including $(UK_CONFIG)...)
 -include $(UK_CONFIG)
 UK_HAVE_DOT_CONFIG := y
 endif
@@ -367,14 +369,16 @@ export HOSTCC_NOCCACHE HOSTCXX_NOCCACHE
 ################################################################################
 # Makefile helpers
 ################################################################################
+$(call verbose_info,Including $(CONFIG_UK_BASE)/support/build/Makefile.rules...)
+include $(CONFIG_UK_BASE)/support/build/Makefile.rules
+
 # We need to include this file early (before any rule is defined)
 # but after we have tried to load a .config and after having our tools defined
-$(foreach M,$(strip $(wildcard $(addsuffix Makefile.rules,\
-	   $(CONFIG_UK_BASE)/support/build/ $(CONFIG_UK_BASE)/lib/*/\
-	   $(CONFIG_UK_BASE)/plat/*/ $(addsuffix /,$(ELIB_DIR)) $(APP_DIR)/)\
-	      )),\
-		$(info Include $(M));\
-		$(eval include $(M)))
+$(foreach _M,$(wildcard $(addsuffix Makefile.rules,\
+	   $(CONFIG_UK_BASE)/lib/*/ $(CONFIG_UK_BASE)/plat/*/ \
+	   $(addsuffix /,$(ELIB_DIR)) $(APP_DIR)/)), \
+		$(eval $(call verbose_include,$(_M))) \
+)
 
 ################################################################################
 # Clean targets that do not have any dependency on a configuration
@@ -395,7 +399,7 @@ distclean: properclean
 # Unikraft Architecture
 ################################################################################
 # Set target archicture as set in config
-include $(CONFIG_UK_BASE)/arch/Arch.uk
+$(eval $(call verbose_include,$(CONFIG_UK_BASE)/arch/Arch.uk))
 ifeq ($(CONFIG_UK_ARCH),)
 # Set target archicture as set in environment
 ifneq ($(ARCH),)
@@ -490,7 +494,7 @@ ifneq ("$(origin CROSS_COMPILE)","undefined")
 CONFIG_CROSS_COMPILE := $(CROSS_COMPILE:"%"=%)
 endif
 
-include $(CONFIG_UK_BASE)/arch/$(UK_FAMILY)/Compiler.uk
+$(eval $(call verbose_include,$(CONFIG_UK_BASE)/arch/$(UK_FAMILY)/Compiler.uk))
 
 # Make variables (CC, etc...)
 LD		:= $(CONFIG_CROSS_COMPILE)gcc
@@ -552,21 +556,24 @@ ifneq ($(CONFIG_UK_BASE),$(CONFIG_UK_APP))
 $(eval $(call _import_lib,$(CONFIG_UK_APP)));
 endif
 
-include $(CONFIG_UK_BASE)/lib/Makefile.uk # libraries
+# internal libraries
+$(eval $(call verbose_include,$(CONFIG_UK_BASE)/lib/Makefile.uk))
 
 # external libraries
 $(foreach E,$(ELIB_DIR), \
 	$(eval $(call _import_lib,$(E))); \
 )
-$(eval $(call _import_lib,$(CONFIG_UK_BASE)/arch/$(UK_FAMILY))) # architecture libraries
-include $(CONFIG_UK_BASE)/plat/Makefile.uk # platform libraries
+# architecture library
+$(eval $(call _import_lib,$(CONFIG_UK_BASE)/arch/$(UK_FAMILY)))
+# internal platform libraries
+$(eval $(call verbose_include,$(CONFIG_UK_BASE)/plat/Makefile.uk))
 # external platform libraries
 # NOTE: We include them after internal platform libs so that also base variables
 #       provided with /plat/Makefile.uk are populated
 $(foreach E,$(EPLAT_DIR), \
 	$(eval $(call _import_lib,$(E))); \
 )
-include $(CONFIG_UK_BASE)/Makefile.uk # Unikraft base
+$(eval $(call verbose_include,$(CONFIG_UK_BASE)/Makefile.uk)) # Unikraft base
 
 ifeq ($(call qstrip,$(UK_PLATS) $(UK_PLATS-y)),)
 $(warning You did not choose any target platform.)
@@ -583,10 +590,13 @@ endif
 endif
 
 # Generate build rules
-include $(CONFIG_UK_BASE)/support/build/Makefile.build
+$(eval $(call verbose_include,$(CONFIG_UK_BASE)/support/build/Makefile.build))
 
+# Include source dependencies
 ifneq ($(call qstrip,$(UK_DEPS) $(UK_DEPS-y)),)
--include $(UK_DEPS) $(UK_DEPS-y) # include header dependencies
+$(foreach _D,$(UK_DEPS) $(UK_DEPS-y),\
+ $(eval $(call verbose_include_try,$(_D))) \
+)
 endif
 
 # include Makefile for platform linking (`Linker.uk`)
@@ -627,7 +637,7 @@ all: images gdb_helpers
 # Cleanup rules
 ################################################################################
 # Generate cleaning rules
-include $(CONFIG_UK_BASE)/support/build/Makefile.clean
+$(eval $(call verbose_include,$(CONFIG_UK_BASE)/support/build/Makefile.clean))
 
 clean-libs: $(addprefix clean-,\
 	$(foreach P,$(UK_PLATS) $(UK_PLATS-y),\
