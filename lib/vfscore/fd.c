@@ -97,9 +97,15 @@ int vfscore_put_fd(int fd)
 	unsigned long flags;
 
 	UK_ASSERT(fd < (int) FDTABLE_MAX_FILES);
-	/* Currently it is not allowed to free std(in|out|err) */
-	if (fd <= 2)
-		return -EBUSY;
+
+	/* FIXME Currently it is not allowed to free std(in|out|err):
+	 * if (fd <= 2) return -EBUSY;
+	 *
+	 * However, returning -EBUSY in this case breaks dup2 with stdin, out,
+	 * err. Ignoring this should be fine as long as those are not fdrop-ed
+	 * twice, in which case the static fp would be freed, and here be
+	 * dragons.
+	 */
 
 	flags = ukplat_lcpu_save_irqf();
 	uk_bitmap_clear(fdtable.bitmap, fd, 1);
