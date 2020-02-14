@@ -141,7 +141,7 @@ int gethostname(char *name, size_t len)
 		return -1;
 	}
 
-	strncpy(name, buf.nodename, node_len);
+	strncpy(name, buf.nodename, len);
 
 	return 0;
 }
