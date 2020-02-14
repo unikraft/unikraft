@@ -109,7 +109,8 @@ int device_close(struct device *dev)
 }
 
 int
-mount(const char *dev, const char *dir, const char *fsname, int flags, const void *data)
+mount(const char *dev, const char *dir, const char *fsname, unsigned long flags,
+      const void *data)
 {
 	const struct vfscore_fs_type *fs;
 	struct mount *mp;

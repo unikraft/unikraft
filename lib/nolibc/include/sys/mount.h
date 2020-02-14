@@ -92,10 +92,10 @@ extern "C" {
 #define MS_MGC_VAL 0xc0ed0000
 #define MS_MGC_MSK 0xffff0000
 
-#define MNT_FORCE       1
-#define MNT_DETACH      2
-#define MNT_EXPIRE      4
-#define UMOUNT_NOFOLLOW 8
+#define MNT_FORCE       0x00000001
+#define MNT_DETACH      0x00000002
+#define MNT_EXPIRE      0x00000004
+#define UMOUNT_NOFOLLOW 0x00000008
 
 int mount(const char *dev, const char *dir, const char *fsname,
 	  unsigned long flags, const void *data);

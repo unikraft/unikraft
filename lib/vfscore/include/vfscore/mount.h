@@ -29,11 +29,12 @@
  *	@(#)mount.h	8.21 (Berkeley) 5/20/95
  */
 
-#ifndef _SYS_MOUNT_H_
-#define _SYS_MOUNT_H_
+#ifndef _VFSCORE_SYS_MOUNT_H_
+#define _VFSCORE_SYS_MOUNT_H_
 
 #define _BSD_SOURCE
 
+#include <sys/mount.h>
 #include <sys/statfs.h>
 #include <limits.h>
 #include <uk/list.h>
@@ -60,39 +61,73 @@ struct mount {
 /*
  * Mount flags.
  */
+#ifndef MNT_RDONLY
 #define	MNT_RDONLY	0x00000001	/* read only filesystem */
+#endif
+#ifndef	MNT_SYNCHRONOUS
 #define	MNT_SYNCHRONOUS	0x00000002	/* file system written synchronously */
+#endif
+#ifndef	MNT_NOEXEC
 #define	MNT_NOEXEC	0x00000004	/* can't exec from filesystem */
+#endif
+#ifndef	MNT_NOSUID
 #define	MNT_NOSUID	0x00000008	/* don't honor setuid bits on fs */
+#endif
+#ifndef	MNT_NODEV
 #define	MNT_NODEV	0x00000010	/* don't interpret special files */
+#endif
+#ifndef	MNT_UNION
 #define	MNT_UNION	0x00000020	/* union with underlying filesystem */
+#endif
+#ifndef	MNT_ASYNC
 #define	MNT_ASYNC	0x00000040	/* file system written asynchronously */
+#endif
 
 /*
  * Unmount flags.
  */
+#ifndef MNT_FORCE
 #define MNT_FORCE	0x00000001	/* forced unmount */
+#endif
 
 /*
  * exported mount flags.
  */
+#ifndef	MNT_EXRDONLY
 #define	MNT_EXRDONLY	0x00000080	/* exported read only */
+#endif
+#ifndef	MNT_EXPORTED
 #define	MNT_EXPORTED	0x00000100	/* file system is exported */
+#endif
+#ifndef	MNT_DEFEXPORTED
 #define	MNT_DEFEXPORTED	0x00000200	/* exported to the world */
+#endif
+#ifndef	MNT_EXPORTANON
 #define	MNT_EXPORTANON	0x00000400	/* use anon uid mapping for everyone */
+#endif
+#ifndef	MNT_EXKERB
 #define	MNT_EXKERB	0x00000800	/* exported with Kerberos uid mapping */
+#endif
 
 /*
  * Flags set by internal operations.
  */
+#ifndef	MNT_LOCAL
 #define	MNT_LOCAL	0x00001000	/* filesystem is stored locally */
+#endif
+#ifndef	MNT_QUOTA
 #define	MNT_QUOTA	0x00002000	/* quotas are enabled on filesystem */
+#endif
+#ifndef	MNT_ROOTFS
 #define	MNT_ROOTFS	0x00004000	/* identifies the root filesystem */
+#endif
 
 /*
  * Mask of flags that are visible to statfs()
  */
+#ifndef	MNT_VISFLAGMASK
 #define	MNT_VISFLAGMASK	0x0000ffff
+#endif
 
 /*
  * Filesystem type switch table.
@@ -144,4 +179,4 @@ void	 vfs_unbusy(struct mount *mp);
 
 void	 vfscore_release_mp_dentries(struct mount *mp);
 
-#endif	/* !_SYS_MOUNT_H_ */
+#endif	/* !_VFSCORE_SYS_MOUNT_H_ */
