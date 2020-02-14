@@ -124,6 +124,12 @@ extern "C" {
 #define __constructor_prio(lvl) __attribute__ ((constructor (lvl)))
 #endif
 
+#ifdef CONFIG_HAVE_SCHED
+#define __uk_tls __thread
+#else
+#define __uk_tls
+#endif
+
 #else
 /* TO BE DEFINED */
 #endif /* __GNUC__ */

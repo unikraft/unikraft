@@ -41,6 +41,7 @@
 #include <sys/types.h>
 #include <uk/essentials.h>
 #include <uk/list.h>
+#include <uk/ctors.h>
 #include <uk/print.h>
 #include <uk/user.h>
 
@@ -50,7 +51,7 @@
 #define UK_DEFAULT_GROUP  "root"
 #define UK_DEFAULT_PASS   "x"
 
-static struct passwd_entry {
+static __uk_tls struct passwd_entry {
 	struct passwd *passwd;
 
 	UK_SLIST_ENTRY(struct passwd_entry) entries;
@@ -60,7 +61,13 @@ UK_SLIST_HEAD(uk_entry_list, struct passwd_entry);
 
 static struct uk_entry_list passwds;
 
-void __constructor init_ukunistd()
+static void init_groups(void);
+
+/*
+ * TODO make passwd management consistent with group management
+ */
+
+static void init_posix_user(void)
 {
 	static struct passwd_entry p1;
 	static struct passwd passwd = {
@@ -77,7 +84,10 @@ void __constructor init_ukunistd()
 
 	UK_SLIST_INIT(&passwds);
 	UK_SLIST_INSERT_HEAD(&passwds, &p1, entries);
+
+	init_groups();
 }
+UK_CTOR_FUNC(2, init_posix_user);
 
 uid_t getuid(void)
 {
@@ -169,7 +179,7 @@ int getpwuid_r(uid_t uid __unused, struct passwd *pwd __unused,
 struct passwd *getpwent(void)
 {
 	struct passwd *pwd;
-	
+
 	if (iter == NULL)
 		return NULL;
 
@@ -327,4 +337,61 @@ int getgrnam_r(const char *name, struct group *grp,
 	*result = grp;
 
 	return 0;
+}
+
+struct group *getgrgid(gid_t gid)
+{
+	struct group *res;
+
+	if (gid == g__.gr_gid)
+		res = &g__;
+	else {
+		res = NULL;
+		errno = ENOENT;
+	}
+
+	return res;
+}
+
+static __uk_tls struct group_entry {
+	struct group *group;
+
+	UK_SLIST_ENTRY(struct group_entry) entries;
+} *groups_iter;
+
+UK_SLIST_HEAD(uk_group_entry_list, struct group_entry);
+
+static struct uk_group_entry_list groups;
+
+static void init_groups(void)
+{
+	static struct group_entry ge;
+
+	ge.group = &g__;
+	UK_SLIST_INIT(&groups);
+	UK_SLIST_INSERT_HEAD(&groups, &ge, entries);
+}
+
+void setgrent(void)
+{
+	groups_iter = UK_SLIST_FIRST(&groups);
+}
+
+void endgrent(void)
+{
+	setgrent();
+}
+
+struct group *getgrent(void)
+{
+	struct group *res;
+
+	if (groups_iter) {
+		res = groups_iter->group;
+		groups_iter = UK_SLIST_NEXT(groups_iter, entries);
+	} else
+		res = NULL;
+
+	return res;
+
 }
