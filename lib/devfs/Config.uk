@@ -8,4 +8,21 @@ if LIBDEVFS
         bool "Mount /dev during boot"
 	depends on LIBVFSCORE_AUTOMOUNT_ROOTFS
         default n
+
+	# hidden
+	config LIBDEVFS_DEV_NULL_ZERO
+		bool
+		default n
+
+	config LIBDEVFS_DEV_NULL
+		bool "Register null device"
+		default y if LIBDEVFS_AUTOMOUNT
+		select LIBDEVFS_DEV_NULL_ZERO
+		default n
+
+	config LIBDEVFS_DEV_ZERO
+		bool "Register zero device"
+		default y if LIBDEVFS_AUTOMOUNT
+		select LIBDEVFS_DEV_NULL_ZERO
+		default n
 endif
