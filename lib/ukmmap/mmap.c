@@ -165,8 +165,8 @@ int munmap(void *addr, size_t len)
 	return 0;
 }
 
-void *mremap(void *old_address, size_t old_size, size_t new_size,
-		int flags, ...)
+void *mremap(void *old_address __unused, size_t old_size __unused,
+	     size_t new_size __unused, int flags __unused, ...)
 {
-	return -1;
+	return NULL;
 }
