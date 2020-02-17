@@ -117,7 +117,7 @@ struct uk_netbuf *uk_netbuf_alloc_buf(struct uk_alloc *a, size_t buflen,
 	 * We can only do this if the given headroom stays within
 	 *  uint16_t bounds after the operation.
 	 */
-	if (likely(UINT16_MAX - headroom > NETBUF_ADDR_ALIGNMENT)) {
+	if (likely((size_t)(UINT16_MAX - headroom) > NETBUF_ADDR_ALIGNMENT)) {
 		if (privlen == 0) {
 			priv_offset    = 0;
 			buf_offset     = sizeof(*m);
@@ -166,7 +166,7 @@ struct uk_netbuf *uk_netbuf_prepare_buf(void *mem, size_t size,
 	 * We can only do this if the given headroom stays within
 	 *  uint16_t bounds after the operation.
 	 */
-	if (likely(UINT16_MAX - headroom > NETBUF_ADDR_ALIGNMENT)) {
+	if (likely((size_t)(UINT16_MAX - headroom) > NETBUF_ADDR_ALIGNMENT)) {
 		if (privlen == 0) {
 			priv_offset = 0;
 			buf_offset  = sizeof(*m);
