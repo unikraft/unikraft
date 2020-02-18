@@ -13,22 +13,26 @@ unikernel applications.
 Quick start
 ===========
 
-``kraft`` can be installed by directly cloning its source from `GitHub <https://github.com/unikraft/tools.git>`_: ::
+``kraft`` can be installed by directly cloning its source from `GitHub <https://github.com/unikraft/kraft.git>`_: ::
 
-  git clone https://github.com/unikraft/tools.git
-  cd tools && python setup.py install
+  git clone https://github.com/unikraft/kraft.git
+  cd kraft
+  python3 setup.py install
 
 .. note::
   Additional dependencies include `git`, `make`, ncurses, `flex`, `wget`,
-  `unzip`, `tar`, `python3` and `gcc`.  Details on how to configure how
-  ``kraft`` interacts with gcc and the Unikraft build system in addition on how
-  to use ``kraft`` with Docker is covered in :ref:`advanced_usage`.
+  `unzip`, `tar`, `python3` (including  `setuptools`) and `gcc`.  Details on
+  how to configure how ``kraft`` interacts with gcc and the Unikraft build
+  system in addition on how to use ``kraft`` with Docker is covered in
+  :ref:`advanced_usage`.
 
 Once ``kraft`` it installed you can begin by initializing a new unikernel
 repository using ``kraft init``.  As an example, you can build a Python 3
 unikernel application by running the following: ::
 
-  kraft init -a python3 ./my-first-unikernel
+  kraft list
+  mkdir ~/my-first-unikernel && cd ~/my-first-unikernel
+  kraft up -a helloworld -m x86_64 -p kvm
 
 .. note::
   If this is the first time you are running ``kraft``, you will be prompted to 
@@ -59,8 +63,9 @@ The configuration step used in ``kraft`` will perform necessary checks
 pertaining to compatibility and availability of source code and will populate
 your application directory with new files and folders, including:
 
-  * ``deps.json`` -- This file holds information about which version of the
-    Unikraft core and additional libraries to use for the build.
+  * ``kraft.yaml`` -- This file holds information about which version of the
+    Unikraft core, additional libraries, which architectures and platforms to
+    target and which network bridges and volumes to mount durirng runtime.
   * ``Makefile.uk`` -- A Kconfig target file you can use to create compile-time
     toggles for your application. 
   * ``build/`` -- All build artifacts are placed in this directory including 
@@ -87,38 +92,107 @@ Overview of commands
   Usage: kraft [OPTIONS] COMMAND [ARGS]...
 
   Options:
-    -v, --verbose  Enables verbose mode.
-    -V, --version  Print the version and exit.
-    --help         Show this message and exit.
+    --version                       Show the version and exit.
+    -C, --ignore-git-checkout-errors
+                                    Ignore checkout errors.
+    -X, --dont-checkout             Do not checkout repositories.
+    -v, --verbose                   Enables verbose mode.
+    -h, --help                      Show this message and exit.
 
   Commands:
-    build      Build the unikraft appliance.
-    configure  Sets the default configuration for an appliance.
-    createfs   Generate a static filesystem for the unikraft appliance.
-    init       Initialize a new unikraft project.
-    list       List supported unikraft architectures, platforms, libraries or
-               applications via remote repositories.
-    run        Run the unikraft appliance.
-    update     List supported unikraft architectures, platforms, libraries or
-               applications via remote repositories.
+    build      Build the application.
+    clean      Clean the application.
+    configure  Configure the application.
+    init       Initialize a new unikraft application.
+    list       List architectures, platforms, libraries or applications.
+    run        Run the application.
+    up         Configure, build and run an application.
+
+  Influential Environmental Variables:
+    UK_WORKDIR The working directory for all Unikraft
+               source code [default: ~/.unikraft]
+    UK_ROOT    The directory for Unikraft's core source
+               code [default: $UK_WORKDIR/unikraft]
+    UK_LIBS    The directory of all the external Unikraft
+               libraries [default: $UK_WORKDIR/libs]
+    UK_APPS    The directory of all the template applications
+               [default: $UK_WORKDIR/apps]
+    KRAFTCONF  The location of kraft's preferences file
+               [default: ~/.kraftrc]
+
+  Help:
+    For help using this tool, please open an issue on Github:
+    https://github.com/unikraft/kraft
 
 
-.. _kraft_update:
+.. _kraft_list:
 
-Updating Unikraft library pools
+Viewing Unikraft library pools
+------------------------------
+
+::
+
+  Usage: kraft list [OPTIONS]
+
+    Retrieves lists of available architectures, platforms, libraries and
+    applications supported by unikraft.  Use this command if you wish to
+    determine (and then later select) the possible targets for yourunikraft
+    application.
+
+    By default, this subcommand will list all possible targets.
+
+  Options:
+    -c, --core         Display information about Unikraft's core repository.
+    -p, --plats        List supported platforms.
+    -l, --libs         List supported libraries.
+    -a, --apps         List supported application runtime execution
+                       environments.
+    -d, --show-local   Show local source path.
+    -r, --show-origin  Show remote source location.
+    -n, --paginate     Paginate output.
+    -u, --update       Retrieves lists of available architectures, platforms
+                       libraries and applications supported by Unikraft.
+    -F, --flush        Cleans the cache and lists.
+    -h, --help         Show this message and exit.
+
+
+.. _kraft_up:
+
+Quick Unikraft project creation
 -------------------------------
 
 ::
 
-  Usage: kraft update [OPTIONS]
+  Usage: kraft up [OPTIONS] NAME
 
-    This subcommand retrieves lists of available architectures, platforms,
-    libraries and applications supported by unikraft.
+    Configures, builds and runs an application for a selected architecture and
+    platform.
 
   Options:
-    -s, --staging  Use staging branch (here be dragons).
-    --help         Show this message and exit.
-
+    -p, --plat [linuxu|kvm|xen]    Target platform.
+    -m, --arch [x86_64|arm|arm64]  Target architecture.
+    -i, --initrd TEXT              Provide an init ramdisk.
+    -X, --background               Run in background.
+    -P, --paused                   Run the application in paused state.
+    -g, --gdb INTEGER              Run a GDB server for the guest on specified
+                                   port.
+    -n, --virtio-nic TEXT          Attach a NAT-ed virtio-NIC to the guest.
+    -b, --bridge TEXT              Attach a NAT-ed virtio-NIC an existing
+                                   bridge.
+    -V, --interface TEXT           Assign host device interface directly as
+                                   virtio-NIC to the guest.
+    -D, --dry-run                  Perform a dry run.
+    -M, --memory INTEGER           Assign MB memory to the guest.
+    -s, --cpu-sockets INTEGER      Number of guest CPU sockets.
+    -c, --cpu-cores INTEGER        Number of guest cores per socket.
+    -F, --force                    Overwrite any existing files in current
+                                   working directory.
+    -j, --fast                     Use all CPU cores to build the application.
+    --with-dnsmasq                 Start a Dnsmasq server.
+    --ip-range TEXT                Set the IP range for Dnsmasq.
+    --ip-netmask TEXT              Set the netmask for Dnsmasq.
+    --ip-lease-time TEXT           Set the IP lease time for Dnsmasq.
+    -h, --help                     Show this message and exit.
 
 .. _kraft_init:
 
@@ -127,19 +201,19 @@ Initializing a Unikraft project
 
 ::
 
-  Usage: kraft init [OPTIONS] [PATH] [NAME]
+  Usage: kraft init [OPTIONS] NAME
 
-    This subcommand initializes a new unikraft application at a selected path.
+    Initializes a new unikraft application.
 
     Start here if this is your first time using (uni)kraft.
 
   Options:
-    -m, --arch TEXT  Target architecture  [default: (dynamic)]
-    -p, --plat TEXT  Target platform  [default: linuxu]
-    -l, --lib TEXT   Target platform
-    -a, --app TEXT   Target application
-    -F, --force      Overwrite any existing files.
-    --help           Show this message and exit.
+    -a, --app TEXT                 Use an existing application as a template.
+    -p, --plat [linuxu|kvm|xen]    Target platform.
+    -m, --arch [x86_64|arm|arm64]  Target architecture.
+    -V, --version TEXT             Use specific Unikraft release version.
+    -F, --force                    Overwrite any existing files.
+    -h, --help                     Show this message and exit.
 
 
 .. _kraft_configure:
@@ -149,17 +223,13 @@ Configuring a Unikraft application
 
 ::
 
-  Usage: kraft configure [OPTIONS] [PATH]
-
-    This subcommand populates the local .config for the unikraft appliance
-    with with the default values found for the target application.
+  Usage: kraft configure [OPTIONS]
 
   Options:
-    -n, --menuconfig     Use Unikraft's ncurses Kconfig editor.
-    -d, --dump-makefile  Write a Makefile compatible Unikraft's build system.
-    -u, --dump-unikraft  Copy Unikraft and source libraries into the path.
-    --help               Show this message and exit.
-
+    -p, --plat [linuxu|kvm|xen]    Target platform.
+    -m, --arch [x86_64|arm|arm64]  Target architecture.
+    -k, --menuconfig               Use Unikraft's ncurses Kconfig editor.
+    -h, --help                     Show this message and exit.
 
 
 .. _kraft_build:
@@ -169,15 +239,47 @@ Building a Unikraft application
 
 ::
 
-  Usage: kraft build [OPTIONS] [PATH]
+  Usage: kraft build [OPTIONS]
 
-    This builds the unikraft appliance for the target architecture, platform
-    and with all additional libraries and configurations.
+    Builds the Unikraft application for the target architecture and platform.
 
   Options:
     -j, --fast  Use all CPU cores to build the application.
-    --help      Show this message and exit.
+    -h, --help  Show this message and exit.
 
+.. _kraft_run:
+
+Running a Unikraft application
+------------------------------
+
+::
+
+  Usage: kraft run [OPTIONS] [ARGS]...
+
+  Options:
+    -p, --plat [linuxu|kvm|xen]    Target platform.  [default: linuxu]
+    -m, --arch [x86_64|arm|arm64]  Target architecture.  [default: (dynamic)]
+    -i, --initrd TEXT              Provide an init ramdisk.
+    -X, --background               Run in background.
+    -P, --paused                   Run the application in paused state.
+    -g, --gdb INTEGER              Run a GDB server for the guest at PORT.
+    -n, --virtio-nic TEXT          Attach a NAT-ed virtio-NIC to the guest.
+    -b, --bridge TEXT              Attach a NAT-ed virtio-NIC an existing
+                                   bridge.
+    -V, --interface TEXT           Assign host device interface directly as
+                                   virtio-NIC to the guest.
+    -D, --dry-run                  Perform a dry run.
+    -M, --memory INTEGER           Assign MB memory to the guest.
+    -s, --cpu-sockets INTEGER      Number of guest CPU sockets.
+    -c, --cpu-cores INTEGER        Number of guest cores per socket.
+    --with-dnsmasq                 Start a Dnsmasq server.
+    --ip-range TEXT                Set the IP range for Dnsmasq.  [default:
+                                   172.88.0.1,172.88.0.254]
+    --ip-netmask TEXT              Set the netmask for Dnsmasq.  [default:
+                                   255.255.0.0]
+    --ip-lease-time TEXT           Set the IP lease time for Dnsmasq.  [default:
+                                   12h]
+    -h, --help                     Show this message and exit.
 
 .. _advanced_usage:
 
@@ -198,14 +300,16 @@ Influential environmental variables
 ``kraft`` uses environmental variables to determine the location of the Unikraft
 core source code and all library pools.  This is set using the following:
 
-+------------------------+--------------------------+------------------------------------+
-| Environmental variable | Default value            | Usage                              |
-+========================+==========================+====================================+
-| ``UK_WORKDIR``         | ``~/.unikraft``          | The root directory for all sources |
-+------------------------+--------------------------+------------------------------------+
-| ``UK_ROOT``            | ``$UK_WORKDIR/unikraft`` | The Unikraft core source code      |
-+------------------------+--------------------------+------------------------------------+
-| ``UK_LIBS``            | ``$UK_WORKDIR/libs``     | Library pool sources               |
-+------------------------+--------------------------+------------------------------------+
-| ``UK_APPS``            | ``$UK_WORKDIR/apps``     | Applications and templates         |
-+------------------------+--------------------------+------------------------------------+
++------------------------+--------------------------+-------------------------------------------+
+| Environmental variable | Default value            | Usage                                     |
++========================+==========================+===========================================+
+| ``UK_WORKDIR``         | ``~/.unikraft``          | The root directory for all sources.       |
++------------------------+--------------------------+-------------------------------------------+
+| ``UK_ROOT``            | ``$UK_WORKDIR/unikraft`` | The Unikraft core source code.            |
++------------------------+--------------------------+-------------------------------------------+
+| ``UK_LIBS``            | ``$UK_WORKDIR/libs``     | Library pool sources.                     |
++------------------------+--------------------------+-------------------------------------------+
+| ``UK_APPS``            | ``$UK_WORKDIR/apps``     | Applications and templates.               |
++------------------------+--------------------------+-------------------------------------------+
+| ``KRAFTCONF``          | ``~/.kraftrc``           | The location of kraft's preferences file. |
++------------------------+--------------------------+-------------------------------------------+
