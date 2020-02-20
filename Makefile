@@ -199,9 +199,9 @@ include $(CONFIG_UK_BASE)/version.mk
 # Compute the full local version string so packages can use it as-is
 # Need to export it, so it can be got from environment in children (eg. mconf)
 ifdef UK_EXTRAVERSION
-export UK_FULLVERSION := $(UK_VERSION).$(UK_SUBVERSION).$(UK_EXTRAVERSION)$(shell $(SCRIPTS_DIR)/gitsha1)
+export UK_FULLVERSION := $(UK_VERSION).$(UK_SUBVERSION).$(UK_EXTRAVERSION)$(shell cd $(CONFIG_UK_BASE); $(SCRIPTS_DIR)/gitsha1)
 else
-export UK_FULLVERSION := $(UK_VERSION).$(UK_SUBVERSION)$(shell $(SCRIPTS_DIR)/gitsha1)
+export UK_FULLVERSION := $(UK_VERSION).$(UK_SUBVERSION)$(shell cd $(CONFIG_UK_BASE); $(SCRIPTS_DIR)/gitsha1)
 endif
 
 # Default image name
