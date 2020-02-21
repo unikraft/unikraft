@@ -198,11 +198,11 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 	}
 
 	fp = calloc(sizeof(struct vfscore_file), 1);
-	fhold(fp);
 	if (!fp) {
 	    error = ENOMEM;
 	    goto out_vn_unlock;
 	}
+	fhold(fp);
 	fp->f_flags = flags;
 
 	// OSv was using a intrusive_ptr which was increasing the refcount
