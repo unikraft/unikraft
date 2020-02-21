@@ -176,6 +176,7 @@ Quick Unikraft project creation
     -P, --paused                   Run the application in paused state.
     -g, --gdb INTEGER              Run a GDB server for the guest on specified
                                    port.
+    -d, --dbg                      Use unstriped unikernel.
     -n, --virtio-nic TEXT          Attach a NAT-ed virtio-NIC to the guest.
     -b, --bridge TEXT              Attach a NAT-ed virtio-NIC an existing
                                    bridge.
@@ -228,6 +229,7 @@ Configuring a Unikraft application
   Options:
     -p, --plat [linuxu|kvm|xen]    Target platform.
     -m, --arch [x86_64|arm|arm64]  Target architecture.
+    -F, --force                    Force writing new configuration.
     -k, --menuconfig               Use Unikraft's ncurses Kconfig editor.
     -h, --help                     Show this message and exit.
 
@@ -263,6 +265,7 @@ Running a Unikraft application
     -X, --background               Run in background.
     -P, --paused                   Run the application in paused state.
     -g, --gdb INTEGER              Run a GDB server for the guest at PORT.
+    -d, --dbg                      Use unstriped unikernel.
     -n, --virtio-nic TEXT          Attach a NAT-ed virtio-NIC to the guest.
     -b, --bridge TEXT              Attach a NAT-ed virtio-NIC an existing
                                    bridge.
@@ -272,13 +275,6 @@ Running a Unikraft application
     -M, --memory INTEGER           Assign MB memory to the guest.
     -s, --cpu-sockets INTEGER      Number of guest CPU sockets.
     -c, --cpu-cores INTEGER        Number of guest cores per socket.
-    --with-dnsmasq                 Start a Dnsmasq server.
-    --ip-range TEXT                Set the IP range for Dnsmasq.  [default:
-                                   172.88.0.1,172.88.0.254]
-    --ip-netmask TEXT              Set the netmask for Dnsmasq.  [default:
-                                   255.255.0.0]
-    --ip-lease-time TEXT           Set the IP lease time for Dnsmasq.  [default:
-                                   12h]
     -h, --help                     Show this message and exit.
 
 .. _advanced_usage:
@@ -313,3 +309,62 @@ core source code and all library pools.  This is set using the following:
 +------------------------+--------------------------+-------------------------------------------+
 | ``KRAFTCONF``          | ``~/.kraftrc``           | The location of kraft's preferences file. |
 +------------------------+--------------------------+-------------------------------------------+
+
+Workflow when working on Unikraft internals 
+-------------------------------------------
+
+During phases of development which require modifying the Unikraft core source
+code or an auxiliary library for the target application, ``kraft``'s runtime
+can be altered to facilitate varying developer requirements.
+
+In the following example, both the Unikraft core source code and an additional
+library, ``mylib``, have are utilized for an application.   However, their
+source has been modified and point to external locations.  This is useful if you
+are doing local development or wish to work with private repositories:
+
+::
+
+  specification: '0.4'
+
+  unikraft: file:///home/developer/repos/unikraft/unikraft@3a8150d
+
+  libraries:
+    mylib:
+      version: devel/new-feature
+      source: git://git.example.com/lib-mylib
+
+
+The ``kraft`` tool works with these remote and local Git repositories in order
+to handle version control.  However, wen using the ``kraft`` tool itself in
+during the ``configure`` and ``build`` steps, it is handy to stop it it from
+automatically running ``git checkout`` on these repositories.  This is
+particularly useful when the source tree of the Unikraft core or any other
+library has a dirty working tree.
+
+To ignore warnings and proceed with a command, use the global flag ``-C``:
+
+::
+
+  kraft -Cv configure
+
+To prevent ``kraft`` from checking out repositories entirely, use the global
+flag ``-X``:
+
+::
+
+  kraft -Xv build
+
+Debugging Unikraft applications
+-------------------------------
+
+Running and debugging unikernels can be accomplished largely with the use of
+`gdb <https://www.gnu.org/software/gdb/>`_.  Unikraft will build an un-stripped
+binary with debugging features enabled.  This can be toggled with the
+``-d|--dbg`` flag on ``kraft run``.  To start gdb itself, include the
+``-g|--gdb PORT`` flag during the same run stage.  Additionally, it is often
+useful to start the guest in a paused stage, accomplished with the
+``-P|--paused`` flag:
+
+::
+
+  kraft run -p kvm --gdb 4123 --dbg
