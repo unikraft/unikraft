@@ -191,7 +191,7 @@ vfscore_vget(struct mount *mp, uint64_t ino, struct vnode **vpp)
 		return 1;
 	}
 
-	vp = malloc(sizeof(*vp));
+	vp = calloc(1, sizeof(*vp));
 	if (!vp) {
 		VNODE_UNLOCK();
 		return 0;
