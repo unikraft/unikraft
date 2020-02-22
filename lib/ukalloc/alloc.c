@@ -169,7 +169,8 @@ void *uk_malloc_ifpages(struct uk_alloc *a, size_t size)
 	size_t realsize = sizeof(*metadata) + size;
 
 	UK_ASSERT(a);
-	if (!size)
+	/* check for invalid size and overflow */
+	if (!size || realsize < size)
 		return NULL;
 
 	num_pages = size_to_num_pages(realsize);
@@ -271,6 +272,11 @@ int uk_posix_memalign_ifpages(struct uk_alloc *a,
 	 * order to be sure to find an aligned pointer preceding `size` bytes.
 	 */
 	realsize = size + padding + align;
+
+	/* check for overflow */
+	if (realsize < size)
+		return EINVAL;
+
 	num_pages = size_to_num_pages(realsize);
 	intptr = (uintptr_t) uk_palloc(a, num_pages);
 
@@ -282,7 +288,7 @@ int uk_posix_memalign_ifpages(struct uk_alloc *a,
 
 	metadata = uk_get_metadata(*memptr);
 
-	/* check for underflow */
+	/* check for underflow (should not happen) */
 	UK_ASSERT(intptr <= (uintptr_t) metadata);
 
 	metadata->num_pages = num_pages;
@@ -307,6 +313,10 @@ void *uk_palloc_compat(struct uk_alloc *a, unsigned long num_pages)
 	void *ptr;
 
 	UK_ASSERT(a);
+
+	/* check for overflow */
+	if (num_pages > (~(size_t)0)/__PAGE_SIZE)
+		return NULL;
 
 	if (uk_posix_memalign(a, &ptr, __PAGE_SIZE, num_pages * __PAGE_SIZE))
 		return NULL;
@@ -341,6 +351,10 @@ void *uk_calloc_compat(struct uk_alloc *a, size_t nmemb, size_t size)
 {
 	void *ptr;
 	size_t tlen = nmemb * size;
+
+	/* check for overflow */
+	if (nmemb > (~(size_t)0)/size)
+		return NULL;
 
 	UK_ASSERT(a);
 	ptr = uk_malloc(a, tlen);
