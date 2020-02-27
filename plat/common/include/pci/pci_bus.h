@@ -148,7 +148,7 @@ struct pci_device {
 	struct pci_driver     *drv;
 	enum pci_device_state state;
 
-	uint16_t base;
+	unsigned long base;
 	unsigned long irq;
 };
 
