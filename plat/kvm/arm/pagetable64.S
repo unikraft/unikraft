@@ -48,10 +48,11 @@
 #define RAM_ADDR_START    0x40000000
 #define RAM_L2_ENTRIES    255
 #define RAM_ADDR_SIZE     (0x40000000 * RAM_L2_ENTRIES)
+#define PCIE_ECAM_START   0x4000000000
+#define PCIE_ECAM_L2_ENTRIES 256
 #define PCIE_ADDR_START   0x8000000000
 #define PCIE_L2_ENTRIES   512
 #define PCIE_ADDR_SIZE    0x8000000000
-
 /*
  * As we use VA == PA mapping, so the VIRT_BITS must be the same
  * as PA_BITS. We can get PA_BITS from ID_AA64MMFR0_EL1.PARange.
@@ -96,23 +97,34 @@ ENTRY(create_pagetables)
 	 * (0x40000000 ~ (256GiB -1)). The RAM areas that contain kernel
 	 * sections will be update later.
 	 */
-	add x6, x14, #L1_TABLE_OFFSET
+	add x6, x14, #L1_TABLE_OFFSET	/* 1st L2 table page */
 	ldr x7, =SECT_ATTR_NORMAL
 	mov x8, #RAM_ADDR_START
 	mov x9, x8
-	mov x10, #255
+	mov x10, #RAM_L2_ENTRIES
 	bl  build_l1_block_pagetable
+
+        /*
+         * Using 1GiB block to map PCIe ECAM address space
+         * (256GiB ~ 512GiB).
+         */
+        add x6, x14, #L1_TABLE_OFFSET	/* 1st L2 table page */
+        ldr x7, =SECT_ATTR_DEVICE_nGnRnE
+        mov x8, #PCIE_ECAM_START
+        mov x9, x8
+        mov x10, #PCIE_ECAM_L2_ENTRIES
+        bl  build_l1_block_pagetable
 
 	/*
 	 * Using 1GiB block to map high PCIe address space
 	 * (0x512GiB ~ (1TiB -1)).
 	 */
 	add x6, x14, #L1_TABLE_OFFSET
-	add x6, x6, #__PAGE_SIZE
+	add x6, x6, #__PAGE_SIZE	/* 2nd L2 table page */
 	ldr x7, =SECT_ATTR_DEVICE_nGnRE
 	mov x8, #PCIE_ADDR_START
 	mov x9, x8
-	mov x10, #512
+	mov x10, #PCIE_L2_ENTRIES
 	bl  build_l1_block_pagetable
 
 	/*
