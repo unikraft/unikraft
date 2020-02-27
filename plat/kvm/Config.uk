@@ -68,7 +68,7 @@ endmenu
 config KVM_PCI
        bool "PCI Bus Driver"
        default y
-       depends on (ARCH_X86_64)
+       depends on (ARCH_X86_64 || ARCH_ARM_64)
        select LIBUKBUS
        help
                 PCI bus driver for probing and operating PCI devices
