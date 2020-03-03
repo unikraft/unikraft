@@ -47,8 +47,6 @@
  *		   12 bytes in length in modern mode.
  */
 #define VIRTIO_HDR_LEN          12
-#define ETH_HDR_LEN             14
-#define ETH_PKT_PAYLOAD_LEN   1500
 #define VIRTIO_PKT_BUFFER_LEN ((ETH_PKT_PAYLOAD_LEN)	\
 			       + (ETH_HDR_LEN)		\
 			       + (VIRTIO_HDR_LEN))

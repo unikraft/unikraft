@@ -73,6 +73,13 @@ struct uk_netdev;
 UK_TAILQ_HEAD(uk_netdev_list, struct uk_netdev);
 
 /**
+ * Ethernet macros
+ */
+#define ETH_HDR_LEN           14
+#define ETH_PKT_PAYLOAD_LEN   1500
+#define ETH_PKT_LEN           (ETH_HDR_LEN + ETH_PKT_PAYLOAD_LEN)
+
+/**
  * A structure used for Ethernet hardware addresses
  */
 #define UK_NETDEV_HWADDR_LEN 6 /**< Length of Ethernet address. */
