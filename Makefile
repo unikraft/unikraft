@@ -57,6 +57,7 @@ qstrip = $(strip $(subst ",,$(1)))
 comma := ,
 empty :=
 space := $(empty) $(empty)
+plus  := $(call qstrip,"+")
 
 # bash prints the name of the directory on 'cd <dir>' if CDPATH is
 # set, so unset it here to not cause problems. Notice that the export

@@ -55,6 +55,9 @@ endef
 
 sub_build_dir = $(addprefix $(BUILD_DIR)/,$(notdir $(1)))
 
+# Returns the file extension
+fileext = $(subst .,,$(suffix $(1)))
+
 # converts a list of library names to paths pointing to their corresponding object library file
 # libname2olib $libname
 libname2olib = $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(1)))
@@ -374,7 +377,7 @@ endef
 #
 # buildrule_* $libname,$source,$target,$extraflags(optional)
 
-define buildrule_S =
+define buildrule_S_ =
 $(3): $(2) | prepare
 	$(call build_cmd_fixdep,AS,$(1),$(3),\
 		$(AS)  $(ASINCLUDES) $(ASINCLUDES-y) \
@@ -391,6 +394,8 @@ UK_OBJS-y += $(3)
 $(eval $(call vprefix_lib,$(1),OBJS-y) += $(3))
 $(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(3)) $(call out2dep,$(3)))
 endef
+
+buildrule_sx = $(call buildrule_S_,$(1),$(2),$(3),$(4))
 
 define buildrule_s =
 $(3): $(2) | prepare
@@ -446,6 +451,14 @@ $(eval $(call vprefix_lib,$(1),OBJS-y) += $(3))
 $(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(3)) $(call out2dep,$(3)))
 endef
 
+# Aliases for C++ sources
+buildrule_cp  = $(call buildrule_cc,$(1),$(2),$(3),$(4))
+buildrule_cxx = $(call buildrule_cc,$(1),$(2),$(3),$(4))
+buildrule_cpp = $(call buildrule_cc,$(1),$(2),$(3),$(4))
+buildrule_CPP = $(call buildrule_cc,$(1),$(2),$(3),$(4))
+buildrule_C   = $(call buildrule_cc,$(1),$(2),$(3),$(4))
+buildrule_c$(plus)$(plus) = $(call buildrule_cc,$(1),$(2),$(3),$(4))
+
 define buildrule_go =
 $(3): $(2) | prepare
 	$(call build_cmd,GOC,$(1),$(3),\
@@ -472,7 +485,7 @@ define add_lds_to_lib =
 $(eval EXTRA_LD_SCRIPT-y += $(1))
 endef
 
-define buildrule_lds =
+define buildrule_S_lds =
 $(3): $(2) | prepare
 	$(call build_cmd_fixdep,LDS,$(1),$(3),\
 		$(AS)  -E -P -x assembler-with-cpp $(ASINCLUDES) $(ASINCLUDES-y) \
@@ -495,6 +508,13 @@ $(if $(strip $($(call uc,$(1))_PLATS)),\
 			$(eval UK_PLAT_$(p)_DEF_LDS := $(3)),\
 			$(call add_lds_to_plat,$(3),$(p)))),\
 		$(call add_lds_to_lib,$(3))\
+)
+endef
+
+# buildrule for *.S files: differentiate between *.lds.S, *.S
+define buildrule_S =
+$(if $(filter %.lds.S,$(2)),$(call buildrule_S_lds,$(1),$(2),$(3),$(4)),\
+$(call buildrule_S_,$(1),$(2),$(3),$(4))
 )
 endef
 
@@ -525,29 +545,18 @@ $(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(3)))
 endef
 
 # wrapper for buildrule_*,
-# selects appropriate buildrule depending on file extension
+# selects appropriate buildrule depending on file extension,
+# if there is no such buildrule available, we throw an error.
 #
 # buildrule $libname,$source,$target,$extraflags(optional)
-define buildrule =
-$(if $(filter %.lds.S,$(2)),$(call buildrule_lds,$(1),$(2),$(3),$(4)),\
-$(if $(filter %.ld   ,$(2)),$(call buildrule_ld ,$(1),$(2),$(3),$(4)),\
-$(if $(filter %.dts,  $(2)),$(call buildrule_dts,$(1),$(2),$(3),$(4)),\
-$(if $(filter %.S,    $(2)),$(call buildrule_S  ,$(1),$(2),$(3),$(4)),\
-$(if $(filter %.sx,   $(2)),$(call buildrule_S  ,$(1),$(2),$(3),$(4)),\
-$(if $(filter %.s,    $(2)),$(call buildrule_s  ,$(1),$(2),$(3),$(4)),\
-$(if $(filter %.c,    $(2)),$(call buildrule_c  ,$(1),$(2),$(3),$(4)),\
-$(if $(filter %.cc,   $(2)),$(call buildrule_cc ,$(1),$(2),$(3),$(4)),\
-$(if $(filter %.cp,   $(2)),$(call buildrule_cc ,$(1),$(2),$(3),$(4)),\
-$(if $(filter %.cxx,  $(2)),$(call buildrule_cc ,$(1),$(2),$(3),$(4)),\
-$(if $(filter %.cpp,  $(2)),$(call buildrule_cc ,$(1),$(2),$(3),$(4)),\
-$(if $(filter %.CPP,  $(2)),$(call buildrule_cc ,$(1),$(2),$(3),$(4)),\
-$(if $(filter %.c++,  $(2)),$(call buildrule_cc ,$(1),$(2),$(3),$(4)),\
-$(if $(filter %.C,    $(2)),$(call buildrule_cc ,$(1),$(2),$(3),$(4)),\
-$(if $(filter %.go,   $(2)),$(call buildrule_go ,$(1),$(2),$(3),$(4)),\
-$(error $(3): missing build rule for source type $(suffix $(2))) \
-)))))))))))))))
-endef
+buildrule_ = $(error $(1): Failed to derive source type from $(2))
 
+define buildrule =
+$(if $(filter buildrule_$(call fileext,$(2)),$(.VARIABLES)),,\
+$(error buildrule_$(call fileext,$(2)) is not defined: Failed to install rule for $(2)))
+
+$(call buildrule_$(call fileext,$(2)),$(1),$(2),$(3),$(4))
+endef
 
 #################################################
 #
