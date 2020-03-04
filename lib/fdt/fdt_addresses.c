@@ -55,42 +55,65 @@
 
 #include "libfdt_internal.h"
 
+#define OFW_ROOT_NODE_ADDR_CELLS_DEFAULT 2
+#define OFW_ROOT_NODE_SIZE_CELLS_DEFAULT 1
+
 int fdt_address_cells(const void *fdt, int nodeoffset)
 {
-	const fdt32_t *ac;
+	int cells;
 	int val;
-	int len;
+	int parent;
+	int off = nodeoffset;
+	const fdt32_t *prop;
 
-	ac = fdt_getprop(fdt, nodeoffset, "#address-cells", &len);
-	if (!ac)
-		return 2;
+	do {
+		parent = fdt_parent_offset(fdt, off);
+		if (parent >= 0)
+			off = parent;
 
-	if (len != sizeof(*ac))
-		return -FDT_ERR_BADNCELLS;
+		prop = fdt_getprop(fdt, off, "#address-cells", &cells);
+		if (prop) {
+			if (cells != sizeof(*prop))
+				return -FDT_ERR_BADNCELLS;
 
-	val = fdt32_to_cpu(*ac);
-	if ((val <= 0) || (val > FDT_MAX_NCELLS))
-		return -FDT_ERR_BADNCELLS;
+			val = fdt32_to_cpu(*prop);
+			if ((val <= 0) || (val > FDT_MAX_NCELLS))
+				return -FDT_ERR_BADNCELLS;
 
-	return val;
+			return val;
+		}
+	} while (parent >= 0);
+
+	/* No #address-cells property for the root node */
+	return OFW_ROOT_NODE_ADDR_CELLS_DEFAULT;
 }
 
 int fdt_size_cells(const void *fdt, int nodeoffset)
 {
-	const fdt32_t *sc;
+	int cells;
 	int val;
-	int len;
+	int parent;
+	int off = nodeoffset;
+	const fdt32_t *prop;
 
-	sc = fdt_getprop(fdt, nodeoffset, "#size-cells", &len);
-	if (!sc)
-		return 1;
+	do {
+		parent = fdt_parent_offset(fdt, off);
+		if (parent >= 0)
+			off = parent;
 
-	if (len != sizeof(*sc))
-		return -FDT_ERR_BADNCELLS;
+		prop = fdt_getprop(fdt, off, "#size-cells", &cells);
+		if (prop) {
+			if (cells != sizeof(*prop))
+				return -FDT_ERR_BADNCELLS;
 
-	val = fdt32_to_cpu(*sc);
-	if ((val < 0) || (val > FDT_MAX_NCELLS))
-		return -FDT_ERR_BADNCELLS;
+			val = fdt32_to_cpu(*prop);
+			if ((val <= 0) || (val > FDT_MAX_NCELLS))
+				return -FDT_ERR_BADNCELLS;
 
-	return val;
+			return val;
+		}
+	} while (parent >= 0);
+
+	/* No #size-cells property for the root node */
+	return OFW_ROOT_NODE_SIZE_CELLS_DEFAULT;
 }

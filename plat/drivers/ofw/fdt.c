@@ -232,7 +232,7 @@ bail:
 int fdt_get_address(const void *fdt, int nodeoffset, uint32_t index,
 			uint64_t *addr, uint64_t *size)
 {
-	int parent;
+	int off = nodeoffset;
 	int len, prop_addr, prop_size;
 	int naddr, nsize, term_size;
 	const void *regs;
@@ -240,12 +240,11 @@ int fdt_get_address(const void *fdt, int nodeoffset, uint32_t index,
 	UK_ASSERT(addr && size);
 
 	/* Get address,size cell from parent */
-	parent = fdt_parent_offset(fdt, nodeoffset);
-	naddr = fdt_address_cells(fdt, parent);
+	naddr = fdt_address_cells(fdt, off);
 	if (naddr < 0 || naddr >= FDT_MAX_NCELLS)
 		return naddr;
 
-	nsize = fdt_size_cells(fdt, parent);
+	nsize = fdt_size_cells(fdt, off);
 	if (nsize < 0 || nsize >= FDT_MAX_NCELLS)
 		return nsize;
 
