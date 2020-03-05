@@ -337,6 +337,78 @@ err:
 	return rc;
 }
 
+static int virtio_blkdev_queue_dequeue(struct uk_blkdev_queue *queue,
+		struct uk_blkreq **req)
+{
+	int ret = 0;
+	__u32 len;
+	struct virtio_blkdev_request *response_req;
+
+	UK_ASSERT(req);
+	*req = NULL;
+
+	ret = virtqueue_buffer_dequeue(queue->vq, (void **) &response_req,
+			&len);
+	if (ret < 0) {
+		uk_pr_info("No data available in the queue\n");
+		return 0;
+	}
+
+	/* We need at least one byte for the result status */
+	if (unlikely(len < 1)) {
+		uk_pr_err("Received invalid response size: %u\n", len);
+		ret = -EINVAL;
+		goto out;
+	}
+
+	*req = response_req->req;
+	(*req)->result = -response_req->status;
+
+out:
+	uk_free(a, response_req);
+	return ret;
+}
+
+static int virtio_blkdev_complete_reqs(struct uk_blkdev *dev,
+		struct uk_blkdev_queue *queue)
+{
+	struct uk_blkreq *req;
+	int rc = 0;
+
+	UK_ASSERT(dev);
+
+	/* Queue interrupts have to be off when calling receive */
+	UK_ASSERT(!(queue->intr_enabled & VTBLK_INTR_EN));
+
+moretodo:
+	for (;;) {
+		rc = virtio_blkdev_queue_dequeue(queue, &req);
+		if (unlikely(rc < 0)) {
+			uk_pr_err("Failed to dequeue the request: %d\n", rc);
+			goto err_exit;
+		}
+
+		if (!req)
+			break;
+
+		uk_blkreq_finished(req);
+		if (req->cb)
+			req->cb(req, req->cb_cookie);
+	}
+
+	/* Enable interrupt only when user had previously enabled it */
+	if (queue->intr_enabled & VTBLK_INTR_USR_EN_MASK) {
+		rc = virtqueue_intr_enable(queue->vq);
+		if (rc == 1)
+			goto moretodo;
+	}
+
+	return 0;
+
+err_exit:
+	return rc;
+}
+
 static int virtio_blkdev_recv_done(struct virtqueue *vq, void *priv)
 {
 	struct uk_blkdev_queue *queue = NULL;
@@ -810,6 +882,7 @@ static int virtio_blk_add_dev(struct virtio_dev *vdev)
 		return -ENOMEM;
 
 	vbdev->vdev = vdev;
+	vbdev->blkdev.finish_reqs = virtio_blkdev_complete_reqs;
 	vbdev->blkdev.submit_one = virtio_blkdev_submit_request;
 	vbdev->blkdev.dev_ops = &virtio_blkdev_ops;
 

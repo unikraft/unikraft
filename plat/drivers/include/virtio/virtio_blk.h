@@ -93,4 +93,8 @@ struct virtio_blk_outhdr {
 	__virtio_le64 sector;
 };
 
+/* And this is the final byte of the write scatter-gather list. */
+#define VIRTIO_BLK_S_OK		0
+#define VIRTIO_BLK_S_IOERR	1
+
 #endif /* __PLAT_DRV_VIRTIO_BLK_H */
