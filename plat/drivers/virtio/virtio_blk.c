@@ -55,10 +55,74 @@ struct virtio_blk_device {
 	__u16 uid;
 	/* Virtio Device */
 	struct virtio_dev *vdev;
+	/* List of all the virtqueue in the pci device */
+	struct virtqueue *vq;
 	/* Nb of max_queues supported by device */
 	__u16 max_vqueue_pairs;
+	/* This is used when the user has decided the nb_queues to use */
+	__u16    nb_queues;
+	/* List of queues */
+	struct   uk_blkdev_queue *qs;
 };
 
+struct uk_blkdev_queue {
+	/* The virtqueue reference */
+	struct virtqueue *vq;
+	/* The libukblkdev queue identifier */
+	/* It is also the virtqueue identifier */
+	uint16_t lqueue_id;
+	/* Allocator */
+	struct uk_alloc *a;
+	/* The nr. of descriptor limit */
+	uint16_t max_nb_desc;
+	/* Reference to virtio_blk_device  */
+	struct virtio_blk_device *vbd;
+};
+
+
+static int virtio_blkdev_queues_alloc(struct virtio_blk_device *vbdev,
+				    const struct uk_blkdev_conf *conf)
+{
+	int rc = 0;
+	uint16_t i = 0;
+	int vq_avail = 0;
+	__u16 qdesc_size[conf->nb_queues];
+
+	if (conf->nb_queues > vbdev->max_vqueue_pairs) {
+		uk_pr_err("Queue number not supported: %"__PRIu16"\n",
+				conf->nb_queues);
+		return -ENOTSUP;
+	}
+
+	vbdev->nb_queues = conf->nb_queues;
+	vq_avail = virtio_find_vqs(vbdev->vdev, conf->nb_queues, qdesc_size);
+	if (unlikely(vq_avail != conf->nb_queues)) {
+		uk_pr_err("Expected: %d queues, Found: %d queues\n",
+				conf->nb_queues, vq_avail);
+		rc = -ENOMEM;
+		goto exit;
+	}
+
+	/**
+	 * TODO:
+	 * The virtio device management data structure are allocated using the
+	 * allocator from the blkdev configuration. In the future it might be
+	 * wiser to move it to the allocator of each individual queue. This
+	 * would better considering NUMA support.
+	 */
+	vbdev->qs = uk_calloc(a, conf->nb_queues, sizeof(*vbdev->qs));
+	if (unlikely(vbdev->qs == NULL)) {
+		uk_pr_err("Failed to allocate memory for queue management\n");
+		rc = -ENOMEM;
+		goto exit;
+	}
+
+	for (i = 0; i < conf->nb_queues; ++i)
+		vbdev->qs[i].max_nb_desc = qdesc_size[i];
+
+exit:
+	return rc;
+}
 
 static int virtio_blkdev_configure(struct uk_blkdev *dev,
 		const struct uk_blkdev_conf *conf)
@@ -70,14 +134,24 @@ static int virtio_blkdev_configure(struct uk_blkdev *dev,
 	UK_ASSERT(conf != NULL);
 
 	vbdev = to_virtioblkdev(dev);
+	rc = virtio_blkdev_queues_alloc(vbdev, conf);
+	if (rc) {
+		uk_pr_err("Failed to allocate the queues %d\n", rc);
+		goto exit;
+	}
 
 	uk_pr_info(DRIVER_NAME": %"__PRIu16" configured\n", vbdev->uid);
+exit:
 	return rc;
 }
 
 static int virtio_blkdev_unconfigure(struct uk_blkdev *dev)
 {
+	struct virtio_blk_device *d;
+
 	UK_ASSERT(dev != NULL);
+	d = to_virtioblkdev(dev);
+	uk_free(a, d->qs);
 
 	return 0;
 }
