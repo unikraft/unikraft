@@ -61,3 +61,4 @@ fdt_stringlist_contains
 fdt_resize
 fdt_overlay_apply
 fdt_getprop_u32_by_offset
+fdt_find_irq_parent_offset
