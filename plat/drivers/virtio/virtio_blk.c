@@ -24,6 +24,7 @@
 #include <uk/print.h>
 #include <errno.h>
 #include <fcntl.h>
+#include <stdbool.h>
 #include <virtio/virtio_bus.h>
 #include <virtio/virtio_ids.h>
 #include <uk/blkdev.h>
@@ -48,11 +49,13 @@
  *	Multi-queue,
  *	Maximum size of a segment for requests,
  *	Maximum number of segments per request,
+ *	Flush
  **/
 #define VIRTIO_BLK_DRV_FEATURES(features) \
 	(VIRTIO_FEATURES_UPDATE(features, VIRTIO_BLK_F_RO | \
 	VIRTIO_BLK_F_BLK_SIZE | VIRTIO_BLK_F_MQ | \
-	VIRTIO_BLK_F_SEG_MAX | VIRTIO_BLK_F_SIZE_MAX))
+	VIRTIO_BLK_F_SEG_MAX | VIRTIO_BLK_F_SIZE_MAX | \
+	VIRTIO_BLK_F_CONFIG_WCE | VIRTIO_BLK_F_FLUSH))
 
 static struct uk_alloc *a;
 static const char *drv_name = DRIVER_NAME;
@@ -76,6 +79,8 @@ struct virtio_blk_device {
 	__u32 max_segments;
 	/* Maximum size of a segment */
 	__u32 max_size_segment;
+	/* If it is set then flush request is allowed */
+	__u8 writeback;
 };
 
 struct uk_blkdev_queue {
@@ -107,7 +112,8 @@ struct virtio_blkdev_request {
 
 static int virtio_blkdev_request_set_sglist(struct uk_blkdev_queue *queue,
 		struct virtio_blkdev_request *virtio_blk_req,
-		__sector sector_size)
+		__sector sector_size,
+		bool have_data)
 {
 	struct virtio_blk_device *vbdev;
 	struct uk_blkreq *req;
@@ -136,19 +142,23 @@ static int virtio_blkdev_request_set_sglist(struct uk_blkdev_queue *queue,
 		goto out;
 	}
 
-	for (idx = 0; idx < data_size; idx += segment_max_size) {
-		segment_size = data_size - idx;
-		segment_size = (segment_size > segment_max_size) ?
+	/* Append to sglist chunks of `segment_max_size` size
+	 * Only for read / write operations
+	 **/
+	if (have_data)
+		for (idx = 0; idx < data_size; idx += segment_max_size) {
+			segment_size = data_size - idx;
+			segment_size = (segment_size > segment_max_size) ?
 					segment_max_size : segment_size;
-		rc = uk_sglist_append(&queue->sg,
-				(void *)(start_data + idx),
-				segment_size);
-		if (unlikely(rc != 0)) {
-			uk_pr_err("Failed to append to sg list %d\n",
-					rc);
-			goto out;
+			rc = uk_sglist_append(&queue->sg,
+					(void *)(start_data + idx),
+					segment_size);
+			if (unlikely(rc != 0)) {
+				uk_pr_err("Failed to append to sg list %d\n",
+						rc);
+				goto out;
+			}
 		}
-	}
 
 	rc = uk_sglist_append(&queue->sg, &virtio_blk_req->status,
 			sizeof(uint8_t));
@@ -193,7 +203,7 @@ static int virtio_blkdev_request_write(struct uk_blkdev_queue *queue,
 		return -EINVAL;
 
 	rc = virtio_blkdev_request_set_sglist(queue, virtio_blk_req,
-			cap->ssize);
+			cap->ssize, true);
 	if (rc) {
 		uk_pr_err("Failed to set sglist %d\n", rc);
 		goto out;
@@ -208,6 +218,39 @@ static int virtio_blkdev_request_write(struct uk_blkdev_queue *queue,
 		*write_segs = queue->sg.sg_nseg - 1;
 		virtio_blk_req->virtio_blk_outhdr.type = VIRTIO_BLK_T_IN;
 	}
+
+out:
+	return rc;
+}
+
+static int virtio_blkdev_request_flush(struct uk_blkdev_queue *queue,
+		struct virtio_blkdev_request *virtio_blk_req,
+		__u16 *read_segs, __u16 *write_segs)
+{
+	struct virtio_blk_device *vbdev;
+	int rc = 0;
+
+	UK_ASSERT(queue);
+	UK_ASSERT(virtio_blk_req);
+
+	vbdev = queue->vbd;
+	if (!vbdev->writeback)
+		return -ENOTSUP;
+
+	if (virtio_blk_req->virtio_blk_outhdr.sector) {
+		uk_pr_warn("Start sector should be 0 for flush request\n");
+		virtio_blk_req->virtio_blk_outhdr.sector = 0;
+	}
+
+	rc = virtio_blkdev_request_set_sglist(queue, virtio_blk_req, 0, false);
+	if (rc) {
+		uk_pr_err("Failed to set sglist %d\n", rc);
+		goto out;
+	}
+
+	*read_segs = 1;
+	*write_segs = 1;
+	virtio_blk_req->virtio_blk_outhdr.type = VIRTIO_BLK_T_FLUSH;
 
 out:
 	return rc;
@@ -238,6 +281,9 @@ static int virtio_blkdev_queue_enqueue(struct uk_blkdev_queue *queue,
 	if (req->operation == UK_BLKDEV_WRITE ||
 			req->operation == UK_BLKDEV_READ)
 		rc = virtio_blkdev_request_write(queue, virtio_blk_req,
+				&read_segs, &write_segs);
+	else if (req->operation == UK_BLKDEV_FFLUSH)
+		rc = virtio_blkdev_request_flush(queue, virtio_blk_req,
 				&read_segs, &write_segs);
 	else
 		return -EINVAL;
@@ -718,6 +764,8 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 	vbdev->max_vqueue_pairs = num_queues;
 	vbdev->max_segments = max_segments;
 	vbdev->max_size_segment = max_size_segment;
+	vbdev->writeback = virtio_has_features(host_features,
+				VIRTIO_BLK_F_FLUSH);
 
 	/**
 	 * Mask out features supported by both driver and device.

@@ -45,6 +45,10 @@
 #define VIRTIO_BLK_F_BLK_SIZE	6	/* Block size of disk is available*/
 #define VIRTIO_BLK_F_MQ		12	/* support more than one vq */
 
+/* Legacy feature bits */
+#define VIRTIO_BLK_F_FLUSH	9	/* Flush command supported */
+#define VIRTIO_BLK_F_CONFIG_WCE	11	/* Writeback mode available in config */
+
 struct virtio_blk_config {
 	/* The capacity (in 512-byte sectors). */
 	__u64 capacity;
@@ -55,6 +59,10 @@ struct virtio_blk_config {
 
 	/* block size of device (if VIRTIO_BLK_F_BLK_SIZE) */
 	__u32 blk_size;
+
+
+	/* writeback mode (if VIRTIO_BLK_F_CONFIG_WCE) */
+	__u8 wce;
 
 	/* number of vqs, only available when VIRTIO_BLK_F_MQ is set */
 	__u16 num_queues;
@@ -68,6 +76,9 @@ struct virtio_blk_config {
 #define VIRTIO_BLK_T_IN		0
 #define VIRTIO_BLK_T_OUT	1
 
+
+/* Cache flush command */
+#define VIRTIO_BLK_T_FLUSH	4
 /*
  * This comes first in the read scatter-gather list.
  * For legacy virtio, if VIRTIO_F_ANY_LAYOUT is not negotiated,
