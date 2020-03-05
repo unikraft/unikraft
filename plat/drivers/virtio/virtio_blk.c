@@ -27,13 +27,22 @@
 #include <virtio/virtio_bus.h>
 #include <virtio/virtio_ids.h>
 #include <uk/blkdev.h>
+#include <virtio/virtio_blk.h>
 #include <uk/blkdev_driver.h>
 
 #define DRIVER_NAME		"virtio-blk"
+#define DEFAULT_SECTOR_SIZE	512
 
 #define to_virtioblkdev(bdev) \
 	__containerof(bdev, struct virtio_blk_device, blkdev)
 
+/* Features are:
+ *	Access Mode
+ *	Sector_size;
+ **/
+#define VIRTIO_BLK_DRV_FEATURES(features) \
+	(VIRTIO_FEATURES_UPDATE(features, VIRTIO_BLK_F_RO | \
+	VIRTIO_BLK_F_BLK_SIZE))
 
 static struct uk_alloc *a;
 static const char *drv_name = DRIVER_NAME;
@@ -43,7 +52,74 @@ struct virtio_blk_device {
 	struct uk_blkdev blkdev;
 	/* The blkdevice identifier */
 	__u16 uid;
+	/* Virtio Device */
+	struct virtio_dev *vdev;
 };
+
+static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
+{
+	struct uk_blkdev_cap *cap;
+	__u64 host_features = 0;
+	int bytes_to_read;
+	__sector sectors;
+	__sector ssize;
+	int rc = 0;
+
+	UK_ASSERT(vbdev);
+	cap = &vbdev->blkdev.capabilities;
+	host_features = virtio_feature_get(vbdev->vdev);
+
+	/* Get size of device */
+	bytes_to_read = virtio_config_get(vbdev->vdev,
+			__offsetof(struct virtio_blk_config, capacity),
+			&sectors,
+			sizeof(sectors),
+			1);
+	if (bytes_to_read != sizeof(sectors))  {
+		uk_pr_err("Failed to get nb of sectors from device %d\n", rc);
+		rc = -EAGAIN;
+		goto exit;
+	}
+
+	if (!virtio_has_features(host_features, VIRTIO_BLK_F_BLK_SIZE)) {
+		ssize = DEFAULT_SECTOR_SIZE;
+	} else {
+		bytes_to_read = virtio_config_get(vbdev->vdev,
+				__offsetof(struct virtio_blk_config, blk_size),
+				&ssize,
+				sizeof(ssize),
+				1);
+		if (bytes_to_read != sizeof(ssize))  {
+			uk_pr_err("Failed to get ssize from the device %d\n",
+					rc);
+			rc = -EAGAIN;
+			goto exit;
+		}
+	}
+
+	cap->ssize = ssize;
+	cap->sectors = sectors;
+	cap->ioalign = sizeof(void *);
+	cap->mode = (virtio_has_features(
+			host_features, VIRTIO_BLK_F_RO)) ? O_RDONLY : O_RDWR;
+
+	/**
+	 * Mask out features supported by both driver and device.
+	 */
+	vbdev->vdev->features &= host_features;
+	virtio_feature_set(vbdev->vdev, vbdev->vdev->features);
+
+exit:
+	return rc;
+}
+
+static inline void virtio_blkdev_feature_set(struct virtio_blk_device *vbdev)
+{
+	vbdev->vdev->features = 0;
+
+	/* Setting the feature the driver support */
+	VIRTIO_BLK_DRV_FEATURES(vbdev->vdev->features);
+}
 
 static int virtio_blk_add_dev(struct virtio_dev *vdev)
 {
@@ -56,6 +132,8 @@ static int virtio_blk_add_dev(struct virtio_dev *vdev)
 	if (!vbdev)
 		return -ENOMEM;
 
+	vbdev->vdev = vdev;
+
 	rc = uk_blkdev_drv_register(&vbdev->blkdev, a, drv_name);
 	if (rc < 0) {
 		uk_pr_err("Failed to register virtio_blk device: %d\n", rc);
@@ -63,10 +141,19 @@ static int virtio_blk_add_dev(struct virtio_dev *vdev)
 	}
 
 	vbdev->uid = rc;
+	virtio_blkdev_feature_set(vbdev);
+	rc = virtio_blkdev_feature_negotiate(vbdev);
+	if (rc) {
+		uk_pr_err("Failed to negotiate the device feature %d\n", rc);
+		goto err_negotiate_feature;
+	}
+
 	uk_pr_info("Virtio-blk device registered with libukblkdev\n");
 
 out:
 	return rc;
+err_negotiate_feature:
+	virtio_dev_status_update(vbdev->vdev, VIRTIO_CONFIG_STATUS_FAIL);
 err_out:
 	uk_free(a, vbdev);
 	goto out;
