@@ -36,6 +36,25 @@
 #define FDT_BAD_ADDR (uint64_t)(-1)
 
 /**
+ * fdt_find_irq_parent_offset - find the irq parent offset
+ * @fdt: pointer to the device tree blob
+ * @offset: offset of the node whose irq parent to find
+ *
+ * fdt_find_irq_parent_offset() returns the offset of the irq parent
+ * of given @offset
+ *
+ * returns:
+ *	structure block offset of the located node (>= 0), on success
+ *	-FDT_ERR_NOTFOUND, no node with that phandle exists
+ *	-FDT_ERR_BADPHANDLE, given phandle value was invalid (0 or -1)
+ *	-FDT_ERR_BADMAGIC,
+ *	-FDT_ERR_BADVERSION,
+ *	-FDT_ERR_BADSTATE,
+ *	-FDT_ERR_BADSTRUCTURE, standard meanings
+ */
+int fdt_find_irq_parent_offset(const void *fdt, int offset);
+
+/**
  * fdt_interrupt_cells - retrieve the number of cells needed to encode an
  *                       interrupt source
  * @fdt: pointer to the device tree blob

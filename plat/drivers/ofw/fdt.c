@@ -42,7 +42,7 @@
 #define FDT_CHECK_COUNTS(na, ns)  ((na) > 0 && (na) <= FDT_MAX_ADDR_CELLS && \
 					(ns) > 0)
 
-static int fdt_find_irq_parent_offset(const void *fdt, int offset)
+int fdt_find_irq_parent_offset(const void *fdt, int offset)
 {
 	uint32_t irq_parent;
 
