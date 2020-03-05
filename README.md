@@ -18,7 +18,7 @@ build such images.
 
 ## Getting Started
 The easiest way to get started with Unikraft is to follow the
-[instructions](http://www.unikraft.org/getting-started.md) on our website's getting started page.
+[instructions](http://www.unikraft.org/getting-started) on our website's getting started page.
 
 ## Contributing
 If you're interested in contributing please take a look at the list of [open projects](https://github.com/unikraft/unikraft/issues?q=is%3Aissue+is%3Aopen+label%3Aproject). If one of these interests you please drop us a line via the [mailing list](https://lists.xenproject.org/cgi-bin/mailman/listinfo/minios-devel) or directly at unikraft@listserv.neclab.eu .
