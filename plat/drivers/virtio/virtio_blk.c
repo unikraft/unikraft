@@ -34,6 +34,11 @@
 #define DRIVER_NAME		"virtio-blk"
 #define DEFAULT_SECTOR_SIZE	512
 
+#define	VTBLK_INTR_EN		(1 << 0)
+#define	VTBLK_INTR_EN_MASK	(1)
+#define	VTBLK_INTR_USR_EN	(1 << 1)
+#define	VTBLK_INTR_USR_EN_MASK	(2)
+
 #define to_virtioblkdev(bdev) \
 	__containerof(bdev, struct virtio_blk_device, blkdev)
 
@@ -85,6 +90,8 @@ struct uk_blkdev_queue {
 	uint16_t max_nb_desc;
 	/* The nr. of descriptor user configured */
 	uint16_t nb_desc;
+	/* The flag to interrupt on the queue */
+	uint8_t intr_enabled;
 	/* Reference to virtio_blk_device  */
 	struct virtio_blk_device *vbd;
 	/* The scatter list and its associated fragments */
@@ -101,9 +108,49 @@ static int virtio_blkdev_recv_done(struct virtqueue *vq, void *priv)
 
 	queue = (struct uk_blkdev_queue *) priv;
 
+	/* Disable the interrupt for the ring */
+	virtqueue_intr_disable(vq);
+	queue->intr_enabled &= ~(VTBLK_INTR_EN);
+
 	uk_blkdev_drv_queue_event(&queue->vbd->blkdev, queue->lqueue_id);
 
 	return 1;
+}
+
+static int virtio_blkdev_queue_intr_enable(struct uk_blkdev *dev,
+		struct uk_blkdev_queue *queue)
+{
+	int rc = 0;
+
+	UK_ASSERT(dev);
+
+	/* If the interrupt is enabled */
+	if (queue->intr_enabled & VTBLK_INTR_EN)
+		return 0;
+
+	/**
+	 * Enable the user configuration bit. This would cause the interrupt to
+	 * be enabled automatically, if the interrupt could not be enabled now
+	 * due to data in the queue.
+	 */
+	queue->intr_enabled = VTBLK_INTR_USR_EN;
+	rc = virtqueue_intr_enable(queue->vq);
+	if (!rc)
+		queue->intr_enabled |= VTBLK_INTR_EN;
+
+	return rc;
+}
+
+static int virtio_blkdev_queue_intr_disable(struct uk_blkdev *dev,
+		struct uk_blkdev_queue *queue)
+{
+	UK_ASSERT(dev);
+	UK_ASSERT(queue);
+
+	virtqueue_intr_disable(queue->vq);
+	queue->intr_enabled &= ~(VTBLK_INTR_USR_EN | VTBLK_INTR_EN);
+
+	return 0;
 }
 
 /**
@@ -458,6 +505,8 @@ static const struct uk_blkdev_ops virtio_blkdev_ops = {
 		.dev_configure = virtio_blkdev_configure,
 		.queue_get_info = virtio_blkdev_queue_info_get,
 		.queue_setup = virtio_blkdev_queue_setup,
+		.queue_intr_enable = virtio_blkdev_queue_intr_enable,
+		.queue_intr_disable = virtio_blkdev_queue_intr_disable,
 		.queue_release = virtio_blkdev_queue_release,
 		.dev_unconfigure = virtio_blkdev_unconfigure,
 };
