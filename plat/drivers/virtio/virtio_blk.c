@@ -353,6 +353,52 @@ exit:
 	return rc;
 }
 
+static int virtio_blkdev_start(struct uk_blkdev *dev)
+{
+	struct virtio_blk_device *d;
+
+	UK_ASSERT(dev != NULL);
+
+	d = to_virtioblkdev(dev);
+	virtio_dev_drv_up(d->vdev);
+
+	uk_pr_info(DRIVER_NAME": %"__PRIu16" started\n", d->uid);
+
+	return 0;
+}
+
+/* If one queue has unconsumed responses it returns -EBUSY
+ * TODO restart doesn't work
+ **/
+static int virtio_blkdev_stop(struct uk_blkdev *dev)
+{
+	struct virtio_blk_device *d;
+	uint16_t q_id;
+	int rc = 0;
+
+	UK_ASSERT(dev != NULL);
+
+	d = to_virtioblkdev(dev);
+	for (q_id = 0; q_id < d->nb_queues; ++q_id) {
+		if (virtqueue_hasdata(d->qs[q_id].vq)) {
+			uk_pr_err("Queue:%"__PRIu16" has unconsumed responses\n",
+					q_id);
+			return -EBUSY;
+		}
+	}
+
+	rc = virtio_dev_reset(d->vdev);
+	if (rc) {
+		uk_pr_info(DRIVER_NAME":%"__PRIu16" stopped", d->uid);
+		goto out;
+	}
+
+	uk_pr_warn(DRIVER_NAME":%"__PRIu16" Start is not allowed!!!", d->uid);
+
+out:
+	return rc;
+}
+
 static int virtio_blkdev_unconfigure(struct uk_blkdev *dev)
 {
 	struct virtio_blk_device *d;
@@ -506,6 +552,8 @@ static const struct uk_blkdev_ops virtio_blkdev_ops = {
 		.queue_get_info = virtio_blkdev_queue_info_get,
 		.queue_setup = virtio_blkdev_queue_setup,
 		.queue_intr_enable = virtio_blkdev_queue_intr_enable,
+		.dev_start = virtio_blkdev_start,
+		.dev_stop = virtio_blkdev_stop,
 		.queue_intr_disable = virtio_blkdev_queue_intr_disable,
 		.queue_release = virtio_blkdev_queue_release,
 		.dev_unconfigure = virtio_blkdev_unconfigure,
