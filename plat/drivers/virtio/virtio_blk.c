@@ -39,10 +39,11 @@
 /* Features are:
  *	Access Mode
  *	Sector_size;
+ *	Multi-queue,
  **/
 #define VIRTIO_BLK_DRV_FEATURES(features) \
 	(VIRTIO_FEATURES_UPDATE(features, VIRTIO_BLK_F_RO | \
-	VIRTIO_BLK_F_BLK_SIZE))
+	VIRTIO_BLK_F_BLK_SIZE | VIRTIO_BLK_F_MQ))
 
 static struct uk_alloc *a;
 static const char *drv_name = DRIVER_NAME;
@@ -54,7 +55,44 @@ struct virtio_blk_device {
 	__u16 uid;
 	/* Virtio Device */
 	struct virtio_dev *vdev;
+	/* Nb of max_queues supported by device */
+	__u16 max_vqueue_pairs;
 };
+
+
+static int virtio_blkdev_configure(struct uk_blkdev *dev,
+		const struct uk_blkdev_conf *conf)
+{
+	int rc = 0;
+	struct virtio_blk_device *vbdev = NULL;
+
+	UK_ASSERT(dev != NULL);
+	UK_ASSERT(conf != NULL);
+
+	vbdev = to_virtioblkdev(dev);
+
+	uk_pr_info(DRIVER_NAME": %"__PRIu16" configured\n", vbdev->uid);
+	return rc;
+}
+
+static int virtio_blkdev_unconfigure(struct uk_blkdev *dev)
+{
+	UK_ASSERT(dev != NULL);
+
+	return 0;
+}
+
+static void virtio_blkdev_get_info(struct uk_blkdev *dev,
+		struct uk_blkdev_info *dev_info)
+{
+	struct virtio_blk_device *vbdev = NULL;
+
+	UK_ASSERT(dev != NULL);
+	UK_ASSERT(dev_info != NULL);
+
+	vbdev = to_virtioblkdev(dev);
+	dev_info->max_queues = vbdev->max_vqueue_pairs;
+}
 
 static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 {
@@ -63,6 +101,7 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 	int bytes_to_read;
 	__sector sectors;
 	__sector ssize;
+	__u16 num_queues;
 	int rc = 0;
 
 	UK_ASSERT(vbdev);
@@ -97,11 +136,30 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 		}
 	}
 
+	/* If the device does not support multi-queues,
+	 * we will use only one queue.
+	 */
+	if (virtio_has_features(host_features, VIRTIO_BLK_F_MQ)) {
+		bytes_to_read = virtio_config_get(vbdev->vdev,
+					__offsetof(struct virtio_blk_config,
+							num_queues),
+					&num_queues,
+					sizeof(num_queues),
+					1);
+		if (bytes_to_read != sizeof(num_queues)) {
+			uk_pr_err("Failed to read max-queues\n");
+			rc = -EAGAIN;
+			goto exit;
+		}
+	} else
+		num_queues = 1;
 	cap->ssize = ssize;
 	cap->sectors = sectors;
 	cap->ioalign = sizeof(void *);
 	cap->mode = (virtio_has_features(
 			host_features, VIRTIO_BLK_F_RO)) ? O_RDONLY : O_RDWR;
+
+	vbdev->max_vqueue_pairs = num_queues;
 
 	/**
 	 * Mask out features supported by both driver and device.
@@ -121,6 +179,12 @@ static inline void virtio_blkdev_feature_set(struct virtio_blk_device *vbdev)
 	VIRTIO_BLK_DRV_FEATURES(vbdev->vdev->features);
 }
 
+static const struct uk_blkdev_ops virtio_blkdev_ops = {
+		.get_info = virtio_blkdev_get_info,
+		.dev_configure = virtio_blkdev_configure,
+		.dev_unconfigure = virtio_blkdev_unconfigure,
+};
+
 static int virtio_blk_add_dev(struct virtio_dev *vdev)
 {
 	struct virtio_blk_device *vbdev;
@@ -133,6 +197,7 @@ static int virtio_blk_add_dev(struct virtio_dev *vdev)
 		return -ENOMEM;
 
 	vbdev->vdev = vdev;
+	vbdev->blkdev.dev_ops = &virtio_blkdev_ops;
 
 	rc = uk_blkdev_drv_register(&vbdev->blkdev, a, drv_name);
 	if (rc < 0) {
