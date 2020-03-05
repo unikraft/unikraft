@@ -60,4 +60,26 @@ struct virtio_blk_config {
 	__u16 num_queues;
 } __packed;
 
+/*
+ * Command types
+ */
+
+/* These two define direction. */
+#define VIRTIO_BLK_T_IN		0
+#define VIRTIO_BLK_T_OUT	1
+
+/*
+ * This comes first in the read scatter-gather list.
+ * For legacy virtio, if VIRTIO_F_ANY_LAYOUT is not negotiated,
+ * this is the first element of the read scatter-gather list.
+ */
+struct virtio_blk_outhdr {
+	/* VIRTIO_BLK_T* */
+	__virtio_le32 type;
+	/* io priority. */
+	__virtio_le32 ioprio;
+	/* Sector (ie. 512 byte offset) */
+	__virtio_le64 sector;
+};
+
 #endif /* __PLAT_DRV_VIRTIO_BLK_H */

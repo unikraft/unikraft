@@ -99,6 +99,197 @@ struct uk_blkdev_queue {
 	struct uk_sglist_seg *sgsegs;
 };
 
+struct virtio_blkdev_request {
+	struct uk_blkreq *req;
+	struct virtio_blk_outhdr virtio_blk_outhdr;
+	uint8_t status;
+};
+
+static int virtio_blkdev_request_set_sglist(struct uk_blkdev_queue *queue,
+		struct virtio_blkdev_request *virtio_blk_req,
+		__sector sector_size)
+{
+	struct virtio_blk_device *vbdev;
+	struct uk_blkreq *req;
+	size_t data_size = 0;
+	size_t segment_size;
+	size_t segment_max_size;
+	size_t idx;
+	uintptr_t start_data;
+	int rc = 0;
+
+	UK_ASSERT(queue);
+	UK_ASSERT(virtio_blk_req);
+
+	req = virtio_blk_req->req;
+	vbdev = queue->vbd;
+	start_data = (uintptr_t)req->aio_buf;
+	data_size = req->nb_sectors * sector_size;
+	segment_max_size = vbdev->max_size_segment;
+
+	/* Prepare the sglist */
+	uk_sglist_reset(&queue->sg);
+	rc = uk_sglist_append(&queue->sg, &virtio_blk_req->virtio_blk_outhdr,
+			sizeof(struct virtio_blk_outhdr));
+	if (unlikely(rc != 0)) {
+		uk_pr_err("Failed to append to sg list %d\n", rc);
+		goto out;
+	}
+
+	for (idx = 0; idx < data_size; idx += segment_max_size) {
+		segment_size = data_size - idx;
+		segment_size = (segment_size > segment_max_size) ?
+					segment_max_size : segment_size;
+		rc = uk_sglist_append(&queue->sg,
+				(void *)(start_data + idx),
+				segment_size);
+		if (unlikely(rc != 0)) {
+			uk_pr_err("Failed to append to sg list %d\n",
+					rc);
+			goto out;
+		}
+	}
+
+	rc = uk_sglist_append(&queue->sg, &virtio_blk_req->status,
+			sizeof(uint8_t));
+	if (unlikely(rc != 0)) {
+		uk_pr_err("Failed to append to sg list %d\n", rc);
+		goto out;
+	}
+
+out:
+	return rc;
+}
+
+static int virtio_blkdev_request_write(struct uk_blkdev_queue *queue,
+		struct virtio_blkdev_request *virtio_blk_req,
+		__u16 *read_segs, __u16 *write_segs)
+{
+	struct virtio_blk_device *vbdev;
+	struct uk_blkdev_cap *cap;
+	struct uk_blkreq *req;
+	int rc = 0;
+
+	UK_ASSERT(queue);
+	UK_ASSERT(virtio_blk_req);
+
+	vbdev = queue->vbd;
+	cap = &vbdev->blkdev.capabilities;
+	req = virtio_blk_req->req;
+	if (req->operation == UK_BLKDEV_WRITE &&
+			cap->mode == O_RDONLY)
+		return -EPERM;
+
+	if (req->aio_buf == NULL)
+		return -EINVAL;
+
+	if (req->nb_sectors == 0)
+		return -EINVAL;
+
+	if (req->start_sector + req->nb_sectors > cap->sectors)
+		return -EINVAL;
+
+	if (req->nb_sectors > cap->max_sectors_per_req)
+		return -EINVAL;
+
+	rc = virtio_blkdev_request_set_sglist(queue, virtio_blk_req,
+			cap->ssize);
+	if (rc) {
+		uk_pr_err("Failed to set sglist %d\n", rc);
+		goto out;
+	}
+
+	if (req->operation == UK_BLKDEV_WRITE) {
+		*read_segs = queue->sg.sg_nseg - 1;
+		*write_segs = 1;
+		virtio_blk_req->virtio_blk_outhdr.type = VIRTIO_BLK_T_OUT;
+	} else if (req->operation == UK_BLKDEV_READ) {
+		*read_segs = 1;
+		*write_segs = queue->sg.sg_nseg - 1;
+		virtio_blk_req->virtio_blk_outhdr.type = VIRTIO_BLK_T_IN;
+	}
+
+out:
+	return rc;
+}
+
+static int virtio_blkdev_queue_enqueue(struct uk_blkdev_queue *queue,
+		struct uk_blkreq *req)
+{
+	struct virtio_blkdev_request *virtio_blk_req;
+	__u16 write_segs = 0;
+	__u16 read_segs = 0;
+	int rc = 0;
+
+	UK_ASSERT(queue);
+	UK_ASSERT(req);
+
+	if (virtqueue_is_full(queue->vq)) {
+		uk_pr_debug("The virtqueue is full\n");
+		return -ENOSPC;
+	}
+
+	virtio_blk_req = uk_malloc(a, sizeof(*virtio_blk_req));
+	if (!virtio_blk_req)
+		return -ENOMEM;
+
+	virtio_blk_req->req = req;
+	virtio_blk_req->virtio_blk_outhdr.sector = req->start_sector;
+	if (req->operation == UK_BLKDEV_WRITE ||
+			req->operation == UK_BLKDEV_READ)
+		rc = virtio_blkdev_request_write(queue, virtio_blk_req,
+				&read_segs, &write_segs);
+	else
+		return -EINVAL;
+
+	if (rc)
+		goto out;
+
+	rc = virtqueue_buffer_enqueue(queue->vq, virtio_blk_req, &queue->sg,
+				      read_segs, write_segs);
+
+out:
+	return rc;
+}
+
+static int virtio_blkdev_submit_request(struct uk_blkdev *dev,
+		struct uk_blkdev_queue *queue,
+		struct uk_blkreq *req)
+{
+	int rc = 0;
+	int status = 0x0;
+
+	UK_ASSERT(req);
+	UK_ASSERT(queue);
+	UK_ASSERT(dev);
+
+	rc = virtio_blkdev_queue_enqueue(queue, req);
+	if (likely(rc >= 0)) {
+		uk_pr_debug("Success and more descriptors available\n");
+		status |= UK_BLKDEV_STATUS_SUCCESS;
+		/**
+		 * Notify the host the new buffer.
+		 */
+		virtqueue_host_notify(queue->vq);
+		/**
+		 * When there is further space available in the ring
+		 * return UK_BLKDEV_STATUS_MORE.
+		 */
+		status |= likely(rc > 0) ? UK_BLKDEV_STATUS_MORE : 0x0;
+	} else if (rc == -ENOSPC) {
+		uk_pr_debug("No more descriptors available\n");
+		goto err;
+	} else {
+		uk_pr_err("Failed to enqueue descriptors into the ring: %d\n",
+			  rc);
+		goto err;
+	}
+
+	return status;
+
+err:
+	return rc;
+}
 
 static int virtio_blkdev_recv_done(struct virtqueue *vq, void *priv)
 {
@@ -571,6 +762,7 @@ static int virtio_blk_add_dev(struct virtio_dev *vdev)
 		return -ENOMEM;
 
 	vbdev->vdev = vdev;
+	vbdev->blkdev.submit_one = virtio_blkdev_submit_request;
 	vbdev->blkdev.dev_ops = &virtio_blkdev_ops;
 
 	rc = uk_blkdev_drv_register(&vbdev->blkdev, a, drv_name);
