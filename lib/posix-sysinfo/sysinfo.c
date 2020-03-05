@@ -33,7 +33,7 @@
  */
 
 #include <stddef.h>
-#include <limits.h>
+#include <uk/arch/limits.h>
 #include <unistd.h>
 #include <errno.h>
 #include <string.h>
