@@ -198,6 +198,16 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
  */
 int virtqueue_is_full(struct virtqueue *vq);
 
+/**
+ * Check the virtqueue if has any pending responses.
+ * @param vq
+ *	A reference to the virtqueue.
+ * @return int
+ *	1 on true,
+ *	0 otherwise
+ */
+int virtqueue_hasdata(struct virtqueue *vq);
+
 /*
  * Destroy a virtual queue
  * @param vq

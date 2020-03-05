@@ -78,7 +78,6 @@ static inline void virtqueue_ring_update_avail(struct virtqueue_vring *vrq,
 					       __u16 idx);
 static inline void virtqueue_detach_desc(struct virtqueue_vring *vrq,
 					 __u16 head_idx);
-static inline int virtqueue_hasdata(struct virtqueue_vring *vrq);
 static inline int virtqueue_buffer_enqueue_segments(
 						    struct virtqueue_vring *vrq,
 						    __u16 head,
@@ -110,7 +109,7 @@ int virtqueue_intr_enable(struct virtqueue *vq)
 
 	vrq = to_virtqueue_vring(vq);
 	/* Check if there are no more packets enabled */
-	if (!virtqueue_hasdata(vrq)) {
+	if (!virtqueue_hasdata(vq)) {
 		if (vrq->vring.avail->flags | VRING_AVAIL_F_NO_INTERRUPT) {
 			vrq->vring.avail->flags &=
 				(~VRING_AVAIL_F_NO_INTERRUPT);
@@ -125,7 +124,7 @@ int virtqueue_intr_enable(struct virtqueue *vq)
 			 */
 			mb();
 			/* Check if there are further descriptors */
-			if (virtqueue_hasdata(vrq)) {
+			if (virtqueue_hasdata(vq)) {
 				virtqueue_intr_disable(vq);
 				rc = 1;
 			}
@@ -216,9 +215,14 @@ static inline int virtqueue_buffer_enqueue_segments(
 	return idx;
 }
 
-static inline int virtqueue_hasdata(struct virtqueue_vring *vrq)
+int virtqueue_hasdata(struct virtqueue *vq)
 {
-	return (vrq->last_used_desc_idx != vrq->vring.used->idx);
+	struct virtqueue_vring *vring;
+
+	UK_ASSERT(vq);
+
+	vring = to_virtqueue_vring(vq);
+	return (vring->last_used_desc_idx != vring->vring.used->idx);
 }
 
 __u64 virtqueue_feature_negotiate(__u64 feature_set)
@@ -235,14 +239,12 @@ __u64 virtqueue_feature_negotiate(__u64 feature_set)
 
 int virtqueue_ring_interrupt(void *obj)
 {
-	struct virtqueue_vring *vrq = NULL;
 	struct virtqueue *vq = (struct virtqueue *)obj;
 	int rc = 0;
 
 	UK_ASSERT(vq);
 
-	vrq = to_virtqueue_vring(vq);
-	if (!virtqueue_hasdata(vrq))
+	if (!virtqueue_hasdata(vq))
 		return rc;
 
 	if (likely(vq->vq_callback))
@@ -271,7 +273,7 @@ int virtqueue_buffer_dequeue(struct virtqueue *vq, void **cookie, __u32 *len)
 	vrq = to_virtqueue_vring(vq);
 
 	/* No new descriptor since last dequeue operation */
-	if (!virtqueue_hasdata(vrq))
+	if (!virtqueue_hasdata(vq))
 		return -ENOMSG;
 	used_idx = vrq->last_used_desc_idx++ & (vrq->vring.num - 1);
 	elem = &vrq->vring.used->ring[used_idx];
