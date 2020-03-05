@@ -92,6 +92,8 @@ static struct virtqueue *vpci_legacy_vq_setup(struct virtio_dev *vdev,
 					      __u16 num_desc,
 					      virtqueue_callback_t callback,
 					      struct uk_alloc *a);
+static void vpci_legacy_vq_release(struct virtio_dev *vdev,
+		struct virtqueue *vq, struct uk_alloc *a);
 static int virtio_pci_handle(void *arg);
 static int vpci_legacy_notify(struct virtio_dev *vdev, __u16 queue_id);
 static int virtio_pci_legacy_add_dev(struct pci_device *pci_dev,
@@ -110,6 +112,7 @@ static struct virtio_config_ops vpci_legacy_ops = {
 	.status_set   = vpci_legacy_pci_status_set,
 	.vqs_find     = vpci_legacy_pci_vq_find,
 	.vq_setup     = vpci_legacy_vq_setup,
+	.vq_release   = vpci_legacy_vq_release,
 };
 
 static int vpci_legacy_notify(struct virtio_dev *vdev, __u16 queue_id)
@@ -186,6 +189,29 @@ static struct virtqueue *vpci_legacy_vq_setup(struct virtio_dev *vdev,
 
 err_exit:
 	return vq;
+}
+
+static void vpci_legacy_vq_release(struct virtio_dev *vdev,
+		struct virtqueue *vq, struct uk_alloc *a)
+{
+	struct virtio_pci_dev *vpdev = NULL;
+	long flags;
+
+	UK_ASSERT(vq != NULL);
+	UK_ASSERT(a != NULL);
+	vpdev = to_virtiopcidev(vdev);
+
+	/* Select and deactivate the queue */
+	virtio_cwrite16((void *)(unsigned long)vpdev->pci_base_addr,
+			VIRTIO_PCI_QUEUE_SEL, vq->queue_id);
+	virtio_cwrite32((void *)(unsigned long)vpdev->pci_base_addr,
+			VIRTIO_PCI_QUEUE_PFN, 0);
+
+	flags = ukplat_lcpu_save_irqf();
+	UK_TAILQ_REMOVE(&vpdev->vdev.vqs, vq, next);
+	ukplat_lcpu_restore_irqf(flags);
+
+	virtqueue_destroy(vq, a);
 }
 
 static int vpci_legacy_pci_vq_find(struct virtio_dev *vdev, __u16 num_vqs,

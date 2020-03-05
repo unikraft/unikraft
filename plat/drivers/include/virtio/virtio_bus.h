@@ -104,6 +104,8 @@ struct virtio_config_ops {
 				      __u16 queue_id,
 				      virtqueue_callback_t callback,
 				      struct uk_alloc *a);
+	void (*vq_release)(struct virtio_dev *vdev, struct virtqueue *vq,
+				struct uk_alloc *a);
 };
 
 /**
@@ -314,6 +316,25 @@ static inline struct virtqueue *virtio_vqueue_setup(struct virtio_dev *vdev,
 		vq = vdev->cops->vq_setup(vdev, vq_id, nr_desc, callback, a);
 
 	return vq;
+}
+
+/**
+ * A helper function to release an individual virtqueue.
+ * @param vdev
+ *	Reference to the virtio device.
+ * @param vq
+ *	Reference to the virtqueue.
+ * @param a
+ *	A reference to the allocator.
+ */
+static inline void virtio_vqueue_release(struct virtio_dev *vdev,
+		struct virtqueue *vq, struct uk_alloc *a)
+{
+	UK_ASSERT(vdev);
+	UK_ASSERT(vq);
+	UK_ASSERT(a);
+	if (likely(vdev->cops->vq_release))
+		vdev->cops->vq_release(vdev, vq, a);
 }
 
 static inline int virtio_has_features(__u64 features, __u8 bpos)
