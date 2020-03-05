@@ -66,22 +66,28 @@ void _uk_bus_register(struct uk_bus *b);
 /* Do not use this function directly: */
 void _uk_bus_unregister(struct uk_bus *b);
 
-/* registers a bus driver to the bus system */
+/*
+ * registers a bus driver to the bus system
+ * By default, the priority is 2
+ */
 #define UK_BUS_REGISTER(b) \
-	_UK_BUS_REGISTER(__LIBNAME__, b)
+	_UK_BUS_REGISTER(__LIBNAME__, b, 2)
+
+#define	UK_BUS_REGISTER_PRIORITY(b, prio) \
+	_UK_BUS_REGISTER(__LIBNAME__, b, prio)
 
 #define _UK_BUS_REGFNNAME(x, y)      x##y
 
-#define _UK_BUS_REGISTER_CTOR(ctor)  \
-	UK_CTOR_PRIO(ctor, UK_BUS_REGISTER_PRIO)
+#define _UK_BUS_REGISTER_CTOR(CTOR, prio)  \
+	UK_CTOR_PRIO(CTOR, prio)
 
-#define _UK_BUS_REGISTER(libname, b)				\
+#define _UK_BUS_REGISTER(libname, b, prio)			\
 	static void						\
 	_UK_BUS_REGFNNAME(libname, _uk_bus_register)(void)	\
 	{							\
 		_uk_bus_register((b));				\
 	}							\
-	_UK_BUS_REGISTER_CTOR(_UK_BUS_REGFNNAME(libname, _uk_bus_register))
+	_UK_BUS_REGISTER_CTOR(_UK_BUS_REGFNNAME(libname, _uk_bus_register), prio)
 
 #ifdef __cplusplus
 }
