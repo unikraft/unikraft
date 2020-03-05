@@ -39,6 +39,8 @@
 #include <virtio/virtio_types.h>
 
 /* Feature bits */
+#define VIRTIO_BLK_F_SIZE_MAX	1	/* Indicates maximum segment size */
+#define VIRTIO_BLK_F_SEG_MAX	2	/* Indicates maximum # of segments */
 #define VIRTIO_BLK_F_RO		5	/* Disk is read-only */
 #define VIRTIO_BLK_F_BLK_SIZE	6	/* Block size of disk is available*/
 #define VIRTIO_BLK_F_MQ		12	/* support more than one vq */
@@ -46,6 +48,10 @@
 struct virtio_blk_config {
 	/* The capacity (in 512-byte sectors). */
 	__u64 capacity;
+	/* The maximum segment size (if VIRTIO_BLK_F_SIZE_MAX) */
+	__u32 size_max;
+	/* The maximum number of segments (if VIRTIO_BLK_F_SEG_MAX) */
+	__u32 seg_max;
 
 	/* block size of device (if VIRTIO_BLK_F_BLK_SIZE) */
 	__u32 blk_size;

@@ -28,6 +28,7 @@
 #include <virtio/virtio_ids.h>
 #include <uk/blkdev.h>
 #include <virtio/virtio_blk.h>
+#include <uk/sglist.h>
 #include <uk/blkdev_driver.h>
 
 #define DRIVER_NAME		"virtio-blk"
@@ -40,10 +41,13 @@
  *	Access Mode
  *	Sector_size;
  *	Multi-queue,
+ *	Maximum size of a segment for requests,
+ *	Maximum number of segments per request,
  **/
 #define VIRTIO_BLK_DRV_FEATURES(features) \
 	(VIRTIO_FEATURES_UPDATE(features, VIRTIO_BLK_F_RO | \
-	VIRTIO_BLK_F_BLK_SIZE | VIRTIO_BLK_F_MQ))
+	VIRTIO_BLK_F_BLK_SIZE | VIRTIO_BLK_F_MQ | \
+	VIRTIO_BLK_F_SEG_MAX | VIRTIO_BLK_F_SIZE_MAX))
 
 static struct uk_alloc *a;
 static const char *drv_name = DRIVER_NAME;
@@ -63,6 +67,10 @@ struct virtio_blk_device {
 	__u16    nb_queues;
 	/* List of queues */
 	struct   uk_blkdev_queue *qs;
+	/* Maximum number of segments for a request */
+	__u32 max_segments;
+	/* Maximum size of a segment */
+	__u32 max_size_segment;
 };
 
 struct uk_blkdev_queue {
@@ -75,10 +83,163 @@ struct uk_blkdev_queue {
 	struct uk_alloc *a;
 	/* The nr. of descriptor limit */
 	uint16_t max_nb_desc;
+	/* The nr. of descriptor user configured */
+	uint16_t nb_desc;
 	/* Reference to virtio_blk_device  */
 	struct virtio_blk_device *vbd;
+	/* The scatter list and its associated fragments */
+	struct uk_sglist sg;
+	struct uk_sglist_seg *sgsegs;
 };
 
+
+static int virtio_blkdev_recv_done(struct virtqueue *vq, void *priv)
+{
+	struct uk_blkdev_queue *queue = NULL;
+
+	UK_ASSERT(vq && priv);
+
+	queue = (struct uk_blkdev_queue *) priv;
+
+	uk_blkdev_drv_queue_event(&queue->vbd->blkdev, queue->lqueue_id);
+
+	return 1;
+}
+
+/**
+ * This function setup the vring infrastructure.
+ */
+static int virtio_blkdev_vqueue_setup(struct uk_blkdev_queue *queue,
+		uint16_t nr_desc)
+{
+	uint16_t max_desc;
+	struct virtqueue *vq;
+
+	UK_ASSERT(queue);
+	max_desc = queue->max_nb_desc;
+	if (unlikely(max_desc < nr_desc)) {
+		uk_pr_err("Max desc: %"__PRIu16" Requested desc:%"__PRIu16"\n",
+			  max_desc, nr_desc);
+		return -ENOBUFS;
+	}
+
+	nr_desc = (nr_desc) ? nr_desc : max_desc;
+	uk_pr_debug("Configuring the %d descriptors\n", nr_desc);
+
+	/* Check if the descriptor is a power of 2 */
+	if (unlikely(nr_desc & (nr_desc - 1))) {
+		uk_pr_err("Expected descriptor count as a power 2\n");
+		return -EINVAL;
+	}
+
+	vq = virtio_vqueue_setup(queue->vbd->vdev, queue->lqueue_id, nr_desc,
+			virtio_blkdev_recv_done, a);
+	if (unlikely(PTRISERR(vq))) {
+		uk_pr_err("Failed to set up virtqueue %"__PRIu16"\n",
+			  queue->lqueue_id);
+		return PTR2ERR(vq);
+	}
+
+	queue->vq = vq;
+	vq->priv = queue;
+
+	return 0;
+}
+
+static struct uk_blkdev_queue *virtio_blkdev_queue_setup(struct uk_blkdev *dev,
+		uint16_t queue_id,
+		uint16_t nb_desc,
+		const struct uk_blkdev_queue_conf *queue_conf)
+{
+	struct virtio_blk_device *vbdev;
+	int rc = 0;
+	struct uk_blkdev_queue *queue;
+
+	UK_ASSERT(dev != NULL);
+	UK_ASSERT(queue_conf != NULL);
+
+	vbdev = to_virtioblkdev(dev);
+	if (unlikely(queue_id >= vbdev->nb_queues)) {
+		uk_pr_err("Invalid queue_id %"__PRIu16"\n", queue_id);
+		rc = -EINVAL;
+		goto err_exit;
+	}
+
+	queue = &vbdev->qs[queue_id];
+	queue->a = queue_conf->a;
+
+	/* Init sglist */
+	queue->sgsegs = uk_malloc(queue->a,
+			vbdev->max_segments * sizeof(*queue->sgsegs));
+	if (unlikely(!queue->sgsegs)) {
+		rc = -ENOMEM;
+		goto err_exit;
+	}
+
+	uk_sglist_init(&queue->sg, vbdev->max_segments,
+			queue->sgsegs);
+	queue->vbd = vbdev;
+	queue->nb_desc = nb_desc;
+	queue->lqueue_id = queue_id;
+
+	/* Setup the virtqueue with the descriptor */
+	rc = virtio_blkdev_vqueue_setup(queue, nb_desc);
+	if (rc < 0) {
+		uk_pr_err("Failed to set up virtqueue %"__PRIu16": %d\n",
+			  queue_id, rc);
+		goto setup_err;
+	}
+
+exit:
+	return queue;
+setup_err:
+	uk_free(queue->a, queue->sgsegs);
+err_exit:
+	queue = ERR2PTR(rc);
+	goto exit;
+}
+
+static int virtio_blkdev_queue_release(struct uk_blkdev *dev,
+		struct uk_blkdev_queue *queue)
+{
+	struct virtio_blk_device *vbdev;
+	int rc = 0;
+
+	UK_ASSERT(dev != NULL);
+	vbdev = to_virtioblkdev(dev);
+
+	uk_free(queue->a, queue->sgsegs);
+	virtio_vqueue_release(vbdev->vdev, queue->vq, queue->a);
+
+	return rc;
+}
+
+static int virtio_blkdev_queue_info_get(struct uk_blkdev *dev,
+		uint16_t queue_id,
+		struct uk_blkdev_queue_info *qinfo)
+{
+	struct virtio_blk_device *vbdev = NULL;
+	struct uk_blkdev_queue *queue = NULL;
+	int rc = 0;
+
+	UK_ASSERT(dev);
+	UK_ASSERT(qinfo);
+
+	vbdev = to_virtioblkdev(dev);
+	if (unlikely(queue_id >= vbdev->nb_queues)) {
+		uk_pr_err("Invalid queue_id %"__PRIu16"\n", queue_id);
+		rc = -EINVAL;
+		goto exit;
+	}
+
+	queue = &vbdev->qs[queue_id];
+	qinfo->nb_min = queue->max_nb_desc;
+	qinfo->nb_max = queue->max_nb_desc;
+	qinfo->nb_is_power_of_two = 1;
+
+exit:
+	return rc;
+}
 
 static int virtio_blkdev_queues_alloc(struct virtio_blk_device *vbdev,
 				    const struct uk_blkdev_conf *conf)
@@ -176,6 +337,8 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 	__sector sectors;
 	__sector ssize;
 	__u16 num_queues;
+	__u32 max_segments;
+	__u32 max_size_segment;
 	int rc = 0;
 
 	UK_ASSERT(vbdev);
@@ -227,13 +390,50 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 		}
 	} else
 		num_queues = 1;
+
+	if (virtio_has_features(host_features, VIRTIO_BLK_F_SEG_MAX)) {
+		bytes_to_read = virtio_config_get(vbdev->vdev,
+			__offsetof(struct virtio_blk_config, seg_max),
+			&max_segments,
+			sizeof(max_segments),
+			1);
+		if (bytes_to_read != sizeof(max_segments))  {
+			uk_pr_err("Failed to get maximum nb of segments\n");
+			rc = -EAGAIN;
+			goto exit;
+		}
+	} else
+		max_segments = 1;
+
+	/* We need extra sg elements for head (header) and tail (status). */
+	max_segments += 2;
+
+	if (virtio_has_features(host_features, VIRTIO_BLK_F_SIZE_MAX)) {
+		bytes_to_read = virtio_config_get(vbdev->vdev,
+			__offsetof(struct virtio_blk_config, size_max),
+			&max_size_segment,
+			sizeof(max_size_segment),
+			1);
+		if (bytes_to_read != sizeof(max_size_segment))  {
+			uk_pr_err("Failed to get size max from device %d\n",
+					rc);
+			rc = -EAGAIN;
+			goto exit;
+		}
+	} else
+		max_size_segment = __PAGE_SIZE;
+
 	cap->ssize = ssize;
 	cap->sectors = sectors;
 	cap->ioalign = sizeof(void *);
 	cap->mode = (virtio_has_features(
 			host_features, VIRTIO_BLK_F_RO)) ? O_RDONLY : O_RDWR;
+	cap->max_sectors_per_req =
+			max_size_segment / ssize * (max_segments - 2);
 
 	vbdev->max_vqueue_pairs = num_queues;
+	vbdev->max_segments = max_segments;
+	vbdev->max_size_segment = max_size_segment;
 
 	/**
 	 * Mask out features supported by both driver and device.
@@ -256,6 +456,9 @@ static inline void virtio_blkdev_feature_set(struct virtio_blk_device *vbdev)
 static const struct uk_blkdev_ops virtio_blkdev_ops = {
 		.get_info = virtio_blkdev_get_info,
 		.dev_configure = virtio_blkdev_configure,
+		.queue_get_info = virtio_blkdev_queue_info_get,
+		.queue_setup = virtio_blkdev_queue_setup,
+		.queue_release = virtio_blkdev_queue_release,
 		.dev_unconfigure = virtio_blkdev_unconfigure,
 };
 
