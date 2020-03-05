@@ -18,20 +18,58 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <uk/print.h>
+#include <errno.h>
+#include <fcntl.h>
 #include <virtio/virtio_bus.h>
 #include <virtio/virtio_ids.h>
+#include <uk/blkdev.h>
+#include <uk/blkdev_driver.h>
 
 #define DRIVER_NAME		"virtio-blk"
 
+#define to_virtioblkdev(bdev) \
+	__containerof(bdev, struct virtio_blk_device, blkdev)
+
+
 static struct uk_alloc *a;
+static const char *drv_name = DRIVER_NAME;
+
+struct virtio_blk_device {
+	/* Pointer to Unikraft Block Device */
+	struct uk_blkdev blkdev;
+	/* The blkdevice identifier */
+	__u16 uid;
+};
 
 static int virtio_blk_add_dev(struct virtio_dev *vdev)
 {
+	struct virtio_blk_device *vbdev;
 	int rc = 0;
 
 	UK_ASSERT(vdev != NULL);
 
+	vbdev = uk_calloc(a, 1, sizeof(*vbdev));
+	if (!vbdev)
+		return -ENOMEM;
+
+	rc = uk_blkdev_drv_register(&vbdev->blkdev, a, drv_name);
+	if (rc < 0) {
+		uk_pr_err("Failed to register virtio_blk device: %d\n", rc);
+		goto err_out;
+	}
+
+	vbdev->uid = rc;
+	uk_pr_info("Virtio-blk device registered with libukblkdev\n");
+
+out:
 	return rc;
+err_out:
+	uk_free(a, vbdev);
+	goto out;
 }
 
 static int virtio_blk_drv_init(struct uk_alloc *drv_allocator)
