@@ -52,6 +52,8 @@
 #include <common/gnttab.h>
 #include <common/events.h>
 
+#define BLK_RING_PAGES_NUM 1
+
 #if CONFIG_XEN_BLKFRONT_GREFPOOL
 /**
  * Structure used to describe a list of blkfront_gref elements.

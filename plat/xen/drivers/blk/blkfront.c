@@ -562,7 +562,7 @@ static int blkfront_ring_init(struct uk_blkdev_queue *queue)
 
 	UK_ASSERT(queue);
 	dev = queue->dev;
-	sring = uk_palloc(queue->a, 1);
+	sring = uk_palloc(queue->a, BLK_RING_PAGES_NUM);
 	if (!sring)
 		return -ENOMEM;
 
@@ -587,7 +587,7 @@ static void blkfront_ring_fini(struct uk_blkdev_queue *queue)
 	}
 
 	if (queue->ring.sring != NULL)
-		uk_pfree(queue->a, queue->ring.sring, 0);
+		uk_pfree(queue->a, queue->ring.sring, BLK_RING_PAGES_NUM);
 }
 
 #if CONFIG_XEN_BLKFRONT_GREFPOOL
