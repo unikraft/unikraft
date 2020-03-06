@@ -360,6 +360,7 @@ static int blkfront_xb_write_rings_info(struct blkfront_dev *dev)
 
 	UK_ASSERT(dev != NULL);
 
+again:
 	err = xs_transaction_start(&xbt);
 	if (err)
 		goto abort_transaction;
@@ -375,6 +376,9 @@ static int blkfront_xb_write_rings_info(struct blkfront_dev *dev)
 	}
 
 	err = xs_transaction_end(xbt, 0);
+	if (err == -EAGAIN)
+		goto again;
+
 	if (err)
 		uk_pr_err("Failed to end transaction: %d\n", err);
 
