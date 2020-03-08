@@ -101,6 +101,12 @@ void *mmap(void *addr, size_t len, int prot,
 		return (void *) -1;
 	}
 	new = uk_malloc(uk_alloc_get_default(), sizeof(struct mmap_addr));
+
+	if (!new) {
+		uk_free(uk_alloc_get_default(), mem);
+		errno = ENOMEM;
+		return (void *) -1;
+	}
 	new->begin = mem;
 	new->end = mem + len;
 	new->next = NULL;
