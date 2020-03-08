@@ -1803,6 +1803,12 @@ int futimesat(int dirfd, const char *pathname, const struct timeval times[2])
 
 	/* build absolute path */
 	absolute_path = (char*)malloc(PATH_MAX);
+	if (!absolute_path) {
+		fdrop(fp);
+		error = EFAULT;
+		goto out_errno;
+	}
+
 	strlcpy(absolute_path, fp->f_dentry->d_mount->m_path, PATH_MAX);
 	strlcat(absolute_path, fp->f_dentry->d_path, PATH_MAX);
 
