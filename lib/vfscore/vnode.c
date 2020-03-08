@@ -209,7 +209,7 @@ vfscore_vget(struct mount *mp, uint64_t ino, struct vnode **vpp)
 	if ((error = VFS_VGET(mp, vp)) != 0) {
 		VNODE_UNLOCK();
 		free(vp);
-		return error;
+		return 0;
 	}
 	vfs_busy(vp->v_mount);
 	uk_mutex_lock(&vp->v_lock);
