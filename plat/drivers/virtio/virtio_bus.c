@@ -208,7 +208,7 @@ static int virtio_bus_init(struct uk_alloc *mem_alloc)
 				dev_count++;
 		}
 	}
-	return (dev_count > 0) ? dev_count : -1;
+	return (dev_count > 0) ? dev_count : 0;
 }
 
 /**
