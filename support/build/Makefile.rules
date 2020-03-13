@@ -113,14 +113,17 @@ endef
 # vprefix_lib $libname,$varname(s)
 vprefix_lib = $(addprefix $(call uc,$(1))_,$(2))
 
-# vprefix_src $libname,$source,$varname(s)
+# vprefix_src $libname,$source,$variant,$varname(s)
+#  file-local variable: LIBNAME_FILENAME_[VARIANT_]VARNAME
+#
+#  Note: We need to `strip` the result because the multiline `if` statement
+#        causes whitespaces. Because the output is directly used to to refer to a
+#        variable, this is especially important here.
 define vprefix_src =
-$(call vprefix_lib,$(1),$(addprefix $(call uc,$(basename $(notdir $(2))))_,$(3)))
-endef
-
-# vprefix_srcv $libname,$source,$variant,$varname(s)
-define vprefix_srcv =
-$(call vprefix_src,$(1),$(2),$(addprefix $(call uc,$(3))_,$(4)))
+$(strip $(if $(3),\
+$(call vprefix_lib,$(1),$(addprefix $(call uc,$(basename $(notdir $(2))))_$(call uc,$(3))_,$(4))),\
+$(call vprefix_lib,$(1),$(addprefix $(call uc,$(basename $(notdir $(2))))_,$(4)))\
+))
 endef
 
 
@@ -248,7 +251,7 @@ endif
 #
 # build_cmd_fixdep $quietlabel,$libname(optional),$target,$command
 tmp_depfile = $(dir $1).$(notdir $1).d
-depflags = -Wp$(comma)-MD$(comma)$(call tmp_depfile,$(3))
+depflags = -Wp$(comma)-MD$(comma)$(call tmp_depfile,$(1))
 define build_cmd_fixdep =
 	$(call build_cmd,$1,$2,$3,$4)
 	$Q $(UK_FIXDEP) $(call tmp_depfile,$3) $3 '$(call strip,$4)' \
@@ -375,80 +378,96 @@ endef
 # Generates a build rule for an object of a library
 # Adds library-specific (AS/C/CXX)FLAGS to the build
 #
-# buildrule_* $libname,$source,$target,$extraflags(optional)
+# buildrule_* $libname,$source,$variant,$target,$extraflags
 
 define buildrule_S_ =
-$(3): $(2) | prepare
-	$(call build_cmd_fixdep,AS,$(1),$(3),\
+$(4): $(2) | prepare
+	$(call build_cmd_fixdep,AS,$(1),$(4),\
 		$(AS)  $(ASINCLUDES) $(ASINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),ASINCLUDES)) $($(call vprefix_lib,$(1),ASINCLUDES-y)) \
-		       $(ASFLAGS) $(ASFLAGS-y) $(DBGFLAGS) $(DBGFLAGS-y) \
+		       $($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
+		       $(ASFLAGS) $(ASFLAGS-y) \
 		       $($(call vprefix_lib,$(1),ASFLAGS)) $($(call vprefix_lib,$(1),ASFLAGS-y)) \
-		       $(4) -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) \
-		       -c $(2) -o $(3) $(depflags)
+		       $($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
+		       $(5) \
+		       $(DBGFLAGS) $(DBGFLAGS-y) \
+		       -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) $(if $(3),-D__VARIANT__=$(3)) \
+		       -c $(2) -o $(4) $(call depflags,$(4))
 	)
 
 UK_SRCS-y += $(2)
-UK_DEPS-y += $(call out2dep,$(3))
-UK_OBJS-y += $(3)
-$(eval $(call vprefix_lib,$(1),OBJS-y) += $(3))
-$(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(3)) $(call out2dep,$(3)))
+UK_DEPS-y += $(call out2dep,$(4))
+UK_OBJS-y += $(4)
+$(eval $(call vprefix_lib,$(1),OBJS-y) += $(4))
+$(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(4)) $(call out2dep,$(4)))
 endef
 
 buildrule_sx = $(call buildrule_S_,$(1),$(2),$(3),$(4))
 
 define buildrule_s =
-$(3): $(2) | prepare
-	$(call build_cmd,AS,$(1),$(3),\
+$(4): $(2) | prepare
+	$(call build_cmd,AS,$(1),$(4),\
 		$(AS)  $(ASINCLUDES) $(ASINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),ASINCLUDES)) $($(call vprefix_lib,$(1),ASINCLUDES-y)) \
-		       $(ASFLAGS) $(ASFLAGS-y) $(DBGFLAGS) $(DBGFLAGS-y) \
+		       $($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
+		       $(ASFLAGS) $(ASFLAGS-y) \
 		       $($(call vprefix_lib,$(1),ASFLAGS)) $($(call vprefix_lib,$(1),ASFLAGS-y)) \
-		       $(4) -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) \
-		       -c $(2) -o $(3)
+		       $($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
+		       $(5) \
+		       $(DBGFLAGS) $(DBGFLAGS-y) \
+		       -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) $(if $(3),-D__VARIANT__=$(3)) \
+		       -c $(2) -o $(4)
 	)
 
 UK_SRCS-y += $(2)
-UK_DEPS-y += $(call out2dep,$(3))
-UK_OBJS-y += $(3)
-$(eval $(call vprefix_lib,$(1),OBJS-y) += $(3))
-$(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(3)) $(call out2dep,$(3)))
+UK_DEPS-y += $(call out2dep,$(4))
+UK_OBJS-y += $(4)
+$(eval $(call vprefix_lib,$(1),OBJS-y) += $(4))
+$(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(4)) $(call out2dep,$(4)))
 endef
 
 define buildrule_c =
-$(3): $(2) | prepare
-	$(call build_cmd_fixdep,CC,$(1),$(3),\
+$(4): $(2) | prepare
+	$(call build_cmd_fixdep,CC,$(1),$(4),\
 		$(CC)  $(CINCLUDES) $(CINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),CINCLUDES)) $($(call vprefix_lib,$(1),CINCLUDES-y)) \
-		       $(CFLAGS) $(CFLAGS-y) $(DBGFLAGS) $(DBGFLAGS-y) \
+		       $($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
+		       $(CFLAGS) $(CFLAGS-y) \
 		       $($(call vprefix_lib,$(1),CFLAGS)) $($(call vprefix_lib,$(1),CFLAGS-y)) \
-		       $(4) -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) \
-		       -c $(2) -o $(3) $(depflags)
+		       $($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
+		       $(5) \
+		       $(DBGFLAGS) $(DBGFLAGS-y) \
+		       -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) $(if $(3),-D__VARIANT__=$(3)) \
+		       -c $(2) -o $(4) $(call depflags,$(4))
 )
 
 UK_SRCS-y += $(2)
-UK_DEPS-y += $(call out2dep,$(3))
-UK_OBJS-y += $(3)
-$(eval $(call vprefix_lib,$(1),OBJS-y) += $(3))
-$(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(3)) $(call out2dep,$(3)))
+UK_DEPS-y += $(call out2dep,$(4))
+UK_OBJS-y += $(4)
+$(eval $(call vprefix_lib,$(1),OBJS-y) += $(4))
+$(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(4)) $(call out2dep,$(4)))
 endef
 
 define buildrule_cc =
-$(3): $(2) | prepare
-	$(call build_cmd_fixdep,CXX,$(1),$(3),\
+$(4): $(2) | prepare
+	$(call build_cmd_fixdep,CXX,$(1),$(4),\
 		$(CXX) $(CXXINCLUDES) $(CXXINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),CXXINCLUDES)) $($(call vprefix_lib,$(1),CXXINCLUDES-y)) \
-		       $(CXXFLAGS) $(CXXFLAGS-y) $(DBGFLAGS) $(DBGFLAGS-y) \
+		       $($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
+		       $(CXXFLAGS) $(CXXFLAGS-y) \
 		       $($(call vprefix_lib,$(1),CXXFLAGS)) $($(call vprefix_lib,$(1),CXXFLAGS-y)) \
-		       $(4) -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) \
-		       -c $(2) -o $(3) $(depflags)
+		       $($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
+		       $(5) \
+		       $(DBGFLAGS) $(DBGFLAGS-y) \
+		       -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) $(if $(3),-D__VARIANT__=$(3)) \
+		       -c $(2) -o $(4) $(call depflags,$(4))
 	)
 
 UK_SRCS-y += $(2)
-UK_DEPS-y += $(call out2dep,$(3))
-UK_OBJS-y += $(3)
-$(eval $(call vprefix_lib,$(1),OBJS-y) += $(3))
-$(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(3)) $(call out2dep,$(3)))
+UK_DEPS-y += $(call out2dep,$(4))
+UK_OBJS-y += $(4)
+$(eval $(call vprefix_lib,$(1),OBJS-y) += $(4))
+$(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(4)) $(call out2dep,$(4)))
 endef
 
 # Aliases for C++ sources
@@ -460,21 +479,25 @@ buildrule_C   = $(call buildrule_cc,$(1),$(2),$(3),$(4))
 buildrule_c$(plus)$(plus) = $(call buildrule_cc,$(1),$(2),$(3),$(4))
 
 define buildrule_go =
-$(3): $(2) | prepare
-	$(call build_cmd,GOC,$(1),$(3),\
+$(4): $(2) | prepare
+	$(call build_cmd,GOC,$(1),$(4),\
 		$(GOC) $(GOCINCLUDES) $(GOCINCLUDES-y) \
-			$($(call vprefix_lib,$(1),GOCINCLUDES)) $($(call vprefix_lib,$(1),GOCINCLUDES-y)) \
-			$(GOCFLAGS) $(GOCFLAGS-y) $(DBGFLAGS) $(DBGFLAGS-y) \
-			$($(call vprefix_lib,$(1),GOCFLAGS)) $($(call vprefix_lib,$(1),GOCFLAGS-y)) \
-			$(4) -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) \
-			-c $(2) -o $(3) $(depflags)
+		       $($(call vprefix_lib,$(1),GOCINCLUDES)) $($(call vprefix_lib,$(1),GOCINCLUDES-y)) \
+		       $($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
+		       $(GOCFLAGS) $(GOCFLAGS-y) \
+		       $($(call vprefix_lib,$(1),GOCFLAGS)) $($(call vprefix_lib,$(1),GOCFLAGS-y)) \
+		       $($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
+		       $(5) \
+		       $(DBGFLAGS) $(DBGFLAGS-y) \
+		       -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) $(if $(3),-D__VARIANT__=$(3)) \
+		       -c $(2) -o $(4) $(call depflags,$(4))
 	)
 
 UK_SRCS-y += $(2)
-UK_DEPS-y += $(call out2dep,$(3))
-UK_OBJS-y += $(3)
-$(eval $(call vprefix_lib,$(1),OBJS-y) += $(3))
-$(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(3)) $(call out2dep,$(3)))
+UK_DEPS-y += $(call out2dep,$(4))
+UK_OBJS-y += $(4)
+$(eval $(call vprefix_lib,$(1),OBJS-y) += $(4))
+$(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(4)) $(call out2dep,$(4)))
 endef
 
 define add_lds_to_plat =
@@ -486,35 +509,39 @@ $(eval EXTRA_LD_SCRIPT-y += $(1))
 endef
 
 define buildrule_S_lds =
-$(3): $(2) | prepare
-	$(call build_cmd_fixdep,LDS,$(1),$(3),\
-		$(AS)  -E -P -x assembler-with-cpp $(ASINCLUDES) $(ASINCLUDES-y) \
+$(4): $(2) | prepare
+	$(call build_cmd_fixdep,LDS,$(1),$(4),\
+		$(AS)  -E -P -x assembler-with-cpp $(COMPFLAGS) $(COMPFLAGS-y) \
+		       $(ASINCLUDES) $(ASINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),ASINCLUDES)) $($(call vprefix_lib,$(1),ASINCLUDES-y)) \
+		       $($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
+		       $(ARCHFLAGS) $(ARCHFLAGS-y) \
 		       $(ASFLAGS) $(ASFLAGS-y) \
 		       $($(call vprefix_lib,$(1),ASFLAGS)) $($(call vprefix_lib,$(1),ASFLAGS-y)) \
-		       $(4) \
-		       $(2) -o $(3) $(depflags)
+		       $($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
+		       $(5) \
+		       $(2) -o $(4) $(call depflags,$(4))
 	)
 
 UK_SRCS-y += $(2)
-UK_LDS-y += $(3)
-UK_DEPS-y += $(call out2dep,$(3))
-$(eval $(call vprefix_lib,$(1),LDS-y) += $(3))
-$(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(3)) $(call out2dep,$(3)))
+UK_LDS-y += $(4)
+UK_DEPS-y += $(call out2dep,$(4))
+$(eval $(call vprefix_lib,$(1),LDS-y) += $(4))
+$(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(4)) $(call out2dep,$(4)))
 
 $(if $(strip $($(call uc,$(1))_PLATS)),\
 	$(foreach p,$($(call uc,$(1))_PLATS),\
 		$(if $(filter $(UK_PLAT_$(p)_DEF_LDS),$(2)),\
-			$(eval UK_PLAT_$(p)_DEF_LDS := $(3)),\
-			$(call add_lds_to_plat,$(3),$(p)))),\
-		$(call add_lds_to_lib,$(3))\
+			$(eval UK_PLAT_$(p)_DEF_LDS := $(4)),\
+			$(call add_lds_to_plat,$(4),$(p)))),\
+		$(call add_lds_to_lib,$(4))\
 )
 endef
 
 # buildrule for *.S files: differentiate between *.lds.S, *.S
 define buildrule_S =
-$(if $(filter %.lds.S,$(2)),$(call buildrule_S_lds,$(1),$(2),$(3),$(4)),\
-$(call buildrule_S_,$(1),$(2),$(3),$(4))
+$(if $(filter %.lds.S,$(2)),$(call buildrule_S_lds,$(1),$(2),$(3),$(4),$(5)),\
+$(call buildrule_S_,$(1),$(2),$(3),$(4),$(5))
 )
 endef
 
@@ -534,14 +561,14 @@ $(if $(strip $($(call uc,$(1))_PLATS)),\
 endef
 
 define buildrule_dts =
-$(3) : $(2) | prepare
-	$(call build_cmd,DTC,$(1),$(3),\
+$(4) : $(2) | prepare
+	$(call build_cmd,DTC,$(1),$(4),\
 	       $(DTC) -I dts -O dtb -o $$(@) $$(<)\
 	)
 
 UK_SRCS-y += $(2)
-$(eval $(call vprefix_lib,$(1),DTB-y) += $(3))
-$(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(3)))
+$(eval $(call vprefix_lib,$(1),DTB-y) += $(4))
+$(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(4)))
 endef
 
 # wrapper for buildrule_*,
@@ -555,7 +582,7 @@ define buildrule =
 $(if $(filter buildrule_$(call fileext,$(strip $(2))),$(.VARIABLES)),,\
 $(error buildrule_$(call fileext,$(strip $(2))) is not defined: Failed to install rule for $(2)))
 
-$(call buildrule_$(call fileext,$(strip $(2))),$(strip $(1)),$(strip $(2)),$(strip $(3)),$(strip $(4)))
+$(call buildrule_$(call fileext,$(strip $(2))),$(strip $(1)),$(strip $(2)),$(strip $(3)),$(strip $(4)),$(strip $(5)))
 endef
 
 #################################################
@@ -617,18 +644,7 @@ $(if $(filter %.lds.S,$(2)),\
 	$(if $(filter %.dts,$(2)),\
 		$(eval target=$(call dts2dtb,$(1),$(2))),\
 		$(eval target=$(call src2obj,$(1),$(2),$(3)))))
-$(eval $(call buildrule,$(1),$(2),$(target),\
-  $($(call vprefix_src,$(1),$(2),INCLUDES))\
-  $($(call vprefix_src,$(1),$(2),INCLUDES-y))\
-  $($(call vprefix_src,$(1),$(2),FLAGS))\
-  $($(call vprefix_src,$(1),$(2),FLAGS-y))\
-  $(if $(3),\
-   $($(call vprefix_srcv,$(1),$(2),$(3),INCLUDES))\
-   $($(call vprefix_srcv,$(1),$(2),$(3),INCLUDES-y))\
-   $($(call vprefix_srcv,$(1),$(2),$(3),FLAGS))\
-   $($(call vprefix_srcv,$(1),$(2),$(3),FLAGS-y))\
-  ,)\
-))
+$(eval $(call buildrule,$(1),$(2),$(3),$(target),))
 endef
 
 # Calls the pre-process rule wrapper with translated source and target filename
