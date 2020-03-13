@@ -1,9 +1,5 @@
-ASFLAGS  += -D__X86_64__
-ASFLAGS  += -m64
-CFLAGS   += -D__X86_64__
-CFLAGS   += -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables
-CXXFLAGS += -D__X86_64__
-CXXFLAGS += -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables
+ARCHFLAGS     += -D__X86_64__
+ARCHFLAGS     += -m64 -mno-red-zone -fno-reorder-blocks -fno-asynchronous-unwind-tables
 
 CINCLUDES   += -I$(CONFIG_UK_BASE)/arch/x86/x86_64/include
 ASINCLUDES  += -I$(CONFIG_UK_BASE)/arch/x86/x86_64/include
@@ -13,48 +9,18 @@ CXXINCLUDES += -I$(CONFIG_UK_BASE)/arch/x86/x86_64/include
 # This is for files that contain trap/exception/interrupt handlers
 NO_X86_EXTREGS_FLAGS := -mno-80387 -mno-fp-ret-in-387 -mno-mmx -mno-sse -mno-avx
 
-ASFLAGS-$(CONFIG_MARCH_X86_64_GENERIC)     += -mtune=generic
-CFLAGS-$(CONFIG_MARCH_X86_64_GENERIC)      += -mtune=generic
-CXXFLAGS-$(CONFIG_MARCH_X86_64_GENERIC)    += -mtune=generic
-ASFLAGS-$(CONFIG_MARCH_X86_64_NOCONA)      += -march=nocona
-CFLAGS-$(CONFIG_MARCH_X86_64_NOCONA)       += -march=nocona
-CXXFLAGS-$(CONFIG_MARCH_X86_64_NOCONA)     += -march=nocona
-ASFLAGS-$(CONFIG_MARCH_X86_64_CORE2)       += -march=core2
-CFLAGS-$(CONFIG_MARCH_X86_64_CORE2)        += -march=core2
-CXXFLAGS-$(CONFIG_MARCH_X86_64_CORE2)      += -march=core2
-ASFLAGS-$(CONFIG_MARCH_X86_64_COREI7)      += -march=corei7
-CFLAGS-$(CONFIG_MARCH_X86_64_COREI7)       += -march=corei7
-CXXFLAGS-$(CONFIG_MARCH_X86_64_COREI7)     += -march=corei7
-ASFLAGS-$(CONFIG_MARCH_X86_64_COREI7AVX)   += -march=corei7-avx
-CFLAGS-$(CONFIG_MARCH_X86_64_COREI7AVX)    += -march=corei7-avx
-CXXFLAGS-$(CONFIG_MARCH_X86_64_COREI7AVX)  += -march=corei7-avx
-ASFLAGS-$(CONFIG_MARCH_X86_64_COREI7AVXI)  += -march=core-avx-i
-CFLAGS-$(CONFIG_MARCH_X86_64_COREI7AVXI)   += -march=core-avx-i
-CXXFLAGS-$(CONFIG_MARCH_X86_64_COREI7AVXI) += -march=core-avx-i
-ASFLAGS-$(CONFIG_MARCH_X86_64_ATOM)        += -march=atom
-CFLAGS-$(CONFIG_MARCH_X86_64_ATOM)         += -march=atom
-CXXFLAGS-$(CONFIG_MARCH_X86_64_ATOM)       += -march=atom
-ASFLAGS-$(CONFIG_MARCH_X86_64_K8)          += -march=k8
-CFLAGS-$(CONFIG_MARCH_X86_64_K8)           += -march=k8
-CXXFLAGS-$(CONFIG_MARCH_X86_64_K8)         += -march=k8
-ASFLAGS-$(CONFIG_MARCH_X86_64_K8SSE3)      += -march=k8-sse3
-CFLAGS-$(CONFIG_MARCH_X86_64_K8SSE3)       += -march=k8-sse3
-CXXFLAGS-$(CONFIG_MARCH_X86_64_K8SSE3)     += -march=k8-sse3
-ASFLAGS-$(CONFIG_MARCH_X86_64_AMDFAM10)    += -march=amdfam10
-CFLAGS-$(CONFIG_MARCH_X86_64_AMDFAM10)     += -march=amdfam10
-CXXFLAGS-$(CONFIG_MARCH_X86_64_AMDFAM10)   += -march=amdfam10
-ASFLAGS-$(CONFIG_MARCH_X86_64_BDVER1)      += -march=bdver1
-CFLAGS-$(CONFIG_MARCH_X86_64_BDVER1)       += -march=bdver1
-CXXFLAGS-$(CONFIG_MARCH_X86_64_BDVER1)     += -march=bdver1
-ASFLAGS-$(CONFIG_MARCH_X86_64_BDVER2)      += -march=bdver2
-CFLAGS-$(CONFIG_MARCH_X86_64_BDVER2)       += -march=bdver2
-CXXFLAGS-$(CONFIG_MARCH_X86_64_BDVER2)     += -march=bdver2
-ASFLAGS-$(CONFIG_MARCH_X86_64_BDVER3)      += -march=bdver3
-CFLAGS-$(CONFIG_MARCH_X86_64_BDVER3)       += -march=bdver3
-CXXFLAGS-$(CONFIG_MARCH_X86_64_BDVER3)     += -march=bdver3
-ASFLAGS-$(CONFIG_MARCH_X86_64_BTVER1)      += -march=btver1
-CFLAGS-$(CONFIG_MARCH_X86_64_BTVER1)       += -march=btver1
-CXXFLAGS-$(CONFIG_MARCH_X86_64_BTVER1)     += -march=btver1
-ASFLAGS-$(CONFIG_MARCH_X86_64_BTVER2)      += -march=btver2
-CFLAGS-$(CONFIG_MARCH_X86_64_BTVER2)       += -march=btver2
-CXXFLAGS-$(CONFIG_MARCH_X86_64_BTVER2)     += -march=btver2
+ARCHFLAGS-$(CONFIG_MARCH_X86_64_GENERIC)        += -mtune=generic
+ARCHFLAGS-$(CONFIG_MARCH_X86_64_NOCONA)         += -march=nocona
+ARCHFLAGS-$(CONFIG_MARCH_X86_64_CORE2)          += -march=core2
+ARCHFLAGS-$(CONFIG_MARCH_X86_64_COREI7)         += -march=corei7
+ARCHFLAGS-$(CONFIG_MARCH_X86_64_COREI7AVX)      += -march=corei7-avx
+ARCHFLAGS-$(CONFIG_MARCH_X86_64_COREI7AVXI)     += -march=core-avx-i
+ARCHFLAGS-$(CONFIG_MARCH_X86_64_ATOM)           += -march=atom
+ARCHFLAGS-$(CONFIG_MARCH_X86_64_K8)             += -march=k8
+ARCHFLAGS-$(CONFIG_MARCH_X86_64_K8SSE3)         += -march=k8-sse3
+ARCHFLAGS-$(CONFIG_MARCH_X86_64_AMDFAM10)       += -march=amdfam10
+ARCHFLAGS-$(CONFIG_MARCH_X86_64_BDVER1)         += -march=bdver1
+ARCHFLAGS-$(CONFIG_MARCH_X86_64_BDVER2)         += -march=bdver2
+ARCHFLAGS-$(CONFIG_MARCH_X86_64_BDVER3)         += -march=bdver3
+ARCHFLAGS-$(CONFIG_MARCH_X86_64_BTVER1)         += -march=btver1
+ARCHFLAGS-$(CONFIG_MARCH_X86_64_BTVER2)         += -march=btver2

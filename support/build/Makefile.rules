@@ -383,9 +383,12 @@ endef
 define buildrule_S_ =
 $(4): $(2) | prepare
 	$(call build_cmd_fixdep,AS,$(1),$(4),\
-		$(AS)  $(ASINCLUDES) $(ASINCLUDES-y) \
+		$(AS)  $(COMPFLAGS) $(COMPFLAGS-y) \
+		       $($(call vprefix_lib,$(1),COMPFLAGS)) $($(call vprefix_lib,$(1),COMPFLAGS-y)) \
+		       $(ASINCLUDES) $(ASINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),ASINCLUDES)) $($(call vprefix_lib,$(1),ASINCLUDES-y)) \
 		       $($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
+		       $(ARCHFLAGS) $(ARCHFLAGS-y) \
 		       $(ASFLAGS) $(ASFLAGS-y) \
 		       $($(call vprefix_lib,$(1),ASFLAGS)) $($(call vprefix_lib,$(1),ASFLAGS-y)) \
 		       $($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
@@ -407,9 +410,12 @@ buildrule_sx = $(call buildrule_S_,$(1),$(2),$(3),$(4))
 define buildrule_s =
 $(4): $(2) | prepare
 	$(call build_cmd,AS,$(1),$(4),\
-		$(AS)  $(ASINCLUDES) $(ASINCLUDES-y) \
+		$(AS)  $(COMPFLAGS) $(COMPFLAGS-y) \
+		       $($(call vprefix_lib,$(1),COMPFLAGS)) $($(call vprefix_lib,$(1),COMPFLAGS-y)) \
+		       $(ASINCLUDES) $(ASINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),ASINCLUDES)) $($(call vprefix_lib,$(1),ASINCLUDES-y)) \
 		       $($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
+		       $(ARCHFLAGS) $(ARCHFLAGS-y) \
 		       $(ASFLAGS) $(ASFLAGS-y) \
 		       $($(call vprefix_lib,$(1),ASFLAGS)) $($(call vprefix_lib,$(1),ASFLAGS-y)) \
 		       $($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
@@ -429,9 +435,12 @@ endef
 define buildrule_c =
 $(4): $(2) | prepare
 	$(call build_cmd_fixdep,CC,$(1),$(4),\
-		$(CC)  $(CINCLUDES) $(CINCLUDES-y) \
+		$(CC)  $(COMPFLAGS) $(COMPFLAGS-y) \
+		       $($(call vprefix_lib,$(1),COMPFLAGS)) $($(call vprefix_lib,$(1),COMPFLAGS-y)) \
+		       $(CINCLUDES) $(CINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),CINCLUDES)) $($(call vprefix_lib,$(1),CINCLUDES-y)) \
 		       $($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
+		       $(ARCHFLAGS) $(ARCHFLAGS-y) \
 		       $(CFLAGS) $(CFLAGS-y) \
 		       $($(call vprefix_lib,$(1),CFLAGS)) $($(call vprefix_lib,$(1),CFLAGS-y)) \
 		       $($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
@@ -451,9 +460,11 @@ endef
 define buildrule_cxx =
 $(4): $(2) | prepare
 	$(call build_cmd_fixdep,CXX,$(1),$(4),\
-		$(CXX) $(CXXINCLUDES) $(CXXINCLUDES-y) \
+		$(CXX) $(COMPFLAGS) $(COMPFLAGS-y) \
+		       $(CXXINCLUDES) $(CXXINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),CXXINCLUDES)) $($(call vprefix_lib,$(1),CXXINCLUDES-y)) \
 		       $($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
+		       $(ARCHFLAGS) $(ARCHFLAGS-y) \
 		       $(CXXFLAGS) $(CXXFLAGS-y) \
 		       $($(call vprefix_lib,$(1),CXXFLAGS)) $($(call vprefix_lib,$(1),CXXFLAGS-y)) \
 		       $($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
@@ -481,9 +492,11 @@ buildrule_c$(plus)$(plus) = $(call buildrule_cxx,$(1),$(2),$(3),$(4))
 define buildrule_go =
 $(4): $(2) | prepare
 	$(call build_cmd,GOC,$(1),$(4),\
-		$(GOC) $(GOCINCLUDES) $(GOCINCLUDES-y) \
+		$(GOC) $(COMPFLAGS) $(COMPFLAGS-y) \
+		       $(GOCINCLUDES) $(GOCINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),GOCINCLUDES)) $($(call vprefix_lib,$(1),GOCINCLUDES-y)) \
 		       $($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
+		       $(ARCHFLAGS) $(ARCHFLAGS-y) \
 		       $(GOCFLAGS) $(GOCFLAGS-y) \
 		       $($(call vprefix_lib,$(1),GOCFLAGS)) $($(call vprefix_lib,$(1),GOCFLAGS-y)) \
 		       $($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \

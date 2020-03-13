@@ -4,23 +4,19 @@
 #
 ################################################################################
 
-ASFLAGS     += -U __linux__ -U __FreeBSD__ -U __sun__ -D__ASSEMBLY__
-ASINCLUDES  += -nostdinc -nostdlib -I$(CONFIG_UK_BASE)/include
+COMPFLAGS    += -nostdinc -nostdlib
+COMPFLAGS    += -U __linux__ -U __FreeBSD__ -U __sun__
+COMPFLAGS    += -fno-stack-protector -fno-omit-frame-pointer -fno-tree-sra
+COMPFLAGS    += -Wall -Wextra
 
-CFLAGS      += -U __linux__ -U __FreeBSD__ -U __sun__
-CFLAGS      += -fno-stack-protector -fno-omit-frame-pointer -fno-tree-sra
-CFLAGS      += -Wall -Wextra
-CINCLUDES   += -nostdinc -nostdlib -I$(CONFIG_UK_BASE)/include
+# TODO: Remove -fms-extensions if not needed for our code (it was moved from Arm64 arch)
+CFLAGS       += -fms-extensions
+ASFLAGS      += -D__ASSEMBLY__
 
-CXXFLAGS    += -U __linux__ -U __FreeBSD__ -U __sun__
-CXXFLAGS    += -fno-stack-protector -fno-omit-frame-pointer -fno-tree-sra
-CXXFLAGS    += -Wall -Wextra
-CXXINCLUDES += -nostdinc -nostdlib -I$(CONFIG_UK_BASE)/include
-
-GOCFLAGS    += -U __linux__ -U __FreeBSD__ -U __sun__
-GOCFLAGS    += -fno-stack-protector -fno-omit-frame-pointer -fno-tree-sra
-GOCFLAGS    += -fno-split-stack -Wall -Wextra
-GOCINCLUDES += -nostdinc -nostdlib -I$(CONFIG_UK_BASE)/include
+ASINCLUDES   += -I$(CONFIG_UK_BASE)/include
+CINCLUDES    += -I$(CONFIG_UK_BASE)/include
+CXXINCLUDES  += -I$(CONFIG_UK_BASE)/include
+GOCINCLUDES  += -I$(CONFIG_UK_BASE)/include
 
 # Set the text and data sections to be readable and writable. Also,
 # do not page-align the data segment. If the output format supports
@@ -28,54 +24,33 @@ GOCINCLUDES += -nostdinc -nostdlib -I$(CONFIG_UK_BASE)/include
 LIBLDFLAGS  += -nostdinc -nostdlib -Wl,--omagic -Wl,-r -Wl,-d -Wl,--build-id=none
 LDFLAGS     += -nostdinc -nostdlib -Wl,--omagic -Wl,--build-id=none
 
-CFLAGS-$(CONFIG_OPTIMIZE_NONE)            += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
-CXXFLAGS-$(CONFIG_OPTIMIZE_NONE)          += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
-GOCFLAGS-$(CONFIG_OPTIMIZE_NONE)          += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
-CFLAGS-$(CONFIG_OPTIMIZE_PERF)            += -O2
-CXXFLAGS-$(CONFIG_OPTIMIZE_PERF)          += -O2
-GOCFLAGS-$(CONFIG_OPTIMIZE_PERF)          += -O2
-CFLAGS-$(CONFIG_OPTIMIZE_SIZE)            += -Os
-CXXFLAGS-$(CONFIG_OPTIMIZE_SIZE)          += -Os
-GOCFLAGS-$(CONFIG_OPTIMIZE_SIZE)          += -Os
+COMPFLAGS-$(CONFIG_OPTIMIZE_NONE)         += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
+COMPFLAGS-$(CONFIG_OPTIMIZE_SIZE)         += -Os
+COMPFLAGS-$(CONFIG_OPTIMIZE_PERF)         += -O2
 
-CFLAGS-$(CONFIG_OPTIMIZE_DEADELIM)        += -fdata-sections -ffunction-sections
-CXXFLAGS-$(CONFIG_OPTIMIZE_DEADELIM)      += -fdata-sections -ffunction-sections
-GOCFLAGS-$(CONFIG_OPTIMIZE_DEADELIM)      += -fdata-sections -ffunction-sections
+COMPFLAGS-$(CONFIG_OPTIMIZE_DEADELIM)     += -fdata-sections -ffunction-sections
 LDFLAGS-$(CONFIG_OPTIMIZE_DEADELIM)       += -Wl,--gc-sections
 
 # LTO requires the compiler flags to be handed over also for linking
-CFLAGS-$(CONFIG_OPTIMIZE_LTO)             += -flto
-CXXFLAGS-$(CONFIG_OPTIMIZE_LTO)           += -flto
-GOCFLAGS-$(CONFIG_OPTIMIZE_LTO)           += -flto
-LIBLDFLAGS-$(CONFIG_OPTIMIZE_LTO)         += $(CFLAGS) $(CFLAGS-y)
-LDFLAGS-$(CONFIG_OPTIMIZE_LTO)            += $(CFLAGS) $(CFLAGS-y)
+COMPFLAGS-$(CONFIG_OPTIMIZE_LTO)          += -flto
+LIBLDFLAGS-$(CONFIG_OPTIMIZE_LTO)         += $(COMPFLAGS) $(COMPFLAGS-y) $(ARCHFLAGS) $(ARCHFLAGS-y)
+LDFLAGS-$(CONFIG_OPTIMIZE_LTO)            += $(COMPFLAGS) $(COMPFLAGS-y) $(ARCHFLAGS) $(ARCHFLAGS-y)
 
 DBGFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL0)     += -g0
 DBGFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL1)     += -g1
 DBGFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL2)     += -g2
 DBGFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL3)     += -g3
 
-ASFLAGS  += -D __Unikraft__ -DUK_CODENAME="$(UK_CODENAME)"
-ASFLAGS  += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
-ASFLAGS  += -DUK_FULLVERSION=$(UK_FULLVERSION)
-CFLAGS   += -D __Unikraft__ -DUK_CODENAME="$(UK_CODENAME)"
-CFLAGS   += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
-CFLAGS   += -DUK_FULLVERSION=$(UK_FULLVERSION)
-CXXFLAGS += -D __Unikraft__ -DUK_CODENAME="$(UK_CODENAME)"
-CXXFLAGS += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
-CXXFLAGS += -DUK_FULLVERSION=$(UK_FULLVERSION)
-GOCFLAGS += -D __Unikraft__ -DUK_CODENAME="$(UK_CODENAME)"
-GOCFLAGS += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
-GOCFLAGS += -DUK_FULLVERSION=$(UK_FULLVERSION)
-M4FLAGS  += -D __Unikraft__ -DUK_CODENAME="$(UK_CODENAME)"
-M4FLAGS  += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
+COMPFLAGS     += -D __Unikraft__ -DUK_CODENAME="$(UK_CODENAME)"
+COMPFLAGS     += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
+COMPFLAGS     += -DUK_FULLVERSION=$(UK_FULLVERSION)
+
+M4FLAGS      += -D __Unikraft__ -DUK_CODENAME="$(UK_CODENAME)"
+M4FLAGS      += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
 
 # If GCC supports "-no-pie" flag, we will add this flag to link flags to
 # override "pie" option, because some distributions will set
 # "--enable-default-pie" by default.
-ASFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
-CFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
-CXXFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
-GOFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
+COMPFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 LIBLDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 LDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
