@@ -220,11 +220,20 @@ syntax: ::
   APPNAME_FILENAME_INCLUDES-y += -Iextra/include
 
 It is also be possible compile a single source files multiple times with
-different flags. For this case, Unikore supports variants:
+different flags. For this case, Unikraft supports variants: ::
 
   APPNAME_SRCS-y += $(APPNAME_BASE)/filename.c|variantname
   APPNAME_FILENAME_VARIANTNAME_FLAGS-y += -DFLAG2
   APPNAME_FILENAME_VARIANTNAME_INCLUDES-y += -Iextra/include
+
+.. note:: The build system treats the reserved ``isr`` variant specially:
+	  This variant is intended for build units that contain code that can
+	  also be called from interrupt context. Separate global
+	  architecture flags are used to generate interrupt-safe code
+	  (``ISR_ARCHFLAGS-y`` instead of ``ARCHFLAGS-y``). Generally, these
+	  flags avoid the use of extended machine units which aren't saved by the
+	  processor before entering interrupt context (e.g., floating point
+	  units, vector units).
 
 Finally, you may also need to provide "glue" code, for instance to
 implement the ``main()`` function that Unikraft expects you to
