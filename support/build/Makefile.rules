@@ -126,6 +126,13 @@ $(call vprefix_lib,$(1),$(addprefix $(call uc,$(basename $(notdir $(2))))_,$(4))
 ))
 endef
 
+# vprefix_glb $variant,$varname(s)
+#  prefixes global variables for reserved variants:
+#  '|isr' -> 'ISR_'  # reserved variant for code that can be called within
+#                    # interrupt service routines (e.g., uses only generic regs)
+#  '|.*'  -> ''
+#  ''     -> ''
+vprefix_glb = $(if $(filter isr,$(1)),$(addprefix ISR_,$(2)),$(2))
 
 ################################################################################
 #
@@ -388,7 +395,7 @@ $(4): $(2) | prepare
 		       $(ASINCLUDES) $(ASINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),ASINCLUDES)) $($(call vprefix_lib,$(1),ASINCLUDES-y)) \
 		       $($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
-		       $(ARCHFLAGS) $(ARCHFLAGS-y) \
+		       $($(call vprefix_glb,$(3),ARCHFLAGS)) $($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
 		       $(ASFLAGS) $(ASFLAGS-y) \
 		       $($(call vprefix_lib,$(1),ASFLAGS)) $($(call vprefix_lib,$(1),ASFLAGS-y)) \
 		       $($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
@@ -415,7 +422,7 @@ $(4): $(2) | prepare
 		       $(ASINCLUDES) $(ASINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),ASINCLUDES)) $($(call vprefix_lib,$(1),ASINCLUDES-y)) \
 		       $($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
-		       $(ARCHFLAGS) $(ARCHFLAGS-y) \
+		       $($(call vprefix_glb,$(3),ARCHFLAGS)) $($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
 		       $(ASFLAGS) $(ASFLAGS-y) \
 		       $($(call vprefix_lib,$(1),ASFLAGS)) $($(call vprefix_lib,$(1),ASFLAGS-y)) \
 		       $($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
@@ -440,7 +447,7 @@ $(4): $(2) | prepare
 		       $(CINCLUDES) $(CINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),CINCLUDES)) $($(call vprefix_lib,$(1),CINCLUDES-y)) \
 		       $($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
-		       $(ARCHFLAGS) $(ARCHFLAGS-y) \
+		       $($(call vprefix_glb,$(3),ARCHFLAGS)) $($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
 		       $(CFLAGS) $(CFLAGS-y) \
 		       $($(call vprefix_lib,$(1),CFLAGS)) $($(call vprefix_lib,$(1),CFLAGS-y)) \
 		       $($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
@@ -464,7 +471,7 @@ $(4): $(2) | prepare
 		       $(CXXINCLUDES) $(CXXINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),CXXINCLUDES)) $($(call vprefix_lib,$(1),CXXINCLUDES-y)) \
 		       $($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
-		       $(ARCHFLAGS) $(ARCHFLAGS-y) \
+		       $($(call vprefix_glb,$(3),ARCHFLAGS)) $($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
 		       $(CXXFLAGS) $(CXXFLAGS-y) \
 		       $($(call vprefix_lib,$(1),CXXFLAGS)) $($(call vprefix_lib,$(1),CXXFLAGS-y)) \
 		       $($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
@@ -496,7 +503,7 @@ $(4): $(2) | prepare
 		       $(GOCINCLUDES) $(GOCINCLUDES-y) \
 		       $($(call vprefix_lib,$(1),GOCINCLUDES)) $($(call vprefix_lib,$(1),GOCINCLUDES-y)) \
 		       $($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
-		       $(ARCHFLAGS) $(ARCHFLAGS-y) \
+		       $($(call vprefix_glb,$(3),ARCHFLAGS)) $($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
 		       $(GOCFLAGS) $(GOCFLAGS-y) \
 		       $($(call vprefix_lib,$(1),GOCFLAGS)) $($(call vprefix_lib,$(1),GOCFLAGS-y)) \
 		       $($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
