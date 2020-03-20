@@ -41,6 +41,28 @@ config KVM_DEBUG_VGA_CONSOLE
         depends on ARCH_X86_64
         help
           Choose VGA console for the debug printing
+
+if (KVM_KVM_KERNEL_SERIAL_CONSOLE || KVM_DEBUG_SERIAL_CONSOLE) && ARCH_X86_64
+menu "Serial console configuration"
+	choice
+		prompt "Baudrate"
+		default KVM_SERIAL_BAUD_115200
+
+		config KVM_SERIAL_BAUD_115200
+			bool "115200"
+
+		config KVM_SERIAL_BAUD_57600
+			bool "57600"
+
+		config KVM_SERIAL_BAUD_38400
+			bool "38400"
+
+		config KVM_SERIAL_BAUD_19200
+			bool "19200"
+	endchoice
+endmenu
+endif
+
 endmenu
 
 config KVM_PCI
