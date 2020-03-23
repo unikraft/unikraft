@@ -19,7 +19,7 @@ CINCLUDES    += -I$(CONFIG_UK_BASE)/include
 CXXINCLUDES  += -I$(CONFIG_UK_BASE)/include
 GOCINCLUDES  += -I$(CONFIG_UK_BASE)/include
 
-LIBLDFLAGS  += -nostdinc -nostdlib -Wl,-r -Wl,-d -Wl,--build-id=none
+LIBLDFLAGS  += -nostdinc -nostdlib -Wl,-r -Wl,-d -Wl,--build-id=none -no-pie
 
 # Set the text and data sections to be readable and writable. Also,
 # do not page-align the data segment. If the output format supports
@@ -55,5 +55,4 @@ M4FLAGS      += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
 # override "pie" option, because some distributions will set
 # "--enable-default-pie" by default.
 COMPFLAGS-$(call gcc_version_ge,6,1)	+= -fno-PIC
-LIBLDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 LDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
