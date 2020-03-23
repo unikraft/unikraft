@@ -19,10 +19,11 @@ CINCLUDES    += -I$(CONFIG_UK_BASE)/include
 CXXINCLUDES  += -I$(CONFIG_UK_BASE)/include
 GOCINCLUDES  += -I$(CONFIG_UK_BASE)/include
 
+LIBLDFLAGS  += -nostdinc -nostdlib -Wl,-r -Wl,-d -Wl,--build-id=none
+
 # Set the text and data sections to be readable and writable. Also,
 # do not page-align the data segment. If the output format supports
 # Unix style magic numbers, mark the output as OMAGIC.
-LIBLDFLAGS  += -nostdinc -nostdlib -Wl,--omagic -Wl,-r -Wl,-d -Wl,--build-id=none
 LDFLAGS     += -nostdinc -nostdlib -Wl,--omagic -Wl,--build-id=none
 
 COMPFLAGS-$(CONFIG_OPTIMIZE_NONE)         += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
