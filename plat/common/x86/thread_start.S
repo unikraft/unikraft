@@ -36,7 +36,7 @@ ENTRY(asm_thread_starter)
 	pushq $0
 	xorq %rbp,%rbp
 	call *%rbx
-	call uk_sched_thread_exit
+	call *uk_sched_thread_exit@GOTPCREL(%rip)
 
 ENTRY(asm_ctx_start)
 	mov %rdi, %rsp      /* set SP */
@@ -52,10 +52,11 @@ ENTRY(asm_sw_ctx_switch)
 	pushq %r15
 	movq %rsp, OFFSETOF_SW_CTX_SP(%rdi)       /* save ESP */
 	movq OFFSETOF_SW_CTX_SP(%rsi), %rsp       /* restore ESP */
-	movq $1f, OFFSETOF_SW_CTX_IP(%rdi)        /* save EIP */
+	lea .Lreturn(%rip), %rbx
+	movq %rbx, OFFSETOF_SW_CTX_IP(%rdi)       /* save EIP */
 	pushq OFFSETOF_SW_CTX_IP(%rsi)            /* restore EIP */
 	ret
-1:
+.Lreturn:
 	popq %r15
 	popq %r14
 	popq %r13
