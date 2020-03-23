@@ -47,8 +47,8 @@ _liblinuxuplat_start:
 	andq $~15, %rsp		# align stack to 16-byte boundary
 
 	# Run _liblinuxuplat_entry(argc, argv)
-	callq _liblinuxuplat_entry
+	callq *_liblinuxuplat_entry@GOTPCREL(%rip)
 
 	# Protection
 _liblinuxuplat_start_err:
-	jmp _liblinuxuplat_start_err
+	jmp *_liblinuxuplat_start_err(%rip)
