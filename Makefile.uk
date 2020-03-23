@@ -53,6 +53,6 @@ M4FLAGS      += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
 # If GCC supports "-no-pie" flag, we will add this flag to link flags to
 # override "pie" option, because some distributions will set
 # "--enable-default-pie" by default.
-COMPFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
+COMPFLAGS-$(call gcc_version_ge,6,1)	+= -fno-PIC
 LIBLDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 LDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
