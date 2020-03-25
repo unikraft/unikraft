@@ -9,7 +9,8 @@ CXXINCLUDES += -I$(CONFIG_UK_BASE)/arch/x86/x86_64/include
 
 # compiler flags to prevent use of extended (FP, SSE, AVX) registers.
 # This is for files that contain trap/exception/interrupt handlers
-ISR_ARCHFLAGS += -mno-80387 -mno-fp-ret-in-387 -mno-mmx -mno-sse -mno-avx -mgeneral-regs-only
+ISR_ARCHFLAGS += -mno-80387 -mno-fp-ret-in-387 -mno-mmx -mno-sse -mno-avx
+ISR_ARCHFLAGS-$(call gcc_version_ge,7,1) += -mgeneral-regs-only
 
 ARCHFLAGS-$(CONFIG_MARCH_X86_64_GENERIC)        += -mtune=generic
 ISR_ARCHFLAGS-$(CONFIG_MARCH_X86_64_GENERIC)    += -mtune=generic
