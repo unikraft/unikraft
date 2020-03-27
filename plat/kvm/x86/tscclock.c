@@ -216,7 +216,8 @@ __u64 tscclock_monotonic(void)
  */
 int tscclock_init(void)
 {
-	__u64 tsc_freq, rtc_boot;
+	__u64 tsc_freq = 0, rtc_boot;
+	__u32 eax, ebx, ecx, edx;
 
 	/* Initialise i8254 timer channel 0 to mode 2 at CONFIG_HZ frequency */
 	outb(TIMER_MODE, TIMER_SEL0 | TIMER_RATEGEN | TIMER_16BIT);
@@ -230,15 +231,30 @@ int tscclock_init(void)
 	rtc_boot = rtc_gettimeofday();
 
 	/*
-	 * Calculate TSC frequency by calibrating against an 0.1s delay
-	 * using the i8254 timer.
-	 * TODO: Find a more elegant solution that does not require us to
-	 * to delay the boot for 100ms. Does KVM provides us a pre-calculated
-	 * TSC value?
+	 * Attempt to retrieve TSC frequency via the hypervisor generic cpuid
+	 * timing information leaf. 0x40000010 returns the (virtual) TSC
+	 * frequency in kHz, or 0 if the feature is not supported by the
+	 * hypervisor.
 	 */
-	tsc_base = rdtsc();
-	i8254_delay(100000);
-	tsc_freq = (rdtsc() - tsc_base) * 10;
+	cpuid(0x40000000, 0, &eax, &ebx, &ecx, &edx);
+	if (eax >= 0x40000010) {
+		uk_pr_info("Retrieving TSC clock frequency from hypervisor\n");
+		cpuid(0x40000010, 0, &eax, &ebx, &ecx, &edx);
+		tsc_freq = eax * 1000;
+	}
+
+	/*
+	 * If we could not retrieve the TSC frequency from the hypervisor,
+	 * calibrate against an 0.1s delay using the i8254 timer. This is
+	 * undesirable as it delays the boot sequence.
+	 */
+	if (!tsc_freq) {
+		uk_pr_info("Calibrating TSC clock against i8254 timer\n");
+		tsc_base = rdtsc();
+		i8254_delay(100000);
+		tsc_freq = (rdtsc() - tsc_base) * 10;
+	}
+
 	uk_pr_info("Clock source: TSC, frequency estimate is %llu Hz\n",
 		   (unsigned long long) tsc_freq);
 
