@@ -188,6 +188,13 @@ $(if $(wildcard $(E)), \
 endif
 ELIB_DIR := $(realpath $(patsubst %/,%,$(patsubst %.,%,$(ELIB_DIR))))
 
+$(call verbose_info,* Unikraft base:      $(CONFIG_UK_BASE))
+$(call verbose_info,* Configuration:      $(UK_CONFIG))
+$(call verbose_info,* Application base:   $(CONFIG_UK_APP))
+$(call verbose_info,* External platforms: [ $(EPLAT_DIR) ])
+$(call verbose_info,* External libraries: [ $(ELIB_DIR) ])
+$(call verbose_info,* Build output:       $(BUILD_DIR))
+
 # KConfig settings
 
 CONFIG_UK_PLAT        := $(CONFIG_UK_BASE)/plat/
