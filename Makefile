@@ -138,6 +138,7 @@ override O := $(BUILD_DIR)
 # Retrieved from P variable from the command line (paths separated by colon)
 ifeq ("$(origin P)", "command line")
 $(foreach E,$(subst :, ,$(P)), \
+$(if $(filter /%,$(E)),,$(error Path to external platform "$(E)" (P) is not absolute));\
 $(if $(wildcard $(E)), \
 	$(eval EPLAT_DIR += $(E)) \
 , $(if $(wildcard $(CONFIG_UK_BASE)/$(E)),\
