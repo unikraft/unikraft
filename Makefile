@@ -997,7 +997,15 @@ help:
 	@echo '  savedefconfig          - Save current config to UK_DEFCONFIG (minimal config)'
 	@echo '  allyesconfig           - New config where all options are accepted with yes'
 	@echo '  allnoconfig            - New config where all options are answered with no'
-	@echo
+	@echo ''
+	@echo 'Command-line variables:'
+	@echo '  V=0|1                  - 0 => quiet build (default), 1 => verbose build'
+	@echo '  C=[PATH]               - path to .config configuration file'
+	@echo '  O=[PATH]               - path to build output (will be created if it does not exist)'
+	@echo '  A=[PATH]               - path to Unikraft application'
+	@echo '  L=[PATH]:[PATH]:..     - colon-separated list of paths to external libraries'
+	@echo '  P=[PATH]:[PATH]:..     - colon-separated list of paths to external platforms'
+	@echo ''
 	@echo 'Miscellaneous:'
 	@echo '  print-version          - print Unikraft version'
 	@echo '  print-libs             - print library names enabled for build'
@@ -1005,7 +1013,6 @@ help:
 	@echo '  print-objs             - print object file names enabled for build'
 	@echo '  print-srcs             - print source file names enabled for build'
 	@echo '  print-vars             - prints all the variables currently defined in Makefile'
-	@echo '  make V=0|1             - 0 => quiet build (default), 1 => verbose build'
 	@echo ''
 
 endif #umask
