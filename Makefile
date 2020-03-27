@@ -134,6 +134,21 @@ $(if $(BUILD_DIR),, $(error could not create directory "$(_O)"))
 BUILD_DIR := $(realpath $(patsubst %/,%,$(patsubst %.,%,$(BUILD_DIR))))
 override O := $(BUILD_DIR)
 
+# parameter C: UK_CONFIG ###
+# Use C variable if set on the command line, otherwise use $(A)/.config;
+ifneq ("$(origin C)", "command line")
+ifeq ("$(origin C)", "undefined")
+override C := $(CONFIG_UK_APP)/.config
+endif
+else
+ifeq ("$(filter /%,$(C))", "")
+$(error Path to configuration file (C) is not absolute)
+endif
+override C := $(realpath $(dir $(C)))/$(notdir $(C))
+endif
+UK_CONFIG  := $(C)
+CONFIG_DIR := $(dir $(C))
+
 # EPLAT_DIR (list of external platform libraries)
 # Retrieved from P variable from the command line (paths separated by colon)
 ifeq ("$(origin P)", "command line")
@@ -177,11 +192,9 @@ ELIB_DIR := $(realpath $(patsubst %/,%,$(patsubst %.,%,$(ELIB_DIR))))
 
 CONFIG_UK_PLAT        := $(CONFIG_UK_BASE)/plat/
 CONFIG_UK_LIB         := $(CONFIG_UK_BASE)/lib/
-CONFIG_DIR            := $(CONFIG_UK_APP)
 CONFIG_CONFIG_IN      := $(CONFIG_UK_BASE)/Config.uk
 CONFIG                := $(CONFIG_UK_BASE)/support/kconfig
 CONFIGLIB	      := $(CONFIG_UK_BASE)/support/kconfiglib
-UK_CONFIG             := $(CONFIG_DIR)/.config
 UK_CONFIG_OUT         := $(BUILD_DIR)/config
 UK_GENERATED_INCLUDES := $(BUILD_DIR)/include
 KCONFIG_DIR           := $(BUILD_DIR)/kconfig
@@ -407,7 +420,8 @@ properclean:
 
 distclean: properclean
 	$(call verbose_cmd,RM,config,$(RM) \
-		$(UK_CONFIG) $(UK_CONFIG).old $(CONFIG_DIR)/..config.tmp \
+		$(UK_CONFIG) $(UK_CONFIG).old \
+		$(CONFIG_DIR)/.$(notdir $(UK_CONFIG)).tmp \
 		$(CONFIG_DIR)/.auto.deps)
 
 .PHONY: distclean properclean
