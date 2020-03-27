@@ -161,6 +161,7 @@ endif
 ifeq ("$(origin L)", "command line")
 # library path exists?
 $(foreach E,$(subst :, ,$(L)), \
+$(if $(filter /%,$(E)),,$(error Path to external library "$(E)" (L) is not absolute));\
 $(if $(wildcard $(E)), \
 	$(eval ELIB_DIR += $(E)) \
 , $(if $(wildcard $(CONFIG_UK_BASE)/$(E)),\
