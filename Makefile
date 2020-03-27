@@ -119,16 +119,20 @@ override CONFIG_UK_APP   := $(A)
 override APP_DIR  := $(A)
 override APP_BASE := $(A)
 
-# BUILD_DIR
+# parameter O: BUILD_DIR ###
 # Use O variable if set on the command line, otherwise use $(A)/build;
 ifneq ("$(origin O)", "command line")
-BUILD_DIR := $(shell mkdir -p $(CONFIG_UK_APP)/build && cd $(CONFIG_UK_APP)/build >/dev/null && pwd)
-$(if $(BUILD_DIR),, $(error could not create directory "$(A)/build"))
+_O := $(APP_BASE)/build
 else
-BUILD_DIR := $(shell mkdir -p $(O) && cd $(O) >/dev/null && pwd)
-$(if $(BUILD_DIR),, $(error could not create directory "$(O)"))
+ifeq ("$(filter /%,$(O))", "")
+$(error Path to output directory (O) is not absolute)
 endif
-override BUILD_DIR := $(realpath $(patsubst %/,%,$(patsubst %.,%,$(BUILD_DIR))))
+_O := $(realpath $(dir $(O)))/$(notdir $(O))
+endif
+BUILD_DIR := $(shell mkdir -p $(_O) && cd $(_O) >/dev/null && pwd)
+$(if $(BUILD_DIR),, $(error could not create directory "$(_O)"))
+BUILD_DIR := $(realpath $(patsubst %/,%,$(patsubst %.,%,$(BUILD_DIR))))
+override O := $(BUILD_DIR)
 
 # EPLAT_DIR (list of external platform libraries)
 # Retrieved from P variable from the command line (paths separated by colon)
