@@ -100,16 +100,20 @@ ifeq ($(CONFIG_UK_BASE),)
 $(error "Invalid base directory (CONFIG_UK_BASE)")
 endif
 
-# A // APP_DIR
+# parameter A: APP_DIR ###
 # Set A variable if not already done on the command line;
 ifneq ("$(origin A)", "command line")
-A := $(CONFIG_UK_BASE)
+override A := $(CONFIG_UK_BASE)
+else
+ifeq ("$(filter /%,$(A))", "")
+$(error Path to app directory (A) is not absolute)
+endif
 endif
 # Remove the trailing '/.'
 # Also remove the trailing '/' the user can set when on the command line.
 override A := $(realpath $(patsubst %/,%,$(patsubst %.,%,$(A))))
 ifeq ($(A),)
-$(error "Invalid app directory (A)")
+$(error Invalid app directory (A))
 endif
 override CONFIG_UK_APP   := $(A)
 override APP_DIR  := $(A)
