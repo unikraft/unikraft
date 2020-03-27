@@ -164,12 +164,6 @@ $(if $(wildcard $(E)), \
 )
 endif
 EPLAT_DIR := $(realpath $(patsubst %/,%,$(patsubst %.,%,$(EPLAT_DIR))))
-build_dir_make  := 0
-ifneq ($(BUILD_DIR),$(UK_BASE))
-	build_dir_make := 1;
-else
-	sub_make_exec := 1;
-endif
 
 # ELIB_DIR (list of external libraries)
 # Retrieved from L variable from the command line (paths separated by colon)
@@ -194,6 +188,13 @@ $(call verbose_info,* Application base:   $(CONFIG_UK_APP))
 $(call verbose_info,* External platforms: [ $(EPLAT_DIR) ])
 $(call verbose_info,* External libraries: [ $(ELIB_DIR) ])
 $(call verbose_info,* Build output:       $(BUILD_DIR))
+
+build_dir_make  := 0
+ifneq ($(BUILD_DIR),$(UK_BASE))
+	build_dir_make := 1;
+else
+	sub_make_exec := 1;
+endif
 
 # KConfig settings
 
