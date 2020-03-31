@@ -36,9 +36,7 @@
  */
 
 #include <string.h>
-#include <inttypes.h>
-#include <stdarg.h>
-#include "snprintf.h"
+#include "outf.h"
 
 #include <uk/arch/types.h>
 #include <uk/essentials.h>
@@ -49,90 +47,11 @@
 	(UK_HXDF_GRPBYTE | UK_HXDF_GRPWORD | UK_HXDF_GRPDWORD                  \
 	 | UK_HXDF_GRPQWORD)
 
-enum _hxd_output_type {
-	UK_HXDOUT_FILE = 0,
-	UK_HXDOUT_BUFFER,
-#if CONFIG_LIBUKDEBUG_PRINTK
-	UK_HXDOUT_KERN,
-#endif
-	UK_HXDOUT_DEBUG,
-};
-
-struct _hxd_output {
-	enum _hxd_output_type type;
-
-	union {
-		/* UK_HXDOUT_KERN, UK_HXDOUT_DEBUG */
-		struct {
-			int lvl; /* UK_HXDOUT_KERN only */
-			const char *libname;
-			const char *srcname;
-			unsigned int srcline;
-		} ukprint;
-
-		/* UK_HXDOUT_FILE */
-		struct {
-			FILE *fp;
-		} file;
-
-		/* UK_HXDOUT_BUFFER */
-		struct {
-			char *pos;
-			size_t left;
-		} buffer;
-	};
-};
-
-/**
- * Send a formatted string to an output device
- */
-static int _hxd_outf(struct _hxd_output *o, const char *fmt, ...)
-{
-	int ret = 0;
-	va_list ap;
-
-	va_start(ap, fmt);
-	switch (o->type) {
-	case UK_HXDOUT_FILE:
-		/* Use standard libc approach when printing to a file */
-		ret = vfprintf(o->file.fp, fmt, ap);
-		break;
-	case UK_HXDOUT_BUFFER:
-		ret = __uk_vsnprintf(o->buffer.pos, o->buffer.left, fmt, ap);
-
-		if (ret > 0) {
-			/* in order to overwrite '\0' by successive calls,
-			 * we move the buffer pointer by (ret-1) characters
-			 */
-			o->buffer.pos += (ret - 1);
-			o->buffer.left -= (ret - 1);
-		}
-		break;
-	case UK_HXDOUT_DEBUG:
-		_uk_vprintd(o->ukprint.libname,
-			    o->ukprint.srcname, o->ukprint.srcline,
-			    fmt, ap);
-		break;
-#if CONFIG_LIBUKDEBUG_PRINTK
-	case UK_HXDOUT_KERN:
-		_uk_vprintk(o->ukprint.lvl, o->ukprint.libname,
-			    o->ukprint.srcname, o->ukprint.srcline,
-			    fmt, ap);
-		break;
-#endif
-	default:
-		break;
-	}
-	va_end(ap);
-
-	return ret;
-}
-
 /**
  * Plot one hexdump data line
  * This function is called by _hxd()
  */
-static inline size_t _hxd_line(struct _hxd_output *o, const unsigned char *data,
+static inline size_t _hxd_line(struct out_dev *o, const unsigned char *data,
 			       size_t len, size_t linelen, int flags)
 {
 	size_t i, grplen = 0;
@@ -151,13 +70,13 @@ static inline size_t _hxd_line(struct _hxd_output *o, const unsigned char *data,
 	/* hex section */
 	for (i = 0; i < len; ++i) {
 		c = *(data + i);
-		iret = _hxd_outf(o, "%02x ", (unsigned char)c);
+		iret = outf(o, "%02x ", (unsigned char)c);
 		if (iret < 0)
 			return iret;
 		ret += iret;
 
 		if (i && grplen && ((i + 1) % grplen == 0)) {
-			iret = _hxd_outf(o, " ");
+			iret = outf(o, " ");
 			if (iret < 0)
 				return iret;
 			ret += iret;
@@ -168,45 +87,45 @@ static inline size_t _hxd_line(struct _hxd_output *o, const unsigned char *data,
 	if (flags & UK_HXDF_ASCIISEC) {
 		/* fillup to align ascii section */
 		for (; i < linelen; ++i) {
-			iret = _hxd_outf(o, "   ");
+			iret = outf(o, "   ");
 			if (iret < 0)
 				return iret;
 			ret += iret;
 
 			if (i && grplen && ((i + 1) % grplen == 0)) {
-				iret = _hxd_outf(o, " ");
+				iret = outf(o, " ");
 				if (iret < 0)
 					return iret;
 				ret += iret;
 			}
 		}
 		if (!grplen) {
-			iret = _hxd_outf(o, " ");
+			iret = outf(o, " ");
 			if (iret < 0)
 				return iret;
 			ret += iret;
 		}
 
 		/* print ascii characters */
-		iret = _hxd_outf(o, "|");
+		iret = outf(o, "|");
 		if (iret < 0)
 			return iret;
 		ret += iret;
 		for (i = 0; i < len; ++i) {
 			c = *(data + i);
-			iret = _hxd_outf(o, "%c",
-					 (c >= ' ' && c <= '~') ? c : '.');
+			iret = outf(o, "%c",
+				    (c >= ' ' && c <= '~') ? c : '.');
 			if (iret < 0)
 				return iret;
 			ret += iret;
 		}
-		iret = _hxd_outf(o, "|");
+		iret = outf(o, "|");
 		if (iret < 0)
 			return iret;
 		ret += iret;
 	}
 
-	iret = _hxd_outf(o, "\n");
+	iret = outf(o, "\n");
 	if (iret < 0)
 		return iret;
 	ret += iret;
@@ -227,7 +146,7 @@ static inline size_t _hxd_line(struct _hxd_output *o, const unsigned char *data,
  * @param line_prefix String to be prepended to each line, can be NULL
  * @return Returns the number of printed characters to output o
  */
-static int _hxd(struct _hxd_output *o, const void *data, size_t len,
+static int _hxd(struct out_dev *o, const void *data, size_t len,
 		size_t addr0, int flags, unsigned int grps_per_line,
 		const char *line_prefix)
 {
@@ -266,7 +185,7 @@ static int _hxd(struct _hxd_output *o, const void *data, size_t len,
 				   ((const unsigned char *)data) + i, linebytes)
 			    == 0) {
 				if (!prevc) {
-					iret = _hxd_outf(o, "*\n");
+					iret = outf(o, "*\n");
 					if (iret < 0)
 						return iret;
 					ret += iret;
@@ -278,16 +197,15 @@ static int _hxd(struct _hxd_output *o, const void *data, size_t len,
 		prevc = 0;
 
 		if (line_prefix) {
-			iret = _hxd_outf(o, "%s", line_prefix);
+			iret = outf(o, "%s", line_prefix);
 			if (iret < 0)
 				return iret;
 			ret += iret;
 		}
 
 		if (flags & UK_HXDF_ADDR) {
-			iret = _hxd_outf(o, "%08"__PRIuptr
-					    "  ",
-					 (__uptr)(i + addr0));
+			iret = outf(o, "%08"__PRIuptr"  ",
+				    (__uptr)(i + addr0));
 			if (iret < 0)
 				return iret;
 			ret += iret;
@@ -308,21 +226,20 @@ int uk_hexdumpsn(char *str, size_t size, const void *data, size_t len,
 		 size_t addr0, int flags, unsigned int grps_per_line,
 		 const char *line_prefix)
 {
-	struct _hxd_output o = {.type = UK_HXDOUT_BUFFER,
-				.buffer.pos = str,
-				.buffer.left = size};
-	UK_ASSERT(str != NULL);
+	struct out_dev o;
 
+	UK_ASSERT(str != NULL);
+	out_dev_init_buffer(&o, str, size);
 	return _hxd(&o, data, len, addr0, flags, grps_per_line, line_prefix);
 }
 
 int uk_hexdumpf(FILE *fp, const void *data, size_t len, size_t addr0, int flags,
 		unsigned int grps_per_line, const char *line_prefix)
 {
-	struct _hxd_output o = {.type = UK_HXDOUT_FILE,
-				.file.fp = fp};
-	UK_ASSERT(fp != NULL);
+	struct out_dev o;
 
+	UK_ASSERT(fp != NULL);
+	out_dev_init_file(&o, fp);
 	return _hxd(&o, data, len, addr0, flags, grps_per_line, line_prefix);
 }
 
@@ -331,11 +248,9 @@ void _uk_hexdumpd(const char *libname, const char *srcname,
 		  size_t addr0, int flags, unsigned int grps_per_line,
 		  const char *line_prefix)
 {
-	struct _hxd_output o = {.type = UK_HXDOUT_DEBUG,
-				.ukprint.libname = libname,
-				.ukprint.srcname = srcname,
-				.ukprint.srcline = srcline};
+	struct out_dev o;
 
+	out_dev_init_debug(&o, libname, srcname, srcline);
 	_hxd(&o, data, len, addr0, flags, grps_per_line, line_prefix);
 }
 
@@ -345,12 +260,9 @@ void _uk_hexdumpk(int lvl, const char *libname, const char *srcname,
 		  size_t addr0, int flags, unsigned int grps_per_line,
 		  const char *line_prefix)
 {
-	struct _hxd_output o = {.type = UK_HXDOUT_KERN,
-				.ukprint.lvl = lvl,
-				.ukprint.libname = libname,
-				.ukprint.srcname = srcname,
-				.ukprint.srcline = srcline};
+	struct out_dev o;
 
+	out_dev_init_kern(&o, lvl, libname, srcname, srcline);
 	_hxd(&o, data, len, addr0, flags, grps_per_line, line_prefix);
 }
 #endif
