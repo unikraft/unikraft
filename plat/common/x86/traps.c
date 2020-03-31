@@ -39,6 +39,7 @@
 #include <x86/traps.h>
 #include <uk/print.h>
 #include <uk/assert.h>
+#include <uk/asmdump.h>
 
 /* A general word of caution when writing trap handlers. The platform trap
  * entry code is set up to properly save general-purpose registers (e.g., rsi,
@@ -78,6 +79,7 @@ void do_unhandled_trap(int trapnr, char *str, struct __regs *regs,
 	uk_pr_info("Regs address %p\n", regs);
 	/* TODO revisit when UK_CRASH will also dump the registers */
 	dump_regs(regs);
+	uk_asmdumpk(KLVL_CRIT, (void *) regs->rip, 8);
 	UK_CRASH("Crashing\n");
 }
 
@@ -104,6 +106,7 @@ void do_gp_fault(struct __regs *regs, long error_code)
 		   regs->rip, error_code);
 	dump_regs(regs);
 	stack_walk_for_frame(regs->rbp);
+	uk_asmdumpk(KLVL_CRIT, (void *) regs->rip, 6);
 	dump_mem(regs->rsp);
 	dump_mem(regs->rbp);
 	dump_mem(regs->rip);
@@ -121,6 +124,7 @@ void do_page_fault(struct __regs *regs, unsigned long error_code)
 
 	dump_regs(regs);
 	stack_walk_for_frame(regs->rbp);
+	uk_asmdumpk(KLVL_CRIT, (void *) regs->rip, 6);
 	dump_mem(regs->rsp);
 	dump_mem(regs->rbp);
 	dump_mem(regs->rip);
