@@ -9,6 +9,21 @@ if LIBSYSCALL_SHIM
 	bool
 	default n
 
+	config LIBSYSCALL_SHIM_LIBCSTUBS
+	depends on !LIBSYSCALL_SHIM_NOWRAPPER
+	bool "Provide libc-style stubs"
+	default n
+	help
+		Automatically generate libc-style stubs for unavailable
+		system calls. The aim is to provide all libc-style system
+		call symbols although just a subset of the full API may be
+		implemtented. The symbols are defined as `weak`.
+		Please note that depending on the used compiler and optimization
+		options, this functionality may sometimes cause linking failures
+		because of double definitions of symbols. This is the case when
+		another library is providing some libc-style system calls
+		without registering them to libsyscall_shim.
+
 	config LIBSYSCALL_SHIM_HANDLER
 		bool "Binary system call handler (Linux ABI)"
 		default n
