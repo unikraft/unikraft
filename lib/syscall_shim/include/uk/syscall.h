@@ -42,6 +42,20 @@
 #include <errno.h>
 #include <uk/print.h>
 
+/*
+ * Whenever the hidden Config.uk option LIBSYSCALL_SHIM_NOWRAPPER
+ * is set, the creation of libc-style wrappers are disable by the
+ * UK_SYSCALL_DEFINE() and UK_SYSCALL_R_DEFINE() macros. Alternatively,
+ * UK_LIBC_SYSCALLS can be set to 0 through compilation flags.
+ */
+#ifndef UK_LIBC_SYSCALLS
+#if CONFIG_LIBSYSCALL_SHIM_NOWRAPPER
+#define UK_LIBC_SYSCALLS (0)
+#else
+#define UK_LIBC_SYSCALLS (1)
+#endif /* CONFIG_LIBSYSCALL_SHIM_NOWRAPPER */
+#endif /* UK_LIBC_SYSCALLS */
+
 #define __uk_scc(X) ((long) (X))
 typedef long uk_syscall_arg_t;
 
@@ -135,7 +149,9 @@ typedef long uk_syscall_arg_t;
 /*
  * UK_SYSCALL_DEFINE()
  * Based on UK_LLSYSCALL_DEFINE and provides a libc-style wrapper
+ * in case UK_LIBC_SYSCALLS is enabled
  */
+#if UK_LIBC_SYSCALLS
 #define __UK_SYSCALL_DEFINE(x, rtype, name, ename, rname, ...)		\
 	long ename(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__));		\
 	rtype name(UK_ARG_MAPx(x, UK_S_ARG_ACTUAL, __VA_ARGS__))	\
@@ -152,6 +168,15 @@ typedef long uk_syscall_arg_t;
 			   __UK_NAME2SCALLE_FN(name),			\
 			   __UK_NAME2SCALLR_FN(name),			\
 			   __VA_ARGS__)
+#else
+#define UK_SYSCALL_DEFINE(rtype, name, ...)				\
+	_UK_LLSYSCALL_DEFINE(__UK_SYSCALL_DEF_NARGS(__VA_ARGS__),	\
+			     rtype,					\
+			     name,					\
+			     __UK_NAME2SCALLE_FN(name),			\
+			     __UK_NAME2SCALLR_FN(name),			\
+			     __VA_ARGS__)
+#endif /* UK_LIBC_SYSCALLS */
 
 /* Raw system call implementation that is returning negative codes on errors */
 /* TODO: `void` as return type is currently not supported.
@@ -194,7 +219,9 @@ typedef long uk_syscall_arg_t;
 /*
  * UK_SYSCALL_R_DEFINE()
  * Based on UK_LLSYSCALL_R_DEFINE and provides a libc-style wrapper
+ * in case UK_LIBC_SYSCALLS is enabled
  */
+#if UK_LIBC_SYSCALLS
 #define __UK_SYSCALL_R_DEFINE(x, rtype, name, ename, rname, ...)	\
 	long ename(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__));		\
 	rtype name(UK_ARG_MAPx(x, UK_S_ARG_ACTUAL, __VA_ARGS__))	\
@@ -211,6 +238,14 @@ typedef long uk_syscall_arg_t;
 			     __UK_NAME2SCALLE_FN(name),			\
 			     __UK_NAME2SCALLR_FN(name),			\
 			     __VA_ARGS__)
+#else
+#define UK_SYSCALL_R_DEFINE(rtype, name, ...)				\
+	_UK_LLSYSCALL_R_DEFINE(__UK_SYSCALL_DEF_NARGS(__VA_ARGS__),	\
+			       name,					\
+			       __UK_NAME2SCALLE_FN(name),		\
+			       __UK_NAME2SCALLR_FN(name),		\
+			       __VA_ARGS__)
+#endif /* UK_LIBC_SYSCALLS */
 
 
 #define __UK_SPROTO_ARGS_TYPE long

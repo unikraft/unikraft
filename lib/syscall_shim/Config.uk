@@ -3,6 +3,12 @@ menuconfig LIBSYSCALL_SHIM
 	default n
 
 if LIBSYSCALL_SHIM
+	# Hidden configuration option that can be set by libc's in order to
+	# switch off the generation of libc-style wrapper symbols
+	config LIBSYSCALL_SHIM_NOWRAPPER
+	bool
+	default n
+
 	config LIBSYSCALL_SHIM_HANDLER
 		bool "Binary system call handler (Linux ABI)"
 		default n
