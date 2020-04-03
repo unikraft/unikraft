@@ -39,6 +39,7 @@
 
 #include <uk/config.h>
 #include <uk/essentials.h>
+#include <uk/errptr.h>
 #include <errno.h>
 #include <uk/print.h>
 
@@ -192,20 +193,20 @@ typedef long uk_syscall_arg_t;
 	{								\
 		long ret = rname(					\
 			UK_ARG_MAPx(x, UK_S_ARG_CAST_LONG, __VA_ARGS__)); \
-		if (ret < 0) {						\
-			errno = (int) -ret;				\
+		if (ret < 0 && PTRISERR(ret)) {				\
+			errno = (int) PTR2ERR(ret);			\
 			return -1;					\
 		}							\
 		return ret;						\
 	}								\
-	static inline long __##rname(UK_ARG_MAPx(x, UK_S_ARG_ACTUAL,	\
+	static inline rtype __##rname(UK_ARG_MAPx(x, UK_S_ARG_ACTUAL,	\
 						 __VA_ARGS__));		\
 	long rname(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__))		\
 	{								\
-		return __##rname(					\
+		return (long) __##rname(				\
 			UK_ARG_MAPx(x, UK_S_ARG_CAST_ACTUAL, __VA_ARGS__)); \
 	}								\
-	static inline long __##rname(UK_ARG_MAPx(x, UK_S_ARG_ACTUAL,	\
+	static inline rtype __##rname(UK_ARG_MAPx(x, UK_S_ARG_ACTUAL,	\
 						 __VA_ARGS__))
 #define _UK_LLSYSCALL_R_DEFINE(...) __UK_LLSYSCALL_R_DEFINE(__VA_ARGS__)
 #define UK_LLSYSCALL_R_DEFINE(rtype, name, ...)				\

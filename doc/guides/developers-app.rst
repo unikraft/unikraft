@@ -400,19 +400,18 @@ Example:
 
     UK_SYSCALL_R_DEFINE(ssize_t, write, int, fd, const void *, buf, size_t, count)
     {
-        long ret;
+        ssize_t ret;
 
-        ret = (long) vfs_do_write(fd, buf, count);
+        ret = vfs_do_write(fd, buf, count);
         if (ret < 0) {
             return -EFAULT;
         }
         return ret;
     }
 
-Please note that in the raw case (``UK_SYSCALL_R_DEFINE``), the return type
-within your code block is always ``long``. The specified return type as
-parameter to the macro will be used for the libc-style wrapper. However, the
-input parameters are defined with the actual type for your code block.
+Please note that in the raw case (``UK_SYSCALL_R_DEFINE``), errors are always
+returned as negative value. Whenever the return type is a pointer value, the
+helpers defined in `<uk/errptr.h>` can be used to forward error codes.
 
 Both macros create the following three symbols:
 
@@ -441,9 +440,9 @@ libc-style wrapper on top:
 
     UK_LLSYSCALL_R_DEFINE(ssize_t, write, int, fd, const void *, buf, size_t, count)
     {
-        long ret;
+        ssize_t ret;
 
-        ret = (long) vfs_do_write(fd, buf, count);
+        ret = vfs_do_write(fd, buf, count);
         if (ret < 0) {
             return -EFAULT;
         }
