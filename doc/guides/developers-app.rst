@@ -428,10 +428,39 @@ Both macros create the following three symbols:
     <return_type> <syscall_name>(<arg1_type> <arg1_name>,
                                  <arg2_type> <arg2_name>, ...);
 
+For the case that the libc-style wrapper does not match the signature and return
+type of the underlying system call, a so called low-level variant of these two
+macros are available: ``UK_LLSYSCALL_DEFINE``, ``UK_LLSYSCALL_R_DEFINE``.
+These macros only generate the ``uk_syscall_e_<syscall_name>`` and
+``uk_syscall_r_<syscall_name>`` symbols. You can then provide the custom
+libc-style wrapper on top:
+
+.. code-block:: c
+
+    #include <uk/syscall.h>
+
+    UK_LLSYSCALL_R_DEFINE(ssize_t, write, int, fd, const void *, buf, size_t, count)
+    {
+        long ret;
+
+        ret = (long) vfs_do_write(fd, buf, count);
+        if (ret < 0) {
+            return -EFAULT;
+        }
+        return ret;
+    }
+
+    ssize_t write(int fd, const void *buf, size_t count)
+    {
+        return (ssize_t) uk_syscall_e_write((long) fd,
+                                            (long) buf, (long) count);
+    }
+
 Note: When `syscall_shim` library is not enabled, the original design idea was
-that the macros provide the libc-style wrapper only. However, both macros
-provide always all three variants. This is done to support the case that a
-system call is implemented on top of another.
+that the macros provide the libc-style wrapper only. However, all the
+described macros are still available and populate the symbols as documented
+here. This is done to support the case that a system call is implemented by
+calling another.
 
 If your library uses an ``exportsyms.uk`` file, you need to add the three
 symbols for making them public available: ::
