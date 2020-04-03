@@ -41,6 +41,7 @@
 #include <uk/essentials.h>
 #include <uk/errptr.h>
 #include <errno.h>
+#include <stdarg.h>
 #include <uk/print.h>
 
 /*
@@ -288,6 +289,7 @@ typedef long uk_syscall_arg_t;
 
 /* System call, returns -1 and sets errno on errors */
 long uk_syscall(long n, ...);
+long uk_vsyscall(long n, va_list arg);
 
 /*
  * Use this variant instead of `uk_syscall()` whenever the system call number
@@ -299,6 +301,7 @@ long uk_syscall(long n, ...);
 
 /* Raw system call, returns negative codes on errors */
 long uk_syscall_r(long n, ...);
+long uk_vsyscall_r(long n, va_list arg);
 
 /*
  * Use this variant instead of `uk_syscall_r()` whenever the system call number

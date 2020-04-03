@@ -13,3 +13,15 @@ long uk_syscall(long n, ...)
 	va_end(ap);
 	return __uk_syscall(n,a,b,c,d,e,f);
 }
+
+long uk_vsyscall(long n, va_list arg)
+{
+	long a,b,c,d,e,f;
+	a=va_arg(arg, long);
+	b=va_arg(arg, long);
+	c=va_arg(arg, long);
+	d=va_arg(arg, long);
+	e=va_arg(arg, long);
+	f=va_arg(arg, long);
+	return __uk_syscall(n,a,b,c,d,e,f);
+}

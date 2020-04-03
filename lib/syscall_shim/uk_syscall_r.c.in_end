@@ -14,6 +14,18 @@ long uk_syscall_r(long n, ...)
 	return __uk_syscall_r(n,a,b,c,d,e,f);
 }
 
+long uk_vsyscall_r(long n, va_list arg)
+{
+	long a,b,c,d,e,f;
+	a=va_arg(arg, long);
+	b=va_arg(arg, long);
+	c=va_arg(arg, long);
+	d=va_arg(arg, long);
+	e=va_arg(arg, long);
+	f=va_arg(arg, long);
+	return __uk_syscall_r(n,a,b,c,d,e,f);
+}
+
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER
 #include <uk/plat/syscall.h>
 #include <uk/assert.h>
