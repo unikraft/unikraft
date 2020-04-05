@@ -35,5 +35,8 @@ LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/sscanf.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/asprintf.c
 LIBNOLIBC_SRCS-$(CONFIG_LIBUKALLOC) += $(LIBNOLIBC_BASE)/malloc.c
 
+
+LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/qsort.c
+
 # Localize internal symbols (starting with __*)
 LIBNOLIBC_OBJCFLAGS-y += -w -L __*

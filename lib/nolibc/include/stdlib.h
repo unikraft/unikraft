@@ -89,6 +89,9 @@ void *memalign(size_t align, size_t size);
 
 void abort(void) __noreturn;
 
+void qsort(void *base, size_t nmemb, size_t size,
+           int (*compar)(const void *, const void *));
+
 #if CONFIG_LIBPOSIX_PROCESS
 int system(const char *command);
 #endif
