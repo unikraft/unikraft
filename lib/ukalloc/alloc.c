@@ -253,14 +253,21 @@ int uk_posix_memalign_ifpages(struct uk_alloc *a,
 	 * preceding the memory block, but instead at the beginning of the page
 	 * preceding the memory returned by this function.
 	 *
-	 * align < sizeof(*metadata) implies that metadata are too large to be
-	 * stored preceding the first memory block at given alignment. In this
-	 * case, set align to the next power of two >= sizeof(*metadata). Since
-	 * it is a power of two, the returned pointer will still be aligned at
-	 * the requested alignment.
+	 * align < METADATA_IFPAGES_SIZE_POW2 implies that metadata are too
+	 * large to be stored preceding the first memory block at given
+	 * alignment. In this case, set align to METADATA_IFPAGES_SIZE_POW2,
+	 * the next power of two >= sizeof(*metadata). Since it is a power of
+	 * two, the returned pointer will still be aligned at the requested
+	 * alignment.
 	 */
-	if (align >= __PAGE_SIZE) {
+	if (align > __PAGE_SIZE) {
 		padding = __PAGE_SIZE;
+	} else if (align == __PAGE_SIZE) {
+		/* No padding needed: in this case we already know that the next
+		 * aligned pointer will be intptr (as handed to by palloc) +
+		 * __PAGE_SIZE.
+		 */
+		padding = 0;
 	} else if (align < METADATA_IFPAGES_SIZE_POW2) {
 		align = METADATA_IFPAGES_SIZE_POW2;
 		padding = 0;
