@@ -90,6 +90,9 @@ extern "C" {
 #ifndef __align
 #define __align(bytes)         __attribute__((aligned(bytes)))
 #endif
+#ifndef __unalign
+#define __unalign              __align(1)
+#endif
 /* NOTE: weak aliasing does not work well with link-time optimization
  * currently. Hopefully this will be fixed in gcc 9. The problem is,
  * if a weak symbol is referenced in the library, gcc resolves calls
