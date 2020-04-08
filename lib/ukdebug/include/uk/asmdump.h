@@ -114,11 +114,9 @@ static inline void uk_asmdumpd(const void *instr __unused,
 			       unsigned int instr_count __unused)
 {}
 
-#if CONFIG_LIBUKDEBUG_PRINTK
 static inline void uk_asmdumpk(int lvl __unused, const void *instr __unused,
 			       unsigned int instr_count __unused)
 {}
-#endif /* CONFIG_LIBUKDEBUG_PRINTK */
 
 #endif /* Backends */
 
