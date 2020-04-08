@@ -189,7 +189,7 @@ $(call mk_sub_build_dir,$(1))
 UK_LIBS += $(1)
 $(eval $(call uc,$(1))_BASE    := $(_IMPORT_BASE))
 $(eval $(call uc,$(1))_BUILD   := $(BUILD_DIR)/$(1))
-$(eval $(call uc,$(1))_EXPORTS := $(_IMPORT_BASE)/exportsyms.uk)
+$(eval $(call uc,$(1))_EXPORTS += $(wildcard $(_IMPORT_BASE)/exportsyms.uk))
 endef
 
 # addlib_s $libname,$switch
@@ -206,7 +206,7 @@ $(eval $(call uc,$(2))_PLATS   += $(call uc,$(1)))
 $(eval $(call uc,$(1))_LIBS    += $(2))
 $(eval $(call uc,$(2))_BASE    := $(_IMPORT_BASE))
 $(eval $(call uc,$(2))_BUILD   := $(BUILD_DIR)/$(2))
-$(eval $(call uc,$(2))_EXPORTS := $(_IMPORT_BASE)/exportsyms.uk)
+$(eval $(call uc,$(2))_EXPORTS += $(wildcard $(_IMPORT_BASE)/exportsyms.uk))
 endef
 
 # addplatlib_s $platname,$libname,$switch
@@ -718,10 +718,6 @@ endef
 
 # buildrule_olib $libname
 define buildrule_olib =
-$(if $(wildcard $($(call vprefix_lib,$(1),EXPORTS))),,\
-	$(call verbose_info,Warning: Definition of exported symbols for $(1) missing: $($(call vprefix_lib,$(1),EXPORTS))) \
-)
-
 $(call libname2preolib,$(1)): $($(call vprefix_lib,$(1),OBJS)) \
 			      $($(call vprefix_lib,$(1),OBJS-y)) \
 			      $($(call vprefix_lib,$(1),ALIBS)) \
@@ -742,9 +738,10 @@ $(call libname2preolib,$(1)): $($(call vprefix_lib,$(1),OBJS)) \
 		      -Wl$(comma)--end-group \
 		      -o $(call libname2preolib,$(1)))
 
-$(call libname2olib,$(1)): $(call libname2preolib,$(1)) $(if $(wildcard $($(call vprefix_lib,$(1),EXPORTS))),$($(call vprefix_lib,$(1),EXPORTS)),)
+$(call libname2olib,$(1)): $(call libname2preolib,$(1)) \
+			   $($(call vprefix_lib,$(1),EXPORTS)) $($(call vprefix_lib,$(1),EXPORTS-y)) \
 	$(call build_cmd,OBJCOPY,,$(call libname2olib,$(1)),\
-		$(OBJCOPY) $(if $(wildcard $($(call vprefix_lib,$(1),EXPORTS))),--keep-global-symbols=$($(call vprefix_lib,$(1),EXPORTS)),) \
+		$(OBJCOPY) $(addprefix --keep-global-symbols=,$($(call vprefix_lib,$(1),EXPORTS)) $($(call vprefix_lib,$(1),EXPORTS-y))) \
 		           $(OBJCFLAGS) $(OBJCFLAGS-y) \
 		           $($(call vprefix_lib,$(1),OBJCFLAGS)) $($(call vprefix_lib,$(1),OBJCFLAGS-y)) \
 			   $(call libname2preolib,$(1)) $(call libname2olib,$(1)))
