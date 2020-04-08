@@ -190,6 +190,7 @@ UK_LIBS += $(1)
 $(eval $(call uc,$(1))_BASE    := $(_IMPORT_BASE))
 $(eval $(call uc,$(1))_BUILD   := $(BUILD_DIR)/$(1))
 $(eval $(call uc,$(1))_EXPORTS += $(wildcard $(_IMPORT_BASE)/exportsyms.uk))
+$(eval $(call uc,$(1))_LOCALS  += $(wildcard $(_IMPORT_BASE)/localsyms.uk))
 endef
 
 # addlib_s $libname,$switch
@@ -207,6 +208,7 @@ $(eval $(call uc,$(1))_LIBS    += $(2))
 $(eval $(call uc,$(2))_BASE    := $(_IMPORT_BASE))
 $(eval $(call uc,$(2))_BUILD   := $(BUILD_DIR)/$(2))
 $(eval $(call uc,$(2))_EXPORTS += $(wildcard $(_IMPORT_BASE)/exportsyms.uk))
+$(eval $(call uc,$(2))_LOCALS  += $(wildcard $(_IMPORT_BASE)/localsyms.uk))
 endef
 
 # addplatlib_s $platname,$libname,$switch
@@ -740,8 +742,10 @@ $(call libname2preolib,$(1)): $($(call vprefix_lib,$(1),OBJS)) \
 
 $(call libname2olib,$(1)): $(call libname2preolib,$(1)) \
 			   $($(call vprefix_lib,$(1),EXPORTS)) $($(call vprefix_lib,$(1),EXPORTS-y)) \
+			   $($(call vprefix_lib,$(1),LOCALS)) $($(call vprefix_lib,$(1),LOCALS-y)) \
 	$(call build_cmd,OBJCOPY,,$(call libname2olib,$(1)),\
 		$(OBJCOPY) $(addprefix --keep-global-symbols=,$($(call vprefix_lib,$(1),EXPORTS)) $($(call vprefix_lib,$(1),EXPORTS-y))) \
+			   $(addprefix --localize-symbols=,$($(call vprefix_lib,$(1),LOCALS)) $($(call vprefix_lib,$(1),LOCALS-y))) \
 		           $(OBJCFLAGS) $(OBJCFLAGS-y) \
 		           $($(call vprefix_lib,$(1),OBJCFLAGS)) $($(call vprefix_lib,$(1),OBJCFLAGS-y)) \
 			   $(call libname2preolib,$(1)) $(call libname2olib,$(1)))
