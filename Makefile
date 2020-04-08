@@ -321,6 +321,14 @@ LDFLAGS :=
 LDFLAGS-y :=
 IMAGE_LDFLAGS :=
 IMAGE_LDFLAGS-y :=
+EACHOLIB_SRCS :=
+EACHOLIB_SRCS-y :=
+EACHOLIB_OBJS :=
+EACHOLIB_OBJS-y :=
+EACHOLIB_ALIBS :=
+EACHOLIB_ALIBS-y :=
+EACHOLIB_LOCALS :=
+EACHOLIB_LOCALS-y :=
 
 # Pull in the user's configuration file
 ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
@@ -914,12 +922,14 @@ print-objs:
 		$(foreach P,$(UK_PLATS) $(UK_PLATS-y),\
 		$(if $(call qstrip,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y)),\
 		$(foreach L,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y), \
-		$(if $(call qstrip,$($(call vprefix_lib,$(L),OBJS)) $($(call vprefix_lib,$(L),OBJS-y))), \
-		'$(L):\n   $($(call vprefix_lib,$(L),OBJS)) $($(call vprefix_lib,$(L),OBJS-y))\n'\
+		$(if $(call qstrip,$($(call vprefix_lib,$(L),OBJS)) $($(call vprefix_lib,$(L),OBJS-y)) \
+		       $(EACHOLIB_OBJS) $(EACHOLIB_OBJS-y)), \
+		'$(L):\n   $($(call vprefix_lib,$(L),OBJS)) $($(call vprefix_lib,$(L),OBJS-y)) $(EACHOLIB_OBJS) $(EACHOLIB_OBJS-y)\n'\
 		))))\
 		$(foreach L,$(UK_LIBS) $(UK_LIBS-y),\
-		$(if $(call qstrip,$($(call vprefix_lib,$(L),OBJS)) $($(call vprefix_lib,$(L),OBJS-y))),\
-		'$(L):\n   $($(call vprefix_lib,$(L),OBJS)) $($(call vprefix_lib,$(L),OBJS-y))\n'\
+		$(if $(call qstrip,$($(call vprefix_lib,$(L),OBJS)) $($(call vprefix_lib,$(L),OBJS-y)) \
+		       $(EACHOLIB_OBJS) $(EACHOLIB_OBJS-y)), \
+		'$(L):\n   $($(call vprefix_lib,$(L),OBJS)) $($(call vprefix_lib,$(L),OBJS-y)) $(EACHOLIB_OBJS) $(EACHOLIB_OBJS-y)\n'\
 		))
 
 print-srcs:
@@ -927,12 +937,14 @@ print-srcs:
 		$(foreach P,$(UK_PLATS) $(UK_PLATS-y),\
 		$(if $(call qstrip,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y)),\
 		$(foreach L,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y), \
-		$(if $(call qstrip,$($(call vprefix_lib,$(L),SRCS)) $($(call vprefix_lib,$(L),SRCS-y))), \
-		'$(L):\n   $($(call vprefix_lib,$(L),SRCS)) $($(call vprefix_lib,$(L),SRCS-y))\n'\
+		$(if $(call qstrip,$($(call vprefix_lib,$(L),SRCS)) $($(call vprefix_lib,$(L),SRCS-y)) \
+		       $(EACHOLIB_SRCS) $(EACHOLIB_SRCS-y)), \
+		'$(L):\n   $($(call vprefix_lib,$(L),SRCS)) $($(call vprefix_lib,$(L),SRCS-y)) $(EACHOLIB_SRCS) $(EACHOLIB_SRCS-y)\n'\
 		))))\
 		$(foreach L,$(UK_LIBS) $(UK_LIBS-y),\
-		$(if $(call qstrip,$($(call vprefix_lib,$(L),SRCS)) $($(call vprefix_lib,$(L),SRCS-y))),\
-		'$(L):\n   $($(call vprefix_lib,$(L),SRCS)) $($(call vprefix_lib,$(L),SRCS-y))\n'\
+		$(if $(call qstrip,$($(call vprefix_lib,$(L),SRCS)) $($(call vprefix_lib,$(L),SRCS-y)) \
+		       $(EACHOLIB_SRCS) $(EACHOLIB_SRCS-y)), \
+		'$(L):\n   $($(call vprefix_lib,$(L),SRCS)) $($(call vprefix_lib,$(L),SRCS-y)) $(EACHOLIB_SRCS) $(EACHOLIB_SRCS-y)\n'\
 		))
 else
 print-libs:

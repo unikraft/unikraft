@@ -25,8 +25,10 @@
 
 ifneq ($(call qstrip,$(UK_LIBS) $(UK_LIBS-y)),)
 $(foreach L,$(UK_LIBS) $(UK_LIBS-y), \
-$(if $(call qstrip,$($(call uc,$(L))_SRCS) $($(call uc,$(L))_SRCS-y)), \
-$(foreach S,$($(call uc,$(L))_SRCS) $($(call uc,$(L))_SRCS-y), \
+$(if $(call qstrip,$($(call uc,$(L))_SRCS) $($(call uc,$(L))_SRCS-y) \
+	    $(EACHOLIB_SRCS) $(EACHOLIB_SRCS-y)), \
+$(foreach S,$($(call uc,$(L))_SRCS) $($(call uc,$(L))_SRCS-y) \
+	    $(EACHOLIB_SRCS) $(EACHOLIB_SRCS-y), \
 $(eval $(call buildrule_libobj_multitarget,$(L),$(S))) \
 ); \
 $(eval $(call buildrule_olib,$(L))); \
@@ -46,8 +48,10 @@ ifneq ($(call qstrip,$(UK_PLATS) $(UK_PLATS-y)),)
 $(foreach P,$(UK_PLATS) $(UK_PLATS-y), \
 $(if $(call qstrip,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y)), \
 $(foreach L,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y), \
-$(if $(call qstrip,$($(call uc,$(L))_SRCS) $($(call uc,$(L))_SRCS-y)), \
-$(foreach S,$($(call uc,$(L))_SRCS) $($(call uc,$(L))_SRCS-y), \
+$(if $(call qstrip,$($(call uc,$(L))_SRCS) $($(call uc,$(L))_SRCS-y) \
+     $(EACHOLIB_SRCS) $(EACHOLIB_SRCS-y)), \
+$(foreach S,$($(call uc,$(L))_SRCS) $($(call uc,$(L))_SRCS-y) \
+	    $(EACHOLIB_SRCS) $(EACHOLIB_SRCS-y), \
 $(eval $(call buildrule_libobj_multitarget,$(L),$(S))) \
 ); \
 $(eval $(call buildrule_olib,$(L))); \
