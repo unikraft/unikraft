@@ -9,10 +9,8 @@ else
 ARCHFLAGS     += -D__ARM_64__ -mgeneral-regs-only
 endif
 
-ISR_ARCHFLAGS += -D__ARM_64__ -mgeneral-regs-only
-
 # Disable FPU for trap/exception/interrupt handlers
-ISR_ARCHFLAGS += -mfpu=none
+ISR_ARCHFLAGS += -D__ARM_64__ -mgeneral-regs-only
 
 CINCLUDES   += -I$(CONFIG_UK_BASE)/arch/arm/arm64/include
 ASINCLUDES  += -I$(CONFIG_UK_BASE)/arch/arm/arm64/include
