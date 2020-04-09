@@ -2,6 +2,7 @@ ifeq (x86_64,$(CONFIG_UK_ARCH))
 KVM_LDFLAGS-y += -Wl,-m,elf_x86_64
 else ifeq (arm64,$(CONFIG_UK_ARCH))
 KVM_LDFLAGS-y	 += -Wl,-m,aarch64elf
+KVM_LINK_LIBGCC_FLAG	:= -lgcc
 endif
 
 
@@ -26,6 +27,7 @@ $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 			-Wl$(comma)--start-group \
 			$(KVM_ALIBS) $(KVM_ALIBS-y) \
 			$(UK_ALIBS) $(UK_ALIBS-y) \
+			$(KVM_LINK_LIBGCC_FLAG) \
 			-Wl$(comma)--end-group \
 			-o $(KVM_IMAGE).ld.o)
 	$(call build_cmd,OBJCOPY,,$(KVM_IMAGE).o,\
