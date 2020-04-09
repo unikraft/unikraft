@@ -3,7 +3,12 @@
 # we should not enable the FP & SIMD access for kernel. As GCC will
 # the FP & SIMD registers to pass parameters, we use -mgeneral-regs-only
 # flag to force GCC to use generic registers
+ifeq ($(CONFIG_FPSIMD),y)
+ARCHFLAGS     += -D__ARM_64__
+else
 ARCHFLAGS     += -D__ARM_64__ -mgeneral-regs-only
+endif
+
 ISR_ARCHFLAGS += -D__ARM_64__ -mgeneral-regs-only
 
 # Disable FPU for trap/exception/interrupt handlers
