@@ -116,6 +116,47 @@ void halt(void);
 void reset(void);
 void system_off(void);
 
+#ifdef CONFIG_FPSIMD
+struct fpsimd_state {
+	__u64		regs[32 * 2];
+	__u32		fpsr;
+	__u32		fpcr;
+};
+
+extern void fpsimd_save_state(uintptr_t ptr);
+extern void fpsimd_restore_state(uintptr_t ptr);
+
+static inline void save_extregs(struct sw_ctx *ctx)
+{
+	fpsimd_save_state(ctx->extregs);
+}
+
+static inline void restore_extregs(struct sw_ctx *ctx)
+{
+	fpsimd_restore_state(ctx->extregs);
+}
+
+static inline struct sw_ctx *arch_alloc_sw_ctx(struct uk_alloc *allocator)
+{
+	struct sw_ctx *ctx;
+
+	ctx = (struct sw_ctx *)uk_malloc(allocator,
+			sizeof(struct sw_ctx) + sizeof(struct fpsimd_state));
+	if (ctx)
+		ctx->extregs = (uintptr_t)((void *)ctx + sizeof(struct sw_ctx));
+
+	uk_pr_debug("Allocating %lu + %lu bytes for sw ctx at %p, extregs at %p\n",
+			sizeof(struct sw_ctx), sizeof(struct fpsimd_state),
+			ctx, (void *)ctx->extregs);
+
+	return ctx;
+}
+
+static inline void arch_init_extregs(struct sw_ctx *ctx __unused)
+{
+}
+
+#else /* !CONFIG_FPSIMD */
 static inline void save_extregs(struct sw_ctx *ctx __unused)
 {
 }
@@ -128,9 +169,9 @@ static inline struct sw_ctx *arch_alloc_sw_ctx(struct uk_alloc *allocator)
 {
 	struct sw_ctx *ctx;
 
-	ctx = uk_malloc(allocator, sizeof(struct sw_ctx));
+	ctx = (struct sw_ctx *)uk_malloc(allocator, sizeof(struct sw_ctx));
 	uk_pr_debug("Allocating %lu bytes for sw ctx at %p\n",
-		   sizeof(struct sw_ctx), ctx);
+		sizeof(struct sw_ctx), ctx);
 
 	return ctx;
 }
@@ -140,4 +181,5 @@ static inline void arch_init_extregs(struct sw_ctx *ctx)
 	ctx->extregs = (uintptr_t)ctx + sizeof(struct sw_ctx);
 }
 
+#endif /* CONFIG_FPSIMD */
 #endif /* __PLAT_COMMON_ARM64_CPU_H__ */
