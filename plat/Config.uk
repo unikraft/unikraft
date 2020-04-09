@@ -21,3 +21,10 @@ config HZ
 	help
 		Configure the timer interrupt frequency.
 		Only change this if you know what you're doing.
+
+config FPSIMD
+	bool "floating point & simd support in application"
+	default n
+	depends on ARCH_ARM_64
+	help
+		Enable support FPU usage in application
