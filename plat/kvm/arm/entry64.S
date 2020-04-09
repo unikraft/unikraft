@@ -36,6 +36,7 @@
 #include <kvm-arm/mm.h>
 #include <arm/cpu_defs.h>
 #include <uk/plat/common/sections.h>
+#include <uk/config.h>
 
 .global page_table_size
 .data
@@ -49,6 +50,13 @@ page_table_size:
 
 .text
 ENTRY(_libkvmplat_entry)
+#ifdef CONFIG_FPSIMD
+	/* Enable fp/simd support */
+	ldr        x0, =(3 << 20)
+	msr        cpacr_el1, x0
+	isb
+#endif
+
 	/* Calculate the image size */
 	ldr x25, =_dtb
 	ldr x26, =_end
