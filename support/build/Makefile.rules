@@ -779,8 +779,13 @@ endef
 # cleanrule_lib $libname
 define cleanrule_lib =
 clean-$(1):
-	$(call verbose_cmd,CLEAN,$(1),$(RM) \
-	$($(call vprefix_lib,$(1),CLEAN-y)) $($(call vprefix_lib,$(1),CLEAN)))
+	$(file >$(BUILD_DIR)/$(1)/uk_clean_list) \
+            $(foreach O,$($(call vprefix_lib,$(1),CLEAN-y)),\
+                $(file >>$(BUILD_DIR)/$(1)/uk_clean_list,$O)) \
+            $(foreach O,$($(call vprefix_lib,$(1),CLEAN)),\
+                $(file >>$(BUILD_DIR)/$(1)/uk_clean_list,$O))
+	$(call verbose_cmd,CLEAN,$(1),\
+            $(XARGS) $(RM) <$(BUILD_DIR)/$(1)/uk_clean_list)
 
 .PHONY: clean-$(1)
 endef
