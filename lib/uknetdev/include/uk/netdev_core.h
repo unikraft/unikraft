@@ -364,9 +364,10 @@ typedef int (*uk_netdev_rx_one_t)(struct uk_netdev *dev,
 				  struct uk_netbuf **pkt);
 
 /** Driver callback type to submit one packet to a TX queue. */
-typedef int (*uk_netdev_tx_one_t)(struct uk_netdev *dev,
+typedef int (*uk_netdev_tx_t)(struct uk_netdev *dev,
 				  struct uk_netdev_tx_queue *queue,
-				  struct uk_netbuf *pkt);
+				  struct uk_netbuf **pkt,
+				  __u16 *cnt);
 
 /**
  * A structure containing the functions exported by a driver.
@@ -450,7 +451,7 @@ struct uk_netdev_einfo {
  */
 struct uk_netdev {
 	/** Packet transmission. */
-	uk_netdev_tx_one_t          tx_one; /* by driver */
+	uk_netdev_tx_t        tx; /* by driver */
 
 	/** Packet reception. */
 	uk_netdev_rx_one_t          rx_one; /* by driver */

@@ -469,6 +469,51 @@ static inline int uk_netdev_rx_one(struct uk_netdev *dev, uint16_t queue_id,
 }
 
 /**
+ * Transmit a burst of packets
+ *
+ * @param dev
+ *   The Unikraft Network Device.
+ * @param queue_id
+ *   The index of the receive queue to receive from.
+ *   The value must be in the range [0, nb_tx_queue - 1] previously supplied
+ *   to uk_netdev_configure().
+ * @param pkt
+ *   Reference to an array of netbuf to be sent. Packet is free'd by the driver
+ *   after sending was successfully finished by the device.
+ *   Please note that some drivers may require available headroom on the netbuf
+ *   for doing a transmission - inspect `nb_encap` with uk_netdev_info_get().
+ *   `pkt` has never to be `NULL`.
+ * @param cnt
+ *   Reference to the number of netbuf the user intends to send. On function
+ *   exit the parameter also indicates the number of netbuf transmitted.
+ * @return
+ *   - (>=0): Positive value with status flags
+ *     - UK_NETDEV_STATUS_SUCCESS: `pkt` was successfully put to the transmit
+ *        queue. Whenever this flag is not set, there was no space left on the
+ *        transmit queue to send `pkt`.
+ *     - UK_NETDEV_STATUS_MORE: Indicates there is still at least one descriptor
+ *         available for a subsequent transmission. If the flag is unset means
+ *         that the transmit queue is full.
+ *         This flag may only be set together with UK_NETDEV_STATUS_SUCCESS.
+ *     - UK_NETDEV_STATUS_UNDERRUN: Indicates the some the of the netbufs were
+ *         not sent. The cnt parameter shows the actual number of the packets
+ *         sent.
+ *   - (<0): Negative value with error code from driver, no packet was sent.
+ */
+static inline int uk_netdev_tx_burst(struct uk_netdev *dev, uint16_t queue_id,
+				   struct uk_netbuf **pkt, __u16 *cnt)
+{
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->tx);
+	UK_ASSERT(queue_id < CONFIG_LIBUKNETDEV_MAXNBQUEUES);
+	UK_ASSERT(dev->_data->state == UK_NETDEV_RUNNING);
+	UK_ASSERT(!PTRISERR(dev->_tx_queue[queue_id]));
+	UK_ASSERT(pkt && cnt);
+
+	return dev->tx(dev, dev->_tx_queue[queue_id], pkt, cnt);
+}
+
+/**
  * Transmit one packet
  *
  * @param dev
@@ -497,14 +542,9 @@ static inline int uk_netdev_rx_one(struct uk_netdev *dev, uint16_t queue_id,
 static inline int uk_netdev_tx_one(struct uk_netdev *dev, uint16_t queue_id,
 				   struct uk_netbuf *pkt)
 {
-	UK_ASSERT(dev);
-	UK_ASSERT(dev->tx_one);
-	UK_ASSERT(queue_id < CONFIG_LIBUKNETDEV_MAXNBQUEUES);
-	UK_ASSERT(dev->_data->state == UK_NETDEV_RUNNING);
-	UK_ASSERT(!PTRISERR(dev->_tx_queue[queue_id]));
-	UK_ASSERT(pkt);
+	__u16 cnt = 1;
 
-	return dev->tx_one(dev, dev->_tx_queue[queue_id], pkt);
+	return uk_netdev_tx_burst(dev, queue_id, &pkt, &cnt);
 }
 
 /**

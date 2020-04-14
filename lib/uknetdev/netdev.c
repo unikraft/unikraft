@@ -153,7 +153,7 @@ int uk_netdev_drv_register(struct uk_netdev *dev, struct uk_alloc *a,
 		  || (!dev->ops->rxq_intr_enable
 		      && !dev->ops->rxq_intr_disable));
 	UK_ASSERT(dev->rx_one);
-	UK_ASSERT(dev->tx_one);
+	UK_ASSERT(dev->tx);
 
 	dev->_data = _alloc_data(a, netdev_count,  drv_name);
 	if (!dev->_data)

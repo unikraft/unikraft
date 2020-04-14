@@ -160,6 +160,34 @@ int virtqueue_buffer_enqueue(struct virtqueue *vq, void *cookie,
 			     __u16 write_bufs);
 
 /**
+ * Enqueue a burst of a chain of descriptor into the virtqueue.
+ * @param vq
+ *	Reference to the virtqueue
+ * @param cookies
+ *	Reference to a list of the cookies to reconstruct the buffer.
+ * @param sg
+ *	Reference to the scatter gather list
+ * @param cnt
+ *	Reference to the cnt of the descriptor to insert into the virtqueue.
+ * @param *read_bufs
+ *	Reference to the list of number of read descriptors
+ * @param *write_bufs
+ *	Reference to the list of number of write descriptors
+ * @return
+ *	> 0 The buffers were added into the ring and the count indicates
+ *	the number of available slots in the ring. The value of cnt should
+ *	remain the same as the number of input descriptor.
+ *	0  The buffers were added and there are no further descriptors
+ *	available. The value of cnt should remain the same as the number of
+ *	input descriptor.
+ *	< 0 Failed to enqueue all the descriptor into the ring . The cnt field
+ *	indicates the number of descriptors added.
+ */
+int virtqueue_buffer_enqueue_burst(struct virtqueue *vq, void **cookies,
+				   struct uk_sglist *sg, __u16 *cnt,
+				   __u16 *read_bufs, __u16 *write_bufs);
+
+/**
  * Allocate a virtqueue.
  * @param queue_id
  *	The virtqueue hw id.

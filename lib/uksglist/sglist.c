@@ -537,6 +537,7 @@ int uk_sglist_append_netbuf(struct uk_sglist *sg, struct uk_netbuf *netbuf)
 {
 	struct sgsave save;
 	struct uk_netbuf *nb;
+	int len = 0;
 	int error;
 
 	if (sg->sg_maxseg == 0)
@@ -545,14 +546,14 @@ int uk_sglist_append_netbuf(struct uk_sglist *sg, struct uk_netbuf *netbuf)
 	error = 0;
 	SGLIST_SAVE(sg, save);
 	UK_NETBUF_CHAIN_FOREACH(nb, netbuf) {
-		if (likely(nb->len > 0)) {
-			error = uk_sglist_append(sg, nb->data, nb->len);
-			if (unlikely(error)) {
-				SGLIST_RESTORE(sg, save);
-				return error;
-			}
+		UK_ASSERT(nb->len > 0);
+		error = uk_sglist_append(sg, nb->data, nb->len);
+		if (unlikely(error)) {
+			SGLIST_RESTORE(sg, save);
+			return error;
 		}
+		len += nb->len;
 	}
-	return 0;
+	return len;
 }
 #endif /* CONFIG_LIBUKNETDEV */
