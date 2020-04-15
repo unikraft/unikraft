@@ -134,6 +134,30 @@ int virtqueue_notify_enabled(struct virtqueue *vq);
 int virtqueue_buffer_dequeue(struct virtqueue *vq, void **cookie, __u32 *len);
 
 /**
+ * Remove a list of user buffer from the virtqueue.
+ *
+ * @param vq
+ *	Reference to the virtqueue.
+ * @param cookie
+ *      A list of reference to the cookie that was submitted.
+ *      with the dequeued descriptor after successful exit of this
+ *      function.
+ * @param cnt
+ *	A reference to the count of the max buffer to be dequeued. On
+ *	function exit contains the number of buffers removed from the
+ *	queue.
+ * @param len
+ *	Reference to the length of the data packet.
+ * @return
+ *	>= 0 A buffer was dequeued from the ring and the count indicates
+ *	the number of used slots in the ring after dequeueing.
+ *	< 0 Failed to dequeue a buffer, the output parameters cookie and len
+ *      are unmodified.
+ */
+int virtqueue_buffer_dequeue_burst(struct virtqueue *vq, void **cookie,
+				   __u16 *cnt, __u32 *len);
+
+/**
  * Create a descriptor chain starting at index head,
  * using vq->bufs also starting at index head.
  * @param vq

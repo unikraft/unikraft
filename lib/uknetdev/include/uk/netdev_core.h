@@ -359,9 +359,9 @@ typedef int (*uk_netdev_rxq_intr_disable_t)(struct uk_netdev *dev,
 #define UK_NETDEV_STATUS_UNDERRUN (0x4)
 
 /** Driver callback type to retrieve one packet from a RX queue. */
-typedef int (*uk_netdev_rx_one_t)(struct uk_netdev *dev,
+typedef int (*uk_netdev_rx_t)(struct uk_netdev *dev,
 				  struct uk_netdev_rx_queue *queue,
-				  struct uk_netbuf **pkt);
+				  struct uk_netbuf **pkt, __u16 *cnt);
 
 /** Driver callback type to submit one packet to a TX queue. */
 typedef int (*uk_netdev_tx_t)(struct uk_netdev *dev,
@@ -454,7 +454,7 @@ struct uk_netdev {
 	uk_netdev_tx_t        tx; /* by driver */
 
 	/** Packet reception. */
-	uk_netdev_rx_one_t          rx_one; /* by driver */
+	uk_netdev_rx_t          rx; /* by driver */
 
 	/** Pointer to API-internal state data. */
 	struct uk_netdev_data       *_data;

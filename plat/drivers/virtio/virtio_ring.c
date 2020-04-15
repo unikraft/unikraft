@@ -179,6 +179,8 @@ static inline void virtqueue_detach_desc(struct virtqueue_vring *vrq,
 	/* The value should be empty */
 	UK_ASSERT(vq_info->desc_count == 0);
 
+	uk_pr_debug("vq id: %d,  curr head desc: %d new head_desc: %d\n",
+		    vrq->vq.queue_id,  vrq->head_free_desc, head_idx);
 	/* Appending the descriptor to the head of list */
 	desc->next = vrq->head_free_desc;
 	vrq->head_free_desc = head_idx;
@@ -267,19 +269,19 @@ __phys_addr virtqueue_physaddr(struct virtqueue *vq)
 	return ukplat_virt_to_phys(vrq->vring_mem);
 }
 
-int virtqueue_buffer_dequeue(struct virtqueue *vq, void **cookie, __u32 *len)
+static inline int _virtqueue_buffer_dequeue(struct virtqueue *vq,
+					    void **cookie,
+					    __u32 *len)
 {
 	struct virtqueue_vring *vrq = NULL;
-	__u16 used_idx, head_idx;
 	struct vring_used_elem *elem;
+	__u16 used_idx, head_idx;
 
-	UK_ASSERT(vq);
-	UK_ASSERT(cookie);
 	vrq = to_virtqueue_vring(vq);
-
 	/* No new descriptor since last dequeue operation */
 	if (!virtqueue_hasdata(vq))
 		return -ENOMSG;
+
 	used_idx = vrq->last_used_desc_idx++ & (vrq->vring.num - 1);
 	elem = &vrq->vring.used->ring[used_idx];
 	/**
@@ -293,6 +295,42 @@ int virtqueue_buffer_dequeue(struct virtqueue *vq, void **cookie, __u32 *len)
 	*cookie = vrq->vq_info[head_idx].cookie;
 	virtqueue_detach_desc(vrq, head_idx);
 	vrq->vq_info[head_idx].cookie = NULL;
+	return 0;
+}
+
+int virtqueue_buffer_dequeue(struct virtqueue *vq, void **cookie, __u32 *len)
+{
+	struct virtqueue_vring *vrq = NULL;
+	int rc;
+
+	UK_ASSERT(vq);
+	UK_ASSERT(cookie && len);
+
+	vrq = to_virtqueue_vring(vq);
+	rc = _virtqueue_buffer_dequeue(vq, cookie, len);
+	if (rc < 0)
+		return rc;
+	return (vrq->vring.num - vrq->desc_avail);
+}
+
+int virtqueue_buffer_dequeue_burst(struct virtqueue *vq, void **cookie,
+				   __u16 *cnt, __u32 *len)
+{
+	struct virtqueue_vring *vrq = NULL;
+	int i, rc;
+
+	UK_ASSERT(vq);
+	UK_ASSERT(cookie && len && cnt);
+
+	vrq = to_virtqueue_vring(vq);
+	for (i = 0; i < *cnt; i++) {
+		rc = _virtqueue_buffer_dequeue(vq, &cookie[i], &len[i]);
+		if (rc == -ENOMSG)
+			break;
+
+	}
+
+	*cnt = i;
 	return (vrq->vring.num - vrq->desc_avail);
 }
 
@@ -331,8 +369,8 @@ static int _virtqueue_buffer_enqueue(struct virtqueue *vq, void *cookie,
 	vrq->head_free_desc = idx;
 	vrq->desc_avail -= total_desc;
 
-	uk_pr_debug("Old head:%d, new head:%d, total_desc:%d\n",
-		    head_idx, idx, total_desc);
+	uk_pr_debug("Old head:%d, new head:%d, total_desc:%d total_avail: %d\n",
+		    head_idx, idx, total_desc, vrq->desc_avail);
 
 	virtqueue_ring_update_avail(vrq, head_idx);
 	return vrq->desc_avail;

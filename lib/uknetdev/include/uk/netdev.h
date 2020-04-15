@@ -420,6 +420,61 @@ static inline int uk_netdev_rxq_intr_disable(struct uk_netdev *dev,
 }
 
 /**
+ * Receive a burst of packet and re-program used receive descriptors. In order
+ * to avoid race conditions, queue interrupts have to be off while executing
+ * this function. When operating the queue in interrupt mode, this is
+ * automatically the case as soon as an interrupt arrived or the return code of
+ * uk_netdev_rxq_intr_enable() indicated that packets are left on the queue.
+ * In both cases, uk_netdev_rx_burst() is going to enable interrupts again as
+ * soon as the last packet was received from the queue.
+ * If this function is called from interrupt context (e.g., within receive event
+ * handler when no dispatcher threads are configured) make sure that the
+ * provided receive buffer allocator function is interrupt-context-safe
+ * (see: `uk_netdev_rxq_configure`).
+ *
+ * @param dev
+ *   The Unikraft Network Device.
+ * @param queue_id
+ *   The index of the receive queue to receive from.
+ *   The value must be in the range [0, nb_rx_queue - 1] previously supplied
+ *   to uk_netdev_configure().
+ * @param pkt
+ *   Reference to netbuf pointer which will be point to the received packet
+ *   after the function call. `pkt` has never to be `NULL`.
+ * @param cnt
+ *   Reference to the count of the number of netbuf that can be filled. `cnt`
+ *   should not be NULL. On the function exit the cnt contains the number
+ *   packets received in that burst receive.
+ * @return
+ *   - (>=0): Positive value with status flags
+ *     - UK_NETDEV_STATUS_SUCCESS: `pkt` points to received netbuf. Whenever
+ *        this flag is not set, there was no packet received.
+ *     - UK_NETDEV_STATUS_MORE: Indicates that more received packets are
+ *        available on the receive queue. When interrupts are used, they are
+ *        disabled until this flag is unset by a subsequent call.
+ *        This flag may only be set together with UK_NETDEV_STATUS_SUCCESS.
+ *     - UK_NETDEV_STATUS_UNDERRUN: Informs that some available slots of the
+ *        receive queue could not be programmed with a receive buffer. The
+ *        user-provided receive buffer allocator function returned with an error
+ *        (e.g., out of memory).
+ *     - UK_NETDEV_STATUS_PKT_ERR: Inform that some packets in the burst were
+ *     discarded as an erroneous packets.
+ *   - (<0): Negative value with error code from driver, no packet is returned.
+ */
+static inline int uk_netdev_rx_burst(struct uk_netdev *dev, uint16_t queue_id,
+				   struct uk_netbuf **pkt, __u16 *cnt)
+{
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->rx);
+	UK_ASSERT(queue_id < CONFIG_LIBUKNETDEV_MAXNBQUEUES);
+	UK_ASSERT(dev->_data->state == UK_NETDEV_RUNNING);
+	UK_ASSERT(!PTRISERR(dev->_rx_queue[queue_id]));
+	UK_ASSERT(pkt && cnt);
+
+	return dev->rx(dev, dev->_rx_queue[queue_id], pkt, cnt);
+}
+
+/**
  * Receive one packet and re-program used receive descriptors. In order to avoid
  * race conditions, queue interrupts have to be off while executing this
  * function. When operating the queue in interrupt mode, this is automatically
@@ -455,17 +510,12 @@ static inline int uk_netdev_rxq_intr_disable(struct uk_netdev *dev,
  *        (e.g., out of memory).
  *   - (<0): Negative value with error code from driver, no packet is returned.
  */
-static inline int uk_netdev_rx_one(struct uk_netdev *dev, uint16_t queue_id,
+static inline int uk_netdev_rx_one(struct uk_netdev *dev, uint16_t qid,
 				   struct uk_netbuf **pkt)
 {
-	UK_ASSERT(dev);
-	UK_ASSERT(dev->rx_one);
-	UK_ASSERT(queue_id < CONFIG_LIBUKNETDEV_MAXNBQUEUES);
-	UK_ASSERT(dev->_data->state == UK_NETDEV_RUNNING);
-	UK_ASSERT(!PTRISERR(dev->_rx_queue[queue_id]));
-	UK_ASSERT(pkt);
+	__u16 cnt = 1;
 
-	return dev->rx_one(dev, dev->_rx_queue[queue_id], pkt);
+	return uk_netdev_rx_burst(dev, qid, pkt, &cnt);
 }
 
 /**
