@@ -89,6 +89,8 @@ uk_syscall_e_readlink
 uk_syscall_r_readlink
 fallocate
 lseek
+uk_syscall_e_lseek
+uk_syscall_r_lseek
 uk_syscall_e_writev
 uk_syscall_r_writev
 umask

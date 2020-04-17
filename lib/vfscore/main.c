@@ -262,7 +262,7 @@ UK_TRACEPOINT(trace_vfs_lseek, "%d 0x%x %d", int, off_t, int);
 UK_TRACEPOINT(trace_vfs_lseek_ret, "0x%x", off_t);
 UK_TRACEPOINT(trace_vfs_lseek_err, "%d", int);
 
-off_t lseek(int fd, off_t offset, int whence)
+UK_SYSCALL_R_DEFINE(off_t, lseek, int, fd, off_t, offset, int, whence)
 {
 	struct vfscore_file *fp;
 	off_t org;
@@ -271,20 +271,19 @@ off_t lseek(int fd, off_t offset, int whence)
 	trace_vfs_lseek(fd, offset, whence);
 	error = fget(fd, &fp);
 	if (error)
-		goto out_errno;
+		goto out_error;
 
 	error = sys_lseek(fp, offset, whence, &org);
 	fdrop(fp);
 
 	if (error)
-		goto out_errno;
+		goto out_error;
 	trace_vfs_lseek_ret(org);
 	return org;
 
-	out_errno:
+	out_error:
 	trace_vfs_lseek_err(error);
-	errno = error;
-	return -1;
+	return -error;
 }
 
 LFS64(lseek);
