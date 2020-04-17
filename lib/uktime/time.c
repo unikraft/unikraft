@@ -43,6 +43,8 @@
 #include <uk/plat/time.h>
 #include <uk/config.h>
 #include <uk/print.h>
+#include <uk/syscall.h>
+
 #if CONFIG_HAVE_SCHED
 #include <uk/sched.h>
 #else
@@ -144,30 +146,35 @@ int clock_getres(clockid_t clk_id __unused, struct timespec *res __unused)
 	return 0;
 }
 
-int clock_gettime(clockid_t clk_id __unused, struct timespec *tp __unused)
+UK_SYSCALL_R_DEFINE(int, clock_gettime, clockid_t, clk_id, struct timespec*, tp)
 {
 	__nsec now;
+	int error;
 
 	if (!tp) {
-		errno = EFAULT;
-		return -1;
+		error = EFAULT;
+		goto out_error;
 	}
 
 	switch (clk_id) {
 	case CLOCK_MONOTONIC:
+	case CLOCK_MONOTONIC_COARSE:
 		now = ukplat_monotonic_clock();
 		break;
 	case CLOCK_REALTIME:
 		now = ukplat_wall_clock();
 		break;
 	default:
-		errno = EINVAL;
-		return -1;
+		error = EINVAL;
+		goto out_error;
 	}
 
 	tp->tv_sec = ukarch_time_nsec_to_sec(now);
 	tp->tv_nsec = ukarch_time_subsec(now);
 	return 0;
+
+out_error:
+	return -error;
 }
 
 int clock_settime(clockid_t clk_id __unused, const struct timespec *tp __unused)

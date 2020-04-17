@@ -12,3 +12,5 @@ LIBUKTIME_SRCS-y += $(LIBUKTIME_BASE)/musl-imported/src/__tm_to_secs.c
 LIBUKTIME_SRCS-y += $(LIBUKTIME_BASE)/musl-imported/src/__year_to_secs.c
 LIBUKTIME_SRCS-y += $(LIBUKTIME_BASE)/time.c
 LIBUKTIME_SRCS-y += $(LIBUKTIME_BASE)/timer.c
+
+UK_PROVIDED_SYSCALLS-$(CONFIG_LIBUKTIME) += clock_gettime-2
