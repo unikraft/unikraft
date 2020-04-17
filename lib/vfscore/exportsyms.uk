@@ -51,6 +51,8 @@ vfscore_mount_dump
 umount
 umount2
 link
+uk_syscall_e_link
+uk_syscall_r_link
 unlink
 getcwd
 chown
