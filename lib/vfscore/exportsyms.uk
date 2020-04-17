@@ -33,6 +33,8 @@ fhold
 fdrop
 fget
 ftruncate
+uk_syscall_e_ftruncate
+uk_syscall_r_ftruncate
 stat
 chmod
 fchmod

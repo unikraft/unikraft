@@ -1723,7 +1723,7 @@ UK_TRACEPOINT(trace_vfs_ftruncate, "%d 0x%x", int, off_t);
 UK_TRACEPOINT(trace_vfs_ftruncate_ret, "");
 UK_TRACEPOINT(trace_vfs_ftruncate_err, "%d", int);
 
-int ftruncate(int fd, off_t length)
+UK_SYSCALL_R_DEFINE(int, ftruncate, int, fd, off_t, length)
 {
 	trace_vfs_ftruncate(fd, length);
 	struct vfscore_file *fp;
@@ -1731,20 +1731,19 @@ int ftruncate(int fd, off_t length)
 
 	error = fget(fd, &fp);
 	if (error)
-		goto out_errno;
+		goto out_error;
 
 	error = sys_ftruncate(fp, length);
 	fdrop(fp);
 
 	if (error)
-		goto out_errno;
+		goto out_error;
 	trace_vfs_ftruncate_ret();
 	return 0;
 
-	out_errno:
-	errno = error;
+	out_error:
 	trace_vfs_ftruncate_err(error);
-	return -1;
+	return -error;
 }
 
 LFS64(ftruncate);
