@@ -70,6 +70,8 @@ uk_syscall_e_readv
 uk_syscall_r_readv
 writev
 truncate
+uk_syscall_e_truncate
+uk_syscall_r_truncate
 mknod
 preadv
 ioctl

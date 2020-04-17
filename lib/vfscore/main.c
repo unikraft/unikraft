@@ -1693,7 +1693,7 @@ UK_TRACEPOINT(trace_vfs_truncate, "\"%s\" 0x%x", const char*, off_t);
 UK_TRACEPOINT(trace_vfs_truncate_ret, "");
 UK_TRACEPOINT(trace_vfs_truncate_err, "%d", int);
 
-int truncate(const char *pathname, off_t length)
+UK_SYSCALL_R_DEFINE(int, truncate, const char*, pathname, off_t, length)
 {
 	trace_vfs_truncate(pathname, length);
 	struct task *t = main_task;
@@ -1702,19 +1702,21 @@ int truncate(const char *pathname, off_t length)
 
 	error = ENOENT;
 	if (pathname == NULL)
-		goto out_errno;
+		goto out_error;
+
 	if ((error = task_conv(t, pathname, VWRITE, path)) != 0)
-		goto out_errno;
+		goto out_error;
 
 	error = sys_truncate(path, length);
 	if (error)
-		goto out_errno;
+		goto out_error;
+
 	trace_vfs_truncate_ret();
 	return 0;
-	out_errno:
-	errno = error;
+
+	out_error:
 	trace_vfs_truncate_err(error);
-	return -1;
+	return -error;
 }
 
 LFS64(truncate);
