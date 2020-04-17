@@ -207,22 +207,21 @@ int fdclose(int fd)
 	return error;
 }
 
-int close(int fd)
+UK_SYSCALL_R_DEFINE(int, close, int, fd)
 {
 	int error;
 
 	trace_vfs_close(fd);
 	error = fdclose(fd);
 	if (error)
-		goto out_errno;
+		goto out_error;
 
 	trace_vfs_close_ret();
 	return 0;
 
-	out_errno:
+	out_error:
 	trace_vfs_close_err(error);
-	errno = error;
-	return -1;
+	return -error;
 }
 
 UK_TRACEPOINT(trace_vfs_mknod, "\"%s\" 0%0o 0x%x", const char*, mode_t, dev_t);
