@@ -505,12 +505,18 @@ int blkfront_xb_connect(struct blkfront_dev *blkdev)
 	}
 
 	err = xenbus_switch_state(XBT_NIL, xendev, XenbusStateConnected);
-	if (err)
+	if (err) {
+		uk_pr_err("Failed to switch state to XenbusStateConnected: %d.\n",
+				err);
 		goto err;
+	}
+
 
 	err = blkfront_xb_wait_be_connect(blkdev);
-	if (err)
+	if (err) {
+		uk_pr_err("Backend failed to change state: %d.\n", err);
 		goto err;
+	}
 
 	err = blkfront_xb_get_capabilities(blkdev);
 	if (err) {
