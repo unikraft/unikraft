@@ -75,7 +75,7 @@ static int blkfront_xb_get_nb_max_queues(struct blkfront_dev *dev)
 	xendev = dev->xendev;
 
 	err = xs_scanf(XBT_NIL, xendev->otherend, "multi-queue-max-queues",
-				"%"PRIu16,
+				"%"SCNu16,
 				&dev->nb_queues);
 	if (err < 0) {
 		uk_pr_err("Failed to read multi-queue-max-queues: %d\n", err);
