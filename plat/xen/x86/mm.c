@@ -743,7 +743,7 @@ void arch_mm_pre_suspend(void)
 void arch_mm_post_suspend(int canceled)
 {
 	if (!canceled)
-		arch_rebuild_p2m();
+		_arch_rebuild_p2m();
 }
 #endif
 #endif /* CONFIG_XEN_PV_BUILD_P2M */
