@@ -289,8 +289,8 @@ typedef long uk_syscall_arg_t;
 #include <uk/bits/syscall_stubs.h>
 
 /* System call, returns -1 and sets errno on errors */
-long uk_syscall(long n, ...);
-long uk_vsyscall(long n, va_list arg);
+long uk_syscall(long nr, ...);
+long uk_vsyscall(long nr, va_list arg);
 
 /*
  * Use this variant instead of `uk_syscall()` whenever the system call number
@@ -301,8 +301,8 @@ long uk_vsyscall(long n, va_list arg);
 	UK_CONCAT(__uk_syscall, __UK_SYSCALL_NARGS(__VA_ARGS__))(__VA_ARGS__)
 
 /* Raw system call, returns negative codes on errors */
-long uk_syscall_r(long n, ...);
-long uk_vsyscall_r(long n, va_list arg);
+long uk_syscall_r(long nr, ...);
+long uk_vsyscall_r(long nr, va_list arg);
 
 /*
  * Use this variant instead of `uk_syscall_r()` whenever the system call number

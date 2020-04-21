@@ -1,27 +1,11 @@
 
-long uk_syscall(long n, ...)
+long uk_syscall(long nr, ...)
 {
+	long ret;
 	va_list ap;
-	long a,b,c,d,e,f;
-	va_start(ap, n);
-	a=va_arg(ap, long);
-	b=va_arg(ap, long);
-	c=va_arg(ap, long);
-	d=va_arg(ap, long);
-	e=va_arg(ap, long);
-	f=va_arg(ap, long);
-	va_end(ap);
-	return __uk_syscall(n,a,b,c,d,e,f);
-}
 
-long uk_vsyscall(long n, va_list arg)
-{
-	long a,b,c,d,e,f;
-	a=va_arg(arg, long);
-	b=va_arg(arg, long);
-	c=va_arg(arg, long);
-	d=va_arg(arg, long);
-	e=va_arg(arg, long);
-	f=va_arg(arg, long);
-	return __uk_syscall(n,a,b,c,d,e,f);
+	va_start(ap, nr);
+	ret = uk_vsyscall(nr, ap);
+	va_end(ap);
+	return ret;
 }

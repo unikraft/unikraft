@@ -1,29 +1,13 @@
 
-long uk_syscall_r(long n, ...)
+long uk_syscall_r(long nr, ...)
 {
+	long ret;
 	va_list ap;
-	long a,b,c,d,e,f;
-	va_start(ap, n);
-	a=va_arg(ap, long);
-	b=va_arg(ap, long);
-	c=va_arg(ap, long);
-	d=va_arg(ap, long);
-	e=va_arg(ap, long);
-	f=va_arg(ap, long);
-	va_end(ap);
-	return __uk_syscall_r(n,a,b,c,d,e,f);
-}
 
-long uk_vsyscall_r(long n, va_list arg)
-{
-	long a,b,c,d,e,f;
-	a=va_arg(arg, long);
-	b=va_arg(arg, long);
-	c=va_arg(arg, long);
-	d=va_arg(arg, long);
-	e=va_arg(arg, long);
-	f=va_arg(arg, long);
-	return __uk_syscall_r(n,a,b,c,d,e,f);
+	va_start(ap, nr);
+	ret = uk_vsyscall_r(nr, ap);
+	va_end(ap);
+	return ret;
 }
 
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER
@@ -38,8 +22,8 @@ void ukplat_syscall_handler(struct __regs *r)
 	uk_pr_debug("Binary system call request \"%s\" (%lu) at ip:%p (arg0=0x%lx, arg1=0x%lx, ...)\n",
 		    uk_syscall_name(r->rsyscall), r->rsyscall,
 		    (void *) r->rip, r->rarg0, r->rarg1);
-	r->rret0 = __uk_syscall_r(r->rsyscall,
-				  r->rarg0, r->rarg1, r->rarg2,
-				  r->rarg3, r->rarg4, r->rarg5);
+	r->rret0 = uk_syscall_r(r->rsyscall,
+				r->rarg0, r->rarg1, r->rarg2,
+				r->rarg3, r->rarg4, r->rarg5);
 }
 #endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER */
