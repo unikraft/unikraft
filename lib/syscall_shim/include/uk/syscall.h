@@ -291,6 +291,8 @@ typedef long uk_syscall_arg_t;
 /* System call, returns -1 and sets errno on errors */
 long uk_syscall(long nr, ...);
 long uk_vsyscall(long nr, va_list arg);
+long uk_syscall6(long nr, long arg1, long arg2, long arg3,
+		 long arg4, long arg5, long arg6);
 
 /*
  * Use this variant instead of `uk_syscall()` whenever the system call number
@@ -303,6 +305,8 @@ long uk_vsyscall(long nr, va_list arg);
 /* Raw system call, returns negative codes on errors */
 long uk_syscall_r(long nr, ...);
 long uk_vsyscall_r(long nr, va_list arg);
+long uk_syscall6_r(long nr, long arg1, long arg2, long arg3,
+		   long arg4, long arg5, long arg6);
 
 /*
  * Use this variant instead of `uk_syscall_r()` whenever the system call number
