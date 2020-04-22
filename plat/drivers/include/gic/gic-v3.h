@@ -1,5 +1,10 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
+ * Copyright (c) 2020, OpenSynergy GmbH. All rights reserved.
+ *
+ * ARM Generic Interrupt Controller support v3 version
+ * based on plat/drivers/include/gic/gic-v2.h:
+ *
  * Authors: Wei Chen <Wei.Chen@arm.com>
  *          Jianyong Wu <Jianyong.Wu@arm.com>
  *
@@ -30,13 +35,121 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef __PLAT_DRV_ARM_GIC_H__
-#define __PLAT_DRV_ARM_GIC_H__
+#ifndef __PLAT_DRV_ARM_GICV3_H__
+#define __PLAT_DRV_ARM_GICV3_H__
+
+/** Affinity AFF3 bit mask */
+#define MPIDR_AFF3_MASK			0xff00000000
+/** Affinity AFF2 bit mask */
+#define MPIDR_AFF2_MASK			0x0000ff0000
+/** Affinity AFF1 bit mask */
+#define MPIDR_AFF1_MASK			0x000000ff00
+/** Affinity AFF0 bit mask */
+#define MPIDR_AFF0_MASK			0x00000000ff
+
+/*
+ * GIC System register assembly aliases
+ */
+#define ICC_PMR_EL1			S3_0_C4_C6_0
+#define ICC_DIR_EL1			S3_0_C12_C11_1
+#define ICC_SGI1R_EL1			S3_0_C12_C11_5
+#define ICC_EOIR1_EL1			S3_0_C12_C12_1
+#define ICC_IAR1_EL1			S3_0_C12_C12_0
+#define ICC_BPR1_EL1			S3_0_C12_C12_3
+#define ICC_CTLR_EL1			S3_0_C12_C12_4
+#define ICC_SRE_EL1			S3_0_C12_C12_5
+#define ICC_IGRPEN1_EL1			S3_0_C12_C12_7
+
+/*
+ * Distributor and Redistributor registers
+ */
+#define GICC_CTLR_EL1_EOImode_drop	(1U << 1)
+
+#define GICD_STATUSR			(0x010)
+#define GICD_SETSPI_NSR			(0x040)
+#define GICD_CLRSPI_NSR			(0x048)
+#define GICD_SETSPI_SR			(0x050)
+#define GICD_CLRSPI_SR			(0x058)
+#define GICD_IROUTER_BASE		(0x6000)
+#define GICD_IROUTER32			(0x6100)
+#define GICD_IROUTER1019		(0x7FD8)
+#define GICD_PIDR2			(0xFFE8)
+
+#define GICD_CTLR_RWP			(1UL << 31)
+#define GICD_CTLR_ARE_NS		(1U << 4)
+#define GICD_CTLR_ENABLE_G1NS		(1U << 1)
+#define GICD_CTLR_ENABLE_G0		(1U << 0)
+
+/* Common between GICD_PIDR2 and GICR_PIDR2 */
+#define GIC_PIDR2_ARCH_MASK		(0xf0)
+#define GIC_PIDR2_ARCH_GICv3		(0x30)
+#define GIC_PIDR2_ARCH_GICv4		(0x40)
+
+/* Additional bits in GICD_TYPER defined by GICv3 */
+#define GICD_TYPE_ID_BITS_SHIFT 19
+#define GICD_TYPE_ID_BITS(r)					\
+	((((r) >> GICD_TYPE_ID_BITS_SHIFT) & 0x1f) + 1)
+
+#define GICD_TYPE_LPIS			(1U << 17)
+
+#define GICR_WAKER_ProcessorSleep	(1U << 1)
+#define GICR_WAKER_ChildrenAsleep	(1U << 2)
+
+#define GICR_CTLR			(0x0000)
+#define GICR_IIDR			(0x0004)
+#define GICR_TYPER			(0x0008)
+#define GICR_STATUSR			(0x0010)
+#define GICR_WAKER			(0x0014)
+#define GICR_SETLPIR			(0x0040)
+#define GICR_CLRLPIR			(0x0048)
+#define GICR_PROPBASER			(0x0070)
+#define GICR_PENDBASER			(0x0078)
+#define GICR_INVLPIR			(0x00A0)
+#define GICR_INVALLR			(0x00B0)
+#define GICR_SYNCR			(0x00C0)
+
+#define GICR_TYPER_PLPIS		(1U << 0)
+#define GICR_TYPER_VLPIS		(1U << 1)
+#define GICR_TYPER_LAST			(1U << 4)
+#define GICR_TYPER_PROC_NUM_SHIFT	8
+#define GICR_TYPER_PROC_NUM_MASK	(0xffff << GICR_TYPER_PROC_NUM_SHIFT)
+
+/* GICR frames offset */
+#define GICR_RD_BASE			(0)
+#define GICR_SGI_BASE			(0x10000)
+
+/* GICR for SGI's & PPI's */
+#define GICR_IGROUPR0			(GICR_SGI_BASE + 0x0080)
+#define GICR_ISENABLER0			(GICR_SGI_BASE + 0x0100)
+#define GICR_ICENABLER0			(GICR_SGI_BASE + 0x0180)
+#define GICR_ISPENDR0			(GICR_SGI_BASE + 0x0200)
+#define GICR_ICPENDR0			(GICR_SGI_BASE + 0x0280)
+#define GICR_ISACTIVER0			(GICR_SGI_BASE + 0x0300)
+#define GICR_ICACTIVER0			(GICR_SGI_BASE + 0x0380)
+#define GICR_IPRIORITYR0		(GICR_SGI_BASE + 0x0400)
+#define GICR_IPRIORITYR7		(GICR_SGI_BASE + 0x041C)
+#define GICR_ICFGR0			(GICR_SGI_BASE + 0x0C00)
+#define GICR_ICFGR1			(GICR_SGI_BASE + 0x0C04)
+#define GICR_IGRPMODR0			(GICR_SGI_BASE + 0x0D00)
+#define GICR_NSACR			(GICR_SGI_BASE + 0x0E00)
 
 /*
  * Distributor registers. Unikraft only support run on non-secure
  * so we just describe non-secure registers.
+ * Redistributor registers are also described when necessary
  */
+#define GICD_TYPE_LPIS		(1U << 17)
+
+/* Register bits */
+#define GICD_CTL_ENABLE		0x1
+
+#define GICD_TYPE_LINES		0x01f
+#define GICD_TYPE_CPUS_SHIFT	5
+#define GICD_TYPE_CPUS		0x0e0
+#define GICD_TYPE_SEC		0x400
+#define GICD_TYPER_DVIS		(1U << 18)
+
+#define GICD_IROUTER(n)		(GICD_IROUTER_BASE + (n * 8))
 
 /*
  * Distributor Control Register, GICD_CTLR.
@@ -72,6 +185,7 @@
  */
 #define GICD_IGROUPR(n)		(0x0080 + 4 * ((n) >> 5))
 #define GICD_I_PER_IGROUPRn	32
+#define GICD_DEF_IGROUPRn	0xffffffff
 
 /*
  * Interrupt Set-Enable Registers, GICD_ISENABLERn.
@@ -83,6 +197,7 @@
 #define GICD_ISENABLER(n)	(0x0100 + 4 * ((n) >> 5))
 #define GICD_I_PER_ISENABLERn	32
 #define GICD_DEF_SGI_ISENABLERn	0xffff
+#define GICR_I_PER_ISENABLERn	32
 
 /*
  * Interrupt Clear-Enable Registers, GICD_ICENABLERn.
@@ -95,6 +210,7 @@
 #define GICD_I_PER_ICENABLERn	32
 #define GICD_DEF_ICENABLERn	0xffffffff
 #define GICD_DEF_PPI_ICENABLERn	0xffff0000
+#define GICR_I_PER_ICENABLERn	32
 
 /*
  * Interrupt Set-Pending Registers, GICD_ISPENDRn.
@@ -148,6 +264,19 @@
  * for byte-access.
  */
 #define GICD_IPRIORITYR(n)	(0x0400 + (n))
+#define GICR_IPRIORITYR(n)	(GICR_SGI_BASE + 0x0400 + (n))
+
+/*
+ * Interrupt Priority Registers, GICD_IPRIORITYRn
+ * Provide a macro to access the offset of GICD_IPRIORITYRn register
+ * for a given interrupt
+ *
+ * These registers are 32 bits and contains the priority for 4 interrupts,
+ * so this macro can be used to set the priority of many interrupts at the
+ * same time.
+ */
+#define GICD_IPRIORITYR4(n)	(0x0400 + 4 * ((n) >> 2))
+#define GICR_IPRIORITYR4(n)	(GICR_SGI_BASE + 0x0400 + 4 * ((n) >> 2))
 #define GICD_I_PER_IPRIORITYn	4
 #define GICD_IPRIORITY_DEF	0x80808080
 
@@ -160,6 +289,17 @@
  * for byte-access.
  */
 #define GICD_ITARGETSR(n)	(0x0800 + (n))
+
+/*
+ * Interrupt Processor Targets Registers, GICD_ITARGETSRn
+ * Provide an 8-bit CPU targets field for each interrupt supported by
+ * the GIC.
+ *
+ * These registers are 32 bits and contains the CPU targets for 4 interrupts,
+ * so this macro can be used to set the CPU targets of many interrupts at the
+ * same time.
+ */
+#define GICD_ITARGETSR4(n)	(0x0800 + 4 * ((n) >> 2))
 #define GICD_I_PER_ITARGETSRn	4
 #define GICD_ITARGETSR_DEF	0xffffffff
 
@@ -193,24 +333,6 @@
 #define GICD_SGI_MAX_INITID	15
 #define GICD_PPI_START
 
-enum sgi_filter {
-/*
- * Forward the interrupt to the CPU interfaces specified in the
- * CPUTargetList field
- */
-	GICD_SGI_FILTER_TO_LIST = 0,
-/*
- * Forward the interrupt to all CPU interfaces except that of the
- * processor that requested the interrupt.
- */
-	GICD_SGI_FILTER_TO_OTHERS,
-/*
- * Forward the interrupt only to the CPU interface of the processor
- * that requested the interrupt.
- */
-	GICD_SGI_FILTER_TO_SELF
-};
-
 /*
  * SGI Clear-Pending Registers, GICD_CPENDSGIRn
  * Provide a clear-pending bit for each supported SGI and source
@@ -222,7 +344,7 @@ enum sgi_filter {
  * the reading processor.
  */
 #define GICD_CPENDSGIRn		(0x0F10 + 4 * ((n) >> 2))
-#define GICD_I_PER_CPENDSGIRn   4
+#define GICD_I_PER_CPENDSGIRn	4
 
 /*
  * SGI Set-Pending Registers, GICD_SPENDSGIRn
@@ -236,131 +358,27 @@ enum sgi_filter {
 #define GICD_SPENDSGIRn		(0x0F20 + 4 * ((n) >> 2))
 #define GICD_I_PER_SPENDSGIRn   4
 
-
-/*
- * CPU interface registers. Unikraft only support run on non-secure
- * so we just describe non-secure registers.
- */
-
-/* CPU Interface Control Register */
-#define GICC_CTLR		0x0000
-#define GICC_CTLR_ENABLE	0x1
-
-/* Interrupt Priority Mask Register */
-#define GICC_PMR		0x0004
-#define GICC_PMR_PRIO_MAX	255
-
-/* Binary Point Register */
-#define GICC_BPR		0x0008
-
 /* Interrupt Acknowledge Register */
-#define GICC_IAR		0x000C
-#define GICC_IAR_INTID_MASK	0x3FF
+#define GICC_IAR_INTID_MASK	    0x3FF
 #define GICC_IAR_INTID_SPURIOUS	1023
 
-/* End of Interrupt Register */
-#define GICC_EOIR		0x0010
-
-/* Running Priority Register */
-#define GICC_RPR		0x0014
-
-/* Highest Priority Pending Interrupt Register */
-#define GICC_HPPIR		0x0018
-
-/* Aliased Binary Point Register */
-#define GICC_ABPR		0x001C
-
-/* CPU Interface Identification Register */
-#define GICC_IIDR		0x00FC
-
-/* Deactivate Interrupt Register */
-#define GICC_DIR		0x1000
-
-/*
- * Acknowledging irq equals reading GICC_IAR also
- * get the interrupt ID as the side effect.
- */
+/* Acknowledging IRQ */
 uint32_t gic_ack_irq(void);
 
-/*
- * write to GICC_EOIR to inform cpu interface completation
- * of interrupt processing. If GICC_CTLR.EOImode sets to 1
- * this func just gets priority drop.
- */
+/* Finish interrupt handling: Drop priority and deactivate the interrupt */
 void gic_eoi_irq(uint32_t irq);
 
-/*
- * Forward the SIG to the CPU interfaces specified in the
- * targetlist. Targetlist is a 8-bit bitmap for 0~7 CPU.
- */
-void gic_sgi_gen_to_list(uint32_t sgintid, uint8_t targetlist);
-
-/*
- * Forward the SGI to all CPU interfaces except that of the
- * processor that requested the interrupt.
- */
-void gic_sgi_gen_to_others(uint32_t sgintid);
-
-/*
- * Forward the SGI only to the CPU interface of the processor
- * that requested the interrupt.
- */
-void gic_sgi_gen_to_self(uint32_t sgintid);
-
-/*
- * set target cpu for irq in distributor,
- * @target: bitmask value, bit 1 indicates target to
- * corresponding cpu interface
- */
-void gic_set_irq_target(uint32_t irq, uint8_t target);
-
-/* set priority for irq in distributor */
-void gic_set_irq_prio(uint32_t irq, uint8_t priority);
-
-/*
- * Enable an irq in distributor, each irq occupies one bit
- * to configure in corresponding registor
- */
+/* Enable IRQ in distributor (SPIs) or redistributor (SGIs and PPIS) */
 void gic_enable_irq(uint32_t irq);
 
-/*
- * Disable an irq in distributor, one bit reserved for an irq
- * to configure in corresponding register
- */
+/* Disable an IRQ in distributor (SPIs) or in redistributor (SGIs and PPIs) */
 void gic_disable_irq(uint32_t irq);
 
-/*
- * set pending state for an irq in distributor, one bit
- * reserved for an irq to configure in corresponding register
- */
-void gic_set_irq_pending(uint32_t irq);
+/* Set IRQ affinity routing */
+void gic_set_irq_affinity(uint32_t irq, uint8_t affinity);
 
-/*
- * clear pending state for an irq in distributor, one bit
- * reserved for an irq to configure in corresponding register
- */
-void gic_clear_irq_pending(uint32_t irq);
-
-/*
- * inspect that if an irq is in pending state, every bit
- * holds the value for the corresponding irq
- */
-int gic_is_irq_pending(uint32_t irq);
-
-/* set active state for an irq in distributor */
-void gic_set_irq_active(uint32_t irq);
-
-/* clear active state for an irq in distributor */
-void gic_clear_irq_active(uint32_t irq);
-
-/*
- * inspect that if an irq is in active state,
- * every bit holds the value for an irq
- */
-int gic_is_irq_active(uint32_t irq);
-
-/* Config interrupt trigger type */
-void gic_set_irq_type(uint32_t irq, int trigger);
+/* Set priority for IRQ in [re]distributor */
+void gic_set_irq_prio(uint32_t irq, uint8_t priority);
 
 /* Translate to hwirq according to type e.g. PPI SPI SGI */
 int gic_irq_translate(uint32_t type, uint32_t hw_irq);
@@ -368,7 +386,7 @@ int gic_irq_translate(uint32_t type, uint32_t hw_irq);
 /* Handle IRQ entry */
 void gic_handle_irq(void);
 
-/* Initialize GICv2 from device tree */
+/* Initialize GICv3 from device tree */
 int _dtb_init_gic(const void *fdt);
 
-#endif //__PLAT_DRV_ARM_GICV2_H__
+#endif /* __PLAT_DRV_ARM_GICV3_H__ */
