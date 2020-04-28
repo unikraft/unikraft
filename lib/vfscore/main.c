@@ -1977,25 +1977,25 @@ UK_TRACEPOINT(trace_vfs_chmod, "\"%s\" 0%0o", const char*, mode_t);
 UK_TRACEPOINT(trace_vfs_chmod_ret, "");
 UK_TRACEPOINT(trace_vfs_chmod_err, "%d", int);
 
-int chmod(const char *pathname, mode_t mode)
+UK_SYSCALL_R_DEFINE(int, chmod, const char*, pathname, mode_t, mode)
 {
 	trace_vfs_chmod(pathname, mode);
 	struct task *t = main_task;
 	char path[PATH_MAX];
 	int error = ENOENT;
 	if (pathname == NULL)
-		goto out_errno;
+		goto out_error;
 	if ((error = task_conv(t, pathname, VWRITE, path)) != 0)
-		goto out_errno;
+		goto out_error;
 	error = sys_chmod(path, mode & UK_ALLPERMS);
 	if (error)
-		goto out_errno;
+		goto out_error;
 	trace_vfs_chmod_ret();
 	return 0;
-out_errno:
+
+out_error:
 	trace_vfs_chmod_err(error);
-	errno = error;
-	return -1;
+	return -error;
 }
 
 UK_TRACEPOINT(trace_vfs_fchmod, "\"%d\" 0%0o", int, mode_t);

@@ -37,6 +37,8 @@ uk_syscall_e_ftruncate
 uk_syscall_r_ftruncate
 stat
 chmod
+uk_syscall_e_chmod
+uk_syscall_r_chmod
 fchmod
 fchown
 dup
