@@ -56,6 +56,8 @@ fchown
 uk_syscall_e_fchown
 uk_syscall_r_fchown
 dup
+uk_syscall_e_dup
+uk_syscall_r_dup
 dup2
 uk_syscall_e_dup2
 uk_syscall_r_dup2
