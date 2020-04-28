@@ -46,6 +46,8 @@ fchown
 dup
 dup2
 dup3
+uk_syscall_e_dup3
+uk_syscall_r_dup3
 sync
 vfscore_mount_dump
 umount

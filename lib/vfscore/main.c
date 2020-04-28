@@ -1419,7 +1419,7 @@ UK_TRACEPOINT(trace_vfs_dup3_err, "%d", int);
 /*
  * Duplicate a file descriptor to a particular value.
  */
-int dup3(int oldfd, int newfd, int flags)
+UK_SYSCALL_R_DEFINE(int, dup3, int, oldfd, int, newfd, int, flags)
 {
 	struct vfscore_file *fp, *fp_new;
 	int error;
@@ -1431,44 +1431,45 @@ int dup3(int oldfd, int newfd, int flags)
 	 */
 	if ((flags & ~O_CLOEXEC) != 0) {
 		error = EINVAL;
-		goto out_errno;
+		goto out_error;
 	}
 
 	if (oldfd == newfd) {
 		error = EINVAL;
-		goto out_errno;
+		goto out_error;
 	}
 
 	error = fget(oldfd, &fp);
 	if (error)
-		goto out_errno;
+		goto out_error;
 
 	error = fget(newfd, &fp_new);
 	if (error == 0) {
 		/* if newfd is open, then close it */
 		error = close(newfd);
 		if (error)
-			goto out_errno;
+			goto out_error;
 	}
 
 	error = vfscore_reserve_fd(newfd);
 	if (error)
-		goto out_errno;
+		goto out_error;
 
 	error = vfscore_install_fd(newfd, fp);
 	if (error) {
 		fdrop(fp);
-		goto out_errno;
+		goto out_error;
 	}
 
 	fdrop(fp);
 	trace_vfs_dup3_ret(newfd);
 	return newfd;
 
-	out_errno:
+	out_error:
 	trace_vfs_dup3_err(error);
-	errno = error;
-	return -1;
+	if(error > 0)
+		return -error;
+	return error;
 }
 
 int dup2(int oldfd, int newfd)
