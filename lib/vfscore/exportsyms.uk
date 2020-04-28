@@ -96,6 +96,8 @@ readlink
 uk_syscall_e_readlink
 uk_syscall_r_readlink
 fallocate
+uk_syscall_e_fallocate
+uk_syscall_r_fallocate
 lseek
 uk_syscall_e_lseek
 uk_syscall_r_lseek

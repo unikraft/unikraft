@@ -1784,7 +1784,7 @@ UK_TRACEPOINT(trace_vfs_fallocate, "%d %d 0x%x 0x%x", int, int, loff_t, loff_t);
 UK_TRACEPOINT(trace_vfs_fallocate_ret, "");
 UK_TRACEPOINT(trace_vfs_fallocate_err, "%d", int);
 
-int fallocate(int fd, int mode, loff_t offset, loff_t len)
+UK_SYSCALL_R_DEFINE(int, fallocate, int, fd, int, mode, loff_t, offset, loff_t, len)
 {
 	struct vfscore_file *fp;
 	int error;
@@ -1792,20 +1792,19 @@ int fallocate(int fd, int mode, loff_t offset, loff_t len)
 	trace_vfs_fallocate(fd, mode, offset, len);
 	error = fget(fd, &fp);
 	if (error)
-		goto out_errno;
+		goto out_error;
 
 	error = sys_fallocate(fp, mode, offset, len);
 	fdrop(fp);
 
 	if (error)
-		goto out_errno;
+		goto out_error;
 	trace_vfs_fallocate_ret();
 	return 0;
 
-	out_errno:
+	out_error:
 	trace_vfs_fallocate_err(error);
-	errno = error;
-	return -1;
+	return -error;
 }
 
 LFS64(fallocate);
