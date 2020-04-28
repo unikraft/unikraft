@@ -45,6 +45,8 @@ uk_syscall_r_fchmod
 fchown
 dup
 dup2
+uk_syscall_e_dup2
+uk_syscall_r_dup2
 dup3
 uk_syscall_e_dup3
 uk_syscall_r_dup3

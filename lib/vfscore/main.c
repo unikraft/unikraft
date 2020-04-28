@@ -1472,7 +1472,7 @@ UK_SYSCALL_R_DEFINE(int, dup3, int, oldfd, int, newfd, int, flags)
 	return error;
 }
 
-int dup2(int oldfd, int newfd)
+UK_SYSCALL_R_DEFINE(int, dup2, int, oldfd, int, newfd)
 {
 	if (oldfd == newfd)
 		return newfd;
