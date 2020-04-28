@@ -52,6 +52,8 @@ getcwd
 chown
 chroot
 chdir
+uk_syscall_e_chdir
+uk_syscall_r_chdir
 fstatat
 statfs
 lstat

@@ -1001,7 +1001,7 @@ __do_fchdir(struct vfscore_file *fp, struct task *t)
 	return error;
 }
 
-int chdir(const char *pathname)
+UK_SYSCALL_R_DEFINE(int, chdir, const char*, pathname)
 {
 	trace_vfs_chdir(pathname);
 	struct task *t = main_task;
@@ -1011,29 +1011,29 @@ int chdir(const char *pathname)
 
 	error = ENOENT;
 	if (pathname == NULL)
-		goto out_errno;
+		goto out_error;
 
 	if ((error = task_conv(t, pathname, VREAD, path)) != 0)
-		goto out_errno;
+		goto out_error;
 
 	/* Check if directory exits */
 	error = sys_open(path, O_DIRECTORY, 0, &fp);
 	if (error) {
-		goto out_errno;
+		goto out_error;
 	}
 
 	error = __do_fchdir(fp, t);
 	if (error) {
 		fdrop(fp);
-		goto out_errno;
+		goto out_error;
 	}
 
 	trace_vfs_chdir_ret();
 	return 0;
-	out_errno:
-	errno = error;
+
+	out_error:
 	trace_vfs_chdir_err(errno);
-	return -1;
+	return -error;
 }
 
 UK_TRACEPOINT(trace_vfs_fchdir, "%d", int);
