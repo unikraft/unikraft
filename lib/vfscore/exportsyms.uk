@@ -87,6 +87,8 @@ symlink
 statvfs
 fstatvfs
 access
+uk_syscall_e_access
+uk_syscall_r_access
 faccessat
 readlink
 uk_syscall_e_readlink

@@ -1591,7 +1591,7 @@ UK_TRACEPOINT(trace_vfs_access_err, "%d", int);
 /*
  * Check permission for file access
  */
-int access(const char *pathname, int mode)
+UK_SYSCALL_R_DEFINE(int, access, const char*, pathname, int, mode)
 {
 	trace_vfs_access(pathname, mode);
 	struct task *t = main_task;
@@ -1605,17 +1605,17 @@ int access(const char *pathname, int mode)
 		acc |= VWRITE;
 
 	if ((error = task_conv(t, pathname, acc, path)) != 0)
-		goto out_errno;
+		goto out_error;
 
 	error = sys_access(path, mode);
 	if (error)
-		goto out_errno;
+		goto out_error;
 	trace_vfs_access_ret();
 	return 0;
-	out_errno:
-	errno = error;
+
+	out_error:
 	trace_vfs_access_err(error);
-	return -1;
+	return -error;
 }
 
 int faccessat(int dirfd, const char *pathname, int mode, int flags)
