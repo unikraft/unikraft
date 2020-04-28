@@ -91,6 +91,8 @@ telldir
 seekdir
 rmdir
 fchdir
+uk_syscall_e_fchdir
+uk_syscall_r_fchdir
 symlink
 statvfs
 fstatvfs

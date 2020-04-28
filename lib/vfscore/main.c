@@ -1040,7 +1040,7 @@ UK_TRACEPOINT(trace_vfs_fchdir, "%d", int);
 UK_TRACEPOINT(trace_vfs_fchdir_ret, "");
 UK_TRACEPOINT(trace_vfs_fchdir_err, "%d", int);
 
-int fchdir(int fd)
+UK_SYSCALL_R_DEFINE(int, fchdir, int, fd)
 {
 	trace_vfs_fchdir(fd);
 	struct task *t = main_task;
@@ -1049,21 +1049,20 @@ int fchdir(int fd)
 
 	error = fget(fd, &fp);
 	if (error)
-		goto out_errno;
+		goto out_error;
 
 	error = __do_fchdir(fp, t);
 	if (error) {
 		fdrop(fp);
-		goto out_errno;
+		goto out_error;
 	}
 
 	trace_vfs_fchdir_ret();
 	return 0;
 
-	out_errno:
+	out_error:
 	trace_vfs_fchdir_err(error);
-	errno = error;
-	return -1;
+	return -error;
 }
 
 UK_TRACEPOINT(trace_vfs_link, "\"%s\" \"%s\"", const char*, const char*);
