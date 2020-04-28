@@ -40,6 +40,8 @@ chmod
 uk_syscall_e_chmod
 uk_syscall_r_chmod
 fchmod
+uk_syscall_e_fchmod
+uk_syscall_r_fchmod
 fchown
 dup
 dup2

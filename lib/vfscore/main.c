@@ -2001,17 +2001,16 @@ out_error:
 UK_TRACEPOINT(trace_vfs_fchmod, "\"%d\" 0%0o", int, mode_t);
 UK_TRACEPOINT(trace_vfs_fchmod_ret, "");
 
-int fchmod(int fd, mode_t mode)
+UK_SYSCALL_R_DEFINE(int, fchmod, int, fd, mode_t, mode)
 {
 	trace_vfs_fchmod(fd, mode);
 	int error = sys_fchmod(fd, mode & UK_ALLPERMS);
 	trace_vfs_fchmod_ret();
 	if (error) {
-		errno = error;
-		return -1;
-	} else {
-		return 0;
+		return -error;
 	}
+
+	return 0;
 }
 
 UK_TRACEPOINT(trace_vfs_fchown, "\"%d\" %d %d", int, uid_t, gid_t);
