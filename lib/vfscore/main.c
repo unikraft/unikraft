@@ -1645,7 +1645,7 @@ int dup(int oldfd)
 	trace_vfs_dup(oldfd);
 	error = fget(oldfd, &fp);
 	if (error)
-		goto out_errno;
+		goto out_error;
 
 	error = fdalloc(fp, &newfd);
 	if (error)
@@ -1657,10 +1657,12 @@ int dup(int oldfd)
 
 	out_fdrop:
 	fdrop(fp);
-	out_errno:
+
+	out_error:
 	trace_vfs_dup_err(error);
-	errno = error;
-	return -1;
+	if (error > 0)
+		return -error;
+	return error;
 }
 
 UK_TRACEPOINT(trace_vfs_dup3, "%d %d 0x%x", int, int, int);
