@@ -1618,7 +1618,7 @@ UK_SYSCALL_R_DEFINE(int, access, const char*, pathname, int, mode)
 	return -error;
 }
 
-int faccessat(int dirfd, const char *pathname, int mode, int flags)
+UK_SYSCALL_R_DEFINE(int, faccessat, int, dirfd, const char*, pathname, int, mode, int, flags)
 {
 	if (flags & AT_SYMLINK_NOFOLLOW) {
 		UK_CRASH("UNIMPLEMENTED: faccessat() with AT_SYMLINK_NOFOLLOW");
@@ -1631,8 +1631,7 @@ int faccessat(int dirfd, const char *pathname, int mode, int flags)
 	struct vfscore_file *fp;
 	int error = fget(dirfd, &fp);
 	if (error) {
-		errno = error;
-		return -1;
+		goto out_error;
 	}
 
 	struct vnode *vp = fp->f_dentry->d_vnode;
@@ -1651,6 +1650,7 @@ int faccessat(int dirfd, const char *pathname, int mode, int flags)
 	vn_unlock(vp);
 	fdrop(fp);
 
+	out_error:
 	return error;
 }
 

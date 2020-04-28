@@ -90,6 +90,8 @@ access
 uk_syscall_e_access
 uk_syscall_r_access
 faccessat
+uk_syscall_e_faccessat
+uk_syscall_r_faccessat
 readlink
 uk_syscall_e_readlink
 uk_syscall_r_readlink
