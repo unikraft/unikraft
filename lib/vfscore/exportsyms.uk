@@ -98,6 +98,8 @@ rewinddir
 telldir
 seekdir
 rmdir
+uk_syscall_e_rmdir
+uk_syscall_r_rmdir
 fchdir
 uk_syscall_e_fchdir
 uk_syscall_r_fchdir

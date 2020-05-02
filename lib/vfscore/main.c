@@ -879,7 +879,7 @@ UK_TRACEPOINT(trace_vfs_rmdir, "\"%s\"", const char*);
 UK_TRACEPOINT(trace_vfs_rmdir_ret, "");
 UK_TRACEPOINT(trace_vfs_rmdir_err, "%d", int);
 
-int rmdir(const char *pathname)
+UK_SYSCALL_R_DEFINE(int, rmdir, const char*, pathname)
 {
 	struct task *t = main_task;
 	char path[PATH_MAX];
@@ -888,19 +888,19 @@ int rmdir(const char *pathname)
 	trace_vfs_rmdir(pathname);
 	error = ENOENT;
 	if (pathname == NULL)
-		goto out_errno;
+		goto out_error;
 	if ((error = task_conv(t, pathname, VWRITE, path)) != 0)
-		goto out_errno;
+		goto out_error;
 
 	error = sys_rmdir(path);
 	if (error)
-		goto out_errno;
+		goto out_error;
 	trace_vfs_rmdir_ret();
 	return 0;
-	out_errno:
+
+	out_error:
 	trace_vfs_rmdir_err(error);
-	errno = error;
-	return -1;
+	return -error;
 }
 
 static void
