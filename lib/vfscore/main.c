@@ -237,26 +237,24 @@ int __xmknod(int ver, const char *pathname, mode_t mode, dev_t *dev __unused)
 
 	trace_vfs_mknod(pathname, mode, *dev);
 	if ((error = task_conv(t, pathname, VWRITE, path)) != 0)
-		goto out_errno;
+		goto out_error;
 
 	error = sys_mknod(path, mode);
 	if (error)
-		goto out_errno;
+		goto out_error;
 
 	trace_vfs_mknod_ret();
 	return 0;
 
-	out_errno:
+	out_error:
 	trace_vfs_mknod_err(error);
-	errno = error;
-	return -1;
+	return -error;
 }
 
-int mknod(const char *pathname, mode_t mode, dev_t dev)
+UK_SYSCALL_R_DEFINE(int, mknod, const char*, pathname, mode_t, mode, dev_t, dev)
 {
 	return __xmknod(0, pathname, mode, &dev);
 }
-
 
 UK_TRACEPOINT(trace_vfs_lseek, "%d 0x%x %d", int, off_t, int);
 UK_TRACEPOINT(trace_vfs_lseek_ret, "0x%x", off_t);

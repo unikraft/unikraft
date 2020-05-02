@@ -87,6 +87,8 @@ truncate
 uk_syscall_e_truncate
 uk_syscall_r_truncate
 mknod
+uk_syscall_e_mknod
+uk_syscall_r_mknod
 preadv
 ioctl
 fdatasync
