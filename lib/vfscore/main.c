@@ -418,7 +418,8 @@ UK_TRACEPOINT(trace_vfs_pwritev, "%d %p 0x%x 0x%x", int, const struct iovec*,
 UK_TRACEPOINT(trace_vfs_pwritev_ret, "0x%x", ssize_t);
 UK_TRACEPOINT(trace_vfs_pwritev_err, "%d", int);
 
-ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
+UK_SYSCALL_R_DEFINE(ssize_t, pwritev, int, fd, const struct iovec*, iov,
+			int, iovcnt, off_t, offset)
 {
 	struct vfscore_file *fp;
 	size_t bytes;
@@ -427,20 +428,19 @@ ssize_t pwritev(int fd, const struct iovec *iov, int iovcnt, off_t offset)
 	trace_vfs_pwritev(fd, iov, iovcnt, offset);
 	error = fget(fd, &fp);
 	if (error)
-		goto out_errno;
+		goto out_error;
 
 	error = sys_write(fp, iov, iovcnt, offset, &bytes);
 	fdrop(fp);
 
 	if (has_error(error, bytes))
-		goto out_errno;
+		goto out_error;
 	trace_vfs_pwritev_ret(bytes);
 	return bytes;
 
-	out_errno:
+	out_error:
 	trace_vfs_pwritev_err(error);
-	errno = error;
-	return -1;
+	return -error;
 }
 LFS64(pwritev);
 

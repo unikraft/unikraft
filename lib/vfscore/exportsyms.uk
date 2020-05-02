@@ -77,6 +77,8 @@ closedir
 pread
 pwrite
 pwritev
+uk_syscall_e_pwritev
+uk_syscall_r_pwritev
 readv
 uk_syscall_e_readv
 uk_syscall_r_readv
