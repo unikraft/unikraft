@@ -932,7 +932,7 @@ UK_TRACEPOINT(trace_vfs_rename, "\"%s\" \"%s\"", const char*, const char*);
 UK_TRACEPOINT(trace_vfs_rename_ret, "");
 UK_TRACEPOINT(trace_vfs_rename_err, "%d", int);
 
-int rename(const char *oldpath, const char *newpath)
+UK_SYSCALL_R_DEFINE(int, rename, const char*, oldpath, const char*, newpath)
 {
 	trace_vfs_rename(oldpath, newpath);
 	struct task *t = main_task;
@@ -942,35 +942,35 @@ int rename(const char *oldpath, const char *newpath)
 
 	error = ENOENT;
 	if (null_or_empty(oldpath) || null_or_empty(newpath))
-		goto out_errno;
+		goto out_error;
 
 	get_last_component(oldpath, src);
 	if (!strcmp(src, ".") || !strcmp(src, "..")) {
 		error = EINVAL;
-		goto out_errno;
+		goto out_error;
 	}
 
 	get_last_component(newpath, dest);
 	if (!strcmp(dest, ".") || !strcmp(dest, "..")) {
 		error = EINVAL;
-		goto out_errno;
+		goto out_error;
 	}
 
 	if ((error = task_conv(t, oldpath, VREAD, src)) != 0)
-		goto out_errno;
+		goto out_error;
 
 	if ((error = task_conv(t, newpath, VWRITE, dest)) != 0)
-		goto out_errno;
+		goto out_error;
 
 	error = sys_rename(src, dest);
 	if (error)
-		goto out_errno;
+		goto out_error;
 	trace_vfs_rename_ret();
 	return 0;
-	out_errno:
+
+	out_error:
 	trace_vfs_rename_err(error);
-	errno = error;
-	return -1;
+	return -error;
 }
 
 UK_TRACEPOINT(trace_vfs_chdir, "\"%s\"", const char*);

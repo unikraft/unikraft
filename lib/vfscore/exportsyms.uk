@@ -142,6 +142,8 @@ fstatfs
 eaccess
 euidaccess
 rename
+uk_syscall_e_rename
+uk_syscall_r_rename
 __xmknod
 __xstat
 __lxstat
