@@ -92,6 +92,8 @@ mknod
 uk_syscall_e_mknod
 uk_syscall_r_mknod
 preadv
+uk_syscall_e_preadv
+uk_syscall_r_preadv
 ioctl
 fdatasync
 uk_syscall_e_fdatasync

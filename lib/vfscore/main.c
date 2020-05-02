@@ -381,7 +381,8 @@ UK_SYSCALL_DEFINE(ssize_t, write, int, fd, const void *, buf, size_t, count)
 	return pwrite(fd, buf, count, -1);
 }
 
-ssize_t preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset)
+UK_SYSCALL_R_DEFINE(ssize_t, preadv, int, fd, const struct iovec*, iov,
+	int, iovcnt, off_t, offset)
 {
 	struct vfscore_file *fp;
 	size_t bytes;
@@ -389,18 +390,17 @@ ssize_t preadv(int fd, const struct iovec *iov, int iovcnt, off_t offset)
 
 	error = fget(fd, &fp);
 	if (error)
-		goto out_errno;
+		goto out_error;
 
 	error = sys_read(fp, iov, iovcnt, offset, &bytes);
 	fdrop(fp);
 
 	if (has_error(error, bytes))
-		goto out_errno;
+		goto out_error;
 	return bytes;
 
-	out_errno:
-	errno = error;
-	return -1;
+	out_error:
+	return -error;
 }
 
 LFS64(preadv);
