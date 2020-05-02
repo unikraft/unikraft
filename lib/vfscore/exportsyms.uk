@@ -159,6 +159,8 @@ futimesat
 utimensat
 futimens
 utimes
+uk_syscall_e_utimes
+uk_syscall_r_utimes
 lutimes
 posix_fadvise
 scandir

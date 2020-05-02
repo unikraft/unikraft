@@ -1929,21 +1929,24 @@ static int do_utimes(const char *pathname, const struct timeval times[2], int fl
 
 	error = task_conv(t, pathname, 0, path);
 	if (error) {
-		trace_vfs_utimes_err(error);
-		return libc_error(error);
+		goto out_error;
 	}
 
 	error = sys_utimes(path, times, flags);
 	if (error) {
-		trace_vfs_utimes_err(error);
-		return libc_error(error);
+		goto out_error;
 	}
 
 	trace_vfs_utimes_ret();
 	return 0;
+
+	out_error:
+	trace_vfs_utimes_err(error);
+	return -error;
 }
 
-int utimes(const char *pathname, const struct timeval times[2])
+UK_SYSCALL_R_DEFINE(int, utimes, const char*, pathname,
+	const struct timeval*, times)
 {
 	return do_utimes(pathname, times, 0);
 }
