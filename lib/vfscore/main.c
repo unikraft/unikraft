@@ -489,7 +489,7 @@ UK_TRACEPOINT(trace_vfs_fsync, "%d", int);
 UK_TRACEPOINT(trace_vfs_fsync_ret, "");
 UK_TRACEPOINT(trace_vfs_fsync_err, "%d", int);
 
-int fsync(int fd)
+UK_SYSCALL_R_DEFINE(int, fsync, int, fd)
 {
 	struct vfscore_file *fp;
 	int error;
@@ -497,23 +497,22 @@ int fsync(int fd)
 	trace_vfs_fsync(fd);
 	error = fget(fd, &fp);
 	if (error)
-		goto out_errno;
+		goto out_error;
 
 	error = sys_fsync(fp);
 	fdrop(fp);
 
 	if (error)
-		goto out_errno;
+		goto out_error;
 	trace_vfs_fsync_ret();
 	return 0;
 
-	out_errno:
+	out_error:
 	trace_vfs_fsync_err(error);
-	errno = error;
-	return -1;
+	return -error;
 }
 
-int fdatasync(int fd)
+UK_SYSCALL_R_DEFINE(int, fdatasync, int, fd)
 {
 	// TODO: See if we can do less than fsync().
 	return fsync(fd);

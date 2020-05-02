@@ -25,6 +25,8 @@ uk_syscall_e_read
 uk_syscall_r_read
 mkdir
 fsync
+uk_syscall_e_fsync
+uk_syscall_r_fsync
 fstat
 uk_syscall_e_fstat
 uk_syscall_r_fstat
@@ -92,6 +94,8 @@ uk_syscall_r_mknod
 preadv
 ioctl
 fdatasync
+uk_syscall_e_fdatasync
+uk_syscall_r_fdatasync
 fdopendir
 dirfd
 rewinddir
