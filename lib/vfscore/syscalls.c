@@ -205,8 +205,10 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 	fhold(fp);
 	fp->f_flags = flags;
 
-	// OSv was using a intrusive_ptr which was increasing the refcount
-	dref(dp);
+	/*
+	 * Don't need to increase refcount here, we already hold a reference
+	 * to dp from namei().
+	 */
 	// change to std::move once dp is a dentry_ref
 	fp->f_dentry = dp;
 	dp = NULL;
