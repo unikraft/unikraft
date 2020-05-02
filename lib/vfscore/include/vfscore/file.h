@@ -80,6 +80,9 @@ int fdrop(struct vfscore_file* fp);
 
 #define FOF_OFFSET  0x0800    /* Use the offset in uio argument */
 
+/* Also used from posix-sysinfo to determine sysconf(_SC_OPEN_MAX). */
+#define FDTABLE_MAX_FILES 1024
+
 #ifdef __cplusplus
 }
 #endif

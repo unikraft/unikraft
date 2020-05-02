@@ -42,8 +42,6 @@
 #include <errno.h>
 #include <uk/ctors.h>
 
-#define FDTABLE_MAX_FILES 1024
-
 void init_stdio(void);
 
 struct fdtable {
