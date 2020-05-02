@@ -1209,25 +1209,25 @@ int __lxstat(int ver __unused, const char *pathname, struct stat *st)
 
 	error = task_conv(t, pathname, 0, path);
 	if (error) {
-		errno = error;
-		trace_vfs_lstat_err(error);
-		return (-1);
+		goto out_error;
 	}
 
 	error = sys_lstat(path, st);
 	if (error) {
-		errno = error;
-		trace_vfs_lstat_err(error);
-		return (-1);
+		goto out_error;
 	}
 
 	trace_vfs_lstat_ret();
 	return 0;
+
+	out_error:
+	trace_vfs_lstat_err(error);
+	return -error;
 }
 
 LFS64(__lxstat);
 
-int lstat(const char *pathname, struct stat *st)
+UK_SYSCALL_R_DEFINE(int, lstat, const char*, pathname, struct stat*, st)
 {
 	return __lxstat(1, pathname, st);
 }
