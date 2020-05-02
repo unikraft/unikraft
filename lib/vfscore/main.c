@@ -1636,7 +1636,7 @@ UK_TRACEPOINT(trace_vfs_dup_err, "%d", int);
 /*
  * Duplicate a file descriptor
  */
-int dup(int oldfd)
+UK_SYSCALL_R_DEFINE(int, dup, int, oldfd)
 {
 	struct vfscore_file *fp;
 	int newfd;
