@@ -605,12 +605,14 @@ int fstatat(int dirfd, const char *path, struct stat *st, int flags)
 
 LFS64(fstatat);
 
-int flock(int fd, int operation)
+UK_SYSCALL_R_DEFINE(int, flock, int, fd, int, operation)
 {
 	struct vfscore_file *file;
+	int error;
 
 	if (!fget(fd, &file)) {
-		return libc_error(EBADF);
+		error = EBADF;
+		goto out_error;
 	}
 
 	switch (operation) {
@@ -621,10 +623,14 @@ int flock(int fd, int operation)
 	case LOCK_UN:
 		break;
 	default:
-		return libc_error(EINVAL);
+		error = EINVAL;
+		goto out_error;
 	}
 
 	return 0;
+
+	out_error:
+	return -error;
 }
 
 UK_TRACEPOINT(trace_vfs_readdir, "%d %p", int, struct dirent*);
