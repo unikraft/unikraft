@@ -130,6 +130,8 @@ uk_syscall_r_lseek
 uk_syscall_e_writev
 uk_syscall_r_writev
 umask
+uk_syscall_e_umask
+uk_syscall_r_umask
 dentry_alloc
 dentry_init
 dentry_lookup

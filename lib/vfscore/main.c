@@ -2136,7 +2136,7 @@ int posix_fadvise(int fd __unused, off_t offset __unused, off_t len __unused,
 }
 LFS64(posix_fadvise);
 
-mode_t umask(mode_t newmask)
+UK_SYSCALL_R_DEFINE(mode_t, umask, mode_t, newmask)
 {
 	return ukarch_exchange_n(&global_umask, newmask);
 }
