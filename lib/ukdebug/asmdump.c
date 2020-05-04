@@ -43,7 +43,7 @@
 
 /**
  * Disassemble <num_ins> instructions with zydis starting
- * with instruction at <addr>
+ * with instruction at <instr>
  */
 static int _asmdump(struct out_dev *o,
 		   const void *instr, unsigned int count)
@@ -76,7 +76,10 @@ static int _asmdump(struct out_dev *o,
 
 	while (count) {
 		addr = ((__uptr) instr) + offset;
-		ZydisDecoderDecodeBuffer(&dcr, (const void *) addr, 16, &ins);
+		if (!ZYAN_SUCCESS(ZydisDecoderDecodeBuffer(&dcr,
+							   (const void *) addr,
+							   16, &ins)))
+			break;
 		ZydisFormatterFormatInstruction(&fmt, &ins, buf, sizeof(buf),
 						addr);
 		ret = outf(o, "%08"__PRIuptr" <+%d>: %hs\n", addr, offset, buf);
