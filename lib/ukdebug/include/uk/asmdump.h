@@ -81,9 +81,21 @@ void _uk_asmdumpd(const char *libname, const char *srcname,
 #define uk_asmdumpd(instr, instr_count)					\
 	_uk_asmdumpd(__STR_LIBNAME__, __STR_BASENAME__,			\
 		     __LINE__, (instr), (instr_count))
+
+void _uk_asmndumpd(const char *libname, const char *srcname,
+		   unsigned int srcline, const void *instr,
+		   size_t len);
+
+#define uk_asmndumpd(instr, len)					\
+	_uk_asmndumpd(__STR_LIBNAME__, __STR_BASENAME__,		\
+		      __LINE__, (instr), (len))
 #else /* (defined UK_DEBUG) || CONFIG_LIBUKDEBUG_PRINTD */
 static inline void uk_asmdumpd(const void *instr __unused,
 			      unsigned int instr_count __unused)
+{}
+
+static inline void uk_asmndumpd(const void *instr __unused,
+				size_t len __unused)
 {}
 #endif
 
@@ -99,9 +111,24 @@ void _uk_asmdumpk(int lvl, const char *libname, const char *srcname,
 			_uk_asmdumpk((lvl), __STR_LIBNAME__, __STR_BASENAME__, \
 				     __LINE__, (instr), (instr_count));	\
 	} while (0)
+
+void _uk_asmndumpk(int lvl, const char *libname, const char *srcname,
+		   unsigned int srcline, const void *instr,
+		   size_t len);
+
+#define uk_asmndumpk(lvl, instr, len)					\
+	do {                                                            \
+		if ((lvl) <= KLVL_MAX)                                  \
+			_uk_asmdumpk((lvl), __STR_LIBNAME__, __STR_BASENAME__, \
+				     __LINE__, (instr), (len));		\
+	} while (0)
 #else /* CONFIG_LIBUKDEBUG_PRINTK */
 static inline void uk_asmdumpk(int lvl __unused, const void *instr __unused,
 			      unsigned int instr_count __unused)
+{}
+
+static inline void uk_asmndumpk(int lvl __unused, const void *instr __unused,
+				size_t len __unused)
 {}
 #endif /* CONFIG_LIBUKDEBUG_PRINTK */
 
@@ -114,10 +141,17 @@ static inline void uk_asmdumpd(const void *instr __unused,
 			       unsigned int instr_count __unused)
 {}
 
+static inline void uk_asmndumpd(const void *instr __unused,
+				size_t len __unused)
+{}
+
 static inline void uk_asmdumpk(int lvl __unused, const void *instr __unused,
 			       unsigned int instr_count __unused)
 {}
 
+static inline void uk_asmndumpk(int lvl __unused, const void *instr __unused,
+				size_t len __unused)
+{}
 #endif /* Backends */
 
 #ifdef __cplusplus
