@@ -93,6 +93,7 @@ typedef long uk_syscall_arg_t;
 #define __UK_NAME2SCALLE_FN(name) UK_CONCAT(uk_syscall_e_, name)
 #define __UK_NAME2SCALLR_FN(name) UK_CONCAT(uk_syscall_r_, name)
 
+#define UK_ARG_MAP0(...)
 #define UK_ARG_MAP1(m, type, arg) m(type, arg)
 #define UK_ARG_MAP2(m, type, arg, ...) m(type, arg), UK_ARG_MAP1(m, __VA_ARGS__)
 #define UK_ARG_MAP3(m, type, arg, ...) m(type, arg), UK_ARG_MAP2(m, __VA_ARGS__)
