@@ -182,61 +182,6 @@ void uk_9preq_get(struct uk_9preq *req);
  */
 int uk_9preq_put(struct uk_9preq *req);
 
-/*
- * The following family of serialization and deserialization functions work
- * by employing a printf-like formatting mechanism for data types supported by
- * the 9p protocol:
- * - 'b': byte (uint8_t)
- * - 'w': word (uint16_t)
- * - 'd': double-word (uint32_t)
- * - 'q': quad-word (uint64_t)
- * - 's': uk_9p_str *
- * - 'S': uk_9p_stat *
- *
- * Similarly to vprintf(), the vserialize() and vdeserialize() functions take
- * a va_list instead of a variable number of arguments.
- *
- * Possible return values:
- * - 0: Operation successful.
- * - (-EINVAL): Invalid format specifier.
- * - (-ENOBUFS): End of buffer reached.
- */
-
-int uk_9preq_vserialize(struct uk_9preq *req, const char *fmt, va_list vl);
-int uk_9preq_serialize(struct uk_9preq *req, const char *fmt, ...);
-int uk_9preq_vdeserialize(struct uk_9preq *req, const char *fmt, va_list vl);
-int uk_9preq_deserialize(struct uk_9preq *req, const char *fmt, ...);
-
-/**
- * Copies raw data from the request receive buffer to the provided buffer.
- *
- * @param req
- *   Reference to the 9p request.
- * @param buf
- *   Destination buffer.
- * @param size
- *   Amount to copy.
- * Possible return values:
- * - 0: Operation successful.
- * - (-ENOBUFS): End of buffer reached.
- */
-int uk_9preq_copy_to(struct uk_9preq *req, void *buf, uint32_t size);
-
-/**
- * Copies raw data from the provided buffer to the request transmission buffer.
- *
- * @param req
- *   Reference to the 9p request.
- * @param buf
- *   Source buffer.
- * @param size
- *   Amount to copy.
- * Possible return values:
- * - 0: Operation successful.
- * - (-ENOBUFS): End of buffer reached.
- */
-int uk_9preq_copy_from(struct uk_9preq *req, const void *buf, uint32_t size);
-
 /**
  * Marks the given request as being ready, transitioning between states
  * INITIALIZED and READY.

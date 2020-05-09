@@ -288,42 +288,6 @@ void uk_9pdev_xmit_notify(struct uk_9pdev *dev)
 #endif
 }
 
-struct uk_9preq *uk_9pdev_call(struct uk_9pdev *dev, uint8_t type,
-			uint32_t size, const char *fmt, ...)
-{
-	struct uk_9preq *req;
-	va_list vl;
-	int rc;
-
-	req = uk_9pdev_req_create(dev, type, size);
-	if (PTRISERR(req))
-		return req;
-
-	va_start(vl, fmt);
-	rc = uk_9preq_vserialize(req, fmt, vl);
-	va_end(vl);
-
-	if (rc < 0)
-		goto out;
-
-	rc = uk_9preq_ready(req, UK_9PREQ_ZCDIR_NONE, NULL, 0, 0);
-	if (rc < 0)
-		goto out;
-
-	rc = uk_9pdev_request(dev, req);
-	if (rc < 0)
-		goto out;
-
-	rc = uk_9preq_waitreply(req);
-	if (rc < 0)
-		goto out;
-
-	return req;
-out:
-	uk_9pdev_req_remove(dev, req);
-	return ERR2PTR(rc);
-}
-
 struct uk_9preq *uk_9pdev_req_create(struct uk_9pdev *dev, uint8_t type,
 				uint32_t size)
 {

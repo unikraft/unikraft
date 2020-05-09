@@ -108,29 +108,6 @@ int uk_9pdev_request(struct uk_9pdev *dev, struct uk_9preq *req);
 void uk_9pdev_xmit_notify(struct uk_9pdev *dev);
 
 /**
- * Creates and sends 9P request to the given 9P device, serializing it with
- * the given arguments. This function acts as a shorthand for the explicit
- * calls to req_create(), serialize(), ready(), request(), waitreply().
- *
- * @param dev
- *   The Unikraft 9P Device.
- * @param type
- *   Transmit type of the request, e.g. Tversion, Tread, and so on.
- * @param size
- *   The maximum size for the receive and send buffers.
- * @param fmt
- *   The format of the data to be serialized, in the way uk_9preq_serialize()
- *   expects it.
- * @param ...
- *   The arguments to be serialized.
- * @return
- *   - (!PTRISERR): The 9p request in the UK_9PREQ_RECEIVED state.
- *   - PTRISERR: The error code with which any of the steps failed.
- */
-struct uk_9preq *uk_9pdev_call(struct uk_9pdev *dev, uint8_t type,
-			uint32_t size, const char *fmt, ...);
-
-/**
  * Create a new request, automatically allocating its tag, based on its type.
  *
  * @param dev

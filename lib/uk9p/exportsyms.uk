@@ -5,12 +5,6 @@ uk_9pdev_trans_set_default
 
 uk_9preq_get
 uk_9preq_put
-uk_9preq_vserialize
-uk_9preq_serialize
-uk_9preq_vdeserialize
-uk_9preq_deserialize
-uk_9preq_copy_to
-uk_9preq_copy_from
 uk_9preq_receive_cb
 uk_9preq_waitreply
 uk_9preq_error
@@ -19,7 +13,6 @@ uk_9pdev_connect
 uk_9pdev_disconnect
 uk_9pdev_request
 uk_9pdev_xmit_notify
-uk_9pdev_call
 uk_9pdev_set_msize
 uk_9pdev_get_msize
 
