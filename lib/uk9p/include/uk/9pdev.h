@@ -114,15 +114,12 @@ void uk_9pdev_xmit_notify(struct uk_9pdev *dev);
  *   The Unikraft 9P Device.
  * @param type
  *   Transmit type of the request, e.g. Tversion, Tread, and so on.
- * @param size
- *   The maximum size for the receive and send buffers.
  * @return
  *   If not an error pointer, the created request.
  *   Otherwise, the error in creating the request:
  *   - ENOMEM: No memory for the request or no available tags.
  */
-struct uk_9preq *uk_9pdev_req_create(struct uk_9pdev *dev, uint8_t type,
-				uint32_t size);
+struct uk_9preq *uk_9pdev_req_create(struct uk_9pdev *dev, uint8_t type);
 
 /**
  * Looks up a request based on the given tag. This is generally used by

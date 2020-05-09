@@ -288,8 +288,7 @@ void uk_9pdev_xmit_notify(struct uk_9pdev *dev)
 #endif
 }
 
-struct uk_9preq *uk_9pdev_req_create(struct uk_9pdev *dev, uint8_t type,
-				uint32_t size)
+struct uk_9preq *uk_9pdev_req_create(struct uk_9pdev *dev, uint8_t type)
 {
 	struct uk_9preq *req;
 	int rc = 0;
@@ -298,13 +297,15 @@ struct uk_9preq *uk_9pdev_req_create(struct uk_9pdev *dev, uint8_t type,
 
 	UK_ASSERT(dev);
 
-	size = MIN(size, dev->msize);
-
-	req = uk_9preq_alloc(dev->a, size);
+	req = uk_9preq_alloc(dev->a);
 	if (req == NULL) {
 		rc = -ENOMEM;
 		goto out;
 	}
+
+	/* Shouldn't exceed the msize on non-zerocopy buffers, just in case. */
+	req->recv.size = MIN(req->recv.size, dev->msize);
+	req->xmit.size = MIN(req->xmit.size, dev->msize);
 
 	ukplat_spin_lock_irqsave(&dev->_req_mgmt.spinlock, flags);
 	if (type == UK_9P_TVERSION)

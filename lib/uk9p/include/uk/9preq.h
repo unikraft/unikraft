@@ -63,6 +63,16 @@ extern "C" {
  */
 #define UK_9P_RERROR_MAXSIZE            141U
 
+/*
+ * The transmit and receive buffer size.
+ *
+ * The buffer size is not expected to exceed 1K: reads and writes are
+ * zero-copy; on-the-wire size of a stat structure should not exceed
+ * 1K -- its base size is 61, along with the lengths for name, uid,
+ * gid, muid and extension strings.
+ */
+#define UK_9P_BUFSIZE			1024U
+
 /**
  * @internal
  *
@@ -125,8 +135,23 @@ enum uk_9preq_state {
  *  referenced anymore. A call to uk_9pdev_req_remove() is mandatory to
  *  correctly free this and remove it from the list of requests managed
  *  by the 9p device.
+ *
+ *  Should fit within one page.
  */
 struct uk_9preq {
+	/*
+	 * Fixed-size buffer for transmit, used for most messages.
+	 * Large messages will always zero-copy from the user-provided
+	 * buffer (on Twrite).
+	 */
+	uint8_t				xmit_buf[UK_9P_BUFSIZE];
+	/*
+	 * Fixed-size buffer for receive, used for most messages.
+	 * Large messages will always zero-copy into the user-provided
+	 * buffer (on Tread).
+	 */
+	uint8_t				recv_buf[UK_9P_BUFSIZE];
+	/* 2 KB offset in the structure here. */
 	/* Transmit fcall. */
 	struct uk_9preq_fcall           xmit;
 	/* Receive fcall. */
@@ -147,6 +172,8 @@ struct uk_9preq {
 #endif
 };
 
+UK_CTASSERT(sizeof(struct uk_9preq) <= __PAGE_SIZE);
+
 /**
  * @internal
  * Allocates a 9p request.
@@ -154,13 +181,11 @@ struct uk_9preq {
  *
  * @param a
  *   Allocator to use.
- * @param size
- *   Minimum size of the receive and transmit buffers.
  * @return
  *   - (==NULL): Out of memory.
  *   - (!=NULL): Successful.
  */
-struct uk_9preq *uk_9preq_alloc(struct uk_alloc *a, uint32_t size);
+struct uk_9preq *uk_9preq_alloc(struct uk_alloc *a);
 
 /**
  * Gets the 9p request, incrementing the reference count.

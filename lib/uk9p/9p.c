@@ -74,13 +74,12 @@ static inline int send_and_wait_no_zc(struct uk_9pdev *dev,
 	return send_and_wait_zc(dev, req, UK_9PREQ_ZCDIR_NONE, NULL, 0, 0);
 }
 
-static struct uk_9preq *request_create(struct uk_9pdev *dev,
-		uint8_t type, uint32_t size)
+static struct uk_9preq *request_create(struct uk_9pdev *dev, uint8_t type)
 {
 	struct uk_9preq *req;
 
 	uk_9p_trace_request_create();
-	req = uk_9pdev_req_create(dev, type, size);
+	req = uk_9pdev_req_create(dev, type);
 	if (!PTRISERR(req))
 		uk_9p_trace_request_allocated();
 
@@ -97,7 +96,7 @@ struct uk_9preq *uk_9p_version(struct uk_9pdev *dev,
 
 	uk_9p_str_init(&requested_str, requested);
 
-	req = request_create(dev, UK_9P_TVERSION, __PAGE_SIZE);
+	req = request_create(dev, UK_9P_TVERSION);
 	if (PTRISERR(req))
 		return req;
 
@@ -146,7 +145,7 @@ struct uk_9pfid *uk_9p_attach(struct uk_9pdev *dev, uint32_t afid,
 	if (PTRISERR(fid))
 		return fid;
 
-	req = request_create(dev, UK_9P_TATTACH, __PAGE_SIZE);
+	req = request_create(dev, UK_9P_TATTACH);
 	if (PTRISERR(req)) {
 		uk_9pdev_fid_release(fid);
 		return (void *)req;
@@ -183,7 +182,7 @@ int uk_9p_flush(struct uk_9pdev *dev, uint16_t oldtag)
 	struct uk_9preq *req;
 	int rc = 0;
 
-	req = request_create(dev, UK_9P_TFLUSH, __PAGE_SIZE);
+	req = request_create(dev, UK_9P_TFLUSH);
 	if (PTRISERR(req))
 		return PTR2ERR(req);
 
@@ -216,7 +215,7 @@ struct uk_9pfid *uk_9p_walk(struct uk_9pdev *dev, struct uk_9pfid *fid,
 
 	nwname = name ? 1 : 0;
 
-	req = request_create(dev, UK_9P_TWALK, __PAGE_SIZE);
+	req = request_create(dev, UK_9P_TWALK);
 	if (PTRISERR(req)) {
 		rc = PTR2ERR(req);
 		goto out;
@@ -272,7 +271,7 @@ int uk_9p_open(struct uk_9pdev *dev, struct uk_9pfid *fid, uint8_t mode)
 	struct uk_9preq *req;
 	int rc = 0;
 
-	req = request_create(dev, UK_9P_TOPEN, __PAGE_SIZE);
+	req = request_create(dev, UK_9P_TOPEN);
 	if (PTRISERR(req))
 		return PTR2ERR(req);
 
@@ -306,7 +305,7 @@ int uk_9p_create(struct uk_9pdev *dev, struct uk_9pfid *fid,
 	uk_9p_str_init(&name_str, name);
 	uk_9p_str_init(&extension_str, extension);
 
-	req = request_create(dev, UK_9P_TCREATE, __PAGE_SIZE);
+	req = request_create(dev, UK_9P_TCREATE);
 	if (PTRISERR(req))
 		return PTR2ERR(req);
 
@@ -339,7 +338,7 @@ int uk_9p_remove(struct uk_9pdev *dev, struct uk_9pfid *fid)
 	/* The fid is considered invalid even if the remove fails. */
 	fid->was_removed = 1;
 
-	req = request_create(dev, UK_9P_TREMOVE, __PAGE_SIZE);
+	req = request_create(dev, UK_9P_TREMOVE);
 	if (PTRISERR(req))
 		return PTR2ERR(req);
 
@@ -362,7 +361,7 @@ int uk_9p_clunk(struct uk_9pdev *dev, struct uk_9pfid *fid)
 	if (fid->was_removed)
 		return 0;
 
-	req = request_create(dev, UK_9P_TCLUNK, __PAGE_SIZE);
+	req = request_create(dev, UK_9P_TCLUNK);
 	if (PTRISERR(req))
 		return PTR2ERR(req);
 
@@ -390,7 +389,7 @@ int64_t uk_9p_read(struct uk_9pdev *dev, struct uk_9pfid *fid,
 	uk_pr_debug("TREAD fid %u offset %lu count %u\n", fid->fid,
 			offset, count);
 
-	req = request_create(dev, UK_9P_TREAD, __PAGE_SIZE);
+	req = request_create(dev, UK_9P_TREAD);
 	if (PTRISERR(req))
 		return PTR2ERR(req);
 
@@ -422,7 +421,7 @@ int64_t uk_9p_write(struct uk_9pdev *dev, struct uk_9pfid *fid,
 
 	uk_pr_debug("TWRITE fid %u offset %lu count %u\n", fid->fid,
 			offset, count);
-	req = request_create(dev, UK_9P_TWRITE, __PAGE_SIZE);
+	req = request_create(dev, UK_9P_TWRITE);
 	if (PTRISERR(req))
 		return PTR2ERR(req);
 
@@ -450,7 +449,7 @@ struct uk_9preq *uk_9p_stat(struct uk_9pdev *dev, struct uk_9pfid *fid,
 	int rc = 0;
 	uint16_t dummy;
 
-	req = request_create(dev, UK_9P_TSTAT, __PAGE_SIZE);
+	req = request_create(dev, UK_9P_TSTAT);
 	if (PTRISERR(req))
 		return req;
 
@@ -478,7 +477,7 @@ int uk_9p_wstat(struct uk_9pdev *dev, struct uk_9pfid *fid,
 	int rc = 0;
 	uint16_t *dummy;
 
-	req = request_create(dev, UK_9P_TWSTAT, __PAGE_SIZE);
+	req = request_create(dev, UK_9P_TWSTAT);
 	if (PTRISERR(req))
 		return PTR2ERR(req);
 

@@ -45,51 +45,28 @@
 #include <uk/wait.h>
 #endif
 
-static int _fcall_alloc(struct uk_alloc *a, struct uk_9preq_fcall *f,
-			uint32_t size)
-{
-	UK_ASSERT(a);
-	UK_ASSERT(f);
-	UK_ASSERT(size > 0);
-
-	f->buf = uk_calloc(a, size, sizeof(char));
-	if (f->buf == NULL)
-		return -ENOMEM;
-
-	f->size = size;
-	f->offset = 0;
-	f->zc_buf = NULL;
-	f->zc_size = 0;
-	f->zc_offset = 0;
-
-	return 0;
-}
-
-static void _fcall_free(struct uk_alloc *a, struct uk_9preq_fcall *f)
-{
-	UK_ASSERT(a);
-	UK_ASSERT(f);
-
-	if (f->buf)
-		uk_free(a, f->buf);
-}
-
-struct uk_9preq *uk_9preq_alloc(struct uk_alloc *a, uint32_t size)
+struct uk_9preq *uk_9preq_alloc(struct uk_alloc *a)
 {
 	struct uk_9preq *req;
-	int rc;
 
 	req = uk_calloc(a, 1, sizeof(*req));
 	if (req == NULL)
-		goto out;
+		return NULL;
 
-	rc = _fcall_alloc(a, &req->xmit, size);
-	if (rc < 0)
-		goto out_free;
+	req->xmit.buf = req->xmit_buf;
+	req->recv.buf = req->recv_buf;
+	req->xmit.size = req->recv.size = UK_9P_BUFSIZE;
+	req->xmit.zc_buf = req->recv.zc_buf = NULL;
+	req->xmit.zc_size = req->recv.zc_size = 0;
+	req->xmit.zc_offset = req->recv.zc_offset = 0;
 
-	rc = _fcall_alloc(a, &req->recv, MAX(size, UK_9P_RERROR_MAXSIZE));
-	if (rc < 0)
-		goto out_free;
+	/*
+	 * Assume the header has already been written.
+	 * The header itself will be written on uk_9preq_ready(), when the
+	 * actual message size is known.
+	 */
+	req->xmit.offset = UK_9P_HEADER_SIZE;
+	req->recv.offset = 0;
 
 	UK_INIT_LIST_HEAD(&req->_list);
 	req->_a = a;
@@ -98,28 +75,7 @@ struct uk_9preq *uk_9preq_alloc(struct uk_alloc *a, uint32_t size)
 	uk_waitq_init(&req->wq);
 #endif
 
-	/*
-	 * Assume the header has already been written.
-	 * The header itself will be written on uk_9preq_ready(), when the
-	 * actual message size is known.
-	 */
-	req->xmit.offset = UK_9P_HEADER_SIZE;
-
 	return req;
-
-out_free:
-	_fcall_free(a, &req->recv);
-	_fcall_free(a, &req->xmit);
-	uk_free(a, req);
-out:
-	return NULL;
-}
-
-static void _req_free(struct uk_9preq *req)
-{
-	_fcall_free(req->_a, &req->recv);
-	_fcall_free(req->_a, &req->xmit);
-	uk_free(req->_a, req);
 }
 
 void uk_9preq_get(struct uk_9preq *req)
@@ -133,7 +89,7 @@ int uk_9preq_put(struct uk_9preq *req)
 
 	last = uk_refcount_release(&req->refcount);
 	if (last)
-		_req_free(req);
+		uk_free(req->_a, req);
 
 	return last;
 }
