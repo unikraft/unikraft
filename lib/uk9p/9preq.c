@@ -35,6 +35,7 @@
 #include <string.h>
 #include <uk/config.h>
 #include <uk/9preq.h>
+#include <uk/9pdev.h>
 #include <uk/9p_core.h>
 #include <uk/list.h>
 #include <uk/refcount.h>
@@ -45,14 +46,8 @@
 #include <uk/wait.h>
 #endif
 
-struct uk_9preq *uk_9preq_alloc(struct uk_alloc *a)
+void uk_9preq_init(struct uk_9preq *req)
 {
-	struct uk_9preq *req;
-
-	req = uk_calloc(a, 1, sizeof(*req));
-	if (req == NULL)
-		return NULL;
-
 	req->xmit.buf = req->xmit_buf;
 	req->recv.buf = req->recv_buf;
 	req->xmit.size = req->recv.size = UK_9P_BUFSIZE;
@@ -69,13 +64,10 @@ struct uk_9preq *uk_9preq_alloc(struct uk_alloc *a)
 	req->recv.offset = 0;
 
 	UK_INIT_LIST_HEAD(&req->_list);
-	req->_a = a;
 	uk_refcount_init(&req->refcount, 1);
 #if CONFIG_LIBUKSCHED
 	uk_waitq_init(&req->wq);
 #endif
-
-	return req;
 }
 
 void uk_9preq_get(struct uk_9preq *req)
@@ -89,7 +81,7 @@ int uk_9preq_put(struct uk_9preq *req)
 
 	last = uk_refcount_release(&req->refcount);
 	if (last)
-		uk_free(req->_a, req);
+		uk_9pdev_req_to_freelist(req->_dev, req);
 
 	return last;
 }

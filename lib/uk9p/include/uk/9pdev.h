@@ -150,6 +150,16 @@ struct uk_9preq *uk_9pdev_req_lookup(struct uk_9pdev *dev, uint16_t tag);
 int uk_9pdev_req_remove(struct uk_9pdev *dev, struct uk_9preq *req);
 
 /**
+ * Places the given request on the 9p device's request freelist.
+ *
+ * @param dev
+ *   The Unikraft 9P Device. If NULL, doesn't place the request on the freelist.
+ * @param req
+ *   The request to be placed on the freelist.
+ */
+void uk_9pdev_req_to_freelist(struct uk_9pdev *dev, struct uk_9preq *req);
+
+/**
  * Creates a FID associated with the given 9P device.
  *
  * @param dev

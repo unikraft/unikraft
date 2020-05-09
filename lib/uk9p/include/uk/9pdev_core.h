@@ -120,6 +120,8 @@ struct uk_9pdev_req_mgmt {
 	unsigned long                   tag_bm[UK_BITS_TO_LONGS(UK_9P_NUMTAGS)];
 	/* List of requests allocated and not yet removed. */
 	struct uk_list_head             req_list;
+	/* Free-list of requests. */
+	struct uk_list_head		req_free_list;
 };
 
 /**

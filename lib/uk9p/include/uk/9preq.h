@@ -162,6 +162,8 @@ struct uk_9preq {
 	uint16_t                        tag;
 	/* Entry into the list of requests (API-internal). */
 	struct uk_list_head             _list;
+	/* @internal 9P device this request belongs to. */
+	struct uk_9pdev                 *_dev;
 	/* @internal Allocator used to allocate this request. */
 	struct uk_alloc                 *_a;
 	/* Tracks the number of references to this structure. */
@@ -176,16 +178,10 @@ UK_CTASSERT(sizeof(struct uk_9preq) <= __PAGE_SIZE);
 
 /**
  * @internal
- * Allocates a 9p request.
+ * Initializes a 9P request.
  * Should not be used directly, use uk_9pdev_req_create() instead.
- *
- * @param a
- *   Allocator to use.
- * @return
- *   - (==NULL): Out of memory.
- *   - (!=NULL): Successful.
  */
-struct uk_9preq *uk_9preq_alloc(struct uk_alloc *a);
+void uk_9preq_init(struct uk_9preq *req);
 
 /**
  * Gets the 9p request, incrementing the reference count.
@@ -197,7 +193,8 @@ void uk_9preq_get(struct uk_9preq *req);
 
 /**
  * Puts the 9p request, decrementing the reference count.
- * If this was the last live reference, the memory will be freed.
+ * If this was the last live reference, it will be placed on the asociated
+ * device's request freelist.
  *
  * @param req
  *   Reference to the 9p request.

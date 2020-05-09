@@ -132,6 +132,7 @@ static void _req_mgmt_init(struct uk_9pdev_req_mgmt *req_mgmt)
 	ukarch_spin_lock_init(&req_mgmt->spinlock);
 	uk_bitmap_zero(req_mgmt->tag_bm, UK_9P_NUMTAGS);
 	UK_INIT_LIST_HEAD(&req_mgmt->req_list);
+	UK_INIT_LIST_HEAD(&req_mgmt->req_free_list);
 }
 
 static void _req_mgmt_add_req_locked(struct uk_9pdev_req_mgmt *req_mgmt,
@@ -141,11 +142,32 @@ static void _req_mgmt_add_req_locked(struct uk_9pdev_req_mgmt *req_mgmt,
 	uk_list_add(&req->_list, &req_mgmt->req_list);
 }
 
+static struct uk_9preq *
+_req_mgmt_from_freelist_locked(struct uk_9pdev_req_mgmt *req_mgmt)
+{
+	struct uk_9preq *req;
+
+	if (uk_list_empty(&req_mgmt->req_free_list))
+		return NULL;
+
+	req = uk_list_first_entry(&req_mgmt->req_free_list,
+			struct uk_9preq, _list);
+	uk_list_del(&req->_list);
+
+	return req;
+}
+
 static void _req_mgmt_del_req_locked(struct uk_9pdev_req_mgmt *req_mgmt,
 				struct uk_9preq *req)
 {
 	uk_bitmap_clear(req_mgmt->tag_bm, req->tag, 1);
 	uk_list_del(&req->_list);
+}
+
+static void _req_mgmt_req_to_freelist_locked(struct uk_9pdev_req_mgmt *req_mgmt,
+				struct uk_9preq *req)
+{
+	uk_list_add(&req->_list, &req_mgmt->req_free_list);
 }
 
 static uint16_t _req_mgmt_next_tag_locked(struct uk_9pdev_req_mgmt *req_mgmt)
@@ -164,9 +186,23 @@ static void _req_mgmt_cleanup(struct uk_9pdev_req_mgmt *req_mgmt __unused)
 		tag = req->tag;
 		_req_mgmt_del_req_locked(req_mgmt, req);
 		if (!uk_9preq_put(req)) {
-			uk_pr_warn("Tag %d still has references on cleanup.\n",
+			/* If in the future these references get released, mark
+			 * _dev as NULL so uk_9pdev_req_to_freelist doesn't
+			 * attempt to place them in an invalid memory region.
+			 *
+			 * As _dev is not used for any other purpose, this
+			 * doesn't impact any other logic related to 9p request
+			 * processing.
+			 */
+			req->_dev = NULL;
+			uk_pr_err("Tag %d still has references on cleanup.\n",
 				tag);
 		}
+	}
+	uk_list_for_each_entry_safe(req, reqn, &req_mgmt->req_free_list,
+			_list) {
+		uk_list_del(&req->_list);
+		uk_free(req->_a, req);
 	}
 	ukplat_spin_unlock_irqrestore(&req_mgmt->spinlock, flags);
 }
@@ -297,17 +333,37 @@ struct uk_9preq *uk_9pdev_req_create(struct uk_9pdev *dev, uint8_t type)
 
 	UK_ASSERT(dev);
 
-	req = uk_9preq_alloc(dev->a);
-	if (req == NULL) {
-		rc = -ENOMEM;
-		goto out;
+	ukplat_spin_lock_irqsave(&dev->_req_mgmt.spinlock, flags);
+	if (!(req = _req_mgmt_from_freelist_locked(&dev->_req_mgmt))) {
+		/* Don't allocate with the spinlock held. */
+		ukplat_spin_unlock_irqrestore(&dev->_req_mgmt.spinlock, flags);
+		req = uk_calloc(dev->a, 1, sizeof(*req));
+		if (req == NULL) {
+			rc = -ENOMEM;
+			goto out;
+		}
+		req->_dev = dev;
+		/*
+		 * Duplicate this, instead of using req->_dev, as we can't rely
+		 * on the value of _dev at time of free. Check comment in
+		 * _req_mgmt_cleanup.
+		 */
+		req->_a = dev->a;
+		ukplat_spin_lock_irqsave(&dev->_req_mgmt.spinlock, flags);
 	}
+
+	uk_9preq_init(req);
+
+	/*
+	 * If request was from the free list, it should already belong to the
+	 * dev.
+	 */
+	UK_ASSERT(req->_dev == dev);
 
 	/* Shouldn't exceed the msize on non-zerocopy buffers, just in case. */
 	req->recv.size = MIN(req->recv.size, dev->msize);
 	req->xmit.size = MIN(req->xmit.size, dev->msize);
 
-	ukplat_spin_lock_irqsave(&dev->_req_mgmt.spinlock, flags);
 	if (type == UK_9P_TVERSION)
 		tag = UK_9P_NOTAG;
 	else
@@ -358,6 +414,18 @@ int uk_9pdev_req_remove(struct uk_9pdev *dev, struct uk_9preq *req)
 	ukplat_spin_unlock_irqrestore(&dev->_req_mgmt.spinlock, flags);
 
 	return uk_9preq_put(req);
+}
+
+void uk_9pdev_req_to_freelist(struct uk_9pdev *dev, struct uk_9preq *req)
+{
+	unsigned long flags;
+
+	if (!dev)
+		return;
+
+	ukplat_spin_lock_irqsave(&dev->_req_mgmt.spinlock, flags);
+	_req_mgmt_req_to_freelist_locked(&dev->_req_mgmt, req);
+	ukplat_spin_unlock_irqrestore(&dev->_req_mgmt.spinlock, flags);
 }
 
 struct uk_9pfid *uk_9pdev_fid_create(struct uk_9pdev *dev)
