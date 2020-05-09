@@ -147,7 +147,7 @@ void uk_9pfs_free_vnode_data(struct vnode *vp)
 	struct uk_9pdev *dev = UK_9PFS_MD(vp->v_mount)->dev;
 	struct uk_9pfs_node_data *nd = UK_9PFS_ND(vp);
 
-	if (nd->nb_open_files > 0)
+	if (!vp->v_data)
 		return;
 
 	if (nd->removed)
@@ -156,20 +156,6 @@ void uk_9pfs_free_vnode_data(struct vnode *vp)
 	uk_9pfid_put(nd->fid);
 	free(nd);
 	vp->v_data = NULL;
-}
-
-/*
- * The closing variant of the function will enforce freeing the associated
- * resources only if the vnode was removed via an unlink/rmdir operation.
- */
-static void uk_9pfs_free_vnode_data_closing(struct vnode *vp)
-{
-	struct uk_9pfs_node_data *nd = UK_9PFS_ND(vp);
-
-	if (!nd->removed)
-		return;
-
-	uk_9pfs_free_vnode_data(vp);
 }
 
 static int uk_9pfs_open(struct vfscore_file *file)
@@ -222,7 +208,6 @@ static int uk_9pfs_close(struct vnode *vn __unused, struct vfscore_file *file)
 	uk_9pfid_put(fd->fid);
 	free(fd);
 	UK_9PFS_ND(file->f_dentry->d_vnode)->nb_open_files--;
-	uk_9pfs_free_vnode_data_closing(file->f_dentry->d_vnode);
 
 	return 0;
 }
@@ -327,22 +312,22 @@ static int uk_9pfs_remove_generic(struct vnode *dvp, struct vnode *vp)
 {
 	struct uk_9pdev *dev = UK_9PFS_MD(dvp->v_mount)->dev;
 	struct uk_9pfs_node_data *nd = UK_9PFS_ND(vp);
-	int rc = 0;
 
-	if (!nd->removed && !nd->nb_open_files)
-		rc = uk_9p_remove(dev, nd->fid);
-	else
-		nd->removed = true;
-
-	uk_9pfs_free_vnode_data(vp);
-
-	return -rc;
+	return -uk_9p_remove(dev, nd->fid);
 }
 
 static int uk_9pfs_remove(struct vnode *dvp, struct vnode *vp,
 		char *name __unused)
 {
-	return uk_9pfs_remove_generic(dvp, vp);
+	struct uk_9pfs_node_data *nd = UK_9PFS_ND(vp);
+	int rc = 0;
+
+	if (!nd->nb_open_files)
+		rc = uk_9pfs_remove_generic(dvp, vp);
+	else
+		nd->removed = true;
+
+	return rc;
 }
 
 static int uk_9pfs_mkdir(struct vnode *dvp, char *name, mode_t mode)

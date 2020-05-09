@@ -169,11 +169,10 @@ static void uk_9pfs_release_tree_fids(struct dentry *d)
 {
 	struct dentry *p;
 
-	uk_list_for_each_entry(p, &d->d_child_list, d_child_link)
+	uk_list_for_each_entry(p, &d->d_child_list, d_child_link) {
 		uk_9pfs_release_tree_fids(p);
-
-	if (d->d_vnode->v_data)
-		uk_9pfs_free_vnode_data(d->d_vnode);
+		drele(p);
+	}
 }
 
 static int uk_9pfs_unmount(struct mount *mp, int flags __unused)
