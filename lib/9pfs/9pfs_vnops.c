@@ -409,7 +409,7 @@ again:
 	fake_request.recv.size = fd->readdir_sz;
 	fake_request.recv.offset = fd->readdir_off;
 	fake_request.state = UK_9PREQ_RECEIVED;
-	rc = uk_9preq_deserialize(&fake_request, "S", &stat);
+	rc = uk_9preq_readstat(&fake_request, &stat);
 
 	if (rc == -ENOBUFS) {
 		/*

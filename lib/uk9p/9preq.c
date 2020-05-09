@@ -434,10 +434,8 @@ int uk_9preq_ready(struct uk_9preq *req, enum uk_9preq_zcdir zc_dir,
 
 	UK_ASSERT(req);
 
-	if (UK_READ_ONCE(req->state) != UK_9PREQ_INITIALIZED) {
-		rc = -EIO;
-		goto out;
-	}
+	if (UK_READ_ONCE(req->state) != UK_9PREQ_INITIALIZED)
+		return -EIO;
 
 	/* Save current offset as the size of the message. */
 	total_size = req->xmit.offset;
@@ -448,10 +446,10 @@ int uk_9preq_ready(struct uk_9preq *req, enum uk_9preq_zcdir zc_dir,
 
 	/* Serialize the header. */
 	req->xmit.offset = 0;
-	rc = uk_9preq_serialize(req, "dbw", total_size_with_zc, req->xmit.type,
-			req->tag);
-	if (rc < 0)
-		goto out;
+	if ((rc = uk_9preq_write32(req, total_size_with_zc)) < 0 ||
+		(rc = uk_9preq_write8(req, req->xmit.type)) < 0 ||
+		(rc = uk_9preq_write16(req, req->tag)) < 0)
+		return rc;
 
 	/* Reset offset and size to sane values. */
 	req->xmit.offset = 0;
@@ -474,8 +472,7 @@ int uk_9preq_ready(struct uk_9preq *req, enum uk_9preq_zcdir zc_dir,
 	/* Update the state. */
 	UK_WRITE_ONCE(req->state, UK_9PREQ_READY);
 
-out:
-	return rc;
+	return 0;
 }
 
 int uk_9preq_receive_cb(struct uk_9preq *req, uint32_t recv_size)
@@ -495,8 +492,10 @@ int uk_9preq_receive_cb(struct uk_9preq *req, uint32_t recv_size)
 	/* Deserialize the header into request fields. */
 	req->recv.offset = 0;
 	req->recv.size = recv_size;
-	rc = _fcall_deserialize(&req->recv, "dbw", &size,
-			&req->recv.type, &tag);
+	if ((rc = uk_9preq_read32(req, &size)) < 0 ||
+		(rc = uk_9preq_read8(req, &req->recv.type)) < 0 ||
+		(rc = uk_9preq_read16(req, &tag)) < 0)
+		return rc;
 
 	/* Check sanity of deserialized values. */
 	if (rc < 0)
@@ -557,8 +556,8 @@ int uk_9preq_error(struct uk_9preq *req)
 	 */
 	UK_BUGON(req->recv.offset != UK_9P_HEADER_SIZE);
 
-	rc = uk_9preq_deserialize(req, "sd", &error, &errcode);
-	if (rc < 0)
+	if ((rc = uk_9preq_readstr(req, &error)) < 0 ||
+		(rc = uk_9preq_read32(req, &errcode)) < 0)
 		return rc;
 
 	uk_pr_debug("RERROR %.*s %d\n", error.size, error.data, errcode);
