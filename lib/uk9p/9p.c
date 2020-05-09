@@ -116,12 +116,12 @@ struct uk_9preq *uk_9p_version(struct uk_9pdev *dev,
 
 	/*
 	 * Note: the 9P specification mentions that new_msize <= dev->msize.
-	 * Howevver, execution can continue even if the invariant is violated
+	 * However, execution can continue even if the invariant is violated
 	 * and set_msize() fails, as the old message size is always within the
 	 * accepted limit.
 	 */
 	if (!uk_9pdev_set_msize(dev, new_msize))
-		uk_pr_debug("Invalid new message size.\n");
+		uk_pr_warn("Invalid new message size.\n");
 
 	return req;
 
