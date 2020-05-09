@@ -195,22 +195,15 @@ struct uk_9pfid *uk_9p_walk(struct uk_9pdev *dev, struct uk_9pfid *fid,
 		goto out;
 	}
 
-	if (name) {
-		uk_pr_debug("TWALK fid %u newfid %u nwname %d name %s\n",
-				fid->fid, newfid->fid, nwname, name);
-		if ((rc = uk_9preq_write32(req, fid->fid)) ||
-			(rc = uk_9preq_write32(req, newfid->fid)) ||
-			(rc = uk_9preq_write16(req, nwname)) ||
-			(rc = uk_9preq_writestr(req, &name_str)))
-			goto out;
-	} else {
-		uk_pr_debug("TWALK fid %u newfid %u nwname %d\n",
-				fid->fid, newfid->fid, nwname);
-		if ((rc = uk_9preq_write32(req, fid->fid)) ||
-			(rc = uk_9preq_write32(req, newfid->fid)) ||
-			(rc = uk_9preq_write16(req, nwname)))
-			goto out;
-	}
+	uk_pr_debug("TWALK fid %u newfid %u nwname %d name %s\n",
+		fid->fid, newfid->fid, nwname, name ? name : "<NULL>");
+
+	if ((rc = uk_9preq_write32(req, fid->fid)) ||
+		(rc = uk_9preq_write32(req, newfid->fid)) ||
+		(rc = uk_9preq_write16(req, nwname)))
+		goto out;
+	if (name && (rc = uk_9preq_writestr(req, &name_str)))
+		goto out;
 
 	if ((rc = send_and_wait_no_zc(dev, req))) {
 		/*
