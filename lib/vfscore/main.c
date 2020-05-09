@@ -98,16 +98,9 @@ UK_TRACEPOINT(trace_vfs_open_err, "%d", int);
 
 struct task *main_task;	/* we only have a single process */
 
-int open(const char *pathname, int flags, ...)
+UK_LLSYSCALL_R_DEFINE(int, open, const char*, pathname, int, flags,
+		      mode_t, mode)
 {
-	mode_t mode = 0;
-	if (flags & O_CREAT) {
-		va_list ap;
-		va_start(ap, flags);
-		mode = apply_umask(va_arg(ap, mode_t));
-		va_end(ap);
-	}
-
 	trace_vfs_open(pathname, flags, mode);
 
 	struct task *t = main_task;
@@ -131,11 +124,11 @@ int open(const char *pathname, int flags, ...)
 
 	error = task_conv(t, pathname, acc, path);
 	if (error)
-		goto out_errno;
+		goto out_error;
 
 	error = sys_open(path, flags, mode, &fp);
 	if (error)
-		goto out_errno;
+		goto out_error;
 
 	error = fdalloc(fp, &fd);
 	if (error)
@@ -146,13 +139,29 @@ int open(const char *pathname, int flags, ...)
 
 	out_fput:
 	fdrop(fp);
-	out_errno:
-	errno = error;
+	out_error:
 	trace_vfs_open_err(error);
-	return -1;
+	return -error;
+}
+
+#if UK_LIBC_SYSCALLS
+int open(const char *pathname, int flags, ...)
+{
+	mode_t mode = 0;
+
+	if (flags & O_CREAT) {
+		va_list ap;
+
+		va_start(ap, flags);
+		mode = apply_umask(va_arg(ap, mode_t));
+		va_end(ap);
+	}
+
+	return uk_syscall_e_open((long int)pathname, flags, mode);
 }
 
 LFS64(open);
+#endif
 
 int openat(int dirfd, const char *pathname, int flags, ...)
 {
@@ -165,7 +174,7 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 	}
 
 	if (pathname[0] == '/' || dirfd == AT_FDCWD) {
-		return open(pathname, flags, mode);
+		return uk_syscall_e_open((long int)pathname, flags, mode);
 	}
 
 	struct vfscore_file *fp;
@@ -186,7 +195,7 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 	strlcat(p, "/", PATH_MAX);
 	strlcat(p, pathname, PATH_MAX);
 
-	error = open(p, flags, mode);
+	error = uk_syscall_e_open((long int)p, flags, mode);
 
 	vn_unlock(vp);
 	fdrop(fp);
@@ -197,7 +206,8 @@ LFS64(openat);
 
 int creat(const char *pathname, mode_t mode)
 {
-	return open(pathname, O_CREAT|O_WRONLY|O_TRUNC, mode);
+	return uk_syscall_e_open((long int) pathname,
+		O_CREAT|O_WRONLY|O_TRUNC, mode);
 }
 LFS64(creat);
 
@@ -854,6 +864,7 @@ DIR *opendir(const char *path)
 {
 	DIR *dir;
 	struct stat st;
+	mode_t mode = 0;
 
 	dir = malloc(sizeof(*dir));
 	if (!dir) {
@@ -861,7 +872,7 @@ DIR *opendir(const char *path)
 		goto out_err;
 	}
 
-	dir->fd = open(path, O_RDONLY);
+	dir->fd = uk_syscall_e_open((long int)path, O_RDONLY, mode);
 	if (dir->fd < 0)
 		goto out_free_dir;
 
