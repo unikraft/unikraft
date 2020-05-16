@@ -19,6 +19,11 @@ config XEN_HVMLITE
 	default n if (ARCH_X86_64 || ARCH_X86_32)
 	default y
 
+config XEN_PV
+	bool
+	default n if XEN_HVMLITE
+	default y
+
 menu "Console Options"
 
 config XEN_KERNEL_HV_CONSOLE
@@ -52,6 +57,7 @@ endmenu
 
 config XEN_PV_BUILD_P2M
 	bool "Create p2m table"
+	depends on (ARCH_X86_64 && XEN_PV)
 	default n
 	help
 		Create and initialize physical to machine (p2m) table on a PV
@@ -59,7 +65,8 @@ config XEN_PV_BUILD_P2M
 
 config XEN_GNTTAB
 	bool "Grant table support"
-	default y
+	default y if XEN_PV
+	default n
 	depends on (ARCH_X86_64)
 	select LIBUKALLOC
 	select LIBUKLOCK
@@ -70,8 +77,9 @@ config XEN_GNTTAB
 
 config XEN_XENBUS
 	bool "Xenbus/XenStore driver"
+	default y if XEN_PV
 	default n
-	depends on (ARCH_X86_64)
+	depends on XEN_GNTTAB
 	select LIBUKALLOC
 	select LIBUKSCHED
 	select LIBUKBUS
@@ -80,8 +88,7 @@ config XEN_XENBUS
 		XenStore communication API for Xen drivers
 
 menu "Xenbus Drivers"
-        depends on XEN_XENBUS
-        depends on XEN_GNTTAB
+	depends on XEN_XENBUS
 
 menuconfig XEN_BLKFRONT
 	bool "Xenbus Blkfront Driver"
