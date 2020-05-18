@@ -51,6 +51,7 @@ extern "C" {
 /*
  * Sysconf name values
  */
+#define _SC_OPEN_MAX 4
 #define _SC_PAGESIZE 8
 #define _SC_NPROCESSORS_ONLN 10
 
