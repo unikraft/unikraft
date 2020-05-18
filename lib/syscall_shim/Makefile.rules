@@ -1,0 +1,9 @@
+.PHONY: print-syscalls
+
+ifeq ($(UK_HAVE_DOT_CONFIG),y)
+print-syscalls:
+	@echo $(UK_PROVIDED_SYSCALLS-y) $(UK_PROVIDED_SYSCALLS)
+else
+print-syscalls:
+	$(error Do not have a configuration. Please run one of the configuration targets first)
+endif
