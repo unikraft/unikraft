@@ -89,7 +89,7 @@ $(LIBSYSCALL_SHIM_BUILD)/libc_stubs.c: $(LIBSYSCALL_SHIM_BASE)/gen_libc_stubs.aw
 
 $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in.new:
 	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
-		echo $(UK_PROVIDED_SYSCALLS-y) | tr ' ' '\n' > $@)
+		echo $(UK_PROVIDED_SYSCALLS-y) $(UK_PROVIDED_SYSCALLS) | tr ' ' '\n' > $@)
 
 $(LIBSYSCALL_SHIM_INCLUDES_PATH)/syscall_stubs.h.new: $(LIBSYSCALL_SHIM_BASE)/gen_stubs.awk $(LIBSYSCALL_SHIM_TEMPL)
 	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
