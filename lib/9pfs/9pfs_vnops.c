@@ -47,10 +47,10 @@
 
 #include "9pfs.h"
 
-static uint8_t uk_9pfs_open_mode_from_posix_flags(unsigned long flags)
+static uint32_t uk_9pfs_open_mode_from_posix_flags(int flags)
 {
-	uint8_t mode = 0;
-	uint8_t flags_rw = flags & (UK_FREAD | UK_FWRITE);
+	uint32_t mode = 0;
+	uint32_t flags_rw = flags & (UK_FREAD | UK_FWRITE);
 
 	if (flags_rw == UK_FREAD)
 		mode = UK_9P_OREAD;

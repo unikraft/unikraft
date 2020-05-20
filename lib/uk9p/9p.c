@@ -266,7 +266,7 @@ out:
 	return newfid;
 }
 
-int uk_9p_open(struct uk_9pdev *dev, struct uk_9pfid *fid, uint8_t mode)
+int uk_9p_open(struct uk_9pdev *dev, struct uk_9pfid *fid, uint32_t mode)
 {
 	struct uk_9preq *req;
 	int rc = 0;
@@ -294,7 +294,7 @@ out:
 }
 
 int uk_9p_create(struct uk_9pdev *dev, struct uk_9pfid *fid,
-		const char *name, uint32_t perm, uint8_t mode,
+		const char *name, uint32_t perm, uint32_t mode,
 		const char *extension)
 {
 	struct uk_9preq *req;

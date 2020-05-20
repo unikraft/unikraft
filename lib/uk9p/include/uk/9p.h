@@ -129,7 +129,7 @@ struct uk_9pfid *uk_9p_walk(struct uk_9pdev *dev, struct uk_9pfid *fid,
  *   - 0: Successful.
  *   - (< 0): An error occurred.
  */
-int uk_9p_open(struct uk_9pdev *dev, struct uk_9pfid *fid, uint8_t mode);
+int uk_9p_open(struct uk_9pdev *dev, struct uk_9pfid *fid, uint32_t mode);
 
 /**
  * Creates a new file with the given name in the directory associated with fid,
@@ -153,7 +153,7 @@ int uk_9p_open(struct uk_9pdev *dev, struct uk_9pfid *fid, uint8_t mode);
  *   - (< 0): An error occurred.
  */
 int uk_9p_create(struct uk_9pdev *dev, struct uk_9pfid *fid,
-		const char *name, uint32_t perm, uint8_t mode,
+		const char *name, uint32_t perm, uint32_t mode,
 		const char *extension);
 
 /**
