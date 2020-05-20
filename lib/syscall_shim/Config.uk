@@ -34,4 +34,8 @@ if LIBSYSCALL_SHIM
 			requests (e.g., sysenter/sysexit). The handler maps
 			register values accordingly to the Linux ABI standard
 			(see: man syscalls[2]).
+
+	config LIBSYSCALL_SHIM_DEBUG
+		bool "Enable debug messages"
+		default n
 endif
