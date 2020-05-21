@@ -41,31 +41,66 @@
 #include <uk/alloc.h>
 #include <uk/assert.h>
 
-/* Define macros to access IO registers */
-#define __IOREG_READ(bits) \
-static inline uint##bits##_t \
-	ioreg_read##bits(const volatile uint##bits##_t *addr) \
-		{ return *addr; }
+/*
+ * we should use inline assembly with volatile constraint to access mmio
+ * device memory to avoid compiler use load/store instructions of writeback
+ * addressing mode which will cause crash when running in hyper mode
+ * unless they will be decoded by hypervisor.
+ */
+static inline uint8_t ioreg_read8(const volatile uint8_t *address)
+{
+	uint8_t value;
 
-#define __IOREG_WRITE(bits) \
-static inline void \
-	ioreg_write##bits(volatile uint##bits##_t *addr, \
-						uint##bits##_t value) \
-		{ *addr = value; }
+	asm volatile ("ldrb %w0, [%1]" : "=r"(value) : "r"(address));
+	return value;
+}
 
+static inline uint16_t ioreg_read16(const volatile uint16_t *address)
+{
+	uint16_t value;
 
-#define __IOREG_READ_ALL() __IOREG_READ(8)  \
-			   __IOREG_READ(16) \
-			   __IOREG_READ(32) \
-			   __IOREG_READ(64) \
+	asm volatile ("ldrh %w0, [%1]" : "=r"(value) : "r"(address));
+	return value;
+}
 
-#define __IOREG_WRITE_ALL()	__IOREG_WRITE(8)  \
-			   __IOREG_WRITE(16) \
-			   __IOREG_WRITE(32) \
-			   __IOREG_WRITE(64) \
+static inline uint32_t ioreg_read32(const volatile uint32_t *address)
+{
+	uint32_t value;
 
-__IOREG_READ_ALL()
-__IOREG_WRITE_ALL()
+	asm volatile ("ldr %w0, [%1]" : "=r"(value) : "r"(address));
+	return value;
+}
+
+static inline uint64_t ioreg_read64(const volatile uint64_t *address)
+{
+	uint64_t value;
+
+	asm volatile ("ldr %0, [%1]" : "=r"(value) : "r"(address));
+	return value;
+}
+
+static inline void ioreg_write8(const volatile uint8_t *address, uint8_t value)
+{
+	asm volatile ("strb %w0, [%1]" : : "rZ"(value), "r"(address));
+}
+
+static inline void ioreg_write16(const volatile uint16_t *address,
+				 uint16_t value)
+{
+	asm volatile ("strh %w0, [%1]" : : "rZ"(value), "r"(address));
+}
+
+static inline void ioreg_write32(const volatile uint32_t *address,
+				 uint32_t value)
+{
+	asm volatile ("str %w0, [%1]" : : "rZ"(value), "r"(address));
+}
+
+static inline void ioreg_write64(const volatile uint64_t *address,
+				 uint64_t value)
+{
+	asm volatile ("str %0, [%1]" : : "rZ"(value), "r"(address));
+}
 
 static inline void _init_cpufeatures(void)
 {
