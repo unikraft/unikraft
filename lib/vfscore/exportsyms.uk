@@ -106,6 +106,8 @@ lchown
 uk_syscall_e_lchown
 uk_syscall_r_lchown
 openat
+uk_syscall_e_openat
+uk_syscall_r_openat
 opendir
 readdir
 readdir_r
