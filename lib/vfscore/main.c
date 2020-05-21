@@ -163,16 +163,9 @@ int open(const char *pathname, int flags, ...)
 LFS64(open);
 #endif
 
-int openat(int dirfd, const char *pathname, int flags, ...)
+UK_LLSYSCALL_R_DEFINE(int, openat, int, dirfd, const char *, pathname,
+		      int, flags, int, mode)
 {
-	mode_t mode = 0;
-	if (flags & O_CREAT) {
-		va_list ap;
-		va_start(ap, flags);
-		mode = apply_umask(va_arg(ap, mode_t));
-		va_end(ap);
-	}
-
 	if (pathname[0] == '/' || dirfd == AT_FDCWD) {
 		return uk_syscall_e_open((long int)pathname, flags, mode);
 	}
@@ -200,9 +193,27 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 	vn_unlock(vp);
 	fdrop(fp);
 
-	return error;
+	return -error;
 }
+
+#if UK_LIBC_SYSCALLS
+int openat(int dirfd, const char *pathname, int flags, ...)
+{
+	mode_t mode = 0;
+
+	if (flags & O_CREAT) {
+		va_list ap;
+
+		va_start(ap, flags);
+		mode = apply_umask(va_arg(ap, mode_t));
+		va_end(ap);
+	}
+
+	return uk_syscall_e_openat(dirfd, (long) pathname, flags, mode);
+}
+
 LFS64(openat);
+#endif
 
 int creat(const char *pathname, mode_t mode)
 {
