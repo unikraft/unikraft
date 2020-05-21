@@ -28,7 +28,6 @@ help
 if LIBVFSCORE_AUTOMOUNT_ROOTFS
 	choice LIBVFSCORE_ROOTFS
 	prompt "Default root filesystem"
-	default LIBVFSCORE_ROOTFS_RAMFS
 
 		config LIBVFSCORE_ROOTFS_RAMFS
 		bool "RamFS"
