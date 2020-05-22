@@ -185,6 +185,8 @@ vref
 vflush
 dref
 fcntl
+uk_syscall_e_fcntl
+uk_syscall_r_fcntl
 readdir_r
 readdir64_r
 fstatfs

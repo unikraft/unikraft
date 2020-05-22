@@ -1763,19 +1763,13 @@ UK_TRACEPOINT(trace_vfs_fcntl, "%d %d 0x%x", int, int, int);
 UK_TRACEPOINT(trace_vfs_fcntl_ret, "\"%s\"", int);
 UK_TRACEPOINT(trace_vfs_fcntl_err, "%d", int);
 
-int fcntl(int fd, int cmd, ...)
+UK_LLSYSCALL_R_DEFINE(int, fcntl, int, fd, unsigned int, cmd, int, arg)
 {
-	int arg;
-	va_list ap;
 	struct vfscore_file *fp;
 	int ret = 0, error;
 #if defined(FIONBIO) && defined(FIOASYNC)
 	int tmp;
 #endif
-
-	va_start(ap, cmd);
-	arg = va_arg(ap, int);
-	va_end(ap);
 
 	trace_vfs_fcntl(fd, cmd, arg);
 	error = fget(fd, &fp);
@@ -1855,9 +1849,25 @@ int fcntl(int fd, int cmd, ...)
 
 out_errno:
 	trace_vfs_fcntl_err(error);
-	errno = error;
-	return -1;
+	return -error;
 }
+
+#if UK_LIBC_SYSCALLS
+int fcntl(int fd, int cmd, ...)
+{
+	int arg = 0;
+	va_list ap;
+
+	va_start(ap, cmd);
+	if (cmd == F_SETFD ||
+	    cmd == F_SETFL) {
+		arg = va_arg(ap, int);
+	}
+	va_end(ap);
+
+	return uk_syscall_e_fcntl(fd, cmd, arg);
+}
+#endif
 
 UK_TRACEPOINT(trace_vfs_access, "\"%s\" 0%0o", const char*, int);
 UK_TRACEPOINT(trace_vfs_access_ret, "");
