@@ -47,6 +47,7 @@
 #include <vfscore/file.h>
 #include <vfscore/mount.h>
 #include <vfscore/fs.h>
+#include <uk/print.h>
 #include <uk/errptr.h>
 #include <uk/ctors.h>
 #include <uk/trace.h>
@@ -2217,20 +2218,20 @@ UK_TRACEPOINT(trace_vfs_fchown_ret, "");
 int fchown(int fd __unused, uid_t owner __unused, gid_t group __unused)
 {
 	trace_vfs_fchown(fd, owner, group);
-	WARN_STUBBED();
+	UK_WARN_STUBBED();
 	trace_vfs_fchown_ret();
 	return 0;
 }
 
 int chown(const char *path __unused, uid_t owner __unused, gid_t group __unused)
 {
-	WARN_STUBBED();
+	UK_WARN_STUBBED();
 	return 0;
 }
 
 int lchown(const char *path __unused, uid_t owner __unused, gid_t group __unused)
 {
-	WARN_STUBBED();
+	UK_WARN_STUBBED();
 	return 0;
 }
 
@@ -2346,7 +2347,7 @@ fs_noop(void)
 
 int chroot(const char *path __unused)
 {
-	WARN_STUBBED();
+	UK_WARN_STUBBED();
 	errno = ENOSYS;
 	return -1;
 }
