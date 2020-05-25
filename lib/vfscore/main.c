@@ -1825,16 +1825,16 @@ UK_LLSYSCALL_R_DEFINE(int, fcntl, int, fd, unsigned int, cmd, int, arg)
 		fp->f_flags |= O_CLOEXEC;
 		break;
 	case F_SETLK:
-		uk_pr_warn("fcntl(F_SETLK) stubbed\n");
+		uk_pr_warn_once("fcntl(F_SETLK) stubbed\n");
 		break;
 	case F_GETLK:
-		uk_pr_warn("fcntl(F_GETLK) stubbed\n");
+		uk_pr_warn_once("fcntl(F_GETLK) stubbed\n");
 		break;
 	case F_SETLKW:
-		uk_pr_warn("fcntl(F_SETLKW) stubbed\n");
+		uk_pr_warn_once("fcntl(F_SETLKW) stubbed\n");
 		break;
 	case F_SETOWN:
-		uk_pr_warn("fcntl(F_SETOWN) stubbed\n");
+		uk_pr_warn_once("fcntl(F_SETOWN) stubbed\n");
 		break;
 	default:
 		uk_pr_err("unsupported fcntl cmd 0x%x\n", cmd);
