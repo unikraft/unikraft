@@ -37,6 +37,7 @@
 #define __UKDEBUG_PRINT_H__
 
 #include <stdarg.h>
+#include <uk/arch/lcpu.h>
 #include <uk/essentials.h>
 #include <uk/config.h>
 
@@ -87,10 +88,30 @@ void _uk_printd(const char *libname, const char *srcname,
 			    __LINE__, (fmt), ap);			\
 	} while (0)
 
+#define uk_vprintd_once(fmt, ap)					\
+	do {								\
+		static int __x;						\
+		if (unlikely(!__x)) {					\
+			_uk_vprintd(__STR_LIBNAME__, __STR_BASENAME__,	\
+				    __LINE__, (fmt), ap);		\
+			__x = 1;					\
+		}							\
+	} while (0)
+
 #define uk_printd(fmt, ...)						\
 	do {								\
 		_uk_printd(__STR_LIBNAME__, __STR_BASENAME__,		\
 			   __LINE__, (fmt), ##__VA_ARGS__);		\
+	} while (0)
+
+#define uk_printd_once(fmt, ...)					\
+	do {								\
+		static int __x;						\
+		if (unlikely(!__x)) {					\
+			_uk_printd(__STR_LIBNAME__, __STR_BASENAME__,	\
+				   __LINE__, (fmt), ##__VA_ARGS__);	\
+			__x = 1;					\
+		}							\
 	} while (0)
 #else
 static inline void uk_vprintd(const char *fmt __unused, va_list ap __unused)
@@ -98,6 +119,14 @@ static inline void uk_vprintd(const char *fmt __unused, va_list ap __unused)
 
 static inline void uk_printd(const char *fmt, ...) __printf(1, 2);
 static inline void uk_printd(const char *fmt __unused, ...)
+{}
+
+static inline void uk_vprintd_once(const char *fmt __unused,
+				   va_list ap __unused)
+{}
+
+static inline void uk_printd_once(const char *fmt, ...) __printf(1, 2);
+static inline void uk_printd_once(const char *fmt __unused, ...)
 {}
 #endif
 
@@ -138,11 +167,37 @@ void _uk_printk(int lvl, const char *libname, const char *srcname,
 				    __LINE__, (fmt), ap);                      \
 	} while (0)
 
+#define uk_vprintk_once(lvl, fmt, ap)                                          \
+	do {                                                                   \
+		if ((lvl) <= KLVL_MAX) {                                       \
+			static int __x;                                        \
+			if (unlikely(!__x)) {                                  \
+				_uk_vprintk((lvl), __STR_LIBNAME__,            \
+					    __STR_BASENAME__,                  \
+					    __LINE__, (fmt), ap);              \
+				__x = 1;                                       \
+			}                                                      \
+		}                                                              \
+	} while (0)
+
 #define uk_printk(lvl, fmt, ...)                                               \
 	do {                                                                   \
 		if ((lvl) <= KLVL_MAX)                                         \
 			_uk_printk((lvl), __STR_LIBNAME__, __STR_BASENAME__,   \
 				   __LINE__, (fmt), ##__VA_ARGS__);            \
+	} while (0)
+
+#define uk_printk_once(lvl, fmt, ...)                                          \
+	do {                                                                   \
+		if ((lvl) <= KLVL_MAX) {                                       \
+			static int __x;                                        \
+			if (unlikely(!__x)) {                                  \
+				_uk_printk((lvl), __STR_LIBNAME__,             \
+					   __STR_BASENAME__,                   \
+					   __LINE__, (fmt), ##__VA_ARGS__);    \
+				__x = 1;                                       \
+			}                                                      \
+		}                                                              \
 	} while (0)
 #else
 static inline void uk_vprintk(int lvl __unused, const char *fmt __unused,
@@ -152,6 +207,15 @@ static inline void uk_vprintk(int lvl __unused, const char *fmt __unused,
 static inline void uk_printk(int lvl, const char *fmt, ...) __printf(2, 3);
 static inline void uk_printk(int lvl __unused, const char *fmt __unused, ...)
 {}
+
+static inline void uk_vprintk_once(int lvl __unused, const char *fmt __unused,
+				   va_list ap __unused)
+{}
+
+static inline void uk_printk_once(int lvl, const char *fmt, ...) __printf(2, 3);
+static inline void uk_printk_once(int lvl __unused,
+				  const char *fmt __unused, ...)
+{}
 #endif /* CONFIG_LIBUKDEBUG_PRINTK */
 
 /*
@@ -159,23 +223,29 @@ static inline void uk_printk(int lvl __unused, const char *fmt __unused, ...)
  * This is similar to the pr_* variants that you find in the Linux kernel
  */
 #define uk_pr_debug(fmt, ...) uk_printd((fmt), ##__VA_ARGS__)
+#define uk_pr_debug_once(fmt, ...) uk_printd_once((fmt), ##__VA_ARGS__)
 #define uk_pr_info(fmt, ...)  uk_printk(KLVL_INFO,  (fmt), ##__VA_ARGS__)
+#define uk_pr_info_once(fmt, ...)  uk_printk_once(KLVL_INFO, (fmt), \
+						  ##__VA_ARGS__)
 #define uk_pr_warn(fmt, ...)  uk_printk(KLVL_WARN,  (fmt), ##__VA_ARGS__)
+#define uk_pr_warn_once(fmt, ...)  uk_printk_once(KLVL_WARN, (fmt), \
+						  ##__VA_ARGS__)
 #define uk_pr_err(fmt, ...)   uk_printk(KLVL_ERR,   (fmt), ##__VA_ARGS__)
+#define uk_pr_err_once(fmt, ...)   uk_printk_once(KLVL_ERR,  (fmt), \
+						  ##__VA_ARGS__)
 #define uk_pr_crit(fmt, ...)  uk_printk(KLVL_CRIT,  (fmt), ##__VA_ARGS__)
-
-/* NOTE: borrowed from OSv */
-#define WARN_STUBBED_ONCE(thing) do { \
-	static int _x; \
-	if (!_x) { \
-		_x = 1; \
-		thing; \
-	} \
-} while (0)
+#define uk_pr_crit_once(fmt, ...)  uk_printk_once(KLVL_CRIT, (fmt), \
+						  ##__VA_ARGS__)
 
 /* Warning for stubbed functions */
+#define UK_WARN_STUBBED() \
+	uk_pr_warn_once("%s() stubbed\n", __func__)
+
+/* DEPRECATED: Please use UK_WARN_STUBBED instead */
+#ifndef WARN_STUBBED
 #define WARN_STUBBED() \
-	WARN_STUBBED_ONCE(uk_pr_warn("%s() stubbed\n", __func__))
+	UK_WARN_STUBBED()
+#endif
 
 #ifdef __cplusplus
 }
