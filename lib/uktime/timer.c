@@ -40,14 +40,14 @@ int timer_create(clockid_t clockid __unused,
 		struct sigevent *__restrict sevp __unused,
 		timer_t *__restrict timerid __unused)
 {
-	WARN_STUBBED();
+	UK_WARN_STUBBED();
 	errno = ENOTSUP;
 	return -1;
 }
 
 int timer_delete(timer_t timerid __unused)
 {
-	WARN_STUBBED();
+	UK_WARN_STUBBED();
 	errno = ENOTSUP;
 	return -1;
 }
@@ -57,7 +57,7 @@ int timer_settime(timer_t timerid __unused,
 		const struct itimerspec *__restrict new_value __unused,
 		struct itimerspec *__restrict old_value __unused)
 {
-	WARN_STUBBED();
+	UK_WARN_STUBBED();
 	errno = ENOTSUP;
 	return -1;
 }
@@ -65,14 +65,14 @@ int timer_settime(timer_t timerid __unused,
 int timer_gettime(timer_t timerid __unused,
 		struct itimerspec *curr_value __unused)
 {
-	WARN_STUBBED();
+	UK_WARN_STUBBED();
 	errno = ENOTSUP;
 	return -1;
 }
 
 int timer_getoverrun(timer_t timerid __unused)
 {
-	WARN_STUBBED();
+	UK_WARN_STUBBED();
 	errno = ENOTSUP;
 	return -1;
 }

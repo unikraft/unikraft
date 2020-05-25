@@ -594,7 +594,7 @@ int pipe2(int pipefd[2], int flags)
 /* TODO maybe find a better place for this when it will be implemented */
 int mkfifo(const char *path __unused, mode_t mode __unused)
 {
-	WARN_STUBBED();
+	UK_WARN_STUBBED();
 	errno = ENOTSUP;
 	return -1;
 }

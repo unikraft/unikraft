@@ -184,6 +184,6 @@ UK_SYSCALL_R_DEFINE(int, times, struct tm *, buf)
 int setitimer(int which __unused, const struct itimerval *new_value __unused,
 		struct itimerval *old_value __unused)
 {
-	WARN_STUBBED();
+	UK_WARN_STUBBED();
 	return 0;
 }
