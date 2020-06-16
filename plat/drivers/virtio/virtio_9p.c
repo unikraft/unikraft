@@ -305,17 +305,15 @@ static int virtio_9p_vq_alloc(struct virtio_9p_device *d)
 
 	d->hwvq_id = 0;
 	if (unlikely(qdesc_size != NUM_SEGMENTS)) {
-		uk_pr_err(DRIVER_NAME": Expected %d descriptors, found %d (virtqueue %"
+		uk_pr_info(DRIVER_NAME": Expected %d descriptors, found %d (virtqueue %"
 			  PRIu16")\n", NUM_SEGMENTS, qdesc_size, d->hwvq_id);
-		rc = -EINVAL;
-		goto exit;
 	}
 
 	uk_sglist_init(&d->sg, ARRAY_SIZE(d->sgsegs), &d->sgsegs[0]);
 
 	d->vq = virtio_vqueue_setup(d->vdev,
 				    d->hwvq_id,
-				    qdesc_size,
+				    NUM_SEGMENTS,
 				    virtio_9p_recv,
 				    a);
 	if (unlikely(PTRISERR(d->vq))) {
