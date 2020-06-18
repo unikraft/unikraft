@@ -35,13 +35,13 @@
 #include <stddef.h>
 #include <uk/essentials.h>
 
-/* TODO: Implement a circular buffer. Currently, if the buffer is
- * full, tracing disables itself.
+/* If the buffer is full, tracing disables itself.
+ * Using a circular buffer will not make it better: in any case, losing trace
+ * data is undesired and we should keep this as simple as possible.
  */
-#define UK_TRACE_BUFFER_SIZE 16384
-char uk_trace_buffer[UK_TRACE_BUFFER_SIZE];
+char uk_trace_buffer[CONFIG_LIBUKDEBUG_TRACE_BUFFER_SIZE];
 
-size_t uk_trace_buffer_free = UK_TRACE_BUFFER_SIZE;
+size_t uk_trace_buffer_free = CONFIG_LIBUKDEBUG_TRACE_BUFFER_SIZE;
 char *uk_trace_buffer_writep = uk_trace_buffer;
 
 

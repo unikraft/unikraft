@@ -78,10 +78,16 @@ config LIBUKDEBUG_ENABLE_ASSERT
 menuconfig LIBUKDEBUG_TRACEPOINTS
 	bool "Enable tracepoints"
 	default n
+	help
+	  Tracepoints are stored in an internal, fixed-size buffer. When the end
+	  of the buffer is reached, tracing disables itself.
 if LIBUKDEBUG_TRACEPOINTS
+config LIBUKDEBUG_TRACE_BUFFER_SIZE
+	int "Size of the trace buffer"
+	default 16384
+
 config LIBUKDEBUG_ALL_TRACEPOINTS
 	bool "Enable all tracepoints at once"
 	default n
 endif
-
 endif
