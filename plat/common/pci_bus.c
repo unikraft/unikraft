@@ -1,6 +1,7 @@
 /* TODO: SPDX Header */
 /*
  * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ *          Hugo Lefeuvre <hugo.lefeuvre@neclab.eu>
  *
  * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
  *
@@ -71,17 +72,19 @@ static struct pci_bus_handler ph;
 #define PCI_CONFIG_ADDR             (0xCF8)
 #define PCI_CONFIG_DATA             (0xCFC)
 
-/* 8 bits for bus number, 5 bits for devices */
+/* 8 bits for bus number, 5 bits for devices, 3 for functions */
 #define PCI_MAX_BUSES               (1 << 8)
 #define PCI_MAX_DEVICES             (1 << 5)
+#define PCI_MAX_FUNCTIONS           (1 << 3)
 
 #define PCI_BUS_SHIFT               (16)
 #define PCI_DEVICE_SHIFT            (11)
+#define PCI_FUNCTION_SHIFT          (8)
 #define PCI_ENABLE_BIT              (1 << 31)
 
 #define PCI_CONF_CLASS_ID          (0x08)
-#define PCI_CONF_CLASS_ID_SHFT     (8)
-#define PCI_CONF_CLASS_ID_MASK     (0x00FFFFFF)
+#define PCI_CONF_CLASS_ID_SHFT     (16)
+#define PCI_CONF_CLASS_ID_MASK     (0xFF00)
 
 #define PCI_CONF_VENDOR_ID          (0x00)
 #define PCI_CONF_VENDOR_ID_SHFT     (0)
@@ -94,6 +97,19 @@ static struct pci_bus_handler ph;
 #define PCI_CONF_SUBSYSVEN_ID          (0x2c)
 #define PCI_CONF_SUBSYSVEN_ID_SHFT     (0)
 #define PCI_CONF_SUBSYSVEN_ID_MASK     (0xFFFF)
+
+#define PCI_CONF_SUBCLASS_ID          (0x08)
+#define PCI_CONF_SUBCLASS_ID_SHFT     (16)
+#define PCI_CONF_SUBCLASS_ID_MASK     (0x00FF)
+
+#define PCI_CONF_SECONDARY_BUS          (0x18)
+#define PCI_CONF_SECONDARY_BUS_SHFT     (0)
+#define PCI_CONF_SECONDARY_BUS_MASK     (0xFF00)
+
+#define PCI_HEADER_TYPE_MSB_MASK   (0x80)
+#define PCI_CONF_HEADER_TYPE       (0x00)
+#define PCI_CONF_HEADER_TYPE_SHFT  (16)
+#define PCI_CONF_HEADER_TYPE_MASK  (0xFF)
 
 #define PCI_CONF_SUBSYS_ID          (0x2c)
 #define PCI_CONF_SUBSYS_ID_SHFT     (16)
@@ -218,66 +234,133 @@ static inline int pci_driver_add_device(struct pci_driver *drv,
 	return 0;
 }
 
-static int pci_probe(void)
+static void probe_bus(uint32_t);
+
+/* Probe a function. Return 1 if the function does not exist in the device, 0
+ * otherwise.
+ */
+static int probe_function(uint32_t bus, uint32_t device, uint32_t function)
 {
+	uint32_t config_addr, config_data, subclass, secondary_bus;
 	struct pci_address addr;
 	struct pci_device_id devid;
 	struct pci_driver *drv;
-	uint32_t config_addr, config_data;
-	uint32_t bus;
-	uint8_t dev;
+
+	config_addr = (PCI_ENABLE_BIT)
+			| (bus << PCI_BUS_SHIFT)
+			| (device << PCI_DEVICE_SHIFT)
+			| (function << PCI_FUNCTION_SHIFT);
+
+	outl(PCI_CONFIG_ADDR, config_addr);
+	config_data = inl(PCI_CONFIG_DATA);
+
+	devid.vendor_id = config_data & PCI_DEVICE_ID_MASK;
+	if (devid.vendor_id == PCI_INVALID_ID) {
+		/* Device doesn't exist */
+		return 1;
+	}
+
+	addr.domain   = 0x0;
+	addr.bus      = bus;
+	addr.devid    = device;
+	addr.function = function;
+
+	/* These I/O reads could be batched, but it practice this does not
+	 * appear to make the code more performant.
+	 */
+	PCI_CONF_READ(uint32_t, &devid.class_id,
+			config_addr, CLASS_ID);
+	PCI_CONF_READ(uint32_t, &subclass,
+			config_addr, SUBCLASS_ID);
+	PCI_CONF_READ(uint16_t, &devid.vendor_id,
+			config_addr, VENDOR_ID);
+	PCI_CONF_READ(uint16_t, &devid.device_id,
+			config_addr, DEVICE_ID);
+	PCI_CONF_READ(uint16_t, &devid.subsystem_device_id,
+			config_addr, SUBSYS_ID);
+	PCI_CONF_READ(uint16_t, &devid.subsystem_vendor_id,
+			config_addr, SUBSYSVEN_ID);
+
+	uk_pr_info("PCI %02x:%02x.%02x (%04x %04x:%04x): ",
+		   (int) addr.bus,
+		   (int) addr.devid,
+		   (int) addr.function,
+		   (int) devid.class_id,
+		   (int) devid.vendor_id,
+		   (int) devid.device_id);
+
+	drv = pci_find_driver(&devid);
+	if (!drv) {
+		uk_pr_info("<no driver>\n");
+	} else {
+		uk_pr_info("driver %p\n", drv);
+		pci_driver_add_device(drv, &addr, &devid);
+	}
+
+	/* 0x06 = Bridge Device, 0x04 = PCI-to-PCI bridge */
+	if ((devid.class_id == 0x06) && (subclass == 0x04) ) {
+		PCI_CONF_READ(uint32_t, &secondary_bus,
+				config_addr, SECONDARY_BUS);
+		probe_bus(secondary_bus);
+	}
+
+	return 0;
+}
+
+/* Recursive PCI enumeration: this function is called recursively by
+ * probe_function upon discovering PCI-to-PCI bridges.
+ */
+static void probe_bus(uint32_t bus)
+{
+	uint32_t config_addr, device, header_type, function = 0;
+
+	for (device = 0; device < PCI_MAX_DEVICES; ++device) {
+		if (!probe_function(bus, device, function))
+			continue;
+
+		config_addr = (PCI_ENABLE_BIT);
+		PCI_CONF_READ(uint32_t, &header_type,
+				config_addr, HEADER_TYPE);
+
+		/* Is this a multi-function device? */
+		if ((header_type & PCI_HEADER_TYPE_MSB_MASK) == 0)
+			continue;
+
+		/* Check remaining functions */
+		for (function = 1; function < PCI_MAX_FUNCTIONS; function++)
+			probe_function(bus, device, function);
+	}
+}
+
+static int pci_probe(void)
+{
+	uint32_t config_addr, function, header_type, vendor_id;
 
 	uk_pr_debug("Probe PCI\n");
 
-	for (bus = 0; bus < PCI_MAX_BUSES; ++bus) {
-		for (dev = 0; dev < PCI_MAX_DEVICES; ++dev) {
-			config_addr = (PCI_ENABLE_BIT)
-					| (bus << PCI_BUS_SHIFT)
-					| (dev << PCI_DEVICE_SHIFT);
+	config_addr = (PCI_ENABLE_BIT);
+	PCI_CONF_READ(uint32_t, &header_type,
+			config_addr, HEADER_TYPE);
 
-			outl(PCI_CONFIG_ADDR, config_addr);
-			config_data = inl(PCI_CONFIG_DATA);
+	if ((header_type & PCI_HEADER_TYPE_MSB_MASK) == 0) {
+		/* Single PCI host controller */
+		probe_bus(0);
+	} else {
+		/* Multiple PCI host controllers */
+		for (function = 0; function < PCI_MAX_FUNCTIONS; function++) {
+			config_addr = (PCI_ENABLE_BIT) |
+					(function << PCI_FUNCTION_SHIFT);
 
-			/* TODO: Retrieve the device identfier */
-			addr.domain   = 0x0;
-			addr.bus      = bus;
-			addr.devid    = dev;
-			 /* TODO: Retrieve the function */
-			addr.function = 0x0;
-
-			devid.vendor_id = config_data & PCI_DEVICE_ID_MASK;
-			if (devid.vendor_id == PCI_INVALID_ID) {
-				/* Device doesn't exist */
-				continue;
-			}
-
-			PCI_CONF_READ(uint32_t, &devid.class_id,
-					config_addr, CLASS_ID);
-			PCI_CONF_READ(uint16_t, &devid.vendor_id,
+			PCI_CONF_READ(uint32_t, &vendor_id,
 					config_addr, VENDOR_ID);
-			PCI_CONF_READ(uint16_t, &devid.device_id,
-					config_addr, DEVICE_ID);
-			PCI_CONF_READ(uint16_t, &devid.subsystem_device_id,
-					config_addr, SUBSYS_ID);
-			PCI_CONF_READ(uint16_t, &devid.subsystem_vendor_id,
-					config_addr, SUBSYSVEN_ID);
 
-			uk_pr_info("PCI %02x:%02x.%02x (%04x %04x:%04x): ",
-				   (int) addr.bus,
-				   (int) addr.devid,
-				   (int) addr.function,
-				   (int) devid.class_id,
-				   (int) devid.vendor_id,
-				   (int) devid.device_id);
-			drv = pci_find_driver(&devid);
-			if (!drv) {
-				uk_pr_info("<no driver>\n");
-				continue;
-			}
-			uk_pr_info("driver %p\n", drv);
-			pci_driver_add_device(drv, &addr, &devid);
+			if (vendor_id != PCI_INVALID_ID)
+				break;
+
+			probe_bus(function);
 		}
 	}
+
 	return 0;
 }
 
