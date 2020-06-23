@@ -194,7 +194,7 @@ static __u64 rtc_gettimeofday(void)
 }
 
 /*
- * Beturn monotonic time using TSC clock.
+ * Return monotonic time using TSC clock.
  */
 __u64 tscclock_monotonic(void)
 {
@@ -239,6 +239,7 @@ int tscclock_init(void)
 	cpuid(0x40000000, 0, &eax, &ebx, &ecx, &edx);
 	if (eax >= 0x40000010) {
 		uk_pr_info("Retrieving TSC clock frequency from hypervisor\n");
+		tsc_base = rdtsc();
 		cpuid(0x40000010, 0, &eax, &ebx, &ecx, &edx);
 		tsc_freq = eax * 1000;
 	}
@@ -262,6 +263,9 @@ int tscclock_init(void)
 	 * Calculate TSC scaling multiplier.
 	 *
 	 * (0.32) tsc_mult = UKARCH_NSEC_PER_SEC (32.32) / tsc_freq (32.0)
+	 *
+	 * FIXME: this will overflow with small TSC frequencies. We should
+	 * probably calculate the TSC shift dynamically like solo5/hvt does.
 	 */
 	tsc_mult = (UKARCH_NSEC_PER_SEC << 32) / tsc_freq;
 
