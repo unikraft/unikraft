@@ -256,24 +256,29 @@ int tscclock_init(void)
 		tsc_freq = (rdtsc() - tsc_base) * 10;
 	}
 
-	uk_pr_info("Clock source: TSC, frequency estimate is %llu Hz\n",
-		   (unsigned long long) tsc_freq);
-
 	/*
 	 * Calculate TSC scaling multiplier.
 	 *
 	 * (0.32) tsc_mult = UKARCH_NSEC_PER_SEC (32.32) / tsc_freq (32.0)
+	 *
+	 * Warning, do not print anything between TSC calibration and the
+	 * setting of tsc_mult: if CONFIG_LIBUKDEBUG_PRINT_TIME is enabled
+	 * this will trigger a reset of tsc_base via tscclock_monotonic
+	 * and delay the clock starting point.
 	 *
 	 * FIXME: this will overflow with small TSC frequencies. We should
 	 * probably calculate the TSC shift dynamically like solo5/hvt does.
 	 */
 	tsc_mult = (UKARCH_NSEC_PER_SEC << 32) / tsc_freq;
 
+	uk_pr_info("Clock source: TSC, frequency estimate is %llu Hz\n",
+		   (unsigned long long) tsc_freq);
+
 	/*
 	 * Monotonic time begins at tsc_base (first read of TSC before
 	 * calibration).
 	 */
-	time_base = mul64_32(tsc_base, tsc_mult);
+	tscclock_monotonic();
 
 	/*
 	 * Compute RTC epoch offset by subtracting monotonic time_base from RTC
