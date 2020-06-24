@@ -218,10 +218,10 @@ void generic_timer_cpu_block_until(uint64_t until_ns)
 
 	/* Record current ns and until_ticks for timer */
 	now_ns = ukplat_monotonic_clock();
-	until_ticks = generic_timer_get_ticks()
-				+ ns_to_ticks(until_ns - now_ns);
 
 	if (now_ns < until_ns) {
+		until_ticks = generic_timer_get_ticks()
+				+ ns_to_ticks(until_ns - now_ns);
 		generic_timer_update_compare(until_ticks);
 		generic_timer_enable();
 		generic_timer_unmask_irq();
