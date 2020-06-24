@@ -111,6 +111,7 @@
 .macro LEAVE_TRAP, el
 	/* Mask IRQ to make sure restore would not be interrupted by IRQ */
 	msr daifset, #2
+
 	/* Restore pstate and exception status register */
 	ldp x22, x23, [sp, #16 * 16]
 	msr spsr_el1, x22
@@ -126,6 +127,7 @@
 	ldp x24, x25, [sp, #16 * 12]
 	ldp x22, x23, [sp, #16 * 11]
 	ldp x20, x21, [sp, #16 * 10]
+	ldp x18, x19, [sp, #16 * 9]
 	ldp x16, x17, [sp, #16 * 8]
 	ldp x14, x15, [sp, #16 * 7]
 	ldp x12, x13, [sp, #16 * 6]
@@ -136,6 +138,7 @@
 	ldp x2, x3, [sp, #16 * 1]
 	ldp x0, x1, [sp, #16 * 0]
 
+	/* x18 can be used freely */
 .if \el == 0
 	/* Restore stack pointer for exception from EL0 */
 	ldr x18, [sp, #__SP_EL0_OFFSET]
@@ -146,9 +149,6 @@
 	mov sp, x18
 .endif
 	add sp, sp, #__TRAP_STACK_SIZE
-
-	/* Restore x18,x19 */
-	ldp x18, x19, [sp, #16 * 9]
 
 	eret
 .endm
