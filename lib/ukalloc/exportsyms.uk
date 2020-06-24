@@ -1,6 +1,5 @@
 uk_alloc_register
 uk_alloc_get_default
-uk_alloc_set_default
 uk_malloc_ifpages
 uk_free_ifpages
 uk_realloc_ifpages
@@ -10,3 +9,4 @@ uk_memalign_compat
 uk_realloc_compat
 uk_palloc_compat
 uk_pfree_compat
+_uk_alloc_head

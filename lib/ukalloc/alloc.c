@@ -57,14 +57,14 @@
 	(ALIGN_UP((unsigned long)(size), __PAGE_SIZE) / __PAGE_SIZE)
 #define page_off(x) ((unsigned long)(x) & (__PAGE_SIZE - 1))
 
-static struct uk_alloc *uk_alloc_head;
+struct uk_alloc *_uk_alloc_head;
 
 int uk_alloc_register(struct uk_alloc *a)
 {
-	struct uk_alloc *this = uk_alloc_head;
+	struct uk_alloc *this = _uk_alloc_head;
 
-	if (!uk_alloc_head) {
-		uk_alloc_head = a;
+	if (!_uk_alloc_head) {
+		_uk_alloc_head = a;
 		a->next = NULL;
 		return 0;
 	}
@@ -73,43 +73,6 @@ int uk_alloc_register(struct uk_alloc *a)
 		this = this->next;
 	this->next = a;
 	a->next = NULL;
-	return 0;
-}
-
-struct uk_alloc *uk_alloc_get_default(void)
-{
-	return uk_alloc_head;
-}
-
-int uk_alloc_set_default(struct uk_alloc *a)
-{
-	struct uk_alloc *head, *this, *prev;
-
-	head = uk_alloc_get_default();
-
-	if (a == head)
-		return 0;
-
-	if (!head) {
-		uk_alloc_head = a;
-		return 0;
-	}
-
-	this = head;
-	while (this->next) {
-		prev = this;
-		this = this->next;
-		if (a == this) {
-			prev->next = this->next;
-			this->next = head->next;
-			head = this;
-			return 0;
-		}
-	}
-
-	/* a is not registered yet. Add in front of the queue. */
-	a->next = head;
-	uk_alloc_head = a;
 	return 0;
 }
 
