@@ -143,7 +143,7 @@ static void *create_stack(struct uk_alloc *allocator)
 
 	if (uk_posix_memalign(allocator, &stack,
 			      STACK_SIZE, STACK_SIZE) != 0) {
-		uk_pr_err("Failed to allocate thread stack\n");
+		uk_pr_err("Failed to allocate thread stack: Not enough memory\n");
 		return NULL;
 	}
 
