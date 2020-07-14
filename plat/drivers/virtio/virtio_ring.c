@@ -366,7 +366,7 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 
 	UK_ASSERT(a);
 
-	vrq = uk_malloc(a, sizeof(struct virtqueue) +
+	vrq = uk_malloc(a, sizeof(*vrq) +
 			nr_descs * sizeof(struct virtqueue_desc_info));
 	if (!vrq) {
 		uk_pr_err("Allocation of virtqueue failed\n");
