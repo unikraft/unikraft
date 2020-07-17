@@ -40,7 +40,7 @@
 #include <sys/resource.h>
 #include <uk/process.h>
 #include <uk/print.h>
-
+#include <uk/syscall.h>
 
 int fork(void)
 {
@@ -215,12 +215,12 @@ pid_t wait4(pid_t pid __unused, int *wstatus __unused, int options __unused,
 	return -1;
 }
 
-int getpid(void)
+UK_SYSCALL_R_DEFINE(int, getpid)
 {
 	return UNIKRAFT_PID;
 }
 
-pid_t getppid(void)
+UK_SYSCALL_R_DEFINE(pid_t, getppid)
 {
 	return UNIKRAFT_PPID;
 }
