@@ -1346,7 +1346,7 @@ UK_TRACEPOINT(trace_vfs_getcwd, "%p %d", char*, size_t);
 UK_TRACEPOINT(trace_vfs_getcwd_ret, "\"%s\"", const char*);
 UK_TRACEPOINT(trace_vfs_getcwd_err, "%d", int);
 
-char *getcwd(char *path, size_t size)
+UK_SYSCALL_DEFINE(char*, getcwd, char*, path, size_t, size)
 {
 	trace_vfs_getcwd(path, size);
 	struct task *t = main_task;

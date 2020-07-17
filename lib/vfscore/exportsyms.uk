@@ -63,6 +63,8 @@ uk_syscall_e_link
 uk_syscall_r_link
 unlink
 getcwd
+uk_syscall_e_getcwd
+uk_syscall_r_getcwd
 chown
 chroot
 chdir
