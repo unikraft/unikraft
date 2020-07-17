@@ -37,6 +37,7 @@
 #include <sys/mman.h>
 #include <uk/alloc.h>
 #include <string.h>
+#include <uk/syscall.h>
 
 struct mmap_addr {
 	void *begin;
@@ -64,8 +65,8 @@ static struct mmap_addr *mmap_addr;
  *
  */
 
-void *mmap(void *addr, size_t len, int prot,
-		int flags, int fildes, off_t off)
+UK_SYSCALL_DEFINE(void*, mmap, void*, addr, size_t, len, int, prot,
+		int, flags, int, fildes, off_t, off)
 {
 	struct mmap_addr *tmp = mmap_addr, *last = NULL, *new = NULL;
 
@@ -125,7 +126,7 @@ void *mmap(void *addr, size_t len, int prot,
  * Otherwise the initial memory block is replaced by a smaller one.
  */
 
-int munmap(void *addr, size_t len)
+UK_SYSCALL_DEFINE(int, munmap, void*, addr, size_t, len)
 {
 	struct mmap_addr *tmp = mmap_addr, *prev = NULL;
 	size_t remain_mem;
