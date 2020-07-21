@@ -65,6 +65,10 @@
 extern "C" {
 #endif
 
+#ifndef CONFIG_UK_NETDEV_SCRATCH_SIZE
+#define CONFIG_UK_NETDEV_SCRATCH_SIZE 0
+#endif /* CONFIG_UK_NETDEV_SCRATCH_SIZE */
+
 struct uk_netdev;
 UK_TAILQ_HEAD(uk_netdev_list, struct uk_netdev);
 
@@ -409,6 +413,10 @@ struct uk_netdev {
 
 	/** Netdevice address configuration */
 	struct uk_netdev_einfo *_einfo;
+
+#if (CONFIG_UK_NETDEV_SCRATCH_SIZE > 0)
+	char scratch_pad[CONFIG_UK_NETDEV_SCRATCH_SIZE];
+#endif /* CONFIG_UK_NETDEV_SCRATCH_SIZE */
 };
 
 #ifdef __cplusplus

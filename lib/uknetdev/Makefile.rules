@@ -1,0 +1,17 @@
+UK_SCRATCH_MEM=0
+UK_SCRATCH_RULE_SET=
+
+uk_scratch_mem_set: $$(eval CFLAGS-y+=-DCONFIG_UK_NETDEV_SCRATCH_SIZE=$$(UK_SCRATCH_MEM))
+	@:;
+
+.PHONY : uk_scratch_mem_set
+
+
+## reserve memory for the network stack
+## uknetdev_scratch_mem,bytes_of_memory
+define uknetdev_scratch_mem =
+$(if $(strip $(1)),\
+	$(if $(shell test $(1) -gt $(UK_SCRATCH_MEM) && echo "scratch mem set"), $(eval UK_SCRATCH_MEM:=$(1))))
+
+$(if $(strip $(UK_SCRATCH_RULE_SET)),,$(eval UK_SCRATCH_RULE_SET:=1) $(eval UK_PREPARE-$(CONFIG_LIBUKNETDEV)+=uk_scratch_mem_set))
+endef
