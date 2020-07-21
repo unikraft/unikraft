@@ -77,6 +77,17 @@ UK_TAILQ_HEAD(uk_netdev_list, struct uk_netdev);
  */
 #define UK_NETDEV_HWADDR_LEN 6 /**< Length of Ethernet address. */
 
+/**
+ * The netdevice support rx/tx interrupt.
+ */
+#define UK_FEATURE_RXQ_INTR_BIT		    0
+#define UK_FEATURE_RXQ_INTR_AVAILABLE  (1UL << UK_FEATURE_RXQ_INTR_BIT)
+#define UK_FEATURE_TXQ_INTR_BIT		    1
+#define UK_FEATURE_TXQ_INTR_AVAILABLE  (1UL << UK_FEATURE_TXQ_INTR_BIT)
+
+#define uk_netdev_rxintr_supported(feature)	\
+	(feature & (UK_FEATURE_RXQ_INTR_AVAILABLE))
+
 struct uk_hwaddr {
 	uint8_t addr_bytes[UK_NETDEV_HWADDR_LEN];
 } __packed;
@@ -91,6 +102,7 @@ struct uk_netdev_info {
 	uint16_t max_mtu;   /**< Maximum supported MTU size. */
 	uint16_t nb_encap_tx;  /**< Number of bytes required as headroom for tx. */
 	uint16_t nb_encap_rx;  /**< Number of bytes required as headroom for rx. */
+	uint32_t features; /**< bitmap of the features supported */
 };
 
 /**
