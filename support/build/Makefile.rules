@@ -392,17 +392,17 @@ endef
 define buildrule_S_ =
 $(4): $(2) | prepare
 	$(call build_cmd_fixdep,AS,$(1),$(4),\
-		$(AS)  $(COMPFLAGS) $(COMPFLAGS-y) \
-		       $($(call vprefix_lib,$(1),COMPFLAGS)) $($(call vprefix_lib,$(1),COMPFLAGS-y)) \
-		       $(ASINCLUDES) $(ASINCLUDES-y) \
-		       $($(call vprefix_lib,$(1),ASINCLUDES)) $($(call vprefix_lib,$(1),ASINCLUDES-y)) \
-		       $($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
-		       $($(call vprefix_glb,$(3),ARCHFLAGS)) $($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
-		       $(ASFLAGS) $(ASFLAGS-y) \
-		       $($(call vprefix_lib,$(1),ASFLAGS)) $($(call vprefix_lib,$(1),ASFLAGS-y)) \
-		       $($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
+		$(AS)  $$(COMPFLAGS) $$(COMPFLAGS-y) \
+		       $$($(call vprefix_lib,$(1),COMPFLAGS)) $$($(call vprefix_lib,$(1),COMPFLAGS-y)) \
+		       $$(ASINCLUDES) $$(ASINCLUDES-y) \
+		       $$($(call vprefix_lib,$(1),ASINCLUDES)) $$($(call vprefix_lib,$(1),ASINCLUDES-y)) \
+		       $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
+		       $$($(call vprefix_glb,$(3),ARCHFLAGS)) $$($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
+		       $$(ASFLAGS) $$(ASFLAGS-y) \
+		       $$($(call vprefix_lib,$(1),ASFLAGS)) $$($(call vprefix_lib,$(1),ASFLAGS-y)) \
+		       $$($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $$($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
 		       $(5) \
-		       $(DBGFLAGS) $(DBGFLAGS-y) \
+		       $$(DBGFLAGS) $$(DBGFLAGS-y) \
 		       -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) $(if $(3),-D__VARIANT__=$(3)) \
 		       -c $(2) -o $(4) $(call depflags,$(4))
 	)
@@ -419,17 +419,17 @@ buildrule_sx = $(call buildrule_S_,$(1),$(2),$(3),$(4))
 define buildrule_s =
 $(4): $(2) | prepare
 	$(call build_cmd,AS,$(1),$(4),\
-		$(AS)  $(COMPFLAGS) $(COMPFLAGS-y) \
-		       $($(call vprefix_lib,$(1),COMPFLAGS)) $($(call vprefix_lib,$(1),COMPFLAGS-y)) \
-		       $(ASINCLUDES) $(ASINCLUDES-y) \
-		       $($(call vprefix_lib,$(1),ASINCLUDES)) $($(call vprefix_lib,$(1),ASINCLUDES-y)) \
-		       $($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
-		       $($(call vprefix_glb,$(3),ARCHFLAGS)) $($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
-		       $(ASFLAGS) $(ASFLAGS-y) \
-		       $($(call vprefix_lib,$(1),ASFLAGS)) $($(call vprefix_lib,$(1),ASFLAGS-y)) \
-		       $($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
+		$(AS)  $$(COMPFLAGS) $$(COMPFLAGS-y) \
+		       $$($(call vprefix_lib,$(1),COMPFLAGS)) $$($(call vprefix_lib,$(1),COMPFLAGS-y)) \
+		       $$(ASINCLUDES) $$(ASINCLUDES-y) \
+		       $$($(call vprefix_lib,$(1),ASINCLUDES)) $$($(call vprefix_lib,$(1),ASINCLUDES-y)) \
+		       $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
+		       $$($(call vprefix_glb,$(3),ARCHFLAGS)) $$($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
+		       $$(ASFLAGS) $$(ASFLAGS-y) \
+		       $$($(call vprefix_lib,$(1),ASFLAGS)) $$($(call vprefix_lib,$(1),ASFLAGS-y)) \
+		       $$($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $$($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
 		       $(5) \
-		       $(DBGFLAGS) $(DBGFLAGS-y) \
+		       $$(DBGFLAGS) $$(DBGFLAGS-y) \
 		       -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) $(if $(3),-D__VARIANT__=$(3)) \
 		       -c $(2) -o $(4)
 	)
@@ -444,17 +444,17 @@ endef
 define buildrule_c =
 $(4): $(2) | prepare
 	$(call build_cmd_fixdep,CC,$(1),$(4),\
-		$(CC)  $(COMPFLAGS) $(COMPFLAGS-y) \
-		       $($(call vprefix_lib,$(1),COMPFLAGS)) $($(call vprefix_lib,$(1),COMPFLAGS-y)) \
-		       $(CINCLUDES) $(CINCLUDES-y) \
-		       $($(call vprefix_lib,$(1),CINCLUDES)) $($(call vprefix_lib,$(1),CINCLUDES-y)) \
-		       $($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
-		       $($(call vprefix_glb,$(3),ARCHFLAGS)) $($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
-		       $(CFLAGS) $(CFLAGS-y) \
-		       $($(call vprefix_lib,$(1),CFLAGS)) $($(call vprefix_lib,$(1),CFLAGS-y)) \
-		       $($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
+		$(CC)  $$(COMPFLAGS) $$(COMPFLAGS-y) \
+		       $$($(call vprefix_lib,$(1),COMPFLAGS)) $$($(call vprefix_lib,$(1),COMPFLAGS-y)) \
+		       $$(CINCLUDES) $$(CINCLUDES-y) \
+		       $$($(call vprefix_lib,$(1),CINCLUDES)) $$($(call vprefix_lib,$(1),CINCLUDES-y)) \
+		       $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
+		       $$($(call vprefix_glb,$(3),ARCHFLAGS)) $$($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
+		       $$(CFLAGS) $$(CFLAGS-y) \
+		       $$($(call vprefix_lib,$(1),CFLAGS)) $$($(call vprefix_lib,$(1),CFLAGS-y)) \
+		       $$($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $$($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
 		       $(5) \
-		       $(DBGFLAGS) $(DBGFLAGS-y) \
+		       $$(DBGFLAGS) $$(DBGFLAGS-y) \
 		       -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) $(if $(3),-D__VARIANT__=$(3)) \
 		       -c $(2) -o $(4) $(call depflags,$(4))
 )
@@ -469,16 +469,16 @@ endef
 define buildrule_cxx =
 $(4): $(2) | prepare
 	$(call build_cmd_fixdep,CXX,$(1),$(4),\
-		$(CXX) $(COMPFLAGS) $(COMPFLAGS-y) \
-		       $(CXXINCLUDES) $(CXXINCLUDES-y) \
-		       $($(call vprefix_lib,$(1),CXXINCLUDES)) $($(call vprefix_lib,$(1),CXXINCLUDES-y)) \
-		       $($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
-		       $($(call vprefix_glb,$(3),ARCHFLAGS)) $($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
-		       $(CXXFLAGS) $(CXXFLAGS-y) \
-		       $($(call vprefix_lib,$(1),CXXFLAGS)) $($(call vprefix_lib,$(1),CXXFLAGS-y)) \
-		       $($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
+		$(CXX) $$(COMPFLAGS) $$(COMPFLAGS-y) \
+		       $$(CXXINCLUDES) $$(CXXINCLUDES-y) \
+		       $$($(call vprefix_lib,$(1),CXXINCLUDES)) $$($(call vprefix_lib,$(1),CXXINCLUDES-y)) \
+		       $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
+		       $$($(call vprefix_glb,$(3),ARCHFLAGS)) $$($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
+		       $$(CXXFLAGS) $$(CXXFLAGS-y) \
+		       $$($(call vprefix_lib,$(1),CXXFLAGS)) $$($(call vprefix_lib,$(1),CXXFLAGS-y)) \
+		       $$($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $$($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
 		       $(5) \
-		       $(DBGFLAGS) $(DBGFLAGS-y) \
+		       $$(DBGFLAGS) $$(DBGFLAGS-y) \
 		       -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) $(if $(3),-D__VARIANT__=$(3)) \
 		       -c $(2) -o $(4) $(call depflags,$(4))
 	)
@@ -501,16 +501,16 @@ buildrule_c$(plus)$(plus) = $(call buildrule_cxx,$(1),$(2),$(3),$(4))
 define buildrule_go =
 $(4): $(2) | prepare
 	$(call build_cmd,GOC,$(1),$(4),\
-		$(GOC) $(COMPFLAGS) $(COMPFLAGS-y) \
-		       $(GOCINCLUDES) $(GOCINCLUDES-y) \
-		       $($(call vprefix_lib,$(1),GOCINCLUDES)) $($(call vprefix_lib,$(1),GOCINCLUDES-y)) \
-		       $($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
-		       $($(call vprefix_glb,$(3),ARCHFLAGS)) $($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
-		       $(GOCFLAGS) $(GOCFLAGS-y) \
-		       $($(call vprefix_lib,$(1),GOCFLAGS)) $($(call vprefix_lib,$(1),GOCFLAGS-y)) \
-		       $($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
+		$(GOC) $$(COMPFLAGS) $$(COMPFLAGS-y) \
+		       $$(GOCINCLUDES) $$(GOCINCLUDES-y) \
+		       $$($(call vprefix_lib,$(1),GOCINCLUDES)) $$($(call vprefix_lib,$(1),GOCINCLUDES-y)) \
+		       $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
+		       $$($(call vprefix_glb,$(3),ARCHFLAGS)) $$($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
+		       $$(GOCFLAGS) $$(GOCFLAGS-y) \
+		       $$($(call vprefix_lib,$(1),GOCFLAGS)) $$($(call vprefix_lib,$(1),GOCFLAGS-y)) \
+		       $$($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $$($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
 		       $(5) \
-		       $(DBGFLAGS) $(DBGFLAGS-y) \
+		       $$(DBGFLAGS) $$(DBGFLAGS-y) \
 		       -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) $(if $(3),-D__VARIANT__=$(3)) \
 		       -c $(2) -o $(4) $(call depflags,$(4))
 	)
@@ -533,14 +533,14 @@ endef
 define buildrule_S_lds =
 $(4): $(2) | prepare
 	$(call build_cmd_fixdep,LDS,$(1),$(4),\
-		$(AS)  -E -P -x assembler-with-cpp $(COMPFLAGS) $(COMPFLAGS-y) \
-		       $(ASINCLUDES) $(ASINCLUDES-y) \
-		       $($(call vprefix_lib,$(1),ASINCLUDES)) $($(call vprefix_lib,$(1),ASINCLUDES-y)) \
-		       $($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
-		       $(ARCHFLAGS) $(ARCHFLAGS-y) \
-		       $(ASFLAGS) $(ASFLAGS-y) \
-		       $($(call vprefix_lib,$(1),ASFLAGS)) $($(call vprefix_lib,$(1),ASFLAGS-y)) \
-		       $($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
+		$(AS)  -E -P -x assembler-with-cpp $$(COMPFLAGS) $$(COMPFLAGS-y) \
+		       $$(ASINCLUDES) $$(ASINCLUDES-y) \
+		       $$($(call vprefix_lib,$(1),ASINCLUDES)) $$($(call vprefix_lib,$(1),ASINCLUDES-y)) \
+		       $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
+		       $$(ARCHFLAGS) $$(ARCHFLAGS-y) \
+		       $$(ASFLAGS) $$(ASFLAGS-y) \
+		       $$($(call vprefix_lib,$(1),ASFLAGS)) $$($(call vprefix_lib,$(1),ASFLAGS-y)) \
+		       $$($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $$($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
 		       $(5) \
 		       $(2) -o $(4) $(call depflags,$(4))
 	)

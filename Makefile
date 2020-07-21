@@ -40,6 +40,9 @@ all:
 # Disable built-in rules
 .SUFFIXES:
 
+# Enable secondary expansion
+.SECONDEXPANSION:
+
 # Save running make version
 RUNNING_MAKE_VERSION := $(MAKE_VERSION)
 
