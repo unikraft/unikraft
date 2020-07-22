@@ -430,10 +430,27 @@ err_exit:
 
 static int tap_netdev_start(struct uk_netdev *n)
 {
-	int rc = -EINVAL;
+	int rc = 0;
+	struct tap_net_dev *tdev = NULL;
+	struct uk_ifreq ifrq = {0};
 
 	UK_ASSERT(n);
-	return rc;
+	tdev = to_tapnetdev(n);
+	/* Set the name of the device */
+	snprintf(ifrq.ifr_name, sizeof(ifrq.ifr_name), "%s", tdev->name);
+
+	ifrq.ifr_flags = UK_IFF_UP | UK_IFF_PROMISC;
+
+	/* Set the status of the device */
+	rc = tap_netif_configure(tdev->ctrl_sock, UK_SIOCSIFFLAGS, &ifrq);
+	if (rc < 0) {
+		uk_pr_err(DRIVER_NAME": Failed(%d) to set the flags of if: %s\n",
+			  rc, tdev->name);
+		return rc;
+	}
+	tdev->promisc = 1;
+
+	return 0;
 }
 
 static void tap_netdev_info_get(struct uk_netdev *dev __unused,

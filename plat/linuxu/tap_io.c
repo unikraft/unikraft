@@ -64,8 +64,20 @@ int tap_netif_configure(int fd, __u32 request, void *arg)
 {
 	int rc;
 	struct uk_ifreq *usr_ifr = (struct uk_ifreq *) arg;
+	struct uk_ifreq ifr = {0};
 
 	switch (request) {
+	case UK_SIOCSIFFLAGS:
+		snprintf(ifr.ifr_name, IFNAMSIZ, "%s", usr_ifr->ifr_name);
+		rc = sys_ioctl(fd, UK_SIOCGIFFLAGS, &ifr);
+		/* fetch current flags to leave other flags untouched */
+		if (rc < 0) {
+			uk_pr_err("Failed to read flags %d\n", rc);
+			goto exit_error;
+		}
+		usr_ifr->ifr_flags |= ifr.ifr_flags;
+		break;
+	case UK_SIOCGIFFLAGS:
 	case UK_SIOCGIFINDEX:
 	case UK_SIOCGIFHWADDR:
 	case UK_SIOCSIFHWADDR:
