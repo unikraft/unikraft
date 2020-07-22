@@ -47,6 +47,7 @@
 #define __SC_RT_SIGPROCMASK 14
 #define __SC_IOCTL  16
 #define __SC_EXIT   60
+#define __SC_FCNTL  72
 #define __SC_ARCH_PRCTL       158
 #define __SC_TIMER_CREATE     222
 #define __SC_TIMER_SETTIME    223
@@ -55,6 +56,11 @@
 #define __SC_TIMER_DELETE     226
 #define __SC_CLOCK_GETTIME    228
 #define __SC_PSELECT6 270
+
+
+#ifndef O_TMPFILE
+#define O_TMPFILE 020200000
+#endif
 
 /* NOTE: from linux-4.6.3 (arch/x86/entry/entry_64.S):
  *

@@ -31,6 +31,7 @@
  *
  */
 #include <errno.h>
+#include <stdio.h>
 #include <string.h>
 #include <uk/alloc.h>
 #include <uk/arch/types.h>
@@ -42,6 +43,17 @@
 #include <uk/bus.h>
 #include <tap/tap.h>
 
+/**
+ * The tap driver is supported only on the linuxu platform. Since the driver is
+ * part of the common codebase we add compiler guard to not include the tap
+ * driver from other platforms.
+ */
+#ifdef CONFIG_PLAT_LINUXU
+#include <linuxu/tap.h>
+#else
+#error "The driver is supported on linuxu platform"
+#endif /* CONFIG_PLAT_LINUXU */
+
 #define DRIVER_NAME             "tap-net"
 
 #define ETH_PKT_PAYLOAD_LEN       1500
@@ -50,18 +62,41 @@
  * TODO: Find a better way of forwarding the command line argument to the
  * driver. For now they are defined as macros from this driver.
  */
+
+#define to_tapnetdev(dev) \
+		__containerof(dev, struct tap_net_dev, ndev)
+
+struct uk_netdev_tx_queue {
+	/* tx queue identifier */
+	int queue_id;
+};
+
+struct uk_netdev_rx_queue {
+	/* rx queue identifier */
+	int queue_id;
+};
+
 struct tap_net_dev {
 	/* Net device structure */
 	struct uk_netdev    ndev;
 	/* max number of queues */
 	__u16 max_qpairs;
 	/* Number of rxq configured */
+	__u16 rxq_cnt;
+	/* List of rx queues */
+	UK_TAILQ_HEAD(tap_rxqs, struct uk_netdev_rx_queue) rxqs;
+	/* Number of txq configured */
+	__u16 txq_cnt;
+	/* List of tx queues */
+	UK_TAILQ_HEAD(tap_txqs, struct uk_netdev_tx_queue) txqs;
 	/* The list of the tap device */
 	UK_TAILQ_ENTRY(struct tap_net_dev) next;
 	/* Tap Device identifier */
 	__u16 tid;
 	/* UK Netdevice identifier */
 	__u16 id;
+	/* File Descriptor for the tap device */
+	int tap_fd;
 	/* Name of the character device */
 	char name[IFNAMSIZ];
 	/* MTU of the device */
@@ -133,6 +168,7 @@ static int tap_netdev_rxq_info_get(struct uk_netdev *dev, __u16 queue_id,
 				   struct uk_netdev_queue_info *qinfo);
 static int tap_netdev_txq_info_get(struct uk_netdev *dev, __u16 queue_id,
 				   struct uk_netdev_queue_info *qinfo);
+static int tap_device_create(struct tap_net_dev *tdev, __u32 feature_flags);
 
 /**
  * Local function definitions
@@ -216,6 +252,10 @@ static void tap_netdev_info_get(struct uk_netdev *dev __unused,
 				struct uk_netdev_info *dev_info)
 {
 	UK_ASSERT(dev_info);
+	dev_info->max_rx_queues = 1;
+	dev_info->max_tx_queues = 1;
+	dev_info->nb_encap_tx = 0;
+	dev_info->nb_encap_rx = 0;
 }
 
 static unsigned int tap_netdev_promisc_get(struct uk_netdev *n)
@@ -259,10 +299,73 @@ static int tap_netdev_mac_set(struct uk_netdev *n,
 static int tap_netdev_configure(struct uk_netdev *n,
 				const struct uk_netdev_conf *conf)
 {
-	int rc = -EINVAL;
+	int rc = 0;
+	struct tap_net_dev *tdev = NULL;
+	__u32 feature_flag = 0;
 
 	UK_ASSERT(n && conf);
+	tdev = to_tapnetdev(n);
+
+	if (conf->nb_rx_queues > tdev->max_qpairs
+	    || conf->nb_tx_queues > tdev->max_qpairs) {
+		uk_pr_err(DRIVER_NAME": rx-queue:%d, tx-queue:%d not supported",
+			  conf->nb_rx_queues, conf->nb_tx_queues);
+		return -ENOTSUP;
+	} else if (conf->nb_rx_queues > 1 || conf->nb_tx_queues > 1)
+		/**
+		 * TODO:
+		 * We don't support multi-queues on the uknetdev. Might need to
+		 * revisit this when implementing multi-queue support on
+		 * uknetdev
+		 */
+		feature_flag |= UK_IFF_MULTI_QUEUE;
+
+	/* Open the device and configure the tap interface */
+	rc = tap_device_create(tdev, feature_flag);
+	if (rc < 0) {
+		uk_pr_err(DRIVER_NAME": Failed to configure the tap device\n");
+		goto exit;
+	}
+
+	/* Initialize tx/rx queues list */
+	UK_TAILQ_INIT(&tdev->rxqs);
+	tdev->rxq_cnt = 0;
+	UK_TAILQ_INIT(&tdev->txqs);
+	tdev->txq_cnt = 0;
+exit:
 	return rc;
+}
+
+static int tap_device_create(struct tap_net_dev *tdev, __u32 feature_flags)
+{
+	int rc = 0;
+	struct uk_ifreq ifreq = {0};
+
+	/* Open the tap device */
+	rc = tap_open(O_RDWR | O_NONBLOCK);
+	if (rc < 0) {
+		uk_pr_err(DRIVER_NAME": Failed(%d) to open the tap device\n",
+			  rc);
+		return rc;
+	}
+
+	tdev->tap_fd = rc;
+
+	rc = tap_dev_configure(tdev->tap_fd, feature_flags, &ifreq);
+	if (rc < 0) {
+		uk_pr_err(DRIVER_NAME": Failed to setup the tap device\n");
+		goto close_tap;
+	}
+
+	snprintf(tdev->name, sizeof(tdev->name), "%s", ifreq.ifr_name);
+	uk_pr_info(DRIVER_NAME": Configured tap device %s\n", tdev->name);
+
+exit:
+	return rc;
+close_tap:
+	tap_close(tdev->tap_fd);
+	tdev->tap_fd = -1;
+	goto exit;
 }
 
 static const struct uk_netdev_ops tap_netdev_ops = {

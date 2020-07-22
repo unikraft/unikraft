@@ -28,20 +28,39 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
+ *
  */
-#ifndef __PLAT_DRV_TAP_H
-#define __PLAT_DRV_TAP_H
 
+#include <errno.h>
+#include <stdio.h>
+#include <uk/print.h>
 #include <uk/arch/types.h>
+#include <linuxu/tap.h>
 
-/**
- * Using the musl as reference for the data structure definition
- * Commit-id: 39ef612aa193
- */
-#define IFNAMSIZ        16
+int tap_open(__u32 flags)
+{
+	int rc = 0;
 
-int tap_open(__u32 flags);
-int tap_close(int fd);
-int tap_dev_configure(int fd, __u32 feature_flags, void *arg);
+	rc = sys_open(TAPDEV_PATH, flags);
+	if (rc < 0)
+		uk_pr_err("Error in opening the tap device\n");
+	return rc;
+}
 
-#endif /* __PLAT_DRV_TAP_H */
+int tap_dev_configure(int fd, __u32 feature_flags, void *arg)
+{
+	int rc = 0;
+	struct uk_ifreq *ifreq = (struct uk_ifreq *) arg;
+
+	/* Set the tap device configuration */
+	ifreq->ifr_flags = UK_IFF_TAP | UK_IFF_NO_PI | feature_flags;
+	if ((rc = sys_ioctl(fd, UK_TUNSETIFF, ifreq)) < 0)
+		uk_pr_err("Failed(%d) to configure the tap device\n", rc);
+
+	return rc;
+}
+
+int tap_close(int fd)
+{
+	return sys_close(fd);
+}
