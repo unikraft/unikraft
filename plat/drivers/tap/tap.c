@@ -327,15 +327,37 @@ static unsigned int tap_netdev_promisc_get(struct uk_netdev *n)
 
 static __u16 tap_netdev_mtu_get(struct uk_netdev *n)
 {
+	int rc = 0;
+	struct tap_net_dev *tdev;
+	struct uk_ifreq ifrq = {0};
+
 	UK_ASSERT(n);
-	return 0;
+	tdev = to_tapnetdev(n);
+	snprintf(ifrq.ifr_name, sizeof(ifrq.ifr_name), "%s", tdev->name);
+
+	rc = tap_netif_configure(tdev->ctrl_sock, UK_SIOCGIFMTU, &ifrq);
+	if (rc < 0) {
+		uk_pr_err(DRIVER_NAME": Failed(%d) to get the mtu\n", rc);
+		return rc;
+	}
+
+	return ifrq.ifr_mtu;
 }
 
-static int tap_netdev_mtu_set(struct uk_netdev *n,  __u16 mtu __unused)
+static int tap_netdev_mtu_set(struct uk_netdev *n,  __u16 mtu)
 {
-	int rc = -EINVAL;
+	int rc = 0;
+	struct tap_net_dev *tdev;
+	struct uk_ifreq ifrq = {0};
 
 	UK_ASSERT(n);
+	tdev = to_tapnetdev(n);
+	snprintf(ifrq.ifr_name, sizeof(ifrq.ifr_name), "%s", tdev->name);
+
+	ifrq.ifr_mtu = mtu;
+	rc = tap_netif_configure(tdev->ctrl_sock, UK_SIOCSIFMTU, &ifrq);
+	if (rc < 0)
+		uk_pr_err(DRIVER_NAME": Failed(%d) to set the mtu\n", rc);
 
 	return rc;
 }

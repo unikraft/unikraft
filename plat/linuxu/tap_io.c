@@ -69,6 +69,8 @@ int tap_netif_configure(int fd, __u32 request, void *arg)
 	case UK_SIOCGIFINDEX:
 	case UK_SIOCGIFHWADDR:
 	case UK_SIOCSIFHWADDR:
+	case UK_SIOCSIFMTU:
+	case UK_SIOCGIFMTU:
 	case UK_SIOCBRADDIF:
 		break;
 	default:
