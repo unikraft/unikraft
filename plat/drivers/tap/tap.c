@@ -91,12 +91,16 @@ struct tap_net_dev {
 	UK_TAILQ_HEAD(tap_txqs, struct uk_netdev_tx_queue) txqs;
 	/* The list of the tap device */
 	UK_TAILQ_ENTRY(struct tap_net_dev) next;
+	/* Mac address of the device */
+	struct uk_hwaddr hw_addr;
 	/* Tap Device identifier */
 	__u16 tid;
 	/* UK Netdevice identifier */
 	__u16 id;
 	/* File Descriptor for the tap device */
 	int tap_fd;
+	/* Control socket descriptor */
+	int ctrl_sock;
 	/* Name of the character device */
 	char name[IFNAMSIZ];
 	/* MTU of the device */
@@ -169,6 +173,7 @@ static int tap_netdev_rxq_info_get(struct uk_netdev *dev, __u16 queue_id,
 static int tap_netdev_txq_info_get(struct uk_netdev *dev, __u16 queue_id,
 				   struct uk_netdev_queue_info *qinfo);
 static int tap_device_create(struct tap_net_dev *tdev, __u32 feature_flags);
+static int tap_mac_generate(__u8 *addr, __u8 dev_id);
 
 /**
  * Local function definitions
@@ -284,16 +289,74 @@ static int tap_netdev_mtu_set(struct uk_netdev *n,  __u16 mtu __unused)
 
 static const struct uk_hwaddr *tap_netdev_mac_get(struct uk_netdev *n)
 {
+	struct tap_net_dev *tdev;
+
 	UK_ASSERT(n);
-	return NULL;
+	tdev = to_tapnetdev(n);
+	return &tdev->hw_addr;
 }
 
 static int tap_netdev_mac_set(struct uk_netdev *n,
 			      const struct uk_hwaddr *hwaddr)
 {
-	int rc = -EINVAL;
+	int rc = 0;
+	struct tap_net_dev *tdev;
+	struct uk_ifreq ifrq = {0};
 
 	UK_ASSERT(n && hwaddr);
+	tdev = to_tapnetdev(n);
+
+	snprintf(ifrq.ifr_name, sizeof(ifrq.ifr_name), "%s", tdev->name);
+	uk_pr_info("Setting mac address on tap device %s\n", tdev->name);
+
+#ifdef CONFIG_TAP_DEV_DEBUG
+	int  i;
+
+	for (i = 0; i < UK_NETDEV_HWADDR_LEN; i++) {
+		uk_pr_debug("hw_address: %d - %d\n", i,
+			    hwaddr->addr_bytes[i] & 0xFF);
+	}
+#endif /* CONFIG_TAP_DEV_DEBUG */
+
+	ifrq.ifr_hwaddr.sa_family = AF_LOCAL;
+	memcpy(&ifrq.ifr_hwaddr.sa_data[0], &hwaddr->addr_bytes[0],
+		UK_NETDEV_HWADDR_LEN);
+	rc = tap_netif_configure(tdev->ctrl_sock, UK_SIOCSIFHWADDR, &ifrq);
+	if (rc < 0) {
+		uk_pr_err(DRIVER_NAME": Failed(%d) to set the hardware address\n",
+			  rc);
+		goto exit;
+	}
+	memcpy(&tdev->hw_addr, hwaddr, sizeof(*hwaddr));
+
+exit:
+	return rc;
+}
+
+static int tap_mac_generate(__u8 *addr, __u8 dev_id)
+{
+	const char fmt[] = {0x2, 0x0, 0x0, 0x0, 0x0, 0x0};
+
+	UK_ASSERT(addr);
+
+	memcpy(addr, fmt, UK_NETDEV_HWADDR_LEN - 1);
+	*(addr + UK_NETDEV_HWADDR_LEN - 1) = (__u8) (dev_id + 1);
+	return 0;
+}
+
+static inline int tapdev_ctrlsock_create(struct tap_net_dev *tdev)
+{
+	int rc = 0;
+
+	rc = tap_netif_create();
+	if (rc < 0) {
+		uk_pr_err(DRIVER_NAME":Failed(%d) to create a control socket\n",
+			  rc);
+		goto exit;
+	}
+	tdev->ctrl_sock = rc;
+	rc = 0;
+exit:
 	return rc;
 }
 
@@ -328,13 +391,37 @@ static int tap_netdev_configure(struct uk_netdev *n,
 		goto exit;
 	}
 
-	/* Initialize tx/rx queues list */
+	/* Create a control socket for the network interface */
+	rc = tapdev_ctrlsock_create(tdev);
+	if (rc != 0) {
+		uk_pr_err(DRIVER_NAME": Failed to create a control socket\n");
+		goto close_tap_dev;
+	}
+
+	/* Generate MAC address */
+	tap_mac_generate(&tdev->hw_addr.addr_bytes[0],
+			 tdev->id);
+
+	/* MAC Address configuration */
+	rc = tap_netdev_mac_set(n, &tdev->hw_addr);
+	if (rc < 0) {
+		uk_pr_err(DRIVER_NAME": Failed to set the mac address\n");
+		goto close_ctrl_sock;
+	}
+
+	/* Initialize the tx/rx queues */
 	UK_TAILQ_INIT(&tdev->rxqs);
 	tdev->rxq_cnt = 0;
 	UK_TAILQ_INIT(&tdev->txqs);
 	tdev->txq_cnt = 0;
 exit:
 	return rc;
+
+close_ctrl_sock:
+	tap_close(tdev->ctrl_sock);
+close_tap_dev:
+	tap_close(tdev->tap_fd);
+	goto exit;
 }
 
 static int tap_device_create(struct tap_net_dev *tdev, __u32 feature_flags)

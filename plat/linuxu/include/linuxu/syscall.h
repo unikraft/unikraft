@@ -146,6 +146,31 @@ static inline int sys_close(int fd)
 				  (long) fd);
 }
 
+#ifndef SOCK_STREAM
+#define SOCK_STREAM    1
+#endif /* SOCK_STREAM */
+#ifndef SOCK_DGRAM
+#define SOCK_DGRAM     2
+#endif /* SOCK_DGRAM */
+
+#ifndef SOCK_RAW
+#define SOCK_RAW       3
+#endif /* SOCK_RAW */
+
+#ifndef AF_LOCAL
+#define AF_LOCAL       1
+#endif /* AF_LOCAL */
+#ifndef AF_INET
+#define AF_INET        2
+#endif /* AF_INET */
+static inline int sys_socket(int domain, int type, int protocol)
+{
+	return (ssize_t) syscall3(__SC_SOCKET,
+				  (long) domain,
+				  (long) type,
+				  (long) protocol);
+}
+
 static inline int sys_exit(int status)
 {
 	return (int) syscall1(__SC_EXIT,
