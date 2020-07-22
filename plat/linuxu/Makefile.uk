@@ -7,6 +7,7 @@ $(eval $(call addplat_s,linuxu,$(CONFIG_PLAT_LINUXU)))
 ## Linux user platform library registration
 ##
 $(eval $(call addplatlib,linuxu,liblinuxuplat))
+$(eval $(call addplatlib_s,linuxu,liblinuxutapnet,$(CONFIG_TAP_NET)))
 
 ## Adding libparam for the linuxu platform
 $(eval $(call addlib_paramprefix,liblinuxuplat,linuxu))
@@ -46,3 +47,10 @@ LIBLINUXUPLAT_SRCS-$(CONFIG_ARCH_X86_64) += \
 			$(LIBLINUXUPLAT_BASE)/x86/link64.lds.S
 LIBLINUXUPLAT_SRCS-$(CONFIG_ARCH_ARM_32) += \
 			$(LIBLINUXUPLAT_BASE)/arm/link.lds.S
+
+##
+## LINUXUTAPNET Source
+LIBLINUXUTAPNET_ASINCLUED-y         += -I$(LIBLINUXUPLAT_BASE)/include
+LIBLINUXUTAPNET_CINCLUDES-y         += -I$(LIBLINUXUPLAT_BASE)/include
+
+LIBLINUXUTAPNET_SRCS-y		  += $(UK_PLAT_DRIVERS_BASE)/tap/tap.c
