@@ -254,12 +254,58 @@ static int tap_netdev_recv(struct uk_netdev *dev,
 			   struct uk_netdev_rx_queue *queue,
 			   struct uk_netbuf **pkt)
 {
-	int rc = -EINVAL;
+	int rc = 0;
+	struct tap_net_dev *tdev __maybe_unused;
+	struct uk_netbuf *_pkt = NULL;
 
 	UK_ASSERT(dev);
 	UK_ASSERT(queue && pkt);
 
+	tdev = to_tapnetdev(dev);
+
+	if (!queue->alloc_rxpkts)
+		return -EINVAL;
+
+
+	/**
+	 * Allocate the packet in which the packet will be received.
+	 */
+	rc = queue->alloc_rxpkts(queue->alloc_rxpkts_argp, &_pkt, 1);
+	if (rc == 0) {
+		uk_pr_err(DRIVER_NAME": Failed to allocate the memory\n");
+		rc = -ENOMEM;
+		_pkt = NULL;
+		rc = UK_NETDEV_STATUS_UNDERRUN | UK_NETDEV_STATUS_MORE;
+		return rc;
+	}
+	uk_pr_debug(DRIVER_NAME": Receiving on interface %s(%d) %p(%d)\n",
+		    tdev->name, queue->fd, _pkt->data, _pkt->len);
+	rc = tap_read(queue->fd, _pkt->data, _pkt->len);
+
+	if (rc > 0) {
+		uk_pr_debug(DRIVER_NAME": Recv pkt size: %d\n", rc);
+		/* Setting the length of the packet */
+		_pkt->len = rc;
+		rc = UK_NETDEV_STATUS_SUCCESS | UK_NETDEV_STATUS_MORE;
+	} else if (rc == 0 || rc == -EWOULDBLOCK || rc == -EAGAIN) {
+		rc = 0;
+		goto err_exit;
+	} else {
+		uk_pr_err(DRIVER_NAME": Failed(%d) to read the packet\n", rc);
+		goto err_exit;
+	}
+	uk_pr_debug("uk_netdev buf ptr: %p\n", _pkt);
+
+	*pkt = _pkt;
+
+exit:
 	return rc;
+
+err_exit:
+	if (_pkt)
+		uk_netbuf_free(_pkt);
+	*pkt = NULL;
+	goto exit;
 }
 
 static int tap_netdev_xmit(struct uk_netdev *dev,
