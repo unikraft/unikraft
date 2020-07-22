@@ -69,6 +69,12 @@
 struct uk_netdev_tx_queue {
 	/* tx queue identifier */
 	int queue_id;
+	/* List of tx queue */
+	UK_TAILQ_ENTRY(struct uk_netdev_tx_queue) next;
+	/* Allocator for the txq */
+	struct uk_alloc *a;
+	/* Set the file descriptor for the tap device */
+	int fd;
 };
 
 struct uk_netdev_rx_queue {
@@ -298,17 +304,34 @@ static struct uk_netdev_rx_queue *tap_netdev_rxq_setup(struct uk_netdev *dev,
 }
 
 static struct uk_netdev_tx_queue *tap_netdev_txq_setup(struct uk_netdev *dev,
-						       __u16 queue_id __unused,
+						       __u16 queue_id,
 						       __u16 nb_desc __unused,
 					struct uk_netdev_txqueue_conf *conf)
 {
-	int rc = -EINVAL;
+	int rc = 0;
 	struct uk_netdev_tx_queue *txq = NULL;
+	struct tap_net_dev *tdev = NULL;
 
 	UK_ASSERT(dev && conf);
 
-	txq = ERR2PTR(rc);
+	tdev = to_tapnetdev(dev);
+	txq = uk_zalloc(conf->a, sizeof(*txq));
+	if (!txq) {
+		uk_pr_err(DRIVER_NAME": Failed to allocate the tx queue\n");
+		rc = -ENOMEM;
+		goto err_exit;
+	}
+
+	txq->queue_id = queue_id;
+	txq->fd = tdev->tap_fd;
+	txq->a = conf->a;
+	UK_TAILQ_INSERT_TAIL(&tdev->txqs, txq, next);
+	tdev->txq_cnt++;
+exit:
 	return txq;
+err_exit:
+	txq = ERR2PTR(rc);
+	goto exit;
 }
 
 static int tap_netdev_start(struct uk_netdev *n)
