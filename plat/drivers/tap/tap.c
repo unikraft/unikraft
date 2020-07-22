@@ -174,10 +174,63 @@ static int tap_netdev_txq_info_get(struct uk_netdev *dev, __u16 queue_id,
 				   struct uk_netdev_queue_info *qinfo);
 static int tap_device_create(struct tap_net_dev *tdev, __u32 feature_flags);
 static int tap_mac_generate(__u8 *addr, __u8 dev_id);
+static int tap_dev_br_add(struct tap_net_dev *tdev);
+static int tap_dev_index_get(struct tap_net_dev *tdev);
 
 /**
  * Local function definitions
  */
+
+static int tap_dev_index_get(struct tap_net_dev *tdev)
+{
+	int rc = 0;
+	struct uk_ifreq ifrq = {0};
+
+	snprintf(ifrq.ifr_name, sizeof(ifrq.ifr_name), "%s",
+		     tdev->name);
+
+	rc = tap_netif_configure(tdev->ctrl_sock, UK_SIOCGIFINDEX, &ifrq);
+	if (rc < 0) {
+		uk_pr_err(DRIVER_NAME": Failed to fetch the index\n");
+		goto exit;
+	}
+
+	rc = ifrq.ifr_ifindex;
+exit:
+	return rc;
+
+}
+
+static int tap_dev_br_add(struct tap_net_dev *tdev)
+{
+	int rc = -EINVAL;
+	struct uk_ifreq ifrq = {0};
+
+	if (!tap_drv.bridge_ifs[tdev->tid])
+		goto exit;
+
+	/**
+	 * Get the bridge name.
+	 */
+	snprintf(ifrq.ifr_name, sizeof(ifrq.ifr_name), "%s",
+		 tap_drv.bridge_ifs[tdev->tid]);
+
+	rc = tap_dev_index_get(tdev);
+	if (rc < 0)
+		return rc;
+
+	ifrq.ifr_ifindex = rc;
+	rc = tap_netif_configure(tdev->ctrl_sock, UK_SIOCBRADDIF, &ifrq);
+	if (rc < 0) {
+		uk_pr_err(DRIVER_NAME": Failed to add the interface %s to bridge %s\n",
+			  tdev->name, tap_drv.bridge_ifs[tdev->tid]);
+		goto exit;
+	}
+	rc = 0;
+
+exit:
+	return rc;
+}
 
 static int tap_netdev_recv(struct uk_netdev *dev,
 			   struct uk_netdev_rx_queue *queue,
@@ -406,6 +459,13 @@ static int tap_netdev_configure(struct uk_netdev *n,
 	rc = tap_netdev_mac_set(n, &tdev->hw_addr);
 	if (rc < 0) {
 		uk_pr_err(DRIVER_NAME": Failed to set the mac address\n");
+		goto close_ctrl_sock;
+	}
+
+	rc = tap_dev_br_add(tdev);
+	if (rc < 0) {
+		uk_pr_err(DRIVER_NAME": Failed(%d) to add the bridge interface\n",
+			  rc);
 		goto close_ctrl_sock;
 	}
 
