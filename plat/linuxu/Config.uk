@@ -17,4 +17,13 @@ if (PLAT_LINUXU)
 		changed by using linuxu.heap_size as a command line argument. For more
 		information refer to "Command line arguments in Unikraft" sections in 
 		the developers guide
+
+	config TAP_NET
+	bool "Tap driver"
+	default y if LIBUKNETDEV
+	depends on LIBUKNETDEV
+	help
+		Enable drivers to support tap device on the linuxu platform. The
+		driver implements the uknetdev interface and provides an interface
+		for the network stack to send/receive network packets.
 endif
