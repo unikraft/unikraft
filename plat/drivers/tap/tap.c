@@ -256,6 +256,7 @@ static void tap_netdev_info_get(struct uk_netdev *dev __unused,
 	dev_info->max_tx_queues = 1;
 	dev_info->nb_encap_tx = 0;
 	dev_info->nb_encap_rx = 0;
+	dev_info->features = 0;
 }
 
 static unsigned int tap_netdev_promisc_get(struct uk_netdev *n)
