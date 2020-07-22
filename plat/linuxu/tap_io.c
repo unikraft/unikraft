@@ -109,6 +109,19 @@ int tap_netif_create(void)
 	return sys_socket(AF_INET, SOCK_DGRAM, 0);
 }
 
+ssize_t tap_read(int fd, void *buf, size_t count)
+{
+	ssize_t rc = -EINTR;
+
+	while (rc == -EINTR)
+		rc = sys_read(fd, buf, count);
+
+	if (rc < 0)
+		uk_pr_err("Failed(%ld) to read from the tap device\n", rc);
+
+	return rc;
+}
+
 int tap_close(int fd)
 {
 	return sys_close(fd);
