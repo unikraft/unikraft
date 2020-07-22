@@ -122,6 +122,26 @@ ssize_t tap_read(int fd, void *buf, size_t count)
 	return rc;
 }
 
+ssize_t tap_write(int fd, const void *buf, size_t count)
+{
+	ssize_t rc = -EINTR;
+	size_t written = 0;
+
+	while (count > 0) {
+		rc = sys_write(fd, buf + written, count);
+		if (rc == -EINTR)
+			continue;
+		else if (rc < 0) {
+			uk_pr_err("Failed(%ld) to write to the tap device\n",
+				  rc);
+			return rc;
+		}
+		count -= rc;
+		written += rc;
+	}
+	return (ssize_t)written;
+}
+
 int tap_close(int fd)
 {
 	return sys_close(fd);
