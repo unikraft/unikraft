@@ -80,6 +80,18 @@ struct uk_netdev_tx_queue {
 struct uk_netdev_rx_queue {
 	/* rx queue identifier */
 	int queue_id;
+	/* number of rx descriptors */
+	__u16 nb_desc;
+	/* list of rx queue */
+	UK_TAILQ_ENTRY(struct uk_netdev_rx_queue) next;
+	/* Allocator for the rxq */
+	struct uk_alloc *a;
+	/* Set the file descriptor for the tap device */
+	int fd;
+	/* Callback for filling the buffer */
+	uk_netdev_alloc_rxpkts alloc_rxpkts;
+	/* Reference to a user data */
+	void *alloc_rxpkts_argp;
 };
 
 struct tap_net_dev {
@@ -288,19 +300,101 @@ static int tap_netdev_rxq_info_get(struct uk_netdev *dev __unused,
 	return 0;
 }
 
+static int tap_dev_rxqlen_get(struct tap_net_dev *tdev)
+{
+	int rc = 0;
+	struct uk_ifreq ifrq = {0};
+
+	/* Set the name of the device */
+	snprintf(ifrq.ifr_name, sizeof(ifrq.ifr_name), "%s", tdev->name);
+
+	/* Set the status of the device */
+	rc = tap_netif_configure(tdev->ctrl_sock, UK_SIOCGIFTXQLEN, &ifrq);
+	if (rc < 0) {
+		rc = -errno;
+		uk_pr_err(DRIVER_NAME": Failed(%d) to set the flags of if: %s\n",
+			  rc, tdev->name);
+		return rc;
+	}
+	uk_pr_info(DRIVER_NAME": rxq length is %d\n", ifrq.ifr_qlen);
+	return ifrq.ifr_qlen;
+}
+
+static int tap_dev_rxqlen_set(struct tap_net_dev *tdev, __u16 qlen)
+{
+	int rc = 0;
+	struct uk_ifreq ifrq = {0};
+
+	/* Set the name of the device */
+	snprintf(ifrq.ifr_name, sizeof(ifrq.ifr_name), "%s", tdev->name);
+	ifrq.ifr_qlen = qlen;
+
+	/* Set the status of the device */
+	rc = tap_netif_configure(tdev->ctrl_sock, UK_SIOCSIFTXQLEN, &ifrq);
+	if (rc < 0) {
+		uk_pr_err(DRIVER_NAME": Failed(%d) to set the flags of if: %s\n",
+			  rc, tdev->name);
+		return rc;
+	}
+	uk_pr_info(DRIVER_NAME": rxq length is %d\n", ifrq.ifr_qlen);
+	return rc;
+}
 
 static struct uk_netdev_rx_queue *tap_netdev_rxq_setup(struct uk_netdev *dev,
-						       __u16 queue_id __unused,
-						       __u16 nb_desc __unused,
+						       __u16 queue_id,
+						       __u16 nb_desc,
 					struct uk_netdev_rxqueue_conf *conf)
 {
-	int rc = -EINVAL;
+	int rc = 0;
 	struct uk_netdev_rx_queue *rxq = NULL;
+	struct tap_net_dev *tdev = NULL;
+	__u16 qlen = 0;
 
 	UK_ASSERT(dev && conf);
 
-	rxq = ERR2PTR(rc);
+	tdev = to_tapnetdev(dev);
+	/* Fetch the default queue length of the rx queue */
+	rc = tap_dev_rxqlen_get(tdev);
+	if (rc < 0) {
+		uk_pr_err(DRIVER_NAME": Failed to fetch the tx queue length\n");
+		goto err_exit;
+	}
+	qlen = rc;
+	rc = 0;
+
+	/* Allocate the rx queue */
+	rxq = uk_zalloc(conf->a, sizeof(*rxq));
+	if  (!rxq) {
+		uk_pr_err(DRIVER_NAME": Failed to allocate the rx queue %d",
+			  queue_id);
+		rc = -ENOMEM;
+		goto err_exit;
+	}
+
+	rxq->queue_id = queue_id;
+	rxq->nb_desc = (nb_desc > 0) ? nb_desc : qlen;
+	if (qlen != rxq->nb_desc) {
+		rc = tap_dev_rxqlen_set(tdev, rxq->nb_desc);
+		if (rc < 0) {
+			uk_pr_err(DRIVER_NAME": Failed to setup the rx queue with %d descriptors\n",
+				  rxq->nb_desc);
+			goto free_rxq;
+		}
+	}
+
+	rxq->a = conf->a;
+	rxq->alloc_rxpkts = conf->alloc_rxpkts;
+	rxq->alloc_rxpkts_argp = conf->alloc_rxpkts_argp;
+	rxq->fd = tdev->tap_fd;
+	UK_TAILQ_INSERT_TAIL(&tdev->rxqs, rxq, next);
+	tdev->rxq_cnt++;
+exit:
 	return rxq;
+free_rxq:
+	uk_free(conf->a, rxq);
+err_exit:
+	rxq = ERR2PTR(rc);
+	goto exit;
 }
 
 static struct uk_netdev_tx_queue *tap_netdev_txq_setup(struct uk_netdev *dev,

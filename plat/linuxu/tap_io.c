@@ -71,6 +71,8 @@ int tap_netif_configure(int fd, __u32 request, void *arg)
 	case UK_SIOCSIFHWADDR:
 	case UK_SIOCSIFMTU:
 	case UK_SIOCGIFMTU:
+	case UK_SIOCSIFTXQLEN:
+	case UK_SIOCGIFTXQLEN:
 	case UK_SIOCBRADDIF:
 		break;
 	default:
