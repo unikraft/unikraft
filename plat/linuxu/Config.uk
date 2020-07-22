@@ -22,8 +22,16 @@ if (PLAT_LINUXU)
 	default y if LIBUKNETDEV
 	depends on LIBUKNETDEV
 	select LIBUKBUS
+	imply LIBUKLIBPARAM
 	help
 		Enable drivers to support tap device on the linuxu platform. The
 		driver implements the uknetdev interface and provides an interface
 		for the network stack to send/receive network packets.
+
+	config TAP_DEV_DEBUG
+	bool "Tap Device Debug"
+	default n
+	depends on TAP_NET
+	help
+		Enable debug messages from the tap device.
 endif
