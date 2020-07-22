@@ -66,8 +66,10 @@ int tap_netif_configure(int fd, __u32 request, void *arg)
 	struct uk_ifreq *usr_ifr = (struct uk_ifreq *) arg;
 
 	switch (request) {
+	case UK_SIOCGIFINDEX:
 	case UK_SIOCGIFHWADDR:
 	case UK_SIOCSIFHWADDR:
+	case UK_SIOCBRADDIF:
 		break;
 	default:
 		rc = -EINVAL;
