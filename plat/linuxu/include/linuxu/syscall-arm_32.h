@@ -45,6 +45,7 @@
 #define __SC_EXIT       1
 #define __SC_IOCTL     54
 #define __SC_FSTAT    108
+#define __SC_FCNTL     55
 #define __SC_RT_SIGPROCMASK   126
 #define __SC_ARCH_PRCTL       172
 #define __SC_RT_SIGACTION     174
@@ -55,6 +56,10 @@
 #define __SC_TIMER_DELETE     261
 #define __SC_CLOCK_GETTIME    263
 #define __SC_PSELECT6 335
+
+#ifndef O_TMPFILE
+#define O_TMPFILE 020040000
+#endif
 
 /* NOTE: from `man syscall`:
  *

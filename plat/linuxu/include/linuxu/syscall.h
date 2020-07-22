@@ -34,6 +34,7 @@
 #ifndef __SYSCALL_H__
 #define __SYSCALL_H__
 
+#include <stdarg.h>
 #include <linuxu/time.h>
 #include <linuxu/stat.h>
 #include <linuxu/mode.h>
@@ -84,6 +85,65 @@ static inline int sys_fstat(int fd, struct k_stat *statbuf)
 	return (int)syscall2(__SC_FSTAT,
 			     (long)(fd),
 			     (long)(statbuf));
+
+#ifndef O_RDONLY
+#define O_RDONLY                  00000000
+#endif /* O_RDONLY */
+
+#ifndef O_WRONLY
+#define O_WRONLY                  00000001
+#endif /* O_WRONLY */
+#ifndef O_RDWR
+#define O_RDWR                    00000002
+#endif /* O_RDWR */
+
+#ifndef O_NONBLOCK
+#define O_NONBLOCK		 04000
+#endif /* O_NONBLOCK */
+
+#ifndef O_CREAT
+#define O_CREAT        0100
+#endif
+
+
+#ifndef O_CLOEXEC
+#define O_CLOEXEC  02000000
+#endif /* O_CLOEXEC */
+
+
+#ifndef FD_CLOEXEC
+#define FD_CLOEXEC 1
+#endif
+
+#ifndef F_SETFD
+#define F_SETFD  2
+#endif
+
+static inline int sys_open(const char *pathname, int flags, ...)
+{
+	mode_t mode = 0;
+	int fd;
+
+	if ((flags & O_CREAT) || (flags & O_TMPFILE) == O_TMPFILE) {
+		va_list ap;
+
+		va_start(ap, flags);
+		mode = va_arg(ap, mode_t);
+		va_end(ap);
+	}
+
+	fd = syscall3(__SC_OPEN, (long)pathname, (long)flags, (long)mode);
+	if ((fd >= 0) && (flags & O_CLOEXEC))
+		syscall3(__SC_FCNTL, (long) fd, (long)F_SETFD,
+			 (long)FD_CLOEXEC);
+
+	return fd;
+}
+
+static inline int sys_close(int fd)
+{
+	return (ssize_t) syscall1(__SC_CLOSE,
+				  (long) fd);
 }
 
 static inline int sys_exit(int status)
