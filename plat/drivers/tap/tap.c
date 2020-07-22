@@ -258,17 +258,30 @@ static int tap_netdev_xmit(struct uk_netdev *dev,
 
 static int tap_netdev_txq_info_get(struct uk_netdev *dev __unused,
 				   __u16 queue_id __unused,
-				   struct uk_netdev_queue_info *qinfo __unused)
+				   struct uk_netdev_queue_info *qinfo)
 {
-	return -EINVAL;
+	UK_ASSERT(qinfo);
+
+	qinfo->nb_min = 1;
+	qinfo->nb_max = __U16_MAX;
+	qinfo->nb_align = 4;
+	qinfo->nb_is_power_of_two = 0;
+	return 0;
 }
 
 static int tap_netdev_rxq_info_get(struct uk_netdev *dev __unused,
 				   __u16 queue_id __unused,
-				   struct uk_netdev_queue_info *qinfo __unused)
+				   struct uk_netdev_queue_info *qinfo)
 {
-	return -EINVAL;
+	UK_ASSERT(qinfo);
+
+	qinfo->nb_min = 1;
+	qinfo->nb_max = __U16_MAX;
+	qinfo->nb_align = 4;
+	qinfo->nb_is_power_of_two = 0;
+	return 0;
 }
+
 
 static struct uk_netdev_rx_queue *tap_netdev_rxq_setup(struct uk_netdev *dev,
 						       __u16 queue_id __unused,
