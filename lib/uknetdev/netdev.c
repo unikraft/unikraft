@@ -236,17 +236,39 @@ void uk_netdev_info_get(struct uk_netdev *dev,
 				      dev_info->max_tx_queues);
 }
 
+static const void *_netdev_einfo_get(struct uk_netdev *dev,
+				enum uk_netdev_einfo_type einfo)
+{
+	switch (einfo) {
+	case UK_NETDEV_IPV4_ADDR_STR:
+		if (dev->_einfo->ipv4_addr)
+			uk_pr_debug("ip_addr: %s\n", dev->_einfo->ipv4_addr);
+		return dev->_einfo->ipv4_addr;
+	case UK_NETDEV_IPV4_MASK_STR:
+		if (dev->_einfo->ipv4_net_mask)
+			uk_pr_debug("netmask: %s\n", dev->_einfo->ipv4_net_mask);
+		return dev->_einfo->ipv4_net_mask;
+	case UK_NETDEV_IPV4_GW_STR:
+		if (dev->_einfo->ipv4_gw_addr)
+			uk_pr_debug("Gateway: %s\n", dev->_einfo->ipv4_gw_addr);
+		return dev->_einfo->ipv4_gw_addr;
+	default:
+		uk_pr_warn("Option %d not yet supported\n", einfo);
+	}
+	return NULL;
+}
+
 const void *uk_netdev_einfo_get(struct uk_netdev *dev,
 				enum uk_netdev_einfo_type einfo)
 {
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->ops);
 
-	if (!dev->ops->einfo_get) {
-		/* driver does not provide any extra configuration */
-		return NULL;
-	}
-	return dev->ops->einfo_get(dev, einfo);
+	if (dev->_einfo)
+		return _netdev_einfo_get(dev, einfo);
+	else if (dev->ops->einfo_get)
+		return dev->ops->einfo_get(dev, einfo);
+	return NULL;
 }
 
 int uk_netdev_rxq_info_get(struct uk_netdev *dev, uint16_t queue_id,
