@@ -31,23 +31,77 @@
  *
  */
 #include <errno.h>
+#include <string.h>
 #include <uk/alloc.h>
 #include <uk/arch/types.h>
 #include <uk/netdev_core.h>
 #include <uk/netdev_driver.h>
 #include <uk/netbuf.h>
 #include <uk/errptr.h>
+#include <uk/libparam.h>
 #include <uk/bus.h>
+#include <tap/tap.h>
+
+#define DRIVER_NAME             "tap-net"
+
+#define ETH_PKT_PAYLOAD_LEN       1500
+
+/**
+ * TODO: Find a better way of forwarding the command line argument to the
+ * driver. For now they are defined as macros from this driver.
+ */
+struct tap_net_dev {
+	/* Net device structure */
+	struct uk_netdev    ndev;
+	/* max number of queues */
+	__u16 max_qpairs;
+	/* Number of rxq configured */
+	/* The list of the tap device */
+	UK_TAILQ_ENTRY(struct tap_net_dev) next;
+	/* Tap Device identifier */
+	__u16 tid;
+	/* UK Netdevice identifier */
+	__u16 id;
+	/* Name of the character device */
+	char name[IFNAMSIZ];
+	/* MTU of the device */
+	__u16  mtu;
+	/* RX promiscuous mode */
+	__u8 promisc : 1;
+	/* State of the net device */
+	__u8 state;
+};
 
 struct tap_net_drv {
 	/* allocator to initialize the driver data structure */
 	struct uk_alloc *a;
+	/* list of tap device */
+	UK_TAILQ_HEAD(tdev_list, struct tap_net_dev) tap_dev_list;
+	/* Number of tap devices */
+	__u16 tap_dev_cnt;
+	/* A list of bridges associated with the bridge */
+	char **bridge_ifs;
 };
 
 /**
  * Module level variables
  */
 static struct tap_net_drv tap_drv = {0};
+static const char *drv_name = DRIVER_NAME;
+static int tap_dev_cnt;
+static char *bridgenames;
+
+/**
+ * Module Parameters.
+ */
+/**
+ * tap.tap_dev_cnt=<# of tap device>
+ */
+UK_LIB_PARAM(tap_dev_cnt, __u32);
+/**
+ * tap.bridgenames="br0 br1 ... brn"
+ */
+UK_LIB_PARAM_STR(bridgenames);
 
 /**
  * Module functions
@@ -227,18 +281,104 @@ static const struct uk_netdev_ops tap_netdev_ops = {
 };
 
 /**
+ * Registering the network device.
+ */
+static int tap_dev_init(int id)
+{
+	struct tap_net_dev *tdev;
+	int rc = 0;
+
+	tdev = uk_zalloc(tap_drv.a, sizeof(*tdev));
+	if (!tdev) {
+		uk_pr_err(DRIVER_NAME": Failed to allocate tap_device\n");
+		rc = -ENOMEM;
+		goto exit;
+	}
+	tdev->ndev.rx_one = tap_netdev_recv;
+	tdev->ndev.tx_one = tap_netdev_xmit;
+	tdev->ndev.ops = &tap_netdev_ops;
+	tdev->tid = id;
+	/**
+	 * TODO:
+	 * As an initial implementation we have limit on the number of queues.
+	 */
+	tdev->max_qpairs = 1;
+
+	/* Registering the tap device with libuknet*/
+	rc = uk_netdev_drv_register(&tdev->ndev, tap_drv.a, drv_name);
+	if (rc < 0) {
+		uk_pr_err(DRIVER_NAME": Failed to register the network device\n");
+		goto free_tdev;
+	}
+	tdev->id = rc;
+	rc = 0;
+	tdev->mtu = ETH_PKT_PAYLOAD_LEN;
+	tdev->promisc = 0;
+	uk_pr_info(DRIVER_NAME": device(%d) registered with the libuknet\n",
+		   tdev->id);
+
+	/* Adding the list of devices maintained by this driver */
+	UK_TAILQ_INSERT_TAIL(&tap_drv.tap_dev_list, tdev, next);
+exit:
+	return rc;
+free_tdev:
+	uk_free(tap_drv.a, tdev);
+	goto exit;
+}
+
+/**
  * Register a tap driver as bus. Currently in Unikraft, the uk_bus interface
  * provides the necessary to provide callbacks for bring a pseudo device. In the
  * future we might provide interface to support the pseudo device.
  */
 static int tap_drv_probe(void)
 {
+	int i;
+	int rc = 0;
+	char *idx = NULL, *prev_idx;
+
+	if (tap_dev_cnt > 0) {
+		tap_drv.bridge_ifs = uk_calloc(tap_drv.a, tap_dev_cnt,
+					       sizeof(char *));
+		if (!tap_drv.bridge_ifs) {
+			uk_pr_err(DRIVER_NAME": Failed to allocate brigde_ifs\n");
+			return -ENOMEM;
+		}
+	}
+
+	idx = bridgenames;
+	for (i = 0; i < tap_dev_cnt; i++) {
+		if (idx) {
+			prev_idx = idx;
+			idx = strchr(idx, ' ');
+			if (idx) {
+				*idx = '\0';
+				idx++;
+			}
+			tap_drv.bridge_ifs[i] = prev_idx;
+			uk_pr_debug(DRIVER_NAME": Adding bridge %s\n",
+				    prev_idx);
+		} else {
+			uk_pr_warn(DRIVER_NAME": Adding tap device %d without bridge\n",
+				   i);
+			tap_drv.bridge_ifs[i] = NULL;
+		}
+
+		rc = tap_dev_init(i);
+		if (rc < 0) {
+			uk_pr_err(DRIVER_NAME": Failed to initialize the tap dev id: %d\n",
+				  i);
+			return rc;
+		}
+		tap_drv.tap_dev_cnt++;
+	}
 	return 0;
 }
 
 static int tap_drv_init(struct uk_alloc *_a)
 {
 	tap_drv.a = _a;
+	UK_TAILQ_INIT(&tap_drv.tap_dev_list);
 	return 0;
 }
 
