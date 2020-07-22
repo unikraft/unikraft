@@ -116,7 +116,10 @@ ssize_t tap_read(int fd, void *buf, size_t count)
 	while (rc == -EINTR)
 		rc = sys_read(fd, buf, count);
 
-	if (rc < 0)
+	if (rc == -11)
+		/* Explicitly added since linux errno has -11 for EAGAIN */
+		rc = -EWOULDBLOCK;
+	else if (rc < 0)
 		uk_pr_err("Failed(%ld) to read from the tap device\n", rc);
 
 	return rc;
@@ -131,7 +134,16 @@ ssize_t tap_write(int fd, const void *buf, size_t count)
 		rc = sys_write(fd, buf + written, count);
 		if (rc == -EINTR)
 			continue;
-		else if (rc < 0) {
+		else if (rc == -11) {
+			/*
+			 * Explicitly added since linux errno has -11 for
+			 * EAGAIN.
+			 * FIXME: EAGAIN is not the only error code affected by
+			 * this issue (eg EDESTADDRREQ, EDQUOT). We should think
+			 * of a more generic solution to address it.
+			 */
+			rc = -EAGAIN;
+		} else if (rc < 0) {
 			uk_pr_err("Failed(%ld) to write to the tap device\n",
 				  rc);
 			return rc;
