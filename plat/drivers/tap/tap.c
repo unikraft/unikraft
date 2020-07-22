@@ -319,10 +319,12 @@ static void tap_netdev_info_get(struct uk_netdev *dev __unused,
 
 static unsigned int tap_netdev_promisc_get(struct uk_netdev *n)
 {
+	struct tap_net_dev *tdev;
 
 	UK_ASSERT(n);
+	tdev = to_tapnetdev(n);
 
-	return 0;
+	return tdev->promisc;
 }
 
 static __u16 tap_netdev_mtu_get(struct uk_netdev *n)
