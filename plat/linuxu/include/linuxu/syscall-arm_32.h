@@ -55,6 +55,7 @@
 #define __SC_TIMER_GETOVERRUN 260
 #define __SC_TIMER_DELETE     261
 #define __SC_CLOCK_GETTIME    263
+#define __SC_SOCKET           281
 #define __SC_PSELECT6 335
 
 #ifndef O_TMPFILE

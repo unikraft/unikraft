@@ -46,6 +46,7 @@
 #define __SC_RT_SIGACTION   13
 #define __SC_RT_SIGPROCMASK 14
 #define __SC_IOCTL  16
+#define __SC_SOCKET 41
 #define __SC_EXIT   60
 #define __SC_FCNTL  72
 #define __SC_ARCH_PRCTL       158

@@ -60,6 +60,37 @@ int tap_dev_configure(int fd, __u32 feature_flags, void *arg)
 	return rc;
 }
 
+int tap_netif_configure(int fd, __u32 request, void *arg)
+{
+	int rc;
+	struct uk_ifreq *usr_ifr = (struct uk_ifreq *) arg;
+
+	switch (request) {
+	case UK_SIOCGIFHWADDR:
+	case UK_SIOCSIFHWADDR:
+		break;
+	default:
+		rc = -EINVAL;
+		uk_pr_err("Invalid ioctl request\n");
+		goto exit_error;
+	}
+
+	if ((rc = sys_ioctl(fd, request, usr_ifr)) < 0) {
+		uk_pr_err("Failed to set device control %d\n", rc);
+		goto exit_error;
+	}
+
+	return 0;
+
+exit_error:
+	return rc;
+}
+
+int tap_netif_create(void)
+{
+	return sys_socket(AF_INET, SOCK_DGRAM, 0);
+}
+
 int tap_close(int fd)
 {
 	return sys_close(fd);

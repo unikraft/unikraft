@@ -57,6 +57,13 @@ struct uk_in_addr {
 	uk_in_addr_t s_addr;
 };
 
+struct uk_sockaddr_in {
+	uk_sa_family_t sin_family;
+	uk_in_port_t sin_port;
+	struct uk_in_addr sin_addr;
+	__u8 sin_zero[8];
+};
+
 struct uk_sockaddr {
 	uk_sa_family_t sa_family;
 	char sa_data[14];
