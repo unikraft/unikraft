@@ -1,4 +1,5 @@
 $(eval $(call addlib_s,libuknetdev,$(CONFIG_LIBUKNETDEV)))
+$(eval $(call addlib_paramprefix,libuknetdev,netdev))
 
 CINCLUDES-$(CONFIG_LIBUKNETDEV)		+= -I$(LIBUKNETDEV_BASE)/include
 CXXINCLUDES-$(CONFIG_LIBUKNETDEV)	+= -I$(LIBUKNETDEV_BASE)/include

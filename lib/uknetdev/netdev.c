@@ -38,10 +38,62 @@
 #include <string.h>
 #include <uk/netdev.h>
 #include <uk/print.h>
+#include <uk/libparam.h>
 
 struct uk_netdev_list uk_netdev_list =
 	UK_TAILQ_HEAD_INITIALIZER(uk_netdev_list);
 static uint16_t netdev_count;
+/**
+ * TODO: Define Network argument format when multiple driver device need to
+ * coexist. For example like:
+ * Driver Name:IP Address:Net Mask
+ */
+static char *ipv4_addr;
+static char *ipv4_subnet_mask;
+static char *ipv4_gw_addr;
+
+UK_LIB_PARAM_STR(ipv4_addr);
+UK_LIB_PARAM_STR(ipv4_subnet_mask);
+UK_LIB_PARAM_STR(ipv4_gw_addr);
+
+static const char *_parse_ipv4_addr(void)
+{
+	/** Remember the reference to the ip address for successive calls*/
+	static char *ip_addr;
+
+	if (ip_addr)
+		return strtok_r(NULL, " ", &ip_addr);
+	else if (ipv4_addr)
+		return strtok_r(ipv4_addr, " ", &ip_addr);
+
+	return NULL;
+}
+
+static const char *_parse_ipv4_net_mask(void)
+{
+	/** Remember the reference to the netmask for successive calls*/
+	static char *net_mask;
+
+	if (net_mask)
+		return strtok_r(NULL, " ", &net_mask);
+	else if (ipv4_subnet_mask)
+		return strtok_r(ipv4_subnet_mask, " ", &net_mask);
+
+	return NULL;
+}
+
+static const char *_parse_ipv4_gw_addr(void)
+{
+	/** Remember the reference to the gateway address for successive calls*/
+	static char *gw;
+
+	if (gw)
+		return strtok_r(NULL, " ", &gw);
+	else if (ipv4_gw_addr)
+		return strtok_r(ipv4_gw_addr, " ", &gw);
+
+	return NULL;
+}
 
 static struct uk_netdev_data *_alloc_data(struct uk_alloc *a,
 					  uint16_t netdev_id,
@@ -62,6 +114,25 @@ static struct uk_netdev_data *_alloc_data(struct uk_alloc *a,
 	*(DECONST(uint16_t *, &data->id)) = netdev_id;
 
 	return data;
+}
+
+static struct uk_netdev_einfo *_alloc_einfo(struct uk_alloc *a)
+{
+	struct uk_netdev_einfo *_einfo = NULL;
+
+	if (ipv4_addr || ipv4_subnet_mask || ipv4_gw_addr) {
+		_einfo = uk_zalloc(a, sizeof(*_einfo));
+		if (!_einfo) {
+			uk_pr_warn("Failed to allocate memory for netdev config\n");
+			return NULL;
+		}
+
+		_einfo->ipv4_addr = _parse_ipv4_addr();
+		_einfo->ipv4_net_mask = _parse_ipv4_net_mask();
+		_einfo->ipv4_gw_addr = _parse_ipv4_gw_addr();
+	}
+
+	return _einfo;
 }
 
 int uk_netdev_drv_register(struct uk_netdev *dev, struct uk_alloc *a,
@@ -89,6 +160,10 @@ int uk_netdev_drv_register(struct uk_netdev *dev, struct uk_alloc *a,
 
 	dev->_data = _alloc_data(a, netdev_count,  drv_name);
 	if (!dev->_data)
+		return -ENOMEM;
+
+	dev->_einfo = _alloc_einfo(a);
+	if (!dev->_einfo)
 		return -ENOMEM;
 
 	UK_TAILQ_INSERT_TAIL(&uk_netdev_list, dev, _list);

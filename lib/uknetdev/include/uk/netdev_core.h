@@ -373,6 +373,12 @@ struct uk_netdev_data {
 	const char           *drv_name;
 };
 
+struct uk_netdev_einfo {
+	const char *ipv4_addr;
+	const char *ipv4_net_mask;
+	const char *ipv4_gw_addr;
+};
+
 /**
  * NETDEV
  * A structure used to interact with a network device.
@@ -400,6 +406,9 @@ struct uk_netdev {
 	struct uk_netdev_tx_queue   *_tx_queue[CONFIG_LIBUKNETDEV_MAXNBQUEUES];
 
 	UK_TAILQ_ENTRY(struct uk_netdev) _list;
+
+	/** Netdevice address configuration */
+	struct uk_netdev_einfo *_einfo;
 };
 
 #ifdef __cplusplus
