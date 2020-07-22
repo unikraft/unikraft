@@ -22,6 +22,7 @@ if (PLAT_LINUXU)
 	bool "Tap driver"
 	default y if LIBUKNETDEV
 	depends on LIBUKNETDEV
+	select LIBUKBUS
 	help
 		Enable drivers to support tap device on the linuxu platform. The
 		driver implements the uknetdev interface and provides an interface

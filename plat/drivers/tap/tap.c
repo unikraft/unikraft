@@ -37,6 +37,17 @@
 #include <uk/netdev_driver.h>
 #include <uk/netbuf.h>
 #include <uk/errptr.h>
+#include <uk/bus.h>
+
+struct tap_net_drv {
+	/* allocator to initialize the driver data structure */
+	struct uk_alloc *a;
+};
+
+/**
+ * Module level variables
+ */
+static struct tap_net_drv tap_drv = {0};
 
 /**
  * Module functions
@@ -214,3 +225,25 @@ static const struct uk_netdev_ops tap_netdev_ops = {
 	.txq_info_get = tap_netdev_txq_info_get,
 	.rxq_info_get = tap_netdev_rxq_info_get,
 };
+
+/**
+ * Register a tap driver as bus. Currently in Unikraft, the uk_bus interface
+ * provides the necessary to provide callbacks for bring a pseudo device. In the
+ * future we might provide interface to support the pseudo device.
+ */
+static int tap_drv_probe(void)
+{
+	return 0;
+}
+
+static int tap_drv_init(struct uk_alloc *_a)
+{
+	tap_drv.a = _a;
+	return 0;
+}
+
+static struct uk_bus tap_bus = {
+	.init = tap_drv_init,
+	.probe = tap_drv_probe,
+};
+UK_BUS_REGISTER(&tap_bus);
