@@ -1,0 +1,10 @@
+menuconfig LIBUKRING
+  bool "ukring: Ring buffer interface"
+  select LIBUKALLOC
+  select LIBUKLOCK
+  default n
+  help
+    Provide ring interface for handling object references.
+
+if LIBUKRING
+endif

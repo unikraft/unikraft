@@ -1,0 +1,6 @@
+$(eval $(call addlib_s,libukring,$(CONFIG_LIBUKRING)))
+
+CINCLUDES-$(CONFIG_LIBUKRING)   += -I$(LIBUKRING_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBUKRING) += -I$(LIBUKRING_BASE)/include
+
+LIBUKRING_SRCS-y += $(LIBUKRING_BASE)/ring.c

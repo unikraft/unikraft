@@ -1,0 +1,12 @@
+uk_ring_alloc
+uk_ring_free
+uk_ring_enqueue
+uk_ring_dequeue_mc
+uk_ring_dequeue_sc
+uk_ring_advance_sc
+uk_ring_putback_sc
+uk_ring_peek
+uk_ring_peek_clear_sc
+uk_ring_full
+uk_ring_empty
+uk_ring_count
