@@ -57,3 +57,8 @@ struct __regs {
 #ifndef wmb
 #define wmb() __asm__("dsb" : : : "memory")
 #endif
+
+static inline void ukarch_spinwait(void)
+{
+	/* Intelligent busy wait not supported on arm. */
+}
