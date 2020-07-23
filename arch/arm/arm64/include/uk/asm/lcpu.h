@@ -30,6 +30,8 @@
 #error Do not include this header directly
 #endif
 
+#define CACHE_LINE_SIZE	64
+
 #ifdef __ASSEMBLY__
 /*
  * Stack size to save general purpose registers and essential system

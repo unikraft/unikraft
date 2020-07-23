@@ -32,6 +32,8 @@
 #error Do not include this header directly
 #endif
 
+#define CACHE_LINE_SIZE	64
+
 #ifndef __ASSEMBLY__
 struct __regs {
 	unsigned long pad; /* 8 bytes to make struct size multiple of 16 */

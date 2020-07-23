@@ -29,6 +29,8 @@
 #error Do not include this header directly
 #endif
 
+#define CACHE_LINE_SIZE	32
+
 struct __regs {
 	unsigned long r0;
 	unsigned long r1;
