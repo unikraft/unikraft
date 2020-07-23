@@ -34,19 +34,19 @@
 #include <uk/print.h>
 #include <uk/essentials.h>
 
-struct buf_ring *
-buf_ring_alloc(int count, struct uk_alloc *a
+struct uk_ring *
+uk_ring_alloc(int count, struct uk_alloc *a
 #ifdef DEBUG_BUFRING
 		, struct uk_mutex *lock
 #endif
 )
 {
-	struct buf_ring *br;
+	struct uk_ring *br;
 
 	/* buf ring must be size power of 2 */
 	UK_ASSERT(POWER_OF_2(count));
 
-	br = uk_malloc(a, sizeof(struct buf_ring) + count * sizeof(caddr_t));
+	br = uk_malloc(a, sizeof(struct uk_ring) + count * sizeof(caddr_t));
 	if (br == NULL)
 		return NULL;
 #ifdef DEBUG_BUFRING
@@ -61,7 +61,7 @@ buf_ring_alloc(int count, struct uk_alloc *a
 }
 
 void
-buf_ring_free(struct buf_ring *br, struct uk_alloc *a)
+uk_ring_free(struct uk_ring *br, struct uk_alloc *a)
 {
 	uk_free(a, br);
 }

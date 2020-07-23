@@ -29,8 +29,8 @@
  *
  */
 
-#ifndef _SYS_BUF_RING_H_
-#define _SYS_BUF_RING_H_
+#ifndef __UK_RING_H__
+#define __UK_RING_H__
 
 #include <errno.h>
 #include <uk/mutex.h>
@@ -46,7 +46,7 @@
 #define critical_exit()   uk_preempt_enable()
 
 
-struct buf_ring {
+struct uk_ring {
 	volatile uint32_t br_prod_head;
 	volatile uint32_t br_prod_tail;
 	int               br_prod_size;
@@ -67,7 +67,7 @@ struct buf_ring {
  *
  */
 static __inline int
-buf_ring_enqueue(struct buf_ring *br, void *buf)
+uk_ring_enqueue(struct uk_ring *br, void *buf)
 {
 	uint32_t prod_head, prod_next, cons_tail;
 #ifdef DEBUG_BUFRING
@@ -125,7 +125,7 @@ buf_ring_enqueue(struct buf_ring *br, void *buf)
  *
  */
 static __inline void *
-buf_ring_dequeue_mc(struct buf_ring *br)
+uk_ring_dequeue_mc(struct uk_ring *br)
 {
 	uint32_t cons_head, cons_next;
 	void *buf;
@@ -166,7 +166,7 @@ buf_ring_dequeue_mc(struct buf_ring *br)
  * e.g. a network driver's tx queue lock
  */
 static __inline void *
-buf_ring_dequeue_sc(struct buf_ring *br)
+uk_ring_dequeue_sc(struct uk_ring *br)
 {
 	uint32_t cons_head, cons_next;
 #ifdef PREFETCH_DEFINED
@@ -176,15 +176,15 @@ buf_ring_dequeue_sc(struct buf_ring *br)
 	void *buf;
 
 	/*
-	 * This is a workaround to allow using buf_ring on ARM and ARM64.
-	 * ARM64TODO: Fix buf_ring in a generic way.
+	 * This is a workaround to allow using uk_ring on ARM and ARM64.
+	 * ARM64TODO: Fix uk_ring in a generic way.
 	 * REMARKS: It is suspected that br_cons_head does not require
 	 *   load_acq operation, but this change was extensively tested
 	 *   and confirmed it's working. To be reviewed once again in
 	 *   FreeBSD-12.
 	 *
 	 * Preventing following situation:
-	 * Core(0) - buf_ring_enqueue()                                       Core(1) - buf_ring_dequeue_sc()
+	 * Core(0) - uk_ring_enqueue()                                       Core(1) - uk_ring_dequeue_sc()
 	 * -----------------------------------------                                       ----------------------------------------------
 	 *
 	 *                                                                                cons_head = br->br_cons_head;
@@ -242,7 +242,7 @@ buf_ring_dequeue_sc(struct buf_ring *br)
  * e.g. a network driver's tx queue lock
  */
 static __inline void
-buf_ring_advance_sc(struct buf_ring *br)
+uk_ring_advance_sc(struct uk_ring *br)
 {
 	uint32_t cons_head, cons_next;
 	uint32_t prod_tail;
@@ -277,7 +277,7 @@ buf_ring_advance_sc(struct buf_ring *br)
  * the compare and an atomic.
  */
 static __inline void
-buf_ring_putback_sc(struct buf_ring *br, void *new)
+uk_ring_putback_sc(struct uk_ring *br, void *new)
 {
 	/* Buffer ring has none in putback */
 	UK_ASSERT(br->br_cons_head != br->br_prod_tail);
@@ -290,7 +290,7 @@ buf_ring_putback_sc(struct buf_ring *br, void *new)
  * race-prone if not protected by a lock
  */
 static __inline void *
-buf_ring_peek(struct buf_ring *br)
+uk_ring_peek(struct uk_ring *br)
 {
 #ifdef DEBUG_BUFRING
 	if (!uk_mutex_is_locked(br->br_lock))
@@ -309,7 +309,7 @@ buf_ring_peek(struct buf_ring *br)
 }
 
 static __inline void *
-buf_ring_peek_clear_sc(struct buf_ring *br)
+uk_ring_peek_clear_sc(struct uk_ring *br)
 {
 #ifdef DEBUG_BUFRING
 	void *ret;
@@ -350,30 +350,30 @@ buf_ring_peek_clear_sc(struct buf_ring *br)
 }
 
 static __inline int
-buf_ring_full(struct buf_ring *br)
+uk_ring_full(struct uk_ring *br)
 {
 	return ((br->br_prod_head + 1) & br->br_prod_mask) == br->br_cons_tail;
 }
 
 static __inline int
-buf_ring_empty(struct buf_ring *br)
+uk_ring_empty(struct uk_ring *br)
 {
 	return br->br_cons_head == br->br_prod_tail;
 }
 
 static __inline int
-buf_ring_count(struct buf_ring *br)
+uk_ring_count(struct uk_ring *br)
 {
 	return (br->br_prod_size + br->br_prod_tail - br->br_cons_tail)
 			& br->br_prod_mask;
 }
 
-struct buf_ring *buf_ring_alloc(int count, struct uk_alloc *a
+struct uk_ring *uk_ring_alloc(int count, struct uk_alloc *a
 #ifdef DEBUG_BUFRING
 		, struct uk_mutex *lock
 #endif
 );
-void buf_ring_free(struct buf_ring *br, struct uk_alloc *a);
+void uk_ring_free(struct uk_ring *br, struct uk_alloc *a);
 
 #endif
 
