@@ -32,12 +32,19 @@
 #ifndef _SYS_BUF_RING_H_
 #define _SYS_BUF_RING_H_
 
-#include <machine/cpu.h>
+#include <errno.h>
+#include <uk/mutex.h>
+#include <uk/print.h>
+#include <uk/config.h>
+#include <uk/assert.h>
+#include <uk/plat/lcpu.h>
+#include <uk/arch/atomic.h>
+#include <uk/essentials.h>
+#include <uk/preempt.h>
 
-#ifdef DEBUG_BUFRING
-#include <sys/lock.h>
-#include <sys/mutex.h>
-#endif
+#define critical_enter()  uk_preempt_disable()
+#define critical_exit()   uk_preempt_enable()
+
 
 struct buf_ring {
 	volatile uint32_t br_prod_head;
@@ -50,7 +57,7 @@ struct buf_ring {
 	int               br_cons_size;
 	int               br_cons_mask;
 #ifdef DEBUG_BUFRING
-	struct mtx       *br_lock;
+	struct uk_mutex  *br_lock;
 #endif
 	void             *br_ring[0] __aligned(CACHE_LINE_SIZE);
 };
@@ -74,7 +81,7 @@ buf_ring_enqueue(struct buf_ring *br, void *buf)
 	for (i = br->br_cons_head; i != br->br_prod_head;
 			 i = ((i + 1) & br->br_cons_mask))
 		if (br->br_ring[i] == buf)
-			panic("buf=%p already enqueue at %d prod=%d cons=%d",
+			UK_CRASH("buf=%p already enqueue at %d prod=%d cons=%d",
 					buf, i, br->br_prod_tail, br->br_cons_tail);
 #endif
 	critical_enter();
@@ -92,10 +99,12 @@ buf_ring_enqueue(struct buf_ring *br, void *buf)
 			}
 			continue;
 		}
-	} while (!atomic_cmpset_acq_int(&br->br_prod_head, prod_head, prod_next));
+	} while (!ukarch_compare_exchange_sync((uint32_t *) &br->br_prod_head,
+			prod_head, prod_next));
+
 #ifdef DEBUG_BUFRING
 	if (br->br_ring[prod_head] != NULL)
-		panic("dangling value in enqueue");
+		UK_CRASH("dangling value in enqueue");
 #endif
 	br->br_ring[prod_head] = buf;
 
@@ -105,8 +114,8 @@ buf_ring_enqueue(struct buf_ring *br, void *buf)
 	 * to complete 
 	 */
 	while (br->br_prod_tail != prod_head)
-		cpu_spinwait();
-	atomic_store_rel_int(&br->br_prod_tail, prod_next);
+		ukarch_spinwait();
+	ukarch_store_n(&br->br_prod_tail, prod_next);
 	critical_exit();
 	return 0;
 }
@@ -130,7 +139,8 @@ buf_ring_dequeue_mc(struct buf_ring *br)
 			critical_exit();
 			return NULL;
 		}
-	} while (!atomic_cmpset_acq_int(&br->br_cons_head, cons_head, cons_next));
+	} while (!ukarch_compare_exchange_sync((uint32_t *) &br->br_cons_head,
+			cons_head, cons_next));
 
 	buf = br->br_ring[cons_head];
 #ifdef DEBUG_BUFRING
@@ -142,9 +152,9 @@ buf_ring_dequeue_mc(struct buf_ring *br)
 	 * to complete
 	 */
 	while (br->br_cons_tail != cons_head)
-		cpu_spinwait();
+		ukarch_spinwait();
 
-	atomic_store_rel_int(&br->br_cons_tail, cons_next);
+	ukarch_store_n(&br->br_cons_tail, cons_next);
 	critical_exit();
 
 	return buf;
@@ -189,12 +199,12 @@ buf_ring_dequeue_sc(struct buf_ring *br)
 	 *
 	 * <1> Load (on core 1) from br->br_ring[cons_head] can be reordered (speculative readed) by CPU.
 	 */
-#if defined(__arm__) || defined(__aarch64__)
-	cons_head = atomic_load_acq_32(&br->br_cons_head);
+#if defined(CONFIG_ARCH_ARM_32) || defined(CONFIG_ARCH_ARM_64)
+	cons_head = ukarch_load_n(&br->br_cons_head);
 #else
 	cons_head = br->br_cons_head;
 #endif
-	prod_tail = atomic_load_acq_32(&br->br_prod_tail);
+	prod_tail = ukarch_load_n(&br->br_prod_tail);
 
 	cons_next = (cons_head + 1) & br->br_cons_mask;
 #ifdef PREFETCH_DEFINED
@@ -216,10 +226,10 @@ buf_ring_dequeue_sc(struct buf_ring *br)
 
 #ifdef DEBUG_BUFRING
 	br->br_ring[cons_head] = NULL;
-	if (!mtx_owned(br->br_lock))
-		panic("lock not held on single consumer dequeue");
+	if (!uk_mutex_is_locked(br->br_lock))
+		UK_CRASH("lock not held on single consumer dequeue: %d", br->br_lock->lock_count);
 	if (br->br_cons_tail != cons_head)
-		panic("inconsistent list cons_tail=%d cons_head=%d",
+		UK_CRASH("inconsistent list cons_tail=%d cons_head=%d",
 				br->br_cons_tail, cons_head);
 #endif
 	br->br_cons_tail = cons_next;
@@ -269,8 +279,8 @@ buf_ring_advance_sc(struct buf_ring *br)
 static __inline void
 buf_ring_putback_sc(struct buf_ring *br, void *new)
 {
-	KASSERT(br->br_cons_head != br->br_prod_tail,
-		("Buf-Ring has none in putback"));
+	/* Buffer ring has none in putback */
+	UK_ASSERT(br->br_cons_head != br->br_prod_tail);
 	br->br_ring[br->br_cons_head] = new;
 }
 
@@ -283,8 +293,8 @@ static __inline void *
 buf_ring_peek(struct buf_ring *br)
 {
 #ifdef DEBUG_BUFRING
-	if ((br->br_lock != NULL) && !mtx_owned(br->br_lock))
-		panic("lock not held on single consumer dequeue");
+	if (!uk_mutex_is_locked(br->br_lock))
+		UK_CRASH("lock not held on single consumer dequeue");
 #endif
 	/*
 	 * I believe it is safe to not have a memory barrier
@@ -304,14 +314,14 @@ buf_ring_peek_clear_sc(struct buf_ring *br)
 #ifdef DEBUG_BUFRING
 	void *ret;
 
-	if (!mtx_owned(br->br_lock))
-		panic("lock not held on single consumer dequeue");
+	if (!uk_mutex_is_locked(br->br_lock))
+		UK_CRASH("lock not held on single consumer dequeue");
 #endif
 
 	if (br->br_cons_head == br->br_prod_tail)
 		return NULL;
 
-#if defined(__arm__) || defined(__aarch64__)
+#if defined(CONFIG_ARCH_ARM_32) || defined(CONFIG_ARCH_ARM_64)
 	/*
 	 * The barrier is required there on ARM and ARM64 to ensure, that
 	 * br->br_ring[br->br_cons_head] will not be fetched before the above
@@ -322,7 +332,8 @@ buf_ring_peek_clear_sc(struct buf_ring *br)
 	 * conditional check will be true, so we will return previously fetched
 	 * (and invalid) buffer.
 	 */
-	atomic_thread_fence_acq();
+	#error "unsupported: atomic_thread_fence_acq()"
+	/* TODO atomic_thread_fence_acq(); */
 #endif
 
 #ifdef DEBUG_BUFRING
@@ -357,9 +368,12 @@ buf_ring_count(struct buf_ring *br)
 			& br->br_prod_mask;
 }
 
-struct buf_ring *buf_ring_alloc(int count, struct malloc_type *type, int flags,
-		struct mtx *);
-void buf_ring_free(struct buf_ring *br, struct malloc_type *type);
+struct buf_ring *buf_ring_alloc(int count, struct uk_alloc *a
+#ifdef DEBUG_BUFRING
+		, struct uk_mutex *lock
+#endif
+);
+void buf_ring_free(struct buf_ring *br, struct uk_alloc *a);
 
 #endif
 

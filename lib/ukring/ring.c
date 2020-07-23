@@ -26,25 +26,27 @@
  * SUCH DAMAGE.
  */
 
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
-
-#include <sys/param.h>
-#include <sys/systm.h>
-#include <sys/kernel.h>
-#include <sys/malloc.h>
-#include <sys/ktr.h>
-#include <sys/buf_ring.h>
+#include <uk/ring.h>
+#include <uk/assert.h>
+#include <uk/alloc.h>
+#include <uk/mutex.h>
+#include <uk/config.h>
+#include <uk/print.h>
+#include <uk/essentials.h>
 
 struct buf_ring *
-buf_ring_alloc(int count, struct malloc_type *type, int flags, struct mtx *lock)
+buf_ring_alloc(int count, struct uk_alloc *a
+#ifdef DEBUG_BUFRING
+		, struct uk_mutex *lock
+#endif
+)
 {
 	struct buf_ring *br;
 
-	KASSERT(powerof2(count), ("buf ring must be size power of 2"));
+	/* buf ring must be size power of 2 */
+	UK_ASSERT(POWER_OF_2(count));
 
-	br = malloc(sizeof(struct buf_ring) + count*sizeof(caddr_t),
-			type, flags|M_ZERO);
+	br = uk_malloc(a, sizeof(struct buf_ring) + count * sizeof(caddr_t));
 	if (br == NULL)
 		return NULL;
 #ifdef DEBUG_BUFRING
@@ -59,7 +61,7 @@ buf_ring_alloc(int count, struct malloc_type *type, int flags, struct mtx *lock)
 }
 
 void
-buf_ring_free(struct buf_ring *br, struct malloc_type *type)
+buf_ring_free(struct buf_ring *br, struct uk_alloc *a)
 {
-	free(br, type);
+	uk_free(a, br);
 }
