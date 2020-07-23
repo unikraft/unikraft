@@ -118,4 +118,10 @@ static inline unsigned long ukarch_read_sp(void)
 	__asm__ __volatile__("mov %%rsp, %0" : "=r"(sp));
 	return sp;
 }
+
+static inline void ukarch_spinwait(void)
+{
+	__asm__ __volatile__("pause" : : : "memory");
+}
+
 #endif /* !__ASSEMBLY__ */
