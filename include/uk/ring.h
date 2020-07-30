@@ -377,11 +377,14 @@ struct uk_ring {
 		return ret; \
 	}
 
-static __inline int
-uk_ring_full(struct uk_ring *br)
-{
-	return ((br->br_prod_head + 1) & br->br_prod_mask) == br->br_cons_tail;
-}
+#define UK_RING_FULL(br_name, br) UK_RING_NAME(br_name, full)(br)
+
+#define UK_RING_FULL_FN(br_name, br_t) \
+	static __inline int \
+	UK_RING_NAME(br_name, full)(UK_RING_NAME(br_name, t) * br) \
+	{ \
+		return ((br->br_prod_head + 1) & br->br_prod_mask) == br->br_cons_tail; \
+	}
 
 static __inline int
 uk_ring_empty(struct uk_ring *br)
