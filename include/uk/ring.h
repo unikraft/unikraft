@@ -395,12 +395,15 @@ struct uk_ring {
 		return br->br_cons_head == br->br_prod_tail; \
 	}
 
-static __inline int
-uk_ring_count(struct uk_ring *br)
-{
-	return (br->br_prod_size + br->br_prod_tail - br->br_cons_tail)
-			& br->br_prod_mask;
-}
+#define UK_RING_COUNT(br_name, br) UK_RING_NAME(br_name, count)(br)
+
+#define UK_RING_COUNT_FN(br_name, br_t) \
+	static __inline int \
+	UK_RING_NAME(br_name, count)(UK_RING_NAME(br_name, t) * br) \
+	{ \
+		return (br->br_prod_size + br->br_prod_tail - br->br_cons_tail) \
+				& br->br_prod_mask; \
+	}
 
 static struct uk_ring *
 uk_ring_alloc(unsigned int count, size_t elemsize, struct uk_alloc *a
