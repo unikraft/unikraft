@@ -45,6 +45,11 @@
 #define critical_enter()  uk_preempt_disable()
 #define critical_exit()   uk_preempt_enable()
 
+#define __UK_RING_NAME0(x, ...) x
+#define __UK_RING_NAME1(x, a1) UK_CONCAT(__UK_RING_NAME0(x), _ ## a1)
+#define __UK_RING_NAME2(x, a1, a2) UK_CONCAT(__UK_RING_NAME1(x, a1), _ ## a2)
+#define   UK_RING_NAME(x, ...) \
+	UK_CONCAT(__UK_RING_NAME, UK_NARGS(__VA_ARGS__))(x, __VA_ARGS__)
 
 struct uk_ring {
 	volatile uint32_t br_prod_head;
