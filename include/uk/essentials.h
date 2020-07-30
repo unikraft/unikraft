@@ -291,6 +291,11 @@ extern "C" {
 	char __assert_ ## y [(x) ? 1 : -1]
 #endif /* UK_CTASSERT */
 
+#ifndef UK_NARGS
+#define __UK_NARGS_X(a, b, c, d, e, f, g, h, n, ...) n
+#define UK_NARGS(...)  __UK_NARGS_X(, ##__VA_ARGS__, 7, 6, 5, 4, 3, 2, 1, 0)
+#endif /* UK_NARGS */
+
 #ifdef __cplusplus
 }
 #endif

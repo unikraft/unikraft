@@ -66,9 +66,6 @@ struct uk_tracepoint_header {
 extern size_t uk_trace_buffer_free;
 extern char *uk_trace_buffer_writep;
 
-#define __UK_NARGS_X(a, b, c, d, e, f, g, h, n, ...) n
-#define UK_NARGS(...)  __UK_NARGS_X(, ##__VA_ARGS__, 7, 6, 5, 4, 3, 2, 1, 0)
-
 
 static inline void __uk_trace_save_arg(char **pbuff,
 				      size_t *pfree,
