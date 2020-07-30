@@ -71,59 +71,63 @@ struct uk_ring {
  * multi-producer safe lock-free ring buffer enqueue
  *
  */
-static __inline int
-uk_ring_enqueue(struct uk_ring *br, void *buf)
-{
-	uint32_t prod_head, prod_next, cons_tail;
-#ifdef DEBUG_BUFRING
-	int i;
+#define UK_RING_ENQUEUE(br_name, br, buf) \
+					UK_RING_NAME(br_name, enqueue)(br, buf)
 
-	/*
-	 * Note: It is possible to encounter an mbuf that was removed
-	 * via drbr_peek(), and then re-added via drbr_putback() and
-	 * trigger a spurious panic.
-	 */
-	for (i = br->br_cons_head; i != br->br_prod_head;
-			 i = ((i + 1) & br->br_cons_mask))
-		if (br->br_ring[i] == buf)
+#define uk_ring_while_next(ptr) \
+	while (!ukarch_compare_exchange_sync((uint32_t *) &br->br_ ## ptr ## _head, \
+		ptr ## _head, ptr ## _next))
+
+#ifdef DEBUG_BUFRING
+/*
+ * Note: It is possible to encounter an mbuf that was removed
+ * via drbr_peek(), and then re-added via drbr_putback() and
+ * trigger a spurious panic.
+ */
+#define uk_ring_check_already_enqueued(br, buf) \
+	int i; \
+	for (i = br->br_cons_head; i != br->br_prod_head; \
+			 i = ((i + 1) & br->br_cons_mask)) \
+		if (br->br_ring[i] == buf) \
 			UK_CRASH("buf=%p already enqueue at %d prod=%d cons=%d",
-					buf, i, br->br_prod_tail, br->br_cons_tail);
-#endif
-	critical_enter();
-	do {
-		prod_head = br->br_prod_head;
-		prod_next = (prod_head + 1) & br->br_prod_mask;
-		cons_tail = br->br_cons_tail;
+					buf, i, br->br_prod_tail, br->br_cons_tail)
+#else
+#define uk_ring_check_already_enqueued(br, buf)
+#endif /* DEBUG_BUFRING */
 
-		if (prod_next == cons_tail) {
-			rmb();
-			if (prod_head == br->br_prod_head && cons_tail == br->br_cons_tail) {
-				br->br_drops++;
-				critical_exit();
-				return -ENOBUFS;
-			}
-			continue;
-		}
-	} while (!ukarch_compare_exchange_sync((uint32_t *) &br->br_prod_head,
-			prod_head, prod_next));
-
-#ifdef DEBUG_BUFRING
-	if (br->br_ring[prod_head] != NULL)
-		UK_CRASH("dangling value in enqueue");
-#endif
-	br->br_ring[prod_head] = buf;
-
-	/*
-	 * If there are other enqueues in progress
-	 * that preceded us, we need to wait for them
-	 * to complete 
-	 */
-	while (br->br_prod_tail != prod_head)
-		ukarch_spinwait();
-	ukarch_store_n(&br->br_prod_tail, prod_next);
-	critical_exit();
-	return 0;
-}
+#define UK_RING_ENQUEUE_FN(br_name, br_t) \
+	static __inline int \
+	UK_RING_NAME(br_name, enqueue)(UK_RING_NAME(br_name, t) * br, br_t buf) \
+	{ \
+		uint32_t prod_head, prod_next, cons_tail; \
+		uk_ring_check_already_enqueued(br, buf); \
+		critical_enter(); \
+		do { \
+			prod_head = br->br_prod_head; \
+			prod_next = (prod_head + 1) & br->br_prod_mask; \
+			cons_tail = br->br_cons_tail; \
+			if (prod_next == cons_tail) { \
+				rmb(); \
+				if (prod_head == br->br_prod_head && cons_tail == br->br_cons_tail) { \
+					br->br_drops++; \
+					critical_exit(); \
+					return -ENOBUFS; \
+				} \
+				continue; \
+			} \
+		} uk_ring_while_next(prod); \
+		br->br_ring[prod_head] = buf; \
+		/*\
+		 * If there are other enqueues in progress \
+		 * that preceded us, we need to wait for them \
+		 * to complete \
+		 */\
+		while (br->br_prod_tail != prod_head) \
+			ukarch_spinwait(); \
+		ukarch_store_n(&br->br_prod_tail, prod_next); \
+		critical_exit(); \
+		return 0; \
+	}
 
 /*
  * multi-consumer safe dequeue 
