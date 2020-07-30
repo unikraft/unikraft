@@ -307,13 +307,17 @@ struct uk_ring {
  * if we have to do a multi-queue version we will need
  * the compare and an atomic.
  */
-static __inline void
-uk_ring_putback_sc(struct uk_ring *br, void *new)
-{
-	/* Buffer ring has none in putback */
-	UK_ASSERT(br->br_cons_head != br->br_prod_tail);
-	br->br_ring[br->br_cons_head] = new;
-}
+#define UK_RING_PUTBACK_SC(br_name, br, new) \
+	UK_RING_NAME(br_name, putback_sc)(br, new)
+
+#define UK_RING_PUTBACK_SC_FN(br_name, br_t) \
+	static __inline void \
+	UK_RING_NAME(br_name, putback_sc)(UK_RING_NAME(br_name, t) * br, br_t new) \
+	{ \
+		/* Buffer ring has none in putback */\
+		UK_ASSERT(br->br_cons_head != br->br_prod_tail); \
+		br->br_ring[br->br_cons_head] = new; \
+	}
 
 /*
  * return a pointer to the first entry in the ring
