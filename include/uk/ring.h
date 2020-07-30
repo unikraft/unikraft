@@ -324,24 +324,23 @@ struct uk_ring {
  * without modifying it, or NULL if the ring is empty
  * race-prone if not protected by a lock
  */
-static __inline void *
-uk_ring_peek(struct uk_ring *br)
-{
-#ifdef DEBUG_BUFRING
-	if (!uk_mutex_is_locked(br->br_lock))
-		UK_CRASH("lock not held on single consumer dequeue");
-#endif
-	/*
-	 * I believe it is safe to not have a memory barrier
-	 * here because we control cons and tail is worst case
-	 * a lagging indicator so we worst case we might
-	 * return NULL immediately after a buffer has been enqueued
-	 */
-	if (br->br_cons_head == br->br_prod_tail)
-		return NULL;
+#define UK_RING_PEEK(br_name, br) UK_RING_NAME(br_name, peek)(br)
 
-	return br->br_ring[br->br_cons_head];
-}
+#define UK_RING_PEEK_FN(br_name, br_t) \
+	static __inline br_t \
+	UK_RING_NAME(br_name, peek)(UK_RING_NAME(br_name, t) * br) \
+	{ \
+		uk_ring_debug_check_lock(br); \
+		/*\
+		 * I believe it is safe to not have a memory barrier \
+		 * here because we control cons and tail is worst case \
+		 * a lagging indicator so we worst case we might \
+		 * return NULL immediately after a buffer has been enqueued \
+		 */\
+		if (br->br_cons_head == br->br_prod_tail) \
+			return NULL; \
+		return br->br_ring[br->br_cons_head]; \
+	}
 
 static __inline void *
 uk_ring_peek_clear_sc(struct uk_ring *br)
