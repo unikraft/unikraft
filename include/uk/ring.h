@@ -67,6 +67,13 @@ struct uk_ring {
 	void             *br_ring[0] __aligned(CACHE_LINE_SIZE);
 };
 
+#ifdef DEBUG_BUFRING
+#define uk_ring_debug_set_elem(br, i, val) \
+	(br->br_ring[i] = val);
+#else
+#define uk_ring_debug_set_elem(br, i, val)
+#endif /* DEBUG_BUFRING */
+
 /*
  * multi-producer safe lock-free ring buffer enqueue
  *
@@ -133,41 +140,35 @@ struct uk_ring {
  * multi-consumer safe dequeue 
  *
  */
-static __inline void *
-uk_ring_dequeue_mc(struct uk_ring *br)
-{
-	uint32_t cons_head, cons_next;
-	void *buf;
+#define UK_RING_DEQUEUE_MC(br_name, br) UK_RING_NAME(br_name, dequeue_mc)(br)
 
-	critical_enter();
-	do {
-		cons_head = br->br_cons_head;
-		cons_next = (cons_head + 1) & br->br_cons_mask;
-
-		if (cons_head == br->br_prod_tail) {
-			critical_exit();
-			return NULL;
-		}
-	} while (!ukarch_compare_exchange_sync((uint32_t *) &br->br_cons_head,
-			cons_head, cons_next));
-
-	buf = br->br_ring[cons_head];
-#ifdef DEBUG_BUFRING
-	br->br_ring[cons_head] = NULL;
-#endif
-	/*
-	 * If there are other dequeues in progress
-	 * that preceded us, we need to wait for them
-	 * to complete
-	 */
-	while (br->br_cons_tail != cons_head)
-		ukarch_spinwait();
-
-	ukarch_store_n(&br->br_cons_tail, cons_next);
-	critical_exit();
-
-	return buf;
-}
+#define UK_RING_DEQUEUE_MC_FN(br_name, br_t) \
+	static __inline br_t \
+	UK_RING_NAME(br_name, dequeue_mc)(UK_RING_NAME(br_name, t) * br) \
+	{ \
+		uint32_t cons_head, cons_next; \
+		br_t buf; \
+		critical_enter(); \
+		do { \
+			cons_head = br->br_cons_head; \
+			cons_next = (cons_head + 1) & br->br_cons_mask; \
+			if (cons_head == br->br_prod_tail) { \
+				critical_exit(); \
+				return NULL; \
+			} \
+		} uk_ring_while_next(cons); \
+		buf = br->br_ring[cons_head]; \
+		uk_ring_debug_set_elem(br, cons_head, NULL); \
+		/*\
+		 * If there are other dequeues in progress that preceded us, we need to \
+		 * wait for them to complete. \
+		 */\
+		while (br->br_cons_tail != cons_head) \
+			ukarch_spinwait(); \
+		ukarch_store_n(&br->br_cons_tail, cons_next); \
+		critical_exit(); \
+		return buf; \
+	}
 
 /*
  * single-consumer dequeue 
