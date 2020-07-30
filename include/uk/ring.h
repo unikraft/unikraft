@@ -175,15 +175,7 @@ struct uk_ring {
  * use where dequeue is protected by a lock
  * e.g. a network driver's tx queue lock
  */
-static __inline void *
-uk_ring_dequeue_sc(struct uk_ring *br)
-{
-	uint32_t cons_head, cons_next;
-#ifdef PREFETCH_DEFINED
-	uint32_t cons_next_next;
-#endif
-	uint32_t prod_tail;
-	void *buf;
+#define UK_RING_DEQUEUE_SC(br_name, br) UK_RING_NAME(br_name, dequeue_sc)(br)
 
 	/*
 	 * This is a workaround to allow using uk_ring on ARM and ARM64.
@@ -210,41 +202,71 @@ uk_ring_dequeue_sc(struct uk_ring *br)
 	 * <1> Load (on core 1) from br->br_ring[cons_head] can be reordered (speculative readed) by CPU.
 	 */
 #if defined(CONFIG_ARCH_ARM_32) || defined(CONFIG_ARCH_ARM_64)
-	cons_head = ukarch_load_n(&br->br_cons_head);
+#define uk_ring_set_cons_head(br, cons_head) \
+	(cons_head = ukarch_load_n(&br->br_cons_head))
 #else
-	cons_head = br->br_cons_head;
+#define uk_ring_set_cons_head(br, cons_head) \
+	(cons_head = br->br_cons_head)
 #endif
-	prod_tail = ukarch_load_n(&br->br_prod_tail);
-
-	cons_next = (cons_head + 1) & br->br_cons_mask;
-#ifdef PREFETCH_DEFINED
-	cons_next_next = (cons_head + 2) & br->br_cons_mask;
-#endif
-
-	if (cons_head == prod_tail)
-		return NULL;
 
 #ifdef PREFETCH_DEFINED
-	if (cons_next != prod_tail) {
-		prefetch(br->br_ring[cons_next]);
-		if (cons_next_next != prod_tail)
-			prefetch(br->br_ring[cons_next_next]);
-	}
-#endif
-	br->br_cons_head = cons_next;
-	buf = br->br_ring[cons_head];
+#define uk_ring_cons_next_next uint32_t cons_next_next
+#define uk_ring_set_cons_next_next(br, cons_head, cons_next_next) \
+	(cons_next_next = (cons_head + 2) & br->br_cons_mask)
+#define uk_ring_prefetch_next(br, cons_next, prod_tail, cons_next_next) \
+	do { \
+		if (cons_next != prod_tail) { \
+			prefetch(br->br_ring[cons_next]); \
+			if (cons_next_next != prod_tail) \
+				prefetch(br->br_ring[cons_next_next]); \
+		} \
+	} while (0)
+#else
+#define uk_ring_cons_next_next
+#define uk_ring_set_cons_next_next(br, cons_head, cons_next_next)
+#define uk_ring_prefetch_next(br, cons_next, prod_tail, cons_next_next)
+#endif /* PREFETCH_DEFINED */
 
 #ifdef DEBUG_BUFRING
-	br->br_ring[cons_head] = NULL;
-	if (!uk_mutex_is_locked(br->br_lock))
-		UK_CRASH("lock not held on single consumer dequeue: %d", br->br_lock->lock_count);
-	if (br->br_cons_tail != cons_head)
-		UK_CRASH("inconsistent list cons_tail=%d cons_head=%d",
-				br->br_cons_tail, cons_head);
-#endif
-	br->br_cons_tail = cons_next;
-	return buf;
-}
+#define uk_ring_debug_check_lock(br) \
+	do { \
+		if (!uk_mutex_is_locked(br->br_lock)) \
+			UK_CRASH("lock not held on single consumer dequeue: %d", \
+				br->br_lock->lock_count); \
+	} while (0)
+#define uk_ring_debug_check_cons_head_tail(br, cons_head) \
+	do { \
+		uk_ring_debug_set_elem(br, cons_head, NULL); \
+		uk_ring_debug_check_lock(); \
+		if (br->br_cons_tail != cons_head) \
+			UK_CRASH("inconsistent list cons_tail=%d cons_head=%d", \
+					br->br_cons_tail, cons_head);
+	} while (0)
+#else
+#define uk_ring_debug_check_lock(br)
+#define uk_ring_debug_check_cons_head_tail(br, cons_head)
+#endif /* DEBUG_BUFRING */
+
+#define UK_RING_DEQUEUE_SC_FN(br_name, br_t) \
+	static __inline br_t \
+	UK_RING_NAME(br_name, dequeue_sc)(UK_RING_NAME(br_name, t) * br) \
+	{ \
+		uint32_t cons_head, cons_next; \
+		uk_ring_cons_next_next; \
+		uint32_t prod_tail; \
+		br_t buf; \
+		uk_ring_set_cons_head(br, cons_head); \
+		cons_next = (cons_head + 1) & br->br_cons_mask; \
+		uk_ring_set_cons_next_next(br, cons_head, cons_next_next); \
+		if (cons_head == prod_tail) \
+			return NULL; \
+		uk_ring_prefetch_next(br, cons_next, prod_tail, cons_next_next); \
+		br->br_cons_head = cons_next; \
+		buf = br->br_ring[cons_head]; \
+		uk_ring_debug_check_cons_head_tail(br, cons_head); \
+		br->br_cons_tail = cons_next; \
+		return buf; \
+	}
 
 /*
  * single-consumer advance after a peek
