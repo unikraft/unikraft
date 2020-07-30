@@ -342,19 +342,6 @@ struct uk_ring {
 		return br->br_ring[br->br_cons_head]; \
 	}
 
-static __inline void *
-uk_ring_peek_clear_sc(struct uk_ring *br)
-{
-#ifdef DEBUG_BUFRING
-	void *ret;
-
-	if (!uk_mutex_is_locked(br->br_lock))
-		UK_CRASH("lock not held on single consumer dequeue");
-#endif
-
-	if (br->br_cons_head == br->br_prod_tail)
-		return NULL;
-
 #if defined(CONFIG_ARCH_ARM_32) || defined(CONFIG_ARCH_ARM_64)
 	/*
 	 * The barrier is required there on ARM and ARM64 to ensure, that
@@ -366,22 +353,29 @@ uk_ring_peek_clear_sc(struct uk_ring *br)
 	 * conditional check will be true, so we will return previously fetched
 	 * (and invalid) buffer.
 	 */
+#define UK_RING_PEEK_CLEAR_SC(br_name, br)
 	#error "unsupported: atomic_thread_fence_acq()"
-	/* TODO atomic_thread_fence_acq(); */
-#endif
-
-#ifdef DEBUG_BUFRING
-	/*
-	 * Single consumer, i.e. cons_head will not move while we are
-	 * running, so atomic_swap_ptr() is not necessary here.
-	 */
-	ret = br->br_ring[br->br_cons_head];
-	br->br_ring[br->br_cons_head] = NULL;
-	return ret;
 #else
-	return br->br_ring[br->br_cons_head];
-#endif
-}
+#define UK_RING_PEEK_CLEAR_SC(br_name, br) \
+					UK_RING_NAME(br_name, peek_clear_sc)(br)
+#endif /* defined(CONFIG_ARCH_ARM_32) || defined(CONFIG_ARCH_ARM_64) */
+
+#define UK_RING_PEEK_CLEAR_SC_FN(br_name, br_t) \
+	static __inline br_t \
+	UK_RING_NAME(br_name, peek_clear_sc)(UK_RING_NAME(br_name, t) * br) \
+	{ \
+		br_t ret; \
+		uk_ring_debug_check_lock(br); \
+		if (br->br_cons_head == br->br_prod_tail) \
+			return NULL; \
+		ret = br->br_ring[br->br_cons_head]; \
+		/*\
+		 * Single consumer, i.e. cons_head will not move while we are \
+		 * running, so atomic_swap_ptr() is not necessary here. \
+		 */\
+		uk_ring_debug_set_elem(br, br->br_cons_head, NULL); \
+		return ret; \
+	}
 
 static __inline int
 uk_ring_full(struct uk_ring *br)
