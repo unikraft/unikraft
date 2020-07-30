@@ -273,24 +273,23 @@ struct uk_ring {
  * use where it is protected by a lock
  * e.g. a network driver's tx queue lock
  */
-static __inline void
-uk_ring_advance_sc(struct uk_ring *br)
-{
-	uint32_t cons_head, cons_next;
-	uint32_t prod_tail;
+#define UK_RING_ADVANCE_SC(br_name, br) UK_RING_NAME(br_name, advance_sc)(br)
 
-	cons_head = br->br_cons_head;
-	prod_tail = br->br_prod_tail;
-
-	cons_next = (cons_head + 1) & br->br_cons_mask;
-	if (cons_head == prod_tail)
-		return;
-	br->br_cons_head = cons_next;
-#ifdef DEBUG_BUFRING
-	br->br_ring[cons_head] = NULL;
-#endif
-	br->br_cons_tail = cons_next;
-}
+#define UK_RING_ADVANCE_SC_FN(br_name, br_t) \
+	static __inline void \
+	UK_RING_NAME(br_name, advance_sc)(UK_RING_NAME(br_name, t) * br) \
+	{ \
+		uint32_t cons_head, cons_next; \
+		uint32_t prod_tail; \
+		cons_head = br->br_cons_head; \
+		prod_tail = br->br_prod_tail; \
+		cons_next = (cons_head + 1) & br->br_cons_mask; \
+		if (cons_head == prod_tail) \
+			return; \
+		br->br_cons_head = cons_next; \
+		uk_ring_debug_set_elem(br, cons_head, NULL); \
+		br->br_cons_tail = cons_next; \
+	}
 
 /*
  * Used to return a buffer (most likely already there)
