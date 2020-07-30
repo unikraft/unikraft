@@ -1,0 +1,12 @@
+config LIBUKALLOCREGION
+	bool "ukallocregion: Region-based allocator"
+	default n
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKDEBUG
+	select LIBUKALLOC
+	help
+	  Satisfy allocations as fast as possible, without bookkeeping. No
+	  support for free(): when the end of the allocation pool is reached,
+	  the allocator runs out-of-memory. This allocator is useful for
+	  experimentation, as baseline, or as first-level allocator in a nested
+	  context.
