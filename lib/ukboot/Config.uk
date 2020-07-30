@@ -17,8 +17,23 @@ if LIBUKBOOT
 	int "Maximum number of arguments (max. size of argv)"
 	default 60
 
-	config LIBUKBOOT_INITALLOC
-	bool "Initialize ukallocbbuddy as allocator"
-	default y
-	select LIBUKALLOCBBUDDY
+	choice LIBUKBOOT_INITALLOC
+	prompt "Initialize memory allocator"
+	default LIBUKBOOT_INITBBUDDY
+
+		config LIBUKBOOT_INITBBUDDY
+		bool "Binary buddy allocator"
+		select LIBUKALLOCBBUDDY
+
+		config LIBUKBOOT_INITREGION
+		bool "Region allocator"
+		select LIBUKALLOCREGION
+		help
+		  Satisfy allocation as fast as possible. No support for free().
+		  Refer to help in ukallocregion for more information.
+
+		config LIBUKBOOT_NOALLOC
+		bool "None"
+
+	endchoice
 endif

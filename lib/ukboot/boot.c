@@ -41,8 +41,10 @@
 #include <stdio.h>
 #include <errno.h>
 
-#if CONFIG_LIBUKALLOC && CONFIG_LIBUKALLOCBBUDDY && CONFIG_LIBUKBOOT_INITALLOC
+#if CONFIG_LIBUKBOOT_INITBBUDDY
 #include <uk/allocbbuddy.h>
+#elif CONFIG_LIBUKBOOT_INITREGION
+#include <uk/allocregion.h>
 #endif
 #if CONFIG_LIBUKSCHED
 #include <uk/sched.h>
@@ -178,7 +180,7 @@ void ukplat_entry(int argc, char *argv[])
 #if CONFIG_LIBUKALLOC
 	struct uk_alloc *a = NULL;
 #endif
-#if CONFIG_LIBUKALLOC && CONFIG_LIBUKALLOCBBUDDY && CONFIG_LIBUKBOOT_INITALLOC
+#if !CONFIG_LIBUKBOOT_NOALLOC
 	struct ukplat_memregion_desc md;
 #endif
 #if CONFIG_LIBUKSCHED
@@ -205,9 +207,9 @@ void ukplat_entry(int argc, char *argv[])
 	}
 #endif /* CONFIG_LIBUKLIBPARAM */
 
-#if CONFIG_LIBUKALLOC && CONFIG_LIBUKALLOCBBUDDY && CONFIG_LIBUKBOOT_INITALLOC
+#if !CONFIG_LIBUKBOOT_NOALLOC
 	/* initialize memory allocator
-	 * FIXME: ukallocbbuddy is hard-coded for now
+	 * FIXME: allocators are hard-coded for now
 	 */
 	uk_pr_info("Initialize memory allocator...\n");
 	ukplat_memregion_foreach(&md, UKPLAT_MEMRF_ALLOCATABLE) {
@@ -226,10 +228,15 @@ void ukplat_entry(int argc, char *argv[])
 		 * As soon we have an allocator, we simply add every
 		 * subsequent region to it
 		 */
-		if (unlikely(!a))
+		if (!a) {
+#if CONFIG_LIBUKBOOT_INITBBUDDY
 			a = uk_allocbbuddy_init(md.base, md.len);
-		else
+#elif CONFIG_LIBUKBOOT_INITREGION
+			a = uk_allocregion_init(md.base, md.len);
+#endif
+		} else {
 			uk_alloc_addmem(a, md.base, md.len);
+		}
 	}
 	if (unlikely(!a))
 		uk_pr_warn("No suitable memory region for memory allocator. Continue without heap\n");
