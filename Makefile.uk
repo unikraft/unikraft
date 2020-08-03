@@ -6,7 +6,10 @@
 
 COMPFLAGS    += -nostdinc -nostdlib
 COMPFLAGS    += -U __linux__ -U __FreeBSD__ -U __sun__
-COMPFLAGS    += -fno-stack-protector -fno-omit-frame-pointer -fno-tree-sra -fno-split-stack
+COMPFLAGS    += -fno-omit-frame-pointer -fno-tree-sra -fno-split-stack
+ifneq ($(HAVE_STACKPROTECTOR),y)
+COMPFLAGS    += -fno-stack-protector
+endif
 COMPFLAGS    += -Wall -Wextra
 
 ASFLAGS      += -D__ASSEMBLY__
