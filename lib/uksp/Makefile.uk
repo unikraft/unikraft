@@ -1,0 +1,9 @@
+$(eval $(call addlib_s,libuksp,$(CONFIG_LIBUKSP)))
+
+CINCLUDES-y += -I$(LIBUKSP_BASE)/include
+
+LIBUKSP_SRCS-y += $(LIBUKSP_BASE)/ssp.c
+
+COMPFLAGS-$(CONFIG_STACKPROTECTOR_REGULAR)	+= -fstack-protector -mstack-protector-guard=global
+COMPFLAGS-$(CONFIG_STACKPROTECTOR_STRONG)	+= -fstack-protector-strong -mstack-protector-guard=global
+COMPFLAGS-$(CONFIG_STACKPROTECTOR_ALL)		+= -fstack-protector-all -mstack-protector-guard=global

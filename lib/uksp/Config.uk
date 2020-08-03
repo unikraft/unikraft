@@ -1,0 +1,46 @@
+menuconfig LIBUKSP
+	bool "uksp: Stack protector"
+	select HAVE_STACKPROTECTOR
+	default n
+
+if LIBUKSP
+choice
+	prompt "Stack protector level"
+	default STACKPROTECTOR_REGULAR
+	help
+	  Set the stack protector level
+
+config STACKPROTECTOR_REGULAR
+	bool "Regular"
+	help
+		Regular stack protector, use -fstack-protector.
+
+config STACKPROTECTOR_STRONG
+	bool "Strong"
+	help
+		Strong stack protector, use -fstack-protector-strong.
+
+config STACKPROTECTOR_ALL
+	bool "All"
+	help
+		Protect all functions, use -fstack-protector-all.
+endchoice
+
+choice
+	prompt "Canary Value"
+	default LIBUKSP_VALUE_USECONSTANT
+
+config LIBUKSP_VALUE_USECONSTANT
+	bool "Compiled-in constant"
+
+config LIBUKSP_VALUE_RANDOM
+	bool "Random variable"
+	select LIBUKSWRAND
+endchoice
+
+config LIBUKSP_VALUE_CONSTANT
+	int "Canary value"
+	depends on LIBUKSP_VALUE_USECONSTANT
+	default 42
+
+endif
