@@ -4,6 +4,10 @@ uk_malloc_ifpages
 uk_free_ifpages
 uk_realloc_ifpages
 uk_posix_memalign_ifpages
+uk_malloc_ifmalloc
+uk_realloc_ifmalloc
+uk_posix_memalign_ifmalloc
+uk_free_ifmalloc
 uk_calloc_compat
 uk_memalign_compat
 uk_realloc_compat

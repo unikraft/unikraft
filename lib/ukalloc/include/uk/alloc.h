@@ -85,6 +85,11 @@ struct uk_alloc {
 	uk_alloc_memalign_func_t memalign;
 	uk_alloc_free_func_t free;
 
+#if CONFIG_LIBUKALLOC_IFMALLOC
+	uk_alloc_free_func_t free_backend;
+	uk_alloc_malloc_func_t malloc_backend;
+#endif
+
 	/* page allocation interface */
 	uk_alloc_palloc_func_t palloc;
 	uk_alloc_pfree_func_t pfree;

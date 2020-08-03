@@ -62,6 +62,14 @@ int uk_posix_memalign_ifpages(struct uk_alloc *a, void **memptr,
 				size_t align, size_t size);
 void uk_free_ifpages(struct uk_alloc *a, void *ptr);
 
+#if CONFIG_LIBUKALLOC_IFMALLOC
+void *uk_malloc_ifmalloc(struct uk_alloc *a, size_t size);
+void *uk_realloc_ifmalloc(struct uk_alloc *a, void *ptr, size_t size);
+int uk_posix_memalign_ifmalloc(struct uk_alloc *a, void **memptr,
+				     size_t align, size_t size);
+void uk_free_ifmalloc(struct uk_alloc *a, void *ptr);
+#endif
+
 /* Functionality that is provided based on malloc() and posix_memalign() */
 void *uk_calloc_compat(struct uk_alloc *a, size_t num, size_t len);
 void *uk_realloc_compat(struct uk_alloc *a, void *ptr, size_t size);
@@ -87,6 +95,25 @@ void uk_pfree_compat(struct uk_alloc *a, void *ptr, unsigned long num_pages);
 									\
 		uk_alloc_register((a));					\
 	} while (0)
+
+#if CONFIG_LIBUKALLOC_IFMALLOC
+#define uk_alloc_init_malloc_ifmalloc(a, malloc_f, free_f, addmem_f) 	\
+	do {								\
+		(a)->malloc         = uk_malloc_ifmalloc;		\
+		(a)->calloc         = uk_calloc_compat;			\
+		(a)->realloc        = uk_realloc_ifmalloc;		\
+		(a)->posix_memalign = uk_posix_memalign_ifmalloc;	\
+		(a)->memalign       = uk_memalign_compat;		\
+		(a)->malloc_backend = (malloc_f);			\
+		(a)->free_backend   = (free_f);				\
+		(a)->free           = uk_free_ifmalloc;			\
+		(a)->palloc         = uk_palloc_compat;			\
+		(a)->pfree          = uk_pfree_compat;			\
+		(a)->addmem         = (addmem_f);			\
+									\
+		uk_alloc_register((a));					\
+	} while (0)
+#endif
 
 /* Shortcut for doing a registration of an allocator that only
  * implements palloc(), pfree(), addmem()
