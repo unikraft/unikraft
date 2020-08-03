@@ -63,6 +63,9 @@
 #ifdef CONFIG_LIBUKLIBPARAM
 #include <uk/libparam.h>
 #endif /* CONFIG_LIBUKLIBPARAM */
+#if CONFIG_LIBUKSP
+#include <uk/sp.h>
+#endif
 
 int main(int argc, char *argv[]) __weak;
 
@@ -187,6 +190,14 @@ void ukplat_entry(int argc, char *argv[])
 	struct uk_sched *s = NULL;
 	struct uk_thread *main_thread = NULL;
 #endif
+
+	/* We use a macro because if we were to use a function we
+	 * would not be able to return from the function if we have
+	 * changed the stack protector inside the function */
+#if CONFIG_LIBUKSP
+	UKSP_INIT_CANARY();
+#endif
+
 	uk_ctor_func_t *ctorfn;
 
 	uk_pr_info("Unikraft constructor table at %p - %p\n",
