@@ -770,6 +770,7 @@ static int virtio_netdev_rxq_info_get(struct uk_netdev *dev,
 	rxq = &vndev->rxqs[queue_id];
 	qinfo->nb_min = 1;
 	qinfo->nb_max = rxq->max_nb_desc;
+	qinfo->nb_align = sizeof(void *); /* word size alignment */
 	qinfo->nb_is_power_of_two = 1;
 
 exit:
@@ -797,6 +798,7 @@ static int virtio_netdev_txq_info_get(struct uk_netdev *dev,
 	txq = &vndev->txqs[queue_id];
 	qinfo->nb_min = 1;
 	qinfo->nb_max = txq->max_nb_desc;
+	qinfo->nb_align = sizeof(void *); /* word size alignment */
 	qinfo->nb_is_power_of_two = 1;
 
 exit:
@@ -1048,6 +1050,7 @@ static void virtio_net_info_get(struct uk_netdev *dev,
 
 	dev_info->max_rx_queues = vndev->max_vqueue_pairs;
 	dev_info->max_tx_queues = vndev->max_vqueue_pairs;
+	dev_info->max_mtu = vndev->max_mtu;
 	dev_info->nb_encap_tx = sizeof(struct virtio_net_hdr_padded);
 	dev_info->nb_encap_rx = sizeof(struct virtio_net_hdr_padded);
 	dev_info->features = UK_FEATURE_RXQ_INTR_AVAILABLE;
