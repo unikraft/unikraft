@@ -120,17 +120,15 @@ static struct uk_netdev_einfo *_alloc_einfo(struct uk_alloc *a)
 {
 	struct uk_netdev_einfo *_einfo = NULL;
 
-	if (ipv4_addr || ipv4_subnet_mask || ipv4_gw_addr) {
-		_einfo = uk_zalloc(a, sizeof(*_einfo));
-		if (!_einfo) {
-			uk_pr_warn("Failed to allocate memory for netdev config\n");
-			return NULL;
-		}
-
-		_einfo->ipv4_addr = _parse_ipv4_addr();
-		_einfo->ipv4_net_mask = _parse_ipv4_net_mask();
-		_einfo->ipv4_gw_addr = _parse_ipv4_gw_addr();
+	_einfo = uk_zalloc(a, sizeof(*_einfo));
+	if (!_einfo) {
+		uk_pr_warn("Failed to allocate memory for netdev config\n");
+		return ERR2PTR(-ENOMEM);
 	}
+
+	_einfo->ipv4_addr = _parse_ipv4_addr();
+	_einfo->ipv4_net_mask = _parse_ipv4_net_mask();
+	_einfo->ipv4_gw_addr = _parse_ipv4_gw_addr();
 
 	return _einfo;
 }
@@ -162,9 +160,11 @@ int uk_netdev_drv_register(struct uk_netdev *dev, struct uk_alloc *a,
 	if (!dev->_data)
 		return -ENOMEM;
 
-	dev->_einfo = _alloc_einfo(a);
-	if (!dev->_einfo)
-		return -ENOMEM;
+	if (ipv4_addr || ipv4_subnet_mask || ipv4_gw_addr) {
+		dev->_einfo = _alloc_einfo(a);
+		if (PTRISERR(dev->_einfo))
+			return PTR2ERR(dev->_einfo);
+	}
 
 	UK_TAILQ_INSERT_TAIL(&uk_netdev_list, dev, _list);
 	uk_pr_info("Registered netdev%"PRIu16": %p (%s)\n",
