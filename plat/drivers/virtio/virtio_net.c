@@ -47,8 +47,8 @@
  *		   12 bytes in length in modern mode.
  */
 #define VIRTIO_HDR_LEN          12
-#define VIRTIO_PKT_BUFFER_LEN ((ETH_PKT_PAYLOAD_LEN)	\
-			       + (ETH_HDR_LEN)		\
+#define VIRTIO_PKT_BUFFER_LEN ((UK_ETH_PAYLOAD_MAXLEN) \
+			       + (UK_ETH_HDR_UNTAGGED_LEN) \
 			       + (VIRTIO_HDR_LEN))
 
 #define DRIVER_NAME           "virtio-net"
@@ -511,7 +511,7 @@ static int virtio_netdev_rxq_dequeue(struct uk_netdev_rx_queue *rxq,
 		*netbuf = NULL;
 		return rxq->nb_desc;
 	}
-	if (unlikely((len < VIRTIO_HDR_LEN + ETH_HDR_LEN)
+	if (unlikely((len < VIRTIO_HDR_LEN + UK_ETH_HDR_UNTAGGED_LEN)
 		     || (len > VIRTIO_PKT_BUFFER_LEN))) {
 		uk_pr_err("Received invalid packet size: %"__PRIu32"\n", len);
 		return -EINVAL;
@@ -1137,7 +1137,7 @@ static int virtio_net_add_dev(struct virtio_dev *vdev)
 	}
 	vndev->uid = rc;
 	rc = 0;
-	vndev->max_mtu = ETH_PKT_PAYLOAD_LEN;
+	vndev->max_mtu = UK_ETH_PAYLOAD_MAXLEN;
 	vndev->mtu = vndev->max_mtu;
 	vndev->promisc = 0;
 	virtio_netdev_feature_set(vndev);

@@ -73,16 +73,58 @@ struct uk_netdev;
 UK_TAILQ_HEAD(uk_netdev_list, struct uk_netdev);
 
 /**
- * Ethernet macros
+ * Ethernet size macros
  */
-#define ETH_HDR_LEN           14
-#define ETH_PKT_PAYLOAD_LEN   1500
-#define ETH_PKT_LEN           (ETH_HDR_LEN + ETH_PKT_PAYLOAD_LEN)
+/* Header fields */
+#define UK_ETH_ADDR_LEN			   6
+#define UK_ETH_TYPE_LEN			   2
+#define UK_ETH_8021Q_LEN		(UK_ETH_TYPE_LEN + 2)
+
+/* Ethernet header */
+/* Untagged */
+#define UK_ETH_HDR_UNTAGGED_LEN		((2 * UK_ETH_ADDR_LEN) + \
+					 UK_ETH_TYPE_LEN)
+/* Single VLAN tag (IEEE 802.1q) */
+#define UK_ETH_HDR_8021Q_LEN		(UK_ETH_HDR_UNTAGGED_LEN + \
+					 UK_ETH_8021Q_LEN)
+/* Double VLAN tag (IEEE 802.1q) */
+#define UK_ETH_HDR_8021AD_LEN		(UK_ETH_HDR_UNTAGGED_LEN + \
+					 (2 * UK_ETH_8021Q_LEN))
+
+/* Payload */
+#define UK_ETH_PAYLOAD_MAXLEN		1500
+#define UK_ETH_JPAYLOAD_MAXLEN		9000 /**< Jumbo frame. */
+
+/* Frame sizes */
+#define UK_ETH_FRAME_MINLEN		  60
+
+
+#define UK_ETH_FRAME_UNTAGGED_MAXLEN	(UK_ETH_HDR_UNTAGGED_LEN +	\
+					 UK_ETH_PAYLOAD_MAXLEN)
+#define UK_ETH_FRAME_8021Q_MAXLEN	(UK_ETH_HDR_8021_LEN + \
+					 UK_ETH_PAYLOAD_MAXLEN)
+#define UK_ETH_FRAME_8021AD_MAXLEN	(UK_ETH_HDR_8021ADLEN + \
+					 UK_ETH_PAYLOAD_MAXLEN)
+#define UK_ETH_FRAME_MAXLEN		(UK_ETH_FRAME_8021AD_MAXLEN)
+
+
+#define UK_ETH_JFRAME_UNTAGGED_MAXLEN	(UK_ETH_HDR_UNTAGGED_LEN +	\
+					 UK_ETH_JPAYLOAD_MAXLEN)
+#define UK_ETH_JFRAME_8021Q_MAXLEN	(UK_ETH_HDR_8021_LEN + \
+					 UK_ETH_JPAYLOAD_MAXLEN)
+#define UK_ETH_JFRAME_8021AD_MAXLEN	(UK_ETH_HDR_8021ADLEN + \
+					 UK_ETH_JPAYLOAD_MAXLEN)
+#define UK_ETH_JFRAME_MAXLEN		(UK_ETH_JFRAME_8021AD_MAXLEN)
 
 /**
  * A structure used for Ethernet hardware addresses
  */
-#define UK_NETDEV_HWADDR_LEN 6 /**< Length of Ethernet address. */
+#define UK_NETDEV_HWADDR_LEN		(UK_ETH_ADDR_LEN)
+
+struct uk_hwaddr {
+	uint8_t addr_bytes[UK_NETDEV_HWADDR_LEN];
+} __packed;
+
 
 /**
  * The netdevice support rx/tx interrupt.
@@ -94,10 +136,6 @@ UK_TAILQ_HEAD(uk_netdev_list, struct uk_netdev);
 
 #define uk_netdev_rxintr_supported(feature)	\
 	(feature & (UK_FEATURE_RXQ_INTR_AVAILABLE))
-
-struct uk_hwaddr {
-	uint8_t addr_bytes[UK_NETDEV_HWADDR_LEN];
-} __packed;
 
 /**
  * A structure used to describe network device capabilities.
