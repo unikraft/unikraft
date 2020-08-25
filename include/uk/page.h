@@ -35,7 +35,7 @@
 #ifndef __UK_PAGE_H__
 #define __UK_PAGE_H__
 
-#include <uk/asm/limits.h>
+#include <uk/arch/limits.h>
 #include <uk/essentials.h>
 
 #ifdef __cplusplus
