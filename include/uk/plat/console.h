@@ -29,16 +29,77 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
 #ifndef __UKPLAT_CONSOLE_H__
 #define __UKPLAT_CONSOLE_H__
 
+#include <uk/essentials.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/**
+ * ANSI control sequence helpers
+ */
+#define __UK_ANSI_INTRO			"\033["
+#define __UK_ANSI_CMD0(cmd)		__UK_ANSI_INTRO cmd
+#define __UK_ANSI_CMD1(cmd, arg)	__UK_ANSI_INTRO arg cmd
+#define __UK_ANSI_CMD2(cmd, arg0, arg1)	__UK_ANSI_INTRO arg0 ";" arg1 cmd
+#define UK_ANSI_CLEARLINE		__UK_ANSI_CMD0("K")
+#define UK_ANSI_CLEARSCREEN		__UK_ANSI_CMD1("J", "2")
+#define UK_ANSI_HOME			__UK_ANSI_CMD0("H")
+#define UK_ANSI_UP(n)			__UK_ANSI_CMD1("A", STRINGIFY(n))
+#define UK_ANSI_DOWN(n)			__UK_ANSI_CMD1("B", STRINGIFY(n))
+#define UK_ANSI_RIGHT(n)		__UK_ANSI_CMD1("C"; STRINGIFY(n))
+#define UK_ANSI_LEFT(n)			__UK_ANSI_CMD1("D", STRINGIFY(n))
+#define UK_ANSI_POS(l, c)		__UK_ANSI_CMD2("H", STRINGIFY(l), \
+						       STRINGIFY(c))
+
+#define __UK_ANSI_MOD1(m)		__UK_ANSI_CMD1("m", m)
+#define __UK_ANSI_MOD2(m0, m1)		__UK_ANSI_CMD2("m", m0, m1)
+#define UK_ANSI_MOD_RESET		__UK_ANSI_MOD1("0")
+#define UK_ANSI_MOD_BOLD		__UK_ANSI_MOD1("1")
+#define UK_ANSI_MOD_UNDERSCORE		__UK_ANSI_MOD1("4")
+#define UK_ANSI_MOD_BLINK		__UK_ANSI_MOD1("5")
+#define UK_ANSI_MOD_INVERT		__UK_ANSI_MOD1("7")
+#define UK_ANSI_MOD_HIDE		__UK_ANSI_MOD1("8")
+
+#define __UK_ANSI_MOD_COLOR_FG0		"30"
+#define __UK_ANSI_MOD_COLOR_FG1		"31"
+#define __UK_ANSI_MOD_COLOR_FG2		"32"
+#define __UK_ANSI_MOD_COLOR_FG3		"33"
+#define __UK_ANSI_MOD_COLOR_FG4		"34"
+#define __UK_ANSI_MOD_COLOR_FG5		"35"
+#define __UK_ANSI_MOD_COLOR_FG6		"36"
+#define __UK_ANSI_MOD_COLOR_FG7		"37"
+#define __UK_ANSI_MOD_COLOR_BG0		"40"
+#define __UK_ANSI_MOD_COLOR_BG1		"41"
+#define __UK_ANSI_MOD_COLOR_BG2		"42"
+#define __UK_ANSI_MOD_COLOR_BG3		"43"
+#define __UK_ANSI_MOD_COLOR_BG4		"44"
+#define __UK_ANSI_MOD_COLOR_BG5		"45"
+#define __UK_ANSI_MOD_COLOR_BG6		"46"
+#define __UK_ANSI_MOD_COLOR_BG7		"47"
+
+#define UK_ANSI_MOD_COLOR(fg, bg)	__UK_ANSI_MOD2( \
+					 UK_CONCAT(__UK_ANSI_MOD_COLOR_FG, fg),\
+					 UK_CONCAT(__UK_ANSI_MOD_COLOR_BG, bg))
+#define UK_ANSI_MOD_COLORFG(fg)		__UK_ANSI_MOD1( \
+					 UK_CONCAT(__UK_ANSI_MOD_COLOR_FG, fg))
+#define UK_ANSI_MOD_COLORBG(bg)		__UK_ANSI_MOD1( \
+					 UK_CONCAT(__UK_ANSI_MOD_COLOR_BG, bg))
+
+#define UK_ANSI_COLOR_BLACK		0
+#define UK_ANSI_COLOR_RED		1
+#define UK_ANSI_COLOR_GREEN		2
+#define UK_ANSI_COLOR_YELLOW		3
+#define UK_ANSI_COLOR_BLUE		4
+#define UK_ANSI_COLOR_MAGENTA		5
+#define UK_ANSI_COLOR_CYAN		6
+#define UK_ANSI_COLOR_WHITE		7
+
 
 /**
  * Outputs a string to kernel console
