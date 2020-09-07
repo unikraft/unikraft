@@ -535,7 +535,7 @@ static struct uk_netdev_rx_queue *netfront_rxq_setup(struct uk_netdev *n,
 static int netfront_rxtx_alloc(struct netfront_dev *nfdev,
 		const struct uk_netdev_conf *conf)
 {
-	int rc = 0;
+	int rc = 0, i;
 
 	if (conf->nb_tx_queues != conf->nb_rx_queues) {
 		uk_pr_err("Different number of queues not supported\n");
@@ -553,6 +553,8 @@ static int netfront_rxtx_alloc(struct netfront_dev *nfdev,
 		rc = -ENOMEM;
 		goto err_free_txrx;
 	}
+	for (i = 0; i < nfdev->max_queue_pairs; i++)
+		nfdev->txqs[i].ring_size = NET_TX_RING_SIZE;
 
 	nfdev->rxqs = uk_calloc(drv_allocator,
 		nfdev->max_queue_pairs, sizeof(*nfdev->rxqs));
@@ -561,6 +563,8 @@ static int netfront_rxtx_alloc(struct netfront_dev *nfdev,
 		rc = -ENOMEM;
 		goto err_free_txrx;
 	}
+	for (i = 0; i < nfdev->max_queue_pairs; i++)
+		nfdev->rxqs[i].ring_size = NET_RX_RING_SIZE;
 
 	return rc;
 
