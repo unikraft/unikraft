@@ -31,8 +31,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
 #include "snprintf.h"
@@ -104,8 +102,10 @@ static void _print_stack(struct _vprint_console *cons)
 #endif
 
 static void _vprint(struct _vprint_console *cons,
-		    int lvl, const char *libname, const char *srcname,
-		    unsigned int srcline, const char *fmt, va_list ap)
+		    int lvl, const char *libname,
+		    const char *srcname __maybe_unused,
+		    unsigned int srcline __maybe_unused,
+		    const char *fmt, va_list ap)
 {
 	char lbuf[BUFLEN];
 	int len, llen;
@@ -163,6 +163,7 @@ static void _vprint(struct _vprint_console *cons,
 					   strlen(libname));
 				cons->cout("] ", 2);
 			}
+#if CONFIG_LIBUKDEBUG_PRINT_SRCNAME
 			if (srcname) {
 				char lnobuf[6];
 
@@ -174,6 +175,7 @@ static void _vprint(struct _vprint_console *cons,
 							 "%-5u", srcline));
 				cons->cout(": ", 2);
 			}
+#endif
 			cons->newline = 0;
 		}
 

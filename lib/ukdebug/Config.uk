@@ -69,6 +69,10 @@ config LIBUKDEBUG_PRINT_STACK
 	bool "Print bottom address of stack in messages"
 	default n
 
+config LIBUKDEBUG_PRINT_SRCNAME
+	bool "Print source code location of messages"
+	default y
+
 config LIBUKDEBUG_ENABLE_ASSERT
 	bool "Enable assertions"
 	default y
