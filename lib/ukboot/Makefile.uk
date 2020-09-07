@@ -5,6 +5,9 @@ CXXINCLUDES-$(CONFIG_LIBUKBOOT)	+= -I$(LIBUKBOOT_BASE)/include
 
 LIBUKBOOT_SRCS-y += $(LIBUKBOOT_BASE)/boot.c
 LIBUKBOOT_SRCS-y += $(LIBUKBOOT_BASE)/version.c
+ifneq ($(CONFIG_LIBUKBOOT_BANNER_NONE),y)
+LIBUKBOOT_SRCS-y += $(LIBUKBOOT_BASE)/banner.c
+endif
 
 # The main() is in the separate library to fool the LTO. Which is
 # trying to resolve the main() function call to whatever is available
