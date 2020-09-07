@@ -45,6 +45,44 @@
 #include <uk/errptr.h>
 #include <uk/arch/lcpu.h>
 
+#if CONFIG_LIBUKDEBUG_ANSI_COLOR
+#define LVLC_RESET	UK_ANSI_MOD_RESET
+#define LVLC_TS		UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_GREEN)
+#define LVLC_SP		UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_BLUE)
+#define LVLC_LIBNAME	UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_YELLOW)
+#define LVLC_SRCNAME	UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_CYAN)
+#define LVLC_DEBUG	UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_WHITE)
+#define LVLC_KERN	UK_ANSI_MOD_BOLD \
+			UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_BLUE)
+#define LVLC_INFO	UK_ANSI_MOD_BOLD \
+			UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_GREEN)
+#define LVLC_WARN	UK_ANSI_MOD_BOLD \
+			UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_YELLOW)
+#define LVLC_ERROR	UK_ANSI_MOD_BOLD \
+			UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_RED)
+#define LVLC_ERROR_MSG	UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_RED)
+#define LVLC_CRIT	UK_ANSI_MOD_BOLD \
+			UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_WHITE) \
+			UK_ANSI_MOD_COLORBG(UK_ANSI_COLOR_RED)
+
+#define LVLC_CRIT_MSG	UK_ANSI_MOD_BOLD \
+			UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_RED)
+#else
+#define LVLC_RESET	""
+#define LVLC_TS		""
+#define LVLC_SP		""
+#define LVLC_LIBNAME	""
+#define LVLC_SRCNAME	""
+#define LVLC_DEBUG	""
+#define LVLC_KERN	""
+#define LVLC_INFO	""
+#define LVLC_WARN	""
+#define LVLC_ERROR	""
+#define LVLC_ERROR_MSG	""
+#define LVLC_CRIT	""
+#define LVLC_CRIT_MSG	""
+#endif /* !CONFIG_LIBUKDEBUG_ANSI_COLOR */
+
 #define BUFLEN 192
 /* special level for printk redirection, used internally only */
 #define KLVL_DEBUG (-1)
@@ -81,7 +119,8 @@ static void _print_timestamp(struct _vprint_console *cons)
 	__nsec rem_usec = ukarch_time_subsec(nansec);
 
 	rem_usec = ukarch_time_nsec_to_usec(rem_usec);
-	len = __uk_snprintf(buf, BUFLEN, "[%5" __PRInsec ".%06" __PRInsec "] ",
+	len = __uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_TS
+			    "[%5" __PRInsec ".%06" __PRInsec "] ",
 			    sec, rem_usec);
 	cons->cout((char *)buf, len);
 }
@@ -96,7 +135,8 @@ static void _print_stack(struct _vprint_console *cons)
 
 	stackb = (ukarch_read_sp() & STACK_MASK_TOP) + __STACK_SIZE;
 
-	len = __uk_snprintf(buf, BUFLEN, "<%p> ", (void *) stackb);
+	len = __uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_SP
+			    "<%p> ", (void *) stackb);
 	cons->cout((char *)buf, len);
 }
 #endif
@@ -113,21 +153,25 @@ static void _vprint(struct _vprint_console *cons,
 	const char *lptr = NULL;
 	const char *nlptr = NULL;
 
+	/*
+	 * Note: We reset the console colors earlier in order to exclude
+	 *       background colors for trailing white spaces.
+	 */
 	switch (lvl) {
 	case KLVL_DEBUG:
-		msghdr = "dbg:  ";
+		msghdr = LVLC_RESET LVLC_DEBUG "dbg:" LVLC_RESET "  ";
 		break;
 	case KLVL_CRIT:
-		msghdr = "CRIT: ";
+		msghdr = LVLC_RESET LVLC_CRIT  "CRIT:" LVLC_RESET " ";
 		break;
 	case KLVL_ERR:
-		msghdr = "ERR:  ";
+		msghdr = LVLC_RESET LVLC_ERROR "ERR:" LVLC_RESET "  ";
 		break;
 	case KLVL_WARN:
-		msghdr = "Warn: ";
+		msghdr = LVLC_RESET LVLC_WARN  "Warn:" LVLC_RESET " ";
 		break;
 	case KLVL_INFO:
-		msghdr = "Info: ";
+		msghdr = LVLC_RESET LVLC_INFO  "Info:" LVLC_RESET " ";
 		break;
 	default:
 		/* unknown type: ignore */
@@ -153,12 +197,13 @@ static void _vprint(struct _vprint_console *cons,
 #if CONFIG_LIBUKDEBUG_PRINT_TIME
 			_print_timestamp(cons);
 #endif
-			cons->cout(DECONST(char *, msghdr), 6);
+			cons->cout(DECONST(char *, msghdr), strlen(msghdr));
 #if CONFIG_LIBUKDEBUG_PRINT_STACK
 			_print_stack(cons);
 #endif
 			if (libname) {
-				cons->cout("[", 1);
+				cons->cout(LVLC_RESET LVLC_LIBNAME "[",
+					   strlen(LVLC_RESET LVLC_LIBNAME) + 1);
 				cons->cout(DECONST(char *, libname),
 					   strlen(libname));
 				cons->cout("] ", 2);
@@ -167,13 +212,15 @@ static void _vprint(struct _vprint_console *cons,
 			if (srcname) {
 				char lnobuf[6];
 
+				cons->cout(LVLC_RESET LVLC_SRCNAME "<",
+					   strlen(LVLC_RESET LVLC_SRCNAME) + 1);
 				cons->cout(DECONST(char *, srcname),
 					   strlen(srcname));
 				cons->cout(" @ ", 3);
 				cons->cout(lnobuf,
 					   __uk_snprintf(lnobuf, sizeof(lnobuf),
-							 "%-5u", srcline));
-				cons->cout(": ", 2);
+							 "%4u", srcline));
+				cons->cout("> ", 2);
 			}
 #endif
 			cons->newline = 0;
@@ -186,7 +233,23 @@ static void _vprint(struct _vprint_console *cons,
 		} else {
 			llen = len;
 		}
+
+		/* Message body */
+		switch (lvl) {
+		case KLVL_CRIT:
+			cons->cout(LVLC_RESET LVLC_CRIT_MSG,
+				   strlen(LVLC_RESET LVLC_CRIT_MSG));
+			break;
+		case KLVL_ERR:
+			cons->cout(LVLC_RESET LVLC_ERROR_MSG,
+				   strlen(LVLC_RESET LVLC_ERROR_MSG));
+			break;
+		default:
+			cons->cout(LVLC_RESET, strlen(LVLC_RESET));
+		}
 		cons->cout((char *)lptr, llen);
+		cons->cout(LVLC_RESET, strlen(LVLC_RESET));
+
 		len -= llen;
 		lptr = nlptr + 1;
 	}
