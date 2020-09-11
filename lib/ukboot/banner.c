@@ -35,38 +35,96 @@
  */
 
 #include <uk/config.h>
+#include <uk/plat/console.h>
 #include <stdio.h>
+
+/*
+ * Color palette
+ */
+#if CONFIG_LIBUKBOOT_BANNER_POWEREDBY_ANSI || \
+    CONFIG_LIBUKBOOT_BANNER_POWEREDBY_EAANSI || \
+    CONFIG_LIBUKBOOT_BANNER_POWEREDBY_U8ANSI
+/* Blue version (ANSI) */
+#define B_RST UK_ANSI_MOD_RESET
+#define B_TXT UK_ANSI_MOD_RESET UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_WHITE)
+#define B_LTR UK_ANSI_MOD_RESET UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_BLUE)
+#define B_HL0 UK_ANSI_MOD_BOLD  UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_RED)
+#define B_HL1 UK_ANSI_MOD_RESET UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_RED)
+#define B_HL2 UK_ANSI_MOD_BOLD  UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_BLUE)
+#define B_HL3 UK_ANSI_MOD_RESET UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_BLUE)
+#elif CONFIG_LIBUKBOOT_BANNER_POWEREDBY_ANSI2 || \
+      CONFIG_LIBUKBOOT_BANNER_POWEREDBY_EAANSI2 || \
+      CONFIG_LIBUKBOOT_BANNER_POWEREDBY_U8ANSI2
+/* Gray version (ANSI) */
+#define B_RST UK_ANSI_MOD_RESET
+#define B_TXT UK_ANSI_MOD_RESET UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_WHITE)
+#define B_LTR UK_ANSI_MOD_BOLD  UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_BLACK)
+#define B_HL0 UK_ANSI_MOD_BOLD  UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_RED)
+#define B_HL1 UK_ANSI_MOD_RESET UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_RED)
+#define B_HL2 B_TXT
+#define B_HL3 B_LTR
+#else
+/* No colors */
+#define B_RST ""
+#define B_TXT B_RST
+#define B_LTR B_RST
+#define B_HL0 B_RST
+#define B_HL1 B_RST
+#define B_HL2 B_RST
+#define B_HL3 B_RST
+#endif
 
 
 void print_banner(FILE *out) {
-#if CONFIG_LIBUKBOOT_BANNER_POWEREDBY
-	fprintf(out, "Powered by\n");
-	fprintf(out, "o.   .o       _ _               __ _\n");
-	fprintf(out, "Oo   Oo  ___ (_) | __ __  __ _ ' _) :_\n");
-	fprintf(out, "oO   oO ' _ `| | |/ /  _)' _` | |_|  _)\n");
-	fprintf(out, "oOo oOO| | | | |   (| | | (_) |  _) :_\n");
-	fprintf(out, " OoOoO ._, ._:_:_,\\_._,  .__,_:_, \\___)\n");
-	fprintf(out, "%39s\n",
+#if CONFIG_LIBUKBOOT_BANNER_POWEREDBY || \
+    CONFIG_LIBUKBOOT_BANNER_POWEREDBY_ANSI || \
+    CONFIG_LIBUKBOOT_BANNER_POWEREDBY_ANSI2
+	fprintf(out, B_TXT "Powered by\n");
+	fprintf(out, B_HL2 "o" B_HL1 ".   " B_HL2 "." B_HL3 "o"
+		B_LTR "       _ _               __ _\n");
+	fprintf(out, B_HL0 "O" B_HL2 "o   " B_HL1 "O" B_HL0 "o"
+		B_LTR "  ___ (_) | __ __  __ _ ' _) :_\n");
+	fprintf(out, B_HL3 "o" B_HL0 "O   " B_HL2 "o" B_HL3 "O"
+		B_LTR " ' _ `| | |/ /  _)' _` | |_|  _)\n");
+	fprintf(out, B_HL1 "o" B_HL2 "Oo " B_HL1 "o" B_HL3 "O" B_HL1 "O"
+		B_LTR "| | | | |   (| | | (_) |  _) :_\n");
+	fprintf(out, B_HL3 " O" B_HL0 "o" B_HL3 "O" B_HL2 "o" B_HL3 "O "
+		B_LTR "._, ._:_:_,\\_._,  .__,_:_, \\___)\n");
+	fprintf(out, B_TXT "%39s" B_RST "\n",
 		STRINGIFY(UK_CODENAME) " " STRINGIFY(UK_FULLVERSION));
 
-#elif CONFIG_LIBUKBOOT_BANNER_POWEREDBY_EA
-	fprintf(out, "Powered by\n");
-	fprintf(out, "\xDF\xFE   \xFE\xDC       _ _               __ _\n");
-	fprintf(out, "\xDF\xFE   \xDF\xDC  ___ (_) | __ __  __ _ ' _) :_\n");
-	fprintf(out, "\xDC\xDF   \xDC\xFE ' _ `| | |/ /  _)' _` | |_|  _)\n");
-	fprintf(out, "\xFE\xDF\xFE \xFE\xDC\xDF| | | | |   (| | | (_) |  _) :_\n");
-	fprintf(out, " \xFE\xDC\xDF\xDC\xFE ._, ._:_:_,\\_._,  .__,_:_, \\___)\n");
-	fprintf(out, "%39s\n",
+#elif CONFIG_LIBUKBOOT_BANNER_POWEREDBY_EA ||		\
+      CONFIG_LIBUKBOOT_BANNER_POWEREDBY_EAANSI ||	\
+      CONFIG_LIBUKBOOT_BANNER_POWEREDBY_EAANSI2
+	fprintf(out, B_TXT "Powered by\n");
+	fprintf(out, B_HL2 "\xDF" B_HL1 "\xFE   " B_HL2 "\xFE" B_HL3 "\xDC"
+		B_LTR "       _ _               __ _\n");
+	fprintf(out, B_HL0 "\xDF" B_HL2 "\xFE   " B_HL1 "\xDF" B_HL0 "\xDC"
+		B_LTR "  ___ (_) | __ __  __ _ ' _) :_\n");
+	fprintf(out, B_HL3 "\xDC" B_HL0 "\xDF   " B_HL2 "\xDC" B_HL3 "\xFE"
+		B_LTR " ' _ `| | |/ /  _)' _` | |_|  _)\n");
+	fprintf(out, B_HL1 "\xFE" B_HL2 "\xDF\xFE " B_HL1 "\xFE" B_HL3 "\xDC" B_HL1 "\xDF"
+		B_LTR "| | | | |   (| | | (_) |  _) :_\n");
+	fprintf(out, B_HL3 " \xFE" B_HL0 "\xDC" B_HL3 "\xDF" B_HL2 "\xDC" B_HL3 "\xFE "
+		B_LTR "._, ._:_:_,\\_._,  .__,_:_, \\___)\n");
+	fprintf(out, B_TXT "%39s" B_RST "\n",
 		STRINGIFY(UK_CODENAME) " " STRINGIFY(UK_FULLVERSION));
 
-#elif CONFIG_LIBUKBOOT_BANNER_POWEREDBY_U8
-	fprintf(out, "Powered by\n");
-	fprintf(out, "■▖   ▖■       _ _               __ _\n");
-	fprintf(out, "■▚   ■▞  ___ (_) | __ __  __ _ ´ _) :_\n");
-	fprintf(out, "▀■   ■▄ ´ _ `| | |/ /  _)´ _` | |_|  _)\n");
-	fprintf(out, "▄▀▄ ▗▀▄| | | | |   (| | | (_) |  _) :_\n");
-	fprintf(out, " ▚▄■▄▞ ._, ._:_:_,\\_._,  .__,_:_, \\___)\n");
-	fprintf(out, "%39s\n",
+#elif CONFIG_LIBUKBOOT_BANNER_POWEREDBY_U8 ||		\
+	CONFIG_LIBUKBOOT_BANNER_POWEREDBY_U8ANSI ||	\
+	CONFIG_LIBUKBOOT_BANNER_POWEREDBY_U8ANSI2
+	fprintf(out, B_TXT "Powered by\n");
+	fprintf(out, B_HL2 "■" B_HL1 "▖   " B_HL2 "▖" B_HL3 "■"
+		B_LTR "       _ _               __ _\n");
+	fprintf(out, B_HL0 "■" B_HL2 "▚   " B_HL1 "■" B_HL0 "▞"
+		B_LTR "  ___ (_) | __ __  __ _ ´ _) :_\n");
+	fprintf(out, B_HL3 "▀" B_HL0 "■   " B_HL2 "■" B_HL3 "▄"
+		B_LTR " ´ _ `| | |/ /  _)´ _` | |_|  _)\n");
+	fprintf(out, B_HL1 "▄" B_HL2 "▀▄ " B_HL1 "▗" B_HL3 "▀" B_HL1 "▄"
+		B_LTR "| | | | |   (| | | (_) |  _) :_\n");
+	fprintf(out, B_HL3 " ▚" B_HL0 "▄" B_HL3 "■" B_HL2 "▄" B_HL3 "▞"
+		B_LTR " ._, ._:_:_,\\_._,  .__,_:_, \\___)\n");
+	fprintf(out, B_TXT "%39s" B_RST "\n",
 		STRINGIFY(UK_CODENAME) " " STRINGIFY(UK_FULLVERSION));
 
 #elif CONFIG_LIBUKBOOT_BANNER_POWEREDBY_CLASSIC
