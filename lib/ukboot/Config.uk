@@ -9,9 +9,33 @@ menuconfig LIBUKBOOT
 	# FIXME: binary buddy allocator is hard-coded for now
 
 if LIBUKBOOT
-	config LIBUKBOOT_BANNER
-	bool "Show Unikraft banner"
-	default y
+	choice LIBUKBOOT_BANNER
+	prompt "Unikraft banner"
+	default LIBUKBOOT_BANNER_POWEREDBY
+		config LIBUKBOOT_BANNER_NONE
+		bool "None"
+
+		config LIBUKBOOT_BANNER_MINIMAL
+		bool "One liner"
+
+		config LIBUKBOOT_BANNER_CLASSIC
+		bool "Classic banner"
+
+		config LIBUKBOOT_BANNER_POWEREDBY
+		bool "Powered by Unikraft"
+
+		config LIBUKBOOT_BANNER_POWEREDBY_EA
+		bool "Powered by Unikraft (ASCII)"
+		help
+		  Please make sure that your console display supports
+		  extended ASCII characters
+
+		config LIBUKBOOT_BANNER_POWEREDBY_U8
+		bool "Powered by Unikraft (UTF-8)"
+		help
+		  Please make sure that your console display supports
+		  UTF-8
+	endchoice
 
 	config LIBUKBOOT_MAXNBARGS
 	int "Maximum number of arguments (max. size of argv)"

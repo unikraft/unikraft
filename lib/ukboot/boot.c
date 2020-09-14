@@ -66,6 +66,7 @@
 #if CONFIG_LIBUKSP
 #include <uk/sp.h>
 #endif
+#include "banner.h"
 
 int main(int argc, char *argv[]) __weak;
 
@@ -101,15 +102,9 @@ static void main_thread_func(void *arg)
 		}
 	}
 
-#if CONFIG_LIBUKBOOT_BANNER
-	printf("Welcome to  _ __             _____\n");
-	printf(" __ _____  (_) /__ _______ _/ _/ /_\n");
-	printf("/ // / _ \\/ /  '_// __/ _ `/ _/ __/\n");
-	printf("\\_,_/_//_/_/_/\\_\\/_/  \\_,_/_/ \\__/\n");
-	printf("%35s\n",
-	       STRINGIFY(UK_CODENAME) " " STRINGIFY(UK_FULLVERSION));
+	print_banner(stdout);
 	fflush(stdout);
-#endif
+
 	/*
 	 * Application
 	 *
