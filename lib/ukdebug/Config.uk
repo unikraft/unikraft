@@ -73,6 +73,14 @@ config LIBUKDEBUG_PRINT_SRCNAME
 	bool "Print source code location of messages"
 	default y
 
+config LIBUKDEBUG_ANSI_COLOR
+	bool "Colored output"
+	default n
+	help
+	  Use ANSI control sequences to colorize console output.
+	  Before activating this option, please make sure that
+	  your console output/display supports ANSI.
+
 config LIBUKDEBUG_ENABLE_ASSERT
 	bool "Enable assertions"
 	default y
