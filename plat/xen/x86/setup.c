@@ -104,7 +104,7 @@ char _libxenplat_bootstack[2*__STACK_SIZE];
 /*
  * Memory region description
  */
-#define UKPLAT_MEMRD_MAX_ENTRIES 2
+#define UKPLAT_MEMRD_MAX_ENTRIES 3
 unsigned int _libxenplat_mrd_num;
 struct ukplat_memregion_desc _libxenplat_mrd[UKPLAT_MEMRD_MAX_ENTRIES];
 
@@ -163,6 +163,24 @@ static inline void _init_mem(void)
 			DEMAND_MAP_PAGES);
 
 	_libxenplat_mrd_num = 2;
+
+	/* initrd */
+	if (HYPERVISOR_start_info->mod_len) {
+		if (HYPERVISOR_start_info->flags & SIF_MOD_START_PFN)
+			_libxenplat_mrd[2].base  =
+				to_virt(HYPERVISOR_start_info->mod_start);
+		else
+			_libxenplat_mrd[2].base  =
+				(void *) HYPERVISOR_start_info->mod_start;
+		_libxenplat_mrd[2].len   =
+			(size_t) HYPERVISOR_start_info->mod_len;
+		_libxenplat_mrd[2].flags = (UKPLAT_MEMRF_INITRD
+					    | UKPLAT_MEMRF_WRITABLE);
+#if CONFIG_UKPLAT_MEMRNAME
+		_libxenplat_mrd[2].name  = "initrd";
+#endif
+		_libxenplat_mrd_num++;
+	}
 }
 
 void _libxenplat_x86entry(void *start_info) __noreturn;
