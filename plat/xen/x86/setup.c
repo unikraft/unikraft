@@ -90,8 +90,7 @@
 #include <xen/arch-x86/cpuid.h>
 #include <xen/arch-x86/hvm/start_info.h>
 
-#define MAX_CMDLINE_SIZE 1024
-static char cmdline[MAX_CMDLINE_SIZE];
+static char cmdline[MAX_GUEST_CMDLINE];
 
 start_info_t *HYPERVISOR_start_info;
 shared_info_t *HYPERVISOR_shared_info;
@@ -180,7 +179,7 @@ void _libxenplat_x86entry(void *start_info)
 	_init_shared_info(); /* remaps shared info */
 
 	strncpy(cmdline, (char *)HYPERVISOR_start_info->cmd_line,
-		MAX_CMDLINE_SIZE);
+		MAX_GUEST_CMDLINE);
 
 	/* Set up events. */
 	init_events();
@@ -193,5 +192,5 @@ void _libxenplat_x86entry(void *start_info)
 
 	init_console();
 
-	ukplat_entry_argp(CONFIG_UK_NAME, cmdline, MAX_CMDLINE_SIZE);
+	ukplat_entry_argp(CONFIG_UK_NAME, cmdline, MAX_GUEST_CMDLINE);
 }
