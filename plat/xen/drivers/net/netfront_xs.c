@@ -156,7 +156,7 @@ int netfront_xb_init(struct netfront_dev *nfdev, struct uk_alloc *a)
 		rc = PTR2ERR(mac_str);
 		goto no_conf;
 	}
-	uk_pr_info("\tMAC %s\n", mac_str);
+	uk_pr_debug("\tMAC via XenStore: %s\n", mac_str);
 
 	p = mac_str;
 	for (int i = 0; i < UK_NETDEV_HWADDR_LEN; i++) {
@@ -168,16 +168,15 @@ int netfront_xb_init(struct netfront_dev *nfdev, struct uk_alloc *a)
 	/* read IP address */
 	ip_str = xs_read(XBT_NIL, xendev->otherend, "ip");
 	if (PTRISERR(ip_str)) {
-		uk_pr_err("Error reading IP address.\n");
-		rc = PTR2ERR(ip_str);
-		goto no_conf;
+		uk_pr_debug("No IP address information found on XenStore\n");
+		memset(&nfdev->econf, 0, sizeof(struct xs_econf));
+	} else {
+		uk_pr_debug("\tIP via XenStore: %s\n", ip_str);
+		rc = xs_econf_init(&nfdev->econf, ip_str, a);
+		if (rc)
+			goto no_conf;
+		free(ip_str);
 	}
-	uk_pr_info("\tIP: %s\n", ip_str);
-
-	rc = xs_econf_init(&nfdev->econf, ip_str, a);
-	if (rc)
-		goto no_conf;
-	free(ip_str);
 
 	/* maximum queues number */
 	int_str = xs_read(XBT_NIL, xendev->otherend,
