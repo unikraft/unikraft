@@ -92,6 +92,7 @@ menu "Xenbus Drivers"
 
 menuconfig XEN_BLKFRONT
 	bool "Xenbus Blkfront Driver"
+	default y if LIBUKBLKDEV
 	default n
 	depends on LIBUKBLKDEV
 	help
@@ -117,6 +118,7 @@ config XEN_BLKFRONT_GREFPOOL
 
 menuconfig XEN_9PFRONT
 	bool "Xenbus 9pfront Driver"
+	default y if LIBUK9P
 	default n
 	depends on LIBUK9P
 	help
