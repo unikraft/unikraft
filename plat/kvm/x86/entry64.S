@@ -88,6 +88,7 @@ ENTRY(_libkvmplat_start32)
 	movl $0xc0000080, %ecx
 	rdmsr
 	orl $X86_EFER_LME, %eax
+	orl $X86_EFER_NXE, %eax
 	wrmsr
 
 	/* 3: load pml4 pointer */
