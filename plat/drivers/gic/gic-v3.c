@@ -43,7 +43,6 @@
 #include <uk/assert.h>
 #include <uk/bitops.h>
 #include <uk/asm.h>
-#include <uk/plat/common/irq.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/common/irq.h>
 #ifdef CONFIG_PLAT_KVM
@@ -51,19 +50,9 @@
 #endif
 #include <uk/plat/spinlock.h>
 #include <arm/cpu.h>
+#include <gic/gic.h>
 #include <gic/gic-v3.h>
 #include <ofw/fdt.h>
-
-/* SPI interrupt definitions */
-#define GIC_SPI_TYPE		0
-#define GIC_SPI_BASE		32
-
-/* PPI interrupt definitions */
-#define GIC_PPI_TYPE		1
-#define GIC_PPI_BASE		16
-
-/* Max support interrupt number for GICv3 */
-#define GIC_MAX_IRQ		__MAX_IRQ
 
 #define GIC_DIST_REG(r)	 ((void *)(gic_dist_addr + (r)))
 #define GIC_RDIST_REG(r) ((void *)(gic_rdist_addr + (r)))
@@ -86,6 +75,25 @@ inline void dist_unlock(void) { ukarch_spin_unlock(&gic_dist_lock); };
 inline void dist_lock(void) {};
 inline void dist_unlock(void) {};
 #endif /* CONFIG_HAVE_SMP */
+
+#ifdef CONFIG_HAVE_SMP
+__spinlock gicv3_dist_lock;
+#endif
+
+/** GICv3 driver */
+struct _gic_dev gicv3_drv = {
+	.version        = GIC_V3,
+	.is_present     = 0,
+	.is_probed      = 0,
+	.is_initialized = 0,
+	.dist_mem_addr  = 0,
+	.dist_mem_size  = 0,
+	.rdist_mem_addr = 0,
+	.rdist_mem_size = 0,
+#ifdef CONFIG_HAVE_SMP
+	.dist_lock      = &gicv3_dist_lock,
+#endif
+};
 
 static const char * const gic_device_list[] = {
 	"arm,gic-v3",
