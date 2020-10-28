@@ -532,7 +532,7 @@ static int virtio_netdev_rxq_dequeue(struct uk_netdev_rx_queue *rxq,
 	return ret;
 }
 
-static int virtio_netdev_recv(struct uk_netdev *dev,
+static int virtio_netdev_recv(struct uk_netdev *dev __maybe_unused,
 			      struct uk_netdev_rx_queue *queue,
 			      struct uk_netbuf **pkt)
 {
