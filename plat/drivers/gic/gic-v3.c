@@ -54,23 +54,7 @@
 #include <gic/gic-v3.h>
 #include <ofw/fdt.h>
 
-#define GIC_DIST_REG(r)	 ((void *)(gic_dist_addr + (r)))
-#define GIC_RDIST_REG(r) ((void *)(gic_rdist_addr + (r)))
-#define IRQ_TYPE_MASK	0x0000000f
-#define GIC_DIST_ADDR  (gic_dist_addr)
-#define GIC_RDIST_ADDR (gic_rdist_addr)
-
-static uint64_t gic_dist_addr, gic_rdist_addr;
-static uint64_t gic_dist_size, gic_rdist_size;
-#ifdef UKPLAT_LCPU_MULTICORE
-static char gic_is_initialized;
-DEFINE_SPINLOCK(gic_dist_lock);
-inline void dist_lock(void) { ukarch_spin_lock(&gic_dist_lock); };
-inline void dist_unlock(void) { ukarch_spin_unlock(&gic_dist_lock); };
-#else
-inline void dist_lock(void) {};
-inline void dist_unlock(void) {};
-#endif
+#define GIC_RDIST_REG(gdev, r) ((void *)(gdev.rdist_mem_addr + (r)))
 
 #ifdef UKPLAT_LCPU_MULTICORE
 DEFINE_SPINLOCK(gicv3_dist_lock);
@@ -99,37 +83,37 @@ static const char * const gic_device_list[] = {
 /* inline functions to access GICD & GICR registers */
 static inline void write_gicd8(uint64_t offset, uint8_t val)
 {
-	ioreg_write8(GIC_DIST_REG(offset), val);
+	ioreg_write8(GIC_DIST_REG(gicv3_drv, offset), val);
 }
 
 static inline void write_gicrd8(uint64_t offset, uint8_t val)
 {
-	ioreg_write8(GIC_RDIST_REG(offset), val);
+	ioreg_write8(GIC_RDIST_REG(gicv3_drv, offset), val);
 }
 
 static inline void write_gicd32(uint64_t offset, uint32_t val)
 {
-	ioreg_write32(GIC_DIST_REG(offset), val);
+	ioreg_write32(GIC_DIST_REG(gicv3_drv, offset), val);
 }
 
 static inline void write_gicd64(uint64_t offset, uint64_t val)
 {
-	ioreg_write64(GIC_DIST_REG(offset), val);
+	ioreg_write64(GIC_DIST_REG(gicv3_drv, offset), val);
 }
 
 static inline uint32_t read_gicd32(uint64_t offset)
 {
-	return ioreg_read32(GIC_DIST_REG(offset));
+	return ioreg_read32(GIC_DIST_REG(gicv3_drv, offset));
 }
 
 static inline void write_gicrd32(uint64_t offset, uint32_t val)
 {
-	ioreg_write32(GIC_RDIST_REG(offset), val);
+	ioreg_write32(GIC_RDIST_REG(gicv3_drv, offset), val);
 }
 
 static inline uint32_t read_gicrd32(uint64_t offset)
 {
-	return ioreg_read32(GIC_RDIST_REG(offset));
+	return ioreg_read32(GIC_RDIST_REG(gicv3_drv, offset));
 }
 
 /**
@@ -167,7 +151,7 @@ static uint32_t get_cpu_affinity(void)
 /**
  * \brief Acknowledging IRQ
  */
-uint32_t gic_ack_irq(void)
+static uint32_t gic_ack_irq(void)
 {
 	uint32_t irq;
 
@@ -182,7 +166,7 @@ uint32_t gic_ack_irq(void)
  * \brief Finish interrupt handling: Drop priority and deactivate the interrupt
  * \param [in] irq IRQ number
  */
-void gic_eoi_irq(uint32_t irq)
+static void gic_eoi_irq(uint32_t irq)
 {
 	/* Lower the priority */
 	SYSREG_WRITE32(ICC_EOIR1_EL1, irq);
@@ -196,9 +180,9 @@ void gic_eoi_irq(uint32_t irq)
 /**
  * Enable IRQ in distributor (SPIs) or redistributor (SGIs and PPIS)
  */
-void gic_enable_irq(uint32_t irq)
+static void gic_enable_irq(uint32_t irq)
 {
-	dist_lock();
+	dist_lock(gicv3_drv);
 
 #ifdef UKPLAT_LCPU_MULTICORE
 	/* Route this IRQ to the running core, i.e., route to the CPU interface
@@ -225,15 +209,15 @@ void gic_enable_irq(uint32_t irq)
 				UK_BIT(irq % GICR_I_PER_ISENABLERn));
 	}
 
-	dist_unlock();
+	dist_unlock(gicv3_drv);
 }
 
 /**
  * Disable an IRQ in distributor (SPIs) or in redistributor (SGIs and PPIs)
  */
-void gic_disable_irq(uint32_t irq)
+static void gic_disable_irq(uint32_t irq)
 {
-	dist_lock();
+	dist_lock(gicv3_drv);
 
 	if (irq >= GIC_SPI_BASE) {
 		/* Write to distributor register */
@@ -245,7 +229,7 @@ void gic_disable_irq(uint32_t irq)
 				UK_BIT(irq % GICR_I_PER_ICENABLERn));
 	}
 
-	dist_unlock();
+	dist_unlock(gicv3_drv);
 }
 
 /**
@@ -253,7 +237,7 @@ void gic_disable_irq(uint32_t irq)
  * \param [in] irq IRQ number
  * \param [in] affinity
  */
-void gic_set_irq_affinity(uint32_t irq, uint8_t affinity)
+static void gic_set_irq_affinity(uint32_t irq, uint8_t affinity)
 {
 	uint64_t irouter_val = 0; /* Interrupt_Routing_Mode = 0 */
 
@@ -264,9 +248,9 @@ void gic_set_irq_affinity(uint32_t irq, uint8_t affinity)
 	irouter_val = ((affinity << 8) & MPIDR_AFF3_MASK) |
 		(affinity & 0xffffff);
 
-	dist_lock();
+	dist_lock(gicv3_drv);
 	write_gicd64(GICD_IROUTER(irq), irouter_val);
-	dist_unlock();
+	dist_unlock(gicv3_drv);
 }
 
 /**
@@ -274,9 +258,9 @@ void gic_set_irq_affinity(uint32_t irq, uint8_t affinity)
  * \param [in] irq IRQ number
  * \param [in] priority Priority
  */
-void gic_set_irq_prio(uint32_t irq, uint8_t priority)
+static void gic_set_irq_prio(uint32_t irq, uint8_t priority)
 {
-	dist_lock();
+	dist_lock(gicv3_drv);
 
 	if (irq < GIC_SPI_BASE) {
 		/* Change in redistributor */
@@ -285,7 +269,7 @@ void gic_set_irq_prio(uint32_t irq, uint8_t priority)
 		write_gicd8(GICD_IPRIORITYR(irq), priority);
 	}
 
-	dist_unlock();
+	dist_unlock(gicv3_drv);
 }
 
 /**
@@ -293,11 +277,11 @@ void gic_set_irq_prio(uint32_t irq, uint8_t priority)
  */
 static void gic_enable_dist(void)
 {
-	dist_lock();
+	dist_lock(gicv3_drv);
 	write_gicd32(GICD_CTLR, GICD_CTLR_ARE_NS |
 			GICD_CTLR_ENABLE_G1A | GICD_CTLR_ENABLE_G1);
-	wait_for_rwp(GIC_DIST_ADDR);
-	dist_unlock();
+	wait_for_rwp(gicv3_drv.dist_mem_addr);
+	dist_unlock(gicv3_drv);
 }
 
 /**
@@ -306,10 +290,10 @@ static void gic_enable_dist(void)
 static void gic_disable_dist(void)
 {
 	/* Write 0 to disable distributor */
-	dist_lock();
+	dist_lock(gicv3_drv);
 	write_gicd32(GICD_CTLR, 0);
-	wait_for_rwp(GIC_DIST_ADDR);
-	dist_unlock();
+	wait_for_rwp(gicv3_drv.dist_mem_addr);
+	dist_unlock(gicv3_drv);
 }
 
 /**
@@ -348,7 +332,7 @@ static void gic_enable_redist(void)
 	write_gicrd32(GICR_ISENABLER0, GICD_DEF_SGI_ISENABLERn);
 
 	/* Wait for completion */
-	wait_for_rwp(GIC_RDIST_ADDR);
+	wait_for_rwp(gicv3_drv.rdist_mem_addr);
 
 	/* Enable system register access */
 	val  = SYSREG_READ32(ICC_SRE_EL1);
@@ -374,7 +358,7 @@ static void gic_enable_redist(void)
 }
 
 /* Config interrupt trigger type */
-void gic_set_irq_type(uint32_t irq, int trigger)
+static void gic_set_irq_type(uint32_t irq, int trigger)
 {
 	uint32_t val, mask, oldmask;
 
@@ -384,7 +368,7 @@ void gic_set_irq_type(uint32_t irq, int trigger)
 	if (trigger >= UK_IRQ_TRIGGER_MAX)
 		return;
 
-	dist_lock();
+	dist_lock(gicv3_drv);
 
 	val = read_gicd32(GICD_ICFGR(irq));
 	mask = oldmask = (val >> ((irq % GICD_I_PER_ICFGRn) * 2)) &
@@ -407,7 +391,7 @@ void gic_set_irq_type(uint32_t irq, int trigger)
 	val |= (mask << (irq % GICD_I_PER_ICFGRn) * 2);
 	write_gicd32(GICD_ICFGR(irq), val);
 
-	dist_unlock();
+	dist_unlock(gicv3_drv);
 }
 
 int32_t gic_irq_translate(uint32_t type, uint32_t hw_irq)
@@ -433,7 +417,7 @@ int32_t gic_irq_translate(uint32_t type, uint32_t hw_irq)
 	return -EINVAL;
 }
 
-void gic_handle_irq(void)
+static void gic_handle_irq(void)
 {
 	uint32_t stat, irq;
 
@@ -523,51 +507,24 @@ static void gic_init_dist(void)
 	}
 
 	/* Wait for completion */
-	wait_for_rwp(GIC_DIST_ADDR);
+	wait_for_rwp(gicv3_drv.dist_mem_addr);
 
 	/* Enable the distributor */
 	gic_enable_dist();
 }
 
-int _dtb_init_gic(const void *fdt)
+static int gic_initialize(void)
 {
-	int fdt_gic, ret;
-
 #ifdef UKPLAT_LCPU_MULTICORE
-	if (gic_is_initialized) {
+	if (gicv3_drv.is_initialized) {
 		/* GIC is already initialized, we just need to initialize
 		 * the CPU redistributor interface
 		 */
 		gic_enable_redist();
 		return 0;
 	}
-	gic_is_initialized = 1;
 #endif
-
-	uk_pr_info("Probing GICv3...\n");
-
-	/* Currently, we only support 1 GIC per system */
-	fdt_gic = fdt_node_offset_by_compatible_list(fdt, -1,
-				gic_device_list);
-	if (fdt_gic < 0)
-		UK_CRASH("Could not find GICv3 Interrupt Controller!\n");
-
-	/* Get device address and size at regs region */
-	ret = fdt_get_address(fdt, fdt_gic, 0,
-			&gic_dist_addr, &gic_dist_size);
-	if (ret < 0)
-		UK_CRASH("Could not find GICv3 distributor region!\n");
-
-	ret = fdt_get_address(fdt, fdt_gic, 1,
-			&gic_rdist_addr, &gic_rdist_size);
-	if (ret < 0)
-		UK_CRASH("Could not find GICv3 redistributor region!\n");
-
-	uk_pr_info("Found GICv3 on:\n");
-	uk_pr_info("\tDistributor  : 0x%lx - 0x%lx\n",
-		gic_dist_addr, gic_dist_addr + gic_dist_size - 1);
-	uk_pr_info("\tRedistributor: 0x%lx - 0x%lx\n",
-		gic_rdist_addr, gic_rdist_addr + gic_rdist_size - 1);
+	gicv3_drv.is_initialized = 1;
 
 	/* Initialize GICv3 distributor */
 	gic_init_dist();
@@ -576,4 +533,75 @@ int _dtb_init_gic(const void *fdt)
 	gic_enable_redist();
 
 	return 0;
+}
+
+struct _gic_dev *gicv3_probe(const void *fdt, int *ret)
+{
+#ifdef UKPLAT_LCPU_MULTICORE
+	if (gicv3_drv.is_probed) {
+		/* GIC is already probed, we don't need to probe again */
+		if (gicv3_drv.is_present)
+			return &gicv3_drv;
+		else
+			return NULL;
+	}
+#endif
+	gicv3_drv.is_probed = 1;
+
+	int fdt_gic, r;
+	struct _gic_operations drv_ops = {
+		.initialize        = gic_initialize,
+		.ack_irq           = gic_ack_irq,
+		.eoi_irq           = gic_eoi_irq,
+		.enable_irq        = gic_enable_irq,
+		.disable_irq       = gic_disable_irq,
+		.set_irq_type      = gic_set_irq_type,
+		.set_irq_prio      = gic_set_irq_prio,
+		.set_irq_affinity  = gic_set_irq_affinity,
+		.irq_translate     = gic_irq_translate,
+		.handle_irq        = gic_handle_irq,
+	};
+
+	/* Set driver functions */
+	gicv3_drv.ops = drv_ops;
+
+	/* Currently, we only support 1 GIC per system */
+	fdt_gic = fdt_node_offset_by_compatible_list(fdt, -1,
+				gic_device_list);
+	if (fdt_gic < 0) {
+		/* GICv3 not present */
+		*ret = -1;
+		return NULL;
+	}
+
+	/* Get device address and size at regs region */
+	r = fdt_get_address(fdt, fdt_gic, 0,
+			&gicv3_drv.dist_mem_addr, &gicv3_drv.dist_mem_size);
+	if (r < 0) {
+		uk_pr_err("Could not find GICv3 distributor region!\n");
+		*ret = r;
+		return NULL;
+	}
+
+	r = fdt_get_address(fdt, fdt_gic, 1,
+			&gicv3_drv.rdist_mem_addr, &gicv3_drv.rdist_mem_size);
+	if (r < 0) {
+		uk_pr_err("Could not find GICv3 redistributor region!\n");
+		*ret = r;
+		return NULL;
+	}
+
+	uk_pr_info("Found GICv3 on:\n");
+	uk_pr_info("\tDistributor  : 0x%lx - 0x%lx\n",
+		gicv3_drv.dist_mem_addr,
+		gicv3_drv.dist_mem_addr + gicv3_drv.dist_mem_size - 1);
+	uk_pr_info("\tRedistributor: 0x%lx - 0x%lx\n",
+		gicv3_drv.rdist_mem_addr,
+		gicv3_drv.rdist_mem_addr + gicv3_drv.rdist_mem_size - 1);
+
+	/* GICv3 is present */
+	gicv3_drv.is_present = 1;
+
+	*ret = 0;
+	return &gicv3_drv;
 }

@@ -1,8 +1,6 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Wei Chen <wei.chen@arm.com>
- *
- * Copyright (c) 2018, Arm Ltd., All rights reserved.
+ * Copyright (c) 2020, OpenSynergy GmbH. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,40 +27,41 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include <uk/assert.h>
-#include <kvm/intctrl.h>
-#include <arm/cpu.h>
-#include <arm/irq.h>
-#include <gic/gic.h>
-#include <kvm/config.h>
+#include <string.h>
+#include <libfdt.h>
+#include <uk/config.h>
 #include <uk/essentials.h>
+#include <uk/print.h>
+#include <uk/assert.h>
+#include <gic/gic.h>
+#include <gic/gic-v2.h>
+#include <gic/gic-v3.h>
+#include <ofw/fdt.h>
 
-/** Corresponding driver for GIC present on the hardware */
-struct _gic_dev *gic;
-
-void intctrl_init(void)
+/**
+ * Initialize GIC driver from device tree
+ * @param [in] fdt Pointer to fdt structure
+ * @return Pointer to the corresponding driver
+ */
+struct _gic_dev *_dtb_init_gic(const void *fdt)
 {
-	/* Initialize GIC from DTB */
-	gic = _dtb_init_gic(_libkvmplat_cfg.dtb);
-	if (!gic) {
-		UK_CRASH("Initialize GIC from DTB failed!\n");
-	} else {
-		/* Initialize GIC */
-		gic->ops.initialize();
-	}
+	int ret;
+	struct _gic_dev *gdev;
+
+	uk_pr_info("Probing GIC...\n");
+
+#if CONFIG_LIBGICV2
+	/* First, try GICv2 */
+	gdev = gicv2_probe(fdt, &ret);
+	if (gdev)
+		return gdev;
+#endif
+#if CONFIG_LIBGICV3
+	/* GICv2 is not present, try GICv3 */
+	gdev = gicv3_probe(fdt, &ret);
+	if (gdev)
+		return gdev;
+#endif
+	return NULL;
 }
 
-void intctrl_ack_irq(unsigned int irq __unused)
-{
-	//NOP
-}
-
-void intctrl_mask_irq(unsigned int irq)
-{
-	gic->ops.disable_irq(irq);
-}
-
-void intctrl_clear_irq(unsigned int irq)
-{
-	gic->ops.enable_irq(irq);
-}

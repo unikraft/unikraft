@@ -33,6 +33,8 @@
 #ifndef __PLAT_DRV_ARM_GIC_H__
 #define __PLAT_DRV_ARM_GIC_H__
 
+#include <gic/gic.h>
+
 /*
  * Distributor registers. Unikraft only support run on non-secure
  * so we just describe non-secure registers.
@@ -277,19 +279,6 @@ enum sgi_filter {
 #define GICC_DIR		0x1000
 
 /*
- * Acknowledging irq equals reading GICC_IAR also
- * get the interrupt ID as the side effect.
- */
-uint32_t gic_ack_irq(void);
-
-/*
- * write to GICC_EOIR to inform cpu interface completation
- * of interrupt processing. If GICC_CTLR.EOImode sets to 1
- * this func just gets priority drop.
- */
-void gic_eoi_irq(uint32_t irq);
-
-/*
  * Forward the SIG to the CPU interfaces specified in the
  * targetlist. Targetlist is a 8-bit bitmap for 0~7 CPU.
  */
@@ -307,68 +296,7 @@ void gic_sgi_gen_to_others(uint32_t sgintid);
  */
 void gic_sgi_gen_to_self(uint32_t sgintid);
 
-/*
- * set target cpu for irq in distributor,
- * @target: bitmask value, bit 1 indicates target to
- * corresponding cpu interface
- */
-void gic_set_irq_target(uint32_t irq, uint8_t target);
-
-/* set priority for irq in distributor */
-void gic_set_irq_prio(uint32_t irq, uint8_t priority);
-
-/*
- * Enable an irq in distributor, each irq occupies one bit
- * to configure in corresponding registor
- */
-void gic_enable_irq(uint32_t irq);
-
-/*
- * Disable an irq in distributor, one bit reserved for an irq
- * to configure in corresponding register
- */
-void gic_disable_irq(uint32_t irq);
-
-/*
- * set pending state for an irq in distributor, one bit
- * reserved for an irq to configure in corresponding register
- */
-void gic_set_irq_pending(uint32_t irq);
-
-/*
- * clear pending state for an irq in distributor, one bit
- * reserved for an irq to configure in corresponding register
- */
-void gic_clear_irq_pending(uint32_t irq);
-
-/*
- * inspect that if an irq is in pending state, every bit
- * holds the value for the corresponding irq
- */
-int gic_is_irq_pending(uint32_t irq);
-
-/* set active state for an irq in distributor */
-void gic_set_irq_active(uint32_t irq);
-
-/* clear active state for an irq in distributor */
-void gic_clear_irq_active(uint32_t irq);
-
-/*
- * inspect that if an irq is in active state,
- * every bit holds the value for an irq
- */
-int gic_is_irq_active(uint32_t irq);
-
-/* Config interrupt trigger type */
-void gic_set_irq_type(uint32_t irq, int trigger);
-
-/* Translate to hwirq according to type e.g. PPI SPI SGI */
-int gic_irq_translate(uint32_t type, uint32_t hw_irq);
-
-/* Handle IRQ entry */
-void gic_handle_irq(void);
-
-/* Initialize GICv2 from device tree */
-int _dtb_init_gic(const void *fdt);
+/* Probe GICv2 device */
+struct _gic_dev *gicv2_probe(const void *fdt, int *ret);
 
 #endif //__PLAT_DRV_ARM_GICV2_H__

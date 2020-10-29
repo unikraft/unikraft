@@ -31,6 +31,7 @@
 #define __PLAT_DRV_ARM_GIC_COMMON_H__
 
 #include <stdint.h>
+#include <uk/config.h>
 #include <uk/plat/spinlock.h>
 #include <uk/plat/common/irq.h>
 
@@ -42,8 +43,23 @@
 #define GIC_PPI_TYPE 1
 #define GIC_PPI_BASE 16
 
-/* Max support interrupt number for GIC */
+/** Max support interrupt number for GIC */
 #define GIC_MAX_IRQ  __MAX_IRQ
+
+/** Distributor register address */
+#define GIC_DIST_REG(gdev, r) ((void *)(gdev.dist_mem_addr + (r)))
+
+/** IRQ type mask */
+#define IRQ_TYPE_MASK 0x0000000f
+
+/* Distributor lock functions */
+#ifdef CONFIG_UKPLAT_LCPU_MULTICORE
+#define dist_lock(gdev) ukarch_spin_lock(gdev.dist_lock)
+#define dist_unlock(gdev) ukarch_spin_unlock(gdev.dist_lock)
+#else
+#define dist_lock(gdev) {}
+#define dist_unlock(gdev) {}
+#endif
 
 /** GIC hardware version */
 typedef enum _GIC_HW_VER {
@@ -119,4 +135,7 @@ struct _gic_dev {
 	struct _gic_operations ops;
 };
 
+/* Prototypes */
+struct _gic_dev *_dtb_init_gic(const void *fdt);
+int32_t gic_irq_translate(uint32_t type, uint32_t hw_irq);
 #endif /* __PLAT_DRV_ARM_GIC_COMMON_H__ */
