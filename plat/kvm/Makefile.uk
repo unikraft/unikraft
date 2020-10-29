@@ -14,6 +14,7 @@ $(eval $(call addplatlib_s,kvm,libkvmvirtionet,$(CONFIG_VIRTIO_NET)))
 $(eval $(call addplatlib_s,kvm,libkvmvirtioblk,$(CONFIG_VIRTIO_BLK)))
 $(eval $(call addplatlib_s,kvm,libkvmvirtio9p,$(CONFIG_VIRTIO_9P)))
 $(eval $(call addplatlib_s,kvm,libkvmofw,$(CONFIG_LIBOFW)))
+$(eval $(call addplatlib_s,kvm,libkvmgic,$(CONFIG_LIBGIC)))
 $(eval $(call addplatlib_s,kvm,libkvmgicv2,$(CONFIG_LIBGICV2)))
 
 ##
@@ -199,8 +200,10 @@ LIBKVMOFW_SRCS-$(CONFIG_LIBGICV2) += $(UK_PLAT_DRIVERS_BASE)/ofw/gic_fdt.c
 ##
 ## GICv2 library definitions
 ##
+ifeq ($(findstring y,$(CONFIG_LIBGICV2)),y)
 LIBKVMGICV2_CINCLUDES-y         += -I$(LIBKVMPLAT_BASE)/include
 LIBKVMGICV2_CINCLUDES-y         += -I$(UK_PLAT_COMMON_BASE)/include
 LIBKVMGICV2_CINCLUDES-y         += -I$(UK_PLAT_DRIVERS_BASE)/include
-
 LIBKVMGICV2_SRCS-y += $(UK_PLAT_DRIVERS_BASE)/gic/gic-v2.c
+LIBKVMGICV2_SRCS-y += $(UK_PLAT_DRIVERS_BASE)/gic/gic-common.c
+endif

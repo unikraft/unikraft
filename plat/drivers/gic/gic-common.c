@@ -1,8 +1,6 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Wei Chen <wei.chen@arm.com>
- *
- * Copyright (c) 2018, Arm Ltd., All rights reserved.
+ * Copyright (c) 2020, OpenSynergy GmbH. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,48 +27,54 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#include <string.h>
+#include <errno.h>
+#include <uk/config.h>
 #include <uk/assert.h>
-#include <kvm/intctrl.h>
-#include <arm/cpu.h>
-#include <arm/irq.h>
 #include <gic/gic.h>
-#include <kvm/config.h>
-#include <uk/essentials.h>
+#include <gic/gic-v2.h>
+#include <gic/gic-v3.h>
 
-/** Corresponding driver for GIC present on the hardware */
-struct _gic_dev *gic;
+/** Sanity check for GIC driver availability */
+#if !defined(CONFIG_LIBGICV2) && !defined(CONFIG_LIBGICV3)
+#error At least one GIC driver should be selected!
+#endif
 
-void intctrl_init(void)
+int _dtb_init_gic(const void *fdt, struct _gic_dev **dev)
 {
 	int rc;
 
-	/* Initialize GIC from DTB */
-	rc = _dtb_init_gic(_libkvmplat_cfg.dtb, &gic);
-	if (unlikely(rc))
-		goto EXIT_ERR;
+#ifdef CONFIG_LIBGICV2
+	/* First, try GICv2 */
+	rc = gicv2_probe(fdt, dev);
+	if (rc == 0)
+		return 0;
+#endif /* CONFIG_LIBGICV2 */
 
-	/* Initialize GIC */
-	rc = gic->ops.initialize();
-	if (unlikely(rc))
-		goto EXIT_ERR;
+#ifdef CONFIG_LIBGICV3
+	/* GICv2 is not present, try GICv3 */
+	rc = gicv3_probe(fdt, dev);
+	if (rc == 0)
+		return 0;
+#endif /* CONFIG_LIBGICV3 */
 
-	return;
-
-EXIT_ERR:
-	UK_CRASH("Initialize GIC from DTB failed (code: %d)!\n", rc);
+	*dev = NULL;
+	return rc;
 }
 
-void intctrl_ack_irq(unsigned int irq __unused)
+uint32_t gic_irq_translate(uint32_t type, uint32_t irq)
 {
-	//NOP
-}
+	UK_ASSERT(type == GIC_SPI_TYPE || type == GIC_PPI_TYPE);
 
-void intctrl_mask_irq(unsigned int irq)
-{
-	gic->ops.disable_irq(irq);
-}
+	switch (type) {
+	case GIC_SPI_TYPE:
+		UK_ASSERT((irq + GIC_SPI_BASE) < GIC_MAX_IRQ);
+		return irq + GIC_SPI_BASE;
 
-void intctrl_clear_irq(unsigned int irq)
-{
-	gic->ops.enable_irq(irq);
+	case GIC_PPI_TYPE:
+		UK_ASSERT((irq + GIC_PPI_BASE) < GIC_SPI_BASE);
+		return irq + GIC_PPI_BASE;
+	}
+
+	return (uint32_t)-1;
 }

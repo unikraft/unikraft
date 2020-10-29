@@ -38,6 +38,8 @@
 #ifndef __PLAT_DRV_ARM_GICV3_H__
 #define __PLAT_DRV_ARM_GICV3_H__
 
+#include <gic/gic.h>
+
 /** Affinity AFF3 bit mask */
 #define MPIDR_AFF3_MASK			0xff00000000
 /** Affinity AFF2 bit mask */
@@ -356,37 +358,20 @@
  * reading processor.
  */
 #define GICD_SPENDSGIRn		(0x0F20 + 4 * ((n) >> 2))
-#define GICD_I_PER_SPENDSGIRn   4
+#define GICD_I_PER_SPENDSGIRn	4
 
 /* Interrupt Acknowledge Register */
-#define GICC_IAR_INTID_MASK	    0x3FF
+#define GICC_IAR_INTID_MASK		0x3FF
 #define GICC_IAR_INTID_SPURIOUS	1023
 
-/* Acknowledging IRQ */
-uint32_t gic_ack_irq(void);
-
-/* Finish interrupt handling: Drop priority and deactivate the interrupt */
-void gic_eoi_irq(uint32_t irq);
-
-/* Enable IRQ in distributor (SPIs) or redistributor (SGIs and PPIS) */
-void gic_enable_irq(uint32_t irq);
-
-/* Disable an IRQ in distributor (SPIs) or in redistributor (SGIs and PPIs) */
-void gic_disable_irq(uint32_t irq);
-
-/* Set IRQ affinity routing */
-void gic_set_irq_affinity(uint32_t irq, uint8_t affinity);
-
-/* Set priority for IRQ in [re]distributor */
-void gic_set_irq_prio(uint32_t irq, uint8_t priority);
-
-/* Translate to hwirq according to type e.g. PPI SPI SGI */
-int gic_irq_translate(uint32_t type, uint32_t hw_irq);
-
-/* Handle IRQ entry */
-void gic_handle_irq(void);
-
-/* Initialize GICv3 from device tree */
-int _dtb_init_gic(const void *fdt);
+/**
+ * Probe device tree for GICv3
+ * NOTE: First time must not be called from multiple CPUs in parallel
+ *
+ * @param [in] fdt pointer to device tree
+ * @param [out] dev receives pointer to GICv3 if available, NULL otherwise
+ * @return 0 if device is available, an FDT (FDT_ERR_*) error otherwise
+ */
+int gicv3_probe(const void *fdt, struct _gic_dev **dev);
 
 #endif /* __PLAT_DRV_ARM_GICV3_H__ */
