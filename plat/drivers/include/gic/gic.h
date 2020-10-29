@@ -31,6 +31,7 @@
 #define __PLAT_DRV_ARM_GIC_COMMON_H__
 
 #include <stdint.h>
+#include <uk/config.h>
 #include <uk/plat/spinlock.h>
 #include <uk/plat/common/irq.h>
 
@@ -138,8 +139,6 @@ struct _gic_dev {
 	/** Driver operations */
 	struct _gic_operations ops;
 };
-
-/* Prototypes */
 
 /**
  * Initialize GIC driver from device tree

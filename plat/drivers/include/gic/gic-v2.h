@@ -33,8 +33,10 @@
 #ifndef __PLAT_DRV_ARM_GIC_H__
 #define __PLAT_DRV_ARM_GIC_H__
 
+#include <gic/gic.h>
+
 /*
- * Distributor registers. Unikraft only support run on non-secure
+ * Distributor registers. Unikraft only supports running on non-secure
  * so we just describe non-secure registers.
  */
 
@@ -194,21 +196,23 @@
 #define GICD_PPI_START
 
 enum sgi_filter {
-/*
- * Forward the interrupt to the CPU interfaces specified in the
- * CPUTargetList field
- */
+	/*
+	* Forward the interrupt to the CPU interfaces specified in the
+	* CPUTargetList field
+	*/
 	GICD_SGI_FILTER_TO_LIST = 0,
-/*
- * Forward the interrupt to all CPU interfaces except that of the
- * processor that requested the interrupt.
- */
+	/*
+	* Forward the interrupt to all CPU interfaces except that of the
+	* processor that requested the interrupt.
+	*/
 	GICD_SGI_FILTER_TO_OTHERS,
-/*
- * Forward the interrupt only to the CPU interface of the processor
- * that requested the interrupt.
- */
-	GICD_SGI_FILTER_TO_SELF
+	/*
+	* Forward the interrupt only to the CPU interface of the processor
+	* that requested the interrupt.
+	*/
+	GICD_SGI_FILTER_TO_SELF,
+
+	GICD_SGI_FILTER_MAX
 };
 
 /*
@@ -222,7 +226,7 @@ enum sgi_filter {
  * the reading processor.
  */
 #define GICD_CPENDSGIRn		(0x0F10 + 4 * ((n) >> 2))
-#define GICD_I_PER_CPENDSGIRn   4
+#define GICD_I_PER_CPENDSGIRn	4
 
 /*
  * SGI Set-Pending Registers, GICD_SPENDSGIRn
@@ -234,11 +238,11 @@ enum sgi_filter {
  * reading processor.
  */
 #define GICD_SPENDSGIRn		(0x0F20 + 4 * ((n) >> 2))
-#define GICD_I_PER_SPENDSGIRn   4
+#define GICD_I_PER_SPENDSGIRn	4
 
 
 /*
- * CPU interface registers. Unikraft only support run on non-secure
+ * CPU interface registers. Unikraft only supports running on non-secure
  * so we just describe non-secure registers.
  */
 
@@ -276,99 +280,39 @@ enum sgi_filter {
 /* Deactivate Interrupt Register */
 #define GICC_DIR		0x1000
 
-/*
- * Acknowledging irq equals reading GICC_IAR also
- * get the interrupt ID as the side effect.
+/**
+ * Forward the SGI to the CPU interfaces specified in the target.
+ *
+ * @param sgintid the SGI ID [0-15]
+ * @param target an 8-bit bitmap with 1 bit per CPU 0-7. A `1` bit
+ *    indicates that the SGI should be forwarded to the respective CPU
  */
-uint32_t gic_ack_irq(void);
+void gic_sgi_gen_to_list(uint32_t sgintid, uint8_t target);
 
-/*
- * write to GICC_EOIR to inform cpu interface completation
- * of interrupt processing. If GICC_CTLR.EOImode sets to 1
- * this func just gets priority drop.
- */
-void gic_eoi_irq(uint32_t irq);
-
-/*
- * Forward the SIG to the CPU interfaces specified in the
- * targetlist. Targetlist is a 8-bit bitmap for 0~7 CPU.
- */
-void gic_sgi_gen_to_list(uint32_t sgintid, uint8_t targetlist);
-
-/*
- * Forward the SGI to all CPU interfaces except that of the
- * processor that requested the interrupt.
+/**
+ * Forward the SGI to all CPU interfaces except that of the processor
+ * that requested the interrupt.
+ *
+ * @param sgintid the SGI ID [0-15]
  */
 void gic_sgi_gen_to_others(uint32_t sgintid);
 
-/*
+/**
  * Forward the SGI only to the CPU interface of the processor
  * that requested the interrupt.
+ *
+ * @param sgintid the SGI ID [0-15]
  */
 void gic_sgi_gen_to_self(uint32_t sgintid);
 
-/*
- * set target cpu for irq in distributor,
- * @target: bitmask value, bit 1 indicates target to
- * corresponding cpu interface
+/**
+ * Probe device tree for GICv2
+ * NOTE: First time must not be called from multiple CPUs in parallel
+ *
+ * @param [in] fdt pointer to device tree
+ * @param [out] dev receives pointer to GICv2 if available, NULL otherwise
+ * @return 0 if device is available, an FDT (FDT_ERR_*) error otherwise
  */
-void gic_set_irq_target(uint32_t irq, uint8_t target);
+int gicv2_probe(const void *fdt, struct _gic_dev **dev);
 
-/* set priority for irq in distributor */
-void gic_set_irq_prio(uint32_t irq, uint8_t priority);
-
-/*
- * Enable an irq in distributor, each irq occupies one bit
- * to configure in corresponding registor
- */
-void gic_enable_irq(uint32_t irq);
-
-/*
- * Disable an irq in distributor, one bit reserved for an irq
- * to configure in corresponding register
- */
-void gic_disable_irq(uint32_t irq);
-
-/*
- * set pending state for an irq in distributor, one bit
- * reserved for an irq to configure in corresponding register
- */
-void gic_set_irq_pending(uint32_t irq);
-
-/*
- * clear pending state for an irq in distributor, one bit
- * reserved for an irq to configure in corresponding register
- */
-void gic_clear_irq_pending(uint32_t irq);
-
-/*
- * inspect that if an irq is in pending state, every bit
- * holds the value for the corresponding irq
- */
-int gic_is_irq_pending(uint32_t irq);
-
-/* set active state for an irq in distributor */
-void gic_set_irq_active(uint32_t irq);
-
-/* clear active state for an irq in distributor */
-void gic_clear_irq_active(uint32_t irq);
-
-/*
- * inspect that if an irq is in active state,
- * every bit holds the value for an irq
- */
-int gic_is_irq_active(uint32_t irq);
-
-/* Config interrupt trigger type */
-void gic_set_irq_type(uint32_t irq, int trigger);
-
-/* Translate to hwirq according to type e.g. PPI SPI SGI */
-int gic_irq_translate(uint32_t type, uint32_t hw_irq);
-
-/* Handle IRQ entry */
-void gic_handle_irq(void);
-
-/* Initialize GICv2 from device tree */
-int _dtb_init_gic(const void *fdt);
-
-#endif //__PLAT_DRV_ARM_GICV2_H__
+#endif /* __PLAT_DRV_ARM_GICV2_H__ */
