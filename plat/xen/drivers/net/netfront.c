@@ -137,6 +137,8 @@ static int netfront_xmit(struct uk_netdev *n,
 	UK_ASSERT(txq != NULL);
 	UK_ASSERT(pkt != NULL);
 	UK_ASSERT(pkt->len < PAGE_SIZE);
+	UK_ASSERT(!pkt->next); /* TODO: Support for netbuf chains missing */
+	UK_ASSERT(((unsigned long) pkt->buf & ~PAGE_MASK) == 0);
 
 	nfdev = to_netfront_dev(n);
 
@@ -164,7 +166,7 @@ static int netfront_xmit(struct uk_netdev *n,
 	UK_ASSERT(tx_req->gref != GRANT_INVALID_REF);
 	txq->netbuf[id] = pkt;
 
-	tx_req->offset = 0;
+	tx_req->offset = (uint16_t) uk_netbuf_headroom(pkt);
 	tx_req->size = (uint16_t) pkt->len;
 	tx_req->flags = 0;
 	tx_req->id = id;
