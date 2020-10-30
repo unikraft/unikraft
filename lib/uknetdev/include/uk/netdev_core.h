@@ -147,6 +147,7 @@ struct uk_netdev_info {
 	uint16_t max_mtu;   /**< Maximum supported MTU size. */
 	uint16_t nb_encap_tx;  /**< Number of bytes required as headroom for tx. */
 	uint16_t nb_encap_rx;  /**< Number of bytes required as headroom for rx. */
+	uint16_t ioalign;  /**< Alignment in bytes for packet data buffers */
 	uint32_t features; /**< bitmap of the features supported */
 };
 
@@ -156,8 +157,8 @@ struct uk_netdev_info {
 struct uk_netdev_queue_info {
 	uint16_t nb_max;        /**< Max allowed number of descriptors. */
 	uint16_t nb_min;        /**< Min allowed number of descriptors. */
-	uint16_t nb_align;      /**< Number should be a multiple of nb_align. */
-	int nb_is_power_of_two; /**< Number should be a power of two. */
+	uint16_t nb_align;      /**< Number of descriptors should be aligned. */
+	int nb_is_power_of_two; /**< Number of descriptors should be a power of two. */
 };
 
 /**
