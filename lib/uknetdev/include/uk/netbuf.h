@@ -119,6 +119,7 @@ struct uk_netbuf {
 
 	uk_netbuf_dtor_t dtor; /**< Destructor callback */
 	struct uk_alloc *_a;   /**< @internal Allocator for free'ing */
+	void *_b;              /**< @internal Base address for free'ing */
 };
 
 /*

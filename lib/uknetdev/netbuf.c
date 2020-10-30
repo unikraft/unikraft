@@ -58,7 +58,8 @@ void uk_netbuf_init_indir(struct uk_netbuf *m,
 
 	m->priv   = priv;
 	m->dtor   = dtor;
-	m->_a      = NULL;
+	m->_a     = NULL;
+	m->_b     = NULL;
 }
 
 struct uk_netbuf *uk_netbuf_alloc_indir(struct uk_alloc *a,
@@ -89,6 +90,7 @@ struct uk_netbuf *uk_netbuf_alloc_indir(struct uk_alloc *a,
 	 * for free'ing this uk_netbuf.
 	 */
 	m->_a = a;
+	m->_b = m;
 
 	return m;
 }
@@ -138,10 +140,11 @@ struct uk_netbuf *uk_netbuf_alloc_buf(struct uk_alloc *a, size_t buflen,
 			     privlen > 0 ? ((void *) m + priv_offset) : NULL,
 			     dtor);
 
-	/* Save reference to allocator that is used
-	 * for free'ing this uk_netbuf.
+	/* Save reference to allocator and allocation
+	 * that is used for free'ing this uk_netbuf.
 	 */
 	m->_a = a;
+	m->_b = m;
 
 	return m;
 }
@@ -246,6 +249,7 @@ void uk_netbuf_append(struct uk_netbuf *head,
 void uk_netbuf_free_single(struct uk_netbuf *m)
 {
 	struct uk_alloc *a;
+	void *b;
 
 	UK_ASSERT(m);
 
@@ -258,19 +262,20 @@ void uk_netbuf_free_single(struct uk_netbuf *m)
 		/* Disconnect this netbuf from the chain. */
 		uk_netbuf_disconnect(m);
 
-		/* Copy the reference of the allocator in case
-		 * the destructor is free'ing up our memory
+		/* Copy the reference of the allocator and base address
+		 * in case the destructor is free'ing up our memory
 		 * (e.g., uk_netbuf_init_indir() used).
-		 * In such a case `a` should be (NULL), however
-		 * we need to access it for a  check after we have
-		 * called the destructor.
+		 * In such a case `a` and `b` should be (NULL),
+		 * however we need to access them for a check after
+		 * we have called the destructor.
 		 */
 		a = m->_a;
+		b = m->_b;
 
 		if (m->dtor)
 			m->dtor(m);
-		if (a)
-			uk_free(a, m);
+		if (a && b)
+			uk_free(a, b);
 	} else {
 		uk_pr_debug("Not freeing netbuf %p (next: %p): refcount greater than 1",
 			    m, m->next);
