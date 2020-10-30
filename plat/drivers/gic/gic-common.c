@@ -28,15 +28,17 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 #include <string.h>
-#include <libfdt.h>
+#include <errno.h>
 #include <uk/config.h>
-#include <uk/essentials.h>
 #include <uk/print.h>
-#include <uk/assert.h>
 #include <gic/gic.h>
 #include <gic/gic-v2.h>
 #include <gic/gic-v3.h>
-#include <ofw/fdt.h>
+
+/** Sanity check for GIC driver availability */
+#if !defined(CONFIG_LIBGICV2) && !defined(CONFIG_LIBGICV3)
+#error At least one GIC driver should be selected!
+#endif
 
 /**
  * Initialize GIC driver from device tree
@@ -50,18 +52,43 @@ struct _gic_dev *_dtb_init_gic(const void *fdt)
 
 	uk_pr_info("Probing GIC...\n");
 
-#if CONFIG_LIBGICV2
+#ifdef CONFIG_LIBGICV2
 	/* First, try GICv2 */
 	gdev = gicv2_probe(fdt, &ret);
 	if (gdev)
 		return gdev;
 #endif
-#if CONFIG_LIBGICV3
+
+#ifdef CONFIG_LIBGICV3
 	/* GICv2 is not present, try GICv3 */
 	gdev = gicv3_probe(fdt, &ret);
 	if (gdev)
 		return gdev;
 #endif
+
 	return NULL;
+}
+
+int32_t gic_irq_translate(uint32_t type, uint32_t hw_irq)
+{
+	uint32_t irq;
+
+	switch (type) {
+	case GIC_SPI_TYPE:
+		irq = hw_irq + GIC_SPI_BASE;
+		if (irq >= GIC_SPI_BASE && irq < GIC_MAX_IRQ)
+			return irq;
+		break;
+	case GIC_PPI_TYPE:
+		irq = hw_irq + GIC_PPI_BASE;
+		if (irq >= GIC_PPI_BASE && irq < GIC_SPI_BASE)
+			return irq;
+		break;
+	default:
+		uk_pr_warn("Invalid IRQ type [%d]\n", type);
+	}
+
+	uk_pr_err("irq is out of range\n");
+	return -EINVAL;
 }
 

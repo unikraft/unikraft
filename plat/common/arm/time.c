@@ -40,7 +40,7 @@
 #include <uk/plat/common/cpu.h>
 #include <ofw/gic_fdt.h>
 #include <uk/plat/common/irq.h>
-#include <gic/gic-v2.h>
+#include <gic/gic.h>
 #include <arm/time.h>
 
 /* TODO: For now this file is KVM dependent. As soon as we have more

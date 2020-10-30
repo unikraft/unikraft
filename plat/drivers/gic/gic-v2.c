@@ -319,29 +319,6 @@ static void gic_set_irq_type(uint32_t irq, int trigger)
 	dist_unlock(gicv2_drv);
 }
 
-int32_t gic_irq_translate(uint32_t type, uint32_t hw_irq)
-{
-	uint32_t irq;
-
-	switch (type) {
-	case GIC_SPI_TYPE:
-		irq = hw_irq + GIC_SPI_BASE;
-		if (irq >= GIC_SPI_BASE && irq < __MAX_IRQ)
-			return irq;
-		break;
-	case GIC_PPI_TYPE:
-		irq = hw_irq + GIC_PPI_BASE;
-		if (irq >= GIC_PPI_BASE && irq < GIC_SPI_BASE)
-			return irq;
-		break;
-	default:
-		uk_pr_warn("Invalid IRQ type [%d]\n", type);
-	}
-
-	uk_pr_err("irq is out of range\n");
-	return -EINVAL;
-}
-
 static void gic_handle_irq(void)
 {
 	uint32_t stat, irq;
