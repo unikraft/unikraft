@@ -99,7 +99,7 @@ struct uk_netbuf *uk_netbuf_alloc_indir(struct uk_alloc *a,
 }
 
 struct uk_netbuf *uk_netbuf_alloc_buf(struct uk_alloc *a, size_t buflen,
-				      uint16_t headroom,
+				      size_t bufalign, uint16_t headroom,
 				      size_t privlen, uk_netbuf_dtor_t dtor)
 {
 	void *mem;
@@ -111,7 +111,7 @@ struct uk_netbuf *uk_netbuf_alloc_buf(struct uk_alloc *a, size_t buflen,
 
 	alloc_len = NETBUF_ADDR_ALIGN_UP(buflen)
 		    + NETBUF_ADDR_ALIGN_UP(sizeof(*m) + privlen);
-	mem = uk_malloc(a, alloc_len);
+	mem = uk_memalign(a, bufalign, alloc_len);
 	if (!mem)
 		return NULL;
 

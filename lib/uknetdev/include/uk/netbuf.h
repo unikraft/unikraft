@@ -245,6 +245,8 @@ struct uk_netbuf *uk_netbuf_alloc_indir(struct uk_alloc *a,
  *   to this allocator.
  * @param buflen
  *   Size of the buffer area
+ * @param bufalign
+ *   Alignment for the buffer area (`m->buf` will be aligned to it)
  * @param headroom
  *   Number of bytes reserved as headroom from the buffer area.
  *   `headroom` has to be smaller or equal to `buflen`.
@@ -263,7 +265,7 @@ struct uk_netbuf *uk_netbuf_alloc_indir(struct uk_alloc *a,
  *   - initialized uk_netbuf
  */
 struct uk_netbuf *uk_netbuf_alloc_buf(struct uk_alloc *a, size_t buflen,
-				      uint16_t headroom,
+				      size_t bufalign, uint16_t headroom,
 				      size_t privlen, uk_netbuf_dtor_t dtor);
 
 /**
