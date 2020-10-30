@@ -30,6 +30,7 @@
 #ifndef _LINUX_BITMAP_H_
 #define	_LINUX_BITMAP_H_
 
+#include <string.h>
 #include <uk/bitops.h>
 
 static inline void
