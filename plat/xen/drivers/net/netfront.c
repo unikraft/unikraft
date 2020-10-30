@@ -263,11 +263,18 @@ static int netfront_rxq_dequeue(struct uk_netdev_rx_queue *rxq,
 	gnttab_end_access(rxq->gref[id]);
 
 	buf = rxq->netbuf[id];
-	len = (uint16_t) rx_rsp->status;
-	if (len > UK_ETH_FRAME_MAXLEN)
-		len = UK_ETH_FRAME_MAXLEN;
-	buf->len = len;
-	buf->data = buf->buf;
+	if (unlikely(rx_rsp->status < 0)) {
+		uk_pr_err("rxq %p: Receive error %d!\n", rxq, rx_rsp->status);
+		buf->len = 0;
+	} else {
+		len = (uint16_t) rx_rsp->status;
+		if (len > UK_ETH_FRAME_MAXLEN)
+			len = UK_ETH_FRAME_MAXLEN;
+
+		buf->data = (void *)((__uptr) buf->buf + rx_rsp->offset);
+		buf->len = len;
+		UK_ASSERT(IN_RANGE(buf->data, buf->buf, buf->buflen));
+	}
 
 	*netbuf = buf;
 
