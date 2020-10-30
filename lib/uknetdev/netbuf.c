@@ -37,7 +37,10 @@
 
 /* Used to align netbuf's priv and data areas to `long long` data type */
 #define NETBUF_ADDR_ALIGNMENT (sizeof(long long))
-#define NETBUF_ADDR_ALIGN_UP(x) ALIGN_UP((x), NETBUF_ADDR_ALIGNMENT)
+#define NETBUF_ADDR_ALIGN_UP(x)   ALIGN_UP((__uptr) (x), \
+					   NETBUF_ADDR_ALIGNMENT)
+#define NETBUF_ADDR_ALIGN_DOWN(x) ALIGN_DOWN((__uptr) (x), \
+					     NETBUF_ADDR_ALIGNMENT)
 
 void uk_netbuf_init_indir(struct uk_netbuf *m,
 			  void *buf, size_t buflen, uint16_t headroom,
@@ -99,52 +102,34 @@ struct uk_netbuf *uk_netbuf_alloc_buf(struct uk_alloc *a, size_t buflen,
 				      uint16_t headroom,
 				      size_t privlen, uk_netbuf_dtor_t dtor)
 {
+	void *mem;
+	size_t alloc_len;
 	struct uk_netbuf *m;
-	size_t buf_offset = 0;
-	size_t priv_offset = 0;
-	size_t headroom_extra = 0;
 
 	UK_ASSERT(buflen > 0);
 	UK_ASSERT(headroom <= buflen);
 
-	m = uk_malloc(a, NETBUF_ADDR_ALIGN_UP(sizeof(*m))
-		      + NETBUF_ADDR_ALIGN_UP(privlen)
-		      + buflen);
-	if (!m)
+	alloc_len = NETBUF_ADDR_ALIGN_UP(buflen)
+		    + NETBUF_ADDR_ALIGN_UP(sizeof(*m) + privlen);
+	mem = uk_malloc(a, alloc_len);
+	if (!mem)
 		return NULL;
 
-	/* Place buf right behind `m` or `m->priv` region if privlen > 0.
-	 * In order to keep `m->data - headroom` aligned the padding bytes
-	 *  are added to the headroom.
-	 * We can only do this if the given headroom stays within
-	 *  uint16_t bounds after the operation.
-	 */
-	if (likely((size_t)(UINT16_MAX - headroom) > NETBUF_ADDR_ALIGNMENT)) {
-		if (privlen == 0) {
-			priv_offset    = 0;
-			buf_offset     = sizeof(*m);
-			headroom_extra = NETBUF_ADDR_ALIGN_UP(sizeof(*m))
-					 - sizeof(*m);
-		} else {
-			priv_offset    = NETBUF_ADDR_ALIGN_UP(sizeof(*m));
-			buf_offset     = priv_offset + privlen;
-			headroom_extra = NETBUF_ADDR_ALIGN_UP(privlen)
-					 - privlen;
-		}
+	m = uk_netbuf_prepare_buf(mem,
+				  alloc_len,
+				  headroom,
+				  privlen,
+				  dtor);
+	if (!m) {
+		uk_free(a, mem);
+		return NULL;
 	}
-
-	uk_netbuf_init_indir(m,
-			     (void *) m + buf_offset,
-			     buflen + headroom_extra,
-			     headroom + headroom_extra,
-			     privlen > 0 ? ((void *) m + priv_offset) : NULL,
-			     dtor);
 
 	/* Save reference to allocator and allocation
 	 * that is used for free'ing this uk_netbuf.
 	 */
 	m->_a = a;
-	m->_b = m;
+	m->_b = mem;
 
 	return m;
 }
@@ -154,41 +139,29 @@ struct uk_netbuf *uk_netbuf_prepare_buf(void *mem, size_t size,
 					size_t privlen, uk_netbuf_dtor_t dtor)
 {
 	struct uk_netbuf *m;
-	size_t buf_offset = 0;
-	size_t priv_offset = 0;
+	size_t meta_len = 0;
 
 	UK_ASSERT(mem);
-	if ((NETBUF_ADDR_ALIGN_UP(sizeof(*m))
-	     + NETBUF_ADDR_ALIGN_UP(privlen)
-	     + headroom) > size)
+
+	/* Place headroom and buf at the beginning of the allocation,
+	 * This is done in order to forward potential alignments of the
+	 * underlying allocation directly to the netbuf data area.
+	 * `m` (followed by `m->priv` if privlen > 0) will be placed at
+	 * the end of the given memory.
+	 */
+	meta_len = NETBUF_ADDR_ALIGN_UP(sizeof(*m) + privlen);
+	if (meta_len > NETBUF_ADDR_ALIGN_DOWN((__uptr) mem + size))
 		return NULL;
 
-	/* Place buf right behind `m` or `m->priv` region if privlen > 0.
-	 * In order to keep `m->data - headroom` aligned the padding bytes
-	 *  are added to the headroom.
-	 * We can only do this if the given headroom stays within
-	 *  uint16_t bounds after the operation.
-	 */
-	if (likely((size_t)(UINT16_MAX - headroom) > NETBUF_ADDR_ALIGNMENT)) {
-		if (privlen == 0) {
-			priv_offset = 0;
-			buf_offset  = sizeof(*m);
-			headroom   += NETBUF_ADDR_ALIGN_UP(sizeof(*m))
-				      - sizeof(*m);
-		} else {
-			priv_offset = NETBUF_ADDR_ALIGN_UP(sizeof(*m));
-			buf_offset  = priv_offset + privlen;
-			headroom   += NETBUF_ADDR_ALIGN_UP(privlen)
-				      - privlen;
-		}
-	}
+	m = (struct uk_netbuf *) (NETBUF_ADDR_ALIGN_DOWN((__uptr) mem + size)
+				  - meta_len);
 
-	m = (struct uk_netbuf *) mem;
 	uk_netbuf_init_indir(m,
-			     mem + buf_offset,
-			     size - buf_offset,
+			     mem,
+			     (size_t) ((__uptr) m - (__uptr) mem),
 			     headroom,
-			     privlen > 0 ? (mem + priv_offset) : NULL,
+			     privlen > 0 ? (void *) ((__uptr) m+ sizeof(*m))
+					 : NULL,
 			     dtor);
 	return m;
 }

@@ -57,18 +57,6 @@ typedef void (*uk_netbuf_dtor_t)(struct uk_netbuf *);
  * The structure can be chained to describe a packet with multiple scattered
  * buffers.
  *
- * NETBUF
- *                  +----------------------+
- *                  |   struct uk_netbuf   |
- *                  |                      |
- *                  +----------------------+
- *
- * PRIVATE META DATA
- *         *priv -> +----------------------+
- *                  |      private meta    |
- *                  |       data area      |
- *                  +----------------------+
- *
  * PACKET BUFFER
  *          *buf -> +----------------------+ \
  *                  |      HEAD ROOM       |  |
@@ -82,6 +70,17 @@ typedef void (*uk_netbuf_dtor_t)(struct uk_netbuf *);
  *                  |      TAIL ROOM       |  |
  * *buf + buflen -> +----------------------+ /
  *
+ * NETBUF
+ *                  +----------------------+
+ *                  |   struct uk_netbuf   |
+ *                  |                      |
+ *                  +----------------------+
+ *
+ * PRIVATE META DATA
+ *         *priv -> +----------------------+
+ *                  |      private meta    |
+ *                  |       data area      |
+ *                  +----------------------+
  *
  * The private data area is intended for glue code that wants to embed stack-
  * specific data to the netbuf (e.g., `struct pbuf` for lwIP). This avoids
@@ -237,7 +236,8 @@ struct uk_netbuf *uk_netbuf_alloc_indir(struct uk_alloc *a,
 
 /**
  * Allocate and initialize netbuf with data buffer area.
- * m->len is initialized with 0.
+ * m->len is initialized with 0. Metadata (struct uknetbuf, priv)
+ * is placed at the end of the according allocation.
  * @param a
  *   Allocator to be used for allocating `struct uk_netbuf` and the
  *   corresponding buffer area (single allocation).
@@ -268,7 +268,8 @@ struct uk_netbuf *uk_netbuf_alloc_buf(struct uk_alloc *a, size_t buflen,
 
 /**
  * Initialize netbuf with data buffer on a user given allocated memory area
- * m->len is initialized with 0.
+ * m->len is initialized with 0. Metadata (struct uknetbuf, priv)
+ * is placed at the end of the given allocation.
  * @param mem
  *   Reference to user provided memory region
  * @param buflen
