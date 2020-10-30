@@ -15,7 +15,6 @@ $(eval $(call addplatlib_s,kvm,libkvmvirtioblk,$(CONFIG_VIRTIO_BLK)))
 $(eval $(call addplatlib_s,kvm,libkvmvirtio9p,$(CONFIG_VIRTIO_9P)))
 $(eval $(call addplatlib_s,kvm,libkvmofw,$(CONFIG_LIBOFW)))
 $(eval $(call addplatlib_s,kvm,libkvmgic,$(CONFIG_LIBGIC)))
-$(eval $(call addplatlib_s,kvm,libkvmgicv2,$(CONFIG_LIBGICV2)))
 
 ##
 ## Platform library definitions
@@ -194,16 +193,21 @@ LIBKVMOFW_CINCLUDES-y         += -I$(LIBKVMPLAT_BASE)/include
 LIBKVMOFW_CINCLUDES-y         += -I$(UK_PLAT_COMMON_BASE)/include
 LIBKVMOFW_CINCLUDES-y         += -I$(UK_PLAT_DRIVERS_BASE)/include
 
-LIBKVMOFW_SRCS-y                  += $(UK_PLAT_DRIVERS_BASE)/ofw/fdt.c
-LIBKVMOFW_SRCS-$(CONFIG_LIBGICV2) += $(UK_PLAT_DRIVERS_BASE)/ofw/gic_fdt.c
+LIBKVMOFW_SRCS-y                += $(UK_PLAT_DRIVERS_BASE)/ofw/fdt.c
+LIBKVMOFW_SRCS-$(CONFIG_LIBGIC) += $(UK_PLAT_DRIVERS_BASE)/ofw/gic_fdt.c
 
 ##
-## GICv2 library definitions
+## GIC library definitions
 ##
+ifeq ($(findstring y,$(CONFIG_LIBGIC)),y)
+LIBKVMGIC_CINCLUDES-y         += -I$(LIBKVMPLAT_BASE)/include
+LIBKVMGIC_CINCLUDES-y         += -I$(UK_PLAT_COMMON_BASE)/include
+LIBKVMGIC_CINCLUDES-y         += -I$(UK_PLAT_DRIVERS_BASE)/include
+LIBKVMGIC_SRCS-y += $(UK_PLAT_DRIVERS_BASE)/gic/gic-common.c
 ifeq ($(findstring y,$(CONFIG_LIBGICV2)),y)
-LIBKVMGICV2_CINCLUDES-y         += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMGICV2_CINCLUDES-y         += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMGICV2_CINCLUDES-y         += -I$(UK_PLAT_DRIVERS_BASE)/include
-LIBKVMGICV2_SRCS-y += $(UK_PLAT_DRIVERS_BASE)/gic/gic-v2.c
-LIBKVMGICV2_SRCS-y += $(UK_PLAT_DRIVERS_BASE)/gic/gic-common.c
+LIBKVMGIC_SRCS-y += $(UK_PLAT_DRIVERS_BASE)/gic/gic-v2.c
+endif
+ifeq ($(findstring y,$(CONFIG_LIBGICV3)),y)
+LIBKVMGIC_SRCS-y += $(UK_PLAT_DRIVERS_BASE)/gic/gic-v3.c
+endif
 endif
