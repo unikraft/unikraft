@@ -26,7 +26,7 @@ Quick start
   system in addition on how to use ``kraft`` with Docker is covered in
   :ref:`advanced_usage`.
 
-Once ``kraft`` it installed you can begin by initializing a new unikernel
+Once ``kraft`` is installed you can begin by initializing a new unikernel
 repository using ``kraft init``.  As an example, you can build a Python 3
 unikernel application by running the following: ::
 
