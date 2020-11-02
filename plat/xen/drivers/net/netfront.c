@@ -105,7 +105,7 @@ static int network_tx_buf_gc(struct uk_netdev_tx_queue *txq)
 
 			gnttab_end_access(txq->gref[id]);
 			txq->gref[id] = GRANT_INVALID_REF;
-			uk_netbuf_free_single(txq->netbuf[id]);
+			uk_netbuf_free_single(txq->nbuf[id]);
 
 			add_id_to_freelist(id, txq->freelist);
 			uk_semaphore_up(&txq->sem);
@@ -164,7 +164,9 @@ static int netfront_xmit(struct uk_netdev *n,
 		gnttab_grant_access(nfdev->xendev->otherend_id,
 			virt_to_mfn(pkt->buf), 1);
 	UK_ASSERT(tx_req->gref != GRANT_INVALID_REF);
-	txq->netbuf[id] = pkt;
+
+	/* remember netbuf reference for free'ing it later */
+	txq->nbuf[id] = pkt;
 
 	tx_req->offset = (uint16_t) uk_netbuf_headroom(pkt);
 	tx_req->size = (uint16_t) pkt->len;
