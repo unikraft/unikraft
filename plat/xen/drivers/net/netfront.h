@@ -35,6 +35,7 @@
 #define __NETFRONT_H__
 
 #include <uk/netdev.h>
+#include <uk/netbuf.h>
 #include <uk/semaphore.h>
 #include <xen/io/netif.h>
 #include <common/gnttab.h>
@@ -68,6 +69,8 @@ struct uk_netdev_tx_queue {
 	struct uk_semaphore sem;
 	/* Free list of transmitting request IDs */
 	uint16_t freelist[NET_TX_RING_SIZE + 1];
+	/* Ring of inflight netbufs */
+	struct uk_netbuf *nbuf[NET_TX_RING_SIZE];
 	/* Grants for transmit buffers */
 	grant_ref_t gref[NET_TX_RING_SIZE];
 	/* Transmit packets addresses */
