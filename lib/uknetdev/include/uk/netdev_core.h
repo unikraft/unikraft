@@ -253,6 +253,20 @@ typedef void (*uk_netdev_queue_event_t)(struct uk_netdev *dev,
 typedef uint16_t (*uk_netdev_alloc_rxpkts)(void *argp,
 					   struct uk_netbuf *pkts[],
 					   uint16_t count);
+/**
+ * User callback used by the driver to free netbufs
+ * that are used to cleanup the tx buffer.
+ *
+ * @param argp
+ *   User-provided argument.
+ * @param pkts
+ *   Array for netbuf pointers that the function should allocate.
+ * @param count
+ *   Number of netbufs requested (equal to length of pkts).
+ */
+typedef void (*uk_netdev_free_txpkts)(void *argp,
+				      struct uk_netbuf *pkts[],
+				      uint16_t count);
 
 /**
  * A structure used to configure an Unikraft network device RX queue.
@@ -275,6 +289,8 @@ struct uk_netdev_rxqueue_conf {
  */
 struct uk_netdev_txqueue_conf {
 	struct uk_alloc *a;               /* Allocator for descriptors. */
+	uk_netdev_free_txpkts free_txpkts; /**< Free up the tx free buffer */
+	void *free_txpkts_argp;		   /**< Argument for the free buffer */
 };
 
 /** Driver callback type to read device/driver capabilities,

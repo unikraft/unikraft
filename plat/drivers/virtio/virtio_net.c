@@ -107,6 +107,9 @@ struct uk_netdev_tx_queue {
 	uint16_t max_nb_desc;
 	/* Function to map the tx packet to the ring descriptor */
 	ring_desc_prepare_t txq_prepare;
+	/* User provided free callback */
+	uk_netdev_free_txpkts free_txpkts;
+	void *free_txpkts_argp;
 	/* The nr. of descriptor user configured */
 	uint16_t nb_desc;
 	/* The flag to interrupt on the transmit queue */
@@ -278,15 +281,22 @@ static int virtio_netdev_xmit_free(struct uk_netdev_tx_queue *txq)
 						    &cnt, len);
 		if (cnt == 0)
 			break;
+		uk_pr_debug(DRIVER_NAME": Free up %d buffers on tx queue %d\n",
+			    cnt, txq->hwvq_id);
+		if (txq->free_txpkts)
+			txq->free_txpkts(txq->free_txpkts_argp, pkt, cnt);
+		else {
 
-		for (i = 0; i < cnt; i++) {
-			UK_ASSERT(pkt[i]);
-			/**
-			 * Releasing the free buffer back to netbuf. The netbuf
-			 * could use the destructor to inform the stack
-			 * regarding the free up of memory.
-			 */
-			uk_netbuf_free(pkt[i]);
+			for (i = 0; i < cnt; i++) {
+				UK_ASSERT(pkt[i]);
+				/**
+				 * Releasing the free buffer back to netbuf.
+				 * The netbuf could use the destructor to
+				 * inform the stack regarding the free up of
+				 * memory.
+				 */
+				uk_netbuf_free(pkt[i]);
+			}
 		}
 
 		uk_pr_debug("Free %"__PRIu16" descriptors\n", cnt);
@@ -988,6 +998,13 @@ static struct uk_netdev_tx_queue *virtio_netdev_tx_queue_setup(
 			    _virtio_netdev_xmit_anylayout
 			    : _virtio_netdev_xmit_inorder;
 
+	if (conf->free_txpkts) {
+		txq->free_txpkts = conf->free_txpkts;
+		txq->free_txpkts_argp = conf->free_txpkts_argp;
+	} else {
+		txq->free_txpkts = NULL;
+		txq->free_txpkts_argp = NULL;
+	}
 exit:
 	return txq;
 
