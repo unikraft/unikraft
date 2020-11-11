@@ -69,7 +69,8 @@
 	__containerof(ndev, struct virtio_net_device, netdev)
 
 #define VIRTIO_NET_DRV_FEATURES(features)           \
-	(VIRTIO_FEATURES_UPDATE(features, VIRTIO_NET_F_MAC))
+	(VIRTIO_FEATURES_UPDATE(features, VIRTIO_NET_F_MAC));  \
+	(VIRTIO_FEATURES_UPDATE(features, VIRTIO_F_ANY_LAYOUT))
 
 typedef enum {
 	VNET_RX,
@@ -88,6 +89,11 @@ struct virtio_net_hdr_padded {
 };
 
 /**
+ * Fit packet to a ring, based on the feature negotiated.
+ */
+typedef int (*ring_desc_prepare_t)(struct uk_netbuf *, struct uk_sglist *);
+
+/**
  * @internal structure to represent the transmit queue.
  */
 struct uk_netdev_tx_queue {
@@ -99,6 +105,8 @@ struct uk_netdev_tx_queue {
 	uint16_t lqueue_id;
 	/* The nr. of descriptor limit */
 	uint16_t max_nb_desc;
+	/* Function to map the tx packet to the ring descriptor */
+	ring_desc_prepare_t txq_prepare;
 	/* The nr. of descriptor user configured */
 	uint16_t nb_desc;
 	/* The flag to interrupt on the transmit queue */
@@ -127,6 +135,8 @@ struct uk_netdev_rx_queue {
 	uint16_t max_nb_desc;
 	/* The nr. of descriptor user configured */
 	uint16_t nb_desc;
+	/* Function to map the rx buffer to the ring descriptor */
+	ring_desc_prepare_t rxq_prepare;
 	/* The flag to interrupt on the transmit queue */
 	uint8_t intr_enabled;
 	/* User-provided receive buffer allocation function */
@@ -166,6 +176,8 @@ struct virtio_net_device {
 	struct uk_hwaddr hw_addr;
 	/*  Netdev state */
 	__u8 state;
+	/* Any Layout */
+	__u8 any_layout;
 	/* RX promiscuous mode. */
 	__u8 promisc : 1;
 };
@@ -200,6 +212,10 @@ static int virtio_net_rx_intr_disable(struct uk_netdev *n,
 static int virtio_net_rx_intr_enable(struct uk_netdev *n,
 				     struct uk_netdev_rx_queue *queue);
 static int virtio_netdev_xmit_free(struct uk_netdev_tx_queue *txq);
+static inline int _virtio_netdev_xmit_inorder(struct uk_netbuf *nb,
+					      struct uk_sglist *sg);
+static inline int _virtio_netdev_xmit_anylayout(struct uk_netbuf *nb,
+						struct uk_sglist *sg);
 static int virtio_netdev_xmit(struct uk_netdev *dev,
 			      struct uk_netdev_tx_queue *queue,
 			      struct uk_netbuf **pkt, __u16 *cnt);
@@ -214,12 +230,12 @@ static int virtio_netdev_rxq_info_get(struct uk_netdev *dev, __u16 queue_id,
 static int virtio_netdev_txq_info_get(struct uk_netdev *dev, __u16 queue_id,
 				      struct uk_netdev_queue_info *qinfo);
 static int virtio_netdev_rxq_dequeue(struct uk_netdev_rx_queue *rxq,
-				     struct uk_netbuf **netbuf, __u16 *cnt);
-static int virtio_netdev_rxq_init(struct uk_netdev_rx_queue *rxq,
-				     struct uk_netbuf *netbuf);
+				     struct uk_netbuf **netbuf, __u16 *cnt,
+				     int16_t header_sz, __u8 any_layout,
+				     int *status);
 static int virtio_netdev_recv_done(struct virtqueue *vq, void *priv);
 static int virtio_netdev_rx_fillup(struct uk_netdev_rx_queue *rxq,
-				   __u16 num, int notify);
+				   __u16 num, int notify, __u8 any_layout);
 
 /**
  * Static global constants
@@ -285,7 +301,7 @@ static int virtio_netdev_xmit_free(struct uk_netdev_tx_queue *txq)
 
 static int virtio_netdev_rx_fillup(struct uk_netdev_rx_queue *rxq,
 				   __u16 nb_desc,
-				   int notify)
+				   int notify, __u8 any_layout)
 {
 	struct uk_netbuf *netbuf[RX_FILLUP_BATCHLEN];
 	int rc = 0;
@@ -295,6 +311,7 @@ static int virtio_netdev_rx_fillup(struct uk_netdev_rx_queue *rxq,
 	__u16 cnt = 0;
 	__u16 filled = 0;
 	int count;
+	__u16 rqst_cnt;
 
 	/**
 	 * Fixed amount of memory is allocated to each received buffer. In
@@ -304,16 +321,16 @@ static int virtio_netdev_rx_fillup(struct uk_netdev_rx_queue *rxq,
 	 * Because we using 2 descriptor for a single netbuf, our effective
 	 * queue size is just the half.
 	 */
-	nb_desc = ALIGN_DOWN(nb_desc, 2);
-	while (filled < nb_desc) {
-		req = MIN(nb_desc / 2, RX_FILLUP_BATCHLEN / 2);
-		uk_pr_debug(DRIVER_NAME": Request %d descriptor from rx queue %d\n",
-			    req, rxq->lqueue_id);
+	rqst_cnt = (any_layout) ? nb_desc : (nb_desc >> 1);
+	while (filled < rqst_cnt) {
+		req = MIN(rqst_cnt, RX_FILLUP_BATCHLEN);
 		cnt = rxq->alloc_rxpkts(rxq->alloc_rxpkts_argp, netbuf, req);
+		uk_pr_debug(DRIVER_NAME": Request %d buffers, filling %d buffers from rx queue %d\n",
+			    req, cnt, rxq->lqueue_id);
 		uk_sglist_reset(&rxq->sg);
 		for (i = 0; i < cnt && rxq->sg.sg_nseg < cnt; i++) {
 			count = rxq->sg.sg_nseg;
-			rc = virtio_netdev_rxq_init(rxq, netbuf[i]);
+			rc = rxq->rxq_prepare(netbuf[i], &rxq->sg);
 			if (unlikely(rc < 0)) {
 				uk_pr_err("Failed to add a buffer to receive virtqueue %p: %d\n",
 					  rxq, rc);
@@ -332,19 +349,21 @@ static int virtio_netdev_rx_fillup(struct uk_netdev_rx_queue *rxq,
 						    &rxq->sg, &i,
 						    rxq->readbuf_cnt,
 						    rxq->writebuf_cnt);
-		filled += (i * 2);
+		filled += i;
 		if (unlikely(rc > 0 && cnt < req)) {
 			uk_pr_debug("Incomplete fill-up of netbufs on receive virtqueue %p: Out of memory",
 				    rxq);
 			status |= UK_NETDEV_STATUS_UNDERRUN;
 			goto out;
 		} else if (unlikely(rc == -ENOSPC)) {
+			uk_pr_debug(DRIVER_NAME": Requesting %d desc freeing up %d desc\n", nb_desc, cnt);
 			/*
 			 * Release netbufs that we are not going
 			 * to use anymore
 			 */
-			for (j = i; j < cnt; j++)
+			for (j = i; j < cnt; j++) {
 				uk_netbuf_free(netbuf[j]);
+			}
 			goto out;
 		}
 	}
@@ -362,27 +381,136 @@ out:
 	return status;
 }
 
+static inline int _virtio_netdev_xmit_inorder(struct uk_netbuf *nb,
+					      struct uk_sglist *sg)
+{
+	struct virtio_net_hdr_padded *padded_hdr;
+	int16_t header_sz = sizeof(*padded_hdr);
+	struct virtio_net_hdr *vhdr;
+	size_t total_len = 0;
+	int rc;
+	__u8  *buf_start;
+	size_t buf_len;
+
+	total_len = 0;
+	buf_start = nb->data;
+	buf_len = nb->len;
+	/**
+	 * Use the preallocated header space for the virtio header.
+	 */
+	rc = uk_netbuf_header(nb, header_sz);
+	if (unlikely(rc != 1)) {
+		uk_pr_err("Failed to prepend virtio header\n");
+		return rc;
+	}
+
+	vhdr = nb->data;
+
+	/**
+	 * Fill the virtio-net-header with the necessary information.
+	 * Zero explicitly set.
+	 */
+	memset(vhdr, 0, sizeof(*vhdr));
+	vhdr->gso_type = VIRTIO_NET_HDR_GSO_NONE;
+	/**
+	 * According the specification 5.1.6.6, we need to explicitly use
+	 * 2 descriptor for each transmit and receive network packet since we
+	 * do not negotiate for the VIRTIO_F_ANY_LAYOUT.
+	 *
+	 * 1 for the virtio header and the other for the actual network packet.
+	 */
+	/* Appending the data to the list. */
+	rc = uk_sglist_append(sg, vhdr, sizeof(*vhdr));
+	if (unlikely(rc != 0)) {
+		uk_pr_err("Failed to append to the sg list\n");
+		goto remove_vhdr;
+	}
+	total_len += sizeof(*vhdr);
+	rc = uk_sglist_append(sg, buf_start, buf_len);
+	if (unlikely(rc != 0)) {
+		uk_pr_err("Failed to append to the sg list\n");
+		goto remove_vhdr;
+	}
+	total_len += buf_len;
+	if (nb->next) {
+		rc = uk_sglist_append_netbuf(sg, nb->next);
+		if (unlikely(rc <= 0)) {
+			uk_pr_err("Failed to append to the sg list\n");
+			goto remove_vhdr;
+		}
+		total_len += rc;
+	}
+	if (unlikely(total_len > VIRTIO_PKT_BUFFER_LEN)) {
+		uk_pr_err("Packet size too big: %lu, max:%u\n",
+				total_len, VIRTIO_PKT_BUFFER_LEN);
+		rc = -ENOTSUP;
+		goto remove_vhdr;
+	}
+
+	return 0;
+
+remove_vhdr:
+	uk_netbuf_header(nb, -header_sz);
+	return rc;
+}
+
+static inline int _virtio_netdev_xmit_anylayout(struct uk_netbuf *nb,
+						struct uk_sglist *sg)
+{
+	struct virtio_net_hdr *vhdr;
+	uint16_t total_len;
+	uint16_t header_sz = sizeof(*vhdr);
+	int rc;
+
+	total_len = 0;
+
+	/**
+	 * Use the preallocated header space for the virtio header.
+	 */
+	rc = uk_netbuf_header(nb, header_sz);
+	if (unlikely(rc != 1)) {
+		uk_pr_err("Failed to prepend virtio header\n");
+		return rc;
+	}
+
+	rc = uk_sglist_append_netbuf(sg, nb);
+	if (unlikely(rc <= 0)) {
+		uk_pr_err("Failed to append to the sg list\n");
+		goto remove_vhdr;
+	}
+	total_len += rc;
+	if (unlikely(total_len > VIRTIO_PKT_BUFFER_LEN)) {
+		uk_pr_err("Packet size too big: %u, max:%u\n",
+				total_len, VIRTIO_PKT_BUFFER_LEN);
+		rc = -ENOTSUP;
+		goto remove_vhdr;
+	}
+	uk_pr_debug("Packet total length: %d\n", total_len);
+
+	return 0;
+
+remove_vhdr:
+	uk_netbuf_header(nb, -header_sz);
+	return rc;
+}
+
 static int virtio_netdev_xmit(struct uk_netdev *dev,
 			      struct uk_netdev_tx_queue *queue,
 			      struct uk_netbuf **pkt, __u16 *cnt)
 {
-	struct virtio_net_device *vndev __unused;
-	struct virtio_net_hdr *vhdr;
-	struct virtio_net_hdr_padded *padded_hdr;
-	int16_t header_sz = sizeof(*padded_hdr);
+	struct virtio_net_device *vndev;
 	int rc = 0;
 	int status = 0x0;
-	size_t total_len = 0;
-	__u8  *buf_start;
-	size_t buf_len;
-	int desc_cnt, count = 0, hdr_cnt = 0;
-	__u16 i;
-	int sg_count;
+	int16_t header_sz;
+	int desc_cnt;
+	__u16 i, count, hdr_cnt = 0;
 
 	UK_ASSERT(dev);
 	UK_ASSERT(pkt && queue && cnt);
 
 	vndev = to_virtionetdev(dev);
+	header_sz = vndev->any_layout ? sizeof(struct virtio_net_hdr) :
+					sizeof(struct virtio_net_hdr_padded);
 	/**
 	 * We are reclaiming the free descriptors from buffers. The function is
 	 * not protected by means of locks. We need to be careful if there are
@@ -399,71 +527,22 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 
 
 	for (i = 0; i < *cnt && queue->sg.sg_nseg < desc_cnt; i++) {
-		total_len = 0;
-		buf_start = pkt[i]->data;
-		buf_len = pkt[i]->len;
+		count = queue->sg.sg_nseg;
 		/**
 		 * Prepare the sg list.
 		 */
-		rc = uk_netbuf_header(pkt[i], header_sz);
-		if (unlikely(rc != 1)) {
-			uk_pr_err("Failed to prepend virtio header\n");
+		rc = queue->txq_prepare(pkt[i], &queue->sg);
+		if (unlikely(rc < 0))
 			break;
-		}
+
 		hdr_cnt++;
-		vhdr = pkt[i]->data;
-
-		/**
-		 * Fill the virtio-net-header with the necessary information.
-		 * Zero explicitly set.
-		 */
-		memset(vhdr, 0, sizeof(*vhdr));
-		vhdr->gso_type = VIRTIO_NET_HDR_GSO_NONE;
-
-		/**
-		 * According the specification 5.1.6.6, we need to explicitly
-		 * use 2 descriptor for each transmit and receive network
-		 * packet since we do not negotiate for the
-		 * VIRTIO_F_ANY_LAYOUT.
-		 *
-		 * 1 for the virtio header and the other for the actual
-		 * network packet.
-		 */
-		/* Appending the data to the list. */
-		sg_count = queue->sg.sg_nseg;
-		rc = uk_sglist_append(&queue->sg, vhdr, sizeof(*vhdr));
-		if (unlikely(rc != 0)) {
-			uk_pr_err("Failed to append to the sg list\n");
-			break;
-		}
-		rc = uk_sglist_append(&queue->sg, buf_start, buf_len);
-		if (unlikely(rc != 0)) {
-			uk_pr_err("Failed to append to the sg list\n");
-			break;
-		}
-		total_len += buf_len;
-		if (pkt[i]->next) {
-			rc = uk_sglist_append_netbuf(&queue->sg, pkt[i]->next);
-			if (unlikely(rc < 0)) {
-				uk_pr_err("Failed to append to the sg list\n");
-				break;
-			}
-			total_len += rc;
-		}
-
-		if (unlikely(total_len > VIRTIO_PKT_BUFFER_LEN)) {
-			uk_pr_err("Packet size too big: %lu, max:%u\n",
-					total_len, VIRTIO_PKT_BUFFER_LEN);
-			rc = -ENOTSUP;
-			break;
-		}
-		queue->readbuf_cnt[i] = queue->sg.sg_nseg - sg_count;
+		queue->readbuf_cnt[i] = queue->sg.sg_nseg - count;
 		queue->writebuf_cnt[i] = 0;
 	}
 	if (i == 0) {
 		status = rc;
 		*cnt = 0;
-		goto err_remove_vhdr;
+		goto err_exit;
 	} else if (i < *cnt)  {
 		uk_pr_info(DRIVER_NAME": Expected to send %d packets but have slot for only %d packets\n",
 			   count, i);
@@ -515,55 +594,54 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 		*cnt = i;
 		status = rc;
 	}
-err_remove_vhdr:
+
+	uk_pr_debug("free %d packets with virtio header from tx queue %d\n",
+		    hdr_cnt - i, queue->lqueue_id);
 	/**
 	 * Remove header before exiting because we could not send
 	 */
 	for ( ; i < hdr_cnt; i++)
 		uk_netbuf_header(pkt[i], -header_sz);
+err_exit:
 	return status;
 }
 
-static int virtio_netdev_rxq_init(struct uk_netdev_rx_queue *rxq,
-				     struct uk_netbuf *netbuf)
+static int _virtio_netdev_rxq_init_inorder(struct uk_netbuf *nb,
+					  struct uk_sglist *sg)
 {
-	int rc = 0;
-	struct virtio_net_hdr_padded *rxhdr;
-	int16_t header_sz = sizeof(*rxhdr);
 	__u8 *buf_start;
 	size_t buf_len = 0;
-	struct uk_sglist *sg;
+	struct virtio_net_hdr_padded *rxhdr;
+	int16_t header_sz = sizeof(*rxhdr);
+	int rc;
 
 	/**
 	 * Saving the buffer information before reserving the header space.
 	 */
-	buf_start = netbuf->data;
-	buf_len = netbuf->len;
+	buf_start = nb->data;
+	buf_len = nb->len;
 
 	/**
 	 * Retrieve the buffer header length.
 	 */
-	rc = uk_netbuf_header(netbuf, header_sz);
+	rc = uk_netbuf_header(nb, header_sz);
 	if (unlikely(rc != 1)) {
 		uk_pr_err("Failed to allocate space to prepend virtio header\n");
 		return -EINVAL;
 	}
-	rxhdr = netbuf->data;
-
-	sg = &rxq->sg;
 
 	/* Appending the header buffer to the sglist */
-	rc = uk_sglist_append(sg, rxhdr, sizeof(struct virtio_net_hdr));
+	rc = uk_sglist_append(sg, nb->data, sizeof(struct virtio_net_hdr));
 	if (rc < 0) {
 		uk_pr_err("Failed(%d) to append to virtio header on netbuf %p\n",
-			  rc, netbuf);
+			  rc, nb);
 		goto error_remove_hdr;
 	}
 
 	/* Appending the data buffer to the sglist */
 	rc = uk_sglist_append(sg, buf_start, buf_len);
 	if (rc < 0) {
-		uk_pr_err("Failed to append data\n");
+		uk_pr_err("Failed(%d) to append empty buffer to rxq\n", rc);
 		goto error_remove_sglist;
 	}
 
@@ -572,11 +650,39 @@ static int virtio_netdev_rxq_init(struct uk_netdev_rx_queue *rxq,
 error_remove_sglist:
 	sg->sg_nseg--;
 error_remove_hdr:
-	uk_netbuf_header(netbuf, -header_sz);
+	uk_netbuf_header(nb, -header_sz);
 	return rc;
 }
 
-static int _virtio_pkt_hdr_process(struct uk_netbuf *buf, __u32 len)
+static int _virtio_netdev_rxq_init_anylayout(struct uk_netbuf *nb,
+					     struct uk_sglist *sg)
+{
+	int rc;
+	struct virtio_net_hdr *hdr;
+	int16_t header_sz = sizeof(*hdr);
+
+	rc = uk_netbuf_header(nb, header_sz);
+	if (unlikely(rc != 1)) {
+		uk_pr_err("Failed to allocate space to prepend virtio header\n");
+		return -EINVAL;
+	}
+
+	rc = uk_sglist_append(sg, nb->data, nb->len);
+	if (rc < 0) {
+		uk_pr_err("Failed(%d) to append empty buffer to rxq\n", rc);
+		goto error_remove_sglist;
+	}
+
+	return 0;
+
+error_remove_sglist:
+	sg->sg_nseg--;
+	uk_netbuf_header(nb, -header_sz);
+	return rc;
+}
+
+static int _virtio_pkt_hdr_process(struct uk_netbuf *buf, __u32 len,
+				   int16_t header_sz, __u8 any_layout)
 {
 	int rc;
 
@@ -589,21 +695,25 @@ static int _virtio_pkt_hdr_process(struct uk_netbuf *buf, __u32 len)
 	}
 	uk_pr_debug("Received packet size: %"__PRIu32"\n", len);
 
-	/**
-	 * Removing the virtio header from the buffer and adjusting length.
-	 * We pad "VTNET_RX_HEADER_PAD" to the rx buffer while enqueuing for
-	 * alignment of the packet data. We compensate for this, by adding the
-	 *  padding to the length on dequeue.
-	 */
-	buf->len = len + VTNET_RX_HEADER_PAD;
-	rc = uk_netbuf_header(buf,
-			      -((int16_t)sizeof(struct virtio_net_hdr_padded)));
+	if (any_layout == 0)
+		/**
+		 * Removing the virtio header from the buffer and adjusting length.
+		 * We pad "VTNET_RX_HEADER_PAD" to the rx buffer while enqueuing for
+		 * alignment of the packet data. We compensate for this, by adding the
+		 *  padding to the length on dequeue.
+		 */
+		buf->len = len + VTNET_RX_HEADER_PAD;
+	else
+		buf->len = len;
+	rc = uk_netbuf_header(buf, -header_sz);
 	UK_ASSERT(rc == 1);
 	return 0;
 }
 
 static int virtio_netdev_rxq_dequeue(struct uk_netdev_rx_queue *rxq,
-				     struct uk_netbuf **netbuf, __u16 *cnt)
+				     struct uk_netbuf **netbuf, __u16 *cnt,
+				     int16_t header_sz, __u8 any_layout,
+				     int *status)
 {
 	int ret;
 	int rc = 0, i, j, bad_pkts = 0;
@@ -619,17 +729,18 @@ static int virtio_netdev_rxq_dequeue(struct uk_netdev_rx_queue *rxq,
 	}
 
 	for (i = 0, j = 0; i < *cnt; i++) {
-		rc = _virtio_pkt_hdr_process(netbuf[i], rxq->len[i]);
-		if (unlikely(rc < 0)) {
+		rc = _virtio_pkt_hdr_process(netbuf[i], rxq->len[i], header_sz,
+					     any_layout);
+		if (rc < 0) {
 			uk_pr_warn("Receive queue: %d, bad packet: %p\n",
 					rxq->lqueue_id, netbuf[i]);
+			*status |= UK_NETDEV_STATUS_PKT_ERR;
 			bad_pkts++;
 			continue;
 		}
 		netbuf[j] = netbuf[i];
 		j++;
 	}
-
 	*cnt = *cnt - bad_pkts;
 
 	return ret;
@@ -639,27 +750,34 @@ static int virtio_netdev_recv(struct uk_netdev *dev __maybe_unused,
 			      struct uk_netdev_rx_queue *queue,
 			      struct uk_netbuf **pkt, __u16 *cnt)
 {
+	struct virtio_net_device *vndev;
 	int status = 0x0;
 	int rc = 0;
 	__u16 buf_cnt;
+	int16_t header_sz;
 
 	UK_ASSERT(dev && queue);
 	UK_ASSERT(pkt && cnt);
 
 	buf_cnt = *cnt;
+	vndev = to_virtionetdev(dev);
+	header_sz = vndev->any_layout ? sizeof(struct virtio_net_hdr) :
+					sizeof(struct virtio_net_hdr_padded);
 
 	/* Queue interrupts have to be off when calling receive */
 	UK_ASSERT(!(queue->intr_enabled & VTNET_INTR_EN));
 
-	rc = virtio_netdev_rxq_dequeue(queue, pkt, &buf_cnt);
+	rc = virtio_netdev_rxq_dequeue(queue, pkt, &buf_cnt, header_sz,
+				       vndev->any_layout, &status);
 	if (unlikely(buf_cnt == 0)) {
-		uk_pr_debug("no packet available\n");
 		*cnt = buf_cnt;
 		return status;
 	}
 	status = UK_NETDEV_STATUS_SUCCESS;
 	status |= virtio_netdev_rx_fillup(queue, (queue->nb_desc - rc),
-					  1);
+					  1, vndev->any_layout);
+
+	uk_pr_debug("%s: received %d pkts\n", __func__, buf_cnt);
 
 	/* Enable interrupt only when user had previously enabled it */
 	if (queue->intr_enabled & VTNET_INTR_USR_EN_MASK) {
@@ -672,12 +790,16 @@ static int virtio_netdev_recv(struct uk_netdev *dev __maybe_unused,
 			 * enabling the interrupt
 			 */
 			rc = virtio_netdev_rxq_dequeue(queue, &pkt[buf_cnt],
-						       &tmp_cnt);
+						       &tmp_cnt, header_sz,
+						       vndev->any_layout,
+						       &status);
 			if (unlikely(rc < 0)) {
 				uk_pr_err("Failed to dequeue the packet: %d\n",
 					  rc);
 				goto err_exit;
 			}
+			uk_pr_debug(DRIVER_NAME": Receiving the %d packets on queue :%d\n",
+				    cnt, queue->lqueue_id);
 			status |= UK_NETDEV_STATUS_SUCCESS;
 			buf_cnt += tmp_cnt;
 
@@ -687,7 +809,7 @@ static int virtio_netdev_recv(struct uk_netdev *dev __maybe_unused,
 			 */
 			status |= virtio_netdev_rx_fillup(queue,
 							  (queue->nb_desc - rc),
-							  1);
+							  1, vndev->any_layout);
 
 			/* Need to enable the interrupt on the last packet */
 			rc = virtqueue_intr_enable(queue->vq);
@@ -698,6 +820,7 @@ static int virtio_netdev_recv(struct uk_netdev *dev __maybe_unused,
 			uk_pr_debug("Receive status: %d Interrupt enabling: %d\n",
 				    status, rc);
 		}
+		uk_pr_debug(DRIVER_NAME": Interrupt state: %d\n", rc);
 	} else if (buf_cnt > 0) {
 		/**
 		 * For polling case, we report always there are further
@@ -742,11 +865,14 @@ static struct uk_netdev_rx_queue *virtio_netdev_rx_queue_setup(
 		goto err_exit;
 	}
 	rxq  = &vndev->rxqs[rc];
+	rxq->rxq_prepare = (vndev->any_layout == 1) ?
+			    _virtio_netdev_rxq_init_anylayout :
+			    _virtio_netdev_rxq_init_inorder;
 	rxq->alloc_rxpkts = conf->alloc_rxpkts;
 	rxq->alloc_rxpkts_argp = conf->alloc_rxpkts_argp;
 
 	/* Allocate receive buffers for this queue */
-	virtio_netdev_rx_fillup(rxq, rxq->nb_desc, 0);
+	virtio_netdev_rx_fillup(rxq, rxq->nb_desc, 0, vndev->any_layout);
 
 exit:
 	return rxq;
@@ -858,6 +984,10 @@ static struct uk_netdev_tx_queue *virtio_netdev_tx_queue_setup(
 		goto err_exit;
 	}
 	txq = &vndev->txqs[rc];
+	txq->txq_prepare = (vndev->any_layout == 1) ?
+			    _virtio_netdev_xmit_anylayout
+			    : _virtio_netdev_xmit_inorder;
+
 exit:
 	return txq;
 
@@ -988,6 +1118,11 @@ static int virtio_netdev_feature_negotiate(struct virtio_net_device *vndev)
 		goto exit;
 	}
 	rc = 0;
+
+	if (virtio_has_features(host_features, VIRTIO_F_ANY_LAYOUT)) {
+		vndev->any_layout = 1;
+		printf("virtqueue are configure with any layout\n");
+	}
 
 	/**
 	 * Mask out features supported by both driver and device.

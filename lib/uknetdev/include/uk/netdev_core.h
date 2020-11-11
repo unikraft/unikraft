@@ -357,6 +357,8 @@ typedef int (*uk_netdev_rxq_intr_disable_t)(struct uk_netdev *dev,
 #define UK_NETDEV_STATUS_MORE     (0x2)
 /** Queue underrun (e.g., out-of-memory when allocating new receive buffers). */
 #define UK_NETDEV_STATUS_UNDERRUN (0x4)
+/** Some erroneous packet were received. */
+#define UK_NETDEV_STATUS_PKT_ERR  (0x8)
 
 /** Driver callback type to retrieve one packet from a RX queue. */
 typedef int (*uk_netdev_rx_t)(struct uk_netdev *dev,
