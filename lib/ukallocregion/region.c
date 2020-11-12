@@ -131,6 +131,22 @@ void uk_allocregion_free(struct uk_alloc *a __unused, void *ptr __unused)
 			"ukallocregion\n", a);
 }
 
+/* NOTE: We use `uk_allocregion_leftspace()` for `maxalloc` and `availmem`
+ *       because it is the same for this region allocator
+ */
+static ssize_t uk_allocregion_leftspace(struct uk_alloc *a)
+{
+	struct uk_allocregion *b;
+
+	UK_ASSERT(a != NULL);
+
+	b = (struct uk_allocregion *) &a->priv;
+
+	UK_ASSERT(b != NULL);
+
+	return (uintptr_t) b->heap_top - (uintptr_t) b->heap_base;
+}
+
 int uk_allocregion_addmem(struct uk_alloc *a __unused, void *base __unused,
 				size_t size __unused)
 {
@@ -177,7 +193,9 @@ struct uk_alloc *uk_allocregion_init(void *base, size_t len)
 	uk_alloc_init_malloc(a, uk_allocregion_malloc, uk_calloc_compat,
 				uk_realloc_compat, uk_allocregion_free,
 				uk_allocregion_posix_memalign,
-				uk_memalign_compat, NULL);
+				uk_memalign_compat, uk_allocregion_leftspace,
+				uk_allocregion_leftspace,
+				uk_allocregion_addmem);
 
 	return a;
 }

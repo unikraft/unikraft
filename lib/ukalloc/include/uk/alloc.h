@@ -66,10 +66,8 @@ typedef void  (*uk_alloc_pfree_func_t)
 		(struct uk_alloc *a, void *ptr, unsigned long num_pages);
 typedef int   (*uk_alloc_addmem_func_t)
 		(struct uk_alloc *a, void *base, size_t size);
-#if CONFIG_LIBUKALLOC_IFSTATS
-typedef ssize_t (*uk_alloc_availmem_func_t)
+typedef ssize_t (*uk_alloc_getsize_func_t)
 		(struct uk_alloc *a);
-#endif
 
 struct uk_alloc {
 	/* memory allocation */
@@ -88,10 +86,9 @@ struct uk_alloc {
 	/* page allocation interface */
 	uk_alloc_palloc_func_t palloc;
 	uk_alloc_pfree_func_t pfree;
-#if CONFIG_LIBUKALLOC_IFSTATS
-	/* optional interface */
-	uk_alloc_availmem_func_t availmem;
-#endif
+	/* optional interfaces, but recommended */
+	uk_alloc_getsize_func_t maxalloc; /* biggest alloc req. (bytes) */
+	uk_alloc_getsize_func_t availmem; /* total memory available (bytes) */
 	/* optional interface */
 	uk_alloc_addmem_func_t addmem;
 
@@ -237,7 +234,16 @@ static inline int uk_alloc_addmem(struct uk_alloc *a, void *base,
 	else
 		return -ENOTSUP;
 }
-#if CONFIG_LIBUKALLOC_IFSTATS
+
+/* current biggest allocation request possible */
+static inline ssize_t uk_alloc_maxalloc(struct uk_alloc *a)
+{
+	UK_ASSERT(a);
+	if (!a->maxalloc)
+		return (ssize_t) -ENOTSUP;
+	return a->maxalloc(a);
+}
+
 static inline ssize_t uk_alloc_availmem(struct uk_alloc *a)
 {
 	UK_ASSERT(a);
@@ -245,7 +251,6 @@ static inline ssize_t uk_alloc_availmem(struct uk_alloc *a)
 		return (ssize_t) -ENOTSUP;
 	return a->availmem(a);
 }
-#endif /* CONFIG_LIBUKALLOC_IFSTATS */
 
 #ifdef __cplusplus
 }
