@@ -17,4 +17,6 @@ uk_palloc_compat
 uk_pfree_compat
 uk_alloc_pmaxalloc_compat
 uk_alloc_pavailmem_compat
+uk_alloc_availmem_total
+uk_alloc_pavailmem_total
 _uk_alloc_head
