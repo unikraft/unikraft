@@ -79,11 +79,11 @@ struct uk_alloc_stats {
 
 	uint64_t tot_nb_allocs; /* total number of satisfied allocations */
 	uint64_t tot_nb_frees;  /* total number of satisfied free operations */
-	uint64_t cur_nb_allocs; /* current number of active allocations */
-	uint64_t max_nb_allocs; /* maximum number of active allocations */
+	int64_t cur_nb_allocs; /* current number of active allocations */
+	int64_t max_nb_allocs; /* maximum number of active allocations */
 
-	size_t cur_mem_use; /* current used memory by allocations */
-	size_t max_mem_use; /* maximum amount of memory used by allocations */
+	ssize_t cur_mem_use; /* current used memory by allocations */
+	ssize_t max_mem_use; /* maximum amount of memory used by allocations */
 
 	uint64_t nb_enomem; /* number of times failing allocation requests */
 };
@@ -131,10 +131,14 @@ extern struct uk_alloc *_uk_alloc_head;
 	     iter != NULL;			\
 	     iter = iter->next)
 
+#if CONFIG_LIBUKALLOC_IFSTATS_PERLIB
+struct uk_alloc *uk_alloc_get_default(void);
+#else /* !CONFIG_LIBUKALLOC_IFSTATS_PERLIB */
 static inline struct uk_alloc *uk_alloc_get_default(void)
 {
 	return _uk_alloc_head;
 }
+#endif /* !CONFIG_LIBUKALLOC_IFSTATS_PERLIB */
 
 /* wrapper functions */
 static inline void *uk_do_malloc(struct uk_alloc *a, size_t size)
@@ -314,6 +318,13 @@ void uk_alloc_stats_get(struct uk_alloc *a, struct uk_alloc_stats *dst);
 #if CONFIG_LIBUKALLOC_IFSTATS_GLOBAL
 void uk_alloc_stats_get_global(struct uk_alloc_stats *dst);
 #endif /* CONFIG_LIBUKALLOC_IFSTATS_GLOBAL */
+
+#if CONFIG_LIBUKALLOC_IFSTATS_PERLIB
+struct uk_alloc_libstats_entry {
+	const char *libname;
+	struct uk_alloc *a; /* default allocator wrapper for the library */
+};
+#endif /* CONFIG_LIBUKALLOC_IFSTATS_PERLIB */
 #endif /* CONFIG_LIBUKALLOC_IFSTATS */
 
 #ifdef __cplusplus
