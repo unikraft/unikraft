@@ -310,6 +310,10 @@ unsigned long uk_alloc_pavailmem_total(void);
  * Memory allocation statistics
  */
 void uk_alloc_stats_get(struct uk_alloc *a, struct uk_alloc_stats *dst);
+
+#if CONFIG_LIBUKALLOC_IFSTATS_GLOBAL
+void uk_alloc_stats_get_global(struct uk_alloc_stats *dst);
+#endif /* CONFIG_LIBUKALLOC_IFSTATS_GLOBAL */
 #endif /* CONFIG_LIBUKALLOC_IFSTATS */
 
 #ifdef __cplusplus

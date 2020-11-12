@@ -33,6 +33,10 @@
 
 #include <uk/alloc_impl.h>
 
+#if CONFIG_LIBUKALLOC_IFSTATS_GLOBAL
+struct uk_alloc_stats _uk_alloc_stats_global = { 0 };
+#endif
+
 void uk_alloc_stats_get(struct uk_alloc *a,
 			struct uk_alloc_stats *dst)
 {
@@ -43,3 +47,14 @@ void uk_alloc_stats_get(struct uk_alloc *a,
 	memcpy(dst, &a->_stats, sizeof(*dst));
 	uk_preempt_enable();
 }
+
+#if CONFIG_LIBUKALLOC_IFSTATS_GLOBAL
+void uk_alloc_stats_get_global(struct uk_alloc_stats *dst)
+{
+	UK_ASSERT(dst);
+
+	uk_preempt_disable();
+	memcpy(dst, &_uk_alloc_stats_global, sizeof(*dst));
+	uk_preempt_enable();
+}
+#endif

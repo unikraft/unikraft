@@ -16,4 +16,14 @@ if LIBUKALLOC
 		default n
 		help
 			Provide interfaces for querying allocator statistics.
+
+	config LIBUKALLOC_IFSTATS_GLOBAL
+		bool "Global statistics"
+		default n
+		depends on LIBUKALLOC_IFSTATS
+		help
+			Compute consolidated global allocator statistics.
+			Please note that this option may slow down allocation
+			perfomance due to competition to the single global
+			counters.
 endif
