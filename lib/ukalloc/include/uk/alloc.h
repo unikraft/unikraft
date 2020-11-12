@@ -48,9 +48,6 @@ extern "C" {
 
 struct uk_alloc;
 
-#define uk_zalloc(a, size)  uk_calloc(a, 1, size)
-#define uk_do_zalloc(a, size) uk_do_calloc(a, 1, size)
-
 typedef void* (*uk_alloc_malloc_func_t)
 		(struct uk_alloc *a, size_t size);
 typedef void* (*uk_alloc_calloc_func_t)
@@ -142,6 +139,9 @@ static inline void *uk_calloc(struct uk_alloc *a,
 	}
 	return uk_do_calloc(a, nmemb, size);
 }
+
+#define uk_do_zalloc(a, size) uk_do_calloc((a), 1, (size))
+#define uk_zalloc(a, size) uk_calloc((a), 1, (size))
 
 static inline void *uk_do_realloc(struct uk_alloc *a,
 				  void *ptr, size_t size)
