@@ -68,6 +68,8 @@ typedef int   (*uk_alloc_addmem_func_t)
 		(struct uk_alloc *a, void *base, size_t size);
 typedef ssize_t (*uk_alloc_getsize_func_t)
 		(struct uk_alloc *a);
+typedef long  (*uk_alloc_getpsize_func_t)
+		(struct uk_alloc *a);
 
 struct uk_alloc {
 	/* memory allocation */
@@ -89,6 +91,8 @@ struct uk_alloc {
 	/* optional interfaces, but recommended */
 	uk_alloc_getsize_func_t maxalloc; /* biggest alloc req. (bytes) */
 	uk_alloc_getsize_func_t availmem; /* total memory available (bytes) */
+	uk_alloc_getpsize_func_t pmaxalloc; /* biggest alloc req. (pages) */
+	uk_alloc_getpsize_func_t pavailmem; /* total pages available */
 	/* optional interface */
 	uk_alloc_addmem_func_t addmem;
 
@@ -244,12 +248,29 @@ static inline ssize_t uk_alloc_maxalloc(struct uk_alloc *a)
 	return a->maxalloc(a);
 }
 
+static inline long uk_alloc_pmaxalloc(struct uk_alloc *a)
+{
+	UK_ASSERT(a);
+	if (!a->pmaxalloc)
+		return (long) -ENOTSUP;
+	return a->pmaxalloc(a);
+}
+
+/* total free memory of the allocator */
 static inline ssize_t uk_alloc_availmem(struct uk_alloc *a)
 {
 	UK_ASSERT(a);
 	if (!a->availmem)
 		return (ssize_t) -ENOTSUP;
 	return a->availmem(a);
+}
+
+static inline long uk_alloc_pavailmem(struct uk_alloc *a)
+{
+	UK_ASSERT(a);
+	if (!a->pavailmem)
+		return (long) -ENOTSUP;
+	return a->pavailmem(a);
 }
 
 #ifdef __cplusplus

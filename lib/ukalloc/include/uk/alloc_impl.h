@@ -120,9 +120,10 @@ void uk_pfree_compat(struct uk_alloc *a, void *ptr, unsigned long num_pages);
 #endif
 
 /* Shortcut for doing a registration of an allocator that only
- * implements palloc(), pfree(), addmem()
+ * implements palloc(), pfree(), pmaxalloc(), pavailmem(), addmem()
  */
-#define uk_alloc_init_palloc(a, palloc_func, pfree_func, addmem_func)	\
+#define uk_alloc_init_palloc(a, palloc_func, pfree_func, pmaxalloc_func, \
+			     pavailmem_func, addmem_func)		\
 	do {								\
 		(a)->malloc         = uk_malloc_ifpages;		\
 		(a)->calloc         = uk_calloc_compat;			\
@@ -132,6 +133,8 @@ void uk_pfree_compat(struct uk_alloc *a, void *ptr, unsigned long num_pages);
 		(a)->free           = uk_free_ifpages;			\
 		(a)->palloc         = (palloc_func);			\
 		(a)->pfree          = (pfree_func);			\
+		(a)->pavailmem      = (pavailmem_func);			\
+		(a)->pmaxalloc      = (pmaxalloc_func);			\
 		(a)->addmem         = (addmem_func);			\
 									\
 		uk_alloc_register((a));					\
