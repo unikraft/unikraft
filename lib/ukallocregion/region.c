@@ -75,15 +75,20 @@ static void *uk_allocregion_malloc(struct uk_alloc *a, size_t size)
 
 	newbase  = intptr + size;
 	if (newbase > (uintptr_t) b->heap_top)
-		return NULL; /* OOM */
+		goto enomem; /* OOM */
 
 	/* Check for overflow, handle malloc(0) */
 	if (newbase <= (uintptr_t) b->heap_base)
-		return NULL;
+		goto enomem;
 
 	b->heap_base = (void *)(newbase);
 
+	uk_alloc_stats_count_alloc(a, (void *) intptr, size);
 	return (void *) intptr;
+
+enomem:
+	uk_alloc_stats_count_enomem(a, size);
+	return NULL;
 }
 
 static int uk_allocregion_posix_memalign(struct uk_alloc *a, void **memptr,
@@ -113,16 +118,22 @@ static int uk_allocregion_posix_memalign(struct uk_alloc *a, void **memptr,
 
 	newbase  = intptr + size;
 	if (newbase > (uintptr_t) b->heap_top)
-		return ENOMEM; /* out-of-memory */
+		goto enomem; /* out-of-memory */
 
 	/* Check for overflow */
 	if (newbase <= (uintptr_t) b->heap_base)
-		return EINVAL;
+		goto enomem;
 
 	*memptr = (void *)intptr;
 	b->heap_base = (void *)(newbase);
 
+	uk_alloc_stats_count_alloc(a, (void *) intptr, size);
 	return 0;
+
+enomem:
+	uk_alloc_stats_count_enomem(a, size);
+	return ENOMEM;
+
 }
 
 static void uk_allocregion_free(struct uk_alloc *a __maybe_unused,
@@ -130,6 +141,9 @@ static void uk_allocregion_free(struct uk_alloc *a __maybe_unused,
 {
 	uk_pr_debug("%p: Releasing of memory is not supported by "
 			"ukallocregion\n", a);
+
+	/* Count a free operation but do not release memory from stats */
+	uk_alloc_stats_count_free(a, ptr, 0);
 }
 
 /* NOTE: We use `uk_allocregion_leftspace()` for `maxalloc` and `availmem`
