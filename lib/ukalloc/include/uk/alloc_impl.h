@@ -81,6 +81,109 @@ void uk_pfree_compat(struct uk_alloc *a, void *ptr, unsigned long num_pages);
 long uk_alloc_pavailmem_compat(struct uk_alloc *a);
 long uk_alloc_pmaxalloc_compat(struct uk_alloc *a);
 
+#if CONFIG_LIBUKALLOC_IFSTATS
+#include <string.h>
+#include <uk/preempt.h>
+
+#if CONFIG_LIBUKALLOC_IFSTATS_GLOBAL
+extern struct uk_alloc_stats _uk_alloc_stats_global;
+#endif /* CONFIG_LIBUKALLOC_IFSTATS_GLOBAL */
+
+/* NOTE: Please do not use this function directly */
+static inline void _uk_alloc_stats_refresh_minmax(struct uk_alloc_stats *stats)
+{
+	if (stats->cur_nb_allocs > stats->max_nb_allocs)
+		stats->max_nb_allocs = stats->cur_nb_allocs;
+
+	if (stats->cur_mem_use > stats->max_mem_use)
+		stats->max_mem_use = stats->cur_mem_use;
+
+	if (stats->last_alloc_size) {
+		/* Force storing the minimum allocation size
+		 * with the first allocation request
+		 */
+		if ((stats->tot_nb_allocs == 1)
+		    || (stats->last_alloc_size < stats->min_alloc_size))
+			stats->min_alloc_size = stats->last_alloc_size;
+		if (stats->last_alloc_size > stats->max_alloc_size)
+			stats->max_alloc_size = stats->last_alloc_size;
+	}
+}
+
+/* NOTE: Please do not use this function directly */
+static inline void _uk_alloc_stats_count_alloc(struct uk_alloc_stats *stats,
+					       void *ptr, size_t size)
+{
+	/* TODO: SMP safety */
+	uk_preempt_disable();
+	if (likely(ptr)) {
+		stats->tot_nb_allocs++;
+
+		stats->cur_nb_allocs++;
+		stats->cur_mem_use += size;
+		stats->last_alloc_size = size;
+		_uk_alloc_stats_refresh_minmax(stats);
+	} else {
+		stats->nb_enomem++;
+	}
+	uk_preempt_enable();
+}
+
+/* NOTE: Please do not use this function directly */
+static inline void _uk_alloc_stats_count_free(struct uk_alloc_stats *stats,
+					      void *ptr, size_t size)
+{
+	/* TODO: SMP safety */
+	uk_preempt_disable();
+	if (likely(ptr)) {
+		stats->tot_nb_frees++;
+
+		stats->cur_nb_allocs--;
+		stats->cur_mem_use -= size;
+		_uk_alloc_stats_refresh_minmax(stats);
+	}
+	uk_preempt_enable();
+}
+
+/*
+ * The following macros should be used to instrument an allocator for
+ * statistics:
+ */
+/* NOTE: If ptr is NULL, an ENOMEM event is counted */
+#define uk_alloc_stats_count_alloc(a, ptr, size)			\
+	_uk_alloc_stats_count_alloc(&((a)->_stats),			\
+				    (ptr), (size))
+#define uk_alloc_stats_count_palloc(a, ptr, num_pages)			\
+	uk_alloc_stats_count_alloc((a), (ptr),				\
+				   ((size_t) (num_pages)) << __PAGE_SHIFT)
+
+#define uk_alloc_stats_count_enomem(a, size)			\
+	uk_alloc_stats_count_alloc((a), NULL, (size))
+#define uk_alloc_stats_count_penomem(a, num_pages)			\
+	uk_alloc_stats_count_enomem((a),				\
+				    ((size_t) (num_pages)) << __PAGE_SHIFT)
+
+/* Note: if ptr is NULL, nothing is counted */
+#define uk_alloc_stats_count_free(a, ptr, freed_size)			\
+	_uk_alloc_stats_count_free(&((a)->_stats),			\
+				   (ptr), (freed_size))
+#define uk_alloc_stats_count_pfree(a, ptr, num_pages)			\
+	uk_alloc_stats_count_free((a), (ptr),				\
+				  ((size_t) (num_pages)) << __PAGE_SHIFT)
+
+#define uk_alloc_stats_reset(a)						\
+	memset(&(a)->_stats, 0, sizeof((a)->_stats))
+
+#else /* !CONFIG_LIBUKALLOC_IFSTATS */
+#define uk_alloc_stats_count_alloc(a, ptr, size) do {} while (0)
+#define uk_alloc_stats_count_palloc(a, ptr, num_pages) do {} while (0)
+#define uk_alloc_stats_count_enomem(a, size) do {} while (0)
+#define uk_alloc_stats_count_penomem(a, num_pages) do {} while (0)
+#define uk_alloc_stats_count_free(a, ptr, freed_size) do {} while (0)
+#define uk_alloc_stats_count_pfree(a, ptr, num_pages) do {} while (0)
+#define uk_alloc_stats_reset(a) do {} while (0)
+#endif /* !CONFIG_LIBUKALLOC_IFSTATS */
+
 /* Shortcut for doing a registration of an allocator that does not implement
  * palloc() or pfree()
  */
@@ -104,6 +207,7 @@ long uk_alloc_pmaxalloc_compat(struct uk_alloc *a);
 				      ? uk_alloc_pmaxalloc_compat : NULL; \
 		(a)->addmem         = (addmem_f);			\
 									\
+		uk_alloc_stats_reset((a));				\
 		uk_alloc_register((a));					\
 	} while (0)
 
@@ -129,6 +233,7 @@ long uk_alloc_pmaxalloc_compat(struct uk_alloc *a);
 				      ? uk_alloc_pmaxalloc_compat : NULL; \
 		(a)->addmem         = (addmem_f);			\
 									\
+		uk_alloc_stats_reset((a));				\
 		uk_alloc_register((a));					\
 	} while (0)
 #endif
@@ -155,6 +260,7 @@ long uk_alloc_pmaxalloc_compat(struct uk_alloc *a);
 				      ? uk_alloc_maxalloc_ifpages : NULL; \
 		(a)->addmem         = (addmem_func);			\
 									\
+		uk_alloc_stats_reset((a));				\
 		uk_alloc_register((a));					\
 	} while (0)
 

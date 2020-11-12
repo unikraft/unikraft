@@ -71,6 +71,24 @@ typedef ssize_t (*uk_alloc_getsize_func_t)
 typedef long  (*uk_alloc_getpsize_func_t)
 		(struct uk_alloc *a);
 
+#if CONFIG_LIBUKALLOC_IFSTATS
+struct uk_alloc_stats {
+	size_t last_alloc_size; /* size of the last allocation */
+	size_t max_alloc_size; /* biggest satisfied allocation size */
+	size_t min_alloc_size; /* smallest satisfied allocation size */
+
+	uint64_t tot_nb_allocs; /* total number of satisfied allocations */
+	uint64_t tot_nb_frees;  /* total number of satisfied free operations */
+	uint64_t cur_nb_allocs; /* current number of active allocations */
+	uint64_t max_nb_allocs; /* maximum number of active allocations */
+
+	size_t cur_mem_use; /* current used memory by allocations */
+	size_t max_mem_use; /* maximum amount of memory used by allocations */
+
+	uint64_t nb_enomem; /* number of times failing allocation requests */
+};
+#endif /* CONFIG_LIBUKALLOC_IFSTATS */
+
 struct uk_alloc {
 	/* memory allocation */
 	uk_alloc_malloc_func_t malloc;
@@ -95,6 +113,10 @@ struct uk_alloc {
 	uk_alloc_getpsize_func_t pavailmem; /* total pages available */
 	/* optional interface */
 	uk_alloc_addmem_func_t addmem;
+
+#if CONFIG_LIBUKALLOC_IFSTATS
+	struct uk_alloc_stats _stats;
+#endif
 
 	/* internal */
 	struct uk_alloc *next;
@@ -282,6 +304,13 @@ static inline long uk_alloc_pavailmem(struct uk_alloc *a)
 size_t uk_alloc_availmem_total(void);
 
 unsigned long uk_alloc_pavailmem_total(void);
+
+#if CONFIG_LIBUKALLOC_IFSTATS
+/*
+ * Memory allocation statistics
+ */
+void uk_alloc_stats_get(struct uk_alloc *a, struct uk_alloc_stats *dst);
+#endif /* CONFIG_LIBUKALLOC_IFSTATS */
 
 #ifdef __cplusplus
 }

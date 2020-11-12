@@ -20,3 +20,4 @@ uk_alloc_pavailmem_compat
 uk_alloc_availmem_total
 uk_alloc_pavailmem_total
 _uk_alloc_head
+uk_alloc_stats_get
