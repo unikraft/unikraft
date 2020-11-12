@@ -53,12 +53,16 @@ int uk_alloc_register(struct uk_alloc *a);
  * API functionality is actually implemented.
  */
 
-/* Functions that can be used by allocators that implement palloc(), pfree() only */
+/* Functions that can be used by allocators that implement palloc(),
+ * pfree() and potentially pavail(), pmaxalloc() only
+ */
 void *uk_malloc_ifpages(struct uk_alloc *a, size_t size);
 void *uk_realloc_ifpages(struct uk_alloc *a, void *ptr, size_t size);
 int uk_posix_memalign_ifpages(struct uk_alloc *a, void **memptr,
 				size_t align, size_t size);
 void uk_free_ifpages(struct uk_alloc *a, void *ptr);
+ssize_t uk_alloc_availmem_ifpages(struct uk_alloc *a);
+ssize_t uk_alloc_maxalloc_ifpages(struct uk_alloc *a);
 
 #if CONFIG_LIBUKALLOC_IFMALLOC
 void *uk_malloc_ifmalloc(struct uk_alloc *a, size_t size);
@@ -74,6 +78,8 @@ void *uk_realloc_compat(struct uk_alloc *a, void *ptr, size_t size);
 void *uk_memalign_compat(struct uk_alloc *a, size_t align, size_t len);
 void *uk_palloc_compat(struct uk_alloc *a, unsigned long num_pages);
 void uk_pfree_compat(struct uk_alloc *a, void *ptr, unsigned long num_pages);
+long uk_alloc_pavailmem_compat(struct uk_alloc *a);
+long uk_alloc_pmaxalloc_compat(struct uk_alloc *a);
 
 /* Shortcut for doing a registration of an allocator that does not implement
  * palloc() or pfree()
@@ -91,7 +97,11 @@ void uk_pfree_compat(struct uk_alloc *a, void *ptr, unsigned long num_pages);
 		(a)->palloc         = uk_palloc_compat;			\
 		(a)->pfree          = uk_pfree_compat;			\
 		(a)->availmem       = (availmem_f);			\
+		(a)->pavailmem      = (availmem_f != NULL)		\
+				      ? uk_alloc_pavailmem_compat : NULL; \
 		(a)->maxalloc       = (maxalloc_f);			\
+		(a)->pmaxalloc      = (maxalloc_f != NULL)		\
+				      ? uk_alloc_pmaxalloc_compat : NULL; \
 		(a)->addmem         = (addmem_f);			\
 									\
 		uk_alloc_register((a));					\
@@ -112,7 +122,11 @@ void uk_pfree_compat(struct uk_alloc *a, void *ptr, unsigned long num_pages);
 		(a)->palloc         = uk_palloc_compat;			\
 		(a)->pfree          = uk_pfree_compat;			\
 		(a)->availmem       = (availmem_f);			\
+		(a)->pavailmem      = (availmem_f != NULL)		\
+				      ? uk_alloc_pavailmem_compat : NULL; \
 		(a)->maxalloc       = (maxalloc_f);			\
+		(a)->pmaxalloc      = (maxalloc_f != NULL)		\
+				      ? uk_alloc_pmaxalloc_compat : NULL; \
 		(a)->addmem         = (addmem_f);			\
 									\
 		uk_alloc_register((a));					\
@@ -134,7 +148,11 @@ void uk_pfree_compat(struct uk_alloc *a, void *ptr, unsigned long num_pages);
 		(a)->palloc         = (palloc_func);			\
 		(a)->pfree          = (pfree_func);			\
 		(a)->pavailmem      = (pavailmem_func);			\
+		(a)->availmem       = (pavailmem_func != NULL)		\
+				      ? uk_alloc_availmem_ifpages : NULL; \
 		(a)->pmaxalloc      = (pmaxalloc_func);			\
+		(a)->maxalloc       = (pmaxalloc_func != NULL)		\
+				      ? uk_alloc_maxalloc_ifpages : NULL; \
 		(a)->addmem         = (addmem_func);			\
 									\
 		uk_alloc_register((a));					\
