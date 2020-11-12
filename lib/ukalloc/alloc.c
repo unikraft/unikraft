@@ -32,19 +32,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* This is a very simple, naive implementation of malloc.
- * It's not space-efficient, because it always requests full pages from the
- * underlying memory allocator. It's also not very fast, because for the
- * same reason, it will never hand out memory from already-requested pages,
- * and has to go through the underlying memory allocator on every malloc()
- * and free() (and friends. And God have mercy on your soul if you call free()
- * with a pointer that wasn't received from malloc(). But it's simple, and,
- * above all, it is inherently reentrant, because all bookkeeping is
- * decentralized. This is important, because we currently don't have proper
- * locking support yet. Eventually, this should probably be replaced by
- * something better.
- */
-
 #include <errno.h>
 #include <string.h>
 #include <uk/alloc_impl.h>
@@ -125,6 +112,18 @@ static size_t uk_getmallocsize(const void *ptr)
 	       __PAGE_SIZE - (size_t)ptr;
 }
 
+/* This is a very simple, naive implementation of malloc.
+ * It's not space-efficient, because it always requests full pages from the
+ * underlying memory allocator. It's also not very fast, because for the
+ * same reason, it will never hand out memory from already-requested pages,
+ * and has to go through the underlying memory allocator on every malloc()
+ * and free() (and friends. And God have mercy on your soul if you call free()
+ * with a pointer that wasn't received from malloc(). But it's simple, and,
+ * above all, it is inherently reentrant, because all bookkeeping is
+ * decentralized. This is important, because we currently don't have proper
+ * locking support yet. Eventually, this should probably be replaced by
+ * something better.
+ */
 void *uk_malloc_ifpages(struct uk_alloc *a, size_t size)
 {
 	uintptr_t intptr;
