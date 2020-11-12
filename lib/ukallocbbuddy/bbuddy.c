@@ -280,11 +280,14 @@ static void *bbuddy_palloc(struct uk_alloc *a, unsigned long num_pages)
 	}
 	map_alloc(b, (uintptr_t)alloc_ch, 1UL << order);
 
+	uk_alloc_stats_count_palloc(a, (void *) alloc_ch, num_pages);
 	return ((void *)alloc_ch);
 
 no_memory:
 	uk_pr_warn("%"__PRIuptr": Cannot handle palloc request of order %"__PRIsz": Out of memory\n",
 		   (uintptr_t)a, order);
+
+	uk_alloc_stats_count_penomem(a, num_pages);
 	errno = ENOMEM;
 	return NULL;
 }
@@ -297,6 +300,8 @@ static void bbuddy_pfree(struct uk_alloc *a, void *obj, unsigned long num_pages)
 	unsigned long mask;
 
 	UK_ASSERT(a != NULL);
+
+	uk_alloc_stats_count_pfree(a, obj, num_pages);
 	b = (struct uk_bbpalloc *)&a->priv;
 
 	size_t order = (size_t)num_pages_to_order(num_pages);
