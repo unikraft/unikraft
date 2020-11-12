@@ -56,7 +56,7 @@ struct uk_allocregion {
 	void *heap_base;
 };
 
-void *uk_allocregion_malloc(struct uk_alloc *a, size_t size)
+static void *uk_allocregion_malloc(struct uk_alloc *a, size_t size)
 {
 	struct uk_allocregion *b;
 	uintptr_t intptr, newbase;
@@ -86,8 +86,8 @@ void *uk_allocregion_malloc(struct uk_alloc *a, size_t size)
 	return (void *) intptr;
 }
 
-int uk_allocregion_posix_memalign(struct uk_alloc *a, void **memptr,
-					size_t align, size_t size)
+static int uk_allocregion_posix_memalign(struct uk_alloc *a, void **memptr,
+					 size_t align, size_t size)
 {
 	struct uk_allocregion *b;
 	uintptr_t intptr, newbase;
@@ -125,7 +125,8 @@ int uk_allocregion_posix_memalign(struct uk_alloc *a, void **memptr,
 	return 0;
 }
 
-void uk_allocregion_free(struct uk_alloc *a __unused, void *ptr __unused)
+static void uk_allocregion_free(struct uk_alloc *a __maybe_unused,
+				void *ptr __maybe_unused)
 {
 	uk_pr_debug("%p: Releasing of memory is not supported by "
 			"ukallocregion\n", a);
@@ -147,8 +148,8 @@ static ssize_t uk_allocregion_leftspace(struct uk_alloc *a)
 	return (uintptr_t) b->heap_top - (uintptr_t) b->heap_base;
 }
 
-int uk_allocregion_addmem(struct uk_alloc *a __unused, void *base __unused,
-				size_t size __unused)
+static int uk_allocregion_addmem(struct uk_alloc *a __unused,
+				 void *base __unused, size_t size __unused)
 {
 	/* TODO: support multiple regions */
 	uk_pr_debug("%p: ukallocregion does not support multiple memory "
