@@ -551,3 +551,33 @@ long uk_alloc_pavailmem_compat(struct uk_alloc *a)
 
 	return (long) (mem >> __PAGE_SHIFT);
 }
+
+size_t uk_alloc_availmem_total(void)
+{
+	struct uk_alloc *a;
+	ssize_t availmem;
+	size_t total;
+
+	total = 0;
+	uk_alloc_foreach(a) {
+		availmem = uk_alloc_availmem(a);
+		if (availmem > 0)
+			total += availmem;
+	}
+	return total;
+}
+
+unsigned long uk_alloc_pavailmem_total(void)
+{
+	struct uk_alloc *a;
+	long pavailmem;
+	unsigned long total;
+
+	total = 0;
+	uk_alloc_foreach(a) {
+		pavailmem = uk_alloc_pavailmem(a);
+		if (pavailmem > 0)
+			total += pavailmem;
+	}
+	return total;
+}
