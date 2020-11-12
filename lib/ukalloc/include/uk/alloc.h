@@ -103,6 +103,12 @@ struct uk_alloc {
 
 extern struct uk_alloc *_uk_alloc_head;
 
+/* Iterate over all registered allocators */
+#define uk_alloc_foreach(iter)			\
+	for (iter = _uk_alloc_head;		\
+	     iter != NULL;			\
+	     iter = iter->next)
+
 static inline struct uk_alloc *uk_alloc_get_default(void)
 {
 	return _uk_alloc_head;
