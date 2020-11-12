@@ -79,7 +79,8 @@ void uk_pfree_compat(struct uk_alloc *a, void *ptr, unsigned long num_pages);
  * palloc() or pfree()
  */
 #define uk_alloc_init_malloc(a, malloc_f, calloc_f, realloc_f, free_f,	\
-				posix_memalign_f, memalign_f, addmem_f) \
+			     posix_memalign_f, memalign_f, maxalloc_f,	\
+			     availmem_f, addmem_f)			\
 	do {								\
 		(a)->malloc         = (malloc_f);			\
 		(a)->calloc         = (calloc_f);			\
@@ -89,13 +90,16 @@ void uk_pfree_compat(struct uk_alloc *a, void *ptr, unsigned long num_pages);
 		(a)->free           = (free_f);				\
 		(a)->palloc         = uk_palloc_compat;			\
 		(a)->pfree          = uk_pfree_compat;			\
+		(a)->availmem       = (availmem_f);			\
+		(a)->maxalloc       = (maxalloc_f);			\
 		(a)->addmem         = (addmem_f);			\
 									\
 		uk_alloc_register((a));					\
 	} while (0)
 
 #if CONFIG_LIBUKALLOC_IFMALLOC
-#define uk_alloc_init_malloc_ifmalloc(a, malloc_f, free_f, addmem_f) 	\
+#define uk_alloc_init_malloc_ifmalloc(a, malloc_f, free_f, maxalloc_f,	\
+				      availmem_f, addmem_f)		\
 	do {								\
 		(a)->malloc         = uk_malloc_ifmalloc;		\
 		(a)->calloc         = uk_calloc_compat;			\
@@ -107,6 +111,8 @@ void uk_pfree_compat(struct uk_alloc *a, void *ptr, unsigned long num_pages);
 		(a)->free           = uk_free_ifmalloc;			\
 		(a)->palloc         = uk_palloc_compat;			\
 		(a)->pfree          = uk_pfree_compat;			\
+		(a)->availmem       = (availmem_f);			\
+		(a)->maxalloc       = (maxalloc_f);			\
 		(a)->addmem         = (addmem_f);			\
 									\
 		uk_alloc_register((a));					\

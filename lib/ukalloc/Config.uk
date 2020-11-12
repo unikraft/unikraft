@@ -10,9 +10,4 @@ if LIBUKALLOC
 		default n
 		help
 			Provide helpers for allocators defining exclusively malloc and free
-	config LIBUKALLOC_IFSTATS
-		bool "Statistics interface"
-		default n
-		help
-			Provide interfaces for querying allocator status
 endif

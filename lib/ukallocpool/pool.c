@@ -208,14 +208,19 @@ void uk_allocpool_return_batch(struct uk_allocpool *p,
 		_prepend_free_obj(p, obj[i]);
 }
 
-#if CONFIG_LIBUKALLOC_IFSTATS
 static ssize_t pool_availmem(struct uk_alloc *a)
 {
 	struct uk_allocpool *p = ukalloc2pool(a);
 
-	return (size_t) p->free_obj_count * p->obj_len;
+	return (ssize_t) (p->free_obj_count * p->obj_len);
 }
-#endif
+
+static ssize_t pool_maxalloc(struct uk_alloc *a)
+{
+	struct uk_allocpool *p = ukalloc2pool(a);
+
+	return (ssize_t) p->obj_len;
+}
 
 size_t uk_allocpool_reqmem(unsigned int obj_count, size_t obj_len,
 			   size_t obj_align)
@@ -300,10 +305,9 @@ out:
 			     pool_free,
 			     pool_posix_memalign,
 			     uk_memalign_compat,
+			     pool_maxalloc,
+			     pool_availmem,
 			     NULL);
-#if CONFIG_LIBUKALLOC_IFSTATS
-	p->self.availmem = pool_availmem;
-#endif
 
 	uk_pr_debug("%p: Pool created (%"__PRIsz" B): %u objs of %"__PRIsz" B, aligned to %"__PRIsz" B\n",
 		    p, len, p->obj_count, p->obj_len, p->obj_align);
