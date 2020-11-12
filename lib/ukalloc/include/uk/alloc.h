@@ -42,11 +42,11 @@
 #include <uk/assert.h>
 #include <uk/essentials.h>
 
-struct uk_alloc;
-
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+struct uk_alloc;
 
 #define uk_zalloc(a, size)  uk_calloc(a, 1, size)
 #define uk_do_zalloc(a, size) uk_do_calloc(a, 1, size)
