@@ -35,11 +35,42 @@
 #define __NETFRONT_H__
 
 #include <uk/netdev.h>
+#include <uk/semaphore.h>
+#include <xen/io/netif.h>
+#include <common/gnttab.h>
+#include <common/events.h>
+
+
+#define NET_TX_RING_SIZE __CONST_RING_SIZE(netif_tx, PAGE_SIZE)
 
 /**
  * internal structure to represent the transmit queue.
  */
 struct uk_netdev_tx_queue {
+	/* The netfront device */
+	struct netfront_dev *netfront_dev;
+	/* The libuknet queue identifier */
+	uint16_t lqueue_id;
+	/* True if initialized */
+	bool initialized;
+
+	/* Shared ring size */
+	uint16_t ring_size;
+	/* Shared ring */
+	netif_tx_front_ring_t ring;
+	/* Shared ring grant ref */
+	grant_ref_t ring_ref;
+	/* Queue event channel */
+	evtchn_port_t evtchn;
+
+	/* Free list protecting semaphore */
+	struct uk_semaphore sem;
+	/* Free list of transmitting request IDs */
+	uint16_t freelist[NET_TX_RING_SIZE + 1];
+	/* Grants for transmit buffers */
+	grant_ref_t gref[NET_TX_RING_SIZE];
+	/* Transmit packets addresses */
+	struct uk_netbuf *netbuf[NET_TX_RING_SIZE];
 };
 
 /**
@@ -61,6 +92,7 @@ struct netfront_dev {
 	struct uk_netdev netdev;
 
 	/* List of the Rx/Tx queues */
+	uint16_t txqs_num;
 	struct uk_netdev_tx_queue *txqs;
 	struct uk_netdev_rx_queue *rxqs;
 	/* Maximum number of queue pairs */

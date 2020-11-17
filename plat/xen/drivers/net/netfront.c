@@ -31,10 +31,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <string.h>
 #include <uk/assert.h>
 #include <uk/print.h>
 #include <uk/alloc.h>
 #include <uk/netdev_driver.h>
+#include <xen-x86/mm.h>
 #include <xenbus/xenbus.h>
 #include "netfront.h"
 #include "netfront_xb.h"
@@ -46,6 +48,84 @@
 	__containerof(dev, struct netfront_dev, netdev)
 
 static struct uk_alloc *drv_allocator;
+
+
+static void add_id_to_freelist(uint16_t id, uint16_t *freelist)
+{
+	freelist[id + 1] = freelist[0];
+	freelist[0]  = id;
+}
+
+static uint16_t get_id_from_freelist(uint16_t *freelist)
+{
+	uint16_t id;
+
+	id = freelist[0];
+	freelist[0] = freelist[id + 1];
+	return id;
+}
+
+static struct uk_netdev_tx_queue *netfront_txq_setup(struct uk_netdev *n,
+		uint16_t queue_id,
+		uint16_t nb_desc __unused,
+		struct uk_netdev_txqueue_conf *conf)
+{
+	int rc;
+	struct netfront_dev *nfdev;
+	struct uk_netdev_tx_queue *txq;
+	netif_tx_sring_t *sring;
+
+	UK_ASSERT(n != NULL);
+
+	nfdev = to_netfront_dev(n);
+	if (queue_id >= nfdev->max_queue_pairs) {
+		uk_pr_err("Invalid queue identifier: %"__PRIu16"\n", queue_id);
+		return ERR2PTR(-EINVAL);
+	}
+
+	txq  = &nfdev->txqs[queue_id];
+	UK_ASSERT(!txq->initialized);
+	txq->netfront_dev = nfdev;
+	txq->lqueue_id = queue_id;
+
+	/* Setup shared ring */
+	sring = uk_palloc(conf->a, 1);
+	if (!sring)
+		return ERR2PTR(-ENOMEM);
+	memset(sring, 0, PAGE_SIZE);
+	SHARED_RING_INIT(sring);
+	FRONT_RING_INIT(&txq->ring, sring, PAGE_SIZE);
+	txq->ring_size = NET_TX_RING_SIZE;
+	txq->ring_ref = gnttab_grant_access(nfdev->xendev->otherend_id,
+		virt_to_mfn(sring), 0);
+	UK_ASSERT(txq->ring_ref != GRANT_INVALID_REF);
+
+	/* Setup event channel */
+	rc = evtchn_alloc_unbound(nfdev->xendev->otherend_id,
+			NULL, NULL,
+			&txq->evtchn);
+	if (rc) {
+		uk_pr_err("Error creating event channel: %d\n", rc);
+		gnttab_end_access(txq->ring_ref);
+		uk_pfree(conf->a, sring, 1);
+		return ERR2PTR(-rc);
+	}
+	/* Events are always disabled for tx queue */
+	mask_evtchn(txq->evtchn);
+
+	/* Initialize list of request ids */
+	uk_semaphore_init(&txq->sem, NET_TX_RING_SIZE);
+	for (uint16_t i = 0; i < NET_TX_RING_SIZE; i++) {
+		add_id_to_freelist(i, txq->freelist);
+		txq->gref[i] = GRANT_INVALID_REF;
+		txq->netbuf[i] = NULL;
+	}
+
+	txq->initialized = true;
+	nfdev->txqs_num++;
+
+	return txq;
+}
 
 static int netfront_rxtx_alloc(struct netfront_dev *nfdev,
 		const struct uk_netdev_conf *conf)
@@ -85,6 +165,33 @@ err_free_txrx:
 	if (!nfdev->txqs)
 		uk_free(drv_allocator, nfdev->txqs);
 
+	return rc;
+}
+
+static int netfront_txq_info_get(struct uk_netdev *n,
+		uint16_t queue_id,
+		struct uk_netdev_queue_info *qinfo)
+{
+	struct netfront_dev *nfdev;
+	struct uk_netdev_tx_queue *txq;
+	int rc = 0;
+
+	UK_ASSERT(n != NULL);
+	UK_ASSERT(qinfo != NULL);
+
+	nfdev = to_netfront_dev(n);
+	if (unlikely(queue_id >= nfdev->max_queue_pairs)) {
+		uk_pr_err("Invalid queue_id %"__PRIu16"\n", queue_id);
+		rc = -EINVAL;
+		goto exit;
+	}
+	txq = &nfdev->txqs[queue_id];
+	qinfo->nb_min = txq->ring_size;
+	qinfo->nb_max = txq->ring_size;
+	qinfo->nb_align = 1;
+	qinfo->nb_is_power_of_two = 1;
+
+exit:
 	return rc;
 }
 
@@ -179,6 +286,8 @@ static unsigned int netfront_promisc_get(struct uk_netdev *n)
 
 static const struct uk_netdev_ops netfront_ops = {
 	.configure = netfront_configure,
+	.txq_configure = netfront_txq_setup,
+	.txq_info_get = netfront_txq_info_get,
 	.info_get = netfront_info_get,
 	.einfo_get = netfront_einfo_get,
 	.hwaddr_get = netfront_mac_get,
