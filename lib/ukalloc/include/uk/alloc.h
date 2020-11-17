@@ -34,13 +34,11 @@
 #ifndef __UK_ALLOC_H__
 #define __UK_ALLOC_H__
 
-#include <stddef.h>
-#include <stdint.h>
-#include <sys/types.h>
-#include <errno.h>
+#include <uk/arch/types.h>
 #include <uk/config.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
+#include <errno.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -49,15 +47,15 @@ extern "C" {
 struct uk_alloc;
 
 typedef void* (*uk_alloc_malloc_func_t)
-		(struct uk_alloc *a, size_t size);
+		(struct uk_alloc *a, __sz size);
 typedef void* (*uk_alloc_calloc_func_t)
-		(struct uk_alloc *a, size_t nmemb, size_t size);
+		(struct uk_alloc *a, __sz nmemb, __sz size);
 typedef int   (*uk_alloc_posix_memalign_func_t)
-		(struct uk_alloc *a, void **memptr, size_t align, size_t size);
+		(struct uk_alloc *a, void **memptr, __sz align, __sz size);
 typedef void* (*uk_alloc_memalign_func_t)
-		(struct uk_alloc *a, size_t align, size_t size);
+		(struct uk_alloc *a, __sz align, __sz size);
 typedef void* (*uk_alloc_realloc_func_t)
-		(struct uk_alloc *a, void *ptr, size_t size);
+		(struct uk_alloc *a, void *ptr, __sz size);
 typedef void  (*uk_alloc_free_func_t)
 		(struct uk_alloc *a, void *ptr);
 typedef void* (*uk_alloc_palloc_func_t)
@@ -65,27 +63,27 @@ typedef void* (*uk_alloc_palloc_func_t)
 typedef void  (*uk_alloc_pfree_func_t)
 		(struct uk_alloc *a, void *ptr, unsigned long num_pages);
 typedef int   (*uk_alloc_addmem_func_t)
-		(struct uk_alloc *a, void *base, size_t size);
-typedef ssize_t (*uk_alloc_getsize_func_t)
+		(struct uk_alloc *a, void *base, __sz size);
+typedef __ssz (*uk_alloc_getsize_func_t)
 		(struct uk_alloc *a);
 typedef long  (*uk_alloc_getpsize_func_t)
 		(struct uk_alloc *a);
 
 #if CONFIG_LIBUKALLOC_IFSTATS
 struct uk_alloc_stats {
-	size_t last_alloc_size; /* size of the last allocation */
-	size_t max_alloc_size; /* biggest satisfied allocation size */
-	size_t min_alloc_size; /* smallest satisfied allocation size */
+	__sz last_alloc_size; /* size of the last allocation */
+	__sz max_alloc_size; /* biggest satisfied allocation size */
+	__sz min_alloc_size; /* smallest satisfied allocation size */
 
-	uint64_t tot_nb_allocs; /* total number of satisfied allocations */
-	uint64_t tot_nb_frees;  /* total number of satisfied free operations */
-	int64_t cur_nb_allocs; /* current number of active allocations */
-	int64_t max_nb_allocs; /* maximum number of active allocations */
+	__u64 tot_nb_allocs; /* total number of satisfied allocations */
+	__u64 tot_nb_frees;  /* total number of satisfied free operations */
+	__s64 cur_nb_allocs; /* current number of active allocations */
+	__s64 max_nb_allocs; /* maximum number of active allocations */
 
-	ssize_t cur_mem_use; /* current used memory by allocations */
-	ssize_t max_mem_use; /* maximum amount of memory used by allocations */
+	__ssz cur_mem_use; /* current used memory by allocations */
+	__ssz max_mem_use; /* maximum amount of memory used by allocations */
 
-	uint64_t nb_enomem; /* number of times failing allocation requests */
+	__u64 nb_enomem; /* number of times failing allocation requests */
 };
 #endif /* CONFIG_LIBUKALLOC_IFSTATS */
 
@@ -120,7 +118,7 @@ struct uk_alloc {
 
 	/* internal */
 	struct uk_alloc *next;
-	int8_t priv[];
+	__u8 priv[];
 };
 
 extern struct uk_alloc *_uk_alloc_head;
@@ -128,7 +126,7 @@ extern struct uk_alloc *_uk_alloc_head;
 /* Iterate over all registered allocators */
 #define uk_alloc_foreach(iter)			\
 	for (iter = _uk_alloc_head;		\
-	     iter != NULL;			\
+	     iter != __NULL;			\
 	     iter = iter->next)
 
 #if CONFIG_LIBUKALLOC_IFSTATS_PERLIB
@@ -141,34 +139,34 @@ static inline struct uk_alloc *uk_alloc_get_default(void)
 #endif /* !CONFIG_LIBUKALLOC_IFSTATS_PERLIB */
 
 /* wrapper functions */
-static inline void *uk_do_malloc(struct uk_alloc *a, size_t size)
+static inline void *uk_do_malloc(struct uk_alloc *a, __sz size)
 {
 	UK_ASSERT(a);
 	return a->malloc(a, size);
 }
 
-static inline void *uk_malloc(struct uk_alloc *a, size_t size)
+static inline void *uk_malloc(struct uk_alloc *a, __sz size)
 {
 	if (unlikely(!a)) {
 		errno = ENOMEM;
-		return NULL;
+		return __NULL;
 	}
 	return uk_do_malloc(a, size);
 }
 
 static inline void *uk_do_calloc(struct uk_alloc *a,
-				 size_t nmemb, size_t size)
+				 __sz nmemb, __sz size)
 {
 	UK_ASSERT(a);
 	return a->calloc(a, nmemb, size);
 }
 
 static inline void *uk_calloc(struct uk_alloc *a,
-			      size_t nmemb, size_t size)
+			      __sz nmemb, __sz size)
 {
 	if (unlikely(!a)) {
 		errno = ENOMEM;
-		return NULL;
+		return __NULL;
 	}
 	return uk_do_calloc(a, nmemb, size);
 }
@@ -177,50 +175,50 @@ static inline void *uk_calloc(struct uk_alloc *a,
 #define uk_zalloc(a, size) uk_calloc((a), 1, (size))
 
 static inline void *uk_do_realloc(struct uk_alloc *a,
-				  void *ptr, size_t size)
+				  void *ptr, __sz size)
 {
 	UK_ASSERT(a);
 	return a->realloc(a, ptr, size);
 }
 
-static inline void *uk_realloc(struct uk_alloc *a, void *ptr, size_t size)
+static inline void *uk_realloc(struct uk_alloc *a, void *ptr, __sz size)
 {
 	if (unlikely(!a)) {
 		errno = ENOMEM;
-		return NULL;
+		return __NULL;
 	}
 	return uk_do_realloc(a, ptr, size);
 }
 
 static inline int uk_do_posix_memalign(struct uk_alloc *a, void **memptr,
-				       size_t align, size_t size)
+				       __sz align, __sz size)
 {
 	UK_ASSERT(a);
 	return a->posix_memalign(a, memptr, align, size);
 }
 
 static inline int uk_posix_memalign(struct uk_alloc *a, void **memptr,
-				    size_t align, size_t size)
+				    __sz align, __sz size)
 {
 	if (unlikely(!a)) {
-		*memptr = NULL;
+		*memptr = __NULL;
 		return ENOMEM;
 	}
 	return uk_do_posix_memalign(a, memptr, align, size);
 }
 
 static inline void *uk_do_memalign(struct uk_alloc *a,
-				   size_t align, size_t size)
+				   __sz align, __sz size)
 {
 	UK_ASSERT(a);
 	return a->memalign(a, align, size);
 }
 
 static inline void *uk_memalign(struct uk_alloc *a,
-				size_t align, size_t size)
+				__sz align, __sz size)
 {
 	if (unlikely(!a))
-		return NULL;
+		return __NULL;
 	return uk_do_memalign(a, align, size);
 }
 
@@ -244,7 +242,7 @@ static inline void *uk_do_palloc(struct uk_alloc *a, unsigned long num_pages)
 static inline void *uk_palloc(struct uk_alloc *a, unsigned long num_pages)
 {
 	if (unlikely(!a || !a->palloc))
-		return NULL;
+		return __NULL;
 	return uk_do_palloc(a, num_pages);
 }
 
@@ -262,7 +260,7 @@ static inline void uk_pfree(struct uk_alloc *a, void *ptr,
 }
 
 static inline int uk_alloc_addmem(struct uk_alloc *a, void *base,
-				  size_t size)
+				  __sz size)
 {
 	UK_ASSERT(a);
 	if (a->addmem)
@@ -272,11 +270,11 @@ static inline int uk_alloc_addmem(struct uk_alloc *a, void *base,
 }
 
 /* current biggest allocation request possible */
-static inline ssize_t uk_alloc_maxalloc(struct uk_alloc *a)
+static inline __ssz uk_alloc_maxalloc(struct uk_alloc *a)
 {
 	UK_ASSERT(a);
 	if (!a->maxalloc)
-		return (ssize_t) -ENOTSUP;
+		return (__ssz) -ENOTSUP;
 	return a->maxalloc(a);
 }
 
@@ -289,11 +287,11 @@ static inline long uk_alloc_pmaxalloc(struct uk_alloc *a)
 }
 
 /* total free memory of the allocator */
-static inline ssize_t uk_alloc_availmem(struct uk_alloc *a)
+static inline __ssz uk_alloc_availmem(struct uk_alloc *a)
 {
 	UK_ASSERT(a);
 	if (!a->availmem)
-		return (ssize_t) -ENOTSUP;
+		return (__ssz) -ENOTSUP;
 	return a->availmem(a);
 }
 
@@ -305,7 +303,7 @@ static inline long uk_alloc_pavailmem(struct uk_alloc *a)
 	return a->pavailmem(a);
 }
 
-size_t uk_alloc_availmem_total(void);
+__sz uk_alloc_availmem_total(void);
 
 unsigned long uk_alloc_pavailmem_total(void);
 

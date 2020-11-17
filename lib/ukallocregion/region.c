@@ -47,6 +47,9 @@
  * an introduction to region-based memory management.
  */
 
+#include <stdint.h>
+#include <stddef.h>
+#include <sys/types.h>
 #include <uk/allocregion.h>
 #include <uk/alloc_impl.h>
 #include <uk/page.h>	/* round_pgup() */

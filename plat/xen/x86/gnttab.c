@@ -24,6 +24,7 @@
 /* Taken from Mini-OS */
 
 #include <stdint.h>
+#include <stddef.h>
 #include <uk/print.h>
 #include <xen/xen.h>
 #include <xen/grant_table.h>
