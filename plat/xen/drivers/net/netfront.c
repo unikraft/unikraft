@@ -37,6 +37,7 @@
 #include <uk/alloc.h>
 #include <uk/netdev_driver.h>
 #include <xen-x86/mm.h>
+#include <xen-x86/irq.h>
 #include <xenbus/xenbus.h>
 #include "netfront.h"
 #include "netfront_xb.h"
@@ -74,6 +75,117 @@ static uint16_t get_id_from_freelist(uint16_t *freelist)
 	id = freelist[0];
 	freelist[0] = freelist[id + 1];
 	return id;
+}
+
+static int network_tx_buf_gc(struct uk_netdev_tx_queue *txq)
+{
+	RING_IDX prod, cons;
+	netif_tx_response_t *tx_rsp;
+	uint16_t id;
+	bool more_to_do;
+	int count = 0;
+
+	do {
+		prod = txq->ring.sring->rsp_prod;
+		rmb(); /* Ensure we see responses up to 'rp'. */
+
+		for (cons = txq->ring.rsp_cons; cons != prod; cons++) {
+			tx_rsp = RING_GET_RESPONSE(&txq->ring, cons);
+
+			if (tx_rsp->status == NETIF_RSP_NULL)
+				continue;
+
+			if (tx_rsp->status == NETIF_RSP_ERROR)
+				uk_pr_err("netdev%u: Transmission error on txq %u\n",
+					txq->netfront_dev->netdev._data->id,
+					txq->lqueue_id);
+
+			id  = tx_rsp->id;
+			UK_ASSERT(id < NET_TX_RING_SIZE);
+
+			gnttab_end_access(txq->gref[id]);
+			txq->gref[id] = GRANT_INVALID_REF;
+			uk_netbuf_free_single(txq->netbuf[id]);
+
+			add_id_to_freelist(id, txq->freelist);
+			uk_semaphore_up(&txq->sem);
+
+			count++;
+		}
+
+		txq->ring.rsp_cons = prod;
+
+		RING_FINAL_CHECK_FOR_RESPONSES(&txq->ring, more_to_do);
+	} while (more_to_do);
+
+	return count;
+}
+
+static int netfront_xmit(struct uk_netdev *n,
+		struct uk_netdev_tx_queue *txq,
+		struct uk_netbuf *pkt)
+{
+	struct netfront_dev *nfdev;
+	unsigned long flags;
+	uint16_t id;
+	RING_IDX req_prod;
+	netif_tx_request_t *tx_req;
+	int notify;
+	int status = 0, count;
+
+	UK_ASSERT(n != NULL);
+	UK_ASSERT(txq != NULL);
+	UK_ASSERT(pkt != NULL);
+	UK_ASSERT(pkt->len < PAGE_SIZE);
+
+	nfdev = to_netfront_dev(n);
+
+	/* get request id */
+	if (unlikely(!uk_semaphore_down_try(&txq->sem))) {
+		/* try some cleanup */
+		local_irq_save(flags);
+		count = network_tx_buf_gc(txq);
+		local_irq_restore(flags);
+		if (count == 0 || !uk_semaphore_down_try(&txq->sem))
+			return -ENOSPC;
+	}
+	local_irq_save(flags);
+	id = get_id_from_freelist(txq->freelist);
+	local_irq_restore(flags);
+
+	/* get request */
+	req_prod = txq->ring.req_prod_pvt;
+	tx_req = RING_GET_REQUEST(&txq->ring, req_prod);
+
+	/* setup grant for buffer data */
+	txq->gref[id] = tx_req->gref =
+		gnttab_grant_access(nfdev->xendev->otherend_id,
+			virt_to_mfn(pkt->buf), 1);
+	UK_ASSERT(tx_req->gref != GRANT_INVALID_REF);
+	txq->netbuf[id] = pkt;
+
+	tx_req->offset = 0;
+	tx_req->size = (uint16_t) pkt->len;
+	tx_req->flags = 0;
+	tx_req->id = id;
+
+	txq->ring.req_prod_pvt = req_prod + 1;
+	wmb(); /* Ensure backend sees requests */
+
+	RING_PUSH_REQUESTS_AND_CHECK_NOTIFY(&txq->ring, notify);
+	if (notify)
+		notify_remote_via_evtchn(txq->evtchn);
+
+	status |= UK_NETDEV_STATUS_SUCCESS;
+
+	/* some cleanup */
+	local_irq_save(flags);
+	count = network_tx_buf_gc(txq);
+	local_irq_restore(flags);
+
+	status |= likely(count > 0) ? UK_NETDEV_STATUS_MORE : 0x0;
+
+	return status;
 }
 
 static int netfront_rxq_enqueue(struct uk_netdev_rx_queue *rxq,
@@ -599,6 +711,7 @@ static int netfront_add_dev(struct xenbus_device *xendev)
 	}
 
 	/* register netdev */
+	nfdev->netdev.tx_one = netfront_xmit;
 	nfdev->netdev.ops = &netfront_ops;
 	rc = uk_netdev_drv_register(&nfdev->netdev, drv_allocator, DRIVER_NAME);
 	if (rc < 0) {
