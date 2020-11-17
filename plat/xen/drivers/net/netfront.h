@@ -42,6 +42,7 @@
 
 
 #define NET_TX_RING_SIZE __CONST_RING_SIZE(netif_tx, PAGE_SIZE)
+#define NET_RX_RING_SIZE __CONST_RING_SIZE(netif_rx, PAGE_SIZE)
 
 /**
  * internal structure to represent the transmit queue.
@@ -77,6 +78,33 @@ struct uk_netdev_tx_queue {
  * internal structure to represent the receive queue.
  */
 struct uk_netdev_rx_queue {
+	/* The netfront device */
+	struct netfront_dev *netfront_dev;
+	/* The libuknet queue identifier */
+	uint16_t lqueue_id;
+	/* True if initialized */
+	bool initialized;
+
+	/* Shared ring size */
+	uint16_t ring_size;
+	/* Shared ring */
+	netif_rx_front_ring_t ring;
+	/* Shared ring grant ref */
+	grant_ref_t ring_ref;
+	/* Queue event channel */
+	evtchn_port_t evtchn;
+
+	/* The flag to interrupt on the transmit queue */
+	uint8_t intr_enabled;
+
+	/* User-provided receive buffer allocation function */
+	uk_netdev_alloc_rxpkts alloc_rxpkts;
+	void *alloc_rxpkts_argp;
+
+	/* Receive buffers for incoming packets */
+	struct uk_netbuf *netbuf[NET_RX_RING_SIZE];
+	/* Grants for receive buffers */
+	grant_ref_t gref[NET_RX_RING_SIZE];
 };
 
 struct xs_econf {
@@ -93,6 +121,7 @@ struct netfront_dev {
 
 	/* List of the Rx/Tx queues */
 	uint16_t txqs_num;
+	uint16_t rxqs_num;
 	struct uk_netdev_tx_queue *txqs;
 	struct uk_netdev_rx_queue *rxqs;
 	/* Maximum number of queue pairs */
