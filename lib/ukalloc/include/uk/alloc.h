@@ -324,6 +324,16 @@ struct uk_alloc_libstats_entry {
 	const char *libname;
 	struct uk_alloc *a; /* default allocator wrapper for the library */
 };
+
+extern struct uk_alloc_libstats_entry _uk_alloc_libstats_start[];
+extern struct uk_alloc_libstats_entry _uk_alloc_libstats_end;
+
+#define uk_alloc_foreach_libstats(iter)					\
+	for ((iter) = _uk_alloc_libstats_start;				\
+	     (iter) < &_uk_alloc_libstats_end;				\
+	     (iter) = (struct uk_alloc_libstats_entry *) ((__uptr)(iter) \
+		      + ALIGN_UP(sizeof(struct uk_alloc_libstats_entry), 8)))
+
 #endif /* CONFIG_LIBUKALLOC_IFSTATS_PERLIB */
 #endif /* CONFIG_LIBUKALLOC_IFSTATS */
 
