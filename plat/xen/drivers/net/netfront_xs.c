@@ -29,6 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#define _GNU_SOURCE
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>
@@ -37,7 +38,12 @@
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <xenbus/xs.h>
+#include <xenbus/client.h>
 #include "netfront_xb.h"
+
+
+static int netfront_xb_wait_be_connect(struct netfront_dev *nfdev);
+static int netfront_xb_wait_be_disconnect(struct netfront_dev *nfdev);
 
 
 static int xs_read_backend_id(const char *nodename, domid_t *domid)
@@ -216,4 +222,306 @@ void netfront_xb_fini(struct netfront_dev *nfdev, struct uk_alloc *a)
 		free(xendev->otherend);
 		xendev->otherend = NULL;
 	}
+}
+
+static int xs_write_queue(struct netfront_dev *nfdev, uint16_t queue_id,
+		xenbus_transaction_t xbt, int write_hierarchical)
+{
+	struct xenbus_device *xendev = nfdev->xendev;
+	struct uk_netdev_tx_queue *txq = &nfdev->txqs[queue_id];
+	struct uk_netdev_rx_queue *rxq = &nfdev->rxqs[queue_id];
+	char *path;
+	int rc;
+
+	if (write_hierarchical) {
+		rc = asprintf(&path, "%s/queue-%u", xendev->nodename, queue_id);
+		if (rc < 0)
+			goto out;
+	} else
+		path = xendev->nodename;
+
+	rc = xs_printf(xbt, path, "tx-ring-ref", "%u", txq->ring_ref);
+	if (rc < 0)
+		goto out_path;
+
+	rc = xs_printf(xbt, path, "rx-ring-ref", "%u", rxq->ring_ref);
+	if (rc < 0)
+		goto out_path;
+
+	if (nfdev->split_evtchn) {
+		/* split event channels */
+		rc = xs_printf(xbt, path, "event-channel-tx", "%u",
+			txq->evtchn);
+		if (rc < 0)
+			goto out_path;
+
+		rc = xs_printf(xbt, path, "event-channel-rx", "%u",
+			rxq->evtchn);
+		if (rc < 0)
+			goto out_path;
+	} else {
+		/* shared event channel */
+		rc = xs_printf(xbt, path, "event-channel", "%u",
+			txq->evtchn);
+		if (rc < 0)
+			goto out_path;
+	}
+
+	rc = 0;
+
+out_path:
+	if (write_hierarchical)
+		free(path);
+out:
+	return rc;
+}
+
+static void xs_delete_queue(struct netfront_dev *nfdev, uint16_t queue_id,
+		xenbus_transaction_t xbt, int write_hierarchical)
+{
+	struct xenbus_device *xendev = nfdev->xendev;
+	char *dir, *path;
+	int rc;
+
+	if (write_hierarchical) {
+		rc = asprintf(&dir, "%s/queue-%u", xendev->nodename, queue_id);
+		if (rc < 0)
+			return;
+	} else
+		dir = xendev->nodename;
+
+	rc = asprintf(&path, "%s/tx-ring-ref", dir);
+	if (rc < 0)
+		goto out;
+	xs_rm(xbt, path);
+	free(path);
+
+	rc = asprintf(&path, "%s/rx-ring-ref", dir);
+	if (rc < 0)
+		goto out;
+	xs_rm(xbt, path);
+	free(path);
+
+	if (nfdev->split_evtchn) {
+		/* split event channels */
+		rc = asprintf(&path, "%s/event-channel-tx", dir);
+		if (rc < 0)
+			goto out;
+		xs_rm(xbt, path);
+		free(path);
+		rc = asprintf(&path, "%s/event-channel-rx", dir);
+		if (rc < 0)
+			goto out;
+		xs_rm(xbt, path);
+		free(path);
+	} else {
+		/* shared event channel */
+		rc = asprintf(&path, "%s/event-channel", dir);
+		if (rc < 0)
+			goto out;
+		xs_rm(xbt, path);
+		free(path);
+	}
+
+out:
+	if (write_hierarchical)
+		free(dir);
+}
+
+static int netfront_xb_front_init(struct netfront_dev *nfdev,
+		xenbus_transaction_t xbt)
+{
+	struct xenbus_device *xendev = nfdev->xendev;
+	int rc, i;
+
+	rc = xs_printf(xbt, xendev->nodename, "multi-queue-num-queues",
+			"%u", nfdev->rxqs_num);
+	if (rc < 0)
+		goto out;
+
+	if (nfdev->rxqs_num == 1) {
+		rc = xs_write_queue(nfdev, 0, xbt, 0);
+		if (rc)
+			goto out;
+	} else {
+		for (i = 0; i < nfdev->rxqs_num; i++) {
+			rc = xs_write_queue(nfdev, i, xbt, 1);
+			if (rc)
+				goto out;
+		}
+	}
+
+	rc = xs_printf(xbt, xendev->nodename, "request-rx-copy", "%u", 1);
+	if (rc < 0)
+		goto out;
+
+	rc = 0;
+
+out:
+	return rc;
+}
+
+static void netfront_xb_front_fini(struct netfront_dev *nfdev,
+		xenbus_transaction_t xbt)
+{
+	int i;
+
+	if (nfdev->rxqs_num == 1)
+		xs_delete_queue(nfdev, 0, xbt, 0);
+	else {
+		for (i = 0; i < nfdev->rxqs_num; i++)
+			xs_delete_queue(nfdev, i, xbt, 1);
+	}
+}
+
+int netfront_xb_connect(struct netfront_dev *nfdev)
+{
+	struct xenbus_device *xendev;
+	xenbus_transaction_t xbt;
+	int rc;
+
+	UK_ASSERT(nfdev != NULL);
+
+	xendev = nfdev->xendev;
+	UK_ASSERT(xendev != NULL);
+
+again:
+	rc = xs_transaction_start(&xbt);
+	if (rc)
+		goto abort_transaction;
+
+	rc = netfront_xb_front_init(nfdev, xbt);
+	if (rc)
+		goto abort_transaction;
+
+	rc = xenbus_switch_state(xbt, xendev, XenbusStateConnected);
+	if (rc)
+		goto abort_transaction;
+
+	rc = xs_transaction_end(xbt, 0);
+	if (rc == -EAGAIN)
+		goto again;
+
+	rc = netfront_xb_wait_be_connect(nfdev);
+	if (rc)
+		netfront_xb_front_fini(nfdev, xbt);
+
+	return rc;
+
+abort_transaction:
+	xs_transaction_end(xbt, 1);
+
+	return rc;
+}
+
+int netfront_xb_disconnect(struct netfront_dev *nfdev)
+{
+	struct xenbus_device *xendev;
+	int rc;
+
+	UK_ASSERT(nfdev != NULL);
+
+	xendev = nfdev->xendev;
+	UK_ASSERT(xendev != NULL);
+
+	uk_pr_debug("Close network: backend at %s\n", xendev->otherend);
+
+	rc = xenbus_switch_state(XBT_NIL, xendev, XenbusStateClosing);
+	if (rc)
+		goto out;
+
+	rc = netfront_xb_wait_be_disconnect(nfdev);
+	if (rc)
+		goto out;
+
+	netfront_xb_front_fini(nfdev, XBT_NIL);
+
+out:
+	return rc;
+}
+
+static int be_watch_start(struct xenbus_device *xendev, const char *path)
+{
+	struct xenbus_watch *watch;
+
+	watch = xs_watch_path(XBT_NIL, path);
+	if (PTRISERR(watch))
+		return PTR2ERR(watch);
+
+	xendev->otherend_watch = watch;
+
+	return 0;
+}
+
+static int be_watch_stop(struct xenbus_device *xendev)
+{
+	return xs_unwatch(XBT_NIL, xendev->otherend_watch);
+}
+
+#define WAIT_BE_STATE_CHANGE_WHILE_COND(state_cond) \
+	do { \
+		rc = xs_read_integer(XBT_NIL, be_state_path, \
+			(int *) &be_state); \
+		if (rc) \
+			goto out; \
+		while (!rc && (state_cond)) \
+			rc = xenbus_wait_for_state_change(be_state_path, \
+				&be_state, xendev->otherend_watch); \
+		if (rc) \
+			goto out; \
+	} while (0)
+
+static int netfront_xb_wait_be_connect(struct netfront_dev *nfdev)
+{
+	struct xenbus_device *xendev = nfdev->xendev;
+	char be_state_path[strlen(xendev->otherend) + sizeof("/state")];
+	XenbusState be_state;
+	int rc;
+
+	sprintf(be_state_path, "%s/state", xendev->otherend);
+
+	rc = be_watch_start(xendev, be_state_path);
+	if (rc)
+		goto out;
+
+	WAIT_BE_STATE_CHANGE_WHILE_COND(be_state < XenbusStateConnected);
+
+	if (be_state != XenbusStateConnected) {
+		uk_pr_err("Backend not available, state=%s\n",
+				xenbus_state_to_str(be_state));
+		be_watch_stop(xendev);
+	}
+
+out:
+	return rc;
+}
+
+static int netfront_xb_wait_be_disconnect(struct netfront_dev *nfdev)
+{
+	struct xenbus_device *xendev = nfdev->xendev;
+	char be_state_path[strlen(xendev->otherend) + sizeof("/state")];
+	XenbusState be_state;
+	int rc;
+
+	sprintf(be_state_path, "%s/state", xendev->otherend);
+
+	WAIT_BE_STATE_CHANGE_WHILE_COND(be_state < XenbusStateClosing);
+
+	rc = xenbus_switch_state(XBT_NIL, xendev, XenbusStateClosed);
+	if (rc)
+		goto out;
+
+	WAIT_BE_STATE_CHANGE_WHILE_COND(be_state < XenbusStateClosed);
+
+	rc = xenbus_switch_state(XBT_NIL, xendev, XenbusStateInitialising);
+	if (rc)
+		goto out;
+
+	WAIT_BE_STATE_CHANGE_WHILE_COND(be_state < XenbusStateInitWait ||
+			be_state >= XenbusStateClosed);
+
+	be_watch_stop(xendev);
+
+out:
+	return rc;
 }

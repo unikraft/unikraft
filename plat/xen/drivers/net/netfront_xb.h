@@ -38,4 +38,7 @@
 int  netfront_xb_init(struct netfront_dev *netdev, struct uk_alloc *a);
 void netfront_xb_fini(struct netfront_dev *netdev, struct uk_alloc *a);
 
+int netfront_xb_connect(struct netfront_dev *netdev);
+int netfront_xb_disconnect(struct netfront_dev *netdev);
+
 #endif /* __NETFRONT_XB_H__ */

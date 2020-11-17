@@ -473,6 +473,23 @@ out:
 	return rc;
 }
 
+static int netfront_start(struct uk_netdev *n)
+{
+	struct netfront_dev *nfdev;
+	int rc;
+
+	UK_ASSERT(n != NULL);
+	nfdev = to_netfront_dev(n);
+
+	rc = netfront_xb_connect(nfdev);
+	if (rc) {
+		uk_pr_err("Error connecting to backend: %d\n", rc);
+		return rc;
+	}
+
+	return rc;
+}
+
 static void netfront_info_get(struct uk_netdev *n,
 		struct uk_netdev_info *dev_info)
 {
@@ -543,6 +560,7 @@ static unsigned int netfront_promisc_get(struct uk_netdev *n)
 
 static const struct uk_netdev_ops netfront_ops = {
 	.configure = netfront_configure,
+	.start = netfront_start,
 	.txq_configure = netfront_txq_setup,
 	.rxq_configure = netfront_rxq_setup,
 	.rxq_intr_enable = netfront_rx_intr_enable,
