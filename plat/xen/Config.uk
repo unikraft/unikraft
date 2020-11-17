@@ -90,6 +90,14 @@ config XEN_XENBUS
 menu "Xenbus Drivers"
 	depends on XEN_XENBUS
 
+config XEN_NETFRONT
+	bool "Xenbus Netfront Driver"
+	default y if LIBUKNETDEV
+	default n
+	depends on LIBUKNETDEV
+	help
+		Driver for netfront devices
+
 menuconfig XEN_BLKFRONT
 	bool "Xenbus Blkfront Driver"
 	default y if LIBUKBLKDEV

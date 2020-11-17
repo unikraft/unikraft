@@ -10,6 +10,7 @@ $(eval $(call addplat_s,xen,$(CONFIG_PLAT_XEN)))
 ##
 $(eval $(call addplatlib,xen,libxenplat))
 $(eval $(call addplatlib_s,xen,libxenbus,$(CONFIG_XEN_XENBUS)))
+$(eval $(call addplatlib_s,xen,libxennetfront,$(CONFIG_XEN_NETFRONT)))
 $(eval $(call addplatlib_s,xen,libxenblkfront,$(CONFIG_XEN_BLKFRONT)))
 $(eval $(call addplatlib_s,xen,libxen9pfront,$(CONFIG_XEN_9PFRONT)))
 
@@ -111,6 +112,15 @@ LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/client.c
 LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/xs_comms.c
 LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/xs_watch.c
 LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/xs.c
+endif
+
+ifeq ($(CONFIG_XEN_NETFRONT),y)
+LIBXENNETFRONT_EXPORTS          = $(LIBXENPLAT_BASE)/drivers/net/exportsyms.uk
+LIBXENNETFRONT_ASFLAGS-y       += $(LIBXENPLAT_ASFLAGS-y)
+LIBXENNETFRONT_ASINCLUDES-y    += $(LIBXENPLAT_ASINCLUDES-y)
+LIBXENNETFRONT_CFLAGS-y        += $(LIBXENPLAT_CFLAGS-y)
+LIBXENNETFRONT_CINCLUDES-y     += $(LIBXENPLAT_CINCLUDES-y)
+LIBXENNETFRONT_SRCS-y          += $(LIBXENPLAT_BASE)/drivers/net/netfront.c
 endif
 
 ifeq ($(CONFIG_XEN_BLKFRONT),y)
