@@ -121,7 +121,7 @@ out_err:
 int netfront_xb_init(struct netfront_dev *nfdev, struct uk_alloc *a)
 {
 	struct xenbus_device *xendev;
-	char *mac_str, *p, *ip_str;
+	char *mac_str, *p, *ip_str, *int_str;
 	int rc;
 
 	UK_ASSERT(nfdev != NULL);
@@ -173,7 +173,21 @@ int netfront_xb_init(struct netfront_dev *nfdev, struct uk_alloc *a)
 		goto no_conf;
 	free(ip_str);
 
-	/* TODO spit event channels */
+	/* maximum queues number */
+	int_str = xs_read(XBT_NIL, xendev->otherend,
+		"multi-queue-max-queues");
+	if (!PTRISERR(int_str)) {
+		nfdev->max_queue_pairs = (uint16_t) strtoul(int_str, NULL, 10);
+		free(int_str);
+	}
+
+	/* spit event channels */
+	int_str = xs_read(XBT_NIL, xendev->otherend,
+		"feature-split-event-channels");
+	if (!PTRISERR(int_str)) {
+		nfdev->split_evtchn = (bool) strtoul(int_str, NULL, 10);
+		free(int_str);
+	}
 
 	/* TODO netmap */
 

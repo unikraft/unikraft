@@ -36,6 +36,18 @@
 
 #include <uk/netdev.h>
 
+/**
+ * internal structure to represent the transmit queue.
+ */
+struct uk_netdev_tx_queue {
+};
+
+/**
+ * internal structure to represent the receive queue.
+ */
+struct uk_netdev_rx_queue {
+};
+
 struct xs_econf {
 	char *ipv4addr;
 	char *ipv4mask;
@@ -47,6 +59,14 @@ struct netfront_dev {
 	struct xenbus_device *xendev;
 	/* Network device */
 	struct uk_netdev netdev;
+
+	/* List of the Rx/Tx queues */
+	struct uk_netdev_tx_queue *txqs;
+	struct uk_netdev_rx_queue *rxqs;
+	/* Maximum number of queue pairs */
+	uint16_t  max_queue_pairs;
+	/* True if using split event channels */
+	bool split_evtchn;
 
 	/* Configuration parameters */
 	struct xs_econf econf;

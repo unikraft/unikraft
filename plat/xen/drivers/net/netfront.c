@@ -47,6 +47,86 @@
 
 static struct uk_alloc *drv_allocator;
 
+static int netfront_rxtx_alloc(struct netfront_dev *nfdev,
+		const struct uk_netdev_conf *conf)
+{
+	int rc = 0;
+
+	if (conf->nb_tx_queues != conf->nb_rx_queues) {
+		uk_pr_err("Different number of queues not supported\n");
+		rc = -ENOTSUP;
+		goto err_free_txrx;
+	}
+
+	nfdev->max_queue_pairs =
+		MIN(nfdev->max_queue_pairs, conf->nb_tx_queues);
+
+	nfdev->txqs = uk_calloc(drv_allocator,
+		nfdev->max_queue_pairs, sizeof(*nfdev->txqs));
+	if (unlikely(!nfdev->txqs)) {
+		uk_pr_err("Failed to allocate memory for tx queues\n");
+		rc = -ENOMEM;
+		goto err_free_txrx;
+	}
+
+	nfdev->rxqs = uk_calloc(drv_allocator,
+		nfdev->max_queue_pairs, sizeof(*nfdev->rxqs));
+	if (unlikely(!nfdev->rxqs)) {
+		uk_pr_err("Failed to allocate memory for rx queues\n");
+		rc = -ENOMEM;
+		goto err_free_txrx;
+	}
+
+	return rc;
+
+err_free_txrx:
+	if (!nfdev->rxqs)
+		uk_free(drv_allocator, nfdev->rxqs);
+	if (!nfdev->txqs)
+		uk_free(drv_allocator, nfdev->txqs);
+
+	return rc;
+}
+
+static int netfront_configure(struct uk_netdev *n,
+		const struct uk_netdev_conf *conf)
+{
+	int rc;
+	struct netfront_dev *nfdev;
+
+	UK_ASSERT(n != NULL);
+	UK_ASSERT(conf != NULL);
+
+	nfdev = to_netfront_dev(n);
+
+	rc = netfront_rxtx_alloc(nfdev, conf);
+	if (rc != 0) {
+		uk_pr_err("Failed to allocate rx and tx rings %d\n", rc);
+		goto out;
+	}
+
+out:
+	return rc;
+}
+
+static void netfront_info_get(struct uk_netdev *n,
+		struct uk_netdev_info *dev_info)
+{
+	struct netfront_dev *nfdev;
+
+	UK_ASSERT(n != NULL);
+	UK_ASSERT(dev_info != NULL);
+
+	nfdev = to_netfront_dev(n);
+	dev_info->max_rx_queues = nfdev->max_queue_pairs;
+	dev_info->max_tx_queues = nfdev->max_queue_pairs;
+	dev_info->max_mtu = nfdev->mtu;
+	dev_info->nb_encap_tx = 0;
+	dev_info->nb_encap_rx = 0;
+	dev_info->ioalign = PAGE_SIZE;
+	dev_info->features = UK_FEATURE_RXQ_INTR_AVAILABLE;
+}
+
 static const void *netfront_einfo_get(struct uk_netdev *n,
 		enum uk_netdev_einfo_type einfo_type)
 {
@@ -98,6 +178,8 @@ static unsigned int netfront_promisc_get(struct uk_netdev *n)
 }
 
 static const struct uk_netdev_ops netfront_ops = {
+	.configure = netfront_configure,
+	.info_get = netfront_info_get,
 	.einfo_get = netfront_einfo_get,
 	.hwaddr_get = netfront_mac_get,
 	.mtu_get = netfront_mtu_get,
@@ -119,6 +201,7 @@ static int netfront_add_dev(struct xenbus_device *xendev)
 
 	nfdev->xendev = xendev;
 	nfdev->mtu = UK_ETH_PAYLOAD_MAXLEN;
+	nfdev->max_queue_pairs = 1;
 
 	/* Xenbus initialization */
 	rc = netfront_xb_init(nfdev, drv_allocator);
