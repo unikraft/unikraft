@@ -31,21 +31,121 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <uk/assert.h>
+#include <uk/print.h>
+#include <uk/alloc.h>
+#include <uk/netdev_driver.h>
 #include <xenbus/xenbus.h>
+#include "netfront.h"
+#include "netfront_xb.h"
 
 
 #define DRIVER_NAME  "xen-netfront"
 
+#define to_netfront_dev(dev) \
+	__containerof(dev, struct netfront_dev, netdev)
+
 static struct uk_alloc *drv_allocator;
 
+static const void *netfront_einfo_get(struct uk_netdev *n,
+		enum uk_netdev_einfo_type einfo_type)
+{
+	struct netfront_dev *nfdev;
+
+	UK_ASSERT(n != NULL);
+
+	nfdev = to_netfront_dev(n);
+	switch (einfo_type) {
+	case UK_NETDEV_IPV4_ADDR_STR:
+		return nfdev->econf.ipv4addr;
+	case UK_NETDEV_IPV4_MASK_STR:
+		return nfdev->econf.ipv4mask;
+	case UK_NETDEV_IPV4_GW_STR:
+		return nfdev->econf.ipv4gw;
+	default:
+		break;
+	}
+
+	/* type not supported */
+	return NULL;
+}
+
+static const struct uk_hwaddr *netfront_mac_get(struct uk_netdev *n)
+{
+	struct netfront_dev *nfdev;
+
+	UK_ASSERT(n != NULL);
+	nfdev = to_netfront_dev(n);
+	return &nfdev->hw_addr;
+}
+
+static uint16_t netfront_mtu_get(struct uk_netdev *n)
+{
+	struct netfront_dev *nfdev;
+
+	UK_ASSERT(n != NULL);
+	nfdev = to_netfront_dev(n);
+	return nfdev->mtu;
+}
+
+static unsigned int netfront_promisc_get(struct uk_netdev *n)
+{
+	struct netfront_dev *nfdev;
+
+	UK_ASSERT(n != NULL);
+	nfdev = to_netfront_dev(n);
+	return nfdev->promisc;
+}
+
+static const struct uk_netdev_ops netfront_ops = {
+	.einfo_get = netfront_einfo_get,
+	.hwaddr_get = netfront_mac_get,
+	.mtu_get = netfront_mtu_get,
+	.promiscuous_get = netfront_promisc_get,
+};
 
 static int netfront_add_dev(struct xenbus_device *xendev)
 {
+	struct netfront_dev *nfdev;
 	int rc = 0;
 
 	UK_ASSERT(xendev != NULL);
 
+	nfdev = uk_calloc(drv_allocator, 1, sizeof(*nfdev));
+	if (!nfdev) {
+		rc = -ENOMEM;
+		goto err_out;
+	}
+
+	nfdev->xendev = xendev;
+	nfdev->mtu = UK_ETH_PAYLOAD_MAXLEN;
+
+	/* Xenbus initialization */
+	rc = netfront_xb_init(nfdev, drv_allocator);
+	if (rc) {
+		uk_pr_err("Error initializing Xenbus data: %d\n", rc);
+		goto err_xenbus;
+	}
+
+	/* register netdev */
+	nfdev->netdev.ops = &netfront_ops;
+	rc = uk_netdev_drv_register(&nfdev->netdev, drv_allocator, DRIVER_NAME);
+	if (rc < 0) {
+		uk_pr_err("Failed to register %s device with libuknetdev\n",
+			DRIVER_NAME);
+		goto err_register;
+	}
+	nfdev->uid = rc;
+	rc = 0;
+
+out:
 	return rc;
+err_register:
+	netfront_xb_fini(nfdev, drv_allocator);
+err_xenbus:
+	uk_free(drv_allocator, nfdev);
+err_out:
+	goto out;
 }
 
 static int netfront_drv_init(struct uk_alloc *allocator)
