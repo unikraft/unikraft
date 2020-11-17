@@ -44,6 +44,12 @@
 
 #define DRIVER_NAME  "xen-netfront"
 
+/* TODO Same interrupt macros we use in virtio-net */
+#define NETFRONT_INTR_EN             (1 << 0)
+#define NETFRONT_INTR_EN_MASK        (1)
+#define NETFRONT_INTR_USR_EN         (1 << 1)
+#define NETFRONT_INTR_USR_EN_MASK    (2)
+
 #define to_netfront_dev(dev) \
 	__containerof(dev, struct netfront_dev, netdev)
 
@@ -146,6 +152,22 @@ out:
 	return status;
 }
 
+/* Returns 1 if more packets available */
+static int netfront_rxq_intr_enable(struct uk_netdev_rx_queue *rxq)
+{
+	int more;
+
+	/* Check if there are no more packets enabled */
+	RING_FINAL_CHECK_FOR_RESPONSES(&rxq->ring, more);
+	if (!more) {
+		/* No more packets, we can enable interrupts */
+		rxq->intr_enabled |= NETFRONT_INTR_EN;
+		unmask_evtchn(rxq->evtchn);
+	}
+
+	return (more > 0);
+}
+
 static struct uk_netdev_tx_queue *netfront_txq_setup(struct uk_netdev *n,
 		uint16_t queue_id,
 		uint16_t nb_desc __unused,
@@ -216,6 +238,10 @@ static void netfront_handler(evtchn_port_t port __unused,
 		struct __regs *regs __unused, void *arg)
 {
 	struct uk_netdev_rx_queue *rxq = arg;
+
+	/* Disable the interrupt for the ring */
+	rxq->intr_enabled &= ~(NETFRONT_INTR_EN);
+	mask_evtchn(rxq->evtchn);
 
 	/* Indicate to the network stack about an event */
 	uk_netdev_drv_rx_event(&rxq->netfront_dev->netdev, rxq->lqueue_id);
@@ -331,6 +357,45 @@ err_free_txrx:
 		uk_free(drv_allocator, nfdev->txqs);
 
 	return rc;
+}
+
+static int netfront_rx_intr_enable(struct uk_netdev *n,
+		struct uk_netdev_rx_queue *rxq)
+{
+	int rc;
+
+	UK_ASSERT(n != NULL);
+	UK_ASSERT(rxq != NULL);
+	UK_ASSERT(&rxq->netfront_dev->netdev == n);
+
+	/* If the interrupt is enabled */
+	if (rxq->intr_enabled & NETFRONT_INTR_EN)
+		return 0;
+
+	/**
+	 * Enable the user configuration bit. This would cause the interrupt to
+	 * be enabled automatically if the interrupt could not be enabled now
+	 * due to data in the queue.
+	 */
+	rxq->intr_enabled = NETFRONT_INTR_USR_EN;
+	rc = netfront_rxq_intr_enable(rxq);
+	if (!rc)
+		rxq->intr_enabled |= NETFRONT_INTR_EN;
+
+	return rc;
+}
+
+static int netfront_rx_intr_disable(struct uk_netdev *n,
+		struct uk_netdev_rx_queue *rxq)
+{
+	UK_ASSERT(n != NULL);
+	UK_ASSERT(rxq != NULL);
+	UK_ASSERT(&rxq->netfront_dev->netdev == n);
+
+	rxq->intr_enabled &= ~(NETFRONT_INTR_USR_EN | NETFRONT_INTR_EN);
+	mask_evtchn(rxq->evtchn);
+
+	return 0;
 }
 
 static int netfront_txq_info_get(struct uk_netdev *n,
@@ -480,6 +545,8 @@ static const struct uk_netdev_ops netfront_ops = {
 	.configure = netfront_configure,
 	.txq_configure = netfront_txq_setup,
 	.rxq_configure = netfront_rxq_setup,
+	.rxq_intr_enable = netfront_rx_intr_enable,
+	.rxq_intr_disable = netfront_rx_intr_disable,
 	.txq_info_get = netfront_txq_info_get,
 	.rxq_info_get = netfront_rxq_info_get,
 	.info_get = netfront_info_get,
