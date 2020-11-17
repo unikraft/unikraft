@@ -230,6 +230,52 @@ static int netfront_rxq_enqueue(struct uk_netdev_rx_queue *rxq,
 	return 0;
 }
 
+static int netfront_rxq_dequeue(struct uk_netdev_rx_queue *rxq,
+		struct uk_netbuf **netbuf)
+{
+	RING_IDX prod, cons;
+	netif_rx_response_t *rx_rsp;
+	uint16_t len, id;
+	struct uk_netbuf *buf = NULL;
+	int count = 0;
+
+	UK_ASSERT(rxq != NULL);
+	UK_ASSERT(netbuf != NULL);
+
+	prod = rxq->ring.sring->rsp_prod;
+	rmb(); /* Ensure we see queued responses up to 'rp'. */
+	cons = rxq->ring.rsp_cons;
+	/* No new descriptor since last dequeue operation */
+	if (cons == prod) {
+		*netbuf = NULL;
+		goto out;
+	}
+
+	/* get response */
+	rx_rsp = RING_GET_RESPONSE(&rxq->ring, cons);
+	UK_ASSERT(rx_rsp->status > NETIF_RSP_NULL);
+	id = rx_rsp->id;
+	UK_ASSERT(id < NET_RX_RING_SIZE);
+
+	/* remove grant for buffer data */
+	gnttab_end_access(rxq->gref[id]);
+
+	buf = rxq->netbuf[id];
+	len = (uint16_t) rx_rsp->status;
+	if (len > UK_ETH_FRAME_MAXLEN)
+		len = UK_ETH_FRAME_MAXLEN;
+	buf->len = len;
+	buf->data = buf->buf;
+
+	*netbuf = buf;
+
+	rxq->ring.rsp_cons++;
+	count = 1;
+
+out:
+	return count;
+}
+
 static int netfront_rx_fillup(struct uk_netdev_rx_queue *rxq, uint16_t nb_desc)
 {
 	struct uk_netbuf *netbuf[nb_desc];
@@ -278,6 +324,62 @@ static int netfront_rxq_intr_enable(struct uk_netdev_rx_queue *rxq)
 	}
 
 	return (more > 0);
+}
+
+static int netfront_recv(struct uk_netdev *n,
+		struct uk_netdev_rx_queue *rxq,
+		struct uk_netbuf **pkt)
+{
+	int rc, status = 0;
+
+	UK_ASSERT(n != NULL);
+	UK_ASSERT(rxq != NULL);
+	UK_ASSERT(pkt != NULL);
+
+	/* Queue interrupts have to be off when calling receive */
+	UK_ASSERT(!(rxq->intr_enabled & NETFRONT_INTR_EN));
+
+	rc = netfront_rxq_dequeue(rxq, pkt);
+	UK_ASSERT(rc >= 0);
+
+	status |= (*pkt) ? UK_NETDEV_STATUS_SUCCESS : 0x0;
+	status |= netfront_rx_fillup(rxq, rc);
+
+	/* Enable interrupt only when user had previously enabled it */
+	if (rxq->intr_enabled & NETFRONT_INTR_USR_EN_MASK) {
+		/* Need to enable the interrupt on the last packet */
+		rc = netfront_rxq_intr_enable(rxq);
+		if (rc == 1 && !(*pkt)) {
+			/**
+			 * Packet arrive after reading the queue and before
+			 * enabling the interrupt
+			 */
+			rc = netfront_rxq_dequeue(rxq, pkt);
+			UK_ASSERT(rc >= 0);
+			status |= UK_NETDEV_STATUS_SUCCESS;
+
+			/*
+			 * Since we received something, we need to fillup
+			 * and notify
+			 */
+			status |= netfront_rx_fillup(rxq, rc);
+
+			/* Need to enable the interrupt on the last packet */
+			rc = netfront_rxq_intr_enable(rxq);
+			status |= (rc == 1) ? UK_NETDEV_STATUS_MORE : 0x0;
+		} else if (*pkt) {
+			/* When we originally got a packet and there is more */
+			status |= (rc == 1) ? UK_NETDEV_STATUS_MORE : 0x0;
+		}
+	} else if (*pkt) {
+		/**
+		 * For polling case, we report always there are further
+		 * packets unless the queue is empty.
+		 */
+		status |= UK_NETDEV_STATUS_MORE;
+	}
+
+	return status;
 }
 
 static struct uk_netdev_tx_queue *netfront_txq_setup(struct uk_netdev *n,
@@ -712,6 +814,7 @@ static int netfront_add_dev(struct xenbus_device *xendev)
 
 	/* register netdev */
 	nfdev->netdev.tx_one = netfront_xmit;
+	nfdev->netdev.rx_one = netfront_recv;
 	nfdev->netdev.ops = &netfront_ops;
 	rc = uk_netdev_drv_register(&nfdev->netdev, drv_allocator, DRIVER_NAME);
 	if (rc < 0) {
