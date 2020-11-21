@@ -570,6 +570,11 @@ int uk_libparam_parse(const char *progname, int argc, char **argv)
 		}
 
 		rc = kernel_args_set(&pargs, param);
+		if (rc < 0) {
+			uk_pr_err("Failed to set %s param\n", pargs.param);
+			continue;
+		}
+
 		uk_pr_info("Parsed %d args\n", cnt);
 	}
 
