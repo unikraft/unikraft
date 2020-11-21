@@ -940,14 +940,14 @@ sys_link(char *oldpath, char *newpath)
 	vp = olddp->d_vnode;
 	vn_lock(vp);
 
-	if (vp->v_type == VDIR) {
-		error = EPERM;
-		goto out;
-	}
-
 	/* If newpath exists, it shouldn't be overwritten */
 	if (!namei(newpath, &newdp)) {
 		error = EEXIST;
+		goto out;
+	}
+
+	if (vp->v_type == VDIR) {
+		error = EPERM;
 		goto out;
 	}
 
