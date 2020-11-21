@@ -345,9 +345,13 @@ static int virtio_9p_feature_negotiate(struct virtio_9p_device *d)
 		goto out;
 	}
 
-	virtio_config_get(d->vdev,
+	if (virtio_config_get(d->vdev,
 			  __offsetof(struct virtio_9p_config, tag_len),
-			  &tag_len, 1, sizeof(tag_len));
+			  &tag_len, 1, sizeof(tag_len)))
+	{
+		rc = -EAGAIN;
+		goto out;
+	}
 
 	d->tag = uk_calloc(a, tag_len + 1, sizeof(*d->tag));
 	if (!d->tag) {
