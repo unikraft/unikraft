@@ -1353,6 +1353,11 @@ char *getcwd(char *path, size_t size)
 	size_t len = strlen(t->t_cwd) + 1;
 	int error;
 
+	if (size < len) {
+		error = ERANGE;
+		goto out_errno;
+	}
+
 	if (!path) {
 		if (!size)
 			size = len;
@@ -1366,11 +1371,6 @@ char *getcwd(char *path, size_t size)
 			error = EINVAL;
 			goto out_errno;
 		}
-	}
-
-	if (size < len) {
-		error = ERANGE;
-		goto out_errno;
 	}
 
 	memcpy(path, t->t_cwd, len);
