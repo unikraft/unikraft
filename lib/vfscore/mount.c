@@ -207,6 +207,7 @@ mount(const char *dev, const char *dir, const char *fsname, unsigned long flags,
 
 	mp->m_root = dentry_alloc(NULL, vp, "/");
 	if (!mp->m_root) {
+		error = ENOMEM;
 		vput(vp);
 		goto err3;
 	}
