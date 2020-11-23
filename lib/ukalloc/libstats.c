@@ -45,6 +45,7 @@
 
 #include <uk/print.h>
 #include <uk/alloc_impl.h>
+#include <uk/essentials.h>
 #include <uk/preempt.h>
 
 static inline struct uk_alloc *_uk_alloc_get_actual_default(void)
@@ -120,7 +121,11 @@ static void *wrapper_malloc(struct uk_alloc *a, __sz size)
 	__sz alloc_size;
 	void *ret;
 
-	UK_ASSERT(p);
+	if (unlikely(!p)) {
+		update_stats(&a->_stats, 0, 1, 0, 0);
+		errno = ENOMEM;
+		return NULL;
+	}
 
 	WATCH_STATS_START(p);
 	ret = uk_do_malloc(p, size);
@@ -139,7 +144,11 @@ static void *wrapper_calloc(struct uk_alloc *a, __sz nmemb, __sz size)
 	__sz alloc_size;
 	void *ret;
 
-	UK_ASSERT(p);
+	if (unlikely(!p)) {
+		update_stats(&a->_stats, 0, 1, 0, 0);
+		errno = ENOMEM;
+		return NULL;
+	}
 
 	WATCH_STATS_START(p);
 	ret = uk_do_calloc(p, nmemb, size);
@@ -158,7 +167,10 @@ static int wrapper_posix_memalign(struct uk_alloc *a, void **memptr,
 	__sz alloc_size;
 	int ret;
 
-	UK_ASSERT(p);
+	if (unlikely(!p)) {
+		update_stats(&a->_stats, 0, 1, 0, 0);
+		return ENOMEM;
+	}
 
 	WATCH_STATS_START(p);
 	ret = uk_do_posix_memalign(p, memptr, align, size);
@@ -176,7 +188,11 @@ static void *wrapper_memalign(struct uk_alloc *a, __sz align, __sz size)
 	__sz alloc_size;
 	void *ret;
 
-	UK_ASSERT(p);
+	if (unlikely(!p)) {
+		update_stats(&a->_stats, 0, 1, 0, 0);
+		errno = ENOMEM;
+		return NULL;
+	}
 
 	WATCH_STATS_START(p);
 	ret = uk_do_memalign(p, align, size);
@@ -194,7 +210,11 @@ static void *wrapper_realloc(struct uk_alloc *a, void *ptr, __sz size)
 	__sz alloc_size;
 	void *ret;
 
-	UK_ASSERT(p);
+	if (unlikely(!p)) {
+		update_stats(&a->_stats, 0, 1, 0, 0);
+		errno = ENOMEM;
+		return NULL;
+	}
 
 	WATCH_STATS_START(p);
 	ret = uk_do_realloc(p, ptr, size);
