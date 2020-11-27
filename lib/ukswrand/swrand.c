@@ -34,6 +34,7 @@
 #include <uk/ctors.h>
 #include <uk/config.h>
 #include <uk/print.h>
+#include <uk/init.h>
 
 __u32 uk_swrandr_gen_seed32(void)
 {
@@ -93,4 +94,4 @@ static void _uk_swrand_ctor(void)
 	uk_swrand_init_r(&uk_swrand_def, seedc, seedv);
 }
 
-UK_CTOR_PRIO(_uk_swrand_ctor, UK_SWRAND_CTOR_PRIO);
+uk_early_initcall(_uk_swrand_ctor);
