@@ -105,6 +105,8 @@ typedef long uk_syscall_arg_t;
 
 #define UK_S_ARG_LONG(type, arg)   long arg
 #define UK_S_ARG_ACTUAL(type, arg) type arg
+#define UK_S_ARG_LONG_MAYBE_UNUSED(type, arg)   long arg __maybe_unused
+#define UK_S_ARG_ACTUAL_MAYBE_UNUSED(type, arg) type arg __maybe_unused
 #define UK_S_ARG_CAST_LONG(type, arg)   (long) arg
 #define UK_S_ARG_CAST_ACTUAL(type, arg) (type) arg
 
@@ -139,7 +141,8 @@ typedef long uk_syscall_arg_t;
 			UK_ARG_MAPx(x, UK_S_ARG_CAST_ACTUAL, __VA_ARGS__)); \
 	}								\
 	static inline rtype __##ename(UK_ARG_MAPx(x,			\
-						  UK_S_ARG_ACTUAL, __VA_ARGS__))
+						  UK_S_ARG_ACTUAL_MAYBE_UNUSED,\
+						  __VA_ARGS__))
 #define _UK_LLSYSCALL_DEFINE(...) __UK_LLSYSCALL_DEFINE(__VA_ARGS__)
 #define UK_LLSYSCALL_DEFINE(rtype, name, ...)				\
 	_UK_LLSYSCALL_DEFINE(__UK_SYSCALL_DEF_NARGS(__VA_ARGS__),	\
@@ -208,8 +211,9 @@ typedef long uk_syscall_arg_t;
 		return (long) __##rname(				\
 			UK_ARG_MAPx(x, UK_S_ARG_CAST_ACTUAL, __VA_ARGS__)); \
 	}								\
-	static inline rtype __##rname(UK_ARG_MAPx(x, UK_S_ARG_ACTUAL,	\
-						 __VA_ARGS__))
+	static inline rtype __##rname(UK_ARG_MAPx(x,			\
+						  UK_S_ARG_ACTUAL_MAYBE_UNUSED,\
+						  __VA_ARGS__))
 #define _UK_LLSYSCALL_R_DEFINE(...) __UK_LLSYSCALL_R_DEFINE(__VA_ARGS__)
 #define UK_LLSYSCALL_R_DEFINE(rtype, name, ...)				\
 	_UK_LLSYSCALL_R_DEFINE(__UK_SYSCALL_DEF_NARGS(__VA_ARGS__),	\
