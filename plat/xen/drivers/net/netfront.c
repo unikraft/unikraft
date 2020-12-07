@@ -152,7 +152,6 @@ static int netfront_xmit(struct uk_netdev *n,
 
 	/* get request id */
 	id = get_id_from_freelist(txq->freelist);
-	local_irq_restore(flags);
 
 	/* get request */
 	req_prod = txq->ring.req_prod_pvt;
@@ -189,17 +188,15 @@ static int netfront_xmit(struct uk_netdev *n,
 	if (notify)
 		notify_remote_via_evtchn(txq->evtchn);
 
-	status |= UK_NETDEV_STATUS_SUCCESS;
 
 	/* some cleanup */
-	local_irq_save(flags);
 	do {
 		network_tx_buf_gc(txq);
 		RING_FINAL_CHECK_FOR_RESPONSES(&txq->ring, more_to_do);
 	} while (more_to_do);
-	local_irq_restore(flags);
 
 	status |= (RING_FULL(&txq->ring)) ? 0x0 : UK_NETDEV_STATUS_MORE;
+	local_irq_restore(flags);
 
 	return status;
 }
