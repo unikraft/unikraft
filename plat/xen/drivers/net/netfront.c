@@ -362,6 +362,7 @@ static int netfront_recv(struct uk_netdev *n __unused,
 		struct uk_netbuf **pkt)
 {
 	int rc, status = 0;
+	int more;
 
 	UK_ASSERT(n != NULL);
 	UK_ASSERT(rxq != NULL);
@@ -407,7 +408,8 @@ static int netfront_recv(struct uk_netdev *n __unused,
 		 * For polling case, we report always there are further
 		 * packets unless the queue is empty.
 		 */
-		status |= UK_NETDEV_STATUS_MORE;
+		RING_FINAL_CHECK_FOR_RESPONSES(&rxq->ring, more);
+		status |= (more) ? UK_NETDEV_STATUS_MORE : 0x0;
 	}
 
 	return status;
