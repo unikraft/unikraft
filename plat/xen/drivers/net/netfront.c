@@ -479,7 +479,7 @@ static struct uk_netdev_tx_queue *netfront_txq_setup(struct uk_netdev *n,
 	return txq;
 }
 
-static void netfront_handler(evtchn_port_t port __unused,
+static void netfront_rxq_handler(evtchn_port_t port __unused,
 		struct __regs *regs __unused, void *arg)
 {
 	struct uk_netdev_rx_queue *rxq = arg;
@@ -531,7 +531,7 @@ static struct uk_netdev_rx_queue *netfront_rxq_setup(struct uk_netdev *n,
 	/* Setup event channel */
 	if (nfdev->split_evtchn || !nfdev->txqs[queue_id].initialized) {
 		rc = evtchn_alloc_unbound(nfdev->xendev->otherend_id,
-				netfront_handler, rxq,
+				netfront_rxq_handler, rxq,
 				&rxq->evtchn);
 		if (rc) {
 			uk_pr_err("Error creating event channel: %d\n", rc);
@@ -542,7 +542,7 @@ static struct uk_netdev_rx_queue *netfront_rxq_setup(struct uk_netdev *n,
 	} else {
 		rxq->evtchn = nfdev->txqs[queue_id].evtchn;
 		/* overwriting event handler */
-		bind_evtchn(rxq->evtchn, netfront_handler, rxq);
+		bind_evtchn(rxq->evtchn, netfront_rxq_handler, rxq);
 	}
 	/*
 	 * By default, events are disabled and it is up to the user or
