@@ -2,8 +2,11 @@
 /*
  * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
  *          Razvan Cojocaru <razvan.cojocaru93@gmail.com>
+ *          Simon Kuenzer <simon.kuenzer@neclab.eu>
  *
  * Copyright (c) 2020, University Politehnica of Bucharest. All rights reserved.
+ * Copyright (c) 2020, NEC Laboratories Europe GmbH, NEC Corporation.
+ *                     All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -39,6 +42,7 @@
 #include <xen-x86/mm.h>
 #include <xen-x86/irq.h>
 #include <xenbus/xenbus.h>
+#include <uk/essentials.h>
 #include "netfront.h"
 #include "netfront_xb.h"
 
@@ -103,8 +107,6 @@ static int network_tx_buf_gc(struct uk_netdev_tx_queue *txq)
 			id  = tx_rsp->id;
 			UK_ASSERT(id < NET_TX_RING_SIZE);
 
-			gnttab_end_access(txq->gref[id]);
-			txq->gref[id] = GRANT_INVALID_REF;
 			uk_netbuf_free_single(txq->nbuf[id]);
 
 			add_id_to_freelist(id, txq->freelist);
@@ -160,14 +162,23 @@ static int netfront_xmit(struct uk_netdev *n,
 	tx_req = RING_GET_REQUEST(&txq->ring, req_prod);
 
 	/* setup grant for buffer data */
-	txq->gref[id] = tx_req->gref =
-		gnttab_grant_access(nfdev->xendev->otherend_id,
-			virt_to_mfn(pkt->buf), 1);
-	UK_ASSERT(tx_req->gref != GRANT_INVALID_REF);
+	if (unlikely(txq->gref[id] == GRANT_INVALID_REF)) {
+		/* allocating of a new grant needed */
+		txq->gref[id] = gnttab_grant_access(nfdev->xendev->otherend_id,
+						    virt_to_mfn(pkt->buf),
+						    0);
+	} else {
+		/* re-use grant (update it) */
+		gnttab_update_grant(txq->gref[id],
+				    nfdev->xendev->otherend_id,
+				    virt_to_mfn(pkt->buf),
+				    0);
+	}
+	UK_ASSERT(txq->gref[id] != GRANT_INVALID_REF);
 
 	/* remember netbuf reference for free'ing it later */
 	txq->nbuf[id] = pkt;
-
+	tx_req->gref = txq->gref[id];
 	tx_req->offset = (uint16_t) uk_netbuf_headroom(pkt);
 	tx_req->size = (uint16_t) pkt->len;
 	tx_req->flags = 0;
@@ -219,11 +230,21 @@ static int netfront_rxq_enqueue(struct uk_netdev_rx_queue *rxq,
 	rxq->netbuf[id] = netbuf;
 	/* setup grant for buffer data */
 	nfdev = rxq->netfront_dev;
-	rxq->gref[id] = rx_req->gref =
-		gnttab_grant_access(nfdev->xendev->otherend_id,
-			virt_to_mfn(netbuf->buf), 0);
-	UK_ASSERT(rx_req->gref != GRANT_INVALID_REF);
+	if (unlikely(rxq->gref[id] == GRANT_INVALID_REF)) {
+		/* allocating of a new grant needed */
+		rxq->gref[id] = gnttab_grant_access(nfdev->xendev->otherend_id,
+						    virt_to_mfn(netbuf->buf),
+						    0);
+	} else {
+		/* re-use grant (update it) */
+		gnttab_update_grant(rxq->gref[id],
+				    nfdev->xendev->otherend_id,
+				    virt_to_mfn(netbuf->buf),
+				    0);
+	}
+	UK_ASSERT(rxq->gref[id] != GRANT_INVALID_REF);
 
+	rx_req->gref = rxq->gref[id];
 	wmb(); /* Ensure backend sees requests */
 	rxq->ring.req_prod_pvt = req_prod + 1;
 
@@ -261,8 +282,7 @@ static int netfront_rxq_dequeue(struct uk_netdev_rx_queue *rxq,
 	id = rx_rsp->id;
 	UK_ASSERT(id < NET_RX_RING_SIZE);
 
-	/* remove grant for buffer data */
-	gnttab_end_access(rxq->gref[id]);
+	/* NOTE: we keep the last grant for re-use */
 
 	buf = rxq->netbuf[id];
 	if (unlikely(rx_rsp->status < 0)) {
@@ -533,6 +553,9 @@ static struct uk_netdev_rx_queue *netfront_rxq_setup(struct uk_netdev *n,
 
 	rxq->alloc_rxpkts = conf->alloc_rxpkts;
 	rxq->alloc_rxpkts_argp = conf->alloc_rxpkts_argp;
+
+	for (uint16_t i = 0; i < NET_RX_RING_SIZE; i++)
+		rxq->gref[i] = GRANT_INVALID_REF;
 
 	/* Allocate receive buffers for this queue */
 	netfront_rx_fillup(rxq, rxq->ring_size);
