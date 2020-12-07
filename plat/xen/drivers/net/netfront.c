@@ -110,7 +110,6 @@ static int network_tx_buf_gc(struct uk_netdev_tx_queue *txq)
 			uk_netbuf_free_single(txq->nbuf[id]);
 
 			add_id_to_freelist(id, txq->freelist);
-			uk_semaphore_up(&txq->sem);
 
 			count++;
 		}
@@ -144,16 +143,18 @@ static int netfront_xmit(struct uk_netdev *n,
 
 	nfdev = to_netfront_dev(n);
 
-	/* get request id */
-	if (unlikely(!uk_semaphore_down_try(&txq->sem))) {
-		/* try some cleanup */
-		local_irq_save(flags);
-		count = network_tx_buf_gc(txq);
-		local_irq_restore(flags);
-		if (count == 0 || !uk_semaphore_down_try(&txq->sem))
-			return -ENOSPC;
-	}
 	local_irq_save(flags);
+	if (unlikely(RING_FULL(&txq->ring))) {
+		/* try some cleanup */
+		network_tx_buf_gc(txq);
+		if (unlikely(RING_FULL(&txq->ring))) {
+			uk_pr_debug("tx queue is full\n");
+			local_irq_restore(flags);
+			return 0x0;
+		}
+	}
+
+	/* get request id */
 	id = get_id_from_freelist(txq->freelist);
 	local_irq_restore(flags);
 
@@ -466,7 +467,6 @@ static struct uk_netdev_tx_queue *netfront_txq_setup(struct uk_netdev *n,
 	mask_evtchn(txq->evtchn);
 
 	/* Initialize list of request ids */
-	uk_semaphore_init(&txq->sem, NET_TX_RING_SIZE);
 	for (uint16_t i = 0; i < NET_TX_RING_SIZE; i++) {
 		add_id_to_freelist(i, txq->freelist);
 		txq->gref[i] = GRANT_INVALID_REF;

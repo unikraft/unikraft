@@ -65,8 +65,6 @@ struct uk_netdev_tx_queue {
 	/* Queue event channel */
 	evtchn_port_t evtchn;
 
-	/* Free list protecting semaphore */
-	struct uk_semaphore sem;
 	/* Free list of transmitting request IDs */
 	uint16_t freelist[NET_TX_RING_SIZE + 1];
 	/* Ring of inflight netbufs */
