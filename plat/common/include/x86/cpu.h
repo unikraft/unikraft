@@ -341,4 +341,19 @@ static inline void _init_syscall(void)
 }
 #endif /* CONFIG_HAVE_SYSCALL */
 
+#if CONFIG_HAVE_X86PKU
+static inline void _check_ospke(void)
+{
+	__u32 eax, ebx, ecx, edx;
+	cpuid(0x7, 0, &eax, &ebx, &ecx, &edx);
+	if (!(ecx & X86_CPUID7_ECX_OSPKE)) {
+		/* if PKU is not enabled, abort the boot process. Images
+		 * compiled with HAVE_X86PKU are *specialized* to be executed on
+		 * PKU-enabled hardware. This allows us to avoid checks later at
+		 * runtime. */
+		UK_CRASH("CPU does not support PKU!\n");
+	}
+}
+#endif /* CONFIG_HAVE_X86PKU */
+
 #endif /* __PLAT_COMMON_X86_CPU_H__ */

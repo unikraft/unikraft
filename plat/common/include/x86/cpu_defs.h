@@ -71,6 +71,7 @@
 #define X86_CR4_OSXMMEXCPT      (1 << 10)   /* OS support for FP exceptions */
 #define X86_CR4_FSGSBASE        (1 << 16)   /* enable FSGSBASE*/
 #define X86_CR4_OSXSAVE         (1 << 18)   /* enable XSAVE, extended states */
+#define X86_CR4_PKE             (1 << 22)   /* enable protection keys */
 
 /*
  * Intel CPU features in EFER
@@ -86,6 +87,8 @@
 #define X86_CPUID1_EDX_SSE      (1 << 25)
 /* CPUID feature bits in EBX and ECX when EAX=7, ECX=0 */
 #define X86_CPUID7_EBX_FSGSBASE (1 << 0)
+#define X86_CPUID7_ECX_PKU	(1 << 3)
+#define X86_CPUID7_ECX_OSPKE	(1 << 4)
 /* CPUID feature bits when EAX=0xd, ECX=1 */
 #define X86_CPUIDD1_EAX_XSAVEOPT (1<<0)
 /* CPUID 80000001H:EDX feature list */

@@ -31,6 +31,9 @@
 #include <kvm-x86/traps.h>
 #include <kvm-x86/multiboot_defs.h>
 
+/* necessary for CONFIG_ macros to be accessible */
+#include <uk/config.h>
+
 #define ENTRY(x) .globl x; .type x,%function; x:
 #define END(x)   .size x, . - x
 
@@ -227,6 +230,15 @@ noxsave:
 	orl $(X86_CR4_FSGSBASE), %edi
 	movq %rdi, %cr4
 nofsgsbase:
+#if CONFIG_HAVE_X86PKU
+	/* check for Memory Protection Keys (PKU) */
+	testl $(X86_CPUID7_ECX_PKU), %ecx
+	jz nopku
+	/* if PKU is supported, enable it via CR4 */
+	orl $(X86_CR4_PKE), %edi
+	movq %rdi, %cr4
+nopku:
+#endif /* CONFIG_HAVE_X86PKU */
 	/* done setting up CPU capabilities */
 
 	/* read multiboot info pointer */

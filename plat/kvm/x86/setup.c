@@ -291,6 +291,10 @@ void _libkvmplat_entry(void *arg)
 	_init_syscall();
 #endif /* CONFIG_HAVE_SYSCALL */
 
+#if CONFIG_HAVE_X86PKU
+	_check_ospke();
+#endif /* CONFIG_HAVE_X86PKU */
+
 	/*
 	 * Switch away from the bootstrap stack as early as possible.
 	 */
