@@ -56,9 +56,6 @@ ELFNOTE(Xen, XEN_ELFNOTE_XEN_VERSION, .asciz "xen-3.0")
 
 .section .text.boot, "ax"
 _libxenplat_start:
-#else
-
-#include "entry_hvm.S"
 
 #endif
 	cld
@@ -397,22 +394,3 @@ TRAP_ENTRY alignment_check,     1
 TRAP_ENTRY simd_error,          0
 /* no Virtualization Exception */
 
-
-#ifndef CONFIG_PARAVIRT
-.data
-.globl page_table_base
-        .align __PAGE_SIZE
-page_table_virt_l2:
-        PTE(page_table_virt_l1 + L2_PROT)
-        .align __PAGE_SIZE, 0
-page_table_virt_l3:
-        PTE(page_table_virt_l2 + L3_PROT)
-        .align __PAGE_SIZE, 0
-page_table_l3:
-        PTE(page_table_l2 + L3_PROT)
-        .align __PAGE_SIZE, 0
-page_table_base:
-        PTE(page_table_l3 + L4_PROT)
-        PTE(page_table_virt_l3 + L4_PROT)
-        .align __PAGE_SIZE, 0
-#endif

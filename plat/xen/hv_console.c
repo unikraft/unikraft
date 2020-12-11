@@ -103,9 +103,6 @@
 #include <xen/io/console.h>
 #include <xen/io/protocols.h>
 #include <xen/io/ring.h>
-#ifndef CONFIG_PARAVIRT
-#include <xen/hvm/params.h>
-#endif
 
 static struct xencons_interface *console_ring;
 static uint32_t console_evtchn;
@@ -116,11 +113,6 @@ void hv_console_prepare(void)
 {
 	console_ring = mfn_to_virt(HYPERVISOR_start_info->console.domU.mfn);
 	console_evtchn = HYPERVISOR_start_info->console.domU.evtchn;
-}
-#else
-void hv_console_prepare(void)
-{
-	/* NOT IMPLEMENTED YET */
 }
 #endif
 
@@ -160,13 +152,13 @@ retry:
 			if ((prod + 1 - cons) >= sizeof(console_ring->out))
 				break; /* not enough space for '\r' and '\n'! */
 
-			console_ring->out[MASK_XENCONS_IDX(prod++,
-							   console_ring->out)] =
-				'\r';
+			console_ring
+			    ->out[MASK_XENCONS_IDX(prod++, console_ring->out)] =
+			    '\r';
 		}
 
 		console_ring->out[MASK_XENCONS_IDX(prod++, console_ring->out)] =
-			str[sent];
+		    str[sent];
 		sent++;
 	}
 	wmb(); /* ensure characters are written before increasing out_prod */
@@ -213,8 +205,8 @@ int hv_console_input(char *str, unsigned int maxlen)
 	UK_BUGON((prod - cons) > sizeof(console_ring->in));
 
 	while (cons != prod && maxlen > 0) {
-		*(str + read) = *(console_ring->in+
-				  MASK_XENCONS_IDX(cons, console_ring->in));
+		*(str + read) = *(console_ring->in
+				  + MASK_XENCONS_IDX(cons, console_ring->in));
 		read++;
 		cons++;
 		maxlen--;
@@ -227,8 +219,7 @@ int hv_console_input(char *str, unsigned int maxlen)
 }
 
 static void hv_console_event(evtchn_port_t port __unused,
-			     struct __regs *regs __unused,
-			     void *data __unused)
+			     struct __regs *regs __unused, void *data __unused)
 {
 	/* NOT IMPLEMENTED YET */
 }
@@ -239,8 +230,8 @@ void hv_console_init(void)
 
 	UK_ASSERT(console_ring != NULL);
 
-	uk_pr_debug("hv_console @ %p (evtchn: %"PRIu32")\n",
-		    console_ring, console_evtchn);
+	uk_pr_debug("hv_console @ %p (evtchn: %" PRIu32 ")\n", console_ring,
+		    console_evtchn);
 
 	err = bind_evtchn(console_evtchn, hv_console_event, NULL);
 	if (err <= 0)
