@@ -192,5 +192,9 @@ void _libxenplat_x86entry(void *start_info)
 
 	init_console();
 
+#if CONFIG_HAVE_X86PKU
+	_check_ospke();
+#endif /* CONFIG_HAVE_X86PKU */
+
 	ukplat_entry_argp(CONFIG_UK_NAME, cmdline, MAX_GUEST_CMDLINE);
 }

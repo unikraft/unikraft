@@ -115,6 +115,15 @@ noxsave:
 	orl $(X86_CR4_FSGSBASE), %edi
 	movq %rdi, %cr4
 nofsgsbase:
+#if CONFIG_HAVE_X86PKU
+	/* check for Memory Protection Keys (PKU) */
+	testl $(X86_CPUID7_ECX_PKU), %ecx
+	jz nopku
+	/* if PKU is supported, enable it via CR4 */
+	orl $(X86_CR4_PKE), %edi
+	movq %rdi, %cr4
+nopku:
+#endif /* CONFIG_HAVE_X86PKU */
 	/* Done setting up CPU capabilities, hand over to C entry point. */
 	movq %r8, %rdi /* pass pointer to start_info page to C entry */
 	call _libxenplat_x86entry
