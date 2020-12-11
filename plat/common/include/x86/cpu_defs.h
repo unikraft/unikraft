@@ -100,6 +100,7 @@
 #define X86_XCR0_X87            (1 << 0)
 #define X86_XCR0_SSE            (1 << 1)
 #define X86_XCR0_AVX            (1 << 2)
+#define X86_XCR0_PKRU		(1 << 9)
 
 /*
  * Model-specific register addresses
