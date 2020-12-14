@@ -311,25 +311,18 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset)
 			.iov_base	= buf,
 			.iov_len	= count,
 	};
-	struct vfscore_file *fp;
-	size_t bytes;
-	int error;
+	int bytes;
 
-	error = fget(fd, &fp);
-	if (error)
-		goto out_errno;
+	bytes = preadv(fd, &iov, 1, offset);
+	if (bytes < 0)
+		goto out_error;
 
-	error = sys_read(fp, &iov, 1, offset, &bytes);
-	fdrop(fp);
-
-	if (has_error(error, bytes))
-		goto out_errno;
 	trace_vfs_pread_ret(bytes);
 	return bytes;
 
-	out_errno:
-	trace_vfs_pread_err(error);
-	errno = error;
+out_errno:
+	trace_vfs_pread_err(bytes);
+	errno = bytes;
 	return -1;
 }
 
@@ -382,25 +375,16 @@ ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset)
 			.iov_base	= (void *)buf,
 			.iov_len	= count,
 	};
-	struct vfscore_file *fp;
-	size_t bytes;
-	int error;
+	int bytes;
 
-	error = fget(fd, &fp);
-	if (error)
-		goto out_errno;
+	bytes = pwritev(fd, &iov, 1, offset);
 
-	error = sys_write(fp, &iov, 1, offset, &bytes);
-	fdrop(fp);
-
-	if (has_error(error, bytes))
-		goto out_errno;
 	trace_vfs_pwrite_ret(bytes);
 	return bytes;
 
-	out_errno:
-	trace_vfs_pwrite_err(error);
-	errno = error;
+out_errno:
+	trace_vfs_pwrite_err(bytes);
+	errno = bytes;
 	return -1;
 }
 
