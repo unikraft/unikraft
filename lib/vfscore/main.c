@@ -319,6 +319,11 @@ UK_SYSCALL_DEFINE(ssize_t, read, int, fd, void *, buf, size_t, count)
 	return pread(fd, buf, count, -1);
 }
 
+UK_TRACEPOINT(trace_vfs_preadv, "%d %p 0x%x 0x%x", int, const struct iovec*,
+	      int, off_t);
+UK_TRACEPOINT(trace_vfs_preadv_ret, "0x%x", ssize_t);
+UK_TRACEPOINT(trace_vfs_preadv_err, "%d", int);
+
 UK_SYSCALL_R_DEFINE(ssize_t, preadv, int, fd, const struct iovec*, iov,
 	int, iovcnt, off_t, offset)
 {
@@ -326,6 +331,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, preadv, int, fd, const struct iovec*, iov,
 	size_t bytes;
 	int error;
 
+	trace_vfs_preadv(fd, iov, iovcnt, offset);
 	error = fget(fd, &fp);
 	if (error)
 		goto out_error;
@@ -353,9 +359,11 @@ out_error_fdrop:
 	if (error < 0)
 		goto out_error;
 
+	trace_vfs_preadv_ret(bytes);
 	return bytes;
 
 out_error:
+	trace_vfs_preadv_err(error);
 	return -error;
 }
 
