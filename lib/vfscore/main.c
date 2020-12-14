@@ -290,20 +290,6 @@ UK_TRACEPOINT(trace_vfs_pread, "%d %p 0x%x 0x%x", int, void*, size_t, off_t);
 UK_TRACEPOINT(trace_vfs_pread_ret, "0x%x", ssize_t);
 UK_TRACEPOINT(trace_vfs_pread_err, "%d", int);
 
-// In BSD's internal implementation of read() and write() code, for example
-// sosend_generic(), a partial read or write returns both an EWOULDBLOCK error
-// *and* a non-zero number of written bytes. In that case, we need to zero the
-// error, so the system call appear a successful partial read/write.
-// In FreeBSD, dofilewrite() and dofileread() (sys_generic.c) do this too.
-static inline int has_error(int error, int bytes)
-{
-	/* TODO: OSv checks also for ERESTART */
-	return error && (
-			(bytes == 0) ||
-			(error != EWOULDBLOCK && error != EINTR));
-}
-
-
 ssize_t pread(int fd, void *buf, size_t count, off_t offset)
 {
 	trace_vfs_pread(fd, buf, count, offset);
@@ -344,14 +330,32 @@ UK_SYSCALL_R_DEFINE(ssize_t, preadv, int, fd, const struct iovec*, iov,
 	if (error)
 		goto out_error;
 
+	/* Check if the file is indeed seekable. */
+	if (!(fp->f_vfs_flags & UK_VFSCORE_NOPOS)) {
+		error = ESPIPE;
+		goto out_error_fdrop;
+	}
+
+	/* Check if the file has not already been read and that is not a
+	 * character device. */
+	else if (fp->f_offset < 0 && \
+		(fp->f_dentry == NULL || fp->f_dentry->d_vnode->v_type != VCHR)) {
+		error = EINVAL;
+		goto out_error_fdrop;
+	}
+
+	/* Otherwise, try to read the file. */
 	error = sys_read(fp, iov, iovcnt, offset, &bytes);
+
+out_error_fdrop:
 	fdrop(fp);
 
-	if (has_error(error, bytes))
+	if (error < 0)
 		goto out_error;
+
 	return bytes;
 
-	out_error:
+out_error:
 	return -error;
 }
 
@@ -412,15 +416,33 @@ UK_SYSCALL_R_DEFINE(ssize_t, pwritev, int, fd, const struct iovec*, iov,
 	if (error)
 		goto out_error;
 
+	/* Check if the file is indeed seekable. */
+	if (!(fp->f_vfs_flags & UK_VFSCORE_NOPOS)) {
+		error = ESPIPE;
+		goto out_error_fdrop;
+	}
+
+	/* Check if the file has not already been written to and that it is not a
+	 * character device. */
+	else if (fp->f_offset < 0 && \
+		(fp->f_dentry == NULL || fp->f_dentry->d_vnode->v_type != VCHR)) {
+		error = EINVAL;
+		goto out_error_fdrop;
+	}
+
+	/* Otherwise, try to read the file. */
 	error = sys_write(fp, iov, iovcnt, offset, &bytes);
+
+out_error_fdrop:
 	fdrop(fp);
 
-	if (has_error(error, bytes))
+	if (error < 0)
 		goto out_error;
+
 	trace_vfs_pwritev_ret(bytes);
 	return bytes;
 
-	out_error:
+out_error:
 	trace_vfs_pwritev_err(error);
 	return -error;
 }
