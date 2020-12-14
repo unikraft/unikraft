@@ -43,6 +43,9 @@ struct sw_ctx {
 	uintptr_t extregs;	/* Pointer to an area to which extended
 				 * registers are saved on context switch.
 				 */
+	uint8_t _extregs[];     /* Reserved memory area for extended
+				 * registers state
+				 */
 };
 
 void sw_ctx_callbacks_init(struct ukplat_ctx_callbacks *ctx_cbs);
@@ -50,8 +53,6 @@ void sw_ctx_callbacks_init(struct ukplat_ctx_callbacks *ctx_cbs);
 
 #define OFFSETOF_SW_CTX_SP      0
 #define OFFSETOF_SW_CTX_IP      8
-
-#define SIZEOF_SW_CTX           8
 
 /* TODO This should be better defined in the thread header */
 #define OFFSETOF_UKTHREAD_SW_CTX  16

@@ -94,6 +94,8 @@ int uk_thread_init(struct uk_thread *thread,
 		void (*function)(void *), void *arg)
 {
 	unsigned long sp;
+	void *ctx;
+	int ret = 0;
 
 	UK_ASSERT(thread != NULL);
 	UK_ASSERT(stack != NULL);
@@ -104,12 +106,15 @@ int uk_thread_init(struct uk_thread *thread,
 
 	init_sp(&sp, stack, function, arg);
 
-	/* Call platform specific setup. */
-	thread->ctx = ukplat_thread_ctx_create(cbs, allocator, sp,
-			(uintptr_t)ukarch_tls_pointer(tls));
-	if (thread->ctx == NULL)
-		return -1;
+	/* Allocate thread context */
+	ctx = uk_zalloc(allocator, ukplat_thread_ctx_size(cbs));
+	if (!ctx) {
+		ret = -1;
+		goto err_out;
+	}
 
+	memset(thread, 0, sizeof(*thread));
+	thread->ctx = ctx;
 	thread->name = name;
 	thread->stack = stack;
 	thread->tls = tls;
@@ -129,10 +134,17 @@ int uk_thread_init(struct uk_thread *thread,
 	uk_thread_sig_init(&thread->signals_container);
 #endif
 
+	/* Platform specific context initialization */
+	ukplat_thread_ctx_init(cbs, thread->ctx, sp,
+			       (uintptr_t) ukarch_tls_pointer(tls));
+
 	uk_pr_info("Thread \"%s\": pointer: %p, stack: %p, tls: %p\n",
 		   name, thread, thread->stack, thread->tls);
 
 	return 0;
+
+err_out:
+	return ret;
 }
 
 void uk_thread_fini(struct uk_thread *thread, struct uk_alloc *allocator)
@@ -141,7 +153,9 @@ void uk_thread_fini(struct uk_thread *thread, struct uk_alloc *allocator)
 #if CONFIG_LIBUKSIGNAL
 	uk_thread_sig_uninit(&thread->signals_container);
 #endif
-	ukplat_thread_ctx_destroy(allocator, thread->ctx);
+
+	uk_free(allocator, thread->ctx);
+	thread->ctx = NULL;
 }
 
 static void uk_thread_block_until(struct uk_thread *thread, __snsec until)
