@@ -340,6 +340,36 @@ UK_SYSCALL_DEFINE(ssize_t, read, int, fd, void *, buf, size_t, count)
 	return pread(fd, buf, count, -1);
 }
 
+UK_SYSCALL_R_DEFINE(ssize_t, preadv, int, fd, const struct iovec*, iov,
+	int, iovcnt, off_t, offset)
+{
+	struct vfscore_file *fp;
+	size_t bytes;
+	int error;
+
+	error = fget(fd, &fp);
+	if (error)
+		goto out_error;
+
+	error = sys_read(fp, iov, iovcnt, offset, &bytes);
+	fdrop(fp);
+
+	if (has_error(error, bytes))
+		goto out_error;
+	return bytes;
+
+	out_error:
+	return -error;
+}
+
+LFS64(preadv);
+
+UK_SYSCALL_DEFINE(ssize_t, readv,
+		  int, fd, const struct iovec *, iov, int, iovcnt)
+{
+	return preadv(fd, iov, iovcnt, -1);
+}
+
 UK_TRACEPOINT(trace_vfs_pwrite, "%d %p 0x%x 0x%x", int, const void*, size_t,
 	      off_t);
 UK_TRACEPOINT(trace_vfs_pwrite_ret, "0x%x", ssize_t);
@@ -381,36 +411,6 @@ UK_SYSCALL_DEFINE(ssize_t, write, int, fd, const void *, buf, size_t, count)
 	return pwrite(fd, buf, count, -1);
 }
 
-UK_SYSCALL_R_DEFINE(ssize_t, preadv, int, fd, const struct iovec*, iov,
-	int, iovcnt, off_t, offset)
-{
-	struct vfscore_file *fp;
-	size_t bytes;
-	int error;
-
-	error = fget(fd, &fp);
-	if (error)
-		goto out_error;
-
-	error = sys_read(fp, iov, iovcnt, offset, &bytes);
-	fdrop(fp);
-
-	if (has_error(error, bytes))
-		goto out_error;
-	return bytes;
-
-	out_error:
-	return -error;
-}
-
-LFS64(preadv);
-
-UK_SYSCALL_DEFINE(ssize_t, readv,
-		  int, fd, const struct iovec *, iov, int, iovcnt)
-{
-	return preadv(fd, iov, iovcnt, -1);
-}
-
 UK_TRACEPOINT(trace_vfs_pwritev, "%d %p 0x%x 0x%x", int, const struct iovec*,
 	      int, off_t);
 UK_TRACEPOINT(trace_vfs_pwritev_ret, "0x%x", ssize_t);
@@ -440,6 +440,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, pwritev, int, fd, const struct iovec*, iov,
 	trace_vfs_pwritev_err(error);
 	return -error;
 }
+
 LFS64(pwritev);
 
 UK_SYSCALL_DEFINE(ssize_t, writev,
