@@ -38,8 +38,8 @@
 #include <uk/plat/common/tls.h>
 #include <uk/plat/common/cpu.h>
 
-static void *sw_ctx_create(struct uk_alloc *allocator, unsigned long sp,
-				unsigned long tlsp);
+static size_t sw_ctx_size(void);
+static void  sw_ctx_init(void *ctx, unsigned long sp, unsigned long tlsp);
 static void  sw_ctx_start(void *ctx) __noreturn;
 static void  sw_ctx_switch(void *prevctx, void *nextctx);
 
@@ -49,27 +49,24 @@ static void  sw_ctx_switch(void *prevctx, void *nextctx);
  */
 extern void asm_thread_starter(void);
 
-static void *sw_ctx_create(struct uk_alloc *allocator, unsigned long sp,
-				unsigned long tlsp)
+static size_t sw_ctx_size(void)
 {
-	struct sw_ctx *ctx;
+	return sizeof(struct ukplat_ctx) + arch_extregs_size();
+}
 
-	UK_ASSERT(allocator != NULL);
+static void sw_ctx_init(void *ctx,
+			unsigned long sp, unsigned long tlsp)
+{
+	struct sw_ctx *sw_ctx = ctx;
 
-	ctx = arch_alloc_sw_ctx(allocator);
-	if (ctx == NULL) {
-		uk_pr_warn("Error allocating software context.");
-		return NULL;
-	}
+	UK_ASSERT(sw_ctx != NULL);
 
-	ctx->sp = sp;
-	ctx->tlsp = tlsp;
-	ctx->ip = (unsigned long) asm_thread_starter;
-	arch_init_extregs(ctx);
+	sw_ctx->sp   = sp;
+	sw_ctx->tlsp = tlsp;
+	sw_ctx->ip   = (unsigned long) asm_thread_starter;
+	arch_init_extregs(sw_ctx);
 
-	save_extregs(ctx);
-
-	return ctx;
+	save_extregs(sw_ctx);
 }
 
 extern void asm_ctx_start(unsigned long sp, unsigned long ip) __noreturn;
@@ -103,7 +100,8 @@ static void sw_ctx_switch(void *prevctx, void *nextctx)
 void sw_ctx_callbacks_init(struct ukplat_ctx_callbacks *ctx_cbs)
 {
 	UK_ASSERT(ctx_cbs != NULL);
-	ctx_cbs->create_cb = sw_ctx_create;
+	ctx_cbs->size_cb = sw_ctx_size;
+	ctx_cbs->init_cb = sw_ctx_init;
 	ctx_cbs->start_cb = sw_ctx_start;
 	ctx_cbs->switch_cb = sw_ctx_switch;
 }

@@ -33,6 +33,7 @@
 #ifdef CONFIG_LIBNEWLIBC
 #include <sys/reent.h>
 #endif
+#include <uk/alloc.h>
 #include <uk/arch/lcpu.h>
 #include <uk/arch/time.h>
 #include <uk/plat/thread.h>
