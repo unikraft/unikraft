@@ -33,6 +33,7 @@
  */
 #define _GNU_SOURCE /* for asprintf() */
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <uk/netdev.h>
 #include <uk/print.h>

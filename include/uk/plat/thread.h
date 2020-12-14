@@ -36,7 +36,7 @@
 #ifndef __UKPLAT_THREAD_H__
 #define __UKPLAT_THREAD_H__
 
-#include <stdlib.h>
+#include <uk/arch/types.h>
 #include <uk/essentials.h>
 #include <uk/assert.h>
 
@@ -74,8 +74,8 @@ void *ukplat_thread_ctx_create(struct ukplat_ctx_callbacks *cbs,
 		struct uk_alloc *allocator, unsigned long sp,
 		unsigned long tlsp)
 {
-	UK_ASSERT(cbs != NULL);
-	UK_ASSERT(allocator != NULL);
+	UK_ASSERT(cbs != __NULL);
+	UK_ASSERT(allocator != __NULL);
 
 	return cbs->create_cb(allocator, sp, tlsp);
 }
@@ -90,8 +90,8 @@ static inline
 void ukplat_thread_ctx_start(struct ukplat_ctx_callbacks *cbs,
 		void *ctx)
 {
-	UK_ASSERT(cbs != NULL);
-	UK_ASSERT(ctx != NULL);
+	UK_ASSERT(cbs != __NULL);
+	UK_ASSERT(ctx != __NULL);
 
 	cbs->start_cb(ctx);
 }
@@ -100,9 +100,9 @@ static inline
 void ukplat_thread_ctx_switch(struct ukplat_ctx_callbacks *cbs,
 		void *prevctx, void *nextctx)
 {
-	UK_ASSERT(cbs != NULL);
-	UK_ASSERT(prevctx != NULL);
-	UK_ASSERT(nextctx != NULL);
+	UK_ASSERT(cbs != __NULL);
+	UK_ASSERT(prevctx != __NULL);
+	UK_ASSERT(nextctx != __NULL);
 
 	cbs->switch_cb(prevctx, nextctx);
 }
