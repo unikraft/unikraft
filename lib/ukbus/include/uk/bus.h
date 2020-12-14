@@ -42,7 +42,7 @@
 extern "C" {
 #endif
 
-#define UK_BUS_INIT_CLASS UK_INIT_CLASS_EARLY
+#define UK_BUS_INIT_CLASS UK_INIT_CLASS_PLAT
 #define UK_BUS_INIT_PRIO  0
 #define UK_BUS_REGISTER_PRIO 0
 
