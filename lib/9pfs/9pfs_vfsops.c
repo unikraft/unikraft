@@ -36,6 +36,7 @@
 #include <uk/9pdev_trans.h>
 #include <vfscore/mount.h>
 #include <vfscore/dentry.h>
+#include <stdlib.h>
 
 #include "9pfs.h"
 

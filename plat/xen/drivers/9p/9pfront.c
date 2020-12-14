@@ -30,6 +30,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <uk/config.h>

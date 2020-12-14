@@ -31,6 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 #define _GNU_SOURCE /* for asprintf() */
+#include <stdlib.h>
 #include <inttypes.h>
 #include <stdio.h>
 #include <string.h>

@@ -34,6 +34,7 @@
 
 #include <fcntl.h>
 #include <dirent.h>
+#include <stdlib.h>
 #include <uk/config.h>
 #include <uk/9p.h>
 #include <uk/errptr.h>

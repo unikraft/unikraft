@@ -32,6 +32,7 @@
  */
 
 #include <unistd.h>
+#include <stdlib.h>
 #include <errno.h>
 #include <uk/print.h>
 #include <vfscore/file.h>
