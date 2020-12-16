@@ -15,6 +15,7 @@ $(eval $(call addplatlib_s,kvm,libkvmvirtioblk,$(CONFIG_VIRTIO_BLK)))
 $(eval $(call addplatlib_s,kvm,libkvmvirtio9p,$(CONFIG_VIRTIO_9P)))
 $(eval $(call addplatlib_s,kvm,libkvmofw,$(CONFIG_LIBOFW)))
 $(eval $(call addplatlib_s,kvm,libkvmgic,$(CONFIG_LIBGIC)))
+$(eval $(call addplatlib_s,kvm,libkvmpl031,$(CONFIG_RTC_PL031)))
 
 ##
 ## Platform library definitions
@@ -219,3 +220,13 @@ ifeq ($(findstring y,$(CONFIG_LIBGICV3)),y)
 LIBKVMGIC_SRCS-y += $(UK_PLAT_DRIVERS_BASE)/gic/gic-v3.c
 endif
 endif
+
+##
+## RTC-PL031 library definitions
+##
+LIBKVMPL031_CINCLUDES-y		+= -I$(LIBKVMPLAT_BASE)/include
+LIBKVMPL031_CINCLUDES-y		+= -I$(UK_PLAT_COMMON_BASE)/include
+LIBKVMPL031_CINCLUDES-y		+= -I$(UK_PLAT_DRIVERS_BASE)/include
+
+LIBKVMPL031_SRCS-y		+= $(UK_PLAT_DRIVERS_BASE)/rtc/pl031.c
+LIBKVMPL031_SRCS-y		+= $(UK_PLAT_DRIVERS_BASE)/rtc/rtc.c
