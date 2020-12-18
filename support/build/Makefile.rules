@@ -632,8 +632,10 @@ $(3): $(2) | prepare
 	$(call build_cmd,M4,$(1),$(3),\
 		$(M4)  $$(M4INCLUDES) $$(M4INCLUDES-y) \
 		       $$($(call vprefix_lib,$(1),M4INCLUDES)) $$($(call vprefix_lib,$(1),M4INCLUDES-y)) \
+		       $$($(call vprefix_src,$(1),$(2),,M4INCLUDES)) $$($(call vprefix_src,$(1),$(2),,M4INCLUDES-y)) \
 		       $$(M4FLAGS) $$(M4FLAGS-y) \
 		       $$($(call vprefix_lib,$(1),M4FLAGS)) $$($(call vprefix_lib,$(1),M4FLAGS-y)) \
+		       $$($(call vprefix_src,$(1),$(2),,M4FLAGS)) $$($(call vprefix_src,$(1),$(2),,M4FLAGS-y)) \
 		       $(4) \
 		       $(2) > $(3)
 	)
