@@ -279,6 +279,8 @@ UK_FETCH:=
 UK_FETCH-y:=
 UK_PREPARE:=
 UK_PREPARE-y:=
+UK_PREPROCESS:=
+UK_PREPROCESS-y:=
 UK_PLATS:=
 UK_PLATS-y:=
 UK_LIBS:=
@@ -663,7 +665,7 @@ endif
 # include Makefile for platform linking (`Linker.uk`)
 $(foreach plat,$(UK_PLATS),$(eval $(call _import_linker,$(plat))))
 
-.PHONY: prepare image libs objs clean
+.PHONY: prepare preprocess image libs objs clean
 
 fetch: $(UK_FETCH) $(UK_FETCH-y)
 
@@ -675,6 +677,8 @@ $(UK_CONFIG_OUT): $(UK_CONFIG)
 
 prepare: $(KCONFIG_AUTOHEADER) $(UK_CONFIG_OUT) $(UK_PREPARE) $(UK_PREPARE-y)
 prepare: $(UK_FIXDEP) | fetch
+
+preprocess: $(UK_PREPROCESS) $(UK_PREPROCESS-y) | prepare
 
 objs: $(UK_OBJS) $(UK_OBJS-y)
 
@@ -729,6 +733,8 @@ all: ukconfig
 fetch: ukconfig
 
 prepare: ukconfig
+
+preprocess: ukconfig
 
 objs: ukconfig
 
@@ -1002,6 +1008,7 @@ help:
 	@echo '  libs                   - build libraries and objects'
 	@echo '  [LIBNAME]              - build a single library'
 	@echo '  objs                   - build objects only'
+	@echo '  preprocess             - run preprocessing steps'
 	@echo '  prepare                - run preparation steps'
 	@echo '  fetch                  - fetch, extract, and patch remote code'
 	@echo ''
