@@ -44,6 +44,10 @@
 #include <stdarg.h>
 #include <uk/print.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 /*
  * Whenever the hidden Config.uk option LIBSYSCALL_SHIM_NOWRAPPER
  * is set, the creation of libc-style wrappers are disable by the
@@ -359,5 +363,9 @@ const char *uk_syscall_name_p(long nr);
 long (*uk_syscall_r_fn(long nr))(void);
 
 #endif /* CONFIG_LIBSYSCALL_SHIM */
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* __UK_SYSCALL_H__ */
