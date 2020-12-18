@@ -612,6 +612,16 @@ endef
 # Aliases for pre-processed files (e.g., *.in)
 buildrule_in   = $(call buildrule_noop_,$(1),$(2))
 
+# Aliases for C headers
+buildrule_h   = $(call buildrule_noop_,$(1),$(2))
+
+# Aliases for C++ headers
+buildrule_hp  = $(call buildrule_noop_,$(1),$(2))
+buildrule_hh  = $(call buildrule_noop_,$(1),$(2))
+buildrule_hpp = $(call buildrule_noop_,$(1),$(2))
+buildrule_HPP = $(call buildrule_noop_,$(1),$(2))
+buildrule_H   = $(call buildrule_noop_,$(1),$(2))
+
 # wrapper for buildrule_*,
 # selects appropriate buildrule depending on file extension,
 # if there is no such buildrule available, we throw an error.
