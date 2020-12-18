@@ -603,6 +603,15 @@ $(eval $(call vprefix_lib,$(1),DTB-y) += $(4))
 $(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(4)))
 endef
 
+# terminating build rule
+# Only make sure that the file is registered to the preprocess stage
+define buildrule_noop_ =
+UK_PREPROCESS-y += $(2)
+endef
+
+# Aliases for pre-processed files (e.g., *.in)
+buildrule_in   = $(call buildrule_noop_,$(1),$(2))
+
 # wrapper for buildrule_*,
 # selects appropriate buildrule depending on file extension,
 # if there is no such buildrule available, we throw an error.
