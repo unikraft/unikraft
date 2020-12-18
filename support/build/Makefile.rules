@@ -644,12 +644,14 @@ endef
 
 # wrapper for preprule_*,
 # selects appropriate pre-process rule depending on file extension
+# if there is no such pre-process rule available, we throw an error.
 #
 # preprule $libname,$source,$preptarget,$extraflags(optional)
 define preprule =
-$(if $(filter %.m4   ,$(2)),$(call preprule_m4 ,$(1),$(2),$(3),$(4)),\
-$(error $(3): missing pre-processing rule for source type $(suffix $(2))) \
-)
+$(if $(filter preprule_$(call fileext,$(strip $(2))),$(.VARIABLES)),,\
+$(error preprule_$(call fileext,$(strip $(2))) is not defined: Failed to install rule for $(2)))
+
+$(call preprule_$(call fileext,$(strip $(2))),$(strip $(1)),$(strip $(2)),$(strip $(3)),$(strip $(4)),$(strip $(5)))
 endef
 
 
