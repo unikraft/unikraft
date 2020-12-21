@@ -1361,7 +1361,7 @@ UK_TRACEPOINT(trace_vfs_getcwd, "%p %d", char*, size_t);
 UK_TRACEPOINT(trace_vfs_getcwd_ret, "\"%s\"", const char*);
 UK_TRACEPOINT(trace_vfs_getcwd_err, "%d", int);
 
-UK_SYSCALL_DEFINE(char*, getcwd, char*, path, size_t, size)
+UK_SYSCALL_R_DEFINE(char*, getcwd, char*, path, size_t, size)
 {
 	trace_vfs_getcwd(path, size);
 	struct task *t = main_task;
@@ -1370,7 +1370,7 @@ UK_SYSCALL_DEFINE(char*, getcwd, char*, path, size_t, size)
 
 	if (size < len) {
 		error = ERANGE;
-		goto out_errno;
+		goto out_error;
 	}
 
 	if (!path) {
@@ -1379,12 +1379,12 @@ UK_SYSCALL_DEFINE(char*, getcwd, char*, path, size_t, size)
 		path = (char*)malloc(size);
 		if (!path) {
 			error = ENOMEM;
-			goto out_errno;
+			goto out_error;
 		}
 	} else {
 		if (!size) {
 			error = EINVAL;
-			goto out_errno;
+			goto out_error;
 		}
 	}
 
@@ -1392,10 +1392,9 @@ UK_SYSCALL_DEFINE(char*, getcwd, char*, path, size_t, size)
 	trace_vfs_getcwd_ret(path);
 	return path;
 
-	out_errno:
+out_error:
 	trace_vfs_getcwd_err(error);
-	errno = error;
-	return NULL;
+	return ERR2PTR(-error);
 }
 
 UK_TRACEPOINT(trace_vfs_dup, "%d", int);
