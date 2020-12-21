@@ -620,6 +620,21 @@ static inline int uk_netdev_tx_one(struct uk_netdev *dev, uint16_t queue_id,
 	uk_netdev_status_test_set((status), (UK_NETDEV_STATUS_SUCCESS	\
 					     | UK_NETDEV_STATUS_MORE))
 
+/**
+ * Test if the return status of `uk_netdev_rx_burst` or `uk_netdev_tx_burst`
+ * indicates that the operation was completed successfully for a certain
+ * number of packets and not on all packets.
+ *
+ * @param status
+ *   Return status (int)
+ * @return
+ *   - (True): Flag UK_NETDEV_STATUS_UNDERRUN is set
+ *   - (False): Operation was completed fully or error happened
+ */
+#define uk_netdev_status_underrun(status)				\
+	uk_netdev_status_test_set((status), (UK_NETDEV_STATUS_SUCCESS	\
+					     | UK_NETDEV_STATUS_UNDERRUN))
+
 #ifdef __cplusplus
 }
 #endif
