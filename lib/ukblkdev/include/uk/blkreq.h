@@ -48,6 +48,8 @@ extern "C" {
 #endif
 
 #define __sector size_t
+#include <uk/arch/atomic.h>
+
 struct uk_blkreq;
 
 /**
