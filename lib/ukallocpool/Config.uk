@@ -1,0 +1,6 @@
+config LIBUKALLOCPOOL
+	bool "ukallocpool: Memory pool allocator"
+	default n
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKDEBUG
+	select LIBUKALLOC
