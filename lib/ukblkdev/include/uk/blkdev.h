@@ -255,6 +255,9 @@ static inline const struct uk_blkdev_cap *uk_blkdev_capabilities(
 #define uk_blkdev_sectors(blkdev) \
 	(uk_blkdev_capabilities(blkdev)->sectors)
 
+#define uk_blkdev_size(blkdev) \
+	((size_t) uk_blkdev_sectors(blkdev) * uk_blkdev_ssize(blkdev))
+
 #define uk_blkdev_ioalign(blkdev) \
 	(uk_blkdev_capabilities(blkdev)->ioalign)
 /**
