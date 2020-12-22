@@ -66,6 +66,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <limits.h>
+#include <uk/assert.h>
 #include <uk/list.h>
 #include <uk/errptr.h>
 
