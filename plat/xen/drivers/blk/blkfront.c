@@ -250,7 +250,7 @@ static void blkif_request_init(struct blkif_request *ring_req,
 	UK_ASSERT(nb_segments <= BLKIF_MAX_SEGMENTS_PER_REQUEST);
 
 	/* Set ring request */
-	ring_req->operation = (req->operation == UK_BLKDEV_WRITE) ?
+	ring_req->operation = (req->operation == UK_BLKREQ_WRITE) ?
 			BLKIF_OP_WRITE : BLKIF_OP_READ;
 	ring_req->nr_segments = nb_segments;
 	ring_req->sector_number = req->start_sector;
@@ -281,7 +281,7 @@ static int blkfront_request_write(struct blkfront_request *blkfront_req,
 	dev = blkfront_req->queue->dev;
 	cap = &dev->blkdev.capabilities;
 	sector_size = cap->ssize;
-	if (req->operation == UK_BLKDEV_WRITE && cap->mode == O_RDONLY)
+	if (req->operation == UK_BLKREQ_WRITE && cap->mode == O_RDONLY)
 		return -EPERM;
 
 	if (req->aio_buf == NULL)
@@ -360,10 +360,10 @@ static int blkfront_queue_enqueue(struct uk_blkdev_queue *queue,
 	ring_req->id = (uintptr_t) blkfront_req;
 	ring_req->handle = dev->handle;
 
-	if (req->operation == UK_BLKDEV_READ ||
-			req->operation == UK_BLKDEV_WRITE)
+	if (req->operation == UK_BLKREQ_READ ||
+			req->operation == UK_BLKREQ_WRITE)
 		rc = blkfront_request_write(blkfront_req, ring_req);
-	else if (req->operation == UK_BLKDEV_FFLUSH)
+	else if (req->operation == UK_BLKREQ_FFLUSH)
 		rc =  blkfront_request_flush(blkfront_req, ring_req);
 	else
 		rc = -EINVAL;

@@ -459,18 +459,18 @@ int uk_blkdev_sync_io(struct uk_blkdev *dev,
 		sector,		\
 		nb_sectors,	\
 		buf)		\
-	uk_blkdev_sync_io(blkdev, queue_id, UK_BLKDEV_WRITE, sector, \
-			nb_sectors, buf) \
+	uk_blkdev_sync_io(blkdev, queue_id, UK_BLKREQ_WRITE, sector, \
+			  nb_sectors, buf)			     \
 
 #define uk_blkdev_sync_read(blkdev,\
 		queue_id,	\
 		sector,		\
 		nb_sectors,	\
 		buf)		\
-	uk_blkdev_sync_io(blkdev, queue_id, UK_BLKDEV_READ, sector, \
-			nb_sectors, buf) \
+	uk_blkdev_sync_io(blkdev, queue_id, UK_BLKREQ_READ, sector, \
+			  nb_sectors, buf)			    \
 
-#endif
+#endif /* CONFIG_LIBUKBLKDEV_SYNC_IO_BLOCKED_WAITING */
 
 /**
  * Stop a Unikraft block device, and set its state to UK_BLKDEV_CONFIGURED
