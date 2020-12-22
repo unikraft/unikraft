@@ -413,7 +413,8 @@ int uk_blkdev_queue_submit_one(struct uk_blkdev *dev, uint16_t queue_id,
 					     | UK_BLKDEV_STATUS_MORE))
 
 /**
- * Get responses from the queue
+ * Get responses from the queue and re-enable interrupts on the target queue
+ * when they were enabled before.
  *
  * @param dev
  *	The Unikraft Block Device
