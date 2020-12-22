@@ -1,0 +1,186 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
+/*
+ * Simple memory pool using LIFO principle
+ *
+ * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ *
+ *
+ * Copyright (c) 2020, NEC Laboratories Europe GmbH, NEC Corporation,
+ *                     All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright
+ *    notice, this list of conditions and the following disclaimer.
+ * 2. Redistributions in binary form must reproduce the above copyright
+ *    notice, this list of conditions and the following disclaimer in the
+ *    documentation and/or other materials provided with the distribution.
+ * 3. Neither the name of the copyright holder nor the names of its
+ *    contributors may be used to endorse or promote products derived from
+ *    this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+ * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
+ * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
+ * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
+ * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
+ * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
+ * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+ * POSSIBILITY OF SUCH DAMAGE.
+ */
+
+#include <uk/essentials.h>
+#include <uk/alloc_impl.h>
+#include <uk/allocpool.h>
+#include <uk/list.h>
+#include <string.h>
+#include <stddef.h>
+#include <stdint.h>
+#include <sys/types.h>
+#include <errno.h>
+
+/*
+ * POOL: MEMORY LAYOUT
+ *
+ *          ++---------------------++
+ *          || struct uk_allocpool ||
+ *          ||                     ||
+ *          ++---------------------++
+ *          |    // padding //      |
+ *          +=======================+
+ *          |       OBJECT 1        |
+ *          +=======================+
+ *          |       OBJECT 2        |
+ *          +=======================+
+ *          |       OBJECT 3        |
+ *          +=======================+
+ *          |         ...           |
+ *          v                       v
+ */
+
+#define MIN_OBJ_ALIGN sizeof(void *)
+#define MIN_OBJ_LEN   sizeof(struct uk_list_head)
+
+struct uk_allocpool {
+	struct uk_list_head free_obj;
+	unsigned int free_obj_count;
+
+	size_t obj_align;
+	size_t obj_len;
+	unsigned int obj_count;
+};
+
+struct free_obj {
+	struct uk_list_head list;
+};
+
+static inline void _prepend_free_obj(struct uk_allocpool *p, void *obj)
+{
+	struct uk_list_head *entry;
+
+	UK_ASSERT(p);
+	UK_ASSERT(obj);
+	UK_ASSERT(p->free_obj_count < p->obj_count);
+
+	entry = &((struct free_obj *) obj)->list;
+	uk_list_add(entry, &p->free_obj);
+	p->free_obj_count++;
+}
+
+static inline void *_take_free_obj(struct uk_allocpool *p)
+{
+	struct free_obj *obj;
+
+	UK_ASSERT(p);
+	UK_ASSERT(p->free_obj_count > 0);
+
+	/* get object from list head */
+	obj = uk_list_first_entry(&p->free_obj, struct free_obj, list);
+	uk_list_del(&obj->list);
+	p->free_obj_count--;
+	return (void *) obj;
+}
+
+void *uk_allocpool_take(struct uk_allocpool *p)
+{
+	UK_ASSERT(p);
+
+	if (unlikely(uk_list_empty(&p->free_obj)))
+		return NULL;
+
+	return _take_free_obj(p);
+}
+
+void uk_allocpool_return(struct uk_allocpool *p, void *obj)
+{
+	UK_ASSERT(p);
+
+	_prepend_free_obj(p, obj);
+}
+
+unsigned int uk_allocpool_availcount(struct uk_allocpool *p)
+{
+	return p->free_obj_count;
+}
+
+size_t uk_allocpool_objlen(struct uk_allocpool *p)
+{
+	return p->obj_len;
+}
+
+struct uk_allocpool *uk_allocpool_init(void *base, size_t len,
+				       size_t obj_len, size_t obj_align)
+{
+	struct uk_allocpool *p;
+	size_t obj_alen;
+	size_t left;
+	void *obj_ptr;
+
+	UK_ASSERT(POWER_OF_2(obj_align));
+
+	if (!base || sizeof(struct uk_allocpool) > len) {
+		errno = ENOSPC;
+		return NULL;
+	}
+
+	/* apply minimum requirements */
+	obj_len   = MAX(obj_len, MIN_OBJ_LEN);
+	obj_align = MAX(obj_align, MIN_OBJ_ALIGN);
+
+	p = (struct uk_allocpool *) base;
+	memset(p, 0, sizeof(*p));
+
+	obj_alen = ALIGN_UP(obj_len, obj_align);
+	obj_ptr = (void *) ALIGN_UP((uintptr_t) base + sizeof(*p),
+				    obj_align);
+	if ((uintptr_t) obj_ptr > (uintptr_t) base + len) {
+		uk_pr_debug("%p: Empty pool: Not enough space for allocating objects\n",
+			    p);
+		goto out;
+	}
+
+	left = len - ((uintptr_t) obj_ptr - (uintptr_t) base);
+
+	p->obj_count = 0;
+	p->free_obj_count = 0;
+	UK_INIT_LIST_HEAD(&p->free_obj);
+	while (left >= obj_alen) {
+		++p->obj_count;
+		_prepend_free_obj(p, obj_ptr);
+		obj_ptr = (void *) ((uintptr_t) obj_ptr + obj_alen);
+		left -= obj_alen;
+	}
+
+out:
+	p->obj_len         = obj_alen;
+	p->obj_align       = obj_align;
+
+	uk_pr_debug("%p: Pool created (%"__PRIsz" B): %u objs of %"__PRIsz" B, aligned to %"__PRIsz" B\n",
+		    p, len, p->obj_count, p->obj_len, p->obj_align);
+	return p;
+}
