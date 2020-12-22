@@ -113,6 +113,18 @@ struct uk_allocpool *uk_allocpool_init(void *base, size_t len,
 				       size_t obj_len, size_t obj_align);
 
 /**
+ * Return uk_alloc compatible interface for allocpool.
+ * With this interface, uk_malloc(), uk_free(), etc. can
+ * be used with the pool.
+ *
+ * @param p
+ *  Pointer to memory pool.
+ * @return
+ *  Pointer to uk_alloc interface of given pool.
+ */
+struct uk_alloc *uk_allocpool2ukalloc(struct uk_allocpool *p);
+
+/**
  * Return the number of current available (free) objects.
  *
  * @param p
@@ -134,6 +146,8 @@ size_t uk_allocpool_objlen(struct uk_allocpool *p);
 
 /**
  * Get one object from a pool.
+ * HINT: It is recommended to use this call instead of uk_malloc() whenever
+ *       feasible. This call is avoiding indirections.
  *
  * @param p
  *  Pointer to memory pool.
@@ -145,6 +159,8 @@ void *uk_allocpool_take(struct uk_allocpool *p);
 
 /**
  * Return one object back to a pool.
+ * HINT: It is recommended to use this call instead of uk_free() whenever
+ *       feasible. This call is avoiding indirections.
  *
  * @param p
  *  Pointer to memory pool.

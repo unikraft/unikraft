@@ -67,6 +67,8 @@
 #define MIN_OBJ_LEN   sizeof(struct uk_list_head)
 
 struct uk_allocpool {
+	struct uk_alloc self;
+
 	struct uk_list_head free_obj;
 	unsigned int free_obj_count;
 
@@ -81,6 +83,21 @@ struct uk_allocpool {
 struct free_obj {
 	struct uk_list_head list;
 };
+
+static inline struct uk_allocpool *ukalloc2pool(struct uk_alloc *a)
+{
+	UK_ASSERT(a);
+	return __containerof(a, struct uk_allocpool, self);
+}
+
+#define allocpool2ukalloc(p) \
+	(&(p)->self)
+
+struct uk_alloc *uk_allocpool2ukalloc(struct uk_allocpool *p)
+{
+	UK_ASSERT(p);
+	return allocpool2ukalloc(p);
+}
 
 static inline void _prepend_free_obj(struct uk_allocpool *p, void *obj)
 {
@@ -109,6 +126,42 @@ static inline void *_take_free_obj(struct uk_allocpool *p)
 	return (void *) obj;
 }
 
+static void pool_free(struct uk_alloc *a, void *ptr)
+{
+	struct uk_allocpool *p = ukalloc2pool(a);
+
+	if (likely(ptr))
+		_prepend_free_obj(p, ptr);
+}
+
+static void *pool_malloc(struct uk_alloc *a, size_t size)
+{
+	struct uk_allocpool *p = ukalloc2pool(a);
+
+	if (unlikely((size > p->obj_len)
+		     || uk_list_empty(&p->free_obj))) {
+		errno = ENOMEM;
+		return NULL;
+	}
+
+	return _take_free_obj(p);
+}
+
+static int pool_posix_memalign(struct uk_alloc *a, void **memptr, size_t align,
+				size_t size)
+{
+	struct uk_allocpool *p = ukalloc2pool(a);
+
+	if (unlikely((size > p->obj_len)
+		     || (align > p->obj_align)
+		     || uk_list_empty(&p->free_obj))) {
+		return ENOMEM;
+	}
+
+	*memptr = _take_free_obj(p);
+	return 0;
+}
+
 void *uk_allocpool_take(struct uk_allocpool *p)
 {
 	UK_ASSERT(p);
@@ -125,6 +178,15 @@ void uk_allocpool_return(struct uk_allocpool *p, void *obj)
 
 	_prepend_free_obj(p, obj);
 }
+
+#if CONFIG_LIBUKALLOC_IFSTATS
+static ssize_t pool_availmem(struct uk_alloc *a)
+{
+	struct uk_allocpool *p = ukalloc2pool(a);
+
+	return (size_t) p->free_obj_count * p->obj_len;
+}
+#endif
 
 size_t uk_allocpool_reqmem(unsigned int obj_count, size_t obj_len,
 			   size_t obj_align)
@@ -155,6 +217,7 @@ struct uk_allocpool *uk_allocpool_init(void *base, size_t len,
 				       size_t obj_len, size_t obj_align)
 {
 	struct uk_allocpool *p;
+	struct uk_alloc *a;
 	size_t obj_alen;
 	size_t left;
 	void *obj_ptr;
@@ -172,6 +235,7 @@ struct uk_allocpool *uk_allocpool_init(void *base, size_t len,
 
 	p = (struct uk_allocpool *) base;
 	memset(p, 0, sizeof(*p));
+	a = allocpool2ukalloc(p);
 
 	obj_alen = ALIGN_UP(obj_len, obj_align);
 	obj_ptr = (void *) ALIGN_UP((uintptr_t) base + sizeof(*p),
@@ -199,6 +263,18 @@ out:
 	p->obj_align       = obj_align;
 	p->base            = base;
 	p->parent          = NULL;
+
+	uk_alloc_init_malloc(a,
+			     pool_malloc,
+			     uk_calloc_compat,
+			     uk_realloc_compat,
+			     pool_free,
+			     pool_posix_memalign,
+			     uk_memalign_compat,
+			     NULL);
+#if CONFIG_LIBUKALLOC_IFSTATS
+	p->self.availmem = pool_availmem;
+#endif
 
 	uk_pr_debug("%p: Pool created (%"__PRIsz" B): %u objs of %"__PRIsz" B, aligned to %"__PRIsz" B\n",
 		    p, len, p->obj_count, p->obj_len, p->obj_align);
@@ -240,6 +316,10 @@ void uk_allocpool_free(struct uk_allocpool *p)
 
 	/* Make sure we got all objects back */
 	UK_ASSERT(p->free_obj_count == p->obj_count);
+
+	/* FIXME: Unregister `ukalloc` interface from `lib/ukalloc` */
+	/* TODO: Provide unregistration interface at `lib/ukalloc` */
+	UK_CRASH("Unregistering from `lib/ukalloc` not implemented.\n");
 
 	uk_free(p->parent, p->base);
 }
