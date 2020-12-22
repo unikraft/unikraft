@@ -47,8 +47,10 @@
 extern "C" {
 #endif
 
-#define __sector size_t
 #include <uk/arch/atomic.h>
+
+typedef __sz __sector;
+#define __PRIsctr __PRIsz
 
 struct uk_blkreq;
 
