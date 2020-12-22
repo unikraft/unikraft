@@ -861,12 +861,12 @@ static const struct uk_blkdev_ops virtio_blkdev_ops = {
 		.get_info = virtio_blkdev_get_info,
 		.dev_configure = virtio_blkdev_configure,
 		.queue_get_info = virtio_blkdev_queue_info_get,
-		.queue_setup = virtio_blkdev_queue_setup,
+		.queue_configure = virtio_blkdev_queue_setup,
 		.queue_intr_enable = virtio_blkdev_queue_intr_enable,
 		.dev_start = virtio_blkdev_start,
 		.dev_stop = virtio_blkdev_stop,
 		.queue_intr_disable = virtio_blkdev_queue_intr_disable,
-		.queue_release = virtio_blkdev_queue_release,
+		.queue_unconfigure = virtio_blkdev_queue_release,
 		.dev_unconfigure = virtio_blkdev_unconfigure,
 };
 

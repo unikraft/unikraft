@@ -13,6 +13,6 @@ uk_blkdev_queue_submit_one
 uk_blkdev_queue_finish_reqs
 uk_blkdev_sync_io
 uk_blkdev_stop
-uk_blkdev_queue_release
+uk_blkdev_queue_unconfigure
 uk_blkdev_drv_unregister
 uk_blkdev_unconfigure

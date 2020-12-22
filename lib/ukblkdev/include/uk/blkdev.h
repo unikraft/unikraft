@@ -51,7 +51,7 @@
  * The functions exported by the Unikraft BLK API to setup a device
  * designated by its ID must be invoked in the following order:
  *      - uk_blkdev_configure()
- *      - uk_blkdev_queue_setup()
+ *      - uk_blkdev_queue_configure()
  *      - uk_blkdev_start()
  *
  * There are 4 states in which a block device can be found:
@@ -197,7 +197,7 @@ int uk_blkdev_queue_get_info(struct uk_blkdev *dev, uint16_t queue_id,
  *	to retrieve limitations.
  * @param queue_conf
  *	The pointer to the configuration data to be used for the queue.
- *	This can be shared across multiple queue setups.
+ *	This can be shared across multiple queue configurations.
  * @return
  *	- 0: Success, receive queue correctly set up.
  *	- <0: Unable to allocate and set up the ring descriptors.
@@ -496,12 +496,12 @@ int uk_blkdev_stop(struct uk_blkdev *dev);
  * @param queue_id
  *	The index of the queue to release.
  *	The value must be in range [0, nb_queue -1] previously supplied
- *	to uk_blkdev_configure()
- *	@return
+ *	to uk_blkdev_queue_configure()
+ * @return
  *	- 0: Success
  *	- (<0): on error returned by driver
  */
-int uk_blkdev_queue_release(struct uk_blkdev *dev, uint16_t queue_id);
+int uk_blkdev_queue_unconfigure(struct uk_blkdev *dev, uint16_t queue_id);
 
 /**
  * Close a stopped Unikraft block device.

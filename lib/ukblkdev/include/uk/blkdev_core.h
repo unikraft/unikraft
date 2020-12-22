@@ -207,7 +207,7 @@ typedef int (*uk_blkdev_queue_finish_reqs_t)(struct uk_blkdev *dev,
 typedef int (*uk_blkdev_stop_t)(struct uk_blkdev *dev);
 
 /** Driver callback type to release a queue of an Unikraft block device. */
-typedef int (*uk_blkdev_queue_release_t)(struct uk_blkdev *dev,
+typedef int (*uk_blkdev_queue_unconfigure_t)(struct uk_blkdev *dev,
 		struct uk_blkdev_queue *queue);
 
 /** Driver callback type to unconfigure an Unikraft block device. */
@@ -217,12 +217,12 @@ struct uk_blkdev_ops {
 	uk_blkdev_get_info_t				get_info;
 	uk_blkdev_configure_t				dev_configure;
 	uk_blkdev_queue_get_info_t			queue_get_info;
-	uk_blkdev_queue_configure_t			queue_setup;
+	uk_blkdev_queue_configure_t			queue_configure;
 	uk_blkdev_start_t				dev_start;
 	uk_blkdev_stop_t				dev_stop;
 	uk_blkdev_queue_intr_enable_t			queue_intr_enable;
 	uk_blkdev_queue_intr_disable_t			queue_intr_disable;
-	uk_blkdev_queue_release_t			queue_release;
+	uk_blkdev_queue_unconfigure_t			queue_unconfigure;
 	uk_blkdev_unconfigure_t				dev_unconfigure;
 };
 

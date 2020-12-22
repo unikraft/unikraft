@@ -82,7 +82,7 @@ int uk_blkdev_drv_register(struct uk_blkdev *dev, struct uk_alloc *a,
 	UK_ASSERT(dev->dev_ops);
 	UK_ASSERT(dev->dev_ops->dev_configure);
 	UK_ASSERT(dev->dev_ops->dev_start);
-	UK_ASSERT(dev->dev_ops->queue_setup);
+	UK_ASSERT(dev->dev_ops->queue_configure);
 	UK_ASSERT(dev->dev_ops->get_info);
 	UK_ASSERT(dev->dev_ops->queue_get_info);
 	UK_ASSERT(dev->submit_one);
@@ -313,7 +313,7 @@ int uk_blkdev_queue_configure(struct uk_blkdev *dev, uint16_t queue_id,
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->_data);
 	UK_ASSERT(dev->dev_ops);
-	UK_ASSERT(dev->dev_ops->queue_setup);
+	UK_ASSERT(dev->dev_ops->queue_configure);
 	UK_ASSERT(dev->finish_reqs);
 	UK_ASSERT(queue_id < CONFIG_LIBUKBLKDEV_MAXNBQUEUES);
 	UK_ASSERT(queue_conf);
@@ -339,7 +339,7 @@ int uk_blkdev_queue_configure(struct uk_blkdev *dev, uint16_t queue_id,
 	if (err)
 		goto err_out;
 
-	dev->_queue[queue_id] = dev->dev_ops->queue_setup(dev, queue_id,
+	dev->_queue[queue_id] = dev->dev_ops->queue_configure(dev, queue_id,
 			nb_desc,
 			queue_conf);
 	if (PTRISERR(dev->_queue[queue_id])) {
@@ -493,21 +493,21 @@ int uk_blkdev_stop(struct uk_blkdev *dev)
 	return rc;
 }
 
-int uk_blkdev_queue_release(struct uk_blkdev *dev, uint16_t queue_id)
+int uk_blkdev_queue_unconfigure(struct uk_blkdev *dev, uint16_t queue_id)
 {
 	int rc = 0;
 
 	UK_ASSERT(dev != NULL);
 	UK_ASSERT(dev->_data);
 	UK_ASSERT(dev->dev_ops);
-	UK_ASSERT(dev->dev_ops->queue_release);
+	UK_ASSERT(dev->dev_ops->queue_unconfigure);
 	UK_ASSERT(queue_id < CONFIG_LIBUKBLKDEV_MAXNBQUEUES);
 	UK_ASSERT(dev->_data->state == UK_BLKDEV_CONFIGURED);
 	UK_ASSERT(!PTRISERR(dev->_queue[queue_id]));
 
-	rc = dev->dev_ops->queue_release(dev, dev->_queue[queue_id]);
+	rc = dev->dev_ops->queue_unconfigure(dev, dev->_queue[queue_id]);
 	if (rc)
-		uk_pr_err("Failed to release blkdev%"PRIu16"-q%"PRIu16": %d\n",
+		uk_pr_err("Failed to unconfigure blkdev%"PRIu16"-q%"PRIu16": %d\n",
 				dev->_data->id, queue_id, rc);
 	else {
 #if CONFIG_LIBUKBLKDEV_DISPATCHERTHREADS
@@ -515,7 +515,7 @@ int uk_blkdev_queue_release(struct uk_blkdev *dev, uint16_t queue_id)
 			_destroy_event_handler(
 					&dev->_data->queue_handler[queue_id]);
 #endif
-		uk_pr_info("Released blkdev%"PRIu16"-q%"PRIu16"\n",
+		uk_pr_info("Unconfigured blkdev%"PRIu16"-q%"PRIu16"\n",
 				dev->_data->id, queue_id);
 		dev->_queue[queue_id] = NULL;
 	}
