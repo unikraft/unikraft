@@ -73,6 +73,9 @@ struct uk_allocpool {
 	size_t obj_align;
 	size_t obj_len;
 	unsigned int obj_count;
+
+	struct uk_alloc *parent;
+	void *base;
 };
 
 struct free_obj {
@@ -121,6 +124,21 @@ void uk_allocpool_return(struct uk_allocpool *p, void *obj)
 	UK_ASSERT(p);
 
 	_prepend_free_obj(p, obj);
+}
+
+size_t uk_allocpool_reqmem(unsigned int obj_count, size_t obj_len,
+			   size_t obj_align)
+{
+	size_t obj_alen;
+
+	UK_ASSERT(POWER_OF_2(obj_align));
+
+	obj_len   = MAX(obj_len, MIN_OBJ_LEN);
+	obj_align = MAX(obj_align, MIN_OBJ_ALIGN);
+	obj_alen  = ALIGN_UP(obj_len, obj_align);
+	return (sizeof(struct uk_allocpool)
+		+ obj_align
+		+ ((size_t) obj_count * obj_alen));
 }
 
 unsigned int uk_allocpool_availcount(struct uk_allocpool *p)
@@ -179,8 +197,49 @@ struct uk_allocpool *uk_allocpool_init(void *base, size_t len,
 out:
 	p->obj_len         = obj_alen;
 	p->obj_align       = obj_align;
+	p->base            = base;
+	p->parent          = NULL;
 
 	uk_pr_debug("%p: Pool created (%"__PRIsz" B): %u objs of %"__PRIsz" B, aligned to %"__PRIsz" B\n",
 		    p, len, p->obj_count, p->obj_len, p->obj_align);
 	return p;
+}
+
+struct uk_allocpool *uk_allocpool_alloc(struct uk_alloc *parent,
+					unsigned int obj_count,
+					size_t obj_len, size_t obj_align)
+{
+	struct uk_allocpool *p;
+	void *base;
+	size_t len;
+
+	/* uk_allocpool_reqmem computes minimum requirement */
+	len = uk_allocpool_reqmem(obj_count, obj_len, obj_align);
+	base = uk_malloc(parent, len);
+	if (!base)
+		return NULL;
+
+	p = uk_allocpool_init(base, len, obj_len, obj_align);
+	if (!p) {
+		uk_free(parent, base);
+		errno = ENOSPC;
+		return NULL;
+	}
+
+	p->parent = parent;
+	return p;
+}
+
+void uk_allocpool_free(struct uk_allocpool *p)
+{
+	/* If we do not have a parent, this pool was created with
+	 * uk_allocpool_init(). Such a pool cannot be free'd with
+	 * this function since we are not the owner of the allocation
+	 */
+	UK_ASSERT(p->parent);
+
+	/* Make sure we got all objects back */
+	UK_ASSERT(p->free_obj_count == p->obj_count);
+
+	uk_free(p->parent, p->base);
 }

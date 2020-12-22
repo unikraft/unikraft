@@ -48,6 +48,53 @@ typedef void (*uk_allocpool_obj_init_t)(void *obj, size_t len, void *cookie);
 struct uk_allocpool;
 
 /**
+ * Computes the required memory for a pool allocation.
+ *
+ * @param obj_count
+ *  Number of objects that are allocated with the pool.
+ * @param obj_len
+ *  Size of one object (bytes).
+ * @param obj_align
+ *  Alignment requirement for each pool object.
+ * @return
+ *  Number of bytes needed for pool allocation.
+ */
+size_t uk_allocpool_reqmem(unsigned int obj_count, size_t obj_len,
+			   size_t obj_align);
+
+/**
+ * Allocates a memory pool on a parent allocator.
+ *
+ * @param parent
+ *  Allocator on which the pool will be allocated.
+ * @param obj_count
+ *  Number of objects that are allocated with the pool.
+ * @param obj_len
+ *  Size of one object (bytes).
+ * @param obj_align
+ *  Alignment requirement for each pool object.
+ * @return
+ *  - (NULL): If allocation failed (e.g., ENOMEM).
+ *  - pointer to allocated pool.
+ */
+struct uk_allocpool *uk_allocpool_alloc(struct uk_alloc *parent,
+					unsigned int obj_count,
+					size_t obj_len, size_t obj_align);
+
+/**
+ * Frees a memory pool that was allocated with
+ * uk_allocpool_alloc(). The memory is returned to
+ * the parent allocator.
+ * Note: Please make sure that all taken objects
+ * are returned to the pool before free'ing the
+ * pool.
+ *
+ * @param p
+ *  Pointer to memory pool that will be free'd.
+ */
+void uk_allocpool_free(struct uk_allocpool *p);
+
+/**
  * Initializes a memory pool on a given memory range.
  *
  * @param base
