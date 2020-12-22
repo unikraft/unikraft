@@ -5,5 +5,7 @@ uk_allocpool_reqmem
 uk_allocpool_availcount
 uk_allocpool_objlen
 uk_allocpool_take
+uk_allocpool_take_batch
 uk_allocpool_return
+uk_allocpool_return_batch
 uk_allocpool2ukalloc

@@ -158,6 +158,22 @@ size_t uk_allocpool_objlen(struct uk_allocpool *p);
 void *uk_allocpool_take(struct uk_allocpool *p);
 
 /**
+ * Get multiple objects from a pool.
+ *
+ * @param p
+ *  Pointer to memory pool.
+ * @param obj
+ *  Pointer to array that will be filled with pointers of
+ *  allocated objects from the pool.
+ * @param count
+ *  Maximum number of objects that should be taken from the pool.
+ * @return
+ *  Number of successfully allocated objects on the given array.
+ */
+unsigned int uk_allocpool_take_batch(struct uk_allocpool *p,
+				     void *obj[], unsigned int count);
+
+/**
  * Return one object back to a pool.
  * HINT: It is recommended to use this call instead of uk_free() whenever
  *       feasible. This call is avoiding indirections.
@@ -168,6 +184,20 @@ void *uk_allocpool_take(struct uk_allocpool *p);
  *  Pointer to object that should be returned.
  */
 void uk_allocpool_return(struct uk_allocpool *p, void *obj);
+
+/**
+ * Return multiple objects to a pool.
+ *
+ * @param p
+ *  Pointer to memory pool.
+ * @param obj
+ *  Pointer to array that with pointers of objects that
+ *  should be returned.
+ * @param count
+ *  Number of objects that are on the array.
+ */
+void uk_allocpool_return_batch(struct uk_allocpool *p,
+			       void *obj[], unsigned int count);
 
 #ifdef __cplusplus
 }

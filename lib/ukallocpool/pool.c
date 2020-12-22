@@ -172,11 +172,40 @@ void *uk_allocpool_take(struct uk_allocpool *p)
 	return _take_free_obj(p);
 }
 
+unsigned int uk_allocpool_take_batch(struct uk_allocpool *p,
+				     void *obj[], unsigned int count)
+{
+	unsigned int i;
+
+	UK_ASSERT(p);
+	UK_ASSERT(obj);
+
+	for (i = 0; i < count; ++i) {
+		if (unlikely(uk_list_empty(&p->free_obj)))
+			break;
+		obj[i] = _take_free_obj(p);
+	}
+
+	return i;
+}
+
 void uk_allocpool_return(struct uk_allocpool *p, void *obj)
 {
 	UK_ASSERT(p);
 
 	_prepend_free_obj(p, obj);
+}
+
+void uk_allocpool_return_batch(struct uk_allocpool *p,
+			       void *obj[], unsigned int count)
+{
+	unsigned int i;
+
+	UK_ASSERT(p);
+	UK_ASSERT(obj);
+
+	for (i = 0; i < count; ++i)
+		_prepend_free_obj(p, obj[i]);
 }
 
 #if CONFIG_LIBUKALLOC_IFSTATS
