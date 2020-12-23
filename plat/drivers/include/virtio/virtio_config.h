@@ -113,8 +113,18 @@ static inline void _virtio_cread_bytes(const void *addr, const __u8 offset,
 #else  /* __X86_64__ */
 
 /* IO barriers */
-#define __iormb()		rmb()
-#define __iowmb()		wmb()
+#define __iormb(v)							\
+({									\
+	unsigned long tmp;						\
+	dmb(oshld);							\
+									\
+	asm volatile("eor	%0, %1, %1\n"				\
+		     "cbnz	%0, ."					\
+		     : "=r" (tmp) : "r" ((unsigned long)(v))		\
+		     : "memory");					\
+})
+
+#define __iowmb()		dmb(oshst)
 
 static inline void _virtio_cwrite_bytes(const void *addr, const __u8 offset,
 					const void *buf, int len, int type_len)
@@ -166,7 +176,7 @@ static inline void _virtio_cread_bytes(const void *addr, const __u8 offset,
 		default:
 			UK_CRASH("Unsupported virtio read operation\n");
 		}
-		__iormb();
+		__iormb(io_addr);
 	}
 }
 
