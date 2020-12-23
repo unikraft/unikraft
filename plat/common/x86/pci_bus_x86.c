@@ -55,6 +55,7 @@
 #include <string.h>
 #include <uk/print.h>
 #include <uk/plat/common/cpu.h>
+#include <uk/essentials.h>
 #include <pci/pci_bus.h>
 
 #define PCI_CONF_READ(type, ret, a, s)					\
@@ -207,7 +208,7 @@ static void probe_bus(uint32_t bus)
 	}
 }
 
-int arch_pci_probe(void)
+int arch_pci_probe(struct uk_alloc *pha __unused)
 {
 	uint32_t config_addr, function, header_type, vendor_id;
 
