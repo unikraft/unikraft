@@ -95,6 +95,24 @@ static void fdt_default_count_cells(const void *fdt, int parentoffset,
 		*sizec = fdt_size_cells(fdt, parentoffset);
 }
 
+static __u64 fdt_default_map(fdt32_t *addr, const fdt32_t *range,
+		int na, int ns, int pna)
+{
+	__u64 cp, s, da;
+
+	cp = fdt_reg_read_number(range, na);
+	s  = fdt_reg_read_number(range + na + pna, ns);
+	da = fdt_reg_read_number(addr, na);
+
+	uk_pr_debug("default map, cp=%llx, s=%llx, da=%llx\n",
+		 (unsigned long long)cp, (unsigned long long)s,
+		 (unsigned long long)da);
+
+	if (da < cp || da >= (cp + s))
+		return FDT_BAD_ADDR;
+	return da - cp;
+}
+
 static int fdt_default_translate(fdt32_t *addr, uint64_t offset, int na)
 {
 	uint64_t a = fdt_reg_read_number(addr, na);
@@ -109,10 +127,11 @@ static int fdt_default_translate(fdt32_t *addr, uint64_t offset, int na)
 }
 
 static int fdt_translate_one(const void *fdt, int parent, fdt32_t *addr,
-				    int na, int pna, const char *rprop)
+				int na, int ns, int pna, const char *rprop)
 {
 	const fdt32_t *ranges;
 	int rlen;
+	int rone;
 	uint64_t offset = FDT_BAD_ADDR;
 
 	ranges = fdt_getprop(fdt, parent, rprop, &rlen);
@@ -124,10 +143,23 @@ static int fdt_translate_one(const void *fdt, int parent, fdt32_t *addr,
 		goto finish;
 	}
 
-	uk_pr_err("Error, only 1:1 translation is supported...\n");
-	return 1;
- finish:
-	uk_pr_debug("with offset: 0x%lx\n", offset);
+	uk_pr_debug("walking ranges...\n");
+	/* Now walk through the ranges */
+	rlen /= 4;
+	rone = na + pna + ns;
+	for (; rlen >= rone; rlen -= rone, ranges += rone) {
+		offset = fdt_default_map(addr, ranges, na, ns, pna);
+		if (offset != FDT_BAD_ADDR)
+			break;
+	}
+	if (offset == FDT_BAD_ADDR) {
+		uk_pr_debug("not found !\n");
+		return 1;
+	}
+	memcpy(addr, ranges + na, 4 * pna);
+
+finish:
+	uk_pr_info("parent translation for:%p %x", addr, pna);
 
 	/* Translate it into parent bus space */
 	return fdt_default_translate(addr, offset, pna);
@@ -138,7 +170,7 @@ static int fdt_translate_one(const void *fdt, int parent, fdt32_t *addr,
  * this walks up the tree and applies the various bus mappings on the
  * way.
  */
-static uint64_t fdt_translate_address_by_ranges(const void *fdt,
+uint64_t fdt_translate_address_by_ranges(const void *fdt,
 					int node_offset, const fdt32_t *regs)
 {
 	int parent;
@@ -186,7 +218,7 @@ static uint64_t fdt_translate_address_by_ranges(const void *fdt,
 
 		/* Apply bus translation */
 		if (fdt_translate_one(fdt, node_offset,
-					addr, na, pna, "ranges"))
+					addr, na, ns, pna, "ranges"))
 			break;
 
 		/* Complete the move up one level */
