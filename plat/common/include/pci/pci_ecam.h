@@ -92,7 +92,7 @@ struct fdt_phandle_args {
 
 
 int pci_generic_config_read(__u8 bus, __u8 devfn,
-			    int where, int size, __u32 *val);
+			    int where, int size, void *val);
 
 int pci_generic_config_write(__u8 bus, __u8 devfn,
 			     int where, int size, __u32 val);

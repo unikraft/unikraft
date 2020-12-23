@@ -198,4 +198,15 @@ int fdt_get_interrupt(const void *fdt, int nodeoffset,
  */
 bool fdt_prop_read_bool(const void *fdt, int start_offset,
 					 const char *propname);
+
+/**
+ * fdt_translate_address_by_ranges - Translate an address from the
+ * device-tree into a CPU physical address, this walks up the tree and
+ * applies the various bus mappings on the way.
+ * @fdt: pointer to the device tree blob
+ * @node_offset: start offset of the node to find the address for
+ * @regs regs in device-tree
+ */
+uint64_t fdt_translate_address_by_ranges(const void *fdt,
+				int node_offset, const fdt32_t *regs);
 #endif

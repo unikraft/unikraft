@@ -75,7 +75,6 @@ static int arch_pci_driver_add_device(struct pci_driver *drv,
 {
 	struct pci_device *dev;
 	int ret;
-	__u32 val;
 
 	UK_ASSERT(drv != NULL);
 	UK_ASSERT(drv->add_dev != NULL);
@@ -98,7 +97,7 @@ static int arch_pci_driver_add_device(struct pci_driver *drv,
 
 	dev->base = base;
 	dev->irq = irq;
-	uk_pr_info("pci dev base(0x%llx) irq(%d)\n", dev->base, dev->irq);
+	uk_pr_info("pci dev base(0x%lx) irq(%ld)\n", dev->base, dev->irq);
 
 	if (drv->add_dev)
 		ret = drv->add_dev(dev); //virtio pci
@@ -120,7 +119,6 @@ int arch_pci_probe(struct uk_alloc *pha)
 	struct pci_driver *drv;
 	uint32_t bus;
 	uint8_t dev;
-	int err;
 	int irq, pin = 0;
 	__u64 base;
 	int found_pci_device = 0;
@@ -138,7 +136,7 @@ int arch_pci_probe(struct uk_alloc *pha)
 			 /* TODO: Retrieve the function bus, dev << PCI_DEV_BIT_NBR*/
 			addr.function = 0x0;
 
-			pci_generic_config_read(bus, DEVFN(dev, 0), PCI_VENDOR_ID, 2, &devid.vendor_id);
+			pci_generic_config_read(bus, DEVFN(dev, 0), PCI_VENDOR_ID, 2, (void *)&devid.vendor_id);
 			if (devid.vendor_id == PCI_INVALID_ID) {
 				/* Device doesn't exist */
 				continue;
@@ -147,11 +145,11 @@ int arch_pci_probe(struct uk_alloc *pha)
 			/* mark we found any pci device */
 			found_pci_device = 1;
 
-			pci_generic_config_read(bus, DEVFN(dev, 0), PCI_CLASS_REVISION, 4, &devid.class_id);
-			pci_generic_config_read(bus, DEVFN(dev, 0), PCI_VENDOR_ID, 2, &devid.vendor_id);
-			pci_generic_config_read(bus, DEVFN(dev, 0), PCI_DEV_ID, 2, &devid.device_id);
-			pci_generic_config_read(bus, DEVFN(dev, 0), PCI_SUBSYSTEM_VID, 2, &devid.subsystem_vendor_id);
-			pci_generic_config_read(bus, DEVFN(dev, 0), PCI_SUBSYSTEM_ID, 2, &devid.subsystem_device_id);
+			pci_generic_config_read(bus, DEVFN(dev, 0), PCI_CLASS_REVISION, 4, (void *)&devid.class_id);
+			pci_generic_config_read(bus, DEVFN(dev, 0), PCI_VENDOR_ID, 2, (void *)&devid.vendor_id);
+			pci_generic_config_read(bus, DEVFN(dev, 0), PCI_DEV_ID, 2, (void *)&devid.device_id);
+			pci_generic_config_read(bus, DEVFN(dev, 0), PCI_SUBSYSTEM_VID, 2, (void *)&devid.subsystem_vendor_id);
+			pci_generic_config_read(bus, DEVFN(dev, 0), PCI_SUBSYSTEM_ID, 2, (void *)&devid.subsystem_device_id);
 			uk_pr_info("PCI %02x:%02x.%02x (%04x %04x:%04x): sb=%d,sv=%4x\n",
 				   (int) addr.bus,
 				   (int) addr.devid,
@@ -176,14 +174,14 @@ int arch_pci_probe(struct uk_alloc *pha)
 
 			drv = pci_find_driver(&devid);
 			if (!drv) {
-				uk_pr_info("<no driver> for dev id=%d\n", devid);
+				uk_pr_info("<no driver> for dev id=%d\n", devid.device_id);
 				continue;
 			}
 
 			uk_pr_info("driver %p\n", drv);
 
 			/* probe the irq info*/
-			pci_generic_config_read(bus, DEVFN(dev, 0), PCI_INTERRUPT_PIN, 1, &pin);
+			pci_generic_config_read(bus, DEVFN(dev, 0), PCI_INTERRUPT_PIN, 1, (void *)&pin);
 			out_irq.args_count = 1;
 			out_irq.args[0] = pin;
 			fdtaddr[0] = cpu_to_fdt32((bus << 16) | (DEVFN(dev,0) << 8));
@@ -193,8 +191,6 @@ int arch_pci_probe(struct uk_alloc *pha)
 			irq = gic_irq_translate(0, out_irq.args[1]);
 
 			arch_pci_driver_add_device(drv, &addr, &devid, irq, base, pha);
-
-			uk_pr_info("pci dev base(0x%llx) irq(%d)\n");
 		}
 	}
 

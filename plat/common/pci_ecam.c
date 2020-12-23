@@ -89,7 +89,7 @@ static void *pci_ecam_map_bus(__u8 bus, __u8 devfn, int where)
 }
 
 int pci_generic_config_read(__u8 bus, __u8 devfn,
-			    int where, int size, __u32 *val)
+			    int where, int size, void *val)
 {
 	void *addr;
 
@@ -97,16 +97,16 @@ int pci_generic_config_read(__u8 bus, __u8 devfn,
 	rmb();
 	addr = pci_ecam_map_bus(bus, devfn, where);
 	if (!addr) {
-		*val = ~0;
+		*(int *)val = ~0;
 		return -1;
 	}
 
 	if (size == 1)
-		*val = ioreg_read8(addr);
+		*(uint8_t *)val = ioreg_read8(addr);
 	else if (size == 2)
-		*val = ioreg_read16(addr);
+		*(uint16_t *)val = ioreg_read16(addr);
 	else if (size == 4)
-		*val = ioreg_read32(addr);
+		*(uint32_t *)val = ioreg_read32(addr);
 	else
 		uk_pr_err("not support size pci config read\n");
 
@@ -117,7 +117,6 @@ int pci_generic_config_write(__u8 bus, __u8 devfn,
 			     int where, int size, __u32 val)
 {
 	void *addr;
-	__u32 mask, tmp;
 
 	addr = pci_ecam_map_bus(bus, devfn, where);
 	if (!addr)
@@ -206,7 +205,7 @@ static int irq_find_parent(const void *fdt, int child)
 {
 	int p;
 	int plen;
-	fdt32_t *prop;
+	const fdt32_t *prop;
 	fdt32_t parent;
 
 	do {
@@ -234,7 +233,7 @@ int gen_pci_irq_parse(const fdt32_t *addr, struct fdt_phandle_args *out_irq)
 	int addrsize, newaddrsize = 0;
 	int imaplen, match, i, rc = -EINVAL;
 	int plen;
-	int *prop;
+	const fdt32_t *prop;
 
 	ipar = gen_pci_fdt;
 
@@ -255,7 +254,7 @@ int gen_pci_irq_parse(const fdt32_t *addr, struct fdt_phandle_args *out_irq)
 	}
 
 	intsize = fdt32_to_cpu(prop[0]);
-	uk_pr_info("irq_parse_raw: ipar=%p, size=%d\n", ipar, intsize);
+	uk_pr_info("irq_parse_raw: ipar=%x, size=%d\n", ipar, intsize);
 
 	if (out_irq->args_count != intsize)
 		goto fail;
@@ -385,7 +384,7 @@ int gen_pci_irq_parse(const fdt32_t *addr, struct fdt_phandle_args *out_irq)
 skiplevel:
 		/* Iterate again with new parent */
 		out_irq->np = newpar;
-		uk_pr_info(" -> new parent: %pOF\n", newpar);
+		uk_pr_info(" -> new parent: %x\n", newpar);
 
 		ipar = newpar;
 		newpar = 0;
@@ -398,17 +397,15 @@ fail:
 }
 
 
-static int gen_pci_probe(struct pf_device *pfdev)
+static int gen_pci_probe(struct pf_device *pfdev __unused)
 {
 	const fdt32_t *prop;
 	int prop_len;
 	__u64 reg_base;
 	__u64 reg_size;
-	int err;
 	struct pci_range range;
 	struct pci_range_parser parser;
-	struct fdt_phandle_args out_irq;
-	fdt32_t laddr[3];
+	int err;
 
 	/* 1.Get the base and size of config space */
 	gen_pci_fdt = fdt_node_offset_by_compatible(fdt_start, -1,
@@ -434,7 +431,7 @@ static int gen_pci_probe(struct pf_device *pfdev)
 
 	pcw.config_base = reg_base;
 	pcw.config_space_size = reg_size;
-	uk_pr_info("generic pci config base(0x%llx),size(0x%llx)\n",
+	uk_pr_info("generic pci config base(0x%lx),size(0x%lx)\n",
 				reg_base, reg_size);
 
 	/* 2.Get the bus range of pci controller */
@@ -456,6 +453,11 @@ static int gen_pci_probe(struct pf_device *pfdev)
 
 	/* 3.Get the pci addr base and limit size for pci devices */
 	err = gen_pci_parser_range(&parser, gen_pci_fdt);
+	if (err < 0) {
+		uk_pr_err("bus-range detect error in fdt\n");
+		goto error_exit;
+	}
+
 	do {
 		pci_range_parser_one(&parser, &range, gen_pci_fdt);
 		if (range.flags == IORESOURCE_IO) {
@@ -465,7 +467,7 @@ static int gen_pci_probe(struct pf_device *pfdev)
 		}
 		parser.range += parser.np;
 	} while (parser.range + parser.np <= parser.end);
-	uk_pr_info("generic pci range base(0x%llx),size(0x%llx)\n",
+	uk_pr_info("generic pci range base(0x%lx),size(0x%lx)\n",
 				pcw.pci_device_base, pcw.pci_device_limit);
 
 	return 0;
@@ -492,18 +494,16 @@ static int gen_pci_add_dev(struct pf_device *pfdev __unused)
 
 static const struct device_match_table gen_pci_match_table[];
 
-static struct pf_device_id *gen_pci_id_match_compatible(const char *compatible)
+static int gen_pci_id_match_compatible(const char *compatible)
 {
-	int i;
-
 	for (int i = 0; gen_pci_match_table[i].compatible != NULL; i++)
 		if (strcmp(gen_pci_match_table[i].compatible, compatible) == 0)
-			return gen_pci_match_table[i].id;
+			return gen_pci_match_table[i].id->device_id;
 
-	return NULL;
+	return -1;
 }
 
-static const struct pf_device_id gen_pci_ids = {
+static struct pf_device_id gen_pci_ids = {
 		.device_id = GEN_PCI_ID
 };
 

@@ -179,7 +179,7 @@ struct pci_bus_handler {
 	struct uk_list_head drv_list;  /**< List of PCI drivers */
 	struct uk_list_head dev_list;  /**< List of PCI devices */
 };
-static struct pci_bus_handler ph;
+static struct pci_bus_handler ph __unused;
 
 #define PCI_INVALID_ID              (0xFFFF)
 #define PCI_DEVICE_ID_MASK          (0xFFFF)
