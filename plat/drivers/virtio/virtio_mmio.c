@@ -309,7 +309,7 @@ static struct virtqueue *vm_setup_vq(struct virtio_dev *vdev,
 	virtio_cwrite32(vm_dev->base, VIRTIO_MMIO_QUEUE_SEL, queue_id);
 
 	/* Activate the queue */
-	virtio_cwrite32(vm_dev->base, VIRTIO_MMIO_QUEUE_NUM, (__u32)virtqueue_vring_get_num(vq));
+	virtio_cwrite32(vm_dev->base, VIRTIO_MMIO_QUEUE_NUM, num_desc);
 	if (vm_dev->version == 1) {
 
 		virtio_cwrite32(vm_dev->base, VIRTIO_MMIO_QUEUE_ALIGN, __PAGE_SIZE);
