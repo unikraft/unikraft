@@ -442,7 +442,6 @@ static int virtio_mmio_add_dev(struct pf_device *pfdev)
 	int rc;
 
 	UK_ASSERT(pfdev != NULL);
-	uk_pr_info("virtio_mmio_add dev\n");
 
 	vm_dev = uk_malloc(a, sizeof(*vm_dev));
 	if (!vm_dev) {
@@ -483,7 +482,7 @@ static int virtio_mmio_add_dev(struct pf_device *pfdev)
 		 * virtio-mmio device with an ID 0 is a (dummy) placeholder
 		 * with no function. End probing now with no error reported.
 		 */
-		uk_pr_err("virtio_device_id is 0\n");
+		uk_pr_info("virtio_device_id is 0\n");
 
 		rc = -ENODEV;
 		goto free_vmdev;

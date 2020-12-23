@@ -81,7 +81,7 @@ static inline struct pf_driver *pf_find_driver(const char *compatible)
 		id.device_id = (uint16_t)drv->match(compatible);
 		if (id.device_id) {
 			if (pf_device_id_match(&id, drv->device_ids)) {
-				uk_pr_debug("pf driver found  devid(0x%x)\n", id.device_id);
+				uk_pr_debug("pf driver found devid(0x%x)\n", id.device_id);
 
 				return drv;
 			}
@@ -105,8 +105,8 @@ static inline int pf_driver_add_device(struct pf_driver *drv,
 	uk_pr_debug("pf_driver_add_device devid=%d\n", dev->id.device_id);
 
 	ret = drv->add_dev(dev);
-	if (ret < 0) {
-		uk_pr_err("Platform Failed to initialize device driver\n");
+	if (ret < 0 && ret != -ENODEV) {
+		uk_pr_err("Platform Failed to initialize device driver, ret(%d)\n",ret);
 	}
 
 	return ret;
@@ -178,7 +178,6 @@ static int pf_probe(void)
 
 		ret = pf_driver_add_device(drv, dev);
 		if (ret < 0) {
-			uk_pr_err("Platform Failed to initialize device driver, ret(%d)\n",ret);
 			uk_free(pfh.a, dev);
 		}
 	} while (1);
