@@ -33,6 +33,8 @@
 #ifndef _PLAT_DRIVER_OFW_FDT_H
 #define _PLAT_DRIVER_OFW_FDT_H
 
+#include <stdbool.h>
+
 #define FDT_BAD_ADDR (uint64_t)(-1)
 
 /**
@@ -184,4 +186,16 @@ int fdt_node_offset_idx_by_compatible_list(const void *fdt, int startoffset,
  */
 int fdt_get_interrupt(const void *fdt, int nodeoffset,
 				uint32_t index, int *size, fdt32_t **prop);
+
+/**
+ * fdt_prop_read_bool - Find a property
+ * @fdt: pointer to the device tree blob
+ * @start_offset: start offset of the node to find the address for
+ * @propname:	name of the property to be searched.
+ *
+ * Search for a property in a device node.
+ * Returns true if the property exists false otherwise.
+ */
+bool fdt_prop_read_bool(const void *fdt, int start_offset,
+					 const char *propname);
 #endif

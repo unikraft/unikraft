@@ -335,3 +335,11 @@ int fdt_get_interrupt(const void *fdt, int nodeoffset,
 
 	return 0;
 }
+
+bool fdt_prop_read_bool(const void *fdt, int start_offset,
+					 const char *propname)
+{
+	const struct fdt_property *prop = fdt_getprop(fdt, start_offset, propname, NULL);
+
+	return prop ? true : false;
+}
