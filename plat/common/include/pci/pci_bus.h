@@ -172,5 +172,71 @@ struct pci_device {
 /* Do not use this function directly: */
 void _pci_register_driver(struct pci_driver *drv);
 
+struct pci_bus_handler {
+	struct uk_bus b;
+	struct uk_alloc *a;
+	struct uk_list_head drv_list;  /**< List of PCI drivers */
+	struct uk_list_head dev_list;  /**< List of PCI devices */
+};
+static struct pci_bus_handler ph;
+
+#define PCI_INVALID_ID              (0xFFFF)
+#define PCI_DEVICE_ID_MASK          (0xFFFF)
+
+#define PCI_CONFIG_ADDR             (0xCF8)
+#define PCI_CONFIG_DATA             (0xCFC)
+
+/* 8 bits for bus number, 5 bits for devices, 3 for functions */
+#define PCI_MAX_BUSES               (1 << 8)
+#define PCI_MAX_DEVICES             (1 << 5)
+#define PCI_MAX_FUNCTIONS           (1 << 3)
+
+#define PCI_BUS_SHIFT               (16)
+#define PCI_DEVICE_SHIFT            (11)
+#define PCI_FUNCTION_SHIFT          (8)
+#define PCI_ENABLE_BIT              (1 << 31)
+
+#define PCI_CONF_CLASS_ID          (0x08)
+#define PCI_CONF_CLASS_ID_SHFT     (16)
+#define PCI_CONF_CLASS_ID_MASK     (0xFF00)
+
+#define PCI_CONF_VENDOR_ID          (0x00)
+#define PCI_CONF_VENDOR_ID_SHFT     (0)
+#define PCI_CONF_VENDOR_ID_MASK     (0x0000FFFF)
+
+#define PCI_CONF_DEVICE_ID          (0x00)
+#define PCI_CONF_DEVICE_ID_SHFT     (16)
+#define PCI_CONF_DEVICE_ID_MASK     (0x0000FFFF)
+
+#define PCI_CONF_SUBSYSVEN_ID          (0x2c)
+#define PCI_CONF_SUBSYSVEN_ID_SHFT     (0)
+#define PCI_CONF_SUBSYSVEN_ID_MASK     (0xFFFF)
+
+#define PCI_CONF_SUBCLASS_ID          (0x08)
+#define PCI_CONF_SUBCLASS_ID_SHFT     (16)
+#define PCI_CONF_SUBCLASS_ID_MASK     (0x00FF)
+
+#define PCI_CONF_SECONDARY_BUS          (0x18)
+#define PCI_CONF_SECONDARY_BUS_SHFT     (0)
+#define PCI_CONF_SECONDARY_BUS_MASK     (0xFF00)
+
+#define PCI_HEADER_TYPE_MSB_MASK   (0x80)
+#define PCI_CONF_HEADER_TYPE       (0x00)
+#define PCI_CONF_HEADER_TYPE_SHFT  (16)
+#define PCI_CONF_HEADER_TYPE_MASK  (0xFF)
+
+#define PCI_CONF_SUBSYS_ID          (0x2c)
+#define PCI_CONF_SUBSYS_ID_SHFT     (16)
+#define PCI_CONF_SUBSYS_ID_MASK     (0xFFFF)
+
+#define PCI_CONF_IRQ                (0X3C)
+#define PCI_CONF_IRQ_SHFT           (0x0)
+#define PCI_CONF_IRQ_MASK           (0XFF)
+
+#define PCI_CONF_IOBAR              (0x10)
+#define PCI_CONF_IOBAR_SHFT         (0x0)
+#define PCI_CONF_IOBAR_MASK         (~0x3)
+
+struct pci_driver *pci_find_driver(struct pci_device_id *id);
 
 #endif /* __UKPLAT_COMMON_PCI_BUS_H__ */
