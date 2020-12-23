@@ -52,8 +52,10 @@ struct pf_bus_handler {
 };
 static struct pf_bus_handler pfh;
 
-static const char * const pf_device_list[] = {
+static const char *pf_device_compatilbe_list[] = {
 	"virtio,mmio",
+	"pci-host-ecam-generic",
+	NULL
 };
 
 static inline int pf_device_id_match(const struct pf_device_id *id0,
@@ -67,14 +69,22 @@ static inline int pf_device_id_match(const struct pf_device_id *id0,
 	return rc;
 }
 
-static inline struct pf_driver *pf_find_driver(struct pf_device_id *id)
+static inline struct pf_driver *pf_find_driver(const char *compatible)
 {
 	struct pf_driver *drv;
+	struct pf_device_id id;
 
 	UK_TAILQ_FOREACH(drv, &pfh.drv_list, next) {
-		if (pf_device_id_match(id, drv->device_ids)) {
-			uk_pr_debug("pf driver found devid=%d\n", drv->device_ids->device_id);
-			return drv; /* driver found */
+		if (!drv->match)
+			continue;
+
+		id.device_id = (uint16_t)drv->match(compatible);
+		if (id.device_id) {
+			if (pf_device_id_match(&id, drv->device_ids)) {
+				uk_pr_debug("pf driver found  devid(0x%x)\n", id.device_id);
+
+				return drv;
+			}
 		}
 	}
 
@@ -84,104 +94,96 @@ static inline struct pf_driver *pf_find_driver(struct pf_device_id *id)
 }
 
 static inline int pf_driver_add_device(struct pf_driver *drv,
-					struct pf_device_id *devid,
-					__u64 dev_base,
-					int dev_irq)
+					struct pf_device *dev)
 {
-	struct pf_device *dev;
 	int ret;
 
 	UK_ASSERT(drv != NULL);
 	UK_ASSERT(drv->add_dev != NULL);
+	UK_ASSERT(dev != NULL);
 
-	dev = (struct pf_device *) uk_calloc(pfh.a, 1, sizeof(*dev));
-	if (!dev) {
-		uk_pr_err("Platform : Failed to initialize: Out of memory!\n");
-		return -ENOMEM;
-	}
-
-	memcpy(&dev->id, devid, sizeof(dev->id));
-	uk_pr_debug("pf_driver_add_device dev->id=%d\n", dev->id.device_id);
-
-	dev->base = dev_base;
-	dev->irq = dev_irq;
+	uk_pr_debug("pf_driver_add_device devid=%d\n", dev->id.device_id);
 
 	ret = drv->add_dev(dev);
 	if (ret < 0) {
 		uk_pr_err("Platform Failed to initialize device driver\n");
-		uk_free(pfh.a, dev);
 	}
 
 	return ret;
 }
 
+static inline int pf_driver_probe_device(struct pf_driver *drv,
+					struct pf_device *dev)
+{
+	int ret;
+
+	UK_ASSERT(drv != NULL && dev != NULL);
+	UK_ASSERT(drv->probe != NULL);
+
+	uk_pr_info("pf_driver_probe_device devid=%d\n", dev->id.device_id);
+
+	ret = drv->probe(dev);
+	if (ret < 0) {
+		uk_pr_err("Platform Failed to probe device driver\n");
+
+		return ret;
+	}
+
+	return 0;
+}
+
 static int pf_probe(void)
 {
-	struct pf_device_id devid;
 	struct pf_driver *drv;
-	int i;
-	int end_offset = -1;
+	int idx = 0;
 	int ret = -ENODEV;
-	const fdt32_t *prop;
-	int type, hwirq, prop_len;
-	__u64 reg_base;
-	__phys_addr dev_base;
-	int dev_irq;
+	struct pf_device *dev;
+	int fdt_pf = -1;
 
 	uk_pr_info("Probe PF\n");
 
-	/* We only support virtio_mmio as a platform device here.
-	 * A loop here is needed for finding drivers if more devices
-	 */
-	devid.device_id = VIRTIO_MMIO_ID;
-
-	drv = pf_find_driver(&devid);
-	if (!drv) {
-		uk_pr_info("<no driver>\n");
-		return -ENODEV;
-	}
-
-	uk_pr_info("driver %p\n", drv);
-
-	/* qemu creates virtio devices in reverse order */
-	for (i = 0; i < UK_MAX_VIRTIO_MMIO_DEVICE; i++) {
-		end_offset = fdt_node_offset_by_compatible_list(fdt_start,
-							end_offset,
-							pf_device_list);
-		if (end_offset == -FDT_ERR_NOTFOUND) {
-			uk_pr_info("device not found in fdt\n");
-			goto error_exit;
-		} else {
-			prop = fdt_getprop(fdt_start, end_offset, "interrupts", &prop_len);
-			if (!prop) {
-				uk_pr_err("irq of device not found in fdt\n");
-				goto error_exit;
-			}
-
-			type = fdt32_to_cpu(prop[0]);
-			hwirq = fdt32_to_cpu(prop[1]);
-
-			prop = fdt_getprop(fdt_start, end_offset, "reg", &prop_len);
-			if (!prop) {
-				uk_pr_err("reg of device not found in fdt\n");
-				goto error_exit;
-			}
-
-			/* only care about base addr, ignore the size */
-			reg_base = fdt32_to_cpu(prop[0]);
-			reg_base = reg_base << 32 | fdt32_to_cpu(prop[1]);
+	/* Search all the platform bus devices provided by fdt */
+	do {
+		fdt_pf = fdt_node_offset_idx_by_compatible_list(_libkvmplat_cfg.dtb,
+						fdt_pf, pf_device_compatilbe_list, &idx);
+		if (fdt_pf < 0) {
+			uk_pr_info("End of searching platform devices\n");
+			break;
 		}
 
-		dev_base = reg_base;
-		dev_irq = gic_irq_translate(type, hwirq);
+		/* Alloc dev */
+		dev = (struct pf_device *) uk_calloc(pfh.a, 1, sizeof(*dev));
+		if (!dev) {
+			uk_pr_err("Platform : Failed to initialize: Out of memory!\n");
+			return -ENOMEM;
+		}
 
-		ret = pf_driver_add_device(drv, &devid, dev_base, dev_irq);
-	}
+		dev->fdt_offset = fdt_pf;
+
+		/* Find drv with compatible-id match table */
+		drv = pf_find_driver(pf_device_compatilbe_list[idx]);
+		if (!drv) {
+			uk_free(pfh.a, dev);
+			continue;
+		}
+
+		dev->id = *(struct pf_device_id *)drv->device_ids;
+		uk_pr_info("driver %p\n", drv);
+
+		ret = pf_driver_probe_device(drv, dev);
+		if (ret < 0) {
+			uk_free(pfh.a, dev);
+			continue;
+		}
+
+		ret = pf_driver_add_device(drv, dev);
+		if (ret < 0) {
+			uk_pr_err("Platform Failed to initialize device driver, ret(%d)\n",ret);
+			uk_free(pfh.a, dev);
+		}
+	} while (1);
 
 	return ret;
-
-error_exit:
-	return -ENODEV;
 }
 
 
@@ -232,4 +234,4 @@ static struct pf_bus_handler pfh = {
 	.b.init = pf_init,
 	.b.probe = pf_probe
 };
-UK_BUS_REGISTER(&pfh.b);
+UK_BUS_REGISTER_PRIORITY(&pfh.b, 1);

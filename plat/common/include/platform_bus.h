@@ -43,8 +43,10 @@
  * table of these IDs for each device that it supports.
  */
 #define PLATFORM_DEVICE_ID_START (0x100)
-#define VIRTIO_MMIO_ID PLATFORM_DEVICE_ID_START
-#define PLATFORM_DEVICE_ID_END (PLATFORM_DEVICE_ID_START + 0x100)
+#define VIRTIO_MMIO_ID		(PLATFORM_DEVICE_ID_START)
+#define GEN_PCI_ID		(PLATFORM_DEVICE_ID_START + 1)
+
+#define PLATFORM_DEVICE_ID_END (GEN_PCI_ID + 1)
 
 #define UK_MAX_VIRTIO_MMIO_DEVICE (0x2)
 
@@ -52,16 +54,25 @@ struct pf_device_id {
 	uint16_t device_id;
 };
 
+struct device_match_table {
+	const char		*compatible;
+	struct pf_device_id	*id;
+};
+
 struct pf_device;
 
-typedef int (*pf_driver_add_func_t)(struct pf_device *);
 typedef int (*pf_driver_init_func_t)(struct uk_alloc *a);
+typedef int (*pf_driver_add_func_t)(struct pf_device *);
+typedef int (*pf_driver_probe_func_t)(struct pf_device *);
+typedef int (*pf_driver_match_func_t)(const char *);
 
 struct pf_driver {
 	UK_TAILQ_ENTRY(struct pf_driver) next;
 	const struct pf_device_id *device_ids;
 	pf_driver_init_func_t init; /* optional */
+	pf_driver_probe_func_t probe;
 	pf_driver_add_func_t add_dev;
+	pf_driver_match_func_t match;
 };
 UK_TAILQ_HEAD(pf_driver_list, struct pf_driver);
 
@@ -76,6 +87,7 @@ struct pf_device {
 	struct pf_driver     *drv;
 	enum pf_device_state state;
 
+	int fdt_offset;	/* The start offset of fdt node for device */
 	uint64_t base;
 	unsigned long irq;
 };
@@ -87,12 +99,16 @@ UK_TAILQ_HEAD(pf_device_list, struct pf_device);
 
 #define _PF_REGFNNAME(x, y)      x##y
 
+#define PF_REGISTER_CTOR(CTOR)				\
+		UK_CTOR_FUNC(1, CTOR)
+
 #define _PF_REGISTER_DRIVER(libname, b)				\
-	static void __constructor_prio(105)				\
+	static void						\
 	_PF_REGFNNAME(libname, _pf_register_driver)(void)		\
 	{								\
 		_pf_register_driver((b));				\
-	}
+	}								\
+	PF_REGISTER_CTOR(_PF_REGFNNAME(libname, _pf_register_driver))
 
 /* Do not use this function directly: */
 void _pf_register_driver(struct pf_driver *drv);
