@@ -42,12 +42,16 @@
 #include <uk/plat/irq.h>
 #include <uk/bus.h>
 #include <uk/bitops.h>
+#include <libfdt.h>
+#include <ofw/fdt.h>
+#include <kvm/config.h>
 
 #include <platform_bus.h>
 #include <virtio/virtio_config.h>
 #include <virtio/virtio_bus.h>
 #include <virtio/virtqueue.h>
 #include <virtio/virtio_mmio.h>
+#include <gic/gic-v2.h>
 
 /* The alignment to use between consumer and producer parts of vring.
  * Currently hardcoded to the page size. */
@@ -389,6 +393,48 @@ static struct virtio_config_ops virtio_mmio_config_ops = {
 	.vq_setup	= vm_setup_vq,
 };
 
+static int virtio_mmio_probe(struct pf_device *pfdev)
+{
+	const fdt32_t *prop;
+	int type, hwirq, prop_len;
+	int fdt_vm = pfdev->fdt_offset;
+	__u64 reg_base;
+	__u64 reg_size;
+
+	if (fdt_vm == -FDT_ERR_NOTFOUND) {
+		uk_pr_info("device not found in fdt\n");
+		goto error_exit;
+	} else {
+		prop = fdt_getprop(_libkvmplat_cfg.dtb, fdt_vm, "interrupts", &prop_len);
+		if (!prop) {
+			uk_pr_err("irq of device not found in fdt\n");
+			goto error_exit;
+		}
+
+		type = fdt32_to_cpu(prop[0]);
+		hwirq = fdt32_to_cpu(prop[1]);
+
+		prop = fdt_getprop(_libkvmplat_cfg.dtb, fdt_vm, "reg", &prop_len);
+		if (!prop) {
+			uk_pr_err("reg of device not found in fdt\n");
+			goto error_exit;
+		}
+
+		/* only care about base addr, ignore the size */
+		fdt_get_address(_libkvmplat_cfg.dtb, fdt_vm, 0,
+					&reg_base, &reg_size);
+	}
+
+	pfdev->base = reg_base;
+	pfdev->irq = gic_irq_translate(type, hwirq);
+	uk_pr_info("virtio mmio probe base(0x%lx) irq(%ld)\n",
+				pfdev->base, pfdev->irq);
+	return 0;
+
+error_exit:
+	return -EFAULT;
+}
+
 static int virtio_mmio_add_dev(struct pf_device *pfdev)
 {
 	struct virtio_mmio_device *vm_dev;
@@ -401,7 +447,8 @@ static int virtio_mmio_add_dev(struct pf_device *pfdev)
 	vm_dev = uk_malloc(a, sizeof(*vm_dev));
 	if (!vm_dev) {
 		uk_pr_err("Failed to allocate virtio-pci device\n");
-		return -ENOMEM;
+		rc = -ENOMEM;
+		goto free_vmdev;
 	}
 
 	/* Fetch Pf Device information */
@@ -410,20 +457,24 @@ static int virtio_mmio_add_dev(struct pf_device *pfdev)
 	vm_dev->vdev.cops = &virtio_mmio_config_ops;
 	vm_dev->name = "virtio_mmio";
 
-	if (vm_dev->base == NULL)
-		return -EFAULT;
+	if (vm_dev->base == NULL) {
+		rc = -EFAULT;
+		goto free_vmdev;
+	}
 
 	magic = virtio_cread32(vm_dev->base, VIRTIO_MMIO_MAGIC_VALUE);
 	if (magic != ('v' | 'i' << 8 | 'r' << 16 | 't' << 24)) {
 		uk_pr_err("Wrong magic value 0x%x!\n", magic);
-		return -ENODEV;
+		rc = -ENODEV;
+		goto free_vmdev;
 	}
 
 	/* Check device version */
 	vm_dev->version = virtio_cread32(vm_dev->base, VIRTIO_MMIO_VERSION);
 	if (vm_dev->version < 1 || vm_dev->version > 2) {
 		uk_pr_err("Version %ld not supported!\n", vm_dev->version);
-		return -ENXIO;
+		rc = -ENXIO;
+		goto free_vmdev;
 	}
 
 	vm_dev->vdev.id.virtio_device_id = virtio_cread32(vm_dev->base, VIRTIO_MMIO_DEVICE_ID);
@@ -434,7 +485,8 @@ static int virtio_mmio_add_dev(struct pf_device *pfdev)
 		 */
 		uk_pr_err("virtio_device_id is 0\n");
 
-		return -ENODEV;
+		rc = -ENODEV;
+		goto free_vmdev;
 	}
 	vm_dev->id.vendor = virtio_cread32(vm_dev->base, VIRTIO_MMIO_VENDOR_ID);
 
@@ -443,17 +495,15 @@ static int virtio_mmio_add_dev(struct pf_device *pfdev)
 	rc = virtio_bus_register_device(&vm_dev->vdev);
 	if (rc != 0) {
 		uk_pr_err("Failed to register the virtio device: %d\n", rc);
-		goto free_pf_dev;
+		goto free_vmdev;
 	}
 
-	uk_pr_info("finish add a virtio mmio dev\n");
-
-	return rc;
-
-free_pf_dev:
-	uk_free(a, vm_dev);
+	uk_pr_info("finish probing a virtio mmio dev\n");
 
 	return 0;
+
+free_vmdev:
+	return rc;
 }
 
 static int virtio_mmio_drv_init(struct uk_alloc *drv_allocator)
@@ -467,14 +517,35 @@ static int virtio_mmio_drv_init(struct uk_alloc *drv_allocator)
 	return 0;
 }
 
-static const struct pf_device_id virtio_mmio_ids = {
+static const struct device_match_table virtio_mmio_match_table[];
+
+static int virtio_mmio_id_match_compatible(const char *compatible)
+{
+	int i;
+
+	for (i = 0; virtio_mmio_match_table[i].compatible != NULL; i++)
+		if (strcmp(virtio_mmio_match_table[i].compatible, compatible) == 0)
+			return virtio_mmio_match_table[i].id->device_id;
+
+	return -1;
+}
+
+static struct pf_device_id virtio_mmio_ids = {
 		.device_id = VIRTIO_MMIO_ID
 };
 
 static struct pf_driver virtio_mmio_drv = {
 	.device_ids = &virtio_mmio_ids,
 	.init = virtio_mmio_drv_init,
-	.add_dev = virtio_mmio_add_dev
+	.probe = virtio_mmio_probe,
+	.add_dev = virtio_mmio_add_dev,
+	.match = virtio_mmio_id_match_compatible
+};
+
+static const struct device_match_table virtio_mmio_match_table[] = {
+	{ .compatible = "virtio,mmio",
+	  .id = &virtio_mmio_ids },
+	{NULL}
 };
 
 PF_REGISTER_DRIVER(&virtio_mmio_drv);
