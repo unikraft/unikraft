@@ -38,13 +38,17 @@
 #include <arm/cpu_defs.h>
 /*
  * The following is the Memory Layout of AArch64 Virtual Machine
- * | 0 - 0x3FFFFFFF |   0x40000000 - 0x7FFFFFFFFF           |  512GB - 1TB   |
- * --------------------------------------------------------------------------
- * |  DEVICES MMIO  | DTB|TEXT|DATA|BSS|PAGETABLE|BOOTSTACK | PCI-e High Mem |
- * --------------------------------------------------------------------------
+ * | 0-0x7FFFFFF | 0x8000000-0x3FFFFFFF | 0x40000000-0x7FFFFFFFFF | 512GB-1TB |
+ * ----------------------------------------------------------------------------
+ * | HOLE        | DEVICES MMIO         | <1>                     | <2>       |
+ * ----------------------------------------------------------------------------
+ * <1> DTB|TEXT|DATA|BSS|PAGETABLE|BOOTSTACK
+ * <2> PCI-e High Mem
  */
-#define DEVICE_ADDR_START 0
-#define DEVICE_ADDR_SIZE  0x40000000
+#define HOLE_START 0
+#define HOLE_MEM_ENTRIES  64 /* 128M */
+#define DEVICE_ADDR_START 0x8000000
+#define DEVICE_ENTRIES    448 /* 512-64 */
 #define RAM_ADDR_START    0x40000000
 #define RAM_L2_ENTRIES    255
 #define RAM_ADDR_SIZE     (0x40000000 * RAM_L2_ENTRIES)
@@ -83,14 +87,29 @@ ENTRY(create_pagetables)
 	bl  link_l0_pagetable
 
 	/*
-	 * Using 1GiB block to map device address space (0x0 ~ 0x3fffffff)
+	 * Using 1GiB block to map the hole memory (0x0 ~ 0x7ffffff) and device
+	 * address space (0x0 ~ 0x3fffffff)
 	 */
-	add x6, x14, #L1_TABLE_OFFSET
+	/* Build a L2 block pagetable */
+	add x6, x14, #L2_TABLE_OFFSET
+	ldr x7, =0 /* NONE ATTR*/
+	mov x8, #HOLE_START
+	mov x9, x8
+	ldr x10, =HOLE_MEM_ENTRIES
+	bl  build_l2_block_pagetable
+
+	add x6, x14, #L2_TABLE_OFFSET
 	ldr x7, =SECT_ATTR_DEVICE_nGnRE
 	mov x8, #DEVICE_ADDR_START
 	mov x9, x8
-	mov x10, #1
-	bl  build_l1_block_pagetable
+	ldr x10, =DEVICE_ENTRIES
+	bl  build_l2_block_pagetable
+
+	/* Link this L2 block pagetable to L1 entry */
+	add x6, x14, #L1_TABLE_OFFSET
+	mov x8, #HOLE_START
+	add x9, x14, #L2_TABLE_OFFSET
+	bl  link_l1_pagetable
 
 	/*
 	 * Using 1GiB block to map RAM address space
@@ -135,6 +154,7 @@ ENTRY(create_pagetables)
 	 */
 	/* 1st: Build a L2 block pagetable */
 	add x6, x14, #L2_TABLE_OFFSET
+	add x6, x6, #__PAGE_SIZE
 	ldr x7, =SECT_ATTR_NORMAL
 	mov x8, #RAM_ADDR_START
 	mov x9, x8
@@ -145,6 +165,7 @@ ENTRY(create_pagetables)
 	add x6, x14, #L1_TABLE_OFFSET
 	mov x8, #RAM_ADDR_START
 	add x9, x14, #L2_TABLE_OFFSET
+	add x9, x9, #__PAGE_SIZE
 	bl  link_l1_pagetable
 
 	/* 3rd: Build a L3 pagetable for image occupied memory */
@@ -160,6 +181,7 @@ ENTRY(create_pagetables)
 
 	/* 4th: Link this L3 pagetable to L2 entry */
 	add x6, x14, #L2_TABLE_OFFSET
+	add x6, x6, #__PAGE_SIZE
 1:
 	mov x8, x17
 	mov x9, x16
