@@ -67,6 +67,7 @@
 #include <uk/bus.h>
 #include <uk/alloc.h>
 #include <uk/ctors.h>
+#include <pci/pci_ecam.h>
 
 /**
  * A structure describing an ID for a PCI driver. Each driver provides a
@@ -148,7 +149,7 @@ struct pci_device {
 	struct pci_driver     *drv;
 	enum pci_device_state state;
 
-	uint16_t base;
+	unsigned long base;
 	unsigned long irq;
 };
 
