@@ -54,6 +54,8 @@ static const char * const arch_timer_list[] = {
 	NULL
 };
 
+static uint32_t timer_irq;
+
 void generic_timer_mask_irq(void)
 {
 	set_el0(cntv_ctl, get_el0(cntv_ctl) | GT_TIMER_MASK_IRQ);
@@ -139,6 +141,8 @@ void ukplat_time_init(void)
 	rc = ukplat_irq_register(irq, generic_timer_irq_handler, NULL);
 	if (rc < 0)
 		UK_CRASH("Failed to register timer interrupt handler\n");
+	else
+		timer_irq = irq;
 
 	/*
 	 * Mask IRQ before scheduler start working. Otherwise we will get
@@ -148,4 +152,9 @@ void ukplat_time_init(void)
 
 	/* Enable timer */
 	generic_timer_enable();
+}
+
+uint32_t ukplat_time_get_irq(void)
+{
+	return timer_irq;
 }

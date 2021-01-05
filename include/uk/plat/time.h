@@ -35,6 +35,7 @@
 #define __UKPLAT_TIME_H__
 
 #include <uk/arch/time.h>
+#include <stdint.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -42,6 +43,7 @@ extern "C" {
 
 void ukplat_time_init(void);
 void ukplat_time_fini(void);
+uint32_t ukplat_time_get_irq(void);
 
 __nsec ukplat_monotonic_clock(void);
 __nsec ukplat_wall_clock(void);
