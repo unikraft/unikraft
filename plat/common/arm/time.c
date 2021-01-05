@@ -105,6 +105,11 @@ void time_block_until(__nsec until)
 	}
 }
 
+__nsec ukplat_time_get_ticks(void)
+{
+	return generic_timer_get_ticks();
+}
+
 /* must be called before interrupts are enabled */
 void ukplat_time_init(void)
 {
