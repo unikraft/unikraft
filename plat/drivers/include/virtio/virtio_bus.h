@@ -240,7 +240,7 @@ static inline void virtio_feature_set(struct virtio_dev *vdev, __u32 feature)
  * @param type_len
  *	The data type of the configuration data.
  * @return int
- *	0, on successful reading the configuration space.
+ *	>= 0, on successful reading the configuration space.
  *	< 0, on error.
  */
 static inline int virtio_config_get(struct virtio_dev *vdev, __u16 offset,
