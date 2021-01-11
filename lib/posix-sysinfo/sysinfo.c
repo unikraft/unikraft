@@ -117,7 +117,7 @@ UK_SYSCALL_R_DEFINE(int, uname, struct utsname *, buf)
 	return 0;
 }
 
-int sethostname(const char *name, size_t len)
+UK_SYSCALL_DEFINE(int, sethostname, const char*, name, size_t, len)
 {
 	if (name == NULL) {
 		errno = EFAULT;
