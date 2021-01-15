@@ -25,4 +25,9 @@ if LIBDEVFS
 		default y if LIBDEVFS_AUTOMOUNT
 		select LIBDEVFS_DEV_NULL_ZERO
 		default n
+
+	config LIBDEVFS_DEV_STDOUT
+		bool "Register stdout device"
+		default y if LIBDEVFS_AUTOMOUNT
+		default n
 endif
