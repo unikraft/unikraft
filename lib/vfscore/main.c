@@ -1899,7 +1899,7 @@ UK_TRACEPOINT(trace_vfs_utimensat, "\"%s\"", const char*);
 UK_TRACEPOINT(trace_vfs_utimensat_ret, "");
 UK_TRACEPOINT(trace_vfs_utimensat_err, "%d", int);
 
-int utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags)
+UK_SYSCALL_DEFINE(int, utimensat, int, dirfd, const char*, pathname, const struct timespec*, times, int, flags)
 {
 	int error;
 
