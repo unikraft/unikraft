@@ -176,6 +176,8 @@ pipe2
 mkfifo
 futimes
 futimesat
+uk_syscall_e_utimensat
+uk_syscall_r_utimensat
 utimensat
 futimens
 utimes
