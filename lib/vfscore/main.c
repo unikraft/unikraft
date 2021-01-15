@@ -1838,7 +1838,7 @@ int futimes(int fd, const struct timeval times[2])
     return futimesat(fd, NULL, times);
 }
 
-int futimesat(int dirfd, const char *pathname, const struct timeval times[2])
+UK_SYSCALL_DEFINE(int, futimesat, int, dirfd, const char*, pathname, const struct timeval*, times)
 {
 	struct stat st;
 	struct vfscore_file *fp;
@@ -1892,7 +1892,7 @@ int futimesat(int dirfd, const char *pathname, const struct timeval times[2])
 		goto out_errno;
 	return 0;
 
-	out_errno:
+out_errno:
 	errno = error;
 	return -1;
 }
