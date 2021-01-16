@@ -36,6 +36,9 @@
 #include <uk/arch/lcpu.h>
 #include <uk/arch/time.h>
 #include <uk/plat/thread.h>
+#if CONFIG_LIBUKSIGNAL
+#include <uk/uk_signal.h>
+#endif
 #include <uk/thread_attr.h>
 #include <uk/wait_types.h>
 #include <uk/list.h>
@@ -61,6 +64,9 @@ struct uk_thread {
 	void *prv;
 #ifdef CONFIG_LIBNEWLIBC
 	struct _reent reent;
+#endif
+#if CONFIG_LIBUKSIGNAL
+	struct uk_thread_sig signals_container;
 #endif
 };
 

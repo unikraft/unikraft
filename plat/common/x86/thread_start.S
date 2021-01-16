@@ -26,6 +26,7 @@
  */
 /* Taken from Mini-OS arch/x86/x86_64.S */
 
+#include <uk/config.h>
 #include <uk/plat/common/sw_ctx.h>
 
 #define ENTRY(X) .globl X ; X :
@@ -55,6 +56,12 @@ ENTRY(asm_sw_ctx_switch)
 	lea .Lreturn(%rip), %rbx
 	movq %rbx, OFFSETOF_SW_CTX_IP(%rdi)       /* save EIP */
 	pushq OFFSETOF_SW_CTX_IP(%rsi)            /* restore EIP */
+
+#if CONFIG_LIBUKSIGNAL
+	/* TODO: do we need to save regs? (e.g fpu) */
+	/* stack is aligned here */
+	call uk_sig_handle_signals
+#endif
 	ret
 .Lreturn:
 	popq %r15

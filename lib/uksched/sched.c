@@ -42,6 +42,9 @@
 #if CONFIG_LIBUKSCHEDCOOP
 #include <uk/schedcoop.h>
 #endif
+#if CONFIG_LIBUKSIGNAL
+#include <uk/uk_signal.h>
+#endif
 
 struct uk_sched *uk_sched_head;
 
@@ -49,6 +52,10 @@ struct uk_sched *uk_sched_head;
 struct uk_sched *uk_sched_default_init(struct uk_alloc *a)
 {
 	struct uk_sched *s = NULL;
+
+#if CONFIG_LIBUKSIGNAL
+	uk_proc_sig_init(&uk_proc_sig);
+#endif
 
 #if CONFIG_LIBUKSCHEDCOOP
 	s = uk_schedcoop_init(a);

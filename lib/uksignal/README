@@ -1,0 +1,7 @@
+This library provides a basic implementation of signals over
+Unikraft. It supports signals between threads and process wide
+signals.
+
+It doesn't support signal codes, rt signals and executes the signal
+handlers on the thread stack. It is also not yet integrated with our
+irqs to deliver signals like SIGSEGV.

@@ -89,6 +89,11 @@ int unlink(const char *pathname);
 off_t lseek(int fd, off_t offset, int whence);
 #endif
 
+#if CONFIG_LIBUKSIGNAL
+unsigned int alarm(unsigned int seconds);
+int pause(void);
+#endif /* CONFIG_LIBUKSIGNAL */
+
 #define STDIN_FILENO	0	/* standard input file descriptor */
 #define STDOUT_FILENO	1	/* standard output file descriptor */
 #define STDERR_FILENO	2	/* standard error file descriptor */

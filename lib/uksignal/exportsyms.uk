@@ -1,0 +1,31 @@
+# uk_signal.h
+uk_proc_sig
+
+uk_sig_handle_signals
+uk_proc_sig_init
+uk_thread_sig_init
+uk_thread_sig_uninit
+uk_sig_thread_kill
+uk_thread_sigmask
+
+# signal.h
+sigaction
+signal
+sigprocmask
+sigsuspend
+sigpending
+sigwait
+kill
+raise
+siginterrupt
+
+# sigset.h
+sigemptyset
+sigfillset
+sigaddset
+sigdelset
+sigismember
+
+# unistd.h
+alarm
+pause

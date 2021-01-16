@@ -1,9 +1,12 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ * Authors:  Mihai Pogonaru <pogonarumihai@gmail.com>
+ *		     Teodora Serbanescu <teo.serbanescu16@gmail.com>
+ *		     Felipe Huici <felipe.huici@neclab.eu>
+ *		     Bernard Rizzo <b.rizzo@student.uliege.be>
  *
- *
- * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2021, University Politehnica of Bucharest.
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,55 +33,29 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
-
-#ifndef __STRING_H__
-#define __STRING_H__
+#ifndef __UK_SIGSET_H__
+#define __UK_SIGSET_H__
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#define __NEED_NULL
-#define __NEED_size_t
-#include <nolibc-internal/shareddefs.h>
-
-void *memcpy(void *dst, const void *src, size_t len);
-void *memset(void *ptr, int val, size_t len);
-void *memchr(const void *ptr, int val, size_t len);
-void *memrchr(const void *m, int c, size_t n);
-int memcmp(const void *ptr1, const void *ptr2, size_t len);
-void *memmove(void *dst, const void *src, size_t len);
-
-char *strncpy(char *dst, const char *src, size_t len);
-char *strcpy(char *dst, const char *src);
-size_t strlcpy(char *d, const char *s, size_t n);
-size_t strlcat(char *d, const char *s, size_t n);
-size_t strnlen(const char *str, size_t maxlen);
-size_t strlen(const char *str);
-char *strchrnul(const char *s, int c);
-char *strchr(const char *str, int c);
-char *strrchr(const char *s, int c);
-int strncmp(const char *str1, const char *str2, size_t len);
-int strcmp(const char *str1, const char *str2);
-size_t strcspn(const char *s, const char *c);
-size_t strspn(const char *s, const char *c);
-char *strtok(char *restrict s, const char *restrict sep);
-char *strtok_r(char *restrict s, const char *restrict sep, char **restrict p);
-char *strndup(const char *str, size_t len);
-char *strdup(const char *str);
-
-char *strerror_r(int errnum, char *buf, size_t buflen);
-char *strerror(int errnum);
-
-#if CONFIG_LIBUKSIGNAL
-char *strsignal(int sig);
-#endif /* CONFIG_LIBUKSIGNAL */
-
+/* TODO: do we have gnu statement expression?  */
+/* internal use */
+#define uk_sigemptyset(ptr)	(*(ptr) = 0)
+#define uk_sigfillset(ptr)  (*(ptr) = ~((__sigset_t) 0))
+#define uk_sigaddset(ptr, signo) (*(ptr) |= (1 << ((signo) - 1)))
+#define uk_sigdelset(ptr, signo) (*(ptr) &= ~(1 << ((signo) - 1)))
+#define uk_sigcopyset(ptr1, ptr2) (*(ptr1) = *(ptr2))
+#define uk_sigandset(ptr1, ptr2)  (*(ptr1) &= *(ptr2))
+#define uk_sigorset(ptr1, ptr2)	  (*(ptr1) |= *(ptr2))
+#define uk_sigreverseset(ptr)	  (*(ptr) = ~(*(ptr)))
+#define uk_sigismember(ptr, signo) (*(ptr) & (1 << ((signo) - 1)))
+#define uk_sigisempty(ptr) (*(ptr) == 0)
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __STRING_H__ */
+#endif /* __UK_SIGSET_H__ */

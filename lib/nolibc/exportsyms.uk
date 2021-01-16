@@ -74,6 +74,12 @@ strlcat
 strerror_r
 strerror
 
+# strsignal
+strsignal
+
+#psignal
+psignal
+
 # ctype
 _nolibc_ctype
 
