@@ -267,7 +267,7 @@ UK_SYSCALL_DEFINE(pid_t, getpgid, pid_t, pid)
 	return UNIKRAFT_PGID;
 }
 
-pid_t getpgrp(void)
+UK_SYSCALL_R_DEFINE(pid_t, getpgrp)
 {
 	return UNIKRAFT_PGID;
 }

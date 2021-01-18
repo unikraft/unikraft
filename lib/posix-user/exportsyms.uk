@@ -43,3 +43,6 @@ uk_syscall_r_setpriority
 getpriority
 uk_syscall_e_getpriority
 uk_syscall_r_getpriority
+getpgrp
+uk_syscall_e_getpgrp
+uk_syscall_r_getpgrp
