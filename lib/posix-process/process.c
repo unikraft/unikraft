@@ -300,7 +300,7 @@ int nice(int inc __unused)
 	return -1;
 }
 
-int getpriority(int which, id_t who)
+UK_SYSCALL_DEFINE(int, getpriority, int, which, id_t, who)
 {
 	int rc = 0;
 
