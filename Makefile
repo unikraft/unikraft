@@ -628,7 +628,7 @@ $(eval $(call verbose_include,$(CONFIG_UK_BASE)/Makefile.uk)) # Unikraft base
 
 ifeq ($(call qstrip,$(UK_PLATS) $(UK_PLATS-y)),)
 $(warning You did not choose any target platform.)
-$(warning Please choose at least one target platform in the configuration!)
+$(error Please choose at least one target platform in the configuration!)
 endif
 ifneq ($(CONFIG_HAVE_BOOTENTRY),y)
 $(error You did not select a library that handles bootstrapping! (e.g., ukboot))
