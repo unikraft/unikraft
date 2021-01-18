@@ -257,7 +257,7 @@ int setpgid(pid_t pid, pid_t pgid)
 	return 0;
 }
 
-pid_t getpgid(pid_t pid)
+UK_SYSCALL_DEFINE(pid_t, getpgid, pid_t, pid)
 {
 	if (pid != 0) {
 		/* We support only calls for the only calling "process" */
