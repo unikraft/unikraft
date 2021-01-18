@@ -40,3 +40,6 @@ uk_syscall_r_getsid
 setpriority
 uk_syscall_e_setpriority
 uk_syscall_r_setpriority
+getpriority
+uk_syscall_e_getpriority
+uk_syscall_r_getpriority
