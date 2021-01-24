@@ -34,3 +34,6 @@ uk_syscall_r_setpgid
 setsid
 uk_syscall_e_setsid
 uk_syscall_r_setsid
+getsid
+uk_syscall_e_getsid
+uk_syscall_r_getsid

@@ -232,7 +232,7 @@ UK_SYSCALL_DEFINE(pid_t, setsid)
 	return (pid_t) -1;
 }
 
-pid_t getsid(pid_t pid)
+UK_SYSCALL_DEFINE(pid_t, getsid, pid_t, pid)
 {
 	if (pid != 0) {
 		/* We support only calls for the only calling "process" */
