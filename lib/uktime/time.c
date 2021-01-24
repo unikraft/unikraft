@@ -70,7 +70,7 @@ static void __spin_wait(__nsec nsec)
 }
 #endif
 
-int nanosleep(const struct timespec *req, struct timespec *rem)
+UK_SYSCALL_DEFINE(int, nanosleep, const struct timespec*, req, struct timespec*, rem)
 {
 	__nsec before, after, diff, nsec;
 
