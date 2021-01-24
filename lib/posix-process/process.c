@@ -242,7 +242,7 @@ pid_t getsid(pid_t pid)
 	return UNIKRAFT_SID;
 }
 
-int setpgid(pid_t pid, pid_t pgid)
+UK_SYSCALL_DEFINE(int, setpgid, pid_t, pid, pid_t, pgid)
 {
 	if (pid != 0) {
 		/* We support only calls for the only calling "process" */
