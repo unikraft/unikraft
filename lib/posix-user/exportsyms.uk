@@ -37,3 +37,6 @@ uk_syscall_r_setsid
 getsid
 uk_syscall_e_getsid
 uk_syscall_r_getsid
+setpriority
+uk_syscall_e_setpriority
+uk_syscall_r_setpriority

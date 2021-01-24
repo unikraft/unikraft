@@ -325,7 +325,7 @@ int getpriority(int which, id_t who)
 	return rc;
 }
 
-int setpriority(int which, id_t who, int prio)
+UK_SYSCALL_DEFINE(int, setpriority, int, which, id_t, who, int, prio)
 {
 	int rc = 0;
 
@@ -345,7 +345,7 @@ int setpriority(int which, id_t who, int prio)
 			rc = -1;
 		}
 		break;
-	default:
+default:
 		errno = EINVAL;
 		rc = -1;
 		break;
