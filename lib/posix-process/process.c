@@ -225,7 +225,7 @@ UK_SYSCALL_R_DEFINE(pid_t, getppid)
 	return UNIKRAFT_PPID;
 }
 
-pid_t setsid(void)
+UK_SYSCALL_DEFINE(pid_t, setsid)
 {
 	/* We have a single "session" with a single "process" */
 	errno = EPERM;
