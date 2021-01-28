@@ -301,7 +301,7 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset)
 
 	bytes = preadv(fd, &iov, 1, offset);
 	if (bytes < 0)
-		goto out_error;
+		goto out_errno;
 
 	trace_vfs_pread_ret(bytes);
 	return bytes;
