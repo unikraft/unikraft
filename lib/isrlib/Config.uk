@@ -1,0 +1,4 @@
+config LIBISRLIB
+    bool "isrlib: Interrupt-safe standard routines"
+    default n
+    select LIBNOLIBC if !HAVE_LIBC
