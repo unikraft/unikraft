@@ -12,6 +12,8 @@ getpwuid
 getgrnam
 setgid
 setuid
+uk_syscall_e_setuid
+uk_syscall_r_setuid
 issetugid
 initgroups
 uk_syscall_e_getpid
