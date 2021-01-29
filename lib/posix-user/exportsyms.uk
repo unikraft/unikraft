@@ -14,6 +14,8 @@ uk_syscall_r_getuid
 getpwuid
 getgrnam
 setgid
+uk_syscall_e_setgid
+uk_syscall_r_setgid
 setuid
 uk_syscall_e_setuid
 uk_syscall_r_setuid
