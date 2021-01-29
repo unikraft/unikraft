@@ -6,6 +6,8 @@ geteuid
 uk_syscall_e_geteuid
 uk_syscall_r_geteuid
 getuid
+uk_syscall_e_getuid
+uk_syscall_r_getuid
 getpwuid
 getpwnam
 getgrnam
