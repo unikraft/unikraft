@@ -18,3 +18,6 @@ uk_syscall_r_getppid
 getpgid
 uk_syscall_e_getpgid
 uk_syscall_r_getpgid
+getegid
+uk_syscall_e_getegid
+uk_syscall_r_getegid

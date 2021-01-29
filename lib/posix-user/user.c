@@ -44,6 +44,7 @@
 #include <uk/ctors.h>
 #include <uk/print.h>
 #include <uk/user.h>
+#include <uk/syscall.h>
 
 #define UK_DEFAULT_UID    0
 #define UK_DEFAULT_GID    0
@@ -205,7 +206,7 @@ int issetugid(void)
 	return 0;
 }
 
-gid_t getegid(void)
+UK_SYSCALL_R_DEFINE(gid_t, getegid)
 {
 	return 0;
 }
