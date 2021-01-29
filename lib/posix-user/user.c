@@ -90,7 +90,7 @@ static void init_posix_user(void)
 }
 UK_CTOR_FUNC(2, init_posix_user);
 
-uid_t getuid(void)
+UK_SYSCALL_R_DEFINE(uid_t, getuid)
 {
 	return 0;
 }
