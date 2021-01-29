@@ -31,7 +31,6 @@
  */
 #include <string.h>
 #include <uk/swrand.h>
-#include <uk/ctors.h>
 #include <uk/config.h>
 #include <uk/print.h>
 #include <uk/init.h>
@@ -76,7 +75,7 @@ ssize_t uk_swrand_fill_buffer(void *buf, size_t buflen)
 	return buflen;
 }
 
-static void _uk_swrand_ctor(void)
+static int _uk_swrand_init(void)
 {
 	unsigned int i;
 #ifdef CONFIG_LIBUKSWRAND_CHACHA
@@ -92,6 +91,8 @@ static void _uk_swrand_ctor(void)
 		seedv[i] = uk_swrandr_gen_seed32();
 
 	uk_swrand_init_r(&uk_swrand_def, seedc, seedv);
+
+	return seedc;
 }
 
-uk_early_initcall(_uk_swrand_ctor);
+uk_early_initcall(_uk_swrand_init);
