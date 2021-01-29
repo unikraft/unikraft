@@ -23,3 +23,6 @@ uk_syscall_r_getpgid
 getegid
 uk_syscall_e_getegid
 uk_syscall_r_getegid
+getgid
+uk_syscall_e_getgid
+uk_syscall_r_getgid

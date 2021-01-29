@@ -191,7 +191,7 @@ struct passwd *getpwent(void)
 	return pwd;
 }
 
-gid_t getgid(void)
+UK_SYSCALL_R_DEFINE(gid_t, getgid)
 {
 	return 0;
 }
