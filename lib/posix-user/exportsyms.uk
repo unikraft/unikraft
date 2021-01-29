@@ -75,3 +75,6 @@ getgrnam_r
 setgrent
 endgrent
 getgrent
+getgroups
+uk_syscall_e_getgroups
+uk_syscall_r_getgroups

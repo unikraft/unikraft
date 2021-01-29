@@ -263,7 +263,7 @@ int initgroups(const char *user __unused, gid_t group __unused)
 	return 0;
 }
 
-int getgroups(int size __unused, gid_t list[] __unused)
+UK_SYSCALL_R_DEFINE(int, getgroups, int, size, gid_t*, list)
 {
 	return 0;
 }
