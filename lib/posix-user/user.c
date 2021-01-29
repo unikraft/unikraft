@@ -113,7 +113,7 @@ int getresuid(uid_t *ruid __unused, uid_t *euid __unused, uid_t *suid __unused)
 	return 0;
 }
 
-int setresuid(uid_t ruid __unused, uid_t euid __unused, uid_t suid __unused)
+UK_SYSCALL_R_DEFINE(int, setresuid, uid_t, ruid, uid_t, euid, uid_t, suid)
 {
 	return 0;
 }
