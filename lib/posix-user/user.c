@@ -252,7 +252,7 @@ int setresgid(gid_t rgid, gid_t egid, gid_t sgid)
 	return 0;
 }
 
-int setregid(gid_t rgid __unused, gid_t egid __unused)
+UK_SYSCALL_R_DEFINE(int, setregid, gid_t, rgid, gid_t, egid)
 {
 	return 0;
 }
