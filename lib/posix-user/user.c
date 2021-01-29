@@ -100,7 +100,7 @@ int setuid(uid_t uid __unused)
 	return 0;
 }
 
-uid_t geteuid(void)
+UK_SYSCALL_R_DEFINE(uid_t, geteuid)
 {
 	return 0;
 }
