@@ -61,7 +61,6 @@ uk_syscall_r_getpgrp
 seteuid
 getresuid
 setresuid
-setreuid
 setpwent
 endpwent
 getpwnam_r
@@ -82,3 +81,6 @@ uk_syscall_r_getgroups
 getresgid
 uk_syscall_e_getresgid
 uk_syscall_r_getresgid
+setreuid
+uk_syscall_e_setreuid
+uk_syscall_r_setreuid
