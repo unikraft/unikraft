@@ -229,11 +229,10 @@ int setegid(gid_t egid __unused)
 	return 0;
 }
 
-int getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid)
+UK_SYSCALL_R_DEFINE(int, getresgid, gid_t*, rgid, gid_t*, egid, gid_t*, sgid)
 {
 	if (!rgid || !egid || !sgid) {
-		errno = EFAULT;
-		return -1;
+		return -EFAULT;
 	}
 
 	*rgid = *egid = *sgid = UK_DEFAULT_GID;
