@@ -245,13 +245,12 @@ UK_SYSCALL_R_DEFINE(int, getresgid, gid_t*, rgid, gid_t*, egid, gid_t*, sgid)
 	return 0;
 }
 
-int setresgid(gid_t rgid, gid_t egid, gid_t sgid)
+UK_SYSCALL_R_DEFINE(int, setresgid, gid_t, rgid, gid_t, egid, gid_t, sgid)
 {
 	/* We allow only UK_DEFAULT_GID */
 	if (rgid != UK_DEFAULT_GID || egid != UK_DEFAULT_GID ||
 			sgid != UK_DEFAULT_GID) {
-		errno = EINVAL;
-		return -1;
+		return -EINVAL;
 	}
 
 	return 0;

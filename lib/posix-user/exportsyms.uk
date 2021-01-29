@@ -68,7 +68,6 @@ getpwnam_r
 getpwuid_r
 getpwent
 setegid
-setresgid
 setregid
 getgroups
 getgrnam_r
@@ -96,3 +95,6 @@ uk_syscall_r_setresuid
 getresuid
 uk_syscall_e_getresuid
 uk_syscall_r_getresuid
+setresgid
+uk_syscall_e_setresgid
+uk_syscall_r_setresgid
