@@ -70,7 +70,6 @@ setegid
 setresgid
 setregid
 getgroups
-setgroups
 getgrnam_r
 setgrent
 endgrent
@@ -87,3 +86,6 @@ uk_syscall_r_setreuid
 setregid
 uk_syscall_e_setregid
 uk_syscall_r_setregid
+setgroups
+uk_syscall_e_setgroups
+uk_syscall_r_setgroups

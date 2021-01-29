@@ -267,7 +267,7 @@ UK_SYSCALL_R_DEFINE(int, getgroups, int, size, gid_t*, list)
 	return 0;
 }
 
-int setgroups(size_t size __unused, const gid_t *list __unused)
+UK_SYSCALL_R_DEFINE(int, setgroups, size_t, size, const gid_t*, list)
 {
 	return 0;
 }
