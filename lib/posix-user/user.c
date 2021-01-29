@@ -95,7 +95,7 @@ UK_SYSCALL_R_DEFINE(uid_t, getuid)
 	return 0;
 }
 
-int setuid(uid_t uid __unused)
+UK_SYSCALL_R_DEFINE(int, setuid, uid_t, uid)
 {
 	return 0;
 }
