@@ -84,3 +84,6 @@ uk_syscall_r_getresgid
 setreuid
 uk_syscall_e_setreuid
 uk_syscall_r_setreuid
+setregid
+uk_syscall_e_setregid
+uk_syscall_r_setregid
