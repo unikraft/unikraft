@@ -209,7 +209,7 @@ UK_SYSCALL_R_DEFINE(gid_t, getgid)
 	return 0;
 }
 
-int setgid(gid_t gid __unused)
+UK_SYSCALL_R_DEFINE(int, setgid, gid_t, gid)
 {
 	return 0;
 }
