@@ -3,6 +3,8 @@ getppid
 getlogin
 getpwnam
 geteuid
+uk_syscall_e_geteuid
+uk_syscall_r_geteuid
 getuid
 getpwuid
 getpwnam
