@@ -390,6 +390,8 @@ ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset)
 	int bytes;
 
 	bytes = pwritev(fd, &iov, 1, offset);
+	if (bytes < 0)
+		goto out_errno;
 
 	trace_vfs_pwrite_ret(bytes);
 	return bytes;
