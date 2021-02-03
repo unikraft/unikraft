@@ -82,7 +82,7 @@ static int vfscore_rootfs(void)
 
 	uk_pr_info("Mount %s to /...\n", rootfs);
 	if (mount(rootdev, "/", rootfs, rootflags, rootopts) != 0) {
-		uk_pr_crit("Failed to mount /: %d\n", errno);
+		uk_pr_crit("Failed to mount %s (%s) at /: %d\n", rootdev, rootfs, errno);
 		return -1;
 	}
 
