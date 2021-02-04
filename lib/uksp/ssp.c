@@ -30,10 +30,11 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <uk/arch/limits.h>
+#include <uk/arch/lcpu.h>
 #include <uk/assert.h>
 #include <uk/config.h>
 #include <uk/ctors.h>
-#include <uk/thread.h>
 
 #ifdef CONFIG_LIBUKSP_VALUE_USECONSTANT
 const unsigned long __stack_chk_guard = CONFIG_LIBUKSP_VALUE_CONSTANT;
