@@ -62,6 +62,8 @@ COMPFLAGS-$(call gcc_version_ge,6,1)	+= -fno-PIC
 LDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 ifeq ($(call gcc_version_ge,10,0),y)
 COMPFLAGS-y += -fhosted -ffreestanding -fno-tree-loop-distribute-patterns
+LIBLDFLAGS-$(CONFIG_OPTIMIZE_LTO) += -flinker-output=nolto-rel
+LDFLAGS-$(CONFIG_OPTIMIZE_LTO) += -flinker-output=nolto-rel
 endif
 
 COMPFLAGS-$(call have_clang)	+= -fno-builtin -fno-PIC
