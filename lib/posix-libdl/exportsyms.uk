@@ -4,3 +4,4 @@ dlsym
 dlerror
 dladdr
 dlinfo
+dlvsym

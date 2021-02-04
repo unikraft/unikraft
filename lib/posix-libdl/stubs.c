@@ -67,3 +67,9 @@ int dlinfo(void *handle __unused, int request __unused, void *info __unused)
 {
 	return 0;
 }
+
+void *dlvsym(void *handle __unused, const char *symbol __unused,
+		const char *version __unused)
+{
+	return 0;
+}

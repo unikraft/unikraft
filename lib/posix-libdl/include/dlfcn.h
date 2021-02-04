@@ -58,6 +58,7 @@ typedef struct {
 } Dl_info;
 int dladdr(const void *, Dl_info *);
 int dlinfo(void *, int, void *);
+void *dlvsym(void *handle, const char *symbol, const char *version);
 
 #ifdef __cplusplus
 }
