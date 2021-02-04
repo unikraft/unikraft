@@ -42,7 +42,7 @@ endef
 # test whether GCC version is greater than or equal to the minimum requirement
 # gcc_version_ge $gcc_major,$gcc_minor
 define gcc_version_ge =
-$(shell if [ $(call have_gcc) = y ] ; then if [ $(CC_VER_MAJOR) -gt $(1) ] || ([ $(CC_VER_MAJOR) -eq $(1) ] && [ $(CC_VER_MINOR) -ge $(2) ]) ; then echo y ; fi ; fi)
+$(shell if [ $(call have_gcc) = y ] ; then if [ $(CC_VER_MAJOR) -gt $(1) ] || ([ $(CC_VER_MAJOR) -eq $(1) ] && [ $(CC_VER_MINOR) -ge $(2) ]) ; then echo -n y ; fi ; fi)
 endef
 
 # print error and stop build when GCC version doesn't meet the minimum requirement
