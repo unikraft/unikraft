@@ -72,9 +72,7 @@ char *strdup(const char *str);
 char *strerror_r(int errnum, char *buf, size_t buflen);
 char *strerror(int errnum);
 
-#if CONFIG_LIBUKSIGNAL
 char *strsignal(int sig);
-#endif /* CONFIG_LIBUKSIGNAL */
 
 
 #ifdef __cplusplus
