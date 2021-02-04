@@ -4,9 +4,11 @@
 #
 ################################################################################
 
-COMPFLAGS    += -nostdinc -nostdlib
+COMPFLAGS    += -nostdlib
 COMPFLAGS    += -U __linux__ -U __FreeBSD__ -U __sun__
-COMPFLAGS    += -fno-omit-frame-pointer -fno-tree-sra -fno-split-stack
+COMPFLAGS    += -fno-omit-frame-pointer
+COMPFLAGS-$(call have_gcc)	+= -fno-tree-sra -fno-split-stack -nostdinc
+
 ifneq ($(HAVE_STACKPROTECTOR),y)
 COMPFLAGS    += -fno-stack-protector
 endif
@@ -19,12 +21,14 @@ CINCLUDES    += -I$(CONFIG_UK_BASE)/include
 CXXINCLUDES  += -I$(CONFIG_UK_BASE)/include
 GOCINCLUDES  += -I$(CONFIG_UK_BASE)/include
 
-LIBLDFLAGS  += -nostdinc -nostdlib -Wl,-r -Wl,-d -Wl,--build-id=none -no-pie
+LIBLDFLAGS  += -nostdlib -Wl,-r -Wl,-d -Wl,--build-id=none -no-pie
+LIBLDFLAGS-$(call have_gcc)	+= -nostdinc
 
 # Set the text and data sections to be readable and writable. Also,
 # do not page-align the data segment. If the output format supports
 # Unix style magic numbers, mark the output as OMAGIC.
-LDFLAGS     += -nostdinc -nostdlib -Wl,--omagic -Wl,--build-id=none
+LDFLAGS	+= -nostdlib -Wl,--omagic -Wl,--build-id=none
+LDFLAGS-$(call have_gcc)	+= -nostdinc
 
 COMPFLAGS-$(CONFIG_OPTIMIZE_NONE)         += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
 COMPFLAGS-$(CONFIG_OPTIMIZE_SIZE)         += -Os
@@ -56,3 +60,6 @@ M4FLAGS      += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
 # "--enable-default-pie" by default.
 COMPFLAGS-$(call gcc_version_ge,6,1)	+= -fno-PIC
 LDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
+
+COMPFLAGS-$(call have_clang)	+= -fno-builtin -fno-PIC
+LDFLAGS-$(call have_clang)	+= -no-pie
