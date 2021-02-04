@@ -513,6 +513,7 @@ ifeq ($(sub_make_exec), 1)
 ifeq ($(UK_HAVE_DOT_CONFIG),y)
 # Hide troublesome environment variables from sub processes
 unexport CONFIG_CROSS_COMPILE
+unexport CONFIG_COMPILER
 #unexport CC
 #unexport LD
 #unexport AR
@@ -545,11 +546,18 @@ ifneq ("$(origin CROSS_COMPILE)","undefined")
 CONFIG_CROSS_COMPILE := $(CROSS_COMPILE:"%"=%)
 endif
 
+ifneq ("$(origin COMPILER)","undefined")
+	CONFIG_COMPILER := $(COMPILER:"%"=%)
+else
+	CONFIG_COMPILER := gcc
+endif
+
+
 $(eval $(call verbose_include,$(CONFIG_UK_BASE)/arch/$(UK_FAMILY)/Compiler.uk))
 
 # Make variables (CC, etc...)
-LD		:= $(CONFIG_CROSS_COMPILE)gcc
-CC		:= $(CONFIG_CROSS_COMPILE)gcc
+LD		:= $(CONFIG_CROSS_COMPILE)$(CONFIG_COMPILER)
+CC		:= $(CONFIG_CROSS_COMPILE)$(CONFIG_COMPILER)
 CPP		:= $(CC)
 CXX		:= $(CPP)
 GOC		:= $(CONFIG_CROSS_COMPILE)gccgo-7
