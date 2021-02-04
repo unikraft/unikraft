@@ -60,6 +60,9 @@ M4FLAGS      += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
 # "--enable-default-pie" by default.
 COMPFLAGS-$(call gcc_version_ge,6,1)	+= -fno-PIC
 LDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
+ifeq ($(call gcc_version_ge,10,0),y)
+COMPFLAGS-y += -fhosted -ffreestanding -fno-tree-loop-distribute-patterns
+endif
 
 COMPFLAGS-$(call have_clang)	+= -fno-builtin -fno-PIC
 LDFLAGS-$(call have_clang)	+= -no-pie
