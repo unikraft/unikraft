@@ -16,6 +16,7 @@ sigsuspend
 sigpending
 sigwait
 kill
+killpg
 raise
 siginterrupt
 
