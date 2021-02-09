@@ -42,6 +42,7 @@
 #include <uk/thread.h>
 #include <uk/uk_signal.h>
 #include <uk/essentials.h>
+#include <uk/process.h>
 #include <unistd.h>
 
 /*
@@ -349,6 +350,16 @@ int kill(pid_t pid, int sig)
 	uk_add_proc_signal(&siginfo);
 
 	return 0;
+}
+
+int killpg(int pgrp, int sig)
+{
+	if (pgrp != UNIKRAFT_PGID || pgrp != 0) {
+		errno = ESRCH;
+		return -1;
+	}
+
+	return kill(getpid(), sig);
 }
 
 int raise(int sig)
