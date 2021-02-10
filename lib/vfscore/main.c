@@ -73,6 +73,19 @@ static inline int libc_error(int err)
     return -1;
 }
 
+// In BSD's internal implementation of read() and write() code, for example
+// sosend_generic(), a partial read or write returns both an EWOULDBLOCK error
+// *and* a non-zero number of written bytes. In that case, we need to zero the
+// error, so the system call appear a successful partial read/write.
+// In FreeBSD, dofilewrite() and dofileread() (sys_generic.c) do this too.
+static inline int has_error(int error, int bytes)
+{
+	/* TODO: OSv checks also for ERESTART */
+	return error && (
+		(bytes == 0) ||
+		(error != EWOULDBLOCK && error != EINTR));
+}
+
 static inline mode_t apply_umask(mode_t mode)
 {
 	return mode & ~ukarch_load_n(&global_umask);
@@ -286,6 +299,32 @@ UK_SYSCALL_R_DEFINE(off_t, lseek, int, fd, off_t, offset, int, whence)
 
 LFS64(lseek);
 
+/**
+ * Return:
+ * = 0, Success and the nr of bytes read is returned in bytes parameter.
+ * < 0, error code.
+ */
+static ssize_t do_preadv(struct vfscore_file *fp, const struct iovec *iov,
+			 int iovcnt, off_t offset, ssize_t *bytes)
+{
+	size_t cnt;
+	int error;
+
+	UK_ASSERT(fp && iov);
+
+	/* Otherwise, try to read the file. */
+	error = sys_read(fp, iov, iovcnt, offset, &cnt);
+
+	if (has_error(error, cnt))
+		goto out_error;
+
+	*bytes = cnt;
+	return 0;
+
+out_error:
+	return -error;
+}
+
 UK_TRACEPOINT(trace_vfs_pread, "%d %p 0x%x 0x%x", int, void*, size_t, off_t);
 UK_TRACEPOINT(trace_vfs_pread_ret, "0x%x", ssize_t);
 UK_TRACEPOINT(trace_vfs_pread_err, "%d", int);
@@ -328,7 +367,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, preadv, int, fd, const struct iovec*, iov,
 	int, iovcnt, off_t, offset)
 {
 	struct vfscore_file *fp;
-	size_t bytes;
+	ssize_t bytes;
 	int error;
 
 	trace_vfs_preadv(fd, iov, iovcnt, offset);
@@ -351,7 +390,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, preadv, int, fd, const struct iovec*, iov,
 	}
 
 	/* Otherwise, try to read the file. */
-	error = sys_read(fp, iov, iovcnt, offset, &bytes);
+	error = do_preadv(fp, iov, iovcnt, offset, &bytes);
 
 out_error_fdrop:
 	fdrop(fp);
@@ -373,6 +412,27 @@ UK_SYSCALL_DEFINE(ssize_t, readv,
 		  int, fd, const struct iovec *, iov, int, iovcnt)
 {
 	return preadv(fd, iov, iovcnt, -1);
+}
+
+static int do_pwritev(struct vfscore_file *fp, const struct iovec *iov,
+		      int iovcnt, off_t offset, ssize_t *bytes)
+{
+	int error;
+	size_t cnt;
+
+	UK_ASSERT(bytes);
+
+	/* Otherwise, try to read the file. */
+	error = sys_write(fp, iov, iovcnt, offset, &cnt);
+
+	if (has_error(error, cnt))
+		goto out_error;
+
+	*bytes = cnt;
+	return 0;
+
+out_error:
+	return -error;
 }
 
 UK_TRACEPOINT(trace_vfs_pwrite, "%d %p 0x%x 0x%x", int, const void*, size_t,
@@ -418,7 +478,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, pwritev, int, fd, const struct iovec*, iov,
 			int, iovcnt, off_t, offset)
 {
 	struct vfscore_file *fp;
-	size_t bytes;
+	ssize_t bytes;
 	int error;
 
 	trace_vfs_pwritev(fd, iov, iovcnt, offset);
@@ -441,7 +501,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, pwritev, int, fd, const struct iovec*, iov,
 	}
 
 	/* Otherwise, try to read the file. */
-	error = sys_write(fp, iov, iovcnt, offset, &bytes);
+	error = do_pwritev(fp, iov, iovcnt, offset, &bytes);
 
 out_error_fdrop:
 	fdrop(fp);
