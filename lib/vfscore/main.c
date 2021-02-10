@@ -340,15 +340,10 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset)
 
 	bytes = preadv(fd, &iov, 1, offset);
 	if (bytes < 0)
-		goto out_errno;
-
-	trace_vfs_pread_ret(bytes);
+		trace_vfs_pread_err(bytes);
+	else
+		trace_vfs_pread_ret(bytes);
 	return bytes;
-
-out_errno:
-	trace_vfs_pread_err(bytes);
-	errno = bytes;
-	return -1;
 }
 
 LFS64(pread);
@@ -357,7 +352,7 @@ UK_TRACEPOINT(trace_vfs_read, "%d %p %d", int, void *, int);
 UK_TRACEPOINT(trace_vfs_read_ret, "0x%x", ssize_t);
 UK_TRACEPOINT(trace_vfs_read_err, "%d", int);
 
-UK_SYSCALL_DEFINE(ssize_t, read, int, fd, void *, buf, size_t, count)
+UK_SYSCALL_R_DEFINE(ssize_t, read, int, fd, void *, buf, size_t, count)
 {
 	ssize_t bytes;
 
@@ -392,12 +387,14 @@ UK_SYSCALL_R_DEFINE(ssize_t, preadv, int, fd, const struct iovec*, iov,
 
 	trace_vfs_preadv(fd, iov, iovcnt, offset);
 	error = fget(fd, &fp);
-	if (error)
+	if (error) {
+		error = -error;
 		goto out_error;
+	}
 
 	/* Check if the file is indeed seekable. */
 	if (fp->f_vfs_flags & UK_VFSCORE_NOPOS) {
-		error = ESPIPE;
+		error = -ESPIPE;
 		goto out_error_fdrop;
 	}
 	/* Check if the file has not already been read and that
@@ -406,7 +403,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, preadv, int, fd, const struct iovec*, iov,
 	else if (fp->f_offset < 0 &&
 		(fp->f_dentry == NULL ||
 		 fp->f_dentry->d_vnode->v_type != VCHR)) {
-		error = EINVAL;
+		error = -EINVAL;
 		goto out_error_fdrop;
 	}
 
@@ -424,7 +421,7 @@ out_error_fdrop:
 
 out_error:
 	trace_vfs_preadv_err(error);
-	return -error;
+	return error;
 }
 
 LFS64(preadv);
@@ -434,7 +431,7 @@ UK_TRACEPOINT(trace_vfs_readv, "%d %p 0x%x", int, const struct iovec*,
 UK_TRACEPOINT(trace_vfs_readv_ret, "0x%x", ssize_t);
 UK_TRACEPOINT(trace_vfs_readv_err, "%d", int);
 
-UK_SYSCALL_DEFINE(ssize_t, readv,
+UK_SYSCALL_R_DEFINE(ssize_t, readv,
 		  int, fd, const struct iovec *, iov, int, iovcnt)
 {
 	struct vfscore_file *fp;
@@ -443,8 +440,10 @@ UK_SYSCALL_DEFINE(ssize_t, readv,
 
 	trace_vfs_readv(fd, iov, iovcnt);
 	error = fget(fd, &fp);
-	if (error)
+	if (error) {
+		error = -error;
 		goto out_error;
+	}
 
 	/* Check if the file has not already been read and that is
 	 * not a character device.
@@ -452,7 +451,7 @@ UK_SYSCALL_DEFINE(ssize_t, readv,
 	if (fp->f_offset < 0 &&
 	   (fp->f_dentry == NULL ||
 	    fp->f_dentry->d_vnode->v_type != VCHR)) {
-		error = EINVAL;
+		error = -EINVAL;
 		goto out_error_fdrop;
 	}
 
@@ -470,7 +469,7 @@ out_error_fdrop:
 
 out_error:
 	trace_vfs_readv_err(error);
-	return -error;
+	return error;
 }
 
 static int do_pwritev(struct vfscore_file *fp, const struct iovec *iov,
@@ -510,15 +509,10 @@ ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset)
 
 	bytes = pwritev(fd, &iov, 1, offset);
 	if (bytes < 0)
-		goto out_errno;
-
-	trace_vfs_pwrite_ret(bytes);
+		trace_vfs_pwrite_err(bytes);
+	else
+		trace_vfs_pwrite_ret(bytes);
 	return bytes;
-
-out_errno:
-	trace_vfs_pwrite_err(bytes);
-	errno = bytes;
-	return -1;
 }
 
 LFS64(pwrite);
@@ -528,7 +522,7 @@ UK_TRACEPOINT(trace_vfs_write, "%d %p 0x%x 0x%x", int, const void *,
 UK_TRACEPOINT(trace_vfs_write_ret, "0x%x", ssize_t);
 UK_TRACEPOINT(trace_vfs_write_err, "%d", int);
 
-UK_SYSCALL_DEFINE(ssize_t, write, int, fd, const void *, buf, size_t, count)
+UK_SYSCALL_R_DEFINE(ssize_t, write, int, fd, const void *, buf, size_t, count)
 {
 	ssize_t bytes;
 
@@ -561,12 +555,14 @@ UK_SYSCALL_R_DEFINE(ssize_t, pwritev, int, fd, const struct iovec*, iov,
 
 	trace_vfs_pwritev(fd, iov, iovcnt, offset);
 	error = fget(fd, &fp);
-	if (error)
+	if (error) {
+		error = -error;
 		goto out_error;
+	}
 
 	/* Check if the file is indeed seekable. */
 	if (fp->f_vfs_flags & UK_VFSCORE_NOPOS) {
-		error = ESPIPE;
+		error = -ESPIPE;
 		goto out_error_fdrop;
 	}
 	/* Check if the file has not already been written to and that it is
@@ -575,7 +571,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, pwritev, int, fd, const struct iovec*, iov,
 	else if (fp->f_offset < 0 &&
 		(fp->f_dentry == NULL ||
 		 fp->f_dentry->d_vnode->v_type != VCHR)) {
-		error = EINVAL;
+		error = -EINVAL;
 		goto out_error_fdrop;
 	}
 
@@ -593,7 +589,7 @@ out_error_fdrop:
 
 out_error:
 	trace_vfs_pwritev_err(error);
-	return -error;
+	return error;
 }
 
 LFS64(pwritev);
@@ -603,7 +599,7 @@ UK_TRACEPOINT(trace_vfs_writev, "%d %p 0x%x 0x%x", int, const struct iovec*,
 UK_TRACEPOINT(trace_vfs_writev_ret, "0x%x", ssize_t);
 UK_TRACEPOINT(trace_vfs_writev_err, "%d", int);
 
-UK_SYSCALL_DEFINE(ssize_t, writev,
+UK_SYSCALL_R_DEFINE(ssize_t, writev,
 		  int, fd, const struct iovec *, vec, int, vlen)
 {
 	struct vfscore_file *fp;
@@ -612,8 +608,10 @@ UK_SYSCALL_DEFINE(ssize_t, writev,
 
 	trace_vfs_writev(fd, vec, vlen);
 	error = fget(fd, &fp);
-	if (error)
+	if (error) {
+		error = -error;
 		goto out_error;
+	}
 
 	/* Check if the file has not already been written to and
 	 * that it is not a character device.
@@ -621,7 +619,7 @@ UK_SYSCALL_DEFINE(ssize_t, writev,
 	if (fp->f_offset < 0 &&
 	   (fp->f_dentry == NULL ||
 	    fp->f_dentry->d_vnode->v_type != VCHR)) {
-		error = EINVAL;
+		error = -EINVAL;
 		goto out_error_fdrop;
 	}
 
@@ -639,7 +637,7 @@ out_error_fdrop:
 
 out_error:
 	trace_vfs_pwritev_err(error);
-	return -error;
+	return error;
 }
 
 UK_TRACEPOINT(trace_vfs_ioctl, "%d 0x%x", int, unsigned long);
