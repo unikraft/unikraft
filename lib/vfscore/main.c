@@ -337,7 +337,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, preadv, int, fd, const struct iovec*, iov,
 		goto out_error;
 
 	/* Check if the file is indeed seekable. */
-	if (!(fp->f_vfs_flags & UK_VFSCORE_NOPOS)) {
+	if (fp->f_vfs_flags & UK_VFSCORE_NOPOS) {
 		error = ESPIPE;
 		goto out_error_fdrop;
 	}
@@ -427,7 +427,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, pwritev, int, fd, const struct iovec*, iov,
 		goto out_error;
 
 	/* Check if the file is indeed seekable. */
-	if (!(fp->f_vfs_flags & UK_VFSCORE_NOPOS)) {
+	if (fp->f_vfs_flags & UK_VFSCORE_NOPOS) {
 		error = ESPIPE;
 		goto out_error_fdrop;
 	}
