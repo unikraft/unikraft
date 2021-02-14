@@ -176,10 +176,9 @@ int clock_settime(clockid_t clk_id __unused, const struct timespec *tp __unused)
 	return 0;
 }
 
-int times(struct tm *buf __unused)
+UK_SYSCALL_R_DEFINE(int, times, struct tm *, buf)
 {
-	errno = ENOTSUP;
-	return -1;
+	return -ENOTSUP;
 }
 
 int setitimer(int which __unused, const struct itimerval *new_value __unused,
