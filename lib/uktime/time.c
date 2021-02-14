@@ -125,14 +125,12 @@ unsigned int sleep(unsigned int seconds)
 	return 0;
 }
 
-int gettimeofday(struct timeval *tv, void *tz __unused)
+UK_SYSCALL_R_DEFINE(int, gettimeofday, struct timeval *, tv, void *, tz)
 {
 	__nsec now = ukplat_wall_clock();
 
-	if (!tv) {
-		errno = EINVAL;
-		return -1;
-	}
+	if (!tv)
+		return -EINVAL;
 
 	tv->tv_sec = ukarch_time_nsec_to_sec(now);
 	tv->tv_usec = ukarch_time_nsec_to_usec(ukarch_time_subsec(now));
