@@ -13,6 +13,8 @@ setitimer
 sleep
 timegm
 times
+uk_syscall_e_times
+uk_syscall_r_times
 usleep
 utime
 timer_create
