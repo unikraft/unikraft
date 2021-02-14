@@ -372,7 +372,7 @@ int raise(int sig)
  * Stubbing the function support from requiring signal.
  * Stubs taken from newlib
  */
-unsigned int alarm(unsigned int seconds __unused)
+UK_SYSCALL_R_DEFINE(unsigned int, alarm, unsigned int, seconds)
 {
 	return 0;
 }
