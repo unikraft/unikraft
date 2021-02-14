@@ -27,6 +27,8 @@ sigismember
 
 # unistd.h
 alarm
+uk_syscall_e_alarm
+uk_syscall_r_alarm
 pause
 uk_syscall_e_pause
 uk_syscall_r_pause
