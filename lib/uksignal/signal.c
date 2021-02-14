@@ -44,6 +44,7 @@
 #include <uk/essentials.h>
 #include <uk/process.h>
 #include <unistd.h>
+#include <uk/syscall.h>
 
 /*
  * Tries to deliver a pending signal to the current thread
@@ -381,7 +382,7 @@ int siginterrupt(int sig __unused, int flag __unused)
 	return 0;
 }
 
-int pause(void)
+UK_SYSCALL_R_DEFINE(int, pause)
 {
 	return 0;
 }
