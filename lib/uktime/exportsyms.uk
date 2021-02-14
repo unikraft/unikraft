@@ -22,3 +22,6 @@ timer_delete
 timer_settime
 timer_gettime
 timer_getoverrun
+time
+uk_syscall_e_time
+uk_syscall_r_time

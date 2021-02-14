@@ -123,6 +123,16 @@ unsigned int sleep(unsigned int seconds)
 	return 0;
 }
 
+UK_SYSCALL_R_DEFINE(time_t, time, time_t *, tloc)
+{
+	time_t secs = ukarch_time_nsec_to_sec(ukplat_wall_clock());
+
+	if (tloc)
+		*tloc = secs;
+
+	return secs;
+}
+
 UK_SYSCALL_R_DEFINE(int, gettimeofday, struct timeval *, tv, void *, tz)
 {
 	__nsec now = ukplat_wall_clock();
