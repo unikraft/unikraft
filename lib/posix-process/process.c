@@ -223,44 +223,39 @@ UK_SYSCALL_R_DEFINE(pid_t, getppid)
 	return UNIKRAFT_PPID;
 }
 
-UK_SYSCALL_DEFINE(pid_t, setsid)
+UK_SYSCALL_R_DEFINE(pid_t, setsid)
 {
 	/* We have a single "session" with a single "process" */
-	errno = EPERM;
-	return (pid_t) -1;
+	return (pid_t) -EPERM;
 }
 
-UK_SYSCALL_DEFINE(pid_t, getsid, pid_t, pid)
+UK_SYSCALL_R_DEFINE(pid_t, getsid, pid_t, pid)
 {
 	if (pid != 0) {
 		/* We support only calls for the only calling "process" */
-		errno = ESRCH;
-		return (pid_t) -1;
+		return (pid_t) -ESRCH;
 	}
 	return UNIKRAFT_SID;
 }
 
-UK_SYSCALL_DEFINE(int, setpgid, pid_t, pid, pid_t, pgid)
+UK_SYSCALL_R_DEFINE(int, setpgid, pid_t, pid, pid_t, pgid)
 {
 	if (pid != 0) {
 		/* We support only calls for the only calling "process" */
-		errno = ESRCH;
-		return (pid_t) -1;
+		return (pid_t) -ESRCH;
 	}
 	if (pgid != 0) {
 		/* We have a single "group" with a single "process" */
-		errno = EPERM;
-		return (pid_t) -1;
+		return (pid_t) -EPERM;
 	}
 	return 0;
 }
 
-UK_SYSCALL_DEFINE(pid_t, getpgid, pid_t, pid)
+UK_SYSCALL_R_DEFINE(pid_t, getpgid, pid_t, pid)
 {
 	if (pid != 0) {
 		/* We support only calls for the only calling "process" */
-		errno = ESRCH;
-		return (pid_t) -1;
+		return (pid_t) -ESRCH;
 	}
 	return UNIKRAFT_PGID;
 }
@@ -298,7 +293,7 @@ int nice(int inc __unused)
 	return -1;
 }
 
-UK_SYSCALL_DEFINE(int, getpriority, int, which, id_t, who)
+UK_SYSCALL_R_DEFINE(int, getpriority, int, which, id_t, who)
 {
 	int rc = 0;
 
@@ -310,20 +305,18 @@ UK_SYSCALL_DEFINE(int, getpriority, int, which, id_t, who)
 			/* Allow only for the calling "process" */
 			rc = UNIKRAFT_PROCESS_PRIO;
 		else {
-			errno = ESRCH;
-			rc = -1;
+			rc = -ESRCH;
 		}
 		break;
 	default:
-		errno = EINVAL;
-		rc = -1;
+		rc = -EINVAL;
 		break;
 	}
 
 	return rc;
 }
 
-UK_SYSCALL_DEFINE(int, setpriority, int, which, id_t, who, int, prio)
+UK_SYSCALL_R_DEFINE(int, setpriority, int, which, id_t, who, int, prio)
 {
 	int rc = 0;
 
@@ -335,17 +328,14 @@ UK_SYSCALL_DEFINE(int, setpriority, int, which, id_t, who, int, prio)
 			/* Allow only for the calling "process" */
 			if (prio != UNIKRAFT_PROCESS_PRIO) {
 				/* Allow setting only the default prio */
-				errno = EACCES;
-				rc = -1;
+				rc = -EACCES;
 			}
 		} else {
-			errno = ESRCH;
-			rc = -1;
+			rc = -ESRCH;
 		}
 		break;
 default:
-		errno = EINVAL;
-		rc = -1;
+		rc = -EINVAL;
 		break;
 	}
 
