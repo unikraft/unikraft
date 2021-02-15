@@ -1333,7 +1333,7 @@ UK_TRACEPOINT(trace_vfs_unlink, "\"%s\"", const char*);
 UK_TRACEPOINT(trace_vfs_unlink_ret, "");
 UK_TRACEPOINT(trace_vfs_unlink_err, "%d", int);
 
-int unlink(const char *pathname)
+UK_SYSCALL_R_DEFINE(int, unlink, const char*, pathname)
 {
 	trace_vfs_unlink(pathname);
 	struct task *t = main_task;
@@ -1351,10 +1351,9 @@ int unlink(const char *pathname)
 		goto out_errno;
 	trace_vfs_unlink_ret();
 	return 0;
-	out_errno:
+out_errno:
 	trace_vfs_unlink_err(error);
-	errno = error;
-	return -1;
+	return -error;
 }
 
 UK_TRACEPOINT(trace_vfs_stat, "\"%s\" %p", const char*, struct stat*);

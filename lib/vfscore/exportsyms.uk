@@ -74,6 +74,8 @@ link
 uk_syscall_e_link
 uk_syscall_r_link
 unlink
+uk_syscall_e_unlink
+uk_syscall_r_unlink
 getcwd
 uk_syscall_e_getcwd
 uk_syscall_r_getcwd
