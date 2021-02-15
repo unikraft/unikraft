@@ -2076,7 +2076,7 @@ UK_TRACEPOINT(trace_vfs_utimensat, "\"%s\"", const char*);
 UK_TRACEPOINT(trace_vfs_utimensat_ret, "");
 UK_TRACEPOINT(trace_vfs_utimensat_err, "%d", int);
 
-UK_SYSCALL_DEFINE(int, utimensat, int, dirfd, const char*, pathname, const struct timespec*, times, int, flags)
+UK_SYSCALL_R_DEFINE(int, utimensat, int, dirfd, const char*, pathname, const struct timespec*, times, int, flags)
 {
 	int error;
 
@@ -2086,8 +2086,7 @@ UK_SYSCALL_DEFINE(int, utimensat, int, dirfd, const char*, pathname, const struc
 
 	if (error) {
 		trace_vfs_utimensat_err(error);
-		errno = error;
-		return -1;
+		return -error;
 	}
 
 	trace_vfs_utimensat_ret();

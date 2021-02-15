@@ -70,13 +70,12 @@ static void __spin_wait(__nsec nsec)
 }
 #endif
 
-UK_SYSCALL_DEFINE(int, nanosleep, const struct timespec*, req, struct timespec*, rem)
+UK_SYSCALL_R_DEFINE(int, nanosleep, const struct timespec*, req, struct timespec*, rem)
 {
 	__nsec before, after, diff, nsec;
 
 	if (!req || req->tv_nsec < 0 || req->tv_nsec > 999999999) {
-		errno = EINVAL;
-		return -1;
+		return -EINVAL;
 	}
 
 	nsec = (__nsec) req->tv_sec * 1000000000L;
@@ -97,8 +96,7 @@ UK_SYSCALL_DEFINE(int, nanosleep, const struct timespec*, req, struct timespec*,
 			rem->tv_sec = ukarch_time_nsec_to_sec(nsec - diff);
 			rem->tv_nsec = ukarch_time_subsec(nsec - diff);
 		}
-		errno = EINTR;
-		return -1;
+		return -EINTR;
 	}
 	return 0;
 }
