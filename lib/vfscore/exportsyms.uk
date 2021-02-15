@@ -26,6 +26,8 @@ read
 uk_syscall_e_read
 uk_syscall_r_read
 mkdir
+uk_syscall_e_mkdir
+uk_syscall_r_mkdir
 fsync
 uk_syscall_e_fsync
 uk_syscall_r_fsync
