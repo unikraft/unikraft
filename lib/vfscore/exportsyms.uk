@@ -136,6 +136,8 @@ fchdir
 uk_syscall_e_fchdir
 uk_syscall_r_fchdir
 symlink
+uk_syscall_e_symlink
+uk_syscall_r_symlink
 statvfs
 fstatvfs
 access

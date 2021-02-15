@@ -1307,7 +1307,7 @@ UK_TRACEPOINT(trace_vfs_symlink, "oldpath=%s, newpath=%s", const char*,
 UK_TRACEPOINT(trace_vfs_symlink_ret, "");
 UK_TRACEPOINT(trace_vfs_symlink_err, "errno=%d", int);
 
-int symlink(const char *oldpath, const char *newpath)
+UK_SYSCALL_R_DEFINE(int, symlink, const char*, oldpath, const char*, newpath)
 {
 	int error;
 
@@ -1315,16 +1315,14 @@ int symlink(const char *oldpath, const char *newpath)
 
 	error = ENOENT;
 	if (oldpath == NULL || newpath == NULL) {
-		errno = ENOENT;
 		trace_vfs_symlink_err(error);
-		return (-1);
+		return (-ENOENT);
 	}
 
 	error = sys_symlink(oldpath, newpath);
 	if (error) {
-		errno = error;
 		trace_vfs_symlink_err(error);
-		return (-1);
+		return (-error);
 	}
 
 	trace_vfs_symlink_ret();
