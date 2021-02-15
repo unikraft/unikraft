@@ -53,6 +53,7 @@
 #define __sigprocmask sigprocmask
 #define __sigaction sigaction
 #define __sigpending sigpending
+#define __sigsuspend sigsuspend
 #endif /* CONFIG_LIBC_SIGNAL_ENABLE */
 
 /*
@@ -172,7 +173,9 @@ UK_SYSCALL_R_DEFINE(int, rt_sigpending,
 	return 0;
 }
 
-int sigsuspend(const sigset_t *mask)
+UK_SYSCALL_R_DEFINE(int, rt_sigsuspend,
+		    const sigset_t *, mask,
+		    size_t __unused, sigsetsize)
 {
 	/* If the signals are ignored, this doesn't return <- POSIX */
 
@@ -219,8 +222,7 @@ int sigsuspend(const sigset_t *mask)
 	/* execute other pending signals */
 	uk_sig_handle_signals();
 
-	errno = EINTR;
-	return -1; /* always returns -1 and sets errno to EINTR */
+	return -EINTR; /* always returns -1 and sets errno to EINTR */
 }
 
 int sigwait(const sigset_t *set, int *sig)
@@ -360,6 +362,19 @@ int __sigprocmask(int how, const sigset_t *set, sigset_t *oldset)
 	}
 
 	return ret;
+}
+
+int __sigsuspend(const sigset_t *mask)
+{
+	/* If the signals are ignored, this doesn't return <- POSIX */
+	int error;
+
+	error = rt_sigsuspend(mask, (_NSIG / 8));
+	if (error < 0) {
+		errno = -error;
+		error = -1; /* always returns -1 and sets errno to EINTR */
+	}
+	return error;
 }
 
 #endif /* CONFIG_LIBUKSIGNAL_LIBCFNS_ENABLE */
