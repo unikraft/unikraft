@@ -52,6 +52,7 @@
 #define __signal signal
 #define __sigprocmask sigprocmask
 #define __sigaction sigaction
+#define __sigpending sigpending
 #endif /* CONFIG_LIBC_SIGNAL_ENABLE */
 
 /*
@@ -148,7 +149,6 @@ UK_SYSCALL_R_DEFINE(int, rt_sigaction, int, signum,
 	return 0;
 }
 
-int sigpending(sigset_t *set)
 UK_SYSCALL_R_DEFINE(int, rt_sigprocmask,
 		    int, how,
 		    const sigset_t *, set,
@@ -158,6 +158,9 @@ UK_SYSCALL_R_DEFINE(int, rt_sigprocmask,
 	return  uk_thread_sigmask(how, set, oldset);
 }
 
+UK_SYSCALL_R_DEFINE(int, rt_sigpending,
+		    sigset_t *, set,
+		    size_t __unused, sigsetsize)
 {
 	struct uk_thread_sig *ptr;
 
@@ -329,6 +332,19 @@ sighandler_t __signal(int signum, sighandler_t handler)
 {
 	/* SA_RESTART <- BSD signal semantics */
 	return uk_signal(signum, handler, SA_RESTART);
+}
+
+int __sigpending(sigset_t *set)
+{
+	int error;
+
+	error = rt_sigpending(set, (_NSIG / 8));
+	if (error < 0) {
+		errno = -error;
+		error = -1;
+	}
+
+	return error;
 }
 
 int __sigprocmask(int how, const sigset_t *set, sigset_t *oldset)

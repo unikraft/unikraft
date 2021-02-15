@@ -23,6 +23,10 @@ uk_syscall_r_rt_sigprocmask
 
 sigsuspend
 sigpending
+rt_sigpending
+uk_syscall_e_rt_sigpending
+uk_syscall_r_rt_sigpending
+
 sigwait
 kill
 killpg
