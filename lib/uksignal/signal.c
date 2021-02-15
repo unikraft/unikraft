@@ -36,14 +36,22 @@
 
 #include <errno.h>
 
+#include <uk/config.h>
 #include <uk/alloc.h>
 #include <uk/sched.h>
 #include <signal.h>
+#include <string.h>
 #include <uk/thread.h>
 #include <uk/uk_signal.h>
 #include <uk/essentials.h>
 #include <uk/process.h>
 #include <unistd.h>
+#include <uk/syscall.h>
+
+#ifdef CONFIG_LIBUKSIGNAL_LIBCFNS_ENABLE
+#define __signal signal
+#define __sigaction sigaction
+#endif /* CONFIG_LIBC_SIGNAL_ENABLE */
 
 /*
  * Tries to deliver a pending signal to the current thread
@@ -87,9 +95,10 @@ static int uk_get_awaited_signal(void)
 	return 0;
 }
 
-/* TODO: We do not support any sa_flags besides SA_SIGINFO */
-int
-sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
+UK_SYSCALL_R_DEFINE(int, rt_sigaction, int, signum,
+		    const struct sigaction *, act,
+		    struct sigaction *, oldact,
+		    size_t, sigsetsize)
 {
 	struct uk_list_head *i;
 	struct uk_thread_sig *th_sig;
@@ -97,10 +106,8 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
 
 	if (!uk_sig_is_valid(signum) ||
 			signum == SIGKILL ||
-			signum == SIGSTOP) {
-		errno = EINVAL;
-		return -1;
-	}
+			signum == SIGSTOP)
+		return -EINVAL;
 
 	if (oldact)
 		*oldact = uk_proc_sig.sigaction[signum - 1];
@@ -138,29 +145,6 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
 	}
 
 	return 0;
-}
-
-static sighandler_t uk_signal(int signum, sighandler_t handler, int sa_flags)
-{
-	struct sigaction old;
-	struct sigaction act = {
-		.sa_handler = handler,
-		.sa_flags = sa_flags
-	};
-
-	if (sigaction(signum, &act, &old) < 0)
-		return SIG_ERR;
-
-	if (old.sa_flags & SA_SIGINFO)
-		return NULL;
-	else
-		return old.sa_handler;
-}
-
-sighandler_t signal(int signum, sighandler_t handler)
-{
-	/* SA_RESTART <- BSD signal semantics */
-	return uk_signal(signum, handler, SA_RESTART);
 }
 
 int sigpending(sigset_t *set)
@@ -303,6 +287,46 @@ int sigwait(const sigset_t *set, int *sig)
 
 	return 0; /* returns positive errno */
 }
+
+#ifdef CONFIG_LIBUKSIGNAL_LIBCFNS_ENABLE
+/* TODO: We do not support any sa_flags besides SA_SIGINFO */
+int
+__sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
+{
+	int error;
+
+	error = rt_sigaction(signum, act, oldact, (_NSIG / 8));
+	if (error < 0) {
+		errno = -error;
+		error = -1;
+	}
+	return error;
+}
+
+static sighandler_t uk_signal(int signum, sighandler_t handler, int sa_flags)
+{
+	struct sigaction old;
+	struct sigaction act = {
+		.sa_handler = handler,
+		.sa_flags = sa_flags
+	};
+
+	if (rt_sigaction(signum, &act, &old, (_NSIG / 8)) < 0)
+		return SIG_ERR;
+
+	if (old.sa_flags & SA_SIGINFO)
+		return NULL;
+	else
+		return old.sa_handler;
+}
+
+sighandler_t __signal(int signum, sighandler_t handler)
+{
+	/* SA_RESTART <- BSD signal semantics */
+	return uk_signal(signum, handler, SA_RESTART);
+}
+
+#endif /* CONFIG_LIBUKSIGNAL_LIBCFNS_ENABLE */
 
 /*
  * Search for a thread that does not have the signal blocked

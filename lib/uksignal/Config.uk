@@ -6,3 +6,11 @@ menuconfig LIBUKSIGNAL
 	select LIBUKALLOC
 	select LIBUKSCHED
 	select LIBPOSIX_PROCESS
+	select LIBSYSCALL_SHIM
+	select LIBSYSCALL_SHIM_LIBCSTUBS
+
+if LIBUKSIGNAL
+	config LIBUKSIGNAL_LIBCFNS_ENABLE
+		bool "signal: Provide libc signal implementation"
+		default n
+endif

@@ -11,6 +11,11 @@ uk_thread_sigmask
 # signal.h
 sigaction
 signal
+rt_sigaction
+uk_syscall_e_rt_sigaction
+uk_syscall_r_rt_sigaction
+
+
 sigprocmask
 sigsuspend
 sigpending
