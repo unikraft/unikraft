@@ -52,6 +52,7 @@
 #include <vfscore/prex.h>
 #include <vfscore/dentry.h>
 #include <vfscore/vnode.h>
+#include <uk/syscall.h>
 
 /*
  * List for VFS mount points.
@@ -365,7 +366,7 @@ sys_pivot_root(const char *new_root, const char *put_old)
 }
 #endif
 
-void sync(void)
+UK_LLSYSCALL_R_DEFINE(int, sync)
 {
 	struct mount *mp;
 	uk_mutex_lock(&mount_lock);
@@ -379,6 +380,13 @@ void sync(void)
 #endif
 	uk_mutex_unlock(&mount_lock);
 }
+
+#if UK_LIBC_SYSCALL
+void sync(void)
+{
+   uk_syscall_e_sync();
+}
+#endif
 
 /*
  * Compare two path strings. Return matched length.
