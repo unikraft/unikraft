@@ -1391,11 +1391,10 @@ int __xstat(int ver __unused, const char *pathname, struct stat *st)
 
 LFS64(__xstat);
 
-int stat(const char *pathname, struct stat *st)
+UK_SYSCALL_R_DEFINE(int, stat, const char*, pathname, struct stat*, st)
 {
 	if (!pathname) {
-		errno = EINVAL;
-		return -1;
+		return -EINVAL;
 	}
 	return __xstat(1, pathname, st);
 }
