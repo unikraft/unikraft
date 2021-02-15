@@ -17,6 +17,10 @@ uk_syscall_r_rt_sigaction
 
 
 sigprocmask
+rt_sigprocmask
+uk_syscall_e_rt_sigprocmask
+uk_syscall_r_rt_sigprocmask
+
 sigsuspend
 sigpending
 sigwait

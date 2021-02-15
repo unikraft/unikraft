@@ -50,6 +50,7 @@
 
 #ifdef CONFIG_LIBUKSIGNAL_LIBCFNS_ENABLE
 #define __signal signal
+#define __sigprocmask sigprocmask
 #define __sigaction sigaction
 #endif /* CONFIG_LIBC_SIGNAL_ENABLE */
 
@@ -148,6 +149,15 @@ UK_SYSCALL_R_DEFINE(int, rt_sigaction, int, signum,
 }
 
 int sigpending(sigset_t *set)
+UK_SYSCALL_R_DEFINE(int, rt_sigprocmask,
+		    int, how,
+		    const sigset_t *, set,
+		    sigset_t *, oldset,
+		    size_t, sigsetsize)
+{
+	return  uk_thread_sigmask(how, set, oldset);
+}
+
 {
 	struct uk_thread_sig *ptr;
 
@@ -157,11 +167,6 @@ int sigpending(sigset_t *set)
 	uk_sigorset(set, &uk_proc_sig.pending);
 
 	return 0;
-}
-
-int sigprocmask(int how, const sigset_t *set, sigset_t *oldset)
-{
-	return uk_thread_sigmask(how, set, oldset);
 }
 
 int sigsuspend(const sigset_t *mask)
@@ -324,6 +329,21 @@ sighandler_t __signal(int signum, sighandler_t handler)
 {
 	/* SA_RESTART <- BSD signal semantics */
 	return uk_signal(signum, handler, SA_RESTART);
+}
+
+int __sigprocmask(int how, const sigset_t *set, sigset_t *oldset)
+{
+	int error;
+	int ret = 0;
+
+	error = uk_thread_sigmask(how, set, oldset);
+
+	if (error < 0) {
+		errno = -error;
+		ret = -1;
+	}
+
+	return ret;
 }
 
 #endif /* CONFIG_LIBUKSIGNAL_LIBCFNS_ENABLE */
