@@ -54,6 +54,7 @@
 #define __sigaction sigaction
 #define __sigpending sigpending
 #define __sigsuspend sigsuspend
+#define __sigwait sigwait
 #endif /* CONFIG_LIBC_SIGNAL_ENABLE */
 
 /*
@@ -225,7 +226,11 @@ UK_SYSCALL_R_DEFINE(int, rt_sigsuspend,
 	return -EINTR; /* always returns -1 and sets errno to EINTR */
 }
 
-int sigwait(const sigset_t *set, int *sig)
+UK_SYSCALL_R_DEFINE(int, rt_sigtimedwait,
+		    const sigset_t *, set,
+		    siginfo_t *, info,
+		    const struct timespec *__unused, timeout,
+		    size_t __unused, sigsetsize)
 {
 	/*
 	 * If the signals are ignored, this doesn't return <- TODO: POSIX ??
@@ -246,7 +251,7 @@ int sigwait(const sigset_t *set, int *sig)
 	uk_sigset_remove_unmaskable(&cleaned_set);
 
 	if (uk_sigisempty(&cleaned_set))
-		return EINVAL;
+		return -EINVAL;
 
 	ptr = _UK_TH_SIG;
 
@@ -290,7 +295,8 @@ int sigwait(const sigset_t *set, int *sig)
 	ptr->wait.status = UK_SIG_NOT_WAITING;
 
 	/* do not execute handler, set received signal */
-	*sig = ptr->wait.received_signal.si_signo;
+	memcpy(info, &ptr->wait.received_signal,
+	       sizeof(*info));
 
 	/* execute other pending signals */
 	uk_sig_handle_signals();
@@ -377,6 +383,20 @@ int __sigsuspend(const sigset_t *mask)
 	return error;
 }
 
+int __sigwait(const sigset_t *set, int *sig)
+{
+	int error;
+	siginfo_t si;
+
+	error = rt_sigtimedwait(set, &si, 0, (_NSIG / 8));
+	if (error < 0) {
+		errno = -error;
+		return -1;
+	}
+
+	*sig = si.si_signo;
+	return 0; /* returns positive errno */
+}
 #endif /* CONFIG_LIBUKSIGNAL_LIBCFNS_ENABLE */
 
 /*

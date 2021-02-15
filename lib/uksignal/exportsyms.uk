@@ -32,6 +32,11 @@ uk_syscall_e_rt_sigpending
 uk_syscall_r_rt_sigpending
 
 sigwait
+rt_sigtimedwait
+uk_syscall_e_rt_sigtimedwait
+uk_syscall_r_rt_sigtimedwait
+
+
 kill
 killpg
 raise
