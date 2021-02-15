@@ -195,6 +195,8 @@ vn_unlock
 vfs_busy
 pipe
 pipe2
+uk_syscall_e_pipe2
+uk_syscall_r_pipe2
 mkfifo
 futimes
 uk_syscall_e_futimesat
