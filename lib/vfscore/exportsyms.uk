@@ -68,6 +68,8 @@ uk_syscall_r_sync
 vfscore_mount_dump
 umount
 umount2
+uk_syscall_e_umount2
+uk_syscall_r_umount2
 link
 uk_syscall_e_link
 uk_syscall_r_link
