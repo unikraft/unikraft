@@ -20,6 +20,8 @@ uk_syscall_e_open
 uk_syscall_r_open
 creat
 creat64
+uk_syscall_e_creat
+uk_syscall_r_creat
 write
 uk_syscall_e_write
 uk_syscall_r_write
