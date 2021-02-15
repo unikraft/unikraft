@@ -4,6 +4,8 @@ vfscore_install_fd
 vfscore_get_file
 vfscore_put_file
 mount
+uk_syscall_e_mount
+uk_syscall_r_mount
 vfscore_nullop
 vfscore_release_mp_dentries
 vfscore_vget

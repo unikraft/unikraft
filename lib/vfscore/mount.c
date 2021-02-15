@@ -109,9 +109,8 @@ int device_close(struct device *dev)
 	return 0;
 }
 
-int
-mount(const char *dev, const char *dir, const char *fsname, unsigned long flags,
-      const void *data)
+UK_SYSCALL_R_DEFINE(int, mount, const char*, dev, const char*, dir,
+		const char*, fsname, unsigned long, flags, const void*, data)
 {
 	const struct vfscore_fs_type *fs;
 	struct mount *mp;
@@ -123,11 +122,11 @@ mount(const char *dev, const char *dir, const char *fsname, unsigned long flags,
 	uk_pr_info("VFS: mounting %s at %s\n", fsname, dir);
 
 	if (!dir || *dir == '\0')
-		return ENOENT;
+		return -ENOENT;
 
 	/* Find a file system. */
 	if (!(fs = fs_getfs(fsname)))
-		return ENODEV;  /* No such file system */
+		return -ENODEV;  /* No such file system */
 
 	/* Open device. NULL can be specified as a device. */
 	// Allow device_open() to fail, in which case dev is interpreted
@@ -242,7 +241,7 @@ mount(const char *dev, const char *dir, const char *fsname, unsigned long flags,
 	if (device)
 		device_close(device);
 
-	return error;
+	return -error;
 }
 
 void
