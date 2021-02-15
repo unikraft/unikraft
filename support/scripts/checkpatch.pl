@@ -6370,6 +6370,12 @@ sub process {
 				     "unknown module license " . $extracted_string . "\n" . $herecurr);
 			}
 		}
+
+# check for UK_(LL)SYSCALL_DEFINE(), raw implementation should be preferred
+		if ($line =~ /\bUK_(LL)?SYSCALL_DEFINE\s*\(/) {
+			WARN("NON_RAW_SYSCALL",
+			     "Prefer using raw system call definitions: 'UK_SYSCALL_R_DEFINE', 'UK_LLSYSCALL_R_DEFINE'\n" . $herecurr);
+		}
 	}
 
 	# If we have no input at all, then there is nothing to report on
