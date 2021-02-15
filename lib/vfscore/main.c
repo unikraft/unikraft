@@ -1058,8 +1058,7 @@ UK_TRACEPOINT(trace_vfs_mkdir, "\"%s\" 0%0o", const char*, mode_t);
 UK_TRACEPOINT(trace_vfs_mkdir_ret, "");
 UK_TRACEPOINT(trace_vfs_mkdir_err, "%d", int);
 
-int
-mkdir(const char *pathname, mode_t mode)
+UK_SYSCALL_R_DEFINE(int, mkdir, const char*, pathname, mode_t, mode)
 {
 	struct task *t = main_task;
 	char path[PATH_MAX];
@@ -1076,10 +1075,9 @@ mkdir(const char *pathname, mode_t mode)
 		goto out_errno;
 	trace_vfs_mkdir_ret();
 	return 0;
-	out_errno:
+out_errno:
 	trace_vfs_mkdir_err(error);
-	errno = error;
-	return -1;
+	return -error;
 }
 
 UK_TRACEPOINT(trace_vfs_rmdir, "\"%s\"", const char*);
