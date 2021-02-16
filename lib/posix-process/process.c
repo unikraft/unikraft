@@ -207,12 +207,11 @@ pid_t wait3(int *wstatus __unused, int options __unused,
 	return -1;
 }
 
-pid_t wait4(pid_t pid __unused, int *wstatus __unused, int options __unused,
-		struct rusage *rusage __unused)
+UK_SYSCALL_R_DEFINE(pid_t, wait4, pid_t, pid, int *, wstatus,
+		    int, options, struct rusage *, rusage)
 {
 	/* No children */
-	errno = ECHILD;
-	return -1;
+	return -ECHILD;
 }
 
 UK_SYSCALL_R_DEFINE(int, getpid)
