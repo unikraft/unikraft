@@ -39,7 +39,12 @@ uk_syscall_r_rt_sigtimedwait
 
 kill
 killpg
+
 raise
+tkill
+uk_syscall_e_tkill
+uk_syscall_r_tkill
+
 siginterrupt
 
 # sigset.h

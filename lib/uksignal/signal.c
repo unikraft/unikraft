@@ -55,6 +55,7 @@
 #define __sigpending sigpending
 #define __sigsuspend sigsuspend
 #define __sigwait sigwait
+#define __raise raise
 #endif /* CONFIG_LIBC_SIGNAL_ENABLE */
 
 /*
@@ -304,6 +305,11 @@ UK_SYSCALL_R_DEFINE(int, rt_sigtimedwait,
 	return 0; /* returns positive errno */
 }
 
+UK_SYSCALL_R_DEFINE(int, tkill, pid_t __unused, pid, int, sig)
+{
+	return uk_sig_thread_kill(uk_thread_current(), sig);
+}
+
 #ifdef CONFIG_LIBUKSIGNAL_LIBCFNS_ENABLE
 /* TODO: We do not support any sa_flags besides SA_SIGINFO */
 int
@@ -397,6 +403,20 @@ int __sigwait(const sigset_t *set, int *sig)
 	*sig = si.si_signo;
 	return 0; /* returns positive errno */
 }
+
+int __raise(int sig)
+{
+	int error;
+
+	error = tkill(-1, sig);
+	if (error < 0) {
+		errno = -error;
+		error = -1;
+	}
+
+	return error;
+}
+
 #endif /* CONFIG_LIBUKSIGNAL_LIBCFNS_ENABLE */
 
 /*
@@ -455,11 +475,6 @@ int killpg(int pgrp, int sig)
 	}
 
 	return kill(getpid(), sig);
-}
-
-int raise(int sig)
-{
-	return uk_sig_thread_kill(uk_thread_current(), sig);
 }
 
 /**
