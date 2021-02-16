@@ -343,10 +343,14 @@ default:
 	return rc;
 }
 
-int prctl(int option __unused, ...)
+UK_SYSCALL_R_DEFINE(int, prctl, int, option,
+		    unsigned long, arg2,
+		    unsigned long, arg3,
+		    unsigned long, arg4,
+		    unsigned long, arg5)
 {
 	UK_WARN_STUBBED();
-	return 0;
+	return 0; /* syscall has no effect */
 }
 
 UK_LLSYSCALL_R_DEFINE(int, prlimit64, int, pid, unsigned int, resource,
