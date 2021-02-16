@@ -120,6 +120,9 @@ pwrite
 pwritev
 uk_syscall_e_pwritev
 uk_syscall_r_pwritev
+pwrite64
+uk_syscall_e_pwrite64
+uk_syscall_r_pwrite64
 readv
 uk_syscall_e_readv
 uk_syscall_r_readv
