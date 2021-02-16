@@ -415,19 +415,19 @@ UK_LLSYSCALL_R_DEFINE(int, prlimit64, int, pid, unsigned int, resource,
 	return 0;
 }
 
-#if UK_LIBC_SYSCALLS
-int getrlimit(int resource, struct rlimit *rlim)
+UK_SYSCALL_R_DEFINE(int, getrlimit, int, resource, struct rlimit *, rlim)
 {
-	return uk_syscall_e_prlimit64(0, (long) resource,
+	return uk_syscall_r_prlimit64(0, (long) resource,
 				      (long) NULL, (long) rlim);
 }
 
-int setrlimit(int resource, const struct rlimit *rlim)
+UK_SYSCALL_R_DEFINE(int, setrlimit, int, resource, const struct rlimit *, rlim)
 {
-	return uk_syscall_e_prlimit64(0, (long) resource,
+	return uk_syscall_r_prlimit64(0, (long) resource,
 				      (long) rlim, (long) NULL);
 }
 
+#if UK_LIBC_SYSCALLS
 int prlimit(pid_t pid, int resource, const struct rlimit *new_limit,
 	    struct rlimit *old_limit)
 {
