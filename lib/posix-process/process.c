@@ -44,18 +44,16 @@
 #include <vfscore/file.h>
 #endif
 
-int fork(void)
+UK_SYSCALL_R_DEFINE(int, fork)
 {
 	/* fork() is not supported on this platform */
-	errno = ENOSYS;
-	return -1;
+	return -ENOSYS;
 }
 
-int vfork(void)
+UK_SYSCALL_R_DEFINE(int, vfork)
 {
 	/* vfork() is not supported on this platform */
-	errno = ENOSYS;
-	return -1;
+	return -ENOSYS;
 }
 
 static void exec_warn_argv_variadic(const char *arg, va_list args)
