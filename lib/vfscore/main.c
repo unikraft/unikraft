@@ -351,16 +351,28 @@ UK_TRACEPOINT(trace_vfs_pread, "%d %p 0x%x 0x%x", int, void*, size_t, off_t);
 UK_TRACEPOINT(trace_vfs_pread_ret, "0x%x", ssize_t);
 UK_TRACEPOINT(trace_vfs_pread_err, "%d", int);
 
-ssize_t pread(int fd, void *buf, size_t count, off_t offset)
+/*
+ * Some libc's define some macros that remove the 64 suffix
+ * from some system call function names (e.g., <unistd.h>, <fcntl.h>).
+ * We need to undefine them here so that our system call
+ * registration does not fail in such a case.
+ */
+#ifdef pread64
+#undef pread64
+#endif
+
+UK_LLSYSCALL_R_DEFINE(ssize_t, pread64, int, fd,
+		      void *, buf, size_t, count, off_t, offset)
 {
 	trace_vfs_pread(fd, buf, count, offset);
 	struct iovec iov = {
 			.iov_base	= buf,
 			.iov_len	= count,
 	};
-	int bytes;
+	ssize_t bytes;
 
-	bytes = preadv(fd, &iov, 1, offset);
+	bytes = uk_syscall_r_preadv((long) fd, (long) &iov,
+				    1, (long) offset);
 	if (bytes < 0)
 		trace_vfs_pread_err(bytes);
 	else
@@ -368,7 +380,15 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset)
 	return bytes;
 }
 
+#if UK_LIBC_SYSCALLS
+ssize_t pread(int fd, void *buf, size_t count, off_t offset)
+{
+	return uk_syscall_e_pread64((long) fd, (long) buf,
+				    (long) count, (long) offset);
+}
+
 LFS64(pread);
+#endif
 
 UK_TRACEPOINT(trace_vfs_read, "%d %p %d", int, void *, int);
 UK_TRACEPOINT(trace_vfs_read_ret, "0x%x", ssize_t);

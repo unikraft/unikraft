@@ -114,6 +114,8 @@ readdir_r
 readdir64
 closedir
 pread
+uk_syscall_e_pread64
+uk_syscall_r_pread64
 pwrite
 pwritev
 uk_syscall_e_pwritev
