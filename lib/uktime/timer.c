@@ -34,45 +34,45 @@
 #include <time.h>
 #include <uk/essentials.h>
 #include <uk/print.h>
+#include <uk/syscall.h>
 
 
-int timer_create(clockid_t clockid __unused,
-		struct sigevent *__restrict sevp __unused,
-		timer_t *__restrict timerid __unused)
+UK_SYSCALL_R_DEFINE(int, timer_create, clockid_t, clockid,
+		    struct sigevent *__restrict, sevp,
+		    timer_t *__restrict, timerid)
 {
 	UK_WARN_STUBBED();
-	errno = ENOTSUP;
-	return -1;
+	return -ENOTSUP;
 }
 
-int timer_delete(timer_t timerid __unused)
+UK_SYSCALL_R_DEFINE(int, timer_delete,
+		    timer_t, timerid)
 {
 	UK_WARN_STUBBED();
-	errno = ENOTSUP;
-	return -1;
+	return -ENOTSUP;
 }
 
-int timer_settime(timer_t timerid __unused,
-		int flags __unused,
-		const struct itimerspec *__restrict new_value __unused,
-		struct itimerspec *__restrict old_value __unused)
+UK_SYSCALL_R_DEFINE(int, timer_settime,
+		    timer_t, timerid,
+		    int, flags,
+		    const struct itimerspec *__restrict, new_value,
+		    struct itimerspec *__restrict, old_value)
 {
 	UK_WARN_STUBBED();
-	errno = ENOTSUP;
-	return -1;
+	return -ENOTSUP;
 }
 
-int timer_gettime(timer_t timerid __unused,
-		struct itimerspec *curr_value __unused)
+UK_SYSCALL_R_DEFINE(int, timer_gettime,
+		    timer_t, timerid,
+		    struct itimerspec *, curr_value)
 {
 	UK_WARN_STUBBED();
-	errno = ENOTSUP;
-	return -1;
+	return -ENOTSUP;
 }
 
-int timer_getoverrun(timer_t timerid __unused)
+UK_SYSCALL_R_DEFINE(int, timer_getoverrun,
+		    timer_t, timerid)
 {
 	UK_WARN_STUBBED();
-	errno = ENOTSUP;
-	return -1;
+	return -ENOTSUP;
 }
