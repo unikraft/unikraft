@@ -65,9 +65,19 @@ static struct utsname utsname = {
 #endif
 };
 
-int sysinfo(struct sysinfo *info __unused)
+UK_SYSCALL_R_DEFINE(int, sysinfo, struct sysinfo *, info)
 {
-	return -1;
+	if (!info)
+		return -EFAULT;
+
+	memset(info, 0, sizeof(*info));
+
+	info->procs = 1; /* number of processes */
+
+#if CONFIG_LIBUKALLOC
+	/* TODO: memory usage can be obtained from ukallloc */
+#endif
+	return 0;
 }
 
 long fpathconf(int fd __unused, int name __unused)
