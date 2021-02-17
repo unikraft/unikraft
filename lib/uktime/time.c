@@ -35,7 +35,6 @@
 
 #include <errno.h>
 #include <time.h>
-#include <utime.h>
 #include <unistd.h>
 #include <sys/time.h>
 #include <uk/plat/time.h>
@@ -49,11 +48,6 @@
 #include <uk/plat/lcpu.h>
 #endif
 #include <uk/essentials.h>
-
-int utime(const char *filename __unused, const struct utimbuf *times __unused)
-{
-	return 0;
-}
 
 #ifndef CONFIG_HAVE_SCHED
 /* Workaround until Unikraft changes interface for something more

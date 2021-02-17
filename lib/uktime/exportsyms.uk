@@ -22,7 +22,6 @@ times
 uk_syscall_e_times
 uk_syscall_r_times
 usleep
-utime
 timer_create
 uk_syscall_e_timer_create
 uk_syscall_r_timer_create
