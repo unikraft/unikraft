@@ -230,6 +230,9 @@ uk_syscall_e_utimensat
 uk_syscall_r_utimensat
 utimensat
 futimens
+utime
+uk_syscall_e_utime
+uk_syscall_r_utime
 utimes
 uk_syscall_e_utimes
 uk_syscall_r_utimes

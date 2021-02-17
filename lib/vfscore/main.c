@@ -44,6 +44,7 @@
 #include "vfs.h"
 #include <sys/file.h>
 #include <stdarg.h>
+#include <utime.h>
 #include <vfscore/file.h>
 #include <vfscore/mount.h>
 #include <vfscore/fs.h>
@@ -2279,16 +2280,15 @@ int lutimes(const char *pathname, const struct timeval times[2])
 	return do_utimes(pathname, times, AT_SYMLINK_NOFOLLOW);
 }
 
-#if 0
-int utime(const char *pathname, const struct utimbuf *t)
+UK_SYSCALL_R_DEFINE(int, utime, const char *, pathname,
+		    const struct utimbuf *, t)
 {
-	using namespace std::chrono;
-
 	struct timeval times[2];
 	times[0].tv_usec = 0;
 	times[1].tv_usec = 0;
+
 	if (!t) {
-		long int tsec = duration_cast<seconds>(osv::clock::wall::now().time_since_epoch()).count();
+		long int tsec = 0; /* FIXME: Use current time in seconds */
 		times[0].tv_sec = tsec;
 		times[1].tv_sec = tsec;
 	} else {
@@ -2296,9 +2296,9 @@ int utime(const char *pathname, const struct utimbuf *t)
 		times[1].tv_sec = t->modtime;
 	}
 
-	return utimes(pathname, times);
+	return uk_syscall_r_utimes((long) pathname,
+				   (long) times);
 }
-#endif
 
 UK_TRACEPOINT(trace_vfs_chmod, "\"%s\" 0%0o", const char*, mode_t);
 UK_TRACEPOINT(trace_vfs_chmod_ret, "");
