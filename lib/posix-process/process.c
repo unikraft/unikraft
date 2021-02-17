@@ -34,6 +34,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/prctl.h>
 #include <sys/resource.h>
 #include <uk/process.h>
@@ -429,6 +430,16 @@ UK_SYSCALL_R_DEFINE(int, setrlimit, int, resource, const struct rlimit *, rlim)
 {
 	return uk_syscall_r_prlimit64(0, (long) resource,
 				      (long) rlim, (long) NULL);
+}
+
+UK_SYSCALL_R_DEFINE(int, getrusage, int, who,
+		    struct rusage *, usage)
+{
+	if (!usage)
+		return -EFAULT;
+
+	memset(usage, 0, sizeof(*usage));
+	return 0;
 }
 
 #if UK_LIBC_SYSCALLS
