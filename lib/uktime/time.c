@@ -181,8 +181,10 @@ out_error:
 	return -error;
 }
 
-int clock_settime(clockid_t clk_id __unused, const struct timespec *tp __unused)
+UK_SYSCALL_R_DEFINE(int, clock_settime, clockid_t, clk_id,
+		    const struct timespec *, tp)
 {
+	UK_WARN_STUBBED();
 	return 0;
 }
 
