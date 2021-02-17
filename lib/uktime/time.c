@@ -145,8 +145,10 @@ UK_SYSCALL_R_DEFINE(int, gettimeofday, struct timeval *, tv, void *, tz)
 	return 0;
 }
 
-int clock_getres(clockid_t clk_id __unused, struct timespec *res __unused)
+UK_SYSCALL_R_DEFINE(int, clock_getres, clockid_t, clk_id,
+		    struct timespec *, res)
 {
+	UK_WARN_STUBBED();
 	return 0;
 }
 
