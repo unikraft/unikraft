@@ -1,4 +1,6 @@
 clock_getres
+uk_syscall_e_clock_getres
+uk_syscall_r_clock_getres
 clock_gettime
 uk_syscall_e_clock_gettime
 uk_syscall_r_clock_gettime
