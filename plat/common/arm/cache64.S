@@ -73,3 +73,34 @@ ENTRY(clean_and_invalidate_dcache_range)
 
 	ret
 END(clean_and_invalidate_dcache_range)
+
+ENTRY(invalidate_dcache_range)
+	/* Get information about the caches from CTR_EL0 */
+	mrs	x4, ctr_el0
+	mov	x2, #CTR_BYTES_PER_WORD
+
+	/* Get minimum D cache line size */
+	ubfx	x3, x4, #CTR_DMINLINE_SHIFT, #CTR_DMINLINE_WIDTH
+	lsl	x3, x2, x3
+
+	/* Align the start address to line size */
+	sub	x4, x3, #1
+	and	x2, x0, x4
+	add	x1, x1, x2
+	bic	x0, x0, x4
+1:
+	/* clean D cache by D cache line size */
+	dc	ivac, x0
+	dsb	nsh
+
+	/* Move to next line and reduce the size */
+	add	x0, x0, x3
+	subs	x1, x1, x3
+
+	/* Check if all range has been invalidated */
+	b.hi	1b
+
+	isb
+
+	ret
+END(invalidate_dcache_range)
