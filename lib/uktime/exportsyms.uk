@@ -14,6 +14,8 @@ nanosleep
 uk_syscall_e_nanosleep
 uk_syscall_r_nanosleep
 setitimer
+uk_syscall_e_setitimer
+uk_syscall_r_setitimer
 sleep
 timegm
 times
