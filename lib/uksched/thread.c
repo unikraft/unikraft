@@ -153,9 +153,6 @@ int uk_thread_init(struct uk_thread *thread,
 #ifdef CONFIG_LIBNEWLIBC
 	reent_init(&thread->reent);
 #endif
-#if CONFIG_LIBUKSIGNAL
-	uk_thread_sig_init(&thread->signals_container);
-#endif
 
 	/* Iterate over registered thread initialization functions */
 	uk_thread_inittab_foreach(itr) {
@@ -204,9 +201,6 @@ void uk_thread_fini(struct uk_thread *thread, struct uk_alloc *allocator)
 	struct uk_thread_inittab_entry *itr;
 
 	UK_ASSERT(thread != NULL);
-#if CONFIG_LIBUKSIGNAL
-	uk_thread_sig_uninit(&thread->signals_container);
-#endif
 
 	uk_thread_inittab_foreach_reverse(itr) {
 		if (unlikely(!itr->fini))

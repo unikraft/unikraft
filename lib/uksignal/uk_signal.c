@@ -41,6 +41,7 @@
 #include <signal.h>
 #include <uk/thread.h>
 #include <uk/uk_signal.h>
+#include <uk/essentials.h>
 
 struct uk_proc_sig uk_proc_sig;
 
@@ -61,8 +62,10 @@ int uk_proc_sig_init(struct uk_proc_sig *sig)
 	return 0;
 }
 
-int uk_thread_sig_init(struct uk_thread_sig *sig)
+static int uk_thread_sig_init(struct uk_thread *t)
 {
+	struct uk_thread_sig *sig = &t->signals_container;
+
 	sigemptyset(&sig->mask);
 
 	sig->wait.status = UK_SIG_NOT_WAITING;
@@ -75,9 +78,10 @@ int uk_thread_sig_init(struct uk_thread_sig *sig)
 	return 0;
 }
 
-void uk_thread_sig_uninit(struct uk_thread_sig *sig)
+static void uk_thread_sig_uninit(struct uk_thread *t)
 {
 	/* Clear pending signals */
+	struct uk_thread_sig *sig = &t->signals_container;
 	struct uk_list_head *i, *tmp;
 	struct uk_signal *signal;
 
@@ -90,6 +94,8 @@ void uk_thread_sig_uninit(struct uk_thread_sig *sig)
 		uk_free(uk_alloc_get_default(), signal);
 	}
 }
+
+UK_THREAD_INIT(uk_thread_sig_init, uk_thread_sig_uninit);
 
 int uk_sig_handle_signals(void)
 {
