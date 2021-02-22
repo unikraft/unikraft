@@ -70,6 +70,7 @@ struct uk_thread {
 	struct _reent reent;
 #endif
 #if CONFIG_LIBUKSIGNAL
+	/* TODO: Move to `TLS` and define within uksignal */
 	struct uk_thread_sig signals_container;
 #endif
 };

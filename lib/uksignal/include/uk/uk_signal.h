@@ -110,8 +110,6 @@ struct uk_thread_sig {
 int uk_sig_handle_signals(void);
 
 int uk_proc_sig_init(struct uk_proc_sig *sig);
-int uk_thread_sig_init(struct uk_thread_sig *sig);
-void uk_thread_sig_uninit(struct uk_thread_sig *sig);
 
 /* TODO: replace sched thread_kill? */
 int uk_sig_thread_kill(struct uk_thread *tid, int sig);
