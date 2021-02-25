@@ -30,35 +30,24 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdlib.h>
-#include <uk/plat/thread.h>
-#include <uk/alloc.h>
-#include <uk/plat/common/sw_ctx.h>
-#include <uk/assert.h>
+/*
+ * Platform specific thread functions
+ */
+#ifndef __UKPLAT_CTX_H__
+#define __UKPLAT_CTX_H__
 
-void ukplat_thread_ctx_destroy(struct uk_alloc *allocator, void *ctx)
-{
-	UK_ASSERT(allocator != NULL);
-	UK_ASSERT(ctx != NULL);
+#include <uk/arch/types.h>
+#include <uk/essentials.h>
 
-	uk_free(allocator, ctx);
-}
+struct ukplat_ctx;
 
-int ukplat_ctx_callbacks_init(struct ukplat_ctx_callbacks *ctx_cbs,
-		enum ukplat_ctx_type ctx_type)
-{
-	int err = 0;
+/*
+ * Provided by the platform library
+ */
+__sz ukplat_ctx_size(void);
+void ukplat_ctx_init(struct ukplat_ctx *ctx, unsigned long sp,
+		     unsigned long tlsp);
+void ukplat_ctx_start(struct ukplat_ctx *ctx) __noreturn;
+void ukplat_ctx_switch(struct ukplat_ctx *prevctx, struct ukplat_ctx *nextctx);
 
-	UK_ASSERT(ctx_cbs != NULL);
-
-	switch (ctx_type) {
-	case ukplat_ctx_sw:
-		sw_ctx_callbacks_init(ctx_cbs);
-		break;
-	default:
-		err = EINVAL;
-		break;
-	}
-
-	return err;
-}
+#endif /* __UKPLAT_CTX_H__ */

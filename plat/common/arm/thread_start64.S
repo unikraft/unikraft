@@ -29,7 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include <uk/plat/common/sw_ctx.h>
+#include <uk/plat/common/ctx.h>
 #include <uk/arch/lcpu.h>
 #include <uk/asm.h>
 

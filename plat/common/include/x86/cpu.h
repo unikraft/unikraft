@@ -32,7 +32,7 @@
 
 #include <uk/arch/types.h>
 #include <x86/cpu_defs.h>
-#include <uk/plat/common/sw_ctx.h>
+#include <uk/plat/common/ctx.h>
 #include <stdint.h>
 #include <uk/assert.h>
 #include <uk/alloc.h>
@@ -68,7 +68,7 @@ static inline void cpuid(__u32 fn, __u32 subfn,
 		     : "a"(fn), "c" (subfn));
 }
 
-static inline void save_extregs(struct sw_ctx *ctx)
+static inline void save_extregs(struct ukplat_ctx *ctx)
 {
 	switch (x86_cpu_features.save) {
 	case X86_SAVE_NONE:
@@ -90,7 +90,7 @@ static inline void save_extregs(struct sw_ctx *ctx)
 		break;
 	}
 }
-static inline void restore_extregs(struct sw_ctx *ctx)
+static inline void restore_extregs(struct ukplat_ctx *ctx)
 {
 	switch (x86_cpu_features.save) {
 	case X86_SAVE_NONE:
@@ -118,7 +118,7 @@ static inline __sz arch_extregs_size(void)
 	return x86_cpu_features.extregs_align + x86_cpu_features.extregs_size;
 }
 
-static inline void arch_init_extregs(struct sw_ctx *ctx)
+static inline void arch_init_extregs(struct ukplat_ctx *ctx)
 {
 	ctx->extregs = ALIGN_UP((uintptr_t)ctx->_extregs,
 				x86_cpu_features.extregs_align);
