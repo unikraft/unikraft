@@ -126,7 +126,7 @@ static void schedcoop_schedule(struct uk_sched *s)
 	 * interrupted at the return instruction. And therefore at safe point.
 	 */
 	if (prev != next)
-		uk_sched_thread_switch(s, prev, next);
+		uk_sched_thread_switch(prev, next);
 
 	UK_TAILQ_FOREACH_SAFE(thread, &s->exited_threads, thread_list, tmp) {
 		if (!thread->detached)
@@ -234,8 +234,6 @@ struct uk_sched *uk_schedcoop_init(struct uk_alloc *a)
 	sched = uk_sched_create(a, sizeof(struct schedcoop_private));
 	if (sched == NULL)
 		return NULL;
-
-	ukplat_ctx_callbacks_init(&sched->plat_ctx_cbs, ukplat_ctx_sw);
 
 	prv = sched->prv;
 	UK_TAILQ_INIT(&prv->thread_list);

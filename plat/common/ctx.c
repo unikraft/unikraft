@@ -29,32 +29,60 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef __PLAT_CMN_SW_CTX_H__
-#define __PLAT_CMN_SW_CTX_H__
 
-#ifndef __ASSEMBLY__
 #include <stdint.h>
-#include <uk/plat/thread.h>
+#include <stdlib.h>
+#include <uk/plat/ctx.h>
+#include <uk/plat/common/ctx.h>
+#include <uk/assert.h>
+#include <uk/plat/common/tls.h>
+#include <uk/plat/common/cpu.h>
 
-struct sw_ctx {
-	unsigned long sp;	/* Stack pointer */
-	unsigned long ip;	/* Instruction pointer */
-	unsigned long tlsp;	/* thread-local storage pointer */
-	uintptr_t extregs;	/* Pointer to an area to which extended
-				 * registers are saved on context switch.
-				 */
-	uint8_t _extregs[];     /* Reserved memory area for extended
-				 * registers state
-				 */
-};
+/* Gets run when a new thread is scheduled the first time ever,
+ * defined in x86_[32/64].S
+ */
+extern void asm_thread_starter(void);
 
-void sw_ctx_callbacks_init(struct ukplat_ctx_callbacks *ctx_cbs);
-#endif
+__sz ukplat_ctx_size(void)
+{
+	return sizeof(struct sw_ctx) + arch_extregs_size();
+}
 
-#define OFFSETOF_SW_CTX_SP      0
-#define OFFSETOF_SW_CTX_IP      8
+void ukplat_ctx_init(struct ukplat_ctx *sw_ctx,
+		     unsigned long sp,
+		     unsigned long tlsp)
+{
+	UK_ASSERT(sw_ctx != NULL);
 
-/* TODO This should be better defined in the thread header */
-#define OFFSETOF_UKTHREAD_SW_CTX  16
+	sw_ctx->sp   = sp;
+	sw_ctx->tlsp = tlsp;
+	sw_ctx->ip   = (unsigned long) asm_thread_starter;
+	arch_init_extregs(sw_ctx);
 
-#endif /* __PLAT_CMN_SW_CTX_H__ */
+	save_extregs(sw_ctx);
+}
+
+extern void asm_ctx_start(unsigned long sp, unsigned long ip) __noreturn;
+
+void ukplat_ctx_start(struct ukplat_ctx *sw_ctx)
+{
+	UK_ASSERT(sw_ctx != NULL);
+
+	set_tls_pointer(sw_ctx->tlsp);
+	/* Switch stacks and run the thread */
+	asm_ctx_start(sw_ctx->sp, sw_ctx->ip);
+
+	UK_CRASH("Thread did not start.");
+}
+
+extern void asm_sw_ctx_switch(struct ukplat_ctx *prevctx,
+			      struct ukplat_ctx *nextctx);
+
+void ukplat_ctx_switch(struct ukplat_ctx *prevctx,
+		       struct ukplat_ctx *nextctx)
+{
+	save_extregs(prevctx);
+	restore_extregs(nextctx);
+	set_tls_pointer(nextctx->tlsp);
+	asm_sw_ctx_switch(prevctx, nextctx);
+}

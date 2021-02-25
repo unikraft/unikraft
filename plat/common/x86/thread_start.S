@@ -27,7 +27,7 @@
 /* Taken from Mini-OS arch/x86/x86_64.S */
 
 #include <uk/config.h>
-#include <uk/plat/common/sw_ctx.h>
+#include <uk/plat/common/ctx.h>
 
 #define ENTRY(X) .globl X ; X :
 

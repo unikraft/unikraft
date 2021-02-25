@@ -96,7 +96,6 @@ struct uk_sched {
 	bool threads_started;
 	struct uk_thread idle;
 	struct uk_thread_list exited_threads;
-	struct ukplat_ctx_callbacks plat_ctx_cbs;
 	struct uk_alloc *allocator;
 	struct uk_sched *next;
 	void *prv;
@@ -256,10 +255,10 @@ void uk_sched_thread_kill(struct uk_sched *sched,
 		struct uk_thread *thread);
 
 static inline
-void uk_sched_thread_switch(struct uk_sched *sched,
-		struct uk_thread *prev, struct uk_thread *next)
+void uk_sched_thread_switch(struct uk_thread *prev,
+		struct uk_thread *next)
 {
-	ukplat_thread_ctx_switch(&sched->plat_ctx_cbs, prev->ctx, next->ctx);
+	ukplat_ctx_switch(prev->ctx, next->ctx);
 }
 
 /*
