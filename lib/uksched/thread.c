@@ -108,7 +108,7 @@ extern const struct uk_thread_inittab_entry _uk_thread_inittab_end;
 				 (&_uk_thread_inittab_end))) - 1)
 
 int uk_thread_init(struct uk_thread *thread,
-		struct ukplat_ctx_callbacks *cbs, struct uk_alloc *allocator,
+		struct uk_alloc *allocator,
 		const char *name, void *stack, void *tls,
 		void (*function)(void *), void *arg)
 {
@@ -125,7 +125,7 @@ int uk_thread_init(struct uk_thread *thread,
 	*((unsigned long *) stack) = (unsigned long) thread;
 
 	/* Allocate thread context */
-	ctx = uk_zalloc(allocator, ukplat_thread_ctx_size(cbs));
+	ctx = uk_zalloc(allocator, ukplat_ctx_size());
 	if (!ctx) {
 		ret = -1;
 		goto err_out;
@@ -174,8 +174,8 @@ int uk_thread_init(struct uk_thread *thread,
 	init_sp(&sp, stack, thread->entry, thread->arg);
 
 	/* Platform specific context initialization */
-	ukplat_thread_ctx_init(cbs, thread->ctx, sp,
-			       (uintptr_t) ukarch_tls_pointer(tls));
+	ukplat_ctx_init(thread->ctx, sp,
+			(uintptr_t) ukarch_tls_pointer(tls));
 
 	uk_pr_info("Thread \"%s\": pointer: %p, stack: %p, tls: %p\n",
 		   name, thread, thread->stack, thread->tls);

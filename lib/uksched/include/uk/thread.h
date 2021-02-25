@@ -36,7 +36,7 @@
 #include <uk/alloc.h>
 #include <uk/arch/lcpu.h>
 #include <uk/arch/time.h>
-#include <uk/plat/thread.h>
+#include <uk/plat/ctx.h>
 #if CONFIG_LIBUKSIGNAL
 #include <uk/uk_signal.h>
 #endif
@@ -56,7 +56,7 @@ struct uk_thread {
 	const char *name;
 	void *stack;
 	void *tls;
-	void *ctx;
+	struct ukplat_ctx *ctx;
 	UK_TAILQ_ENTRY(struct uk_thread) thread_list;
 	uint32_t flags;
 	__snsec wakeup_time;
@@ -121,8 +121,7 @@ struct uk_thread *uk_thread_current(void)
 #define set_queueable(_thread)   ((_thread)->flags |=  QUEUEABLE_FLAG)
 #define clear_queueable(_thread) ((_thread)->flags &= ~QUEUEABLE_FLAG)
 
-int uk_thread_init(struct uk_thread *thread,
-		struct ukplat_ctx_callbacks *cbs, struct uk_alloc *allocator,
+int uk_thread_init(struct uk_thread *thread, struct uk_alloc *allocator,
 		const char *name, void *stack, void *tls,
 		void (*function)(void *), void *arg);
 void uk_thread_fini(struct uk_thread *thread,
