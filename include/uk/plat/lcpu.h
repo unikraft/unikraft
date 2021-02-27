@@ -97,6 +97,8 @@ void ukplat_lcpu_halt_to(__snsec until);
  */
 void ukplat_lcpu_halt_irq(void);
 
+int ukplat_lcpu_rstart(__u8 lcpuid, struct ukplat_ctx *ctx);
+
 #ifdef __cplusplus
 }
 #endif
