@@ -102,6 +102,14 @@ static void main_thread_func(void *arg)
 		}
 	}
 
+	/* We use a macro because if we were to use a function we
+	 * would not be able to return from the function if we have
+	 * changed the stack protector inside the function
+	 */
+#if CONFIG_LIBUKSP
+	UKSP_INIT_CANARY();
+#endif
+
 	print_banner(stdout);
 	fflush(stdout);
 
@@ -184,13 +192,6 @@ void ukplat_entry(int argc, char *argv[])
 #if CONFIG_LIBUKSCHED
 	struct uk_sched *s = NULL;
 	struct uk_thread *main_thread = NULL;
-#endif
-
-	/* We use a macro because if we were to use a function we
-	 * would not be able to return from the function if we have
-	 * changed the stack protector inside the function */
-#if CONFIG_LIBUKSP
-	UKSP_INIT_CANARY();
 #endif
 
 	uk_ctor_func_t *ctorfn;
