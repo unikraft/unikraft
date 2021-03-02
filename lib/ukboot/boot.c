@@ -63,7 +63,7 @@
 #ifdef CONFIG_LIBUKLIBPARAM
 #include <uk/libparam.h>
 #endif /* CONFIG_LIBUKLIBPARAM */
-#if CONFIG_LIBUKSP
+#ifdef CONFIG_LIBUKSP
 #include <uk/sp.h>
 #endif
 #include "banner.h"
@@ -102,12 +102,8 @@ static void main_thread_func(void *arg)
 		}
 	}
 
-	/* We use a macro because if we were to use a function we
-	 * would not be able to return from the function if we have
-	 * changed the stack protector inside the function
-	 */
-#if CONFIG_LIBUKSP
-	UKSP_INIT_CANARY();
+#ifdef CONFIG_LIBUKSP
+	uk_stack_chk_guard_setup();
 #endif
 
 	print_banner(stdout);
