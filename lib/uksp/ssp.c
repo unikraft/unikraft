@@ -39,7 +39,7 @@
 #ifdef CONFIG_LIBUKSP_VALUE_USECONSTANT
 const unsigned long __stack_chk_guard = CONFIG_LIBUKSP_VALUE_CONSTANT;
 #else
-const unsigned long __stack_chk_guard = 0xDEADBEEF;
+const unsigned long __stack_chk_guard = 0xFF0A0D00; /* terminator canary */
 #endif
 
 __attribute__((noreturn))

@@ -39,8 +39,8 @@ config LIBUKSP_VALUE_RANDOM
 endchoice
 
 config LIBUKSP_VALUE_CONSTANT
-	int "Canary value"
+	hex "Canary value"
 	depends on LIBUKSP_VALUE_USECONSTANT
-	default 42
+	default 0xff0a0d00
 
 endif
