@@ -44,12 +44,22 @@ extern "C" {
 
 extern const unsigned long __stack_chk_guard;
 
+/*
+ * Note: This function must always be inlined and may only be called from
+ * a function that never returns.
+ */
+__attribute__((always_inline))
+static inline void uk_stack_chk_guard_setup(void)
+{
 #ifdef CONFIG_LIBUKSP_VALUE_RANDOM
-#define UKSP_INIT_CANARY() (*(DECONST(unsigned long *, &__stack_chk_guard)) \
-		= uk_swrand_randr())
-#else
-#define UKSP_INIT_CANARY()
+	unsigned long guard;
+
+	uk_swrand_fill_buffer(&guard, sizeof(guard));
+	guard &= ~0xFFul; /* Use least significant byte as null terminator */
+
+	(*DECONST(unsigned long *, &__stack_chk_guard)) = guard;
 #endif
+}
 
 #ifdef __cplusplus
 }
