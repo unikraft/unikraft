@@ -47,10 +47,10 @@ extern char _dtb[];
 extern char _text[], _etext[];
 
 /* [__eh_frame_start, __eh_frame_end]: contains .eh_frame section */
-extern char __eh_frame_start, __eh_frame_end;
+extern char __eh_frame_start[], __eh_frame_end[];
 
 /* [__eh_frame_hdr_start, __eh_frame_hdr_end]: contains .eh_frame_hdr section */
-extern char __eh_frame_hdr_start, __eh_frame_hdr_end;
+extern char __eh_frame_hdr_start[], __eh_frame_hdr_end[];
 
 /* [_rodata, _erodata]: contains .rodata.* sections */
 extern char _rodata[], _erodata[];
