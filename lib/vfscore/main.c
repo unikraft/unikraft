@@ -1461,12 +1461,16 @@ int __statfs(const char *pathname, struct statfs *buf)
 		goto out_errno;
 	trace_vfs_statfs_ret();
 	return 0;
-	out_errno:
+
+out_errno:
 	trace_vfs_statfs_err(error);
-	errno = error;
-	return -1;
+	return -error;
 }
-__weak_alias(__statfs, statfs);
+
+UK_SYSCALL_R_DEFINE(int, statfs, const char*, pathname, struct statfs*, buf)
+{
+	return __statfs(pathname, buf);
+}
 
 LFS64(statfs);
 

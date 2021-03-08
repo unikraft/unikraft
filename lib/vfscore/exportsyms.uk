@@ -76,6 +76,8 @@ uk_syscall_e_chdir
 uk_syscall_r_chdir
 fstatat
 statfs
+uk_syscall_e_statfs
+uk_syscall_r_statfs
 lstat
 uk_syscall_e_lstat
 uk_syscall_r_lstat
