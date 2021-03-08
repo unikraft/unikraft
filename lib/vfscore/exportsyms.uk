@@ -161,6 +161,8 @@ fcntl
 readdir_r
 readdir64_r
 fstatfs
+uk_syscall_e_fstatfs
+uk_syscall_r_fstatfs
 eaccess
 euidaccess
 rename

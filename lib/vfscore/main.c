@@ -1496,12 +1496,15 @@ int __fstatfs(int fd, struct statfs *buf)
 	trace_vfs_fstatfs_ret();
 	return 0;
 
-	out_errno:
+out_errno:
 	trace_vfs_fstatfs_err(error);
-	errno = error;
-	return -1;
+	return -error;
 }
-__weak_alias(__fstatfs, fstatfs);
+
+UK_SYSCALL_R_DEFINE(int, fstatfs, int, fd, struct statfs*, buf)
+{
+	return __fstatfs(fd, buf);
+}
 
 LFS64(fstatfs);
 
