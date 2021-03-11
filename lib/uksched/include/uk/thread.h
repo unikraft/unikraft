@@ -57,6 +57,7 @@ struct uk_thread {
 	void *stack;
 	void *tls;
 	struct ukplat_ctx *ctx;
+	uintptr_t tlsp; /* Arch TLS pointer */
 	UK_TAILQ_ENTRY(struct uk_thread) thread_list;
 	uint32_t flags;
 	__snsec wakeup_time;

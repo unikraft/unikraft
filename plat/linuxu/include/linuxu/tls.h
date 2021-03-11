@@ -32,9 +32,24 @@
 
 #include <linuxu/syscall.h>
 
-static inline void set_tls_pointer(unsigned long arg)
+static inline void set_tls_pointer(__uptr arg)
 {
 	sys_arch_prctl(ARCH_SET_FS, arg);
+}
+
+static inline __uptr get_tls_pointer(void)
+{
+	__uptr addr;
+	int ret;
+
+	/* TODO: Read from FS register directly instead
+	 * of issue'ing a system Call
+	 */
+	ret = sys_arch_prctl(ARCH_GET_FS, (long) &addr);
+	if (ret < 0)
+		UK_CRASH("Failed to retrieve TLSP\n");
+
+	return addr;
 }
 
 #endif /* __PLAT_LINUXU_TLS_H__ */
