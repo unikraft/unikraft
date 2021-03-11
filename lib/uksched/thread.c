@@ -133,6 +133,7 @@ int uk_thread_init(struct uk_thread *thread,
 	thread->name = name;
 	thread->stack = stack;
 	thread->tls = tls;
+	thread->tlsp = (tls == NULL) ? 0 : (uintptr_t) ukarch_tls_pointer(tls);
 	thread->entry = function;
 	thread->arg = arg;
 
@@ -163,7 +164,7 @@ int uk_thread_init(struct uk_thread *thread,
 			goto err_fini;
 	}
 
-	/* Prepare stack and TLS
+	/* Prepare stack
 	 * NOTE: In case the function pointer was changed by a thread init
 	 *       function (e.g., encapsulation), we prepare the stack here
 	 *       with the final setup
@@ -171,8 +172,7 @@ int uk_thread_init(struct uk_thread *thread,
 	init_sp(&sp, stack, thread->entry, thread->arg);
 
 	/* Platform specific context initialization */
-	ukplat_ctx_init(thread->ctx, sp,
-			(uintptr_t) ukarch_tls_pointer(tls));
+	ukplat_ctx_init(thread->ctx, sp);
 
 	uk_pr_info("Thread \"%s\": pointer: %p, stack: %p, tls: %p\n",
 		   name, thread, thread->stack, thread->tls);

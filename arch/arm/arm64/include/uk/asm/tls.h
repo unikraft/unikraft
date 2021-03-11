@@ -64,7 +64,7 @@ static inline void ukarch_tls_area_copy(void *tls_area)
 	memset(tls_area + tls_data_len + 16, 0, tls_bss_len);
 }
 
-static inline void *ukarch_tls_pointer(void *tls_area)
+static inline __uptr ukarch_tls_pointer(void *tls_area)
 {
-	return tls_area;
+	return (__uptr) tls_area;
 }

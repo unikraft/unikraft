@@ -36,7 +36,6 @@
 #include <uk/plat/ctx.h>
 #include <uk/alloc.h>
 #include <uk/sched.h>
-#include <uk/arch/tls.h>
 #if CONFIG_LIBUKSCHEDCOOP
 #include <uk/schedcoop.h>
 #endif
@@ -146,6 +145,7 @@ void uk_sched_start(struct uk_sched *sched)
 {
 	UK_ASSERT(sched != NULL);
 	__uk_sched_thread_current = &sched->idle;
+	ukplat_tlsp_set(sched->idle.tlsp);
 	ukplat_ctx_start(sched->idle.ctx);
 }
 

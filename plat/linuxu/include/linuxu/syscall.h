@@ -224,6 +224,7 @@ static inline int sys_sigprocmask(int how,
 }
 
 #define ARCH_SET_FS 0x1002
+#define ARCH_GET_FS 0x1003
 static inline int sys_arch_prctl(int code, unsigned long addr)
 {
 	return (int) syscall2(__SC_ARCH_PRCTL,

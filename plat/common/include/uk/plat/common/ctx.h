@@ -39,7 +39,6 @@
 struct ukplat_ctx {
 	unsigned long sp;	/* Stack pointer */
 	unsigned long ip;	/* Instruction pointer */
-	unsigned long tlsp;	/* thread-local storage pointer */
 	uintptr_t extregs;	/* Pointer to an area to which extended
 				 * registers are saved on context switch.
 				 */

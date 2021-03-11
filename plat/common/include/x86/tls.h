@@ -30,7 +30,15 @@
 #ifndef __PLAT_CMN_X86_TLS_H__
 #define __PLAT_CMN_X86_TLS_H__
 
+#include <x86/cpu.h> /* rdmsrl, wrmsrl */
 #include <x86/cpu_defs.h>
+
+/* TODO: On latest CPUs a faster instruction can be used:
+ * https://www.kernel.org/doc/html/latest/x86/x86_64/fsgs.html
+ *  #accessing-fs-gs-base-with-the-fsgsbase-instructions
+ */
+
+#define get_tls_pointer() rdmsrl(X86_MSR_FS_BASE)
 
 #define set_tls_pointer(ptr) wrmsrl(X86_MSR_FS_BASE, ptr)
 

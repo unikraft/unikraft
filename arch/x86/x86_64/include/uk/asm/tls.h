@@ -68,7 +68,7 @@ static inline void ukarch_tls_area_copy(void *tls_area)
 	*((__uptr *)(tls_area + tls_len)) = (__uptr)(tls_area + tls_len);
 }
 
-static inline void *ukarch_tls_pointer(void *tls_area)
+static inline __uptr ukarch_tls_pointer(void *tls_area)
 {
-	return tls_area + (_tls_end - _tls_start);
+	return (__uptr) tls_area + ((__uptr) _tls_end - (__uptr) _tls_start);
 }

@@ -1,8 +1,11 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
+ *          Simon Kuenzer <simon.kuenzer@neclab.eu>
  *
  * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2021, NEC Laboratories Europe GmbH. NEC Corporation.
+ *                     All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,58 +33,18 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdint.h>
-#include <stdlib.h>
-#include <uk/plat/ctx.h>
-#include <uk/plat/common/ctx.h>
-#include <uk/assert.h>
-#include <uk/plat/common/tls.h>
-#include <uk/plat/common/cpu.h>
+#include <uk/arch/types.h>
+#include <uk/plat/tls.h>
 
-/* Gets run when a new thread is scheduled the first time ever,
- * defined in x86_[32/64].S
- */
-extern void asm_thread_starter(void);
-
-__sz ukplat_ctx_size(void)
-{
-	return sizeof(struct sw_ctx) + arch_extregs_size();
-}
-
-void ukplat_ctx_init(struct ukplat_ctx *sw_ctx,
-		     unsigned long sp)
-{
-	UK_ASSERT(sw_ctx != NULL);
-
-	sw_ctx->sp   = sp;
-	sw_ctx->ip   = (unsigned long) asm_thread_starter;
-	arch_init_extregs(sw_ctx);
-
-	save_extregs(sw_ctx);
-}
-
-extern void asm_ctx_start(unsigned long sp, unsigned long ip) __noreturn;
-
-void ukplat_ctx_start(struct ukplat_ctx *sw_ctx)
-{
-	UK_ASSERT(sw_ctx != NULL);
-
-	/* Switch stacks and run the thread */
-	asm_ctx_start(sw_ctx->sp, sw_ctx->ip);
-
-	UK_CRASH("Thread did not start.");
-}
-
-extern void asm_sw_ctx_switch(struct ukplat_ctx *prevctx,
-			      struct ukplat_ctx *nextctx);
-
-void ukplat_ctx_switch(struct ukplat_ctx *prevctx,
-		       struct ukplat_ctx *nextctx)
-{
-	save_extregs(prevctx);
-	restore_extregs(nextctx);
-	asm_sw_ctx_switch(prevctx, nextctx);
-}
+#if defined(LINUXUPLAT)
+#include <linuxu/tls.h>
+#elif defined(__X86_64__)
+#include <x86/tls.h>
+#elif defined(__ARM_64__)
+#include <arm/arm64/tls.h>
+#else
+#error "For thread-local storage support, add tls.h for current architecture."
+#endif
 
 __uptr ukplat_tlsp_get(void)
 {
