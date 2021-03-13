@@ -1,5 +1,8 @@
 getpid
 getppid
+setfsuid
+uk_syscall_e_setfsuid
+uk_syscall_r_setfsuid
 getlogin
 getpwnam
 geteuid
