@@ -138,6 +138,11 @@ UK_SYSCALL_R_DEFINE(int, capset, void*, hdrp, void*, datap)
 	return 0;
 }
 
+UK_SYSCALL_R_DEFINE(int, capget, void*, hdrp, void*, datap)
+{
+	return 0;
+}
+
 char *getlogin(void)
 {
 	return 0;
