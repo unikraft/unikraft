@@ -17,6 +17,9 @@ uk_syscall_r_setuid
 capset
 uk_syscall_e_capset
 uk_syscall_r_capset
+setfsgid
+uk_syscall_e_setfsgid
+uk_syscall_r_setfsgid
 issetugid
 initgroups
 uk_syscall_e_getpid
