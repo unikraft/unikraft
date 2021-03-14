@@ -137,6 +137,11 @@ static int pipe_buf_can_read(struct pipe_buf *pipe_buf)
 	return pipe_buf_get_available(pipe_buf) > 0;
 }
 
+static int pipe_file_can_read(struct pipe_file *pipe_file)
+{
+	return pipe_buf_can_read(pipe_file->buf) || !(pipe_file->w_refcount);
+}
+
 static unsigned long pipe_buf_write(struct pipe_buf *pipe_buf,
 		struct iovec *iovec, size_t iovec_off)
 {
@@ -335,7 +340,11 @@ static int pipe_read(struct vnode *vnode,
 					while (!pipe_buf_can_read(pipe_buf)) {
 						uk_mutex_unlock(&pipe_buf->rdlock);
 						uk_waitq_wait_event(&pipe_buf->rdwq,
-							pipe_buf_can_read(pipe_buf));
+							pipe_file_can_read(pipe_file));
+
+						if (!pipe_file->w_refcount)
+							return 0;
+
 						uk_mutex_lock(&pipe_buf->rdlock);
 					}
 				}
@@ -348,6 +357,8 @@ static int pipe_read(struct vnode *vnode,
 
 				/* wake some writers */
 				uk_waitq_wake_up(&pipe_buf->wrwq);
+
+				break;
 			}
 		}
 
