@@ -121,9 +121,6 @@ int uk_thread_init(struct uk_thread *thread,
 	UK_ASSERT(stack != NULL);
 	UK_ASSERT(!have_tls_area() || tls != NULL);
 
-	/* Save pointer to the thread on the stack to get current thread */
-	*((unsigned long *) stack) = (unsigned long) thread;
-
 	/* Allocate thread context */
 	ctx = uk_zalloc(allocator, ukplat_ctx_size());
 	if (!ctx) {

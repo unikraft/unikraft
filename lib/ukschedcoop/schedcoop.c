@@ -104,7 +104,6 @@ static void schedcoop_schedule(struct uk_sched *s)
 			else
 				set_queueable(prev);
 			clear_queueable(next);
-			ukplat_stack_set_current_thread(next);
 			break;
 		} else if (is_runnable(prev)) {
 			next = prev;
@@ -126,7 +125,7 @@ static void schedcoop_schedule(struct uk_sched *s)
 	 * interrupted at the return instruction. And therefore at safe point.
 	 */
 	if (prev != next)
-		uk_sched_thread_switch(prev, next);
+		uk_sched_thread_switch(next);
 
 	UK_TAILQ_FOREACH_SAFE(thread, &s->exited_threads, thread_list, tmp) {
 		if (!thread->detached)
