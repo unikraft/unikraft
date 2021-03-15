@@ -33,6 +33,8 @@ $(eval $(call buildrule_libobj_multitarget,$(L),$(S))) \
 ); \
 $(eval $(call buildrule_olib,$(L))); \
 $(eval UK_OLIBS-y += $(call libname2olib,$(L))); \
+, \
+$(call verbose_info,Warning: '$(L)' has no sources$(comma) ignoring...) \
 ) \
 )
 endif
@@ -56,8 +58,12 @@ $(eval $(call buildrule_libobj_multitarget,$(L),$(S))) \
 ); \
 $(eval $(call buildrule_olib,$(L))); \
 $(eval $(call uc,$(P))_OLIBS-y    += $(call libname2olib,$(L))); \
+, \
+$(call verbose_info,Warning: '$(L) has no sources$(comma) ignoring...) \
 ) \
 ) \
+, \
+$(call verbose_info,Warning: '$(P)' has no registered libraries$(comma) ignoring...) \
 ); \
 )
 endif
