@@ -47,6 +47,9 @@
 
 struct uk_sched *uk_sched_head;
 
+/* TODO: Define per CPU */
+struct uk_thread *__uk_sched_thread_current;
+
 /* FIXME Support for external schedulers */
 struct uk_sched *uk_sched_default_init(struct uk_alloc *a)
 {
@@ -142,6 +145,7 @@ struct uk_sched *uk_sched_create(struct uk_alloc *a, size_t prv_size)
 void uk_sched_start(struct uk_sched *sched)
 {
 	UK_ASSERT(sched != NULL);
+	__uk_sched_thread_current = &sched->idle;
 	ukplat_ctx_start(sched->idle.ctx);
 }
 
