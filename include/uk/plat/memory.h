@@ -157,12 +157,6 @@ int ukplat_memallocator_set(struct uk_alloc *a);
  */
 struct uk_alloc *ukplat_memallocator_get(void);
 
-/**
- * Sets the current thread address on top of kernel stack
- * @param thread_addr Current thread address
- */
-void ukplat_stack_set_current_thread(void *thread_addr);
-
 #ifdef __cplusplus
 }
 #endif

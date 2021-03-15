@@ -30,6 +30,7 @@ uk_thread_attr_set_prio
 uk_thread_attr_get_prio
 uk_thread_attr_set_timeslice
 uk_thread_attr_get_timeslice
+__uk_sched_thread_current
 
 # Newlib related
 __getreent

@@ -95,15 +95,13 @@ int uk_thread_get_prio(const struct uk_thread *thread, prio_t *prio);
 int uk_thread_set_timeslice(struct uk_thread *thread, int timeslice);
 int uk_thread_get_timeslice(const struct uk_thread *thread, int *timeslice);
 
+/* managed by sched.c */
+extern struct uk_thread *__uk_sched_thread_current;
+
 static inline
 struct uk_thread *uk_thread_current(void)
 {
-	struct uk_thread **current;
-	unsigned long sp = ukarch_read_sp();
-
-	current = (struct uk_thread **) (sp & STACK_MASK_TOP);
-
-	return *current;
+	return __uk_sched_thread_current;
 }
 
 #define RUNNABLE_FLAG   0x00000001
