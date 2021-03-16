@@ -170,11 +170,19 @@ UK_SYSCALL_DEFINE(int, munmap, void*, addr, size_t, len)
 	return 0;
 }
 
+UK_LLSYSCALL_R_DEFINE(int, mremap, void*, old_address, size_t, old_size,
+		size_t, new_size, int, flags, unsigned long, arg)
+{
+	return 0;
+}
+
+#if UK_LIBC_SYSCALLS
 void *mremap(void *old_address __unused, size_t old_size __unused,
 	     size_t new_size __unused, int flags __unused, ...)
 {
 	return NULL;
 }
+#endif
 
 UK_SYSCALL_R_DEFINE(int, madvise, void*, addr, size_t, length, int, advice)
 {
