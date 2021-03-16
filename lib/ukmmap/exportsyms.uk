@@ -8,3 +8,5 @@ mremap
 madvise
 uk_syscall_e_madvise
 uk_syscall_r_madvise
+uk_syscall_e_mremap
+uk_syscall_r_mremap
