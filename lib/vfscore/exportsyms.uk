@@ -84,6 +84,8 @@ lstat
 uk_syscall_e_lstat
 uk_syscall_r_lstat
 lchown
+uk_syscall_e_lchown
+uk_syscall_r_lchown
 openat
 opendir
 readdir
