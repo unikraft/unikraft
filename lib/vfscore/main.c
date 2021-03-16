@@ -644,20 +644,16 @@ UK_TRACEPOINT(trace_vfs_ioctl, "%d 0x%x", int, unsigned long);
 UK_TRACEPOINT(trace_vfs_ioctl_ret, "");
 UK_TRACEPOINT(trace_vfs_ioctl_err, "%d", int);
 
-int ioctl(int fd, unsigned long int request, ...)
+UK_LLSYSCALL_R_DEFINE(int, ioctl, int, fd, unsigned long int, request,
+		void*, arg)
 {
 	struct vfscore_file *fp;
 	int error;
-	va_list ap;
-	void* arg;
 
 	trace_vfs_ioctl(fd, request);
 	/* glibc ABI provides a variadic prototype for ioctl so we need to agree
 	 * with it, since we now include sys/ioctl.h
 	 * read the first argument and pass it to sys_ioctl() */
-	va_start(ap, request);
-	arg = va_arg(ap, void*);
-	va_end(ap);
 
 	error = fget(fd, &fp);
 	if (error)
@@ -671,11 +667,24 @@ int ioctl(int fd, unsigned long int request, ...)
 	trace_vfs_ioctl_ret();
 	return 0;
 
-	out_errno:
+out_errno:
 	trace_vfs_ioctl_err(error);
-	errno = error;
-	return -1;
+	return -error;
 }
+
+#if UK_LIBC_SYSCALL
+int ioctl(int fd, unsigned long int request, ...)
+{
+	va_list ap;
+	void *arg;
+
+	va_start(ap, request);
+	arg = va_arg(ap, void*);
+	va_end(ap);
+
+	return uk_syscall_e_ioctl(fd, request, arg);
+}
+#endif
 
 UK_TRACEPOINT(trace_vfs_fsync, "%d", int);
 UK_TRACEPOINT(trace_vfs_fsync_ret, "");
