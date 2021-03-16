@@ -36,7 +36,6 @@
 #include <uk/alloc.h>
 #include <uk/arch/lcpu.h>
 #include <uk/arch/time.h>
-#include <uk/plat/ctx.h>
 #include <uk/arch/ctx.h>
 #if CONFIG_LIBUKSIGNAL
 #include <uk/uk_signal.h>
@@ -57,7 +56,7 @@ struct uk_thread {
 	const char *name;
 	void *stack;
 	void *tls;
-	struct ukplat_ctx *ctx;
+	struct ukarch_ctx ctx;
 	struct ukarch_ectx *ectx;
 	uintptr_t tlsp; /* Arch TLS pointer */
 	UK_TAILQ_ENTRY(struct uk_thread) thread_list;
@@ -121,6 +120,7 @@ struct uk_thread *uk_thread_current(void)
 #define is_queueable(_thread)    ((_thread)->flags &   QUEUEABLE_FLAG)
 #define set_queueable(_thread)   ((_thread)->flags |=  QUEUEABLE_FLAG)
 #define clear_queueable(_thread) ((_thread)->flags &= ~QUEUEABLE_FLAG)
+
 
 int uk_thread_init(struct uk_thread *thread, struct uk_alloc *allocator,
 		const char *name, void *stack, void *tls,

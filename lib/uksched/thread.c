@@ -41,27 +41,21 @@
 #include <uk/assert.h>
 #include <uk/arch/tls.h>
 
-/* Pushes the specified value onto the stack of the specified thread */
-static void stack_push(unsigned long *sp, unsigned long value)
+typedef void (*capsule_fn)(void *);
+
+static __noreturn void thread_capsule(long funcp, long argp)
 {
-	*sp -= sizeof(unsigned long);
-	*((unsigned long *) *sp) = value;
-}
+	capsule_fn func;
 
-static void init_sp(unsigned long *sp, char *stack,
-		void (*function)(void *), void *data)
-{
-	*sp = (unsigned long) stack + STACK_SIZE;
+	UK_ASSERT(funcp);
 
-#if defined(__X86_64__)
-	/* Must ensure that (%rsp + 8) is 16-byte aligned
-	 * at the start of thread_starter.
-	 */
-	stack_push(sp, 0);
-#endif
+	func = (capsule_fn) funcp;
+	func((void *) argp);
 
-	stack_push(sp, (unsigned long) function);
-	stack_push(sp, (unsigned long) data);
+	uk_sched_thread_exit();
+	uk_pr_crit("uk_sched_thread_exit() unexpectedly returned! Busy looping...\n");
+	for (;;)
+		uk_sched_yield();
 }
 
 #ifdef CONFIG_LIBNEWLIBC
@@ -113,7 +107,6 @@ int uk_thread_init(struct uk_thread *thread,
 		void (*function)(void *), void *arg)
 {
 	unsigned long sp;
-	void *ctx;
 	void *ectx = NULL;
 	__sz ectx_size;
 	int ret = 0;
@@ -123,12 +116,6 @@ int uk_thread_init(struct uk_thread *thread,
 	UK_ASSERT(stack != NULL);
 	UK_ASSERT(!have_tls_area() || tls != NULL);
 
-	/* Allocate thread context */
-	ctx = uk_zalloc(allocator, ukplat_ctx_size());
-	if (!ctx) {
-		ret = -1;
-		goto err_out;
-	}
 	/* Allocate thread extended context */
 	ectx_size = ukarch_ectx_size();
 	if (ectx_size > 0) {
@@ -140,7 +127,6 @@ int uk_thread_init(struct uk_thread *thread,
 	}
 
 	memset(thread, 0, sizeof(*thread));
-	thread->ctx = ctx;
 	thread->ectx = ectx;
 	thread->name = name;
 	thread->stack = stack;
@@ -176,15 +162,10 @@ int uk_thread_init(struct uk_thread *thread,
 			goto err_fini;
 	}
 
-	/* Prepare stack
-	 * NOTE: In case the function pointer was changed by a thread init
-	 *       function (e.g., encapsulation), we prepare the stack here
-	 *       with the final setup
-	 */
-	init_sp(&sp, stack, thread->entry, thread->arg);
-
-	/* Platform specific context initialization */
-	ukplat_ctx_init(thread->ctx, sp);
+	/* Architecture-specific context initialization */
+	sp = (__uptr) stack + STACK_SIZE;
+	ukarch_ctx_init_entry2(&thread->ctx, sp, 0, thread_capsule,
+			       (long) function, (long) arg);
 
 	uk_pr_info("Thread \"%s\": pointer: %p, stack: %p, tls: %p\n",
 		   name, thread, thread->stack, thread->tls);
@@ -200,8 +181,6 @@ err_fini:
 			continue;
 		(itr->fini)(thread);
 	}
-	if (thread->ctx)
-		uk_free(allocator, thread->ctx);
 	if (thread->ectx)
 		uk_free(allocator, thread->ectx);
 	thread->ectx = NULL;
@@ -220,9 +199,6 @@ void uk_thread_fini(struct uk_thread *thread, struct uk_alloc *allocator)
 			continue;
 		(itr->fini)(thread);
 	}
-	if (thread->ctx)
-		uk_free(allocator, thread->ctx);
-	thread->ctx = NULL;
 	if (thread->ectx)
 		uk_free(allocator, thread->ectx);
 	thread->ectx = NULL;
