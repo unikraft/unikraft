@@ -2238,7 +2238,7 @@ UK_SYSCALL_R_DEFINE(int, fchown, int, fd, uid_t, owner, gid_t, group)
 	return 0;
 }
 
-int chown(const char *path __unused, uid_t owner __unused, gid_t group __unused)
+UK_SYSCALL_R_DEFINE(int, chown, const char*, path, uid_t, owner, gid_t, group)
 {
 	UK_WARN_STUBBED();
 	return 0;
