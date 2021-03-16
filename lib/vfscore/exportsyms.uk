@@ -72,6 +72,8 @@ getcwd
 uk_syscall_e_getcwd
 uk_syscall_r_getcwd
 chown
+uk_syscall_e_chown
+uk_syscall_r_chown
 chroot
 chdir
 uk_syscall_e_chdir
