@@ -2354,11 +2354,10 @@ fs_noop(void)
 	return 0;
 }
 
-int chroot(const char *path __unused)
+UK_SYSCALL_R_DEFINE(int, chroot, const char*, path)
 {
 	UK_WARN_STUBBED();
-	errno = ENOSYS;
-	return -1;
+	return -ENOSYS;
 }
 
 static struct task _main_task_impl;
