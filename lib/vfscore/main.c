@@ -2230,7 +2230,7 @@ UK_SYSCALL_R_DEFINE(int, fchmod, int, fd, mode_t, mode)
 UK_TRACEPOINT(trace_vfs_fchown, "\"%d\" %d %d", int, uid_t, gid_t);
 UK_TRACEPOINT(trace_vfs_fchown_ret, "");
 
-int fchown(int fd __unused, uid_t owner __unused, gid_t group __unused)
+UK_SYSCALL_R_DEFINE(int, fchown, int, fd, uid_t, owner, gid_t, group)
 {
 	trace_vfs_fchown(fd, owner, group);
 	UK_WARN_STUBBED();
