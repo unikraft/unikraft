@@ -32,7 +32,6 @@
 
 #include <uk/arch/types.h>
 #include <x86/cpu_defs.h>
-#include <uk/plat/common/ctx.h>
 #include <stdint.h>
 #include <uk/assert.h>
 #include <uk/alloc.h>

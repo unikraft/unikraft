@@ -142,10 +142,14 @@ struct uk_sched *uk_sched_create(struct uk_alloc *a, size_t prv_size)
 
 void uk_sched_start(struct uk_sched *sched)
 {
+	struct ukarch_ctx origin;
+
 	UK_ASSERT(sched != NULL);
 	__uk_sched_thread_current = &sched->idle;
 	ukplat_tlsp_set(sched->idle.tlsp);
-	ukplat_ctx_start(sched->idle.ctx);
+	ukarch_ctx_switch(&origin, &sched->idle.ctx);
+
+	UK_CRASH("Failed to start scheduler: context switch unexpectedly returned\n");
 }
 
 static void *create_stack(struct uk_alloc *allocator)
