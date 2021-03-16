@@ -1,7 +1,9 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
 /*
- * Copyright (c) 2009, Citrix Systems, Inc.
- * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation.
+ * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ *
+ * Copyright (c) 2021, NEC Laboratories Europe GmbH, NEC Corporation.
+ *                     All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -24,50 +26,18 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-/* Taken from Mini-OS arch/x86/x86_64.S */
 
-#include <uk/config.h>
-#include <uk/plat/common/ctx.h>
-
-#define ENTRY(X) .globl X ; X :
-
-ENTRY(asm_thread_starter)
-	popq %rdi
-	popq %rbx
-	pushq $0
-	xorq %rbp,%rbp
-	call *%rbx
-	call *uk_sched_thread_exit@GOTPCREL(%rip)
-
-ENTRY(asm_ctx_start)
-	mov %rdi, %rsp      /* set SP */
-	push %rsi           /* push IP and return */
-	ret
-
-ENTRY(asm_sw_ctx_switch)
-	pushq %rbp
-	pushq %rbx
-	pushq %r12
-	pushq %r13
-	pushq %r14
-	pushq %r15
-	movq %rsp, OFFSETOF_SW_CTX_SP(%rdi)       /* save ESP */
-	movq OFFSETOF_SW_CTX_SP(%rsi), %rsp       /* restore ESP */
-	lea .Lreturn(%rip), %rbx
-	movq %rbx, OFFSETOF_SW_CTX_IP(%rdi)       /* save EIP */
-	pushq OFFSETOF_SW_CTX_IP(%rsi)            /* restore EIP */
-
-#if CONFIG_LIBUKSIGNAL
-	/* TODO: do we need to save regs? (e.g fpu) */
-	/* stack is aligned here */
-	call uk_sig_handle_signals
+#ifndef __UKARCH_CTX_H__
+#error Do not include this header directly
 #endif
-	ret
-.Lreturn:
-	popq %r15
-	popq %r14
-	popq %r13
-	popq %r12
-	popq %rbx
-	popq %rbp
-	ret
+
+#define ukarch_rstack_push(sp, value)			\
+	({						\
+		unsigned long __sp__ = (sp);		\
+		__sp__ -= sizeof(value);		\
+		*((typeof(value) *) __sp__) = (value);	\
+		__sp__;					\
+	})
+
+#define UKARCH_SP_ALIGN		(1 << 1)
+#define UKARCH_SP_ALIGN_MASK	(UKARCH_SP_ALIGN - 1)
