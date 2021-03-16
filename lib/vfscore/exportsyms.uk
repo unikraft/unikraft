@@ -83,6 +83,8 @@ chown
 uk_syscall_e_chown
 uk_syscall_r_chown
 chroot
+uk_syscall_e_chroot
+uk_syscall_r_chroot
 chdir
 uk_syscall_e_chdir
 uk_syscall_r_chdir
