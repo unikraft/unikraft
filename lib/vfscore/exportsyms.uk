@@ -105,6 +105,8 @@ preadv
 uk_syscall_e_preadv
 uk_syscall_r_preadv
 ioctl
+uk_syscall_e_ioctl
+uk_syscall_r_ioctl
 fdatasync
 uk_syscall_e_fdatasync
 uk_syscall_r_fdatasync
