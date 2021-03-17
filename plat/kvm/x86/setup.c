@@ -73,6 +73,24 @@ static inline void _mb_get_cmdline(struct multiboot_info *mi)
 	cmdline[(sizeof(cmdline) - 1)] = '\0';
 }
 
+static inline void _mb_get_acpi(struct multiboot_info *mi)
+{
+	size_t *mi_mmap_lenght, *mi_mmap_addr;
+	multiboot_mmap_entry *m;
+
+	/*
+	 * Find the entry with the type 3, that is memory 
+	 * containing ACPI information
+	 */
+	for (offset = 0; offset < mi->mmap_length;
+		 offset += m->size + sizeof(m->size)) {
+		m = (void *)(__uptr)(mi->mmap_addr + offset);
+		if (m->type == MULTIBOOT_MEMORY_ACPI_RECLAIMABLE) {
+			uk_pr_debug("ACPI memory zone found!\n");
+		}
+	}
+}
+
 static inline void _mb_init_mem(struct multiboot_info *mi)
 {
 	multiboot_memory_map_t *m;
@@ -273,6 +291,7 @@ void _libkvmplat_entry(void *arg)
 	 * everything necessary before we initialise memory allocation.
 	 */
 	_mb_get_cmdline(mi);
+	_mb_get_acpi(mi);
 	_mb_init_mem(mi);
 	_mb_init_initrd(mi);
 

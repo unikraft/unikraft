@@ -41,4 +41,7 @@
 /* is the command-line defined? */
 #define MULTIBOOT_INFO_CMDLINE			0x00000004
 
+/* Give us the memory map provided by the BIOS */
+#define MULTIBOOT_INFO_MMAP             0x00000040
+
 #endif /* ! MULTIBOOT_DEFS_HEADER */
