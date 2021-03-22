@@ -136,18 +136,15 @@
 	}
 
 /**
- * @internal This function updates the consumer head for dequeue
+ * This function updates the consumer head for dequeue
  *
- * @param r
+ * @param br
  *   A pointer to the ring structure
  * @param is_sc
  *   Indicates whether multi-consumer path is needed or not
  * @param n
  *   The number of elements we will want to enqueue, i.e. how far should the
  *   head be moved
- * @param behavior
- *   RTE_RING_QUEUE_FIXED:    Dequeue a fixed number of items from a ring
- *   RTE_RING_QUEUE_VARIABLE: Dequeue as many items as possible from ring
  * @param old_head
  *   Returns head value as it was before the move, i.e. where dequeue starts
  * @param new_head
@@ -155,53 +152,49 @@
  * @param entries
  *   Returns the number of entries in the ring BEFORE head was moved
  * @return
- *   - Actual number of objects dequeued.
- *     If behavior == RTE_RING_QUEUE_FIXED, this will be 0 or n only.
+ *   Actual number of objects dequeued.
  */
-static __rte_always_inline unsigned int
-__rte_ring_move_cons_head(struct rte_ring *r, unsigned int is_sc,
-		unsigned int n, enum rte_ring_queue_behavior behavior,
-		uint32_t *old_head, uint32_t *new_head,
-		uint32_t *entries)
-{
-	unsigned int max = n;
-	int success;
+#define UK_RING_MOVE_CONS_HEAD(br_name, br, is_sc, n, old_head, new_head, \
+					free_entries) UK_RING_NAME(br_name, move_cons_head_mc)(br, is_sc, n, \
+					old_head, new_head, free_entries)
 
-	/* move cons.head atomically */
-	do {
-		/* Restore n as it may change every loop */
-		n = max;
-
-		*old_head = r->cons.head;
-
-		/* add rmb barrier to avoid load/load reorder in weak
-		 * memory model. It is noop on x86
-		 */
-		rte_smp_rmb();
-
-		/* The subtraction is done between two unsigned 32bits value
-		 * (the result is always modulo 32 bits even if we have
-		 * cons_head > prod_tail). So 'entries' is always between 0
-		 * and size(ring)-1.
-		 */
-		*entries = (r->prod.tail - *old_head);
-
-		/* Set the actual entries for dequeue */
-		if (n > *entries)
-			n = (behavior == RTE_RING_QUEUE_FIXED) ? 0 : *entries;
-
-		if (unlikely(n == 0))
-			return 0;
-
-		*new_head = *old_head + n;
-		if (is_sc)
-			r->cons.head = *new_head, success = 1;
-		else
-			success = rte_atomic32_cmpset(&r->cons.head, *old_head,
-					*new_head);
-	} while (unlikely(success == 0));
-	return n;
-}
+#define UK_RING_MOVE_CONS_HEAD_FN(br_name, br_t) \
+	static __inline unsigned int \
+	UK_RING_NAME(br_name, move_cons_head)(UK_RING_NAME(br_name, t) * br, \
+					unsigned int is_sc, unsigned int n, uint32_t *old_head, \
+					uint32_t *new_head, uint32_t *entries) \
+	{ \
+		unsigned int max = n; \
+		int success; \
+		/* move br_cons_head atomically */\
+		do { \
+			/* Restore n as it may change every loop */\
+			n = max; \
+			*old_head = br->br_cons_head; \
+			/* add rmb barrier to avoid load/load reorder in weak \
+			 * memory model. It is noop on x86 \
+			 */\
+			rmb(); \
+			/* The subtraction is done between two unsigned 32bits value \
+			 * (the result is always modulo 32 bits even if we have \
+			 * cons_head > prod_tail). So 'entries' is always between 0 \
+			 * and size(ring)-1. \
+			 */\
+			*entries = (br->br_prod_tail - *old_head); \
+			/* Set the actual entries for dequeue */\
+			if (n > *entries) \
+				n = *entries; \
+			if (unlikely(n == 0)) \
+				return 0; \
+			*new_head = *old_head + n; \
+			if (is_sc) \
+				br->br_cons_head = *new_head, success = 1; \
+			else \
+				success = ukarch_compare_exchange_sync(&br->br_cons_head, *old_head, \
+						*new_head); \
+		} while (unlikely(success == 0)); \
+		return n; \
+	}
 
 /*
  * multi-producer safe lock-free ring buffer enqueue
@@ -596,6 +589,7 @@ __rte_ring_move_cons_head(struct rte_ring *r, unsigned int is_sc,
 	UK_RING_FREE_FN(br_name, br_t); \
 	UK_RING_MOVE_PROD_HEAD_FN(br_name, br_t); \
 	UK_RING_ENQUEUE_FN(br_name, br_t); \
+	UK_RING_MOVE_CONS_HEAD_FN(br_name, br_t); \
 	UK_RING_DEQUEUE_SC_FN(br_name, br_t); \
 	UK_RING_DEQUEUE_MC_FN(br_name, br_t); \
 	UK_RING_PUTBACK_SC_FN(br_name, br_t); \
