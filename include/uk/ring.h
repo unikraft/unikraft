@@ -258,6 +258,48 @@
 		return 0; \
 	}
 
+/**
+ * @internal Enqueue several objects on the ring
+ *
+  * @param r
+ *   A pointer to the ring structure.
+ * @param obj_table
+ *   A pointer to a table of void * pointers (objects).
+ * @param n
+ *   The number of objects to add in the ring from the obj_table.
+ * @param behavior
+ *   RTE_RING_QUEUE_FIXED:    Enqueue a fixed number of items from a ring
+ *   RTE_RING_QUEUE_VARIABLE: Enqueue as many items as possible from ring
+ * @param is_sp
+ *   Indicates whether to use single producer or multi-producer head update
+ * @param free_space
+ *   returns the amount of space after the enqueue operation has finished
+ * @return
+ *   Actual number of objects enqueued.
+ *   If behavior == RTE_RING_QUEUE_FIXED, this will be 0 or n only.
+ */
+static __rte_always_inline unsigned int
+__rte_ring_do_enqueue(struct rte_ring *r, void * const *obj_table,
+		 unsigned int n, enum rte_ring_queue_behavior behavior,
+		 unsigned int is_sp, unsigned int *free_space)
+{
+	uint32_t prod_head, prod_next;
+	uint32_t free_entries;
+
+	n = __rte_ring_move_prod_head(r, is_sp, n, behavior,
+			&prod_head, &prod_next, &free_entries);
+	if (n == 0)
+		goto end;
+
+	ENQUEUE_PTRS(r, &r[1], prod_head, obj_table, n, void *);
+
+	update_tail(&r->prod, prod_head, prod_next, is_sp, 1);
+end:
+	if (free_space != NULL)
+		*free_space = free_entries - n;
+	return n;
+}
+
 /*
  * multi-consumer safe dequeue 
  *
