@@ -51,21 +51,20 @@
 #define   UK_RING_NAME(x, ...) \
 	UK_CONCAT(__UK_RING_NAME, UK_NARGS(__VA_ARGS__))(x, __VA_ARGS__)
 
-struct uk_ring {
-	volatile uint32_t br_prod_head;
-	volatile uint32_t br_prod_tail;
-	int               br_prod_size;
-	int               br_prod_mask;
-	uint64_t          br_drops;
-	volatile uint32_t br_cons_head __aligned(CACHE_LINE_SIZE);
-	volatile uint32_t br_cons_tail;
-	int               br_cons_size;
-	int               br_cons_mask;
-#ifdef DEBUG_BUFRING
-	struct uk_mutex  *br_lock;
-#endif
-	void             *br_ring[0] __aligned(CACHE_LINE_SIZE);
-};
+#define UK_RING_STRUCT(br_name, br_t) \
+	typedef struct UK_RING_NAME(br_name) { \
+		volatile uint32_t br_prod_head; \
+		volatile uint32_t br_prod_tail; \
+		int               br_prod_size; \
+		int               br_prod_mask; \
+		uint64_t          br_drops; \
+		volatile uint32_t br_cons_head __aligned(CACHE_LINE_SIZE); \
+		volatile uint32_t br_cons_tail; \
+		int               br_cons_size; \
+		int               br_cons_mask; \
+		struct uk_mutex  *br_lock;  \
+		br_t              br_ring[0]; \
+	} UK_RING_NAME(br_name, t)
 
 #ifdef DEBUG_BUFRING
 #define uk_ring_debug_set_elem(br, i, val) \
