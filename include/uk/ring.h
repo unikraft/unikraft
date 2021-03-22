@@ -321,47 +321,70 @@
 	}
 
 /**
- * @internal Dequeue several objects from the ring
+ * Dequeue several objects from the ring
  *
- * @param r
+ * @param br
  *   A pointer to the ring structure.
- * @param obj_table
- *   A pointer to a table of void * pointers (objects).
+ * @param buf
+ *   A pointer to the buffer to dequeue objects into.
  * @param n
  *   The number of objects to pull from the ring.
- * @param behavior
- *   RTE_RING_QUEUE_FIXED:    Dequeue a fixed number of items from a ring
- *   RTE_RING_QUEUE_VARIABLE: Dequeue as many items as possible from ring
- * @param is_sc
- *   Indicates whether to use single consumer or multi-consumer head update
  * @param available
  *   returns the number of remaining ring entries after the dequeue has finished
  * @return
- *   - Actual number of objects dequeued.
- *     If behavior == RTE_RING_QUEUE_FIXED, this will be 0 or n only.
+ *   Actual number of objects dequeued.
  */
-static __rte_always_inline unsigned int
-__rte_ring_do_dequeue(struct rte_ring *r, void **obj_table,
-		 unsigned int n, enum rte_ring_queue_behavior behavior,
-		 unsigned int is_sc, unsigned int *available)
-{
-	uint32_t cons_head, cons_next;
-	uint32_t entries;
+#define UK_RING_DEQUEUE_BULK_MC(br_name, br, buf, n, available) \
+					UK_RING_NAME(br_name, dequeue_bulk_mc)(br, n, buf, available)
 
-	n = __rte_ring_move_cons_head(r, (int)is_sc, n, behavior,
-			&cons_head, &cons_next, &entries);
-	if (n == 0)
-		goto end;
-
-	DEQUEUE_PTRS(r, &r[1], cons_head, obj_table, n, void *);
-
-	update_tail(&r->cons, cons_head, cons_next, is_sc, 0);
-
-end:
-	if (available != NULL)
-		*available = entries - n;
-	return n;
-}
+#define UK_RING_DEQUEUE_BULK_MC_FN(br_name, br_t) \
+	static __inline unsigned int \
+	UK_RING_NAME(br_name, dequeue_bulk_mc)(UK_RING_NAME(br_name, t) * br, \
+					br_t buf[], unsigned int n, unsigned int *available) \
+	{ \
+		unsigned int i; \
+		uint32_t idx; \
+		uint32_t cons_head, cons_next; \
+		uint32_t entries; \
+		n = UK_RING_NAME(br_name, move_cons_head)(br, 0, n,  &cons_head, \
+					&cons_next, &entries); \
+		if (n == 0) \
+			goto end; \
+		idx = cons_head & br->br_cons_mask; \
+		if (likely(idx + n < br->br_cons_size)) { \
+			for (i = 0; i < (n & (~(unsigned)0x3)); i += 4, idx += 4) {\
+				buf[i] = br->br_ring[idx]; \
+				buf[i+1] = br->br_ring[idx+1]; \
+				buf[i+2] = br->br_ring[idx+2]; \
+				buf[i+3] = br->br_ring[idx+3]; \
+			} \
+			switch (n & 0x3) { \
+			case 3: \
+				buf[i++] = br->br_ring[idx++]; /* fallthrough */ \
+			case 2: \
+				buf[i++] = br->br_ring[idx++]; /* fallthrough */ \
+			case 1: \
+				buf[i++] = br->br_ring[idx++]; \
+			} \
+		} else { \
+			for (i = 0; idx < br->br_cons_size; i++, idx++) \
+				buf[i] = br->br_ring[idx]; \
+			for (idx = 0; i < n; i++, idx++) \
+				buf[i] = br->br_ring[idx]; \
+		} \
+		rmb(); \
+		/*\
+		 * If there are other enqueues/dequeues in progress that preceded us, \
+		 * we need to wait for them to complete \
+		 */\
+		while (unlikely(br->br_cons_tail != cons_head)) \
+			ukarch_spinwait(); \
+		br->br_cons_tail = cons_next; \
+	end: \
+		if (available != NULL) \
+			*available = entries - n; \
+		return n; \
+	}
 
 /*
  * multi-consumer safe dequeue 
@@ -698,6 +721,7 @@ end:
 	UK_RING_MOVE_CONS_HEAD_FN(br_name, br_t); \
 	UK_RING_DEQUEUE_SC_FN(br_name, br_t); \
 	UK_RING_DEQUEUE_MC_FN(br_name, br_t); \
+	UK_RING_DEQUEUE_BULK_MC_FN(br_name, br_t); \
 	UK_RING_PUTBACK_SC_FN(br_name, br_t); \
 	UK_RING_PEEK_FN(br_name, br_t); \
 	UK_RING_PEEK_CLEAR_SC_FN(br_name, br_t); \
