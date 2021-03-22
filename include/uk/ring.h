@@ -405,35 +405,51 @@ struct uk_ring {
 				& br->br_prod_mask; \
 	}
 
-static struct uk_ring *
-uk_ring_alloc(unsigned int count, size_t elemsize, struct uk_alloc *a
 #ifdef DEBUG_BUFRING
-		, struct uk_mutex *lock
-#endif
-)
-{
-	struct uk_ring *br;
+#define UK_RING_ALLOC(br_name, count, a, lock) \
+					UK_RING_NAME(br_name, alloc)(br_name, count, a, lock)
 
-	/* buf ring must be size power of 2 */
-	UK_ASSERT(POWER_OF_2(count));
+#define UK_RING_ALLOC_FN(br_name, br_t) \
+	static __inline UK_RING_NAME(br_name, t) * \
+	UK_RING_NAME(br_name, alloc)(unsigned int count, struct uk_alloc *a, \
+					struct uk_mutex *lock) \
+	{ \
+		UK_RING_NAME(br_name, t) * br; \
+		/* buf ring must be size power of 2 */\
+		UK_ASSERT(POWER_OF_2(count)); \
+		br = uk_malloc(a, sizeof(UK_RING_NAME(br_name, t)) + \
+					count * sizeof(br_t)); \
+		if (br == NULL) \
+			return NULL; \
+		br->br_lock = lock;
+		br->br_prod_size = br->br_cons_size = count; \
+		br->br_prod_mask = br->br_cons_mask = count - 1; \
+		br->br_prod_head = br->br_cons_head = 0; \
+		br->br_prod_tail = br->br_cons_tail = 0; \
+		return br; \
+	}
+#else
+#define UK_RING_ALLOC(br_name, count, a) \
+					UK_RING_NAME(br_name, alloc)(br_name, count, a)
 
-	/* Limit the size of each element to the maximum pointer size as the buffer
-	 * should not handle large elements. */
-	UK_ASSERT(elemsize <= sizeof(void *));
-
-	br = uk_malloc(a, sizeof(struct uk_ring) + count * elemsize);
-	if (br == NULL)
-		return NULL;
-#ifdef DEBUG_BUFRING
-	br->br_lock = lock;
-#endif
-	br->br_prod_size = br->br_cons_size = count;
-	br->br_prod_mask = br->br_cons_mask = count - 1;
-	br->br_prod_head = br->br_cons_head = 0;
-	br->br_prod_tail = br->br_cons_tail = 0;
-
-	return br;
-}
+#define UK_RING_ALLOC_FN(br_name, br_t) \
+	static __inline UK_RING_NAME(br_name, t) * \
+	UK_RING_NAME(br_name, alloc)(unsigned int count, struct uk_alloc *a) \
+	{ \
+		UK_RING_NAME(br_name, t) * br; \
+		/* buf ring must be size power of 2 */\
+		UK_ASSERT(POWER_OF_2(count)); \
+		br = uk_malloc(a, sizeof(UK_RING_NAME(br_name, t)) + \
+					count * sizeof(br_t)); \
+		if (br == NULL) \
+			return NULL; \
+		br->br_prod_size = br->br_cons_size = count; \
+		br->br_prod_mask = br->br_cons_mask = count - 1; \
+		br->br_prod_head = br->br_cons_head = 0; \
+		br->br_prod_tail = br->br_cons_tail = 0; \
+		return br; \
+	}
+#endif /* DEBUG_BUFRING */
 
 static void
 uk_ring_free(struct uk_ring *br, struct uk_alloc *a)
