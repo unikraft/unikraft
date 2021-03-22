@@ -74,18 +74,15 @@
 #endif /* DEBUG_BUFRING */
 
 /**
- * @internal This function updates the producer head for enqueue
+ * This function updates the producer head for enqueue
  *
- * @param r
+ * @param br
  *   A pointer to the ring structure
  * @param is_sp
  *   Indicates whether multi-producer path is needed or not
  * @param n
  *   The number of elements we will want to enqueue, i.e. how far should the
  *   head be moved
- * @param behavior
- *   RTE_RING_QUEUE_FIXED:    Enqueue a fixed number of items from a ring
- *   RTE_RING_QUEUE_VARIABLE: Enqueue as many items as possible from ring
  * @param old_head
  *   Returns head value as it was before the move, i.e. where enqueue starts
  * @param new_head
@@ -94,54 +91,49 @@
  *   Returns the amount of free space in the ring BEFORE head was moved
  * @return
  *   Actual number of objects enqueued.
- *   If behavior == RTE_RING_QUEUE_FIXED, this will be 0 or n only.
  */
-static __rte_always_inline unsigned int
-__rte_ring_move_prod_head(struct rte_ring *r, unsigned int is_sp,
-		unsigned int n, enum rte_ring_queue_behavior behavior,
-		uint32_t *old_head, uint32_t *new_head,
-		uint32_t *free_entries)
-{
-	const uint32_t capacity = r->capacity;
-	unsigned int max = n;
-	int success;
+#define UK_RING_MOVE_PROD_HEAD(br_name, br, is_sp, n, old_head, new_head, \
+					free_entries) UK_RING_NAME(br_name, move_prod_head_mc)(br, is_sp, n, \
+					old_head, new_head, free_entries)
 
-	do {
-		/* Reset n to the initial burst count */
-		n = max;
-
-		*old_head = r->prod.head;
-
-		/* add rmb barrier to avoid load/load reorder in weak
-		 * memory model. It is noop on x86
-		 */
-		rte_smp_rmb();
-
-		/*
-		 *  The subtraction is done between two unsigned 32bits value
-		 * (the result is always modulo 32 bits even if we have
-		 * *old_head > cons_tail). So 'free_entries' is always between 0
-		 * and capacity (which is < size).
-		 */
-		*free_entries = (capacity + r->cons.tail - *old_head);
-
-		/* check that we have enough room in ring */
-		if (unlikely(n > *free_entries))
-			n = (behavior == RTE_RING_QUEUE_FIXED) ?
-					0 : *free_entries;
-
-		if (n == 0)
-			return 0;
-
-		*new_head = *old_head + n;
-		if (is_sp)
-			r->prod.head = *new_head, success = 1;
-		else
-			success = rte_atomic32_cmpset(&r->prod.head,
-					*old_head, *new_head);
-	} while (unlikely(success == 0));
-	return n;
-}
+#define UK_RING_MOVE_PROD_HEAD_FN(br_name, br_t) \
+	static __inline unsigned int \
+	UK_RING_NAME(br_name, move_prod_head)(UK_RING_NAME(br_name, t) * br, \
+					unsigned int is_sp, unsigned int n, uint32_t *old_head, \
+					uint32_t *new_head, uint32_t *free_entries) \
+	{ \
+		const uint32_t capacity = br->br_prod_size; \
+		unsigned int max = n; \
+		int success; \
+		do { \
+			/* Reset n to the initial burst count */\
+			n = max; \
+			*old_head = br->br_prod_head; \
+			/* add rmb barrier to avoid load/load reorder in weak \
+			 * memory model. It is noop on x86 \
+			 */\
+			rmb(); \
+			/*\
+			 * The subtraction is done between two unsigned 32bits value \
+			 * (the result is always modulo 32 bits even if we have \
+			 * *old_head > cons_tail). So 'free_entries' is always between 0 \
+			 * and capacity (which is < size). \
+			 */\
+			*free_entries = (capacity + br->br_cons_tail - *old_head); \
+			/* check that we have enough room in ring */\
+			if (unlikely(n > *free_entries)) \
+				n = *free_entries; \
+			if (n == 0) \
+				return 0; \
+			*new_head = *old_head + n; \
+			if (is_sp) \
+				br->br_prod_head = *new_head, success = 1; \
+			else \
+				success = ukarch_compare_exchange_sync(&br->br_prod_head, *old_head, \
+					*new_head); \
+		} while (unlikely(success == 0)); \
+		return n; \
+	}
 
 /*
  * multi-producer safe lock-free ring buffer enqueue
@@ -534,6 +526,7 @@ __rte_ring_move_prod_head(struct rte_ring *r, unsigned int is_sp,
 	UK_RING_STRUCT(br_name, br_t); \
 	UK_RING_ALLOC_FN(br_name, br_t); \
 	UK_RING_FREE_FN(br_name, br_t); \
+	UK_RING_MOVE_PROD_HEAD_FN(br_name, br_t); \
 	UK_RING_ENQUEUE_FN(br_name, br_t); \
 	UK_RING_DEQUEUE_SC_FN(br_name, br_t); \
 	UK_RING_DEQUEUE_MC_FN(br_name, br_t); \
