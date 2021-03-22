@@ -320,6 +320,49 @@
 		return n; \
 	}
 
+/**
+ * @internal Dequeue several objects from the ring
+ *
+ * @param r
+ *   A pointer to the ring structure.
+ * @param obj_table
+ *   A pointer to a table of void * pointers (objects).
+ * @param n
+ *   The number of objects to pull from the ring.
+ * @param behavior
+ *   RTE_RING_QUEUE_FIXED:    Dequeue a fixed number of items from a ring
+ *   RTE_RING_QUEUE_VARIABLE: Dequeue as many items as possible from ring
+ * @param is_sc
+ *   Indicates whether to use single consumer or multi-consumer head update
+ * @param available
+ *   returns the number of remaining ring entries after the dequeue has finished
+ * @return
+ *   - Actual number of objects dequeued.
+ *     If behavior == RTE_RING_QUEUE_FIXED, this will be 0 or n only.
+ */
+static __rte_always_inline unsigned int
+__rte_ring_do_dequeue(struct rte_ring *r, void **obj_table,
+		 unsigned int n, enum rte_ring_queue_behavior behavior,
+		 unsigned int is_sc, unsigned int *available)
+{
+	uint32_t cons_head, cons_next;
+	uint32_t entries;
+
+	n = __rte_ring_move_cons_head(r, (int)is_sc, n, behavior,
+			&cons_head, &cons_next, &entries);
+	if (n == 0)
+		goto end;
+
+	DEQUEUE_PTRS(r, &r[1], cons_head, obj_table, n, void *);
+
+	update_tail(&r->cons, cons_head, cons_next, is_sc, 0);
+
+end:
+	if (available != NULL)
+		*available = entries - n;
+	return n;
+}
+
 /*
  * multi-consumer safe dequeue 
  *
