@@ -451,11 +451,15 @@ struct uk_ring {
 	}
 #endif /* DEBUG_BUFRING */
 
-static void
-uk_ring_free(struct uk_ring *br, struct uk_alloc *a)
-{
-	uk_free(a, br);
-}
+#define UK_RING_FREE(br_name, br, a) UK_RING_NAME(br_name, free)(br, a)
+
+#define UK_RING_FREE_FN(br_name, br_t) \
+	void \
+	UK_RING_NAME(br_name, free)(UK_RING_NAME(br_name, t) * br, \
+					struct uk_alloc *a) \
+	{ \
+		uk_free(a, br); \
+	}
 
 #endif
 
