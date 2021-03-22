@@ -460,5 +460,18 @@
 		uk_free(a, br); \
 	}
 
-#endif
+#define UK_RING_DEFINE(br_name, br_t) \
+	UK_RING_STRUCT(br_name, br_t); \
+	UK_RING_ALLOC_FN(br_name, br_t); \
+	UK_RING_FREE_FN(br_name, br_t); \
+	UK_RING_ENQUEUE_FN(br_name, br_t); \
+	UK_RING_DEQUEUE_SC_FN(br_name, br_t); \
+	UK_RING_DEQUEUE_MC_FN(br_name, br_t); \
+	UK_RING_PUTBACK_SC_FN(br_name, br_t); \
+	UK_RING_PEEK_FN(br_name, br_t); \
+	UK_RING_PEEK_CLEAR_SC_FN(br_name, br_t); \
+	UK_RING_FULL_FN(br_name, br_t); \
+	UK_RING_EMPTY_FN(br_name, br_t); \
+	UK_RING_COUNT_FN(br_name, br_t)
 
+#endif
