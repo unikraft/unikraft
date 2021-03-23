@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Florian Schmidt <florian.schmidt@neclab.eu>
+ * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
  *
- * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2021, NEC Laboratories Europe GmbH, NEC Corporation.
+ *                     All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,6 +31,52 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <x86/cpu.h>
+#ifndef __UKARCH_CTX_H__
+#define __UKARCH_CTX_H__
 
-struct _x86_features x86_cpu_features;
+#include <uk/arch/types.h>
+
+/**
+ * State of extended context, like additional CPU registers and units
+ * (e.g., floating point, vector registers)
+ */
+struct ukarch_ectx;
+
+/**
+ * Size needed to allocate memory to store an extended context state
+ */
+__sz ukarch_ectx_size(void);
+
+/**
+ * Alignment requirement for allocated memory to store an
+ * extended context state
+ */
+__sz ukarch_ectx_align(void);
+
+/**
+ * Initializes an extended context so that it can be loaded
+ * into a logical CPU with `ukarch_ectx_load()`.
+ *
+ * @param state
+ *   Reference to extended context to initialize
+ */
+void ukarch_ectx_init(struct ukarch_ectx *state);
+
+/**
+ * Stores the extended context of the currently executing CPU to `state`.
+ * Such an extended context can be restored with `ukarch_ectx_load()`.
+ *
+ * @param state
+ *   Reference to extended context to save to
+ */
+void ukarch_ectx_store(struct ukarch_ectx *state);
+
+/**
+ * Restores a given extended context on the currently executing CPU.
+ *
+ * @param state
+ *   Reference to extended context to restore
+ */
+void ukarch_ectx_load(struct ukarch_ectx *state);
+
+#endif /* __UKARCH_CTX_H__ */

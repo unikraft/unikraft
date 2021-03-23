@@ -114,6 +114,8 @@ int uk_thread_init(struct uk_thread *thread,
 {
 	unsigned long sp;
 	void *ctx;
+	void *ectx = NULL;
+	__sz ectx_size;
 	int ret = 0;
 	struct uk_thread_inittab_entry *itr;
 
@@ -127,9 +129,19 @@ int uk_thread_init(struct uk_thread *thread,
 		ret = -1;
 		goto err_out;
 	}
+	/* Allocate thread extended context */
+	ectx_size = ukarch_ectx_size();
+	if (ectx_size > 0) {
+		ectx = uk_memalign(allocator, ukarch_ectx_align(), ectx_size);
+		if (!ectx) {
+			ret = -1;
+			goto err_out;
+		}
+	}
 
 	memset(thread, 0, sizeof(*thread));
 	thread->ctx = ctx;
+	thread->ectx = ectx;
 	thread->name = name;
 	thread->stack = stack;
 	thread->tls = tls;
@@ -188,7 +200,11 @@ err_fini:
 			continue;
 		(itr->fini)(thread);
 	}
-	uk_free(allocator, thread->ctx);
+	if (thread->ctx)
+		uk_free(allocator, thread->ctx);
+	if (thread->ectx)
+		uk_free(allocator, thread->ectx);
+	thread->ectx = NULL;
 err_out:
 	return ret;
 }
@@ -204,8 +220,12 @@ void uk_thread_fini(struct uk_thread *thread, struct uk_alloc *allocator)
 			continue;
 		(itr->fini)(thread);
 	}
-	uk_free(allocator, thread->ctx);
+	if (thread->ctx)
+		uk_free(allocator, thread->ctx);
 	thread->ctx = NULL;
+	if (thread->ectx)
+		uk_free(allocator, thread->ectx);
+	thread->ectx = NULL;
 }
 
 static void uk_thread_block_until(struct uk_thread *thread, __snsec until)

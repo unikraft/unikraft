@@ -45,7 +45,7 @@ extern void asm_thread_starter(void);
 
 __sz ukplat_ctx_size(void)
 {
-	return sizeof(struct sw_ctx) + arch_extregs_size();
+	return sizeof(struct ukplat_ctx);
 }
 
 void ukplat_ctx_init(struct ukplat_ctx *sw_ctx,
@@ -55,9 +55,6 @@ void ukplat_ctx_init(struct ukplat_ctx *sw_ctx,
 
 	sw_ctx->sp   = sp;
 	sw_ctx->ip   = (unsigned long) asm_thread_starter;
-	arch_init_extregs(sw_ctx);
-
-	save_extregs(sw_ctx);
 }
 
 extern void asm_ctx_start(unsigned long sp, unsigned long ip) __noreturn;
@@ -78,8 +75,6 @@ extern void asm_sw_ctx_switch(struct ukplat_ctx *prevctx,
 void ukplat_ctx_switch(struct ukplat_ctx *prevctx,
 		       struct ukplat_ctx *nextctx)
 {
-	save_extregs(prevctx);
-	restore_extregs(nextctx);
 	asm_sw_ctx_switch(prevctx, nextctx);
 }
 

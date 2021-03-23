@@ -37,6 +37,7 @@
 #include <uk/arch/lcpu.h>
 #include <uk/arch/time.h>
 #include <uk/plat/ctx.h>
+#include <uk/arch/ctx.h>
 #if CONFIG_LIBUKSIGNAL
 #include <uk/uk_signal.h>
 #endif
@@ -57,6 +58,7 @@ struct uk_thread {
 	void *stack;
 	void *tls;
 	struct ukplat_ctx *ctx;
+	struct ukarch_ectx *ectx;
 	uintptr_t tlsp; /* Arch TLS pointer */
 	UK_TAILQ_ENTRY(struct uk_thread) thread_list;
 	uint32_t flags;

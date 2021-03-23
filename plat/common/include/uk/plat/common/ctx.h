@@ -39,14 +39,8 @@
 struct ukplat_ctx {
 	unsigned long sp;	/* Stack pointer */
 	unsigned long ip;	/* Instruction pointer */
-	uintptr_t extregs;	/* Pointer to an area to which extended
-				 * registers are saved on context switch.
-				 */
-	uint8_t _extregs[];     /* Reserved memory area for extended
-				 * registers state
-				 */
 };
-#endif
+#endif /* __ASSEMBLY__ */
 
 #define OFFSETOF_SW_CTX_SP      0
 #define OFFSETOF_SW_CTX_IP      8

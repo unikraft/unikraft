@@ -462,7 +462,6 @@ void _libkvmplat_entry(struct lcpu *lcpu, void *arg)
 	if (unlikely(rc))
 		UK_CRASH("Failed to init bootstrap processor\n");
 
-	_init_cpufeatures();
 	intctrl_init();
 
 	uk_pr_info("Entering from KVM (x86)...\n");
