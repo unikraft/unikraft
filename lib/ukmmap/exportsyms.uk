@@ -5,3 +5,6 @@ munmap
 uk_syscall_e_munmap
 uk_syscall_r_munmap
 mremap
+madvise
+uk_syscall_e_madvise
+uk_syscall_r_madvise
