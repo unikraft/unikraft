@@ -214,6 +214,11 @@ extern "C" {
 #define ALIGN_DOWN(v, a) ((v) & ~((a)-1))
 #endif
 
+/* Note: a has to be a power of 2 */
+#ifndef IS_ALIGNED
+#define IS_ALIGNED(v, a) (((v) & ~((a)-1)) == (v))
+#endif
+
 /**
  * Tests if `val` is part of the range defined by `base` and `len`
  */
