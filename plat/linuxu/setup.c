@@ -49,8 +49,6 @@ void _liblinuxuplat_entry(int argc, char *argv[]) __noreturn;
 
 void _liblinuxuplat_entry(int argc, char *argv[])
 {
-	_init_cpufeatures();
-
 	/*
 	 * Initialize platform console
 	 */
