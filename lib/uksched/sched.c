@@ -33,7 +33,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <uk/plat/config.h>
-#include <uk/plat/ctx.h>
 #include <uk/alloc.h>
 #include <uk/sched.h>
 #if CONFIG_LIBUKSCHEDCOOP

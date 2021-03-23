@@ -264,13 +264,18 @@ void uk_sched_thread_switch(struct uk_thread *next)
 
 	__uk_sched_thread_current = next;
 	prev->tlsp = ukplat_tlsp_get();
+	if (prev->ectx)
+		ukarch_ectx_store(prev->ectx);
 
 	/* Load next TLS and extended registers before context switch.
 	 * This avoids requiring special initialization code for newly
 	 * created threads to do the loading.
 	 */
 	ukplat_tlsp_set(next->tlsp);
-	ukplat_ctx_switch(prev->ctx, next->ctx);
+	if (next->ectx)
+		ukarch_ectx_load(next->ectx);
+
+	ukarch_ctx_switch(&prev->ctx, &next->ctx);
 }
 
 /*
