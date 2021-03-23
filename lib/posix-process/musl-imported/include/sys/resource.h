@@ -54,7 +54,6 @@ int setpriority (int, id_t, int);
 
 #ifdef _GNU_SOURCE
 int prlimit(pid_t, int, const struct rlimit *, struct rlimit *);
-#define prlimit64 prlimit
 #endif
 
 #define PRIO_MIN (-20)

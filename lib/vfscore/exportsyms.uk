@@ -68,6 +68,9 @@ getcwd
 uk_syscall_e_getcwd
 uk_syscall_r_getcwd
 chown
+prlimit64
+uk_syscall_e_prlimit64
+uk_syscall_r_prlimit64
 chroot
 chdir
 uk_syscall_e_chdir

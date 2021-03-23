@@ -51,6 +51,7 @@
 #include <uk/ctors.h>
 #include <uk/trace.h>
 #include <uk/syscall.h>
+#include <sys/resource.h>
 
 #ifdef DEBUG_VFS
 int	vfs_debug = VFSDB_FLAGS;
@@ -2234,6 +2235,12 @@ int lchown(const char *path __unused, uid_t owner __unused, gid_t group __unused
 	return 0;
 }
 
+UK_SYSCALL_R_DEFINE(int, prlimit64, pid_t, pid, int, resource,
+		    const struct rlimit*, new_limit, struct rlimit*, old_limit)
+{
+	WARN_STUBBED();
+	return 0;
+}
 
 #if 0
 ssize_t sendfile(int out_fd, int in_fd, off_t *_offset, size_t count)
