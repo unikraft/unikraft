@@ -44,39 +44,21 @@ extern "C" {
 /* TODO: do we have gnu statement expression?  */
 /* internal use */
 #define uk_sigemptyset(ptr)	\
-		do {	\
-			      (((ptr)->__bits[0]) = 0);	\
-            (((ptr)->__bits[1]) = 0);	\
-		} while (0)
+do { \
+	(((ptr)->__bits[0]) = 0); \
+	(((ptr)->__bits[1]) = 0); \
+} while (0)
 #define uk_sigfillset(ptr)	\
-		do {	\
-            (((ptr)->__bits[0]) = ~((unsigned long) 0));	\
-            (((ptr)->__bits[1]) = ~((unsigned long) 0));	\
-		} while (0)
-#define uk_sigaddset(ptr, signo)	\
-		do {	\
-            (((ptr)->__bits[0]) |= (1 << ((signo) - 1))); \
-		} while (0)
-#define uk_sigdelset(ptr, signo)	\
-		do {	\
-            (((ptr)->__bits[0]) &= ~(1 << ((signo) - 1))); \
-		} while (0)
-#define uk_sigcopyset(ptr1, ptr2)	\
-		do {	\
-			      (((ptr1)->__bits[0]) = ((ptr2)->__bits[0])); \
-		} while (0)
-#define uk_sigandset(ptr1, ptr2)	\
-		do {	\
-            (((ptr1)->__bits[0]) &= ((ptr2)->__bits[0])); \
-		} while (0)
-#define uk_sigorset(ptr1, ptr2)	\
-		do {	\
-            (((ptr1)->__bits[0]) |= ((ptr2)->__bits[0])); \
-		} while (0)
-#define uk_sigreverseset(ptr)	\
-		do {	\
-            (((ptr)->__bits[0]) = ~((ptr)->__bits[0])); \
-		} while (0)
+	do { \
+		(((ptr)->__bits[0]) = ~(0)); \
+		(((ptr)->__bits[1]) = ~(0)); \
+	} while (0)
+#define uk_sigaddset(ptr, signo) (((ptr)->__bits[0]) |= (1 << ((signo) - 1)))
+#define uk_sigdelset(ptr, signo) (((ptr)->__bits[0]) &= ~(1 << ((signo) - 1)))
+#define uk_sigcopyset(ptr1, ptr2) (((ptr1)->__bits[0]) = ((ptr2)->__bits[0]))
+#define uk_sigandset(ptr1, ptr2) (((ptr1)->__bits[0]) &= ((ptr2)->__bits[0]))
+#define uk_sigorset(ptr1, ptr2) (((ptr1)->__bits[0]) |= ((ptr2)->__bits[0]))
+#define uk_sigreverseset(ptr) (((ptr)->__bits[0]) = ~((ptr)->__bits[0]))
 #define uk_sigismember(ptr, signo) (((ptr)->__bits[0]) & (1 << ((signo) - 1)))
 #define uk_sigisempty(ptr) (((ptr)->__bits[0]) == 0)
 
