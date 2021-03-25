@@ -36,7 +36,9 @@
 
 void dump_regs(struct __regs *regs);
 void dump_mem(unsigned long addr);
+#if !__OMIT_FRAMEPOINTER__
 void stack_walk(void);
 void stack_walk_for_frame(unsigned long frame_base);
+#endif /* !__OMIT_FRAMEPOINTER__ */
 
 #endif /* __PLAT_CMN_TRACE_H__ */

@@ -103,7 +103,9 @@ void do_gp_fault(struct __regs *regs, long error_code)
 	uk_pr_crit("GPF rip: %lx, error_code=%lx\n",
 		   regs->rip, error_code);
 	dump_regs(regs);
+#if !__OMIT_FRAMEPOINTER__
 	stack_walk_for_frame(regs->rbp);
+#endif /* !__OMIT_FRAMEPOINTER__ */
 	uk_asmdumpk(KLVL_CRIT, (void *) regs->rip, 6);
 	dump_mem(regs->rsp);
 	dump_mem(regs->rbp);
@@ -121,7 +123,9 @@ void do_page_fault(struct __regs *regs, unsigned long error_code)
 		   addr, regs->rip, regs, regs->rsp, &addr, error_code);
 
 	dump_regs(regs);
+#if !__OMIT_FRAMEPOINTER__
 	stack_walk_for_frame(regs->rbp);
+#endif /* !__OMIT_FRAMEPOINTER__ */
 	uk_asmdumpk(KLVL_CRIT, (void *) regs->rip, 6);
 	dump_mem(regs->rsp);
 	dump_mem(regs->rbp);

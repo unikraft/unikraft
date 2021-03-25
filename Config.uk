@@ -67,6 +67,15 @@ endchoice
 comment "Hint: Specify a CPU type to get most benefits from performance optimization"
 	depends on OPTIMIZE_PERF && (MARCH_X86_64_GENERIC || MARCH_ARM64_GENERIC)
 
+config OPTIMIZE_NOOMITFP
+	bool "Keep stack frame pointers"
+	default y
+	help
+		Reserves one CPU register for using it as stack frame pointer.
+		Functions are instrumented to save, set up, and restore frame
+		pointers. This option simplifies doing stack walks for
+		debugging for instance.
+
 config OPTIMIZE_DEADELIM
 	bool "Drop unused functions and data"
 	default n
@@ -119,6 +128,9 @@ config DEBUG_SYMBOLS_LVL3
 		macro definitions present in the program. Some debuggers
 		support macro expansion.
 endchoice
+
+comment "Hint: Keep frame pointers to ease debugging"
+	depends on !OPTIMIZE_NOOMITFP && !DEBUG_SYMBOLS_LVL0
 
 config OPTIMIZE_SYMFILE
 	bool "Create a symbols file"
