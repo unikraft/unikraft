@@ -69,6 +69,7 @@ void dump_mem(unsigned long addr)
 	uk_pr_crit("\n");
 }
 
+#if !__OMIT_FRAMEPOINTER__
 void stack_walk(void)
 {
 	unsigned long bp;
@@ -87,3 +88,4 @@ void stack_walk_for_frame(unsigned long frame_base)
 	if (frame[0])
 		stack_walk_for_frame(frame[0]);
 }
+#endif /* !__OMIT_FRAMEPOINTER__ */

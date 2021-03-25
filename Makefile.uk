@@ -6,7 +6,6 @@
 
 COMPFLAGS    += -nostdlib
 COMPFLAGS    += -U __linux__ -U __FreeBSD__ -U __sun__
-COMPFLAGS    += -fno-omit-frame-pointer
 COMPFLAGS-$(call have_gcc)	+= -fno-tree-sra -fno-split-stack -nostdinc
 
 ifneq ($(HAVE_STACKPROTECTOR),y)
@@ -57,6 +56,11 @@ LDFLAGS-$(call have_gcc)	+= -nostdinc
 COMPFLAGS-$(CONFIG_OPTIMIZE_NONE)         += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize
 COMPFLAGS-$(CONFIG_OPTIMIZE_SIZE)         += -Os
 COMPFLAGS-$(CONFIG_OPTIMIZE_PERF)         += -O2
+ifeq ($(CONFIG_OPTIMIZE_NOOMITFP),y)
+COMPFLAGS-y  += -fno-omit-frame-pointer
+else
+COMPFLAGS-y  += -fomit-frame-pointer -D __OMIT_FRAMEPOINTER__
+endif
 
 COMPFLAGS-$(CONFIG_OPTIMIZE_DEADELIM)     += -fdata-sections -ffunction-sections
 LDFLAGS-$(CONFIG_OPTIMIZE_DEADELIM)       += -Wl,--gc-sections
