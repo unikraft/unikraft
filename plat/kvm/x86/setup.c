@@ -34,6 +34,7 @@
 #include <kvm/console.h>
 #include <kvm/intctrl.h>
 #include <kvm-x86/multiboot2.h>
+#include <kvm-x86/multiboot2_defs.h>
 #include <uk/arch/limits.h>
 #include <uk/arch/types.h>
 #include <uk/plat/console.h>
@@ -431,7 +432,7 @@ void _libkvmplat_entry(void *arg)
 	uk_pr_info("Announced mbi size 0x%x\n", size);
 
 	tag = (struct multiboot_tag *)(mb + 8);
-	_mb_print_tags(tag);
+	_mb_parse_tags(tag);
 
 	/*
 	 * The multiboot structures may be anywhere in memory, so take a copy of

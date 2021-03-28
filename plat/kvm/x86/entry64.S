@@ -29,7 +29,7 @@
 
 #include <x86/cpu_defs.h>
 #include <kvm-x86/traps.h>
-#include <kvm-x86/multiboot2.h>
+#include <kvm-x86/multiboot2_defs.h>
 
 /* necessary for CONFIG_ macros to be accessible */
 #include <uk/config.h>
@@ -40,24 +40,24 @@
 .section .data.boot
 
 .align 8
-multiboot_header:
+_multiboot_header:
         /*  magic */
         .long   MULTIBOOT2_HEADER_MAGIC
         /*  ISA: i386 */
         .long   MULTIBOOT_ARCHITECTURE_I386
         /*  Header length. */
-        .long   multiboot_header_end - multiboot_header
+        .long   multiboot_header_end - _multiboot_header
         /*  checksum */
-        .long   -(MULTIBOOT2_HEADER_MAGIC + MULTIBOOT_ARCHITECTURE_I386 + (multiboot_header_end - multiboot_header))
+        .long   -(MULTIBOOT2_HEADER_MAGIC + MULTIBOOT_ARCHITECTURE_I386 + (multiboot_header_end - _multiboot_header))
 
 address_tag_start:
         .short MULTIBOOT_HEADER_TAG_ADDRESS
         .short MULTIBOOT_HEADER_TAG_OPTIONAL
         .long address_tag_end - address_tag_start
         /*  header_addr */
-        .long   multiboot_header
+        .long   _multiboot_header
         /*  load_addr */
-        .long   _start
+        .long   _libkvmplat_start32
         /*  load_end_addr */
         .long   _edata
         /*  bss_end_addr */
