@@ -45,14 +45,14 @@
 
 #define MAX_CMDLINE_SIZE 8192
 static char cmdline[MAX_CMDLINE_SIZE];
-static char have_cmdline = 0, have_initrd = 0;
+static char have_cmdline, have_initrd;
 
 struct kvmplat_config _libkvmplat_cfg = {0};
 
 extern void _libkvmplat_newstack(uintptr_t stack_start, void (*tramp)(void *),
 				 void *arg);
 
-static inline void _mb_get_cmdline()
+static inline void _mb_get_cmdline(void)
 {
 	if (!have_cmdline) {
 		/* Use image name as cmdline to provide argv[0] */
@@ -78,16 +78,15 @@ static inline void _mb_init_mem(struct multiboot_tag *tag)
 	 * Look for the first chunk of memory at PLATFORM_MEM_START.
 	 */
 
-	for (m = ((struct multiboot_tag_mmap *) tag)->entries;
-                 (multiboot_uint8_t *) m 
-                   < (multiboot_uint8_t *) tag + tag->size;
-                 m = (multiboot_memory_map_t *) 
-                   ((unsigned long) m
-                    + ((struct multiboot_tag_mmap *) tag)->entry_size)) {
-						if (m->addr == PLATFORM_MEM_START
-						&& m->type == MULTIBOOT_MEMORY_AVAILABLE)
-							break;
-					}
+	for (m = ((struct multiboot_tag_mmap *)tag)->entries;
+	     (multiboot_uint8_t *)m < (multiboot_uint8_t *)tag + tag->size;
+	     m = (multiboot_memory_map_t *)((unsigned long)m
+					    + ((struct multiboot_tag_mmap *)tag)
+						  ->entry_size)) {
+		if (m->addr == PLATFORM_MEM_START
+		    && m->type == MULTIBOOT_MEMORY_AVAILABLE)
+			break;
+	}
 
 	/*
 	 * Cap our memory size to PLATFORM_MAX_MEM_SIZE which boot.S defines
@@ -149,7 +148,8 @@ static inline void _mb_init_initrd(struct multiboot_tag_module *mod1)
 			     _libkvmplat_cfg.heap.start,
 			     _libkvmplat_cfg.heap.len)) {
 			/* Start of initrd within heap range;
-			 * Use the prepending left piece as heap */
+			 * Use the prepending left piece as heap
+			 */
 			heap0_start = _libkvmplat_cfg.heap.start;
 			heap0_end = ALIGN_DOWN(_libkvmplat_cfg.initrd.start,
 					       __PAGE_SIZE);
@@ -159,7 +159,8 @@ static inline void _mb_init_initrd(struct multiboot_tag_module *mod1)
 			     _libkvmplat_cfg.heap.start,
 			     _libkvmplat_cfg.heap.len)) {
 			/* End of initrd within heap range;
-			 * Use the remaining left piece as heap */
+			 * Use the remaining left piece as heap
+			 */
 			heap1_start =
 			    ALIGN_UP(_libkvmplat_cfg.initrd.end, __PAGE_SIZE);
 			heap1_end = _libkvmplat_cfg.heap.end;
@@ -246,9 +247,11 @@ static inline void _mb_parse_tags(struct multiboot_tag *tag)
 		uk_pr_debug("Tag 0x%x, Size 0x%x\n", tag->type, tag->size);
 		switch (tag->type) {
 		case MULTIBOOT_TAG_TYPE_CMDLINE:
-			uk_pr_debug("Command line = %s\n",
-			       ((struct multiboot_tag_string *)tag)->string);
-			mi_cmdline = ((struct multiboot_tag_string *)tag)->string;
+			uk_pr_debug(
+			    "Command line = %s\n",
+			    ((struct multiboot_tag_string *)tag)->string);
+			mi_cmdline =
+			    ((struct multiboot_tag_string *)tag)->string;
 
 			if (strlen(mi_cmdline) > sizeof(cmdline) - 1)
 				uk_pr_err("Command line too long, truncated\n");
@@ -256,29 +259,33 @@ static inline void _mb_parse_tags(struct multiboot_tag *tag)
 			have_cmdline = 1;
 			break;
 		case MULTIBOOT_TAG_TYPE_BOOT_LOADER_NAME:
-			uk_pr_debug("Boot loader name = %s\n",
-			       ((struct multiboot_tag_string *)tag)->string);
+			uk_pr_debug(
+			    "Boot loader name = %s\n",
+			    ((struct multiboot_tag_string *)tag)->string);
 			break;
 		case MULTIBOOT_TAG_TYPE_MODULE:
-			uk_pr_debug("Module at 0x%x-0x%x. Command line %s\n",
-			       ((struct multiboot_tag_module *)tag)->mod_start,
-			       ((struct multiboot_tag_module *)tag)->mod_end,
-			       ((struct multiboot_tag_module *)tag)->cmdline);
+			uk_pr_debug(
+			    "Module at 0x%x-0x%x. Command line %s\n",
+			    ((struct multiboot_tag_module *)tag)->mod_start,
+			    ((struct multiboot_tag_module *)tag)->mod_end,
+			    ((struct multiboot_tag_module *)tag)->cmdline);
 			if (!have_initrd)
-				_mb_init_initrd((struct multiboot_tag_module *)tag);
+				_mb_init_initrd(
+				    (struct multiboot_tag_module *)tag);
 			break;
 		case MULTIBOOT_TAG_TYPE_BASIC_MEMINFO:
 			uk_pr_debug("mem_lower = %uKB, mem_upper = %uKB\n",
-			       ((struct multiboot_tag_basic_meminfo *)tag)
-				   ->mem_lower,
-			       ((struct multiboot_tag_basic_meminfo *)tag)
-				   ->mem_upper);
+				    ((struct multiboot_tag_basic_meminfo *)tag)
+					->mem_lower,
+				    ((struct multiboot_tag_basic_meminfo *)tag)
+					->mem_upper);
 			break;
 		case MULTIBOOT_TAG_TYPE_BOOTDEV:
-			uk_pr_debug("Boot device 0x%x,%u,%u\n",
-			       ((struct multiboot_tag_bootdev *)tag)->biosdev,
-			       ((struct multiboot_tag_bootdev *)tag)->slice,
-			       ((struct multiboot_tag_bootdev *)tag)->part);
+			uk_pr_debug(
+			    "Boot device 0x%x,%u,%u\n",
+			    ((struct multiboot_tag_bootdev *)tag)->biosdev,
+			    ((struct multiboot_tag_bootdev *)tag)->slice,
+			    ((struct multiboot_tag_bootdev *)tag)->part);
 			break;
 		case MULTIBOOT_TAG_TYPE_MMAP: {
 			multiboot_memory_map_t *mmap;
@@ -292,19 +299,20 @@ static inline void _mb_parse_tags(struct multiboot_tag *tag)
 					 *)((unsigned long)mmap
 					    + ((struct multiboot_tag_mmap *)tag)
 						  ->entry_size))
-				uk_pr_debug(" base_addr = 0x%x%x,"
-				       " length = 0x%x%x, type = 0x%x\n",
-				       (unsigned)(mmap->addr >> 32),
-				       (unsigned)(mmap->addr & 0xffffffff),
-				       (unsigned)(mmap->len >> 32),
-				       (unsigned)(mmap->len & 0xffffffff),
-				       (unsigned)mmap->type);
-			
+				uk_pr_debug(
+				    " base_addr = 0x%x%x,"
+				    " length = 0x%x%x, type = 0x%x\n",
+				    (unsigned int)(mmap->addr >> 32),
+				    (unsigned int)(mmap->addr & 0xffffffff),
+				    (unsigned int)(mmap->len >> 32),
+				    (unsigned int)(mmap->len & 0xffffffff),
+				    (unsigned int)mmap->type);
+
 			_mb_init_mem(tag);
 		} break;
 		case MULTIBOOT_TAG_TYPE_FRAMEBUFFER: {
 			multiboot_uint32_t color;
-			unsigned i;
+			unsigned int i;
 			struct multiboot_tag_framebuffer *tagfb =
 			    (struct multiboot_tag_framebuffer *)tag;
 			void *fb = (void *)(unsigned long)
@@ -312,7 +320,7 @@ static inline void _mb_parse_tags(struct multiboot_tag *tag)
 
 			switch (tagfb->common.framebuffer_type) {
 			case MULTIBOOT_FRAMEBUFFER_TYPE_INDEXED: {
-				unsigned best_distance, distance;
+				unsigned int best_distance, distance;
 				struct multiboot_color *palette;
 
 				palette = tagfb->framebuffer_palette;
@@ -404,7 +412,7 @@ void _libkvmplat_entry(void *arg)
 	// struct multiboot_info *mi = (struct multiboot_info *)arg;
 	struct multiboot_tag *tag;
 	unsigned long mb = *(unsigned long *)arg;
-	unsigned size;
+	unsigned int size;
 
 	_init_cpufeatures();
 	_libkvmplat_init_console();
@@ -419,10 +427,10 @@ void _libkvmplat_entry(void *arg)
 		return;
 	}
 
-	size = *(unsigned *)mb;
+	size = *(unsigned int *)mb;
 	uk_pr_info("Announced mbi size 0x%x\n", size);
 
-	tag = (struct multiboot_tag *) (mb + 8);
+	tag = (struct multiboot_tag *)(mb + 8);
 	_mb_print_tags(tag);
 
 	/*

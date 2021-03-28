@@ -50,7 +50,7 @@ multiboot_header:
         /*  checksum */
         .long   -(MULTIBOOT2_HEADER_MAGIC + MULTIBOOT_ARCHITECTURE_I386 + (multiboot_header_end - multiboot_header))
 
-address_tag_start:      
+address_tag_start:
         .short MULTIBOOT_HEADER_TAG_ADDRESS
         .short MULTIBOOT_HEADER_TAG_OPTIONAL
         .long address_tag_end - address_tag_start
@@ -64,14 +64,14 @@ address_tag_start:
         .long   _end
 
 address_tag_end:
-entry_address_tag_start:        
+entry_address_tag_start:
         .short MULTIBOOT_HEADER_TAG_ENTRY_ADDRESS
         .short MULTIBOOT_HEADER_TAG_OPTIONAL
         .long entry_address_tag_end - entry_address_tag_start
         /*  entry_addr */
         .long _libkvmplat_start32
 entry_address_tag_end:
-framebuffer_tag_start:  
+framebuffer_tag_start:
         .short MULTIBOOT_HEADER_TAG_FRAMEBUFFER
         .short MULTIBOOT_HEADER_TAG_OPTIONAL
         .long framebuffer_tag_end - framebuffer_tag_start
