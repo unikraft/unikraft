@@ -29,7 +29,7 @@
 
 #include <x86/cpu_defs.h>
 #include <kvm-x86/traps.h>
-#include <kvm-x86/multiboot_defs.h>
+#include <kvm-x86/multiboot2.h>
 
 /* necessary for CONFIG_ macros to be accessible */
 #include <uk/config.h>
@@ -37,21 +37,52 @@
 #define ENTRY(x) .globl x; .type x,%function; x:
 #define END(x)   .size x, . - x
 
-#define MYMULTIBOOT_FLAGS \
-    (MULTIBOOT_PAGE_ALIGN | MULTIBOOT_MEMORY_INFO | MULTIBOOT_AOUT_KLUDGE)
-
 .section .data.boot
 
-.align 4
-_multiboot_header:
-.long MULTIBOOT_HEADER_MAGIC
-.long MYMULTIBOOT_FLAGS
-.long -(MULTIBOOT_HEADER_MAGIC+MYMULTIBOOT_FLAGS) /* checksum */
-.long _multiboot_header                           /* header addr */
-.long 0x100000                                    /* load addr */
-.long _edata                                      /* load end addr */
-.long _end                                        /* bss end addr */
-.long _libkvmplat_start32                         /* entry addr */
+.align 8
+multiboot_header:
+        /*  magic */
+        .long   MULTIBOOT2_HEADER_MAGIC
+        /*  ISA: i386 */
+        .long   MULTIBOOT_ARCHITECTURE_I386
+        /*  Header length. */
+        .long   multiboot_header_end - multiboot_header
+        /*  checksum */
+        .long   -(MULTIBOOT2_HEADER_MAGIC + MULTIBOOT_ARCHITECTURE_I386 + (multiboot_header_end - multiboot_header))
+
+address_tag_start:      
+        .short MULTIBOOT_HEADER_TAG_ADDRESS
+        .short MULTIBOOT_HEADER_TAG_OPTIONAL
+        .long address_tag_end - address_tag_start
+        /*  header_addr */
+        .long   multiboot_header
+        /*  load_addr */
+        .long   _start
+        /*  load_end_addr */
+        .long   _edata
+        /*  bss_end_addr */
+        .long   _end
+
+address_tag_end:
+entry_address_tag_start:        
+        .short MULTIBOOT_HEADER_TAG_ENTRY_ADDRESS
+        .short MULTIBOOT_HEADER_TAG_OPTIONAL
+        .long entry_address_tag_end - entry_address_tag_start
+        /*  entry_addr */
+        .long _libkvmplat_start32
+entry_address_tag_end:
+framebuffer_tag_start:  
+        .short MULTIBOOT_HEADER_TAG_FRAMEBUFFER
+        .short MULTIBOOT_HEADER_TAG_OPTIONAL
+        .long framebuffer_tag_end - framebuffer_tag_start
+        .long 1024
+        .long 768
+        .long 32
+framebuffer_tag_end:
+        .short MULTIBOOT_HEADER_TAG_END
+        .short 0
+        .long 8
+multiboot_header_end:
 
 .section .bss
 
@@ -73,11 +104,11 @@ ENTRY(_libkvmplat_start32)
 	cld
 
 	/* only multiboot is supported for now */
-	cmpl $MULTIBOOT_BOOTLOADER_MAGIC, %eax
+	cmpl $MULTIBOOT2_BOOTLOADER_MAGIC, %eax
 	jne nomultiboot
 
 	/*
-	 * Multiboot drops us off in 32-bit protected mode with some sane
+	 * Multiboot2 drops us off in 32-bit protected mode with some sane
 	 * initial settings, good enough to go straight for the only thing
 	 * that we care about: go straight into long mode..
 	 */
