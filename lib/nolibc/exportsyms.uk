@@ -38,6 +38,8 @@ fprintf
 vprintf
 printf
 fflush
+fputc
+putchar
 
 # stdlib
 strtol
