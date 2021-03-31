@@ -37,6 +37,8 @@
 #define ENTRY(x) .globl x; .type x,%function; x:
 #define END(x)   .size x, . - x
 
+#define AOUT_KLUDGE MULTIBOOT_AOUT_KLUDGE
+
 .section .data.boot
 
 .align 8
@@ -49,7 +51,7 @@ _multiboot_header:
         .long   multiboot_header_end - _multiboot_header
         /*  checksum */
         .long   -(MULTIBOOT2_HEADER_MAGIC + MULTIBOOT_ARCHITECTURE_I386 + (multiboot_header_end - _multiboot_header))
-
+.align 8
 address_tag_start:
         .short MULTIBOOT_HEADER_TAG_ADDRESS
         .short MULTIBOOT_HEADER_TAG_OPTIONAL
@@ -62,8 +64,8 @@ address_tag_start:
         .long   _edata
         /*  bss_end_addr */
         .long   _end
-
 address_tag_end:
+.align 8 
 entry_address_tag_start:
         .short MULTIBOOT_HEADER_TAG_ENTRY_ADDRESS
         .short MULTIBOOT_HEADER_TAG_OPTIONAL
@@ -71,6 +73,7 @@ entry_address_tag_start:
         /*  entry_addr */
         .long _libkvmplat_start32
 entry_address_tag_end:
+.align 8
 framebuffer_tag_start:
         .short MULTIBOOT_HEADER_TAG_FRAMEBUFFER
         .short MULTIBOOT_HEADER_TAG_OPTIONAL
@@ -78,6 +81,7 @@ framebuffer_tag_start:
         .long 1024
         .long 768
         .long 32
+.align 8
 framebuffer_tag_end:
         .short MULTIBOOT_HEADER_TAG_END
         .short 0
