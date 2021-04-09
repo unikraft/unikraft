@@ -390,10 +390,28 @@ $(BUILD_DIR)/$(1)/$(3):
 $(call unarchive,$(1),$(BUILD_DIR)/$(1)/$(3),$(4))
 endef
 
+# fetchas2 works like fetchas but supports a secondary URL
+# fetchas2 $libname,$url,$url2,$target_fname(no_path!),$dir_with_patches(optional)
+define fetchas2 =
+$(BUILD_DIR)/$(1)/$(4):
+	$(call verbose_cmd,WGET,$(1)':' $(2) [retry-with: $(3)], \
+	 $(WGET) -q --show-progress --progress=bar -O $(BUILD_DIR)/$(1)/$(4) $(2) || \
+	 $(WGET) -q --show-progress --progress=bar -O $(BUILD_DIR)/$(1)/$(4) $(3) || \
+	 $(RM) $(BUILD_DIR)/$(1)/$(4))
+
+$(call unarchive,$(1),$(BUILD_DIR)/$(1)/$(4),$(5))
+endef
+
 # Downloads an archive from remote and invokes unarchive
 # fetch $libname,$url,$dir_with_patches(optional)
 define fetch =
 $(call fetchas,$(1),$(2),$(notdir $(2)),$(3))
+endef
+
+# fetch2 works like fetch but supports a secondary URL
+# fetch2 $libname,$url,$url2,$dir_with_patches(optional)
+define fetch2 =
+$(call fetchas2,$(1),$(2),$(3),$(notdir $(2)),$(4))
 endef
 
 
