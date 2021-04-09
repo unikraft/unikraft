@@ -194,7 +194,7 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 }
 LFS64(openat);
 
-int creat(const char *pathname, mode_t mode)
+UK_SYSCALL_DEFINE(int, creat, const char*, pathname, mode_t, mode)
 {
 	return open(pathname, O_CREAT|O_WRONLY|O_TRUNC, mode);
 }

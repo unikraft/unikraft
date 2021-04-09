@@ -14,6 +14,8 @@ vfscore_vop_eperm
 vfscore_vop_erofs
 open
 creat
+uk_syscall_e_creat
+uk_syscall_r_creat
 write
 uk_syscall_e_write
 uk_syscall_r_write
