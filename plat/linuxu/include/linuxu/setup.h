@@ -44,10 +44,6 @@ struct liblinuxuplat_memregion {
 struct liblinuxuplat_opts {
 	struct liblinuxuplat_memregion heap;
 	struct liblinuxuplat_memregion initrd;
-	struct {
-		void *base;
-		size_t len;
-	} heap;
 };
 
 extern struct liblinuxuplat_opts _liblinuxuplat_opts;
