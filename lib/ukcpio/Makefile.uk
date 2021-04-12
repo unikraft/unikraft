@@ -2,3 +2,5 @@ $(eval $(call addlib_s,libukcpio,$(CONFIG_LIBUKCPIO)))
 
 CINCLUDES-$(CONFIG_LIBUKCPIO) += -I$(LIBUKCPIO_BASE)/include
 CXXINCLUDES-$(CONFIG_LIBUKCPIO) += -I$(LIBUKCPIO_BASE)/include
+
+LIBUKCPIO_SRCS-y += $(LIBUKCPIO_BASE)/cpio.c
