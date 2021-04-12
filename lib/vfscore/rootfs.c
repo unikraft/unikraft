@@ -3,7 +3,9 @@
  * Mount VFS root
  *
  * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
- *
+ *          Robert Hrusecky <roberth@cs.utexas.edu>
+ *          Omar Jamil <omarj2898@gmail.com>
+ *          Sachin Beldona <sachinbeldona@utexas.edu>
  *
  * Copyright (c) 2019, NEC Laboratories Europe GmbH, NEC Corporation.
  *                     All rights reserved.
@@ -40,6 +42,11 @@
 #include <sys/stat.h>
 #include <sys/mount.h>
 #include <uk/init.h>
+#ifdef CONFIG_LIBVFSCORE_ROOTFS_INITRD
+#include <uk/plat/memory.h>
+#include <uk/cpio.h>
+#include <string.h>
+#endif /* CONFIG_LIBVFSCORE_ROOTFS_INITRD */
 
 static const char *rootfs   = CONFIG_LIBVFSCORE_ROOTFS;
 
@@ -78,16 +85,43 @@ static int vfscore_rootfs(void)
 		return -1;
 	}
 
+#if CONFIG_LIBVFSCORE_ROOTFS_INITRD
+	if (strncmp(rootfs, "initrd", 5) == 0) {
+		struct ukplat_memregion_desc initrd;
+		enum ukcpio_error error;
+
+		if (ukplat_memregion_find_initrd0(&initrd) < 0) {
+			uk_pr_crit("Could not find an initrd!\n");
+			return -1;
+		}
+
+		uk_pr_info("Mount ramfs to /...\n");
+
+		if (mount("", "/", "ramfs", 0, NULL) != 0) {
+			uk_pr_crit("Failed to mount ramfs to /: %d\n",
+				   errno);
+			return -1;
+		}
+
+		uk_pr_info("Extracting initrd @ %p (%"__PRIsz" bytes) to /...\n",
+			   initrd.base, initrd.len);
+
+		error = ukcpio_extract("/", initrd.base, initrd.len);
+		if (error < 0) {
+			uk_pr_crit("Failed to extract cpio archive to /: %d\n",
+				   error);
+			return -1;
+		}
+
+		return 0;
+	}
+#endif /* CONFIG_LIBVFSCORE_ROOTFS_INITRD */
+
 	uk_pr_info("Mount %s to /...\n", rootfs);
 	if (mount(rootdev, "/", rootfs, rootflags, rootopts) != 0) {
 		uk_pr_crit("Failed to mount /: %d\n", errno);
 		return -1;
 	}
-
-	/*
-	 * TODO: Alternatively we could extract an archive found
-	 * as initrd to a ramfs '/' if we have got fsname 'initrd'
-	 */
 
 	return 0;
 }
