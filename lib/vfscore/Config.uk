@@ -38,6 +38,11 @@ if LIBVFSCORE_AUTOMOUNT_ROOTFS
 		select LIBUK9P
 		select LIB9PFS
 
+		config LIBVFSCORE_ROOTFS_INITRD
+		bool "InitRD"
+		select LIBRAMFS
+		select LIBUKCPIO
+
 		config LIBVFSCORE_ROOTFS_CUSTOM
 		bool "Custom argument"
 		help
@@ -61,13 +66,14 @@ if LIBVFSCORE_AUTOMOUNT_ROOTFS
 	string
 	default "ramfs" if LIBVFSCORE_ROOTFS_RAMFS
 	default "9pfs" if LIBVFSCORE_ROOTFS_9PFS
+	default "initrd" if LIBVFSCORE_ROOTFS_INITRD
 	default LIBVFSCORE_ROOTFS_CUSTOM_ARG if LIBVFSCORE_ROOTFS_CUSTOM
 	default ""
 
 	# The root device option is hidden for RamFS and 9PFS
 	config LIBVFSCORE_ROOTDEV
 	string "Default root device"
-	depends on !LIBVFSCORE_ROOTFS_RAMFS
+	depends on !LIBVFSCORE_ROOTFS_RAMFS && !LIBVFSCORE_ROOTFS_INITRD
 	default "rootfs" if LIBVFSCORE_ROOTFS_9PFS
 	default ""
 	help
@@ -78,7 +84,7 @@ if LIBVFSCORE_AUTOMOUNT_ROOTFS
 	# The root flags is hidden for RamFS
 	config LIBVFSCORE_ROOTFLAGS
 	hex "Default root mount flags"
-	depends on !LIBVFSCORE_ROOTFS_RAMFS
+	depends on !LIBVFSCORE_ROOTFS_RAMFS && !LIBVFSCORE_ROOTFS_INITRD
 	default 0x0
 	help
 		Mount flags.
@@ -86,7 +92,7 @@ if LIBVFSCORE_AUTOMOUNT_ROOTFS
 	# The root options are hidden for RamFS
 	config LIBVFSCORE_ROOTOPTS
 	string "Default root mount options"
-	depends on !LIBVFSCORE_ROOTFS_RAMFS
+	depends on !LIBVFSCORE_ROOTFS_RAMFS && !LIBVFSCORE_ROOTFS_INITRD
 	default ""
 	help
 		Usually a comma-separated list of additional mount
