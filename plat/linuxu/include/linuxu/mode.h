@@ -1,9 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ * Authors: Alexander Jung <a.jung@lancs.ac.uk>
  *
- *
- * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2021, Lancaster University. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,26 +29,11 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#ifndef __LINUXU_MODE_H__
+#define __LINUXU_MODE_H__
 
-#ifndef __SETUP_H__
-#define __SETUP_H__
+typedef unsigned int k_mode_t;
 
-#include <sys/types.h>
+#define K_O_RDONLY 0x0000
 
-struct liblinuxuplat_memregion {
-	void *base;
-	size_t len;
-};
-
-struct liblinuxuplat_opts {
-	struct liblinuxuplat_memregion heap;
-	struct liblinuxuplat_memregion initrd;
-	struct {
-		void *base;
-		size_t len;
-	} heap;
-};
-
-extern struct liblinuxuplat_opts _liblinuxuplat_opts;
-
-#endif /* __SETUP_H__ */
+#endif /* __LINUXU_MODE_H__ */

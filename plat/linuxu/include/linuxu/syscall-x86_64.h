@@ -40,6 +40,7 @@
 #define __SC_WRITE   1
 #define __SC_OPEN    2
 #define __SC_CLOSE   3
+#define __SC_FSTAT   5
 #define __SC_MMAP    9
 #define __SC_MUNMAP 11
 #define __SC_RT_SIGACTION   13
