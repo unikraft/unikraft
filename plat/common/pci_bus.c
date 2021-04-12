@@ -78,7 +78,7 @@ static struct pci_bus_handler ph;
 #define PCI_BUS_SHIFT               (16)
 #define PCI_DEVICE_SHIFT            (11)
 #define PCI_FUNCTION_SHIFT          (8)
-#define PCI_ENABLE_BIT              (1u << 31)
+#define PCI_ENABLE_BIT              (1 << 31)
 
 #define PCI_CONF_CLASS_ID          (0x08)
 #define PCI_CONF_CLASS_ID_SHFT     (16)
