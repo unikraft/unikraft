@@ -1,0 +1,10 @@
+config LIBUKCPIO
+	bool "ukcpio: CPIO archive extraction"
+	# We use `depends on` and not `select` for the option below to prevent
+	# recursive dependency between vfscore and ukcpio as vfscore has
+	# additional options todo with automatically mounting the desired
+	# filesystem and also initializing it (in the case of ramfs) with
+	# ukcpio.
+	depends on LIBVFSCORE
+	select LIBNOLIBC if !HAVE_LIBC
+	default n
