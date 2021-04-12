@@ -1,9 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ * Authors: Alexander Jung <a.jung@lancs.ac.uk>
  *
- *
- * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2021, Lancaster University. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,26 +29,41 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#ifndef __LINUXU_STAT_H__
+#define __LINUXU_STAT_H__
 
-#ifndef __SETUP_H__
-#define __SETUP_H__
+#include <linuxu/time.h>
+#include <linuxu/mode.h>
 
-#include <sys/types.h>
+typedef __u64 k_dev_t;
+typedef __u64 k_ino_t;
+typedef __u32 k_nlink_t;
+typedef unsigned int k_uid_t;
+typedef unsigned int k_gid_t;
+typedef unsigned int k_id_t;
+typedef __off k_off_t;
+typedef long k_blksize_t;
+typedef __s64 k_blkcnt_t;
 
-struct liblinuxuplat_memregion {
-	void *base;
-	size_t len;
+
+struct k_stat {
+	k_dev_t st_dev;
+	k_ino_t st_ino;
+	k_nlink_t st_nlink;
+	k_mode_t st_mode;
+	k_uid_t st_uit;
+	k_gid_t st_gid;
+
+	unsigned int __pad0;
+
+	k_dev_t st_rdev;
+	k_off_t st_size;
+	k_blksize_t st_blksize;
+	k_blkcnt_t st_blocks;
+
+	struct k_timespec st_atim;
+	struct k_timespec st_mtim;
+	struct k_timespec st_ctim;
 };
 
-struct liblinuxuplat_opts {
-	struct liblinuxuplat_memregion heap;
-	struct liblinuxuplat_memregion initrd;
-	struct {
-		void *base;
-		size_t len;
-	} heap;
-};
-
-extern struct liblinuxuplat_opts _liblinuxuplat_opts;
-
-#endif /* __SETUP_H__ */
+#endif /* __LINUXU_STAT_H__ */
