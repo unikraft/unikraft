@@ -582,6 +582,10 @@ GZIP		:= gzip
 TAR		:= tar
 UNZIP		:= unzip -qq -u
 WGET		:= wget
+SHA1SUM		:= sha1sum -b
+SHA256SUM	:= sha256sum -b
+SHA512SUM	:= sha512sum -b
+MD5SUM		:= md5sum -b
 DTC		:= dtc
 # Time requires the full path so that subarguments are handled correctly
 TIME		:= $(shell which time)
