@@ -1,5 +1,5 @@
 menuconfig LIBSYSCALL_SHIM
-	bool "syscall_shim: Syscall shim layer"
+	bool "syscall-shim: Syscall shim layer"
 	default n
 
 if LIBSYSCALL_SHIM
