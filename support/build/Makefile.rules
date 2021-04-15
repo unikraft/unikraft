@@ -291,6 +291,14 @@ build_clean = $(1)
 endif
 endif
 
+# Helper that generates a command for validating a checksum for
+# a given file. The command returns 1 on a checksum mismatch.
+#
+# chksum_cmd $algorithm(MD5,SHA1,SHA256,SHA512), $libname, $sourcefile, $chksum
+define chksum_cmd =
+$(call verbose_cmd,$(1),$(2)':' $(notdir $(3)), \
+  if ! [[ "`$($(1)SUM) - < "$(3)"`" =~ ^$(call qstrip,$(4))[[:space:]] ]]; then echo "$(3): $(1) checksum validation failed" 1>&2; exit 1; fi )
+endef
 
 #################################################
 #
@@ -302,9 +310,9 @@ endif
 # extracts an archive to LIBRARY_BUILD/origin
 # On success, creates LIBRARY_BUILD/.origin file
 #
-# _extractorigin_* $libname,$archive_fname
+# _extractorigin_* $libname,$archive_fname,$extra_deps(optional)
 define _extracttoorigin_tgz =
-$(BUILD_DIR)/$(1)/.origin: $(2)
+$(BUILD_DIR)/$(1)/.origin: $(2) $(3)
 	$(call verbose_cmd,UNTAR,$(1)':' $(notdir $(2)), \
 	  $(TAR) -xzf $(2) \
 	         -C $(BUILD_DIR)/$(1)/origin && \
@@ -312,7 +320,7 @@ $(BUILD_DIR)/$(1)/.origin: $(2)
 endef
 
 define _extracttoorigin_tgz_xz =
-$(BUILD_DIR)/$(1)/.origin: $(2)
+$(BUILD_DIR)/$(1)/.origin: $(2) $(3)
 	$(call verbose_cmd,UNTAR,$(1)':' $(notdir $(2)), \
 	  $(TAR) -xJf $(2) \
 	         -C $(BUILD_DIR)/$(1)/origin && \
@@ -320,7 +328,7 @@ $(BUILD_DIR)/$(1)/.origin: $(2)
 endef
 
 define _extracttoorigin_tgz_bz2 =
-$(BUILD_DIR)/$(1)/.origin: $(2)
+$(BUILD_DIR)/$(1)/.origin: $(2) $(3)
 	$(call verbose_cmd,UNTAR,$(1)':' $(notdir $(2)), \
 	  $(TAR) -xjf $(2) \
 	         -C $(BUILD_DIR)/$(1)/origin && \
@@ -328,7 +336,7 @@ $(BUILD_DIR)/$(1)/.origin: $(2)
 endef
 
 define _extracttoorigin_zip =
-$(BUILD_DIR)/$(1)/.origin: $(2)
+$(BUILD_DIR)/$(1)/.origin: $(2) $(3)
 	$(call verbose_cmd,UNZIP,$(1)':' $(notdir $(2)), \
 	  $(UNZIP) -d $(BUILD_DIR)/$(1)/origin \
 		   $(2) && \
@@ -357,17 +365,43 @@ endef
 # A variable called LIB[LIBNAME]_ORIGIN is initialized with
 # the path to the extracted files
 #
-# unarchive $libname,$archive_fname,$dir_with_patches(optional)
+# unarchive $libname,$archive_fname,$dir_with_patches(optional),$extra_deps(optional)
 define unarchive =
-$(if $(filter %.tar.gz %.tgz,$(2)),$(call _extracttoorigin_tgz,$(1),$(2)),\
-$(if $(filter %.tar.xz %.txz,$(2)),$(call _extracttoorigin_tgz_xz,$(1),$(2)),\
-$(if $(filter %.tar.bz2 %.tbz2,$(2)),$(call _extracttoorigin_tgz_bz2,$(1),$(2)),\
-$(if $(filter %.zip,$(2)),$(call          _extracttoorigin_zip,$(1),$(2)),\
+$(if $(filter %.tar.gz %.tgz,$(2)),$(call _extracttoorigin_tgz,$(1),$(2),$(4)),\
+$(if $(filter %.tar.xz %.txz,$(2)),$(call _extracttoorigin_tgz_xz,$(1),$(2),$(4)),\
+$(if $(filter %.tar.bz2 %.tbz2,$(2)),$(call _extracttoorigin_tgz_bz2,$(1),$(2),$(4)),\
+$(if $(filter %.zip,$(2)),$(call          _extracttoorigin_zip,$(1),$(2),$(4)),\
 $(error $(2): missing extraction rule for archive type)\
 ))))
 UK_FETCH-y += $(BUILD_DIR)/$(1)/.origin \
 $(eval $(call vprefix_lib,$(1),ORIGIN) = $(BUILD_DIR)/$(1)/origin)
 $(call mk_sub_build_dir,$(1)/origin)
+endef
+
+# Internal helper to compute and compare a checksum of a downloaded file
+# (see: fetch(as)[2])
+# This command picks up the checksum for comparison from the library-local
+# variable LIBNAME_ORIGIN_[MD5|SHA1|...]. It generates a rule that tests
+# only given and supported checksums.
+# NOTE: The variable containing the checksum need to be defined
+# before calling `fetch`, `fetch2`, `fetchas`, or `fetchas2`.
+#
+# _chksum_origin $libname, $file, $status_ok
+define _chksum_origin =
+$(3): $(2)
+	$(if $(filter $(call vprefix_lib,$(1),ORIGIN_SHA1),$(.VARIABLES)), \
+		$(call chksum_cmd,SHA1,$(1),$(2),$($(call vprefix_lib,$(1),ORIGIN_SHA1))) \
+	)
+	$(if $(filter $(call vprefix_lib,$(1),ORIGIN_SHA256),$(.VARIABLES)), \
+		$(call chksum_cmd,SHA256,$(1),$(2),$($(call vprefix_lib,$(1),ORIGIN_SHA256))) \
+	)
+	$(if $(filter $(call vprefix_lib,$(1),ORIGIN_SHA512),$(.VARIABLES)), \
+		$(call chksum_cmd,SHA512,$(1),$(2),$($(call vprefix_lib,$(1),ORIGIN_SHA512))) \
+	)
+	$(if $(filter $(call vprefix_lib,$(1),ORIGIN_MD5),$(.VARIABLES)), \
+		$(call chksum_cmd,MD5,$(1),$(2),$($(call vprefix_lib,$(1),ORIGIN_MD5))) \
+	)
+	@$(TOUCH) $(3)
 endef
 
 # Downloads an archive from remote and invokes unarchive. The target filename
@@ -379,7 +413,10 @@ $(BUILD_DIR)/$(1)/$(3):
 	 $(WGET) -q --show-progress --progress=bar -O $(BUILD_DIR)/$(1)/$(3) $(2) || \
 	 $(RM) $(BUILD_DIR)/$(1)/$(3))
 
-$(call unarchive,$(1),$(BUILD_DIR)/$(1)/$(3),$(4))
+$(call _chksum_origin,$(1),$(BUILD_DIR)/$(1)/$(3),$(BUILD_DIR)/$(1)/.chksum)
+$(call unarchive,$(1),$(BUILD_DIR)/$(1)/$(3),$(4),$(BUILD_DIR)/$(1)/.chksum)
+
+UK_FETCH-y += $(BUILD_DIR)/$(1)/.chksum
 endef
 
 # fetchas2 works like fetchas but supports a secondary URL
@@ -391,7 +428,10 @@ $(BUILD_DIR)/$(1)/$(4):
 	 $(WGET) -q --show-progress --progress=bar -O $(BUILD_DIR)/$(1)/$(4) $(3) || \
 	 $(RM) $(BUILD_DIR)/$(1)/$(4))
 
-$(call unarchive,$(1),$(BUILD_DIR)/$(1)/$(4),$(5))
+$(call _chksum_origin,$(1),$(BUILD_DIR)/$(1)/$(4),$(BUILD_DIR)/$(1)/.chksum)
+$(call unarchive,$(1),$(BUILD_DIR)/$(1)/$(4),$(5),$(BUILD_DIR)/$(1)/.chksum)
+
+UK_FETCH-y += $(BUILD_DIR)/$(1)/.chksum
 endef
 
 # Downloads an archive from remote and invokes unarchive
