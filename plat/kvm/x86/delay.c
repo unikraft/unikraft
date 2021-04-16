@@ -1,10 +1,7 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
- *          Cristian Vijelie <cristianvijelie@gmail.com>
+ * Authors: Cristian Vijelie <cristianvijelie@gmail.com>
  *
- *
- * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
  * Copyright (c) 2021, University Politehnica of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -35,77 +32,27 @@
  * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#ifndef __UKPLAT_LCPU_H__
-#define __UKPLAT_LCPU_H__
+#include <uk/plat/lcpu.h>
 
-#include <uk/arch/time.h>
-
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-#if UKPLAT_LCPU_MULTICORE
-__u8 ukplat_lcpu_id(void);
-__u8 ukplat_lcpu_count(void);
-#else
-#define ukplat_lcpu_id()    (0)
-#define ukplat_lcpu_count() (1)
-#endif
-
-/**
- * Enables interrupts
+/* 
+ * Write to an unused IO port. This takes aproximatevly 1 us
  */
-void ukplat_lcpu_enable_irq(void);
 
-/**
- * Disables interrupts
- */
-void ukplat_lcpu_disable_irq(void);
+static inline void uk_io_delay(void)
+{
+	const __u16 DELAY_PORT = 0x80;
 
-/**
- * Returns current interrupt flags and disables them
- * @return interrupt flags (Note that the format is unspecified)
- */
-unsigned long ukplat_lcpu_save_irqf(void);
-
-/**
- * Loads interrupt flags
- * @param flags interrupt flags (Note that the format is unspecified)
- */
-void ukplat_lcpu_restore_irqf(unsigned long flags);
-
-/**
- * Checks if interrupts are disabled
- * @return non-zero value if interrupts are disabled
- */
-int ukplat_lcpu_irqs_disabled(void);
-
-void ukplat_lcpu_irqs_handle_pending(void);
-
-/**
- * Halts the current logical CPU execution
- */
-void ukplat_lcpu_halt(void);
-
-/**
- * Halts the current logical CPU execution
- * Execution is returned when an interrupt/signal arrived or
- * the specified deadline expired
- * @param until deadline in nanoseconds
- */
-void ukplat_lcpu_halt_to(__snsec until);
-
-/**
- * Halts the current logical CPU execution
- * Execution is returned when an interrupt/signal arrived
- */
-void ukplat_lcpu_halt_irq(void);
-
-void uk_udelay(__u16 usec);
-void uk_mdelay(__u16 msec);
-
-#ifdef __cplusplus
+	asm volatile("outb %%al,%0" : : "dN"(DELAY_PORT));
 }
-#endif
 
-#endif /* __UKPLAT_LCPU_H__ */
+inline void uk_udelay(__u16 usec)
+{
+	while (usec--)
+		uk_io_delay();
+}
+
+inline void uk_mdelay(__u16 msec)
+{
+	while (msec--)
+		uk_udelay(1000);
+}
