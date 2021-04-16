@@ -36,14 +36,27 @@
 
 #include <errno.h>
 
+#include <uk/config.h>
 #include <uk/alloc.h>
 #include <uk/sched.h>
 #include <signal.h>
+#include <string.h>
 #include <uk/thread.h>
 #include <uk/uk_signal.h>
 #include <uk/essentials.h>
 #include <uk/process.h>
 #include <unistd.h>
+#include <uk/syscall.h>
+
+#ifdef CONFIG_LIBUKSIGNAL_LIBCFNS_ENABLE
+#define __signal signal
+#define __sigprocmask sigprocmask
+#define __sigaction sigaction
+#define __sigpending sigpending
+#define __sigsuspend sigsuspend
+#define __sigwait sigwait
+#define __raise raise
+#endif /* CONFIG_LIBC_SIGNAL_ENABLE */
 
 /*
  * Tries to deliver a pending signal to the current thread
@@ -87,9 +100,10 @@ static int uk_get_awaited_signal(void)
 	return 0;
 }
 
-/* TODO: We do not support any sa_flags besides SA_SIGINFO */
-int
-sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
+UK_SYSCALL_R_DEFINE(int, rt_sigaction, int, signum,
+		    const struct sigaction *, act,
+		    struct sigaction *, oldact,
+		    size_t, sigsetsize)
 {
 	struct uk_list_head *i;
 	struct uk_thread_sig *th_sig;
@@ -97,10 +111,8 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
 
 	if (!uk_sig_is_valid(signum) ||
 			signum == SIGKILL ||
-			signum == SIGSTOP) {
-		errno = EINVAL;
-		return -1;
-	}
+			signum == SIGSTOP)
+		return -EINVAL;
 
 	if (oldact)
 		*oldact = uk_proc_sig.sigaction[signum - 1];
@@ -140,30 +152,18 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
 	return 0;
 }
 
-static sighandler_t uk_signal(int signum, sighandler_t handler, int sa_flags)
+UK_SYSCALL_R_DEFINE(int, rt_sigprocmask,
+		    int, how,
+		    const sigset_t *, set,
+		    sigset_t *, oldset,
+		    size_t, sigsetsize)
 {
-	struct sigaction old;
-	struct sigaction act = {
-		.sa_handler = handler,
-		.sa_flags = sa_flags
-	};
-
-	if (sigaction(signum, &act, &old) < 0)
-		return SIG_ERR;
-
-	if (old.sa_flags & SA_SIGINFO)
-		return NULL;
-	else
-		return old.sa_handler;
+	return  uk_thread_sigmask(how, set, oldset);
 }
 
-sighandler_t signal(int signum, sighandler_t handler)
-{
-	/* SA_RESTART <- BSD signal semantics */
-	return uk_signal(signum, handler, SA_RESTART);
-}
-
-int sigpending(sigset_t *set)
+UK_SYSCALL_R_DEFINE(int, rt_sigpending,
+		    sigset_t *, set,
+		    size_t __unused, sigsetsize)
 {
 	struct uk_thread_sig *ptr;
 
@@ -175,12 +175,9 @@ int sigpending(sigset_t *set)
 	return 0;
 }
 
-int sigprocmask(int how, const sigset_t *set, sigset_t *oldset)
-{
-	return uk_thread_sigmask(how, set, oldset);
-}
-
-int sigsuspend(const sigset_t *mask)
+UK_SYSCALL_R_DEFINE(int, rt_sigsuspend,
+		    const sigset_t *, mask,
+		    size_t __unused, sigsetsize)
 {
 	/* If the signals are ignored, this doesn't return <- POSIX */
 
@@ -227,11 +224,14 @@ int sigsuspend(const sigset_t *mask)
 	/* execute other pending signals */
 	uk_sig_handle_signals();
 
-	errno = EINTR;
-	return -1; /* always returns -1 and sets errno to EINTR */
+	return -EINTR; /* always returns -1 and sets errno to EINTR */
 }
 
-int sigwait(const sigset_t *set, int *sig)
+UK_SYSCALL_R_DEFINE(int, rt_sigtimedwait,
+		    const sigset_t *, set,
+		    siginfo_t *, info,
+		    const struct timespec *__unused, timeout,
+		    size_t __unused, sigsetsize)
 {
 	/*
 	 * If the signals are ignored, this doesn't return <- TODO: POSIX ??
@@ -252,7 +252,7 @@ int sigwait(const sigset_t *set, int *sig)
 	uk_sigset_remove_unmaskable(&cleaned_set);
 
 	if (uk_sigisempty(&cleaned_set))
-		return EINVAL;
+		return -EINVAL;
 
 	ptr = _UK_TH_SIG;
 
@@ -296,13 +296,128 @@ int sigwait(const sigset_t *set, int *sig)
 	ptr->wait.status = UK_SIG_NOT_WAITING;
 
 	/* do not execute handler, set received signal */
-	*sig = ptr->wait.received_signal.si_signo;
+	memcpy(info, &ptr->wait.received_signal,
+	       sizeof(*info));
 
 	/* execute other pending signals */
 	uk_sig_handle_signals();
 
 	return 0; /* returns positive errno */
 }
+
+UK_SYSCALL_R_DEFINE(int, tkill, pid_t __unused, pid, int, sig)
+{
+	return uk_sig_thread_kill(uk_thread_current(), sig);
+}
+
+#ifdef CONFIG_LIBUKSIGNAL_LIBCFNS_ENABLE
+/* TODO: We do not support any sa_flags besides SA_SIGINFO */
+int
+__sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
+{
+	int error;
+
+	error = rt_sigaction(signum, act, oldact, (_NSIG / 8));
+	if (error < 0) {
+		errno = -error;
+		error = -1;
+	}
+	return error;
+}
+
+static sighandler_t uk_signal(int signum, sighandler_t handler, int sa_flags)
+{
+	struct sigaction old;
+	struct sigaction act = {
+		.sa_handler = handler,
+		.sa_flags = sa_flags
+	};
+
+	if (rt_sigaction(signum, &act, &old, (_NSIG / 8)) < 0)
+		return SIG_ERR;
+
+	if (old.sa_flags & SA_SIGINFO)
+		return NULL;
+	else
+		return old.sa_handler;
+}
+
+sighandler_t __signal(int signum, sighandler_t handler)
+{
+	/* SA_RESTART <- BSD signal semantics */
+	return uk_signal(signum, handler, SA_RESTART);
+}
+
+int __sigpending(sigset_t *set)
+{
+	int error;
+
+	error = rt_sigpending(set, (_NSIG / 8));
+	if (error < 0) {
+		errno = -error;
+		error = -1;
+	}
+
+	return error;
+}
+
+int __sigprocmask(int how, const sigset_t *set, sigset_t *oldset)
+{
+	int error;
+	int ret = 0;
+
+	error = uk_thread_sigmask(how, set, oldset);
+
+	if (error < 0) {
+		errno = -error;
+		ret = -1;
+	}
+
+	return ret;
+}
+
+int __sigsuspend(const sigset_t *mask)
+{
+	/* If the signals are ignored, this doesn't return <- POSIX */
+	int error;
+
+	error = rt_sigsuspend(mask, (_NSIG / 8));
+	if (error < 0) {
+		errno = -error;
+		error = -1; /* always returns -1 and sets errno to EINTR */
+	}
+	return error;
+}
+
+int __sigwait(const sigset_t *set, int *sig)
+{
+	int error;
+	siginfo_t si;
+
+	error = rt_sigtimedwait(set, &si, 0, (_NSIG / 8));
+	if (error < 0) {
+		errno = -error;
+		return -1;
+	}
+
+	*sig = si.si_signo;
+	return 0; /* returns positive errno */
+}
+
+int __raise(int sig)
+{
+	int error;
+
+	error = tkill(-1, sig);
+	if (error < 0) {
+		errno = -error;
+		error = -1;
+	}
+
+	return error;
+}
+
+#endif /* CONFIG_LIBUKSIGNAL_LIBCFNS_ENABLE */
 
 /*
  * Search for a thread that does not have the signal blocked
@@ -360,11 +475,6 @@ int killpg(int pgrp, int sig)
 	}
 
 	return kill(getpid(), sig);
-}
-
-int raise(int sig)
-{
-	return uk_sig_thread_kill(uk_thread_current(), sig);
 }
 
 /**

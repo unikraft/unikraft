@@ -206,10 +206,8 @@ int uk_sig_thread_kill(struct uk_thread *tid, int sig)
 	struct uk_signal *signal;
 	struct uk_thread_sig *ptr;
 
-	if (!uk_sig_is_valid(sig)) {
-		errno = EINVAL;
-		return -1;
-	}
+	if (!uk_sig_is_valid(sig))
+		return -EINVAL;
 
 	ptr = &tid->signals_container;
 
@@ -309,8 +307,7 @@ int uk_thread_sigmask(int how, const sigset_t *set, sigset_t *oldset)
 			uk_sigcopyset(mask, set);
 			break;
 		default:
-			errno = EINVAL;
-			return -1;
+			return -EINVAL;
 		}
 
 		uk_sigset_remove_unmaskable(mask);
