@@ -1,9 +1,11 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ *          Cristian Vijelie <cristianvijelie@gmail.com>
  *
  *
  * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2021, University Politehnica of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -98,6 +100,9 @@ void ukplat_lcpu_halt_to(__snsec until);
  * Execution is returned when an interrupt/signal arrived
  */
 void ukplat_lcpu_halt_irq(void);
+
+void uk_udelay(__u16 usec);
+void uk_mdelay(__u16 msec);
 
 #ifdef __cplusplus
 }
