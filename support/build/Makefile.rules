@@ -647,9 +647,10 @@ endef
 #
 # preprule $libname,$source,$preptarget,$extraflags(optional)
 define preprule =
-$(if $(filter %.m4   ,$(2)),$(call preprule_m4 ,$(1),$(2),$(3),$(4)),\
-$(error $(3): missing pre-processing rule for source type $(suffix $(2))) \
-)
+$(if $(filter preprule_$(call fileext,$(strip $(2))),$(.VARIABLES)),\
+$(call preprule_$(call fileext,$(strip $(2))),$(strip $(1)),$(strip $(2)),$(strip $(3)),$(strip $(4)),$(strip $(5))),\
+$(error Cannot compile $(strip $(2)). No rule defined for .$(call fileext,$(strip $(2))) format. Please create a Makefile.rules\
+that defines the necessary rules))
 endef
 
 
