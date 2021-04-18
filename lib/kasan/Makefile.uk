@@ -1,0 +1,10 @@
+$(eval $(call addlib_s,libkasan,$(CONFIG_LIBKASAN)))
+
+CINCLUDES-$(CONFIG_LIBKASAN)     += -I$(LIBKASAN_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBKASAN)   += -I$(LIBKASAN_BASE)/include
+
+COMPFLAGS-$(CONFIG_LIBKASAN_GLOBAL)	+= -fsanitize=kernel-address
+
+LIBKASAN_CFLAGS-y += -Wbuiltin-declaration-mismatch
+
+LIBKASAN_SRCS-y += $(LIBKASAN_BASE)/kasan.c
