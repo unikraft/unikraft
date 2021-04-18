@@ -1,0 +1,15 @@
+menuconfig LIBKASAN
+	bool "kasan: Kernel Address Sanitizer(KVM x86 only)"
+	default n
+	help
+		Experimental. Only works for the heap. Uses
+		1 MB of heap.
+
+if LIBKASAN
+
+config LIBKASAN_GLOBAL
+	bool "Global Kernel Address Sanitizer"
+	default n
+	help
+		Enable Kernel Address Sanitizer globally.
+endif
