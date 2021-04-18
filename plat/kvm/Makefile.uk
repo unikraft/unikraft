@@ -24,9 +24,9 @@ LIBKVMPLAT_CINCLUDES-y         += -I$(LIBKVMPLAT_BASE)/include
 LIBKVMPLAT_CINCLUDES-y         += -I$(UK_PLAT_COMMON_BASE)/include
 LIBKVMPLAT_CINCLUDES-y         += -I$(UK_PLAT_DRIVERS_BASE)/include
 
-LIBKVMPLAT_ASFLAGS             += -DKVMPLAT
-LIBKVMPLAT_CFLAGS              += -DKVMPLAT
-LIBKVMPLAT_CXXFLAGS            += -DKVMPLAT
+LIBKVMPLAT_ASFLAGS             += -DKVMPLAT -fno-sanitize=kernel-address
+LIBKVMPLAT_CFLAGS              += -DKVMPLAT -fno-sanitize=kernel-address
+LIBKVMPLAT_CXXFLAGS            += -DKVMPLAT -fno-sanitize=kernel-address
 
 ##
 ## Default Linker script
