@@ -54,6 +54,7 @@ SECTIONS {
 
 	/* Place DTB binary at the beginning of the RAM */
 	_dtb = .;
+	_start_ram_addr = .;
 	. = . + DTB_RESERVED_SIZE;
 
 	/* Code */
