@@ -90,6 +90,11 @@ ENTRY(_libkvmplat_entry)
 	add x27, x26, x17
 	add x27, x27, #__STACK_SIZE
 	sub x1, x27, x25
+
+	/*
+	 * set x0 as the start of ram address.
+	 */
+	ldr x0, = _start_ram_addr;
 	bl clean_and_invalidate_dcache_range
 
 	/* Disable the MMU and D-Cache. */
