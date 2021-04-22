@@ -51,7 +51,7 @@ extern void asm_thread_starter(void);
 
 static size_t sw_ctx_size(void)
 {
-	return sizeof(struct ukplat_ctx) + arch_extregs_size();
+	return sizeof(struct sw_ctx) + arch_extregs_size();
 }
 
 static void sw_ctx_init(void *ctx,
