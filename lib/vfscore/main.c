@@ -959,6 +959,45 @@ int scandir(const char *path, struct dirent ***res,
 	return cnt;
 }
 
+UK_TRACEPOINT(trace_vfs_getdents, "%d %p %hu", int, struct dirent*, size_t);
+UK_TRACEPOINT(trace_vfs_getdents_ret, "");
+UK_TRACEPOINT(trace_vfs_getdents_err, "%d", int);
+
+UK_SYSCALL_R_DEFINE(int, getdents, int, fd, struct dirent*, dirp,
+					size_t, count) {
+	trace_vfs_getdents(fd, dirp, count);
+	if (dirp == NULL || count == 0)
+		return 0;
+
+	DIR dir = {
+		.fd = fd
+	};
+
+	size_t i = 0;
+	struct dirent entry, *result;
+	int error;
+
+	do {
+		error = readdir_r(&dir, &entry, &result);
+		if (error) {
+			trace_vfs_getdents_err(error);
+			return -error;
+
+		} else
+			trace_vfs_getdents_ret();
+
+		if (result != NULL) {
+			memcpy(dirp + i, result, sizeof(struct dirent));
+			i++;
+
+		} else
+			break;
+
+	} while (i < count);
+
+	return (i * sizeof(struct dirent));
+}
+
 struct dirent *readdir(DIR *dir)
 {
 	static __thread struct dirent entry, *result;
