@@ -218,3 +218,6 @@ uk_syscall_r_utimes
 lutimes
 posix_fadvise
 scandir
+getdents
+uk_syscall_e_getdents
+uk_syscall_r_getdents
