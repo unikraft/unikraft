@@ -807,6 +807,12 @@ int fstatat(int dirfd, const char *path, struct stat *st, int flags)
 
 LFS64(fstatat);
 
+UK_SYSCALL_R_DEFINE(int, newfstatat, int, dirfd, const char*, path,
+				struct stat*, st, int, flags)
+{
+	return __fxstatat(1, dirfd, path, st, flags);
+}
+
 UK_SYSCALL_R_DEFINE(int, flock, int, fd, int, operation)
 {
 	struct vfscore_file *file;

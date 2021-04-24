@@ -89,6 +89,9 @@ chdir
 uk_syscall_e_chdir
 uk_syscall_r_chdir
 fstatat
+newfstatat
+uk_syscall_e_newfstatat
+uk_syscall_r_newfstatat
 statfs
 uk_syscall_e_statfs
 uk_syscall_r_statfs
