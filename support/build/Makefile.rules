@@ -226,6 +226,14 @@ define addplatlib_s =
 $(if $(filter y,$(3)),$(call addplatlib,$(1),$(2)),)
 endef
 
+# creates a sub build directory for a library
+# $libname,$subdir
+define mk_sub_libbuild_dir =
+$(if $(shell mkdir -p "$(BUILD_DIR)/$(1)/$(2)" && cd "$(BUILD_DIR)/$(1)/$(2)" >/dev/null && pwd),,\
+     $(error could not create directory "$(BUILD_DIR)/$(1)/$(2)"))
+endef
+
+sub_libbuild_dir = $(BUILD_DIR)/$(1)/$(2)
 
 ################################################################################
 #
