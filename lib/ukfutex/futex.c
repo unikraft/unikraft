@@ -5,7 +5,6 @@
 #include <uk/list.h>
 #include <uk/assert.h>
 #include <uk/print.h>
-#include <errno.h>
 
 /* TODO: Hash bucket */
 #define add_futex(addr, fthread) \
@@ -15,7 +14,7 @@
 	f->thread = fthread; \
 	uk_list_add_tail(&f->list_node, &futex_list)
 
-/* TODO: timeout futexes not removed from the list */
+/* TODO: timed out futexes not removed from the list */
 static UK_LIST_HEAD(futex_list);
 
 static int futex_wait(uint32_t *uaddr, uint32_t val, const struct timespec *tm)
@@ -24,7 +23,8 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const struct timespec *tm)
 		add_futex(uaddr, uk_thread_current());
 		if (tm)
 			/* Block for at least x nanosecs */
-			uk_thread_block_timeout(uk_thread_current(), tm->tv_nsec);
+			uk_thread_block_timeout(uk_thread_current(),
+				tm->tv_nsec);
 		else
 			/* Block undefinitely */
 			uk_thread_block(uk_thread_current());
@@ -38,7 +38,6 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const struct timespec *tm)
 	}
 
 	/* futex word does not contain expected val */
-	errno = EAGAIN;
 	return -EAGAIN;
 }
 
@@ -80,7 +79,6 @@ long do_futex(uint32_t *uaddr, int futex_op, uint32_t val,
 		return futex_wake(uaddr, val);
 
 	default:
-		errno = ENOSYS;
 		return -ENOSYS;
 	}
 }
