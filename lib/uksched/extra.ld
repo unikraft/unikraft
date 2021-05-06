@@ -1,7 +1,6 @@
 SECTIONS
 {
 	.uk_thread_inittab : {
-		. = ALIGN(0x8);
 		PROVIDE(_uk_thread_inittab_start = .);
 		KEEP (*(.uk_thread_inittab0))
 		KEEP (*(.uk_thread_inittab0.*))
