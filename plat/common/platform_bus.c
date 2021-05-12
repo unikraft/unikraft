@@ -104,9 +104,8 @@ static inline int pf_driver_add_device(struct pf_driver *drv,
 	uk_pr_debug("pf_driver_add_device devid=%d\n", dev->id.device_id);
 
 	ret = drv->add_dev(dev);
-	if (ret < 0) {
-		uk_pr_err("Platform Failed to initialize device driver\n");
-	}
+	if (ret < 0 && ret != -ENODEV)
+		uk_pr_err("Platform Failed to initialize device driver, ret(%d)\n", ret);
 
 	return ret;
 }
