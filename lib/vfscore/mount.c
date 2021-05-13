@@ -380,7 +380,7 @@ UK_LLSYSCALL_R_DEFINE(int, sync)
 	uk_mutex_unlock(&mount_lock);
 }
 
-#if UK_LIBC_SYSCALL
+#if UK_LIBC_SYSCALLS
 void sync(void)
 {
    uk_syscall_e_sync();
