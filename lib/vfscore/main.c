@@ -673,7 +673,7 @@ out_errno:
 	return -error;
 }
 
-#if UK_LIBC_SYSCALL
+#if UK_LIBC_SYSCALLS
 int ioctl(int fd, unsigned long int request, ...)
 {
 	va_list ap;
