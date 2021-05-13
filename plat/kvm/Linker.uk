@@ -5,6 +5,24 @@ KVM_LDFLAGS-y	 += -Wl,-m,aarch64elf
 KVM_LINK_LIBGCC_FLAG	:= -lgcc
 endif
 
+# allsyms tool settings
+ALLSYMS_TOOL         := $(BUILD_DIR)/allsyms2assembly
+ALLSYMS_TOOL_SRC     := $(CONFIG_UK_BASE)/support/kallsyms/kallsyms.c
+
+ifeq ($(CONFIG_DEBUG_BACK_TRACE),y)
+#todo change to build
+SYMBOL_SRC       := $(BUILD_DIR)/symbol.S
+SYMBOL_OBJ       := $(call src2obj,libkvmplat,$(SYMBOL_SRC))
+endif
+
+$(ALLSYMS_TOOL):$(ALLSYMS_TOOL_SRC)
+ifeq ($(CONFIG_DEBUG_BACK_TRACE),y)
+	$(HOSTCC) $(HOST_EXTRACFLAGS) $(HOSTCFLAGS) $< -o $(ALLSYMS_TOOL)
+endif
+
+allsyms:$(ALLSYMS_TOOL)
+
+.PHONY: allsyms
 
 ##
 ## Link image
@@ -18,7 +36,7 @@ KVM_LD_SCRIPT_FLAGS += $(addprefix -Wl$(comma)-T$(comma),\
 			$(KVM_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y))
 
 $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
-		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y)
+		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) allsyms
 	$(call build_cmd,LD,,$(KVM_IMAGE).ld.o,\
 	       $(LD) -r $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
 			$(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
@@ -38,6 +56,57 @@ $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 		     $(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
 		     $(KVM_LD_SCRIPT_FLAGS) \
 		     $(KVM_IMAGE).o -o $@)
+# If dumping backtrace is supported, we should link the image 3 times after
+# getting the symbol name assembly src file.
+ifeq ($(CONFIG_DEBUG_BACK_TRACE),y)
+# 2nd time link
+	$(NM) -n $@ | $(ALLSYMS_TOOL) > $(SYMBOL_SRC)
+	$(HOSTCC) -I$(CONFIG_UK_BASE)/include $(HOST_EXTRACFLAGS) $(HOSTCFLAGS) -c $(SYMBOL_SRC) -o $(SYMBOL_OBJ)
+	$(call build_cmd,LD,,$(KVM_IMAGE).ld.2.o,\
+	       $(LD) -r $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
+			$(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
+			$(KVM_OLIBS) $(KVM_OLIBS-y) \
+			$(UK_OLIBS) $(UK_OLIBS-y) \
+			-Wl$(comma)--start-group \
+			$(KVM_ALIBS) $(KVM_ALIBS-y) \
+			$(UK_ALIBS) $(UK_ALIBS-y) \
+			$(KVM_LINK_LIBGCC_FLAG) \
+			$(SYMBOL_OBJ) \
+			-Wl$(comma)--end-group \
+			-o $(KVM_IMAGE).ld.2.o)
+	$(call build_cmd,OBJCOPY,,$(KVM_IMAGE).2.o,\
+		$(OBJCOPY) -w -G kvmos_* -G _libkvmplat_entry \
+			$(KVM_IMAGE).ld.2.o $(KVM_IMAGE).2.o)
+	$(call build_cmd,LD,,$@,\
+	       $(LD) $(LDFLAGS) $(LDFLAGS-y) \
+		     $(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
+		     $(KVM_LD_SCRIPT_FLAGS) \
+		     $(KVM_IMAGE).2.o -o $@)
+# 3rd time
+	$(NM) -n $@ | $(ALLSYMS_TOOL) > $(SYMBOL_SRC)
+	rm -f $(SYMBOL_OBJ)
+	$(HOSTCC) -I$(CONFIG_UK_BASE)/include $(HOST_EXTRACFLAGS) $(HOSTCFLAGS) -c $(SYMBOL_SRC) -o $(SYMBOL_OBJ)
+	$(call build_cmd,LD,,$(KVM_IMAGE).ld.3.o,\
+	       $(LD) -r $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
+			$(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
+			$(KVM_OLIBS) $(KVM_OLIBS-y) \
+			$(UK_OLIBS) $(UK_OLIBS-y) \
+			-Wl$(comma)--start-group \
+			$(KVM_ALIBS) $(KVM_ALIBS-y) \
+			$(UK_ALIBS) $(UK_ALIBS-y) \
+			$(KVM_LINK_LIBGCC_FLAG) \
+			$(SYMBOL_OBJ) \
+			-Wl$(comma)--end-group \
+			-o $(KVM_IMAGE).ld.3.o)
+	$(call build_cmd,OBJCOPY,,$(KVM_IMAGE).3.o,\
+		$(OBJCOPY) -w -G kvmos_* -G _libkvmplat_entry \
+			$(KVM_IMAGE).ld.3.o $(KVM_IMAGE).3.o)
+	$(call build_cmd,LD,,$@,\
+	       $(LD) $(LDFLAGS) $(LDFLAGS-y) \
+		     $(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
+		     $(KVM_LD_SCRIPT_FLAGS) \
+		     $(KVM_IMAGE).3.o -o $@)
+endif
 
 $(KVM_IMAGE): $(KVM_IMAGE).dbg
 	$(call build_cmd,SCSTRIP,,$@,\
@@ -64,3 +133,6 @@ endif
 # ...for cleaning:
 LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_IMAGE).o)
 LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_IMAGE).ld.o)
+LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_IMAGE).*.o)
+LIBKVMPLAT_CLEAN += $(call build_clean,$(SYMBOL_OBJ))
+LIBKVMPLAT_CLEAN += $(call build_clean,$(SYMBOL_SRC))
