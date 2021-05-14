@@ -56,7 +56,7 @@
 #include <uk/plat/common/cpu.h>
 #include <pci/pci_bus.h>
 
-extern int arch_pci_probe(void);
+extern int arch_pci_probe(struct uk_alloc *pha);
 
 static inline int pci_device_id_match(const struct pci_device_id *id0,
 					const struct pci_device_id *id1)
@@ -119,7 +119,7 @@ struct pci_driver *pci_find_driver(struct pci_device_id *id)
 
 static int pci_probe(void)
 {
-	return arch_pci_probe();
+	return arch_pci_probe(ph.a);
 }
 
 
