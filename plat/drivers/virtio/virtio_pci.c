@@ -276,8 +276,11 @@ static int vpci_legacy_pci_config_get(struct virtio_dev *vdev, __u16 offset,
 		rc = virtio_cread_bytes_many(
 				(void *) (unsigned long)vpdev->pci_base_addr,
 				VIRTIO_PCI_CONFIG_OFF + offset,	buf, len);
+		if (rc != (int)len)
+			return -EFAULT;
 	}
-	return rc;
+
+	return 0;
 }
 
 static __u8 vpci_legacy_pci_status_get(struct virtio_dev *vdev)
