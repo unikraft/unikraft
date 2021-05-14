@@ -206,11 +206,13 @@ static void probe_bus(uint32_t bus)
 	}
 }
 
-int arch_pci_probe(void)
+int arch_pci_probe(struct uk_alloc *pha)
 {
 	uint32_t config_addr, function, header_type, vendor_id;
 
 	uk_pr_debug("Probe PCI\n");
+
+	ph.a = pha;
 
 	config_addr = (PCI_ENABLE_BIT);
 	PCI_CONF_READ(uint32_t, &header_type,
