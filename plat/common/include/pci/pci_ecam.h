@@ -38,6 +38,11 @@
 #include <uk/list.h>
 #include <pci/pci_bus.h>
 #include <platform_bus.h>
+#include <libfdt.h>
+
+struct fdt_phandle_args;
+extern struct pci_config_window pcw;
+extern int gen_pci_irq_parse(const fdt32_t *addr, struct fdt_phandle_args *out_irq);
 
 /*
  * struct to hold bus shift of the config window
