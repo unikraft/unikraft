@@ -21,7 +21,7 @@
 #include <uk/config.h>
 #include <libfdt.h>
 #include <uk/plat/common/sections.h>
-#include <arm/pl011.h>
+#include <uart/pl011.h>
 #include <kvm/config.h>
 #include <uk/assert.h>
 #include <kvm-arm/mm.h>
