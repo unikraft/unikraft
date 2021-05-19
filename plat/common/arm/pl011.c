@@ -23,11 +23,6 @@
 #include <uk/assert.h>
 #include <arm/cpu.h>
 
-/* TODO: For now this file is KVM dependent. As soon as we have more
- * Arm platforms that are using this file, we need to introduce a
- * portable way to handover the DTB entry point to common platform code */
-#include <kvm/config.h>
-
 /* PL011 UART registers and masks*/
 /* Data register */
 #define REG_UARTDR_OFFSET	0x00
@@ -79,8 +74,8 @@
 static uint8_t pl011_uart_initialized = 1;
 static uint64_t pl011_uart_bas = CONFIG_EARLY_PRINT_PL011_UART_ADDR;
 #else
-static uint8_t pl011_uart_initialized = 0;
-static uint64_t pl011_uart_bas = 0;
+static uint8_t pl011_uart_initialized;
+static uint64_t pl011_uart_bas;
 #endif
 
 /* Macros to access PL011 Registers with base address */
@@ -93,7 +88,7 @@ static void init_pl011(uint64_t bas)
 	pl011_uart_bas = bas;
 
 	/* Mask all interrupts */
-	PL011_REG_WRITE(REG_UARTIMSC_OFFSET, \
+	PL011_REG_WRITE(REG_UARTIMSC_OFFSET,
 		PL011_REG_READ(REG_UARTIMSC_OFFSET) & 0xf800);
 
 	/* Clear all interrupts */
@@ -103,14 +98,14 @@ static void init_pl011(uint64_t bas)
 	PL011_REG_WRITE(REG_UARTCR_OFFSET, 0);
 
 	/* Select 8-bits data transmit and receive */
-	PL011_REG_WRITE(REG_UARTLCR_H_OFFSET, \
+	PL011_REG_WRITE(REG_UARTLCR_H_OFFSET,
 		(PL011_REG_READ(REG_UARTLCR_H_OFFSET) & 0xff00) | LCR_H_WLEN8);
 
 	/* Just enable UART and data transmit/receive */
 	PL011_REG_WRITE(REG_UARTCR_OFFSET, CR_TXE | CR_UARTEN);
 }
 
-void _libkvmplat_init_console(void)
+void pl011_console_init(const void *dtb)
 {
 	int offset, len, naddr, nsize;
 	const uint64_t *regs;
@@ -118,20 +113,19 @@ void _libkvmplat_init_console(void)
 
 	uk_pr_info("Serial initializing\n");
 
-	offset = fdt_node_offset_by_compatible(_libkvmplat_cfg.dtb, \
-					-1, "arm,pl011");
+	offset = fdt_node_offset_by_compatible(dtb, -1, "arm,pl011");
 	if (offset < 0)
 		UK_CRASH("No console UART found!\n");
 
-	naddr = fdt_address_cells(_libkvmplat_cfg.dtb, offset);
+	naddr = fdt_address_cells(dtb, offset);
 	if (naddr < 0 || naddr >= FDT_MAX_NCELLS)
 		UK_CRASH("Could not find proper address cells!\n");
 
-	nsize = fdt_size_cells(_libkvmplat_cfg.dtb, offset);
+	nsize = fdt_size_cells(dtb, offset);
 	if (nsize < 0 || nsize >= FDT_MAX_NCELLS)
 		UK_CRASH("Could not find proper size cells!\n");
 
-	regs = fdt_getprop(_libkvmplat_cfg.dtb, offset, "reg", &len);
+	regs = fdt_getprop(dtb, offset, "reg", &len);
 	if (regs == NULL || (len < (int)sizeof(fdt32_t) * (naddr + nsize)))
 		UK_CRASH("Bad 'reg' property: %p %d\n", regs, len);
 
@@ -151,7 +145,7 @@ static void pl011_write(char a)
 {
 	/*
 	 * Avoid using the UART before base address initialized,
-	 * or CONFIG_KVM_EARLY_DEBUG_PL011_UART doesn't be enabled.
+	 * or CONFIG_EARLY_PRINT_PL011_UART is not enabled.
 	 */
 	if (!pl011_uart_initialized)
 		return;
@@ -175,7 +169,7 @@ static int pl011_getc(void)
 {
 	/*
 	 * Avoid using the UART before base address initialized,
-	 * or CONFIG_KVM_EARLY_DEBUG_PL011_UART doesn't be enabled.
+	 * or CONFIG_EARLY_PRINT_PL011_UART is not enabled.
 	 */
 	if (!pl011_uart_initialized)
 		return -1;
