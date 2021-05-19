@@ -21,7 +21,7 @@
 #include <uk/config.h>
 #include <libfdt.h>
 #include <uk/plat/common/sections.h>
-#include <kvm/console.h>
+#include <arm/pl011.h>
 #include <kvm/config.h>
 #include <uk/assert.h>
 #include <kvm-arm/mm.h>
@@ -208,7 +208,7 @@ static void _libkvmplat_entry2(void *arg __attribute__((unused)))
 void _libkvmplat_start(void *dtb_pointer)
 {
 	_init_dtb(dtb_pointer);
-	_libkvmplat_init_console();
+	pl011_console_init(dtb_pointer);
 
 	uk_pr_info("Entering from KVM (arm64)...\n");
 
