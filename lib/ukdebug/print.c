@@ -141,7 +141,7 @@ static void _print_stack(struct _vprint_console *cons)
 }
 #endif
 
-static void _vprint(struct _vprint_console *cons,
+static void _vlprint(struct _vprint_console *cons,
 		    int lvl, const char *libname,
 		    const char *srcname __maybe_unused,
 		    unsigned int srcline __maybe_unused,
@@ -261,24 +261,24 @@ static void _vprint(struct _vprint_console *cons,
  *  We rely on OPTIMIZE_DEADELIM: These symbols are automatically
  *  removed from the final image when there was no usage.
  */
-void _uk_vprintd(const char *libname, const char *srcname,
+void _uk_vlprintd(const char *libname, const char *srcname,
 		 unsigned int srcline, const char *fmt, va_list ap)
 {
 
 #if CONFIG_LIBUKDEBUG_REDIR_PRINTD
-	_vprint(&kern,  KLVL_DEBUG, libname, srcname, srcline, fmt, ap);
+	_vlprint(&kern,  KLVL_DEBUG, libname, srcname, srcline, fmt, ap);
 #else
-	_vprint(&debug, KLVL_DEBUG, libname, srcname, srcline, fmt, ap);
+	_vlprint(&debug, KLVL_DEBUG, libname, srcname, srcline, fmt, ap);
 #endif
 }
 
-void _uk_printd(const char *libname, const char *srcname,
+void _uk_lprintd(const char *libname, const char *srcname,
 		unsigned int srcline, const char *fmt, ...)
 {
 	va_list ap;
 
 	va_start(ap, fmt);
-	_uk_vprintd(libname, srcname, srcline, fmt, ap);
+	_uk_vlprintd(libname, srcname, srcline, fmt, ap);
 	va_end(ap);
 }
 
@@ -289,23 +289,23 @@ void _uk_printd(const char *libname, const char *srcname,
  *  enabled.
  */
 #if CONFIG_LIBUKDEBUG_PRINTK
-void _uk_vprintk(int lvl, const char *libname, const char *srcname,
+void _uk_vlprintk(int lvl, const char *libname, const char *srcname,
 		 unsigned int srcline, const char *fmt, va_list ap)
 {
 #if CONFIG_LIBUKDEBUG_REDIR_PRINTK
-	_vprint(&debug, lvl, libname, srcname, srcline, fmt, ap);
+	_vlprint(&debug, lvl, libname, srcname, srcline, fmt, ap);
 #else
-	_vprint(&kern,  lvl, libname, srcname, srcline, fmt, ap);
+	_vlprint(&kern,  lvl, libname, srcname, srcline, fmt, ap);
 #endif
 }
 
-void _uk_printk(int lvl, const char *libname, const char *srcname,
+void _uk_lprintk(int lvl, const char *libname, const char *srcname,
 		unsigned int srcline, const char *fmt, ...)
 {
 	va_list ap;
 
 	va_start(ap, fmt);
-	_uk_vprintk(lvl, libname, srcname, srcline, fmt, ap);
+	_uk_vlprintk(lvl, libname, srcname, srcline, fmt, ap);
 	va_end(ap);
 }
 #endif /* CONFIG_LIBUKDEBUG_PRINTD */
