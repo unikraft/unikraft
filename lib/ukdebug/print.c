@@ -196,19 +196,19 @@ static void _vlprint(struct _vprint_console *cons,
 	 */
 	switch (lvl) {
 	case KLVL_DEBUG:
-		msghdr = LVLC_RESET LVLC_DEBUG "dbg:" LVLC_RESET "  ";
+		msghdr = LVLC_RESET LVLC_DEBUG "dbug:" LVLC_RESET " ";
 		break;
 	case KLVL_CRIT:
 		msghdr = LVLC_RESET LVLC_CRIT  "CRIT:" LVLC_RESET " ";
 		break;
 	case KLVL_ERR:
-		msghdr = LVLC_RESET LVLC_ERROR "ERR:" LVLC_RESET "  ";
+		msghdr = LVLC_RESET LVLC_ERROR "erro:" LVLC_RESET " ";
 		break;
 	case KLVL_WARN:
-		msghdr = LVLC_RESET LVLC_WARN  "Warn:" LVLC_RESET " ";
+		msghdr = LVLC_RESET LVLC_WARN  "warn:" LVLC_RESET " ";
 		break;
 	case KLVL_INFO:
-		msghdr = LVLC_RESET LVLC_INFO  "Info:" LVLC_RESET " ";
+		msghdr = LVLC_RESET LVLC_INFO  "info:" LVLC_RESET " ";
 		break;
 	default:
 		/* unknown type: ignore */
