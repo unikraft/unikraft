@@ -1,8 +1,22 @@
 menuconfig LIBUKTEST
 bool "uktest: Unikraft Test Suite"
 default n
+select LIBUKBOOT
 select LIBNOLIBC if !HAVE_LIBC
 select LIBUKDEBUG
 
 if LIBUKTEST
+	config LIBUKTEST_ALL
+	bool "Enable all tests across all libraries"
+	select LIBUKTEST_CTORTAB if LIBUKTEST_ALL
+	default y
+
+	config LIBUKTEST_FAILFAST
+	bool "Crash on first test failure"
+	default n
+
+	config LIBUKTEST_LOG_TESTS
+	bool "Output results of tests as they occur"
+	default y
+
 endif # LIBUKTEST

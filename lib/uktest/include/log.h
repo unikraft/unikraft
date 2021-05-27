@@ -29,87 +29,16 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-
-#include <stdio.h>
-#include <limits.h>
+#ifndef __LIBUKTEST_LOG_H__
+#define __LIBUKTEST_LOG_H__
 
 #include <uk/test.h>
-#include <uk/list.h>
-#include <uk/config.h>
-#include <uk/essentials.h>
+#include <uk/print.h>
 
+#define uk_test_printf(fmt, ...)		\
+	uk_printd("    "			\
+		  LVLC_TESTNAME ":"		\
+		  UK_ANSI_MOD_RESET "\t"	\
+		  fmt, ##__VA_ARGS__)
 
-/**
- * Assertion statistics
- */
-struct uk_assert_stats {
-	int total;
-	int fail;
-	int success;
-};
-
-static void
-_uk_test_compute_assert_stats(struct uk_testcase *esac,
-	struct uk_assert_stats *out)
-{
-	struct uk_assert* assert;
-
-	out->total = 0;
-	out->fail = 0;
-	out->success = 0;
-
-	uk_test_assert_foreach(esac, assert) {
-		out->total++;
-
-		switch (assert->status) {
-		case UK_TEST_ASSERT_SUCCESS:
-			out->success++;
-			break;
-		case UK_TEST_ASSERT_FAIL:
-			out->fail++;
-			break;
-		}
-	}
-}
-
-int
-uk_testsuite_run(struct uk_testsuite *suite)
-{
-	int ret = 0;
-	struct uk_testcase *esac;
-	struct uk_assert_stats stats;
-
-	if (suite->init) {
-		ret = suite->init(suite);
-
-		if (ret != 0) {
-			uk_pr_err("Could not initialize test suite: %s",
-				  suite->name);
-			goto ERR_EXIT;
-		}
-	}
-
-	uk_testsuite_case_foreach(suite, esac) {
-#ifdef CONFIG_LIBUKTEST_LOG_TESTS
-		printf(LVLC_TESTNAME "test:" UK_ANSI_MOD_RESET
-			  " %s->%s",
-			  suite->name,
-			  esac->name
-		);
-		if (esac->desc != NULL)
-			printf(": %s\n", esac->desc);
-		else
-			printf("\n");
-#endif /* CONFIG_LIBUKTEST_LOG_TESTS */
-		
-		esac->func(esac);
-
-		_uk_test_compute_assert_stats(esac, &stats);
-
-		if (stats.fail > 0)
-			suite->failed_cases++;
-	}
-
-ERR_EXIT:
-	return ret;
-}
+#endif /* __LIBUKTEST_LOG_H__ */
