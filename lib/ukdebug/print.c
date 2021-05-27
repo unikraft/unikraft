@@ -253,10 +253,10 @@ static void _vlprint(struct _vprint_console *cons,
 					   strlen(LVLC_RESET LVLC_SRCNAME) + 1);
 				cons->cout(DECONST(char *, srcname),
 					   strlen(srcname));
-				cons->cout(" @ ", 3);
+				cons->cout(":", 1);
 				cons->cout(lnobuf,
 					   __uk_snprintf(lnobuf, sizeof(lnobuf),
-							 "%4u", srcline));
+							 "%d", srcline));
 				cons->cout("> ", 2);
 			}
 #endif
