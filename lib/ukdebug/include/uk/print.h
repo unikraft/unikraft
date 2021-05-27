@@ -77,6 +77,12 @@ extern "C" {
  * they compile in the function calls only if debugging
  * is enabled
  */
+void _uk_vprintd(const char *fmt, va_list ap);
+void _uk_printd(const char *fmt, ...) __printf(1, 2);
+
+#define uk_vprintd(fmt, ap) _uk_vprintd((fmt), ap)
+#define uk_printd(fmt, ...) _uk_printd((fmt), ##__VA_ARGS__)
+
 void _uk_vlprintd(const char *libname, const char *srcname,
 		 unsigned int srcline, const char *fmt, va_list ap);
 void _uk_lprintd(const char *libname, const char *srcname,
@@ -155,6 +161,12 @@ static inline void uk_lprintd_once(const char *fmt __unused, ...)
  * they compile in the function calls only if the configured
  * debug level requires it
  */
+void _uk_vprintk(const char *fmt, va_list ap);
+void _uk_printk(const char *fmt, ...) __printf(1, 2);
+
+#define uk_vprintk(fmt, ap) _uk_vprintk((fmt), ap)
+#define uk_printk(fmt, ...) _uk_printk((fmt), ##__VA_ARGS__)
+
 void _uk_vlprintk(int lvl, const char *libname, const char *srcname,
 		 unsigned int srcline, const char *fmt, va_list ap);
 void _uk_lprintk(int lvl, const char *libname, const char *srcname,

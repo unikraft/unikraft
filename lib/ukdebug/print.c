@@ -141,6 +141,43 @@ static void _print_stack(struct _vprint_console *cons)
 }
 #endif
 
+static void
+_vprint(struct _vprint_console *cons, const char *fmt, va_list ap)
+{
+	char lbuf[BUFLEN];
+	int len, llen;
+	const char *lptr = NULL;
+	const char *nlptr = NULL;
+
+	len = __uk_vsnprintf(lbuf, BUFLEN, fmt, ap);
+	lptr = lbuf;
+
+	while (len > 0) {
+		if (cons->newline) {
+#if CONFIG_LIBUKDEBUG_PRINT_TIME
+			_print_timestamp(cons);
+#endif
+			cons->newline = 0;
+		}
+
+		cons->cout(LVLC_RESET, strlen(LVLC_RESET));
+
+		nlptr = memchr(lptr, '\n', len);
+		if (nlptr) {
+			llen = (int)((uintptr_t)nlptr - (uintptr_t)lptr) + 1;
+			cons->newline = 1;
+		} else {
+			llen = len;
+		}
+
+		cons->cout((char *)lptr, llen);
+		cons->cout(LVLC_RESET, strlen(LVLC_RESET));
+
+		len -= llen;
+		lptr = nlptr + 1;
+	}
+}
+
 static void _vlprint(struct _vprint_console *cons,
 		    int lvl, const char *libname,
 		    const char *srcname __maybe_unused,
@@ -261,6 +298,24 @@ static void _vlprint(struct _vprint_console *cons,
  *  We rely on OPTIMIZE_DEADELIM: These symbols are automatically
  *  removed from the final image when there was no usage.
  */
+void _uk_vprintd(const char *fmt, va_list ap)
+{
+#if CONFIG_LIBUKDEBUG_REDIR_PRINTD
+	_vprint(&kern,  fmt, ap);
+#else
+	_vprint(&debug, fmt, ap);
+#endif
+}
+
+void _uk_printd(const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	_uk_vprintd(fmt, ap);
+	va_end(ap);
+}
+
 void _uk_vlprintd(const char *libname, const char *srcname,
 		 unsigned int srcline, const char *fmt, va_list ap)
 {
@@ -289,6 +344,24 @@ void _uk_lprintd(const char *libname, const char *srcname,
  *  enabled.
  */
 #if CONFIG_LIBUKDEBUG_PRINTK
+void _uk_vprintk(const char *fmt, va_list ap)
+{
+#if CONFIG_LIBUKDEBUG_REDIR_PRINTK
+	_vprint(&debug, fmt, ap);
+#else
+	_vprint(&kern,  fmt, ap);
+#endif
+}
+
+void _uk_printk(const char *fmt, ...)
+{
+	va_list ap;
+
+	va_start(ap, fmt);
+	_uk_vprintk(fmt, ap);
+	va_end(ap);
+}
+
 void _uk_vlprintk(int lvl, const char *libname, const char *srcname,
 		 unsigned int srcline, const char *fmt, va_list ap)
 {
