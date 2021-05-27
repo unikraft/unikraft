@@ -1,0 +1,8 @@
+menuconfig LIBUKTEST
+bool "uktest: Unikraft Test Suite"
+default n
+select LIBNOLIBC if !HAVE_LIBC
+select LIBUKDEBUG
+
+if LIBUKTEST
+endif # LIBUKTEST
