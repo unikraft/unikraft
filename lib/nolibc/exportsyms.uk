@@ -75,6 +75,7 @@ strlcpy
 strlcat
 strerror_r
 strerror
+strncat
 
 # strsignal
 strsignal
