@@ -132,6 +132,13 @@ endchoice
 comment "Hint: Keep frame pointers to ease debugging"
 	depends on !OPTIMIZE_NOOMITFP && !DEBUG_SYMBOLS_LVL0
 
+config OPTIMIZE_WARNISERROR
+	bool "Treat warnings as errors"
+	default n
+	help
+		When this option is enabled, the build system stops
+		compilation when a compiler warning is displayed.
+
 config OPTIMIZE_SYMFILE
 	bool "Create a symbols file"
 	default n
