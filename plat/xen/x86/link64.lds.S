@@ -48,6 +48,8 @@ SECTIONS
 
 	INITTAB_SECTION
 
+	EVENTTAB_SECTION
+
 	_rodata = .;
 	.rodata : {
 		*(.rodata)
