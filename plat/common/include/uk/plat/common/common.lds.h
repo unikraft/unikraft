@@ -102,6 +102,13 @@
 	}								\
 	uk_inittab_end = .;
 
+#define EVENTTAB_SECTION						\
+	. = ALIGN(0x8);							\
+	.uk_eventtab :							\
+	{								\
+		KEEP(*(SORT_BY_NAME(.uk_event_*)))			\
+	}
+
 #define TLS_SECTIONS							\
 	. = ALIGN(0x20);						\
 	_tls_start = .;							\

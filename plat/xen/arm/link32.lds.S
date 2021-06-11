@@ -55,6 +55,8 @@ SECTIONS
 
 	INITTAB_SECTION
 
+	EVENTTAB_SECTION
+
 	/* Read-only data */
 	_rodata = .;
 	.rodata :
