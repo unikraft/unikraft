@@ -30,51 +30,55 @@
 #include <uk/asm.h>
 
 .macro EXCHANGE_SP_WITH_X0
-	add sp, sp, x0	// new_sp = sp + x0
-	sub x0, sp, x0	// new_x0 = new_sp - x0 = sp + x0 - x0 = sp
-	sub sp, sp, x0	// new_sp = new_sp - new_x0 = sp + x0 - sp = x0
+	add sp, sp, x0	/* new_sp = sp + x0 */
+	sub x0, sp, x0	/* new_x0 = new_sp - x0 = sp + x0 - x0 = sp */
+	sub sp, sp, x0	/* new_sp = new_sp - new_x0 = sp + x0 - sp = x0 */
 .endm
 
 .macro ALIGN_STACK
-	// First, exchange the SP with x0
+	/* First, exchange the SP with x0 */
 	EXCHANGE_SP_WITH_X0
 
-	// Check whether the stack is alignment
+	/* Check whether the stack is aligned */
 	tst x0, #0xf
-	// If yes, save and go out. If not, align the stack
+	/* If yes, save and go out. If not, align the stack */
 	b.eq 0f
 
-	// Start to align the stack.
+	/* Start to align the stack */
 
-	// We will use the x1 as temporary, save x1 to stack temporary
+	/* We use x1, so save it to stack temporarily. This won't cause an
+	 * SP alignment fault because we do not use SP to address the stack
+	 */
 	str x1, [x0]
 
-	// Align down sp to 16-byte, save old sp to aligned_sp[__SP_OFFSET]
+	/* Align down sp to 16-byte, save old sp to
+	 * aligned_sp[__REGS_OFFSETOF_SP]
+	 */
 	bic x1, x0, #0xf
 	str x0, [x1, #__REGS_OFFSETOF_SP]
 
-	// Restore x1 before x0 is overridden
+	/* Restore x1 before x0 is overridden */
 	ldr x1, [x0]
 
-	// Save aligned_sp to x0
+	/* Save aligned_sp to x0 */
 	bic x0, x0, #0xf
 	b 1f
 0:
 	str x0, [x0, #__REGS_OFFSETOF_SP]
 1:
-	// Change back the SP from x0
+	/* Change back the SP from x0 */
 	EXCHANGE_SP_WITH_X0
 .endm
 
 .macro ENTER_TRAP, el
 	sub sp, sp, #__REGS_SIZEOF
 
-.if	\el != 0
-	/* Force align the stack, and save SP to __SP_OFFSET */
+.if \el != 0
+	/* Force align the stack, and save SP to __REGS_OFFSETOF_SP */
 	ALIGN_STACK
 .endif
 
-	/* Save general purpose registers */
+	/* Save general-purpose registers */
 	stp x0, x1, [sp, #16 * 0]
 	stp x2, x3, [sp, #16 * 1]
 	stp x4, x5, [sp, #16 * 2]
@@ -120,7 +124,7 @@
 	ldp lr, x21, [sp, #__REGS_OFFSETOF_LR]
 	msr elr_el1, x21
 
-	/* Restore general purpose registers */
+	/* Restore general-purpose registers */
 	ldp x28, x29, [sp, #16 * 14]
 	ldp x26, x27, [sp, #16 * 13]
 	ldp x24, x25, [sp, #16 * 12]
@@ -154,7 +158,7 @@
 .endm
 
 /*
- * Most aarch64 SoC is using 64-byte cache line. Align the
+ * Most aarch64 SoCs are using 64-byte cache lines. Align the
  * exception handlers to 64-byte will benefit the cache hit
  * rate of handlers.
  */
