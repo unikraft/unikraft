@@ -33,7 +33,6 @@
 #define CACHE_LINE_SIZE	64
 
 #ifndef __ASSEMBLY__
-#include <stdint.h>
 /*
  * Stack size to save general purpose registers and essential system
  * registers. 8 * (30 + lr + elr_el1 + spsr_el1 + esr_el1) = 272.
@@ -47,25 +46,25 @@
  */
 struct __regs {
 	/* General-purpose registers, from x0 ~ x29 */
-	uint64_t x[30];
+	unsigned long x[30];
 
 	/* Link Register (x30) */
-	uint64_t lr;
+	unsigned long lr;
 
 	/* Exception Link Register */
-	uint64_t elr_el1;
+	unsigned long elr_el1;
 
 	/* Processor State Register */
-	uint64_t spsr_el1;
+	unsigned long spsr_el1;
 
 	/* Exception Status Register */
-	uint64_t esr_el1;
+	unsigned long esr_el1;
 
 	/* Stack Pointer */
-	uint64_t sp;
+	unsigned long sp;
 
 	/* Stack Pointer from el0 */
-	uint64_t sp_el0;
+	unsigned long sp_el0;
 };
 #endif /* !__ASSEMBLY__ */
 
@@ -95,13 +94,13 @@ struct __regs {
  */
 struct __callee_saved_regs {
 	/* Callee-saved registers, from x19 ~ x28 */
-	uint64_t callee[10];
+	unsigned long callee[10];
 
 	/* Frame Pointer Register (x29) */
-	uint64_t fp;
+	unsigned long fp;
 
 	/* Link Register (x30) */
-	uint64_t lr;
+	unsigned long lr;
 };
 #endif /* !__ASSEMBLY__ */
 
