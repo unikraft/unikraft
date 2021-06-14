@@ -32,7 +32,8 @@
 
 #define CACHE_LINE_SIZE	64
 
-#ifdef __ASSEMBLY__
+#ifndef __ASSEMBLY__
+#include <stdint.h>
 /*
  * Stack size to save general purpose registers and essential system
  * registers. 8 * (30 + lr + elr_el1 + spsr_el1 + esr_el1) = 272.
@@ -41,30 +42,11 @@
  * alignment check, we will force align the stack for EL1 exceptions,
  * so we add a sp to save original stack pointer: 280 + 8 = 288
  *
- * TODO: We'd better to calculate this size automatically later.
- */
-#define __TRAP_STACK_SIZE	288
-#define __SP_OFFSET		272
-#define __SP_EL0_OFFSET		280
-
-/*
- * In thread context switch, we will save the callee-saved registers
- * (x19 ~ x28) and Frame Point Register and Link Register to prev's
- * thread stack:
- * http://infocenter.arm.com/help/topic/com.arm.doc.ihi0055b/IHI0055B_aapcs64.pdf
- */
-#define __CALLEE_SAVED_SIZE    96
-
-#else
-
-#include <stdint.h>
-
-/*
- * Change this structure must update TRAP_STACK_SIZE at the same time.
- * This data structure must be 16-byte alignment.
+ * Changes to this structure must be reflected in the following OFFSETOF/SIZEOF
+ * macros. This data structure must be 16-byte aligned.
  */
 struct __regs {
-	/* Generic Purpose registers, from x0 ~ x29 */
+	/* General-purpose registers, from x0 ~ x29 */
 	uint64_t x[30];
 
 	/* Link Register (x30) */
@@ -85,22 +67,51 @@ struct __regs {
 	/* Stack Pointer from el0 */
 	uint64_t sp_el0;
 };
+#endif /* !__ASSEMBLY__ */
 
+#define __REGS_OFFSETOF_X0        0
+#define __REGS_OFFSETOF_LR        240
+#define __REGS_OFFSETOF_ELR_EL1   248
+#define __REGS_OFFSETOF_SPSR_EL1  256
+#define __REGS_OFFSETOF_SP        272
+#define __REGS_OFFSETOF_SP_EL0    280
+
+#define __REGS_PAD_SIZE           __REGS_OFFSETOF_X0
+#define __REGS_SIZEOF             288
+
+/* sanity check */
+#if __REGS_SIZEOF & 0xf
+#error "__regs structure size should be a multiple of 16."
+#endif
+
+#ifndef __ASSEMBLY__
 /*
- * Change this structure must update __CALLEE_SAVED_SIZE at the
- * same time.
+ * In a thread context switch, we save the callee-saved registers (x19 ~ x28),
+ * the frame pointer register and the link register to the previous thread's
+ * stack: https://github.com/ARM-software/abi-aa/releases
+ *
+ * Changes to this structure must be reflected in following OFFSETOF/SIZEOF
+ * macros.
  */
 struct __callee_saved_regs {
 	/* Callee-saved registers, from x19 ~ x28 */
 	uint64_t callee[10];
 
-	/* Frame Point Register (x29) */
+	/* Frame Pointer Register (x29) */
 	uint64_t fp;
 
 	/* Link Register (x30) */
 	uint64_t lr;
 };
+#endif /* !__ASSEMBLY__ */
 
+#define __CALLEE_SAVED_REGS_OFFSETOF_X19  0
+#define __CALLEE_SAVED_REGS_OFFSETOF_FP   80
+#define __CALLEE_SAVED_REGS_OFFSETOF_LR   88
+
+#define __CALLEE_SAVED_REGS_SIZEOF        96
+
+#ifndef __ASSEMBLY__
 /*
  * Instruction Synchronization Barrier flushes the pipeline in the
  * processor, so that all instructions following the ISB are fetched
@@ -153,4 +164,4 @@ static inline void ukarch_spinwait(void)
 	/* Intelligent busy wait not supported on arm64. */
 }
 
-#endif /* __ASSEMBLY__ */
+#endif /* !__ASSEMBLY__ */

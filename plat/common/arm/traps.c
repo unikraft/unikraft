@@ -172,7 +172,7 @@ static void dump_registers(struct __regs *regs, uint64_t far)
 		   regs->x[28], regs->x[29]);
 }
 
-void invalid_trap_handler(struct __regs *regs, uint32_t el,
+void do_unhandled_trap(struct __regs *regs, uint32_t el,
 				uint32_t reason, uint64_t far)
 {
 	uk_pr_crit("Unikraft: EL%d invalid %s trap caught\n",
@@ -181,7 +181,7 @@ void invalid_trap_handler(struct __regs *regs, uint32_t el,
 	ukplat_crash();
 }
 
-void trap_el1_sync(struct __regs *regs, uint64_t far)
+void do_el1_sync(struct __regs *regs, uint64_t far)
 {
 	struct ukarch_trap_ctx ctx = {regs, regs->esr_el1, 1, 0, far};
 	enum aarch64_trap trap = esr_to_trap(regs->esr_el1);
@@ -197,7 +197,7 @@ void trap_el1_sync(struct __regs *regs, uint64_t far)
 	ukplat_crash();
 }
 
-void trap_el1_irq(void)
+void do_el1_irq(void)
 {
 	gic_handle_irq();
 }
