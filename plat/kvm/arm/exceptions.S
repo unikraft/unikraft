@@ -163,20 +163,22 @@
  * rate of handlers.
  */
 .align 6
-el1_sync:
+GLOBAL(el1_sync)
 	ENTER_TRAP 1
 	mov x0, sp
 	mrs x1, far_el1
 	bl do_el1_sync
 	LEAVE_TRAP 1
+ENDPROC(el1_sync)
 
 .align 6
-el1_irq:
+GLOBAL(el1_irq)
 	ENTER_TRAP 1
 	msr daifclr, #(8 | 4 | 1)
 	mov x0, sp
 	bl do_el1_irq
 	LEAVE_TRAP 1
+ENDPROC(el1_irq)
 
 /* Bad Abort numbers */
 #define BAD_SYNC  0
@@ -186,14 +188,14 @@ el1_irq:
 
 #define el_invalid(name, reason, el)	\
 .align 6;				\
-name##_invalid:				\
+GLOBAL(name##_invalid)			\
 	ENTER_TRAP  el;			\
 	mov x0, sp;			\
 	mov x1, el;			\
 	mov x2, #(reason);		\
 	mrs x3, far_el1;		\
 	b   do_unhandled_trap;		\
-ENDPROC(name##_invalid);		\
+ENDPROC(name##_invalid)
 
 el_invalid(el1_sync, BAD_SYNC, 1);
 el_invalid(el0_sync, BAD_SYNC, 0);
