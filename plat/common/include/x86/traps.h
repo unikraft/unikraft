@@ -55,7 +55,7 @@
 #define TRAP_machine_check       18
 #define TRAP_simd_error          19
 #define TRAP_virt_error          20
-#define TRAP_security_error      30
+#define TRAP_security_error      21
 
 #define ASM_TRAP_SYM(trapname)   asm_trap_##trapname
 
@@ -87,7 +87,7 @@ DECLARE_ASM_TRAP(alignment_check);
 DECLARE_ASM_TRAP(machine_check);
 DECLARE_ASM_TRAP(simd_error);
 DECLARE_ASM_TRAP(virt_error);
-
+DECLARE_ASM_TRAP(security_error);
 
 void do_unhandled_trap(int trapnr, char *str, struct __regs *regs,
 		unsigned long error_code);
