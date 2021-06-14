@@ -30,8 +30,8 @@
 
 /* Traps used only on Xen */
 
-DECLARE_TRAP_EC(coproc_seg_overrun, "coprocessor segment overrun")
-DECLARE_TRAP   (spurious_int,       "spurious interrupt bug")
+DECLARE_TRAP_EC(coproc_seg_overrun, "coprocessor segment overrun", NULL)
+DECLARE_TRAP   (spurious_int,       "spurious interrupt bug",      NULL)
 
 
 #ifdef CONFIG_PARAVIRT
