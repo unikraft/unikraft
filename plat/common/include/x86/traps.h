@@ -35,6 +35,7 @@
 #define __UKARCH_TRAPS_X86_64_H__
 
 #include <uk/arch/lcpu.h>
+#include <uk/arch/traps.h>
 
 #define TRAP_divide_error        0
 #define TRAP_debug               1
@@ -92,18 +93,31 @@ DECLARE_ASM_TRAP(security_error);
 void do_unhandled_trap(int trapnr, char *str, struct __regs *regs,
 		unsigned long error_code);
 
-#define DECLARE_TRAP(name, str) \
-void do_##name(struct __regs *regs) \
-{ \
-	do_unhandled_trap(TRAP_##name, str, regs, 0); \
+#define DECLARE_TRAP_EVENT(event)					\
+UK_EVENT(event);							\
+static inline int _raise_event_##event(int trapnr, struct __regs *regs,	\
+		unsigned long error_code) {				\
+	struct ukarch_trap_ctx ctx = {regs, trapnr, error_code, 0};	\
+	return uk_raise_event(event, &ctx);				\
 }
 
-#define DECLARE_TRAP_EC(name, str) \
-void do_##name(struct __regs *regs, unsigned long error_code) \
-{ \
-	do_unhandled_trap(TRAP_##name, str, regs, error_code); \
+#define _raise_event_NULL(...) (0)
+
+#define DECLARE_TRAP(name, str, event)					\
+void do_##name(struct __regs *regs)					\
+{									\
+	if (!_raise_event_##event(TRAP_##name, regs, 0)) {		\
+		do_unhandled_trap(TRAP_##name, str, regs, 0);		\
+	}								\
 }
 
+#define DECLARE_TRAP_EC(name, str, event)				\
+void do_##name(struct __regs *regs, unsigned long error_code)		\
+{									\
+	if (!_raise_event_##event(TRAP_##name, regs, error_code)) {	\
+		do_unhandled_trap(TRAP_##name, str, regs, error_code);	\
+	}								\
+}
 
 void traps_init(void);
 void traps_fini(void);
