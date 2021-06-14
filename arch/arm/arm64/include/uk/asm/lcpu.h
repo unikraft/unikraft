@@ -34,12 +34,10 @@
 
 #ifndef __ASSEMBLY__
 /*
- * Stack size to save general purpose registers and essential system
- * registers. 8 * (30 + lr + elr_el1 + spsr_el1 + esr_el1) = 272.
- * From exceptions come from EL0, we have to save sp_el0. So the
- * TRAP_STACK_SIZE should be 272 + 8 = 280. But we enable the stack
- * alignment check, we will force align the stack for EL1 exceptions,
- * so we add a sp to save original stack pointer: 280 + 8 = 288
+ * Stack size to save general-purpose registers and essential system
+ * registers: 8 * (30 + lr + pc + pstate + sp) = 272. For exceptions that come
+ * from EL0, we save sp_el0 in sp. For exceptions from EL1, we save sp_el1 in
+ * sp. For exceptions, we save elr_el1 in pc.
  *
  * Changes to this structure must be reflected in the following OFFSETOF/SIZEOF
  * macros. This data structure must be 16-byte aligned.
@@ -51,32 +49,25 @@ struct __regs {
 	/* Link Register (x30) */
 	unsigned long lr;
 
-	/* Exception Link Register */
-	unsigned long elr_el1;
+	/* Program Counter */
+	unsigned long pc;
 
 	/* Processor State Register */
-	unsigned long spsr_el1;
-
-	/* Exception Status Register */
-	unsigned long esr_el1;
+	unsigned long pstate;
 
 	/* Stack Pointer */
 	unsigned long sp;
-
-	/* Stack Pointer from el0 */
-	unsigned long sp_el0;
 };
 #endif /* !__ASSEMBLY__ */
 
 #define __REGS_OFFSETOF_X0        0
 #define __REGS_OFFSETOF_LR        240
-#define __REGS_OFFSETOF_ELR_EL1   248
-#define __REGS_OFFSETOF_SPSR_EL1  256
-#define __REGS_OFFSETOF_SP        272
-#define __REGS_OFFSETOF_SP_EL0    280
+#define __REGS_OFFSETOF_PC        248
+#define __REGS_OFFSETOF_PSTATE    256
+#define __REGS_OFFSETOF_SP        264
 
 #define __REGS_PAD_SIZE           __REGS_OFFSETOF_X0
-#define __REGS_SIZEOF             288
+#define __REGS_SIZEOF             272
 
 /* sanity check */
 #if __REGS_SIZEOF & 0xf

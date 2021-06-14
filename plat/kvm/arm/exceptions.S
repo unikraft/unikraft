@@ -96,18 +96,26 @@
 	stp x28, x29, [sp, #16 * 14]
 
 	/* Save LR and exception PC */
-	mrs x21, elr_el1
-	stp lr, x21, [sp, #__REGS_OFFSETOF_LR]
+	mrs x20, elr_el1
+	stp lr, x20, [sp, #__REGS_OFFSETOF_LR]
 
-	/* Save pstate and exception status register */
-	mrs x22, spsr_el1
-	mrs x23, esr_el1
-	stp x22, x23, [sp, #__REGS_OFFSETOF_SPSR_EL1]
+	/* Save pstate */
+	mrs x21, spsr_el1
+	str x21, [sp, #__REGS_OFFSETOF_PSTATE]
 
 .if \el == 0
-	/* Save stack pointer for lower level exception */
+	/* Save stack pointer for exception from EL0 */
 	mrs x18, sp_el0
-	str x18, [sp, #__REGS_OFFSETOF_SP_EL0]
+	str x18, [sp, #__REGS_OFFSETOF_SP]
+.else
+	/* Fix the saved stack pointer for exception from EL1
+	 * The saved SP must point above the (unaligned) register snapshot.
+	 * That means it must have the same value as when we entered the trap
+	 * so it is correct after we return from the trap.
+	 */
+	ldr x18, [sp, #__REGS_OFFSETOF_SP]
+	add x18, x18, #__REGS_SIZEOF
+	str x18, [sp, #__REGS_OFFSETOF_SP]
 .endif
 
 .endm
@@ -115,10 +123,10 @@
 .macro LEAVE_TRAP, el
 	/* Mask IRQ to make sure restore would not be interrupted by IRQ */
 	msr daifset, #2
-	/* Restore pstate and exception status register */
-	ldp x22, x23, [sp, #__REGS_OFFSETOF_SPSR_EL1]
-	msr spsr_el1, x22
-	msr esr_el1, x23
+
+	/* Restore pstate */
+	ldr x20, [sp, #__REGS_OFFSETOF_PSTATE]
+	msr spsr_el1, x20
 
 	/* Restore LR and exception PC */
 	ldp lr, x21, [sp, #__REGS_OFFSETOF_LR]
@@ -130,6 +138,7 @@
 	ldp x24, x25, [sp, #16 * 12]
 	ldp x22, x23, [sp, #16 * 11]
 	ldp x20, x21, [sp, #16 * 10]
+	/* skip x18, x19 */
 	ldp x16, x17, [sp, #16 * 8]
 	ldp x14, x15, [sp, #16 * 7]
 	ldp x12, x13, [sp, #16 * 6]
@@ -142,17 +151,31 @@
 
 .if \el == 0
 	/* Restore stack pointer for exception from EL0 */
-	ldr x18, [sp, #__REGS_OFFSETOF_SP_EL0]
-	msr sp_el0, x18
-.else
-	/* Restore stack pointer for exception from EL1 */
 	ldr x18, [sp, #__REGS_OFFSETOF_SP]
-	mov sp, x18
-.endif
-	add sp, sp, #__REGS_SIZEOF
+	msr sp_el0, x18
 
-	/* Restore x18,x19 */
+	/* Restore x18, x19 */
 	ldp x18, x19, [sp, #16 * 9]
+
+	add sp, sp, #__REGS_SIZEOF
+.else
+	/* Restore stack pointer for exception from EL1
+	 * Since we may have aligned the stack pointer by an unknown offset,
+	 * we cannot just add the register snapshot size. Instead, we have to
+	 * restore the stack pointer directly from the snapshot. This will
+	 * undo the alignment as well as the allocation for the snapshot.
+	 *
+	 * N.B. The code must not be interrupted until registers x18 and x19
+	 * have been restored. Otherwise, state will be corrupted since the
+	 * SP_EL1 stack pointer already points above the register snapshot!
+	 */
+	ldr x18, [sp, #__REGS_OFFSETOF_SP]
+	mov x19, sp
+	mov sp, x18
+
+	/* Restore x18, x19 */
+	ldp x18, x19, [x19, #16 * 9]
+.endif
 
 	eret
 .endm
@@ -166,7 +189,8 @@
 GLOBAL(el1_sync)
 	ENTER_TRAP 1
 	mov x0, sp
-	mrs x1, far_el1
+	mrs x1, esr_el1
+	mrs x2, far_el1
 	bl do_el1_sync
 	LEAVE_TRAP 1
 ENDPROC(el1_sync)
@@ -190,10 +214,11 @@ ENDPROC(el1_irq)
 .align 6;				\
 GLOBAL(name##_invalid)			\
 	ENTER_TRAP  el;			\
-	mov x0, sp;			\
-	mov x1, el;			\
-	mov x2, #(reason);		\
-	mrs x3, far_el1;		\
+	mov x0, el;			\
+	mov x1, #(reason);		\
+	mov x2, sp;			\
+	mrs x3, esr_el1;		\
+	mrs x4, far_el1;		\
 	b   do_unhandled_trap;		\
 ENDPROC(name##_invalid)
 

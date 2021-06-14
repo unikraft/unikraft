@@ -151,16 +151,16 @@ static enum aarch64_trap esr_to_trap(unsigned long esr)
 	return AARCH64_TRAP_MAX;
 }
 
-static void dump_registers(struct __regs *regs, uint64_t far)
+static void dump_registers(struct __regs *regs, uint64_t esr, uint64_t far)
 {
 	unsigned char idx;
 
 	uk_pr_crit("Unikraft: Dump registers:\n");
 	uk_pr_crit("\t SP       : 0x%016lx\n", regs->sp);
-	uk_pr_crit("\t ESR_EL1  : 0x%016lx\n", regs->esr_el1);
-	uk_pr_crit("\t ELR_EL1  : 0x%016lx\n", regs->elr_el1);
+	uk_pr_crit("\t ESR_EL1  : 0x%016lx\n", esr);
+	uk_pr_crit("\t ELR_EL1  : 0x%016lx\n", regs->pc);
 	uk_pr_crit("\t LR (x30) : 0x%016lx\n", regs->lr);
-	uk_pr_crit("\t PSTATE   : 0x%016lx\n", regs->spsr_el1);
+	uk_pr_crit("\t PSTATE   : 0x%016lx\n", regs->pstate);
 	uk_pr_crit("\t FAR_EL1  : 0x%016lx\n", far);
 
 	for (idx = 0; idx < 28; idx += 4)
@@ -172,19 +172,19 @@ static void dump_registers(struct __regs *regs, uint64_t far)
 		   regs->x[28], regs->x[29]);
 }
 
-void do_unhandled_trap(struct __regs *regs, uint32_t el,
-				uint32_t reason, uint64_t far)
+void do_unhandled_trap(int el, int reason, struct __regs *regs,
+		unsigned long esr, unsigned long far)
 {
 	uk_pr_crit("Unikraft: EL%d invalid %s trap caught\n",
 		   el, exception_modes[reason]);
-	dump_registers(regs, far);
+	dump_registers(regs, esr, far);
 	ukplat_crash();
 }
 
-void do_el1_sync(struct __regs *regs, uint64_t far)
+void do_el1_sync(struct __regs *regs, unsigned long esr, unsigned long far)
 {
-	struct ukarch_trap_ctx ctx = {regs, regs->esr_el1, 1, 0, far};
-	enum aarch64_trap trap = esr_to_trap(regs->esr_el1);
+	struct ukarch_trap_ctx ctx = {regs, esr, 1, 0, far};
+	enum aarch64_trap trap = esr_to_trap(esr);
 
 	if (trap < AARCH64_TRAP_MAX) {
 		if (uk_raise_event_ptr(_trap_table[trap].event, &ctx))
@@ -193,11 +193,11 @@ void do_el1_sync(struct __regs *regs, uint64_t far)
 
 	uk_pr_crit("Unikraft: EL1 sync trap caught\n");
 
-	dump_registers(regs, far);
+	dump_registers(regs, esr, far);
 	ukplat_crash();
 }
 
-void do_el1_irq(void)
+void do_el1_irq(struct __regs *regs)
 {
 	gic_handle_irq();
 }
