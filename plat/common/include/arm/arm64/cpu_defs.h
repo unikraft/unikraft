@@ -32,6 +32,8 @@
 #ifndef __CPU_ARM_64_DEFS_H__
 #define __CPU_ARM_64_DEFS_H__
 
+#include <uk/asm.h>
+
 /*
  * CTR_EL0, Cache Type Register
  * Provides information about the architecture of the caches.
@@ -189,8 +191,8 @@
  */
 /* Level 0 table, 512GiB per entry */
 #define L0_SHIFT	39
-#define L0_SIZE		(1ul << L0_SHIFT)
-#define L0_OFFSET	(L0_SIZE - 1ul)
+#define L0_SIZE		(_AC(1, UL) << L0_SHIFT)
+#define L0_OFFSET	(L0_SIZE - _AC(1, UL))
 #define L0_INVAL	0x0 /* An invalid address */
 	/* 0x1 Level 0 doesn't support block translation */
 	/* 0x2 also marks an invalid address */
@@ -291,5 +293,104 @@
 #define SECT_ATTR_DEVICE_nGnRnE	\
 		(SECT_ATTR_DEFAULT | ATTR_XN | \
 		ATTR_IDX(DEVICE_nGnRnE))
+
+/*
+ * ESR_EL1 - Exception Syndrome Register
+ */
+#define ESR_ISS_SHIFT		0
+#define ESR_ISS(x)		((x) << ESR_ISS_SHIFT)
+#define ESR_ISS_MASK		_AC(0x0000000000ffffff, UL)
+#define ESR_ISS_FROM(x)		(((x) & ESR_ISS_MASK) >> ESR_ISS_SHIFT)
+
+#define ESR_IL			(1 << 25)
+
+#define ESR_EC_SHIFT		26
+#define ESR_EC(x)		((x) << ESR_EC_SHIFT)
+#define ESR_EC_MASK		_AC(0x00000000fc000000, UL)
+#define ESR_EC_FROM(x)		(((x) & ESR_EC_MASK) >> ESR_EC_SHIFT)
+
+#define ESR_ISS2_SHIFT		32
+#define ESR_ISS2(x)		(_AC(x, UL) << ESR_ISS2_SHIFT)
+#define ESR_ISS2_MASK		_AC(0x0000001f00000000, UL)
+#define ESR_ISS2_FROM(x)	(((x) & ESR_ISS2_MASK) >> ESR_ISS2_SHIFT)
+
+/* Exception classes */
+#define ESR_EL1_EC_UNKNOWN			0x00
+#define ESR_EL1_EC_WFx				0x01
+#define ESR_EL1_EC_COPROC_15_32			0x03
+#define ESR_EL1_EC_COPROC_15_64			0x04
+#define ESR_EL1_EC_COPROC_14_32			0x05
+#define ESR_EL1_EC_COPROC_14_LS			0x06
+#define ESR_EL1_EC_SVE_ASIMD_FP_ACC		0x07
+#define ESR_EL1_EC_LS64				0x0a
+#define ESR_EL1_EC_COPROC_14_64			0x0c
+#define ESR_EL1_EC_BTI				0x0d
+#define ESR_EL1_EC_ILL				0x0e
+#define ESR_EL1_EC_SVC32			0x11
+#define ESR_EL1_EC_SVC64			0x15
+#define ESR_EL1_EC_SYS64			0x18
+#define ESR_EL1_EC_SVE_ACC			0x19
+#define ESR_EL1_EC_FPAC				0x1c
+#define ESR_EL1_EC_MMU_IABRT_EL0		0x20
+#define ESR_EL1_EC_MMU_IABRT_EL1		0x21
+#define ESR_EL1_EC_PC_ALIGN			0x22
+#define ESR_EL1_EC_MMU_DABRT_EL0		0x24
+#define ESR_EL1_EC_MMU_DABRT_EL1		0x25
+#define ESR_EL1_EC_SP_ALIGN			0x26
+#define ESR_EL1_EC_FP32				0x28
+#define ESR_EL1_EC_FP64				0x2c
+#define ESR_EL1_EC_SERROR			0x2f
+#define ESR_EL1_EC_BRK_EL0			0x30
+#define ESR_EL1_EC_BRK_EL1			0x31
+#define ESR_EL1_EC_STEP_EL0			0x32
+#define ESR_EL1_EC_STEP_EL1			0x33
+#define ESR_EL1_EC_WATCHP_EL0			0x34
+#define ESR_EL1_EC_WATCHP_EL1			0x35
+#define ESR_EL1_EC_BKPT32			0x38
+#define ESR_EL1_EC_BRK64			0x3c
+
+/* ISS for instruction and data aborts */
+#define ESR_ISS_ABRT_FSC_SHIFT			0
+#define ESR_ISS_ABRT_FSC(x)			((x) << ESR_ISS_ABRT_FSC_SHIFT)
+#define ESR_ISS_ABRT_FSC_MASK			_AC(0x000000000000003f, UL)
+#define ESR_ISS_ABRT_FSC_FROM(x) \
+	(((x) & ESR_ISS_ABRT_FSC_MASK) >> ESR_ISS_ABRT_FSC_SHIFT)
+
+#define ESR_ISS_ABRT_FSC_ADDR_L0		0x00
+#define ESR_ISS_ABRT_FSC_ADDR_L1		0x01
+#define ESR_ISS_ABRT_FSC_ADDR_L2		0x02
+#define ESR_ISS_ABRT_FSC_ADDR_L3		0x03
+#define ESR_ISS_ABRT_FSC_TRANS_L0		0x04
+#define ESR_ISS_ABRT_FSC_TRANS_L1		0x05
+#define ESR_ISS_ABRT_FSC_TRANS_L2		0x06
+#define ESR_ISS_ABRT_FSC_TRANS_L3		0x07
+#define ESR_ISS_ABRT_FSC_ACCF_L0		0x08
+#define ESR_ISS_ABRT_FSC_ACCF_L1		0x09
+#define ESR_ISS_ABRT_FSC_ACCF_L2		0x0a
+#define ESR_ISS_ABRT_FSC_ACCF_L3		0x0b
+#define ESR_ISS_ABRT_FSC_PERM_L0		0x0c
+#define ESR_ISS_ABRT_FSC_PERM_L1		0x0d
+#define ESR_ISS_ABRT_FSC_PERM_L2		0x0e
+#define ESR_ISS_ABRT_FSC_PERM_L3		0x0f
+#define ESR_ISS_ABRT_FSC_SYNC			0x10
+#define ESR_ISS_ABRT_FSC_TAG			0x11
+#define ESR_ISS_ABRT_FSC_SYNC_PT_LM1		0x13
+#define ESR_ISS_ABRT_FSC_SYNC_PT_L0		0x14
+#define ESR_ISS_ABRT_FSC_SYNC_PT_L1		0x15
+#define ESR_ISS_ABRT_FSC_SYNC_PT_L2		0x16
+#define ESR_ISS_ABRT_FSC_SYNC_PT_L3		0x17
+#define ESR_ISS_ABRT_FSC_SYNC_ECC		0x18
+#define ESR_ISS_ABRT_FSC_SYNC_ECC_PT_LM1	0x1b
+#define ESR_ISS_ABRT_FSC_SYNC_ECC_PT_L0		0x1c
+#define ESR_ISS_ABRT_FSC_SYNC_ECC_PT_L1		0x1d
+#define ESR_ISS_ABRT_FSC_SYNC_ECC_PT_L2		0x1e
+#define ESR_ISS_ABRT_FSC_SYNC_ECC_PT_L3		0x1f
+#define ESR_ISS_ABRT_FSC_ALIGN			0x21
+#define ESR_ISS_ABRT_FSC_ADDR_LM1		0x29
+#define ESR_ISS_ABRT_FSC_TRANS_LM1		0x2b
+#define ESR_ISS_ABRT_FSC_TLB			0x30
+#define ESR_ISS_ABRT_FSC_UNSUP_ATOM		0x31
+#define ESR_ISS_ABRT_FSC_LOCKDOWN		0x34
+#define ESR_ISS_ABRT_FSC_UNSUP_EXCL		0x35
 
 #endif /* __CPU_ARM_64_DEFS_H__ */
