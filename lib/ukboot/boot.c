@@ -66,6 +66,9 @@
 #ifdef CONFIG_LIBUKSP
 #include <uk/sp.h>
 #endif
+#ifdef CONFIG_LIBKASAN
+#include <uk/kasan.h>
+#endif
 #include "banner.h"
 
 int main(int argc, char *argv[]) __weak;
@@ -232,6 +235,13 @@ void ukplat_entry(int argc, char *argv[])
 		 * subsequent region to it
 		 */
 		if (!a) {
+#ifdef CONFIG_LIBKASAN
+		/* We reserve a small portion of the heap for KASAN */
+		init_kasan(md.base);
+		md.base = md.base + KASAN_MD_SHADOW_SIZE;
+		md.len = md.len - KASAN_MD_SHADOW_SIZE;
+#endif
+
 #if CONFIG_LIBUKBOOT_INITBBUDDY
 			a = uk_allocbbuddy_init(md.base, md.len);
 #elif CONFIG_LIBUKBOOT_INITREGION
