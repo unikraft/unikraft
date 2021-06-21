@@ -36,6 +36,7 @@ LIBLINUXUPLAT_SRCS-y              += $(LIBLINUXUPLAT_BASE)/setup.c
 LIBLINUXUPLAT_SRCS-y              += $(LIBLINUXUPLAT_BASE)/console.c
 LIBLINUXUPLAT_SRCS-y              += $(LIBLINUXUPLAT_BASE)/shutdown.c
 LIBLINUXUPLAT_SRCS-y              += $(LIBLINUXUPLAT_BASE)/memory.c
+LIBLINUXUPLAT_SRCS-y              += $(LIBLINUXUPLAT_BASE)/balloon.c
 LIBLINUXUPLAT_SRCS-y              += $(LIBLINUXUPLAT_BASE)/lcpu.c
 LIBLINUXUPLAT_SRCS-y              += $(LIBLINUXUPLAT_BASE)/irq.c
 LIBLINUXUPLAT_SRCS-y              += $(LIBLINUXUPLAT_BASE)/time.c

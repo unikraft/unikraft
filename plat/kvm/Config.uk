@@ -87,7 +87,7 @@ config VIRTIO_BUS
 menu "Virtio"
 config VIRTIO_PCI
        bool "Virtio PCI device support"
-       default y if (VIRTIO_NET || VIRTIO_9P || VIRTIO_BLK)
+       default y if (VIRTIO_NET || VIRTIO_9P || VIRTIO_BLK || VIRTIO_BALLOON)
        default n
        depends on KVM_PCI
        select VIRTIO_BUS
@@ -125,6 +125,18 @@ config VIRTIO_9P
        select LIBUKSGLIST
        help
               Virtio 9P driver.
+
+config VIRTIO_BALLOON
+	bool "Virtio Balloon device"
+	default y if LIBUKALLOCBBUDDY
+	default n
+       depends on LIBUKALLOCBBUDDY
+	select LIBUKLOCK_MUTEX
+       select VIRTIO_BUS
+	help
+		Virtio Memory ballooning device driver for returning memory
+		to the host.
+
 endmenu
 
 config LIBGICV2
