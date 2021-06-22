@@ -68,55 +68,53 @@ static pgentry_t pt_prot[PAGETABLE_LEVELS] = {
 };
 
 static void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn,
-                         unsigned long offset, unsigned long level)
+			 unsigned long offset, unsigned long level)
 {
-    pgentry_t *tab;
-    unsigned long pt_page = (unsigned long)pfn_to_virt(*pt_pfn);
+	pgentry_t *tab;
+	unsigned long pt_page = (unsigned long)pfn_to_virt(*pt_pfn);
 #ifdef CONFIG_PARAVIRT
-    mmu_update_t mmu_updates[1];
-    int rc;
+	mmu_update_t mmu_updates[1];
+	int rc;
 #endif
 
-    uk_pr_debug("Allocating new L%lu pt frame for pfn=%lx, "
-		"prev_l_mfn=%lx, offset=%lx\n",
-		level, *pt_pfn, prev_l_mfn, offset);
+	uk_pr_debug("Allocating new L%lu pt frame for pfn=%lx, "
+		    "prev_l_mfn=%lx, offset=%lx\n",
+		    level, *pt_pfn, prev_l_mfn, offset);
 
-    /* We need to clear the page, otherwise we might fail to map it
-       as a page table page */
-    memset((void*) pt_page, 0, PAGE_SIZE);
+	/* We need to clear the page, otherwise we might fail to map it
+	   as a page table page */
+	memset((void *)pt_page, 0, PAGE_SIZE);
 
-    UK_ASSERT(level >= 1 && level <= PAGETABLE_LEVELS);
+	UK_ASSERT(level >= 1 && level <= PAGETABLE_LEVELS);
 
 #ifdef CONFIG_PARAVIRT
-    /* Make PFN a page table page */
-    tab = pt_base;
+	/* Make PFN a page table page */
+	tab = pt_base;
 #if defined(__x86_64__)
-    tab = pte_to_virt(tab[l4_table_offset(pt_page)]);
+	tab = pte_to_virt(tab[l4_table_offset(pt_page)]);
 #endif
-    tab = pte_to_virt(tab[l3_table_offset(pt_page)]);
+	tab = pte_to_virt(tab[l3_table_offset(pt_page)]);
 
-    mmu_updates[0].ptr = (tab[l2_table_offset(pt_page)] & PAGE_MASK) +
-        sizeof(pgentry_t) * l1_table_offset(pt_page);
-    mmu_updates[0].val = (pgentry_t)pfn_to_mfn(*pt_pfn) << PAGE_SHIFT |
-        (pt_prot[level - 1] & ~_PAGE_RW);
+	mmu_updates[0].ptr = (tab[l2_table_offset(pt_page)] & PAGE_MASK)
+			     + sizeof(pgentry_t) * l1_table_offset(pt_page);
+	mmu_updates[0].val = (pgentry_t)pfn_to_mfn(*pt_pfn) << PAGE_SHIFT
+			     | (pt_prot[level - 1] & ~_PAGE_RW);
 
-    if ( (rc = HYPERVISOR_mmu_update(mmu_updates, 1, NULL, DOMID_SELF)) < 0 )
-	    UK_CRASH("PTE for new page table page could not be updated: "
-		     "mmu_update failed with rc=%d\n", rc);
+	if ((rc = HYPERVISOR_mmu_update(mmu_updates, 1, NULL, DOMID_SELF)) < 0)
+		UK_CRASH("PTE for new page table page could not be updated: "
+			 "mmu_update failed with rc=%d\n",
+			 rc);
 
-    /* Hook the new page table page into the hierarchy */
-    mmu_updates[0].ptr =
-        ((pgentry_t)prev_l_mfn << PAGE_SHIFT) + sizeof(pgentry_t) * offset;
-    mmu_updates[0].val = (pgentry_t)pfn_to_mfn(*pt_pfn) << PAGE_SHIFT |
-        pt_prot[level];
+	/* Hook the new page table page into the hierarchy */
+	mmu_updates[0].ptr =
+	    ((pgentry_t)prev_l_mfn << PAGE_SHIFT) + sizeof(pgentry_t) * offset;
+	mmu_updates[0].val =
+	    (pgentry_t)pfn_to_mfn(*pt_pfn) << PAGE_SHIFT | pt_prot[level];
 
-    if ( (rc = HYPERVISOR_mmu_update(mmu_updates, 1, NULL, DOMID_SELF)) < 0 )
-	    UK_CRASH("mmu_update failed with rc=%d\n", rc);
-#else
-    tab = mfn_to_virt(prev_l_mfn);
-    tab[offset] = (*pt_pfn << PAGE_SHIFT) | pt_prot[level];
+	if ((rc = HYPERVISOR_mmu_update(mmu_updates, 1, NULL, DOMID_SELF)) < 0)
+		UK_CRASH("mmu_update failed with rc=%d\n", rc);
 #endif
-    *pt_pfn += 1;
+	*pt_pfn += 1;
 }
 
 /*
@@ -124,106 +122,99 @@ static void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn,
  */
 void _init_mem_build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
 {
-    unsigned long start_address, end_address;
-    unsigned long pfn_to_map, pt_pfn = *start_pfn;
-    pgentry_t *tab = pt_base, page;
-    unsigned long pt_mfn = pfn_to_mfn(virt_to_pfn(pt_base));
-    unsigned long offset;
+	unsigned long start_address, end_address;
+	unsigned long pfn_to_map, pt_pfn = *start_pfn;
+	pgentry_t *tab = pt_base, page;
+	unsigned long pt_mfn = pfn_to_mfn(virt_to_pfn(pt_base));
+	unsigned long offset;
 #ifdef CONFIG_PARAVIRT
-    static mmu_update_t mmu_updates[L1_PAGETABLE_ENTRIES + 1];
-    int count = 0;
-    int rc;
+	static mmu_update_t mmu_updates[L1_PAGETABLE_ENTRIES + 1];
+	int count = 0;
+	int rc;
 #endif
 
-    /* Be conservative: even if we know there will be more pages already
-       mapped, start the loop at the very beginning. */
-    pfn_to_map = *start_pfn;
+	/* Be conservative: even if we know there will be more pages already
+	   mapped, start the loop at the very beginning. */
+	pfn_to_map = *start_pfn;
 
 #ifdef CONFIG_PARAVIRT
-    if ( *max_pfn >= virt_to_pfn(HYPERVISOR_VIRT_START) )
-    {
-	    uk_pr_warn("Trying to use Xen virtual space. "
-		       "Truncating memory from %luMB to ",
-		       ((unsigned long)pfn_to_virt(*max_pfn) - __TEXT)>>20);
-	    *max_pfn = virt_to_pfn(HYPERVISOR_VIRT_START - PAGE_SIZE);
-	    uk_pr_warn("%luMB\n",
-		       ((unsigned long)pfn_to_virt(*max_pfn) - __TEXT)>>20);
-    }
-#else
-    /* Round up to next 2MB boundary as we are using 2MB pages on HVMlite. */
-    pfn_to_map = (pfn_to_map + L1_PAGETABLE_ENTRIES - 1) &
-                 ~(L1_PAGETABLE_ENTRIES - 1);
+	if (*max_pfn >= virt_to_pfn(HYPERVISOR_VIRT_START)) {
+		uk_pr_warn("Trying to use Xen virtual space. "
+			   "Truncating memory from %luMB to ",
+			   ((unsigned long)pfn_to_virt(*max_pfn) - __TEXT)
+			       >> 20);
+		*max_pfn = virt_to_pfn(HYPERVISOR_VIRT_START - PAGE_SIZE);
+		uk_pr_warn("%luMB\n",
+			   ((unsigned long)pfn_to_virt(*max_pfn) - __TEXT)
+			       >> 20);
+	}
 #endif
 
-    start_address = (unsigned long)pfn_to_virt(pfn_to_map);
-    end_address = (unsigned long)pfn_to_virt(*max_pfn);
+	start_address = (unsigned long)pfn_to_virt(pfn_to_map);
+	end_address = (unsigned long)pfn_to_virt(*max_pfn);
 
-    /* We worked out the virtual memory range to map, now mapping loop */
-    uk_pr_info("Mapping memory range 0x%lx - 0x%lx\n",
-	       start_address, end_address);
+	/* We worked out the virtual memory range to map, now mapping loop */
+	uk_pr_info("Mapping memory range 0x%lx - 0x%lx\n", start_address,
+		   end_address);
 
-    while ( start_address < end_address )
-    {
-        tab = pt_base;
-        pt_mfn = pfn_to_mfn(virt_to_pfn(pt_base));
+	while (start_address < end_address) {
+		tab = pt_base;
+		pt_mfn = pfn_to_mfn(virt_to_pfn(pt_base));
 
 #if defined(__x86_64__)
-        offset = l4_table_offset(start_address);
-        /* Need new L3 pt frame */
-        if ( !(tab[offset] & _PAGE_PRESENT) )
-            new_pt_frame(&pt_pfn, pt_mfn, offset, L3_FRAME);
+		offset = l4_table_offset(start_address);
+		/* Need new L3 pt frame */
+		if (!(tab[offset] & _PAGE_PRESENT))
+			new_pt_frame(&pt_pfn, pt_mfn, offset, L3_FRAME);
 
-        page = tab[offset];
-        pt_mfn = pte_to_mfn(page);
-        tab = to_virt(mfn_to_pfn(pt_mfn) << PAGE_SHIFT);
+		page = tab[offset];
+		pt_mfn = pte_to_mfn(page);
+		tab = to_virt(mfn_to_pfn(pt_mfn) << PAGE_SHIFT);
 #endif
-        offset = l3_table_offset(start_address);
-        /* Need new L2 pt frame */
-        if ( !(tab[offset] & _PAGE_PRESENT) )
-            new_pt_frame(&pt_pfn, pt_mfn, offset, L2_FRAME);
+		offset = l3_table_offset(start_address);
+		/* Need new L2 pt frame */
+		if (!(tab[offset] & _PAGE_PRESENT))
+			new_pt_frame(&pt_pfn, pt_mfn, offset, L2_FRAME);
 
-        page = tab[offset];
-        pt_mfn = pte_to_mfn(page);
-        tab = to_virt(mfn_to_pfn(pt_mfn) << PAGE_SHIFT);
-        offset = l2_table_offset(start_address);
+		page = tab[offset];
+		pt_mfn = pte_to_mfn(page);
+		tab = to_virt(mfn_to_pfn(pt_mfn) << PAGE_SHIFT);
+		offset = l2_table_offset(start_address);
 #ifdef CONFIG_PARAVIRT
-        /* Need new L1 pt frame */
-        if ( !(tab[offset] & _PAGE_PRESENT) )
-            new_pt_frame(&pt_pfn, pt_mfn, offset, L1_FRAME);
+		/* Need new L1 pt frame */
+		if (!(tab[offset] & _PAGE_PRESENT))
+			new_pt_frame(&pt_pfn, pt_mfn, offset, L1_FRAME);
 
-        page = tab[offset];
-        pt_mfn = pte_to_mfn(page);
-        tab = to_virt(mfn_to_pfn(pt_mfn) << PAGE_SHIFT);
-        offset = l1_table_offset(start_address);
+		page = tab[offset];
+		pt_mfn = pte_to_mfn(page);
+		tab = to_virt(mfn_to_pfn(pt_mfn) << PAGE_SHIFT);
+		offset = l1_table_offset(start_address);
 
-        if ( !(tab[offset] & _PAGE_PRESENT) )
-        {
-            mmu_updates[count].ptr =
-                ((pgentry_t)pt_mfn << PAGE_SHIFT) + sizeof(pgentry_t) * offset;
-            mmu_updates[count].val =
-                (pgentry_t)pfn_to_mfn(pfn_to_map) << PAGE_SHIFT | L1_PROT;
-            count++;
-        }
-        pfn_to_map++;
-        if ( count == L1_PAGETABLE_ENTRIES ||
-             (count && pfn_to_map == *max_pfn) )
-        {
-            rc = HYPERVISOR_mmu_update(mmu_updates, count, NULL, DOMID_SELF);
-            if ( rc < 0 )
-		    UK_CRASH("PTE could not be updated. "
-			     "mmu_update failed with rc=%d\n", rc);
-            count = 0;
-        }
-        start_address += PAGE_SIZE;
-#else
-        if ( !(tab[offset] & _PAGE_PRESENT) )
-            tab[offset] = (pgentry_t)pfn_to_map << PAGE_SHIFT |
-                          L2_PROT | _PAGE_PSE;
-        start_address += 1UL << L2_PAGETABLE_SHIFT;
+		if (!(tab[offset] & _PAGE_PRESENT)) {
+			mmu_updates[count].ptr =
+			    ((pgentry_t)pt_mfn << PAGE_SHIFT)
+			    + sizeof(pgentry_t) * offset;
+			mmu_updates[count].val =
+			    (pgentry_t)pfn_to_mfn(pfn_to_map) << PAGE_SHIFT
+			    | L1_PROT;
+			count++;
+		}
+		pfn_to_map++;
+		if (count == L1_PAGETABLE_ENTRIES
+		    || (count && pfn_to_map == *max_pfn)) {
+			rc = HYPERVISOR_mmu_update(mmu_updates, count, NULL,
+						   DOMID_SELF);
+			if (rc < 0)
+				UK_CRASH("PTE could not be updated. "
+					 "mmu_update failed with rc=%d\n",
+					 rc);
+			count = 0;
+		}
+		start_address += PAGE_SIZE;
 #endif
-    }
+	}
 
-    *start_pfn = pt_pfn;
+	*start_pfn = pt_pfn;
 }
 
 /*
@@ -341,11 +332,9 @@ static pgentry_t *need_pte(unsigned long va, struct uk_alloc *a)
  * derived by adding @incr.
  */
 #define MAP_BATCH ((STACK_SIZE / 4) / sizeof(mmu_update_t))
-int do_map_frames(unsigned long va,
-		const unsigned long *mfns, unsigned long n,
-		unsigned long stride, unsigned long incr,
-		domid_t id, int *err, unsigned long prot,
-		struct uk_alloc *a)
+int do_map_frames(unsigned long va, const unsigned long *mfns, unsigned long n,
+		  unsigned long stride, unsigned long incr, domid_t id,
+		  int *err, unsigned long prot, struct uk_alloc *a)
 {
 	pgentry_t *pte = NULL;
 	unsigned long mapped = 0;
@@ -355,8 +344,9 @@ int do_map_frames(unsigned long va,
 		return -EINVAL;
 	}
 
-	uk_pr_debug("Mapping va=%p n=%lu, mfns[0]=0x%lx stride=%lu incr=%lu prot=0x%lx\n",
-		    (void *) va, n, mfns[0], stride, incr, prot);
+	uk_pr_debug("Mapping va=%p n=%lu, mfns[0]=0x%lx stride=%lu incr=%lu "
+		    "prot=0x%lx\n",
+		    (void *)va, n, mfns[0], stride, incr, prot);
 
 	if (err)
 		memset(err, 0, n * sizeof(int));
@@ -384,10 +374,12 @@ int do_map_frames(unsigned long va,
 				return -ENOMEM;
 
 			mmu_updates[i].ptr =
-				virt_to_mach(pte) | MMU_NORMAL_PT_UPDATE;
+			    virt_to_mach(pte) | MMU_NORMAL_PT_UPDATE;
 			mmu_updates[i].val =
-				((pgentry_t) (mfns[(mapped + i) * stride]
-				+ (mapped + i) * incr) << PAGE_SHIFT) | prot;
+			    ((pgentry_t)(mfns[(mapped + i) * stride]
+					 + (mapped + i) * incr)
+			     << PAGE_SHIFT)
+			    | prot;
 		}
 
 		rc = HYPERVISOR_mmu_update(mmu_updates, batched, NULL, id);
@@ -396,23 +388,12 @@ int do_map_frames(unsigned long va,
 				err[mapped * stride] = rc;
 			else
 				UK_CRASH(
-					"Map %ld (%lx, ...) at %lx failed: %d.\n",
-					batched,
-					mfns[mapped * stride] + mapped * incr,
-					va, rc);
+				    "Map %ld (%lx, ...) at %lx failed: %d.\n",
+				    batched,
+				    mfns[mapped * stride] + mapped * incr, va,
+				    rc);
 		}
 		mapped += batched;
-#else
-		if (!pte || !(va & L1_MASK))
-			pte = need_pte(va & ~L1_MASK, a);
-		if (!pte)
-			return -ENOMEM;
-
-		UK_ASSERT(!(*pte & _PAGE_PSE));
-		pte[l1_table_offset(va)] =
-			(pgentry_t) (((mfns[mapped * stride]
-			+ mapped * incr) << PAGE_SHIFT) | prot);
-		mapped++;
 #endif
 	}
 
@@ -427,12 +408,11 @@ unsigned long allocate_ondemand(unsigned long n, unsigned long align)
 	unsigned long page_idx, contig = 0;
 
 	/* Find a properly aligned run of n contiguous frames */
-	for (page_idx = 0;
-		page_idx <= DEMAND_MAP_PAGES - n;
-		page_idx = (page_idx + contig + 1 + align - 1) & ~(align - 1)) {
+	for (page_idx = 0; page_idx <= DEMAND_MAP_PAGES - n;
+	     page_idx = (page_idx + contig + 1 + align - 1) & ~(align - 1)) {
 
 		unsigned long addr =
-			demand_map_area_start + page_idx * PAGE_SIZE;
+		    demand_map_area_start + page_idx * PAGE_SIZE;
 		pgentry_t *pte = get_pte(addr);
 
 		for (contig = 0; contig < n; contig++, addr += PAGE_SIZE) {
@@ -481,10 +461,9 @@ unsigned long allocate_ondemand(unsigned long n, unsigned long align)
  * derived by adding @incr.
  */
 void *map_frames_ex(const unsigned long *mfns, unsigned long n,
-		unsigned long stride, unsigned long incr,
-		unsigned long alignment,
-		domid_t id, int *err, unsigned long prot,
-		struct uk_alloc *a)
+		    unsigned long stride, unsigned long incr,
+		    unsigned long alignment, domid_t id, int *err,
+		    unsigned long prot, struct uk_alloc *a)
 {
 	unsigned long va = allocate_ondemand(n, alignment);
 
@@ -494,7 +473,7 @@ void *map_frames_ex(const unsigned long *mfns, unsigned long n,
 	if (do_map_frames(va, mfns, n, stride, incr, id, err, prot, a))
 		return NULL;
 
-	return (void *) va;
+	return (void *)va;
 }
 
 /*
@@ -507,14 +486,11 @@ int unmap_frames(unsigned long va, unsigned long num_frames)
 	unsigned long i, n = UNMAP_BATCH;
 	multicall_entry_t call[n];
 	int ret;
-#else
-	pgentry_t *pte;
 #endif
 
-	UK_ASSERT(!((unsigned long) va & ~PAGE_MASK));
+	UK_ASSERT(!((unsigned long)va & ~PAGE_MASK));
 
-	uk_pr_debug("Unmapping va=%p, num=%lu\n",
-		    (void *) va, num_frames);
+	uk_pr_debug("Unmapping va=%p, num=%lu\n", (void *)va, num_frames);
 
 	while (num_frames) {
 #ifdef CONFIG_PARAVIRT
@@ -540,28 +516,21 @@ int unmap_frames(unsigned long va, unsigned long num_frames)
 
 		ret = HYPERVISOR_multicall(call, n);
 		if (ret) {
-			uk_pr_err("update_va_mapping hypercall failed with rc=%d.\n",
-				  ret);
+			uk_pr_err(
+			    "update_va_mapping hypercall failed with rc=%d.\n",
+			    ret);
 			return -ret;
 		}
 
 		for (i = 0; i < n; i++) {
 			if (call[i].result) {
-				uk_pr_err("update_va_mapping failed for with rc=%d.\n",
+				uk_pr_err("update_va_mapping failed for with "
+					  "rc=%d.\n",
 					  ret);
 				return -(call[i].result);
 			}
 		}
 		num_frames -= n;
-#else
-		pte = get_pte(va);
-		if (pte) {
-			UK_ASSERT(!(*pte & _PAGE_PSE));
-			*pte = 0;
-			invlpg(va);
-		}
-		va += PAGE_SIZE;
-		num_frames--;
 #endif
 	}
 	return 0;
@@ -573,88 +542,78 @@ int unmap_frames(unsigned long va, unsigned long num_frames)
 extern struct shared_info _libxenplat_shared_info;
 void _init_mem_set_readonly(void *text, void *etext)
 {
-    unsigned long start_address =
-        ((unsigned long) text + PAGE_SIZE - 1) & PAGE_MASK;
-    unsigned long end_address = (unsigned long) etext;
-    pgentry_t *tab = pt_base, page;
-    unsigned long mfn;
-    unsigned long offset;
-    unsigned long page_size = PAGE_SIZE;
+	unsigned long start_address =
+	    ((unsigned long)text + PAGE_SIZE - 1) & PAGE_MASK;
+	unsigned long end_address = (unsigned long)etext;
+	pgentry_t *tab = pt_base, page;
+	unsigned long mfn;
+	unsigned long offset;
+	unsigned long page_size = PAGE_SIZE;
 #ifdef CONFIG_PARAVIRT
-    static mmu_update_t mmu_updates[L1_PAGETABLE_ENTRIES + 1];
-    int count = 0;
-    int rc;
+	static mmu_update_t mmu_updates[L1_PAGETABLE_ENTRIES + 1];
+	int count = 0;
+	int rc;
 #endif
 
-    uk_pr_debug("Set %p-%p readonly\n", text, etext);
-    mfn = pfn_to_mfn(virt_to_pfn(pt_base));
+	uk_pr_debug("Set %p-%p readonly\n", text, etext);
+	mfn = pfn_to_mfn(virt_to_pfn(pt_base));
 
-    while ( start_address + page_size <= end_address )
-    {
-        tab = pt_base;
-        mfn = pfn_to_mfn(virt_to_pfn(pt_base));
+	while (start_address + page_size <= end_address) {
+		tab = pt_base;
+		mfn = pfn_to_mfn(virt_to_pfn(pt_base));
 
 #if defined(__x86_64__)
-        offset = l4_table_offset(start_address);
-        page = tab[offset];
-        mfn = pte_to_mfn(page);
-        tab = to_virt(mfn_to_pfn(mfn) << PAGE_SHIFT);
+		offset = l4_table_offset(start_address);
+		page = tab[offset];
+		mfn = pte_to_mfn(page);
+		tab = to_virt(mfn_to_pfn(mfn) << PAGE_SHIFT);
 #endif
-        offset = l3_table_offset(start_address);
-        page = tab[offset];
-        mfn = pte_to_mfn(page);
-        tab = to_virt(mfn_to_pfn(mfn) << PAGE_SHIFT);
-        offset = l2_table_offset(start_address);        
-        if ( !(tab[offset] & _PAGE_PSE) )
-        {
-            page = tab[offset];
-            mfn = pte_to_mfn(page);
-            tab = to_virt(mfn_to_pfn(mfn) << PAGE_SHIFT);
+		offset = l3_table_offset(start_address);
+		page = tab[offset];
+		mfn = pte_to_mfn(page);
+		tab = to_virt(mfn_to_pfn(mfn) << PAGE_SHIFT);
+		offset = l2_table_offset(start_address);
+		if (!(tab[offset] & _PAGE_PSE)) {
+			page = tab[offset];
+			mfn = pte_to_mfn(page);
+			tab = to_virt(mfn_to_pfn(mfn) << PAGE_SHIFT);
 
-            offset = l1_table_offset(start_address);
-        }
+			offset = l1_table_offset(start_address);
+		}
 
-        if ( start_address != (unsigned long)&_libxenplat_shared_info )
-        {
+		if (start_address != (unsigned long)&_libxenplat_shared_info) {
 #ifdef CONFIG_PARAVIRT
-            mmu_updates[count].ptr = 
-                ((pgentry_t)mfn << PAGE_SHIFT) + sizeof(pgentry_t) * offset;
-            mmu_updates[count].val = tab[offset] & ~_PAGE_RW;
-            count++;
-#else
-            tab[offset] &= ~_PAGE_RW;
+			mmu_updates[count].ptr = ((pgentry_t)mfn << PAGE_SHIFT)
+						 + sizeof(pgentry_t) * offset;
+			mmu_updates[count].val = tab[offset] & ~_PAGE_RW;
+			count++;
 #endif
-        } else {
-            uk_pr_debug("skipped %lx\n", start_address);
+		} else {
+			uk_pr_debug("skipped %lx\n", start_address);
+		}
+
+		start_address += page_size;
+
+#ifdef CONFIG_PARAVIRT
+		if (count == L1_PAGETABLE_ENTRIES
+		    || start_address + page_size > end_address) {
+			rc = HYPERVISOR_mmu_update(mmu_updates, count, NULL,
+						   DOMID_SELF);
+			if (rc < 0)
+				UK_CRASH("PTE could not be updated\n");
+			count = 0;
+		}
+#endif
 	}
 
-        start_address += page_size;
-
 #ifdef CONFIG_PARAVIRT
-        if ( count == L1_PAGETABLE_ENTRIES || 
-             start_address + page_size > end_address )
-        {
-            rc = HYPERVISOR_mmu_update(mmu_updates, count, NULL, DOMID_SELF);
-            if ( rc < 0 )
-		    UK_CRASH("PTE could not be updated\n");
-            count = 0;
-        }
-#else
-        if ( start_address == (1UL << L2_PAGETABLE_SHIFT) )
-            page_size = 1UL << L2_PAGETABLE_SHIFT;
-#endif
-    }
-
-#ifdef CONFIG_PARAVIRT
-    {
-        mmuext_op_t op = {
-            .cmd = MMUEXT_TLB_FLUSH_ALL,
-        };
-        int count;
-        HYPERVISOR_mmuext_op(&op, 1, &count, DOMID_SELF);
-    }
-#else
-    write_cr3((unsigned long)pt_base);
+	{
+		mmuext_op_t op = {
+		    .cmd = MMUEXT_TLB_FLUSH_ALL,
+		};
+		int count;
+		HYPERVISOR_mmuext_op(&op, 1, &count, DOMID_SELF);
+	}
 #endif
 }
 
@@ -664,24 +623,18 @@ void _init_mem_set_readonly(void *text, void *etext)
 void _init_mem_clear_bootstrap(void)
 {
 #ifdef CONFIG_PARAVIRT
-    pte_t nullpte = { };
-    int rc;
-#else
-    pgentry_t *pgt;
+	pte_t nullpte = {};
+	int rc;
 #endif
 
 	uk_pr_debug("Clear bootstrapping memory: %p\n", (void *)__TEXT);
 
-    /* Use first page as the CoW zero page */
+	/* Use first page as the CoW zero page */
 	memset((void *)__TEXT, 0, PAGE_SIZE);
 	mfn_zero = virt_to_mfn(__TEXT);
 #ifdef CONFIG_PARAVIRT
-    if ( (rc = HYPERVISOR_update_va_mapping(0, nullpte, UVMF_INVLPG)) )
-	    uk_pr_err("Unable to unmap NULL page. rc=%d\n", rc);
-#else
-	pgt = get_pgt(__TEXT);
-    *pgt = 0;
-	invlpg(__TEXT);
+	if ((rc = HYPERVISOR_update_va_mapping(0, nullpte, UVMF_INVLPG)))
+		uk_pr_err("Unable to unmap NULL page. rc=%d\n", rc);
 #endif
 }
 
@@ -709,10 +662,10 @@ void _arch_init_p2m(struct uk_alloc *a)
 		}
 
 		l2_list[L2_P2M_IDX(pfn)] =
-			virt_to_mfn(phys_to_machine_mapping + pfn);
+		    virt_to_mfn(phys_to_machine_mapping + pfn);
 	}
 	HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
-		virt_to_mfn(l3_list);
+	    virt_to_mfn(l3_list);
 	HYPERVISOR_shared_info->arch.max_pfn = max_pfn;
 }
 
@@ -728,18 +681,15 @@ void _arch_rebuild_p2m(void)
 		}
 
 		l2_list[L2_P2M_IDX(pfn)] =
-				virt_to_mfn(phys_to_machine_mapping + pfn);
+		    virt_to_mfn(phys_to_machine_mapping + pfn);
 	}
 	HYPERVISOR_shared_info->arch.pfn_to_mfn_frame_list_list =
-			virt_to_mfn(l3_list);
+	    virt_to_mfn(l3_list);
 	HYPERVISOR_shared_info->arch.max_pfn = max_pfn;
 }
 
 #ifdef CONFIG_MIGRATION
-void arch_mm_pre_suspend(void)
-{
-
-}
+void arch_mm_pre_suspend(void) {}
 void arch_mm_post_suspend(int canceled)
 {
 	if (!canceled)
@@ -758,12 +708,12 @@ void arch_mm_init(struct uk_alloc *a)
 void _init_mem_prepare(unsigned long *start_pfn, unsigned long *max_pfn)
 {
 #ifdef CONFIG_PARAVIRT
-    phys_to_machine_mapping = (unsigned long *)HYPERVISOR_start_info->mfn_list;
-    pt_base = (pgentry_t *)HYPERVISOR_start_info->pt_base;
-    *start_pfn = PFN_UP(to_phys(pt_base)) + HYPERVISOR_start_info->nr_pt_frames;
-    *max_pfn = HYPERVISOR_start_info->nr_pages;
-#else
-#error "Please port (see Mini-OS's arch_mm_preinit())"
+	phys_to_machine_mapping =
+	    (unsigned long *)HYPERVISOR_start_info->mfn_list;
+	pt_base = (pgentry_t *)HYPERVISOR_start_info->pt_base;
+	*start_pfn =
+	    PFN_UP(to_phys(pt_base)) + HYPERVISOR_start_info->nr_pt_frames;
+	*max_pfn = HYPERVISOR_start_info->nr_pages;
 #endif
 }
 
@@ -776,6 +726,6 @@ void _init_mem_demand_area(unsigned long start, unsigned long page_num)
 	demand_map_area_start = start;
 	demand_map_area_end = demand_map_area_start + page_num * PAGE_SIZE;
 
-	uk_pr_info("Demand map pfns at %lx-%lx.\n",
-		   demand_map_area_start, demand_map_area_end);
+	uk_pr_info("Demand map pfns at %lx-%lx.\n", demand_map_area_start,
+		   demand_map_area_end);
 }

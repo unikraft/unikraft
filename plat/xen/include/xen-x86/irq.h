@@ -61,7 +61,7 @@
 		_vcpu->evtchn_upcall_mask = 0;                                 \
 		barrier(); /* unmask then check (avoid races) */               \
 		if (unlikely(_vcpu->evtchn_upcall_pending))                    \
-			ukplat_lcpu_irqs_handle_pending();		       \
+			ukplat_lcpu_irqs_handle_pending();                     \
 	} while (0)
 
 #define __save_flags(x)                                                        \
@@ -100,14 +100,12 @@
 #define irqs_disabled()                                                        \
 	HYPERVISOR_shared_info->vcpu_info[smp_processor_id()].evtchn_upcall_mask
 
-#define local_irq_save(x)        __save_and_cli(x)
-#define local_irq_restore(x)     __restore_flags(x)
-#define local_save_flags(x)      __save_flags(x)
-#define local_irq_disable()      __cli()
-#define local_irq_enable()       __sti()
+#define local_irq_save(x) __save_and_cli(x)
+#define local_irq_restore(x) __restore_flags(x)
+#define local_save_flags(x) __save_flags(x)
+#define local_irq_disable() __cli()
+#define local_irq_enable() __sti()
 
-#else
-#include <x86/irq.h>
 #endif
 
 #endif /* PLAT_XEN_INCLUDE_XEN_X86_IRQ_H_ */
