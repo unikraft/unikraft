@@ -1,0 +1,5 @@
+$(eval $(call addlib_s,libubsan,$(CONFIG_LIBUBSAN)))
+
+COMPFLAGS-$(CONFIG_LIBUBSAN_GLOBAL)	+= -fsanitize=undefined
+
+LIBUBSAN_SRCS-y += $(LIBUBSAN_BASE)/ubsan.c
