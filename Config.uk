@@ -86,6 +86,15 @@ config OPTIMIZE_LTO
 		will increase overall building time but creates more efficient
 		Unikraft binaries.
 
+config ENABLE_PIE
+	bool "PIE - Postition-Independent Executable"
+	default n
+	help
+		Enables the unikernel to be compiled as a position-independent executable.
+		Note that certain parts of the entry64.S file will be eliminated, and the unikernel
+		will need to be loaded into memory from initrd by the bootloader (which will be compiled
+		separately).
+
 choice
 	prompt "Debug information level"
 	default DEBUG_SYMBOLS_LVL3
