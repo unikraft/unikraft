@@ -92,6 +92,11 @@ if LIBUKBOOT
 		  Satisfy allocation as fast as possible. No support for free().
 		  Refer to help in ukallocregion for more information.
 
+		config LIBUKBOOT_INITMIMALLOC
+		bool "Mimalloc"
+		depends on LIBMIMALLOC_INCLUDED
+		select LIBMIMALLOC
+
 		config LIBUKBOOT_INITTLSF
 		bool "TLSF"
 		depends on LIBTLSF_INCLUDED
