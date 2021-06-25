@@ -40,6 +40,7 @@
 #include <uk/plat/console.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
+#include <x86/acpi/acpi.h>
 
 #define PLATFORM_MEM_START 0x100000
 #define PLATFORM_MAX_MEM_ADDR 0x40000000
@@ -286,6 +287,10 @@ void _libkvmplat_entry(void *arg)
 			   (void *) _libkvmplat_cfg.heap2.start);
 	uk_pr_info("     stack top: %p\n",
 		   (void *) _libkvmplat_cfg.bstack.start);
+
+#ifdef CONFIG_HAVE_SMP
+	acpi_init();
+#endif /* CONFIG_HAVE_SMP */
 
 #ifdef CONFIG_HAVE_SYSCALL
 	_init_syscall();
