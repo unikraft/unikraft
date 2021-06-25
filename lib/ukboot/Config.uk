@@ -97,6 +97,17 @@ if LIBUKBOOT
 		depends on LIBMIMALLOC_INCLUDED
 		select LIBMIMALLOC
 
+		config LIBUKBOOT_INITTINYALLOC
+		bool "tinyalloc"
+		depends on LIBTINYALLOC_INCLUDED
+		select LIBTINYALLOC
+		help
+		  Minimalist allocator implementation, meant for use in systems
+		  with unmanaged linear memory such as WebAssembly or embedded
+		  systems. tinyalloc is highly configurable and offers high
+		  performance and reasonable memory usage when used and
+		  configured appropriately.
+
 		config LIBUKBOOT_INITTLSF
 		bool "TLSF"
 		depends on LIBTLSF_INCLUDED

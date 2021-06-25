@@ -47,6 +47,8 @@
 #include <uk/mimalloc.h>
 #elif CONFIG_LIBUKBOOT_INITTLSF
 #include <uk/tlsf.h>
+#elif CONFIG_LIBUKBOOT_INITTINYALLOC
+#include <uk/tinyalloc.h>
 #endif
 #if CONFIG_LIBUKSCHED
 #include <uk/sched.h>
@@ -242,6 +244,8 @@ void ukplat_entry(int argc, char *argv[])
 			a = uk_mimalloc_init(md.base, md.len);
 #elif CONFIG_LIBUKBOOT_INITTLSF
 			a = uk_tlsf_init(md.base, md.len);
+#elif CONFIG_LIBUKBOOT_INITTINYALLOC
+			a = uk_tinyalloc_init(md.base, md.len);
 #endif
 		} else {
 			uk_alloc_addmem(a, md.base, md.len);
