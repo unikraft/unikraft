@@ -43,6 +43,8 @@
 #include <uk/allocbbuddy.h>
 #elif CONFIG_LIBUKBOOT_INITREGION
 #include <uk/allocregion.h>
+#elif CONFIG_LIBUKBOOT_INITMIMALLOC
+#include <uk/mimalloc.h>
 #elif CONFIG_LIBUKBOOT_INITTLSF
 #include <uk/tlsf.h>
 #endif
@@ -236,6 +238,8 @@ void ukplat_entry(int argc, char *argv[])
 			a = uk_allocbbuddy_init(md.base, md.len);
 #elif CONFIG_LIBUKBOOT_INITREGION
 			a = uk_allocregion_init(md.base, md.len);
+#elif CONFIG_LIBUKBOOT_INITMIMALLOC
+			a = uk_mimalloc_init(md.base, md.len);
 #elif CONFIG_LIBUKBOOT_INITTLSF
 			a = uk_tlsf_init(md.base, md.len);
 #endif
