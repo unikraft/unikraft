@@ -36,4 +36,8 @@ if (PLAT_LINUXU)
 	depends on TAP_NET
 	help
 		Enable debug messages from the tap device.
+
+	config LINUXU_MAX_IRQ_HANDLER_ENTRIES
+	int "Maximum number of handlers per IRQ"
+	default 8
 endif
