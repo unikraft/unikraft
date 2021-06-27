@@ -29,6 +29,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
 #ifndef __UK_STORE_H__
 #define __UK_STORE_H__
 
@@ -49,6 +50,39 @@ extern "C" {
 
 enum uk_store_entry_type;
 struct uk_store_entry;
+
+#define __UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set)	\
+	static const struct uk_store_entry				\
+	__unused __align8						\
+	__uk_store_entries_list ## _ ## entry = {			\
+		.name = STRINGIFY(entry),				\
+		.type       = (uk_store_get_entry_type(e_type)),	\
+		.get.e_type = (e_get),					\
+		.set.e_type = (e_set),					\
+		.flags      = UK_STORE_ENTRY_FLAG_STATIC		\
+	}
+
+/* Do not call directly */
+#define _UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set)	\
+	__UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set)
+
+/**
+ * Adds an entry to the entry section of a library.
+ *
+ * @param entry the entry in the section
+ * @param e_type the type of the function
+ * @param e_get getter pointer
+ * @param e_set setter pointer
+ */
+#define UK_STORE_STATIC_ENTRY(entry, e_type, e_get, e_set)	\
+	_UK_STORE_STATIC_ENTRY(entry, STRINGIFY(__LIBNAME__),	\
+		e_type, e_get, e_set)
+
+/* Flags if an entry is static or dynamic */
+#define UK_STORE_ENTRY_FLAG_STATIC	(1 << 0)
+
+#define UK_STORE_ENTRY_ISSTATIC(entry)	\
+	((entry)->flags & UK_STORE_ENTRY_FLAG_STATIC)
 
 #define uk_store_get_folder(library_id, folder_name)	\
 	do { } while (0)
@@ -181,6 +215,47 @@ struct uk_store_entry {
 /* Used internally for storage */
 struct uk_store_folder;
 struct uk_store_folder_entry;
+
+/* Flags if an entry is static or dynamic */
+#define UK_STORE_ENTRY_FLAG_STATIC	(1 << 0)
+
+/**
+ * Checks if an entry is static
+ *
+ * @param entry the entry to check
+ * @return the condition result
+ */
+#define UK_STORE_ENTRY_ISSTATIC(entry)	\
+	((entry)->flags & UK_STORE_ENTRY_FLAG_STATIC)
+
+/* Do not call directly */
+#define __UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set)	\
+	static const struct uk_store_entry				\
+	__used __section(".uk_store_lib_" lib_str) __align8		\
+	__uk_store_entries_list ## _ ## entry = {			\
+		.name = STRINGIFY(entry),				\
+		.type       = (uk_store_get_entry_type(e_type)),	\
+		.get.e_type = (e_get),					\
+		.set.e_type = (e_set),					\
+		.flags      = UK_STORE_ENTRY_FLAG_STATIC,		\
+		.cookie     = NULL					\
+	}
+
+/* Do not call directly */
+#define _UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set)	\
+	__UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set)
+
+/**
+ * Adds an entry to the entry section of a library.
+ *
+ * @param entry the entry in the section
+ * @param e_type the type of the function
+ * @param e_get getter pointer
+ * @param e_set setter pointer
+ */
+#define UK_STORE_STATIC_ENTRY(entry, e_type, e_get, e_set)	\
+	_UK_STORE_STATIC_ENTRY(entry, STRINGIFY(__LIBNAME__),	\
+		e_type, e_get, e_set)
 
 const struct uk_store_entry *
 		_uk_store_dynamic_entry_create_u8(
@@ -322,9 +397,14 @@ const struct uk_store_entry *
 _uk_store_get_dynamic_entry(unsigned int libid, const char *f_name,
 				const char *e_name);
 
+const struct uk_store_entry *
+_uk_store_get_static_entry(unsigned int libid, const char *e_name);
+
 static inline const struct uk_store_entry *
 _uk_store_get_entry(unsigned int libid, const char *f_name, const char *e_name)
 {
+	if (!f_name)
+		return _uk_store_get_static_entry(libid, e_name);
 	return _uk_store_get_dynamic_entry(libid, f_name, e_name);
 }
 
@@ -435,4 +515,3 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val);
 #endif
 
 #endif /* __UK_STORE_H__ */
-
