@@ -13,7 +13,9 @@ CXXINCLUDES-$(CONFIG_LIBUKSTORE) += -I$(LIBUKSTORE_GEN_INCLUDES_PATH)
 LIBUKSTORE_PHONY_SRC     := $(LIBUKSTORE_BUILD)/uk_libs.in
 LIBUKSTORE_PHONY_SRC_NEW := $(addsuffix .new, $(LIBUKSTORE_PHONY_SRC))
 
-UK_PREPROCESS-$(CONFIG_LIBUKSTORE) += $(LIBUKSTORE_PHONY_SRC)
+LIBUKSTORE_GEN_SRC := $(LIBUKSTORE_GEN_INCLUDES_PATH)/uk/_store_libs.h
+
+UK_PREPROCESS-$(CONFIG_LIBUKSTORE) += $(LIBUKSTORE_PHONY_SRC) $(LIBUKSTORE_GEN_SRC)
 
 $(LIBUKSTORE_PHONY_SRC): %: %.new
 	@cmp -s $^ $@; if [ $$? -ne 0 ]; then cp $^ $@; fi
@@ -28,6 +30,11 @@ $(LIBUKSTORE_BUILD)/uk_libs.in.new:
 		     )))) \
 		     $(UK_LIBS) $(UK_LIBS-y) \
 		| tr ' ' '\n' > $@)
+
+$(LIBUKSTORE_GEN_INCLUDES_PATH)/uk/_store_libs.h: $(LIBUKSTORE_BASE)/gen_libs.h.awk $(LIBUKSTORE_BUILD)/uk_libs.in
+	$(call build_cmd,AWK,libukstore,$(notdir $@), \
+		$(AWK) -F '-' -f $(LIBUKSTORE_BASE)/gen_libs.h.awk \
+		$(LIBUKSTORE_BUILD)/uk_libs.in > $@)
 
 LIBUKSTORE_SRCS-y += $(LIBUKSTORE_BASE)/store.c
 
