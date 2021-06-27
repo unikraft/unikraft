@@ -49,6 +49,9 @@
 #if CONFIG_LIBUKSCHED
 #include <uk/sched.h>
 #endif
+#if CONFIG_LIBUKMMIO
+#include <uk/mmio.h>
+#endif
 #include <uk/arch/lcpu.h>
 #include <uk/plat/bootstrap.h>
 #include <uk/plat/memory.h>

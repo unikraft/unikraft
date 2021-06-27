@@ -36,10 +36,14 @@
 #include <uk/print.h>
 #include <uk/plat/common/cpu.h>
 #include <platform_bus.h>
+#ifdef CONFIG_ARCH_ARM_64
 #include <libfdt.h>
+#endif
 #include <kvm/config.h>
+#ifdef CONFIG_ARCH_ARM_64
 #include <gic/gic-v2.h>
 #include <ofw/fdt.h>
+#endif
 
 #define fdt_start (_libkvmplat_cfg.dtb)
 
@@ -54,7 +58,9 @@ static struct pf_bus_handler pfh;
 
 static const char *pf_device_compatilbe_list[] = {
 	"virtio,mmio",
+#ifdef CONFIG_ARCH_ARM_64
 	"pci-host-ecam-generic",
+#endif
 	NULL
 };
 
@@ -144,12 +150,14 @@ static int pf_probe(void)
 
 	/* Search all the platform bus devices provided by fdt */
 	do {
+		#ifdef CONFIG_ARCH_ARM_64
 		fdt_pf = fdt_node_offset_idx_by_compatible_list(_libkvmplat_cfg.dtb,
 						fdt_pf, pf_device_compatilbe_list, &idx);
 		if (fdt_pf < 0) {
 			uk_pr_info("End of searching platform devices\n");
 			break;
 		}
+		#endif
 
 		/* Alloc dev */
 		dev = (struct pf_device *) uk_calloc(pfh.a, 1, sizeof(*dev));
@@ -158,7 +166,9 @@ static int pf_probe(void)
 			return -ENOMEM;
 		}
 
+		#ifdef CONFIG_ARCH_ARM_64
 		dev->fdt_offset = fdt_pf;
+		#endif
 
 		/* Find drv with compatible-id match table */
 		drv = pf_find_driver(pf_device_compatilbe_list[idx]);
@@ -180,6 +190,7 @@ static int pf_probe(void)
 		if (ret < 0) {
 			uk_free(pfh.a, dev);
 		}
+		return 0;
 	} while (1);
 
 	return ret;

@@ -42,8 +42,10 @@
 #include <uk/plat/irq.h>
 #include <uk/bus.h>
 #include <uk/bitops.h>
+#ifdef CONFIG_ARCH_ARM_64
 #include <libfdt.h>
 #include <ofw/fdt.h>
+#endif
 #include <kvm/config.h>
 
 #include <platform_bus.h>
@@ -51,7 +53,13 @@
 #include <virtio/virtio_bus.h>
 #include <virtio/virtqueue.h>
 #include <virtio/virtio_mmio.h>
+#ifdef CONFIG_ARCH_ARM_64
 #include <gic/gic-v2.h>
+#endif
+
+#if CONFIG_LIBUKMMIO
+#include <uk/mmio.h>
+#endif
 
 /* The alignment to use between consumer and producer parts of vring.
  * Currently hardcoded to the page size. */
@@ -395,12 +403,17 @@ static struct virtio_config_ops virtio_mmio_config_ops = {
 
 static int virtio_mmio_probe(struct pf_device *pfdev)
 {
+#ifdef CONFIG_ARCH_ARM_64
 	const fdt32_t *prop;
 	int type, hwirq, prop_len;
 	int fdt_vm = pfdev->fdt_offset;
 	__u64 reg_base;
 	__u64 reg_size;
+#else
+	struct uk_mmio_device *mmio_dev;
+#endif
 
+#ifdef CONFIG_ARCH_ARM_64
 	if (fdt_vm == -FDT_ERR_NOTFOUND) {
 		uk_pr_info("device not found in fdt\n");
 		goto error_exit;
@@ -427,10 +440,21 @@ static int virtio_mmio_probe(struct pf_device *pfdev)
 
 	pfdev->base = reg_base;
 	pfdev->irq = gic_irq_translate(type, hwirq);
+#else
+	mmio_dev = uk_mmio_dev_get(0);
+
+	if (!mmio_dev) {
+		uk_pr_err("mmio device not found\n");
+		goto error_exit;
+	}
+	pfdev->base = mmio_dev->base_addr;
+	pfdev->irq = mmio_dev->irq;
+
 	uk_pr_info("virtio mmio probe base(0x%lx) irq(%ld)\n",
 				pfdev->base, pfdev->irq);
-	return 0;
+#endif
 
+	return 0;
 error_exit:
 	return -EFAULT;
 }
