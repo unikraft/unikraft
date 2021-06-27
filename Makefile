@@ -319,6 +319,8 @@ CXXINCLUDES :=
 CXXINCLUDES-y :=
 GOCFLAGS :=
 GOCFLAGS-y :=
+RUSTCFLAGS :=
+RUSTCFLAGS-y :=
 GOCINCLUDES :=
 GOCINCLUDES-y :=
 DBGFLAGS :=
@@ -568,6 +570,13 @@ CC		:= $(CONFIG_CROSS_COMPILE)$(CONFIG_COMPILER)
 CPP		:= $(CC)
 CXX		:= $(CPP)
 GOC		:= $(CONFIG_CROSS_COMPILE)gccgo-7
+# We use rustc because the gcc frontend is experimental and missing features such
+# as borrowing checking
+ifneq ("$(origin LLVM_TARGET_ARCH)","undefined")
+RUSTC		:= rustc --target=$(CONFIG_LLVM_TARGET_ARCH)
+else
+RUSTC		:= rustc
+endif
 AS		:= $(CC)
 AR		:= $(CONFIG_CROSS_COMPILE)gcc-ar
 NM		:= $(CONFIG_CROSS_COMPILE)gcc-nm
