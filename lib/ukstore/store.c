@@ -80,6 +80,9 @@ struct uk_store_folder_entry {
 /* The starting point of all dynamic folders for each library */
 static struct uk_list_head dynamic_heads[__UK_STORE_COUNT] = { NULL, };
 
+/* static struct uk_store_folder *static_folders[2 * __UK_STORE_COUNT] */
+#include <uk/_store_array.h>
+
 /**
  * Adds a folder entry to a folder list
  *
@@ -99,6 +102,7 @@ static struct uk_list_head dynamic_heads[__UK_STORE_COUNT] = { NULL, };
 static inline struct uk_store_folder_entry *
 uk_store_get_folder_entry(const struct uk_store_entry *p_entry)
 {
+	UK_ASSERT(!UK_STORE_ENTRY_ISSTATIC(p_entry));
 	return __containerof(p_entry, struct uk_store_folder_entry, entry);
 }
 
@@ -113,6 +117,9 @@ void
 _uk_store_release_entry(const struct uk_store_entry **p_entry)
 {
 	struct uk_store_folder_entry *res;
+
+	if (UK_STORE_ENTRY_ISSTATIC(*p_entry))
+		return;
 
 	res = uk_store_get_folder_entry(*p_entry);
 
@@ -132,6 +139,9 @@ void
 _uk_store_free_entry(const struct uk_store_entry *entry)
 {
 	struct uk_alloc *a = uk_store_get_folder_entry(entry)->a;
+
+	if (UK_STORE_ENTRY_ISSTATIC(entry))
+		return;
 
 	a->free(a, entry->name);
 	a->free(a, uk_store_get_folder_entry(entry));
@@ -244,6 +254,26 @@ _uk_store_get_folder(unsigned int library_id, const char *name)
 	uk_list_for_each_entry(res, &dynamic_heads[library_id], folder_head)
 		if (!strcmp(res->name, name))
 			return res;
+
+	return NULL;
+}
+
+/**
+ * Find a static entry and returns it.
+ *
+ * @param libid the id of the library to search in
+ * @param e_name the name of the entry to search for
+ * @return the found entry or NULL
+ */
+const struct uk_store_entry *
+_uk_store_get_static_entry(unsigned int libid, const char *e_name)
+{
+	struct uk_store_entry *entry = static_entries[2 * libid];
+	struct uk_store_entry *stop = static_entries[2 * libid + 1];
+
+	for (; entry != stop; ++entry)
+		if (!strcmp(entry->name, e_name))
+			return entry;
 
 	return NULL;
 }
@@ -1438,4 +1468,3 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 		return -EINVAL;
 	}
 }
-

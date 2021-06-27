@@ -17,6 +17,7 @@ _uk_store_get_u64
 _uk_store_get_s64
 _uk_store_get_uptr
 _uk_store_get_dynamic_entry
+_uk_store_get_static_entry
 _uk_store_add_folder
 _uk_store_get_dynamic_folder
 _uk_store_dynamic_folder_alloc
