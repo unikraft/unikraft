@@ -37,6 +37,13 @@
 #include <string.h>
 #include <uk/syscall.h>
 
+#ifdef DRUNTIME
+#include <uk/essentials.h>
+
+#define size_to_num_pages(size) \
+	(ALIGN_UP((unsigned long)(size), __PAGE_SIZE) / __PAGE_SIZE)
+#endif
+
 struct mmap_addr {
 	void *begin;
 	void *end;
@@ -93,7 +100,12 @@ UK_SYSCALL_DEFINE(void*, mmap, void*, addr, size_t, len, int, prot,
 		last = tmp;
 		tmp = tmp->next;
 	}
+#ifdef DRUNTIME
+	int num_pages = size_to_num_pages(len);
+	void *mem = uk_palloc(uk_alloc_get_default(), num_pages);
+#else
 	void *mem = uk_malloc(uk_alloc_get_default(), len);
+#endif
 
 	if (!mem) {
 		errno = ENOMEM;
@@ -136,6 +148,7 @@ UK_SYSCALL_DEFINE(int, munmap, void*, addr, size_t, len)
 	if (!addr)
 		return 0;
 	while (tmp) {
+#ifndef DRUNTIME
 		if (addr != tmp->begin) {
 			if (tmp->end > addr + len) {
 				errno = EINVAL;
@@ -163,6 +176,20 @@ UK_SYSCALL_DEFINE(int, munmap, void*, addr, size_t, len)
 			uk_free(uk_alloc_get_default(), addr);
 			return 0;
 		}
+#else
+		if (addr == tmp->begin) {
+			int num_pages = size_to_num_pages(len);
+
+			if (!prev)
+				mmap_addr = tmp->next;
+			else
+				prev->next = tmp->next;
+			uk_free(uk_alloc_get_default(), tmp);
+			uk_pfree(uk_alloc_get_default(), addr, num_pages);
+			break;
+		}
+#endif
+
 		prev = tmp;
 		tmp = tmp->next;
 	}
