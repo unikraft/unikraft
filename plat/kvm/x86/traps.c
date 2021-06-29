@@ -96,9 +96,9 @@ static void tss_init(void)
 
 
 /* Declare the traps used only by this platform: */
-DECLARE_TRAP_EC(nmi,           "NMI")
-DECLARE_TRAP_EC(double_fault,  "double fault")
-DECLARE_TRAP_EC(virt_error,    "virtualization error")
+DECLARE_TRAP_EC(nmi,           "NMI",                  NULL)
+DECLARE_TRAP_EC(double_fault,  "double fault",         NULL)
+DECLARE_TRAP_EC(virt_error,    "virtualization error", NULL)
 
 
 static struct seg_gate_desc64 cpu_idt[IDT_NUM_ENTRIES] __align64b;
