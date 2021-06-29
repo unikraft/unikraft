@@ -1,4 +1,10 @@
 menu "Platform Interface Options"
+config UKPLAT_HAVE_MULTIBOOT2
+	bool "Multiboot v2 bootloader"
+	default n
+	help
+		Use the Multiboot v2 bootloader
+
 config UKPLAT_MEMRNAME
 	bool "Memory region names"
 	default n
