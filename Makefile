@@ -321,6 +321,14 @@ GOCFLAGS :=
 GOCFLAGS-y :=
 GOCINCLUDES :=
 GOCINCLUDES-y :=
+DMDFLAGS :=
+DMDFLAGS-y :=
+DMDINCLUDES :=
+DMDINCLUDES-y :=
+GDCFLAGS :=
+GDCFLAGS-y :=
+GDCINCLUDES :=
+GDCINCLUDES-y :=
 DBGFLAGS :=
 DBGFLAGS-y :=
 LDFLAGS :=
@@ -563,6 +571,8 @@ CC		:= $(CONFIG_CROSS_COMPILE)$(CONFIG_COMPILER)
 CPP		:= $(CC)
 CXX		:= $(CPP)
 GOC		:= $(CONFIG_CROSS_COMPILE)gccgo-7
+DMD		:= $(CONFIG_CROSS_COMPILE)dmd
+GDC		:= $(CONFIG_CROSS_COMPILE)gdc
 AS		:= $(CC)
 AR		:= $(CONFIG_CROSS_COMPILE)gcc-ar
 NM		:= $(CONFIG_CROSS_COMPILE)gcc-nm
@@ -598,6 +608,7 @@ ASFLAGS		+= -DCC_VERSION=$(CC_VERSION)
 CFLAGS		+= -DCC_VERSION=$(CC_VERSION)
 CXXFLAGS	+= -DCC_VERSION=$(CC_VERSION)
 GOCFLAGS	+= -DCC_VERSION=$(CC_VERSION)
+GDCFLAGS	+= -DCC_VERSION=$(CC_VERSION)
 
 # ensure $(BUILD_DIR)/kconfig, $(BUILD_DIR)/include and $(BUILD_DIR)/include/uk exists
 $(call mk_sub_build_dir,kconfig)
@@ -608,6 +619,8 @@ ASINCLUDES            += -I$(UK_GENERATED_INCLUDES)
 CINCLUDES             += -I$(UK_GENERATED_INCLUDES)
 CXXINCLUDES           += -I$(UK_GENERATED_INCLUDES)
 GOCINCLUDES           += -I$(UK_GENERATED_INCLUDES)
+DMDINCLUDES           += -I$(UK_GENERATED_INCLUDES)
+GDCINCLUDES           += -I$(UK_GENERATED_INCLUDES)
 
 ################################################################################
 # Build rules
