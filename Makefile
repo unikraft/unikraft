@@ -324,6 +324,14 @@ RUSTCFLAGS :=
 RUSTCFLAGS-y :=
 GOCINCLUDES :=
 GOCINCLUDES-y :=
+DMDFLAGS :=
+DMDFLAGS-y :=
+DMDINCLUDES :=
+DMDINCLUDES-y :=
+GDCFLAGS :=
+GDCFLAGS-y :=
+GDCINCLUDES :=
+GDCINCLUDES-y :=
 DBGFLAGS :=
 DBGFLAGS-y :=
 LDFLAGS :=
@@ -588,6 +596,8 @@ RUSTC		:= rustc --target=$(CONFIG_LLVM_TARGET_ARCH)
 else
 RUSTC		:= rustc
 endif
+DMD		:= $(CONFIG_CROSS_COMPILE)dmd
+GDC		:= $(CONFIG_CROSS_COMPILE)gdc
 AS		:= $(CC)
 AR		:= $(CONFIG_CROSS_COMPILE)gcc-ar
 NM		:= $(CONFIG_CROSS_COMPILE)gcc-nm
@@ -628,6 +638,7 @@ ASFLAGS		+= -DCC_VERSION=$(CC_VERSION)
 CFLAGS		+= -DCC_VERSION=$(CC_VERSION)
 CXXFLAGS	+= -DCC_VERSION=$(CC_VERSION)
 GOCFLAGS	+= -DCC_VERSION=$(CC_VERSION)
+GDCFLAGS	+= -DCC_VERSION=$(CC_VERSION)
 
 # ensure $(BUILD_DIR)/kconfig, $(BUILD_DIR)/include and $(BUILD_DIR)/include/uk exists
 $(call mk_sub_build_dir,kconfig)
@@ -638,6 +649,8 @@ ASINCLUDES            += -I$(UK_GENERATED_INCLUDES)
 CINCLUDES             += -I$(UK_GENERATED_INCLUDES)
 CXXINCLUDES           += -I$(UK_GENERATED_INCLUDES)
 GOCINCLUDES           += -I$(UK_GENERATED_INCLUDES)
+DMDINCLUDES           += -I$(UK_GENERATED_INCLUDES)
+GDCINCLUDES           += -I$(UK_GENERATED_INCLUDES)
 
 ################################################################################
 # Build rules
