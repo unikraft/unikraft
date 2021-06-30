@@ -66,6 +66,7 @@ char *strtok(char *restrict s, const char *restrict sep);
 char *strtok_r(char *restrict s, const char *restrict sep, char **restrict p);
 char *strndup(const char *str, size_t len);
 char *strdup(const char *str);
+char *strncat(char *dest, const char *src, size_t n);
 
 char *strerror_r(int errnum, char *buf, size_t buflen);
 char *strerror(int errnum);

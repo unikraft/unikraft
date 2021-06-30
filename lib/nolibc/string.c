@@ -686,3 +686,17 @@ char *strerror(int errnum)
 
 	return strerror_r(errnum, buf, sizeof(buf));
 }
+
+char *strncat(char *dest, const char *src, size_t n)
+{
+	char *a = dest;
+
+	dest = dest + strlen(dest);
+	while (n && *src) {
+		n--;
+		*dest++ = *src++;
+	}
+
+	*dest++ = 0;
+	return a;
+}
