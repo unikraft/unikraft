@@ -1,3 +1,11 @@
 uk_vsockdev_init
 uk_vsockdev_get
 uk_vsockdev_drv_register
+vsock_socket
+vsock_bind
+vsock_listen
+vsock_accept
+vsock_connect
+vsock_send
+vsock_recv
+vsock_close
