@@ -515,6 +515,7 @@ ifeq ($(sub_make_exec), 1)
 ifeq ($(UK_HAVE_DOT_CONFIG),y)
 # Hide troublesome environment variables from sub processes
 unexport CONFIG_CROSS_COMPILE
+unexport CONFIG_LLVM_TARGET_ARCH
 unexport CONFIG_COMPILER
 #unexport CC
 #unexport LD
@@ -546,6 +547,10 @@ unexport MACHINE
 
 ifneq ("$(origin CROSS_COMPILE)","undefined")
 CONFIG_CROSS_COMPILE := $(CROSS_COMPILE:"%"=%)
+endif
+
+ifneq ("$(origin LLVM_TARGET_ARCH)","undefined")
+CONFIG_LLVM_TARGET_ARCH := $(LLVM_TARGET_ARCH:"%"=%)
 endif
 
 ifneq ("$(origin COMPILER)","undefined")

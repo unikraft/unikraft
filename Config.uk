@@ -168,6 +168,15 @@ config CROSS_COMPILE
 		need to set this unless you want the configured build
 		directory to select the cross-compiler automatically.
 
+
+config LLVM_TARGET_ARCH
+	string "Custom cross-compiler LLVM target (optional)"
+	help
+		Same as running 'make LLVM_TARGET_ARCH=target' but stored for
+		default make runs in this build directory.  You don't
+		need to set this unless you want the configured build
+		directory to select the cross-compiler automatically.
+		This is used for LLVM based compilers such as clang or rustc.
 #config PARALLEL_JOBS
 #	int "Number of jobs to run simultaneously (0 for auto)"
 #	default "0"
