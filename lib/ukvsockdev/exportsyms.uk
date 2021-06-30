@@ -1,0 +1,3 @@
+uk_vsockdev_init
+uk_vsockdev_get
+uk_vsockdev_drv_register
