@@ -12,6 +12,9 @@ config EARLY_PRINT_PL011_UART_ADDR
 	help
 		Pl011 serial address used by early debug console.
 
+config HAVE_SMP
+	bool "Symmetric multi-processor support"
+	default n
 endmenu
 
 config HZ
@@ -28,3 +31,5 @@ config FPSIMD
 	depends on ARCH_ARM_64
 	help
 		Enable support FPU usage in application
+
+
