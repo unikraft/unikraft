@@ -41,6 +41,9 @@
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include <x86/acpi/acpi.h>
+#include <kvm-x86/smp.h>
+
+#include <uk/plat/lcpu.h>
 
 #ifdef CONFIG_PAGING
 #include <uk/plat/paging.h>
@@ -67,8 +70,7 @@ static inline void _mb_get_cmdline(struct multiboot_info *mi)
 
 		if (strlen(mi_cmdline) > sizeof(cmdline) - 1)
 			uk_pr_err("Command line too long, truncated\n");
-		strncpy(cmdline, mi_cmdline,
-			sizeof(cmdline));
+		strncpy(cmdline, mi_cmdline, sizeof(cmdline));
 	} else {
 		/* Use image name as cmdline to provide argv[0] */
 		uk_pr_debug("No command line present\n");
@@ -420,7 +422,11 @@ void _libkvmplat_entry(void *arg)
 
 	_init_cpufeatures();
 	_libkvmplat_init_console();
+#ifdef CONFIG_HAVE_SMP
+	traps_init_bsp();
+#else
 	traps_init();
+#endif /* CONFIG_HAVE_SMP */
 	intctrl_init();
 
 	uk_pr_info("Entering from KVM (x86)...\n");
@@ -447,7 +453,16 @@ void _libkvmplat_entry(void *arg)
 		   (void *) _libkvmplat_cfg.bstack.start);
 
 #ifdef CONFIG_HAVE_SMP
-	acpi_init();
+	__s8 ret;
+
+	ret = acpi_init();
+	if (ret != 0) {
+		uk_pr_err("ACPI Init failed with error %d\n", ret);
+		goto newstack;
+	}
+	ret = smp_init();
+	if (ret != 0)
+		uk_pr_err("SMP init failed\n");
 #endif /* CONFIG_HAVE_SMP */
 
 #ifdef CONFIG_HAVE_SYSCALL
@@ -461,6 +476,9 @@ void _libkvmplat_entry(void *arg)
 	/*
 	 * Switch away from the bootstrap stack as early as possible.
 	 */
+#ifdef CONFIG_HAVE_SMP
+newstack:
+#endif /* CONFIG_HAVE_SMP */
 	uk_pr_info("Switch from bootstrap stack to stack @%p\n",
 		   (void *) _libkvmplat_cfg.bstack.end);
 	_libkvmplat_newstack(_libkvmplat_cfg.bstack.end,

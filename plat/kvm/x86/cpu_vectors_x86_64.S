@@ -25,6 +25,10 @@
 /* Taken from solo5 */
 
 #include <x86/traps.h>
+#include <uk/plat/config.h>
+#ifdef CONFIG_HAVE_SMP
+#include <x86/apic_defs.h>
+#endif /* CONFIG_HAVE_SMP */
 
 #define ENTRY(X)     .global X ; .type X, @function ; X:
 
@@ -129,7 +133,18 @@ IRQ_ENTRY 2
 IRQ_ENTRY 3
 IRQ_ENTRY 4
 IRQ_ENTRY 5
+#ifdef CONFIG_HAVE_SMP
+ENTRY(cpu_irq_6)
+	cld
+	/* ack x2apic interrupt */
+	xor %eax, %eax
+	xor %edx, %edx
+	mov $x2APIC_EOI, %ecx
+	wrmsr
+	iretq
+#else
 IRQ_ENTRY 6
+#endif /* CONFIG_HAVE_SMP */
 IRQ_ENTRY 7
 IRQ_ENTRY 8
 IRQ_ENTRY 9

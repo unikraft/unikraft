@@ -96,10 +96,13 @@ static void tss_init(void)
 
 
 /* Declare the traps used only by this platform: */
-DECLARE_TRAP_EC(nmi,           "NMI",                  NULL)
-DECLARE_TRAP_EC(double_fault,  "double fault",         NULL)
-DECLARE_TRAP_EC(virt_error,    "virtualization error", NULL)
-
+#ifdef CONFIG_HAVE_SMP
+extern void do_nmi(struct __regs *regs, unsigned long error_code);
+#else
+DECLARE_TRAP_EC(nmi,		"NMI",			NULL)
+#endif /* CONFIG_HAVE_SMP */
+DECLARE_TRAP_EC(double_fault,	"double fault",		NULL)
+DECLARE_TRAP_EC(virt_error,	"virtualization error",	NULL)
 
 static struct seg_gate_desc64 cpu_idt[IDT_NUM_ENTRIES] __align64b;
 
