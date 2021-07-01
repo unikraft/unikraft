@@ -54,6 +54,7 @@
 /*
  * Basic CPU control in CR0
  */
+#define X86_CR0_PE              (1 << 0)    /* Protection Enable */
 #define X86_CR0_MP              (1 << 1)    /* Monitor Coprocessor */
 #define X86_CR0_EM              (1 << 2)    /* Emulation */
 #define X86_CR0_TS              (1 << 3)    /* Task Switched */
