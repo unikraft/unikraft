@@ -46,6 +46,8 @@ void _libkvmplat_init_console(void)
 
 }
 
+static int lock;
+
 int ukplat_coutd(const char *buf __maybe_unused, unsigned int len)
 {
 	for (unsigned int i = 0; i < len; i++) {
@@ -62,6 +64,8 @@ int ukplat_coutd(const char *buf __maybe_unused, unsigned int len)
 
 int ukplat_coutk(const char *buf __maybe_unused, unsigned int len)
 {
+	while (__sync_val_compare_and_swap(&lock, 0, 1))
+		;
 	for (unsigned int i = 0; i < len; i++) {
 #if CONFIG_KVM_KERNEL_SERIAL_CONSOLE
 		_libkvmplat_serial_putc(buf[i]);
@@ -70,6 +74,7 @@ int ukplat_coutk(const char *buf __maybe_unused, unsigned int len)
 		_libkvmplat_vga_putc(buf[i]);
 #endif
 	}
+	lock = 0;
 	return len;
 }
 
@@ -78,6 +83,8 @@ int ukplat_cink(char *buf __maybe_unused, unsigned int maxlen __maybe_unused)
 	int ret __maybe_unused;
 	unsigned int num = 0;
 
+	while (__sync_val_compare_and_swap(&lock, 0, 1))
+		;
 #if CONFIG_KVM_KERNEL_SERIAL_CONSOLE
 	while (num < maxlen
 	       && (ret = _libkvmplat_serial_getc()) >= 0) {
@@ -85,5 +92,6 @@ int ukplat_cink(char *buf __maybe_unused, unsigned int maxlen __maybe_unused)
 		num++;
 	}
 #endif
+	lock = 0;
 	return (int) num;
 }
