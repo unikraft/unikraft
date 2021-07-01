@@ -12,6 +12,15 @@ config EARLY_PRINT_PL011_UART_ADDR
 	help
 		Pl011 serial address used by early debug console.
 
+config UKPLAT_LCPU_MAXCOUNT
+        int "Maximum number of supported logical CPUs"
+        range 1 256
+        default 1
+
+config HAVE_SMP
+        bool
+        default y if UKPLAT_LCPU_MAXCOUNT > 1
+        default n
 endmenu
 
 config HZ
