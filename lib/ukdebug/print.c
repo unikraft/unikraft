@@ -272,13 +272,18 @@ void _uk_vprintd(const char *libname, const char *srcname,
 #endif
 }
 
+static int lock;
+
 void _uk_printd(const char *libname, const char *srcname,
 		unsigned int srcline, const char *fmt, ...)
 {
 	va_list ap;
 
 	va_start(ap, fmt);
+	while (__sync_val_compare_and_swap(&lock, 0, 1))
+		;
 	_uk_vprintd(libname, srcname, srcline, fmt, ap);
+	lock = 0;
 	va_end(ap);
 }
 
@@ -305,7 +310,10 @@ void _uk_printk(int lvl, const char *libname, const char *srcname,
 	va_list ap;
 
 	va_start(ap, fmt);
+	while (__sync_val_compare_and_swap(&lock, 0, 1))
+		;
 	_uk_vprintk(lvl, libname, srcname, srcline, fmt, ap);
+	lock = 0;
 	va_end(ap);
 }
 #endif /* CONFIG_LIBUKDEBUG_PRINTD */
