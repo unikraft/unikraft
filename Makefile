@@ -712,6 +712,7 @@ clean-libs: $(addprefix clean-,\
 clean: clean-libs
 	$(call verbose_cmd,CLEAN,build/,$(RM) \
 		$(UK_CONFIG_OUT) \
+		$(ALLSYMS_TOOL) \
 		$(call build_clean,\
 			$(UK_DEBUG_IMAGES) $(UK_DEBUG_IMAGES-y) \
 			$(UK_IMAGES) $(UK_IMAGES-y)) \
