@@ -275,8 +275,8 @@ static void handle_vsock_connection_reset(struct vsock_handler *vsh,
 		return;
 	}
 
-	UK_TAILQ_REMOVE(&vsh->sock_list, sock, _list);
-
+	sock->state = VSOCK_STATE_CLOSED;
+	uk_semaphore_up(&sock->rx_sem);
 }
 
 static void handle_vsock_connection_shutdown(struct vsock_handler *vsh,
@@ -294,7 +294,8 @@ static void handle_vsock_connection_shutdown(struct vsock_handler *vsh,
 		return;
 	}
 
-	UK_TAILQ_REMOVE(&vsh->sock_list, sock, _list);
+	sock->state = VSOCK_STATE_CLOSED;
+	uk_semaphore_up(&sock->rx_sem);
 }
 
 static void handle_vsock_data_recv(struct vsock_handler *vsh,
@@ -605,6 +606,10 @@ ssize_t vsock_send(int sockfd, const void *buf, size_t len, int flags)
 		return -1;
 	}
 
+	if (sock->state == VSOCK_STATE_CLOSED) {
+		return -1;
+	}
+
 	if (sock->txb.full)
 		return 0;
 
@@ -657,6 +662,10 @@ ssize_t vsock_recv(int sockfd, void *buf, size_t len, int flags)
 		return -1;
 	}
 
+	if (sock->state == VSOCK_STATE_CLOSED) {
+		return -1;
+	}
+
 	uk_mutex_lock(&sock->rx_mutex);
 	avail = sock->rxb.tail - sock->rxb.head;
 	if (avail < 0 || (avail == 0 && sock->rxb.full)) {
@@ -667,6 +676,10 @@ ssize_t vsock_recv(int sockfd, void *buf, size_t len, int flags)
 		/* wait to recv some data */
 		uk_mutex_unlock(&sock->rx_mutex);
 		uk_semaphore_down(&sock->rx_sem);
+
+		if (sock->state == VSOCK_STATE_CLOSED) {
+			return -1;
+		}
 		uk_mutex_lock(&sock->rx_mutex);
 	}
 
