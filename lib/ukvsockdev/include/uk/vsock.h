@@ -78,6 +78,121 @@ struct vsock_handler {
 	struct vsock_sock_list sock_list;
 };
 
+/**
+ * Opens a vsock socket.
+ *
+ * @return
+ *   - > 0: representing sockfd
+ *   - < 0: error
+ */
+int vsock_socket();
+
+/**
+ * Closes a vsock socket.
+ *
+ * @param sockfd
+ *   The identifier of the vsock socket to close.
+ * @return
+ *   - = 0: succes
+ *   - < 0: error
+ */
+int vsock_close(int sockfd);
+
+/**
+ * Binds an anddress to a socket.
+ *
+ * @param sockfd
+ *   The identifier of the vsock socket to close.
+ * @param addr
+ * 	 Pointer to a vsock_sockaddr representing address and port.
+ * @return
+ *   - = 0: succes
+ *   - < 0: error
+ */
+int vsock_bind(int sockfd, struct vsock_sockaddr *addr);
+
+/**
+ * Set a vsock socket in listen state.
+ *
+ * @param sockfd
+ *   The identifier of the vsock socket to close.
+ * @param backlog
+ *   Not used at the moment.
+ * @return
+ *   - = 0: succes
+ *   - < 0: error
+ */
+int vsock_listen(int sockfd, int backlog);
+
+/**
+ * Accepts the first incoming connection.
+ *
+ * @param sockfd
+ *   The identifier of the vsock socket to close.
+ * @param addr
+ * 	 Pointer to a vsock_sockaddr representing address and port.
+ * @return
+ *   - > 0: representing sockfd
+ *   - < 0: error
+ */
+int vsock_accept(int sockfd, struct vsock_sockaddr *addr);
+
+/**
+ * Connects a socket to a specific address.
+ *
+ * @param sockfd
+ *   The identifier of the vsock socket to close.
+ * @param addr
+ * 	 Pointer to a vsock_sockaddr representing address and port.
+ * @return
+ *   - = 0: succes
+ *   - < 0: error
+ */
+int vsock_connect(int sockfd, const struct vsock_sockaddr *addr);
+
+/**
+ * Sends a message on a socket.
+ *
+ * @param sockfd
+ *   The identifier of the vsock socket to close.
+ * @param buf
+ * 	 Pointer to a buffer containing the message.
+ * @param len
+ *   Length to be sent.
+ * @param flags
+ *    Not used at the moment.
+ * @return
+ *   - > 0: number of bytes sent
+ *   - < 0: error
+ */
+ssize_t vsock_send(int sockfd, const void *buf, size_t len, int flags);
+
+/**
+ * Receives a message from a socket.
+ *
+ * @param sockfd
+ *   The identifier of the vsock socket to close.
+ * @param buf
+ * 	 Pointer to a buffer where to be stored the read message.
+ * @param len
+ *   Maximum length to be read.
+ * @param flags
+ *    Not used at the moment.
+ * @return
+ *   - > 0: number of bytes received
+ *   - < 0: error
+ */
+ssize_t vsock_recv(int sockfd, void *buf, size_t len, int flags);
+
+/**
+ * Initializes vsock.
+ *
+ * @return
+ *   - = 0: succes
+ *   - < 0: error
+ */
+int uk_vsockdev_init();
+
 #ifdef __cplusplus
 }
 #endif
