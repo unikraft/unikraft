@@ -143,7 +143,7 @@ static void _destroy_event_handler(struct uk_vsockdev_event_handler *h
 }
 
 static int uk_vsockdev_tx(struct vsock_sock *sock, struct uk_alloc *a,
-	enum virtio_vsock_op op, const void *buf, int len, int flags)
+	enum virtio_vsock_op op, const void *buf, int len, int flags __unused)
 {
 	int sz;
 	int rc;
@@ -203,7 +203,7 @@ void handle_vsock_connection_request(struct vsock_handler *vsh,
 
 	UK_TAILQ_FOREACH(sock, &vsh->sock_list, _list) {
 		if (sock->state == VSOCK_STATE_LISTENING &&
-			(sock->local_addr.port == pkt->hdr.dst_port || sock->local_addr.port == VMADDR_PORT_ANY)) {
+			(sock->local_addr.port == pkt->hdr.dst_port || (int) sock->local_addr.port == VMADDR_PORT_ANY)) {
 			int sz;
 			
 			sz = VIRTIO_VSOCK_RX_DATA_SIZE * VSOCK_RING_BUFS;
@@ -250,7 +250,7 @@ void handle_vsock_connection_resposne(struct vsock_handler *vsh,
 
 	UK_TAILQ_FOREACH(sock, &vsh->sock_list, _list) {
 		if (sock->state == VSOCK_STATE_WAIT_CONNECT &&
-			(sock->local_addr.port == pkt->hdr.dst_port || sock->local_addr.port == VMADDR_PORT_ANY)) {
+			(sock->local_addr.port == pkt->hdr.dst_port || (int) sock->local_addr.port == VMADDR_PORT_ANY)) {
 			break;
 		}
 	}
@@ -325,7 +325,7 @@ static void handle_vsock_data_recv(struct vsock_handler *vsh,
 		uk_semaphore_up(&sock->rx_sem);
 	}
 
-	if (pkt->hdr.len + sock->rxb.tail >= sock->rxb.cap) {
+	if (pkt->hdr.len + sock->rxb.tail >= (__u32) sock->rxb.cap) {
 		/* overflow, must copy at the beginning of the buffer */
 		len = sock->rxb.cap - sock->rxb.tail;
 		memcpy(sock->rxb.buf + sock->rxb.tail, pkt->data, len);
@@ -528,7 +528,7 @@ int vsock_bind(int sockfd, struct vsock_sockaddr *addr)
 {
     struct vsock_sock *sock;
 
-    if (addr->cid != VMADDR_CID_ANY) {
+    if (addr->cid != (unsigned long) VMADDR_CID_ANY) {
         return -1;   
     }
 
@@ -546,7 +546,7 @@ int vsock_bind(int sockfd, struct vsock_sockaddr *addr)
     return 0;
 }
 
-int vsock_listen(int sockfd, int backlog)
+int vsock_listen(int sockfd, int backlog __unused)
 {
     struct vsock_sock *sk;
     
@@ -601,7 +601,7 @@ int vsock_connect(int sockfd, const struct vsock_sockaddr *addr)
     return 0;
 }
 
-ssize_t vsock_send(int sockfd, const void *buf, size_t len, int flags)
+ssize_t vsock_send(int sockfd, const void *buf, size_t len, int flags __unused)
 {
 	int l;
 	int sz = 0;
@@ -657,7 +657,7 @@ ssize_t vsock_send(int sockfd, const void *buf, size_t len, int flags)
     return sz;
 }
 
-ssize_t vsock_recv(int sockfd, void *buf, size_t len, int flags)
+ssize_t vsock_recv(int sockfd, void *buf, size_t len, int flags __unused)
 {
 	int l;
 	int sz;
@@ -690,7 +690,7 @@ ssize_t vsock_recv(int sockfd, void *buf, size_t len, int flags)
 		uk_mutex_lock(&sock->rx_mutex);
 	}
 
-	if (len > avail) {
+	if (len > (long unsigned) avail) {
 		/* the user required more data than possible */
 		sz = avail;
 	} else {
