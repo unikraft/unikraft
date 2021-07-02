@@ -226,6 +226,7 @@ void handle_vsock_connection_request(struct vsock_handler *vsh,
 			uk_mutex_init(&new_sock->rx_mutex);
 			uk_mutex_init(&new_sock->tx_mutex);
 			uk_semaphore_init(&new_sock->conn_sem, 0);
+			uk_semaphore_init(&new_sock->rx_sem, 0);
 			
 			new_fd = new_sock->fd;
 			UK_TAILQ_INSERT_TAIL(&vsh->sock_list, new_sock, _list);
@@ -315,6 +316,10 @@ static void handle_vsock_data_recv(struct vsock_handler *vsh,
 	}
 
 	uk_mutex_lock(&sock->rx_mutex);
+	if (sock->rxb.head == sock->rxb.tail && !sock->rxb.full) {
+		uk_semaphore_up(&sock->rx_sem);
+	}
+
 	if (pkt->hdr.len + sock->rxb.tail >= sock->rxb.cap) {
 		/* overflow, must copy at the beginning of the buffer */
 		len = sock->rxb.cap - sock->rxb.tail;
@@ -475,6 +480,7 @@ int vsock_socket() {
 	uk_mutex_init(&sock->rx_mutex);
 	uk_mutex_init(&sock->tx_mutex);
 	uk_semaphore_init(&sock->conn_sem, 0);
+	uk_semaphore_init(&sock->rx_sem, 0);
 
     sock->fd = ++vsh.cnt;
 	UK_TAILQ_INSERT_TAIL(&vsh.sock_list, sock, _list);
@@ -653,8 +659,15 @@ ssize_t vsock_recv(int sockfd, void *buf, size_t len, int flags)
 
 	uk_mutex_lock(&sock->rx_mutex);
 	avail = sock->rxb.tail - sock->rxb.head;
-	if (avail < 0) {
+	if (avail < 0 || (avail == 0 && sock->rxb.full)) {
 		avail += sock->rxb.cap;
+	}
+
+	if (avail == 0) {
+		/* wait to recv some data */
+		uk_mutex_unlock(&sock->rx_mutex);
+		uk_semaphore_down(&sock->rx_sem);
+		uk_mutex_lock(&sock->rx_mutex);
 	}
 
 	if (len > avail) {

@@ -55,6 +55,7 @@ struct vsock_sock {
     struct vsock_sockaddr local_addr;
     struct vsock_sockaddr remote_addr;
 	
+	struct uk_semaphore rx_sem;
 	struct uk_mutex rx_mutex;
 	struct vsock_buf rxb;
 	struct uk_mutex tx_mutex;
