@@ -202,7 +202,7 @@ void handle_vsock_connection_request(struct vsock_handler *vsh,
 	int new_fd = 0;
 
 	UK_TAILQ_FOREACH(sock, &vsh->sock_list, _list) {
-		if (sock->state == VSOCK_STATE_ACCEPT && 
+		if (sock->state == VSOCK_STATE_LISTENING &&
 			(sock->local_addr.port == pkt->hdr.dst_port || sock->local_addr.port == VMADDR_PORT_ANY)) {
 			int sz;
 			
@@ -216,7 +216,7 @@ void handle_vsock_connection_request(struct vsock_handler *vsh,
 
 		    new_sock->buf_alloc = VIRTIO_VSOCK_RX_DATA_SIZE * VSOCK_RING_BUFS;
 			new_sock->fd = ++vsh->cnt;
-			new_sock->state = VSOCK_STATE_CONNECTED;
+			new_sock->state = VSOCK_STATE_OPEN;
 
 			new_sock->local_addr.cid = pkt->hdr.dst_cid;
 			new_sock->local_addr.port = pkt->hdr.dst_port;
@@ -255,8 +255,12 @@ void handle_vsock_connection_resposne(struct vsock_handler *vsh,
 		}
 	}
 
+	if (!sock) {
+		return;
+	}
+
 	sock->remote_addr.port = pkt->hdr.src_port;
-	sock->state = VSOCK_STATE_CONNECTED;
+	sock->state = VSOCK_STATE_OPEN;
 	uk_semaphore_up(&sock->conn_sem);
 }
 
@@ -305,7 +309,7 @@ static void handle_vsock_data_recv(struct vsock_handler *vsh,
 	struct vsock_sock *sock = NULL;
 
 	UK_TAILQ_FOREACH(sock, &vsh->sock_list, _list) {
-		if (sock->state == VSOCK_STATE_CONNECTED &&
+		if (sock->state == VSOCK_STATE_OPEN &&
 			sock->local_addr.port == pkt->hdr.dst_port) {
 			break;
 		}
@@ -348,7 +352,7 @@ static void handle_vsock_credit_update(struct vsock_handler *vsh,
 	struct vsock_sock *sock = NULL;
 
 	UK_TAILQ_FOREACH(sock, &vsh->sock_list, _list) {
-		if (sock->state == VSOCK_STATE_CONNECTED &&
+		if (sock->state == VSOCK_STATE_OPEN &&
 			sock->local_addr.port == pkt->hdr.dst_port) {
 			break;
 		}
@@ -368,7 +372,7 @@ static void handle_vsock_credit_request(struct vsock_handler *vsh,
 	struct vsock_sock *sock = NULL;
 
 	UK_TAILQ_FOREACH(sock, &vsh->sock_list, _list) {
-		if (sock->state == VSOCK_STATE_CONNECTED &&
+		if (sock->state == VSOCK_STATE_OPEN &&
 			sock->local_addr.port == pkt->hdr.dst_port) {
 			break;
 		}
@@ -538,7 +542,7 @@ int vsock_bind(int sockfd, struct vsock_sockaddr *addr)
 
     sock->local_addr.cid = addr->cid;
     sock->local_addr.port = addr->port;
-
+	sock->state = VSOCK_STATE_BOUND;
     return 0;
 }
 
@@ -550,7 +554,7 @@ int vsock_listen(int sockfd, int backlog)
     if (sk == NULL) {
         return -1;
     }
-    sk->state = VSOCK_STATE_LISTEN;
+    sk->state = VSOCK_STATE_LISTENING;
 
     return 0;
 }
@@ -565,8 +569,6 @@ int vsock_accept(int sockfd, struct vsock_sockaddr *addr)
         return -1;
     }
 
-	sk->state = VSOCK_STATE_ACCEPT;
-	
 	uk_semaphore_down(&sk->conn_sem);
 	sock = UK_TAILQ_LAST(&vsh.sock_list, vsock_sock_list);
 	addr->cid = sock->remote_addr.cid;
@@ -578,7 +580,8 @@ int vsock_accept(int sockfd, struct vsock_sockaddr *addr)
 int vsock_connect(int sockfd, const struct vsock_sockaddr *addr)
 {
 	struct vsock_sock *sock;
-	
+	int rc;
+
 	sock = vsock_get(sockfd);
 	if (!sock) {
 		return -1;
@@ -588,7 +591,11 @@ int vsock_connect(int sockfd, const struct vsock_sockaddr *addr)
 	sock->remote_addr.port = addr->port;
 
 	sock->state = VSOCK_STATE_WAIT_CONNECT;
-	uk_vsockdev_tx(sock, vsh.a, VIRTIO_VSOCK_OP_REQUEST, NULL, 0, 0);
+
+	rc = uk_vsockdev_tx(sock, vsh.a, VIRTIO_VSOCK_OP_REQUEST, NULL, 0, 0);
+	if (rc < 0) {
+		return rc;
+	}
 	uk_semaphore_down(&sock->conn_sem);
 
     return 0;
