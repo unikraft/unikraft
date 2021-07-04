@@ -191,3 +191,36 @@ UK_SYSCALL_DEFINE(int, munmap, void*, addr, size_t, len)
 
 	return 0;
 }
+
+UK_SYSCALL_DEFINE(int, mprotect, void*, addr, size_t, len, int, prot)
+{
+	unsigned long start = (unsigned long) addr;
+	unsigned long page_prot, page;
+
+	if (PAGE_ALIGNED(start)) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	if (!length)
+		return 0;
+
+	if ((prot & PROT_NONE) && (prot != PROT_NONE)) {
+		errno = EINVAL;
+		return -1;
+	}
+
+	page_prot = PAGE_PROT_NONE;
+	if (prot & PROT_READ)
+		page_prot |= PAGE_PROT_READ;
+	if (prot & PROT_WRITE)
+		page_prot |= PAGE_PROT_WRITE;
+	if (prot & PROT_EXEC)
+		page_prot |= PAGE_PROT_EXEC;
+
+	length = PAGE_ALIGN_UP(length);
+	for (page = start; page < start + length; page += PAGE_SIZE)
+		ukplat_page_set_prot(ukplat_get_active_pt(), page, page_prot);
+
+	return 0;
+}
