@@ -1,1 +1,3 @@
 uk_get_next_free_frame
+uk_frameallocbbuddy_metadata_size
+uk_frameallocbbuddy_init

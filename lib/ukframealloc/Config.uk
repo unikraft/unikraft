@@ -3,3 +3,9 @@ menuconfig LIBUKFRAMEALLOC
 	default n
 	select LIBNOLIBC if !HAVE_LIBC
 	select LIBUKDEBUG
+
+if LIBUKFRAMEALLOC
+	config LIBUKFRAMEALLOC_BBUDDY
+		bool "Binary buddy frame allocator"
+		default y
+endif
