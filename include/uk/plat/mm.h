@@ -172,6 +172,22 @@ int ukplat_page_unmap(struct uk_pagetable *pt, __vaddr_t vaddr);
 int ukplat_page_unshare(struct uk_pagetable *pt, __vaddr_t vaddr);
 
 /**
+ * Sets new protections for a given page.
+ *
+ * @param pt: the page table instance on which to operate.
+ * @param vaddr: the virtual address of the page whose protections are updated.
+ * @param new_prot: new protections that will be set to the page (obtained by
+ * or'ing PAGE_PROT_* flags).
+ *
+ * @return: 0 in case of success and -1 on failure. The call fails if:
+ * - the given page is not mapped to any frame;
+ * - the virtual address given is not aligned to page (simple/large/huge) size.
+ * - the platform rejected the unmapping.
+ */
+int ukplat_page_set_prot(struct uk_pagetable *pt, __vaddr_t vaddr,
+	unsigned long new_prot);
+
+/**
  * Return page table entry corresponding to given virtual address.
  *
  * @param pt: the page table instance on which to operate.
