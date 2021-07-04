@@ -224,3 +224,9 @@ UK_SYSCALL_DEFINE(int, mprotect, void*, addr, size_t, len, int, prot)
 
 	return 0;
 }
+
+UK_SYSCALL_DEFINE(int, msync, void*, addr, size_t, len, int, prot)
+{
+	errno = ENOTSUP;
+	return -1;
+}

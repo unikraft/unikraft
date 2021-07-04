@@ -54,4 +54,6 @@ int munmap(void *addr, size_t length);
 
 int mprotect(void *addr, size_t len, int prot);
 
+int msync(void *addr, size_t length, int flags);
+
 #endif /* __POSIX_MMAP__ */
