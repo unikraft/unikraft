@@ -43,6 +43,8 @@
 #include <uk/framealloc.h>
 #include <uk/framealloc/bbuddy.h>
 
+typedef int (*pte_write_func_t)(__vaddr_t, size_t, __pte_t, size_t);
+
 /* TODO: there is currently just one page table used, Update accordingly when
  * using multiple page tables,
  */
@@ -51,6 +53,360 @@ struct uk_pagetable ukplat_default_pt;
 struct uk_pagetable *ukplat_get_active_pt(void)
 {
 	return &ukplat_default_pt;
+}
+
+static void _refresh_pt_pages_cache(struct uk_pagetable *pt)
+{
+	size_t needed_pages = PT_PAGES_CACHE_MAX_PAGES - pt->pages_cache_length;
+	size_t i;
+	__vaddr_t page;
+	struct uk_pagetable *active_pt = ukplat_get_active_pt();
+
+	page = pt->fa->palloc(pt->fa, needed_pages);
+	ukplat_page_map_many(active_pt, page + pt->virt_offset,
+			page, needed_pages,
+			PAGE_PROT_READ | PAGE_PROT_WRITE, 0);
+	if (pt != active_pt) {
+		ukplat_page_map_many(pt, page + pt->virt_offset, page,
+				needed_pages, PAGE_PROT_READ | PAGE_PROT_WRITE,
+				0);
+	}
+
+	for (i = 0; i < needed_pages; i++)
+		pt->pages_cache[pt->pages_cache_length++] = page + + pt->virt_offset + i * PAGE_SIZE;
+}
+
+/**
+ * Allocate a page table for a given level (in the PT hierarchy).
+ *
+ * @param level: the level of the needed page table.
+ *
+ * @return: virtual address of newly allocated page table or PAGE_INVALID
+ * on failure.
+ */
+static __pte_t uk_pt_alloc_table(struct uk_pagetable *pt, size_t level, int is_initmem)
+{
+	__vaddr_t pt_vaddr;
+	int rc;
+	unsigned long plat_flags;
+
+	plat_flags = ukplat_mm_supported_features();
+
+	if (pt->pages_cache_length < PT_PAGES_CACHE_MIN_PAGES)
+		_refresh_pt_pages_cache(pt);
+	pt_vaddr = pt->pages_cache[--pt->pages_cache_length];
+
+	UK_ASSERT(PAGE_PRESENT(ukplat_virt_to_pte(pt, pt_vaddr)));
+
+	if (plat_flags & UKPLAT_READONLY_PAGETABLE) {
+		rc = ukplat_page_set_prot(pt, pt_vaddr,
+				PAGE_PROT_READ | PAGE_PROT_WRITE);
+		if (rc)
+			return PAGE_INVALID;
+	}
+
+	memset((void *) pt_vaddr, 0,
+		sizeof(__pte_t) * pagetable_entries[level - 1]);
+
+	/*
+	 * When using this function on Xen for the initmem part, the page
+	 * must not be set to read-only, as we are currently writing
+	 * directly into it. All page tables will be set later to read-only
+	 * before setting the new pt_base.
+	 */
+	if (!is_initmem && (plat_flags & UKPLAT_READONLY_PAGETABLE)) {
+		rc = ukplat_page_set_prot(pt, pt_vaddr, PAGE_PROT_READ);
+		if (rc)
+			return PAGE_INVALID;
+	}
+
+	/*
+	 * This is an L(n + 1) entry, so we set L(n + 1) flags
+	 * (Index in pagetable_protections is level of PT - 1)
+	 */
+	return pt_virt_to_mframe(pt, pt_vaddr) | pagetable_protections[level];
+}
+
+static int uk_pt_release_if_unused(struct uk_pagetable *pt, __vaddr_t vaddr,
+		__vaddr_t pt_vaddr, __vaddr_t parent_pt_vaddr, size_t level)
+{
+	size_t i;
+	int rc;
+
+	if (!PAGE_ALIGNED(pt_vaddr) || !PAGE_ALIGNED(parent_pt_vaddr)) {
+		uk_pr_err("Table's address must be aligned to page size\n");
+		return -1;
+	}
+
+	for (i = 0; i < pagetable_entries[level - 1]; i++) {
+		if (PAGE_PRESENT(ukarch_pte_read(pt_vaddr, i, level)))
+			return 0;
+	}
+
+	rc = ukarch_pte_write(parent_pt_vaddr, Lx_OFFSET(vaddr, level + 1), 0,
+		level + 1);
+	if (rc)
+		return -1;
+
+	ukarch_flush_tlb_entry(parent_pt_vaddr);
+
+	/* TODO: check if this always works */
+	pt->pages_cache[++pt->pages_cache_length] = pt_vaddr;
+
+	return 0;
+}
+
+static int _page_map(struct uk_pagetable *pt, __vaddr_t vaddr, __paddr_t paddr,
+	  unsigned long prot, unsigned long flags, int is_initmem,
+	  pte_write_func_t pte_write)
+{
+	__pte_t pte;
+	__vaddr_t pt_vaddr = pt->pt_base;
+	int rc;
+
+	if (!PAGE_ALIGNED(vaddr)) {
+		uk_pr_err("Virt address must be aligned to page size\n");
+		return -1;
+	}
+	if (flags & PAGE_FLAG_LARGE && !PAGE_LARGE_ALIGNED(vaddr)) {
+		uk_pr_err("Virt ddress must be aligned to large page size\n");
+		return -1;
+	}
+
+	if ((flags & PAGE_FLAG_LARGE) &&
+			!(ukplat_mm_supported_features()
+				& UKPLAT_SUPPORT_LARGE_PAGES)) {
+		uk_pr_err("Large pages are not supported this platform\n");
+		return -1;
+	}
+
+	if (paddr == PAGE_PADDR_ANY) {
+		paddr = uk_get_next_free_frame(pt->fa, flags);
+		if (paddr == PAGE_INVALID)
+			return -1;
+	} else if (!PAGE_ALIGNED(paddr)) {
+		uk_pr_err("Phys address must be aligned to page size\n");
+		return -1;
+	} else if ((flags & PAGE_FLAG_LARGE) && !PAGE_LARGE_ALIGNED(paddr)) {
+		uk_pr_err("Phys address must be aligned to large page size\n");
+		return -1;
+	}
+
+	/*
+	 * XXX: On 64-bits architectures (x86_64 and arm64) the hierarchical
+	 * page tables have a 4 level layout. This implementation will need a
+	 * revision when introducing support for 32-bits architectures, since
+	 * there are only 3 levels of page tables.
+	 */
+	pte = ukarch_pte_read(pt_vaddr, L4_OFFSET(vaddr), 4);
+	if (!PAGE_PRESENT(pte)) {
+		pte = uk_pt_alloc_table(pt, 3, is_initmem);
+		if (pte == PAGE_INVALID)
+			return -1;
+
+		rc = pte_write(pt_vaddr, L4_OFFSET(vaddr), pte, 4);
+		if (rc)
+			return -1;
+	}
+
+	pt_vaddr = pt_pte_to_virt(pt, pte);
+	pte = ukarch_pte_read(pt_vaddr, L3_OFFSET(vaddr), 3);
+	if (!PAGE_PRESENT(pte)) {
+		pte = uk_pt_alloc_table(pt, 2, is_initmem);
+		if (pte == PAGE_INVALID)
+			return -1;
+
+		rc = pte_write(pt_vaddr, L3_OFFSET(vaddr), pte, 3);
+		if (rc)
+			return -1;
+	}
+
+	pt_vaddr = pt_pte_to_virt(pt, pte);
+	pte = ukarch_pte_read(pt_vaddr, L2_OFFSET(vaddr), 2);
+	if (flags & PAGE_FLAG_LARGE) {
+		if (PAGE_PRESENT(pte)) {
+			uk_pr_err("Virtual address %p is within a range already mapped by a large page\n",
+					(void *) vaddr);
+			return -1;
+		}
+
+		pte = ukarch_pte_create(pte_to_mframe(paddr), prot, 2);
+		rc = pte_write(pt_vaddr, L2_OFFSET(vaddr), pte, 2);
+		if (rc)
+			return -1;
+
+		return 0;
+	}
+	if (!PAGE_PRESENT(pte)) {
+		pte = uk_pt_alloc_table(pt, 1, is_initmem);
+		if (pte == PAGE_INVALID)
+			return -1;
+
+		rc = pte_write(pt_vaddr, L2_OFFSET(vaddr), pte, 2);
+		if (rc)
+			return -1;
+	}
+
+	pt_vaddr = pt_pte_to_virt(pt, pte);
+	pte = ukarch_pte_read(pt_vaddr, L1_OFFSET(vaddr), 1);
+	if (!PAGE_PRESENT(pte) || (flags & PAGE_FLAG_SHARED)) {
+		pte = ukarch_pte_create(paddr, prot, 1);
+		rc = pte_write(pt_vaddr, L1_OFFSET(vaddr), pte, 1);
+		if (rc)
+			return -1;
+	} else {
+		uk_pr_info("Virtual address 0x%08lx is already mapped\n",
+			vaddr);
+		return -1;
+	}
+
+	return 0;
+}
+
+int _initmem_page_map(struct uk_pagetable *pt, __vaddr_t vaddr, __paddr_t paddr,
+		unsigned long prot, unsigned long flags)
+{
+	return _page_map(pt, vaddr, paddr, prot, flags, 1,
+		_ukarch_pte_write_raw);
+}
+
+
+int ukplat_page_map(struct uk_pagetable *pt,__vaddr_t vaddr, __paddr_t paddr,
+		unsigned long prot, unsigned long flags)
+{
+	return _page_map(pt, vaddr, paddr, prot, flags, 0, ukarch_pte_write);
+}
+
+static int _page_unmap(struct uk_pagetable *pt, __vaddr_t vaddr,
+	unsigned long flags, pte_write_func_t pte_write)
+{
+	__vaddr_t l1_table, l2_table, l3_table, l4_table, pte;
+	__paddr_t pfn;
+	size_t frame_size = PAGE_SIZE;
+	int rc;
+
+	if (!PAGE_ALIGNED(vaddr)) {
+		uk_pr_err("Address must be aligned to page size\n");
+		return -1;
+	}
+
+	l4_table = pt->pt_base;
+	pte = ukarch_pte_read(l4_table, L4_OFFSET(vaddr), 4);
+	if (!PAGE_PRESENT(pte))
+		return -1;
+
+	l3_table = (__vaddr_t) pt_pte_to_virt(pt, pte);
+	pte = ukarch_pte_read(l3_table, L3_OFFSET(vaddr), 3);
+	if (!PAGE_PRESENT(pte))
+		return -1;
+
+	l2_table = (__vaddr_t) pt_pte_to_virt(pt, pte);
+	pte = ukarch_pte_read(l2_table, L2_OFFSET(vaddr), 2);
+	if (!PAGE_PRESENT(pte))
+		return -1;
+	if (PAGE_LARGE(pte)) {
+		if (!PAGE_LARGE_ALIGNED(vaddr))
+			return -1;
+
+		pfn = pte_to_pfn(pte);
+		rc = pte_write(l2_table, L2_OFFSET(vaddr), 0, 2);
+		if (rc)
+			return -1;
+		frame_size = PAGE_LARGE_SIZE;
+	} else {
+		l1_table = (unsigned long) pt_pte_to_virt(pt, pte);
+		pte = ukarch_pte_read(l1_table, L1_OFFSET(vaddr), 1);
+		if (!PAGE_PRESENT(pte))
+			return -1;
+
+		pfn = pte_to_pfn(pte);
+		rc = pte_write(l1_table, L1_OFFSET(vaddr), 0, 1);
+		if (rc)
+			return -1;
+		rc = uk_pt_release_if_unused(pt, vaddr, l1_table, l2_table, 1);
+		if (rc)
+			return -1;
+	}
+
+	ukarch_flush_tlb_entry(vaddr);
+
+	if (pt->fa && !(flags & PAGE_FLAG_SHARED))
+		pt->fa->pfree(pt->fa, pfn << PAGE_SHIFT, frame_size);
+
+	rc = uk_pt_release_if_unused(pt, vaddr, l2_table, l3_table, 2);
+	if (rc)
+		return -1;
+	rc = uk_pt_release_if_unused(pt, vaddr, l3_table, l4_table, 3);
+	if (rc)
+		return -1;
+
+	return 0;
+}
+
+int ukplat_page_unmap(struct uk_pagetable *pt, __vaddr_t vaddr)
+{
+	return _page_unmap(pt, vaddr, 0, ukarch_pte_write);
+}
+
+int ukplat_page_unshare(struct uk_pagetable *pt, __vaddr_t vaddr)
+{
+	return _page_unmap(pt, vaddr, PAGE_FLAG_SHARED, ukarch_pte_write);
+}
+
+static int _map_region(struct uk_pagetable *pt, __vaddr_t vaddr,
+	__paddr_t paddr, size_t pages, unsigned long prot,
+	unsigned long flags, int is_initmem, pte_write_func_t pte_write)
+{
+	size_t i;
+	unsigned long increment;
+	int rc;
+
+	if (flags & PAGE_FLAG_LARGE)
+		increment = PAGE_LARGE_SIZE;
+	else
+		increment = PAGE_SIZE;
+
+	for (i = 0; i < pages; i++) {
+		unsigned long current_paddr;
+
+		if (paddr == PAGE_PADDR_ANY)
+			current_paddr = PAGE_PADDR_ANY;
+		else
+			current_paddr = pfn_to_mfn((paddr + i * increment) >> PAGE_SHIFT) << PAGE_SHIFT;
+
+		rc = _page_map(pt, vaddr + i * increment, current_paddr, prot,
+			flags, is_initmem, pte_write);
+		if (rc) {
+			size_t j;
+
+			uk_pr_err("Could not map page 0x%08lx\n",
+				vaddr + i * increment);
+
+			for (j = 0; j < i; j++)
+				_page_unmap(pt, vaddr, flags, pte_write);
+			return -1;
+		}
+	}
+
+	return 0;
+}
+
+int ukplat_page_map_many(struct uk_pagetable *pt, __vaddr_t vaddr,
+		__paddr_t paddr, size_t pages, unsigned long prot,
+		unsigned long flags)
+{
+	if (!pages)
+		return 0;
+
+	return _map_region(pt, vaddr, paddr, pages, prot, flags, 0,
+			ukarch_pte_write);
+}
+
+int _initmem_page_map_many(struct uk_pagetable *pt, __vaddr_t vaddr,
+	__paddr_t paddr, size_t pages, unsigned long prot, unsigned long flags)
+{
+	return _map_region(pt, vaddr, paddr, pages, prot, flags, 1,
+		_ukarch_pte_write_raw);
 }
 
 __pte_t ukplat_virt_to_pte(struct uk_pagetable *pt, __vaddr_t vaddr)

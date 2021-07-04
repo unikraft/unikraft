@@ -90,6 +90,88 @@ struct uk_pagetable {
 struct uk_pagetable *ukplat_get_active_pt(void);
 
 /**
+ * Create a mapping from a virtual address to a physical address, with given
+ * protections and flags.
+ *
+ * @param pt: the page table instance on which to operate.
+ * @param vaddr: the virtual address of the page that is to be mapped.
+ * @param paddr: the physical address of the frame to which the virtual page
+ * is mapped to. This parameter can be equal to PAGE_PADDR_ANY when the caller
+ * is not interested in the physical address where the mapping is created.
+ * @param prot: protection permissions of the page (obtained by or'ing
+ * PAGE_PROT_* flags).
+ * @param flags: flags of the page (obtained by or'ing PAGE_FLAG_* flags).
+ *
+ * @return: 0 on success and -1 on failure. ukplat_page_map can fail if:
+ * - the given physical or virtual addresses are not aligned to page size;
+ * - any page in the region is already mapped to another frame;
+ * - if PAGE_PADDR_ANY flag is selected and there are no more available
+ *   free frames in the physical memory;
+ * - the platform rejects the mapping (for example, because large pages are
+ *   not supported).
+ *
+ * In case of failure, the mapping is not created.
+ */
+int ukplat_page_map(struct uk_pagetable *pt,__vaddr_t vaddr, __paddr_t paddr,
+		unsigned long prot, unsigned long flags);
+
+/**
+ * Create a mapping from a region starting at a virtual address to a physical
+ * address, with given protections and flags.
+ *
+ * @param pt: the page table instance on which to operate.
+ * @param vaddr: the virtual address of the page where the region that is to be
+ * mapped starts.
+ * @param paddr: the physical address of the starting frame of the region to
+ * which the virtual region is mapped to. This parameter can be equal to
+ * PAGE_PADDR_ANY when the caller is not interested in the physical address
+ * where the mappings are created.
+ * @param prot: protection permissions of the pages (obtained by or'ing
+ * PAGE_PROT_* flags).
+ * @param flags: flags of the page (obtained by or'ing PAGE_FLAG_* flags).
+ *
+ * @return: 0 on success and -1 on failure. ukplat_page_map_many can fail if:
+ * - the given physical or virtual addresses are not aligned to page size;
+ * - any page in the region is already mapped to another frame;
+ * - if PAGE_PADDR_ANY flag is selected and there are no more available
+ *   free frames in the physical memory;
+ * - the platform rejects the mapping (for example, because large pages are
+ *   not supported).
+ *
+ * In case of failure, no new mapping is created.
+ */
+int ukplat_page_map_many(struct uk_pagetable *pt, __vaddr_t vaddr,
+		__paddr_t paddr, size_t pages, unsigned long prot,
+		unsigned long flags);
+
+/**
+ * Frees a mapping for a page and marks the underlying frame as unused.
+ *
+ * @param pt: the page table instance on which to operate.
+ * @param vaddr: the virtual address of the page that is to be unmapped.
+ *
+ * @return: 0 in case of success and -1 on failure. The call fails if:
+ * - the given page is not mapped to any frame;
+ * - the virtual address given is not aligned to page (simple/large/huge) size.
+ * - the platform rejected the unmapping.
+ */
+int ukplat_page_unmap(struct uk_pagetable *pt, __vaddr_t vaddr);
+
+/**
+ * Frees a mapping for a page, but keeps the underlying physical frame reserved
+ * (because it's mapped at another virtual address as well).
+ *
+ * @param pt: the page table instance on which to operate.
+ * @param vaddr: the virtual address of the page that is to be unmapped.
+ *
+ * @return: 0 in case of success and -1 on failure. The call fails if:
+ * - the given page is not mapped to any frame;
+ * - the virtual address given is not aligned to page (simple/large/huge) size.
+ * - the platform rejected the unmapping.
+ */
+int ukplat_page_unshare(struct uk_pagetable *pt, __vaddr_t vaddr);
+
+/**
  * Return page table entry corresponding to given virtual address.
  *
  * @param pt: the page table instance on which to operate.
