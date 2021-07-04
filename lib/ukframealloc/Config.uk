@@ -1,0 +1,5 @@
+menuconfig LIBUKFRAMEALLOC
+	bool "ukframealloc: Abstraction for physical frames allocators"
+	default n
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKDEBUG
