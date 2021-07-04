@@ -72,6 +72,10 @@
 #endif
 #include "banner.h"
 
+#ifdef CONFIG_PT_API
+#include <uk/plat/mm.h>
+#endif /* CONFIG_PT_API */
+
 int main(int argc, char *argv[]) __weak;
 
 static void main_thread_func(void *arg) __noreturn;
@@ -237,6 +241,19 @@ void ukplat_entry(int argc, char *argv[])
 		 */
 		if (!a) {
 #if CONFIG_LIBUKBOOT_INITBBUDDY
+			/* TODO: fix the dynamic heap map to work for all
+			 * allocators. */
+#ifdef CONFIG_PT_API
+			/*
+			 * The buddy allocator uses the whole memory it is
+			 * given from the beginning, so the whole heap has to
+			 * be mapped before initializing the allocator if
+			 * dynamic initialization of page tables is chosen.
+			 */
+			if (unlikely(uk_heap_map((unsigned long) md.base,
+							md.len)))
+				UK_CRASH("Could not map heap\n");
+#endif /* CONFIG_PT_API */
 			a = uk_allocbbuddy_init(md.base, md.len);
 #elif CONFIG_LIBUKBOOT_INITREGION
 			a = uk_allocregion_init(md.base, md.len);
@@ -248,6 +265,15 @@ void ukplat_entry(int argc, char *argv[])
 			a = uk_tinyalloc_init(md.base, md.len);
 #endif
 		} else {
+#if defined(CONFIG_PT_API) && defined(CONFIG_LIBUKBOOT_INITBBUDDY)
+			/*
+			 * Same as above, when adding memory to the buddy
+			 * allocator, it has to be already mapped
+			 */
+			if (unlikely(uk_heap_map((unsigned long) md.base,
+							md.len)))
+				UK_CRASH("Could not map heap\n");
+#endif /* CONFIG_PT_API && CONFIG_LIB_UKBOOT_INITBBUDDY */
 			uk_alloc_addmem(a, md.base, md.len);
 		}
 	}
