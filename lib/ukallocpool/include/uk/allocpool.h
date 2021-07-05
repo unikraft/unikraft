@@ -43,8 +43,6 @@
 extern "C" {
 #endif
 
-typedef void (*uk_allocpool_obj_init_t)(void *obj, __sz len, void *cookie);
-
 struct uk_allocpool;
 
 /**
