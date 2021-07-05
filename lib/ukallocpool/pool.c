@@ -39,9 +39,6 @@
 #include <uk/allocpool.h>
 #include <uk/list.h>
 #include <string.h>
-#include <stddef.h>
-#include <stdint.h>
-#include <sys/types.h>
 #include <errno.h>
 
 /*
@@ -72,8 +69,8 @@ struct uk_allocpool {
 	struct uk_list_head free_obj;
 	unsigned int free_obj_count;
 
-	size_t obj_align;
-	size_t obj_len;
+	__sz obj_align;
+	__sz obj_len;
 	unsigned int obj_count;
 
 	struct uk_alloc *parent;
@@ -136,7 +133,7 @@ static void pool_free(struct uk_alloc *a, void *ptr)
 	}
 }
 
-static void *pool_malloc(struct uk_alloc *a, size_t size)
+static void *pool_malloc(struct uk_alloc *a, __sz size)
 {
 	struct uk_allocpool *p = ukalloc2pool(a);
 	void *obj;
@@ -153,8 +150,8 @@ static void *pool_malloc(struct uk_alloc *a, size_t size)
 	return obj;
 }
 
-static int pool_posix_memalign(struct uk_alloc *a, void **memptr, size_t align,
-				size_t size)
+static int pool_posix_memalign(struct uk_alloc *a, void **memptr, __sz align,
+			       __sz size)
 {
 	struct uk_allocpool *p = ukalloc2pool(a);
 
@@ -235,24 +232,24 @@ void uk_allocpool_return_batch(struct uk_allocpool *p,
 	}
 }
 
-static ssize_t pool_availmem(struct uk_alloc *a)
+static __ssz pool_availmem(struct uk_alloc *a)
 {
 	struct uk_allocpool *p = ukalloc2pool(a);
 
-	return (ssize_t) (p->free_obj_count * p->obj_len);
+	return (__ssz) (p->free_obj_count * p->obj_len);
 }
 
-static ssize_t pool_maxalloc(struct uk_alloc *a)
+static __ssz pool_maxalloc(struct uk_alloc *a)
 {
 	struct uk_allocpool *p = ukalloc2pool(a);
 
-	return (ssize_t) p->obj_len;
+	return (__ssz) p->obj_len;
 }
 
-size_t uk_allocpool_reqmem(unsigned int obj_count, size_t obj_len,
-			   size_t obj_align)
+__sz uk_allocpool_reqmem(unsigned int obj_count, __sz obj_len,
+			 __sz obj_align)
 {
-	size_t obj_alen;
+	__sz obj_alen;
 
 	UK_ASSERT(POWER_OF_2(obj_align));
 
@@ -261,7 +258,7 @@ size_t uk_allocpool_reqmem(unsigned int obj_count, size_t obj_len,
 	obj_alen  = ALIGN_UP(obj_len, obj_align);
 	return (sizeof(struct uk_allocpool)
 		+ obj_align
-		+ ((size_t) obj_count * obj_alen));
+		+ ((__sz) obj_count * obj_alen));
 }
 
 unsigned int uk_allocpool_availcount(struct uk_allocpool *p)
@@ -269,18 +266,18 @@ unsigned int uk_allocpool_availcount(struct uk_allocpool *p)
 	return p->free_obj_count;
 }
 
-size_t uk_allocpool_objlen(struct uk_allocpool *p)
+__sz uk_allocpool_objlen(struct uk_allocpool *p)
 {
 	return p->obj_len;
 }
 
-struct uk_allocpool *uk_allocpool_init(void *base, size_t len,
-				       size_t obj_len, size_t obj_align)
+struct uk_allocpool *uk_allocpool_init(void *base, __sz len,
+				       __sz obj_len, __sz obj_align)
 {
 	struct uk_allocpool *p;
 	struct uk_alloc *a;
-	size_t obj_alen;
-	size_t left;
+	__sz obj_alen;
+	__sz left;
 	void *obj_ptr;
 
 	UK_ASSERT(POWER_OF_2(obj_align));
@@ -299,15 +296,15 @@ struct uk_allocpool *uk_allocpool_init(void *base, size_t len,
 	a = allocpool2ukalloc(p);
 
 	obj_alen = ALIGN_UP(obj_len, obj_align);
-	obj_ptr = (void *) ALIGN_UP((uintptr_t) base + sizeof(*p),
+	obj_ptr = (void *) ALIGN_UP((__uptr) base + sizeof(*p),
 				    obj_align);
-	if ((uintptr_t) obj_ptr > (uintptr_t) base + len) {
+	if ((__uptr) obj_ptr > (__uptr) base + len) {
 		uk_pr_debug("%p: Empty pool: Not enough space for allocating objects\n",
 			    p);
 		goto out;
 	}
 
-	left = len - ((uintptr_t) obj_ptr - (uintptr_t) base);
+	left = len - ((__uptr) obj_ptr - (__uptr) base);
 
 	p->obj_count = 0;
 	p->free_obj_count = 0;
@@ -315,7 +312,7 @@ struct uk_allocpool *uk_allocpool_init(void *base, size_t len,
 	while (left >= obj_alen) {
 		++p->obj_count;
 		_prepend_free_obj(p, obj_ptr);
-		obj_ptr = (void *) ((uintptr_t) obj_ptr + obj_alen);
+		obj_ptr = (void *) ((__uptr) obj_ptr + obj_alen);
 		left -= obj_alen;
 	}
 
@@ -343,11 +340,11 @@ out:
 
 struct uk_allocpool *uk_allocpool_alloc(struct uk_alloc *parent,
 					unsigned int obj_count,
-					size_t obj_len, size_t obj_align)
+					__sz obj_len, __sz obj_align)
 {
 	struct uk_allocpool *p;
 	void *base;
-	size_t len;
+	__sz len;
 
 	/* uk_allocpool_reqmem computes minimum requirement */
 	len = uk_allocpool_reqmem(obj_count, obj_len, obj_align);
