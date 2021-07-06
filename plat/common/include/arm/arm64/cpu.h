@@ -162,11 +162,17 @@ extern void fpsimd_restore_state(uintptr_t ptr);
 static inline void save_extregs(struct sw_ctx *ctx)
 {
 	fpsimd_save_state(ctx->extregs);
+
+	/* make sure sysreg writing takes effects */
+	isb();
 }
 
 static inline void restore_extregs(struct sw_ctx *ctx)
 {
 	fpsimd_restore_state(ctx->extregs);
+
+	/* make sure sysreg writing takes effects */
+	isb();
 }
 
 static inline void arch_init_extregs(struct sw_ctx *ctx)

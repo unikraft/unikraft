@@ -1,0 +1,5 @@
+config LIBUKMMIO
+	bool "ukmmio: mmio support"
+	default n
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKDEBUG
