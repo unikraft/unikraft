@@ -53,19 +53,31 @@
 #include <uk/ctors.h>
 #include <uk/trace.h>
 #include <uk/syscall.h>
+#include <uk/essentials.h>
 
 #ifdef DEBUG_VFS
 int	vfs_debug = VFSDB_FLAGS;
 #endif
 
 /* This macro is for defining an alias of the 64bit version of a
- * syscall to the regular one. It seams we can make the logic which is
- * choosing the right call simpler then in common libc.
+ * syscall to the regular one. We only do this when libc-style
+ * syscall wrappers are requested to be created.
+ * NOTE: When using LFS64(), remember to undefine possible rename
+ *       macros created by included libc headers (e.g., <fcntl.h>):
+ *       ```
+ *       #ifdef openat64
+ *       #undef openat64
+ *       #endif
  *
- * Let's keep LFS64 calls just in case in future we will find out that
- * these aliases are need.
+ *       LFS64(openat)
+ *       ```
  */
+#if UK_LIBC_SYSCALLS
+#define LFS64(x)				\
+	__alias(x, x##64)
+#else
 #define LFS64(x)
+#endif /* !UK_LIBC_SYSCALLS */
 
 static mode_t global_umask = S_IWGRP | S_IWOTH;
 
@@ -161,6 +173,10 @@ int open(const char *pathname, int flags, ...)
 	return uk_syscall_e_open((long int)pathname, flags, mode);
 }
 
+#ifdef open64
+#undef open64
+#endif
+
 LFS64(open);
 #endif
 
@@ -213,6 +229,10 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 	return uk_syscall_e_openat(dirfd, (long) pathname, flags, mode);
 }
 
+#ifdef openat64
+#undef openat64
+#endif
+
 LFS64(openat);
 #endif
 
@@ -221,6 +241,11 @@ int creat(const char *pathname, mode_t mode)
 	return uk_syscall_e_open((long int) pathname,
 		O_CREAT|O_WRONLY|O_TRUNC, mode);
 }
+
+#ifdef creat64
+#undef creat64
+#endif
+
 LFS64(creat);
 
 UK_TRACEPOINT(trace_vfs_close, "%d", int);
@@ -320,6 +345,10 @@ UK_SYSCALL_R_DEFINE(off_t, lseek, int, fd, off_t, offset, int, whence)
 	return -error;
 }
 
+#ifdef lseek64
+#undef lseek64
+#endif
+
 LFS64(lseek);
 
 /**
@@ -387,6 +416,10 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset)
 	return uk_syscall_e_pread64((long) fd, (long) buf,
 				    (long) count, (long) offset);
 }
+
+#ifdef pread64
+#undef pread64
+#endif
 
 LFS64(pread);
 #endif
@@ -466,6 +499,10 @@ out_error:
 	trace_vfs_preadv_err(error);
 	return error;
 }
+
+#ifdef preadv64
+#undef preadv64
+#endif
 
 LFS64(preadv);
 
@@ -577,6 +614,10 @@ ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset)
 				     (long) count, (long) offset);
 }
 
+#ifdef pwrite64
+#undef pwrite64
+#endif
+
 LFS64(pwrite);
 #endif
 
@@ -654,6 +695,10 @@ out_error:
 	trace_vfs_pwritev_err(error);
 	return error;
 }
+
+#ifdef pwritev64
+#undef pwritev64
+#endif
 
 LFS64(pwritev);
 
@@ -811,12 +856,20 @@ int __fxstat(int ver __unused, int fd, struct stat *st)
 	return -1;
 }
 
+#ifdef __fxstat64
+#undef __fxstat64
+#endif
+
 LFS64(__fxstat);
 
 UK_SYSCALL_DEFINE(int, fstat, int, fd, struct stat *, st)
 {
 	return __fxstat(1, fd, st);
 }
+
+#ifdef fstat64
+#undef fstat64
+#endif
 
 LFS64(fstat);
 
@@ -860,12 +913,20 @@ int __fxstatat(int ver __unused, int dirfd, const char *pathname, struct stat *s
 	return error;
 }
 
+#ifdef __fxstatat64
+#undef __fxstatat64
+#endif
+
 LFS64(__fxstatat);
 
 int fstatat(int dirfd, const char *path, struct stat *st, int flags)
 {
 	return __fxstatat(1, dirfd, path, st, flags);
 }
+
+#ifdef fstatat64
+#undef fstatat64
+#endif
 
 LFS64(fstatat);
 
@@ -1492,6 +1553,10 @@ int __xstat(int ver __unused, const char *pathname, struct stat *st)
 	return -1;
 }
 
+#ifdef __xstat64
+#undef __xstat64
+#endif
+
 LFS64(__xstat);
 
 UK_SYSCALL_R_DEFINE(int, stat, const char*, pathname, struct stat*, st)
@@ -1501,6 +1566,10 @@ UK_SYSCALL_R_DEFINE(int, stat, const char*, pathname, struct stat*, st)
 	}
 	return __xstat(1, pathname, st);
 }
+
+#ifdef stat64
+#undef stat64
+#endif
 
 LFS64(stat);
 
@@ -1535,12 +1604,20 @@ int __lxstat(int ver __unused, const char *pathname, struct stat *st)
 	return -error;
 }
 
+#ifdef __lxstat64
+#undef __lxstat64
+#endif
+
 LFS64(__lxstat);
 
 UK_SYSCALL_R_DEFINE(int, lstat, const char*, pathname, struct stat*, st)
 {
 	return __lxstat(1, pathname, st);
 }
+
+#ifdef lstat64
+#undef lstat64
+#endif
 
 LFS64(lstat);
 
@@ -1574,6 +1651,10 @@ UK_SYSCALL_R_DEFINE(int, statfs, const char*, pathname, struct statfs*, buf)
 {
 	return __statfs(pathname, buf);
 }
+
+#ifdef statfs64
+#undef statfs64
+#endif
 
 LFS64(statfs);
 
@@ -1609,6 +1690,10 @@ UK_SYSCALL_R_DEFINE(int, fstatfs, int, fd, struct statfs*, buf)
 	return __fstatfs(fd, buf);
 }
 
+#ifdef fstatfs64
+#undef fstatfs64
+#endif
+
 LFS64(fstatfs);
 
 static int
@@ -1638,6 +1723,10 @@ statvfs(const char *pathname, struct statvfs *buf)
 	return statfs_to_statvfs(buf, &st);
 }
 
+#ifdef statvfs64
+#undef statvfs64
+#endif
+
 LFS64(statvfs);
 
 int
@@ -1649,6 +1738,10 @@ fstatvfs(int fd, struct statvfs *buf)
 		return -1;
 	return statfs_to_statvfs(buf, &st);
 }
+
+#ifdef fstatvfs64
+#undef fstatvfs64
+#endif
 
 LFS64(fstatvfs);
 
@@ -2045,6 +2138,10 @@ UK_SYSCALL_R_DEFINE(int, truncate, const char*, pathname, off_t, length)
 	return -error;
 }
 
+#ifdef truncate64
+#undef truncate64
+#endif
+
 LFS64(truncate);
 
 UK_TRACEPOINT(trace_vfs_ftruncate, "%d 0x%x", int, off_t);
@@ -2073,6 +2170,10 @@ UK_SYSCALL_R_DEFINE(int, ftruncate, int, fd, off_t, length)
 	trace_vfs_ftruncate_err(error);
 	return -error;
 }
+
+#ifdef ftruncate64
+#undef ftruncate64
+#endif
 
 LFS64(ftruncate);
 
@@ -2132,6 +2233,10 @@ UK_SYSCALL_R_DEFINE(int, fallocate, int, fd, int, mode, loff_t, offset, loff_t, 
 	trace_vfs_fallocate_err(error);
 	return -error;
 }
+
+#ifdef fallocate64
+#undef fallocate64
+#endif
 
 LFS64(fallocate);
 
@@ -2442,6 +2547,7 @@ ssize_t sendfile(int out_fd, int in_fd, off_t *_offset, size_t count)
 }
 
 #undef sendfile64
+
 LFS64(sendfile);
 #endif
 
@@ -2460,6 +2566,11 @@ int posix_fadvise(int fd __unused, off_t offset __unused, off_t len __unused,
 		return EINVAL;
 	}
 }
+
+#ifdef posix_fadvise64
+#undef posix_fadvise64
+#endif
+
 LFS64(posix_fadvise);
 
 UK_SYSCALL_R_DEFINE(mode_t, umask, mode_t, newmask)
