@@ -17,4 +17,8 @@ if (PLAT_LINUXU)
 		changed by using linuxu.heap_size as a command line argument. For more
 		information refer to "Command line arguments in Unikraft" sections in 
 		the developers guide
+
+	config LINUXU_MAX_IRQ_HANDLER_ENTRIES
+	int "Maximum number of IRQ handlers per event"
+	default 8
 endif

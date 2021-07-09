@@ -65,6 +65,11 @@ endif
 
 endmenu
 
+config KVM_MAX_IRQ_HANDLER_ENTRIES
+       int "Maximum number of IRQ handlers per event"
+       default 8
+       depends on (ARCH_X86_64)
+
 config KVM_PCI
        bool "PCI Bus Driver"
        default y
