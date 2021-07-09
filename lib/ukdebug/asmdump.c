@@ -93,6 +93,60 @@ static int _asmdump(struct out_dev *o,
 
 	return total;
 }
+
+/**
+ * Disassemble <len> bytes with zydis starting
+ * with instruction at <instr>
+ */
+static int _asmndump(struct out_dev *o,
+		     const void *instr, size_t len)
+{
+	ZydisDecoder dcr;
+	ZydisFormatter fmt;
+	ZydisDecodedInstruction ins;
+	char buf[128];
+	int offset = 0;
+	int ret, total = 0;
+	__uptr addr = (__uptr) instr;
+
+#if __X86_32__
+	if (!ZYAN_SUCCESS(ZydisDecoderInit(&dcr,
+					   ZYDIS_MACHINE_MODE_LONG_COMPAT_32,
+					   ZYDIS_ADDRESS_WIDTH_32)))
+		return -1;
+#elif __X86_64__
+	if (!ZYAN_SUCCESS(ZydisDecoderInit(&dcr,
+					   ZYDIS_MACHINE_MODE_LONG_64,
+					   ZYDIS_ADDRESS_WIDTH_64)))
+		return -1;
+#else
+#error libzydis: Unsupported architecture
+#endif
+
+	if (!ZYAN_SUCCESS(ZydisFormatterInit(&fmt,
+					     ZYDIS_FORMATTER_STYLE_ATT)))
+		return -1;
+
+	while (len) {
+		addr = ((__uptr) instr) + offset;
+		if (!ZYAN_SUCCESS(ZydisDecoderDecodeBuffer(&dcr,
+							   (const void *) addr,
+							   MIN(16u, len),
+							   &ins)))
+			break;
+		ZydisFormatterFormatInstruction(&fmt, &ins, buf, sizeof(buf),
+						addr);
+		ret = outf(o, "%08"__PRIuptr" <+%d>: %hs\n", addr, offset, buf);
+		if (ret < 0)
+			return ret;
+
+		total += ret;
+		offset += ins.length;
+		len -= ins.length;
+	}
+
+	return total;
+}
 #else /* CONFIG_LIBZYDIS */
 #error No supported disassembler backend available.
 #endif /* CONFIG_LIBZYDIS */
@@ -107,6 +161,16 @@ void _uk_asmdumpd(const char *libname, const char *srcname,
 	_asmdump(&o, instr, instr_count);
 }
 
+void _uk_asmndumpd(const char *libname, const char *srcname,
+		   unsigned int srcline, const void *instr,
+		   size_t len)
+{
+	struct out_dev o;
+
+	out_dev_init_debug(&o, libname, srcname, srcline);
+	_asmndump(&o, instr, len);
+}
+
 #if CONFIG_LIBUKDEBUG_PRINTK
 void _uk_asmdumpk(int lvl, const char *libname,
 		  const char *srcname, unsigned int srcline,
@@ -116,5 +180,15 @@ void _uk_asmdumpk(int lvl, const char *libname,
 
 	out_dev_init_kern(&o, lvl, libname, srcname, srcline);
 	_asmdump(&o, instr, instr_count);
+}
+
+void _uk_asmndumpk(int lvl, const char *libname,
+		   const char *srcname, unsigned int srcline,
+		   const void *instr, size_t len)
+{
+	struct out_dev o;
+
+	out_dev_init_kern(&o, lvl, libname, srcname, srcline);
+	_asmndump(&o, instr, len);
 }
 #endif /* CONFIG_LIBUKDEBUG_PRINTK */
