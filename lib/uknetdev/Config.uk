@@ -30,4 +30,10 @@ if LIBUKNETDEV
 			When this option is enabled a dispatcher thread is
 			allocated for each configured receive queue.
 			libuksched is required for this option.
+	config LIBUKNETDEV_METRICS
+		bool "Interface metrics for statistics"
+		default n
+		help
+			The metrics instrumented are the same with the ones from
+			/proc/net/dev. The metrics are per interface.
 endif

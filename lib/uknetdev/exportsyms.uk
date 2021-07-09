@@ -14,6 +14,7 @@ uk_netdev_id_get
 uk_netdev_drv_name_get
 uk_netdev_state_get
 uk_netdev_info_get
+uk_netdev_metrics_get
 uk_netdev_einfo_get
 uk_netdev_rxq_info_get
 uk_netdev_txq_info_get

@@ -324,6 +324,12 @@ int uk_netdev_configure(struct uk_netdev *dev,
 		uk_pr_info("netdev%"PRIu16": Configured interface\n",
 			   dev->_data->id);
 		dev->_data->state = UK_NETDEV_CONFIGURED;
+
+#ifdef CONFIG_LIBUKNETDEV_METRICS
+		memset(&dev->metrics, 0, sizeof(dev->metrics));
+		ukarch_spin_lock_init(&dev->metrics_lock);
+#endif /* CONFIG_LIBUKNETDEV_METRICS */
+
 	} else {
 		uk_pr_err("netdev%"PRIu16": Failed to configure interface: %d\n",
 			  dev->_data->id, ret);
@@ -624,3 +630,18 @@ int uk_netdev_mtu_set(struct uk_netdev *dev, uint16_t mtu)
 
 	return dev->ops->mtu_set(dev, mtu);
 }
+
+#ifdef CONFIG_LIBUKNETDEV_METRICS
+int uk_netdev_metrics_get(struct uk_netdev *dev,
+			struct uk_netdev_metrics *dev_metrics)
+{
+	UK_ASSERT(dev);
+	UK_ASSERT(dev_metrics);
+
+	ukarch_spin_lock(&dev->metrics_lock);
+	memcpy(dev_metrics, &dev->metrics, sizeof(*dev_metrics));
+	ukarch_spin_unlock(&dev->metrics_lock);
+
+	return 0;
+}
+#endif /* CONFIG_LIBUKNETDEV_METRICS */

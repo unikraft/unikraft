@@ -138,6 +138,9 @@ enum uk_netdev_state uk_netdev_state_get(struct uk_netdev *dev);
 void uk_netdev_info_get(struct uk_netdev *dev,
 			struct uk_netdev_info *dev_info);
 
+int uk_netdev_metrics_get(struct uk_netdev *dev,
+			struct uk_netdev_metrics *dev_metrics);
+
 /**
  * Extra information query interface.
  * The user can query the driver for any additional information (e.g,
@@ -458,6 +461,8 @@ static inline int uk_netdev_rxq_intr_disable(struct uk_netdev *dev,
 static inline int uk_netdev_rx_one(struct uk_netdev *dev, uint16_t queue_id,
 				   struct uk_netbuf **pkt)
 {
+	int ret;
+
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->rx_one);
 	UK_ASSERT(queue_id < CONFIG_LIBUKNETDEV_MAXNBQUEUES);
@@ -465,7 +470,38 @@ static inline int uk_netdev_rx_one(struct uk_netdev *dev, uint16_t queue_id,
 	UK_ASSERT(!PTRISERR(dev->_rx_queue[queue_id]));
 	UK_ASSERT(pkt);
 
-	return dev->rx_one(dev, dev->_rx_queue[queue_id], pkt);
+
+	ret = dev->rx_one(dev, dev->_rx_queue[queue_id], pkt);
+
+#ifdef CONFIG_LIBUKNETDEV_METRICS
+	if (ret >= 0 && (ret & UK_NETDEV_STATUS_SUCCESS)) {
+		ukarch_spin_lock(&dev->metrics_lock);
+		dev->metrics.rx_m.bytes += (*pkt)->len;
+		dev->metrics.rx_m.packets++;
+		ukarch_spin_unlock(&dev->metrics_lock);
+		return ret;
+	}
+	if (ret >= 0 && (ret & UK_NETDEV_STATUS_UNDERRUN)) {
+		ukarch_spin_lock(&dev->metrics_lock);
+		dev->metrics.rx_m.fifo++;
+		ukarch_spin_unlock(&dev->metrics_lock);
+		return ret;
+	}
+	if (ret == -EINVAL) {
+		ukarch_spin_lock(&dev->metrics_lock);
+		dev->metrics.rx_m.frame++;
+		ukarch_spin_unlock(&dev->metrics_lock);
+		return ret;
+	}
+	if (ret < 0) {
+		ukarch_spin_lock(&dev->metrics_lock);
+		dev->metrics.rx_m.errors++;
+		ukarch_spin_unlock(&dev->metrics_lock);
+		return ret;
+	}
+#endif /* CONFIG_LIBUKNETDEV_METRICS */
+
+	return ret;
 }
 
 /**
@@ -497,6 +533,8 @@ static inline int uk_netdev_rx_one(struct uk_netdev *dev, uint16_t queue_id,
 static inline int uk_netdev_tx_one(struct uk_netdev *dev, uint16_t queue_id,
 				   struct uk_netbuf *pkt)
 {
+	int ret;
+
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->tx_one);
 	UK_ASSERT(queue_id < CONFIG_LIBUKNETDEV_MAXNBQUEUES);
@@ -504,7 +542,35 @@ static inline int uk_netdev_tx_one(struct uk_netdev *dev, uint16_t queue_id,
 	UK_ASSERT(!PTRISERR(dev->_tx_queue[queue_id]));
 	UK_ASSERT(pkt);
 
-	return dev->tx_one(dev, dev->_tx_queue[queue_id], pkt);
+#ifdef CONFIG_LIBUKNETDEV_METRICS
+	size_t len = pkt->len;
+#endif /* CONFIG_LIBUKNETDEV_METRICS */
+
+	ret = dev->tx_one(dev, dev->_tx_queue[queue_id], pkt);
+
+#ifdef CONFIG_LIBUKNETDEV_METRICS
+	if (ret >= 0 && (ret & UK_NETDEV_STATUS_SUCCESS)) {
+		ukarch_spin_lock(&dev->metrics_lock);
+		dev->metrics.tx_m.bytes += len;
+		dev->metrics.tx_m.packets++;
+		ukarch_spin_unlock(&dev->metrics_lock);
+		return ret;
+	}
+	if (ret >= 0 && (ret & UK_NETDEV_STATUS_UNDERRUN)) {
+		ukarch_spin_lock(&dev->metrics_lock);
+		dev->metrics.tx_m.fifo++;
+		ukarch_spin_unlock(&dev->metrics_lock);
+		return ret;
+	}
+	if (ret < 0) {
+		ukarch_spin_lock(&dev->metrics_lock);
+		dev->metrics.tx_m.errors++;
+		ukarch_spin_unlock(&dev->metrics_lock);
+		return ret;
+	}
+#endif /* CONFIG_LIBUKNETDEV_METRICS */
+
+	return ret;
 }
 
 /**
