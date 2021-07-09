@@ -27,7 +27,6 @@
  */
 
 #include <string.h>
-#include <uk/plat/common/sections.h>
 #include <x86/cpu.h>
 #include <x86/traps.h>
 #include <kvm/config.h>
@@ -38,9 +37,15 @@
 #include <uk/arch/limits.h>
 #include <uk/arch/types.h>
 #include <uk/plat/console.h>
+#include <uk/plat/common/mem_layout.h>
+#include <uk/plat/common/sections.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include <x86/acpi/acpi.h>
+
+#if CONFIG_PT_API
+#include <uk/plat/mm.h>
+#endif /* CONFIG_PT_API */
 
 #define PLATFORM_MEM_START 0x100000
 #define PLATFORM_MAX_MEM_ADDR 0x40000000
@@ -74,6 +79,28 @@ static inline void _mb_get_cmdline(struct multiboot_info *mi)
 	cmdline[(sizeof(cmdline) - 1)] = '\0';
 }
 
+static inline size_t _mb_initrd_len(struct multiboot_info *mi)
+{
+	multiboot_module_t *mod1;
+
+	/*
+	 * Search for initrd (called boot module according multiboot)
+	 */
+	if (mi->mods_count == 0)
+		return 0;
+
+	/*
+	 * NOTE: We are only taking the first boot module as initrd.
+	 *       Initrd arguments and further modules are ignored.
+	 */
+	UK_ASSERT(mi->mods_addr);
+
+	mod1 = (multiboot_module_t *)((uintptr_t) mi->mods_addr);
+	UK_ASSERT(mod1->mod_end >= mod1->mod_start);
+
+	return (size_t) (mod1->mod_end - mod1->mod_start);
+}
+
 static inline void _mb_init_mem(struct multiboot_info *mi)
 {
 	multiboot_memory_map_t *m;
@@ -97,8 +124,10 @@ static inline void _mb_init_mem(struct multiboot_info *mi)
 	 * page tables for.
 	 */
 	max_addr = m->addr + m->len;
+#ifndef CONFIG_PT_API
 	if (max_addr > PLATFORM_MAX_MEM_ADDR)
 		max_addr = PLATFORM_MAX_MEM_ADDR;
+#endif /* CONFIG_PT_API */
 	UK_ASSERT((size_t) __END <= max_addr);
 
 	/*
@@ -107,6 +136,32 @@ static inline void _mb_init_mem(struct multiboot_info *mi)
 	if ((max_addr - m->addr) < __STACK_SIZE)
 		UK_CRASH("Not enough memory to allocate boot stack\n");
 
+#if CONFIG_PT_API
+	struct uk_pagetable *pt = uk_pt_init(PAGE_ALIGN_UP(m->addr + KERNEL_AREA_SIZE + _mb_initrd_len(mi)),
+			PAGE_ALIGN_DOWN(m->len - KERNEL_AREA_SIZE - _mb_initrd_len(mi)));
+
+	/* TODO: don't use all memory for heap, leave some for page tables
+	 * as well (maybe this is the cause of the bug */
+	/* TODO: the PAGE_LARGE_SIZE is subtracted because of a bug. When not
+	 * subtracting it, the system runs out of physical memory. Find out why
+	 */
+	_libkvmplat_cfg.heap.start = HEAP_AREA_START;
+	_libkvmplat_cfg.heap.end   = HEAP_AREA_START + pt->fa->available_memory - __STACK_SIZE - PAGE_LARGE_SIZE;
+	_libkvmplat_cfg.heap.len   = _libkvmplat_cfg.heap.end
+				     - _libkvmplat_cfg.heap.start;
+#if CONFIG_LIBPOSIX_MMAP
+	/* TODO: implement a way to dynamically resize the heap (e.g. brk()) */
+	_libkvmplat_cfg.heap.len /= 2;
+	_libkvmplat_cfg.heap.end = _libkvmplat_cfg.heap.start
+				   + _libkvmplat_cfg.heap.len;
+#endif /* CONFIG_LIBPOSIX_MMAP */
+
+	uk_heap_map(m->addr + m->len - __STACK_SIZE, __STACK_SIZE);
+	_libkvmplat_cfg.bstack.start = (uintptr_t) m->addr + m->len - __STACK_SIZE;
+	_libkvmplat_cfg.bstack.end   = _libkvmplat_cfg.bstack.start
+					+ __STACK_SIZE;
+	_libkvmplat_cfg.bstack.len   = __STACK_SIZE;
+#else
 	_libkvmplat_cfg.heap.start = ALIGN_UP((uintptr_t) __END, __PAGE_SIZE);
 	_libkvmplat_cfg.heap.end   = (uintptr_t) max_addr - __STACK_SIZE;
 	_libkvmplat_cfg.heap.len   = _libkvmplat_cfg.heap.end
@@ -114,6 +169,17 @@ static inline void _mb_init_mem(struct multiboot_info *mi)
 	_libkvmplat_cfg.bstack.start = _libkvmplat_cfg.heap.end;
 	_libkvmplat_cfg.bstack.end   = max_addr;
 	_libkvmplat_cfg.bstack.len   = __STACK_SIZE;
+#endif /* CONFIG_PT_API */
+
+	for (offset = 0; offset < mi->mmap_length;
+	     offset += m->size + sizeof(m->size)) {
+		m = (void *)(__uptr)(mi->mmap_addr + offset);
+		if (m->addr > PLATFORM_MEM_START
+		    && m->type == MULTIBOOT_MEMORY_AVAILABLE) {
+			uk_pt_add_mem(m->addr, m->len);
+		}
+	}
+
 }
 
 static inline void _mb_init_initrd(struct multiboot_info *mi)

@@ -1,10 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Sharan Santhanam <sharan.santhanam@neclab.eu>
- *          Stefan Teodorescu <stefanl.teodorescu@gmail.com>
+ * Authors: Stefan Teodorescu <stefanl.teodorescu@gmail.com>
  *
- * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
- * Copyright (c) 2021, University Politehnica of Bucharest., NEC Corporation. All rights reserved.
+ * Copyright (c) 2021, University Politehnica of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,32 +30,30 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <uk/plat/io.h>
-#include <uk/config.h>
-
-#ifdef CONFIG_PT_API
 #include <uk/plat/mm.h>
-#endif
+#include <uk/plat/common/mem_layout.h>
 
-__phys_addr ukplat_virt_to_phys(const volatile void *address)
+/* TODO: add all relevant features here */
+/* TODO: make static inline */
+unsigned long ukplat_mm_supported_features(void)
 {
-#ifdef CONFIG_PT_API
-	__vaddr_t vaddr = (__vaddr_t) address;
-	__pte_t pte;
-	unsigned long offset;
+	return UKPLAT_SUPPORT_LARGE_PAGES;
+}
 
-	pte = ukplat_virt_to_pte(ukplat_get_active_pt(),
-			PAGE_ALIGN_DOWN(vaddr));
+int ukplat_map_specific_areas(struct uk_pagetable *pt)
+{
+	unsigned long mbinfo_pages, vgabuffer_pages;
 
-	/* TODO: add support for huge pages */
-	if (PAGE_LARGE(pte)) {
-		offset = vaddr - PAGE_LARGE_ALIGN_DOWN(vaddr);
-	} else {
-		offset = vaddr - PAGE_ALIGN_DOWN(vaddr);
-	}
+	mbinfo_pages = DIV_ROUND_UP(MBINFO_AREA_SIZE, PAGE_SIZE);
+	vgabuffer_pages = DIV_ROUND_UP(VGABUFFER_AREA_SIZE, PAGE_SIZE);
+	if (_initmem_page_map_many(pt, MBINFO_AREA_START, MBINFO_AREA_START,
+			mbinfo_pages, PAGE_PROT_READ, 0))
+		return -1;
 
-	return pte_to_mframe(pte) + offset;
-#else
-	return (__phys_addr)address;
-#endif
+	if (_initmem_page_map_many(pt, VGABUFFER_AREA_START,
+			VGABUFFER_AREA_START, vgabuffer_pages,
+			PAGE_PROT_READ | PAGE_PROT_WRITE, 0))
+		return -1;
+
+	return 0;
 }

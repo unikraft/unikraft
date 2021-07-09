@@ -1,10 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Sharan Santhanam <sharan.santhanam@neclab.eu>
- *          Stefan Teodorescu <stefanl.teodorescu@gmail.com>
+ * Authors: Stefan Teodorescu <stefanl.teodorescu@gmail.com>
  *
- * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
- * Copyright (c) 2021, University Politehnica of Bucharest., NEC Corporation. All rights reserved.
+ * Copyright (c) 2021, University Politehnica of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,32 +30,27 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <uk/plat/io.h>
+#ifndef __UK_FRAMEALLOC_BBUDDY_H__
+#define __UK_FRAMEALLOC_BBUDDY_H__
+
+#include <uk/asm/page.h>
 #include <uk/config.h>
+#include <stddef.h>
 
-#ifdef CONFIG_PT_API
-#include <uk/plat/mm.h>
-#endif
+#ifndef CONFIG_PT_API
+#error Using this header requires enabling the virtual memory management API
+#endif /* CONFIG_PT_API */
 
-__phys_addr ukplat_virt_to_phys(const volatile void *address)
-{
-#ifdef CONFIG_PT_API
-	__vaddr_t vaddr = (__vaddr_t) address;
-	__pte_t pte;
-	unsigned long offset;
+struct uk_framealloc;
 
-	pte = ukplat_virt_to_pte(ukplat_get_active_pt(),
-			PAGE_ALIGN_DOWN(vaddr));
+__paddr_t uk_frameallocbbuddy_palloc(struct uk_framealloc *a, unsigned long num_pages);
 
-	/* TODO: add support for huge pages */
-	if (PAGE_LARGE(pte)) {
-		offset = vaddr - PAGE_LARGE_ALIGN_DOWN(vaddr);
-	} else {
-		offset = vaddr - PAGE_ALIGN_DOWN(vaddr);
-	}
+void uk_frameallocbbuddy_pfree(struct uk_framealloc *a, __paddr_t obj, unsigned long num_pages);
 
-	return pte_to_mframe(pte) + offset;
-#else
-	return (__phys_addr)address;
-#endif
-}
+int uk_frameallocbbuddy_addmem(struct uk_framealloc *a, __paddr_t base, size_t len, void *metadata_base);
+
+struct uk_framealloc *uk_frameallocbbuddy_init(__paddr_t base, size_t len, void *metadata_base);
+
+size_t uk_frameallocbbuddy_metadata_size(__paddr_t paddr_start, size_t len);
+
+#endif /* __UK_FRAMEALLOC_BBUDDY_H__ */

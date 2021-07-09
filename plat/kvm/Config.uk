@@ -65,6 +65,14 @@ endif
 
 endmenu
 
+config PT_API
+	bool "Virtual memory management API"
+	default n
+	depends on ARCH_X86_64
+	select LIBUKFRAMEALLOC
+	help
+		Provide functions for managing virtual memory
+
 config KVM_PCI
        bool "PCI Bus Driver"
        default y

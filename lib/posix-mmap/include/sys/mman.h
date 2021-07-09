@@ -1,10 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Sharan Santhanam <sharan.santhanam@neclab.eu>
- *          Stefan Teodorescu <stefanl.teodorescu@gmail.com>
+ * Authors: Stefan Teodorescu <stefanl.teodorescu@gmail.com>
  *
- * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
- * Copyright (c) 2021, University Politehnica of Bucharest., NEC Corporation. All rights reserved.
+ * Copyright (c) 2021, University Politehnica of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,32 +30,30 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <uk/plat/io.h>
-#include <uk/config.h>
+#ifndef __POSIX_MMAP__
+#define __POSIX_MMAP__
 
-#ifdef CONFIG_PT_API
-#include <uk/plat/mm.h>
-#endif
+#define MAP_FAILED	((void *) -1)
 
-__phys_addr ukplat_virt_to_phys(const volatile void *address)
-{
-#ifdef CONFIG_PT_API
-	__vaddr_t vaddr = (__vaddr_t) address;
-	__pte_t pte;
-	unsigned long offset;
+#define PROT_NONE	0x0
+#define PROT_READ	0x1
+#define PROT_WRITE	0x2
+#define PROT_EXEC	0x4
 
-	pte = ukplat_virt_to_pte(ukplat_get_active_pt(),
-			PAGE_ALIGN_DOWN(vaddr));
+#define MAP_SHARED	0x1
+#define MAP_PRIVATE	0x2
 
-	/* TODO: add support for huge pages */
-	if (PAGE_LARGE(pte)) {
-		offset = vaddr - PAGE_LARGE_ALIGN_DOWN(vaddr);
-	} else {
-		offset = vaddr - PAGE_ALIGN_DOWN(vaddr);
-	}
+#define MAP_FIXED	0x10
+#define MAP_ANONYMOUS	0x20
+#define MAP_ANON	MAP_ANONYMOUS
 
-	return pte_to_mframe(pte) + offset;
-#else
-	return (__phys_addr)address;
-#endif
-}
+void *mmap(void *addr, size_t length, int prot, int flags,
+		   int fd, off_t offset);
+
+int munmap(void *addr, size_t length);
+
+int mprotect(void *addr, size_t len, int prot);
+
+int msync(void *addr, size_t length, int flags);
+
+#endif /* __POSIX_MMAP__ */

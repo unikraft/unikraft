@@ -1,10 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Sharan Santhanam <sharan.santhanam@neclab.eu>
- *          Stefan Teodorescu <stefanl.teodorescu@gmail.com>
+ * Authors: Stefan Teodorescu <stefanl.teodorescu@gmail.com>
  *
- * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
- * Copyright (c) 2021, University Politehnica of Bucharest., NEC Corporation. All rights reserved.
+ * Copyright (c) 2021, University Politehnica of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,34 +28,52 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
+ *
+ * Some of these macros here were inspired from Xen code.
+ * For example, from "xen/include/asm-x86/x86_64/page.h" file.
  */
 
-#include <uk/plat/io.h>
-#include <uk/config.h>
+#ifndef __UKARCH_X86_64_MM_NATIVE__
+#define __UKARCH_X86_64_MM_NATIVE__
 
-#ifdef CONFIG_PT_API
-#include <uk/plat/mm.h>
-#endif
+#include "mm.h"
+#include <uk/bitmap.h>
+#include <uk/assert.h>
+#include <uk/print.h>
 
-__phys_addr ukplat_virt_to_phys(const volatile void *address)
+#define pt_pte_to_virt(pt, pte) (pte_to_mframe(pte) + pt->virt_offset)
+#define pt_virt_to_mframe(pt, vaddr) (vaddr - pt->virt_offset)
+#define pfn_to_mfn(pfn) (pfn)
+
+#define pte_to_pfn(pte) (pte_to_mframe(pte) >> PAGE_SHIFT)
+#define pfn_to_mframe(pfn) (pfn << PAGE_SHIFT)
+#define mframe_to_pframe(mframe) (mframe)
+
+static inline __paddr_t ukarch_read_pt_base(void)
 {
-#ifdef CONFIG_PT_API
-	__vaddr_t vaddr = (__vaddr_t) address;
-	__pte_t pte;
-	unsigned long offset;
+	__paddr_t cr3;
 
-	pte = ukplat_virt_to_pte(ukplat_get_active_pt(),
-			PAGE_ALIGN_DOWN(vaddr));
+	__asm__ __volatile__("movq %%cr3, %0" : "=r"(cr3)::);
 
-	/* TODO: add support for huge pages */
-	if (PAGE_LARGE(pte)) {
-		offset = vaddr - PAGE_LARGE_ALIGN_DOWN(vaddr);
-	} else {
-		offset = vaddr - PAGE_ALIGN_DOWN(vaddr);
-	}
-
-	return pte_to_mframe(pte) + offset;
-#else
-	return (__phys_addr)address;
-#endif
+	return pte_to_mframe(cr3);
 }
+
+static inline void ukarch_write_pt_base(__paddr_t cr3)
+{
+	__asm__ __volatile__("movq %0, %%cr3" :: "r"(cr3) : );
+}
+
+static inline int ukarch_flush_tlb_entry(__vaddr_t vaddr)
+{
+	__asm__ __volatile__("invlpg (%0)" ::"r" (vaddr) : "memory");
+
+	return 0;
+}
+
+static inline int ukarch_pte_write(__vaddr_t pt, size_t offset, __pte_t pte,
+		size_t level)
+{
+	return _ukarch_pte_write_raw(pt, offset, pte, level);
+}
+
+#endif	/* __UKARCH_X86_64_MM_NATIVE__ */

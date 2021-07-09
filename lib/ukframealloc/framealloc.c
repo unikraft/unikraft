@@ -1,10 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Sharan Santhanam <sharan.santhanam@neclab.eu>
- *          Stefan Teodorescu <stefanl.teodorescu@gmail.com>
+ * Authors: Stefan Teodorescu <stefanl.teodorescu@gmail.com>
  *
- * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
- * Copyright (c) 2021, University Politehnica of Bucharest., NEC Corporation. All rights reserved.
+ * Copyright (c) 2021, University Politehnica of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,32 +30,30 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <uk/plat/io.h>
-#include <uk/config.h>
+#include <uk/framealloc.h>
 
-#ifdef CONFIG_PT_API
-#include <uk/plat/mm.h>
-#endif
-
-__phys_addr ukplat_virt_to_phys(const volatile void *address)
+__paddr_t uk_get_next_free_frame(struct uk_framealloc *fa, unsigned long flags)
 {
-#ifdef CONFIG_PT_API
-	__vaddr_t vaddr = (__vaddr_t) address;
-	__pte_t pte;
-	unsigned long offset;
+	__paddr_t frame;
+	size_t num_pages;
 
-	pte = ukplat_virt_to_pte(ukplat_get_active_pt(),
-			PAGE_ALIGN_DOWN(vaddr));
-
-	/* TODO: add support for huge pages */
-	if (PAGE_LARGE(pte)) {
-		offset = vaddr - PAGE_LARGE_ALIGN_DOWN(vaddr);
-	} else {
-		offset = vaddr - PAGE_ALIGN_DOWN(vaddr);
+	if ((flags & PAGE_FLAG_LARGE) &&
+			!(ukplat_mm_supported_features()
+				& UKPLAT_SUPPORT_LARGE_PAGES)) {
+		uk_pr_err("Large pages are not supported this platform\n");
+		return PAGE_INVALID;
 	}
 
-	return pte_to_mframe(pte) + offset;
-#else
-	return (__phys_addr)address;
-#endif
+	if (flags & PAGE_FLAG_LARGE)
+		num_pages = PAGE_LARGE_SIZE >> PAGE_SHIFT;
+	else
+		num_pages = 1;
+
+	frame = fa->palloc(fa, num_pages);
+	if (!frame) {
+		uk_pr_err("Out of physical memory\n");
+		return PAGE_INVALID;
+	}
+
+	return pfn_to_mframe(frame >> PAGE_SHIFT);
 }

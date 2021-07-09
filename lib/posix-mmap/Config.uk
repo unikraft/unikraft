@@ -1,0 +1,4 @@
+config LIBPOSIX_MMAP
+	bool "POSIX mmap functions"
+	default n
+	select PT_API
