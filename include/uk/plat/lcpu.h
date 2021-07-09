@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
- *
+ *          Cristian Vijelie <cristianvijelie@gmail.com>
  *
  * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
  *
@@ -40,13 +40,13 @@
 extern "C" {
 #endif
 
-#if UKPLAT_LCPU_MULTICORE
+#ifdef CONFIG_HAVE_SMP
 __u8 ukplat_lcpu_id(void);
 __u8 ukplat_lcpu_count(void);
 #else
-#define ukplat_lcpu_id()    (0)
+#define ukplat_lcpu_id() (0)
 #define ukplat_lcpu_count() (1)
-#endif
+#endif /* CONFIG_HAVE_SMP */
 
 /**
  * Enables interrupts
@@ -96,6 +96,24 @@ void ukplat_lcpu_halt_to(__snsec until);
  * Execution is returned when an interrupt/signal arrived
  */
 void ukplat_lcpu_halt_irq(void);
+
+#ifdef CONFIG_HAVE_SMP
+typedef void (*func_t)(void);
+
+/**
+ * Starts multiple cores
+ * @param coremask bitmask with the cores that are to be started
+ * @param sp array of stack pointers - provide a stack for each core
+ * @param entry array of function pointers - the entry for each core
+ * @return bitmask of the cores that have started
+ */
+unsigned long long ukplat_lcpu_rstart_multiple(unsigned long long coremask, void *sp[],
+				  func_t entry[]);
+
+#define ukplat_lcpu_rstart(coreid, sp, entry)                                  \
+	ukplat_lcpu_rstart_multiple((1 << (coreid)), &(sp), &(entry))
+
+#endif /* CONFIG_HAVE_SMP */
 
 #ifdef __cplusplus
 }
