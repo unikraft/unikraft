@@ -37,9 +37,12 @@
 #include <uk/assert.h>
 #include <uk/bitops.h>
 #include <uk/asm.h>
-#include <uk/plat/common/irq.h>
-#include <kvm/irq.h>
 #include <uk/plat/lcpu.h>
+#include <uk/plat/common/irq.h>
+#if defined(CONFIG_PLAT_KVM)
+#include <kvm/irq.h>
+#endif
+#include <uk/plat/spinlock.h>
 #include <arm/cpu.h>
 #include <gic/gic-v2.h>
 #include <ofw/fdt.h>
@@ -47,23 +50,26 @@
 /* Max CPU interface for GICv2 */
 #define GIC_MAX_CPUIF		8
 
-/* SPI interrupt definitions */
-#define GIC_SPI_TYPE		0
-#define GIC_SPI_BASE		32
+#define GIC_CPU_REG(gdev, r)	((void *)(gdev.cpuif_mem_addr + (r)))
 
-/* PPI interrupt definitions */
-#define GIC_PPI_TYPE		1
-#define GIC_PPI_BASE		16
+#ifdef UKPLAT_LCPU_MULTICORE
+DEFINE_SPINLOCK(gicv2_dist_lock);
+#endif
 
-/* Max support interrupt number for GICv2 */
-#define GIC_MAX_IRQ		__MAX_IRQ
-
-static uint64_t gic_dist_addr, gic_cpuif_addr;
-static uint64_t gic_dist_size, gic_cpuif_size;
-
-#define GIC_DIST_REG(r)	((void *)(gic_dist_addr + (r)))
-#define GIC_CPU_REG(r)	((void *)(gic_cpuif_addr + (r)))
-#define IRQ_TYPE_MASK	0x0000000f
+/** GICv2 driver */
+struct _gic_dev gicv2_drv = {
+	.version        = GIC_V2,
+	.is_present     = 0,
+	.is_probed      = 0,
+	.is_initialized = 0,
+	.dist_mem_addr  = 0,
+	.dist_mem_size  = 0,
+	.cpuif_mem_addr = 0,
+	.cpuif_mem_size = 0,
+#ifdef UKPLAT_LCPU_MULTICORE
+	.dist_lock      = &gicv2_dist_lock,
+#endif
+};
 
 static const char * const gic_device_list[] = {
 	"arm,cortex-a15-gic",
@@ -73,27 +79,27 @@ static const char * const gic_device_list[] = {
 /* inline functions to access GICC & GICD registers */
 static inline void write_gicd8(uint64_t offset, uint8_t val)
 {
-	ioreg_write8(GIC_DIST_REG(offset), val);
+	ioreg_write8(GIC_DIST_REG(gicv2_drv, offset), val);
 }
 
 static inline void write_gicd32(uint64_t offset, uint32_t val)
 {
-	ioreg_write32(GIC_DIST_REG(offset), val);
+	ioreg_write32(GIC_DIST_REG(gicv2_drv, offset), val);
 }
 
 static inline uint32_t read_gicd32(uint64_t offset)
 {
-	return ioreg_read32(GIC_DIST_REG(offset));
+	return ioreg_read32(GIC_DIST_REG(gicv2_drv, offset));
 }
 
 static inline void write_gicc32(uint64_t offset, uint32_t val)
 {
-	ioreg_write32(GIC_CPU_REG(offset), val);
+	ioreg_write32(GIC_CPU_REG(gicv2_drv, offset), val);
 }
 
 static inline uint32_t read_gicc32(uint64_t offset)
 {
-	return ioreg_read32(GIC_CPU_REG(offset));
+	return ioreg_read32(GIC_CPU_REG(gicv2_drv, offset));
 }
 
 /*
@@ -119,7 +125,7 @@ static void gic_set_threshold_priority(uint32_t threshold_prio)
  * Acknowledging irq equals reading GICC_IAR also
  * get the interrupt ID as the side effect.
  */
-uint32_t gic_ack_irq(void)
+static uint32_t gic_ack_irq(void)
 {
 	return read_gicc32(GICC_IAR);
 }
@@ -129,7 +135,7 @@ uint32_t gic_ack_irq(void)
  * of interrupt processing. If GICC_CTLR.EOImode sets to 1
  * this func just gets priority drop.
  */
-void gic_eoi_irq(uint32_t irq)
+static void gic_eoi_irq(uint32_t irq)
 {
 	write_gicc32(GICC_EOIR, irq);
 }
@@ -160,7 +166,9 @@ static void gic_sgi_gen(uint32_t sgintid, enum sgi_filter targetfilter,
 	val |= sgintid;
 
 	/* Generate SGI */
+	dist_lock(gicv2_drv);
 	write_gicd32(GICD_SGIR, val);
+	dist_unlock(gicv2_drv);
 }
 
 /*
@@ -173,9 +181,11 @@ void gic_sgi_gen_to_list(uint32_t sgintid, uint8_t targetlist)
 	unsigned long irqf;
 
 	/* spin lock here is needed when smp is supported */
+	dist_lock(gicv2_drv);
 	irqf = ukplat_lcpu_save_irqf();
 	gic_sgi_gen(sgintid, GICD_SGI_FILTER_TO_LIST, targetlist);
 	ukplat_lcpu_restore_irqf(irqf);
+	dist_unlock(gicv2_drv);
 }
 
 /*
@@ -188,9 +198,11 @@ void gic_sgi_gen_to_others(uint32_t sgintid)
 	unsigned long irqf;
 
 	/* spin lock here is needed when smp is supported */
+	dist_lock(gicv2_drv);
 	irqf = ukplat_lcpu_save_irqf();
 	gic_sgi_gen(sgintid, GICD_SGI_FILTER_TO_OTHERS, 0);
 	ukplat_lcpu_restore_irqf(irqf);
+	dist_unlock(gicv2_drv);
 }
 
 /*
@@ -207,57 +219,71 @@ void gic_sgi_gen_to_self(uint32_t sgintid)
  * @target: bitmask value, bit 1 indicates target to
  * corresponding cpu interface
  */
-void gic_set_irq_target(uint32_t irq, uint8_t target)
+static void gic_set_irq_target(uint32_t irq, uint8_t target)
 {
 	if (irq < GIC_SPI_BASE)
 		UK_CRASH("Bad irq number: should not less than %u",
 			GIC_SPI_BASE);
 
+	dist_lock(gicv2_drv);
 	write_gicd8(GICD_ITARGETSR(irq), target);
+	dist_unlock(gicv2_drv);
 }
 
 /* set priority for irq in distributor */
-void gic_set_irq_prio(uint32_t irq, uint8_t priority)
+static void gic_set_irq_prio(uint32_t irq, uint8_t priority)
 {
+	dist_lock(gicv2_drv);
 	write_gicd8(GICD_IPRIORITYR(irq), priority);
+	dist_unlock(gicv2_drv);
 }
 
 /*
  * Enable an irq in distributor, each irq occupies one bit
- * to configure in corresponding registor
+ * to configure in corresponding register
  */
-void gic_enable_irq(uint32_t irq)
+static void gic_enable_irq(uint32_t irq)
 {
+	dist_lock(gicv2_drv);
+
 	write_gicd32(GICD_ISENABLER(irq),
 		UK_BIT(irq % GICD_I_PER_ISENABLERn));
+
+	dist_unlock(gicv2_drv);
 }
 
 /*
  * Disable an irq in distributor, one bit reserved for an irq
  * to configure in corresponding register
  */
-void gic_disable_irq(uint32_t irq)
+static void gic_disable_irq(uint32_t irq)
 {
+	dist_lock(gicv2_drv);
 	write_gicd32(GICD_ICENABLER(irq),
 		UK_BIT(irq % GICD_I_PER_ICENABLERn));
+	dist_unlock(gicv2_drv);
 }
 
 /* Enable distributor */
 static void gic_enable_dist(void)
 {
 	/* just set bit 0 to 1 to enable distributor */
+	dist_lock(gicv2_drv);
 	write_gicd32(GICD_CTLR, read_gicd32(GICD_CTLR) | GICD_CTLR_ENABLE);
+	dist_unlock(gicv2_drv);
 }
 
 /* disable distributor */
 static void gic_disable_dist(void)
 {
-	/* just clear bit 0 to 0 to enable distributor */
+	/* just clear bit 0 to 0 to disable distributor */
+	dist_lock(gicv2_drv);
 	write_gicd32(GICD_CTLR, read_gicd32(GICD_CTLR) & (~GICD_CTLR_ENABLE));
+	dist_unlock(gicv2_drv);
 }
 
 /* Config interrupt trigger type */
-void gic_set_irq_type(uint32_t irq, int trigger)
+static void gic_set_irq_type(uint32_t irq, int trigger)
 {
 	uint32_t val, mask, oldmask;
 
@@ -266,6 +292,8 @@ void gic_set_irq_type(uint32_t irq, int trigger)
 			GIC_PPI_BASE);
 	if (trigger >= UK_IRQ_TRIGGER_MAX)
 		return;
+
+	dist_lock(gicv2_drv);
 
 	val = read_gicd32(GICD_ICFGR(irq));
 	mask = oldmask = (val >> ((irq % GICD_I_PER_ICFGRn) * 2)) &
@@ -287,32 +315,11 @@ void gic_set_irq_type(uint32_t irq, int trigger)
 	val &= (~(GICD_ICFGR_MASK << (irq % GICD_I_PER_ICFGRn) * 2));
 	val |= (mask << (irq % GICD_I_PER_ICFGRn) * 2);
 	write_gicd32(GICD_ICFGR(irq), val);
+
+	dist_unlock(gicv2_drv);
 }
 
-int32_t gic_irq_translate(uint32_t type, uint32_t hw_irq)
-{
-	uint32_t irq;
-
-	switch (type) {
-	case GIC_SPI_TYPE:
-		irq = hw_irq + GIC_SPI_BASE;
-		if (irq >= GIC_SPI_BASE && irq < __MAX_IRQ)
-			return irq;
-		break;
-	case GIC_PPI_TYPE:
-		irq = hw_irq + GIC_PPI_BASE;
-		if (irq >= GIC_PPI_BASE && irq < GIC_SPI_BASE)
-			return irq;
-		break;
-	default:
-		uk_pr_warn("Invalid IRQ type [%d]\n", type);
-	}
-
-	uk_pr_err("irq is out of range\n");
-	return -EINVAL;
-}
-
-void gic_handle_irq(void)
+static void gic_handle_irq(void)
 {
 	uint32_t stat, irq;
 
@@ -320,7 +327,12 @@ void gic_handle_irq(void)
 		stat = gic_ack_irq();
 		irq = stat & GICC_IAR_INTID_MASK;
 
-		uk_pr_info("Unikraft: EL1 IRQ#%d trap caught\n", irq);
+#ifndef UKPLAT_LCPU_MULTICORE
+		uk_pr_debug("Unikraft: EL1 IRQ#%d trap caught\n", irq);
+#else
+		uk_pr_debug("Unikraft (Core %ld): EL1 IRQ#%d trap caught\n",
+				ukplat_lcpu_id(), irq);
+#endif
 
 		/*
 		 * TODO: Handle IPI&SGI interrupts here
@@ -356,6 +368,7 @@ static void gic_init_dist(void)
 	if (irq_number > GIC_MAX_IRQ)
 		irq_number = GIC_MAX_IRQ;
 	uk_pr_info("GICv2 Max interrupt lines:%d\n", irq_number);
+
 	/*
 	 * Set all SPI interrupts targets to all CPU.
 	 */
@@ -414,35 +427,19 @@ static void gic_init_cpuif(void)
 	gic_enable_cpuif();
 }
 
-int _dtb_init_gic(const void *fdt)
+static int gic_initialize(void)
 {
-	int fdt_gic, ret;
-
-	uk_pr_info("Probing GICv2...\n");
-
-	/* Currently, we only support 1 GIC per system */
-	fdt_gic = fdt_node_offset_by_compatible_list(fdt, -1,
-				gic_device_list);
-	if (fdt_gic < 0)
-		UK_CRASH("Could not find GICv2 Interrupt Controller!\n");
-
-	/* Get device address and size at regs region */
-	ret = fdt_get_address(fdt, fdt_gic, 0,
-			&gic_dist_addr, &gic_dist_size);
-	if (ret < 0)
-		UK_CRASH("Could not find GICv2 distributor region!\n");
-
-	ret = fdt_get_address(fdt, fdt_gic, 1,
-			&gic_cpuif_addr, &gic_cpuif_size);
-	if (ret < 0)
-		UK_CRASH("Could not find GICv2 cpuif region!\n");
-
-	uk_pr_info("Found GICv2 on:\n");
-	uk_pr_info("\tDistributor  : 0x%lx - 0x%lx\n",
-		gic_dist_addr, gic_dist_addr + gic_dist_size - 1);
-	uk_pr_info("\tCPU interface: 0x%lx - 0x%lx\n",
-		gic_cpuif_addr, gic_cpuif_addr + gic_cpuif_size - 1);
-
+#ifdef UKPLAT_LCPU_MULTICORE
+	if (gicv2_drv.is_initialized) {
+		/* GIC is already initialized, we just need to initialize
+		 * the CPU interface
+		 */
+		gic_init_cpuif();
+		return 0;
+	}
+	gic_is_initialized = 1;
+#endif
+	gicv2_drv.is_initialized = 1;
 
 	/* Initialize GICv2 distributor */
 	gic_init_dist();
@@ -451,4 +448,75 @@ int _dtb_init_gic(const void *fdt)
 	gic_init_cpuif();
 
 	return 0;
+}
+
+struct _gic_dev *gicv2_probe(const void *fdt, int *ret)
+{
+#ifdef UKPLAT_LCPU_MULTICORE
+	if (gicv2_drv.is_probed) {
+		/* GIC is already probed, we don't need to probe again */
+		if (gicv2_drv.is_present)
+			return &gicv2_drv;
+		else
+			return NULL;
+	}
+#endif
+	gicv2_drv.is_probed = 1;
+
+	int fdt_gic, r;
+	struct _gic_operations drv_ops = {
+		.initialize        = gic_initialize,
+		.ack_irq           = gic_ack_irq,
+		.eoi_irq           = gic_eoi_irq,
+		.enable_irq        = gic_enable_irq,
+		.disable_irq       = gic_disable_irq,
+		.set_irq_type      = gic_set_irq_type,
+		.set_irq_prio      = gic_set_irq_prio,
+		.set_irq_affinity  = gic_set_irq_target,
+		.irq_translate     = gic_irq_translate,
+		.handle_irq        = gic_handle_irq,
+	};
+
+	/* Set driver functions */
+	gicv2_drv.ops = drv_ops;
+
+	/* Currently, we only support 1 GIC per system */
+	fdt_gic = fdt_node_offset_by_compatible_list(fdt, -1,
+				gic_device_list);
+	if (fdt_gic < 0) {
+		/* GICv2 not present */
+		*ret = -1;
+		return NULL;
+	}
+
+	/* Get device address and size at regs region */
+	r = fdt_get_address(fdt, fdt_gic, 0,
+			&gicv2_drv.dist_mem_addr, &gicv2_drv.dist_mem_size);
+	if (r < 0) {
+		uk_pr_err("Could not find GICv2 distributor region!\n");
+		*ret = r;
+		return NULL;
+	}
+
+	r = fdt_get_address(fdt, fdt_gic, 1,
+			&gicv2_drv.cpuif_mem_addr, &gicv2_drv.cpuif_mem_size);
+	if (r < 0) {
+		uk_pr_err("Could not find GICv2 cpuif region!\n");
+		*ret = r;
+		return NULL;
+	}
+
+	uk_pr_info("Found GICv2 on:\n");
+	uk_pr_info("\tDistributor  : 0x%lx - 0x%lx\n",
+		gicv2_drv.dist_mem_addr,
+		gicv2_drv.dist_mem_addr + gicv2_drv.dist_mem_size - 1);
+	uk_pr_info("\tCPU interface: 0x%lx - 0x%lx\n",
+		gicv2_drv.cpuif_mem_addr,
+		gicv2_drv.cpuif_mem_addr + gicv2_drv.cpuif_mem_size - 1);
+
+	/* GICv2 is present */
+	gicv2_drv.is_present = 1;
+
+	*ret = 0;
+	return &gicv2_drv;
 }

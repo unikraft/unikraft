@@ -23,7 +23,10 @@
 #include <string.h>
 #include <uk/print.h>
 #include <uk/assert.h>
-#include <gic/gic-v2.h>
+#include <gic/gic.h>
+
+/** GIC driver to call interrupt handler */
+extern struct _gic_dev *gic;
 
 static const char *exception_modes[]= {
 	"Synchronous Abort",
@@ -72,5 +75,10 @@ void trap_el1_sync(struct __regs *regs, uint64_t far)
 
 void trap_el1_irq(void)
 {
-	gic_handle_irq();
+	if (!gic) {
+		uk_pr_crit("GIC driver is not initialized!\n");
+		ukplat_crash();
+	} else {
+		gic->ops.handle_irq();
+	}
 }
