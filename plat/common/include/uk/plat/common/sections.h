@@ -55,6 +55,9 @@ extern char __eh_frame_hdr_start[], __eh_frame_hdr_end[];
 /* [_rodata, _erodata]: contains .rodata.* sections */
 extern char _rodata[], _erodata[];
 
+/* [_slocks, _eslocks]: contains .slocks.* sections */
+extern char _slocks[], _eslocks[];
+
 /* [_data, _edata]: contains .data.* sections */
 extern char _data[], _edata[];
 
@@ -83,6 +86,8 @@ extern char _end[];
 #define __EH_FRAME_HDR_END      __uk_image_symbol(__eh_frame_hdr_end)
 #define __RODATA                __uk_image_symbol(_rodata)
 #define __ERODATA               __uk_image_symbol(_erodata)
+#define __SLOCKS                __uk_image_symbol(_slocks)
+#define __SLOCKS_END            __uk_image_symbol(_eslocks)
 #define __DATA                  __uk_image_symbol(_data)
 #define __EDATA                 __uk_image_symbol(_edata)
 #define __CTORS                 __uk_image_symbol(_ctors)

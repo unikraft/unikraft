@@ -106,6 +106,16 @@ SECTIONS {
 
 	TLS_SECTIONS
 
+	/* Spinlocks area */
+	_slocks = .;
+	.slocks :
+	{
+		*(.slocks)
+		*(.slocks.*)
+	}
+	_eslocks = .;
+	. = ALIGN(__PAGE_SIZE);
+
 	/* Read-write data that is initialized explicitly in code */
 	_data = .;
 	.data :
