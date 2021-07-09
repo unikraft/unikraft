@@ -16,10 +16,13 @@ COMPFLAGS    += -Wall -Wextra
 
 ASFLAGS      += -D__ASSEMBLY__
 
+GDCFLAGS     += -nostdlib -nophoboslib
+
 ASINCLUDES   += -I$(CONFIG_UK_BASE)/include
 CINCLUDES    += -I$(CONFIG_UK_BASE)/include
 CXXINCLUDES  += -I$(CONFIG_UK_BASE)/include
 GOCINCLUDES  += -I$(CONFIG_UK_BASE)/include
+GDCINCLUDES  += -I$(CONFIG_UK_BASE)/include
 
 LIBLDFLAGS  += -nostdlib -Wl,-r -Wl,-d -Wl,--build-id=none -no-pie
 LIBLDFLAGS-$(call have_gcc)	+= -nostdinc
