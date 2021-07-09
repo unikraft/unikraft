@@ -105,12 +105,46 @@ typedef long uk_syscall_arg_t;
 #define UK_ARG_MAP7(m, type, arg, ...) m(type, arg), UK_ARG_MAP6(m, __VA_ARGS__)
 #define UK_ARG_MAPx(nr_args, ...) UK_CONCAT(UK_ARG_MAP, nr_args)(__VA_ARGS__)
 
+/* Variant of UK_ARG_MAPx() but prepends a comma if nr_args > 0 */
+#define UK_ARG_EMAP0(...)
+#define UK_ARG_EMAP1(m, type, arg) , m(type, arg)
+#define UK_ARG_EMAP2(m, type, arg, ...) , m(type, arg), UK_ARG_MAP1(m, __VA_ARGS__)
+#define UK_ARG_EMAP3(m, type, arg, ...) , m(type, arg), UK_ARG_MAP2(m, __VA_ARGS__)
+#define UK_ARG_EMAP4(m, type, arg, ...) , m(type, arg), UK_ARG_MAP3(m, __VA_ARGS__)
+#define UK_ARG_EMAP5(m, type, arg, ...) , m(type, arg), UK_ARG_MAP4(m, __VA_ARGS__)
+#define UK_ARG_EMAP6(m, type, arg, ...) , m(type, arg), UK_ARG_MAP5(m, __VA_ARGS__)
+#define UK_ARG_EMAP7(m, type, arg, ...) , m(type, arg), UK_ARG_MAP6(m, __VA_ARGS__)
+#define UK_ARG_EMAPx(nr_args, ...) UK_CONCAT(UK_ARG_EMAP, nr_args)(__VA_ARGS__)
+
 #define UK_S_ARG_LONG(type, arg)   long arg
 #define UK_S_ARG_ACTUAL(type, arg) type arg
 #define UK_S_ARG_LONG_MAYBE_UNUSED(type, arg)   long arg __maybe_unused
 #define UK_S_ARG_ACTUAL_MAYBE_UNUSED(type, arg) type arg __maybe_unused
 #define UK_S_ARG_CAST_LONG(type, arg)   (long) arg
 #define UK_S_ARG_CAST_ACTUAL(type, arg) (type) arg
+
+#if CONFIG_LIBSYSCALL_SHIM_DEBUG || CONFIG_LIBUKDEBUG_PRINTD
+#define UK_ARG_FMT_MAP0(...)
+#define UK_ARG_FMT_MAP1(m, type, arg) m(type, arg)
+#define UK_ARG_FMT_MAP2(m, type, arg, ...) m(type, arg) ", " UK_ARG_FMT_MAP1(m, __VA_ARGS__)
+#define UK_ARG_FMT_MAP3(m, type, arg, ...) m(type, arg) ", " UK_ARG_FMT_MAP2(m, __VA_ARGS__)
+#define UK_ARG_FMT_MAP4(m, type, arg, ...) m(type, arg) ", " UK_ARG_FMT_MAP3(m, __VA_ARGS__)
+#define UK_ARG_FMT_MAP5(m, type, arg, ...) m(type, arg) ", " UK_ARG_FMT_MAP4(m, __VA_ARGS__)
+#define UK_ARG_FMT_MAP6(m, type, arg, ...) m(type, arg) ", " UK_ARG_FMT_MAP5(m, __VA_ARGS__)
+#define UK_ARG_FMT_MAP7(m, type, arg, ...) m(type, arg) ", " UK_ARG_FMT_MAP6(m, __VA_ARGS__)
+#define UK_ARG_FMT_MAPx(nr_args, ...) UK_CONCAT(UK_ARG_FMT_MAP, nr_args)(__VA_ARGS__)
+
+#define UK_S_ARG_FMT_LONG(type, arg)  "(" STRINGIFY(type) ") %ld"
+#define UK_S_ARG_FMT_LONGX(type, arg)  "(" STRINGIFY(type) ") 0x%lx"
+
+#define __UK_SYSCALL_PRINTD(x, rtype, fname, ...)			\
+	_uk_printd(__STR_LIBNAME__, __STR_BASENAME__, __LINE__,		\
+		   "(" STRINGIFY(rtype) ") " STRINGIFY(fname)		\
+		   "(" UK_ARG_FMT_MAPx(x, UK_S_ARG_FMT_LONGX, __VA_ARGS__) ")\n" \
+		   UK_ARG_EMAPx(x, UK_S_ARG_CAST_LONG, __VA_ARGS__) )
+#else
+#define __UK_SYSCALL_PRINTD(...) do {} while(0)
+#endif /* CONFIG_LIBSYSCALL_SHIM_DEBUG || CONFIG_LIBUKDEBUG_PRINTD */
 
 /* System call implementation that uses errno and returns -1 on errors */
 /* TODO: `void` as return type is currently not supported.
@@ -139,6 +173,7 @@ typedef long uk_syscall_arg_t;
 					UK_S_ARG_ACTUAL, __VA_ARGS__)); \
 	long ename(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__))		\
 	{								\
+		__UK_SYSCALL_PRINTD(x, rtype, ename, __VA_ARGS__);	\
 		return (long) __##ename(				\
 			UK_ARG_MAPx(x, UK_S_ARG_CAST_ACTUAL, __VA_ARGS__)); \
 	}								\
@@ -210,6 +245,7 @@ typedef long uk_syscall_arg_t;
 						 __VA_ARGS__));		\
 	long rname(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__))		\
 	{								\
+		__UK_SYSCALL_PRINTD(x, rtype, rname, __VA_ARGS__);	\
 		return (long) __##rname(				\
 			UK_ARG_MAPx(x, UK_S_ARG_CAST_ACTUAL, __VA_ARGS__)); \
 	}								\

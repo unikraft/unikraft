@@ -35,7 +35,6 @@
 
 #include <errno.h>
 #include <time.h>
-#include <utime.h>
 #include <unistd.h>
 #include <sys/time.h>
 #include <uk/plat/time.h>
@@ -49,11 +48,6 @@
 #include <uk/plat/lcpu.h>
 #endif
 #include <uk/essentials.h>
-
-int utime(const char *filename __unused, const struct utimbuf *times __unused)
-{
-	return 0;
-}
 
 #ifndef CONFIG_HAVE_SCHED
 /* Workaround until Unikraft changes interface for something more
@@ -145,8 +139,10 @@ UK_SYSCALL_R_DEFINE(int, gettimeofday, struct timeval *, tv, void *, tz)
 	return 0;
 }
 
-int clock_getres(clockid_t clk_id __unused, struct timespec *res __unused)
+UK_SYSCALL_R_DEFINE(int, clock_getres, clockid_t, clk_id,
+		    struct timespec *, res)
 {
+	UK_WARN_STUBBED();
 	return 0;
 }
 
@@ -181,8 +177,10 @@ out_error:
 	return -error;
 }
 
-int clock_settime(clockid_t clk_id __unused, const struct timespec *tp __unused)
+UK_SYSCALL_R_DEFINE(int, clock_settime, clockid_t, clk_id,
+		    const struct timespec *, tp)
 {
+	UK_WARN_STUBBED();
 	return 0;
 }
 
@@ -191,8 +189,9 @@ UK_SYSCALL_R_DEFINE(int, times, struct tm *, buf)
 	return -ENOTSUP;
 }
 
-int setitimer(int which __unused, const struct itimerval *new_value __unused,
-		struct itimerval *old_value __unused)
+UK_SYSCALL_R_DEFINE(int, setitimer, int, which,
+		    const struct itimerval *, new_value,
+		    struct itimerval *, old_value)
 {
 	UK_WARN_STUBBED();
 	return 0;
