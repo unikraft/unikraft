@@ -1,0 +1,27 @@
+posix_socket_get_family
+posix_socket_family_count
+_posix_socket_family_register
+_posix_socket_family_unregister
+
+socket_alloc_fd
+posix_socket_file_get
+
+# Full socket API
+socket
+accept
+bind
+shutdown
+getpeername
+getsockname
+getnameinfo
+getsockopt
+setsockopt
+connect
+listen
+recv
+recvfrom
+recvmsg
+send
+sendmsg
+sendto
+socketpair

@@ -1,0 +1,17 @@
+menuconfig LIBPOSIX_SOCKET
+	bool "posix-socket: Abstraction for communication sockets"
+	default n
+	select LIBUKDEBUG
+	select LIBUKALLOC
+	help
+		This microlibrary allows other microlibraries to register a socket family
+		number, such as AF_INET, for their socket implementation and provides the
+		POSIX socket API unikernel-wide and acts appropriately on a given file
+		descriptor.
+
+		The API includes prototypes for socket(), accept(), bind(), shutdown(),
+		connect(), listen(), send(), sendmsg(), sendto(), recv(), recvfrom(),
+		recvmsg(), getpeername(), getsockname(), getsockopt() and setsockopt().
+
+if LIBPOSIX_SOCKET
+endif
