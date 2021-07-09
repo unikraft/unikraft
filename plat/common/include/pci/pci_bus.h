@@ -150,7 +150,7 @@ struct pci_device {
 	struct pci_driver     *drv;
 	enum pci_device_state state;
 
-	uint16_t base;
+	unsigned long base;
 	unsigned long irq;
 };
 
@@ -174,5 +174,123 @@ struct pci_device {
 /* Do not use this function directly: */
 void _pci_register_driver(struct pci_driver *drv);
 
+struct pci_bus_handler {
+	struct uk_bus b;
+	struct uk_alloc *a;
+	struct uk_list_head drv_list;  /**< List of PCI drivers */
+	struct uk_list_head dev_list;  /**< List of PCI devices */
+};
+static struct pci_bus_handler ph __unused;
+
+#define PCI_INVALID_ID              (0xFFFF)
+#define PCI_DEVICE_ID_MASK          (0xFFFF)
+
+#define PCI_CONFIG_ADDR             (0xCF8)
+#define PCI_CONFIG_DATA             (0xCFC)
+
+/* 8 bits for bus number, 5 bits for devices, 3 for functions */
+#define PCI_MAX_BUSES               (1 << 8)
+#define PCI_MAX_DEVICES             (1 << 5)
+#define PCI_MAX_FUNCTIONS           (1 << 3)
+
+#define PCI_BUS_BIT_NBR			(8)
+#define PCI_DEV_BIT_NBR			(5)
+#define PCI_FN_BIT_NBR			(3)
+
+#define PCI_BUS_SHIFT               (16)
+#define PCI_DEVICE_SHIFT            (11)
+#define PCI_FUNCTION_SHIFT          (8)
+#define PCI_ENABLE_BIT              (1u << 31)
+
+#define PCI_CONF_CLASS_ID          (0x08)
+#define PCI_CONF_CLASS_ID_SHFT     (16)
+#define PCI_CONF_CLASS_ID_MASK     (0xFF00)
+
+#define PCI_CONF_VENDOR_ID          (0x00)
+#define PCI_CONF_VENDOR_ID_SHFT     (0)
+#define PCI_CONF_VENDOR_ID_MASK     (0x0000FFFF)
+
+#define PCI_CONF_DEVICE_ID          (0x00)
+#define PCI_CONF_DEVICE_ID_SHFT     (16)
+#define PCI_CONF_DEVICE_ID_MASK     (0x0000FFFF)
+
+#define PCI_CONF_SUBSYSVEN_ID          (0x2c)
+#define PCI_CONF_SUBSYSVEN_ID_SHFT     (0)
+#define PCI_CONF_SUBSYSVEN_ID_MASK     (0xFFFF)
+
+#define PCI_CONF_SUBCLASS_ID          (0x08)
+#define PCI_CONF_SUBCLASS_ID_SHFT     (16)
+#define PCI_CONF_SUBCLASS_ID_MASK     (0x00FF)
+
+#define PCI_CONF_SECONDARY_BUS          (0x18)
+#define PCI_CONF_SECONDARY_BUS_SHFT     (0)
+#define PCI_CONF_SECONDARY_BUS_MASK     (0xFF00)
+
+#define PCI_HEADER_TYPE_MSB_MASK   (0x80)
+#define PCI_CONF_HEADER_TYPE       (0x00)
+#define PCI_CONF_HEADER_TYPE_SHFT  (16)
+#define PCI_CONF_HEADER_TYPE_MASK  (0xFF)
+
+#define PCI_CONF_SUBSYS_ID          (0x2c)
+#define PCI_CONF_SUBSYS_ID_SHFT     (16)
+#define PCI_CONF_SUBSYS_ID_MASK     (0xFFFF)
+
+#define PCI_CONF_IRQ                (0X3C)
+#define PCI_CONF_IRQ_SHFT           (0x0)
+#define PCI_CONF_IRQ_MASK           (0XFF)
+
+#define PCI_CONF_IOBAR              (0x10)
+#define PCI_CONF_IOBAR_SHFT         (0x0)
+#define PCI_CONF_IOBAR_MASK         (~0x3)
+
+#define PCI_BASE_ADDRESS_0	0x10	/* 32 bits */
+#define PCI_BASE_ADDRESS_1	0x14	/* 32 bits */
+#define PCI_BASE_ADDRESS_2	0x18	/* 32 bits */
+#define PCI_BASE_ADDRESS_3	0x1c	/* 32 bits */
+#define PCI_BASE_ADDRESS_4	0x20	/* 32 bits */
+#define PCI_BASE_ADDRESS_5	0x24	/* 32 bits */
+
+#define PCI_VENDOR_ID		0x0
+#define PCI_DEV_ID			0x02
+
+#define PCI_BUS_OFFSET       16
+#define PCI_SLOT_OFFSET      11
+#define PCI_FUNC_OFFSET      8
+#define PCI_CONFIG_ADDRESS_ENABLE   0x80000000
+#define PCI_COMMAND_OFFSET   0x4
+#define PCI_BUS_MASTER_BIT   0x2
+#define PCI_STATUS_OFFSET    0x6
+#define PCI_CLASS_REVISION   0x8
+#define PCI_CLASS_OFFSET     0xb
+#define PCI_SUBCLASS_OFFSET	 0xa
+#define PCI_HEADER_TYPE      0xe
+#define PCI_SUBSYSTEM_ID     0x2e
+#define PCI_SUBSYSTEM_VID    0x2c
+#define PCI_HEADER_MULTI_FUNC   0x80
+#define PCI_BAR0_ADDR        0x10
+#define PCI_CONFIG_SECONDARY_BUS   0x19
+#define PCI_CAPABILITIES_PTR   0x34
+
+#define PCI_COMMAND		0x04	/* 16 bits */
+#define  PCI_COMMAND_IO		0x1	/* Enable response in I/O space */
+#define  PCI_COMMAND_MEMORY	0x2	/* Enable response in Memory space */
+#define  PCI_COMMAND_MASTER	0x4	/* Enable bus mastering */
+#define  PCI_COMMAND_SPECIAL	0x8	/* Enable response to special cycles */
+#define  PCI_COMMAND_INVALIDATE	0x10	/* Use memory write and invalidate */
+#define  PCI_COMMAND_VGA_PALETTE 0x20	/* Enable palette snooping */
+#define  PCI_COMMAND_PARITY	0x40	/* Enable parity checking */
+#define  PCI_COMMAND_WAIT	0x80	/* Enable address/data stepping */
+#define  PCI_COMMAND_SERR	0x100	/* Enable SERR */
+#define  PCI_COMMAND_FAST_BACK	0x200	/* Enable back-to-back writes */
+#define  PCI_COMMAND_INTX_DISABLE 0x400 /* INTx Emulation Disable */
+#define PCI_COMMAND_DECODE_ENABLE	(PCI_COMMAND_MEMORY | PCI_COMMAND_IO)
+
+/* 0x35-0x3b are reserved */
+#define PCI_INTERRUPT_LINE	0x3c	/* 8 bits */
+#define PCI_INTERRUPT_PIN	0x3d	/* 8 bits */
+#define PCI_MIN_GNT		0x3e	/* 8 bits */
+#define PCI_MAX_LAT		0x3f	/* 8 bits */
+
+struct pci_driver *pci_find_driver(struct pci_device_id *id);
 
 #endif /* __UKPLAT_COMMON_PCI_BUS_H__ */

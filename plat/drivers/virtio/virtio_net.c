@@ -833,7 +833,6 @@ static __u16 virtio_net_mtu_get(struct uk_netdev *n)
 static int virtio_netdev_feature_negotiate(struct virtio_net_device *vndev)
 {
 	__u64 host_features = 0;
-	__u16 hw_len;
 	int rc = 0;
 
 	/**
@@ -863,16 +862,19 @@ static int virtio_netdev_feature_negotiate(struct virtio_net_device *vndev)
 	 * virtio device in a separate header file which could be reused across
 	 * different virtio devices.
 	 */
-	hw_len = virtio_config_get(vndev->vdev,
+	virtio_config_get(vndev->vdev,
 				   __offsetof(struct virtio_net_config, mac),
 				   &vndev->hw_addr.addr_bytes[0],
 				   UK_NETDEV_HWADDR_LEN, 1);
-	if (unlikely(hw_len != UK_NETDEV_HWADDR_LEN)) {
-		uk_pr_err("Failed to retrieve the mac address from device\n");
-		rc = -EAGAIN;
-		goto exit;
-	}
 	rc = 0;
+	uk_pr_info("vndev->hw_addr.addr_bytes=[%x %x %x %x %x %x]\n",
+		vndev->hw_addr.addr_bytes[0],
+		vndev->hw_addr.addr_bytes[1],
+		vndev->hw_addr.addr_bytes[2],
+		vndev->hw_addr.addr_bytes[3],
+		vndev->hw_addr.addr_bytes[4],
+		vndev->hw_addr.addr_bytes[5]);
+
 
 	/**
 	 * Mask out features supported by both driver and device.

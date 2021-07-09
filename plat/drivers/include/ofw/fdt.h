@@ -33,7 +33,28 @@
 #ifndef _PLAT_DRIVER_OFW_FDT_H
 #define _PLAT_DRIVER_OFW_FDT_H
 
+#include <stdbool.h>
+
 #define FDT_BAD_ADDR (uint64_t)(-1)
+
+/**
+ * fdt_find_irq_parent_offset - find the irq parent offset
+ * @fdt: pointer to the device tree blob
+ * @offset: offset of the node whose irq parent to find
+ *
+ * fdt_find_irq_parent_offset() returns the offset of the irq parent
+ * of given @offset
+ *
+ * returns:
+ *	structure block offset of the located node (>= 0), on success
+ *	-FDT_ERR_NOTFOUND, no node with that phandle exists
+ *	-FDT_ERR_BADPHANDLE, given phandle value was invalid (0 or -1)
+ *	-FDT_ERR_BADMAGIC,
+ *	-FDT_ERR_BADVERSION,
+ *	-FDT_ERR_BADSTATE,
+ *	-FDT_ERR_BADSTRUCTURE, standard meanings
+ */
+int fdt_find_irq_parent_offset(const void *fdt, int offset);
 
 /**
  * fdt_interrupt_cells - retrieve the number of cells needed to encode an
@@ -117,6 +138,34 @@ int fdt_node_offset_by_compatible_list(const void *fdt, int startoffset,
 					const char * const compatibles[]);
 
 /**
+ * fdt_node_offset_idx_by_compatible_list - find nodes with a given
+ *                                     'compatible' list value, and return
+ *                                     index of compatible array
+ * @fdt: pointer to the device tree blob
+ * @startoffset: only find nodes after this offset
+ * @compatibles: a list of 'compatible' string to match, should be ended
+ * with NULL string.
+ * @idx the index of compatible array
+ * fdt_node_offset_idx_by_compatible_list() returns the offset of the
+ * first matched node after startoffset, which has a 'compatible'
+ * property which lists the given compatible string; or if
+ * startoffset is -1, the very first such node in the tree.
+ *
+ * returns:
+ *     structure block offset of the located node (>= 0, >startoffset),
+ *              on success
+ *     -FDT_ERR_NOTFOUND, no node matching the criterion exists in the
+ *             tree after startoffset
+ *     -FDT_ERR_BADOFFSET, nodeoffset does not refer to a BEGIN_NODE tag
+ *     -FDT_ERR_BADMAGIC,
+ *     -FDT_ERR_BADVERSION,
+ *     -FDT_ERR_BADSTATE,
+ *     -FDT_ERR_BADSTRUCTURE, standard meanings
+ */
+int fdt_node_offset_idx_by_compatible_list(const void *fdt, int startoffset,
+				const char * const compatibles[], int *index);
+
+/**
  * fdt_get_interrupt - retrieve device interrupt of a given index
  * @fdt: pointer to the device tree blob
  * @nodeoffset: offset of the node to find the address for
@@ -135,4 +184,27 @@ int fdt_node_offset_by_compatible_list(const void *fdt, int startoffset,
  */
 int fdt_get_interrupt(const void *fdt, int nodeoffset,
 				uint32_t index, int *size, fdt32_t **prop);
+
+/**
+ * fdt_prop_read_bool - Find a property
+ * @fdt: pointer to the device tree blob
+ * @start_offset: start offset of the node to find the address for
+ * @propname:	name of the property to be searched.
+ *
+ * Search for a property in a device node.
+ * Returns true if the property exists false otherwise.
+ */
+bool fdt_prop_read_bool(const void *fdt, int start_offset,
+					 const char *propname);
+
+/**
+ * fdt_translate_address_by_ranges - Translate an address from the
+ * device-tree into a CPU physical address, this walks up the tree and
+ * applies the various bus mappings on the way.
+ * @fdt: pointer to the device tree blob
+ * @node_offset: start offset of the node to find the address for
+ * @regs regs in device-tree
+ */
+uint64_t fdt_translate_address_by_ranges(const void *fdt,
+				int node_offset, const fdt32_t *regs);
 #endif

@@ -60,11 +60,12 @@
  * Each entry in L2_TABLE can map to a 2MiB block memory or link to a
  * L3_TABLE which supports 2MiB memory mapping. We need a L3_TABLE to
  * cover image area for us to manager different sections attributes.
- * So, we need one page for L2_TABLE to provide 511 enties for 2MiB
- * block mapping and 1 entry for L3_TABLE link.
+ * So, we need two page for L2_TABLE. One is to provide a protecting hole
+ * from memory corrupting. One is to provide 511 enties for 2MiB block
+ * mapping and 1 entry for L3_TABLE link.
  */
 #define L2_TABLE_OFFSET (L1_TABLE_OFFSET + L1_TABLE_SIZE)
-#define L2_TABLE_SIZE   __PAGE_SIZE
+#define L2_TABLE_SIZE   (__PAGE_SIZE * 2)
 
 /*
  * We will use Unikraft image's size to caculate the L3_TABLE_SIZE.
