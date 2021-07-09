@@ -1,0 +1,6 @@
+menuconfig LIBUKFUTEX
+  bool "ukfutex: Futex syscall implementation"
+  select LIBUKSCHED
+  default y
+  help
+    Futex syscall.
