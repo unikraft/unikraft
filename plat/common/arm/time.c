@@ -54,6 +54,8 @@ static const char * const arch_timer_list[] = {
 	NULL
 };
 
+static uint32_t timer_irq;
+
 void generic_timer_mask_irq(void)
 {
 	set_el0(cntv_ctl, get_el0(cntv_ctl) | GT_TIMER_MASK_IRQ);
@@ -94,13 +96,18 @@ uint32_t generic_timer_get_frequency(int fdt_timer)
 
 unsigned long sched_have_pending_events;
 
-void time_block_until(__snsec until)
+void time_block_until(__nsec until)
 {
-	while ((__snsec) ukplat_monotonic_clock() < until) {
+	while (ukplat_monotonic_clock() < until) {
 		generic_timer_cpu_block_until(until);
 		if (__uk_test_and_clear_bit(0, &sched_have_pending_events))
 			break;
 	}
+}
+
+__nsec ukplat_time_get_ticks(void)
+{
+	return generic_timer_get_ticks();
 }
 
 /* must be called before interrupts are enabled */
@@ -139,6 +146,8 @@ void ukplat_time_init(void)
 	rc = ukplat_irq_register(irq, generic_timer_irq_handler, NULL);
 	if (rc < 0)
 		UK_CRASH("Failed to register timer interrupt handler\n");
+	else
+		timer_irq = irq;
 
 	/*
 	 * Mask IRQ before scheduler start working. Otherwise we will get
@@ -148,4 +157,9 @@ void ukplat_time_init(void)
 
 	/* Enable timer */
 	generic_timer_enable();
+}
+
+uint32_t ukplat_time_get_irq(void)
+{
+	return timer_irq;
 }

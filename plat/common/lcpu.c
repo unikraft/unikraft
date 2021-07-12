@@ -48,7 +48,7 @@ void ukplat_lcpu_halt_irq(void)
 	ukplat_lcpu_disable_irq();
 }
 
-void ukplat_lcpu_halt_to(__snsec until)
+void ukplat_lcpu_halt_to(__nsec until)
 {
 	unsigned long flags;
 
