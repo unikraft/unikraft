@@ -40,6 +40,8 @@
 #define MYMULTIBOOT_FLAGS \
     (MULTIBOOT_PAGE_ALIGN | MULTIBOOT_MEMORY_INFO | MULTIBOOT_AOUT_KLUDGE)
 
+#ifndef CONFIG_ENABLE_PIE
+
 .section .data.boot
 
 .align 4
@@ -260,6 +262,8 @@ nopku:
 	cli
 	hlt
 END(_libkvmplat_start64)
+
+#endif /* CONFIG_ENABLE_PIE */
 
 .text
 ENTRY(_libkvmplat_newstack)
