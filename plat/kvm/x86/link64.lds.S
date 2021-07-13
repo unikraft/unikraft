@@ -50,6 +50,8 @@ SECTIONS
 
 	INITTAB_SECTION
 
+	EVENTTAB_SECTION
+
 	/* Read-only data */
 	. = ALIGN(__PAGE_SIZE);
 	_rodata = .;
