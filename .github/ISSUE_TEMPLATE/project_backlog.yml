@@ -1,0 +1,51 @@
+name: 📥 Add to the backlog
+description: Create an issue for new work to be done which has been discussed.
+labels: [kind/enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please only use this form to submit new, well-defined work to the Unikraft project's backlog.  Issues under this category have been discussed with the core team.
+
+        If you're intending to request a feature, please [open a discussion using the "Ideas" category](https://github.com/unikraft/unikraft/discussions/new) instead so we can understand your workflow first.  If you are unsure about a feature, please [check out our documentation](https://docs.unikraft.org/) which covers existing features and possibilities with Unikraft or filter existing issues labelled under [`kind/enhancement`](https://github.com/unikraft/unikraft/labels/kind/enhancement) to prevent double-posting.
+  - type: textarea
+    id: feature-request-summary
+    attributes:
+      label: Feature request summary
+      description: Please provide a quick summary which clearly and concisely describes the feature.  For example, highlights of new functionality; proposal of a new architecture or platform; additions to documentation; etc.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Describe alternatives
+      description: A clear and concise description of any alternative solutions or features considered.
+    validations:
+      required: false
+  - type: dropdown
+    id: related-architectures
+    attributes:
+      label: Related architectures
+      description: Please indicate whether the feature request is related to a specific architecture.  If this feature is architecture agnostic or you are unsure then please do not select an architecture listed below.
+      multiple: false
+      options:
+        - x86_64
+        - arm
+        - arm64
+  - type: dropdown
+    id: related-platforms
+    attributes:
+      label: Related platforms
+      description: Please indicate whether the feature request is related to a specific platform.  If this feature is platform agnostic or you are unsure then please do not select an platform listed below.
+      multiple: false
+      options:
+        - kvm
+        - xen
+        - linuxu
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add any other context, longer descriptions, screenshot/mock-ups, or links to related material about the feature request.
+    validations:
+      required: false
