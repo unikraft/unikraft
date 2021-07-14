@@ -474,7 +474,7 @@ $(4): $(2) | preprocess
 		       $$($(call vprefix_lib,$(1),ASINCLUDES)) $$($(call vprefix_lib,$(1),ASINCLUDES-y)) \
 		       $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
 		       $$($(call vprefix_glb,$(3),ARCHFLAGS)) $$($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
-		       $$(ASFLAGS) $$(ASFLAGS-y) \
+		       $$(ASFLAGS) $$(ASFLAGS-y) $$(ASFLAGS_EXTRA) \
 		       $$($(call vprefix_lib,$(1),ASFLAGS)) $$($(call vprefix_lib,$(1),ASFLAGS-y)) \
 		       $$($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $$($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
 		       $(5) \
@@ -501,7 +501,7 @@ $(4): $(2) | preprocess
 		       $$($(call vprefix_lib,$(1),ASINCLUDES)) $$($(call vprefix_lib,$(1),ASINCLUDES-y)) \
 		       $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
 		       $$($(call vprefix_glb,$(3),ARCHFLAGS)) $$($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
-		       $$(ASFLAGS) $$(ASFLAGS-y) \
+		       $$(ASFLAGS) $$(ASFLAGS-y) $$(ASFLAGS_EXTRA) \
 		       $$($(call vprefix_lib,$(1),ASFLAGS)) $$($(call vprefix_lib,$(1),ASFLAGS-y)) \
 		       $$($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $$($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
 		       $(5) \
@@ -526,7 +526,7 @@ $(4): $(2) | preprocess
 		       $$($(call vprefix_lib,$(1),CINCLUDES)) $$($(call vprefix_lib,$(1),CINCLUDES-y)) \
 		       $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
 		       $$($(call vprefix_glb,$(3),ARCHFLAGS)) $$($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
-		       $$(CFLAGS) $$(CFLAGS-y) \
+		       $$(CFLAGS) $$(CFLAGS-y) $$(CFLAGS_EXTRA) \
 		       $$($(call vprefix_lib,$(1),CFLAGS)) $$($(call vprefix_lib,$(1),CFLAGS-y)) \
 		       $$($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $$($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
 		       $(5) \
@@ -550,7 +550,7 @@ $(4): $(2) | preprocess
 		       $$($(call vprefix_lib,$(1),CXXINCLUDES)) $$($(call vprefix_lib,$(1),CXXINCLUDES-y)) \
 		       $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
 		       $$($(call vprefix_glb,$(3),ARCHFLAGS)) $$($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
-		       $$(CXXFLAGS) $$(CXXFLAGS-y) \
+		       $$(CXXFLAGS) $$(CXXFLAGS-y) $$(CXXFLAGS_EXTRA) \
 		       $$($(call vprefix_lib,$(1),CXXFLAGS)) $$($(call vprefix_lib,$(1),CXXFLAGS-y)) \
 		       $$($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $$($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
 		       $(5) \
@@ -582,7 +582,7 @@ $(4): $(2) | preprocess
 		       $$($(call vprefix_lib,$(1),GOCINCLUDES)) $$($(call vprefix_lib,$(1),GOCINCLUDES-y)) \
 		       $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
 		       $$($(call vprefix_glb,$(3),ARCHFLAGS)) $$($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
-		       $$(GOCFLAGS) $$(GOCFLAGS-y) \
+		       $$(GOCFLAGS) $$(GOCFLAGS-y) $$(GOCFLAGS_EXTRA) \
 		       $$($(call vprefix_lib,$(1),GOCFLAGS)) $$($(call vprefix_lib,$(1),GOCFLAGS-y)) \
 		       $$($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $$($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
 		       $(5) \
@@ -614,7 +614,7 @@ $(4): $(2) | preprocess
 		       $$($(call vprefix_lib,$(1),ASINCLUDES)) $$($(call vprefix_lib,$(1),ASINCLUDES-y)) \
 		       $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
 		       $$(ARCHFLAGS) $$(ARCHFLAGS-y) \
-		       $$(ASFLAGS) $$(ASFLAGS-y) \
+		       $$(ASFLAGS) $$(ASFLAGS-y) $$(ASFLAGS_EXTRA) \
 		       $$($(call vprefix_lib,$(1),ASFLAGS)) $$($(call vprefix_lib,$(1),ASFLAGS-y)) \
 		       $$($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $$($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
 		       $(5) \
@@ -718,7 +718,7 @@ $(3): $(2) | prepare
 		$(M4)  $$(M4INCLUDES) $$(M4INCLUDES-y) \
 		       $$($(call vprefix_lib,$(1),M4INCLUDES)) $$($(call vprefix_lib,$(1),M4INCLUDES-y)) \
 		       $$($(call vprefix_src,$(1),$(2),,M4INCLUDES)) $$($(call vprefix_src,$(1),$(2),,M4INCLUDES-y)) \
-		       $$(M4FLAGS) $$(M4FLAGS-y) \
+		       $$(M4FLAGS) $$(M4FLAGS-y) $$(M4FLAGS_EXTRA) \
 		       $$($(call vprefix_lib,$(1),M4FLAGS)) $$($(call vprefix_lib,$(1),M4FLAGS-y)) \
 		       $$($(call vprefix_src,$(1),$(2),,M4FLAGS)) $$($(call vprefix_src,$(1),$(2),,M4FLAGS-y)) \
 		       $(4) \
