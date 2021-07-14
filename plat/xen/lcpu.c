@@ -51,6 +51,13 @@ void ukplat_lcpu_disable_irq(void)
 	local_irq_disable();
 }
 
+void ukplat_lcpu_halt_irq(void)
+{
+	ukplat_lcpu_enable_irq();
+	halt();
+	ukplat_lcpu_disable_irq();
+}
+
 unsigned long ukplat_lcpu_save_irqf(void)
 {
 	unsigned long flags;

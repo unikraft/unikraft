@@ -35,7 +35,6 @@
 #include <uk/plat/lcpu.h>
 #include <x86/irq.h>
 
-
 void ukplat_lcpu_enable_irq(void)
 {
 	local_irq_enable();
@@ -43,6 +42,21 @@ void ukplat_lcpu_enable_irq(void)
 
 void ukplat_lcpu_disable_irq(void)
 {
+	local_irq_disable();
+}
+
+void ukplat_lcpu_halt_irq(void)
+{
+	/*
+	 * We have to be careful when enabling interrupts before entering a
+	 * halt state. If we want to wait for an interrupt (e.g., a timer)
+	 * the interrupt may fire in the short window between sti and hlt and
+	 * we are going to halt forever. As sti only enables interrupts after
+	 * the following instruction, we can avoid the race condition by
+	 * ensuring that hlt immediately follows sti. There must be no
+	 * instruction in between.
+	 */
+	local_irq_enable_halt();
 	local_irq_disable();
 }
 
