@@ -79,6 +79,13 @@ void ukplat_lcpu_disable_irq(void)
 	irq_enabled = 0;
 }
 
+void ukplat_lcpu_halt_irq(void)
+{
+	ukplat_lcpu_enable_irq();
+	halt();
+	ukplat_lcpu_disable_irq();
+}
+
 int ukplat_lcpu_irqs_disabled(void)
 {
 	return (irq_enabled == 0);

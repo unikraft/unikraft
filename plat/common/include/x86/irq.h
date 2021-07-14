@@ -49,6 +49,11 @@
 	asm volatile("sti" : : : "memory"); \
 })
 
+#define __sti_hlt() \
+({ \
+	asm volatile("sti; hlt" : : : "memory"); \
+})
+
 #define __save_flags(x) \
 	do { \
 		unsigned long __f; \
@@ -83,6 +88,7 @@ static inline int irqs_disabled(void)
 #define local_save_flags(x)      __save_flags(x)
 #define local_irq_disable()      __cli()
 #define local_irq_enable()       __sti()
+#define local_irq_enable_halt()  __sti_hlt()
 
 #define __MAX_IRQ	16
 

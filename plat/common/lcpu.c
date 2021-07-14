@@ -34,18 +34,10 @@
 #include <uk/plat/common/cpu.h>
 #include <uk/plat/common/_time.h>
 
-
 void ukplat_lcpu_halt(void)
 {
 	ukplat_lcpu_disable_irq();
 	halt();
-}
-
-void ukplat_lcpu_halt_irq(void)
-{
-	ukplat_lcpu_enable_irq();
-	halt();
-	ukplat_lcpu_disable_irq();
 }
 
 void ukplat_lcpu_halt_to(__snsec until)
