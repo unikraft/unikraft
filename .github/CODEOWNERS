@@ -1,0 +1,26 @@
+# https://help.github.com/articles/about-codeowners/
+
+# These owners are the default owners for all Unikraft core files.
+*                     @unikraft/maintainers-core
+
+# Along with all default owners, these owners oversee hardware architectures.
+/arch/                @unikraft/maintainers-arch
+
+# Along with all default owners, these owners oversee platforms.
+/plat/                @unikraft/maintainers-plat
+
+# Along with all default owners, these owners oversee internal libraries.
+/lib/                 @unikraft/maintainers-libs
+/lib/ukalloc/         @unikraft/maintainers-alloc
+/lib/ukallocbuddy/    @unikraft/maintainers-alloc
+/lib/ukallocpool/     @unikraft/maintainers-alloc
+/lib/ukallocregion/   @unikraft/maintainers-alloc
+
+# The include folder is used by architectures, platforms and libraries.
+/include/             @unikraft/maintainers-arch @unikraft/maintainers-plat @unikraft/maintainers-libs
+
+# Along with all default owners, these owners oversee the build system and
+# auxiliary tooling and scripts.
+/Makefile             @unikraft/maintainers-build
+/Makefile.uk          @unikraft/maintainers-build
+/support/             @unikraft/maintainers-build
