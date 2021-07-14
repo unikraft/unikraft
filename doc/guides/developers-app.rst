@@ -657,6 +657,13 @@ below: ::
   print-vars             - prints all the variables currently defined in Makefile
   make V=0|1             - 0 => quiet build (default), 1 => verbose build
 
+Additional flags can be passed to the compiler via environment variables, e.g.,
+``CFLAGS_EXTRA`` in the case of C:
+
+.. code-block:: bash
+
+  make CFLAGS_EXTRA="-DSOME_MACRO=0"
+
 
 ============================
 Patch Creation
