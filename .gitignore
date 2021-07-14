@@ -26,6 +26,7 @@
 *.pyc
 !.gitignore
 .*
+!.github/
 
 # gnu global files
 GPATH
