@@ -1,0 +1,9 @@
+menuconfig LIBPOSIX_FUTEX
+	bool "posix-futex: Futex"
+	select NOLIBC if !HAVE_LIBC
+	select UKTIME if !HAVE_LIBC
+	select LIBUKSCHED
+	select LIBUKDEBUG
+	default n
+	help
+		Linux-compatible futex calls
