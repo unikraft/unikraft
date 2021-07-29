@@ -574,30 +574,6 @@ buildrule_CPP = $(call buildrule_cxx,$(1),$(2),$(3),$(4))
 buildrule_C   = $(call buildrule_cxx,$(1),$(2),$(3),$(4))
 buildrule_c$(plus)$(plus) = $(call buildrule_cxx,$(1),$(2),$(3),$(4))
 
-define buildrule_go =
-$(4): $(2) | preprocess
-	$(call build_cmd,GOC,$(1),$(4),\
-		$(GOC) $$(COMPFLAGS) $$(COMPFLAGS-y) \
-		       $$(GOCINCLUDES) $$(GOCINCLUDES-y) \
-		       $$($(call vprefix_lib,$(1),GOCINCLUDES)) $$($(call vprefix_lib,$(1),GOCINCLUDES-y)) \
-		       $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
-		       $$($(call vprefix_glb,$(3),ARCHFLAGS)) $$($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
-		       $$(GOCFLAGS) $$(GOCFLAGS-y) $$(GOCFLAGS_EXTRA) \
-		       $$($(call vprefix_lib,$(1),GOCFLAGS)) $$($(call vprefix_lib,$(1),GOCFLAGS-y)) \
-		       $$($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $$($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
-		       $(5) \
-		       $$(DBGFLAGS) $$(DBGFLAGS-y) \
-		       -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) $(if $(3),-D__VARIANT__=$(3)) \
-		       -c $(2) -o $(4) $(call depflags,$(4))
-	)
-
-UK_SRCS-y += $(2)
-UK_DEPS-y += $(call out2dep,$(4))
-UK_OBJS-y += $(4)
-$(eval $(call vprefix_lib,$(1),OBJS-y) += $(4))
-$(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(4)) $(call out2dep,$(4)))
-endef
-
 define add_lds_to_plat =
 $(eval $(call uc,$(2))_LD_SCRIPT-y += $(1))
 endef
