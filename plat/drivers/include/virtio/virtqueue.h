@@ -134,6 +134,30 @@ int virtqueue_notify_enabled(struct virtqueue *vq);
 int virtqueue_buffer_dequeue(struct virtqueue *vq, void **cookie, __u32 *len);
 
 /**
+ * Remove a list of user buffer from the virtqueue.
+ *
+ * @param vq
+ *	Reference to the virtqueue.
+ * @param cookie
+ *      A list of reference to the cookie that was submitted.
+ *      with the dequeued descriptor after successful exit of this
+ *      function.
+ * @param cnt
+ *	A reference to the count of the max buffer to be dequeued. On
+ *	function exit contains the number of buffers removed from the
+ *	queue.
+ * @param len
+ *	Reference to the length of the data packet.
+ * @return
+ *	>= 0 A buffer was dequeued from the ring and the count indicates
+ *	the number of used slots in the ring after dequeueing.
+ *	< 0 Failed to dequeue a buffer, the output parameters cookie and len
+ *      are unmodified.
+ */
+int virtqueue_buffer_dequeue_burst(struct virtqueue *vq, void **cookie,
+				   __u16 *cnt, __u32 *len);
+
+/**
  * Create a descriptor chain starting at index head,
  * using vq->bufs also starting at index head.
  * @param vq
@@ -158,6 +182,34 @@ int virtqueue_buffer_dequeue(struct virtqueue *vq, void **cookie, __u32 *len);
 int virtqueue_buffer_enqueue(struct virtqueue *vq, void *cookie,
 			     struct uk_sglist *sg, __u16 read_bufs,
 			     __u16 write_bufs);
+
+/**
+ * Enqueue a burst of a chain of descriptor into the virtqueue.
+ * @param vq
+ *	Reference to the virtqueue
+ * @param cookies
+ *	Reference to a list of the cookies to reconstruct the buffer.
+ * @param sg
+ *	Reference to the scatter gather list
+ * @param cnt
+ *	Reference to the cnt of the descriptor to insert into the virtqueue.
+ * @param *read_bufs
+ *	Reference to the list of number of read descriptors
+ * @param *write_bufs
+ *	Reference to the list of number of write descriptors
+ * @return
+ *	> 0 The buffers were added into the ring and the count indicates
+ *	the number of available slots in the ring. The value of cnt should
+ *	remain the same as the number of input descriptor.
+ *	0  The buffers were added and there are no further descriptors
+ *	available. The value of cnt should remain the same as the number of
+ *	input descriptor.
+ *	< 0 Failed to enqueue all the descriptor into the ring . The cnt field
+ *	indicates the number of descriptors added.
+ */
+int virtqueue_buffer_enqueue_burst(struct virtqueue *vq, void **cookies,
+				   struct uk_sglist *sg, __u16 *cnt,
+				   __u16 *read_bufs, __u16 *write_bufs);
 
 /**
  * Allocate a virtqueue.

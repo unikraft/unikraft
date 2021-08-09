@@ -49,6 +49,9 @@ extern "C" {
 #define VIRTIO_CONFIG_STATUS_NEEDS_RESET   0x40 /* device needs reset */
 #define VIRTIO_CONFIG_STATUS_FAIL          0x80 /* device something's wrong*/
 
+/* Can the device handle any descriptor layout? */
+#define VIRTIO_F_ANY_LAYOUT         27
+
 #define VIRTIO_TRANSPORT_F_START    28
 #define VIRTIO_TRANSPORT_F_END      32
 

@@ -274,10 +274,11 @@ int uk_sglist_slice(struct uk_sglist *original, struct uk_sglist **slice,
  * The function create a scatter gather list from the netbuf
  * @param sg
  *	A reference to the scatter gather list.
- * @param m0
+ * @param netbuf
  *	A reference to the netbuf
  * @return
- *	0, on successful creation of the scatter gather list
+ *	> 0, total length of the netbuf packet on successful creation of
+ *	the scatter gather list
  *	-EINVAL, Invalid sg list.
  */
 int uk_sglist_append_netbuf(struct uk_sglist *sg, struct uk_netbuf *netbuf);

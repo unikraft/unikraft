@@ -253,6 +253,20 @@ typedef void (*uk_netdev_queue_event_t)(struct uk_netdev *dev,
 typedef uint16_t (*uk_netdev_alloc_rxpkts)(void *argp,
 					   struct uk_netbuf *pkts[],
 					   uint16_t count);
+/**
+ * User callback used by the driver to free netbufs
+ * that are used to cleanup the tx buffer.
+ *
+ * @param argp
+ *   User-provided argument.
+ * @param pkts
+ *   Array for netbuf pointers that the function should allocate.
+ * @param count
+ *   Number of netbufs requested (equal to length of pkts).
+ */
+typedef void (*uk_netdev_free_txpkts)(void *argp,
+				      struct uk_netbuf *pkts[],
+				      uint16_t count);
 
 /**
  * A structure used to configure an Unikraft network device RX queue.
@@ -275,6 +289,8 @@ struct uk_netdev_rxqueue_conf {
  */
 struct uk_netdev_txqueue_conf {
 	struct uk_alloc *a;               /* Allocator for descriptors. */
+	uk_netdev_free_txpkts free_txpkts; /**< Free up the tx free buffer */
+	void *free_txpkts_argp;		   /**< Argument for the free buffer */
 };
 
 /** Driver callback type to read device/driver capabilities,
@@ -357,16 +373,19 @@ typedef int (*uk_netdev_rxq_intr_disable_t)(struct uk_netdev *dev,
 #define UK_NETDEV_STATUS_MORE     (0x2)
 /** Queue underrun (e.g., out-of-memory when allocating new receive buffers). */
 #define UK_NETDEV_STATUS_UNDERRUN (0x4)
+/** Some erroneous packet were received. */
+#define UK_NETDEV_STATUS_PKT_ERR  (0x8)
 
 /** Driver callback type to retrieve one packet from a RX queue. */
-typedef int (*uk_netdev_rx_one_t)(struct uk_netdev *dev,
+typedef int (*uk_netdev_rx_t)(struct uk_netdev *dev,
 				  struct uk_netdev_rx_queue *queue,
-				  struct uk_netbuf **pkt);
+				  struct uk_netbuf **pkt, __u16 *cnt);
 
 /** Driver callback type to submit one packet to a TX queue. */
-typedef int (*uk_netdev_tx_one_t)(struct uk_netdev *dev,
+typedef int (*uk_netdev_tx_t)(struct uk_netdev *dev,
 				  struct uk_netdev_tx_queue *queue,
-				  struct uk_netbuf *pkt);
+				  struct uk_netbuf **pkt,
+				  __u16 *cnt);
 
 /**
  * A structure containing the functions exported by a driver.
@@ -450,10 +469,10 @@ struct uk_netdev_einfo {
  */
 struct uk_netdev {
 	/** Packet transmission. */
-	uk_netdev_tx_one_t          tx_one; /* by driver */
+	uk_netdev_tx_t        tx; /* by driver */
 
 	/** Packet reception. */
-	uk_netdev_rx_one_t          rx_one; /* by driver */
+	uk_netdev_rx_t          rx; /* by driver */
 
 	/** Pointer to API-internal state data. */
 	struct uk_netdev_data       *_data;

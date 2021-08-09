@@ -30,4 +30,11 @@ if LIBUKNETDEV
 			When this option is enabled a dispatcher thread is
 			allocated for each configured receive queue.
 			libuksched is required for this option.
+
+	config LIBUKNETDEV_MAX_PKT_BURST
+		int "Netdev burst transaction"
+		default 64
+		help
+			The maximum number of packets to be sent/received on a
+			single burst transaction.
 endif
