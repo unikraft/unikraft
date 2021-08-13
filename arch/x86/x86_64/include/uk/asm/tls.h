@@ -62,7 +62,8 @@ static inline void ukarch_tls_area_copy(void *tls_area)
 	memcpy(tls_area, _tls_start, tls_data_len);
 	memset(tls_area + tls_data_len, 0, tls_bss_len);
 	/* x86_64 ABI requires that fs:%0 contains the address of itself. */
-	*((__uptr *)(tls_area + tls_len)) = (__uptr)(tls_area + tls_len);
+	*((__uptr *)(tls_area + tls_len + ukarch_tls_area_align())) =
+                                                    (__uptr)(tls_area + tls_len);
 }
 
 static inline void *ukarch_tls_pointer(void *tls_area)

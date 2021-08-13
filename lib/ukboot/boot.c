@@ -54,6 +54,7 @@
 #include <uk/sched.h>
 #endif
 #include <uk/arch/lcpu.h>
+#include <uk/arch/types.h>
 #include <uk/plat/bootstrap.h>
 #include <uk/plat/memory.h>
 #include <uk/plat/lcpu.h>
@@ -64,6 +65,10 @@
 #include <uk/ctors.h>
 #include <uk/init.h>
 #include <uk/argparse.h>
+#include <string.h>
+#include <uk/arch/tls.h>
+#include <uk/plat/common/tls.h>
+#include <uk/plat/common/cpu.h>
 #ifdef CONFIG_LIBUKLIBPARAM
 #include <uk/libparam.h>
 #endif /* CONFIG_LIBUKLIBPARAM */
@@ -71,6 +76,22 @@
 #include <uk/sp.h>
 #endif
 #include "banner.h"
+
+static void* uk_boot_tls_init(struct uk_alloc *a)
+{
+        void *boot_tls = uk_malloc(a, ukarch_tls_area_size());
+	if (boot_tls == NULL) {
+		uk_pr_warn("Failed to allocate Boot TLS\n");
+		return NULL;
+	}
+
+        ukarch_tls_area_copy(boot_tls);
+
+        set_tls_pointer((uintptr_t)(ukarch_tls_pointer(boot_tls) +
+                        ukarch_tls_area_align()));
+
+        return boot_tls;
+}
 
 int main(int argc, char *argv[]) __weak;
 
@@ -194,26 +215,6 @@ void ukplat_entry(int argc, char *argv[])
 	struct uk_thread *main_thread = NULL;
 #endif
 
-	uk_ctor_func_t *ctorfn;
-
-	uk_pr_info("Unikraft constructor table at %p - %p\n",
-		   &uk_ctortab_start[0], &uk_ctortab_end);
-	uk_ctortab_foreach(ctorfn, uk_ctortab_start, uk_ctortab_end) {
-		UK_ASSERT(*ctorfn);
-		uk_pr_debug("Call constructor: %p())...\n", *ctorfn);
-		(*ctorfn)();
-	}
-
-#ifdef CONFIG_LIBUKLIBPARAM
-	rc = (argc > 1) ? uk_libparam_parse(argv[0], argc - 1, &argv[1]) : 0;
-	if (unlikely(rc < 0))
-		uk_pr_crit("Failed to parse the kernel argument\n");
-	else {
-		kern_args = rc;
-		uk_pr_info("Found %d library args\n", kern_args);
-	}
-#endif /* CONFIG_LIBUKLIBPARAM */
-
 #if !CONFIG_LIBUKBOOT_NOALLOC
 	/* initialize memory allocator
 	 * FIXME: allocators are hard-coded for now
@@ -259,6 +260,33 @@ void ukplat_entry(int argc, char *argv[])
 			UK_CRASH("Could not set the platform memory allocator\n");
 	}
 #endif
+
+        if (_tls_end > _tls_start) {
+        	uk_pr_info("Initialize Boot TLS...\n");
+        	void *boot_tls = uk_boot_tls_init(a);
+	        if (unlikely(!boot_tls))
+	        	UK_CRASH("Could not initialize Boot TLS\n");
+        }
+
+	uk_ctor_func_t *ctorfn;
+
+	uk_pr_info("Unikraft constructor table at %p - %p\n",
+		   &uk_ctortab_start[0], &uk_ctortab_end);
+	uk_ctortab_foreach(ctorfn, uk_ctortab_start, uk_ctortab_end) {
+		UK_ASSERT(*ctorfn);
+		uk_pr_debug("Call constructor: %p())...\n", *ctorfn);
+		(*ctorfn)();
+	}
+
+#ifdef CONFIG_LIBUKLIBPARAM
+	rc = (argc > 1) ? uk_libparam_parse(argv[0], argc - 1, &argv[1]) : 0;
+	if (unlikely(rc < 0))
+		uk_pr_crit("Failed to parse the kernel argument\n");
+	else {
+		kern_args = rc;
+		uk_pr_info("Found %d library args\n", kern_args);
+	}
+#endif /* CONFIG_LIBUKLIBPARAM */
 
 #if CONFIG_LIBUKALLOC
 	uk_pr_info("Initialize IRQ subsystem...\n");
