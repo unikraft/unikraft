@@ -650,3 +650,18 @@ int uk_netdev_mtu_set(struct uk_netdev *dev, uint16_t mtu)
 
 	return dev->ops->mtu_set(dev, mtu);
 }
+
+#ifdef CONFIG_LIBUKNETDEV_METRICS
+int uk_netdev_metrics_get(struct uk_netdev *dev,
+			struct uk_netdev_metrics *dev_metrics)
+{
+	UK_ASSERT(dev);
+	UK_ASSERT(dev_metrics);
+
+	ukarch_spin_lock(&dev->metrics_lock);
+	memcpy(dev_metrics, &dev->metrics, sizeof(*dev_metrics));
+	ukarch_spin_unlock(&dev->metrics_lock);
+
+	return 0;
+}
+#endif /* CONFIG_LIBUKNETDEV_METRICS */

@@ -154,6 +154,9 @@ int uk_netdev_probe(struct uk_netdev *dev);
 void uk_netdev_info_get(struct uk_netdev *dev,
 			struct uk_netdev_info *dev_info);
 
+int uk_netdev_metrics_get(struct uk_netdev *dev,
+			struct uk_netdev_metrics *dev_metrics);
+
 /**
  * Extra information query interface.
  * The user can query the driver for any additional information (e.g,
