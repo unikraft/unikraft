@@ -344,6 +344,12 @@ int uk_netdev_configure(struct uk_netdev *dev,
 		uk_pr_info("netdev%"PRIu16": Configured interface\n",
 			   dev->_data->id);
 		dev->_data->state = UK_NETDEV_CONFIGURED;
+
+#ifdef CONFIG_LIBUKNETDEV_METRICS
+		memset(&dev->metrics, 0, sizeof(dev->metrics));
+		ukarch_spin_init(&dev->metrics_lock);
+#endif /* CONFIG_LIBUKNETDEV_METRICS */
+
 	} else {
 		uk_pr_err("netdev%"PRIu16": Failed to configure interface: %d\n",
 			  dev->_data->id, ret);
