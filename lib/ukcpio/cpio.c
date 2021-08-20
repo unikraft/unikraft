@@ -306,7 +306,7 @@ ukcpio_extract(const char *dest, void *buf, size_t buflen)
 	if (dest == NULL)
 		return -UKCPIO_NODEST;
 
-	while (!error && header) {
+	while ((error == UKCPIO_SUCCESS) && header) {
 		error = read_section(header_ptr, dest, end + buflen);
 		header = *header_ptr;
 	}

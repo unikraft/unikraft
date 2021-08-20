@@ -107,7 +107,7 @@ static int vfscore_rootfs(void)
 			   initrd.base, initrd.len);
 
 		error = ukcpio_extract("/", initrd.base, initrd.len);
-		if (error < 0) {
+		if (error != UKCPIO_SUCCESS) {
 			uk_pr_crit("Failed to extract cpio archive to /: %d\n",
 				   error);
 			return -1;
