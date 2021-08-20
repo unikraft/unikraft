@@ -101,9 +101,33 @@ typedef void (*uk_netbuf_dtor_t)(struct uk_netbuf *);
  * uk_netbuf_prepare_buf() are placing all these three regions into a single
  * allocation.
  */
+
+/* Packet is validated (non-corrupted, checksum okay)
+ * When sending or receiving a packet with a partial checksum, the
+ * DATA_VALID bit should also be set in order to confirm that the
+ * payload is not corrupted.
+ */
+#define UK_NETBUF_F_DATA_VALID_BIT   0
+#define UK_NETBUF_F_DATA_VALID       (1 << UK_NETBUF_F_DATA_VALID_BIT)
+
+/* Indicates that a protocol Checksum was only partially computed (e.g, TCP,
+ * UDP). `csum_start` and `csum_offset` fields indicate over which bytes
+ * the checksum needs to be computed and to which offset the result
+ * needs to be written. On transmit this is typically done by a physical
+ * interface card when leaving the host.
+ * NOTE: The defacto standard is that IP header checksums are always
+ * computed in software). In the case of TCP and UDP, a softrware computed
+ * partial checksum (just the pseudo header) is filled into the checksum
+ * field.
+ */
+#define UK_NETBUF_F_PARTIAL_CSUM_BIT 1
+#define UK_NETBUF_F_PARTIAL_CSUM     (1 << UK_NETBUF_F_PARTIAL_CSUM_BIT)
+
 struct uk_netbuf {
 	struct uk_netbuf *next;
 	struct uk_netbuf *prev;
+
+	uint8_t flags;         /**< Flags for this netbuf */
 
 	void *data;            /**< Payload start, is part of buf. */
 	uint16_t len;          /**< Payload length (should be <= buflen). */
@@ -113,6 +137,15 @@ struct uk_netbuf {
 
 	void *buf;             /**< Start address of contiguous buffer. */
 	size_t buflen;         /**< Length of buffer. */
+
+	uint16_t csum_start;   /**< Used if UK_NETBUF_F_PARTIAL_CSUM is set;
+				 * Offset within this netbuf's data segment to
+				 * begin checksumming
+				 */
+	uint16_t csum_offset;  /**< Used if UK_NETBUF_F_PARTIAL_CSUM is set;
+				 * Number of bytes starting from `csum_start`
+				 * pointing to the checksum field
+				 */
 
 	uk_netbuf_dtor_t dtor; /**< Destructor callback */
 	struct uk_alloc *_a;   /**< @internal Allocator for free'ing */
@@ -520,6 +553,14 @@ static inline int uk_netbuf_header(struct uk_netbuf *head, int16_t len)
 
 	head->data   -= len;
 	head->len    += len;
+
+	if (head->flags & UK_NETBUF_F_PARTIAL_CSUM) {
+		/* When header gets removed, delete PARTIAL_CSUM flag */
+		if (unlikely((len < 0) && (-len > head->csum_start)))
+			head->flags &= ~UK_NETBUF_F_PARTIAL_CSUM;
+		else
+			head->csum_start += len;
+	}
 	return 1;
 }
 
