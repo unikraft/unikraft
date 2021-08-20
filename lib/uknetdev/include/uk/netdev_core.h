@@ -132,10 +132,18 @@ struct uk_hwaddr {
 #define UK_NETDEV_F_TXQ_INTR_BIT	1
 #define UK_NETDEV_F_TXQ_INTR		(1UL << UK_NETDEV_F_TXQ_INTR_BIT)
 
+/* Indicates that UK_NETBUF_F_PARTIAL_CSUM and UK_NETBUF_F_DATA_VALID is
+ * supported by the device
+ */
+#define UK_NETDEV_F_PARTIAL_CSUM_BIT	2
+#define UK_NETDEV_F_PARTIAL_CSUM	(1UL << UK_NETDEV_F_PARTIAL_CSUM_BIT)
+
 #define uk_netdev_rxintr_supported(feature)	\
 	(feature & (UK_NETDEV_F_RXQ_INTR))
 #define uk_netdev_txintr_supported(feature)	\
 	(feature & (UK_NETDEV_F_TXQ_INTR))
+#define uk_netdev_partial_csum_supported(feature)	\
+	(feature & (UK_NETDEV_F_PARTIAL_CSUM))
 
 /**
  * A structure used to describe network device capabilities.
