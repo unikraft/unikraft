@@ -756,7 +756,7 @@ static void netfront_info_get(struct uk_netdev *n,
 	dev_info->nb_encap_tx = 0;
 	dev_info->nb_encap_rx = 0;
 	dev_info->ioalign = PAGE_SIZE;
-	dev_info->features = UK_FEATURE_RXQ_INTR_AVAILABLE;
+	dev_info->features = UK_NETDEV_F_RXQ_INTR;
 }
 
 static const void *netfront_einfo_get(struct uk_netdev *n,
