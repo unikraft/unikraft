@@ -36,6 +36,8 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdint.h>
+#include <inttypes.h>
+#include <errno.h>
 
 #include <uk/assert.h>
 #include <uk/print.h>
@@ -199,6 +201,8 @@ read_section(struct cpio_header **header_ptr,
 	}
 
 	if (!valid_magic(*header_ptr)) {
+		uk_pr_err("Unsupported or invalid magic number in CPIO header at %p\n",
+			  *header_ptr);
 		*header_ptr = NULL;
 		return -UKCPIO_INVALID_HEADER;
 	}
@@ -209,6 +213,7 @@ read_section(struct cpio_header **header_ptr,
 	path_from_root = absolute_path(dest, filename(header));
 
 	if (path_from_root == NULL) {
+		uk_pr_err("Out of memory\n");
 		*header_ptr = NULL;
 		error = -UKCPIO_NOMEM;
 		goto out;
@@ -225,10 +230,13 @@ read_section(struct cpio_header **header_ptr,
 	}
 
 	if (IS_FILE(header_mode) && header_filesize != 0) {
-		uk_pr_info("Creating %s...\n", path_from_root);
+		uk_pr_info("Extracting %s (%"PRIu32" bytes)\n",
+			   path_from_root, header_filesize);
 		fd = open(path_from_root, O_CREAT | O_RDWR);
 
 		if (fd < 0) {
+			uk_pr_err("%s: Failed to create file\n",
+				  path_from_root);
 			*header_ptr = NULL;
 			error = -UKCPIO_FILE_CREATE_FAILED;
 			goto out;
@@ -239,7 +247,8 @@ read_section(struct cpio_header **header_ptr,
 				+ header_namesize);
 
 		if ((uintptr_t)data_location + header_filesize > last) {
-			uk_pr_err("Malformed CPIO input\n");
+			uk_pr_err("%s: File exceeds archive bounds\n",
+				  path_from_root);
 			*header_ptr = NULL;
 			error = -UKCPIO_MALFORMED_INPUT;
 			goto out;
@@ -252,7 +261,9 @@ read_section(struct cpio_header **header_ptr,
 			bytes_written = write(fd, data_location + bytes_written,
 					      bytes_to_write);
 			if (bytes_written < 0) {
-				uk_pr_warn("Failed to write from CPIO input\n");
+				uk_pr_err("%s: Failed to load content: %s (%d)\n",
+					  path_from_root, strerror(errno),
+					  errno);
 				*header_ptr = NULL;
 				error = -UKCPIO_FILE_WRITE_FAILED;
 				goto out;
@@ -261,19 +272,22 @@ read_section(struct cpio_header **header_ptr,
 		}
 
 		if (chmod(path_from_root, header_mode & 0777) < 0)
-			uk_pr_warn("Failed to chmod %s\n", path_from_root);
+			uk_pr_warn("%s: Failed to chmod: %s (%d)\n",
+				   path_from_root, strerror(errno), errno);
 
 		if (close(fd) < 0) {
-			uk_pr_warn("Failed to close CPIO input\n");
+			uk_pr_err("%s: Failed to close file: %s (%d)\n",
+				  path_from_root, strerror(errno), errno);
 			*header_ptr = NULL;
 			error = -UKCPIO_FILE_CLOSE_FAILED;
 			goto out;
 		}
 	} else if (IS_DIR(header_mode)) {
-		uk_pr_info("Extracting %s...\n", path_from_root);
+		uk_pr_info("Creating directory %s\n", path_from_root);
 		if (strcmp(".", filename(header)) != 0
 			&& mkdir(path_from_root, header_mode & 0777) < 0) {
-			uk_pr_err("Could not create directory from CPIO\n");
+			uk_pr_err("%s: Failed to create directory: %s (%d)\n",
+				   path_from_root, strerror(errno), errno);
 			*header_ptr = NULL;
 			error = -UKCPIO_MKDIR_FAILED;
 			goto out;
