@@ -127,13 +127,15 @@ struct uk_hwaddr {
 /**
  * The netdevice support rx/tx interrupt.
  */
-#define UK_FEATURE_RXQ_INTR_BIT		    0
-#define UK_FEATURE_RXQ_INTR_AVAILABLE  (1UL << UK_FEATURE_RXQ_INTR_BIT)
-#define UK_FEATURE_TXQ_INTR_BIT		    1
-#define UK_FEATURE_TXQ_INTR_AVAILABLE  (1UL << UK_FEATURE_TXQ_INTR_BIT)
+#define UK_NETDEV_F_RXQ_INTR_BIT	0
+#define UK_NETDEV_F_RXQ_INTR		(1UL << UK_NETDEV_F_RXQ_INTR_BIT)
+#define UK_NETDEV_F_TXQ_INTR_BIT	1
+#define UK_NETDEV_F_TXQ_INTR		(1UL << UK_NETDEV_F_TXQ_INTR_BIT)
 
 #define uk_netdev_rxintr_supported(feature)	\
-	(feature & (UK_FEATURE_RXQ_INTR_AVAILABLE))
+	(feature & (UK_NETDEV_F_RXQ_INTR))
+#define uk_netdev_txintr_supported(feature)	\
+	(feature & (UK_NETDEV_F_TXQ_INTR))
 
 /**
  * A structure used to describe network device capabilities.

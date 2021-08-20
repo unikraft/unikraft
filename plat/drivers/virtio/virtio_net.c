@@ -1054,7 +1054,7 @@ static void virtio_net_info_get(struct uk_netdev *dev,
 	dev_info->nb_encap_tx = sizeof(struct virtio_net_hdr_padded);
 	dev_info->nb_encap_rx = sizeof(struct virtio_net_hdr_padded);
 	dev_info->ioalign = sizeof(void *); /* word size alignment */
-	dev_info->features = UK_FEATURE_RXQ_INTR_AVAILABLE;
+	dev_info->features = UK_NETDEV_F_RXQ_INTR;
 }
 
 static int virtio_net_start(struct uk_netdev *n)
