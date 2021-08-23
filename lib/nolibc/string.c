@@ -113,8 +113,8 @@ void *memmove(void *dst, const void *src, size_t len)
 		for (; len > 0; --len)
 			*(d++) = *(s++);
 	} else {
-		s += len;
-		d += len;
+		s += len - 1;
+		d += len - 1;
 
 		for (; len > 0; --len)
 			*(d--) = *(s--);
