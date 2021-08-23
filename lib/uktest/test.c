@@ -31,6 +31,7 @@
  */
 
 #include <stdio.h>
+#include <stdint.h>
 #include <limits.h>
 
 #include <uk/test.h>
@@ -40,17 +41,90 @@
 
 
 /**
- * Assertion statistics
+ * Test suite, case and assertion statistics
  */
-struct uk_assert_stats {
-	int total;
-	int fail;
-	int success;
+struct uk_test_stats {
+	unsigned int total;
+	unsigned int fail;
+	unsigned int success;
 };
+
+static struct uk_test_stats testsuite_stats = {0};
+static struct uk_test_stats testcase_stats = {0};
+static struct uk_test_stats testassert_stats = {0};
+
+
+#ifdef CONFIG_LIBUKTEST_PRINT_STATS
+#include <uk/plat/console.h>
+
+#define UK_TEST_STATS_INIT_CLASS UK_INIT_CLASS_LATE
+#define UK_TEST_STATS_INIT_PRIO  9 /* As late as possible. */
+
+#if CONFIG_LIBUKDEBUG_ANSI_COLOR
+#define UK_TEST_STAT_FAILED	UK_ANSI_MOD_BOLD \
+				UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_RED)
+#else /* CONFIG_LIBUKDEBUG_ANSI_COLOR */
+#define UK_TEST_STAT_FAILED
+#endif /* !CONFIG_LIBUKDEBUG_ANSI_COLOR */
+
+static int
+uk_test_print_stats(void)
+{
+	int failed;
+
+	uk_printd("\nTest Summary:\n");
+
+	/*
+	 * Test suites
+	 */
+
+	uk_printd(" - Suites:     ");
+	failed = testsuite_stats.fail;
+	if (failed > 0)
+		uk_printd(UK_TEST_STAT_FAILED
+			  "%d failed"
+			  UK_ANSI_MOD_RESET
+			  ", ", failed);
+	uk_printd("%d total\n", testsuite_stats.total);
+
+	/*
+	 * Test cases
+	 */
+
+	uk_printd(" - Cases:      ");
+	failed = testcase_stats.fail;
+	if (failed > 0)
+		uk_printd(UK_TEST_STAT_FAILED
+			  "%d failed"
+			  UK_ANSI_MOD_RESET
+			  ", ", failed);
+	uk_printd("%d total\n", testcase_stats.total);
+
+	/*
+	 * Assertions
+	 */
+
+	uk_printd(" - Assertions: ");
+	failed = testassert_stats.fail;
+	if (failed > 0)
+		uk_printd(UK_TEST_STAT_FAILED
+			  "%d failed"
+			  UK_ANSI_MOD_RESET
+			  ", ", failed);
+	uk_printd("%d total\n", testassert_stats.total);
+
+	return 0;
+}
+uk_initcall_class_prio(
+	uk_test_print_stats,
+	UK_TEST_STATS_INIT_CLASS,
+	UK_TEST_STATS_INIT_PRIO
+);
+#endif /* CONFIG_LIBUKTEST_PRINT_STATS */
 
 static void
 _uk_test_compute_assert_stats(struct uk_testcase *esac,
-	struct uk_assert_stats *out)
+	struct uk_test_stats *out)
 {
 	struct uk_assert* assert;
 
@@ -77,7 +151,10 @@ uk_testsuite_run(struct uk_testsuite *suite)
 {
 	int ret = 0;
 	struct uk_testcase *esac;
-	struct uk_assert_stats stats;
+	struct uk_test_stats stats;
+
+	/* Increase the number of recognised test suites. */
+	testsuite_stats.total++;
 
 	if (suite->init) {
 		ret = suite->init(suite);
@@ -90,6 +167,9 @@ uk_testsuite_run(struct uk_testsuite *suite)
 	}
 
 	uk_testsuite_case_foreach(suite, esac) {
+		/* Increase the number of recognised test cases. */
+		testcase_stats.total++;
+
 #ifdef CONFIG_LIBUKTEST_LOG_TESTS
 		printf(LVLC_TESTNAME "test:" UK_ANSI_MOD_RESET
 			  " %s->%s",
@@ -106,10 +186,27 @@ uk_testsuite_run(struct uk_testsuite *suite)
 
 		_uk_test_compute_assert_stats(esac, &stats);
 
-		if (stats.fail > 0)
+		testassert_stats.total += stats.total;
+		if (stats.fail > 0) {
 			suite->failed_cases++;
+			testcase_stats.fail++;
+			testassert_stats.fail += stats.fail;
+		}
+		if (stats.success > 0) {
+			testcase_stats.success++;
+			testassert_stats.success += stats.success;
+		}
 	}
 
+	if (suite->failed_cases > 0)
+		testsuite_stats.fail++;
+	else
+		testsuite_stats.success++;
+	goto EXIT;
+
 ERR_EXIT:
+	testsuite_stats.fail++;
+
+EXIT:
 	return ret;
 }

@@ -19,4 +19,8 @@ if LIBUKTEST
 	bool "Output results of tests as they occur"
 	default y
 
+	config LIBUKTEST_PRINT_STATS
+	bool "Print test statistics after all tests"
+	default y
+
 endif # LIBUKTEST
