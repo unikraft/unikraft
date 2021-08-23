@@ -570,4 +570,191 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 #define UK_TEST_ASSERT(cond) UK_TEST_EXPECT(cond)
 
 
+/**
+ * Expect an expression to be NULL.
+ *
+ * @param exp
+ *   The expression under consideration.
+ */
+#define UK_TEST_EXPECT_NULL(exp)					\
+	UK_TEST_ASSERTF(esac,						\
+		exp == NULL,						\
+		"expected `" STRINGIFY(exp) "` to be NULL"		\
+	)
+
+
+/**
+ * Expect an expression to not be NULL.
+ *
+ * @param exp
+ *   The expression under consideration.
+ */
+#define UK_TEST_EXPECT_NOT_NULL(exp)					\
+	UK_TEST_ASSERTF(						\
+		exp != NULL,						\
+		"expected `" STRINGIFY(exp) "` to not be NULL"		\
+	)
+
+
+/**
+ * Expect an expression to be evaluate to zero.
+ *
+ * @param exp
+ *   The expression under consideration.
+ */
+#define UK_TEST_EXPECT_ZERO(exp)					\
+	UK_TEST_ASSERTF(						\
+		exp == 0,						\
+		"expected `" STRINGIFY(exp) "` to be zero"		\
+	)
+
+
+/**
+ * Expect an expression to not evaluate to zero.
+ *
+ * @param exp
+ *   The expression under consideration.
+ */
+#define UK_TEST_EXPECT_NOT_ZERO(exp)					\
+	UK_TEST_ASSERTF(						\
+		exp != 0,						\
+		"expected `" STRINGIFY(exp) "` to not be zero"		\
+	)
+
+
+/**
+ * Expect two pointers to be equal to each other.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_EXPECT_PTR_EQ(a, b)					\
+	UK_TEST_ASSERTF(						\
+		(a) == (b),						\
+		"expected `" #a "` and `" #b "` to be %p "		\
+		"but was `" #b "` was %p",				\
+		(void *)(uintptr_t)(a), (void *)(uintptr_t)(b)		\
+	)
+
+
+/**
+ * Expect the contents of two buffers to be equal.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_EXPECT_BYTES_EQ(a, b, size)				\
+	UK_TEST_ASSERTF(						\
+		memcmp(a, b, size) == 0,				\
+		"expected `" #a "` at %p to equal `" #b "` at %p",	\
+		(void *)(uintptr_t)(b), (void *)(uintptr_t)(a)		\
+	)
+
+
+/**
+ * Expect two long integers to be equal to each other.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_EXPECT_SNUM_EQ(a, b)					\
+	UK_TEST_ASSERTF(						\
+		(a) == (b),						\
+		"expected `" #a "` to be %ld "				\
+		"but was %ld",						\
+		(long)(b), (long)(a)					\
+	)
+
+
+/**
+ * Expect two long integers to not be equal to each other.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_EXPECT_SNUM_NQ(a, b)					\
+	UK_TEST_ASSERTF(						\
+		(a) != (b),						\
+		"expected `" #a "` to not be %ld "			\
+		"but was %ld",						\
+		(long)(b), (long)(a)					\
+	)
+
+
+/**
+ * Expect the left-hand long integersto be greater than the right.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_EXPECT_SNUM_GT(a, b)					\
+	UK_TEST_ASSERTF(						\
+		(a) > (b),						\
+		"expected `" #a "` to be greater than %ld "		\
+		"but was %ld",						\
+		(long)(b), (long)(a)					\
+	)
+
+
+/**
+ * Expect the left-hand long integer to be greater or equal to the right.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_EXPECT_SNUM_GE(a, b)					\
+	UK_TEST_ASSERTF(						\
+		(a) >= (b),						\
+		"expected `" #a "` to be greater than %ld "		\
+		"but was %ld",						\
+		(long)(b), (long)(a)					\
+	)
+
+
+/**
+ * Expect the left-hand long integer to be less than the right.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_EXPECT_SNUM_LT(a, b)					\
+	UK_TEST_ASSERTF(						\
+		(a) < (b),						\
+		"expected `" #a "` to be less than %ld "		\
+		"but was %ld",						\
+		(long)(b), (long)(a)					\
+	)
+
+
+/**
+ * Expect the left-hand long integer to be less than or equal the right.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_EXPECT_SNUM_LE(a, b)					\
+	UK_TEST_ASSERTF(						\
+		(a) <= (b),						\
+		"expected `" #a "` to be less than or equal to %ld "	\
+		"but was %ld",						\
+		(long)(b), (long)(a)					\
+	)
+
+
 #endif /* __UK_TEST_H__ */
