@@ -55,9 +55,9 @@ struct virtio_pci_dev {
 	/* Virtio Device */
 	struct virtio_dev vdev;
 	/* Pci base address */
-	__u16 pci_base_addr;
+	__u64 pci_base_addr;
 	/* ISR Address Range */
-	__u16 pci_isr_addr;
+	__u64 pci_isr_addr;
 	/* Pci device information */
 	struct pci_device *pdev;
 };
@@ -276,8 +276,11 @@ static int vpci_legacy_pci_config_get(struct virtio_dev *vdev, __u16 offset,
 		rc = virtio_cread_bytes_many(
 				(void *) (unsigned long)vpdev->pci_base_addr,
 				VIRTIO_PCI_CONFIG_OFF + offset,	buf, len);
+		if (rc != (int)len)
+			return -EFAULT;
 	}
-	return rc;
+
+	return 0;
 }
 
 static __u8 vpci_legacy_pci_status_get(struct virtio_dev *vdev)
@@ -375,6 +378,8 @@ static int virtio_pci_legacy_add_dev(struct pci_device *pci_dev,
 
 	uk_pr_info("Added virtio-pci device %04x\n",
 		   pci_dev->id.device_id);
+	uk_pr_info("Added virtio-pci subsystem_device_id %04x\n",
+		   pci_dev->id.subsystem_device_id);
 
 	/* Mapping the virtio device identifier */
 	vpci_dev->vdev.id.virtio_device_id = pci_dev->id.subsystem_device_id;
