@@ -12,6 +12,7 @@ $(eval $(call addplatlib_s,kvm,libkvmvirtio,$(CONFIG_VIRTIO_BUS)))
 $(eval $(call addplatlib_s,kvm,libkvmvirtionet,$(CONFIG_VIRTIO_NET)))
 $(eval $(call addplatlib_s,kvm,libkvmvirtioblk,$(CONFIG_VIRTIO_BLK)))
 $(eval $(call addplatlib_s,kvm,libkvmvirtio9p,$(CONFIG_VIRTIO_9P)))
+$(eval $(call addplatlib_s,kvm,libkvmvirtiovsock,$(CONFIG_VIRTIO_VSOCK)))
 $(eval $(call addplatlib_s,kvm,libkvmofw,$(CONFIG_LIBOFW)))
 $(eval $(call addplatlib_s,kvm,libkvmgicv2,$(CONFIG_LIBGICV2)))
 
@@ -154,6 +155,17 @@ LIBKVMVIRTIOBLK_ASINCLUDES-y   += -I$(UK_PLAT_DRIVERS_BASE)/include
 LIBKVMVIRTIOBLK_CINCLUDES-y    += -I$(UK_PLAT_DRIVERS_BASE)/include
 LIBKVMVIRTIOBLK_SRCS-y +=\
 			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_blk.c
+##
+## Virtio VSOCK library definition
+##
+LIBKVMVIRTIOVSOCK_ASINCLUDES-y   += -I$(LIBKVMPLAT_BASE)/include
+LIBKVMVIRTIOVSOCK_CINCLUDES-y    += -I$(LIBKVMPLAT_BASE)/include
+LIBKVMVIRTIOVSOCK_ASINCLUDES-y   += -I$(UK_PLAT_COMMON_BASE)/include
+LIBKVMVIRTIOVSOCK_CINCLUDES-y    += -I$(UK_PLAT_COMMON_BASE)/include
+LIBKVMVIRTIOVSOCK_ASINCLUDES-y   += -I$(UK_PLAT_DRIVERS_BASE)/include
+LIBKVMVIRTIOVSOCK_CINCLUDES-y    += -I$(UK_PLAT_DRIVERS_BASE)/include
+LIBKVMVIRTIOVSOCK_SRCS-y +=\
+			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_vsock.c
 
 ##
 ## Virtio 9P library definition
