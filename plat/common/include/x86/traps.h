@@ -119,7 +119,12 @@ void do_##name(struct __regs *regs, unsigned long error_code)		\
 	}								\
 }
 
+#ifdef CONFIG_HAVE_SMP
+void traps_init_bsp(void);
+void traps_init_ap(void);
+#else
 void traps_init(void);
+#endif /* CONFIG_HAVE_SMP */
 void traps_fini(void);
 
 #endif

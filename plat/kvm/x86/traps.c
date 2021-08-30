@@ -25,22 +25,53 @@
  */
 
 #include <string.h>
+#include <uk/print.h>
 #include <uk/essentials.h>
 #include <uk/arch/lcpu.h>
+#include <uk/plat/lcpu.h>
 #include <uk/plat/config.h>
+#ifdef CONFIG_HAVE_SMP
+#include <kvm-x86/smp_defs.h>
+#endif /* CONFIG_HAVE_SMP */
 #include <x86/desc.h>
 #include <kvm-x86/traps.h>
 
-static struct seg_desc32 cpu_gdt64[GDT_NUM_ENTRIES] __align64b;
+#ifdef CONFIG_HAVE_SMP
+static struct seg_desc32 cpu_gdt64[CONFIG_UKPLAT_LCPU_MAXCOUNT]
+				  [GDT_NUM_ENTRIES] __align64b;
 
-/*
+/**
  * The monitor (ukvm) or bootloader + bootstrap (virtio) starts us up with a
  * bootstrap GDT which is "invisible" to the guest, init and switch to our own
  * GDT.
  *
  * This is done primarily since we need to do LTR later in a predictable
  * fashion.
+ *
+ * With SMP enabled, each CPU gets its own GDT, to avoid race conditions.
  */
+
+static void gdt_init(__lcpuid id)
+{
+	volatile struct desc_table_ptr64 gdtptr;
+
+	memset(cpu_gdt64[id], 0, sizeof(cpu_gdt64[id]));
+	cpu_gdt64[id][GDT_DESC_CODE].raw = GDT_DESC_CODE_VAL;
+	cpu_gdt64[id][GDT_DESC_DATA].raw = GDT_DESC_DATA_VAL;
+
+	gdtptr.limit = sizeof(cpu_gdt64[id]) - 1;
+	gdtptr.base = (__u64) &cpu_gdt64[id];
+	__asm__ __volatile__("lgdt (%0)" ::"r"(&gdtptr));
+
+	/*
+	 * TODO: Technically we should reload all segment registers here, in
+	 * practice this doesn't matter since the bootstrap GDT matches ours,
+	 * for now.
+	 */
+}
+#else
+static struct seg_desc32 cpu_gdt64[GDT_NUM_ENTRIES] __align64b;
+
 static void gdt_init(void)
 {
 	volatile struct desc_table_ptr64 gdtptr;
@@ -58,42 +89,80 @@ static void gdt_init(void)
 	 * for now.
 	 */
 }
+#endif /* CONFIG_HAVE_SMP */
 
+/**
+ * With SMP enabled, each CPU gets one of each interrupt stacks,
+ * as well as its own TSS. This ensures we can use the IST to switch stacks for
+ * handling interrupts.
+ */
+#ifdef CONFIG_HAVE_SMP
+static struct tss64 cpu_tss[CONFIG_UKPLAT_LCPU_MAXCOUNT];
+
+__section(".intrstack")
+	__align(STACK_SIZE) char cpu_intr_stack[CONFIG_UKPLAT_LCPU_MAXCOUNT]
+					       [STACK_SIZE];	/* IST1 */
+__section(".intrstack")
+	__align(STACK_SIZE) char cpu_trap_stack[CONFIG_UKPLAT_LCPU_MAXCOUNT]
+					       [STACK_SIZE];	/* IST2 */
+__section(".intrstack")
+	__align(STACK_SIZE) char cpu_nmi_stack[CONFIG_UKPLAT_LCPU_MAXCOUNT]
+					      [4096];		/* IST3 */
+#else
 static struct tss64 cpu_tss;
 
-__section(".intrstack")  __align(STACK_SIZE)
-char cpu_intr_stack[STACK_SIZE];  /* IST1 */
-__section(".intrstack")  __align(STACK_SIZE)
-char cpu_trap_stack[STACK_SIZE];  /* IST2 */
-static char cpu_nmi_stack[4096];  /* IST3 */
+__section(".intrstack") __align(STACK_SIZE)
+	char cpu_intr_stack[STACK_SIZE];	/* IST1 */
+__section(".intrstack") __align(STACK_SIZE)
+	char cpu_trap_stack[STACK_SIZE];	/* IST2 */
+__section(".intrstack") __align(STACK_SIZE)
+	static char cpu_nmi_stack[4096];	/* IST3 */
+#endif /*CONFIG_HAVE_SMP */
 
+#ifdef CONFIG_HAVE_SMP
+static void tss_init(__lcpuid id)
+{
+	struct seg_desc64 *td = (void *) &cpu_gdt64[id][GDT_DESC_TSS_LO];
+
+	cpu_tss[id].ist[0] =
+	    (__u64) &cpu_intr_stack[id][sizeof(cpu_intr_stack[id])];
+	cpu_tss[id].ist[1] =
+	    (__u64) &cpu_trap_stack[id][sizeof(cpu_trap_stack[id])];
+	cpu_tss[id].ist[2] =
+	    (__u64) &cpu_nmi_stack[id][sizeof(cpu_nmi_stack[id])];
+
+	td->limit_lo	= sizeof(cpu_tss[id]);
+	td->base_lo	= (__u64) &(cpu_tss[id]);
+	td->base_hi	= (__u64) &(cpu_tss[id]) >> 24;
+#else
 static void tss_init(void)
 {
-	struct seg_desc64 *td = (void *) &cpu_gdt64[GDT_DESC_TSS_LO];
+	struct seg_desc64 *td = (void *)&cpu_gdt64[GDT_DESC_TSS_LO];
 
-	cpu_tss.ist[0] = (__u64) &cpu_intr_stack[sizeof(cpu_intr_stack)];
-	cpu_tss.ist[1] = (__u64) &cpu_trap_stack[sizeof(cpu_trap_stack)];
-	cpu_tss.ist[2] = (__u64) &cpu_nmi_stack[sizeof(cpu_nmi_stack)];
+	cpu_tss.ist[0] =
+	    (__u64) &cpu_intr_stack[sizeof(cpu_intr_stack)];
+	cpu_tss.ist[1] =
+	    (__u64) &cpu_trap_stack[sizeof(cpu_trap_stack)];
+	cpu_tss.ist[2] =
+	    (__u64) &cpu_nmi_stack[sizeof(cpu_nmi_stack)];
 
-	td->limit_lo = sizeof(cpu_tss);
-	td->base_lo = (__u64) &cpu_tss;
-	td->type = 0x9;
-	td->zero = 0;
-	td->dpl = 0;
-	td->p = 1;
-	td->limit_hi = 0;
-	td->gran = 0;
-	td->base_hi = (__u64) &cpu_tss >> 24;
-	td->zero1 = 0;
+	td->limit_lo	= sizeof(cpu_tss);
+	td->base_lo	= (__u64) &(cpu_tss);
+	td->base_hi	= (__u64) &(cpu_tss) >> 24;
+#endif /*CONFIG_HAVE_SMP */
+	td->type	= 0x9;
+	td->zero	= 0;
+	td->dpl		= 0;
+	td->p		= 1;
+	td->limit_hi	= 0;
+	td->gran	= 0;
+	td->zero1	= 0;
 
 	barrier();
-	__asm__ __volatile__(
-		"ltr %0"
-		:
-		: "r" ((unsigned short) (GDT_DESC_TSS_LO * 8))
-	);
+	__asm__ __volatile__("ltr %0"
+			     :
+			     : "r"((unsigned short)(GDT_DESC_TSS_LO * 8)));
 }
-
 
 /* Declare the traps used only by this platform: */
 #ifdef CONFIG_HAVE_SMP
@@ -115,11 +184,11 @@ static void idt_fillgate(unsigned int num, void *fun, unsigned int ist)
 	 */
 	desc->offset_hi = (__u64) fun >> 16;
 	desc->offset_lo = (__u64) fun & 0xffff;
-	desc->selector = GDT_DESC_OFFSET(GDT_DESC_CODE);
-	desc->ist = ist;
-	desc->type = 14; /* == 0b1110 */
-	desc->dpl = 0;
-	desc->p = 1;
+	desc->selector	= GDT_DESC_OFFSET(GDT_DESC_CODE);
+	desc->ist	= ist;
+	desc->type	= 14; /* == 0b1110 */
+	desc->dpl	= 0;
+	desc->p		= 1;
 }
 
 volatile struct desc_table_ptr64 idtptr;
@@ -130,35 +199,39 @@ static void idt_init(void)
 	 * Load trap vectors. All traps run on IST2 (cpu_trap_stack), except for
 	 * the exceptions.
 	 */
-#define FILL_TRAP_GATE(name, ist) extern void cpu_trap_##name(void); \
+#define FILL_TRAP_GATE(name, ist)                                              \
+	extern void cpu_trap_##name(void);                                     \
 	idt_fillgate(TRAP_##name, ASM_TRAP_SYM(name), ist)
-	FILL_TRAP_GATE(divide_error,    2);
-	FILL_TRAP_GATE(debug,           2);
-	FILL_TRAP_GATE(nmi,             3); /* #NMI runs on IST3 (cpu_nmi_stack) */
-	FILL_TRAP_GATE(int3,            2);
-	FILL_TRAP_GATE(overflow,        2);
-	FILL_TRAP_GATE(bounds,          2);
-	FILL_TRAP_GATE(invalid_op,      2);
-	FILL_TRAP_GATE(no_device,       2);
-	FILL_TRAP_GATE(double_fault,    3); /* #DF runs on IST3 (cpu_nmi_stack) */
 
-	FILL_TRAP_GATE(invalid_tss,     2);
-	FILL_TRAP_GATE(no_segment,      2);
-	FILL_TRAP_GATE(stack_error,     2);
-	FILL_TRAP_GATE(gp_fault,        2);
-	FILL_TRAP_GATE(page_fault,      2);
+	FILL_TRAP_GATE(divide_error,	2);
+	FILL_TRAP_GATE(debug,		2);
+	FILL_TRAP_GATE(nmi,		3); /* #NMI runs on IST3 (cpu_nmi_stack) */
+	FILL_TRAP_GATE(int3,		2);
+	FILL_TRAP_GATE(overflow,	2);
+	FILL_TRAP_GATE(bounds,		2);
+	FILL_TRAP_GATE(invalid_op,	2);
+	FILL_TRAP_GATE(no_device,	2);
+	FILL_TRAP_GATE(double_fault,	3); /* #DF runs on IST3 (cpu_nmi_stack) */
 
-	FILL_TRAP_GATE(coproc_error,    2);
-	FILL_TRAP_GATE(alignment_check, 2);
-	FILL_TRAP_GATE(machine_check,   2);
-	FILL_TRAP_GATE(simd_error,      2);
-	FILL_TRAP_GATE(virt_error,      2);
+	FILL_TRAP_GATE(invalid_tss,	2);
+	FILL_TRAP_GATE(no_segment,	2);
+	FILL_TRAP_GATE(stack_error,	2);
+	FILL_TRAP_GATE(gp_fault,	2);
+	FILL_TRAP_GATE(page_fault,	2);
+
+	FILL_TRAP_GATE(coproc_error,	2);
+	FILL_TRAP_GATE(alignment_check,	2);
+	FILL_TRAP_GATE(machine_check,	2);
+	FILL_TRAP_GATE(simd_error,	2);
+	FILL_TRAP_GATE(virt_error,	2);
 
 	/*
 	 * Load irq vectors. All irqs run on IST1 (cpu_intr_stack).
 	 */
-#define FILL_IRQ_GATE(num, ist) extern void cpu_irq_##num(void); \
+#define FILL_IRQ_GATE(num, ist)                                                \
+	extern void cpu_irq_##num(void);                                       \
 	idt_fillgate(32 + num, cpu_irq_##num, ist)
+
 	FILL_IRQ_GATE(0, 1);
 	FILL_IRQ_GATE(1, 1);
 	FILL_IRQ_GATE(2, 1);
@@ -181,13 +254,36 @@ static void idt_init(void)
 	__asm__ __volatile__("lidt (%0)" :: "r" (&idtptr));
 }
 
+/**
+ * Considering that each CPU has its own TSS and GDT, we need to know for
+ * which CPU will the TSS be initialized. The AP's don't need to initialize
+ * the IDT, as they use the same one as the BSP.
+ */
+#ifdef CONFIG_HAVE_SMP
+void traps_init_bsp(void)
+{
+	__lcpuid id = ukplat_lcpu_id();
+
+	gdt_init(id);
+	tss_init(id);
+	idt_init();
+}
+
+void traps_init_ap(void)
+{
+	__lcpuid id = ukplat_lcpu_id();
+
+	gdt_init(id);
+	tss_init(id);
+	__asm__ __volatile__("lidt (%0)" :: "r" (&idtptr));
+}
+#else
 void traps_init(void)
 {
 	gdt_init();
 	tss_init();
 	idt_init();
 }
+#endif /* CONFIG_HAVE_SMP */
 
-void traps_fini(void)
-{
-}
+void traps_fini(void) {}
