@@ -45,6 +45,7 @@ extern "C" {
 #endif /* __cplusplus */
 
 #include <uk/config.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <uk/arch/types.h>
 #include <uk/refcount.h>
