@@ -36,6 +36,6 @@
 #include <sys/types.h>
 #include <uk/plat/irq.h>
 
-void _ukplat_irq_handle(unsigned long irq);
+void _ukplat_irq_handle(unsigned long irq, struct __regs *regs);
 
 #endif /* __KVM_IRQ_H_ */

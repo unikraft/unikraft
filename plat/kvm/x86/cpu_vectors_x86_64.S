@@ -98,6 +98,7 @@ ENTRY(cpu_irq_\irqno)
 	subq $__REGS_PAD_SIZE, %rsp         /* we have some padding */
 
 	movq $\irqno, %rdi
+	movq %rsp, %rsi
 	call _ukplat_irq_handle
 
 	addq $__REGS_PAD_SIZE, %rsp         /* we have some padding */

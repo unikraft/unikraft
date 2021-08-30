@@ -87,7 +87,7 @@ int ukplat_irq_register(unsigned long irq, irq_handler_func_t func, void *arg)
  */
 extern unsigned long sched_have_pending_events;
 
-void _ukplat_irq_handle(unsigned long irq)
+void _ukplat_irq_handle(unsigned long irq, struct __regs *regs)
 {
 	struct irq_handler *h;
 	int i;
@@ -111,7 +111,7 @@ void _ukplat_irq_handle(unsigned long irq)
 			 */
 			__uk_test_and_set_bit(0, &sched_have_pending_events);
 
-		if (h->func(h->arg) == 1)
+		if (h->func(h->arg, regs) == 1)
 			goto exit_ack;
 	}
 	/*

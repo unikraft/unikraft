@@ -45,7 +45,11 @@ struct uk_alloc;
  */
 int ukplat_irq_init(struct uk_alloc *a);
 
+#ifdef CONFIG_PLAT_KVM
+typedef int (*irq_handler_func_t)(void *, struct __regs *);
+#else
 typedef int (*irq_handler_func_t)(void *);
+#endif /* CONFIG_PLAT_KVM */
 
 /**
  * Registers an interrupt handler
