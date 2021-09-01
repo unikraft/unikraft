@@ -81,7 +81,7 @@ _libxenplat_start:
 	movq %rdi, %cr4
 	ldmxcsr (mxcsr_ptr)
 #endif /* __SSE__ */
-#if (__AVX__ || CONFIG_HAVE_X86PKU)
+#if (__AVX__)
 	/* Check capabilities subject to availability as indicated by cpuid.
 	 * First, start off with "standard features" */
 	movl $0x1, %eax
@@ -93,7 +93,7 @@ _libxenplat_start:
 	jz noxsave
 	orl $(X86_CR4_OSXSAVE), %edi
 	movq %rdi, %cr4
-#if __AVX__
+
 	/* now enable AVX. This needs to be last checking cpuid features from
 	 * the eax=1 cpuid call, because it clobbers ecx */
 	testl $(X86_CPUID1_ECX_AVX), %ecx
@@ -103,10 +103,9 @@ _libxenplat_start:
 	orl $(X86_XCR0_SSE | X86_XCR0_AVX), %eax
 	xsetbv
 noavx:
-#endif /* __AVX__ */
 /* Do not enable AVX without XSAVE, otherwise we'll get #UD */
 noxsave:
-#endif /* __AVX__ || CONFIG_HAVE_X86PKU */
+#endif /* __AVX__ */
 	/* Now, check for extended features. */
 	movl $0x7, %eax
 	movl $0x0, %ecx
@@ -118,23 +117,6 @@ noxsave:
 	orl $(X86_CR4_FSGSBASE), %edi
 	movq %rdi, %cr4
 nofsgsbase:
-#if CONFIG_HAVE_X86PKU
-	/* check for Memory Protection Keys (PKU) */
-	testl $(X86_CPUID7_ECX_PKU), %ecx
-	jz nopku
-	/* only enable PKU if we support XSAVE */
-	testl $(X86_CR4_OSXSAVE), %edi
-	jz nopku
-	/* PKU is supported, enable it via CR4 */
-	orl $(X86_CR4_PKE), %edi
-	movq %rdi, %cr4
-	/* also enable XSAVE for the PKRU */
-	xorl %ecx, %ecx
-	xgetbv
-	orl $(X86_XCR0_PKRU), %eax
-	xsetbv
-nopku:
-#endif /* CONFIG_HAVE_X86PKU */
 	/* Done setting up CPU capabilities, hand over to C entry point. */
 	movq %r8, %rdi /* pass pointer to start_info page to C entry */
 	call _libxenplat_x86entry
