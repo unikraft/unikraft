@@ -21,7 +21,7 @@ CINCLUDES    += -I$(CONFIG_UK_BASE)/include
 CXXINCLUDES  += -I$(CONFIG_UK_BASE)/include
 GOCINCLUDES  += -I$(CONFIG_UK_BASE)/include
 
-RUSTCFLAGS-y	+= --emit=obj --crate-type=rlib --edition=2018 \
+RUSTCFLAGS-y	+= +nightly --emit=obj --crate-type=rlib --edition=2018 \
 		-Cpanic=abort -Cembed-bitcode=n \
 		-Zbinary_dep_depinfo=y -Zsymbol-mangling-version=v0 \
 		-Cforce-unwind-tables=n -Ccodegen-units=1 \
