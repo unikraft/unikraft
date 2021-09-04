@@ -34,6 +34,9 @@ GRTAGS
 GSYMS
 GTAGS
 
+# Carog build dirs
+**/target
+
 # cscope files
 cscope.*
 ncscope.*

@@ -1,0 +1,3 @@
+config LIBRUSTCORE
+	bool "Rust-Core: the rust core library"
+	default n
