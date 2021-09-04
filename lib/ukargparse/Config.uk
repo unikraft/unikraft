@@ -1,4 +1,31 @@
-config LIBUKARGPARSE
-       bool "ukargparse: Simple argument parser"
-       default n
-       select LIBUKDEBUG
+menuconfig LIBUKARGPARSE
+	bool "ukargparse: Simple argument parser"
+	default n
+	select LIBUKDEBUG
+
+if LIBUKARGPARSE
+
+config LIBUKARGPARSE_TESTS
+	bool "Enable tests"
+	default n
+	select LIBUKTEST
+	select LIBUKARGPARSE_TESTS_PARSE if LIBUKTEST_ALL
+	select LIBUKARGPARSE_TESTS_NULL if LIBUKTEST_ALL
+	select LIBUKARGPARSE_TESTS_EXTRA if LIBUKTEST_ALL
+
+if LIBUKARGPARSE_TESTS
+
+config LIBUKARGPARSE_TESTS_PARSE
+	bool "test: uk_argparse() - basic valid string"
+	default n
+
+config LIBUKARGPARSE_TESTS_NULL
+	bool "test: uk_argparse() - empty string"
+	default n
+
+config LIBUKARGPARSE_TESTS_EXTRA
+	bool "test: uk_argparse() - extra whitespaces"
+	default n
+
+endif
+endif
