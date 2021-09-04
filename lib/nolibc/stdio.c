@@ -486,7 +486,7 @@ int fflush(FILE *fp __unused)
 
 int fputc(int _c, FILE *fp)
 {
-	int ret;
+	int ret = 0;
 	unsigned char c = _c;
 
 	if (fp == stdout)
