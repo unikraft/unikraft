@@ -1,0 +1,6 @@
+$(eval $(call addlib_s,librustarg,$(CONFIG_LIBRUSTARG)))
+
+CINCLUDES-$(CONFIG_LIBRUSTARG)	+= -I$(LIBRUSTARG_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBRUSTARG)	+= -I$(LIBRUSTARG_BASE)/include
+
+LIBRUSTARG_SRCS-y += $(LIBRUSTARG_BASE)/argparse.rs

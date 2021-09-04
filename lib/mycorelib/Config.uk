@@ -1,4 +1,0 @@
-config LIBMYCORELIB
-	bool "My Core Library"
-	default n
-

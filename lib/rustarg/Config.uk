@@ -1,5 +1,6 @@
-config LIBUKARGPARSERS
+config LIBRUSTARG
        bool "ukargparse-rs: Simple argument parser"
        default n
+       select LIBRUSTCORE if !HAVE_RUSTCORE
        select HAVE_ARGPARSE
        select LIBUKDEBUG
