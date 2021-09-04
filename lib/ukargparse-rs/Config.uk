@@ -1,0 +1,5 @@
+config LIBUKARGPARSERS
+       bool "ukargparse-rs: Simple argument parser"
+       default n
+       select HAVE_UKARGPARSE
+       select LIBUKDEBUG

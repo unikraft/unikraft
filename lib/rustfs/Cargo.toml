@@ -1,0 +1,23 @@
+[package]
+name = "rust"
+version = "0.1.0"
+edition = "2018"
+author = "TrueDoctor"
+
+[lib]
+name = "rustfs"
+crate-type = ["staticlib"]
+
+[dependencies]
+wee_alloc = {version="0.4", features = ["static_array_backend"]}
+#capsule = "0.1"
+
+[build-dependencies]
+#cbindgen = "0.12"
+
+
+[profile.dev]
+panic = "abort"
+
+[profile.release]
+panic = "abort"
