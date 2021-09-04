@@ -13,6 +13,14 @@ config HAVE_LIBC
        bool
        default n
 
+config HAVE_RUSTCORE
+       bool
+       default n
+
+config HAVE_ARGPARSE
+       bool
+       default n
+
 config HAVE_TIME
        bool
        default n
