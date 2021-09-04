@@ -1,13 +1,9 @@
 #![no_std]
-#![feature(libc)]
+
 use core::panic::PanicInfo;
 
 extern "C" {
     pub fn printf(format: *const u8, ...) -> i32;
-}
-
-pub fn do_panic() -> ! {
-    panic!("test")
 }
 
 #[panic_handler]

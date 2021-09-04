@@ -1,13 +1,13 @@
 #![no_std]
 use core::panic::PanicInfo;
-use core::{slice, str};
+use core::{slice, str, str::Utf8Error};
 
-fn cs_to_slice(base: *mut u8, maxlen: usize) -> &'static mut str {
+fn cs_to_slice(base: *mut u8, maxlen: usize) -> Result<&'static mut str, Utf8Error> {
     let slice = unsafe {
         let len = (base as usize..).position(|c| *(c as *const u8) == 0);
         slice::from_raw_parts_mut(base, len.unwrap_or(maxlen))
     };
-    str::from_utf8_mut(slice).expect("Passed not utf-8 string")
+    str::from_utf8_mut(slice)
 }
 
 #[no_mangle]
@@ -17,7 +17,10 @@ pub extern "C" fn uk_argnparse(
     indices: *mut *mut u8,
     max_count: i32,
 ) -> i32 {
-    let mut string = cs_to_slice(argument_buffer, max_len);
+    let mut string = match cs_to_slice(argument_buffer, max_len) {
+        Ok(s) => s,
+        _ => return -1,
+    };
     let mut arguments = unsafe { slice::from_raw_parts_mut(indices, max_count as usize) };
     let max_count = max_count as usize;
     let mut arg_count = 0;

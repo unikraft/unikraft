@@ -1,16 +1,15 @@
 $(eval $(call addlib_s,librustcore,$(CONFIG_LIBRUSTCORE)))
 
-LIBRUSTCORE_TARGET = $(LIBRUSTCORE_BASE)/target
+LIBRUSTCORE_TARGET = $(LIBRUSTCORE_BASE)/target/linux-unikraft/debug
 LIBRUSTCORE_SRCS-y += $(LIBRUSTCORE_BASE)/extra.ld
 LIBRUSTCORE_SRCS-y += $(LIBRUSTCORE_BASE)/dummy.rs
 
 UK_ALIBS-$(CONFIG_LIBRUSTCORE) += $(LIBRUSTCORE_TARGET)/librustcore.a
-#RUSTFLAGS-y += "-Clink-arg=-no-gc-sections"
-#LIBRUSTCORE_OBJCFLAGS-y += "-no-gc-sections"
 
 $(LIBRUSTCORE_TARGET)/librustcore.a:
-	cd $(LIBRUSTCORE_BASE) && cargo build $(RUST_TARGET)
-	cp $(shell find ${LIBRUSTCORE_TARGET} -name "*.a") $(LIBRUSTCORE_TARGET)
-	#cd $(LIBRUSTCORE_TARGET) && ar x librustcore.a
+	cd $(LIBRUSTCORE_BASE) && cargo build --target linux-unikraft.json -Zbuild-std=core,alloc
+	#cp $(find $(LIBRUSTCORE_BASE) -type f -name "*.a") $(LIBRUSTCORE_TARGET)
+	cd $(LIBRUSTCORE_TARGET) && ar x librustcore.a
+
 
 UK_PREPARE += $(LIBRUSTCORE_TARGET)/librustcore.a
