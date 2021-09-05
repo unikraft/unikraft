@@ -1,57 +1,88 @@
 #![no_std]
+#![feature(option_result_unwrap_unchecked)]
+use core::ops::{Index, IndexMut};
 use core::panic::PanicInfo;
-use core::{slice, str, str::Utf8Error};
 
-fn cs_to_slice(base: *mut u8, maxlen: usize) -> Result<&'static mut str, Utf8Error> {
-    let slice = unsafe {
-        let len = (base as usize..).position(|c| *(c as *const u8) == 0);
-        slice::from_raw_parts_mut(base, len.unwrap_or(maxlen))
-    };
-    str::from_utf8_mut(slice)
+unsafe fn left_shift(mut buf: CharPtr, mut index: usize, max_len: usize) {
+    while buf[index] != 0 && index < max_len {
+        buf[index] = buf[index + 1];
+        index += 1;
+    }
+}
+#[derive(Copy, Clone)]
+#[repr(transparent)]
+pub struct CharPtr(*mut u8);
+
+impl Index<usize> for CharPtr {
+    type Output = u8;
+    fn index(&self, index: usize) -> &Self::Output {
+        unsafe { self.0.add(index).as_ref().unwrap_unchecked() }
+    }
 }
 
+impl IndexMut<usize> for CharPtr {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        unsafe { self.0.add(index).as_mut().unwrap_unchecked() }
+    }
+}
+
+/// # Safety
+/// This function is not safe
+/// like not at all
+/// it is basically c code
 #[no_mangle]
 pub extern "C" fn uk_argnparse(
-    argument_buffer: *mut u8,
+    mut argument_buffer: CharPtr,
     max_len: usize,
-    indices: *mut *mut u8,
+    indices: *mut CharPtr,
     max_count: i32,
 ) -> i32 {
-    let mut string = match cs_to_slice(argument_buffer, max_len) {
-        Ok(s) => s,
-        _ => return -1,
-    };
-    let mut arguments = unsafe { slice::from_raw_parts_mut(indices, max_count as usize) };
-    let max_count = max_count as usize;
-    let mut arg_count = 0;
-    let mut base_ptr = argument_buffer;
-    let mut quote = None;
-    let mut previous_whitespace = true;
-    let is_quote = |c: char| c == '\'' || c == '"';
-    for c in string.chars() {
-        match (c, quote, previous_whitespace) {
-            (c, None, _) if c.is_whitespace() => {
-                for i in 0..c.len_utf8() {
-                    unsafe { *base_ptr.offset(i as isize) = 0 };
+    unsafe {
+        let mut argc = 0;
+        let mut prev_wspace = true;
+        let mut in_quote = 0;
+        let mut i = 0;
+        while i < max_len && argc < max_count {
+            match argument_buffer[i] {
+                /* end of string */
+                0 => break,
+
+                /* white spaces */
+                9..=12 | 13 | 32 => {
+                    if in_quote == 0 {
+                        argument_buffer[i] = 0;
+                        prev_wspace = true;
+                    }
+                }
+
+                /* quotes */
+                34 | 39 if in_quote == argument_buffer[i] => {
+                    in_quote = 0;
+                    left_shift(argument_buffer, i, max_len);
+                    i -= 1;
+                }
+                34 | 39 if in_quote == 0 => {
+                    in_quote = argument_buffer[i];
+                    left_shift(argument_buffer, i, max_len);
+                    i -= 1;
+                }
+
+                /* Fall through */
+                c =>
+                /* any character */
+                {
+                    if prev_wspace {
+                        *indices.offset(argc as isize) =
+                            CharPtr(argument_buffer.0.offset(i as isize));
+                        argc += 1;
+                        prev_wspace = false;
+                    }
                 }
             }
-            (c, None, _) if is_quote(c) => {
-                quote = Some(c);
-            }
-            (c, Some(q), _) if c == q => {
-                quote = None;
-            }
-            ('\0', _, _) => return arg_count as i32,
-            (c, _, true) if arg_count < max_count => {
-                arg_count += 1;
-                arguments[arg_count] = base_ptr;
-                previous_whitespace = false;
-            }
-            _ => (),
+            i += 1;
         }
-        unsafe { base_ptr.offset(c.len_utf8() as isize) };
+        argc
     }
-    0
 }
 
 #[panic_handler]
