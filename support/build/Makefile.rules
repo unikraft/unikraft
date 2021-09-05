@@ -72,6 +72,10 @@ fileext = $(subst .,,$(suffix $(1)))
 # libname2olib $libname
 libname2olib = $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(1)))
 
+# converts a list of library names to paths pointing to their corresponding static library file
+# libname2alib $libname
+libname2alib = $(addprefix $(BUILD_DIR)/,$(addsuffix .a,$(1)))
+
 libname2preolib = $(addprefix $(BUILD_DIR)/,$(addsuffix .ld.o,$(1)))
 
 # converts a list of sources to paths pointing to their corresponding destination files
@@ -88,11 +92,16 @@ endef
 define src2obj =
 $(call src2dst,$(1),$(2),.o,$(3))
 endef
+# cargo2alib $libname,$source(s),$variant(optional)
+# converts a list of .toml files to library out files
+define cargo2alib =
+$(call src2dst,$(1),$(1),.a,$(3))
+endef
 
 # converts a list of output file (object files or linker scripts) paths
 # to paths pointing to their corresponding dependency file
 # out2dep $objects
-out2dep = $(patsubst %.o,%.d,$(patsubst %.lds,%.lds.d,$(1)))
+out2dep = $(patsubst %.o,%.d,$(patsubst %.lds,%.lds.d,$(patsubst %.o,%.d,$(patsubst %.a,%.d,$(1)))))
 
 # converts a list of sources (.S, .c, .cc, .cpp) to paths pointing to their corresponding dependency file
 # src2dep $libname,$source(s),$variant(optional)
@@ -592,6 +601,33 @@ $(eval $(call vprefix_lib,$(1),OBJS-y) += $(4))
 $(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(4)) $(call out2dep,$(4)))
 endef
 
+# Build rust projects via Cargo
+# NOTE: We are not using most of the flags such as COMPFLAGS due to incompatibilities between rustc and GCC.
+			#/--out-dir=$(call sub_build_dir,$(1)) \
+	#$(call libname2olib,$(1))
+# buildrule_cargo $libname,$source,$variant,$target,$extraflags
+# $$(RUSTCFLAGS) $$(RUSTCFLAGS-y) $$(RUSTCFLAGS_EXTRA)
+define buildrule_toml =
+$(4): $(2) | preprocess
+	$(call build_cmd,CARGO,$(1),$(4),\
+		$(CARGO) $$(CARGOFLAGS) $$(CARGOFLAGS-y) $$(CARGOFLAGS_EXTRA) \
+			--manifest-path=$(2) -q \
+			$$($(call vprefix_lib,$(1),CARGOFLAGS)) $$($(call vprefix_lib,$(1),CARGOFLAGS-y)) \
+			-- \
+			$$($(call vprefix_lib,$(1),RUSTCFLAGS)) $$($(call vprefix_lib,$(1),RUSTCFLAGS-y)) \
+			$$($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $$($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
+			--cfg '__LIBNAME__="$(1)"' $(if $(3),--cfg '__VARIANT__="$(3)"') \
+			--emit link=$(4)
+	)
+
+UK_SRCS-y += $(2)
+UK_DEPS-y += $(call out2dep,$(4))
+UK_ALIBS-y += $(4)
+$(eval $(call vprefix_lib,$(1),OBJS-y) += $(4))
+$(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(4)) $(call out2dep,$(4)))
+endef
+
+
 define add_lds_to_plat =
 $(eval $(call uc,$(2))_LD_SCRIPT-y += $(1))
 endef
@@ -784,7 +820,9 @@ $(if $(filter %.lds.S,$(2)),\
 		$(eval target=$(call src2lds,$(1),$(2))),\
 	$(if $(filter %.dts,$(2)),\
 		$(eval target=$(call dts2dtb,$(1),$(2))),\
-		$(eval target=$(call src2obj,$(1),$(2),$(3)))))
+		$(if $(filter %Cargo.toml,$(2)),\
+			$(eval target=$(call cargo2alib,$(1),$(2),$(3))),\
+			$(eval target=$(call src2obj,$(1),$(2),$(3))))))
 $(eval $(call buildrule,$(1),$(2),$(3),$(target),))
 endef
 

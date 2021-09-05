@@ -27,6 +27,8 @@ RUSTCFLAGS-y	+= +nightly --emit=obj --crate-type=rlib --edition=2018 \
 		-Cforce-unwind-tables=n -Ccodegen-units=1 \
 		-Dunsafe_op_in_unsafe_fn -Drust_2018_idioms
 
+CARGOFLAGS-y	+= -Z unstable-options
+
 
 RUSTCFLAGS-$(CONFIG_OPTIMIZE_NONE)         += -Copt-level="0"
 RUSTCFLAGS-$(CONFIG_OPTIMIZE_SIZE)         += -Copt-level="s"

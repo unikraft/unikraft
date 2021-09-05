@@ -3,7 +3,7 @@ $(eval $(call addlib_s,librustarg,$(CONFIG_LIBRUSTARG)))
 CINCLUDES-$(CONFIG_LIBRUSTARG)	+= -I$(LIBRUSTARG_BASE)/include
 CXXINCLUDES-$(CONFIG_LIBRUSTARG)	+= -I$(LIBRUSTARG_BASE)/include
 
-RUSTFLAGS-y += "--extern RUSTCORE=../rustcore"
+#RUSTFLAGS-y += "--extern RUSTCORE=../rustcore"
 
 LIBRUSTARG_SRCS-y += $(LIBRUSTARG_BASE)/argparse.rs
 LIBRUSTARG_SRCS-y += $(LIBRUSTARG_BASE)/glue.c
