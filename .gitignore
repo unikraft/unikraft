@@ -36,6 +36,8 @@ GTAGS
 
 # Carog build dirs
 **/target
+TODO: Decide whether to include lock files
+**/Cargo.lock
 
 # cscope files
 cscope.*
