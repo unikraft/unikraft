@@ -1,6 +1,22 @@
-config LIBRUSTARG
+menuconfig LIBRUSTARG
        bool "ukargparse-rs: Simple argument parser"
        default n
-       select LIBRUSTCORE if !HAVE_RUSTCORE
+       select LIBRUSTCORE if !HAVE_RUSTCORE && !LIBRUSTARG_UTF8
        select HAVE_ARGPARSE
-       select LIBUKDEBUG
+
+if LIBRUSTARG
+	choice LIBURSTARG_CHARSET
+	prompt "Charset support"
+
+		config LIBRUSTARG_CHARSET_ASCII
+		bool "ASCII"
+        select LIBRUSTCORE if !HAVE_RUSTCORE
+
+		config LIBRUSTARG_CHARSET_UTF8
+		bool "UTF-8"
+             help
+               This uses Cargo to build the application instead of relying on rustc.
+               This implementation also provides potentially better safety due to the
+               reduction in unsafe code.
+	endchoice
+endif

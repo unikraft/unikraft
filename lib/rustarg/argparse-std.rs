@@ -42,7 +42,7 @@ pub extern "C" fn uk_argnparse(
                 quote = None;
             }
             ('\0', _, _) => return arg_count as i32,
-            (c, _, true) if arg_count < max_count => {
+            (_, _, true) if arg_count < max_count => {
                 arg_count += 1;
                 arguments[arg_count] = base_ptr;
                 previous_whitespace = false;
