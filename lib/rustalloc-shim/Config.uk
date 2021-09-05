@@ -1,0 +1,4 @@
+menuconfig LIBRUSTALLOCSHIM
+       bool "rustalloc-shim: rust interface to uk alloc"
+       default n
+       select LIBRUSTCORE if !HAVE_RUSTCORE

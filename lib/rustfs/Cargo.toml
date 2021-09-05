@@ -2,13 +2,13 @@
 name = "rust"
 version = "0.1.0"
 edition = "2018"
-authors = ["TrueDoctor"]
+authors = ["Dennis Kobert <dennis@kobert.dev>"]
 
 [lib]
 crate-type = ["staticlib"]
 
 [dependencies]
-wee_alloc = {version="0.4", features = ["static_array_backend"]}
+alloc-shim = {path="../rustalloc-shim"}
 
 [build-dependencies]
 

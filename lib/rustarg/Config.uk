@@ -1,7 +1,7 @@
 menuconfig LIBRUSTARG
        bool "ukargparse-rs: Simple argument parser"
        default n
-       select LIBRUSTCORE if !HAVE_RUSTCORE && !LIBRUSTARG_UTF8
+       select LIBRUSTCORE if !HAVE_RUSTCORE && !LIBRUSTARG_CHARSET_UTF8
        select HAVE_ARGPARSE
 
 if LIBRUSTARG

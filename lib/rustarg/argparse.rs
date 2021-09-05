@@ -1,5 +1,6 @@
 #![no_std]
 #![feature(option_result_unwrap_unchecked)]
+#![allow(unused_unsafe)]
 use core::ops::{Index, IndexMut};
 use core::panic::PanicInfo;
 
@@ -31,7 +32,7 @@ impl IndexMut<usize> for CharPtr {
 /// like not at all
 /// it is basically c code
 #[no_mangle]
-pub extern "C" fn uk_argnparse(
+pub unsafe extern "C" fn uk_argnparse(
     mut argument_buffer: CharPtr,
     max_len: usize,
     indices: *mut CharPtr,
@@ -67,13 +68,9 @@ pub extern "C" fn uk_argnparse(
                     i -= 1;
                 }
 
-                /* Fall through */
-                c =>
-                /* any character */
-                {
+                _ => {
                     if prev_wspace {
-                        *indices.offset(argc as isize) =
-                            CharPtr(argument_buffer.0.offset(i as isize));
+                        *indices.offset(argc as isize) = CharPtr(argument_buffer.0.add(i));
                         argc += 1;
                         prev_wspace = false;
                     }
