@@ -2,17 +2,6 @@ $(eval $(call addlib_s,librustfs,$(CONFIG_LIBRUSTFS)))
 
 LIBRUSTFS_CFLAGS-$(call gcc_version_ge,8,0) += -Wno-cast-function-type
 
-LIBRUSTFS_SRCS-y += $(LIBRUSTFS_BASE)/rustfs_vfsops.c
-LIBRUSTFS_SRCS-y += $(LIBRUSTFS_BASE)/rustfs_vnops.c
-LIBRUSTFS_SRCS-y += $(LIBRUSTFS_BASE)/extra.ld
-
-LIBRUSTFS_TARGET = $(LIBRUSTFS_BASE)/target/x86_64-unknown-redox/debug
-
-LIBRUSTFS_ALIBS-y += $(LIBRUSTFS_TARGET)/librustfs.a
-
-.PHONY: RUST_SOURCE
-
-$(LIBRUSTFS_TARGET)/librustfs.a: RUST_SOURCE
-	cd $(LIBRUSTFS_BASE) && cargo +nightly build
-
-UK_PREPARE += $(LIBRUSTFS_TARGET)/librustfs.a
+LIBRUSTFS_SRCS-$(LIBRUSTFS) += $(LIBRUSTFS_BASE)/rustfs_vfsops.c
+LIBRUSTFS_SRCS-$(LIBRUSTFS) += $(LIBRUSTFS_BASE)/rustfs_vnops.c
+LIBRUSTFS_SRCS-$(LIBRUSTFS) += $(LIBRUSTFS_BASE)/Cargo.toml
