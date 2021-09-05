@@ -1,5 +1,7 @@
 $(eval $(call addlib_s,librustcore,$(CONFIG_LIBRUSTCORE)))
 
 LIBRUSTCORE_SRCS-y += $(LIBRUSTCORE_BASE)/extra.ld
-LIBRUSTCORE_SRCS-$(LIBRUSTCORE) += $(LIBRUSTCORE_BASE)/Cargo.toml
+LIBRUSTCORE_SRCS-$(CONFIG_LIBRUSTCORE) += $(LIBRUSTCORE_BASE)/Cargo.toml
 LIBRUSTCORE_SRCS-y += $(LIBRUSTCORE_BASE)/dummy.rs
+
+LIBRUSTCORE_RUSTCFLAGS-y += -Clink-dead-code=y -Clink-self-contained=y -Clto=n -Crelocation-model=pic -Csave-temps=y

@@ -610,7 +610,8 @@ endef
 define buildrule_toml =
 $(4): $(2) | preprocess
 	$(call build_cmd,CARGO,$(1),$(4),\
-		$(CARGO) $$(CARGOFLAGS) $$(CARGOFLAGS-y) $$(CARGOFLAGS_EXTRA) \
+		$(CARGO) $$($(call vprefix_lib,$(1),RUSTCHANNEL)) rustc \
+		 	$$(CARGOFLAGS) $$(CARGOFLAGS-y) $$(CARGOFLAGS_EXTRA) \
 			--manifest-path=$(2) -q \
 			$$($(call vprefix_lib,$(1),CARGOFLAGS)) $$($(call vprefix_lib,$(1),CARGOFLAGS-y)) \
 			-- \

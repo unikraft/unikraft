@@ -27,12 +27,12 @@ RUSTCFLAGS-y	+= +nightly --emit=obj --crate-type=rlib --edition=2018 \
 		-Cforce-unwind-tables=n -Ccodegen-units=1 \
 		-Dunsafe_op_in_unsafe_fn -Drust_2018_idioms
 
-CARGOFLAGS-y	+= 
+CARGOFLAGS-y	+=
 
 
 RUSTCFLAGS-$(CONFIG_OPTIMIZE_NONE)         += -Copt-level="0"
 RUSTCFLAGS-$(CONFIG_OPTIMIZE_SIZE)         += -Copt-level="s"
-RUSTCFLAGS-$(CONFIG_OPTIMIZE_PERF)         += -Copt-level="2"
+RUSTCFLAGS-$(CONFIG_OPTIMIZE_PERF)         += -Copt-level="3"
 
 RUSTCFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL0)     += -Cdebuginfo=0
 RUSTCFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL1)     += -Cdebuginfo=1

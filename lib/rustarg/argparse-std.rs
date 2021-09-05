@@ -38,7 +38,7 @@ pub extern "C" fn uk_argnparse(
             (c, None, _) if is_quote(c) => {
                 quote = Some(c);
             }
-            (c, Some(q), _) if c == q => {
+            (_, Some(q), _) if c == q => {
                 quote = None;
             }
             ('\0', _, _) => return arg_count as i32,

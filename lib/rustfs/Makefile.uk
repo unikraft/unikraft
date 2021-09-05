@@ -1,7 +1,9 @@
 $(eval $(call addlib_s,librustfs,$(CONFIG_LIBRUSTFS)))
 
 LIBRUSTFS_CFLAGS-$(call gcc_version_ge,8,0) += -Wno-cast-function-type
+LIBRUSTFS_RUSTCHANNEL = +nightly
+LIBRUSTFS_CARGOFLAGS = -Zbuild-std=core,alloc,panic_abort --target x86_64-unknown-redox
 
-LIBRUSTFS_SRCS-$(LIBRUSTFS) += $(LIBRUSTFS_BASE)/rustfs_vfsops.c
-LIBRUSTFS_SRCS-$(LIBRUSTFS) += $(LIBRUSTFS_BASE)/rustfs_vnops.c
-LIBRUSTFS_SRCS-$(LIBRUSTFS) += $(LIBRUSTFS_BASE)/Cargo.toml
+LIBRUSTFS_SRCS-$(CONFIG_LIBRUSTFS) += $(LIBRUSTFS_BASE)/rustfs_vfsops.c
+LIBRUSTFS_SRCS-$(CONFIG_LIBRUSTFS) += $(LIBRUSTFS_BASE)/rustfs_vnops.c
+LIBRUSTFS_SRCS-$(CONFIG_LIBRUSTFS) += $(LIBRUSTFS_BASE)/Cargo.toml

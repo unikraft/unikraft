@@ -323,6 +323,7 @@ RUSTCFLAGS :=
 RUSTCFLAGS-y :=
 CARGOFLAGS :=
 CARGOFLAGS-y :=
+RUSTCHANNEL :=
 GOCINCLUDES :=
 GOCINCLUDES-y :=
 DBGFLAGS :=
@@ -578,7 +579,7 @@ ifneq ("$(origin LLVM_TARGET_ARCH)","undefined")
 RUST_TARGET		:= --target=$(CONFIG_LLVM_TARGET_ARCH)
 endif
 RUSTC		:= rustc $(RUST_TARGET)
-CARGO		:= cargo rustc $(RUST_TARGET)
+CARGO		:= cargo $(RUST_TARGET)
 AS		:= $(CC)
 AR		:= $(CONFIG_CROSS_COMPILE)gcc-ar
 NM		:= $(CONFIG_CROSS_COMPILE)gcc-nm
