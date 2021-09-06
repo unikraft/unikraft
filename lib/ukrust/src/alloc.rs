@@ -1,8 +1,5 @@
-#![no_std]
-#![allow(unused_unsafe)]
-pub mod sys;
-
 use core::alloc::{GlobalAlloc, Layout};
+use unikraft_sys::sys;
 
 /// USAGE:
 /// '''rust
@@ -22,7 +19,7 @@ unsafe impl GlobalAlloc for UkAlloc {
     unsafe fn dealloc(&self, ptr: *mut u8, _layout: Layout) {
         unsafe {
             let alloc = sys::_uk_alloc_head;
-            sys::uk_free_ifpages(alloc, ptr as *mut core::ffi::c_void)
+            sys::uk_free_ifpages(alloc, ptr as *mut sys::ffi::c_void)
         }
     }
 }

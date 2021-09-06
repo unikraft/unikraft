@@ -5,7 +5,7 @@ pub mod api;
 pub mod fs;
 
 #[global_allocator]
-static ALLOC: unikraft_sys::alloc::UkAlloc = unikraft_sys::alloc::UkAlloc;
+static ALLOC: unikraft::alloc::UkAlloc = unikraft::alloc::UkAlloc;
 
 use core::panic::PanicInfo;
 

@@ -8,7 +8,7 @@ authors = ["Dennis Kobert <dennis@kobert.dev>"]
 crate-type = ["staticlib"]
 
 [dependencies]
-unikraft-sys = {path="../uk-rust-sys"}
+unikraft = {path="../ukrust"}
 
 [build-dependencies]
 
