@@ -8,10 +8,9 @@ authors = ["Dennis Kobert <dennis@kobert.dev>"]
 crate-type = ["staticlib"]
 
 [dependencies]
-alloc-shim = {path="../rustalloc-shim"}
+ukalloc = {path="../ukalloc/rust"}
 
 [build-dependencies]
-
 
 [profile.dev]
 panic = "abort"

@@ -610,9 +610,10 @@ endef
 define buildrule_toml =
 $(4): $(2) | preprocess
 	$(call build_cmd,CARGO,$(1),$(4),\
+		UK_CINCLUDES="$$(CINCLUDES) $$(CINCLUDES-y) $$($(call vprefix_lib,$(1),CINCLUDES)) $$($(call vprefix_lib,$(1),CINCLUDES-y))" \
 		$(CARGO) $$($(call vprefix_lib,$(1),RUSTCHANNEL)) rustc \
 		 	$$(CARGOFLAGS) $$(CARGOFLAGS-y) $$(CARGOFLAGS_EXTRA) \
-			--manifest-path=$(2) -q \
+			--manifest-path=$(2) \
 			$$($(call vprefix_lib,$(1),CARGOFLAGS)) $$($(call vprefix_lib,$(1),CARGOFLAGS-y)) \
 			-- \
 			$$($(call vprefix_lib,$(1),RUSTCFLAGS)) $$($(call vprefix_lib,$(1),RUSTCFLAGS-y)) \
