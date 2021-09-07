@@ -3,11 +3,12 @@ extern crate alloc;
 use crate::api::*;
 use alloc::{borrow::ToOwned, string::String, vec::Vec};
 
-#[derive(Default)]
+#[derive(Default, Debug)]
 pub struct RustNode {
     pub data: Vec<u8>,
 }
 
+#[derive(Debug)]
 pub enum Node {
     Directory(Vec<(String, Node)>),
     Vnode(RustNode),
@@ -34,6 +35,7 @@ impl Node {
         }
     }
     pub fn create(&mut self, path: &str) -> Option<&RustNode> {
+        eprintln!("creating node at {}", path);
         let (file, suffix) = path.split_once('/').unwrap_or(("", path));
         match self {
             Node::Vnode(_) => None,
@@ -53,6 +55,7 @@ impl Node {
         }
     }
     pub fn remove(&mut self, to_remove: &RustNode) -> Option<Node> {
+        eprintln!("removing node: {:x}", to_remove as *const RustNode as usize);
         match self {
             Node::Vnode(_) => None,
             Node::Directory(vec) => {

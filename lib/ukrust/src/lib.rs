@@ -2,3 +2,4 @@
 #![allow(unused_unsafe)]
 
 pub mod alloc;
+pub mod log;

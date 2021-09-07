@@ -4,6 +4,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <uk/print.h>
+#include <uk/plat/console.h>
+
 #include <uk/list.h>
 #include <vfscore/dentry.h>
 #include <vfscore/vnode.h>
