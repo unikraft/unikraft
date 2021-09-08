@@ -98,7 +98,7 @@
 	uk_inittab_start = .;						\
 	.uk_inittab :							\
 	{								\
-		KEEP(*(SORT_BY_NAME(.uk_inittab[1-6][0-9])))		\
+		KEEP(*(SORT_BY_NAME(*.uk_inittab[1-6][0-9])))		\
 	}								\
 	uk_inittab_end = .;
 

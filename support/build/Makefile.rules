@@ -627,6 +627,7 @@ UK_DEPS-y += $(call out2dep,$(4))
 UK_ALIBS-y += $(4)
 $(eval $(call vprefix_lib,$(1),OBJS-y) += $(4))
 $(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(4)) $(call out2dep,$(4)))
+.PHONY: $(4)
 endef
 
 

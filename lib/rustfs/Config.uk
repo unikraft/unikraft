@@ -2,3 +2,4 @@ config LIBRUSTFS
 	bool "Rust-ramfs: dummy implementation of ramfs"
 	default n
 	depends on LIBVFSCORE
+    select LIBUKRUST

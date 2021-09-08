@@ -11,13 +11,9 @@ static ALLOC: unikraft::alloc::UkAlloc = unikraft::alloc::UkAlloc;
 
 use core::panic::PanicInfo;
 
-extern "C" {
-    pub fn printf(format: *const u8, ...) -> i32;
-}
-
 #[panic_handler]
 fn panic(info: &PanicInfo<'_>) -> ! {
-    println!("Rust panic: {}", info);
+    unikraft::log::panic_handler(info);
     loop {}
 }
 
@@ -28,5 +24,6 @@ fn alloc_error(layout: core::alloc::Layout) -> ! {
         layout.size(),
         layout.align()
     );
+    #[allow(clippy::clippy::empty_loop)]
     loop {}
 }

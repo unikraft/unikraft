@@ -2,6 +2,7 @@ extern crate alloc;
 
 use crate::api::*;
 use alloc::{borrow::ToOwned, string::String, vec::Vec};
+use unikraft::log;
 
 #[derive(Default, Debug)]
 pub struct RustNode {

@@ -8,7 +8,7 @@ authors = ["Dennis Kobert <dennis@kobert.dev>"]
 crate-type = ["staticlib"]
 
 [dependencies]
-unikraft = {path="../ukrust"}
+unikraft = {path="../ukrust", features = ["log-crate"]}
 
 [build-dependencies]
 

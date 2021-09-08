@@ -54,10 +54,15 @@
 #include <fcntl.h>
 #include <vfscore/fs.h>
 #include <uk/list.h>
+#include <uk/init.h>
 
 static struct uk_mutex rustfs_lock = UK_MUTEX_INITIALIZER(rustfs_lock);
 static uint64_t inode_count = 1; /* inode 0 is reserved to root */
 extern struct uk_list_head rustfs_head;
+
+
+//static const long long __used __section(".uk_inittab")	foo = (init_ukrust);
+
 
 static int
 rustfs_shim_lookup(struct vnode *dvp, char *name, struct vnode **vpp)

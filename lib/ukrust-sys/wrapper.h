@@ -6,6 +6,7 @@
 
 #include <uk/print.h>
 #include <uk/plat/console.h>
+#include <uk/init.h>
 
 #include <uk/list.h>
 #include <vfscore/dentry.h>
