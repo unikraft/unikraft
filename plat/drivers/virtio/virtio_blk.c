@@ -102,6 +102,12 @@ struct uk_blkdev_queue {
 	/* The scatter list and its associated fragments */
 	struct uk_sglist sg;
 	struct uk_sglist_seg *sgsegs;
+
+	/* ring buffer for requests */
+	struct virtio_blkdev_request *vreq_buf;
+	uint16_t vreq_log_size;
+	uint16_t vreq_head;
+	uint16_t vreq_tail;
 };
 
 struct virtio_blkdev_request {
@@ -259,6 +265,7 @@ out:
 static int virtio_blkdev_queue_enqueue(struct uk_blkdev_queue *queue,
 		struct uk_blkreq *req)
 {
+	uint16_t req_idx;
 	struct virtio_blkdev_request *virtio_blk_req;
 	__u16 write_segs = 0;
 	__u16 read_segs = 0;
@@ -272,10 +279,14 @@ static int virtio_blkdev_queue_enqueue(struct uk_blkdev_queue *queue,
 		return -ENOSPC;
 	}
 
-	virtio_blk_req = uk_malloc(a, sizeof(*virtio_blk_req));
-	if (!virtio_blk_req)
+	if (queue->vreq_head + (1 << queue->vreq_log_size)
+	    == queue->vreq_tail) {
+		uk_pr_warn("ring buffer has no free memory\n");
 		return -ENOMEM;
+	}
+	req_idx = queue->vreq_head++ & ((1 << queue->vreq_log_size) - 1);
 
+	virtio_blk_req = &queue->vreq_buf[req_idx];
 	virtio_blk_req->req = req;
 	virtio_blk_req->virtio_blk_outhdr.sector = req->start_sector;
 	if (req->operation == UK_BLKREQ_WRITE ||
@@ -340,6 +351,7 @@ err:
 static int virtio_blkdev_queue_dequeue(struct uk_blkdev_queue *queue,
 		struct uk_blkreq **req)
 {
+	__maybe_unused uint16_t req_idx;
 	int ret = 0;
 	__u32 len;
 	struct virtio_blkdev_request *response_req;
@@ -365,7 +377,9 @@ static int virtio_blkdev_queue_dequeue(struct uk_blkdev_queue *queue,
 	(*req)->result = -response_req->status;
 
 out:
-	uk_free(a, response_req);
+	req_idx = queue->vreq_tail & ((1 << queue->vreq_log_size) - 1);
+	UK_ASSERT(&queue->vreq_buf[req_idx] == response_req);
+	queue->vreq_tail++;
 	return ret;
 }
 
@@ -538,6 +552,17 @@ static struct uk_blkdev_queue *virtio_blkdev_queue_setup(struct uk_blkdev *dev,
 	queue->nb_desc = nb_desc;
 	queue->lqueue_id = queue_id;
 
+	queue->vreq_log_size = nb_desc == 1 ? 0 : ukarch_fls(nb_desc - 1) + 1;
+
+	queue->vreq_buf = uk_calloc(a, 1 << queue->vreq_log_size,
+				sizeof(struct virtio_blkdev_request));
+	if (queue->vreq_buf == NULL) {
+		rc = -ENOMEM;
+		goto req_alloc_err;
+	}
+	queue->vreq_head = 0;
+	queue->vreq_tail = 0;
+
 	/* Setup the virtqueue with the descriptor */
 	rc = virtio_blkdev_vqueue_setup(queue, nb_desc);
 	if (rc < 0) {
@@ -548,6 +573,8 @@ static struct uk_blkdev_queue *virtio_blkdev_queue_setup(struct uk_blkdev *dev,
 
 exit:
 	return queue;
+req_alloc_err:
+	uk_free(a, queue->vreq_buf);
 setup_err:
 	uk_free(queue->a, queue->sgsegs);
 err_exit:
@@ -565,6 +592,7 @@ static int virtio_blkdev_queue_release(struct uk_blkdev *dev,
 	vbdev = to_virtioblkdev(dev);
 
 	uk_free(queue->a, queue->sgsegs);
+	uk_free(a, queue->vreq_buf);
 	virtio_vqueue_release(vbdev->vdev, queue->vq, queue->a);
 
 	return rc;
