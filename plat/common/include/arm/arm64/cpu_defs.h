@@ -33,20 +33,6 @@
 #define __CPU_ARM_64_DEFS_H__
 
 /*
- * Power State Coordination Interface (PSCI v0.2) function codes
- */
-#define PSCI_FNID_VERSION		0x84000000
-#define PSCI_FNID_CPU_SUSPEND		0xc4000001
-#define PSCI_FNID_CPU_OFF		0x84000002
-#define PSCI_FNID_CPU_ON		0xc4000003
-#define PSCI_FNID_AFFINITY_INFO		0xc4000004
-#define PSCI_FNID_MIGRATE		0xc4000005
-#define PSCI_FNID_MIGRATE_INFO_TYPE	0x84000006
-#define PSCI_FNID_MIGRATE_INFO_UP_CPU	0xc4000007
-#define PSCI_FNID_SYSTEM_OFF		0x84000008
-#define PSCI_FNID_SYSTEM_RESET		0x84000009
-
-/*
  * CTR_EL0, Cache Type Register
  * Provides information about the architecture of the caches.
  */
