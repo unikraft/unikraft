@@ -124,6 +124,15 @@ static inline void uk_mutex_unlock(struct uk_mutex *m)
 	ukplat_lcpu_restore_irqf(irqf);
 }
 
+#define uk_waitq_wait_event_mutex(wq, condition, mutex) \
+	uk_waitq_wait_event_locked(wq, condition, uk_mutex_lock, \
+				   uk_mutex_unlock, mutex)
+
+#define uk_waitq_wait_event_deadline_mutex(wq, condition, deadline, mutex) \
+	uk_waitq_wait_event_deadline_locked(wq, condition, deadline, \
+					    uk_mutex_lock, uk_mutex_unlock, \
+					    mutex)
+
 #ifdef __cplusplus
 }
 #endif
