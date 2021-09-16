@@ -26,6 +26,7 @@
 #ifndef __UK_SCHED_WAIT_H__
 #define __UK_SCHED_WAIT_H__
 
+#include <uk/essentials.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/time.h>
 #include <uk/sched.h>
@@ -92,40 +93,66 @@ do { \
 	ukplat_lcpu_restore_irqf(flags); \
 } while (0)
 
-#define __wq_wait_event_deadline(wq, condition, deadline, deadline_condition) \
-do { \
+#define __wq_wait_event_deadline(wq, condition, deadline, deadline_condition, \
+				 lock_fn, unlock_fn, lock) \
+({ \
 	struct uk_thread *__current; \
 	unsigned long flags; \
+	int timedout = 0; \
 	DEFINE_WAIT(__wait); \
-	if (condition) \
-		break; \
-	for (;;) { \
+	if (!(condition)) { \
 		__current = uk_thread_current(); \
-		/* protect the list */ \
+		for (;;) { \
+			/* protect the list */ \
+			flags = ukplat_lcpu_save_irqf(); \
+			uk_waitq_add(wq, &__wait); \
+			__current->wakeup_time = deadline; \
+			clear_runnable(__current); \
+			uk_sched_thread_blocked(__current->sched, __current); \
+			ukplat_lcpu_restore_irqf(flags); \
+			if (lock) \
+				unlock_fn(lock); \
+			uk_sched_yield(); \
+			if (lock) \
+				lock_fn(lock); \
+			if (condition) \
+				break; \
+			if (deadline_condition) { \
+				timedout = 1; \
+				break; \
+			} \
+		} \
 		flags = ukplat_lcpu_save_irqf(); \
-		uk_waitq_add(wq, &__wait); \
-		__current->wakeup_time = deadline; \
-		clear_runnable(__current); \
-		uk_sched_thread_blocked(__current->sched, __current); \
+		/* need to wake up */ \
+		uk_thread_wake(__current); \
+		uk_waitq_remove(wq, &__wait); \
 		ukplat_lcpu_restore_irqf(flags); \
-		if ((condition) || (deadline_condition)) \
-			break; \
-		uk_sched_yield(); \
 	} \
-	flags = ukplat_lcpu_save_irqf(); \
-	/* need to wake up */ \
-	uk_thread_wake(__current); \
-	uk_waitq_remove(wq, &__wait); \
-	ukplat_lcpu_restore_irqf(flags); \
-} while (0)
+	timedout; \
+})
+
+static inline void __lock_dummy(void *lock __unused) {}
 
 #define uk_waitq_wait_event(wq, condition) \
-	__wq_wait_event_deadline(wq, (condition), 0, 0)
+	__wq_wait_event_deadline(wq, (condition), 0, 0, \
+				 __lock_dummy, __lock_dummy, NULL)
+
+#define uk_waitq_wait_event_locked(wq, condition, lock_fn, unlock_fn, lock) \
+	__wq_wait_event_deadline(wq, (condition), 0, 0, \
+				 lock_fn, unlock_fn, lock)
 
 #define uk_waitq_wait_event_deadline(wq, condition, deadline) \
 	__wq_wait_event_deadline(wq, (condition), \
 		(deadline), \
-		(deadline) && ukplat_monotonic_clock() >= (deadline))
+		(deadline) && ukplat_monotonic_clock() >= (deadline), \
+		__lock_dummy, __lock_dummy, NULL)
+
+#define uk_waitq_wait_event_deadline_locked(wq, condition, deadline, \
+					    lock_fn, unlock_fn, lock) \
+	__wq_wait_event_deadline(wq, (condition), \
+		(deadline), \
+		(deadline) && ukplat_monotonic_clock() >= (deadline), \
+		lock_fn, unlock_fn, lock)
 
 static inline
 void uk_waitq_wake_up(struct uk_waitq *wq)
