@@ -1,0 +1,4 @@
+$(eval $(call addlib_s,libukrust,$(CONFIG_LIBUKRUST)))
+
+
+LIBUKRUST_SRCS-$(CONFIG_LIBUKRUST) += $(LIBUKRUST_BASE)/initcall.rs
