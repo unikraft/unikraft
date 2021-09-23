@@ -29,7 +29,7 @@ RUSTCFLAGS-y	+= --emit=obj --crate-type=rlib --edition=2018 \
 
 RUSTCFLAGS-$(CONFIG_OPTIMIZE_NONE)         += -Copt-level="0"
 RUSTCFLAGS-$(CONFIG_OPTIMIZE_SIZE)         += -Copt-level="s"
-RUSTCFLAGS-$(CONFIG_OPTIMIZE_PERF)         += -Copt-level="2"
+RUSTCFLAGS-$(CONFIG_OPTIMIZE_PERF)         += -Copt-level="3"
 
 RUSTCFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL0)     += -Cdebuginfo=0
 RUSTCFLAGS-$(CONFIG_DEBUG_SYMBOLS_LVL1)     += -Cdebuginfo=1
