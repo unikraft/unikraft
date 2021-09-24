@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Wei Chen <wei.chen@arm.com>
+ * Authors: Jia He <justin.he@arm.com>
+ *          Răzvan Vîrtan <virtanrazvan@gmail.com>
  *
- * Copyright (c) 2018, Arm Ltd., All rights reserved.
+ * Copyright (c) 2021, Arm Ltd., University Politehnica of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,55 +30,34 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include <uk/config.h>
-#include <uk/plat/common/cpu.h>
-#if !CONFIG_ARCH_ARM_32
-/* TODO: Not yet supported for Arm32 */
-#include <uk/plat/common/irq.h>
-#include <arm/psci.h>
+
+#ifndef __PLAT_CMN_ARM_PSCI_H__
+#define __PLAT_CMN_ARM_PSCI_H__
+
+#if defined(__ARM_64__)
+#include "arm64/psci.h"
+#else
+#include "arm/psci.h"
 #endif
-#include <uk/assert.h>
 
-/*
- * Halts the CPU until the next external interrupt is fired. For Arm,
- * we can use WFI to implement this feature.
- */
-void halt(void)
-{
-	__asm__ __volatile__("wfi");
-}
+enum psci_function {
+	PSCI_FN_CPU_SUSPEND,
+	PSCI_FN_CPU_ON,
+	PSCI_FN_CPU_OFF,
+	PSCI_FN_MIGRATE,
+	PSCI_FN_MAX,
+};
 
-#if !CONFIG_ARCH_ARM_32
-/*
- * TODO: Port the following functionality to Arm32
- */
-/* Systems support PSCI >= 0.2 can do system reset from PSCI */
-void reset(void)
-{
-	/*
-	 * NO PSCI or invalid PSCI method, we can't do reset, just
-	 * halt the CPU.
-	 */
-	if (!smcc_psci_call) {
-		uk_pr_crit("Couldn't reset system, HALT!\n");
-		__CPU_HALT();
-	}
+/* PSCI return values (inclusive of all PSCI versions) */
+#define PSCI_RET_SUCCESS             0
+#define PSCI_RET_NOT_SUPPORTED      -1
+#define PSCI_RET_INVALID_PARAMS     -2
+#define PSCI_RET_DENIED             -3
+#define PSCI_RET_ALREADY_ON         -4
+#define PSCI_RET_ON_PENDING         -5
+#define PSCI_RET_INTERNAL_FAILURE   -6
+#define PSCI_RET_NOT_PRESENT        -7
+#define PSCI_RET_DISABLED           -8
+#define PSCI_RET_INVALID_ADDRESS    -9
 
-	smcc_psci_call(PSCI_FNID_SYSTEM_RESET, 0, 0, 0);
-}
-
-/* Systems support PSCI >= 0.2 can do system off from PSCI */
-void system_off(void)
-{
-	/*
-	 * NO PSCI or invalid PSCI method, we can't do shutdown, just
-	 * halt the CPU.
-	 */
-	if (!smcc_psci_call) {
-		uk_pr_crit("Couldn't shutdown system, HALT!\n");
-		__CPU_HALT();
-	}
-
-	smcc_psci_call(PSCI_FNID_SYSTEM_OFF, 0, 0, 0);
-}
-#endif /* !CONFIG_ARCH_ARM_32 */
+#endif /* __PLAT_CMN_ARM_PSCI_H__ */

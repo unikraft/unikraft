@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Wei Chen <wei.chen@arm.com>
+ * Authors: Jia He <justin.he@arm.com>
+ *          Răzvan Vîrtan <virtanrazvan@gmail.com>
  *
- * Copyright (c) 2018, Arm Ltd., All rights reserved.
+ * Copyright (c) 2021, Arm Ltd., University Politehnica of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,55 +30,23 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include <uk/config.h>
-#include <uk/plat/common/cpu.h>
-#if !CONFIG_ARCH_ARM_32
-/* TODO: Not yet supported for Arm32 */
-#include <uk/plat/common/irq.h>
-#include <arm/psci.h>
-#endif
-#include <uk/assert.h>
+
+#ifndef __ARM_PSCI_H__
+#define __ARM_PSCI_H__
 
 /*
- * Halts the CPU until the next external interrupt is fired. For Arm,
- * we can use WFI to implement this feature.
+ * PSCI function codes (as per PSCI v0.2).
  */
-void halt(void)
-{
-	__asm__ __volatile__("wfi");
-}
+#define PSCI_FNID_VERSION               0x84000000
+#define PSCI_FNID_CPU_SUSPEND           0x84000001
+#define PSCI_FNID_CPU_OFF               0x84000002
+#define PSCI_FNID_CPU_ON                0x84000003
+#define PSCI_FNID_AFFINITY_INFO         0x84000004
+#define PSCI_FNID_MIGRATE               0x84000005
+#define PSCI_FNID_MIGRATE_INFO_TYPE     0x84000006
+#define PSCI_FNID_MIGRATE_INFO_UP_CPU   0x84000007
+#define PSCI_FNID_SYSTEM_OFF            0x84000008
+#define PSCI_FNID_SYSTEM_RESET          0x84000009
+#define PSCI_FNID_FEATURES              0x8400000a
 
-#if !CONFIG_ARCH_ARM_32
-/*
- * TODO: Port the following functionality to Arm32
- */
-/* Systems support PSCI >= 0.2 can do system reset from PSCI */
-void reset(void)
-{
-	/*
-	 * NO PSCI or invalid PSCI method, we can't do reset, just
-	 * halt the CPU.
-	 */
-	if (!smcc_psci_call) {
-		uk_pr_crit("Couldn't reset system, HALT!\n");
-		__CPU_HALT();
-	}
-
-	smcc_psci_call(PSCI_FNID_SYSTEM_RESET, 0, 0, 0);
-}
-
-/* Systems support PSCI >= 0.2 can do system off from PSCI */
-void system_off(void)
-{
-	/*
-	 * NO PSCI or invalid PSCI method, we can't do shutdown, just
-	 * halt the CPU.
-	 */
-	if (!smcc_psci_call) {
-		uk_pr_crit("Couldn't shutdown system, HALT!\n");
-		__CPU_HALT();
-	}
-
-	smcc_psci_call(PSCI_FNID_SYSTEM_OFF, 0, 0, 0);
-}
-#endif /* !CONFIG_ARCH_ARM_32 */
+#endif /* __ARM_PSCI_H__ */
