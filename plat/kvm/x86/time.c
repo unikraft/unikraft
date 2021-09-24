@@ -60,7 +60,7 @@ __nsec ukplat_wall_clock(void)
  * compiled with NO_X86_EXTREGS_FLAGS to prevent potential clobbering of
  * registers that are not saved on interrupt handling.
  */
-static int timer_handler(void *arg __unused)
+static int timer_handler(void *arg __unused, struct __regs *regs __unused)
 {
 	/* Yes, we handled the irq. */
 	return 1;
