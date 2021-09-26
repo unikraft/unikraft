@@ -319,6 +319,8 @@ CXXINCLUDES :=
 CXXINCLUDES-y :=
 GOCFLAGS :=
 GOCFLAGS-y :=
+RUSTCFLAGS :=
+RUSTCFLAGS-y :=
 GOCINCLUDES :=
 GOCINCLUDES-y :=
 DBGFLAGS :=
@@ -515,6 +517,7 @@ ifeq ($(sub_make_exec), 1)
 ifeq ($(UK_HAVE_DOT_CONFIG),y)
 # Hide troublesome environment variables from sub processes
 unexport CONFIG_CROSS_COMPILE
+unexport CONFIG_LLVM_TARGET_ARCH
 unexport CONFIG_COMPILER
 #unexport CC
 #unexport LD
@@ -548,6 +551,10 @@ ifneq ("$(origin CROSS_COMPILE)","undefined")
 CONFIG_CROSS_COMPILE := $(CROSS_COMPILE:"%"=%)
 endif
 
+ifneq ("$(origin LLVM_TARGET_ARCH)","undefined")
+CONFIG_LLVM_TARGET_ARCH := $(LLVM_TARGET_ARCH:"%"=%)
+endif
+
 ifneq ("$(origin COMPILER)","undefined")
 	CONFIG_COMPILER := $(COMPILER:"%"=%)
 else
@@ -563,6 +570,13 @@ CC		:= $(CONFIG_CROSS_COMPILE)$(CONFIG_COMPILER)
 CPP		:= $(CC)
 CXX		:= $(CPP)
 GOC		:= $(CONFIG_CROSS_COMPILE)gccgo-7
+# We use rustc because the gcc frontend is experimental and missing features such
+# as borrowing checking
+ifneq ("$(origin LLVM_TARGET_ARCH)","undefined")
+RUSTC		:= rustc --target=$(CONFIG_LLVM_TARGET_ARCH)
+else
+RUSTC		:= rustc
+endif
 AS		:= $(CC)
 AR		:= $(CONFIG_CROSS_COMPILE)gcc-ar
 NM		:= $(CONFIG_CROSS_COMPILE)gcc-nm
