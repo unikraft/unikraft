@@ -50,7 +50,10 @@ static inline __sz ukarch_tls_area_size(void)
 
 static inline __sz ukarch_tls_area_align(void)
 {
-	return 8;
+	/* The minimal required TLS area alignment should ideally come from the
+	 * ELF header, but 32 should be fine for all use X86_64 instructions.
+	 */
+	return 32;
 }
 
 static inline void ukarch_tls_area_copy(void *tls_area)

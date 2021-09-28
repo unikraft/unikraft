@@ -103,7 +103,7 @@
 	uk_inittab_end = .;
 
 #define TLS_SECTIONS							\
-	. = ALIGN(0x8);							\
+	. = ALIGN(0x20);						\
 	_tls_start = .;							\
 	.tdata :							\
 	{								\
@@ -117,7 +117,7 @@
 		*(.tbss)						\
 		*(.tbss.*)						\
 		*(.gnu.linkonce.tb.*)					\
-		. = ALIGN(0x8);						\
+		. = ALIGN(0x20);					\
 	}								\
 	_tls_end = . + SIZEOF(.tbss);
 
