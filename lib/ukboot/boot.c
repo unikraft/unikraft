@@ -64,6 +64,10 @@
 #include <uk/ctors.h>
 #include <uk/init.h>
 #include <uk/argparse.h>
+#include <uk/plat/lcpu.h>
+#ifdef CONFIG_HAVE_SMP
+#include "../../plat/kvm/include/kvm-arm/smp.h"
+#endif
 #ifdef CONFIG_LIBUKLIBPARAM
 #include <uk/libparam.h>
 #endif /* CONFIG_LIBUKLIBPARAM */
@@ -71,6 +75,8 @@
 #include <uk/sp.h>
 #endif
 #include "banner.h"
+
+uint8_t secondary_stacks[CONFIG_MAX_CPUS - 1][__PAGE_SIZE * 4];
 
 int main(int argc, char *argv[]) __weak;
 
@@ -280,6 +286,16 @@ void ukplat_entry(int argc, char *argv[])
 
 	tma.argc = argc - kern_args;
 	tma.argv = &argv[kern_args];
+
+#ifdef CONFIG_HAVE_SMP
+	int lcpuid[] = {0, 1, 2};
+	void *stack[3];
+	ukplat_lcpu_entry_t entry[3];
+	stack[0] = secondary_stacks[0]; entry[0] = _lcpu_entry_default;
+	stack[1] = secondary_stacks[1]; entry[1] = _lcpu_entry_default;
+	stack[2] = secondary_stacks[2]; entry[2] = _lcpu_entry_default;
+	ukplat_lcpu_start(lcpuid, stack, entry, 3);
+#endif /* CONFIG_HAVE_SMP */
 
 #if CONFIG_LIBUKSCHED
 	main_thread = uk_thread_create("main", main_thread_func, &tma);
