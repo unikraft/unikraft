@@ -31,6 +31,7 @@
  */
 
 #include <inttypes.h>
+#include <unistd.h>
 #include <uk/alloc.h>
 #include <uk/essentials.h>
 #include <uk/sglist.h>
@@ -47,7 +48,7 @@ static struct uk_alloc *a;
 
 /* List of initialized virtio 9p devices. */
 static UK_LIST_HEAD(virtio_9p_device_list);
-static DEFINE_SPINLOCK(virtio_9p_device_list_lock);
+static __spinlock virtio_9p_device_list_lock;
 
 struct virtio_9p_device {
 	/* Virtio device. */
@@ -66,7 +67,7 @@ struct virtio_9p_device {
 	struct uk_sglist sg;
 	struct uk_sglist_seg sgsegs[NUM_SEGMENTS];
 	/* Spinlock protecting the sg list and the vq. */
-	spinlock_t spinlock;
+	__spinlock spinlock;
 };
 
 static int virtio_9p_connect(struct uk_9pdev *p9dev,
@@ -431,7 +432,7 @@ static int virtio_9p_add_dev(struct virtio_dev *vdev)
 		rc = -ENOMEM;
 		goto out;
 	}
-	ukarch_spin_lock_init(&d->spinlock);
+	ukarch_spin_init(&d->spinlock);
 	d->vdev = vdev;
 	virtio_9p_feature_set(d);
 	rc = virtio_9p_configure(d);

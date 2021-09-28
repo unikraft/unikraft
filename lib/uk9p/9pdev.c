@@ -51,7 +51,7 @@
 
 static void _fid_mgmt_init(struct uk_9pdev_fid_mgmt *fid_mgmt)
 {
-	ukarch_spin_lock_init(&fid_mgmt->spinlock);
+	ukarch_spin_init(&fid_mgmt->spinlock);
 	fid_mgmt->next_fid = 0;
 	UK_INIT_LIST_HEAD(&fid_mgmt->fid_free_list);
 	UK_INIT_LIST_HEAD(&fid_mgmt->fid_active_list);
@@ -126,7 +126,7 @@ static void _fid_mgmt_cleanup(struct uk_9pdev_fid_mgmt *fid_mgmt)
 
 static void _req_mgmt_init(struct uk_9pdev_req_mgmt *req_mgmt)
 {
-	ukarch_spin_lock_init(&req_mgmt->spinlock);
+	ukarch_spin_init(&req_mgmt->spinlock);
 	uk_bitmap_zero(req_mgmt->tag_bm, UK_9P_NUMTAGS);
 	UK_INIT_LIST_HEAD(&req_mgmt->req_list);
 	UK_INIT_LIST_HEAD(&req_mgmt->req_free_list);
