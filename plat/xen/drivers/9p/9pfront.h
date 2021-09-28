@@ -57,7 +57,7 @@ struct p9front_dev_ring {
 	/* Grant reference for the interface. */
 	grant_ref_t ref;
 	/* Per-ring spinlock. */
-	spinlock_t spinlock;
+	__spinlock spinlock;
 	/* Tracks if this ring was initialized. */
 	bool initialized;
 #if CONFIG_LIBUKSCHED

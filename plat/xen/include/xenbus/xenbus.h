@@ -103,7 +103,7 @@ struct xenbus_watch {
 	/**< in use internally */
 	UK_TAILQ_ENTRY(struct xenbus_watch) watch_list;
 	/**< Lock */
-	spinlock_t lock;
+	__spinlock lock;
 	/**< Number of pending events */
 	int pending_events;
 	/**< Watch waiting queue */
