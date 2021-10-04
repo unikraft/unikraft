@@ -138,6 +138,8 @@ typedef struct sigaltstack {
 	size_t ss_size;
 } stack_t;
 
+int sigaltstack(const stack_t *ss, stack_t *old_ss);
+
 #ifdef __cplusplus
 }
 #endif

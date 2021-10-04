@@ -24,6 +24,7 @@ sigfillset
 sigaddset
 sigdelset
 sigismember
+sigaltstack
 
 # unistd.h
 alarm

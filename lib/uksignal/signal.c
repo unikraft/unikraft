@@ -386,3 +386,10 @@ UK_SYSCALL_R_DEFINE(int, pause)
 {
 	return 0;
 }
+
+int sigaltstack(const stack_t *ss __unused, stack_t *old_ss __unused)
+{
+	UK_WARN_STUBBED();
+	errno = ENOTSUP;
+	return -1;
+}
