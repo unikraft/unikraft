@@ -1126,8 +1126,10 @@ struct dirent *readdir(DIR *dir)
 	int ret;
 
 	ret = readdir_r(dir, &entry, &result);
-	if (ret)
-		return ERR2PTR(-ret);
+	if (ret) {
+		errno = ret;
+		return NULL;
+	}
 
 	errno = 0;
 	return result;
