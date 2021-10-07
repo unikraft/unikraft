@@ -77,7 +77,7 @@ ifndef BUILD_VERBOSE
   BUILD_VERBOSE = 0
 endif
 
-ifeq ($(KBUILD_VERBOSE),1)
+ifneq ($(KBUILD_VERBOSE),0)
   Q =
 ifndef VERBOSE
   VERBOSE = 1
@@ -87,10 +87,16 @@ else
    Q = @
 endif
 
+# Enable warnings about undefined variables
+# with verbosity level 2
+ifeq ($(BUILD_VERBOSE),2)
+MAKEFLAGS+=--warn-undefined-variables
+endif
+
 # Helper that shows an `info` message only
 # when verbose mode is on
 # verbose_info $verbosemessage
-ifeq ($(BUILD_VERBOSE),1)
+ifneq ($(BUILD_VERBOSE),0)
 verbose_info = $(info $(1))
 else
 verbose_info =
@@ -1050,7 +1056,8 @@ help:
 	@echo '  allnoconfig            - New config where all options are answered with no'
 	@echo ''
 	@echo 'Command-line variables:'
-	@echo '  V=0|1                  - 0 => quiet build (default), 1 => verbose build'
+	@echo '  V=0|1|2                - 0 => quiet build (default), 1 => verbose build,'
+	@echo '                           2 => like 1 and warn about undefined build variables'
 	@echo '  C=[PATH]               - path to .config configuration file'
 	@echo '  O=[PATH]               - path to build output (will be created if it does not exist)'
 	@echo '  A=[PATH]               - path to Unikraft application'
