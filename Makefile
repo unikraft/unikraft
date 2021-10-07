@@ -252,7 +252,7 @@ noconfig_targets	:= ukconfig menuconfig nconfig gconfig xconfig config \
 			   silentoldconfig \
 			   release olddefconfig properclean distclean \
 			   scriptconfig iscriptconfig kmenuconfig guiconfig \
-			   dumpvarsconfig $(null_targets)
+			   dumpvarsconfig print-version help
 
 # we want bash as shell
 SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
@@ -925,9 +925,10 @@ $(KCONFIG_AUTOHEADER): $(UK_CONFIG) $(KCONFIG_DIR)/conf
 print-vars:
 	@$(foreach V, \
 		$(sort $(if $(VARS),$(filter $(VARS),$(.VARIABLES)),$(.VARIABLES))), \
-		$(if $(filter-out environment% default automatic, \
-				$(origin $V)), \
-		$(info $V=$($V) ($(value $V)))))
+		$(if $(filter-out environment% default automatic,$(origin $V)), \
+		$(if $(filter simple,$(flavor $V)), \
+			$(info [$(origin $V)] $V := $(value $V)), \
+			$(info [$(origin $V)] $V = <$(flavor $V)>))))
 
 print-version:
 	@echo $(UK_FULLVERSION)
