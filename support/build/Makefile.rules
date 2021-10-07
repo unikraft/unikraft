@@ -244,7 +244,7 @@ sub_libbuild_dir = $(BUILD_DIR)/$(1)/$(2)
 # verbose_cmd $quietlabel,$quiettext,$command
 # verbose_cmd_inner is a version of verbose_command for use inside foreach
 # loops inside evals and similar
-ifeq ($(BUILD_VERBOSE),1)
+ifneq ($(BUILD_VERBOSE),0)
 verbose_cmd = $(3)
 verbose_cmd_inner = printf '%s\n' '$(3)' && $(3)
 else
