@@ -190,6 +190,7 @@ struct uk_netdev_rx_queue;
  */
 enum uk_netdev_state {
 	UK_NETDEV_INVALID = 0,
+	UK_NETDEV_UNPROBED,
 	UK_NETDEV_UNCONFIGURED,
 	UK_NETDEV_CONFIGURED,
 	UK_NETDEV_RUNNING,
@@ -286,6 +287,10 @@ struct uk_netdev_rxqueue_conf {
 struct uk_netdev_txqueue_conf {
 	struct uk_alloc *a;               /* Allocator for descriptors. */
 };
+
+/** Driver callback type to probe device capabilities and features (optional)
+ */
+typedef int (*uk_netdev_probe_t)(struct uk_netdev *dev);
 
 /** Driver callback type to read device/driver capabilities,
  *  used for configuring the device
@@ -405,6 +410,7 @@ struct uk_netdev_ops {
 	uk_netdev_einfo_get_t           einfo_get;        /* optional */
 
 	/** Device life cycle. */
+	uk_netdev_probe_t               probe;            /* recommended */
 	uk_netdev_configure_t           configure;
 	uk_netdev_txq_configure_t       txq_configure;
 	uk_netdev_rxq_configure_t       rxq_configure;
