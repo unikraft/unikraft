@@ -867,14 +867,6 @@ static int virtio_netdev_feature_negotiate(struct virtio_net_device *vndev)
 				   &vndev->hw_addr.addr_bytes[0],
 				   UK_NETDEV_HWADDR_LEN, 1);
 	rc = 0;
-	uk_pr_info("vndev->hw_addr.addr_bytes=[%x %x %x %x %x %x]\n",
-		vndev->hw_addr.addr_bytes[0],
-		vndev->hw_addr.addr_bytes[1],
-		vndev->hw_addr.addr_bytes[2],
-		vndev->hw_addr.addr_bytes[3],
-		vndev->hw_addr.addr_bytes[4],
-		vndev->hw_addr.addr_bytes[5]);
-
 
 	/**
 	 * Mask out features supported by both driver and device.
