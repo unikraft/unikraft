@@ -94,6 +94,7 @@ static UK_LIST_HEAD(uk_libsections);
  * Local functions
  */
 static int kernel_arg_range_fetch(int argc, char **argv);
+static const char *str_param_type(const struct uk_param *param);
 static void uk_usage(const char *progname);
 static int kernel_arg_fetch(char **args, int nr_args,
 			    struct param_args *pargs, int *rewind);
@@ -113,14 +114,92 @@ void _uk_libparam_lib_add(struct uk_lib_section *lib_sec)
 	uk_list_add_tail(&lib_sec->next, &uk_libsections);
 }
 
+static const char *str_param_type(const struct uk_param *param)
+{
+	const char *ret;
+
+	UK_ASSERT(param);
+
+	switch (param->param_type) {
+	case _LIB_PARAM___s8: /* _LIB_PARAM_char */
+		ret = "char";
+		break;
+	case _LIB_PARAM___u8:
+		ret = "u8";
+		break;
+	case _LIB_PARAM___s16:
+		ret = "s16";
+		break;
+	case _LIB_PARAM___u16:
+		ret = "u16";
+		break;
+	case _LIB_PARAM___s32: /* _LIB_PARAM_int */
+		ret = "int";
+		break;
+	case _LIB_PARAM___u32:
+		ret = "uint";
+		break;
+	case _LIB_PARAM___s64:
+		ret = "s64";
+		break;
+	case _LIB_PARAM___u64:
+		ret = "u64";
+		break;
+	case _LIB_PARAM___uptr: /* _LIB_PARAM_charp */
+		ret = "string";
+		break;
+	default:
+		ret = "?";
+		break;
+	}
+
+	return ret;
+}
+
 static void uk_usage(const char *progname)
 {
+	struct uk_lib_section *section;
+	struct uk_param *param;
+	int i, j, len, type_size;
+
 	printf("Usage: %s\n", progname);
-	printf(" [[UNIKRAFT KERNEL ARGUMENT]].. -- [[APPLICATION ARGUMENT]]..\n\n");
-	printf("Unikraft library arguments:\n");
-	printf("The library arguments are represented as [LIBPARAM_PREFIX].[PARAMNAME]\n\n");
+	printf(" [[UNIKRAFT OPTION]].. [[UNIKRAFT LIBRARY ARGUMENT]].. -- [[APPLICATION ARGUMENT]]..\n\n");
+	printf("Unikraft options:\n");
 	printf("  -h, --help                 display this help and exit\n");
-	printf("  -V, --version              display Unikraft version and exit\n");
+	printf("  -V, --version              display Unikraft version and exit\n\n");
+	printf("Unikraft library arguments:\n");
+	uk_list_for_each_entry(section, &uk_libsections, next) {
+		len = section->len / sizeof(struct uk_param);
+		param = section->sec_addr_start;
+
+		UK_ASSERT(param);
+		UK_ASSERT(param->param_type > 0);
+		UK_ASSERT(param->param_size > 0);
+
+		for (i = 0; i < len; i++, param++) {
+			type_size = (param->param_type >> PARAM_SIZE_SHIFT)
+				    & PARAM_SIZE_MASK;
+
+			UK_ASSERT(type_size > 0);
+
+			printf("  %s=[%s]",
+			       param->name, str_param_type(param));
+
+			/* ...in case we have an array: */
+			for (j = param->param_size / type_size;
+			     j > 1;
+			     --j) {
+				printf("%c[%s]",
+				       ARRAY_SEP, str_param_type(param));
+			}
+
+			printf("\n");
+		}
+	}
+	printf("\n");
+	printf("For application arguments refer to the application manual or application help.\n");
+	printf("For example, use `-h` as application argument.\n");
+	fflush(stdout);
 }
 
 static int kernel_arg_range_fetch(int argc, char **argv)
