@@ -384,6 +384,11 @@ $(error $(2): missing extraction rule for archive type)\
 UK_FETCH-y += $(BUILD_DIR)/$(1)/.origin \
 $(eval $(call vprefix_lib,$(1),ORIGIN) = $(BUILD_DIR)/$(1)/origin)
 $(call mk_sub_build_dir,$(1)/origin)
+
+.PRECIOUS: $(BUILD_DIR)/$(1)/origin
+
+$(BUILD_DIR)/$(1)/origin/%: $(BUILD_DIR)/$(1)/.origin
+	@:
 endef
 
 # Internal helper to compute and compare a checksum of a downloaded file
