@@ -144,6 +144,8 @@ struct vattr {
 
 #define IO_APPEND	0x0001
 #define IO_SYNC		0x0002
+#define IO_ASYNC	0x0004	/* start the storage I/O asynchronously */
+#define IO_DIRECT	0x0008	/* try to bypass the buffer cache */
 
 /*
  * ARC actions
