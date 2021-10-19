@@ -86,6 +86,10 @@ void psignal(int sig, const char *s);
 int fputc(int _c, FILE *fp);
 int putchar(int c);
 
+#if CONFIG_LIBVFSCORE
+int rename(const char *oldpath, const char *newpath);
+#endif
+
 #ifdef __STDIO_H_DEFINED_va_list
 #undef va_list
 #endif
