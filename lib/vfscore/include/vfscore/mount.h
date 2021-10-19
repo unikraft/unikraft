@@ -82,6 +82,9 @@ struct mount {
 #ifndef	MNT_ASYNC
 #define	MNT_ASYNC	0x00000040	/* file system written asynchronously */
 #endif
+#ifndef MNT_NOATIME
+#define MNT_NOATIME	0x00000080	/* do not update access times */
+#endif
 
 /*
  * Unmount flags.
