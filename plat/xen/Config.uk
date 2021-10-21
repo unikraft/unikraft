@@ -1,9 +1,9 @@
 menuconfig PLAT_XEN
        bool "Xen guest image"
        default n
-       depends on (ARCH_X86_32 || ARCH_X86_64 || ARCH_ARM_32)
+       depends on ((ARCH_X86_32 && !HAVE_SMP) || (ARCH_X86_64 && !HAVE_SMP) || (ARCH_ARM_32 && !HAVE_SMP))
+       depends on ((ARCH_X86_32 && !HAVE_SYSCALL) || (ARCH_X86_64 && !HAVE_SYSCALL) || (ARCH_ARM_32 && !HAVE_SYSCALL))
        imply XEN_PV_BUILD_P2M
-       depends on !HAVE_SYSCALL
        select LIBUKDEBUG
        select LIBNOLIBC if !HAVE_LIBC
        select LIBUKTIME if !HAVE_LIBC && ARCH_X86_64
