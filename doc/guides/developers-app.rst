@@ -66,7 +66,7 @@ Each setting that is defined in this file will be globally populated as set
 variable for all ``Makefile.uk`` file, as defined macro in your source code when
 you use ``"#include <uk/config.h>"``. Please ensure that all settings are
 properly name spaced. They should begin with ``[APPNAME]_`` (e.g.,
-``APPHELLOWORLD_``). Please also not that some variable names are predefined for
+``APPHELLOWORLD_``). Please also note that some variable names are predefined for
 each application or library name space (see Makefile.uk).
 
 We recommend as current best practice to begin the file with defining
