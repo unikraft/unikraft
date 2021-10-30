@@ -1285,7 +1285,7 @@ static void convert_timeval(struct timespec *to, const struct timeval *from)
 }
 
 int
-sys_utimes(char *path, const struct timeval times[2], int flags)
+sys_utimes(char *path, const struct timeval *times, int flags)
 {
 	int error;
 	struct dentry *dp;
