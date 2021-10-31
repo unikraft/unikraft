@@ -37,6 +37,20 @@ ARCHFLAGS-$(call gcc_version_ge,4,9)     += -march=armv8-a -mcpu=cortex-a53 -mtu
 ISR_ARCHFLAGS-$(call gcc_version_ge,4,9) += -march=armv8-a -mcpu=cortex-a53 -mtune=cortex-a53
 endif
 
+# For erratum 835769
+ifeq ($(CONFIG_ARM64_ERRATUM_835769),y)
+$(call error_if_gcc_version_lt,4,9)
+ARCHFLAGS-$(call gcc_version_ge,4,9)     += -mfix-cortex-a53-835769
+ISR_ARCHFLAGS-$(call gcc_version_ge,4,9) += -mfix-cortex-a53-835769
+endif
+
+# For erratum 843419
+ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
+$(call error_if_gcc_version_lt,4,9)
+ARCHFLAGS-$(call gcc_version_ge,4,9)     += -mfix-cortex-a53-843419
+ISR_ARCHFLAGS-$(call gcc_version_ge,4,9) += -mfix-cortex-a53-843419
+endif
+
 # GCC support -mcpu=cortex-a57 for arm64 from 4.9
 ifeq ($(CONFIG_MARCH_ARM64_CORTEXA57),y)
 $(call error_if_gcc_version_lt,4,9)
