@@ -39,7 +39,6 @@
 #include <uk/errptr.h>
 #include <uk/bitmap.h>
 #include <uk/refcount.h>
-#include <uk/wait.h>
 #include <uk/9p.h>
 #include <uk/9pdev.h>
 #include <uk/9pdev_trans.h>
