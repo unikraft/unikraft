@@ -75,16 +75,14 @@ ifeq ("$(origin V)", "command line")
 endif
 ifndef BUILD_VERBOSE
   BUILD_VERBOSE = 0
+  # Set KBUILD_VERBOSE and Q to quiet mode
+  KBUILD_VERBOSE := 0
+  Q := @
 endif
 
-ifneq ($(KBUILD_VERBOSE),0)
-  Q =
-ifndef VERBOSE
-  VERBOSE = 1
-endif
-export VERBOSE
-else
-   Q = @
+ifneq ($(BUILD_VERBOSE),0)
+  KBUILD_VERBOSE := 1
+  Q :=
 endif
 
 # Enable warnings about undefined variables
@@ -782,9 +780,11 @@ KCONFIG_TOOLS = conf mconf gconf nconf qconf fixdep
 KCONFIG_TOOLS := $(addprefix $(KCONFIG_DIR)/,$(KCONFIG_TOOLS))
 
 $(KCONFIG_TOOLS):
-	mkdir -p $(@D)/lxdialog
-	$(MAKE) --no-print-directory CC="$(HOSTCC_NOCCACHE)" HOSTCC="$(HOSTCC_NOCCACHE)" \
-	    obj=$(@D) -C $(CONFIG) -f Makefile.br $(@)
+	$(call verbose_cmd,MKDIR,lxdialog,$(MKDIR) -p $(@D)/lxdialog)
+	$(call verbose_cmd,MAKE,$(notdir $(CONFIG)),$(MAKE) \
+	    --no-print-directory \
+	    CC="$(HOSTCC_NOCCACHE)" HOSTCC="$(HOSTCC_NOCCACHE)" \
+	    obj=$(@D) -C $(CONFIG) -f Makefile.br $(@))
 
 DEFCONFIG = $(call qstrip,$(UK_DEFCONFIG))
 
