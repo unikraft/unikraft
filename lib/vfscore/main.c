@@ -401,7 +401,7 @@ UK_LLSYSCALL_R_DEFINE(ssize_t, pread64, int, fd,
 	};
 	ssize_t bytes;
 
-	bytes = uk_syscall_r_preadv((long) fd, (long) &iov,
+	bytes = uk_syscall_r_pread64((long) fd, (long) &iov,
 				    1, (long) offset);
 	if (bytes < 0)
 		trace_vfs_pread_err(bytes);
@@ -598,7 +598,7 @@ UK_LLSYSCALL_R_DEFINE(ssize_t, pwrite64, int, fd,
 	};
 	ssize_t bytes;
 
-	bytes = uk_syscall_r_pwritev((long) fd, (long) &iov,
+	bytes = uk_syscall_r_pwrite64((long) fd, (long) &iov,
 				     1, (long) offset);
 	if (bytes < 0)
 		trace_vfs_pwrite_err(bytes);
