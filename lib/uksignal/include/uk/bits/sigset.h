@@ -43,16 +43,16 @@ extern "C" {
 
 /* TODO: do we have gnu statement expression?  */
 /* internal use */
-#define uk_sigemptyset(ptr)	(*(ptr) = 0)
-#define uk_sigfillset(ptr)  (*(ptr) = ~((__sigset_t) 0))
-#define uk_sigaddset(ptr, signo) (*(ptr) |= (1 << ((signo) - 1)))
-#define uk_sigdelset(ptr, signo) (*(ptr) &= ~(1 << ((signo) - 1)))
-#define uk_sigcopyset(ptr1, ptr2) (*(ptr1) = *(ptr2))
-#define uk_sigandset(ptr1, ptr2)  (*(ptr1) &= *(ptr2))
-#define uk_sigorset(ptr1, ptr2)	  (*(ptr1) |= *(ptr2))
-#define uk_sigreverseset(ptr)	  (*(ptr) = ~(*(ptr)))
-#define uk_sigismember(ptr, signo) (*(ptr) & (1 << ((signo) - 1)))
-#define uk_sigisempty(ptr) (*(ptr) == 0)
+#define uk_sigemptyset(ptr) (((ptr)->__bits[0]) = 0)
+#define uk_sigfillset(ptr) (((ptr)->__bits[0]) = ~(0))
+#define uk_sigaddset(ptr, signo) (((ptr)->__bits[0]) |= (1 << ((signo) - 1)))
+#define uk_sigdelset(ptr, signo) (((ptr)->__bits[0]) &= ~(1 << ((signo) - 1)))
+#define uk_sigcopyset(ptr1, ptr2) (((ptr1)->__bits[0]) = ((ptr2)->__bits[0]))
+#define uk_sigandset(ptr1, ptr2) (((ptr1)->__bits[0]) &= ((ptr2)->__bits[0]))
+#define uk_sigorset(ptr1, ptr2) (((ptr1)->__bits[0]) |= ((ptr2)->__bits[0]))
+#define uk_sigreverseset(ptr) (((ptr)->__bits[0]) = ~((ptr)->__bits[0]))
+#define uk_sigismember(ptr, signo) (((ptr)->__bits[0]) & (1 << ((signo) - 1)))
+#define uk_sigisempty(ptr) (((ptr)->__bits[0]) == 0)
 
 #ifdef __cplusplus
 }
