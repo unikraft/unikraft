@@ -51,11 +51,16 @@
  *	Maximum number of segments per request,
  *	Flush
  **/
-#define VIRTIO_BLK_DRV_FEATURES(features) \
-	(VIRTIO_FEATURES_UPDATE(features, VIRTIO_BLK_F_RO | \
-	VIRTIO_BLK_F_BLK_SIZE | VIRTIO_BLK_F_MQ | \
-	VIRTIO_BLK_F_SEG_MAX | VIRTIO_BLK_F_SIZE_MAX | \
-	VIRTIO_BLK_F_CONFIG_WCE | VIRTIO_BLK_F_FLUSH))
+#define VIRTIO_BLK_DRV_FEATURES(features)				\
+	do {								\
+		VIRTIO_FEATURE_SET(features, VIRTIO_BLK_F_RO);		\
+		VIRTIO_FEATURE_SET(features, VIRTIO_BLK_F_BLK_SIZE);	\
+		VIRTIO_FEATURE_SET(features, VIRTIO_BLK_F_SEG_MAX);	\
+		VIRTIO_FEATURE_SET(features, VIRTIO_BLK_F_CONFIG_WCE);	\
+		VIRTIO_FEATURE_SET(features, VIRTIO_BLK_F_MQ);		\
+		VIRTIO_FEATURE_SET(features, VIRTIO_BLK_F_SIZE_MAX);	\
+		VIRTIO_FEATURE_SET(features, VIRTIO_BLK_F_FLUSH);	\
+	} while (0)
 
 static struct uk_alloc *a;
 static const char *drv_name = DRIVER_NAME;
@@ -757,7 +762,7 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 		goto exit;
 	}
 
-	if (!virtio_has_features(host_features, VIRTIO_BLK_F_BLK_SIZE)) {
+	if (!VIRTIO_FEATURE_HAS(host_features, VIRTIO_BLK_F_BLK_SIZE)) {
 		ssize = DEFAULT_SECTOR_SIZE;
 	} else {
 		rc = virtio_config_get(vbdev->vdev,
@@ -775,7 +780,7 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 	/* If the device does not support multi-queues,
 	 * we will use only one queue.
 	 */
-	if (virtio_has_features(host_features, VIRTIO_BLK_F_MQ)) {
+	if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_BLK_F_MQ)) {
 		rc = virtio_config_get(vbdev->vdev,
 					__offsetof(struct virtio_blk_config,
 							num_queues),
@@ -789,7 +794,7 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 	} else
 		num_queues = 1;
 
-	if (virtio_has_features(host_features, VIRTIO_BLK_F_SEG_MAX)) {
+	if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_BLK_F_SEG_MAX)) {
 		rc = virtio_config_get(vbdev->vdev,
 			__offsetof(struct virtio_blk_config, seg_max),
 			&max_segments,
@@ -805,7 +810,7 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 	/* We need extra sg elements for head (header) and tail (status). */
 	max_segments += 2;
 
-	if (virtio_has_features(host_features, VIRTIO_BLK_F_SIZE_MAX)) {
+	if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_BLK_F_SIZE_MAX)) {
 		rc = virtio_config_get(vbdev->vdev,
 			__offsetof(struct virtio_blk_config, size_max),
 			&max_size_segment,
@@ -822,7 +827,7 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 	cap->ssize = ssize;
 	cap->sectors = sectors;
 	cap->ioalign = sizeof(void *);
-	cap->mode = (virtio_has_features(
+	cap->mode = (VIRTIO_FEATURE_HAS(
 			host_features, VIRTIO_BLK_F_RO)) ? O_RDONLY : O_RDWR;
 	cap->max_sectors_per_req =
 			max_size_segment / ssize * (max_segments - 2);
@@ -830,7 +835,7 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 	vbdev->max_vqueue_pairs = num_queues;
 	vbdev->max_segments = max_segments;
 	vbdev->max_size_segment = max_size_segment;
-	vbdev->writeback = virtio_has_features(host_features,
+	vbdev->writeback = VIRTIO_FEATURE_HAS(host_features,
 				VIRTIO_BLK_F_FLUSH);
 
 	/**

@@ -68,8 +68,8 @@
 #define to_virtionetdev(ndev) \
 	__containerof(ndev, struct virtio_net_device, netdev)
 
-#define VIRTIO_NET_DRV_FEATURES(features)           \
-	(VIRTIO_FEATURES_UPDATE(features, VIRTIO_NET_F_MAC))
+#define VIRTIO_NET_DRV_FEATURES(features)			\
+	VIRTIO_FEATURES_SET((features), VIRTIO_NET_F_MAC)
 
 typedef enum {
 	VNET_RX,
@@ -843,7 +843,7 @@ static int virtio_netdev_feature_negotiate(struct virtio_net_device *vndev)
 	 * accepting it.
 	 */
 	host_features = virtio_feature_get(vndev->vdev);
-	if (!virtio_has_features(host_features, VIRTIO_NET_F_MAC)) {
+	if (!VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_MAC)) {
 		/**
 		 * The feature that aren't supported are usually masked out and
 		 * provided with default value. In this case we need to

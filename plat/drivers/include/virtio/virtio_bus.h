@@ -48,8 +48,18 @@
 extern "C" {
 #endif /* __cplusplus */
 
-#define VIRTIO_FEATURES_UPDATE(features, bpos)	\
-	(features |= (1ULL << bpos))
+#define VIRTIO_FEATURE_SET(features, bitpos)				\
+	do {								\
+		(features) |=  (((typeof (features)) 1) << (bitpos));	\
+	} while (0)
+
+#define VIRTIO_FEATURE_CLEAR(features, bitpos) \
+	do {								\
+		(features) &= ~(((typeof (features)) 1) << (bitpos));	\
+	} while (0)
+
+#define VIRTIO_FEATURE_HAS(features, bitpos)				\
+	(!(!(features & (((typeof (features)) 1) << (bitpos)))))
 
 struct virtio_dev;
 typedef int (*virtio_driver_init_func_t)(struct uk_alloc *);
@@ -333,16 +343,6 @@ static inline void virtio_vqueue_release(struct virtio_dev *vdev,
 	UK_ASSERT(a);
 	if (likely(vdev->cops->vq_release))
 		vdev->cops->vq_release(vdev, vq, a);
-}
-
-static inline int virtio_has_features(__u64 features, __u8 bpos)
-{
-	__u64 tmp_feature = 0;
-
-	VIRTIO_FEATURES_UPDATE(tmp_feature, bpos);
-	tmp_feature &= features;
-
-	return tmp_feature ? 1 : 0;
 }
 
 static inline void virtio_dev_drv_up(struct virtio_dev *vdev)
