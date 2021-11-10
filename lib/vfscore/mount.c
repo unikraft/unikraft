@@ -377,12 +377,14 @@ UK_LLSYSCALL_R_DEFINE(int, sync)
 	bio_sync();
 #endif
 	uk_mutex_unlock(&mount_lock);
+
+	return 0;
 }
 
 #if UK_LIBC_SYSCALLS
 void sync(void)
 {
-   uk_syscall_e_sync();
+	uk_syscall_e_sync();
 }
 #endif
 
