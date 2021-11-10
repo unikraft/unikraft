@@ -782,7 +782,7 @@ int ioctl(int fd, unsigned long int request, ...)
 	arg = va_arg(ap, void*);
 	va_end(ap);
 
-	return uk_syscall_e_ioctl(fd, request, arg);
+	return uk_syscall_e_ioctl((long) fd, (long) request, (long) arg);
 }
 #endif
 
