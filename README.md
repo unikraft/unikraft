@@ -1,6 +1,6 @@
 # [![Unikraft](http://unikraft.org/assets/imgs/unikraft-logo-small.png)][unikraft-website]
 
-[![](https://img.shields.io/badge/version-v0.5%20(Tethys)-%23EC591A)][unikraft-latest] [![](https://img.shields.io/static/v1?label=license&message=BSD-3&color=%23385177)][unikraft-license]
+[![](https://img.shields.io/badge/version-v0.5%20(Tethys)-%23EC591A)][unikraft-latest] [![](https://img.shields.io/static/v1?label=license&message=BSD-3&color=%23385177)][unikraft-license] [![](https://badgen.net/discord/online-members/RG5ZQGKxyW)][unikraft-discord]
 
 ***Unleash the Power of Unikernels!***
 
@@ -27,7 +27,7 @@ Unikraft is a new system for ultra-light virtualization of your services in the 
 
 🛡️ **Ready for mission critical deployments**
    Focus your trust on a minimal set of required components, significantly reduce your service's attack surface, and minimize certification costs.
-   
+
 🏎 **Outstanding performance**
    Specializing the OS to meet your application's needs is the key to achieving superior performance, making you ready to drive your infrastructure to the peak.
 
@@ -89,6 +89,7 @@ Unikraft is licensed under a BSD-3-Clause.  For more information, please refer t
 [unikraft-license]: https://github.com/unikraft/unikraft/blob/staging/COPYING.md
 [unikraft-latest]: https://github.com/unikraft/unikraft/tree/RELEASE-0.5
 [unikraft-gettingstarted]: http://www.unikraft.org/getting-started
+[unikraft-discord]: https://bit.ly/UnikraftDiscord
 [kraft]: https://github.com/unikraft/kraft/
 [github-issues]: https://github.com/unikraft/unikraft/issues
 [github-projects]: https://github.com/unikraft/unikraft/labels/kind/project
