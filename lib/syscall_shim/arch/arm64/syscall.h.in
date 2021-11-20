@@ -276,4 +276,22 @@
 #define __NR_pkey_free 290
 #define __NR_statx 291
 #define __NR_io_pgetevents 292
-
+#define __NR_rseq 293
+#define __NR_kexec_file_load 294
+#define __NR_pidfd_send_signal 424
+#define __NR_io_uring_setup 425
+#define __NR_io_uring_enter 426
+#define __NR_io_uring_register 427
+#define __NR_open_tree		428
+#define __NR_move_mount		429
+#define __NR_fsopen		430
+#define __NR_fsconfig		431
+#define __NR_fsmount		432
+#define __NR_fspick		433
+#define __NR_pidfd_open		434
+#define __NR_clone3		435
+#define __NR_close_range	436
+#define __NR_openat2		437
+#define __NR_pidfd_getfd	438
+#define __NR_faccessat2		439
+#define __NR_process_madvise	440

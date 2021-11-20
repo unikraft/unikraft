@@ -111,8 +111,12 @@ UK_TRACEPOINT(trace_vfs_open_err, "%d", int);
 
 struct task *main_task;	/* we only have a single process */
 
+#if CONFIG_ARCH_x86_64
 UK_LLSYSCALL_R_DEFINE(int, open, const char*, pathname, int, flags,
 		      mode_t, mode)
+#else
+int open_nosyscall(const char *pathname, int flags, mode_t mode)
+#endif
 {
 	trace_vfs_open(pathname, flags, mode);
 
@@ -170,7 +174,11 @@ int open(const char *pathname, int flags, ...)
 		va_end(ap);
 	}
 
+#if CONFIG_ARCH_x86_64
 	return uk_syscall_e_open((long int)pathname, flags, mode);
+#else
+	return open_nosyscall((char *)pathname, flags, mode);
+#endif
 }
 
 #ifdef open64
@@ -184,7 +192,11 @@ UK_LLSYSCALL_R_DEFINE(int, openat, int, dirfd, const char *, pathname,
 		      int, flags, int, mode)
 {
 	if (pathname[0] == '/' || dirfd == AT_FDCWD) {
+#if CONFIG_ARCH_x86_64
 		return uk_syscall_e_open((long int)pathname, flags, mode);
+#else
+		return open_nosyscall((char *)pathname, flags, mode);
+#endif
 	}
 
 	struct vfscore_file *fp;
@@ -205,7 +217,11 @@ UK_LLSYSCALL_R_DEFINE(int, openat, int, dirfd, const char *, pathname,
 	strlcat(p, "/", PATH_MAX);
 	strlcat(p, pathname, PATH_MAX);
 
+#if CONFIG_ARCH_x86_64
 	error = uk_syscall_e_open((long int)p, flags, mode);
+#else
+	error = open_nosyscall((char *)p, flags, mode);
+#endif
 
 	vn_unlock(vp);
 	fdrop(fp);
@@ -236,10 +252,19 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 LFS64(openat);
 #endif
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_DEFINE(int, creat, const char*, pathname, mode_t, mode)
+#else
+int creat(const char *pathname, mode_t mode)
+#endif
 {
+#if CONFIG_ARCH_x86_64
 	return uk_syscall_e_open((long int) pathname,
 		O_CREAT|O_WRONLY|O_TRUNC, mode);
+#else
+	return open_nosyscall((char *) pathname,
+		O_CREAT|O_WRONLY|O_TRUNC, mode);
+#endif
 }
 
 #ifdef creat64
@@ -312,7 +337,11 @@ int __xmknod(int ver, const char *pathname, mode_t mode, dev_t *dev __unused)
 	return -error;
 }
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(int, mknod, const char*, pathname, mode_t, mode, dev_t, dev)
+#else
+int mknod(const char *pathname, mode_t mode, dev_t dev)
+#endif
 {
 	return __xmknod(0, pathname, mode, &dev);
 }
@@ -977,7 +1006,11 @@ DIR *opendir(const char *path)
 		goto out_err;
 	}
 
+#if CONFIG_ARCH_x86_64
 	dir->fd = uk_syscall_e_open((long int)path, O_RDONLY, mode);
+#else
+	dir->fd = open_nosyscall((char *)path, O_RDONLY, mode);
+#endif
 	if (dir->fd < 0)
 		goto out_free_dir;
 
@@ -1085,8 +1118,13 @@ UK_TRACEPOINT(trace_vfs_getdents, "%d %p %hu", int, struct dirent*, size_t);
 UK_TRACEPOINT(trace_vfs_getdents_ret, "");
 UK_TRACEPOINT(trace_vfs_getdents_err, "%d", int);
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(int, getdents, int, fd, struct dirent*, dirp,
-					size_t, count) {
+					size_t, count)
+#else
+int getdents(int fd, struct dirent *dirp, size_t count)
+#endif
+{
 	trace_vfs_getdents(fd, dirp, count);
 	if (dirp == NULL || count == 0)
 		return 0;
@@ -1219,7 +1257,11 @@ UK_TRACEPOINT(trace_vfs_mkdir, "\"%s\" 0%0o", const char*, mode_t);
 UK_TRACEPOINT(trace_vfs_mkdir_ret, "");
 UK_TRACEPOINT(trace_vfs_mkdir_err, "%d", int);
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(int, mkdir, const char*, pathname, mode_t, mode)
+#else
+int mkdir(const char *pathname, mode_t mode)
+#endif
 {
 	struct task *t = main_task;
 	char path[PATH_MAX];
@@ -1245,7 +1287,11 @@ UK_TRACEPOINT(trace_vfs_rmdir, "\"%s\"", const char*);
 UK_TRACEPOINT(trace_vfs_rmdir_ret, "");
 UK_TRACEPOINT(trace_vfs_rmdir_err, "%d", int);
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(int, rmdir, const char*, pathname)
+#else
+int rmdir(const char *pathname)
+#endif
 {
 	struct task *t = main_task;
 	char path[PATH_MAX];
@@ -1298,7 +1344,11 @@ UK_TRACEPOINT(trace_vfs_rename, "\"%s\" \"%s\"", const char*, const char*);
 UK_TRACEPOINT(trace_vfs_rename_ret, "");
 UK_TRACEPOINT(trace_vfs_rename_err, "%d", int);
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(int, rename, const char*, oldpath, const char*, newpath)
+#else
+int rename(const char *oldpath, const char *newpath)
+#endif
 {
 	trace_vfs_rename(oldpath, newpath);
 	struct task *t = main_task;
@@ -1433,7 +1483,11 @@ UK_TRACEPOINT(trace_vfs_link, "\"%s\" \"%s\"", const char*, const char*);
 UK_TRACEPOINT(trace_vfs_link_ret, "");
 UK_TRACEPOINT(trace_vfs_link_err, "%d", int);
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(int, link, const char*, oldpath, const char*, newpath)
+#else
+int link(const char *oldpath, const char *newpath)
+#endif
 {
 	struct task *t = main_task;
 	char path1[PATH_MAX];
@@ -1468,7 +1522,11 @@ UK_TRACEPOINT(trace_vfs_symlink, "oldpath=%s, newpath=%s", const char*,
 UK_TRACEPOINT(trace_vfs_symlink_ret, "");
 UK_TRACEPOINT(trace_vfs_symlink_err, "errno=%d", int);
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(int, symlink, const char*, oldpath, const char*, newpath)
+#else
+int symlink(const char *oldpath, const char *newpath)
+#endif
 {
 	int error;
 
@@ -1494,7 +1552,11 @@ UK_TRACEPOINT(trace_vfs_unlink, "\"%s\"", const char*);
 UK_TRACEPOINT(trace_vfs_unlink_ret, "");
 UK_TRACEPOINT(trace_vfs_unlink_err, "%d", int);
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(int, unlink, const char*, pathname)
+#else
+int unlink(const char *pathname)
+#endif
 {
 	trace_vfs_unlink(pathname);
 	struct task *t = main_task;
@@ -1551,7 +1613,11 @@ int __xstat(int ver __unused, const char *pathname, struct stat *st)
 
 LFS64(__xstat);
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(int, stat, const char*, pathname, struct stat*, st)
+#else
+int stat(const char *pathname, struct stat *st)
+#endif
 {
 	if (!pathname) {
 		return -EINVAL;
@@ -1602,7 +1668,11 @@ int __lxstat(int ver __unused, const char *pathname, struct stat *st)
 
 LFS64(__lxstat);
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(int, lstat, const char*, pathname, struct stat*, st)
+#else
+int lstat(const char *pathname, struct stat *st)
+#endif
 {
 	return __lxstat(1, pathname, st);
 }
@@ -1872,7 +1942,11 @@ UK_SYSCALL_R_DEFINE(int, dup3, int, oldfd, int, newfd, int, flags)
 	return error;
 }
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(int, dup2, int, oldfd, int, newfd)
+#else
+int dup2(int oldfd, int newfd)
+#endif
 {
 	if (oldfd == newfd)
 		return newfd;
@@ -2002,7 +2076,11 @@ UK_TRACEPOINT(trace_vfs_access_err, "%d", int);
 /*
  * Check permission for file access
  */
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(int, access, const char*, pathname, int, mode)
+#else
+int access(const char *pathname, int mode)
+#endif
 {
 	trace_vfs_access(pathname, mode);
 	struct task *t = main_task;
@@ -2169,7 +2247,11 @@ UK_SYSCALL_R_DEFINE(int, ftruncate, int, fd, off_t, length)
 
 LFS64(ftruncate);
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_DEFINE(ssize_t, readlink, const char *, pathname, char *, buf, size_t, bufsize)
+#else
+ssize_t readlink(const char *pathname, char *buf, size_t bufsize)
+#endif
 {
 	struct task *t = main_task;
 	char path[PATH_MAX];
@@ -2241,7 +2323,11 @@ int futimes(int fd, const struct timeval *times)
     return futimesat(fd, NULL, times);
 }
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_DEFINE(int, futimesat, int, dirfd, const char*, pathname, const struct timeval*, times)
+#else
+int futimesat(int dirfd, const char *pathname, const struct timeval *times)
+#endif
 {
 	struct stat st;
 	struct vfscore_file *fp;
@@ -2366,8 +2452,12 @@ static int do_utimes(const char *pathname, const struct timeval *times, int flag
 	return -error;
 }
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(int, utimes, const char*, pathname,
 	const struct timeval*, times)
+#else
+int utimes(const char *pathname, const struct timeval *times)
+#endif
 {
 	return do_utimes(pathname, times, 0);
 }
@@ -2377,8 +2467,13 @@ int lutimes(const char *pathname, const struct timeval *times)
 	return do_utimes(pathname, times, AT_SYMLINK_NOFOLLOW);
 }
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(int, utime, const char *, pathname,
 		    const struct utimbuf *, t)
+#else
+int utime(const char *pathname,
+		    const struct utimbuf *t)
+#endif
 {
 	struct timeval times[2];
 	times[0].tv_usec = 0;
@@ -2393,15 +2488,23 @@ UK_SYSCALL_R_DEFINE(int, utime, const char *, pathname,
 		times[1].tv_sec = t->modtime;
 	}
 
+#if CONFIG_ARCH_x86_64
 	return uk_syscall_r_utimes((long) pathname,
 				   (long) times);
+#else
+	return utimes((char *) pathname, (const struct timeval *) times);
+#endif
 }
 
 UK_TRACEPOINT(trace_vfs_chmod, "\"%s\" 0%0o", const char*, mode_t);
 UK_TRACEPOINT(trace_vfs_chmod_ret, "");
 UK_TRACEPOINT(trace_vfs_chmod_err, "%d", int);
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(int, chmod, const char*, pathname, mode_t, mode)
+#else
+int chmod(const char *pathname, mode_t mode)
+#endif
 {
 	trace_vfs_chmod(pathname, mode);
 	struct task *t = main_task;
@@ -2448,13 +2551,25 @@ UK_SYSCALL_R_DEFINE(int, fchown, int, fd, uid_t, owner, gid_t, group)
 	return 0;
 }
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(int, chown, const char*, path, uid_t, owner, gid_t, group)
+#else
+int chown(const char *path __unused,
+			uid_t owner __unused,
+			gid_t group __unused)
+#endif
 {
 	UK_WARN_STUBBED();
 	return 0;
 }
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(int, lchown, const char*, path, uid_t, owner, gid_t, group)
+#else
+int lchown(const char *path __unused,
+			uid_t owner __unused,
+			gid_t group __unused)
+#endif
 {
 	UK_WARN_STUBBED();
 	return 0;

@@ -117,7 +117,11 @@ unsigned int sleep(unsigned int seconds)
 	return 0;
 }
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(time_t, time, time_t *, tloc)
+#else
+time_t time(time_t *tloc)
+#endif
 {
 	time_t secs = ukarch_time_nsec_to_sec(ukplat_wall_clock());
 

@@ -45,13 +45,21 @@
 #include <vfscore/file.h>
 #endif
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(int, fork)
+#else
+int fork(void)
+#endif
 {
 	/* fork() is not supported on this platform */
 	return -ENOSYS;
 }
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(int, vfork)
+#else
+int vfork(void)
+#endif
 {
 	/* vfork() is not supported on this platform */
 	return -ENOSYS;
@@ -262,7 +270,11 @@ UK_SYSCALL_R_DEFINE(pid_t, getpgid, pid_t, pid)
 	return UNIKRAFT_PGID;
 }
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(pid_t, getpgrp)
+#else
+pid_t getpgrp(void)
+#endif
 {
 	return UNIKRAFT_PGID;
 }

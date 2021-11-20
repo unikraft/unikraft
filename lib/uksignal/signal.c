@@ -372,7 +372,11 @@ int raise(int sig)
  * Stubbing the function support from requiring signal.
  * Stubs taken from newlib
  */
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(unsigned int, alarm, unsigned int, seconds)
+#else
+unsigned int alarm(unsigned int seconds __unused)
+#endif
 {
 	return 0;
 }
@@ -382,7 +386,11 @@ int siginterrupt(int sig __unused, int flag __unused)
 	return 0;
 }
 
+#if CONFIG_ARCH_x86_64
 UK_SYSCALL_R_DEFINE(int, pause)
+#else
+int pause(void)
+#endif
 {
 	return 0;
 }
