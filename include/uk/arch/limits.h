@@ -224,6 +224,25 @@
 #define __HAVE_PTR__
 #endif
 
+#if (defined __HAVE_PTR__)
+#define __VADDR_MAX __PTR_MAX
+#define __VADDR_MIN __PTR_MIN
+#endif
+
+#if (defined __PADDR_IS_16)
+#define __PADDR_MAX __U16_MAX
+#define __PADDR_MIN __U16_MIN
+#define __HAVE_PADDR__
+#elif (defined __PADDR_IS_32)
+#define __PADDR_MAX __U32_MAX
+#define __PADDR_MIN __U32_MIN
+#define __HAVE_PADDR__
+#elif (defined __PADDR_IS_64)
+#define __PADDR_MAX __U64_MAX
+#define __PADDR_MIN __U64_MIN
+#define __HAVE_PADDR__
+#endif
+
 /* Clean-up */
 #ifdef __HAVE_INT8__
 #undef __HAVE_INT8__
@@ -239,6 +258,9 @@
 #endif
 #ifdef __HAVE_PTR__
 #undef __HAVE_PTR__
+#endif
+#ifdef __HAVE_PADDR__
+#undef __HAVE_PADDR__
 #endif
 
 #endif /* !__ASSEMBLY__ */

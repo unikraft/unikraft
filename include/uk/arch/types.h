@@ -191,25 +191,28 @@ typedef __u64 __uptr;
 #define __PRIoff  __PRIs64
 #define __HAVE_PTR__
 #endif
-typedef __uptr __sz;  /* size_t  equivalent */
+
+#ifdef __HAVE_PTR__
+typedef __uptr __sz; /* size_t equivalent */
 typedef __sptr __ssz; /* ssize_t equivalent */
 typedef __sptr __off; /* off_t equivalent */
 
-#if (defined __PHY_ADDR_IS_16)
-typedef __u16 __vm_offset;
-typedef __u16 __phys_addr;
+typedef __uptr __vaddr_t; /* virtual address */
+#define __PRIvaddr __PRIuptr
+#endif
+
+#if (defined __PADDR_IS_16)
+typedef __u16 __paddr_t;
 #define __PRIpaddr __PRIx16
-#define __HAVE_PHYS_ADDR__
-#elif (defined __PHY_ADDR_IS_32)
-typedef __u32 __vm_offset;
-typedef __u32 __phys_addr;
+#define __HAVE_PADDR__
+#elif (defined __PADDR_IS_32)
+typedef __u32 __paddr_t;
 #define __PRIpaddr __PRIx32
-#define __HAVE_PHYS_ADDR__
-#elif (defined __PHY_ADDR_IS_64)
-typedef __u64 __vm_offset;
-typedef __u64 __phys_addr;
+#define __HAVE_PADDR__
+#elif (defined __PADDR_IS_64)
+typedef __u64 __paddr_t;
 #define __PRIpaddr __PRIx64
-#define __HAVE_PHYS_ADDR__
+#define __HAVE_PADDR__
 #endif
 
 /* Sanity check */
@@ -238,10 +241,10 @@ typedef __u64 __phys_addr;
 #else
 #undef __HAVE_PTR__
 #endif
-#ifndef __HAVE_PHYS_ADDR__
+#ifndef __HAVE_PADDR__
 #error Missing physical address definitions
 #else
-#undef __HAVE_PHYS_ADDR__
+#undef __HAVE_PADDR__
 #endif
 
 #ifndef __NULL
