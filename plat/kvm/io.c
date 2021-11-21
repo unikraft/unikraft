@@ -37,7 +37,7 @@
  * For our kvm platform, the guest virtual address == guest physical address.
  * We may have to reconsider this implementation when condition changes.
  */
-__phys_addr ukplat_virt_to_phys(const volatile void *address)
+__paddr_t ukplat_virt_to_phys(const volatile void *address)
 {
-	return (__phys_addr)address;
+	return (__paddr_t)address;
 }

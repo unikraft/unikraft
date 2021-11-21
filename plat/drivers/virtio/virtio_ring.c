@@ -250,7 +250,7 @@ int virtqueue_ring_interrupt(void *obj)
 	return rc;
 }
 
-__phys_addr virtqueue_physaddr(struct virtqueue *vq)
+__paddr_t virtqueue_physaddr(struct virtqueue *vq)
 {
 	struct virtqueue_vring *vrq = NULL;
 
@@ -260,7 +260,7 @@ __phys_addr virtqueue_physaddr(struct virtqueue *vq)
 	return ukplat_virt_to_phys(vrq->vring_mem);
 }
 
-__phys_addr virtqueue_get_avail_addr(struct virtqueue *vq)
+__paddr_t virtqueue_get_avail_addr(struct virtqueue *vq)
 {
 	struct virtqueue_vring *vrq = NULL;
 
@@ -271,7 +271,7 @@ __phys_addr virtqueue_get_avail_addr(struct virtqueue *vq)
 		((char *)vrq->vring.avail - (char *)vrq->vring.desc);
 }
 
-__phys_addr virtqueue_get_used_addr(struct virtqueue *vq)
+__paddr_t virtqueue_get_used_addr(struct virtqueue *vq)
 {
 	struct virtqueue_vring *vrq = NULL;
 
