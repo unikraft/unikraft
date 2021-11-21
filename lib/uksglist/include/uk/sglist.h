@@ -57,7 +57,7 @@ extern "C" {
 #endif /* CONFIG_LIBUKNETDEV */
 
 struct uk_sglist_seg {
-	__phys_addr  ss_paddr; /* Physical address */
+	__paddr_t  ss_paddr; /* Physical address */
 	size_t      ss_len;   /* Length of the buffer */
 };
 
