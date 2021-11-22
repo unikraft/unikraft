@@ -95,7 +95,7 @@ ENTRY(_libkvmplat_start32)
 	wrmsr
 
 	/* 3: load pml4 pointer */
-	movl $cpu_pml4, %eax
+	movl $x86_bpt_pml4, %eax
 	movl %eax, %cr3
 
 	/* 4: enable paging */
@@ -147,7 +147,7 @@ mxcsr_ptr:
 	.long 0x1f80			/* Intel SDM power-on default */
 
 
-#include "pagetable.S"
+#include "pagetable64.S"
 
 .code64
 .section .text.boot
