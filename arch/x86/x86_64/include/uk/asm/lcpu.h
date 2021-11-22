@@ -35,6 +35,8 @@
 #define CACHE_LINE_SIZE	64
 
 #ifndef __ASSEMBLY__
+#include <uk/arch/types.h>
+
 struct __regs {
 	unsigned long pad; /* 8 bytes to make struct size multiple of 16 */
 	unsigned long r15;
@@ -112,7 +114,9 @@ struct __regs {
 #ifndef nop
 #define nop()   __asm__ __volatile__ ("nop" : : : "memory")
 #endif
+#endif /* !__ASSEMBLY__ */
 
+#ifndef __ASSEMBLY__
 static inline unsigned long ukarch_read_sp(void)
 {
 	unsigned long sp;
@@ -125,5 +129,22 @@ static inline void ukarch_spinwait(void)
 {
 	__asm__ __volatile__("pause" : : : "memory");
 }
+#endif /* !__ASSEMBLY__ */
 
+/* CPUID feature bits in EBX and ECX when EAX=7, ECX=0 */
+#define X86_CPUID7_ECX_LA57		(1 << 16)
+/* CPUID 80000001H:EDX feature list */
+#define X86_CPUID81_NX			(1 << 20)
+#define X86_CPUID81_PAGE1GB		(1 << 26)
+#define X86_CPUID81_LM			(1 << 29)
+
+#ifndef __ASSEMBLY__
+static inline void ukarch_x86_cpuid(__u32 fn, __u32 subfn,
+				    __u32 *eax, __u32 *ebx,
+				    __u32 *ecx, __u32 *edx)
+{
+	__asm__ __volatile__("cpuid"
+			     : "=a"(*eax), "=b"(*ebx), "=c"(*ecx), "=d"(*edx)
+			     : "a"(fn), "c" (subfn));
+}
 #endif /* !__ASSEMBLY__ */
