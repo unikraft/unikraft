@@ -4,6 +4,18 @@ menuconfig LIBUKLOCK
 	default n
 
 if LIBUKLOCK
+	choice
+		prompt "Spinlock algorithm"
+		default LIBUKLOCK_SPINLOCK
+		depends on ARCH_ARM_64
+
+		config LIBUKLOCK_SPINLOCK
+			bool "Spinlocks"
+
+		config LIBUKLOCK_TICKETLOCK
+			bool "Ticketlocks"
+	endchoice
+
 	config LIBUKLOCK_SEMAPHORE
 		bool "Semaphores"
 		select LIBUKSCHED

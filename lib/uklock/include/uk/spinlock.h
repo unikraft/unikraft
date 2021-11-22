@@ -39,6 +39,8 @@ extern "C" {
 
 /* See uk/arch/spinlock.h for the interface documentation */
 
+#ifndef CONFIG_LIBUKLOCK_TICKETLOCK
+
 #ifndef uk_spinlock
 #include <uk/arch/spinlock.h>
 
@@ -51,6 +53,26 @@ extern "C" {
 #define uk_spin_trylock(lock)      ukarch_spin_trylock(lock)
 #define uk_spin_is_locked(lock)    ukarch_spin_is_locked(lock)
 #endif /* uk_spinlock */
+
+#else	/* CONFIG_LIBUKLOCK_TICKETLOCK */
+
+#ifndef uk_spinlock
+
+#ifdef CONFIG_ARCH_ARM_64
+#include <uk/arch/arm64/ticketlock.h>
+#endif
+
+#define uk_spinlock __ticketlock
+
+#define UK_SPINLOCK_INITIALIZER()  UKARCH_TICKETLOCK_INITIALIZER()
+#define uk_spin_init(lock)         ukarch_ticket_init(lock)
+#define uk_spin_lock(lock)         ukarch_ticket_lock(lock)
+#define uk_spin_unlock(lock)       ukarch_ticket_unlock(lock)
+#define uk_spin_trylock(lock)      ukarch_ticket_trylock(lock)
+#define uk_spin_is_locked(lock)    ukarch_ticket_is_locked(lock)
+#endif /* uk_spinlock */
+
+#endif	/* CONFIG_LIBUKLOCK_TICKETLOCK */
 
 #ifdef __cplusplus
 }
