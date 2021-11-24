@@ -1,0 +1,71 @@
+name: 🐞 Report a bug
+description: Create a bug report about unexpected behavior.
+labels: [kind/bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this bug report!
+
+        Please only use this form to submit problems with builds or the runtime of Unikraft unikernels.  This includes unexpected or undefined behavior, stacktraces, critical messages, and things just breaking or exploding.
+        
+        **Ensure you have tested against the latest changes on `staging` branch before submitting this form.**
+
+        For questions, concerns or help with running Unikraft, please check out our additional resources:
+
+        * [Unikraft Documentation](https://docs.unikraft.org)
+        * [Getting Started Guide](https://unikraft.org/getting-started)
+        * [Unikraft Discussions Forum](https://github.com/unikraft/unikraft/discussions)
+  - type: textarea
+    id: bug-description
+    attributes:
+      label: Describe the bug
+      description: Please provide a clear and concise description of the bug.
+    validations:
+      required: true
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to reproduce
+      description: Please provide the steps necessary to reproduce the behavior, for example the command used to run the unikernel, or the sequence of actions, auxiliary components, networking setup, etc. leading up to the error or bug.  Please also include any options you set during the configuration step.
+      placeholder: |
+        For example, I enabled these options:
+
+         - `CONFIG_LIB9PFS=y`
+         - ...
+    validations:
+      required: false
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected behavior
+      description: A clear and concise description of what you expected to happen.
+      placeholder: For example, I expected the unikernel to boot and print "Hello, world!"
+    validations:
+      required: false
+  - type: dropdown
+    id: architectures
+    attributes:
+      label: Which architectures were you using or does this bug affect?
+      description: If this bug is architecture agnostic or you are unsure then please do not select an architecture listed below.
+      multiple: true
+      options:
+        - x86_64
+        - arm
+        - arm64
+  - type: dropdown
+    id: platforms
+    attributes:
+      label: Which platforms were you using or does this bug affect?
+      description: If this bug is platform agnostic or you are unsure then please do not select an platform listed below.  If this affects an external platform (i.e. one in a separate repository) then please open the bug report in the relevant repository.
+      multiple: true
+      options:
+        - kvm
+        - xen
+        - linuxu
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant log output
+      description: Please copy and paste any relevant log output.  This will be automatically formatted into code, so no need for backticks.
+      render: shell

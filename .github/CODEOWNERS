@@ -1,0 +1,77 @@
+# https://help.github.com/articles/about-codeowners/
+
+# These owners are the default owners for all Unikraft core files.
+*			@unikraft/maintainers-core @unikraft/reviewers-core
+
+# These owners oversee the core parts of Unikraft.
+/lib/isrlib/		@unikraft/maintainers-core @unikraft/reviewers-core
+/lib/nolibc/		@unikraft/maintainers-core @unikraft/reviewers-core
+/lib/uktime/		@unikraft/maintainers-core @unikraft/reviewers-core
+/lib/uktimeconv/	@unikraft/maintainers-core @unikraft/reviewers-core
+/lib/uklibparam/	@unikraft/maintainers-core @unikraft/reviewers-core
+/lib/posix-libdl	@unikraft/maintainers-core @unikraft/reviewers-core
+/lib/syscall_shim/	@unikraft/maintainers-core @unikraft/reviewers-core
+/lib/ukboot/		@unikraft/maintainers-core @unikraft/reviewers-core
+/lib/ukargparse/	@unikraft/maintainers-core @unikraft/reviewers-core
+/lib/uksglist/		@unikraft/maintainers-core @unikraft/reviewers-core
+
+# These owners oversee the APIs.
+/include/		@unikraft/maintainers-api @unikraft/reviewers-api
+/arch/*/include/	@unikraft/maintainers-api @unikraft/reviewers-api
+/arch/*/*/include/	@unikraft/maintainers-api @unikraft/reviewers-api
+/plat/include/		@unikraft/maintainers-api @unikraft/reviewers-api
+
+# These owners oversee the ARM architecture.
+/lib/fdt/		@unikraft/maintainers-arch-arm @unikraft/reviewers-arch-arm
+/arch/arm/		@unikraft/maintainers-arch-arm @unikraft/reviewers-arch-arm
+
+# These owners oversee the x86 architecture.
+/arch/x86/		@unikraft/maintainers-arch-x86 @unikraft/reviewers-arch-x86
+
+# These owners oversee the KVM platform.
+/plat/kvm/		@unikraft/maintainers-plat-kvm @unikraft/reviewers-plat-kvm
+
+# These owners oversee the Xen platform.
+/plat/xen/		@unikraft/maintainers-plat-xen @unikraft/reviewers-plat-xen
+
+# These owners oversee the linuxu platform.
+/plat/linuxu/		@unikraft/maintainers-plat-linuxu @unikraft/reviewers-plat-linuxu
+
+# These owners oversee the scheduler-related components.
+/lib/uksched*		@unikraft/maintainers-sched @unikraft/reviewers-sched
+/lib/uklock/		@unikraft/maintainers-sched @unikraft/reviewers-sched
+/lib/ukmpi/		@unikraft/maintainers-sched @unikraft/reviewers-sched
+/lib/posix-process/	@unikraft/maintainers-sched @unikraft/reviewers-sched
+
+# These owners oversee the memory manangement-related components.
+/lib/ukmmap/		@unikraft/maintainers-mem @unikraft/reviewers-mem
+/lib/ukalloc*		@unikraft/maintainers-mem @unikraft/reviewers-mem
+
+# These owners oversee the security-related components.
+/lib/uksp/		@unikraft/maintainers-security @unikraft/reviewers-security
+/lib/ukswrand/		@unikraft/maintainers-security @unikraft/reviewers-security
+/lib/uksp/		@unikraft/maintainers-security @unikraft/reviewers-security
+
+# These owners oversee the network-related components.
+/lib/uknetdev/		@unikraft/maintainers-net @unikraft/reviewers-net
+
+# These owners oversee the filesystem-related components.
+/lib/vfscore/		@unikraft/maintainers-fs @unikraft/reviewers-fs
+/lib/ukblkdev/		@unikraft/maintainers-fs @unikraft/reviewers-fs
+/lib/posix-user/	@unikraft/maintainers-fs @unikraft/reviewers-fs
+/lib/ukcpio/		@unikraft/maintainers-fs @unikraft/reviewers-fs
+/lib/uk9p/		@unikraft/maintainers-fs @unikraft/reviewers-fs
+/lib/9pfs/		@unikraft/maintainers-fs @unikraft/reviewers-fs
+/lib/devfs/		@unikraft/maintainers-fs @unikraft/reviewers-fs
+/lib/ramfs/		@unikraft/maintainers-fs @unikraft/reviewers-fs
+
+# These owners oversee the device-related components.
+/lib/ukbus/		@unikraft/maintainers-device @unikraft/reviewers-device
+
+# These owners oversee the build system.
+/Makefile		@unikraft/maintainers-build @unikraft/reviewers-build
+/Makefile.uk		@unikraft/maintainers-build @unikraft/reviewers-build
+/support/		@unikraft/maintainers-build @unikraft/reviewers-build
+
+# These owners oversee the debugging support.
+/lib/ukdebug/		@unikraft/maintainers-debug @unikraft/reviewers-debug

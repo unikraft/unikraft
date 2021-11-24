@@ -449,16 +449,16 @@ libc-style wrapper on top:
         return ret;
     }
 
-    #if UK_LIBC_SYSCALL
+    #if UK_LIBC_SYSCALLS
     ssize_t write(int fd, const void *buf, size_t count)
     {
         return (ssize_t) uk_syscall_e_write((long) fd,
                                             (long) buf, (long) count);
     }
-    #endif /* UK_LIBC_SYSCALL */
+    #endif /* UK_LIBC_SYSCALLS */
 
 Note: Please note that the implementation of custom libc-style wrappers have to
-be guarded with ``#if UK_LIBC_SYSCALL``. This macro is provided by the
+be guarded with ``#if UK_LIBC_SYSCALLS``. This macro is provided by the
 ``<uk/syscall.h>`` header. Some libC ports (e.g., musl) deactivate this option
 whenever their provide own wrapper functions. For such cases, the syscall_shim
 library will only provide the ``uk_syscall_e_<syscall_name>`` and
@@ -656,6 +656,13 @@ below: ::
   print-srcs             - print source file names enabled for build
   print-vars             - prints all the variables currently defined in Makefile
   make V=0|1             - 0 => quiet build (default), 1 => verbose build
+
+Additional flags can be passed to the compiler via environment variables, e.g.,
+``CFLAGS_EXTRA`` in the case of C:
+
+.. code-block:: bash
+
+  make CFLAGS_EXTRA="-DSOME_MACRO=0"
 
 
 ============================

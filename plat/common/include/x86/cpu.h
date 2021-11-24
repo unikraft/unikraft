@@ -110,22 +110,17 @@ static inline void restore_extregs(struct sw_ctx *ctx)
 	}
 }
 
-static inline struct sw_ctx *arch_alloc_sw_ctx(struct uk_alloc *allocator)
+static inline __sz arch_extregs_size(void)
 {
-	struct sw_ctx *ctx;
-	size_t sz;
+	/* Make sure that _init_cpufeatures() was called before */
+	UK_ASSERT(x86_cpu_features.extregs_size > 0);
 
-	sz = ALIGN_UP(sizeof(struct sw_ctx), x86_cpu_features.extregs_align)
-		+ x86_cpu_features.extregs_size;
-	ctx = uk_malloc(allocator, sz);
-	uk_pr_debug("Allocating %lu bytes for sw ctx at %p\n", sz, ctx);
-
-	return ctx;
+	return x86_cpu_features.extregs_align + x86_cpu_features.extregs_size;
 }
 
 static inline void arch_init_extregs(struct sw_ctx *ctx)
 {
-	ctx->extregs = ALIGN_UP(((uintptr_t)ctx + sizeof(struct sw_ctx)),
+	ctx->extregs = ALIGN_UP((uintptr_t)ctx->_extregs,
 				x86_cpu_features.extregs_align);
 	// Initialize extregs area: zero out, then save a valid layout to it.
 	memset((void *)ctx->extregs, 0, x86_cpu_features.extregs_size);

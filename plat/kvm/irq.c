@@ -29,6 +29,7 @@
 #include <uk/alloc.h>
 #include <uk/list.h>
 #include <uk/plat/lcpu.h>
+#include <uk/plat/time.h>
 #include <uk/plat/common/cpu.h>
 #include <uk/plat/common/irq.h>
 #include <kvm/irq.h>
@@ -83,10 +84,9 @@ void _ukplat_irq_handle(unsigned long irq)
 	struct irq_handler *h;
 
 	UK_SLIST_FOREACH(h, &irq_handlers[irq], entries) {
-		/* TODO define platform wise macro for timer IRQ number */
-		if (irq != 0)
-			/* IRQ 0 is reserved for a timer, responsible to
-			 * wake up cpu from halt, so it can check if
+		if (irq != ukplat_time_get_irq())
+			/* ukplat_time_get_irq() gives the IRQ reserved for a timer,
+			 * responsible to wake up cpu from halt, so it can check if
 			 * it has something to do. Effectively it is OS ticks.
 			 *
 			 * If interrupt comes not from the timer, the

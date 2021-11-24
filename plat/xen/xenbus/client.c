@@ -32,8 +32,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 /*
  * Client interface between the device and the Xenbus driver.
@@ -74,6 +72,7 @@ const char *xenbus_state_to_str(XenbusState state)
 
 static const char *const xb_devtype_tbl[] = {
 	XENBUS_DEVTYPE_ENTRY(none),
+	XENBUS_DEVTYPE_ENTRY(vif),
 	XENBUS_DEVTYPE_ENTRY(vbd),
 	XENBUS_DEVTYPE_ENTRY(9pfs),
 };

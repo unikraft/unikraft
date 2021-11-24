@@ -32,14 +32,13 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 /*
  * Communication with Xenstore
  * Ported from Mini-OS xenbus.c
  */
 
+#include <stdlib.h>
 #include <string.h>
 #include <uk/errptr.h>
 #include <uk/bitmap.h>
@@ -106,7 +105,7 @@ struct xs_request_pool {
 	/**< Last probed request index */
 	__u32 last_probed;
 	/**< Lock */
-	spinlock_t lock;
+	__spinlock lock;
 	/**< Waiting queue for 'not-full' notifications */
 	struct uk_waitq waitq;
 	/**< Queue for requests to be sent */
@@ -130,7 +129,7 @@ static void xs_request_pool_init(struct xs_request_pool *pool)
 
 	pool->num_live = 0;
 	pool->last_probed = -1;
-	ukarch_spin_lock_init(&pool->lock);
+	ukarch_spin_init(&pool->lock);
 	uk_waitq_init(&pool->waitq);
 	UK_TAILQ_INIT(&pool->queued);
 	uk_bitmap_zero(pool->entries_bm, XS_REQ_POOL_SIZE);

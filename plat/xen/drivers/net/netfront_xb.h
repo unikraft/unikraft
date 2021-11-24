@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Florian Schmidt <florian.schmidt@neclab.eu>
+ * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
  *
- * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2020, University Politehnica of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,45 +28,17 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
-#include <stddef.h>
-#include <stdint.h>
-#include <sys/types.h>
-#include <errno.h>
-#include <uk/alloc.h>
-#include <uk/assert.h>
-#include <uk/essentials.h>
+#ifndef __NETFRONT_XB_H__
+#define __NETFRONT_XB_H__
 
-void *malloc(size_t size)
-{
-	return uk_malloc(uk_alloc_get_default(), size);
-}
+#include "netfront.h"
 
-void *calloc(size_t nmemb, size_t size)
-{
-	return uk_calloc(uk_alloc_get_default(), nmemb, size);
-}
+int  netfront_xb_init(struct netfront_dev *netdev, struct uk_alloc *a);
+void netfront_xb_fini(struct netfront_dev *netdev, struct uk_alloc *a);
 
-void *realloc(void *ptr, size_t size)
-{
-	return uk_realloc(uk_alloc_get_default(), ptr, size);
-}
+int netfront_xb_connect(struct netfront_dev *netdev);
+int netfront_xb_disconnect(struct netfront_dev *netdev);
 
-int posix_memalign(void **memptr, size_t align, size_t size)
-{
-	return uk_posix_memalign(uk_alloc_get_default(),
-				 memptr, align, size);
-}
-
-void *memalign(size_t align, size_t size)
-{
-	return uk_memalign(uk_alloc_get_default(), align, size);
-}
-
-void free(void *ptr)
-{
-	return uk_free(uk_alloc_get_default(), ptr);
-}
+#endif /* __NETFRONT_XB_H__ */

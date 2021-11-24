@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
 #ifndef __UK_9PDEV_CORE__
@@ -115,7 +113,7 @@ struct uk_9pdev_trans_ops {
  */
 struct uk_9pdev_req_mgmt {
 	/* Spinlock protecting this data. */
-	spinlock_t                      spinlock;
+	__spinlock                      spinlock;
 	/* Bitmap of available tags. */
 	unsigned long                   tag_bm[UK_BITS_TO_LONGS(UK_9P_NUMTAGS)];
 	/* List of requests allocated and not yet removed. */
@@ -130,7 +128,7 @@ struct uk_9pdev_req_mgmt {
  */
 struct uk_9pdev_fid_mgmt {
 	/* Spinlock protecting fids. */
-	spinlock_t			spinlock;
+	__spinlock			spinlock;
 	/* Next available fid. */
 	uint32_t			next_fid;
 	/* Free-list of fids that can be reused. */

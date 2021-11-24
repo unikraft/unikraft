@@ -47,6 +47,9 @@
  * an introduction to region-based memory management.
  */
 
+#include <stdint.h>
+#include <stddef.h>
+#include <sys/types.h>
 #include <uk/allocregion.h>
 #include <uk/alloc_impl.h>
 #include <uk/page.h>	/* round_pgup() */
@@ -56,7 +59,7 @@ struct uk_allocregion {
 	void *heap_base;
 };
 
-void *uk_allocregion_malloc(struct uk_alloc *a, size_t size)
+static void *uk_allocregion_malloc(struct uk_alloc *a, size_t size)
 {
 	struct uk_allocregion *b;
 	uintptr_t intptr, newbase;
@@ -75,19 +78,24 @@ void *uk_allocregion_malloc(struct uk_alloc *a, size_t size)
 
 	newbase  = intptr + size;
 	if (newbase > (uintptr_t) b->heap_top)
-		return NULL; /* OOM */
+		goto enomem; /* OOM */
 
 	/* Check for overflow, handle malloc(0) */
 	if (newbase <= (uintptr_t) b->heap_base)
-		return NULL;
+		goto enomem;
 
 	b->heap_base = (void *)(newbase);
 
+	uk_alloc_stats_count_alloc(a, (void *) intptr, size);
 	return (void *) intptr;
+
+enomem:
+	uk_alloc_stats_count_enomem(a, size);
+	return NULL;
 }
 
-int uk_allocregion_posix_memalign(struct uk_alloc *a, void **memptr,
-					size_t align, size_t size)
+static int uk_allocregion_posix_memalign(struct uk_alloc *a, void **memptr,
+					 size_t align, size_t size)
 {
 	struct uk_allocregion *b;
 	uintptr_t intptr, newbase;
@@ -113,26 +121,52 @@ int uk_allocregion_posix_memalign(struct uk_alloc *a, void **memptr,
 
 	newbase  = intptr + size;
 	if (newbase > (uintptr_t) b->heap_top)
-		return ENOMEM; /* out-of-memory */
+		goto enomem; /* out-of-memory */
 
 	/* Check for overflow */
 	if (newbase <= (uintptr_t) b->heap_base)
-		return EINVAL;
+		goto enomem;
 
 	*memptr = (void *)intptr;
 	b->heap_base = (void *)(newbase);
 
+	uk_alloc_stats_count_alloc(a, (void *) intptr, size);
 	return 0;
+
+enomem:
+	uk_alloc_stats_count_enomem(a, size);
+	return ENOMEM;
+
 }
 
-void uk_allocregion_free(struct uk_alloc *a __unused, void *ptr __unused)
+static void uk_allocregion_free(struct uk_alloc *a __maybe_unused,
+				void *ptr __maybe_unused)
 {
 	uk_pr_debug("%p: Releasing of memory is not supported by "
 			"ukallocregion\n", a);
+
+	/* Count a free operation but do not release memory from stats */
+	uk_alloc_stats_count_free(a, ptr, 0);
 }
 
-int uk_allocregion_addmem(struct uk_alloc *a __unused, void *base __unused,
-				size_t size __unused)
+/* NOTE: We use `uk_allocregion_leftspace()` for `maxalloc` and `availmem`
+ *       because it is the same for this region allocator
+ */
+static ssize_t uk_allocregion_leftspace(struct uk_alloc *a)
+{
+	struct uk_allocregion *b;
+
+	UK_ASSERT(a != NULL);
+
+	b = (struct uk_allocregion *) &a->priv;
+
+	UK_ASSERT(b != NULL);
+
+	return (uintptr_t) b->heap_top - (uintptr_t) b->heap_base;
+}
+
+static int uk_allocregion_addmem(struct uk_alloc *a __unused,
+				 void *base __unused, size_t size __unused)
 {
 	/* TODO: support multiple regions */
 	uk_pr_debug("%p: ukallocregion does not support multiple memory "
@@ -177,7 +211,9 @@ struct uk_alloc *uk_allocregion_init(void *base, size_t len)
 	uk_alloc_init_malloc(a, uk_allocregion_malloc, uk_calloc_compat,
 				uk_realloc_compat, uk_allocregion_free,
 				uk_allocregion_posix_memalign,
-				uk_memalign_compat, NULL);
+				uk_memalign_compat, uk_allocregion_leftspace,
+				uk_allocregion_leftspace,
+				uk_allocregion_addmem);
 
 	return a;
 }

@@ -4,6 +4,8 @@ uk_malloc_ifpages
 uk_free_ifpages
 uk_realloc_ifpages
 uk_posix_memalign_ifpages
+uk_alloc_maxalloc_ifpages
+uk_alloc_availmem_ifpages
 uk_malloc_ifmalloc
 uk_realloc_ifmalloc
 uk_posix_memalign_ifmalloc
@@ -13,4 +15,11 @@ uk_memalign_compat
 uk_realloc_compat
 uk_palloc_compat
 uk_pfree_compat
+uk_alloc_pmaxalloc_compat
+uk_alloc_pavailmem_compat
+uk_alloc_availmem_total
+uk_alloc_pavailmem_total
 _uk_alloc_head
+uk_alloc_stats_get
+_uk_alloc_stats_global
+uk_alloc_stats_get_global

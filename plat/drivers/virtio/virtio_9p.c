@@ -28,11 +28,10 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
 #include <inttypes.h>
+#include <unistd.h>
 #include <uk/alloc.h>
 #include <uk/essentials.h>
 #include <uk/sglist.h>
@@ -49,7 +48,7 @@ static struct uk_alloc *a;
 
 /* List of initialized virtio 9p devices. */
 static UK_LIST_HEAD(virtio_9p_device_list);
-static DEFINE_SPINLOCK(virtio_9p_device_list_lock);
+static __spinlock virtio_9p_device_list_lock;
 
 struct virtio_9p_device {
 	/* Virtio device. */
@@ -68,7 +67,7 @@ struct virtio_9p_device {
 	struct uk_sglist sg;
 	struct uk_sglist_seg sgsegs[NUM_SEGMENTS];
 	/* Spinlock protecting the sg list and the vq. */
-	spinlock_t spinlock;
+	__spinlock spinlock;
 };
 
 static int virtio_9p_connect(struct uk_9pdev *p9dev,
@@ -307,17 +306,15 @@ static int virtio_9p_vq_alloc(struct virtio_9p_device *d)
 
 	d->hwvq_id = 0;
 	if (unlikely(qdesc_size != NUM_SEGMENTS)) {
-		uk_pr_err(DRIVER_NAME": Expected %d descriptors, found %d (virtqueue %"
+		uk_pr_info(DRIVER_NAME": Expected %d descriptors, found %d (virtqueue %"
 			  PRIu16")\n", NUM_SEGMENTS, qdesc_size, d->hwvq_id);
-		rc = -EINVAL;
-		goto exit;
 	}
 
 	uk_sglist_init(&d->sg, ARRAY_SIZE(d->sgsegs), &d->sgsegs[0]);
 
 	d->vq = virtio_vqueue_setup(d->vdev,
 				    d->hwvq_id,
-				    qdesc_size,
+				    NUM_SEGMENTS,
 				    virtio_9p_recv,
 				    a);
 	if (unlikely(PTRISERR(d->vq))) {
@@ -435,7 +432,7 @@ static int virtio_9p_add_dev(struct virtio_dev *vdev)
 		rc = -ENOMEM;
 		goto out;
 	}
-	ukarch_spin_lock_init(&d->spinlock);
+	ukarch_spin_init(&d->spinlock);
 	d->vdev = vdev;
 	virtio_9p_feature_set(d);
 	rc = virtio_9p_configure(d);

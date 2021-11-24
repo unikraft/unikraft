@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
 #ifndef __PLAT_CMN_SECTIONS_H__
@@ -49,10 +47,10 @@ extern char _dtb[];
 extern char _text[], _etext[];
 
 /* [__eh_frame_start, __eh_frame_end]: contains .eh_frame section */
-extern char __eh_frame_start, __eh_frame_end;
+extern char __eh_frame_start[], __eh_frame_end[];
 
 /* [__eh_frame_hdr_start, __eh_frame_hdr_end]: contains .eh_frame_hdr section */
-extern char __eh_frame_hdr_start, __eh_frame_hdr_end;
+extern char __eh_frame_hdr_start[], __eh_frame_hdr_end[];
 
 /* [_rodata, _erodata]: contains .rodata.* sections */
 extern char _rodata[], _erodata[];

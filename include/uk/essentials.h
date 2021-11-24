@@ -31,8 +31,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
 #ifndef __UK_ESSENTIALS_H__
@@ -92,6 +90,11 @@ extern "C" {
 #endif
 #ifndef __unalign
 #define __unalign              __align(1)
+#endif
+
+#ifndef __alias
+#define __alias(old, new) \
+	extern __typeof(old) new __attribute__((alias(#old)))
 #endif
 /* NOTE: weak aliasing does not work well with link-time optimization
  * currently. Hopefully this will be fixed in gcc 9. The problem is,

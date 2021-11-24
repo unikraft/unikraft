@@ -29,8 +29,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
 #ifndef __SETUP_H__
@@ -38,11 +36,14 @@
 
 #include <sys/types.h>
 
+struct liblinuxuplat_memregion {
+	void *base;
+	size_t len;
+};
+
 struct liblinuxuplat_opts {
-	struct {
-		void *base;
-		size_t len;
-	} heap;
+	struct liblinuxuplat_memregion heap;
+	struct liblinuxuplat_memregion initrd;
 };
 
 extern struct liblinuxuplat_opts _liblinuxuplat_opts;

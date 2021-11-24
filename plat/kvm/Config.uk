@@ -68,15 +68,23 @@ endmenu
 config KVM_PCI
        bool "PCI Bus Driver"
        default y
-       depends on (ARCH_X86_64)
+       depends on (ARCH_X86_64 || ARCH_ARM_64)
        select LIBUKBUS
        help
                 PCI bus driver for probing and operating PCI devices
 
+config KVM_PF
+       bool "Platform Bus Driver"
+       default y
+       depends on (ARCH_ARM_64)
+       select LIBUKBUS
+       help
+               Platform bus driver for probing and operating platform devices
+
 config VIRTIO_BUS
       bool  "Virtio bus driver"
       default y
-      depends on (ARCH_X86_64)
+      depends on (ARCH_X86_64 || ARCH_ARM_64)
       depends on LIBUKBUS
       select LIBUKALLOC
       select LIBUKSGLIST
@@ -100,7 +108,7 @@ config VIRTIO_NET
        default n
        depends on LIBUKNETDEV
        imply VIRTIO_PCI if ARCH_X86_64
-       select VIRTIO_BUS
+       select VIRTIO
        select LIBUKSGLIST
        help
               Virtual network driver.

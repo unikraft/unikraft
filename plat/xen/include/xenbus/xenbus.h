@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
 #ifndef __XENBUS_H__
@@ -49,6 +47,7 @@
  */
 typedef enum xenbus_dev_type {
 	xenbus_dev_none = 0,
+	xenbus_dev_vif,
 	xenbus_dev_vbd,
 	xenbus_dev_9pfs,
 } xenbus_dev_type_t;
@@ -104,7 +103,7 @@ struct xenbus_watch {
 	/**< in use internally */
 	UK_TAILQ_ENTRY(struct xenbus_watch) watch_list;
 	/**< Lock */
-	spinlock_t lock;
+	__spinlock lock;
 	/**< Number of pending events */
 	int pending_events;
 	/**< Watch waiting queue */

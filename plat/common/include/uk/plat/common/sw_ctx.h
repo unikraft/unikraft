@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 #ifndef __PLAT_CMN_SW_CTX_H__
 #define __PLAT_CMN_SW_CTX_H__
@@ -45,6 +43,9 @@ struct sw_ctx {
 	uintptr_t extregs;	/* Pointer to an area to which extended
 				 * registers are saved on context switch.
 				 */
+	uint8_t _extregs[];     /* Reserved memory area for extended
+				 * registers state
+				 */
 };
 
 void sw_ctx_callbacks_init(struct ukplat_ctx_callbacks *ctx_cbs);
@@ -52,8 +53,6 @@ void sw_ctx_callbacks_init(struct ukplat_ctx_callbacks *ctx_cbs);
 
 #define OFFSETOF_SW_CTX_SP      0
 #define OFFSETOF_SW_CTX_IP      8
-
-#define SIZEOF_SW_CTX           8
 
 /* TODO This should be better defined in the thread header */
 #define OFFSETOF_UKTHREAD_SW_CTX  16

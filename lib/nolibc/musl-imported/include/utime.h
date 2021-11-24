@@ -1,6 +1,10 @@
 #ifndef	_UTIME_H
 #define	_UTIME_H
 
+#include <uk/config.h>
+
+#if CONFIG_LIBVFSCORE
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -15,6 +19,8 @@ struct utimbuf {
 };
 
 int utime (const char *, const struct utimbuf *);
+
+#endif /* CONFIG_LIBVFSCORE */
 
 #ifdef __cplusplus
 }

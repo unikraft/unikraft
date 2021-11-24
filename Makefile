@@ -75,22 +75,26 @@ ifeq ("$(origin V)", "command line")
 endif
 ifndef BUILD_VERBOSE
   BUILD_VERBOSE = 0
+  # Set KBUILD_VERBOSE and Q to quiet mode
+  KBUILD_VERBOSE := 0
+  Q := @
 endif
 
-ifeq ($(KBUILD_VERBOSE),1)
-  Q =
-ifndef VERBOSE
-  VERBOSE = 1
+ifneq ($(BUILD_VERBOSE),0)
+  KBUILD_VERBOSE := 1
+  Q :=
 endif
-export VERBOSE
-else
-   Q = @
+
+# Enable warnings about undefined variables
+# with verbosity level 2
+ifeq ($(BUILD_VERBOSE),2)
+MAKEFLAGS+=--warn-undefined-variables
 endif
 
 # Helper that shows an `info` message only
 # when verbose mode is on
 # verbose_info $verbosemessage
-ifeq ($(BUILD_VERBOSE),1)
+ifneq ($(BUILD_VERBOSE),0)
 verbose_info = $(info $(1))
 else
 verbose_info =
@@ -252,7 +256,7 @@ noconfig_targets	:= ukconfig menuconfig nconfig gconfig xconfig config \
 			   silentoldconfig \
 			   release olddefconfig properclean distclean \
 			   scriptconfig iscriptconfig kmenuconfig guiconfig \
-			   dumpvarsconfig $(null_targets)
+			   dumpvarsconfig print-version help
 
 # we want bash as shell
 SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
@@ -279,6 +283,8 @@ UK_FETCH:=
 UK_FETCH-y:=
 UK_PREPARE:=
 UK_PREPARE-y:=
+UK_PREPROCESS:=
+UK_PREPROCESS-y:=
 UK_PLATS:=
 UK_PLATS-y:=
 UK_LIBS:=
@@ -317,6 +323,8 @@ CXXINCLUDES :=
 CXXINCLUDES-y :=
 GOCFLAGS :=
 GOCFLAGS-y :=
+RUSTCFLAGS :=
+RUSTCFLAGS-y :=
 GOCINCLUDES :=
 GOCINCLUDES-y :=
 DBGFLAGS :=
@@ -513,6 +521,7 @@ ifeq ($(sub_make_exec), 1)
 ifeq ($(UK_HAVE_DOT_CONFIG),y)
 # Hide troublesome environment variables from sub processes
 unexport CONFIG_CROSS_COMPILE
+unexport CONFIG_LLVM_TARGET_ARCH
 unexport CONFIG_COMPILER
 #unexport CC
 #unexport LD
@@ -546,6 +555,10 @@ ifneq ("$(origin CROSS_COMPILE)","undefined")
 CONFIG_CROSS_COMPILE := $(CROSS_COMPILE:"%"=%)
 endif
 
+ifneq ("$(origin LLVM_TARGET_ARCH)","undefined")
+CONFIG_LLVM_TARGET_ARCH := $(LLVM_TARGET_ARCH:"%"=%)
+endif
+
 ifneq ("$(origin COMPILER)","undefined")
 	CONFIG_COMPILER := $(COMPILER:"%"=%)
 else
@@ -561,6 +574,13 @@ CC		:= $(CONFIG_CROSS_COMPILE)$(CONFIG_COMPILER)
 CPP		:= $(CC)
 CXX		:= $(CPP)
 GOC		:= $(CONFIG_CROSS_COMPILE)gccgo-7
+# We use rustc because the gcc frontend is experimental and missing features such
+# as borrowing checking
+ifneq ("$(origin LLVM_TARGET_ARCH)","undefined")
+RUSTC		:= rustc --target=$(CONFIG_LLVM_TARGET_ARCH)
+else
+RUSTC		:= rustc
+endif
 AS		:= $(CC)
 AR		:= $(CONFIG_CROSS_COMPILE)gcc-ar
 NM		:= $(CONFIG_CROSS_COMPILE)gcc-nm
@@ -580,6 +600,10 @@ GZIP		:= gzip
 TAR		:= tar
 UNZIP		:= unzip -qq -u
 WGET		:= wget
+SHA1SUM		:= sha1sum -b
+SHA256SUM	:= sha256sum -b
+SHA512SUM	:= sha512sum -b
+MD5SUM		:= md5sum -b
 DTC		:= dtc
 # Time requires the full path so that subarguments are handled correctly
 TIME		:= $(shell which time)
@@ -663,7 +687,7 @@ endif
 # include Makefile for platform linking (`Linker.uk`)
 $(foreach plat,$(UK_PLATS),$(eval $(call _import_linker,$(plat))))
 
-.PHONY: prepare image libs objs clean
+.PHONY: prepare preprocess image libs objs clean
 
 fetch: $(UK_FETCH) $(UK_FETCH-y)
 
@@ -675,6 +699,8 @@ $(UK_CONFIG_OUT): $(UK_CONFIG)
 
 prepare: $(KCONFIG_AUTOHEADER) $(UK_CONFIG_OUT) $(UK_PREPARE) $(UK_PREPARE-y)
 prepare: $(UK_FIXDEP) | fetch
+
+preprocess: $(UK_PREPROCESS) $(UK_PREPROCESS-y) | prepare
 
 objs: $(UK_OBJS) $(UK_OBJS-y)
 
@@ -730,6 +756,8 @@ fetch: ukconfig
 
 prepare: ukconfig
 
+preprocess: ukconfig
+
 objs: ukconfig
 
 libs: ukconfig
@@ -752,9 +780,11 @@ KCONFIG_TOOLS = conf mconf gconf nconf qconf fixdep
 KCONFIG_TOOLS := $(addprefix $(KCONFIG_DIR)/,$(KCONFIG_TOOLS))
 
 $(KCONFIG_TOOLS):
-	mkdir -p $(@D)/lxdialog
-	$(MAKE) --no-print-directory CC="$(HOSTCC_NOCCACHE)" HOSTCC="$(HOSTCC_NOCCACHE)" \
-	    obj=$(@D) -C $(CONFIG) -f Makefile.br $(@)
+	$(call verbose_cmd,MKDIR,lxdialog,$(MKDIR) -p $(@D)/lxdialog)
+	$(call verbose_cmd,MAKE,$(notdir $(CONFIG)),$(MAKE) \
+	    --no-print-directory \
+	    CC="$(HOSTCC_NOCCACHE)" HOSTCC="$(HOSTCC_NOCCACHE)" \
+	    obj=$(@D) -C $(CONFIG) -f Makefile.br $(@))
 
 DEFCONFIG = $(call qstrip,$(UK_DEFCONFIG))
 
@@ -901,9 +931,10 @@ $(KCONFIG_AUTOHEADER): $(UK_CONFIG) $(KCONFIG_DIR)/conf
 print-vars:
 	@$(foreach V, \
 		$(sort $(if $(VARS),$(filter $(VARS),$(.VARIABLES)),$(.VARIABLES))), \
-		$(if $(filter-out environment% default automatic, \
-				$(origin $V)), \
-		$(info $V=$($V) ($(value $V)))))
+		$(if $(filter-out environment% default automatic,$(origin $V)), \
+		$(if $(filter simple,$(flavor $V)), \
+			$(info [$(origin $V)] $V := $(value $V)), \
+			$(info [$(origin $V)] $V = <$(flavor $V)>))))
 
 print-version:
 	@echo $(UK_FULLVERSION)
@@ -1002,6 +1033,7 @@ help:
 	@echo '  libs                   - build libraries and objects'
 	@echo '  [LIBNAME]              - build a single library'
 	@echo '  objs                   - build objects only'
+	@echo '  preprocess             - run preprocessing steps'
 	@echo '  prepare                - run preparation steps'
 	@echo '  fetch                  - fetch, extract, and patch remote code'
 	@echo ''
@@ -1025,7 +1057,8 @@ help:
 	@echo '  allnoconfig            - New config where all options are answered with no'
 	@echo ''
 	@echo 'Command-line variables:'
-	@echo '  V=0|1                  - 0 => quiet build (default), 1 => verbose build'
+	@echo '  V=0|1|2                - 0 => quiet build (default), 1 => verbose build,'
+	@echo '                           2 => like 1 and warn about undefined build variables'
 	@echo '  C=[PATH]               - path to .config configuration file'
 	@echo '  O=[PATH]               - path to build output (will be created if it does not exist)'
 	@echo '  A=[PATH]               - path to Unikraft application'

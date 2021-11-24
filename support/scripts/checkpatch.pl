@@ -2536,6 +2536,13 @@ sub process {
 			     "A patch subject line should describe the change not the tool that found it\n" . $herecurr);
 		}
 
+# Check if Unikraft subject format is used on commit message
+		if ($in_header_lines &&
+		    $line =~ /^Subject:[^:]+$/i) {
+			ERROR("UNIKRAFT_SUBJECT_FORMAT",
+			     "Patch subject line does not follow Unikraft scheme: '[Selector]/[Component]: [Short message]'\n" . $herecurr);
+		}
+
 # Check for old stable address
 		if ($line =~ /^\s*cc:\s*.*<?\bstable\@kernel\.org\b>?.*$/i) {
 			ERROR("STABLE_ADDRESS",
@@ -6369,6 +6376,12 @@ sub process {
 				WARN("MODULE_LICENSE",
 				     "unknown module license " . $extracted_string . "\n" . $herecurr);
 			}
+		}
+
+# check for UK_(LL)SYSCALL_DEFINE(), raw implementation should be preferred
+		if ($line =~ /\bUK_(LL)?SYSCALL_DEFINE\s*\(/) {
+			WARN("NON_RAW_SYSCALL",
+			     "Prefer using raw system call definitions: 'UK_SYSCALL_R_DEFINE', 'UK_LLSYSCALL_R_DEFINE'\n" . $herecurr);
 		}
 	}
 

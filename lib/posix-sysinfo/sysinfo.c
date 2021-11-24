@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
 #include <stddef.h>
@@ -67,9 +65,19 @@ static struct utsname utsname = {
 #endif
 };
 
-int sysinfo(struct sysinfo *info __unused)
+UK_SYSCALL_R_DEFINE(int, sysinfo, struct sysinfo *, info)
 {
-	return -1;
+	if (!info)
+		return -EFAULT;
+
+	memset(info, 0, sizeof(*info));
+
+	info->procs = 1; /* number of processes */
+
+#if CONFIG_LIBUKALLOC
+	/* TODO: memory usage can be obtained from ukallloc */
+#endif
+	return 0;
 }
 
 long fpathconf(int fd __unused, int name __unused)
@@ -117,16 +125,14 @@ UK_SYSCALL_R_DEFINE(int, uname, struct utsname *, buf)
 	return 0;
 }
 
-UK_SYSCALL_DEFINE(int, sethostname, const char*, name, size_t, len)
+UK_SYSCALL_R_DEFINE(int, sethostname, const char*, name, size_t, len)
 {
 	if (name == NULL) {
-		errno = EFAULT;
-		return -1;
+		return -EFAULT;
 	}
 
 	if (len > sizeof(utsname.nodename)) {
-		errno = EINVAL;
-		return -1;
+		return -EINVAL;
 	}
 
 	strncpy(utsname.nodename, name, len);

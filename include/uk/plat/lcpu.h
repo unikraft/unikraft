@@ -29,8 +29,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
 #ifndef __UKPLAT_LCPU_H__
@@ -91,7 +89,7 @@ void ukplat_lcpu_halt(void);
  * the specified deadline expired
  * @param until deadline in nanoseconds
  */
-void ukplat_lcpu_halt_to(__snsec until);
+void ukplat_lcpu_halt_to(__nsec until);
 
 /**
  * Halts the current logical CPU execution

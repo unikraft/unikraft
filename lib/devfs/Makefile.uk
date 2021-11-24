@@ -7,3 +7,4 @@ LIBDEVFS_CFLAGS-$(call gcc_version_ge,8,0) += -Wno-cast-function-type
 LIBDEVFS_SRCS-y += $(LIBDEVFS_BASE)/device.c
 LIBDEVFS_SRCS-y += $(LIBDEVFS_BASE)/devfs_vnops.c
 LIBDEVFS_SRCS-$(CONFIG_LIBDEVFS_DEV_NULL_ZERO) += $(LIBDEVFS_BASE)/null.c
+LIBDEVFS_SRCS-$(CONFIG_LIBDEVFS_DEV_STDOUT) += $(LIBDEVFS_BASE)/stdout.c

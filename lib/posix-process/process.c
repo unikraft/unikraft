@@ -29,31 +29,32 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include <string.h>
 #include <sys/prctl.h>
 #include <sys/resource.h>
 #include <uk/process.h>
 #include <uk/print.h>
 #include <uk/syscall.h>
+#include <uk/arch/limits.h>
+#if CONFIG_LIBVFSCORE
+#include <vfscore/file.h>
+#endif
 
-int fork(void)
+UK_SYSCALL_R_DEFINE(int, fork)
 {
 	/* fork() is not supported on this platform */
-	errno = ENOSYS;
-	return -1;
+	return -ENOSYS;
 }
 
-int vfork(void)
+UK_SYSCALL_R_DEFINE(int, vfork)
 {
 	/* vfork() is not supported on this platform */
-	errno = ENOSYS;
-	return -1;
+	return -ENOSYS;
 }
 
 static void exec_warn_argv_variadic(const char *arg, va_list args)
@@ -131,13 +132,13 @@ int execle(const char *path, const char *arg, ...
 	return -1;
 }
 
-int execve(const char *path, char *const argv[], char *const envp[])
+UK_SYSCALL_R_DEFINE(int, execve, const char *, path,
+		    char *const *, argv, char *const *, envp)
 {
 	uk_pr_warn("%s(): path=%s\n", __func__, path);
 	exec_warn_argv(argv);
 	exec_warn_envp(envp);
-	errno = ENOSYS;
-	return -1;
+	return -ENOSYS;
 }
 
 int execv(const char *path, char *const argv[])
@@ -207,12 +208,11 @@ pid_t wait3(int *wstatus __unused, int options __unused,
 	return -1;
 }
 
-pid_t wait4(pid_t pid __unused, int *wstatus __unused, int options __unused,
-		struct rusage *rusage __unused)
+UK_SYSCALL_R_DEFINE(pid_t, wait4, pid_t, pid, int *, wstatus,
+		    int, options, struct rusage *, rusage)
 {
 	/* No children */
-	errno = ECHILD;
-	return -1;
+	return -ECHILD;
 }
 
 UK_SYSCALL_R_DEFINE(int, getpid)
@@ -225,44 +225,39 @@ UK_SYSCALL_R_DEFINE(pid_t, getppid)
 	return UNIKRAFT_PPID;
 }
 
-UK_SYSCALL_DEFINE(pid_t, setsid)
+UK_SYSCALL_R_DEFINE(pid_t, setsid)
 {
 	/* We have a single "session" with a single "process" */
-	errno = EPERM;
-	return (pid_t) -1;
+	return (pid_t) -EPERM;
 }
 
-UK_SYSCALL_DEFINE(pid_t, getsid, pid_t, pid)
+UK_SYSCALL_R_DEFINE(pid_t, getsid, pid_t, pid)
 {
 	if (pid != 0) {
 		/* We support only calls for the only calling "process" */
-		errno = ESRCH;
-		return (pid_t) -1;
+		return (pid_t) -ESRCH;
 	}
 	return UNIKRAFT_SID;
 }
 
-UK_SYSCALL_DEFINE(int, setpgid, pid_t, pid, pid_t, pgid)
+UK_SYSCALL_R_DEFINE(int, setpgid, pid_t, pid, pid_t, pgid)
 {
 	if (pid != 0) {
 		/* We support only calls for the only calling "process" */
-		errno = ESRCH;
-		return (pid_t) -1;
+		return (pid_t) -ESRCH;
 	}
 	if (pgid != 0) {
 		/* We have a single "group" with a single "process" */
-		errno = EPERM;
-		return (pid_t) -1;
+		return (pid_t) -EPERM;
 	}
 	return 0;
 }
 
-UK_SYSCALL_DEFINE(pid_t, getpgid, pid_t, pid)
+UK_SYSCALL_R_DEFINE(pid_t, getpgid, pid_t, pid)
 {
 	if (pid != 0) {
 		/* We support only calls for the only calling "process" */
-		errno = ESRCH;
-		return (pid_t) -1;
+		return (pid_t) -ESRCH;
 	}
 	return UNIKRAFT_PGID;
 }
@@ -300,7 +295,7 @@ int nice(int inc __unused)
 	return -1;
 }
 
-UK_SYSCALL_DEFINE(int, getpriority, int, which, id_t, who)
+UK_SYSCALL_R_DEFINE(int, getpriority, int, which, id_t, who)
 {
 	int rc = 0;
 
@@ -312,20 +307,18 @@ UK_SYSCALL_DEFINE(int, getpriority, int, which, id_t, who)
 			/* Allow only for the calling "process" */
 			rc = UNIKRAFT_PROCESS_PRIO;
 		else {
-			errno = ESRCH;
-			rc = -1;
+			rc = -ESRCH;
 		}
 		break;
 	default:
-		errno = EINVAL;
-		rc = -1;
+		rc = -EINVAL;
 		break;
 	}
 
 	return rc;
 }
 
-UK_SYSCALL_DEFINE(int, setpriority, int, which, id_t, who, int, prio)
+UK_SYSCALL_R_DEFINE(int, setpriority, int, which, id_t, who, int, prio)
 {
 	int rc = 0;
 
@@ -337,25 +330,123 @@ UK_SYSCALL_DEFINE(int, setpriority, int, which, id_t, who, int, prio)
 			/* Allow only for the calling "process" */
 			if (prio != UNIKRAFT_PROCESS_PRIO) {
 				/* Allow setting only the default prio */
-				errno = EACCES;
-				rc = -1;
+				rc = -EACCES;
 			}
 		} else {
-			errno = ESRCH;
-			rc = -1;
+			rc = -ESRCH;
 		}
 		break;
 default:
-		errno = EINVAL;
-		rc = -1;
+		rc = -EINVAL;
 		break;
 	}
 
 	return rc;
 }
 
-int prctl(int option __unused, ...)
+UK_SYSCALL_R_DEFINE(int, prctl, int, option,
+		    unsigned long, arg2,
+		    unsigned long, arg3,
+		    unsigned long, arg4,
+		    unsigned long, arg5)
 {
-	WARN_STUBBED();
+	UK_WARN_STUBBED();
+	return 0; /* syscall has no effect */
+}
+
+UK_LLSYSCALL_R_DEFINE(int, prlimit64, int, pid, unsigned int, resource,
+		      struct rlimit *, new_limit, struct rlimit *, old_limit)
+{
+	if (unlikely(pid != 0))
+		uk_pr_debug("Do not support prlimit64 on PID %u, use current process\n",
+			    pid);
+
+	/*
+	 * Lookup if resource can be set/retrieved
+	 */
+	switch (resource) {
+	case RLIMIT_STACK:
+		break;
+#if CONFIG_LIBVFSCORE
+	case RLIMIT_NOFILE:
+		break;
+#endif
+	default:
+		uk_pr_err("Unsupported resource %u\n",
+			  resource);
+		return -EINVAL;
+	}
+
+	/*
+	 * Set resource
+	 */
+	if (new_limit) {
+		switch (resource) {
+		default:
+			uk_pr_err("Ignore updating resource %u: cur = %llu, max = %llu\n",
+				  resource,
+				  (unsigned long long) new_limit->rlim_cur,
+				  (unsigned long long) new_limit->rlim_max);
+			break;
+		}
+	}
+
+	/*
+	 * Get resource
+	 */
+	if (!old_limit)
+		return 0;
+	switch (resource) {
+	case RLIMIT_STACK:
+		old_limit->rlim_cur = __STACK_SIZE;
+		old_limit->rlim_max = __STACK_SIZE;
+		break;
+
+#if CONFIG_LIBVFSCORE
+	case RLIMIT_NOFILE:
+		old_limit->rlim_cur = FDTABLE_MAX_FILES;
+		old_limit->rlim_max = FDTABLE_MAX_FILES;
+		break;
+#endif
+
+	default:
+		break;
+	}
+
+	uk_pr_debug("Resource %u: cur = %llu, max = %llu\n",
+		    resource,
+		    (unsigned long long) old_limit->rlim_cur,
+		    (unsigned long long) old_limit->rlim_max);
 	return 0;
 }
+
+UK_SYSCALL_R_DEFINE(int, getrlimit, int, resource, struct rlimit *, rlim)
+{
+	return uk_syscall_r_prlimit64(0, (long) resource,
+				      (long) NULL, (long) rlim);
+}
+
+UK_SYSCALL_R_DEFINE(int, setrlimit, int, resource, const struct rlimit *, rlim)
+{
+	return uk_syscall_r_prlimit64(0, (long) resource,
+				      (long) rlim, (long) NULL);
+}
+
+UK_SYSCALL_R_DEFINE(int, getrusage, int, who,
+		    struct rusage *, usage)
+{
+	if (!usage)
+		return -EFAULT;
+
+	memset(usage, 0, sizeof(*usage));
+	return 0;
+}
+
+#if UK_LIBC_SYSCALLS
+int prlimit(pid_t pid, int resource, const struct rlimit *new_limit,
+	    struct rlimit *old_limit)
+{
+	return uk_syscall_e_prlimit64(0, (long) resource,
+				      (long) new_limit, (long) old_limit);
+}
+#endif

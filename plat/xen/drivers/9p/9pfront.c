@@ -28,10 +28,9 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
+#include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <uk/config.h>
@@ -57,7 +56,7 @@
 
 static struct uk_alloc *a;
 static UK_LIST_HEAD(p9front_device_list);
-static DEFINE_SPINLOCK(p9front_device_list_lock);
+static __spinlock p9front_device_list_lock;
 
 struct p9front_header {
 	uint32_t size;
@@ -222,7 +221,7 @@ static int p9front_allocate_dev_ring(struct p9front_dev *p9fdev, int idx)
 	ring = &p9fdev->rings[idx];
 	UK_ASSERT(!ring->initialized);
 
-	ukarch_spin_lock_init(&ring->spinlock);
+	ukarch_spin_init(&ring->spinlock);
 	ring->dev = p9fdev;
 
 	/* Allocate ring intf page. */

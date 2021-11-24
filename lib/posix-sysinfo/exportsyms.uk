@@ -1,6 +1,8 @@
 fpathconf
 sysconf
 sysinfo
+uk_syscall_e_sysinfo
+uk_syscall_r_sysinfo
 confstr
 pathconf
 getpagesize

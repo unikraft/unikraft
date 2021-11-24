@@ -3,8 +3,6 @@ uk_proc_sig
 
 uk_sig_handle_signals
 uk_proc_sig_init
-uk_thread_sig_init
-uk_thread_sig_uninit
 uk_sig_thread_kill
 uk_thread_sigmask
 
@@ -16,6 +14,7 @@ sigsuspend
 sigpending
 sigwait
 kill
+killpg
 raise
 siginterrupt
 
@@ -28,4 +27,8 @@ sigismember
 
 # unistd.h
 alarm
+uk_syscall_e_alarm
+uk_syscall_r_alarm
 pause
+uk_syscall_e_pause
+uk_syscall_r_pause

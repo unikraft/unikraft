@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 /**
  * Inspired from the FreeBSD.
@@ -260,6 +258,38 @@ __phys_addr virtqueue_physaddr(struct virtqueue *vq)
 
 	vrq = to_virtqueue_vring(vq);
 	return ukplat_virt_to_phys(vrq->vring_mem);
+}
+
+__phys_addr virtqueue_get_avail_addr(struct virtqueue *vq)
+{
+	struct virtqueue_vring *vrq = NULL;
+
+	UK_ASSERT(vq);
+
+	vrq = to_virtqueue_vring(vq);
+	return virtqueue_physaddr(vq) +
+		((char *)vrq->vring.avail - (char *)vrq->vring.desc);
+}
+
+__phys_addr virtqueue_get_used_addr(struct virtqueue *vq)
+{
+	struct virtqueue_vring *vrq = NULL;
+
+	UK_ASSERT(vq);
+
+	vrq = to_virtqueue_vring(vq);
+	return virtqueue_physaddr(vq) +
+		((char *)vrq->vring.used - (char *)vrq->vring.desc);
+}
+
+unsigned int virtqueue_vring_get_num(struct virtqueue *vq)
+{
+	struct virtqueue_vring *vrq = NULL;
+
+	UK_ASSERT(vq);
+
+	vrq = to_virtqueue_vring(vq);
+	return vrq->vring.num;
 }
 
 int virtqueue_buffer_dequeue(struct virtqueue *vq, void **cookie, __u32 *len)

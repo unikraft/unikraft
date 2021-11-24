@@ -43,8 +43,6 @@
 extern "C" {
 #endif
 
-typedef void (*uk_allocpool_obj_init_t)(void *obj, size_t len, void *cookie);
-
 struct uk_allocpool;
 
 /**
@@ -59,8 +57,8 @@ struct uk_allocpool;
  * @return
  *  Number of bytes needed for pool allocation.
  */
-size_t uk_allocpool_reqmem(unsigned int obj_count, size_t obj_len,
-			   size_t obj_align);
+__sz uk_allocpool_reqmem(unsigned int obj_count, __sz obj_len,
+			 __sz obj_align);
 
 /**
  * Allocates a memory pool on a parent allocator.
@@ -79,7 +77,7 @@ size_t uk_allocpool_reqmem(unsigned int obj_count, size_t obj_len,
  */
 struct uk_allocpool *uk_allocpool_alloc(struct uk_alloc *parent,
 					unsigned int obj_count,
-					size_t obj_len, size_t obj_align);
+					__sz obj_len, __sz obj_align);
 
 /**
  * Frees a memory pool that was allocated with
@@ -109,8 +107,8 @@ void uk_allocpool_free(struct uk_allocpool *p);
  *  - (NULL): Not enough memory for pool.
  *  - pointer to initializes pool.
  */
-struct uk_allocpool *uk_allocpool_init(void *base, size_t len,
-				       size_t obj_len, size_t obj_align);
+struct uk_allocpool *uk_allocpool_init(void *base, __sz len,
+				       __sz obj_len, __sz obj_align);
 
 /**
  * Return uk_alloc compatible interface for allocpool.
@@ -142,7 +140,7 @@ unsigned int uk_allocpool_availcount(struct uk_allocpool *p);
  * @return
  *  Size of an object.
  */
-size_t uk_allocpool_objlen(struct uk_allocpool *p);
+__sz uk_allocpool_objlen(struct uk_allocpool *p);
 
 /**
  * Get one object from a pool.

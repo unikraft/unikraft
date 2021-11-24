@@ -10,9 +10,34 @@ if LIBUKALLOC
 		default n
 		help
 			Provide helpers for allocators defining exclusively malloc and free
+
 	config LIBUKALLOC_IFSTATS
-		bool "Statistics interface"
+		bool "Allocator statistics interface"
 		default n
 		help
-			Provide interfaces for querying allocator status
+			Provide interfaces for querying allocator statistics.
+
+	config LIBUKALLOC_IFSTATS_GLOBAL
+		bool "Global statistics"
+		default n
+		depends on LIBUKALLOC_IFSTATS
+		help
+			Compute consolidated global allocator statistics.
+			Please note that this option may slow down allocation
+			perfomance due to competition to the single global
+			counters.
+
+	config LIBUKALLOC_IFSTATS_PERLIB
+		bool "Per-library statistics"
+		default n
+		depends on LIBUKALLOC_IFSTATS
+		help
+			Additionally compute per-library statistics. This is
+			achieved by returning a per library uk_alloc wrapper
+			with the uk_alloc_get_default() call. This wrapper
+			forwards operations to the actual default allocator
+			but records statistics changes for each library.
+			Please note that memory usage numbers can be negative:
+			This can be a result of a library A allocating memory
+			and another library B freeing it.
 endif

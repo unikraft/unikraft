@@ -29,6 +29,9 @@
 
 #include <uk/config.h>
 #include <uk/essentials.h>
+#if CONFIG_LIBUKALLOC
+#include <uk/alloc.h>
+#endif
 
 #ifdef __cplusplus
 extern "C" {
@@ -62,29 +65,53 @@ int atoi(const char *s);
 /* Allocate size bytes of memory. Returns pointer to start of allocated memory,
  * or NULL on failure.
  */
-void *malloc(size_t size);
+static inline void *malloc(size_t size)
+{
+	return uk_malloc(uk_alloc_get_default(), size);
+}
+
 /* Release memory previously allocated by malloc(). ptr must be a pointer
  * previously returned by malloc(), otherwise undefined behavior will occur.
  */
-void free(void *ptr);
+static inline void free(void *ptr)
+{
+	return uk_free(uk_alloc_get_default(), ptr);
+}
+
 /* Allocate memory for an array of nmemb elements of size bytes. Returns
  * pointer to start of allocated memory, or NULL on failure.
  */
-void *calloc(size_t nmemb, size_t size);
+static inline void *calloc(size_t nmemb, size_t size)
+{
+	return uk_calloc(uk_alloc_get_default(), nmemb, size);
+}
+
 /* Change the size of the memory block pointed to by ptr to size bytes.
  * Returns a pointer to the resized memory area. If the area pointed to was
  * moved, a free(ptr) is done.
  */
-void *realloc(void *ptr, size_t size);
+static inline void *realloc(void *ptr, size_t size)
+{
+	return uk_realloc(uk_alloc_get_default(), ptr, size);
+}
+
 /* Allocate size bytes of memory, aligned to align bytes, and return the
  * pointer to that area in *memptr. Returns 0 on success, and a non-zero error
  * value on failure.
  */
-int posix_memalign(void **memptr, size_t align, size_t size);
+static inline int posix_memalign(void **memptr, size_t align, size_t size)
+{
+	return uk_posix_memalign(uk_alloc_get_default(),
+				 memptr, align, size);
+}
+
 /* Allocate size bytes of memory, aligned to align bytes. Returns pointer to
  * start of allocated memory, or NULL on failure.
  */
-void *memalign(size_t align, size_t size);
+static inline void *memalign(size_t align, size_t size)
+{
+	return uk_memalign(uk_alloc_get_default(), align, size);
+}
 #endif /* CONFIG_LIBUKALLOC */
 
 void abort(void) __noreturn;

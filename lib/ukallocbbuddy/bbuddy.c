@@ -214,17 +214,6 @@ static void map_free(struct uk_bbpalloc *b, uintptr_t first_page,
 	b->nr_free_pages += nr_pages;
 }
 
-#if CONFIG_LIBUKALLOC_IFSTATS
-static ssize_t bbuddy_availmem(struct uk_alloc *a)
-{
-	struct uk_bbpalloc *b;
-
-	UK_ASSERT(a != NULL);
-	b = (struct uk_bbpalloc *)&a->priv;
-	return (ssize_t) b->nr_free_pages << __PAGE_SHIFT;
-}
-#endif
-
 /* return log of the next power of two of passed number */
 static inline unsigned long num_pages_to_order(unsigned long num_pages)
 {
@@ -291,11 +280,14 @@ static void *bbuddy_palloc(struct uk_alloc *a, unsigned long num_pages)
 	}
 	map_alloc(b, (uintptr_t)alloc_ch, 1UL << order);
 
+	uk_alloc_stats_count_palloc(a, (void *) alloc_ch, num_pages);
 	return ((void *)alloc_ch);
 
 no_memory:
 	uk_pr_warn("%"__PRIuptr": Cannot handle palloc request of order %"__PRIsz": Out of memory\n",
 		   (uintptr_t)a, order);
+
+	uk_alloc_stats_count_penomem(a, num_pages);
 	errno = ENOMEM;
 	return NULL;
 }
@@ -308,6 +300,8 @@ static void bbuddy_pfree(struct uk_alloc *a, void *obj, unsigned long num_pages)
 	unsigned long mask;
 
 	UK_ASSERT(a != NULL);
+
+	uk_alloc_stats_count_pfree(a, obj, num_pages);
 	b = (struct uk_bbpalloc *)&a->priv;
 
 	size_t order = (size_t)num_pages_to_order(num_pages);
@@ -360,6 +354,36 @@ static void bbuddy_pfree(struct uk_alloc *a, void *obj, unsigned long num_pages)
 
 	freed_ch->next->pprev = &freed_ch->next;
 	b->free_head[order] = freed_ch;
+}
+
+static long bbuddy_pmaxalloc(struct uk_alloc *a)
+{
+	struct uk_bbpalloc *b;
+	size_t i, order;
+
+	UK_ASSERT(a != NULL);
+	b = (struct uk_bbpalloc *)&a->priv;
+
+	/* Find biggest order that has still elements available */
+	order = FREELIST_SIZE;
+	for (i = 0; i < FREELIST_SIZE; i++) {
+		if (!FREELIST_EMPTY(b->free_head[i]))
+			order = i;
+	}
+	if (order == FREELIST_SIZE)
+		return 0; /* no memory left */
+
+	return (long) (1 << order);
+}
+
+static long bbuddy_pavailmem(struct uk_alloc *a)
+{
+	struct uk_bbpalloc *b;
+
+	UK_ASSERT(a != NULL);
+	b = (struct uk_bbpalloc *)&a->priv;
+
+	return (long) b->nr_free_pages;
 }
 
 static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
@@ -503,10 +527,8 @@ struct uk_alloc *uk_allocbbuddy_init(void *base, size_t len)
 
 	/* initialize and register allocator interface */
 	uk_alloc_init_palloc(a, bbuddy_palloc, bbuddy_pfree,
+			     bbuddy_pmaxalloc, bbuddy_pavailmem,
 			     bbuddy_addmem);
-#if CONFIG_LIBUKALLOC_IFSTATS
-	a->availmem = bbuddy_availmem;
-#endif
 
 	if (max > min + metalen) {
 		/* add left memory - ignore return value */

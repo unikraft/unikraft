@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 #include <stdint.h>
 #include <uk/plat/lcpu.h>
@@ -43,6 +41,13 @@ void ukplat_lcpu_enable_irq(void)
 void ukplat_lcpu_disable_irq(void)
 {
 	local_irq_disable();
+}
+
+void ukplat_lcpu_halt_irq(void)
+{
+	ukplat_lcpu_enable_irq();
+	halt();
+	ukplat_lcpu_disable_irq();
 }
 
 unsigned long ukplat_lcpu_save_irqf(void)

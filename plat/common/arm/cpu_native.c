@@ -28,15 +28,13 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 #include <uk/config.h>
 #include <uk/plat/common/cpu.h>
 #if !CONFIG_ARCH_ARM_32
 /* TODO: Not yet supported for Arm32 */
 #include <uk/plat/common/irq.h>
-#include <arm/cpu_defs.h>
+#include <arm/psci.h>
 #endif
 #include <uk/assert.h>
 

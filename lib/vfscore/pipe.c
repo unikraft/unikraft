@@ -29,11 +29,10 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
 #include <uk/config.h>
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
 #include <vfscore/file.h>
@@ -41,7 +40,9 @@
 #include <vfscore/mount.h>
 #include <vfscore/vnode.h>
 #include <uk/wait.h>
+#include <uk/syscall.h>
 #include <sys/ioctl.h>
+#include <uk/syscall.h>
 
 /* We use the default size in Linux kernel */
 #define PIPE_MAX_SIZE	(1 << CONFIG_LIBVFSCORE_PIPE_SIZE_ORDER)
@@ -536,7 +537,7 @@ ERR_EXIT:
 	return ret;
 }
 
-int pipe(int pipefd[2])
+UK_SYSCALL_R_DEFINE(int, pipe, int*, pipefd)
 {
 	int ret = 0;
 	int r_fd, w_fd;
@@ -573,7 +574,7 @@ ERR_EXIT:
 }
 
 /* TODO find a more efficient way to implement pipe2() */
-int pipe2(int pipefd[2], int flags)
+UK_SYSCALL_R_DEFINE(int, pipe2, int*, pipefd, int, flags)
 {
 	int rc;
 
@@ -595,7 +596,7 @@ int pipe2(int pipefd[2], int flags)
 /* TODO maybe find a better place for this when it will be implemented */
 int mkfifo(const char *path __unused, mode_t mode __unused)
 {
-	WARN_STUBBED();
+	UK_WARN_STUBBED();
 	errno = ENOTSUP;
 	return -1;
 }

@@ -104,6 +104,7 @@ int sigsuspend(const sigset_t *mask);
 int sigwait(const sigset_t *set, int *sig);
 
 int kill(pid_t pid, int sig);
+int killpg(int pgrp, int sig);
 int raise(int sig);
 int siginterrupt(int sig, int flag);
 void psignal(int sig, const char *s);

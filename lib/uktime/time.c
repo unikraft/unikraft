@@ -31,13 +31,10 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
 #include <errno.h>
 #include <time.h>
-#include <utime.h>
 #include <unistd.h>
 #include <sys/time.h>
 #include <uk/plat/time.h>
@@ -52,11 +49,6 @@
 #endif
 #include <uk/essentials.h>
 
-int utime(const char *filename __unused, const struct utimbuf *times __unused)
-{
-	return 0;
-}
-
 #ifndef CONFIG_HAVE_SCHED
 /* Workaround until Unikraft changes interface for something more
  * sensible
@@ -70,13 +62,12 @@ static void __spin_wait(__nsec nsec)
 }
 #endif
 
-UK_SYSCALL_DEFINE(int, nanosleep, const struct timespec*, req, struct timespec*, rem)
+UK_SYSCALL_R_DEFINE(int, nanosleep, const struct timespec*, req, struct timespec*, rem)
 {
 	__nsec before, after, diff, nsec;
 
 	if (!req || req->tv_nsec < 0 || req->tv_nsec > 999999999) {
-		errno = EINVAL;
-		return -1;
+		return -EINVAL;
 	}
 
 	nsec = (__nsec) req->tv_sec * 1000000000L;
@@ -97,8 +88,7 @@ UK_SYSCALL_DEFINE(int, nanosleep, const struct timespec*, req, struct timespec*,
 			rem->tv_sec = ukarch_time_nsec_to_sec(nsec - diff);
 			rem->tv_nsec = ukarch_time_subsec(nsec - diff);
 		}
-		errno = EINTR;
-		return -1;
+		return -EINTR;
 	}
 	return 0;
 }
@@ -127,22 +117,32 @@ unsigned int sleep(unsigned int seconds)
 	return 0;
 }
 
-int gettimeofday(struct timeval *tv, void *tz __unused)
+UK_SYSCALL_R_DEFINE(time_t, time, time_t *, tloc)
+{
+	time_t secs = ukarch_time_nsec_to_sec(ukplat_wall_clock());
+
+	if (tloc)
+		*tloc = secs;
+
+	return secs;
+}
+
+UK_SYSCALL_R_DEFINE(int, gettimeofday, struct timeval *, tv, void *, tz)
 {
 	__nsec now = ukplat_wall_clock();
 
-	if (!tv) {
-		errno = EINVAL;
-		return -1;
-	}
+	if (!tv)
+		return -EINVAL;
 
 	tv->tv_sec = ukarch_time_nsec_to_sec(now);
 	tv->tv_usec = ukarch_time_nsec_to_usec(ukarch_time_subsec(now));
 	return 0;
 }
 
-int clock_getres(clockid_t clk_id __unused, struct timespec *res __unused)
+UK_SYSCALL_R_DEFINE(int, clock_getres, clockid_t, clk_id,
+		    struct timespec *, res)
 {
+	UK_WARN_STUBBED();
 	return 0;
 }
 
@@ -177,20 +177,22 @@ out_error:
 	return -error;
 }
 
-int clock_settime(clockid_t clk_id __unused, const struct timespec *tp __unused)
+UK_SYSCALL_R_DEFINE(int, clock_settime, clockid_t, clk_id,
+		    const struct timespec *, tp)
 {
+	UK_WARN_STUBBED();
 	return 0;
 }
 
-int times(struct tm *buf __unused)
+UK_SYSCALL_R_DEFINE(int, times, struct tm *, buf)
 {
-	errno = ENOTSUP;
-	return -1;
+	return -ENOTSUP;
 }
 
-int setitimer(int which __unused, const struct itimerval *new_value __unused,
-		struct itimerval *old_value __unused)
+UK_SYSCALL_R_DEFINE(int, setitimer, int, which,
+		    const struct itimerval *, new_value,
+		    struct itimerval *, old_value)
 {
-	WARN_STUBBED();
+	UK_WARN_STUBBED();
 	return 0;
 }

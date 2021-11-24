@@ -88,12 +88,34 @@ struct _reent *__getreent(void)
 }
 #endif /* CONFIG_LIBNEWLIBC */
 
+extern const struct uk_thread_inittab_entry _uk_thread_inittab_start[];
+extern const struct uk_thread_inittab_entry _uk_thread_inittab_end;
+
+#define uk_thread_inittab_foreach(itr)					\
+	for ((itr) = DECONST(struct uk_thread_inittab_entry*,		\
+			     _uk_thread_inittab_start);			\
+	     (itr) < &(_uk_thread_inittab_end);				\
+	     (itr)++)
+
+#define uk_thread_inittab_foreach_reverse2(itr, start)			\
+	for ((itr) = (start);						\
+	     (itr) >= _uk_thread_inittab_start;				\
+	     (itr)--)
+
+#define uk_thread_inittab_foreach_reverse(itr)				\
+	uk_thread_inittab_foreach_reverse2((itr),			\
+			(DECONST(struct uk_thread_inittab_entry*,	\
+				 (&_uk_thread_inittab_end))) - 1)
+
 int uk_thread_init(struct uk_thread *thread,
 		struct ukplat_ctx_callbacks *cbs, struct uk_alloc *allocator,
 		const char *name, void *stack, void *tls,
 		void (*function)(void *), void *arg)
 {
 	unsigned long sp;
+	void *ctx;
+	int ret = 0;
+	struct uk_thread_inittab_entry *itr;
 
 	UK_ASSERT(thread != NULL);
 	UK_ASSERT(stack != NULL);
@@ -102,17 +124,20 @@ int uk_thread_init(struct uk_thread *thread,
 	/* Save pointer to the thread on the stack to get current thread */
 	*((unsigned long *) stack) = (unsigned long) thread;
 
-	init_sp(&sp, stack, function, arg);
+	/* Allocate thread context */
+	ctx = uk_zalloc(allocator, ukplat_thread_ctx_size(cbs));
+	if (!ctx) {
+		ret = -1;
+		goto err_out;
+	}
 
-	/* Call platform specific setup. */
-	thread->ctx = ukplat_thread_ctx_create(cbs, allocator, sp,
-			(uintptr_t)ukarch_tls_pointer(tls));
-	if (thread->ctx == NULL)
-		return -1;
-
+	memset(thread, 0, sizeof(*thread));
+	thread->ctx = ctx;
 	thread->name = name;
 	thread->stack = stack;
 	thread->tls = tls;
+	thread->entry = function;
+	thread->arg = arg;
 
 	/* Not runnable, not exited, not sleeping */
 	thread->flags = 0;
@@ -122,26 +147,68 @@ int uk_thread_init(struct uk_thread *thread,
 	thread->sched = NULL;
 	thread->prv = NULL;
 
+	/* TODO: Move newlibc reent initialization to newlib as
+	 *       thread initialization function
+	 */
 #ifdef CONFIG_LIBNEWLIBC
 	reent_init(&thread->reent);
 #endif
-#if CONFIG_LIBUKSIGNAL
-	uk_thread_sig_init(&thread->signals_container);
-#endif
+
+	/* Iterate over registered thread initialization functions */
+	uk_thread_inittab_foreach(itr) {
+		if (unlikely(!itr->init))
+			continue;
+
+		uk_pr_debug("New thread %p: Call thread initialization function %p...\n",
+			    thread, *itr->init);
+		ret = (itr->init)(thread);
+		if (ret < 0)
+			goto err_fini;
+	}
+
+	/* Prepare stack and TLS
+	 * NOTE: In case the function pointer was changed by a thread init
+	 *       function (e.g., encapsulation), we prepare the stack here
+	 *       with the final setup
+	 */
+	init_sp(&sp, stack, thread->entry, thread->arg);
+
+	/* Platform specific context initialization */
+	ukplat_thread_ctx_init(cbs, thread->ctx, sp,
+			       (uintptr_t) ukarch_tls_pointer(tls));
 
 	uk_pr_info("Thread \"%s\": pointer: %p, stack: %p, tls: %p\n",
 		   name, thread, thread->stack, thread->tls);
 
 	return 0;
+
+err_fini:
+	/* Run fini functions starting from one level before the failed one
+	 * because we expect that the failed one cleaned up.
+	 */
+	uk_thread_inittab_foreach_reverse2(itr, itr - 2) {
+		if (unlikely(!itr->fini))
+			continue;
+		(itr->fini)(thread);
+	}
+	uk_free(allocator, thread->ctx);
+err_out:
+	return ret;
 }
 
 void uk_thread_fini(struct uk_thread *thread, struct uk_alloc *allocator)
 {
+	struct uk_thread_inittab_entry *itr;
+
 	UK_ASSERT(thread != NULL);
-#if CONFIG_LIBUKSIGNAL
-	uk_thread_sig_uninit(&thread->signals_container);
-#endif
-	ukplat_thread_ctx_destroy(allocator, thread->ctx);
+
+	uk_thread_inittab_foreach_reverse(itr) {
+		if (unlikely(!itr->fini))
+			continue;
+		(itr->fini)(thread);
+	}
+	uk_free(allocator, thread->ctx);
+	thread->ctx = NULL;
 }
 
 static void uk_thread_block_until(struct uk_thread *thread, __snsec until)

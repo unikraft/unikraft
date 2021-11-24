@@ -32,19 +32,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-/* This is a very simple, naive implementation of malloc.
- * It's not space-efficient, because it always requests full pages from the
- * underlying memory allocator. It's also not very fast, because for the
- * same reason, it will never hand out memory from already-requested pages,
- * and has to go through the underlying memory allocator on every malloc()
- * and free() (and friends. And God have mercy on your soul if you call free()
- * with a pointer that wasn't received from malloc(). But it's simple, and,
- * above all, it is inherently reentrant, because all bookkeeping is
- * decentralized. This is important, because we currently don't have proper
- * locking support yet. Eventually, this should probably be replaced by
- * something better.
- */
-
 #include <errno.h>
 #include <string.h>
 #include <uk/alloc_impl.h>
@@ -66,14 +53,14 @@ int uk_alloc_register(struct uk_alloc *a)
 
 	if (!_uk_alloc_head) {
 		_uk_alloc_head = a;
-		a->next = NULL;
+		a->next = __NULL;
 		return 0;
 	}
 
 	while (this && this->next)
 		this = this->next;
 	this->next = a;
-	a->next = NULL;
+	a->next = __NULL;
 	return 0;
 }
 
@@ -94,7 +81,7 @@ UK_CTASSERT(!(sizeof(struct metadata_ifpages) > METADATA_IFPAGES_SIZE_POW2));
 
 static struct metadata_ifpages *uk_get_metadata(const void *ptr)
 {
-	uintptr_t metadata;
+	__uptr metadata;
 
 	/* a ptr less or equal to page size would mean that the actual allocated
 	 * object started at 0x0, so it was NULL.
@@ -102,11 +89,11 @@ static struct metadata_ifpages *uk_get_metadata(const void *ptr)
 	 * also imply that the actual allocated object started at 0x0 because
 	 * we need space to store metadata.
 	 */
-	UK_ASSERT((uintptr_t) ptr >= __PAGE_SIZE +
+	UK_ASSERT((__uptr) ptr >= __PAGE_SIZE +
 		  sizeof(struct metadata_ifpages));
 
-	metadata = ALIGN_DOWN((uintptr_t) ptr, (uintptr_t) __PAGE_SIZE);
-	if (metadata == (uintptr_t) ptr) {
+	metadata = ALIGN_DOWN((__uptr) ptr, (__uptr) __PAGE_SIZE);
+	if (metadata == (__uptr) ptr) {
 		/* special case: the memory was page-aligned.
 		 * In this case the metadata lies at the start of the
 		 * previous page, with the rest of that page unused.
@@ -117,31 +104,43 @@ static struct metadata_ifpages *uk_get_metadata(const void *ptr)
 	return (struct metadata_ifpages *) metadata;
 }
 
-static size_t uk_getmallocsize(const void *ptr)
+static __sz uk_getmallocsize(const void *ptr)
 {
 	struct metadata_ifpages *metadata = uk_get_metadata(ptr);
 
-	return (size_t)metadata->base + (size_t)(metadata->num_pages) *
-	       __PAGE_SIZE - (size_t)ptr;
+	return (__sz)metadata->base + (__sz)(metadata->num_pages) *
+	       __PAGE_SIZE - (__sz)ptr;
 }
 
-void *uk_malloc_ifpages(struct uk_alloc *a, size_t size)
+/* This is a very simple, naive implementation of malloc.
+ * It's not space-efficient, because it always requests full pages from the
+ * underlying memory allocator. It's also not very fast, because for the
+ * same reason, it will never hand out memory from already-requested pages,
+ * and has to go through the underlying memory allocator on every malloc()
+ * and free() (and friends. And God have mercy on your soul if you call free()
+ * with a pointer that wasn't received from malloc(). But it's simple, and,
+ * above all, it is inherently reentrant, because all bookkeeping is
+ * decentralized. This is important, because we currently don't have proper
+ * locking support yet. Eventually, this should probably be replaced by
+ * something better.
+ */
+void *uk_malloc_ifpages(struct uk_alloc *a, __sz size)
 {
-	uintptr_t intptr;
+	__uptr intptr;
 	unsigned long num_pages;
 	struct metadata_ifpages *metadata;
-	size_t realsize = sizeof(*metadata) + size;
+	__sz realsize = sizeof(*metadata) + size;
 
 	UK_ASSERT(a);
 	/* check for invalid size and overflow */
 	if (!size || realsize < size)
-		return NULL;
+		return __NULL;
 
 	num_pages = size_to_num_pages(realsize);
-	intptr = (uintptr_t)uk_palloc(a, num_pages);
+	intptr = (__uptr)uk_palloc(a, num_pages);
 
 	if (!intptr)
-		return NULL;
+		return __NULL;
 
 	metadata = (struct metadata_ifpages *) intptr;
 	metadata->num_pages = num_pages;
@@ -160,15 +159,15 @@ void uk_free_ifpages(struct uk_alloc *a, void *ptr)
 
 	metadata = uk_get_metadata(ptr);
 
-	UK_ASSERT(metadata->base != NULL);
+	UK_ASSERT(metadata->base != __NULL);
 	UK_ASSERT(metadata->num_pages != 0);
 	uk_pfree(a, metadata->base, metadata->num_pages);
 }
 
-void *uk_realloc_ifpages(struct uk_alloc *a, void *ptr, size_t size)
+void *uk_realloc_ifpages(struct uk_alloc *a, void *ptr, __sz size)
 {
 	void *retptr;
-	size_t mallocsize;
+	__sz mallocsize;
 
 	UK_ASSERT(a);
 	if (!ptr)
@@ -176,12 +175,12 @@ void *uk_realloc_ifpages(struct uk_alloc *a, void *ptr, size_t size)
 
 	if (ptr && !size) {
 		uk_free_ifpages(a, ptr);
-		return NULL;
+		return __NULL;
 	}
 
 	retptr = uk_malloc_ifpages(a, size);
 	if (!retptr)
-		return NULL;
+		return __NULL;
 
 	mallocsize = uk_getmallocsize(ptr);
 
@@ -195,12 +194,12 @@ void *uk_realloc_ifpages(struct uk_alloc *a, void *ptr, size_t size)
 }
 
 int uk_posix_memalign_ifpages(struct uk_alloc *a,
-				void **memptr, size_t align, size_t size)
+				void **memptr, __sz align, __sz size)
 {
 	struct metadata_ifpages *metadata;
 	unsigned long num_pages;
-	uintptr_t intptr;
-	size_t realsize, padding;
+	__uptr intptr;
+	__sz realsize, padding;
 
 	UK_ASSERT(a);
 	if (((align - 1) & align) != 0
@@ -253,18 +252,18 @@ int uk_posix_memalign_ifpages(struct uk_alloc *a,
 		return EINVAL;
 
 	num_pages = size_to_num_pages(realsize);
-	intptr = (uintptr_t) uk_palloc(a, num_pages);
+	intptr = (__uptr) uk_palloc(a, num_pages);
 
 	if (!intptr)
 		return ENOMEM;
 
 	*memptr = (void *) ALIGN_UP(intptr + sizeof(*metadata),
-				    (uintptr_t) align);
+				    (__uptr) align);
 
 	metadata = uk_get_metadata(*memptr);
 
 	/* check for underflow (should not happen) */
-	UK_ASSERT(intptr <= (uintptr_t) metadata);
+	UK_ASSERT(intptr <= (__uptr) metadata);
 
 	metadata->num_pages = num_pages;
 	metadata->base = (void *) intptr;
@@ -272,10 +271,45 @@ int uk_posix_memalign_ifpages(struct uk_alloc *a,
 	return 0;
 }
 
+__ssz uk_alloc_maxalloc_ifpages(struct uk_alloc *a)
+{
+	long num_pages;
+	__ssz maxalloc;
+
+	UK_ASSERT(a);
+
+	num_pages = uk_alloc_pmaxalloc(a);
+	if (num_pages < 0) {
+		/* forward error code */
+		return (__ssz) num_pages;
+	}
+
+	maxalloc = ((__ssz) num_pages) << __PAGE_SHIFT;
+
+	if (maxalloc <= METADATA_IFPAGES_SIZE_POW2)
+		return 0;
+
+	maxalloc -= METADATA_IFPAGES_SIZE_POW2;
+	return maxalloc;
+}
+
+__ssz uk_alloc_availmem_ifpages(struct uk_alloc *a)
+{
+	long num_pages;
+
+	UK_ASSERT(a);
+
+	num_pages = uk_alloc_pavailmem(a);
+	if (num_pages < 0)
+		return (__ssz) num_pages;
+
+	return ((__ssz) num_pages) << __PAGE_SHIFT;
+}
+
 #if CONFIG_LIBUKALLOC_IFMALLOC
 
 struct metadata_ifmalloc {
-	size_t	size;
+	__sz	size;
 	void	*base;
 };
 
@@ -284,16 +318,16 @@ UK_CTASSERT(!(sizeof(struct metadata_ifmalloc) > METADATA_IFMALLOC_SIZE_POW2));
 
 static struct metadata_ifmalloc *uk_get_metadata_ifmalloc(const void *ptr)
 {
-	return (struct metadata_ifmalloc *)((uintptr_t) ptr -
+	return (struct metadata_ifmalloc *)((__uptr) ptr -
 		METADATA_IFMALLOC_SIZE_POW2);
 }
 
-static size_t uk_getmallocsize_ifmalloc(const void *ptr)
+static __sz uk_getmallocsize_ifmalloc(const void *ptr)
 {
 	struct metadata_ifmalloc *metadata = uk_get_metadata_ifmalloc(ptr);
 
-	return (size_t) ((uintptr_t) metadata->base + metadata->size -
-			 (uintptr_t) ptr);
+	return (__sz) ((__uptr) metadata->base + metadata->size -
+			 (__uptr) ptr);
 }
 
 void uk_free_ifmalloc(struct uk_alloc *a, void *ptr)
@@ -309,10 +343,10 @@ void uk_free_ifmalloc(struct uk_alloc *a, void *ptr)
 	a->free_backend(a, metadata->base);
 }
 
-void *uk_malloc_ifmalloc(struct uk_alloc *a, size_t size)
+void *uk_malloc_ifmalloc(struct uk_alloc *a, __sz size)
 {
 	struct metadata_ifmalloc *metadata;
-	size_t realsize = size + METADATA_IFMALLOC_SIZE_POW2;
+	__sz realsize = size + METADATA_IFMALLOC_SIZE_POW2;
 	void *ptr;
 
 	UK_ASSERT(a);
@@ -320,23 +354,23 @@ void *uk_malloc_ifmalloc(struct uk_alloc *a, size_t size)
 
 	/* check for overflow */
 	if (unlikely(realsize < size))
-		return NULL;
+		return __NULL;
 
 	ptr = a->malloc_backend(a, realsize);
 	if (!ptr)
-		return NULL;
+		return __NULL;
 
 	metadata = ptr;
 	metadata->size = realsize;
 	metadata->base = ptr;
 
-	return (void *) ((uintptr_t) ptr + METADATA_IFMALLOC_SIZE_POW2);
+	return (void *) ((__uptr) ptr + METADATA_IFMALLOC_SIZE_POW2);
 }
 
-void *uk_realloc_ifmalloc(struct uk_alloc *a, void *ptr, size_t size)
+void *uk_realloc_ifmalloc(struct uk_alloc *a, void *ptr, __sz size)
 {
 	void *retptr;
-	size_t mallocsize;
+	__sz mallocsize;
 
 	UK_ASSERT(a);
 	if (!ptr)
@@ -344,12 +378,12 @@ void *uk_realloc_ifmalloc(struct uk_alloc *a, void *ptr, size_t size)
 
 	if (ptr && !size) {
 		uk_free_ifmalloc(a, ptr);
-		return NULL;
+		return __NULL;
 	}
 
 	retptr = uk_malloc_ifmalloc(a, size);
 	if (!retptr)
-		return NULL;
+		return __NULL;
 
 	mallocsize = uk_getmallocsize_ifmalloc(ptr);
 
@@ -360,11 +394,11 @@ void *uk_realloc_ifmalloc(struct uk_alloc *a, void *ptr, size_t size)
 }
 
 int uk_posix_memalign_ifmalloc(struct uk_alloc *a,
-				     void **memptr, size_t align, size_t size)
+				     void **memptr, __sz align, __sz size)
 {
 	struct metadata_ifmalloc *metadata;
-	size_t realsize, padding;
-	uintptr_t intptr;
+	__sz realsize, padding;
+	__uptr intptr;
 
 	UK_ASSERT(a);
 	if (((align - 1) & align) != 0
@@ -392,18 +426,18 @@ int uk_posix_memalign_ifmalloc(struct uk_alloc *a,
 	if (unlikely(realsize < size))
 		return ENOMEM;
 
-	intptr = (uintptr_t) a->malloc_backend(a, realsize);
+	intptr = (__uptr) a->malloc_backend(a, realsize);
 
 	if (!intptr)
 		return ENOMEM;
 
 	*memptr = (void *) ALIGN_UP(intptr + METADATA_IFMALLOC_SIZE_POW2,
-				    (uintptr_t) align);
+				    (__uptr) align);
 
 	metadata = uk_get_metadata_ifmalloc(*memptr);
 
 	/* check for underflow */
-	UK_ASSERT(intptr <= (uintptr_t) metadata);
+	UK_ASSERT(intptr <= (__uptr) metadata);
 
 	metadata->size = realsize;
 	metadata->base = (void *) intptr;
@@ -431,16 +465,16 @@ void *uk_palloc_compat(struct uk_alloc *a, unsigned long num_pages)
 	UK_ASSERT(a);
 
 	/* check for overflow */
-	if (num_pages > (~(size_t)0)/__PAGE_SIZE)
-		return NULL;
+	if (num_pages > (~(__sz)0)/__PAGE_SIZE)
+		return __NULL;
 
 	if (uk_posix_memalign(a, &ptr, __PAGE_SIZE, num_pages * __PAGE_SIZE))
-		return NULL;
+		return __NULL;
 
 	return ptr;
 }
 
-void *uk_realloc_compat(struct uk_alloc *a, void *ptr, size_t size)
+void *uk_realloc_compat(struct uk_alloc *a, void *ptr, __sz size)
 {
 	void *retptr;
 
@@ -450,12 +484,12 @@ void *uk_realloc_compat(struct uk_alloc *a, void *ptr, size_t size)
 
 	if (ptr && !size) {
 		uk_free(a, ptr);
-		return NULL;
+		return __NULL;
 	}
 
 	retptr = uk_malloc(a, size);
 	if (!retptr)
-		return NULL;
+		return __NULL;
 
 	memcpy(retptr, ptr, size);
 
@@ -463,31 +497,87 @@ void *uk_realloc_compat(struct uk_alloc *a, void *ptr, size_t size)
 	return retptr;
 }
 
-void *uk_calloc_compat(struct uk_alloc *a, size_t nmemb, size_t size)
+void *uk_calloc_compat(struct uk_alloc *a, __sz nmemb, __sz size)
 {
 	void *ptr;
-	size_t tlen = nmemb * size;
+	__sz tlen = nmemb * size;
 
 	/* check for overflow */
-	if (nmemb > (~(size_t)0)/size)
-		return NULL;
+	if (nmemb > (~(__sz)0)/size)
+		return __NULL;
 
 	UK_ASSERT(a);
 	ptr = uk_malloc(a, tlen);
 	if (!ptr)
-		return NULL;
+		return __NULL;
 
 	memset(ptr, 0, tlen);
 	return ptr;
 }
 
-void *uk_memalign_compat(struct uk_alloc *a, size_t align, size_t size)
+void *uk_memalign_compat(struct uk_alloc *a, __sz align, __sz size)
 {
 	void *ptr;
 
 	UK_ASSERT(a);
 	if (uk_posix_memalign(a, &ptr, align, size) != 0)
-		return NULL;
+		return __NULL;
 
 	return ptr;
+}
+
+long uk_alloc_pmaxalloc_compat(struct uk_alloc *a)
+{
+	__ssz mem;
+
+	UK_ASSERT(a);
+
+	mem = uk_alloc_maxalloc(a);
+	if (mem < 0)
+		return (long) mem;
+
+	return (long) (mem >> __PAGE_SHIFT);
+}
+
+long uk_alloc_pavailmem_compat(struct uk_alloc *a)
+{
+	__ssz mem;
+
+	UK_ASSERT(a);
+
+	mem = uk_alloc_availmem(a);
+	if (mem < 0)
+		return (long) mem;
+
+	return (long) (mem >> __PAGE_SHIFT);
+}
+
+__sz uk_alloc_availmem_total(void)
+{
+	struct uk_alloc *a;
+	__ssz availmem;
+	__sz total;
+
+	total = 0;
+	uk_alloc_foreach(a) {
+		availmem = uk_alloc_availmem(a);
+		if (availmem > 0)
+			total += availmem;
+	}
+	return total;
+}
+
+unsigned long uk_alloc_pavailmem_total(void)
+{
+	struct uk_alloc *a;
+	long pavailmem;
+	unsigned long total;
+
+	total = 0;
+	uk_alloc_foreach(a) {
+		pavailmem = uk_alloc_pavailmem(a);
+		if (pavailmem > 0)
+			total += pavailmem;
+	}
+	return total;
 }

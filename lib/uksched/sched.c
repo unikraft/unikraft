@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
 #include <stdlib.h>
@@ -45,6 +43,7 @@
 #if CONFIG_LIBUKSIGNAL
 #include <uk/uk_signal.h>
 #endif
+#include <uk/syscall.h>
 
 struct uk_sched *uk_sched_head;
 
@@ -287,4 +286,10 @@ void uk_sched_thread_exit(void)
 	UK_ASSERT(thread->sched);
 	uk_sched_thread_remove(thread->sched, thread);
 	UK_CRASH("Failed to stop the thread\n");
+}
+
+UK_SYSCALL_R_DEFINE(int, sched_yield)
+{
+	uk_sched_yield();
+	return 0;
 }

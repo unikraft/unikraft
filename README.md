@@ -1,6 +1,6 @@
 # [![Unikraft](http://unikraft.org/assets/imgs/unikraft-logo-small.png)][unikraft-website]
 
-[![](https://img.shields.io/badge/version-v0.4%20(Rhea)-%23EC591A)][unikraft-latest] [![](https://img.shields.io/static/v1?label=license&message=BSD-3&color=%23385177)][unikraft-license]
+[![](https://img.shields.io/badge/version-v0.5%20(Tethys)-%23EC591A)][unikraft-latest] [![](https://img.shields.io/static/v1?label=license&message=BSD-3&color=%23385177)][unikraft-license]
 
 ***Unleash the Power of Unikernels!***
 
@@ -87,7 +87,7 @@ Unikraft is licensed under a BSD-3-Clause.  For more information, please refer t
 [unikraft-contributing]: https://github.com/unikraft/unikraft/blob/staging/CONTRIBUTING.md
 [unikraft-ci]: http://ci.unikraft.org
 [unikraft-license]: https://github.com/unikraft/unikraft/blob/staging/COPYING.md
-[unikraft-latest]: https://github.com/unikraft/unikraft/tree/RELEASE-0.4
+[unikraft-latest]: https://github.com/unikraft/unikraft/tree/RELEASE-0.5
 [unikraft-gettingstarted]: http://www.unikraft.org/getting-started
 [kraft]: https://github.com/unikraft/kraft/
 [github-issues]: https://github.com/unikraft/unikraft/issues

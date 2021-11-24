@@ -5,3 +5,4 @@ menuconfig LIBUKSIGNAL
 	select LIBUKDEBUG
 	select LIBUKALLOC
 	select LIBUKSCHED
+	select LIBPOSIX_PROCESS

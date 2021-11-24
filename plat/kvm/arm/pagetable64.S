@@ -38,20 +38,25 @@
 #include <arm/cpu_defs.h>
 /*
  * The following is the Memory Layout of AArch64 Virtual Machine
- * | 0 - 0x3FFFFFFF |   0x40000000 - 0x7FFFFFFFFF           |  512GB - 1TB   |
- * --------------------------------------------------------------------------
- * |  DEVICES MMIO  | DTB|TEXT|DATA|BSS|PAGETABLE|BOOTSTACK | PCI-e High Mem |
- * --------------------------------------------------------------------------
+ * | 0-0x7FFFFFF | 0x8000000-0x3FFFFFFF | 0x40000000-0x7FFFFFFFFF | 512GB-1TB |
+ * ----------------------------------------------------------------------------
+ * | HOLE        | DEVICES MMIO         | <1>                     | <2>       |
+ * ----------------------------------------------------------------------------
+ * <1> DTB|TEXT|DATA|BSS|PAGETABLE|BOOTSTACK
+ * <2> PCI-e High Mem
  */
-#define DEVICE_ADDR_START 0
-#define DEVICE_ADDR_SIZE  0x40000000
+#define HOLE_START 0
+#define HOLE_MEM_ENTRIES  64 /* 128M */
+#define DEVICE_ADDR_START 0x8000000
+#define DEVICE_ENTRIES    448 /* 512-64 */
 #define RAM_ADDR_START    0x40000000
 #define RAM_L2_ENTRIES    255
 #define RAM_ADDR_SIZE     (0x40000000 * RAM_L2_ENTRIES)
+#define PCIE_ECAM_START   0x4000000000
+#define PCIE_ECAM_L2_ENTRIES 256
 #define PCIE_ADDR_START   0x8000000000
 #define PCIE_L2_ENTRIES   512
 #define PCIE_ADDR_SIZE    0x8000000000
-
 /*
  * As we use VA == PA mapping, so the VIRT_BITS must be the same
  * as PA_BITS. We can get PA_BITS from ID_AA64MMFR0_EL1.PARange.
@@ -82,37 +87,63 @@ ENTRY(create_pagetables)
 	bl  link_l0_pagetable
 
 	/*
-	 * Using 1GiB block to map device address space (0x0 ~ 0x3fffffff)
+	 * Using 1GiB block to map the hole memory (0x0 ~ 0x7ffffff) and device
+	 * address space (0x8000000 ~ 0x3fffffff)
 	 */
-	add x6, x14, #L1_TABLE_OFFSET
+	/* Build a L2 block pagetable */
+	add x6, x14, #L2_TABLE_OFFSET
+	ldr x7, =0 /* NONE ATTR*/
+	mov x8, #HOLE_START
+	mov x9, x8
+	ldr x10, =HOLE_MEM_ENTRIES
+	bl  build_l2_block_pagetable
+
+	add x6, x14, #L2_TABLE_OFFSET
 	ldr x7, =SECT_ATTR_DEVICE_nGnRE
 	mov x8, #DEVICE_ADDR_START
 	mov x9, x8
-	mov x10, #1
-	bl  build_l1_block_pagetable
+	ldr x10, =DEVICE_ENTRIES
+	bl  build_l2_block_pagetable
+
+	/* Link this L2 block pagetable to L1 entry */
+	add x6, x14, #L1_TABLE_OFFSET
+	mov x8, #HOLE_START
+	add x9, x14, #L2_TABLE_OFFSET
+	bl  link_l1_pagetable
 
 	/*
 	 * Using 1GiB block to map RAM address space
 	 * (0x40000000 ~ (256GiB -1)). The RAM areas that contain kernel
 	 * sections will be update later.
 	 */
-	add x6, x14, #L1_TABLE_OFFSET
+	add x6, x14, #L1_TABLE_OFFSET	/* 1st L2 table page */
 	ldr x7, =SECT_ATTR_NORMAL
 	mov x8, #RAM_ADDR_START
 	mov x9, x8
-	mov x10, #255
+	mov x10, #RAM_L2_ENTRIES
 	bl  build_l1_block_pagetable
+
+        /*
+         * Using 1GiB block to map PCIe ECAM address space
+         * (256GiB ~ 512GiB).
+         */
+        add x6, x14, #L1_TABLE_OFFSET	/* 1st L2 table page */
+        ldr x7, =SECT_ATTR_DEVICE_nGnRnE
+        mov x8, #PCIE_ECAM_START
+        mov x9, x8
+        mov x10, #PCIE_ECAM_L2_ENTRIES
+        bl  build_l1_block_pagetable
 
 	/*
 	 * Using 1GiB block to map high PCIe address space
 	 * (0x512GiB ~ (1TiB -1)).
 	 */
 	add x6, x14, #L1_TABLE_OFFSET
-	add x6, x6, #__PAGE_SIZE
+	add x6, x6, #__PAGE_SIZE	/* 2nd L2 table page */
 	ldr x7, =SECT_ATTR_DEVICE_nGnRE
 	mov x8, #PCIE_ADDR_START
 	mov x9, x8
-	mov x10, #512
+	mov x10, #PCIE_L2_ENTRIES
 	bl  build_l1_block_pagetable
 
 	/*
@@ -123,6 +154,7 @@ ENTRY(create_pagetables)
 	 */
 	/* 1st: Build a L2 block pagetable */
 	add x6, x14, #L2_TABLE_OFFSET
+	add x6, x6, #__PAGE_SIZE
 	ldr x7, =SECT_ATTR_NORMAL
 	mov x8, #RAM_ADDR_START
 	mov x9, x8
@@ -133,6 +165,7 @@ ENTRY(create_pagetables)
 	add x6, x14, #L1_TABLE_OFFSET
 	mov x8, #RAM_ADDR_START
 	add x9, x14, #L2_TABLE_OFFSET
+	add x9, x9, #__PAGE_SIZE
 	bl  link_l1_pagetable
 
 	/* 3rd: Build a L3 pagetable for image occupied memory */
@@ -148,6 +181,7 @@ ENTRY(create_pagetables)
 
 	/* 4th: Link this L3 pagetable to L2 entry */
 	add x6, x14, #L2_TABLE_OFFSET
+	add x6, x6, #__PAGE_SIZE
 1:
 	mov x8, x17
 	mov x9, x16

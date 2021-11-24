@@ -42,7 +42,9 @@
 #include <uk/thread.h>
 #include <uk/uk_signal.h>
 #include <uk/essentials.h>
+#include <uk/process.h>
 #include <unistd.h>
+#include <uk/syscall.h>
 
 /*
  * Tries to deliver a pending signal to the current thread
@@ -351,6 +353,16 @@ int kill(pid_t pid, int sig)
 	return 0;
 }
 
+int killpg(int pgrp, int sig)
+{
+	if (pgrp != UNIKRAFT_PGID || pgrp != 0) {
+		errno = ESRCH;
+		return -1;
+	}
+
+	return kill(getpid(), sig);
+}
+
 int raise(int sig)
 {
 	return uk_sig_thread_kill(uk_thread_current(), sig);
@@ -360,7 +372,7 @@ int raise(int sig)
  * Stubbing the function support from requiring signal.
  * Stubs taken from newlib
  */
-unsigned int alarm(unsigned int seconds __unused)
+UK_SYSCALL_R_DEFINE(unsigned int, alarm, unsigned int, seconds)
 {
 	return 0;
 }
@@ -370,7 +382,7 @@ int siginterrupt(int sig __unused, int flag __unused)
 	return 0;
 }
 
-int pause(void)
+UK_SYSCALL_R_DEFINE(int, pause)
 {
 	return 0;
 }

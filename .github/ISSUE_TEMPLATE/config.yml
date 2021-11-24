@@ -1,0 +1,6 @@
+blank_issues_enabled: false
+
+contact_links:
+  - name: 💡 Discuss an idea
+    url: https://github.com/unikraft/unikraft/discussions/new
+    about: Discuss a feature or usecase which Unikraft could support.

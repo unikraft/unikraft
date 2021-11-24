@@ -29,8 +29,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
 #ifndef __VFSCORE_FILE_H__
@@ -46,7 +44,7 @@ extern "C" {
 
 struct vfscore_file;
 
-/* Set this flag if vfs should NOt handle POSition for this file. The
+/* Set this flag if vfs should not handle position for this file. The
  * file is not seek-able, updating f_offset does not make sense for
  * it */
 #define UK_VFSCORE_NOPOS ((int) (1 << 0))

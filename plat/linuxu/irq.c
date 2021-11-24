@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 #include <string.h>
 #include <uk/alloc.h>
@@ -79,6 +77,13 @@ void ukplat_lcpu_disable_irq(void)
 		UK_CRASH("Failed to block signals (%d)\n", rc);
 
 	irq_enabled = 0;
+}
+
+void ukplat_lcpu_halt_irq(void)
+{
+	ukplat_lcpu_enable_irq();
+	halt();
+	ukplat_lcpu_disable_irq();
 }
 
 int ukplat_lcpu_irqs_disabled(void)

@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 /* For the parts taken from musl (marked as such below), the MIT licence
  * applies instead:
@@ -115,8 +113,8 @@ void *memmove(void *dst, const void *src, size_t len)
 		for (; len > 0; --len)
 			*(d++) = *(s++);
 	} else {
-		s += len;
-		d += len;
+		s += len - 1;
+		d += len - 1;
 
 		for (; len > 0; --len)
 			*(d--) = *(s--);

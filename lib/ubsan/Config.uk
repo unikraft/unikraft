@@ -1,0 +1,13 @@
+menuconfig LIBUBSAN
+	bool "ubsan: Undefined Behavior Sanitization"
+	default n
+
+if LIBUBSAN
+
+config LIBUBSAN_GLOBAL
+	bool "Global undefined sanitization"
+	default n
+	help
+		Enable undefined behavior sanitization globally.
+endif
+

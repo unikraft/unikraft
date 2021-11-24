@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 /* Internal API for Xenstore watches */
 
@@ -64,7 +62,7 @@ struct xs_watch *xs_watch_create(const char *path)
 	if (!xsw)
 		return ERR2PTR(-ENOMEM);
 
-	ukarch_spin_lock_init(&xsw->base.lock);
+	ukarch_spin_init(&xsw->base.lock);
 	xsw->base.pending_events = 0;
 	uk_waitq_init(&xsw->base.wq);
 

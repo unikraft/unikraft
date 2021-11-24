@@ -43,6 +43,7 @@
 int outf(struct out_dev *dev, const char *fmt, ...)
 {
 	int ret = 0;
+	size_t rem;
 	va_list ap;
 
 	UK_ASSERT(dev);
@@ -57,11 +58,9 @@ int outf(struct out_dev *dev, const char *fmt, ...)
 		ret = __uk_vsnprintf(dev->buffer.pos, dev->buffer.left, fmt, ap);
 
 		if (ret > 0) {
-			/* in order to overwrite '\0' by successive calls,
-			 * we move the buffer pointer by (ret-1) characters
-			 */
-			dev->buffer.pos  += (ret - 1);
-			dev->buffer.left -= (ret - 1);
+			rem = MIN(dev->buffer.left, (size_t)ret);
+			dev->buffer.pos  += rem;
+			dev->buffer.left -= rem;
 		}
 		break;
 	case OUTDEV_DEBUG:

@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
 #ifndef __PLAT_DRV_VIRTQUEUE_H__
@@ -81,6 +79,39 @@ struct virtqueue {
  *	Return the guest physical address of the vring.
  */
 __phys_addr virtqueue_physaddr(struct virtqueue *vq);
+
+/**
+ * Fetch the avail address of the descriptor ring.
+ * @param vq
+ *	Reference to the virtqueue.
+ *
+ * @return
+ *	Return the guest avail address of the vring.
+ */
+__phys_addr virtqueue_get_avail_addr(struct virtqueue *vq);
+
+/**
+ * Fetch the used address of the descriptor ring.
+ * @param vq
+ *	Reference to the virtqueue.
+ *
+ * @return
+ *	Return the guest used address of the vring.
+ */
+__phys_addr virtqueue_get_used_addr(struct virtqueue *vq);
+
+/**
+ * Get the number of vring for virtqueue
+ *
+ * @param vq
+ *	Reference to the virtual queue
+ *
+ * @return
+ *	the number of vring for virtqueue
+ *
+ */
+unsigned int virtqueue_vring_get_num(struct virtqueue *vq);
+
 
 /**
  * Ring interrupt handler. This function is invoked from the interrupt handler

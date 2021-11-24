@@ -28,14 +28,13 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
 #define _GNU_SOURCE
 
 #include <fcntl.h>
 #include <dirent.h>
+#include <stdlib.h>
 #include <uk/config.h>
 #include <uk/9p.h>
 #include <uk/errptr.h>

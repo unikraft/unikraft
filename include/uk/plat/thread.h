@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
 /*
@@ -38,7 +36,7 @@
 #ifndef __UKPLAT_THREAD_H__
 #define __UKPLAT_THREAD_H__
 
-#include <stdlib.h>
+#include <uk/arch/types.h>
 #include <uk/essentials.h>
 #include <uk/assert.h>
 
@@ -48,19 +46,19 @@ enum ukplat_ctx_type {
 	ukplat_ctx_sw,
 };
 
-struct uk_alloc;
-
-typedef void *(*ukplat_ctx_create_func_t)
-		(struct uk_alloc *allocator, unsigned long sp,
-		 unsigned long tlsp);
+typedef __sz (*ukplat_ctx_size_func_t)(void);
+typedef void  (*ukplat_ctx_init_func_t)
+		(void *ctx, unsigned long sp, unsigned long tlsp);
 typedef void  (*ukplat_ctx_start_func_t)
 		(void *ctx);
 typedef void  (*ukplat_ctx_switch_func_t)
 		(void *prevctx, void *nextctx);
 
 struct ukplat_ctx_callbacks {
-	/* callback for creating thread context */
-	ukplat_ctx_create_func_t create_cb;
+	/* callback for returning the needed size for a thread context */
+	ukplat_ctx_size_func_t size_cb;
+	/* callback for initializing a new thread context */
+	ukplat_ctx_init_func_t init_cb;
 	/* callback for starting thread context */
 	ukplat_ctx_start_func_t start_cb __noreturn;
 	/* callback for switching contexts */
@@ -72,17 +70,23 @@ int ukplat_ctx_callbacks_init(struct ukplat_ctx_callbacks *ctx_cbs,
 
 
 static inline
-void *ukplat_thread_ctx_create(struct ukplat_ctx_callbacks *cbs,
-		struct uk_alloc *allocator, unsigned long sp,
-		unsigned long tlsp)
+__sz ukplat_thread_ctx_size(struct ukplat_ctx_callbacks *cbs)
 {
-	UK_ASSERT(cbs != NULL);
-	UK_ASSERT(allocator != NULL);
+	UK_ASSERT(cbs != __NULL);
 
-	return cbs->create_cb(allocator, sp, tlsp);
+	return cbs->size_cb();
 }
 
-void ukplat_thread_ctx_destroy(struct uk_alloc *allocator, void *ctx);
+static inline
+void ukplat_thread_ctx_init(struct ukplat_ctx_callbacks *cbs,
+			    void *ctx,
+			    unsigned long sp, unsigned long tlsp)
+{
+	UK_ASSERT(cbs != __NULL);
+	UK_ASSERT(ctx != __NULL);
+
+	return cbs->init_cb(ctx, sp, tlsp);
+}
 
 static inline
 void ukplat_thread_ctx_start(struct ukplat_ctx_callbacks *cbs,
@@ -92,8 +96,8 @@ static inline
 void ukplat_thread_ctx_start(struct ukplat_ctx_callbacks *cbs,
 		void *ctx)
 {
-	UK_ASSERT(cbs != NULL);
-	UK_ASSERT(ctx != NULL);
+	UK_ASSERT(cbs != __NULL);
+	UK_ASSERT(ctx != __NULL);
 
 	cbs->start_cb(ctx);
 }
@@ -102,9 +106,9 @@ static inline
 void ukplat_thread_ctx_switch(struct ukplat_ctx_callbacks *cbs,
 		void *prevctx, void *nextctx)
 {
-	UK_ASSERT(cbs != NULL);
-	UK_ASSERT(prevctx != NULL);
-	UK_ASSERT(nextctx != NULL);
+	UK_ASSERT(cbs != __NULL);
+	UK_ASSERT(prevctx != __NULL);
+	UK_ASSERT(nextctx != __NULL);
 
 	cbs->switch_cb(prevctx, nextctx);
 }

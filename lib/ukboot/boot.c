@@ -31,8 +31,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
 #include <uk/config.h>
@@ -45,8 +43,12 @@
 #include <uk/allocbbuddy.h>
 #elif CONFIG_LIBUKBOOT_INITREGION
 #include <uk/allocregion.h>
+#elif CONFIG_LIBUKBOOT_INITMIMALLOC
+#include <uk/mimalloc.h>
 #elif CONFIG_LIBUKBOOT_INITTLSF
 #include <uk/tlsf.h>
+#elif CONFIG_LIBUKBOOT_INITTINYALLOC
+#include <uk/tinyalloc.h>
 #endif
 #if CONFIG_LIBUKSCHED
 #include <uk/sched.h>
@@ -65,7 +67,7 @@
 #ifdef CONFIG_LIBUKLIBPARAM
 #include <uk/libparam.h>
 #endif /* CONFIG_LIBUKLIBPARAM */
-#if CONFIG_LIBUKSP
+#ifdef CONFIG_LIBUKSP
 #include <uk/sp.h>
 #endif
 #include "banner.h"
@@ -103,6 +105,10 @@ static void main_thread_func(void *arg)
 			goto exit;
 		}
 	}
+
+#ifdef CONFIG_LIBUKSP
+	uk_stack_chk_guard_setup();
+#endif
 
 	print_banner(stdout);
 	fflush(stdout);
@@ -188,13 +194,6 @@ void ukplat_entry(int argc, char *argv[])
 	struct uk_thread *main_thread = NULL;
 #endif
 
-	/* We use a macro because if we were to use a function we
-	 * would not be able to return from the function if we have
-	 * changed the stack protector inside the function */
-#if CONFIG_LIBUKSP
-	UKSP_INIT_CANARY();
-#endif
-
 	uk_ctor_func_t *ctorfn;
 
 	uk_pr_info("Unikraft constructor table at %p - %p\n",
@@ -241,8 +240,12 @@ void ukplat_entry(int argc, char *argv[])
 			a = uk_allocbbuddy_init(md.base, md.len);
 #elif CONFIG_LIBUKBOOT_INITREGION
 			a = uk_allocregion_init(md.base, md.len);
+#elif CONFIG_LIBUKBOOT_INITMIMALLOC
+			a = uk_mimalloc_init(md.base, md.len);
 #elif CONFIG_LIBUKBOOT_INITTLSF
 			a = uk_tlsf_init(md.base, md.len);
+#elif CONFIG_LIBUKBOOT_INITTINYALLOC
+			a = uk_tinyalloc_init(md.base, md.len);
 #endif
 		} else {
 			uk_alloc_addmem(a, md.base, md.len);

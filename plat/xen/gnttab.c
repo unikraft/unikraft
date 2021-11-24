@@ -17,6 +17,7 @@
  ****************************************************************************
  */
 #include <stdint.h>
+#include <stddef.h>
 #ifdef DBGGNT
 #include <string.h>
 #endif
