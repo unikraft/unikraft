@@ -180,6 +180,7 @@ static int netfront_xmit(struct uk_netdev *n,
 	tx_req->size = (uint16_t) pkt->len;
 	tx_req->flags = 0;
 	tx_req->id = id;
+	status = UK_NETDEV_STATUS_SUCCESS;
 
 	txq->ring.req_prod_pvt = req_prod + 1;
 	wmb(); /* Ensure backend sees requests */
