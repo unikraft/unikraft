@@ -43,6 +43,11 @@
 #include <uk/wait_types.h>
 #include <uk/plat/time.h>
 
+#ifdef CONFIG_LIBUKLOCK_MUTEX_METRICS
+#include <uk/plat/spinlock.h>
+#include <string.h>
+#endif /* CONFIG_LIBUKLOCK_MUTEX_METRICS */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -56,6 +61,33 @@ struct uk_mutex {
 	struct uk_thread *owner;
 	struct uk_waitq wait;
 };
+
+/*
+ * Mutex statistics for ukstore.
+ */
+struct uk_mutex_metrics {
+	/** Mutex objects currently locked */
+	size_t active_locked;
+	/** Mutex objects currently unlocked */
+	size_t active_unlocked;
+
+	/** Successful blocking lock operations since startup */
+	size_t total_locks;
+	/** Successful non-blocking (trylock) operations since startup */
+	size_t total_ok_trylocks;
+	/** Failed non-blocking (trylock) operations since startup */
+	size_t total_failed_trylocks;
+	/** Successful unlock operations since startup */
+	size_t total_unlocks;
+};
+
+#ifdef CONFIG_LIBUKLOCK_MUTEX_METRICS
+/*
+ * Metric storage (see mutex.c).
+ */
+extern struct uk_mutex_metrics _uk_mutex_metrics;
+extern __spinlock              _uk_mutex_metrics_lock;
+#endif /* CONFIG_LIBUKLOCK_MUTEX_METRICS */
 
 #define	UK_MUTEX_INITIALIZER(name)				\
 	{ 0, NULL, __WAIT_QUEUE_INITIALIZER((name).wait) }
@@ -79,8 +111,20 @@ static inline void uk_mutex_lock(struct uk_mutex *m)
 			break;
 		ukplat_lcpu_restore_irqf(irqf);
 	}
+#ifdef CONFIG_LIBUKLOCK_MUTEX_METRICS
+	ukarch_spin_lock(&_uk_mutex_metrics_lock);
+#endif /* CONFIG_LIBUKLOCK_MUTEX_METRICS */
+
 	m->lock_count++;
 	m->owner = current;
+
+#ifdef CONFIG_LIBUKLOCK_MUTEX_METRICS
+	_uk_mutex_metrics.active_locked   += (m->lock_count == 1);
+	_uk_mutex_metrics.active_unlocked -= (m->lock_count == 1);
+	_uk_mutex_metrics.total_locks++;
+
+	ukarch_spin_unlock(&_uk_mutex_metrics_lock);
+#endif /* CONFIG_LIBUKLOCK_MUTEX_METRICS */
 	ukplat_lcpu_restore_irqf(irqf);
 }
 
@@ -100,6 +144,14 @@ static inline int uk_mutex_trylock(struct uk_mutex *m)
 		m->lock_count++;
 		m->owner = current;
 	}
+
+#ifdef CONFIG_LIBUKLOCK_MUTEX_METRICS
+	_uk_mutex_metrics.active_locked += (ret == 1) && (m->lock_count == 1);
+	_uk_mutex_metrics.active_unlocked += (ret == 1) && (m->lock_count == 1);
+	_uk_mutex_metrics.total_ok_trylocks += ret;
+	_uk_mutex_metrics.total_failed_trylocks += !ret;
+#endif /* CONFIG_LIBUKLOCK_MUTEX_METRICS */
+
 	ukplat_lcpu_restore_irqf(irqf);
 	return ret;
 }
@@ -116,11 +168,25 @@ static inline void uk_mutex_unlock(struct uk_mutex *m)
 	UK_ASSERT(m);
 
 	irqf = ukplat_lcpu_save_irqf();
+
+#ifdef CONFIG_LIBUKLOCK_MUTEX_METRICS
+	ukarch_spin_lock(&_uk_mutex_metrics_lock);
+#endif /* CONFIG_LIBUKLOCK_MUTEX_METRICS */
+
 	UK_ASSERT(m->lock_count > 0);
 	if (--m->lock_count == 0) {
 		m->owner = NULL;
 		uk_waitq_wake_up(&m->wait);
 	}
+
+#ifdef CONFIG_LIBUKLOCK_MUTEX_METRICS
+	_uk_mutex_metrics.active_locked   -= (m->lock_count == 0);
+	_uk_mutex_metrics.active_unlocked += (m->lock_count == 0);
+	_uk_mutex_metrics.total_unlocks++;
+
+	ukarch_spin_unlock(&_uk_mutex_metrics_lock);
+#endif /* CONFIG_LIBUKLOCK_MUTEX_METRICS */
+
 	ukplat_lcpu_restore_irqf(irqf);
 }
 
