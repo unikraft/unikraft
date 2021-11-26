@@ -93,6 +93,7 @@ extern __spinlock              _uk_mutex_metrics_lock;
 	{ 0, NULL, __WAIT_QUEUE_INITIALIZER((name).wait) }
 
 void uk_mutex_init(struct uk_mutex *m);
+void uk_mutex_get_metrics(struct uk_mutex_metrics *dst);
 
 static inline void uk_mutex_lock(struct uk_mutex *m)
 {
