@@ -75,6 +75,8 @@
 # These owners oversee the build system.
 /Makefile		@unikraft/maintainers-build @unikraft/reviewers-build
 /Makefile.uk		@unikraft/maintainers-build @unikraft/reviewers-build
+/lib/Config.uk		@unikraft/maintainers-build @unikraft/reviewers-build
+/lib/Makefile.uk	@unikraft/maintainers-build @unikraft/reviewers-build
 /support/		@unikraft/maintainers-build @unikraft/reviewers-build
 
 # These owners oversee the debugging support.
