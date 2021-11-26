@@ -24,9 +24,13 @@
 # These owners oversee the ARM architecture.
 /lib/fdt/		@unikraft/maintainers-arch-arm @unikraft/reviewers-arch-arm
 /arch/arm/		@unikraft/maintainers-arch-arm @unikraft/reviewers-arch-arm
+/plat/*/arm/		@unikraft/maintainers-arch-arm @unikraft/reviewers-arch-arm
+/plat/*/include/*-arm/	@unikraft/maintainers-arch-arm @unikraft/reviewers-arch-arm
 
 # These owners oversee the x86 architecture.
 /arch/x86/		@unikraft/maintainers-arch-x86 @unikraft/reviewers-arch-x86
+/plat/*/x86/		@unikraft/maintainers-arch-x86 @unikraft/reviewers-arch-x86
+/plat/*/include/*-x86/	@unikraft/maintainers-arch-x86 @unikraft/reviewers-arch-x86
 
 # These owners oversee the KVM platform.
 /plat/kvm/		@unikraft/maintainers-plat-kvm @unikraft/reviewers-plat-kvm
