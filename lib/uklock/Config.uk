@@ -17,4 +17,13 @@ if LIBUKLOCK
 		default y
 		help
 			Enable mutex based synchornization
+
+	config LIBUKLOCK_MUTEX_METRICS
+		bool "Metrics for mutex objects"
+		default n
+		depends on LIBUKLOCK_MUTEX
+		help
+			Metrics related to mutex objects: current amount of (un)locked
+			objects, as well as number of successful/failed locking attempts
+			since startup.
 endif
