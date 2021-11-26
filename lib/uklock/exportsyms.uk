@@ -1,2 +1,4 @@
 uk_semaphore_init
 uk_mutex_init
+_uk_mutex_metrics
+_uk_mutex_metrics_lock
