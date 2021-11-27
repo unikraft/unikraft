@@ -46,7 +46,7 @@
 #error "Unsupported architecture"
 #endif
 
-#define IRQS_NUM    16
+#define __MAX_IRQ 16
 #define HANDLER_RESERVED ((void *) 0x1)
 
 /* IRQ handlers declarations */
@@ -61,7 +61,7 @@ struct irq_handler {
 	struct uk_sigaction oldaction;
 };
 
-static struct irq_handler irq_handlers[IRQS_NUM]
+static struct irq_handler irq_handlers[__MAX_IRQ]
 				[CONFIG_LINUXU_MAX_IRQ_HANDLER_ENTRIES];
 
 static k_sigset_t handled_signals_set;
@@ -69,7 +69,7 @@ static unsigned long irq_enabled;
 
 static inline struct irq_handler *allocate_handler(unsigned long irq)
 {
-	UK_ASSERT(irq < IRQS_NUM);
+	UK_ASSERT(irq < __MAX_IRQ);
 	for (int i = 0; i < CONFIG_LINUXU_MAX_IRQ_HANDLER_ENTRIES; i++)
 		if (irq_handlers[irq][i].func == NULL)
 			return &irq_handlers[irq][i];
@@ -149,7 +149,7 @@ static void _irq_handle(int irq)
 	struct irq_handler *h;
 	int i;
 
-	UK_ASSERT(irq >= 0 && irq < IRQS_NUM);
+	UK_ASSERT(irq >= 0 && irq < __MAX_IRQ);
 
 	for (i = 0; i < CONFIG_LINUXU_MAX_IRQ_HANDLER_ENTRIES; i++) {
 		if (irq_handlers[irq][i].func == NULL)
@@ -177,7 +177,7 @@ int ukplat_irq_register(unsigned long irq, irq_handler_func_t func, void *arg)
 	unsigned long flags;
 	int rc;
 
-	if (irq >= IRQS_NUM)
+	if (irq >= __MAX_IRQ)
 		return -EINVAL;
 
 	/* New handler */
