@@ -1,0 +1,11 @@
+config LIBUKRUST
+	bool "ukrust: Rust support for Unikraft's internals"
+	depends on ARCH_X86_64
+	select LIBUKDEBUG
+	default n
+	help
+	  This library provides all the necessary functionalities
+	  for Rust libraries that utilize Unikraft's native API.
+	  It exports Rust bindings over the Unikraft API as well
+	  as provide other useful functionalities such as a global
+	  allocator.
