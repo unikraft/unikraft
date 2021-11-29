@@ -1,8 +1,11 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Alexander Jung <a.jung@lancs.ac.uk>
+ *          Marc Rittinghaus <marc.rittinghaus@kit.edu>
  *
  * Copyright (c) 2021, Lancaster University.  All rights reserved.
+ * Copyright (c) 2021, Karlsruhe Institute of Technology (KIT).
+ *                     All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -39,6 +42,7 @@
 #include <uk/config.h>
 #include <uk/essentials.h>
 
+#ifdef CONFIG_LIBUKTEST_LOG_STATS
 /**
  * Test suite, case and assertion statistics
  */
@@ -52,6 +56,67 @@ static struct uk_test_stats testsuite_stats = {0};
 static struct uk_test_stats testcase_stats = {0};
 static struct uk_test_stats testassert_stats = {0};
 
+#include <uk/plat/console.h>
+
+#define UK_TEST_STATS_INIT_CLASS UK_INIT_CLASS_LATE
+#define UK_TEST_STATS_INIT_PRIO  9 /* As late as possible. */
+
+#if CONFIG_LIBUKDEBUG_ANSI_COLOR
+#define UK_TEST_STAT_FAILED	UK_ANSI_MOD_BOLD \
+				UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_RED)
+#else /* CONFIG_LIBUKDEBUG_ANSI_COLOR */
+#define UK_TEST_STAT_FAILED
+#endif /* !CONFIG_LIBUKDEBUG_ANSI_COLOR */
+
+static int
+uk_test_print_stats(void)
+{
+	int failed;
+
+	/*
+	 * Test suites
+	 */
+
+	uk_pr_info("uktest:suites:     ");
+	failed = testsuite_stats.fail;
+	if (failed > 0)
+		uk_pr_info(UK_TEST_STAT_FAILED
+			   "%d failed"
+			   UK_ANSI_MOD_RESET
+			   ", ", failed);
+	uk_pr_info("%d total\n", testsuite_stats.total);
+
+	/*
+	 * Test cases
+	 */
+
+	uk_pr_info("uktest:cases:      ");
+	failed = testcase_stats.fail;
+	if (failed > 0)
+		uk_pr_info(UK_TEST_STAT_FAILED
+			   "%d failed"
+			   UK_ANSI_MOD_RESET
+			   ", ", failed);
+	uk_pr_info("%d total\n", testcase_stats.total);
+
+	/*
+	 * Assertions
+	 */
+
+	uk_pr_info("uktest:assertions: ");
+	failed = testassert_stats.fail;
+	if (failed > 0)
+		uk_pr_info(UK_TEST_STAT_FAILED
+			   "%d failed"
+			   UK_ANSI_MOD_RESET
+			   ", ", failed);
+	uk_pr_info("%d total\n", testassert_stats.total);
+
+	return 0;
+}
+
+uk_late_initcall(uk_test_print_stats);
+#endif /* CONFIG_LIBUKTEST_LOG_STATS */
 
 static void
 _uk_test_compute_assert_stats(struct uk_testcase *esac,
@@ -85,12 +150,16 @@ uk_testsuite_run(struct uk_testsuite *suite)
 {
 	int ret = 0;
 	struct uk_testcase *esac;
+#ifdef CONFIG_LIBUKTEST_LOG_STATS
 	struct uk_test_stats stats;
+#endif /* CONFIG_LIBUKTEST_LOG_STATS */
 
 	UK_ASSERT(suite);
 
+#ifdef CONFIG_LIBUKTEST_LOG_STATS
 	/* Increase the number of recognized test suites. */
 	testsuite_stats.total++;
+#endif /* CONFIG_LIBUKTEST_LOG_STATS */
 
 	if (suite->init) {
 		ret = suite->init(suite);
@@ -103,8 +172,10 @@ uk_testsuite_run(struct uk_testsuite *suite)
 	}
 
 	uk_testsuite_case_foreach(suite, esac) {
+#ifdef CONFIG_LIBUKTEST_LOG_STATS
 		/* Increase the number of recognized test cases. */
 		testcase_stats.total++;
+#endif /* CONFIG_LIBUKTEST_LOG_STATS */
 
 #ifdef CONFIG_LIBUKTEST_LOG_TESTS
 		printf(LVLC_TESTNAME "test:" UK_ANSI_MOD_RESET
@@ -119,6 +190,7 @@ uk_testsuite_run(struct uk_testsuite *suite)
 
 		esac->func(esac);
 
+#ifdef CONFIG_LIBUKTEST_LOG_STATS
 		_uk_test_compute_assert_stats(esac, &stats);
 
 		testassert_stats.total += stats.total;
@@ -131,17 +203,22 @@ uk_testsuite_run(struct uk_testsuite *suite)
 			testcase_stats.success++;
 			testassert_stats.success += stats.success;
 		}
+#endif /* CONFIG_LIBUKTEST_LOG_STATS */
 	}
 
+#ifdef CONFIG_LIBUKTEST_LOG_STATS
 	if (suite->failed_cases > 0)
 		testsuite_stats.fail++;
 	else
 		testsuite_stats.success++;
+#endif /* CONFIG_LIBUKTEST_LOG_STATS */
 
 EXIT:
 	return ret;
 
 ERR_EXIT:
+#ifdef CONFIG_LIBUKTEST_LOG_STATS
 	testsuite_stats.fail++;
+#endif /* CONFIG_LIBUKTEST_LOG_STATS */
 	goto EXIT;
 }
