@@ -8,6 +8,7 @@ if LIBUKTEST
 
 config LIBUKTEST_ALL
 	bool "Enable all tests across all libraries"
+	select LIBUKTEST_TEST_MYSELF
 	default y
 
 config LIBUKTEST_FAILFAST
@@ -22,5 +23,9 @@ config LIBUKTEST_LOG_STATS
 	bool "Log test statistics"
 	default y
 	select LIBUKDEBUG_PRINTK_INFO
+
+config LIBUKTEST_TEST_MYSELF
+	bool "Run self-test to check sanity"
+	default n
 
 endif # LIBUKTEST
