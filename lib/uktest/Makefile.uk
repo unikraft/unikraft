@@ -1,0 +1,6 @@
+$(eval $(call addlib_s,libuktest,$(CONFIG_LIBUKTEST)))
+
+CINCLUDES-$(CONFIG_LIBUKTEST)   += -I$(LIBUKTEST_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBUKTEST) += -I$(LIBUKTEST_BASE)/include
+
+LIBUKTEST_SRCS-y += $(LIBUKTEST_BASE)/test.c
