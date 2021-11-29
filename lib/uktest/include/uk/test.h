@@ -699,4 +699,182 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 
 #define UK_TEST_ASSERT(cond) UK_TEST_EXPECT(cond)
 
+
+/**
+ * Helper macro to compare expression a with expression b of same type.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param cond
+ *   The comparison operator (e.g., ==).
+ * @param b
+ *   The right-hand operand.
+ * @param desc
+ *   A textual description of the comparison.
+ * @param type
+ *   The type of the evaluated expression.
+ * @param fmt
+ *   A printf format specifier to print the expression values.
+ */
+#define _UK_TEST_EXPECT_A_COND_B(a, cond, b, desc, type, fmt)		\
+	do {								\
+		type a_v = (type)(a);					\
+		type b_v = (type)(b);					\
+		int _cond = (a_v cond b_v);				\
+		UK_TEST_ASSERTF(					\
+			_cond,						\
+			"expected `" STRINGIFY(a) "` to " desc		\
+			" " fmt " %s was " fmt,				\
+			b_v, _cond ? "and" : "but", a_v			\
+		);							\
+	} while (0)
+
+
+/**
+ * Expect an expression to be NULL.
+ *
+ * @param exp
+ *   The expression under consideration.
+ */
+#define UK_TEST_EXPECT_NULL(exp)					\
+	_UK_TEST_EXPECT_A_COND_B(exp, ==, NULL, "be", void *, "%p")
+
+
+/**
+ * Expect an expression to not be NULL.
+ *
+ * @param exp
+ *   The expression under consideration.
+ */
+#define UK_TEST_EXPECT_NOT_NULL(exp)					\
+	_UK_TEST_EXPECT_A_COND_B(exp, !=, NULL, "not be", void *, "%p")
+
+
+/**
+ * Expect an expression to evaluate to zero.
+ *
+ * @param exp
+ *   The expression under consideration.
+ */
+#define UK_TEST_EXPECT_ZERO(exp)					\
+	_UK_TEST_EXPECT_A_COND_B(exp, ==, 0, "be", long, "%ld")
+
+
+/**
+ * Expect an expression to not evaluate to zero.
+ *
+ * @param exp
+ *   The expression under consideration.
+ */
+#define UK_TEST_EXPECT_NOT_ZERO(exp)					\
+	_UK_TEST_EXPECT_A_COND_B(exp, !=, 0, "not be", long, "%ld")
+
+
+/**
+ * Expect two pointers to be equal to each other.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_EXPECT_PTR_EQ(a, b)					\
+	_UK_TEST_EXPECT_A_COND_B(a, ==, b, "be", void *, "%p")
+
+
+/**
+ * Expect the contents of two buffers to be equal.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_EXPECT_BYTES_EQ(a, b, size)				\
+	do {								\
+		void *a_p = (void *)(a);				\
+		void *b_p = (void *)(b);				\
+		UK_TEST_ASSERTF(					\
+			memcmp(a_p, b_p, size) == 0,			\
+			"expected `" STRINGIFY(a) "` at %p "		\
+			"to equal `" STRINGIFY(b) "` at %p",		\
+			b_p, a_p					\
+		);							\
+	} while (0)
+
+
+/**
+ * Expect two long integers to be equal to each other.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_EXPECT_SNUM_EQ(a, b)					\
+	_UK_TEST_EXPECT_A_COND_B(a, ==, b, "be", long, "%ld")
+
+
+/**
+ * Expect two long integers to not be equal to each other.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_EXPECT_SNUM_NQ(a, b)					\
+	_UK_TEST_EXPECT_A_COND_B(a, !=, b, "not be", long, "%ld")
+
+
+/**
+ * Expect the left-hand long integer to be greater than the right.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_EXPECT_SNUM_GT(a, b)					\
+	_UK_TEST_EXPECT_A_COND_B(a, >, b, "be greater than", long, "%ld")
+
+
+/**
+ * Expect the left-hand long integer to be greater or equal to the right.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_EXPECT_SNUM_GE(a, b)					\
+	_UK_TEST_EXPECT_A_COND_B(a, >=, b, "be greater than or equal to",\
+				 long, "%ld")
+
+
+/**
+ * Expect the left-hand long integer to be less than the right.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_EXPECT_SNUM_LT(a, b)					\
+	_UK_TEST_EXPECT_A_COND_B(a, <, b, "be less than", long, "%ld")
+
+
+/**
+ * Expect the left-hand long integer to be less than or equal the right.
+ *
+ * @param a
+ *   The left-hand operand.
+ * @param b
+ *   The right-hand operand.
+ */
+#define UK_TEST_EXPECT_SNUM_LE(a, b)					\
+	_UK_TEST_EXPECT_A_COND_B(a, <=, b, "be less than or equal to",	\
+				 long, "%ld")
+
+
 #endif /* __UK_TEST_H__ */
