@@ -74,7 +74,7 @@ With kraft installed, you can download Unikraft components, configure your unike
 
 ## Contributing
 
-Contributions are welcome!  Please see our [Contributing Guide][unikraft-contributing] for more details. A good starting point is the list of [open projects][github-projects].  If one of these interests you or you are interested in finding out more information, please drop us a line via the [mailing list][mailing-list] or directly at <unikraft@listserv.neclab.eu>.
+Contributions are welcome!  Please see our [Contributing Guide][unikraft-contributing] for more details. A good starting point is the list of [open projects][github-projects].  If one of these interests you or you are interested in finding out more information, please drop us a line via the [mailing list][dev-discuss-list] or directly at <dev-discuss@unikraft.org>.
 
 ## Further Resources
 For more information about Unikraft, including user and developer guides, please refer to the [`docs/guides`][unikraft-guides] directory or vist the our [documentation][unikraft-docs].
@@ -97,7 +97,7 @@ Unikraft is licensed under a BSD-3-Clause.  For more information, please refer t
 [github-issues]: https://github.com/unikraft/unikraft/issues
 [github-projects]: https://github.com/unikraft/unikraft/labels/kind/project
 [dockerhub-kraft]: https://hub.docker.com/r/unikraft/kraft
-[mailing-list]: https://lists.xenproject.org/cgi-bin/mailman/listinfo/minios-devel
+[dev-discuss-list]: https://groups.google.com/a/unikraft.org/g/user-discuss
 [unikernel-wikipedia]: https://en.wikipedia.org/wiki/Unikernel
 [arch-x86_64]: https://github.com/unikraft/unikraft/tree/staging/arch/x86/x86_64
 [arch-arm]: https://github.com/unikraft/unikraft/tree/staging/arch/arm/arm
