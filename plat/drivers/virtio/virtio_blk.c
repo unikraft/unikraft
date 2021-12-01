@@ -735,7 +735,6 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 {
 	struct uk_blkdev_cap *cap;
 	__u64 host_features = 0;
-	int bytes_to_read;
 	__sector sectors;
 	__sector ssize;
 	__u16 num_queues;
@@ -748,29 +747,27 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 	host_features = virtio_feature_get(vbdev->vdev);
 
 	/* Get size of device */
-	bytes_to_read = virtio_config_get(vbdev->vdev,
+	rc = virtio_config_get(vbdev->vdev,
 			__offsetof(struct virtio_blk_config, capacity),
 			&sectors,
 			sizeof(sectors),
 			1);
-	if (bytes_to_read != sizeof(sectors))  {
+	if (unlikely(rc)) {
 		uk_pr_err("Failed to get nb of sectors from device %d\n", rc);
-		rc = -EAGAIN;
 		goto exit;
 	}
 
 	if (!virtio_has_features(host_features, VIRTIO_BLK_F_BLK_SIZE)) {
 		ssize = DEFAULT_SECTOR_SIZE;
 	} else {
-		bytes_to_read = virtio_config_get(vbdev->vdev,
+		rc = virtio_config_get(vbdev->vdev,
 				__offsetof(struct virtio_blk_config, blk_size),
 				&ssize,
 				sizeof(ssize),
 				1);
-		if (bytes_to_read != sizeof(ssize))  {
+		if (unlikely(rc)) {
 			uk_pr_err("Failed to get ssize from the device %d\n",
 					rc);
-			rc = -EAGAIN;
 			goto exit;
 		}
 	}
@@ -779,29 +776,27 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 	 * we will use only one queue.
 	 */
 	if (virtio_has_features(host_features, VIRTIO_BLK_F_MQ)) {
-		bytes_to_read = virtio_config_get(vbdev->vdev,
+		rc = virtio_config_get(vbdev->vdev,
 					__offsetof(struct virtio_blk_config,
 							num_queues),
 					&num_queues,
 					sizeof(num_queues),
 					1);
-		if (bytes_to_read != sizeof(num_queues)) {
+		if (unlikely(rc)) {
 			uk_pr_err("Failed to read max-queues\n");
-			rc = -EAGAIN;
 			goto exit;
 		}
 	} else
 		num_queues = 1;
 
 	if (virtio_has_features(host_features, VIRTIO_BLK_F_SEG_MAX)) {
-		bytes_to_read = virtio_config_get(vbdev->vdev,
+		rc = virtio_config_get(vbdev->vdev,
 			__offsetof(struct virtio_blk_config, seg_max),
 			&max_segments,
 			sizeof(max_segments),
 			1);
-		if (bytes_to_read != sizeof(max_segments))  {
+		if (unlikely(rc)) {
 			uk_pr_err("Failed to get maximum nb of segments\n");
-			rc = -EAGAIN;
 			goto exit;
 		}
 	} else
@@ -811,15 +806,14 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 	max_segments += 2;
 
 	if (virtio_has_features(host_features, VIRTIO_BLK_F_SIZE_MAX)) {
-		bytes_to_read = virtio_config_get(vbdev->vdev,
+		rc = virtio_config_get(vbdev->vdev,
 			__offsetof(struct virtio_blk_config, size_max),
 			&max_size_segment,
 			sizeof(max_size_segment),
 			1);
-		if (bytes_to_read != sizeof(max_size_segment))  {
+		if (unlikely(rc)) {
 			uk_pr_err("Failed to get size max from device %d\n",
 					rc);
-			rc = -EAGAIN;
 			goto exit;
 		}
 	} else
