@@ -177,7 +177,10 @@ static int netfront_xmit(struct uk_netdev *n,
 	tx_req->gref = txq->gref[id];
 	tx_req->offset = (uint16_t) uk_netbuf_headroom(pkt);
 	tx_req->size = (uint16_t) pkt->len;
-	tx_req->flags = 0;
+	tx_req->flags  = (pkt->flags & UK_NETBUF_F_PARTIAL_CSUM)
+			 ? NETTXF_csum_blank : 0x0;
+	tx_req->flags |= (pkt->flags & UK_NETBUF_F_DATA_VALID)
+			 ? NETTXF_data_validated : 0x0;
 	tx_req->id = id;
 	status = UK_NETDEV_STATUS_SUCCESS;
 
@@ -294,6 +297,15 @@ static int netfront_rxq_dequeue(struct uk_netdev_rx_queue *rxq,
 		buf->data = (void *)((__uptr) buf->buf + rx_rsp->offset);
 		buf->len = len;
 		UK_ASSERT(IN_RANGE(buf->data, buf->buf, buf->buflen));
+
+		buf->flags |= (rx_rsp->flags & NETTXF_csum_blank)
+			      ? UK_NETBUF_F_PARTIAL_CSUM : 0x0;
+		buf->flags |= (rx_rsp->flags & NETTXF_data_validated)
+			      ? UK_NETBUF_F_DATA_VALID : 0x0;
+
+		/* netfront does not tell us where the checksum is located */
+		buf->csum_start  = 0;
+		buf->csum_offset = 0;
 	}
 
 	*netbuf = buf;
@@ -756,7 +768,7 @@ static void netfront_info_get(struct uk_netdev *n,
 	dev_info->nb_encap_tx = 0;
 	dev_info->nb_encap_rx = 0;
 	dev_info->ioalign = PAGE_SIZE;
-	dev_info->features = UK_NETDEV_F_RXQ_INTR;
+	dev_info->features = UK_NETDEV_F_RXQ_INTR | UK_NETDEV_F_PARTIAL_CSUM;
 }
 
 static const void *netfront_einfo_get(struct uk_netdev *n,
