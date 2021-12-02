@@ -173,9 +173,9 @@ int netfront_xb_init(struct netfront_dev *nfdev, struct uk_alloc *a)
 	} else {
 		uk_pr_debug("\tIP via XenStore: %s\n", ip_str);
 		rc = xs_econf_init(&nfdev->econf, ip_str, a);
+		free(ip_str);
 		if (rc)
 			goto no_conf;
-		free(ip_str);
 	}
 
 	/* maximum queues number */
