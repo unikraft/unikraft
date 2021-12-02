@@ -809,7 +809,28 @@ static unsigned int netfront_promisc_get(struct uk_netdev *n)
 	return nfdev->promisc;
 }
 
+static int netfront_probe(struct uk_netdev *n)
+{
+	struct netfront_dev *nfdev;
+	int rc;
+
+	UK_ASSERT(n != NULL);
+
+	nfdev = to_netfront_dev(n);
+
+	/* Xenbus initialization */
+	rc = netfront_xb_init(nfdev, drv_allocator);
+	if (rc) {
+		uk_pr_err("Error initializing Xenbus data: %d\n", rc);
+		goto out;
+	}
+
+out:
+	return rc;
+}
+
 static const struct uk_netdev_ops netfront_ops = {
+	.probe = netfront_probe,
 	.configure = netfront_configure,
 	.start = netfront_start,
 	.txq_configure = netfront_txq_setup,
@@ -841,15 +862,6 @@ static int netfront_add_dev(struct xenbus_device *xendev)
 	nfdev->xendev = xendev;
 	nfdev->mtu = UK_ETH_PAYLOAD_MAXLEN;
 	nfdev->max_queue_pairs = 1;
-
-	/* Xenbus initialization */
-	rc = netfront_xb_init(nfdev, drv_allocator);
-	if (rc) {
-		uk_pr_err("Error initializing Xenbus data: %d\n", rc);
-		goto err_xenbus;
-	}
-
-	/* register netdev */
 	nfdev->netdev.tx_one = netfront_xmit;
 	nfdev->netdev.rx_one = netfront_recv;
 	nfdev->netdev.ops = &netfront_ops;
@@ -865,8 +877,6 @@ static int netfront_add_dev(struct xenbus_device *xendev)
 out:
 	return rc;
 err_register:
-	netfront_xb_fini(nfdev, drv_allocator);
-err_xenbus:
 	uk_free(drv_allocator, nfdev);
 err_out:
 	goto out;
