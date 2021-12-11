@@ -186,8 +186,7 @@ static int uk_9pfs_open(struct vfscore_file *file)
 
 	fd->fid = openedfid;
 	file->f_data = fd;
- 	UK_9PFS_ND(file->f_dentry->d_vnode)->nb_open_files++;
-
+	UK_9PFS_ND(file->f_dentry->d_vnode)->nb_open_files++;
 	return 0;
 
 out_err:

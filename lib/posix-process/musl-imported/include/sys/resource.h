@@ -45,12 +45,12 @@ struct rusage {
 	long    __reserved[16];
 };
 
-int getrlimit (int, struct rlimit *);
-int setrlimit (int, const struct rlimit *);
-int getrusage (int, struct rusage *);
+int getrlimit(int, struct rlimit *);
+int setrlimit(int, const struct rlimit *);
+int getrusage(int, struct rusage *);
 
-int getpriority (int, id_t);
-int setpriority (int, id_t, int);
+int getpriority(int, id_t);
+int setpriority(int, id_t, int);
 
 #ifdef _GNU_SOURCE
 int prlimit(pid_t, int, const struct rlimit *, struct rlimit *);

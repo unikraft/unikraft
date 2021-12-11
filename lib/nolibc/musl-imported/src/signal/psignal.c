@@ -15,6 +15,6 @@ void psignal(int sig, const char *msg)
 	 * error since fprintf might change it even on success but psignal is
 	 * not permitted to do so. */
 
-	if (fprintf(f, "%s%s%s\n", msg?msg:"", msg?": ":"", s)>=0)
+	if (fprintf(f, "%s%s%s\n", msg?msg:"", msg?": ":"", s) >= 0)
 		errno = old_errno;
 }

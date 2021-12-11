@@ -111,7 +111,7 @@ uk_ring_enqueue(struct uk_ring *br, void *buf)
 	/*
 	 * If there are other enqueues in progress
 	 * that preceded us, we need to wait for them
-	 * to complete 
+	 * to complete
 	 */
 	while (br->br_prod_tail != prod_head)
 		ukarch_spinwait();
@@ -121,7 +121,7 @@ uk_ring_enqueue(struct uk_ring *br, void *buf)
 }
 
 /*
- * multi-consumer safe dequeue 
+ * multi-consumer safe dequeue
  *
  */
 static __inline void *
@@ -161,7 +161,7 @@ uk_ring_dequeue_mc(struct uk_ring *br)
 }
 
 /*
- * single-consumer dequeue 
+ * single-consumer dequeue
  * use where dequeue is protected by a lock
  * e.g. a network driver's tx queue lock
  */
@@ -193,7 +193,7 @@ uk_ring_dequeue_sc(struct uk_ring *br)
 	 * br->br_ring[prod_head] = buf;
 	 * atomic_store_rel_32(&br->br_prod_tail, ...);
 	 *                                                                                prod_tail = br->br_prod_tail;
-	 *                                                                                if (cons_head == prod_tail) 
+	 *                                                                                if (cons_head == prod_tail)
 	 *                                                                                        return (NULL);
 	 *                                                                                <condition is false and code uses invalid(old) buf>`
 	 *

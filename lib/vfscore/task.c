@@ -119,7 +119,7 @@ path_conv(char *wd, const char *cpath, char *full)
 	}
 	*tgt = '\0';
 
-	return (0);
+	return 0;
 }
 
 /*
@@ -136,7 +136,7 @@ task_conv(struct task *t, const char *cpath, int acc __unused, char *full)
 
 	rc = path_conv(t->t_cwd, cpath, full);
 	if (rc != 0) {
-		return (rc);
+		return rc;
 	}
 
 	/* Check if the client task has required permission */

@@ -617,7 +617,7 @@ int uk_libparam_parse(const char *progname, int argc, char **argv)
 			uk_pr_err("Failed to fetch arg between index %d and %d\n",
 				  cnt, (cnt + args_read));
 			uk_pr_err("Skipping Args:");
-			for ( i = cnt; i < cnt + args_read; i++)
+			for (i = cnt; i < cnt + args_read; i++)
 				uk_pr_err(" %s", argv[i]);
 			uk_pr_err("\n");
 			cnt += args_read;

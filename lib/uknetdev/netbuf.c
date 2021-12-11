@@ -158,7 +158,7 @@ struct uk_netbuf *uk_netbuf_prepare_buf(void *mem, size_t size,
 			     mem,
 			     (size_t) ((__uptr) m - (__uptr) mem),
 			     headroom,
-			     privlen > 0 ? (void *) ((__uptr) m+ sizeof(*m))
+			     privlen > 0 ? (void *) ((__uptr) m + sizeof(*m))
 					 : NULL,
 			     dtor);
 	return m;

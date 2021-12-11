@@ -336,7 +336,7 @@ UK_SYSCALL_R_DEFINE(int, setpriority, int, which, id_t, who, int, prio)
 			rc = -ESRCH;
 		}
 		break;
-default:
+	default:
 		rc = -EINVAL;
 		break;
 	}

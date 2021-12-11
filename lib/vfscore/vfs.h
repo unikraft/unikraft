@@ -58,7 +58,7 @@ extern int vfs_debug;
 
 #define VFSDB_FLAGS	0x00000013
 
-#define	DPRINTF(_m,X)	if (vfs_debug & (_m)) uk_pr_debug X
+#define	DPRINTF(_m, X)	if (vfs_debug & (_m)) uk_pr_debug X
 #else
 #define	DPRINTF(_m, X)
 #endif
@@ -78,7 +78,7 @@ int	 sys_read(struct vfscore_file *fp, const struct iovec *iov, size_t niov,
 		off_t offset, size_t *count);
 int	 sys_write(struct vfscore_file *fp, const struct iovec *iov, size_t niov,
 		off_t offset, size_t *count);
-int	 sys_lseek(struct vfscore_file *fp, off_t off, int type, off_t * cur_off);
+int	 sys_lseek(struct vfscore_file *fp, off_t off, int type, off_t *cur_off);
 int	 sys_ioctl(struct vfscore_file *fp, unsigned long request, void *buf);
 int	 sys_fstat(struct vfscore_file *fp, struct stat *st);
 int	 sys_fstatfs(struct vfscore_file *fp, struct statfs *buf);

@@ -71,7 +71,7 @@ open_no_follow_chk(char *path)
 
 	error = lookup(path, &ddp, &name);
 	if (error) {
-		return (error);
+		return error;
 	}
 
 	error = namei_last_nofollow(path, ddp, &dp);
@@ -159,7 +159,7 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 		if (flags & O_NOFOLLOW) {
 			error = open_no_follow_chk(path);
 			if (error != 0) {
-				return (error);
+				return error;
 			}
 		}
 		error = namei(path, &dp);
@@ -179,8 +179,8 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 		}
 		if (flags & O_DIRECTORY) {
 		    if (vp->v_type != VDIR) {
-		        error = ENOTDIR;
-		        goto out_drele;
+				error = ENOTDIR;
+				goto out_drele;
 		    }
 		}
 	}
@@ -729,13 +729,13 @@ sys_rename(char *src, char *dest)
 
 	error = lookup(src, &ddp1, &sname);
 	if (error != 0) {
-		return (error);
+		return error;
 	}
 
 	error = namei_last_nofollow(src, ddp1, &dp1);
 	if (error != 0) {
 		drele(ddp1);
-		return (error);
+		return error;
 	}
 
 	vp1 = dp1->d_vnode;
@@ -871,7 +871,7 @@ sys_symlink(const char *oldpath, const char *newpath)
 	char		*name;
 
 	if (oldpath == NULL || newpath == NULL) {
-		return (EFAULT);
+		return EFAULT;
 	}
 
 	DPRINTF(VFSDB_SYSCALL, ("sys_link: oldpath=%s newpath=%s\n",
@@ -882,7 +882,7 @@ sys_symlink(const char *oldpath, const char *newpath)
 
 	error = task_conv(t, newpath, VWRITE, np);
 	if (error != 0) {
-		return (error);
+		return error;
 	}
 
 	/* parent directory for new path must exist */
@@ -1000,7 +1000,7 @@ sys_unlink(char *path)
 
 	error = lookup(path, &ddp, &name);
 	if (error != 0) {
-		return (error);
+		return error;
 	}
 
 	error = namei_last_nofollow(path, ddp, &dp);
@@ -1103,7 +1103,7 @@ int sys_lstat(char *path, struct stat *st)
 
 	error = lookup(path, &ddp, &name);
 	if (error) {
-		return (error);
+		return error;
 	}
 
 	error = namei_last_nofollow(path, ddp, &dp);
@@ -1223,19 +1223,19 @@ sys_readlink(char *path, char *buf, size_t bufsize, ssize_t *size)
 	*size = 0;
 	error = lookup(path, &ddp, &name);
 	if (error) {
-		return (error);
+		return error;
 	}
 
 	error = namei_last_nofollow(path, ddp, &dp);
 	if (error) {
 		drele(ddp);
-		return (error);
+		return error;
 	}
 
 	if (dp->d_vnode->v_type != VLNK) {
 		drele(dp);
 		drele(ddp);
-		return (EINVAL);
+		return EINVAL;
 	}
 	vec.iov_base	= buf;
 	vec.iov_len	= bufsize;
@@ -1255,11 +1255,11 @@ sys_readlink(char *path, char *buf, size_t bufsize, ssize_t *size)
 	drele(ddp);
 
 	if (error) {
-		return (error);
+		return error;
 	}
 
 	*size = bufsize - uio.uio_resid;
-	return (0);
+	return 0;
 }
 
 /*
@@ -1362,7 +1362,7 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 	struct dentry *dp;
 
 	/* utimensat should return ENOENT when pathname is empty */
-	if(pathname && pathname[0] == 0)
+	if (pathname && pathname[0] == 0)
 		return ENOENT;
 
 	if (flags && !(flags & AT_SYMLINK_NOFOLLOW))

@@ -69,24 +69,24 @@ typedef long uk_syscall_arg_t;
 	UK_CONCAT(uk_syscall_r_fn_, syscall_nr) (__VA_ARGS__)
 
 #define __uk_syscall0(n) __uk_syscall_fn(n)
-#define __uk_syscall1(n,a) __uk_syscall_fn(n,__uk_scc(a))
-#define __uk_syscall2(n,a,b) __uk_syscall_fn(n,__uk_scc(a),__uk_scc(b))
-#define __uk_syscall3(n,a,b,c) __uk_syscall_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c))
-#define __uk_syscall4(n,a,b,c,d) __uk_syscall_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d))
-#define __uk_syscall5(n,a,b,c,d,e) __uk_syscall_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e))
-#define __uk_syscall6(n,a,b,c,d,e,f) __uk_syscall_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e),__uk_scc(f))
-#define __uk_syscall7(n,a,b,c,d,e,f,g) __uk_syscall_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e),__uk_scc(f),__uk_scc(g))
+#define __uk_syscall1(n, a) __uk_syscall_fn(n, __uk_scc(a))
+#define __uk_syscall2(n, a, b) __uk_syscall_fn(n, __uk_scc(a), __uk_scc(b))
+#define __uk_syscall3(n, a, b, c) __uk_syscall_fn(n,__uk_scc(a), __uk_scc(b), __uk_scc(c))
+#define __uk_syscall4(n, a, b, c, d) __uk_syscall_fn(n, __uk_scc(a), __uk_scc(b), __uk_scc(c), __uk_scc(d))
+#define __uk_syscall5(n, a, b, c, d, e) __uk_syscall_fn(n, __uk_scc(a), __uk_scc(b), __uk_scc(c), __uk_scc(d), __uk_scc(e))
+#define __uk_syscall6(n, a, b, c, d, e, f) __uk_syscall_fn(n, __uk_scc(a), __uk_scc(b), __uk_scc(c), __uk_scc(d), __uk_scc(e), __uk_scc(f))
+#define __uk_syscall7(n, a, b, c, d, e, f, g) __uk_syscall_fn(n, __uk_scc(a), __uk_scc(b), __uk_scc(c), __uk_scc(d), __uk_scc(e), __uk_scc(f), __uk_scc(g))
 
 #define __uk_syscall0_r(n) __uk_syscall_r_fn(n)
-#define __uk_syscall1_r(n,a) __uk_syscall_r_fn(n,__uk_scc(a))
-#define __uk_syscall2_r(n,a,b) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b))
-#define __uk_syscall3_r(n,a,b,c) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c))
-#define __uk_syscall4_r(n,a,b,c,d) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d))
-#define __uk_syscall5_r(n,a,b,c,d,e) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e))
-#define __uk_syscall6_r(n,a,b,c,d,e,f) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e),__uk_scc(f))
-#define __uk_syscall7_r(n,a,b,c,d,e,f,g) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e),__uk_scc(f),__uk_scc(g))
+#define __uk_syscall1_r(n, a) __uk_syscall_r_fn(n, __uk_scc(a))
+#define __uk_syscall2_r(n, a, b) __uk_syscall_r_fn(n, __uk_scc(a), __uk_scc(b))
+#define __uk_syscall3_r(n, a, b, c) __uk_syscall_r_fn(n, __uk_scc(a), __uk_scc(b), __uk_scc(c))
+#define __uk_syscall4_r(n, a, b, c, d) __uk_syscall_r_fn(n, __uk_scc(a), __uk_scc(b), __uk_scc(c), __uk_scc(d))
+#define __uk_syscall5_r(n, a, b, c, d, e) __uk_syscall_r_fn(n, __uk_scc(a), __uk_scc(b), __uk_scc(c), __uk_scc(d), __uk_scc(e))
+#define __uk_syscall6_r(n, a, b, c, d, e, f) __uk_syscall_r_fn(n, __uk_scc(a), __uk_scc(b), __uk_scc(c), __uk_scc(d), __uk_scc(e), __uk_scc(f))
+#define __uk_syscall7_r(n, a, b, c, d, e, f, g) __uk_syscall_r_fn(n, __uk_scc(a), __uk_scc(b), __uk_scc(c), __uk_scc(d), __uk_scc(e), __uk_scc(f), __uk_scc(g))
 
-#define __UK_SYSCALL_NARGS_X(a,b,c,d,e,f,g,h,n,...) n
+#define __UK_SYSCALL_NARGS_X(a, b, c, d, e, f, g, h, n, ...) n
 #define __UK_SYSCALL_NARGS(...) __UK_SYSCALL_NARGS_X(__VA_ARGS__,7,6,5,4,3,2,1,0,)
 
 #define __UK_SYSCALL_DEF_NARGS_X(z, a1,a2, b1,b2, c1,c2, d1,d2, e1,e2, f1,f2, g1,g2, nr, ...) nr

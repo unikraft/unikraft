@@ -55,11 +55,11 @@ read_link(struct vnode *vp, char *buf, size_t bufsz, ssize_t *sz)
 	vn_unlock(vp);
 
 	if (rc != 0) {
-		return (rc);
+		return rc;
 	}
 
 	*sz = bufsz - uio.uio_resid;
-	return (0);
+	return 0;
 }
 
 int
@@ -74,7 +74,7 @@ namei_follow_link(struct dentry *dp, char *node, char *name, char *fp, size_t mo
 
 	error = read_link(dp->d_vnode, link, PATH_MAX, &sz);
 	if (error != 0) {
-		return (error);
+		return error;
 	}
 	link[sz] = 0;
 
@@ -93,7 +93,7 @@ namei_follow_link(struct dentry *dp, char *node, char *name, char *fp, size_t mo
 	}
 	node[0] = 0;
 	name[0] = 0;
-	return (0);
+	return 0;
 }
 /*
  * Convert a pathname into a pointer to a dentry
@@ -205,7 +205,7 @@ namei(const char *path, struct dentry **dpp)
 				error = namei_follow_link(dp, node, name, fp, mountpoint_len);
 				if (error) {
 					drele(dp);
-					return (error);
+					return error;
 				}
 
 				drele(dp);
@@ -219,7 +219,7 @@ namei(const char *path, struct dentry **dpp)
 				node[0] = 0;
 
 				if (++links_followed >= MAXSYMLINKS) {
-					return (ELOOP);
+					return ELOOP;
 				}
 				need_continue = 1;
 				break;
@@ -258,18 +258,18 @@ namei_last_nofollow(char *path, struct dentry *ddp, struct dentry **dpp)
 	dvp  = NULL;
 
 	if (path[0] != '/') {
-		return (ENOTDIR);
+		return ENOTDIR;
 	}
 
 	name = strrchr(path, '/');
 	if (name == NULL) {
-		return (ENOENT);
+		return ENOENT;
 	}
 	name++;
 
 	error = vfs_findroot(path, &mp, &p);
 	if (error != 0) {
-		return (ENOTDIR);
+		return ENOTDIR;
 	}
 
 	strlcpy(node, "/", PATH_MAX);
