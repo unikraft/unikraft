@@ -2536,6 +2536,15 @@ sub process {
 			     "A patch subject line should describe the change not the tool that found it\n" . $herecurr);
 		}
 
+# Check git commit message contains invalid git trailers
+		if ($in_header_lines &&
+			(index($line, "Reviewed-by:") != -1 ||
+			index($line, "Approved-by:") != -1 ||
+			index($line, "Github-Pull-Request:") != -1) {
+				ERROR("UNIKRAFT_COMMIT_TRAILER",
+					 "commit messages cannot contain strings that are used as Unikraft controls.\n" . $herecurr);
+			}
+			
 # Check if Unikraft subject format is used on commit message
 		if ($in_header_lines &&
 		    $line =~ /^Subject:[^:]+$/i) {
