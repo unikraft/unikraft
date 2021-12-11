@@ -134,10 +134,10 @@ vn_path(struct vnode *vp)
 	struct dentry *dp;
 
 	if (uk_list_empty(&vp->v_names) == 1) {
-		return (" ");
+		return " ";
 	}
 	dp = uk_list_first_entry(&vp->v_names, struct dentry, d_names_link);
-	return (dp->d_path);
+	return dp->d_path;
 }
 #endif
 

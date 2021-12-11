@@ -15,17 +15,17 @@ struct statvfs {
 	fsfilcnt_t f_files, f_ffree, f_favail;
 #if __BYTE_ORDER == __LITTLE_ENDIAN
 	unsigned long f_fsid;
-	unsigned :8*(2*sizeof(int)-sizeof(long));
+	unsigned:8*(2*sizeof(int)-sizeof(long));
 #else
-	unsigned :8*(2*sizeof(int)-sizeof(long));
+	unsigned:8*(2*sizeof(int)-sizeof(long));
 	unsigned long f_fsid;
 #endif
 	unsigned long f_flag, f_namemax;
 	int __reserved[6];
 };
 
-int statvfs (const char *__restrict, struct statvfs *__restrict);
-int fstatvfs (int, struct statvfs *);
+int statvfs(const char *__restrict, struct statvfs *__restrict);
+int fstatvfs(int, struct statvfs *);
 
 #define ST_RDONLY 1
 #define ST_NOSUID 2

@@ -960,8 +960,7 @@ UK_TRACEPOINT(trace_vfs_readdir, "%d %p", int, struct dirent*);
 UK_TRACEPOINT(trace_vfs_readdir_ret, "");
 UK_TRACEPOINT(trace_vfs_readdir_err, "%d", int);
 
-struct __dirstream
-{
+struct __dirstream {
 	int fd;
 };
 
@@ -1039,14 +1038,14 @@ int scandir(const char *path, struct dirent ***res,
 	int (*cmp)(const struct dirent **, const struct dirent **))
 {
 	DIR *d = opendir(path);
-	struct dirent *de, **names=0, **tmp;
-	size_t cnt=0, len=0;
+	struct dirent *de, **names = 0, **tmp;
+	size_t cnt = 0, len = 0;
 	int old_errno = errno;
 
 	if (!d)
 		return -1;
 
-	while ((errno=0), (de = readdir(d))) {
+	while ((errno = 0), (de = readdir(d))) {
 		if (sel && !sel(de))
 			continue;
 		if (cnt >= len) {
@@ -1068,7 +1067,7 @@ int scandir(const char *path, struct dirent ***res,
 
 	if (errno) {
 		if (names)
-			while (cnt-->0)
+			while (cnt-- > 0)
 				free(names[cnt]);
 		free(names);
 		return -1;
@@ -1757,7 +1756,7 @@ UK_SYSCALL_R_DEFINE(char*, getcwd, char*, path, size_t, size)
 	if (!path) {
 		if (!size)
 			size = len;
-		path = (char*)malloc(size);
+		path = (char *)malloc(size);
 		if (!path) {
 			error = ENOMEM;
 			goto out_error;
@@ -1867,7 +1866,7 @@ UK_SYSCALL_R_DEFINE(int, dup3, int, oldfd, int, newfd, int, flags)
 
 	out_error:
 	trace_vfs_dup3_err(error);
-	if(error > 0)
+	if (error > 0)
 		return -error;
 	return error;
 }
@@ -2070,7 +2069,7 @@ int euidaccess(const char *pathname, int mode)
 	return access(pathname, mode);
 }
 
-__weak_alias(euidaccess,eaccess);
+__weak_alias(euidaccess, eaccess);
 
 #if 0
 /*
@@ -2260,7 +2259,7 @@ UK_SYSCALL_DEFINE(int, futimesat, int, dirfd, const char*, pathname, const struc
 			goto out_errno;
 		}
 
-		if (!S_ISDIR(st.st_mode)){
+		if (!S_ISDIR(st.st_mode)) {
 			error = ENOTDIR;
 			goto out_errno;
 		}
@@ -2271,7 +2270,7 @@ UK_SYSCALL_DEFINE(int, futimesat, int, dirfd, const char*, pathname, const struc
 		goto out_errno;
 
 	/* build absolute path */
-	absolute_path = (char*)malloc(PATH_MAX);
+	absolute_path = (char *)malloc(PATH_MAX);
 	if (!absolute_path) {
 		fdrop(fp);
 		error = EFAULT;
@@ -2527,7 +2526,7 @@ ssize_t sendfile(int out_fd, int in_fd, off_t *_offset, size_t count)
 
 	if (ret < 0) {
 		return libc_error(errno);
-	} else if(_offset == nullptr) {
+	} else if (_offset == nullptr) {
 		lseek(in_fd, ret, SEEK_CUR);
 	} else {
 		*_offset += ret;

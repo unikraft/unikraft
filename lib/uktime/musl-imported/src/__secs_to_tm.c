@@ -30,7 +30,8 @@ int __secs_to_tm(long long t, struct tm *tm)
 	}
 
 	wday = (3+days)%7;
-	if (wday < 0) wday += 7;
+	if (wday < 0)
+		wday += 7;
 
 	qc_cycles = days / DAYS_PER_400Y;
 	remdays = days % DAYS_PER_400Y;

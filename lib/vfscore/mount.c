@@ -322,7 +322,7 @@ sys_pivot_root(const char *new_root, const char *put_old)
 	int error;
 
 	WITH_LOCK(mount_lock) {
-		for (auto&& mp : mount_list) {
+		for (auto && mp : mount_list) {
 			if (!strcmp(mp->m_path, new_root)) {
 				newmp = mp;
 			}
@@ -333,7 +333,7 @@ sys_pivot_root(const char *new_root, const char *put_old)
 		if (!newmp || !oldmp || newmp == oldmp) {
 			return EINVAL;
 		}
-		for (auto&& mp : mount_list) {
+		for (auto && mp : mount_list) {
 			if (mp == newmp || mp == oldmp) {
 				continue;
 			}

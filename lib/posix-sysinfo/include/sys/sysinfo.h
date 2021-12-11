@@ -49,11 +49,11 @@ struct sysinfo {
 	char __reserved[256];
 };
 
-int sysinfo (struct sysinfo *);
-int get_nprocs_conf (void);
-int get_nprocs (void);
-long get_phys_pages (void);
-long get_avphys_pages (void);
+int sysinfo(struct sysinfo *);
+int get_nprocs_conf(void);
+int get_nprocs(void);
+long get_phys_pages(void);
+long get_avphys_pages(void);
 
 #ifdef __cplusplus
 }

@@ -175,7 +175,7 @@ int fdt_begin_node(void *fdt, const char *name)
 	FDT_SW_CHECK_HEADER(fdt);
 
 	nh = _fdt_grab_space(fdt, sizeof(*nh) + FDT_TAGALIGN(namelen));
-	if (! nh)
+	if (!nh)
 		return -FDT_ERR_NOSPACE;
 
 	nh->tag = cpu_to_fdt32(FDT_BEGIN_NODE);
@@ -190,7 +190,7 @@ int fdt_end_node(void *fdt)
 	FDT_SW_CHECK_HEADER(fdt);
 
 	en = _fdt_grab_space(fdt, FDT_TAGSIZE);
-	if (! en)
+	if (!en)
 		return -FDT_ERR_NOSPACE;
 
 	*en = cpu_to_fdt32(FDT_END_NODE);
@@ -232,7 +232,7 @@ int fdt_property_placeholder(void *fdt, const char *name, int len, void **valp)
 		return -FDT_ERR_NOSPACE;
 
 	prop = _fdt_grab_space(fdt, sizeof(*prop) + FDT_TAGALIGN(len));
-	if (! prop)
+	if (!prop)
 		return -FDT_ERR_NOSPACE;
 
 	prop->tag = cpu_to_fdt32(FDT_PROP);
@@ -266,7 +266,7 @@ int fdt_finish(void *fdt)
 
 	/* Add terminator */
 	end = _fdt_grab_space(fdt, sizeof(*end));
-	if (! end)
+	if (!end)
 		return -FDT_ERR_NOSPACE;
 	*end = cpu_to_fdt32(FDT_END);
 

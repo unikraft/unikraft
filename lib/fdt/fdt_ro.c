@@ -177,7 +177,8 @@ int fdt_subnode_offset_namelen(const void *fdt, int offset,
 int fdt_subnode_offset(const void *fdt, int parentoffset,
 		       const char *name)
 {
-	return fdt_subnode_offset_namelen(fdt, parentoffset, name, strlen(name));
+	return fdt_subnode_offset_namelen(fdt, parentoffset, name,
+	strlen(name));
 }
 
 int fdt_path_offset_namelen(const void *fdt, const char *path, int namelen)
@@ -212,7 +213,7 @@ int fdt_path_offset_namelen(const void *fdt, const char *path, int namelen)
 				return offset;
 		}
 		q = memchr(p, '/', end - p);
-		if (! q)
+		if (!q)
 			q = end;
 
 		offset = fdt_subnode_offset_namelen(fdt, offset, p, q-p);
@@ -234,7 +235,6 @@ const char *fdt_get_name(const void *fdt, int nodeoffset, int *len)
 {
 	const struct fdt_node_header *nh = _fdt_offset_ptr(fdt, nodeoffset);
 	int err;
-
 	if (((err = fdt_check_header(fdt)) != 0)
 	    || ((err = _fdt_check_node_offset(fdt, nodeoffset)) < 0))
 			goto fail;
@@ -422,7 +422,6 @@ int fdt_get_path(const void *fdt, int nodeoffset, char *buf, int buflen)
 		if (offset == nodeoffset) {
 			if (pdepth < (depth + 1))
 				return -FDT_ERR_NOSPACE;
-
 			if (p > 1) /* special case so that root path is "/", not "" */
 				p--;
 			buf[p] = '\0';
