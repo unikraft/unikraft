@@ -71,7 +71,7 @@ typedef long uk_syscall_arg_t;
 #define __uk_syscall0(n) __uk_syscall_fn(n)
 #define __uk_syscall1(n, a) __uk_syscall_fn(n, __uk_scc(a))
 #define __uk_syscall2(n, a, b) __uk_syscall_fn(n, __uk_scc(a), __uk_scc(b))
-#define __uk_syscall3(n, a, b, c) __uk_syscall_fn(n,__uk_scc(a), __uk_scc(b), __uk_scc(c))
+#define __uk_syscall3(n, a, b, c) __uk_syscall_fn(n, __uk_scc(a), __uk_scc(b), __uk_scc(c))
 #define __uk_syscall4(n, a, b, c, d) __uk_syscall_fn(n, __uk_scc(a), __uk_scc(b), __uk_scc(c), __uk_scc(d))
 #define __uk_syscall5(n, a, b, c, d, e) __uk_syscall_fn(n, __uk_scc(a), __uk_scc(b), __uk_scc(c), __uk_scc(d), __uk_scc(e))
 #define __uk_syscall6(n, a, b, c, d, e, f) __uk_syscall_fn(n, __uk_scc(a), __uk_scc(b), __uk_scc(c), __uk_scc(d), __uk_scc(e), __uk_scc(f))

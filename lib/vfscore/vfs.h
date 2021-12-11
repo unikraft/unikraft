@@ -58,6 +58,7 @@ extern int vfs_debug;
 
 #define VFSDB_FLAGS	0x00000013
 
+/* Checkpatch-WarnOnly: MACRO STARTING WITH IF */
 #define	DPRINTF(_m, X)	if (vfs_debug & (_m)) uk_pr_debug X
 #else
 #define	DPRINTF(_m, X)
