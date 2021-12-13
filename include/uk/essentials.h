@@ -219,6 +219,13 @@ extern "C" {
 	(((val) >= (base)) && ((val) < (base) + (len)))
 
 /**
+ * Tests if range 0 is equal to range 1
+ */
+#define RANGE_ISEQUAL(base0, len0, base1, len1)		\
+	(((base0) == (base1))				\
+	 && (len0) == (len1))
+
+/**
  * Tests if range 0 contains range 1
  * This is the case when both of the following conditions are true:
  *  - The start of range 1 is within range 0
