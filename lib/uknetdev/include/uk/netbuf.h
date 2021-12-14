@@ -483,6 +483,42 @@ void uk_netbuf_free(struct uk_netbuf *m);
 void uk_netbuf_free_single(struct uk_netbuf *m);
 
 /**
+ * Allocate a duplicate of a src netbuf. The data buffer area is copied
+ * into the new netbuf.
+ * Metadata (struct uknetbuf, priv) is placed at the end of the according
+ * allocation.
+ * @param a
+ *   Allocator to be used for allocating `struct uk_netbuf` and the
+ *   corresponding buffer area (single allocation).
+ *   On uk_netbuf_free() and refcount == 0 the allocation is free'd
+ *   to this allocator.
+ * @param buflen
+ *   Size of the buffer area
+ * @param bufalign
+ *   Alignment for the buffer area (`m->buf` will be aligned to it)
+ * @param headroom
+ *   Number of bytes reserved as headroom from the buffer area.
+ *   `headroom` has to be smaller or equal to `buflen`.
+ *   Please note that `m->data` is aligned when `headroom` is 0.
+ *   In order to keep this property when a headroom is used,
+ *   it is recommended to align up the required headroom.
+ * @param privlen
+ *   Length for reserved memory to store private data. This memory is free'd
+ *   together with this netbuf. If privlen is 0, either no private data is
+ *   required or external meta data corresponds to this netbuf. m->priv can be
+ *   modified after the allocation.
+ * @param dtor
+ *   Destructor that is called when netbuf is free'd (optional)
+ * @returns
+ *   - (NULL): Allocation failed
+ *   - initialized uk_netbuf
+ */
+struct uk_netbuf *uk_netbuf_dup_single(struct uk_alloc *a, size_t buflen,
+				       size_t bufalign, uint16_t headroom,
+				       size_t privlen, uk_netbuf_dtor_t dtor,
+				       const struct uk_netbuf *src);
+
+/**
  * Calculates the current available headroom bytes of a netbuf
  * @param m
  *   uk_netbuf to return headroom bytes of

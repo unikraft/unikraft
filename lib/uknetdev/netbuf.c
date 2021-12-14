@@ -32,6 +32,7 @@
 #include <uk/netbuf.h>
 #include <uk/essentials.h>
 #include <uk/print.h>
+#include <string.h>
 
 /* Used to align netbuf's priv and data areas to `long long` data type */
 #define NETBUF_ADDR_ALIGNMENT (sizeof(long long))
@@ -262,4 +263,29 @@ void uk_netbuf_free(struct uk_netbuf *m)
 		uk_netbuf_free_single(m);
 		m = n;
 	}
+}
+
+struct uk_netbuf *uk_netbuf_dup_single(struct uk_alloc *a, size_t buflen,
+				       size_t bufalign, uint16_t headroom,
+				       size_t privlen, uk_netbuf_dtor_t dtor,
+				       const struct uk_netbuf *src)
+{
+	struct uk_netbuf *nb;
+
+	UK_ASSERT(src);
+
+	if (unlikely((size_t) src->len + headroom > buflen))
+		return NULL; /* buffer would be too small to hold everything */
+
+	nb = uk_netbuf_alloc_buf(a, buflen, bufalign, headroom, privlen, dtor);
+	if (unlikely(!nb))
+		return NULL;
+
+	memcpy(nb->data, src->data, src->len);
+	nb->len = src->len;
+	nb->flags = src->flags;
+	nb->csum_start = src->csum_start;
+	nb->csum_offset = src->csum_offset;
+
+	return nb;
 }
