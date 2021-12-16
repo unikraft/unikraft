@@ -66,6 +66,11 @@ static inline int pci_device_id_match(const struct pci_device_id *id0,
 	    (id0->class_id != id1->class_id)) {
 		return 0;
 	}
+	if ((id0->sub_class_id != PCI_CLASS_ANY_ID) &&
+	    (id1->sub_class_id != PCI_CLASS_ANY_ID) &&
+	    (id0->sub_class_id != id1->sub_class_id)) {
+		return 0;
+	}
 	if ((id0->vendor_id != PCI_ANY_ID) &&
 	    (id1->vendor_id != PCI_ANY_ID) &&
 	    (id0->vendor_id != id1->vendor_id)) {
@@ -92,6 +97,7 @@ static inline int pci_device_id_match(const struct pci_device_id *id0,
 static inline int pci_device_id_is_any(const struct pci_device_id *id)
 {
 	if ((id->class_id == PCI_CLASS_ANY_ID) &&
+	    (id->sub_class_id == PCI_CLASS_ANY_ID) &&
 	    (id->vendor_id == PCI_ANY_ID) &&
 	    (id->device_id == PCI_ANY_ID) &&
 	    (id->subsystem_vendor_id == PCI_ANY_ID) &&
