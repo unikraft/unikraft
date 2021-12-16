@@ -78,6 +78,8 @@
 struct pci_device_id {
 	/**< Class ID or PCI_CLASS_ANY_ID. */
 	uint32_t class_id;
+	/**< Sub class ID or PCI_CLASS_ANY_ID. */
+	uint32_t sub_class_id;
 	/**< Vendor ID or PCI_ANY_ID. */
 	uint16_t vendor_id;
 	/**< Device ID or PCI_ANY_ID. */
@@ -98,6 +100,7 @@ struct pci_device_id {
  */
 #define PCI_DEVICE_ID(vend, dev)           \
 	.class_id = PCI_CLASS_ANY_ID,      \
+	.sub_class_id = PCI_CLASS_ANY_ID,  \
 	.vendor_id = (vend),               \
 	.device_id = (dev),                \
 	.subsystem_vendor_id = PCI_ANY_ID, \
@@ -105,6 +108,7 @@ struct pci_device_id {
 
 #define PCI_ANY_DEVICE_ID                  \
 	.class_id = PCI_CLASS_ANY_ID,      \
+	.sub_class_id = PCI_CLASS_ANY_ID,  \
 	.vendor_id = PCI_ANY_ID,           \
 	.device_id = PCI_ANY_ID,           \
 	.subsystem_vendor_id = PCI_ANY_ID, \

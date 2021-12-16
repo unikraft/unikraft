@@ -115,7 +115,7 @@ static void probe_bus(uint32_t);
  */
 static int probe_function(uint32_t bus, uint32_t device, uint32_t function)
 {
-	uint32_t config_addr, config_data, subclass, secondary_bus;
+	uint32_t config_addr, config_data, secondary_bus;
 	struct pci_address addr;
 	struct pci_device_id devid;
 	struct pci_driver *drv;
@@ -144,7 +144,7 @@ static int probe_function(uint32_t bus, uint32_t device, uint32_t function)
 	 */
 	PCI_CONF_READ(uint32_t, &devid.class_id,
 			config_addr, CLASS_ID);
-	PCI_CONF_READ(uint32_t, &subclass,
+	PCI_CONF_READ(uint32_t, &devid.sub_class_id,
 			config_addr, SUBCLASS_ID);
 	PCI_CONF_READ(uint16_t, &devid.vendor_id,
 			config_addr, VENDOR_ID);
@@ -172,7 +172,7 @@ static int probe_function(uint32_t bus, uint32_t device, uint32_t function)
 	}
 
 	/* 0x06 = Bridge Device, 0x04 = PCI-to-PCI bridge */
-	if ((devid.class_id == 0x06) && (subclass == 0x04)) {
+	if ((devid.class_id == 0x06) && (devid.sub_class_id == 0x04)) {
 		PCI_CONF_READ(uint32_t, &secondary_bus,
 				config_addr, SECONDARY_BUS);
 		probe_bus(secondary_bus);
