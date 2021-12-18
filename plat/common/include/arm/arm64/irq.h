@@ -32,6 +32,8 @@
 #ifndef __PLAT_CMN_ARM64_IRQ_H__
 #define __PLAT_CMN_ARM64_IRQ_H__
 
+#include <uk/arch/types.h>
+
 /*
  * SPSR_EL1, Saved Program Status Register
  * When the exception is taken in AArch64:
@@ -89,7 +91,7 @@
 
 static inline int irqs_disabled(void)
 {
-	uint64_t flags;
+	__u64 flags;
 	__save_flags(flags);
 	return (flags & PSR_I);
 }
