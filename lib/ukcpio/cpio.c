@@ -229,7 +229,7 @@ read_section(struct cpio_header **header_ptr,
 		goto out;
 	}
 
-	if (IS_FILE(header_mode) && header_filesize != 0) {
+	if (IS_FILE(header_mode)) {
 		uk_pr_info("Extracting %s (%"PRIu32" bytes)\n",
 			   path_from_root, header_filesize);
 		fd = open(path_from_root, O_CREAT | O_RDWR);
