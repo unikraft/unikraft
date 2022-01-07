@@ -107,6 +107,8 @@ int uk_sched_set_default(struct uk_sched *s)
 			prev->next = this->next;
 			this->next = head->next;
 			head = this;
+			// Update the default scheduler to head
+			uk_sched_head = head;
 			return 0;
 		}
 	}
