@@ -1,6 +1,7 @@
 menuconfig LIBUKSP
 	bool "uksp: Stack protector"
 	select HAVE_STACKPROTECTOR
+	depends on (ARCH_ARM_64 || ARCH_X86_64)
 	default n
 
 if LIBUKSP
