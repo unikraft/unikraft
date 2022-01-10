@@ -36,7 +36,7 @@
 
 #include <uk/arch/atomic.h>
 
-struct __spinlock {
+struct __align(8) __spinlock {
 	volatile int lock;
 };
 
