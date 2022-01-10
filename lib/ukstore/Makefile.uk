@@ -1,0 +1,33 @@
+$(eval $(call addlib_s,libukstore,$(CONFIG_LIBUKSTORE)))
+
+$(call mk_sub_libbuild_dir,libukstore,include/uk/bits)
+
+LIBUKSTORE_GEN_INCLUDES_PATH := $(call sub_libbuild_dir,libukstore,include)
+
+CINCLUDES-y                    += -I$(LIBUKSTORE_BASE)/include
+CINCLUDES-$(CONFIG_LIBUKSTORE) += -I$(LIBUKSTORE_GEN_INCLUDES_PATH)
+CXXINCLUDES-y                    += -I$(LIBUKSTORE_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBUKSTORE) += -I$(LIBUKSTORE_GEN_INCLUDES_PATH)
+
+LIBUKSTORE_PHONY_SRC     := $(LIBUKSTORE_BUILD)/uk_libs.in
+LIBUKSTORE_PHONY_SRC_NEW := $(addsuffix .new, $(LIBUKSTORE_PHONY_SRC))
+
+UK_PREPROCESS-$(CONFIG_LIBUKSTORE) += $(LIBUKSTORE_PHONY_SRC)
+
+$(LIBUKSTORE_PHONY_SRC): %: %.new
+	@cmp -s $^ $@; if [ $$? -ne 0 ]; then cp $^ $@; fi
+
+$(LIBUKSTORE_BUILD)/uk_libs.in.new:
+	$(call build_cmd,GEN,libukstore,$(notdir $@), \
+		echo $(foreach P,$(UK_PLATS) $(UK_PLATS-y),\
+		     $(if $(call qstrip,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y)),\
+		     $(foreach L,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y), \
+		     $(if $(call qstrip,$($(call vprefix_lib,$(L),SRCS)) $($(call vprefix_lib,$(L),SRCS-y))), \
+		     $(L) \
+		     )))) \
+		     $(UK_LIBS) $(UK_LIBS-y) \
+		| tr ' ' '\n' > $@)
+
+LIBUKSTORE_SRCS-y += $(LIBUKSTORE_BASE)/store.c
+
+LIBUKSTORE_CLEAN = $(LIBUKSTORE_PHONY_SRC) $(LIBUKSTORE_PHONY_SRC_NEW)
