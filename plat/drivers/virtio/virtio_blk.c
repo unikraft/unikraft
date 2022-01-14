@@ -102,10 +102,16 @@ struct uk_blkdev_queue {
 	/* The scatter list and its associated fragments */
 	struct uk_sglist sg;
 	struct uk_sglist_seg *sgsegs;
+	/* List of virtio_blkdev_requests to be freed outside of interrupt
+	 * handler
+	 */
+	/* TODO: Replace with Linux llist-style list for SMP support */
+	struct uk_list_head free_list;
 };
 
 struct virtio_blkdev_request {
 	struct uk_blkreq *req;
+	struct uk_list_head free_list_head;
 	struct virtio_blk_outhdr virtio_blk_outhdr;
 	uint8_t status;
 };
@@ -256,6 +262,27 @@ out:
 	return rc;
 }
 
+static void virtio_blkdev_queue_cleanup_requests(struct uk_blkdev_queue *queue)
+{
+	struct virtio_blkdev_request *request, *request_tmp;
+
+	UK_LIST_HEAD(list);
+
+	/* Move all entries to local list, while ensuring no interrupt fiddles
+	 * with the list pointers.
+	 */
+	ukplat_lcpu_disable_irq();
+	uk_list_splice_init(&queue->free_list, &list);
+	ukplat_lcpu_enable_irq();
+
+	/* Free all old requests */
+	uk_list_for_each_entry_safe(request, request_tmp, &list,
+				    free_list_head) {
+		uk_list_del(&request->free_list_head);
+		uk_free(a, request);
+	}
+}
+
 static int virtio_blkdev_queue_enqueue(struct uk_blkdev_queue *queue,
 		struct uk_blkreq *req)
 {
@@ -271,6 +298,8 @@ static int virtio_blkdev_queue_enqueue(struct uk_blkdev_queue *queue,
 		uk_pr_debug("The virtqueue is full\n");
 		return -ENOSPC;
 	}
+
+	virtio_blkdev_queue_cleanup_requests(queue);
 
 	virtio_blk_req = uk_malloc(a, sizeof(*virtio_blk_req));
 	if (!virtio_blk_req)
@@ -365,7 +394,7 @@ static int virtio_blkdev_queue_dequeue(struct uk_blkdev_queue *queue,
 	(*req)->result = -response_req->status;
 
 out:
-	uk_free(a, response_req);
+	uk_list_add(&response_req->free_list_head, &queue->free_list);
 	return ret;
 }
 
@@ -537,6 +566,7 @@ static struct uk_blkdev_queue *virtio_blkdev_queue_setup(struct uk_blkdev *dev,
 	queue->vbd = vbdev;
 	queue->nb_desc = nb_desc;
 	queue->lqueue_id = queue_id;
+	UK_INIT_LIST_HEAD(&queue->free_list);
 
 	/* Setup the virtqueue with the descriptor */
 	rc = virtio_blkdev_vqueue_setup(queue, nb_desc);
@@ -564,6 +594,7 @@ static int virtio_blkdev_queue_release(struct uk_blkdev *dev,
 	UK_ASSERT(dev != NULL);
 	vbdev = to_virtioblkdev(dev);
 
+	virtio_blkdev_queue_cleanup_requests(queue);
 	uk_free(queue->a, queue->sgsegs);
 	virtio_vqueue_release(vbdev->vdev, queue->vq, queue->a);
 
