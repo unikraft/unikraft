@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 OPT_BASENAME=`basename $0`
 OPT_STRING="a:e:ho:p:"
