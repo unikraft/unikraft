@@ -34,10 +34,12 @@
 #include <sys/random.h>
 #include <uk/essentials.h>
 #include <uk/swrand.h>
+#include <uk/syscall.h>
 
-
-ssize_t getrandom(void *buf, size_t buflen, unsigned int flags __unused)
-{	
+UK_SYSCALL_R_DEFINE(ssize_t, getrandom,
+		    void *, buf, size_t, buflen,
+		    unsigned int, flags)
+{
 	#ifdef CONFIG_LIBUKSWRAND_PSEUDO_RANDOMNESS
 		return uk_swrand_fill_buffer(buf, buflen);
 	#endif

@@ -39,7 +39,7 @@ int has_intel_cpu() {
 }
 
 int has_RDRAND() {    
-    if (!(has_amd_cpu() || has_amd_cpu()))
+    if (!(has_amd_cpu() || has_intel_cpu()))
         return 0;
 
     struct CPUIDinfo info;
