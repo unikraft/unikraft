@@ -28,8 +28,6 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 
 #ifndef __UK_SWRAND__
@@ -44,6 +42,8 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+#define UK_SWRAND_CTOR_PRIO	1
 
 struct uk_swrand;
 
@@ -70,6 +70,8 @@ static inline __u32 uk_swrand_randr(void)
 }
 
 ssize_t uk_swrand_fill_buffer(void *buf, size_t buflen);
+ssize_t RDRAND_bytes(unsigned char* buffer, size_t buflen);
+
 
 #ifdef __cplusplus
 }
