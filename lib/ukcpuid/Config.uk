@@ -1,0 +1,4 @@
+config LIBUKCPUID
+	bool "ukcpuid: CPUID information extraction"
+	select LIBNOLIBC if !HAVE_LIBC
+	default n

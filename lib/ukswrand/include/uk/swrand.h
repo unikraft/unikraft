@@ -70,6 +70,8 @@ static inline __u32 uk_swrand_randr(void)
 }
 
 ssize_t uk_swrand_fill_buffer(void *buf, size_t buflen);
+ssize_t RDRAND_bytes(unsigned char *buffer, size_t buflen);
+
 
 #ifdef __cplusplus
 }

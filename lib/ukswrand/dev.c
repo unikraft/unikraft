@@ -53,7 +53,13 @@ int dev_random_read(struct device *dev __unused, struct uio *uio,
 	buf = uio->uio_iov->iov_base;
 	count = uio->uio_iov->iov_len;
 
-	uk_swrand_fill_buffer(buf, count);
+	#ifdef CONFIG_LIBUKSWRAND_PSEUDO_RANDOMNESS
+		uk_swrand_fill_buffer(buf, count);
+	#endif
+
+	#ifdef CONFIG_LIBUKSWRAND_TRUE_RANDOMNESS
+		RDRAND_bytes(buf, count);
+	#endif
 
 	uio->uio_resid = 0;
 	return 0;
