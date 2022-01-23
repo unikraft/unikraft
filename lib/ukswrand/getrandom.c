@@ -35,7 +35,6 @@
 #include <uk/essentials.h>
 #include <uk/swrand.h>
 #include <uk/syscall.h>
-#include <stdio.h>
 
 UK_SYSCALL_R_DEFINE(ssize_t, getrandom,
 		    void *, buf, size_t, buflen,
@@ -46,7 +45,6 @@ UK_SYSCALL_R_DEFINE(ssize_t, getrandom,
 	#endif
 
 	#ifdef CONFIG_LIBUKSWRAND_TRUE_RANDOMNESS
-		printf("da \n");
 		return RDRAND_bytes(buf, buflen);
 	#endif
 
