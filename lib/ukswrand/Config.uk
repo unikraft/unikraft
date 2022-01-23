@@ -4,6 +4,23 @@ menuconfig LIBUKSWRAND
 	default n
 
 if LIBUKSWRAND
+
+choice
+	prompt "Support"
+	default LIBUKSWRAND_PSEUDO_RANDOMNESS
+
+config LIBUKSWRAND_PSEUDO_RANDOMNESS
+	bool "PRNG"
+	help
+		"Pseudo random number generator support"
+
+config LIBUKSWRAND_TRUE_RANDOMNESS
+	depends on ARCH_X86_64
+	bool "TRNG (RDRAND)"
+	help
+		"True random number generator support based on RDRAND instruction"
+endchoice
+
 choice
 	prompt "Algorithm"
 	default LIBUKSWRAND_CHACHA

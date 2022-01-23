@@ -26,16 +26,12 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
- *
- * THIS HEADER MAY NOT BE EXTRACTED OR MODIFIED IN ANY WAY.
  */
 #include <string.h>
 #include <uk/swrand.h>
-#include <uk/ctors.h>
 #include <uk/config.h>
 #include <uk/print.h>
-
-#define UK_SWRAND_CTOR_PRIO    1
+#include <uk/init.h>
 
 __u32 uk_swrandr_gen_seed32(void)
 {
@@ -77,7 +73,7 @@ ssize_t uk_swrand_fill_buffer(void *buf, size_t buflen)
 	return buflen;
 }
 
-static void _uk_swrand_ctor(void)
+static int _uk_swrand_init(void)
 {
 	unsigned int i;
 #ifdef CONFIG_LIBUKSWRAND_CHACHA
@@ -93,6 +89,8 @@ static void _uk_swrand_ctor(void)
 		seedv[i] = uk_swrandr_gen_seed32();
 
 	uk_swrand_init_r(&uk_swrand_def, seedc, seedv);
+
+	return seedc;
 }
 
-UK_CTOR_PRIO(_uk_swrand_ctor, UK_SWRAND_CTOR_PRIO);
+uk_early_initcall(_uk_swrand_init);

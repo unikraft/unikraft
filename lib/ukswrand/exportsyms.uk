@@ -3,3 +3,4 @@ uk_swrand_def
 uk_swrand_init_r
 uk_swrand_randr_r
 uk_swrandr_gen_seed32
+uk_swrand_fill_buffer
