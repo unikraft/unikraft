@@ -16,6 +16,14 @@ because these tools ensure the correct formatting of your
 patches. E-Mail clients often do some sophisticated reformatting of
 the e-mail body which usually break your patches.
 
+You may also submit pull requests on GitHub. In order to run checkpatch before
+pushing to GitHub, you can run:
+
+```
+git format-patch staging
+./support/scripts/checkpatch.pl ./*.patch
+```
+
 Make sure that you tested your changes on various setups before
 sending us the patch. Try several different configuration options (in particular
 multiple architectures and platforms) and library combinations. During
