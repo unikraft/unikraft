@@ -36,6 +36,7 @@
 #include <uk/alloc.h>
 #include <string.h>
 #include <uk/syscall.h>
+#include <uk/page.h>
 
 struct mmap_addr {
 	void *begin;
@@ -93,19 +94,23 @@ UK_SYSCALL_DEFINE(void*, mmap, void*, addr, size_t, len, int, prot,
 		last = tmp;
 		tmp = tmp->next;
 	}
-	void *mem = uk_malloc(uk_alloc_get_default(), len);
 
+	void *mem = uk_memalign(uk_alloc_get_default(), __PAGE_SIZE, len);
 	if (!mem) {
 		errno = ENOMEM;
 		return (void *) -1;
 	}
-	new = uk_malloc(uk_alloc_get_default(), sizeof(struct mmap_addr));
 
+	new = uk_malloc(uk_alloc_get_default(), sizeof(struct mmap_addr));
 	if (!new) {
 		uk_free(uk_alloc_get_default(), mem);
 		errno = ENOMEM;
 		return (void *) -1;
 	}
+
+	/* The caller expects the memory to be zeroed */
+	memset(mem, 0, len);
+
 	new->begin = mem;
 	new->end = mem + len;
 	new->next = NULL;
