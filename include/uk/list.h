@@ -137,6 +137,9 @@ uk_list_del_init(struct uk_list_head *entry)
 #define	uk_list_first_entry_or_null(ptr, type, member) \
 	(!uk_list_empty(ptr) ? uk_list_first_entry(ptr, type, member) : NULL)
 
+#define	uk_list_last_entry_or_null(ptr, type, member)			\
+	(!uk_list_empty(ptr) ? uk_list_last_entry(ptr, type, member) : NULL)
+
 #define	uk_list_next_entry(ptr, member)					\
 	uk_list_entry(((ptr)->member.next), typeof(*(ptr)), member)
 
