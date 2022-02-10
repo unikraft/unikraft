@@ -189,3 +189,9 @@ UK_SYSCALL_R_DEFINE(int, madvise, void*, addr, size_t, length, int, advice)
 	WARN_STUBBED();
 	return 0;
 }
+
+UK_SYSCALL_R_DEFINE(int, mprotect, void*, addr, size_t, len, int, prot)
+{
+	WARN_STUBBED();
+	return 0;
+}
