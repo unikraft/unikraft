@@ -9,4 +9,4 @@ SECTIONS
 		uk_asserttab_end = .;
 	}
 }
-INSERT AFTER .text;
+INSERT AFTER .rodata;
