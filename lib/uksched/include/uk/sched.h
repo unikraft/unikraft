@@ -1,8 +1,11 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
+ *          Simon Kuenzer <simon.kuenzer@neclab.eu>
  *
  * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2022, NEC Laboratories GmbH, NEC Corrporation.
+ *                     All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -49,8 +52,6 @@ struct uk_sched;
 
 struct uk_sched *uk_sched_default_init(struct uk_alloc *a);
 
-extern char _tls_start[], _etdata[], _tls_end[];
-#define have_tls_area() (_tls_end - _tls_start)
 
 extern struct uk_sched *uk_sched_head;
 int uk_sched_register(struct uk_sched *s);
@@ -122,6 +123,7 @@ static inline int uk_sched_thread_add(struct uk_sched *s,
 
 	UK_ASSERT(s);
 	UK_ASSERT(t);
+	UK_ASSERT(!t->sched);
 	if (attr)
 		t->detached = attr->detached;
 	rc = s->thread_add(s, t, attr);
@@ -137,6 +139,7 @@ static inline int uk_sched_thread_remove(struct uk_sched *s,
 	UK_ASSERT(t);
 	UK_ASSERT(t->sched == s);
 	s->thread_remove(s, t);
+	t->sched = NULL;
 	return 0;
 }
 
@@ -204,8 +207,7 @@ static inline int uk_sched_thread_get_timeslice(struct uk_sched *s,
 
 struct uk_sched *uk_sched_create(struct uk_alloc *a, size_t prv_size);
 
-void uk_sched_idle_init(struct uk_sched *sched,
-		void *stack, void (*function)(void *));
+void uk_sched_idle_init(struct uk_sched *sched, uk_thread_fn0_t idle_fn);
 
 static inline struct uk_thread *uk_sched_get_idle(struct uk_sched *s)
 {
@@ -249,7 +251,7 @@ static inline bool uk_sched_started(struct uk_sched *sched)
 
 struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
 		const char *name, const uk_thread_attr_t *attr,
-		void (*function)(void *), void *arg);
+		uk_thread_fn1_t function, void *arg);
 void uk_sched_thread_destroy(struct uk_sched *sched,
 		struct uk_thread *thread);
 void uk_sched_thread_kill(struct uk_sched *sched,

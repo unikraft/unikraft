@@ -143,8 +143,6 @@ static int schedcoop_thread_add(struct uk_sched *s, struct uk_thread *t,
 	unsigned long flags;
 	struct schedcoop_private *prv = s->prv;
 
-	set_runnable(t);
-
 	flags = ukplat_lcpu_save_irqf();
 	UK_TAILQ_INSERT_TAIL(&prv->thread_list, t, thread_list);
 	ukplat_lcpu_restore_irqf(flags);
@@ -204,7 +202,7 @@ static void schedcoop_thread_woken(struct uk_sched *s, struct uk_thread *t)
 	}
 }
 
-static void idle_thread_fn(void *unused __unused)
+static void idle_thread_fn(void)
 {
 	struct uk_thread *current = uk_thread_current();
 	struct uk_sched *s = current->sched;
@@ -238,7 +236,7 @@ struct uk_sched *uk_schedcoop_init(struct uk_alloc *a)
 	UK_TAILQ_INIT(&prv->thread_list);
 	UK_TAILQ_INIT(&prv->sleeping_threads);
 
-	uk_sched_idle_init(sched, NULL, idle_thread_fn);
+	uk_sched_idle_init(sched, idle_thread_fn);
 
 	uk_sched_init(sched,
 			schedcoop_yield,
