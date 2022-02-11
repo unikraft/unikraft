@@ -5,7 +5,7 @@ new changes, features, fixes, and more!  Please fill in this form to indicate
 the status of your PR.  Please ensure you have read the contribution guidelines
 before opening a new PR as this will cover the PR process:
 
-  https://docs.unikraft.org/contribute.html
+  https://unikraft.org/docs/contributing/
 
 -->
 
@@ -15,7 +15,7 @@ before opening a new PR as this will cover the PR process:
 Please mark items appropriately:
 -->
 
- - [ ] Read the [contribution guidelines](https://docs.unikraft.org/contribute.html) regarding submitting new changes to the project;
+ - [ ] Read the [contribution guidelines](https://unikraft.org/docs/contributing/) regarding submitting new changes to the project;
  - [ ] Tested your changes against relevant architectures and platforms;
  - [ ] Ran the [`checkpatch.pl`](https://github.com/unikraft/unikraft/blob/staging/support/scripts/checkpatch.pl) on your commit series before opening this PR;
  - [ ] Updated relevant documentation.
