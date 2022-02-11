@@ -320,8 +320,8 @@ struct uk_testsuite {
 #define _UK_TEST_ASSERTTAB_ENTRY(status)				\
 	_UK_TEST_SECTION_DATA(						\
 		".uk_asserttab",					\
-		".word " STRINGIFY(status) "\n"				\
-		".word " STRINGIFY(__LINE__)				\
+		".hword " STRINGIFY(status) "\n"			\
+		".hword " STRINGIFY(__LINE__)				\
 	)
 
 /**
