@@ -52,22 +52,34 @@ extern "C" {
 
 struct uk_sched;
 
+typedef void (*uk_thread_dtor_t)(struct uk_thread *);
+
+typedef void (*uk_thread_fn0_t)(void) __noreturn;
+typedef void (*uk_thread_fn1_t)(void *) __noreturn;
+typedef void (*uk_thread_fn2_t)(void *, void *) __noreturn;
+
 struct uk_thread {
-	const char *name;
-	void *stack;
-	void *tls;
-	struct ukarch_ctx ctx;
-	struct ukarch_ectx *ectx;
-	uintptr_t tlsp; /* Arch TLS pointer */
+	struct ukarch_ctx    ctx;	/**< Architecture context */
+	struct ukarch_ectx *ectx;	/**< Extended context (FPU, VPU, ...) */
+	uintptr_t           tlsp;	/**< Architecture TLS pointer */
+
 	UK_TAILQ_ENTRY(struct uk_thread) thread_list;
 	uint32_t flags;
 	__snsec wakeup_time;
 	bool detached;
 	struct uk_waitq waiting_threads;
 	struct uk_sched *sched;
-	void (*entry)(void *);
-	void *arg;
-	void *prv;
+
+	struct {
+		struct uk_alloc *t_a;
+		void            *stack;
+		struct uk_alloc *stack_a;
+		void            *tls;
+		struct uk_alloc *tls_a;
+	} _mem;				/**< Associated allocs (internal!) */
+	uk_thread_dtor_t dtor;		/**< User provided destructor */
+	void *priv;			/**< Private field, free for use */
+
 #ifdef CONFIG_LIBNEWLIBC
 	struct _reent reent;
 #endif
@@ -75,6 +87,7 @@ struct uk_thread {
 	/* TODO: Move to `TLS` and define within uksignal */
 	struct uk_thread_sig signals_container;
 #endif
+	const char *name;		/**< Reference to thread name */
 };
 
 UK_TAILQ_HEAD(uk_thread_list, struct uk_thread);
@@ -106,27 +119,378 @@ struct uk_thread *uk_thread_current(void)
 	return __uk_sched_thread_current;
 }
 
-#define RUNNABLE_FLAG   0x00000001
-#define EXITED_FLAG     0x00000002
-#define QUEUEABLE_FLAG  0x00000004
+/*
+ * STATES OF THREADS
+ * =================
+ *
+ * The state of a thread can be determined by checking for the
+ * `UK_THREADF_RUNNABLE` and `UK_THREADF_EXITED` flags. A thread can then be in
+ * one of three states: BLOCKED, RUNNABLE, EXITED
+ * (state flags legend: [<R=Runnable><E=Exited>]):
+ *
+ *     uk_thread create()/init()
+ *           |     |      _____
+ *           |     |     /     \
+ *           |     v    v       |
+ *           |    BLOCKED [--]  |
+ *           |  /  |            |
+ *            \|   | block()    | wake()
+ *             \   |            |
+ *             |\  |            |
+ *             | v v            |
+ * terminate() |  RUNNABLE [R-] |
+ *             |   |     \_____/
+ *             |   |
+ *             |   | terminate()
+ *             |   v
+ *              > EXITED [*E]
+ *                 |
+ *                 | release()
+ *                 v
+ *                (X)
+ *
+ * NOTE: Depending on the API used for thread creation, a thread is created in
+ *       runnable or blocked state.
+ */
 
-#define is_runnable(_thread)    ((_thread)->flags &   RUNNABLE_FLAG)
-#define set_runnable(_thread)   ((_thread)->flags |=  RUNNABLE_FLAG)
-#define clear_runnable(_thread) ((_thread)->flags &= ~RUNNABLE_FLAG)
+#define UK_THREADF_ECTX       (0x001)	/**< Extended context available */
+#define UK_THREADF_UKTLS      (0x002)	/**< Unikraft allocated TLS */
+#define UK_THREADF_RUNNABLE   (0x004)
+#define UK_THREADF_EXITED     (0x008)
+#define UK_THREADF_QUEUEABLE  (0x010)
 
-#define is_exited(_thread)      ((_thread)->flags &   EXITED_FLAG)
-#define set_exited(_thread)     ((_thread)->flags |=  EXITED_FLAG)
+#define is_runnable(_thread)     ((_thread)->flags &   UK_THREADF_RUNNABLE)
+#define set_runnable(_thread)    ((_thread)->flags |=  UK_THREADF_RUNNABLE)
+#define clear_runnable(_thread)  ((_thread)->flags &= ~UK_THREADF_RUNNABLE)
 
-#define is_queueable(_thread)    ((_thread)->flags &   QUEUEABLE_FLAG)
-#define set_queueable(_thread)   ((_thread)->flags |=  QUEUEABLE_FLAG)
-#define clear_queueable(_thread) ((_thread)->flags &= ~QUEUEABLE_FLAG)
+#define is_exited(_thread)       ((_thread)->flags &   UK_THREADF_EXITED)
+#define set_exited(_thread)      ((_thread)->flags |=  UK_THREADF_EXITED)
 
+#define is_queueable(_thread)    ((_thread)->flags &   UK_THREADF_QUEUEABLE)
+#define set_queueable(_thread)   ((_thread)->flags |=  UK_THREADF_QUEUEABLE)
+#define clear_queueable(_thread) ((_thread)->flags &= ~UK_THREADF_QUEUEABLE)
 
-int uk_thread_init(struct uk_thread *thread, struct uk_alloc *allocator,
-		const char *name, void *stack, void *tls,
-		void (*function)(void *), void *arg);
-void uk_thread_fini(struct uk_thread *thread,
-		struct uk_alloc *allocator);
+/*
+ * WARNING: The following functions allow threads being created without extended
+ *          context (ectx) and without or a custom TLS. Such threads are
+ *          intended for very special cases. Threads without ectx must be
+ *          ISR-safe routines or need to be never interrupted until completed.
+ *          Threads with a custom or without TLS cannot execute standard
+ *          Unikraft code that potentially makes use of the system TLS.
+ */
+
+/**
+ * Initializes a given uk_thread structure. Such a thread can then be
+ * assigned to a scheduler. No register initialization (reset)
+ * is done.
+ * NOTE: On releasing, only the destructor `dtor` is called,
+ *       no memory is released.
+ *
+ * @param t
+ *   Reference to uk_thread structure to initialize
+ * @param ip
+ *   Instruction pointer. When `ip != NULL`, the flag
+ *   UK_THREADF_RUNNABLE is set.
+ * @param sp
+ *   Stack pointer
+ * @param tlsp
+ *   Architecture pointer to TLS. If set to NULL, the thread cannot
+ *   access thread-local variables.
+ * @param is_uktls
+ *   Indicates that the given TLS pointer (`tlsp` must be != 0x0)
+ *   points to a TLS derived from the Unikraft system TLS template.
+ * @param ectx
+ *   Reference to memory for saving/restoring extended CPU context
+ *   (e.g., floating point, vector registers). If set to `NULL`, no
+ *   extended context is saved nor restored on thread switches.
+ *   Executed functions must be ISR-safe. `UK_THREADF_ECTX` is set
+ *   when ectx is given.
+ * @param name
+ *   Optional reference to a name for the thread
+ * @param priv
+ *   Reference to external data that corresponds to this thread
+ * @param dtor
+ *   Destructor that is called when this thread is released
+ */
+void uk_thread_init_bare(struct uk_thread *t,
+			 uintptr_t ip,
+			 uintptr_t sp,
+			 uintptr_t tlsp,
+			 bool is_uktls,
+			 struct ukarch_ectx *ectx,
+			 const char *name,
+			 void *priv,
+			 uk_thread_dtor_t dtor);
+
+/**
+ * Initializes a given uk_thread structure. Such a thread can then be
+ * assigned to a scheduler. When the thread starts, the general-purpose
+ * registers are reset. The thread is set with
+ * `UK_THREADF_RUNNABLE`.
+ * NOTE: On releasing, only the destructor `dtor` is called,
+ *       no memory is released.
+ *
+ * @param t
+ *   Reference to uk_thread structure to initialize
+ * @param fn
+ *   Thread entry function (required)
+ * @param sp
+ *   Architecture stack pointer (stack is required)
+ * @param tlsp
+ *   Architecture pointer to TLS. If set to NULL, the thread cannot
+ *   access thread-local variables.
+ * @param is_uktls
+ *   Indicates that the given TLS pointer (`tlsp` must be != 0x0)
+ *   points to a TLS derived from the Unikraft system TLS template.
+ * @param ectx
+ *   Reference to memory for saving/restoring extended CPU context
+ *   (e.g., floating point, vector registers). If set to `NULL`, no
+ *   extended context is saved nor restored on thread switches.
+ *   Executed functions must be ISR-safe. `UK_THREADF_ECTX` is set
+ *   when ectx is given.
+ * @param name
+ *   Optional reference to a name for the thread
+ * @param priv
+ *   Reference to external data that corresponds to this thread
+ * @param dtor
+ *   Destructor that is called when this thread is released
+ */
+void uk_thread_init_bare_fn0(struct uk_thread *t,
+			     uk_thread_fn0_t fn,
+			     uintptr_t sp,
+			     uintptr_t tlsp,
+			     bool is_uktls,
+			     struct ukarch_ectx *ectx,
+			     const char *name,
+			     void *priv,
+			     uk_thread_dtor_t dtor);
+
+/**
+ * Similar to `uk_thread_init_bare_fn0()` but with a thread function accepting
+ * one argument
+ */
+void uk_thread_init_bare_fn1(struct uk_thread *t,
+			     uk_thread_fn1_t fn,
+			     void *argp,
+			     uintptr_t sp,
+			     uintptr_t tlsp,
+			     bool is_uktls,
+			     struct ukarch_ectx *ectx,
+			     const char *name,
+			     void *priv,
+			     uk_thread_dtor_t dtor);
+
+/**
+ * Similar to `uk_thread_init_bare_fn0()` but with a thread function accepting
+ * two arguments
+ */
+void uk_thread_init_bare_fn2(struct uk_thread *t,
+			     uk_thread_fn2_t fn,
+			     void *argp0, void *argp1,
+			     uintptr_t sp,
+			     uintptr_t tlsp,
+			     bool is_uktls,
+			     struct ukarch_ectx *ectx,
+			     const char *name,
+			     void *priv,
+			     uk_thread_dtor_t dtor);
+
+/**
+ * Initializes a `uk_thread` structure and allocates stack and optionally TLS.
+ * Such a thread can then be assigned to a scheduler. When the thread starts,
+ * the general-purpose registers are reset.
+ *
+ * @param t
+ *   Reference to uk_thread structure to initialize
+ * @param fn
+ *   Thread entry function (required)
+ * @param a_stack
+ *   Reference to an allocator for allocating a stack (required)
+ * @param stack_len
+ *   Size of the thread stack. If set to 0, a default stack size is used
+ *   for the allocation.
+ * @param a_tls
+ *   Reference to an allocator for allocating thread local storage.
+ *   In case `custom_ectx` is not set, space for extended CPU context state
+ *   is allocated together with the TLS. If `NULL` is passed, a thread without
+ *   TLS is allocated (and without ectx if `custom_ectx` is not set
+ *   (see arguments `custom_ectx`, `ectx`).
+ * @param custom_ectx
+ *   Do not allocate ectx together with TLS. Use next parameter as reference
+ *   to load and store ectx.
+ * @param ectx
+ *   This parameter is only used if `custom_ectx` is set. If set to `NULL`
+ *   no memory is available for saving/restoring extended CPU context state
+ *   (e.g., floating point, vector registers). In such a case, no ectx can
+ *   be saved nor restored on thread switches.
+ *   Executed functions must be ISR-safe and UK_THREADF_ECTX is not set.
+ * @param name
+ *   Optional name for the thread, can be `NULL`
+ * @param priv
+ *   Reference to external data that corresponds to this thread
+ * @param dtor
+ *   Destructor that is called when this thread is released
+ * @return
+ *   - (0):  Successfully initialized
+ *   - (<0): Negative value with error code
+ */
+int uk_thread_init_fn0(struct uk_thread *t,
+		       uk_thread_fn0_t fn,
+		       struct uk_alloc *a_stack,
+		       size_t stack_len,
+		       struct uk_alloc *a_tls,
+		       bool custom_ectx,
+		       struct ukarch_ectx *ectx,
+		       const char *name,
+		       void *priv,
+		       uk_thread_dtor_t dtor);
+
+/**
+ * Similar to `uk_thread_init_fn0()` but with a thread function accepting
+ * one argument
+ */
+int uk_thread_init_fn1(struct uk_thread *t,
+		       uk_thread_fn1_t fn,
+		       void *argp,
+		       struct uk_alloc *a_stack,
+		       size_t stack_len,
+		       struct uk_alloc *a_tls,
+		       bool custom_ectx,
+		       struct ukarch_ectx *ectx,
+		       const char *name,
+		       void *priv,
+		       uk_thread_dtor_t dtor);
+
+/**
+ * Similar to `uk_thread_init_fn0()` but with a thread function accepting
+ * two arguments
+ */
+int uk_thread_init_fn2(struct uk_thread *t,
+		       uk_thread_fn2_t fn,
+		       void *argp0, void *argp1,
+		       struct uk_alloc *a_stack,
+		       size_t stack_len,
+		       struct uk_alloc *a_tls,
+		       bool custom_ectx,
+		       struct ukarch_ectx *ectx,
+		       const char *name,
+		       void *priv,
+		       uk_thread_dtor_t dtor);
+
+/**
+ * Allocates a bare uk_thread structure. Such a thread can then be assigned
+ * to a scheduler. No register initialization (reset) is done.
+ *
+ * @param a
+ *   Reference to an allocator
+ * @param ip
+ *   Instruction pointer. When `ip != NULL`, the flag
+ *   `UK_THREADF_RUNNABLE` is set.
+ * @param sp
+ *   Stack pointer
+ * @param tlsp
+ *   Architecture pointer to TLS. If set to NULL, the thread cannot
+ *   access thread-local variables
+ * @param is_uktls
+ *   Indicates that the given TLS pointer (`tlsp` must be != 0x0)
+ *   points to a TLS derived from the Unikraft system TLS template.
+ * @param no_ectx
+ *   If set, no memory is allocated for saving/restoring extended CPU
+ *   context state (e.g., floating point, vector registers). In such a
+ *   case, no extended context is saved nor restored on thread switches.
+ *   Executed functions must be ISR-safe.
+ * @param name
+ *   Optional name for the thread
+ * @param priv
+ *   Reference to external data that corresponds to this thread
+ * @param dtor
+ *   Destructor that is called when this thread is released
+ * @return
+ *   - (NULL): Allocation failed
+ *   - Reference to initialized uk_thread
+ */
+struct uk_thread *uk_thread_create_bare(struct uk_alloc *a,
+					uintptr_t ip,
+					uintptr_t sp,
+					uintptr_t tlsp,
+					bool is_uktls,
+					bool no_ectx,
+					const char *name,
+					void *priv,
+					uk_thread_dtor_t dtor);
+
+/**
+ * Allocates a raw uk_thread structure. Such a thread can then be assigned
+ * to a scheduler. When the thread starts, the general-purpose registers are
+ * reset.
+ *
+ * @param a
+ *   Reference to an allocator (required)
+ * @param fn
+ *   Thread entry function (required)
+ * @param a_stack
+ *   Reference to an allocator for allocating a stack (required)
+ * @param stack_len
+ *   Size of the thread stack. If set to 0, a default stack size is used
+ *   for the stack allocation.
+ * @param a_tls
+ *   Reference to an allocator for allocating thread local storage.
+ *   If `NULL` is passed, a thread without TLS is allocated.
+ * @param no_ectx
+ *   If set, no memory is allocated for saving/restoring extended CPU
+ *   context state (e.g., floating point, vector registers). In such a
+ *   case, no extended context is saved nor restored on thread switches.
+ *   Executed functions must be ISR-safe.
+ * @param name
+ *   Optional name for the thread
+ * @param priv
+ *   Reference to external data that corresponds to this thread
+ * @param dtor
+ *   Destructor that is called when this thread is released
+ * @return
+ *   - (NULL): Allocation failed
+ *   - Reference to initialized uk_thread
+ */
+struct uk_thread *uk_thread_create_fn0(struct uk_alloc *a,
+				       uk_thread_fn0_t fn,
+				       struct uk_alloc *a_stack,
+				       size_t stack_len,
+				       struct uk_alloc *a_tls,
+				       bool no_ectx,
+				       const char *name,
+				       void *priv,
+				       uk_thread_dtor_t dtor);
+
+/**
+ * Similar to `uk_thread_create_fn0()` but with a thread function accepting
+ * one argument
+ */
+struct uk_thread *uk_thread_create_fn1(struct uk_alloc *a,
+				       uk_thread_fn1_t fn, void *argp,
+				       struct uk_alloc *a_stack,
+				       size_t stack_len,
+				       struct uk_alloc *a_tls,
+				       bool no_ectx,
+				       const char *name,
+				       void *priv,
+				       uk_thread_dtor_t dtor);
+
+/**
+ * Similar to `uk_thread_create_fn0()` but with a thread function accepting
+ * two arguments
+ */
+struct uk_thread *uk_thread_create_fn2(struct uk_alloc *a,
+				       uk_thread_fn2_t fn,
+				       void *argp0, void *argp1,
+				       struct uk_alloc *a_stack,
+				       size_t stack_len,
+				       struct uk_alloc *a_tls,
+				       bool no_ectx,
+				       const char *name,
+				       void *priv,
+				       uk_thread_dtor_t dtor);
+
+void uk_thread_release(struct uk_thread *t);
 void uk_thread_block_timeout(struct uk_thread *thread, __nsec nsec);
 void uk_thread_block(struct uk_thread *thread);
 void uk_thread_wake(struct uk_thread *thread);

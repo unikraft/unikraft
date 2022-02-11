@@ -152,56 +152,24 @@ void uk_sched_start(struct uk_sched *sched)
 	UK_CRASH("Failed to start scheduler: context switch unexpectedly returned\n");
 }
 
-static void *create_stack(struct uk_alloc *allocator)
+void uk_sched_idle_init(struct uk_sched *sched, uk_thread_fn0_t idle_fn)
 {
-	void *stack;
-
-	if (uk_posix_memalign(allocator, &stack,
-			      STACK_SIZE, STACK_SIZE) != 0) {
-		uk_pr_err("Failed to allocate thread stack: Not enough memory\n");
-		return NULL;
-	}
-
-	return stack;
-}
-
-static void *uk_thread_tls_create(struct uk_alloc *allocator)
-{
-	void *tls;
-
-	if (uk_posix_memalign(allocator, &tls, ukarch_tls_area_align(),
-			      ukarch_tls_area_size()) != 0) {
-		uk_pr_err("Failed to allocate thread TLS area\n");
-		return NULL;
-	}
-	ukarch_tls_area_init(tls);
-	return tls;
-}
-
-void uk_sched_idle_init(struct uk_sched *sched,
-		void *stack, void (*function)(void *))
-{
-	struct uk_thread *idle;
 	int rc;
-	void *tls = NULL;
 
 	UK_ASSERT(sched != NULL);
 
-	if (stack == NULL)
-		stack = create_stack(sched->allocator);
-	UK_ASSERT(stack != NULL);
-	if (have_tls_area() && !(tls = uk_thread_tls_create(sched->allocator)))
+	rc = uk_thread_init_fn0(&sched->idle,
+				idle_fn,
+				sched->allocator, STACK_SIZE,
+				sched->allocator,
+				false, NULL,
+				"idle",
+				NULL,
+				NULL);
+	if (rc < 0)
 		goto out_crash;
 
-	idle = &sched->idle;
-
-	rc = uk_thread_init(idle,
-			sched->allocator,
-			"Idle", stack, tls, function, NULL);
-	if (rc)
-		goto out_crash;
-
-	idle->sched = sched;
+	sched->idle.sched = sched;
 	return;
 
 out_crash:
@@ -210,33 +178,23 @@ out_crash:
 
 struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
 		const char *name, const uk_thread_attr_t *attr,
-		void (*function)(void *), void *arg)
+		uk_thread_fn1_t function, void *arg)
 {
 	struct uk_thread *thread = NULL;
-	void *stack = NULL;
 	int rc;
-	void *tls = NULL;
 
-	thread = uk_malloc(sched->allocator, sizeof(struct uk_thread));
+	thread = uk_thread_create_fn1(sched->allocator,
+				      function, arg,
+				      sched->allocator, STACK_SIZE,
+				      sched->allocator,
+				      0x0,
+				      name,
+				      NULL,
+				      NULL);
 	if (thread == NULL) {
 		uk_pr_err("Failed to allocate thread\n");
 		goto err;
 	}
-
-	/* We can't use lazy allocation here
-	 * since the trap handler runs on the stack
-	 */
-	stack = create_stack(sched->allocator);
-	if (stack == NULL)
-		goto err;
-	if (have_tls_area() && !(tls = uk_thread_tls_create(sched->allocator)))
-		goto err;
-
-	rc = uk_thread_init(thread,
-			sched->allocator,
-			name, stack, tls, function, arg);
-	if (rc)
-		goto err;
 
 	rc = uk_sched_thread_add(sched, thread, attr);
 	if (rc)
@@ -245,15 +203,8 @@ struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
 	return thread;
 
 err_add:
-	uk_thread_fini(thread, sched->allocator);
+	uk_thread_release(thread);
 err:
-	if (tls)
-		uk_free(sched->allocator, tls);
-	if (stack)
-		uk_free(sched->allocator, stack);
-	if (thread)
-		uk_free(sched->allocator, thread);
-
 	return NULL;
 }
 
@@ -261,16 +212,10 @@ void uk_sched_thread_destroy(struct uk_sched *sched, struct uk_thread *thread)
 {
 	UK_ASSERT(sched != NULL);
 	UK_ASSERT(thread != NULL);
-	UK_ASSERT(thread->stack != NULL);
-	UK_ASSERT(!have_tls_area() || thread->tls != NULL);
 	UK_ASSERT(is_exited(thread));
 
 	UK_TAILQ_REMOVE(&sched->exited_threads, thread, thread_list);
-	uk_thread_fini(thread, sched->allocator);
-	uk_free(sched->allocator, thread->stack);
-	if (thread->tls)
-		uk_free(sched->allocator, thread->tls);
-	uk_free(sched->allocator, thread);
+	uk_thread_release(thread);
 }
 
 void uk_sched_thread_kill(struct uk_sched *sched, struct uk_thread *thread)
