@@ -294,7 +294,7 @@ int uk_sglist_join(struct uk_sglist *first, struct uk_sglist *second)
 	return 0;
 }
 
-#ifdef CONFIG_UKALLOC
+#ifdef CONFIG_LIBUKALLOC
 struct uk_sglist *uk_sglist_alloc(struct uk_alloc *a, int nsegs)
 {
 	struct uk_sglist *sg;
@@ -530,7 +530,7 @@ int uk_sglist_slice(struct uk_sglist *original, struct uk_sglist **slice,
 	}
 	return 0;
 }
-#endif /* CONFIG_UKALLOC */
+#endif /* CONFIG_LIBUKALLOC */
 
 #ifdef CONFIG_LIBUKNETDEV
 int uk_sglist_append_netbuf(struct uk_sglist *sg, struct uk_netbuf *netbuf)
