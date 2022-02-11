@@ -41,3 +41,11 @@
 
 #define UKARCH_SP_ALIGN		(1 << 1)
 #define UKARCH_SP_ALIGN_MASK	(UKARCH_SP_ALIGN - 1)
+
+#define ukarch_gen_sp(base, len)					\
+	({								\
+		unsigned long __sp__ = (unsigned long) (base)		\
+			+ (unsigned long) (len);			\
+		__sp__ &= ~((unsigned long) UKARCH_SP_ALIGN_MASK);	\
+		__sp__;							\
+	})
