@@ -36,6 +36,7 @@
 #include <errno.h>
 #include <uk/plat/config.h>
 #include <uk/plat/time.h>
+#include <uk/plat/tls.h>
 #include <uk/thread.h>
 #include <uk/sched.h>
 #include <uk/wait.h>
@@ -86,6 +87,150 @@ extern const struct uk_thread_inittab_entry _uk_thread_inittab_end;
 			(DECONST(struct uk_thread_inittab_entry*,	\
 				 (&_uk_thread_inittab_end))) - 1)
 
+struct _inittab_call_init_args {
+	uk_thread_init_func_t init;
+	struct uk_thread *child;
+	struct uk_thread *parent;
+};
+
+static int _inittab_call_init(void *argp)
+{
+	const struct _inittab_call_init_args *args
+		= (const struct _inittab_call_init_args *) argp;
+	int ret;
+
+	UK_ASSERT(args);
+	UK_ASSERT(args->init);
+
+	ret = (args->init)(args->child, args->parent);
+	return ret;
+}
+
+struct _inittab_call_term_args {
+	uk_thread_term_func_t term;
+	struct uk_thread *child;
+};
+
+static int _inittab_call_term(void *argp)
+{
+	const struct _inittab_call_term_args *args
+		= (const struct _inittab_call_term_args *) argp;
+
+	UK_ASSERT(args);
+	UK_ASSERT(args->term);
+
+	(args->term)(args->child);
+	return 0;
+}
+
+/** Iterates over registered thread initialization functions */
+static int _uk_thread_call_inittab(struct uk_thread *child)
+{
+	struct uk_thread *parent = uk_thread_current();
+	struct uk_thread_inittab_entry *itr;
+	struct _inittab_call_init_args init_args;
+	struct _inittab_call_term_args term_args;
+	int ret = 0;
+
+	/* Either we run without scheduling or we need to make sure that we have ectx */
+	UK_ASSERT(!parent || parent->flags & UK_THREADF_ECTX);
+
+	/* Go over thread initialization functions that match with
+	 * child's ECTX and UKTLS feature requirements
+	 */
+	init_args.child  = child;
+	init_args.parent = parent;
+	uk_thread_inittab_foreach(itr) {
+		if (unlikely(!itr->init))
+			continue;
+		if (unlikely((itr->flags & child->flags) != itr->flags)) {
+			uk_pr_debug("uk_thread %p (%s) init cb: Skip %p() due to feature mismatch: %c%c required (has %c%c)\n",
+				    child, child->name
+				     ? child->name : "<unnamed>",
+				    *itr->init,
+				    (itr->flags & UK_THREAD_INITF_ECTX)
+				     ? 'E' : '-',
+				    (itr->flags & UK_THREAD_INITF_UKTLS)
+				     ? 'T' : '-',
+				    (child->flags & UK_THREADF_ECTX)
+				     ? 'E' : '-',
+				    (child->flags & UK_THREADF_UKTLS)
+				     ? 'T' : '-');
+			continue;
+		}
+
+		/* NOTE: We execute the init function with child's TLS enabled. */
+		uk_pr_debug("uk_thread %p (%s) init: Call initialization %p()...\n",
+			    child, child->name ? child->name : "<unnamed>",
+			    *itr->init);
+		init_args.init = itr->init;
+		ret = ukplat_tlsp_exec(child->uktlsp, _inittab_call_init, &init_args);
+		if (ret < 0)
+			goto err;
+	}
+	goto out;
+
+err:
+	/* Run termination functions starting from one level before the failed
+	 * one for cleanup
+	 */
+	term_args.child = child;
+	uk_thread_inittab_foreach_reverse2(itr, itr - 2) {
+		if (unlikely(!itr->term
+			     || (itr->flags & child->flags) != itr->flags))
+			continue;
+		term_args.term = itr->term;
+		ukplat_tlsp_exec(child->uktlsp, _inittab_call_term, &term_args);
+	}
+out:
+	return ret;
+}
+
+/** Iterates over registered thread termination functions */
+static int _uk_thread_call_termtab(struct uk_thread *child)
+{
+	struct uk_thread *parent = uk_thread_current();
+	struct uk_thread_inittab_entry *itr;
+	struct _inittab_call_term_args term_args;
+	int ret = 0;
+
+	/* Either we run without scheduling or we need to make sure that we have ectx */
+	UK_ASSERT(!parent || parent->flags & UK_THREADF_ECTX);
+
+	/* Go over thread termination functions that match with
+	 * child's ECTX and UKTLS feature requirements
+	 */
+	term_args.child = child;
+        uk_thread_inittab_foreach_reverse(itr) {
+		if (unlikely(!itr->term))
+			continue;
+		if (unlikely((itr->flags & child->flags) != itr->flags)) {
+			uk_pr_debug("uk_thread %p (%s) term cb: Skip %p() due to feature mismatch: %c%c required (has %c%c)\n",
+				    child, child->name
+				     ? child->name : "<unnamed>",
+				    *itr->term,
+				    (itr->flags & UK_THREAD_INITF_ECTX)
+				     ? 'E' : '-',
+				    (itr->flags & UK_THREAD_INITF_UKTLS)
+				     ? 'T' : '-',
+				    (child->flags & UK_THREADF_ECTX)
+				     ? 'E' : '-',
+				    (child->flags & UK_THREADF_UKTLS)
+				     ? 'T' : '-');
+			continue;
+		}
+
+		uk_pr_debug("uk_thread %p (%s) term: Call termination %p()...\n",
+			    child, child->name
+			    ? child->name : "<unnamed>",
+			    *itr->term);
+		term_args.term = itr->term;
+		ukplat_tlsp_exec(child->uktlsp, _inittab_call_term, &term_args);
+	}
+
+	return ret;
+}
+
 static void _uk_thread_struct_init(struct uk_thread *t,
 				   uintptr_t tlsp,
 				   bool is_uktls,
@@ -127,15 +272,15 @@ static void _uk_thread_struct_init(struct uk_thread *t,
 		    &t->ctx, t->ectx, (void *) t->tlsp);
 }
 
-void uk_thread_init_bare(struct uk_thread *t,
-			 uintptr_t ip,
-			 uintptr_t sp,
-			 uintptr_t tlsp,
-			 bool is_uktls,
-			 struct ukarch_ectx *ectx,
-			 const char *name,
-			 void *priv,
-			 uk_thread_dtor_t dtor)
+int uk_thread_init_bare(struct uk_thread *t,
+			uintptr_t ip,
+			uintptr_t sp,
+			uintptr_t tlsp,
+			bool is_uktls,
+			struct ukarch_ectx *ectx,
+			const char *name,
+			void *priv,
+			uk_thread_dtor_t dtor)
 {
 	UK_ASSERT(t);
 	UK_ASSERT(t != uk_thread_current());
@@ -145,17 +290,19 @@ void uk_thread_init_bare(struct uk_thread *t,
 
 	if (ip)
 		t->flags |= UK_THREADF_RUNNABLE;
+
+	return _uk_thread_call_inittab(t);
 }
 
-void uk_thread_init_bare_fn0(struct uk_thread *t,
-			     uk_thread_fn0_t fn,
-			     uintptr_t sp,
-			     uintptr_t tlsp,
-			     bool is_uktls,
-			     struct ukarch_ectx *ectx,
-			     const char *name,
-			     void *priv,
-			     uk_thread_dtor_t dtor)
+int uk_thread_init_bare_fn0(struct uk_thread *t,
+			    uk_thread_fn0_t fn,
+			    uintptr_t sp,
+			    uintptr_t tlsp,
+			    bool is_uktls,
+			    struct ukarch_ectx *ectx,
+			    const char *name,
+			    void *priv,
+			    uk_thread_dtor_t dtor)
 {
 	UK_ASSERT(t);
 	UK_ASSERT(t != uk_thread_current());
@@ -166,18 +313,20 @@ void uk_thread_init_bare_fn0(struct uk_thread *t,
 	ukarch_ctx_init_entry0(&t->ctx, sp, 0,
 			       (ukarch_ctx_entry0) fn);
 	t->flags |= UK_THREADF_RUNNABLE;
+
+	return _uk_thread_call_inittab(t);
 }
 
-void uk_thread_init_bare_fn1(struct uk_thread *t,
-			     uk_thread_fn1_t fn,
-			     void *argp,
-			     uintptr_t sp,
-			     uintptr_t tlsp,
-			     bool is_uktls,
-			     struct ukarch_ectx *ectx,
-			     const char *name,
-			     void *priv,
-			     uk_thread_dtor_t dtor)
+int uk_thread_init_bare_fn1(struct uk_thread *t,
+			    uk_thread_fn1_t fn,
+			    void *argp,
+			    uintptr_t sp,
+			    uintptr_t tlsp,
+			    bool is_uktls,
+			    struct ukarch_ectx *ectx,
+			    const char *name,
+			    void *priv,
+			    uk_thread_dtor_t dtor)
 {
 	UK_ASSERT(t);
 	UK_ASSERT(t != uk_thread_current());
@@ -189,18 +338,20 @@ void uk_thread_init_bare_fn1(struct uk_thread *t,
 			       (ukarch_ctx_entry1) fn,
 			       (long) argp);
 	t->flags |= UK_THREADF_RUNNABLE;
+
+	return _uk_thread_call_inittab(t);
 }
 
-void uk_thread_init_bare_fn2(struct uk_thread *t,
-			     uk_thread_fn2_t fn,
-			     void *argp0, void *argp1,
-			     uintptr_t sp,
-			     uintptr_t tlsp,
-			     bool is_uktls,
-			     struct ukarch_ectx *ectx,
-			     const char *name,
-			     void *priv,
-			     uk_thread_dtor_t dtor)
+int uk_thread_init_bare_fn2(struct uk_thread *t,
+			    uk_thread_fn2_t fn,
+			    void *argp0, void *argp1,
+			    uintptr_t sp,
+			    uintptr_t tlsp,
+			    bool is_uktls,
+			    struct ukarch_ectx *ectx,
+			    const char *name,
+			    void *priv,
+			    uk_thread_dtor_t dtor)
 {
 	UK_ASSERT(t);
 	UK_ASSERT(t != uk_thread_current());
@@ -212,6 +363,8 @@ void uk_thread_init_bare_fn2(struct uk_thread *t,
 			       (ukarch_ctx_entry2) fn,
 			       (long) argp0, (long) argp1);
 	t->flags |= UK_THREADF_RUNNABLE;
+
+	return _uk_thread_call_inittab(t);
 }
 
 /** Initializes uk_thread struct and allocates stack & TLS */
@@ -289,6 +442,25 @@ err_out:
 	return -ENOMEM;
 }
 
+/** Reverts `_uk_thread_struct_init_alloc()` */
+void _uk_thread_struct_free_alloc(struct uk_thread *t)
+{
+
+	UK_ASSERT(t);
+
+	/* Free memory that was allocated by us */
+	if (t->_mem.tls_a   && t->_mem.tls) {
+		uk_free(t->_mem.tls_a,   t->_mem.tls);
+		t->_mem.tls_a   = NULL;
+		t->_mem.tls     = NULL;
+	}
+	if (t->_mem.stack_a && t->_mem.stack) {
+		uk_free(t->_mem.stack_a, t->_mem.stack);
+		t->_mem.stack_a = NULL;
+		t->_mem.stack   = NULL;
+	}
+}
+
 int uk_thread_init_fn0(struct uk_thread *t,
 		       uk_thread_fn0_t fn,
 		       struct uk_alloc *a_stack,
@@ -310,14 +482,21 @@ int uk_thread_init_fn0(struct uk_thread *t,
 					   a_tls, custom_ectx, ectx, name,
 					   priv, dtor);
 	if (ret < 0)
-		goto out;
+		goto err_out;
 
 	ukarch_ctx_init_entry0(&t->ctx,
 			       ukarch_gen_sp(t->_mem.stack, stack_len),
 			       0, (ukarch_ctx_entry0) fn);
 	t->flags |= UK_THREADF_RUNNABLE;
 
-out:
+	ret = _uk_thread_call_inittab(t);
+	if (ret < 0)
+		goto err_free_alloc;
+	return 0;
+
+err_free_alloc:
+	_uk_thread_struct_free_alloc(t);
+err_out:
 	return ret;
 }
 
@@ -343,14 +522,21 @@ int uk_thread_init_fn1(struct uk_thread *t,
 					   a_tls, custom_ectx, ectx, name,
 					   priv, dtor);
 	if (ret < 0)
-		goto out;
+		goto err_out;
 
 	ukarch_ctx_init_entry1(&t->ctx,
 			       ukarch_gen_sp(t->_mem.stack, stack_len),
 			       0, (ukarch_ctx_entry1) fn, (long) argp);
 	t->flags |= UK_THREADF_RUNNABLE;
 
-out:
+	ret = _uk_thread_call_inittab(t);
+	if (ret < 0)
+		goto err_free_alloc;
+	return 0;
+
+err_free_alloc:
+	_uk_thread_struct_free_alloc(t);
+err_out:
 	return ret;
 }
 
@@ -376,7 +562,7 @@ int uk_thread_init_fn2(struct uk_thread *t,
 					   a_tls, custom_ectx, ectx, name,
 					   priv, dtor);
 	if (ret < 0)
-		goto out;
+		goto err_out;
 
 	ukarch_ctx_init_entry2(&t->ctx,
 			       ukarch_gen_sp(t->_mem.stack, stack_len),
@@ -384,7 +570,14 @@ int uk_thread_init_fn2(struct uk_thread *t,
 			       (long) argp0, (long) argp1);
 	t->flags |= UK_THREADF_RUNNABLE;
 
-out:
+	ret = _uk_thread_call_inittab(t);
+	if (ret < 0)
+		goto err_free_alloc;
+	return 0;
+
+err_free_alloc:
+	_uk_thread_struct_free_alloc(t);
+err_out:
 	return ret;
 }
 
@@ -468,6 +661,15 @@ err_out:
 	return NULL;
 }
 
+/** Reverts `_uk_thread_alloc()` */
+static void _uk_thread_free(struct uk_thread *t)
+{
+	UK_ASSERT(t);
+
+	_uk_thread_struct_free_alloc(t);
+	uk_free(t->_mem.t_a, t);
+}
+
 struct uk_thread *uk_thread_create_fn0(struct uk_alloc *a,
 				       uk_thread_fn0_t fn,
 				       struct uk_alloc *a_stack,
@@ -479,6 +681,7 @@ struct uk_thread *uk_thread_create_fn0(struct uk_alloc *a,
 				       uk_thread_dtor_t dtor)
 {
 	struct uk_thread *t;
+	int ret;
 
 	UK_ASSERT(fn);
 	UK_ASSERT(a_stack); /* A stack is required for ctx initialization */
@@ -489,7 +692,7 @@ struct uk_thread *uk_thread_create_fn0(struct uk_alloc *a,
 			     a_tls,
 			     no_ectx, name, priv, dtor);
 	if (!t)
-		return NULL;
+		goto err_out;
 
 	ukarch_ctx_init_entry0(&t->ctx,
 			       ukarch_gen_sp(t->_mem.stack, stack_len),
@@ -497,7 +700,15 @@ struct uk_thread *uk_thread_create_fn0(struct uk_alloc *a,
 			       fn);
 	t->flags |= UK_THREADF_RUNNABLE;
 
+	ret = _uk_thread_call_inittab(t);
+	if (ret < 0)
+		goto err_free_alloc;
 	return t;
+
+err_free_alloc:
+	_uk_thread_free(t);
+err_out:
+	return NULL;
 }
 
 struct uk_thread *uk_thread_create_fn1(struct uk_alloc *a,
@@ -512,6 +723,7 @@ struct uk_thread *uk_thread_create_fn1(struct uk_alloc *a,
 				       uk_thread_dtor_t dtor)
 {
 	struct uk_thread *t;
+	int ret;
 
 	UK_ASSERT(fn);
 	UK_ASSERT(a_stack); /* A stack is required for ctx initialization */
@@ -522,7 +734,7 @@ struct uk_thread *uk_thread_create_fn1(struct uk_alloc *a,
 			     a_tls,
 			     no_ectx, name, priv, dtor);
 	if (!t)
-		return NULL;
+		goto err_out;
 
 	ukarch_ctx_init_entry1(&t->ctx,
 			       ukarch_gen_sp(t->_mem.stack, stack_len),
@@ -530,7 +742,15 @@ struct uk_thread *uk_thread_create_fn1(struct uk_alloc *a,
 			       (ukarch_ctx_entry1) fn, (long) argp);
 	t->flags |= UK_THREADF_RUNNABLE;
 
+	ret = _uk_thread_call_inittab(t);
+	if (ret < 0)
+		goto err_free_alloc;
 	return t;
+
+err_free_alloc:
+	_uk_thread_free(t);
+err_out:
+	return NULL;
 }
 
 struct uk_thread *uk_thread_create_fn2(struct uk_alloc *a,
@@ -545,6 +765,7 @@ struct uk_thread *uk_thread_create_fn2(struct uk_alloc *a,
 				       uk_thread_dtor_t dtor)
 {
 	struct uk_thread *t;
+	int ret;
 
 	UK_ASSERT(fn);
 	UK_ASSERT(a_stack); /* A stack is required for ctx initialization */
@@ -555,7 +776,7 @@ struct uk_thread *uk_thread_create_fn2(struct uk_alloc *a,
 			     a_tls,
 			     no_ectx, name, priv, dtor);
 	if (!t)
-		return NULL;
+		goto err_out;
 
 	ukarch_ctx_init_entry2(&t->ctx,
 			       ukarch_gen_sp(t->_mem.stack, stack_len),
@@ -564,7 +785,15 @@ struct uk_thread *uk_thread_create_fn2(struct uk_alloc *a,
 			       (long) argp0, (long) argp1);
 	t->flags |= UK_THREADF_RUNNABLE;
 
+	ret = _uk_thread_call_inittab(t);
+	if (ret < 0)
+		goto err_free_alloc;
 	return t;
+
+err_free_alloc:
+	_uk_thread_free(t);
+err_out:
+	return NULL;
 }
 
 void uk_thread_release(struct uk_thread *t)
@@ -578,6 +807,8 @@ void uk_thread_release(struct uk_thread *t)
 	UK_ASSERT(t);
 	UK_ASSERT(t != uk_thread_current());
 	UK_ASSERT(!t->sched); /* Thread must be disconnected from scheduler */
+
+	_uk_thread_call_termtab(t);
 
 	/* Take copies of associated allocation information.
 	 * The destructor provided might free the struct before

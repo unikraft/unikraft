@@ -211,16 +211,19 @@ struct uk_thread *uk_thread_current(void)
  *   Reference to external data that corresponds to this thread
  * @param dtor
  *   Destructor that is called when this thread is released
+ * @return
+ *   - (0):  Successfully initialized
+ *   - (<0): Negative value with error code
  */
-void uk_thread_init_bare(struct uk_thread *t,
-			 uintptr_t ip,
-			 uintptr_t sp,
-			 uintptr_t tlsp,
-			 bool is_uktls,
-			 struct ukarch_ectx *ectx,
-			 const char *name,
-			 void *priv,
-			 uk_thread_dtor_t dtor);
+int uk_thread_init_bare(struct uk_thread *t,
+			uintptr_t ip,
+			uintptr_t sp,
+			uintptr_t tlsp,
+			bool is_uktls,
+			struct ukarch_ectx *ectx,
+			const char *name,
+			void *priv,
+			uk_thread_dtor_t dtor);
 
 /**
  * Initializes a given uk_thread structure. Such a thread can then be
@@ -254,46 +257,49 @@ void uk_thread_init_bare(struct uk_thread *t,
  *   Reference to external data that corresponds to this thread
  * @param dtor
  *   Destructor that is called when this thread is released
+ * @return
+ *   - (0):  Successfully initialized
+ *   - (<0): Negative value with error code
  */
-void uk_thread_init_bare_fn0(struct uk_thread *t,
-			     uk_thread_fn0_t fn,
-			     uintptr_t sp,
-			     uintptr_t tlsp,
-			     bool is_uktls,
-			     struct ukarch_ectx *ectx,
-			     const char *name,
-			     void *priv,
-			     uk_thread_dtor_t dtor);
+int uk_thread_init_bare_fn0(struct uk_thread *t,
+			    uk_thread_fn0_t fn,
+			    uintptr_t sp,
+			    uintptr_t tlsp,
+			    bool is_uktls,
+			    struct ukarch_ectx *ectx,
+			    const char *name,
+			    void *priv,
+			    uk_thread_dtor_t dtor);
 
 /**
  * Similar to `uk_thread_init_bare_fn0()` but with a thread function accepting
  * one argument
  */
-void uk_thread_init_bare_fn1(struct uk_thread *t,
-			     uk_thread_fn1_t fn,
-			     void *argp,
-			     uintptr_t sp,
-			     uintptr_t tlsp,
-			     bool is_uktls,
-			     struct ukarch_ectx *ectx,
-			     const char *name,
-			     void *priv,
-			     uk_thread_dtor_t dtor);
+int uk_thread_init_bare_fn1(struct uk_thread *t,
+			    uk_thread_fn1_t fn,
+			    void *argp,
+			    uintptr_t sp,
+			    uintptr_t tlsp,
+			    bool is_uktls,
+			    struct ukarch_ectx *ectx,
+			    const char *name,
+			    void *priv,
+			    uk_thread_dtor_t dtor);
 
 /**
  * Similar to `uk_thread_init_bare_fn0()` but with a thread function accepting
  * two arguments
  */
-void uk_thread_init_bare_fn2(struct uk_thread *t,
-			     uk_thread_fn2_t fn,
-			     void *argp0, void *argp1,
-			     uintptr_t sp,
-			     uintptr_t tlsp,
-			     bool is_uktls,
-			     struct ukarch_ectx *ectx,
-			     const char *name,
-			     void *priv,
-			     uk_thread_dtor_t dtor);
+int uk_thread_init_bare_fn2(struct uk_thread *t,
+			    uk_thread_fn2_t fn,
+			    void *argp0, void *argp1,
+			    uintptr_t sp,
+			    uintptr_t tlsp,
+			    bool is_uktls,
+			    struct ukarch_ectx *ectx,
+			    const char *name,
+			    void *priv,
+			    uk_thread_dtor_t dtor);
 
 /**
  * Initializes a `uk_thread` structure and allocates stack and optionally TLS.
@@ -496,6 +502,58 @@ void uk_thread_block(struct uk_thread *thread);
 void uk_thread_wake(struct uk_thread *thread);
 
 /**
+ * Thread initialization callback
+ * A thread initialization callback is called during thread creation
+ * from the parent context. Libraries can register callbacks with
+ * the `UK_THREAD_INIT*()` macros.
+ *
+ * @param parent
+ *  Parent thread of created one. Please note that the parent can be NULL.
+ *  This happens when scheduling is currently initializing and the main
+ *  threads are set up (e.g., "main", "idle").
+ * @param child
+ *  The child thread that is created.
+ *
+ * @return
+ *  (>=0): Success
+ *  (<0): Failure, thread creation will be aborted
+ */
+typedef int  (*uk_thread_init_func_t)(struct uk_thread *child,
+				      struct uk_thread *parent);
+
+/**
+ * Thread termination callback
+ * A thread finalization callback is called when a thread exits or got killed.
+ * Libraries can register callbacks with the `UK_THREAD_INIT*()` macros.
+ *
+ * @param child
+ *  The thread that is going to be removed from the system.
+ */
+typedef void (*uk_thread_term_func_t)(struct uk_thread *child);
+
+struct uk_thread_inittab_entry {
+	uint32_t flags;
+	uk_thread_init_func_t init;
+	uk_thread_term_func_t term;
+};
+
+#define UK_THREAD_INITF_ECTX  (UK_THREADF_ECTX)
+#define UK_THREAD_INITF_UKTLS (UK_THREADF_UKTLS)
+#define UK_THREAD_INITF_ALL   (UK_THREAD_INITF_ECTX | UK_THREAD_INITF_UKTLS)
+
+#define __UK_THREAD_INITTAB_ENTRY(init_fn, term_fn, prio, arg_flags)	\
+	static const struct uk_thread_inittab_entry			\
+	__used __section(".uk_thread_inittab" # prio) __align(8)	\
+		__uk_thread_inittab ## prio ## _ ## init_fn ## _ ## fini_fn = {\
+		.flags = (arg_flags),					\
+		.init = (init_fn),					\
+		.term = (term_fn)					\
+	}
+
+#define _UK_THREAD_INITTAB_ENTRY(init_fn, term_fn, prio, flags)		\
+	__UK_THREAD_INITTAB_ENTRY(init_fn, term_fn, prio, flags)
+
+/**
  * Registers a thread initialization function that is
  * called during thread creation
  *
@@ -506,29 +564,16 @@ void uk_thread_wake(struct uk_thread *thread);
  *   Use the UK_PRIO_AFTER() helper macro for computing priority dependencies.
  *   Note: Any other value for level will be ignored
  */
-typedef int  (*uk_thread_init_func_t)(struct uk_thread *thread);
-typedef void (*uk_thread_fini_func_t)(struct uk_thread *thread);
-struct uk_thread_inittab_entry {
-	uk_thread_init_func_t init;
-	uk_thread_fini_func_t fini;
-};
+#define UK_THREAD_INIT_PRIO_FLAGS(init_fn, term_fn, prio, flags)	\
+	_UK_THREAD_INITTAB_ENTRY(init_fn, term_fn, prio,		\
+				 ((flags) & (UK_THREAD_INITF_ALL)))
 
-#define __UK_THREAD_INITTAB_ENTRY(init_fn, fini_fn, prio)		\
-	static const struct uk_thread_inittab_entry			\
-	__used __section(".uk_thread_inittab" # prio) __align(8)	\
-		__uk_thread_inittab ## prio ## _ ## init_fn ## _ ## fini_fn = {\
-		.init = (init_fn),					\
-		.fini = (fini_fn)					\
-	}
+#define UK_THREAD_INIT_PRIO(init_fn, term_fn, prio)			\
+	UK_THREAD_INIT_PRIO_FLAGS(init_fn, term_fn, prio, (UK_THREAD_INITF_ALL))
 
-#define _UK_THREAD_INITTAB_ENTRY(init_fn, fini_fn, prio)		\
-	__UK_THREAD_INITTAB_ENTRY(init_fn, fini_fn, prio)
-
-#define UK_THREAD_INIT_PRIO(init_fn, fini_fn, prio)			\
-	_UK_THREAD_INITTAB_ENTRY(init_fn, fini_fn, prio)
-
-#define UK_THREAD_INIT(init_fn, fini_fn)				\
-	_UK_THREAD_INITTAB_ENTRY(init_fn, fini_fn, UK_PRIO_LATEST)
+#define UK_THREAD_INIT(init_fn, term_fn)				\
+	UK_THREAD_INIT_PRIO_FLAGS(init_fn, term_fn, UK_PRIO_LATEST,	\
+				  (UK_THREAD_INITF_ALL))
 
 #ifdef __cplusplus
 }
