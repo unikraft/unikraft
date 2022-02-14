@@ -154,3 +154,9 @@ typedef int __sig_atomic_t;
 typedef __sig_atomic_t sig_atomic_t;
 #define __DEFINED_sig_atomic_t
 #endif
+
+#if defined(__NEED_socklen_t) && !defined(__DEFINED_socklen_t)
+typedef unsigned int __socklen_t;
+typedef __socklen_t socklen_t;
+#define __DEFINED_socklen_t
+#endif
