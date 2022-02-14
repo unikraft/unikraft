@@ -185,23 +185,12 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 		}
 	}
 
-	vn_lock(vp);
-	/* Process truncate request */
-	if (flags & O_TRUNC) {
-		error = EINVAL;
-		if (!(flags & UK_FWRITE) || vp->v_type == VDIR)
-			goto out_vn_unlock;
-
-		error = VOP_TRUNCATE(vp, 0);
-		if (error)
-			goto out_vn_unlock;
-	}
-
 	fp = calloc(sizeof(struct vfscore_file), 1);
 	if (!fp) {
-	    error = ENOMEM;
-	    goto out_vn_unlock;
+		error = ENOMEM;
+		goto out_drele;
 	}
+
 	fhold(fp);
 	fp->f_flags = flags;
 
@@ -209,28 +198,33 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 	 * Don't need to increase refcount here, we already hold a reference
 	 * to dp from namei().
 	 */
-	// change to std::move once dp is a dentry_ref
 	fp->f_dentry = dp;
-	dp = NULL;
 
 	uk_mutex_init(&fp->f_lock);
 
-	error = VOP_OPEN(vp, fp);
-	if (error) {
-		vn_unlock(vp);
-		// Note direct delete of fp instead of fdrop(fp). fp was never
-		// returned so cannot be in use, and because it wasn't opened
-		// it cannot be close()ed.
-		drele(fp->f_dentry);
-		free(fp);
-		return error;
+	vn_lock(vp);
+
+	if (flags & O_TRUNC) {
+		error = EINVAL;
+		if (!(flags & UK_FWRITE) || vp->v_type == VDIR)
+			goto out_fp_free_unlock;
+
+		error = VOP_TRUNCATE(vp, 0);
+		if (error)
+			goto out_fp_free_unlock;
 	}
+
+	error = VOP_OPEN(vp, fp);
+	if (error)
+		goto out_fp_free_unlock;
+
 	vn_unlock(vp);
 
 	*fpp = fp;
 	return 0;
 
-out_vn_unlock:
+out_fp_free_unlock:
+	free(fp);
 	vn_unlock(vp);
 out_drele:
 	if (dp) {
