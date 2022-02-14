@@ -7,8 +7,13 @@ RUSTCFLAGS-$(CONFIG_LIBUKRUST) += --extern ukrust_sys -L $(LIBUKRUST_BUILD)/ --e
 		-Zallow-features=allocator_api,bench_black_box,concat_idents,global_asm,try_reserve
 
 export LIBUKRUST_BINDINGS_FILE=$(LIBUKRUST_BUILD)/bindings_generated.rs
-RUSTC_SYSROOT = $(shell $(RUSTC)  --print sysroot)
+
+ifeq ($(CONFIG_LIBRUST),y)
+# Do not perform these if CONFIG_RUST is not set, as it is not
+# guaranteed that rustc will be available in the system.
+RUSTC_SYSROOT := $(shell $(RUSTC)  --print sysroot)
 RUST_LIB_SRC ?= $(RUSTC_SYSROOT)/lib/rustlib/src/rust/library
+endif
 
 # Common flags
 LIBUKRUST_COMMON_FLAGS = --target=$(LIBUKRUST_BASE)/target.json --emit=dep-info,obj,metadata --edition=2018 \
