@@ -158,9 +158,8 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 		/* Open */
 		if (flags & O_NOFOLLOW) {
 			error = open_no_follow_chk(path);
-			if (error != 0) {
-				return (error);
-			}
+			if (error != 0)
+				return error;
 		}
 		error = namei(path, &dp);
 		if (error)
@@ -178,10 +177,10 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 				goto out_drele;
 		}
 		if (flags & O_DIRECTORY) {
-		    if (vp->v_type != VDIR) {
-		        error = ENOTDIR;
-		        goto out_drele;
-		    }
+			if (vp->v_type != VDIR) {
+				error = ENOTDIR;
+				goto out_drele;
+			}
 		}
 	}
 
@@ -227,9 +226,8 @@ out_fp_free_unlock:
 	free(fp);
 	vn_unlock(vp);
 out_drele:
-	if (dp) {
+	if (dp)
 		drele(dp);
-	}
 	return error;
 }
 
