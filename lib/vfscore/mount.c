@@ -476,13 +476,14 @@ vfs_unbusy(struct mount *mp)
 	ukarch_dec(&mp->m_count);
 }
 
-int vfscore_nullop(void)
+int
+vfscore_nullop()
 {
 	return 0;
 }
 
 int
-vfs_einval(void)
+vfscore_einval()
 {
 	return EINVAL;
 }
