@@ -58,10 +58,10 @@ extern "C" {
 #define SA_RESETHAND  0x80000000
 #define SA_RESTORER   0x04000000
 
-typedef int pid_t;
-typedef int sig_atomic_t;
-typedef unsigned long __sigset_t;
-typedef __sigset_t sigset_t;
+#define __NEED_pid_t
+#define __NEED_sig_atomic_t
+#define __NEED_sigset_t
+#include <nolibc-internal/shareddefs.h>
 
 #define NSIG _NSIG
 
