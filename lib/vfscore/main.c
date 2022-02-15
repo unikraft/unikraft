@@ -377,31 +377,6 @@ out_error:
 	return -error;
 }
 
-UK_TRACEPOINT(trace_vfs_read, "%d %p %d", int, void *, int);
-UK_TRACEPOINT(trace_vfs_read_ret, "0x%x", ssize_t);
-UK_TRACEPOINT(trace_vfs_read_err, "%d", int);
-
-UK_SYSCALL_R_DEFINE(ssize_t, read, int, fd, void *, buf, size_t, count)
-{
-	ssize_t bytes;
-
-	UK_ASSERT(buf);
-
-	struct iovec iov = {
-			.iov_base	= buf,
-			.iov_len	= count,
-	};
-
-	trace_vfs_read(fd, buf, count);
-
-	bytes = readv(fd, &iov, 1);
-	if (bytes < 0)
-		trace_vfs_read_err(bytes);
-	else
-		trace_vfs_read_ret(bytes);
-	return bytes;
-}
-
 UK_TRACEPOINT(trace_vfs_preadv, "%d %p 0x%x 0x%x", int, const struct iovec*,
 	      int, off_t);
 UK_TRACEPOINT(trace_vfs_preadv_ret, "0x%x", ssize_t);
@@ -548,6 +523,31 @@ out_error:
 	return error;
 }
 
+UK_TRACEPOINT(trace_vfs_read, "%d %p %d", int, void *, int);
+UK_TRACEPOINT(trace_vfs_read_ret, "0x%x", ssize_t);
+UK_TRACEPOINT(trace_vfs_read_err, "%d", int);
+
+UK_SYSCALL_R_DEFINE(ssize_t, read, int, fd, void *, buf, size_t, count)
+{
+	ssize_t bytes;
+
+	UK_ASSERT(buf);
+
+	struct iovec iov = {
+			.iov_base	= buf,
+			.iov_len	= count,
+	};
+
+	trace_vfs_read(fd, buf, count);
+
+	bytes = uk_syscall_r_readv((long) fd, (long) &iov, 1);
+	if (bytes < 0)
+		trace_vfs_read_err(bytes);
+	else
+		trace_vfs_read_ret(bytes);
+	return bytes;
+}
+
 static int do_pwritev(struct vfscore_file *fp, const struct iovec *iov,
 		      int iovcnt, off_t offset, ssize_t *bytes)
 {
@@ -567,30 +567,6 @@ static int do_pwritev(struct vfscore_file *fp, const struct iovec *iov,
 
 out_error:
 	return -error;
-}
-
-UK_TRACEPOINT(trace_vfs_write, "%d %p 0x%x 0x%x", int, const void *,
-	      size_t);
-UK_TRACEPOINT(trace_vfs_write_ret, "0x%x", ssize_t);
-UK_TRACEPOINT(trace_vfs_write_err, "%d", int);
-
-UK_SYSCALL_R_DEFINE(ssize_t, write, int, fd, const void *, buf, size_t, count)
-{
-	ssize_t bytes;
-
-	UK_ASSERT(buf);
-
-	struct iovec iov = {
-			.iov_base	= (void *)buf,
-			.iov_len	= count,
-	};
-	trace_vfs_write(fd, buf, count);
-	bytes = writev(fd, &iov, 1);
-	if (bytes < 0)
-		trace_vfs_write_err(errno);
-	else
-		trace_vfs_write_ret(bytes);
-	return bytes;
 }
 
 UK_TRACEPOINT(trace_vfs_pwritev, "%d %p 0x%x 0x%x", int, const struct iovec*,
@@ -738,6 +714,30 @@ out_error_fdrop:
 out_error:
 	trace_vfs_pwritev_err(error);
 	return error;
+}
+
+UK_TRACEPOINT(trace_vfs_write, "%d %p 0x%x 0x%x", int, const void *,
+	      size_t);
+UK_TRACEPOINT(trace_vfs_write_ret, "0x%x", ssize_t);
+UK_TRACEPOINT(trace_vfs_write_err, "%d", int);
+
+UK_SYSCALL_R_DEFINE(ssize_t, write, int, fd, const void *, buf, size_t, count)
+{
+	ssize_t bytes;
+
+	UK_ASSERT(buf);
+
+	struct iovec iov = {
+			.iov_base	= (void *)buf,
+			.iov_len	= count,
+	};
+	trace_vfs_write(fd, buf, count);
+	bytes = uk_syscall_r_writev((long) fd, (long) &iov, 1);
+	if (bytes < 0)
+		trace_vfs_write_err(errno);
+	else
+		trace_vfs_write_ret(bytes);
+	return bytes;
 }
 
 UK_TRACEPOINT(trace_vfs_ioctl, "%d 0x%x", int, unsigned long);
