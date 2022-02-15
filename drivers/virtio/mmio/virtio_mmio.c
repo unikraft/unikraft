@@ -271,7 +271,15 @@ static int vm_interrupt(void *opaque)
 	/* Read and acknowledge interrupts */
 	status = virtio_mmio_cread32(vm_dev->base,
 				     VIRTIO_MMIO_INTERRUPT_STATUS);
-	virtio_mmio_cwrite32(vm_dev->base, VIRTIO_MMIO_INTERRUPT_ACK, status);
+
+	/* It is possible that more than one device shares the same
+	 * interrupt line. Because of that, do not acknowledge the
+	 * interrupt unless one of the status bits is set, as writing
+	 * zero to the ACK register instructs the device to reset.
+	 */
+	if (likely(status))
+		virtio_mmio_cwrite32(vm_dev->base, VIRTIO_MMIO_INTERRUPT_ACK,
+				     status);
 
 	if (unlikely(status & VIRTIO_MMIO_INT_CONFIG)) {
 		uk_pr_warn("Unsupported config change interrupt received on virtio-mmio device %p\n",
@@ -284,6 +292,11 @@ static int vm_interrupt(void *opaque)
 			rc |= virtqueue_ring_interrupt(vq);
 		}
 		ukplat_lcpu_restore_irqf(flags);
+
+		/* If this is a virtio interrupt, then it MUST
+		 * be handled by one of the drivers.
+		 */
+		UK_ASSERT(rc);
 	}
 
 	return rc;

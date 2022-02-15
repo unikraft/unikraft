@@ -243,16 +243,18 @@ __u64 virtqueue_feature_negotiate(__u64 feature_set)
 int virtqueue_ring_interrupt(void *obj)
 {
 	struct virtqueue *vq = (struct virtqueue *)obj;
-	int rc = 0;
 
 	UK_ASSERT(vq);
 
+	/* It is possible that the vqueue is empty if the
+	 * interrupt arrives before the data is observable
+	 * by the device. In that case there's not much we
+	 * can do now but defer handling to the next irq.
+	 */
 	if (!virtqueue_hasdata(vq))
-		return rc;
+		return 1;
 
-	if (likely(vq->vq_callback))
-		rc = vq->vq_callback(vq, vq->priv);
-	return rc;
+	return (likely(vq->vq_callback)) ? vq->vq_callback(vq, vq->priv) : 1;
 }
 
 __paddr_t virtqueue_physaddr(struct virtqueue *vq)
