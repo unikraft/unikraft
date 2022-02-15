@@ -1204,7 +1204,8 @@ sys_fchdir(struct vfscore_file *fp, char *cwd)
 		vn_unlock(dvp);
 		return EBADF;
 	}
-	strlcpy(cwd, fp->f_dentry->d_path, PATH_MAX);
+	strlcpy(cwd, fp->f_dentry->d_mount->m_path, PATH_MAX);
+	strlcat(cwd, fp->f_dentry->d_path, PATH_MAX);
 	vn_unlock(dvp);
 	return 0;
 }
