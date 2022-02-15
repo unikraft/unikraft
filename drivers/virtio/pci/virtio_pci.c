@@ -135,17 +135,16 @@ static int virtio_pci_handle(void *arg)
 
 	/* Reading the isr status is used to acknowledge the interrupt */
 	isr_status = virtio_cread8((void *)(unsigned long)d->pci_isr_addr, 0);
-	/* We don't support configuration interrupt on the device */
+
 	if (isr_status & VIRTIO_PCI_ISR_CONFIG) {
-		uk_pr_warn("Unsupported config change interrupt received on virtio-pci device %p\n",
-			   d);
+		/* We don't support configuration interrupt on the device */
+		uk_pr_warn("Unsupported config change interrupt received on virtio-pci device %p\n", d);
 	}
 
-	if (isr_status & VIRTIO_PCI_ISR_HAS_INTR) {
-		UK_TAILQ_FOREACH(vq, &d->vdev.vqs, next) {
+	if (isr_status & VIRTIO_PCI_ISR_HAS_INTR)
+		UK_TAILQ_FOREACH(vq, &d->vdev.vqs, next)
 			rc |= virtqueue_ring_interrupt(vq);
-		}
-	}
+
 	return rc;
 }
 
