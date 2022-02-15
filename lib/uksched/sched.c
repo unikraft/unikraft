@@ -140,42 +140,6 @@ struct uk_sched *uk_sched_create(struct uk_alloc *a, size_t prv_size)
 	return sched;
 }
 
-void uk_sched_start(struct uk_sched *sched)
-{
-	struct ukarch_ctx origin;
-
-	UK_ASSERT(sched != NULL);
-	__uk_sched_thread_current = &sched->idle;
-	ukplat_tlsp_set(sched->idle.tlsp);
-	ukarch_ctx_switch(&origin, &sched->idle.ctx);
-
-	UK_CRASH("Failed to start scheduler: context switch unexpectedly returned\n");
-}
-
-void uk_sched_idle_init(struct uk_sched *sched, uk_thread_fn0_t idle_fn)
-{
-	int rc;
-
-	UK_ASSERT(sched != NULL);
-
-	rc = uk_thread_init_fn0(&sched->idle,
-				idle_fn,
-				sched->allocator, STACK_SIZE,
-				sched->allocator,
-				false, NULL,
-				"idle",
-				NULL,
-				NULL);
-	if (rc < 0)
-		goto out_crash;
-
-	sched->idle.sched = sched;
-	return;
-
-out_crash:
-	UK_CRASH("Failed to initialize `idle` thread\n");
-}
-
 struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
 		const char *name, const uk_thread_attr_t *attr,
 		uk_thread_fn1_t function, void *arg)
@@ -206,6 +170,56 @@ err_add:
 	uk_thread_release(thread);
 err:
 	return NULL;
+}
+
+int uk_sched_start(struct uk_sched *s)
+{
+	struct uk_thread *main_thread;
+	uintptr_t tlsp;
+	int ret;
+
+	UK_ASSERT(s);
+	UK_ASSERT(s->sched_start);
+	UK_ASSERT(!s->is_started);
+	UK_ASSERT(!uk_thread_current()); /* No other thread runs */
+
+	/* Allocate an `uk_thread` instance for current context
+	 * NOTE: We assume that if we have a TLS pointer, it points to
+	 *       an TLS that is derived from the Unikraft TLS template.
+	 */
+	tlsp = ukplat_tlsp_get();
+	main_thread = uk_thread_create_bare(s->a,
+					    0x0, 0x0, tlsp, !(!tlsp), false,
+					    "init", NULL, NULL);
+	if (!main_thread) {
+		ret = -ENOMEM;
+		goto err_out;
+	}
+	main_thread->sched = s;
+
+	/* Because `main_thread` acts as container for storing the current
+	 * context, it does not have IP and SP set. We have to manually mark
+	 * the thread as RUNNABLE.
+	 */
+	main_thread->flags |= UK_THREADF_RUNNABLE;
+
+	/* Set main_thread as current scheduled thread */
+	__uk_sched_thread_current = main_thread;
+
+	/* Enable scheduler, like time slicing, etc. and notify that `s`
+	 * has an (already) scheduled thread
+	 */
+	ret = s->sched_start(s, main_thread);
+	if (ret < 0)
+		goto err_unset_thread_current;
+	s->is_started = true;
+	return 0;
+
+err_unset_thread_current:
+	__uk_sched_thread_current = NULL;
+	uk_thread_release(main_thread);
+err_out:
+	return ret;
 }
 
 void uk_sched_thread_destroy(struct uk_sched *sched, struct uk_thread *thread)

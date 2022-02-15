@@ -71,6 +71,8 @@ typedef void  (*uk_sched_thread_blocked_func_t)
 typedef void  (*uk_sched_thread_woken_func_t)
 		(struct uk_sched *s, struct uk_thread *t);
 
+typedef int   (*uk_sched_start_t)(struct uk_sched *s, struct uk_thread *main);
+
 typedef int   (*uk_sched_thread_set_prio_func_t)
 		(struct uk_sched *s, struct uk_thread *t, prio_t prio);
 typedef int   (*uk_sched_thread_get_prio_func_t)
@@ -93,9 +95,11 @@ struct uk_sched {
 	uk_sched_thread_set_tslice_func_t thread_set_tslice;
 	uk_sched_thread_get_tslice_func_t thread_get_tslice;
 
+	uk_sched_start_t sched_start;
+
 	/* internal */
+	bool is_started;
 	bool threads_started;
-	struct uk_thread idle;
 	struct uk_thread_list exited_threads;
 	struct uk_alloc *allocator;
 	struct uk_sched *next;
@@ -204,20 +208,13 @@ static inline int uk_sched_thread_get_timeslice(struct uk_sched *s,
 
 struct uk_sched *uk_sched_create(struct uk_alloc *a, size_t prv_size);
 
-void uk_sched_idle_init(struct uk_sched *sched, uk_thread_fn0_t idle_fn);
-
-static inline struct uk_thread *uk_sched_get_idle(struct uk_sched *s)
-{
-	UK_ASSERT(s);
-	return &s->idle;
-}
-
-#define uk_sched_init(s, yield_func, \
+#define uk_sched_init(s, start_func, yield_func, \
 		thread_add_func, thread_remove_func, \
 		thread_blocked_func, thread_woken_func, \
 		thread_set_prio_func, thread_get_prio_func, \
 		thread_set_tslice_func, thread_get_tslice_func) \
 	do { \
+		(s)->sched_start     = start_func; \
 		(s)->yield           = yield_func; \
 		(s)->thread_add      = thread_add_func; \
 		(s)->thread_remove   = thread_remove_func; \
@@ -234,7 +231,10 @@ static inline struct uk_thread *uk_sched_get_idle(struct uk_sched *s)
  * Public scheduler functions
  */
 
-void uk_sched_start(struct uk_sched *sched) __noreturn;
+/**
+ * Create a main thread from current context and call thread starter function
+ */
+int uk_sched_start(struct uk_sched *sched);
 
 static inline bool uk_sched_started(struct uk_sched *sched)
 {

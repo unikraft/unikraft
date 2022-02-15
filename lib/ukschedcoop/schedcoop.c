@@ -29,6 +29,7 @@
  * The scheduler is non-preemptive (cooperative), and schedules according
  * to Round Robin algorithm.
  */
+#include <uk/plat/config.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/memory.h>
 #include <uk/plat/time.h>
@@ -38,6 +39,8 @@
 struct schedcoop_private {
 	struct uk_thread_list thread_list;
 	struct uk_thread_list sleeping_threads;
+
+	struct uk_thread idle;
 };
 
 #ifdef SCHED_DEBUG
@@ -202,13 +205,12 @@ static void schedcoop_thread_woken(struct uk_sched *s, struct uk_thread *t)
 	}
 }
 
+static void idle_thread_fn(void) __noreturn;
+
 static void idle_thread_fn(void)
 {
 	struct uk_thread *current = uk_thread_current();
 	struct uk_sched *s = current->sched;
-
-	s->threads_started = true;
-	ukplat_lcpu_enable_irq();
 
 	while (1) {
 		uk_thread_block(current);
@@ -221,10 +223,30 @@ static void schedcoop_yield(struct uk_sched *s)
 	schedcoop_schedule(s);
 }
 
+static int schedcoop_start(struct uk_sched *s, struct uk_thread *main_thread)
+{
+	UK_ASSERT(main_thread);
+	UK_ASSERT(main_thread->sched == s);
+	UK_ASSERT(uk_thread_is_runnable(main_thread));
+	UK_ASSERT(!uk_thread_is_exited(main_thread));
+	UK_ASSERT(uk_thread_current() == main_thread);
+
+	/* NOTE: We do not put `main_thread` into the thread list.
+	 *       Current running threads will be added as soon as
+	 *       a different thread is scheduled.
+	 */
+
+	s->threads_started = true;
+	ukplat_lcpu_enable_irq();
+
+	return 0;
+}
+
 struct uk_sched *uk_schedcoop_init(struct uk_alloc *a)
 {
 	struct schedcoop_private *prv = NULL;
 	struct uk_sched *sched = NULL;
+	int rc;
 
 	uk_pr_info("Initializing cooperative scheduler\n");
 
@@ -236,9 +258,24 @@ struct uk_sched *uk_schedcoop_init(struct uk_alloc *a)
 	UK_TAILQ_INIT(&prv->thread_list);
 	UK_TAILQ_INIT(&prv->sleeping_threads);
 
-	uk_sched_idle_init(sched, idle_thread_fn);
+	rc = uk_thread_init_fn0(&prv->idle,
+				idle_thread_fn,
+				a, STACK_SIZE,
+				a,
+				false, NULL,
+				"idle",
+				NULL,
+				NULL);
+	if (rc < 0) {
+		 /* FIXME: Do not crash on failure */
+		UK_CRASH("Failed to initialize `idle` thread\n");
+	}
+
+	prv->idle.sched = sched;
+	UK_TAILQ_INSERT_TAIL(&prv->thread_list, &prv->idle, thread_list);
 
 	uk_sched_init(sched,
+		        schedcoop_start,
 			schedcoop_yield,
 			schedcoop_thread_add,
 			schedcoop_thread_remove,
