@@ -1541,8 +1541,7 @@ int __xstat(int ver __unused, const char *pathname, struct stat *st)
 
 	out_errno:
 	trace_vfs_stat_err(error);
-	errno = error;
-	return -1;
+	return -error;
 }
 
 #ifdef __xstat64
