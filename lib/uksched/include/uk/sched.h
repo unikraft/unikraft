@@ -104,7 +104,6 @@ struct uk_sched {
 	struct uk_thread_list exited_threads;
 	struct uk_alloc *allocator;
 	struct uk_sched *next;
-	void *prv;
 };
 
 /* wrapper functions over scheduler callbacks */
@@ -208,14 +207,12 @@ static inline int uk_sched_thread_get_timeslice(struct uk_sched *s,
 /*
  * Internal scheduler functions
  */
-
-struct uk_sched *uk_sched_create(struct uk_alloc *a, size_t prv_size);
-
 #define uk_sched_init(s, start_func, yield_func, \
 		thread_add_func, thread_remove_func, \
 		thread_blocked_func, thread_woken_func, \
 		thread_set_prio_func, thread_get_prio_func, \
-		thread_set_tslice_func, thread_get_tslice_func) \
+		thread_set_tslice_func, thread_get_tslice_func, \
+		def_allocator) \
 	do { \
 		(s)->sched_start     = start_func; \
 		(s)->yield           = yield_func; \
@@ -228,6 +225,10 @@ struct uk_sched *uk_sched_create(struct uk_alloc *a, size_t prv_size);
 		(s)->thread_set_tslice  = thread_set_tslice_func; \
 		(s)->thread_get_tslice  = thread_get_tslice_func; \
 		uk_sched_register((s)); \
+		\
+		(s)->threads_started = false;	\
+		(s)->allocator = (def_allocator); \
+		UK_TAILQ_INIT(&(s)->exited_threads); \
 	} while (0)
 
 /*
