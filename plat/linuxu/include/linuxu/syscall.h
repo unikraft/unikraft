@@ -49,14 +49,6 @@
 #error "Unsupported architecture"
 #endif
 
-static inline int sys_open(const char *pathname, int flags, k_mode_t mode)
-{
-	return (int)syscall3(__SC_OPEN,
-			    (long) (pathname),
-			    (long) (flags),
-			    (long) (mode));
-}
-
 static inline int sys_close(int fd)
 {
 	return (int)syscall1(__SC_CLOSE,
@@ -85,7 +77,7 @@ static inline int sys_fstat(int fd, struct k_stat *statbuf)
 	return (int)syscall2(__SC_FSTAT,
 			     (long)(fd),
 			     (long)(statbuf));
-
+}
 #ifndef O_RDONLY
 #define O_RDONLY                  00000000
 #endif /* O_RDONLY */
@@ -138,12 +130,6 @@ static inline int sys_open(const char *pathname, int flags, ...)
 			 (long)FD_CLOEXEC);
 
 	return fd;
-}
-
-static inline int sys_close(int fd)
-{
-	return (ssize_t) syscall1(__SC_CLOSE,
-				  (long) fd);
 }
 
 #ifndef SOCK_STREAM
