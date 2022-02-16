@@ -35,21 +35,31 @@
 #include <uk/plat/time.h>
 #include <uk/sched.h>
 #include <uk/schedcoop.h>
+#include <uk/essentials.h>
 
-struct schedcoop_private {
+struct schedcoop {
+	struct uk_sched sched;
+
 	struct uk_thread_list thread_list;
 	struct uk_thread_list sleeping_threads;
 
 	struct uk_thread idle;
 };
 
+static inline struct schedcoop *uksched2schedcoop(struct uk_sched *s)
+{
+	UK_ASSERT(s);
+
+	return __containerof(s, struct schedcoop, sched);
+}
+
 #ifdef SCHED_DEBUG
 static void print_runqueue(struct uk_sched *s)
 {
-	struct schedcoop_private *prv = s->private;
+	struct schedcoop *c = uksched2schedcoop(s);
 	struct uk_thread *th;
 
-	UK_TAILQ_FOREACH(th, &prv->thread_list, thread_list) {
+	UK_TAILQ_FOREACH(th, &c->thread_list, thread_list) {
 		uk_pr_debug("   Thread \"%s\", runnable=%d\n",
 			    th->name, is_runnable(th));
 	}
@@ -58,7 +68,7 @@ static void print_runqueue(struct uk_sched *s)
 
 static void schedcoop_schedule(struct uk_sched *s)
 {
-	struct schedcoop_private *prv = s->prv;
+	struct schedcoop *c = uksched2schedcoop(s);
 	struct uk_thread *prev, *next, *thread, *tmp;
 	unsigned long flags;
 
@@ -83,7 +93,7 @@ static void schedcoop_schedule(struct uk_sched *s)
 		__snsec min_wakeup_time = now + ukarch_time_sec_to_nsec(10);
 
 		/* wake some sleeping threads */
-		UK_TAILQ_FOREACH_SAFE(thread, &prv->sleeping_threads,
+		UK_TAILQ_FOREACH_SAFE(thread, &c->sleeping_threads,
 				      thread_list, tmp) {
 
 			if (thread->wakeup_time && thread->wakeup_time <= now)
@@ -93,16 +103,16 @@ static void schedcoop_schedule(struct uk_sched *s)
 				min_wakeup_time = thread->wakeup_time;
 		}
 
-		next = UK_TAILQ_FIRST(&prv->thread_list);
+		next = UK_TAILQ_FIRST(&c->thread_list);
 		if (next) {
 			UK_ASSERT(next != prev);
 			UK_ASSERT(is_runnable(next));
 			UK_ASSERT(!is_exited(next));
-			UK_TAILQ_REMOVE(&prv->thread_list, next,
+			UK_TAILQ_REMOVE(&c->thread_list, next,
 					thread_list);
 			/* Put previous thread on the end of the list */
 			if (is_runnable(prev))
-				UK_TAILQ_INSERT_TAIL(&prv->thread_list, prev,
+				UK_TAILQ_INSERT_TAIL(&c->thread_list, prev,
 						thread_list);
 			else
 				set_queueable(prev);
@@ -143,11 +153,11 @@ static void schedcoop_schedule(struct uk_sched *s)
 static int schedcoop_thread_add(struct uk_sched *s, struct uk_thread *t,
 	const uk_thread_attr_t *attr __unused)
 {
+	struct schedcoop *c = uksched2schedcoop(s);
 	unsigned long flags;
-	struct schedcoop_private *prv = s->prv;
 
 	flags = ukplat_lcpu_save_irqf();
-	UK_TAILQ_INSERT_TAIL(&prv->thread_list, t, thread_list);
+	UK_TAILQ_INSERT_TAIL(&c->thread_list, t, thread_list);
 	ukplat_lcpu_restore_irqf(flags);
 
 	return 0;
@@ -155,14 +165,14 @@ static int schedcoop_thread_add(struct uk_sched *s, struct uk_thread *t,
 
 static void schedcoop_thread_remove(struct uk_sched *s, struct uk_thread *t)
 {
+	struct schedcoop *c = uksched2schedcoop(s);
 	unsigned long flags;
-	struct schedcoop_private *prv = s->prv;
 
 	flags = ukplat_lcpu_save_irqf();
 
 	/* Remove from the thread list */
 	if (t != uk_thread_current())
-		UK_TAILQ_REMOVE(&prv->thread_list, t, thread_list);
+		UK_TAILQ_REMOVE(&c->thread_list, t, thread_list);
 	clear_runnable(t);
 
 	uk_thread_exit(t);
@@ -181,26 +191,26 @@ static void schedcoop_thread_remove(struct uk_sched *s, struct uk_thread *t)
 
 static void schedcoop_thread_blocked(struct uk_sched *s, struct uk_thread *t)
 {
-	struct schedcoop_private *prv = s->prv;
+	struct schedcoop *c = uksched2schedcoop(s);
 
 	UK_ASSERT(ukplat_lcpu_irqs_disabled());
 
 	if (t != uk_thread_current())
-		UK_TAILQ_REMOVE(&prv->thread_list, t, thread_list);
+		UK_TAILQ_REMOVE(&c->thread_list, t, thread_list);
 	if (t->wakeup_time > 0)
-		UK_TAILQ_INSERT_TAIL(&prv->sleeping_threads, t, thread_list);
+		UK_TAILQ_INSERT_TAIL(&c->sleeping_threads, t, thread_list);
 }
 
 static void schedcoop_thread_woken(struct uk_sched *s, struct uk_thread *t)
 {
-	struct schedcoop_private *prv = s->prv;
+	struct schedcoop *c = uksched2schedcoop(s);
 
 	UK_ASSERT(ukplat_lcpu_irqs_disabled());
 
 	if (t->wakeup_time > 0)
-		UK_TAILQ_REMOVE(&prv->sleeping_threads, t, thread_list);
+		UK_TAILQ_REMOVE(&c->sleeping_threads, t, thread_list);
 	if (t != uk_thread_current() || is_queueable(t)) {
-		UK_TAILQ_INSERT_TAIL(&prv->thread_list, t, thread_list);
+		UK_TAILQ_INSERT_TAIL(&c->thread_list, t, thread_list);
 		clear_queueable(t);
 	}
 }
@@ -242,23 +252,20 @@ static int schedcoop_start(struct uk_sched *s, struct uk_thread *main_thread)
 	return 0;
 }
 
-struct uk_sched *uk_schedcoop_init(struct uk_alloc *a)
+struct uk_sched *uk_schedcoop_create(struct uk_alloc *a)
 {
-	struct schedcoop_private *prv = NULL;
-	struct uk_sched *sched = NULL;
+	struct schedcoop *c = NULL;
 	int rc;
 
 	uk_pr_info("Initializing cooperative scheduler\n");
-
-	sched = uk_sched_create(a, sizeof(struct schedcoop_private));
-	if (sched == NULL)
+	c = uk_zalloc(a, sizeof(struct schedcoop));
+	if (!c)
 		return NULL;
 
-	prv = sched->prv;
-	UK_TAILQ_INIT(&prv->thread_list);
-	UK_TAILQ_INIT(&prv->sleeping_threads);
+	UK_TAILQ_INIT(&c->thread_list);
+	UK_TAILQ_INIT(&c->sleeping_threads);
 
-	rc = uk_thread_init_fn0(&prv->idle,
+	rc = uk_thread_init_fn0(&c->idle,
 				idle_thread_fn,
 				a, STACK_SIZE,
 				a,
@@ -271,17 +278,17 @@ struct uk_sched *uk_schedcoop_init(struct uk_alloc *a)
 		UK_CRASH("Failed to initialize `idle` thread\n");
 	}
 
-	prv->idle.sched = sched;
-	UK_TAILQ_INSERT_TAIL(&prv->thread_list, &prv->idle, thread_list);
+	c->idle.sched = &c->sched;
 
-	uk_sched_init(sched,
+	uk_sched_init(&c->sched,
 		        schedcoop_start,
 			schedcoop_yield,
 			schedcoop_thread_add,
 			schedcoop_thread_remove,
 			schedcoop_thread_blocked,
 			schedcoop_thread_woken,
-			NULL, NULL, NULL, NULL);
+		        NULL, NULL, NULL, NULL,
+		        a);
 
-	return sched;
+	return &c->sched;
 }

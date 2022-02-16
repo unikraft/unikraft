@@ -58,7 +58,7 @@ struct uk_sched *uk_sched_default_init(struct uk_alloc *a)
 #endif
 
 #if CONFIG_LIBUKSCHEDCOOP
-	s = uk_schedcoop_init(a);
+	s = uk_schedcoop_create(a);
 #endif
 
 	return s;
@@ -118,26 +118,6 @@ int uk_sched_set_default(struct uk_sched *s)
 	s->next = head;
 	uk_sched_head = s;
 	return 0;
-}
-
-struct uk_sched *uk_sched_create(struct uk_alloc *a, size_t prv_size)
-{
-	struct uk_sched *sched = NULL;
-
-	UK_ASSERT(a != NULL);
-
-	sched = uk_malloc(a, sizeof(struct uk_sched) + prv_size);
-	if (sched == NULL) {
-		uk_pr_warn("Failed to allocate scheduler\n");
-		return NULL;
-	}
-
-	sched->threads_started = false;
-	sched->allocator = a;
-	UK_TAILQ_INIT(&sched->exited_threads);
-	sched->prv = (void *) sched + sizeof(struct uk_sched);
-
-	return sched;
 }
 
 struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
