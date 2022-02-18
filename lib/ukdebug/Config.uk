@@ -65,6 +65,16 @@ config LIBUKDEBUG_PRINT_TIME
 	bool "Show timestamp in messages"
 	default y
 
+config LIBUKDEBUG_PRINT_THREAD
+	bool "Show thread identifier"
+	default n
+	depends on LIBUKSCHED
+	help
+	  Prints the thread name or, if unnamed, the address of
+	  the TCB (struct uk_thread) of the currently scheduled
+	  thread. For the case `uk_thread_current()` returns
+	  NULL, the placeholder "<<n/a>>" is printed instead.
+
 config LIBUKDEBUG_PRINT_CALLER
 	bool "Show caller information"
 	default n
