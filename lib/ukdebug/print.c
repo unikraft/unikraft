@@ -44,11 +44,15 @@
 #include <uk/print.h>
 #include <uk/errptr.h>
 #include <uk/arch/lcpu.h>
+#if CONFIG_LIBUKDEBUG_PRINT_THREAD
+#include <uk/thread.h>
+#endif
 
 #if CONFIG_LIBUKDEBUG_ANSI_COLOR
 #define LVLC_RESET	UK_ANSI_MOD_RESET
 #define LVLC_TS		UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_GREEN)
 #define LVLC_CALLER	UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_RED)
+#define LVLC_THREAD	UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_BLUE)
 #define LVLC_LIBNAME	UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_YELLOW)
 #define LVLC_SRCNAME	UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_CYAN)
 #define LVLC_DEBUG	UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_WHITE)
@@ -126,6 +130,29 @@ static void _print_timestamp(struct _vprint_console *cons)
 }
 #endif
 
+#if CONFIG_LIBUKDEBUG_PRINT_THREAD
+static void _print_thread(struct _vprint_console *cons)
+{
+	struct uk_thread *t = uk_thread_current();
+	char buf[BUFLEN];
+	int len;
+
+	if (t) {
+		if (t->name) {
+			len = __uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_THREAD
+					    "<%s> ", t->name);
+		} else {
+			len = __uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_THREAD
+					    "<%p> ", (void *) t);
+		}
+	} else {
+		len = __uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_THREAD
+				    "<<n/a>> ");
+	}
+	cons->cout((char *)buf, len);
+}
+#endif /* CONFIG_LIBUKDEBUG_PRINT_THREAD */
+
 #if CONFIG_LIBUKDEBUG_PRINT_CALLER
 static void _print_caller(struct _vprint_console *cons, __uptr ra, __uptr fa)
 {
@@ -201,6 +228,9 @@ static void _vprint(struct _vprint_console *cons,
 			_print_timestamp(cons);
 #endif
 			cons->cout(DECONST(char *, msghdr), strlen(msghdr));
+#if CONFIG_LIBUKDEBUG_PRINT_THREAD
+			_print_thread(cons);
+#endif
 #if CONFIG_LIBUKDEBUG_PRINT_CALLER
 			_print_caller(cons, retaddr, frameaddr);
 #endif
