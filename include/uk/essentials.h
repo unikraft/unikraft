@@ -317,6 +317,19 @@ extern "C" {
 #endif
 #endif /* !__containerof */
 
+#ifdef __GNUC__
+#ifndef __return_addr
+#define __return_addr(lvl) \
+	((__uptr) __builtin_extract_return_addr(__builtin_return_address(lvl)))
+#endif
+#ifndef __frame_addr
+#define __frame_addr(lvl) \
+	((__uptr) __builtin_frame_address(lvl))
+#endif
+#else
+	/* to be defined */
+#endif /* !__GNUC__ */
+
 #ifndef UK_CTASSERT
 #define UK_CTASSERT(x)             _UK_CTASSERT(x, __LINE__)
 #define _UK_CTASSERT(x, y)         __UK_CTASSERT(x, y)
