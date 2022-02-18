@@ -48,7 +48,7 @@
 #if CONFIG_LIBUKDEBUG_ANSI_COLOR
 #define LVLC_RESET	UK_ANSI_MOD_RESET
 #define LVLC_TS		UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_GREEN)
-#define LVLC_SP		UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_BLUE)
+#define LVLC_CALLER	UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_RED)
 #define LVLC_LIBNAME	UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_YELLOW)
 #define LVLC_SRCNAME	UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_CYAN)
 #define LVLC_DEBUG	UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_WHITE)
@@ -126,25 +126,28 @@ static void _print_timestamp(struct _vprint_console *cons)
 }
 #endif
 
-#if CONFIG_LIBUKDEBUG_PRINT_STACK
-static void _print_stack(struct _vprint_console *cons)
+#if CONFIG_LIBUKDEBUG_PRINT_CALLER
+static void _print_caller(struct _vprint_console *cons, __uptr ra, __uptr fa)
 {
-	unsigned long stackb;
 	char buf[BUFLEN];
 	int len;
 
-	stackb = (ukarch_read_sp() & STACK_MASK_TOP) + __STACK_SIZE;
-
-	len = __uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_SP
-			    "<%p> ", (void *) stackb);
+	len = __uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_CALLER
+			    "{r:%p,f:%p} ", (void *) ra, (void *) fa);
 	cons->cout((char *)buf, len);
 }
-#endif
+#endif /* CONFIG_LIBUKDEBUG_PRINT_CALLER */
 
 static void _vprint(struct _vprint_console *cons,
 		    int lvl, const char *libname,
-		    const char *srcname __maybe_unused,
-		    unsigned int srcline __maybe_unused,
+#if CONFIG_LIBUKDEBUG_PRINT_SRCNAME
+		    const char *srcname,
+		    unsigned int srcline,
+#endif /* CONFIG_LIBUKDEBUG_PRINT_SRCNAME */
+#if CONFIG_LIBUKDEBUG_PRINT_CALLER
+		    __uptr retaddr,
+		    __uptr frameaddr,
+#endif /* CONFIG_LIBUKDEBUG_PRINT_CALLER */
 		    const char *fmt, va_list ap)
 {
 	char lbuf[BUFLEN];
@@ -198,8 +201,8 @@ static void _vprint(struct _vprint_console *cons,
 			_print_timestamp(cons);
 #endif
 			cons->cout(DECONST(char *, msghdr), strlen(msghdr));
-#if CONFIG_LIBUKDEBUG_PRINT_STACK
-			_print_stack(cons);
+#if CONFIG_LIBUKDEBUG_PRINT_CALLER
+			_print_caller(cons, retaddr, frameaddr);
 #endif
 			if (libname) {
 				cons->cout(LVLC_RESET LVLC_LIBNAME "[",
@@ -261,15 +264,36 @@ static void _vprint(struct _vprint_console *cons,
  *  We rely on OPTIMIZE_DEADELIM: These symbols are automatically
  *  removed from the final image when there was no usage.
  */
+#if CONFIG_LIBUKDEBUG_PRINT_SRCNAME
+#define _VPRINT_ARGS_SRCNAME(srcname, srcline)	\
+	(srcname), (srcline),
+#else
+#define _VPRINT_ARGS_SRCNAME(srcname, srcline)
+#endif /* CONFIG_LIBUKDEBUG_PRINT_SRCNAME */
+
+#if CONFIG_LIBUKDEBUG_PRINT_CALLER
+#define _VPRINT_ARGS_CALLER()			\
+	__return_addr(0),			\
+	__frame_addr(0),
+#else
+#define _VPRINT_ARGS_CALLER()
+#endif /* CONFIG_LIBUKDEBUG_PRINT_CALLER */
+
 void _uk_vprintd(const char *libname, const char *srcname,
 		 unsigned int srcline, const char *fmt, va_list ap)
 {
 
 #if CONFIG_LIBUKDEBUG_REDIR_PRINTD
-	_vprint(&kern,  KLVL_DEBUG, libname, srcname, srcline, fmt, ap);
+	_vprint(&kern,  KLVL_DEBUG, libname,
+		_VPRINT_ARGS_SRCNAME(srcname, srcline)
+		_VPRINT_ARGS_CALLER()
+		fmt, ap);
 #else
-	_vprint(&debug, KLVL_DEBUG, libname, srcname, srcline, fmt, ap);
-#endif
+	_vprint(&debug, KLVL_DEBUG, libname,
+		_VPRINT_ARGS_SRCNAME(srcname, srcline)
+		_VPRINT_ARGS_CALLER()
+		fmt, ap);
+#endif /* !CONFIG_LIBUKDEBUG_REDIR_PRINTD */
 }
 
 void _uk_printd(const char *libname, const char *srcname,
@@ -278,7 +302,17 @@ void _uk_printd(const char *libname, const char *srcname,
 	va_list ap;
 
 	va_start(ap, fmt);
-	_uk_vprintd(libname, srcname, srcline, fmt, ap);
+#if CONFIG_LIBUKDEBUG_REDIR_PRINTD
+	_vprint(&kern,  KLVL_DEBUG, libname,
+		_VPRINT_ARGS_SRCNAME(srcname, srcline)
+		_VPRINT_ARGS_CALLER()
+		fmt, ap);
+#else
+	_vprint(&debug, KLVL_DEBUG, libname,
+		_VPRINT_ARGS_SRCNAME(srcname, srcline)
+		_VPRINT_ARGS_CALLER()
+		fmt, ap);
+#endif /* !CONFIG_LIBUKDEBUG_REDIR_PRINTD */
 	va_end(ap);
 }
 
@@ -293,10 +327,16 @@ void _uk_vprintk(int lvl, const char *libname, const char *srcname,
 		 unsigned int srcline, const char *fmt, va_list ap)
 {
 #if CONFIG_LIBUKDEBUG_REDIR_PRINTK
-	_vprint(&debug, lvl, libname, srcname, srcline, fmt, ap);
+	_vprint(&debug, lvl, libname,
+		_VPRINT_ARGS_SRCNAME(srcname, srcline)
+		_VPRINT_ARGS_CALLER()
+		fmt, ap);
 #else
-	_vprint(&kern,  lvl, libname, srcname, srcline, fmt, ap);
-#endif
+	_vprint(&kern,  lvl, libname,
+		_VPRINT_ARGS_SRCNAME(srcname, srcline)
+		_VPRINT_ARGS_CALLER()
+		fmt, ap);
+#endif /* !CONFIG_LIBUKDEBUG_REDIR_PRINTK */
 }
 
 void _uk_printk(int lvl, const char *libname, const char *srcname,
@@ -305,7 +345,17 @@ void _uk_printk(int lvl, const char *libname, const char *srcname,
 	va_list ap;
 
 	va_start(ap, fmt);
-	_uk_vprintk(lvl, libname, srcname, srcline, fmt, ap);
+#if CONFIG_LIBUKDEBUG_REDIR_PRINTK
+	_vprint(&debug, lvl, libname,
+		_VPRINT_ARGS_SRCNAME(srcname, srcline)
+		_VPRINT_ARGS_CALLER()
+		fmt, ap);
+#else
+	_vprint(&kern,  lvl, libname,
+		_VPRINT_ARGS_SRCNAME(srcname, srcline)
+		_VPRINT_ARGS_CALLER()
+		fmt, ap);
+#endif /* !CONFIG_LIBUKDEBUG_REDIR_PRINTK */
 	va_end(ap);
 }
 #endif /* CONFIG_LIBUKDEBUG_PRINTD */
