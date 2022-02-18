@@ -560,7 +560,7 @@ static void xs_recv(void)
 	}
 }
 
-static void xs_thread_func(void *ign __unused)
+static __noreturn void xs_thread_func(void *ign __unused)
 {
 	for (;;) {
 		uk_waitq_wait_event(&xsh.waitq, xs_avail_work());

@@ -203,7 +203,7 @@ int uk_blkdev_configure(struct uk_blkdev *dev,
 }
 
 #if CONFIG_LIBUKBLKDEV_DISPATCHERTHREADS
-static void _dispatcher(void *args)
+static __noreturn void _dispatcher(void *args)
 {
 	struct uk_blkdev_event_handler *handler =
 		(struct uk_blkdev_event_handler *) args;

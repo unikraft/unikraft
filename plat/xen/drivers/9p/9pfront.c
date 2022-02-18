@@ -68,7 +68,7 @@ static void p9front_recv(struct p9front_dev_ring *ring);
 
 #if CONFIG_LIBUKSCHED
 
-static void p9front_bh_handler(void *arg)
+static __noreturn void p9front_bh_handler(void *arg)
 {
 	struct p9front_dev_ring *ring = arg;
 
