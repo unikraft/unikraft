@@ -352,7 +352,7 @@ int uk_netdev_configure(struct uk_netdev *dev,
 }
 
 #ifdef CONFIG_LIBUKNETDEV_DISPATCHERTHREADS
-static void _dispatcher(void *arg)
+static __noreturn void _dispatcher(void *arg)
 {
 	struct uk_netdev_event_handler *handler =
 		(struct uk_netdev_event_handler *) arg;
