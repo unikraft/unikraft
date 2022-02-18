@@ -44,6 +44,7 @@ struct schedcoop {
 	struct uk_thread_list sleeping_threads;
 
 	struct uk_thread idle;
+	__nsec idle_return_time;
 };
 
 static inline struct schedcoop *uksched2schedcoop(struct uk_sched *s)
@@ -83,7 +84,6 @@ static void schedcoop_schedule(struct uk_sched *s)
 		UK_CRASH("Must not call %s from a callback\n", __func__);
 #endif
 
-	do {
 		/* Examine all threads.
 		 * Find a runnable thread, but also wake up expired ones and
 		 * find the time when the next timeout expires, else use
@@ -103,34 +103,29 @@ static void schedcoop_schedule(struct uk_sched *s)
 				min_wakeup_time = thread->wakeup_time;
 		}
 
-		next = UK_TAILQ_FIRST(&c->thread_list);
-		if (next) {
-			UK_ASSERT(next != prev);
-			UK_ASSERT(is_runnable(next));
-			UK_ASSERT(!is_exited(next));
-			UK_TAILQ_REMOVE(&c->thread_list, next,
-					thread_list);
-			/* Put previous thread on the end of the list */
-			if (is_runnable(prev))
-				UK_TAILQ_INSERT_TAIL(&c->thread_list, prev,
-						thread_list);
-			else
-				set_queueable(prev);
-			clear_queueable(next);
-			break;
-		} else if (is_runnable(prev)) {
-			next = prev;
-			break;
-		}
+	next = UK_TAILQ_FIRST(&c->thread_list);
+	if (next) {
+		UK_ASSERT(next != prev);
+		UK_ASSERT(is_runnable(next));
+		UK_ASSERT(!is_exited(next));
+		UK_TAILQ_REMOVE(&c->thread_list, next,
+				thread_list);
 
-		/* block until the next timeout expires, or for 10 secs,
-		 * whichever comes first
+		/* Put previous thread on the end of the list */
+		if ((prev != &c->idle) && is_runnable(prev))
+			UK_TAILQ_INSERT_TAIL(&c->thread_list, prev,
+					     thread_list);
+	} else if (is_runnable(prev)) {
+		next = prev;
+	} else {
+		/*
+		 * Schedule idle thread that will halt the CPU
+		 * We select the idle thread only if we do not have anything
+		 * else to execute
 		 */
-		ukplat_lcpu_halt_to(min_wakeup_time);
-		/* handle pending events if any */
-		ukplat_lcpu_irqs_handle_pending();
-
-	} while (1);
+		c->idle_return_time = min_wakeup_time;
+		next = &c->idle;
+	}
 
 	ukplat_lcpu_restore_irqf(flags);
 
@@ -207,16 +202,30 @@ static void schedcoop_thread_woken(struct uk_sched *s, struct uk_thread *t)
 	}
 }
 
-static void idle_thread_fn(void) __noreturn;
-
-static void idle_thread_fn(void)
+static __noreturn void idle_thread_fn(void *argp)
 {
-	struct uk_thread *current = uk_thread_current();
-	struct uk_sched *s = current->sched;
+	struct schedcoop *c = (struct schedcoop *) argp;
+	__nsec now, wake_up_time;
 
-	while (1) {
-		uk_thread_block(current);
-		schedcoop_schedule(s);
+	UK_ASSERT(c);
+
+	for (;;) {
+		/* Read return time set by last schedule operation */
+		wake_up_time = (volatile __nsec) c->idle_return_time;
+		now = ukplat_monotonic_clock();
+
+		if (wake_up_time > now) {
+			if (wake_up_time)
+				ukplat_lcpu_halt_to(wake_up_time);
+			else
+				ukplat_lcpu_halt_irq();
+
+			/* handle pending events if any */
+			ukplat_lcpu_irqs_handle_pending();
+		}
+
+		/* try to schedule a thread that might now be available */
+		schedcoop_schedule(&c->sched);
 	}
 }
 
@@ -257,8 +266,8 @@ struct uk_sched *uk_schedcoop_create(struct uk_alloc *a)
 	UK_TAILQ_INIT(&c->thread_list);
 	UK_TAILQ_INIT(&c->sleeping_threads);
 
-	rc = uk_thread_init_fn0(&c->idle,
-				idle_thread_fn,
+	rc = uk_thread_init_fn1(&c->idle,
+				idle_thread_fn, (void *) c,
 				a, STACK_SIZE,
 				a,
 				false, NULL,
