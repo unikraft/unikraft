@@ -65,9 +65,16 @@ config LIBUKDEBUG_PRINT_TIME
 	bool "Show timestamp in messages"
 	default y
 
-config LIBUKDEBUG_PRINT_STACK
-	bool "Print bottom address of stack in messages"
+config LIBUKDEBUG_PRINT_CALLER
+	bool "Show caller information"
 	default n
+	help
+	  Prints the current return address and current stack frame
+	  address for the message command. The return address can be
+	  useful in combination with a debugger. The stack frame
+	  address is a handy information for analysing the state of
+	  the currently active stack.
+	  Format: "{r:<return address>,f:<stack frame address>}"
 
 config LIBUKDEBUG_PRINT_SRCNAME
 	bool "Print source code location of messages"
