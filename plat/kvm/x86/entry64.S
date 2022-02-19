@@ -27,22 +27,31 @@
  * SUCH DAMAGE.
  */
 
-#include <x86/cpu_defs.h>
-#include <kvm-x86/traps.h>
-#include <kvm-x86/multiboot_defs.h>
-
 /* necessary for CONFIG_ macros to be accessible */
 #include <uk/config.h>
+
+#include <x86/cpu_defs.h>
+#include <kvm-x86/traps.h>
+#ifndef CONFIG_UKPLAT_HAVE_MULTIBOOT2
+#include <kvm-x86/multiboot_defs.h>
+#else
+#include <kvm-x86/multiboot2_defs.h>
+#endif /* CONFIG_UKPLAT_HAVE_MULTIBOOT2 */
 
 #define ENTRY(x) .globl x; .type x,%function; x:
 #define END(x)   .size x, . - x
 
+#ifndef CONFIG_UKPLAT_HAVE_MULTIBOOT2
 #define MYMULTIBOOT_FLAGS \
     (MULTIBOOT_PAGE_ALIGN | MULTIBOOT_MEMORY_INFO | MULTIBOOT_AOUT_KLUDGE)
+#else
+#define AOUT_KLUDGE MULTIBOOT_AOUT_KLUDGE
+#endif /* CONFIG_UKPLAT_HAVE_MULTIBOOT2 */
 
 .section .data.boot
 
 .align 4
+#ifndef CONFIG_UKPLAT_HAVE_MULTIBOOT2
 _multiboot_header:
 .long MULTIBOOT_HEADER_MAGIC
 .long MYMULTIBOOT_FLAGS
@@ -52,6 +61,48 @@ _multiboot_header:
 .long _edata                                      /* load end addr */
 .long _end                                        /* bss end addr */
 .long _libkvmplat_start32                         /* entry addr */
+#else
+_multiboot_header:
+        /*  magic */
+        .long   MULTIBOOT2_HEADER_MAGIC
+        /*  ISA: i386 */
+        .long   MULTIBOOT_ARCHITECTURE_I386
+        /*  Header length. */
+        .long   multiboot_header_end - _multiboot_header
+        /*  checksum */
+        .long   -(MULTIBOOT2_HEADER_MAGIC + MULTIBOOT_ARCHITECTURE_I386 + (multiboot_header_end - _multiboot_header))
+.align 8
+address_tag_start:
+        .short MULTIBOOT_HEADER_TAG_ADDRESS
+        .short MULTIBOOT_HEADER_TAG_OPTIONAL
+        .long address_tag_end - address_tag_start
+        /*  header_addr */
+        .long   _multiboot_header
+        /*  load_addr */
+        .long   _text
+        /*  load_end_addr */
+        .long   _edata
+        /*  bss_end_addr */
+        .long   _end
+address_tag_end:
+.align 8
+entry_address_tag_start:
+        .short MULTIBOOT_HEADER_TAG_ENTRY_ADDRESS
+        .short MULTIBOOT_HEADER_TAG_OPTIONAL
+        .long entry_address_tag_end - entry_address_tag_start
+        /*  entry_addr */
+        .long _libkvmplat_start32
+entry_address_tag_end:
+.align 8
+information_request_tag_start:
+		.short MULTIBOOT_HEADER_TAG_INFORMATION_REQUEST
+		.short MULTIBOOT_HEADER_TAG_OPTIONAL
+		.long information_request_tag_end - information_request_tag_start
+		/* command line */
+		.long 1
+information_request_tag_end:
+multiboot_header_end:
+#endif /* CONFIG_UKPLAT_HAVE_MULTIBOOT2 */
 
 .section .bss
 
@@ -73,9 +124,14 @@ ENTRY(_libkvmplat_start32)
 	cld
 
 	/* only multiboot is supported for now */
+#ifndef CONFIG_UKPLAT_HAVE_MULTIBOOT2
 	cmpl $MULTIBOOT_BOOTLOADER_MAGIC, %eax
+#else
+	cmpl $MULTIBOOT2_BOOTLOADER_MAGIC, %eax
+#endif /* CONFIG_UKPLAT_HAVE_MULTIBOOT2 */
 	jne nomultiboot
 
+have_multiboot:
 	/*
 	 * Multiboot drops us off in 32-bit protected mode with some sane
 	 * initial settings, good enough to go straight for the only thing
