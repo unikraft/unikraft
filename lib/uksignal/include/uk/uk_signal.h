@@ -45,6 +45,16 @@
 extern "C" {
 #endif
 
+#ifndef is_sig_dfl
+#define is_sig_dfl(ptr) \
+	(!((ptr)->sa_flags & SA_SIGINFO) && (ptr)->sa_handler == SIG_DFL)
+#endif
+
+#ifndef is_sig_ign
+#define is_sig_ign(ptr) \
+	(!((ptr)->sa_flags & SA_SIGINFO) && (ptr)->sa_handler == SIG_IGN)
+#endif
+
 #define _UK_TH_SIG uk_crr_thread_sig_container()
 
 struct uk_thread;
