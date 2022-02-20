@@ -33,7 +33,7 @@
  *     OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 /* adapted from OSv */
-
+#define _GNU_SOURCE
 #include <errno.h>
 
 #include <uk/alloc.h>
