@@ -45,6 +45,8 @@
 #include <linuxu/syscall-x86_64.h>
 #elif defined __ARM_32__
 #include <linuxu/syscall-arm_32.h>
+#elif defined __ARM_64__
+#include <linuxu/syscall-arm_64.h>
 #else
 #error "Unsupported architecture"
 #endif
@@ -111,6 +113,10 @@ static inline int sys_fstat(int fd, struct k_stat *statbuf)
 #define F_SETFD  2
 #endif
 
+#ifndef AT_FDCWD
+#define AT_FDCWD (-100)
+#endif
+
 static inline int sys_open(const char *pathname, int flags, ...)
 {
 	mode_t mode = 0;
@@ -123,8 +129,8 @@ static inline int sys_open(const char *pathname, int flags, ...)
 		mode = va_arg(ap, mode_t);
 		va_end(ap);
 	}
-
-	fd = syscall3(__SC_OPEN, (long)pathname, (long)flags, (long)mode);
+	fd = syscall4(__SC_OPENAT, AT_FDCWD, (long)pathname, (long)flags,
+			(long)mode);
 	if ((fd >= 0) && (flags & O_CLOEXEC))
 		syscall3(__SC_FCNTL, (long) fd, (long)F_SETFD,
 			 (long)FD_CLOEXEC);

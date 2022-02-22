@@ -1,9 +1,11 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>,
+ *			Florin Postolache <florin.postolache80@gmail.com>
  *
- *
- * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation,
+ *               2022, Florin Postolache, <florin.postolache80@gmail.com>
+ *               All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,32 +33,32 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __SYSCALL_ARM_32_H__
-#define __SYSCALL_ARM_32_H__
+#ifndef __SYSCALL_ARM_64_H__
+#define __SYSCALL_ARM_64_H__
 
 #include <stdint.h>
 
-#define __SC_READ       3
-#define __SC_WRITE      4
-#define __SC_OPENAT     322
-#define __SC_CLOSE      6
-#define __SC_MMAP     192 /* use mmap2() since mmap() is obsolete */
-#define __SC_MUNMAP    91
-#define __SC_EXIT       1
-#define __SC_IOCTL     54
-#define __SC_FSTAT    108
-#define __SC_FCNTL     55
-#define __SC_RT_SIGPROCMASK   126
-#define __SC_ARCH_PRCTL       172
-#define __SC_RT_SIGACTION     174
-#define __SC_TIMER_CREATE     257
-#define __SC_TIMER_SETTIME    258
-#define __SC_TIMER_GETTIME    259
-#define __SC_TIMER_GETOVERRUN 260
-#define __SC_TIMER_DELETE     261
-#define __SC_CLOCK_GETTIME    263
-#define __SC_SOCKET           281
-#define __SC_PSELECT6 335
+#define __SC_READ       63
+#define __SC_WRITE      64
+#define __SC_OPENAT     56 /* changed to openat because open is not on arm64 */
+#define __SC_CLOSE      57
+#define __SC_MMAP      222 /* use mmap2() since mmap() is obsolete */
+#define __SC_MUNMAP    215
+#define __SC_EXIT       93
+#define __SC_IOCTL		29
+#define __SC_FSTAT		80
+#define __SC_FCNTL		25
+#define __SC_RT_SIGPROCMASK   135
+#define __SC_ARCH_PRCTL       167
+#define __SC_RT_SIGACTION     134
+#define __SC_TIMER_CREATE     107
+#define __SC_TIMER_SETTIME    110
+#define __SC_TIMER_GETTIME    108
+#define __SC_TIMER_GETOVERRUN 109
+#define __SC_TIMER_DELETE     111
+#define __SC_CLOCK_GETTIME    113
+#define __SC_SOCKET           198
+#define __SC_PSELECT6         72
 
 #ifndef O_TMPFILE
 #define O_TMPFILE 020040000
@@ -64,24 +66,24 @@
 
 /* NOTE: from `man syscall`:
  *
- * ARM/EABI
+ * ARM64
  *
  * instruction  syscall #  retval
  * ------------------------------
- * swi 0x0      r7         r0
+ * svc #0       x8         x0
  *
  * arg1  arg2  arg3  arg4  arg5  arg6  arg7
  * ----------------------------------------
- * r0    r1    r2    r3    r4    r5    r6
+ * x0    x1    x2    x3    x4    x5
  *
  */
 
 #define syscall0(num)					\
 ({							\
-	register long _num asm("r7") = (num);		\
-	register long _ret asm("r0");			\
+	register long _num asm("x8") = (num);		\
+	register long _ret asm("x0");			\
 							\
-	asm volatile ("swi #0"%				\
+	asm volatile ("svc #0"%				\
 		      : /* output */			\
 			"=r" (_ret)			\
 		      : /* input */			\
@@ -93,10 +95,10 @@
 
 #define syscall1(num, arg0)				\
 ({							\
-	register long _num   asm("r7") = (num);		\
-	register long _a0ret asm("r0") = (arg0);	\
+	register long _num   asm("x8") = (num);		\
+	register long _a0ret asm("x0") = (arg0);	\
 							\
-	asm volatile ("swi #0"				\
+	asm volatile ("svc #0"				\
 		      : /* output */			\
 			"=r" (_a0ret)			\
 		      : /* input */			\
@@ -109,11 +111,11 @@
 
 #define syscall2(num, arg0, arg1)			\
 ({							\
-	register long _num   asm("r7") = (num);		\
-	register long _a0ret asm("r0") = (arg0);	\
-	register long _arg1  asm("r1") = (arg1);	\
+	register long _num   asm("x8") = (num);		\
+	register long _a0ret asm("x0") = (arg0);	\
+	register long _arg1  asm("x1") = (arg1);	\
 							\
-	asm volatile ("swi #0"				\
+	asm volatile ("svc #0"				\
 		      : /* output */			\
 			"=r" (_a0ret)			\
 		      : /* input */			\
@@ -127,12 +129,12 @@
 
 #define syscall3(num, arg0, arg1, arg2)			\
 ({							\
-	register long _num   asm("r7") = (num);		\
-	register long _a0ret asm("r0") = (arg0);	\
-	register long _arg1  asm("r1") = (arg1);	\
-	register long _arg2  asm("r2") = (arg2);	\
+	register long _num   asm("x8") = (num);		\
+	register long _a0ret asm("x0") = (arg0);	\
+	register long _arg1  asm("x1") = (arg1);	\
+	register long _arg2  asm("x2") = (arg2);	\
 							\
-	asm volatile ("swi #0"				\
+	asm volatile ("svc #0"				\
 		      : /* output */			\
 			"=r" (_a0ret)			\
 		      : /* input */			\
@@ -147,13 +149,13 @@
 
 #define syscall4(num, arg0, arg1, arg2, arg3)		\
 ({							\
-	register long _num   asm("r7") = (num);		\
-	register long _a0ret asm("r0") = (arg0);	\
-	register long _arg1  asm("r1") = (arg1);	\
-	register long _arg2  asm("r2") = (arg2);	\
-	register long _arg3  asm("r3") = (arg3);	\
+	register long _num   asm("x8") = (num);		\
+	register long _a0ret asm("x0") = (arg0);	\
+	register long _arg1  asm("x1") = (arg1);	\
+	register long _arg2  asm("x2") = (arg2);	\
+	register long _arg3  asm("x3") = (arg3);	\
 							\
-	asm volatile ("swi #0"				\
+	asm volatile ("svc #0"				\
 		      : /* output */			\
 			"=r" (_a0ret)			\
 		      : /* input */			\
@@ -169,14 +171,14 @@
 
 #define syscall5(num, arg0, arg1, arg2, arg3, arg4)	\
 ({							\
-	register long _num   asm("r7") = (num);		\
-	register long _a0ret asm("r0") = (arg0);	\
-	register long _arg1  asm("r1") = (arg1);	\
-	register long _arg2  asm("r2") = (arg2);	\
-	register long _arg3  asm("r3") = (arg3);	\
-	register long _arg4  asm("r4") = (arg4);	\
+	register long _num   asm("x8") = (num);		\
+	register long _a0ret asm("x0") = (arg0);	\
+	register long _arg1  asm("x1") = (arg1);	\
+	register long _arg2  asm("x2") = (arg2);	\
+	register long _arg3  asm("x3") = (arg3);	\
+	register long _arg4  asm("x4") = (arg4);	\
 							\
-	asm volatile ("swi #0"				\
+	asm volatile ("svc #0"				\
 		      : /* output */			\
 			"=r" (_a0ret)			\
 		      : /* input */			\
@@ -194,15 +196,15 @@
 #define syscall6(num, arg0, arg1, arg2, arg3, arg4,	\
 		 arg5)					\
 ({							\
-	register long _num   asm("r7") = (num);		\
-	register long _a0ret asm("r0") = (arg0);	\
-	register long _arg1  asm("r1") = (arg1);	\
-	register long _arg2  asm("r2") = (arg2);	\
-	register long _arg3  asm("r3") = (arg3);	\
-	register long _arg4  asm("r4") = (arg4);	\
-	register long _arg5  asm("r5") = (arg5);	\
+	register long _num   asm("x8") = (num);		\
+	register long _a0ret asm("x0") = (arg0);	\
+	register long _arg1  asm("x1") = (arg1);	\
+	register long _arg2  asm("x2") = (arg2);	\
+	register long _arg3  asm("x3") = (arg3);	\
+	register long _arg4  asm("x4") = (arg4);	\
+	register long _arg5  asm("x5") = (arg5);	\
 							\
-	asm volatile ("swi #0"				\
+	asm volatile ("svc #0"				\
 		      : /* output */			\
 			"=r" (_a0ret)			\
 		      : /* input */			\
@@ -218,33 +220,5 @@
 	_a0ret;						\
 })
 
-#define syscall7(num, arg0, arg1, arg2, arg3, arg4,	\
-		 arg5, arg6)				\
-({							\
-	register long _num   asm("r7") = (num);		\
-	register long _a0ret asm("r0") = (arg0);	\
-	register long _arg1  asm("r1") = (arg1);	\
-	register long _arg2  asm("r2") = (arg2);	\
-	register long _arg3  asm("r3") = (arg3);	\
-	register long _arg4  asm("r4") = (arg4);	\
-	register long _arg5  asm("r5") = (arg5);	\
-	register long _arg6  asm("r6") = (arg6);	\
-							\
-	asm volatile ("swi #0"				\
-		      : /* output */			\
-			"=r" (_a0ret)			\
-		      : /* input */			\
-			"r" (_num),			\
-			"r" (_a0ret),			\
-			"r" (_arg1),			\
-			"r" (_arg2),			\
-			"r" (_arg3),			\
-			"r" (_arg4),			\
-			"r" (_arg5),			\
-			"r" (_arg6)			\
-		      : /* clobbers */			\
-			"memory");			\
-	_a0ret;						\
-})
 
-#endif /* __SYSCALL_ARM_32_H__ */
+#endif /* __SYSCALL_ARM_64_H__ */
