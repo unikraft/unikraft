@@ -140,6 +140,8 @@ void __restorer(void);
 asm("__restorer:mov $15,%rax\nsyscall");
 #elif defined __ARM_32__
 asm("__restorer:mov r7, #0x77\nsvc 0x0");
+#elif defined __ARM_64__
+asm("__restorer:mov x8, #0x8b\nsvc #0");
 #else
 #error "Unsupported architecture"
 #endif
