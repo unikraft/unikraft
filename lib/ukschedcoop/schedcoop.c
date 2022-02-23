@@ -209,9 +209,8 @@ static void schedcoop_thread_woken(struct uk_sched *s, struct uk_thread *t)
 
 	if (t->wakeup_time > 0)
 		UK_TAILQ_REMOVE(&c->sleeping_threads, t, thread_list);
-	if (t != uk_thread_current() || is_queueable(t)) {
+	if (t != uk_thread_current() && is_runnable(t)) {
 		UK_TAILQ_INSERT_TAIL(&c->thread_list, t, thread_list);
-		clear_queueable(t);
 	}
 }
 

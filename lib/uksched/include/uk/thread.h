@@ -162,7 +162,6 @@ struct uk_thread *uk_thread_current(void)
 #define UK_THREADF_UKTLS      (0x002)	/**< Unikraft allocated TLS */
 #define UK_THREADF_RUNNABLE   (0x004)
 #define UK_THREADF_EXITED     (0x008)
-#define UK_THREADF_QUEUEABLE  (0x010)
 
 #define is_runnable(_thread)     ((_thread)->flags &   UK_THREADF_RUNNABLE)
 #define set_runnable(_thread)    ((_thread)->flags |=  UK_THREADF_RUNNABLE)
@@ -170,10 +169,6 @@ struct uk_thread *uk_thread_current(void)
 
 #define is_exited(_thread)       ((_thread)->flags &   UK_THREADF_EXITED)
 #define set_exited(_thread)      ((_thread)->flags |=  UK_THREADF_EXITED)
-
-#define is_queueable(_thread)    ((_thread)->flags &   UK_THREADF_QUEUEABLE)
-#define set_queueable(_thread)   ((_thread)->flags |=  UK_THREADF_QUEUEABLE)
-#define clear_queueable(_thread) ((_thread)->flags &= ~UK_THREADF_QUEUEABLE)
 
 /*
  * WARNING: The following functions allow threads being created without extended

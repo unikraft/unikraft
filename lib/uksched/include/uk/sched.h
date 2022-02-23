@@ -156,6 +156,8 @@ static inline void uk_sched_thread_woken(struct uk_sched *s,
 		struct uk_thread *t)
 {
 	UK_ASSERT(s);
+
+	set_runnable(t);
 	s->thread_woken(s, t);
 }
 
