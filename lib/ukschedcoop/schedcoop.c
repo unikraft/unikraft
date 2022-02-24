@@ -203,11 +203,6 @@ static __noreturn void idle_thread_fn(void *argp)
 	}
 }
 
-static void schedcoop_yield(struct uk_sched *s)
-{
-	schedcoop_schedule(s);
-}
-
 static int schedcoop_start(struct uk_sched *s, struct uk_thread *main_thread)
 {
 	UK_ASSERT(main_thread);
@@ -257,7 +252,7 @@ struct uk_sched *uk_schedcoop_create(struct uk_alloc *a)
 
 	uk_sched_init(&c->sched,
 		        schedcoop_start,
-			schedcoop_yield,
+			schedcoop_schedule,
 			schedcoop_thread_add,
 			schedcoop_thread_remove,
 			schedcoop_thread_blocked,
