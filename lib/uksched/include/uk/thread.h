@@ -68,7 +68,7 @@ struct uk_thread {
 					 *   to Unikraft TLS.
 					 */
 
-	UK_TAILQ_ENTRY(struct uk_thread) thread_list;
+	UK_TAILQ_ENTRY(struct uk_thread) queue;
 	uint32_t flags;
 	__snsec wakeup_time;
 	bool detached;
