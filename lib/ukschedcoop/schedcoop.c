@@ -122,8 +122,6 @@ static void schedcoop_schedule(struct uk_sched *s)
 	 */
 	if (prev != next)
 		uk_sched_thread_switch(next);
-
-	uk_sched_thread_gc(&c->sched);
 }
 
 static int schedcoop_thread_add(struct uk_sched *s, struct uk_thread *t,
@@ -183,6 +181,23 @@ static __noreturn void idle_thread_fn(void *argp)
 	UK_ASSERT(c);
 
 	for (;;) {
+		/*
+		 * FIXME: We assume that `uk_sched_thread_gc()` is non-blocking
+		 *        because we implement a cooperative scheduler. However,
+		 *        this assumption may not be true depending on the
+		 *        destructor functions that are assigned to the threads
+		 *        and are called by `uk_sched_thred_gc()`.
+		 * NOTE:  This idle thread must be non-blocking so that the
+		 *        scheduler has always something to schedule.
+		 */
+		if (uk_sched_thread_gc(&c->sched) > 0) {
+			/* We collected successfully some garbage.
+			 * Check if something else can be scheduled now.
+			 */
+			schedcoop_schedule(&c->sched);
+			continue;
+		}
+
 		/* Read return time set by last schedule operation */
 		wake_up_time = (volatile __nsec) c->idle_return_time;
 		now = ukplat_monotonic_clock();
