@@ -184,7 +184,7 @@ static void p9front_free_dev_ring(struct p9front_dev *p9fdev, int idx)
 
 	if (ring->bh_thread_name)
 		free(ring->bh_thread_name);
-	uk_thread_kill(ring->bh_thread);
+	uk_sched_thread_terminate(ring->bh_thread);
 	unbind_evtchn(ring->evtchn);
 	for (i = 0; i < (1 << p9fdev->ring_order); i++)
 		gnttab_end_access(ring->intf->ref[i]);
@@ -290,7 +290,7 @@ static int p9front_allocate_dev_ring(struct p9front_dev *p9fdev, int idx)
 out_free_thread:
 	if (ring->bh_thread_name)
 		free(ring->bh_thread_name);
-	uk_thread_kill(ring->bh_thread);
+	uk_sched_thread_terminate(ring->bh_thread);
 out_free_grants:
 	for (i = 0; i < (1 << p9fdev->ring_order); i++)
 		gnttab_end_access(ring->intf->ref[i]);
