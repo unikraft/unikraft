@@ -34,6 +34,7 @@
 #include <string.h>
 #include <uk/plat/config.h>
 #include <uk/alloc.h>
+#include <uk/plat/lcpu.h>
 #include <uk/sched.h>
 #if CONFIG_LIBUKSCHEDCOOP
 #include <uk/schedcoop.h>
@@ -186,6 +187,9 @@ int uk_sched_start(struct uk_sched *s)
 	/* Set main_thread as current scheduled thread */
 	__uk_sched_thread_current = main_thread;
 
+	/* Add main to the scheduler's thread list */
+	UK_TAILQ_INSERT_TAIL(&s->thread_list, main_thread, thread_list);
+
 	/* Enable scheduler, like time slicing, etc. and notify that `s`
 	 * has an (already) scheduled thread
 	 */
@@ -244,7 +248,7 @@ void uk_sched_thread_kill(struct uk_thread *thread)
 		    sched, thread, thread->name ? thread->name : "<unnamed>");
 
 	/* remove from scheduling queue */
-	uk_sched_thread_remove(sched, thread);
+	uk_sched_thread_remove(thread);
 
 	set_exited(thread);
 	clear_runnable(thread);
@@ -281,8 +285,67 @@ void uk_sched_thread_sleep(__nsec nsec)
 	uk_sched_yield();
 }
 
+int uk_sched_thread_add(struct uk_sched *s,
+			struct uk_thread *t, const uk_thread_attr_t *attr)
+{
+	unsigned long flags;
+	int rc;
+
+	UK_ASSERT(s);
+	UK_ASSERT(t);
+	UK_ASSERT(!t->sched);
+
+	flags = ukplat_lcpu_save_irqf();
+	if (attr)
+		t->detached = attr->detached;
+
+	rc = s->thread_add(s, t, attr);
+	if (rc < 0)
+		goto out;
+
+	t->sched = s;
+	UK_TAILQ_INSERT_TAIL(&s->thread_list, t, thread_list);
+out:
+	ukplat_lcpu_restore_irqf(flags);
+	return rc;
+}
+
+int uk_sched_thread_remove(struct uk_thread *t)
+{
+	unsigned long flags;
+	struct uk_sched *s;
+
+	UK_ASSERT(t);
+	UK_ASSERT(t->sched);
+
+	flags = ukplat_lcpu_save_irqf();
+	s = t->sched;
+	s->thread_remove(s, t);
+	t->sched = NULL;
+	UK_TAILQ_REMOVE(&s->thread_list, t, thread_list);
+	ukplat_lcpu_restore_irqf(flags);
+	return 0;
+}
+
 UK_SYSCALL_R_DEFINE(int, sched_yield)
 {
 	uk_sched_yield();
 	return 0;
+}
+
+void uk_sched_dumpk_threads(int klvl, struct uk_sched *s)
+{
+	struct uk_thread *t, *tmp;
+
+	uk_sched_foreach_thread_safe(s, t, tmp) {
+		uk_printk(klvl,
+			  "sched %p: thread %p (%s), ctx: %p, flags: %c%c%c%c\n",
+			  s,
+			  t, t->name ? t->name : "<unnamed>",
+			  &t->ctx,
+			  (t->flags & UK_THREADF_RUNNABLE) ? 'R' : '-',
+			  (t->flags & UK_THREADF_EXITED)   ? 'D' : '-',
+			  (t->flags & UK_THREADF_ECTX)     ? 'E' : '-',
+			  (t->flags & UK_THREADF_UKTLS)    ? 'T' : '-');
+	}
 }

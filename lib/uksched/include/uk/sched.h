@@ -100,6 +100,7 @@ struct uk_sched {
 	/* internal */
 	bool is_started;
 	bool threads_started;
+	struct uk_thread_list thread_list;
 	struct uk_thread_list exited_threads;
 	struct uk_alloc *allocator;
 	struct uk_sched *next;
@@ -118,32 +119,11 @@ static inline void uk_sched_yield(void)
 	s->yield(s);
 }
 
-static inline int uk_sched_thread_add(struct uk_sched *s,
-		struct uk_thread *t, const uk_thread_attr_t *attr)
-{
-	int rc;
+int uk_sched_thread_add(struct uk_sched *s,
+			struct uk_thread *t, const uk_thread_attr_t *attr);
 
-	UK_ASSERT(s);
-	UK_ASSERT(t);
-	UK_ASSERT(!t->sched);
-	if (attr)
-		t->detached = attr->detached;
-	rc = s->thread_add(s, t, attr);
-	if (rc == 0)
-		t->sched = s;
-	return rc;
-}
+int uk_sched_thread_remove(struct uk_thread *t);
 
-static inline int uk_sched_thread_remove(struct uk_sched *s,
-		struct uk_thread *t)
-{
-	UK_ASSERT(s);
-	UK_ASSERT(t);
-	UK_ASSERT(t->sched == s);
-	s->thread_remove(s, t);
-	t->sched = NULL;
-	return 0;
-}
 
 static inline void uk_sched_thread_blocked(struct uk_sched *s,
 		struct uk_thread *t)
@@ -229,6 +209,7 @@ static inline int uk_sched_thread_get_timeslice(struct uk_sched *s,
 		\
 		(s)->threads_started = false;	\
 		(s)->allocator = (def_allocator); \
+		UK_TAILQ_INIT(&(s)->thread_list); \
 		UK_TAILQ_INIT(&(s)->exited_threads); \
 	} while (0)
 
@@ -286,6 +267,13 @@ void uk_sched_thread_switch(struct uk_thread *next)
 
 	ukarch_ctx_switch(&prev->ctx, &next->ctx);
 }
+
+#define uk_sched_foreach_thread(sched, itr)				\
+	UK_TAILQ_FOREACH((itr), &(sched)->thread_list, thread_list)
+#define uk_sched_foreach_thread_safe(sched, itr, tmp)			\
+	UK_TAILQ_FOREACH_SAFE((itr), &(sched)->thread_list, thread_list, (tmp))
+
+void uk_sched_dumpk_threads(int klvl, struct uk_sched *s);
 
 /*
  * Public thread scheduling functions

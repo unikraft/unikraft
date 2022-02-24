@@ -5,9 +5,12 @@ uk_sched_set_default
 uk_sched_create
 uk_sched_start
 uk_sched_thread_create
+uk_sched_thread_add
+uk_sched_thread_remove
 uk_sched_thread_kill
 uk_sched_thread_sleep
 uk_sched_thread_exit
+uk_sched_dumpk_threads
 uk_sched_thread_gc
 uk_thread_init_bare
 uk_thread_init_bare_fn0

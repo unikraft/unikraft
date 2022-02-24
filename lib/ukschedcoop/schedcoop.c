@@ -130,16 +130,13 @@ static int schedcoop_thread_add(struct uk_sched *s, struct uk_thread *t,
 	const uk_thread_attr_t *attr __unused)
 {
 	struct schedcoop *c = uksched2schedcoop(s);
-	unsigned long flags;
 
 	UK_ASSERT(t);
 	UK_ASSERT(!is_exited(t));
 
-	flags = ukplat_lcpu_save_irqf();
 	/* Add to run queue if runnable */
 	if (is_runnable(t))
 		UK_TAILQ_INSERT_TAIL(&c->run_queue, t, queue);
-	ukplat_lcpu_restore_irqf(flags);
 
 	return 0;
 }
@@ -147,16 +144,11 @@ static int schedcoop_thread_add(struct uk_sched *s, struct uk_thread *t,
 static void schedcoop_thread_remove(struct uk_sched *s, struct uk_thread *t)
 {
 	struct schedcoop *c = uksched2schedcoop(s);
-	unsigned long flags;
-
-	flags = ukplat_lcpu_save_irqf();
-
 
 	/* Remove from run_queue */
 	if (t != uk_thread_current()
 	    && is_runnable(t))
 		UK_TAILQ_REMOVE(&c->run_queue, t, queue);
-	ukplat_lcpu_restore_irqf(flags);
 }
 
 static void schedcoop_thread_blocked(struct uk_sched *s, struct uk_thread *t)
@@ -272,6 +264,9 @@ struct uk_sched *uk_schedcoop_create(struct uk_alloc *a)
 			schedcoop_thread_woken,
 		        NULL, NULL, NULL, NULL,
 		        a);
+
+	/* Add idle thread to the scheduler's thread list */
+	UK_TAILQ_INSERT_TAIL(&c->sched.thread_list, &c->idle, thread_list);
 
 	return &c->sched;
 }

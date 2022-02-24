@@ -93,6 +93,7 @@ struct uk_thread {
 	struct uk_thread_sig signals_container;
 #endif
 	const char *name;		/**< Reference to thread name */
+	UK_TAILQ_ENTRY(struct uk_thread) thread_list;
 };
 
 UK_TAILQ_HEAD(uk_thread_list, struct uk_thread);
