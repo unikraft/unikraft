@@ -225,12 +225,19 @@ static int schedcoop_start(struct uk_sched *s, struct uk_thread *main_thread)
 struct uk_sched *uk_schedcoop_create(struct uk_alloc *a)
 {
 	struct schedcoop *c = NULL;
+	struct ukarch_ectx *idle_ectx;
 	int rc;
 
 	uk_pr_info("Initializing cooperative scheduler\n");
 	c = uk_zalloc(a, sizeof(struct schedcoop));
 	if (!c)
-		return NULL;
+		goto err_out;
+
+	idle_ectx = uk_memalign(a, /* TODO: use TLS allocator */
+				ukarch_ectx_align(),
+				ukarch_ectx_size());
+	if (!idle_ectx)
+		goto err_free_c;
 
 	UK_TAILQ_INIT(&c->run_queue);
 	UK_TAILQ_INIT(&c->sleep_queue);
@@ -238,15 +245,13 @@ struct uk_sched *uk_schedcoop_create(struct uk_alloc *a)
 	rc = uk_thread_init_fn1(&c->idle,
 				idle_thread_fn, (void *) c,
 				a, STACK_SIZE,
-				a,
-				false, NULL,
+				NULL, true,
+			        idle_ectx,
 				"idle",
 				NULL,
 				NULL);
-	if (rc < 0) {
-		 /* FIXME: Do not crash on failure */
-		UK_CRASH("Failed to initialize `idle` thread\n");
-	}
+	if (rc < 0)
+		goto err_free_ectx;
 
 	c->idle.sched = &c->sched;
 
@@ -264,4 +269,11 @@ struct uk_sched *uk_schedcoop_create(struct uk_alloc *a)
 	UK_TAILQ_INSERT_TAIL(&c->sched.thread_list, &c->idle, thread_list);
 
 	return &c->sched;
+
+err_free_ectx:
+	uk_free(a, idle_ectx); /* TODO: TLS allocator */
+err_free_c:
+	uk_free(a, c);
+err_out:
+	return NULL;
 }
