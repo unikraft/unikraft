@@ -122,8 +122,6 @@ static void schedcoop_schedule(struct uk_sched *s)
 	 */
 	if (prev != next)
 		uk_sched_thread_switch(next);
-
-	uk_sched_thread_gc(&c->sched);
 }
 
 static int schedcoop_thread_add(struct uk_sched *s, struct uk_thread *t,
@@ -184,6 +182,14 @@ static __noreturn void idle_thread_fn(void *argp)
 	UK_ASSERT(c);
 
 	for (;;) {
+		if (uk_sched_thread_gc(&c->sched) > 0) {
+			/* We collected successfully some garbage.
+			 * Check if something else can be scheduled now.
+			 */
+			schedcoop_schedule(&c->sched);
+			continue;
+		}
+
 		/* Read return time set by last schedule operation */
 		wake_up_time = (volatile __nsec) c->idle_return_time;
 		now = ukplat_monotonic_clock();
