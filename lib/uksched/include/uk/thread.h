@@ -65,7 +65,7 @@ struct uk_thread {
 	uintptr_t           tlsp;	/**< Current active TLS pointer */
 	__uptr            uktlsp;	/**< Unikraft TLS pointer */
 
-	UK_TAILQ_ENTRY(struct uk_thread) thread_list;
+	UK_TAILQ_ENTRY(struct uk_thread) queue;
 	uint32_t flags;
 	__snsec wakeup_time;
 	bool detached;
