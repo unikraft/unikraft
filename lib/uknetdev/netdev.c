@@ -407,8 +407,8 @@ static int _create_event_handler(uk_netdev_queue_event_t callback,
 	}
 
 	h->dispatcher = uk_sched_thread_create(h->dispatcher_s,
-					       h->dispatcher_name, NULL,
-					       _dispatcher, h);
+					       _dispatcher, h,
+					       h->dispatcher_name);
 	if (!h->dispatcher) {
 		if (h->dispatcher_name)
 			free(h->dispatcher_name);
