@@ -227,14 +227,14 @@ static inline bool uk_sched_started(struct uk_sched *sched)
 	return sched->threads_started;
 }
 
+struct uk_thread *uk_sched_thread_create(struct uk_sched *s,
+					 uk_thread_fn1_t fn,
+					 void * argp,
+					 const char *name);
 
 /*
  * Internal thread scheduling functions
  */
-
-struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
-		const char *name, const uk_thread_attr_t *attr,
-		uk_thread_fn1_t function, void *arg);
 
 /**
  * Releases self-exited threads (garbage collection)

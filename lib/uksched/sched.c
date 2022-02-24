@@ -121,35 +121,36 @@ int uk_sched_set_default(struct uk_sched *s)
 	return 0;
 }
 
-struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
-		const char *name, const uk_thread_attr_t *attr,
-		uk_thread_fn1_t function, void *arg)
+struct uk_thread *uk_sched_thread_create(struct uk_sched *s,
+					 uk_thread_fn1_t fn,
+					 void * argp,
+					 const char *name)
 {
-	struct uk_thread *thread = NULL;
+	struct uk_thread *t;
 	int rc;
 
-	thread = uk_thread_create_fn1(sched->allocator,
-				      function, arg,
-				      sched->allocator, STACK_SIZE,
-				      sched->allocator,
-				      0x0,
-				      name,
-				      NULL,
-				      NULL);
-	if (thread == NULL) {
-		uk_pr_err("Failed to allocate thread\n");
-		goto err;
-	}
+	UK_ASSERT(s);
 
-	rc = uk_sched_thread_add(sched, thread, attr);
-	if (rc)
-		goto err_add;
+	t = uk_thread_create_fn1(s->allocator,
+				 fn, argp,
+				 s->allocator, 0, /* TODO: stack allocator */
+				 s->allocator, /* TODO: TLS allocator */
+				 false,
+				 name,
+				 NULL,
+				 NULL);
+	if (!t)
+		goto err_out;
 
-	return thread;
+	rc = uk_sched_thread_add(s, t, NULL);
+	if (rc < 0)
+		goto err_free_t;
 
-err_add:
-	uk_thread_release(thread);
-err:
+	return t;
+
+err_free_t:
+	uk_thread_release(t);
+err_out:
 	return NULL;
 }
 

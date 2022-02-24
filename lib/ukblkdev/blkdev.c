@@ -254,9 +254,9 @@ static int _create_event_handler(uk_blkdev_queue_event_t callback,
 
 	/* Create thread */
 	event_handler->dispatcher = uk_sched_thread_create(
-			event_handler->dispatcher_s,
-			event_handler->dispatcher_name, NULL,
-			_dispatcher, (void *)event_handler);
+				event_handler->dispatcher_s,
+				_dispatcher, (void *)event_handler,
+				event_handler->dispatcher_name);
 	if (event_handler->dispatcher == NULL) {
 		if (event_handler->dispatcher_name) {
 			free(event_handler->dispatcher);

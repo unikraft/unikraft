@@ -98,11 +98,8 @@ struct uk_thread {
 
 UK_TAILQ_HEAD(uk_thread_list, struct uk_thread);
 
-#define uk_thread_create_attr(name, attr, function, data) \
-	uk_sched_thread_create(uk_sched_get_default(), \
-			name, attr, function, data)
-#define uk_thread_create(name, function, data) \
-	uk_thread_create_attr(name, NULL, function, data)
+#define uk_thread_create(name, function, argp) \
+	uk_sched_thread_create(uk_sched_get_default(), name, function, argp)
 #define uk_thread_kill(thread) \
 	uk_sched_thread_kill(thread)
 #define uk_thread_exit() \

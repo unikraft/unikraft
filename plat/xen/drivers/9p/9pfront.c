@@ -264,10 +264,12 @@ static int p9front_allocate_dev_ring(struct p9front_dev *p9fdev, int idx)
 
 	rc = asprintf(&ring->bh_thread_name, DRIVER_NAME"-recv-%s-%u",
 			p9fdev->tag, idx);
-	ring->bh_thread = uk_thread_create(ring->bh_thread_name,
-			p9front_bh_handler, ring);
-	if (!ring->bh_thread) {
-		rc = -ENOMEM;
+	ring->bh_thread = uk_sched_thread_create(uk_sched_current(),
+						 p9front_bh_handler, ring,
+						 ring->bh_thread_name);
+	if (PTRISERR(ring->bh_thread)) {
+		rc = PTR2ERR(ring->bh_thread);
+		ring->bh_thread = NULL;
 		goto out_free_grants;
 	}
 #endif

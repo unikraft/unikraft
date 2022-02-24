@@ -589,7 +589,9 @@ int xs_comms_init(void)
 
 	uk_waitq_init(&xsh.waitq);
 
-	thread = uk_thread_create("xenstore", xs_thread_func, NULL);
+	thread = uk_sched_thread_create(uk_sched_current(),
+					xs_thread_func, NULL,
+					"xenstore");
 	if (PTRISERR(thread))
 		return PTR2ERR(thread);
 
