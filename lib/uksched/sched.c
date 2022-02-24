@@ -202,19 +202,74 @@ err_out:
 	return ret;
 }
 
-void uk_sched_thread_destroy(struct uk_sched *sched, struct uk_thread *thread)
+unsigned int uk_sched_thread_gc(struct uk_sched *sched)
 {
-	UK_ASSERT(sched != NULL);
-	UK_ASSERT(thread != NULL);
-	UK_ASSERT(is_exited(thread));
+	struct uk_thread *thread, *tmp;
+	unsigned int num = 0;
 
-	UK_TAILQ_REMOVE(&sched->exited_threads, thread, thread_list);
-	uk_thread_release(thread);
+	/* Cleanup finished threads */
+	UK_TAILQ_FOREACH_SAFE(thread, &sched->exited_threads,
+			      thread_list, tmp) {
+		UK_ASSERT(thread != uk_thread_current());
+
+		if (!thread->detached)
+			continue; /* someone will eventually wait for it */
+		uk_pr_debug("%p: garbage collect thread %p (%s)\n",
+			    sched, thread,
+			    thread->name ? thread->name : "<unnamed>");
+
+		UK_TAILQ_REMOVE(&sched->exited_threads, thread, thread_list);
+		uk_thread_release(thread);
+		++num;
+	}
+
+	return num;
 }
 
-void uk_sched_thread_kill(struct uk_sched *sched, struct uk_thread *thread)
+void uk_sched_thread_kill(struct uk_thread *thread)
 {
+	struct uk_sched *sched;
+
+	UK_ASSERT(thread);
+	 /* NOTE: The following assertion fails for instance on a double-kill.
+	  *       This can happen when the thread was put on the exited_thread
+	  *       list and waits for getting garbage collected.
+	  *       Double-kill can be avoided by testing for the exit flag.
+	  */
+	UK_ASSERT(thread->sched);
+
+	sched = thread->sched;
+
+	uk_pr_debug("%p: thread %p (%s) killed\n",
+		    sched, thread, thread->name ? thread->name : "<unnamed>");
+
+	/* remove from scheduling queue */
 	uk_sched_thread_remove(sched, thread);
+
+	set_exited(thread);
+	clear_runnable(thread);
+
+	/* enqueue thread for garbage collecting */
+	if (!thread->detached)
+		UK_TAILQ_INSERT_TAIL(&sched->exited_threads, thread,
+				     thread_list); /* another thread waits */
+	else
+		uk_thread_release(thread);
+
+	if (thread == uk_thread_current()) {
+		/* leave this thread */
+		sched->yield(sched); /* we won't return */
+		UK_CRASH("Unexpectedly returned to exited thread %p\n", thread);
+	}
+}
+
+/* This function has the __noreturn attribute set */
+void uk_sched_thread_exit(void)
+{
+	struct uk_thread *t = uk_thread_current();
+
+	uk_sched_thread_kill(t);
+	UK_CRASH("Unexpectedly returned to exited thread %p\n", t);
 }
 
 void uk_sched_thread_sleep(__nsec nsec)
@@ -224,16 +279,6 @@ void uk_sched_thread_sleep(__nsec nsec)
 	thread = uk_thread_current();
 	uk_thread_block_timeout(thread, nsec);
 	uk_sched_yield();
-}
-
-void uk_sched_thread_exit(void)
-{
-	struct uk_thread *thread;
-
-	thread = uk_thread_current();
-	UK_ASSERT(thread->sched);
-	uk_sched_thread_remove(thread->sched, thread);
-	UK_CRASH("Failed to stop the thread\n");
 }
 
 UK_SYSCALL_R_DEFINE(int, sched_yield)

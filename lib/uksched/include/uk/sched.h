@@ -254,10 +254,15 @@ static inline bool uk_sched_started(struct uk_sched *sched)
 struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
 		const char *name, const uk_thread_attr_t *attr,
 		uk_thread_fn1_t function, void *arg);
-void uk_sched_thread_destroy(struct uk_sched *sched,
-		struct uk_thread *thread);
-void uk_sched_thread_kill(struct uk_sched *sched,
-		struct uk_thread *thread);
+
+/**
+ * Releases self-exited threads (garbage collection)
+ *
+ * @return
+ *   - (0): No work was done
+ *   - (>0): Number of threads that were cleaned up
+ */
+unsigned int uk_sched_thread_gc(struct uk_sched *sched);
 
 static inline
 void uk_sched_thread_switch(struct uk_thread *next)
@@ -287,7 +292,12 @@ void uk_sched_thread_switch(struct uk_thread *next)
  */
 
 void uk_sched_thread_sleep(__nsec nsec);
+
+/* exits the current thread context */
 void uk_sched_thread_exit(void) __noreturn;
+
+/* kill another thread */
+void uk_sched_thread_kill(struct uk_thread *thread);
 
 #ifdef __cplusplus
 }

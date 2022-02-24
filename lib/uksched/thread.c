@@ -869,18 +869,6 @@ void uk_thread_wake(struct uk_thread *thread)
 	ukplat_lcpu_restore_irqf(flags);
 }
 
-void uk_thread_exit(struct uk_thread *thread)
-{
-	UK_ASSERT(thread);
-
-	set_exited(thread);
-
-	if (!thread->detached)
-		uk_waitq_wake_up(&thread->waiting_threads);
-
-	uk_pr_debug("Thread \"%s\" exited.\n", thread->name);
-}
-
 int uk_thread_wait(struct uk_thread *thread)
 {
 	UK_ASSERT(thread);
@@ -894,7 +882,7 @@ int uk_thread_wait(struct uk_thread *thread)
 
 	thread->detached = true;
 
-	uk_sched_thread_destroy(thread->sched, thread);
+	uk_sched_thread_kill(thread);
 
 	return 0;
 }

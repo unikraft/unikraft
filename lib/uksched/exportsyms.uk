@@ -5,10 +5,10 @@ uk_sched_set_default
 uk_sched_create
 uk_sched_start
 uk_sched_thread_create
-uk_sched_thread_destroy
 uk_sched_thread_kill
 uk_sched_thread_sleep
 uk_sched_thread_exit
+uk_sched_thread_gc
 uk_thread_init_bare
 uk_thread_init_bare_fn0
 uk_thread_init_bare_fn1
@@ -21,7 +21,6 @@ uk_thread_create_fn0
 uk_thread_create_fn1
 uk_thread_create_fn2
 uk_thread_release
-uk_thread_exit
 uk_thread_wait
 uk_thread_detach
 uk_thread_set_prio
