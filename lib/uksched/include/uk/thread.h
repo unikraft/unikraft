@@ -99,9 +99,10 @@ UK_TAILQ_HEAD(uk_thread_list, struct uk_thread);
 			name, attr, function, data)
 #define uk_thread_create(name, function, data) \
 	uk_thread_create_attr(name, NULL, function, data)
-#define uk_thread_kill(thread) \
-	uk_sched_thread_kill(thread->sched, thread)
-void uk_thread_exit(struct uk_thread *thread);
+#define uk_thread_terminate(thread) \
+	uk_sched_thread_terminate(thread)
+#define uk_thread_exit() \
+	uk_sched_thread_exit()
 
 int uk_thread_wait(struct uk_thread *thread);
 int uk_thread_detach(struct uk_thread *thread);

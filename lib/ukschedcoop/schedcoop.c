@@ -140,14 +140,7 @@ static void schedcoop_schedule(struct uk_sched *s)
 	if (prev != next)
 		uk_sched_thread_switch(next);
 
-	UK_TAILQ_FOREACH_SAFE(thread, &s->exited_threads, thread_list, tmp) {
-		if (!thread->detached)
-			/* someone will eventually wait for it */
-			continue;
-
-		if (thread != prev)
-			uk_sched_thread_destroy(s, thread);
-	}
+	uk_sched_thread_gc(&c->sched);
 }
 
 static int schedcoop_thread_add(struct uk_sched *s, struct uk_thread *t,
