@@ -229,23 +229,22 @@ struct uk_sched *uk_schedcoop_create(struct uk_alloc *a)
 	uk_pr_info("Initializing cooperative scheduler\n");
 	c = uk_zalloc(a, sizeof(struct schedcoop));
 	if (!c)
-		return NULL;
+		goto err_out;
 
 	UK_TAILQ_INIT(&c->run_queue);
 	UK_TAILQ_INIT(&c->sleep_queue);
 
+	/* Create idle thread */
 	rc = uk_thread_init_fn1(&c->idle,
 				idle_thread_fn, (void *) c,
 				a, STACK_SIZE,
-				a,
-				false, NULL,
+				a, false,
+				NULL,
 				"idle",
 				NULL,
 				NULL);
-	if (rc < 0) {
-		 /* FIXME: Do not crash on failure */
-		UK_CRASH("Failed to initialize `idle` thread\n");
-	}
+	if (rc < 0)
+		goto err_free_c;
 
 	c->idle.sched = &c->sched;
 
@@ -263,4 +262,9 @@ struct uk_sched *uk_schedcoop_create(struct uk_alloc *a)
 	UK_TAILQ_INSERT_TAIL(&c->sched.thread_list, &c->idle, thread_list);
 
 	return &c->sched;
+
+err_free_c:
+	uk_free(a, c);
+err_out:
+	return NULL;
 }
