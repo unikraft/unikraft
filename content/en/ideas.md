@@ -219,38 +219,6 @@ These two methods should be provided as a driver mechanism which allows external
 
 ---
 
-### Implement event API (`eventfd`)
-
-| | |
-|-|-|
-| **Project Github Issue** | https://github.com/unikraft/unikraft/issues/50 |
-| **Difficulty** | 4/5 |
-| **Project Size** | 350 hours |
-| **Maximum instances** | 1 |
-| **Constraints/requirements** | Very strong programming skills [C (gcc), Python, GNU Make] and experience with Linux tooling.  Very strong knowledge of networking and networking protocols. |
-
-#### Description
-
-Unikraft uses modularity to enable specialization, splitting OS functionality into fine-grained components that only communicate across well-defined API boundaries.
-The ability to easily swap components in and out, and to plug applications in at different levels presents application developers with a wide range of optimization possibilities.
-
-"The event API provides a mechanism to execute a function when a specific event on a file descriptor occurs or after a given time has passed,"[[1]] and is a suite of common POSIX methods.
-
-The event API could be based on the FreeBSD[[2]] which provides a clean set of methods which implements the standard.
-
-The goal is to, of course be able to use the event API, so the task would involve the entire event syscall suite. This **may** be split in two separate components: one with the core eventfd implementation and one for the event syscall suite.
-
-[1]: https://linux.die.net/man/3/event
-[2]: https://github.com/freebsd/freebsd/blob/master/sys/compat/linux/linux_event.c
-
-#### Reading & Related Material
-
-1. https://linux.die.net/man/3/event
-2. https://github.com/freebsd/freebsd/blob/master/sys/compat/linux/linux_event.c
-
-
----
-
 ### Track changes of compile flags
 
 | | |
@@ -273,36 +241,6 @@ This project namely starts as resolving an error resulting in incorrect builds b
 #### Reading & Related Material
 
 * https://github.com/torvalds/linux/blob/master/scripts/basic/fixdep.c
-
-
----
-
-### Django on Unikraft
-
-| | |
-|-|-|
-| **Project Github Issue** | https://github.com/unikraft/unikraft/issues/40 |
-| **Difficulty** | 2/5 |
-| **Project Size** | 175 hours |
-| **Maximum instances** | 2 |
-| **Constraints/requirements** | Strong programming skills [C (gcc), Python, GNU Make] and experience with Linux tooling. |
-
-#### Description
-
-Many applications are built using high-level languages for their ease in use and extensive availability of libraries.
-
-Deploying a Python-based service is already possible via Unikraft using the [`app-python3`](https://github.com/unikraft/app-python) application library, making it easy for someone to bring their applcation to Unikraft.
-
-However, no support or tooling is currently provided for larger software frameworks, such as Django which is based on Python.
-This project tracks the introduction of build tools and changes to Unikraft which aid and facilitate in making it easier to bring libraries such as Django to Unikraft.
-This can be achieved by making changes to the companion and command-line utility `kraft` and/or to application libraries which help with native package managers.
-
-#### Reading & Related Material
-
-* https://github.com/unikraft/kraft
-* https://github.com/unikraft/lib-python3
-* https://www.djangoproject.com/
-* https://usoc21.unikraft.org/docs/sessions/04-complex-applications/
 
 
 ---
@@ -337,35 +275,6 @@ This project focuses on implementing the use of TEE on Intel-based processors (k
 
 ---
 
-### `virtiofs` support
-
-| | |
-|-|-|
-| **Project Github Issue** | https://github.com/unikraft/unikraft/issues/21 |
-| **Difficulty** | 4/5 |
-| **Project Size** | 350 hours |
-| **Maximum instances** | 1 |
-| **Constraints/requirements** | Very strong programming skills [C (gcc), GNU Make] and experience with Linux tooling.  Very strong knowledge of networking and storage protocols as well as OS primitives. |
-
-#### Description
-
-Unikraft uses modularity to enable specialization, splitting OS functionality into fine-grained components that only communicate across well-defined API boundaries.
-The ability to easily swap components in and out, and to plug applications in at different levels presents application developers with a wide range of optimization possibilities.
-
-Virtiofs is a shared file system that lets virtual machines access a directory tree on the host.
-Unlike existing approaches, it is designed to offer local file system semantics and performance.
-Virtiofs was started at Red Hat and is being developed in the Linux, QEMU, FUSE, and Kata Containers open source communities.
-
-This project tracks adding new modularity within the core Unikraft microlibrary `vfscore` such that it can allow for the registration of external filesystems which can interface with `virtiofs`.
-
-#### Reading & Related Material
-
-* https://virtio-fs.gitlab.io/
-* https://github.com/unikraft/unikraft/tree/staging/lib/vfscore
-
-
----
-
 ### Unikernel QEMU/Stub Domains
 
 | | |
@@ -394,36 +303,6 @@ This project consists of generating different stub domains based on Unikraft by 
 #### Reading & Related Material
 
 * https://wiki.xenproject.org/wiki/Device_Model_Stub_Domains
-
-
----
-
-### Uniprof KVM extension
-
-| | |
-|-|-|
-| **Project Github Issue** | https://github.com/unikraft/unikraft/issues/19 |
-| **Difficulty** | 4/5 |
-| **Project Size** | 350 hours |
-| **Maximum instances** | 1 |
-| **Constraints/requirements** | Very strong programming skills [C (gcc), Python, GNU Make] and experience with Linux tooling.  Very strong knowledge of hypervisors and OS primitives. |
-
-#### Description
-
-Unikernels are increasingly gaining traction in real-world deployments, especially for NFV and micro-services, where their low footprint and high performance are especially beneficial.
-
-However, they still suffer from a lack of tools to support developers.
-`uniprof` is a stack profiler that supports Xen unikernels on x86 and ARM and does not requires any code changes or instrumentation.
-Its high speed and low overhead (0.1% at 100 samples/s) makes it usable even in production environments, allowing the collection of realistic and highly credible data.
-
-This project tracks adding this support other hypervisors, namely KVM.
-The project would also investigate if there are other profiling information Unikraft could use: for example, lock contention; coverage; or, the possibility to better understand interrupt performance.
-
-#### Reading & Related Material
-
-* https://dl.acm.org/doi/pdf/10.1145/3123878.3131976
-* https://github.com/cnplab/libunwind
-* https://github.com/cnplab/uniprof/
 
 
 ---
@@ -487,28 +366,3 @@ This allows for remote "command-and-control" functionality of a running unikerne
 * https://github.com/unikraft/unikraft/pull/202
 * https://fosdem.org/2022/schedule/event/skuenzer/
 
----
-
-### Port of node.js to Unikraft
-
-| | |
-|-|-|
-| **Project Github Issue** | https://github.com/unikraft/unikraft/issues/2 |
-| **Difficulty** | 4/5 |
-| **Project Size** | 175 hours |
-| **Maximum instances** | 1 |
-| **Constraints/requirements** | Strong programming skills [C (gcc), JavaSCript, GNU Make] and experience with Linux tooling. |
-
-#### Description
-
-Many applications are built using high-level languages for their ease in use and extensive availability of libraries.
-
-Deploying a JavaScript-based service is already possible via Unikraft using the [`app-duktape`](https://github.com/unikraft/app-duktape) application library, making it easy for someone to bring their application to Unikraft.  However, Duktape is an embedded JavaScript runtime engine and lacks many features necessary for modern JavaScript frameworks.
-
-This project tracks the introduction of node.js as a microlibrary into Unikraft which aid and facilitate in making it easier to bring backends based on node.js, like express.js, to Unikraft.
-
-#### Reading & Related Material
-
-* https://github.com/nodejs/node
-* https://usoc21.unikraft.org/docs/sessions/04-complex-applications/
-* https://unikraft.org/docs/develop/porting/
