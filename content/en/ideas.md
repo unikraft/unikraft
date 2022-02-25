@@ -26,6 +26,7 @@ Below are a list of open projects for Unikraft which can be developed as part of
 |-|-|
 | **Project Github Issue** | https://github.com/unikraft/unikraft/issues/187 |
 | **Difficulty** | 3/5 |
+| **Project Size** | 175 hours |
 | **Maximum instances** | 1 |
 | **Constraints/requirements** | Very strong programming skills [C (gcc), GNU Make] and experience with Linux tooling.  Very strong knowledge of scheduling and OS primitives. |
 
@@ -56,6 +57,7 @@ One example of an external scheduler includes [atomthreads](https://github.com/k
 |-|-|
 | **Project Github Issue** | https://github.com/unikraft/unikraft/issues/73 |
 | **Difficulty** | 5/5 |
+| **Project Size** | 350 hours |
 | **Maximum instances** | 1 |
 | **Constraints/requirements** | Very strong programming skills [C (gcc), Assembly, GNU Make] and experience with Linux tooling.  Very strong knowledge of OS primitives and memory and disk systems. |
 
@@ -97,6 +99,7 @@ From Persistent Memory Development Kit (PMDK), the following libraries would be 
 |-|-|
 | **Project Github Issue** | https://github.com/unikraft/unikraft/issues/63 |
 | **Difficulty** | 4/5 |
+| **Project Size** | 175 hours |
 | **Maximum instances** | 1 |
 | **Constraints/requirements** | Very strong programming skills [C (gcc), Assembly, GNU Make] and experience with Linux tooling.  Very strong knowledge of OS primitives and working with hypervisors. |
 
@@ -124,6 +127,7 @@ This project tracks the introduction of another platform/architecture combinatio
 |-|-|
 | **Project Github Issue** | https://github.com/unikraft/unikraft/issues/62 |
 | **Difficulty** | 4/5 |
+| **Project Size** | 175 hours |
 | **Maximum instances** | 1 |
 | **Constraints/requirements** | Very strong programming skills [C (gcc), Assembly, GNU Make] and experience with Linux tooling.  Very strong knowledge of networking and networking protocols. |
 
@@ -154,6 +158,7 @@ Support already exists for running Unikraft on Xen but only for Intel x86_64.
 |-|-|
 | **Project Github Issue** | https://github.com/unikraft/unikraft/issues/60 |
 | **Difficulty** | 4/5 |
+| **Project Size** | 350 hours |
 | **Maximum instances** | 2 |
 | **Constraints/requirements** | Very strong programming skills [C (gcc), Assembly, RISC-V, GNU Make] and experience with Linux tooling.  Very strong assembly and familiarity with RISC-V architecture and ISA is required. |
 
@@ -182,6 +187,7 @@ Some initial work has been done on this project, with an initial investigation a
 |-|-|
 | **Project Github Issue** | https://github.com/unikraft/unikraft/issues/51 |
 | **Difficulty** | 4/5 |
+| **Project Size** | 175 hours |
 | **Maximum instances** | 1 |
 | **Constraints/requirements** | Very strong programming skills [C (gcc),, GNU Make] and experience with Linux tooling.  Strong knowledge of OS primitives and exposure to driver design. |
 
@@ -208,6 +214,7 @@ These two methods should be provided as a driver mechanism which allows external
 |-|-|
 | **Project Github Issue** | https://github.com/unikraft/unikraft/issues/50 |
 | **Difficulty** | 4/5 |
+| **Project Size** | 350 hours |
 | **Maximum instances** | 1 |
 | **Constraints/requirements** | Very strong programming skills [C (gcc), Python, GNU Make] and experience with Linux tooling.  Very strong knowledge of networking and networking protocols. |
 
@@ -239,6 +246,7 @@ The goal is to, of course be able to use the event API, so the task would involv
 |-|-|
 | **Project Github Issue** | https://github.com/unikraft/unikraft/issues/47 |
 | **Difficulty** | 2/5 |
+| **Project Size** | 175 hours |
 | **Maximum instances** | 1 |
 | **Constraints/requirements** | Very strong programming skills [C (gcc), Python, GNU Make] and experience with Linux tooling.  Knowledge of build systems and using gcc/Make. |
 
@@ -264,6 +272,7 @@ This project namely starts as resolving an error resulting in incorrect builds b
 |-|-|
 | **Project Github Issue** | https://github.com/unikraft/unikraft/issues/40 |
 | **Difficulty** | 2/5 |
+| **Project Size** | 175 hours |
 | **Maximum instances** | 2 |
 | **Constraints/requirements** | Strong programming skills [C (gcc), Python, GNU Make] and experience with Linux tooling. |
 
@@ -293,6 +302,7 @@ This can be achieved by making changes to the companion and command-line utility
 |-|-|
 | **Project Github Issue** | https://github.com/unikraft/unikraft/issues/33 |
 | **Difficulty** | 5/5 |
+| **Project Size** | 350 hours |
 | **Maximum instances** | 1 |
 | **Constraints/requirements** | Very strong programming skills [C (gcc), GNU make] and experience with Linux tooling. |
 
@@ -322,6 +332,7 @@ This project focuses on implementing the use of TEE on Intel-based processors (k
 |-|-|
 | **Project Github Issue** | https://github.com/unikraft/unikraft/issues/21 |
 | **Difficulty** | 4/5 |
+| **Project Size** | 350 hours |
 | **Maximum instances** | 1 |
 | **Constraints/requirements** | Very strong programming skills [C (gcc), GNU Make] and experience with Linux tooling.  Very strong knowledge of networking and storage protocols as well as OS primitives. |
 
@@ -350,6 +361,7 @@ This project tracks adding new modularity within the core Unikraft microlibrary 
 |-|-|
 | **Project Github Issue** | https://github.com/unikraft/unikraft/issues/20 |
 | **Difficulty** | 3/5 |
+| **Project Size** | 175 hours |
 | **Maximum instances** | 1 |
 | **Constraints/requirements** | Very strong programming skills [C (gcc), Python, GNU Make] and experience with Linux tooling.  Strong knowledge of hypervisors and OS primitives. |
 
@@ -381,6 +393,7 @@ This project consists of generating different stub domains based on Unikraft by 
 |-|-|
 | **Project Github Issue** | https://github.com/unikraft/unikraft/issues/19 |
 | **Difficulty** | 4/5 |
+| **Project Size** | 350 hours |
 | **Maximum instances** | 1 |
 | **Constraints/requirements** | Very strong programming skills [C (gcc), Python, GNU Make] and experience with Linux tooling.  Very strong knowledge of hypervisors and OS primitives. |
 
@@ -410,6 +423,7 @@ The project would also investigate if there are other profiling information Unik
 |-|-|
 | **Project Github Issue** | https://github.com/unikraft/unikraft/issues/10 |
 | **Difficulty** | 4/5 |
+| **Project Size** | 350 hours |
 | **Maximum instances** | 1 |
 | **Constraints/requirements** | Very strong programming skills [C (gcc), Python, GNU Make] and experience with Linux tooling.  Very strong knowledge of filesystems and OS primitives. |
 
@@ -436,7 +450,8 @@ The external library can be ported to Unikraft and then interface with `vfscore`
 | | |
 |-|-|
 | **Project Github Issue** | https://github.com/unikraft/unikraft/issues/5 |
-| **Difficulty** | |
+| **Difficulty** | 3/5 |
+| **Project Size** | 175 hours |
 | **Maximum instances** | 1 |
 | **Constraints/requirements** | Very strong programming skills [C (gcc), Python, GNU Make] and experience with Linux tooling.  Very strong knowledge of networking and networking protocols. |
 
@@ -469,6 +484,7 @@ This allows for remote "command-and-control" functionality of a running unikerne
 |-|-|
 | **Project Github Issue** | https://github.com/unikraft/unikraft/issues/2 |
 | **Difficulty** | 4/5 |
+| **Project Size** | 175 hours |
 | **Maximum instances** | 1 |
 | **Constraints/requirements** | Strong programming skills [C (gcc), JavaSCript, GNU Make] and experience with Linux tooling. |
 
