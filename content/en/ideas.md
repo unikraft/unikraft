@@ -15,6 +15,17 @@ One unikernel framework which provides minimal runtime footprint and fast (~35μ
 
 Unikraft is a Unikernel Development Kit and consists of an extensive build system in addition to core and external library ecosystem which facilitate the underlying functionality of a unikernel.
 
+## Mentors of the projects
+
+Mentors will be assigned when the project is initiated.  Please feel free to reach out beforehand to discuss the project.
+
+| Mentor | Email |
+|--------|-------|
+| [Razvan Deaconescu](https://github.com/razvand) | razvan.deaconescu@cs.pub.ro |
+| [Alexander Jung](https://github.com/nderjung) | a.jung@lancs.ac.uk |
+| [Simon Kuenzer](https://github.com/skuenzer) | simon.kuenzer@neclab.eu |
+| [Felipe Huici](https://github.com/felipehuici) | felipe.huici@neclab.eu |
+
 Below are a list of open projects for Unikraft which can be developed as part of GSoC22.  
 
 
