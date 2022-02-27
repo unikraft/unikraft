@@ -252,6 +252,7 @@
 #define ATTR_XN		(ATTR_PXN | ATTR_UXN)
 #define ATTR_CONTIGUOUS	(_AC(1, UL) << 52)
 #define ATTR_DBM	(_AC(1, UL) << 51)
+#define ATTR_GP		(_AC(1, UL) << 50)
 #define ATTR_nG		(1 << 11)
 #define ATTR_AF		(1 << 10)
 #define ATTR_SH(x)	((x) << 8)
@@ -278,18 +279,30 @@
  */
 #define SECT_ATTR_DEFAULT	\
 		(Ln_BLOCK | ATTR_DEFAULT)
+
 #define SECT_ATTR_NORMAL	\
 		(SECT_ATTR_DEFAULT | ATTR_XN | \
 		ATTR_IDX(NORMAL_WB))
+
 #define SECT_ATTR_NORMAL_RO	\
 		(SECT_ATTR_DEFAULT | ATTR_XN | \
 		ATTR_AP_RW_BIT | ATTR_IDX(NORMAL_WB))
+
+#ifdef CONFIG_ARM64_FEAT_BTI
+#define SECT_ATTR_NORMAL_EXEC	\
+		(SECT_ATTR_DEFAULT | ATTR_UXN | \
+		ATTR_GP |                       \
+		ATTR_AP_RW_BIT | ATTR_IDX(NORMAL_WB))
+#else
 #define SECT_ATTR_NORMAL_EXEC	\
 		(SECT_ATTR_DEFAULT | ATTR_UXN | \
 		ATTR_AP_RW_BIT | ATTR_IDX(NORMAL_WB))
+#endif /* CONFIG_ARM64_FEAT_BTI */
+
 #define SECT_ATTR_DEVICE_nGnRE	\
 		(SECT_ATTR_DEFAULT | ATTR_XN | \
 		ATTR_IDX(DEVICE_nGnRE))
+
 #define SECT_ATTR_DEVICE_nGnRnE	\
 		(SECT_ATTR_DEFAULT | ATTR_XN | \
 		ATTR_IDX(DEVICE_nGnRnE))

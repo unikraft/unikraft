@@ -29,6 +29,18 @@ ARCH_REV := armv8.3-a
 BRANCH_PROTECTION := pac-ret+leaf
 endif
 
+ifeq ($(CONFIG_ARM64_FEAT_BTI),y)
+# Min GCC >= 10, due to buggy GCC-9.
+# https://gcc.gnu.org/bugzilla/show_bug.cgi?id=94697
+$(call error_if_gcc_version_lt,10,0)
+ARCH_REV := armv8.5-a
+ifeq ($(BRANCH_PROTECTION),)
+	BRANCH_PROTECTION := bti
+else
+	BRANCH_PROTECTION := standard
+endif
+endif
+
 ifdef ARCH_REV
 ARCHFLAGS-y += -march=$(ARCH_REV)
 ISR_ARCHFLAGS-y += -march=$(ARCH_REV)
