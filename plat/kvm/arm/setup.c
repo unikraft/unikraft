@@ -39,8 +39,9 @@ static const char *appname = CONFIG_UK_NAME;
 
 smccc_conduit_fn_t smccc_psci_call;
 
-extern void _libkvmplat_newstack(uint64_t stack_start,
-			void (*tramp)(void *), void *arg);
+#define _libkvmplat_newstack(sp) ({				\
+	__asm__ __volatile__("mov sp, %0\n" ::"r" (sp));	\
+})
 
 static void _init_dtb(void *dtb_pointer)
 {
@@ -201,13 +202,7 @@ enocmdl:
 	uk_pr_info("No command line found\n");
 }
 
-static void _libkvmplat_entry2(void *arg __attribute__((unused)))
-{
-	ukplat_entry_argp(DECONST(char *, appname),
-			  (char *)cmdline, strlen(cmdline));
-}
-
-void _libkvmplat_start(void *dtb_pointer)
+void __no_pauth _libkvmplat_start(void *dtb_pointer)
 {
 	_init_dtb(dtb_pointer);
 	pl011_console_init(dtb_pointer);
@@ -239,6 +234,8 @@ void _libkvmplat_start(void *dtb_pointer)
 	uk_pr_info("Switch from bootstrap stack to stack @%p\n",
 		   (void *) _libkvmplat_cfg.bstack.end);
 
-	_libkvmplat_newstack((uint64_t) _libkvmplat_cfg.bstack.end,
-				_libkvmplat_entry2, NULL);
+	_libkvmplat_newstack(_libkvmplat_cfg.bstack.end);
+
+	ukplat_entry_argp(DECONST(char *, appname),
+			  (char *)cmdline, strlen(cmdline));
 }

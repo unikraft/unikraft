@@ -143,13 +143,3 @@ ENTRY(_libkvmplat_entry)
 	b _libkvmplat_start
 END(_libkvmplat_entry)
 
-ENTRY(_libkvmplat_newstack)
-	/* Setup new stack */
-	mov sp, x0
-
-	/* Setup parameter for _libkvmplat_entry2 */
-	mov x0, x2
-
-	/* Branch to _libkvmplat_entry2 */
-	br x1
-END(_libkvmplat_newstack)
