@@ -84,9 +84,11 @@ static void *uk_allocregion_malloc(struct uk_alloc *a, size_t size)
 	if (newbase <= (uintptr_t) b->heap_base)
 		goto enomem;
 
+	uk_alloc_stats_count_alloc(a, (void *) intptr,
+				   newbase - (uintptr_t) b->heap_base);
+
 	b->heap_base = (void *)(newbase);
 
-	uk_alloc_stats_count_alloc(a, (void *) intptr, size);
 	return (void *) intptr;
 
 enomem:
@@ -128,9 +130,12 @@ static int uk_allocregion_posix_memalign(struct uk_alloc *a, void **memptr,
 		goto enomem;
 
 	*memptr = (void *)intptr;
+
+	uk_alloc_stats_count_alloc(a, (void *) intptr,
+				   newbase - (uintptr_t)b->heap_base);
+
 	b->heap_base = (void *)(newbase);
 
-	uk_alloc_stats_count_alloc(a, (void *) intptr, size);
 	return 0;
 
 enomem:
