@@ -112,7 +112,7 @@ do { \
 			uk_waitq_add(wq, &__wait); \
 			__current->wakeup_time = deadline; \
 			clear_runnable(__current); \
-			uk_sched_thread_blocked(__current->sched, __current); \
+			uk_sched_thread_blocked(__current); \
 			ukplat_lcpu_restore_irqf(flags); \
 			if (lock) \
 				unlock_fn(lock); \
@@ -128,7 +128,7 @@ do { \
 		} \
 		flags = ukplat_lcpu_save_irqf(); \
 		/* need to wake up */ \
-		uk_thread_wake(__current); \
+		uk_thread_wakeup(__current); \
 		uk_waitq_remove(wq, &__wait); \
 		ukplat_lcpu_restore_irqf(flags); \
 	} \
@@ -166,7 +166,7 @@ void uk_waitq_wake_up(struct uk_waitq *wq)
 
 	flags = ukplat_lcpu_save_irqf();
 	UK_STAILQ_FOREACH_SAFE(curr, wq, thread_list, tmp)
-		uk_thread_wake(curr->thread);
+		uk_thread_wakeup(curr->thread);
 	ukplat_lcpu_restore_irqf(flags);
 }
 

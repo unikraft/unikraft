@@ -32,7 +32,7 @@ uk_thread_set_timeslice
 uk_thread_get_timeslice
 uk_thread_block_timeout
 uk_thread_block
-uk_thread_wake
+uk_thread_wakeup
 uk_thread_attr_init
 uk_thread_attr_fini
 uk_thread_attr_set_detachstate

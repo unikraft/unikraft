@@ -498,7 +498,7 @@ struct uk_thread *uk_thread_create_fn2(struct uk_alloc *a,
 void uk_thread_release(struct uk_thread *t);
 void uk_thread_block_timeout(struct uk_thread *thread, __nsec nsec);
 void uk_thread_block(struct uk_thread *thread);
-void uk_thread_wake(struct uk_thread *thread);
+void uk_thread_wakeup(struct uk_thread *thread);
 
 /**
  * Thread initialization callback

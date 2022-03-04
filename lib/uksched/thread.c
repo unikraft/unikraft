@@ -837,10 +837,15 @@ static void uk_thread_block_until(struct uk_thread *thread, __snsec until)
 {
 	unsigned long flags;
 
+	UK_ASSERT(thread);
+
 	flags = ukplat_lcpu_save_irqf();
 	thread->wakeup_time = until;
-	clear_runnable(thread);
-	uk_sched_thread_blocked(thread->sched, thread);
+	if (is_runnable(thread)) {
+		clear_runnable(thread);
+		if (thread->sched)
+			uk_sched_thread_blocked(thread);
+	}
 	ukplat_lcpu_restore_irqf(flags);
 }
 
@@ -848,24 +853,29 @@ void uk_thread_block_timeout(struct uk_thread *thread, __nsec nsec)
 {
 	__snsec until = (__snsec) ukplat_monotonic_clock() + nsec;
 
+	UK_ASSERT(thread);
+
 	uk_thread_block_until(thread, until);
 }
 
 void uk_thread_block(struct uk_thread *thread)
 {
-	uk_thread_block_until(thread, 0LL);
+	UK_ASSERT(thread);
+
+	uk_thread_block_until(thread, (__nsec) 0);
 }
 
-void uk_thread_wake(struct uk_thread *thread)
+void uk_thread_wakeup(struct uk_thread *thread)
 {
 	unsigned long flags;
 
 	flags = ukplat_lcpu_save_irqf();
 	if (!is_runnable(thread)) {
-		uk_sched_thread_woken(thread->sched, thread);
-		thread->wakeup_time = 0LL;
 		set_runnable(thread);
+		if (thread->sched)
+			uk_sched_thread_wokeup(thread);
 	}
+	thread->wakeup_time = 0LL;
 	ukplat_lcpu_restore_irqf(flags);
 }
 

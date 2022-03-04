@@ -68,7 +68,7 @@ typedef void  (*uk_sched_thread_remove_func_t)
 		(struct uk_sched *s, struct uk_thread *t);
 typedef void  (*uk_sched_thread_blocked_func_t)
 		(struct uk_sched *s, struct uk_thread *t);
-typedef void  (*uk_sched_thread_woken_func_t)
+typedef void  (*uk_sched_thread_wokeup_func_t)
 		(struct uk_sched *s, struct uk_thread *t);
 
 typedef int   (*uk_sched_start_t)(struct uk_sched *s, struct uk_thread *main);
@@ -88,7 +88,7 @@ struct uk_sched {
 	uk_sched_thread_add_func_t      thread_add;
 	uk_sched_thread_remove_func_t   thread_remove;
 	uk_sched_thread_blocked_func_t  thread_blocked;
-	uk_sched_thread_woken_func_t    thread_woken;
+	uk_sched_thread_wokeup_func_t   thread_wokeup;
 
 	uk_sched_thread_set_prio_func_t   thread_set_prio;
 	uk_sched_thread_get_prio_func_t   thread_get_prio;
@@ -124,21 +124,29 @@ int uk_sched_thread_add(struct uk_sched *s,
 
 int uk_sched_thread_remove(struct uk_thread *t);
 
-
-static inline void uk_sched_thread_blocked(struct uk_sched *s,
-		struct uk_thread *t)
+static inline void uk_sched_thread_blocked(struct uk_thread *t)
 {
-	UK_ASSERT(s);
+	struct uk_sched *s;
+
+	UK_ASSERT(t);
+	UK_ASSERT(t->sched);
+	UK_ASSERT(!is_runnable(t));
+
+	s = t->sched;
 	s->thread_blocked(s, t);
 }
 
-static inline void uk_sched_thread_woken(struct uk_sched *s,
-		struct uk_thread *t)
+static inline void uk_sched_thread_wokeup(struct uk_thread *t)
 {
-	UK_ASSERT(s);
 
-	set_runnable(t);
-	s->thread_woken(s, t);
+	struct uk_sched *s;
+
+	UK_ASSERT(t);
+	UK_ASSERT(t->sched);
+	UK_ASSERT(is_runnable(t));
+
+	s = t->sched;
+	s->thread_wokeup(s, t);
 }
 
 static inline int uk_sched_thread_set_prio(struct uk_sched *s,
@@ -190,7 +198,7 @@ static inline int uk_sched_thread_get_timeslice(struct uk_sched *s,
  */
 #define uk_sched_init(s, start_func, yield_func, \
 		thread_add_func, thread_remove_func, \
-		thread_blocked_func, thread_woken_func, \
+		thread_blocked_func, thread_wokeup_func, \
 		thread_set_prio_func, thread_get_prio_func, \
 		thread_set_tslice_func, thread_get_tslice_func, \
 		def_allocator) \
@@ -200,7 +208,7 @@ static inline int uk_sched_thread_get_timeslice(struct uk_sched *s,
 		(s)->thread_add      = thread_add_func; \
 		(s)->thread_remove   = thread_remove_func; \
 		(s)->thread_blocked  = thread_blocked_func; \
-		(s)->thread_woken    = thread_woken_func; \
+		(s)->thread_wokeup   = thread_wokeup_func; \
 		(s)->thread_set_prio    = thread_set_prio_func; \
 		(s)->thread_get_prio    = thread_get_prio_func; \
 		(s)->thread_set_tslice  = thread_set_tslice_func; \

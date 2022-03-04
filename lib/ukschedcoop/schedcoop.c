@@ -81,7 +81,7 @@ static void schedcoop_schedule(struct uk_sched *s)
 			      queue, tmp) {
 		if (likely(thread->wakeup_time)) {
 			if (thread->wakeup_time <= now)
-				uk_thread_wake(thread);
+				uk_thread_wakeup(thread);
 			else if (!min_wakeup_time
 				 || thread->wakeup_time < min_wakeup_time)
 				min_wakeup_time = thread->wakeup_time;
