@@ -131,7 +131,7 @@ int uk_thread_init(struct uk_thread *thread,
 	thread->name = name;
 	thread->stack = stack;
 	thread->tls = tls;
-	thread->tlsp = (tls == NULL) ? 0 : (uintptr_t) ukarch_tls_pointer(tls);
+	thread->tlsp = (tls == NULL) ? 0 : ukarch_tls_tlsp(tls);
 	thread->entry = function;
 	thread->arg = arg;
 

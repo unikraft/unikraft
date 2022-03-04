@@ -174,7 +174,7 @@ static void *uk_thread_tls_create(struct uk_alloc *allocator)
 		uk_pr_err("Failed to allocate thread TLS area\n");
 		return NULL;
 	}
-	ukarch_tls_area_copy(tls);
+	ukarch_tls_area_init(tls);
 	return tls;
 }
 
