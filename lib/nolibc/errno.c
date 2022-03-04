@@ -33,13 +33,8 @@
 
 #include <errno.h>
 
-/* Works only for single-threaded unikernels only,
- * errno should be placed on the beginning of each
- * thread's stack instead
- */
-static int __errno;
-
-int *_nolibc_errno(void)
-{
-	return &__errno;
-}
+#if CONFIG_HAVE_SCHED
+__thread int errno = 0x0;
+#else
+int errno = 0x0;
+#endif /* !CONFIG_HAVE_SCHED */
