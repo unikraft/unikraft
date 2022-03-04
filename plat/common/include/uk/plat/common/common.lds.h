@@ -124,8 +124,15 @@
 		*(.tbss)						\
 		*(.tbss.*)						\
 		*(.gnu.linkonce.tb.*)					\
-		. = ALIGN(0x20);					\
+		*(.tcommon)						\
 	}								\
+	/*								\
+	 * NOTE: Because the .tbss section is zero-sized in the final	\
+	 *       ELF image, just setting _tls_end to the end of it	\
+	 *       does not give us the the size of the memory area once	\
+	 *       loaded, so we use SIZEOF to have it point to the end.	\
+	 *       _tls_end is only used to compute the .tbss size.	\
+	 */								\
 	_tls_end = . + SIZEOF(.tbss);
 
 #define DATA_SECTIONS							\
