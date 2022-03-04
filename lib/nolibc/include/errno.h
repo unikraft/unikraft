@@ -38,8 +38,13 @@
 extern "C" {
 #endif
 
-extern int *_nolibc_errno(void);
-#define errno (*_nolibc_errno())
+#include <uk/config.h>
+
+#if CONFIG_HAVE_SCHED
+extern __thread int errno;
+#else
+extern int errno;
+#endif /* !CONFIG_HAVE_SCHED */
 
 /*
  * Linux compatible errno list
