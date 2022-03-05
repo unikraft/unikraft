@@ -54,6 +54,8 @@
 extern "C" {
 #endif
 
+#include <uk/asm/compiler.h>
+
 #ifdef __GNUC__
 #ifndef __packed
 #define __packed               __attribute__((packed))
