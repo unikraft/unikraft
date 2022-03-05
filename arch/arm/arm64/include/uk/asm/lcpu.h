@@ -30,6 +30,8 @@
 #error Do not include this header directly
 #endif
 
+#include <uk/asm.h>
+
 #define CACHE_LINE_SIZE	64
 
 #ifdef __ASSEMBLY__
@@ -152,5 +154,49 @@ static inline void ukarch_spinwait(void)
 {
 	/* Intelligent busy wait not supported on arm64. */
 }
+
+/******************************************************************
+ * System Register Definitions
+ ******************************************************************/
+
+/* SCTLR_EL1: System Control Register */
+#define SCTLR_EL1_M_BIT             (_AC(1, ULL) << 0)
+#define SCTLR_EL1_A_BIT             (_AC(1, ULL) << 1)
+#define SCTLR_EL1_C_BIT             (_AC(1, ULL) << 2)
+#define SCTLR_EL1_SA_BIT            (_AC(1, ULL) << 3)
+#define SCTLR_EL1_SA0_BIT           (_AC(1, ULL) << 4)
+#define SCTLR_EL1_CP15BEN_BIT       (_AC(1, ULL) << 5)
+#define SCTLR_EL1_ITD_BIT           (_AC(1, ULL) << 7)
+#define SCTLR_EL1_SED_BIT           (_AC(1, ULL) << 8)
+#define SCTLR_EL1_UMA_BIT           (_AC(1, ULL) << 9)
+#define SCTLR_EL1_I_BIT             (_AC(1, ULL) << 12)
+#define SCTLR_EL1_EnDB_BIT          (_AC(1, ULL) << 13)
+#define SCTLR_EL1_DZE_BIT           (_AC(1, ULL) << 14)
+#define SCTLR_EL1_UCT_BIT           (_AC(1, ULL) << 15)
+#define SCTLR_EL1_NTWI_BIT          (_AC(1, ULL) << 16)
+#define SCTLR_EL1_NTWE_BIT          (_AC(1, ULL) << 18)
+#define SCTLR_EL1_WXN_BIT           (_AC(1, ULL) << 19)
+#define SCTLR_EL1_UWXN_BIT          (_AC(1, ULL) << 20)
+#define SCTLR_EL1_IESB_BIT          (_AC(1, ULL) << 21)
+#define SCTLR_EL1_E0E_BIT           (_AC(1, ULL) << 24)
+#define SCTLR_EL1_EE_BIT            (_AC(1, ULL) << 25)
+#define SCTLR_EL1_UCI_BIT           (_AC(1, ULL) << 26)
+#define SCTLR_EL1_EnDA_BIT          (_AC(1, ULL) << 27)
+#define SCTLR_EL1_EnIB_BIT          (_AC(1, ULL) << 30)
+#define SCTLR_EL1_EnIA_BIT          (_AC(1, ULL) << 31)
+#define SCTLR_EL1_BT0_BIT           (_AC(1, ULL) << 35)
+#define SCTLR_EL1_BT1_BIT           (_AC(1, ULL) << 36)
+#define SCTLR_EL1_BT_BIT            (_AC(1, ULL) << 36)
+#define SCTLR_EL1_DSSBS_BIT         (_AC(1, ULL) << 44)
+
+/* ID_AA64_ISAR_EL1: AArch64 Instruction Set Attributes Register 1 */
+#define ID_AA64ISAR1_EL1_GPI_SHIFT  28
+#define ID_AA64ISAR1_EL1_GPI_MASK   0xf
+#define ID_AA64ISAR1_EL1_GPA_SHIFT  24
+#define ID_AA64ISAR1_EL1_GPA_MASK   0xf
+#define ID_AA64ISAR1_EL1_API_SHIFT  8
+#define ID_AA64ISAR1_EL1_API_MASK   0xf
+#define ID_AA64ISAR1_EL1_APA_SHIFT  4
+#define ID_AA64ISAR1_EL1_APA_MASK   0xf
 
 #endif /* __ASSEMBLY__ */
