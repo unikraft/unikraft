@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2022, Michalis Pappas <mpappas@fastmail.fm>.
+ * Copyright (c) 2021, Michalis Pappas <mpappas@fastmail.fm>.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,13 +28,32 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef __UK_ESSENTIALS_H__
-#error Do not include this header directly
-#endif
+#ifndef __PLAT_COMMON_ARM64_PAUTH_H__
+#define __PLAT_COMMON_ARM64_PAUTH_H__
 
-#if CONFIG_ARM64_FEAT_PAUTH
-#define __no_pauth __attribute__((target("branch-protection=none")))
-#else
-#define __no_pauth
-#endif /* CONFIG_ARM64_FEAT_PAUTH */
+/* Generate a PAuth key
+ *
+ * Generate an 128-bit key for PAC generation and verification. This
+ * function should be implemented by the platform. Failure to generate
+ * a key must be handled internally to this function in a platform-specific
+ * way.
+ *
+ * NOTICE: Definition of this function must use the __no_pauth attribute.
+ *         See arch/arm/arm64/compiler.h
+ *
+ * @param [in/out] key_hi upper 64 key bits
+ * @param [in/out] key_lo lower 64 key bits
+ */
+void ukplat_pauth_gen_key(__u64 *key_hi, __u64 *key_lo);
 
+/* Initialize and enable Pointer Authentication
+ *
+ * Initializes and enables Pointer Authentication. This function
+ * generates keys by calling ukplat_pauth_gen_key(), programs keys,
+ * and enables pointer authentication.
+ *
+ * @return 0 on success, -1 if FEAT_PAUTH is not implemented.
+ */
+int ukplat_pauth_init(void);
+
+#endif /* __PLAT_COMMON_ARM64_PAUTH_H__ */

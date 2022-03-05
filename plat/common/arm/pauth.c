@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2022, Michalis Pappas <mpappas@fastmail.fm>.
+ * Copyright (c) 2021, Michalis Pappas <mpappas@fastmail.fm>.
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -28,13 +28,39 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef __UK_ESSENTIALS_H__
-#error Do not include this header directly
-#endif
+#include <arm/arm64/cpu.h>
+#include <arm/arm64/pauth.h>
+#include <uk/arch/types.h>
+#include <uk/assert.h>
+#include <uk/essentials.h>
 
-#if CONFIG_ARM64_FEAT_PAUTH
-#define __no_pauth __attribute__((target("branch-protection=none")))
-#else
-#define __no_pauth
-#endif /* CONFIG_ARM64_FEAT_PAUTH */
+int __no_pauth ukplat_pauth_init(void)
+{
+	__u64 reg;
+	__u64 apa, api;
+	__u64 key_hi, key_lo;
 
+	/* Check if pointer authentication is available.
+	 *
+	 * This checks whether either QARMA or an IMPLEMENTATION DEFINED
+	 * algorithm is used. If the platform supports PAuth, one of
+	 * the two must be present.
+	 */
+	reg = SYSREG_READ(ID_AA64ISAR1_EL1);
+	apa = (reg >> ID_AA64ISAR1_EL1_APA_SHIFT) & ID_AA64ISAR1_EL1_APA_MASK;
+	api = (reg >> ID_AA64ISAR1_EL1_API_SHIFT) & ID_AA64ISAR1_EL1_API_MASK;
+	if (!apa && !api)
+		return -1;
+
+	/* Program instruction Key A */
+	ukplat_pauth_gen_key(&key_hi, &key_lo);
+	SYSREG_WRITE64(APIAKeyHi_EL1, key_hi);
+	SYSREG_WRITE64(APIAKeyLo_EL1, key_lo);
+
+	/* Enable pointer authentication */
+	reg = SYSREG_READ64(sctlr_el1);
+	reg |= SCTLR_EL1_EnIA_BIT;
+	SYSREG_WRITE64(sctlr_el1, reg);
+
+	return 0;
+}
