@@ -69,8 +69,7 @@ typedef void  (*uk_sched_yield_func_t)
 		(struct uk_sched *s);
 
 typedef int   (*uk_sched_thread_add_func_t)
-		(struct uk_sched *s, struct uk_thread *t,
-			const uk_thread_attr_t *attr);
+		(struct uk_sched *s, struct uk_thread *t);
 typedef void  (*uk_sched_thread_remove_func_t)
 		(struct uk_sched *s, struct uk_thread *t);
 typedef void  (*uk_sched_thread_blocked_func_t)
@@ -80,15 +79,6 @@ typedef void  (*uk_sched_thread_woken_func_t)
 
 typedef int   (*uk_sched_start_t)(struct uk_sched *s, struct uk_thread *main);
 
-typedef int   (*uk_sched_thread_set_prio_func_t)
-		(struct uk_sched *s, struct uk_thread *t, prio_t prio);
-typedef int   (*uk_sched_thread_get_prio_func_t)
-		(struct uk_sched *s, const struct uk_thread *t, prio_t *prio);
-typedef int   (*uk_sched_thread_set_tslice_func_t)
-		(struct uk_sched *s, struct uk_thread *t, int tslice);
-typedef int   (*uk_sched_thread_get_tslice_func_t)
-		(struct uk_sched *s, const struct uk_thread *t, int *tslice);
-
 struct uk_sched {
 	uk_sched_yield_func_t yield;
 
@@ -96,11 +86,6 @@ struct uk_sched {
 	uk_sched_thread_remove_func_t   thread_remove;
 	uk_sched_thread_blocked_func_t  thread_blocked;
 	uk_sched_thread_woken_func_t    thread_woken;
-
-	uk_sched_thread_set_prio_func_t   thread_set_prio;
-	uk_sched_thread_get_prio_func_t   thread_get_prio;
-	uk_sched_thread_set_tslice_func_t thread_set_tslice;
-	uk_sched_thread_get_tslice_func_t thread_get_tslice;
 
 	uk_sched_start_t sched_start;
 
@@ -126,8 +111,7 @@ static inline void uk_sched_yield(void)
 	s->yield(s);
 }
 
-int uk_sched_thread_add(struct uk_sched *s,
-			struct uk_thread *t, const uk_thread_attr_t *attr);
+int uk_sched_thread_add(struct uk_sched *s, struct uk_thread *t);
 
 int uk_sched_thread_remove(struct uk_thread *t);
 
@@ -156,58 +140,12 @@ static inline void uk_sched_thread_woken(struct uk_thread *t)
 	s->thread_woken(s, t);
 }
 
-static inline int uk_sched_thread_set_prio(struct uk_sched *s,
-		struct uk_thread *t, prio_t prio)
-{
-	UK_ASSERT(s);
-
-	if (!s->thread_set_prio)
-		return -EINVAL;
-
-	return s->thread_set_prio(s, t, prio);
-}
-
-static inline int uk_sched_thread_get_prio(struct uk_sched *s,
-		const struct uk_thread *t, prio_t *prio)
-{
-	UK_ASSERT(s);
-
-	if (!s->thread_get_prio)
-		return -EINVAL;
-
-	return s->thread_get_prio(s, t, prio);
-}
-
-static inline int uk_sched_thread_set_timeslice(struct uk_sched *s,
-		struct uk_thread *t, int tslice)
-{
-	UK_ASSERT(s);
-
-	if (!s->thread_set_tslice)
-		return -EINVAL;
-
-	return s->thread_set_tslice(s, t, tslice);
-}
-
-static inline int uk_sched_thread_get_timeslice(struct uk_sched *s,
-		const struct uk_thread *t, int *tslice)
-{
-	UK_ASSERT(s);
-
-	if (!s->thread_get_tslice)
-		return -EINVAL;
-
-	return s->thread_get_tslice(s, t, tslice);
-}
-
 /*
  * Internal scheduler functions
  */
 #define uk_sched_init(s, start_func, yield_func, \
 		thread_add_func, thread_remove_func, \
 		thread_blocked_func, thread_woken_func, \
-		thread_set_prio_func, thread_get_prio_func, \
-		thread_set_tslice_func, thread_get_tslice_func, \
 		def_allocator) \
 	do { \
 		(s)->sched_start     = start_func; \
@@ -216,10 +154,6 @@ static inline int uk_sched_thread_get_timeslice(struct uk_sched *s,
 		(s)->thread_remove   = thread_remove_func; \
 		(s)->thread_blocked  = thread_blocked_func; \
 		(s)->thread_woken    = thread_woken_func; \
-		(s)->thread_set_prio    = thread_set_prio_func; \
-		(s)->thread_get_prio    = thread_get_prio_func; \
-		(s)->thread_set_tslice  = thread_set_tslice_func; \
-		(s)->thread_get_tslice  = thread_get_tslice_func; \
 		uk_sched_register((s)); \
 		\
 		(s)->threads_started = false;	\
