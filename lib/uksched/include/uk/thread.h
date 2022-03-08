@@ -67,8 +67,6 @@ struct uk_thread {
 	UK_TAILQ_ENTRY(struct uk_thread) queue;
 	uint32_t flags;
 	__snsec wakeup_time;
-	bool detached;
-	struct uk_waitq waiting_threads;
 	struct uk_sched *sched;
 
 	struct {
@@ -100,9 +98,6 @@ UK_TAILQ_HEAD(uk_thread_list, struct uk_thread);
 	uk_sched_thread_terminate(thread)
 #define uk_thread_exit() \
 	uk_sched_thread_exit()
-
-int uk_thread_wait(struct uk_thread *thread);
-int uk_thread_detach(struct uk_thread *thread);
 
 /* managed by sched.c */
 extern struct uk_thread *__uk_sched_thread_current;
