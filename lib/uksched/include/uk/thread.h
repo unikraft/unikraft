@@ -40,7 +40,6 @@
 #if CONFIG_LIBUKSIGNAL
 #include <uk/uk_signal.h>
 #endif
-#include <uk/thread_attr.h>
 #include <uk/plat/tls.h>
 #include <uk/wait_types.h>
 #include <uk/list.h>
@@ -107,12 +106,6 @@ UK_TAILQ_HEAD(uk_thread_list, struct uk_thread);
 
 int uk_thread_wait(struct uk_thread *thread);
 int uk_thread_detach(struct uk_thread *thread);
-
-int uk_thread_set_prio(struct uk_thread *thread, prio_t prio);
-int uk_thread_get_prio(const struct uk_thread *thread, prio_t *prio);
-
-int uk_thread_set_timeslice(struct uk_thread *thread, int timeslice);
-int uk_thread_get_timeslice(const struct uk_thread *thread, int *timeslice);
 
 /* managed by sched.c */
 extern struct uk_thread *__uk_sched_thread_current;

@@ -124,8 +124,7 @@ static void schedcoop_schedule(struct uk_sched *s)
 		uk_sched_thread_switch(next);
 }
 
-static int schedcoop_thread_add(struct uk_sched *s, struct uk_thread *t,
-	const uk_thread_attr_t *attr __unused)
+static int schedcoop_thread_add(struct uk_sched *s, struct uk_thread *t)
 {
 	struct schedcoop *c = uksched2schedcoop(s);
 
@@ -268,7 +267,6 @@ struct uk_sched *uk_schedcoop_create(struct uk_alloc *a)
 			schedcoop_thread_remove,
 			schedcoop_thread_blocked,
 			schedcoop_thread_woken,
-		        NULL, NULL, NULL, NULL,
 		        a);
 
 	/* Add idle thread to the scheduler's thread list */

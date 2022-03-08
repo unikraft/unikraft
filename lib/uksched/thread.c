@@ -905,35 +905,3 @@ int uk_thread_detach(struct uk_thread *thread)
 
 	return 0;
 }
-
-int uk_thread_set_prio(struct uk_thread *thread, prio_t prio)
-{
-	if (!thread)
-		return -EINVAL;
-
-	return uk_sched_thread_set_prio(thread->sched, thread, prio);
-}
-
-int uk_thread_get_prio(const struct uk_thread *thread, prio_t *prio)
-{
-	if (!thread)
-		return -EINVAL;
-
-	return uk_sched_thread_get_prio(thread->sched, thread, prio);
-}
-
-int uk_thread_set_timeslice(struct uk_thread *thread, int timeslice)
-{
-	if (!thread)
-		return -EINVAL;
-
-	return uk_sched_thread_set_timeslice(thread->sched, thread, timeslice);
-}
-
-int uk_thread_get_timeslice(const struct uk_thread *thread, int *timeslice)
-{
-	if (!thread)
-		return -EINVAL;
-
-	return uk_sched_thread_get_timeslice(thread->sched, thread, timeslice);
-}

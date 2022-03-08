@@ -142,7 +142,7 @@ struct uk_thread *uk_sched_thread_create(struct uk_sched *s,
 	if (!t)
 		goto err_out;
 
-	rc = uk_sched_thread_add(s, t, NULL);
+	rc = uk_sched_thread_add(s, t);
 	if (rc < 0)
 		goto err_free_t;
 
@@ -286,8 +286,7 @@ void uk_sched_thread_sleep(__nsec nsec)
 	uk_sched_yield();
 }
 
-int uk_sched_thread_add(struct uk_sched *s,
-			struct uk_thread *t, const uk_thread_attr_t *attr)
+int uk_sched_thread_add(struct uk_sched *s, struct uk_thread *t)
 {
 	unsigned long flags;
 	int rc;
@@ -297,10 +296,8 @@ int uk_sched_thread_add(struct uk_sched *s,
 	UK_ASSERT(!t->sched);
 
 	flags = ukplat_lcpu_save_irqf();
-	if (attr)
-		t->detached = attr->detached;
 
-	rc = s->thread_add(s, t, attr);
+	rc = s->thread_add(s, t);
 	if (rc < 0)
 		goto out;
 

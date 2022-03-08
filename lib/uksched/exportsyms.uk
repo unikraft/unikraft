@@ -26,21 +26,9 @@ uk_thread_create_fn2
 uk_thread_release
 uk_thread_wait
 uk_thread_detach
-uk_thread_set_prio
-uk_thread_get_prio
-uk_thread_set_timeslice
-uk_thread_get_timeslice
 uk_thread_block_timeout
 uk_thread_block
 uk_thread_wakeup
-uk_thread_attr_init
-uk_thread_attr_fini
-uk_thread_attr_set_detachstate
-uk_thread_attr_get_detachstate
-uk_thread_attr_set_prio
-uk_thread_attr_get_prio
-uk_thread_attr_set_timeslice
-uk_thread_attr_get_timeslice
 __uk_sched_thread_current
 
 # Newlib related
