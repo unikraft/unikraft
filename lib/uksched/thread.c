@@ -259,8 +259,6 @@ static void _uk_thread_struct_init(struct uk_thread *t,
 		t->flags |= UK_THREADF_ECTX;
 	}
 
-	uk_waitq_init(&t->waiting_threads);
-
 #ifdef CONFIG_LIBNEWLIBC
 	/* TODO: Move newlibc reent initialization to newlib as
 	 *       thread initialization function and use TLS
@@ -877,31 +875,4 @@ void uk_thread_wakeup(struct uk_thread *thread)
 	}
 	thread->wakeup_time = 0LL;
 	ukplat_lcpu_restore_irqf(flags);
-}
-
-int uk_thread_wait(struct uk_thread *thread)
-{
-	UK_ASSERT(thread);
-
-	/* TODO critical region */
-
-	if (thread->detached)
-		return -EINVAL;
-
-	uk_waitq_wait_event(&thread->waiting_threads, is_exited(thread));
-
-	thread->detached = true;
-
-	uk_sched_thread_kill(thread);
-
-	return 0;
-}
-
-int uk_thread_detach(struct uk_thread *thread)
-{
-	UK_ASSERT(thread);
-
-	thread->detached = true;
-
-	return 0;
 }

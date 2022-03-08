@@ -430,9 +430,8 @@ static void _destroy_event_handler(struct uk_netdev_event_handler *h
 
 	if (h->dispatcher) {
 		uk_thread_kill(h->dispatcher);
-		uk_thread_wait(h->dispatcher);
+		h->dispatcher = NULL;
 	}
-	h->dispatcher = NULL;
 
 	if (h->dispatcher_name)
 		free(h->dispatcher_name);

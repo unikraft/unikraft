@@ -24,8 +24,6 @@ uk_thread_create_fn0
 uk_thread_create_fn1
 uk_thread_create_fn2
 uk_thread_release
-uk_thread_wait
-uk_thread_detach
 uk_thread_block_timeout
 uk_thread_block
 uk_thread_wakeup

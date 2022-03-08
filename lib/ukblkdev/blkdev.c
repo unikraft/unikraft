@@ -280,7 +280,6 @@ static void _destroy_event_handler(struct uk_blkdev_event_handler *h
 		uk_semaphore_up(&h->events);
 		UK_ASSERT(h->dispatcher_s);
 		uk_thread_kill(h->dispatcher);
-		uk_thread_wait(h->dispatcher);
 		h->dispatcher = NULL;
 	}
 

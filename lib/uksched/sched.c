@@ -217,8 +217,6 @@ unsigned int uk_sched_thread_gc(struct uk_sched *sched)
 			      thread_list, tmp) {
 		UK_ASSERT(thread != uk_thread_current());
 
-		if (!thread->detached)
-			continue; /* someone will eventually wait for it */
 		uk_pr_debug("%p: garbage collect thread %p (%s)\n",
 			    sched, thread,
 			    thread->name ? thread->name : "<unnamed>");
@@ -254,17 +252,19 @@ void uk_sched_thread_kill(struct uk_thread *thread)
 	set_exited(thread);
 	clear_runnable(thread);
 
-	/* enqueue thread for garbage collecting */
-	if (!thread->detached)
-		UK_TAILQ_INSERT_TAIL(&sched->exited_threads, thread,
-				     thread_list); /* another thread waits */
-	else
-		uk_thread_release(thread);
-
 	if (thread == uk_thread_current()) {
+		/* enqueue thread for garbage collecting */
+		uk_pr_debug("%p: thread %p (%s) on gc list\n",
+			    sched, thread, thread->name ? thread->name : "<unnamed>");
+		UK_TAILQ_INSERT_TAIL(&sched->exited_threads, thread,
+				     thread_list);
+
 		/* leave this thread */
 		sched->yield(sched); /* we won't return */
 		UK_CRASH("Unexpectedly returned to exited thread %p\n", thread);
+	} else {
+		/* free thread resources immediately */
+		uk_thread_release(thread);
 	}
 }
 
