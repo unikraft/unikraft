@@ -34,60 +34,68 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
+#include <string.h>
 #include <errno.h>
 
+#include <uk/plat/tls.h>
 #include <uk/alloc.h>
 #include <uk/print.h>
+#include <uk/ctors.h>
 #include <signal.h>
 #include <uk/thread.h>
 #include <uk/uk_signal.h>
 #include <uk/essentials.h>
 
 struct uk_proc_sig uk_proc_sig;
+static __uk_tls struct uk_thread_sig signals_container;
 
-int uk_proc_sig_init(struct uk_proc_sig *sig)
+static void uk_proc_sig_ctor(void)
 {
 	int i;
 
-	sigemptyset(&sig->pending);
+	sigemptyset(&uk_proc_sig.pending);
 
 	for (i = 0; i < NSIG - 1; ++i) {
 		/* TODO: set ign to the ones that should be ign */
-		sig->sigaction[i].sa_handler = SIG_DFL;
-		sigemptyset(&sig->sigaction[i].sa_mask);
-		sig->sigaction[i].sa_flags = 0;
+		uk_proc_sig.sigaction[i].sa_handler = SIG_DFL;
+		sigemptyset(&uk_proc_sig.sigaction[i].sa_mask);
+		uk_proc_sig.sigaction[i].sa_flags = 0;
 	}
 
-	UK_INIT_LIST_HEAD(&sig->thread_sig_list);
-	return 0;
+	UK_INIT_LIST_HEAD(&uk_proc_sig.thread_sig_list);
 }
 
-static int uk_thread_sig_init(struct uk_thread *t)
+UK_CTOR(uk_proc_sig_ctor);
+
+static int uk_thread_sig_init(struct uk_thread *thread,
+			      struct uk_thread *parent __unused)
 {
-	struct uk_thread_sig *sig = &t->signals_container;
+	memset(&signals_container, 0, (sizeof(signals_container)));
+	sigemptyset(&signals_container.mask);
 
-	sigemptyset(&sig->mask);
+	signals_container.tid = thread;
+	signals_container.wait.status = UK_SIG_NOT_WAITING;
+	sigemptyset(&signals_container.wait.awaited);
 
-	sig->wait.status = UK_SIG_NOT_WAITING;
-	sigemptyset(&sig->wait.awaited);
+	sigemptyset(&signals_container.pending);
+	UK_INIT_LIST_HEAD(&signals_container.pending_signals);
 
-	sigemptyset(&sig->pending);
-	UK_INIT_LIST_HEAD(&sig->pending_signals);
-
-	uk_list_add(&sig->list_node, &uk_proc_sig.thread_sig_list);
+	uk_list_add(&signals_container.list_node, &uk_proc_sig.thread_sig_list);
 	return 0;
 }
 
-static void uk_thread_sig_uninit(struct uk_thread *t)
+static void uk_thread_sig_uninit(struct uk_thread *thread __maybe_unused)
 {
 	/* Clear pending signals */
-	struct uk_thread_sig *sig = &t->signals_container;
 	struct uk_list_head *i, *tmp;
 	struct uk_signal *signal;
 
-	uk_list_del(&sig->list_node);
+	/* ensure that the signals_container on the TLS is really ours */
+	UK_ASSERT(signals_container.tid == thread);
 
-	uk_list_for_each_safe(i, tmp, &sig->pending_signals) {
+	uk_list_del(&signals_container.list_node);
+
+	uk_list_for_each_safe(i, tmp, &signals_container.pending_signals) {
 		signal = uk_list_entry(i, struct uk_signal, list_node);
 
 		uk_list_del(&signal->list_node);
@@ -171,7 +179,6 @@ int uk_sig_handle_signals(void)
 static int
 uk_deliver_signal_unmasked(struct uk_thread_sig *th_sig, siginfo_t *sig)
 {
-	struct uk_thread *tid;
 	struct uk_signal *uk_sig;
 
 	/* If the signal is ignored, we don't deliver it */
@@ -197,10 +204,7 @@ uk_deliver_signal_unmasked(struct uk_thread_sig *th_sig, siginfo_t *sig)
 	if (th_sig->wait.status != UK_SIG_NOT_WAITING &&
 			th_sig->wait.status != UK_SIG_WAITING_SCHED) {
 		th_sig->wait.status = UK_SIG_WAITING_SCHED;
-
-		tid = __containerof(th_sig, struct uk_thread,
-				    signals_container);
-		uk_thread_wake(tid);
+		uk_thread_wakeup(th_sig->tid);
 	}
 
 	return 1;
@@ -215,13 +219,16 @@ int uk_sig_thread_kill(struct uk_thread *tid, int sig)
 	if (!uk_sig_is_valid(sig))
 		return -EINVAL;
 
-	ptr = &tid->signals_container;
+	ptr = &uk_thread_uktls_var(tid, signals_container);
+
+	/* ensure that getting signals_container from foreign tls worked */
+	UK_ASSERT(ptr->tid == tid);
 
 	/* setup siginfo */
 	uk_sig_init_siginfo(&siginfo, sig);
 
 	/* check if we are sending this to ourself */
-	if (&tid->signals_container == _UK_TH_SIG) {
+	if (uk_thread_current() == ptr->tid) {
 		/* if it's not masked just run it */
 		if (!uk_sigismember(&ptr->mask, sig)) {
 			/* remove the signal from pending */
@@ -331,7 +338,7 @@ int uk_thread_sigmask(int how, const sigset_t *set, sigset_t *oldset)
 
 struct uk_thread_sig *uk_crr_thread_sig_container(void)
 {
-	return &(uk_thread_current()->signals_container);
+	return &signals_container;
 }
 
 void uk_sig_init_siginfo(siginfo_t *siginfo, int sig)

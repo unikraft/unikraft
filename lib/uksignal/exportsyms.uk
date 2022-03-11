@@ -2,7 +2,6 @@
 uk_proc_sig
 
 uk_sig_handle_signals
-uk_proc_sig_init
 uk_sig_thread_kill
 uk_thread_sigmask
 

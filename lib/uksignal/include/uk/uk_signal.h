@@ -94,6 +94,7 @@ struct uk_thread_sig_wait {
 };
 
 struct uk_thread_sig {
+	struct uk_thread *tid;
 	/* blocked signals */
 	sigset_t mask;
 	/* used as a bitmap for pending signals */
@@ -108,8 +109,6 @@ struct uk_thread_sig {
 
 /* returns number of executed signal handlers */
 int uk_sig_handle_signals(void);
-
-int uk_proc_sig_init(struct uk_proc_sig *sig);
 
 /* TODO: replace sched thread_kill? */
 int uk_sig_thread_kill(struct uk_thread *tid, int sig);

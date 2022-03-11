@@ -48,10 +48,6 @@
 static void reent_init(struct _reent *reent)
 {
 	_REENT_INIT_PTR(reent);
-#if 0
-	/* TODO initialize basic signal handling */
-	_init_signal_r(myreent);
-#endif
 }
 
 struct _reent *__getreent(void)

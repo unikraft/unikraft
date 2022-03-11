@@ -37,9 +37,6 @@
 #include <uk/arch/lcpu.h>
 #include <uk/arch/time.h>
 #include <uk/arch/ctx.h>
-#if CONFIG_LIBUKSIGNAL
-#include <uk/uk_signal.h>
-#endif
 #include <uk/plat/tls.h>
 #include <uk/wait_types.h>
 #include <uk/list.h>
@@ -84,10 +81,6 @@ struct uk_thread {
 
 #ifdef CONFIG_LIBNEWLIBC
 	struct _reent reent;
-#endif
-#if CONFIG_LIBUKSIGNAL
-	/* TODO: Move to `TLS` and define within uksignal */
-	struct uk_thread_sig signals_container;
 #endif
 	const char *name;		/**< Reference to thread name */
 	UK_TAILQ_ENTRY(struct uk_thread) thread_list;
