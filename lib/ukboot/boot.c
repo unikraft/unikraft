@@ -70,6 +70,8 @@
 #ifdef CONFIG_LIBUKSP
 #include <uk/sp.h>
 #endif
+#include <uk/arch/tls.h>
+#include <uk/plat/tls.h>
 #include "banner.h"
 
 int main(int argc, char *argv[]) __weak;
@@ -188,12 +190,12 @@ void ukplat_entry(int argc, char *argv[])
 #endif
 #if !CONFIG_LIBUKBOOT_NOALLOC
 	struct ukplat_memregion_desc md;
+	void *tls = NULL;
 #endif
 #if CONFIG_LIBUKSCHED
 	struct uk_sched *s = NULL;
 	struct uk_thread *main_thread = NULL;
 #endif
-
 	uk_ctor_func_t *ctorfn;
 
 	uk_pr_info("Unikraft constructor table at %p - %p\n",
@@ -252,13 +254,25 @@ void ukplat_entry(int argc, char *argv[])
 		}
 	}
 	if (unlikely(!a))
-		uk_pr_warn("No suitable memory region for memory allocator. Continue without heap\n");
+		UK_CRASH("No suitable memory region for memory allocator\n");
 	else {
 		rc = ukplat_memallocator_set(a);
 		if (unlikely(rc != 0))
 			UK_CRASH("Could not set the platform memory allocator\n");
 	}
-#endif
+
+	/* Allocate a TLS for this execution context */
+	tls = uk_memalign(a,
+			  ukarch_tls_area_align(),
+			  ukarch_tls_area_size());
+	if (!tls)
+		UK_CRASH("Failed to allocate and initialize TLS\n");
+
+	/* Copy from TLS master template */
+	ukarch_tls_area_init(tls);
+	/* Activate TLS */
+	ukplat_tlsp_set(ukarch_tls_tlsp(tls));
+#endif /* !CONFIG_LIBUKBOOT_NOALLOC */
 
 #if CONFIG_LIBUKALLOC
 	uk_pr_info("Initialize IRQ subsystem...\n");
