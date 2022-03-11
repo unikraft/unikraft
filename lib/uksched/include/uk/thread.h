@@ -41,6 +41,7 @@
 #include <uk/uk_signal.h>
 #endif
 #include <uk/thread_attr.h>
+#include <uk/plat/tls.h>
 #include <uk/wait_types.h>
 #include <uk/list.h>
 #include <uk/prio.h>
@@ -61,7 +62,11 @@ typedef void (*uk_thread_fn2_t)(void *, void *) __noreturn;
 struct uk_thread {
 	struct ukarch_ctx    ctx;	/**< Architecture context */
 	struct ukarch_ectx *ectx;	/**< Extended context (FPU, VPU, ...) */
-	uintptr_t           tlsp;	/**< Architecture TLS pointer */
+	uintptr_t           tlsp;	/**< Current active architecture TLS
+					 *   pointer */
+	__uptr            uktlsp;	/**< Original architecture TLS pointer
+					 *   to Unikraft TLS.
+					 */
 
 	UK_TAILQ_ENTRY(struct uk_thread) thread_list;
 	uint32_t flags;
@@ -74,8 +79,8 @@ struct uk_thread {
 		struct uk_alloc *t_a;
 		void            *stack;
 		struct uk_alloc *stack_a;
-		void            *tls;
-		struct uk_alloc *tls_a;
+		void            *uktls;
+		struct uk_alloc *uktls_a;
 	} _mem;				/**< Associated allocs (internal!) */
 	uk_thread_dtor_t dtor;		/**< User provided destructor */
 	void *priv;			/**< Private field, free for use */
@@ -315,8 +320,8 @@ int uk_thread_init_bare_fn2(struct uk_thread *t,
  * @param stack_len
  *   Size of the thread stack. If set to 0, a default stack size is used
  *   for the allocation.
- * @param a_tls
- *   Reference to an allocator for allocating thread local storage.
+ * @param a_uktls
+ *   Reference to an allocator for allocating (Unikraft) thread local storage.
  *   In case `custom_ectx` is not set, space for extended CPU context state
  *   is allocated together with the TLS. If `NULL` is passed, a thread without
  *   TLS is allocated (and without ectx if `custom_ectx` is not set
@@ -344,7 +349,7 @@ int uk_thread_init_fn0(struct uk_thread *t,
 		       uk_thread_fn0_t fn,
 		       struct uk_alloc *a_stack,
 		       size_t stack_len,
-		       struct uk_alloc *a_tls,
+		       struct uk_alloc *a_uktls,
 		       bool custom_ectx,
 		       struct ukarch_ectx *ectx,
 		       const char *name,
@@ -360,7 +365,7 @@ int uk_thread_init_fn1(struct uk_thread *t,
 		       void *argp,
 		       struct uk_alloc *a_stack,
 		       size_t stack_len,
-		       struct uk_alloc *a_tls,
+		       struct uk_alloc *a_uktls,
 		       bool custom_ectx,
 		       struct ukarch_ectx *ectx,
 		       const char *name,
@@ -376,7 +381,7 @@ int uk_thread_init_fn2(struct uk_thread *t,
 		       void *argp0, void *argp1,
 		       struct uk_alloc *a_stack,
 		       size_t stack_len,
-		       struct uk_alloc *a_tls,
+		       struct uk_alloc *a_uktls,
 		       bool custom_ectx,
 		       struct ukarch_ectx *ectx,
 		       const char *name,
@@ -439,8 +444,8 @@ struct uk_thread *uk_thread_create_bare(struct uk_alloc *a,
  * @param stack_len
  *   Size of the thread stack. If set to 0, a default stack size is used
  *   for the stack allocation.
- * @param a_tls
- *   Reference to an allocator for allocating thread local storage.
+ * @param a_uktls
+ *   Reference to an allocator for allocating (Unikraft) thread local storage.
  *   If `NULL` is passed, a thread without TLS is allocated.
  * @param no_ectx
  *   If set, no memory is allocated for saving/restoring extended CPU
@@ -461,7 +466,7 @@ struct uk_thread *uk_thread_create_fn0(struct uk_alloc *a,
 				       uk_thread_fn0_t fn,
 				       struct uk_alloc *a_stack,
 				       size_t stack_len,
-				       struct uk_alloc *a_tls,
+				       struct uk_alloc *a_uktls,
 				       bool no_ectx,
 				       const char *name,
 				       void *priv,
@@ -475,7 +480,7 @@ struct uk_thread *uk_thread_create_fn1(struct uk_alloc *a,
 				       uk_thread_fn1_t fn, void *argp,
 				       struct uk_alloc *a_stack,
 				       size_t stack_len,
-				       struct uk_alloc *a_tls,
+				       struct uk_alloc *a_uktls,
 				       bool no_ectx,
 				       const char *name,
 				       void *priv,
@@ -490,7 +495,7 @@ struct uk_thread *uk_thread_create_fn2(struct uk_alloc *a,
 				       void *argp0, void *argp1,
 				       struct uk_alloc *a_stack,
 				       size_t stack_len,
-				       struct uk_alloc *a_tls,
+				       struct uk_alloc *a_uktls,
 				       bool no_ectx,
 				       const char *name,
 				       void *priv,
@@ -530,6 +535,30 @@ typedef int  (*uk_thread_init_func_t)(struct uk_thread *child,
  *  The thread that is going to be removed from the system.
  */
 typedef void (*uk_thread_term_func_t)(struct uk_thread *child);
+
+/**
+ * Macro to access a Unikraft thread-local (UKTLS) variable of a
+ * (foreign) thread.
+ * This macro computes the offset of the TLS variable address to the
+ * architecture TLS pointer. Since each UKTLS has the same structure,
+ * the offset from the tlsp to the variable should be the same
+ * regardless of which TLS we are looking at.
+ * Because we get the absolute address of a variable with the `&`
+ * operand, we need to subtract the current TLS pointer to retrieve
+ * the variable offset.
+ */
+#define uk_thread_uktls_var(thread, variable)				\
+	(*({								\
+		__uptr _curr_tlsp = ukplat_tlsp_get();			\
+		__sptr _offset;						\
+		typeof(variable) *_ref;					\
+									\
+		UK_ASSERT((thread)->flags & UK_THREADF_UKTLS);		\
+									\
+		_offset = _curr_tlsp - (__uptr) &(variable);		\
+		_ref = (typeof(_ref)) ((thread)->uktlsp - _offset);	\
+		_ref;							\
+	}))
 
 struct uk_thread_inittab_entry {
 	uint32_t flags;
