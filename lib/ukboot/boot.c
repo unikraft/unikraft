@@ -106,6 +106,9 @@ void ukplat_entry(int argc, char *argv[])
 #if CONFIG_LIBUKSCHED
 	struct uk_sched *s = NULL;
 #endif
+#if CONFIG_LIBUKALLOC
+	void *tls;
+#endif
 	uk_ctor_func_t *ctorfn;
 	uk_init_func_t *initfn;
 	int i;
@@ -173,6 +176,22 @@ void ukplat_entry(int argc, char *argv[])
 			UK_CRASH("Could not set the platform memory allocator\n");
 	}
 #endif
+
+#if CONFIG_LIBUKALLOC
+	/* Allocate a TLS for this execution context */
+	tls = uk_memalign(a,
+			  ukarch_tls_area_align(),
+			  ukarch_tls_area_size()
+			  + ukarch_ectx_size()
+			  + ukarch_ectx_align());
+	if (!tls) {
+		UK_CRASH("Failed to allocate and initialize TLS\n");
+	}
+	/* Copy from TLS master template */
+	ukarch_tls_area_copy(tls);
+	/* Activate TLS */
+	ukplat_tlsp_set(ukarch_tls_pointer(tls));
+#endif /* CONFIG_LIBUKALLOC */
 
 #if CONFIG_LIBUKALLOC
 	uk_pr_info("Initialize IRQ subsystem...\n");
