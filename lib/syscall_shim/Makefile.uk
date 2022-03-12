@@ -45,31 +45,36 @@ $(LIBSYSCALL_SHIM_INCLUDES_PATH)/syscall_map.h.new: $(LIBSYSCALL_SHIM_BASE)/gen_
 		$(AWK) -f  $(LIBSYSCALL_SHIM_BASE)/gen_syscall_map.awk \
 		$(LIBSYSCALL_SHIM_TEMPL) > $@)
 
-$(LIBSYSCALL_SHIM_INCLUDES_PATH)/provided_syscalls.h: $(LIBSYSCALL_SHIM_BASE)/gen_provided.awk $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in
+$(LIBSYSCALL_SHIM_BUILD)/provided_syscalls_arch.h.in: $(LIBSYSCALL_SHIM_BASE)/gen_available.awk $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in $(LIBSYSCALL_SHIM_TEMPL)
+	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
+		$(AWK) -F '[- \t]' -f $(LIBSYSCALL_SHIM_BASE)/gen_available.awk \
+		$(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in $(LIBSYSCALL_SHIM_TEMPL) > $@)
+
+$(LIBSYSCALL_SHIM_INCLUDES_PATH)/provided_syscalls.h: $(LIBSYSCALL_SHIM_BASE)/gen_provided.awk  $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls_arch.h.in
 	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
 		$(AWK) -F '-' -f  $(LIBSYSCALL_SHIM_BASE)/gen_provided.awk \
-		$(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in > $@)
+		$(LIBSYSCALL_SHIM_BUILD)/provided_syscalls_arch.h.in > $@)
 
-$(LIBSYSCALL_SHIM_BUILD)/uk_syscall6.c: $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall6.awk
+$(LIBSYSCALL_SHIM_BUILD)/uk_syscall6.c: $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls_arch.h.in $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall6.awk
 	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
 		$(AWK) -F '-' -f $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall6.awk $< > $@)
 
-$(LIBSYSCALL_SHIM_BUILD)/uk_syscall.c: $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall.awk $(LIBSYSCALL_SHIM_BASE)/uk_syscall.c.in_end
+$(LIBSYSCALL_SHIM_BUILD)/uk_syscall.c: $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls_arch.h.in $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall.awk $(LIBSYSCALL_SHIM_BASE)/uk_syscall.c.in_end
 	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
 		$(AWK) -F '-' -f $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall.awk $< > $@ && \
 		cat $(LIBSYSCALL_SHIM_BASE)/uk_syscall.c.in_end >> $@)
 
-$(LIBSYSCALL_SHIM_BUILD)/uk_syscall_r.c: $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall_r.awk $(LIBSYSCALL_SHIM_BASE)/uk_syscall_r.c.in_end
+$(LIBSYSCALL_SHIM_BUILD)/uk_syscall_r.c: $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls_arch.h.in $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall_r.awk $(LIBSYSCALL_SHIM_BASE)/uk_syscall_r.c.in_end
 	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
 		$(AWK) -F '-' -f $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall_r.awk $< > $@ && \
 		cat $(LIBSYSCALL_SHIM_BASE)/uk_syscall_r.c.in_end >> $@)
 
-$(LIBSYSCALL_SHIM_BUILD)/uk_syscall6_r.c: $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall6_r.awk $(LIBSYSCALL_SHIM_BASE)/uk_syscall6_r.c.in_end
+$(LIBSYSCALL_SHIM_BUILD)/uk_syscall6_r.c: $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls_arch.h.in $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall6_r.awk $(LIBSYSCALL_SHIM_BASE)/uk_syscall6_r.c.in_end
 	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
 		$(AWK) -F '-' -f $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall6_r.awk $< > $@ && \
 		cat $(LIBSYSCALL_SHIM_BASE)/uk_syscall6_r.c.in_end >> $@)
 
-$(LIBSYSCALL_SHIM_BUILD)/uk_syscall_r_fn.c: $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall_r_fn.awk
+$(LIBSYSCALL_SHIM_BUILD)/uk_syscall_r_fn.c: $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls_arch.h.in $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall_r_fn.awk
 	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
 		$(AWK) -F '-' -f $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall_r_fn.awk $< > $@)
 
@@ -78,7 +83,7 @@ $(LIBSYSCALL_SHIM_BUILD)/uk_syscall_name.c: $(LIBSYSCALL_SHIM_BASE)/gen_uk_sysca
 		$(AWK) -f $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall_name.awk \
 		$(LIBSYSCALL_SHIM_TEMPL) > $@)
 
-$(LIBSYSCALL_SHIM_BUILD)/uk_syscall_name_p.c: $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall_name_p.awk
+$(LIBSYSCALL_SHIM_BUILD)/uk_syscall_name_p.c: $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls_arch.h.in $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall_name_p.awk
 	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
 		$(AWK) -F '-' -f $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall_name_p.awk $< > $@)
 
