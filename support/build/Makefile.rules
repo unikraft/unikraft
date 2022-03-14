@@ -552,9 +552,9 @@ $(4): $(2) | preprocess
 	$(call build_cmd_fixdep,CC,$(1),$(4),\
 		$(CC)  $$(COMPFLAGS) $$(COMPFLAGS-y) \
 		       $$($(call vprefix_lib,$(1),COMPFLAGS)) $$($(call vprefix_lib,$(1),COMPFLAGS-y)) \
-		       $$(CINCLUDES) $$(CINCLUDES-y) \
-		       $$($(call vprefix_lib,$(1),CINCLUDES)) $$($(call vprefix_lib,$(1),CINCLUDES-y)) \
 		       $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
+		       $$($(call vprefix_lib,$(1),CINCLUDES)) $$($(call vprefix_lib,$(1),CINCLUDES-y)) \
+		       $$(CINCLUDES) $$(CINCLUDES-y) \
 		       $$($(call vprefix_glb,$(3),ARCHFLAGS)) $$($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
 		       $$(CFLAGS) $$(CFLAGS-y) $$(CFLAGS_EXTRA) \
 		       $$($(call vprefix_lib,$(1),CFLAGS)) $$($(call vprefix_lib,$(1),CFLAGS-y)) \
