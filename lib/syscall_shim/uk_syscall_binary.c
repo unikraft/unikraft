@@ -36,12 +36,20 @@
 #include <uk/syscall.h>
 #include <uk/plat/syscall.h>
 #include <uk/arch/ctx.h>
+#if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
+#include <uk/plat/tls.h>
+#include <uk/thread.h>
+#endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include "arch/regmap_linuxabi.h"
 
 void ukplat_syscall_handler(struct __regs *r)
 {
+#if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
+	struct uk_thread *self;
+	__uptr orig_tlsp;
+#endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
 	/* Place backup of extended register state on stack */
 	__sz ectx_align = ukarch_ectx_align();
 	__u8 ectxbuf[ukarch_ectx_size() + ectx_align];
@@ -53,12 +61,32 @@ void ukplat_syscall_handler(struct __regs *r)
 	/* Save extended register state */
 	ukarch_ectx_store(ectx);
 
+#if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
+	/* Activate Unikraft TLS */
+	orig_tlsp = ukplat_tlsp_get();
+	self = uk_thread_current();
+	UK_ASSERT(self);
+	ukplat_tlsp_set(self->uktlsp);
+#endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
+
 	uk_pr_debug("Binary system call request \"%s\" (%lu) at ip:%p (arg0=0x%lx, arg1=0x%lx, ...)\n",
 		    uk_syscall_name(r->rsyscall), r->rsyscall,
 		    (void *) r->rip, r->rarg0, r->rarg1);
 	r->rret0 = uk_syscall6_r(r->rsyscall,
 				 r->rarg0, r->rarg1, r->rarg2,
 				 r->rarg3, r->rarg4, r->rarg5);
+
+#if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
+	/* Restore original TLS only if it was _NOT_
+	 * changed by the system call handler
+	 */
+	if (likely(ukplat_tlsp_get() == self->uktlsp)) {
+		ukplat_tlsp_set(orig_tlsp);
+	} else {
+		uk_pr_debug("System call updated userland TLS pointer register to %p (before: %p)\n",
+			    (void *) orig_tlsp, (void *) ukplat_tlsp_get());
+	}
+#endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
 
 	/* Restore extended register state */
 	ukarch_ectx_load(ectx);
