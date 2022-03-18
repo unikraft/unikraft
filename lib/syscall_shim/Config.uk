@@ -35,6 +35,16 @@ if LIBSYSCALL_SHIM
 			register values accordingly to the Linux ABI standard
 			(see: man syscalls[2]).
 
+	config LIBSYSCALL_SHIM_HANDLER_ULTLS
+		bool "Support userland TLS"
+		default n
+		depends on LIBSYSCALL_SHIM_HANDLER
+		select LIBUKSCHED
+		help
+			Saves the current TLS pointer before handling a system
+			call and restores it afterwards. This enables the use
+			of different TLS pointers of userland code.
+
 	config LIBSYSCALL_SHIM_DEBUG
 		bool "Enable debug messages"
 		default n
