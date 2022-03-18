@@ -35,12 +35,23 @@
 
 #include <uk/syscall.h>
 #include <uk/plat/syscall.h>
+#include <uk/arch/ctx.h>
 #include <uk/assert.h>
+#include <uk/essentials.h>
 #include "arch/regmap_linuxabi.h"
 
 void ukplat_syscall_handler(struct __regs *r)
 {
+	/* Place backup of extended register state on stack */
+	__sz ectx_align = ukarch_ectx_align();
+	__u8 ectxbuf[ukarch_ectx_size() + ectx_align];
+	struct ukarch_ectx *ectx = (struct ukarch_ectx *)
+					 ALIGN_UP((__uptr) ectxbuf, ectx_align);
+
 	UK_ASSERT(r);
+
+	/* Save extended register state */
+	ukarch_ectx_store(ectx);
 
 	uk_pr_debug("Binary system call request \"%s\" (%lu) at ip:%p (arg0=0x%lx, arg1=0x%lx, ...)\n",
 		    uk_syscall_name(r->rsyscall), r->rsyscall,
@@ -48,4 +59,7 @@ void ukplat_syscall_handler(struct __regs *r)
 	r->rret0 = uk_syscall6_r(r->rsyscall,
 				 r->rarg0, r->rarg1, r->rarg2,
 				 r->rarg3, r->rarg4, r->rarg5);
+
+	/* Restore extended register state */
+	ukarch_ectx_load(ectx);
 }
