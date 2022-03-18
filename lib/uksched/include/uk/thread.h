@@ -30,9 +30,6 @@
 
 #include <stdint.h>
 #include <stdbool.h>
-#ifdef CONFIG_LIBNEWLIBC
-#include <sys/reent.h>
-#endif
 #include <uk/alloc.h>
 #include <uk/arch/lcpu.h>
 #include <uk/arch/time.h>
@@ -79,9 +76,6 @@ struct uk_thread {
 	uk_thread_dtor_t dtor;		/**< User provided destructor */
 	void *priv;			/**< Private field, free for use */
 
-#ifdef CONFIG_LIBNEWLIBC
-	struct _reent reent;
-#endif
 	const char *name;		/**< Reference to thread name */
 	UK_TAILQ_ENTRY(struct uk_thread) thread_list;
 };

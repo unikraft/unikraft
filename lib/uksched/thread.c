@@ -44,26 +44,6 @@
 #include <uk/assert.h>
 #include <uk/arch/tls.h>
 
-#ifdef CONFIG_LIBNEWLIBC
-static void reent_init(struct _reent *reent)
-{
-	_REENT_INIT_PTR(reent);
-}
-
-struct _reent *__getreent(void)
-{
-	struct _reent *_reent;
-	struct uk_sched *s = uk_sched_get_default();
-
-	if (!s || !uk_sched_started(s))
-		_reent = _impure_ptr;
-	else
-		_reent = &uk_thread_current()->reent;
-
-	return _reent;
-}
-#endif /* CONFIG_LIBNEWLIBC */
-
 extern const struct uk_thread_inittab_entry _uk_thread_inittab_start[];
 extern const struct uk_thread_inittab_entry _uk_thread_inittab_end;
 
@@ -254,13 +234,6 @@ static void _uk_thread_struct_init(struct uk_thread *t,
 		ukarch_ectx_init(t->ectx);
 		t->flags |= UK_THREADF_ECTX;
 	}
-
-#ifdef CONFIG_LIBNEWLIBC
-	/* TODO: Move newlibc reent initialization to newlib as
-	 *       thread initialization function and use TLS
-	 */
-	reent_init(&t->reent);
-#endif
 
 	uk_pr_debug("uk_thread %p (%s): ctx:%p, ectx:%p, tlsp:%p\n",
 		    t, t->name ? t->name : "<unnamed>",
