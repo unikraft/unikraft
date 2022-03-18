@@ -64,10 +64,9 @@ $(LIBSYSCALL_SHIM_BUILD)/uk_syscall_r.c: $(LIBSYSCALL_SHIM_BUILD)/provided_sysca
 		$(AWK) -F '-' -f $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall_r.awk $< > $@ && \
 		cat $(LIBSYSCALL_SHIM_BASE)/uk_syscall_r.c.in_end >> $@)
 
-$(LIBSYSCALL_SHIM_BUILD)/uk_syscall6_r.c: $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall6_r.awk $(LIBSYSCALL_SHIM_BASE)/uk_syscall6_r.c.in_end
+$(LIBSYSCALL_SHIM_BUILD)/uk_syscall6_r.c: $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall6_r.awk
 	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
-		$(AWK) -F '-' -f $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall6_r.awk $< > $@ && \
-		cat $(LIBSYSCALL_SHIM_BASE)/uk_syscall6_r.c.in_end >> $@)
+		$(AWK) -F '-' -f $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall6_r.awk $< > $@)
 
 $(LIBSYSCALL_SHIM_BUILD)/uk_syscall_r_fn.c: $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in $(LIBSYSCALL_SHIM_BASE)/gen_uk_syscall_r_fn.awk
 	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
@@ -114,5 +113,6 @@ LIBSYSCALL_SHIM_SRCS-y += $(LIBSYSCALL_SHIM_BUILD)/uk_syscall_name.c
 LIBSYSCALL_SHIM_SRCS-y += $(LIBSYSCALL_SHIM_BUILD)/uk_syscall_name_p.c
 LIBSYSCALL_SHIM_SRCS-$(CONFIG_LIBSYSCALL_SHIM_LIBCSTUBS) += $(LIBSYSCALL_SHIM_BUILD)/libc_stubs.c
 LIBSYSCALL_SHIM_LIBC_STUBS_FLAGS+=-fno-builtin -Wno-builtin-declaration-mismatch
+LIBSYSCALL_SHIM_SRCS-$(CONFIG_LIBSYSCALL_SHIM_HANDLER) += $(LIBSYSCALL_SHIM_BASE)/uk_syscall_binary.c
 
 LIBSYSCALL_SHIM_CLEAN = $(LIBSYSCALL_SHIM_PHONY_SRC) $(LIBSYSCALL_SHIM_PHONY_SRC_NEW) $(LIBSYSCALL_SHIM_GEN_SRC) $(LIBSYSCALL_SHIM_GEN_SRC)
