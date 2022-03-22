@@ -66,6 +66,7 @@ char *strtok(char *restrict s, const char *restrict sep);
 char *strtok_r(char *restrict s, const char *restrict sep, char **restrict p);
 char *strndup(const char *str, size_t len);
 char *strdup(const char *str);
+char *strcat(char *restrict dest, const char *restrict src);
 char *strncat(char *dest, const char *src, size_t n);
 
 char *strerror_r(int errnum, char *buf, size_t buflen);
@@ -73,6 +74,9 @@ char *strerror(int errnum);
 
 char *strsignal(int sig);
 
+void bcopy(const void *from, void *to, size_t len);
+void bzero(void *buf, size_t len);
+int bcmp(const void *s1, const void *s2, size_t n);
 
 #ifdef __cplusplus
 }
