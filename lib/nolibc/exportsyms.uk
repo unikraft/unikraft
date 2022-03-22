@@ -51,6 +51,8 @@ qsort
 
 # string
 memcpy
+bcopy
+bzero
 bcmp
 memset
 memchr
@@ -60,6 +62,7 @@ memcmp
 strnlen
 strlen
 strncpy
+strcat
 strcpy
 strchr
 strrchr

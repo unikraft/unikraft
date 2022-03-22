@@ -799,6 +799,12 @@ char *strerror(int errnum)
 	return strerror_r(errnum, buf, sizeof(buf));
 }
 
+char *strcat(char *restrict dest, const char *restrict src)
+{
+	strcpy(dest + strlen(dest), src);
+	return dest;
+}
+
 char *strncat(char *dest, const char *src, size_t n)
 {
 	char *a = dest;
@@ -817,4 +823,14 @@ char *strncat(char *dest, const char *src, size_t n)
 int bcmp(const void *s1, const void *s2, size_t count)
 {
 	return memcmp(s1, s2, count);
+}
+
+void bcopy(const void *from, void *to, size_t len)
+{
+	memmove(to, from, len);
+}
+
+void bzero(void *buf, size_t len)
+{
+	memset(buf, 0, len);
 }
