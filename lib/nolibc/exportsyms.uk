@@ -47,6 +47,7 @@ strtoul
 strtoll
 strtoull
 atoi
+atol
 qsort
 
 # string

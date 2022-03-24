@@ -60,6 +60,7 @@ unsigned long long strtoull(const char *nptr, char **endptr, int base);
  * @s: The start of the string
  */
 int atoi(const char *s);
+long atol(const char *s);
 
 #if CONFIG_LIBUKALLOC
 /* Allocate size bytes of memory. Returns pointer to start of allocated memory,
