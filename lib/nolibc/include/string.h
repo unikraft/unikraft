@@ -68,6 +68,7 @@ char *strndup(const char *str, size_t len);
 char *strdup(const char *str);
 char *strcat(char *restrict dest, const char *restrict src);
 char *strncat(char *dest, const char *src, size_t n);
+int strcasecmp(const char *s1, const char *s2);
 
 char *strerror_r(int errnum, char *buf, size_t buflen);
 char *strerror(int errnum);

@@ -61,6 +61,7 @@
 #include <limits.h>
 #include <errno.h>
 #include <stdio.h>
+#include <ctype.h>
 
 void *memcpy(void *dst, const void *src, size_t len)
 {
@@ -818,6 +819,15 @@ char *strncat(char *dest, const char *src, size_t n)
 
 	*dest++ = 0;
 	return a;
+}
+
+int strcasecmp(const char *s1, const char *s2)
+{
+	/* The following code is taken from musl libc */
+	const unsigned char *l = (void *) s1, *r = (void *) s2;
+
+	for (; *l && *r && (*l == *r || tolower(*l) == tolower(*r)); l++, r++);
+	return tolower(*l) - tolower(*r);
 }
 
 int bcmp(const void *s1, const void *s2, size_t count)
