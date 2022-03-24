@@ -37,6 +37,13 @@
 #include <uk/assert.h>
 #include <linuxu/syscall.h>
 #include <linuxu/signal.h>
+#if defined(__X86_32__) || defined(__x86_64__)
+#include <x86/cpu.h>
+#elif (defined __ARM_32__) || (defined __ARM_64__)
+#include <arm/cpu.h>
+#else
+#error "Unsupported architecture"
+#endif
 
 #define IRQS_NUM    16
 
