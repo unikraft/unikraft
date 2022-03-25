@@ -6,7 +6,7 @@ Apply to [GSoC22](https://summerofcode.withgoogle.com/) with [Unikraft](https://
 [Google Summer of Code 2022](https://summerofcode.withgoogle.com/) (GSoC'22) is a global online program focused on bringing new contributors into open source software development.
 GSoC Contributors work with an open source organization, such as Unikraft, on a 12+ week programming project under the guidance of mentors.
 
-[Unikraft](https://unikraft.org/) Unikraft is a fast, secure and open-source Unikernel Development Kit.
+[Unikraft](https://unikraft.org/) is a fast, secure and open-source Unikernel Development Kit.
 By tailoring the operating system, libraries and configuration to the particular needs of your application, it vastly reduces virtual machine and container image sizes to a few KBs, provides blazing performance, and drastically cuts down your software stack’s attack surface.
 
 ## How to Apply[^1]
