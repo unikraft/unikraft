@@ -431,3 +431,11 @@ void abort(void)
 	uk_pr_crit("Abnormal termination!\n");
 	ukplat_crash();
 }
+
+#ifndef CONFIG_LIBPOSIX_PROCESS
+void exit(int status)
+{
+	uk_pr_info("exit called with status %d, halting system\n", status);
+	ukplat_terminate(status);
+}
+#endif /* !CONFIG_LIBPOSIX_PROCESS */
