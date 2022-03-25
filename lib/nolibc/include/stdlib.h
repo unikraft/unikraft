@@ -126,6 +126,11 @@ void qsort(void *base, size_t nmemb, size_t size,
 int system(const char *command);
 #endif
 
+char *setstate(char *state);
+char *initstate(unsigned int seed, char *state, size_t size);
+void srandom(unsigned int seed);
+long random(void);
+
 #ifdef __cplusplus
 }
 #endif
