@@ -43,6 +43,7 @@ putchar
 
 # stdlib
 abort
+exit
 strtol
 strtoul
 strtoll
