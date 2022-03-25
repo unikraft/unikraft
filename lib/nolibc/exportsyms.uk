@@ -101,3 +101,9 @@ errno
 htons
 nthos
 h_errno
+
+# random
+random
+srandom
+initstate
+setstate
