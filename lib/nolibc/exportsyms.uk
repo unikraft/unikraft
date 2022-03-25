@@ -42,6 +42,7 @@ fputc
 putchar
 
 # stdlib
+abort
 strtol
 strtoul
 strtoll
