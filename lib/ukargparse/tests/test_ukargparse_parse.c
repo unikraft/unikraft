@@ -1,9 +1,11 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Rico Muench <muench.rico@gmail.com>
+ *          Stefan Jumarea <stefanjumarea02@gmail.com>
  *
  *
- * Copyright (c) 2020, NEC Laboratories Europe GmbH, NEC Corporation,
+ * Copyright (c) 2021 Rico Muench <muench.rico@gmail.com>,
+ *               2022 Stefan Jumarea <stefanjumarea02@gmail.com>
  *                     All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -36,9 +38,8 @@
 #include <uk/test.h>
 #include <stdint.h>
 
-#include "../include/uk/argparse.h"
+#include <uk/argparse.h>
 
-#if CONFIG_LIBUKARGPARSE_TESTS_PARSE
 UK_TESTCASE(ukargparse, parse_space_separated)
 {
 	char *arg_str = {"some/path/file -test 1 --test-this"};
@@ -56,9 +57,7 @@ UK_TESTCASE(ukargparse, parse_space_separated)
 	for (size_t i = 0; i < ARRAY_SIZE(arg_ex); ++i)
 		UK_TEST_EXPECT_SNUM_EQ(strcmp(arg_ex[i], arg_out[i]), 0);
 }
-#endif
 
-#if CONFIG_LIBUKARGPARSE_TESTS_NULL
 UK_TESTCASE(ukargparse, parse_null)
 {
 	char arg_str[] = "";
@@ -69,9 +68,7 @@ UK_TESTCASE(ukargparse, parse_null)
 	UK_TEST_EXPECT_SNUM_EQ(argc, 0);
 	UK_TEST_EXPECT_PTR_EQ(arg_out, NULL);
 }
-#endif
 
-#if CONFIG_LIBUKARGPARSE_TESTS_EXTRA
 UK_TESTCASE(ukargparse, parse_extra_whitespaces)
 {
 	char *arg_str = {"some\t\t\n\t\tseparated\n\t\t  \n  string"};
@@ -88,6 +85,22 @@ UK_TESTCASE(ukargparse, parse_extra_whitespaces)
 	for (size_t i = 0; i < ARRAY_SIZE(arg_ex); ++i)
 		UK_TEST_EXPECT_SNUM_EQ(strcmp(arg_ex[i], arg_out[i]), 0);
 }
-#endif
+
+UK_TESTCASE(ukargparse, parse_quotes)
+{
+	char *arg_str = {"\"\targ_a\" ' arg_b' \"arg'c\" arg_d'' arg\"_\"e\"'\""};
+	static const char * const arg_ex[] = {"\targ_a", " arg_b", "arg'c", "arg_d", "arg_e'"};
+
+	// null-terminated array of parsed arguments
+	char *arg_out[0x10] = {NULL};
+	int argc = uk_argparse(arg_str, arg_out, ARRAY_SIZE(arg_out) - 1);
+
+	UK_TEST_EXPECT_SNUM_EQ(argc, ARRAY_SIZE(arg_ex));
+	if (argc != ARRAY_SIZE(arg_ex))
+		return;
+
+	for (size_t i = 0; i < ARRAY_SIZE(arg_ex); ++i)
+		UK_TEST_EXPECT_SNUM_EQ(strcmp(arg_ex[i], arg_out[i]), 0);
+}
 
 uk_testsuite_register(ukargparse, NULL);
