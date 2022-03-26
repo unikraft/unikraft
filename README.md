@@ -9,6 +9,8 @@ GSoC Contributors work with an open source organization, such as Unikraft, on a 
 [Unikraft](https://unikraft.org/) is a fast, secure and open-source Unikernel Development Kit.
 By tailoring the operating system, libraries and configuration to the particular needs of your application, it vastly reduces virtual machine and container image sizes to a few KBs, provides blazing performance, and drastically cuts down your software stack’s attack surface.
 
+Before you apply, see the [GSoC contributor eligibility](https://summerofcode.withgoogle.com/get-started).
+
 ## How to Apply[^1]
 
 * Connect to the community
@@ -64,7 +66,7 @@ If that is indeed a project you want to work on, then you can submit it as part 
 
 ### Fill out an application
 
-Once the application period has opened (in the April 4-19, 2022 period), you have to submit your application on the Google Summer of Code website.
+Once the application period has opened (in the April 4-19, 2022 period), you have to submit your application on the [Google Summer of Code website](https://summerofcode.withgoogle.com/).
 Your application must be written in English.
 It should contain a detailed description of your project proposal.
 
