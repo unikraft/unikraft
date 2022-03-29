@@ -103,6 +103,12 @@ htons
 nthos
 h_errno
 
+# syslog
+openlog
+closelog
+syslog
+vsyslog
+
 # random
 random
 srandom
