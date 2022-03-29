@@ -40,6 +40,8 @@ printf
 fflush
 fputc
 putchar
+fputs
+puts
 
 # stdlib
 abort
