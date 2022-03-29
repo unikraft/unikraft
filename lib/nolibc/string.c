@@ -299,6 +299,23 @@ char *strtok_r(char *restrict s, const char *restrict sep, char **restrict p)
 	return s;
 }
 
+char *strsep(char **restrict s, const char *restrict sep)
+{
+	char *p, *str = *s;
+
+	if (!*s)
+		return NULL;
+
+	p = *s + strcspn(*s, sep);
+	if (*p)
+		*p++ = 0;
+	else
+		p = NULL;
+
+	*s = p;
+	return str;
+}
+
 char *strndup(const char *str, size_t len)
 {
 	char *__res;

@@ -77,6 +77,7 @@ strcspn
 strspn
 strtok
 strtok_r
+strsep
 strndup
 strdup
 strlcpy

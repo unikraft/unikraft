@@ -64,6 +64,7 @@ size_t strcspn(const char *s, const char *c);
 size_t strspn(const char *s, const char *c);
 char *strtok(char *restrict s, const char *restrict sep);
 char *strtok_r(char *restrict s, const char *restrict sep, char **restrict p);
+char *strsep(char **restrict s, const char *restrict sep);
 char *strndup(const char *str, size_t len);
 char *strdup(const char *str);
 char *strcat(char *restrict dest, const char *restrict src);
