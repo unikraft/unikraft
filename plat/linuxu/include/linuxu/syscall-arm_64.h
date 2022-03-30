@@ -38,27 +38,29 @@
 
 #include <stdint.h>
 
-#define __SC_READ       63
-#define __SC_WRITE      64
-#define __SC_OPENAT     56 /* changed to openat because open is not on arm64 */
-#define __SC_CLOSE      57
-#define __SC_MMAP      222 /* use mmap2() since mmap() is obsolete */
-#define __SC_MUNMAP    215
-#define __SC_EXIT       93
-#define __SC_IOCTL		29
-#define __SC_FSTAT		80
-#define __SC_FCNTL		25
-#define __SC_RT_SIGPROCMASK   135
-#define __SC_ARCH_PRCTL       167
-#define __SC_RT_SIGACTION     134
-#define __SC_TIMER_CREATE     107
-#define __SC_TIMER_SETTIME    110
-#define __SC_TIMER_GETTIME    108
-#define __SC_TIMER_GETOVERRUN 109
-#define __SC_TIMER_DELETE     111
-#define __SC_CLOCK_GETTIME    113
-#define __SC_SOCKET           198
-#define __SC_PSELECT6         72
+#define __SC_FCNTL	25
+#define __SC_IOCTL	29
+#define __SC_OPENAT	56 /* use openat because open is not on arm64 */
+#define __SC_CLOSE	57
+#define __SC_READ	63
+#define __SC_WRITE	64
+#define __SC_PSELECT6	72
+#define __SC_FSTAT	80
+#define __SC_EXIT	93
+#define __SC_TIMER_CREATE	107
+#define __SC_TIMER_GETTIME	108
+#define __SC_TIMER_GETOVERRUN	109
+#define __SC_TIMER_SETTIME	110
+#define __SC_TIMER_DELETE	111
+#define __SC_CLOCK_GETTIME	113
+#define __SC_RT_SIGACTION	134
+#define __SC_RT_SIGPROCMASK	135
+#define __SC_ARCH_PRCTL	167
+#define __SC_SOCKET	198
+#define __SC_MUNMAP	215
+#define __SC_MMAP	222 /* use mmap2() since mmap() is obsolete */
+
+
 
 #ifndef O_TMPFILE
 #define O_TMPFILE 020040000
