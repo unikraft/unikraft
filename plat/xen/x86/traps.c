@@ -70,14 +70,8 @@ void traps_init(void)
 {
 	HYPERVISOR_set_trap_table(trap_table);
 
-#ifdef __i386__
-	HYPERVISOR_set_callbacks(__KERNEL_CS,
-				 (unsigned long) asm_trap_hypervisor_callback,
-				 __KERNEL_CS, (unsigned long) asm_failsafe_callback);
-#else
 	HYPERVISOR_set_callbacks((unsigned long) asm_trap_hypervisor_callback,
 				 (unsigned long) asm_failsafe_callback, 0);
-#endif
 }
 
 void traps_fini(void)
