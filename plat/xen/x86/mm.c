@@ -505,9 +505,6 @@ int unmap_frames(unsigned long va, unsigned long num_frames)
 			call[i].op = __HYPERVISOR_update_va_mapping;
 			call[i].args[arg++] = va;
 			call[i].args[arg++] = 0;
-#ifdef __i386__
-			call[i].args[arg++] = 0;
-#endif
 			call[i].args[arg++] = UVMF_INVLPG;
 
 			va += PAGE_SIZE;
