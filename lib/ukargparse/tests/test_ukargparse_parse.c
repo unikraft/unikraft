@@ -42,7 +42,7 @@
 
 UK_TESTCASE(ukargparse, parse_space_separated)
 {
-	char *arg_str = {"some/path/file -test 1 --test-this"};
+	char arg_str[] = "some/path/file -test 1 --test-this";
 	static const char * const arg_ex[] = {"some/path/file",
 		"-test", "1", "--test-this"};
 
@@ -71,7 +71,7 @@ UK_TESTCASE(ukargparse, parse_null)
 
 UK_TESTCASE(ukargparse, parse_extra_whitespaces)
 {
-	char *arg_str = {"some\t\t\n\t\tseparated\n\t\t  \n  string"};
+	char arg_str[] = "some\t\t\n\t\tseparated\n\t\t  \n  string";
 	static const char * const arg_ex[] = {"some", "separated", "string"};
 
 	// null-terminated array of parsed arguments
@@ -88,7 +88,7 @@ UK_TESTCASE(ukargparse, parse_extra_whitespaces)
 
 UK_TESTCASE(ukargparse, parse_quotes)
 {
-	char *arg_str = {"\"\targ_a\" ' arg_b' \"arg'c\" arg_d'' arg\"_\"e\"'\""};
+	char arg_str[] = "\"\targ_a\" ' arg_b' \"arg'c\" arg_d'' arg\"_\"e\"'\"";
 	static const char * const arg_ex[] = {"\targ_a", " arg_b", "arg'c", "arg_d", "arg_e'"};
 
 	// null-terminated array of parsed arguments
