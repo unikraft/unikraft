@@ -707,6 +707,7 @@ UK_SYSCALL_R_DEFINE(int, pipe2, int*, pipefd, int, flags)
 	return 0;
 }
 
+#if UK_LIBC_SYSCALLS
 /* TODO maybe find a better place for this when it will be implemented */
 int mkfifo(const char *path __unused, mode_t mode __unused)
 {
@@ -714,3 +715,4 @@ int mkfifo(const char *path __unused, mode_t mode __unused)
 	errno = ENOTSUP;
 	return -1;
 }
+#endif /* UK_LIBC_SYSCALLS */
