@@ -200,6 +200,7 @@ pid_t waitpid(pid_t pid __unused, int *wstatus __unused, int options __unused)
 	return -1;
 }
 
+#if UK_LIBC_SYSCALLS
 pid_t wait3(int *wstatus __unused, int options __unused,
 		struct rusage *rusage __unused)
 {
@@ -207,6 +208,7 @@ pid_t wait3(int *wstatus __unused, int options __unused,
 	errno = ECHILD;
 	return -1;
 }
+#endif /* UK_LIBC_SYSCALLS */
 
 UK_SYSCALL_R_DEFINE(pid_t, wait4, pid_t, pid, int *, wstatus,
 		    int, options, struct rusage *, rusage)
@@ -267,11 +269,14 @@ UK_SYSCALL_R_DEFINE(pid_t, getpgrp)
 	return UNIKRAFT_PGID;
 }
 
+#if UK_LIBC_SYSCALLS
 int setpgrp(void)
 {
 	return setpgid(0, 0);
 }
+#endif /* UK_LIBC_SYSCALLS */
 
+#if UK_LIBC_SYSCALLS
 int tcsetpgrp(int fd __unused, pid_t pgrp)
 {
 	/* TODO check if fd is BADF */
@@ -281,18 +286,20 @@ int tcsetpgrp(int fd __unused, pid_t pgrp)
 	}
 	return 0;
 }
+#endif /* UK_LIBC_SYSCALLS */
 
+#if UK_LIBC_SYSCALLS
 pid_t tcgetpgrp(int fd)
 {
 	/* We have a single "process group" */
 	return UNIKRAFT_PGID;
 }
+#endif /* UK_LIBC_SYSCALLS */
 
-int nice(int inc __unused)
+UK_SYSCALL_R_DEFINE(int, nice, int, inc)
 {
 	/* We don't support priority updates for unikernels */
-	errno = EPERM;
-	return -1;
+	return -EPERM;
 }
 
 UK_SYSCALL_R_DEFINE(int, getpriority, int, which, id_t, who)
@@ -449,4 +456,4 @@ int prlimit(pid_t pid, int resource, const struct rlimit *new_limit,
 	return uk_syscall_e_prlimit64(0, (long) resource,
 				      (long) new_limit, (long) old_limit);
 }
-#endif
+#endif /* UK_LIBC_SYSCALLS */
