@@ -178,7 +178,7 @@ int open(const char *pathname, int flags, ...)
 #endif
 
 LFS64(open);
-#endif
+#endif /* UK_LIBC_SYSCALLS */
 
 UK_LLSYSCALL_R_DEFINE(int, openat, int, dirfd, const char *, pathname,
 		      int, flags, int, mode)
@@ -234,7 +234,7 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 #endif
 
 LFS64(openat);
-#endif
+#endif /* UK_LIBC_SYSCALLS */
 
 UK_SYSCALL_DEFINE(int, creat, const char*, pathname, mode_t, mode)
 {
@@ -289,7 +289,8 @@ UK_TRACEPOINT(trace_vfs_mknod, "\"%s\" 0%0o 0x%x", const char*, mode_t, dev_t);
 UK_TRACEPOINT(trace_vfs_mknod_ret, "");
 UK_TRACEPOINT(trace_vfs_mknod_err, "%d", int);
 
-int __xmknod(int ver, const char *pathname, mode_t mode, dev_t *dev __unused)
+static int __xmknod_helper(int ver, const char *pathname,
+		mode_t mode, dev_t *dev __unused)
 {
 	UK_ASSERT(ver == 0); // On x86-64 Linux, _MKNOD_VER_LINUX is 0.
 	struct task *t = main_task;
@@ -312,9 +313,17 @@ int __xmknod(int ver, const char *pathname, mode_t mode, dev_t *dev __unused)
 	return -error;
 }
 
+#if UK_LIBC_SYSCALLS
+int __xmknod(int ver, const char *pathname,
+		mode_t mode, dev_t *dev __unused)
+{
+	return __xmknod_helper(ver, pathname, mode, dev);
+}
+#endif /* UK_LIBC_SYSCALLS */
+
 UK_SYSCALL_R_DEFINE(int, mknod, const char*, pathname, mode_t, mode, dev_t, dev)
 {
-	return __xmknod(0, pathname, mode, &dev);
+	return __xmknod_helper(0, pathname, mode, &dev);
 }
 
 UK_TRACEPOINT(trace_vfs_lseek, "%d 0x%x %d", int, off_t, int);
@@ -784,7 +793,7 @@ int ioctl(int fd, unsigned long int request, ...)
 
 	return uk_syscall_e_ioctl((long) fd, (long) request, (long) arg);
 }
-#endif
+#endif /* UK_LIBC_SYSCALLS */
 
 UK_TRACEPOINT(trace_vfs_fsync, "%d", int);
 UK_TRACEPOINT(trace_vfs_fsync_ret, "");
@@ -823,7 +832,7 @@ UK_TRACEPOINT(trace_vfs_fstat, "%d %p", int, struct stat*);
 UK_TRACEPOINT(trace_vfs_fstat_ret, "");
 UK_TRACEPOINT(trace_vfs_fstat_err, "%d", int);
 
-int __fxstat(int ver __unused, int fd, struct stat *st)
+static int __fxstat_helper(int ver __unused, int fd, struct stat *st)
 {
 	struct vfscore_file *fp;
 	int error;
@@ -848,15 +857,21 @@ int __fxstat(int ver __unused, int fd, struct stat *st)
 	return -1;
 }
 
+#if UK_LIBC_SYSCALLS
+int __fxstat(int ver __unused, int fd, struct stat *st)
+{
+	return __fxstat_helper(ver, fd, st);
+}
 #ifdef __fxstat64
 #undef __fxstat64
 #endif
 
 LFS64(__fxstat);
+#endif /* UK_LIBC_SYSCALLS */
 
 UK_SYSCALL_DEFINE(int, fstat, int, fd, struct stat *, st)
 {
-	return __fxstat(1, fd, st);
+	return __fxstat_helper(1, fd, st);
 }
 
 #ifdef fstat64
@@ -865,8 +880,8 @@ UK_SYSCALL_DEFINE(int, fstat, int, fd, struct stat *, st)
 
 LFS64(fstat);
 
-int __fxstatat(int ver __unused, int dirfd, const char *pathname, struct stat *st,
-		int flags)
+static int __fxstatat_helper(int ver __unused, int dirfd, const char *pathname,
+		struct stat *st, int flags)
 {
 	if (pathname[0] == '/' || dirfd == AT_FDCWD) {
 		return stat(pathname, st);
@@ -905,27 +920,38 @@ int __fxstatat(int ver __unused, int dirfd, const char *pathname, struct stat *s
 	return error;
 }
 
+#if UK_LIBC_SYSCALLS
+int __fxstatat(int ver __unused, int dirfd, const char *pathname,
+		struct stat *st, int flags)
+{
+	return __fxstatat_helper(ver, dirfd, pathname, st, flags);
+}
 #ifdef __fxstatat64
 #undef __fxstatat64
 #endif
 
 LFS64(__fxstatat);
+#endif /* UK_LIBC_SYSCALLS */
 
-int fstatat(int dirfd, const char *path, struct stat *st, int flags)
+UK_SYSCALL_R_DEFINE(int, fstatat, int, dirfd, const char*, path,
+				struct stat*, st, int, flags)
 {
-	return __fxstatat(1, dirfd, path, st, flags);
+	return __fxstatat_helper(1, dirfd, path, st, flags);
 }
+
+#if UK_LIBC_SYSCALLS
 
 #ifdef fstatat64
 #undef fstatat64
 #endif
 
 LFS64(fstatat);
+#endif /* UK_LIBC_SYSCALLS */
 
 UK_SYSCALL_R_DEFINE(int, newfstatat, int, dirfd, const char*, path,
 				struct stat*, st, int, flags)
 {
-	return __fxstatat(1, dirfd, path, st, flags);
+	return __fxstatat_helper(1, dirfd, path, st, flags);
 }
 
 UK_SYSCALL_R_DEFINE(int, flock, int, fd, int, operation)
@@ -1522,7 +1548,8 @@ UK_TRACEPOINT(trace_vfs_stat, "\"%s\" %p", const char*, struct stat*);
 UK_TRACEPOINT(trace_vfs_stat_ret, "");
 UK_TRACEPOINT(trace_vfs_stat_err, "%d", int);
 
-int __xstat(int ver __unused, const char *pathname, struct stat *st)
+static int __xstat_helper(int ver __unused, const char *pathname,
+		struct stat *st)
 {
 	struct task *t = main_task;
 	char path[PATH_MAX];
@@ -1545,18 +1572,25 @@ int __xstat(int ver __unused, const char *pathname, struct stat *st)
 	return -error;
 }
 
+#if UK_LIBC_SYSCALLS
+static int __xstat(int ver __unused, const char *pathname,
+		struct stat *st)
+{
+	return __xstat_helper(ver, pathname, st);
+}
 #ifdef __xstat64
 #undef __xstat64
 #endif
 
 LFS64(__xstat);
+#endif /* UK_LIBC_SYSCALLS */
 
 UK_SYSCALL_R_DEFINE(int, stat, const char*, pathname, struct stat*, st)
 {
 	if (!pathname) {
 		return -EINVAL;
 	}
-	return __xstat(1, pathname, st);
+	return __xstat_helper(1, pathname, st);
 }
 
 #ifdef stat64
@@ -1570,6 +1604,7 @@ UK_TRACEPOINT(trace_vfs_lstat, "pathname=%s, stat=%p", const char*,
 UK_TRACEPOINT(trace_vfs_lstat_ret, "");
 UK_TRACEPOINT(trace_vfs_lstat_err, "errno=%d", int);
 
+#if UK_LIBC_SYSCALLS
 int __lxstat(int ver __unused, const char *pathname, struct stat *st)
 {
 	struct task *t = main_task;
@@ -1601,6 +1636,7 @@ int __lxstat(int ver __unused, const char *pathname, struct stat *st)
 #endif
 
 LFS64(__lxstat);
+#endif /* UK_LIBC_SYSCALLS */
 
 UK_SYSCALL_R_DEFINE(int, lstat, const char*, pathname, struct stat*, st)
 {
@@ -1705,6 +1741,7 @@ statfs_to_statvfs(struct statvfs *dst, struct statfs *src)
 	return 0;
 }
 
+#if UK_LIBC_SYSCALLS
 int
 statvfs(const char *pathname, struct statvfs *buf)
 {
@@ -1720,7 +1757,9 @@ statvfs(const char *pathname, struct statvfs *buf)
 #endif
 
 LFS64(statvfs);
+#endif /* UK_LIBC_SYSCALLS */
 
+#if UK_LIBC_SYSCALLS
 int
 fstatvfs(int fd, struct statvfs *buf)
 {
@@ -1736,6 +1775,7 @@ fstatvfs(int fd, struct statvfs *buf)
 #endif
 
 LFS64(fstatvfs);
+#endif /* UK_LIBC_SYSCALLS */
 
 
 UK_TRACEPOINT(trace_vfs_getcwd, "%p %d", char*, size_t);
@@ -1877,7 +1917,7 @@ UK_SYSCALL_R_DEFINE(int, dup2, int, oldfd, int, newfd)
 	if (oldfd == newfd)
 		return newfd;
 
-	return dup3(oldfd, newfd, 0);
+	return uk_syscall_r_dup3(oldfd, newfd, 0);
 }
 
 /*
@@ -1993,7 +2033,7 @@ int fcntl(int fd, int cmd, ...)
 
 	return uk_syscall_e_fcntl(fd, cmd, arg);
 }
-#endif
+#endif /* UK_LIBC_SYSCALLS */
 
 UK_TRACEPOINT(trace_vfs_access, "\"%s\" 0%0o", const char*, int);
 UK_TRACEPOINT(trace_vfs_access_ret, "");
@@ -2321,6 +2361,7 @@ UK_SYSCALL_R_DEFINE(int, utimensat, int, dirfd, const char*, pathname, const str
 	return 0;
 }
 
+#if UK_LIBC_SYSCALLS
 UK_TRACEPOINT(trace_vfs_futimens, "%d", int);
 UK_TRACEPOINT(trace_vfs_futimens_ret, "");
 UK_TRACEPOINT(trace_vfs_futimens_err, "%d", int);
@@ -2339,6 +2380,7 @@ int futimens(int fd, const struct timespec *times)
 	trace_vfs_futimens_ret();
 	return 0;
 }
+#endif /* UK_LIBC_SYSCALLS */
 
 static int do_utimes(const char *pathname, const struct timeval *times, int flags)
 {
@@ -2543,6 +2585,7 @@ ssize_t sendfile(int out_fd, int in_fd, off_t *_offset, size_t count)
 LFS64(sendfile);
 #endif
 
+#if UK_LIBC_SYSCALLS
 int posix_fadvise(int fd __unused, off_t offset __unused, off_t len __unused,
 		int advice)
 {
@@ -2564,6 +2607,7 @@ int posix_fadvise(int fd __unused, off_t offset __unused, off_t len __unused,
 #endif
 
 LFS64(posix_fadvise);
+#endif /* UK_LIBC_SYSCALLS */
 
 UK_SYSCALL_R_DEFINE(mode_t, umask, mode_t, newmask)
 {
