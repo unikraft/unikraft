@@ -121,6 +121,14 @@ ENTRY(_libkvmplat_entry)
 
 	mov sp, x27
 
+	/* Zero-out the BSS */
+	ldr x26, =__bss_start
+	ldr x27, =_end
+2:
+	str	xzr, [x26], #8
+	cmp	x26, x27
+	b.lo	2b
+
 	/* Set the context id */
 	msr contextidr_el1, xzr
 
