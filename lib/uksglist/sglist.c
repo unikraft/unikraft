@@ -379,7 +379,7 @@ int uk_sglist_split(struct uk_sglist *original, struct uk_sglist **head,
 	int count, i;
 
 	if (uk_refcount_read(&original->sg_refs) > 1)
-		return -EDOOFUS;
+		return -EINVAL;
 
 	/* Figure out how big of a sglist '*head' has to hold. */
 	count = 0;

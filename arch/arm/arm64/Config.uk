@@ -1,50 +1,148 @@
 choice
-	prompt "Processor Optimization"
-	default MARCH_ARM64_GENERIC
+	prompt "Target Processor"
+	default MCPU_ARM64_NONE
 	help
-		Optimize the code for selected target processor
+		Compile and optimize the code for selected target processor.
+		This automatically enables/disables architecture extensions
+		and applies compiler optimizations for the target processor.
 
-config MARCH_ARM64_NATIVE
-	bool "Auto-detect host CPU"
-	help
-		Optimize compilation to host CPU. Please note that this
-		option will fail in case of cross-compilation
+	config MCPU_ARM64_NONE
+		bool "None"
+		help
+			Do not compile for a specific CPU. This allows choosing
+			individual architecture extensions or features.
 
-config MARCH_ARM64_GENERIC
-	bool "Generic Armv8 CPU"
-	help
-		Compile for Generic Armv8 compatible CPUs
+	config MCPU_ARM64_NATIVE
+		bool "Auto-detect host CPU"
+		help
+			Compile and optimize for the host CPU. Please note that this
+			option will fail in case of cross-compilation.
 
-config MARCH_ARM64_CORTEXA53
-	bool "Generic Armv8 Cortex A53"
-	help
-		Compile for Armv8 Cortex-A53 (and compatible) CPUs
+	config MCPU_ARM64_GENERIC
+		bool "Generic Armv8 CPU"
+		help
+			Compile for Generic Armv8 compatible CPUs.
 
-config MARCH_ARM64_CORTEXA57
-	bool "Generic Armv8 Cortex A57"
-	help
-		Compile for Armv8 Cortex-A57 (and compatible) CPUs
+	config MCPU_ARM64_CORTEX_A34
+		bool "Cortex-A34"
+		help
+			Compile and optimize for Cortex-A34 CPUs.
 
-config MARCH_ARM64_CORTEXA72
-	bool "Generic Armv8 Cortex A72"
-	help
-		Compile for Armv8 Cortex-A72 (and compatible) CPUs
+	config MCPU_ARM64_CORTEX_A35
+		bool "Cortex-A35"
+		help
+			Compile and optimize for Cortex-A35 CPUs.
 
-config MARCH_ARM64_CORTEXA73
-	bool "Generic Armv8 Cortex A73"
-	help
-		Compile for Armv8 Cortex-A73 (and compatible) CPUs
+	config MCPU_ARM64_CORTEX_A53
+		bool "Cortex-A53"
+		help
+			Compile and optimize for Cortex-A53 CPUs.
 
-config MARCH_ARM64_CORTEXA55
-	bool "Generic Armv8.2 Cortex A55"
-	help
-		Compile for Armv8.2 Cortex-A55 (and compatible) CPUs
+	config MCPU_ARM64_CORTEX_A55
+		bool "Cortex-A55"
+		help
+			Compile and optimize for Cortex-A55 CPUs.
 
-config MARCH_ARM64_CORTEXA75
-	bool "Generic Armv8.2 Cortex A75"
-	help
-		Compile for Armv8.2 Cortex-A75 (and compatible) CPUs
+	config MCPU_ARM64_CORTEX_A57
+		bool "Cortex-A57"
+		help
+			Compile and optimize for Cortex-A57 CPUs.
 
+	config MCPU_ARM64_CORTEX_A57_A53
+		bool "Cortex-A57 / Cortex-A53 big.LITTLE"
+		help
+			Compile and optimize for Cortex-A57 / Cortex-A53
+			big.LITTLE CPUs.
+
+	config MCPU_ARM64_CORTEX_A65
+		bool "Cortex-A65"
+		help
+			Compile and optimize for Cortex-A65 CPUs.
+
+	config MCPU_ARM64_CORTEX_A65AE
+		bool "Cortex-A65AE"
+		help
+			Compile and optimize for Cortex-A65AE CPUs.
+
+	config MCPU_ARM64_CORTEX_A72
+		bool "Cortex-A72"
+		help
+			Compile and optimize for Cortex-A72 CPUs.
+
+	config MCPU_ARM64_CORTEX_A72_A53
+		bool "Cortex-A72 / Cortex-A53 big.LITTLE"
+		help
+			Compile and optimize for Cortex-A72 / Cortex-A53
+			big.LITTLE CPUs.
+
+	config MCPU_ARM64_CORTEX_A73
+		bool "Cortex-A73"
+		help
+			Compile and optimize for Cortex-A73 CPUs.
+
+	config MCPU_ARM64_CORTEX_A73_A35
+		bool "Cortex-A73 / Cortex-A35 big.LITTLE"
+		help
+			Compile and optimize for Cortex-A73 / Cortex-A35
+			big.LITTLE CPUs.
+
+	config MCPU_ARM64_CORTEX_A73_A53
+		bool "Cortex-A73 / Cortex-A53 big.LITTLE"
+		help
+			Compile and optimize for Cortex-A73 / Cortex-A53
+			big.LITTLE CPUs.
+
+	config MCPU_ARM64_CORTEX_A75
+		bool "Cortex-A75"
+		help
+			Compile and optimize for Cortex-A75 CPUs.
+
+	config MCPU_ARM64_CORTEX_A76
+		bool "Cortex-A76"
+		help
+			Compile and optimize for Cortex-A76 CPUs.
+
+	config MCPU_ARM64_CORTEX_A76AE
+		bool "Cortex-A76AE"
+		help
+			Compile and optimize for Cortex-A76AE CPUs.
+
+	config MCPU_ARM64_CORTEX_A75_A55
+		bool "Cortex-A75 / Cortex-A55 DynamIQ"
+		help
+			Compile and optimize for Cortex-A75 / Cortex-A55 DynamIQ
+			big.LITTLE CPUs.
+
+	config MCPU_ARM64_CORTEX_A76_A55
+		bool "Cortex-A76 / Cortex-A55 DynamIQ"
+		help
+			Compile and optimize for Cortex-A76 / Cortex-A55 DynamIQ
+			big.LITTLE CPUs.
+
+	config MCPU_ARM64_CORTEX_A77
+		bool "Cortex-A77"
+		help
+			Compile and optimize for Cortex-A77 CPUs.
+
+	config MCPU_ARM64_NEOVERSE_E1
+		bool "Neoverse E1"
+		help
+			Compile and optimize for Neoverse E1 CPUs.
+
+	config MCPU_ARM64_NEOVERSE_N1
+		bool "Neoverse N1"
+		help
+			Compile and optimize for Neoverse N1 CPUs.
+
+	config MCPU_ARM64_NEOVERSE_N2
+		bool "Neoverse N2"
+		help
+			Compile and optimize for Neoverse N2 CPUs.
+
+	config MCPU_ARM64_NEOVERSE_V1
+		bool "Neoverse V1"
+		help
+			Compile and optimize for Neoverse V1 CPUs.
 endchoice
 
 config ARM64_ERRATUM_858921
