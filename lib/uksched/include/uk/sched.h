@@ -49,8 +49,6 @@ struct uk_sched;
 
 struct uk_sched *uk_sched_default_init(struct uk_alloc *a);
 
-extern char _tls_start[], _etdata[], _tls_end[];
-#define have_tls_area() (_tls_end - _tls_start)
 
 extern struct uk_sched *uk_sched_head;
 int uk_sched_register(struct uk_sched *s);
