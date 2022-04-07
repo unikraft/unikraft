@@ -1,7 +1,5 @@
 uk_sched_default_init
 uk_sched_register
-uk_sched_get_default
-uk_sched_set_default
 uk_sched_create
 uk_sched_start
 uk_sched_thread_create
