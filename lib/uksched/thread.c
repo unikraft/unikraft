@@ -581,19 +581,22 @@ struct uk_thread *uk_thread_create_bare(struct uk_alloc *a,
 	return t;
 }
 
-/** Allocates `struct uk_thread` along with stack and TLS */
-static struct uk_thread *_uk_thread_alloc(struct uk_alloc *a,
-					  struct uk_alloc *a_stack,
-					  size_t stack_len,
-					  struct uk_alloc *a_uktls,
-					  bool no_ectx,
-					  const char *name,
-					  void *priv,
-					  uk_thread_dtor_t dtor)
+/** Allocates `struct uk_thread` along with stack and TLS but do not initialize
+ *  the architecture context with an entry function (set to NULL)
+ */
+struct uk_thread *uk_thread_create_container(struct uk_alloc *a,
+					     struct uk_alloc *a_stack,
+					     size_t stack_len,
+					     struct uk_alloc *a_uktls,
+					     bool no_ectx,
+					     const char *name,
+					     void *priv,
+					     uk_thread_dtor_t dtor)
 {
 	struct uk_thread *t;
 	size_t t_size;
 	struct ukarch_ectx *ectx = NULL;
+	int ret;
 
 	/* NOTE: We place space for extended context after
 	 *       struct uk_thread within the same allocation
@@ -612,6 +615,8 @@ static struct uk_thread *_uk_thread_alloc(struct uk_alloc *a,
 						       + sizeof(*t),
 						       ukarch_ectx_align());
 
+	stack_len = (!!stack_len) ? stack_len : STACK_SIZE;
+
 	if (_uk_thread_struct_init_alloc(t,
 					 a_stack, stack_len,
 					 a_uktls,
@@ -620,6 +625,76 @@ static struct uk_thread *_uk_thread_alloc(struct uk_alloc *a,
 					 name, priv, dtor) < 0)
 		goto err_free_thread;
 	t->_mem.t_a = a;
+
+	/* Minimal context initialization where the stack pointer
+	 * is initialized (if available)
+	 */
+	ukarch_ctx_init_bare(&t->ctx,
+			     t->_mem.stack ?
+				  ukarch_gen_sp(t->_mem.stack, stack_len) : 0x0,
+			     0x0);
+
+	ret = _uk_thread_call_inittab(t);
+	if (ret < 0)
+		goto err_free_alloc;
+
+	return t;
+
+err_free_alloc:
+	_uk_thread_struct_free_alloc(t);
+err_free_thread:
+	uk_free(a, t);
+err_out:
+	return NULL;
+}
+
+/** Allocates `struct uk_thread` along with ectx (if requested), take stack
+ *  and TLS from caller but do not initialize the architecture context with
+ *  an entry function (set to NULL)
+ */
+struct uk_thread *uk_thread_create_container2(struct uk_alloc *a,
+					      uintptr_t sp,
+					      uintptr_t tlsp,
+					      bool is_uktls,
+					      bool no_ectx,
+					      const char *name,
+					      void *priv,
+					      uk_thread_dtor_t dtor)
+{
+	struct uk_thread *t;
+	size_t t_size;
+	struct ukarch_ectx *ectx = NULL;
+	int ret;
+
+	/* NOTE: We place space for extended context after
+	 *       struct uk_thread within the same allocation
+	 *       when ectx support was requested
+	 */
+	t_size = sizeof(*t);
+	if (!no_ectx)
+		t_size += ukarch_ectx_size() + ukarch_ectx_align();
+
+	t = uk_malloc(a, t_size);
+	if (!t)
+		goto err_out;
+
+	if (!no_ectx)
+		ectx = (struct ukarch_ectx *) ALIGN_UP((uintptr_t) t
+						       + sizeof(*t),
+						       ukarch_ectx_align());
+
+	_uk_thread_struct_init(t, tlsp, is_uktls, ectx, name, priv, dtor);
+	t->_mem.t_a = a;
+
+	/* Minimal context initialization where the stack pointer
+	 * is initialized
+	 */
+	ukarch_ctx_init_bare(&t->ctx, sp, 0x0);
+
+	ret = _uk_thread_call_inittab(t);
+	if (ret < 0)
+		goto err_free_thread;
+
 	return t;
 
 err_free_thread:
@@ -628,13 +703,59 @@ err_out:
 	return NULL;
 }
 
-/** Reverts `_uk_thread_alloc()` */
-static void _uk_thread_free(struct uk_thread *t)
+void uk_thread_container_init_bare(struct uk_thread *t,
+				   uintptr_t ip)
 {
 	UK_ASSERT(t);
+	UK_ASSERT(ip);
+	/* Make sure that we got handed over a container */
+	UK_ASSERT(t->ctx.ip == 0x0);
+	UK_ASSERT(!(t->flags & UK_THREADF_RUNNABLE));
 
-	_uk_thread_struct_free_alloc(t);
-	uk_free(t->_mem.t_a, t);
+	ukarch_ctx_init_bare(&t->ctx, t->ctx.sp, ip);
+	t->flags |= UK_THREADF_RUNNABLE;
+}
+
+void uk_thread_container_init_fn0(struct uk_thread *t,
+				  uk_thread_fn0_t fn)
+{
+	UK_ASSERT(t);
+	UK_ASSERT(fn);
+	UK_ASSERT(t->ctx.ip == 0x0);
+	UK_ASSERT(!(t->flags & UK_THREADF_RUNNABLE));
+
+	ukarch_ctx_init_entry0(&t->ctx, t->ctx.sp, 0,
+			       (ukarch_ctx_entry0) fn);
+	t->flags |= UK_THREADF_RUNNABLE;
+}
+
+void uk_thread_container_init_fn1(struct uk_thread *t,
+				  uk_thread_fn1_t fn,
+				  void *argp)
+{
+	UK_ASSERT(t);
+	UK_ASSERT(fn);
+	UK_ASSERT(t->ctx.ip == 0x0);
+	UK_ASSERT(!(t->flags & UK_THREADF_RUNNABLE));
+
+	ukarch_ctx_init_entry1(&t->ctx, t->ctx.sp, 0,
+			       (ukarch_ctx_entry1) fn, (long) argp);
+	t->flags |= UK_THREADF_RUNNABLE;
+}
+
+void uk_thread_container_init_fn2(struct uk_thread *t,
+				  uk_thread_fn2_t fn,
+				  void *argp0, void *argp1)
+{
+	UK_ASSERT(t);
+	UK_ASSERT(fn);
+	UK_ASSERT(t->ctx.ip == 0x0);
+	UK_ASSERT(!(t->flags & UK_THREADF_RUNNABLE));
+
+	ukarch_ctx_init_entry2(&t->ctx, t->ctx.sp, 0,
+			       (ukarch_ctx_entry2) fn,
+			       (long) argp0, (long) argp1);
+	t->flags |= UK_THREADF_RUNNABLE;
 }
 
 struct uk_thread *uk_thread_create_fn0(struct uk_alloc *a,
@@ -648,32 +769,20 @@ struct uk_thread *uk_thread_create_fn0(struct uk_alloc *a,
 				       uk_thread_dtor_t dtor)
 {
 	struct uk_thread *t;
-	int ret;
 
 	UK_ASSERT(fn);
 	UK_ASSERT(a_stack); /* A stack is required for ctx initialization */
 
-	stack_len = (!!stack_len) ? stack_len : STACK_SIZE;
-	t = _uk_thread_alloc(a,
-			     a_stack, stack_len,
-			     a_uktls,
-			     no_ectx, name, priv, dtor);
+	t = uk_thread_create_container(a,
+				       a_stack, stack_len,
+				       a_uktls,
+				       no_ectx, name, priv, dtor);
 	if (!t)
 		goto err_out;
 
-	ukarch_ctx_init_entry0(&t->ctx,
-			       ukarch_gen_sp(t->_mem.stack, stack_len),
-			       0,
-			       fn);
-	t->flags |= UK_THREADF_RUNNABLE;
-
-	ret = _uk_thread_call_inittab(t);
-	if (ret < 0)
-		goto err_free_alloc;
+	uk_thread_container_init_fn0(t, fn);
 	return t;
 
-err_free_alloc:
-	_uk_thread_free(t);
 err_out:
 	return NULL;
 }
@@ -690,32 +799,20 @@ struct uk_thread *uk_thread_create_fn1(struct uk_alloc *a,
 				       uk_thread_dtor_t dtor)
 {
 	struct uk_thread *t;
-	int ret;
 
 	UK_ASSERT(fn);
 	UK_ASSERT(a_stack); /* A stack is required for ctx initialization */
 
-	stack_len = (!!stack_len) ? stack_len : STACK_SIZE;
-	t = _uk_thread_alloc(a,
-			     a_stack, stack_len,
-			     a_uktls,
-			     no_ectx, name, priv, dtor);
+	t = uk_thread_create_container(a,
+				       a_stack, stack_len,
+				       a_uktls,
+				       no_ectx, name, priv, dtor);
 	if (!t)
 		goto err_out;
 
-	ukarch_ctx_init_entry1(&t->ctx,
-			       ukarch_gen_sp(t->_mem.stack, stack_len),
-			       0,
-			       (ukarch_ctx_entry1) fn, (long) argp);
-	t->flags |= UK_THREADF_RUNNABLE;
-
-	ret = _uk_thread_call_inittab(t);
-	if (ret < 0)
-		goto err_free_alloc;
+	uk_thread_container_init_fn1(t, fn, argp);
 	return t;
 
-err_free_alloc:
-	_uk_thread_free(t);
 err_out:
 	return NULL;
 }
@@ -732,33 +829,20 @@ struct uk_thread *uk_thread_create_fn2(struct uk_alloc *a,
 				       uk_thread_dtor_t dtor)
 {
 	struct uk_thread *t;
-	int ret;
 
 	UK_ASSERT(fn);
 	UK_ASSERT(a_stack); /* A stack is required for ctx initialization */
 
-	stack_len = (!!stack_len) ? stack_len : STACK_SIZE;
-	t = _uk_thread_alloc(a,
-			     a_stack, stack_len,
-			     a_uktls,
-			     no_ectx, name, priv, dtor);
+	t = uk_thread_create_container(a,
+				       a_stack, stack_len,
+				       a_uktls,
+				       no_ectx, name, priv, dtor);
 	if (!t)
 		goto err_out;
 
-	ukarch_ctx_init_entry2(&t->ctx,
-			       ukarch_gen_sp(t->_mem.stack, stack_len),
-			       0,
-			       (ukarch_ctx_entry2) fn,
-			       (long) argp0, (long) argp1);
-	t->flags |= UK_THREADF_RUNNABLE;
-
-	ret = _uk_thread_call_inittab(t);
-	if (ret < 0)
-		goto err_free_alloc;
+	uk_thread_container_init_fn2(t, fn, argp0, argp1);
 	return t;
 
-err_free_alloc:
-	_uk_thread_free(t);
 err_out:
 	return NULL;
 }
