@@ -1,4 +1,10 @@
-config LIBPOSIX_PROCESS
+menuconfig LIBPOSIX_PROCESS
 	bool "posix-process: Process-related functions"
 	default n
 	select LIBNOLIBC if !HAVE_LIBC
+
+if LIBPOSIX_PROCESS
+	config LIBPOSIX_PROCESS_DEBUG
+	bool "Enable debug messages"
+	default n
+endif
