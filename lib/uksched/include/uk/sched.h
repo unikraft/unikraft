@@ -52,9 +52,15 @@ struct uk_sched *uk_sched_default_init(struct uk_alloc *a);
 
 extern struct uk_sched *uk_sched_head;
 int uk_sched_register(struct uk_sched *s);
-struct uk_sched *uk_sched_get_default(void);
-int uk_sched_set_default(struct uk_sched *s);
 
+static inline struct uk_sched *uk_sched_current(void)
+{
+	struct uk_thread *th = uk_thread_current();
+
+	if (th)
+		return th->sched;
+	return NULL;
+}
 
 typedef void  (*uk_sched_yield_func_t)
 		(struct uk_sched *s);

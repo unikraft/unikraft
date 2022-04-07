@@ -75,45 +75,6 @@ int uk_sched_register(struct uk_sched *s)
 	return 0;
 }
 
-struct uk_sched *uk_sched_get_default(void)
-{
-	return uk_sched_head;
-}
-
-int uk_sched_set_default(struct uk_sched *s)
-{
-	struct uk_sched *head, *this, *prev;
-
-	head = uk_sched_get_default();
-
-	if (s == head)
-		return 0;
-
-	if (!head) {
-		uk_sched_head = s;
-		return 0;
-	}
-
-	this = head;
-	while (this->next) {
-		prev = this;
-		this = this->next;
-		if (s == this) {
-			prev->next = this->next;
-			this->next = head->next;
-			head = this;
-			// Update the default scheduler to head
-			uk_sched_head = head;
-			return 0;
-		}
-	}
-
-	/* s is not registered yet. Add in front of the queue. */
-	s->next = head;
-	uk_sched_head = s;
-	return 0;
-}
-
 struct uk_thread *uk_sched_thread_create(struct uk_sched *s,
 					 uk_thread_fn1_t fn,
 					 void * argp,
