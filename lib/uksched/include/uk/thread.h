@@ -400,6 +400,47 @@ struct uk_thread *uk_thread_create_bare(struct uk_alloc *a,
 					uk_thread_dtor_t dtor);
 
 /**
+ * Allocates a uk_thread container with stack and TLS. The entry point is not set
+ * and the thread is not marked as runnable. Such a thread should only be
+ * assigned to a scheduler after an entry point is configured (`thread->ctx`) and
+ * the thread was marked as runnable.
+ *
+ * @param a
+ *   Reference to an allocator (required)
+ * @param a_stack
+ *   Reference to an allocator for allocating a stack
+ *   Set to `NULL` to continue without a stack.
+ * @param stack_len
+ *   Size of the thread stack. If set to 0, a default stack size is used
+ *   for the stack allocation.
+ * @param a_uktls
+ *   Reference to an allocator for allocating (Unikraft) thread local storage.
+ *   If `NULL` is passed, a thread without TLS is allocated.
+ * @param no_ectx
+ *   If set, no memory is allocated for saving/restoring extended CPU
+ *   context state (e.g., floating point, vector registers). In such a
+ *   case, no extended context is saved nor restored on thread switches.
+ *   Executed functions must be ISR-safe.
+ * @param name
+ *   Optional name for the thread
+ * @param priv
+ *   Reference to external data that corresponds to this thread
+ * @param dtor
+ *   Destructor that is called when this thread is released
+ * @return
+ *   - (NULL): Allocation failed
+ *   - Reference to initialized uk_thread
+ */
+struct uk_thread *uk_thread_create_container(struct uk_alloc *a,
+					     struct uk_alloc *a_stack,
+					     size_t stack_len,
+					     struct uk_alloc *a_uktls,
+					     bool no_ectx,
+					     const char *name,
+					     void *priv,
+					     uk_thread_dtor_t dtor);
+
+/**
  * Allocates a raw uk_thread structure. Such a thread can then be assigned
  * to a scheduler. When the thread starts, the general-purpose registers are
  * reset.
