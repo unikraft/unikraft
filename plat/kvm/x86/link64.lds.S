@@ -82,26 +82,7 @@ SECTIONS
 
 	TLS_SECTIONS
 
-	/* Read-write data (initialized) */
-	. = ALIGN(__PAGE_SIZE);
-	_data = .;
-	.data :
-	{
-		*(.data)
-		*(.data.*)
-	}
-	_edata = .;
-
-	/* Read-write data (uninitialized) */
-	. = ALIGN(__PAGE_SIZE);
-	__bss_start = .;
-	.bss :
-	{
-		*(.bss)
-		*(.bss.*)
-		*(COMMON)
-		. = ALIGN(__PAGE_SIZE);
-	}
+	DATA_SECTIONS
 
 	/* We keep the interrupt stack on a different section
 	 * given that it may have a big alignment and it would
