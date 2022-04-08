@@ -109,30 +109,13 @@ SECTIONS {
 
 	TLS_SECTIONS
 
-	/* Read-write data that is initialized explicitly in code */
-	_data = .;
-	.data :
-	{
-		*(.data)
-		*(.data.*)
-	}
-	_edata = .;
-	. = ALIGN(__PAGE_SIZE);
+	DATA_SECTIONS
 
-	__bss_start = .;
-	/* Read-write data that is not initialized explicitly in code */
-	.bss :
-	{
-		*(.bss)
-		*(.bss.*)
-		*(COMMON)
-		. = ALIGN(__PAGE_SIZE);
 	/*
 	 * TODO
 	 * We can define the stack and page-table here, and free them once
 	 * the boot is done.
 	 */
-	}
 
 	_end = .;
 

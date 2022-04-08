@@ -128,4 +128,31 @@
 	}								\
 	_tls_end = . + SIZEOF(.tbss);
 
+#define DATA_SECTIONS							\
+	/* Read-write data (initialized) */				\
+	. = ALIGN(__PAGE_SIZE);						\
+	_data = .;							\
+	.data :								\
+	{								\
+		*(.data)						\
+		*(.data.*)						\
+	}								\
+	_edata = .;							\
+									\
+	/*								\
+	 * NOTE: linker will insert any extra sections here,		\
+	 * just before .bss						\
+	 */								\
+									\
+	/* Read-write data (uninitialized) */				\
+	. = ALIGN(__PAGE_SIZE);						\
+	__bss_start = .;						\
+	.bss :								\
+	{								\
+		*(.bss)							\
+		*(.bss.*)						\
+		*(COMMON)						\
+		. = ALIGN(__PAGE_SIZE);					\
+	}
+
 #endif /* __UK_COMMON_LDS_H */
