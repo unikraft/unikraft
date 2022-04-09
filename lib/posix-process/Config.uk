@@ -4,6 +4,22 @@ menuconfig LIBPOSIX_PROCESS
 	select LIBNOLIBC if !HAVE_LIBC
 
 if LIBPOSIX_PROCESS
+	menuconfig LIBPOSIX_PROCESS_PIDS
+		bool "Process and thread IDs"
+		default n
+		select LIBUKSCHED
+
+if LIBPOSIX_PROCESS_PIDS
+		config LIBPOSIX_PROCESS_MAX_PID
+		int "Largest PID"
+		range 1 32768
+		default 32
+
+		config LIBPOSIX_PROCESS_INIT_PIDS
+		bool "Assign PID during boot"
+		default n
+endif
+
 	config LIBPOSIX_PROCESS_DEBUG
 	bool "Enable debug messages"
 	default n
