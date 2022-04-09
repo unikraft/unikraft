@@ -33,10 +33,5 @@
 #ifndef __UK_PROCESS_H__
 #define __UK_PROCESS_H__
 
-#define UNIKRAFT_PID      1
-#define UNIKRAFT_PPID     0
-#define UNIKRAFT_SID      0
-#define UNIKRAFT_PGID     0
-#define UNIKRAFT_PROCESS_PRIO 0
 
 #endif /* __UK_PROCESS_H__ */

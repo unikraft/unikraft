@@ -45,6 +45,12 @@
 #include <vfscore/file.h>
 #endif
 
+#define UNIKRAFT_PID      1
+#define UNIKRAFT_PPID     0
+#define UNIKRAFT_SID      0
+#define UNIKRAFT_PGID     0
+#define UNIKRAFT_PROCESS_PRIO 0
+
 UK_SYSCALL_R_DEFINE(int, fork)
 {
 	/* fork() is not supported on this platform */
