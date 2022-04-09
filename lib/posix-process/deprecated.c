@@ -45,6 +45,12 @@
 #include <vfscore/file.h>
 #endif
 
+#define UNIKRAFT_PID      1
+#define UNIKRAFT_PPID     0
+#define UNIKRAFT_SID      0
+#define UNIKRAFT_PGID     0
+#define UNIKRAFT_PROCESS_PRIO 0
+
 UK_SYSCALL_R_DEFINE(int, fork)
 {
 	/* fork() is not supported on this platform */
@@ -75,11 +81,10 @@ static void exec_warn_argv_variadic(const char *arg, va_list args)
 
 static void __exec_warn_array(const char *name, char *const argv[])
 {
-	int i = 0;
-
 	uk_pr_warn(" %s=[", name);
 
 	if (argv) {
+		int i = 0;
 		while (argv[i]) {
 			uk_pr_warn("%s%s", (i > 0 ? ", " : ""), argv[i]);
 			i++;
@@ -186,6 +191,7 @@ int pclose(FILE *stream __unused)
 	return -1;
 }
 
+#if UK_LIBC_SYSCALLS
 int wait(int *status __unused)
 {
 	/* No children */
@@ -200,7 +206,6 @@ pid_t waitpid(pid_t pid __unused, int *wstatus __unused, int options __unused)
 	return -1;
 }
 
-#if UK_LIBC_SYSCALLS
 pid_t wait3(int *wstatus __unused, int options __unused,
 		struct rusage *rusage __unused)
 {
