@@ -49,18 +49,6 @@
 #define UNIKRAFT_PGID     0
 #define UNIKRAFT_PROCESS_PRIO 0
 
-UK_SYSCALL_R_DEFINE(int, fork)
-{
-	/* fork() is not supported on this platform */
-	return -ENOSYS;
-}
-
-UK_SYSCALL_R_DEFINE(int, vfork)
-{
-	/* vfork() is not supported on this platform */
-	return -ENOSYS;
-}
-
 static void exec_warn_argv_variadic(const char *arg, va_list args)
 {
 	int i = 1;
