@@ -73,3 +73,6 @@ uk_syscall_r_exit_group
 uk_syscall_e_exit_group
 uk_posix_process_create
 uk_posix_process_kill
+clone
+uk_syscall_r_clone
+uk_syscall_e_clone
