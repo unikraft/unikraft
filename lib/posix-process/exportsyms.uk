@@ -65,3 +65,11 @@ uk_syscall_e_getppid
 gettid
 uk_syscall_r_gettid
 uk_syscall_e_gettid
+exit
+uk_syscall_r_exit
+uk_syscall_e_exit
+exit_group
+uk_syscall_r_exit_group
+uk_syscall_e_exit_group
+uk_posix_process_create
+uk_posix_process_kill

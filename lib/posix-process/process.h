@@ -30,20 +30,19 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-
-#ifndef __UK_PROCESS_H__
-#define __UK_PROCESS_H__
+#ifndef __PROCESS_H_INTERNAL__
+#define __PROCESS_H_INTERNAL__
 
 #include <uk/config.h>
-#if CONFIG_LIBUKSCHED
+#include <sys/types.h>
+#if CONFIG_LIBPOSIX_PROCESS_PIDS
 #include <uk/thread.h>
-#endif
+#endif /* CONFIG_LIBPOSIX_PROCESS_PIDS */
 
-#if CONFIG_LIBUKSCHED
-int uk_posix_process_create(struct uk_alloc *a,
-			    struct uk_thread *thread,
-			    struct uk_thread *parent);
-void uk_posix_process_kill(struct uk_thread *thread);
-#endif /* CONFIG_LIBUKSCHED */
+#if CONFIG_LIBPOSIX_PROCESS_PIDS
+struct uk_thread *tid2ukthread(pid_t tid);
+pid_t ukthread2tid(struct uk_thread *thread);
+pid_t ukthread2pid(struct uk_thread *thread);
+#endif /* CONFIG_LIBPOSIX_PROCESS_PIDS */
 
-#endif /* __UK_PROCESS_H__ */
+#endif /* __PROCESS_H_INTERNAL__ */
