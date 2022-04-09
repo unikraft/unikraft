@@ -45,8 +45,6 @@
 #include <vfscore/file.h>
 #endif
 
-#define UNIKRAFT_PID      1
-#define UNIKRAFT_PPID     0
 #define UNIKRAFT_SID      0
 #define UNIKRAFT_PGID     0
 #define UNIKRAFT_PROCESS_PRIO 0
@@ -221,16 +219,6 @@ UK_SYSCALL_R_DEFINE(pid_t, wait4, pid_t, pid, int *, wstatus,
 {
 	/* No children */
 	return -ECHILD;
-}
-
-UK_SYSCALL_R_DEFINE(int, getpid)
-{
-	return UNIKRAFT_PID;
-}
-
-UK_SYSCALL_R_DEFINE(pid_t, getppid)
-{
-	return UNIKRAFT_PPID;
 }
 
 UK_SYSCALL_R_DEFINE(pid_t, setsid)

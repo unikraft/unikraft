@@ -62,3 +62,6 @@ uk_syscall_e_getpid
 getppid
 uk_syscall_r_getppid
 uk_syscall_e_getppid
+gettid
+uk_syscall_r_gettid
+uk_syscall_e_gettid
