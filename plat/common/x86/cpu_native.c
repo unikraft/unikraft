@@ -48,6 +48,13 @@ unsigned long read_cr2(void)
 
 void system_off(void)
 {
+#ifdef CONFIG_KVM_VMM_FIRECRACKER
+	/* Trigger the reset line via the PS/2 controller. On firecracker
+	 * this will shutdown the VM.
+	 */
+	outb(0x64, 0xFE);
+#endif /* CONFIG_KVM_VMM_FIRECRACKER */
+
 	/*
 	 * Perform an ACPI shutdown by writing (SLP_TYPa | SLP_EN) to PM1a_CNT.
 	 * Generally speaking, we'd have to jump through a lot of hoops to
