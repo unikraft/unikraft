@@ -5,3 +5,9 @@ menuconfig LIBUKSCHED
 	select LIBUKDEBUG
 	select LIBUKALLOC
 	select HAVE_SCHED
+
+if LIBUKSCHED
+	config LIBUKSCHED_DEBUG
+		bool "Enable debug messages"
+		default n
+endif
