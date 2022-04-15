@@ -1,5 +1,9 @@
 $(eval $(call addlib_s,libuksched,$(CONFIG_LIBUKSCHED)))
 
+# NOTE: Additional flags might be set to
+#       `LIBUKSCHED_THREAD_FLAGS-y`, `CFLAGS-y`, and `CXXFLAGS-y`
+#       by `Makefiles.rules`
+
 CINCLUDES-$(CONFIG_LIBUKSCHED)     += -I$(LIBUKSCHED_BASE)/include
 CXXINCLUDES-$(CONFIG_LIBUKSCHED)   += -I$(LIBUKSCHED_BASE)/include
 
