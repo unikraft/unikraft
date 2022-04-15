@@ -38,11 +38,16 @@
 #include <uk/plat/time.h>
 #include <uk/plat/tls.h>
 #include <uk/thread.h>
+#include <uk/tcb_impl.h>
 #include <uk/sched.h>
 #include <uk/wait.h>
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <uk/arch/tls.h>
+
+#if CONFIG_LIBUKSCHED_TCB_INIT && !CONFIG_UKARCH_TLS_HAVE_TCB
+#error CONFIG_LIBUKSCHED_TCB_INIT requires that a TLS contains reserved space for a TCB
+#endif
 
 extern const struct uk_thread_inittab_entry _uk_thread_inittab_start[];
 extern const struct uk_thread_inittab_entry _uk_thread_inittab_end;
@@ -349,11 +354,14 @@ static int _uk_thread_struct_init_alloc(struct uk_thread *t,
 	void *stack = NULL;
 	void *tls = NULL;
 	uintptr_t tlsp = 0x0;
+	int rc;
 
 	if (a_stack && stack_len) {
 		stack = uk_malloc(a_stack, stack_len);
-		if (!stack)
+		if (!stack) {
+			rc = -ENOMEM;
 			goto err_out;
+		}
 	}
 
 	if (a_uktls) {
@@ -364,8 +372,10 @@ static int _uk_thread_struct_init_alloc(struct uk_thread *t,
 					  ukarch_tls_area_size()
 					  + ukarch_ectx_size()
 					  + ukarch_ectx_align());
-			if (!tls)
+			if (!tls) {
+				rc = -ENOMEM;
 				goto err_free_stack;
+			}
 
 			/* When custom_ectx is not set, we ignore user's
 			 * ectx argument and overwrite it...
@@ -376,11 +386,13 @@ static int _uk_thread_struct_init_alloc(struct uk_thread *t,
 		} else {
 			tls = uk_memalign(a_uktls, ukarch_tls_area_align(),
 					  ukarch_tls_area_size());
-			if (!tls)
+			if (!tls) {
+				rc = -ENOMEM;
 				goto err_free_stack;
+			}
 		}
 
-		tlsp = ukarch_tls_pointer(tls);
+		tlsp = ukarch_tls_tlsp(tls);
 	}
 
 	_uk_thread_struct_init(t, tlsp, !(!tlsp), ectx, name, priv, dtor);
@@ -392,22 +404,33 @@ static int _uk_thread_struct_init_alloc(struct uk_thread *t,
 	}
 
 	if (tls) {
-		ukarch_tls_area_copy(tls);
+		ukarch_tls_area_init(tls);
 
 		t->_mem.uktls = tls;
 		t->_mem.uktls_a = a_uktls;
 		t->flags |= UK_THREADF_UKTLS;
+
+#if CONFIG_LIBUKSCHED_TCB_INIT
+		/* Initialize TCB by external lib */
+		rc = uk_thread_uktcb_init(t, uk_thread_uktcb(t));
+		if (rc < 0)
+			goto err_free_tls;
+#endif /* CONFIG_LIBUKSCHED_TCB_INIT */
 	} else {
 		tlsp = 0x0;
 	}
 
 	return 0;
 
+#if CONFIG_LIBUKSCHED_TCB_INIT
+err_free_tls:
+	uk_free(a_uktls, tls);
+#endif /* CONFIG_LIBUKSCHED_TCB_INIT */
 err_free_stack:
 	if (stack)
 		uk_free(a_stack, stack);
 err_out:
-	return -ENOMEM;
+	return rc;
 }
 
 /** Reverts `_uk_thread_struct_init_alloc()` */
@@ -418,6 +441,9 @@ void _uk_thread_struct_free_alloc(struct uk_thread *t)
 
 	/* Free memory that was allocated by us */
 	if (t->_mem.uktls_a && t->_mem.uktls) {
+#if CONFIG_LIBUKSCHED_TCB_INIT
+		uk_thread_tcb_fini(t, uk_thread_uktcb(t));
+#endif /* CONFIG_LIBUKSCHED_TCB_INIT */
 		uk_free(t->_mem.uktls_a, t->_mem.uktls);
 		t->_mem.uktls_a = NULL;
 		t->_mem.uktls   = NULL;
@@ -778,6 +804,10 @@ void uk_thread_release(struct uk_thread *t)
 	tls_a   = t->_mem.uktls_a;
 	tls     = t->_mem.uktls;
 
+#if CONFIG_LIBUKSCHED_TCB_INIT
+	if (tls_a && tls)
+		uk_thread_tcb_fini(t, uk_thread_uktcb(t));
+#endif /* CONFIG_LIBUKSCHED_TCB_INIT */
 	if (t->dtor)
 		t->dtor(t);
 
