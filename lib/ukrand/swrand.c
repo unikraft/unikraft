@@ -1,7 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
- *
  * Copyright (c) 2019, University Politehnica of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -29,24 +27,67 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-
 #include <string.h>
-#include <sys/random.h>
-#include <uk/essentials.h>
 #include <uk/swrand.h>
-#include <uk/syscall.h>
+#include <uk/config.h>
+#include <uk/print.h>
 
-UK_SYSCALL_R_DEFINE(ssize_t, getrandom,
-		    void *, buf, size_t, buflen,
-		    unsigned int, flags)
+__u32 uk_swrandr_gen_seed32(void)
 {
-	#ifdef CONFIG_LIBUKSWRAND_PSEUDO_RANDOMNESS
-		return uk_swrand_fill_buffer(buf, buflen);
-	#endif
+	__u32 val;
 
-	#ifdef CONFIG_LIBUKSWRAND_TRUE_RANDOMNESS
-		return RDRAND_bytes(buf, buflen);
-	#endif
+#ifdef CONFIG_LIBUKRAND_INITIALSEED_TIME
+	val = (__u32)ukplat_wall_clock();
+#endif
 
-	return -1;
+#ifdef CONFIG_LIBUKRAND_INITIALSEED_RDRAND
+	asm volatile ("rdrand %%eax;"
+		: "=a" (val));
+#endif
+
+#ifdef CONFIG_LIBUKRAND_INITIALSEED_USECONSTANT
+	val = CONFIG_LIBUKRAND_INITIALSEED_CONSTANT;
+#endif
+
+	return val;
+}
+
+ssize_t uk_swrand_generate_bytes(void *buf, size_t buflen)
+{
+	size_t step, chunk_size, i;
+	__u32 rd;
+
+	step = sizeof(__u32);
+	chunk_size = buflen % step;
+
+	for (i = 0; i < buflen - chunk_size; i += step)
+		*(__u32 *)((char *) buf + i) = uk_swrand_randr();
+
+	/* fill the remaining bytes of the buffer */
+	if (chunk_size > 0) {
+		rd = uk_swrand_randr();
+		memcpy(buf + i, &rd, chunk_size);
+	}
+
+	return buflen;
+}
+
+int _uk_swrand_init(void)
+{	
+	unsigned int i;
+#ifdef CONFIG_LIBUKRAND_CHACHA
+	unsigned int seedc = 10;
+	__u32 seedv[10];
+#else
+	unsigned int seedc = 2;
+	__u32 seedv[2];
+#endif
+	uk_pr_info("Initialize random number generator...\n");
+
+	for (i = 0; i < seedc; i++)
+		seedv[i] = uk_swrandr_gen_seed32();
+
+	uk_swrand_init_r(&uk_swrand_def, seedc, seedv);
+
+	return seedc;
 }

@@ -35,6 +35,7 @@
 #include <uk/ctors.h>
 #include <uk/print.h>
 #include <uk/swrand.h>
+#include <uk/hwrand.h>
 #include <uk/assert.h>
 #include <uk/config.h>
 #include <uk/essentials.h>
@@ -50,15 +51,15 @@ int dev_random_read(struct device *dev __unused, struct uio *uio,
 	size_t count;
 	char *buf;
 
-	buf = uio->uio_iov->iov_base;
+	buf = (char*)uio->uio_iov->iov_base;
 	count = uio->uio_iov->iov_len;
 
-	#ifdef CONFIG_LIBUKSWRAND_PSEUDO_RANDOMNESS
-		uk_swrand_fill_buffer(buf, count);
+	#ifdef CONFIG_LIBUKRAND_PSEUDO_RANDOMNESS
+		uk_swrand_generate_bytes(buf, count);
 	#endif
 
-	#ifdef CONFIG_LIBUKSWRAND_TRUE_RANDOMNESS
-		RDRAND_bytes(buf, count);
+	#ifdef CONFIG_LIBUKRAND_TRUE_RANDOMNESS
+		uk_hwrand_generate_bytes(buf, count);
 	#endif
 
 	uio->uio_resid = 0;

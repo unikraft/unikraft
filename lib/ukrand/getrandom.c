@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Vlad-Andrei Badoiu <vlad_andrei.badoiu@stud.acs.upb.ro>
+ * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
  *
  * Copyright (c) 2019, University Politehnica of Bucharest. All rights reserved.
  *
@@ -30,39 +30,24 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __UK_STACKPROTECTOR_H__
-#define __UK_STACKPROTECTOR_H__
-
-#ifdef CONFIG_LIBUKSP_VALUE_RANDOM
+#include <string.h>
+#include <sys/random.h>
+#include <uk/essentials.h>
 #include <uk/swrand.h>
-#endif
-#include <uk/config.h>
+#include <uk/hwrand.h>
+#include <uk/syscall.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-extern const unsigned long __stack_chk_guard;
-
-/*
- * Note: This function must always be inlined and may only be called from
- * a function that never returns.
- */
-__attribute__((always_inline))
-static inline void uk_stack_chk_guard_setup(void)
+UK_SYSCALL_R_DEFINE(ssize_t, getrandom,
+		    void *, buf, size_t, buflen,
+		    unsigned int, flags)
 {
-#ifdef CONFIG_LIBUKSP_VALUE_RANDOM
-	unsigned long guard;
+	#ifdef CONFIG_LIBUKRAND_PSEUDO_RANDOMNESS
+		return uk_swrand_generate_bytes(buf, buflen);
+	#endif
 
-	uk_swrand_generate_bytes(&guard, sizeof(guard));
-	guard &= ~0xFFul; /* Use least significant byte as null terminator */
+	#ifdef CONFIG_LIBUKRAND_TRUE_RANDOMNESS
+		return uk_hwrand_generate_bytes(buf, buflen);
+	#endif
 
-	(*DECONST(unsigned long *, &__stack_chk_guard)) = guard;
-#endif
+	return -1;
 }
-
-#ifdef __cplusplus
-}
-#endif
-
-#endif /* __UK_STACKPROTECTOR_H__ */

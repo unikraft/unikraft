@@ -3,8 +3,11 @@
 #include <string.h>
 
 #include <uk/swrand.h>
-#include "rdrand.h"
+#include <uk/print.h>
+#include <uk/hwrand.h>
 
+
+// TODO replace below calls with libukcpuid requests
 int has_amd_cpu(void)
 {
 	struct CPUID_info info;
@@ -42,27 +45,20 @@ int has_RDRAND(void)
 	return (info.ECX & RDRAND_FLAG) == RDRAND_FLAG;
 }
 
-int RDRAND_bytes(unsigned char *buf, size_t buflen)
+ssize_t uk_hwrand_generate_bytes(void *buf, size_t buflen)
 {
 	size_t idx = 0, rem = buflen;
-	size_t safety = buflen / sizeof(unsigned int) + 4;
-	u_int8_t error_code;
-	unsigned int val;
-
-	if (!has_RDRAND()) {
-		return -1;
-	}
+	size_t safety = buflen / sizeof(unsigned int);
+	u_int8_t success;
+	__u32 val;
 
 	while (rem > 0 && safety > 0) {
-		__asm__ volatile(
-			"rdrand %0 ; setc %1"
-			: "=r" (val), "=qm" (error_code)
-		);
+		val = uk_hwrand_randr(&success);
 
-		if (error_code) {
+		if (success) {
 			size_t cnt = (rem < sizeof(val) ? rem : sizeof(val));
 
-			memcpy(buf + idx, &val, cnt);
+			memcpy((unsigned char*)buf + idx, &val, cnt);
 
 			rem -= cnt;
 			idx += cnt;

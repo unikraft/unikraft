@@ -1,0 +1,65 @@
+menuconfig LIBUKRAND
+	bool "ukrand: Random number generator"
+	select LIBUKDEBUG
+	default n
+
+if LIBUKRAND
+
+choice
+	prompt "Support"
+	default LIBUKRAND_PSEUDO_RANDOMNESS
+
+config LIBUKRAND_PSEUDO_RANDOMNESS
+	bool "SWRAND"
+	help
+		"Software random number generator support"
+
+config LIBUKRAND_TRUE_RANDOMNESS
+	depends on ARCH_X86_64
+	bool "HWRAND"
+	help
+		"Hardware random number generator support based on RDRAND instruction"
+endchoice
+
+choice
+	prompt "Algorithm"
+	default LIBUKRAND_CHACHA
+
+config LIBUKRAND_MWC
+	bool "Multiply-with-carry"
+	help
+		Use multiply-with-carry algorithm
+
+config LIBUKRAND_CHACHA
+	bool "ChaCha20"
+	help
+		Use ChaCha20 algorithm
+endchoice
+
+choice
+    prompt "Initial seed"
+    default LIBUKRAND_INITIALSEED_TIME
+
+config LIBUKRAND_INITIALSEED_TIME
+    bool "Platform timestamp"
+
+config LIBUKRAND_INITIALSEED_RDRAND
+    depends on ARCH_X86_64 && (MARCH_X86_64_COREI7AVXI)
+    bool "`rdrand` instruction"
+
+config LIBUKRAND_INITIALSEED_USECONSTANT
+    bool "Compiled-in constant"
+endchoice
+
+config LIBUKRAND_INITIALSEED_CONSTANT
+    int "Initial seed constant"
+    depends on LIBUKRAND_INITIALSEED_USECONSTANT
+    default 23
+
+config LIBUKRAND_DEVFS
+	bool "Register random and urandom device to devfs"
+	select LIBDEVFS
+	select LIBVFSCORE
+	default n
+
+endif

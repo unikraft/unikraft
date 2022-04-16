@@ -53,7 +53,7 @@
 
 # These owners oversee the security-related components.
 /lib/uksp/		@unikraft/maintainers-security @unikraft/reviewers-security
-/lib/ukswrand/		@unikraft/maintainers-security @unikraft/reviewers-security
+/lib/ukrand/		@unikraft/maintainers-security @unikraft/reviewers-security
 /lib/uksp/		@unikraft/maintainers-security @unikraft/reviewers-security
 
 # These owners oversee the network-related components.
