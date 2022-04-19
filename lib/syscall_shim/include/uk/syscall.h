@@ -123,29 +123,6 @@ extern __uk_tls __uptr _uk_syscall_return_addr;
 #define __uk_scc(X) ((long) (X))
 typedef long uk_syscall_arg_t;
 
-#define __uk_syscall_fn(syscall_nr, ...) \
-	UK_CONCAT(uk_syscall_fn_, syscall_nr) (__VA_ARGS__)
-#define __uk_syscall_r_fn(syscall_nr, ...) \
-	UK_CONCAT(uk_syscall_r_fn_, syscall_nr) (__VA_ARGS__)
-
-#define __uk_syscall0(n) __uk_syscall_fn(n)
-#define __uk_syscall1(n,a) __uk_syscall_fn(n,__uk_scc(a))
-#define __uk_syscall2(n,a,b) __uk_syscall_fn(n,__uk_scc(a),__uk_scc(b))
-#define __uk_syscall3(n,a,b,c) __uk_syscall_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c))
-#define __uk_syscall4(n,a,b,c,d) __uk_syscall_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d))
-#define __uk_syscall5(n,a,b,c,d,e) __uk_syscall_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e))
-#define __uk_syscall6(n,a,b,c,d,e,f) __uk_syscall_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e),__uk_scc(f))
-#define __uk_syscall7(n,a,b,c,d,e,f,g) __uk_syscall_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e),__uk_scc(f),__uk_scc(g))
-
-#define __uk_syscall0_r(n) __uk_syscall_r_fn(n)
-#define __uk_syscall1_r(n,a) __uk_syscall_r_fn(n,__uk_scc(a))
-#define __uk_syscall2_r(n,a,b) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b))
-#define __uk_syscall3_r(n,a,b,c) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c))
-#define __uk_syscall4_r(n,a,b,c,d) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d))
-#define __uk_syscall5_r(n,a,b,c,d,e) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e))
-#define __uk_syscall6_r(n,a,b,c,d,e,f) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e),__uk_scc(f))
-#define __uk_syscall7_r(n,a,b,c,d,e,f,g) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e),__uk_scc(f),__uk_scc(g))
-
 #define __UK_SYSCALL_NARGS_X(a,b,c,d,e,f,g,h,n,...) n
 #define __UK_SYSCALL_NARGS(...) __UK_SYSCALL_NARGS_X(__VA_ARGS__,7,6,5,4,3,2,1,0,)
 
@@ -416,6 +393,8 @@ typedef long uk_syscall_arg_t;
 #include <uk/bits/syscall_map.h>
 #include <uk/bits/provided_syscalls.h>
 #include <uk/bits/syscall_stubs.h>
+#include <uk/bits/syscall_static.h>
+#include <uk/bits/syscall_r_static.h>
 
 /* System call, returns -1 and sets errno on errors */
 long uk_syscall(long nr, ...);
@@ -428,8 +407,24 @@ long uk_syscall6(long nr, long arg1, long arg2, long arg3,
  * is a constant. This macro maps the function call directly to the target
  * handler instead of doing a look-up at runtime
  */
-#define uk_syscall_static(...)						\
-	UK_CONCAT(__uk_syscall, __UK_SYSCALL_NARGS(__VA_ARGS__))(__VA_ARGS__)
+#define uk_syscall_static0(syscall_nr) \
+	UK_CONCAT(uk_syscall0_fn, syscall_nr)()
+#define uk_syscall_static1(syscall_nr, a) \
+	UK_CONCAT(uk_syscall1_fn, syscall_nr)(a)
+#define uk_syscall_static2(syscall_nr, a, b) \
+	UK_CONCAT(uk_syscall2_fn, syscall_nr)(a, b)
+#define uk_syscall_static3(syscall_nr, a, b, c) \
+	UK_CONCAT(uk_syscall3_fn, syscall_nr)(a, b, c)
+#define uk_syscall_static4(syscall_nr, a, b, c, d) \
+	UK_CONCAT(uk_syscall4_fn, syscall_nr)(a, b, c, d)
+#define uk_syscall_static5(syscall_nr, a, b, c, d, e) \
+	UK_CONCAT(uk_syscall5_fn, syscall_nr)(a, b, c, d, e)
+#define uk_syscall_static6(syscall_nr, a, b, c, d, e, f) \
+	UK_CONCAT(uk_syscall6_fn, syscall_nr)(a, b, c, d, e, f)
+
+#define uk_syscall_static(...)					\
+	UK_CONCAT(uk_syscall_static,				\
+		  __UK_SYSCALL_NARGS(__VA_ARGS__))(__VA_ARGS__)
 
 /* Raw system call, returns negative codes on errors */
 long uk_syscall_r(long nr, ...);
@@ -442,9 +437,24 @@ long uk_syscall6_r(long nr, long arg1, long arg2, long arg3,
  * is a constant. This macro maps the function call directly to the target
  * handler instead of doing a look-up at runtime
  */
-#define uk_syscall_r_static(...)					\
-	UK_CONCAT(__uk_syscall,						\
-		  UK_CONCAT(__UK_SYSCALL_NARGS(__VA_ARGS__)), _r)(__VA_ARGS__)
+#define uk_syscall_r_static0(syscall_nr) \
+	UK_CONCAT(uk_syscall_r0_fn, syscall_nr)()
+#define uk_syscall_r_static1(syscall_nr, a) \
+	UK_CONCAT(uk_syscall_r1_fn, syscall_nr)(a)
+#define uk_syscall_r_static2(syscall_nr, a, b) \
+	UK_CONCAT(uk_syscall_r2_fn, syscall_nr)(a, b)
+#define uk_syscall_r_static3(syscall_nr, a, b, c) \
+	UK_CONCAT(uk_syscall_r3_fn, syscall_nr)(a, b, c)
+#define uk_syscall_r_static4(syscall_nr, a, b, c, d) \
+	UK_CONCAT(uk_syscall_r4_fn, syscall_nr)(a, b, c, d)
+#define uk_syscall_r_static5(syscall_nr, a, b, c, d, e) \
+	UK_CONCAT(uk_syscall_r5_fn, syscall_nr)(a, b, c, d, e)
+#define uk_syscall_r_static6(syscall_nr, a, b, c, d, e, f) \
+	UK_CONCAT(uk_syscall_r6_fn, syscall_nr)(a, b, c, d, e, f)
+
+#define uk_syscall_r_static(...)				\
+	UK_CONCAT(uk_syscall_r_static,				\
+		  __UK_SYSCALL_NARGS(__VA_ARGS__))(__VA_ARGS__)
 
 /**
  * Returns a string with the name of the system call number `nr`.

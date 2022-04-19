@@ -8,6 +8,8 @@ LIBSYSCALL_SHIM_PHONY_SRC += $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in
 LIBSYSCALL_SHIM_PHONY_SRC_NEW := $(addsuffix .new, $(LIBSYSCALL_SHIM_PHONY_SRC))
 
 LIBSYSCALL_SHIM_GEN_SRC := $(LIBSYSCALL_SHIM_INCLUDES_PATH)/provided_syscalls.h
+LIBSYSCALL_SHIM_GEN_SRC += $(LIBSYSCALL_SHIM_INCLUDES_PATH)/syscall_static.h
+LIBSYSCALL_SHIM_GEN_SRC += $(LIBSYSCALL_SHIM_INCLUDES_PATH)/syscall_r_static.h
 
 UK_PREPARE-$(CONFIG_LIBSYSCALL_SHIM) += $(LIBSYSCALL_SHIM_PHONY_SRC) $(LIBSYSCALL_SHIM_GEN_SRC)
 
@@ -41,6 +43,14 @@ $(LIBSYSCALL_SHIM_INCLUDES_PATH)/provided_syscalls.h: $(LIBSYSCALL_SHIM_BASE)/ge
 	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
 		$(AWK) -F '-' -f  $(LIBSYSCALL_SHIM_BASE)/gen_provided.awk \
 		$(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in > $@)
+
+$(LIBSYSCALL_SHIM_INCLUDES_PATH)/syscall_static.h: $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in $(LIBSYSCALL_SHIM_BASE)/gen_syscall_static.awk
+	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
+		$(AWK) -F '-' -f $(LIBSYSCALL_SHIM_BASE)/gen_syscall_static.awk $< > $@)
+
+$(LIBSYSCALL_SHIM_INCLUDES_PATH)/syscall_r_static.h: $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in $(LIBSYSCALL_SHIM_BASE)/gen_syscall_r_static.awk
+	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
+		$(AWK) -F '-' -f $(LIBSYSCALL_SHIM_BASE)/gen_syscall_r_static.awk $< > $@)
 
 $(LIBSYSCALL_SHIM_BUILD)/provided_syscalls.h.in.new:
 	$(call build_cmd,GEN,libsyscall_shim,$(notdir $@), \
