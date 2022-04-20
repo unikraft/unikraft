@@ -117,9 +117,9 @@ UK_LLSYSCALL_R_DEFINE(int, clone,
 	UK_ASSERT(s);
 	UK_ASSERT(uk_syscall_return_addr());
 
-	child = uk_thread_create_container(s->allocator,
+	child = uk_thread_create_container(s->a,
 					   NULL, 0, /* no stack */
-					   s->allocator, /* UKTLS, TODO: TLS allocator */
+					   s->a_uktls, /* UKTLS */
 					   false,
 					   (t->name) ? strdup(t->name) : NULL,
 					   NULL,
