@@ -91,7 +91,9 @@ struct uk_sched {
 	bool threads_started;
 	struct uk_thread_list thread_list;
 	struct uk_thread_list exited_threads;
-	struct uk_alloc *allocator;
+	struct uk_alloc *a;       /**< default allocator for struct uk_thread */
+	struct uk_alloc *a_stack; /**< default allocator for stacks */
+	struct uk_alloc *a_uktls; /**< default allocator for TLS+ectx */
 	struct uk_sched *next;
 };
 
@@ -154,7 +156,9 @@ static inline void uk_sched_thread_wokeup(struct uk_thread *t)
 		uk_sched_register((s)); \
 		\
 		(s)->threads_started = false;	\
-		(s)->allocator = (def_allocator); \
+		(s)->a = (def_allocator); \
+		(s)->a_stack = (def_allocator); \
+		(s)->a_uktls = (def_allocator); \
 		UK_TAILQ_INIT(&(s)->thread_list); \
 		UK_TAILQ_INIT(&(s)->exited_threads); \
 	} while (0)
@@ -173,10 +177,78 @@ static inline bool uk_sched_started(struct uk_sched *sched)
 	return sched->threads_started;
 }
 
-struct uk_thread *uk_sched_thread_create(struct uk_sched *s,
-					 uk_thread_fn1_t fn,
-					 void * argp,
-					 const char *name);
+/**
+ * Allocates a uk_thread and assigns it to a scheduler.
+ * Similar to `uk_thread_create_fn0()`, general-purpose registers are reset
+ * on thread start.
+ *
+ * @param s
+ *   Reference to scheduler that will execute the thread after creation (required)
+ * @param fn0
+ *   Thread entry function (required)
+ * @param stack_len
+ *   Size of the thread stack. If set to 0, a default stack size is used
+ *   for the stack allocation.
+ * @param no_uktls
+ *   If set, no memory is allocated for a TLS. Functions must not use
+ *   any TLS variables.
+ * @param no_ectx
+ *   If set, no memory is allocated for saving/restoring extended CPU
+ *   context state (e.g., floating point, vector registers). In such a
+ *   case, no extended context is saved nor restored on thread switches.
+ *   Executed functions must be ISR-safe.
+ * @param name
+ *   Optional name for the thread
+ * @param priv
+ *   Reference to external data that corresponds to this thread
+ * @param dtor
+ *   Destructor that is called when this thread is released
+ * @return
+ *   - (NULL): Allocation failed
+ *   - Reference to created uk_thread
+ */
+struct uk_thread *uk_sched_thread_create_fn0(struct uk_sched *s,
+					     uk_thread_fn0_t fn0,
+					     size_t stack_len,
+					     bool no_uktls,
+					     bool no_ectx,
+					     const char *name,
+					     void *priv,
+					     uk_thread_dtor_t dtor);
+
+/**
+ * Similar to `uk_sched_thread_create_fn0()` but with a thread function
+ * accepting one argument
+ */
+struct uk_thread *uk_sched_thread_create_fn1(struct uk_sched *s,
+					     uk_thread_fn1_t fn1,
+					     void * argp,
+					     size_t stack_len,
+					     bool no_uktls,
+					     bool no_ectx,
+					     const char *name,
+					     void *priv,
+					     uk_thread_dtor_t dtor);
+
+/**
+ * Similar to `uk_sched_thread_create_fn0()` but with a thread function
+ * accepting two arguments
+ */
+struct uk_thread *uk_sched_thread_create_fn2(struct uk_sched *s,
+					     uk_thread_fn2_t fn2,
+					     void * argp0, void *argp1,
+					     size_t stack_len,
+					     bool no_uktls,
+					     bool no_ectx,
+					     const char *name,
+					     void *priv,
+					     uk_thread_dtor_t dtor);
+
+/* Shortcut for creating a thread with default settings */
+#define uk_sched_thread_create(s, fn1, argp, name)		\
+	uk_sched_thread_create_fn1((s), (fn1), (void *) (argp),	\
+				   0x0, false, false,		\
+				   (name), NULL, NULL)
 
 /*
  * Internal thread scheduling functions

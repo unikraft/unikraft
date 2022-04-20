@@ -2,7 +2,9 @@ uk_sched_default_init
 uk_sched_register
 uk_sched_create
 uk_sched_start
-uk_sched_thread_create
+uk_sched_thread_create_fn0
+uk_sched_thread_create_fn1
+uk_sched_thread_create_fn2
 uk_sched_thread_add
 uk_sched_thread_remove
 uk_sched_thread_kill
