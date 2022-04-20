@@ -78,24 +78,116 @@ int uk_sched_register(struct uk_sched *s)
 	return 0;
 }
 
-struct uk_thread *uk_sched_thread_create(struct uk_sched *s,
-					 uk_thread_fn1_t fn,
-					 void *argp,
-					 const char *name)
+struct uk_thread *uk_sched_thread_create_fn0(struct uk_sched *s,
+					     uk_thread_fn0_t fn0,
+					     size_t stack_len,
+					     bool no_uktls,
+					     bool no_ectx,
+					     const char *name,
+					     void *priv,
+					     uk_thread_dtor_t dtor)
 {
 	struct uk_thread *t;
 	int rc;
 
 	UK_ASSERT(s);
+	UK_ASSERT(s->a_stack);
 
-	t = uk_thread_create_fn1(s->allocator,
-				 fn, argp,
-				 s->allocator, 0, /* TODO: stack allocator */
-				 s->allocator, /* TODO: TLS allocator */
-				 false,
+	if (!no_uktls && !s->a_uktls)
+		goto err_out;
+
+	t = uk_thread_create_fn0(s->a,
+				 fn0,
+				 s->a_stack, stack_len,
+				 no_uktls ? NULL : s->a_uktls,
+				 no_ectx,
 				 name,
-				 NULL,
-				 NULL);
+				 priv,
+				 dtor);
+	if (!t)
+		goto err_out;
+
+	rc = uk_sched_thread_add(s, t);
+	if (rc < 0)
+		goto err_free_t;
+
+	return t;
+
+err_free_t:
+	uk_thread_release(t);
+err_out:
+	return NULL;
+}
+
+struct uk_thread *uk_sched_thread_create_fn1(struct uk_sched *s,
+					     uk_thread_fn1_t fn1,
+					     void *argp,
+					     size_t stack_len,
+					     bool no_uktls,
+					     bool no_ectx,
+					     const char *name,
+					     void *priv,
+					     uk_thread_dtor_t dtor)
+{
+	struct uk_thread *t;
+	int rc;
+
+	UK_ASSERT(s);
+	UK_ASSERT(s->a_stack);
+
+	if (!no_uktls && !s->a_uktls)
+		goto err_out;
+
+	t = uk_thread_create_fn1(s->a,
+				 fn1, argp,
+				 s->a_stack, stack_len,
+				 no_uktls ? NULL : s->a_uktls,
+				 no_ectx,
+				 name,
+				 priv,
+				 dtor);
+	if (!t)
+		goto err_out;
+
+	rc = uk_sched_thread_add(s, t);
+	if (rc < 0)
+		goto err_free_t;
+
+	return t;
+
+err_free_t:
+	uk_thread_release(t);
+err_out:
+	return NULL;
+}
+
+struct uk_thread *uk_sched_thread_create_fn2(struct uk_sched *s,
+					     uk_thread_fn2_t fn2,
+					     void *argp0, void *argp1,
+					     size_t stack_len,
+					     bool no_uktls,
+					     bool no_ectx,
+					     const char *name,
+					     void *priv,
+					     uk_thread_dtor_t dtor)
+{
+	struct uk_thread *t;
+	int rc;
+
+	UK_ASSERT(s);
+	UK_ASSERT(s->a_stack);
+
+	if (!no_uktls && !s->a_uktls)
+		goto err_out;
+
+	t = uk_thread_create_fn2(s->a,
+				 fn2, argp0, argp1,
+				 s->a_stack, stack_len,
+				 no_uktls ? NULL : s->a_uktls,
+				 no_ectx,
+				 name,
+				 priv,
+				 dtor);
 	if (!t)
 		goto err_out;
 
@@ -127,7 +219,7 @@ int uk_sched_start(struct uk_sched *s)
 	 *       an TLS that is derived from the Unikraft TLS template.
 	 */
 	tlsp = ukplat_tlsp_get();
-	main_thread = uk_thread_create_bare(s->allocator,
+	main_thread = uk_thread_create_bare(s->a,
 					    0x0, 0x0, tlsp, !(!tlsp), false,
 					    "init", NULL, NULL);
 	if (!main_thread) {
