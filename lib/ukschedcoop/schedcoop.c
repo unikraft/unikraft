@@ -221,7 +221,6 @@ static int schedcoop_start(struct uk_sched *s, struct uk_thread *main_thread)
 	 *       a different thread is scheduled.
 	 */
 
-	s->threads_started = true;
 	ukplat_lcpu_enable_irq();
 
 	return 0;

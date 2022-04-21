@@ -88,7 +88,6 @@ struct uk_sched {
 
 	/* internal */
 	bool is_started;
-	bool threads_started;
 	struct uk_thread_list thread_list;
 	struct uk_thread_list exited_threads;
 	struct uk_alloc *a;       /**< default allocator for struct uk_thread */
@@ -155,7 +154,6 @@ static inline void uk_sched_thread_wokeup(struct uk_thread *t)
 		(s)->thread_wokeup   = thread_wokeup_func; \
 		uk_sched_register((s)); \
 		\
-		(s)->threads_started = false;	\
 		(s)->a = (def_allocator); \
 		(s)->a_stack = (def_allocator); \
 		(s)->a_uktls = (def_allocator); \
@@ -171,11 +169,6 @@ static inline void uk_sched_thread_wokeup(struct uk_thread *t)
  * Create a main thread from current context and call thread starter function
  */
 int uk_sched_start(struct uk_sched *sched);
-
-static inline bool uk_sched_started(struct uk_sched *sched)
-{
-	return sched->threads_started;
-}
 
 /**
  * Allocates a uk_thread and assigns it to a scheduler.
