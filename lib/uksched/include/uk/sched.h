@@ -91,7 +91,6 @@ struct uk_sched {
 
 	/* internal */
 	bool is_started;
-	bool threads_started;
 	struct uk_thread_list thread_list;
 	struct uk_thread_list exited_threads;
 	struct uk_alloc *allocator;
@@ -156,7 +155,6 @@ static inline void uk_sched_thread_woken(struct uk_thread *t)
 		(s)->thread_woken    = thread_woken_func; \
 		uk_sched_register((s)); \
 		\
-		(s)->threads_started = false;	\
 		(s)->allocator = (def_allocator); \
 		UK_TAILQ_INIT(&(s)->thread_list); \
 		UK_TAILQ_INIT(&(s)->exited_threads); \
@@ -170,11 +168,6 @@ static inline void uk_sched_thread_woken(struct uk_thread *t)
  * Create a main thread from current context and call thread starter function
  */
 int uk_sched_start(struct uk_sched *sched);
-
-static inline bool uk_sched_started(struct uk_sched *sched)
-{
-	return sched->threads_started;
-}
 
 struct uk_thread *uk_sched_thread_create(struct uk_sched *s,
 					 uk_thread_fn1_t fn,
