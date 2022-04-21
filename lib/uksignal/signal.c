@@ -158,13 +158,15 @@ static sighandler_t uk_signal(int signum, sighandler_t handler, int sa_flags)
 		return old.sa_handler;
 }
 
+#if UK_LIBC_SYSCALLS
 sighandler_t signal(int signum, sighandler_t handler)
 {
 	/* SA_RESTART <- BSD signal semantics */
 	return uk_signal(signum, handler, SA_RESTART);
 }
+#endif /* UK_LIBC_SYSCALLS */
 
-int sigpending(sigset_t *set)
+UK_SYSCALL_R_DEFINE(int, sigpending, sigset_t*, set)
 {
 	struct uk_thread_sig *ptr;
 
@@ -176,12 +178,14 @@ int sigpending(sigset_t *set)
 	return 0;
 }
 
+#if UK_LIBC_SYSCALLS
 int sigprocmask(int how, const sigset_t *set, sigset_t *oldset)
 {
 	return uk_thread_sigmask(how, set, oldset);
 }
+#endif /* UK_LIBC_SYSCALLS */
 
-int sigsuspend(const sigset_t *mask)
+UK_SYSCALL_R_DEFINE(int, sigsuspend, const sigset_t*, mask)
 {
 	/* If the signals are ignored, this doesn't return <- POSIX */
 
@@ -232,7 +236,7 @@ int sigsuspend(const sigset_t *mask)
 	return -1; /* always returns -1 and sets errno to EINTR */
 }
 
-int sigwait(const sigset_t *set, int *sig)
+UK_SYSCALL_R_DEFINE(int, sigwait, const sigset_t*, set, int *, sig)
 {
 	/*
 	 * If the signals are ignored, this doesn't return <- TODO: POSIX ??
@@ -310,7 +314,7 @@ int sigwait(const sigset_t *set, int *sig)
  * If all of the threads have the signal blocked, add it to process
  * pending signals
  */
-int kill(pid_t pid, int sig)
+UK_SYSCALL_R_DEFINE(int, kill, pid_t, pid, int, sig)
 {
 	/*
 	 * POSIX.1 requires that if a process sends a signal to itself, and the
@@ -353,6 +357,7 @@ int kill(pid_t pid, int sig)
 	return 0;
 }
 
+#if UK_LIBC_SYSCALLS
 int killpg(int pgrp, int sig)
 {
 	if (pgrp != UNIKRAFT_PGID || pgrp != 0) {
@@ -362,11 +367,14 @@ int killpg(int pgrp, int sig)
 
 	return kill(uk_syscall_r_getpid(), sig);
 }
+#endif /* UK_LIBC_SYSCALLS */
 
+#if UK_LIBC_SYSCALLS
 int raise(int sig)
 {
 	return uk_sig_thread_kill(uk_thread_current(), sig);
 }
+#endif /* UK_LIBC_SYSCALLS */
 
 /**
  * Stubbing the function support from requiring signal.
@@ -377,10 +385,12 @@ UK_SYSCALL_R_DEFINE(unsigned int, alarm, unsigned int, seconds)
 	return 0;
 }
 
+#if UK_LIBC_SYSCALLS
 int siginterrupt(int sig __unused, int flag __unused)
 {
 	return 0;
 }
+#endif /* UK_LIBC_SYSCALLS */
 
 UK_SYSCALL_R_DEFINE(int, pause)
 {
