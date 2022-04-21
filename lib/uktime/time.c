@@ -93,6 +93,7 @@ UK_SYSCALL_R_DEFINE(int, nanosleep, const struct timespec*, req, struct timespec
 	return 0;
 }
 
+#if UK_LIBC_SYSCALLS
 int usleep(useconds_t usec)
 {
 	struct timespec ts;
@@ -116,6 +117,7 @@ unsigned int sleep(unsigned int seconds)
 
 	return 0;
 }
+#endif /* UK_LIBC_SYSCALLS */
 
 UK_SYSCALL_R_DEFINE(time_t, time, time_t *, tloc)
 {
