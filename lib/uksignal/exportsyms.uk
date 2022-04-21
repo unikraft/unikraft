@@ -11,9 +11,17 @@ sigaction
 signal
 sigprocmask
 sigsuspend
+uk_syscall_e_sigsuspend
+uk_syscall_r_sigsuspend
 sigpending
+uk_syscall_e_sigpending
+uk_syscall_r_sigpending
 sigwait
+uk_syscall_e_sigwait
+uk_syscall_r_sigwait
 kill
+uk_syscall_e_kill
+uk_syscall_r_kill
 killpg
 raise
 siginterrupt

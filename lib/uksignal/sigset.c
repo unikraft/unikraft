@@ -3,7 +3,9 @@
 #include <errno.h>
 #include <uk/uk_signal.h>
 #include <signal.h>
+#include <uk/syscall.h>
 
+#if UK_LIBC_SYSCALLS
 int sigemptyset(sigset_t *set)
 {
 	uk_sigemptyset(set);
@@ -50,3 +52,4 @@ int sigismember(const sigset_t *set, int signo)
 	else
 		return 0;
 }
+#endif /* UK_LIBC_SYSCALLS */
