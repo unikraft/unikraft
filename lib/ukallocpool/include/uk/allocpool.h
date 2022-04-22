@@ -133,6 +133,17 @@ struct uk_alloc *uk_allocpool2ukalloc(struct uk_allocpool *p);
 unsigned int uk_allocpool_availcount(struct uk_allocpool *p);
 
 /**
+ * Return the maximum number of objects that can be allocated at any point in
+ * time. This is the pools capacity.
+ *
+ * @param p
+ *   Pointer to memory pool.
+ * @return
+ *   Maximum number of objects allocated from the pool.
+ */
+unsigned int uk_allocpool_maxcount(struct uk_allocpool *p);
+
+/**
  * Return the size of an object.
  *
  * @param p

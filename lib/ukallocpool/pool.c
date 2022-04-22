@@ -276,6 +276,11 @@ unsigned int uk_allocpool_availcount(struct uk_allocpool *p)
 	return p->free_obj_count;
 }
 
+unsigned int uk_allocpool_maxcount(struct uk_allocpool *p)
+{
+	return p->obj_count;
+}
+
 __sz uk_allocpool_objlen(struct uk_allocpool *p)
 {
 	return p->obj_len;
