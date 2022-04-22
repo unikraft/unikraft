@@ -282,7 +282,7 @@ struct uk_allocpool *uk_allocpool_init(void *base, __sz len,
 
 	UK_ASSERT(POWER_OF_2(obj_align));
 
-	if (!base || sizeof(struct uk_allocpool) > len) {
+	if (unlikely(!base || sizeof(struct uk_allocpool) > len)) {
 		errno = ENOSPC;
 		return NULL;
 	}
@@ -296,9 +296,8 @@ struct uk_allocpool *uk_allocpool_init(void *base, __sz len,
 	a = allocpool2ukalloc(p);
 
 	obj_alen = ALIGN_UP(obj_len, obj_align);
-	obj_ptr = (void *) ALIGN_UP((__uptr) base + sizeof(*p),
-				    obj_align);
-	if ((__uptr) obj_ptr > (__uptr) base + len) {
+	obj_ptr = (void *) ALIGN_UP((__uptr) base + sizeof(*p), obj_align);
+	if (unlikely((__uptr) obj_ptr > (__uptr) base + len)) {
 		uk_pr_debug("%p: Empty pool: Not enough space for allocating objects\n",
 			    p);
 		goto out;
@@ -349,11 +348,11 @@ struct uk_allocpool *uk_allocpool_alloc(struct uk_alloc *parent,
 	/* uk_allocpool_reqmem computes minimum requirement */
 	len = uk_allocpool_reqmem(obj_count, obj_len, obj_align);
 	base = uk_malloc(parent, len);
-	if (!base)
+	if (unlikely(!base))
 		return NULL;
 
 	p = uk_allocpool_init(base, len, obj_len, obj_align);
-	if (!p) {
+	if (unlikely(!p)) {
 		uk_free(parent, base);
 		errno = ENOSPC;
 		return NULL;
