@@ -7,7 +7,7 @@ uk_sched_thread_create_fn1
 uk_sched_thread_create_fn2
 uk_sched_thread_add
 uk_sched_thread_remove
-uk_sched_thread_kill
+uk_sched_thread_terminate
 uk_sched_thread_sleep
 uk_sched_thread_exit
 uk_sched_dumpk_threads

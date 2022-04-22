@@ -429,7 +429,7 @@ static void _destroy_event_handler(struct uk_netdev_event_handler *h
 	UK_ASSERT(h->dispatcher_s);
 
 	if (h->dispatcher) {
-		uk_thread_kill(h->dispatcher);
+		uk_sched_thread_terminate(h->dispatcher);
 		h->dispatcher = NULL;
 	}
 

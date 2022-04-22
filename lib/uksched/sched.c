@@ -275,21 +275,22 @@ unsigned int uk_sched_thread_gc(struct uk_sched *sched)
 	return num;
 }
 
-void uk_sched_thread_kill(struct uk_thread *thread)
+void uk_sched_thread_terminate(struct uk_thread *thread)
 {
 	struct uk_sched *sched;
 
 	UK_ASSERT(thread);
-	 /* NOTE: The following assertion fails for instance on a double-kill.
-	  *       This can happen when the thread was put on the exited_thread
-	  *       list and waits for getting garbage collected.
-	  *       Double-kill can be avoided by testing for the exit flag.
+	 /* NOTE: The following assertion can also fail on a double-termination.
+	  *       This can happen when the thread was already put on the
+	  *       exited_thread list and waits for getting garbage collected.
+	  *       Double-termination can be avoided by testing for the exited
+	  *       flag.
 	  */
 	UK_ASSERT(thread->sched);
 
 	sched = thread->sched;
 
-	uk_pr_debug("%p: thread %p (%s) killed\n",
+	uk_pr_debug("%p: thread %p (%s) terminated\n",
 		    sched, thread, thread->name ? thread->name : "<unnamed>");
 
 	/* remove from scheduling queue */
@@ -319,7 +320,7 @@ void uk_sched_thread_exit(void)
 {
 	struct uk_thread *t = uk_thread_current();
 
-	uk_sched_thread_kill(t);
+	uk_sched_thread_terminate(t);
 	UK_CRASH("Unexpectedly returned to exited thread %p\n", t);
 }
 

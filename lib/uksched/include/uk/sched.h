@@ -295,8 +295,8 @@ void uk_sched_thread_sleep(__nsec nsec);
 /* exits the current thread context */
 void uk_sched_thread_exit(void) __noreturn;
 
-/* kill another thread */
-void uk_sched_thread_kill(struct uk_thread *thread);
+/* terminate another thread */
+void uk_sched_thread_terminate(struct uk_thread *thread);
 
 #ifdef __cplusplus
 }
