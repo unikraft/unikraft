@@ -103,6 +103,7 @@ static inline void _prepend_free_obj(struct uk_allocpool *p, void *obj)
 	UK_ASSERT(p);
 	UK_ASSERT(obj);
 	UK_ASSERT(p->free_obj_count < p->obj_count);
+	UK_ASSERT(IS_ALIGNED((__sz)obj, p->obj_align));
 
 	entry = &((struct free_obj *) obj)->list;
 	uk_list_add(entry, &p->free_obj);
@@ -120,6 +121,8 @@ static inline void *_take_free_obj(struct uk_allocpool *p)
 	obj = uk_list_first_entry(&p->free_obj, struct free_obj, list);
 	uk_list_del(&obj->list);
 	p->free_obj_count--;
+
+	UK_ASSERT(IS_ALIGNED((__sz)obj, p->obj_align));
 	return (void *) obj;
 }
 
