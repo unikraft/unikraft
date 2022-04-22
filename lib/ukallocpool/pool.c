@@ -68,10 +68,10 @@ struct uk_allocpool {
 
 	struct uk_list_head free_obj;
 	unsigned int free_obj_count;
+	unsigned int obj_count;
 
 	__sz obj_align;
 	__sz obj_len;
-	unsigned int obj_count;
 
 	struct uk_alloc *parent;
 	void *base;
