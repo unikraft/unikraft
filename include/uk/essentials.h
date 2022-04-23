@@ -96,6 +96,9 @@ extern "C" {
 #ifndef __noinline
 #define __noinline             __attribute__((noinline))
 #endif
+#ifndef __check_result
+#define __check_result         __attribute__((warn_unused_result))
+#endif
 
 #ifndef __alias
 #define __alias(old, new) \
