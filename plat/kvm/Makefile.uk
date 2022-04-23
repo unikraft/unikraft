@@ -10,6 +10,8 @@ $(eval $(call addplatlib,kvm,libkvmplat))
 $(eval $(call addplatlib_s,kvm,libkvmpci,$(CONFIG_KVM_PCI)))
 $(eval $(call addplatlib_s,kvm,libkvmpf,$(CONFIG_KVM_PF)))
 $(eval $(call addplatlib_s,kvm,libkvmvirtio,$(CONFIG_VIRTIO_BUS)))
+$(eval $(call addplatlib_s,kvm,libkvmvmxnet3,$(CONFIG_VMXNET3)))
+$(eval $(call addplatlib_s,kvm,libkvme1000,$(CONFIG_E1000)))
 $(eval $(call addplatlib_s,kvm,libkvmvirtionet,$(CONFIG_VIRTIO_NET)))
 $(eval $(call addplatlib_s,kvm,libkvmvirtioblk,$(CONFIG_VIRTIO_BLK)))
 $(eval $(call addplatlib_s,kvm,libkvmvirtio9p,$(CONFIG_VIRTIO_9P)))
@@ -184,6 +186,44 @@ LIBKVMVIRTIONET_ASINCLUDES-y   += -I$(UK_PLAT_DRIVERS_BASE)/include
 LIBKVMVIRTIONET_CINCLUDES-y    += -I$(UK_PLAT_DRIVERS_BASE)/include
 LIBKVMVIRTIONET_SRCS-y +=\
 			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_net.c
+##
+## VMXNET3 library definition
+##
+LIBKVMVMXNET3_ASINCLUDES-y   += -I$(LIBKVMPLAT_BASE)/include
+LIBKVMVMXNET3_CINCLUDES-y    += -I$(LIBKVMPLAT_BASE)/include
+LIBKVMVMXNET3_ASINCLUDES-y   += -I$(UK_PLAT_COMMON_BASE)/include
+LIBKVMVMXNET3_CINCLUDES-y    += -I$(UK_PLAT_COMMON_BASE)/include
+LIBKVMVMXNET3_ASINCLUDES-y   += -I$(UK_PLAT_DRIVERS_BASE)/include
+LIBKVMVMXNET3_CINCLUDES-y    += -I$(UK_PLAT_DRIVERS_BASE)/include
+LIBKVMVMXNET3_SRCS-y +=\
+			$(UK_PLAT_DRIVERS_BASE)/vmxnet3/vmxnet3_ethdev.c
+LIBKVMVMXNET3_SRCS-y +=\
+			$(UK_PLAT_DRIVERS_BASE)/vmxnet3/vmxnet3_rxtx.c
+##
+## E1000 library definition
+##
+LIBKVME1000_ASINCLUDES-y   += -I$(LIBKVMPLAT_BASE)/include
+LIBKVME1000_CINCLUDES-y    += -I$(LIBKVMPLAT_BASE)/include
+LIBKVME1000_ASINCLUDES-y   += -I$(UK_PLAT_COMMON_BASE)/include
+LIBKVME1000_CINCLUDES-y    += -I$(UK_PLAT_COMMON_BASE)/include
+LIBKVME1000_ASINCLUDES-y   += -I$(UK_PLAT_DRIVERS_BASE)/include
+LIBKVME1000_CINCLUDES-y    += -I$(UK_PLAT_DRIVERS_BASE)/include
+LIBKVME1000_SRCS-y +=\
+			$(UK_PLAT_DRIVERS_BASE)/e1000/e1000_82540.c
+LIBKVME1000_SRCS-y +=\
+			$(UK_PLAT_DRIVERS_BASE)/e1000/e1000_api.c
+LIBKVME1000_SRCS-y +=\
+			$(UK_PLAT_DRIVERS_BASE)/e1000/e1000_mac.c
+LIBKVME1000_SRCS-y +=\
+			$(UK_PLAT_DRIVERS_BASE)/e1000/e1000_nvm.c
+LIBKVME1000_SRCS-y +=\
+			$(UK_PLAT_DRIVERS_BASE)/e1000/e1000_phy.c
+LIBKVME1000_SRCS-y +=\
+			$(UK_PLAT_DRIVERS_BASE)/e1000/e1000_mbx.c
+LIBKVME1000_SRCS-y +=\
+			$(UK_PLAT_DRIVERS_BASE)/e1000/em_rxtx.c
+LIBKVME1000_SRCS-y +=\
+			$(UK_PLAT_DRIVERS_BASE)/e1000/em_ethdev.c
 ##
 ## Virtio BLK library definition
 ##

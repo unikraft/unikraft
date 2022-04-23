@@ -154,6 +154,13 @@ struct pci_device {
 	struct pci_driver     *drv;
 	enum pci_device_state state;
 
+	uint32_t bar0;
+	uint32_t bar1;
+	uint32_t bar2;
+	uint32_t bar3;
+	uint32_t bar4;
+	uint32_t bar5;
+
 	unsigned long base;
 	unsigned long irq;
 };
@@ -246,6 +253,30 @@ static struct pci_bus_handler ph __unused;
 #define PCI_CONF_IOBAR              (0x10)
 #define PCI_CONF_IOBAR_SHFT         (0x0)
 #define PCI_CONF_IOBAR_MASK         (~0x3)
+
+#define PCI_CONF_BAR0              (0x10)
+#define PCI_CONF_BAR0_SHFT         (0x0)
+#define PCI_CONF_BAR0_MASK         (0xFFFFFFFF)
+
+#define PCI_CONF_BAR1              (0x14)
+#define PCI_CONF_BAR1_SHFT         (0x0)
+#define PCI_CONF_BAR1_MASK         (0xFFFFFFFF)
+
+#define PCI_CONF_BAR2              (0x18)
+#define PCI_CONF_BAR2_SHFT         (0x0)
+#define PCI_CONF_BAR2_MASK         (0xFFFFFFFF)
+
+#define PCI_CONF_BAR3              (0x1c)
+#define PCI_CONF_BAR3_SHFT         (0x0)
+#define PCI_CONF_BAR3_MASK         (0xFFFFFFFF)
+
+#define PCI_CONF_BAR4              (0x20)
+#define PCI_CONF_BAR4_SHFT         (0x0)
+#define PCI_CONF_BAR4_MASK         (0xFFFFFFFF)
+
+#define PCI_CONF_BAR5              (0x24)
+#define PCI_CONF_BAR5_SHFT         (0x0)
+#define PCI_CONF_BAR5_MASK         (0xFFFFFFFF)
 
 #define PCI_BASE_ADDRESS_0	0x10	/* 32 bits */
 #define PCI_BASE_ADDRESS_1	0x14	/* 32 bits */

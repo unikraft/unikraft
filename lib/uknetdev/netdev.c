@@ -324,6 +324,8 @@ int uk_netdev_configure(struct uk_netdev *dev,
 	struct uk_netdev_info dev_info;
 	int ret;
 
+	uk_pr_info("uk_netdev_configure\n");
+
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->_data);
 	UK_ASSERT(dev->ops);
@@ -520,6 +522,8 @@ int uk_netdev_txq_configure(struct uk_netdev *dev, uint16_t queue_id,
 int uk_netdev_start(struct uk_netdev *dev)
 {
 	int ret;
+
+	uk_pr_info("uk_netdev_start\n");
 
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->_data);

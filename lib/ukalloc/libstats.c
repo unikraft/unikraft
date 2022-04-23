@@ -183,6 +183,7 @@ static int wrapper_posix_memalign(struct uk_alloc *a, void **memptr,
 
 static void *wrapper_memalign(struct uk_alloc *a, __sz align, __sz size)
 {
+	uk_pr_info("fdsaoifpjasioreqwrewq\n");
 	struct uk_alloc *p = _uk_alloc_get_actual_default();
 	__ssz nb_allocs, mem_use, nb_enomem;
 	__sz alloc_size;

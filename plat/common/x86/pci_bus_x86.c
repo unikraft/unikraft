@@ -96,6 +96,21 @@ static inline int pci_driver_add_device(struct pci_driver *drv,
 			| (addr->devid << PCI_DEVICE_SHIFT);
 	PCI_CONF_READ(uint16_t, &dev->base, config_addr, IOBAR);
 	PCI_CONF_READ(uint8_t, &dev->irq, config_addr, IRQ);
+	uk_pr_info("dev->base: 0x%08X\n", dev->base);
+
+	PCI_CONF_READ(uint32_t, &dev->bar0, config_addr, BAR0);
+	uk_pr_info("bar0: 0x%08X\n", dev->bar0);
+	PCI_CONF_READ(uint32_t, &dev->bar1, config_addr, BAR1);
+	uk_pr_info("bar1: 0x%08X\n", dev->bar1);
+	PCI_CONF_READ(uint32_t, &dev->bar2, config_addr, BAR2);
+	uk_pr_info("bar2: 0x%08X\n", dev->bar2);
+	PCI_CONF_READ(uint32_t, &dev->bar3, config_addr, BAR3);
+	uk_pr_info("bar3: 0x%08X\n", dev->bar3);
+	PCI_CONF_READ(uint32_t, &dev->bar4, config_addr, BAR4);
+	uk_pr_info("bar4: 0x%08X\n", dev->bar4);
+	PCI_CONF_READ(uint32_t, &dev->bar5, config_addr, BAR5);
+	uk_pr_info("bar5: 0x%08X\n", dev->bar5);
+
 
 	ret = drv->add_dev(dev);
 	if (ret < 0) {
@@ -218,24 +233,27 @@ int arch_pci_probe(struct uk_alloc *pha)
 	PCI_CONF_READ(uint32_t, &header_type,
 			config_addr, HEADER_TYPE);
 
-	if ((header_type & PCI_HEADER_TYPE_MSB_MASK) == 0) {
-		/* Single PCI host controller */
-		probe_bus(0);
-	} else {
-		/* Multiple PCI host controllers */
-		for (function = 0; function < PCI_MAX_FUNCTIONS; function++) {
-			config_addr = (PCI_ENABLE_BIT) |
-					(function << PCI_FUNCTION_SHIFT);
-
-			PCI_CONF_READ(uint32_t, &vendor_id,
-					config_addr, VENDOR_ID);
-
-			if (vendor_id != PCI_INVALID_ID)
-				break;
-
-			probe_bus(function);
-		}
+	for (int i = 0; i < 256; i++) {
+		probe_bus(i);
 	}
+	// if ((header_type & PCI_HEADER_TYPE_MSB_MASK) == 0) {
+	// 	/* Single PCI host controller */
+	// 	probe_bus(0);
+	// } else {
+	// 	/* Multiple PCI host controllers */
+	// 	for (function = 0; function < PCI_MAX_FUNCTIONS; function++) {
+	// 		config_addr = (PCI_ENABLE_BIT) |
+	// 				(function << PCI_FUNCTION_SHIFT);
+
+	// 		PCI_CONF_READ(uint32_t, &vendor_id,
+	// 				config_addr, VENDOR_ID);
+
+	// 		if (vendor_id != PCI_INVALID_ID)
+	// 			break;
+
+	// 		probe_bus(function);
+	// 	}
+	// }
 
 	return 0;
 }
