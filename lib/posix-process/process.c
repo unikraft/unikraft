@@ -340,7 +340,7 @@ static void pprocess_kill(struct posix_process *pprocess)
 			self_destruct = true;
 			continue;
 		}
-		if (is_exited(pthread->thread)) {
+		if (uk_thread_is_exited(pthread->thread)) {
 			/* Thread already exited, might wait for getting
 			 * garbage collected. */
 			continue;
@@ -355,13 +355,13 @@ static void pprocess_kill(struct posix_process *pprocess)
 		 * pthread resources and pprocess resources on the last
 		 * thread
 		 */
-		uk_sched_thread_kill(pthread->thread);
+		uk_sched_thread_terminate(pthread->thread);
 	}
 
 	if (self_destruct) {
 		uk_pr_debug("Terminating PID %d: Self-killing TID %d...\n",
 			    pprocess->pid, pthread->tid);
-		uk_thread_kill(uk_thread_current());
+		uk_sched_thread_terminate(uk_thread_current());
 
 		/* NOTE: Nothing will be executed from here on */
 	}
