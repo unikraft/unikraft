@@ -7,12 +7,13 @@ Unikraft Source Code
 Unikraft is organized into libraries where each might be individually licensed.
 In general, each source file should declare who is the copyright owner and under
 which terms and conditions the code is licensed. The main license of the project
-is the following BSD 3-clause license. It applies in particular to source code
-files that do not declare a license and where there is no license information
-file (e.g., `LICENSE`, `COPYING`) placed in the same or corresponding root
-folder.
+is the following BSD 3-clause license. It applies verbatim with copyright
+attributed to Unikraft UG (haftungsbeschränkt) to all source code files that do
+not declare a license with copyright attributed and where there is no license
+information file (e.g., `LICENSE`, `COPYING`) placed in the same or
+corresponding root folder.
 
-	Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+	Copyright (c) YYYY, Copyright holder. All rights reserved.
 
 	Redistribution and use in source and binary forms, with or without
 	modification, are permitted provided that the following conditions
