@@ -229,7 +229,7 @@ int uk_sched_start(struct uk_sched *s)
 	 * context, it does not have IP and SP set. We have to manually mark
 	 * the thread as RUNNABLE.
 	 */
-	main_thread->flags |= UK_THREADF_RUNNABLE;
+	uk_thread_set_runnable(main_thread);
 
 	/* Set main_thread as current scheduled thread */
 	__uk_sched_thread_current = main_thread;
@@ -262,6 +262,7 @@ unsigned int uk_sched_thread_gc(struct uk_sched *sched)
 	UK_TAILQ_FOREACH_SAFE(thread, &sched->exited_threads,
 			      thread_list, tmp) {
 		UK_ASSERT(thread != uk_thread_current());
+		UK_ASSERT(uk_thread_is_exited(thread));
 
 		uk_pr_debug("%p: garbage collect thread %p (%s)\n",
 			    sched, thread,
@@ -296,8 +297,7 @@ void uk_sched_thread_terminate(struct uk_thread *thread)
 	/* remove from scheduling queue */
 	uk_sched_thread_remove(thread);
 
-	set_exited(thread);
-	clear_runnable(thread);
+	uk_thread_set_exited(thread);
 
 	if (thread == uk_thread_current()) {
 		/* enqueue thread for garbage collecting */

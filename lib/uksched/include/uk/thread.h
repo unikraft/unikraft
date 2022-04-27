@@ -137,12 +137,20 @@ struct uk_thread *uk_thread_current(void)
 #define UK_THREADF_RUNNABLE   (0x004)
 #define UK_THREADF_EXITED     (0x008)
 
-#define is_runnable(_thread)     ((_thread)->flags &   UK_THREADF_RUNNABLE)
-#define set_runnable(_thread)    ((_thread)->flags |=  UK_THREADF_RUNNABLE)
-#define clear_runnable(_thread)  ((_thread)->flags &= ~UK_THREADF_RUNNABLE)
+#define uk_thread_is_exited(t)   ((t)->flags & UK_THREADF_EXITED)
+#define uk_thread_is_runnable(t) (!uk_thread_is_exited(t) \
+				  && ((t)->flags & UK_THREADF_RUNNABLE))
+#define uk_thread_is_blocked(t)  ((t)->flags &				\
+				  (UK_THREADF_EXITED | UK_THREADF_RUNNABLE) == \
+				  0x0)
 
-#define is_exited(_thread)       ((_thread)->flags &   UK_THREADF_EXITED)
-#define set_exited(_thread)      ((_thread)->flags |=  UK_THREADF_EXITED)
+#define uk_thread_set_runnable(t) \
+	do { (t)->flags |= UK_THREADF_RUNNABLE; } while (0)
+#define uk_thread_set_blocked(t) \
+	do { (t)->flags &= ~UK_THREADF_RUNNABLE; } while (0)
+/* NOTE: Setting a thread as EXITED cannot be undone. */
+#define uk_thread_set_exited(t) \
+	do { (t)->flags |= UK_THREADF_EXITED; } while (0)
 
 /*
  * WARNING: The following functions allow threads being created without extended

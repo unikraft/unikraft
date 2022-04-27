@@ -111,7 +111,7 @@ do { \
 			} \
 			uk_waitq_add(wq, &__wait); \
 			__current->wakeup_time = deadline; \
-			clear_runnable(__current); \
+			uk_thread_set_blocked(__current); \
 			uk_sched_thread_blocked(__current); \
 			ukplat_lcpu_restore_irqf(flags); \
 			if (lock) \

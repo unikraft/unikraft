@@ -91,19 +91,19 @@ static void schedcoop_schedule(struct uk_sched *s)
 	next = UK_TAILQ_FIRST(&c->run_queue);
 	if (next) {
 		UK_ASSERT(next != prev);
-		UK_ASSERT(is_runnable(next));
-		UK_ASSERT(!is_exited(next));
+		UK_ASSERT(uk_thread_is_runnable(next));
+		UK_ASSERT(!uk_thread_is_exited(next));
 		UK_TAILQ_REMOVE(&c->run_queue, next,
 				queue);
 
 		/* Put previous thread on the end of the list */
 		if ((prev != &c->idle)
-		    && is_runnable(prev)
-		    && !is_exited(prev))
+		    && uk_thread_is_runnable(prev)
+		    && !uk_thread_is_exited(prev))
 			UK_TAILQ_INSERT_TAIL(&c->run_queue, prev,
 					     queue);
-	} else if (is_runnable(prev)
-		   && !is_exited(prev)) {
+	} else if (uk_thread_is_runnable(prev)
+		   && !uk_thread_is_exited(prev)) {
 		next = prev;
 	} else {
 		/*
@@ -129,10 +129,10 @@ static int schedcoop_thread_add(struct uk_sched *s, struct uk_thread *t)
 	struct schedcoop *c = uksched2schedcoop(s);
 
 	UK_ASSERT(t);
-	UK_ASSERT(!is_exited(t));
+	UK_ASSERT(!uk_thread_is_exited(t));
 
 	/* Add to run queue if runnable */
-	if (is_runnable(t))
+	if (uk_thread_is_runnable(t))
 		UK_TAILQ_INSERT_TAIL(&c->run_queue, t, queue);
 
 	return 0;
@@ -144,7 +144,7 @@ static void schedcoop_thread_remove(struct uk_sched *s, struct uk_thread *t)
 
 	/* Remove from run_queue */
 	if (t != uk_thread_current()
-	    && is_runnable(t))
+	    && uk_thread_is_runnable(t))
 		UK_TAILQ_REMOVE(&c->run_queue, t, queue);
 }
 
@@ -168,7 +168,7 @@ static void schedcoop_thread_woken(struct uk_sched *s, struct uk_thread *t)
 
 	if (t->wakeup_time > 0)
 		UK_TAILQ_REMOVE(&c->sleep_queue, t, queue);
-	if (t != uk_thread_current() && is_runnable(t)) {
+	if (t != uk_thread_current() && uk_thread_is_runnable(t)) {
 		UK_TAILQ_INSERT_TAIL(&c->run_queue, t, queue);
 	}
 }

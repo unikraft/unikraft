@@ -119,7 +119,7 @@ static inline void uk_sched_thread_blocked(struct uk_thread *t)
 
 	UK_ASSERT(t);
 	UK_ASSERT(t->sched);
-	UK_ASSERT(!is_runnable(t));
+	UK_ASSERT(!uk_thread_is_runnable(t));
 
 	s = t->sched;
 	s->thread_blocked(s, t);
@@ -132,7 +132,7 @@ static inline void uk_sched_thread_wokeup(struct uk_thread *t)
 
 	UK_ASSERT(t);
 	UK_ASSERT(t->sched);
-	UK_ASSERT(is_runnable(t));
+	UK_ASSERT(uk_thread_is_runnable(t));
 
 	s = t->sched;
 	s->thread_wokeup(s, t);
