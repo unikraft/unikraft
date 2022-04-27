@@ -359,6 +359,18 @@ int sigwait(const sigset_t *set, int *sig)
 }
 #endif /* UK_LIBC_SYSCALLS */
 
+UK_SYSCALL_R_DEFINE(int, tkill, int __unused, tid, int, sig)
+{
+	return uk_sig_thread_kill(uk_thread_current(), sig);
+}
+
+#if UK_LIBC_SYSCALLS
+int raise(int sig)
+{
+	return tkill(-1, sig);
+}
+#endif /* UK_LIBC_SYSCALLS */
+
 /*
  * Search for a thread that does not have the signal blocked
  * If all of the threads have the signal blocked, add it to process
@@ -416,13 +428,6 @@ int killpg(int pgrp, int sig)
 	}
 
 	return kill(uk_syscall_r_getpid(), sig);
-}
-#endif /* UK_LIBC_SYSCALLS */
-
-#if UK_LIBC_SYSCALLS
-int raise(int sig)
-{
-	return uk_sig_thread_kill(uk_thread_current(), sig);
 }
 #endif /* UK_LIBC_SYSCALLS */
 
