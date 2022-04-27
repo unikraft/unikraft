@@ -37,6 +37,10 @@ kill
 uk_syscall_e_kill
 uk_syscall_r_kill
 killpg
+tkill
+uk_syscall_e_tkill
+uk_syscall_r_tkill
+
 raise
 siginterrupt
 
