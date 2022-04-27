@@ -40,13 +40,13 @@
 #include <uk/alloc.h>
 #include <uk/sched.h>
 #include <signal.h>
-#include <string.h>
 #include <uk/thread.h>
 #include <uk/uk_signal.h>
 #include <uk/essentials.h>
 #include <uk/process.h>
 #include <unistd.h>
 #include <uk/syscall.h>
+
 
 /*
  * Tries to deliver a pending signal to the current thread
@@ -169,7 +169,9 @@ sighandler_t signal(int signum, sighandler_t handler)
 }
 #endif /* UK_LIBC_SYSCALLS */
 
-UK_SYSCALL_R_DEFINE(int, sigpending, sigset_t*, set)
+UK_SYSCALL_R_DEFINE(int, rt_sigpending,
+		    sigset_t *, set,
+		    size_t __unused, sigsetsize)
 {
 	struct uk_thread_sig *ptr;
 
@@ -180,6 +182,13 @@ UK_SYSCALL_R_DEFINE(int, sigpending, sigset_t*, set)
 
 	return 0;
 }
+
+#if UK_LIBC_SYSCALLS
+int sigpending(sigset_t *set)
+{
+	return rt_sigpending(set, (_NSIG / 8));
+}
+#endif /* UK_LIBC_SYSCALLS */
 
 UK_SYSCALL_R_DEFINE(int, rt_sigprocmask,
 		    int, how,
