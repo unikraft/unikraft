@@ -36,9 +36,11 @@
 
 #include <errno.h>
 
+#include <uk/config.h>
 #include <uk/alloc.h>
 #include <uk/sched.h>
 #include <signal.h>
+#include <string.h>
 #include <uk/thread.h>
 #include <uk/uk_signal.h>
 #include <uk/essentials.h>
@@ -89,8 +91,10 @@ static int uk_get_awaited_signal(void)
 }
 
 /* TODO: We do not support any sa_flags besides SA_SIGINFO */
-int
-sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
+UK_SYSCALL_R_DEFINE(int, rt_sigaction, int, signum,
+		    const struct sigaction *, act,
+		    struct sigaction *, oldact,
+		    size_t, sigsetsize)
 {
 	struct uk_list_head *i;
 	struct uk_thread_sig *th_sig;
@@ -99,8 +103,7 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
 	if (!uk_sig_is_valid(signum) ||
 			signum == SIGKILL ||
 			signum == SIGSTOP) {
-		errno = EINVAL;
-		return -1;
+		return -EINVAL;
 	}
 
 	if (oldact)
@@ -141,28 +144,28 @@ sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
 	return 0;
 }
 
-static sighandler_t uk_signal(int signum, sighandler_t handler, int sa_flags)
+#if UK_LIBC_SYSCALLS
+int sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
 {
+	return rt_sigaction(signum, act, oldact, (_NSIG / 8));
+}
+
+sighandler_t signal(int signum, sighandler_t handler)
+{
+	/* SA_RESTART <- BSD signal semantics */
 	struct sigaction old;
 	struct sigaction act = {
 		.sa_handler = handler,
-		.sa_flags = sa_flags
+		.sa_flags = SA_RESTART
 	};
 
-	if (sigaction(signum, &act, &old) < 0)
+	if (rt_sigaction(signum, &act, &old, (_NSIG / 8)) < 0)
 		return SIG_ERR;
 
 	if (old.sa_flags & SA_SIGINFO)
 		return NULL;
 	else
 		return old.sa_handler;
-}
-
-#if UK_LIBC_SYSCALLS
-sighandler_t signal(int signum, sighandler_t handler)
-{
-	/* SA_RESTART <- BSD signal semantics */
-	return uk_signal(signum, handler, SA_RESTART);
 }
 #endif /* UK_LIBC_SYSCALLS */
 
