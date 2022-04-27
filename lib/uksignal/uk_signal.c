@@ -315,8 +315,7 @@ int uk_thread_sigmask(int how, const sigset_t *set, sigset_t *oldset)
 			uk_sigcopyset(mask, set);
 			break;
 		default:
-			errno = EINVAL;
-			return -1;
+			return -EINVAL;
 		}
 
 		uk_sigset_remove_unmaskable(mask);
