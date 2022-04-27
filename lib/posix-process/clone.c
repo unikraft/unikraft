@@ -136,7 +136,7 @@ UK_LLSYSCALL_R_DEFINE(int, clone,
 			       false,
 			       (ukarch_ctx_entry0) uk_syscall_return_addr());
 	child->tlsp = (__uptr) tlsp;
-	child->flags |= UK_THREADF_RUNNABLE;
+	uk_thread_set_runnable(child);
 
 	uk_sched_thread_add(s, child);
 	uk_sched_yield(); /* Enable the child to execute directly */
