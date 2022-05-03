@@ -8,6 +8,8 @@ choice
 
 config ARCH_X86_64
        bool "x86 compatible (64 bits)"
+config ARCH_X86_64_SGX
+	   bool "x86 compatible with Intel SGX support (64 bits)"
 config ARCH_ARM_64
        bool "Armv8 compatible (64 bits)"
 config ARCH_ARM_32
@@ -17,6 +19,9 @@ endchoice
 
 if (ARCH_X86_64)
 	source "$(UK_BASE)/arch/x86/x86_64/Config.uk"
+endif
+if (ARCH_X86_64_SGX)
+	source "$(UK_BASE)/arch/x86/x86_64-sgx/Config.uk"
 endif
 if (ARCH_ARM_32)
 	source "$(UK_BASE)/arch/arm/arm/Config.uk"

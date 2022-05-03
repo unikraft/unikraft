@@ -1,4 +1,6 @@
 # Include forward declarations by corresponding architecutes
 ifeq ($(CONFIG_ARCH_X86_64),y)
 	include $(CONFIG_UK_BASE)/arch/x86/x86_64/Makefile.uk
+else ifeq ($(CONFIG_ARCH_X86_64_SGX),y)
+	include $(CONFIG_UK_BASE)/arch/x86/x86_64-sgx/Makefile.uk
 endif

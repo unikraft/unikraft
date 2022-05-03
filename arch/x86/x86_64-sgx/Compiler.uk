@@ -1,0 +1,6 @@
+# set cross compile
+ifeq ($(call qstrip,$(CONFIG_CROSS_COMPILE)),)
+ifneq ($(CONFIG_UK_ARCH),$(HOSTARCH))
+	CONFIG_CROSS_COMPILE := x86_64-linux-gnu-
+endif
+endif

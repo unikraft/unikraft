@@ -1,6 +1,8 @@
 # Selects architecture according to .config
 ifeq ($(CONFIG_ARCH_X86_64),y)
 CONFIG_UK_ARCH := x86_64
+else ifeq ($(CONFIG_ARCH_X86_64_SGX),y)
+CONFIG_UK_ARCH := x86_64-sgx
 else ifeq ($(CONFIG_ARCH_ARM_64),y)
 CONFIG_UK_ARCH := arm64
 else ifeq ($(CONFIG_ARCH_ARM_32),y)
