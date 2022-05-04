@@ -283,7 +283,6 @@ void ukplat_entry(int argc, char *argv[])
 #endif
 
 #if CONFIG_LIBUKSGX
-	uk_pr_debug("before sgx_probe()\n");
 	sgx_probe();
 #endif
 

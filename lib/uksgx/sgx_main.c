@@ -37,7 +37,7 @@
 
 bool sgx_has_sgx2;
 
-static int sgx_probe()
+int sgx_probe()
 {
 	unsigned int info[4] = {0, 0, 0, 0};
 	unsigned int *eax, *ebx, *ecx, *edx;
@@ -97,13 +97,13 @@ static int sgx_probe()
 	pa = ((__u64)(*ebx & 0xfffff) << 32) + (__u64)(*eax & 0xfffff000);
 	size = ((__u64)(*edx & 0xfffff) << 32) + (__u64)(*ecx & 0xfffff000);
 
-	uk_pr_info("EPC bank 0x%lx-0x%lx\n", pa, pa + size);
+	uk_pr_info("EPC section: 0x%lx-0x%lx\n", pa, pa + size);
 
 error_exit:
 	return -ENODEV;
 }
 
-static int sgx_init()
+int sgx_init()
 {
 	// unsigned int info[4] = {0, 0, 0, 0};
 	// unsigned int *eax, *ebx, *ecx, *edx;

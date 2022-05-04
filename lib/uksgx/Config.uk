@@ -2,6 +2,7 @@ menuconfig LIBUKSGX
 	bool "uksgx: Intel SGX driver"
 	select LIBUKDEBUG
 	select LIBUKALLOC
+	select LIBNOLIBC if !HAVE_LIBC
 	depends on (ARCH_X86_64 && MARCH_X86_64_SGX)
 	default y
 
