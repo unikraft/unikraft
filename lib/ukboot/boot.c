@@ -53,6 +53,10 @@
 #if CONFIG_LIBUKSCHED
 #include <uk/sched.h>
 #endif
+#if CONFIG_LIBUKSGX
+#include <uk/sgx.h>
+#endif
+
 #include <uk/arch/lcpu.h>
 #include <uk/plat/bootstrap.h>
 #include <uk/plat/memory.h>
@@ -276,6 +280,11 @@ void ukplat_entry(int argc, char *argv[])
 	s = uk_sched_default_init(a);
 	if (unlikely(!s))
 		UK_CRASH("Could not initialize the scheduler\n");
+#endif
+
+#if CONFIG_LIBUKSGX
+	uk_pr_debug("before sgx_probe()\n");
+	sgx_probe();
 #endif
 
 	tma.argc = argc - kern_args;

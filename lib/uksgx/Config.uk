@@ -1,0 +1,9 @@
+menuconfig LIBUKSGX
+	bool "uksgx: Intel SGX driver"
+	select LIBUKDEBUG
+	select LIBUKALLOC
+	depends on (ARCH_X86_64 && MARCH_X86_64_SGX)
+	default y
+
+if LIBUKSGX
+endif
