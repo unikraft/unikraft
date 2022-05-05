@@ -30,34 +30,64 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _UK_SGX_CPU_H_
-#define _UK_SGX_CPU_H_
+#include <uk/sgx_internal.h>
+#include <uk/list.h>
+#include <uk/assert.h>
+#include <uk/arch/paging.h>
+#include <stdlib.h>
 
-#include <uk/arch/types.h>
+#define SGX_NR_LOW_EPC_PAGES_DEFAULT 32
+#define SGX_NR_SWAP_CLUSTER_MAX 16
 
-#define	BIT(nr)			        (1UL << (nr))
+__spinlock sgx_free_list_lock;
+UK_LIST_HEAD(sgx_free_list);
 
-/* Referred to as IA32_FEATURE_CONTROL in Intel's SDM. */
-#define X86_MSR_IA32_FEAT_CTL		            0x0000003a
-#define X86_FEAT_CTL_LOCKED				        BIT(0)
-#define X86_FEAT_CTL_VMX_ENABLED_INSIDE_SMX		BIT(1)
-#define X86_FEAT_CTL_VMX_ENABLED_OUTSIDE_SMX	BIT(2)
-#define X86_FEAT_CTL_SGX_LC_ENABLED			    BIT(17)
-#define X86_FEAT_CTL_SGX_ENABLED			    BIT(18)
-#define X86_FEAT_CTL_LMCE_ENABLED			    BIT(20)
+static unsigned int sgx_nr_total_epc_pages;
+static unsigned int sgx_nr_free_pages;
+static unsigned int sgx_nr_low_pages = SGX_NR_LOW_EPC_PAGES_DEFAULT;
+static unsigned int sgx_nr_high_pages;
 
-static inline void rdmsr(unsigned int msr, __u32 *lo, __u32 *hi)
+int sgx_add_epc_bank(__paddr_t start, unsigned long size, int bank)
 {
-	asm volatile("rdmsr" : "=a"(*lo), "=d"(*hi)
-			     : "c"(msr));
+	unsigned long i;
+	struct sgx_epc_page *new_epc_page, *entry;
+	struct uk_list_head *parser, *temp;
+
+	for (i = 0; i < size; i += PAGE_SIZE) {
+		new_epc_page = calloc(sizeof(*new_epc_page), 1);
+		if (!new_epc_page)
+			goto err_freelist;
+		new_epc_page->pa = (start + i) | bank;
+
+		ukarch_spin_lock(&sgx_free_list_lock);
+		uk_list_add_tail(&new_epc_page->list, &sgx_free_list);
+		sgx_nr_total_epc_pages++;
+		sgx_nr_free_pages++;
+		ukarch_spin_unlock(&sgx_free_list_lock);
+	}
+
+	return 0;
+err_freelist:
+	uk_list_for_each_safe(parser, temp, &sgx_free_list) {
+		ukarch_spin_lock(&sgx_free_list_lock);
+		entry = uk_list_entry(parser, struct sgx_epc_page, list);
+		uk_list_del(&entry->list);
+		ukarch_spin_unlock(&sgx_free_list_lock);
+		free(entry);
+	}
+	return -ENOMEM;
 }
 
-static inline __u64 rdmsrl(unsigned int msr)
+int sgx_page_cache_init(void)
 {
-	__u32 lo, hi;
+/*	struct task_struct *tmp;
 
-	rdmsr(msr, &lo, &hi);
-	return ((__u64) lo | (__u64) hi << 32);
+	sgx_nr_high_pages = 2 * sgx_nr_low_pages;
+
+	tmp = kthread_run(ksgxswapd, NULL, "ksgxswapd");
+	if (!IS_ERR(tmp))
+		ksgxswapd_tsk = tmp;
+	return PTR_ERR_OR_ZERO(tmp);*/
+	uk_pr_warn("%s not implemented", __func__);
+	return -EPERM;
 }
-
-#endif

@@ -29,23 +29,87 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include "uk/sgx_cpu.h"
+#include <uk/sgx_cpu.h>
 #include <uk/sgx_asm.h>
+#include <uk/sgx_internal.h>
 #include <uk/print.h>
-#include <errno.h>
 #include <stdbool.h>
 
+#define SGX_MAX_EPC_BANKS 8 /* support up to 8 EPC banks according to Intel SGX  \
+			     OOT-drvier 2.11 */
+struct sgx_epc_bank sgx_epc_banks[SGX_MAX_EPC_BANKS];
+int sgx_nr_epc_banks;
+__u64 sgx_encl_size_max_64;
 bool sgx_has_sgx2;
+
+int sgx_init()
+{
+	unsigned int info[4] = {0, 0, 0, 0};
+	unsigned int *eax, *ebx, *ecx, *edx;
+	unsigned long pa, size;
+	int i, ret;
+
+	eax = &info[0];
+	ebx = &info[1];
+	ecx = &info[2];
+	edx = &info[3];
+
+	__cpuid_count(info, SGX_CPUID, SGX_CPUID_CAPABILITIES);
+
+	sgx_encl_size_max_64 = 1ULL << ((*edx >> 8) & 0xFF);
+
+	/* initialize EPC banks */
+
+	for (i = 0; i < SGX_MAX_EPC_BANKS; i++) {
+		__cpuid_count(info, SGX_CPUID, i + SGX_CPUID_EPC_BANKS);
+		if (!(*eax & 0xf))
+			break;
+
+		pa = ((__u64)(*ebx & 0xfffff) << 32)
+		     + (__u64)(*eax & 0xfffff000);
+		size = ((__u64)(*edx & 0xfffff) << 32)
+		       + (__u64)(*ecx & 0xfffff000);
+
+		uk_pr_info("EPC section: 0x%lx-0x%lx (%dMB)\n", pa, pa + size, size / 1024 / 1024);
+
+		sgx_epc_banks[i].pa = pa;
+		sgx_epc_banks[i].size = size;
+	}
+
+	sgx_nr_epc_banks = i;
+
+	/* initialize sgx_free_list_lock */
+	ukarch_spin_init(&sgx_free_list_lock);
+
+	/* set virtual address the same as the physical address 
+	 * FIXME: we should use ioremap() instead */
+	for (i = 0; i < sgx_nr_epc_banks; i++) {
+		sgx_epc_banks[i].va = (void *)pa;
+		ret = sgx_add_epc_bank(sgx_epc_banks[i].pa, sgx_epc_banks[i].size, i);
+
+		if (ret) {
+			sgx_nr_epc_banks = i + 1;
+			goto out_iounmap;
+		}
+	}
+
+	ret = sgx_page_cache_init();
+	if (ret)
+		goto out_iounmap;
+
+	return 0;
+
+out_iounmap:
+	uk_pr_err("dummy iounmap\n");
+
+	return ret;
+}
 
 int sgx_probe()
 {
 	unsigned int info[4] = {0, 0, 0, 0};
 	unsigned int *eax, *ebx, *ecx, *edx;
-	unsigned int subleaf = 2;
-	unsigned int flag;
 	unsigned long fc;
-	unsigned long pa;
-	unsigned long size;
 
 	eax = &info[0];
 	ebx = &info[1];
@@ -90,28 +154,11 @@ int sgx_probe()
 	}
 	sgx_has_sgx2 = ((*eax & 0x2) != 0);
 
-	uk_pr_info("SGX status: SGX1 - true, SGX2 - %s\n", sgx_has_sgx2 ? "true" : "false");
+	uk_pr_info("SGX status: SGX1 - true, SGX2 - %s\n",
+		   sgx_has_sgx2 ? "true" : "false");
 
-	__cpuid_count(info, SGX_CPUID, SGX_CPUID_EPC_BANKS); /* TODO: support more EPC banks */
-
-	pa = ((__u64)(*ebx & 0xfffff) << 32) + (__u64)(*eax & 0xfffff000);
-	size = ((__u64)(*edx & 0xfffff) << 32) + (__u64)(*ecx & 0xfffff000);
-
-	uk_pr_info("EPC section: 0x%lx-0x%lx\n", pa, pa + size);
+	return sgx_init();
 
 error_exit:
 	return -ENODEV;
-}
-
-int sgx_init()
-{
-	// unsigned int info[4] = {0, 0, 0, 0};
-	// unsigned int *eax, *ebx, *ecx, *edx;
-	// unsigned long pa, size;
-
-	// eax = &info[0];
-	// ebx = &info[1];
-	// ecx = &info[2];
-	// edx = &info[3];
-	return -1;
 }

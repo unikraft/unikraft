@@ -30,34 +30,49 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _UK_SGX_CPU_H_
-#define _UK_SGX_CPU_H_
+#ifndef _UK_SGX_INTERNAL_H_
+#define _UK_SGX_INTERNAL_H_
 
+#include <uk/arch/spinlock.h>
 #include <uk/arch/types.h>
+#include <uk/list.h>
+#include <uk/bitops.h>
+#include <errno.h>
 
-#define	BIT(nr)			        (1UL << (nr))
+#define SGX_VA_SLOT_COUNT 512
 
-/* Referred to as IA32_FEATURE_CONTROL in Intel's SDM. */
-#define X86_MSR_IA32_FEAT_CTL		            0x0000003a
-#define X86_FEAT_CTL_LOCKED				        BIT(0)
-#define X86_FEAT_CTL_VMX_ENABLED_INSIDE_SMX		BIT(1)
-#define X86_FEAT_CTL_VMX_ENABLED_OUTSIDE_SMX	BIT(2)
-#define X86_FEAT_CTL_SGX_LC_ENABLED			    BIT(17)
-#define X86_FEAT_CTL_SGX_ENABLED			    BIT(18)
-#define X86_FEAT_CTL_LMCE_ENABLED			    BIT(20)
+extern __spinlock sgx_free_list_lock;
 
-static inline void rdmsr(unsigned int msr, __u32 *lo, __u32 *hi)
-{
-	asm volatile("rdmsr" : "=a"(*lo), "=d"(*hi)
-			     : "c"(msr));
-}
+struct sgx_epc_bank {
+	unsigned long pa;
+	unsigned long va;
+	unsigned long size;
+};
 
-static inline __u64 rdmsrl(unsigned int msr)
-{
-	__u32 lo, hi;
+struct sgx_epc_page {
+	__paddr_t	pa;
+	struct uk_list_head list;
+	struct sgx_encl_page *encl_page;
+};
 
-	rdmsr(msr, &lo, &hi);
-	return ((__u64) lo | (__u64) hi << 32);
-}
+
+#define DECLARE_BITMAP(name,bits) \
+	unsigned long name[UK_BITS_TO_LONGS(bits)]
+struct sgx_va_page {
+	struct sgx_epc_page *epc_page;
+	DECLARE_BITMAP(slots, SGX_VA_SLOT_COUNT);
+	struct uk_list_head list;
+};
+
+struct sgx_encl_page {
+	unsigned long addr;
+	unsigned int flags;
+	struct sgx_epc_page *epc_page;
+	struct sgx_va_page *va_page;
+	unsigned int va_offset;
+};
+
+int sgx_add_epc_bank(__paddr_t start, unsigned long size, int bank);
+int sgx_page_cache_init(void);
 
 #endif
