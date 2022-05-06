@@ -119,6 +119,45 @@ UK_LLSYSCALL_R_DEFINE(int, clone,
 	UK_ASSERT(s);
 	UK_ASSERT(uk_syscall_return_addr());
 
+#if UK_DEBUG
+	uk_pr_debug("uk_syscall_r_clone(\n");
+	uk_pr_debug(" flags: 0x%lx [", flags);
+	if (flags & CLONE_NEWTIME)		uk_pr_debug(" NEWTIME");
+	if (flags & CLONE_VM)			uk_pr_debug(" VM");
+	if (flags & CLONE_FS)			uk_pr_debug(" FS");
+	if (flags & CLONE_FILES)		uk_pr_debug(" FILES");
+	if (flags & CLONE_SIGHAND)		uk_pr_debug(" SIGHAND");
+	if (flags & CLONE_PIDFD)		uk_pr_debug(" PIDFD");
+	if (flags & CLONE_PTRACE)		uk_pr_debug(" PTRACE");
+	if (flags & CLONE_VFORK)		uk_pr_debug(" VFORK");
+	if (flags & CLONE_PARENT)		uk_pr_debug(" PARENT");
+	if (flags & CLONE_THREAD)		uk_pr_debug(" THREAD");
+	if (flags & CLONE_NEWNS)		uk_pr_debug(" NEWNS");
+	if (flags & CLONE_SYSVSEM)		uk_pr_debug(" SYSVSEM");
+	if (flags & CLONE_SETTLS)		uk_pr_debug(" SETTLS");
+	if (flags & CLONE_PARENT_SETTID)	uk_pr_debug(" PARENT_SETTID");
+	if (flags & CLONE_CHILD_CLEARTID)	uk_pr_debug(" CHILD_CLEARTID");
+	if (flags & CLONE_DETACHED)		uk_pr_debug(" DETACHED");
+	if (flags & CLONE_UNTRACED)		uk_pr_debug(" UNTRACED");
+	if (flags & CLONE_CHILD_SETTID)		uk_pr_debug(" CHILD_SETTID");
+	if (flags & CLONE_NEWCGROUP)		uk_pr_debug(" NEWCGROUP");
+	if (flags & CLONE_NEWUTS)		uk_pr_debug(" NEWUTS");
+	if (flags & CLONE_NEWIPC)		uk_pr_debug(" NEWIPC");
+	if (flags & CLONE_NEWUSER)		uk_pr_debug(" NEWUSER");
+	if (flags & CLONE_NEWPID)		uk_pr_debug(" NEWPID");
+	if (flags & CLONE_NEWNET)		uk_pr_debug(" NEWNET");
+	if (flags & CLONE_IO)			uk_pr_debug(" IO");
+	uk_pr_debug(" ]\n");
+	uk_pr_debug(" sp: %p\n", sp);
+	uk_pr_debug(" tlsp: %p\n", tlsp);
+	if (flags & CLONE_PARENT_SETTID)
+		uk_pr_debug(" parent_tid: %p\n", parent_tid);
+	if (flags & (CLONE_CHILD_CLEARTID | CLONE_CHILD_SETTID))
+		uk_pr_debug(" child_tid: %p\n", child_tid);
+	uk_pr_debug(" <return>: %p\n", uk_syscall_return_addr());
+	uk_pr_debug(")\n");
+#endif /* UK_DEBUG */
+
 	child = uk_thread_create_container(s->a,
 					   NULL, 0, /* no stack */
 					   s->a_uktls, /* UKTLS */
