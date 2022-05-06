@@ -130,6 +130,12 @@ struct uk_thread *uk_thread_current(void)
  *
  * NOTE: Depending on the API used for thread creation, a thread is created in
  *       runnable or blocked state.
+ * NOTE: The thread initialization callbacks are called on any of the thread
+ *       creation/initialization APIs.
+ *       The termination callbacks are called when the thread transitions to the
+ *       exited state. Calling `uk_thread_release()` on a non-exited thread will
+ *       transition the thread to the exited state first and will cause the
+ *       termination callbacks as well.
  */
 
 #define UK_THREADF_ECTX       (0x001)	/**< Extended context available */
@@ -149,8 +155,9 @@ struct uk_thread *uk_thread_current(void)
 #define uk_thread_set_blocked(t) \
 	do { (t)->flags &= ~UK_THREADF_RUNNABLE; } while (0)
 /* NOTE: Setting a thread as EXITED cannot be undone. */
-#define uk_thread_set_exited(t) \
-	do { (t)->flags |= UK_THREADF_EXITED; } while (0)
+/* NOTE: Never change the EXIT flag manually. Trnasition to exit state reqiures
+ * the terminate funcrtiomns to be called. */
+void uk_thread_set_exited(struct uk_thread *t);
 
 /*
  * WARNING: The following functions allow threads being created without extended
@@ -546,7 +553,9 @@ typedef int  (*uk_thread_init_func_t)(struct uk_thread *child,
 
 /**
  * Thread termination callback
- * A thread finalization callback is called when a thread exits or got killed.
+ * A thread termination callback is called when a threads terminates or gets
+ * terminated (transition into EXITED state) and before the thread resources
+ * are released.
  * Libraries can register callbacks with the `UK_THREAD_INIT*()` macros.
  *
  * @param child

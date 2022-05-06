@@ -24,6 +24,7 @@ uk_thread_create_container
 uk_thread_create_fn0
 uk_thread_create_fn1
 uk_thread_create_fn2
+uk_thread_set_exited
 uk_thread_release
 uk_thread_block_timeout
 uk_thread_block

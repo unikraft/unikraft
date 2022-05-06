@@ -212,6 +212,16 @@ static int _uk_thread_call_termtab(struct uk_thread *child)
 	return ret;
 }
 
+/* Handles to exit state transition and calls termtab */
+void uk_thread_set_exited(struct uk_thread *t)
+{
+	if (uk_thread_is_exited(t))
+		return;
+
+	_uk_thread_call_termtab(t);
+	t->flags |= UK_THREADF_EXITED;
+}
+
 static void _uk_thread_struct_init(struct uk_thread *t,
 				   uintptr_t tlsp,
 				   bool is_uktls,
@@ -792,7 +802,7 @@ void uk_thread_release(struct uk_thread *t)
 	UK_ASSERT(t != uk_thread_current());
 	UK_ASSERT(!t->sched); /* Thread must be disconnected from scheduler */
 
-	_uk_thread_call_termtab(t);
+	uk_thread_set_exited(t);
 
 	/* Take copies of associated allocation information.
 	 * The destructor provided might free the struct before
