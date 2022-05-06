@@ -31,10 +31,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _GNU_SOURCE
 #include <errno.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <sched.h>
 #include <sys/prctl.h>
 #include <sys/resource.h>
 #include <uk/process.h>
