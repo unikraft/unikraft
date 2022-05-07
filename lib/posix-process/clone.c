@@ -93,31 +93,33 @@ static void _clone_child_gc(struct uk_thread *t)
 	}
 }
 
-#if CONFIG_ARCH_X86_64
-UK_LLSYSCALL_R_DEFINE(int, clone,
-		      unsigned long, flags,
-		      void *, sp,
-		      int *, parent_tid,
-		      int *, child_tid,
-		      unsigned long, tlsp)
-#else /* !CONFIG_ARCH_X86_64 */
-UK_LLSYSCALL_R_DEFINE(int, clone,
-		      unsigned long, flags,
-		      void *, sp,
-		      int *, parent_tid,
-		      unsigned long, tlsp,
-		      int *, child_tid)
-#endif /* !CONFIG_ARCH_X86_64 */
+/* Up to cl_args->tls, the fields of clone_args are required arguments */
+#define CL_ARGS_REQUIRED_SIZE					\
+	(__offsetof(struct clone_args, tls)			\
+	 + sizeof(((struct clone_args *)0)->tls))
+
+static int _clone(struct clone_args *cl_args, size_t cl_args_size,
+		  __uptr return_addr)
 {
 	struct uk_thread *t;
 	struct uk_sched *s;
 	struct uk_thread *child = NULL;
+	__u64 flags;
+	int err;
 
 	t = uk_thread_current();
 	s = uk_sched_current();
 
 	UK_ASSERT(s);
 	UK_ASSERT(uk_syscall_return_addr());
+
+	if (!cl_args || cl_args_size < CL_ARGS_REQUIRED_SIZE) {
+		uk_pr_debug("No or invalid clone arguments given\n");
+		err = -EINVAL;
+		goto err_out;
+	}
+
+	flags = cl_args->flags;
 
 #if UK_DEBUG
 	uk_pr_debug("uk_syscall_r_clone(\n");
@@ -148,13 +150,15 @@ UK_LLSYSCALL_R_DEFINE(int, clone,
 	if (flags & CLONE_NEWNET)		uk_pr_debug(" NEWNET");
 	if (flags & CLONE_IO)			uk_pr_debug(" IO");
 	uk_pr_debug(" ]\n");
-	uk_pr_debug(" sp: %p\n", sp);
-	uk_pr_debug(" tlsp: %p\n", tlsp);
+	if (flags & CLONE_PIDFD)
+		uk_pr_debug(" pidfd: %d\n", (int) cl_args->pidfd);
 	if (flags & CLONE_PARENT_SETTID)
-		uk_pr_debug(" parent_tid: %p\n", parent_tid);
+		uk_pr_debug(" parent_tid: %p\n", (void *) cl_args->parent_tid);
 	if (flags & (CLONE_CHILD_CLEARTID | CLONE_CHILD_SETTID))
-		uk_pr_debug(" child_tid: %p\n", child_tid);
-	uk_pr_debug(" <return>: %p\n", uk_syscall_return_addr());
+		uk_pr_debug(" child_tid: %p\n", (void *) cl_args->child_tid);
+	uk_pr_debug(" stack: %p\n", (void *) cl_args->stack);
+	uk_pr_debug(" tls: %p\n", (void *) cl_args->tls);
+	uk_pr_debug(" <return>: %p\n", (void *) return_addr);
 	uk_pr_debug(")\n");
 #endif /* UK_DEBUG */
 
@@ -173,14 +177,55 @@ UK_LLSYSCALL_R_DEFINE(int, clone,
 	 * It starts at userland context...
 	 */
 	ukarch_ctx_init_entry0(&child->ctx,
-			       (__uptr) sp,
+			       (__uptr) cl_args->stack,
 			       false,
-			       (ukarch_ctx_entry0) uk_syscall_return_addr());
-	child->tlsp = (__uptr) tlsp;
+			       (ukarch_ctx_entry0) return_addr);
+	child->tlsp = (__uptr) cl_args->tls;
 	uk_thread_set_runnable(child);
 
 	uk_sched_thread_add(s, child);
 	uk_sched_yield(); /* Enable the child to execute directly */
 
 	return ukthread2tid(child);
+
+err_out:
+	return err;
+}
+
+#if CONFIG_ARCH_X86_64
+UK_LLSYSCALL_R_DEFINE(int, clone,
+		      unsigned long, flags,
+		      void *, sp,
+		      int *, parent_tid,
+		      int *, child_tid,
+		      unsigned long, tlsp)
+#else /* !CONFIG_ARCH_X86_64 */
+UK_LLSYSCALL_R_DEFINE(int, clone,
+		      unsigned long, flags,
+		      void *, sp,
+		      int *, parent_tid,
+		      unsigned long, tlsp,
+		      int *, child_tid)
+#endif /* !CONFIG_ARCH_X86_64 */
+{
+	/* Translate */
+	struct clone_args cl_args = {
+		.flags       = (__u64) (flags & ~0xff),
+		.pidfd       = (__u64) (flags & CLONE_PIDFD) ? parent_tid : 0,
+		.child_tid   = (__u64) child_tid,
+		.parent_tid  = (__u64) (flags & CLONE_PIDFD) ? 0 : parent_tid,
+		.exit_signal = (__u64) (flags & 0xff),
+		.stack       = (__u64) sp,
+		.tls         = (__u64) tlsp
+	};
+
+	return _clone(&cl_args, sizeof(cl_args), uk_syscall_return_addr());
+}
+
+/* NOTE: There are currently no libc wrapper for clone3 */
+UK_LLSYSCALL_R_DEFINE(long, clone3,
+		      struct clone_args *, cl_args,
+		      size_t, cl_args_size)
+{
+	return _clone(cl_args, cl_args_size, uk_syscall_return_addr());
 }
