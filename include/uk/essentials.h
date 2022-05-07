@@ -320,6 +320,14 @@ extern "C" {
 #endif
 #endif /* !__containerof */
 
+/* Computes the offsset and size of a field within a struct and checks
+ * if it is within bounds
+ */
+#ifndef __contains
+#define __contains(t, field, size)					\
+	((__offsetof(t, field) + sizeof(((t *)0)->field)) <= (size))
+#endif
+
 #ifdef __GNUC__
 #ifndef __return_addr
 #define __return_addr(lvl) \
