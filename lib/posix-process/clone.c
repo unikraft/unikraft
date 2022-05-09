@@ -94,11 +94,11 @@ static void _clone_child_gc(struct uk_thread *t)
 }
 
 /* Up to cl_args->tls, the fields of clone_args are required arguments */
-#define CL_ARGS_REQUIRED_SIZE					\
+#define CL_ARGS_REQUIRED_LEN					\
 	(__offsetof(struct clone_args, tls)			\
 	 + sizeof(((struct clone_args *)0)->tls))
 
-static int _clone(struct clone_args *cl_args, size_t cl_args_size,
+static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 		  __uptr return_addr)
 {
 	struct uk_thread *t;
@@ -113,7 +113,7 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_size,
 	UK_ASSERT(s);
 	UK_ASSERT(uk_syscall_return_addr());
 
-	if (!cl_args || cl_args_size < CL_ARGS_REQUIRED_SIZE) {
+	if (!cl_args || cl_args_len < CL_ARGS_REQUIRED_LEN) {
 		uk_pr_debug("No or invalid clone arguments given\n");
 		ret = -EINVAL;
 		goto err_out;
@@ -227,7 +227,7 @@ UK_LLSYSCALL_R_DEFINE(int, clone,
 /* NOTE: There are currently no libc wrapper for clone3 */
 UK_LLSYSCALL_R_DEFINE(long, clone3,
 		      struct clone_args *, cl_args,
-		      size_t, cl_args_size)
+		      size_t, cl_args_len)
 {
-	return _clone(cl_args, cl_args_size, uk_syscall_return_addr());
+	return _clone(cl_args, cl_args_len, uk_syscall_return_addr());
 }
