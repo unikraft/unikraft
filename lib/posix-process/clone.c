@@ -105,7 +105,7 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_size,
 	struct uk_sched *s;
 	struct uk_thread *child = NULL;
 	__u64 flags;
-	int err;
+	int ret;
 
 	t = uk_thread_current();
 	s = uk_sched_current();
@@ -115,7 +115,7 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_size,
 
 	if (!cl_args || cl_args_size < CL_ARGS_REQUIRED_SIZE) {
 		uk_pr_debug("No or invalid clone arguments given\n");
-		err = -EINVAL;
+		ret = -EINVAL;
 		goto err_out;
 	}
 
@@ -169,8 +169,10 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_size,
 					   (t->name) ? strdup(t->name) : NULL,
 					   NULL,
 					   _clone_child_gc);
-	if (!child)
-		return -EAGAIN;
+	if (PTRISERR(child)) {
+		ret = (PTR2ERR(child) != 0) ? PTR2ERR(child) : -ENOMEM;
+		goto err_out;
+	}
 
 	/*
 	 * Child starts at return address, sets given stack and given TLS:
@@ -189,7 +191,7 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_size,
 	return ukthread2tid(child);
 
 err_out:
-	return err;
+	return ret;
 }
 
 #if CONFIG_ARCH_X86_64
