@@ -183,6 +183,14 @@ void gic_sgi_gen_to_list(uint32_t sgintid, uint8_t targetlist)
 }
 
 /*
+ * Forward the SGI to the CPU specified by cpuid.
+ */
+static void gic_sgi_gen_to_cpu(uint8_t sgintid, uint32_t cpuid)
+{
+	gic_sgi_gen_to_list((uint32_t) sgintid, (uint8_t) (1 << (cpuid % 8)));
+}
+
+/*
  * Forward the SGI to all CPU interfaces except that of the
  * processor that requested the interrupt.
  */
@@ -465,6 +473,7 @@ static int gicv2_do_probe(const void *fdt)
 		.set_irq_affinity  = gic_set_irq_target,
 		.irq_translate     = gic_irq_translate,
 		.handle_irq        = gic_handle_irq,
+		.gic_sgi_gen = gic_sgi_gen_to_cpu,
 	};
 
 	/* Set driver functions */
