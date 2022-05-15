@@ -360,7 +360,7 @@ int killpg(int pgrp, int sig)
 		return -1;
 	}
 
-	return kill(uk_syscall_r_getpid(), sig);
+	return kill(getpid(), sig);
 }
 
 int raise(int sig)
