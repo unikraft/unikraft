@@ -14,6 +14,7 @@ LIBNOLIBC_NO_BUILTINS		+= -fno-builtin-sscanf
 LIBNOLIBC_NO_BUILTINS		+= -fno-builtin-vscanf
 LIBNOLIBC_NO_BUILTINS		+= -fno-builtin-vfscanf
 LIBNOLIBC_NO_BUILTINS		+= -fno-builtin-vsscanf
+LIBNOLIBC_NO_BUILTINS		+= -Wno-nonnull-compare
 
 CFLAGS-$(CONFIG_LIBNOLIBC)		+= $(LIBNOLIBC_NO_BUILTINS)
 CXXFLAGS-$(CONFIG_LIBNOLIBC)		+= $(LIBNOLIBC_NO_BUILTINS)
