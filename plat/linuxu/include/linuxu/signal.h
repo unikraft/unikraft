@@ -61,7 +61,9 @@ struct uk_sigaction {
 };
 
 /* sigaction flags */
+#ifndef SA_SIGINFO
 #define SA_SIGINFO      0x00000004
+#endif
 #define SA_RESTORER     0x04000000
 
 
