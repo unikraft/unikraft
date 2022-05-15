@@ -95,6 +95,8 @@ struct _gic_operations {
 	uint32_t (*irq_translate)(uint32_t type, uint32_t irq);
 	/** Handle IRQ */
 	void (*handle_irq)(void);
+	/** Send a SGI to the specifiec core */
+	void (*gic_sgi_gen)(uint8_t sgintid, uint32_t cpuid);
 };
 
 /** GIC controller structure */

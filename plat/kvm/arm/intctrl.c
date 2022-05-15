@@ -62,7 +62,7 @@ EXIT_ERR:
 
 void intctrl_ack_irq(unsigned int irq __unused)
 {
-	//NOP
+	gic->ops.ack_irq();
 }
 
 void intctrl_mask_irq(unsigned int irq)
@@ -73,4 +73,9 @@ void intctrl_mask_irq(unsigned int irq)
 void intctrl_clear_irq(unsigned int irq)
 {
 	gic->ops.enable_irq(irq);
+}
+
+void intctrl_send_ipi(uint8_t sgintid, uint32_t cpuid)
+{
+	gic->ops.gic_sgi_gen(sgintid, cpuid);
 }
