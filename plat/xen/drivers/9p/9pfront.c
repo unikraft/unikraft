@@ -30,6 +30,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _GNU_SOURCE
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdio.h>
