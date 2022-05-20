@@ -72,6 +72,57 @@
 #endif
 #include "banner.h"
 
+#ifdef CONFIG_LIBUKBOOT_ENFORCE_W_XOR_X
+#include <uk/plat/paging.h>
+
+#ifdef CONFIG_UKPLAT_MEMRNAME
+#define WXORX_REGION_NAME d.name
+#else /* !CONFIG_UKPLAT_MEMRNAME */
+#define WXORX_REGION_NAME "memory range"
+#endif /* CONFIG_UKPLAT_MEMRNAME */
+
+void enforce_w_xor_x(void)
+{
+	struct ukplat_memregion_desc d;
+	unsigned long prot, pages;
+	int rc, i = 0;
+
+	while ((rc = ukplat_memregion_get(i++, &d)) >= 0) {
+		pages = DIV_ROUND_UP(d.len, PAGE_SIZE);
+		prot = PAGE_ATTR_PROT_READ;
+
+		if (d.flags & UKPLAT_MEMRF_EXECUTABLE)
+			prot |= PAGE_ATTR_PROT_EXEC;
+		else if (d.flags & UKPLAT_MEMRF_WRITABLE)
+			prot |= PAGE_ATTR_PROT_WRITE;
+
+		uk_pr_debug("Setting protections for %s: %"
+			    __PRIvaddr " - %" __PRIvaddr " [R%c%c]\n",
+			    WXORX_REGION_NAME,
+			    (__vaddr_t)d.base,
+			    (__vaddr_t)d.base + pages * PAGE_SIZE,
+			    (prot & PAGE_ATTR_PROT_WRITE) ? 'W' : '-',
+			    (prot & PAGE_ATTR_PROT_EXEC) ? 'X' : '-');
+
+		rc = ukplat_page_set_attr(ukplat_pt_get_active(),
+					  (__vaddr_t)d.base, pages, prot, 0);
+
+		if (unlikely(rc)) {
+			uk_pr_err("Failed to set protections for %s: %"
+				  __PRIvaddr " - %" __PRIvaddr " [R%c%c]: %d\n",
+				  WXORX_REGION_NAME,
+				  (__vaddr_t)d.base,
+				  (__vaddr_t)d.base + pages * PAGE_SIZE,
+				  (prot & PAGE_ATTR_PROT_WRITE) ? 'W' : '-',
+				  (prot & PAGE_ATTR_PROT_EXEC) ? 'X' : '-',
+				  rc);
+		}
+	}
+}
+
+#undef WXORX_REGION_NAME
+#endif /* CONFIG_LIBUKBOOT_ENFORCE_W_XOR_X */
+
 int main(int argc, char *argv[]) __weak;
 
 static void main_thread_func(void *arg) __noreturn;
@@ -195,6 +246,10 @@ void ukplat_entry(int argc, char *argv[])
 #endif
 
 	uk_ctor_func_t *ctorfn;
+
+#ifdef CONFIG_LIBUKBOOT_ENFORCE_W_XOR_X
+	enforce_w_xor_x();
+#endif /* CONFIG_LIBUKBOOT_ENFORCE_W_XOR_X */
 
 	uk_pr_info("Unikraft constructor table at %p - %p\n",
 		   &uk_ctortab_start[0], &uk_ctortab_end);

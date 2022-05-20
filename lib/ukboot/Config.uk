@@ -117,4 +117,13 @@ if LIBUKBOOT
 		bool "None"
 
 	endchoice
+
+	config LIBUKBOOT_ENFORCE_W_XOR_X
+		bool "Enforce W^X"
+		default n
+		depends on PAGING
+		help
+			During boot the protection settings of all memory
+			ranges are updated to enforce write XOR execute (W^X)
+			and mitigate code injection attacks.
 endif
