@@ -43,7 +43,8 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->base  = (void *) __TEXT;
 		m->len   = (size_t) __ETEXT - (size_t) __TEXT;
 		m->flags = (UKPLAT_MEMRF_RESERVED
-			    | UKPLAT_MEMRF_READABLE);
+			    | UKPLAT_MEMRF_READABLE
+			    | UKPLAT_MEMRF_EXECUTABLE);
 #if CONFIG_UKPLAT_MEMRNAME
 		m->name  = "text";
 #endif
