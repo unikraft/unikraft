@@ -45,11 +45,12 @@ extern "C" {
 /* Memory region flags */
 #define UKPLAT_MEMRF_FREE	(0x1)	/* Region with uninitialized memory */
 #define UKPLAT_MEMRF_RESERVED	(0x2)	/* Region is in use by platform */
-#define UKPLAT_MEMRF_EXTRADATA	(0x4)	/* Contains additional loaded data
-					 * (e.g., initramdisk)
+#define UKPLAT_MEMRF_EXTRADATA	(0x4)	/* Contains additional loaded data \
+					 * (e.g., initramdisk) \
 					 */
 #define UKPLAT_MEMRF_READABLE	(0x10)	/* Region is readable */
 #define UKPLAT_MEMRF_WRITABLE	(0x20)	/* Region is writable */
+#define UKPLAT_MEMRF_EXECUTABLE	(0x40)	/* Region is executable */
 
 #define UKPLAT_MEMRF_ALLOCATABLE (UKPLAT_MEMRF_FREE \
 				  | UKPLAT_MEMRF_READABLE \
