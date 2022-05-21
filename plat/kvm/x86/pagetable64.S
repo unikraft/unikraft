@@ -115,6 +115,7 @@
  * 0x0000000000000000 - 0x0000000000000000 Mapping of first 4GB
  *
  * However, the first 1M is inaccessible, except for:
+ * 0x0000000000008000 - 0x0000000000008fff SMP processors initialization code
  * 0x0000000000009000 - 0x0000000000009fff Multiboot info @ 0x09500 (read-only)
  * 0x00000000000b8000 - 0x00000000000bffff VGA buffer (read+write)
  * 0x00000000000e0000 - 0x00000000000fffff BIOS memory (read-only)
@@ -124,7 +125,8 @@
  */
 .align 0x1000
 x86_bpt_pt0_0_0:
-	pte_zero 0x0000000000000000, 0x009
+	pte_zero 0x0000000000000000, 0x008
+	pte_fill 0x0000000000008000, 0x001, PT_LVL, PTE_RW
 	pte_fill 0x0000000000009000, 0x008, PT_LVL, PTE_RO
 	pte_zero 0x0000000000010000, 0x0a7
 	pte_fill 0x00000000000b8000, 0x008, PT_LVL, PTE_RW

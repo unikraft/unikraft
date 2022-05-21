@@ -36,6 +36,8 @@
 #include <x86/acpi/acpi.h>
 #include <x86/acpi/madt.h>
 #include <uk/assert.h>
+#include <uk/plat/paging.h>
+#include <uk/falloc.h>
 
 #define RSDT_ENTRIES(rsdt) (((rsdt)->h.Length - sizeof((rsdt)->h)) / 4)
 
@@ -136,11 +138,19 @@ static int detect_acpi_version(void)
 
 static int acpi10_find_rsdt(void)
 {
+	__paddr_t paddr;
+	struct uk_pagetable *pt = ukplat_pt_get_active();
+
 	UK_ASSERT(acpi_version == 1);
 	UK_ASSERT(acpi_rsdp);
 
 	acpi_rsdt = (struct RSDT *)((__uptr)acpi_rsdp->RsdtAddress);
 	uk_pr_debug("ACPI RSDT present at %p\n", acpi_rsdt);
+
+	paddr = (__paddr_t)acpi_rsdt & (~0xFFFF);
+	uk_pr_debug("paddr: 0x%lx\n", paddr);
+	pt->fa->falloc(pt->fa, &paddr, 1, 0);
+	ukplat_page_map(pt, paddr, paddr, 10, PAGE_ATTR_PROT_READ, 0);
 
 	if (verify_acpi_checksum(&acpi_rsdt->h) != 0) {
 		uk_pr_err("ACPI RSDT corrupted\n");
@@ -161,7 +171,10 @@ static int acpi10_find_rsdt(void)
 static int acpi10_find_madt(void)
 {
 	int entries, i;
+	__paddr_t paddr;
 	struct ACPISDTHeader *h;
+
+	struct uk_pagetable *pt = ukplat_pt_get_active();
 
 	UK_ASSERT(acpi_version == 1);
 	UK_ASSERT(acpi_rsdt);
@@ -176,6 +189,11 @@ static int acpi10_find_madt(void)
 			continue; /* Not an APIC entry */
 
 		uk_pr_debug("ACPI MADT present at %p\n", h);
+
+		paddr = (__paddr_t)h & (~0xFFFF);
+		uk_pr_debug("paddr: %lx\n", paddr);
+		pt->fa->falloc(pt->fa, &paddr, 1, 0);
+		ukplat_page_map(pt, paddr, paddr, 10, PAGE_ATTR_PROT_READ, 0);
 
 		if (verify_acpi_checksum(h) != 0) {
 			uk_pr_err("ACPI MADT corrupted\n");
