@@ -219,8 +219,6 @@ typedef unsigned long maddr_t;
 extern pgentry_t *pt_base;
 #ifdef CONFIG_PARAVIRT
 extern unsigned long *phys_to_machine_mapping;
-#else
-extern pgentry_t page_table_base[];
 #endif
 
 extern unsigned long mfn_zero;
@@ -290,10 +288,6 @@ void *map_frames_ex(const unsigned long *mfns, unsigned long n,
 
 void arch_mm_preinit(void *p);
 unsigned long alloc_virt_kernel(unsigned n_pages);
-
-#ifndef CONFIG_PARAVIRT
-void arch_print_memmap(void);
-#endif
 
 #endif
 
