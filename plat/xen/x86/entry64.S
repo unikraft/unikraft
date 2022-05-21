@@ -56,9 +56,6 @@ ELFNOTE(Xen, XEN_ELFNOTE_XEN_VERSION, .asciz "xen-3.0")
 
 .section .text.boot, "ax"
 _libxenplat_start:
-#else
-
-#include "entry_hvm.S"
 
 #endif
 	cld
@@ -375,16 +372,6 @@ critical_region_fixup:
 16:	movq %rdi,%rsp        # final rdi is top of merged stack
 	andb $KERNEL_CS_MASK,__REGS_OFFSETOF_CS(%rsp)  # CS might have changed
 	jmp  11b
-
-#else
-error_exit:
-	RESTORE_ALL
-	HYPERVISOR_IRET
-
-/*
- * Xen event (virtual interrupt) entry point.
- */
-TRAP_ENTRY hypervisor_callback, 0
 #endif
 
 ENTRY(asm_failsafe_callback)
@@ -416,23 +403,3 @@ TRAP_ENTRY alignment_check,     1
 /* no Machine Check */
 TRAP_ENTRY simd_error,          0
 /* no Virtualization Exception */
-
-
-#ifndef CONFIG_PARAVIRT
-.data
-.globl page_table_base
-        .align __PAGE_SIZE
-page_table_virt_l2:
-        PTE(page_table_virt_l1 + L2_PROT)
-        .align __PAGE_SIZE, 0
-page_table_virt_l3:
-        PTE(page_table_virt_l2 + L3_PROT)
-        .align __PAGE_SIZE, 0
-page_table_l3:
-        PTE(page_table_l2 + L3_PROT)
-        .align __PAGE_SIZE, 0
-page_table_base:
-        PTE(page_table_l3 + L4_PROT)
-        PTE(page_table_virt_l3 + L4_PROT)
-        .align __PAGE_SIZE, 0
-#endif
