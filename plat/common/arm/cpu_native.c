@@ -35,6 +35,7 @@
 #include <arm/psci.h>
 #include <uk/assert.h>
 #include <arm/smccc.h>
+#include <uk/plat/common/lcpu.h>
 
 
 /*
@@ -82,3 +83,24 @@ void system_off(void)
 	smccc_psci_call(&smccc_arguments);
 }
 
+#ifdef CONFIG_HAVE_SMP
+/* Powers on a secondary cpu in an SMP system. */
+int cpu_on(__lcpuid id, __paddr_t entry, void *arg)
+{
+	struct smccc_args smccc_arguments = {0};
+
+	/*
+	 * Check if a PSCI method is set.
+	 */
+	UK_ASSERT(smccc_psci_call);
+
+	smccc_arguments.a0 = PSCI_FNID_CPU_ON;
+	smccc_arguments.a1 = (__u64) id;
+	smccc_arguments.a2 = (__u64) entry;
+	smccc_arguments.a3 = (__u64) arg;
+
+	smccc_psci_call(&smccc_arguments);
+
+	return (int) smccc_arguments.a0;
+}
+#endif /* CONFIG_HAVE_SMP */
