@@ -39,6 +39,7 @@
 #include <uk/alloc.h>
 #include <uk/assert.h>
 #include <arm/smccc.h>
+#include <uk/plat/common/lcpu.h>
 
 /*
  * we should use inline assembly with volatile constraint to access mmio
@@ -145,6 +146,9 @@ extern smccc_conduit_fn_t smccc_psci_call;
 void halt(void);
 void reset(void);
 void system_off(void);
+#ifdef CONFIG_HAVE_SMP
+int cpu_on(__lcpuid id, __paddr_t entry, void *arg);
+#endif /* CONFIG_HAVE_SMP */
 
 #ifdef CONFIG_FPSIMD
 struct fpsimd_state {
