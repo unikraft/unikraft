@@ -109,9 +109,9 @@ struct ukplat_lcpu_func {
 	 * Function to execute.
 	 *
 	 * @param regs pointer to a snapshot of the current CPU state. Changes
-	 *   to the state are applied after the function returns
+	 *   to the state are applied after the RUN IRQ handler returns
 	 * @param fn pointer to this structure. The structure is not touched
-	 *   after function invocation and can be freed if necessary during
+	 *   after function invocation and must be freed if necessary during
 	 *   function execution
 	 */
 	void (*fn)(struct __regs *regs, struct ukplat_lcpu_func *fn);
@@ -126,16 +126,18 @@ struct ukplat_lcpu_func {
 __lcpuid ukplat_lcpu_id(void);
 
 /**
- * Returns the number of logical CPUs present on the system
+ * Returns the number of logical CPUs present in the system
  */
 __lcpuid ukplat_lcpu_count(void);
 
 /**
  * Starts multiple logical CPUs and assigns them the given stacks. The logical
  * CPUs execute the entry functions if supplied or enter a low-power wait state
- * otherwise.
+ * otherwise. CPUs that have already been started are ignored.
  *
- * @param lcpuid array with the IDs of the logical CPUs that are to be started
+ * @param lcpuid array with the IDs of the logical CPUs that are to be started.
+ *   Can be NULL to include all logical CPUs except the one executing the
+ *   function.
  * @param sp array of stack pointers, one for each specified logical CPU
  * @param entry optional array of entry function pointers, one for each
  *   specified logical CPU. Provided functions must not return. If the
@@ -174,7 +176,7 @@ int ukplat_lcpu_wait(__lcpuid lcpuid[], unsigned int num, __nsec timeout);
  * @param num number of logical CPU IDs given
  * @param fn the function to be executed
  * @param flags (architecture-dependent) flags that specify how the function
- *   should be executed (see UKPLAT_LCPU_RFLG_* flags)
+ *   should be executed (see UKPLAT_LCPU_RFLG_* flags if available)
  *
  * @return 0 on success, an errno-type error value otherwise
  */
@@ -183,6 +185,11 @@ int ukplat_lcpu_run(__lcpuid lcpuid[], unsigned int num,
 
 /**
  * Wakes up the specified logical CPUs from a halt or low-power sleep state.
+ *
+ * @param lcpuid array with the IDs of the logical CPUs that should be waked up.
+ *   Can be NULL to execute the function on all logical CPUs except the current
+ *   one.
+ * @param num number of logical CPU IDs given
  *
  * @return 0 on success, an errno-type error value otherwise
  */
