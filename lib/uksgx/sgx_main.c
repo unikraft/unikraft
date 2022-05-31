@@ -43,6 +43,10 @@ __u64 sgx_encl_size_max_64;
 bool sgx_has_sgx2;
 
 static int sgx_reset_pubkey_hash() {
+	/* 
+	 * TODO: linux-sgx-driver uses those hard-coded values, but in-kernel driver
+	 * uses generated ones. This implementation follows the older one and should be optimized.
+	 */
 	if (wrmsrl_safe(MSR_IA32_SGXLEPUBKEYHASH0, 0xa6053e051270b7acULL) ||
 		wrmsrl_safe(MSR_IA32_SGXLEPUBKEYHASH1, 0x6cfbe8ba8b3b413dULL) ||
 		wrmsrl_safe(MSR_IA32_SGXLEPUBKEYHASH2, 0xc4916d99f2b3735dULL) ||
@@ -91,7 +95,8 @@ int sgx_init()
 	/* initialize sgx_free_list_lock */
 	ukarch_spin_init(&sgx_free_list_lock);
 
-	/* set virtual address the same as the physical address 
+	/* 
+	 * set virtual address the same as the physical address 
 	 * TODO: linux-sgx-driver uses ioremap() to map the physical address to 
 	 * virtual address, but in Unikraft, Virtual Memory API is a optional feature in 
 	 * Platform Interface Options, hence, we need to add two conditions here, like:
@@ -117,11 +122,23 @@ int sgx_init()
 		goto out_iounmap;
 	}
 	
-	/* TODO: for paging, linux-sgx-driver alloc a workqueue here, need to implement something similar */
+	/* 
+	 * TODO: for paging, linux-sgx-driver alloc a workqueue here, need to implement something similar once
+	 * Unikraft supports SMP.
+	 */
 
-	ret = sgx_reset_pubkey_hash(); // TODO: test if this is okay when SGX_LC == true
-	if (ret) {
-		uk_pr_err("can not reset SGX LE public key hash MSRs\n");
+	/* 
+	 * MSR_IA32_SGXLEPUBKEYHASHn is only writable if FLC is supported,
+	 * so we need to check before reset the hash values.
+	 */
+	unsigned long fc = rdmsrl(X86_MSR_IA32_FEAT_CTL);
+	if (fc & X86_FEAT_CTL_SGX_LC_ENABLED) {
+		ret = sgx_reset_pubkey_hash();
+			if (ret) {
+				uk_pr_err("can not reset SGX LE public key hash MSRs dut to unknown reason\n");
+		}
+	} else {
+		uk_pr_info("Flexible Launch Control is not enabled\n");
 	}
 
 	return 0;
