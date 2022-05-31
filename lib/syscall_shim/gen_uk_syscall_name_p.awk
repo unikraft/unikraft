@@ -9,8 +9,10 @@ BEGIN {
 }
 
 /[a-zA-Z0-9]+-[0-9]+/{
+	printf "#ifdef HAVE_uk_syscall_%s\n", name;
 	printf "\tcase SYS_%s:\n", $1
 	printf "\t\treturn \"%s\";\n", $1
+	printf "#endif /* HAVE_uk_syscall_%s */\n\n", name;
 }
 
 END {
