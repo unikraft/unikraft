@@ -88,6 +88,6 @@ int sgx_page_cache_init(void)
 	if (!IS_ERR(tmp))
 		ksgxswapd_tsk = tmp;
 	return PTR_ERR_OR_ZERO(tmp);*/
-	uk_pr_warn("%s not implemented", __func__);
-	return -EPERM;
+	WARN_STUBBED();
+	return 0;
 }

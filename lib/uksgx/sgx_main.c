@@ -42,6 +42,16 @@ int sgx_nr_epc_banks;
 __u64 sgx_encl_size_max_64;
 bool sgx_has_sgx2;
 
+static int sgx_reset_pubkey_hash() {
+	if (wrmsrl_safe(MSR_IA32_SGXLEPUBKEYHASH0, 0xa6053e051270b7acULL) ||
+		wrmsrl_safe(MSR_IA32_SGXLEPUBKEYHASH1, 0x6cfbe8ba8b3b413dULL) ||
+		wrmsrl_safe(MSR_IA32_SGXLEPUBKEYHASH2, 0xc4916d99f2b3735dULL) ||
+		wrmsrl_safe(MSR_IA32_SGXLEPUBKEYHASH3, 0xd4f8c05909f9bb3bULL)) {
+			return -EIO;
+		}
+	return 0;
+}
+
 int sgx_init()
 {
 	unsigned int info[4] = {0, 0, 0, 0};
@@ -70,7 +80,7 @@ int sgx_init()
 		size = ((__u64)(*edx & 0xfffff) << 32)
 		       + (__u64)(*ecx & 0xfffff000);
 
-		uk_pr_info("EPC section: 0x%lx-0x%lx (%dMB)\n", pa, pa + size, size / 1024 / 1024);
+		uk_pr_info("EPC section: 0x%lx-0x%lx (%ldMB)\n", pa, pa + size, size / 1024 / 1024);
 
 		sgx_epc_banks[i].pa = pa;
 		sgx_epc_banks[i].size = size;
@@ -82,9 +92,17 @@ int sgx_init()
 	ukarch_spin_init(&sgx_free_list_lock);
 
 	/* set virtual address the same as the physical address 
-	 * FIXME: we should use ioremap() instead */
+	 * TODO: linux-sgx-driver uses ioremap() to map the physical address to 
+	 * virtual address, but in Unikraft, Virtual Memory API is a optional feature in 
+	 * Platform Interface Options, hence, we need to add two conditions here, like:
+	 * #ifdef CONFIG_PAGING
+	 * code to handle PA-VA mapping...
+	 * #else
+	 * code for PA only...
+	 * #endif
+	 */
 	for (i = 0; i < sgx_nr_epc_banks; i++) {
-		sgx_epc_banks[i].va = (void *)pa;
+		sgx_epc_banks[i].va = pa;
 		ret = sgx_add_epc_bank(sgx_epc_banks[i].pa, sgx_epc_banks[i].size, i);
 
 		if (ret) {
@@ -94,8 +112,17 @@ int sgx_init()
 	}
 
 	ret = sgx_page_cache_init();
-	if (ret)
+	if (ret) {
+		uk_pr_err("sgx_page_cache_init() failed with return value %d\n", ret);
 		goto out_iounmap;
+	}
+	
+	/* TODO: for paging, linux-sgx-driver alloc a workqueue here, need to implement something similar */
+
+	ret = sgx_reset_pubkey_hash();
+	if (ret) {
+		uk_pr_err("can not reset SGX LE public key hash MSRs\n");
+	}
 
 	return 0;
 
