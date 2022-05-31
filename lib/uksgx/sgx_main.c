@@ -119,7 +119,7 @@ int sgx_init()
 	
 	/* TODO: for paging, linux-sgx-driver alloc a workqueue here, need to implement something similar */
 
-	ret = sgx_reset_pubkey_hash();
+	ret = sgx_reset_pubkey_hash(); // TODO: test if this is okay when SGX_LC == true
 	if (ret) {
 		uk_pr_err("can not reset SGX LE public key hash MSRs\n");
 	}
