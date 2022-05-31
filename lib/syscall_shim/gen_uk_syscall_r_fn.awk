@@ -13,8 +13,10 @@ BEGIN {
 	name = $1
 	sys_name = "SYS_" name
 	uk_syscall_r = "uk_syscall_r_" name
+	printf "#ifdef HAVE_uk_syscall_%s\n", name;
 	printf "\tcase %s:\n", sys_name;
 	printf "\t\treturn (long (*)(void)) %s;\n", uk_syscall_r;
+	printf "#endif /* HAVE_uk_syscall_%s */\n\n", name;
 }
 
 END {

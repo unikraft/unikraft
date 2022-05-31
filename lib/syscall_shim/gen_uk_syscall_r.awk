@@ -16,6 +16,7 @@ BEGIN {
 	sys_name = "SYS_" name
 	uk_syscall_r = "uk_syscall_r_" name
 	args_nr = $2 + 0
+	printf "#ifdef HAVE_uk_syscall_%s\n", name;
 	printf "\tcase %s:\n", sys_name;
 	printf "\t\treturn %s(", uk_syscall_r;
 	for (i = 1; i < args_nr; i++)
@@ -23,6 +24,7 @@ BEGIN {
 	if (args_nr > 0)
 		printf("va_arg(arg, long)")
 	printf(");\n")
+	printf "#endif /* HAVE_uk_syscall_%s */\n\n", name;
 }
 
 END {
