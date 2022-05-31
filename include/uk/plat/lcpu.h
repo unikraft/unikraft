@@ -96,11 +96,19 @@ void ukplat_lcpu_halt_to(__nsec until);
  */
 void ukplat_lcpu_halt_irq(void);
 
+/* Non-prototyped logical CPU entry function */
+typedef void __noreturn (*ukplat_lcpu_entry_t)();
+
+typedef __u32 __lcpuidx;	/* Sequential index of logical CPU */
+typedef __u64 __lcpuid;		/* Physical ID of logical CPU */
+
+/**
+ * Returns the hardware ID of the current logical CPU
+ */
+__lcpuid ukplat_lcpu_id(void);
+
 #ifdef CONFIG_HAVE_SMP
 #include <uk/list.h>
-
-typedef void (*ukplat_lcpu_entry_t)(void) __noreturn;
-typedef __u32 __lcpuid;
 
 struct ukplat_lcpu_func {
 	struct uk_list_head lentry;
@@ -121,9 +129,9 @@ struct ukplat_lcpu_func {
 };
 
 /**
- * Returns the ID of the current logical CPU
+ * Returns the index of the current logical CPU
  */
-__lcpuid ukplat_lcpu_id(void);
+__lcpuidx ukplat_lcpu_idx(void);
 
 /**
  * Returns the number of logical CPUs present in the system
@@ -135,70 +143,71 @@ __u32 ukplat_lcpu_count(void);
  * CPUs execute the entry functions if supplied or enter a low-power wait state
  * otherwise. CPUs that have already been started are ignored.
  *
- * @param lcpuid array with the IDs of the logical CPUs that are to be started.
- *   Can be NULL to include all logical CPUs except the one executing the
- *   function.
- * @param num number of logical CPU IDs given
- * @param sp array of stack pointers, one for each specified logical CPU
- * @param entry optional array of entry function pointers, one for each
- *   specified logical CPU. Provided functions must not return. If the
- *   parameter or individual elements are NULL the respective logical CPUs
- *   enter a low-power wait state after startup
+ * @param lcpuidx array with the indices of the logical CPUs that are to be
+ *   started. Can be NULL to include all logical CPUs except the one executing
+ *   the function
+ * @param num number of logical CPUs specified, 0 if lcpuidx is NULL
+ * @param sp array of stack pointers, one for each logical CPU to start. If
+ *   lcpuidx is NULL, must be ukplat_lcpu_count() - 1 stacks
+ * @param entry array of entry function pointers, one for logical CPU to start.
+ *   Can be NULL, otherwise if lcpuidx is NULL, must contain
+ *   ukplat_lcpu_count() - 1 function pointers. Provided functions must not
+ *   return. If the parameter or individual function pointers are NULL the
+ *   respective logical CPUs enter a low-power wait state after startup
  * @param flags (architecture-dependent) flags that specify how to start the
  *   CPUs (see UKPLAT_LCPU_SFLG_* flags if available)
  *
  * @return 0 on success, an errno-type error value otherwise
  */
-int ukplat_lcpu_start(__lcpuid lcpuid[], unsigned int num, void *sp[],
+int ukplat_lcpu_start(__lcpuidx lcpuidx[], unsigned int num, void *sp[],
 		      ukplat_lcpu_entry_t entry[], unsigned long flags);
 
 /**
  * Waits for the specified logical CPUs to enter idle state, or until the
  * timeout expires.
  *
- * @param lcpuid array with the IDs of the logical CPUs to wait for. Can be
- *   NULL to include all logical CPUs except the one executing the function
- * @param num number of logical CPU IDs given
+ * @param lcpuidx array with the indices of the logical CPUs to wait for. Can
+ *   be NULL to include all logical CPUs except the one executing the function
+ * @param num number of logical CPUs specified, 0 if lcpuidx is NULL
  * @param timeout timeout in nanoseconds for the wait to be satisfied. Can be
  *   0 to wait indefinitely
  *
  * @return 0 if the wait for all specified logical CPUs has been satisfied,
  *   an errno-type error value otherwise (e.g., timeout)
  */
-int ukplat_lcpu_wait(__lcpuid lcpuid[], unsigned int num, __nsec timeout);
+int ukplat_lcpu_wait(__lcpuidx lcpuidx[], unsigned int num, __nsec timeout);
 
 /**
  * Executes a function on the specified logical CPUs. The run function does not
  * wait for the execution to start or complete. Multiple functions can be run
  * at the same time without having to wait for their completion.
  *
- * @param lcpuid array with the IDs of the logical CPUs that should execute the
- *   function. Can be NULL to execute the function on all logical CPUs except
- *   the current one
- * @param num number of logical CPU IDs given
+ * @param lcpuidx array with the indices of the logical CPUs that should
+ *   execute the function. Can be NULL to execute the function on all logical
+ *   CPUs except the current one
+ * @param num number of logical CPUs specified, 0 if lcpuidx is NULL
  * @param fn the function to be executed
  * @param flags (architecture-dependent) flags that specify how the function
  *   should be executed (see UKPLAT_LCPU_RFLG_* flags if available)
  *
  * @return 0 on success, an errno-type error value otherwise
  */
-int ukplat_lcpu_run(__lcpuid lcpuid[], unsigned int num,
+int ukplat_lcpu_run(__lcpuidx lcpuidx[], unsigned int num,
 		    struct ukplat_lcpu_func *fn, unsigned long flags);
 
 /**
  * Wakes up the specified logical CPUs from a halt or low-power sleep state.
  *
- * @param lcpuid array with the IDs of the logical CPUs that should be waked up.
- *   Can be NULL to execute the function on all logical CPUs except the current
- *   one.
- * @param num number of logical CPU IDs given
+ * @param lcpuidx array with the indices of the logical CPUs that should be
+ *   woken up. Can be NULL to wakeup all logical CPUs except the current one.
+ * @param num number of logical CPUs specified, 0 if lcpuidx is NULL
  *
  * @return 0 on success, an errno-type error value otherwise
  */
-int ukplat_lcpu_wakeup(__lcpuid lcpuid[], unsigned int num);
+int ukplat_lcpu_wakeup(__lcpuidx lcpuidx[], unsigned int num);
 
 #else /* CONFIG_HAVE_SMP */
-#define ukplat_lcpu_id()	(0)
+#define ukplat_lcpu_idx()	(0)
 #define ukplat_lcpu_count()	(1)
 #endif /* CONFIG_HAVE_SMP */
 
