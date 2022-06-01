@@ -80,7 +80,7 @@ void ukplat_lcpu_irqs_handle_pending(void);
 /**
  * Halts the current logical CPU execution
  */
-void ukplat_lcpu_halt(void);
+void __noreturn ukplat_lcpu_halt(void);
 
 /**
  * Halts the current logical CPU. Execution is resumed when an interrupt/signal
