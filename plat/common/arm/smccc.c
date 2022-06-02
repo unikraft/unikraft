@@ -31,7 +31,7 @@
  */
 #include <arm/smccc.h>
 
-static void (*_conduit)(struct smccc_args *args) = smccc_smc;
+static smccc_conduit_fn_t conduit = smccc_smc;
 static unsigned long _version = SMCCC_VERSION_1_2;
 
 unsigned long smccc_version(void)
@@ -108,9 +108,9 @@ unsigned long smccc_svc_query(unsigned long service, unsigned long type)
 void smccc_init(struct smccc_config *config)
 {
 	if (config->conduit == SMCCC_CONDUIT_HVC)
-		_conduit = smccc_hvc;
+		conduit = smccc_hvc;
 	else
-		_conduit = smccc_smc;
+		conduit = smccc_smc;
 
 	_version = config->version;
 }
@@ -127,5 +127,5 @@ void smccc_invoke(struct smccc_args *args)
 		args->a0 |= (SMCCC_SVE_STATE_OFF << SMCCC_SVE_STATE_SHIFT);
 	}
 #endif
-	_conduit(args);
+	conduit(args);
 }
