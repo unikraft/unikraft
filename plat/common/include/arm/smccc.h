@@ -141,6 +141,8 @@ struct smccc_args {
 #endif
 };
 
+typedef void (*smccc_conduit_fn_t)(struct smccc_args *args);
+
 /**
  * Sets the conduit and version to use when issuing SMCCC calls.
  *
