@@ -144,11 +144,13 @@ __lcpuid ukplat_lcpu_count(void);
  *   specified logical CPU. Provided functions must not return. If the
  *   parameter or individual elements are NULL the respective logical CPUs
  *   enter a low-power wait state after startup
+ * @param flags (architecture-dependent) flags that specify how to start the
+ *   CPUs (see UKPLAT_LCPU_SFLG_* flags if available)
  *
  * @return 0 on success, an errno-type error value otherwise
  */
 int ukplat_lcpu_start(__lcpuid lcpuid[], unsigned int num, void *sp[],
-		      ukplat_lcpu_entry_t entry[]);
+		      ukplat_lcpu_entry_t entry[], unsigned long flags);
 
 /**
  * Waits for the specified logical CPUs to enter idle state, or until the
@@ -181,7 +183,7 @@ int ukplat_lcpu_wait(__lcpuid lcpuid[], unsigned int num, __nsec timeout);
  * @return 0 on success, an errno-type error value otherwise
  */
 int ukplat_lcpu_run(__lcpuid lcpuid[], unsigned int num,
-		    struct ukplat_lcpu_func *fn, int flags);
+		    struct ukplat_lcpu_func *fn, unsigned long flags);
 
 /**
  * Wakes up the specified logical CPUs from a halt or low-power sleep state.
