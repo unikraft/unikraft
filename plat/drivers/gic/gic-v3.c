@@ -219,6 +219,53 @@ static void gicv3_enable_irq(uint32_t irq)
 }
 
 /**
+ * Send a software generated interrupt to the specified core.
+ *
+ * @sgintid the software generated interrupt id
+ * @cpuid the id of the targeted cpu
+ */
+static void gicv3_sgi_gen(uint8_t sgintid, uint32_t cpuid)
+{
+	uint64_t sgi_register = 0, control_register_rss, type_register_rss;
+	uint64_t range_selector = 0, extended_cpuid;
+	uint32_t aff0;
+
+	extended_cpuid = (uint64_t) cpuid;
+
+	/* Only INTID 0-15 allocated to sgi */
+	UK_ASSERT(sgintid <= GICD_SGI_MAX_INITID);
+	sgi_register |= (sgintid << 24);
+
+	/* Set affinity fields and optional range selector */
+	sgi_register |= (extended_cpuid & MPIDR_AFF3_MASK) << 48;
+	sgi_register |= (extended_cpuid & MPIDR_AFF2_MASK) << 32;
+	sgi_register |= (extended_cpuid & MPIDR_AFF1_MASK) << 16;
+	/**
+	 ** For affinity 0, we need to find which group of 16 values is
+	 ** represented by the TargetList field in ICC_SGI1R_EL1.
+	 **/
+	aff0 = extended_cpuid & MPIDR_AFF0_MASK;
+	if (aff0 >= 16) {
+		control_register_rss = SYSREG_READ64(ICC_CTLR_EL1) & (1 << 18);
+		type_register_rss =  read_gicd32(GICD_TYPER)  & (1 << 26);
+		if (control_register_rss == 1 && type_register_rss == 1) {
+			range_selector = aff0 / 16;
+			sgi_register |= (range_selector << 44);
+		} else {
+			uk_pr_err("Can't generate interrupt!\n");
+			return;
+		}
+	}
+
+	sgi_register |= (1 << (aff0 % 16));
+
+	/* Generate interrupt */
+	dist_lock(gicv3_drv);
+	SYSREG_WRITE64(ICC_SGI1R_EL1, sgi_register);
+	dist_unlock(gicv3_drv);
+}
+
+/**
  * Disable an interrupt
  *
  * @param irq interrupt number [0..GIC_MAX_IRQ-1]
@@ -526,6 +573,7 @@ static int gicv3_do_probe(const void *fdt)
 		.set_irq_affinity  = gicv3_set_irq_affinity,
 		.irq_translate     = gic_irq_translate,
 		.handle_irq        = gicv3_handle_irq,
+		.gic_sgi_gen	   = gicv3_sgi_gen,
 	};
 
 	/* Set driver functions */
