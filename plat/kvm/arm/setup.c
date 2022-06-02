@@ -27,6 +27,8 @@
 #include <kvm-arm/mm.h>
 #include <kvm/intctrl.h>
 #include <arm/cpu.h>
+#include <arm/arm64/cpu.h>
+#include <arm/smccc.h>
 #include <uk/arch/limits.h>
 
 struct kvmplat_config _libkvmplat_cfg = { 0 };
@@ -35,7 +37,7 @@ struct kvmplat_config _libkvmplat_cfg = { 0 };
 static char cmdline[MAX_CMDLINE_SIZE];
 static const char *appname = CONFIG_UK_NAME;
 
-smcc_psci_callfn_t smcc_psci_call;
+smccc_conduit_fn_t smccc_psci_call;
 
 extern void _libkvmplat_newstack(uint64_t stack_start,
 			void (*tramp)(void *), void *arg);
@@ -65,6 +67,7 @@ static void _dtb_get_psci_method(void)
 	if (fdtpsci < 0)
 		fdtpsci = fdt_node_offset_by_compatible(_libkvmplat_cfg.dtb,
 							-1, "arm,psci-0.2");
+
 	if (fdtpsci < 0) {
 		uk_pr_info("No PSCI conduit found in DTB\n");
 		goto enomethod;
@@ -77,21 +80,20 @@ static void _dtb_get_psci_method(void)
 	}
 
 	if (!strcmp(fdtmethod, "hvc"))
-		smcc_psci_call = smcc_psci_hvc_call;
+		smccc_psci_call = smccc_hvc;
 	else if (!strcmp(fdtmethod, "smc"))
-		smcc_psci_call = smcc_psci_smc_call;
+		smccc_psci_call = smccc_smc;
 	else {
 		uk_pr_info("Invalid PSCI conduit method: %s\n",
 			   fdtmethod);
 		goto enomethod;
 	}
-
 	uk_pr_info("PSCI method: %s\n", fdtmethod);
 	return;
 
 enomethod:
 	uk_pr_info("Support PSCI from PSCI-0.2\n");
-	smcc_psci_call = NULL;
+	smccc_psci_call = NULL;
 }
 
 static void _init_dtb_mem(void)
