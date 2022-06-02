@@ -3,7 +3,8 @@
 
 #include <uk/sgx.h>
 #include <uk/arch/types.h>
-#include <lib/nolibc/musl-imported/arch/generic/bits/ioctl.h>
+// #include <lib/nolibc/musl-imported/arch/generic/bits/ioctl.h>
+#include <sys/ioctl.h>
 
 #define SGX_MAGIC 0xA4
 

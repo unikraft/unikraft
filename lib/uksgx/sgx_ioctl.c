@@ -1,7 +1,7 @@
 #include <uk/sgx_user.h>
 #include <errno.h>
 
-int sgx_get_encl(unsigned long addr, struct sgx_encl **encl)
+int sgx_get_encl(unsigned int addr, struct sgx_encl **encl)
 {
 	return 0;
 }
@@ -19,8 +19,8 @@ int sgx_get_encl(unsigned long addr, struct sgx_encl **encl)
  * 0 on success,
  * system error on failure
  */
-static long sgx_ioc_enclave_create(struct device *filep, unsigned int cmd,
-				   unsigned long arg)
+static int sgx_ioc_enclave_create(struct device *filep, unsigned int cmd,
+				   unsigned int arg)
 {
 	return 0;
 }
@@ -39,8 +39,8 @@ static long sgx_ioc_enclave_create(struct device *filep, unsigned int cmd,
  * 0 on success,
  * system error on failure
  */
-static long sgx_ioc_enclave_add_page(struct device *filep, unsigned int cmd,
-				     unsigned long arg)
+static int sgx_ioc_enclave_add_page(struct device *filep, unsigned int cmd,
+				     unsigned int arg)
 {
     return 0;
 }
@@ -58,14 +58,14 @@ static long sgx_ioc_enclave_add_page(struct device *filep, unsigned int cmd,
  * 0 on success,
  * system error on failure
  */
-static long sgx_ioc_enclave_init(struct device *filep, unsigned int cmd,
-				 unsigned long arg)
+static int sgx_ioc_enclave_init(struct device *filep, unsigned int cmd,
+				 unsigned int arg)
 {
 	return 0;
 }
 
-long sgx_ioc_page_modpr(struct device *filep, unsigned int cmd,
-			unsigned long arg)
+int sgx_ioc_page_modpr(struct device *filep, unsigned int cmd,
+			unsigned int arg)
 {
 	return 0;
 }
@@ -76,20 +76,20 @@ long sgx_ioc_page_modpr(struct device *filep, unsigned int cmd,
  * eaccept needs to be invoked after return.
  * @arg range address of pages to be switched
  */
-long sgx_ioc_page_to_tcs(struct device *filep, unsigned int cmd,
-			 unsigned long arg)
+int sgx_ioc_page_to_tcs(struct device *filep, unsigned int cmd,
+			 unsigned int arg)
 {
 	return 0;
 }
 
 /**
  * sgx_ioc_trim_page() - Pages defined in range are being trimmed.
- * These pages still belong to the enclave and can not be removed until
+ * These pages still beint to the enclave and can not be removed until
  * eaccept has been invoked
  * @arg range address of pages to be trimmed
  */
-long sgx_ioc_trim_page(struct device *filep, unsigned int cmd,
-		       unsigned long arg)
+int sgx_ioc_trim_page(struct device *filep, unsigned int cmd,
+		       unsigned int arg)
 {
 	return 0;
 }
@@ -100,11 +100,11 @@ long sgx_ioc_trim_page(struct device *filep, unsigned int cmd,
 //  * should have PT_TRIM page type and should have been eaccepted priorly
 //  * @arg range address of pages
 //  */
-// long sgx_ioc_page_notify_accept(struct device *filep, unsigned int cmd,
-// 				unsigned long arg)
+// int sgx_ioc_page_notify_accept(struct device *filep, unsigned int cmd,
+// 				unsigned int arg)
 // {
 // 	struct sgx_range *rg;
-// 	unsigned long address, end;
+// 	unsigned int address, end;
 // 	struct sgx_encl *encl;
 // 	int ret, tmp_ret = 0;
 
@@ -143,11 +143,11 @@ long sgx_ioc_trim_page(struct device *filep, unsigned int cmd,
 //  * sgx_ioc_page_remove() - Pages defined by address will be removed
 //  * @arg address of page
 //  */
-// long sgx_ioc_page_remove(struct device *filep, unsigned int cmd,
-// 			 unsigned long arg)
+// int sgx_ioc_page_remove(struct device *filep, unsigned int cmd,
+// 			 unsigned int arg)
 // {
 // 	struct sgx_encl *encl;
-// 	unsigned long address = *((unsigned long *) arg);
+// 	unsigned int address = *((unsigned int *) arg);
 // 	int ret;
 
 // 	if (!sgx_has_sgx2)
@@ -169,14 +169,14 @@ long sgx_ioc_trim_page(struct device *filep, unsigned int cmd,
 // 	return ret;
 // }
 
-typedef long (*sgx_ioc_t)(struct device *, unsigned long, void *);
+typedef int (*sgx_ioc_t)(struct device *, unsigned int, void *);
 #define ENOIOCTLCMD	515	/* No ioctl command */
 
-long sgx_ioctl(struct device *filep, unsigned int cmd, unsigned long arg)
+int sgx_ioctl(struct device *dev, unsigned long cmd, void *arg)
 {
 	char data[256];
 	sgx_ioc_t handler = __NULL;
-	long ret;
+	int ret;
 
 	switch (cmd) {
 	case SGX_IOC_ENCLAVE_CREATE:
@@ -210,7 +210,7 @@ long sgx_ioctl(struct device *filep, unsigned int cmd, unsigned long arg)
 	// if (copy_from_user(data, (void *)arg, _IOC_SIZE(cmd)))
 	// 	return -EFAULT;
 
-	// ret = handler(filep, cmd, (unsigned long)((void *)data));
+	// ret = handler(filep, cmd, (unsigned int)((void *)data));
 	// if (!ret && (cmd & IOC_OUT)) {
 	// 	if (copy_to_user((void *)arg, data, _IOC_SIZE(cmd)))
 	// 		return -EFAULT;

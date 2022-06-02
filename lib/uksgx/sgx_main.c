@@ -233,7 +233,13 @@ static int devfs_register(void)
 	uk_pr_info("Register %s to devfs\n", DEV_SGX_NAME);
 
 	/* register /dev/sgx */
-	dev = device_create()
+	dev = device_create(&drv_sgx, DEV_SGX_NAME, D_CHR);
+	if (dev == NULL) {
+		uk_pr_err("Failed to register %s to devfs\n", DEV_SGX_NAME);
+		return -1;
+	}
+
+	return 0;
 }
 
 devfs_initcall(devfs_register);

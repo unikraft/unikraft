@@ -75,6 +75,6 @@ struct sgx_encl_page {
 
 int sgx_add_epc_bank(__paddr_t start, unsigned long size, int bank);
 int sgx_page_cache_init(void);
-long sgx_ioctl(struct device *filep, unsigned int cmd, unsigned long arg);
+int sgx_ioctl(struct device *filep, unsigned long cmd, void *arg);
 
 #endif
