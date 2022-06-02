@@ -39,6 +39,7 @@ extern "C" {
 
 int sgx_probe();
 int sgx_init();
+long sgx_ioctl(struct device *filep, unsigned int cmd, unsigned long arg);
 
 #ifdef __cplusplus
 }

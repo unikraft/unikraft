@@ -33,7 +33,11 @@
 #include <uk/sgx_asm.h>
 #include <uk/sgx_internal.h>
 #include <uk/print.h>
+#include <vfscore/uio.h>
+
 #include <stdbool.h>
+
+#define DEV_SGX_NAME "sgx"
 
 #define SGX_MAX_EPC_BANKS 8 /* support up to 8 EPC banks according to Intel SGX  \
 			     OOT-drvier 2.11 */
@@ -201,8 +205,35 @@ int sgx_probe()
 	uk_pr_info("SGX status: SGX1 - true, SGX2 - %s\n",
 		   sgx_has_sgx2 ? "true" : "false");
 
+
+	uk_pr_info("Current machine is running under %s mode\n", read_cr0() & 0x1 ? "protected" : "real");
+	
+	uk_pr_info("Paging is %s\n", read_cr0() & 0x80000000 ? "enabled" : "disabled");
+
 	return sgx_init();
 
 error_exit:
 	return -ENODEV;
 }
+
+static struct devops sgx_devops = {
+	.ioctl = sgx_ioctl,
+};
+
+static struct driver drv_sgx = {
+	.devops = &sgx_devops,
+	.devsz = 0,
+	.name = DEV_SGX_NAME
+};
+
+static int devfs_register(void) 
+{
+	struct device *dev;
+
+	uk_pr_info("Register %s to devfs\n", DEV_SGX_NAME);
+
+	/* register /dev/sgx */
+	dev = device_create()
+}
+
+devfs_initcall(devfs_register);

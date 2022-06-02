@@ -37,6 +37,7 @@
 #include <uk/arch/types.h>
 #include <uk/list.h>
 #include <uk/bitops.h>
+#include <devfs/device.h>
 #include <errno.h>
 
 #define SGX_VA_SLOT_COUNT 512
@@ -74,5 +75,6 @@ struct sgx_encl_page {
 
 int sgx_add_epc_bank(__paddr_t start, unsigned long size, int bank);
 int sgx_page_cache_init(void);
+long sgx_ioctl(struct device *filep, unsigned int cmd, unsigned long arg);
 
 #endif
