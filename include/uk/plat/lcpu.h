@@ -128,7 +128,7 @@ __lcpuid ukplat_lcpu_id(void);
 /**
  * Returns the number of logical CPUs present in the system
  */
-__lcpuid ukplat_lcpu_count(void);
+__u32 ukplat_lcpu_count(void);
 
 /**
  * Starts multiple logical CPUs and assigns them the given stacks. The logical
