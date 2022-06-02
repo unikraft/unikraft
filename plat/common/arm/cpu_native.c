@@ -31,12 +31,11 @@
  */
 #include <uk/config.h>
 #include <uk/plat/common/cpu.h>
-#if !CONFIG_ARCH_ARM_32
-/* TODO: Not yet supported for Arm32 */
 #include <uk/plat/common/irq.h>
 #include <arm/psci.h>
-#endif
 #include <uk/assert.h>
+#include <arm/smccc.h>
+
 
 /*
  * Halts the CPU until the next external interrupt is fired. For Arm,
@@ -47,37 +46,39 @@ void halt(void)
 	__asm__ __volatile__("wfi");
 }
 
-#if !CONFIG_ARCH_ARM_32
-/*
- * TODO: Port the following functionality to Arm32
- */
 /* Systems support PSCI >= 0.2 can do system reset from PSCI */
 void reset(void)
 {
+	struct smccc_args smccc_arguments = {0};
+
 	/*
 	 * NO PSCI or invalid PSCI method, we can't do reset, just
 	 * halt the CPU.
 	 */
-	if (!smcc_psci_call) {
+	if (!smccc_psci_call) {
 		uk_pr_crit("Couldn't reset system, HALT!\n");
 		__CPU_HALT();
 	}
 
-	smcc_psci_call(PSCI_FNID_SYSTEM_RESET, 0, 0, 0);
+	smccc_arguments.a0 = PSCI_FNID_SYSTEM_RESET;
+	smccc_psci_call(&smccc_arguments);
 }
 
 /* Systems support PSCI >= 0.2 can do system off from PSCI */
 void system_off(void)
 {
+	struct smccc_args smccc_arguments = {0};
+
 	/*
 	 * NO PSCI or invalid PSCI method, we can't do shutdown, just
 	 * halt the CPU.
 	 */
-	if (!smcc_psci_call) {
+	if (!smccc_psci_call) {
 		uk_pr_crit("Couldn't shutdown system, HALT!\n");
 		__CPU_HALT();
 	}
 
-	smcc_psci_call(PSCI_FNID_SYSTEM_OFF, 0, 0, 0);
+	smccc_arguments.a0 = PSCI_FNID_SYSTEM_OFF;
+	smccc_psci_call(&smccc_arguments);
 }
-#endif /* !CONFIG_ARCH_ARM_32 */
+
