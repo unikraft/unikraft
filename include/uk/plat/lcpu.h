@@ -138,17 +138,17 @@ __lcpuid ukplat_lcpu_count(void);
  * @param lcpuid array with the IDs of the logical CPUs that are to be started.
  *   Can be NULL to include all logical CPUs except the one executing the
  *   function.
+ * @param num number of logical CPU IDs given
  * @param sp array of stack pointers, one for each specified logical CPU
  * @param entry optional array of entry function pointers, one for each
  *   specified logical CPU. Provided functions must not return. If the
  *   parameter or individual elements are NULL the respective logical CPUs
  *   enter a low-power wait state after startup
- * @param num number of logical CPU IDs given
  *
  * @return 0 on success, an errno-type error value otherwise
  */
-int ukplat_lcpu_start(__lcpuid lcpuid[], void *sp[],
-		      ukplat_lcpu_entry_t entry[], unsigned int num);
+int ukplat_lcpu_start(__lcpuid lcpuid[], unsigned int num, void *sp[],
+		      ukplat_lcpu_entry_t entry[]);
 
 /**
  * Waits for the specified logical CPUs to enter idle state, or until the
