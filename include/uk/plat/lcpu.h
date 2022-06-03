@@ -108,23 +108,20 @@ typedef __u64 __lcpuid;		/* Physical ID of logical CPU */
 __lcpuid ukplat_lcpu_id(void);
 
 #ifdef CONFIG_HAVE_SMP
-#include <uk/list.h>
 
 struct ukplat_lcpu_func {
-	struct uk_list_head lentry;
-
 	/**
 	 * Function to execute.
 	 *
-	 * @param regs pointer to a snapshot of the current CPU state. Changes
-	 *   to the state are applied after the RUN IRQ handler returns
-	 * @param fn pointer to this structure. The structure is not touched
-	 *   after function invocation and must be freed if necessary during
-	 *   function execution
+	 * @param regs pointer to a snapshot of the current CPU register state.
+	 *    Changes to the registers are applied after the RUN IRQ handler
+	 *    returns. The parameter might be NULL if the platform does not
+	 *    support supplying a register snapshot.
+	 * @param arg user-supplied argument
 	 */
-	void (*fn)(struct __regs *regs, const struct ukplat_lcpu_func *fn);
+	void (*fn)(struct __regs *regs, void *arg);
 
-	/* Optional user-supplied pointer. */
+	/* Optional user-supplied argument. */
 	void *user;
 };
 
