@@ -53,7 +53,7 @@ ssize_t uk_hwrand_generate_bytes(void *buf, size_t buflen)
 	__u32 val;
 
 	while (rem > 0 && safety > 0) {
-		val = uk_hwrand_randr(&success);
+		success = uk_hwrand_randr(&val);
 
 		if (success) {
 			size_t cnt = (rem < sizeof(val) ? rem : sizeof(val));

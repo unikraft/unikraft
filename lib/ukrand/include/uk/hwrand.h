@@ -26,15 +26,17 @@ int has_RDRAND(void);
 
 ssize_t uk_hwrand_generate_bytes(void *buf, size_t buflen);
 
-static inline __u32 uk_hwrand_randr(uint8_t *success)
+static inline uint8_t uk_hwrand_randr(__u32 *val)
 {	
-	__u32 val;
+	__u8 success;
+	
 	__asm__ volatile(
 		"rdrand %0 ; setc %1"
-		: "=r" (val), "=qm" (*success)
+		: "=r" (*val), "=qm" (success)
 	);
 
-	return val;
+	return success;
 }
+
 
 #endif

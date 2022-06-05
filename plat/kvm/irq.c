@@ -37,6 +37,7 @@
 #include <uk/assert.h>
 #include <errno.h>
 #include <uk/bitops.h>
+#include <uk/entropy.h>
 
 static struct uk_alloc *allocator;
 
@@ -83,7 +84,10 @@ void _ukplat_irq_handle(unsigned long irq)
 {
 	struct irq_handler *h;
 
+	add_interrupt_randomness(irq);
+	
 	UK_SLIST_FOREACH(h, &irq_handlers[irq], entries) {
+		
 		if (irq != ukplat_time_get_irq())
 			/* ukplat_time_get_irq() gives the IRQ reserved for a timer,
 			 * responsible to wake up cpu from halt, so it can check if
