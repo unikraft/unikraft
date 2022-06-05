@@ -1,13 +1,132 @@
 menuconfig LIBUBSAN
 	bool "ubsan: Undefined Behavior Sanitization"
 	default n
+	select LIBNOLIBC if !HAVE_LIBC
 
 if LIBUBSAN
+choice LIBUBSAN_GLOBAL
+	prompt "Enable global undefinied behavior sanitization"
+	default LIBUBSAN_GLOBAL_ON
 
-config LIBUBSAN_GLOBAL
-	bool "Global undefined sanitization"
+config LIBUBSAN_GLOBAL_OFF
+	bool "Off"
+
+config LIBUBSAN_GLOBAL_ON
+	bool "Default"
+
+config LIBUBSAN_GLOBAL_CUSTOM
+	bool "Custom"
+
+endchoice # LIBUBSAN_GLOBAL
+
+if LIBUBSAN_GLOBAL_CUSTOM
+menu "Custom sanitization options"
+
+config LIBUBSAN_SAN_SHIFT
+	bool "Result of shift operations"
+	default y
+
+config LIBUBSAN_SAN_DIV_BY_ZERO
+	bool "Integer division by zero"
+	default y
+
+# TODO: Float support
+# config LIBUBSAN_SAN_FLOAT_DIV_BY_ZERO
+#	bool "Float division by zero"
+#	default y
+
+config LIBUBSAN_SAN_UNREACHABLE
+	bool "__builtin_unreachable() calls"
+	default y
+
+config LIBUBSAN_SAN_VLA_BOUND
+	bool "Length of variable length array is positive"
+	default y
+
+config LIBUBSAN_SAN_NULL
+	bool "NULL pointer dereference"
+	default y
+
+config LIBUBSAN_SAN_RETURN
+	bool "Return statement checking (C++ only)"
+	default y
+
+config LIBUBSAN_SAN_INT_OVERFLOW
+	bool "Overflows for signed integer arithmetics"
+	default y
+
+# TODO: Float support
+# config LIBUBSAN_SAN_FLOAT_CAST_OVERFLOW
+#	bool "Overflows for float-to-int casts"
+#	default y
+
+config LIBUBSAN_SAN_POINTER_OVERFLOW
+	bool "Overflows for pointers"
+	default y
+
+choice LIBUBSAN_SAN_BOUNDS
+	prompt "Array bounds checking"
+	default LIBUBSAN_SAN_BOUNDS_STRICT
+
+config LIBUBSAN_SAN_BOUNDS_OFF
+	bool "Off"
+
+config LIBUBSAN_SAN_BOUNDS_STRICT
+	bool "Strict"
+	help
+		Most out of bounds accesses are detected, including flexible
+		array members and flexible array member-like arrays.
+		Initializers of variables with static storage are not
+		instrumented.
+
+config LIBUBSAN_SAN_BOUNDS_NON_STRICT
+	bool "Less strict"
+	help
+		Flexible array members, flexible array member-like arrays,
+		and initializers of variables with static storage are not
+		instrumented.
+
+endchoice # LIBUBSAN_SAN_BOUNDS
+
+config LIBUBSAN_SAN_ALIGNMENT
+	bool "Unaligned pointer dereference"
+	default y
+
+config LIBUBSAN_SAN_OBJECT_SIZE
+	bool "Memory references using __builtin_object_size"
+	default y
+
+config LIBUBSAN_SAN_NONNULL
+	bool "NULL arguments marked with nonnull attribute"
+	default y
+
+config LIBUBSAN_SAN_RETURNS_NONNULL
+	bool "NULL returns for functions with returns_nonnull attribute"
+	default y
+
+config LIBUBSAN_SAN_BOOL
+	bool "Loads from bools"
+	default y
+
+config LIBUBSAN_SAN_ENUM
+	bool "Loads from enums"
+	default y
+
+config LIBUBSAN_SAN_VPTR
+	bool "Type confusions (C++ only)"
+	default y
+
+config LIBUBSAN_SAN_BUILTIN
+	bool "Undefined behavior for builtin functions"
+	default y
+
+endmenu
+endif # LIBUBSAN_GLOBAL_CUSTOM
+
+config LIBUBSAN_ABORT
+	bool "Abort on recoverable events"
 	default n
 	help
-		Enable undefined behavior sanitization globally.
+		Crashes the system when detecting undefined behavior even if
+		the event is recoverable.
 endif
-

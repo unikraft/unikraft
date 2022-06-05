@@ -36,6 +36,7 @@
 #include <uk/alloc.h>
 #include <string.h>
 #include <uk/syscall.h>
+#include <uk/page.h>
 
 struct mmap_addr {
 	void *begin;
@@ -93,19 +94,23 @@ UK_SYSCALL_DEFINE(void*, mmap, void*, addr, size_t, len, int, prot,
 		last = tmp;
 		tmp = tmp->next;
 	}
-	void *mem = uk_malloc(uk_alloc_get_default(), len);
 
+	void *mem = uk_memalign(uk_alloc_get_default(), __PAGE_SIZE, len);
 	if (!mem) {
 		errno = ENOMEM;
 		return (void *) -1;
 	}
-	new = uk_malloc(uk_alloc_get_default(), sizeof(struct mmap_addr));
 
+	new = uk_malloc(uk_alloc_get_default(), sizeof(struct mmap_addr));
 	if (!new) {
 		uk_free(uk_alloc_get_default(), mem);
 		errno = ENOMEM;
 		return (void *) -1;
 	}
+
+	/* The caller expects the memory to be zeroed */
+	memset(mem, 0, len);
+
 	new->begin = mem;
 	new->end = mem + len;
 	new->next = NULL;
@@ -121,52 +126,48 @@ UK_SYSCALL_DEFINE(void*, mmap, void*, addr, size_t, len, int, prot,
  * addr needs to be a pointer to a memory block that has been allocated from
  * mmap. If len has the same value with the size of the memory block that has
  * been allocated from mmap the struct mmap_addr counterpart is destroyed.
- * Otherwise the initial memory block is replaced by a smaller one.
+ * Otherwise, we do nothing and unfortunately have to leak the memory. This is
+ * inherent to the way this library works as it implements mmap on top of
+ * ukalloc which does not provide any means to partially free memory or do a
+ * realloc with the guarantee of not moving the existing allocation.
  */
 
 UK_SYSCALL_DEFINE(int, munmap, void*, addr, size_t, len)
 {
 	struct mmap_addr *tmp = mmap_addr, *prev = NULL;
-	size_t remain_mem;
 
 	if (!len) {
 		errno = EINVAL;
 		return -1;
 	}
+
 	if (!addr)
 		return 0;
+
 	while (tmp) {
-		if (addr != tmp->begin) {
-			if (tmp->end > addr + len) {
-				errno = EINVAL;
-				return -1;
-			}
-			remain_mem = tmp->end - addr - len;
-			if (remain_mem) {
+		if (addr >= tmp->begin && addr < tmp->end) {
+			/* We cannot release only some part of the allocation.
+			 * In that case, pretend we have done it and hope
+			 * everything will be fine
+			 */
+			if (len != (__uptr)tmp->end - (__uptr)tmp->begin)
+				return 0;
 
-				void *mem = uk_malloc(uk_alloc_get_default(),
-						remain_mem);
-				if (!mem) {
-					errno = ENOMEM;
-					return -1;
-				}
-				memcpy(mem, addr+len, remain_mem);
-				tmp->begin = mem;
-			} else {
+			/* Caller wants to unmap the whole region. Easy! */
+			if (!prev)
+				mmap_addr = tmp->next;
+			else
+				prev->next = tmp->next;
 
-				if (!prev)
-					mmap_addr = tmp->next;
-				else
-					prev->next = tmp->next;
-				uk_free(uk_alloc_get_default(), tmp);
-			}
+			uk_free(uk_alloc_get_default(), tmp);
 			uk_free(uk_alloc_get_default(), addr);
 			return 0;
 		}
-		prev = tmp;
+
 		tmp = tmp->next;
 	}
-	/* unimplemented munmap */
+
+	/* No matching region found. But it is ok anyway */
 	return 0;
 }
 
@@ -185,6 +186,12 @@ void *mremap(void *old_address __unused, size_t old_size __unused,
 #endif
 
 UK_SYSCALL_R_DEFINE(int, madvise, void*, addr, size_t, length, int, advice)
+{
+	WARN_STUBBED();
+	return 0;
+}
+
+UK_SYSCALL_R_DEFINE(int, mprotect, void*, addr, size_t, len, int, prot)
 {
 	WARN_STUBBED();
 	return 0;

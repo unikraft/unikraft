@@ -1,6 +1,6 @@
 # [![Unikraft](http://unikraft.org/assets/imgs/unikraft-logo-small.png)][unikraft-website]
 
-[![](https://img.shields.io/badge/version-v0.7.0%20(Mimas)-%23EC591A)][unikraft-latest]
+[![](https://img.shields.io/badge/version-v0.8.0%20(Enceladus)-%23EC591A)][unikraft-latest]
 [![](https://img.shields.io/static/v1?label=license&message=BSD-3&color=%23385177)][unikraft-license]
 [![](https://img.shields.io/discord/762976922531528725.svg?label=discord&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2)][unikraft-discord]
 [![](https://img.shields.io/github/contributors/unikraft/unikraft)](https://github.com/unikraft/unikraft/graphs/contributors)
@@ -30,7 +30,7 @@ Unikraft is a new system for ultra-light virtualization of your services in the 
 
 🛡️ **Ready for mission critical deployments**
    Focus your trust on a minimal set of required components, significantly reduce your service's attack surface, and minimize certification costs.
-   
+
 🏎 **Outstanding performance**
    Specializing the OS to meet your application's needs is the key to achieving superior performance, making you ready to drive your infrastructure to the peak.
 
@@ -48,14 +48,14 @@ Unikraft supports the construction of multiple architectures, platforms, and ima
 
 ### 💻 Platform Support
 
-| Platform                       | `x86_64`                                                                                                                                                                                                                                   | `arm32`             | `arm64`                                                                                                                                                                                                                            |
-|--------------------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------:|:-------------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------:|
-| [Linux Userspace][plat-linuxu] | [![](https://builds.unikraft.io/api/v1/teams/unikraft/pipelines/unikraft-staging/jobs/compile-helloworld-x86_64-linuxu/badge)](https://builds.unikraft.io/teams/unikraft/pipelines/unikraft-staging/jobs/compile-helloworld-x86_64-linuxu) | ✅                  | ✅                                                                                                                                                                                                                                 |
-| [Linux KVM][plat-kvm]          | [![](https://builds.unikraft.io/api/v1/teams/unikraft/pipelines/unikraft-staging/jobs/compile-helloworld-x86_64-kvm/badge)](https://builds.unikraft.io/teams/unikraft/pipelines/unikraft-staging/jobs/compile-helloworld-x86_64-kvm)       | -                   | [![](https://builds.unikraft.io/api/v1/teams/unikraft/pipelines/unikraft-staging/jobs/compile-helloworld-arm64-kvm/badge)](https://builds.unikraft.io/teams/unikraft/pipelines/unikraft-staging/jobs/compile-helloworld-arm64-kvm) |
-| [Xen Hypervisor][plat-xen]     | [![](https://builds.unikraft.io/api/v1/teams/unikraft/pipelines/unikraft-staging/jobs/compile-helloworld-x86_64-xen/badge)](https://builds.unikraft.io/teams/unikraft/pipelines/unikraft-staging/jobs/compile-helloworld-x86_64-xen)       | ⚙️ [Issue #34][i34] | ⚙️ [Issue #62][i62]                                                                                                                                                                                                                |
-| [Solo5][plat-solo5]            | ✅                                                                                                                                                                                                                                         | -                   | ⚙️ [Issue #63][i63]                                                                                                                                                                                                                |
-| VMWare                         | ⚙️ [Issue #3][i3]                                                                                                                                                                                                                          | -                   | -                                                                                                                                                                                                                                  |
-| Hyper-V                        | ⚙️ [Issue #61][i61]                                                                                                                                                                                                                        | -                   | -                                                                                                                                                                                                                                  |
+| Platform                       | `x86_64`                                                                                                                                                                                                                                   | `arm32`             | `arm64`                                                                                                                                                                                                                                  |
+|--------------------------------|:------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------:|:-------------------:|:----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------:|
+| [Linux Userspace][plat-linuxu] | [![](https://builds.unikraft.io/api/v1/teams/unikraft/pipelines/unikraft-staging/jobs/compile-helloworld-x86_64-linuxu/badge)](https://builds.unikraft.io/teams/unikraft/pipelines/unikraft-staging/jobs/compile-helloworld-x86_64-linuxu) | ✅                  | [![](https://builds.unikraft.io/api/v1/teams/unikraft/pipelines/unikraft-staging/jobs/compile-helloworld-arm64-linuxu/badge)](https://builds.unikraft.io/teams/unikraft/pipelines/unikraft-staging/jobs/compile-helloworld-arm64-linuxu) |
+| [Linux KVM][plat-kvm]          | [![](https://builds.unikraft.io/api/v1/teams/unikraft/pipelines/unikraft-staging/jobs/compile-helloworld-x86_64-kvm/badge)](https://builds.unikraft.io/teams/unikraft/pipelines/unikraft-staging/jobs/compile-helloworld-x86_64-kvm)       | -                   | [![](https://builds.unikraft.io/api/v1/teams/unikraft/pipelines/unikraft-staging/jobs/compile-helloworld-arm64-kvm/badge)](https://builds.unikraft.io/teams/unikraft/pipelines/unikraft-staging/jobs/compile-helloworld-arm64-kvm)       |
+| [Xen Hypervisor][plat-xen]     | [![](https://builds.unikraft.io/api/v1/teams/unikraft/pipelines/unikraft-staging/jobs/compile-helloworld-x86_64-xen/badge)](https://builds.unikraft.io/teams/unikraft/pipelines/unikraft-staging/jobs/compile-helloworld-x86_64-xen)       | ⚙️ [Issue #34][i34] | ⚙️ [Issue #62][i62]                                                                                                                                                                                                                      |
+| [Solo5][plat-solo5]            | ✅                                                                                                                                                                                                                                         | -                   | ⚙️ [Issue #63][i63]                                                                                                                                                                                                                      |
+| VMWare                         | ⚙️ [Issue #3][i3]                                                                                                                                                                                                                          | -                   | -                                                                                                                                                                                                                                        |
+| Hyper-V                        | ⚙️ [Issue #61][i61]                                                                                                                                                                                                                        | -                   | -                                                                                                                                                                                                                                        |
 
 
 ### ☁️ IaaS Providers
@@ -74,24 +74,39 @@ With kraft installed, you can download Unikraft components, configure your unike
 
 ## Contributing
 
-Contributions are welcome!  Please see our [Contributing Guide][unikraft-contributing] for more details. A good starting point is the list of [open projects][github-projects].  If one of these interests you or you are interested in finding out more information, please drop us a line via the [mailing list][dev-discuss-list] or directly at <dev-discuss@unikraft.org>.
+Contributions are welcome!  Please see our [Contributing Guide][unikraft-contributing] for more details.
+A good starting point is the list of [open projects][github-projects].
+If one of these interests you or you are interested in finding out more information, please drop us a line via the [mailing list][dev-discuss-list] or directly at <dev-discuss@unikraft.org>.
 
-## Further Resources
-For more information about Unikraft, including user and developer guides, please refer to the [`docs/guides`][unikraft-guides] directory or vist the our [documentation][unikraft-docs].
+## Additional resources
+
+* [Quick-start guide][unikraft-gettingstarted]
+* [What is a unikernel?][unikraft-concepts]
+* [Unikraft's inherent security benefits][unikraft-security]
+* [Performance of Unikraft][unikraft-performance]
+* [POSIX-compatibility with Unikraft][unikraft-posix-compatibility]
+* [Energy efficiency with Unikraft][Unikraft-green]
+* [Unikraft Community][unikraft-community]
+* [Unikraft Documentation][unikraft-docs]
 
 ## License
 
 Unikraft is licensed under a BSD-3-Clause.  For more information, please refer to [`COPYING.md`][unikraft-license].
 
 
-[unikraft-website]: http://unikraft.org
-[unikraft-docs]: http://docs.unikraft.org
-[unikraft-guides]: https://github.com/unikraft/unikraft/tree/staging/docs/guides
-[unikraft-contributing]: https://github.com/unikraft/unikraft/blob/staging/CONTRIBUTING.md
+[unikraft-website]: https://unikraft.org
+[unikraft-docs]: https://unikraft.org/docs
+[unikraft-community]: https://unikraft.org/community
+[unikraft-contributing]: https://unikraft.org/docs/contributing/
 [unikraft-ci]: http://ci.unikraft.org
 [unikraft-license]: https://github.com/unikraft/unikraft/blob/staging/COPYING.md
-[unikraft-latest]: https://github.com/unikraft/unikraft/tree/RELEASE-0.5
-[unikraft-gettingstarted]: http://www.unikraft.org/getting-started
+[unikraft-latest]: https://github.com/unikraft/unikraft/tree/RELEASE-0.8.0
+[unikraft-gettingstarted]: http://unikraft.org/docs/getting-started
+[unikraft-concepts]: https://unikraft.org/docs/concepts/
+[unikraft-posix-compatibility]: https://unikraft.org/docs/features/posix-compatibility
+[unikraft-performance]: https://unikraft.org/docs/features/performance/
+[unikraft-security]: https://unikraft.org/docs/features/security/
+[unikraft-green]: https://unikraft.org/docs/features/green/
 [unikraft-discord]: https://bit.ly/UnikraftDiscord
 [kraft]: https://github.com/unikraft/kraft/
 [github-issues]: https://github.com/unikraft/unikraft/issues

@@ -63,11 +63,11 @@ struct bus_range {
 };
 
 struct pci_config_window {
-	__phys_addr		config_base;
+	__paddr_t		config_base;
 	__u64			config_space_size;
 	struct bus_range br;
 	struct pci_ecam_ops		*ops;
-	__phys_addr		pci_device_base;
+	__paddr_t		pci_device_base;
 	__u64			pci_device_limit;
 };
 

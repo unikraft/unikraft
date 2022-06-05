@@ -1,0 +1,29 @@
+menuconfig LIBUKFALLOCBUDDY
+	bool "ukfallocbuddy: Buddy-based physical memory allocator"
+	default n
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKDEBUG
+	select LIBUKFALLOC
+
+if LIBUKFALLOCBUDDY
+
+config LIBUKFALLOCBUDDY_MAX_ALLOC_ORDER
+	int "Maximum contiguous allocation (order)"
+	default 30
+	help
+		The size of the maximum allocatable contiguous chunk of
+		physical memory. At runtime also depends on free memory and
+		address alignment.
+
+config LIBUKFALLOCBUDDY_DEBUG
+	bool "Enable additional debug checks"
+	default n
+	help
+		Adds additional checks to verify the integrity of the
+		frame allocator.
+
+config LIBUKFALLOCBUDDY_STATS
+	bool "Collect frame allocation statistics"
+	default n
+
+endif

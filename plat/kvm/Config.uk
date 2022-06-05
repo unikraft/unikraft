@@ -1,7 +1,7 @@
 menuconfig PLAT_KVM
        bool "KVM guest"
        default n
-       depends on ((ARCH_X86_64 && !HAVE_SMP) || (ARCH_ARM_64 && !HAVE_SMP && !HAVE_SYSCALL))
+       depends on ((ARCH_X86_64 && !HAVE_SMP) || (ARCH_ARM_64 && !HAVE_SMP && !HAVE_SYSCALL && !HAVE_PAGING))
        select LIBUKDEBUG
        select LIBUKALLOC
        select LIBUKTIMECONV
@@ -76,6 +76,11 @@ endmenu
 endif
 
 endmenu
+
+config KVM_MAX_IRQ_HANDLER_ENTRIES
+       int "Maximum number of handlers per IRQ"
+       default 8
+       depends on (ARCH_X86_64 || ARCH_ARM_64)
 
 config KVM_PCI
        bool "PCI Bus Driver"

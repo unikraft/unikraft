@@ -105,6 +105,10 @@ do { \
 		for (;;) { \
 			/* protect the list */ \
 			flags = ukplat_lcpu_save_irqf(); \
+			if (condition) { \
+				ukplat_lcpu_restore_irqf(flags); \
+				break; \
+			} \
 			uk_waitq_add(wq, &__wait); \
 			__current->wakeup_time = deadline; \
 			clear_runnable(__current); \

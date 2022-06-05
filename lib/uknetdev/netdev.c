@@ -105,7 +105,7 @@ static struct uk_netdev_data *_alloc_data(struct uk_alloc *a,
 		return NULL;
 
 	data->drv_name = drv_name;
-	data->state    = UK_NETDEV_UNCONFIGURED;
+	data->state    = UK_NETDEV_UNPROBED;
 
 	/* This is the only place where we set the device ID;
 	 * during the rest of the device's life time this ID is read-only
@@ -214,6 +214,24 @@ enum uk_netdev_state uk_netdev_state_get(struct uk_netdev *dev)
 	return dev->_data->state;
 }
 
+int uk_netdev_probe(struct uk_netdev *dev)
+{
+	int ret = 0;
+
+	UK_ASSERT(dev);
+	UK_ASSERT(dev->ops);
+	UK_ASSERT(dev->_data);
+	UK_ASSERT(dev->_data->state == UK_NETDEV_UNPROBED);
+
+	if (dev->ops->probe)
+		ret = dev->ops->probe(dev);
+	if (ret < 0)
+		return ret;
+
+	dev->_data->state = UK_NETDEV_UNCONFIGURED;
+	return ret;
+}
+
 void uk_netdev_info_get(struct uk_netdev *dev,
 			struct uk_netdev_info *dev_info)
 {
@@ -221,6 +239,7 @@ void uk_netdev_info_get(struct uk_netdev *dev,
 	UK_ASSERT(dev->ops);
 	UK_ASSERT(dev->ops->info_get);
 	UK_ASSERT(dev_info);
+	UK_ASSERT(dev->_data->state >= UK_NETDEV_UNCONFIGURED);
 
 	/* Clear values before querying driver for capabilities */
 	memset(dev_info, 0, sizeof(*dev_info));
@@ -262,6 +281,7 @@ const void *uk_netdev_einfo_get(struct uk_netdev *dev,
 {
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->ops);
+	UK_ASSERT(dev->_data->state >= UK_NETDEV_UNCONFIGURED);
 
 	if (dev->_einfo)
 		return _netdev_einfo_get(dev, einfo);

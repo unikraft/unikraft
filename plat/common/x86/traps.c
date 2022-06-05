@@ -53,21 +53,29 @@
 
 /* Traps handled on both Xen and KVM */
 
-DECLARE_TRAP_EC(divide_error,      "divide error")
-DECLARE_TRAP   (debug,             "debug exception")
-DECLARE_TRAP_EC(int3,              "int3")
-DECLARE_TRAP_EC(overflow,          "overflow")
-DECLARE_TRAP_EC(bounds,            "bounds")
-DECLARE_TRAP_EC(invalid_op,        "invalid opcode")
-DECLARE_TRAP_EC(no_device,         "device not available")
-DECLARE_TRAP_EC(invalid_tss,       "invalid TSS")
-DECLARE_TRAP_EC(no_segment,        "segment not present")
-DECLARE_TRAP_EC(stack_error,       "stack segment")
-DECLARE_TRAP   (coproc_error,      "coprocessor error")
-DECLARE_TRAP_EC(alignment_check,   "alignment check")
-DECLARE_TRAP_EC(machine_check,     "machine check")
-DECLARE_TRAP   (simd_error,        "SIMD coprocessor error")
+DECLARE_TRAP_EVENT(UKARCH_TRAP_INVALID_OP);
+DECLARE_TRAP_EVENT(UKARCH_TRAP_DEBUG);
+DECLARE_TRAP_EVENT(UKARCH_TRAP_PAGE_FAULT);
+DECLARE_TRAP_EVENT(UKARCH_TRAP_BUS_ERROR);
+DECLARE_TRAP_EVENT(UKARCH_TRAP_MATH);
+DECLARE_TRAP_EVENT(UKARCH_TRAP_SECURITY);
 
+DECLARE_TRAP_EC(divide_error,    "divide error",         UKARCH_TRAP_MATH)
+DECLARE_TRAP   (debug,           "debug",                UKARCH_TRAP_DEBUG)
+DECLARE_TRAP_EC(int3,            "int3",                 UKARCH_TRAP_DEBUG)
+DECLARE_TRAP_EC(overflow,        "overflow",             NULL)
+DECLARE_TRAP_EC(bounds,          "bounds",               NULL)
+DECLARE_TRAP_EC(invalid_op,      "invalid opcode",       UKARCH_TRAP_INVALID_OP)
+DECLARE_TRAP_EC(no_device,       "device not available", UKARCH_TRAP_MATH)
+DECLARE_TRAP_EC(invalid_tss,     "invalid TSS",          NULL)
+DECLARE_TRAP_EC(no_segment,      "segment not present",  UKARCH_TRAP_BUS_ERROR)
+DECLARE_TRAP_EC(stack_error,     "stack segment",        UKARCH_TRAP_BUS_ERROR)
+DECLARE_TRAP_EC(gp_fault,        "general protection",   NULL)
+DECLARE_TRAP   (coproc_error,    "coprocessor",          UKARCH_TRAP_MATH)
+DECLARE_TRAP_EC(alignment_check, "alignment check",      UKARCH_TRAP_BUS_ERROR)
+DECLARE_TRAP_EC(machine_check,   "machine check",        NULL)
+DECLARE_TRAP   (simd_error,      "SIMD coprocessor",     UKARCH_TRAP_MATH)
+DECLARE_TRAP_EC(security_error,  "control protection",   UKARCH_TRAP_SECURITY)
 
 void do_unhandled_trap(int trapnr, char *str, struct __regs *regs,
 		unsigned long error_code)
@@ -81,46 +89,13 @@ void do_unhandled_trap(int trapnr, char *str, struct __regs *regs,
 	UK_CRASH("Crashing\n");
 }
 
-static int handling_fault;
-
-static void fault_prologue(void)
-{
-	/* If we are already handling a page fault, and got another one
-	 * that means we faulted in pagetable walk. Continuing here would cause
-	 * a recursive fault
-	 */
-	if (handling_fault == 1) {
-		UK_CRASH("Page fault in pagetable walk "
-			 "(access to invalid memory?).\n");
-	}
-	handling_fault++;
-	barrier();
-}
-
-void do_gp_fault(struct __regs *regs, long error_code)
-{
-	fault_prologue();
-	uk_pr_crit("GPF rip: %lx, error_code=%lx\n",
-		   regs->rip, error_code);
-	dump_regs(regs);
-#if !__OMIT_FRAMEPOINTER__
-	stack_walk_for_frame(regs->rbp);
-#endif /* !__OMIT_FRAMEPOINTER__ */
-	uk_asmdumpk(KLVL_CRIT, (void *) regs->rip, 6);
-	dump_mem(regs->rsp);
-	dump_mem(regs->rbp);
-	dump_mem(regs->rip);
-	UK_CRASH("Crashing\n");
-}
-
 void do_page_fault(struct __regs *regs, unsigned long error_code)
 {
-	unsigned long addr = read_cr2();
+	unsigned long vaddr = read_cr2();
+	struct ukarch_trap_ctx ctx = {regs, TRAP_page_fault, error_code, vaddr};
 
-	fault_prologue();
-	uk_pr_crit("Page fault at linear address %lx, rip %lx, "
-		   "regs %p, sp %lx, our_sp %p, code %lx\n",
-		   addr, regs->rip, regs, regs->rsp, &addr, error_code);
+	if (uk_raise_event(UKARCH_TRAP_PAGE_FAULT, &ctx))
+		return;
 
 	dump_regs(regs);
 #if !__OMIT_FRAMEPOINTER__

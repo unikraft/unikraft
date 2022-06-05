@@ -16,6 +16,29 @@ CINCLUDES   += -I$(CONFIG_UK_BASE)/arch/arm/arm64/include
 ASINCLUDES  += -I$(CONFIG_UK_BASE)/arch/arm/arm64/include
 CXXINCLUDES += -I$(CONFIG_UK_BASE)/arch/arm/arm64/include
 
+# Architecture Extensions
+#
+# Define these in the order of arch revision, to allow march
+# to be overwritten to the highest version required by the
+# selected extensions.
+ifeq ($(CONFIG_ARM64_FEAT_PAUTH),y)
+# Min GCC >= 9 to avoid dealing with deprecated
+# msign-return-address here and in macros
+$(call error_if_gcc_version_lt,9,0)
+ARCH_REV := armv8.3-a
+BRANCH_PROTECTION := pac-ret+leaf
+endif
+
+ifdef ARCH_REV
+ARCHFLAGS-y += -march=$(ARCH_REV)
+ISR_ARCHFLAGS-y += -march=$(ARCH_REV)
+endif
+
+ifdef BRANCH_PROTECTION
+ARCHFLAGS-y += -mbranch-protection=$(BRANCH_PROTECTION)
+ISR_ARCHFLAGS-y += -mbranch-protection=$(BRANCH_PROTECTION)
+endif
+
 # GCC support -mcpu=native for arm64 from 6.0
 ifeq ($(CONFIG_MCPU_ARM64_NATIVE),y)
 $(call error_if_gcc_version_lt,6,0)

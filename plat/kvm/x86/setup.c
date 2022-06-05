@@ -33,6 +33,7 @@
 #include <kvm/config.h>
 #include <kvm/console.h>
 #include <kvm/intctrl.h>
+#include <kvm-x86/bootinfo.h>
 #include <kvm-x86/multiboot.h>
 #include <kvm-x86/multiboot_defs.h>
 #include <uk/arch/limits.h>
@@ -42,6 +43,11 @@
 #include <uk/essentials.h>
 #include <x86/acpi/acpi.h>
 
+#ifdef CONFIG_PAGING
+#include <uk/plat/paging.h>
+#include <uk/falloc.h>
+#endif /* CONFIG_PAGING */
+
 #define PLATFORM_MEM_START 0x100000
 #define PLATFORM_MAX_MEM_ADDR 0x40000000
 
@@ -49,35 +55,21 @@
 static char cmdline[MAX_CMDLINE_SIZE];
 
 struct kvmplat_config _libkvmplat_cfg = { 0 };
+struct uk_bootinfo bootinfo = { 0 };
 
 extern void _libkvmplat_newstack(uintptr_t stack_start, void (*tramp)(void *),
 				 void *arg);
 
-static inline void _mb_get_cmdline(struct multiboot_info *mi)
-{
-	char *mi_cmdline;
-
-	if (mi->flags & MULTIBOOT_INFO_CMDLINE) {
-		mi_cmdline = (char *)(__u64)mi->cmdline;
-
-		if (strlen(mi_cmdline) > sizeof(cmdline) - 1)
-			uk_pr_err("Command line too long, truncated\n");
-		strncpy(cmdline, mi_cmdline,
-			sizeof(cmdline));
-	} else {
-		/* Use image name as cmdline to provide argv[0] */
-		uk_pr_debug("No command line present\n");
-		strncpy(cmdline, CONFIG_UK_NAME, sizeof(cmdline));
-	}
-
-	/* ensure null termination */
-	cmdline[(sizeof(cmdline) - 1)] = '\0';
-}
-
-static inline void _mb_init_mem(struct multiboot_info *mi)
+static void _convert_mbinfo(struct multiboot_info *mi)
 {
 	multiboot_memory_map_t *m;
-	size_t offset, max_addr;
+	multiboot_module_t *mod1;
+	size_t offset;
+
+	if (mi->flags & MULTIBOOT_INFO_CMDLINE)
+		bootinfo.u64_cmdline = (__u64)mi->cmdline;
+	else
+		bootinfo.u64_cmdline = 0;
 
 	/*
 	 * Look for the first chunk of memory at PLATFORM_MEM_START.
@@ -93,42 +85,29 @@ static inline void _mb_init_mem(struct multiboot_info *mi)
 	UK_ASSERT(offset < mi->mmap_length);
 
 	/*
-	 * Cap our memory size to PLATFORM_MAX_MEM_SIZE which boot.S defines
-	 * page tables for.
+	 * Cap our memory size to PLATFORM_MAX_MEM_SIZE for which the initial
+	 * static page table defines mappings for. Don't apply the limit when
+	 * paging is enabled as we take the information about the heap regions
+	 * to initialize the frame allocator.
 	 */
-	max_addr = m->addr + m->len;
-	if (max_addr > PLATFORM_MAX_MEM_ADDR)
-		max_addr = PLATFORM_MAX_MEM_ADDR;
-	UK_ASSERT((size_t) __END <= max_addr);
+	bootinfo.max_addr = m->addr + m->len;
+	if (bootinfo.max_addr > PLATFORM_MAX_MEM_ADDR)
+		bootinfo.max_addr = PLATFORM_MAX_MEM_ADDR;
+	UK_ASSERT(bootinfo.max_addr >= (size_t) __END);
 
 	/*
 	 * Reserve space for boot stack at the end of found memory
 	 */
-	if ((max_addr - m->addr) < __STACK_SIZE)
+	if ((bootinfo.max_addr - m->addr) < __STACK_SIZE)
 		UK_CRASH("Not enough memory to allocate boot stack\n");
 
-	_libkvmplat_cfg.heap.start = ALIGN_UP((uintptr_t) __END, __PAGE_SIZE);
-	_libkvmplat_cfg.heap.end   = (uintptr_t) max_addr - __STACK_SIZE;
-	_libkvmplat_cfg.heap.len   = _libkvmplat_cfg.heap.end
-				     - _libkvmplat_cfg.heap.start;
-	_libkvmplat_cfg.bstack.start = _libkvmplat_cfg.heap.end;
-	_libkvmplat_cfg.bstack.end   = max_addr;
-	_libkvmplat_cfg.bstack.len   = __STACK_SIZE;
-}
-
-static inline void _mb_init_initrd(struct multiboot_info *mi)
-{
-	multiboot_module_t *mod1;
-	uintptr_t heap0_start, heap0_end;
-	uintptr_t heap1_start, heap1_end;
-	size_t    heap0_len,   heap1_len;
-
 	/*
-	 * Search for initrd (called boot module according multiboot)
+	 * Search for initrd (called boot module according to multiboot)
 	 */
 	if (mi->mods_count == 0) {
 		uk_pr_debug("No initrd present\n");
-		goto no_initrd;
+		bootinfo.has_initrd = 0;
+		return;
 	}
 
 	/*
@@ -137,17 +116,66 @@ static inline void _mb_init_initrd(struct multiboot_info *mi)
 	 */
 	UK_ASSERT(mi->mods_addr);
 
-	mod1 = (multiboot_module_t *)((uintptr_t) mi->mods_addr);
+	mod1 = (multiboot_module_t *)((uintptr_t)mi->mods_addr);
 	UK_ASSERT(mod1->mod_end >= mod1->mod_start);
 
 	if (mod1->mod_end == mod1->mod_start) {
 		uk_pr_debug("Ignoring empty initrd\n");
-		goto no_initrd;
+		bootinfo.initrd_start = 0;
+		bootinfo.initrd_end = 0;
+		bootinfo.initrd_length = 0;
+		bootinfo.has_initrd = 0;
+	} else {
+		bootinfo.initrd_start = mod1->mod_start;
+		bootinfo.initrd_end = mod1->mod_end;
+		bootinfo.initrd_length = mod1->mod_end - mod1->mod_start;
+		bootinfo.has_initrd = 1;
+	}
+}
+
+static inline void _get_cmdline(struct uk_bootinfo *bi)
+{
+	char *mi_cmdline;
+
+	if (bi->u64_cmdline) {
+		mi_cmdline = (char *)bi->u64_cmdline;
+
+		if (strlen(mi_cmdline) > sizeof(cmdline) - 1)
+			uk_pr_err("Command line too long, truncated\n");
+		strncpy(cmdline, mi_cmdline, sizeof(cmdline));
+	} else {
+		/* Use image name as cmdline to provide argv[0] */
+		uk_pr_debug("No command line present\n");
+		strncpy(cmdline, CONFIG_UK_NAME, sizeof(cmdline));
 	}
 
-	_libkvmplat_cfg.initrd.start = (uintptr_t) mod1->mod_start;
-	_libkvmplat_cfg.initrd.end = (uintptr_t) mod1->mod_end;
-	_libkvmplat_cfg.initrd.len = (size_t) (mod1->mod_end - mod1->mod_start);
+	/* ensure null termination */
+	cmdline[(sizeof(cmdline) - 1)] = '\0';
+}
+
+static inline void _init_mem(struct uk_bootinfo *bi)
+{
+	_libkvmplat_cfg.heap.start = ALIGN_UP((uintptr_t)__END, __PAGE_SIZE);
+	_libkvmplat_cfg.heap.end = (uintptr_t)bi->max_addr - __STACK_SIZE;
+	_libkvmplat_cfg.heap.len =
+	    _libkvmplat_cfg.heap.end - _libkvmplat_cfg.heap.start;
+	_libkvmplat_cfg.bstack.start = _libkvmplat_cfg.heap.end;
+	_libkvmplat_cfg.bstack.end = bi->max_addr;
+	_libkvmplat_cfg.bstack.len = __STACK_SIZE;
+}
+
+static inline void _init_initrd(struct uk_bootinfo *bi)
+{
+	uintptr_t heap0_start, heap0_end;
+	uintptr_t heap1_start, heap1_end;
+	size_t heap0_len, heap1_len;
+
+	if (!bi->has_initrd)
+		goto no_initrd;
+
+	_libkvmplat_cfg.initrd.start = bi->initrd_start;
+	_libkvmplat_cfg.initrd.end   = bi->initrd_end;
+	_libkvmplat_cfg.initrd.len   = bi->initrd_length;
 
 	/*
 	 * Check if initrd is part of heap
@@ -209,9 +237,9 @@ static inline void _mb_init_initrd(struct multiboot_info *mi)
 			_libkvmplat_cfg.heap.end   = 0;
 			_libkvmplat_cfg.heap.len   = 0;
 		}
-		 _libkvmplat_cfg.heap2.start = 0;
-		 _libkvmplat_cfg.heap2.end   = 0;
-		 _libkvmplat_cfg.heap2.len   = 0;
+		_libkvmplat_cfg.heap2.start = 0;
+		_libkvmplat_cfg.heap2.end   = 0;
+		_libkvmplat_cfg.heap2.len   = 0;
 	} else {
 		/* Heap piece 0 has memory */
 		_libkvmplat_cfg.heap.start = heap0_start;
@@ -234,8 +262,7 @@ static inline void _mb_init_initrd(struct multiboot_info *mi)
 	 * places the initrd close to the beginning of the heap region. One need
 	 * to assign just more memory in order to avoid this crash.
 	 */
-	if (RANGE_OVERLAP(_libkvmplat_cfg.heap.start,
-			  _libkvmplat_cfg.heap.len,
+	if (RANGE_OVERLAP(_libkvmplat_cfg.heap.start, _libkvmplat_cfg.heap.len,
 			  _libkvmplat_cfg.initrd.start,
 			  _libkvmplat_cfg.initrd.len))
 		UK_CRASH("Not enough space at end of memory for boot stack\n");
@@ -251,6 +278,154 @@ no_initrd:
 	_libkvmplat_cfg.heap2.len    = 0;
 	return;
 }
+
+#ifdef CONFIG_PAGING
+/* TODO: Find an appropriate solution to manage the address space layout
+ * without the presence of any more advanced virtual memory management.
+ * For now, we simply map the heap statically at 0x400000000 (16 GiB).
+ */
+#define PG_HEAP_MAP_START			(1UL << 34) /* 16 GiB */
+
+/* Initial page table struct used for paging API to absorb statically defined
+ * startup page table.
+ */
+static struct uk_pagetable kernel_pt;
+
+static void _init_paging(struct multiboot_info *mi)
+{
+	struct kvmplat_config_memregion *mr[2];
+	multiboot_memory_map_t *m;
+	__sz offset, len;
+	__paddr_t start;
+	__sz free_memory, res_memory;
+	unsigned long frames;
+	int rc;
+
+	/* Initialize the frame allocator by taking away the memory from the
+	 * larger heap area. We setup a new heap area later.
+	 */
+	if (_libkvmplat_cfg.heap2.len > _libkvmplat_cfg.heap.len) {
+		mr[0] = &_libkvmplat_cfg.heap2;
+		mr[1] = &_libkvmplat_cfg.heap;
+	} else {
+		mr[0] = &_libkvmplat_cfg.heap;
+		mr[1] = &_libkvmplat_cfg.heap2;
+	}
+
+	offset = mr[0]->start - PAGE_ALIGN_UP(mr[0]->start);
+	start  = PAGE_ALIGN_UP(mr[0]->start);
+	len    = PAGE_ALIGN_DOWN(mr[0]->len - offset);
+
+	rc = ukplat_pt_init(&kernel_pt, start, len);
+	if (unlikely(rc))
+		goto EXIT_FATAL;
+
+	/* Also add memory of the smaller heap region. Since the region might
+	 * be as small as a single page or less, we do not treat errors as
+	 * fatal here
+	 */
+	offset = mr[1]->start - PAGE_ALIGN_UP(mr[1]->start);
+	start  = PAGE_ALIGN_UP(mr[1]->start);
+	len    = PAGE_ALIGN_DOWN(mr[1]->len - offset);
+
+	ukplat_pt_add_mem(&kernel_pt, start, len);
+
+	/* Add remaining physical memory that has not been added to the heaps
+	 * previously
+	 */
+	for (offset = 0; offset < mi->mmap_length;
+	     offset += m->size + sizeof(m->size)) {
+		m = (void *)(__uptr)(mi->mmap_addr + offset);
+
+		if ((m->type != MULTIBOOT_MEMORY_AVAILABLE) ||
+		    (m->addr <= PLATFORM_MEM_START))
+			continue;
+
+		rc = ukplat_pt_add_mem(&kernel_pt, m->addr, m->len);
+		if (unlikely(rc))
+			goto EXIT_FATAL;
+	}
+
+	/* Switch to new page table */
+	rc = ukplat_pt_set_active(&kernel_pt);
+	if (unlikely(rc))
+		goto EXIT_FATAL;
+
+	/* Unmap all 1:1 mappings extending over the kernel image and initrd.
+	 * The boot page table maps the first 1 GiB with everything starting
+	 * from 2 MiB mapped as 2 MiB large pages (see pagetable64.S).
+	 */
+	offset = mr[0]->start - PAGE_LARGE_ALIGN_UP(mr[0]->start);
+	start  = PAGE_LARGE_ALIGN_UP(mr[0]->start);
+	len    = PAGE_LARGE_ALIGN_DOWN(mr[0]->len - offset);
+
+	rc = ukplat_page_unmap(&kernel_pt, start,
+			       (PLATFORM_MAX_MEM_ADDR - start) >> PAGE_SHIFT,
+			       PAGE_FLAG_KEEP_FRAMES);
+	if (unlikely(rc))
+		goto EXIT_FATAL;
+
+	/* Setup and map heap */
+
+	/* TODO: We don't have any virtual address space management yet. We are
+	 * also missing demand paging and the means to dynamically assign frames
+	 * to the heap or other areas (e.g., mmap). We thus simply statically
+	 * pre-map the RAM as heap.
+	 * To map all this memory we also need page tables. This memory won't be
+	 * available for use by the heap, so we reduce the heap size by this
+	 * amount. We compute the number of page tables for the worst case
+	 * (i.e., 4K pages). Also reserve some space for the boot stack.
+	 */
+	free_memory = kernel_pt.fa->free_memory;
+	frames = free_memory >> PAGE_SHIFT;
+
+	res_memory = __STACK_SIZE;			/* boot stack */
+	res_memory += PT_PAGES(frames) << PAGE_SHIFT;	/* page tables */
+
+	_libkvmplat_cfg.heap.start = PG_HEAP_MAP_START;
+	_libkvmplat_cfg.heap.end = PG_HEAP_MAP_START + free_memory - res_memory;
+	_libkvmplat_cfg.heap.len = _libkvmplat_cfg.heap.end -
+				   _libkvmplat_cfg.heap.start;
+
+	uk_pr_info("HEAP area @ %"__PRIpaddr" - %"__PRIpaddr
+		   " (%"__PRIsz" bytes)\n",
+		   (__paddr_t)_libkvmplat_cfg.heap.start,
+		   (__paddr_t)_libkvmplat_cfg.heap.end,
+		   _libkvmplat_cfg.heap.len);
+
+	frames = _libkvmplat_cfg.heap.len >> PAGE_SHIFT;
+
+	rc = ukplat_page_map(&kernel_pt, _libkvmplat_cfg.heap.start,
+			     __PADDR_ANY, frames, PAGE_ATTR_PROT_RW, 0);
+	if (unlikely(rc))
+		goto EXIT_FATAL;
+
+	/* Forget about heap2 */
+	_libkvmplat_cfg.heap2.start = 0;
+	_libkvmplat_cfg.heap2.end = 0;
+	_libkvmplat_cfg.heap2.len = 0;
+
+	/* Setup and map boot stack */
+	_libkvmplat_cfg.bstack.start = _libkvmplat_cfg.heap.end;
+	_libkvmplat_cfg.bstack.end = _libkvmplat_cfg.heap.end + __STACK_SIZE;
+	_libkvmplat_cfg.bstack.len = _libkvmplat_cfg.bstack.end -
+				     _libkvmplat_cfg.bstack.start;
+
+	frames = _libkvmplat_cfg.bstack.len >> PAGE_SHIFT;
+
+	rc = ukplat_page_map(&kernel_pt, _libkvmplat_cfg.bstack.start,
+			     __PADDR_ANY, frames, PAGE_ATTR_PROT_RW, 0);
+	if (unlikely(rc))
+		goto EXIT_FATAL;
+
+	return;
+
+EXIT_FATAL:
+	UK_CRASH("Failed to initialize paging (code: %d)\n", -rc);
+}
+#else /* CONFIG_PAGING */
+#define _init_paging(mi) do { } while (0)
+#endif /* CONFIG_PAGING */
 
 static void _libkvmplat_entry2(void *arg __attribute__((unused)))
 {
@@ -269,24 +444,25 @@ void _libkvmplat_entry(void *arg)
 	uk_pr_info("Entering from KVM (x86)...\n");
 	uk_pr_info("     multiboot: %p\n", mi);
 
+	_convert_mbinfo(mi);
+
 	/*
 	 * The multiboot structures may be anywhere in memory, so take a copy of
 	 * everything necessary before we initialise memory allocation.
 	 */
-	_mb_get_cmdline(mi);
-	_mb_init_mem(mi);
-	_mb_init_initrd(mi);
+	_get_cmdline(&bootinfo);
+	_init_mem(&bootinfo);
+	_init_initrd(&bootinfo);
 
 	if (_libkvmplat_cfg.initrd.len)
 		uk_pr_info("        initrd: %p\n",
-			   (void *) _libkvmplat_cfg.initrd.start);
-	uk_pr_info("    heap start: %p\n",
-		   (void *) _libkvmplat_cfg.heap.start);
+			   (void *)_libkvmplat_cfg.initrd.start);
+	uk_pr_info("    heap start: %p\n", (void *)_libkvmplat_cfg.heap.start);
 	if (_libkvmplat_cfg.heap2.len)
 		uk_pr_info(" heap start (2): %p\n",
-			   (void *) _libkvmplat_cfg.heap2.start);
+			   (void *)_libkvmplat_cfg.heap2.start);
 	uk_pr_info("     stack top: %p\n",
-		   (void *) _libkvmplat_cfg.bstack.start);
+		   (void *)_libkvmplat_cfg.bstack.start);
 
 #ifdef CONFIG_HAVE_SMP
 	acpi_init();
@@ -304,7 +480,6 @@ void _libkvmplat_entry(void *arg)
 	 * Switch away from the bootstrap stack as early as possible.
 	 */
 	uk_pr_info("Switch from bootstrap stack to stack @%p\n",
-		   (void *) _libkvmplat_cfg.bstack.end);
-	_libkvmplat_newstack(_libkvmplat_cfg.bstack.end,
-			     _libkvmplat_entry2, 0);
+		   (void *)_libkvmplat_cfg.bstack.end);
+	_libkvmplat_newstack(_libkvmplat_cfg.bstack.end, _libkvmplat_entry2, 0);
 }

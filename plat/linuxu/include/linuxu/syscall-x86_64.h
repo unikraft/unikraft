@@ -38,7 +38,7 @@
 
 #define __SC_READ    0
 #define __SC_WRITE   1
-#define __SC_OPEN    2
+#define __SC_OPENAT  257
 #define __SC_CLOSE   3
 #define __SC_FSTAT   5
 #define __SC_MMAP    9

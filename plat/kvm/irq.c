@@ -27,47 +27,55 @@
 
 #include <stdlib.h>
 #include <uk/alloc.h>
-#include <uk/list.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/time.h>
-#include <uk/plat/common/cpu.h>
+#include <uk/plat/irq.h>
 #include <uk/plat/common/irq.h>
 #include <kvm/irq.h>
 #include <kvm/intctrl.h>
 #include <uk/assert.h>
+#include <uk/print.h>
 #include <errno.h>
 #include <uk/bitops.h>
 #include <uk/entropy.h>
 
-static struct uk_alloc *allocator;
-
+/* IRQ handlers declarations */
 struct irq_handler {
 	irq_handler_func_t func;
 	void *arg;
-
-	UK_SLIST_ENTRY(struct irq_handler) entries;
 };
 
-UK_SLIST_HEAD(irq_handler_head, struct irq_handler);
-static struct irq_handler_head irq_handlers[__MAX_IRQ];
+static struct irq_handler irq_handlers[__MAX_IRQ]
+				[CONFIG_KVM_MAX_IRQ_HANDLER_ENTRIES];
+
+static inline struct irq_handler *allocate_handler(unsigned long irq)
+{
+	UK_ASSERT(irq < __MAX_IRQ);
+	for (int i = 0; i < CONFIG_KVM_MAX_IRQ_HANDLER_ENTRIES; i++)
+		if (irq_handlers[irq][i].func == NULL)
+			return &irq_handlers[irq][i];
+	return NULL;
+}
 
 int ukplat_irq_register(unsigned long irq, irq_handler_func_t func, void *arg)
 {
 	struct irq_handler *h;
 	unsigned long flags;
 
-	UK_ASSERT(irq < __MAX_IRQ);
-	UK_ASSERT(allocator != NULL);
+	UK_ASSERT(func);
+	if (irq >= __MAX_IRQ)
+		return -EINVAL;
 
-	h = uk_malloc(allocator, sizeof(struct irq_handler));
-	if (!h)
+	flags = ukplat_lcpu_save_irqf();
+	h = allocate_handler(irq);
+	if (!h) {
+		ukplat_lcpu_restore_irqf(flags);
 		return -ENOMEM;
+	}
 
 	h->func = func;
 	h->arg = arg;
 
-	flags = ukplat_lcpu_save_irqf();
-	UK_SLIST_INSERT_HEAD(&irq_handlers[irq], h, entries);
 	ukplat_lcpu_restore_irqf(flags);
 
 	intctrl_clear_irq(irq);
@@ -83,11 +91,14 @@ extern unsigned long sched_have_pending_events;
 void _ukplat_irq_handle(unsigned long irq)
 {
 	struct irq_handler *h;
+	int i;
 
 	add_interrupt_randomness(irq);
-	
-	UK_SLIST_FOREACH(h, &irq_handlers[irq], entries) {
-		
+
+	for (i = 0; i < CONFIG_KVM_MAX_IRQ_HANDLER_ENTRIES; i++) {
+		if (irq_handlers[irq][i].func == NULL)
+			break;
+		h = &irq_handlers[irq][i];
 		if (irq != ukplat_time_get_irq())
 			/* ukplat_time_get_irq() gives the IRQ reserved for a timer,
 			 * responsible to wake up cpu from halt, so it can check if
@@ -116,9 +127,10 @@ exit_ack:
 	intctrl_ack_irq(irq);
 }
 
-int ukplat_irq_init(struct uk_alloc *a)
+int ukplat_irq_init(struct uk_alloc *a __unused)
 {
-	UK_ASSERT(allocator == NULL);
-	allocator = a;
+	UK_ASSERT(ukplat_lcpu_irqs_disabled());
+
+	/* Nothing for now */
 	return 0;
 }

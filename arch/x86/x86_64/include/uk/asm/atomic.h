@@ -31,57 +31,61 @@
 #endif
 
 /**
- * ukarch_ffs - find first (lowest) set bit in word.
- * @word: The word to search
+ * Find first (lowest) set bit in word.
+ * @param x The word to operate on
  *
- * Undefined if no bit exists, so code should check against 0 first.
+ * @return The index of the least significant 1-bit of x, or if x is zero,
+ *   the result is undefined. ffs(1)=0, ffs(3)=0, ffs(0x80000000)=31
  */
-static inline unsigned int ukarch_ffs(unsigned int word)
+static inline unsigned int ukarch_ffs(unsigned int x)
 {
 	__asm__("bsfl %1,%0"
-		: "=r" (word)
-		: "rm" (word));
-	return word;
+		: "=r" (x)
+		: "rm" (x));
+	return x;
 }
 
 /**
- * ukarch_fls - find last (highest) set bit in word.
- * @word: The word to search
+ * Find last (highest) set bit in word.
+ * @param x The word to operate on
  *
- * Undefined if no bit exists, so code should check against 0 first.
+ * @return The index of the most significant 1-bit of x, or if x is zero,
+ *   the result is undefined. fls(1)=0, fls(3)=1, fls(0x80000001)=31
  */
-static inline unsigned int ukarch_fls(unsigned int word)
+static inline unsigned int ukarch_fls(unsigned int x)
 {
 	__asm__("bsrl %1,%0"
-		: "=r" (word)
-		: "rm" (word));
-	return word;
+		: "=r" (x)
+		: "rm" (x));
+	return x;
 }
 
 /**
- * ukarch_ffsl - find first (lowest) set bit in word.
- * @word: The word to search
+ * Find first (lowest) set bit in long word.
+ * @param x The long word to operate on
  *
- * Undefined if no bit exists, so code should check against 0 first.
+ * @return The index of the least significant 1-bit of x, or if x is zero,
+ *    the result is undefined. ffs(1)=0, ffs(3)=0, ffs(0x80000000)=31
  */
-static inline unsigned long ukarch_ffsl(unsigned long word)
+static inline unsigned int ukarch_ffsl(unsigned long x)
 {
 	__asm__("bsfq %1,%0"
-		: "=r" (word)
-		: "rm" (word));
-	return word;
+		: "=r" (x)
+		: "rm" (x));
+	return x;
 }
 
 /**
- * ukarch_flsl - find last (highest) set bit in word.
- * @word: The word to search
+ * Find last (highest) set bit in long word.
+ * @param x The long word to operate on
  *
- * Undefined if no bit exists, so code should check against 0 first.
+ * @return The index of the most significant 1-bit of x, or if x is zero,
+ *   the result is undefined. fls(1)=0, fls(3)=1, fls(0x80000001)=31
  */
-static inline unsigned long ukarch_flsl(unsigned long word)
+static inline unsigned int ukarch_flsl(unsigned long x)
 {
 	__asm__("bsrq %1,%0"
-		: "=r" (word)
-		: "rm" (word));
-	return word;
+		: "=r" (x)
+		: "rm" (x));
+	return x;
 }

@@ -1,6 +1,4 @@
 $(eval $(call addlib_s,lib9pfs,$(CONFIG_LIB9PFS)))
 
-LIB9PFS_CFLAGS-$(call gcc_version_ge,8,0) += -Wno-cast-function-type
-
 LIB9PFS_SRCS-y += $(LIB9PFS_BASE)/9pfs_vfsops.c
 LIB9PFS_SRCS-y += $(LIB9PFS_BASE)/9pfs_vnops.c

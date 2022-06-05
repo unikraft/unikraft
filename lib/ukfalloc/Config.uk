@@ -1,0 +1,8 @@
+menuconfig LIBUKFALLOC
+	bool "ukfalloc: Abstraction for physical memory allocators"
+	default n
+	select LIBUKDEBUG
+
+if LIBUKFALLOC
+
+endif

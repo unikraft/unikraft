@@ -54,6 +54,7 @@
  * The functions exported by the Unikraft NET API to setup a device
  * must be invoked in the following order:
  *     - uk_netdev
+ *     - uk_netdev_probe()
  *     - uk_netdev_configure()
  *     - uk_netdev_txq_configure()
  *     - uk_netdev_rxq_configure()
@@ -62,7 +63,7 @@
  * device is not started.
  *
  * There are 4 states in which a network device can be found:
- *     - UK_NETDEV_UNREGISTERED
+ *     - UK_NETDEV_UNPROBED
  *     - UK_NETDEV_UNCONFIGURED
  *     - UK_NETDEV_CONFIGURED
  *     - UK_NETDEV_RUNNING
@@ -125,12 +126,27 @@ const char *uk_netdev_drv_name_get(struct uk_netdev *dev);
 enum uk_netdev_state uk_netdev_state_get(struct uk_netdev *dev);
 
 /**
+ * Probes an unprobed Unikraft network device and turns it
+ * into unconfigured state. After successful probing, the
+ * driver collected information about the backend device.
+ * `uk_netdev_info_get()` and `uk_netdev_einfo_get()` can
+ * be called afterwards.
+ *
+ * @param dev
+ *   The Unikraft Network Device in unprobed state.
+ * @return
+ *   - (0): Success, device is in unconfigured state.
+ *   - (<0): Error code returned by the driver.
+ */
+int uk_netdev_probe(struct uk_netdev *dev);
+
+/**
  * Query device capabilities.
  * Information that is useful for device initialization (e.g.,
  * maximum number of supported RX/TX queues).
  *
  * @param dev
- *   The Unikraft Network Device.
+ *   The Unikraft Network Device in unconfigured state.
  * @param dev_info
  *   A pointer to a structure of type *uk_netdev_info* to be filled with
  *   the contextual information of the network device.

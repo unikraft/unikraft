@@ -38,4 +38,5 @@ if LIBSYSCALL_SHIM
 	config LIBSYSCALL_SHIM_DEBUG
 		bool "Enable debug messages"
 		default n
+		select LIBUKDEBUG_PRINTD
 endif

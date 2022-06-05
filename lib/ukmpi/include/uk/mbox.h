@@ -40,6 +40,7 @@
 #include <errno.h>
 #include <uk/semaphore.h>
 #include <uk/alloc.h>
+#include <uk/arch/time.h>
 
 #ifdef __cplusplus
 extern "C" {

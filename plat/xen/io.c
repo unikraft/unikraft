@@ -42,7 +42,7 @@
  * Implementation support for the guest physical address conversion.
  * The function support only Para-Virtualized guest.
  */
-__phys_addr ukplat_virt_to_phys(const volatile void *address)
+__paddr_t ukplat_virt_to_phys(const volatile void *address)
 {
-	return (__phys_addr)virt_to_mfn(address);
+	return (__paddr_t)virt_to_mfn(address);
 }

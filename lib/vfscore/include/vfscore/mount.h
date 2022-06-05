@@ -171,8 +171,8 @@ typedef int (*vfsop_statfs_t)(struct mount *, struct statfs *);
 
 #define VFS_NULL		    ((void *)vfs_null)
 
-int	vfscore_nullop(void);
-int	vfs_einval(void);
+int vfscore_nullop();
+int vfscore_einval();
 
 void	 vfs_busy(struct mount *mp);
 void	 vfs_unbusy(struct mount *mp);

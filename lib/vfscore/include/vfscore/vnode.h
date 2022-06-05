@@ -229,10 +229,10 @@ struct vnops {
 #define VOP_READLINK(VP, U)        ((VP)->v_op->vop_readlink)(VP, U)
 #define VOP_SYMLINK(DVP, OP, NP)   ((DVP)->v_op->vop_symlink)(DVP, OP, NP)
 
-int	 vfscore_vop_nullop(void);
-int	 vfscore_vop_einval(void);
-int	 vfscore_vop_eperm(void);
-int	 vfscore_vop_erofs(void);
+int vfscore_vop_nullop();
+int vfscore_vop_einval();
+int vfscore_vop_eperm();
+int vfscore_vop_erofs();
 struct vnode *vn_lookup(struct mount *, uint64_t);
 void	 vn_lock(struct vnode *);
 void	 vn_unlock(struct vnode *);
