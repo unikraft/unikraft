@@ -1,3 +1,5 @@
 is_xsave_available
-init_cpuid
 get_cpuid_info
+is_AMD
+is_INTEL
+is_RDRAND_available

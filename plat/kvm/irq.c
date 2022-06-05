@@ -93,7 +93,7 @@ void _ukplat_irq_handle(unsigned long irq)
 	struct irq_handler *h;
 	int i;
 
-	add_interrupt_randomness(irq);
+	// add_interrupt_randomness(irq);
 
 	for (i = 0; i < CONFIG_KVM_MAX_IRQ_HANDLER_ENTRIES; i++) {
 		if (irq_handlers[irq][i].func == NULL)

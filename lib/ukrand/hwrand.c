@@ -6,45 +6,6 @@
 #include <uk/print.h>
 #include <uk/hwrand.h>
 
-
-// TODO replace below calls with libukcpuid requests
-int has_amd_cpu(void)
-{
-	struct CPUID_info info;
-
-	cpuid_macro(info.EAX, info.EBX, info.ECX, info.EDX, 0x00, 0x00);
-
-	return (memcmp((char *) (&info.EBX), "htuA", 4) == 0
-		&& memcmp((char *) (&info.EDX), "itne", 4) == 0
-		&& memcmp((char *) (&info.ECX), "DMAc", 4) == 0);
-}
-
-
-int has_intel_cpu(void)
-{
-	struct CPUID_info info;
-
-	cpuid_macro(info.EAX, info.EBX, info.ECX, info.EDX, 0x00, 0x00);
-
-	return (memcmp((char *) (&info.EBX), "Genu", 4) == 0
-		&& memcmp((char *) (&info.EDX), "ineI", 4) == 0
-		&& memcmp((char *) (&info.ECX), "ntel", 4) == 0);
-}
-
-int has_RDRAND(void)
-{
-	struct CPUID_info info;
-	static const unsigned int RDRAND_FLAG = (1 << 30);
-
-	if (!(has_amd_cpu() || has_intel_cpu())) {
-		return 0;
-	}
-
-	cpuid_macro(info.EAX, info.EBX, info.ECX, info.EDX, 0x00, 0x00);
-
-	return (info.ECX & RDRAND_FLAG) == RDRAND_FLAG;
-}
-
 ssize_t uk_hwrand_generate_bytes(void *buf, size_t buflen)
 {
 	size_t idx = 0, rem = buflen;

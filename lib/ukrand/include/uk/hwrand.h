@@ -19,11 +19,6 @@ struct CPUID_info {
 	unsigned int EDX;
 };
 
-/*
-TODO remove defintion of has_RDRAND once we integrate ukcpuid library
-*/
-int has_RDRAND(void);
-
 ssize_t uk_hwrand_generate_bytes(void *buf, size_t buflen);
 
 static inline uint8_t uk_hwrand_randr(__u32 *val)

@@ -31,13 +31,14 @@
 #include <uk/config.h>
 #include <uk/print.h>
 #include <uk/init.h>
-#include "uk/hwrand.h"
-#include "uk/swrand.h"
+#include <uk/hwrand.h>
+#include <uk/swrand.h>
+#include <uk/cpuid.h>
 
 static int _uk_random_generator_init() {
 	#ifdef CONFIG_LIBUKRAND_TRUE_RANDOMNESS
 		// TODO HW randomness init
-		if (!has_RDRAND()) {
+		if (!is_RDRAND_available()) {
 			uk_pr_err("No support for RDRAND\n");
 
 			#undef CONFIG_LIBUKRAND_TRUE_RANDOMNESS

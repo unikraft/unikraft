@@ -83,6 +83,7 @@
 #define X86_CPUID1_EDX_FPU      (1 << 0)
 #define X86_CPUID1_EDX_FXSR     (1 << 24)
 #define X86_CPUID1_EDX_SSE      (1 << 25)
+#define X86_CPUID1_ECX_RDRAND   (1 << 30)
 /* CPUID feature bits in EBX and ECX when EAX=7, ECX=0 */
 #define X86_CPUID7_EBX_FSGSBASE (1 << 0)
 #define X86_CPUID7_ECX_PKU	(1 << 3)
