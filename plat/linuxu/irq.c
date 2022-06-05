@@ -31,31 +31,50 @@
  */
 #include <string.h>
 #include <uk/alloc.h>
-#include <uk/list.h>
+#include <errno.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/irq.h>
 #include <uk/assert.h>
+#include <uk/print.h>
 #include <linuxu/syscall.h>
 #include <linuxu/signal.h>
+#if defined(__X86_32__) || defined(__x86_64__)
+#include <x86/cpu.h>
+#elif (defined __ARM_32__) || (defined __ARM_64__)
+#include <arm/cpu.h>
+#else
+#error "Unsupported architecture"
+#endif
 
-#define IRQS_NUM    16
+#define __MAX_IRQ 16
+#define HANDLER_RESERVED ((void *) 0x1)
 
 /* IRQ handlers declarations */
 struct irq_handler {
+	/* func() special values:
+	 *   NULL: free,
+	 *   HANDLER_RESERVED: reserved
+	 */
 	irq_handler_func_t func;
 	void *arg;
 
 	struct uk_sigaction oldaction;
-
-	UK_SLIST_ENTRY(struct irq_handler) entries;
 };
 
-UK_SLIST_HEAD(irq_handler_head, struct irq_handler);
-static struct irq_handler_head irq_handlers[IRQS_NUM];
+static struct irq_handler irq_handlers[__MAX_IRQ]
+				[CONFIG_LINUXU_MAX_IRQ_HANDLER_ENTRIES];
 
-static struct uk_alloc *allocator;
 static k_sigset_t handled_signals_set;
 static unsigned long irq_enabled;
+
+static inline struct irq_handler *allocate_handler(unsigned long irq)
+{
+	UK_ASSERT(irq < __MAX_IRQ);
+	for (int i = 0; i < CONFIG_LINUXU_MAX_IRQ_HANDLER_ENTRIES; i++)
+		if (irq_handlers[irq][i].func == NULL)
+			return &irq_handlers[irq][i];
+	return NULL;
+}
 
 void ukplat_lcpu_enable_irq(void)
 {
@@ -121,6 +140,8 @@ void __restorer(void);
 asm("__restorer:mov $15,%rax\nsyscall");
 #elif defined __ARM_32__
 asm("__restorer:mov r7, #0x77\nsvc 0x0");
+#elif defined __ARM_64__
+asm("__restorer:mov x8, #0x8b\nsvc #0");
 #else
 #error "Unsupported architecture"
 #endif
@@ -128,10 +149,16 @@ asm("__restorer:mov r7, #0x77\nsvc 0x0");
 static void _irq_handle(int irq)
 {
 	struct irq_handler *h;
+	int i;
 
-	UK_ASSERT(irq >= 0 && irq < IRQS_NUM);
+	UK_ASSERT(irq >= 0 && irq < __MAX_IRQ);
 
-	UK_SLIST_FOREACH(h, &irq_handlers[irq], entries) {
+	for (i = 0; i < CONFIG_LINUXU_MAX_IRQ_HANDLER_ENTRIES; i++) {
+		if (irq_handlers[irq][i].func == NULL)
+			break;
+		else if (irq_handlers[irq][i].func == HANDLER_RESERVED)
+			continue; /* reserved entry */
+		h = &irq_handlers[irq][i];
 		if (h->func(h->arg) == 1)
 			return;
 	}
@@ -152,15 +179,19 @@ int ukplat_irq_register(unsigned long irq, irq_handler_func_t func, void *arg)
 	unsigned long flags;
 	int rc;
 
-	if (irq >= IRQS_NUM)
+	if (irq >= __MAX_IRQ)
 		return -EINVAL;
 
 	/* New handler */
-	h = uk_malloc(allocator, sizeof(struct irq_handler));
-	if (!h)
-		return -ENOMEM;
-	h->func = func;
-	h->arg = arg;
+	flags = ukplat_lcpu_save_irqf();
+	h = allocate_handler(irq);
+	if (!h) {
+		ukplat_lcpu_restore_irqf(flags);
+		return -EINVAL;
+	}
+
+	h->func = HANDLER_RESERVED; /* reserve */
+	ukplat_lcpu_restore_irqf(flags);
 
 	/* Register signal action */
 	memset(&action, 0, sizeof(action));
@@ -169,12 +200,14 @@ int ukplat_irq_register(unsigned long irq, irq_handler_func_t func, void *arg)
 	action.k_sa_restorer = __restorer;
 
 	rc = sys_sigaction((int) irq, &action, &h->oldaction);
-	if (rc != 0)
+	if (rc != 0) {
+		h->func = NULL; /* give back */
 		goto err;
+	}
 
-	flags = ukplat_lcpu_save_irqf();
-	UK_SLIST_INSERT_HEAD(&irq_handlers[irq], h, entries);
-	ukplat_lcpu_restore_irqf(flags);
+	/* Enable the handler */
+	h->func = func;
+	h->arg = arg;
 
 	/* Unblock the signal */
 	k_sigemptyset(&set);
@@ -190,22 +223,12 @@ int ukplat_irq_register(unsigned long irq, irq_handler_func_t func, void *arg)
 	return 0;
 
 err:
-	uk_free(allocator, h);
 	return -rc;
 }
 
-int ukplat_irq_init(struct uk_alloc *a)
+int ukplat_irq_init(struct uk_alloc *a __unused)
 {
-	UK_ASSERT(!irq_enabled);
-	UK_ASSERT(!allocator);
-
-	allocator = a;
-
-	/* Clear list head */
-	for (int i = 0; i < IRQS_NUM; i++)
-		UK_SLIST_INIT(&irq_handlers[i]);
-
+	UK_ASSERT(ukplat_lcpu_irqs_disabled());
 	k_sigemptyset(&handled_signals_set);
-
 	return 0;
 }

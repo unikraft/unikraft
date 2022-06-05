@@ -68,9 +68,6 @@
 #define to_virtionetdev(ndev) \
 	__containerof(ndev, struct virtio_net_device, netdev)
 
-#define VIRTIO_NET_DRV_FEATURES(features)           \
-	(VIRTIO_FEATURES_UPDATE(features, VIRTIO_NET_F_MAC))
-
 typedef enum {
 	VNET_RX,
 	VNET_TX,
@@ -170,12 +167,11 @@ static int virtio_net_drv_init(struct uk_alloc *drv_allocator);
 static int virtio_net_add_dev(struct virtio_dev *vdev);
 static void virtio_net_info_get(struct uk_netdev *dev,
 				struct uk_netdev_info *dev_info);
-static inline void virtio_netdev_feature_set(struct virtio_net_device *vndev);
 static int virtio_netdev_configure(struct uk_netdev *n,
 				   const struct uk_netdev_conf *conf);
 static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 				    const struct uk_netdev_conf *conf);
-static int virtio_netdev_feature_negotiate(struct virtio_net_device *vndev);
+static int virtio_netdev_feature_negotiate(struct uk_netdev *n);
 static struct uk_netdev_tx_queue *virtio_netdev_tx_queue_setup(
 					struct uk_netdev *n, uint16_t queue_id,
 					uint16_t nb_desc,
@@ -372,8 +368,23 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 	/**
 	 * Fill the virtio-net-header with the necessary information.
 	 * Zero explicitly set.
+	 * NOTE: We do not set VIRTIO_NET_HDR_F_DATA_VALID and
+	 *       VIRTIO_NET_HDR_F_RSC_INFO because we aren't allowed
+	 *       according to virtio specification during sending.
+	 * TODO: We assume that the PARTIAL_CSUM flag is only set with
+	 *       the first netbuf of a queue. If this is not the case,
+	 *       (e.g., due to encapsulation of protocol headers with
+	 *        prepending netbufs) we need to replace the call
+	 *       to `uk_sglist_append_netbuf()`. However, a netbuf
+	 *       chain can only once have set the PARTIAL_CSUM flag.
 	 */
 	memset(vhdr, 0, sizeof(*vhdr));
+	if (pkt->flags & UK_NETBUF_F_PARTIAL_CSUM) {
+		vhdr->flags       |= VIRTIO_NET_HDR_F_NEEDS_CSUM;
+		/* `csum_start` is without header size */
+		vhdr->csum_start   = pkt->csum_start - header_sz;
+		vhdr->csum_offset  = pkt->csum_offset;
+	}
 	vhdr->gso_type = VIRTIO_NET_HDR_GSO_NONE;
 
 	/**
@@ -501,6 +512,7 @@ static int virtio_netdev_rxq_dequeue(struct uk_netdev_rx_queue *rxq,
 	int ret;
 	int rc __maybe_unused = 0;
 	struct uk_netbuf *buf = NULL;
+	struct virtio_net_hdr *vhdr;
 	__u32 len;
 
 	UK_ASSERT(netbuf);
@@ -515,6 +527,22 @@ static int virtio_netdev_rxq_dequeue(struct uk_netdev_rx_queue *rxq,
 		     || (len > VIRTIO_PKT_BUFFER_LEN))) {
 		uk_pr_err("Received invalid packet size: %"__PRIu32"\n", len);
 		return -EINVAL;
+	}
+
+	/**
+	 * Copy virtio header flags to netbuf
+	 */
+	vhdr = (struct virtio_net_hdr *) buf->data;
+	buf->flags  = ((vhdr->flags & VIRTIO_NET_HDR_F_DATA_VALID)
+		       ? UK_NETBUF_F_DATA_VALID   : 0x0);
+	if (vhdr->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM) {
+		buf->flags |= UK_NETBUF_F_PARTIAL_CSUM;
+		buf->csum_offset = vhdr->csum_offset;
+		/* NOTE: csum_start is without virtio header
+		 *       (uk_netbuf_header() will remove it again)
+		 */
+		buf->csum_start  = vhdr->csum_start
+			+ ((uint16_t)sizeof(struct virtio_net_hdr_padded));
 	}
 
 	/**
@@ -830,10 +858,15 @@ static __u16 virtio_net_mtu_get(struct uk_netdev *n)
 	return d->mtu;
 }
 
-static int virtio_netdev_feature_negotiate(struct virtio_net_device *vndev)
+static int virtio_netdev_feature_negotiate(struct uk_netdev *n)
 {
 	__u64 host_features = 0;
+	__u64 drv_features  = 0;
 	int rc = 0;
+	struct virtio_net_device *vndev;
+
+	UK_ASSERT(n);
+	vndev = to_virtionetdev(n);
 
 	/**
 	 * Read device feature bits, and write the subset of feature bits
@@ -843,17 +876,59 @@ static int virtio_netdev_feature_negotiate(struct virtio_net_device *vndev)
 	 * accepting it.
 	 */
 	host_features = virtio_feature_get(vndev->vdev);
-	if (!virtio_has_features(host_features, VIRTIO_NET_F_MAC)) {
+
+	/**
+	 * Hardware address
+	 * NOTE: For now, we require a provided hw address. In principle,
+	 *       we could generate one if none was given.
+	 */
+	if (!VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_MAC)) {
 		/**
 		 * The feature that aren't supported are usually masked out and
 		 * provided with default value. In this case we need to
 		 * report an error as we don't support  generation of random
 		 * MAC Address.
 		 */
-		uk_pr_err("Host system does not offer MAC feature\n");
+		uk_pr_err("%p: Host system does not offer MAC feature\n", n);
 		rc = -EINVAL;
-		goto exit;
+		goto err_negotiate_feature;
 	}
+	VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_MAC);
+
+	/**
+	 * MTU information (needed)
+	 */
+	if (!VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_STATUS)) {
+		uk_pr_err("%p: Host system does not offer MTU feature\n", n);
+		rc = -EINVAL;
+		goto err_negotiate_feature;
+	}
+	VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_STATUS);
+
+	/**
+	 * Gratuitous ARP
+	 * NOTE: We tell that we will do gratuitous ARPs ourselves.
+	 */
+	VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_GUEST_ANNOUNCE);
+
+	/**
+	 * Partial checksumming
+	 * NOTE: This enables sending and receiving of packets marked with
+	 *       VIRTIO_NET_HDR_F_DATA_VALID and VIRTIO_NET_HDR_F_NEEDS_CSUM
+	 */
+	if (!VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_CSUM)) {
+		uk_pr_debug("%p: Host does not offer partial checksumming feature: Checksum offloading disabled.\n",
+			    n);
+	} else {
+		VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_CSUM);
+		VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_GUEST_CSUM);
+	}
+
+	/**
+	 * Announce our enabled driver features back to the backend device
+	 */
+	vndev->vdev->features = drv_features;
+	virtio_feature_set(vndev->vdev, vndev->vdev->features);
 
 	/**
 	 * According to Virtio specification, section 2.3.1. Config fields
@@ -866,22 +941,11 @@ static int virtio_netdev_feature_negotiate(struct virtio_net_device *vndev)
 				   __offsetof(struct virtio_net_config, mac),
 				   &vndev->hw_addr.addr_bytes[0],
 				   UK_NETDEV_HWADDR_LEN, 1);
-	rc = 0;
-	uk_pr_info("vndev->hw_addr.addr_bytes=[%x %x %x %x %x %x]\n",
-		vndev->hw_addr.addr_bytes[0],
-		vndev->hw_addr.addr_bytes[1],
-		vndev->hw_addr.addr_bytes[2],
-		vndev->hw_addr.addr_bytes[3],
-		vndev->hw_addr.addr_bytes[4],
-		vndev->hw_addr.addr_bytes[5]);
 
+	return 0;
 
-	/**
-	 * Mask out features supported by both driver and device.
-	 */
-	vndev->vdev->features &= host_features;
-	virtio_feature_set(vndev->vdev, vndev->vdev->features);
-exit:
+err_negotiate_feature:
+	virtio_dev_status_update(vndev->vdev, VIRTIO_CONFIG_STATUS_FAIL);
 	return rc;
 }
 
@@ -977,30 +1041,17 @@ static int virtio_netdev_configure(struct uk_netdev *n,
 	UK_ASSERT(conf);
 	vndev = to_virtionetdev(n);
 
-	rc = virtio_netdev_feature_negotiate(vndev);
-	if (rc != 0) {
-		uk_pr_err("Failed to negotiate the device feature %d\n", rc);
-		goto err_negotiate_feature;
-	}
-
 	rc = virtio_netdev_rxtx_alloc(vndev, conf);
-	if (rc != 0) {
-		uk_pr_err("Failed to probe the rx and tx rings %d\n", rc);
-		goto err_negotiate_feature;
+	if (rc < 0) {
+		uk_pr_err("%p: Failed to initialize rx and tx rings: %d\n",
+			  n, rc);
 	}
 
 	/* Initialize the count of the virtio-net device */
 	vndev->rx_vqueue_cnt = 0;
 	vndev->tx_vqueue_cnt = 0;
 
-	uk_pr_info("Configured: features=0x%lx max_virtqueue_pairs=%"__PRIu16"\n",
-		   vndev->vdev->features, vndev->max_vqueue_pairs);
-exit:
 	return rc;
-
-err_negotiate_feature:
-	virtio_dev_status_update(vndev->vdev, VIRTIO_CONFIG_STATUS_FAIL);
-	goto exit;
 }
 
 static int virtio_net_rx_intr_enable(struct uk_netdev *n,
@@ -1054,7 +1105,9 @@ static void virtio_net_info_get(struct uk_netdev *dev,
 	dev_info->nb_encap_tx = sizeof(struct virtio_net_hdr_padded);
 	dev_info->nb_encap_rx = sizeof(struct virtio_net_hdr_padded);
 	dev_info->ioalign = sizeof(void *); /* word size alignment */
-	dev_info->features = UK_FEATURE_RXQ_INTR_AVAILABLE;
+	dev_info->features = UK_NETDEV_F_RXQ_INTR
+		| (VIRTIO_FEATURE_HAS(vndev->vdev->features, VIRTIO_NET_F_CSUM)
+		   ? UK_NETDEV_F_PARTIAL_CSUM : 0);
 }
 
 static int virtio_net_start(struct uk_netdev *n)
@@ -1089,19 +1142,8 @@ static int virtio_net_start(struct uk_netdev *n)
 	return 0;
 }
 
-static inline void virtio_netdev_feature_set(struct virtio_net_device *vndev)
-{
-	vndev->vdev->features = 0;
-	/* Setting the feature the driver support */
-	VIRTIO_NET_DRV_FEATURES(vndev->vdev->features);
-	/**
-	 * TODO:
-	 * Adding multiqueue support for the virtio net driver.
-	 */
-	vndev->max_vqueue_pairs = 1;
-}
-
 static const struct uk_netdev_ops virtio_netdev_ops = {
+	.probe = virtio_netdev_feature_negotiate,
 	.configure = virtio_netdev_configure,
 	.rxq_configure = virtio_netdev_rx_queue_setup,
 	.txq_configure = virtio_netdev_tx_queue_setup,
@@ -1144,8 +1186,13 @@ static int virtio_net_add_dev(struct virtio_dev *vdev)
 	vndev->max_mtu = UK_ETH_PAYLOAD_MAXLEN;
 	vndev->mtu = vndev->max_mtu;
 	vndev->promisc = 0;
-	virtio_netdev_feature_set(vndev);
-	uk_pr_info("virtio-net device registered with libuknet\n");
+
+	/**
+	 * TODO:
+	 * Adding multiqueue support for the virtio net driver.
+	 */
+	vndev->max_vqueue_pairs = 1;
+	uk_pr_debug("virtio-net device registered with libuknet\n");
 
 exit:
 	return rc;

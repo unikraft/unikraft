@@ -1,0 +1,4 @@
+$(eval $(call addlib_s,libukfalloc,$(CONFIG_LIBUKFALLOC)))
+
+CINCLUDES-$(CONFIG_LIBUKFALLOC)   += -I$(LIBUKFALLOC_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBUKFALLOC) += -I$(LIBUKFALLOC_BASE)/include

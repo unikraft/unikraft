@@ -142,3 +142,15 @@ typedef unsigned long long fsblkcnt_t;
 typedef unsigned long long fsfilcnt_t;
 #define __DEFINED_fsfilcnt_t
 #endif
+
+#if defined(__NEED_sigset_t) && !defined(__DEFINED_sigset_t)
+typedef unsigned long __sigset_t;
+typedef __sigset_t sigset_t;
+#define __DEFINED_sigset_t
+#endif
+
+#if defined(__NEED_sig_atomic_t) && !defined(__DEFINED_sig_atomic_t)
+typedef int __sig_atomic_t;
+typedef __sig_atomic_t sig_atomic_t;
+#define __DEFINED_sig_atomic_t
+#endif

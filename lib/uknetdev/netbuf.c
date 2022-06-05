@@ -48,19 +48,16 @@ void uk_netbuf_init_indir(struct uk_netbuf *m,
 	UK_ASSERT(buf || (buf == NULL && buflen == 0));
 	UK_ASSERT(headroom <= buflen);
 
-	m->buf    = buf;
-	m->buflen = buflen;
-	m->data   = (void *) ((uintptr_t) buf + headroom);
-	m->len    = 0;
-	m->prev   = NULL;
-	m->next   = NULL;
+	/* Reset pbuf, non-listed fields are automatically set to 0 */
+	*m = (struct uk_netbuf) {
+		.buf    = buf,
+		.buflen = buflen,
+		.data   = (void *) ((uintptr_t) buf + headroom),
+		.priv   = priv,
+		.dtor   = dtor
+	};
 
 	uk_refcount_init(&m->refcount, 1);
-
-	m->priv   = priv;
-	m->dtor   = dtor;
-	m->_a     = NULL;
-	m->_b     = NULL;
 }
 
 struct uk_netbuf *uk_netbuf_alloc_indir(struct uk_alloc *a,

@@ -336,7 +336,7 @@ static int virtio_9p_feature_negotiate(struct virtio_9p_device *d)
 	int rc = 0;
 
 	host_features = virtio_feature_get(d->vdev);
-	if (!virtio_has_features(host_features, VIRTIO_9P_F_MOUNT_TAG)) {
+	if (!VIRTIO_FEATURE_HAS(host_features, VIRTIO_9P_F_MOUNT_TAG)) {
 		uk_pr_err(DRIVER_NAME": Host system does not offer MOUNT_TAG feature\n");
 		rc = -EINVAL;
 		goto out;
@@ -380,7 +380,7 @@ out:
 static inline void virtio_9p_feature_set(struct virtio_9p_device *d)
 {
 	d->vdev->features = 0;
-	VIRTIO_FEATURES_UPDATE(d->vdev->features, VIRTIO_9P_F_MOUNT_TAG);
+	VIRTIO_FEATURE_SET(d->vdev->features, VIRTIO_9P_F_MOUNT_TAG);
 }
 
 static int virtio_9p_configure(struct virtio_9p_device *d)

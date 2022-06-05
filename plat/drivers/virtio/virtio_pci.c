@@ -158,7 +158,7 @@ static struct virtqueue *vpci_legacy_vq_setup(struct virtio_dev *vdev,
 {
 	struct virtio_pci_dev *vpdev = NULL;
 	struct virtqueue *vq;
-	__phys_addr addr;
+	__paddr_t addr;
 	long flags;
 
 	UK_ASSERT(vdev != NULL);

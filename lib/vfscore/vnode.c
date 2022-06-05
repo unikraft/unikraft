@@ -477,25 +477,25 @@ vnode_dump(void)
 #endif
 
 int
-vfscore_vop_nullop(void)
+vfscore_vop_nullop()
 {
 	return 0;
 }
 
 int
-vfscore_vop_einval(void)
+vfscore_vop_einval()
 {
 	return EINVAL;
 }
 
 int
-vfscore_vop_eperm(void)
+vfscore_vop_eperm()
 {
 	return EPERM;
 }
 
 int
-vfscore_vop_erofs(void)
+vfscore_vop_erofs()
 {
 	return EROFS;
 }
@@ -528,4 +528,3 @@ void vn_del_name(struct vnode *vp __unused, struct dentry *dp)
 	/* UK_ASSERT(uk_mutex_is_locked(&vp->v_lock)); */
 	uk_list_del(&dp->d_names_link);
 }
-

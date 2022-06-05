@@ -38,7 +38,7 @@
 
 #define __SC_READ       3
 #define __SC_WRITE      4
-#define __SC_OPEN       5
+#define __SC_OPENAT     322
 #define __SC_CLOSE      6
 #define __SC_MMAP     192 /* use mmap2() since mmap() is obsolete */
 #define __SC_MUNMAP    91

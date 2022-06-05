@@ -127,13 +127,23 @@ struct uk_hwaddr {
 /**
  * The netdevice support rx/tx interrupt.
  */
-#define UK_FEATURE_RXQ_INTR_BIT		    0
-#define UK_FEATURE_RXQ_INTR_AVAILABLE  (1UL << UK_FEATURE_RXQ_INTR_BIT)
-#define UK_FEATURE_TXQ_INTR_BIT		    1
-#define UK_FEATURE_TXQ_INTR_AVAILABLE  (1UL << UK_FEATURE_TXQ_INTR_BIT)
+#define UK_NETDEV_F_RXQ_INTR_BIT	0
+#define UK_NETDEV_F_RXQ_INTR		(1UL << UK_NETDEV_F_RXQ_INTR_BIT)
+#define UK_NETDEV_F_TXQ_INTR_BIT	1
+#define UK_NETDEV_F_TXQ_INTR		(1UL << UK_NETDEV_F_TXQ_INTR_BIT)
+
+/* Indicates that UK_NETBUF_F_PARTIAL_CSUM and UK_NETBUF_F_DATA_VALID is
+ * supported by the device
+ */
+#define UK_NETDEV_F_PARTIAL_CSUM_BIT	2
+#define UK_NETDEV_F_PARTIAL_CSUM	(1UL << UK_NETDEV_F_PARTIAL_CSUM_BIT)
 
 #define uk_netdev_rxintr_supported(feature)	\
-	(feature & (UK_FEATURE_RXQ_INTR_AVAILABLE))
+	(feature & (UK_NETDEV_F_RXQ_INTR))
+#define uk_netdev_txintr_supported(feature)	\
+	(feature & (UK_NETDEV_F_TXQ_INTR))
+#define uk_netdev_partial_csum_supported(feature)	\
+	(feature & (UK_NETDEV_F_PARTIAL_CSUM))
 
 /**
  * A structure used to describe network device capabilities.
@@ -180,6 +190,7 @@ struct uk_netdev_rx_queue;
  */
 enum uk_netdev_state {
 	UK_NETDEV_INVALID = 0,
+	UK_NETDEV_UNPROBED,
 	UK_NETDEV_UNCONFIGURED,
 	UK_NETDEV_CONFIGURED,
 	UK_NETDEV_RUNNING,
@@ -276,6 +287,10 @@ struct uk_netdev_rxqueue_conf {
 struct uk_netdev_txqueue_conf {
 	struct uk_alloc *a;               /* Allocator for descriptors. */
 };
+
+/** Driver callback type to probe device capabilities and features (optional)
+ */
+typedef int (*uk_netdev_probe_t)(struct uk_netdev *dev);
 
 /** Driver callback type to read device/driver capabilities,
  *  used for configuring the device
@@ -395,6 +410,7 @@ struct uk_netdev_ops {
 	uk_netdev_einfo_get_t           einfo_get;        /* optional */
 
 	/** Device life cycle. */
+	uk_netdev_probe_t               probe;            /* recommended */
 	uk_netdev_configure_t           configure;
 	uk_netdev_txq_configure_t       txq_configure;
 	uk_netdev_rxq_configure_t       rxq_configure;

@@ -230,18 +230,6 @@ devfs_getattr(struct vnode *vnode, struct vattr *attr)
 	return 0;
 }
 
-int
-vop_einval(void)
-{
-	return EINVAL;
-}
-
-int
-vop_eperm(void)
-{
-	return EPERM;
-}
-
 #define devfs_mount	((vfsop_mount_t)vfscore_nullop)
 #define devfs_sync	((vfsop_sync_t)vfscore_nullop)
 #define devfs_vget	((vfsop_vget_t)vfscore_nullop)
@@ -249,15 +237,15 @@ vop_eperm(void)
 
 #define devfs_seek	((vnop_seek_t)vfscore_vop_nullop)
 #define devfs_fsync	((vnop_fsync_t)vfscore_vop_nullop)
-#define devfs_create	((vnop_create_t)vop_einval)
-#define devfs_remove	((vnop_remove_t)vop_einval)
-#define devfs_rename	((vnop_rename_t)vop_einval)
-#define devfs_mkdir	((vnop_mkdir_t)vop_einval)
-#define devfs_rmdir	((vnop_rmdir_t)vop_einval)
-#define devfs_setattr	((vnop_setattr_t)vop_eperm)
+#define devfs_create	((vnop_create_t)vfscore_vop_einval)
+#define devfs_remove	((vnop_remove_t)vfscore_vop_einval)
+#define devfs_rename	((vnop_rename_t)vfscore_vop_einval)
+#define devfs_mkdir	((vnop_mkdir_t)vfscore_vop_einval)
+#define devfs_rmdir	((vnop_rmdir_t)vfscore_vop_einval)
+#define devfs_setattr	((vnop_setattr_t)vfscore_vop_eperm)
 #define devfs_inactive	((vnop_inactive_t)vfscore_vop_nullop)
 #define devfs_truncate	((vnop_truncate_t)vfscore_vop_nullop)
-#define devfs_link	((vnop_link_t)vop_eperm)
+#define devfs_link	((vnop_link_t)vfscore_vop_eperm)
 #define devfs_fallocate ((vnop_fallocate_t)vfscore_vop_nullop)
 #define devfs_readlink	((vnop_readlink_t)vfscore_vop_nullop)
 #define devfs_symlink	((vnop_symlink_t)vfscore_vop_nullop)

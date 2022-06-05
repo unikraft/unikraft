@@ -38,6 +38,7 @@
 #include <common/events.h>
 #include <xen/xen.h>
 #include <uk/print.h>
+#include <uk/assert.h>
 #include <uk/bitops.h>
 
 #define NR_EVS 1024
@@ -332,6 +333,8 @@ struct uk_alloc;
 
 int ukplat_irq_init(struct uk_alloc *a __unused)
 {
+	UK_ASSERT(ukplat_lcpu_irqs_disabled());
+
 	/* Nothing for now */
 	return 0;
 }

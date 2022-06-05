@@ -54,6 +54,8 @@
 extern "C" {
 #endif
 
+#include <uk/asm/compiler.h>
+
 #ifdef __GNUC__
 #ifndef __packed
 #define __packed               __attribute__((packed))
@@ -219,16 +221,39 @@ extern "C" {
 	(((val) >= (base)) && ((val) < (base) + (len)))
 
 /**
+ * Tests if range 0 is equal to range 1
+ */
+#define RANGE_ISEQUAL(base0, len0, base1, len1)		\
+	(((base0) == (base1))				\
+	 && (len0) == (len1))
+
+/**
+ * Tests if range 0 contains range 1
+ * This is the case when both of the following conditions are true:
+ *  - The start of range 1 is within range 0
+ *  - The end of range 1 is within range 0
+ *  NOTE: The expressions take into account that `base + len` points to
+ *        the first value that is outside of a range.
+ */
+#define RANGE_CONTAIN(base0, len0, base1, len1)				\
+	(IN_RANGE((base1), (base0), (len0))				\
+	 && (((base1) + (len1)) > (base0))				\
+	 && (((base1) + (len1)) <= ((base0) + (len0))))
+
+/**
  * Tests if two ranges overlap
  * This is the case when at least one of the following conditions is true:
  *  - The start of range 1 is within range 0
  *  - The end of range 1 is within range 0
  *  - The start of range 1 is smaller than the start of range 0 while
  *    the end of range 1 is bigger than the end of range 0
+ *  NOTE: The expressions take into account that `base + len` points to
+ *        the first value that is outside of a range.
  */
 #define RANGE_OVERLAP(base0, len0, base1, len1)				\
 	(IN_RANGE((base1), (base0), (len0))				\
-	 || IN_RANGE((base1) + (len1), (base0), (len0))			\
+	 || ((((base1) + (len1)) > (base0))				\
+	     && (((base1) + (len1)) <= (base0) + (len0)))		\
 	 || (((base1) <= (base0))					\
 	     && (((base1) + (len1)) >= ((base0) + (len0)))))
 

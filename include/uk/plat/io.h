@@ -34,6 +34,6 @@
 
 #include <uk/arch/types.h>
 
-__phys_addr ukplat_virt_to_phys(const volatile void *address);
+__paddr_t ukplat_virt_to_phys(const volatile void *address);
 
 #endif /* __UKPLAT_IO_H__ */

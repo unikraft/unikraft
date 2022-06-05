@@ -78,7 +78,7 @@ struct virtqueue {
  * @return
  *	Return the guest physical address of the vring.
  */
-__phys_addr virtqueue_physaddr(struct virtqueue *vq);
+__paddr_t virtqueue_physaddr(struct virtqueue *vq);
 
 /**
  * Fetch the avail address of the descriptor ring.
@@ -88,7 +88,7 @@ __phys_addr virtqueue_physaddr(struct virtqueue *vq);
  * @return
  *	Return the guest avail address of the vring.
  */
-__phys_addr virtqueue_get_avail_addr(struct virtqueue *vq);
+__paddr_t virtqueue_get_avail_addr(struct virtqueue *vq);
 
 /**
  * Fetch the used address of the descriptor ring.
@@ -98,7 +98,7 @@ __phys_addr virtqueue_get_avail_addr(struct virtqueue *vq);
  * @return
  *	Return the guest used address of the vring.
  */
-__phys_addr virtqueue_get_used_addr(struct virtqueue *vq);
+__paddr_t virtqueue_get_used_addr(struct virtqueue *vq);
 
 /**
  * Get the number of vring for virtqueue

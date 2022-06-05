@@ -41,4 +41,4 @@
 #define __L_IS_32    /* long */
 #define __LL_IS_64   /* long long */
 #define __PTR_IS_32 /* void * */
-#define __PHY_ADDR_IS_32 /* phys_addr */
+#define __PADDR_IS_32 /* physical address */

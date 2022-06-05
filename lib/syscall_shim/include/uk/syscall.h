@@ -286,6 +286,7 @@ typedef long uk_syscall_arg_t;
 #else
 #define UK_SYSCALL_R_DEFINE(rtype, name, ...)				\
 	_UK_LLSYSCALL_R_DEFINE(__UK_SYSCALL_DEF_NARGS(__VA_ARGS__),	\
+			       rtype,					\
 			       name,					\
 			       __UK_NAME2SCALLE_FN(name),		\
 			       __UK_NAME2SCALLR_FN(name),		\

@@ -35,7 +35,7 @@
 #include <uk/assert.h>
 
 
-static void left_shift(char *buf, __sz index, __sz maxlen) 
+static void left_shift(char *buf, __sz index, __sz maxlen)
 {
 	while(buf[index] != '\0' && index < maxlen) {
 		buf[index] = buf[index + 1];
@@ -69,8 +69,9 @@ int uk_argnparse(char *argb, __sz maxlen, char *argv[], int maxcount)
 			if (!in_quote) {
 				argb[i] = '\0';
 				prev_wspace = 1;
+				break;
 			}
-			break;
+			goto regularchar;
 
 		/* quotes */
 		case '\'':
@@ -87,9 +88,10 @@ int uk_argnparse(char *argb, __sz maxlen, char *argv[], int maxcount)
 				--i;
 				break;
 			}
-			
-			/* Fall through */
+			goto regularchar;
+
 		default:
+		regularchar:
 			/* any character */
 			if (prev_wspace) {
 				argv[argc++] = &argb[i];

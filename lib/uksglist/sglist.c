@@ -77,7 +77,7 @@ struct sgsave {
 } while (0)
 
 static inline int _sglist_append_range(struct uk_sglist *sg,
-			struct uk_sglist_seg **ssp, __phys_addr paddr,
+			struct uk_sglist_seg **ssp, __paddr_t paddr,
 			size_t len);
 static inline int _sglist_append_buf(struct uk_sglist *sg, void *buf,
 				size_t len, size_t *donep);
@@ -87,7 +87,7 @@ static inline int _sglist_append_buf(struct uk_sglist *sg, void *buf,
  * EFBIG will be returned.
  */
 static inline int _sglist_append_range(struct uk_sglist *sg,
-			struct uk_sglist_seg **ssp, __phys_addr paddr,
+			struct uk_sglist_seg **ssp, __paddr_t paddr,
 			size_t len)
 {
 	struct uk_sglist_seg *ss;
@@ -115,8 +115,8 @@ static inline int _sglist_append_buf(struct uk_sglist *sg, void *buf,
 				size_t len, size_t *donep)
 {
 	struct uk_sglist_seg *ss;
-	__vm_offset vaddr, offset;
-	__phys_addr paddr;
+	__vaddr_t vaddr, offset;
+	__paddr_t paddr;
 	size_t seglen;
 	int error;
 
@@ -126,7 +126,7 @@ static inline int _sglist_append_buf(struct uk_sglist *sg, void *buf,
 		return 0;
 
 	/* Do the first page.  It may have an offset. */
-	vaddr = (__vm_offset)buf;
+	vaddr = (__vaddr_t)buf;
 	offset = page_off(vaddr);
 	paddr = ukplat_virt_to_phys((void *)vaddr);
 	seglen = MIN(len, __PAGE_SIZE - offset);
@@ -163,15 +163,15 @@ static inline int _sglist_append_buf(struct uk_sglist *sg, void *buf,
 
 int uk_sglist_count(void *buf, size_t len)
 {
-	__vm_offset vaddr, vendaddr;
-	__phys_addr lastaddr, paddr;
+	__vaddr_t vaddr, vendaddr;
+	__paddr_t lastaddr, paddr;
 	int nsegs;
 
 	if (len == 0)
 		return 0;
 
-	vaddr = trunc_page((__vm_offset)buf);
-	vendaddr = (__vm_offset)buf + len;
+	vaddr = trunc_page((__vaddr_t)buf);
+	vendaddr = (__vaddr_t)buf + len;
 	nsegs = 1;
 	lastaddr = ukplat_virt_to_phys((void *)vaddr);
 	vaddr += __PAGE_SIZE;
