@@ -218,6 +218,8 @@ error_exit:
 
 static struct devops sgx_devops = {
 	.ioctl = sgx_ioctl,
+	.open = sgx_open,
+	.close = sgx_close,
 };
 
 static struct driver drv_sgx = {

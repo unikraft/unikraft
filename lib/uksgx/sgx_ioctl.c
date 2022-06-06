@@ -1,14 +1,16 @@
 #include <uk/sgx_user.h>
+#include <uk/print.h>
 #include <errno.h>
 
 int sgx_get_encl(unsigned int addr, struct sgx_encl **encl)
 {
+    WARN_STUBBED();
 	return 0;
 }
 
 /**
  * sgx_ioc_enclave_create - handler for %SGX_IOC_ENCLAVE_CREATE
- * @filep:	open file to /dev/sgx
+ * @dev:	open file to /dev/sgx
  * @cmd:	the command value
  * @arg:	pointer to the &struct sgx_enclave_create
  *
@@ -19,16 +21,17 @@ int sgx_get_encl(unsigned int addr, struct sgx_encl **encl)
  * 0 on success,
  * system error on failure
  */
-static int sgx_ioc_enclave_create(struct device *filep, unsigned int cmd,
+static int sgx_ioc_enclave_create(struct device *dev, unsigned int cmd,
 				   unsigned int arg)
 {
+    WARN_STUBBED();
 	return 0;
 }
 
 /**
  * sgx_ioc_enclave_add_page - handler for %SGX_IOC_ENCLAVE_ADD_PAGE
  *
- * @filep:	open file to /dev/sgx
+ * @dev:	open file to /dev/sgx
  * @cmd:	the command value
  * @arg:	pointer to the &struct sgx_enclave_add_page
  *
@@ -39,16 +42,17 @@ static int sgx_ioc_enclave_create(struct device *filep, unsigned int cmd,
  * 0 on success,
  * system error on failure
  */
-static int sgx_ioc_enclave_add_page(struct device *filep, unsigned int cmd,
+static int sgx_ioc_enclave_add_page(struct device *dev, unsigned int cmd,
 				     unsigned int arg)
 {
+    WARN_STUBBED();
     return 0;
 }
 
 /**
  * sgx_ioc_enclave_init - handler for %SGX_IOC_ENCLAVE_INIT
  *
- * @filep:	open file to /dev/sgx
+ * @dev:	open file to /dev/sgx
  * @cmd:	the command value
  * @arg:	pointer to the &struct sgx_enclave_init
  *
@@ -58,15 +62,17 @@ static int sgx_ioc_enclave_add_page(struct device *filep, unsigned int cmd,
  * 0 on success,
  * system error on failure
  */
-static int sgx_ioc_enclave_init(struct device *filep, unsigned int cmd,
+static int sgx_ioc_enclave_init(struct device *dev, unsigned int cmd,
 				 unsigned int arg)
 {
+    WARN_STUBBED();
 	return 0;
 }
 
-int sgx_ioc_page_modpr(struct device *filep, unsigned int cmd,
+int sgx_ioc_page_modpr(struct device *dev, unsigned int cmd,
 			unsigned int arg)
 {
+    WARN_STUBBED();
 	return 0;
 }
 
@@ -76,9 +82,10 @@ int sgx_ioc_page_modpr(struct device *filep, unsigned int cmd,
  * eaccept needs to be invoked after return.
  * @arg range address of pages to be switched
  */
-int sgx_ioc_page_to_tcs(struct device *filep, unsigned int cmd,
+int sgx_ioc_page_to_tcs(struct device *dev, unsigned int cmd,
 			 unsigned int arg)
 {
+    WARN_STUBBED();
 	return 0;
 }
 
@@ -88,9 +95,10 @@ int sgx_ioc_page_to_tcs(struct device *filep, unsigned int cmd,
  * eaccept has been invoked
  * @arg range address of pages to be trimmed
  */
-int sgx_ioc_trim_page(struct device *filep, unsigned int cmd,
+int sgx_ioc_trim_page(struct device *dev, unsigned int cmd,
 		       unsigned int arg)
 {
+    WARN_STUBBED();
 	return 0;
 }
 
@@ -100,7 +108,7 @@ int sgx_ioc_trim_page(struct device *filep, unsigned int cmd,
 //  * should have PT_TRIM page type and should have been eaccepted priorly
 //  * @arg range address of pages
 //  */
-// int sgx_ioc_page_notify_accept(struct device *filep, unsigned int cmd,
+// int sgx_ioc_page_notify_accept(struct device *dev, unsigned int cmd,
 // 				unsigned int arg)
 // {
 // 	struct sgx_range *rg;
@@ -143,7 +151,7 @@ int sgx_ioc_trim_page(struct device *filep, unsigned int cmd,
 //  * sgx_ioc_page_remove() - Pages defined by address will be removed
 //  * @arg address of page
 //  */
-// int sgx_ioc_page_remove(struct device *filep, unsigned int cmd,
+// int sgx_ioc_page_remove(struct device *dev, unsigned int cmd,
 // 			 unsigned int arg)
 // {
 // 	struct sgx_encl *encl;
@@ -177,7 +185,7 @@ int sgx_ioctl(struct device *dev, unsigned long cmd, void *arg)
 	char data[256];
 	sgx_ioc_t handler = __NULL;
 	int ret;
-
+    
 	switch (cmd) {
 	case SGX_IOC_ENCLAVE_CREATE:
 		handler = sgx_ioc_enclave_create;
@@ -210,11 +218,23 @@ int sgx_ioctl(struct device *dev, unsigned long cmd, void *arg)
 	// if (copy_from_user(data, (void *)arg, _IOC_SIZE(cmd)))
 	// 	return -EFAULT;
 
-	// ret = handler(filep, cmd, (unsigned int)((void *)data));
+	ret = handler(dev, cmd, (unsigned int)((void *)data));
 	// if (!ret && (cmd & IOC_OUT)) {
 	// 	if (copy_to_user((void *)arg, data, _IOC_SIZE(cmd)))
 	// 		return -EFAULT;
 	// }
 
 	return ret;
+}
+
+int sgx_open(struct device *dev, int flags)
+{
+    WARN_STUBBED();
+    return 0;
+}
+
+int sgx_close(struct device *dev)
+{
+    WARN_STUBBED();
+    return 0;
 }

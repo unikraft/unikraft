@@ -37,8 +37,14 @@
 #include <uk/arch/types.h>
 #include <uk/list.h>
 #include <uk/bitops.h>
+#include <uk/mutex.h>
+#include <uk/list.h>
+#include <uk/refcount.h>
 #include <devfs/device.h>
 #include <errno.h>
+#include <signal.h>
+
+#include <uk/sgx_cpu.h>
 
 #define SGX_VA_SLOT_COUNT 512
 
@@ -56,7 +62,6 @@ struct sgx_epc_page {
 	struct sgx_encl_page *encl_page;
 };
 
-
 #define DECLARE_BITMAP(name,bits) \
 	unsigned long name[UK_BITS_TO_LONGS(bits)]
 struct sgx_va_page {
@@ -73,8 +78,51 @@ struct sgx_encl_page {
 	unsigned int va_offset;
 };
 
+struct sgx_tgid_ctx {
+	// struct pid *tgid;
+	pid_t *tgid;
+	__atomic refcount;
+	struct uk_list_head encl_list;
+	struct uk_list_head list;
+};
+
+enum sgx_encl_flags {
+	SGX_ENCL_INITIALIZED	= BIT(0),
+	SGX_ENCL_DEBUG		= BIT(1),
+	SGX_ENCL_SECS_EVICTED	= BIT(2),
+	SGX_ENCL_SUSPEND	= BIT(3),
+	SGX_ENCL_DEAD		= BIT(4),
+};
+
+struct sgx_encl {
+	unsigned int flags;
+	uint64_t attributes;
+	uint64_t xfrm;
+	unsigned int secs_child_cnt;
+	struct uk_mutex lock;
+	// struct mm_struct *mm;
+	// struct file *backing;
+	// struct file *pcmd;
+	struct uk_list_head load_list;
+	__atomic refcount;
+	unsigned long base;
+	unsigned long size;
+	unsigned long ssaframesize;
+	struct uk_list_head va_pages;
+	// struct radix_tree_root page_tree;
+	struct uk_list_head add_page_reqs;
+	// struct work_struct add_page_work;
+	struct sgx_encl_page secs;
+	struct sgx_tgid_ctx *tgid_ctx;
+	struct uk_list_head encl_list;
+	// struct mmu_notifier mmu_notifier;
+	unsigned int shadow_epoch;
+};
+
 int sgx_add_epc_bank(__paddr_t start, unsigned long size, int bank);
 int sgx_page_cache_init(void);
 int sgx_ioctl(struct device *filep, unsigned long cmd, void *arg);
+int sgx_open(struct device *dev, int flags);
+int sgx_close(struct device *dev);
 
 #endif
