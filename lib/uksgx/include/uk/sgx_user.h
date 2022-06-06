@@ -14,16 +14,6 @@
 	_IOW(SGX_MAGIC, 0x01, struct sgx_enclave_add_page)
 #define SGX_IOC_ENCLAVE_INIT \
 	_IOW(SGX_MAGIC, 0x02, struct sgx_enclave_init)
-#define SGX_IOC_ENCLAVE_EMODPR \
-	_IOW(SGX_MAGIC, 0x09, struct sgx_modification_param)
-#define SGX_IOC_ENCLAVE_MKTCS \
-	_IOW(SGX_MAGIC, 0x0a, struct sgx_range)
-#define SGX_IOC_ENCLAVE_TRIM \
-	_IOW(SGX_MAGIC, 0x0b, struct sgx_range)
-#define SGX_IOC_ENCLAVE_NOTIFY_ACCEPT \
-	_IOW(SGX_MAGIC, 0x0c, struct sgx_range)
-#define SGX_IOC_ENCLAVE_PAGE_REMOVE \
-	_IOW(SGX_MAGIC, 0x0d, unsigned long)
 
 /* SGX leaf instruction return values */
 #define SGX_SUCCESS			0
@@ -91,20 +81,5 @@ struct sgx_enclave_init {
 	__u64	sigstruct;
 	__u64	einittoken;
 } __attribute__((__packed__));
-
-/*
- *     SGX2.0 definitions
- */
-
-struct sgx_range {
-	unsigned long start_addr;
-	unsigned int nr_pages;
-};
-
-struct sgx_modification_param {
-	struct sgx_range range;
-	unsigned long flags;
-};
-
 
 #endif

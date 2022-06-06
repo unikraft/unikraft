@@ -40,7 +40,7 @@
 #define DEV_SGX_NAME "sgx"
 
 #define SGX_MAX_EPC_BANKS 8 /* support up to 8 EPC banks according to Intel SGX  \
-			     OOT-drvier 2.11 */
+			     OOT-drvier 2.5 */
 struct sgx_epc_bank sgx_epc_banks[SGX_MAX_EPC_BANKS];
 int sgx_nr_epc_banks;
 __u64 sgx_encl_size_max_64;
