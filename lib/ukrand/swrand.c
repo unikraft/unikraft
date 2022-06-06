@@ -29,8 +29,10 @@
  */
 #include <string.h>
 #include <uk/swrand.h>
+#include <uk/hwrand.h>
 #include <uk/config.h>
 #include <uk/print.h>
+#include <uk/cpuid.h>
 
 __u32 uk_swrandr_gen_seed32(void)
 {
@@ -40,9 +42,26 @@ __u32 uk_swrandr_gen_seed32(void)
 	val = (__u32)ukplat_wall_clock();
 #endif
 
+/* 1) try to call rdseed
+ * 2) if rdseed is not available or fails, call rdrand
+ * 3) if rdrand is not available or fails, call clock
+*/
 #ifdef CONFIG_LIBUKRAND_INITIALSEED_RDRAND
-	asm volatile ("rdrand %%eax;"
-		: "=a" (val));
+	__u8 ret = 0;
+
+	if (is_RDSEED_available()) {
+		ret = uk_hwrand_seed(&val);
+	}
+
+	if (ret == 0) {
+		if (is_RDRAND_available()) {
+			ret = uk_hwrand_randr(&val);
+		}
+	}
+
+	if (ret == 0) {
+		val = (__u32)ukplat_wall_clock();
+	}
 #endif
 
 #ifdef CONFIG_LIBUKRAND_INITIALSEED_USECONSTANT

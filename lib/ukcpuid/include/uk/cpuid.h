@@ -20,6 +20,8 @@ void get_cpuid_info(__u32 primary_code,
 __u8 is_AMD(void);
 __u8 is_INTEL(void);
 __u8 is_RDRAND_available(void);
+__u8 is_RDSEED_available(void);
+
 #ifdef __cplusplus
 }
 #endif

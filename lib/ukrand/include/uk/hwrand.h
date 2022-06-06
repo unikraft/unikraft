@@ -33,5 +33,16 @@ static inline uint8_t uk_hwrand_randr(__u32 *val)
 	return success;
 }
 
+static inline uint8_t uk_hwrand_seed(__u32 *val) {
+	__u8 success;
+	
+	__asm__ volatile(
+		"rdseed %0 ; setc %1"
+		: "=r" (*val), "=qm" (success)
+	);
+
+	return success;
+}
+
 
 #endif

@@ -7,4 +7,5 @@ uk_swrand_randr_r
 uk_swrandr_gen_seed32
 uk_swrand_generate_bytes
 uk_hwrand_generate_bytes
+uk_hwrand_seed
 add_interrupt_randomness

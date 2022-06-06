@@ -58,7 +58,7 @@ struct uk_cpuid_cache {
 	__u8 is_AMD : 2;
 	__u8 is_INTEL : 2;
 	__u8 is_RDRAND_available: 2;
-
+	__u8 is_RDSEED_available: 2;
 };
 
 static struct uk_cpuid_info info;
@@ -126,7 +126,6 @@ __u8 is_fpu_available(void)
 	return is_flag_enabled(EAX_FEATURE_INFO, 0x0, X86_CPUID1_EDX_FPU, &(info.EDX));
 }
 
-
 __u8 is_fxsr_available(void)
 {
 	// TODO cache the response ??
@@ -192,7 +191,6 @@ __u8 is_xsaveopt_available(void)
 
 	return is_flag_enabled(EAX_EXTENDED_STATE_INFO, 0x1, X86_CPUIDD1_EAX_XSAVEOPT, &(info.EAX));
 }
-
 
 __u8 is_syscall_available(void)
 {
@@ -272,6 +270,24 @@ __u8 is_RDRAND_available(void) {
 
 return_RDRAND:
 	return get_value(cache.is_RDRAND_available);
+}
+
+__u8 is_RDSEED_available(void) {
+	__u8 value;
+
+	if (is_cached(cache.is_RDSEED_available)) {
+		goto return_RDSEED;
+	}
+
+	if (!(is_INTEL() || is_AMD())) {
+		return 0;
+	}
+
+	value = is_flag_enabled(EAX_STRUCTURED_EXTENDED_FEATURE_INFO, 0x0, X86_CPUID7_EBX_RDSEED, &(info.EBX));
+	set_cache(cache.is_RDSEED_available, value);
+
+return_RDSEED:
+	return get_value(cache.is_RDSEED_available);
 }
 
 

@@ -44,8 +44,8 @@ config LIBUKRAND_INITIALSEED_TIME
     bool "Platform timestamp"
 
 config LIBUKRAND_INITIALSEED_RDRAND
-    depends on ARCH_X86_64 && (MARCH_X86_64_COREI7AVXI)
-    bool "`rdrand` instruction"
+    depends on ARCH_X86_64
+    bool "Hardware seed"
 
 config LIBUKRAND_INITIALSEED_USECONSTANT
     bool "Compiled-in constant"
