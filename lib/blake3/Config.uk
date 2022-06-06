@@ -1,0 +1,3 @@
+config BLAKE3
+	bool "blake3: hashing library"
+	default n
