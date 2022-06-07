@@ -35,9 +35,19 @@
 #define __UK_PROCESS_H__
 
 #include <uk/config.h>
+#include <stdbool.h>
+#include <uk/config.h>
 #if CONFIG_LIBUKSCHED
 #include <uk/thread.h>
 #endif
+#include <uk/prio.h>
+#if CONFIG_LIBPOSIX_PROCESS_CLONE
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+#include <sched.h>       /* CLONE_* constants */
+#include <linux/sched.h> /* struct clone_args */
+#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 
 #if CONFIG_LIBUKSCHED
 int uk_posix_process_create(struct uk_alloc *a,
@@ -45,5 +55,61 @@ int uk_posix_process_create(struct uk_alloc *a,
 			    struct uk_thread *parent);
 void uk_posix_process_kill(struct uk_thread *thread);
 #endif /* CONFIG_LIBUKSCHED */
+
+#if CONFIG_LIBPOSIX_PROCESS_CLONE
+typedef int  (*uk_posix_clone_init_func_t)(const struct clone_args *cl_args,
+					   size_t cl_args_len,
+					   struct uk_thread *child,
+					   struct uk_thread *parent);
+typedef void (*uk_posix_clone_term_func_t)(__u64 cl_flags,
+					   struct uk_thread *child);
+
+/* helper to test if a cl_args field is given */
+#define UK_POSIX_CLONE_ARGS_HAS(field, cl_args_len)		\
+	__contains(struct clone_args, field, cl_args_len)
+
+
+struct uk_posix_clonetab_entry {
+	__u64 flags_mask;
+	bool presence_only; /* call handlers only if (flags & flags_mask) != 0x0 */
+	uk_posix_clone_init_func_t init;
+	uk_posix_clone_term_func_t term;
+};
+
+#define __UK_POSIX_CLONETAB_ENTRY(arg_flags_mask, arg_presence_only, init_fn, term_fn, prio) \
+	static const struct uk_posix_clonetab_entry			\
+	__used __section(".uk_posix_clonetab" # prio) __align(8)	\
+		__uk_posix_clonetab ## prio ## _ ## init_fn ## _ ## term_fn = {	\
+		.flags_mask = (arg_flags_mask),				\
+		.presence_only = !(!(arg_presence_only)),		\
+		.init = (init_fn),					\
+		.term = (term_fn)					\
+	}
+
+#define _UK_POSIX_CLONETAB_ENTRY(flags_mask, presence_only, init_fn, term_fn, prio) \
+	__UK_POSIX_CLONETAB_ENTRY(flags_mask, presence_only, init_fn, term_fn, prio)
+
+/**
+ * Registers a clone handler that is called during thread cloning
+ *
+ * @param flags_mask
+ *   Mask of flags that are handled by this handler
+ * @param presence_only
+ *   Call handler only if at least one flag is set from flags_mask:
+ *   (clone_args->flags & flags_mask) != 0
+ * @param init_fn
+ *   Handler that is called once from parent during clone
+ * @param term_fn
+ *   Handler that is called when the child terminates
+ * @parm prio
+ *   Call order priority for this handler
+ */
+#define UK_POSIX_CLONE_HANDLER_PRIO(flags_mask, presence_only, init_fn, term_fn, prio) \
+	_UK_POSIX_CLONETAB_ENTRY(flags_mask, presence_only, init_fn, term_fn, prio)
+
+#define UK_POSIX_CLONE_HANDLER(flags_mask, presence_only, init_fn, term_fn) \
+	_UK_POSIX_CLONETAB_ENTRY(flags_mask, presence_only, init_fn, term_fn, UK_PRIO_LATEST)
+
+#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 
 #endif /* __UK_PROCESS_H__ */
