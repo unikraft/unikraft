@@ -75,4 +75,11 @@ enum sgx_commands {
 	EMODT	= 0xF,
 };
 
+static inline unsigned long get_cpl(void)
+{
+	unsigned long cs;
+	asm volatile("mov %%cs, %0" : "=r"(cs));
+	return cs & 0x3;
+}
+
 #endif
