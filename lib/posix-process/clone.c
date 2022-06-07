@@ -405,19 +405,19 @@ err_out:
 }
 
 #if CONFIG_ARCH_X86_64
-UK_LLSYSCALL_R_DEFINE(int, clone,
-		      unsigned long, flags,
-		      void *, sp,
-		      int *, parent_tid,
-		      int *, child_tid,
-		      unsigned long, tlsp)
+UK_LLSYSCALL_R_DEFINE2(int, clone,
+		       unsigned long, flags,
+		       void *, sp,
+		       int *, parent_tid,
+		       int *, child_tid,
+		       unsigned long, tlsp)
 #else /* !CONFIG_ARCH_X86_64 */
-UK_LLSYSCALL_R_DEFINE(int, clone,
-		      unsigned long, flags,
-		      void *, sp,
-		      int *, parent_tid,
-		      unsigned long, tlsp,
-		      int *, child_tid)
+UK_LLSYSCALL_R_DEFINE2(int, clone,
+		       unsigned long, flags,
+		       void *, sp,
+		       int *, parent_tid,
+		       unsigned long, tlsp,
+		       int *, child_tid)
 #endif /* !CONFIG_ARCH_X86_64 */
 {
 	/* Translate */
@@ -435,9 +435,9 @@ UK_LLSYSCALL_R_DEFINE(int, clone,
 }
 
 /* NOTE: There are currently no libc wrapper for clone3 */
-UK_LLSYSCALL_R_DEFINE(long, clone3,
-		      struct clone_args *, cl_args,
-		      size_t, cl_args_len)
+UK_LLSYSCALL_R_DEFINE2(long, clone3,
+		       struct clone_args *, cl_args,
+		       size_t, cl_args_len)
 {
 	return _clone(cl_args, cl_args_len, uk_syscall_return_addr());
 }
