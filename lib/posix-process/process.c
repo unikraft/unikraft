@@ -33,6 +33,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#include <uk/config.h>
 #include <sys/types.h>
 #include <stddef.h>
 #include <errno.h>
@@ -48,6 +49,9 @@
 #include <uk/init.h>
 #include <uk/errptr.h>
 #include <uk/essentials.h>
+#if CONFIG_LIBPOSIX_PROCESS_CLONE
+#include <uk/process.h>
+#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 
 #include "process.h"
 
@@ -569,6 +573,55 @@ __noreturn void exit_group(int status) {
 }
 #endif /* UK_LIBC_SYSCALLS */
 
+#if CONFIG_LIBPOSIX_PROCESS_CLONE
+/* Store child PID at given location for parent */
+static int pprocess_parent_settid(const struct clone_args *cl_args,
+				  size_t cl_args_len __unused,
+				  struct uk_thread *child,
+				  struct uk_thread *parent __unused)
+{
+	pid_t child_tid = ukthread2tid(child);
+
+	UK_ASSERT(child_tid >= 0);
+
+	if (!cl_args->parent_tid)
+		return -EINVAL;
+
+	*((pid_t *) cl_args->parent_tid) = child_tid;
+	return 0;
+}
+UK_POSIX_CLONE_HANDLER(CLONE_PARENT_SETTID, true, pprocess_parent_settid, 0x0);
+
+/* Store child PID at given location in child */
+static int pprocess_child_settid(const struct clone_args *cl_args,
+				 size_t cl_args_len __unused,
+				 struct uk_thread *child,
+				 struct uk_thread *parent __unused)
+{
+	pid_t child_tid = ukthread2tid(child);
+
+	UK_ASSERT(child_tid >= 0);
+
+	if (!cl_args->child_tid)
+		return -EINVAL;
+
+	*((pid_t *) cl_args->child_tid) = child_tid;
+	return 0;
+}
+UK_POSIX_CLONE_HANDLER(CLONE_CHILD_SETTID, true, pprocess_child_settid, 0x0);
+
+/* if not set child in new TGID (thread group ID), with set, same getppid as parent  */
+static int pprocess_clone_thread(const struct clone_args *cl_args __unused,
+				 size_t cl_args_len __unused,
+				 struct uk_thread *child __unused,
+				 struct uk_thread *parent __unused)
+{
+	UK_WARN_STUBBED();
+
+	return 0;
+}
+UK_POSIX_CLONE_HANDLER(CLONE_THREAD, false, pprocess_clone_thread, 0x0);
+#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 #else  /* !CONFIG_LIBPOSIX_PROCESS_PIDS */
 
 #define UNIKRAFT_PID      1
