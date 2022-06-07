@@ -205,12 +205,9 @@ int sgx_probe()
 	uk_pr_info("SGX status: SGX1 - true, SGX2 - %s\n",
 		   sgx_has_sgx2 ? "true" : "false");
 
-
-	uk_pr_info("Current machine is running under %s mode\n", read_cr0() & 0x1 ? "protected" : "real");
-	
-	uk_pr_info("Paging is %s\n", read_cr0() & 0x80000000 ? "enabled" : "disabled");
-
 	uk_pr_info("Current machine is running under ring %ld\n", get_cpl());
+
+	
 
 	return sgx_init();
 
