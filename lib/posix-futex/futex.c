@@ -50,6 +50,9 @@
 #include <uk/thread.h>
 #include <uk/thread.h>
 #include <uk/list.h>
+#if CONFIG_LIBPOSIX_PROCESS_CLONE
+#include <uk/process.h>
+#endif
 #include <uk/sched.h>
 #include <uk/list.h>
 #include <uk/assert.h>
@@ -295,3 +298,52 @@ UK_LLSYSCALL_R_DEFINE(int, futex, uint32_t *, uaddr, int, futex_op,
 		/* TODO: other operations? */
 	}
 }
+
+#if CONFIG_LIBPOSIX_PROCESS_CLONE
+/*
+ * Reference to child TID that should be cleared on thread exit
+ * (if not NULL):
+ *  https://man7.org/linux/man-pages/man2/set_tid_address.2.html
+ */
+static __uk_tls pid_t *child_tid_clear_ref = NULL;
+
+/* Store reference for clearing child TID on exit */
+static int pfutex_child_cleartid(const struct clone_args *cl_args,
+				 size_t cl_args_len __unused,
+				 struct uk_thread *child __unused,
+				 struct uk_thread *parent __unused)
+{
+	child_tid_clear_ref = (pid_t *) cl_args->child_tid;
+	return 0;
+}
+UK_POSIX_CLONE_HANDLER(CLONE_CHILD_CLEARTID, true, pfutex_child_cleartid, 0x0);
+
+/* Update the stored reference for clearing child TID on exit
+ * NOTE: There is no libc wrapper
+ * NOTE: The system call also returns the caller's thread ID.
+ *       We call SYS_gettid effectively and in case of an error
+ *       we forward the error code to the caller. In such a case,
+ *       we also do not update the reference.
+ */
+UK_LLSYSCALL_R_DEFINE(pid_t, set_tid_address, pid_t *, tid_ref)
+{
+	pid_t self_tid = uk_syscall_r_gettid();
+
+	if (self_tid >= 0) {
+		/* Store new reference */
+		child_tid_clear_ref = tid_ref;
+	}
+	return self_tid;
+}
+
+/* Thread exit handler that clears child TID at the stored reference */
+static void pfutex_child_cleartid_term(struct uk_thread *child __unused)
+{
+	if (child_tid_clear_ref != NULL) {
+		*((pid_t *) child_tid_clear_ref) = 0;
+		futex_wake((uint32_t *) child_tid_clear_ref, 0);
+	}
+}
+UK_THREAD_INIT_PRIO(0x0, pfutex_child_cleartid_term, UK_PRIO_EARLIEST);
+
+#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
