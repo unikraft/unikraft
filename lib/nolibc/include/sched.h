@@ -62,6 +62,8 @@ extern "C" {
 #define CLONE_NEWPID		0x20000000
 #define CLONE_NEWNET		0x40000000
 #define CLONE_IO		0x80000000
+
+int clone (int (*fn)(void *), void *sp, int flags, void *arg, ...);
 #endif /* _GNU_SOURCE */
 #endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 

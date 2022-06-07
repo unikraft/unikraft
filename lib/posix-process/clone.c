@@ -434,6 +434,19 @@ UK_LLSYSCALL_R_DEFINE2(int, clone,
 	return _clone(&cl_args, sizeof(cl_args), uk_syscall_return_addr());
 }
 
+#if UK_LIBC_SYSCALLS
+int clone(int (*fn)(void *) __unused,
+	  void *sp __unused,
+	  int flags __unused,
+	  void *arg __unused, ...
+	   /* pid_t *parent_tid, void *tls, pid_t *child_tid */ )
+{
+	/* TODO */
+	errno = EINVAL;
+	return -1;
+}
+#endif /* UK_LIBC_SYSCALLS */
+
 /* NOTE: There are currently no libc wrapper for clone3 */
 UK_LLSYSCALL_R_DEFINE2(long, clone3,
 		       struct clone_args *, cl_args,
