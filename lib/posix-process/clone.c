@@ -309,6 +309,10 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 	s = uk_sched_current();
 
 	UK_ASSERT(s);
+	UK_ASSERT(t);
+	/* Parent must have ECTX and a Unikraft TLS */
+	UK_ASSERT((t->flags & UK_THREADF_ECTX)
+		  && (t->flags & UK_THREADF_UKTLS));
 	UK_ASSERT(uk_syscall_return_addr());
 
 	if (!cl_args || cl_args_len < CL_ARGS_REQUIRED_LEN) {
@@ -360,21 +364,42 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 	uk_pr_debug(")\n");
 #endif /* UK_DEBUG */
 
-	child = uk_thread_create_container(s->a,
-					   NULL, 0, /* no stack */
-					   s->a_uktls, /* UKTLS */
-					   false,
-					   (t->name) ? strdup(t->name) : NULL,
-					   NULL,
-					   _clone_child_gc);
+	if (flags & CLONE_SETTLS) {
+		/* The caller already created a TLS for the child (for instance
+		 * by a pthread API wrapper). We expect that this TLS is a
+		 * Unikraft TLS.
+		 */
+		child = uk_thread_create_container2(s->a,
+						    (__uptr) cl_args->stack,
+						    (__uptr) cl_args->tls,
+						    true, /* TLS is an UKTLS */
+						    false, /* We want ECTX */
+						    (t->name) ? strdup(t->name)
+							      : NULL,
+						    NULL,
+						    _clone_child_gc);
+	} else {
+		/* If no TLS was given, still allocate one
+		 * because Unikraft places TLS variables and
+		 * uses them effectively as TCB.
+		 */
+		child = uk_thread_create_container(s->a,
+						   NULL, 0, /* Stack is given */
+						   s->a_uktls,
+						   false, /* We want ECTX */
+						   (t->name) ? strdup(t->name)
+							     : NULL,
+						   NULL,
+						   _clone_child_gc);
+	}
 	if (PTRISERR(child)) {
 		ret = (PTR2ERR(child) != 0) ? PTR2ERR(child) : -ENOMEM;
 		goto err_out;
 	}
 
-	/* Call clone handler table */
+	/* Call clone handler table but treat CLONE_SETTLS as handled */
 	ret = _uk_posix_clonetab_init(cl_args, cl_args_len,
-				      0x0,
+				      CLONE_SETTLS,
 				      child, t);
 	if (ret < 0) {
 		goto err_free_child;
@@ -384,8 +409,9 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 		    child, child->name ? child->name : "<unnamed>", ret);
 
 	/*
-	 * Child starts at return address, sets given stack and given TLS:
-	 * It starts at userland context...
+	 * Child starts at return address, sets given stack and given TLS.
+	 * Register clearing has the effect that it looks like `clone`
+	 * returns `0` in the child.
 	 */
 	ukarch_ctx_init_entry0(&child->ctx,
 			       (__uptr) cl_args->stack,
@@ -393,10 +419,16 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 			       (ukarch_ctx_entry0) return_addr);
 	uk_thread_set_runnable(child);
 
-	uk_sched_thread_add(s, child);
-	uk_sched_yield(); /* Enable the child to execute directly */
+	/* We will return the child's thread ID in the parent */
+	ret = ukthread2tid(child);
 
-	return ukthread2tid(child);
+	/* Assing the child to a scheduler and give it the chance
+	 * to get scheduled directly
+	 */
+	uk_sched_thread_add(s, child);
+	uk_sched_yield();
+
+	return ret;
 
 err_free_child:
 	uk_thread_release(child);
