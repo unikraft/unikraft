@@ -1,4 +1,5 @@
 #include <uk/sgx_user.h>
+#include <uk/sgx_internal.h>
 #include <uk/print.h>
 #include <errno.h>
 
@@ -24,7 +25,14 @@ int sgx_get_encl(unsigned int addr, struct sgx_encl **encl)
 static int sgx_ioc_enclave_create(struct device *dev, unsigned int cmd,
 				   unsigned int arg)
 {
-    WARN_STUBBED();
+    // WARN_STUBBED();
+	// test switch_to_ring3
+	__u64 addr;
+	// get current rip and save it to addr
+	asm volatile(" \
+	lea 0(%%rip), %0; \
+	": "=r" (addr));
+	switch_to_ring3(addr);
 	return 0;
 }
 
