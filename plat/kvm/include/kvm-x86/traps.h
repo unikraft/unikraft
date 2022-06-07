@@ -20,6 +20,7 @@
  */
 
 #include <x86/traps.h>
+#include <uk/config.h>
 
 /*
  * GDT layout
@@ -30,16 +31,33 @@
 #define GDT_DESC_NULL           0
 #define GDT_DESC_CODE           1
 #define GDT_DESC_DATA           2
-#define GDT_DESC_TSS_LO         3
-#define GDT_DESC_TSS_HI         4
+#ifdef CONFIG_KVM_RING3
+    #define GDT_DESC_USER_CODE      3
+    #define GDT_DESC_USER_DATA      4
+    #define GDT_DESC_TSS_LO         5
+    #define GDT_DESC_TSS_HI         6
+#else
+    #define GDT_DESC_TSS_LO         3
+    #define GDT_DESC_TSS_HI         4
+#endif
 #define GDT_DESC_TSS            GDT_DESC_TSS_LO
 
 #define GDT_DESC_OFFSET(n)      ((n) * 0x8)
-#define GDT_NUM_ENTRIES         5
+#ifdef CONFIG_KVM_RING3
+    #define GDT_NUM_ENTRIES         7
+#else
+    #define GDT_NUM_ENTRIES         5
+#endif
 
 #define GDT_DESC_CODE_VAL       0x00af99000000ffff
+// gran:1 32-bit:0 long:1 available:0 limit_high:1111 present:1 dpl:00 segment:1 code:1 conforming:0 readable:0 accessed:1 000000000000000000000000 1111111111111111
 #define GDT_DESC_CODE32_VAL     0x00cf9b000000ffff
 #define GDT_DESC_DATA_VAL       0x00cf93000000ffff
-
+// 1 1 0 0 1111 1 00 1 0 0 1 1 000000000000000000000000 1111111111111111
+#ifdef CONFIG_KVM_RING3
+    #define GDT_DESC_USER_CODE_VAL  0x00aff9000000ffff 
+    // gran:1 32-bit:0 long:1 available:0 limit_high:1111 present:1 dpl:11 segment:1 code:1 conforming:0 readable:0 accessed:1 000000000000000000000000 1111111111111111
+    #define GDT_DESC_USER_DATA_VAL  0x00aff1000000ffff
+#endif
 
 #define IDT_NUM_ENTRIES         48

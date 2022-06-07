@@ -109,6 +109,15 @@ config VIRTIO_BUS
                Virtio bus driver for probing and operating virtio device and
                transport layer.
 
+config KVM_RING3
+       bool "Ring-3 support (Experimental)"
+       default n
+       depends on ARCH_X86_64
+       help
+               Enable experimental ring-3 support to run some unpreviledged-only
+               instructions on X86_64 architecture.
+
+
 menu "Virtio"
 config VIRTIO_PCI
        bool "Virtio PCI device support"
