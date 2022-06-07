@@ -149,8 +149,11 @@ __u32 ukplat_lcpu_count(void);
  *   sequential order of lcpuidx. If the call succeeds, input and output values
  *   are equal. Must be NULL if lcpuidx is NULL
  * @param sp array of stack pointers, one for each logical CPU to start. If
- *   lcpuidx is NULL, must be ukplat_lcpu_count() - 1 stacks
- * @param entry array of entry function pointers, one for logical CPU to start.
+ *   lcpuidx is NULL, must be ukplat_lcpu_count() - 1 stack pointers. The
+ *   stacks may be specifically prepared to contain arguments for the entry
+ *   function (e.g., cdecl calling convention). The platform may use the
+ *   following stack space to execute initialization routines
+ * @param entry array of entry functions, one for each logical CPU to start.
  *   Can be NULL, otherwise if lcpuidx is NULL, must contain
  *   ukplat_lcpu_count() - 1 function pointers. Provided functions must not
  *   return. If the parameter or individual function pointers are NULL the
