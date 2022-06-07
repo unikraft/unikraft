@@ -37,6 +37,7 @@
 
 #define _BSD_SOURCE
 #define _GNU_SOURCE
+#include <uk/config.h>
 #include <limits.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -45,6 +46,9 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#if CONFIG_LIBPOSIX_PROCESS_CLONE
+#include <uk/process.h>
+#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 
 #include <dirent.h>
 #include <vfscore/prex.h>
@@ -1202,6 +1206,26 @@ sys_fchdir(struct vfscore_file *fp, char *cwd)
 	vn_unlock(dvp);
 	return 0;
 }
+
+#if CONFIG_LIBPOSIX_PROCESS_CLONE
+static int uk_posix_clone_fs(const struct clone_args *cl_args,
+			     size_t cl_args_len __unused,
+			     struct uk_thread *child __unused,
+			     struct uk_thread *parent __unused)
+{
+	if (unlikely(!(cl_args->flags & CLONE_FS))) {
+		uk_pr_warn("Separate filesystem information for childs are not supported yet (CLONE_FS absent)\n");
+		return -ENOTSUP;
+	}
+
+	/* CLONE_FS says that filesystem information (fs root, workdir)
+	 * is shared with the child, this is what we have implemented only
+	 * at the moment
+	 */
+	return 0;
+}
+UK_POSIX_CLONE_HANDLER(CLONE_FS, false, uk_posix_clone_fs, 0x0);
+#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 
 int
 sys_readlink(char *path, char *buf, size_t bufsize, ssize_t *size)
