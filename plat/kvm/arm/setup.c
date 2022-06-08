@@ -204,7 +204,10 @@ enocmdl:
 
 void __no_pauth _libkvmplat_start(void *dtb_pointer)
 {
+	int ret;
+
 	_init_dtb(dtb_pointer);
+
 	pl011_console_init(dtb_pointer);
 
 	uk_pr_info("Entering from KVM (arm64)...\n");
@@ -220,6 +223,19 @@ void __no_pauth _libkvmplat_start(void *dtb_pointer)
 
 	/* Initialize interrupt controller */
 	intctrl_init();
+
+	/* Initialize logical boot CPU */
+	ret = lcpu_init(lcpu_get_bsp());
+	if (unlikely(ret))
+		UK_CRASH("Failed to initialize bootstrapping CPU: %d\n", ret);
+
+#ifdef CONFIG_HAVE_SMP
+	ret = lcpu_mp_init(CONFIG_UKPLAT_LCPU_RUN_IRQ,
+			   CONFIG_UKPLAT_LCPU_WAKEUP_IRQ,
+			   _libkvmplat_cfg.dtb);
+	if (unlikely(ret))
+		UK_CRASH("SMP initialization failed: %d.\n", ret);
+#endif /* CONFIG_HAVE_SMP */
 
 	uk_pr_info("pagetable start: %p\n",
 		   (void *) _libkvmplat_cfg.pagetable.start);
