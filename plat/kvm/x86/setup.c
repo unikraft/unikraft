@@ -454,6 +454,10 @@ void _libkvmplat_entry(void *arg)
 	_init_mem(&bootinfo);
 	_init_initrd(&bootinfo);
 
+#ifdef CONFIG_PAGING
+	_init_paging(mi);
+#endif
+	
 	if (_libkvmplat_cfg.initrd.len)
 		uk_pr_info("        initrd: %p\n",
 			   (void *)_libkvmplat_cfg.initrd.start);

@@ -49,8 +49,16 @@ static void gdt_init(void)
 	cpu_gdt64[GDT_DESC_CODE].raw = GDT_DESC_CODE_VAL;
 	cpu_gdt64[GDT_DESC_DATA].raw = GDT_DESC_DATA_VAL;
 #ifdef CONFIG_KVM_RING3
-	cpu_gdt64[GDT_DESC_USER_CODE].raw = GDT_DESC_USER_CODE_VAL;
-	cpu_gdt64[GDT_DESC_USER_DATA].raw = GDT_DESC_USER_DATA_VAL;
+	// cpu_gdt64[GDT_DESC_CODE].code.r = 1; // 
+	cpu_gdt64[GDT_DESC_CODE].code.c = 1; // set to make kernel code executed in ring 3
+	cpu_gdt64[GDT_DESC_USER_CODE].raw = GDT_DESC_CODE_VAL;
+	// cpu_gdt64[GDT_DESC_USER_CODE].code.a = 0;
+	cpu_gdt64[GDT_DESC_USER_CODE].code.r = 1;
+	// cpu_gdt64[GDT_DESC_USER_CODE].code.c = 1;
+	cpu_gdt64[GDT_DESC_USER_CODE].code.dpl = 3;
+	// cpu_gdt64[GDT_DESC_USER_CODE].code.avl = 0;
+	cpu_gdt64[GDT_DESC_USER_DATA].raw = cpu_gdt64[GDT_DESC_USER_CODE].raw;
+	cpu_gdt64[GDT_DESC_USER_DATA].data.x = 0;
 #endif
 	gdtptr.limit = sizeof(cpu_gdt64) - 1;
 	gdtptr.base = (__u64) &cpu_gdt64;
@@ -83,7 +91,7 @@ static void tss_init(void)
 	cpu_tss.ist[2] = (__u64) &cpu_nmi_stack[sizeof(cpu_nmi_stack)];
 
 #ifdef CONFIG_KVM_RING3
-	cpu_tss.rsp[0] = (__u64) &bootstack;
+	cpu_tss.rsp[0] = (__u64) ((char *)&bootstack + 4096);
 #endif
 
 	td->limit_lo = sizeof(cpu_tss);
