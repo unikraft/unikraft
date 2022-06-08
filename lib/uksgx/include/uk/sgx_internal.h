@@ -124,6 +124,6 @@ int sgx_page_cache_init(void);
 int sgx_ioctl(struct device *filep, unsigned long cmd, void *arg);
 int sgx_open(struct device *dev, int flags);
 int sgx_close(struct device *dev);
-void switch_to_ring3(__u64 addr);
+void switch_to_ring3();
 
 #endif
