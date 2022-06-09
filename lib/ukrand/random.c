@@ -27,31 +27,51 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include <string.h>
 #include <uk/config.h>
-#include <uk/print.h>
 #include <uk/init.h>
-#include <uk/hwrand.h>
+#include <uk/syscall.h>
+#include <sys/random.h>
+#include <uk/essentials.h>
 #include <uk/swrand.h>
-#include <uk/cpuid.h>
+#include <uk/hwrand.h>
 
 static int _uk_random_generator_init() {
-	#ifdef CONFIG_LIBUKRAND_TRUE_RANDOMNESS
-		// TODO HW randomness init
-		if (!is_RDRAND_available()) {
-			uk_pr_err("No support for RDRAND\n");
-
-			#undef CONFIG_LIBUKRAND_TRUE_RANDOMNESS
-			#define CONFIG_LIBUKRAND_PSEUDO_RANDOMNESS
-
-			return _uk_swrand_init();
+	int ret;
+	#ifdef CONFIG_LIBUKRAND_HARDWARE_RANDOMNESS
+		ret = _uk_hwrand_init();
+		if (ret) {
+			goto exit;
 		}
-
-		return 0;
-
 	#endif
 
-	return _uk_swrand_init();
+	#ifdef CONFIG_LIBUKRAND_SOFTWARE_RANDOMNESS
+		ret = _uk_swrand_init();
+		if (ret) {
+			goto exit;
+		}
+	#endif
+
+exit:
+	return ret;
+
+}
+
+UK_SYSCALL_R_DEFINE(ssize_t, getrandom,
+		    void *, buf, size_t, buflen,
+		    unsigned int, flags)
+{	
+	size_t offset = 0;
+	#ifdef CONFIG_LIBUKRAND_HARDWARE_RANDOMNESS
+		offset = uk_hwrand_generate_bytes(buf, buflen);
+	#endif
+
+	#ifdef CONFIG_LIBUKRAND_SOFTWARE_RANDOMNESS
+		if(offset < buflen) {
+			offset += uk_swrand_generate_bytes(buf + offset, buflen - offset);
+		}
+	#endif
+
+	return offset;
 }
 
 uk_early_initcall(_uk_random_generator_init);

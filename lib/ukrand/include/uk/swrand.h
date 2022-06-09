@@ -69,7 +69,7 @@ static inline __u32 uk_swrand_randr(void)
 	return ret;
 }
 
-ssize_t uk_swrand_generate_bytes(void *buf, size_t buflen);
+size_t uk_swrand_generate_bytes(void *buf, size_t buflen);
 
 int _uk_swrand_init(void);
 #ifdef __cplusplus

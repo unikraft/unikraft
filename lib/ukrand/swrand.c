@@ -31,8 +31,8 @@
 #include <uk/swrand.h>
 #include <uk/hwrand.h>
 #include <uk/config.h>
-#include <uk/print.h>
 #include <uk/cpuid.h>
+#include <uk/print.h>
 
 __u32 uk_swrandr_gen_seed32(void)
 {
@@ -50,12 +50,12 @@ __u32 uk_swrandr_gen_seed32(void)
 	__u8 ret = 0;
 
 	if (is_RDSEED_available()) {
-		ret = uk_hwrand_seed(&val);
+		ret = uk_hwrand_rdseed(&val);
 	}
 
 	if (ret == 0) {
 		if (is_RDRAND_available()) {
-			ret = uk_hwrand_randr(&val);
+			ret = uk_hwrand_rdrand(&val);
 		}
 	}
 
@@ -71,7 +71,7 @@ __u32 uk_swrandr_gen_seed32(void)
 	return val;
 }
 
-ssize_t uk_swrand_generate_bytes(void *buf, size_t buflen)
+size_t uk_swrand_generate_bytes(void *buf, size_t buflen)
 {
 	size_t step, chunk_size, i;
 	__u32 rd;

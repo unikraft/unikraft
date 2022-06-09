@@ -45,6 +45,7 @@
 #define DEV_RANDOM_NAME "random"
 #define DEV_URANDOM_NAME "urandom"
 
+#ifdef CONFIG_LIBUKRAND_HARDWARE_RANDOMNESS
 int dev_random_read(struct device *dev __unused, struct uio *uio,
 			int flags __unused)
 {
@@ -54,13 +55,7 @@ int dev_random_read(struct device *dev __unused, struct uio *uio,
 	buf = (char*)uio->uio_iov->iov_base;
 	count = uio->uio_iov->iov_len;
 
-	#ifdef CONFIG_LIBUKRAND_PSEUDO_RANDOMNESS
-		uk_swrand_generate_bytes(buf, count);
-	#endif
-
-	#ifdef CONFIG_LIBUKRAND_TRUE_RANDOMNESS
-		uk_hwrand_generate_bytes(buf, count);
-	#endif
+	uk_hwrand_generate_bytes(buf, count);
 
 	uio->uio_resid = 0;
 	return 0;
@@ -88,12 +83,50 @@ static struct driver drv_random = {
 	.devsz = 0,
 	.name = DEV_RANDOM_NAME
 };
+#endif
+
+#ifdef CONFIG_LIBUKRAND_SOFTWARE_RANDOMNESS
+int dev_urandom_read(struct device *dev __unused, struct uio *uio,
+			int flags __unused)
+{
+	size_t count;
+	char *buf;
+
+	buf = (char*)uio->uio_iov->iov_base;
+	count = uio->uio_iov->iov_len;
+
+	uk_swrand_generate_bytes(buf, count);
+
+	uio->uio_resid = 0;
+	return 0;
+}
+
+int dev_urandom_open(struct device *device __unused, int mode __unused)
+{
+	return 0;
+}
+
+
+int dev_urandom_close(struct device *device __unused)
+{
+	return 0;
+}
+
+
+static struct devops urandom_devops = {
+	.read = dev_urandom_read,
+	.open = dev_urandom_open,
+	.close = dev_urandom_close,
+};
 
 static struct driver drv_urandom = {
-	.devops = &random_devops,
+	.devops = &urandom_devops,
 	.devsz = 0,
 	.name = DEV_URANDOM_NAME
 };
+
+#endif
+
 
 static int devfs_register(void)
 {
@@ -102,6 +135,7 @@ static int devfs_register(void)
 	uk_pr_info("Register '%s' and '%s' to devfs\n",
 		   DEV_URANDOM_NAME, DEV_RANDOM_NAME);
 
+	#ifdef CONFIG_LIBUKRAND_SOFTWARE_RANDOMNESS
 	/* register /dev/urandom */
 	dev = device_create(&drv_urandom, DEV_URANDOM_NAME, D_CHR);
 	if (dev == NULL) {
@@ -109,7 +143,9 @@ static int devfs_register(void)
 			  DEV_URANDOM_NAME);
 		return -1;
 	}
+	#endif
 
+	#ifdef CONFIG_LIBUKRAND_HARDWARE_RANDOMNESS
 	/* register /dev/random */
 	dev = device_create(&drv_random, DEV_RANDOM_NAME, D_CHR);
 	if (dev == NULL) {
@@ -117,6 +153,7 @@ static int devfs_register(void)
 			  DEV_RANDOM_NAME);
 		return -1;
 	}
+	#endif
 
 	return 0;
 }

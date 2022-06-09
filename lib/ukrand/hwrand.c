@@ -1,34 +1,23 @@
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include <uk/swrand.h>
+#include <uk/rdrand.h>
+#include <uk/entropy.h>
+#include <uk/cpuid.h>
 #include <uk/print.h>
-#include <uk/hwrand.h>
 
-ssize_t uk_hwrand_generate_bytes(void *buf, size_t buflen)
-{
-	size_t idx = 0, rem = buflen;
-	size_t safety = buflen / sizeof(unsigned int);
-	u_int8_t success;
-	__u32 val;
-
-	while (rem > 0 && safety > 0) {
-		success = uk_hwrand_randr(&val);
-
-		if (success) {
-			size_t cnt = (rem < sizeof(val) ? rem : sizeof(val));
-
-			memcpy((unsigned char*)buf + idx, &val, cnt);
-
-			rem -= cnt;
-			idx += cnt;
-		} else {
-			safety--;
+size_t uk_hwrand_generate_bytes(void *buf, size_t buflen) {
+	size_t offset = uk_entropy_generate_bytes(buf, buflen);
+	
+	if (offset < buflen) {
+		if (is_RDRAND_available()) {
+			offset += uk_rdrand_generate_bytes(buf + offset, buflen - offset);
 		}
 	}
 
-	*((volatile unsigned int*)&val) = 0;
+	return offset;
+}
 
-	return (ssize_t)(buflen - rem);
+int _uk_hwrand_init(void)
+{	
+	return uk_entropy_init();
 }

@@ -5,22 +5,20 @@ menuconfig LIBUKRAND
 
 if LIBUKRAND
 
-choice
-	prompt "Support"
-	default LIBUKRAND_PSEUDO_RANDOMNESS
-
-config LIBUKRAND_PSEUDO_RANDOMNESS
-	bool "SWRAND"
-	help
-		"Software random number generator support"
-
-config LIBUKRAND_TRUE_RANDOMNESS
+config LIBUKRAND_HARDWARE_RANDOMNESS
 	depends on ARCH_X86_64
 	bool "HWRAND"
 	help
-		"Hardware random number generator support based on RDRAND instruction"
-endchoice
+		"Hardware random number generator support"
+	default n
 
+config LIBUKRAND_SOFTWARE_RANDOMNESS
+	bool "SWRAND"
+	help
+		"Software random number generator support"
+	default n
+
+if LIBUKRAND_SOFTWARE_RANDOMNESS
 choice
 	prompt "Algorithm"
 	default LIBUKRAND_CHACHA
@@ -55,6 +53,7 @@ config LIBUKRAND_INITIALSEED_CONSTANT
     int "Initial seed constant"
     depends on LIBUKRAND_INITIALSEED_USECONSTANT
     default 23
+endif
 
 config LIBUKRAND_DEVFS
 	bool "Register random and urandom device to devfs"
