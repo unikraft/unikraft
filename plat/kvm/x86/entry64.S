@@ -55,7 +55,6 @@ _multiboot_header:
 
 .section .bss
 
-.globl bootstack
 .space 4096
 bootstack:
 

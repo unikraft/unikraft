@@ -1,6 +1,8 @@
 #include <uk/sgx_internal.h>
 #include <uk/sgx_asm.h>
 #include <uk/config.h>
+#include <uk/print.h>
+
 /*
  * Actually unikernel does not need ring-3, however,
  * ENCLU instruction in only avaliable in ring-3. Hence,
@@ -37,5 +39,7 @@ void switch_to_ring3()
 //         nop; \
 //         nop; ");
 #endif
+        int a = 0/0;
+        (void *) a;
         return;
 }
