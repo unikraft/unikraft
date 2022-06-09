@@ -30,6 +30,7 @@
 #include <uk/plat/config.h>
 #include <x86/desc.h>
 #include <kvm-x86/traps.h>
+#include <kvm/config.h>
 
 static struct seg_desc32 cpu_gdt64[GDT_NUM_ENTRIES] __align64b;
 
@@ -49,8 +50,18 @@ static void gdt_init(void)
 	cpu_gdt64[GDT_DESC_CODE].raw = GDT_DESC_CODE_VAL;
 	cpu_gdt64[GDT_DESC_DATA].raw = GDT_DESC_DATA_VAL;
 #ifdef CONFIG_KVM_RING3
-	cpu_gdt64[GDT_DESC_USER_CODE].raw = GDT_DESC_USER_CODE_VAL;
-	cpu_gdt64[GDT_DESC_USER_DATA].raw = GDT_DESC_USER_DATA_VAL;
+	// cpu_gdt64[GDT_DESC_CODE].code.r = 1; // 
+	cpu_gdt64[GDT_DESC_CODE].code.c = 1; // set to make kernel code executed in ring 3
+	cpu_gdt64[GDT_DESC_USER_CODE].raw = GDT_DESC_CODE_VAL;
+	// cpu_gdt64[GDT_DESC_USER_CODE].code.a = 0;
+	cpu_gdt64[GDT_DESC_USER_CODE].code.r = 1;
+	// cpu_gdt64[GDT_DESC_USER_CODE].code.c = 1;
+	cpu_gdt64[GDT_DESC_USER_CODE].code.dpl = 3;
+	// cpu_gdt64[GDT_DESC_USER_CODE].code.avl = 0;
+	cpu_gdt64[GDT_DESC_USER_DATA].raw = cpu_gdt64[GDT_DESC_USER_CODE].raw;
+	cpu_gdt64[GDT_DESC_USER_DATA].data.x = 0;
+	cpu_gdt64[GDT_DESC_USER_DATA].data.reserved = 0;
+	cpu_gdt64[GDT_DESC_USER_DATA].data.b = 1;
 #endif
 	gdtptr.limit = sizeof(cpu_gdt64) - 1;
 	gdtptr.base = (__u64) &cpu_gdt64;
@@ -74,7 +85,7 @@ static char cpu_nmi_stack[4096];  /* IST3 */
 
 static void tss_init(void)
 {
-	extern int bootstack;
+	extern struct kvmplat_config _libkvmplat_cfg;
 
 	struct seg_desc64 *td = (void *) &cpu_gdt64[GDT_DESC_TSS_LO];
 
@@ -83,7 +94,7 @@ static void tss_init(void)
 	cpu_tss.ist[2] = (__u64) &cpu_nmi_stack[sizeof(cpu_nmi_stack)];
 
 #ifdef CONFIG_KVM_RING3
-	cpu_tss.rsp[0] = (__u64) &bootstack;
+	cpu_tss.rsp[0] = _libkvmplat_cfg.bstack.start;
 #endif
 
 	td->limit_lo = sizeof(cpu_tss);
