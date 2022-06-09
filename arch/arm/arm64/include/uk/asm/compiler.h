@@ -33,8 +33,28 @@
 #endif
 
 #if CONFIG_ARM64_FEAT_PAUTH
+#if CONFIG_ARM64_FEAT_BTI
+#define __no_pauth __attribute__((target("branch-protection=bti")))
+#else
 #define __no_pauth __attribute__((target("branch-protection=none")))
+#endif /* CONFIG_ARM64_FEAT_BTI */
 #else
 #define __no_pauth
 #endif /* CONFIG_ARM64_FEAT_PAUTH */
+
+#if CONFIG_ARM64_FEAT_BTI
+#if CONFIG_ARM64_FEAT_PAUTH
+#define __no_bti __attribute__((target("branch-protection=pac-ret+leaf")))
+#else
+#define __no_bti __attribute__((target("branch-protection=none")))
+#endif /* CONFIG_ARM64_FEAT_PAUTH */
+#else
+#define __no_bti
+#endif /* CONFIG_ARM64_FEAT_BTI */
+
+#if defined(CONFIG_ARM64_FEAT_PAUTH) || defined(CONFIG_ARM64_FEAT_BTI)
+#define __no_branch_protection __attribute__((target("branch-protection=none")))
+#else
+#define __no_branch_protection
+#endif /* CONFIG_ARM64_FEAT_PAUTH || CONFIG_ARM64_FEAT_BTI */
 
