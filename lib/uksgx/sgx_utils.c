@@ -3,7 +3,7 @@
 #include <uk/sgx_cpu.h>
 #include <uk/config.h>
 #include <uk/print.h>
-// #include <plat/kvm/include/kvm-x86/traps.h>
+#include <kvm-x86/traps.h>
 
 typedef int(cpl_switch_handler_t)(__u8 rpl);
 
@@ -19,17 +19,18 @@ cpl_switch_handler_t *cpl_switch_handler;
 int legacy_cpl_switch(__u8 rpl)
 {
 	asm volatile(""
-		     "mov $0x1b, %rax;"
-		     "mov %rax, %ds;"
-		     "mov %rax, %es;"
-		     "mov %rsp, %rax;"
-		     "push $0x1b;"
-		     "push %rax;"
+		     "mov %0, %%rax;"
+		     "mov %%rax, %%ds;"
+		     "mov %%rax, %%es;"
+		     "mov %%rsp, %%rax;"
+		     "push %0;"
+		     "push %%rax;"
 		     "pushf;"
-		     "push $0x23;"
+		     "push %1;"
 		     "push $1f;"
 		     "iretq;"
-		     "1:");
+		     "1:" ::"g"(GDT_DESC_OFFSET(GDT_DESC_USER_DATA) | 3),
+		     "g"(GDT_DESC_OFFSET(GDT_DESC_USER_CODE) | 3));
 }
 
 int fast_cpl_switch(__u8 rpl)
@@ -42,16 +43,15 @@ int fast_cpl_switch(__u8 rpl)
 	if (rpl == 0) { /* syscall */
 		/* We do not need to save rsp as the stack will not be changed
 		 */
-		asm volatile(""
-			     "syscall;");
+		asm volatile("syscall;");
 	} else { /* rpl == 3, sysret */
 		asm volatile(""
-			     "movq $1f, %rcx;"
+			     "movq %0, %%rcx;"
 			     "pushfq;"
-			     "popq %r11;"
-			     "orq $0x200, %r11;"
+			     "popq %%r11;"
+			     "orq $0x200, %%r11;"
 			     "sysretq;"
-			     "1:");
+			     "1:" ::"g"(&&success));
 	}
 success:
 	return;
@@ -153,7 +153,9 @@ void cpl_switch_init()
 			 * IA32_STAR[63:48] should be set to 0x10,
 			 * IA32_STAR[47:32] is the kernel CS selector 0x8.
 			 */
-			wrmsr_safe(X86_MSR_IA32_STAR, 0, 0x10 << 16 | 0x8);
+			wrmsr_safe(X86_MSR_IA32_STAR, 0,
+				   GDT_DESC_OFFSET(GDT_DESC_DATA) << 16
+				       | GDT_DESC_OFFSET(GDT_DESC_CODE));
 			/*
 			 * wrmsrl_safe(X86_MSR_IA32_LSTAR, (__u64) && success);
 			 *

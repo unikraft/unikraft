@@ -1,6 +1,8 @@
 $(eval $(call addlib_s,libuksgx,$(CONFIG_LIBUKSGX)))
 
 CINCLUDES-$(CONFIG_LIBUKSGX)    += -I$(LIBUKSGX_BASE)/include
+CINCLUDES-$(CONFIG_LIBUKSGX)    += -I$(CONFIG_UK_BASE)/plat/kvm/include
+CINCLUDES-$(CONFIG_LIBUKSGX)    += -I$(CONFIG_UK_BASE)/plat/common/include
 CXXINCLUDES-$(CONFIG_LIBUKSGX)  += -I$(LIBUKSGX_BASE)/include
 
 LIBUKSGX_SRCS-$(CONFIG_LIBUKSGX) += $(LIBUKSGX_BASE)/sgx_main.c
