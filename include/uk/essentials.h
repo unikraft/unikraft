@@ -242,7 +242,7 @@ extern "C" {
  */
 #define RANGE_CONTAIN(base0, len0, base1, len1)				\
 	(IN_RANGE((base1), (base0), (len0))				\
-	 && (((base1) + (len1)) > (base0))				\
+	 && (((base1) + (len1)) >= (base0))				\
 	 && (((base1) + (len1)) <= ((base0) + (len0))))
 
 /**
