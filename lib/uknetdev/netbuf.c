@@ -130,6 +130,117 @@ struct uk_netbuf *uk_netbuf_alloc_buf(struct uk_alloc *a, size_t buflen,
 	return m;
 }
 
+#if CONFIG_LIBUKALLOCPOOL
+struct uk_netbuf *uk_netbuf_poolalloc_buf(struct uk_allocpool *p,
+					  uint16_t headroom,
+					  size_t privlen,
+					  uk_netbuf_dtor_t dtor)
+{
+	void *obj;
+	size_t obj_len;
+	size_t meta_len;
+	struct uk_alloc *a;
+	struct uk_netbuf *m;
+
+	UK_ASSERT(p);
+
+	/* uk_alloc interface used for free'ing */
+	a = uk_allocpool2ukalloc(p);
+
+	UK_ASSERT(a);
+
+	/* Place headroom and buf at the beginning of the allocation,
+	 * This is done in order to forward potential alignments of the
+	 * underlying allocation directly to the netbuf data area.
+	 * `m` (followed by `m->priv` if privlen > 0) will be placed at
+	 * the end of the given memory.
+	 * If the operation does not work, we
+	 */
+	obj_len = uk_allocpool_objlen(p);
+	meta_len = NETBUF_ADDR_ALIGN_UP(sizeof(*m) + privlen);
+	if (unlikely(meta_len > NETBUF_ADDR_ALIGN_DOWN(obj_len)))
+		return NULL; /* no space for meta data on pool objects */
+
+	obj = uk_allocpool_take(p);
+	if (unlikely(!obj))
+		return NULL;
+
+	m = (struct uk_netbuf *) (NETBUF_ADDR_ALIGN_DOWN((__uptr) obj
+							 + obj_len)
+				  - meta_len);
+	uk_netbuf_init_indir(m,
+			     obj,
+			     (size_t) ((__uptr) m - (__uptr) obj),
+			     headroom,
+			     privlen > 0 ? (void *) ((__uptr) m
+						     + sizeof(*m))
+			     : NULL,
+			     dtor);
+
+	/* Save reference to allocator and allocation
+	 * that is used for free'ing this uk_netbuf.
+	 */
+	m->_a = a;
+	m->_b = obj;
+
+	return m;
+}
+
+int uk_netbuf_poolalloc_buf_batch(struct uk_allocpool *p,
+				  struct uk_netbuf *m[], unsigned int count,
+				  uint16_t headroom,
+				  size_t privlen, uk_netbuf_dtor_t dtor)
+{
+	size_t meta_len = 0;
+	size_t obj_len;
+	struct uk_alloc *a;
+	void *obj[count];
+	unsigned int i;
+
+	UK_ASSERT(p);
+
+	/* uk_alloc interface used for free'ing */
+	a = uk_allocpool2ukalloc(p);
+
+	UK_ASSERT(a);
+
+	/* Place headroom and buf at the beginning of the allocation,
+	 * This is done in order to forward potential alignments of the
+	 * underlying allocation directly to the netbuf data area.
+	 * `m` (followed by `m->priv` if privlen > 0) will be placed at
+	 * the end of the given memory.
+	 * If the operation does not work, we
+	 */
+	obj_len = uk_allocpool_objlen(p);
+	meta_len = NETBUF_ADDR_ALIGN_UP(sizeof(struct uk_netbuf) + privlen);
+	if (unlikely(meta_len > NETBUF_ADDR_ALIGN_DOWN(obj_len)))
+		return -ENOSPC; /* no space for meta data on pool objects */
+
+	count = uk_allocpool_take_batch(p, obj, count);
+	for (i = 0; i < count; ++i) {
+		m[i] = (struct uk_netbuf *) (NETBUF_ADDR_ALIGN_DOWN((__uptr) obj[i]
+								    + obj_len)
+					     - meta_len);
+		uk_netbuf_init_indir(m[i],
+				     obj[i],
+				     (size_t) ((__uptr) m[i] - (__uptr) obj[i]),
+				     headroom,
+				     privlen > 0 ? (void *) ((__uptr) m[i]
+							     + sizeof(struct uk_netbuf))
+				     : NULL,
+				     dtor);
+
+		/* Save reference to allocator and allocation
+		 * that is used for free'ing this uk_netbuf.
+		 */
+		m[i]->_a = a;
+		m[i]->_b = obj[i];
+	}
+
+	return (int) count;
+}
+#endif /* CONFIG_LIBUKALLOCPOOL */
+
 struct uk_netbuf *uk_netbuf_prepare_buf(void *mem, size_t size,
 					uint16_t headroom,
 					size_t privlen, uk_netbuf_dtor_t dtor)

@@ -1,6 +1,8 @@
 uk_netbuf_init_indir
 uk_netbuf_alloc_indir
 uk_netbuf_alloc_buf
+uk_netbuf_poolalloc_buf
+uk_netbuf_poolalloc_buf_batch
 uk_netbuf_prepare_buf
 uk_netbuf_free_single
 uk_netbuf_free
