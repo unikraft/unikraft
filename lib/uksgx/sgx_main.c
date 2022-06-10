@@ -207,7 +207,7 @@ int sgx_probe()
 
 	uk_pr_info("Current machine is running under ring %ld\n", get_cpl());
 
-	
+	cpl_switch_init();
 
 	return sgx_init();
 

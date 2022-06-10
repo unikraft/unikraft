@@ -78,6 +78,12 @@
 #define X86_FEAT_CTL_SGX_ENABLED			    BIT(18)
 #define X86_FEAT_CTL_LMCE_ENABLED			    BIT(20)
 
+#define X86_MSR_IA32_EFER			            0xC0000080 /* extended feature enables */
+#define X86_EFER_SYSCALL			    		0x1UL
+#define X86_MSR_IA32_STAR			            0xC0000081 /* legacy mode SYSCALL target */
+#define X86_MSR_IA32_LSTAR			            0xC0000082 /* long mode SYSCALL target */
+#define X86_MSR_IA32_FMASK			            0xC0000084 /* legacy mode SYSCALL mask */
+
 /* Intel SGX Launch Enclave Public Key Hash MSRs */
 #define MSR_IA32_SGXLEPUBKEYHASH0	0x0000008C
 #define MSR_IA32_SGXLEPUBKEYHASH1	0x0000008D
@@ -102,7 +108,6 @@ static inline __u64 rdmsrl(unsigned int msr)
 static inline int native_write_msr_safe(unsigned int msr, __u32 low, __u32 high)
 {
 	int err = 0;
-	/*
 	asm volatile("2: wrmsr ; xor %[err],%[err]\n"
 		     "1:\n\t"
 		     ".section .fixup,\"ax\"\n\t"
@@ -113,18 +118,6 @@ static inline int native_write_msr_safe(unsigned int msr, __u32 low, __u32 high)
 		     : "c" (msr), "0" (low), "d" (high),
 		       [fault] "i" (-EIO)
 		     : "memory");
-	*/
-	asm volatile("2: wrmsr ; xor %[err],%[err]\n"
-		     "1:\n\t"
-		     ".section .fixup,\"ax\"\n\t"
-		     "3:  mov %[fault],%[err] ; jmp 1b\n\t"
-		     ".previous\n\t"
-		     _ASM_EXTABLE(2b, 3b)
-		     : [err] "=a" (err)
-		     : "c" (msr), "0" (low), "d" (high),
-		       [fault] "i" (-EIO)
-		     : "memory");
-
 	return err;
 }
 

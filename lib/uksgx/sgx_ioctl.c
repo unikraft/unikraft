@@ -32,7 +32,8 @@ static int sgx_ioc_enclave_create(struct device *dev, unsigned int cmd,
 	asm volatile(" \
 	lea 0(%%rip), %0; \
 	": "=r" (addr));
-	switch_to_ring3();
+	cpl_switch(3);
+	cpl_switch(0);
 	return 0;
 }
 
