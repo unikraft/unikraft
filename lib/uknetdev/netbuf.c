@@ -145,7 +145,7 @@ struct uk_netbuf *uk_netbuf_prepare_buf(void *mem, size_t size,
 	 * the end of the given memory.
 	 */
 	meta_len = NETBUF_ADDR_ALIGN_UP(sizeof(*m) + privlen);
-	if (meta_len > NETBUF_ADDR_ALIGN_DOWN((__uptr) mem + size))
+	if (meta_len > NETBUF_ADDR_ALIGN_DOWN(size))
 		return NULL;
 
 	m = (struct uk_netbuf *) (NETBUF_ADDR_ALIGN_DOWN((__uptr) mem + size)
