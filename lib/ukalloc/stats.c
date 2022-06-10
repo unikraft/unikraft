@@ -31,6 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <uk/store.h>
 #include <uk/alloc_impl.h>
 
 #if CONFIG_LIBUKALLOC_IFSTATS_GLOBAL
@@ -48,6 +49,13 @@ void uk_alloc_stats_get(struct uk_alloc *a,
 	uk_preempt_enable();
 }
 
+static int get_cur_mem_free(void *cookie __unused, __u64 *out)
+{
+	*out = (__u64) uk_alloc_availmem_total();
+	return 0;
+}
+UK_STORE_STATIC_ENTRY(cur_mem_free, u64, get_cur_mem_free, NULL, NULL);
+
 #if CONFIG_LIBUKALLOC_IFSTATS_GLOBAL
 void uk_alloc_stats_get_global(struct uk_alloc_stats *dst)
 {
@@ -57,4 +65,75 @@ void uk_alloc_stats_get_global(struct uk_alloc_stats *dst)
 	memcpy(dst, &_uk_alloc_stats_global, sizeof(*dst));
 	uk_preempt_enable();
 }
+
+static int get_last_alloc_size(void *cookie __unused, __u64 *out)
+{
+	*out = (__u64) _uk_alloc_stats_global.last_alloc_size;
+	return 0;
+}
+UK_STORE_STATIC_ENTRY(last_alloc_size, u64, get_last_alloc_size, NULL, NULL);
+
+static int get_max_alloc_size(void *cookie __unused, __u64 *out)
+{
+	*out = (__u64) _uk_alloc_stats_global.max_alloc_size;
+	return 0;
+}
+UK_STORE_STATIC_ENTRY(max_alloc_size, u64, get_max_alloc_size, NULL, NULL);
+
+static int get_min_alloc_size(void *cookie __unused, __u64 *out)
+{
+	*out = (__u64) _uk_alloc_stats_global.min_alloc_size;
+	return 0;
+}
+UK_STORE_STATIC_ENTRY(min_alloc_size, u64, get_min_alloc_size, NULL, NULL);
+
+static int get_tot_nb_allocs(void *cookie __unused, __u64 *out)
+{
+	*out = (__u64) _uk_alloc_stats_global.tot_nb_allocs;
+	return 0;
+}
+UK_STORE_STATIC_ENTRY(tot_nb_allocs, u64, get_tot_nb_allocs, NULL, NULL);
+
+static int get_tot_nb_frees(void *cookie __unused, __u64 *out)
+{
+	*out = (__u64) _uk_alloc_stats_global.tot_nb_frees;
+	return 0;
+}
+UK_STORE_STATIC_ENTRY(tot_nb_frees, u64, get_tot_nb_frees, NULL, NULL);
+
+static int get_cur_nb_allocs(void *cookie __unused, __s64 *out)
+{
+	*out = (__s64) _uk_alloc_stats_global.cur_nb_allocs;
+	return 0;
+}
+UK_STORE_STATIC_ENTRY(cur_nb_allocs, s64, get_cur_nb_allocs, NULL, NULL);
+
+static int get_max_nb_allocs(void *cookie __unused, __s64 *out)
+{
+	*out = (__s64) _uk_alloc_stats_global.max_nb_allocs;
+	return 0;
+}
+UK_STORE_STATIC_ENTRY(max_nb_allocs, s64, get_max_nb_allocs, NULL, NULL);
+
+static int get_cur_mem_use(void *cookie __unused, __s64 *out)
+{
+	*out = (__s64) _uk_alloc_stats_global.cur_mem_use;
+	return 0;
+}
+UK_STORE_STATIC_ENTRY(cur_mem_use, s64, get_cur_mem_use, NULL, NULL);
+
+static int get_max_mem_use(void *cookie __unused, __s64 *out)
+{
+	*out = (__s64) _uk_alloc_stats_global.max_mem_use;
+	return 0;
+}
+UK_STORE_STATIC_ENTRY(max_mem_use, s64, get_max_mem_use, NULL, NULL);
+
+static int get_nb_enomem(void *cookie __unused, __u64 *out)
+{
+	*out = (__u64) _uk_alloc_stats_global.nb_enomem;
+	return 0;
+}
+UK_STORE_STATIC_ENTRY(nb_enomem, u64, get_nb_enomem, NULL, NULL);
+
 #endif
