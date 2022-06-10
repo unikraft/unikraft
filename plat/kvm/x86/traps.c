@@ -51,7 +51,7 @@ static void gdt_init(void)
 	cpu_gdt64[GDT_DESC_DATA].raw = GDT_DESC_DATA_VAL;
 #ifdef CONFIG_KVM_RING3
 	// cpu_gdt64[GDT_DESC_CODE].code.r = 1; // 
-	cpu_gdt64[GDT_DESC_CODE].code.c = 1; // set to make kernel code executed in ring 3
+	// cpu_gdt64[GDT_DESC_CODE].code.c = 1; // conform, set to make kernel code executed in ring 3
 	cpu_gdt64[GDT_DESC_USER_CODE].raw = GDT_DESC_CODE_VAL;
 	// cpu_gdt64[GDT_DESC_USER_CODE].code.a = 0;
 	cpu_gdt64[GDT_DESC_USER_CODE].code.r = 1;
