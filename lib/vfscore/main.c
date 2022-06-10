@@ -933,10 +933,9 @@ UK_SYSCALL_R_DEFINE(int, flock, int, fd, int, operation)
 	struct vfscore_file *file;
 	int error;
 
-	if (!fget(fd, &file)) {
-		error = EBADF;
+	error = fget(fd, &file);
+	if (error)
 		goto out_error;
-	}
 
 	switch (operation) {
 	case LOCK_SH:
