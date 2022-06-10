@@ -101,9 +101,6 @@
 #include <xen/io/console.h>
 #include <xen/io/protocols.h>
 #include <xen/io/ring.h>
-#ifndef CONFIG_PARAVIRT
-#include <xen/hvm/params.h>
-#endif
 
 static struct xencons_interface *console_ring;
 static uint32_t console_evtchn;
@@ -114,11 +111,6 @@ void hv_console_prepare(void)
 {
 	console_ring = mfn_to_virt(HYPERVISOR_start_info->console.domU.mfn);
 	console_evtchn = HYPERVISOR_start_info->console.domU.evtchn;
-}
-#else
-void hv_console_prepare(void)
-{
-	/* NOT IMPLEMENTED YET */
 }
 #endif
 
