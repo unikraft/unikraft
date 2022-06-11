@@ -16,23 +16,6 @@ cpl_switch_handler_t *cpl_switch_handler;
  * when the CPU is running enclave code.
  */
 
-int legacy_cpl_switch(__u8 rpl)
-{
-	asm volatile(""
-		     "mov %0, %%rax;"
-		     "mov %%rax, %%ds;"
-		     "mov %%rax, %%es;"
-		     "mov %%rsp, %%rax;"
-		     "push %0;"
-		     "push %%rax;"
-		     "pushf;"
-		     "push %1;"
-		     "push $1f;"
-		     "iretq;"
-		     "1:" ::"g"(GDT_DESC_OFFSET(GDT_DESC_USER_DATA) | 3),
-		     "g"(GDT_DESC_OFFSET(GDT_DESC_USER_CODE) | 3));
-}
-
 int fast_cpl_switch(__u8 rpl)
 {
 	static __u8 is_lstar_set = 0;
@@ -41,8 +24,7 @@ int fast_cpl_switch(__u8 rpl)
 		wrmsrl_safe(X86_MSR_IA32_LSTAR, (__u64) && success);
 	}
 	if (rpl == 0) { /* syscall */
-		/* We do not need to save rsp as the stack will not be changed
-		 */
+		/* We do not need to save rsp as the stack will not change */
 		asm volatile("syscall;");
 	} else { /* rpl == 3, sysret */
 		asm volatile(""
@@ -77,6 +59,7 @@ int cpl_switch(__u8 rpl)
 	return cpl_switch_handler(rpl);
 
 success:
+	uk_pr_info("Successfully switch CPL from %d to %d\n", cpl, rpl);
 	return 0;
 
 err_invalid_rpl:
@@ -88,7 +71,7 @@ err_not_init:
 	return -EINIT;
 }
 
-void cpl_switch_init()
+int cpl_switch_init()
 {
 	unsigned int info[4] = {0, 0, 0, 0};
 	unsigned int *eax, *ebx, *ecx, *edx;
@@ -106,9 +89,12 @@ void cpl_switch_init()
 
 	// check if extended feature is enabled
 	__cpuid(info, 0x80000001);
-	if (!(*edx & (0x1 << 20)) && !(*edx & (0x1 << 29))) {
-		uk_pr_info("Extended feature is not enabled\n");
-		cpl_switch_handler = &legacy_cpl_switch;
+	if (unlikely(!(*edx & (0x1 << 20)) && !(*edx & (0x1 << 29)))) {
+		/* this is unlikely to happen in an modern x86_64 Intel CPU */
+		uk_pr_info("Extended feature is not enabled, cpl_switch_init() "
+			   "failed\n");
+		cpl_switch_handler = NULL;
+		return -EINIT;
 	}
 
 	// enable syscall/sysret (IA32_EFER.[0] = 1)])
@@ -120,11 +106,14 @@ void cpl_switch_init()
 		ret |= X86_EFER_SYSCALL;
 		wrmsrl_safe(X86_MSR_IA32_EFER, ret);
 		ret = rdmsrl(X86_MSR_IA32_EFER);
-		if (!(ret & X86_EFER_SYSCALL)) {
-			uk_pr_info(
+		if (unlikely(!(ret & X86_EFER_SYSCALL))) {
+			/* this is unlikely to happen in an modern x86_64 Intel
+			 * CPU */
+			uk_pr_err(
 			    "syscall/sysret instruction enabled unsucessfully, "
-			    "fallback to legacy switch\n");
-			cpl_switch_handler = &legacy_cpl_switch;
+			    "cpl_switch_init() failed\n");
+			cpl_switch_handler = NULL;
+			return -EINIT;
 		} else {
 			cpl_switch_handler = &fast_cpl_switch;
 
@@ -140,9 +129,10 @@ void cpl_switch_init()
 			 * rip = rcx
 			 *
 			 * as Unikraft works only under 64-bit mode, we should
-			 * set STAR.SYSRET_CS to 0x10 ((0x10 + 16) | 3 = 0x23 is
-			 * the userspace cs selector). hence ss = (0x10 + 8) | 3
-			 * = 0x1b
+			 * set IA32_LSTAR[63:48] to
+			 * GDT_DESC_OFFSET(GDT_DESC_DATA)
+			 * ((0x10 + 16) | 3 = 0x23 is the userspace cs
+			 * selector). hence ss = (0x10 + 8) | 3 = 0x1b
 			 *
 			 * SYSCALL hardcodes selectors and registers:
 			 *
@@ -151,7 +141,8 @@ void cpl_switch_init()
 			 *    rip = IA32_LSTAR
 			 *
 			 * IA32_STAR[63:48] should be set to 0x10,
-			 * IA32_STAR[47:32] is the kernel CS selector 0x8.
+			 * IA32_STAR[47:32] should be set to the kernel CS
+			 * selector GDT_DESC_OFFSET(GDT_DESC_CODE).
 			 */
 			wrmsr_safe(X86_MSR_IA32_STAR, 0,
 				   GDT_DESC_OFFSET(GDT_DESC_DATA) << 16
@@ -162,7 +153,8 @@ void cpl_switch_init()
 			 * We cannot initialize LSTAR here, as the target
 			 * address is not known yet. However, we can initialize
 			 * it before the first call of fast_cpl_switch() because
-			 * it must be called from ring-0 at the first time.
+			 * it must be called from ring-0 at the first time and
+			 * the target address will not change.
 			 */
 		}
 	}
