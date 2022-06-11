@@ -124,6 +124,6 @@ int sgx_page_cache_init(void);
 int sgx_ioctl(struct device *filep, unsigned long cmd, void *arg);
 int sgx_open(struct device *dev, int flags);
 int sgx_close(struct device *dev);
-void cpl_switch_init();
+int cpl_switch_init();
 int cpl_switch(__u8 rpl);
 #endif
