@@ -22,6 +22,9 @@
 #include <libfdt.h>
 #include <uk/plat/common/sections.h>
 #include <uart/pl011.h>
+#ifdef CONFIG_RTC_PL031
+#include <rtc/pl031.h>
+#endif /* CONFIG_RTC_PL031 */
 #include <kvm/config.h>
 #include <uk/assert.h>
 #include <kvm-arm/mm.h>
@@ -220,6 +223,11 @@ void __no_pauth _libkvmplat_start(void *dtb_pointer)
 
 	/* Initialize memory from DTB */
 	_init_dtb_mem();
+
+#ifdef CONFIG_RTC_PL031
+	/* Initialize RTC */
+	pl031_init_rtc(dtb_pointer);
+#endif /* CONFIG_RTC_PL031 */
 
 	/* Initialize interrupt controller */
 	intctrl_init();

@@ -161,6 +161,11 @@ config VIRTIO_9P
               Virtio 9P driver.
 endmenu
 
+config RTC_PL031
+       bool "Arm platform RTC (PL031) driver"
+       default y if ARCH_ARM_64
+       depends on ARCH_ARM_64
+
 config LIBOFW
        bool "Open Firmware library support"
        default n
