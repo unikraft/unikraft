@@ -47,6 +47,11 @@ struct fast_pool {
     __u8 count;
 };
 
+struct timer_rand_state {
+	__u64 last_time;
+	__u64 last_delta;
+	__u64 last_delta2;
+};
 
 static inline void get_registers(struct __regs *regs) {
     asm(
@@ -110,6 +115,9 @@ static inline uint64_t get_rip() {
 */
 static int random_read_minimum_bits = 64;
 static __u32 input_pool_data[INPUT_POOL_WORDS];
+static struct timer_rand_state network_rand_state;
+static __u32 last_value;
+
 static __u32 const twist_table[8] = {
 	0x00000000, 0x3b6e20c8, 0x76dc4190, 0x4db26158,
 	0xedb88320, 0xd6d6a3e8, 0x9b64c2b0, 0xa00ae278 };
@@ -329,11 +337,11 @@ static void __uk_extract_buf(struct entropy_store *r, __u8 *out)
 		hash_input[i] ^= r->pool[i];
 
 	/* Update the state of the hasher */
-	blake3_hasher_update(&hasher, (__uint8_t*)hash_input, sizeof(__u32) * INPUT_POOL_WORDS);
+	blake3_hasher_update(&hasher, (__u8*)hash_input, sizeof(__u32) * INPUT_POOL_WORDS);
 
 
 	/* Get the hash of the input pool */
-	blake3_hasher_finalize(&hasher, (__uint8_t*)hash_output, sizeof(__u32) * INPUT_POOL_OUTPUT_HASH_SIZE);
+	blake3_hasher_finalize(&hasher, (__u8*)hash_output, sizeof(__u32) * INPUT_POOL_OUTPUT_HASH_SIZE);
 
 	/*
 	 * We mix the hash back into the pool to prevent backtracking
@@ -458,7 +466,7 @@ static __u64 get_reg(struct fast_pool *f_pool, struct __regs *regs) {
 
 }
 
-void add_interrupt_randomness(int irq) {
+void uk_add_interrupt_randomness(int irq) {
     struct __regs regs;
     __u64 startup_time_ns = ukplat_monotonic_clock();
     __u64 rip = get_rip();
@@ -474,9 +482,9 @@ void add_interrupt_randomness(int irq) {
 
     get_registers(&regs);
     reg = get_reg(&fast_pool, &regs);
-
     reg_high = reg >> 32;
     startup_high = reg >> 32;
+
     fast_pool.pool[0] ^= reg ^ startup_high ^ irq;
     fast_pool.pool[1] ^= startup_time_ns ^ reg_high;
     fast_pool.pool[2] ^= rip;
@@ -486,11 +494,13 @@ void add_interrupt_randomness(int irq) {
 	fast_pool.count++;
 	
 	/*
-	 * Wait for 10 interrupts before adding the entropy in input_pool
+	 * Wait for 32 interrupts before adding the entropy in input_pool
 	 */
-	if (fast_pool.count < 10) {
+	if (fast_pool.count < 32) {
 		return;
 	}
+
+	uk_pr_crit("entropy = %u\n", input_pool.entropy_count >> 3);
 
 	/*
 	 * If we have architectural seed generator, produce a seed and
@@ -520,6 +530,61 @@ void add_interrupt_randomness(int irq) {
 	fast_pool.count = 0;
 
 	_uk_credit_entropy_bits(&input_pool, credit);
+}
+
+static void _uk_add_timer_randomness(struct timer_rand_state *state, __u32 value) {
+	struct {
+		__u64 timestamp;
+		__u32 value;
+	} sample;
+	long delta, delta2, delta3;
+	__u64 credit;
+	__u8 last_bit;
+
+
+	sample.timestamp = ukplat_monotonic_clock();
+	sample.value = value;
+	_mix_pool_bytes(&input_pool, &sample, sizeof(sample));
+
+	delta = sample.timestamp - state->last_time;
+	state->last_time = sample.timestamp;
+
+	delta2 = delta - state->last_delta;
+	state->last_delta = delta;
+
+	delta3 = delta2 - state->last_delta2;
+	state->last_delta2 = delta2;
+
+	if (delta < 0) {
+		delta = -delta;
+	}
+	if (delta2 < 0) {
+		delta2 = -delta2;
+	}
+	if (delta3 < 0) {
+		delta3 = -delta3;
+	}
+
+	if (delta > delta2) {
+		delta = delta2;
+	}
+	if (delta > delta3) {
+		delta = delta3;
+	}
+
+	last_bit = ukarch_flsl((unsigned long)delta>>1);
+	
+	credit = last_bit < 11 ? last_bit : 11;
+	_uk_credit_entropy_bits(&input_pool, credit);
+}
+
+void uk_add_network_randomness(__u32 value) {
+	if (last_value == value) {
+		return;
+	}
+	last_value = value;
+
+	_uk_add_timer_randomness(&network_rand_state, value);
 }
 
 size_t uk_entropy_generate_bytes(void *buf, size_t buflen)

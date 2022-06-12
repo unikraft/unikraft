@@ -10,4 +10,5 @@ uk_hwrand_generate_bytes
 uk_rdrand_generate_bytes
 uk_hwrand_rdseed
 uk_hwrand_rdrand
-add_interrupt_randomness
+uk_add_interrupt_randomness
+uk_add_network_randomness

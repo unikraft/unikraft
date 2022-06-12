@@ -15,7 +15,7 @@
 
 size_t uk_rdrand_generate_bytes(void *buf, size_t buflen);
 
-static inline uint8_t uk_hwrand_rdrand(__u32 *val)
+static inline __u8 uk_hwrand_rdrand(__u32 *val)
 {	
 	__u8 success;
 	
@@ -27,7 +27,7 @@ static inline uint8_t uk_hwrand_rdrand(__u32 *val)
 	return success;
 }
 
-static inline uint8_t uk_hwrand_rdseed(__u32 *val) {
+static inline __u8 uk_hwrand_rdseed(__u32 *val) {
 	__u8 success;
 	
 	__asm__ volatile(

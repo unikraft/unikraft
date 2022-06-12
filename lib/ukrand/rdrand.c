@@ -8,7 +8,7 @@ size_t uk_rdrand_generate_bytes(void *buf, size_t buflen)
 {
 	size_t idx = 0, rem = buflen;
 	size_t safety = buflen / sizeof(unsigned int);
-	u_int8_t success;
+	__u8 success;
 	__u32 val;
 
 	while (rem > 0 && safety > 0) {

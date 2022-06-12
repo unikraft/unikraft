@@ -1,16 +1,35 @@
 menuconfig LIBUKRAND
 	bool "ukrand: Random number generator"
 	select LIBUKDEBUG
+	select LIBUKCPUID
 	default n
 
 if LIBUKRAND
 
 config LIBUKRAND_HARDWARE_RANDOMNESS
+	select UKBLAKE3
 	depends on ARCH_X86_64
 	bool "HWRAND"
 	help
 		"Hardware random number generator support"
 	default n
+
+if LIBUKRAND_HARDWARE_RANDOMNESS
+
+config 	LIBUKRAND_INTERRUPT_RANDOMNESS
+	bool "INTERRUPT_RANDOMNESS"
+	help
+		"Gather entropy from interrupts"
+	default y
+
+config 	LIBUKRAND_NETWORK_RANDOMNESS
+	bool "NETWORK_RANDOMNESS"
+	help
+		"Gather entropy from network"
+	default y
+
+endif
+
 
 config LIBUKRAND_SOFTWARE_RANDOMNESS
 	bool "SWRAND"
