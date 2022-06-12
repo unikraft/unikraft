@@ -1,7 +1,6 @@
 libfdt, a utility library for reading and manipulating the
 binary format. It is part of Device Tree Compiler (DTC) found
 on  https://github.com/dgibson/dtc.git
-    (commit: 0016f8c2aa32423f680ec6e94a00f1095b81b5fc)
 and https://git.kernel.org/cgit/utils/dtc/dtc.git
 
 DTC and libfdt are maintained by:

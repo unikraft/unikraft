@@ -42,6 +42,26 @@
 #define FDT_CHECK_COUNTS(na, ns)  ((na) > 0 && (na) <= FDT_MAX_ADDR_CELLS && \
 					(ns) > 0)
 
+int fdt_getprop_u32_by_offset(const void *fdt, int offset,
+		const char *name, uint32_t *out)
+{
+	const struct fdt_property *prop;
+	int prop_len;
+	fdt32_t result;
+
+	prop = fdt_get_property_namelen(fdt, offset, name, strlen(name),
+					&prop_len);
+	if (!prop)
+		return prop_len;
+
+	memcpy(&result, prop->data, sizeof(result));
+
+	if (out)
+		*out = fdt32_to_cpu(result);
+
+	return 0;
+}
+
 int fdt_find_irq_parent_offset(const void *fdt, int offset)
 {
 	uint32_t irq_parent;
