@@ -289,3 +289,35 @@ struct uk_netbuf *uk_netbuf_dup_single(struct uk_alloc *a, size_t buflen,
 
 	return nb;
 }
+
+#if CONFIG_LIBUKALLOCPOOL
+struct uk_netbuf *uk_netbuf_pooldup_single(struct uk_allocpool *p,
+					   uint16_t headroom,
+					   size_t privlen,
+					   uk_netbuf_dtor_t dtor,
+					   const struct uk_netbuf *src)
+{
+	struct uk_netbuf *nb;
+
+	UK_ASSERT(src);
+
+	if (unlikely((size_t) src->len + headroom > (NETBUF_ADDR_ALIGN_DOWN(uk_allocpool_objlen(p))
+						     - NETBUF_ADDR_ALIGN_UP(sizeof(*nb) + privlen))))
+		return NULL; /* buffer would be too small to hold everything */
+
+	nb = uk_netbuf_poolalloc_buf(p, headroom, privlen, dtor);
+	if (unlikely(!nb))
+		return NULL;
+
+	/* double-check that target packet has really enough space to hold the source */
+	UK_ASSERT(uk_netbuf_tailroom(nb) >= src->len);
+
+	memcpy(nb->data, src->data, src->len);
+	nb->len = src->len;
+	nb->flags = src->flags;
+	nb->csum_start = src->csum_start;
+	nb->csum_offset = src->csum_offset;
+
+	return nb;
+}
+#endif /* CONFIG_LIBUKALLOCPOOL */

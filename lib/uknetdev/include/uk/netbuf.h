@@ -518,6 +518,14 @@ struct uk_netbuf *uk_netbuf_dup_single(struct uk_alloc *a, size_t buflen,
 				       size_t privlen, uk_netbuf_dtor_t dtor,
 				       const struct uk_netbuf *src);
 
+#if CONFIG_LIBUKALLOCPOOL
+struct uk_netbuf *uk_netbuf_pooldup_single(struct uk_allocpool *p,
+					   uint16_t headroom,
+					   size_t privlen,
+					   uk_netbuf_dtor_t dtor,
+					   const struct uk_netbuf *src);
+#endif /* CONFIG_LIBUKALLOCPOOL */
+
 /**
  * Calculates the current available headroom bytes of a netbuf
  * @param m

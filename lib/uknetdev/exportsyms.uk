@@ -5,6 +5,7 @@ uk_netbuf_prepare_buf
 uk_netbuf_free_single
 uk_netbuf_free
 uk_netbuf_dup_single
+uk_netbuf_pooldup_single
 uk_netbuf_disconnect
 uk_netbuf_connect
 uk_netbuf_append
