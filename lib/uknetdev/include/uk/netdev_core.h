@@ -260,6 +260,8 @@ typedef void (*uk_netdev_queue_event_t)(struct uk_netdev *dev,
  *   Number of successful allocated netbufs,
  *   has to be in range [0, count].
  *   References to allocated packets are placed to pkts[0]...pkts[count -1].
+ *   The len field of the allocated netbufs should be set to the size usable
+ *   for receiving packets.
  */
 typedef uint16_t (*uk_netdev_alloc_rxpkts)(void *argp,
 					   struct uk_netbuf *pkts[],
