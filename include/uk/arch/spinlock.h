@@ -29,6 +29,7 @@
 extern "C" {
 #endif
 
+#include <uk/config.h>
 #include <uk/arch/lcpu.h>
 
 #ifdef CONFIG_HAVE_SMP
