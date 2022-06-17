@@ -365,9 +365,9 @@ static void gicv2_handle_irq(void)
 		irq = stat & GICC_IAR_INTID_MASK;
 
 #ifndef CONFIG_HAVE_SMP
-		uk_pr_debug("EL1 IRQ#%d trap caught\n", irq);
+		uk_pr_debug("EL1 IRQ#%"__PRIu32" caught\n", irq);
 #else /* !CONFIG_HAVE_SMP */
-		uk_pr_debug("Core %d: EL1 IRQ#%d trap caught\n",
+		uk_pr_debug("Core %"__PRIu64": EL1 IRQ#%"__PRIu32" caught\n",
 			    ukplat_lcpu_id(), irq);
 #endif /* CONFIG_HAVE_SMP */
 
