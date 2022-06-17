@@ -38,20 +38,7 @@
 #include <libfdt.h>
 #include <ofw/fdt.h>
 
-/**
- * The number of cells for the size field should be 0 in cpu nodes.
- * The number of cells in the address field is set by default to 2 in cpu
- * nodes. This is also the maximum number of cells for the address field that
- * we can currently support.
- */
-#define FDT_SIZE_CELLS_DEFAULT 0
-#define FDT_ADDR_CELLS_DEFAULT 2
 #define CPU_ID_MASK 0xff00ffffffUL
-
-static void *dtb;
-void lcpu_start(struct lcpu *cpu);
-static __paddr_t lcpu_start_paddr;
-extern struct _gic_dev *gic;
 
 __lcpuid lcpu_arch_id(void)
 {
@@ -64,6 +51,20 @@ __lcpuid lcpu_arch_id(void)
 }
 
 #ifdef CONFIG_HAVE_SMP
+/**
+ * The number of cells for the size field should be 0 in cpu nodes.
+ * The number of cells in the address field is set by default to 2 in cpu
+ * nodes. This is also the maximum number of cells for the address field that
+ * we can currently support.
+ */
+#define FDT_SIZE_CELLS_DEFAULT 0
+#define FDT_ADDR_CELLS_DEFAULT 2
+
+static void *dtb;
+void lcpu_start(struct lcpu *cpu);
+static __paddr_t lcpu_start_paddr;
+extern struct _gic_dev *gic;
+
 int lcpu_arch_init(struct lcpu *this_lcpu)
 {
 	int ret = 0;
