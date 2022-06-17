@@ -37,6 +37,7 @@
 #include <uk/assert.h>
 #include <uk/bitops.h>
 #include <uk/asm.h>
+#include <uk/arch/limits.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/common/irq.h>
 #ifdef CONFIG_PLAT_KVM
@@ -168,8 +169,8 @@ static void gic_sgi_gen(uint32_t sgintid, enum sgi_filter targetfilter,
 {
 	uint32_t val;
 
-	/* Only INTID 0-15 allocated to sgi */
 	UK_ASSERT(sgintid <= GICD_SGI_MAX_INITID);
+	UK_ASSERT(targetfilter < GICD_SGI_FILTER_MAX);
 
 	/* Set SGI targetfilter field */
 	val = (targetfilter & GICD_SGI_FILTER_MASK) << GICD_SGI_FILTER_SHIFT;
@@ -241,9 +242,8 @@ void gic_sgi_gen_to_self(uint32_t sgintid)
  */
 static void gic_set_irq_target(uint32_t irq, uint32_t targetlist)
 {
-	if (irq < GIC_SPI_BASE)
-		UK_CRASH("Bad irq number: should not less than %u",
-			GIC_SPI_BASE);
+	UK_ASSERT(irq >= GIC_SPI_BASE && irq < GIC_MAX_IRQ);
+	UK_ASSERT(targetlist <= __U8_MAX);
 
 	dist_lock(gicv2_drv);
 	write_gicd8(GICD_ITARGETSR(irq), (uint8_t)targetlist);
@@ -261,6 +261,8 @@ static void gic_set_irq_target(uint32_t irq, uint32_t targetlist)
  */
 static void gic_set_irq_prio(uint32_t irq, uint8_t priority)
 {
+	UK_ASSERT(irq < GIC_MAX_IRQ);
+
 	dist_lock(gicv2_drv);
 	write_gicd8(GICD_IPRIORITYR(irq), priority);
 	dist_unlock(gicv2_drv);
@@ -273,11 +275,10 @@ static void gic_set_irq_prio(uint32_t irq, uint8_t priority)
  */
 static void gic_enable_irq(uint32_t irq)
 {
+	UK_ASSERT(irq < GIC_MAX_IRQ);
+
 	dist_lock(gicv2_drv);
-
-	write_gicd32(GICD_ISENABLER(irq),
-		UK_BIT(irq % GICD_I_PER_ISENABLERn));
-
+	write_gicd32(GICD_ISENABLER(irq), UK_BIT(irq % GICD_I_PER_ISENABLERn));
 	dist_unlock(gicv2_drv);
 }
 
@@ -288,9 +289,10 @@ static void gic_enable_irq(uint32_t irq)
  */
 static void gic_disable_irq(uint32_t irq)
 {
+	UK_ASSERT(irq < GIC_MAX_IRQ);
+
 	dist_lock(gicv2_drv);
-	write_gicd32(GICD_ICENABLER(irq),
-		UK_BIT(irq % GICD_I_PER_ICENABLERn));
+	write_gicd32(GICD_ICENABLER(irq), UK_BIT(irq % GICD_I_PER_ICENABLERn));
 	dist_unlock(gicv2_drv);
 }
 
