@@ -9,16 +9,17 @@
 
 #include "../plat/common/include/x86/cpu_defs.h"
 
-#define cpuid_macro(ax, bx, cx, dx, func_1, func_2) do { \
+#define cpuid_macro(eax, ebx, ecx, edx, func_1, func_2) do { \
 		__asm__ __volatile__ ( \
 			"cpuid" \
-			: "=a" (ax), "=b" (bx), \
-			  "=c" (cx), "=d" (dx) \
+			: "=a" (eax), "=b" (ebx), \
+			  "=c" (ecx), "=d" (edx) \
 			: "a" (func_1), "c" (func_2) \
 		); \
 		} while (0)
 
 #define is_cached(field) (field & CPUID_CACHE_VALID)
+
 #define get_value(field) (field & CPUID_CACHE_VALUE)
 
 #define set_cache(cache_field, value) \

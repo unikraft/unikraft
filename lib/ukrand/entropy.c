@@ -17,16 +17,16 @@
 #define OUTPUT_POOL_WORDS	(1 << (OUTPUT_POOL_SHIFT-5))
 #define INIT_ENTROPY_SIZE 	32
 #define ENTROPY_SHIFT 3
-static struct poolinfo {
+static struct uk_poolinfo {
 	__u32 poolbitshift, poolwords, poolbytes, poolbits, poolfracbits;
 	__u32 tap1, tap2, tap3, tap4, tap5;
 } poolinfo = {
 	12,	128, 512, 4096, 32758, 104,	76,	51,	25,	1
 };
 
-struct entropy_store {
+struct uk_entropy_store {
 	/* read-only data: */
-	const struct poolinfo *poolinfo;
+	const struct uk_poolinfo *poolinfo;
 	__u32 *pool;
 	const char *name;
 
@@ -40,20 +40,19 @@ struct entropy_store {
 	__u8 last_data[EXTRACT_SIZE];
 };
 
-struct fast_pool {
+struct uk_fast_pool {
     __u32 pool[4];
-    __u32 last;
     __u16 reg_index;
     __u8 count;
 };
 
-struct timer_rand_state {
+struct uk_timer_rand_state {
 	__u64 last_time;
 	__u64 last_delta;
 	__u64 last_delta2;
 };
 
-static inline void get_registers(struct __regs *regs) {
+static inline void _uk_get_registers(struct __regs *regs) {
     asm(
         "mov %%r15, %0 \n\t\
          mov %%r14, %1 \n\t\
@@ -96,7 +95,7 @@ static inline void get_registers(struct __regs *regs) {
     );
 }
 
-static inline uint64_t get_rip() {
+static inline uint64_t _uk_get_rip() {
     __u64 rip;
 
     asm(
@@ -115,25 +114,25 @@ static inline uint64_t get_rip() {
 */
 static int random_read_minimum_bits = 64;
 static __u32 input_pool_data[INPUT_POOL_WORDS];
-static struct timer_rand_state network_rand_state;
+static struct uk_timer_rand_state network_rand_state;
 static __u32 last_value;
 
 static __u32 const twist_table[8] = {
 	0x00000000, 0x3b6e20c8, 0x76dc4190, 0x4db26158,
 	0xedb88320, 0xd6d6a3e8, 0x9b64c2b0, 0xa00ae278 };
 
-static struct fast_pool fast_pool = {
+static struct uk_fast_pool fast_pool = {
     .reg_index = 0,
 };
 
-static struct entropy_store input_pool = {
+static struct uk_entropy_store input_pool = {
 	.poolinfo = &poolinfo,
 	.name = "input",
 	.pool = input_pool_data
 };
 
 
-static __u8 get_hw_entropy(__u32* data, __u32 len) {
+static __u8 _uk_get_hw_entropy(__u32* data, __u32 len) {
 	__u8 (*func)(__u32*);
 	__u8 entropy_count = 0, ret;
 
@@ -154,7 +153,7 @@ static __u8 get_hw_entropy(__u32* data, __u32 len) {
 }
 
 
-static void _mix_pool_bytes(struct entropy_store *r, const void *in,
+static void _mix_pool_bytes(struct uk_entropy_store *r, const void *in,
 			    int nbytes)
 {
 	__u32 i, tap1, tap2, tap3, tap4, tap5;
@@ -205,7 +204,7 @@ static void _mix_pool_bytes(struct entropy_store *r, const void *in,
  * This function decides how many bytes to actually take from the
  * given pool, and also debits the entropy count accordingly.
  */
-static size_t __uk_account(struct entropy_store *r, size_t nbytes)
+static size_t __uk_account(struct uk_entropy_store *r, size_t nbytes)
 {
 	int entropy_count, flags;
 	size_t extracted_frac, nfrac, min_frac;
@@ -244,7 +243,7 @@ static size_t __uk_account(struct entropy_store *r, size_t nbytes)
 /*
  * Credit (or debit) the entropy store with n bits of entropy.
  */
-static void _uk_credit_entropy_bits(struct entropy_store *r, __u8 nbits)
+static void _uk_credit_entropy_bits(struct uk_entropy_store *r, __u8 nbits)
 {
 	const int pool_size = r->poolinfo->poolfracbits;
 	/* The +2 corresponds to the /4 in the denominator */
@@ -315,7 +314,7 @@ static void _uk_credit_entropy_bits(struct entropy_store *r, __u8 nbits)
  *
  * Note: we assume that .poolwords is a multiple of 16 words.
  */
-static void __uk_extract_buf(struct entropy_store *r, __u8 *out)
+static void __uk_extract_buf(struct uk_entropy_store *r, __u8 *out)
 {
 	ssize_t i;
 	blake3_hasher hasher;
@@ -329,7 +328,7 @@ static void __uk_extract_buf(struct entropy_store *r, __u8 *out)
 	 * If we have an architectural hardware random number
 	 * generator, use it for BLAKE's initial vector
 	 */
-	get_hw_entropy(hash_input, INPUT_POOL_WORDS);
+	_uk_get_hw_entropy(hash_input, INPUT_POOL_WORDS);
 
 	/* build hash input across the pool, 1 word at a time */
 	ukplat_spin_lock_irqsave(&r->spinlock, flags);
@@ -372,7 +371,7 @@ static void __uk_extract_buf(struct entropy_store *r, __u8 *out)
 }
 
 
-static size_t _extract_entropy(struct entropy_store *r, void *buf,
+static size_t _extract_entropy(struct uk_entropy_store *r, void *buf,
 				size_t nbytes)
 {
 	size_t ret = 0, size;
@@ -412,7 +411,7 @@ static size_t _extract_entropy(struct entropy_store *r, void *buf,
  * collector.  It's hardcoded for an 128 bit pool and assumes that any
  * locks that might be needed are taken by the caller.
  */
-static void fast_mix(struct fast_pool *f)
+static void _uk_fast_mix(struct uk_fast_pool *f)
 {
 	__u32 a = f->pool[0],	b = f->pool[1];
 	__u32 c = f->pool[2],	d = f->pool[3];
@@ -438,7 +437,7 @@ static void fast_mix(struct fast_pool *f)
 	f->count++;
 }
 
-static __u64 get_reg(struct fast_pool *f_pool, struct __regs *regs) {
+static __u64 _uk_get_reg(struct uk_fast_pool *f_pool, struct __regs *regs) {
     __u64 *ptr = (__u64 *) regs;
     __u16 index;
 
@@ -469,7 +468,7 @@ static __u64 get_reg(struct fast_pool *f_pool, struct __regs *regs) {
 void uk_add_interrupt_randomness(int irq) {
     struct __regs regs;
     __u64 startup_time_ns = ukplat_monotonic_clock();
-    __u64 rip = get_rip();
+    __u64 rip = _uk_get_rip();
     __u64 reg;
     __u32 reg_high, startup_high;
 	__u32 hw_entropy, ret = 0;
@@ -480,8 +479,8 @@ void uk_add_interrupt_randomness(int irq) {
 		return;
 	}
 
-    get_registers(&regs);
-    reg = get_reg(&fast_pool, &regs);
+    _uk_get_registers(&regs);
+    reg = _uk_get_reg(&fast_pool, &regs);
     reg_high = reg >> 32;
     startup_high = reg >> 32;
 
@@ -490,7 +489,7 @@ void uk_add_interrupt_randomness(int irq) {
     fast_pool.pool[2] ^= rip;
     fast_pool.pool[3] ^= rip >> 32 ^ reg;
 
-    fast_mix(&fast_pool);
+    _uk_fast_mix(&fast_pool);
 	fast_pool.count++;
 	
 	/*
@@ -499,8 +498,6 @@ void uk_add_interrupt_randomness(int irq) {
 	if (fast_pool.count < 32) {
 		return;
 	}
-
-	uk_pr_crit("entropy = %u\n", input_pool.entropy_count >> 3);
 
 	/*
 	 * If we have architectural seed generator, produce a seed and
@@ -532,7 +529,7 @@ void uk_add_interrupt_randomness(int irq) {
 	_uk_credit_entropy_bits(&input_pool, credit);
 }
 
-static void _uk_add_timer_randomness(struct timer_rand_state *state, __u32 value) {
+static void _uk_add_timer_randomness(struct uk_timer_rand_state *state, __u32 value) {
 	struct {
 		__u64 timestamp;
 		__u32 value;
@@ -598,7 +595,7 @@ int uk_entropy_init(void) {
 	__u8 entropy_count;
 
 	input_pool.initialized = 1;
-	entropy_count = get_hw_entropy(initial_entropy, INIT_ENTROPY_SIZE);
+	entropy_count = _uk_get_hw_entropy(initial_entropy, INIT_ENTROPY_SIZE);
 	ukarch_spin_init(&input_pool.spinlock);
 
 	_mix_pool_bytes(&input_pool, &initial_entropy, entropy_count);
