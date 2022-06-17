@@ -106,7 +106,7 @@ static inline uint32_t read_gicc32(uint64_t offset)
 /* Functions of GIC CPU interface */
 
 /** Enable GIC CPU interface */
-static void gic_enable_cpuif(void)
+static void gicv2_enable_cpuif(void)
 {
 	/* just set bit 0 to 1 to enable CPU interface */
 	write_gicc32(GICC_CTLR, GICC_CTLR_ENABLE);
@@ -120,7 +120,7 @@ static void gic_enable_cpuif(void)
  *    may not support all levels. For example, if only 128 levels are supported
  *    every two levels (e.g., 0 and 1) map to the same effective value
  */
-static void gic_set_threshold_priority(uint32_t priority)
+static void gicv2_set_threshold_priority(uint32_t priority)
 {
 	/* GICC_PMR allocate 1 byte for each IRQ */
 	UK_ASSERT(priority <= GICC_PMR_PRIO_MAX);
@@ -133,7 +133,7 @@ static void gic_set_threshold_priority(uint32_t priority)
  * @return the ID of the signaled interrupt in bits [0..9] and for SGIs in
  *    a multiprocessor system the originating CPU's ID in bits [10..12]
  */
-static uint32_t gic_ack_irq(void)
+static uint32_t gicv2_ack_irq(void)
 {
 	return read_gicc32(GICC_IAR);
 }
@@ -149,7 +149,7 @@ static uint32_t gic_ack_irq(void)
  *    the ID of the CPU that requested the interrupt in bits [10..12]. Must
  *    correspond to the last value read with ack_irq()
  */
-static void gic_eoi_irq(uint32_t eoir)
+static void gicv2_eoi_irq(uint32_t eoir)
 {
 	write_gicc32(GICC_EOIR, eoir);
 }
@@ -164,8 +164,8 @@ static void gic_eoi_irq(uint32_t eoir)
  * @param targetlist an 8-bit bitmap with 1 bit per CPU 0-7. A `1` bit
  *    indicates that the SGI should be forwarded to the respective CPU
  */
-static void gic_sgi_gen(uint32_t sgintid, enum sgi_filter targetfilter,
-			uint8_t targetlist)
+static void gicv2_sgi_gen(uint32_t sgintid, enum sgi_filter targetfilter,
+			  uint8_t targetlist)
 {
 	uint32_t val;
 
@@ -194,33 +194,33 @@ static void gic_sgi_gen(uint32_t sgintid, enum sgi_filter targetfilter,
  * @param targetlist an 8-bit bitmap with 1 bit per CPU 0-7. A `1` bit
  *    indicates that the SGI should be forwarded to the respective CPU
  */
-void gic_sgi_gen_to_list(uint32_t sgintid, uint8_t targetlist)
+void gicv2_sgi_gen_to_list(uint32_t sgintid, uint8_t targetlist)
 {
 	unsigned long irqf;
 
 	irqf = ukplat_lcpu_save_irqf();
-	gic_sgi_gen(sgintid, GICD_SGI_FILTER_TO_LIST, targetlist);
+	gicv2_sgi_gen(sgintid, GICD_SGI_FILTER_TO_LIST, targetlist);
 	ukplat_lcpu_restore_irqf(irqf);
 }
 
 /**
  * Forward the SGI to the CPU specified by cpuid.
  */
-static void gic_sgi_gen_to_cpu(uint8_t sgintid, uint32_t cpuid)
+static void gicv2_sgi_gen_to_cpu(uint8_t sgintid, uint32_t cpuid)
 {
-	gic_sgi_gen_to_list((uint32_t) sgintid, (uint8_t) (1 << (cpuid % 8)));
+	gicv2_sgi_gen_to_list((uint32_t) sgintid, (uint8_t) (1 << (cpuid % 8)));
 }
 
 /**
  * Forward the SGI to all CPU interfaces except the one of the processor that
  * requested the interrupt.
  */
-void gic_sgi_gen_to_others(uint32_t sgintid)
+void gicv2_sgi_gen_to_others(uint32_t sgintid)
 {
 	unsigned long irqf;
 
 	irqf = ukplat_lcpu_save_irqf();
-	gic_sgi_gen(sgintid, GICD_SGI_FILTER_TO_OTHERS, 0);
+	gicv2_sgi_gen(sgintid, GICD_SGI_FILTER_TO_OTHERS, 0);
 	ukplat_lcpu_restore_irqf(irqf);
 }
 
@@ -228,9 +228,9 @@ void gic_sgi_gen_to_others(uint32_t sgintid)
  * Forward the SGI only to the CPU interface of the processor that requested
  * the interrupt.
  */
-void gic_sgi_gen_to_self(uint32_t sgintid)
+void gicv2_sgi_gen_to_self(uint32_t sgintid)
 {
-	gic_sgi_gen(sgintid, GICD_SGI_FILTER_TO_SELF, 0);
+	gicv2_sgi_gen(sgintid, GICD_SGI_FILTER_TO_SELF, 0);
 }
 
 /**
@@ -240,7 +240,7 @@ void gic_sgi_gen_to_self(uint32_t sgintid)
  * @param targetlist an 8-bit bitmap with 1 bit per CPU 0-7. A `1` bit
  *    indicates that the SGI should be forwarded to the respective CPU
  */
-static void gic_set_irq_target(uint32_t irq, uint32_t targetlist)
+static void gicv2_set_irq_target(uint32_t irq, uint32_t targetlist)
 {
 	UK_ASSERT(irq >= GIC_SPI_BASE && irq < GIC_MAX_IRQ);
 	UK_ASSERT(targetlist <= __U8_MAX);
@@ -259,7 +259,7 @@ static void gic_set_irq_target(uint32_t irq, uint32_t targetlist)
  *    (e.g., 0 and 1) map to the same effective value. Lower values correspond
  *    to higher priority
  */
-static void gic_set_irq_prio(uint32_t irq, uint8_t priority)
+static void gicv2_set_irq_prio(uint32_t irq, uint8_t priority)
 {
 	UK_ASSERT(irq < GIC_MAX_IRQ);
 
@@ -273,7 +273,7 @@ static void gic_set_irq_prio(uint32_t irq, uint8_t priority)
  *
  * @param irq interrupt number [0..GIC_MAX_IRQ-1]
  */
-static void gic_enable_irq(uint32_t irq)
+static void gicv2_enable_irq(uint32_t irq)
 {
 	UK_ASSERT(irq < GIC_MAX_IRQ);
 
@@ -287,7 +287,7 @@ static void gic_enable_irq(uint32_t irq)
  *
  * @param irq interrupt number [0..GIC_MAX_IRQ-1]
  */
-static void gic_disable_irq(uint32_t irq)
+static void gicv2_disable_irq(uint32_t irq)
 {
 	UK_ASSERT(irq < GIC_MAX_IRQ);
 
@@ -297,7 +297,7 @@ static void gic_disable_irq(uint32_t irq)
 }
 
 /** Enable distributor */
-static void gic_enable_dist(void)
+static void gicv2_enable_dist(void)
 {
 	/* just set bit 0 to 1 to enable distributor */
 	dist_lock(gicv2_drv);
@@ -306,7 +306,7 @@ static void gic_enable_dist(void)
 }
 
 /** Disable distributor */
-static void gic_disable_dist(void)
+static void gicv2_disable_dist(void)
 {
 	/* just clear bit 0 to disable distributor */
 	dist_lock(gicv2_drv);
@@ -321,7 +321,7 @@ static void gic_disable_dist(void)
  * @param irq interrupt number [GIC_PPI_BASE..GIC_MAX_IRQ-1]
  * @param trigger trigger type (UK_IRQ_TRIGGER_*)
  */
-static void gic_set_irq_type(uint32_t irq, enum uk_irq_trigger trigger)
+static void gicv2_set_irq_type(uint32_t irq, enum uk_irq_trigger trigger)
 {
 	uint32_t val, mask, oldmask;
 
@@ -356,19 +356,19 @@ EXIT_UNLOCK:
 	dist_unlock(gicv2_drv);
 }
 
-static void gic_handle_irq(void)
+static void gicv2_handle_irq(void)
 {
 	uint32_t stat, irq;
 
 	do {
-		stat = gic_ack_irq();
+		stat = gicv2_ack_irq();
 		irq = stat & GICC_IAR_INTID_MASK;
 
 #ifndef CONFIG_HAVE_SMP
 		uk_pr_debug("EL1 IRQ#%d trap caught\n", irq);
 #else /* !CONFIG_HAVE_SMP */
 		uk_pr_debug("Core %d: EL1 IRQ#%d trap caught\n",
-				ukplat_lcpu_id(), irq);
+			    ukplat_lcpu_id(), irq);
 #endif /* CONFIG_HAVE_SMP */
 
 		/* Ensure interrupt processing starts only after ACK */
@@ -376,26 +376,26 @@ static void gic_handle_irq(void)
 
 		if (irq < GIC_MAX_IRQ) {
 			_ukplat_irq_handle((unsigned long)irq);
-			gic_eoi_irq(stat);
+			gicv2_eoi_irq(stat);
 
 			continue;
 		}
 
 		/* EoI should only be signaled for non-spurious interrupts */
 		if (irq != GICC_IAR_INTID_SPURIOUS)
-			gic_eoi_irq(stat);
+			gicv2_eoi_irq(stat);
 
 		break;
 	} while (1);
 }
 
-static void gic_init_dist(void)
+static void gicv2_init_dist(void)
 {
 	uint32_t val, cpuif_number, irq_number;
 	uint32_t i;
 
 	/* Turn off distributor */
-	gic_disable_dist();
+	gicv2_disable_dist();
 
 	/* Get GIC CPU interface */
 	val = read_gicd32(GICD_TYPER);
@@ -429,12 +429,12 @@ static void gic_init_dist(void)
 	}
 
 	/* Turn on distributor */
-	gic_enable_dist();
+	gicv2_enable_dist();
 
 	uk_pr_info("GICv2 distributor initialized.\n");
 }
 
-static void gic_init_cpuif(void)
+static void gicv2_init_cpuif(void)
 {
 	uint32_t i;
 
@@ -442,7 +442,7 @@ static void gic_init_cpuif(void)
 	 * the CPU interface. Note: Higher priority corresponds to a lower
 	 * priority field value.
 	 */
-	gic_set_threshold_priority(GICC_PMR_PRIO_MAX);
+	gicv2_set_threshold_priority(GICC_PMR_PRIO_MAX);
 
 	/* Set PPI and SGI to the default value */
 	for (i = 0; i < GIC_SPI_BASE; i += GICD_I_PER_IPRIORITYn)
@@ -456,7 +456,7 @@ static void gic_init_cpuif(void)
 	write_gicd32(GICD_ISENABLER(0), GICD_DEF_SGI_ISENABLERn);
 
 	/* Enable CPU interface */
-	gic_enable_cpuif();
+	gicv2_enable_cpuif();
 
 	isb();
 
@@ -470,14 +470,14 @@ static void gic_init_cpuif(void)
  *
  * @return 0 on success, a non-zero error otherwise
  */
-static int gic_initialize(void)
+static int gicv2_initialize(void)
 {
 #ifdef CONFIG_HAVE_SMP
 	if (gicv2_drv.is_initialized) {
 		/* GIC is already initialized, we just need to initialize
 		 * the CPU interface
 		 */
-		gic_init_cpuif();
+		gicv2_init_cpuif();
 		return 0;
 	}
 #endif /* CONFIG_HAVE_SMP */
@@ -485,10 +485,10 @@ static int gic_initialize(void)
 	gicv2_drv.is_initialized = 1;
 
 	/* Initialize GICv2 distributor */
-	gic_init_dist();
+	gicv2_init_dist();
 
 	/* Initialize GICv2 CPU interface */
-	gic_init_cpuif();
+	gicv2_init_cpuif();
 
 	return 0;
 }
@@ -497,17 +497,17 @@ static int gicv2_do_probe(const void *fdt)
 {
 	int fdt_gic, r;
 	struct _gic_operations drv_ops = {
-		.initialize        = gic_initialize,
-		.ack_irq           = gic_ack_irq,
-		.eoi_irq           = gic_eoi_irq,
-		.enable_irq        = gic_enable_irq,
-		.disable_irq       = gic_disable_irq,
-		.set_irq_type      = gic_set_irq_type,
-		.set_irq_prio      = gic_set_irq_prio,
-		.set_irq_affinity  = gic_set_irq_target,
+		.initialize        = gicv2_initialize,
+		.ack_irq           = gicv2_ack_irq,
+		.eoi_irq           = gicv2_eoi_irq,
+		.enable_irq        = gicv2_enable_irq,
+		.disable_irq       = gicv2_disable_irq,
+		.set_irq_type      = gicv2_set_irq_type,
+		.set_irq_prio      = gicv2_set_irq_prio,
+		.set_irq_affinity  = gicv2_set_irq_target,
 		.irq_translate     = gic_irq_translate,
-		.handle_irq        = gic_handle_irq,
-		.gic_sgi_gen = gic_sgi_gen_to_cpu,
+		.handle_irq        = gicv2_handle_irq,
+		.gic_sgi_gen       = gicv2_sgi_gen_to_cpu,
 	};
 
 	/* Set driver functions */
