@@ -41,7 +41,7 @@
 #include <uk/plat/common/irq.h>
 #ifdef CONFIG_PLAT_KVM
 #include <kvm/irq.h>
-#endif
+#endif /* CONFIG_PLAT_KVM */
 #include <uk/plat/spinlock.h>
 #include <arm/cpu.h>
 #include <gic/gic-v2.h>
@@ -104,47 +104,64 @@ static inline uint32_t read_gicc32(uint64_t offset)
 
 /* Functions of GIC CPU interface */
 
-/* Enable GIC cpu interface */
+/** Enable GIC CPU interface */
 static void gic_enable_cpuif(void)
 {
-	/* just set bit 0 to 1 to enable cpu interface */
+	/* just set bit 0 to 1 to enable CPU interface */
 	write_gicc32(GICC_CTLR, GICC_CTLR_ENABLE);
 }
 
-/* Set priority threshold for processor */
-static void gic_set_threshold_priority(uint32_t threshold_prio)
+/**
+ * Set priority threshold for processor. Only interrupts with higher priority
+ * than this threshold are signaled to the processor
+ *
+ * @param priority priority threshold [0..255]. The GIC implementation
+ *    may not support all levels. For example, if only 128 levels are supported
+ *    every two levels (e.g., 0 and 1) map to the same effective value
+ */
+static void gic_set_threshold_priority(uint32_t priority)
 {
-	/* GICC_PMR allocate 1 byte for each irq */
-	UK_ASSERT(threshold_prio <= GICC_PMR_PRIO_MAX);
-	write_gicc32(GICC_PMR, threshold_prio);
+	/* GICC_PMR allocate 1 byte for each IRQ */
+	UK_ASSERT(priority <= GICC_PMR_PRIO_MAX);
+	write_gicc32(GICC_PMR, priority);
 }
 
-/*
- * Acknowledging irq equals reading GICC_IAR also
- * get the interrupt ID as the side effect.
+/**
+ * Acknowledge IRQ and retrieve highest priority pending interrupt
+ *
+ * @return the ID of the signaled interrupt in bits [0..9] and for SGIs in
+ *    a multiprocessor system the originating CPU's ID in bits [10..12]
  */
 static uint32_t gic_ack_irq(void)
 {
 	return read_gicc32(GICC_IAR);
 }
 
-/*
- * write to GICC_EOIR to inform cpu interface completion
- * of interrupt processing. If GICC_CTLR.EOImode sets to 1
- * this func just gets priority drop.
+/**
+ * Signal completion of interrupt processing.
+ *
+ * NOTE: If GICC_CTLR.EOImode is set to 1 this performs a priority drop for
+ *    the specified interrupt.
+ *
+ * @param eoir acknowledge register value with bits [0..9] indicating the
+ *    ID of the interrupt to complete and for SGIs in a multiprocessor system
+ *    the ID of the CPU that requested the interrupt in bits [10..12]. Must
+ *    correspond to the last value read with ack_irq()
  */
-static void gic_eoi_irq(uint32_t irq)
+static void gic_eoi_irq(uint32_t eoir)
 {
-	write_gicc32(GICC_EOIR, irq);
+	write_gicc32(GICC_EOIR, eoir);
 }
 
 /* Functions of GIC Distributor */
 
-/*
- * @sgintid denotes the sgi ID;
- * @targetfilter : this term is TargetListFilter
- * @targetlist is bitmask value, A bit set to '1' indicated
- * the interrupt is wired to that CPU.
+/**
+ * Generate a Software Generated Interrupt (SGI)
+ *
+ * @param sgintid the SGI ID [0-15]
+ * @param targetfilter filter for the target list (GICD_SGI_FILTER_*)
+ * @param targetlist an 8-bit bitmap with 1 bit per CPU 0-7. A `1` bit
+ *    indicates that the SGI should be forwarded to the respective CPU
  */
 static void gic_sgi_gen(uint32_t sgintid, enum sgi_filter targetfilter,
 			uint8_t targetlist)
@@ -154,7 +171,7 @@ static void gic_sgi_gen(uint32_t sgintid, enum sgi_filter targetfilter,
 	/* Only INTID 0-15 allocated to sgi */
 	UK_ASSERT(sgintid <= GICD_SGI_MAX_INITID);
 
-	/* Set SGI tagetfileter field */
+	/* Set SGI targetfilter field */
 	val = (targetfilter & GICD_SGI_FILTER_MASK) << GICD_SGI_FILTER_SHIFT;
 
 	/* Set SGI targetlist field */
@@ -163,15 +180,18 @@ static void gic_sgi_gen(uint32_t sgintid, enum sgi_filter targetfilter,
 	/* Set SGI INITID field */
 	val |= sgintid;
 
-	/* Generate SGI - spin lock here is needed when smp is supported */
+	/* Generate SGI */
 	dist_lock(gicv2_drv);
 	write_gicd32(GICD_SGIR, val);
 	dist_unlock(gicv2_drv);
 }
 
-/*
- * Forward the SGI to the CPU interfaces specified in the
- * targetlist. Targetlist is a 8-bit bitmap for 0~7 CPU.
+/**
+ * Forward the SGI to the CPU interfaces specified in the target list
+ *
+ * @param sgintid the SGI ID [0-15]
+ * @param targetlist an 8-bit bitmap with 1 bit per CPU 0-7. A `1` bit
+ *    indicates that the SGI should be forwarded to the respective CPU
  */
 void gic_sgi_gen_to_list(uint32_t sgintid, uint8_t targetlist)
 {
@@ -182,7 +202,7 @@ void gic_sgi_gen_to_list(uint32_t sgintid, uint8_t targetlist)
 	ukplat_lcpu_restore_irqf(irqf);
 }
 
-/*
+/**
  * Forward the SGI to the CPU specified by cpuid.
  */
 static void gic_sgi_gen_to_cpu(uint8_t sgintid, uint32_t cpuid)
@@ -190,9 +210,9 @@ static void gic_sgi_gen_to_cpu(uint8_t sgintid, uint32_t cpuid)
 	gic_sgi_gen_to_list((uint32_t) sgintid, (uint8_t) (1 << (cpuid % 8)));
 }
 
-/*
- * Forward the SGI to all CPU interfaces except that of the
- * processor that requested the interrupt.
+/**
+ * Forward the SGI to all CPU interfaces except the one of the processor that
+ * requested the interrupt.
  */
 void gic_sgi_gen_to_others(uint32_t sgintid)
 {
@@ -203,32 +223,42 @@ void gic_sgi_gen_to_others(uint32_t sgintid)
 	ukplat_lcpu_restore_irqf(irqf);
 }
 
-/*
- * Forward the SGI only to the CPU interface of the processor
- * that requested the interrupt.
+/**
+ * Forward the SGI only to the CPU interface of the processor that requested
+ * the interrupt.
  */
 void gic_sgi_gen_to_self(uint32_t sgintid)
 {
 	gic_sgi_gen(sgintid, GICD_SGI_FILTER_TO_SELF, 0);
 }
 
-/*
- * set target cpu for irq in distributor,
- * @target: bitmask value, bit 1 indicates target to
- * corresponding cpu interface
+/**
+ * Set target CPU for an interrupt
+ *
+ * @param irq interrupt number [GIC_SPI_BASE..GIC_MAX_IRQ-1]
+ * @param targetlist an 8-bit bitmap with 1 bit per CPU 0-7. A `1` bit
+ *    indicates that the SGI should be forwarded to the respective CPU
  */
-static void gic_set_irq_target(uint32_t irq, uint32_t target)
+static void gic_set_irq_target(uint32_t irq, uint32_t targetlist)
 {
 	if (irq < GIC_SPI_BASE)
 		UK_CRASH("Bad irq number: should not less than %u",
 			GIC_SPI_BASE);
 
 	dist_lock(gicv2_drv);
-	write_gicd8(GICD_ITARGETSR(irq), (uint8_t)target);
+	write_gicd8(GICD_ITARGETSR(irq), (uint8_t)targetlist);
 	dist_unlock(gicv2_drv);
 }
 
-/* set priority for irq in distributor */
+/**
+ * Set priority for an interrupt
+ *
+ * @param irq interrupt number [0..GIC_MAX_IRQ-1]
+ * @param priority priority [0..255]. The GIC implementation may not support
+ *    all levels. For example, if only 128 levels are supported every two levels
+ *    (e.g., 0 and 1) map to the same effective value. Lower values correspond
+ *    to higher priority
+ */
 static void gic_set_irq_prio(uint32_t irq, uint8_t priority)
 {
 	dist_lock(gicv2_drv);
@@ -236,9 +266,10 @@ static void gic_set_irq_prio(uint32_t irq, uint8_t priority)
 	dist_unlock(gicv2_drv);
 }
 
-/*
- * Enable an irq in distributor, each irq occupies one bit
- * to configure in corresponding register
+/**
+ * Enable an interrupt
+ *
+ * @param irq interrupt number [0..GIC_MAX_IRQ-1]
  */
 static void gic_enable_irq(uint32_t irq)
 {
@@ -250,9 +281,10 @@ static void gic_enable_irq(uint32_t irq)
 	dist_unlock(gicv2_drv);
 }
 
-/*
- * Disable an irq in distributor, one bit reserved for an irq
- * to configure in corresponding register
+/**
+ * Disable an interrupt
+ *
+ * @param irq interrupt number [0..GIC_MAX_IRQ-1]
  */
 static void gic_disable_irq(uint32_t irq)
 {
@@ -262,7 +294,7 @@ static void gic_disable_irq(uint32_t irq)
 	dist_unlock(gicv2_drv);
 }
 
-/* Enable distributor */
+/** Enable distributor */
 static void gic_enable_dist(void)
 {
 	/* just set bit 0 to 1 to enable distributor */
@@ -271,10 +303,10 @@ static void gic_enable_dist(void)
 	dist_unlock(gicv2_drv);
 }
 
-/* disable distributor */
+/** Disable distributor */
 static void gic_disable_dist(void)
 {
-	/* just clear bit 0 to 0 to disable distributor */
+	/* just clear bit 0 to disable distributor */
 	dist_lock(gicv2_drv);
 	write_gicd32(GICD_CTLR, read_gicd32(GICD_CTLR) & (~GICD_CTLR_ENABLE));
 	dist_unlock(gicv2_drv);
