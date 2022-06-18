@@ -37,6 +37,40 @@
 #include <uk/arch/types.h>
 #include <uk/store.h>
 
+struct uk_store_folder {
+	/* List for the dynamic folders only */
+	struct uk_list_head folder_head;
+
+	/* List for the entries in the folder */
+	struct uk_list_head entry_head;
+
+	/* Allocator to be used in allocations */
+	struct uk_alloc *a;
+
+	/* The folder name */
+	char *name;
+} __align8;
+
+struct uk_store_folder_entry {
+	/* Saved entry */
+	struct uk_store_entry entry;
+
+	/* Folder reference */
+	struct uk_store_folder *folder;
+
+	/* Allocator to be used in allocations */
+	struct uk_alloc *a;
+
+	/* Cleanup function */
+	uk_store_entry_freed_func_t clean;
+
+	/* The linked list head */
+	struct uk_list_head list_head;
+
+	/* Refcount */
+	__atomic refcount;
+} __align8;
+
 #define _U8_STRLEN (3 + 1) /* 3 digits plus terminating '\0' */
 #define _S8_STRLEN (1 + _U8_STRLEN) /* space for potential sign in front */
 #define _U16_STRLEN (5 + 1)
@@ -47,7 +81,34 @@
 #define _S64_STRLEN (1 + _U64_STRLEN)
 #define _UPTR_STRLEN (2 + 16 + 1) /* 64bit in hex with leading `0x` prefix */
 
+/* The starting point of all dynamic folders for each library */
+static struct uk_list_head dynamic_heads[__UK_STORE_COUNT] = { NULL, };
+
+/* static struct uk_store_folder *static_folders[2 * __UK_STORE_COUNT] */
 #include <uk/bits/store_array.h>
+
+/**
+ * Adds a folder entry to a folder list
+ *
+ * @param folder pointer to the place where to add the new entry
+ * @param folder_entry pointer to the entry to add
+ */
+#define uk_store_add_folder_entry(folder, folder_entry)	\
+	uk_list_add(&(folder_entry)->list_head, &(folder)->entry_head)
+
+
+/**
+ * Returns the folder_entry of an entry
+ *
+ * @param entry the entry
+ * @return the folder_entry
+ */
+static inline struct uk_store_folder_entry *
+uk_store_get_folder_entry(const struct uk_store_entry *p_entry)
+{
+	UK_ASSERT(!UK_STORE_ENTRY_ISSTATIC(p_entry));
+	return __containerof(p_entry, struct uk_store_folder_entry, entry);
+}
 
 /**
  * Releases an entry (decreases the refcount and sets the reference to NULL)
@@ -57,10 +118,144 @@
  * @param p_entry pointer to the entry to release
  */
 void
-_uk_store_release_entry(const struct uk_store_entry *p_entry)
+_uk_store_release_entry(const struct uk_store_entry *entry)
 {
-	if (UK_STORE_ENTRY_ISSTATIC(p_entry))
+	struct uk_store_folder_entry *res;
+
+	if (UK_STORE_ENTRY_ISSTATIC(entry))
 		return;
+
+	res = uk_store_get_folder_entry(entry);
+
+	ukarch_dec(&res->refcount.counter);
+
+	if (ukarch_load_n(&res->refcount.counter) == 0) {
+		uk_list_del(&res->list_head);
+		if (res->clean)
+			res->clean(res->entry.cookie);
+		uk_store_free_entry(entry);
+	}
+}
+
+void
+_uk_store_free_entry(const struct uk_store_entry *entry)
+{
+	struct uk_alloc *a = uk_store_get_folder_entry(entry)->a;
+
+	if (UK_STORE_ENTRY_ISSTATIC(entry))
+		return;
+
+	a->free(a, entry->name);
+	a->free(a, uk_store_get_folder_entry(entry));
+}
+
+/**
+ * Creates a folder
+ *
+ * @param name the folder to allocate
+ * @return the allocated folder
+ */
+struct uk_store_folder *
+_uk_store_dynamic_folder_alloc(struct uk_alloc *a, const char *name)
+{
+	struct uk_store_folder *new_folder;
+
+	UK_ASSERT(name);
+
+	new_folder = a->malloc(a, sizeof(*new_folder));
+	if (!new_folder)
+		return NULL;
+
+	new_folder->name = a->malloc(a, sizeof(*name) * strlen(name));
+	if (!new_folder->name) {
+		a->free(a, new_folder);
+		return NULL;
+	}
+
+	strcpy(new_folder->name, name);
+
+	new_folder->a = a;
+
+	UK_INIT_LIST_HEAD(&new_folder->folder_head);
+	UK_INIT_LIST_HEAD(&new_folder->entry_head);
+
+	return new_folder;
+}
+
+/**
+ * Adds a folder to the dynamic list of folders
+ *
+ * @param library_id the library list to add to
+ * @param folder the dynamic folder to be added
+ * @return 0 on success and < 0 on failure
+ */
+int
+_uk_store_add_folder(unsigned int library_id, struct uk_store_folder *folder)
+{
+	if (unlikely(library_id >= __UK_STORE_COUNT))
+		return -EINVAL;
+
+	if (!dynamic_heads[library_id].next)
+		UK_INIT_LIST_HEAD(&dynamic_heads[library_id]);
+
+	uk_list_add(&folder->folder_head, &dynamic_heads[library_id]);
+
+	return 0;
+}
+
+/**
+ * Frees a folder and all its contents
+ *
+ * @param folder reference to the folder to free
+ */
+void
+_uk_store_free_folder(struct uk_store_folder *folder)
+{
+	struct uk_store_folder_entry *iter, *sec;
+	const struct uk_store_entry *entry;
+
+	folder->a->free(folder->a, folder->name);
+
+	uk_list_for_each_entry_safe(iter, sec,
+				&folder->entry_head, list_head) {
+		uk_list_del(&iter->list_head);
+		iter->folder = NULL;
+		entry = &iter->entry;
+		uk_store_release_entry(entry);
+	}
+}
+
+/**
+ * Removes a folder from a library
+ *
+ * @param folder the folder to remove
+ */
+void
+_uk_store_remove_folder(struct uk_store_folder *folder)
+{
+	uk_list_del(&(folder->folder_head));
+}
+
+/**
+ * Searches for an folder in a library and returns it.
+ *
+ * @param library_id the library id to search in
+ * @param name the name of the folder to search for
+ * @return the found folder or NULL
+ */
+struct uk_store_folder *
+_uk_store_get_folder(unsigned int library_id, const char *name)
+{
+	struct uk_store_folder *res = NULL;
+
+	if (!dynamic_heads[library_id].next)
+		return NULL;
+
+	uk_list_for_each_entry(res, &dynamic_heads[library_id], folder_head)
+		if (!strcmp(res->name, name))
+			return res;
+
+	return NULL;
 }
 
 /**
@@ -82,6 +277,96 @@ _uk_store_get_static_entry(unsigned int libid, const char *e_name)
 
 	return NULL;
 }
+
+/**
+ * Searches for a folder in a library. Then search for an entry in the folder.
+ * Increases the refcount.
+ *
+ * @param libid the library to search in
+ * @param f_name the name of the folder to search for
+ * @param e_name the name of the entry to search for
+ * @return the found entry or NULL
+ */
+const struct uk_store_entry *
+_uk_store_get_dynamic_entry(unsigned int libid, const char *f_name,
+				const char *e_name)
+{
+	struct uk_store_folder *folder = _uk_store_get_folder(libid, f_name);
+	struct uk_store_folder_entry *res = NULL;
+
+	if (!folder)
+		return NULL;
+
+	uk_list_for_each_entry(res, &folder->entry_head, list_head)
+		if (!strcmp(res->entry.name, e_name))
+			break;
+
+	if (res) {
+		ukarch_inc(&res->refcount.counter);
+		return &res->entry;
+	}
+
+	return NULL;
+}
+
+/**
+ * Generates a function that creates the given type
+ *
+ * @param gen_type the type to use to generate
+ */
+#define _UK_STORE_DYNAMIC_CREATE_TYPED(gen_type)			\
+	const struct uk_store_entry *					\
+	_uk_store_dynamic_entry_create_ ## gen_type(			\
+		struct uk_store_folder *folder,				\
+		const char *name,					\
+		uk_store_get_ ## gen_type ## _func_t get,		\
+		uk_store_set_ ## gen_type ## _func_t set,		\
+		void *cookie, uk_store_entry_freed_func_t clean)	\
+	{								\
+		struct uk_store_folder_entry *new_folder_entry;		\
+									\
+		UK_ASSERT(folder || name || folder->a);			\
+									\
+		new_folder_entry = folder->a->malloc(			\
+				folder->a, sizeof(*new_folder_entry));	\
+		if (!new_folder_entry)					\
+			return NULL;					\
+									\
+		new_folder_entry->entry.name = folder->a->malloc(	\
+			folder->a, sizeof(*name) * strlen(name));	\
+		if (!new_folder_entry->entry.name) {			\
+			folder->a->free(folder->a, new_folder_entry);	\
+			return NULL;					\
+		}							\
+		strcpy(new_folder_entry->entry.name, name);		\
+		new_folder_entry->entry.type =				\
+				UK_STORE_ENTRY_TYPE(gen_type);		\
+		new_folder_entry->entry.get.gen_type = get;		\
+		new_folder_entry->entry.set.gen_type = set;		\
+		new_folder_entry->entry.flags = 0;			\
+		new_folder_entry->entry.cookie = cookie;		\
+		new_folder_entry->folder = folder;			\
+		new_folder_entry->a = folder->a;			\
+		new_folder_entry->clean = clean;			\
+									\
+		ukarch_store_n(&new_folder_entry->refcount.counter, 1);	\
+									\
+		uk_store_add_folder_entry(folder, new_folder_entry);	\
+									\
+		return &new_folder_entry->entry;			\
+	}
+
+/* Generate a function creator for each type */
+_UK_STORE_DYNAMIC_CREATE_TYPED(u8);
+_UK_STORE_DYNAMIC_CREATE_TYPED(s8);
+_UK_STORE_DYNAMIC_CREATE_TYPED(u16);
+_UK_STORE_DYNAMIC_CREATE_TYPED(s16);
+_UK_STORE_DYNAMIC_CREATE_TYPED(u32);
+_UK_STORE_DYNAMIC_CREATE_TYPED(s32);
+_UK_STORE_DYNAMIC_CREATE_TYPED(u64);
+_UK_STORE_DYNAMIC_CREATE_TYPED(s64);
+_UK_STORE_DYNAMIC_CREATE_TYPED(uptr);
+_UK_STORE_DYNAMIC_CREATE_TYPED(charp);
 
 /* Capital types used internally */
 #define S8  __do_not_expand__
@@ -1075,6 +1360,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 {
 	int ret;
 	char *str;
+	struct uk_alloc *a = uk_store_get_folder_entry(e)->folder->a;
 
 	UK_ASSERT(e);
 	if (unlikely(e->get.u8 == NULL))
@@ -1084,7 +1370,11 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 	case UK_STORE_ENTRY_TYPE(u8): {
 		__u8 val;
 
-		str = calloc(_U8_STRLEN, sizeof(char));
+		if (UK_STORE_ENTRY_ISSTATIC(e)) {
+			str = calloc(_U8_STRLEN, sizeof(char));
+		} else {
+			str = a->calloc(a, _U8_STRLEN, sizeof(char));
+		}
 		if (unlikely(!str))
 			return -ENOMEM;
 
@@ -1099,7 +1389,11 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 	case UK_STORE_ENTRY_TYPE(s8): {
 		__s8 val;
 
-		str = calloc(_S8_STRLEN, sizeof(char));
+		if (UK_STORE_ENTRY_ISSTATIC(e)) {
+			str = calloc(_S8_STRLEN, sizeof(char));
+		} else {
+			str = a->calloc(a, _S8_STRLEN, sizeof(char));
+		}
 		if (unlikely(!str))
 			return -ENOMEM;
 
@@ -1114,7 +1408,11 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 	case UK_STORE_ENTRY_TYPE(u16): {
 		__u16 val;
 
-		str = calloc(_U16_STRLEN, sizeof(char));
+		if (UK_STORE_ENTRY_ISSTATIC(e)) {
+			str = calloc(_U16_STRLEN, sizeof(char));
+		} else {
+			str = a->calloc(a, _U16_STRLEN, sizeof(char));
+		}
 		if (unlikely(!str))
 			return -ENOMEM;
 
@@ -1129,7 +1427,11 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 	case UK_STORE_ENTRY_TYPE(s16): {
 		__s16 val;
 
-		str = calloc(_S16_STRLEN, sizeof(char));
+		if (UK_STORE_ENTRY_ISSTATIC(e)) {
+			str = calloc(_S16_STRLEN, sizeof(char));
+		} else {
+			str = a->calloc(a, _S16_STRLEN, sizeof(char));
+		}
 		if (unlikely(!str))
 			return -ENOMEM;
 
@@ -1144,7 +1446,11 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 	case UK_STORE_ENTRY_TYPE(u32): {
 		__u32 val;
 
-		str = calloc(_U32_STRLEN, sizeof(char));
+		if (UK_STORE_ENTRY_ISSTATIC(e)) {
+			str = calloc(_U32_STRLEN, sizeof(char));
+		} else {
+			str = a->calloc(a, _U32_STRLEN, sizeof(char));
+		}
 		if (unlikely(!str))
 			return -ENOMEM;
 
@@ -1159,7 +1465,11 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 	case UK_STORE_ENTRY_TYPE(s32): {
 		__s32 val;
 
-		str = calloc(_S32_STRLEN, sizeof(char));
+		if (UK_STORE_ENTRY_ISSTATIC(e)) {
+			str = calloc(_S32_STRLEN, sizeof(char));
+		} else {
+			str = a->calloc(a, _S32_STRLEN, sizeof(char));
+		}
 		if (unlikely(!str))
 			return -ENOMEM;
 
@@ -1174,7 +1484,11 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 	case UK_STORE_ENTRY_TYPE(u64): {
 		__u64 val;
 
-		str = calloc(_U64_STRLEN, sizeof(char));
+		if (UK_STORE_ENTRY_ISSTATIC(e)) {
+			str = calloc(_U64_STRLEN, sizeof(char));
+		} else {
+			str = a->calloc(a, _U64_STRLEN, sizeof(char));
+		}
 		if (unlikely(!str))
 			return -ENOMEM;
 
@@ -1189,7 +1503,11 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 	case UK_STORE_ENTRY_TYPE(s64): {
 		__s64 val;
 
-		str = calloc(_S64_STRLEN, sizeof(char));
+		if (UK_STORE_ENTRY_ISSTATIC(e)) {
+			str = calloc(_S64_STRLEN, sizeof(char));
+		} else {
+			str = a->calloc(a, _S64_STRLEN, sizeof(char));
+		}
 		if (unlikely(!str))
 			return -ENOMEM;
 
@@ -1204,7 +1522,11 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 	case UK_STORE_ENTRY_TYPE(uptr): {
 		__uptr val;
 
-		str = calloc(_UPTR_STRLEN, sizeof(char));
+		if (UK_STORE_ENTRY_ISSTATIC(e)) {
+			str = calloc(_UPTR_STRLEN, sizeof(char));
+		} else {
+			str = a->calloc(a, _UPTR_STRLEN, sizeof(char));
+		}
 		if (unlikely(!str))
 			return -ENOMEM;
 

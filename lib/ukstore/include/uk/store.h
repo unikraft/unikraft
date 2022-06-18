@@ -96,6 +96,9 @@ typedef int (*uk_store_set_u64_func_t)(void *, __u64);
 typedef int (*uk_store_set_uptr_func_t)(void *, __uptr);
 typedef int (*uk_store_set_charp_func_t)(void *, const char *);
 
+/* Cleanup definition */
+typedef void (*uk_store_entry_freed_func_t)(void *);
+
 struct uk_store_entry {
 	/* Function getter pointer */
 	union {
@@ -137,6 +140,9 @@ struct uk_store_entry {
 	/* Extra cookie that is handed over to getter and setter */
 	void *cookie;
 } __align8;
+
+struct uk_store_folder;
+struct uk_alloc;
 
 /* Flags if an entry is static or dynamic */
 #define UK_STORE_ENTRY_FLAG_STATIC	(1 << 0)
@@ -244,13 +250,154 @@ struct uk_store_entry {
 		e_type, e_get, e_set, cookie)
 
 const struct uk_store_entry *
+		_uk_store_dynamic_entry_create_u8(
+		struct uk_store_folder *folder, const char *name,
+		uk_store_get_u8_func_t get, uk_store_set_u8_func_t set,
+		void *cookie, uk_store_entry_freed_func_t clean);
+const struct uk_store_entry *
+		_uk_store_dynamic_entry_create_s8(
+		struct uk_store_folder *folder, const char *name,
+		uk_store_get_s8_func_t get, uk_store_set_s8_func_t set,
+		void *cookie, uk_store_entry_freed_func_t clean);
+const struct uk_store_entry *
+		_uk_store_dynamic_entry_create_u16(
+		struct uk_store_folder *folder, const char *name,
+		uk_store_get_u16_func_t get, uk_store_set_u16_func_t set,
+		void *cookie, uk_store_entry_freed_func_t clean);
+const struct uk_store_entry *
+		_uk_store_dynamic_entry_create_s16(
+		struct uk_store_folder *folder, const char *name,
+		uk_store_get_s16_func_t get, uk_store_set_s16_func_t set,
+		void *cookie, uk_store_entry_freed_func_t clean);
+const struct uk_store_entry *
+		_uk_store_dynamic_entry_create_u32(
+		struct uk_store_folder *folder, const char *name,
+		uk_store_get_u32_func_t get, uk_store_set_u32_func_t set,
+		void *cookie, uk_store_entry_freed_func_t clean);
+const struct uk_store_entry *
+		_uk_store_dynamic_entry_create_s32(
+		struct uk_store_folder *folder, const char *name,
+		uk_store_get_s32_func_t get, uk_store_set_s32_func_t set,
+		void *cookie, uk_store_entry_freed_func_t clean);
+const struct uk_store_entry *
+		_uk_store_dynamic_entry_create_u64(
+		struct uk_store_folder *folder, const char *name,
+		uk_store_get_u64_func_t get, uk_store_set_u64_func_t set,
+		void *cookie, uk_store_entry_freed_func_t clean);
+const struct uk_store_entry *
+		_uk_store_dynamic_entry_create_s64(
+		struct uk_store_folder *folder, const char *name,
+		uk_store_get_s64_func_t get, uk_store_set_s64_func_t set,
+		void *cookie, uk_store_entry_freed_func_t clean);
+const struct uk_store_entry *
+		_uk_store_dynamic_entry_create_uptr(
+		struct uk_store_folder *folder, const char *name,
+		uk_store_get_uptr_func_t get, uk_store_set_uptr_func_t set,
+		void *cookie, uk_store_entry_freed_func_t clean);
+const struct uk_store_entry *
+		_uk_store_dynamic_entry_create_charp(
+		struct uk_store_folder *folder, const char *name,
+		uk_store_get_charp_func_t get, uk_store_set_charp_func_t set,
+		void *cookie, uk_store_entry_freed_func_t clean);
+
+/**
+ * Creates a new dynamic entry
+ *
+ * Guard this with `#if CONFIG_LIBUKSTORE`
+ *
+ * @param fld the folder where to add the entry
+ * @param n the name of the new entry (it is duplicated with strdup)
+ * @param type the type of the new entry
+ * @param g the getter function to save
+ * @param s the setter function to save
+ * @param c cookie for extra storage (optional)
+ * @param f cleanup function (optional)
+ * @return pointer to the created entry
+ */
+#define uk_store_dynamic_entry_create(fld, n, type, g, s, c, f)	\
+	_uk_store_dynamic_entry_create_ ## type((fld), (n), (g), (s), (c), (f))
+
+/**
+ * Creates a new dynamic folder
+ *
+ * Guard this with `#if CONFIG_LIBUKSTORE`
+ *
+ * @param name the name of the new folder
+ * @return pointer to the alloc folder
+ */
+#define uk_store_dynamic_folder_alloc(name)	\
+	_uk_store_dynamic_folder_alloc(uk_alloc_get_default(), (name))
+
+struct uk_store_folder *
+_uk_store_dynamic_folder_alloc(struct uk_alloc *a, const char *name);
+
+/**
+ * Adds a dynamic folder to a library
+ *
+ * Guard this with `#if CONFIG_LIBUKSTORE`
+ *
+ * @param folder the folder to add it to
+ * @return 0 on success and < 0 on failure
+ */
+#define uk_store_add_folder(folder)	\
+	_uk_store_add_folder(uk_store_libid_self(), folder)
+
+int
+_uk_store_add_folder(unsigned int library_id, struct uk_store_folder *folder);
+
+/**
+ * Frees the memory of a dynamic folder and
+ * the memory of the entries and deletes them
+ *
+ * Guard this with `#if CONFIG_LIBUKSTORE`
+ *
+ * @param folder the folder to free
+ */
+#define uk_store_free_folder(folder)	\
+	_uk_store_free_folder((folder))
+
+void
+_uk_store_free_folder(struct uk_store_folder *folder);
+
+/**
+ * Removes a dynamic folder from the folder list of the library
+ *
+ * Guard this with `#if CONFIG_LIBUKSTORE`
+ *
+ * @param folder the folder to remove
+ */
+#define uk_store_remove_folder(folder)	\
+	_uk_store_remove_folder((folder))
+
+void
+_uk_store_remove_folder(struct uk_store_folder *folder);
+
+/**
+ * Get a dynamic folder from a library
+ *
+ * @param folder_name the name of the folder to search for
+ * @param library_id the id returned by uk_store_libid
+ * @return the folder searched for
+ */
+#define uk_store_get_folder(library_id, folder_name)	\
+	_uk_store_get_folder(library_id, folder_name)
+
+struct uk_store_folder *
+_uk_store_get_folder(unsigned int library_id, const char *name);
+
+const struct uk_store_entry *
+_uk_store_get_dynamic_entry(unsigned int libid, const char *f_name,
+				const char *e_name);
+
+const struct uk_store_entry *
 _uk_store_get_static_entry(unsigned int libid, const char *e_name);
 
 static inline const struct uk_store_entry *
-_uk_store_get_entry(unsigned int libid, const char *f_name __unused,
-			const char *e_name)
+_uk_store_get_entry(unsigned int libid, const char *f_name, const char *e_name)
 {
-	return _uk_store_get_static_entry(libid, e_name);
+	if (!f_name)
+		return _uk_store_get_static_entry(libid, e_name);
+	return _uk_store_get_dynamic_entry(libid, f_name, e_name);
 }
 
 /**
@@ -263,6 +410,19 @@ _uk_store_get_entry(unsigned int libid, const char *f_name __unused,
  */
 #define uk_store_get_entry(libname, foldername, entryname)	\
 	_uk_store_get_entry(uk_store_libid(libname), foldername, entryname)
+
+/**
+ * Frees the memory of an entry
+ *
+ * Guard this with `#if CONFIG_LIBUKSTORE`
+ *
+ * @param entry the entry to free
+ */
+#define uk_store_free_entry(entry)	\
+	_uk_store_free_entry((entry))
+
+void
+_uk_store_free_entry(const struct uk_store_entry *entry);
 
 /**
  * Decreases the refcount. When it reaches 0, the memory is freed
