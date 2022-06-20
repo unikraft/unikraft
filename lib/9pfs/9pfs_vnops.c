@@ -577,6 +577,7 @@ out:
 #define uk_9pfs_symlink		((vnop_symlink_t)vfscore_vop_eperm)
 #define uk_9pfs_fallocate	((vnop_fallocate_t)vfscore_vop_nullop)
 #define uk_9pfs_rename		((vnop_rename_t)vfscore_vop_einval)
+#define uk_9pfs_poll		((vnop_poll_t)vfscore_vop_einval)
 
 struct vnops uk_9pfs_vnops = {
 	.vop_open	= uk_9pfs_open,
@@ -601,5 +602,6 @@ struct vnops uk_9pfs_vnops = {
 	.vop_cache	= uk_9pfs_cache,
 	.vop_fallocate	= uk_9pfs_fallocate,
 	.vop_readlink	= uk_9pfs_readlink,
-	.vop_symlink	= uk_9pfs_symlink
+	.vop_symlink	= uk_9pfs_symlink,
+	.vop_poll	= uk_9pfs_poll,
 };
