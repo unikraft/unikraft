@@ -34,6 +34,7 @@ static int sgx_ioc_enclave_create(struct device *dev, unsigned int cmd,
 	": "=r" (addr));
 	cpl_switch(3);
 	cpl_switch(0);
+	uk_pr_info("cpl_switch successful\n");
 	return 0;
 }
 

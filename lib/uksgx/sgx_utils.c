@@ -21,7 +21,7 @@ int fast_cpl_switch(__u8 rpl)
 	static __u8 is_lstar_set = 0;
 	if (!is_lstar_set) {
 		is_lstar_set = 1;
-		wrmsrl_safe(X86_MSR_IA32_LSTAR, (__u64) && success);
+		wrmsrl(X86_MSR_IA32_LSTAR, (__u64) && success);
 	}
 	if (rpl == 0) { /* syscall */
 		/* We do not need to save rsp as the stack will not change */
@@ -104,7 +104,7 @@ int cpl_switch_init()
 		uk_pr_info("syscall/sysret instruction is not enabled, trying "
 			   "to enable them\n");
 		ret |= X86_EFER_SYSCALL;
-		wrmsrl_safe(X86_MSR_IA32_EFER, ret);
+		wrmsrl(X86_MSR_IA32_EFER, ret);
 		ret = rdmsrl(X86_MSR_IA32_EFER);
 		if (unlikely(!(ret & X86_EFER_SYSCALL))) {
 			/* this is unlikely to happen in an modern x86_64 Intel
@@ -144,11 +144,11 @@ int cpl_switch_init()
 			 * IA32_STAR[47:32] should be set to the kernel CS
 			 * selector GDT_DESC_OFFSET(GDT_DESC_CODE).
 			 */
-			wrmsr_safe(X86_MSR_IA32_STAR, 0,
+			wrmsr(X86_MSR_IA32_STAR, 0,
 				   GDT_DESC_OFFSET(GDT_DESC_DATA) << 16
 				       | GDT_DESC_OFFSET(GDT_DESC_CODE));
 			/*
-			 * wrmsrl_safe(X86_MSR_IA32_LSTAR, (__u64) && success);
+			 * wrmsrl(X86_MSR_IA32_LSTAR, (__u64) && success);
 			 *
 			 * We cannot initialize LSTAR here, as the target
 			 * address is not known yet. However, we can initialize

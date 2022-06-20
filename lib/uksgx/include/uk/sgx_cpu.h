@@ -90,6 +90,22 @@
 #define MSR_IA32_SGXLEPUBKEYHASH2	0x0000008E
 #define MSR_IA32_SGXLEPUBKEYHASH3	0x0000008F
 
+/* __cpuid_count(unsinged int info[4], unsigned int leaf, unsigned int subleaf); */
+#define __cpuid_count(x, y, z)                                                       \
+	asm volatile("cpuid"                                                   \
+		     : "=a"(x[0]), "=b"(x[1]), "=c"(x[2]), "=d"(x[3])          \
+		     : "a"(y), "c"(z))
+
+/* __cpuid(unsinged int info[4], unsigned int leaf); */
+#define __cpuid(x, y)                                                    \
+	asm volatile("cpuid"                                                   \
+		     : "=a"(x[0]), "=b"(x[1]), "=c"(x[2]), "=d"(x[3])          \
+		     : "a"(y))
+
+#define Genu 0x756e6547
+#define ineI 0x49656e69
+#define ntel 0x6c65746e
+
 static inline void rdmsr(unsigned int msr, __u32 *lo, __u32 *hi)
 {
 	asm volatile("rdmsr" : "=a"(*lo), "=d"(*hi)
@@ -104,35 +120,20 @@ static inline __u64 rdmsrl(unsigned int msr)
 	return ((__u64) lo | (__u64) hi << 32);
 }
 
-/* Can be uninlined because referenced by paravirt */
-static inline int native_write_msr_safe(unsigned int msr, __u32 low, __u32 high)
-{
-	int err = 0;
-	asm volatile("2: wrmsr ; xor %[err],%[err]\n"
-		     "1:\n\t"
-		     ".section .fixup,\"ax\"\n\t"
-		     "3:  mov %[fault],%[err] ; jmp 1b\n\t"
-		     ".previous\n\t"
-		     _ASM_EXTABLE(2b, 3b)
-		     : [err] "=a" (err)
-		     : "c" (msr), "0" (low), "d" (high),
-		       [fault] "i" (-EIO)
-		     : "memory");
-	return err;
-}
-
 /* wrmsr with exception handling */
-static inline int wrmsr_safe(unsigned int msr, __u32 low, __u32 high)
+static inline void wrmsr(unsigned int msr, __u32 low, __u32 high)
 {
-	return native_write_msr_safe(msr, low, high);
+	asm volatile("wrmsr"
+			     : /* no outputs */
+			     : "c"(msr), "a"(low), "d"(high));
 }
 
 /*
- * 64-bit version of wrmsr_safe():
+ * 64-bit version of wrmsr():
  */
-static inline int wrmsrl_safe(__u32 msr, __u64 val)
+static inline void wrmsrl(__u32 msr, __u64 val)
 {
-	return wrmsr_safe(msr, (__u32)val,  (__u32)(val >> 32));
+	wrmsr(msr, (__u32)val,  (__u32)(val >> 32));
 }
 
 

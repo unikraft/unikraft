@@ -33,21 +33,42 @@
 #ifndef _UK_SGX_ASM_H_
 #define _UK_SGX_ASM_H_
 
-/* __cpuid_count(unsinged int info[4], unsigned int leaf, unsigned int subleaf); */
-#define __cpuid_count(x, y, z)                                                       \
-	asm volatile("cpuid"                                                   \
-		     : "=a"(x[0]), "=b"(x[1]), "=c"(x[2]), "=d"(x[3])          \
-		     : "a"(y), "c"(z))
+#include <uk/sgx_cpu.h>
 
-/* __cpuid(unsinged int info[4], unsigned int leaf); */
-#define __cpuid(x, y)                                                    \
-	asm volatile("cpuid"                                                   \
-		     : "=a"(x[0]), "=b"(x[1]), "=c"(x[2]), "=d"(x[3])          \
-		     : "a"(y))
+#define __encls_ret(rax, rbx, rcx, rdx)			\
+	({						\
+	int ret;					\
+	asm volatile(					\
+	"1: .byte 0x0f, 0x01, 0xcf;\n\t"		\
+	"2:\n"						\
+	".section .fixup,\"ax\"\n"			\
+	"3: mov $-14,%%rax\n"				\
+	"   jmp 2b\n"					\
+	".previous\n"					\
+	_ASM_EXTABLE(1b, 3b)				\
+	: "=a"(ret)					\
+	: "a"(rax), "b"(rbx), "c"(rcx), "d"(rdx)	\
+	: "memory");					\
+	ret;						\
+	})
 
-#define Genu 0x756e6547
-#define ineI 0x49656e69
-#define ntel 0x6c65746e
+#define __encls(rax, rbx, rcx, rdx...)			\
+	({						\
+	int ret;					\
+	asm volatile(					\
+	"1: .byte 0x0f, 0x01, 0xcf;\n\t"		\
+	"   xor %%rax,%%rax\n"				\
+	"2:\n"						\
+	".section .fixup,\"ax\"\n"			\
+	"3: mov $-14,%%rax\n"				\
+	"   jmp 2b\n"					\
+	".previous\n"					\
+	_ASM_EXTABLE(1b, 3b)				\
+	: "=a"(ret), "=b"(rbx), "=c"(rcx)		\
+	: "a"(rax), "b"(rbx), "c"(rcx), rdx		\
+	: "memory");					\
+	ret;						\
+	})
 
 #define SGX_CPUID 0x12
 
