@@ -36,6 +36,7 @@
 #include <errno.h>
 #include <uk/print.h>
 #include <vfscore/file.h>
+#include <vfscore/eventpoll.h>
 #include <uk/assert.h>
 #include "vfs.h"
 
@@ -52,6 +53,8 @@ int fdrop(struct vfscore_file *fp)
 		UK_CRASH("Unbalanced fhold/fdrop");
 
 	if (prev == 1) {
+		eventpoll_notify_close(fp);
+
 		/*
 		 * we free the file even in case of an error
 		 * so release the dentry too

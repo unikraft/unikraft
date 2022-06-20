@@ -200,6 +200,7 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 	fp->f_dentry = dp;
 
 	uk_mutex_init(&fp->f_lock);
+	UK_INIT_LIST_HEAD(&fp->f_ep);
 
 	vn_lock(vp);
 
