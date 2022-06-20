@@ -25,3 +25,9 @@ uk_syscall_r_epoll_wait
 epoll_pwait
 uk_syscall_e_epoll_pwait
 uk_syscall_r_epoll_pwait
+eventfd
+uk_syscall_e_eventfd
+uk_syscall_r_eventfd
+eventfd2
+uk_syscall_e_eventfd2
+uk_syscall_r_eventfd2
