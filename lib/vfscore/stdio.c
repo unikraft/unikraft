@@ -212,7 +212,7 @@ static struct vfscore_file  stdio_file = {
 
 void init_stdio(void)
 {
-	int fd;
+	int fd __maybe_unused;
 
 	fd = vfscore_alloc_fd();
 	UK_ASSERT(fd == 0);
