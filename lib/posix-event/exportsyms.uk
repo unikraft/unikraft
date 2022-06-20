@@ -4,3 +4,9 @@ uk_syscall_r_poll
 ppoll
 uk_syscall_e_ppoll
 uk_syscall_r_ppoll
+select
+uk_syscall_e_select
+uk_syscall_r_select
+pselect
+uk_syscall_e_pselect6
+uk_syscall_r_pselect6
