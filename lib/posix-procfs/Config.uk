@@ -1,0 +1,45 @@
+menuconfig LIBPROCFS
+	bool "procfs: procfs file system"
+	default n
+	depends on LIBVFSCORE
+	depends on LIBUKSTORE
+
+if LIBPROCFS
+	config LIBPROCFS_AUTOMOUNT
+        bool "Mount /proc during boot"
+	depends on LIBVFSCORE_AUTOMOUNT_ROOTFS
+        default n
+
+	config LIBPROCFS_MEMINFO
+		bool "Create meminfo file"
+		default y if LIBPROCFS_AUTOMOUNT
+		default n
+
+	config LIBPROCFS_CMDLINE
+		bool "Create cmdline file"
+		default y if LIBPROCFS_AUTOMOUNT
+		default n
+		depends on LIBNEWLIBC
+		depends on LIBNEWLIBC_LINUX_ERRNO_EXTENSIONS
+
+	config LIBPROCFS_VERSION
+		bool "Create version file"
+		default y if LIBPROCFS_AUTOMOUNT
+		default n
+		
+	
+	config LIBPROCFS_FIELSYSTEMS
+		bool "Create filesystems file"
+		default y if LIBPROCFS_AUTOMOUNT
+		default n
+		depends on LIBNEWLIBC
+		depends on LIBNEWLIBC_LINUX_ERRNO_EXTENSIONS
+
+	config LIBPROCFS_MOUNTS
+		bool "Create mounts file"
+		default y if LIBPROCFS_AUTOMOUNT
+		default n
+		depends on LIBNEWLIBC
+		depends on LIBNEWLIBC_LINUX_ERRNO_EXTENSIONS
+
+endif

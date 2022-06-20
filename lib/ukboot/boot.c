@@ -71,6 +71,12 @@
 #include <uk/sp.h>
 #endif
 #include "banner.h"
+#ifdef CONFIG_LIBPROCFS_CMDLINE
+#include <string.h>
+#include <stdlib.h>
+#include <uk/store.h>
+#endif /* CONFIG_LIBPROCFS_CMDLINE */
+
 
 int main(int argc, char *argv[]) __weak;
 
@@ -81,11 +87,42 @@ struct thread_main_arg {
 	char **argv;
 };
 
+#ifdef CONFIG_LIBPROCFS_CMDLINE
+struct thread_main_arg * return_arg;
+
+struct thread_main_arg *
+get_main_thread_arguments(void)
+{
+	return return_arg;
+}
+
+static int get_uk_arguments(void *cookie __unused, char **out)
+{
+	*out = malloc(sizeof(char) * 100);
+	if (*out == NULL)
+		return -ENOMEM;
+	
+	struct thread_main_arg *arg = get_main_thread_arguments();
+	strcpy(*out, arg->argv[0]);
+	for (int i = 1; i < arg->argc; i++) {
+		strcat(*out, " ");
+		strcat(*out, arg->argv[i]);
+	}
+	strcat(*out, "\n");
+
+	return 0;
+}											
+UK_STORE_STATIC_ENTRY(uk_arguments, charp, get_uk_arguments, NULL, NULL);
+#endif /* CONFIG_LIBPROCFS_CMDLINE */
+
 static void main_thread_func(void *arg)
 {
 	int i;
 	int ret;
 	struct thread_main_arg *tma = arg;
+#ifdef CONFIG_LIBPROCFS_CMDLINE
+	return_arg = arg;
+#endif /* CONFIG_LIBPROCFS_CMDLINE */
 	uk_ctor_func_t *ctorfn;
 	uk_init_func_t *initfn;
 
