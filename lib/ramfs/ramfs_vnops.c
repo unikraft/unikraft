@@ -643,6 +643,7 @@ ramfs_setattr(struct vnode *vnode, struct vattr *attr)
 #define ramfs_inactive  ((vnop_inactive_t)vfscore_vop_nullop)
 #define ramfs_link      ((vnop_link_t)vfscore_vop_eperm)
 #define ramfs_fallocate ((vnop_fallocate_t)vfscore_vop_nullop)
+#define ramfs_poll      ((vnop_poll_t)vfscore_vop_einval)
 
 /*
  * vnode operations
@@ -671,5 +672,5 @@ struct vnops ramfs_vnops = {
 		ramfs_fallocate,        /* fallocate */
 		ramfs_readlink,         /* read link */
 		ramfs_symlink,          /* symbolic link */
+		ramfs_poll,             /* poll */
 };
-
