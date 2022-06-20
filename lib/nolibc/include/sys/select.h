@@ -41,6 +41,7 @@ extern "C" {
 #define __NEED_time_t
 #define __NEED_suseconds_t
 #define __NEED_struct_timespec
+#define __NEED_struct_timeval
 #include <nolibc-internal/shareddefs.h>
 
 typedef unsigned long __fd_mask;
@@ -74,6 +75,18 @@ typedef struct fd_set {
 	while (_n > 0)					\
 		_p->__fds_bits[--_n] = 0;		\
 } while (0)
+
+int select(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
+	   struct timeval *timeout);
+
+#ifdef _GNU_SOURCE
+#define __NEED_time_t
+#define __NEED_struct_timespec
+#define __NEED_sigset_t
+#include <nolibc-internal/shareddefs.h>
+int pselect(int nfds, fd_set *readfds, fd_set *writefds, fd_set *exceptfds,
+	    const struct timespec *timeout, const sigset_t *sigmask);
+#endif
 
 #ifdef __cplusplus
 }
