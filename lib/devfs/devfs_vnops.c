@@ -249,6 +249,7 @@ devfs_getattr(struct vnode *vnode, struct vattr *attr)
 #define devfs_fallocate ((vnop_fallocate_t)vfscore_vop_nullop)
 #define devfs_readlink	((vnop_readlink_t)vfscore_vop_nullop)
 #define devfs_symlink	((vnop_symlink_t)vfscore_vop_nullop)
+#define devfs_poll	((vnop_poll_t)vfscore_vop_nullop)
 
 /*
  * vnode operations
@@ -277,6 +278,7 @@ struct vnops devfs_vnops = {
 	devfs_fallocate,	/* fallocate */
 	devfs_readlink,		/* read link */
 	devfs_symlink,		/* symbolic link */
+	devfs_poll,		/* poll */
 };
 
 /*
