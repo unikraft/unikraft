@@ -38,6 +38,7 @@
 
 #include <uk/mutex.h>
 #include <uk/list.h>
+#include <uk/config.h>
 #include <time.h>
 #include <vfscore/uio.h>
 #include <vfscore/dentry.h>
@@ -59,6 +60,10 @@ enum vtype {
 	VLNK,	    /* symbolic link */
 	VSOCK,	    /* socks */
 	VFIFO,	    /* FIFO */
+#ifdef CONFIG_LIBPOSIX_EVENT
+	VEPOLL,	    /* epoll */
+	VEVENT,	    /* eventfd */
+#endif /* CONFIG_LIBPOSIX_EVENT */
 	VBAD
 };
 
