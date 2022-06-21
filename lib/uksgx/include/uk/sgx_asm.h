@@ -34,67 +34,93 @@
 #define _UK_SGX_ASM_H_
 
 #include <uk/sgx_cpu.h>
+#include <uk/sgx_arch.h>
 
-#define __encls_ret(rax, rbx, rcx, rdx)			\
-	({						\
-	int ret;					\
-	asm volatile(					\
-	"1: .byte 0x0f, 0x01, 0xcf;\n\t"		\
-	"2:\n"						\
-	".section .fixup,\"ax\"\n"			\
-	"3: mov $-14,%%rax\n"				\
-	"   jmp 2b\n"					\
-	".previous\n"					\
-	_ASM_EXTABLE(1b, 3b)				\
-	: "=a"(ret)					\
-	: "a"(rax), "b"(rbx), "c"(rcx), "d"(rdx)	\
-	: "memory");					\
-	ret;						\
+#define __encls_ret(rax, rbx, rcx, rdx)                                        \
+	({                                                                     \
+		int ret;                                                       \
+		asm volatile("1: .byte 0x0f, 0x01, 0xcf;\n\t"                  \
+			     : "=a"(ret)                                       \
+			     : "a"(rax), "b"(rbx), "c"(rcx), "d"(rdx));        \
+		ret;                                                           \
 	})
 
-#define __encls(rax, rbx, rcx, rdx...)			\
-	({						\
-	int ret;					\
-	asm volatile(					\
-	"1: .byte 0x0f, 0x01, 0xcf;\n\t"		\
-	"   xor %%rax,%%rax\n"				\
-	"2:\n"						\
-	".section .fixup,\"ax\"\n"			\
-	"3: mov $-14,%%rax\n"				\
-	"   jmp 2b\n"					\
-	".previous\n"					\
-	_ASM_EXTABLE(1b, 3b)				\
-	: "=a"(ret), "=b"(rbx), "=c"(rcx)		\
-	: "a"(rax), "b"(rbx), "c"(rcx), rdx		\
-	: "memory");					\
-	ret;						\
+#define __encls(rax, rbx, rcx, rdx...)                                         \
+	({                                                                     \
+		int ret;                                                       \
+		asm volatile("1: .byte 0x0f, 0x01, 0xcf;\n\t"                  \
+			     : "=a"(ret), "=b"(rbx), "=c"(rcx)                 \
+			     : "a"(rax), "b"(rbx), "c"(rcx), rdx);             \
+		ret;                                                           \
 	})
 
 #define SGX_CPUID 0x12
 
 enum sgx_cpuid {
-	SGX_CPUID_CAPABILITIES	= 0,
-	SGX_CPUID_ATTRIBUTES	= 1,
-	SGX_CPUID_EPC_BANKS	= 2,
+	SGX_CPUID_CAPABILITIES = 0,
+	SGX_CPUID_ATTRIBUTES = 1,
+	SGX_CPUID_EPC_BANKS = 2,
 };
 
 enum sgx_commands {
-	ECREATE	= 0x0,
-	EADD	= 0x1,
-	EINIT	= 0x2,
-	EREMOVE	= 0x3,
-	EDGBRD	= 0x4,
-	EDGBWR	= 0x5,
-	EEXTEND	= 0x6,
-	ELDU	= 0x8,
-	EBLOCK	= 0x9,
-	EPA	= 0xA,
-	EWB	= 0xB,
-	ETRACK	= 0xC,
-	EAUG	= 0xD,
-	EMODPR	= 0xE,
-	EMODT	= 0xF,
+	ECREATE = 0x0,
+	EADD = 0x1,
+	EINIT = 0x2,
+	EREMOVE = 0x3,
+	EDGBRD = 0x4,
+	EDGBWR = 0x5,
+	EEXTEND = 0x6,
+	ELDU = 0x8,
+	EBLOCK = 0x9,
+	EPA = 0xA,
+	EWB = 0xB,
+	ETRACK = 0xC,
+	EAUG = 0xD,
+	EMODPR = 0xE,
+	EMODT = 0xF,
 };
+
+static inline unsigned long __ecreate(struct sgx_pageinfo *pginfo, void *secs)
+{
+	return __encls(ECREATE, pginfo, secs, "d"(0));
+}
+
+static inline int __eextend(void *secs, void *epc)
+{
+	return __encls(EEXTEND, secs, epc, "d"(0));
+}
+
+static inline int __eadd(struct sgx_pageinfo *pginfo, void *epc)
+{
+	return __encls(EADD, pginfo, epc, "d"(0));
+}
+
+static inline int __einit(void *sigstruct, struct sgx_einittoken *einittoken,
+			  void *secs)
+{
+	return __encls_ret(EINIT, sigstruct, secs, einittoken);
+}
+
+static inline int __epa(void *epc)
+{
+	unsigned long rbx = SGX_PAGE_TYPE_VA;
+
+	return __encls(EPA, rbx, epc, "d"(0));
+}
+
+static inline int __eldu(unsigned long rbx, unsigned long rcx,
+			 unsigned long rdx)
+{
+	return __encls_ret(ELDU, rbx, rcx, rdx);
+}
+
+static inline int __eremove(void *epc)
+{
+	unsigned long rbx = 0;
+	unsigned long rdx = 0;
+
+	return __encls_ret(EREMOVE, rbx, epc, rdx);
+}
 
 static inline unsigned long get_cpl(void)
 {

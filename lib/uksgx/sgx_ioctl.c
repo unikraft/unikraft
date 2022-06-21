@@ -1,5 +1,6 @@
 #include <uk/sgx_user.h>
 #include <uk/sgx_internal.h>
+#include <uk/sgx_asm.h>
 #include <uk/print.h>
 #include <errno.h>
 
