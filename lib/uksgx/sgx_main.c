@@ -118,6 +118,7 @@ int sgx_init()
 
 	// sgx_epc_bank.va = pa;
 	sgx_epc_bank.va = x86_directmap_paddr_to_vaddr(pa);
+	uk_pr_info("EPC virtual address range: 0x%lx-0x%lx", sgx_epc_bank.va, sgx_epc_bank.va + size);
 	ret = sgx_add_epc_bank(sgx_epc_bank.pa, sgx_epc_bank.size, 0);
 
 	if (ret) {
