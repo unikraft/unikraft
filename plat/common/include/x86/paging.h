@@ -87,6 +87,10 @@ pgarch_pte_create(__paddr_t paddr, unsigned long attr, unsigned int level,
 	pte = paddr & X86_PTE_PADDR_MASK;
 	pte |= X86_PTE_PRESENT;
 
+#ifdef CONFIG_KVM_RING3
+	pte |= X86_PTE_US;
+#endif
+
 	if (level > PAGE_LEVEL) {
 		UK_ASSERT(level <= PAGE_HUGE_LEVEL);
 		pte |= X86_PTE_PSE;
@@ -167,6 +171,10 @@ pgarch_pt_pte_create(struct uk_pagetable *pt __unused, __paddr_t pt_paddr,
 	 * protections in the PTEs mapping pages only
 	 */
 	pt_pte |= (X86_PTE_PRESENT | X86_PTE_RW);
+	
+#ifdef CONFIG_KVM_RING3
+	pt_pte |= X86_PTE_US;
+#endif
 
 	/* Take all other bits from template. We also keep the flags that are
 	 * ignored by the architecture. The caller might have stored custom
