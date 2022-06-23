@@ -47,6 +47,7 @@
 #include <uk/sgx_cpu.h>
 
 #define SGX_VA_SLOT_COUNT 512
+#define SGX_PAGE_SIZE 4096
 
 extern __spinlock sgx_free_list_lock;
 
@@ -54,6 +55,7 @@ struct sgx_epc_bank {
 	unsigned long pa;
 	unsigned long va;
 	unsigned long size;
+	unsigned long npages;
 };
 
 struct sgx_epc_page {

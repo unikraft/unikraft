@@ -34,6 +34,8 @@
 #include <uk/sgx_internal.h>
 #include <uk/print.h>
 #include <vfscore/uio.h>
+#define __PLAT_CMN_ARCH_PAGING_H__
+#include <x86/paging.h>
 
 #include <stdbool.h>
 
@@ -42,8 +44,8 @@
 #define SGX_MAX_EPC_BANKS                                                      \
 	8 /* support up to 8 EPC banks according to Intel SGX                  \
 	   OOT-drvier 2.5 */
-struct sgx_epc_bank sgx_epc_banks[SGX_MAX_EPC_BANKS];
-int sgx_nr_epc_banks;
+struct sgx_epc_bank sgx_epc_bank;
+int sgx_nr_epc_banks = 1;
 __u64 sgx_encl_size_max_64;
 bool sgx_has_sgx2;
 
@@ -66,7 +68,7 @@ int sgx_init()
 	unsigned int info[4] = {0, 0, 0, 0};
 	unsigned int *eax, *ebx, *ecx, *edx;
 	unsigned long pa, size;
-	int i, ret;
+	int ret;
 
 	eax = &info[0];
 	ebx = &info[1];
@@ -77,26 +79,30 @@ int sgx_init()
 
 	sgx_encl_size_max_64 = 1ULL << ((*edx >> 8) & 0xFF);
 
-	/* initialize EPC banks */
+	/* initialize EPC bank (currently support only 1 EPC bank) */
 
-	for (i = 0; i < SGX_MAX_EPC_BANKS; i++) {
-		__cpuid_count(info, SGX_CPUID, i + SGX_CPUID_EPC_BANKS);
-		if (!(*eax & 0xf))
-			break;
-
-		pa = ((__u64)(*ebx & 0xfffff) << 32)
-		     + (__u64)(*eax & 0xfffff000);
-		size = ((__u64)(*edx & 0xfffff) << 32)
-		       + (__u64)(*ecx & 0xfffff000);
-
-		uk_pr_info("EPC section: 0x%lx-0x%lx (%ldMB)\n", pa, pa + size,
-			   size / 1024 / 1024);
-
-		sgx_epc_banks[i].pa = pa;
-		sgx_epc_banks[i].size = size;
+	__cpuid_count(info, SGX_CPUID, SGX_CPUID_EPC_BANKS);
+	if (!(*eax & 0xf)) { /* no EPC bank */
+		uk_pr_err("No EPC bank found\n");
+		goto out_epc_err;
 	}
 
-	sgx_nr_epc_banks = i;
+	pa = ((__u64)(*ebx & 0xfffff) << 32) + (__u64)(*eax & 0xfffff000);
+	size = ((__u64)(*edx & 0xfffff) << 32) + (__u64)(*ecx & 0xfffff000);
+
+	if (pa == 0 || size == 0) {
+		uk_pr_err(
+		    "EPC data is incorrect: pa=0x%lx, size=0x%lx (%ldMB)\n", pa,
+		    size, size / 1024 / 1024);
+		goto out_epc_err;
+	}
+
+	uk_pr_info("EPC section: 0x%lx-0x%lx (%ldMB)\n", pa, pa + size,
+		   size / 1024 / 1024);
+
+	sgx_epc_bank.pa = pa;
+	sgx_epc_bank.size = size;
+	sgx_epc_bank.npages = size / SGX_PAGE_SIZE;
 
 	/* initialize sgx_free_list_lock */
 	ukarch_spin_init(&sgx_free_list_lock);
@@ -109,15 +115,14 @@ int sgx_init()
 	 * conditions here, like: #ifdef CONFIG_PAGING code to handle PA-VA
 	 * mapping... #else code for PA only... #endif
 	 */
-	for (i = 0; i < sgx_nr_epc_banks; i++) {
-		sgx_epc_banks[i].va = pa;
-		ret = sgx_add_epc_bank(sgx_epc_banks[i].pa,
-				       sgx_epc_banks[i].size, i);
 
-		if (ret) {
-			sgx_nr_epc_banks = i + 1;
-			goto out_iounmap;
-		}
+	// sgx_epc_bank.va = pa;
+	sgx_epc_bank.va = x86_directmap_paddr_to_vaddr(pa);
+	ret = sgx_add_epc_bank(sgx_epc_bank.pa, sgx_epc_bank.size, 0);
+
+	if (ret) {
+		sgx_nr_epc_banks = 0;
+		goto out_iounmap;
 	}
 
 	ret = sgx_page_cache_init();
@@ -151,8 +156,10 @@ int sgx_init()
 
 out_iounmap:
 	uk_pr_err("dummy iounmap\n");
-
 	return ret;
+
+out_epc_err:
+	return -EINVAL;
 }
 
 int sgx_probe()
