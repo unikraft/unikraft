@@ -34,8 +34,7 @@
 #include <uk/sgx_internal.h>
 #include <uk/print.h>
 #include <vfscore/uio.h>
-#define __PLAT_CMN_ARCH_PAGING_H__
-#include <x86/paging.h>
+#include <uk/plat/paging.h>
 
 #include <stdbool.h>
 
@@ -48,6 +47,7 @@ struct sgx_epc_bank sgx_epc_bank;
 int sgx_nr_epc_banks = 1;
 __u64 sgx_encl_size_max_64;
 bool sgx_has_sgx2;
+struct uk_pagetable *kernel_pt;
 
 static int sgx_reset_pubkey_hash()
 {
@@ -108,17 +108,19 @@ int sgx_init()
 	ukarch_spin_init(&sgx_free_list_lock);
 
 	/*
-	 * set virtual address the same as the physical address
-	 * TODO: linux-sgx-driver uses ioremap() to map the physical address to
-	 * virtual address, but in Unikraft, Virtual Memory API is a optional
-	 * feature in Platform Interface Options, hence, we need to add two
-	 * conditions here, like: #ifdef CONFIG_PAGING code to handle PA-VA
-	 * mapping... #else code for PA only... #endif
+	 * Map the EPC section PA to non-occupied legal VA using the following 
+	 * SGX_VA_OFFSET. This is a temporary solution as the ability of 
+	 * retriving available VA ranges is under implementation.
 	 */
-
-	// sgx_epc_bank.va = pa;
-	sgx_epc_bank.va = x86_directmap_paddr_to_vaddr(pa);
+	#define SGX_VA_OFFSET 0x7ff000000000
+	sgx_epc_bank.va = sgx_epc_bank.pa | SGX_VA_OFFSET;
+	ret = ukplat_page_map(ukplat_pt_get_active(), pa | SGX_VA_OFFSET, pa, sgx_epc_bank.npages, PAGE_ATTR_PROT_RW , NULL );
 	uk_pr_info("EPC virtual address range: 0x%lx-0x%lx", sgx_epc_bank.va, sgx_epc_bank.va + size);
+	
+	if (ret) {
+		goto out_page_map;
+	}
+
 	ret = sgx_add_epc_bank(sgx_epc_bank.pa, sgx_epc_bank.size, 0);
 
 	if (ret) {
@@ -160,6 +162,16 @@ out_iounmap:
 	return ret;
 
 out_epc_err:
+	return -EINVAL;
+
+out_page_map:
+	if (ret == -EEXIST) {
+		uk_pr_err("there is already a larger page mapped at address 0x%lx\n",
+			  sgx_epc_bank.va);
+	}
+	else {
+		uk_pr_err("ukplat_page_map() failed with return value %d\n", ret);
+	}
 	return -EINVAL;
 }
 
