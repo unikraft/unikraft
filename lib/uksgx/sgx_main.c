@@ -114,7 +114,8 @@ int sgx_init()
 	 */
 	#define SGX_VA_OFFSET 0x7ff000000000
 	sgx_epc_bank.va = sgx_epc_bank.pa | SGX_VA_OFFSET;
-	ret = ukplat_page_map(ukplat_pt_get_active(), pa | SGX_VA_OFFSET, pa, sgx_epc_bank.npages, PAGE_ATTR_PROT_RW , NULL );
+	ret = ukplat_page_map(ukplat_pt_get_active(), sgx_epc_bank.va, pa, sgx_epc_bank.npages, 
+	PAGE_ATTR_PROT_RW , PAGE_FLAG_FORCE_SIZE | PAGE_FLAG_SIZE(PAGE_LEVEL)); /* enforce 4K page size */
 	uk_pr_info("EPC virtual address range: 0x%lx-0x%lx", sgx_epc_bank.va, sgx_epc_bank.va + size);
 	
 	if (ret) {
