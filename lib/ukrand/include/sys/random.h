@@ -42,7 +42,7 @@ extern "C" {
 #define GRND_RANDOM       0x02
 
 ssize_t getrandom(void *buf, size_t buflen, unsigned int flags);
-
+__u32 uk_get_estimated_entropy();
 #ifdef __cplusplus
 }
 #endif

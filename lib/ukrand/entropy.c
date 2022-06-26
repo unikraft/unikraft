@@ -34,7 +34,6 @@ struct uk_entropy_store {
 	__u16 add_ptr;
 	__u16 input_rotate;
 	__u32 entropy_count;
-	__u32 entropy_total;
 	__u32 initialized:1;
 	__u32 last_data_init:1;
 	__u8 last_data[EXTRACT_SIZE];
@@ -132,7 +131,7 @@ static struct uk_entropy_store input_pool = {
 };
 
 
-static __u8 _uk_get_hw_entropy(__u32* data, __u32 len) {
+static __u32 _uk_get_hw_entropy(__u32* data, __u32 len) {
 	__u8 (*func)(__u32*);
 	__u8 entropy_count = 0, ret;
 
@@ -141,7 +140,7 @@ static __u8 _uk_get_hw_entropy(__u32* data, __u32 len) {
 	} else if (is_RDRAND_available()) {
 		func = &uk_hwrand_rdrand;
 	} else {
-		return entropy_count;
+		return 0;
 	}
 
 	for (ssize_t i = 0; i < len; i++) {
@@ -153,7 +152,7 @@ static __u8 _uk_get_hw_entropy(__u32* data, __u32 len) {
 }
 
 
-static void _mix_pool_bytes(struct uk_entropy_store *r, const void *in,
+static void _uk_mix_pool_bytes(struct uk_entropy_store *r, const void *in,
 			    int nbytes)
 {
 	__u32 i, tap1, tap2, tap3, tap4, tap5;
@@ -312,7 +311,6 @@ static void _uk_credit_entropy_bits(struct uk_entropy_store *r, __u8 nbits)
  * This function does the actual extraction for extract_entropy and
  * extract_entropy_user.
  *
- * Note: we assume that .poolwords is a multiple of 16 words.
  */
 static void __uk_extract_buf(struct uk_entropy_store *r, __u8 *out)
 {
@@ -351,7 +349,7 @@ static void __uk_extract_buf(struct uk_entropy_store *r, __u8 *out)
 	 * brute-forcing the feedback as hard as brute-forcing the
 	 * hash.
 	 */
-	_mix_pool_bytes(r, hash_output, sizeof(__u32) * INPUT_POOL_OUTPUT_HASH_SIZE);
+	_uk_mix_pool_bytes(r, hash_output, sizeof(__u32) * INPUT_POOL_OUTPUT_HASH_SIZE);
 	ukplat_spin_unlock_irqrestore(&r->spinlock, flags);
 
 	memset(hash_input, 0, sizeof(__u32) * INPUT_POOL_WORDS);
@@ -371,7 +369,7 @@ static void __uk_extract_buf(struct uk_entropy_store *r, __u8 *out)
 }
 
 
-static size_t _extract_entropy(struct uk_entropy_store *r, void *buf,
+static size_t _uk_extract_entropy(struct uk_entropy_store *r, void *buf,
 				size_t nbytes)
 {
 	size_t ret = 0, size;
@@ -462,7 +460,6 @@ static __u64 _uk_get_reg(struct uk_fast_pool *f_pool, struct __regs *regs) {
     f_pool->reg_index = index;
 
     return *ptr;
-
 }
 
 void uk_add_interrupt_randomness(int irq) {
@@ -473,7 +470,6 @@ void uk_add_interrupt_randomness(int irq) {
     __u32 reg_high, startup_high;
 	__u32 hw_entropy, ret = 0;
 	__u8 credit = 0;
-
 
 	if (!input_pool.initialized) {
 		return;
@@ -503,25 +499,16 @@ void uk_add_interrupt_randomness(int irq) {
 	 * If we have architectural seed generator, produce a seed and
 	 * add it to the pool.
 	 */
-	if (is_RDSEED_available()) {
-		ret = uk_hwrand_rdseed(&hw_entropy);
-	}
-
-	if (ret == 0) {
-		if (is_RDRAND_available()) {
-			ret = uk_hwrand_rdrand(&hw_entropy);
-		}
-	}
-	
+	ret = _uk_get_hw_entropy(&hw_entropy, 1);
 	if (ret){
-		credit += sizeof(__u32);
-		_mix_pool_bytes(&input_pool, &hw_entropy, sizeof(__u32));
+		credit += 1;
+		_uk_mix_pool_bytes(&input_pool, &hw_entropy, sizeof(__u32));
 	}
 
 	/*
 	 * Add fast pool entropy to the input pool
 	 */
-	_mix_pool_bytes(&input_pool, fast_pool.pool, sizeof(fast_pool.pool));
+	_uk_mix_pool_bytes(&input_pool, fast_pool.pool, sizeof(fast_pool.pool));
 	credit += sizeof(fast_pool.pool);
 
 	fast_pool.count = 0;
@@ -541,7 +528,7 @@ static void _uk_add_timer_randomness(struct uk_timer_rand_state *state, __u32 va
 
 	sample.timestamp = ukplat_monotonic_clock();
 	sample.value = value;
-	_mix_pool_bytes(&input_pool, &sample, sizeof(sample));
+	_uk_mix_pool_bytes(&input_pool, &sample, sizeof(sample));
 
 	delta = sample.timestamp - state->last_time;
 	state->last_time = sample.timestamp;
@@ -586,7 +573,11 @@ void uk_add_network_randomness(__u32 value) {
 
 size_t uk_entropy_generate_bytes(void *buf, size_t buflen)
 {
-	return _extract_entropy(&input_pool, buf, buflen);
+	return _uk_extract_entropy(&input_pool, buf, buflen);
+}
+
+__u32 uk_entropy_get_estimated_entropy() {
+	return input_pool.entropy_count;
 }
 
 
@@ -598,8 +589,9 @@ int uk_entropy_init(void) {
 	entropy_count = _uk_get_hw_entropy(initial_entropy, INIT_ENTROPY_SIZE);
 	ukarch_spin_init(&input_pool.spinlock);
 
-	_mix_pool_bytes(&input_pool, &initial_entropy, entropy_count);
-	_uk_credit_entropy_bits(&input_pool, entropy_count * sizeof(__u32));
+	_uk_mix_pool_bytes(&input_pool, &initial_entropy, entropy_count);
+	_uk_credit_entropy_bits(&input_pool, entropy_count);
+
 
 	return 0;
 }

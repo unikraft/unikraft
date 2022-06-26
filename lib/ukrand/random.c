@@ -34,6 +34,7 @@
 #include <uk/essentials.h>
 #include <uk/swrand.h>
 #include <uk/hwrand.h>
+#include <uk/entropy.h>
 
 static int _uk_random_generator_init() {
 	int ret;
@@ -56,6 +57,16 @@ exit:
 
 }
 
+__u32 uk_get_estimated_entropy(void) {
+	#ifdef CONFIG_LIBUKRAND_HARDWARE_RANDOMNESS
+		return uk_entropy_get_estimated_entropy();
+	#endif
+
+	#ifdef CONFIG_LIBUKRAND_SOFTWARE_RANDOMNESS
+		return 0;
+	#endif	
+}
+
 UK_SYSCALL_R_DEFINE(ssize_t, getrandom,
 		    void *, buf, size_t, buflen,
 		    unsigned int, flags)
@@ -63,11 +74,15 @@ UK_SYSCALL_R_DEFINE(ssize_t, getrandom,
 	size_t offset = 0;
 	#ifdef CONFIG_LIBUKRAND_HARDWARE_RANDOMNESS
 		offset = uk_hwrand_generate_bytes(buf, buflen);
+		uk_pr_crit("HARDWARE = %lu\n", offset);
+
 	#endif
 
 	#ifdef CONFIG_LIBUKRAND_SOFTWARE_RANDOMNESS
 		if(offset < buflen) {
 			offset += uk_swrand_generate_bytes(buf + offset, buflen - offset);
+			uk_pr_crit("SOFTWARE = %lu\n", offset);
+
 		}
 	#endif
 

@@ -19,7 +19,6 @@
 		} while (0)
 
 #define is_cached(field) (field & CPUID_CACHE_VALID)
-
 #define get_value(field) (field & CPUID_CACHE_VALUE)
 
 #define set_cache(cache_field, value) \
@@ -261,7 +260,6 @@ __u8 is_RDRAND_available(void) {
 	if (is_cached(cache.is_RDRAND_available)) {
 		goto return_RDRAND;
 	}
-
 	if (!(is_INTEL() || is_AMD())) {
 		return 0;
 	}
@@ -312,4 +310,4 @@ static int init_cpuid(void)
 
 	return 0;
 }
-uk_rootfs_initcall_prio(init_cpuid, 3);
+uk_lib_initcall(init_cpuid);
