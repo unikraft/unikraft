@@ -53,6 +53,46 @@ extern "C" {
  * Source: https://github.com/9fans/plan9port/blob/master/include/fcall.h
  */
 enum uk_9p_type {
+	UK_9P_TLERROR = 6,
+	UK_9P_RLERROR,
+	UK_9P_TSTATFS = 8,
+	UK_9P_RSTATFS,
+	UK_9P_TLOPEN = 12,
+	UK_9P_RLOPEN,
+	UK_9P_TLCREATE = 14,
+	UK_9P_RLCREATE,
+	UK_9P_TSYMLINK = 16,
+	UK_9P_RSYMLINK,
+	UK_9P_TMKNOD = 18,
+	UK_9P_RMKNOD,
+	UK_9P_TRENAME = 20,
+	UK_9P_RRENAME,
+	UK_9P_TREADLINK = 22,
+	UK_9P_RREADLINK,
+	UK_9P_TGETATTR = 24,
+	UK_9P_RGETATTR,
+	UK_9P_TSETATTR = 26,
+	UK_9P_RSETATTR,
+	UK_9P_TXATTRWALK = 30,
+	UK_9P_RXATTRWALK,
+	UK_9P_TXATTRCREATE = 32,
+	UK_9P_RXATTRCREATE,
+	UK_9P_TREADDIR = 40,
+	UK_9P_RREADDIR,
+	UK_9P_TFSYNC = 50,
+	UK_9P_RFSYNC,
+	UK_9P_TLOCK = 52,
+	UK_9P_RLOCK,
+	UK_9P_TGETLOCK = 54,
+	UK_9P_RGETLOCK,
+	UK_9P_TLINK = 70,
+	UK_9P_RLINK,
+	UK_9P_TMKDIR = 72,
+	UK_9P_RMKDIR,
+	UK_9P_TRENAMEAT = 74,
+	UK_9P_RRENAMEAT,
+	UK_9P_TUNLINKAT = 76,
+	UK_9P_RUNLINKAT,
 	UK_9P_TVERSION          = 100,
 	UK_9P_RVERSION,
 	UK_9P_TAUTH             = 102,
@@ -135,6 +175,35 @@ enum uk_9p_type {
 #define UK_9P_OAPPEND             0x80
 #define UK_9P_OEXCL               0x1000
 
+#define UK_9P_GETATTR_MODE        0x00000001
+#define UK_9P_GETATTR_NLINK       0x00000002
+#define UK_9P_GETATTR_UID         0x00000004
+#define UK_9P_GETATTR_GID         0x00000008
+#define UK_9P_GETATTR_RDEV        0x00000010
+#define UK_9P_GETATTR_ATIME       0x00000020
+#define UK_9P_GETATTR_MTIME       0x00000040
+#define UK_9P_GETATTR_CTIME       0x00000080
+#define UK_9P_GETATTR_INO         0x00000100
+#define UK_9P_GETATTR_SIZE        0x00000200
+#define UK_9P_GETATTR_BLOCKS      0x00000400
+
+#define UK_9P_GETATTR_BTIME        0x00000800
+#define UK_9P_GETATTR_GEN          0x00001000
+#define UK_9P_GETATTR_DATA_VERSION 0x00002000
+
+#define UK_9P_GETATTR_BASIC       0x000007ff /* Mask for fields up to BLOCKS */
+#define UK_9P_GETATTR_ALL         0x00003fff /* Mask for All fields above */
+
+#define UK_9P_SETATTR_MODE        0x00000001UL
+#define UK_9P_SETATTR_UID         0x00000002UL
+#define UK_9P_SETATTR_GID         0x00000004UL
+#define UK_9P_SETATTR_SIZE        0x00000008UL
+#define UK_9P_SETATTR_ATIME       0x00000010UL
+#define UK_9P_SETATTR_MTIME       0x00000020UL
+#define UK_9P_SETATTR_CTIME       0x00000040UL
+#define UK_9P_SETATTR_ATIME_SET   0x00000080UL
+#define UK_9P_SETATTR_MTIME_SET   0x00000100UL
+
 /**
  * 9P qid.
  *
@@ -210,6 +279,32 @@ struct uk_9p_stat {
 	uint32_t                n_uid;
 	uint32_t                n_gid;
 	uint32_t                n_muid;
+};
+
+/**
+ * 9P2000.L stat structure.
+ */
+struct uk_9p_attr {
+	uint64_t				valid;
+	struct uk_9p_qid		qid;
+	uint32_t				mode;
+	uint32_t				uid;
+	uint32_t				gid;
+	uint64_t				nlink;
+	uint64_t				rdev;
+	uint64_t				size;
+	uint64_t				blksize;
+	uint64_t				blocks;
+	uint64_t				atime_sec;
+	uint64_t				atime_nsec;
+	uint64_t				mtime_sec;
+	uint64_t				mtime_nsec;
+	uint64_t				ctime_sec;
+	uint64_t				ctime_nsec;
+	uint64_t				btime_sec;
+	uint64_t				btime_nsec;
+	uint64_t				gen;
+	uint64_t				data_version;
 };
 
 /*

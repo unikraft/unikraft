@@ -442,6 +442,51 @@ static inline int uk_9preq_readstat(struct uk_9preq *req,
 	return 0;
 }
 
+static inline int uk_9preq_readdirent(struct uk_9preq *req,
+		struct uk_9p_qid *qid, uint64_t *offset, uint8_t *type,
+		struct uk_9p_str *name)
+{
+	int rc;
+
+	if ((rc = uk_9preq_readqid(req, qid)) ||
+		(rc = uk_9preq_read64(req, offset)) ||
+		(rc = uk_9preq_read8(req, type)) ||
+		(rc = uk_9preq_readstr(req, name)))
+		return rc;
+
+	return 0;
+}
+
+static inline int uk_9preq_readattr(struct uk_9preq *req,
+		struct uk_9p_attr *val)
+{
+	int rc;
+
+	if ((rc = uk_9preq_read64(req, &val->valid)) ||
+		(rc = uk_9preq_readqid(req, &val->qid)) ||
+		(rc = uk_9preq_read32(req, &val->mode)) ||
+		(rc = uk_9preq_read32(req, &val->uid)) ||
+		(rc = uk_9preq_read32(req, &val->gid)) ||
+		(rc = uk_9preq_read64(req, &val->nlink)) ||
+		(rc = uk_9preq_read64(req, &val->rdev)) ||
+		(rc = uk_9preq_read64(req, &val->size)) ||
+		(rc = uk_9preq_read64(req, &val->blksize)) ||
+		(rc = uk_9preq_read64(req, &val->blocks)) ||
+		(rc = uk_9preq_read64(req, &val->atime_sec)) ||
+		(rc = uk_9preq_read64(req, &val->atime_nsec)) ||
+		(rc = uk_9preq_read64(req, &val->mtime_sec)) ||
+		(rc = uk_9preq_read64(req, &val->mtime_nsec)) ||
+		(rc = uk_9preq_read64(req, &val->ctime_sec)) ||
+		(rc = uk_9preq_read64(req, &val->ctime_nsec)) ||
+		(rc = uk_9preq_read64(req, &val->btime_sec)) ||
+		(rc = uk_9preq_read64(req, &val->btime_nsec)) ||
+		(rc = uk_9preq_read64(req, &val->gen)) ||
+		(rc = uk_9preq_read64(req, &val->data_version)))
+		return rc;
+
+	return 0;
+}
+
 #ifdef __cplusplus
 }
 #endif
