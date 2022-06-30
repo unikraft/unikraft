@@ -44,6 +44,7 @@
  */
 enum uk_9pfs_proto {
 	UK_9P_PROTO_2000U,
+	UK_9P_PROTO_2000L,
 	UK_9P_PROTO_MAX
 };
 

@@ -206,7 +206,7 @@ int uk_9preq_error(struct uk_9preq *req)
 
 	if (UK_READ_ONCE(req->state) != UK_9PREQ_RECEIVED)
 		return -EIO;
-	if (req->recv.type != UK_9P_RERROR)
+	if (req->recv.type != UK_9P_RERROR && req->recv.type != UK_9P_RLERROR)
 		return 0;
 
 	/*
@@ -215,11 +215,18 @@ int uk_9preq_error(struct uk_9preq *req)
 	 */
 	UK_BUGON(req->recv.offset != UK_9P_HEADER_SIZE);
 
-	if ((rc = uk_9preq_readstr(req, &error)) < 0 ||
-		(rc = uk_9preq_read32(req, &errcode)) < 0)
+	if (req->recv.type == UK_9P_RERROR &&
+		(rc = uk_9preq_readstr(req, &error)) < 0)
 		return rc;
 
-	uk_pr_debug("RERROR %.*s %d\n", error.size, error.data, errcode);
+	if ((rc = uk_9preq_read32(req, &errcode)) < 0)
+		return rc;
+
+	if (req->recv.type == UK_9P_RERROR)
+		uk_pr_debug("RERROR %.*s %d\n", error.size, error.data,
+				errcode);
+	else
+		uk_pr_debug("RLERROR %d\n", errcode);
 	if (errcode == 0 || errcode >= 512)
 		return -EIO;
 

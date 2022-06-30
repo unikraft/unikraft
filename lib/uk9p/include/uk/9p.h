@@ -130,6 +130,21 @@ struct uk_9pfid *uk_9p_walk(struct uk_9pdev *dev, struct uk_9pfid *fid,
 int uk_9p_open(struct uk_9pdev *dev, struct uk_9pfid *fid, uint32_t mode);
 
 /**
+ * Opens the fid, using Linux open flags. (9P2000.L only)
+ *
+ * @param dev
+ *   The Unikraft 9P Device.
+ * @param fid
+ *   9P fid.
+ * @param flags
+ *   Linux open(2) flags.
+ * @return
+ *   - 0: Successful.
+ *   - (< 0): An error occurred.
+ */
+int uk_9p_lopen(struct uk_9pdev *dev, struct uk_9pfid *fid, uint32_t flags);
+
+/**
  * Creates a new file with the given name in the directory associated with fid,
  * and associates fid with the newly created file, opening it with the given
  * mode.
@@ -153,6 +168,30 @@ int uk_9p_open(struct uk_9pdev *dev, struct uk_9pfid *fid, uint32_t mode);
 int uk_9p_create(struct uk_9pdev *dev, struct uk_9pfid *fid,
 		const char *name, uint32_t perm, uint32_t mode,
 		const char *extension);
+
+/**
+ * Creates a new file with the given name in the directory associated with fid,
+ * and associates fid with the newly created file, opening it with the given
+ * mode. (9P2000.L only)
+ *
+ * @param dev
+ *   The Unikraft 9P Device.
+ * @param fid
+ *   9P directory fid.
+ * @param name
+ *   Name of the created file.
+ * @param flags
+ *   Flags passed to open(2) along with O_CREAT.
+ * @param mode
+ *   Linux open mode.
+ * @param gid
+ *   Effective GID of caller.
+ * @return
+ *   - 0: Successful.
+ *   - (< 0): An error occurred.
+ */
+int uk_9p_lcreate(struct uk_9pdev *dev, struct uk_9pfid *fid,
+		const char *name, uint32_t flags, uint32_t mode, uint32_t gid);
 
 /**
  * Removes the file associated with fid.
@@ -255,6 +294,189 @@ struct uk_9preq *uk_9p_stat(struct uk_9pdev *dev, struct uk_9pfid *fid,
  */
 int uk_9p_wstat(struct uk_9pdev *dev, struct uk_9pfid *fid,
 		struct uk_9p_stat *stat);
+
+/**
+ * Synchronizes the given fid with the underlying device. (9P2000.L only)
+ *
+ * @param dev
+ *   The Unikraft 9P Device.
+ * @param fid
+ *   9P fid to synchronize.
+ * @return
+ *   - 0: Successful.
+ *   - (< 0): An error occurred.
+ */
+int uk_9p_fsync(struct uk_9pdev *dev, struct uk_9pfid *fid);
+
+/**
+ * Reads a directory. (9P2000.L only)
+ *
+ * @param dev
+ *   The Unikraft 9P Device.
+ * @param fid
+ *   9P fid of directory to read.
+ * @param offset
+ *   Zero, or offset returned from last call to readdir.
+ * @param count
+ *   Maximum number of bytes to write.
+ * @param buf
+ *   Data to be written.
+ * @return
+ *   - (>= 0): Amount of bytes read.
+ *   - (< 0): An error occurred.
+ */
+int64_t uk_9p_readdir(struct uk_9pdev *dev, struct uk_9pfid *fid,
+		uint64_t offset, uint32_t count, char *buf);
+
+/**
+ * Gets file attributes. (9P2000.L only)
+ *
+ * @param dev
+ *   The Unikraft 9P Device.
+ * @param fid
+ *   9P fid of target file.
+ * @param request_mask
+ *   Bitmask of P9_GETATTR_* values.
+ * @param stat
+ *   Pointer to output stat structure buffer.
+ * @return
+ *   - (!ERRPTR): The request. It must be removed only after all accesses to
+ *   the strings in the stat structure are over.
+ *   - ERRPTR: The error returned either by the API or by the remote server.
+ */
+struct uk_9preq *uk_9p_getattr(struct uk_9pdev *dev, struct uk_9pfid *fid,
+		uint64_t request_mask, struct uk_9p_attr *stat);
+
+/**
+ * Sets file attributes. (9P2000.L only)
+ *
+ * @param dev
+ *   The Unikraft 9P Device.
+ * @param fid
+ *   9P fid of target file.
+ * @param valid
+ *   Bitmask of P9_GETATTR_* values corresponding to attributes
+ *   that need to be set.
+ * @param mode
+ *   Mode of the target file (requires P9_SETATTR_MODE).
+ * @param uid
+ *   UID of the target file (requires P9_SETATTR_UID).
+ * @param gid
+ *   GID of the target file (requires P9_SETATTR_GID).
+ * @param size
+ *   Size of the target file for truncation (requires P9_SETATTR_SIZE).
+ * @param atime_sec
+ *   Access time of target file, seconds part
+ *   (requires P9_SETATTR_ATIME_SET).
+ * @param atime_nsec
+ *   Access time of target file, nanoseconds part.
+ * @param mtime_sec
+ *   Modification time of target file, seconds part
+ *   (requires P9_SETATTR_MTIME_SET).
+ * @param mtime_nsec
+ *   Modification time of target file, nanoseconds part.
+ * @return
+ *   - 0: Successful.
+ *   - (< 0): An error occurred.
+ */
+int uk_9p_setattr(struct uk_9pdev *dev, struct uk_9pfid *fid,
+		uint32_t valid, uint32_t mode, uint32_t uid, uint32_t gid,
+		uint64_t size, uint64_t atime_sec, uint64_t atime_nsec,
+		uint64_t mtime_sec, uint64_t mtime_nsec);
+
+/**
+ * Renames a file. (9P2000.L only)
+ *
+ * @param dev
+ *   The Unikraft 9P Device.
+ * @param olddfid
+ *   9P fid of directory containing target file.
+ * @param oldname
+ *   Name of file to be renamed.
+ * @param newdfid
+ *   9P fid of directory to move the target file to.
+ * @param newname
+ *   New name of the target file.
+ * @return
+ *   - 0: Successful.
+ *   - (< 0): An error occurred.
+ */
+int uk_9p_renameat(struct uk_9pdev *dev, struct uk_9pfid *olddfid,
+		const char *oldname, struct uk_9pfid *newdfid,
+		const char *newname);
+
+/**
+ * Renames a file. (9P2000.L only)
+ *
+ * @param dev
+ *   The Unikraft 9P Device.
+ * @param fid
+ *   9P fid of target file.
+ * @param dfid
+ *   9P fid of directory to move the target file to.
+ * @param name
+ *   New name of the target file.
+ * @return
+ *   - 0: Successful.
+ *   - (< 0): An error occurred.
+ */
+int uk_9p_rename(struct uk_9pdev *dev, struct uk_9pfid *fid,
+		struct uk_9pfid *dfid, const char *name);
+
+/**
+ * Creates a hard link. (9P2000.L only)
+ *
+ * @param dev
+ *   The Unikraft 9P Device.
+ * @param dfid
+ *   9P fid of directory to create the link in.
+ * @param fid
+ *   9P fid of target file.
+ * @param name
+ *   Name of the link.
+ * @return
+ *   - 0: Successful.
+ *   - (< 0): An error occurred.
+ */
+int uk_9p_link(struct uk_9pdev *dev, struct uk_9pfid *dfid,
+		struct uk_9pfid *fid, const char *name);
+
+/**
+ * Reads a symbolic link. (9P2000.L only)
+ *
+ * @param dev
+ *   The Unikraft 9P Device.
+ * @param fid
+ *   9P fid of link to read.
+ * @param target
+ *   Received link target string.
+ * @return
+ *   - (!ERRPTR): The request. It must be removed only after all accesses to
+ *   the target link name are over.
+ *   - ERRPTR: The error returned either by the API or by the remote server.
+ */
+struct uk_9preq *uk_9p_readlink(struct uk_9pdev *dev, struct uk_9pfid *fid,
+		struct uk_9p_str *target);
+
+/**
+ * Creates a symbolic link. (9P2000.L only)
+ *
+ * @param dev
+ *   The Unikraft 9P Device.
+ * @param sfid
+ *   9P fid of directory to create the link in.
+ * @param name
+ *   Name of the link.
+ * @param symtgt
+ *   Target of the link.
+ * @param gid
+ *   Effective GID of caller
+ * @return
+ *   - (!ERRPTR): The fid of the link.
+ *   - ERRPTR: The error returned either by the API or by the remote server.
+ */
+struct uk_9pfid *uk_9p_symlink(struct uk_9pdev *dev, struct uk_9pfid *sfid,
+		const char *name, const char *symtgt, uint32_t gid);
 
 #ifdef __cplusplus
 }

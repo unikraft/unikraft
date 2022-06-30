@@ -69,7 +69,8 @@ static struct vfscore_fs_type uk_9pfs_fs = {
 UK_FS_REGISTER(uk_9pfs_fs);
 
 static const char *uk_9pfs_proto_str[UK_9P_PROTO_MAX] = {
-	[UK_9P_PROTO_2000U] = "9P2000.u"
+	[UK_9P_PROTO_2000U] = "9P2000.u",
+	[UK_9P_PROTO_2000L] = "9P2000.L"
 };
 
 static int uk_9pfs_parse_options(struct uk_9pfs_mount_data *md,
