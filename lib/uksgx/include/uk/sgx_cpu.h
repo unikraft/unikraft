@@ -102,6 +102,29 @@
 		     : "=a"(x[0]), "=b"(x[1]), "=c"(x[2]), "=d"(x[3])          \
 		     : "a"(y))
 
+static inline __u8 check_cpuid_xsave()
+{
+	unsigned int info[4] = {0, 0, 0, 0};
+	unsigned int *eax, *ebx, *ecx, *edx;
+
+	eax = &info[0];
+	ebx = &info[1];
+	ecx = &info[2];
+	edx = &info[3];
+
+	eax = 1;
+	ecx = 0;
+	__cpuid__count(info, 1, 0);
+
+#define X86_FEATURE_OSXSAVE		(1 << 27)
+	if (!(*ecx & X86_FEATURE_OSXSAVE)) {
+		uk_pr_warn("no OS xsave support!");
+		return 0;
+	}
+
+	return 1;
+}
+
 #define Genu 0x756e6547
 #define ineI 0x49656e69
 #define ntel 0x6c65746e

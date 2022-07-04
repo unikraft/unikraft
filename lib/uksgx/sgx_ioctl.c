@@ -2,6 +2,8 @@
 #include <uk/sgx_internal.h>
 #include <uk/sgx_asm.h>
 #include <uk/print.h>
+#include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 
 int sgx_get_encl(unsigned int addr, struct sgx_encl **encl)
@@ -26,17 +28,34 @@ int sgx_get_encl(unsigned int addr, struct sgx_encl **encl)
 static int sgx_ioc_enclave_create(struct device *dev, unsigned int cmd,
 				   unsigned int arg)
 {
-    // WARN_STUBBED();
-	// test switch_to_ring3
-	__u64 addr;
-	// get current rip and save it to addr
-	asm volatile(" \
-	lea 0(%%rip), %0; \
-	": "=r" (addr));
-	cpl_switch(3);
-	cpl_switch(0);
-	uk_pr_info("cpl_switch successful\n");
+	struct sgx_enclave_create *createp = (struct sgx_enclave_create *)arg;
+	void *src = (void *) createp->src;
+	struct sgx_secs *secs;
+	
+
+	unsigned long ssaframesize;
+	int ret;
+
+	/* initialize SECS */
+	secs = (struct sgx_secs *) malloc(sizeof(*secs));
+	if (!secs)
+		return -ENOMEM;
+
+	ret = memcpy((void *)secs, src, sizeof(*secs)); /* don't need to care about copy_from_user() */
+	if (ret) {
+		free(secs);
+		return ret;
+	}
+
+	/* validate SECS */
+	
+
+
+
 	return 0;
+
+err:
+	free(secs);
 }
 
 /**

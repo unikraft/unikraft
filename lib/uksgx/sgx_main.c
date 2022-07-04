@@ -47,6 +47,8 @@ struct sgx_epc_bank sgx_epc_bank;
 int sgx_nr_epc_banks = 1;
 __u64 sgx_encl_size_max_64;
 bool sgx_has_sgx2;
+__u64 sgx_xfrm_mask = 0x3;
+__u32 sgx_xsave_size_tbl[64];
 struct uk_pagetable *kernel_pt;
 
 static int sgx_reset_pubkey_hash()
@@ -69,6 +71,7 @@ int sgx_init()
 	unsigned int *eax, *ebx, *ecx, *edx;
 	unsigned long pa, size;
 	int ret;
+	int i;
 
 	eax = &info[0];
 	ebx = &info[1];
@@ -78,6 +81,17 @@ int sgx_init()
 	__cpuid_count(info, SGX_CPUID, SGX_CPUID_CAPABILITIES);
 
 	sgx_encl_size_max_64 = 1ULL << ((*edx >> 8) & 0xFF);
+
+	if (check_cpuid_xsave()) {
+		__cpuid__count(info, SGX_CPUID, SGX_CPUID_ATTRIBUTES);
+		sgx_xfrm_mask = (((__u64)*edx) << 32) + (__u64)*ecx;
+
+		for (i = 2; i < 64; i++) {
+			__cpuid_count(info, 0x0D, i);
+			if ((1 << i) & sgx_xfrm_mask)
+				sgx_xsave_size_tbl[i] = *eax + *ebx;
+		}
+	}
 
 	/* initialize EPC bank (currently support only 1 EPC bank) */
 
@@ -122,7 +136,7 @@ int sgx_init()
 		goto out_page_map;
 	}
 
-	ret = sgx_add_epc_bank(sgx_epc_bank.pa, sgx_epc_bank.size, 0);
+	ret = sgx_add_epc_bank(sgx_epc_bank.pa, sgx_epc_bank.size);
 
 	if (ret) {
 		sgx_nr_epc_banks = 0;

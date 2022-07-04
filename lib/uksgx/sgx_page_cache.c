@@ -47,7 +47,7 @@ static unsigned int sgx_nr_free_pages;
 static unsigned int sgx_nr_low_pages = SGX_NR_LOW_EPC_PAGES_DEFAULT;
 static unsigned int sgx_nr_high_pages;
 
-int sgx_add_epc_bank(__paddr_t start, unsigned long size, int bank)
+int sgx_add_epc_bank(__paddr_t start, unsigned long size)
 {
 	unsigned long i;
 	struct sgx_epc_page *new_epc_page, *entry;
@@ -57,7 +57,7 @@ int sgx_add_epc_bank(__paddr_t start, unsigned long size, int bank)
 		new_epc_page = calloc(sizeof(*new_epc_page), 1);
 		if (!new_epc_page)
 			goto err_freelist;
-		new_epc_page->pa = (start + i) | bank;
+		new_epc_page->pa = start + i;
 
 		ukarch_spin_lock(&sgx_free_list_lock);
 		uk_list_add_tail(&new_epc_page->list, &sgx_free_list);

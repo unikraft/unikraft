@@ -121,7 +121,7 @@ struct sgx_encl {
 	unsigned int shadow_epoch;
 };
 
-int sgx_add_epc_bank(__paddr_t start, unsigned long size, int bank);
+int sgx_add_epc_bank(__paddr_t start, unsigned long size);
 int sgx_page_cache_init(void);
 int sgx_ioctl(struct device *filep, unsigned long cmd, void *arg);
 int sgx_open(struct device *dev, int flags);
