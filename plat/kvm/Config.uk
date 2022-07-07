@@ -77,6 +77,23 @@ endif
 
 endmenu
 
+menu "Memory security"
+
+config LINK_ASLR
+	bool "Libraries ASLR activation"
+	default n
+	help
+		Activates the ASLR, it consists in modifying the lib addresses during linking time in order
+		to have different microlibs memory layouts.
+
+config RUNTIME_ASLR
+	bool "Heap/stack ASLR activation"
+	default n
+	select LIBUKSWRAND
+	help
+		Activates the ASLR, it consists in modifying the heap/lib addresses when booting the kernel.
+endmenu
+
 config KVM_MAX_IRQ_HANDLER_ENTRIES
        int "Maximum number of handlers per IRQ"
        default 8
