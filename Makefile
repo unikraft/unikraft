@@ -817,9 +817,18 @@ $(BUILD_DIR)/uk-gdb.py: $(SCRIPTS_DIR)/uk-gdb.py
 	$(call verbose_cmd,GEN,$(notdir $@), \
 	sed '/scripts_dir = / s/os.path.dirname(os.path.realpath(__file__))/"$(SCRIPTS_DIR_BACKSLASHED)"/g' $^ > $@)
 
+ifeq ($(CONFIG_LINK_ASLR),y)
+prepare-ASLR:
+	$(eval ASLR_BASE_ADDRESS := $(shell $(SCRIPTS_DIR)/ASLR/ASLR.py --setup_file="$(LIBKVMPLAT_BASE)/x86/entry64.S"))
+else
+prepare-ASLR:
+	$(eval ASLR_BASE_ADDRESS :=  $(shell $(SCRIPTS_DIR)/ASLR/ASLR.py --setup_file="$(LIBKVMPLAT_BASE)/x86/entry64.S" \
+		--base_addr="100000"))
+endif
+
 gdb_helpers: $(GDB_HELPER_LINKS) $(BUILD_DIR)/uk-gdb.py
 
-all: images gdb_helpers
+all: prepare-ASLR images gdb_helpers
 ################################################################################
 # Cleanup rules
 ################################################################################

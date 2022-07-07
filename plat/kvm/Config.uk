@@ -211,6 +211,23 @@ endif
 
 endmenu
 
+menu "Memory security"
+
+config LINK_ASLR
+	bool "Libraries ASLR activation"
+	default n
+	help
+		Activates the ASLR, it consists in modifying the lib addresses during linking time in order
+		to have different microlibs memory layouts.
+
+config RUNTIME_ASLR
+	bool "Heap/stack ASLR activation"
+	default n
+	select LIBUKSWRAND
+	help
+		Activates the ASLR, it consists in modifying the heap/lib addresses when booting the kernel.
+endmenu
+
 config RTC_PL031
        bool "Arm platform RTC (PL031) driver"
        default y if ARCH_ARM_64

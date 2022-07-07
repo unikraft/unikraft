@@ -46,7 +46,67 @@ KVM_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-dT$(comma),\
 			 $(UK_PLAT_KVM_DEF_LDS))
 KVM_LD_SCRIPT_FLAGS += $(addprefix -Wl$(comma)-T$(comma),\
 			$(KVM_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y))
+KVM_LD_SCRIPT_FLAGS_ASLR := $(addprefix -Wl$(comma)-dT$(comma),\
+			 $(UK_PLAT_KVM_DEF_LDS_ASLR))
+KVM_LD_SCRIPT_FLAGS_ASLR += $(addprefix -Wl$(comma)-T$(comma),\
+			$(KVM_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y))
 
+ifeq ($(CONFIG_UKPLAT_MEMRNAME),y)
+KVM_BINFO_FLAGS += -n
+endif
+
+define build_bootinfo =
+	$(call build_cmd,UKBI,,$(1).bootinfo,\
+		$(SCRIPTS_DIR)/mkbootinfo.py $(1) $(1).bootinfo $(KVM_BINFO_FLAGS) && \
+		$(OBJCOPY) $(1) --update-section .uk_bootinfo=$(1).bootinfo)
+endef
+
+ASLR_LIBS += $(foreach P,$(UK_PLATS) $(UK_PLATS-y),\
+		$(if $(call qstrip,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y)),\
+		$(foreach L,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y), \
+		$(if $(call qstrip,$($(call vprefix_lib,$(L),SRCS)) $($(call vprefix_lib,$(L),SRCS-y))), \
+		$(L) \
+		)))) \
+		$(UK_LIBS) $(UK_LIBS-y)
+
+ASLR_args += --base_addr=$(ASLR_BASE_ADDRESS) --file_path=$(UK_PLAT_KVM_DEF_LDS) \
+	--lib_list="$(ASLR_LIBS)" --output_path=$(UK_PLAT_KVM_DEF_LDS_ASLR) 
+
+ifeq (y,$(CONFIG_LINK_ASLR))
+$(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
+		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y)
+
+	$(call build_cmd,ASLR,,$@,\
+		$(SCRIPTS_DIR)/ASLR/ASLR.py \
+			$(ASLR_args))
+
+	$(call build_cmd,LD,,$(KVM_IMAGE).ld.o,\
+	       $(LD) -r $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
+			$(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
+			$(KVM_OLIBS) $(KVM_OLIBS-y) \
+			$(UK_OLIBS) $(UK_OLIBS-y) \
+			-Wl$(comma)--start-group \
+			$(KVM_ALIBS) $(KVM_ALIBS-y) \
+			$(UK_ALIBS) $(UK_ALIBS-y) \
+			$(KVM_LINK_LIBGCC_FLAG) \
+			-Wl$(comma)--end-group \
+			-o $(KVM_IMAGE).ld.o)
+			
+	$(call build_cmd,OBJCOPY,,$(KVM_IMAGE).o,\
+		$(OBJCOPY) -w -G kvmos_* -G _libkvmplat_entry \
+			$(KVM_IMAGE).ld.o $(KVM_IMAGE).o)
+	
+	$(call build_cmd,COPY,,ASLR scripts,\
+		cp $(SCRIPTS_DIR)/ASLR/relink_ELF.sh ./../; \
+		cp $(SCRIPTS_DIR)/ASLR/string_script.py ./../)
+	
+	$(call build_cmd,LD,,$@,\
+	       $(LD) $(LDFLAGS) $(LDFLAGS-y) \
+		     $(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
+		     $(KVM_LD_SCRIPT_FLAGS_ASLR)\
+		     -L$(BUILD_DIR) \
+		     -o $@)
+else
 $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) \
 		    $(KVM_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y) \
@@ -61,11 +121,13 @@ $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 			$(UK_ALIBS) $(UK_ALIBS-y) \
 			$(KVM_LINK_LIBGCC_FLAG) \
 			-Wl$(comma)--end-group \
-			$(LDFLAGS) $(LDFLAGS-y) \
-			$(KVM_LD_SCRIPT_FLAGS) \
-			-o $@)
-ifeq ($(CONFIG_OPTIMIZE_PIE),y)
-	$(call build_uk_reloc,$@)
+			-o $(KVM_IMAGE).o)
+	$(call build_cmd,LD,,$@,\
+	       $(LD) $(LDFLAGS) $(LDFLAGS-y) \
+		     $(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
+		     $(KVM_LD_SCRIPT_FLAGS) \
+		     $(KVM_IMAGE).o -o $@)
+	$(call build_bootinfo,$@)
 endif
 
 $(KVM_IMAGE): $(KVM_IMAGE).dbg
