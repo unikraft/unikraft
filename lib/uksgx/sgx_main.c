@@ -65,6 +65,29 @@ static int sgx_reset_pubkey_hash()
 	return 0;
 }
 
+static inline __u8 check_cpuid_xsave()
+{
+	unsigned int info[4] = {0, 0, 0, 0};
+	unsigned int *eax, *ebx, *ecx, *edx;
+
+	eax = &info[0];
+	ebx = &info[1];
+	ecx = &info[2];
+	edx = &info[3];
+
+	*eax = 1;
+	*ecx = 0;
+	__cpuid_count(info, 1, 0);
+
+#define X86_FEATURE_OSXSAVE		(1 << 27)
+	if (!(*ecx & X86_FEATURE_OSXSAVE)) {
+		uk_pr_warn("no OS xsave support!");
+		return 0;
+	}
+
+	return 1;
+}
+
 int sgx_init()
 {
 	unsigned int info[4] = {0, 0, 0, 0};
@@ -83,7 +106,7 @@ int sgx_init()
 	sgx_encl_size_max_64 = 1ULL << ((*edx >> 8) & 0xFF);
 
 	if (check_cpuid_xsave()) {
-		__cpuid__count(info, SGX_CPUID, SGX_CPUID_ATTRIBUTES);
+		__cpuid_count(info, SGX_CPUID, SGX_CPUID_ATTRIBUTES);
 		sgx_xfrm_mask = (((__u64)*edx) << 32) + (__u64)*ecx;
 
 		for (i = 2; i < 64; i++) {

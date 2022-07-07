@@ -47,7 +47,8 @@ static int sgx_ioc_enclave_create(struct device *dev, unsigned int cmd,
 		return ret;
 	}
 
-	/* validate SECS */
+	/* create enclave from given SECS */
+	ret = sgx_encl_create(secs);
 	
 
 

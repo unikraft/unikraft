@@ -91,3 +91,33 @@ int sgx_page_cache_init(void)
 	WARN_STUBBED();
 	return 0;
 }
+
+
+/**
+ * sgx_alloc_page - allocate an EPC page
+ * @flags:	allocation flags
+ *
+ * Try to grab a page from the free EPC page list. If there is a free page
+ * available, it is returned to the caller. If called with SGX_ALLOC_ATOMIC,
+ * the function will return immediately if the list is empty. Otherwise, it
+ * will swap pages up until there is a free page available. Before returning
+ * the low watermark is checked and ksgxswapd is waken up if we are below it.
+ *
+ * Return: an EPC page or a system error code
+ */
+struct sgx_epc_page *sgx_alloc_page(unsigned int flags)
+{
+	struct sgx_epc_page *entry = NULL;
+
+	ukarch_spin_lock(&sgx_free_list_lock);
+
+	if(!uk_list_empty(&sgx_free_list)) {
+		entry = uk_list_first_entry(&sgx_free_list, struct sgx_epc_page, list);
+		uk_list_del(&entry->list);
+		sgx_nr_free_pages--;
+	}
+
+	ukarch_spin_unlock(&sgx_free_list_lock);
+	
+	return entry;
+}

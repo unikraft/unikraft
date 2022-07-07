@@ -121,11 +121,20 @@ struct sgx_encl {
 	unsigned int shadow_epoch;
 };
 
+/* sgx_page_cache.c */
 int sgx_add_epc_bank(__paddr_t start, unsigned long size);
 int sgx_page_cache_init(void);
+struct sgx_epc_page *sgx_alloc_page(unsigned int flags);
+
+/* sgx_ioctl.c */
 int sgx_ioctl(struct device *filep, unsigned long cmd, void *arg);
 int sgx_open(struct device *dev, int flags);
 int sgx_close(struct device *dev);
+
+/* sgx_encl.c */
+int sgx_encl_create(struct sgx_secs *secs);
+
+/* sgx_util.c */
 int cpl_switch_init();
 int cpl_switch(__u8 rpl);
 #endif

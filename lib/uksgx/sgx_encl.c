@@ -1,5 +1,8 @@
 #include <uk/sgx_arch.h>
+#include <uk/sgx_internal.h>
 #include <uk/arch/paging.h>
+#include <stdlib.h>
+#include <string.h>
 #include <errno.h>
 
 extern __u64 sgx_encl_size_max_64;
@@ -80,13 +83,29 @@ static __u32 sgx_calc_ssaframesize(__u32 miscselect, __u64 xfrm)
 static struct sgx_encl *sgx_encl_alloc(struct sgx_secs *secs)
 {
     unsigned long ssaframesize;
-
+	struct sgx_encl *encl;
     int ret;
 
     ssaframesize = sgx_calc_ssaframesize(secs->miscselect, secs->xfrm);
 	ret = sgx_secs_validate(secs, ssaframesize);
+	if (ret) {
+		uk_pr_err("Invalid ssaframesize\n");
+		return (struct sgx_encl *) 0;
+	}
+    /* ignore shared memory since Unikraft is single address space */
 
-    /* TODO: figure how to handle shared memory issue */
+	encl = malloc(sizeof(struct sgx_encl));
+
+	encl->base = secs->base;
+	encl->size = secs->size;
+	encl->ssaframesize = ssaframesize;
+	encl->attributes = secs->attributes;
+	encl->xfrm = secs->xfrm;
+
+	UK_INIT_LIST_HEAD(&encl->encl_list);
+	uk_mutex_init(&encl->lock);
+
+	return encl;
 }
 
 /**
@@ -112,6 +131,18 @@ int sgx_encl_create(struct sgx_secs *secs)
     encl = sgx_encl_alloc(secs);
     if (!encl)
         goto err;
+
+	memset(&pginfo, 0, sizeof(struct sgx_pageinfo));
+	memset(&secinfo, 0, sizeof(struct sgx_secinfo));
+	pginfo.linaddr = 0;
+	pginfo.srcpge = (unsigned long) secs;
+	pginfo.secinfo = &secinfo;
+	pginfo.secs = 0;
+
+	secs_epc = sgx_alloc_page(0);
+	if (!secs_epc) {
+		goto err;
+	}
 
     return 0;
 
