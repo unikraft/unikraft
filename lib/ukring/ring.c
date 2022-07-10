@@ -46,7 +46,7 @@ uk_ring_alloc(int count, struct uk_alloc *a
 	/* buf ring must be size power of 2 */
 	UK_ASSERT(POWER_OF_2(count));
 
-	br = uk_malloc(a, sizeof(struct uk_ring) + count * sizeof(caddr_t));
+	br = uk_malloc(a, sizeof(struct uk_ring) + count * sizeof(void *));
 	if (br == NULL)
 		return NULL;
 #ifdef DEBUG_BUFRING
