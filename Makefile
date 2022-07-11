@@ -616,6 +616,10 @@ CC_VERSION	:= $(shell $(CC) --version | \
 CC_VER_MAJOR   := $(word 1,$(subst ., ,$(CC_VERSION)))
 CC_VER_MINOR   := $(word 2,$(subst ., ,$(CC_VERSION)))
 
+CFLAGS         += --target=$(CONFIG_LLVM_TARGET_ARCH)
+ASFLAGS        += --target=$(CONFIG_LLVM_TARGET_ARCH)
+CXXFLAGS       += --target=$(CONFIG_LLVM_TARGET_ARCH)
+
 ASFLAGS		+= -DCC_VERSION=$(CC_VERSION)
 CFLAGS		+= -DCC_VERSION=$(CC_VERSION)
 CXXFLAGS	+= -DCC_VERSION=$(CC_VERSION)
