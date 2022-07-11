@@ -38,6 +38,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <errno.h>
+#include <stdlib.h>
 
 #if CONFIG_LIBUKBOOT_INITBBUDDY
 #include <uk/allocbbuddy.h>
@@ -81,6 +82,12 @@ struct thread_main_arg {
 	char **argv;
 };
 
+void __attribute__ ((constructor)) __attribute__((no_sanitize("shadow-call-stack"))) setup_x18()
+{
+	void *shadow = malloc(16384);
+	__asm __volatile ( "mov x18, %0" : : "r" (shadow) );
+}
+
 static void main_thread_func(void *arg)
 {
 	int i;
@@ -122,6 +129,8 @@ static void main_thread_func(void *arg)
 	 * mimic what a regular user application (e.g., BSD, Linux) would expect
 	 * from its OS being initialized.
 	 */
+
+	setup_x18();
 	uk_pr_info("Pre-init table at %p - %p\n",
 		   &__preinit_array_start[0], &__preinit_array_end);
 	uk_ctortab_foreach(ctorfn,
