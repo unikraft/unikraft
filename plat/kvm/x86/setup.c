@@ -1,5 +1,4 @@
-/* SPDX-License-Identifier: ISC */
-/*
+/* SPDX-License-Identifier: ISC
  * Authors: Dan Williams
  *          Martin Lucina
  *          Ricardo Koller
