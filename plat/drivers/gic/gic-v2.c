@@ -40,9 +40,6 @@
 #include <uk/arch/limits.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/common/irq.h>
-#ifdef CONFIG_PLAT_KVM
-#include <kvm/irq.h>
-#endif /* CONFIG_PLAT_KVM */
 #include <uk/plat/spinlock.h>
 #include <arm/cpu.h>
 #include <gic/gic-v2.h>
