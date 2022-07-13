@@ -45,9 +45,6 @@
 #include <uk/asm.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/common/irq.h>
-#ifdef CONFIG_PLAT_KVM
-#include <kvm/irq.h>
-#endif
 #include <uk/plat/spinlock.h>
 #include <arm/cpu.h>
 #include <gic/gic.h>
