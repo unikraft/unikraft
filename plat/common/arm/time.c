@@ -38,15 +38,11 @@
 #include <uk/plat/irq.h>
 #include <uk/bitops.h>
 #include <uk/plat/common/cpu.h>
+#include <uk/plat/common/sections.h>
 #include <ofw/gic_fdt.h>
 #include <uk/plat/common/irq.h>
 #include <gic/gic.h>
 #include <arm/time.h>
-
-/* TODO: For now this file is KVM dependent. As soon as we have more
- * Arm platforms that are using this file, we need to introduce a
- * portable way to handover the DTB entry point to common platform code */
-#include <kvm/config.h>
 
 static const char * const arch_timer_list[] = {
 	"arm,armv8-timer",
@@ -82,8 +78,7 @@ uint32_t generic_timer_get_frequency(int fdt_timer)
 	* by the firmware. A property in the DT (clock-frequency) has
 	* been introduced to workaround those firmware.
 	*/
-	fdt_freq = fdt_getprop(_libkvmplat_cfg.dtb,
-			fdt_timer, "clock-frequency", &len);
+	fdt_freq = fdt_getprop(_dtb, fdt_timer, "clock-frequency", &len);
 	if (!fdt_freq || (len <= 0)) {
 		uk_pr_info("No clock-frequency found, reading from register directly.\n");
 
@@ -124,8 +119,8 @@ void ukplat_time_init(void)
 	generic_timer_update_boot_ticks();
 
 	/* Currently, we only support 1 timer per system */
-	fdt_timer = fdt_node_offset_by_compatible_list(_libkvmplat_cfg.dtb,
-				-1, arch_timer_list);
+	fdt_timer = fdt_node_offset_by_compatible_list(_dtb, -1,
+						       arch_timer_list);
 	if (fdt_timer < 0)
 		UK_CRASH("Could not find arch timer!\n");
 
@@ -133,8 +128,8 @@ void ukplat_time_init(void)
 	if (rc < 0)
 		UK_CRASH("Failed to initialize platform time\n");
 
-	rc = gic_get_irq_from_dtb(_libkvmplat_cfg.dtb, fdt_timer, 2,
-			&irq_type, &hwirq, &trigger_type);
+	rc = gic_get_irq_from_dtb(_dtb, fdt_timer, 2, &irq_type, &hwirq,
+				  &trigger_type);
 	if (rc < 0)
 		UK_CRASH("Failed to find IRQ number from DTB\n");
 
