@@ -33,6 +33,7 @@
 #include <uk/sgx_asm.h>
 #include <uk/sgx_internal.h>
 #include <uk/print.h>
+#include <uk/mutex.h>
 #include <vfscore/uio.h>
 #include <uk/plat/paging.h>
 
@@ -50,6 +51,7 @@ bool sgx_has_sgx2;
 __u64 sgx_xfrm_mask = 0x3;
 __u32 sgx_xsave_size_tbl[64];
 struct uk_pagetable *kernel_pt;
+extern struct uk_mutex sgx_tgid_ctx_mutex;
 
 static int sgx_reset_pubkey_hash()
 {
@@ -165,6 +167,8 @@ int sgx_init()
 		sgx_nr_epc_banks = 0;
 		goto out_iounmap;
 	}
+
+	uk_mutex_init(&sgx_tgid_ctx_mutex);
 
 	ret = sgx_page_cache_init();
 	if (ret) {

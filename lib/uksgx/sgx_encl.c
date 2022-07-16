@@ -1,4 +1,5 @@
 #include <uk/sgx_arch.h>
+#include <uk/sgx_asm.h>
 #include <uk/sgx_internal.h>
 #include <uk/arch/paging.h>
 #include <uk/arch/atomic.h>
@@ -10,6 +11,8 @@ extern __u64 sgx_encl_size_max_64;
 extern __u64 sgx_xfrm_mask;
 extern __u32 sgx_xsave_size_tbl[64];
 extern int sgx_va_pages_cnt;
+extern struct uk_list_head sgx_tgid_ctx_list;
+extern struct uk_mutex sgx_tgid_ctx_mutex;
 
 static int sgx_secs_validate(const struct sgx_secs *secs, unsigned long ssaframesize)
 {
@@ -172,6 +175,65 @@ static int sgx_init_page(struct sgx_encl *encl, struct sgx_encl_page *entry,
 	return 0;
 }
 
+static struct sgx_tgid_ctx *sgx_find_tgid_ctx(struct pid *tgid)
+{
+	struct sgx_tgid_ctx *ctx;
+
+	uk_list_for_each_entry(ctx, &sgx_tgid_ctx_list, list)
+		if (pid_nr(ctx->tgid) == pid_nr(tgid))
+			return ctx;
+
+	return NULL;
+}
+
+static int sgx_add_to_tgid_ctx(struct sgx_encl *encl)
+{
+	struct sgx_tgid_ctx *ctx;
+
+	mutex_lock(&sgx_tgid_ctx_mutex);
+
+	ctx = sgx_find_tgid_ctx(tgid);
+	if (ctx) {
+		if (kref_get_unless_zero(&ctx->refcount)) {
+			encl->tgid_ctx = ctx;
+			mutex_unlock(&sgx_tgid_ctx_mutex);
+			put_pid(tgid);
+			return 0;
+		} else {
+			list_del_init(&ctx->list);
+		}
+	}
+
+	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
+	if (!ctx) {
+		mutex_unlock(&sgx_tgid_ctx_mutex);
+		put_pid(tgid);
+		return -ENOMEM;
+	}
+
+	ctx->tgid = tgid;
+	kref_init(&ctx->refcount);
+	INIT_LIST_HEAD(&ctx->encl_list);
+
+	list_add(&ctx->list, &sgx_tgid_ctx_list);
+
+	encl->tgid_ctx = ctx;
+
+	mutex_unlock(&sgx_tgid_ctx_mutex);
+	return 0;
+}
+
+void sgx_tgid_ctx_release(struct kref *ref)
+{
+	struct sgx_tgid_ctx *pe =
+		container_of(ref, struct sgx_tgid_ctx, refcount);
+	mutex_lock(&sgx_tgid_ctx_mutex);
+	list_del(&pe->list);
+	mutex_unlock(&sgx_tgid_ctx_mutex);
+	put_pid(pe->tgid);
+	kfree(pe);
+}
+
 /**
  * sgx_encl_create - create an enclave
  *
@@ -215,6 +277,19 @@ int sgx_encl_create(struct sgx_secs *secs)
 
 	ret = sgx_init_page(encl, &encl->secs, encl->base + encl->size, 0);
 	if (ret) {
+		goto err;
+	}
+
+	secs_vaddr = sgx_get_page(secs_epc);
+
+	/* perform the real ECREATE instruction */
+	ret = __ecreate((void *)&pginfo, secs_vaddr);
+
+	sgx_put_page(secs_vaddr);
+
+	if (ret) {
+		uk_pr_err("ECREATE returned %ld\n", ret);
+		ret = -EFAULT;
 		goto err;
 	}
 

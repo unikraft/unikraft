@@ -125,6 +125,8 @@ struct sgx_encl {
 int sgx_add_epc_bank(__paddr_t start, unsigned long size);
 int sgx_page_cache_init(void);
 struct sgx_epc_page *sgx_alloc_page(unsigned int flags);
+void *sgx_get_page(struct sgx_epc_page *entry);
+void sgx_put_page(void *epc_page_vaddr);
 
 /* sgx_ioctl.c */
 int sgx_ioctl(struct device *filep, unsigned long cmd, void *arg);

@@ -42,12 +42,16 @@
 __spinlock sgx_free_list_lock;
 UK_LIST_HEAD(sgx_free_list);
 
+UK_LIST_HEAD(sgx_tgid_ctx_list);
+struct uk_mutex sgx_tgid_ctx_mutex;
 static unsigned int sgx_nr_total_epc_pages;
 static unsigned int sgx_nr_free_pages;
 static unsigned int sgx_nr_low_pages = SGX_NR_LOW_EPC_PAGES_DEFAULT;
 static unsigned int sgx_nr_high_pages;
 
 unsigned int sgx_va_pages_cnt;
+
+extern struct sgx_epc_bank sgx_epc_bank;
 
 int sgx_add_epc_bank(__paddr_t start, unsigned long size)
 {
@@ -122,4 +126,18 @@ struct sgx_epc_page *sgx_alloc_page(unsigned int flags)
 	ukarch_spin_unlock(&sgx_free_list_lock);
 
 	return entry;
+}
+
+void *sgx_get_page(struct sgx_epc_page *entry)
+{
+	int i = ((entry->pa) & ~PAGE_MASK);
+
+	return (void *)(sgx_epc_bank.va +
+		((entry->pa & PAGE_MASK) - sgx_epc_bank.pa));
+
+}
+
+void sgx_put_page(void *epc_page_vaddr)
+{
+	WARN_STUBBED();
 }
