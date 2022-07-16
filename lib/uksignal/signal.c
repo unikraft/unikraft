@@ -386,3 +386,9 @@ UK_SYSCALL_R_DEFINE(int, pause)
 {
 	return 0;
 }
+
+UK_SYSCALL_R_DEFINE(int, rt_sigaction, int, signum, const struct sigaction *,
+		act, struct sigaction *, oldact)
+{
+	return sigaction(signum, act, oldact);
+}
