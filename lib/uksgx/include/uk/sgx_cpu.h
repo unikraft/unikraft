@@ -58,17 +58,6 @@
 #define __stringify_1(x...)	#x
 #define __stringify(x...)	__stringify_1(x)
 
-# define _ASM_EXTABLE_TYPE(from, to, type)			\
-	" .pushsection \"__ex_table\",\"a\"\n"			\
-	" .balign 4\n"						\
-	" .long (" #from ") - .\n"				\
-	" .long (" #to ") - .\n"				\
-	" .long " __stringify(type) " \n"			\
-	" .popsection\n"
-
-#define _ASM_EXTABLE(from, to)					\
-	_ASM_EXTABLE_TYPE(from, to, EX_TYPE_DEFAULT)
-
 /* Referred to as IA32_FEATURE_CONTROL in Intel's SDM. */
 #define X86_MSR_IA32_FEAT_CTL		            0x0000003a
 #define X86_FEAT_CTL_LOCKED				        BIT(0)
