@@ -47,6 +47,8 @@ static unsigned int sgx_nr_free_pages;
 static unsigned int sgx_nr_low_pages = SGX_NR_LOW_EPC_PAGES_DEFAULT;
 static unsigned int sgx_nr_high_pages;
 
+unsigned int sgx_va_pages_cnt;
+
 int sgx_add_epc_bank(__paddr_t start, unsigned long size)
 {
 	unsigned long i;
@@ -118,6 +120,6 @@ struct sgx_epc_page *sgx_alloc_page(unsigned int flags)
 	}
 
 	ukarch_spin_unlock(&sgx_free_list_lock);
-	
+
 	return entry;
 }

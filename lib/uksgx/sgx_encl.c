@@ -1,6 +1,7 @@
 #include <uk/sgx_arch.h>
 #include <uk/sgx_internal.h>
 #include <uk/arch/paging.h>
+#include <uk/arch/atomic.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -8,6 +9,7 @@
 extern __u64 sgx_encl_size_max_64;
 extern __u64 sgx_xfrm_mask;
 extern __u32 sgx_xsave_size_tbl[64];
+extern int sgx_va_pages_cnt;
 
 static int sgx_secs_validate(const struct sgx_secs *secs, unsigned long ssaframesize)
 {
@@ -108,6 +110,68 @@ static struct sgx_encl *sgx_encl_alloc(struct sgx_secs *secs)
 	return encl;
 }
 
+static int sgx_init_page(struct sgx_encl *encl, struct sgx_encl_page *entry,
+			 unsigned long addr, unsigned int alloc_flags)
+{
+	struct sgx_va_page *va_page;
+	struct sgx_epc_page *epc_page = NULL;
+	unsigned int va_offset = PAGE_SIZE;
+	void *vaddr;
+	int ret = 0;
+
+	uk_list_for_each_entry(va_page, &encl->va_pages, list) {
+		va_offset = sgx_alloc_va_slot(va_page);
+		if (va_offset < PAGE_SIZE)
+			break;
+	}
+
+	if (va_offset == PAGE_SIZE) {
+		va_page = malloc(sizeof(*va_page));
+		if (!va_page)
+			return -ENOMEM;
+
+		epc_page = sgx_alloc_page(alloc_flags);
+		if (IS_ERR(epc_page)) {
+			kfree(va_page);
+			return PTR_ERR(epc_page);
+		}
+
+		vaddr = sgx_get_page(epc_page);
+		if (!vaddr) {
+			sgx_warn(encl, "kmap of a new VA page failed %d\n",
+				 ret);
+			sgx_free_page(epc_page, encl);
+			kfree(va_page);
+			return -EFAULT;
+		}
+
+		ret = __epa(vaddr);
+		sgx_put_page(vaddr);
+
+		if (ret) {
+			sgx_warn(encl, "EPA returned %d\n", ret);
+			sgx_free_page(epc_page, encl);
+			kfree(va_page);
+			return -EFAULT;
+		}
+
+		ukarch_inc(&sgx_va_pages_cnt);
+
+		va_page->epc_page = epc_page;
+		va_offset = sgx_alloc_va_slot(va_page);
+
+		mutex_lock(&encl->lock);
+		list_add(&va_page->list, &encl->va_pages);
+		mutex_unlock(&encl->lock);
+	}
+
+	entry->va_page = va_page;
+	entry->va_offset = va_offset;
+	entry->addr = addr;
+
+	return 0;
+}
+
 /**
  * sgx_encl_create - create an enclave
  *
@@ -127,6 +191,7 @@ int sgx_encl_create(struct sgx_secs *secs)
 	struct sgx_encl *encl;
 	struct sgx_epc_page *secs_epc;
 	void *secs_vaddr;
+	long ret;
 
     encl = sgx_encl_alloc(secs);
     if (!encl)
@@ -141,6 +206,15 @@ int sgx_encl_create(struct sgx_secs *secs)
 
 	secs_epc = sgx_alloc_page(0);
 	if (!secs_epc) {
+		goto err;
+	}
+
+	encl->secs.epc_page = secs_epc;
+
+	// TODO: check if sgx_add_to_tgid_ctx is required
+
+	ret = sgx_init_page(encl, &encl->secs, encl->base + encl->size, 0);
+	if (ret) {
 		goto err;
 	}
 
