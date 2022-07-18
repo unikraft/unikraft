@@ -93,6 +93,7 @@ menuconfig LIBGIC
 	select LIBOFW
 	default y if ARCH_ARM_64
 	depends on ARCH_ARM_64
+	depends on UKPLAT_ALLOW_GIC
 if LIBGIC
 config LIBGICV2
 	bool "Version 2"
