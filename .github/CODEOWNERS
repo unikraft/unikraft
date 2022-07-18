@@ -63,15 +63,9 @@
 /lib/ukmmap		@unikraft/maintainers-mem
 
 # These owners oversee the security-related components.
-<<<<<<< HEAD
-/lib/uksp/		@unikraft/maintainers-security @unikraft/reviewers-security
-/lib/ukrand/		@unikraft/maintainers-security @unikraft/reviewers-security
-/lib/uksp/		@unikraft/maintainers-security @unikraft/reviewers-security
-=======
 /lib/ubsan		@unikraft/maintainers-security
 /lib/uksp		@unikraft/maintainers-security
-/lib/ukswrand		@unikraft/maintainers-security
->>>>>>> @{-1}
+/lib/uksrand		@unikraft/maintainers-security
 
 # These owners oversee the network-related components.
 /lib/uknetdev		@unikraft/maintainers-net
