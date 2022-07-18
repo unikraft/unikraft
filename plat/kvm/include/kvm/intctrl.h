@@ -34,3 +34,4 @@ void intctrl_init(void);
 void intctrl_clear_irq(unsigned int irq);
 void intctrl_mask_irq(unsigned int irq);
 void intctrl_ack_irq(unsigned int irq);
+void intctrl_send_ipi(uint8_t sgintid, uint32_t cpuid);

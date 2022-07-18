@@ -163,7 +163,7 @@ static void gic_sgi_gen(uint32_t sgintid, enum sgi_filter targetfilter,
 	/* Set SGI INITID field */
 	val |= sgintid;
 
-	/* Generate SGI */
+	/* Generate SGI - spin lock here is needed when smp is supported */
 	dist_lock(gicv2_drv);
 	write_gicd32(GICD_SGIR, val);
 	dist_unlock(gicv2_drv);
@@ -172,35 +172,35 @@ static void gic_sgi_gen(uint32_t sgintid, enum sgi_filter targetfilter,
 /*
  * Forward the SGI to the CPU interfaces specified in the
  * targetlist. Targetlist is a 8-bit bitmap for 0~7 CPU.
- * TODO: this will not work until SMP is supported
  */
 void gic_sgi_gen_to_list(uint32_t sgintid, uint8_t targetlist)
 {
 	unsigned long irqf;
 
-	/* spin lock here is needed when smp is supported */
-	dist_lock(gicv2_drv);
 	irqf = ukplat_lcpu_save_irqf();
 	gic_sgi_gen(sgintid, GICD_SGI_FILTER_TO_LIST, targetlist);
 	ukplat_lcpu_restore_irqf(irqf);
-	dist_unlock(gicv2_drv);
+}
+
+/*
+ * Forward the SGI to the CPU specified by cpuid.
+ */
+static void gic_sgi_gen_to_cpu(uint8_t sgintid, uint32_t cpuid)
+{
+	gic_sgi_gen_to_list((uint32_t) sgintid, (uint8_t) (1 << (cpuid % 8)));
 }
 
 /*
  * Forward the SGI to all CPU interfaces except that of the
  * processor that requested the interrupt.
- * TODO: this will not work until SMP is supported
  */
 void gic_sgi_gen_to_others(uint32_t sgintid)
 {
 	unsigned long irqf;
 
-	/* spin lock here is needed when smp is supported */
-	dist_lock(gicv2_drv);
 	irqf = ukplat_lcpu_save_irqf();
 	gic_sgi_gen(sgintid, GICD_SGI_FILTER_TO_OTHERS, 0);
 	ukplat_lcpu_restore_irqf(irqf);
-	dist_unlock(gicv2_drv);
 }
 
 /*
@@ -473,6 +473,7 @@ static int gicv2_do_probe(const void *fdt)
 		.set_irq_affinity  = gic_set_irq_target,
 		.irq_translate     = gic_irq_translate,
 		.handle_irq        = gic_handle_irq,
+		.gic_sgi_gen = gic_sgi_gen_to_cpu,
 	};
 
 	/* Set driver functions */

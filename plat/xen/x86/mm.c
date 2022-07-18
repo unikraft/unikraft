@@ -112,9 +112,6 @@ static void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn,
 
     if ( (rc = HYPERVISOR_mmu_update(mmu_updates, 1, NULL, DOMID_SELF)) < 0 )
 	    UK_CRASH("mmu_update failed with rc=%d\n", rc);
-#else
-    tab = mfn_to_virt(prev_l_mfn);
-    tab[offset] = (*pt_pfn << PAGE_SHIFT) | pt_prot[level];
 #endif
     *pt_pfn += 1;
 }
@@ -149,10 +146,6 @@ void _init_mem_build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
 	    uk_pr_warn("%luMB\n",
 		       ((unsigned long)pfn_to_virt(*max_pfn) - __TEXT)>>20);
     }
-#else
-    /* Round up to next 2MB boundary as we are using 2MB pages on HVMlite. */
-    pfn_to_map = (pfn_to_map + L1_PAGETABLE_ENTRIES - 1) &
-                 ~(L1_PAGETABLE_ENTRIES - 1);
 #endif
 
     start_address = (unsigned long)pfn_to_virt(pfn_to_map);
@@ -215,11 +208,6 @@ void _init_mem_build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
             count = 0;
         }
         start_address += PAGE_SIZE;
-#else
-        if ( !(tab[offset] & _PAGE_PRESENT) )
-            tab[offset] = (pgentry_t)pfn_to_map << PAGE_SHIFT |
-                          L2_PROT | _PAGE_PSE;
-        start_address += 1UL << L2_PAGETABLE_SHIFT;
 #endif
     }
 
@@ -402,17 +390,6 @@ int do_map_frames(unsigned long va,
 					va, rc);
 		}
 		mapped += batched;
-#else
-		if (!pte || !(va & L1_MASK))
-			pte = need_pte(va & ~L1_MASK, a);
-		if (!pte)
-			return -ENOMEM;
-
-		UK_ASSERT(!(*pte & _PAGE_PSE));
-		pte[l1_table_offset(va)] =
-			(pgentry_t) (((mfns[mapped * stride]
-			+ mapped * incr) << PAGE_SHIFT) | prot);
-		mapped++;
 #endif
 	}
 
@@ -507,8 +484,6 @@ int unmap_frames(unsigned long va, unsigned long num_frames)
 	unsigned long i, n = UNMAP_BATCH;
 	multicall_entry_t call[n];
 	int ret;
-#else
-	pgentry_t *pte;
 #endif
 
 	UK_ASSERT(!((unsigned long) va & ~PAGE_MASK));
@@ -530,9 +505,6 @@ int unmap_frames(unsigned long va, unsigned long num_frames)
 			call[i].op = __HYPERVISOR_update_va_mapping;
 			call[i].args[arg++] = va;
 			call[i].args[arg++] = 0;
-#ifdef __i386__
-			call[i].args[arg++] = 0;
-#endif
 			call[i].args[arg++] = UVMF_INVLPG;
 
 			va += PAGE_SIZE;
@@ -553,15 +525,6 @@ int unmap_frames(unsigned long va, unsigned long num_frames)
 			}
 		}
 		num_frames -= n;
-#else
-		pte = get_pte(va);
-		if (pte) {
-			UK_ASSERT(!(*pte & _PAGE_PSE));
-			*pte = 0;
-			invlpg(va);
-		}
-		va += PAGE_SIZE;
-		num_frames--;
 #endif
 	}
 	return 0;
@@ -621,8 +584,6 @@ void _init_mem_set_readonly(void *text, void *etext)
                 ((pgentry_t)mfn << PAGE_SHIFT) + sizeof(pgentry_t) * offset;
             mmu_updates[count].val = tab[offset] & ~_PAGE_RW;
             count++;
-#else
-            tab[offset] &= ~_PAGE_RW;
 #endif
         } else {
             uk_pr_debug("skipped %lx\n", start_address);
@@ -639,9 +600,6 @@ void _init_mem_set_readonly(void *text, void *etext)
 		    UK_CRASH("PTE could not be updated\n");
             count = 0;
         }
-#else
-        if ( start_address == (1UL << L2_PAGETABLE_SHIFT) )
-            page_size = 1UL << L2_PAGETABLE_SHIFT;
 #endif
     }
 
@@ -653,8 +611,6 @@ void _init_mem_set_readonly(void *text, void *etext)
         int count;
         HYPERVISOR_mmuext_op(&op, 1, &count, DOMID_SELF);
     }
-#else
-    write_cr3((unsigned long)pt_base);
 #endif
 }
 
@@ -666,8 +622,6 @@ void _init_mem_clear_bootstrap(void)
 #ifdef CONFIG_PARAVIRT
     pte_t nullpte = { };
     int rc;
-#else
-    pgentry_t *pgt;
 #endif
 
 	uk_pr_debug("Clear bootstrapping memory: %p\n", (void *)__TEXT);
@@ -678,10 +632,6 @@ void _init_mem_clear_bootstrap(void)
 #ifdef CONFIG_PARAVIRT
     if ( (rc = HYPERVISOR_update_va_mapping(0, nullpte, UVMF_INVLPG)) )
 	    uk_pr_err("Unable to unmap NULL page. rc=%d\n", rc);
-#else
-	pgt = get_pgt(__TEXT);
-    *pgt = 0;
-	invlpg(__TEXT);
 #endif
 }
 
@@ -762,8 +712,6 @@ void _init_mem_prepare(unsigned long *start_pfn, unsigned long *max_pfn)
     pt_base = (pgentry_t *)HYPERVISOR_start_info->pt_base;
     *start_pfn = PFN_UP(to_phys(pt_base)) + HYPERVISOR_start_info->nr_pt_frames;
     *max_pfn = HYPERVISOR_start_info->nr_pages;
-#else
-#error "Please port (see Mini-OS's arch_mm_preinit())"
 #endif
 }
 

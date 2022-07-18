@@ -1,9 +1,10 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Wei Chen <Wei.Chen@arm.com>
- *          Jianyong Wu <Jianyong.Wu@arm.com>
+ * Authors: Răzvan Vîrtan <virtanrazvan@gmail.com>
+ *          Justin He     <justin.he@arm.com>
  *
- * Copyright (c) 2018, Arm Ltd. All rights reserved.
+ * Copyright (c) 2021, Arm Ltd. All rights reserved.
+ * Copyright (c) 2021, University Politehnica of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,26 +31,37 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include <libfdt_env.h>
-#include <fdt.h>
-#include <libfdt.h>
 
-int fdt_getprop_u32_by_offset(const void *fdt, int offset,
-		const char *name, uint32_t *out)
-{
-	const struct fdt_property *prop;
-	int prop_len;
-	fdt32_t result;
+ #include <uk/asm.h>
+ #include <uk/plat/common/lcpu.h>
 
-	prop = fdt_get_property_namelen(fdt, offset, name, strlen(name),
-					&prop_len);
-	if (!prop)
-		return prop_len;
+.text
+/* void _lcpu_start(lcpu *cpu) */
+ENTRY(lcpu_start)
+	/* save x0 */
+	mov	x9, x0
 
-	memcpy(&result, prop->data, sizeof(result));
+	/* Disable interrupts */
+	msr	daifset, #2
 
-	if (out)
-		*out = fdt32_to_cpu(result);
+	/* Set the context id */
+	msr	contextidr_el1, xzr
 
-	return 0;
-}
+	/* Setup exception vector table address before enable MMU */
+	ldr	x29, =vector_table
+	msr	VBAR_EL1, x29
+
+	/* Enable the mmu */
+	bl	start_mmu
+
+	/* restore x0 */
+	mov	x0, x9
+
+	/* Load the stack pointer */
+	ldr	x9, [x0, #LCPU_STACKP_OFFSET]
+	mov	sp, x9
+
+	/* Load the entry address and jump to it */
+	ldr	x9, [x0, #LCPU_ENTRY_OFFSET]
+	br	x9
+END(lcpu_start)

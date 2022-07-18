@@ -1,7 +1,7 @@
 menuconfig PLAT_KVM
        bool "KVM guest"
        default n
-       depends on ((ARCH_X86_64 && !HAVE_SMP) || (ARCH_ARM_64 && !HAVE_SMP && !HAVE_SYSCALL && !HAVE_PAGING))
+       depends on ((ARCH_X86_64 && !HAVE_SMP) || (ARCH_ARM_64 && !HAVE_SYSCALL && !HAVE_PAGING))
        select LIBUKDEBUG
        select LIBUKALLOC
        select LIBUKTIMECONV
@@ -151,6 +151,11 @@ config VIRTIO_9P
        help
               Virtio 9P driver.
 endmenu
+
+config RTC_PL031
+       bool "Arm platform RTC (PL031) driver"
+       default y if ARCH_ARM_64
+       depends on ARCH_ARM_64
 
 config LIBOFW
        bool "Open Firmware library support"

@@ -15,6 +15,7 @@ $(eval $(call addplatlib_s,kvm,libkvmvirtioblk,$(CONFIG_VIRTIO_BLK)))
 $(eval $(call addplatlib_s,kvm,libkvmvirtio9p,$(CONFIG_VIRTIO_9P)))
 $(eval $(call addplatlib_s,kvm,libkvmofw,$(CONFIG_LIBOFW)))
 $(eval $(call addplatlib_s,kvm,libkvmgic,$(CONFIG_LIBGIC)))
+$(eval $(call addplatlib_s,kvm,libkvmpl031,$(CONFIG_RTC_PL031)))
 
 ##
 ## Platform library definitions
@@ -86,13 +87,16 @@ LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_DRIVERS_BASE)/uart/pl011.c
 endif
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/cpu_native.c|common
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/cache64.S|common
-LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/psci_arm64.S|common
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/smccc.c|common
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/smccc_invoke.S|common
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/time.c|common
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/generic_timer.c|common
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/lcpu.c|arm64_common
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/traps_arm64.c|isr
 LIBKVMPLAT_SRCS-$(CONFIG_FPSIMD)      += $(UK_PLAT_COMMON_BASE)/arm/fp_arm64.c|isr
+ifeq ($(CONFIG_HAVE_SMP),y)
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/lcpu_start.S
+endif
 ifeq ($(CONFIG_HAVE_SCHED),y)
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/thread_start64.S|isr
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/thread.c|common
@@ -216,3 +220,13 @@ ifeq ($(findstring y,$(CONFIG_LIBGICV3)),y)
 LIBKVMGIC_SRCS-y += $(UK_PLAT_DRIVERS_BASE)/gic/gic-v3.c
 endif
 endif
+
+##
+## RTC-PL031 library definitions
+##
+LIBKVMPL031_CINCLUDES-y		+= -I$(LIBKVMPLAT_BASE)/include
+LIBKVMPL031_CINCLUDES-y		+= -I$(UK_PLAT_COMMON_BASE)/include
+LIBKVMPL031_CINCLUDES-y		+= -I$(UK_PLAT_DRIVERS_BASE)/include
+
+LIBKVMPL031_SRCS-y		+= $(UK_PLAT_DRIVERS_BASE)/rtc/pl031.c
+LIBKVMPL031_SRCS-y		+= $(UK_PLAT_DRIVERS_BASE)/rtc/rtc.c

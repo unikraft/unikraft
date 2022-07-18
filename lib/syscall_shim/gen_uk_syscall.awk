@@ -20,6 +20,7 @@ BEGIN {
 	name = $1
 	sys_name = "SYS_" name
 	args_nr = $2 + 0
+	printf "#ifdef HAVE_uk_syscall_%s\n", name;
 	printf "\tcase %s:\n", sys_name;
 	for (i = 1; i <= args_nr; i++)
 		printf "\t\ta%s = va_arg(arg, long);\n", i;
@@ -29,6 +30,7 @@ BEGIN {
 	if (args_nr > 0)
 		printf "a%d", args_nr;
 	printf(");\n")
+	printf "#endif /* HAVE_uk_syscall_%s */\n\n", name;
 }
 
 END {

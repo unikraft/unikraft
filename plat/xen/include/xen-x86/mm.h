@@ -28,10 +28,7 @@
 #include <uk/plat/common/sections.h>
 #ifndef __ASSEMBLY__
 #include <xen/xen.h>
-#if defined(__i386__)
-#include <xen/arch-x86_32.h>
-#define __CONST(x) x ## ULL
-#elif defined(__x86_64__)
+#if defined(__x86_64__)
 #include <xen/arch-x86_64.h>
 #define __CONST(x) x ## UL
 #else
@@ -74,39 +71,7 @@
 
 #define L1_PAGETABLE_SHIFT      12
 
-#if defined(__i386__)
-
-#define L2_PAGETABLE_SHIFT      21
-#define L3_PAGETABLE_SHIFT      30
-
-#define L1_PAGETABLE_ENTRIES    512
-#define L2_PAGETABLE_ENTRIES    512
-#define L3_PAGETABLE_ENTRIES    4
-
-#define PAGETABLE_LEVELS        3
-
-#define PADDR_BITS              44
-#define PADDR_MASK              ((1ULL << PADDR_BITS)-1)
-
-#define L2_MASK  ((1UL << L3_PAGETABLE_SHIFT) - 1)
-
-#define PRIpte "016llx"
-#ifndef __ASSEMBLY__
-typedef uint64_t pgentry_t;
-#else
-#define PTE(val) .long val; .long 0
-#endif
-
-#define MAX_MEM_SIZE            CONST(0x3f000000)
-#define VIRT_KERNEL_AREA        CONST(0x3f000000)
-#define VIRT_DEMAND_AREA        CONST(0x40000000)
-#define VIRT_HEAP_AREA          CONST(0xb0000000)
-
-#define DEMAND_MAP_PAGES        CONST(0x6ffff)
-#define HEAP_PAGES_MAX          ((HYPERVISOR_VIRT_START - VIRT_HEAP_AREA) / \
-                                 PAGE_SIZE - 1)
-
-#elif defined(__x86_64__)
+#if defined(__x86_64__)
 
 #define L2_PAGETABLE_SHIFT      21
 #define L3_PAGETABLE_SHIFT      30
@@ -176,18 +141,13 @@ typedef unsigned long pgentry_t;
 #define _PAGE_PSE      CONST(0x080)
 #define _PAGE_GLOBAL   CONST(0x100)
 
-#if defined(__i386__)
-#define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED)
-#define L1_PROT_RO (_PAGE_PRESENT|_PAGE_ACCESSED)
-#define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY |_PAGE_USER)
-#define L3_PROT (_PAGE_PRESENT)
-#elif defined(__x86_64__)
+#if defined(__x86_64__)
 #define L1_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_USER)
 #define L1_PROT_RO (_PAGE_PRESENT|_PAGE_ACCESSED|_PAGE_USER)
 #define L2_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #define L3_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
 #define L4_PROT (_PAGE_PRESENT|_PAGE_RW|_PAGE_ACCESSED|_PAGE_DIRTY|_PAGE_USER)
-#endif /* __i386__ || __x86_64__ */
+#endif /* __x86_64__ */
 
 /* flags for ioremap */
 #define IO_PROT (L1_PROT)
@@ -208,19 +168,12 @@ typedef unsigned long pgentry_t;
 
 #ifndef __ASSEMBLY__
 /* Definitions for machine and pseudophysical addresses. */
-#ifdef __i386__
-typedef unsigned long long paddr_t;
-typedef unsigned long long maddr_t;
-#else
 typedef unsigned long paddr_t;
 typedef unsigned long maddr_t;
-#endif
 
 extern pgentry_t *pt_base;
 #ifdef CONFIG_PARAVIRT
 extern unsigned long *phys_to_machine_mapping;
-#else
-extern pgentry_t page_table_base[];
 #endif
 
 extern unsigned long mfn_zero;
@@ -290,10 +243,6 @@ void *map_frames_ex(const unsigned long *mfns, unsigned long n,
 
 void arch_mm_preinit(void *p);
 unsigned long alloc_virt_kernel(unsigned n_pages);
-
-#ifndef CONFIG_PARAVIRT
-void arch_print_memmap(void);
-#endif
 
 #endif
 

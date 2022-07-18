@@ -14,4 +14,3 @@ LIBFDT_SRCS-y += $(LIBFDT_BASE)/fdt_rw.c
 LIBFDT_SRCS-y += $(LIBFDT_BASE)/fdt_strerror.c
 LIBFDT_SRCS-y += $(LIBFDT_BASE)/fdt_sw.c
 LIBFDT_SRCS-y += $(LIBFDT_BASE)/fdt_wip.c
-LIBFDT_SRCS-y += $(LIBFDT_BASE)/uk_fdt.c

@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Wei Chen <wei.chen@arm.com>
+ * Authors: Wei Chen <Wei.Chen@arm.com>
+ *          Jianyong Wu <Jianyong.Wu@arm.com>
  *
- * Copyright (c) 2018, Arm Ltd. All rights reserved.
+ * Copyright (c) 2019, Arm Ltd. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,26 +29,39 @@
  * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
+ *
  */
-#include <uk/asm.h>
-#include <arm/cpu_defs.h>
 
-/*
- * Use HVC to call PSCI functions, based on the SMC Calling
- * Convention:
- * int32_t smcc_psci_hvc_call(uint32_t, uint64_t, uint64_t, uint64_t);
- */
-ENTRY(smcc_psci_hvc_call)
-	hvc #0
-	ret
-END(smcc_psci_hvc_call)
+#ifndef __PLAT_DRV_RTC_H__
+#define __PLAT_DRV_RTC_H__
 
-/*
- * Use SMC to call PSCI functions, based on the SMC Calling
- * Convention:
- * int32_t smcc_psci_smc_call(uint32_t, uint64_t, uint64_t, uint64_t);
+#include <uk/arch/types.h>
+
+/* Store time in structured format. */
+struct rtc_time {
+	int year;
+	int mon;
+	int day;
+	int hour;
+	int min;
+	int sec;
+};
+
+/**
+ * Convert raw RTC data (read from RTC register) to a time structure.
+ *
+ * @param raw Raw RTC value
+ * @param [inout] tm Pointer to time structure storing the result
  */
-ENTRY(smcc_psci_smc_call)
-	smc #0
-	ret
-END(smcc_psci_smc_call)
+void rtc_raw_to_tm(__u32 raw, struct rtc_time *tm);
+
+/**
+ * Convert structured time to raw RTC data (to be written to RTC register).
+ *
+ * @param tm Pointer to time structure
+ *
+ * @return The raw RTC data
+ */
+__u32 rtc_tm_to_raw(struct rtc_time *tm);
+
+#endif //__PLAT_DRV_RTC_H__

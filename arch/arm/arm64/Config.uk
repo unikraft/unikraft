@@ -155,6 +155,12 @@ menu "Armv8-A Extensions"
 		provides protections against classes of attacks that
 		rely on memory corruption, such as stack smashing and
 		ROP.
+
+	config ARM64_FEAT_BTI
+	bool "Armv8.5 Branch Target Identification"
+	help
+		BTI protects against JOP-like attacks by placing and
+		verifying landing pads on branch targets.
 endmenu
 
 config ARM64_ERRATUM_858921
