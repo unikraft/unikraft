@@ -13,8 +13,6 @@
 		); \
 		} while (0)
 
-size_t uk_rdrand_generate_bytes(void *buf, size_t buflen);
-
 static inline __u8 uk_hwrand_rdrand(__u32 *val)
 {	
 	__u8 success;

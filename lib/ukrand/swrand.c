@@ -29,7 +29,7 @@
  */
 #include <string.h>
 #include <uk/swrand.h>
-#include <uk/hwrand.h>
+#include <uk/rdrand.h>
 #include <uk/config.h>
 #include <uk/cpuid.h>
 #include <uk/print.h>
