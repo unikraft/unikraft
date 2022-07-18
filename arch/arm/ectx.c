@@ -1,8 +1,13 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Wei Chen <wei.chen@arm.com>
+ * Authors: Florian Schmidt <florian.schmidt@neclab.eu>
+ *          Simon Kuenzer <simon.kuenzer@neclab.eu>
+ *          Robert Kuban <robert.kuban@opensynergy.com>
  *
- * Copyright (c) 2018, Arm Ltd. All rights reserved.
+ * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2021, NEC Laboratories Europe GmbH, NEC Corporation.
+ *                     All rights reserved.
+ * Copyright (c) 2022, OpenSynergy GmbH All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,78 +34,56 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-
-#ifndef __PLAT_COMMON_ARM64_CPU_H__
-#define __PLAT_COMMON_ARM64_CPU_H__
-
-#include <inttypes.h>
+#include <uk/arch/ctx.h>
+#include <uk/arch/lcpu.h>
+#include <uk/arch/types.h>
+#include <uk/ctors.h>
 #include <uk/essentials.h>
-#include <uk/alloc.h>
 #include <uk/assert.h>
-#include <arm/smccc.h>
-#include <uk/plat/common/lcpu.h>
+#include <uk/print.h>
+#include <string.h> /* memset */
+#include <arm/cpu.h>
 
-static inline void _init_cpufeatures(void)
+__sz ukarch_ectx_size(void)
 {
+	return sizeof(struct fpsimd_state);
 }
 
-/* Define compatibility IO macros */
-#define outb(addr, v)   UK_BUG()
-#define outw(addr, v)   UK_BUG()
-#define inb(addr)       UK_BUG()
-
-/*
- * PSCI conduit method to call functions, based on the SMC Calling Convention.
+/* TODO: find good alignment for ectx
+ * registers are stored/loaded by the STP/LTP instruction
+ * 16 byte seem reasonable
  */
-extern smccc_conduit_fn_t smccc_psci_call;
+#define ECTX_ALIGN 16
 
-/* CPU native APIs */
-void halt(void);
-void reset(void);
-void system_off(void);
-#ifdef CONFIG_HAVE_SMP
-int cpu_on(__lcpuid id, __paddr_t entry, void *arg);
-#endif /* CONFIG_HAVE_SMP */
-
-#ifdef CONFIG_FPSIMD
-
-struct fpsimd_state {
-	__u64		regs[32 * 2];
-	__u32		fpsr;
-	__u32		fpcr;
-};
-
-extern void fpsimd_save_state(uintptr_t ptr);
-extern void fpsimd_restore_state(uintptr_t ptr);
-
-static inline void save_extregs(void *ectx)
+__sz ukarch_ectx_align(void)
 {
-	fpsimd_save_state((uintptr_t) ectx);
-
-	/* make sure sysreg writing takes effects */
-	isb();
+	return ECTX_ALIGN;
 }
 
-static inline void restore_extregs(void *ectx)
+void ukarch_ectx_init(struct ukarch_ectx *state)
 {
-	fpsimd_restore_state((uintptr_t) ectx);
+	UK_ASSERT(state);
+	UK_ASSERT(IS_ALIGNED((__uptr) state, ECTX_ALIGN));
 
-	/* make sure sysreg writing takes effects */
-	isb();
+	/* Initialize extregs area:
+	 * Zero out and then save a valid layout to it.
+	 */
+	memset(state, 0, sizeof(struct fpsimd_state));
+	ukarch_ectx_store(state);
 }
 
-#else /* !CONFIG_FPSIMD */
-
-struct fpsimd_state { };
-
-static inline void save_extregs(void *ectx __unused)
+void ukarch_ectx_store(struct ukarch_ectx *state)
 {
+	UK_ASSERT(state);
+	UK_ASSERT(IS_ALIGNED((__uptr) state, ECTX_ALIGN));
+
+	save_extregs(state);
 }
 
-static inline void restore_extregs(void *ectx __unused)
+void ukarch_ectx_load(struct ukarch_ectx *state)
 {
+	UK_ASSERT(state);
+	UK_ASSERT(IS_ALIGNED((__uptr) state, ECTX_ALIGN));
+
+	restore_extregs(state);
 }
-
-#endif /* CONFIG_FPSIMD */
-
-#endif /* __PLAT_COMMON_ARM64_CPU_H__ */
