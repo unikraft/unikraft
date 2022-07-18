@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Wei Chen <wei.chen@arm.com>
+ *          Robert Kuban <robert.kuban@opensynergy.com>
  *
  * Copyright (c) 2018, Arm Ltd. All rights reserved.
+ * Copyright (c) 2022, OpenSynergy GmbH All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,60 +31,81 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-//#include <uk/plat/common/ctx.h>
+
+#include <uk/arch/ctx.h>
 #include <uk/arch/lcpu.h>
-#include <uk/asm.h>
 
 /*
- * Thread stack memory layout:
+ * NOTE: If we use the SP for single registers, we need to decrease the
+ *       SP 16 bytes for single registers.
+ * https://community.arm.com/arm-community-blogs/b/
+ *  architectures-and-processors-blog/posts/
+ *  using-the-stack-in-aarch64-implementing-push-and-pop
  *
- * |-----------------------------| --> SP
- * |    thread main function     | In init_sp, we have pushed thread main
- * |-----------------------------| function and arguments to stackfunction
- * |    arguments                | and arguments to stack.
- * |-----------------------------| --> ctx->sp = SP - function - arguments
- * |    Reversed room for Arm64  |
- * |    Callee saved registers:  |
- * |    x19 ~ x28                |
- * |-----------------------------|
- * |    x29 (frame pointer)      |
- * |-----------------------------|
- * |    ...                      |
- * |    ...                      |
- * |-----------------------------|
- * |    thread                   | --> used for uk_thread_current
- * |-----------------------------|
+ * WARNING: Changes here need also be reflected in uk/asm/ctx.h
  */
 
-/*
- * This function will jump to thread main function and set up
- * thread exit handler.
- */
-ENTRY(asm_thread_starter)
-	mov x2, sp
-	ldp x0, x1, [x2]		/* Load func to x1, args to x0 */
-	ldr x30, =uk_sched_thread_exit	/* Set thread exit handler */
-	br  x1				/* Jump to thread main function */
-ENDPROC(asm_thread_starter)
+ENTRY(_ctx_arm_clearregs)
+	/* wipe argument and return registers */
+	mov x0, xzr
+	mov x1, xzr
+	mov x2, xzr
+	mov x3, xzr
+	mov x4, xzr
+	mov x5, xzr
+	mov x6, xzr
+	mov x7, xzr
+
+	/* wipe callee-saved registers */
+	mov x19, xzr
+	mov x20, xzr
+	mov x21, xzr
+	mov x22, xzr
+	mov x23, xzr
+	mov x24, xzr
+	mov x25, xzr
+	mov x26, xzr
+	mov x27, xzr
+	mov x28, xzr
+#if __OMIT_FRAMEPOINTER__
+	mov x29, xzr /* don't wipe if x29 is used as frame pointer */
+#endif /* __OMIT_FRAMEPOINTER__ */
+
+	/* jump to entrance function left on stack */
+	ldr x30, [sp], #16
+	ret
+
+ENTRY(_ctx_arm_call0)
+#if !__OMIT_FRAMEPOINTER__
+	mov x29, xzr /* reset frame pointer */
+#endif /* !__OMIT_FRAMEPOINTER__ */
+	/* jump to entrance function left on stack */
+	ldr x30, [sp], #16
+	ret
+
+ENTRY(_ctx_arm_call1)
+#if !__OMIT_FRAMEPOINTER__
+	mov x29, xzr /* reset frame pointer */
+#endif /* !__OMIT_FRAMEPOINTER__ */
+	ldr x0, [sp], #16
+	/* jump to entrance function left on stack */
+	ldr x30, [sp], #16
+	ret
+
+ENTRY(_ctx_arm_call2)
+#if !__OMIT_FRAMEPOINTER__
+	mov x29, xzr /* reset frame pointer */
+#endif /* !__OMIT_FRAMEPOINTER__ */
+	ldr x1, [sp], #16
+	ldr x0, [sp], #16
+	/* jump to entrance function left on stack */
+	ldr x30, [sp], #16
+	ret
 
 /*
- * x0 = ctx->sp
- * x1 = ctx->ip = asm_thread_starter
- *
- * This function will set the SP to thread's SP and jump to
- * ctx->ip: asm_thread_starter
+ * Do a local context switch taken from thread_start64.S
  */
-ENTRY(asm_ctx_start)
-	mov sp, x0	/* set SP */
-	br x1		/* jump to asm_thread_starter */
-ENDPROC(asm_ctx_start)
-
-/*
- * x0 = prectx
- * x1 = nextctx
- * This function will switch to the next thread context
- */
-ENTRY(asm_ctx_switch)
+ENTRY(ukarch_ctx_switch)
 	/* Save callee-saved registers to prevctx's stack */
 	sub x2, sp, #__CALLEE_SAVED_SIZE
 	stp x19, x20, [x2, #16 * 0]
@@ -99,10 +122,10 @@ ENTRY(asm_ctx_switch)
 	ldr x30, =restore_point
 
 	/* Save sp and restore point to previous context */
-	stp x2, x30, [x0]
+	stp x30, x2, [x0]
 
-	/* Restire sp and restore point from next context */
-	ldp x2, x30, [x1]
+	/* Restore sp and restore point from next context */
+	ldp x30, x2, [x1]
 	mov sp, x2
 
 	ret
@@ -118,4 +141,4 @@ restore_point:
 
 	add sp, x2, #__CALLEE_SAVED_SIZE
 	ret
-ENDPROC(asm_ctx_switch)
+

@@ -35,7 +35,6 @@
 
 #include <inttypes.h>
 #include <uk/essentials.h>
-#include <uk/plat/common/ctx.h>
 #include <uk/alloc.h>
 #include <uk/assert.h>
 #include <arm/smccc.h>
@@ -151,6 +150,7 @@ int cpu_on(__lcpuid id, __paddr_t entry, void *arg);
 #endif /* CONFIG_HAVE_SMP */
 
 #ifdef CONFIG_FPSIMD
+
 struct fpsimd_state {
 	__u64		regs[32 * 2];
 	__u32		fpsr;
@@ -160,57 +160,34 @@ struct fpsimd_state {
 extern void fpsimd_save_state(uintptr_t ptr);
 extern void fpsimd_restore_state(uintptr_t ptr);
 
-static inline void save_extregs(struct sw_ctx *ctx)
+static inline void save_extregs(void *ectx)
 {
-	fpsimd_save_state(ctx->extregs);
+	fpsimd_save_state((uintptr_t) ectx);
 
 	/* make sure sysreg writing takes effects */
 	isb();
 }
 
-static inline void restore_extregs(struct sw_ctx *ctx)
+static inline void restore_extregs(void *ectx)
 {
-	fpsimd_restore_state(ctx->extregs);
+	fpsimd_restore_state((uintptr_t) ectx);
 
 	/* make sure sysreg writing takes effects */
 	isb();
-}
-
-static inline void arch_init_extregs(struct sw_ctx *ctx)
-{
-	if (ctx)
-		ctx->extregs = (uintptr_t)ctx->_extregs;
-
-	uk_pr_debug("Allocating %lu + %lu bytes for sw ctx at %p, extregs at %p\n",
-		sizeof(struct sw_ctx), sizeof(struct fpsimd_state),
-		ctx, (void *)ctx->extregs);
-}
-
-static inline __sz arch_extregs_size(void)
-{
-	return sizeof(struct fpsimd_state);
 }
 
 #else /* !CONFIG_FPSIMD */
-static inline void save_extregs(struct sw_ctx *ctx __unused)
+
+struct fpsimd_state { };
+
+static inline void save_extregs(void *ectx)
 {
 }
 
-static inline void restore_extregs(struct sw_ctx *ctx __unused)
+static inline void restore_extregs(void *ectx)
 {
 }
 
-static inline void arch_init_extregs(struct sw_ctx *ctx)
-{
-	if (ctx)
-		ctx->extregs = (uintptr_t)ctx->_extregs;
-}
-
-static inline __sz arch_extregs_size(void)
-{
-	return 0;
-}
 #endif /* CONFIG_FPSIMD */
-
 
 #endif /* __PLAT_COMMON_ARM64_CPU_H__ */
