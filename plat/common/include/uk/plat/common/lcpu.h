@@ -49,6 +49,10 @@
 #define ALIGN_UP(v, a) (((v) + (a)-1) & ~((a)-1))
 #endif /* __ASSEMBLY__ */
 
+#if defined(__X86_64__)
+#include <x86/lcpu_defs.h>
+#endif /* __X86_64__ */
+
 /* Provide empty architecture-dependent LCPU part as default */
 #ifndef LCPU_ARCH_SIZE
 #define LCPU_ARCH_SIZE			0x00
