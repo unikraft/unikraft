@@ -2,7 +2,7 @@
 /*
  * Authors: Cristian Vijelie <cristianvijelie@gmail.com>
  *
- * Copyright (c) 2021, University Politehnica of Bucharest. All rights reserved.
+ * Copyright (c) 2021, University POLITEHNICA of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -45,10 +45,30 @@ struct MADT {
 	__u8 Entries[];
 } __packed;
 
+#define MADT_FLAGS_PCAT_COMPAT			0x01
+
 struct MADTEntryHeader {
 	__u8 Type;
 	__u8 Length;
 } __packed;
+
+#define MADT_TYPE_LAPIC				0x00
+#define MADT_TYPE_IO_APIC			0x01
+#define MADT_TYPE_INT_SRC_OVERRIDE		0x02
+#define MADT_TYPE_NMI_SOURCE			0x03
+#define MADT_TYPE_LAPIC_NMI			0x04
+#define MADT_TYPE_LAPIC_ADDRESS_OVERRIDE	0x05
+#define MADT_TYPE_IO_SAPIC			0x06
+#define MADT_TYPE_LSAPIC			0x07
+#define MADT_TYPE_PLATFORM_INT_SOURCES		0x08
+#define MADT_TYPE_LX2APIC			0x09
+#define MADT_TYPE_LX2APIC_NMI			0x0a
+#define MADT_TYPE_GICC				0x0b
+#define MADT_TYPE_GICD				0x0c
+#define MADT_TYPE_GIC_MSI			0x0d
+#define MADT_TYPE_GICR				0x0e
+#define MADT_TYPE_GIC_ITS			0x0f
+#define MADT_TYPE_MP_WAKEUP			0x10
 
 /*
  * The following structures are declared according to the ACPI
@@ -61,10 +81,13 @@ struct MADTEntryHeader {
 /* Processor Local APIC Structure */
 struct MADTType0Entry {
 	struct MADTEntryHeader eh;
-	__u8 ACPIProcessorID;
+	__u8 ACPIProcessorUID;
 	__u8 APICID;
 	__u32 Flags;
 } __packed;
+
+#define MADT_T0_FLAGS_ENABLED			0x01
+#define MADT_T0_FLAGS_ONLINE_CAPABLE		0x02
 
 /* I/O APIC Structure */
 struct MADTType1Entry {
@@ -147,6 +170,9 @@ struct MADTType9Entry {
 	__u32 Flags;
 	__u32 ACPIProcessorUID;
 } __packed;
+
+#define MADT_T9_FLAGS_ENABLED			0x01
+#define MADT_T9_FLAGS_ONLINE_CAPABLE		0x02
 
 /* Local x2APIC NMI Structure */
 struct MADTTypeAEntry {
