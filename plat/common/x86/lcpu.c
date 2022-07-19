@@ -58,7 +58,7 @@ __lcpuid lcpu_arch_id(void)
 	return (ebx >> 24);
 }
 
-int lcpu_arch_init(struct lcpu *this_lcpu __unused)
+int lcpu_arch_init(struct lcpu *this_lcpu)
 {
 #ifdef CONFIG_HAVE_SMP
 	int rc;
@@ -68,7 +68,7 @@ int lcpu_arch_init(struct lcpu *this_lcpu __unused)
 		return rc;
 #endif /* CONFIG_HAVE_SMP */
 
-	traps_init();
+	traps_lcpu_init(this_lcpu);
 
 	return 0;
 }

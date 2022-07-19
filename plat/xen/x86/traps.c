@@ -27,6 +27,7 @@
 #include <xen-x86/traps.h>
 #include <xen-x86/hypercall.h>
 #include <uk/print.h>
+#include <uk/plat/common/lcpu.h>
 
 /* Traps used only on Xen */
 
@@ -66,7 +67,7 @@ static trap_info_t trap_table[] = {
 	{ 0, 0, 0, 0 }
 };
 
-void traps_init(void)
+void traps_lcpu_init(struct lcpu *current __unused)
 {
 	HYPERVISOR_set_trap_table(trap_table);
 

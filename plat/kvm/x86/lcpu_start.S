@@ -87,7 +87,7 @@ gdt32_ptr:
 gdt32_cs:
 	.quad	GDT_DESC_CODE32_VAL	/* 32-bit CS	*/
 gdt32_ds:
-	.quad	GDT_DESC_DATA_VAL	/* DS		*/
+	.quad	GDT_DESC_DATA32_VAL	/* DS		*/
 gdt32_end:
 
 #define CR0_BOOT16_SETTINGS						\
@@ -140,9 +140,9 @@ gdt64:
 gdt64_null:
 	.quad	0x0000000000000000	/* null segment */
 gdt64_cs:
-	.quad	GDT_DESC_CODE_VAL	/* 64-bit CS	*/
+	.quad	GDT_DESC_CODE64_VAL	/* 64-bit CS	*/
 gdt64_ds:
-	.quad	GDT_DESC_DATA_VAL	/* DS		*/
+	.quad	GDT_DESC_DATA64_VAL	/* DS		*/
 gdt64_end:
 gdt64_ptr:
 	.word	gdt64_end - gdt64 - 1
