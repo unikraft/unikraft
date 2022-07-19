@@ -123,7 +123,12 @@
 arm64_bpt_l3_pt0:
 	pte_tbl_desc	arm64_bpt_l2_pt0
 	pte_tbl_desc	arm64_bpt_l2_pt1
-	pte_zero	, 510
+	pte_zero	, 509
+#ifdef CONFIG_PAGING
+	pte_tbl_desc	arm64_bpt_l2_pt511
+#else
+	pte_zero	, 1
+#endif /* CONFIG_PAGING */
 
 /* L2: 0 - 512GiB (1GiB / entry)
  *
@@ -146,6 +151,16 @@ arm64_bpt_l2_pt0:
 .align 12
 arm64_bpt_l2_pt1:
 	pte_fill	0x0000008000000000, 512, 2, PTE_BLOCK_DEVICE_nGnRE
+
+#ifdef CONFIG_PAGING
+/* L2: 255.5 TiB - 256TiB (1GiB / entry)
+ *
+ * 0x0000ff8000000000 - 0x0000ffffffffffff	Direct-mapped
+ */
+.align 12
+arm64_bpt_l2_pt511:
+	pte_fill	0x0000000000000000, 512, 2, PTE_BLOCK_NORMAL_RW
+#endif /* CONFIG_PAGING */
 
 /* L1: 0 - 1GiB (2MiB / entry)
  *
