@@ -30,12 +30,14 @@ config UKPLAT_LCPU_IDISIDX
 config UKPLAT_LCPU_RUN_IRQ
 	int "Remote Function IRQ#"
 	default 5 if ARCH_ARM_64
-	depends on (ARCH_ARM_64 && PLAT_KVM)
+	default 13 if ARCH_X86_64
+	depends on ((ARCH_ARM_64 || ARCH_X86_64) && PLAT_KVM)
 
 config UKPLAT_LCPU_WAKEUP_IRQ
 	int "Wakeup IRQ#"
 	default 6 if ARCH_ARM_64
-	depends on (ARCH_ARM_64 && PLAT_KVM)
+	default 14 if ARCH_X86_64
+	depends on ((ARCH_ARM_64 || ARCH_X86_64) && PLAT_KVM)
 
 endmenu
 
