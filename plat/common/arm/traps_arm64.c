@@ -24,7 +24,6 @@
 #include <uk/arch/lcpu.h>
 #include <uk/arch/types.h>
 #include <arm/traps.h>
-#include <arm/cpu_defs.h>
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <gic/gic.h>
