@@ -49,7 +49,7 @@
 #endif /* CONFIG_PAGING */
 
 #define PLATFORM_MEM_START 0x100000
-#define PLATFORM_MAX_MEM_ADDR 0x40000000
+#define PLATFORM_MAX_MEM_ADDR 0x100000000 /* 4 GiB */
 
 #define MAX_CMDLINE_SIZE 8192
 static char cmdline[MAX_CMDLINE_SIZE];
@@ -351,9 +351,10 @@ static void _init_paging(struct multiboot_info *mi)
 	if (unlikely(rc))
 		goto EXIT_FATAL;
 
-	/* Unmap all 1:1 mappings extending over the kernel image and initrd.
-	 * The boot page table maps the first 1 GiB with everything starting
-	 * from 2 MiB mapped as 2 MiB large pages (see pagetable64.S).
+	/* Unmap all 1:1 mappings extending over the first megabyte, the kernel
+	 * image and initrd. The boot page table maps the first 4 GiB with
+	 * everything starting from 2 MiB mapped as 2 MiB large pages (see
+	 * pagetable64.S).
 	 */
 	offset = mr[0]->start - PAGE_LARGE_ALIGN_UP(mr[0]->start);
 	start  = PAGE_LARGE_ALIGN_UP(mr[0]->start);
