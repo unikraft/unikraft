@@ -140,10 +140,31 @@ UK_SYSCALL_R_DEFINE(int, gettimeofday, struct timeval *, tv, void *, tz)
 }
 
 UK_SYSCALL_R_DEFINE(int, clock_getres, clockid_t, clk_id,
-		    struct timespec *, res)
+		    struct timespec *, tp)
 {
-	UK_WARN_STUBBED();
+	int error;
+
+	if (!tp) {
+		error = EFAULT;
+		goto out_error;
+	}
+
+	switch (clk_id) {
+	case CLOCK_MONOTONIC:
+	case CLOCK_MONOTONIC_COARSE:
+	case CLOCK_REALTIME:
+		tp->tv_sec = 0;
+		tp->tv_nsec = UKPLAT_TIME_TICK_NSEC;
+		break;
+	default:
+		error = EINVAL;
+		goto out_error;
+	}
+
 	return 0;
+
+out_error:
+	return -error;
 }
 
 UK_SYSCALL_R_DEFINE(int, clock_gettime, clockid_t, clk_id, struct timespec*, tp)
