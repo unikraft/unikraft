@@ -451,10 +451,19 @@ static void _libkvmplat_entry2(void *arg __attribute__((unused)))
 void _libkvmplat_entry(struct lcpu *lcpu, void *arg)
 {
 	struct multiboot_info *mi = (struct multiboot_info *)arg;
+	int rc;
+
+	_libkvmplat_init_console();
+
+	/* Initialize trap vector table */
+	traps_table_init();
+
+	/* Initialize LCPU of bootstrap processor */
+	rc = lcpu_init(lcpu);
+	if (unlikely(rc))
+		UK_CRASH("Failed to init bootstrap processor\n");
 
 	_init_cpufeatures();
-	_libkvmplat_init_console();
-	traps_init(lcpu);
 	intctrl_init();
 
 	uk_pr_info("Entering from KVM (x86)...\n");
@@ -484,7 +493,16 @@ void _libkvmplat_entry(struct lcpu *lcpu, void *arg)
 		   (void *)_libkvmplat_cfg.bstack.start);
 
 #ifdef CONFIG_HAVE_SMP
-	acpi_init();
+	rc = acpi_init();
+	if (likely(rc == 0)) {
+		rc = lcpu_mp_init(CONFIG_UKPLAT_LCPU_RUN_IRQ,
+				  CONFIG_UKPLAT_LCPU_WAKEUP_IRQ,
+				  NULL);
+		if (unlikely(rc))
+			uk_pr_err("SMP init failed: %d\n", rc);
+	} else {
+		uk_pr_err("ACPI init failed: %d\n", rc);
+	}
 #endif /* CONFIG_HAVE_SMP */
 
 #ifdef CONFIG_HAVE_SYSCALL
