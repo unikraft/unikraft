@@ -448,13 +448,13 @@ static void _libkvmplat_entry2(void *arg __attribute__((unused)))
 	ukplat_entry_argp(NULL, cmdline, sizeof(cmdline));
 }
 
-void _libkvmplat_entry(struct lcpu *lcpu __unused, void *arg)
+void _libkvmplat_entry(struct lcpu *lcpu, void *arg)
 {
 	struct multiboot_info *mi = (struct multiboot_info *)arg;
 
 	_init_cpufeatures();
 	_libkvmplat_init_console();
-	traps_init();
+	traps_init(lcpu);
 	intctrl_init();
 
 	uk_pr_info("Entering from KVM (x86)...\n");
