@@ -74,9 +74,4 @@ void traps_init(void)
 				 (unsigned long) asm_failsafe_callback, 0);
 }
 
-void traps_fini(void)
-{
-	HYPERVISOR_set_trap_table(NULL);
-}
-
 #endif
