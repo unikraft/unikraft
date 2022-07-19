@@ -150,6 +150,7 @@ x86_bpt_pdpt511:
 #endif /* CONFIG_PAGING */
 
 .align 0x1000
+.global x86_bpt_pml4
 x86_bpt_pml4:
 	pte	 x86_bpt_pdpt0  , PTE_RW
 	pte_zero , 0x1fe
