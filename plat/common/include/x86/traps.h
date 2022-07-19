@@ -120,7 +120,6 @@ void do_##name(struct __regs *regs, unsigned long error_code)		\
 }
 
 void traps_init(void);
-void traps_fini(void);
 
 #endif
 

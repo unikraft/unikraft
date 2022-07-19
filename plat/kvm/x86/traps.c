@@ -184,7 +184,3 @@ void traps_init(void)
 	tss_init();
 	idt_init();
 }
-
-void traps_fini(void)
-{
-}
