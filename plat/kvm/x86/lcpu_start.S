@@ -304,17 +304,3 @@ fail_loop:
 	hlt
 	jmp	1b
 END(lcpu_start64)
-
-.text
-ENTRY(_libkvmplat_newstack)
-	movq %rdi, %rsp
-	movq %rdx, %rdi
-
-	pushq $0x0
-	pushq $0x0
-
-	call *%rsi
-
-	cli
-	hlt
-END(_libkvmplat_newstack)

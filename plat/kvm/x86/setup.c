@@ -60,9 +60,6 @@ static char cmdline[MAX_CMDLINE_SIZE];
 struct kvmplat_config _libkvmplat_cfg = { 0 };
 struct uk_bootinfo bootinfo = { 0 };
 
-extern void _libkvmplat_newstack(uintptr_t stack_start, void (*tramp)(void *),
-				 void *arg);
-
 static void _convert_mbinfo(struct multiboot_info *mi)
 {
 	multiboot_memory_map_t *m;
@@ -443,9 +440,11 @@ EXIT_FATAL:
 #define _init_paging(mi) do { } while (0)
 #endif /* CONFIG_PAGING */
 
-static void _libkvmplat_entry2(void *arg __attribute__((unused)))
+static void __noreturn _libkvmplat_entry2(void)
 {
 	ukplat_entry_argp(NULL, cmdline, sizeof(cmdline));
+
+	ukplat_lcpu_halt();
 }
 
 void _libkvmplat_entry(struct lcpu *lcpu, void *arg)
@@ -518,5 +517,6 @@ void _libkvmplat_entry(struct lcpu *lcpu, void *arg)
 	 */
 	uk_pr_info("Switch from bootstrap stack to stack @%p\n",
 		   (void *)_libkvmplat_cfg.bstack.end);
-	_libkvmplat_newstack(_libkvmplat_cfg.bstack.end, _libkvmplat_entry2, 0);
+	lcpu_arch_jump_to((void *)_libkvmplat_cfg.bstack.end,
+			  _libkvmplat_entry2);
 }
