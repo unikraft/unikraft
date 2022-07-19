@@ -43,6 +43,9 @@
 #include <uk/essentials.h>
 #include <x86/acpi/acpi.h>
 
+#include <uk/plat/lcpu.h>
+#include <uk/plat/common/lcpu.h>
+
 #ifdef CONFIG_PAGING
 #include <uk/plat/paging.h>
 #include <uk/falloc.h>
@@ -445,7 +448,7 @@ static void _libkvmplat_entry2(void *arg __attribute__((unused)))
 	ukplat_entry_argp(NULL, cmdline, sizeof(cmdline));
 }
 
-void _libkvmplat_entry(void *arg)
+void _libkvmplat_entry(struct lcpu *lcpu __unused, void *arg)
 {
 	struct multiboot_info *mi = (struct multiboot_info *)arg;
 
