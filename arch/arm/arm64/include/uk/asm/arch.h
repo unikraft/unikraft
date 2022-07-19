@@ -157,6 +157,57 @@
 #define MAIR_EL1_ATTR_MASK(idx)			(_AC(0xff, UL) << ((idx) * 8))
 #define MAIR_EL1_ATTR(attr, idx)		(_AC(attr, UL) << ((idx) * 8))
 
+/* ID_AA64MMFR0_EL1 - Memory Model Feature Register 1 */
+#define ID_AA64MMFR0_EL1_PARANGE_SHIFT		_AC(0, U)
+#define ID_AA64MMFR0_EL1_PARANGE_MASK		_AC(0xf, ULL)
+
+#define PARANGE_0000				_AC(32, U)
+#define PARANGE_0001				_AC(36, U)
+#define PARANGE_0010				_AC(40, U)
+#define PARANGE_0011				_AC(42, U)
+#define PARANGE_0100				_AC(44, U)
+#define PARANGE_0101				_AC(48, U)
+#define PARANGE_0110				_AC(52, U)
+
+#define ID_AA64MMFR0_EL1_ECV_SHIFT		_AC(60, U)
+#define ID_AA64MMFR0_EL1_ECV_MASK		_AC(0xf, ULL)
+#define ID_AA64MMFR0_EL1_ECV_NOT_SUPPORTED	_AC(0x0, ULL)
+#define ID_AA64MMFR0_EL1_ECV_SUPPORTED		_AC(0x1, ULL)
+#define ID_AA64MMFR0_EL1_ECV_SELF_SYNCH		_AC(0x2, ULL)
+
+#define ID_AA64MMFR0_EL1_FGT_SHIFT		_AC(56, U)
+#define ID_AA64MMFR0_EL1_FGT_MASK		_AC(0xf, ULL)
+#define ID_AA64MMFR0_EL1_FGT_SUPPORTED		_AC(0x1, ULL)
+#define ID_AA64MMFR0_EL1_FGT_NOT_SUPPORTED	_AC(0x0, ULL)
+
+#define ID_AA64MMFR0_EL1_TGRAN4_SHIFT		_AC(28, U)
+#define ID_AA64MMFR0_EL1_TGRAN4_MASK		_AC(0xf, ULL)
+#define ID_AA64MMFR0_EL1_TGRAN4_SUPPORTED	_AC(0x0, ULL)
+#define ID_AA64MMFR0_EL1_TGRAN4_NOSUPPORTED	_AC(0xf, ULL)
+
+#define ID_AA64MMFR0_EL1_TGRAN64_SHIFT		_AC(24, U)
+#define ID_AA64MMFR0_EL1_TGRAN64_MASK		_AC(0xf, ULL)
+#define ID_AA64MMFR0_EL1_TGRAN64_SUPPORTED	_AC(0x0, ULL)
+#define ID_AA64MMFR0_EL1_TGRAN64_NOT_SUPPORTED	_AC(0xf, ULL)
+
+#define ID_AA64MMFR0_EL1_TGRAN16_SHIFT		_AC(20, U)
+#define ID_AA64MMFR0_EL1_TGRAN16_MASK		_AC(0xf, ULL)
+#define ID_AA64MMFR0_EL1_TGRAN16_SUPPORTED	_AC(0x1, ULL)
+#define ID_AA64MMFR0_EL1_TGRAN16_NOT_SUPPORTED	_AC(0x0, ULL)
+
+/* ID_AA64MMFR2_EL1 - Memory Model Feature Register 2 */
+#define ID_AA64MMFR2_EL1			S3_0_C0_C7_2
+
+#define ID_AA64MMFR2_EL1_ST_SHIFT		_AC(28, U)
+#define ID_AA64MMFR2_EL1_ST_MASK		_AC(0xf, ULL)
+
+#define ID_AA64MMFR2_EL1_CCIDX_SHIFT		_AC(20, U)
+#define ID_AA64MMFR2_EL1_CCIDX_MASK		_AC(0xf, ULL)
+#define ID_AA64MMFR2_EL1_CCIDX_LENGTH		_AC(4, U)
+
+#define ID_AA64MMFR2_EL1_CNP_SHIFT		_AC(0, U)
+#define ID_AA64MMFR2_EL1_CNP_MASK		_AC(0xf, ULL)
+
 /* SCTLR_EL1: System Control Register */
 #define SCTLR_EL1_M_BIT			(_AC(1, UL) << 0)
 #define SCTLR_EL1_A_BIT			(_AC(1, UL) << 1)
@@ -201,6 +252,8 @@
 #define TCR_EL1_ASID_SHIFT		36
 #define TCR_EL1_ASID_8			(_AC(0, UL) << TCR_EL1_ASID_SHIFT)
 #define TCR_EL1_ASID_16			(_AC(1, UL) << TCR_EL1_ASID_SHIFT)
+#define TCR_EL1_IPS_SHIFT		32
+#define TCR_EL1_IPS_MASK		(_AC(0x7, UL))
 #define TCR_EL1_TG1_SHIFT		30
 #define TCR_EL1_TG1_MASK		_AC(0x3, UL)
 #define TCR_EL1_SH1_SHIFT		28
@@ -225,9 +278,38 @@
 #define TCR_EL1_T0SZ_MASK		0x3f
 #define TCR_EL1_T0SZ_SHIFT		0
 
+#define TCR_EL1_IPS_32			0
+#define TCR_EL1_IPS_36			1
+#define TCR_EL1_IPS_40			2
+#define TCR_EL1_IPS_42			3
+#define TCR_EL1_IPS_44			4
+#define TCR_EL1_IPS_48			5
+#define TCR_EL1_IPS_52			6
+#define TCR_EL1_IPS(x)			(_AC(x, UL) << TCR_EL1_IPS_SHIFT)
+
+#define TCR_EL1_T0SZ_52			12
+#define TCR_EL1_T0SZ_48			16
+#define TCR_EL1_T0SZ_44			20
+#define TCR_EL1_T0SZ_42			22
+#define TCR_EL1_T0SZ_40			24
+#define TCR_EL1_T0SZ_36			28
+#define TCR_EL1_T0SZ_32			32
+#define TCR_EL1_T0SZ(x)			(_AC(x, UL) << TCR_EL1_T0SZ_SHIFT)
+#define TCR_EL1_T1SZ(x)			(_AC(x, UL) << TCR_EL1_T1SZ_SHIFT)
+
 #define TCR_EL1_TG0_4K			0
 #define TCR_EL1_TG0_64K			1
 #define TCR_EL1_TG0_16K			2
+
+/* TTBR0_EL1 - Translation Table Base Register 0 */
+#define TTBR0_EL1_ASID_MASK		_AC(0xffff000000000000, UL)
+#define TTBR0_EL1_BADDR_MASK		_AC(0x0000fffffffffffe, UL)
+#define TTBR0_EL1_CnP_MASK		_AC(0x0000000000000001, UL)
+
+/* TTBR1_EL1 - Translation Table Base Register 1 */
+#define TTBR1_EL1_ASID_MASK		_AC(0xffff000000000000, UL)
+#define TTBR1_EL1_BADDR_MASK		_AC(0x0000fffffffffffe, UL)
+#define TTBR1_EL1_CnP_MASK		_AC(0x0000000000000001, UL)
 
 /* TTBR0_EL1 - Translation Table Base Register 0 */
 #define TTBR0_EL1_ASID_MASK		_AC(0xffff000000000000, UL)
@@ -249,6 +331,11 @@
 #define PTE_TYPE_BLOCK			1
 #define PTE_TYPE_PAGE			3
 #define PTE_TYPE_TABLE			3
+
+#define PTE_L2_BLOCK_PADDR_MASK		_AC(0x0000ffffc0000000, UL)
+#define PTE_L1_BLOCK_PADDR_MASK		_AC(0x0000ffffffe00000, UL)
+#define PTE_L0_PAGE_PADDR_MASK		_AC(0x0000fffffffff000, UL)
+#define PTE_Lx_TABLE_PADDR_MASK		_AC(0x0000fffffffff000, UL)
 
 /* Translation Table Descriptor Attributes */
 #define PTE_ATTR_MASK_H			_AC(0xfff0000000000000, UL)
@@ -278,4 +365,3 @@
 #define PTE_ATTR_NS			(1 << 5)
 #define PTE_ATTR_IDX(x)			((x) << 2)
 #define PTE_ATTR_IDX_MASK		(7 << 2)
-
