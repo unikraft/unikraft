@@ -2,7 +2,7 @@
 /*
  * Authors: Cristian Vijelie <cristianvijelie@gmail.com>
  *
- * Copyright (c) 2021, University Politehnica of Bucharest. All rights reserved.
+ * Copyright (c) 2021, University POLITEHNICA of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -54,14 +54,10 @@ struct RSDPDescriptor20 {
 	__u8 Reserved[3];
 } __packed;
 
-/* Error codes returned by acpi_init */
-#define ACPI_INVALID_TABLE      -1
-#define ACPI_NOT_IMPLEMENTED    -2
-
 /**
  * Detect ACPI version and discover ACPI tables.
  *
- * @return 0 on success, one of the ACPI_* error codes otherwise.
+ * @return 0 on success, -errno otherwise.
  */
 int acpi_init(void);
 

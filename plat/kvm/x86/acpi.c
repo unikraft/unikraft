@@ -2,7 +2,7 @@
 /*
  * Authors: Cristian Vijelie <cristianvijelie@gmail.com>
  *
- * Copyright (c) 2021, University Politehnica of Bucharest. All rights reserved.
+ * Copyright (c) 2021, University POLITEHNICA of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -32,10 +32,12 @@
  */
 
 #include <uk/print.h>
-#include <string.h>
+#include <uk/assert.h>
 #include <x86/acpi/acpi.h>
 #include <x86/acpi/madt.h>
-#include <uk/assert.h>
+
+#include <string.h>
+#include <errno.h>
 
 #define RSDT_ENTRIES(rsdt) (((rsdt)->h.Length - sizeof((rsdt)->h)) / 4)
 
@@ -78,8 +80,8 @@ static inline int verify_acpi_checksum(struct ACPISDTHeader *h)
  * Find the Root System Descriptor Pointer (RSDP) in the physical memory area
  * 0xe0000 -> 0xfffff and determine ACPI version.
  *
- * @return ACPI_INVALID_TABLE if the table is not found, or invalid,
- * ACPI_NOT_IMPLEMENTED if the ACPI version is >= 2, 0 otherwise.
+ * @return 0 on success, -ENOENT if the table is not found, or invalid,
+ * -ENOTSUP if the ACPI version is not supported.
  */
 
 static int detect_acpi_version(void)
@@ -101,14 +103,14 @@ static int detect_acpi_version(void)
 
 	if (!acpi_rsdp) {
 		uk_pr_debug("ACPI RSDP not found\n");
-		return ACPI_INVALID_TABLE;
+		return -ENOENT;
 	}
 
 	if (verify_rsdp_checksum(acpi_rsdp) != 0) {
 		uk_pr_err("ACPI RSDP corrupted\n");
 
 		acpi_rsdp = NULL;
-		return ACPI_INVALID_TABLE;
+		return -ENOENT;
 	}
 
 	uk_pr_info("ACPI version detected: ");
@@ -124,7 +126,7 @@ static int detect_acpi_version(void)
 		 */
 		uk_pr_err("ACPI version not supported\n");
 
-		return ACPI_NOT_IMPLEMENTED;
+		return -ENOTSUP;
 	}
 
 	return 0;
@@ -142,11 +144,11 @@ static int acpi10_find_rsdt(void)
 	acpi_rsdt = (struct RSDT *)((__uptr)acpi_rsdp->RsdtAddress);
 	uk_pr_debug("ACPI RSDT present at %p\n", acpi_rsdt);
 
-	if (verify_acpi_checksum(&acpi_rsdt->h) != 0) {
+	if (unlikely(verify_acpi_checksum(&acpi_rsdt->h) != 0)) {
 		uk_pr_err("ACPI RSDT corrupted\n");
 
 		acpi_rsdt = NULL;
-		return ACPI_INVALID_TABLE;
+		return -ENOENT;
 	}
 
 	return 0;
@@ -179,7 +181,7 @@ static int acpi10_find_madt(void)
 
 		if (verify_acpi_checksum(h) != 0) {
 			uk_pr_err("ACPI MADT corrupted\n");
-			return ACPI_INVALID_TABLE;
+			return -ENOENT;
 		}
 
 		acpi_madt = (struct MADT *)h;
@@ -187,7 +189,7 @@ static int acpi10_find_madt(void)
 	}
 
 	/* no MADT was found */
-	return ACPI_INVALID_TABLE;
+	return -ENOENT;
 }
 
 /*
@@ -260,7 +262,7 @@ int acpi_init(void)
 		}
 	} else {
 		UK_ASSERT(!acpi_version);
-		return ACPI_NOT_IMPLEMENTED;
+		return -ENOTSUP;
 	}
 
 	return 0;
