@@ -33,6 +33,7 @@
 
 #include <uk/asm.h>
 #include <uk/asm/arch.h>
+#include <uk/config.h>
 
 #define CACHE_LINE_SIZE		64
 
@@ -51,7 +52,7 @@
 
 /* Memory attributes */
 #define PTE_ATTR_DEFAULT					\
-	(PTE_ATTR_AF | PTE_ATTR_SH(PTE_ATTR_SH_IS) | PTE_TYPE_Lx_BLOCK)
+	(PTE_ATTR_AF | PTE_ATTR_SH(PTE_ATTR_SH_IS) | PTE_TYPE_BLOCK)
 
 #define PTE_ATTR_DEVICE_nGnRE					\
 	(PTE_ATTR_DEFAULT | PTE_ATTR_XN | PTE_ATTR_IDX(DEVICE_nGnRE))
@@ -108,9 +109,21 @@
 #define TCR_SMP_ATTRS						\
 	(TCR_EL1_SH0_IS | TCR_EL1_SH1_IS)
 
+#ifdef CONFIG_PAGING
+/* Set TCR attributes as required by the arm64 paging implementation:
+ * 48-bit IA, 48-bit OA, 4KiB granule, TTBR0_EL1 walks enabled,
+ * TTBR1_EL1 walks disabled.
+ */
+#define TCR_INIT_FLAGS						\
+	(TCR_EL1_ASID_16 | TCR_CACHE_ATTRS | TCR_SMP_ATTRS |	\
+	 (TCR_EL1_TG0_4K << TCR_EL1_TG0_SHIFT) |		\
+	 TCR_EL1_EPD1_BIT | TCR_EL1_T0SZ(TCR_EL1_T0SZ_48) |	\
+	 TCR_EL1_IPS(TCR_EL1_IPS_48))
+#else
 #define TCR_INIT_FLAGS						\
 	(TCR_EL1_ASID_16 | TCR_CACHE_ATTRS | TCR_SMP_ATTRS |	\
 	 (TCR_EL1_TG0_4K << TCR_EL1_TG0_SHIFT))
+#endif /* CONFIG_PAGING */
 
 /* Default MAIR_EL1 configuration */
 
@@ -129,6 +142,12 @@
 	 MAIR_EL1_ATTR(MAIR_NORMAL_NC, NORMAL_NC) |		\
 	 MAIR_EL1_ATTR(MAIR_NORMAL_WT, NORMAL_WT) |		\
 	 MAIR_EL1_ATTR(MAIR_NORMAL_WB, NORMAL_WB))
+
+/* Mapping of TCR_EL1.IPS to number of bits */
+#ifndef __ASSEMBLY__
+static __attribute__((unused))
+unsigned char tcr_ips_bits[] = {32, 36, 40, 42, 44, 48};
+#endif
 
 #ifdef __ASSEMBLY__
 /*
