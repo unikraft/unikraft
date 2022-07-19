@@ -2,7 +2,7 @@
 /*
  * Authors: Cristian Vijelie <cristianvijelie@gmail.com>
  *
- * Copyright (c) 2021, University Politehnica of Bucharest. All rights reserved.
+ * Copyright (c) 2021, University POLITEHNICA of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,8 +31,8 @@
  *
  */
 
-#ifndef __PLAT_KVM_X86_DELAY_H__
-#define __PLAT_KVM_X86_DELAY_H__
+#ifndef __PLAT_COMMON_X86_DELAY_H__
+#define __PLAT_COMMON_X86_DELAY_H__
 
 #include <x86/cpu.h>
 
@@ -60,4 +60,4 @@ static inline void mdelay(__u16 msec)
 		udelay(1000);
 }
 
-#endif /* __PLAT_KVM_X86_DELAY_H__ */
+#endif /* __PLAT_COMMON_X86_DELAY_H__ */
