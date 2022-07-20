@@ -108,6 +108,10 @@ UK_SYSCALL_R_DEFINE(uid_t, getuid)
 
 UK_SYSCALL_R_DEFINE(int, setuid, uid_t, uid)
 {
+	/* We allow only UK_DEFAULT_UID */
+	if (unlikely(uid != UK_DEFAULT_UID))
+		return -EINVAL;
+
 	return 0;
 }
 
@@ -117,13 +121,21 @@ UK_SYSCALL_R_DEFINE(uid_t, geteuid)
 }
 
 /* not a syscall */
-int seteuid(uid_t euid __unused)
+int seteuid(uid_t euid)
 {
+	/* We allow only UK_DEFAULT_UID */
+	if (unlikely(euid != UK_DEFAULT_UID))
+		return -EINVAL;
+
 	return 0;
 }
 
 UK_SYSCALL_R_DEFINE(int, setreuid, uid_t, ruid, uid_t, euid)
 {
+	/* We allow only UK_DEFAULT_UID */
+	if (unlikely(ruid != UK_DEFAULT_UID || euid != UK_DEFAULT_UID))
+		return -EINVAL;
+
 	return 0;
 }
 
@@ -139,6 +151,12 @@ UK_SYSCALL_R_DEFINE(int, getresuid, uid_t *, ruid, uid_t *, euid, uid_t *, suid)
 
 UK_SYSCALL_R_DEFINE(int, setresuid, uid_t, ruid, uid_t, euid, uid_t, suid)
 {
+	/* We allow only UK_DEFAULT_UID */
+	if (unlikely(ruid != UK_DEFAULT_UID ||
+		     euid != UK_DEFAULT_UID ||
+		     suid != UK_DEFAULT_UID))
+		return -EINVAL;
+
 	return 0;
 }
 
