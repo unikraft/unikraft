@@ -105,20 +105,7 @@ ENTRY(_libkvmplat_entry)
 	msr sctlr_el1, x2
 	isb
 
-	/*
-	 * Clean the boot stack and page table. As _end, PAGE_TABLE_SIZE and
-	 * BOOT_STACK_SIZE are page_size alignment, the boot stack can be
-	 * 64-bytes alignment too. Execute 4 stp consecutively without boundary
-	 * check would be safe here.
-	 */
-1:
-	stp xzr, xzr, [x26], #16
-	stp xzr, xzr, [x26], #16
-	stp xzr, xzr, [x26], #16
-	stp xzr, xzr, [x26], #16
-	cmp x26, x27
-	b.lo 1b
-
+	/* Set the boot stack */
 	mov sp, x27
 
 	/* Set the context id */
