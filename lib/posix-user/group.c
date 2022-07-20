@@ -187,58 +187,57 @@ UK_SYSCALL_R_DEFINE(int, setgroups, size_t, size, const gid_t *, list)
 	return 0;
 }
 
-int getgrnam_r(const char *name, struct group *grp,
-	       char *buf, size_t buflen, struct group **result)
+static int getgr_r(struct group *ingrp, struct group *grp, char *buf,
+		   size_t buflen, struct group **result)
 {
 	size_t needed;
 	int i, members;
 
-	if (!name || strcmp(name, g__.gr_name)) {
+	UK_ASSERT(grp);
+	UK_ASSERT(buf);
+	UK_ASSERT(result);
+
+	if (unlikely(!ingrp)) {
 		*result = NULL;
 		return 0;
 	}
 
-	/* check if provided buffer is big enough */
-	needed = strlen(g__.gr_name) + 1
-			+ strlen(g__.gr_passwd) + 1
-			+ sizeof(g__.gr_gid);
-	i = 0;
-	while (g__.gr_mem[i])
-		needed += strlen(g__.gr_mem[i++]) + 1;
-	members = i;
+	/* check if provided buffer is large enough */
+	needed = strlen(ingrp->gr_name) + 1 +
+		 strlen(ingrp->gr_passwd) + 1;
 
-	if (buflen < needed) {
+	members = 0;
+	while (ingrp->gr_mem[members])
+		needed += strlen(ingrp->gr_mem[members++]) + 1;
+
+	needed += members + 1 * sizeof(char *);
+
+	if (unlikely(buflen < needed)) {
 		*result = NULL;
-		return ERANGE;
+		return ERANGE; /* must be positive */
 	}
 
 	/* set name */
-	strlcpy(buf, g__.gr_name, strlen(g__.gr_name) + 1);
 	grp->gr_name = buf;
-	buf += strlen(g__.gr_name) + 1;
+	buf = pu_cpystr(ingrp->gr_name, buf);
 
 	/* set passwd */
-	strlcpy(buf, g__.gr_passwd, strlen(g__.gr_passwd) + 1);
 	grp->gr_passwd = buf;
-	buf += strlen(g__.gr_passwd) + 1;
+	buf = pu_cpystr(ingrp->gr_passwd, buf);
 
 	/* set gid */
-	grp->gr_gid = g__.gr_gid;
+	grp->gr_gid = ingrp->gr_gid;
 
 	/* set members */
-	i = 0;
 	grp->gr_mem = (char **) buf;
 	buf += (members + 1) * sizeof(char *);
-	while (g__.gr_mem[i]) {
-		strlcpy(buf, g__.gr_mem[i], strlen(g__.gr_mem[i]) + 1);
+	for (i = 0; i < members; i++) {
 		grp->gr_mem[i] = buf;
-		buf += strlen(g__.gr_mem[i]) + 1;
-		i++;
+		buf = pu_cpystr(ingrp->gr_mem[i], buf);
 	}
-	grp->gr_mem[i] = NULL;
+	grp->gr_mem[members] = NULL;
 
 	*result = grp;
-
 	return 0;
 }
 
@@ -256,6 +255,12 @@ struct group *getgrnam(const char *name)
 	return res;
 }
 
+int getgrnam_r(const char *name, struct group *grp,
+	       char *buf, size_t buflen, struct group **result)
+{
+	return getgr_r(getgrnam(name), grp, buf, buflen, result);
+}
+
 struct group *getgrgid(gid_t gid)
 {
 	struct group *res;
@@ -268,4 +273,10 @@ struct group *getgrgid(gid_t gid)
 	}
 
 	return res;
+}
+
+int getgrgid_r(gid_t gid, struct group *grp, char *buf, size_t buflen,
+	       struct group **result)
+{
+	return getgr_r(getgrgid(gid), grp, buf, buflen, result);
 }
