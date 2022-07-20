@@ -169,6 +169,18 @@ UK_SYSCALL_R_DEFINE(int, setfsuid, uid_t, fsuid)
 char *getlogin(void)
 {
 	return UK_DEFAULT_USER;
+}
+
+int getlogin_r(char *buf, size_t bufsize)
+{
+	UK_ASSERT(buf);
+
+	if (unlikely(bufsize < sizeof(UK_DEFAULT_USER))) {
+		errno = ERANGE;
+		return -1;
+	}
+
+	memcpy(buf, UK_DEFAULT_USER, sizeof(UK_DEFAULT_USER));
 	return 0;
 }
 
