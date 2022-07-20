@@ -67,3 +67,10 @@ getgrnam_r
 getgrgid
 getgrgid_r
 getgrouplist
+
+capget
+uk_syscall_e_capget
+uk_syscall_r_capget
+capset
+uk_syscall_e_capset
+uk_syscall_r_capset
