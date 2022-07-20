@@ -108,6 +108,10 @@ UK_SYSCALL_R_DEFINE(gid_t, getgid)
 
 UK_SYSCALL_R_DEFINE(int, setgid, gid_t, gid)
 {
+	/* We allow only UK_DEFAULT_GID */
+	if (unlikely(gid != UK_DEFAULT_GID))
+		return -EINVAL;
+
 	return 0;
 }
 
@@ -123,13 +127,21 @@ UK_SYSCALL_R_DEFINE(gid_t, getegid)
 }
 
 /* not a syscall */
-int setegid(gid_t egid __unused)
+int setegid(gid_t egid)
 {
+	/* We allow only UK_DEFAULT_GID */
+	if (unlikely(egid != UK_DEFAULT_GID))
+		return -EINVAL;
+
 	return 0;
 }
 
 UK_SYSCALL_R_DEFINE(int, setregid, gid_t, rgid, gid_t, egid)
 {
+	/* We allow only UK_DEFAULT_GID */
+	if (unlikely(rgid != UK_DEFAULT_GID || egid != UK_DEFAULT_GID))
+		return -EINVAL;
+
 	return 0;
 }
 
