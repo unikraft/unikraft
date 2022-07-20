@@ -71,6 +71,14 @@ config HAVE_PAGING_DIRECTMAP
 	default y if PAGING && ARCH_X86_64
 	default n
 
+config ENFORCE_W_XOR_X
+	bool "Enforce W^X"
+	depends on PAGING && ARCH_ARM_64
+	default y
+	help
+		During boot the protection settings of all memory
+		ranges are updated to enforce write XOR execute (W^X)
+		and mitigate code injection attacks.
 endmenu
 
 config HZ
