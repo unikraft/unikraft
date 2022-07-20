@@ -48,11 +48,22 @@
 #include <errno.h>
 #include <sys/types.h>
 
+/* Default passwd */
+static struct passwd pw__ = {
+	.pw_name = UK_DEFAULT_USER,
+	.pw_passwd = UK_DEFAULT_PASS,
+	.pw_uid = UK_DEFAULT_UID,
+	.pw_gid = UK_DEFAULT_GID,
+	.pw_gecos = UK_DEFAULT_USER,
+	.pw_dir = "/",
+	.pw_shell = "",
+};
+
 static __uk_tls struct passwd_entry {
 	struct passwd *passwd;
 
 	UK_SLIST_ENTRY(struct passwd_entry) entries;
-} *iter;
+} *passwds_iter;
 
 UK_SLIST_HEAD(uk_entry_list, struct passwd_entry);
 
@@ -60,42 +71,32 @@ static struct uk_entry_list passwds;
 
 void pu_init_passwds(void)
 {
-	static struct passwd_entry p1;
-	static struct passwd passwd = {
-		.pw_name = UK_DEFAULT_USER,
-		.pw_passwd = UK_DEFAULT_PASS,
-		.pw_uid = UK_DEFAULT_UID,
-		.pw_gid = UK_DEFAULT_GID,
-		.pw_gecos = UK_DEFAULT_USER,
-		.pw_dir = "/",
-		.pw_shell = NULL,
-	};
+	static struct passwd_entry pe;
 
-	p1.passwd = &passwd;
-
+	pe.passwd = &pw__;
 	UK_SLIST_INIT(&passwds);
-	UK_SLIST_INSERT_HEAD(&passwds, &p1, entries);
+	UK_SLIST_INSERT_HEAD(&passwds, &pe, entries);
 }
 
 void setpwent(void)
 {
-	iter = UK_SLIST_FIRST(&passwds);
+	passwds_iter = UK_SLIST_FIRST(&passwds);
 }
 
 void endpwent(void)
 {
+	/* Nothing to do */
 }
 
 struct passwd *getpwent(void)
 {
 	struct passwd *pwd;
 
-	if (iter == NULL)
-		return NULL;
-
-	pwd = iter->passwd;
-
-	iter = UK_SLIST_NEXT(iter, entries);
+	if (passwds_iter) {
+		pwd = passwds_iter->passwd;
+		passwds_iter = UK_SLIST_NEXT(passwds_iter, entries);
+	} else
+		pwd = NULL;
 
 	return pwd;
 }
@@ -151,10 +152,12 @@ struct passwd *getpwnam(const char *name)
 {
 	struct passwd *pwd;
 
-	setpwent();
-	while ((pwd = getpwent()) && strcmp(pwd->pw_name, name))
-		;
-	endpwent();
+	if (name && !strcmp(name, pw__.pw_name))
+		pwd = &pw__;
+	else {
+		pwd = NULL;
+		errno = ENOENT;
+	}
 
 	return pwd;
 }
@@ -170,10 +173,12 @@ struct passwd *getpwuid(uid_t uid)
 {
 	struct passwd *pwd;
 
-	setpwent();
-	while ((pwd = getpwent()) && pwd->pw_uid != uid)
-		;
-	endpwent();
+	if (uid == pw__.pw_uid)
+		pwd = &pw__;
+	else {
+		pwd = NULL;
+		errno = ENOENT;
+	}
 
 	return pwd;
 }

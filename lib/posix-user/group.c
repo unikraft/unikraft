@@ -85,21 +85,20 @@ void setgrent(void)
 
 void endgrent(void)
 {
-	setgrent();
+	/* Nothing to do */
 }
 
 struct group *getgrent(void)
 {
-	struct group *res;
+	struct group *grp;
 
 	if (groups_iter) {
-		res = groups_iter->group;
+		grp = groups_iter->group;
 		groups_iter = UK_SLIST_NEXT(groups_iter, entries);
 	} else
-		res = NULL;
+		grp = NULL;
 
-	return res;
-
+	return grp;
 }
 
 UK_SYSCALL_R_DEFINE(gid_t, getgid)
