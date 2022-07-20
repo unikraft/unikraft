@@ -35,9 +35,19 @@
 
 #include <uk/config.h>
 
+/*
+* initial workaround, needed for STACK_SIZE
+*/
+#include <uk/plat/config.h>
+
 #include <stddef.h>
 #include <stdio.h>
 #include <errno.h>
+
+/*
+* DELETEME: we use stdlib for now
+* TODO: use uk allocators later, for better performance
+*/
 #include <stdlib.h>
 
 #if CONFIG_LIBUKBOOT_INITBBUDDY
@@ -84,7 +94,7 @@ struct thread_main_arg {
 
 void __attribute__ ((constructor)) __attribute__((no_sanitize("shadow-call-stack"))) setup_x18()
 {
-	void *shadow = malloc(16384);
+	void *shadow = malloc(STACK_SIZE);
 	__asm __volatile ( "mov x18, %0" : : "r" (shadow) );
 }
 
