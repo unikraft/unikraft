@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
+ * Authors: Marc Rittinghaus <marc.rittinghaus@kit.edu>
  *
- * Copyright (c) 2019, University Politehnica of Bucharest. All rights reserved.
+ * Copyright (c) 2022, Karlsruhe Institute of Technology (KIT).
+ *                     All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,23 +31,18 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __UK_USER_H__
-#define __UK_USER_H__
-#ifdef __cplusplus
-extern "C" {
-#endif
+#ifndef __LIBPOSIX_USER_H__
+#define __LIBPOSIX_USER_H__
 
-#define __NEED_uid_t
-#define __NEED_gid_t
-#include <sys/types.h>
+#include <uk/assert.h>
 
-int getresuid(uid_t *ruid, uid_t *euid, uid_t *suid);
-int setresuid(uid_t ruid, uid_t euid, uid_t suid);
+#define UK_DEFAULT_UID		0
+#define UK_DEFAULT_GID		0
+#define UK_DEFAULT_USER		"root"
+#define UK_DEFAULT_GROUP	"root"
+#define UK_DEFAULT_PASS		""
 
-int getresgid(gid_t *rgid, gid_t *egid, gid_t *sgid);
-int setresgid(gid_t rgid, gid_t egid, gid_t sgid);
+void pu_init_passwds(void);
+void pu_init_groups(void);
 
-#ifdef __cplusplus
-}
-#endif
-#endif /* __UK_USER_H__ */
+#endif /* __LIBPOSIX_USER_H__ */
