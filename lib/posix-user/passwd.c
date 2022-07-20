@@ -277,3 +277,14 @@ int getpwuid_r(uid_t uid, struct passwd *pwd, char *buf, size_t buflen,
 {
 	return getpw_r(getpwuid(uid), pwd, buf, buflen, result);
 }
+
+/* TODO: Find better place (perhaps posix-process) */
+UK_SYSCALL_R_DEFINE(int, capget, void*, hdrp, void*, datap)
+{
+	return 0;
+}
+
+UK_SYSCALL_R_DEFINE(int, capset, void*, hdrp, void*, datap)
+{
+	return 0;
+}
