@@ -280,3 +280,32 @@ int getgrgid_r(gid_t gid, struct group *grp, char *buf, size_t buflen,
 {
 	return getgr_r(getgrgid(gid), grp, buf, buflen, result);
 }
+
+int getgrouplist(const char *user, gid_t group, gid_t *groups, int *ngroups)
+{
+	struct passwd *pwd;
+	int ngrps;
+
+	UK_ASSERT(ngroups);
+	UK_ASSERT(groups);
+
+	pwd = getpwnam(user);
+	if (!pwd)
+		return -1;
+
+	ngrps = (group == pwd->pw_gid) ? 1 : 2;
+
+	/* Check if the grouplist is large enough */
+	if (*ngroups < ngrps) {
+		*ngroups = ngrps;
+		return -1;
+	}
+
+	groups[0] = pwd->pw_gid;
+	if (group != pwd->pw_gid)
+		groups[1] = group;
+
+	*ngroups = ngrps;
+
+	return ngrps;
+}
