@@ -112,6 +112,7 @@ UK_SYSCALL_R_DEFINE(int, setgid, gid_t, gid)
 	return 0;
 }
 
+/* not a syscall */
 int issetugid(void)
 {
 	return 0;
@@ -122,6 +123,7 @@ UK_SYSCALL_R_DEFINE(gid_t, getegid)
 	return 0;
 }
 
+/* not a syscall */
 int setegid(gid_t egid __unused)
 {
 	return 0;
@@ -132,7 +134,7 @@ UK_SYSCALL_R_DEFINE(int, setregid, gid_t, rgid, gid_t, egid)
 	return 0;
 }
 
-UK_SYSCALL_R_DEFINE(int, getresgid, gid_t*, rgid, gid_t*, egid, gid_t*, sgid)
+UK_SYSCALL_R_DEFINE(int, getresgid, gid_t *, rgid, gid_t *, egid, gid_t *, sgid)
 {
 	if (!rgid || !egid || !sgid) {
 		return -EFAULT;
@@ -159,23 +161,24 @@ UK_SYSCALL_R_DEFINE(int, setfsgid, uid_t, fsgid)
 	return 0;
 }
 
+/* not a syscall */
 int initgroups(const char *user __unused, gid_t group __unused)
 {
 	return 0;
 }
 
-UK_SYSCALL_R_DEFINE(int, getgroups, int, size, gid_t*, list)
+UK_SYSCALL_R_DEFINE(int, getgroups, int, size, gid_t *, list)
 {
 	return 0;
 }
 
-UK_SYSCALL_R_DEFINE(int, setgroups, size_t, size, const gid_t*, list)
+UK_SYSCALL_R_DEFINE(int, setgroups, size_t, size, const gid_t *, list)
 {
 	return 0;
 }
 
 int getgrnam_r(const char *name, struct group *grp,
-		char *buf, size_t buflen, struct group **result)
+	       char *buf, size_t buflen, struct group **result)
 {
 	size_t needed;
 	int i, members;
