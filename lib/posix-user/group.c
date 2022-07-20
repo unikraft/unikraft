@@ -103,7 +103,7 @@ struct group *getgrent(void)
 
 UK_SYSCALL_R_DEFINE(gid_t, getgid)
 {
-	return 0;
+	return UK_DEFAULT_GID;
 }
 
 UK_SYSCALL_R_DEFINE(int, setgid, gid_t, gid)
@@ -119,7 +119,7 @@ int issetugid(void)
 
 UK_SYSCALL_R_DEFINE(gid_t, getegid)
 {
-	return 0;
+	return UK_DEFAULT_GID;
 }
 
 /* not a syscall */
@@ -135,9 +135,8 @@ UK_SYSCALL_R_DEFINE(int, setregid, gid_t, rgid, gid_t, egid)
 
 UK_SYSCALL_R_DEFINE(int, getresgid, gid_t *, rgid, gid_t *, egid, gid_t *, sgid)
 {
-	if (!rgid || !egid || !sgid) {
+	if (unlikely(!rgid || !egid || !sgid))
 		return -EFAULT;
-	}
 
 	*rgid = *egid = *sgid = UK_DEFAULT_GID;
 
@@ -147,17 +146,17 @@ UK_SYSCALL_R_DEFINE(int, getresgid, gid_t *, rgid, gid_t *, egid, gid_t *, sgid)
 UK_SYSCALL_R_DEFINE(int, setresgid, gid_t, rgid, gid_t, egid, gid_t, sgid)
 {
 	/* We allow only UK_DEFAULT_GID */
-	if (rgid != UK_DEFAULT_GID || egid != UK_DEFAULT_GID ||
-			sgid != UK_DEFAULT_GID) {
+	if (unlikely(rgid != UK_DEFAULT_GID ||
+		     egid != UK_DEFAULT_GID ||
+		     sgid != UK_DEFAULT_GID))
 		return -EINVAL;
-	}
 
 	return 0;
 }
 
 UK_SYSCALL_R_DEFINE(int, setfsgid, uid_t, fsgid)
 {
-	return 0;
+	return UK_DEFAULT_GID;
 }
 
 /* not a syscall */
