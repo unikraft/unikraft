@@ -115,6 +115,7 @@ UK_SYSCALL_R_DEFINE(uid_t, geteuid)
 	return 0;
 }
 
+/* not a syscall */
 int seteuid(uid_t euid __unused)
 {
 	return 0;
@@ -125,7 +126,7 @@ UK_SYSCALL_R_DEFINE(int, setreuid, uid_t, ruid, uid_t, euid)
 	return 0;
 }
 
-UK_SYSCALL_R_DEFINE(int, getresuid, uid_t*, ruid, uid_t*, euid, uid_t*, suid)
+UK_SYSCALL_R_DEFINE(int, getresuid, uid_t *, ruid, uid_t *, euid, uid_t *, suid)
 {
 	return 0;
 }
@@ -140,6 +141,7 @@ UK_SYSCALL_R_DEFINE(int, setfsuid, uid_t, fsuid)
 	return 0;
 }
 
+/* not a syscall */
 char *getlogin(void)
 {
 	return 0;
@@ -158,8 +160,8 @@ struct passwd *getpwnam(const char *name)
 }
 
 int getpwnam_r(const char *name __unused, struct passwd *pwd __unused,
-	char *buf __unused, size_t buflen __unused,
-	struct passwd **result __unused)
+	       char *buf __unused, size_t buflen __unused,
+	       struct passwd **result __unused)
 {
 	return 0;
 }
@@ -177,18 +179,8 @@ struct passwd *getpwuid(uid_t uid)
 }
 
 int getpwuid_r(uid_t uid __unused, struct passwd *pwd __unused,
-	char *buf __unused, size_t buflen __unused,
-	struct passwd **result __unused)
-{
-	return 0;
-}
-
-UK_SYSCALL_R_DEFINE(int, capset, void*, hdrp, void*, datap)
-{
-	return 0;
-}
-
-UK_SYSCALL_R_DEFINE(int, capget, void*, hdrp, void*, datap)
+	       char *buf __unused, size_t buflen __unused,
+	       struct passwd **result __unused)
 {
 	return 0;
 }
