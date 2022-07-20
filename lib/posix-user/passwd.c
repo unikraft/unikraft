@@ -103,7 +103,7 @@ struct passwd *getpwent(void)
 
 UK_SYSCALL_R_DEFINE(uid_t, getuid)
 {
-	return 0;
+	return UK_DEFAULT_UID;
 }
 
 UK_SYSCALL_R_DEFINE(int, setuid, uid_t, uid)
@@ -113,7 +113,7 @@ UK_SYSCALL_R_DEFINE(int, setuid, uid_t, uid)
 
 UK_SYSCALL_R_DEFINE(uid_t, geteuid)
 {
-	return 0;
+	return UK_DEFAULT_UID;
 }
 
 /* not a syscall */
@@ -129,6 +129,11 @@ UK_SYSCALL_R_DEFINE(int, setreuid, uid_t, ruid, uid_t, euid)
 
 UK_SYSCALL_R_DEFINE(int, getresuid, uid_t *, ruid, uid_t *, euid, uid_t *, suid)
 {
+	if (unlikely(!ruid || !euid || !suid))
+		return -EFAULT;
+
+	*ruid = *euid = *suid = UK_DEFAULT_UID;
+
 	return 0;
 }
 
@@ -139,12 +144,13 @@ UK_SYSCALL_R_DEFINE(int, setresuid, uid_t, ruid, uid_t, euid, uid_t, suid)
 
 UK_SYSCALL_R_DEFINE(int, setfsuid, uid_t, fsuid)
 {
-	return 0;
+	return UK_DEFAULT_UID;
 }
 
 /* not a syscall */
 char *getlogin(void)
 {
+	return UK_DEFAULT_USER;
 	return 0;
 }
 
