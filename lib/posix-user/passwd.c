@@ -184,6 +184,60 @@ int getlogin_r(char *buf, size_t bufsize)
 	return 0;
 }
 
+static int getpw_r(struct passwd *inpwd, struct passwd *pwd, char *buf,
+		   size_t buflen, struct passwd **result)
+{
+	size_t needed;
+
+	UK_ASSERT(pwd);
+	UK_ASSERT(buf);
+	UK_ASSERT(result);
+
+	if (unlikely(!inpwd)) {
+		*result = NULL;
+		return 0;
+	}
+
+	/* check if provided buffer is large enough */
+	needed = strlen(inpwd->pw_name) + 1 +
+		 strlen(inpwd->pw_passwd) + 1 +
+		 strlen(inpwd->pw_gecos) + 1 +
+		 strlen(inpwd->pw_dir) + 1 +
+		 strlen(inpwd->pw_shell) + 1;
+
+	if (unlikely(buflen < needed)) {
+		*result = NULL;
+		return ERANGE; /* must be positive */
+	}
+
+	/* set name */
+	pwd->pw_name = buf;
+	buf = pu_cpystr(inpwd->pw_name, buf);
+
+	/* set passwd */
+	pwd->pw_passwd = buf;
+	buf = pu_cpystr(inpwd->pw_passwd, buf);
+
+	/* set uid & gid */
+	pwd->pw_uid = inpwd->pw_uid;
+	pwd->pw_gid = inpwd->pw_gid;
+
+	/* set gecos */
+	pwd->pw_gecos = buf;
+	buf = pu_cpystr(inpwd->pw_gecos, buf);
+
+	/* set dir */
+	pwd->pw_dir = buf;
+	buf = pu_cpystr(inpwd->pw_dir, buf);
+
+	/* set shell */
+	pwd->pw_shell = buf;
+	pu_cpystr(inpwd->pw_shell, buf);
+
+	*result = pwd;
+	return 0;
+}
+
 struct passwd *getpwnam(const char *name)
 {
 	struct passwd *pwd;
@@ -198,11 +252,10 @@ struct passwd *getpwnam(const char *name)
 	return pwd;
 }
 
-int getpwnam_r(const char *name __unused, struct passwd *pwd __unused,
-	       char *buf __unused, size_t buflen __unused,
-	       struct passwd **result __unused)
+int getpwnam_r(const char *name, struct passwd *pwd, char *buf, size_t buflen,
+	       struct passwd **result)
 {
-	return 0;
+	return getpw_r(getpwnam(name), pwd, buf, buflen, result);
 }
 
 struct passwd *getpwuid(uid_t uid)
@@ -219,9 +272,8 @@ struct passwd *getpwuid(uid_t uid)
 	return pwd;
 }
 
-int getpwuid_r(uid_t uid __unused, struct passwd *pwd __unused,
-	       char *buf __unused, size_t buflen __unused,
-	       struct passwd **result __unused)
+int getpwuid_r(uid_t uid, struct passwd *pwd, char *buf, size_t buflen,
+	       struct passwd **result)
 {
-	return 0;
+	return getpw_r(getpwuid(uid), pwd, buf, buflen, result);
 }

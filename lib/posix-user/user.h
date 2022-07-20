@@ -45,4 +45,16 @@
 void pu_init_passwds(void);
 void pu_init_groups(void);
 
+static inline char *pu_cpystr(char *src, char *dest)
+{
+	UK_ASSERT(src);
+	UK_ASSERT(dest);
+
+	while (*src)
+		*dest++ = *src++;
+
+	*dest++ = '\0';
+	return dest;
+}
+
 #endif /* __LIBPOSIX_USER_H__ */
