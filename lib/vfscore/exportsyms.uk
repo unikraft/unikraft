@@ -273,6 +273,9 @@ eventpoll_mod
 eventpoll_del
 eventpoll_del_unsafe
 eventpoll_wait
+getdents64
+uk_syscall_e_getdents64
+uk_syscall_r_getdents64
 eventpoll_signal
 __fxstat
 __fxstat64

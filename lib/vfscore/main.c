@@ -1107,6 +1107,44 @@ UK_SYSCALL_R_DEFINE(int, getdents, int, fd, struct dirent*, dirp,
 	return (i * sizeof(struct dirent));
 }
 
+UK_TRACEPOINT(trace_vfs_getdents64, "%d %p %hu", int, struct dirent64 *, size_t);
+UK_TRACEPOINT(trace_vfs_getdents64_ret, "");
+UK_TRACEPOINT(trace_vfs_getdents64_err, "%d", int);
+
+UK_SYSCALL_R_DEFINE(int, getdents64, int, fd, struct dirent64 *, dirp,
+					size_t, count) {
+	trace_vfs_getdents64(fd, dirp, count);
+	if (dirp == NULL || count == 0)
+		return 0;
+
+	DIR dir = {
+		.fd = fd
+	};
+
+	size_t i = 0;
+	struct dirent64 entry, *result;
+	int error;
+
+	while (((i + 1) * sizeof(struct dirent64)) < count) {
+		error = readdir64_r(&dir, &entry, &result);
+		if (error) {
+			trace_vfs_getdents64_err(error);
+			return -error;
+
+		} else
+			trace_vfs_getdents64_ret();
+
+		if (result != NULL) {
+			memcpy(dirp + i, result, sizeof(struct dirent64));
+			i++;
+
+		} else
+			break;
+	}
+
+	return (i * sizeof(struct dirent64));
+}
+
 struct dirent *readdir(DIR *dir)
 {
 	static __thread struct dirent entry, *result;
