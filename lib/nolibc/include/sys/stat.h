@@ -20,6 +20,16 @@ extern "C" {
 
 #include <nolibc-internal/shareddefs.h>
 
+/*
+ * Imported from Musl (arch/x86_64/bits/stat.h)
+ *
+ * Copied from kernel definition, but with padding replaced
+ * by the corresponding correctly-sized userspace types.
+ *
+ * FIXME: This structure is defined for x86_64. On Musl, the ARM layout
+ * is different.
+ */
+
 struct stat {
 	dev_t st_dev;
 	ino_t st_ino;
@@ -37,6 +47,7 @@ struct stat {
 	struct timespec st_atim;
 	struct timespec st_mtim;
 	struct timespec st_ctim;
+	long unused[3];
 };
 
 #define st_atime st_atim.tv_sec
