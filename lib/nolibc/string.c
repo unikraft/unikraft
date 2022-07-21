@@ -362,6 +362,10 @@ size_t strlcat(char *d, const char *s, size_t n)
 }
 
 /* GNU-specific version of strerror_r */
+/*
+ * List generated with `errno`
+ * https://manpages.debian.org/testing/moreutils/errno.1.en.html
+ */
 char *strerror_r(int errnum, char *buf, size_t buflen)
 {
 	const char *strerr;
@@ -383,7 +387,7 @@ char *strerror_r(int errnum, char *buf, size_t buflen)
 		strerr = "Input/output error";
 		break;
 	case ENXIO:
-		strerr = "Device not configured";
+		strerr = "No such device or address";
 		break;
 	case E2BIG:
 		strerr = "Argument list too long";
@@ -397,8 +401,8 @@ char *strerror_r(int errnum, char *buf, size_t buflen)
 	case ECHILD:
 		strerr = "No child processes";
 		break;
-	case EDEADLK:
-		strerr = "Resource deadlock avoided";
+	case EAGAIN:
+		strerr = "Resource temporarily unavailable";
 		break;
 	case ENOMEM:
 		strerr = "Cannot allocate memory";
@@ -413,16 +417,16 @@ char *strerror_r(int errnum, char *buf, size_t buflen)
 		strerr = "Block device required";
 		break;
 	case EBUSY:
-		strerr = "Device busy";
+		strerr = "Device or resource busy";
 		break;
 	case EEXIST:
 		strerr = "File exists";
 		break;
 	case EXDEV:
-		strerr = "Cross-device link";
+		strerr = "Invalid cross-device link";
 		break;
 	case ENODEV:
-		strerr = "Operation not supported by device";
+		strerr = "No such device";
 		break;
 	case ENOTDIR:
 		strerr = "Not a directory";
@@ -467,16 +471,160 @@ char *strerror_r(int errnum, char *buf, size_t buflen)
 		strerr = "Numerical argument out of domain";
 		break;
 	case ERANGE:
-		strerr = "Result too large";
+		strerr = "Numerical result out of range";
 		break;
-	case EAGAIN:
-		strerr = "Resource temporarily unavailable";
+	case EDEADLK:
+		strerr = "Resource deadlock avoided";
 		break;
-	case EINPROGRESS:
-		strerr = "Operation now in progress";
+	case ENAMETOOLONG:
+		strerr = "File name too long";
 		break;
-	case EALREADY:
-		strerr = "Operation already in progress";
+	case ENOLCK:
+		strerr = "No locks available";
+		break;
+	case ENOSYS:
+		strerr = "Function not implemented";
+		break;
+	case ENOTEMPTY:
+		strerr = "Directory not empty";
+		break;
+	case ELOOP:
+		strerr = "Too many levels of symbolic links";
+		break;
+	case ENOMSG:
+		strerr = "No message of desired type";
+		break;
+	case EIDRM:
+		strerr = "Identifier removed";
+		break;
+	case ECHRNG:
+		strerr = "Channel number out of range";
+		break;
+	case EL2NSYNC:
+		strerr = "Level 2 not synchronized";
+		break;
+	case EL3HLT:
+		strerr = "Level 3 halted";
+		break;
+	case EL3RST:
+		strerr = "Level 3 reset";
+		break;
+	case ELNRNG:
+		strerr = "Link number out of range";
+		break;
+	case EUNATCH:
+		strerr = "Protocol driver not attached";
+		break;
+	case ENOCSI:
+		strerr = "No CSI structure available";
+		break;
+	case EL2HLT:
+		strerr = "Level 2 halted";
+		break;
+	case EBADE:
+		strerr = "Invalid exchange";
+		break;
+	case EBADR:
+		strerr = "Invalid request descriptor";
+		break;
+	case EXFULL:
+		strerr = "Exchange full";
+		break;
+	case ENOANO:
+		strerr = "No anode";
+		break;
+	case EBADRQC:
+		strerr = "Invalid request code";
+		break;
+	case EBADSLT:
+		strerr = "Invalid slot";
+		break;
+	case EBFONT:
+		strerr = "Bad font file format";
+		break;
+	case ENOSTR:
+		strerr = "Device not a stream";
+		break;
+	case ENODATA:
+		strerr = "No data available";
+		break;
+	case ETIME:
+		strerr = "Timer expired";
+		break;
+	case ENOSR:
+		strerr = "Out of streams resources";
+		break;
+	case ENONET:
+		strerr = "Machine is not on the network";
+		break;
+	case ENOPKG:
+		strerr = "Package not installed";
+		break;
+	case EREMOTE:
+		strerr = "Object is remote";
+		break;
+	case ENOLINK:
+		strerr = "Link has been severed";
+		break;
+	case EADV:
+		strerr = "Advertise error";
+		break;
+	case ESRMNT:
+		strerr = "Srmount error";
+		break;
+	case ECOMM:
+		strerr = "Communication error on send";
+		break;
+	case EPROTO:
+		strerr = "Protocol error";
+		break;
+	case EMULTIHOP:
+		strerr = "Multihop attempted";
+		break;
+	case EDOTDOT:
+		strerr = "RFS specific error";
+		break;
+	case EBADMSG:
+		strerr = "Bad message";
+		break;
+	case EOVERFLOW:
+		strerr = "Value too large for defined data type";
+		break;
+	case ENOTUNIQ:
+		strerr = "Name not unique on network";
+		break;
+	case EBADFD:
+		strerr = "File descriptor in bad state";
+		break;
+	case EREMCHG:
+		strerr = "Remote address changed";
+		break;
+	case ELIBACC:
+		strerr = "Can not access a needed shared library";
+		break;
+	case ELIBBAD:
+		strerr = "Accessing a corrupted shared library";
+		break;
+	case ELIBSCN:
+		strerr = ".lib section in a.out corrupted";
+		break;
+	case ELIBMAX:
+		strerr = "Attempting to link in too many shared libraries";
+		break;
+	case ELIBEXEC:
+		strerr = "Cannot exec a shared library directly";
+		break;
+	case EILSEQ:
+		strerr = "Invalid or incomplete multibyte or wide character";
+		break;
+	case ERESTART:
+		strerr = "Interrupted system call should be restarted";
+		break;
+	case ESTRPIPE:
+		strerr = "Streams pipe error";
+		break;
+	case EUSERS:
+		strerr = "Too many users";
 		break;
 	case ENOTSOCK:
 		strerr = "Socket operation on non-socket";
@@ -500,19 +648,19 @@ char *strerror_r(int errnum, char *buf, size_t buflen)
 		strerr = "Socket type not supported";
 		break;
 	case EOPNOTSUPP:
-		strerr = "Operation not supported on socket";
+		strerr = "Operation not supported";
 		break;
 	case EPFNOSUPPORT:
 		strerr = "Protocol family not supported";
 		break;
 	case EAFNOSUPPORT:
-		strerr = "Address family not supported by protocol family";
+		strerr = "Address family not supported by protocol";
 		break;
 	case EADDRINUSE:
 		strerr = "Address already in use";
 		break;
 	case EADDRNOTAVAIL:
-		strerr = "Can't assign requested address";
+		strerr = "Cannot assign requested address";
 		break;
 	case ENETDOWN:
 		strerr = "Network is down";
@@ -533,25 +681,22 @@ char *strerror_r(int errnum, char *buf, size_t buflen)
 		strerr = "No buffer space available";
 		break;
 	case EISCONN:
-		strerr = "Socket is already connected";
+		strerr = "Transport endpoint is already connected";
 		break;
 	case ENOTCONN:
-		strerr = "Socket is not connected";
+		strerr = "Transport endpoint is not connected";
 		break;
 	case ESHUTDOWN:
-		strerr = "Can't send after socket shutdown";
+		strerr = "Cannot send after transport endpoint shutdown";
+		break;
+	case ETOOMANYREFS:
+		strerr = "Too many references: cannot splice";
 		break;
 	case ETIMEDOUT:
-		strerr = "Operation timed out";
+		strerr = "Connection timed out";
 		break;
 	case ECONNREFUSED:
 		strerr = "Connection refused";
-		break;
-	case ELOOP:
-		strerr = "Too many levels of symbolic links";
-		break;
-	case ENAMETOOLONG:
-		strerr = "File name too long";
 		break;
 	case EHOSTDOWN:
 		strerr = "Host is down";
@@ -559,98 +704,65 @@ char *strerror_r(int errnum, char *buf, size_t buflen)
 	case EHOSTUNREACH:
 		strerr = "No route to host";
 		break;
-	case ENOTEMPTY:
-		strerr = "Directory not empty";
+	case EALREADY:
+		strerr = "Operation already in progress";
 		break;
-	case EPROCLIM:
-		strerr = "Too many processes";
-		break;
-	case EUSERS:
-		strerr = "Too many users";
-		break;
-	case EDQUOT:
-		strerr = "Disc quota exceeded";
+	case EINPROGRESS:
+		strerr = "Operation now in progress";
 		break;
 	case ESTALE:
-		strerr = "Stale NFS file handle";
+		strerr = "Stale file handle";
 		break;
-	case EBADRPC:
-		strerr = "RPC struct is bad";
+	case EUCLEAN:
+		strerr = "Structure needs cleaning";
 		break;
-	case ERPCMISMATCH:
-		strerr = "RPC version wrong";
+	case ENOTNAM:
+		strerr = "Not a XENIX named type file";
 		break;
-	case EPROGUNAVAIL:
-		strerr = "RPC prog";
+	case ENAVAIL:
+		strerr = "No XENIX semaphores available";
 		break;
-	case EPROGMISMATCH:
-		strerr = "Program version wrong";
+	case EISNAM:
+		strerr = "Is a named type file";
 		break;
-	case EPROCUNAVAIL:
-		strerr = "Bad procedure for program";
+	case EREMOTEIO:
+		strerr = "Remote I/O error";
 		break;
-	case ENOLCK:
-		strerr = "No locks available";
+	case EDQUOT:
+		strerr = "Disk quota exceeded";
 		break;
-	case ENOSYS:
-		strerr = "Function not implemented";
+	case ENOMEDIUM:
+		strerr = "No medium found";
 		break;
-	case EFTYPE:
-		strerr = "Inappropriate file type or format";
-		break;
-	case EAUTH:
-		strerr = "Authentication error";
-		break;
-	case ENEEDAUTH:
-		strerr = "Need authenticator";
-		break;
-	case EIDRM:
-		strerr = "Identifier removed";
-		break;
-	case ENOMSG:
-		strerr = "No message of desired type";
-		break;
-	case EOVERFLOW:
-		strerr = "Value too large to be stored in data type";
+	case EMEDIUMTYPE:
+		strerr = "Wrong medium type";
 		break;
 	case ECANCELED:
 		strerr = "Operation canceled";
 		break;
-	case EILSEQ:
-		strerr = "Illegal byte sequence";
+	case ENOKEY:
+		strerr = "Required key not available";
 		break;
-	case ENOATTR:
-		strerr = "Attribute not found";
+	case EKEYEXPIRED:
+		strerr = "Key has expired";
 		break;
-	case EDOOFUS:
-		strerr = "Programming error";
+	case EKEYREVOKED:
+		strerr = "Key has been revoked";
 		break;
-	case EBADMSG:
-		strerr = "Bad message";
+	case EKEYREJECTED:
+		strerr = "Key was rejected by service";
 		break;
-	case EMULTIHOP:
-		strerr = "Multihop attempted";
-		break;
-	case ENOLINK:
-		strerr = "Link has been severed";
-		break;
-	case EPROTO:
-		strerr = "Protocol error";
-		break;
-	case ENOTCAPABLE:
-		strerr = "Capabilities insufficient";
-		break;
-	case ECAPMODE:
-		strerr = "Not permitted in capability mode";
+	case EOWNERDEAD:
+		strerr = "Owner died";
 		break;
 	case ENOTRECOVERABLE:
 		strerr = "State not recoverable";
 		break;
-	case EOWNERDEAD:
-		strerr = "Previous owner died";
+	case ERFKILL:
+		strerr = "Operation not possible due to RF-kill";
 		break;
-	case ENOTSUP:
-		strerr = "Not supported";
+	case EHWPOISON:
+		strerr = "Memory page has hardware error";
 		break;
 	default:
 		strerr = NULL;
