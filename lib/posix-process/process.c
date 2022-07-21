@@ -151,7 +151,7 @@ static struct posix_thread *pprocess_create_pthread(struct posix_process *pproce
 
 	tid = find_and_reserve_tid();
 	if (tid < 0) {
-		err = EPROCLIM;
+		err = EAGAIN;
 		goto err_out;
 	}
 
