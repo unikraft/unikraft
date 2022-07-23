@@ -433,7 +433,8 @@ include $(CONFIG_UK_BASE)/support/build/Makefile.rules
 # We need to include this file early (before any rule is defined)
 # but after we have tried to load a .config and after having our tools defined
 $(foreach _M,$(wildcard $(addsuffix Makefile.rules,\
-	   $(CONFIG_UK_BASE)/lib/*/ $(CONFIG_UK_BASE)/plat/*/ \
+	   $(CONFIG_UK_BASE)/arch/ $(CONFIG_UK_BASE)/arch/*/ \
+	   $(CONFIG_UK_BASE)/plat/*/ $(CONFIG_UK_BASE)/lib/*/ \
 	   $(addsuffix /,$(ELIB_DIR)) $(APP_DIR)/)), \
 		$(eval $(call verbose_include,$(_M))) \
 )
