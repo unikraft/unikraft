@@ -181,16 +181,14 @@ void ukplat_entry(int argc, char *argv[])
 	/* Allocate a TLS for this execution context */
 	tls = uk_memalign(a,
 			  ukarch_tls_area_align(),
-			  ukarch_tls_area_size()
-			  + ukarch_ectx_size()
-			  + ukarch_ectx_align());
+			  ukarch_tls_area_size());
 	if (!tls) {
 		UK_CRASH("Failed to allocate and initialize TLS\n");
 	}
 	/* Copy from TLS master template */
-	ukarch_tls_area_copy(tls);
+	ukarch_tls_area_init(tls);
 	/* Activate TLS */
-	ukplat_tlsp_set(ukarch_tls_pointer(tls));
+	ukplat_tlsp_set(ukarch_tls_tlsp(tls));
 #endif /* CONFIG_LIBUKALLOC */
 
 #if CONFIG_LIBUKALLOC
