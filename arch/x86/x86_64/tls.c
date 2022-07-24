@@ -44,26 +44,61 @@
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include <uk/arch/types.h>
+#include <uk/arch/tls.h>
+
+#ifndef __UKARCH_TLS_HAVE_TCB__
+#ifndef TCB_SIZE
+#define TCB_SIZE (sizeof(void *))
+#endif /* !TCB_SIZE */
+#endif /* !__UKARCH_TLS_HAVE_TCB__ */
+
+/* A minimal TCB must contain the self pointer */
+UK_CTASSERT(TCB_SIZE >= sizeof(void *));
 
 extern char _tls_start[], _etdata[], _tls_end[];
 
 /*
  * This file implements a static exec TLS layout
  * (variant 2 with one static TLS block).
+ * The calls create a TLS containing space for a TCB.
  *
- * aligned --> +-------------------------+ \
- * allocation  |                         | |
- *             | .tdata                  | |
- *             |                         | |
- *             +-------------------------+ |
- *             |                         | |
- *             | .tbss                   |  > tls_area
- *             |                         | |
- *             +-------------------------+ |
- *             | / PADDING / / / / / / / | |
- *             +-------------------------+ |
- * tlsp -------+-> self pointer (void *) | |
- *             +-------------------------+ /
+ * aligned --> +-------------------------+ \  \
+ * allocation  |                         | |  |
+ *             | .tdata                  | |  |
+ *             |                         | |   > Static TLS block
+ *             + - - - - - - - - - - - - + |  |
+ *             |                         | |  |
+ *             | .tbss                   | |  |
+ *             |                         | |  |
+ *             +-------------------------+ |  /
+ *             | / PADDING / / / / / / / |  > tls_area_size()
+ *             +-------------------------+ |  \
+ * tlsp, tcbp -+-> self pointer (void *) | |  |
+ *             |                         | |  |
+ *             | Custom TCB format       | |   > Thread Control Block (TCB)
+ *             | (might be used          | |  |  (length: TCB_SIZE)
+ *             |  by a libC)             | |  |
+ *             |                         | |  |
+ *             +-------------------------+ /  /
+ *
+ * NOTE: A TCB must contain the self-pointer as first field
+ *       as required by the TLS-ABI. ukarch_tlsp_get() points
+ *       to the TCB of the thread.
+ *
+ *       Example:
+ *         struct tcb {
+ *             struct tcb *self; //<- self pointer
+ *
+ *             int tcb_field0;
+ *             int tcb_field1;
+ *             // ...
+ *         }
+ *
+ *       Accessing the TCB:
+ *         struct *tcb = (struct tcb *) ukplat_get_tlsp();
+ *
+ * NOTE: The most minimal TCB contains only the self-pointer
+ *       (= sizeof(void *)).
  *
  * Partly derived from
  *  https://wiki.osdev.org/Thread_Local_Storage
@@ -83,6 +118,11 @@ __sz ukarch_tls_area_align(void)
 	return 0x20;
 }
 
+__sz ukarch_tls_tcb_size(void)
+{
+	return (__sz) TCB_SIZE;
+}
+
 __sz ukarch_tls_area_size(void)
 {
 	/* NOTE: X86_64 ABI requires that fs:%0 contains the address of itself,
@@ -90,27 +130,35 @@ __sz ukarch_tls_area_size(void)
 	 *       TLS allocation is the aligned up TLS area plus 8 bytes for this
 	 *       self-pointer.
 	 */
-	__sz tls_len =  ALIGN_UP((__uptr) _tls_end - (__uptr) _tls_start,
-				   sizeof(void *));
-	return tls_len + sizeof(void *);
+	__sz static_tls_len =  ALIGN_UP((__uptr) _tls_end - (__uptr) _tls_start,
+					sizeof(void *));
+	return static_tls_len + TCB_SIZE;
 }
 
 __uptr ukarch_tls_tlsp(void *tls_area)
 {
 	UK_ASSERT(IS_ALIGNED((__uptr) tls_area, ukarch_tls_area_align()));
 
-	return (__uptr) tls_area + ukarch_tls_area_size() - sizeof(void *);
+	return (__uptr) tls_area + ukarch_tls_area_size() - TCB_SIZE;
 }
 
 void *ukarch_tls_area_get(__uptr tlsp)
 {
 	__uptr tls_area;
 
-	tls_area = tlsp - (ukarch_tls_area_size() - sizeof(void *));
+	tls_area = tlsp - (ukarch_tls_area_size() - TCB_SIZE);
 
 	UK_ASSERT(IS_ALIGNED((__uptr) tls_area, ukarch_tls_area_align()));
 
 	return (void *) tls_area;
+}
+
+void *ukarch_tls_tcb_get(__uptr tlsp)
+{
+	/*
+	 * The TCB pointer is the same as the TLS architecture pointer
+	 */
+	return (void *) tlsp;
 }
 
 void ukarch_tls_area_init(void *tls_area)
@@ -118,7 +166,7 @@ void ukarch_tls_area_init(void *tls_area)
 	const __sz tdata_len = (__uptr) _etdata  - (__uptr) _tls_start;
 	const __sz tbss_len  = (__uptr) _tls_end - (__uptr) _etdata;
 	const __sz padding   = ukarch_tls_area_size() - (tbss_len + tdata_len
-							 + sizeof(void *));
+							 + TCB_SIZE);
 
 	UK_ASSERT(IS_ALIGNED((__uptr) tls_area, ukarch_tls_area_align()));
 
@@ -130,8 +178,10 @@ void ukarch_tls_area_init(void *tls_area)
 		    (__sz) tbss_len);
 	uk_pr_debug("tls_area_init: pad: %"__PRIsz" bytes\n",
 		    padding);
-	uk_pr_debug("tls_area_init: self ptr: %p\n",
-		    (void *) ukarch_tls_pointer(tls_area));
+	uk_pr_debug("tls_area_init: tcb: %"__PRIsz" bytes\n",
+		    (__sz) TCB_SIZE);
+	uk_pr_debug("tls_area_init: tcb self ptr: %p\n",
+		    (void *) ukarch_tls_tlsp(tls_area));
 
 	/* .tdata */
 	memcpy((void *)((__uptr) tls_area),
@@ -146,6 +196,10 @@ void ukarch_tls_area_init(void *tls_area)
 	/* x86_64 ABI requires that fs:%0 contains the address of itself. */
 	*((__uptr *) ukarch_tls_tlsp(tls_area))
 		= (__uptr) ukarch_tls_tlsp(tls_area);
+
+#if CONFIG_UKARCH_TLS_HAVE_TCB
+	ukarch_tls_tcb_init((void *) ukarch_tls_tlsp(tls_area));
+#endif /* CONFIG_UKARCH_TLS_HAVE_TCB */
 
 	uk_hexdumpCd(tls_area, ukarch_tls_area_size());
 }
