@@ -1,0 +1,14 @@
+_UKARCH_TLS_HAVE_TCB=
+
+## Make sure that the reserved space for a TCB is set only once.
+## A second call of this function will make compiling stop.
+## Usage:
+##  $(eval $(call ukarch_tls_tcb_reserve,<tcb_size_in_bytes>))
+define ukarch_tls_tcb_reserve =
+$(if $(strip $(_UKARCH_TLS_HAVE_TCB)),
+		$(error ukarch_tls_tcb_reserve: Multiple reservations for a TCB requested. Only a single configuration is possible),
+		$(eval LIBCONTEXT_CFLAGS-y+=-DTCB_SIZE=$(1)) \
+		$(eval CFLAGS-y+=-DCONFIG_UKARCH_TLS_HAVE_TCB=1) \
+		$(eval CXXFLAGS-y+=-DCONFIG_UKARCH_TLS_HAVE_TCB=1) \
+		$(eval _UKARCH_TLS_HAVE_TCB:=1))
+endef
