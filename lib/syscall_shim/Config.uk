@@ -39,4 +39,11 @@ if LIBSYSCALL_SHIM
 		bool "Enable debug messages"
 		default n
 		select LIBUKDEBUG_PRINTD
+
+	config LIBSYSCALL_SHIM_LEGACY_VERBOSE
+		bool "Warn for unmapped legacy syscalls"
+		default y
+		help
+			Generates a warning during the build process for each legacy syscall
+			that is not mapped to a syscall number.
 endif

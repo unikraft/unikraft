@@ -41,6 +41,7 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <uk/print.h>
+#include "legacy_syscall.h"
 
 #ifdef __cplusplus
 extern "C" {
