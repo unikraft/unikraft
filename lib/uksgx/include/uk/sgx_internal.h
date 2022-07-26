@@ -64,13 +64,28 @@ struct sgx_epc_page {
 	struct sgx_encl_page *encl_page;
 };
 
-#define DECLARE_BITMAP(name,bits) \
-	unsigned long name[UK_BITS_TO_LONGS(bits)]
 struct sgx_va_page {
 	struct sgx_epc_page *epc_page;
-	DECLARE_BITMAP(slots, SGX_VA_SLOT_COUNT);
+	unsigned long slots[UK_BITS_TO_LONGS(SGX_VA_SLOT_COUNT)];
 	struct uk_list_head list;
 };
+
+static inline unsigned int sgx_alloc_va_slot(struct sgx_va_page *page)
+{
+	int slot = uk_find_first_zero_bit(page->slots, SGX_VA_SLOT_COUNT);
+
+	if (slot < SGX_VA_SLOT_COUNT)
+		set_bit(slot, page->slots);
+
+	return slot << 3;
+}
+
+static inline void sgx_free_va_slot(struct sgx_va_page *page,
+				    unsigned int offset)
+{
+	uk_clear_bit(offset >> 3, page->slots);
+}
+
 
 struct sgx_encl_page {
 	unsigned long addr;

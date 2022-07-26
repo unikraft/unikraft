@@ -31,6 +31,7 @@
  */
 
 #include <uk/sgx_internal.h>
+#include <uk/sgx_asm.h>
 #include <uk/list.h>
 #include <uk/assert.h>
 #include <uk/arch/paging.h>
@@ -140,4 +141,32 @@ void *sgx_get_page(struct sgx_epc_page *entry)
 void sgx_put_page(void *epc_page_vaddr)
 {
 	WARN_STUBBED();
+}
+
+/**
+ * sgx_free_page - free an EPC page
+ *
+ * EREMOVE an EPC page and insert it back to the list of free pages.
+ * If EREMOVE fails, the error is printed out loud as a critical error.
+ * It is an indicator of a driver bug if that would happen.
+ *
+ * @entry:	any EPC page
+ * @encl:	enclave that owns the given EPC page
+ */
+void sgx_free_page(struct sgx_epc_page *entry, struct sgx_encl *encl)
+{
+	void *epc;
+	int ret;
+
+	epc = sgx_get_page(entry);
+	ret = __eremove(epc);
+	sgx_put_page(epc);
+
+	if (ret)
+		uk_pr_crit("EREMOVE returned %d\n", ret);
+
+	ukarch_spin_lock(&sgx_free_list_lock);
+	uk_list_add(&entry->list, &sgx_free_list);
+	sgx_nr_free_pages++;
+	ukarch_spin_unlock(&sgx_free_list_lock);
 }

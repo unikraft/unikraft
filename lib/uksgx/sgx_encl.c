@@ -134,17 +134,17 @@ static int sgx_init_page(struct sgx_encl *encl, struct sgx_encl_page *entry,
 			return -ENOMEM;
 
 		epc_page = sgx_alloc_page(alloc_flags);
-		if (IS_ERR(epc_page)) {
-			kfree(va_page);
-			return PTR_ERR(epc_page);
+		if (epc_page == NULL) {
+			free(va_page);
+			return NULL;
 		}
 
 		vaddr = sgx_get_page(epc_page);
 		if (!vaddr) {
-			sgx_warn(encl, "kmap of a new VA page failed %d\n",
+			uk_pr_warn("kmap of a new VA page failed %d\n",
 				 ret);
 			sgx_free_page(epc_page, encl);
-			kfree(va_page);
+			free(va_page);
 			return -EFAULT;
 		}
 
@@ -152,9 +152,9 @@ static int sgx_init_page(struct sgx_encl *encl, struct sgx_encl_page *entry,
 		sgx_put_page(vaddr);
 
 		if (ret) {
-			sgx_warn(encl, "EPA returned %d\n", ret);
+			uk_pr_warn("EPA returned %d\n", ret);
 			sgx_free_page(epc_page, encl);
-			kfree(va_page);
+			free(va_page);
 			return -EFAULT;
 		}
 
@@ -173,65 +173,6 @@ static int sgx_init_page(struct sgx_encl *encl, struct sgx_encl_page *entry,
 	entry->addr = addr;
 
 	return 0;
-}
-
-static struct sgx_tgid_ctx *sgx_find_tgid_ctx(struct pid *tgid)
-{
-	struct sgx_tgid_ctx *ctx;
-
-	uk_list_for_each_entry(ctx, &sgx_tgid_ctx_list, list)
-		if (pid_nr(ctx->tgid) == pid_nr(tgid))
-			return ctx;
-
-	return NULL;
-}
-
-static int sgx_add_to_tgid_ctx(struct sgx_encl *encl)
-{
-	struct sgx_tgid_ctx *ctx;
-
-	mutex_lock(&sgx_tgid_ctx_mutex);
-
-	ctx = sgx_find_tgid_ctx(tgid);
-	if (ctx) {
-		if (kref_get_unless_zero(&ctx->refcount)) {
-			encl->tgid_ctx = ctx;
-			mutex_unlock(&sgx_tgid_ctx_mutex);
-			put_pid(tgid);
-			return 0;
-		} else {
-			list_del_init(&ctx->list);
-		}
-	}
-
-	ctx = kzalloc(sizeof(*ctx), GFP_KERNEL);
-	if (!ctx) {
-		mutex_unlock(&sgx_tgid_ctx_mutex);
-		put_pid(tgid);
-		return -ENOMEM;
-	}
-
-	ctx->tgid = tgid;
-	kref_init(&ctx->refcount);
-	INIT_LIST_HEAD(&ctx->encl_list);
-
-	list_add(&ctx->list, &sgx_tgid_ctx_list);
-
-	encl->tgid_ctx = ctx;
-
-	mutex_unlock(&sgx_tgid_ctx_mutex);
-	return 0;
-}
-
-void sgx_tgid_ctx_release(struct kref *ref)
-{
-	struct sgx_tgid_ctx *pe =
-		container_of(ref, struct sgx_tgid_ctx, refcount);
-	mutex_lock(&sgx_tgid_ctx_mutex);
-	list_del(&pe->list);
-	mutex_unlock(&sgx_tgid_ctx_mutex);
-	put_pid(pe->tgid);
-	kfree(pe);
 }
 
 /**
@@ -273,7 +214,10 @@ int sgx_encl_create(struct sgx_secs *secs)
 
 	encl->secs.epc_page = secs_epc;
 
-	// TODO: check if sgx_add_to_tgid_ctx is required
+	/*
+	 * pid and tgid related operations are not required, as Unikraft is 
+	 * single-process and every thread belongs to the same process.
+	 */
 
 	ret = sgx_init_page(encl, &encl->secs, encl->base + encl->size, 0);
 	if (ret) {
@@ -292,6 +236,13 @@ int sgx_encl_create(struct sgx_secs *secs)
 		ret = -EFAULT;
 		goto err;
 	}
+
+	/* 
+	 * We need to handle the VMA issue manually (no API supported yet)
+	 * to maintain a list of SGX-related VMA so that we can manage the
+	 * map/unmap of the pages to be added
+	 */
+
 
     return 0;
 
