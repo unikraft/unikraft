@@ -47,6 +47,85 @@
 #endif
 #include <sched.h>       /* CLONE_* constants */
 #include <linux/sched.h> /* struct clone_args */
+
+/* In case a libC is defining only a subset of our currently supported clone
+ * flags, we provide here a completion of the list
+ */
+#ifndef CLONE_NEWTIME
+#define CLONE_NEWTIME		0x00000080
+#endif /* !CLONE_NEWTIME */
+#ifndef CLONE_VM
+#define CLONE_VM		0x00000100
+#endif /* !CLONE_VM */
+#ifndef CLONE_FS
+#define CLONE_FS		0x00000200
+#endif /* !CLONE_FS */
+#ifndef CLONE_FILES
+#define CLONE_FILES		0x00000400
+#endif /* !CLONE_FILES */
+#ifndef CLONE_SIGHAND
+#define CLONE_SIGHAND		0x00000800
+#endif /* !CLONE_SIGHAND */
+#ifndef CLONE_PIDFD
+#define CLONE_PIDFD		0x00001000
+#endif /* !CLONE_PIDFD */
+#ifndef CLONE_PTRACE
+#define CLONE_PTRACE		0x00002000
+#endif /* !CLONE_PTRACE */
+#ifndef CLONE_VFORK
+#define CLONE_VFORK		0x00004000
+#endif /* !CLONE_VFORK */
+#ifndef CLONE_PARENT
+#define CLONE_PARENT		0x00008000
+#endif /* !CLONE_PARENT */
+#ifndef CLONE_THREAD
+#define CLONE_THREAD		0x00010000
+#endif /* !CLONE_THREAD */
+#ifndef CLONE_NEWNS
+#define CLONE_NEWNS		0x00020000
+#endif /* !CLONE_NEWNS */
+#ifndef CLONE_SYSVSEM
+#define CLONE_SYSVSEM		0x00040000
+#endif /* !CLONE_SYSVSEM */
+#ifndef CLONE_SETTLS
+#define CLONE_SETTLS		0x00080000
+#endif /* !CLONE_SETTLS */
+#ifndef CLONE_PARENT_SETTID
+#define CLONE_PARENT_SETTID	0x00100000
+#endif /* !CLONE_PARENT_SETTID */
+#ifndef CLONE_CHILD_CLEARTID
+#define CLONE_CHILD_CLEARTID	0x00200000
+#endif /* !CLONE_CHILD_CLEARTID */
+#ifndef CLONE_DETACHED
+#define CLONE_DETACHED		0x00400000
+#endif /* !CLONE_DETACHED */
+#ifndef CLONE_UNTRACED
+#define CLONE_UNTRACED		0x00800000
+#endif /* !CLONE_UNTRACED */
+#ifndef CLONE_CHILD_SETTID
+#define CLONE_CHILD_SETTID	0x01000000
+#endif /* !CLONE_CHILD_SETTID */
+#ifndef CLONE_NEWCGROUP
+#define CLONE_NEWCGROUP		0x02000000
+#endif /* !CLONE_NEWCGROUP */
+#ifndef CLONE_NEWUTS
+#define CLONE_NEWUTS		0x04000000
+#endif /* !CLONE_NEWUTS */
+#ifndef CLONE_NEWIPC
+#define CLONE_NEWIPC		0x08000000
+#endif /* !CLONE_NEWIPC */
+#ifndef CLONE_NEWUSER
+#define CLONE_NEWUSER		0x10000000
+#endif /* !CLONE_NEWUSER */
+#ifndef CLONE_NEWPID
+#define CLONE_NEWPID		0x20000000
+#endif /* !CLONE_NEWPID */
+#ifndef CLONE_NEWNET
+#define CLONE_NEWNET		0x40000000
+#endif /* !CLONE_NEWNET */
+#ifndef CLONE_IO
+#define CLONE_IO		0x80000000
+#endif /* !CLONE_IO */
 #endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 
 #if CONFIG_LIBUKSCHED
