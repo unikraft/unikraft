@@ -61,6 +61,11 @@ static __uk_tls struct {
 	__u64 cl_flags;
 } cl_status = { false, 0x0 };
 
+#ifdef CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+#define CL_UKTLS_SANITY_MAGIC 0xb0b0f00d /* Bobo food */
+static __thread uint32_t cl_uktls_magic = CL_UKTLS_SANITY_MAGIC;
+#endif /* CONFIG_LIBUKDEBUG_ENABLE_ASSERT */
+
 #define uk_posix_clonetab_foreach(itr)					\
 	for ((itr) = DECONST(struct uk_posix_clonetab_entry*,		\
 			     _uk_posix_clonetab_start);			\
@@ -396,6 +401,13 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 		ret = (PTR2ERR(child) != 0) ? PTR2ERR(child) : -ENOMEM;
 		goto err_out;
 	}
+#ifdef CONFIG_LIBUKDEBUG_ENABLE_ASSERT
+	/* Sanity check that the UKTLS of the child is really a Unikraft TLS:
+	 * Do we find our magic on the TLS, is Bobo's banana there?
+	 */
+	UK_ASSERT(uk_thread_uktls_var(child, cl_uktls_magic)
+		  == CL_UKTLS_SANITY_MAGIC);
+#endif /* CONFIG_LIBUKDEBUG_ENABLE_ASSERT */
 
 	/* Call clone handler table but treat CLONE_SETTLS as handled */
 	ret = _uk_posix_clonetab_init(cl_args, cl_args_len,
