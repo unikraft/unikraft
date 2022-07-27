@@ -685,6 +685,61 @@ err_out:
 	return NULL;
 }
 
+/** Allocates `struct uk_thread` along with ectx (if requested), take stack
+ *  and TLS from caller but do not initialize the architecture context with
+ *  an entry function (set to NULL)
+ */
+struct uk_thread *uk_thread_create_container2(struct uk_alloc *a,
+					      uintptr_t sp,
+					      uintptr_t tlsp,
+					      bool is_uktls,
+					      bool no_ectx,
+					      const char *name,
+					      void *priv,
+					      uk_thread_dtor_t dtor)
+{
+	struct uk_thread *t;
+	size_t t_size;
+	struct ukarch_ectx *ectx = NULL;
+	int ret;
+
+	/* NOTE: We place space for extended context after
+	 *       struct uk_thread within the same allocation
+	 *       when ectx support was requested
+	 */
+	t_size = sizeof(*t);
+	if (!no_ectx)
+		t_size += ukarch_ectx_size() + ukarch_ectx_align();
+
+	t = uk_malloc(a, t_size);
+	if (!t)
+		goto err_out;
+
+	if (!no_ectx)
+		ectx = (struct ukarch_ectx *) ALIGN_UP((uintptr_t) t
+						       + sizeof(*t),
+						       ukarch_ectx_align());
+
+	_uk_thread_struct_init(t, tlsp, is_uktls, ectx, name, priv, dtor);
+	t->_mem.t_a = a;
+
+	/* Minimal context initialization where the stack pointer
+	 * is initialized
+	 */
+	ukarch_ctx_init_bare(&t->ctx, sp, 0x0);
+
+	ret = _uk_thread_call_inittab(t);
+	if (ret < 0)
+		goto err_free_thread;
+
+	return t;
+
+err_free_thread:
+	uk_free(a, t);
+err_out:
+	return NULL;
+}
+
 struct uk_thread *uk_thread_create_fn0(struct uk_alloc *a,
 				       uk_thread_fn0_t fn,
 				       struct uk_alloc *a_stack,

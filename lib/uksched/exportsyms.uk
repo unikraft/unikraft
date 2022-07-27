@@ -21,6 +21,7 @@ uk_thread_init_fn1
 uk_thread_init_fn2
 uk_thread_create_bare
 uk_thread_create_container
+uk_thread_create_container2
 uk_thread_create_fn0
 uk_thread_create_fn1
 uk_thread_create_fn2

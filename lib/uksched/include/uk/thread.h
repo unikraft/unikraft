@@ -456,6 +456,47 @@ struct uk_thread *uk_thread_create_container(struct uk_alloc *a,
 					     uk_thread_dtor_t dtor);
 
 /**
+ * Allocates a uk_thread container. Stack and TLS are given by the caller.
+ * The entry point is not set and the thread is not marked as runnable.
+ * Such a thread should only be assigned to a scheduler after stack and
+ * entry point is configured (`thread->ctx`) and the thread was marked as
+ * runnable.
+ *
+ * @param a
+ *   Reference t o an allocator (required)
+ * @param sp
+ *   Stack pointer
+ * @param tlsp
+ *   Architecture pointer to TLS. If set to NULL, the thread cannot
+ *   access thread-local variables
+ * @param is_uktls
+ *   Indicates that the given TLS pointer (`tlsp` must be != 0x0)
+ *   points to a TLS derived from the Unikraft system TLS template.
+ * @param no_ectx
+ *   If set, no memory is allocated for saving/restoring extended CPU
+ *   context state (e.g., floating point, vector registers). In such a
+ *   case, no extended context is saved nor restored on thread switches.
+ *   Executed functions must be ISR-safe.
+ * @param name
+ *   Optional name for the thread
+ * @param priv
+ *   Reference to external data that corresponds to this thread
+ * @param dtor
+ *   Destructor that is called when this thread is released
+ * @return
+ *   - (NULL): Allocation failed
+ *   - Reference to initialized uk_thread
+ */
+struct uk_thread *uk_thread_create_container2(struct uk_alloc *a,
+					      uintptr_t sp,
+					      uintptr_t tlsp,
+					      bool is_uktls,
+					      bool no_ectx,
+					      const char *name,
+					      void *priv,
+					      uk_thread_dtor_t dtor);
+
+/**
  * Allocates a raw uk_thread structure. Such a thread can then be assigned
  * to a scheduler. When the thread starts, the general-purpose registers are
  * reset.
