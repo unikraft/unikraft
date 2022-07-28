@@ -171,6 +171,11 @@ UK_SYSCALL_R_DEFINE(int, setfsgid, uid_t, fsgid)
 	return UK_DEFAULT_GID;
 }
 
+/* Maximum number of supplementary groups (Linux 2.6.4+) */
+#ifndef NGROUPS_MAX
+#define NGROUPS_MAX		(1 << 16)
+#endif
+
 /* not a syscall */
 int initgroups(const char *user __unused, gid_t group __unused)
 {
@@ -179,11 +184,28 @@ int initgroups(const char *user __unused, gid_t group __unused)
 
 UK_SYSCALL_R_DEFINE(int, getgroups, int, size, gid_t *, list)
 {
+	/* We only have one group and it is not specified if the effective GID
+	 * (which is this group) should be part of the list. So we can safely
+	 * return an empty list
+	 */
 	return 0;
 }
 
 UK_SYSCALL_R_DEFINE(int, setgroups, size_t, size, const gid_t *, list)
 {
+	size_t i;
+
+	if (unlikely(size > NGROUPS_MAX))
+		return -EINVAL;
+
+	/* Since we have only one group, we just check if the caller tries to
+	 * set any invalid groups. Since the only valid group ID is also the
+	 * effective group it, it is fine to collapse to an empty list.
+	 */
+	for (i = 0; i < size; i++)
+		if (unlikely(list[i] != UK_DEFAULT_GID))
+			return -EINVAL;
+
 	return 0;
 }
 
