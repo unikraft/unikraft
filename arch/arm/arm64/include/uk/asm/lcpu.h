@@ -149,9 +149,12 @@
 	 MAIR_EL1_ATTR(MAIR_NORMAL_WB, NORMAL_WB))
 
 /* Mapping of TCR_EL1.IPS to number of bits */
-#ifndef __ASSEMBLY__
+#ifdef __ASSEMBLY__
+tcr_ips_bits:
+	.byte 32, 36, 40, 42, 44, 48, 52
+#else
 static __attribute__((unused))
-unsigned char tcr_ips_bits[] = {32, 36, 40, 42, 44, 48};
+unsigned char tcr_ips_bits[] = {32, 36, 40, 42, 44, 48, 52};
 #endif
 
 #ifdef __ASSEMBLY__

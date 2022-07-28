@@ -36,13 +36,6 @@
 #include <uk/arch/limits.h>
 #include <uk/asm.h>
 
-/*
- * As we use VA == PA mapping, so the VIRT_BITS must be the same
- * as PA_BITS. We can get PA_BITS from ID_AA64MMFR0_EL1.PARange.
- */
-virt_bits:
-	.byte 32, 36, 40, 42, 44, 48
-
 ENTRY(start_mmu)
 	/*
 	 * Using dsb here to guarantee the create_pagetables has
@@ -65,9 +58,16 @@ ENTRY(start_mmu)
 	ldr x2, =MAIR_INIT_ATTR
 	msr mair_el1, x2
 
+#ifdef CONFIG_PAGING
+	/* Set up TCR_EL1. The platform must provide a
+	 * configuration compatible with the paging API.
+	 */
+	ldr x2, =TCR_INIT_FLAGS
+	msr tcr_el1, x2
+#else /* CONFIG_PAGING */
 	/* Get VIRT_BITS from id_aa64mmfr0_el1.PARange */
 	mrs x3, id_aa64mmfr0_el1
-	ldr x5, =virt_bits
+	ldr x5, =tcr_ips_bits
 	ubfx x4, x3, #0, #4
 	ldrb w4, [x5, x4]
 
@@ -81,6 +81,7 @@ ENTRY(start_mmu)
 	orr x2, x5, x2
 	bfi x2, x3, #32, #3
 	msr tcr_el1, x2
+#endif /* CONFIG_PAGING */
 
 	/* save lr */
 	mov x22, x30
