@@ -88,8 +88,6 @@ size_t uk_swrand_generate_bytes(void *buf, size_t buflen)
 		memcpy(buf + i, &rd, chunk_size);
 	}
 	
-	uk_pr_crit("UKSWRAND has generated %ld bytes\n", buflen);
-
 	return buflen;
 }
 

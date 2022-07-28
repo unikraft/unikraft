@@ -74,14 +74,12 @@ UK_SYSCALL_R_DEFINE(ssize_t, getrandom,
 	size_t offset = 0;
 	#ifdef CONFIG_LIBUKRAND_HARDWARE_RANDOMNESS
 		offset = uk_hwrand_generate_bytes(buf, buflen);
-		uk_pr_crit("HARDWARE = %lu\n", offset);
 
 	#endif
 
 	#ifdef CONFIG_LIBUKRAND_SOFTWARE_RANDOMNESS
 		if(offset < buflen) {
 			offset += uk_swrand_generate_bytes(buf + offset, buflen - offset);
-			uk_pr_crit("SOFTWARE = %lu\n", offset);
 
 		}
 	#endif
