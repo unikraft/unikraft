@@ -950,15 +950,18 @@ endef
 #
 #################################################
 # Generates a phony clean rule for a given library
-
+#
+# FIXME: The sed command replaces ' ' with newlines instead of enumerating
+#        paths. This will break if there are any spaces in the file path.
+#
 # cleanrule_lib $libname
 define cleanrule_lib =
 clean-$(1):
-	$(file >$(BUILD_DIR)/$(1)/uk_clean_list) \
-            $(foreach O,$($(call vprefix_lib,$(1),CLEAN-y)),\
-                $(file >>$(BUILD_DIR)/$(1)/uk_clean_list,$O)) \
-            $(foreach O,$($(call vprefix_lib,$(1),CLEAN)),\
-                $(file >>$(BUILD_DIR)/$(1)/uk_clean_list,$O))
+	$(file >$(BUILD_DIR)/$(1)/uk_clean_list, \
+            $($(call vprefix_lib,$(1),CLEAN-y)) \
+            $($(call vprefix_lib,$(1),CLEAN))) \
+	$(shell $(SED) -E -e 's/^ +//g' -e 's/ +$$//g' -e 's/ +/\n/g' \
+	            -i $(BUILD_DIR)/$(1)/uk_clean_list)
 	$(call verbose_cmd,CLEAN,$(1),\
             $(XARGS) $(RM) <$(BUILD_DIR)/$(1)/uk_clean_list)
 
