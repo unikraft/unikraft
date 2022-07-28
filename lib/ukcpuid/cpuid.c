@@ -218,9 +218,9 @@ __u8 is_AMD(void) {
 	info.ECX = 0x0;
 	cpuid_macro(info.EAX, info.EBX, info.ECX, info.EDX, info.EAX, info.ECX);
 
-	value = (memcmp((char *) (&info.EBX), "htuA", 4) == 0
-		&& memcmp((char *) (&info.EDX), "itne", 4) == 0
-		&& memcmp((char *) (&info.ECX), "DMAc", 4) == 0);
+	value = (memcmp((char *) (&info.EBX), "Auth", 4) == 0
+		&& memcmp((char *) (&info.EDX), "enti", 4) == 0
+		&& memcmp((char *) (&info.ECX), "cAMD", 4) == 0);
 
 	set_cache(cache.is_AMD, value);
 
