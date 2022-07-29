@@ -136,10 +136,35 @@ struct sgx_encl {
 	unsigned int shadow_epoch;
 };
 
+
+/*
+ * Decrement the reference counter, if no one ref it, release it by calling release().
+ * @param refs
+ *	Reference to the atomic counter.
+ * @return
+ *	0: there are more active reference
+ *	1: this was let reference to the counter.
+ */
+static inline void uk_refcount_put(__atomic *ref, void (*release)(__atomic *ref))
+{
+	if (release == NULL) {
+		uk_pr_warn("release == NULL!");
+		return 0;
+	}
+
+	if (uk_refcount_release(ref)) {
+		release(ref);
+		return 1;
+	}
+	
+	return 0;
+}
+
 /* sgx_page_cache.c */
 int sgx_add_epc_bank(__paddr_t start, unsigned long size);
 int sgx_page_cache_init(void);
 struct sgx_epc_page *sgx_alloc_page(unsigned int flags);
+void sgx_free_page(struct sgx_epc_page *entry, struct sgx_encl *encl);
 void *sgx_get_page(struct sgx_epc_page *entry);
 void sgx_put_page(void *epc_page_vaddr);
 
@@ -150,8 +175,12 @@ int sgx_close(struct device *dev);
 
 /* sgx_encl.c */
 int sgx_encl_create(struct sgx_secs *secs);
+void sgx_encl_release(__atomic *ref);
+int sgx_encl_add_page(struct sgx_encl *encl, unsigned long addr, void *data,
+		      struct sgx_secinfo *secinfo, unsigned int mrmask);
 
 /* sgx_util.c */
 int cpl_switch_init();
 int cpl_switch(__u8 rpl);
+
 #endif

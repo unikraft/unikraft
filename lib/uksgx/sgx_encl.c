@@ -1,6 +1,7 @@
 #include <uk/sgx_arch.h>
 #include <uk/sgx_asm.h>
 #include <uk/sgx_internal.h>
+#include <uk/mutex.h>
 #include <uk/arch/paging.h>
 #include <uk/arch/atomic.h>
 #include <stdlib.h>
@@ -14,7 +15,15 @@ extern int sgx_va_pages_cnt;
 extern struct uk_list_head sgx_tgid_ctx_list;
 extern struct uk_mutex sgx_tgid_ctx_mutex;
 
-static int sgx_secs_validate(const struct sgx_secs *secs, unsigned long ssaframesize)
+struct sgx_add_page_req {
+	struct sgx_encl *encl;
+	struct sgx_encl_page *encl_page;
+	struct sgx_secinfo secinfo;
+	__u16 mrmask;
+	struct uk_list_head list;
+};
+
+static int sgx_validate_secs(const struct sgx_secs *secs, unsigned long ssaframesize)
 {
 	int i;
 
@@ -63,6 +72,77 @@ static int sgx_secs_validate(const struct sgx_secs *secs, unsigned long ssaframe
 	return 0;
 }
 
+static int sgx_validate_secinfo(struct sgx_secinfo *secinfo)
+{
+	__u64 perm = secinfo->flags & SGX_SECINFO_PERMISSION_MASK;
+	__u64 page_type = secinfo->flags & SGX_SECINFO_PAGE_TYPE_MASK;
+	int i;
+
+	if ((secinfo->flags & SGX_SECINFO_RESERVED_MASK) ||
+	    ((perm & SGX_SECINFO_W) && !(perm & SGX_SECINFO_R)) ||
+	    (page_type != SGX_SECINFO_TCS &&
+	     page_type != SGX_SECINFO_REG))
+		return -EINVAL;
+
+	for (i = 0; i < sizeof(secinfo->reserved) / sizeof(__u64); i++)
+		if (secinfo->reserved[i])
+			return -EINVAL;
+
+	return 0;
+}
+
+static int sgx_validate_tcs(struct sgx_encl *encl, struct sgx_tcs *tcs)
+{
+	int i;
+
+	if (tcs->flags & SGX_TCS_RESERVED_MASK) {
+		uk_pr_crit("%s: invalid TCS flags = 0x%lx\n",
+			 (unsigned long)tcs->flags);
+		return -EINVAL;
+	}
+
+	if (tcs->flags & SGX_TCS_DBGOPTIN) {
+		uk_pr_crit("%s: DBGOPTIN TCS flag is set, EADD will clear it\n");
+		return -EINVAL;
+	}
+
+	if (!sgx_validate_offset(encl, tcs->ossa)) {
+		uk_pr_crit("%s: invalid OSSA: 0x%lx\n", 
+			(unsigned long)tcs->ossa);
+		return -EINVAL;
+	}
+
+	if (!sgx_validate_offset(encl, tcs->ofsbase)) {
+		uk_pr_crit("%s: invalid OFSBASE: 0x%lx\n", 
+			(unsigned long)tcs->ofsbase);
+		return -EINVAL;
+	}
+
+	if (!sgx_validate_offset(encl, tcs->ogsbase)) {
+		uk_pr_crit("%s: invalid OGSBASE: 0x%lx\n", 
+			(unsigned long)tcs->ogsbase);
+		return -EINVAL;
+	}
+
+	if ((tcs->fslimit & 0xFFF) != 0xFFF) {
+		uk_pr_crit("%s: invalid FSLIMIT: 0x%x\n", 
+			tcs->fslimit);
+		return -EINVAL;
+	}
+
+	if ((tcs->gslimit & 0xFFF) != 0xFFF) {
+		uk_pr_crit("%s: invalid GSLIMIT: 0x%x\n", 
+			tcs->gslimit);
+		return -EINVAL;
+	}
+
+	for (i = 0; i < sizeof(tcs->reserved) / sizeof(__u64); i++)
+		if (tcs->reserved[i])
+			return -EINVAL;
+
+	return 0;
+}
+
 static __u32 sgx_calc_ssaframesize(__u32 miscselect, __u64 xfrm)
 {
 	__u32 size_max = PAGE_SIZE;
@@ -92,7 +172,7 @@ static struct sgx_encl *sgx_encl_alloc(struct sgx_secs *secs)
     int ret;
 
     ssaframesize = sgx_calc_ssaframesize(secs->miscselect, secs->xfrm);
-	ret = sgx_secs_validate(secs, ssaframesize);
+	ret = sgx_validate_secs(secs, ssaframesize);
 	if (ret) {
 		uk_pr_err("Invalid ssaframesize\n");
 		return (struct sgx_encl *) 0;
@@ -175,6 +255,129 @@ static int sgx_init_page(struct sgx_encl *encl, struct sgx_encl_page *entry,
 	return 0;
 }
 
+static int __sgx_encl_add_page(struct sgx_encl *encl,
+			       struct sgx_encl_page *encl_page,
+			       unsigned long addr,
+			       void *data,
+			       struct sgx_secinfo *secinfo,
+			       unsigned int mrmask)
+{
+	__u64 page_type = secinfo->flags & SGX_SECINFO_PAGE_TYPE_MASK;
+	struct page *backing;
+	struct sgx_add_page_req *req = NULL;
+	int ret;
+	int empty;
+	void *backing_ptr;
+
+	if (sgx_validate_secinfo(secinfo))
+		return -EINVAL;
+
+	if (page_type == SGX_SECINFO_TCS) {
+		ret = sgx_validate_tcs(encl, data);
+		if (ret)
+			return ret;
+	}
+
+	ret = sgx_init_page(encl, encl_page, addr, 0);
+	if (ret)
+		return ret;
+
+	uk_mutex_lock(&encl->lock);
+
+	if (encl->flags & (SGX_ENCL_INITIALIZED | SGX_ENCL_DEAD)) {
+		ret = -EINVAL;
+		goto out;
+	}
+
+	// if (radix_tree_lookup(&encl->page_tree, addr >> PAGE_SHIFT)) {
+	// 	ret = -EEXIST;
+	// 	goto out;
+	// }
+
+	req = malloc(sizeof(*req));
+	if (!req) {
+		ret = -ENOMEM;
+		goto out;
+	}
+	memset(req, 0, sizeof(*req));
+
+	backing = sgx_get_backing(encl, encl_page, false);
+	if (IS_ERR((void *)backing)) {
+		ret = PTR_ERR((void *)backing);
+		goto out;
+	}
+
+	// ret = radix_tree_insert(&encl->page_tree, encl_page->addr >> PAGE_SHIFT,
+	// 			encl_page);
+	// if (ret) {
+	// 	sgx_put_backing(backing, false /* write */);
+	// 	goto out;
+	// }
+
+	backing_ptr = kmap(backing);
+	memcpy(backing_ptr, data, PAGE_SIZE);
+	kunmap(backing);
+
+	if (page_type == SGX_SECINFO_TCS)
+		encl_page->flags |= SGX_ENCL_PAGE_TCS;
+
+	memcpy(&req->secinfo, secinfo, sizeof(*secinfo));
+
+	req->encl = encl;
+	req->encl_page = encl_page;
+	req->mrmask = mrmask;
+	empty = list_empty(&encl->add_page_reqs);
+	kref_get(&encl->refcount);
+	list_add_tail(&req->list, &encl->add_page_reqs);
+	if (empty)
+		queue_work(sgx_add_page_wq, &encl->add_page_work);
+
+	sgx_put_backing(backing, true /* write */);
+
+	uk_mutex_unlock(&encl->lock);
+	return 0;
+out:
+	kfree(req);
+	sgx_free_va_slot(encl_page->va_page, encl_page->va_offset);
+	uk_mutex_unlock(&encl->lock);
+	return ret;
+}
+
+/**
+ * sgx_encl_add_page - add a page to the enclave
+ *
+ * @encl:	an enclave
+ * @addr:	page address in the ELRANGE
+ * @data:	page data
+ * @secinfo:	page permissions
+ * @mrmask:	bitmask to select the 256 byte chunks to be measured
+ *
+ * Creates a new enclave page and enqueues an EADD operation that will be
+ * processed by a worker thread later on.
+ *
+ * Return:
+ * 0 on success,
+ * system error on failure
+ */
+int sgx_encl_add_page(struct sgx_encl *encl, unsigned long addr, void *data,
+		      struct sgx_secinfo *secinfo, unsigned int mrmask)
+{
+	struct sgx_encl_page *page;
+	int ret;
+
+	page = malloc(sizeof(*page));
+	if (!page)
+		return -ENOMEM;
+	memset(page, 0, sizeof(*page));
+
+	ret = __sgx_encl_add_page(encl, page, addr, data, secinfo, mrmask);
+
+	if (ret)
+		free(page);
+
+	return ret;
+}
+
 /**
  * sgx_encl_create - create an enclave
  *
@@ -238,7 +441,7 @@ int sgx_encl_create(struct sgx_secs *secs)
 	}
 
 	/* 
-	 * We need to handle the VMA issue manually (no API supported yet)
+	 * TODO: We need to handle the VMA issue manually (no API supported yet)
 	 * to maintain a list of SGX-related VMA so that we can manage the
 	 * map/unmap of the pages to be added
 	 */
@@ -247,5 +450,12 @@ int sgx_encl_create(struct sgx_secs *secs)
     return 0;
 
 err:
+	uk_refcount_put(&encl->refcount, sgx_encl_release);
     return -EINVAL;
+}
+
+void sgx_encl_release(__atomic *ref) 
+{
+	WARN_STUBBED();
+	return 0;
 }

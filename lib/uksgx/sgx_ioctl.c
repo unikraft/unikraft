@@ -50,13 +50,9 @@ static int sgx_ioc_enclave_create(struct device *dev, unsigned int cmd,
 	/* create enclave from given SECS */
 	ret = sgx_encl_create(secs);
 	
-
-
+	free(secs);
 
 	return 0;
-
-err:
-	free(secs);
 }
 
 /**
@@ -76,8 +72,44 @@ err:
 static int sgx_ioc_enclave_add_page(struct device *dev, unsigned int cmd,
 				     unsigned int arg)
 {
-    WARN_STUBBED();
+    struct sgx_enclave_add_page *addp = (void *)arg;
+	unsigned long secinfop = (unsigned long)addp->secinfo;
+	struct sgx_secinfo secinfo;
+	struct sgx_encl *encl;
+	void *data;
+	int ret;
+
+	ret = sgx_get_encl(addp->addr, &encl);
+	if (ret)
+		return ret;
+
+	if (memcpy(&secinfo, (void *)secinfop, sizeof(secinfo))) {
+		uk_refcount_put(&encl->refcount, sgx_encl_release);
+		return -EFAULT;
+	}
+
+	/* alloc_page() and kmap() */
+	data = malloc(__PAGE_SIZE);
+	if (data == NULL) {
+		uk_refcount_put(&encl->refcount, sgx_encl_release);
+		return -ENOMEM;
+	}
+
+	ret = memcpy(data, (void *)addp->src, __PAGE_SIZE);
+	if (ret) 
+		goto out;
+	
+
+	ret = sgx_encl_add_page(encl, addp->addr, data, &secinfo, addp->mrmask);
+	if (ret)
+		goto out;
     return 0;
+
+out:
+	uk_pr_crit("failed to add page\n");
+	uk_refcount_put(&encl->refcount, sgx_encl_release);
+	free(data);
+	return ret;
 }
 
 /**
