@@ -47,6 +47,7 @@ extern "C" {
 struct uk_sched;
 
 typedef void (*uk_thread_dtor_t)(struct uk_thread *);
+typedef void (*uk_thread_gc_t)(struct uk_thread *, void *);
 
 typedef void (*uk_thread_fn0_t)(void) __noreturn;
 typedef void (*uk_thread_fn1_t)(void *) __noreturn;
@@ -73,6 +74,9 @@ struct uk_thread {
 		void            *uktls;
 		struct uk_alloc *uktls_a;
 	} _mem;				/**< Associated allocs (internal!) */
+	uk_thread_gc_t _gc_fn;		/**< Extra gc function (internal!) */
+	void *_gc_argp;			/**< Argument for gc fn (internal!) */
+
 	uk_thread_dtor_t dtor;		/**< User provided destructor */
 	void *priv;			/**< Private field, free for use */
 

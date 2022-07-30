@@ -269,6 +269,8 @@ unsigned int uk_sched_thread_gc(struct uk_sched *sched)
 			    thread->name ? thread->name : "<unnamed>");
 
 		UK_TAILQ_REMOVE(&sched->exited_threads, thread, thread_list);
+		if (thread->_gc_fn)
+			thread->_gc_fn(thread,  thread->_gc_argp);
 		uk_thread_release(thread);
 		++num;
 	}
@@ -316,12 +318,20 @@ void uk_sched_thread_terminate(struct uk_thread *thread)
 }
 
 /* This function has the __noreturn attribute set */
-void uk_sched_thread_exit(void)
+void uk_sched_thread_exit2(uk_thread_gc_t gc_fn, void *gc_argp)
 {
 	struct uk_thread *t = uk_thread_current();
 
+	t->_gc_fn   = gc_fn;
+	t->_gc_argp = gc_argp;
 	uk_sched_thread_terminate(t);
 	UK_CRASH("Unexpectedly returned to exited thread %p\n", t);
+}
+
+/* This function has the __noreturn attribute set */
+void uk_sched_thread_exit(void)
+{
+	uk_sched_thread_exit2(NULL, NULL);
 }
 
 void uk_sched_thread_sleep(__nsec nsec)
