@@ -303,6 +303,11 @@ void uk_sched_thread_sleep(__nsec nsec);
 /* Exits the current thread context */
 void uk_sched_thread_exit(void) __noreturn;
 
+/* Exits the current thread and runs the given routine when releasing the
+ * thread from garbage collection context.
+ */
+void uk_sched_thread_exit2(uk_thread_gc_t gc_fn, void *gc_argp) __noreturn;
+
 /* Terminates another thread */
 void uk_sched_thread_terminate(struct uk_thread *thread);
 
