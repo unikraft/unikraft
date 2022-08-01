@@ -45,9 +45,6 @@
 #include <uk/asm.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/common/irq.h>
-#ifdef CONFIG_PLAT_KVM
-#include <kvm/irq.h>
-#endif
 #include <uk/plat/spinlock.h>
 #include <arm/cpu.h>
 #include <gic/gic.h>
@@ -462,10 +459,10 @@ static void gicv3_handle_irq(void)
 		irq = stat & GICC_IAR_INTID_MASK;
 
 #ifndef CONFIG_HAVE_SMP
-		uk_pr_debug("EL1 IRQ#%d trap caught\n", irq);
+		uk_pr_debug("EL1 IRQ#%"__PRIu32" caught\n", irq);
 #else /* !CONFIG_HAVE_SMP */
-		uk_pr_debug("Core %d: EL1 IRQ#%d trap caught\n",
-				ukplat_lcpu_id(), irq);
+		uk_pr_debug("Core %"__PRIu64": EL1 IRQ#%"__PRIu32" caught\n",
+			    ukplat_lcpu_id(), irq);
 #endif /* CONFIG_HAVE_SMP */
 
 		/* Ensure interrupt processing starts only after ACK */

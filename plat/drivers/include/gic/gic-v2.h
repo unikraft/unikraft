@@ -287,7 +287,7 @@ enum sgi_filter {
  * @param target an 8-bit bitmap with 1 bit per CPU 0-7. A `1` bit
  *    indicates that the SGI should be forwarded to the respective CPU
  */
-void gic_sgi_gen_to_list(uint32_t sgintid, uint8_t target);
+void gicv2_sgi_gen_to_list(uint32_t sgintid, uint8_t target);
 
 /**
  * Forward the SGI to all CPU interfaces except that of the processor
@@ -295,7 +295,7 @@ void gic_sgi_gen_to_list(uint32_t sgintid, uint8_t target);
  *
  * @param sgintid the SGI ID [0-15]
  */
-void gic_sgi_gen_to_others(uint32_t sgintid);
+void gicv2_sgi_gen_to_others(uint32_t sgintid);
 
 /**
  * Forward the SGI only to the CPU interface of the processor
@@ -303,7 +303,7 @@ void gic_sgi_gen_to_others(uint32_t sgintid);
  *
  * @param sgintid the SGI ID [0-15]
  */
-void gic_sgi_gen_to_self(uint32_t sgintid);
+void gicv2_sgi_gen_to_self(uint32_t sgintid);
 
 /**
  * Probe device tree for GICv2

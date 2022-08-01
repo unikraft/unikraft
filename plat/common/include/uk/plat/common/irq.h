@@ -59,4 +59,12 @@ enum uk_irq_polarity {
 	UK_IRQ_POLARITY_MAX
 };
 
+/**
+ * Calls the registered IRQ handlers for the given IRQ vector. This will
+ * acknowledge the IRQ.
+ *
+ * @param irq IRQ vector
+ */
+void _ukplat_irq_handle(unsigned long irq);
+
 #endif /* __PLAT_CMN_IRQ_H__ */

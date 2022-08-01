@@ -172,4 +172,8 @@ config LIBOFW
        depends on ARCH_ARM_64
        select LIBFDT
 
+config UKPLAT_ALLOW_GIC
+	bool
+	default y
+
 endif
