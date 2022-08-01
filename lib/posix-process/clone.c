@@ -301,6 +301,20 @@ static void _clone_child_gc(struct uk_thread *t)
 	}
 }
 
+/*
+ * NOTE: The clone system call and the handling of the TLS
+ *
+ *       `_clone()` assumes that a passed TLS pointer is an Unikraft TLS.
+ *       The only exception exists if `_clone()` is called from a context
+ *       where a custom TLS is already active (depends on
+ *       `CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS`). In such a case, an
+ *       Unikraft TLS is allocated but the passed TLS pointer is activated.
+ *       The reason is that Unikraft libraries place TLS variables and use
+ *       the TLS effectively as TCB.
+ *       In case no TLS is handed over (CLONE_SETTLS is not set), _clone will
+ *       still allocate an Unikraft TLS but sets the TLS architecture pointer
+ *       to zero.
+ */
 static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 		  __uptr return_addr)
 {
@@ -369,11 +383,17 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 	uk_pr_debug(")\n");
 #endif /* UK_DEBUG */
 
-	if (flags & CLONE_SETTLS) {
+	if ((flags & CLONE_SETTLS)
+#if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
+	    && (uk_syscall_ultlsp() == 0x0)
+#endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
+	) {
 		/* The caller already created a TLS for the child (for instance
 		 * by a pthread API wrapper). We expect that this TLS is a
 		 * Unikraft TLS.
 		 */
+		uk_pr_debug("Using passed TLS pointer %p as an Unikraft TLS\n",
+			    (void *) cl_args->tls);
 		child = uk_thread_create_container2(s->a,
 						    (__uptr) cl_args->stack,
 						    (__uptr) cl_args->tls,
@@ -384,10 +404,19 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 						    NULL,
 						    _clone_child_gc);
 	} else {
-		/* If no TLS was given, still allocate one
-		 * because Unikraft places TLS variables and
-		 * uses them effectively as TCB.
+		/* If no TLS was given or the parent calls us already from
+		 * a context with an userland TLS activated (kernel land vs.
+		 * user land), we allocate an Unikraft TLS because Unikraft
+		 * places TLS variables and uses them effectively as TCB.
 		 */
+#if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
+		if (uk_syscall_ultlsp() != 0x0) {
+			uk_pr_debug("Allocating an Unikraft TLS for the new child, parent called from context with custom TLS\n");
+		} else
+#endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
+		{
+			uk_pr_debug("Allocating an Unikraft TLS for the new child, no TLS given by parent\n");
+		}
 		child = uk_thread_create_container(s->a,
 						   NULL, 0, /* Stack is given */
 						   s->a_uktls,
@@ -408,6 +437,16 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 	UK_ASSERT(uk_thread_uktls_var(child, cl_uktls_magic)
 		  == CL_UKTLS_SANITY_MAGIC);
 #endif /* CONFIG_LIBUKDEBUG_ENABLE_ASSERT */
+
+	/* CLONE_SETTLS: Instead of just activating the Unikraft TLS, we
+	 * activate the passed TLS pointer as soon as the child wakes up.
+	 * NOTE: If SETTLS is not set, we do not activate any TLS although
+	 *       an Unikraft TLS was allocated.
+	 */
+	child->tlsp = (flags & CLONE_SETTLS) ? cl_args->tls : 0x0;
+	uk_pr_debug("Child is going to wake up with TLS pointer set to: %p (%s TLS)\n",
+		    (void *) child->tlsp,
+		    (child->tlsp != child->uktlsp) ? "custom" : "Unikraft");
 
 	/* Call clone handler table but treat CLONE_SETTLS as handled */
 	ret = _uk_posix_clonetab_init(cl_args, cl_args_len,
