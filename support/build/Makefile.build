@@ -38,6 +38,11 @@ $(call verbose_info,Warning: '$(L)' has no sources or object files$(comma) ignor
 )
 endif
 
+$(foreach _M,$(wildcard $(addsuffix Makefile.build,\
+	   $(CONFIG_UK_BASE)/lib/*/ $(CONFIG_UK_BASE)/plat/*/ \
+	   $(addsuffix /,$(ELIB_DIR)) $(APP_DIR)/)), \
+		$(eval $(call verbose_include,$(_M))) \
+)
 
 #################################################
 #
