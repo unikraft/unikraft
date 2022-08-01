@@ -120,6 +120,45 @@ extern __uk_tls __uptr _uk_syscall_return_addr;
 	do { } while (0)
 #endif /* !CONFIG_LIBSYSCALL_SHIM */
 
+#if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
+#include <uk/thread.h>
+
+/**
+ * Library-internal thread-local variable containing the current userland
+ * TLS pointer.
+ * NOTE: Use the `uk_syscall_ultlsp()` macro to retrieve the userland TLS
+ *       pointer.
+ * NOTE: Userland TLS pointers are only supported on binary system calls.
+ */
+extern __uk_tls __uptr _uk_syscall_ultlsp;
+
+/**
+ * Returns the userland TLS pointer if it is not equal to the Unikraft tlsp of
+ * the current thread and if it was set. Please note that we must be called
+ * from a binary system call request.
+ */
+static inline __uptr uk_syscall_ultlsp(void)
+{
+	__uptr ultlsp = _uk_syscall_ultlsp;
+	struct uk_thread *self = uk_thread_current();
+
+	UK_ASSERT(self);
+	if (ultlsp && (ultlsp != self->uktlsp))
+		return ultlsp;
+	return 0x0;
+}
+#else /* !CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
+
+/**
+ * If we do not support binary system calls and userland TLS pointers, we do not
+ * know any caller TLS pointer, so we can always return 0.
+ */
+static inline __uptr uk_syscall_ultlsp(void)
+{
+	return 0x0;
+}
+#endif /* !CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
+
 #define __uk_scc(X) ((long) (X))
 typedef long uk_syscall_arg_t;
 
