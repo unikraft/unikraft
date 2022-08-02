@@ -553,3 +553,16 @@ static int uk_posix_clone_checkvm(const struct clone_args *cl_args,
 	return 0;
 }
 UK_POSIX_CLONE_HANDLER(CLONE_VM, false, uk_posix_clone_checkvm, 0x0);
+
+/*
+ * Ignore historical CLONE_DETACHED flag
+ */
+static int uk_posix_clone_detached(const struct clone_args *cl_args __unused,
+				   size_t cl_args_len __unused,
+				   struct uk_thread *child __unused,
+				   struct uk_thread *parent __unused)
+{
+	uk_pr_debug("Ignoring historical CLONE_DETACHED\n");
+	return 0;
+}
+UK_POSIX_CLONE_HANDLER(CLONE_DETACHED, false, uk_posix_clone_detached, 0x0);
