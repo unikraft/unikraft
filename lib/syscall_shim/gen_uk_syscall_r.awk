@@ -7,6 +7,11 @@ BEGIN {
 
 	print "long uk_vsyscall_r(long nr, va_list arg)\n{"
 	print "\t(void) arg;\n"
+
+	printf "\t__maybe_unused long "
+	for (i = 1; i < max_args; i++)
+		printf "a%d, ", i
+	printf "a%d;\n", max_args
 	print "\tswitch (nr) {"
 }
 
@@ -18,11 +23,13 @@ BEGIN {
 	args_nr = $2 + 0
 	printf "#ifdef HAVE_uk_syscall_%s\n", name;
 	printf "\tcase %s:\n", sys_name;
+	for (i = 1; i <= args_nr; i++)
+		printf "\t\ta%s = va_arg(arg, long);\n", i;
 	printf "\t\treturn %s(", uk_syscall_r;
 	for (i = 1; i < args_nr; i++)
-		printf("va_arg(arg, long), ")
+		printf "a%d, ", i;
 	if (args_nr > 0)
-		printf("va_arg(arg, long)")
+		printf "a%d", args_nr;
 	printf(");\n")
 	printf "#endif /* HAVE_uk_syscall_%s */\n\n", name;
 }
