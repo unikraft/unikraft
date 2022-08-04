@@ -50,7 +50,7 @@
 #define UK_DEFAULT_GROUP  "root"
 #define UK_DEFAULT_PASS   "x"
 
-static __uk_tls struct passwd_entry {
+static struct passwd_entry {
 	struct passwd *passwd;
 
 	UK_SLIST_ENTRY(struct passwd_entry) entries;
@@ -370,7 +370,7 @@ struct group *getgrgid(gid_t gid)
 	return res;
 }
 
-static __uk_tls struct group_entry {
+static struct group_entry {
 	struct group *group;
 
 	UK_SLIST_ENTRY(struct group_entry) entries;
