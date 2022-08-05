@@ -694,7 +694,8 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 #define UK_TEST_EXPECT(cond)						\
 	UK_TEST_ASSERTF(						\
 		(cond),							\
-		"expected `" STRINGIFY(cond) "` to be true"		\
+		"expected `%s` to be true",				\
+		STRINGIFY(cond)						\
 	)
 
 #define UK_TEST_ASSERT(cond) UK_TEST_EXPECT(cond)
@@ -723,9 +724,10 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 		int _cond = (a_v cond b_v);				\
 		UK_TEST_ASSERTF(					\
 			_cond,						\
-			"expected `" STRINGIFY(a) "` to " desc		\
+			"expected `%s` to " desc			\
 			" " fmt " %s was " fmt,				\
-			b_v, _cond ? "and" : "but", a_v			\
+			STRINGIFY(a), b_v,				\
+			_cond ? "and" : "but", a_v			\
 		);							\
 	} while (0)
 
@@ -796,9 +798,9 @@ _uk_test_do_assert(struct uk_testcase *esac, unsigned short line, int cond,
 		void *b_p = (void *)(b);				\
 		UK_TEST_ASSERTF(					\
 			memcmp(a_p, b_p, size) == 0,			\
-			"expected `" STRINGIFY(a) "` at %p "		\
-			"to equal `" STRINGIFY(b) "` at %p",		\
-			b_p, a_p					\
+			"expected `%s` at %p "				\
+			"to equal `%s` at %p",				\
+			STRINGIFY(a), b_p, STRINGIFY(b), a_p		\
 		);							\
 	} while (0)
 
