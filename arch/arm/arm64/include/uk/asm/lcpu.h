@@ -2,6 +2,7 @@
 /*
  * Copyright (c) 2009, Citrix Systems, Inc.
  * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation.
+ * Copyright (c) 2022, OpenSynergy GmbH.
  * Copyright (c) 2018, Arm Ltd.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,8 +32,103 @@
 #endif
 
 #include <uk/asm.h>
+#include <uk/asm/arch.h>
 
-#define CACHE_LINE_SIZE	64
+#define CACHE_LINE_SIZE		64
+
+/* Device-nGnRnE memory */
+#define MAIR_DEVICE_nGnRnE	0x00
+/* Device-nGnRE memory */
+#define MAIR_DEVICE_nGnRE	0x04
+/* Device-GRE memory */
+#define MAIR_DEVICE_GRE		0x0C
+/* Outer Non-cacheable + Inner Non-cacheable */
+#define MAIR_NORMAL_NC		0x44
+/* Outer + Inner Write-back non-transient */
+#define MAIR_NORMAL_WB		0xff
+/* Outer + Inner Write-through non-transient */
+#define MAIR_NORMAL_WT		0xbb
+
+/* Memory attributes */
+#define PTE_ATTR_DEFAULT					\
+	(PTE_ATTR_AF | PTE_ATTR_SH(PTE_ATTR_SH_IS) | PTE_TYPE_Lx_BLOCK)
+
+#define PTE_ATTR_DEVICE_nGnRE					\
+	(PTE_ATTR_DEFAULT | PTE_ATTR_XN | PTE_ATTR_IDX(DEVICE_nGnRE))
+
+#define PTE_ATTR_DEVICE_nGnRnE					\
+	(PTE_ATTR_DEFAULT | PTE_ATTR_XN | PTE_ATTR_IDX(DEVICE_nGnRnE))
+
+#define PTE_ATTR_NORMAL_RW					\
+	(PTE_ATTR_DEFAULT | PTE_ATTR_XN | PTE_ATTR_IDX(NORMAL_WB))
+
+#define PTE_ATTR_NORMAL_RO					\
+	(PTE_ATTR_DEFAULT | PTE_ATTR_XN |			\
+	 PTE_ATTR_IDX(NORMAL_WB) | PTE_ATTR_AP_RW_BIT)
+
+#ifdef CONFIG_ARM64_FEAT_BTI
+#define PTE_ATTR_NORMAL_RX					\
+	(PTE_ATTR_DEFAULT | PTE_ATTR_UXN |			\
+	 PTE_ATTR_IDX(NORMAL_WB) | PTE_ATTR_AP_RW_BIT |		\
+	 PTE_ATTR_GP)
+#else
+#define PTE_ATTR_NORMAL_RX					\
+	(PTE_ATTR_DEFAULT | PTE_ATTR_UXN |			\
+	 PTE_ATTR_IDX(NORMAL_WB) | PTE_ATTR_AP_RW_BIT)
+#endif /* CONFIG_ARM64_FEAT_BTI */
+
+/* Default SCTLR_EL1 configuration */
+
+#define SCTLR_SET_BITS						\
+	(SCTLR_EL1_UCI_BIT | SCTLR_EL1_nTWE_BIT |		\
+	 SCTLR_EL1_nTWI_BIT | SCTLR_EL1_UCT_BIT |		\
+	 SCTLR_EL1_DZE_BIT | SCTLR_EL1_I_BIT |			\
+	 SCTLR_EL1_SED_BIT | SCTLR_EL1_SA0_BIT |		\
+	 SCTLR_EL1_SA_BIT | SCTLR_EL1_C_BIT |			\
+	 SCTLR_EL1_M_BIT | SCTLR_EL1_CP15BEN_BIT |		\
+	 SCTLR_EL1_EOS_BIT | SCTLR_EL1_UWXN_BIT |		\
+	 SCTLR_EL1_EIS_BIT | SCTLR_EL1_SPAN_BIT |		\
+	 SCTLR_EL1_nTLSMD_BIT |	SCTLR_EL1_LSMAOE_BIT)
+
+#define SCTLR_CLEAR_BITS \
+	(SCTLR_EL1_EE_BIT | SCTLR_EL1_E0E_BIT |			\
+	 SCTLR_EL1_WXN_BIT | SCTLR_EL1_UMA_BIT |		\
+	 SCTLR_EL1_ITD_BIT | SCTLR_EL1_A_BIT |			\
+	 SCTLR_EL1_nAA_BIT | SCTLR_EL1_EnRCTX_BIT |		\
+	 SCTLR_EL1_EnDB_BIT | SCTLR_EL1_RES0_27_BIT |		\
+	 SCTLR_EL1_EnDA_BIT | SCTLR_EL1_IESB_BIT |		\
+	 SCTLR_EL1_EnIB_BIT | SCTLR_EL1_EnIA_BIT)
+
+/* Default TCR_EL1 configuration */
+
+#define TCR_CACHE_ATTRS						\
+	(TCR_EL1_IRGN0_WBWA | TCR_EL1_IRGN1_WBWA |		\
+	 TCR_EL1_ORGN0_WBWA | TCR_EL1_ORGN1_WBWA)
+
+#define TCR_SMP_ATTRS						\
+	(TCR_EL1_SH0_IS | TCR_EL1_SH1_IS)
+
+#define TCR_INIT_FLAGS						\
+	(TCR_EL1_ASID_16 | TCR_CACHE_ATTRS | TCR_SMP_ATTRS |	\
+	 (TCR_EL1_TG0_4K << TCR_EL1_TG0_SHIFT))
+
+/* Default MAIR_EL1 configuration */
+
+/* These are the indexes in MAIR_EL1 */
+#define DEVICE_nGnRnE		0
+#define DEVICE_nGnRE		1
+#define DEVICE_GRE		2
+#define NORMAL_NC		3
+#define NORMAL_WT		4
+#define NORMAL_WB		5
+
+#define MAIR_INIT_ATTR						\
+	(MAIR_EL1_ATTR(MAIR_DEVICE_nGnRnE, DEVICE_nGnRnE) |	\
+	 MAIR_EL1_ATTR(MAIR_DEVICE_nGnRE, DEVICE_nGnRE) |	\
+	 MAIR_EL1_ATTR(MAIR_DEVICE_GRE, DEVICE_GRE) |		\
+	 MAIR_EL1_ATTR(MAIR_NORMAL_NC, NORMAL_NC) |		\
+	 MAIR_EL1_ATTR(MAIR_NORMAL_WT, NORMAL_WT) |		\
+	 MAIR_EL1_ATTR(MAIR_NORMAL_WB, NORMAL_WB))
 
 #ifdef __ASSEMBLY__
 /*
@@ -154,49 +250,5 @@ static inline void ukarch_spinwait(void)
 {
 	/* Intelligent busy wait not supported on arm64. */
 }
-
-/******************************************************************
- * System Register Definitions
- ******************************************************************/
-
-/* SCTLR_EL1: System Control Register */
-#define SCTLR_EL1_M_BIT             (_AC(1, ULL) << 0)
-#define SCTLR_EL1_A_BIT             (_AC(1, ULL) << 1)
-#define SCTLR_EL1_C_BIT             (_AC(1, ULL) << 2)
-#define SCTLR_EL1_SA_BIT            (_AC(1, ULL) << 3)
-#define SCTLR_EL1_SA0_BIT           (_AC(1, ULL) << 4)
-#define SCTLR_EL1_CP15BEN_BIT       (_AC(1, ULL) << 5)
-#define SCTLR_EL1_ITD_BIT           (_AC(1, ULL) << 7)
-#define SCTLR_EL1_SED_BIT           (_AC(1, ULL) << 8)
-#define SCTLR_EL1_UMA_BIT           (_AC(1, ULL) << 9)
-#define SCTLR_EL1_I_BIT             (_AC(1, ULL) << 12)
-#define SCTLR_EL1_EnDB_BIT          (_AC(1, ULL) << 13)
-#define SCTLR_EL1_DZE_BIT           (_AC(1, ULL) << 14)
-#define SCTLR_EL1_UCT_BIT           (_AC(1, ULL) << 15)
-#define SCTLR_EL1_NTWI_BIT          (_AC(1, ULL) << 16)
-#define SCTLR_EL1_NTWE_BIT          (_AC(1, ULL) << 18)
-#define SCTLR_EL1_WXN_BIT           (_AC(1, ULL) << 19)
-#define SCTLR_EL1_UWXN_BIT          (_AC(1, ULL) << 20)
-#define SCTLR_EL1_IESB_BIT          (_AC(1, ULL) << 21)
-#define SCTLR_EL1_E0E_BIT           (_AC(1, ULL) << 24)
-#define SCTLR_EL1_EE_BIT            (_AC(1, ULL) << 25)
-#define SCTLR_EL1_UCI_BIT           (_AC(1, ULL) << 26)
-#define SCTLR_EL1_EnDA_BIT          (_AC(1, ULL) << 27)
-#define SCTLR_EL1_EnIB_BIT          (_AC(1, ULL) << 30)
-#define SCTLR_EL1_EnIA_BIT          (_AC(1, ULL) << 31)
-#define SCTLR_EL1_BT0_BIT           (_AC(1, ULL) << 35)
-#define SCTLR_EL1_BT1_BIT           (_AC(1, ULL) << 36)
-#define SCTLR_EL1_BT_BIT            (_AC(1, ULL) << 36)
-#define SCTLR_EL1_DSSBS_BIT         (_AC(1, ULL) << 44)
-
-/* ID_AA64_ISAR_EL1: AArch64 Instruction Set Attributes Register 1 */
-#define ID_AA64ISAR1_EL1_GPI_SHIFT  28
-#define ID_AA64ISAR1_EL1_GPI_MASK   0xf
-#define ID_AA64ISAR1_EL1_GPA_SHIFT  24
-#define ID_AA64ISAR1_EL1_GPA_MASK   0xf
-#define ID_AA64ISAR1_EL1_API_SHIFT  8
-#define ID_AA64ISAR1_EL1_API_MASK   0xf
-#define ID_AA64ISAR1_EL1_APA_SHIFT  4
-#define ID_AA64ISAR1_EL1_APA_MASK   0xf
 
 #endif /* __ASSEMBLY__ */

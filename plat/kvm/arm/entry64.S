@@ -100,7 +100,7 @@ ENTRY(_libkvmplat_entry)
 	/* Disable the MMU and D-Cache. */
 	dsb sy
 	mrs x2, sctlr_el1
-	mov x3, #SCTLR_M|SCTLR_C
+	mov x3, #SCTLR_EL1_M_BIT|SCTLR_EL1_C_BIT
 	bic x2, x2, x3
 	msr sctlr_el1, x2
 	isb
