@@ -99,7 +99,7 @@ ENTRY(create_pagetables)
 	bl  build_l2_block_pagetable
 
 	add x6, x14, #L2_TABLE_OFFSET
-	ldr x7, =SECT_ATTR_DEVICE_nGnRE
+	ldr x7, =PTE_ATTR_DEVICE_nGnRE
 	mov x8, #DEVICE_ADDR_START
 	mov x9, x8
 	ldr x10, =DEVICE_ENTRIES
@@ -117,7 +117,7 @@ ENTRY(create_pagetables)
 	 * sections will be update later.
 	 */
 	add x6, x14, #L1_TABLE_OFFSET	/* 1st L2 table page */
-	ldr x7, =SECT_ATTR_NORMAL
+	ldr x7, =PTE_ATTR_NORMAL_RW
 	mov x8, #RAM_ADDR_START
 	mov x9, x8
 	mov x10, #RAM_L2_ENTRIES
@@ -128,7 +128,7 @@ ENTRY(create_pagetables)
          * (256GiB ~ 512GiB).
          */
         add x6, x14, #L1_TABLE_OFFSET	/* 1st L2 table page */
-        ldr x7, =SECT_ATTR_DEVICE_nGnRnE
+        ldr x7, =PTE_ATTR_DEVICE_nGnRnE
         mov x8, #PCIE_ECAM_START
         mov x9, x8
         mov x10, #PCIE_ECAM_L2_ENTRIES
@@ -140,7 +140,7 @@ ENTRY(create_pagetables)
 	 */
 	add x6, x14, #L1_TABLE_OFFSET
 	add x6, x6, #__PAGE_SIZE	/* 2nd L2 table page */
-	ldr x7, =SECT_ATTR_DEVICE_nGnRE
+	ldr x7, =PTE_ATTR_DEVICE_nGnRE
 	mov x8, #PCIE_ADDR_START
 	mov x9, x8
 	mov x10, #PCIE_L2_ENTRIES
@@ -155,7 +155,7 @@ ENTRY(create_pagetables)
 	/* 1st: Build a L2 block pagetable */
 	add x6, x14, #L2_TABLE_OFFSET
 	add x6, x6, #__PAGE_SIZE
-	ldr x7, =SECT_ATTR_NORMAL
+	ldr x7, =PTE_ATTR_NORMAL_RW
 	mov x8, #RAM_ADDR_START
 	mov x9, x8
 	mov x10, 512
@@ -173,7 +173,7 @@ ENTRY(create_pagetables)
 	mov x17, #RAM_ADDR_START
 
 	mov x6, x16
-	ldr x7, =SECT_ATTR_NORMAL
+	ldr x7, =PTE_ATTR_NORMAL_RW
 	mov x8, x17
 	mov x9, x17
 	lsr x10, x15, L3_SHIFT
@@ -198,7 +198,7 @@ ENTRY(create_pagetables)
 	ldr x9, =_text
 	sub x10, x9, x8
 	add x6, x14, #L3_TABLE_OFFSET
-	ldr x7, =SECT_ATTR_NORMAL_RO
+	ldr x7, =PTE_ATTR_NORMAL_RO
 	mov x9, x8
 	lsr x10, x10, L3_SHIFT
 	bl  build_l3_pagetable
@@ -208,7 +208,7 @@ ENTRY(create_pagetables)
 	ldr x9, =_etext
 	sub x10, x9, x8
 	add x6, x14, #L3_TABLE_OFFSET
-	ldr x7, =SECT_ATTR_NORMAL_EXEC
+	ldr x7, =PTE_ATTR_NORMAL_RX
 	mov x9, x8
 	lsr x10, x10, L3_SHIFT
 	bl  build_l3_pagetable
@@ -218,7 +218,7 @@ ENTRY(create_pagetables)
 	ldr x9, =_ectors
 	sub x10, x9, x8
 	add x6, x14, #L3_TABLE_OFFSET
-	ldr x7, =SECT_ATTR_NORMAL_RO
+	ldr x7, =PTE_ATTR_NORMAL_RO
 	mov x9, x8
 	lsr x10, x10, L3_SHIFT
 	bl  build_l3_pagetable
@@ -257,11 +257,11 @@ ENTRY(start_mmu)
 	ubfx x4, x3, #0, #4
 	ldrb w4, [x5, x4]
 
-	/* Setup TCR_TxSZ(64 - VIRT_BITS) for TCR_INIT_FLAGS */
+	/* Setup TCR_EL1_TxSZ(64 - VIRT_BITS) for TCR_INIT_FLAGS */
 	mov x5, #64
 	sub x5, x5, x4
 	mov x4, x5
-	lsl x5, x5, #TCR_T1SZ_SHIFT
+	lsl x5, x5, #TCR_EL1_T1SZ_SHIFT
 	orr x5, x4, x5
 	ldr x2, =TCR_INIT_FLAGS
 	orr x2, x5, x2
