@@ -161,6 +161,15 @@ menu "Armv8-A Extensions"
 	help
 		BTI protects against JOP-like attacks by placing and
 		verifying landing pads on branch targets.
+
+config ARM64_FEAT_RNG
+	bool "Armv8.5 Random Number Generator"
+	select HAVE_RANDOM
+	help
+	  This enables the hardware RNG functionality provided by the
+	  processor. The architecture specifies that this is implemented
+	  by a Deterministic Random Bit Generator (DRBG) that is seeded
+	  from a TRNG.
 endmenu
 
 config ARM64_ERRATUM_858921
