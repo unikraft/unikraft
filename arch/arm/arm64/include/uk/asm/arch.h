@@ -143,6 +143,10 @@
 #define ESR_ISS_ABRT_FSC_LOCKDOWN		0x34
 #define ESR_ISS_ABRT_FSC_UNSUP_EXCL		0x35
 
+/* ID_AA64ISAR0_EL1: AArch64 Instruction Set Attributes Register 0 */
+#define ID_AA64ISAR0_EL1_RNDR_SHIFT		_AC(60, ULL)
+#define ID_AA64ISAR0_EL1_RNDR_MASK		_AC(0xf, UL)
+
 /* ID_AA64ISAR1_EL1: AArch64 Instruction Set Attributes Register 1 */
 #define ID_AA64ISAR1_EL1_GPI_SHIFT		28
 #define ID_AA64ISAR1_EL1_GPI_MASK		0xf
