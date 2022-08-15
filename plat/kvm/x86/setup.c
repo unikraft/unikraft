@@ -296,7 +296,8 @@ static void _init_paging(struct multiboot_info *mi)
 	struct kvmplat_config_memregion *mr[2];
 	multiboot_memory_map_t *m;
 	__sz offset, len;
-	__paddr_t start;
+	__paddr_t start, paddr;
+	__vaddr_t vaddr;
 	__sz free_memory, res_memory;
 	unsigned long frames;
 	int rc;
@@ -330,22 +331,6 @@ static void _init_paging(struct multiboot_info *mi)
 
 	ukplat_pt_add_mem(&kernel_pt, start, len);
 
-	/* Add remaining physical memory that has not been added to the heaps
-	 * previously
-	 */
-	for (offset = 0; offset < mi->mmap_length;
-	     offset += m->size + sizeof(m->size)) {
-		m = (void *)(__uptr)(mi->mmap_addr + offset);
-
-		if ((m->type != MULTIBOOT_MEMORY_AVAILABLE) ||
-		    (m->addr <= PLATFORM_MEM_START))
-			continue;
-
-		rc = ukplat_pt_add_mem(&kernel_pt, m->addr, m->len);
-		if (unlikely(rc))
-			goto EXIT_FATAL;
-	}
-
 	/* Switch to new page table */
 	rc = ukplat_pt_set_active(&kernel_pt);
 	if (unlikely(rc))
@@ -365,6 +350,33 @@ static void _init_paging(struct multiboot_info *mi)
 			       PAGE_FLAG_KEEP_FRAMES);
 	if (unlikely(rc))
 		goto EXIT_FATAL;
+
+	/* Add remaining physical memory that has not been added to the heaps
+	 * previously. Also map regions marked as RESERVED 1:1 because this
+	 * will include memory-mapped ACPI and APIC tables and registers. For
+	 * now, we map these ranges as read-only.
+	 */
+	for (offset = 0; offset < mi->mmap_length;
+	     offset += m->size + sizeof(m->size)) {
+		m = (void *)(__uptr)(mi->mmap_addr + offset);
+
+		if (m->addr <= PLATFORM_MEM_START)
+			continue;
+
+		if (m->type == MULTIBOOT_MEMORY_RESERVED) {
+			vaddr  = paddr = PAGE_ALIGN_DOWN(m->addr);
+			frames = DIV_ROUND_UP(m->len, PAGE_SIZE);
+
+			rc = ukplat_page_map(&kernel_pt, vaddr, paddr, frames,
+					     PAGE_ATTR_PROT_READ, 0);
+			if (unlikely(rc))
+				goto EXIT_FATAL;
+		} else if (m->type == MULTIBOOT_MEMORY_AVAILABLE) {
+			rc = ukplat_pt_add_mem(&kernel_pt, m->addr, m->len);
+			if (unlikely(rc))
+				goto EXIT_FATAL;
+		}
+	}
 
 	/* Setup and map heap */
 
