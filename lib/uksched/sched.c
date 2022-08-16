@@ -207,6 +207,9 @@ struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
 {
 	struct uk_thread *thread = NULL;
 	void *stack = NULL;
+#ifdef _SHADOW_STACK_
+	void *shadow_stack = NULL;
+#endif
 	int rc;
 	void *tls = NULL;
 
@@ -222,6 +225,18 @@ struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
 	stack = create_stack(sched->allocator);
 	if (stack == NULL)
 		goto err;
+
+#ifdef _SHADOW_STACK_
+	shadow_stack = create_stack(sched->allocator);
+	if (shadow_stack == NULL)
+		goto err;
+
+	/*
+	* FIXME: include the shadow stack initialization in the uk_thread_init function
+	*/
+	thread->shadow_stack = shadow_stack;
+#endif
+	
 	if (have_tls_area() && !(tls = uk_thread_tls_create(sched->allocator)))
 		goto err;
 

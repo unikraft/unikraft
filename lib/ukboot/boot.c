@@ -140,7 +140,9 @@ static void main_thread_func(void *arg)
 	 * from its OS being initialized.
 	 */
 
+#ifndef CONFIG_LIBUKSCHED
 	setup_x18();
+#endif
 	uk_pr_info("Pre-init table at %p - %p\n",
 		   &__preinit_array_start[0], &__preinit_array_end);
 	uk_ctortab_foreach(ctorfn,
