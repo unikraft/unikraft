@@ -8,9 +8,11 @@ ARCHFLAGS     += -D__ARM_64__
 else
 ARCHFLAGS     += -D__ARM_64__ -mgeneral-regs-only
 endif
+ARCHFLAGS-$(call gcc_version_ge,9,4) += -mno-outline-atomics
 
 # Disable FPU for trap/exception/interrupt handlers
 ISR_ARCHFLAGS += -D__ARM_64__ -mgeneral-regs-only
+ISR_ARCHFLAGS-$(call gcc_version_ge,9,4) += -mno-outline-atomics
 
 CINCLUDES   += -I$(CONFIG_UK_BASE)/arch/arm/arm64/include
 ASINCLUDES  += -I$(CONFIG_UK_BASE)/arch/arm/arm64/include
