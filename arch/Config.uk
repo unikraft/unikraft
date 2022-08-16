@@ -17,6 +17,7 @@ endchoice
 
 if (ARCH_X86_64)
 	source "$(UK_BASE)/arch/x86/x86_64/Config.uk"
+	source "$(UK_BASE)/arch/x86/x86_64/SGX.uk"
 endif
 if (ARCH_ARM_32)
 	source "$(UK_BASE)/arch/arm/arm/Config.uk"
@@ -24,6 +25,7 @@ endif
 if (ARCH_ARM_64)
 	source "$(UK_BASE)/arch/arm/arm64/Config.uk"
 endif
+
 
 config STACK_SIZE_PAGE_ORDER
 	int

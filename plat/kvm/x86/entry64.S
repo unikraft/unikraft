@@ -132,6 +132,12 @@ gdt64_cs:
 	.quad GDT_DESC_CODE_VAL		/* 64bit CS		*/
 gdt64_ds:
 	.quad GDT_DESC_DATA_VAL		/* DS			*/
+#if CONFIG_KVM_RING3
+gdt64_user_ds:
+	.quad GDT_DESC_USER_DATA_VAL
+gdt64_user_cs:
+	.quad GDT_DESC_USER_CODE_VAL
+#endif /* CONFIG_KVM_RING3 */
 	.quad 0x0000000000000000	/* TSS part 1 (via C)	*/
 	.quad 0x0000000000000000	/* TSS part 2 (via C)	*/
 gdt64_end:

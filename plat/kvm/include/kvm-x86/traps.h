@@ -20,6 +20,7 @@
  */
 
 #include <x86/traps.h>
+#include <uk/config.h>
 
 /*
  * GDT layout
@@ -30,16 +31,34 @@
 #define GDT_DESC_NULL           0
 #define GDT_DESC_CODE           1
 #define GDT_DESC_DATA           2
-#define GDT_DESC_TSS_LO         3
-#define GDT_DESC_TSS_HI         4
+#ifdef CONFIG_KVM_RING3
+/* 
+ * put GDT_DESC_USER_DATA before GDT_DESC_USER_CODE to satisfy the requirements
+ * of syscall/sysret instruction
+ */
+    #define GDT_DESC_USER_DATA      3
+    #define GDT_DESC_USER_CODE      4
+    #define GDT_DESC_TSS_LO         5
+    #define GDT_DESC_TSS_HI         6
+#else
+    #define GDT_DESC_TSS_LO         3
+    #define GDT_DESC_TSS_HI         4
+#endif
 #define GDT_DESC_TSS            GDT_DESC_TSS_LO
 
 #define GDT_DESC_OFFSET(n)      ((n) * 0x8)
-#define GDT_NUM_ENTRIES         5
+#ifdef CONFIG_KVM_RING3
+    #define GDT_NUM_ENTRIES         7
+#else
+    #define GDT_NUM_ENTRIES         5
+#endif
 
 #define GDT_DESC_CODE_VAL       0x00af99000000ffff
 #define GDT_DESC_CODE32_VAL     0x00cf9b000000ffff
 #define GDT_DESC_DATA_VAL       0x00cf93000000ffff
-
+#ifdef CONFIG_KVM_RING3
+    #define GDT_DESC_USER_CODE_VAL  0x00aff9000000ffff 
+    #define GDT_DESC_USER_DATA_VAL  0x00aff1000000ffff
+#endif
 
 #define IDT_NUM_ENTRIES         48

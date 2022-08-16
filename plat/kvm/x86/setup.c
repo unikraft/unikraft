@@ -479,6 +479,10 @@ void _libkvmplat_entry(void *arg)
 	_check_ospke();
 #endif /* CONFIG_HAVE_X86PKU */
 
+#if CONFIG_KVM_RING3
+	uk_pr_info("Experimental ring-3 support is enabled\n");
+#endif /* CONFIG_KVM_RING3 */
+
 	/*
 	 * Switch away from the bootstrap stack as early as possible.
 	 */

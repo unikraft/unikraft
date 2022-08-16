@@ -1,0 +1,15 @@
+menuconfig MARCH_X86_64_SGX
+bool "Intel Software Guard Extensions Support"
+default false
+help
+    Configures if Intel SGX is enabled.
+
+if MARCH_X86_64_SGX
+    config SGX_EPC_SIZE
+    int
+    prompt "SGX Enclave Page Cache size (MB)"
+    default 64
+    help
+        Configures the pre-allocated SGX EPC memory size.
+        This value must be smaller than the maximum EPC size of your host machine.
+endif

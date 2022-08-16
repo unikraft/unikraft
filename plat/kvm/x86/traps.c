@@ -30,6 +30,7 @@
 #include <uk/plat/config.h>
 #include <x86/desc.h>
 #include <kvm-x86/traps.h>
+#include <kvm/config.h>
 
 static struct seg_desc32 cpu_gdt64[GDT_NUM_ENTRIES] __align64b;
 
@@ -48,7 +49,16 @@ static void gdt_init(void)
 	memset(cpu_gdt64, 0, sizeof(cpu_gdt64));
 	cpu_gdt64[GDT_DESC_CODE].raw = GDT_DESC_CODE_VAL;
 	cpu_gdt64[GDT_DESC_DATA].raw = GDT_DESC_DATA_VAL;
-
+#ifdef CONFIG_KVM_RING3
+	cpu_gdt64[GDT_DESC_USER_CODE].raw = GDT_DESC_CODE_VAL;
+	cpu_gdt64[GDT_DESC_USER_CODE].code.r = 1;
+	cpu_gdt64[GDT_DESC_USER_CODE].code.dpl = 3;
+	
+	cpu_gdt64[GDT_DESC_USER_DATA].raw = cpu_gdt64[GDT_DESC_USER_CODE].raw;
+	cpu_gdt64[GDT_DESC_USER_DATA].data.x = 0;
+	cpu_gdt64[GDT_DESC_USER_DATA].data.reserved = 0;
+	cpu_gdt64[GDT_DESC_USER_DATA].data.b = 1;
+#endif
 	gdtptr.limit = sizeof(cpu_gdt64) - 1;
 	gdtptr.base = (__u64) &cpu_gdt64;
 	__asm__ __volatile__("lgdt (%0)" ::"r"(&gdtptr));
@@ -67,13 +77,21 @@ __section(".intrstack")  __align(STACK_SIZE)
 char cpu_trap_stack[STACK_SIZE];  /* IST2 */
 static char cpu_nmi_stack[4096];  /* IST3 */
 
+
+
 static void tss_init(void)
 {
+	extern struct kvmplat_config _libkvmplat_cfg;
+
 	struct seg_desc64 *td = (void *) &cpu_gdt64[GDT_DESC_TSS_LO];
 
 	cpu_tss.ist[0] = (__u64) &cpu_intr_stack[sizeof(cpu_intr_stack)];
 	cpu_tss.ist[1] = (__u64) &cpu_trap_stack[sizeof(cpu_trap_stack)];
 	cpu_tss.ist[2] = (__u64) &cpu_nmi_stack[sizeof(cpu_nmi_stack)];
+
+#ifdef CONFIG_KVM_RING3
+	cpu_tss.rsp[0] = _libkvmplat_cfg.bstack.start;
+#endif
 
 	td->limit_lo = sizeof(cpu_tss);
 	td->base_lo = (__u64) &cpu_tss;
