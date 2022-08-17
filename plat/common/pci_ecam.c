@@ -226,7 +226,10 @@ int gen_pci_irq_parse(const fdt32_t *addr, struct fdt_phandle_args *out_irq)
 	fdt32_t initial_match_array[16];
 	const fdt32_t *match_array = initial_match_array;
 	const fdt32_t *tmp, *imap, *imask;
-	const fdt32_t dummy_imask[] = { 0 };
+	const fdt32_t dummy_imask[] = {cpu_to_fdt32(~0), cpu_to_fdt32(~0), cpu_to_fdt32(~0), cpu_to_fdt32(~0),
+								   cpu_to_fdt32(~0), cpu_to_fdt32(~0), cpu_to_fdt32(~0), cpu_to_fdt32(~0),
+								   cpu_to_fdt32(~0), cpu_to_fdt32(~0), cpu_to_fdt32(~0), cpu_to_fdt32(~0),
+								   cpu_to_fdt32(~0), cpu_to_fdt32(~0), cpu_to_fdt32(~0), cpu_to_fdt32(~0), cpu_to_fdt32(~0)};
 	int intsize, newintsize;
 	int addrsize, newaddrsize = 0;
 	int imaplen, match, i, rc = -EINVAL;
