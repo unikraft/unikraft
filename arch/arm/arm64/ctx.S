@@ -107,21 +107,22 @@ ENTRY(_ctx_arm_call2)
  */
 ENTRY(ukarch_ctx_switch)
 	/* Save callee-saved registers to prevctx's stack */
-	sub x2, sp, #__CALLEE_SAVED_SIZE
-	stp x19, x20, [x2, #16 * 0]
-	stp x21, x22, [x2, #16 * 1]
-	stp x23, x24, [x2, #16 * 2]
-	stp x25, x26, [x2, #16 * 3]
-	stp x27, x28, [x2, #16 * 4]
-	stp x29, x30, [x2, #16 * 5]
+	sub sp, sp, #__CALLEE_SAVED_SIZE
+	stp x19, x20, [sp, #16 * 0]
+	stp x21, x22, [sp, #16 * 1]
+	stp x23, x24, [sp, #16 * 2]
+	stp x25, x26, [sp, #16 * 3]
+	stp x27, x28, [sp, #16 * 4]
+	stp x29, x30, [sp, #16 * 5]
 
 	/*
 	 * Record the restore point for switch out thread to restore
-	 * its called-saved registers in next switch to time.
+	 * its callee-saved registers in next switch to time.
 	 */
 	ldr x30, =restore_point
 
 	/* Save sp and restore point to previous context */
+	mov x2, sp
 	stp x30, x2, [x0]
 
 	/* Restore sp and restore point from next context */
@@ -132,13 +133,13 @@ ENTRY(ukarch_ctx_switch)
 
 restore_point:
 	/* Restore the callee-saved registers */
-	ldp x19, x20, [x2, #16 * 0]
-	ldp x21, x22, [x2, #16 * 1]
-	ldp x23, x24, [x2, #16 * 2]
-	ldp x25, x26, [x2, #16 * 3]
-	ldp x27, x28, [x2, #16 * 4]
-	ldp x29, x30, [x2, #16 * 5]
+	ldp x19, x20, [sp, #16 * 0]
+	ldp x21, x22, [sp, #16 * 1]
+	ldp x23, x24, [sp, #16 * 2]
+	ldp x25, x26, [sp, #16 * 3]
+	ldp x27, x28, [sp, #16 * 4]
+	ldp x29, x30, [sp, #16 * 5]
 
-	add sp, x2, #__CALLEE_SAVED_SIZE
+	add sp, sp, #__CALLEE_SAVED_SIZE
 	ret
 
