@@ -37,6 +37,7 @@
 #include <uk/config.h>
 #include <uk/arch/types.h>
 #include <uk/arch/tls.h>
+#include <uk/arch/lcpu.h>
 #include <uk/essentials.h>
 #if CONFIG_LIBUKDEBUG
 #include <uk/assert.h>
@@ -51,6 +52,12 @@ __uptr ukplat_tlsp_get(void);
 
 /**
  * Sets the thread local storage register
+ * WARNING: Setting of the TLS pointer should happen outside of a function that
+ *          accesses TLS variables because of potential compiler optimizations.
+ *          Due to performance optimizations, it can happen that a TLS variable
+ *          is loaded and cached before the actual TLS pointer is set.
+ *          When working with multiple TLS, we recommend using
+ *          `ukplat_tlsp_exec()`.
  *
  * @param tlsp TLS pointer value (see `ukarch_tls_tlsp()`)
  */
@@ -71,6 +78,45 @@ static inline void ukplat_tls_set(void *tls_area)
 #endif /* CONFIG_LIBUKDEBUG */
 
 	ukplat_tlsp_set(ukarch_tls_tlsp(tls_area));
+}
+
+/**
+ * Executes a function with a different TLS pointer activated.
+ * This wrapper function will apply a given TLS pointer before executing
+ * a given function. After the execution, the original TLS pointer is
+ * restored.
+ * NOTE: This function is decalred as `__noinline`  so that we keep
+ *       a dedicated function context to load and store the TLS pointer
+ *       register of the CPU. No TLS variable is accessed within this
+ *       function wrapper.
+ *
+ * @param tlsp
+ *   TLS pointer to set for the execution of `fn()`
+ * @param fn
+ *   Function to execute
+ * @param argp
+ *   Argument pointer that will be handed over to `fn`
+ * @return
+ *   The return value from `fn()`
+ */
+typedef int (*ukplat_tlsp_exec_fn)(void *);
+
+static __noinline __maybe_unused int
+ukplat_tlsp_exec(__uptr tlsp, ukplat_tlsp_exec_fn fn, void *argp)
+{
+	__uptr orig_tlsp;
+	int ret;
+
+#if CONFIG_LIBUKDEBUG
+	UK_ASSERT(fn);
+#endif
+
+	orig_tlsp = ukplat_tlsp_get();
+	barrier();
+	ukplat_tlsp_set(tlsp);
+	ret = (*fn)(argp);
+	ukplat_tlsp_set(orig_tlsp);
+	return ret;
 }
 
 #endif /* __UKPLAT_TLS_H__ */
