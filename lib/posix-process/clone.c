@@ -77,6 +77,44 @@ static __uk_tls struct {
 			(DECONST(struct uk_posix_clonetab_entry*,	\
 				 (&_uk_posix_clonetab_end))) - 1)
 
+struct _clonetab_init_call_args {
+	uk_posix_clone_init_func_t init;
+	const struct clone_args *cl_args;
+	size_t cl_args_len;
+	__u64 cl_flags_optional;
+	struct uk_thread *child;
+	struct uk_thread *parent;
+};
+
+static int _clonetab_init_call(void *argp)
+{
+	struct _clonetab_init_call_args *args
+		= (struct _clonetab_init_call_args *) argp;
+	int ret;
+
+	UK_ASSERT(args);
+	UK_ASSERT(args->init);
+
+	ret = (args->init)(args->cl_args, args->cl_args_len, args->child, args->parent);
+	return ret;
+}
+struct _clonetab_term_call_args {
+	uk_posix_clone_term_func_t term;
+	__u64 cl_flags;
+	struct uk_thread *child;
+};
+
+static int _clonetab_term_call(void *argp)
+{
+	struct _clonetab_term_call_args *args
+		= (struct _clonetab_term_call_args *) argp;
+
+	UK_ASSERT(args);
+	UK_ASSERT(args->term);
+
+	(args->term)(args->cl_flags, args->child);
+	return 0;
+}
 /** Iterates over registered thread initialization functions */
 static int _uk_posix_clonetab_init(const struct clone_args *cl_args,
 				   size_t cl_args_len,
@@ -85,7 +123,8 @@ static int _uk_posix_clonetab_init(const struct clone_args *cl_args,
 				   struct uk_thread *parent)
 {
 	struct uk_posix_clonetab_entry *itr;
-	__uptr orig_tlsp;
+	struct _clonetab_init_call_args init_args;
+	struct _clonetab_term_call_args term_args;
 	int ret = 0;
 	__u64 flags;
 
@@ -119,15 +158,11 @@ static int _uk_posix_clonetab_init(const struct clone_args *cl_args,
 		goto out;
 	}
 
-	/* NOTE: We temporarily set the Unikraft TLS to the one of the created
-	 *       child in order to enable TLS initializations within the init
-	 *       functions.
-	 */
-	orig_tlsp = ukplat_tlsp_get();
-	ukplat_tlsp_set(child->uktlsp);
-	barrier(); /* avoid that TLS accesses are re-ordered */
-
 	/* Call handlers according to clone flags */
+	init_args.cl_args     = cl_args;
+	init_args.cl_args_len = cl_args_len;
+	init_args.child       = child;
+	init_args.parent      = parent;
 	uk_posix_clonetab_foreach(itr) {
 		if (unlikely(!itr->init))
 			continue;
@@ -137,7 +172,12 @@ static int _uk_posix_clonetab_init(const struct clone_args *cl_args,
 		uk_pr_debug("posix_clone %p (%s) init: Call initialization %p() [flags: 0x%"__PRIx64"]...\n",
 			    child, child->name ? child->name : "<unnamed>",
 			    *itr->init, itr->flags_mask);
-		ret = (itr->init)(cl_args, cl_args_len, child, parent);
+
+		/* NOTE: We call the init function with the Unikraft TLS set of the created
+		 *       child in order to enable TLS initializations.
+		 */
+		init_args.init = *itr->init;
+		ret = ukplat_tlsp_exec(child->uktlsp, _clonetab_init_call, &init_args);
 		if (ret < 0) {
 			uk_pr_debug("posix_clone %p (%s) init: %p() returned %d\n",
 				    child, child->name ? child->name : "<unnamed>",
@@ -147,15 +187,17 @@ static int _uk_posix_clonetab_init(const struct clone_args *cl_args,
 	}
 
 	/* Set status in the child (TLS variable) */
-	cl_status.is_cloned = true;
-	cl_status.cl_flags = cl_args->flags;
-	ret = (ret > 0) ? 0 : ret;
-	goto out_tls;
+	uk_thread_uktls_var(child, cl_status.is_cloned) = true;
+	uk_thread_uktls_var(child, cl_status.cl_flags)  = cl_args->flags;
+	ret = 0; /* success */
+	goto out;
 
 err:
 	/* Run termination functions starting from one level before the failed
-	 * one for cleanup (still child TLS context)
+	 * one for cleanup (also with child TLS context)
 	 */
+	term_args.cl_flags = cl_args->flags;
+	term_args.child   = child;
 	uk_posix_clonetab_foreach_reverse2(itr, itr - 2) {
 		if (unlikely(!itr->term))
 			continue;
@@ -165,12 +207,9 @@ err:
 		uk_pr_debug("posix_clone %p (%s) init: Call termination %p() [flags: 0x%"__PRIx64"]...\n",
 			    child, child->name ? child->name : "<unnamed>",
 			    *itr->term, itr->flags_mask);
-		(itr->term)(cl_args->flags, child);
+		term_args.term = itr->term;
+		ukplat_tlsp_exec(child->uktlsp, _clonetab_term_call, &term_args);
 	}
-out_tls:
-	/* Restore TLS pointer of parent */
-	barrier();
-	ukplat_tlsp_set(orig_tlsp);
 out:
 	return ret;
 }
