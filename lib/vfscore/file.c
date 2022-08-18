@@ -31,14 +31,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "vfs.h"
+
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <uk/print.h>
+#include <uk/assert.h>
 #include <vfscore/file.h>
 #include <vfscore/eventpoll.h>
-#include <uk/assert.h>
-#include "vfs.h"
 
 int fdrop(struct vfscore_file *fp)
 {
