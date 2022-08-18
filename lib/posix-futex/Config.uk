@@ -3,7 +3,19 @@ menuconfig LIBPOSIX_FUTEX
 	select NOLIBC if !HAVE_LIBC
 	select UKTIME if !HAVE_LIBC
 	select LIBUKSCHED
+	select LIBUKLOCK
 	select LIBUKDEBUG
+	select LIBSYSCALL_SHIM if LIBUKTEST_ALL
 	default n
 	help
 		Linux-compatible futex calls
+
+if LIBPOSIX_FUTEX
+
+config LIBPOSIX_FUTEX_TEST
+	bool "Enable tests"
+	default n
+	select LIBUKTEST
+	select LIBSYSCALL_SHIM
+
+endif
