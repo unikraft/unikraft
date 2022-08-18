@@ -93,6 +93,9 @@ extern "C" {
 #ifndef __unalign
 #define __unalign              __align(1)
 #endif
+#ifndef __noinline
+#define __noinline             __attribute__((noinline))
+#endif
 
 #ifndef __alias
 #define __alias(old, new) \
