@@ -32,6 +32,35 @@
 #ifndef _LINUX_RADIX_TREE_H_
 #define _LINUX_RADIX_TREE_H_
 
+
+/*
+ * Radix tree illustration (index=11100000):
+                                                                    +-------------+                                                                    
+                                                                    |*00* 01 10 11|                                                                    
+                                                                    +-------------+                                                                    
+                                                                  /---  /   \  ---\                                                                  
+                                                            /-----     /     \     -----\                                                            
+                                                      /-----          /       \          -----\                                                      
+                                                /-----               /         \               -----\                                                
+                                         +-------------+     +-----------+     +-----------+     +-----------+                                         
+                                         |*00* 01 10 11|     |00 01 10 11|     |00 01 10 11|     |00 01 10 11|                                         
+                                         +-------------+     +-----------+     +-----------+     +-----------+                                         
+                                         /-                                                              -\                                          
+                                      /--                                                                  --\                                       
+                                    /-                                                                        --\                                    
+                                 /--                                                                             --\                                 
+                           +-------------+                                                                     +-----------+                           
+                           |00 01 *10* 11|                              .........                              |00 01 10 11|                           
+                           +-------------+                                                                     +-----------+                           
+                         /---  /   \  ---\                                                                 /---  /   \  ---\                         
+                   /-----     /     \     -----\                                                     /-----     /     \     -----\                   
+             /-----          /       \          -----\                                         /-----          /       \          -----\             
+       /-----               /         \               -----\                             /-----               /         \               -----\       
++-----------+     +-----------+     +-------------+     +-----------+               +-----------+     +-----------+     +-----------+     +-----------+
+|00 01 10 11|     |00 01 10 11|     |00 01 10 *11*|     |00 01 10 11|               |00 01 10 11|     |00 01 10 11|     |00 01 10 11|     |00 01 10 11|
++-----------+     +-----------+     +-------------+     +-----------+               +-----------+     +-----------+     +-----------+     +-----------+
+*/
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <stdbool.h>
@@ -46,9 +75,9 @@
 extern "C" {
 #endif
 
-#define	UK_RADIX_TREE_MAP_SHIFT	6
-#define	UK_RADIX_TREE_MAP_SIZE	(1UL << UK_RADIX_TREE_MAP_SHIFT)
-#define	UK_RADIX_TREE_MAP_MASK	(UK_RADIX_TREE_MAP_SIZE - 1UL)
+#define	UK_RADIX_TREE_MAP_SHIFT	6 /* each layer represents 6 bits of the index */
+#define	UK_RADIX_TREE_MAP_SIZE	(1UL << UK_RADIX_TREE_MAP_SHIFT) /* max number of child nodes: 2^6 = 64 1000000 */
+#define	UK_RADIX_TREE_MAP_MASK	(UK_RADIX_TREE_MAP_SIZE - 1UL) /* mask: 2^6 - 1 = 63 111111 */
 #define	UK_RADIX_TREE_MAX_HEIGHT \
 	howmany(sizeof(long) * NBBY, UK_RADIX_TREE_MAP_SHIFT)
 
@@ -314,7 +343,7 @@ uk_radix_tree_insert(struct uk_radix_tree_root *root, unsigned long index, void 
 	 */
 	idx = uk_radix_pos(index, 0);
 	if (node->slots[idx]) {
-		uk_pr_crit("radix tree insert failed: item already exists (node->slots[%d]=%p)\n", idx, node->slots[idx]);
+		uk_pr_warn("radix tree insert failed: item already exists (node->slots[%d]=%p)\n", idx, node->slots[idx]);
 		return (-EEXIST);
 	}
 	node->slots[idx] = item;
