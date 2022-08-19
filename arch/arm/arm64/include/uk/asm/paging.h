@@ -211,6 +211,8 @@ static inline int ukarch_pte_write(__vaddr_t pt_vaddr, unsigned int lvl,
 #endif /* CONFIG_LIBUKDEBUG */
 
 	*((__pte_t *)pt_vaddr + idx) = pte;
+	dsb(ishst);
+	isb();
 
 	return 0;
 }
