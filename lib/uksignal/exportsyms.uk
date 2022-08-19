@@ -29,8 +29,10 @@ uk_syscall_e_rt_sigpending
 uk_syscall_r_rt_sigpending
 
 sigwait
-uk_syscall_e_sigwait
-uk_syscall_r_sigwait
+rt_sigtimedwait
+uk_syscall_e_rt_sigtimedwait
+uk_syscall_r_rt_sigtimedwait
+
 kill
 uk_syscall_e_kill
 uk_syscall_r_kill

@@ -46,7 +46,10 @@
 #include <uk/process.h>
 #include <unistd.h>
 #include <uk/syscall.h>
-
+#ifndef __NEED_struct_timespec
+#define __NEED_struct_timespec
+#endif
+#include <sys/types.h>
 
 /*
  * Tries to deliver a pending signal to the current thread
@@ -266,7 +269,11 @@ int sigsuspend(const sigset_t *mask)
 }
 #endif /* UK_LIBC_SYSCALLS */
 
-UK_SYSCALL_R_DEFINE(int, sigwait, const sigset_t*, set, int *, sig)
+UK_SYSCALL_R_DEFINE(int, rt_sigtimedwait,
+		    const sigset_t *, set,
+		    siginfo_t *, info,
+		    const struct timespec *__unused, timeout,
+		    size_t __unused, sigsetsize)
 {
 	/*
 	 * If the signals are ignored, this doesn't return <- TODO: POSIX ??
@@ -287,7 +294,7 @@ UK_SYSCALL_R_DEFINE(int, sigwait, const sigset_t*, set, int *, sig)
 	uk_sigset_remove_unmaskable(&cleaned_set);
 
 	if (uk_sigisempty(&cleaned_set))
-		return EINVAL;
+		return -EINVAL;
 
 	ptr = _UK_TH_SIG;
 
@@ -331,13 +338,26 @@ UK_SYSCALL_R_DEFINE(int, sigwait, const sigset_t*, set, int *, sig)
 	ptr->wait.status = UK_SIG_NOT_WAITING;
 
 	/* do not execute handler, set received signal */
-	*sig = ptr->wait.received_signal.si_signo;
+	*info = ptr->wait.received_signal;
 
 	/* execute other pending signals */
 	uk_sig_handle_signals();
 
 	return 0; /* returns positive errno */
 }
+
+#if UK_LIBC_SYSCALLS
+int sigwait(const sigset_t *set, int *sig)
+{
+	int error;
+	siginfo_t si;
+
+	error = rt_sigtimedwait(set, &si, NULL, (_NSIG / 8));
+	*sig = si.si_signo;
+
+	return error;
+}
+#endif /* UK_LIBC_SYSCALLS */
 
 /*
  * Search for a thread that does not have the signal blocked
