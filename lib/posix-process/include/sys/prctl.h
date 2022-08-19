@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include <uk/syscall.h>
 
 #define PR_SET_PDEATHSIG  1
 #define PR_GET_PDEATHSIG  2
