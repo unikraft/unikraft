@@ -206,7 +206,9 @@ int sigprocmask(int how, const sigset_t *set, sigset_t *oldset)
 }
 #endif /* UK_LIBC_SYSCALLS */
 
-UK_SYSCALL_R_DEFINE(int, sigsuspend, const sigset_t*, mask)
+UK_SYSCALL_R_DEFINE(int, rt_sigsuspend,
+		    const sigset_t *, mask,
+		    size_t __unused, sigsetsize)
 {
 	/* If the signals are ignored, this doesn't return <- POSIX */
 
@@ -253,9 +255,16 @@ UK_SYSCALL_R_DEFINE(int, sigsuspend, const sigset_t*, mask)
 	/* execute other pending signals */
 	uk_sig_handle_signals();
 
-	errno = EINTR;
-	return -1; /* always returns -1 and sets errno to EINTR */
+	return -EINTR;
 }
+
+#if UK_LIBC_SYSCALLS
+int sigsuspend(const sigset_t *mask)
+{
+	/* If the signals are ignored, this doesn't return <- POSIX */
+	return rt_sigsuspend(mask, (_NSIG / 8));
+}
+#endif /* UK_LIBC_SYSCALLS */
 
 UK_SYSCALL_R_DEFINE(int, sigwait, const sigset_t*, set, int *, sig)
 {
