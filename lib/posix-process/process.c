@@ -296,11 +296,14 @@ pid_t tcgetpgrp(int fd)
 }
 #endif /* UK_LIBC_SYSCALLS */
 
-UK_SYSCALL_R_DEFINE(int, nice, int, inc)
+#if UK_LIBC_SYSCALLS
+int nice(int inc)
 {
-	/* We don't support priority updates for unikernels */
-	return -EPERM;
+	/* We don't support priority updates at the moment */
+	errno = EPERM;
+	return -1;
 }
+#endif /* UK_LIBC_SYSCALLS */
 
 UK_SYSCALL_R_DEFINE(int, getpriority, int, which, id_t, who)
 {
