@@ -365,7 +365,7 @@ int killpg(int pgrp, int sig)
 		return -1;
 	}
 
-	return kill(uk_syscall_r_getpid(), sig);
+	return kill(uk_syscall_r_stub("getpid"), sig);
 }
 #endif /* UK_LIBC_SYSCALLS */
 
