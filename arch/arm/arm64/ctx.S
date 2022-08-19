@@ -56,6 +56,9 @@ ENTRY(_ctx_arm_clearregs)
 	mov x6, xzr
 	mov x7, xzr
 
+	/* wipe the platform-specific x18 register */
+	mov x18, xzr
+
 	/* wipe callee-saved registers */
 	mov x19, xzr
 	mov x20, xzr
@@ -106,6 +109,16 @@ ENTRY(_ctx_arm_call2)
  * Switch context on the current LCPU.
  */
 ENTRY(ukarch_ctx_switch)
+
+	/*
+	 * Store the x18 register on the stack.
+	 *
+	 * The role of register x18 is platform specific,
+	 * but saving and restoring it later is definitely
+	 * safer than leaving random values in it.
+	 */
+	str x18, [sp, #-16]!
+
 	/* Save callee-saved registers to prevctx's stack */
 	sub sp, sp, #__CALLEE_SAVED_SIZE
 	stp x19, x20, [sp, #16 * 0]
@@ -141,5 +154,9 @@ restore_point:
 	ldp x29, x30, [sp, #16 * 5]
 
 	add sp, sp, #__CALLEE_SAVED_SIZE
+
+	/* restore x18 */
+	ldr x18, [sp], #16
+
 	ret
 
