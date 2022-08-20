@@ -34,6 +34,7 @@
 #include <vfscore/file.h>
 #include <vfscore/fs.h>
 #include <uk/plat/console.h>
+#include <uk/syscall.h>
 #include <uk/essentials.h>
 #include <termios.h>
 #include <vfscore/vnode.h>
