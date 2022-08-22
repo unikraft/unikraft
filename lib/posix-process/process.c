@@ -375,6 +375,8 @@ UK_LLSYSCALL_R_DEFINE(int, prlimit64, int, pid, unsigned int, resource,
 	 * Lookup if resource can be set/retrieved
 	 */
 	switch (resource) {
+	case RLIMIT_DATA:
+		break;
 	case RLIMIT_STACK:
 		break;
 #if CONFIG_LIBVFSCORE
