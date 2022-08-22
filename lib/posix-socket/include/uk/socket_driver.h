@@ -60,7 +60,7 @@ struct eventpoll_cb;
  * The POSIX socket driver defines the operations to be used for the
  * specified AF family as well as the memory allocator.
  */
-struct posix_socket_driver {
+struct __align(8) posix_socket_driver {
 	/** The AF family ID */
 	const int family;
 	/** Name of the driver library */
@@ -620,7 +620,8 @@ posix_socket_family_count(void);
  * Creates a static struct posix_socket_driver for the AF family
  */
 #define _POSIX_SOCKET_FAMILY_REGISTER(lib, fam, vops)			\
-	__used __section("." _POSIX_SOCKET_FAMILY_SECNAME(lib, fam))	\
+	__used __align(8)						\
+		__section("." _POSIX_SOCKET_FAMILY_SECNAME(lib, fam))	\
 	static struct posix_socket_driver				\
 	_POSIX_SOCKET_FAMILY_DRVRNAME(lib, fam) = {			\
 		.family = fam,						\
