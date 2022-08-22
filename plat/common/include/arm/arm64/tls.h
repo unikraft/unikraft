@@ -35,7 +35,9 @@
 
 #define get_tls_pointer() SYSREG_READ(tpidr_el0)
 
-#define set_tls_pointer(ptr) SYSREG_WRITE(tpidr_el0, ptr)
-
+/* like SYSREG_WRITE, but with compiler barrier */
+#define set_tls_pointer(ptr) \
+	__asm__ __volatile__("msr tpidr_el0, %0" \
+			: : "r" ((uint64_t)(ptr)) : "memory")
 
 #endif /* __PLAT_CMN_ARM64_TLS_H__ */
