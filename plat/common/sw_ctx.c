@@ -37,6 +37,7 @@
 #include <uk/assert.h>
 #include <uk/plat/common/tls.h>
 #include <uk/plat/common/cpu.h>
+#include <uk/plat/config.h>
 
 static size_t sw_ctx_size(void);
 static void  sw_ctx_init(void *ctx, unsigned long sp, unsigned long tlsp);
@@ -71,6 +72,14 @@ static void sw_ctx_init(void *ctx,
 
 extern void asm_ctx_start(unsigned long sp, unsigned long ip) __noreturn;
 
+void setupx18(struct sw_ctx *sw_ctx)
+{
+	void *shadow = sw_ctx->sp & STACK_SIZE;
+
+	shadow += STACK_SIZE;
+	__asm __volatile ( "mov x18, %0" : : "r" (shadow) );
+}
+
 static void sw_ctx_start(void *ctx)
 {
 	struct sw_ctx *sw_ctx = ctx;
@@ -78,6 +87,10 @@ static void sw_ctx_start(void *ctx)
 	UK_ASSERT(sw_ctx != NULL);
 
 	set_tls_pointer(sw_ctx->tlsp);
+#ifdef _SHADOW_STACK_
+	setupx18(sw_ctx);
+#endif /* _SHADOW_STACK_ */
+
 	/* Switch stacks and run the thread */
 	asm_ctx_start(sw_ctx->sp, sw_ctx->ip);
 
@@ -94,6 +107,9 @@ static void sw_ctx_switch(void *prevctx, void *nextctx)
 	save_extregs(p);
 	restore_extregs(n);
 	set_tls_pointer(n->tlsp);
+#ifdef _SHADOW_STACK_
+	setupx18(n);
+#endif /* _SHADOW_STACK_ */
 	asm_sw_ctx_switch(prevctx, nextctx);
 }
 

@@ -262,7 +262,7 @@ err:
 
 #ifdef _SHADOW_STACK_
 	if (shadow_stack)
-		uk_free(sched->allocator, shadow_stack)
+		uk_free(sched->allocator, shadow_stack);
 #endif /* _SHADOW_STACK_ */
 
 	if (thread)
