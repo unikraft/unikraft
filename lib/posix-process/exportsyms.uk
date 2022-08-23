@@ -56,6 +56,9 @@ wait4
 uk_syscall_r_wait4
 uk_syscall_e_wait4
 waitpid
+waitid
+uk_syscall_r_waitid
+uk_syscall_e_waitid
 getpid
 uk_syscall_r_getpid
 uk_syscall_e_getpid
