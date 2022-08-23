@@ -178,7 +178,7 @@ static int futex_wake(uint32_t *uaddr, uint32_t val)
 			/* TODO: Replace with uk_thread_wakeup when the new
 			 * scheduler API is ready
 			 */
-			uk_thread_wake(f->thread);
+			uk_thread_wakeup(f->thread);
 
 			/* Wake at most val threads */
 			if (++count >= val)
