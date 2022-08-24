@@ -15,13 +15,11 @@ extern "C" {
 #define __NEED_timer_t
 #define __NEED_pid_t
 #define __NEED_locale_t
+#define __NEED_suseconds_t
+#define __NEED_struct_timeval
 
+#include <nolibc-internal/shareddefs.h>
 #include <sys/types.h>
-
-#ifndef CONFIG_LIBNOLIBC
-/* Allow custom definitions */
-#include_next <time.h>
-#endif
 
 #if defined(_BSD_SOURCE) || defined(_GNU_SOURCE)
 #define __tm_gmtoff tm_gmtoff

@@ -4,17 +4,12 @@
 extern "C" {
 #endif
 
-#include <uk/config.h>
-
 #define __NEED_time_t
 #define __NEED_suseconds_t
 #define __NEED_struct_timeval
-#include <uk/time_types.h>
+#include <nolibc-internal/shareddefs.h>
 
-#ifndef CONFIG_LIBNOLIBC
-/* Allow custom definitions */
-#include_next <sys/time.h>
-#endif
+#include <uk/config.h>
 
 int gettimeofday (struct timeval *__restrict, void *__restrict);
 
