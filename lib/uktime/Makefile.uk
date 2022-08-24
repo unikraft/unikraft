@@ -1,15 +1,9 @@
 $(eval $(call addlib_s,libuktime,$(CONFIG_LIBUKTIME)))
 
 LIBUKTIME_COMMON_INCLUDES-y      += -I$(LIBUKTIME_BASE)/include
-LIBUKTIME_COMMON_INCLUDES-y      += -I$(LIBUKTIME_BASE)/musl-imported/include
 CINCLUDES-$(CONFIG_LIBUKTIME)    += $(LIBUKTIME_COMMON_INCLUDES-y)
 CXXINCLUDES-$(CONFIG_LIBUKTIME)  += $(LIBUKTIME_COMMON_INCLUDES-y)
 
-LIBUKTIME_SRCS-y += $(LIBUKTIME_BASE)/musl-imported/src/__month_to_secs.c
-LIBUKTIME_SRCS-y += $(LIBUKTIME_BASE)/musl-imported/src/__secs_to_tm.c
-LIBUKTIME_SRCS-y += $(LIBUKTIME_BASE)/musl-imported/src/timegm.c
-LIBUKTIME_SRCS-y += $(LIBUKTIME_BASE)/musl-imported/src/__tm_to_secs.c
-LIBUKTIME_SRCS-y += $(LIBUKTIME_BASE)/musl-imported/src/__year_to_secs.c
 LIBUKTIME_SRCS-y += $(LIBUKTIME_BASE)/time.c
 LIBUKTIME_SRCS-y += $(LIBUKTIME_BASE)/timer.c
 
