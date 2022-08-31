@@ -259,6 +259,9 @@ static inline
 void uk_sched_thread_switch(struct uk_sched *sched,
 		struct uk_thread *prev, struct uk_thread *next)
 {
+#ifdef _SHADOW_STACK_
+	__asm __volatile ( "mov x18, %0" : : "r" (next->shadow_stack) );
+#endif
 	ukplat_thread_ctx_switch(&sched->plat_ctx_cbs, prev->ctx, next->ctx);
 }
 
