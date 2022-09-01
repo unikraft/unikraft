@@ -77,9 +77,21 @@ void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
 {
 	__asm__ (
 		"movq	%0, %%rsp\n"
+
+		/* According to System V AMD64 the stack pointer must be
+		 * aligned to 16-bytes. In other words, the value (RSP+8) must
+		 * be a multiple of 16 when control is transferred to the
+		 * function entry point (i.e., the compiler expects a
+		 * misalignment due to the return address having been pushed
+		 * onto the stack).
+		 */
+		"andq	$~0xf, %%rsp\n"
+		"subq	$0x8, %%rsp\n"
+
 #if !__OMIT_FRAMEPOINTER__
 		"xorq	%%rbp, %%rbp\n"
 #endif /* __OMIT_FRAMEPOINTER__ */
+
 		"jmp	*%1\n"
 		:
 		: "r"(sp), "r"(entry)
