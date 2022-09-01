@@ -284,6 +284,15 @@ no_args:
 	movq	LCPU_STACKP_OFFSET(%rbp), %rsp
 
 jump_to_entry:
+	/* According to System V AMD64 the stack pointer must be aligned to
+	 * 16-bytes. In other words, the value (RSP+8) must be a multiple of
+	 * 16 when control is transferred to the function entry point (i.e.,
+	 * the compiler expects a misalignment due to the return address having
+	 * been pushed onto the stack).
+	 */
+	andq	$~0xf, %rsp
+	subq	$0x8, %rsp
+
 	movq	%rbp, %rdi
 #if !__OMIT_FRAMEPOINTER__
 	/* Reset frame pointer */
