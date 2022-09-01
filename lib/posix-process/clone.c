@@ -464,10 +464,10 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 	 * Register clearing has the effect that it looks like `clone`
 	 * returns `0` in the child.
 	 */
-	ukarch_ctx_init_entry0(&child->ctx,
-			       (__uptr) cl_args->stack,
-			       false,
-			       (ukarch_ctx_entry0) return_addr);
+	ukarch_ctx_init(&child->ctx,
+			(__uptr) cl_args->stack,
+			false,
+			return_addr);
 	uk_thread_set_runnable(child);
 
 	/* We will return the child's thread ID in the parent */
