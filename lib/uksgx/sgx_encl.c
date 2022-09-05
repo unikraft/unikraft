@@ -4,6 +4,8 @@
 #include <uk/mutex.h>
 #include <uk/arch/paging.h>
 #include <uk/arch/atomic.h>
+#include <uk/radix_tree.h>
+
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -76,7 +78,7 @@ static int sgx_validate_secinfo(struct sgx_secinfo *secinfo)
 {
 	__u64 perm = secinfo->flags & SGX_SECINFO_PERMISSION_MASK;
 	__u64 page_type = secinfo->flags & SGX_SECINFO_PAGE_TYPE_MASK;
-	int i;
+	unsigned long i;
 
 	if ((secinfo->flags & SGX_SECINFO_RESERVED_MASK) ||
 	    ((perm & SGX_SECINFO_W) && !(perm & SGX_SECINFO_R)) ||
@@ -91,47 +93,59 @@ static int sgx_validate_secinfo(struct sgx_secinfo *secinfo)
 	return 0;
 }
 
+static bool sgx_validate_offset(struct sgx_encl *encl, unsigned long offset)
+{
+	if (offset & (PAGE_SIZE - 1))
+		return false;
+
+	if (offset >= encl->size)
+		return false;
+
+	return true;
+}
+
+
 static int sgx_validate_tcs(struct sgx_encl *encl, struct sgx_tcs *tcs)
 {
-	int i;
+	unsigned long i;
 
 	if (tcs->flags & SGX_TCS_RESERVED_MASK) {
-		uk_pr_crit("%s: invalid TCS flags = 0x%lx\n",
+		uk_pr_crit("invalid TCS flags = 0x%lx\n",
 			 (unsigned long)tcs->flags);
 		return -EINVAL;
 	}
 
 	if (tcs->flags & SGX_TCS_DBGOPTIN) {
-		uk_pr_crit("%s: DBGOPTIN TCS flag is set, EADD will clear it\n");
+		uk_pr_crit("DBGOPTIN TCS flag is set, EADD will clear it\n");
 		return -EINVAL;
 	}
 
 	if (!sgx_validate_offset(encl, tcs->ossa)) {
-		uk_pr_crit("%s: invalid OSSA: 0x%lx\n", 
+		uk_pr_crit("invalid OSSA: 0x%lx\n", 
 			(unsigned long)tcs->ossa);
 		return -EINVAL;
 	}
 
 	if (!sgx_validate_offset(encl, tcs->ofsbase)) {
-		uk_pr_crit("%s: invalid OFSBASE: 0x%lx\n", 
+		uk_pr_crit("invalid OFSBASE: 0x%lx\n", 
 			(unsigned long)tcs->ofsbase);
 		return -EINVAL;
 	}
 
 	if (!sgx_validate_offset(encl, tcs->ogsbase)) {
-		uk_pr_crit("%s: invalid OGSBASE: 0x%lx\n", 
+		uk_pr_crit("invalid OGSBASE: 0x%lx\n", 
 			(unsigned long)tcs->ogsbase);
 		return -EINVAL;
 	}
 
 	if ((tcs->fslimit & 0xFFF) != 0xFFF) {
-		uk_pr_crit("%s: invalid FSLIMIT: 0x%x\n", 
+		uk_pr_crit("invalid FSLIMIT: 0x%x\n", 
 			tcs->fslimit);
 		return -EINVAL;
 	}
 
 	if ((tcs->gslimit & 0xFFF) != 0xFFF) {
-		uk_pr_crit("%s: invalid GSLIMIT: 0x%x\n", 
+		uk_pr_crit("invalid GSLIMIT: 0x%x\n", 
 			tcs->gslimit);
 		return -EINVAL;
 	}
@@ -214,9 +228,9 @@ static int sgx_init_page(struct sgx_encl *encl, struct sgx_encl_page *entry,
 			return -ENOMEM;
 
 		epc_page = sgx_alloc_page(alloc_flags);
-		if (epc_page == NULL) {
+		if (!epc_page) {
 			free(va_page);
-			return NULL;
+			return -EINVAL;
 		}
 
 		vaddr = sgx_get_page(epc_page);
@@ -243,9 +257,9 @@ static int sgx_init_page(struct sgx_encl *encl, struct sgx_encl_page *entry,
 		va_page->epc_page = epc_page;
 		va_offset = sgx_alloc_va_slot(va_page);
 
-		mutex_lock(&encl->lock);
-		list_add(&va_page->list, &encl->va_pages);
-		mutex_unlock(&encl->lock);
+		uk_mutex_lock(&encl->lock);
+		uk_list_add(&va_page->list, &encl->va_pages);
+		uk_mutex_unlock(&encl->lock);
 	}
 
 	entry->va_page = va_page;
@@ -289,10 +303,10 @@ static int __sgx_encl_add_page(struct sgx_encl *encl,
 		goto out;
 	}
 
-	// if (radix_tree_lookup(&encl->page_tree, addr >> PAGE_SHIFT)) {
-	// 	ret = -EEXIST;
-	// 	goto out;
-	// }
+	if (uk_radix_tree_lookup(&encl->page_tree, addr >> PAGE_SHIFT)) {
+		ret = -EEXIST;
+		goto out;
+	}
 
 	req = malloc(sizeof(*req));
 	if (!req) {
@@ -301,22 +315,23 @@ static int __sgx_encl_add_page(struct sgx_encl *encl,
 	}
 	memset(req, 0, sizeof(*req));
 
-	backing = sgx_get_backing(encl, encl_page, false);
-	if (IS_ERR((void *)backing)) {
-		ret = PTR_ERR((void *)backing);
-		goto out;
-	}
-
-	// ret = radix_tree_insert(&encl->page_tree, encl_page->addr >> PAGE_SHIFT,
-	// 			encl_page);
-	// if (ret) {
-	// 	sgx_put_backing(backing, false /* write */);
+	/* TODO: figure out what is backing here */
+	// backing = sgx_get_backing(encl, encl_page, false);
+	// if (IS_ERR((void *)backing)) {
+	// 	ret = PTR_ERR((void *)backing);
 	// 	goto out;
 	// }
 
-	backing_ptr = kmap(backing);
-	memcpy(backing_ptr, data, PAGE_SIZE);
-	kunmap(backing);
+	ret = uk_radix_tree_insert(&encl->page_tree, encl_page->addr >> PAGE_SHIFT,
+				encl_page);
+	if (ret) {
+		// sgx_put_backing(backing, false /* write */);
+		goto out;
+	}
+
+	// backing_ptr = kmap(backing);
+	// memcpy(backing_ptr, data, PAGE_SIZE);
+	// kunmap(backing);
 
 	if (page_type == SGX_SECINFO_TCS)
 		encl_page->flags |= SGX_ENCL_PAGE_TCS;
@@ -326,18 +341,19 @@ static int __sgx_encl_add_page(struct sgx_encl *encl,
 	req->encl = encl;
 	req->encl_page = encl_page;
 	req->mrmask = mrmask;
-	empty = list_empty(&encl->add_page_reqs);
-	kref_get(&encl->refcount);
-	list_add_tail(&req->list, &encl->add_page_reqs);
-	if (empty)
-		queue_work(sgx_add_page_wq, &encl->add_page_work);
+	empty = uk_list_empty(&encl->add_page_reqs);
+	uk_refcount_acquire(&encl->refcount);
+	uk_list_add_tail(&req->list, &encl->add_page_reqs);
+	/* TODO: refactor the add page work into sync mode */
+	// if (empty)
+	// 	queue_work(sgx_add_page_wq, &encl->add_page_work);
 
-	sgx_put_backing(backing, true /* write */);
+	// sgx_put_backing(backing, true /* write */);
 
 	uk_mutex_unlock(&encl->lock);
 	return 0;
 out:
-	kfree(req);
+	free(req);
 	sgx_free_va_slot(encl_page->va_page, encl_page->va_offset);
 	uk_mutex_unlock(&encl->lock);
 	return ret;

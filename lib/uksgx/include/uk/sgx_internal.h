@@ -75,7 +75,7 @@ static inline unsigned int sgx_alloc_va_slot(struct sgx_va_page *page)
 	int slot = uk_find_first_zero_bit(page->slots, SGX_VA_SLOT_COUNT);
 
 	if (slot < SGX_VA_SLOT_COUNT)
-		set_bit(slot, page->slots);
+		uk_set_bit(slot, page->slots);
 
 	return slot << 3;
 }
@@ -86,6 +86,12 @@ static inline void sgx_free_va_slot(struct sgx_va_page *page,
 	uk_clear_bit(offset >> 3, page->slots);
 }
 
+enum sgx_encl_page_flags {
+	SGX_ENCL_PAGE_TCS	= BIT(0),
+	SGX_ENCL_PAGE_RESERVED	= BIT(1),
+	SGX_ENCL_PAGE_TRIM	= BIT(2),
+	SGX_ENCL_PAGE_ADDED	= BIT(3),
+};
 
 struct sgx_encl_page {
 	unsigned long addr;
@@ -126,7 +132,7 @@ struct sgx_encl {
 	unsigned long size;
 	unsigned long ssaframesize;
 	struct uk_list_head va_pages;
-	// struct radix_tree_root page_tree;
+	struct uk_radix_tree_root page_tree;
 	struct uk_list_head add_page_reqs;
 	// struct work_struct add_page_work;
 	struct sgx_encl_page secs;
@@ -148,16 +154,12 @@ struct sgx_encl {
 static inline void uk_refcount_put(__atomic *ref, void (*release)(__atomic *ref))
 {
 	if (release == NULL) {
-		uk_pr_warn("release == NULL!");
-		return 0;
+		uk_pr_crit("release == NULL!");
 	}
 
 	if (uk_refcount_release(ref)) {
 		release(ref);
-		return 1;
 	}
-	
-	return 0;
 }
 
 /* sgx_page_cache.c */
