@@ -128,7 +128,7 @@ uk_radix_pos(long id, int height)
 	return (id >> (UK_RADIX_TREE_MAP_SHIFT * height)) & UK_RADIX_TREE_MAP_MASK;
 }
 
-static void
+static inline void
 uk_radix_tree_clean_root_node(struct uk_radix_tree_root *root)
 {
 	/* Check if the root node should be freed */
@@ -139,7 +139,7 @@ uk_radix_tree_clean_root_node(struct uk_radix_tree_root *root)
 	}
 }
 
-void *
+static inline void *
 uk_radix_tree_lookup(struct uk_radix_tree_root *root, unsigned long index)
 {
 	struct uk_radix_tree_node *node;
@@ -160,7 +160,7 @@ out:
 	return (item);
 }
 
-bool
+static inline bool
 uk_radix_tree_iter_find(struct uk_radix_tree_root *root, struct uk_radix_tree_iter *iter,
     void ***pppslot)
 {
@@ -199,7 +199,7 @@ restart:
 	return (true);
 }
 
-void *
+static inline void *
 uk_radix_tree_delete(struct uk_radix_tree_root *root, unsigned long index)
 {
 	struct uk_radix_tree_node *stack[UK_RADIX_TREE_MAX_HEIGHT];
@@ -246,14 +246,14 @@ out:
 	return (item);
 }
 
-void
+static inline void
 uk_radix_tree_iter_delete(struct uk_radix_tree_root *root,
     struct uk_radix_tree_iter *iter, void **slot)
 {
 	uk_radix_tree_delete(root, iter->index);
 }
 
-int
+static inline int
 uk_radix_tree_insert(struct uk_radix_tree_root *root, unsigned long index, void *item)
 {
 	struct uk_radix_tree_node *node;
@@ -352,7 +352,7 @@ uk_radix_tree_insert(struct uk_radix_tree_root *root, unsigned long index, void 
 	return (0);
 }
 
-int
+static inline int
 uk_radix_tree_store(struct uk_radix_tree_root *root, unsigned long index, void **ppitem)
 {
 	struct uk_radix_tree_node *node;
