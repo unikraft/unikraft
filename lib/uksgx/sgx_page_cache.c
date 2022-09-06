@@ -87,14 +87,14 @@ err_freelist:
 
 int sgx_page_cache_init(void)
 {
-/*	struct task_struct *tmp;
+	struct task_struct *tmp;
 
 	sgx_nr_high_pages = 2 * sgx_nr_low_pages;
 
-	tmp = kthread_run(ksgxswapd, NULL, "ksgxswapd");
-	if (!IS_ERR(tmp))
-		ksgxswapd_tsk = tmp;
-	return PTR_ERR_OR_ZERO(tmp);*/
+	// tmp = kthread_run(ksgxswapd, NULL, "ksgxswapd");
+	// if (!IS_ERR(tmp))
+	// 	ksgxswapd_tsk = tmp;
+	// return PTR_ERR_OR_ZERO(tmp);
 	WARN_STUBBED();
 	return 0;
 }
@@ -114,6 +114,8 @@ int sgx_page_cache_init(void)
  */
 struct sgx_epc_page *sgx_alloc_page(unsigned int flags)
 {
+	(void) flags;
+
 	struct sgx_epc_page *entry = NULL;
 
 	ukarch_spin_lock(&sgx_free_list_lock);
@@ -131,15 +133,12 @@ struct sgx_epc_page *sgx_alloc_page(unsigned int flags)
 
 void *sgx_get_page(struct sgx_epc_page *entry)
 {
-	int i = ((entry->pa) & ~PAGE_MASK);
-
 	return (void *)(sgx_epc_bank.va +
 		((entry->pa & PAGE_MASK) - sgx_epc_bank.pa));
-
 }
 
 void sgx_put_page(void *epc_page_vaddr)
-{
+{	(void) epc_page_vaddr;
 	WARN_STUBBED();
 }
 
@@ -163,7 +162,7 @@ void sgx_free_page(struct sgx_epc_page *entry, struct sgx_encl *encl)
 	sgx_put_page(epc);
 
 	if (ret)
-		uk_pr_crit("EREMOVE returned %d\n", ret);
+		uk_pr_crit("encl %p EREMOVE returned %d\n", encl, ret);
 
 	ukarch_spin_lock(&sgx_free_list_lock);
 	uk_list_add(&entry->list, &sgx_free_list);

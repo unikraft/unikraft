@@ -5,7 +5,9 @@
 #include <uk/arch/paging.h>
 #include <uk/arch/atomic.h>
 #include <uk/radix_tree.h>
-
+#include <uk/uk_signal.h>
+#include <uk/thread.h>
+#include <signal.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
@@ -110,42 +112,42 @@ static int sgx_validate_tcs(struct sgx_encl *encl, struct sgx_tcs *tcs)
 	unsigned long i;
 
 	if (tcs->flags & SGX_TCS_RESERVED_MASK) {
-		uk_pr_crit("invalid TCS flags = 0x%lx\n",
+		uk_pr_crit("encl %p invalid TCS flags = 0x%lx\n", encl,
 			 (unsigned long)tcs->flags);
 		return -EINVAL;
 	}
 
 	if (tcs->flags & SGX_TCS_DBGOPTIN) {
-		uk_pr_crit("DBGOPTIN TCS flag is set, EADD will clear it\n");
+		uk_pr_crit("encl %p DBGOPTIN TCS flag is set, EADD will clear it\n", encl);
 		return -EINVAL;
 	}
 
 	if (!sgx_validate_offset(encl, tcs->ossa)) {
-		uk_pr_crit("invalid OSSA: 0x%lx\n", 
+		uk_pr_crit("encl %p invalid OSSA: 0x%lx\n", encl,
 			(unsigned long)tcs->ossa);
 		return -EINVAL;
 	}
 
 	if (!sgx_validate_offset(encl, tcs->ofsbase)) {
-		uk_pr_crit("invalid OFSBASE: 0x%lx\n", 
+		uk_pr_crit("encl %p invalid OFSBASE: 0x%lx\n", encl,
 			(unsigned long)tcs->ofsbase);
 		return -EINVAL;
 	}
 
 	if (!sgx_validate_offset(encl, tcs->ogsbase)) {
-		uk_pr_crit("invalid OGSBASE: 0x%lx\n", 
+		uk_pr_crit("encl %p invalid OGSBASE: 0x%lx\n", encl,
 			(unsigned long)tcs->ogsbase);
 		return -EINVAL;
 	}
 
 	if ((tcs->fslimit & 0xFFF) != 0xFFF) {
-		uk_pr_crit("invalid FSLIMIT: 0x%x\n", 
+		uk_pr_crit("encl %p invalid FSLIMIT: 0x%x\n", encl,
 			tcs->fslimit);
 		return -EINVAL;
 	}
 
 	if ((tcs->gslimit & 0xFFF) != 0xFFF) {
-		uk_pr_crit("invalid GSLIMIT: 0x%x\n", 
+		uk_pr_crit("encl %p invalid GSLIMIT: 0x%x\n", encl,
 			tcs->gslimit);
 		return -EINVAL;
 	}
@@ -277,11 +279,11 @@ static int __sgx_encl_add_page(struct sgx_encl *encl,
 			       unsigned int mrmask)
 {
 	__u64 page_type = secinfo->flags & SGX_SECINFO_PAGE_TYPE_MASK;
-	struct page *backing;
+	// struct page *backing;
 	struct sgx_add_page_req *req = NULL;
 	int ret;
-	int empty;
-	void *backing_ptr;
+	// int empty;
+	// void *backing_ptr;
 
 	if (sgx_validate_secinfo(secinfo))
 		return -EINVAL;
@@ -341,7 +343,7 @@ static int __sgx_encl_add_page(struct sgx_encl *encl,
 	req->encl = encl;
 	req->encl_page = encl_page;
 	req->mrmask = mrmask;
-	empty = uk_list_empty(&encl->add_page_reqs);
+	// empty = uk_list_empty(&encl->add_page_reqs);
 	uk_refcount_acquire(&encl->refcount);
 	uk_list_add_tail(&req->list, &encl->add_page_reqs);
 	/* TODO: refactor the add page work into sync mode */
@@ -416,14 +418,15 @@ int sgx_encl_create(struct sgx_secs *secs)
 	long ret;
 
     encl = sgx_encl_alloc(secs);
-    if (!encl)
+    if (!encl) {
         goto err;
+	}
 
 	memset(&pginfo, 0, sizeof(struct sgx_pageinfo));
 	memset(&secinfo, 0, sizeof(struct sgx_secinfo));
 	pginfo.linaddr = 0;
 	pginfo.srcpge = (unsigned long) secs;
-	pginfo.secinfo = &secinfo;
+	pginfo.secinfo = (unsigned long) &secinfo;
 	pginfo.secs = 0;
 
 	secs_epc = sgx_alloc_page(0);
@@ -470,8 +473,131 @@ err:
     return -EINVAL;
 }
 
+static int sgx_einit(struct sgx_encl *encl, struct sgx_sigstruct *sigstruct,
+		     struct sgx_einittoken *token)
+{
+	struct sgx_epc_page *secs_epc = encl->secs.epc_page;
+	void *secs_va;
+	int ret;
+
+	secs_va = sgx_get_page(secs_epc);
+	ret = __einit(sigstruct, token, secs_va);
+	sgx_put_page(secs_va);
+
+	return ret;
+}
+
+/**
+ * sgx_encl_init - perform EINIT for the given enclave
+ *
+ * @encl:	an enclave
+ * @sigstruct:	SIGSTRUCT for the enclave
+ * @token:	EINITTOKEN for the enclave
+ *
+ * Retries a few times in order to perform EINIT operation on an enclave
+ * because there could be potentially an interrupt storm.
+ *
+ * Return:
+ * 0 on success,
+ * -FAULT on a CPU exception during EINIT,
+ * SGX error code
+ */
+int sgx_encl_init(struct sgx_encl *encl, struct sgx_sigstruct *sigstruct,
+		  struct sgx_einittoken *token)
+{
+	int ret;
+	int i;
+	int j;
+
+	/* wait for the current add_page_work to finish
+	 * this is useless in Unikraft's implementation since the add_page_work
+	 * is always executed in sync mode 
+	 */
+	// flush_work(&encl->add_page_work);
+
+	uk_mutex_lock(&encl->lock);
+
+	if (encl->flags & SGX_ENCL_INITIALIZED) {
+		uk_mutex_unlock(&encl->lock);
+		return 0;
+	}
+
+	for (i = 0; i < SGX_EINIT_SLEEP_COUNT; i++) {
+		for (j = 0; j < SGX_EINIT_SPIN_COUNT; j++) {
+			ret = sgx_einit(encl, sigstruct, token);
+
+			if (ret == SGX_UNMASKED_EVENT)
+				continue;
+			else
+				break;
+		}
+
+		if (ret != SGX_UNMASKED_EVENT)
+			break;
+
+		/* restart if there is pending signal on the current thread,
+		 * actually I think this is somehow impossible in Unikraft
+		 */
+		struct uk_thread_sig *current = &(uk_thread_current()->signals_container);
+		if (uk_sig_th_get_pending_any(current, current->wait.awaited)) {
+			uk_mutex_unlock(&encl->lock);
+			#define ERESTARTSYS 512
+			return -ERESTARTSYS;
+		}
+	}
+
+	uk_mutex_unlock(&encl->lock);
+
+	if (ret) {
+		if (ret > 0)
+			uk_pr_crit("encl %p EINIT returned %d\n", encl, ret);
+		return ret;
+	}
+
+	encl->flags |= SGX_ENCL_INITIALIZED;
+	return 0;
+}
+
 void sgx_encl_release(__atomic *ref) 
 {
-	WARN_STUBBED();
-	return 0;
+	struct sgx_encl_page *entry;
+	struct sgx_va_page *va_page;
+	struct sgx_encl *encl = __containerof(ref, struct sgx_encl, refcount);
+	struct uk_radix_tree_iter iter;
+	void **slot;
+
+	uk_mutex_lock(&sgx_tgid_ctx_mutex);
+	if (!uk_list_empty(&encl->encl_list))
+		uk_list_del(&encl->encl_list);
+	uk_mutex_unlock(&sgx_tgid_ctx_mutex);
+
+	uk_radix_tree_for_each_slot(slot, &encl->page_tree, &iter, 0) {
+		entry = *slot;
+		if (entry->epc_page) {
+			uk_list_del(&entry->epc_page->list);
+			sgx_free_page(entry->epc_page, encl);
+		}
+		uk_radix_tree_delete(&encl->page_tree, entry->addr >> PAGE_SHIFT);
+		free(entry);
+	}
+
+	while (!uk_list_empty(&encl->va_pages)) {
+		va_page = uk_list_first_entry(&encl->va_pages,
+					   struct sgx_va_page, list);
+		uk_list_del(&va_page->list);
+		sgx_free_page(va_page->epc_page, encl);
+		free(va_page);
+		ukarch_dec(&sgx_va_pages_cnt);
+	}
+
+	if (encl->secs.epc_page)
+		sgx_free_page(encl->secs.epc_page, encl);
+
+	// if (encl->backing)
+	// 	fput(encl->backing);
+
+	// if (encl->pcmd)
+	// 	fput(encl->pcmd);
+
+	free(encl);
 }

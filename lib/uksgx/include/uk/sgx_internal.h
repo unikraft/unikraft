@@ -39,15 +39,23 @@
 #include <uk/bitops.h>
 #include <uk/mutex.h>
 #include <uk/list.h>
+#include <uk/radix_tree.h>
 #include <uk/refcount.h>
 #include <devfs/device.h>
 #include <errno.h>
 #include <signal.h>
 
 #include <uk/sgx_cpu.h>
+#include <uk/sgx_arch.h>
+#include <uk/sgx_user.h>
 
 #define SGX_VA_SLOT_COUNT 512
 #define SGX_PAGE_SIZE 4096
+
+#define SGX_EINIT_SPIN_COUNT	20
+#define SGX_EINIT_SLEEP_COUNT	50
+#define SGX_EINIT_SLEEP_TIME	20
+#define SGX_EDMM_SPIN_COUNT	20
 
 extern __spinlock sgx_free_list_lock;
 
@@ -180,7 +188,8 @@ int sgx_encl_create(struct sgx_secs *secs);
 void sgx_encl_release(__atomic *ref);
 int sgx_encl_add_page(struct sgx_encl *encl, unsigned long addr, void *data,
 		      struct sgx_secinfo *secinfo, unsigned int mrmask);
-
+int sgx_encl_init(struct sgx_encl *encl, struct sgx_sigstruct *sigstruct,
+		  struct sgx_einittoken *token);
 /* sgx_util.c */
 int cpl_switch_init();
 int cpl_switch(__u8 rpl);

@@ -2,12 +2,19 @@
 #include <uk/sgx_internal.h>
 #include <uk/sgx_asm.h>
 #include <uk/print.h>
+#include <uk/arch/paging.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 
+/* 
+ * TODO: We need to handle the VMA issue manually (no API supported yet)
+ * to access the list of SGX-related VMA so that we can retrieves the pages
+ */
 int sgx_get_encl(unsigned int addr, struct sgx_encl **encl)
 {
+	(void) addr;
+	(void) encl;
     WARN_STUBBED();
 	return 0;
 }
@@ -31,9 +38,6 @@ static int sgx_ioc_enclave_create(struct device *dev, unsigned int cmd,
 	struct sgx_enclave_create *createp = (struct sgx_enclave_create *)arg;
 	void *src = (void *) createp->src;
 	struct sgx_secs *secs;
-	
-
-	unsigned long ssaframesize;
 	int ret;
 
 	/* initialize SECS */
@@ -41,7 +45,7 @@ static int sgx_ioc_enclave_create(struct device *dev, unsigned int cmd,
 	if (!secs)
 		return -ENOMEM;
 
-	ret = memcpy((void *)secs, src, sizeof(*secs)); /* don't need to care about copy_from_user() */
+	ret = (int) memcpy((void *)secs, src, sizeof(*secs)); /* don't need to care about copy_from_user() */
 	if (ret) {
 		free(secs);
 		return ret;
@@ -128,8 +132,38 @@ out:
 static int sgx_ioc_enclave_init(struct device *dev, unsigned int cmd,
 				 unsigned int arg)
 {
-    WARN_STUBBED();
-	return 0;
+    struct sgx_enclave_init *initp = (struct sgx_enclave_init *)arg;
+	unsigned long sigstructp = (unsigned long)initp->sigstruct;
+	unsigned long einittokenp = (unsigned long)initp->einittoken;
+	unsigned long encl_id = initp->addr;
+	struct sgx_sigstruct *sigstruct;
+	struct sgx_einittoken *einittoken;
+	struct sgx_encl *encl;
+	int ret;
+
+	sigstruct = malloc(sizeof(struct sgx_sigstruct));
+	einittoken = (struct sgx_einittoken *)
+		((unsigned long)sigstruct + PAGE_SIZE / 2);
+
+	ret = memcpy(sigstruct, (void *)sigstructp, sizeof(*sigstruct));
+	if (ret)
+		goto out;
+
+	ret = memcpy(einittoken, (void *)einittokenp, sizeof(*einittoken));
+	if (ret)
+		goto out;
+
+	ret = sgx_get_encl(encl_id, &encl);
+	if (ret)
+		goto out;
+
+	ret = sgx_encl_init(encl, sigstruct, einittoken);
+
+	uk_refcount_put(&encl->refcount, sgx_encl_release);
+
+out:
+	free(sigstruct);
+	return ret;
 }
 
 typedef int (*sgx_ioc_t)(struct device *, unsigned int, void *);
