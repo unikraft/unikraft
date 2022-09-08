@@ -1,0 +1,7 @@
+TDX_QGS_VERSION="1.0"
+TARBALL_NAME=tdx-qgs_1.0.orig.tar.gz
+
+TDX_QGS_PACKAGE_PATH=/opt/intel
+TDX_QGS_PACKAGE_NAME=tdx-qgs
+
+ETC_DIR=etc

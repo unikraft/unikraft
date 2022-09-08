@@ -1,0 +1,80 @@
+/*
+ * Copyright (C) 2011-2021 Intel Corporation. All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions
+ * are met:
+ *
+ *   * Redistributions of source code must retain the above copyright
+ *     notice, this list of conditions and the following disclaimer.
+ *   * Redistributions in binary form must reproduce the above copyright
+ *     notice, this list of conditions and the following disclaimer in
+ *     the documentation and/or other materials provided with the
+ *     distribution.
+ *   * Neither the name of Intel Corporation nor the names of its
+ *     contributors may be used to endorse or promote products derived
+ *     from this software without specific prior written permission.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ *
+ */
+
+enclave {
+include "sgx_report.h"
+include "sgx_quote.h"
+include "sgx_quote_3.h"
+include "user_types.h"
+include "ecdsa_quote.h"
+
+trusted {
+    public uint32_t get_pce_encrypt_key([in]const sgx_target_info_t *pce_target_info,
+                                        [out] sgx_report_t *p_qe_report,
+                                        uint8_t crypto_suite,
+                                        uint16_t cert_key_type,
+                                        uint32_t key_size,
+                                        [out, size=key_size] uint8_t *p_public_key);
+
+    public uint32_t gen_att_key([size = blob_size, in, out] uint8_t *p_blob,
+                                uint32_t blob_size,
+                                [in]const sgx_target_info_t *p_pce_target_info,
+                                [out] sgx_report_t *qe_report,
+                                [in, size = authentication_data_size] uint8_t* p_authentication_data,
+                                uint32_t authentication_data_size);
+
+    public uint32_t verify_blob([size = blob_size, in, out] uint8_t *p_blob,
+                                uint32_t blob_size,
+                                [out] uint8_t *p_is_resealed,
+                                [out] sgx_report_body_t *p_report,
+                                uint32_t pub_key_id_size,
+                                [out, size=pub_key_id_size] uint8_t *p_pub_key_id);
+
+    public uint32_t store_cert_data([in]ref_plaintext_ecdsa_data_sdk_t *p_plaintext_data,
+                                    sgx_ql_cert_key_type_t certification_key_type,
+                                    [in, size = encrypted_ppid_size] uint8_t* p_encrypted_ppid,
+                                    uint32_t encrypted_ppid_size,
+                                    [in, out, size = blob_size] uint8_t *p_blob,
+                                    uint32_t blob_size);
+
+    public uint32_t gen_quote([size = blob_size, in, out] uint8_t *p_blob,
+                              uint32_t blob_size,
+                              [in] const sgx_report_t *p_app_report,
+                              [in] const sgx_quote_nonce_t *p_nonce,
+                              [in] const sgx_target_info_t *p_app_enclave_target_info,
+                              [out] sgx_report_t *p_qe_report,
+                              [size = quote_size, in, out] uint8_t *p_quote,
+                              uint32_t quote_size,
+                              sgx_isv_svn_t pce_isvnsvn,
+                              [in, size = cert_data_size] const uint8_t * p_cert_data,
+                              uint32_t cert_data_size);
+    };
+};

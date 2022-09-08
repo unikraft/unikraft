@@ -1,0 +1,13 @@
+diff --git a/third_party/jsoncpp.cpp b/third_party/jsoncpp.cpp
+index 60c7a44..d827863 100644
+--- a/third_party/jsoncpp.cpp
++++ b/third_party/jsoncpp.cpp
+@@ -1307,7 +1307,7 @@ bool OurReader::readToken(Token& token) {
+     token.type_ = tokenString;
+     ok = readStringSingleQuote();
+     break;
+-    } // else continue
++    } // else fall through
+   case '/':
+     token.type_ = tokenComment;
+     ok = readComment();

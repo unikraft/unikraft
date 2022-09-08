@@ -1,0 +1,2 @@
+DeliveryName	InstallName	FileCheckSum	FileFeature	FileOwner
+<deliverydir>/quote_wrapper/ql/inc/sgx_dcap_ql_wrapper.h	<installdir>/include/sgx_dcap_ql_wrapper.h	0	main	STP

@@ -1,0 +1,18 @@
+Source: libtdx-attest
+Section: libs
+Priority: optional
+Maintainer: <feng.qiu@intel.com>
+Build-Depends: debhelper (>= 8.0.0)
+Standards-Version: 3.9.4
+Homepage: https://github.com/intel/SGXDataCenterAttestationPrimitives
+
+Package: libtdx-attest
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Description: Intel(R) Trust Domain Extensions Attestation library
+
+Package: libtdx-attest-dev
+Section: devel
+Architecture: amd64
+Depends: libtdx-attest (= @dep_version@)
+Description: Intel(R) Trust Domain Extensions Attestation For Developers

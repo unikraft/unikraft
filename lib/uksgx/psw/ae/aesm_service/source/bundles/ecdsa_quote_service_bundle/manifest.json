@@ -1,0 +1,7 @@
+{
+  "bundle.symbolic_name" : "ecdsa_quote_service_symbolic_name",
+  "bundle.activator" : true,
+  "bundle.name" : "ECDSA Quote Service",
+  "bundle.description" : "This bundle provide ECDSA Quote Service",
+  "bundle.version" : "2.0.0"
+}

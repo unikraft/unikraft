@@ -1,0 +1,852 @@
+From b309912dc33756a51d49af062ba883790d206f14 Mon Sep 17 00:00:00 2001
+From: yanxue <yan.xue@intel.com>
+Date: Fri, 6 May 2022 16:04:12 +0800
+Subject: [PATCH] Enable Protobuf in SGX
+
+---
+ cmake/CMakeLists.txt                          |  31 +++-
+ cmake/libsgx_protobuf.cmake                   | 140 ++++++++++++++++++
+ configure.ac                                  |   2 +-
+ .../protobuf/io/zero_copy_stream_impl.cc      |   6 +
+ .../protobuf/io/zero_copy_stream_impl.h       |   4 +-
+ src/google/protobuf/map.h                     |  12 ++
+ src/google/protobuf/message_lite.cc           |   4 +
+ src/google/protobuf/message_lite.h            |   4 +
+ src/google/protobuf/port_def.inc              |   2 +-
+ src/google/protobuf/repeated_ptr_field.h      |   2 +-
+ src/google/protobuf/stubs/common.cc           |  16 ++
+ src/google/protobuf/stubs/int128.cc           |   4 +
+ src/google/protobuf/stubs/int128.h            |   4 +
+ src/google/protobuf/stubs/port.h              |   6 +-
+ src/google/protobuf/stubs/status.cc           |   4 +
+ src/google/protobuf/stubs/status.h            |   2 +
+ src/google/protobuf/stubs/stringpiece.cc      |   5 +-
+ src/google/protobuf/stubs/stringpiece.h       |   2 +
+ src/google/protobuf/stubs/strutil.cc          |  35 +++++
+ src/google/protobuf/stubs/time.cc             |   4 +
+ src/google/protobuf/text_format.cc            |   4 +
+ .../protobuf/util/delimited_message_util.cc   |   2 +
+ .../protobuf/util/delimited_message_util.h    |   7 +-
+ src/google/protobuf/util/time_util.h          |   4 +
+ 24 files changed, 292 insertions(+), 14 deletions(-)
+ create mode 100644 cmake/libsgx_protobuf.cmake
+
+diff --git a/cmake/CMakeLists.txt b/cmake/CMakeLists.txt
+index ac92442a1..98e459eb3 100644
+--- a/cmake/CMakeLists.txt
++++ b/cmake/CMakeLists.txt
+@@ -23,6 +23,13 @@ endif()
+ # Project
+ project(protobuf C CXX)
+ 
++#for SGX
++if(SGX)
++  add_definitions(-DPB_ENABLE_SGX)
++  set(SGX_PROGRAM_SEARCH_PATH)
++  LIST(APPEND CMAKE_PROGRAM_PATH  "/usr/local/bin/"  ${SGX_PROGRAM_SEARCH_PATH} ...)
++endif()
++
+ # Add c++11 flags
+ if (CYGWIN)
+   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11")
+@@ -277,10 +284,20 @@ endif (MSVC)
+ 
+ get_filename_component(protobuf_source_dir ${protobuf_SOURCE_DIR} PATH)
+ 
+-include_directories(
+-  ${ZLIB_INCLUDE_DIRECTORIES}
+-  ${protobuf_BINARY_DIR}
+-  ${protobuf_source_dir}/src)
++if(SGX)
++  include_directories(
++    ${protobuf_BINARY_DIR}
++    ${protobuf_source_dir}/src
++    ${protobuf_source_dir}/../../../common/inc/internal
++    ${protobuf_source_dir}/../../../common/inc/tlibc
++    ${protobuf_source_dir}/../../../common/inc
++    ${protobuf_source_dir}/../../../sdk/tlibcxx/include)
++else()
++  include_directories(
++    ${ZLIB_INCLUDE_DIRECTORIES}
++    ${protobuf_BINARY_DIR}
++    ${protobuf_source_dir}/src)
++endif()
+ 
+ if (MSVC)
+   # Add the "lib" prefix for generated .lib outputs.
+@@ -296,7 +313,11 @@ if (protobuf_UNICODE)
+ endif (protobuf_UNICODE)
+ 
+ include(libprotobuf-lite.cmake)
+-include(libprotobuf.cmake)
++if (SGX)
++  include(libsgx_protobuf.cmake)
++else()
++  include(libprotobuf.cmake)
++endif()
+ if (protobuf_BUILD_LIBPROTOC)
+   include(libprotoc.cmake)
+ endif (protobuf_BUILD_LIBPROTOC)
+diff --git a/cmake/libsgx_protobuf.cmake b/cmake/libsgx_protobuf.cmake
+new file mode 100644
+index 000000000..2d5b33da5
+--- /dev/null
++++ b/cmake/libsgx_protobuf.cmake
+@@ -0,0 +1,140 @@
++set(libprotobuf_files
++  ${protobuf_source_dir}/src/google/protobuf/any.cc
++  ${protobuf_source_dir}/src/google/protobuf/any.pb.cc
++  ${protobuf_source_dir}/src/google/protobuf/api.pb.cc
++  #${protobuf_source_dir}/src/google/protobuf/compiler/importer.cc
++  ${protobuf_source_dir}/src/google/protobuf/compiler/parser.cc
++  ${protobuf_source_dir}/src/google/protobuf/descriptor.cc
++  ${protobuf_source_dir}/src/google/protobuf/descriptor.pb.cc
++  ${protobuf_source_dir}/src/google/protobuf/descriptor_database.cc
++  ${protobuf_source_dir}/src/google/protobuf/duration.pb.cc
++  ${protobuf_source_dir}/src/google/protobuf/dynamic_message.cc
++  ${protobuf_source_dir}/src/google/protobuf/empty.pb.cc
++  ${protobuf_source_dir}/src/google/protobuf/extension_set_heavy.cc
++  ${protobuf_source_dir}/src/google/protobuf/field_mask.pb.cc
++  ${protobuf_source_dir}/src/google/protobuf/generated_message_bases.cc
++  ${protobuf_source_dir}/src/google/protobuf/generated_message_reflection.cc
++  ${protobuf_source_dir}/src/google/protobuf/generated_message_tctable_full.cc
++  #${protobuf_source_dir}/src/google/protobuf/io/gzip_stream.cc
++  ${protobuf_source_dir}/src/google/protobuf/io/printer.cc
++  ${protobuf_source_dir}/src/google/protobuf/io/tokenizer.cc
++  ${protobuf_source_dir}/src/google/protobuf/map_field.cc
++  ${protobuf_source_dir}/src/google/protobuf/message.cc
++  ${protobuf_source_dir}/src/google/protobuf/reflection_internal.h
++  ${protobuf_source_dir}/src/google/protobuf/reflection_ops.cc
++  ${protobuf_source_dir}/src/google/protobuf/service.cc
++  ${protobuf_source_dir}/src/google/protobuf/source_context.pb.cc
++  ${protobuf_source_dir}/src/google/protobuf/struct.pb.cc
++  ${protobuf_source_dir}/src/google/protobuf/stubs/substitute.cc
++  ${protobuf_source_dir}/src/google/protobuf/text_format.cc
++  ${protobuf_source_dir}/src/google/protobuf/timestamp.pb.cc
++  ${protobuf_source_dir}/src/google/protobuf/type.pb.cc
++  ${protobuf_source_dir}/src/google/protobuf/unknown_field_set.cc
++  ${protobuf_source_dir}/src/google/protobuf/util/delimited_message_util.cc
++  ${protobuf_source_dir}/src/google/protobuf/util/field_comparator.cc
++  ${protobuf_source_dir}/src/google/protobuf/util/field_mask_util.cc
++  ${protobuf_source_dir}/src/google/protobuf/util/internal/datapiece.cc
++  ${protobuf_source_dir}/src/google/protobuf/util/internal/default_value_objectwriter.cc
++  ${protobuf_source_dir}/src/google/protobuf/util/internal/error_listener.cc
++  ${protobuf_source_dir}/src/google/protobuf/util/internal/field_mask_utility.cc
++  ${protobuf_source_dir}/src/google/protobuf/util/internal/json_escaping.cc
++  ${protobuf_source_dir}/src/google/protobuf/util/internal/json_objectwriter.cc
++  ${protobuf_source_dir}/src/google/protobuf/util/internal/json_stream_parser.cc
++  ${protobuf_source_dir}/src/google/protobuf/util/internal/object_writer.cc
++  ${protobuf_source_dir}/src/google/protobuf/util/internal/proto_writer.cc
++  ${protobuf_source_dir}/src/google/protobuf/util/internal/protostream_objectsource.cc
++  ${protobuf_source_dir}/src/google/protobuf/util/internal/protostream_objectwriter.cc
++  ${protobuf_source_dir}/src/google/protobuf/util/internal/type_info.cc
++  ${protobuf_source_dir}/src/google/protobuf/util/internal/utility.cc
++  ${protobuf_source_dir}/src/google/protobuf/util/json_util.cc
++  ${protobuf_source_dir}/src/google/protobuf/util/message_differencer.cc
++  #${protobuf_source_dir}/src/google/protobuf/util/time_util.cc
++  ${protobuf_source_dir}/src/google/protobuf/util/type_resolver_util.cc
++  ${protobuf_source_dir}/src/google/protobuf/wire_format.cc
++  ${protobuf_source_dir}/src/google/protobuf/wrappers.pb.cc
++)
++
++set(libprotobuf_includes
++  ${protobuf_source_dir}/src/google/protobuf/any.pb.h
++  ${protobuf_source_dir}/src/google/protobuf/api.pb.h
++  #${protobuf_source_dir}/src/google/protobuf/compiler/importer.h
++  ${protobuf_source_dir}/src/google/protobuf/compiler/parser.h
++  ${protobuf_source_dir}/src/google/protobuf/descriptor.h
++  ${protobuf_source_dir}/src/google/protobuf/descriptor.pb.h
++  ${protobuf_source_dir}/src/google/protobuf/descriptor_database.h
++  ${protobuf_source_dir}/src/google/protobuf/duration.pb.h
++  ${protobuf_source_dir}/src/google/protobuf/dynamic_message.h
++  ${protobuf_source_dir}/src/google/protobuf/empty.pb.h
++  ${protobuf_source_dir}/src/google/protobuf/field_access_listener.h
++  ${protobuf_source_dir}/src/google/protobuf/field_mask.pb.h
++  ${protobuf_source_dir}/src/google/protobuf/generated_enum_reflection.h
++  ${protobuf_source_dir}/src/google/protobuf/generated_message_bases.h
++  ${protobuf_source_dir}/src/google/protobuf/generated_message_reflection.h
++  #${protobuf_source_dir}/src/google/protobuf/io/gzip_stream.h
++  ${protobuf_source_dir}/src/google/protobuf/io/printer.h
++  ${protobuf_source_dir}/src/google/protobuf/io/tokenizer.h
++  ${protobuf_source_dir}/src/google/protobuf/map_entry.h
++  ${protobuf_source_dir}/src/google/protobuf/map_field.h
++  ${protobuf_source_dir}/src/google/protobuf/map_field_inl.h
++  ${protobuf_source_dir}/src/google/protobuf/message.h
++  ${protobuf_source_dir}/src/google/protobuf/metadata.h
++  ${protobuf_source_dir}/src/google/protobuf/reflection.h
++  ${protobuf_source_dir}/src/google/protobuf/reflection_ops.h
++  ${protobuf_source_dir}/src/google/protobuf/service.h
++  ${protobuf_source_dir}/src/google/protobuf/source_context.pb.h
++  ${protobuf_source_dir}/src/google/protobuf/struct.pb.h
++  ${protobuf_source_dir}/src/google/protobuf/text_format.h
++  ${protobuf_source_dir}/src/google/protobuf/timestamp.pb.h
++  ${protobuf_source_dir}/src/google/protobuf/type.pb.h
++  ${protobuf_source_dir}/src/google/protobuf/unknown_field_set.h
++  ${protobuf_source_dir}/src/google/protobuf/util/delimited_message_util.h
++  ${protobuf_source_dir}/src/google/protobuf/util/field_comparator.h
++  ${protobuf_source_dir}/src/google/protobuf/util/field_mask_util.h
++  ${protobuf_source_dir}/src/google/protobuf/util/json_util.h
++  ${protobuf_source_dir}/src/google/protobuf/util/message_differencer.h
++  ${protobuf_source_dir}/src/google/protobuf/util/time_util.h
++  ${protobuf_source_dir}/src/google/protobuf/util/type_resolver.h
++  ${protobuf_source_dir}/src/google/protobuf/util/type_resolver_util.h
++  ${protobuf_source_dir}/src/google/protobuf/wire_format.h
++  ${protobuf_source_dir}/src/google/protobuf/wrappers.pb.h
++)
++
++if (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
++set(libprotobuf_rc_files
++  ${CMAKE_CURRENT_BINARY_DIR}/version.rc
++)
++endif()
++
++add_library(libprotobuf ${protobuf_SHARED_OR_STATIC}
++  ${libprotobuf_lite_files} ${libprotobuf_files} ${libprotobuf_includes} ${libprotobuf_rc_files})
++if(protobuf_HAVE_LD_VERSION_SCRIPT)
++  if(${CMAKE_VERSION} VERSION_GREATER 3.13 OR ${CMAKE_VERSION} VERSION_EQUAL 3.13)
++    target_link_options(libprotobuf PRIVATE -Wl,--version-script=${protobuf_source_dir}/src/libprotobuf.map)
++  elseif(protobuf_BUILD_SHARED_LIBS)
++    target_link_libraries(libprotobuf PRIVATE -Wl,--version-script=${protobuf_source_dir}/src/libprotobuf.map)
++  endif()
++  set_target_properties(libprotobuf PROPERTIES
++    LINK_DEPENDS ${protobuf_source_dir}/src/libprotobuf.map)
++endif()
++target_link_libraries(libprotobuf PRIVATE ${CMAKE_THREAD_LIBS_INIT})
++if(protobuf_WITH_ZLIB)
++  target_link_libraries(libprotobuf PRIVATE ${ZLIB_LIBRARIES})
++endif()
++if(protobuf_LINK_LIBATOMIC)
++  target_link_libraries(libprotobuf PRIVATE atomic)
++endif()
++if(${CMAKE_SYSTEM_NAME} STREQUAL "Android")
++  target_link_libraries(libprotobuf PRIVATE log)
++endif()
++target_include_directories(libprotobuf PUBLIC ${protobuf_source_dir}/src)
++if(protobuf_BUILD_SHARED_LIBS)
++  target_compile_definitions(libprotobuf
++    PUBLIC  PROTOBUF_USE_DLLS
++    PRIVATE LIBPROTOBUF_EXPORTS)
++endif()
++set_target_properties(libprotobuf PROPERTIES
++    VERSION ${protobuf_VERSION}
++    SOVERSION 31
++    OUTPUT_NAME ${LIB_PREFIX}protobuf
++    DEBUG_POSTFIX "${protobuf_DEBUG_POSTFIX}")
++add_library(protobuf::libprotobuf ALIAS libprotobuf)
+diff --git a/configure.ac b/configure.ac
+index 5de1ce20a..712fa41d5 100644
+--- a/configure.ac
++++ b/configure.ac
+@@ -106,7 +106,7 @@ ACX_CHECK_SUNCC
+ 
+ # Have to do libtool after SUNCC, other wise it "helpfully" adds Crun Cstd
+ # to the link
+-AC_PROG_LIBTOOL
++LT_INIT
+ 
+ # Check whether the linker supports version scripts
+ AC_MSG_CHECKING([whether the linker supports version scripts])
+diff --git a/src/google/protobuf/io/zero_copy_stream_impl.cc b/src/google/protobuf/io/zero_copy_stream_impl.cc
+index c66bc862a..1fee728cd 100644
+--- a/src/google/protobuf/io/zero_copy_stream_impl.cc
++++ b/src/google/protobuf/io/zero_copy_stream_impl.cc
+@@ -33,15 +33,19 @@
+ //  Sanjay Ghemawat, Jeff Dean, and others.
+ 
+ #ifndef _MSC_VER
++#ifndef PB_ENABLE_SGX
+ #include <fcntl.h>
+ #include <sys/stat.h>
++#endif //PB_ENABLE_SGX
+ #include <sys/types.h>
+ #include <unistd.h>
+ #endif
+ #include <errno.h>
+ 
+ #include <algorithm>
++#ifndef PB_ENABLE_SGX
+ #include <iostream>
++#endif //PB_ENABLE_SGX
+ 
+ #include <google/protobuf/stubs/common.h>
+ #include <google/protobuf/stubs/logging.h>
+@@ -67,6 +71,7 @@ using google::protobuf::io::win32::read;
+ using google::protobuf::io::win32::write;
+ #endif
+ 
++#ifndef PB_ENABLE_SGX
+ namespace {
+ 
+ // EINTR sucks.
+@@ -304,6 +309,7 @@ bool OstreamOutputStream::CopyingOstreamOutputStream::Write(const void* buffer,
+   output_->write(reinterpret_cast<const char*>(buffer), size);
+   return output_->good();
+ }
++#endif //PB_ENABLE_SGX
+ 
+ // ===================================================================
+ 
+diff --git a/src/google/protobuf/io/zero_copy_stream_impl.h b/src/google/protobuf/io/zero_copy_stream_impl.h
+index a385992f2..57e261954 100644
+--- a/src/google/protobuf/io/zero_copy_stream_impl.h
++++ b/src/google/protobuf/io/zero_copy_stream_impl.h
+@@ -54,7 +54,7 @@
+ namespace google {
+ namespace protobuf {
+ namespace io {
+-
++#ifndef PB_ENABLE_SGX
+ // ===================================================================
+ 
+ // A ZeroCopyInputStream which reads from a file descriptor.
+@@ -290,7 +290,7 @@ class PROTOBUF_EXPORT OstreamOutputStream PROTOBUF_FUTURE_FINAL
+ 
+   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(OstreamOutputStream);
+ };
+-
++#endif //PB_ENABLE_SGX
+ // ===================================================================
+ 
+ // A ZeroCopyInputStream which reads from several other streams in sequence.
+diff --git a/src/google/protobuf/map.h b/src/google/protobuf/map.h
+index 09d03b812..4e78bdc59 100644
+--- a/src/google/protobuf/map.h
++++ b/src/google/protobuf/map.h
+@@ -69,6 +69,11 @@
+ // Must be included last.
+ #include <google/protobuf/port_def.inc>
+ 
++#ifdef PB_ENABLE_SGX
++#include "sgx_trts.h"
++#include "sgx_error.h"
++#endif //PB_ENABLE_SGX
++
+ namespace google {
+ namespace protobuf {
+ 
+@@ -1093,9 +1098,16 @@ class Map {
+       // iOS, tvOS, watchOS, etc).
+       s += mach_absolute_time();
+ #elif defined(__x86_64__) && defined(__GNUC__)
++#ifndef PB_ENABLE_SGX
+       uint32_t hi, lo;
+       asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
+       s += ((static_cast<uint64_t>(hi) << 32) | lo);
++#else
++      uint64_t random_num;
++      if (SGX_SUCCESS != sgx_read_rand((unsigned char *)&random_num, sizeof(uint64_t)))
++          abort();
++      s += random_num;
++#endif //PB_ENABLE_SGX
+ #elif defined(__aarch64__) && defined(__GNUC__)
+       // There is no rdtsc on ARMv8. CNTVCT_EL0 is the virtual counter of the
+       // system timer. It runs at a different frequency than the CPU's, but is
+diff --git a/src/google/protobuf/message_lite.cc b/src/google/protobuf/message_lite.cc
+index 3a1b67bf6..5d540ed68 100644
+--- a/src/google/protobuf/message_lite.cc
++++ b/src/google/protobuf/message_lite.cc
+@@ -265,6 +265,7 @@ bool MessageLite::ParsePartialFromZeroCopyStream(
+   return ParseFrom<kParsePartial>(input);
+ }
+ 
++#ifndef PB_ENABLE_SGX
+ bool MessageLite::ParseFromFileDescriptor(int file_descriptor) {
+   io::FileInputStream input(file_descriptor);
+   return ParseFromZeroCopyStream(&input) && input.GetErrno() == 0;
+@@ -284,6 +285,7 @@ bool MessageLite::ParsePartialFromIstream(std::istream* input) {
+   io::IstreamInputStream zero_copy_input(input);
+   return ParsePartialFromZeroCopyStream(&zero_copy_input) && input->eof();
+ }
++#endif //PB_ENABLE_SGX
+ 
+ bool MessageLite::MergePartialFromBoundedZeroCopyStream(
+     io::ZeroCopyInputStream* input, int size) {
+@@ -414,6 +416,7 @@ bool MessageLite::SerializePartialToZeroCopyStream(
+   return true;
+ }
+ 
++#ifndef PB_ENABLE_SGX
+ bool MessageLite::SerializeToFileDescriptor(int file_descriptor) const {
+   io::FileOutputStream output(file_descriptor);
+   return SerializeToZeroCopyStream(&output) && output.Flush();
+@@ -436,6 +439,7 @@ bool MessageLite::SerializePartialToOstream(std::ostream* output) const {
+   io::OstreamOutputStream zero_copy_output(output);
+   return SerializePartialToZeroCopyStream(&zero_copy_output);
+ }
++#endif //PB_ENABLE_SGX
+ 
+ bool MessageLite::AppendToString(std::string* output) const {
+   GOOGLE_DCHECK(IsInitialized()) << InitializationErrorMessage("serialize", *this);
+diff --git a/src/google/protobuf/message_lite.h b/src/google/protobuf/message_lite.h
+index 1c22f894e..69006e686 100644
+--- a/src/google/protobuf/message_lite.h
++++ b/src/google/protobuf/message_lite.h
+@@ -254,11 +254,13 @@ class PROTOBUF_EXPORT MessageLite {
+       int file_descriptor);
+   // Parse a protocol buffer from a C++ istream.  If successful, the entire
+   // input will be consumed.
++#ifndef PB_ENABLE_SGX
+   PROTOBUF_ATTRIBUTE_REINITIALIZES bool ParseFromIstream(std::istream* input);
+   // Like ParseFromIstream(), but accepts messages that are missing
+   // required fields.
+   PROTOBUF_ATTRIBUTE_REINITIALIZES bool ParsePartialFromIstream(
+       std::istream* input);
++#endif //PB_ENABLE_SGX
+   // Read a protocol buffer from the given zero-copy input stream, expecting
+   // the message to be exactly "size" bytes long.  If successful, exactly
+   // this many bytes will have been consumed from the input.
+@@ -359,9 +361,11 @@ class PROTOBUF_EXPORT MessageLite {
+   bool SerializePartialToFileDescriptor(int file_descriptor) const;
+   // Serialize the message and write it to the given C++ ostream.  All
+   // required fields must be set.
++#ifndef PB_ENABLE_SGX
+   bool SerializeToOstream(std::ostream* output) const;
+   // Like SerializeToOstream(), but allows missing required fields.
+   bool SerializePartialToOstream(std::ostream* output) const;
++#endif //PB_ENABLE_SGX
+ 
+   // Like SerializeToString(), but appends to the data to the string's
+   // existing contents.  All required fields must be set.
+diff --git a/src/google/protobuf/port_def.inc b/src/google/protobuf/port_def.inc
+index 31ab3b159..cadbf1645 100644
+--- a/src/google/protobuf/port_def.inc
++++ b/src/google/protobuf/port_def.inc
+@@ -608,7 +608,7 @@
+      (!defined(__APPLE__) && __clang_major__ >= 12))
+ #define PROTOBUF_CONSTINIT [[clang::require_constant_initialization]]
+ #define PROTOBUF_CONSTEXPR constexpr
+-#elif PROTOBUF_GNUC_MIN(12, 0)
++#elif PROTOBUF_GNUC_MIN(13, 0)
+ #define PROTOBUF_CONSTINIT __constinit
+ #define PROTOBUF_CONSTEXPR constexpr
+ #else
+diff --git a/src/google/protobuf/repeated_ptr_field.h b/src/google/protobuf/repeated_ptr_field.h
+index e81b2c7e4..205d3b287 100644
+--- a/src/google/protobuf/repeated_ptr_field.h
++++ b/src/google/protobuf/repeated_ptr_field.h
+@@ -749,7 +749,7 @@ class GenericTypeHandler {
+   static inline GenericType* New(Arena* arena, GenericType&& value) {
+     return Arena::Create<GenericType>(arena, std::move(value));
+   }
+-  static inline GenericType* NewFromPrototype(const GenericType* prototype,
++  static inline GenericType* NewFromPrototype(const GenericType* /*prototype*/,
+                                               Arena* arena = nullptr) {
+     return New(arena);
+   }
+diff --git a/src/google/protobuf/stubs/common.cc b/src/google/protobuf/stubs/common.cc
+index 82d46531f..203a0cffe 100644
+--- a/src/google/protobuf/stubs/common.cc
++++ b/src/google/protobuf/stubs/common.cc
+@@ -35,7 +35,11 @@
+ #include <atomic>
+ #include <errno.h>
+ #include <sstream>
++#ifndef PB_ENABLE_SGX
+ #include <stdio.h>
++#else
++#include <cstdio>
++#endif //PB_ENABLE_SGX
+ #include <vector>
+ 
+ #ifdef _WIN32
+@@ -157,6 +161,9 @@ inline void DefaultLogHandler(LogLevel level, const char* filename, int line,
+ }
+ 
+ #else
++#ifdef PB_ENABLE_SGX
++extern "C" int printf(const char* fmt, ...);
++#endif //PB_ENABLE_SGX
+ void DefaultLogHandler(LogLevel level, const char* filename, int line,
+                        const std::string& message) {
+   if (level < GOOGLE_PROTOBUF_MIN_LOG_LEVEL) {
+@@ -166,9 +173,14 @@ void DefaultLogHandler(LogLevel level, const char* filename, int line,
+ 
+   // We use fprintf() instead of cerr because we want this to work at static
+   // initialization time.
++#ifndef PB_ENABLE_SGX
+   fprintf(stderr, "[libprotobuf %s %s:%d] %s\n",
+           level_names[level], filename, line, message.c_str());
+   fflush(stderr);  // Needed on MSVC.
++#else
++  printf("[libprotobuf %s %s:%d] %s\n", level_names[level], filename, line,
++         message.c_str());
++#endif //PB_ENABLE_SGX
+ }
+ #endif
+ 
+@@ -201,9 +213,13 @@ LogMessage& LogMessage::operator<<(const util::Status& status) {
+ }
+ 
+ LogMessage& LogMessage::operator<<(const uint128& value) {
++#ifndef PB_ENABLE_SGX
+   std::ostringstream str;
+   str << value;
+   message_ += str.str();
++#else
++  message_ += std::to_string((const long long &)value);
++#endif //PB_ENABLE_SGX
+   return *this;
+ }
+ 
+diff --git a/src/google/protobuf/stubs/int128.cc b/src/google/protobuf/stubs/int128.cc
+index b60722def..0a4c96c3a 100644
+--- a/src/google/protobuf/stubs/int128.cc
++++ b/src/google/protobuf/stubs/int128.cc
+@@ -31,7 +31,9 @@
+ #include <google/protobuf/stubs/int128.h>
+ 
+ #include <iomanip>
++#ifndef PB_ENABLE_SGX
+ #include <ostream>  // NOLINT(readability/streams)
++#endif //PB_ENABLE_SGX
+ #include <sstream>
+ 
+ #include <google/protobuf/stubs/logging.h>
+@@ -123,6 +125,7 @@ uint128& uint128::operator%=(const uint128& divisor) {
+   return *this;
+ }
+ 
++#ifndef PB_ENABLE_SGX
+ std::ostream& operator<<(std::ostream& o, const uint128& b) {
+   std::ios_base::fmtflags flags = o.flags();
+ 
+@@ -186,6 +189,7 @@ std::ostream& operator<<(std::ostream& o, const uint128& b) {
+   // Stream the final representation in a single "<<" call.
+   return o << rep;
+ }
++#endif //PB_ENABLE_SGX
+ 
+ }  // namespace protobuf
+ }  // namespace google
+diff --git a/src/google/protobuf/stubs/int128.h b/src/google/protobuf/stubs/int128.h
+index dc70d96eb..bfca3bfc6 100644
+--- a/src/google/protobuf/stubs/int128.h
++++ b/src/google/protobuf/stubs/int128.h
+@@ -85,9 +85,11 @@ class PROTOBUF_EXPORT uint128 {
+   friend uint64 Uint128Low64(const uint128& v);
+   friend uint64 Uint128High64(const uint128& v);
+ 
++#ifndef PB_ENABLE_SGX
+   // We add "std::" to avoid including all of port.h.
+   PROTOBUF_EXPORT friend std::ostream& operator<<(std::ostream& o,
+                                                   const uint128& b);
++#endif //PB_ENABLE_SGX
+ 
+  private:
+   static void DivModImpl(uint128 dividend, uint128 divisor,
+@@ -120,9 +122,11 @@ struct uint128_pod {
+ 
+ PROTOBUF_EXPORT extern const uint128_pod kuint128max;
+ 
++#ifndef PB_ENABLE_SGX
+ // allow uint128 to be logged
+ PROTOBUF_EXPORT extern std::ostream& operator<<(std::ostream& o,
+                                                 const uint128& b);
++#endif //PB_ENABLE_SGX
+ 
+ // Methods to access low and high pieces of 128-bit value.
+ // Defined externally from uint128 to facilitate conversion
+diff --git a/src/google/protobuf/stubs/port.h b/src/google/protobuf/stubs/port.h
+index 045e25d89..8eb363834 100644
+--- a/src/google/protobuf/stubs/port.h
++++ b/src/google/protobuf/stubs/port.h
+@@ -84,7 +84,8 @@
+ #include <intrin.h>
+ #elif defined(__APPLE__)
+ #include <libkern/OSByteOrder.h>
+-#elif defined(__linux__) || defined(__ANDROID__) || defined(__CYGWIN__)
++//#elif defined(__linux__) || defined(__ANDROID__) || defined(__CYGWIN__)
++#elif defined(__GLIBC__) || defined(__BIONIC__) || defined(__CYGWIN__) //for SGX
+ #include <byteswap.h>  // IWYU pragma: export
+ #endif
+ 
+@@ -248,7 +249,8 @@ inline void GOOGLE_UNALIGNED_STORE64(void *p, uint64 v) {
+ #define bswap_32(x) OSSwapInt32(x)
+ #define bswap_64(x) OSSwapInt64(x)
+ 
+-#elif !defined(__linux__) && !defined(__ANDROID__) && !defined(__CYGWIN__)
++//#elif !defined(__linux__) && !defined(__ANDROID__) && !defined(__CYGWIN__)
++#elif !defined(__GLIBC__) && !defined(__BIONIC__) && !defined(__CYGWIN__) //for SGX
+ 
+ #ifndef bswap_16
+ static inline uint16 bswap_16(uint16 x) {
+diff --git a/src/google/protobuf/stubs/status.cc b/src/google/protobuf/stubs/status.cc
+index f5c0fa48f..3c134fde6 100644
+--- a/src/google/protobuf/stubs/status.cc
++++ b/src/google/protobuf/stubs/status.cc
+@@ -29,7 +29,9 @@
+ // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ #include <google/protobuf/stubs/status.h>
+ 
++#ifndef PB_ENABLE_SGX
+ #include <ostream>
++#endif //PB_ENABLE_SGX
+ #include <stdio.h>
+ #include <string>
+ #include <utility>
+@@ -123,10 +125,12 @@ std::string Status::ToString() const {
+ 
+ Status OkStatus() { return Status(); }
+ 
++#ifndef PB_ENABLE_SGX
+ std::ostream& operator<<(std::ostream& os, const Status& x) {
+   os << x.ToString();
+   return os;
+ }
++#endif //PB_ENABLE_SGX
+ 
+ bool IsAborted(const Status& status) {
+   return status.code() == StatusCode::kAborted;
+diff --git a/src/google/protobuf/stubs/status.h b/src/google/protobuf/stubs/status.h
+index c858cf623..ee72b6c6a 100644
+--- a/src/google/protobuf/stubs/status.h
++++ b/src/google/protobuf/stubs/status.h
+@@ -101,8 +101,10 @@ class PROTOBUF_EXPORT Status {
+ // usage of `OkStatus()` when constructing such an OK status.
+ PROTOBUF_EXPORT Status OkStatus();
+ 
++#ifndef PB_ENABLE_SGX
+ // Prints a human-readable representation of 'x' to 'os'.
+ PROTOBUF_EXPORT std::ostream& operator<<(std::ostream& os, const Status& x);
++#endif //PB_ENABLE_SGX
+ 
+ // These convenience functions return `true` if a given status matches the
+ // `StatusCode` error code of its associated function.
+diff --git a/src/google/protobuf/stubs/stringpiece.cc b/src/google/protobuf/stubs/stringpiece.cc
+index 71880464c..f6801cf4d 100644
+--- a/src/google/protobuf/stubs/stringpiece.cc
++++ b/src/google/protobuf/stubs/stringpiece.cc
+@@ -33,18 +33,21 @@
+ #include <algorithm>
+ #include <climits>
+ #include <string>
++#ifndef PB_ENABLE_SGX
+ #include <ostream>
++#endif //PB_ENABLE_SGX
+ 
+ #include <google/protobuf/stubs/logging.h>
+ 
+ namespace google {
+ namespace protobuf {
+ namespace stringpiece_internal {
+-
++#ifndef PB_ENABLE_SGX
+ std::ostream& operator<<(std::ostream& o, StringPiece piece) {
+   o.write(piece.data(), piece.size());
+   return o;
+ }
++#endif //PB_ENABLE_SGX
+ 
+ void StringPiece::LogFatalSizeTooBig(size_t size, const char* details) {
+   GOOGLE_LOG(FATAL) << "size too big: " << size << " details: " << details;
+diff --git a/src/google/protobuf/stubs/stringpiece.h b/src/google/protobuf/stubs/stringpiece.h
+index c63e25b25..0122672a9 100644
+--- a/src/google/protobuf/stubs/stringpiece.h
++++ b/src/google/protobuf/stubs/stringpiece.h
+@@ -375,8 +375,10 @@ inline bool operator>=(StringPiece x, StringPiece y) {
+   return !(x < y);
+ }
+ 
++#ifndef PB_ENABLE_SGX
+ // allow StringPiece to be logged
+ extern std::ostream& operator<<(std::ostream& o, StringPiece piece);
++#endif //PB_ENABLE_SGX
+ 
+ }  // namespace stringpiece_internal
+ 
+diff --git a/src/google/protobuf/stubs/strutil.cc b/src/google/protobuf/stubs/strutil.cc
+index 7c84cac2e..776001f8a 100644
+--- a/src/google/protobuf/stubs/strutil.cc
++++ b/src/google/protobuf/stubs/strutil.cc
+@@ -39,6 +39,9 @@
+ #include <cmath>
+ #include <iterator>
+ #include <limits>
++#ifdef PB_ENABLE_SGX
++#include <cstring>
++#endif //PB_ENABLE_SGX
+ 
+ #include <google/protobuf/stubs/logging.h>
+ #include <google/protobuf/stubs/stl_util.h>
+@@ -503,8 +506,14 @@ int CEscapeInternal(const char* src, int src_len, char* dest,
+              (last_hex_escape && isxdigit(*src)))) {
+           if (dest_len - used < 4) // need space for 4 letter escape
+             return -1;
++#ifndef PB_ENABLE_SGX
+           sprintf(dest + used, (use_hex ? "\\x%02x" : "\\%03o"),
+                   static_cast<uint8>(*src));
++#else
++          snprintf(dest + used, dest_len - used,
++                   (use_hex ? "\\x%02x" : "\\%03o"),
++                   static_cast<uint8>(*src));
++#endif //PB_ENABLE_SGX
+           is_hex_escape = use_hex;
+           used += 4;
+         } else {
+@@ -1246,6 +1255,7 @@ char* DoubleToBuffer(double value, char* buffer) {
+   // this assert.
+   static_assert(DBL_DIG < 20, "DBL_DIG_is_too_big");
+ 
++#ifndef PB_ENABLE_SGX
+   if (value == std::numeric_limits<double>::infinity()) {
+     strcpy(buffer, "inf");
+     return buffer;
+@@ -1256,6 +1266,18 @@ char* DoubleToBuffer(double value, char* buffer) {
+     strcpy(buffer, "nan");
+     return buffer;
+   }
++#else
++  if (value == std::numeric_limits<double>::infinity()) {
++    strncpy(buffer, "inf", strlen("inf"));
++    return buffer;
++  } else if (value == -std::numeric_limits<double>::infinity()) {
++    strncpy(buffer, "-inf", strlen("-inf"));
++    return buffer;
++  } else if (std::isnan(value)) {
++    strncpy(buffer, "nan", strlen("nan"));
++    return buffer;
++  }
++#endif //PB_ENABLE_SGX
+ 
+   int snprintf_result =
+     snprintf(buffer, kDoubleToBufferSize, "%.*g", DBL_DIG, value);
+@@ -1364,6 +1386,7 @@ char* FloatToBuffer(float value, char* buffer) {
+   // this assert.
+   static_assert(FLT_DIG < 10, "FLT_DIG_is_too_big");
+ 
++#ifndef PB_ENABLE_SGX
+   if (value == std::numeric_limits<double>::infinity()) {
+     strcpy(buffer, "inf");
+     return buffer;
+@@ -1374,6 +1397,18 @@ char* FloatToBuffer(float value, char* buffer) {
+     strcpy(buffer, "nan");
+     return buffer;
+   }
++#else
++  if (value == std::numeric_limits<double>::infinity()) {
++    strncpy(buffer, "inf", strlen("inf"));
++    return buffer;
++  } else if (value == -std::numeric_limits<double>::infinity()) {
++    strncpy(buffer, "-inf", strlen("-inf"));
++    return buffer;
++  } else if (std::isnan(value)) {
++    strncpy(buffer, "nan", strlen("nan"));
++    return buffer;
++  }
++#endif //PB_ENABLE_SGX
+ 
+   int snprintf_result =
+     snprintf(buffer, kFloatToBufferSize, "%.*g", FLT_DIG, value);
+diff --git a/src/google/protobuf/stubs/time.cc b/src/google/protobuf/stubs/time.cc
+index 922be76d1..4efb2e85e 100644
+--- a/src/google/protobuf/stubs/time.cc
++++ b/src/google/protobuf/stubs/time.cc
+@@ -264,7 +264,11 @@ bool DateTimeToSeconds(const DateTime& time, int64* seconds) {
+ void GetCurrentTime(int64* seconds, int32* nanos) {
+   // TODO(xiaofeng): Improve the accuracy of this implementation (or just
+   // remove this method from protobuf).
++#ifndef PB_ENABLE_SGX
+   *seconds = time(nullptr);
++#else
++  *seconds = 0;
++#endif //PB_ENABLE_SGX
+   *nanos = 0;
+ }
+ 
+diff --git a/src/google/protobuf/text_format.cc b/src/google/protobuf/text_format.cc
+index 880b16dde..8cd82000b 100644
+--- a/src/google/protobuf/text_format.cc
++++ b/src/google/protobuf/text_format.cc
+@@ -67,6 +67,10 @@
+ 
+ #define DEBUG_STRING_SILENT_MARKER "\t "
+ 
++#ifdef PB_ENABLE_SGX
++extern "C" int printf(const char* fmt, ...);
++#endif //PB_ENABLE_SGX
++
+ namespace google {
+ namespace protobuf {
+ 
+diff --git a/src/google/protobuf/util/delimited_message_util.cc b/src/google/protobuf/util/delimited_message_util.cc
+index 80cab309b..c97790c68 100644
+--- a/src/google/protobuf/util/delimited_message_util.cc
++++ b/src/google/protobuf/util/delimited_message_util.cc
+@@ -38,6 +38,7 @@ namespace google {
+ namespace protobuf {
+ namespace util {
+ 
++#ifndef PB_ENABLE_SGX
+ bool SerializeDelimitedToFileDescriptor(const MessageLite& message,
+                                         int file_descriptor) {
+   io::FileOutputStream output(file_descriptor);
+@@ -60,6 +61,7 @@ bool ParseDelimitedFromZeroCopyStream(MessageLite* message,
+   io::CodedInputStream coded_input(input);
+   return ParseDelimitedFromCodedStream(message, &coded_input, clean_eof);
+ }
++#endif //PB_ENABLE_SGX
+ 
+ bool ParseDelimitedFromCodedStream(MessageLite* message,
+                                    io::CodedInputStream* input,
+diff --git a/src/google/protobuf/util/delimited_message_util.h b/src/google/protobuf/util/delimited_message_util.h
+index 78625cf2f..c3c11cb1b 100644
+--- a/src/google/protobuf/util/delimited_message_util.h
++++ b/src/google/protobuf/util/delimited_message_util.h
+@@ -34,8 +34,9 @@
+ #ifndef GOOGLE_PROTOBUF_UTIL_DELIMITED_MESSAGE_UTIL_H__
+ #define GOOGLE_PROTOBUF_UTIL_DELIMITED_MESSAGE_UTIL_H__
+ 
+-
++#ifndef PB_ENABLE_SGX
+ #include <ostream>
++#endif //PB_ENABLE_SGX
+ 
+ #include <google/protobuf/message_lite.h>
+ #include <google/protobuf/io/coded_stream.h>
+@@ -64,11 +65,13 @@ namespace util {
+ // then parse it. As a result, they may read past the end of the delimited
+ // message. There is no way for them to push the extra data back into the
+ // underlying source, so instead you must keep using the same stream object.
++#ifndef PB_ENABLE_SGX
+ bool PROTOBUF_EXPORT SerializeDelimitedToFileDescriptor(
+     const MessageLite& message, int file_descriptor);
+ 
+ bool PROTOBUF_EXPORT SerializeDelimitedToOstream(const MessageLite& message,
+                                                  std::ostream* output);
++#endif //PB_ENABLE_SGX
+ 
+ // Read a single size-delimited message from the given stream. Delimited
+ // format allows a single file or stream to contain multiple messages,
+@@ -82,8 +85,10 @@ bool PROTOBUF_EXPORT SerializeDelimitedToOstream(const MessageLite& message,
+ // otherwise it will be set false. Note that these methods return false
+ // on EOF, but they also return false on other errors, so |clean_eof| is
+ // needed to distinguish a clean end from errors.
++#ifndef PB_ENABLE_SGX
+ bool PROTOBUF_EXPORT ParseDelimitedFromZeroCopyStream(
+     MessageLite* message, io::ZeroCopyInputStream* input, bool* clean_eof);
++#endif //PB_ENABLE_SGX
+ 
+ bool PROTOBUF_EXPORT ParseDelimitedFromCodedStream(MessageLite* message,
+                                                    io::CodedInputStream* input,
+diff --git a/src/google/protobuf/util/time_util.h b/src/google/protobuf/util/time_util.h
+index 95cc64520..6d7c44775 100644
+--- a/src/google/protobuf/util/time_util.h
++++ b/src/google/protobuf/util/time_util.h
+@@ -44,10 +44,14 @@ struct timeval {
+   int64 tv_usec; /* and microseconds */
+ };
+ #else
++#ifndef PB_ENABLE_SGX
+ #include <winsock2.h>
++#endif //PB_ENABLE_SGX
+ #endif  // _XBOX_ONE
+ #else
++#ifndef PB_ENABLE_SGX
+ #include <sys/time.h>
++#endif //PB_ENABLE_SGX
+ #endif
+ 
+ #include <google/protobuf/duration.pb.h>
+-- 
+2.17.1
+

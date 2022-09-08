@@ -1,0 +1,2 @@
+DeliveryName	InstallName	FileCheckSum	FileFeature	FileOwner
+<deliverydir>/build/linux/libtdx_attest.so	<installdir>/lib/libtdx_attest.so	0	main	STP

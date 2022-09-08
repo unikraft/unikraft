@@ -1,0 +1,5 @@
+libsgx-tdx-logic (1.0-1) unstable; urgency=low
+
+  * 0.1 pre-alpha release
+
+ -- Qiu Feng <feng.qiu@intel.com>  Mon, 27 Jul 2020 10:54:41 +0800

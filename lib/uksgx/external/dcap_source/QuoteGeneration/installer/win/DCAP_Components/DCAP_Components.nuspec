@@ -1,0 +1,23 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2010/07/nuspec.xsd">
+  <metadata>
+    <id>DCAP_Components</id>
+    <version>1.14.100.3</version>
+    <title>DCAP Components</title>
+    <authors>Intel(R) SGX</authors>
+    <owners>Intel</owners>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>DCAP Components</description>
+    <copyright>Copyright (C) 2022 Intel Corporation</copyright>
+    <dependencies>
+      <dependency id="SgxHeaders" version="2.16.100.3" />
+    </dependencies>
+  </metadata>
+  <files>
+    <file src="DCAP_Components.targets" target="build" />
+    <file src="License.txt" target="" />
+    <file src="Header Files\*" target="build\Header Files" />
+    <file src="lib\*" target="build\lib" />
+    <file src="lib\**\*" target="build\lib" />
+  </files>
+</package>

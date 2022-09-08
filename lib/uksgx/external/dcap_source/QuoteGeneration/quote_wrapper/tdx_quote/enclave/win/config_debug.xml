@@ -1,0 +1,14 @@
+<EnclaveConfiguration>
+    <IntelSigned>1</IntelSigned>
+    <ProvisionKey>1</ProvisionKey>
+    <ProdID>0x2</ProdID>
+    <!-- TODO: Should we change to another value? -->
+    <ISVSVN>0</ISVSVN>
+    <TCSNum>1</TCSNum>
+    <TCSPolicy>1</TCSPolicy>
+    <HW>0</HW>
+    <!-- TODO: Need to fine tune these values --> 
+    <StackMaxSize>0x84000</StackMaxSize>
+    <HeapMaxSize>0x84000</HeapMaxSize>
+    <DisableDebug>0</DisableDebug>
+</EnclaveConfiguration>

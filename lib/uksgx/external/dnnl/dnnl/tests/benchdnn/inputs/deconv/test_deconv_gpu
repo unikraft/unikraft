@@ -1,0 +1,16 @@
+# f32
+--reset
+--mb=2
+--dir=FWD_B,BWD_D,BWD_WB --batch=deconv_all
+
+# f16
+--reset
+--cfg=f16
+--mb=2
+--dir=FWD_B --batch=deconv_all
+
+# int8
+--reset
+--cfg=u8s8u8,s8s8u8
+--mb=2
+--dir=FWD_B --batch=deconv_all

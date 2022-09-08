@@ -1,0 +1,5 @@
+libsgx-ra-uefi (1.0-1) unstable; urgency=low
+
+  * Initial release
+
+ -- Junli Sun <junli.sun@intel.com>  Mon, 10 Feb 2020 15:19:41 +0800

@@ -1,0 +1,267 @@
+{
+   <dlopen>
+   Memcheck:Leak
+   fun:calloc
+   fun:_dlerror_run
+   fun:dlopen*
+   ...
+}
+
+{
+   <dlopen>
+   Memcheck:Leak
+   fun:malloc
+   fun:strdup
+   fun:_dl_map_object
+   fun:dl_open_worker
+   fun:_dl_catch_error
+   fun:_dl_open
+   fun:dlopen_doit
+   fun:_dl_catch_error
+   fun:_dlerror_run
+   fun:dlopen*
+   ...
+}
+
+{
+   <dlopen>
+   Memcheck:Leak
+   fun:malloc
+   fun:_dl_new_object
+   fun:_dl_map_object_from_fd
+   fun:_dl_map_object
+   fun:dl_open_worker
+   fun:_dl_catch_error
+   fun:_dl_open
+   fun:dlopen_doit
+   fun:_dl_catch_error
+   fun:_dlerror_run
+   fun:dlopen*
+   ...
+}
+
+{
+   <dlopen>
+   Memcheck:Leak
+   fun:calloc
+   fun:_dl_check_map_versions
+   fun:dl_open_worker
+   fun:_dl_catch_error
+   fun:_dl_open
+   fun:dlopen_doit
+   fun:_dl_catch_error
+   fun:_dlerror_run
+   fun:dlopen*
+   ...
+}
+
+{
+   <dlopen>
+   Memcheck:Leak
+   fun:calloc
+   fun:_dl_new_object
+   fun:_dl_map_object_from_fd
+   fun:_dl_map_object
+   fun:dl_open_worker
+   fun:_dl_catch_error
+   fun:_dl_open
+   fun:dlopen_doit
+   fun:_dl_catch_error
+   fun:_dlerror_run
+   fun:dlopen*
+   ...
+}
+
+{
+   <dl_init>
+   Memcheck:Leak
+   fun:malloc
+   obj:/usr/*/libstdc++*
+   fun:call_init.part.0
+   fun:_dl_init
+   obj:/usr/*/ld-*.so
+   ...
+}
+
+{
+   <TestBundleC1-atomic>
+   Helgrind:Race
+   fun:load
+   fun:_ZNKSt6atomicIbE4loadESt12memory_order
+   fun:_ZN2us21TestBundleC1Activator10UnRegisterEv
+   ...
+}
+
+{
+   <BundleContext-atomic>
+   Helgrind:Race
+   fun:load
+   fun:_ZNKSt13__atomic_baseIPN2us13BundleContextEEcvS2_Ev
+   fun:_ZNKSt6atomicIPN2us13BundleContextEEcvS2_Ev
+   ...
+}
+
+{
+   <BundleStart-atomic>
+   Helgrind:Race
+   fun:store
+   fun:_ZNSt13__atomic_baseIPN2us13BundleContextEEaSES2_
+   fun:_ZNSt6atomicIPN2us13BundleContextEEaSES2_
+   ...
+}
+
+{
+   <BundleStart-atomic>
+   Helgrind:Race
+   fun:store
+   fun:_ZNSt13__atomic_baseIbEaSEb
+   fun:_ZNSt6atomicIbEaSEb
+   ...
+}
+
+{
+   <Bundle-atomic>
+   Helgrind:Race
+   fun:load
+   fun:_ZNKSt6atomicIPN2us13BundleContextEE4loadESt12memory_order
+   ...
+}
+
+{
+   <ServiceReg-atomic>
+   Helgrind:Race
+   fun:load
+   fun:_ZNKSt6atomicIbEcvbEv
+   fun:_ZNK2us23ServiceRegistrationBase12GetReferenceERKSs
+   ...
+}
+
+{
+   <ServiceReferenceBase-atomic>
+   Helgrind:Race
+   fun:_ZNSt13__atomic_baseIiEmmEv
+   fun:_ZN2us20ServiceReferenceBaseD1Ev
+   ...
+}
+
+{
+   <ServiceReferenceBase-atomic>
+   Helgrind:Race
+   fun:store
+   fun:_ZNSt13__atomic_baseIPN2us27ServiceReferenceBasePrivateEEaSES2_
+   ...
+}
+
+{
+   <ServiceReferenceBase-atomic>
+   Helgrind:Race
+   fun:load
+   fun:_ZNKSt6atomicIPN2us27ServiceReferenceBasePrivateEE4loadESt12memory_order
+   ...
+}
+
+{
+   <ServiceReferenceBase-atomic>
+   Helgrind:Race
+   fun:_ZNSt13__atomic_baseIiEppEv
+   fun:_ZN2us20ServiceReferenceBaseaSERKS0_
+   ...
+}
+
+{
+   <_us_create_activator>
+   Helgrind:Race
+   fun:load
+   fun:_ZNKSt6atomicIbE4loadESt12memory_order
+   ...
+}
+
+
+{
+   <future>
+   Helgrind:Race
+   fun:_ZNKSt10unique_ptrINSt13__future_base12_Result_baseENS1_8_DeleterEE3getEv
+   fun:_ZNKSt10unique_ptrINSt13__future_base12_Result_baseENS1_8_DeleterEEdeEv
+   fun:_ZNSt13__future_base13_State_baseV24waitEv
+   fun:_ZNKSt14__basic_futureIvE4waitEv
+   ...
+}
+
+{
+   <shared_ptr>
+   Helgrind:Race
+   fun:_ZNSt14__shared_countILN9__gnu_cxx12_Lock_policyE2EED1Ev
+   fun:_ZNSt12__shared_ptrINSt6thread10_Impl_baseELN9__gnu_cxx12_Lock_policyE2EED1Ev
+   fun:_ZNSt10shared_ptrINSt6thread10_Impl_baseEED1Ev
+   ...
+}
+
+{
+   <thread_impl>
+   Helgrind:Race
+   fun:_ZNSt6thread5_ImplISt12_Bind_simple*
+   ...
+}
+
+
+{
+   <thread_impl>
+   Helgrind:Race
+   fun:_ZNSt6thread5_ImplISt12_Bind_result*
+   ...
+}
+
+{
+   <thread_impl>
+   Helgrind:Race
+   fun:memset
+   fun:pthread_create*
+   fun:pthread_create_WRK
+   ...
+}
+
+
+{
+   <condition_variable-notifyall>
+   Helgrind:Misc
+   obj:/usr/*/valgrind/vgpreload_helgrind*
+   fun:pthread_cond_broadcast*
+   ...
+}
+
+
+{
+   <miniz-uninitialized_values>
+   Memcheck:Cond
+   fun:tdefl_find_match
+   fun:tdefl_compress_normal
+   fun:tdefl_compress
+   fun:tdefl_compress_buffer
+   fun:mz_zip_writer_add_mem_ex
+   fun:mz_zip_writer_add_mem
+   ...
+   fun:main
+}
+
+
+{
+   <miniz-uninitialized_values>
+   Memcheck:Cond
+   fun:tdefl_compress
+   ...
+   fun:mz_zip_writer_add_mem_ex
+   fun:mz_zip_writer_add_mem
+   ...
+   fun:main
+}
+
+
+{
+   <miniz-uninitialized_values>
+   Memcheck:Cond
+   fun:tdefl_compress_normal
+   ...
+   fun:mz_zip_writer_add_mem
+   ...
+   fun:main
+}

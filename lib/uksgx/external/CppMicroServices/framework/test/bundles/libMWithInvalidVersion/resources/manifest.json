@@ -1,0 +1,6 @@
+{
+  "bundle.symbolic_name": "TestBundleMWithInvalidVersion",
+  "bundle.description": "A test bundle containing an invalid bundle.version value.",
+  "bundle.version": "0.0.1.-??0??",
+  "bundle.activator" : true
+}

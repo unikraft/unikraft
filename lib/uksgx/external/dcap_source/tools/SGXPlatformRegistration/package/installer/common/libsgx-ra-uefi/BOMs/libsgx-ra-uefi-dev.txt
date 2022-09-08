@@ -1,0 +1,4 @@
+DeliveryName	InstallName	FileCheckSum	FileFeature	FileOwner
+<deliverydir>/include/MPUefi.h	<installdir>/include/MPUefi.h	0	main	STP
+<deliverydir>/include/MultiPackageDefs.h	<installdir>/include/MultiPackageDefs.h	0	main	STP
+<deliverydir>/include/c_wrapper/mp_uefi.h	<installdir>/include/mp_uefi.h	0	main	STP

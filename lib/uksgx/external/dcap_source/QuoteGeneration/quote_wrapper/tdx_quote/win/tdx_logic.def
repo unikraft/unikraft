@@ -1,0 +1,9 @@
+LIBRARY	"sgx_tdx_logic"
+
+EXPORTS
+    td_set_enclave_load_policy        @1
+    td_set_qe_path                    @2
+    td_set_qpl_path                   @3
+    td_init_quote                     @4
+    td_get_quote_size                 @5
+    td_get_quote                      @6

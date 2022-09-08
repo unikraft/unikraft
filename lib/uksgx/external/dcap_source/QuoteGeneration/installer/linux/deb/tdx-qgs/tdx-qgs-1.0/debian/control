@@ -1,0 +1,12 @@
+Source: tdx-qgs
+Section: utils
+Priority: optional
+Maintainer: <xiangquan.liu@intel.com>
+Build-Depends: debhelper (>= 8.0.0)
+Standards-Version: 3.9.4
+Homepage: https://github.com/intel/SGXDataCenterAttestationPrimitives
+
+Package: tdx-qgs
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}, libsgx-tdx-logic(>= @dep_version@)
+Description: Intel(R) TD Quoting Generation Service

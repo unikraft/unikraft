@@ -1,0 +1,109 @@
+;/*
+;   Copyright(C) 2011-2020 Intel Corporation All Rights Reserved.
+;
+;   The source code, information  and  material ("Material") contained herein is
+;   owned  by Intel Corporation or its suppliers or licensors, and title to such
+;   Material remains  with Intel Corporation  or its suppliers or licensors. The
+;   Material  contains proprietary information  of  Intel or  its  suppliers and
+;   licensors. The  Material is protected by worldwide copyright laws and treaty
+;   provisions. No  part  of  the  Material  may  be  used,  copied, reproduced,
+;   modified, published, uploaded, posted, transmitted, distributed or disclosed
+;   in any way  without Intel's  prior  express written  permission. No  license
+;   under  any patent, copyright  or  other intellectual property rights  in the
+;   Material  is  granted  to  or  conferred  upon  you,  either  expressly,  by
+;   implication, inducement,  estoppel or  otherwise.  Any  license  under  such
+;   intellectual  property  rights must  be express  and  approved  by  Intel in
+;   writing.
+;
+;   *Third Party trademarks are the property of their respective owners.
+;
+;   Unless otherwise  agreed  by Intel  in writing, you may not remove  or alter
+;   this  notice or  any other notice embedded  in Materials by Intel or Intel's
+;   suppliers or licensors in any way.
+;
+;*/
+[Version]
+Signature   = "$Windows NT$"
+Provider    = %INTC%
+DriverVer   = 01/07/2019,1.0.0.1
+CatalogFile = sgx_mpa.cat
+Class       = SoftwareComponent
+ClassGuid   = {5c4c3332-344d-483c-8739-259e934c9cc8}
+
+;;;;;;;;;;;;;;;;;;https://docs.microsoft.com/en-us/windows-hardware/drivers/install/using-dirids
+; 10 is %SystemRoot%
+; 11 is %SystemRoot%\system32
+; 12 is %SystemRoot%\system32\drivers
+; 13 is FileRepository 
+[DestinationDirs]
+mpa.bin = 13
+mpa.dll = 11
+
+[SourceDisksNames]
+1 = %DiskId1%,,,
+
+[SourceDisksFiles]
+events.dll = 1,
+license.txt = 1,
+mpa.exe = 1,
+mpa_manage.exe = 1,
+mp_uefi.dll = 1,
+mp_network.dll = 1,
+sgx_capable.dll = 1,
+
+
+[Manufacturer]
+%StdMfg%=Standard,NTamd64.6.1
+
+
+[Standard.NTamd64.6.1]
+"Intel(R) Software Guard Extensions Software Multi-Package Registration Agent" = SGX_MPA, SWC\VEN_INT&DEV_0E0C_MPR
+
+
+[SGX_MPA.NT]
+CopyFiles = mpa.bin, mpa.dll
+AddReg = mpa_service_reg
+
+ 
+[mpa_service_reg]
+HKLM,SYSTEM\CurrentControlSet\Services\EventLog\Application\IntelMPAService,EventMessageFile,,"%13%\events.dll"
+HKLM,SYSTEM\CurrentControlSet\Services\EventLog\Application\IntelMPAService,TypesSupported,0x00010001,7
+
+                                                                           
+[mpa.bin]
+events.dll
+license.txt
+mpa.exe
+mpa_manage.exe
+sgx_capable.dll
+
+[mpa.dll]
+mp_uefi.dll
+mp_network.dll
+
+[SGX_MPA.NT.Services]
+AddService = IntelMPAService,%SPSVCSINST_STARTSERVICE%, mpa_service_install
+AddService = ,%SPSVCINST_ASSOCSERVICE%
+
+; -------------- 
+[mpa_service_configuration_reg]
+HKR,,Description,,"Intel(R) SGX Multi-Package Attestation Registration Service"
+HKR,,DependOnService,0x00010000,"Tcpip"
+HKR,,DelayedAutostart,0x00010001,1
+
+[mpa_service_install]
+ServiceName    = IntelMPAService
+DisplayName    = "Intel(R) SGX Multi-Package Registration Service"
+ServiceType    = 0x00000010      ; SERVICE_WIN32_OWN_PROCESS
+StartType      = 2               ; SERVICE_AUTO_START 
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %13%\mpa.exe
+AddReg         = mpa_service_configuration_reg
+
+[Strings]
+SPSVCINST_ASSOCSERVICE= 0x00000002
+SPSVCSINST_STARTSERVICE= 0x00000800
+INTC = "Intel Corporation"
+StdMfg = "Intel Corporation"
+DiskId1 = "Intel(R) Software Guard Extensions Tools Install Disk"
+REG_EXPAND_SZ = 0x00020000

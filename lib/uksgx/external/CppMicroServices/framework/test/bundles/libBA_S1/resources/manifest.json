@@ -1,0 +1,4 @@
+{
+  "bundle.symbolic_name" : "TestBundleBA_S1",
+  "bundle.activator" : "cppmicroservices::TestBundleAActivator"
+}

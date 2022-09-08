@@ -1,0 +1,9 @@
+libsgx-dcap-ql (1.0-1) unstable; urgency=low
+
+  * 1.0 Gold release
+  * Provide the Quote Verification Library and sample project. Please note this library is only provided in source code in the Intel® SGX DCAP project repo
+  * Provide the Quote Generation Library and sample project
+  * Provide the sample project for Platform Provider Library
+  * Separate the Quote Verification Library into a standalone installer
+
+ -- Xiangquan Liu <xiangquan.liu@intel.com>  Thu, 10 Oct 2019 15:19:41 +0800

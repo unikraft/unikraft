@@ -1,0 +1,4 @@
+{
+  "bundle.symbolic_name" : "eventlistener",
+  "bundle.activator" : true
+}

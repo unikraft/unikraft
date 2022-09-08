@@ -1,0 +1,6 @@
+AE_QVE_VERSION="1.0"
+TARBALL_NAME=libsgx-ae-qve_1.0.orig.tar.gz
+
+AE_QVE_PACKAGE_NAME=libsgx-ae-qve
+
+LIB_DIR=lib

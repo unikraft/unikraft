@@ -1,0 +1,160 @@
+===============================================================================
+                        Multi-Package Registration Agent
+===============================================================================
+
+The SGX Multi-Package Registration Agent is a software layer between the BIOS 
+and the SGX Registration Server which manages the SGX multi-package 
+registration flows. SGX Multi-Package Registration Agent is responsible 
+to deliver requests from BIOS to the SGX Registration Server.
+
+Platform registration requests are triggered via UEFI variables and delivered
+to registration server by the agent over a TLS connection.
+
+Any pending registration request is handled by the agent upon OS boot, if there
+is no pending request the agent stops till next OS boot.
+
+Linux:
+
+    Package ingredients:
+        For Ubuntu:
+          libsgx-ra-network_{version}-{revision}_{arch}.deb--------network library
+          libsgx-ra-network-dev_{version}-{revision}_{arch}.deb----network library headers
+          libsgx-ra-uefi_{version}-{revision}_{arch}.deb-----------uefi library
+          libsgx-ra-uefi-dev_{version}-{revision}_{arch}.deb-------uefi library headers
+          sgx-ra-service_{version}-{revision}_{arch}.deb-----------multi-package registration agent service and management tool
+        For Redhat:
+          libsgx-ra-network-<version>-1.el8.x86_64.rpm-------------network library
+          libsgx-ra-network-devel-<version>-1.el8.x86_64.rpm-------network library headers
+          libsgx-ra-uefi-<version>-1.el8.x86_64.rpm----------------uefi library
+          libsgx-ra-uefi-devel-<version>-1.el8.x86_64.rpm----------uefi library headers
+          sgx-ra-service-<version>-1.el8.x86_64.rpm----------------multi-package registration agent service and management tool
+        
+        mpa_registration.conf - Sample configuration file
+        README - This file
+
+    Installation path:
+        /opt/intel/sgx-ra-service
+
+    RHEL Installation instructions:
+        sudo yum install libsgx-ra-network-<version>-1.el8.x86_64.rpm
+        sudo yum install libsgx-ra-uefi-<version>-1.el8.x86_64.rpm
+        sudo yum install sgx-ra-service-<version>-1.el8.x86_64.rpm
+
+    RHEL Uninstallation instructions:
+        sudo yum remove sgx-ra-service.x86_64
+        sudo yum remove libsgx-ra-network.x86_64
+        sudo yum remove libsgx-ra-uefi.x86_64
+
+    Ubuntu Installation instructions:
+        sudo dpkg -i libsgx-ra-network_{version}-{revision}_{arch}.deb
+        sudo dpkg -i libsgx-ra-uefi_{version}-{revision}_{arch}.deb
+        sudo dpkg -i sgx-ra-service_{version}-{revision}_{arch}.deb
+
+    Ubuntu Uninstallation instructions:
+        sudo dpkg -r sgx-ra-service
+        sudo dpkg -r libsgx-ra-network
+        sudo dpkg -r libsgx-ra-uefi
+
+    Log file:
+        /var/log/mpa_registration.log
+        
+    The agent supports an optional configuration file, located in:
+        /etc/mpa_registration.conf 
+        
+    Restart service instructions:
+        sudo systemctl restart mpa_registration_tool.service
+    
+Windows:
+
+    Package ingredients:
+        sgx_mpa\  - SGX Registration Agent INF installation package
+
+    Installation instructions:
+        Navigate to "Device Manager"->"Software Components"->"Intel(R) Software Guard Extensions Software Multi-Package Registration"
+
+        Install SGX Registration Agent driver:
+          * Navigate to "Device Manager"->"Software Components"->"Intel(R) Software Guard Extensions Software Multi-Package Registration"
+          * Right click on "Intel(R) Software Guard Extensions Software Multi-Package Registration"
+          * Choose "Update driver"
+          * On the "Update drivers" windows choose "Browse my computer for driver software".
+          * Navigate to "sgx_mpa" directory in the installation package.
+          * Click next and approve all dialogs during installation.
+          * Once installation is finished, the agent is fully installed on your system.
+        
+    Logs:
+        Event Viewer -> Windows Logs -> Application -> Source:"IntelMPAService"
+
+    Restart service instructions:
+        Navigate to "Services" and look for "Intel(R) SGX Multi-Package Registration Service", restart using service properties.
+
+Linux optional configuration file:
+    
+    Subscription key setting:
+        To set the subscription key, add the following line:
+            subscription key = <64byte-hex-value>
+        e.g:
+            subscription key = 7a963d696ff94b7d82df4cbe924b1574
+    
+    Proxy settings:
+        To set direct access to the Internet without any proxy configuration:
+            proxy type = direct
+        To set default proxy configuration, as configured in your operation system
+         environment (HTTPS_PROXY):
+            proxy type = default
+        To set manual proxy setting, which also supports authenticated proxy 
+         configuration:
+            proxy type = manual
+            proxy url = proxy-chain.intel.com:912
+        The format of url is standard: 
+            user:password@proxy:port
+
+    UEFI path (linux only):
+        To set uefi path (default path = /sys/firmware/efi/efivars/):
+            uefi path = /home/user/uefi/
+            
+    Log level:
+        To set logging level:
+            Verbose level, general logs, errors and verbose:
+                log level = info
+            Default, general logs and errors:
+                log level = error
+            Functional, general logs:
+                log level = func
+            No logs:
+                log level = none
+                
+Windows optional configuration:
+
+ The agent supports an optional configurations using some registry keys:
+
+    Subscription key setting: HKEY_LOCAL_MACHINE\SOFTWARE\Intel\SGX_RA\RASubscriptionKey
+  
+        To set the subscription key, add the following String key name "token":
+            <64byte-hex-value>
+        e.g:
+            7a963d696ff94b7d82df4cbe924b1574
+
+    Proxy settings: HKEY_LOCAL_MACHINE\SOFTWARE\Intel\SGX_RA\RAProxy
+  
+        To set default proxy configuration, as configured in your operation system, add the following DWORD key name "type":
+            "0"
+        To set direct access to the Internet without any proxy configuration, add the following DWORD key name "type":
+            "1"
+        To set manual proxy setting, which also supports authenticated proxy configuration, add the following DWORD key name "type":
+            "2"
+        To set the specific proxy URL, add the following String key "url":
+            e.g: "proxy-chain.intel.com:912"
+        The format of url is standard: 
+            user:password@proxy:port
+            
+    Log level settings: HKEY_LOCAL_MACHINE\SOFTWARE\Intel\SGX_RA\RALog
+
+        To set logging level, add the following DWORD key "level":
+            No logs:
+                "0"
+            Functional, general logs:
+                "1"
+            Default, general logs and errors:
+                "2"
+            Verbose, general logs, errors and verbose:
+                "3"

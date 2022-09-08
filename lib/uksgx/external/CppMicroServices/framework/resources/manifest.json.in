@@ -1,0 +1,5 @@
+{
+  "bundle.symbolic_name" : "system_bundle",
+  "bundle.name" : "System Bundle",
+  "bundle.version" : "@CppMicroServices_VERSION@"
+}

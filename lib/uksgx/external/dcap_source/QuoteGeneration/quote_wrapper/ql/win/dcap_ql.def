@@ -1,0 +1,8 @@
+LIBRARY	"sgx_dcap_ql"
+
+EXPORTS
+    sgx_qe_set_enclave_load_policy    @1
+    sgx_qe_get_target_info            @2
+    sgx_qe_get_quote_size             @3
+    sgx_qe_get_quote                  @4
+    sgx_qe_cleanup_by_policy          @5

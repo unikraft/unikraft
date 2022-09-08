@@ -1,0 +1,2 @@
+DeliveryName	InstallName	FileCheckSum	FileFeature	FileOwner
+<deliverydir>/psw/ae/data/prebuilt/libsgx_id_enclave.signed.so	<installdir>/lib/libsgx_id_enclave.signed.so	0	main	STP

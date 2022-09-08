@@ -1,0 +1,47 @@
+# pylint:disable=I0011,W0401,W0614,C0103,E0602
+############################################################################
+# Copyright 2017 Intel Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+############################################################################
+"""Build configuration for unit test of tiny math library.
+"""
+Import('*')
+env.PartName('utest')
+
+env.DependsOn([Component('gtest'),
+               Component(env.subst('${PART_PARENT_NAME}'))])
+
+utest_files = Pattern(src_dir='.',
+                      includes=['*-test.cc',
+                                '*-testhelper.cc'],
+                      recursive=True).files()
+
+env.Append(CPPPATH='#')
+
+env['UNIT_TEST_TARGET_NAME'] = "${PART_PARENT_NAME}-${UNIT_TEST_TARGET}"
+
+utest = env.UnitTest('${PART_SHORT_NAME}',
+                     utest_files,
+                     command_args=[
+                         '--gtest_filter=**',
+                         '--gtest_color=yes',
+                         '--gtest_print_time=1',
+                         '--gtest_output=xml',
+                         #'--gtest_break_on_failure',
+                         #'--gtest_catch_exceptions=0',
+                     ],
+                     data_src=[],
+                     make_pdb=(env.isConfigBasedOn('debug')),
+                     INSTALL_BIN='${INSTALL_TEST_BIN}',
+                    )

@@ -1,0 +1,8 @@
+DCAP_QPL_VERSION="1.0"
+TARBALL_NAME=libsgx-dcap-default-qpl_1.0.orig.tar.gz
+
+DCAP_QPL_PACKAGE_NAME=libsgx-dcap-default-qpl
+DCAP_QPL_DEV_PACKAGE_NAME=libsgx-dcap-default-qpl-dev
+
+LIB_DIR=lib
+ETC_DIR=etc

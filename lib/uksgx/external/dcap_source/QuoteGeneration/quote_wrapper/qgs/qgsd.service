@@ -1,0 +1,27 @@
+[Unit]
+Description=Intel(R) TD Quoting Generation Service 
+After=syslog.target network.target auditd.service
+After=remount-dev-exec.service
+Wants=remount-dev-exec.service
+
+[Service]
+User=qgsd
+Type=forking
+Environment=NAME=qgsd
+Environment=LD_LIBRARY_PATH=@qgs_folder@
+WorkingDirectory=@qgs_folder@
+PermissionsStartOnly=true
+ExecStart=@qgs_folder@/qgs
+ExecStartPre=@qgs_folder@/linksgx.sh
+InaccessibleDirectories=/home
+ExecReload=/bin/kill -SIGHUP $MAINPID
+Restart=on-failure
+RestartSec=15s
+DevicePolicy=closed
+DeviceAllow=/dev/sgx rw
+DeviceAllow=/dev/sgx/enclave rw
+DeviceAllow=/dev/sgx/provision rw
+DeviceAllow=/dev/sgx_enclave rw
+DeviceAllow=/dev/sgx_provision rw
+[Install]
+WantedBy=multi-user.target

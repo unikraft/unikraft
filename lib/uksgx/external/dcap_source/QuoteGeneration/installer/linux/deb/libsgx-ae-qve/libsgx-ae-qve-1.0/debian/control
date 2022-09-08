@@ -1,0 +1,11 @@
+Source: libsgx-ae-qve
+Section: libs
+Priority: optional
+Maintainer: <xiangquan.liu@intel.com>
+Build-Depends: debhelper (>= 8.0.0)
+Standards-Version: 3.9.4
+Homepage: https://github.com/intel/SGXDataCenterAttestationPrimitives
+
+Package: libsgx-ae-qve
+Architecture: amd64
+Description: Intel(R) Software Guard Extensions QVE

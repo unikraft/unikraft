@@ -1,0 +1,19 @@
+Source: libsgx-dcap-quote-verify
+Section: libs
+Priority: optional
+Maintainer: <hongyan.jiang@intel.com>
+Build-Depends: debhelper (>= 8.0.0)
+Standards-Version: 3.9.4
+Homepage: https://github.com/intel/SGXDataCenterAttestationPrimitives
+
+Package: libsgx-dcap-quote-verify
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends}
+Recommends: libsgx-ae-qve (>= @dep_version@), libsgx-urts (>= @dep_version@)
+Description: Intel(R) Software Guard Extensions Data Center Attestation Primitives
+
+Package: libsgx-dcap-quote-verify-dev
+Section: devel
+Architecture: amd64
+Depends: libsgx-dcap-quote-verify (= @dep_version@), libsgx-headers (>= 2.17)
+Description: Intel(R) Software Guard Extensions Data Center Attestation Primitives For Developers

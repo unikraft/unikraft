@@ -1,0 +1,98 @@
+# pylint:disable=I0011,W0401,W0614,C0103,E0602
+############################################################################
+# Copyright 2017 Intel Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+############################################################################
+"""Build configuration for tiny member library.
+"""
+Import('*')
+env.PartName('member')
+
+default_build_mode = 'static'
+
+include_files = Pattern(src_dir='.', includes=['*.h'], recursive=False).files()
+
+src_files = Pattern(
+    src_dir='tiny/src', includes=['*.c'], recursive=False).files()
+
+install_files = Pattern(
+    src_dir='tiny',
+    includes=[
+        '*.h', '*.c', '*-test.cc', '*-testhelper.cc', '*-testhelper.h',
+        '*.parts', 'Makefile'
+    ],
+    excludes=['*/platform_specific*/'],
+    recursive=True)
+
+if 'install_package' in env['MODE']:
+    env.InstallTopLevel(install_files, sub_dir='epid/member/tiny')
+
+else:
+    env.Part(parts_file='tiny/stdlib/tiny_stdlib.parts')
+    env.Part(parts_file='tiny/math/math.parts')
+    env.DependsOn([
+        Component('tinycommon', requires=REQ.HEADERS),
+        Component('member.tiny_stdlib'), Component('member.math')
+    ])
+
+    env.Append(CPPPATH='#')
+
+    if 'use-sigrl-by-reference' in env['MODE']:
+        env.Append(CPPDEFINES=['USE_SIGRL_BY_REFERENCE'])
+    else:
+        max_sigrl_entries = ARGUMENTS.get('MAX_SIGRL_ENTRIES', 0)
+        n2_max = int(max_sigrl_entries)
+        if n2_max:
+            env.Append(CPPDEFINES=['MAX_SIGRL_ENTRIES={0}'.format(n2_max)])
+
+    if 'static' in env['MODE'] and 'shared' in env['MODE']:
+        PrintError("both shared and static build mode specified for '{}'. "
+                   .format(env.subst('$PART_SHORT_NAME')))
+    if 'static' not in env['MODE'] and 'shared' not in env['MODE']:
+        PrintMessage(
+            "build mode not specified for '{}'. Defaulting to '{}'"
+            .format(env.subst('$PART_SHORT_NAME'), default_build_mode))
+        env['MODE'].append(default_build_mode)
+
+    if 'shared' in env['MODE']:
+        env.Append(CPPDEFINES=['SHARED'])
+        env.ExportCPPDEFINES(['SHARED'])
+        outputs = env.SharedLibrary('${PART_SHORT_NAME}', src_files)
+    elif 'static' in env['MODE']:
+        outputs = env.Library('${PART_SHORT_NAME}', src_files)
+    else:
+        print env.subst('$PART_SHORT_NAME')
+        PrintError("build mode not specified for '{}'. {}".format(
+            env.subst('$PART_SHORT_NAME'),
+            "Specify either 'shared' or 'static'."))
+
+    sdk_outs = env.Sdk(outputs)
+    env.SdkInclude(include_files, sub_dir='epid/${PART_SHORT_NAME}')
+
+    if 'shared' in env['MODE']:
+        env.InstallTarget(outputs)
+
+    if 'install_lib' in env['MODE']:
+        env.InstallInclude(include_files, sub_dir='epid/${PART_SHORT_NAME}')
+        if 'static' in env['MODE']:
+            env.InstallLib(outputs)
+
+    is_utest_build = False
+    for i in BUILD_TARGETS:
+        if "utest::" in str(i):
+            is_utest_build = True
+    if is_utest_build:
+        env.Part(
+            parts_file='tiny/unittests/utest.parts',
+            CONFIG=DefaultEnvironment().subst('$CONFIG'))

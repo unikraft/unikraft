@@ -1,0 +1,4 @@
+GetBundleContext
+----------------
+
+.. doxygenfunction:: cppmicroservices::GetBundleContext

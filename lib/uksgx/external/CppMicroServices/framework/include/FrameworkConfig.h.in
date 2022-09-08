@@ -1,0 +1,28 @@
+/*
+  FrameworkConfig.h
+  This file is generated. Do not change!
+*/
+
+#ifndef CPPMICROSERVICES_FRAMEWORKCONFIG_H
+#define CPPMICROSERVICES_FRAMEWORKCONFIG_H
+
+#include "cppmicroservices/FrameworkExport.h"
+
+///-------------------------------------------------------------------
+// Version information
+//-------------------------------------------------------------------
+
+#define US_FRAMEWORK_VERSION_MAJOR @Framework_VERSION_MAJOR@
+#define US_FRAMEWORK_VERSION_MINOR @Framework_VERSION_MINOR@
+#define US_FRAMEWORK_VERSION_PATCH @Framework_VERSION_PATCH@
+#define US_FRAMEWORK_VERSION @Framework_VERSION@
+#define US_FRAMEWORK_VERSION_STR "@Framework_VERSION@"
+
+
+///-------------------------------------------------------------------
+// Macros used by the unit tests
+//-------------------------------------------------------------------
+
+#define US_FRAMEWORK_SOURCE_DIR "@PROJECT_SOURCE_DIR@"
+
+#endif // CPPMICROSERVICES_FRAMEWORKCONFIG_H

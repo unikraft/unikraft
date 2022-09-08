@@ -1,0 +1,41 @@
+From 2e183ac7a9ee7405d8ba8433e930f7fb8057c176 Mon Sep 17 00:00:00 2001
+From: Zhang Lili <lili.z.zhang@intel.com>
+Date: Wed, 4 Aug 2021 16:29:26 +0800
+Subject: [PATCH] IPP crypto for SGX.
+
+Signed-off-by: Zhang Lili <lili.z.zhang@intel.com>
+---
+ CMakeLists.txt                     | 3 +++
+ sources/cmake/linux/GNU8.2.0.cmake | 2 +-
+ 2 files changed, 4 insertions(+), 1 deletion(-)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index f750c7b..1bf6305 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -20,6 +20,9 @@
+ 
+ cmake_minimum_required(VERSION 3.12)
+ 
++set(SGX_PROGRAM_SEARCH_PATH)
++LIST(APPEND CMAKE_PROGRAM_PATH  "/usr/local/bin/"  ${SGX_PROGRAM_SEARCH_PATH} ...)
++
+ include("${CMAKE_CURRENT_SOURCE_DIR}/sources/cmake/ippcp-utils.cmake")
+ ippcp_getlibversion("${CMAKE_CURRENT_SOURCE_DIR}/include/ippversion.h")
+ if ((NOT DEFINED IPPCP_VERSION_MAJOR) OR
+diff --git a/sources/cmake/linux/GNU8.2.0.cmake b/sources/cmake/linux/GNU8.2.0.cmake
+index 24d7e0f..a8be309 100644
+--- a/sources/cmake/linux/GNU8.2.0.cmake
++++ b/sources/cmake/linux/GNU8.2.0.cmake
+@@ -96,7 +96,7 @@ if(${ARCH} MATCHES "ia32")
+ endif(${ARCH} MATCHES "ia32")
+ 
+ # Optimization level = 3, no-debug definition (turns off asserts), warnings=errors
+-set (CMAKE_C_FLAGS_RELEASE " -O3 -DNDEBUG -Werror")
++set (CMAKE_C_FLAGS_RELEASE " -O3 -DNDEBUG ")
+ 
+ set(w7_opt "${w7_opt} -march=pentium4 -msse2")
+ set(s8_opt "${s8_opt} -march=core2 -mssse3")
+-- 
+2.35.1
+

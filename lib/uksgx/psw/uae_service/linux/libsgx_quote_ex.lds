@@ -1,0 +1,11 @@
+{
+global:
+    sgx_select_att_key_id;
+    sgx_init_quote_ex;
+    sgx_get_quote_size_ex;
+    sgx_get_quote_ex;
+	sgx_get_supported_att_key_id_num;
+	sgx_get_supported_att_key_ids;
+local:
+    *;
+};

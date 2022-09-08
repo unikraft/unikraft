@@ -1,0 +1,19 @@
+LIBRARY	"sgx_default_qcnl_wrapper"
+
+EXPORTS
+    sgx_qcnl_get_pck_cert_chain       @1
+    sgx_qcnl_free_pck_cert_chain      @2
+    sgx_qcnl_get_pck_crl_chain        @3
+    sgx_qcnl_free_pck_crl_chain       @4
+    sgx_qcnl_get_tcbinfo              @5
+    sgx_qcnl_free_tcbinfo             @6
+    sgx_qcnl_get_qe_identity          @7
+    sgx_qcnl_free_qe_identity         @8
+    sgx_qcnl_get_qve_identity         @9
+    sgx_qcnl_free_qve_identity        @10
+    sgx_qcnl_get_root_ca_crl          @11
+    sgx_qcnl_free_root_ca_crl         @12
+    sgx_qcnl_get_api_version          @13
+    sgx_qcnl_set_logging_callback     @14
+    tdx_qcnl_get_tcbinfo              @15
+    tdx_qcnl_free_tcbinfo             @16

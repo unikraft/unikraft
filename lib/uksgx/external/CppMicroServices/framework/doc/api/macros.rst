@@ -1,0 +1,24 @@
+CPPMICROSERVICES_INITIALIZE_BUNDLE
+----------------------------------
+
+.. doxygendefine:: CPPMICROSERVICES_INITIALIZE_BUNDLE
+
+CPPMICROSERVICES_INITIALIZE_STATIC_BUNDLE
+-----------------------------------------
+
+.. doxygendefine:: CPPMICROSERVICES_INITIALIZE_STATIC_BUNDLE
+
+CPPMICROSERVICES_IMPORT_BUNDLE
+------------------------------
+
+.. doxygendefine:: CPPMICROSERVICES_IMPORT_BUNDLE
+
+CPPMICROSERVICES_EXPORT_BUNDLE_ACTIVATOR
+----------------------------------------
+
+.. doxygendefine:: CPPMICROSERVICES_EXPORT_BUNDLE_ACTIVATOR
+
+CPPMICROSERVICES_DECLARE_SERVICE_INTERFACE
+------------------------------------------
+
+.. doxygendefine:: CPPMICROSERVICES_DECLARE_SERVICE_INTERFACE

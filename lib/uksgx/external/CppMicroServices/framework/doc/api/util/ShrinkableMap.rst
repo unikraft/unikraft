@@ -1,0 +1,4 @@
+ShrinkableMap
+-------------
+
+.. doxygenclass:: cppmicroservices::ShrinkableMap

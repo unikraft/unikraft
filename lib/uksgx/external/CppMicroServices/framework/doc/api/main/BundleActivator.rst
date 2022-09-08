@@ -1,0 +1,4 @@
+BundleActivator
+---------------
+
+.. doxygenstruct:: cppmicroservices::BundleActivator

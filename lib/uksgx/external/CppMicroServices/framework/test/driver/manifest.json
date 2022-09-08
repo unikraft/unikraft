@@ -1,0 +1,5 @@
+{
+  "bundle.symbolic_name" : "main",
+  "bundle.version" : "0.1.0",
+  "bundle.activator" : true
+}

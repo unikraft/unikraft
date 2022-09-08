@@ -1,0 +1,6 @@
+{
+  "bundle.symbolic_name": "",
+  "bundle.description": "A test bundle containing an empty bundle.symbolic_name value.",
+  "bundle.version": "1.0",
+  "bundle.activator" : true
+}

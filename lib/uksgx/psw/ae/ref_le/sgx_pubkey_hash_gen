@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+#
+# Copyright (C) 2011-2021 Intel Corporation. All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+#   * Redistributions of source code must retain the above copyright
+#     notice, this list of conditions and the following disclaimer.
+#   * Redistributions in binary form must reproduce the above copyright
+#     notice, this list of conditions and the following disclaimer in
+#     the documentation and/or other materials provided with the
+#     distribution.
+#   * Neither the name of Intel Corporation nor the names of its
+#     contributors may be used to endorse or promote products derived
+#     from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+# A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+# LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+# DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+# THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+# (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+# OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+#
+
+if test $# -eq 1 && test -f $1; then
+	(openssl version) >/dev/null 2>&1 || (echo "Error: openssl not found." && exit 1)
+	(xxd -v) >/dev/null 2>&1 || (echo "Error: xxd not found." && exit 1)
+	(perl -v) >/dev/null 2>&1 || (echo "Error: perl not found." && exit 1)
+
+	PUBKEY=$(openssl rsa -pubin -in $1 -modulus -noout)
+	test $? -ne 0 && echo "Error: Invalid public key file." && exit 1
+	echo $PUBKEY | cut -d= -f2 | xxd -r -p | perl -0777 -F -ape '$_=reverse@F' | openssl sha256 -binary | perl -0777 -F -ape '$_=reverse@F' | xxd -g8 -c8 -u | awk '{print $2}' | tac
+else
+	echo "Usage: $0 [PUBLIC_KEY_FILE]"
+	echo ""
+	echo "Generate SHA256 value of the enclave signer public key modulus to be written to the IA32_SGXPUBKEYHASH0..3 MSRs in order from hash0 to hash3."
+fi

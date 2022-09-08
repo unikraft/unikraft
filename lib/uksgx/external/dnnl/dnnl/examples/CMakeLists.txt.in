@@ -1,0 +1,124 @@
+#===============================================================================
+# Copyright 2019 Intel Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+#===============================================================================
+
+cmake_minimum_required(VERSION 2.8.11)
+project (DNNL_EXAMPLES)
+
+set(DNNL_CPU_RUNTIME "@DNNL_CPU_RUNTIME@")
+set(DNNL_GPU_RUNTIME "@DNNL_GPU_RUNTIME@")
+
+if(POLICY CMP0015)
+    cmake_policy(SET CMP0015 NEW)
+endif()
+
+set(DNNLROOT "${PROJECT_SOURCE_DIR}/.." CACHE STRING "")
+
+enable_testing()
+
+if(UNIX OR MINGW)
+    set(LIBM m)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -std=c99")
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=c++11")
+    if(NOT APPLE)
+        set(CMAKE_EXE_LINKER_FLAGS "-Wl,--as-needed")
+    endif()
+endif()
+
+if(WIN32 AND ${CMAKE_CXX_COMPILER_ID} STREQUAL MSVC)
+    add_definitions(/Qpar)
+    add_definitions(/openmp)
+else()
+    find_package(OpenMP)
+    #newer version for findOpenMP (>= v. 3.9)
+    if(CMAKE_VERSION VERSION_LESS "3.9" AND OPENMP_FOUND)
+        if(${CMAKE_MAJOR_VERSION} VERSION_LESS "3" AND
+                ${CMAKE_CXX_COMPILER_ID} STREQUAL "Intel")
+            # Override FindOpenMP flags for Intel Compiler (otherwise deprecated)
+            set(OpenMP_CXX_FLAGS "-fopenmp")
+            set(OpenMP_C_FLAGS "-fopenmp")
+        endif()
+        set(OpenMP_C_FOUND true)
+        set(OpenMP_CXX_FOUND true)
+    endif()
+    if(OpenMP_C_FOUND)
+        set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} ${OpenMP_C_FLAGS}")
+    endif()
+    if(OpenMP_CXX_FOUND)
+        set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+    endif()
+endif()
+
+if(WIN32)
+    set(CTESTCONFIG_PATH "${DNNLROOT}\\bin")
+elseif(APPLE)
+    set(CTESTCONFIG_PATH "${DNNLROOT}/lib")
+endif()
+
+# Common configuration for tests / test cases on Windows and Apple
+function(maybe_configure_test name kind)
+    if(WIN32)
+        string(REPLACE  ";" "\;" PATH "${CTESTCONFIG_PATH};$ENV{PATH}")
+        set_property(${kind} ${name} PROPERTY ENVIRONMENT "PATH=${PATH}")
+        if(CMAKE_GENERATOR MATCHES "Visual Studio")
+            configure_file(template.vcxproj.user ${name}.vcxproj.user @ONLY)
+        endif()
+    elseif(APPLE)
+        set_property(${kind} ${name} PROPERTY ENVIRONMENT
+                "DYLD_LIBRARY_PATH=${CTESTCONFIG_PATH}:$ENV{DYLD_LIBRARY_PATH}")
+    endif()
+endfunction()
+
+# Register example
+#   name -- name of the executable
+#   srcs -- list of source, if many must be enclosed with ""
+#   test -- "test" to mark executable as a test, "" otherwise
+function(register_example name srcs test)
+    add_executable(${name} ${srcs})
+    find_package(dnnl @PROJECT_VERSION@ CONFIG REQUIRED HINTS ${DNNLROOT})
+    target_link_libraries(${name} DNNL::dnnl ${LIBM})
+    if("x${test}" STREQUAL "xtest")
+        add_test(${name} ${name})
+        maybe_configure_test("${example_name}" TEST)
+    endif()
+endfunction()
+
+file(GLOB sources *.cpp *.c)
+
+foreach(src ${sources})
+    get_filename_component(src_name ${src} NAME)
+    string(REGEX REPLACE "[_\\.]" "-" example_name ${src_name})
+    if(${example_name} MATCHES "^(cpu)")
+        # Example name contains cpu-
+        register_example(${example_name} ${src} "test" ${LIBM})
+    elseif(${example_name} MATCHES "^(cross-engine|gpu)")
+        # Example Name contains cross-engine or gpu-
+        if (NOT DNNL_GPU_RUNTIME STREQUAL "NONE")
+            register_example(${example_name} ${src} "test" ${LIBM})
+        endif()
+    else()
+        register_example(${example_name} ${src} "" ${LIBM})
+
+        # Adding test for CPU
+        add_test("cpu-${example_name}" "${example_name}" cpu)
+        maybe_configure_test("cpu-${example_name}" TEST)
+        
+        # Adding test for GPU 
+        if (NOT DNNL_GPU_RUNTIME STREQUAL "NONE")
+            add_test("gpu-${example_name}" "${example_name}" gpu)            
+            maybe_configure_test("gpu-${example_name}" TEST)
+        endif()
+    endif()
+endforeach()

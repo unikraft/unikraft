@@ -1,0 +1,14 @@
+Source: sgx-ra-service
+Section: misc
+Priority: optional
+Maintainer: Junli Sun <junli.sun@intel.com>
+Build-Depends: debhelper (>= 8.0.0)
+Standards-Version: 3.9.4
+Homepage: https://github.com/intel/SGXDataCenterAttestationPrimitives
+
+Package: sgx-ra-service
+Architecture: amd64
+Depends: ${shlibs:Depends}, ${misc:Depends},libsgx-ra-uefi (>= @dep_version@),libsgx-ra-network (>= @dep_version@)
+Description: Intel(R) Software Guard Extensions Multi-Package Registration Agent Service
+ Enables SGX Remote attestation for Multi-Package platforms
+

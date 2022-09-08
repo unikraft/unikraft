@@ -1,0 +1,4 @@
+{
+  "bundle.symbolic_name" : "spellcheckservice",
+  "bundle.activator" : true
+}

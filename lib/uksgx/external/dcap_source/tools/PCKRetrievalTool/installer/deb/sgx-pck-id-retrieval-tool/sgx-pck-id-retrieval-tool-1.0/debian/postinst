@@ -1,0 +1,6 @@
+#!/bin/sh
+
+# Exit on error
+set -e
+
+ln -s -f @pkg_path@/PCKIDRetrievalTool /usr/local/bin/PCKIDRetrievalTool

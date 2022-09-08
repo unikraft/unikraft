@@ -1,0 +1,123 @@
+############################################################################
+# Copyright 2017 Intel Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+############################################################################
+import os
+
+Import('*')
+
+env.PartName('tpm2')
+
+include_files = Pattern(src_dir='.',
+                        includes=['*.h'],
+                        recursive=False).files()
+
+install_files = Pattern(src_dir='.',
+                        includes=[
+                            '*.h',
+                            '*.c',
+                            '*-test.cc',
+                            '*-testhelper.cc',
+                            '*.parts'],
+                        recursive=True)
+
+if 'install_package' in env['MODE']:
+    env.InstallTopLevel(install_files,
+                        sub_dir='epid/member/${PART_SHORT_NAME}')
+else:
+    env.DependsOn([
+        Component('common'),
+    ])
+
+    env.Append(CPPPATH='#')
+
+    if 'use_tss' in env['MODE']:
+        src_files = Pattern(src_dir='ibm_tss',
+                            includes=['*.c'],
+                            recursive=False).files()
+        utest_files = Pattern(src_dir='unittests',
+                              includes=['*-test.cc',
+                                        '*-testhelper.cc'],
+                              excludes=['*-simulator-test.cc'],
+                              recursive=False).files()
+        if env['TARGET_ARCH'] == 'x86_64' and env['TARGET_PLATFORM']['OS'] == 'win32':
+            PrintError("--use-tss is not compatiable with x86_64 target. "
+                       "Try an x86 build.")
+        try:
+            TSSROOT = os.environ['TSSROOT']
+        except KeyError, e:
+            env.PrintError("Necessary environment variable not set: ",
+                           e, show_stack=False)
+        env.Append(CPPPATH=TSSROOT)
+        env.Append(LIBPATH=TSSROOT)
+        if 'cl' in env['CC']:
+            env.Append(CCFLAGS=['/wd4201',   # allow nameless struct
+                                '/wd4200',   # allow zero-sized array in struct
+                               ])
+        env.Append(CPPDEFINES=['TPM_TSS'])
+
+    else:
+        src_files = Pattern(src_dir='src',
+                    includes=['*.c'],
+                    recursive=False).files()
+
+        utest_files = Pattern(src_dir='unittests',
+                              includes=['*-test.cc',
+                                        '*-testhelper.cc'],
+                              excludes=['*-tss-test.cc'],
+                              recursive=False).files()
+
+    testenv = env.Clone()
+
+    outputs = env.Library('${PART_NAME}', src_files)
+    env.Sdk(outputs)
+    env.SdkInclude(include_files,
+                   sub_dir='epid/member/${PART_SHORT_NAME}')
+
+    #unit tests
+    testenv['UNIT_TEST_TARGET_NAME'] = "${PART_NAME}-${UNIT_TEST_TARGET}"
+
+    utest = testenv.UnitTest("utest",
+                             utest_files,
+                             command_args=[
+                                 '--gtest_color=yes',
+                                 '--gtest_print_time=1',
+                                 '--gtest_output=xml',
+                                 '--gtest_filter=**',
+                             ],
+                             make_pdb=(env.isConfigBasedOn('debug') or
+                                       env.isConfigBasedOn('static_crt_debug')),
+                             depends=[Component('gtest'),
+                                      Component('common-testhelper'),
+                                      Component('member.tpm2')],
+                             INSTALL_BIN='${INSTALL_TEST_BIN}')
+
+    if 'use_tss' in env['MODE']:
+      if env['TARGET_PLATFORM']['OS'] == 'win32':
+          libpost = env['LIBSUFFIX']
+          shlibpost = env['SHLIBSUFFIX']
+      else:
+          libpost = env['SHLIBSUFFIX']
+          shlibpost = libpost
+
+      tss_libname = env['LIBPREFIX'] + 'tss' + libpost
+      env.SdkLib(os.path.join(TSSROOT, tss_libname))
+
+      if env['TARGET_PLATFORM']['OS'] != 'win32':
+          env.ExportLIBS(['crypto'])
+
+      tss_shlibname = env['SHLIBPREFIX'] + 'tss' + shlibpost
+      runtime_lib = testenv.CCopy("${INSTALL_TEST_BIN}",
+                                os.path.join(TSSROOT, tss_shlibname))
+      Depends(utest, runtime_lib)

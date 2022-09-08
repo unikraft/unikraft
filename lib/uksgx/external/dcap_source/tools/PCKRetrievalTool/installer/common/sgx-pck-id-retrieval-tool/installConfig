@@ -1,0 +1,6 @@
+PCK_ID_RETRIEVAL_TOOL_VERSION="1.0"
+TARBALL_NAME=sgx-pck-id-retrieval-tool_1.0.orig.tar.gz
+
+PCK_ID_RETRIEVAL_TOOL_PACKAGE_PATH=/opt/intel
+PCK_ID_RETRIEVAL_TOOL_PACKAGE_NAME=sgx-pck-id-retrieval-tool
+

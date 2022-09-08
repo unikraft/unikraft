@@ -1,0 +1,2 @@
+DeliveryName	InstallName	FileCheckSum	FileFeature	FileOwner
+<deliverydir>/build/linux/libsgx_pce_logic.so	<installdir>/lib/libsgx_pce_logic.so	0	main	STP

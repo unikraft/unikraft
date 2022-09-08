@@ -1,0 +1,191 @@
+os: Visual Studio 2015
+version: 3.99.{build}
+
+pull_requests:
+  do_not_increment_build_number: true
+
+branches:
+  except:
+  - coverity_scan
+  - gh_pages
+
+skip_tags: true
+
+matrix:
+  fast_finish: true
+
+# We do not test all build configurations with all compiler / platform
+# combinations. For now, just the latest compilers being tested will
+# run all build configurations.
+
+environment:
+  matrix:
+  # ---------- Visual Studio 2015 ------------
+  #---- Win32
+  #- APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+  #  platform: Win32
+  #  configuration: Release
+  #  gen: "Visual Studio 14 2015"
+  #  US_SHARED: 0
+  #  US_THREADED: 0
+  #- APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+  #  platform: Win32
+  #  configuration: Release
+  #  gen: "Visual Studio 14 2015"
+  #  US_SHARED: 1
+  #  US_THREADED: 0
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+    platform: Win32
+    configuration: Release
+    gen: "Visual Studio 14 2015"
+    US_SHARED: 0
+    US_THREADED: 1
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+    platform: Win32
+    configuration: Release
+    gen: "Visual Studio 14 2015"
+    US_SHARED: 1
+    US_THREADED: 1
+  #---- Win64
+  #- APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+  #  platform: Win64
+  #  configuration: Release
+  #  gen: "Visual Studio 14 2015 Win64"
+  #  US_SHARED: 0
+  #  US_THREADED: 0
+  #- APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+  #  platform: x64
+  #  configuration: Release
+  #  gen: "Visual Studio 14 2015 Win64"
+  #  US_SHARED: 1
+  #  US_THREADED: 0
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+    platform: x64
+    configuration: Release
+    gen: "Visual Studio 14 2015 Win64"
+    US_SHARED: 0
+    US_THREADED: 1
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2015
+    platform: x64
+    configuration: Release
+    gen: "Visual Studio 14 2015 Win64"
+    US_SHARED: 1
+    US_THREADED: 1
+  # ---------- Visual Studio 2017 ------------
+  #---- Win32
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    platform: Win32
+    configuration: Release
+    gen: "Visual Studio 15 2017"
+    US_SHARED: 0
+    US_THREADED: 0
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    platform: Win32
+    configuration: Release
+    gen: "Visual Studio 15 2017"
+    US_SHARED: 1
+    US_THREADED: 0
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    platform: Win32
+    configuration: Release
+    gen: "Visual Studio 15 2017"
+    US_SHARED: 0
+    US_THREADED: 1
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    platform: Win32
+    configuration: Release
+    gen: "Visual Studio 15 2017"
+    US_SHARED: 1
+    US_THREADED: 1
+  #---- Win64
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    platform: x64
+    configuration: Debug
+    gen: "Visual Studio 15 2017 Win64"
+    US_SHARED: 0
+    US_THREADED: 1
+    WITH_COVERAGE: 1
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    platform: x64
+    configuration: Debug
+    gen: "Visual Studio 15 2017 Win64"
+    US_SHARED: 1
+    US_THREADED: 1
+    WITH_COVERAGE: 1
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    platform: x64
+    configuration: Release
+    gen: "Visual Studio 15 2017 Win64"
+    US_SHARED: 0
+    US_THREADED: 0
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    platform: x64
+    configuration: Release
+    gen: "Visual Studio 15 2017 Win64"
+    US_SHARED: 1
+    US_THREADED: 0
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    platform: x64
+    configuration: Release
+    gen: "Visual Studio 15 2017 Win64"
+    US_SHARED: 0
+    US_THREADED: 1
+  - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2017
+    platform: x64
+    configuration: Release
+    gen: "Visual Studio 15 2017 Win64"
+    US_SHARED: 1
+    US_THREADED: 1
+  # ---------- MinGW-w64 (via MSYS2) ------------
+  - platform: mingw-w64
+    configuration: Release
+    gen: "MinGW Makefiles"
+    US_SHARED: 0
+    US_THREADED: 0
+  - platform: mingw-w64
+    configuration: Release
+    gen: "MinGW Makefiles"
+    US_SHARED: 1
+    US_THREADED: 0
+  - platform: mingw-w64
+    configuration: Release
+    gen: "MinGW Makefiles"
+    US_SHARED: 0
+    US_THREADED: 1
+  - platform: mingw-w64
+    configuration: Release
+    gen: "MinGW Makefiles"
+    US_SHARED: 1
+    US_THREADED: 1
+
+init:
+- echo %APPVEYOR_BUILD_WORKER_IMAGE%
+- cmake -version
+- git config --global core.autocrlf true
+
+before_build:
+- mkdir build & cd build
+- echo %PATH%
+- if "%platform%"=="mingw-w64" set PATH=%PATH:C:\Program Files\Git\usr\bin;=%
+- if "%platform%"=="mingw-w64" set PATH=C:\msys64\mingw64\bin;%PATH%
+- if [%WITH_COVERAGE%]==[1] set PATH=%PATH%;C:\Program Files\OpenCppCoverage
+- echo %PATH%
+- cmake .. -G"%gen%" -DCMAKE_BUILD_TYPE=%configuration% -DUS_BUILD_SHARED_LIBS:BOOL=%US_SHARED% -DUS_ENABLE_THREADING_SUPPORT:BOOL=%US_THREADED% -DUS_ENABLE_COVERAGE:BOOL=%WITH_COVERAGE% -DUS_BUILD_TESTING:BOOL=1 2>&1
+
+install:
+- if [%WITH_COVERAGE%]==[1] choco install opencppcoverage
+- if [%WITH_COVERAGE%]==[1] pip install codecov
+
+build_script:
+- if NOT "%platform%"=="mingw-w64" cmake --build %APPVEYOR_BUILD_FOLDER%/build --config %configuration% -- /maxcpucount
+- if "%platform%"=="mingw-w64" cmake --build %APPVEYOR_BUILD_FOLDER%/build -- -j2
+
+after_test:
+- if [%WITH_COVERAGE%]==[1] %APPVEYOR_BUILD_FOLDER%/opencppcoverage_mergereports.bat
+- if [%WITH_COVERAGE%]==[1] python %APPVEYOR_BUILD_FOLDER%/fixcoveragefilepaths.py -i coverage.xml -s %APPVEYOR_BUILD_FOLDER% -o coverage_pathsfixed.xml
+- if [%WITH_COVERAGE%]==[1] codecov -X gcov -f coverage_pathsfixed.xml
+
+test_script:
+- cd %APPVEYOR_BUILD_FOLDER%/build
+- ctest -j2 -C %CONFIGURATION% --output-on-failure
+

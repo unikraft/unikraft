@@ -1,0 +1,28 @@
+diff --git a/third_party/linenoise.c b/third_party/linenoise.c
+index 71df27b..cefe0e0 100644
+--- a/third_party/linenoise.c
++++ b/third_party/linenoise.c
+@@ -113,6 +113,7 @@
+ #define strdup _strdup
+ #define snprintf _snprintf
+ #endif
++#pragma warning( disable : 4244 4267 )
+ #else
+ #include <termios.h>
+ #include <sys/ioctl.h>
+@@ -133,7 +134,14 @@
+ #include <sys/types.h>
+ 
+ #include "linenoise.h"
+-#include "utf8.h"
++
++/* No utf-8 support. 1 byte = 1 char */
++#define utf8_strlen(S, B) ((B) < 0 ? (int)strlen(S) : (B))
++#define utf8_tounicode(S, CP) (*(CP) = (unsigned char)*(S), 1)
++#define utf8_index(C, I) (I)
++#define utf8_charlen(C) 1
++
++//#include "utf8.h"
+ 
+ #define LINENOISE_DEFAULT_HISTORY_MAX_LEN 100
+ #define LINENOISE_MAX_LINE 4096

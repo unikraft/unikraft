@@ -1,0 +1,3 @@
+DeliveryName	InstallName	FileCheckSum	FileFeature	FileOwner
+<deliverydir>/installer/linux/common/sgx-dcap-pccs/installConfig	<installdir>/installConfig	0	main	STP
+<deliverydir>/installer/linux/common/sgx-dcap-pccs/Makefile	<installdir>/Makefile	0	main	STP

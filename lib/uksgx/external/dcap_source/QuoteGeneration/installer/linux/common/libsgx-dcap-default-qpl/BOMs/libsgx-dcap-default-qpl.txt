@@ -1,0 +1,4 @@
+DeliveryName	InstallName	FileCheckSum	FileFeature	FileOwner
+<deliverydir>/build/linux/libdcap_quoteprov.so	<installdir>/lib/libdcap_quoteprov.so	0	main	STP
+<deliverydir>/build/linux/libsgx_default_qcnl_wrapper.so	<installdir>/lib/libsgx_default_qcnl_wrapper.so	0	main	STP
+<deliverydir>/qcnl/linux/sgx_default_qcnl.conf	<installdir>/etc/sgx_default_qcnl.conf	0	main	STP

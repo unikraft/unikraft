@@ -1,0 +1,12 @@
+{
+global:
+    td_set_enclave_load_policy;
+    td_set_qe_path;
+    td_set_qpl_path;
+    td_init_quote;
+    td_get_quote_size;
+    td_get_quote;
+    get_qpl_handle;
+local:
+    *;
+};

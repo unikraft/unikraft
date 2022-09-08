@@ -1,0 +1,3 @@
+exclude folder */test/
+exclude folder ThirdParty/
+exclude source **/main.cpp

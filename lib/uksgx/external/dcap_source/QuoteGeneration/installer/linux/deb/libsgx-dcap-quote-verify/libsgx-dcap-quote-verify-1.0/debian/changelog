@@ -1,0 +1,6 @@
+libsgx-dcap-quote-verify (1.0-1) unstable; urgency=low
+
+  * 1.0 Gold release
+  * Provide the Quote Verification Library
+
+ -- Hongyan Jiang <hongyan.jiang@intel.com>  Thu, 16 Jul 2020 14:57:32 +0800

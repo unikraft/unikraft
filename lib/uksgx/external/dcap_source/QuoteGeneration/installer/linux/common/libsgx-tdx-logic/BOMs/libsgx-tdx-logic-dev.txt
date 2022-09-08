@@ -1,0 +1,2 @@
+DeliveryName	InstallName	FileCheckSum	FileFeature	FileOwner
+<deliverydir>/quote_wrapper/tdx_quote/td_ql_logic.h	<installdir>/include/td_ql_logic.h	0	main	STP

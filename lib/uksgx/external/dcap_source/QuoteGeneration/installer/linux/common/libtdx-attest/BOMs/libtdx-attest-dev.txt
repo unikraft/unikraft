@@ -1,0 +1,4 @@
+DeliveryName	InstallName	FileCheckSum	FileFeature	FileOwner
+<deliverydir>/quote_wrapper/tdx_attest/tdx_attest.h	<installdir>/include/tdx_attest.h	0	main	STP
+<deliverydir>/quote_wrapper/tdx_attest/test_tdx_attest.c	<installdir>/sample/test_tdx_attest.c	0	main	STP
+<deliverydir>/quote_wrapper/tdx_attest/Makefile.sample	<installdir>/sample/Makefile	0	main	STP

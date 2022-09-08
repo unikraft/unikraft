@@ -1,0 +1,4 @@
+PrototypeServiceFactory
+-----------------------
+
+.. doxygenstruct:: cppmicroservices::PrototypeServiceFactory

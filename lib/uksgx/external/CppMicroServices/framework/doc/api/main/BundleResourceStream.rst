@@ -1,0 +1,4 @@
+BundleResourceStream
+--------------------
+
+.. doxygenclass:: cppmicroservices::BundleResourceStream

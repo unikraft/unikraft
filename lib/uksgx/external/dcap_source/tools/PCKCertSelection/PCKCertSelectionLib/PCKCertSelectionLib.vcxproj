@@ -1,0 +1,303 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" ToolsVersion="15.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|Win32">
+      <Configuration>Debug</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Infra|Win32">
+      <Configuration>Infra</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Infra|x64">
+      <Configuration>Infra</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|Win32">
+      <Configuration>Release</Configuration>
+      <Platform>Win32</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Debug|x64">
+      <Configuration>Debug</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64">
+      <Configuration>Release</Configuration>
+      <Platform>x64</Platform>
+    </ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <VCProjectVersion>15.0</VCProjectVersion>
+    <ProjectGuid>{82A33389-AEFC-4CCE-92A5-04FF646161A5}</ProjectGuid>
+    <Keyword>Win32Proj</Keyword>
+    <RootNamespace>PCKCertSelectionLib</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0.18362.0</WindowsTargetPlatformVersion>
+    <ProjectName>PCKCertSelectionLib</ProjectName>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Infra|Win32'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>true</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Infra|x64'" Label="Configuration">
+    <ConfigurationType>DynamicLibrary</ConfigurationType>
+    <UseDebugLibraries>false</UseDebugLibraries>
+    <PlatformToolset>v142</PlatformToolset>
+    <WholeProgramOptimization>true</WholeProgramOptimization>
+    <CharacterSet>Unicode</CharacterSet>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ImportGroup Label="ExtensionSettings">
+  </ImportGroup>
+  <ImportGroup Label="Shared">
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Infra|Win32'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Label="PropertySheets" Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <ImportGroup Condition="'$(Configuration)|$(Platform)'=='Infra|x64'" Label="PropertySheets">
+    <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
+  </ImportGroup>
+  <PropertyGroup Label="UserMacros" />
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <LinkIncremental>true</LinkIncremental>
+    <TargetName>$(SolutionName)</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <LinkIncremental>true</LinkIncremental>
+    <TargetName>$(ProjectName)</TargetName>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Infra|Win32'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Infra|x64'">
+    <LinkIncremental>false</LinkIncremental>
+  </PropertyGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;_DEBUG;PCKCertSelectionLIB_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir)\..\include;$(ProjectDir)\..\..\..\QuoteVerification\QVL\Src\AttestationParsers\include;$(ProjectDir)\..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src;$(ProjectDir)..\..\..\prebuilt\openssl\inc;$(ProjectDir)\..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include;$(ProjectDir)..\..\..\QuoteGeneration\common\inc\internal</AdditionalIncludeDirectories>
+      <ExceptionHandling>SyncCThrow</ExceptionHandling>
+      <LanguageStandard>stdcpp14</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\..\..\prebuilt\openssl\lib\win64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>libcrypto.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <CETCompat>true</CETCompat>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
+    <ClCompile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>Disabled</Optimization>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>_DEBUG;PCKCertSelectionLIB_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir)\..\include;$(ProjectDir)\..\..\..\QuoteVerification\QVL\Src\AttestationParsers\include;$(ProjectDir)\..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src;$(ProjectDir)..\..\..\prebuilt\openssl\inc;$(ProjectDir)\..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include;$(ProjectDir)..\..\..\QuoteGeneration\common\inc\internal;$(ProjectDir)\..\..\..\QuoteVerification\QVL\Src\AttestationCommons/include;$(ProjectDir)\..\..\..\QuoteVerification\QVL\Src\AttestationCommons/include/Utils</AdditionalIncludeDirectories>
+      <ExceptionHandling>SyncCThrow</ExceptionHandling>
+      <LanguageStandard>stdcpp14</LanguageStandard>
+      <TreatWarningAsError>true</TreatWarningAsError>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\..\..\prebuilt\openssl\lib\win64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>libcrypto.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <CETCompat>true</CETCompat>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
+    <ClCompile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>WIN32;NDEBUG;PCKCertSelectionLIB_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir)\..\include;$(ProjectDir)\..\..\..\QuoteVerification\QVL\Src\AttestationParsers\include;$(ProjectDir)\..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src;$(ProjectDir)..\..\..\prebuilt\openssl\inc;$(ProjectDir)\..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include;$(ProjectDir)..\..\..\QuoteGeneration\common\inc\internal</AdditionalIncludeDirectories>
+      <ExceptionHandling>SyncCThrow</ExceptionHandling>
+      <LanguageStandard>stdcpp14</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>true</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\..\..\prebuilt\openssl\lib\win64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>libcrypto.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <CETCompat>true</CETCompat>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
+    <ClCompile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <WarningLevel>Level4</WarningLevel>
+      <Optimization>MaxSpeed</Optimization>
+      <FunctionLevelLinking>true</FunctionLevelLinking>
+      <IntrinsicFunctions>true</IntrinsicFunctions>
+      <SDLCheck>true</SDLCheck>
+      <PreprocessorDefinitions>NDEBUG;PCKCertSelectionLIB_EXPORTS;_WINDOWS;_USRDLL;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(ProjectDir)\..\include;$(ProjectDir)\..\..\..\QuoteVerification\QVL\Src\AttestationParsers\include;$(ProjectDir)\..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src;$(ProjectDir)..\..\..\prebuilt\openssl\inc;$(ProjectDir)\..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include;$(ProjectDir)..\..\..\QuoteGeneration\common\inc\internal;$(ProjectDir)\..\..\..\QuoteVerification\QVL\Src\AttestationCommons/include;$(ProjectDir)\..\..\..\QuoteVerification\QVL\Src\AttestationCommons/include/Utils</AdditionalIncludeDirectories>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <ExceptionHandling>SyncCThrow</ExceptionHandling>
+      <LanguageStandard>stdcpp14</LanguageStandard>
+    </ClCompile>
+    <Link>
+      <SubSystem>Windows</SubSystem>
+      <EnableCOMDATFolding>true</EnableCOMDATFolding>
+      <OptimizeReferences>true</OptimizeReferences>
+      <GenerateDebugInformation>false</GenerateDebugInformation>
+      <AdditionalLibraryDirectories>$(ProjectDir)..\..\..\prebuilt\openssl\lib\win64;%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>libcrypto.lib;%(AdditionalDependencies)</AdditionalDependencies>
+      <CETCompat>true</CETCompat>
+    </Link>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\Json\JsonParser.cpp" />
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\Json\TcbComponent.cpp" />
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\Json\TcbInfo.cpp" />
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\Json\TcbLevel.cpp" />
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\Json\TdxModule.cpp" />
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\OpensslHelpers\OidUtils.cpp" />
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\X509/ProcessorPckCertificate.cpp" />
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\ParserUtils.cpp" />
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationCommons\src\Utils\GMTime.cpp" />
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationCommons\src\Utils\TimeUtils.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">4996;4267;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">4996;4267;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Infra|Win32'">4996;4267;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">4996;4267;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4996;4267;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Infra|x64'">4996;4267;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\X509\Certificate.cpp" />
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\X509\DistinguishedName.cpp" />
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\X509\Extension.cpp" />
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\X509\PckCertificate.cpp" />
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\X509\Signature.cpp" />
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\X509\Tcb.cpp" />
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\X509\Validity.cpp" />
+    <ClCompile Include="config_selector.cpp" />
+    <ClCompile Include="dllmain.cpp" />
+    <ClCompile Include="pck_cert_selection.cpp" />
+    <ClCompile Include="pck_sorter.cpp">
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Release|x64'">4267</DisableSpecificWarnings>
+      <DisableSpecificWarnings Condition="'$(Configuration)|$(Platform)'=='Infra|x64'">4267</DisableSpecificWarnings>
+    </ClCompile>
+    <ClCompile Include="tcb_manager.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\include\SgxEcdsaAttestation\AttestationParsers.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\Json\JsonParser.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\OpensslHelpers\Bytes.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\OpensslHelpers\OidUtils.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\OpensslHelpers\OpensslInit.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\OpensslHelpers\OpensslTypes.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\ParserUtils.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\AttestationCommons\include\Utils\TimeUtils.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\X509Constants.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\allocators.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\document.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\encodedstream.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\encodings.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\error\en.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\error\error.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\filereadstream.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\filewritestream.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\fwd.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\biginteger.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\diyfp.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\dtoa.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\ieee754.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\itoa.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\meta.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\pow10.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\regex.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\stack.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\strfunc.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\strtod.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\swap.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\istreamwrapper.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\memorybuffer.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\memorystream.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\msinttypes\inttypes.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\msinttypes\stdint.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\ostreamwrapper.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\pointer.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\prettywriter.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\rapidjson.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\reader.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\schema.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\stream.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\stringbuffer.h" />
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\writer.h" />
+    <ClInclude Include="..\include\pck_cert_selection.h" />
+    <ClInclude Include="config_selector.h" />
+    <ClInclude Include="constants.h" />
+    <ClInclude Include="tcb_manager.h" />
+    <ClInclude Include="pck_sorter.h" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Makefile" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <ImportGroup Label="ExtensionTargets">
+  </ImportGroup>
+</Project>

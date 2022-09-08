@@ -1,0 +1,33 @@
+syntax = "proto2";
+package qgs.message;
+option optimize_for = LITE_RUNTIME;
+
+message UUID{
+    required bytes value = 1;
+}
+
+message Request{
+    message GetQuoteRequest{
+        required bytes report = 1;
+        repeated UUID id_list = 2;
+    }
+
+    required uint32 type = 1;
+    oneof msg {
+        GetQuoteRequest getQuoteRequest = 2;
+    }
+}
+
+
+message Response{
+    message GetQuoteResponse{
+        required uint32 error_code = 1 [default = 1];
+        optional UUID selected_id = 2;
+        optional bytes quote = 3;
+    }
+
+    required uint32 type = 1;
+    oneof msg {
+        GetQuoteResponse getQuoteResponse = 2;
+    }
+}

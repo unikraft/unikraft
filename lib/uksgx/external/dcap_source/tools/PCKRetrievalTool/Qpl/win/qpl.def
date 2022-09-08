@@ -1,0 +1,5 @@
+LIBRARY	"dcap_quoteprov"
+
+EXPORTS
+    sgx_ql_get_quote_config           @1
+    sgx_ql_free_quote_config          @2

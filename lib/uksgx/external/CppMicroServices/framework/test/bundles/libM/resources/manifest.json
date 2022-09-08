@@ -1,0 +1,18 @@
+{
+  "bundle.symbolic_name": "TestBundleM",
+  "bundle.description": "My Bundle description",
+  "bundle.version": "1.0.0",
+  "bundle.activator" : true,
+  "number": 5,
+  "double": 1.1,
+  "vector": [
+    "first",
+    2,
+    "third"
+    ],
+  "map": {
+    "string": "hi",
+    "number": 4,
+    "list": [ "a", "b" ]
+    }
+}

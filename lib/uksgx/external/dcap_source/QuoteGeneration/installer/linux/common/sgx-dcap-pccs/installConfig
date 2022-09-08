@@ -1,0 +1,5 @@
+DCAP_PCCS_VERSION="1.0"
+TARBALL_NAME=sgx-dcap-pccs_1.0.orig.tar.gz
+
+DCAP_PCCS_PACKAGE_PATH=/opt/intel
+DCAP_PCCS_PACKAGE_NAME=sgx-dcap-pccs

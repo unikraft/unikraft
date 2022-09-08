@@ -1,0 +1,4 @@
+DeliveryName	InstallName	FileCheckSum	FileFeature	FileOwner
+<deliverydir>/include/MPNetwork.h	<installdir>/include/MPNetwork.h	0	main	STP
+<deliverydir>/include/MPNetworkDefs.h	<installdir>/include/MPNetworkDefs.h	0	main	STP
+<deliverydir>/include/c_wrapper/mp_network.h	<installdir>/include/mp_network.h	0	main	STP

@@ -1,0 +1,55 @@
+This library serves as a quoting data provider plugin for Intel® Software Guard Extensions Data Center Attestation Primitives (Intel® SGX 
+DCAP). This provider plugin is used to fetch certain data files
+
+
+API and structure Definitions
+===============
+/**
+Parameters:
+    p_pck_cert_id [In]
+        Pointer to the PCK Certificate ID structure. 
+    pp_quote_config [Out]
+        Pointer to the PCK certification data needed for quote generation.  
+Return Values:
+    SGX_QL_SUCCESS: 
+        The platform has the certification data available and has returned it in the p_quote_config buffer.
+    SGX_QL_INVALID_PARRAMETER: 
+        The parameters are incorrect.
+    SGX_QL_OUT_OF_MEMORY: 
+        Out of memory error.
+*/
+quote3_error_t sgx_ql_get_quote_config(const sgx_ql_pck_cert_id_t *p_pck_cert_id, sgx_ql_config_t **pp_quote_config);
+
+
+/**
+Parameters:
+    p_quote_config [In]
+        Pointer to the PCK certification data needed for quote generation.  
+Return Values:
+    SGX_QL_SUCCESS: 
+        The buffer was freed successfully.
+*/
+quote3_error_t sgx_ql_free_quote_config(sgx_ql_config_t *p_quote_config);
+
+/** Used to describe the PCK Cert for a platform */
+typedef struct _sgx_ql_pck_cert_id_t
+{
+    uint8_t *p_qe_id;
+    uint32_t qe_id_size;
+    sgx_cpu_svn_t *platform_cpu_svn;
+    sgx_isv_svn_t *platform_pce_isv_svn;
+    uint8_t* p_encrypted_ppid;
+    uint32_t encrypted_ppid_size;
+    uint8_t crypto_suite;
+    uint16_t *pce_id;
+}sgx_ql_pck_cert_id_t;
+
+/** Describes the return data from the Quote Provider Library sgx_ql_get_quote_config() API */
+typedef struct _sgx_ql_config_t {
+    sgx_ql_config_version_t version;
+    sgx_cpu_svn_t   cert_cpu_svn;
+    sgx_isv_svn_t   cert_pce_isv_svn;
+    uint32_t cert_data_size;
+    uint8_t* p_cert_data;
+}sgx_ql_config_t;
+

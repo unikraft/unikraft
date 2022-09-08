@@ -1,0 +1,5 @@
+libsgx-ae-id-enclave (1.0-1) unstable; urgency=low
+
+  * Initial release
+
+ -- Li Xun <xun.li@intel.com>  Mon, 20 Dec 2021 03:46:52 +0800

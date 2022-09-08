@@ -1,0 +1,41 @@
+diff --git a/third_party/civetweb/civetweb.c b/third_party/civetweb/civetweb.c
+index 98130f5..cc25d9d 100644
+--- a/third_party/civetweb/civetweb.c
++++ b/third_party/civetweb/civetweb.c
+@@ -129,8 +129,11 @@ mg_static_assert(sizeof(void *) >= sizeof(int), "data type size check");
+ 
+ #ifdef __MACH__
+ 
+-#define CLOCK_MONOTONIC (1)
+-#define CLOCK_REALTIME (2)
++#include <AvailabilityMacros.h>
++#if MAC_OS_X_VERSION_MIN_REQUIRED < 101200
++// define this macro to ensure system functions are used for 10.12 and beyond
++#define _DARWIN_FEATURE_CLOCK_GETTIME 0
++#endif
+ 
+ #include <sys/time.h>
+ #include <mach/clock.h>
+@@ -138,7 +141,14 @@ mg_static_assert(sizeof(void *) >= sizeof(int), "data type size check");
+ #include <mach/mach_time.h>
+ #include <assert.h>
+ 
++#ifndef CLOCK_MONOTONIC
++#define CLOCK_MONOTONIC (1)
++#endif
++#ifndef CLOCK_REALTIME
++#define CLOCK_REALTIME (2)
++#endif
+ 
++#if defined(_DARWIN_FEATURE_CLOCK_GETTIME) && (_DARWIN_FEATURE_CLOCK_GETTIME == 0)
+ /* clock_gettime is not implemented on OSX */
+ int clock_gettime(int clk_id, struct timespec *t);
+ 
+@@ -183,6 +193,7 @@ clock_gettime(int clk_id, struct timespec *t)
+ 	}
+ 	return -1; /* EINVAL - Clock ID is unknown */
+ }
++#endif // defined(_DARWIN_FEATURE_CLOCK_GETTIME) && (_DARWIN_FEATURE_CLOCK_GETTIME == 0)
+ #endif
+ 
+ 

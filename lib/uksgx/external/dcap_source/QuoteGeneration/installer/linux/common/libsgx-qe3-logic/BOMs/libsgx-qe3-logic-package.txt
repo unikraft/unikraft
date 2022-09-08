@@ -1,0 +1,3 @@
+DeliveryName	InstallName	FileCheckSum	FileFeature	FileOwner
+<deliverydir>/installer/linux/common/libsgx-qe3-logic/installConfig	<installdir>/installConfig	0	main	STP
+<deliverydir>/installer/linux/common/libsgx-qe3-logic/Makefile	<installdir>/Makefile	0	main	STP

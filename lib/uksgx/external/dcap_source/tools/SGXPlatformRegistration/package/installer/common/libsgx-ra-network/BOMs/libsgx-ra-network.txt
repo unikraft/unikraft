@@ -1,0 +1,2 @@
+DeliveryName	InstallName	FileCheckSum	FileFeature	FileOwner
+<deliverydir>/build/lib64/libmpa_network.so	<installdir>/lib/libmpa_network.so	0	main	STP

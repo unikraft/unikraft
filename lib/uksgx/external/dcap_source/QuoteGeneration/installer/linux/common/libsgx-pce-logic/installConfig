@@ -1,0 +1,5 @@
+PCE_LOGIC_VERSION="1.0"
+TARBALL_NAME=libsgx-pce-logic_1.0.orig.tar.gz
+
+PCE_LOGIC_PACKAGE_NAME=libsgx-pce-logic
+LIB_DIR=lib

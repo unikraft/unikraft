@@ -1,0 +1,1411 @@
+From bff36a2672ae0905af3e3af7822e7155911310dc Mon Sep 17 00:00:00 2001
+From: Zhang Lili <lili.z.zhang@intel.com>
+Date: Thu, 15 Jul 2021 16:19:43 +0000
+Subject: [PATCH] Enable OpenMP in SGX
+
+Signed-off-by: Zhang Lili <lili.z.zhang@intel.com>
+---
+ final/CMakeLists.txt                        |  5 +-
+ final/runtime/CMakeLists.txt                | 12 +++-
+ final/runtime/cmake/LibompDefinitions.cmake |  1 +
+ final/runtime/cmake/LibompHandleFlags.cmake |  7 ++
+ final/runtime/cmake/config-ix.cmake         |  2 +-
+ final/runtime/src/CMakeLists.txt            |  5 ++
+ final/runtime/src/kmp.h                     | 42 ++++++++++-
+ final/runtime/src/kmp_affinity.h            |  4 ++
+ final/runtime/src/kmp_config.h.cmake        | 12 ++++
+ final/runtime/src/kmp_csupport.cpp          | 12 ++++
+ final/runtime/src/kmp_environment.cpp       | 11 ++-
+ final/runtime/src/kmp_ftn_entry.h           | 10 +++
+ final/runtime/src/kmp_global.cpp            |  5 ++
+ final/runtime/src/kmp_i18n.cpp              | 24 +++++--
+ final/runtime/src/kmp_io.cpp                |  6 ++
+ final/runtime/src/kmp_lock.h                |  3 +
+ final/runtime/src/kmp_os.h                  | 12 ++++
+ final/runtime/src/kmp_runtime.cpp           | 28 ++++++--
+ final/runtime/src/kmp_settings.cpp          | 15 ++++
+ final/runtime/src/kmp_utility.cpp           |  6 ++
+ final/runtime/src/kmp_wrapper_getpid.h      |  4 ++
+ final/runtime/src/kmp_wrapper_malloc.h      |  2 +
+ final/runtime/src/sgx_stub.cpp              | 63 ++++++++++++++++
+ final/runtime/src/sgx_stub.h                | 51 +++++++++++++
+ final/runtime/src/z_Linux_util.cpp          | 79 +++++++++++++++++++--
+ 25 files changed, 400 insertions(+), 21 deletions(-)
+ create mode 100644 final/runtime/src/sgx_stub.cpp
+ create mode 100644 final/runtime/src/sgx_stub.h
+
+diff --git a/final/CMakeLists.txt b/final/CMakeLists.txt
+index 597eedc..8d820a1 100644
+--- a/final/CMakeLists.txt
++++ b/final/CMakeLists.txt
+@@ -3,6 +3,9 @@ cmake_minimum_required(VERSION 2.8 FATAL_ERROR)
+ # Add cmake directory to search for custom cmake functions.
+ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
+ 
++set(SGX_PROGRAM_SEARCH_PATH)
++LIST(APPEND CMAKE_PROGRAM_PATH  "/usr/local/bin/"  ${SGX_PROGRAM_SEARCH_PATH} ...)
++
+ # llvm/runtimes/ will set OPENMP_STANDALONE_BUILD.
+ if (OPENMP_STANDALONE_BUILD OR "${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
+   set(OPENMP_STANDALONE_BUILD TRUE)
+@@ -58,7 +61,7 @@ set(OPENMP_TEST_OPENMP_FLAGS ${OPENMP_TEST_COMPILER_OPENMP_FLAGS} CACHE STRING
+ add_subdirectory(runtime)
+ 
+ 
+-set(ENABLE_LIBOMPTARGET ON)
++set(ENABLE_LIBOMPTARGET OFF)
+ # Currently libomptarget cannot be compiled on Windows or MacOS X.
+ # Since the device plugins are only supported on Linux anyway,
+ # there is no point in trying to compile libomptarget on other OSes.
+diff --git a/final/runtime/CMakeLists.txt b/final/runtime/CMakeLists.txt
+index 447b3cd..3d3018c 100644
+--- a/final/runtime/CMakeLists.txt
++++ b/final/runtime/CMakeLists.txt
+@@ -20,6 +20,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
+ set(LIBOMP_VERSION_MAJOR 5)
+ set(LIBOMP_VERSION_MINOR 0)
+ 
++set(BUILD_SGX_OPENMP TRUE)
++
+ # These include files are in the cmake/ subdirectory
+ include(LibompUtils)
+ include(LibompGetArchitecture)
+@@ -33,7 +35,7 @@ if(${OPENMP_STANDALONE_BUILD})
+   set(LIBOMP_ARCH ${LIBOMP_DETECTED_ARCH} CACHE STRING
+     "The architecture to build for (x86_64/i386/arm/ppc64/ppc64le/aarch64/mic/mips/mips64).")
+   # Should assertions be enabled?  They are on by default.
+-  set(LIBOMP_ENABLE_ASSERTIONS TRUE CACHE BOOL
++  set(LIBOMP_ENABLE_ASSERTIONS FALSE CACHE BOOL
+     "enable assertions?")
+ else() # Part of LLVM build
+   # Determine the native architecture from LLVM.
+@@ -282,7 +284,7 @@ if(LIBOMP_STATS)
+ endif()
+ 
+ # Shared library can be switched to a static library
+-set(LIBOMP_ENABLE_SHARED TRUE CACHE BOOL
++set(LIBOMP_ENABLE_SHARED FALSE CACHE BOOL
+   "Shared library instead of static library?")
+ 
+ if(WIN32 AND NOT LIBOMP_ENABLE_SHARED)
+@@ -301,8 +303,9 @@ endif()
+ 
+ # OMPT-support defaults to ON for OpenMP 5.0+ and if the requirements in
+ # cmake/config-ix.cmake are fulfilled.
++# But we need to disable OMPT for SGX
+ set(OMPT_DEFAULT FALSE)
+-if ((${LIBOMP_OMP_VERSION} GREATER 49) AND (LIBOMP_HAVE_OMPT_SUPPORT) AND (NOT WIN32))
++if ((${LIBOMP_OMP_VERSION} GREATER 49) AND (LIBOMP_HAVE_OMPT_SUPPORT) AND (NOT WIN32) AND (NOT BUILD_SGX_OPENMP))
+   set(OMPT_DEFAULT TRUE)
+ endif()
+ set(LIBOMP_OMPT_SUPPORT ${OMPT_DEFAULT} CACHE BOOL
+@@ -318,6 +321,9 @@ endif()
+ if(LIBOMP_OMPT_SUPPORT AND (${LIBOMP_OMP_VERSION} LESS 50))
+   libomp_error_say("OpenMP Tools Interface only available with OpenMP 5.0, LIBOMP_OMP_VERSION is ${LIBOMP_OMP_VERSION}")
+ endif()
++if(LIBOMP_OMPT_SUPPORT AND BUILD_SGX_OPENMP)
++  libomp_error_say("OMP tool should not be enabled for SGX environment")
++endif()
+ 
+ # TSAN-support
+ set(LIBOMP_TSAN_SUPPORT FALSE CACHE BOOL
+diff --git a/final/runtime/cmake/LibompDefinitions.cmake b/final/runtime/cmake/LibompDefinitions.cmake
+index c4cfbb9..5fb8732 100644
+--- a/final/runtime/cmake/LibompDefinitions.cmake
++++ b/final/runtime/cmake/LibompDefinitions.cmake
+@@ -24,6 +24,7 @@ function(libomp_get_definitions_flags cppflags)
+   else()
+     libomp_append(cppflags_local "-D _GNU_SOURCE")
+     libomp_append(cppflags_local "-D _REENTRANT")
++    libomp_append(cppflags_local "-D _OPENMP_SGX" BUILD_SGX_OPENMP)
+   endif()
+ 
+   # CMake doesn't include CPPFLAGS from environment, but we will.
+diff --git a/final/runtime/cmake/LibompHandleFlags.cmake b/final/runtime/cmake/LibompHandleFlags.cmake
+index 0b829a5..237d40f 100644
+--- a/final/runtime/cmake/LibompHandleFlags.cmake
++++ b/final/runtime/cmake/LibompHandleFlags.cmake
+@@ -72,6 +72,12 @@ function(libomp_get_c_and_cxxflags_common flags)
+     libomp_append(flags_local -ftls-model=initial-exec LIBOMP_HAVE_FTLS_MODEL_FLAG)
+     libomp_append(flags_local "-opt-streaming-stores never" LIBOMP_HAVE_OPT_STREAMING_STORES_FLAG)
+   endif()
++  libomp_append(flags_local -nostdinc)
++  string( TOLOWER "${CMAKE_BUILD_TYPE}" LIBOMPTARGET_CMAKE_BUILD_TYPE)
++  if("${libomp_build_type_lowercase}" STREQUAL "debug")
++    libomp_append(flags_local "-O0")
++  endif()
++  libomp_append(flags_local -fPIC)
+   set(${flags} ${flags_local} PARENT_SCOPE)
+ endfunction()
+ 
+@@ -91,6 +97,7 @@ endfunction()
+ function(libomp_get_cxxflags cxxflags)
+   set(cxxflags_local)
+   libomp_get_c_and_cxxflags_common(cxxflags_local)
++  libomp_append(cxxflags_local "-nostdinc++")
+   if(${OPENMP_STANDALONE_BUILD})
+       libomp_append(cxxflags_local -Wcast-qual LIBOMP_HAVE_WCAST_QUAL_FLAG)
+   endif()
+diff --git a/final/runtime/cmake/config-ix.cmake b/final/runtime/cmake/config-ix.cmake
+index 019c83c..a9a3654 100644
+--- a/final/runtime/cmake/config-ix.cmake
++++ b/final/runtime/cmake/config-ix.cmake
+@@ -188,7 +188,7 @@ else()
+ endif()
+ 
+ # Check if adaptive locks are available
+-if((${IA32} OR ${INTEL64}) AND NOT MSVC)
++if((${IA32} OR ${INTEL64}) AND NOT MSVC AND NOT BUILD_SGX_OPENMP)
+   set(LIBOMP_HAVE_ADAPTIVE_LOCKS TRUE)
+ else()
+   set(LIBOMP_HAVE_ADAPTIVE_LOCKS FALSE)
+diff --git a/final/runtime/src/CMakeLists.txt b/final/runtime/src/CMakeLists.txt
+index 9bf9c80..dc0c2df 100644
+--- a/final/runtime/src/CMakeLists.txt
++++ b/final/runtime/src/CMakeLists.txt
+@@ -46,6 +46,10 @@ include_directories(
+   ${LIBOMP_SRC_DIR}/i18n
+   ${LIBOMP_INC_DIR}
+   ${LIBOMP_SRC_DIR}/thirdparty/ittnotify
++  ${LIBOMP_SRC_DIR}/../../../../../../common/inc/
++  ${LIBOMP_SRC_DIR}/../../../../../../common/inc/tlibc
++  ${LIBOMP_SRC_DIR}/../../../../../../common/inc/internal
++  ${LIBOMP_SRC_DIR}/../../../../../../sdk/tlibcxx/include
+ )
+ if(${LIBOMP_USE_HWLOC})
+   include_directories(${LIBOMP_HWLOC_INSTALL_DIR}/include)
+@@ -103,6 +107,7 @@ else()
+     libomp_append(LIBOMP_CXXFILES kmp_taskdeps.cpp)
+     libomp_append(LIBOMP_CXXFILES kmp_cancel.cpp)
+   endif()
++  libomp_append(LIBOMP_CXXFILES sgx_stub.cpp BUILD_SGX_OPENMP)
+ endif()
+ # Files common to stubs and normal library
+ libomp_append(LIBOMP_CXXFILES kmp_ftn_cdecl.cpp)
+diff --git a/final/runtime/src/kmp.h b/final/runtime/src/kmp.h
+index 599cbf2..62b3420 100644
+--- a/final/runtime/src/kmp.h
++++ b/final/runtime/src/kmp.h
+@@ -16,7 +16,9 @@
+ #define KMP_H
+ 
+ #include "kmp_config.h"
+-
++#ifdef _OPENMP_SGX
++#include "sgx_stub.h"
++#endif
+ /* #define BUILD_PARALLEL_ORDERED 1 */
+ 
+ /* This fix replaces gettimeofday with clock_gettime for better scalability on
+@@ -50,8 +52,11 @@
+ #define TASK_PROXY 1
+ #define TASK_FULL 0
+ 
++#ifndef _OPENMP_SGX
+ #define KMP_CANCEL_THREADS
+ #define KMP_THREAD_ATTR
++#endif
++
+ 
+ // Android does not have pthread_cancel.  Undefine KMP_CANCEL_THREADS if being
+ // built on Android
+@@ -59,7 +64,9 @@
+ #undef KMP_CANCEL_THREADS
+ #endif
+ 
++#ifndef _OPENMP_SGX
+ #include <signal.h>
++#endif
+ #include <stdarg.h>
+ #include <stddef.h>
+ #include <stdio.h>
+@@ -100,8 +107,10 @@ class kmp_stats_list;
+ #endif
+ 
+ #if KMP_ARCH_X86 || KMP_ARCH_X86_64
++#ifndef _OPENMP_SGX
+ #include <xmmintrin.h>
+ #endif
++#endif
+ 
+ #include "kmp_debug.h"
+ #include "kmp_lock.h"
+@@ -111,7 +120,9 @@ class kmp_stats_list;
+ #endif
+ #include "kmp_i18n.h"
+ 
++#ifndef _OPENMP_SGX
+ #define KMP_HANDLE_SIGNALS (KMP_OS_UNIX || KMP_OS_WINDOWS)
++#endif
+ 
+ #include "kmp_wrapper_malloc.h"
+ #if KMP_OS_UNIX
+@@ -560,7 +571,9 @@ typedef int PACKED_REDUCTION_METHOD_T;
+ #endif
+ 
+ #if KMP_OS_UNIX
++#ifndef _OPENMP_SGX
+ #include <dlfcn.h>
++#endif
+ #include <pthread.h>
+ #endif
+ 
+@@ -967,8 +980,12 @@ extern kmp_uint64 __kmp_ticks_per_msec;
+ #if KMP_COMPILER_ICC
+ #define KMP_NOW() ((kmp_uint64)_rdtsc())
+ #else
++#ifdef _OPENMP_SGX
++#define KMP_NOW() get_timestamp() 
++#else
+ #define KMP_NOW() __kmp_hardware_timestamp()
+ #endif
++#endif
+ #define KMP_NOW_MSEC() (KMP_NOW() / __kmp_ticks_per_msec)
+ #define KMP_BLOCKTIME_INTERVAL(team, tid)                                      \
+   (KMP_BLOCKTIME(team, tid) * __kmp_ticks_per_msec)
+@@ -1086,7 +1103,16 @@ typedef struct kmp_cpuid {
+   kmp_uint32 ecx;
+   kmp_uint32 edx;
+ } kmp_cpuid_t;
++#ifndef _OPENMP_SGX
+ extern void __kmp_x86_cpuid(int mode, int mode2, struct kmp_cpuid *p);
++#else
++
++#include "sgx_cpuid.h"
++static inline void __kmp_x86_cpuid(int leaf, int subleaf, struct kmp_cpuid *p) {
++	sgx_cpuidex((int *)p, leaf, subleaf);
++}
++#endif
++
+ #if KMP_ARCH_X86
+ extern void __kmp_x86_pause(void);
+ #elif KMP_MIC
+@@ -1096,7 +1122,11 @@ extern void __kmp_x86_pause(void);
+ // on Spec OMP2001 and LCPC tasking tests, no regressions on EPCC.
+ static inline void __kmp_x86_pause(void) { _mm_delay_32(300); }
+ #else
++#ifndef _OPENMP_SGX
+ static inline void __kmp_x86_pause(void) { _mm_pause(); }
++#else
++static inline void __kmp_x86_pause(void) { __builtin_ia32_pause(); }
++#endif
+ #endif
+ #define KMP_CPU_PAUSE() __kmp_x86_pause()
+ #elif KMP_ARCH_PPC64
+@@ -1212,6 +1242,9 @@ typedef pthread_key_t kmp_key_t;
+ #endif
+ 
+ extern kmp_key_t __kmp_gtid_threadprivate_key;
++#ifdef _OPENMP_SGX
++extern void * __kmp_gtid_threadprivate_data;
++#endif
+ 
+ typedef struct kmp_sys_info {
+   long maxrss; /* the maximum resident set size utilized (in kilobytes)     */
+@@ -3666,9 +3699,14 @@ extern int __kmp_read_from_file(char const *path, char const *format, ...);
+ 
+ extern void __kmp_query_cpuid(kmp_cpuinfo_t *p);
+ 
++#ifndef _OPENMP_SGX
+ #define __kmp_load_mxcsr(p) _mm_setcsr(*(p))
+ static inline void __kmp_store_mxcsr(kmp_uint32 *p) { *p = _mm_getcsr(); }
+-
++#else
++// These builtin are referenced from glibc xmmintrin.h
++#define __kmp_load_mxcsr(p) __builtin_ia32_ldmxcsr(*(p))
++static inline void __kmp_store_mxcsr(kmp_uint32 *p) { *p = __builtin_ia32_stmxcsr(); }
++#endif
+ extern void __kmp_load_x87_fpu_control_word(kmp_int16 *p);
+ extern void __kmp_store_x87_fpu_control_word(kmp_int16 *p);
+ extern void __kmp_clear_x87_fpu_status_word();
+diff --git a/final/runtime/src/kmp_affinity.h b/final/runtime/src/kmp_affinity.h
+index 34147fd..1cc2dd4 100644
+--- a/final/runtime/src/kmp_affinity.h
++++ b/final/runtime/src/kmp_affinity.h
+@@ -572,11 +572,13 @@ public:
+   }
+   bool operator!=(const Address &b) const { return !operator==(b); }
+   void print() const {
++#ifndef _OPENMP_SGX
+     unsigned i;
+     printf("Depth: %u --- ", depth);
+     for (i = 0; i < depth; i++) {
+       printf("%u ", labels[i]);
+     }
++#endif
+   }
+ };
+ 
+@@ -592,9 +594,11 @@ public:
+     return *this;
+   }
+   void print() const {
++#ifndef _OPENMP_SGX
+     printf("first = ");
+     first.print();
+     printf(" --- second = %u", second);
++#endif
+   }
+   bool operator==(const AddrUnsPair &b) const {
+     if (first != b.first)
+diff --git a/final/runtime/src/kmp_config.h.cmake b/final/runtime/src/kmp_config.h.cmake
+index c9ebbc0..17c1f66 100644
+--- a/final/runtime/src/kmp_config.h.cmake
++++ b/final/runtime/src/kmp_config.h.cmake
+@@ -53,7 +53,9 @@
+ #cmakedefine01 LIBOMP_USE_INTERNODE_ALIGNMENT
+ #define KMP_USE_INTERNODE_ALIGNMENT LIBOMP_USE_INTERNODE_ALIGNMENT
+ #cmakedefine01 LIBOMP_ENABLE_ASSERTIONS
++#if LIBOMP_ENABLE_ASSERTIONS
+ #define KMP_USE_ASSERT LIBOMP_ENABLE_ASSERTIONS
++#endif
+ #cmakedefine01 LIBOMP_USE_HIER_SCHED
+ #define KMP_USE_HIER_SCHED LIBOMP_USE_HIER_SCHED
+ #cmakedefine01 STUBS_LIBRARY
+@@ -95,11 +97,16 @@
+ #define USE_ITT_BUILD LIBOMP_USE_ITT_NOTIFY
+ #define INTEL_ITTNOTIFY_PREFIX __kmp_itt_
+ #if ! KMP_MIC
++
++#ifndef _OPENMP_SGX  
+ # define USE_LOAD_BALANCE 1
+ #endif
++#endif
+ #if ! (KMP_OS_WINDOWS || KMP_OS_DARWIN)
++#ifndef _OPENMP_SGX
+ # define KMP_TDATA_GTID 1
+ #endif
++#endif
+ #if STUBS_LIBRARY
+ # define KMP_STUB 1
+ #endif
+@@ -107,6 +114,11 @@
+ # define KMP_DEBUG 1
+ #endif
+ 
++
++#ifdef _OPENMP_SGX
++# undef KMP_DEBUG
++#endif
++
+ #if KMP_OS_WINDOWS
+ # define KMP_WIN_CDECL
+ #else
+diff --git a/final/runtime/src/kmp_csupport.cpp b/final/runtime/src/kmp_csupport.cpp
+index 3afefed..04019c1 100644
+--- a/final/runtime/src/kmp_csupport.cpp
++++ b/final/runtime/src/kmp_csupport.cpp
+@@ -38,6 +38,7 @@
+  * it will be implicitly called by attempts to use other library functions.
+  */
+ void __kmpc_begin(ident_t *loc, kmp_int32 flags) {
++#ifndef _OPENMP_SGX
+   // By default __kmpc_begin() is no-op.
+   char *env;
+   if ((env = getenv("KMP_INITIAL_THREAD_BIND")) != NULL &&
+@@ -49,6 +50,10 @@ void __kmpc_begin(ident_t *loc, kmp_int32 flags) {
+     __kmp_internal_begin();
+     KC_TRACE(10, ("__kmpc_begin: called\n"));
+   }
++#else
++    __kmp_internal_begin();
++    KC_TRACE(10, ("__kmpc_begin: called\n"));
++#endif
+ }
+ 
+ /*!
+@@ -60,6 +65,7 @@ void __kmpc_begin(ident_t *loc, kmp_int32 flags) {
+  * zero.
+  */
+ void __kmpc_end(ident_t *loc) {
++#ifndef _OPENMP_SGX
+   // By default, __kmp_ignore_mppend() returns TRUE which makes __kmpc_end()
+   // call no-op. However, this can be overridden with KMP_IGNORE_MPPEND
+   // environment variable. If KMP_IGNORE_MPPEND is 0, __kmp_ignore_mppend()
+@@ -79,6 +85,12 @@ void __kmpc_end(ident_t *loc) {
+   if (ompt_enabled.enabled)
+     __kmp_internal_end_library(__kmp_gtid_get_specific());
+ #endif
++#else
++    KC_TRACE(10, ("__kmpc_end: called\n"));
++    KA_TRACE(30, ("__kmpc_end\n"));
++
++    __kmp_internal_end_thread(-1);
++#endif // _OPENMP_SGX
+ }
+ 
+ /*!
+diff --git a/final/runtime/src/kmp_environment.cpp b/final/runtime/src/kmp_environment.cpp
+index 22c2941..4bb56b8 100644
+--- a/final/runtime/src/kmp_environment.cpp
++++ b/final/runtime/src/kmp_environment.cpp
+@@ -82,6 +82,7 @@ static inline void *allocate(size_t size) {
+   return ptr;
+ } // allocate
+ 
++#ifndef _OPENMP_SGX
+ char *__kmp_env_get(char const *name) {
+ 
+   char *result = NULL;
+@@ -223,6 +224,8 @@ void __kmp_env_unset(char const *name) {
+ #endif
+ 
+ } // func __kmp_env_unset
++#endif // _OPENMP_SGX
++
+ 
+ /* Intel OpenMP RTL string representation of environment: just a string of
+    characters, variables are separated with vertical bars, e. g.:
+@@ -431,6 +434,8 @@ ___kmp_env_blk_parse_unix(kmp_env_blk_t *block, // M: Env block to fill.
+ void __kmp_env_blk_init(kmp_env_blk_t *block, // M: Block to initialize.
+                         char const *bulk // I: Initialization string, or NULL.
+                         ) {
++// Disable reading environment for SGX
++#ifndef _OPENMP_SGX
+ 
+   if (bulk != NULL) {
+     ___kmp_env_blk_parse_string(block, bulk);
+@@ -452,6 +457,9 @@ void __kmp_env_blk_init(kmp_env_blk_t *block, // M: Block to initialize.
+ #error Unknown or unsupported OS.
+ #endif
+   }
++#else
++  memset(block, 0, sizeof(kmp_env_blk_t));
++#endif // _OPENMP_SGX
+ 
+ } // __kmp_env_blk_init
+ 
+@@ -473,12 +481,13 @@ void __kmp_env_blk_sort(
+ void __kmp_env_blk_free(
+     kmp_env_blk_t *block // M: Block of environment variables to free.
+     ) {
+-
++#ifndef _OPENMP_SGX
+   KMP_INTERNAL_FREE(CCAST(kmp_env_var_t *, block->vars));
+   __kmp_str_free(&(block->bulk));
+ 
+   block->count = 0;
+   block->vars = NULL;
++#endif
+ 
+ } // __kmp_env_blk_free
+ 
+diff --git a/final/runtime/src/kmp_ftn_entry.h b/final/runtime/src/kmp_ftn_entry.h
+index c08e31b..076031e 100644
+--- a/final/runtime/src/kmp_ftn_entry.h
++++ b/final/runtime/src/kmp_ftn_entry.h
+@@ -944,6 +944,7 @@ int FTN_STDCALL KMP_EXPAND_NAME(FTN_GET_NUM_DEVICES)(void) {
+ #if KMP_MIC || KMP_OS_DARWIN || KMP_OS_WINDOWS || defined(KMP_STUB)
+   return 0;
+ #else
++  #ifndef _OPENMP_SGX
+   int (*fptr)();
+   if ((*(void **)(&fptr) = dlsym(RTLD_DEFAULT, "_Offload_number_of_devices"))) {
+     return (*fptr)();
+@@ -952,6 +953,9 @@ int FTN_STDCALL KMP_EXPAND_NAME(FTN_GET_NUM_DEVICES)(void) {
+   } else { // liboffload & libomptarget don't exist
+     return 0;
+   }
++  #else
++  return 0;
++  #endif
+ #endif // KMP_MIC || KMP_OS_DARWIN || KMP_OS_WINDOWS || defined(KMP_STUB)
+ }
+ 
+@@ -973,12 +977,16 @@ int FTN_STDCALL FTN_GET_INITIAL_DEVICE(void) {
+ #if KMP_MIC || KMP_OS_DARWIN || KMP_OS_WINDOWS || defined(KMP_STUB)
+   return KMP_HOST_DEVICE;
+ #else
++  #ifndef _OPENMP_SGX
+   int (*fptr)();
+   if ((*(void **)(&fptr) = dlsym(RTLD_NEXT, "omp_get_initial_device"))) {
+     return (*fptr)();
+   } else { // liboffload & libomptarget don't exist
+     return KMP_HOST_DEVICE;
+   }
++  #else
++  return KMP_DEVICE_DEFAULT;
++  #endif
+ #endif
+ }
+ 
+@@ -1202,6 +1210,7 @@ int FTN_STDCALL KMP_EXPAND_NAME(FTN_TEST_NEST_LOCK)(void **user_lock) {
+ #endif
+ }
+ 
++#ifndef _OPENMP_SGX
+ double FTN_STDCALL KMP_EXPAND_NAME(FTN_GET_WTIME)(void) {
+ #ifdef KMP_STUB
+   return __kmps_get_wtime();
+@@ -1231,6 +1240,7 @@ double FTN_STDCALL KMP_EXPAND_NAME(FTN_GET_WTICK)(void) {
+   return data;
+ #endif
+ }
++#endif
+ 
+ /* ------------------------------------------------------------------------ */
+ 
+diff --git a/final/runtime/src/kmp_global.cpp b/final/runtime/src/kmp_global.cpp
+index 5f38009..75afc33 100644
+--- a/final/runtime/src/kmp_global.cpp
++++ b/final/runtime/src/kmp_global.cpp
+@@ -18,6 +18,11 @@
+ #endif
+ 
+ kmp_key_t __kmp_gtid_threadprivate_key;
++#ifdef _OPENMP_SGX
++void * __kmp_gtid_threadprivate_data;
++uint64_t __kmp_global_count = 0;
++#endif
++
+ 
+ #if KMP_ARCH_X86 || KMP_ARCH_X86_64
+ kmp_cpuinfo_t __kmp_cpuinfo = {0}; // Not initialized
+diff --git a/final/runtime/src/kmp_i18n.cpp b/final/runtime/src/kmp_i18n.cpp
+index 95daac2..6e56904 100644
+--- a/final/runtime/src/kmp_i18n.cpp
++++ b/final/runtime/src/kmp_i18n.cpp
+@@ -20,7 +20,9 @@
+ #include "kmp_os.h"
+ 
+ #include <errno.h>
++#ifndef _OPENMP_SGX
+ #include <locale.h>
++#endif
+ #include <stdarg.h>
+ #include <stdio.h>
+ #include <string.h>
+@@ -61,6 +63,7 @@ static kmp_bootstrap_lock_t lock = KMP_BOOTSTRAP_LOCK_INITIALIZER(lock);
+ // wrongly. So we put it outside of function just in case.
+ 
+ void __kmp_i18n_catopen() {
++#ifndef _OPENMP_SGX
+   if (status == KMP_I18N_CLOSED) {
+     __kmp_acquire_bootstrap_lock(&lock);
+     if (status == KMP_I18N_CLOSED) {
+@@ -68,12 +71,14 @@ void __kmp_i18n_catopen() {
+     }
+     __kmp_release_bootstrap_lock(&lock);
+   }
++#endif
+ } // func __kmp_i18n_catopen
+ 
+ /* Linux* OS and OS X* part */
+ #if KMP_OS_UNIX
+ #define KMP_I18N_OK
+ 
++#ifndef _OPENMP_SGX
+ #include <nl_types.h>
+ 
+ #define KMP_I18N_NULLCAT ((nl_catd)(-1))
+@@ -86,7 +91,6 @@ http://www.opengroup.org/onlinepubs/000095399/basedefs/xbd_chap08.html#tag_08_02
+ http://www.opengroup.org/onlinepubs/000095399/functions/catopen.html
+ http://www.opengroup.org/onlinepubs/000095399/functions/setlocale.html
+ */
+-
+ void __kmp_i18n_do_catopen() {
+   int english = 0;
+   char *lang = __kmp_env_get("LANG");
+@@ -175,18 +179,21 @@ void __kmp_i18n_do_catopen() {
+     __kmp_str_buf_free(&version);
+   }
+ } // func __kmp_i18n_do_catopen
++#endif
+ 
+ void __kmp_i18n_catclose() {
++#ifndef _OPENMP_SGX
+   if (status == KMP_I18N_OPENED) {
+     KMP_DEBUG_ASSERT(cat != KMP_I18N_NULLCAT);
+     catclose(cat);
+     cat = KMP_I18N_NULLCAT;
+   }
+   status = KMP_I18N_CLOSED;
++#endif
+ } // func __kmp_i18n_catclose
+ 
+ char const *__kmp_i18n_catgets(kmp_i18n_id_t id) {
+-
++#ifndef _OPENMP_SGX
+   int section = get_section(id);
+   int number = get_number(id);
+   char const *message = NULL;
+@@ -209,13 +216,16 @@ char const *__kmp_i18n_catgets(kmp_i18n_id_t id) {
+     message = no_message_available;
+   }
+   return message;
++#else
++  return NULL;
++#endif
+ 
+ } // func __kmp_i18n_catgets
+ 
+ #endif // KMP_OS_UNIX
+ 
+ /* Windows* OS part. */
+-
++#ifndef _OPENMP_SGX
+ #if KMP_OS_WINDOWS
+ #define KMP_I18N_OK
+ 
+@@ -581,6 +591,7 @@ char const *__kmp_i18n_catgets(kmp_i18n_id_t id) {
+ } // func __kmp_i18n_catgets
+ 
+ #endif // KMP_OS_WINDOWS
++#endif // _OPENMP_SGX
+ 
+ // -----------------------------------------------------------------------------
+ 
+@@ -591,7 +602,7 @@ char const *__kmp_i18n_catgets(kmp_i18n_id_t id) {
+ // -----------------------------------------------------------------------------
+ 
+ void __kmp_i18n_dump_catalog(kmp_str_buf_t *buffer) {
+-
++#ifndef _OPENMP_SGX
+   struct kmp_i18n_id_range_t {
+     kmp_i18n_id_t first;
+     kmp_i18n_id_t last;
+@@ -617,6 +628,7 @@ void __kmp_i18n_dump_catalog(kmp_str_buf_t *buffer) {
+   }
+ 
+   __kmp_printf("%s", buffer->str);
++#endif // _OPENMP_SGX
+ 
+ } // __kmp_i18n_dump_catalog
+ 
+@@ -787,6 +799,7 @@ kmp_msg_t __kmp_msg_error_mesg(char const *mesg) {
+ 
+ // -----------------------------------------------------------------------------
+ void __kmp_msg(kmp_msg_severity_t severity, kmp_msg_t message, va_list args) {
++#ifndef _OPENMP_SGX
+   kmp_i18n_id_t format; // format identifier
+   kmp_msg_t fmsg; // formatted message
+   kmp_str_buf_t buffer;
+@@ -847,6 +860,7 @@ void __kmp_msg(kmp_msg_severity_t severity, kmp_msg_t message, va_list args) {
+ 
+   // __kmp_release_bootstrap_lock( & lock );  // GEH - this lock causing tests
+   // to hang on OS X*.
++#endif // _OPENMP_SGX
+ 
+ } // __kmp_msg
+ 
+@@ -858,6 +872,7 @@ void __kmp_msg(kmp_msg_severity_t severity, kmp_msg_t message, ...) {
+ }
+ 
+ void __kmp_fatal(kmp_msg_t message, ...) {
++#ifndef _OPENMP_SGX
+   va_list args;
+   va_start(args, message);
+   __kmp_msg(kmp_ms_fatal, message, args);
+@@ -866,6 +881,7 @@ void __kmp_fatal(kmp_msg_t message, ...) {
+   // Delay to give message a chance to appear before reaping
+   __kmp_thread_sleep(500);
+ #endif
++#endif // _OPENMP_SGX
+   __kmp_abort_process();
+ } // __kmp_fatal
+ 
+diff --git a/final/runtime/src/kmp_io.cpp b/final/runtime/src/kmp_io.cpp
+index 24c6e72..43d5468 100644
+--- a/final/runtime/src/kmp_io.cpp
++++ b/final/runtime/src/kmp_io.cpp
+@@ -125,11 +125,14 @@ static void __kmp_redirect_output(void) {
+ }
+ 
+ #else
++#ifndef _OPENMP_SGX
+ #define __kmp_stderr (stderr)
+ #define __kmp_stdout (stdout)
++#endif /*! _OPENMP_SGX */
+ #endif /* KMP_OS_WINDOWS */
+ 
+ void __kmp_vprintf(enum kmp_io out_stream, char const *format, va_list ap) {
++#ifndef _OPENMP_SGX
+ #if KMP_OS_WINDOWS
+   if (!__kmp_console_exists) {
+     __kmp_redirect_output();
+@@ -196,6 +199,9 @@ void __kmp_vprintf(enum kmp_io out_stream, char const *format, va_list ap) {
+     fflush(stream);
+ #endif
+   }
++#else
++  return;
++#endif
+ }
+ 
+ void __kmp_printf(char const *format, ...) {
+diff --git a/final/runtime/src/kmp_lock.h b/final/runtime/src/kmp_lock.h
+index 6a88d7b..e74d18b 100644
+--- a/final/runtime/src/kmp_lock.h
++++ b/final/runtime/src/kmp_lock.h
+@@ -158,11 +158,14 @@ extern void __kmp_destroy_nested_tas_lock(kmp_tas_lock_t *lck);
+ #define KMP_LOCK_STILL_HELD 0
+ #define KMP_LOCK_ACQUIRED_FIRST 1
+ #define KMP_LOCK_ACQUIRED_NEXT 0
++#ifndef _OPENMP_SGX
++// Disable KMP_USE_FUTEX macro
+ #ifndef KMP_USE_FUTEX
+ #define KMP_USE_FUTEX                                                          \
+   (KMP_OS_LINUX && !KMP_OS_CNK &&                                              \
+    (KMP_ARCH_X86 || KMP_ARCH_X86_64 || KMP_ARCH_ARM || KMP_ARCH_AARCH64))
+ #endif
++#endif // _OPENMP_SGX
+ #if KMP_USE_FUTEX
+ 
+ // ----------------------------------------------------------------------------
+diff --git a/final/runtime/src/kmp_os.h b/final/runtime/src/kmp_os.h
+index 3c2426b..cad1ccf 100644
+--- a/final/runtime/src/kmp_os.h
++++ b/final/runtime/src/kmp_os.h
+@@ -74,6 +74,13 @@
+ #define KMP_GROUP_AFFINITY 0
+ #endif
+ 
++#ifdef _OPENMP_SGX
++#undef KMP_AFFINITY_SUPPORTED
++#define KMP_AFFINITY_SUPPORTED 0
++#define KMP_GROUP_AFFINITY 0
++#endif
++
++
+ /* Check for quad-precision extension. */
+ #define KMP_HAVE_QUAD 0
+ #if KMP_ARCH_X86 || KMP_ARCH_X86_64
+@@ -892,6 +899,11 @@ typedef void (*microtask_t)(int *gtid, int *npr, ...);
+ #define KMP_USE_DYNAMIC_LOCK 1
+ #endif
+ 
++#ifdef _OPENMP_SGX 
++#undef KMP_USE_DYNAMIC_LOCK
++#define KMP_USE_DYNAMIC_LOCK 0
++#endif
++
+ // Enable Intel(R) Transactional Synchronization Extensions (Intel(R) TSX) if
+ // dynamic user lock is turned on
+ #if KMP_USE_DYNAMIC_LOCK
+diff --git a/final/runtime/src/kmp_runtime.cpp b/final/runtime/src/kmp_runtime.cpp
+index 0db3761..14d86aa 100644
+--- a/final/runtime/src/kmp_runtime.cpp
++++ b/final/runtime/src/kmp_runtime.cpp
+@@ -424,6 +424,7 @@ void __kmp_abort_process() {
+     __kmp_dump_debug_buffer();
+   }
+ 
++#ifndef _OPENMP_SGX
+   if (KMP_OS_WINDOWS) {
+     // Let other threads know of abnormal termination and prevent deadlock
+     // if abort happened during library initialization or shutdown
+@@ -443,7 +444,9 @@ void __kmp_abort_process() {
+   } else {
+     abort();
+   }
+-
++#else
++  abort();
++#endif
+   __kmp_infinite_loop();
+   __kmp_release_bootstrap_lock(&__kmp_exit_lock);
+ 
+@@ -5962,10 +5965,11 @@ static void __kmp_reap_thread(kmp_info_t *thread, int is_root) {
+ 
+ static void __kmp_internal_end(void) {
+   int i;
+-
++#ifndef _OPENMP_SGX
+   /* First, unregister the library */
+   __kmp_unregister_library();
+ 
++#endif
+ #if KMP_OS_WINDOWS
+   /* In Win static library, we can't tell when a root actually dies, so we
+      reclaim the data structures for any root threads that have died but not
+@@ -6325,6 +6329,9 @@ void __kmp_internal_end_thread(int gtid_req) {
+ #endif
+ } // __kmp_internal_end_thread
+ 
++# ifndef _OPENMP_SGX
++// OpenMP will be static linked to enclave. No need library registration
++
+ // -----------------------------------------------------------------------------
+ // Library registration stuff.
+ 
+@@ -6458,6 +6465,7 @@ void __kmp_unregister_library(void) {
+ 
+ // End of Library registration stuff.
+ // -----------------------------------------------------------------------------
++#endif // _OPENMP_SGX
+ 
+ #if KMP_MIC_SUPPORTED
+ 
+@@ -6498,11 +6506,14 @@ static void __kmp_do_serial_initialize(void) {
+   /* Initialize internal memory allocator */
+   __kmp_init_allocator();
+ 
++#ifndef _OPENMP_SGX
+   /* Register the library startup via an environment variable and check to see
+      whether another copy of the library is already registered. */
+ 
+   __kmp_register_library_startup();
+ 
++#endif // _OPENMP_SGX
++
+   /* TODO reinitialization of library */
+   if (TCR_4(__kmp_global.g.g_done)) {
+     KA_TRACE(10, ("__kmp_do_serial_initialize: reinitialization of library\n"));
+@@ -7130,9 +7141,13 @@ int __kmp_invoke_teams_master(int gtid) {
+ 
+ void __kmp_push_num_threads(ident_t *id, int gtid, int num_threads) {
+   kmp_info_t *thr = __kmp_threads[gtid];
+-
++#ifndef _OPENMP_SGX
+   if (num_threads > 0)
+     thr->th.th_set_nproc = num_threads;
++#else
++  if(num_threads > 0 && num_threads <= __kmp_xproc)
++    thr->th.th_set_nproc = num_threads;
++#endif
+ }
+ 
+ #if OMP_40_ENABLED
+@@ -7497,7 +7512,9 @@ void __kmp_cleanup(void) {
+ }
+ 
+ /* ------------------------------------------------------------------------ */
+-
++#ifndef _OPENMP_SGX
++// below two APIs are called by __kmpc_begin() and __kmpc_end()
++// Disable them in SGX environment
+ int __kmp_ignore_mppbeg(void) {
+   char *env;
+ 
+@@ -7519,6 +7536,7 @@ int __kmp_ignore_mppend(void) {
+   // By default __kmpc_end() is no-op.
+   return TRUE;
+ }
++#endif
+ 
+ void __kmp_internal_begin(void) {
+   int gtid;
+@@ -7872,12 +7890,14 @@ static int __kmp_aux_capture_affinity_field(int gtid, const kmp_info_t *th,
+     __kmp_expand_host_name(buf, BUFFER_SIZE);
+     rc = __kmp_str_buf_print(field_buffer, format, buf);
+   } break;
++#ifndef _OPENMP_SGX
+   case 'P':
+     rc = __kmp_str_buf_print(field_buffer, format, getpid());
+     break;
+   case 'i':
+     rc = __kmp_str_buf_print(field_buffer, format, __kmp_gettid());
+     break;
++#endif
+   case 'N':
+     rc = __kmp_str_buf_print(field_buffer, format, th->th.th_team->t.t_nproc);
+     break;
+diff --git a/final/runtime/src/kmp_settings.cpp b/final/runtime/src/kmp_settings.cpp
+index 6d049e4..56aae0a 100644
+--- a/final/runtime/src/kmp_settings.cpp
++++ b/final/runtime/src/kmp_settings.cpp
+@@ -480,6 +480,9 @@ static void __kmp_stg_parse_par_range(char const *name, char const *value,
+ } // __kmp_stg_parse_par_range
+ #endif
+ 
++#ifdef _OPENMP_SGX
++  extern "C" size_t get_max_tcs_num();
++#endif
+ int __kmp_initial_threads_capacity(int req_nproc) {
+   int nth = 32;
+ 
+@@ -493,6 +496,14 @@ int __kmp_initial_threads_capacity(int req_nproc) {
+   if (nth > __kmp_max_nth)
+     nth = __kmp_max_nth;
+ 
++#ifdef _OPENMP_SGX
++  /* For SGX, threads number should be not greater than (max_tcs_num - 1)*/
++  size_t tcs_num = get_max_tcs_num();
++  if(nth > tcs_num - 1)
++  {
++    nth = tcs_num - 1;
++  }
++#endif
+   return nth;
+ }
+ 
+@@ -5447,7 +5458,11 @@ void __kmp_env_initialize(char const *string) {
+     __kmp_affinity_format =
+         (char *)KMP_INTERNAL_MALLOC(sizeof(char) * KMP_AFFINITY_FORMAT_SIZE);
+   }
++#ifndef _OPENMP_SGX
+   KMP_STRCPY_S(__kmp_affinity_format, KMP_AFFINITY_FORMAT_SIZE, m.str);
++#else
++  KMP_STRNCPY_S(__kmp_affinity_format, KMP_AFFINITY_FORMAT_SIZE, m.str, m.len);
++#endif
+   __kmp_str_free(&m.str);
+ #endif
+ 
+diff --git a/final/runtime/src/kmp_utility.cpp b/final/runtime/src/kmp_utility.cpp
+index dc4c714..c307c1c 100644
+--- a/final/runtime/src/kmp_utility.cpp
++++ b/final/runtime/src/kmp_utility.cpp
+@@ -292,6 +292,9 @@ void __kmp_query_cpuid(kmp_cpuinfo_t *p) {
+ 
+ void __kmp_expand_host_name(char *buffer, size_t size) {
+   KMP_DEBUG_ASSERT(size >= sizeof(unknown));
++#ifdef _OPENMP_SGX
++  KMP_STRNCPY_S(buffer, size, unknown, sizeof(unknown));
++#else
+ #if KMP_OS_WINDOWS
+   {
+     DWORD s = size;
+@@ -304,8 +307,10 @@ void __kmp_expand_host_name(char *buffer, size_t size) {
+   if (gethostname(buffer, size) || buffer[size - 2] != 0)
+     KMP_STRCPY_S(buffer, size, unknown);
+ #endif
++#endif // _OPENMP_SGX
+ }
+ 
++#ifndef _OPENMP_SGX
+ /* Expand the meta characters in the filename:
+  * Currently defined characters are:
+  * %H the hostname
+@@ -408,3 +413,4 @@ void __kmp_expand_file_name(char *result, size_t rlen, char *pattern) {
+ 
+   *pos = '\0';
+ }
++#endif // _OPENMP_SGX
+diff --git a/final/runtime/src/kmp_wrapper_getpid.h b/final/runtime/src/kmp_wrapper_getpid.h
+index 47e2728..fc91c20 100644
+--- a/final/runtime/src/kmp_wrapper_getpid.h
++++ b/final/runtime/src/kmp_wrapper_getpid.h
+@@ -14,6 +14,8 @@
+ #ifndef KMP_WRAPPER_GETPID_H
+ #define KMP_WRAPPER_GETPID_H
+ 
++#ifndef _OPENMP_SGX
++
+ #if KMP_OS_UNIX
+ 
+ // On Unix-like systems (Linux* OS and OS X*) getpid() is declared in standard
+@@ -68,6 +70,8 @@ typedef int pid_t;
+    (kmp_uint32, kmp_uint64, KMP_UINT64_SPEC, and KMP_UNIT32_SPEC are defined in
+    "kmp_os.h".)  */
+ 
++#endif // _OPENMP_SGX
++
+ #endif // KMP_WRAPPER_GETPID_H
+ 
+ // end of file //
+diff --git a/final/runtime/src/kmp_wrapper_malloc.h b/final/runtime/src/kmp_wrapper_malloc.h
+index c8d2c70..df677bb 100644
+--- a/final/runtime/src/kmp_wrapper_malloc.h
++++ b/final/runtime/src/kmp_wrapper_malloc.h
+@@ -99,7 +99,9 @@
+ #elif KMP_OS_DRAGONFLY || KMP_OS_FREEBSD || KMP_OS_NETBSD || KMP_OS_OPENBSD
+ // Declared in "stdlib.h".
+ #elif KMP_OS_UNIX
++#ifndef _OPENMP_SGX
+ #include <alloca.h> // Linux* OS and OS X*: alloc() declared in "alloca".
++#endif
+ #else
+ #error Unknown or unsupported OS.
+ #endif
+diff --git a/final/runtime/src/sgx_stub.cpp b/final/runtime/src/sgx_stub.cpp
+new file mode 100644
+index 0000000..2294365
+--- /dev/null
++++ b/final/runtime/src/sgx_stub.cpp
+@@ -0,0 +1,63 @@
++/*
++ * Copyright (C) 2011-2019 Intel Corporation. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ *   * Redistributions of source code must retain the above copyright
++ *     notice, this list of conditions and the following disclaimer.
++ *   * Redistributions in binary form must reproduce the above copyright
++ *     notice, this list of conditions and the following disclaimer in
++ *     the documentation and/or other materials provided with the
++ *     distribution.
++ *   * Neither the name of Intel Corporation nor the names of its
++ *     contributors may be used to endorse or promote products derived
++ *     from this software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ *
++ */
++
++#ifdef _OPENMP_SGX
++#include "stdlib.h"
++#include "sgx_stub.h"
++
++extern kmp_uint64 __kmp_hardware_timestamp(void);
++extern int EDMM_supported;
++extern uint64_t __kmp_global_count;
++
++// hack for sscanf as we don't need it for SGX
++extern "C" int sscanf(const char *, const char *, ...)
++{
++   abort();
++   // only for compiling
++   return 1;
++}
++
++
++kmp_uint64 get_timestamp()
++{
++    if(EDMM_supported)
++    {
++        return __kmp_hardware_timestamp();
++    }
++    else
++    {
++        return __sync_add_and_fetch(&__kmp_global_count, 20*KMP_USEC_PER_SEC); 
++    }
++}
++
++#endif
++
++
+diff --git a/final/runtime/src/sgx_stub.h b/final/runtime/src/sgx_stub.h
+new file mode 100644
+index 0000000..5e81f5c
+--- /dev/null
++++ b/final/runtime/src/sgx_stub.h
+@@ -0,0 +1,51 @@
++/*
++ * Copyright (C) 2011-2019 Intel Corporation. All rights reserved.
++ *
++ * Redistribution and use in source and binary forms, with or without
++ * modification, are permitted provided that the following conditions
++ * are met:
++ *
++ *   * Redistributions of source code must retain the above copyright
++ *     notice, this list of conditions and the following disclaimer.
++ *   * Redistributions in binary form must reproduce the above copyright
++ *     notice, this list of conditions and the following disclaimer in
++ *     the documentation and/or other materials provided with the
++ *     distribution.
++ *   * Neither the name of Intel Corporation nor the names of its
++ *     contributors may be used to endorse or promote products derived
++ *     from this software without specific prior written permission.
++ *
++ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
++ * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
++ * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
++ * A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
++ * OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
++ * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
++ * LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
++ * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
++ * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
++ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
++ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
++ *
++ */
++
++#ifndef _SGX_STUB_H_
++#define _SGX_STUB_H_
++#ifdef _OPENMP_SGX
++#include "kmp_config.h"
++#include "kmp_os.h"
++#include "kmp.h"
++
++#ifdef __cplusplus
++extern "C" {
++#endif
++int sscanf(const char *, const char *, ...);
++
++kmp_uint64 get_timestamp();
++
++#ifdef __cplusplus
++}
++#endif
++
++#endif
++#endif
+diff --git a/final/runtime/src/z_Linux_util.cpp b/final/runtime/src/z_Linux_util.cpp
+index aa0302c..f4823b8 100644
+--- a/final/runtime/src/z_Linux_util.cpp
++++ b/final/runtime/src/z_Linux_util.cpp
+@@ -22,6 +22,7 @@
+ #include "kmp_wait_release.h"
+ #include "kmp_wrapper_getpid.h"
+ 
++#ifndef _OPENMP_SGX
+ #if !KMP_OS_DRAGONFLY && !KMP_OS_FREEBSD && !KMP_OS_NETBSD && !KMP_OS_OPENBSD
+ #include <alloca.h>
+ #endif
+@@ -60,9 +61,11 @@
+ #include <ctype.h>
+ #include <dirent.h>
+ #include <fcntl.h>
++#endif // _OPENMP_SGX 
+ 
+ #include "tsan_annotations.h"
+ 
++#ifndef _OPENMP_SGX
+ struct kmp_sys_timer {
+   struct timespec start;
+ };
+@@ -77,6 +80,7 @@ typedef void (*sig_func_t)(int);
+ STATIC_EFI2_WORKAROUND struct sigaction __kmp_sighldrs[NSIG];
+ static sigset_t __kmp_sigset;
+ #endif
++#endif // _OPENMP_SGX
+ 
+ static int __kmp_init_runtime = FALSE;
+ 
+@@ -447,6 +451,8 @@ void __kmp_terminate_thread(int gtid) {
+    determined exactly, FALSE if incremental refinement is necessary. */
+ static kmp_int32 __kmp_set_stack_info(int gtid, kmp_info_t *th) {
+   int stack_data;
++#ifndef _OPENMP_SGX
++// Disable pthread_attr* functions in SGX
+ #if KMP_OS_LINUX || KMP_OS_DRAGONFLY || KMP_OS_FREEBSD || KMP_OS_NETBSD ||     \
+         KMP_OS_HURD
+   pthread_attr_t attr;
+@@ -488,6 +494,7 @@ static kmp_int32 __kmp_set_stack_info(int gtid, kmp_info_t *th) {
+   }
+ #endif /* KMP_OS_LINUX || KMP_OS_DRAGONFLY || KMP_OS_FREEBSD || KMP_OS_NETBSD ||
+               KMP_OS_HURD */
++#endif
+   /* Use incremental refinement starting from initial conservative estimate */
+   TCW_PTR(th->th.th_info.ds.ds_stacksize, 0);
+   TCW_PTR(th->th.th_info.ds.ds_stackbase, &stack_data);
+@@ -1108,7 +1115,6 @@ void __kmp_reap_worker(kmp_info_t *th) {
+                   th->th.th_info.ds.ds_gtid, exit_val));
+   }
+ #endif /* KMP_DEBUG */
+-
+   KA_TRACE(10, ("__kmp_reap_worker: done reaping T#%d\n",
+                 th->th.th_info.ds.ds_gtid));
+ 
+@@ -1259,6 +1265,7 @@ void __kmp_disable(int *old_state) {
+ #endif
+ }
+ 
++#ifndef _OPENMP_SGX
+ static void __kmp_atfork_prepare(void) {
+   __kmp_acquire_bootstrap_lock(&__kmp_initz_lock);
+   __kmp_acquire_bootstrap_lock(&__kmp_forkjoin_lock);
+@@ -1360,22 +1367,28 @@ static void __kmp_atfork_child(void) {
+   //       startup; look at kmp_global.cpp and etc.
+   //__kmp_internal_begin ();
+ }
++#endif
+ 
+ void __kmp_register_atfork(void) {
+   if (__kmp_need_register_atfork) {
++#ifndef _OPENMP_SGX /*Inside SGX don't support fork(2) function.*/
+     int status = pthread_atfork(__kmp_atfork_prepare, __kmp_atfork_parent,
+                                 __kmp_atfork_child);
+     KMP_CHECK_SYSFAIL("pthread_atfork", status);
++#endif
+     __kmp_need_register_atfork = FALSE;
+   }
+ }
+ 
+ void __kmp_suspend_initialize(void) {
++#ifndef _OPENMP_SGX
++// Disable pthread_attr* in SGX environment
+   int status;
+   status = pthread_mutexattr_init(&__kmp_suspend_mutex_attr);
+   KMP_CHECK_SYSFAIL("pthread_mutexattr_init", status);
+   status = pthread_condattr_init(&__kmp_suspend_cond_attr);
+   KMP_CHECK_SYSFAIL("pthread_condattr_init", status);
++#endif
+ }
+ 
+ static void __kmp_suspend_initialize_thread(kmp_info_t *th) {
+@@ -1667,6 +1680,7 @@ void __kmp_resume_monitor() {
+ #endif // KMP_USE_MONITOR
+ 
+ void __kmp_yield(int cond) {
++#ifndef _OPENMP_SGX
+   if (!cond)
+     return;
+ #if KMP_USE_MONITOR
+@@ -1677,15 +1691,23 @@ void __kmp_yield(int cond) {
+     return;
+ #endif
+   sched_yield();
++#endif
+ }
+ 
+ void __kmp_gtid_set_specific(int gtid) {
+   if (__kmp_init_gtid) {
+-    int status;
+-    status = pthread_setspecific(__kmp_gtid_threadprivate_key,
++    int status=0;
++#ifdef _OPENMP_SGX
++    pthread_t self = pthread_self();
++    if(NULL == self)
++        __kmp_gtid_threadprivate_data = (void *)(intptr_t)(gtid + 1);
++    else
++#endif
++      status = pthread_setspecific(__kmp_gtid_threadprivate_key,
+                                  (void *)(intptr_t)(gtid + 1));
+     KMP_CHECK_SYSFAIL("pthread_setspecific", status);
+-  } else {
++
++  } else {	
+     KA_TRACE(50, ("__kmp_gtid_set_specific: runtime shutdown, returning\n"));
+   }
+ }
+@@ -1697,6 +1719,11 @@ int __kmp_gtid_get_specific() {
+                   "KMP_GTID_SHUTDOWN\n"));
+     return KMP_GTID_SHUTDOWN;
+   }
++#ifdef _OPENMP_SGX
++  if(NULL == pthread_self())
++    gtid = (int)(size_t)__kmp_gtid_threadprivate_data;
++  else
++#endif
+   gtid = (int)(size_t)pthread_getspecific(__kmp_gtid_threadprivate_key);
+   if (gtid == 0) {
+     gtid = KMP_GTID_DNE;
+@@ -1708,6 +1735,14 @@ int __kmp_gtid_get_specific() {
+   return gtid;
+ }
+ 
++#ifndef _OPENMP_SGX
++// APIs are not called:
++//      __kmp_read_cpu_time()
++//      __kmp_read_system_info()
++//      __kmp_clear_system_time()
++// The API __kmp_read_system_time() is called by __kmp_register_library_startup()
++// Which is disabled in SGX.
++// So disable all these APIs in SGX.
+ double __kmp_read_cpu_time(void) {
+   /*clock_t   t;*/
+   struct tms buffer;
+@@ -1766,15 +1801,24 @@ void __kmp_clear_system_time(void) {
+   KMP_CHECK_SYSFAIL_ERRNO("gettimeofday", status);
+   TIMEVAL_TO_TIMESPEC(&tval, &__kmp_sys_timer_data.start);
+ }
++#endif // _OPENMP_SGX
+ 
++#ifdef _OPENMP_SGX
++extern "C" size_t get_max_tcs_num();
++extern uint32_t g_cpu_core_num;
++#endif
+ static int __kmp_get_xproc(void) {
+ 
+   int r = 0;
+ 
+ #if KMP_OS_LINUX || KMP_OS_DRAGONFLY || KMP_OS_FREEBSD || KMP_OS_NETBSD ||     \
+         KMP_OS_OPENBSD || KMP_OS_HURD
+-
++#ifndef _OPENMP_SGX
+   r = sysconf(_SC_NPROCESSORS_ONLN);
++#else
++  size_t tcs_num = get_max_tcs_num();
++  r = tcs_num > g_cpu_core_num ? g_cpu_core_num : tcs_num;
++#endif
+ 
+ #elif KMP_OS_DARWIN
+ 
+@@ -1804,6 +1848,7 @@ static int __kmp_get_xproc(void) {
+ 
+ } // __kmp_get_xproc
+ 
++#ifndef _OPENMP_SGX
+ int __kmp_read_from_file(char const *path, char const *format, ...) {
+   int result;
+   va_list args;
+@@ -1817,6 +1862,7 @@ int __kmp_read_from_file(char const *path, char const *format, ...) {
+ 
+   return result;
+ }
++#endif
+ 
+ void __kmp_runtime_initialize(void) {
+   int status;
+@@ -1835,6 +1881,7 @@ void __kmp_runtime_initialize(void) {
+ 
+   __kmp_xproc = __kmp_get_xproc();
+ 
++#ifndef _OPENMP_SGX 
+   if (sysconf(_SC_THREADS)) {
+ 
+     /* Query the maximum number of threads */
+@@ -1853,19 +1900,27 @@ void __kmp_runtime_initialize(void) {
+       __kmp_sys_min_stksize = KMP_MIN_STKSIZE;
+     }
+   }
++#else
++  __kmp_sys_max_nth = get_max_tcs_num() - 1;
++#endif // _OPENMP_SGX
+ 
+   /* Set up minimum number of threads to switch to TLS gtid */
+   __kmp_tls_gtid_min = KMP_TLS_GTID_MIN;
+ 
++
+   status = pthread_key_create(&__kmp_gtid_threadprivate_key,
+                               __kmp_internal_end_dest);
+   KMP_CHECK_SYSFAIL("pthread_key_create", status);
++#ifndef _OPENMP_SGX
+   status = pthread_mutexattr_init(&mutex_attr);
+   KMP_CHECK_SYSFAIL("pthread_mutexattr_init", status);
++#endif
+   status = pthread_mutex_init(&__kmp_wait_mx.m_mutex, &mutex_attr);
+   KMP_CHECK_SYSFAIL("pthread_mutex_init", status);
++#ifndef _OPENMP_SGX
+   status = pthread_condattr_init(&cond_attr);
+   KMP_CHECK_SYSFAIL("pthread_condattr_init", status);
++#endif
+   status = pthread_cond_init(&__kmp_wait_cv.c_cond, &cond_attr);
+   KMP_CHECK_SYSFAIL("pthread_cond_init", status);
+ #if USE_ITT_BUILD
+@@ -1904,10 +1959,19 @@ void __kmp_runtime_destroy(void) {
+   __kmp_init_runtime = FALSE;
+ }
+ 
++#ifndef _OPENMP_SGX
+ /* Put the thread to sleep for a time period */
+ /* NOTE: not currently used anywhere */
+ void __kmp_thread_sleep(int millis) { sleep((millis + 500) / 1000); }
++#endif
+ 
++#ifndef _OPENMP_SGX
++//__kmp_elapsed() is called in __kmp_get_load_balance() if USE_LOAD_BALANCE macro is enabled
++// Disable this function as USE_LOAD_BALANCE is disabled for SGX
++//
++// __kmp_initialize_system_tick() is called by __kmp_register_library_startup()
++// Disable it as we don't need __kmp_register_library_startup() in SGX enclave.
++//
+ /* Calculate the elapsed wall clock time for the user */
+ void __kmp_elapsed(double *t) {
+   int status;
+@@ -1959,6 +2023,9 @@ void __kmp_initialize_system_tick() {
+ }
+ #endif
+ 
++// This function is called by __kmp_register_library_startup()
++// Disable this function for SGX as we don't need __kmp_register_library_startup()
++//
+ /* Determine whether the given address is mapped into the current address
+    space. */
+ 
+@@ -2070,6 +2137,8 @@ int __kmp_is_address_mapped(void *addr) {
+ 
+ } // __kmp_is_address_mapped
+ 
++#endif // _OPENMP_SGX
++
+ #ifdef USE_LOAD_BALANCE
+ 
+ #if KMP_OS_DARWIN || KMP_OS_NETBSD
+-- 
+2.17.1
+

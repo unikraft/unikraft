@@ -1,0 +1,24 @@
+///-------------------------------------------------------------------
+// Macros for import/export declarations
+//-------------------------------------------------------------------
+
+#ifndef CPPMICROSERVICES_@PROJECT_NAME@EXPORT_H
+#define CPPMICROSERVICES_@PROJECT_NAME@EXPORT_H
+
+#include "cppmicroservices/GlobalConfig.h"
+
+#ifdef US_BUILD_SHARED_LIBS
+  // We are building a shared lib
+  #ifdef @PROJECT_TARGET@_EXPORTS
+    #define US_@PROJECT_NAME@_EXPORT US_ABI_EXPORT
+  #else
+    #define US_@PROJECT_NAME@_EXPORT US_ABI_IMPORT
+  #endif
+#else
+  // We are building a static lib
+  // Don't hide RTTI symbols of definitions in the C++ Micro Services
+  // headers that are included in DSOs with hidden visibility
+  #define US_@PROJECT_NAME@_EXPORT US_ABI_EXPORT
+#endif
+
+#endif // CPPMICROSERVICES_@PROJECT_NAME@EXPORT_H

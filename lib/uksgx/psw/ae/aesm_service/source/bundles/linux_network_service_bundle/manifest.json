@@ -1,0 +1,7 @@
+{
+  "bundle.symbolic_name" : "linux_network_service_symbolic_name",
+  "bundle.activator" : true,
+  "bundle.name" : "Linux Network Service",
+  "bundle.description" : "This bundle provide Linux Network Service",
+  "bundle.version" : "2.0.0"
+}

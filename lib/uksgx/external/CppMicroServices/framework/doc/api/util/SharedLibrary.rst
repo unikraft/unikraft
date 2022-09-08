@@ -1,0 +1,4 @@
+SharedLibrary
+-------------
+
+.. doxygenclass:: cppmicroservices::SharedLibrary

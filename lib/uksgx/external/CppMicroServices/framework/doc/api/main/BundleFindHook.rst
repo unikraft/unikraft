@@ -1,0 +1,4 @@
+BundleFindHook
+--------------
+
+.. doxygenstruct:: cppmicroservices::BundleFindHook

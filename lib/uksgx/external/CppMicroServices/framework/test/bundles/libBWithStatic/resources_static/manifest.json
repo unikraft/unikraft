@@ -1,0 +1,4 @@
+{
+  "bundle.symbolic_name" : "TestBundleImportedByB",
+  "bundle.activator" : true
+}

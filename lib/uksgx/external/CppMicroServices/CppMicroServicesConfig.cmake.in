@@ -1,0 +1,155 @@
+# A package config for @PROJECT_NAME@.
+# This file loads component specific configuration files and
+# sets the following variables which can be used in other
+# CMake projects to build and link against @PROJECT_NAME@:
+#
+#   US_LIBRARIES
+#   US_RUNTIME_LIBRARY_DIRS
+#
+# The following variables are aliases for the ones above:
+#
+#   CppMicroServices_LIBRARIES
+#   CppMicroServices_RUNTIME_LIBRARY_DIRS
+#
+# To specify a compatible version for a specific component,
+# set the following variable before calling find_package:
+#
+#   US_<component>_FIND_VERSION
+#
+# After find_package returns successfully, the following additional
+# variables will be set:
+#
+#   US_FOUND
+#   CPPMICROSERVICES_FOUND
+#
+#   US_RCC_EXECUTABLE_TARGET
+#
+#   US_VERSION
+#   US_VERSION_MAJOR
+#   US_VERSION_MINOR
+#   US_VERSION_PATCH
+#   US_VERSION_TWEAK
+#   US_VERSION_COUNT
+#
+# Additional component specific variables:
+#
+#   US_<component>_FOUND
+#
+#   US_<component>_VERSION
+#   US_<component>_VERSION_MAJOR
+#   US_<component>_VERSION_MINOR
+#   US_<component>_VERSION_PATCH
+#   US_<component>_VERSION_TWEAK
+#   US_<component>_VERSION_COUNT
+#
+
+@PACKAGE_INIT@
+
+set(US_CMAKE_MINIMUM_REQUIRED_VERSION @US_CMAKE_MINIMUM_REQUIRED_VERSION@)
+set(US_ENABLE_THREADING_SUPPORT @US_ENABLE_THREADING_SUPPORT@)
+
+cmake_minimum_required(VERSION ${US_CMAKE_MINIMUM_REQUIRED_VERSION})
+
+list(APPEND CMAKE_MODULE_PATH "@PACKAGE_CONFIG_CMAKE_DIR@")
+
+set(US_BUNDLE_INIT_TEMPLATE "@PACKAGE_CONFIG_CMAKE_DIR@/BundleInit.cpp")
+set(US_RESOURCE_RC_TEMPLATE "@PACKAGE_CONFIG_CMAKE_DIR@/cppmicroservices_resources.rc.in")
+set(US_CMAKE_RESOURCE_DEPENDENCIES_CPP "@PACKAGE_CONFIG_CMAKE_DIR@/CMakeResourceDependencies.cpp")
+
+set(US_RCC_EXECUTABLE_TARGET @US_RCC_EXECUTABLE_TARGET@)
+if(NOT TARGET ${US_RCC_EXECUTABLE_TARGET})
+  include("${CMAKE_CURRENT_LIST_DIR}/@PROJECT_NAME@Targets.cmake")
+endif()
+
+# Include helper macros
+include(CMakeParseArguments)
+include(FindPackageHandleStandardArgs)
+
+include("@PACKAGE_CONFIG_CMAKE_DIR@/usFunctionGenerateBundleInit.cmake")
+include("@PACKAGE_CONFIG_CMAKE_DIR@/usFunctionAddResources.cmake")
+include("@PACKAGE_CONFIG_CMAKE_DIR@/usFunctionCheckCompilerFlags.cmake")
+include("@PACKAGE_CONFIG_CMAKE_DIR@/usFunctionEmbedResources.cmake")
+include("@PACKAGE_CONFIG_CMAKE_DIR@/usFunctionCheckResourceLinking.cmake")
+include("@PACKAGE_CONFIG_CMAKE_DIR@/usFunctionGetResourceSource.cmake")
+
+usFunctionCheckResourceLinking()
+
+# Required packages
+
+if(US_ENABLE_THREADING_SUPPORT AND NOT CMAKE_THREAD_LIBS_INIT)
+  set(THREADS_PREFER_PTHREAD_FLAG 1)
+  find_package(Threads REQUIRED)
+endif()
+
+# Clear variables
+set(US_LIBRARIES )
+set(US_RUNTIME_LIBRARY_DIRS )
+
+# Components support
+set(US_BUNDLES Framework HttpService WebConsole ShellService) # ConfigAdmin EventAdmin ...
+
+set(US_Framework_BUNDLE_DEPS )
+set(US_HttpService_BUNDLE_DEPS Framework)
+set(US_WebConsole_BUNDLE_DEPS ${US_HttpService_BUNDLE_DEPS} HttpService)
+set(US_ShellService_BUNDLE_DEPS Framework)
+
+if(NOT @PROJECT_NAME@_FIND_COMPONENTS)
+  set(@PROJECT_NAME@_FIND_COMPONENTS Framework)
+endif()
+
+set(US_BUNDLES_NEEDED )
+foreach(component ${@PROJECT_NAME@_FIND_COMPONENTS})
+  list(APPEND US_BUNDLES_NEEDED ${US_${component}_BUNDLE_DEPS} ${component})
+endforeach()
+list(REMOVE_DUPLICATES US_BUNDLES_NEEDED)
+
+set(@PROJECT_NAME@_FOUND TRUE)
+foreach(component ${US_BUNDLES_NEEDED})
+  if(NOT EXISTS "${CMAKE_CURRENT_LIST_DIR}/us${component}Config.cmake")
+    set(US_${component}_FOUND 0)
+    set(CppMicroServices_${component}_FOUND 0)
+  else()
+    find_package(us${component} ${US_${component}_FIND_VERSION} QUIET REQUIRED
+                 HINTS ${CMAKE_CURRENT_LIST_DIR}
+                 NO_DEFAULT_PATH
+                )
+    mark_as_advanced(us${component}_DIR)
+    set(US_${component}_FOUND ${us${component}_FOUND})
+    set(CppMicroServices_${component}_FOUND ${US_${component}_FOUND})
+  endif()
+
+  if(US_${component}_FOUND)
+    list(APPEND US_LIBRARIES ${US_${component}_LIBRARIES})
+    list(APPEND US_RUNTIME_LIBRARY_DIRS ${US_${component}_RUNTIME_LIBRARY_DIRS})
+
+    set(US_${component}_VERSION ${${component}_VERSION})
+    set(US_${component}_VERSION_MAJOR ${${component}_VERSION_MAJOR})
+    set(US_${component}_VERSION_MINOR ${${component}_VERSION_MINOR})
+    set(US_${component}_VERSION_PATCH ${${component}_VERSION_PATCH})
+    set(US_${component}_VERSION_TWEAK ${${component}_VERSION_TWEAK})
+    set(US_${component}_VERSION_COUNT ${${component}_VERSION_COUNT})
+  else()
+    if(@PROJECT_NAME@_FIND_REQUIRED_${component})
+      set(@PROJECT_NAME@_FOUND FALSE)
+    endif()
+  endif()
+endforeach()
+
+if(US_LIBRARIES)
+  list(REMOVE_DUPLICATES US_LIBRARIES)
+endif()
+if(US_RUNTIME_LIBRARY_DIRS)
+  list(REMOVE_DUPLICATES US_RUNTIME_LIBRARY_DIRS)
+endif()
+
+set(CppMicroServices_LIBRARIES ${US_LIBRARIES})
+set(CppMicroServices_RUNTIME_LIBRARY_DIRS ${US_RUNTIME_LIBRARY_DIRS})
+
+set(@PROJECT_NAME@_CONFIG ${CMAKE_CURRENT_LIST_FILE})
+find_package_handle_standard_args(@PROJECT_NAME@
+  HANDLE_COMPONENTS
+  CONFIG_MODE
+)
+
+string(TOUPPER "@PROJECT_NAME@" @PROJECT_NAME@_UPPER)
+set(US_FOUND ${${@PROJECT_NAME@_UPPER}_FOUND})

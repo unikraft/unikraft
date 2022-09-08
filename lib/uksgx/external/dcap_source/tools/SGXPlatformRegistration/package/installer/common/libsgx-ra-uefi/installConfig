@@ -1,0 +1,8 @@
+RA_UEFI_VERSION="1.0"
+TARBALL_NAME=libsgx-ra-uefi_1.0.orig.tar.gz
+
+RA_UEFI_PACKAGE_NAME=libsgx-ra-uefi
+RA_UEFI_DEV_PACKAGE_NAME=libsgx-ra-uefi-dev
+
+LIB_DIR=lib
+INC_DIR=include

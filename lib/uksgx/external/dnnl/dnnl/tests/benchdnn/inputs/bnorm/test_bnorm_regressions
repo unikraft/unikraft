@@ -1,0 +1,11 @@
+--skip-impl=ref
+--tag=nhwc,nchw,nChw8c,nChw16c
+
+--dir=FWD_D,BWD_DW --flags=SR,GS,S --attr=                --batch=bnorm_regressions
+--dir=FWD_D        --flags=GS,S    --attr=post_ops='relu' --batch=bnorm_regressions
+--dir=BWD_D        --flags=        --attr=                --batch=bnorm_regressions
+
+# Numerical stability issues
+# catastrophic cancellation results in error > machine_epsilon
+--dir=FWD_D
+--flags=S mb2ic128ih2 mb2ic1024ih2

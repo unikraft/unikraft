@@ -1,0 +1,51 @@
+# pylint:disable=I0011,W0401,W0614,C0103,E0602
+############################################################################
+# Copyright 2017 Intel Corporation
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+############################################################################
+"""Build configuration for tiny math library.
+"""
+Import('*')
+env.PartName('math')
+
+env.DependsOn([
+    Component('member.tiny_stdlib'),
+    Component('tinycommon', requires=REQ.HEADERS)
+])
+
+include_files = Pattern(src_dir='.',
+                        includes=['*.h'],
+                        recursive=False).files()
+
+src_files = Pattern(src_dir='src',
+                    includes=['*.c'],
+                    recursive=False).files()
+
+env.Append(CPPPATH='#')
+
+outputs = env.Library('${PART_SHORT_NAME}', src_files)
+
+sdk_outs = env.Sdk(outputs)
+env.SdkInclude(include_files, sub_dir='${PART_SHORT_NAME}')
+
+if 'install_lib' in env['MODE'] and 'shared' not in env['MODE']:
+    env.InstallLib(outputs)
+
+is_utest_build = False
+for i in BUILD_TARGETS:
+    if "utest::" in str(i):
+        is_utest_build = True
+if is_utest_build:
+    env.Part(parts_file='unittests/utest.parts',
+             CONFIG=DefaultEnvironment().subst('$CONFIG'))

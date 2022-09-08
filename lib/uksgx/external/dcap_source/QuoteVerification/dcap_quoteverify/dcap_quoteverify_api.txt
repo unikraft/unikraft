@@ -1,0 +1,131 @@
+Intel® Software Guard Extensions Data Center Attestation Primitives (Intel® SGX DCAP) Quote Verification Library
+
+API and structure Definitions
+===============
+
+/**
+Parameters:
+    p_quote [In]
+        Pointer to an SGX Quote.  Currently, the QvE only supports Quotes with CertType = 5.
+    quote_size [In]
+        Size of the buffer pointed to by p_quote (in bytes).
+    p_quote_collateral [In]
+        If not NULL, this is a pointer to the Quote Certification Collateral provided by the caller.
+        If it is NULL, the DCAP library will attempt to retrieve the collateral from the Platform Quote Provider library if available.
+        If the provider library is not available or the collateral cannot be retrieved, this API will return and error.
+    expiration_check_date [In]
+        This is the date that the QVE will use to determine if any of the inputted collateral have expired.
+    p_collateral_expiration_status [Out]
+        Address of the outputted expiration status.  This input must not be NULL.
+        When this API returns a 0 at this address, none of the inputted collateral has expired as compared to the inputted expiration_check_date.
+    p_quote_verification_result [Out]
+        Address of the outputted quote verification result.
+    p_qve_report_info [In/Out]
+        This parameter is optional.  If not NULL, the QvE will generate a report using the target_info provided in the sgx_ql_qe_report_info_t structure .
+        If NULL, the quote can still be verified on a non-SGX capable platform or by a QVE but the results cannot be cryptographically verified.
+    supplemental_data_size [In]
+        Size of the buffer pointed to by p_supplemental_data (in bytes).
+        The value should match the value retuned by the sgx_qve_get_supplemental_data_size().
+    p_supplemental_data [Out]
+        The parameter is optional.  If it is NULL, supplemental_data_size must be 0.
+        This data can be used by the CSP or Relying Party to enforce a different quote verification policy than enforced by this API.
+
+Return Values:
+    SGX_QL_SUCCESS:
+        Successfully evaluated the quote.
+    SGX_QL_INVALID_PARAMETER:
+        One of the input parameters value.
+    SGX_QL_QUOTE_FORMAT_UNSUPPORTED:
+        The inputted quote format is not supported.  Either because the header information is not supported or the quote is malformed in some way.
+    SGX_QL_QUOTE_CERTIFICATION_DATA_UNSUPPORTED:
+        The quote verifier doesn't support the certification data in the Quote.  Currently, the Intel QVE only supported CertType = 5.
+    SGX_QL_APP_REPORT_UNSUPPORTED_FORMAT:
+        The quote verifier doesn't support the format of the application REPORT the Quote.
+    SGX_QL_QE_REPORT_UNSUPPORTED_FORMAT:
+        The quote verifier doesn't support the format of the application REPORT the Quote.
+    SGX_QL_QE_REPORT_INVALID_SIGNATURE:
+        The signature over the QE Report is invalid.
+    SGX_QL_QE_REPORT_ATT_KEY_MISMATCH:
+        The attestation key provided in the Quote was not produced by the QE described in the quote.
+    SGX_QL_PCK_CERT_UNSUPPORTED_FORMAT:
+        The format of the PCK Cert is unsupported.
+    SGX_QL_PCK_CERT_CHAIN_ERROR:
+        There was an error verifying the PCK signature chain including PCK Cert revocation.
+    SGX_QL_TCBINFO_UNSUPPORTED_FORMAT:
+        The format of the TCBInfo structure is unsupported.
+    SGX_QL_TCBINFO_CHAIN_ERROR:
+        There was an error verifying the TCBInfo signature chain including TCBInfo revocation.
+    SGX_QL_TCBINFO_MISMATCH:
+        PCK Cert FMSPc does not match the TCBInfo FMSPc.
+    SGX_QL_QEIDENTITY_UNSUPPORTED_FORMAT:
+        The format of the QEIdentity structure is unsupported.
+    SGX_QL_QEIDENTITY_MISMATCH:
+        The Quote's QE doesn't match the inputted expected QEIdentity.
+    SGX_QL_QEIDENTITY_CHAIN_ERROR:
+        There was an error verifying the QEIdentity signature chain including QEIdentity signature revocation.
+    SGX_QL_OUT_OF_MEMORY:
+        Heap memory allocation error in library or enclave.
+    SGX_QL_ENCLAVE_LOAD_ERROR:
+        Unable to load QvE.  Could be due to file I/O error, loading infrastructure error or insufficient enclave memory.
+    SGX_QL_ENCLAVE_LOST:
+        Enclave lost after power transition or used in child process created by linux:fork().
+    SGX_QL_INVALID_REPORT:
+        Report MAC check failed on application report.
+    SGX_QL_PLATFORM_LIB_UNAVAILABLE:
+        The Quote Library could not locate the provider library.
+    SGX_QL_UNABLE_TO_GENERATE_REPORT:
+        The QvE was unable to generate its own report targeting the application enclave because there is an enclave compatibility issue.
+    SGX_QL_UNABLE_TO_GET_COLLATERAL:
+        The Quote Library was available but the quote library could not retrieve the data.
+    SGX_QL_ERROR_UNEXPECTED:
+        An unexpected internal error occurred.
+*/
+quote3_error_t sgx_qv_verify_quote(
+    const uint8_t *p_quote,
+    uint32_t quote_size,
+    const sgx_ql_qv_collateral_t *p_quote_collateral,
+    const time_t expiration_check_date,
+    uint32_t *p_collateral_expiration_status,
+    sgx_ql_qv_result_t *p_quote_verification_result,
+    sgx_ql_qe_report_info_t *p_qve_report_info,
+    uint32_t supplemental_data_size,
+    uint8_t *p_supplemental_data);
+
+/**
+Parameters:
+    p_data_size [Out]
+        Pointer to the supplemental data required size.
+*/
+quote3_error_t sgx_qv_get_quote_supplemental_data_size(
+    uint32_t *p_data_size);
+
+
+/**
+Parameters:
+    policy [In]
+        Set QvE load policy. Possible values:
+            SGX_QL_PERSISTENT, ///< QvE is initialized on first use and reused until process ends.
+            SGX_QL_EPHEMERAL,  ///< QvE is initialized and terminated on every verification.
+                               ///< If a previous QvE exists, it is stopped & restarted before verification.
+            SGX_QL_DEFAULT = SGX_QL_PERSISTENT
+.
+*/
+quote3_error_t sgx_qv_set_enclave_load_policy(sgx_ql_request_policy_t policy);
+
+
+/**
+Parameters:
+    path_type [In]
+        Set path type. Possible values:
+            SGX_QV_QVE_PATH, ///< Set the full path of QvE
+            SGX_QV_QPL_PATH,  ///< Set the full path of QPL
+    p_path [In]
+        Null terminated string of the full path
+
+Return Values:
+    SGX_QL_SUCCESS:
+        Successfully evaluated the quote.
+    SGX_QL_ERROR_INVALID_PARAMETER:
+        The parameter is incorrect.
+*/
+ quote3_error_t sgx_qv_set_path(sgx_qv_path_type_t path_type, const char *p_path)

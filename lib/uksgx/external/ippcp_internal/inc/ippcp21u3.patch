@@ -1,0 +1,12 @@
+--- ipp-crypto/include/ippcp.h	2021-08-04 22:06:05.695679315 +0800
++++ inc/ippcp.h	2021-08-05 18:31:57.496601097 +0800
+@@ -23,6 +23,9 @@
+ #if !defined( IPPCP_H__ ) || defined( _OWN_BLDPCS )
+ #define IPPCP_H__
+ 
++#ifndef _SGX_IPPCP_H_
++#include "sgx_ippcp.h"
++#endif
+ 
+ #ifndef IPPCPDEFS_H__
+   #include "ippcpdefs.h"

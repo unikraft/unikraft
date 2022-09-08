@@ -1,0 +1,4 @@
+Constants
+---------
+
+.. doxygennamespace:: cppmicroservices::Constants

@@ -1,0 +1,5 @@
+QE3_LOGIC_VERSION="1.0"
+TARBALL_NAME=libsgx-qe3-logic_1.0.orig.tar.gz
+
+QE3_LOGIC_PACKAGE_NAME=libsgx-qe3-logic
+LIB_DIR=lib

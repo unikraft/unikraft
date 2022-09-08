@@ -1,0 +1,1270 @@
+{
+	"tcbInfo":
+	{
+		"id":"SGX",
+		"version":3,
+		"issueDate":"2018-07-23T14:35:49Z",
+		"nextUpdate":"2018-07-30T14:35:49Z",
+		"fmspc":"00707f000000",
+		"pceId":"0000",
+		"tcbType":0,
+		"tcbEvaluationDataNumber":0,
+		"tcbLevels":
+		[
+			{
+				"tcb":
+				{
+					"sgxtcbcomponents":
+					[
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"SW",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"BIOS",
+							"type":"Patch@Reset"
+						}
+					],
+					"pcesvn":7,
+					"tdxtcbcomponents":
+					[
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"SW",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"BIOS",
+							"type":"Patch@Reset"
+						}
+					]
+				},
+				"tcbDate":"2020-02-05T14:35:49Z",
+				"tcbStatus":"UpToDate",
+				"AdvisoryIDs":
+				[
+					"INTEL-SA-00079",
+					"INTEL-SA-00076"
+				]
+			},
+			{
+				"tcb":
+				{
+					"sgxtcbcomponents":
+					[
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"SW",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"BIOS",
+							"type":"Patch@Reset"
+						}
+					],
+					"pcesvn":6,
+					"tdxtcbcomponents":
+					[
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"SW",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"BIOS",
+							"type":"Patch@Reset"
+						}
+					]
+				},
+				"tcbDate":"2020-02-05T14:35:49Z",
+				"tcbStatus":"SWHardeningNeeded",
+				"AdvisoryIDs":
+				[
+					"INTEL-SA-00079",
+					"INTEL-SA-00076"
+				]
+			},
+			{
+				"tcb":
+				{
+					"sgxtcbcomponents":
+					[
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"SW",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"BIOS",
+							"type":"Patch@Reset"
+						}
+					],
+					"pcesvn":5,
+					"tdxtcbcomponents":
+					[
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"SW",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"BIOS",
+							"type":"Patch@Reset"
+						}
+					]
+				},
+				"tcbDate":"2020-02-05T14:35:49Z",
+				"tcbStatus":"ConfigurationNeeded",
+				"AdvisoryIDs":
+				[
+					"INTEL-SA-00079",
+					"INTEL-SA-00076"
+				]
+			},
+			{
+				"tcb":
+				{
+					"sgxtcbcomponents":
+					[
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"SW",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"BIOS",
+							"type":"Patch@Reset"
+						}
+					],
+					"pcesvn":4,
+					"tdxtcbcomponents":
+					[
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"SW",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"BIOS",
+							"type":"Patch@Reset"
+						}
+					]
+				},
+				"tcbDate":"2020-02-05T14:35:49Z",
+				"tcbStatus":"ConfigurationAndSWHardeningNeeded",
+				"AdvisoryIDs":
+				[
+					"INTEL-SA-00079",
+					"INTEL-SA-00076"
+				]
+			},
+			{
+				"tcb":
+				{
+					"sgxtcbcomponents":
+					[
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"SW",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"BIOS",
+							"type":"Patch@Reset"
+						}
+					],
+					"pcesvn":3,
+					"tdxtcbcomponents":
+					[
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"SW",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"BIOS",
+							"type":"Patch@Reset"
+						}
+					]
+				},
+				"tcbDate":"2020-02-05T14:35:49Z",
+				"tcbStatus":"OutOfDate",
+				"AdvisoryIDs":
+				[
+					"INTEL-SA-00079",
+					"INTEL-SA-00076"
+				]
+			},	
+			{
+				"tcb":
+				{
+					"sgxtcbcomponents":
+					[
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"SW",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"BIOS",
+							"type":"Patch@Reset"
+						}
+					],
+					"pcesvn":2,
+					"tdxtcbcomponents":
+					[
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":1,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"SW",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"BIOS",
+							"type":"Patch@Reset"
+						}
+					]
+				},
+				"tcbDate":"2020-02-05T14:35:49Z",
+				"tcbStatus":"OutOfDateConfigurationNeeded",
+				"AdvisoryIDs":
+				[
+					"INTEL-SA-00079",
+					"INTEL-SA-00076"
+				]
+			},
+			{
+				"tcb":
+				{
+					"sgxtcbcomponents":
+					[
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"BIOS",
+							"type":"Patch@Reset"
+						}
+					],
+					"pcesvn":1,
+					"tdxtcbcomponents":
+					[
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"ucode",
+							"type":"Late Patch"
+						},
+						{
+							"svn":0,
+							"category":"BIOS",
+							"type":"Patch@Reset"
+						}
+					]
+				},
+				"tcbDate":"2020-02-05T14:35:49Z",
+				"tcbStatus":"Revoked",
+				"AdvisoryIDs":
+				[
+					"INTEL-SA-00079",
+					"INTEL-SA-00076"
+				]
+			}
+		]
+	},
+	"signature":"43cc4895a9b1035ef4c5aa0290913a31c1825d192ecbe0ef4854c603f2dede023665cd622f25825bbae1f8f8dc6e1286cdee499c8a40fc76d689dd2a3329a1c1"
+}

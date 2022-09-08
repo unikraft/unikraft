@@ -1,0 +1,3 @@
+# Use a combination of sphinx and breathe that is known to work
+sphinx >=1.5,<1.6
+breathe >=4.6,<4.7

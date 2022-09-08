@@ -1,0 +1,39 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 16
+VisualStudioVersion = 16.0.29806.167
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PCKCertSelectionLib", "PCKCertSelectionLib\PCKCertSelectionLib.vcxproj", "{82A33389-AEFC-4CCE-92A5-04FF646161A5}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{9A3CF35E-E0C4-4BD5-8EEC-66AF20E52361}"
+	ProjectSection(SolutionItems) = preProject
+		README.md = README.md
+	EndProjectSection
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "PCKSelectionSample", "PCKSelectionSample\PCKSelectionSample.vcxproj", "{8EA99187-2E00-4820-BEA4-5E371F1D46DA}"
+	ProjectSection(ProjectDependencies) = postProject
+		{82A33389-AEFC-4CCE-92A5-04FF646161A5} = {82A33389-AEFC-4CCE-92A5-04FF646161A5}
+	EndProjectSection
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|x64 = Debug|x64
+		Release|x64 = Release|x64
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{82A33389-AEFC-4CCE-92A5-04FF646161A5}.Debug|x64.ActiveCfg = Debug|x64
+		{82A33389-AEFC-4CCE-92A5-04FF646161A5}.Debug|x64.Build.0 = Debug|x64
+		{82A33389-AEFC-4CCE-92A5-04FF646161A5}.Release|x64.ActiveCfg = Release|x64
+		{82A33389-AEFC-4CCE-92A5-04FF646161A5}.Release|x64.Build.0 = Release|x64
+		{8EA99187-2E00-4820-BEA4-5E371F1D46DA}.Debug|x64.ActiveCfg = Debug|x64
+		{8EA99187-2E00-4820-BEA4-5E371F1D46DA}.Debug|x64.Build.0 = Debug|x64
+		{8EA99187-2E00-4820-BEA4-5E371F1D46DA}.Release|x64.ActiveCfg = Release|x64
+		{8EA99187-2E00-4820-BEA4-5E371F1D46DA}.Release|x64.Build.0 = Release|x64
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {F40DFD62-1F04-4444-8E8B-D7D527C86ABB}
+	EndGlobalSection
+EndGlobal

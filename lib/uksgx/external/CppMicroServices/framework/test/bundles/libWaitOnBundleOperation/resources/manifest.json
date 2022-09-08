@@ -1,0 +1,4 @@
+{
+  "bundle.symbolic_name" : "TestBundleWaitOnOperation",
+  "bundle.activator" : true
+}

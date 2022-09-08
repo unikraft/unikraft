@@ -1,0 +1,27 @@
+From d8472cb9429d37354665961ccc271fbecbb3fb02 Mon Sep 17 00:00:00 2001
+From: Zhang Lili <lili.z.zhang@intel.com>
+Date: Wed, 4 Aug 2021 16:29:26 +0800
+Subject: [PATCH] IPP crypto for SGX.
+
+Signed-off-by: Zhang Lili <lili.z.zhang@intel.com>
+---
+ CMakeLists.txt | 3 +++
+ 1 file changed, 3 insertions(+)
+
+diff --git a/CMakeLists.txt b/CMakeLists.txt
+index f750c7b..1bf6305 100644
+--- a/CMakeLists.txt
++++ b/CMakeLists.txt
+@@ -20,6 +20,9 @@
+ 
+ cmake_minimum_required(VERSION 3.12)
+ 
++set(SGX_PROGRAM_SEARCH_PATH)
++LIST(APPEND CMAKE_PROGRAM_PATH  "/usr/local/bin/"  ${SGX_PROGRAM_SEARCH_PATH} ...)
++
+ include("${CMAKE_CURRENT_SOURCE_DIR}/sources/cmake/ippcp-utils.cmake")
+ ippcp_getlibversion("${CMAKE_CURRENT_SOURCE_DIR}/include/ippversion.h")
+ if ((NOT DEFINED IPPCP_VERSION_MAJOR) OR
+-- 
+2.17.1
+

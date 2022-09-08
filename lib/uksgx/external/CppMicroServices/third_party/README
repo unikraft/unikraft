@@ -1,0 +1,140 @@
+README
+======
+
+This directory contains several third-party libraries.
+
+For detailed copyright and license information see the header of the respective
+file. A record of their origin and version is provided in the list below.
+
+If a third-party library has been modified for the purposes of the
+CppMicroServices library, it is marked as such.
+
+dirent_win32
+------------
+
+See file for license information.
+
+http://softagalleria.net/dirent.php
+1.20.1
+
+Patches
+
+ * Set errno to ENAMETOOLONG if opendir() is called with a path argument
+   longer than MAX_PATH.
+
+jsoncpp
+-------
+
+MIT License or Public Domain
+
+https://github.com/open-source-parsers/jsoncpp
+(formerly http://jsoncpp.sourceforge.net)
+0.10.6
+
+Patches
+
+ * Suppress -Wimplicit-fallthrough warning in GCC 7
+
+miniz
+-----
+
+Public Domain
+
+https://code.google.com/p/miniz/
+v1.15 r4
+
+Patches
+
+ * Support for zip files with prepended binary blobs.
+ * Write to C file streams.
+
+libtelnet
+---------
+
+Public Domain
+
+https://github.com/seanmiddleditch/libtelnet
+574eef9fd7f373fb2812939456fc5a4c3e975b44
+
+tinyscheme
+----------
+
+BSD-style license
+
+http://tinyscheme.sourceforge.net/home.html
+1.41
+
+Patches
+
+ * Added header for missing off_t declaration.
+ * Disable Windows warnings C4244 and C4267.
+ * Do not use dllexport/dllimport specs on Windows
+
+Linenoise
+---------
+
+BSD license
+
+https://github.com/msteveb/linenoise
+0f2343d2bc763b735b6242b5831be611703965a1
+
+This is a fork of the original antirez/linenoise project
+which contains Windows support and a few additional features.
+
+Patches
+
+ * Don't depend on utf8.h because it is not supported
+   on Windows.
+ * Disable Windows warnings C4244 and C4267.
+ * Do not define snprintf for MSC_VER 1900 or higher
+
+The Lean Mean C++ Option Parser
+-------------------------------
+
+MIT License
+
+http://sourceforge.net/projects/optionparser
+1.7
+
+Patches
+
+ * Added virtual destructors
+ * Converted old-style casts to C++ casts
+
+Civetweb
+--------
+
+MIT License
+
+https://github.com/civetweb/civetweb
+1.8
+
+Patches
+
+ * Use system function clock_gettime on Mac OS X 10.12 and above
+
+Mustache
+--------
+
+See webconsole/include/cppmicroservices/webconsole/mustache.hpp for license information.
+
+https://github.com/kainjow/Mustache/releases
+2.0
+
+Patches
+
+ * Support GCC 4.6
+
+
+Google Test and Google Mock
+----------------------------
+
+See https://github.com/google/googletest/blob/master/googletest/LICENSE for license information.
+
+https://github.com/google/googletest/releases
+1.8.0
+
+Patches
+
+ * Suppress CMake warning about policy CMP0048
+ * Suppress tr1 namespace deprecation warnings

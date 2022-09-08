@@ -1,0 +1,130 @@
+diff --git a/third_party/mustache.hpp b/third_party/mustache.hpp
+index a59bb20..63b83dc 100644
+--- a/third_party/mustache.hpp
++++ b/third_party/mustache.hpp
+@@ -95,13 +95,13 @@ public:
+             Invalid,
+         };
+ 
+-        using ObjectType = std::unordered_map<StringType, Data>;
+-        using ListType = std::vector<Data>;
+-        using PartialType = std::function<StringType()>;
+-        using LambdaType = std::function<StringType(const StringType&)>;
++        typedef std::unordered_map<StringType, Data> ObjectType;
++        typedef std::vector<Data> ListType;
++        typedef std::function<StringType()> PartialType;
++        typedef std::function<StringType(const StringType&)> LambdaType;
+ 
+         // Construction
+-        Data() : Data(Type::Object) {
++        Data() : type_{Type::Object}, obj_(new ObjectType) {
+         }
+         Data(const StringType& string) : type_{Type::String} {
+             str_.reset(new StringType(string));
+@@ -127,7 +127,7 @@ public:
+                     break;
+             }
+         }
+-        Data(const StringType& name, const Data& var) : Data{} {
++        Data(const StringType& name, const Data& var) : type_{Type::Object}, obj_(new ObjectType) {
+             set(name, var);
+         }
+         Data(const PartialType& partial) : type_{Type::Partial} {
+@@ -316,7 +316,7 @@ public:
+         return render(data, ss).str();
+     }
+ 
+-    using RenderHandler = std::function<void(const StringType&)>;
++    typedef std::function<void(const StringType&)> RenderHandler;
+     void render(const Data& data, const RenderHandler& handler) {
+         if (!isValid()) {
+             return;
+@@ -326,7 +326,7 @@ public:
+     }
+ 
+ private:
+-    using StringSizeType = typename StringType::size_type;
++    typedef typename StringType::size_type StringSizeType;
+ 
+     class DelimiterSet {
+     public:
+@@ -362,7 +362,7 @@ private:
+             SetDelimiter,
+         };
+         StringType name;
+-        Type type = Type::Invalid;
++        Type type;
+         std::shared_ptr<StringType> sectionText;
+         std::shared_ptr<DelimiterSet> delimiterSet;
+         bool isSectionBegin() const {
+@@ -371,6 +371,7 @@ private:
+         bool isSectionEnd() const {
+             return type == Type::SectionEnd;
+         }
++        Tag() : type(Type::Invalid) {}
+     };
+ 
+     class Component {
+@@ -378,11 +379,11 @@ private:
+         StringType text;
+         Tag tag;
+         std::vector<Component> children;
+-        StringSizeType position = StringType::npos;
++        StringSizeType position;
+         bool isText() const {
+             return tag.type == Tag::Type::Invalid;
+         }
+-        Component() {}
++        Component() : position(StringType::npos) {}
+         Component(const StringType& t, StringSizeType p) : text(t), position(p) {}
+     };
+ 
+@@ -477,7 +478,7 @@ private:
+     }
+ 
+     void parse(const StringType& input, Context& ctx) {
+-        using streamstring = std::basic_ostringstream<typename StringType::value_type>;
++        typedef std::basic_ostringstream<typename StringType::value_type> streamstring;
+ 
+         const StringType braceDelimiterEndUnescaped(3, '}');
+         const StringSizeType inputSize{input.size()};
+@@ -583,7 +584,7 @@ private:
+         Stop,
+         Skip,
+     };
+-    using WalkCallback = std::function<WalkControl(Component&)>;
++    typedef std::function<WalkControl(Component&)> WalkCallback;
+ 
+     void walk(const WalkCallback& callback) const {
+         walkChildren(callback, rootComponent_);
+@@ -688,8 +689,8 @@ private:
+     }
+ 
+     void render(const RenderHandler& handler, Context& ctx) {
+-        walk([&handler, &ctx, this](Component& comp) -> WalkControl {
+-            return renderComponent(handler, ctx, comp);
++        walk([&handler, &ctx, this](Component& comp) {
++            return BasicMustache<StringType>::renderComponent(handler, ctx, comp);
+         });
+     }
+ 
+@@ -790,7 +791,7 @@ private:
+ 
+     void renderSection(const RenderHandler& handler, Context& ctx, Component& incomp, const Data* var) {
+         const auto callback = [&handler, &ctx, this](Component& comp) -> WalkControl {
+-            return renderComponent(handler, ctx, comp);
++            return BasicMustache<StringType>::renderComponent(handler, ctx, comp);
+         };
+         if (var && var->isNonEmptyList()) {
+             for (const auto& item : var->list()) {
+@@ -810,8 +811,8 @@ private:
+     Component rootComponent_;
+ };
+ 
+-using Mustache = Kainjow::BasicMustache<std::string>;
+-using MustacheW = Kainjow::BasicMustache<std::wstring>;
++typedef Kainjow::BasicMustache<std::string> Mustache;
++typedef Kainjow::BasicMustache<std::wstring> MustacheW;
+ 
+ } // Kainjow
+ 

@@ -1,0 +1,86 @@
+;/*
+;   Copyright(C) 2011-2019 Intel Corporation All Rights Reserved.
+;
+;   The source code, information  and  material ("Material") contained herein is
+;   owned  by Intel Corporation or its suppliers or licensors, and title to such
+;   Material remains  with Intel Corporation  or its suppliers or licensors. The
+;   Material  contains proprietary information  of  Intel or  its  suppliers and
+;   licensors. The  Material is protected by worldwide copyright laws and treaty
+;   provisions. No  part  of  the  Material  may  be  used,  copied, reproduced,
+;   modified, published, uploaded, posted, transmitted, distributed or disclosed
+;   in any way  without Intel's  prior  express written  permission. No  license
+;   under  any patent, copyright  or  other intellectual property rights  in the
+;   Material  is  granted  to  or  conferred  upon  you,  either  expressly,  by
+;   implication, inducement,  estoppel or  otherwise.  Any  license  under  such
+;   intellectual  property  rights must  be express  and  approved  by  Intel in
+;   writing.
+;
+;   *Third Party trademarks are the property of their respective owners.
+;
+;   Unless otherwise  agreed  by Intel  in writing, you may not remove  or alter
+;   this  notice or  any other notice embedded  in Materials by Intel or Intel's
+;   suppliers or licensors in any way.
+;
+;*/
+
+[Version]
+Signature   = "$WINDOWS NT$"
+Class       = SoftwareDevice
+ClassGuid   = {62f9c741-b25a-46ce-b54c-9bccce08b6f2}
+Provider    = %INTC%
+CatalogFile = sgx_dcap_dev.cat
+DriverVer   = 11/01/2018,1.0.0.0
+
+[Manufacturer]
+%INTC% = SgxDCAPComponentsDev,NTamd64.10.0.3..14393,NTamd64.10.0...16299   ;;; 3 for Server
+
+[SgxDCAPComponentsDev.NTamd64.10.0.3..14393]
+%SgxDCAPComponentsnDevice.DeviceDesc% = SgxDCAPComponentsDevice, root\SgxLCDevice_DCAP
+
+; do not install on Windows 10 RS3 and after
+[SgxDCAPComponentsDev.NTamd64.10.0...16299]
+
+[SgxDCAPComponentsDevice.NT]
+CopyFiles = SgxDCAPComponentsDevice_CopyFiles, License_CopyFiles
+
+[SgxDCAPComponentsDevice.NT.Services]
+AddService = , %SPSVCINST_ASSOCSERVICE%
+
+[SgxDCAPComponentsDevice_CopyFiles]
+sgx_dcap_ql.dll
+qe3.signed.dll
+id_enclave.signed.dll
+pce.signed.dll
+qve.signed.dll
+sgx_dcap_quoteverify.dll
+
+[License_CopyFiles]
+License.txt
+ThirdPartyLicenses.txt
+
+[SourceDisksFiles]
+sgx_dcap_ql.dll = 1
+qe3.signed.dll = 1
+id_enclave.signed.dll = 1
+pce.signed.dll = 1
+qve.signed.dll = 1
+sgx_dcap_quoteverify.dll = 1
+License.txt = 1
+ThirdPartyLicenses.txt = 1
+
+[SourceDisksNames]
+1 = %DiskName%
+
+;;;;;;;;;;;;;;;;;;https://docs.microsoft.com/en-us/windows-hardware/drivers/install/using-dirids
+; 11 is %SystemRoot%\system32
+; 13 is FileRepository 
+[DestinationDirs]
+DefaultDestDir = 11
+License_CopyFiles = 13
+
+[Strings]
+SPSVCINST_ASSOCSERVICE = 0x00000002
+INTC = "Intel Corporation"
+DiskName = "Intel(R) Software Guard Extensions DCAP Components Device Install Disk"
+SgxDCAPComponentsnDevice.DeviceDesc = "Intel(R) Software Guard Extensions DCAP Components Device"
+ClassName = "Intel(R) Software Guard Extensions DCAP Components Device"

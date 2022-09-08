@@ -1,0 +1,8 @@
+LIBRARY	"sgx_dcap_quoteverify"
+
+EXPORTS
+    sgx_qv_verify_quote                             @1
+    sgx_qv_get_quote_supplemental_data_size         @2
+    sgx_qv_set_enclave_load_policy                  @3
+    sgx_qv_get_qve_identity                         @4
+    sgx_qv_free_qve_identity                        @5

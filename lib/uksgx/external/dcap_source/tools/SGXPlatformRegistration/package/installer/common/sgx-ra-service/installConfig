@@ -1,0 +1,8 @@
+SGX_RA_SERVICE_VERSION="1.0"
+TARBALL_NAME=sgx-ra-service_1.0.orig.tar.gz
+
+SGX_RA_SERVICE_PACKAGE_PATH=/opt/intel
+SGX_RA_SERVICE_PACKAGE_NAME=sgx-ra-service
+
+LIB_DIR=lib
+ETC_DIR=etc

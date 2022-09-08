@@ -1,0 +1,10 @@
+{
+global:
+    tdx_att_get_quote;
+    tdx_att_free_quote;
+    tdx_att_get_report;
+    tdx_att_extend;
+    tdx_att_get_supported_att_key_ids;
+local:
+    *;
+};

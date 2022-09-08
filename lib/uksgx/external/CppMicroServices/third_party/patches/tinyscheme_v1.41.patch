@@ -1,0 +1,14 @@
+diff --git a/third_party/tinyscheme/scheme.c b/third_party/tinyscheme/scheme.c
+index 99f9106..59921e4 100644
+--- a/third_party/tinyscheme/scheme.c
++++ b/third_party/tinyscheme/scheme.c
+@@ -18,7 +18,9 @@
+ # include <unistd.h>
+ #endif
+ #ifdef WIN32
++#include <wchar.h>
+ #define snprintf _snprintf
++#pragma warning( disable : 4244 4267)
+ #endif
+ #if USE_DL
+ # include "dynload.h"

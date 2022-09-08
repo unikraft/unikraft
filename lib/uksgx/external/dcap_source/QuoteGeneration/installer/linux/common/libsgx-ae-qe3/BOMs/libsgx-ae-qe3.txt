@@ -1,0 +1,2 @@
+DeliveryName	InstallName	FileCheckSum	FileFeature	FileOwner
+<deliverydir>/psw/ae/data/prebuilt/libsgx_qe3.signed.so	<installdir>/lib/libsgx_qe3.signed.so	0	main	STP

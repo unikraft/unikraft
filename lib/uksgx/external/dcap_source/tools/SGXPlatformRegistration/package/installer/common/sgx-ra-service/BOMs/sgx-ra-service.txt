@@ -1,0 +1,8 @@
+DeliveryName	InstallName	FileCheckSum	FileFeature	FileOwner
+<deliverydir>/build/bin/mpa_manage	<installdir>/mpa_manage	0	main	STP
+<deliverydir>/package/mpa_registration	<installdir>/mpa_registration	0	main	STP
+<deliverydir>/package/mpa_registration_tool.service	<installdir>/mpa_registration_tool.service	0	main	STP
+<deliverydir>/package/mpa_registration_tool.conf	<installdir>/mpa_registration_tool.conf	0	main	STP
+<deliverydir>/config/mpa_registration.conf	<installdir>/conf/mpa_registration.conf	0	main	STP
+<deliverydir>/package/startup.sh	<installdir>/startup.sh	0	main	STP
+<deliverydir>/package/cleanup.sh	<installdir>/cleanup.sh	0	main	STP

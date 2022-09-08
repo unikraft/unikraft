@@ -1,0 +1,5 @@
+DeliveryName	InstallName	FileCheckSum	FileFeature	FileOwner
+<deliverydir>/network_setting.conf	<installdir>/network_setting.conf	0	main	STP
+<deliverydir>/PCKIDRetrievalTool	<installdir>/PCKIDRetrievalTool	0	main	STP
+<deliverydir>/README.txt	<installdir>/README.txt	0	main	STP
+<deliverydir>/License.txt	<installdir>/License.txt	0	main	STP

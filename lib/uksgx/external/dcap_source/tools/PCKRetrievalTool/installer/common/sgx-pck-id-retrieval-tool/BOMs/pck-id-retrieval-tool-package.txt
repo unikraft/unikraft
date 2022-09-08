@@ -1,0 +1,3 @@
+DeliveryName	InstallName	FileCheckSum	FileFeature	FileOwner
+<deliverydir>/installer/common/sgx-pck-id-retrieval-tool/installConfig	<installdir>/installConfig	0	main	STP
+<deliverydir>/installer/common/sgx-pck-id-retrieval-tool/Makefile	<installdir>/Makefile	0	main	STP

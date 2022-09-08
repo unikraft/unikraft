@@ -1,0 +1,8 @@
+RA_NETWORK_VERSION="1.0"
+TARBALL_NAME=libsgx-ra-network_1.0.orig.tar.gz
+
+RA_NETWORK_PACKAGE_NAME=libsgx-ra-network
+RA_NETWORK_DEV_PACKAGE_NAME=libsgx-ra-network-dev
+
+LIB_DIR=lib
+INC_DIR=include

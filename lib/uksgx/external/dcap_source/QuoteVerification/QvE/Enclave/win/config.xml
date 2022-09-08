@@ -1,0 +1,11 @@
+<EnclaveConfiguration>
+    <IntelSigned>1</IntelSigned>
+    <ProdID>0x2</ProdID>
+    <ISVSVN>6</ISVSVN>
+<!--     QvE enclave must be signle thread enclave. Otherwise getCurrentTime() will have a race condition, which may cause wrong results. -->
+    <TCSNum>1</TCSNum>
+    <TCSPolicy>1</TCSPolicy>
+    <StackMaxSize>0x44000</StackMaxSize>
+    <HeapMaxSize>0x80000</HeapMaxSize>
+    <DisableDebug>1</DisableDebug>
+</EnclaveConfiguration>

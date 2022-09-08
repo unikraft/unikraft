@@ -1,0 +1,7 @@
+{
+  "bundle.symbolic_name" : "pce_service_symbolic_name",
+  "bundle.activator" : true,
+  "bundle.name" : "PCE Service",
+  "bundle.description" : "This bundle provide PCE Service",
+  "bundle.version" : "2.0.0"
+}

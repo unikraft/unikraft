@@ -1,0 +1,56 @@
+Intel(R) Software Guard Extensions Data Center Attestation Primitives (Intel(R) SGX DCAP): PCK Cert ID Retrieval Tool
+===============================================
+
+
+## Prerequisites
+
+## How to build this tool
+For Linux version:
+- Install prebuilt Intel(R) SGX SDK and urts Installer, you can download it from [01.org](https://01.org/intel-software-guard-extensions/downloads)
+    a. sgx_linux_x64_sdk_${version}.bin
+- Just run the command: make 
+
+ 
+For Windows version:
+1. Install Intel(R)_SGX_Windows_SDK_2.x.xxx.xxx, you can download it from [01.org](https://01.org/intel-software-guard-extensions/downloads)
+2. Build "DCAP.sln" with Microsoft Visual Studio 
+3. Open the solution "PCKIDRetrievalTool.sln" with Microsoft Visual Studio
+4. Build it directly with the correct configuration
+
+## Usage
+PCKIDRetrievalTool [OPTION]
+Example: PCKIDRetrievalTool -f retrieval_result.csv -url https://localhost:8081 -user_token 123456 -use_secure_cert true
+
+Options:
+  -f filename                          - output the retrieval result to the "filename"
+  -url cache_server_address            - cache server's address
+  -user_token token_string             - user token to access the cache server
+  -proxy_type proxy_type               - proxy setting when access the cache server
+  -proxy_url  proxy_server_address     - proxy server's address
+  -use_secure_cert [true | false]      - accept secure/insecure https cert,default value is true
+  -platform_id \"platform_id_string\"  - in this mode, enclave is not needed to load, but platform id need to input
+  -?                                   - show command help
+  -h                                   - show command help
+  -help                                - show command help
+
+If option is not specified, it will write the retrieved data to file: pckid_retrieval.csv
+
+
+user can also use the configuration file(network_configuration.conf) to configure these options, but
+command line option has higher priority.
+
+## Output file
+If the retrieved data is saved to file:
+   the outputed file is CSV format and the values are CSV delimited Base16(HEX):
+
+in enclave mode:
+ EncryptedPPID(384 byte array),PCE_ID (16 bit integer),CPUSVN (16 byte array),PCE ISVSVN (16 bit integer),QE_ID (16 byte array)[,PLATFORM_MANIFEST (variable byte array)]
+   Big Endian                    Little Endian        Big Endian                Little Endian               Big Endian                    Big Endian
+
+in non-enclave mode:
+ ,PCE_ID (16 bit integer),,,PLATFORM_ID (variable length byte array),PLATFORM_MANIFEST (variable length byte array)
+        Little Endian          Big Endian                                 Big Endian
+
+And the retrieved data can also be uploaded to cache server if user provide the cache server's url and access token.
+
+#Notes:

@@ -1,0 +1,33 @@
+{
+  "name": "PCCS",
+  "description": "Provisioning Certificate Caching Service",
+  "version": "1.14.0",
+  "dependencies": {
+    "@fidm/x509": "^1.2.1",
+    "ajv": "^6.12.4",
+    "body-parser": "^1.19.0",
+    "caw": "^2.0.1",
+    "cls-hooked": "^4.2.2",
+    "config": "^3.3.7",
+    "esm": "^3.2.25",
+    "express": "^4.17.1",
+    "ffi-napi": "^4.0.3",
+    "got": "^11.6.0",
+    "morgan": "^1.10.0",
+    "mysql2": "^2.1.0",
+    "node-schedule": "^2.1.0",
+    "ref-array-di": "^1.2.2",
+    "ref-napi": "^3.0.3",
+    "sequelize": "^6.19.0",
+    "sqlite3": "^5.0.6",
+    "umzug": "^2.3.0",
+    "winston": "^3.3.3"
+  },
+  "engines": {
+    "node": ">= 12.22.0"
+  },
+  "scripts": {
+    "start": "set NODE_ENV=dev && node -r esm pccs_server.js",
+    "test": "NODE_ENV=test mocha -r esm ../../../unittests/psw/pccs_ut/test.js --timeout 120000 --exit"
+  }
+}

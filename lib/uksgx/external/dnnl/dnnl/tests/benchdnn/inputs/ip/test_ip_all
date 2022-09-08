@@ -1,0 +1,17 @@
+# f32
+--reset
+--dir=FWD_B,BWD_D,BWD_WB --batch=ip_all
+--mb=2
+--dir=FWD_B
+--attr=post_ops='sum:0.5;relu:0.5' --batch=ip_all
+
+# int8
+--reset
+--mb=2
+--dir=FWD_B
+--cfg=s8s8s32,s8s8s8,s8s8u8,u8s8s32,u8s8s8,u8s8u8
+--attr=oscale=per_oc:2.25;post_ops='sum:0.5;relu:0.5' --batch=ip_all
+--attr=oscale=common:2.25;post_ops='sum:0.5;tanh' --batch=ip_all
+
+# bf16
+--batch=test_ip_bfloat16

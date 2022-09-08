@@ -1,0 +1,7 @@
+{
+  "bundle.symbolic_name" : "quote_ex_service_symbolic_name",
+  "bundle.activator" : true,
+  "bundle.name" : "Unified Quote Service",
+  "bundle.description" : "This bundle provide Unified Quote Service",
+  "bundle.version" : "2.0.0"
+}

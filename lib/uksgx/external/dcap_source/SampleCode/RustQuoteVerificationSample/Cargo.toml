@@ -1,0 +1,11 @@
+[package]
+name = "app"
+version = "0.1.0"
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+sgx-dcap-quoteverify-rs = { path = "../../QuoteVerification/dcap_quoteverify/sgx-dcap-quoteverify-rs"}
+sgx-dcap-quoteverify-sys = { path = "../../QuoteVerification/dcap_quoteverify/sgx-dcap-quoteverify-sys"}
+clap = "2.34"

@@ -1,0 +1,17 @@
+Source: libsgx-ra-uefi
+Section: libs
+Priority: optional
+Maintainer: <junli.sun@intel.com>
+Build-Depends: debhelper (>= 8.0.0)
+Standards-Version: 3.9.4
+Homepage: https://github.com/intel/SGXDataCenterAttestationPrimitives
+
+Package: libsgx-ra-uefi
+Architecture: amd64
+Description: Intel(R) Software Guard Extensions Registration Agent UEFI library
+
+Package: libsgx-ra-uefi-dev
+Section: devel
+Architecture: amd64
+Depends: libsgx-ra-uefi (= @dep_version@)
+Description: Intel(R) Software Guard Extensions Registration Agent UEFI library for Developer

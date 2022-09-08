@@ -1,0 +1,11 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+# Uncomment this to turn on verbose mode.
+#export DH_VERBOSE=1
+
+%:
+	dh $@
+
+override_dh_shlibdeps:
+	dh_shlibdeps -l $(LINUX_BUILD_DIR) --dpkg-shlibdeps-params=--ignore-missing-info

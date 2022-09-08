@@ -1,0 +1,10 @@
+commit 29348046dd8b680051de55c4eddee4222e2fae02 (HEAD -> development, origin/development, origin/HEAD)
+Author: Charles Wilcox <44209640+mw-cwilcox@users.noreply.github.com>
+Date:   Wed Oct 24 09:08:10 2018 -0400
+
+    307 bundle crc32 (#308)
+
+    * Adding 'uint32_t 'BundleResource::GetCrc32() const;'.
+
+    Signed-off-by: Charles Wilcox <cwilcox@mathworks.com>
+

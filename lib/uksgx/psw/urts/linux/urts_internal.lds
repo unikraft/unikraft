@@ -1,0 +1,26 @@
+{
+    global:
+        sgx_create_enclave;
+        sgx_create_enclave_ex;
+        sgx_destroy_enclave;
+        sgx_ecall;
+        sgx_ecall_switchless;
+        sgx_thread_wait_untrusted_event_ocall;
+        sgx_thread_set_untrusted_event_ocall;
+        sgx_thread_setwait_untrusted_events_ocall;
+        sgx_thread_set_multiple_untrusted_events_ocall;
+        pthread_create_ocall;
+        pthread_wait_timeout_ocall;
+        pthread_wakeup_ocall;
+        sgx_oc_cpuidex;
+        sgx_get_target_info;
+        sgx_create_encrypted_enclave;
+        sgx_create_enclave_from_buffer_ex;
+        sgx_create_le;
+        is_launch_token_required;
+        sgx_get_metadata;
+        sgx_set_switchless_itf;
+        init_get_launch_token;
+    local:
+        *;
+};

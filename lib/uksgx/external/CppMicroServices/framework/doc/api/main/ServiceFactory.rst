@@ -1,0 +1,4 @@
+ServiceFactory
+--------------
+
+.. doxygenclass:: cppmicroservices::ServiceFactory

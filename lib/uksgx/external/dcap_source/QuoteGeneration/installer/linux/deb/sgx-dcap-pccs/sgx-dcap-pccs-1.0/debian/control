@@ -1,0 +1,12 @@
+Source: sgx-dcap-pccs
+Section: web
+Priority: optional
+Maintainer: <xiangquan.liu@intel.com>
+Build-Depends: debhelper (>= 8.0.0)
+Standards-Version: 3.9.4
+Homepage: https://github.com/intel/SGXDataCenterAttestationPrimitives
+
+Package: sgx-dcap-pccs
+Architecture: any
+Depends: npm, nodejs, build-essential
+Description: Intel(R) Software Guard Extensions PCK Caching Service

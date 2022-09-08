@@ -1,0 +1,9 @@
+DCAP_QL_VERSION="1.0"
+TARBALL_NAME=libsgx-dcap-ql_1.0.orig.tar.gz
+
+DCAP_QL_PACKAGE_NAME=libsgx-dcap-ql
+DCAP_QL_DEV_PACKAGE_NAME=libsgx-dcap-ql-dev
+
+LIB_DIR=lib
+INC_DIR=include
+

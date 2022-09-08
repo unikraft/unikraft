@@ -1,0 +1,7 @@
+{
+  "bundle.symbolic_name" : "epid_quote_service_symbolic_name",
+  "bundle.activator" : true,
+  "bundle.name" : "EPID Quote Service",
+  "bundle.description" : "This bundle provide EPID Quote Service",
+  "bundle.version" : "2.0.0"
+}

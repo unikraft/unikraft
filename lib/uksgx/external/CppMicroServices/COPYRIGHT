@@ -1,0 +1,19 @@
+Source: https://github.com/CppMicroServices/CppMicroServices
+
+Files: * (see the VCS history for detailed change information)
+Copyright: 2015 Sascha Zelzer <sascha.zelzer@gmail.com>
+Copyright: 2012 - 2015 Sascha Zelzer, German Cancer Research Center <sascha.zelzer@dkfz-heidelberg.de>
+License: Apache License 2.0
+
+Files: * (see the VCS history for detailed change information)
+Copyright: 2015 The MathWorks, Inc.
+License: Apache License 2.0
+
+Files: core/include/usAny.h
+Copyright: Kevlin Henney, 2000, 2001, 2002. All rights reserved.
+           Extracted from Boost 1.46.1 and adapted for CppMicroServices.
+License: See the file header
+
+Files: third_party/*
+Copyright: See third_party/README
+License: See third_party/README

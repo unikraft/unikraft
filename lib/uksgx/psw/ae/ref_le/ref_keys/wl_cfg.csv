@@ -1,0 +1,3 @@
+true, false, ec 15 b1 07 87 d2 f8 46 67 ce b0 b5 98 ff c4 4a 1f 1c b8 0f 67 0a ae 5d f9 e8 fa 9f 63 76 e1 f8, , , , PVE
+true, false, C5 4A 62 F2 BE 9E F7 6E FB 1F 39 30 AD 81 EA 7F 60 DE FC 1F 5F 25 E0 9B 7C 06 7A 81 5A E0 C6 CB, , , , PCE
+false, false, , ./ref_keys/enclave_public_test_key.pem, , , arbitrary enclave

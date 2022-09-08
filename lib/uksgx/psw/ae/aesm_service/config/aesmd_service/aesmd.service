@@ -1,0 +1,34 @@
+[Unit]
+Description=Intel(R) Architectural Enclave Service Manager 
+After=syslog.target network.target auditd.service
+After=remount-dev-exec.service
+Wants=remount-dev-exec.service
+
+[Service]
+User=aesmd
+Type=forking
+Environment=NAME=aesm_service
+Environment=AESM_PATH=@aesm_folder@
+Environment=LD_LIBRARY_PATH=@aesm_folder@
+WorkingDirectory=@aesm_folder@
+PermissionsStartOnly=true
+ExecStartPre=@aesm_folder@/linksgx.sh
+ExecStartPre=/bin/mkdir -p /var/run/aesmd/
+ExecStartPre=/bin/chown -R aesmd:aesmd /var/run/aesmd/
+ExecStartPre=/bin/chmod 0755 /var/run/aesmd/
+ExecStartPre=/bin/chown -R aesmd:aesmd /var/opt/aesmd/
+ExecStartPre=/bin/chmod 0750 /var/opt/aesmd/
+ExecStart=@aesm_folder@/aesm_service
+InaccessibleDirectories=/home
+ExecReload=/bin/kill -SIGHUP $MAINPID
+Restart=on-failure
+RestartSec=15s
+DevicePolicy=closed
+DeviceAllow=/dev/isgx rw
+DeviceAllow=/dev/sgx rw
+DeviceAllow=/dev/sgx/enclave rw
+DeviceAllow=/dev/sgx/provision rw
+DeviceAllow=/dev/sgx_enclave rw
+DeviceAllow=/dev/sgx_provision rw
+[Install]
+WantedBy=multi-user.target

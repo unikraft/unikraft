@@ -1,0 +1,8 @@
+DeliveryName	InstallName	FileCheckSum	FileFeature	FileOwner
+<deliverydir>/quote_wrapper/qgs/qgsd.service	<installdir>/qgsd.service	0	main	STP
+<deliverydir>/quote_wrapper/qgs/qgsd.conf	<installdir>/qgsd.conf	0	main	STP
+<deliverydir>/quote_wrapper/qgs/qgs.conf	<installdir>/conf/qgs.conf	0	main	STP
+<deliverydir>/quote_wrapper/qgs/qgs	<installdir>/qgs	0	main	STP
+<deliverydir>/installer/linux/common/tdx-qgs/startup.sh	<installdir>/startup.sh	0	main	STP
+<deliverydir>/installer/linux/common/tdx-qgs/cleanup.sh	<installdir>/cleanup.sh	0	main	STP
+<deliverydir>/installer/linux/common/tdx-qgs/linksgx.sh	<installdir>/linksgx.sh	0	main	STP

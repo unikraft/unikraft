@@ -1,0 +1,9 @@
+TDX_ATTEST_VERSION="1.0"
+TARBALL_NAME=libtdx-attest_1.0.orig.tar.gz
+
+TDX_ATTEST_PACKAGE_NAME=libtdx-attest
+TDX_ATTEST_DEV_PACKAGE_NAME=libtdx-attest-dev
+
+LIB_DIR=lib
+INC_DIR=include
+SAMPLE_DIR=sample

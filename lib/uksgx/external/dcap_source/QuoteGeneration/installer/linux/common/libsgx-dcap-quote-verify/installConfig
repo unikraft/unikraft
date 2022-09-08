@@ -1,0 +1,8 @@
+DCAP_QVL_VERSION="1.0"
+TARBALL_NAME=libsgx-dcap-quote-verify_1.0.orig.tar.gz
+
+DCAP_QVL_PACKAGE_NAME=libsgx-dcap-quote-verify
+DCAP_QVL_DEV_PACKAGE_NAME=libsgx-dcap-quote-verify-dev
+
+LIB_DIR=lib
+INC_DIR=include

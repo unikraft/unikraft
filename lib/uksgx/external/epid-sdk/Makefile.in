@@ -1,0 +1,187 @@
+#!/usr/bin/make -f
+include ../../buildenv.mk
+
+#variables are set by configure
+prefix = @prefix@
+installdir = $(prefix)/
+epidinstalldir = $(installdir)/epid-sdk
+CC = @CC@
+CXX = @CXX@
+CFLAGS = @CFLAGS@
+LDFLAGS = @LDFLAGS@
+RANLIB = @RANLIB@
+TSS_PATH = @TSS_PATH@
+TINY = @TINY@
+
+#set performance affecting flags
+SIZE_CFLAGS := -O2
+
+#gcc flags
+CC_FLAGS := $(CFLAGS) $(SIZE_CFLAGS) -Werror -Wall -Wextra -Wno-missing-braces \
+	-Wno-missing-field-initializers -Wno-unknown-pragmas -Wno-unused-function \
+	-fno-strict-aliasing -Wno-unused-but-set-variable -Wno-comment -Wformat \
+	-Wformat-security -fstack-protector -DNDEBUG -D_FORTIFY_SOURCE=2 $(MITIGATION_CFLAGS)
+
+#intel c compiler flags
+ICC_FLAGS := $(CFLAGS) $(SIZE_CFLAGS) -Werror -Wall -Wextra -DNDEBUG \
+	-fstack-protector -D_FORTIFY_SOURCE=2 \
+	-Wformat -Wformat-security
+
+ifneq ($(OS),Windows_NT)
+	CC_FLAGS += -fPIC
+	ICC_FLAGS += -fPIC
+	CXX11_FLAG = -std=c++0x
+	EXE_EXTENSION =
+else
+	CC_FLAGS += -D__int64='long long'
+	CXX11_FLAG = -std=gnu++11
+	EXE_EXTENSION = .exe
+endif
+
+#g++ flags
+CXX_FLAGS := $(CC_FLAGS) $(CXX11_FLAG)
+
+#intel c++ compiler flags
+ICPC_FLAGS := $(ICC_FLAGS) $(CXX11_FLAG)
+
+#check if architecture was specified
+#or take it by shell command
+ifeq ($(findstring -m32,$(CFLAGS)),-m32)
+	ARCH = x86
+	CXXFLAGS += -m32
+	LDFLAGS += -m32
+else ifeq ($(findstring -m64,$(CFLAGS)),-m64)
+	ARCH = x86_64
+	CXXFLAGS += -m64
+	LDFLAGS += -m64
+else
+	ifeq ($(findstring arm-,$(CC)),arm-)
+		ARCH = arm
+
+		ifneq (,$(findstring gnueabihf,$(CC)))
+			ARCH := $(addsuffix hf,$(ARCH))
+		endif
+
+	else
+		ARCH := $(shell uname -m)
+	endif
+endif
+
+#set tools and flags depending on specified compiler
+ifeq ($(findstring icc,$(CC)),icc)
+	CFLAGS := $(ICC_FLAGS)
+	CXXFLAGS := $(ICPC_FLAGS)
+	AR = $(subst icc,xiar,$(CC))
+else
+	CFLAGS := $(CC_FLAGS)
+	CXXFLAGS := $(CXX_FLAGS)
+endif
+
+# ld flags
+LDFLAGS += -fstack-protector
+ifneq ($(OS),Windows_NT)
+  LDFLAGS += -z noexecstack -z relro -z now -pie
+endif
+
+#gtest defines
+GTEST_DEFINES := -DGTEST_HAS_PTHREAD=0 -D_VARIADIC_MAX=10
+
+#set flags for unit tests executables
+GTEST_FLAGS = --gtest_color=yes \
+	--gtest_print_time=1 \
+	--gtest_output=xml
+
+export CC LDFLAGS ARCH CFLAGS
+export CXX CXXFLAGS
+export AR RANLIB
+export epidinstalldir
+export GTEST_FLAGS GTEST_DEFINES 
+export EXE_EXTENSION
+export TSS_PATH
+export TINY
+
+#output of the main parameters
+$(info $$ccompiler is [${CC}])
+$(info $$cxxcompiler is [${CXX}])
+$(info $$architecture is [${ARCH}])
+#targets part
+all:
+	$(MAKE) common member verifier argtable3 
+
+clean:
+	$(MAKE) -C ./epid/common/ clean
+	$(MAKE) -C ./epid/member/ clean
+	$(MAKE) -C ./epid/verifier/ clean
+ifeq ("$(shell test -f ./ext/gtest/Makefile && echo Makefile exists)", "Makefile exists")
+	$(MAKE) -C ./ext/gtest clean
+endif
+	$(MAKE) -C ./epid/common-testhelper/ clean
+	$(MAKE) -C ./ext/argtable3/ clean
+ifneq ("$(wildcard ./ext/google_benchmark)","")
+	$(MAKE) -C ./ext/google_benchmark/ clean
+endif
+
+install:
+	$(MAKE) -C ./epid/common/ install
+	$(MAKE) -C ./epid/member/ install
+	$(MAKE) -C ./epid/verifier/ install
+	$(MAKE) -C ./epid/common-testhelper/ install
+
+uninstall:
+	rm -rf  $(epidinstalldir)
+
+common-testhelper:
+	$(MAKE) -C ./epid/common-testhelper/ all
+
+common-testhelper_utest:
+	$(MAKE) -C ./epid/common-testhelper/ utest
+
+common:
+	$(MAKE) -C ./epid/common/ all
+
+common_utest:
+	$(MAKE) -C ./epid/common/ utest
+
+member:
+	$(MAKE) -C ./epid/member/ all
+
+member_utest:
+	$(MAKE) -C ./epid/member/ utest
+
+verifier:
+	$(MAKE) -C ./epid/verifier/ all
+
+verifier_utest:
+	$(MAKE) -C ./epid/verifier/ utest
+
+gtest:
+	$(MAKE) -C ./ext/gtest/ all
+
+argtable3:
+	$(MAKE) -C ./ext/argtable3/ all
+
+utest:
+	$(MAKE) gtest common-testhelper
+	$(MAKE) common-testhelper_utest common_utest member_utest verifier_utest
+
+run_utest:
+	$(MAKE) -C ./epid/common-testhelper/ run_utest
+	$(MAKE) -C ./epid/common/ run_utest
+	$(MAKE) -C ./epid/member/ run_utest
+	$(MAKE) -C ./epid/verifier/ run_utest
+
+check:
+	$(MAKE) utest
+	$(MAKE) run_utest
+
+perf:
+ifneq ("$(wildcard ./ext/google_benchmark/)","")
+	$(MAKE) -C ./ext/google_benchmark/ all
+	$(MAKE) -C ./ext/google_benchmark/ utest
+	$(MAKE) -C ./ext/google_benchmark/ run_utest
+endif
+
+build:
+	$(MAKE) all
+	$(MAKE) check
+	$(MAKE) install

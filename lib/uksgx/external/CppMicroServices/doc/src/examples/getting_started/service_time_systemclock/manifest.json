@@ -1,0 +1,6 @@
+{
+  "bundle.symbolic_name" : "service_time_systemclock",
+  "bundle.activator" : true,
+  "bundle.name" : "Service Time SystemClock",
+  "bundle.description" : "This bundle uses std::chrono::system_clock"
+}

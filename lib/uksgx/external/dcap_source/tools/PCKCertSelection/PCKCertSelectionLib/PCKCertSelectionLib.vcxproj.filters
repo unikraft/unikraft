@@ -1,0 +1,263 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="Source Files">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="Header Files">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;ipp;xsd</Extensions>
+    </Filter>
+    <Filter Include="OpensslHelpers">
+      <UniqueIdentifier>{831901d1-1bb3-461a-8362-a03d137aaeaf}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="rapidjson">
+      <UniqueIdentifier>{e9630173-df12-4a3e-a653-eae4c057897d}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="SgxEcdsaAttestation">
+      <UniqueIdentifier>{c6b8ec3c-306e-435d-bb3b-14aa6c7b3026}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="AttestationParsers">
+      <UniqueIdentifier>{0d7b4c99-a7b0-4c24-9af8-d7de8b7e8f8c}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Json">
+      <UniqueIdentifier>{4048b3f4-cfdd-42d4-ab43-2aa31171c321}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="X509">
+      <UniqueIdentifier>{80b175a4-3e48-4694-afe6-4fd14d9c6c7b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="rapidjson\error">
+      <UniqueIdentifier>{54032b0a-019b-4177-9924-a1e1045472ce}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="rapidjson\internal">
+      <UniqueIdentifier>{42133510-1f0b-451d-bf01-454e0e26e5be}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="rapidjson\msinttypes">
+      <UniqueIdentifier>{bcad9c35-58f6-48ea-a5df-21c2b0ae9313}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Utils">
+      <UniqueIdentifier>{4b078cb8-ef86-4886-8e7c-b866b9bb969f}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="dllmain.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pck_sorter.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="pck_cert_selection.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\ParserUtils.cpp">
+      <Filter>AttestationParsers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\Json\JsonParser.cpp">
+      <Filter>Json</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\Json\TcbInfo.cpp">
+      <Filter>Json</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\Json\TcbLevel.cpp">
+      <Filter>Json</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\OpensslHelpers\OidUtils.cpp">
+      <Filter>OpensslHelpers</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\X509\Certificate.cpp">
+      <Filter>X509</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\X509\DistinguishedName.cpp">
+      <Filter>X509</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\X509\Extension.cpp">
+      <Filter>X509</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\X509\PckCertificate.cpp">
+      <Filter>X509</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\X509\Signature.cpp">
+      <Filter>X509</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\X509\Tcb.cpp">
+      <Filter>X509</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\X509\Validity.cpp">
+      <Filter>X509</Filter>
+    </ClCompile>
+    <ClCompile Include="tcb_manager.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="config_selector.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\X509/ProcessorPckCertificate.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationCommons\src\Utils\GMTime.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationCommons\src\Utils\TimeUtils.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\Json\TcbComponent.cpp">
+      <Filter>Json</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\Json\TdxModule.cpp">
+      <Filter>Json</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="pck_sorter.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\include\pck_cert_selection.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="constants.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\allocators.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\document.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\encodedstream.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\encodings.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\filereadstream.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\filewritestream.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\fwd.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\istreamwrapper.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\memorybuffer.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\memorystream.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\ostreamwrapper.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\pointer.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\prettywriter.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\rapidjson.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\reader.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\schema.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\stream.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\stringbuffer.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\writer.h">
+      <Filter>rapidjson</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\error\en.h">
+      <Filter>rapidjson\error</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\error\error.h">
+      <Filter>rapidjson\error</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\biginteger.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\diyfp.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\dtoa.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\ieee754.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\itoa.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\meta.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\pow10.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\regex.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\stack.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\strfunc.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\strtod.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\internal\swap.h">
+      <Filter>rapidjson\internal</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\msinttypes\inttypes.h">
+      <Filter>rapidjson\msinttypes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\ThirdParty\rapidjson\include\rapidjson\msinttypes\stdint.h">
+      <Filter>rapidjson\msinttypes</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\include\SgxEcdsaAttestation\AttestationParsers.h">
+      <Filter>SgxEcdsaAttestation</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\ParserUtils.h">
+      <Filter>AttestationParsers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\X509Constants.h">
+      <Filter>AttestationParsers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\Json\JsonParser.h">
+      <Filter>Json</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\OpensslHelpers\Bytes.h">
+      <Filter>OpensslHelpers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\OpensslHelpers\OidUtils.h">
+      <Filter>OpensslHelpers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\OpensslHelpers\OpensslInit.h">
+      <Filter>OpensslHelpers</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\AttestationParsers\src\OpensslHelpers\OpensslTypes.h">
+      <Filter>OpensslHelpers</Filter>
+    </ClInclude>
+    <ClInclude Include="tcb_manager.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="config_selector.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\..\QuoteVerification\QVL\Src\AttestationCommons\include\Utils\TimeUtils.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="Makefile" />
+  </ItemGroup>
+</Project>

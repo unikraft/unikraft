@@ -1,0 +1,16 @@
+<EnclaveConfiguration>
+    <IntelSigned>1</IntelSigned>
+    <ProvisionKey>0</ProvisionKey>
+    <LaunchKey>0</LaunchKey>
+    <ProdID>0x1</ProdID>
+    <ISVSVN>0xD</ISVSVN>
+    <TCSNum>1</TCSNum>
+    <TCSMinPool>0</TCSMinPool>
+    <TCSPolicy>1</TCSPolicy>
+    <HW>0</HW>
+    <StackMaxSize>0x7000</StackMaxSize>
+    <StackMinSize>0x7000</StackMinSize>
+    <HeapMaxSize>0x50000</HeapMaxSize>
+    <HeapMinSize>0x50000</HeapMinSize>
+    <DisableDebug>1</DisableDebug>
+</EnclaveConfiguration>

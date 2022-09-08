@@ -1,0 +1,9 @@
+LIBRARY	"sgx_pce_wrapper"
+
+EXPORTS
+    sgx_set_pce_enclave_load_policy    @1
+    sgx_pce_get_target                 @2
+    sgx_get_pce_info                   @3
+    sgx_pce_sign_report                @4
+    sgx_get_pce_info_without_ppid      @5
+    sgx_set_pce_path                   @6

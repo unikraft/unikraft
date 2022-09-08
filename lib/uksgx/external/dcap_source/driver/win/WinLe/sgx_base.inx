@@ -1,0 +1,148 @@
+;/*
+;Copyright (C) 2011-2019 Intel Corporation. All rights reserved.
+;
+;Redistribution and use in source and binary forms, with or without
+;modification, are permitted provided that the following conditions
+;are met:
+;
+;  * Redistributions of source code must retain the above copyright
+;    notice, this list of conditions and the following disclaimer.
+;  * Redistributions in binary form must reproduce the above copyright
+;    notice, this list of conditions and the following disclaimer in
+;    the documentation and/or other materials provided with the
+;    distribution.
+;  * Neither the name of Intel Corporation nor the names of its
+;    contributors may be used to endorse or promote products derived
+;    from this software without specific prior written permission.
+;
+;THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+;"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+;LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+;A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+;OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+;SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+;LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+;DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+;THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+;(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+;OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+;*/
+
+[Version]
+Signature = "$WINDOWS NT$"
+Class       = System
+ClassGuid   = {4D36E97D-E325-11CE-BFC1-08002BE10318}
+Provider    = %INTC%
+CatalogFile = sgx_base.cat
+DriverVer   = 04/17/2018,1.0.0.2
+
+[SourceDisksNames]
+1 = %Disk%,,,""
+
+[SourceDisksFiles]
+sgx_lc_msr.sys         = 1,,
+sgx_lc.dll = 1
+License.txt = 1
+ThirdPartyLicenses.txt = 1
+
+[DestinationDirs]
+DefaultDestDir     = 12
+FLCDrv_CopyFiles   = 13      ; copy to Driver store
+UMDriver_CopyFiles = 13      ; copy to Driver store
+License_CopyFiles  = 13      ; copy to Driver store
+
+[Manufacturer]
+%StdMfg%=SGXPSW,NTamd64.10.0.1..16299      ;;; 1 for Client
+%StdMfg%=SGXPSW_LC,NTamd64.10.0.3..16299   ;;; 3 for Server
+
+[SGXPSW.NTamd64.10.0.1..16299]
+%SGXPSW.DeviceDesc% = SGXPSW_Device, acpi\int0e0c
+
+[SGXPSW_LC.NTamd64.10.0.3..16299]
+%SGXPSW_LC.DeviceDesc% = SGXPSW_LC_Device, acpi\int0e0c
+
+[SGXPSW_Device.NT]
+Include=umpass.inf
+Needs=Umpass
+
+[SGXPSW_Device.NT.Services]
+Include=umpass.inf
+Needs=Umpass.Services
+
+[SGXPSW_Device.NT.Components]
+AddComponent = psw_installer,, PswInstaller_component
+
+[SGXPSW_LC_Device]
+CopyFiles = UMDriver_CopyFiles
+CopyFiles = FLCDrv_CopyFiles
+CopyFiles = License_CopyFiles
+
+[SGXPSW_LC_Device.HW]
+AddReg = SGXPSW_LC_Device_AddReg
+
+[SGXPSW_LC_Device_AddReg]
+HKR,,"UpperFilters",%REG_MULTI_SZ%,"WUDFRd"
+
+[SGXPSW_LC_Device.Components]
+AddComponent = psw_installer,, PswInstaller_component
+AddComponent = dcap_installer,, SGXDCAP_component
+
+[SGXPSW_LC_Device.Services]
+AddService = WUDFRd,0x000009f8,WUDFRD_ServiceInstall
+AddService = sgx_lc_msr,%SPSVCINST_ASSOCSERVICE%,SGXLCMSR_Service_Inst
+
+[SGXPSW_LC_Device.Wdf]
+UmdfService      = WinLeProxyUMDF,WinLeProxyUMDF_Install
+UmdfServiceOrder = WinLeProxyUMDF
+
+[WinLeProxyUMDF_Install]
+UmdfLibraryVersion = $UMDFVERSION$
+ServiceBinary      = %13%\sgx_lc.dll
+
+[WUDFRD_ServiceInstall]
+DisplayName    = %WudfRdDisplayName%
+ServiceType    = 1
+StartType      = 3
+ErrorControl   = 1
+ServiceBinary  = %12%\WUDFRd.sys
+
+[SGXLCMSR_Service_Inst]
+DisplayName    = %SGXLCMSR.SVCDESC%
+ServiceType    = 1               ; SERVICE_KERNEL_DRIVER
+StartType      = 3               ; SERVICE_DEMAND_START
+ErrorControl   = 1               ; SERVICE_ERROR_NORMAL
+ServiceBinary  = %13%\sgx_lc_msr.sys
+AddReg         = sgx_lc_msr_reg
+
+[sgx_lc_msr_reg]
+HKR,Parameters,SGX_Launch_Config_Optin,0x00010003,0     ;FLG_ADDREG_TYPE_DWORD|FLG_ADDREG_NOCLOBBER
+
+[UMDriver_CopyFiles]
+sgx_lc.dll
+
+[FLCDrv_CopyFiles]
+sgx_lc_msr.sys
+
+[License_CopyFiles]
+License.txt
+ThirdPartyLicenses.txt
+
+[PswInstaller_component]
+ComponentIds = VEN_INT&DEV_0E0C
+Description = "Intel(R) Software Guard Extensions Software"
+
+[SGXDCAP_component]
+ComponentIds = VEN_INT&DEV_0E0C_DCAP
+Description = "Intel(R) Software Guard Extensions Software DCAP"
+
+[Strings]
+INTC                    = "Intel Corporation"
+StdMfg                  = "Intel"
+SGXPSW_LC.DeviceDesc    = "Intel(R) Software Guard Extensions Launch Configuration Service"
+SGXPSW.DeviceDesc       = "Intel(R) Software Guard Extensions Device"
+Disk                    = "Intel(R) Software Guard Extensions Install Disk"
+WudfRdDisplayName       = "Windows Driver Foundation - User-mode Driver Framework Reflector"
+SGXLCMSR.SVCDESC        = "Intel(R) Software Guard Extensions Launch Configuration Service"
+DeviceName              = "Intel(R) Software Guard Extensions Launch Token Service"
+SPSVCINST_ASSOCSERVICE  = 0x00000002
+REG_MULTI_SZ            = 0x00010000

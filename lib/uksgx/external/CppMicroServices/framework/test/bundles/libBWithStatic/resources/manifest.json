@@ -1,0 +1,4 @@
+{
+  "bundle.symbolic_name" : "TestBundleB",
+  "bundle.activator" : true
+}

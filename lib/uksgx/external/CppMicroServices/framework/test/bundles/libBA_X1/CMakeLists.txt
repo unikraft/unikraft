@@ -1,0 +1,3 @@
+
+usFunctionCreateTestBundleWithResources(TestBundleBA_X1 SOURCES TestBundleBA_X1.cpp RESOURCES manifest.json)
+
