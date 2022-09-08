@@ -40,17 +40,11 @@
 #        - tcmalloc:      libsgx_tcmalloc.a
 #        - openmp:        libsgx_omp.a
 #        - protobuf:      libsgx_protobuf.a
-#  - Untrtusted libraries
-#        - sample_crypto: libsample_crypto.so (for sample code use)
 #  - Tools
 #        - signtool:      sgx_sign
 #        - edger8r:       sgx_edger8r
 #        - sgx_encrypt:  sgx_encrypt
 #        - sgx_protoc:    sgx_protoc
-#
-
-# .PHONY: components
-# components: tstdc tcxx tservice trts tcrypto tcmalloc openmp protobuf sample_crypto signtool edger8r sgx_encrypt  pthread
 
 # all: 
 # 	@echo $(CXXINCLUDES-$(CONFIG_LIBUKSGX))

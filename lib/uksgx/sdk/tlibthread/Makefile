@@ -29,7 +29,7 @@
 #
 #
 
-include ../../buildenv.mk
+include $(LIBUKSGX_SDK_BASE)/../buildenv.mk
 
 CXXFLAGS += $(ENCLAVE_CXXFLAGS) -Werror -fno-exceptions -fno-rtti
 
@@ -52,7 +52,7 @@ all: $(LIBTLIBTHREAD)
 $(LIBTLIBTHREAD): $(OBJ)
 	$(AR) rcs $@ $^
 
-$(OBJ): %.o: %.cpp
+$(OBJ): %.o: %.c
 	$(CXX) -c $(CXXFLAGS) $(CPPFLAGS) $< -o $@
 
 .PHONY: clean
