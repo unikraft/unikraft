@@ -34,7 +34,7 @@
 #include <string.h>
 #include <errno.h>
 
-#include "util.h"
+// #include "util.h"
 #include "sethread_internal.h"
 
 int sgx_thread_cond_init(sgx_thread_cond_t *cond, const sgx_thread_condattr_t *unused)
