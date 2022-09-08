@@ -373,12 +373,12 @@ endef
 # A variable called LIB[LIBNAME]_ORIGIN is initialized with
 # the path to the extracted files
 #
-# unarchive $libname,$archive_fname,$dir_with_patches(optional),$extra_deps(optional)
+# unarchive $libname,$archive_fname,$extra_deps(optional)
 define unarchive =
-$(if $(filter %.tar.gz %.tgz,$(2)),$(call _extracttoorigin_tgz,$(1),$(2),$(4)),\
-$(if $(filter %.tar.xz %.txz,$(2)),$(call _extracttoorigin_tgz_xz,$(1),$(2),$(4)),\
-$(if $(filter %.tar.bz2 %.tbz2,$(2)),$(call _extracttoorigin_tgz_bz2,$(1),$(2),$(4)),\
-$(if $(filter %.zip,$(2)),$(call          _extracttoorigin_zip,$(1),$(2),$(4)),\
+$(if $(filter %.tar.gz %.tgz,$(2)),$(call _extracttoorigin_tgz,$(1),$(2),$(3)),\
+$(if $(filter %.tar.xz %.txz,$(2)),$(call _extracttoorigin_tgz_xz,$(1),$(2),$(3)),\
+$(if $(filter %.tar.bz2 %.tbz2,$(2)),$(call _extracttoorigin_tgz_bz2,$(1),$(2),$(3)),\
+$(if $(filter %.zip,$(2)),$(call          _extracttoorigin_zip,$(1),$(2),$(3)),\
 $(error $(2): missing extraction rule for archive type)\
 ))))
 UK_FETCH-y += $(BUILD_DIR)/$(1)/.origin \
@@ -419,7 +419,7 @@ endef
 
 # Downloads an archive from remote and invokes unarchive. The target filename
 # (without path!) is specified
-# fetchas $libname,$url,$target_fname(no_path!),$dir_with_patches(optional)
+# fetchas $libname,$url,$target_fname(no_path!)
 define fetchas =
 $(BUILD_DIR)/$(1)/$(3):
 	$(call verbose_cmd,WGET,$(1)':' $(2), \
@@ -427,13 +427,13 @@ $(BUILD_DIR)/$(1)/$(3):
 	 $(RM) $(BUILD_DIR)/$(1)/$(3))
 
 $(call _chksum_origin,$(1),$(BUILD_DIR)/$(1)/$(3),$(BUILD_DIR)/$(1)/.chksum)
-$(call unarchive,$(1),$(BUILD_DIR)/$(1)/$(3),$(4),$(BUILD_DIR)/$(1)/.chksum)
+$(call unarchive,$(1),$(BUILD_DIR)/$(1)/$(3),$(BUILD_DIR)/$(1)/.chksum)
 
 UK_FETCH-y += $(BUILD_DIR)/$(1)/.chksum
 endef
 
 # fetchas2 works like fetchas but supports a secondary URL
-# fetchas2 $libname,$url,$url2,$target_fname(no_path!),$dir_with_patches(optional)
+# fetchas2 $libname,$url,$url2,$target_fname(no_path!)
 define fetchas2 =
 $(BUILD_DIR)/$(1)/$(4):
 	$(call verbose_cmd,WGET,$(1)':' $(2) [retry-with: $(3)], \
@@ -442,21 +442,21 @@ $(BUILD_DIR)/$(1)/$(4):
 	 $(RM) $(BUILD_DIR)/$(1)/$(4))
 
 $(call _chksum_origin,$(1),$(BUILD_DIR)/$(1)/$(4),$(BUILD_DIR)/$(1)/.chksum)
-$(call unarchive,$(1),$(BUILD_DIR)/$(1)/$(4),$(5),$(BUILD_DIR)/$(1)/.chksum)
+$(call unarchive,$(1),$(BUILD_DIR)/$(1)/$(4),$(BUILD_DIR)/$(1)/.chksum)
 
 UK_FETCH-y += $(BUILD_DIR)/$(1)/.chksum
 endef
 
 # Downloads an archive from remote and invokes unarchive
-# fetch $libname,$url,$dir_with_patches(optional)
+# fetch $libname,$url
 define fetch =
-$(call fetchas,$(1),$(2),$(notdir $(2)),$(3))
+$(call fetchas,$(1),$(2),$(notdir $(2)))
 endef
 
 # fetch2 works like fetch but supports a secondary URL
-# fetch2 $libname,$url,$url2,$dir_with_patches(optional)
+# fetch2 $libname,$url,$url2
 define fetch2 =
-$(call fetchas2,$(1),$(2),$(3),$(notdir $(2)),$(4))
+$(call fetchas2,$(1),$(2),$(3),$(notdir $(2)))
 endef
 
 
