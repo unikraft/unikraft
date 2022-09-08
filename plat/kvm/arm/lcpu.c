@@ -32,6 +32,7 @@
 #include <stdint.h>
 #include <uk/plat/lcpu.h>
 #include <arm/irq.h>
+#include <arm/cpu.h>
 
 void ukplat_lcpu_enable_irq(void)
 {
