@@ -1,8 +1,0 @@
-CINCLUDES-$(CONFIG_LIBUKSGX)  += -I$(LIBUKSGX_SDK_BASE)/tlibthread
-CINCLUDES-$(CONFIG_LIBUKSGX)  += -I$(LIBUKSGX_SDK_BASE)/trts
-
-LIBUKSGX_SRCS-$(CONFIG_LIBUKSGX) += $(wildcard $(LIBUKSGX_SDK_BASE)/tlibthread/*.c)
-
-# trusted libraries behave like standlone libraries and should not be compiled together with Unikraft's kernel itself
-# the best solution is to compile the untrusted runtime into the kernel and the trusted libraries into some separate static liraries
-# then when composing the final Unikraft's app image, we can link the enclave with the trusted libraries and find a proper way to sign it and cretae a enclave inside the CPU

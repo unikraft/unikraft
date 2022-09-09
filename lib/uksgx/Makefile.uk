@@ -4,6 +4,7 @@ $(eval $(call addlib_s,libuksgx,$(CONFIG_LIBUKSGX)))
 LIBUKSGX_DRIVER_BASE := $(LIBUKSGX_BASE)/driver
 LIBUKSGX_SDK_BASE := $(LIBUKSGX_BASE)/sdk
 LIBUKSGX_PSW_BASE := $(LIBUKSGX_BASE)/psw
+LIBUKSGX_EXT_BASE := $(LIBUKSGX_BASE)/external
 
 # driver
 CINCLUDES-$(CONFIG_LIBUKSGX) += -I$(LIBUKSGX_DRIVER_BASE)/include
@@ -17,9 +18,11 @@ LIBUKSGX_SRCS-$(CONFIG_LIBUKSGX) += $(LIBUKSGX_DRIVER_BASE)/sgx_encl.c
 LIBUKSGX_SRCS-$(CONFIG_LIBUKSGX) += $(LIBUKSGX_DRIVER_BASE)/sgx_ioctl.c
 LIBUKSGX_SRCS-$(CONFIG_LIBUKSGX) += $(LIBUKSGX_DRIVER_BASE)/sgx_utils.c
 
-# sdk and psw shared headers
-CINCLUDES-$(CONFIG_LIBUKSGX) += $(foreach d, $(shell find $(LIBUKSGX_BASE)/common/inc -type d), -I$(d))
-CXXINCLUDES-$(CONFIG_LIBUKSGX) += $(foreach d, $(shell find $(LIBUKSGX_BASE)/common/inc -type d), -I$(d))
+include $(LIBUKSGX_EXT_BASE)/Makefile.uk
+
+# # sdk and psw shared headers
+# CINCLUDES-$(CONFIG_LIBUKSGX) += $(foreach d, $(shell find $(LIBUKSGX_BASE)/common/inc -type d), -I$(d))
+# CXXINCLUDES-$(CONFIG_LIBUKSGX) += $(foreach d, $(shell find $(LIBUKSGX_BASE)/common/inc -type d), -I$(d))
 
 # sdk
 include $(LIBUKSGX_SDK_BASE)/Makefile.uk

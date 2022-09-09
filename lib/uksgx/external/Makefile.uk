@@ -1,0 +1,7 @@
+# ipp-crypto
+$(LIBUKSGX_EXT_BASE)/ippcp_internal/lib/linux/intel64/no_mitigation/libippcp.a:
+	$(call build_cmd, SGXEXT, libippcp, $(notdir @), \
+	$(MAKE) -C $(LIBUKSGX_EXT_BASE)/ippcp_internal UK_INCS="$(CINCLUDES) $(CINCLUDES-y)")
+
+UK_PREPARE-$(CONFIG_LIBUKSGX) += $(LIBUKSGX_EXT_BASE)/ippcp_internal/lib/linux/intel64/no_mitigation/libippcp.a
+LIBUKSGX_OBJS-y += $(LIBUKSGX_EXT_BASE)/ippcp_internal/lib/linux/intel64/no_mitigation/libippcp.a

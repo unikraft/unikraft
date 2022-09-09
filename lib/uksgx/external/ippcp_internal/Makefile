@@ -42,8 +42,10 @@ ARCH = intel64
 IPP_CONFIG += -DARCH=$(ARCH)
 
 ENC_FLAGS = $(patsubst -fpie, -fpic, $(ENCLAVE_CFLAGS))
-# ipp-crypto requires system header files
-ENC_CFLAGS = $(patsubst -nostdinc, , $(ENC_FLAGS))
+# ipp-crypto requires system header files, in unikraft it should be nolibc
+# ENC_CFLAGS = $(patsubst -nostdinc, , $(ENC_FLAGS))
+# UK_INCS = -I$(ROOT_DIR)/../../build/include -I$(ROOT_DIR)/../../include -I$(ROOT_DIR)/../../arch/x86/x86_64/include 
+ENC_CFLAGS = $(ENC_FLAGS) $(NOLIBC_INCS) $(UK_INCS)
 ENC_CXXFLAGS = $(ENC_CFLAGS)
 
 IPP_CONFIG += -DCMAKE_C_FLAGS="$(ENC_CFLAGS)"
@@ -84,18 +86,18 @@ all: build_ipp
 	$(MKDIR) license
 	$(CP) ipp-crypto/LICENSE ./license/
 
-build_ipp: $(CHECK_SOURCE)
+build_ipp: 
 	cd $(IPP_SOURCE) && $(PRE_CONFIG) cmake CMakeLists.txt $(IPP_CONFIG) && cd build && make ippcp_s
 
-.PHONY: ipp_source
-ipp_source:
-ifeq ($(shell git rev-parse --is-inside-work-tree), true)
-	git submodule update -f --init --recursive --remote -- $(IPP_SOURCE)
-else
-	$(RM) -rf $(IPP_SOURCE)
-	git clone -b ippcp_2021.3 https://github.com/intel/ipp-crypto.git --depth 1 $(IPP_SOURCE)
-endif
-	cd $(IPP_SOURCE) && git am ../0001-IPP-crypto-for-SGX.patch
+# .PHONY: ipp_source
+# ipp_source:
+# ifeq ($(shell git rev-parse --is-inside-work-tree), true)
+# 	git submodule update -f --init --recursive --remote -- $(IPP_SOURCE)
+# else
+# 	$(RM) -rf $(IPP_SOURCE)
+# 	git clone -b ippcp_2021.3 https://github.com/intel/ipp-crypto.git --depth 1 $(IPP_SOURCE)
+# endif
+# 	cd $(IPP_SOURCE) && git am ../0001-IPP-crypto-for-SGX.patch
 
 .PHONY: clean
 clean:

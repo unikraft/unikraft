@@ -35,8 +35,7 @@ CFLAGS += -Werror $(ENCLAVE_CFLAGS)          \
           -I$(LINUX_SDK_DIR)/trts            \
           -I$(COMMON_DIR)/inc                \
           -I$(COMMON_DIR)/inc/internal       \
-          -I$(COMMON_DIR)/inc/internal/linux \
-          -I$(LINUX_SDK_DIR)/simulation/assembly/
+          -I$(COMMON_DIR)/inc/internal/linux
 
 CXXFLAGS += -Werror $(ENCLAVE_CXXFLAGS)      \
           -I$(LINUX_SDK_DIR)/trts            \

@@ -66,7 +66,7 @@ LIBTCXX    := $(BUILD_DIR)/libsgx_tcxx.a
 LIBTSE     := $(BUILD_DIR)/libsgx_tservice.a
 
 .PHONY: components
-components: tstdc tcxx tservice trts tcrypto tkey_exchange ukey_exchange tprotected_fs uprotected_fs ptrace sample_crypto libcapable simulation signtool edger8r tcmalloc sgx_pcl sgx_encrypt sgx_tswitchless sgx_uswitchless pthread openmp protobuf ttls utls
+components: tstdc tcxx tservice trts tcrypto signtool edger8r tcmalloc sgx_encrypt pthread openmp protobuf
 
 # ---------------------------------------------------
 #  tstdc
@@ -184,21 +184,9 @@ trts:
 tcrypto: edger8r
 	$(MAKE) -C tlibcrypto/
 
-.PHONY: tkey_exchange
-tkey_exchange: edger8r
-	$(MAKE) -C tkey_exchange
-
 .PHONY: tcmalloc
 tcmalloc:
 	$(MAKE) -C gperftools/
-
-.PHONY: tprotected_fs
-tprotected_fs: edger8r
-	$(MAKE) -C protected_fs/sgx_tprotected_fs
-
-.PHONY: sgx_pcl
-sgx_pcl:
-	$(MAKE) -C protected_code_loader
 
 .PHONY: openmp
 openmp:
@@ -211,58 +199,6 @@ ifeq ($(MITIGATION-CVE-2020-0551),)
 else
 	$(MAKE) -C $(LINUX_EXTERNAL_DIR)/protobuf
 endif
-
-.PHONY: ttls
-ttls: edger8r
-	$(MAKE) -C ttls
-
-# ---------------------------------------------------
-#  Untrusted libraries
-# ---------------------------------------------------
-.PHONY: ukey_exchange
-ukey_exchange:
-	$(MAKE) -C ukey_exchange
-
-.PHONY: uprotected_fs
-uprotected_fs: edger8r
-	$(MAKE) -C protected_fs/sgx_uprotected_fs
-
-.PHONY: ptrace
-ptrace:
-	$(MAKE) -C debugger_interface/linux/
-
-.PHONY: sample_crypto
-sample_crypto:
-	$(MAKE) -C sample_libcrypto
-
-.PHONY: utls
-utls:
-	$(MAKE) -C utls
-
-# ---------------------------------------------------
-#  standalone, untrusted libraries
-# ---------------------------------------------------
-.PHONY: libcapable
-libcapable:
-	$(MAKE) -C libcapable/linux/
-
-# ---------------------------------------------------
-#  Switchless
-# ---------------------------------------------------
-.PHONY: sgx_tswitchless
-sgx_tswitchless: trts tlibc edger8r
-	$(MAKE) -C switchless/sgx_tswitchless
-
-.PHONY: sgx_uswitchless
-sgx_uswitchless: edger8r
-	$(MAKE) -C switchless/sgx_uswitchless
-
-# ---------------------------------------------------
-#  simualtion libraries and tools
-# ---------------------------------------------------
-.PHONY: simulation
-simulation: edger8r
-	$(MAKE) -C simulation/
 
 # ---------------------------------------------------
 #  tools
@@ -296,25 +232,12 @@ clean:
 	$(MAKE) -C tsafecrt/                           clean
 	$(MAKE) -C gperftools/                         clean
 	$(MAKE) -C tlibcrypto/                         clean
-	$(MAKE) -C tkey_exchange/                      clean
-	$(MAKE) -C ukey_exchange/                      clean
-	$(MAKE) -C protected_fs/sgx_tprotected_fs/     clean
-	$(MAKE) -C protected_fs/sgx_uprotected_fs/     clean
-	$(MAKE) -C debugger_interface/linux/           clean
-	$(MAKE) -C sample_libcrypto/                   clean
-	$(MAKE) -C libcapable/linux/                   clean
-	$(MAKE) -C simulation/                         clean
 	$(MAKE) -C sign_tool/SignTool                  clean
 	$(MAKE) -C edger8r/linux                       clean
-	$(MAKE) -C protected_code_loader               clean
 	$(MAKE) -C encrypt_enclave                     clean
-	$(MAKE) -C switchless/sgx_tswitchless          clean
-	$(MAKE) -C switchless/sgx_uswitchless          clean
 	$(MAKE) -C tmm_rsrv/                           clean
 	$(MAKE) -C pthread                             clean
 	$(MAKE) -C $(LINUX_EXTERNAL_DIR)/openmp        clean
 	$(MAKE) -C $(LINUX_EXTERNAL_DIR)/protobuf      clean
-	$(MAKE) -C ttls						           clean
-	$(MAKE) -C utls						           clean
 	@$(RM) $(LIBTLIBC) $(LIBTCXX) $(LIBTSE)
 	@$(RM) $(BUILD_DIR)/libc++_Changes_SGX.txt

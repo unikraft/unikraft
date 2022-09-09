@@ -1,0 +1,188 @@
+Checking whether the ASM_NASM compiler is GNU using "--version" did not match "(GNU assembler)|(GCC)|(Free Software Foundation)":
+NASM version 2.15.05
+Checking whether the ASM_NASM compiler is Clang using "--version" did not match "(clang version)":
+NASM version 2.15.05
+Checking whether the ASM_NASM compiler is AppleClang using "--version" did not match "(Apple LLVM version)":
+NASM version 2.15.05
+Checking whether the ASM_NASM compiler is ARMClang using "--version" did not match "armclang":
+NASM version 2.15.05
+Checking whether the ASM_NASM compiler is HP using "-V" did not match "HP C":
+nasm: error: unrecognised option `-V'
+Checking whether the ASM_NASM compiler is Intel using "--version" did not match "(ICC)":
+NASM version 2.15.05
+Checking whether the ASM_NASM compiler is IntelLLVM using "--version" did not match "(Intel[^
+]+oneAPI)":
+NASM version 2.15.05
+Checking whether the ASM_NASM compiler is SunPro using "-V" did not match "Sun C":
+nasm: error: unrecognised option `-V'
+Checking whether the ASM_NASM compiler is XL using "-qversion" did not match "XL C":
+nasm: error: unrecognised option `-q'
+Checking whether the ASM_NASM compiler is MSVC using "-?" did not match "Microsoft":
+nasm: error: unrecognised option `-?'
+Checking whether the ASM_NASM compiler is TI using "-h" did not match "Texas Instruments":
+Usage: /usr/bin/nasm [-@ response_file] [options...] [--] filename
+       /usr/bin/nasm -v (or --v)
+
+Options (values in brackets indicate defaults):
+
+    -h            show this text and exit (also --help)
+    -v (or --v)   print the NASM version number and exit
+    -@ file       response file; one command line option per line
+
+    -o outfile    write output to outfile
+    --keep-all    output files will not be removed even if an error happens
+
+    -Xformat      specifiy error reporting format (gnu or vc)
+    -s            redirect error messages to stdout
+    -Zfile        redirect error messages to file
+
+    -M            generate Makefile dependencies on stdout
+    -MG           d:o, missing files assumed generated
+    -MF file      set Makefile dependency file
+    -MD file      assemble and generate dependencies
+    -MT file      dependency target name
+    -MQ file      dependency target name (quoted)
+    -MP           emit phony targets
+
+    -f format     select output file format
+       bin                  Flat raw binary (MS-DOS, embedded, ...) [default]
+       ith                  Intel Hex encoded flat binary
+       srec                 Motorola S-records encoded flat binary
+       aout                 Linux a.out
+       aoutb                NetBSD/FreeBSD a.out
+       coff                 COFF (i386) (DJGPP, some Unix variants)
+       elf32                ELF32 (i386) (Linux, most Unix variants)
+       elf64                ELF64 (x86-64) (Linux, most Unix variants)
+       elfx32               ELFx32 (ELF32 for x86-64) (Linux)
+       as86                 as86 (bin86/dev86 toolchain)
+       obj                  Intel/Microsoft OMF (MS-DOS, OS/2, Win16)
+       win32                Microsoft extended COFF for Win32 (i386)
+       win64                Microsoft extended COFF for Win64 (x86-64)
+       ieee                 IEEE-695 (LADsoft variant) object file format
+       macho32              Mach-O i386 (Mach, including MacOS X and variants)
+       macho64              Mach-O x86-64 (Mach, including MacOS X and variants)
+       dbg                  Trace of all info passed to output stage
+       elf                  Legacy alias for "elf32"
+       macho                Legacy alias for "macho32"
+       win                  Legacy alias for "win32"
+
+    -g            generate debugging information
+    -F format     select a debugging format (output format dependent)
+    -gformat      same as -g -F format
+       elf32:     dwarf     ELF32 (i386) dwarf (newer) [default]
+                  stabs     ELF32 (i386) stabs (older)
+       elf64:     dwarf     ELF64 (x86-64) dwarf (newer) [default]
+                  stabs     ELF64 (x86-64) stabs (older)
+       elfx32:    dwarf     ELFx32 (x86-64) dwarf (newer) [default]
+                  stabs     ELFx32 (x86-64) stabs (older)
+       obj:       borland   Borland Debug Records [default]
+       win32:     cv8       Codeview 8+ [default]
+       win64:     cv8       Codeview 8+ [default]
+       ieee:      ladsoft   LADsoft Debug Records [default]
+       macho32:   dwarf     Mach-O i386 dwarf for Darwin/MacOS [default]
+       macho64:   dwarf     Mach-O x86-64 dwarf for Darwin/MacOS [default]
+       dbg:       debug     Trace of all info passed to debug stage [default]
+
+    -l listfile   write listing to a list file
+    -Lflags...    add optional information to the list file
+       -Lb        show builtin macro packages (standard and %use)
+       -Ld        show byte and repeat counts in decimal, not hex
+       -Le        show the preprocessed output
+       -Lf        ignore .nolist (force output)
+       -Lm        show multi-line macro calls with expanded parmeters
+       -Lp        output a list file every pass, in case of errors
+       -Ls        show all single-line macro definitions
+       -Lw        flush the output after every line (very slow!)
+       -L+        enable all listing options except -Lw (very verbose!)
+
+    -Oflags...    optimize opcodes, immediates and branch offsets
+       -O0        no optimization
+       -O1        minimal optimization
+       -Ox        multipass optimization (default)
+       -Ov        display the number of passes executed at the end
+    -t            assemble in limited SciTech TASM compatible mode
+
+    -E (or -e)    preprocess only (writes output to stdout by default)
+    -a            don't preprocess (assemble only)
+    -Ipath        add a pathname to the include file path
+    -Pfile        pre-include a file (also --include)
+    -Dmacro[=str] pre-define a macro
+    -Umacro       undefine a macro
+   --pragma str   pre-executes a specific %%pragma
+   --before str   add line (usually a preprocessor statement) before the input
+   --no-line      ignore %line directives in input
+
+   --prefix str   prepend the given string to the names of all extern,
+                  common and global symbols (also --gprefix)
+   --suffix str   append the given string to the names of all extern,
+                  common and global symbols (also --gprefix)
+   --lprefix str  prepend the given string to local symbols
+   --lpostfix str append the given string to local symbols
+
+   --reproducible attempt to produce run-to-run identical output
+
+    -w+x          enable warning x (also -Wx)
+    -w-x          disable warning x (also -Wno-x)
+    -w[+-]error   promote all warnings to errors (also -Werror)
+    -w[+-]error=x promote warning x to errors (also -Werror=x)
+       all                  all possible warnings
+       bnd                  invalid BND prefixes [on]
+       db-empty             no operand for data declaration [on]
+       environment          nonexistent environment variable [on]
+       float                all warnings prefixed with "float-"
+       float-denorm         floating point denormal [off]
+       float-overflow       floating point overflow [on]
+       float-toolong        too many digits in floating-point number [on]
+       float-underflow      floating point underflow [off]
+       hle                  invalid HLE prefixes [on]
+       label                all warnings prefixed with "label-"
+       label-orphan         labels alone on lines without trailing `:' [on]
+       label-redef          label redefined to an identical value [off]
+       label-redef-late     label (re)defined during code generation [error]
+       lock                 LOCK prefix on unlockable instructions [on]
+       macro                all warnings prefixed with "macro-"
+       macro-def            all warnings prefixed with "macro-def-"
+       macro-def-case-single single-line macro defined both case sensitive and insensitive [on]
+       macro-def-greedy-single single-line macro [on]
+       macro-def-param-single single-line macro defined with and without parameters [error]
+       macro-defaults       macros with more default than optional parameters [on]
+       macro-params         all warnings prefixed with "macro-params-"
+       macro-params-legacy  improperly calling multi-line macro for legacy support [on]
+       macro-params-multi   multi-line macro calls with wrong parameter count [on]
+       macro-params-single  single-line macro calls with wrong parameter count [on]
+       negative-rep         regative %rep count [on]
+       number-overflow      numeric constant does not fit [on]
+       obsolete             all warnings prefixed with "obsolete-"
+       obsolete-nop         instruction obsolete and is a noop on the target CPU [on]
+       obsolete-removed     instruction obsolete and removed on the target CPU [on]
+       obsolete-valid       instruction obsolete but valid on the target CPU [on]
+       phase                phase error during stabilization [off]
+       pragma               all warnings prefixed with "pragma-"
+       pragma-bad           malformed %pragma [off]
+       pragma-empty         empty %pragma directive [off]
+       pragma-na            %pragma not applicable to this compilation [off]
+       pragma-unknown       unknown %pragma facility or directive [off]
+       ptr                  non-NASM keyword used in other assemblers [on]
+       regsize              register size specification ignored [on]
+       unknown-warning      unknown warning in -W/-w or warning directive [off]
+       user                 %warning directives [on]
+       warn-stack-empty     warning stack empty [on]
+       zeroing              RESx in initialized section becomes zero [on]
+       zext-reloc           relocation zero-extended to match output format [on]
+       other                any warning not specifially mentioned above [on]
+
+   --limit-X val  set execution limit X
+       passes               total number of passes [unlimited]
+       stalled-passes       number of passes without forward progress [1000]
+       macro-levels         levels of macro expansion [10000]
+       macro-tokens         tokens processed during single-lime macro expansion [10000000]
+       mmacros              multi-line macros before final return [100000]
+       rep                  %rep count [1000000]
+       eval                 expression evaluation descent [8192]
+       lines                total source lines processed [2000000000]
+Checking whether the ASM_NASM compiler is IAR using "" did not match "IAR Assembler":
+nasm: fatal: no input file specified
+Type /usr/bin/nasm -h for help.
+Checking whether the ASM_NASM compiler is ARMCC using "" did not match "(ARM Compiler)|(ARM Assembler)":
+nasm: fatal: no input file specified
+Type /usr/bin/nasm -h for help.

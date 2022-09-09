@@ -49,5 +49,47 @@
 # all: 
 # 	@echo $(CXXINCLUDES-$(CONFIG_LIBUKSGX))
 
+# ---------------------------------------------------
+# tstdc: 
+# 	requires: tlibthread compiler-rt tsafecrt tsetjmp tmm_rsrv
+# ---------------------------------------------------
 # tlibthread
-include $(LIBUKSGX_SDK_BASE)/tlibthread/Makefile.uk
+# $(LIBUKSGX_SDK_BASE)/tlibthread/libtlibthread.a:
+# 	$(call build_cmd, SGXSDK, tlibthread, $(notdir @), \
+# 	$(MAKE) -C $(LIBUKSGX_SDK_BASE)/tlibthread)
+# UK_PREPARE-$(CONFIG_LIBUKSGX) += $(LIBUKSGX_SDK_BASE)/tlibthread/libtlibthread.a
+
+# # tsafecrt
+# $(LIBUKSGX_SDK_BASE)/tsafecrt/libsgx_tsafecrt.a:
+# 	$(call build_cmd, SGXSDK, tsafecrt, $(notdir @), \
+# 	$(MAKE) -C $(LIBUKSGX_SDK_BASE)/tsafecrt)
+# UK_PREPARE-$(CONFIG_LIBUKSGX) += $(LIBUKSGX_SDK_BASE)/tsafecrt/libsgx_tsafecrt.a
+
+# # compiler-rt
+# $(LIBUKSGX_SDK_BASE)/compiler-rt/libcompiler-rt.a:
+# 	$(call build_cmd, SGXSDK, compiler-rt, $(notdir @), \
+# 	$(MAKE) -C $(LIBUKSGX_SDK_BASE)/compiler-rt)
+# UK_PREPARE-$(CONFIG_LIBUKSGX) += $(LIBUKSGX_SDK_BASE)/compiler-rt/libcompiler-rt.a
+
+# # tsetjmp
+# $(LIBUKSGX_SDK_BASE)/tsetjmp/libsgx_tsetjmp.a:
+# 	$(call build_cmd, SGXSDK, tsetjmp, $(notdir @), \
+# 	$(MAKE) -C $(LIBUKSGX_SDK_BASE)/tsetjmp)
+# UK_PREPARE-$(CONFIG_LIBUKSGX) += $(LIBUKSGX_SDK_BASE)/tsetjmp/libsgx_tsetjmp.a
+
+# # tmm_rsrv
+# $(LIBUKSGX_SDK_BASE)/tmm_rsrv/libsgx_tmm_rsrv.a:
+# 	$(call build_cmd, SGXSDK, tmm_rsrv, $(notdir @), \
+# 	$(MAKE) -C $(LIBUKSGX_SDK_BASE)/tmm_rsrv)
+# UK_PREPARE-$(CONFIG_LIBUKSGX) += $(LIBUKSGX_SDK_BASE)/tmm_rsrv/libsgx_tmm_rsrv.a
+
+# # tstdc: tlibthread compiler-rt tsafecrt tsetjmp tmm_rsrv
+# $(LIBUKSGX_SDK_BASE)/tlibc/libtlibc.a:
+# 	$(call build_cmd, SGXSDK, tlibc, $(notdir @), \
+# 	$(MAKE) -C $(LIBUKSGX_SDK_BASE)/tlibc)
+# UK_PREPARE-$(CONFIG_LIBUKSGX) += $(LIBUKSGX_SDK_BASE)/tlibc/libtlibc.a
+
+# $(LIBUKSGX_SDK_BASE)/libsgx_tstdc.a: $(LIBUKSGX_SDK_BASE)/tlibc/libtlibc.a
+# TODO: invoke make -C sdk/ to generate those targets
+SDK_TARGETS := libsgx_tstdc.a libsgx_tcxx.a libsgx_tservice.a libsgx_trts.a libsgx_tcrypto.a libsgx_tcmalloc.a libsgx_omp.a libsgx_protobuf.a
+

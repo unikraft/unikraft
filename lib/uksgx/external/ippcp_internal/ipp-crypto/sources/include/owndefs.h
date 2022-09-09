@@ -440,14 +440,14 @@ typedef union { /* single precision */
 
 /* ////////////////////////////////////////////////////////////////////////// */
 
-/* Define NULL pointer value */
-#ifndef NULL
-#ifdef  __cplusplus
-#define NULL    0
-#else
-#define NULL    ((void *)0)
-#endif
-#endif
+// /* Define NULL pointer value */
+// #ifndef NULL
+// #ifdef  __cplusplus
+// #define NULL    0
+// #else
+// #define NULL    ((void *)0)
+// #endif
+// #endif
 
 #define IPP_UNREFERENCED_PARAMETER(p) (void)(p)
 

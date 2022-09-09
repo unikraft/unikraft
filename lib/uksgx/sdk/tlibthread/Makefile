@@ -29,7 +29,7 @@
 #
 #
 
-include $(LIBUKSGX_SDK_BASE)/../buildenv.mk
+include ../../buildenv.mk
 
 CXXFLAGS += $(ENCLAVE_CXXFLAGS) -Werror -fno-exceptions -fno-rtti
 

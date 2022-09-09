@@ -179,7 +179,6 @@ else
 COMMON_FLAGS += -DITT_ARCH_IA64
 endif
 
-
 CET_FLAGS := 
 ifeq ($(CC_NO_LESS_THAN_8), 1)
     CET_FLAGS += -fcf-protection
@@ -187,6 +186,9 @@ endif
 
 CFLAGS   += $(COMMON_FLAGS)
 CXXFLAGS += $(COMMON_FLAGS)
+
+CFLAGS   += -nostdinc
+CXXFLAGS += -nostdinc++
 
 # Enable the security flags
 COMMON_LDFLAGS := -Wl,-z,relro,-z,now,-z,noexecstack

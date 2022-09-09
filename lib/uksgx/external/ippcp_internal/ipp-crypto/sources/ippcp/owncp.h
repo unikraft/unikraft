@@ -59,7 +59,7 @@ typedef int cpSize;
 #define CACHE_LINE_SIZE      (16)
 #define LOG_CACHE_LINE_SIZE   (4)
 #else
-#define CACHE_LINE_SIZE      (64)
+// #define CACHE_LINE_SIZE      (64)
 #define LOG_CACHE_LINE_SIZE   (6)
 #endif
 
