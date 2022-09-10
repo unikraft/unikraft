@@ -2,7 +2,7 @@ menuconfig LIBPOSIX_PROCESS
 	bool "posix-process: Process-related functions"
 	default n
 	select LIBNOLIBC if !HAVE_LIBC
-	select LIBUKTIME
+	select LIBPOSIX_TIME
 
 if LIBPOSIX_PROCESS
 	menuconfig LIBPOSIX_PROCESS_PIDS

@@ -2,7 +2,7 @@ menuconfig LIBNOLIBC
 	bool "nolibc: Only neccessary subset of libc functionality"
 	depends on !HAVE_LIBC
 	default y if !HAVE_LIBC
-	imply LIBUKTIME
+	imply LIBPOSIX_TIME
 
 if LIBNOLIBC
 	config LIBNOLIBC_UKDEBUG_ASSERT
