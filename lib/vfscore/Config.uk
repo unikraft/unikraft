@@ -4,6 +4,7 @@ config LIBVFSCORE
 	select LIBNOLIBC if !HAVE_LIBC
 	select LIBUKDEBUG
 	select LIBUKLOCK
+	select LIBPOSIX_TIME
 
 if LIBVFSCORE
 menu "vfscore: Configuration"
