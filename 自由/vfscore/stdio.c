@@ -218,8 +218,8 @@ void init_stdio(void)
 	fd = vfscore_alloc_fd();
 	UK_ASSERT(fd == 0);
 	vfscore_install_fd(0, &stdio_file);
-	if (uk_syscall_r_dup2(0, 1) != 1)
+	if (dup2(0, 1) != 1)  /* uk_syscall_r_dup2 */
 		uk_pr_err("failed to dup to stdin\n");
-	if (uk_syscall_r_dup2(0, 2) != 2)
+	if (dup2(0, 2) != 2)  /* uk_syscall_r_dup2 */
 		uk_pr_err("failed to dup to stderr\n");
 }
