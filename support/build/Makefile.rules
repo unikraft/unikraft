@@ -355,7 +355,7 @@ endef
 # Takes all files from $patchdir, sorts them, and applies each
 # of these patches to the source tree in $source_target_dir
 #
-# patch $libname,$patchdir,$source_target_dir
+# patch $libname,$patchdir,$source_target_dir(optional)
 define patch =
 $(BUILD_DIR)/$(1)/.patched: $(BUILD_DIR)/$(1)/.origin
 	@$(foreach P,$(sort $(wildcard $(2)/*)), \
@@ -457,6 +457,25 @@ endef
 # fetch2 $libname,$url,$url2
 define fetch2 =
 $(call fetchas2,$(1),$(2),$(3),$(notdir $(2)))
+endef
+
+# Clones a git repo
+# NOTE: This command can not clone a specific commit from a
+# specific branch of a repo
+# clone $libname $giturl $branch/tag
+define clone =
+$(BUILD_DIR)/$(1)/.origin:
+	$(call verbose_cmd,GIT,$(1),$(RM) -r $(BUILD_DIR)/$(1)/origin && \
+	$(GIT) clone --recurse-submodules -q --progress --depth 1 --branch $(3) --no-tags $(2) $(BUILD_DIR)/$(1)/origin/ && \
+	$(TOUCH) $(BUILD_DIR)/$(1)/.origin)
+UK_FETCH-y += $(BUILD_DIR)/$(1)/.origin \
+$(eval $(call vprefix_lib,$(1),ORIGIN) = $(BUILD_DIR)/$(1)/origin)
+
+.PRECIOUS: $(BUILD_DIR)/$(1)/origin
+
+$(BUILD_DIR)/$(1)/origin/%: $(BUILD_DIR)/$(1)/.origin
+	@:
+
 endef
 
 
