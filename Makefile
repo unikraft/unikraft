@@ -600,6 +600,7 @@ PATCH		:= patch
 GZIP		:= gzip
 TAR		:= tar
 UNZIP		:= unzip -qq -u
+GIT		:= git
 WGET		:= wget
 SHA1SUM		:= sha1sum -b
 SHA256SUM	:= sha256sum -b
