@@ -1,7 +1,7 @@
 menuconfig PLAT_LINUXU
        bool "Linux user space"
        default n
-       depends on !HAVE_SYSCALL && !HAVE_SMP && ((!ARCH_ARM_32 && !ARCH_ARM_64) || !HAVE_SCHED)
+       depends on !HAVE_SYSCALL && !HAVE_SMP && (!ARCH_ARM_32 || !HAVE_SCHED)
        depends on !HAVE_PAGING
        select LIBUKDEBUG
        select LIBUKALLOC
