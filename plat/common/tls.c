@@ -36,8 +36,8 @@
 #include <uk/arch/types.h>
 #include <uk/plat/tls.h>
 
-#if defined(LINUXUPLAT)
-#include <linuxu/tls.h>
+#if defined(LINUXUPLAT) && defined(__X86_64__)
+#include <linuxu/x86/tls.h>
 #elif defined(__X86_64__)
 #include <x86/tls.h>
 #elif defined(__ARM_64__)
