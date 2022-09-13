@@ -575,6 +575,7 @@ static int do_pwritev(struct vfscore_file *fp, const struct iovec *iov,
 	return 0;
 
 out_error:
+	*bytes = -1;
 	return -error;
 }
 
