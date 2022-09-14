@@ -99,22 +99,22 @@ typedef unsigned id_t;
 #endif
 
 #if defined(__NEED_dev_t) && !defined(__DEFINED_dev_t)
-typedef __u64 dev_t;
+typedef unsigned long dev_t;
 #define __DEFINED_dev_t
 #endif
 
 #if defined(__NEED_ino_t) && !defined(__DEFINED_ino_t)
-typedef __u64 ino_t;
+typedef unsigned long ino_t;
 #define __DEFINED_ino_t
 #endif
 
 #if defined(__NEED_nlink_t) && !defined(__DEFINED_nlink_t)
-typedef __u32 nlink_t;
+typedef unsigned long nlink_t;
 #define __DEFINED_nlink_t
 #endif
 
 #if defined(__NEED_blkcnt_t) && !defined(__DEFINED_blkcnt_t)
-typedef __s64 blkcnt_t;
+typedef long blkcnt_t;
 #define __DEFINED_blkcnt_t
 #endif
 
