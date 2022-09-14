@@ -82,6 +82,7 @@ static inline void *allocate(size_t size) {
   return ptr;
 } // allocate
 
+#ifndef _OPENMP_SGX
 char *__kmp_env_get(char const *name) {
 
   char *result = NULL;
@@ -223,6 +224,8 @@ void __kmp_env_unset(char const *name) {
 #endif
 
 } // func __kmp_env_unset
+#endif // _OPENMP_SGX
+
 
 /* Intel OpenMP RTL string representation of environment: just a string of
    characters, variables are separated with vertical bars, e. g.:
@@ -431,6 +434,8 @@ ___kmp_env_blk_parse_unix(kmp_env_blk_t *block, // M: Env block to fill.
 void __kmp_env_blk_init(kmp_env_blk_t *block, // M: Block to initialize.
                         char const *bulk // I: Initialization string, or NULL.
                         ) {
+// Disable reading environment for SGX
+#ifndef _OPENMP_SGX
 
   if (bulk != NULL) {
     ___kmp_env_blk_parse_string(block, bulk);
@@ -452,6 +457,9 @@ void __kmp_env_blk_init(kmp_env_blk_t *block, // M: Block to initialize.
 #error Unknown or unsupported OS.
 #endif
   }
+#else
+  memset(block, 0, sizeof(kmp_env_blk_t));
+#endif // _OPENMP_SGX
 
 } // __kmp_env_blk_init
 
@@ -473,12 +481,13 @@ void __kmp_env_blk_sort(
 void __kmp_env_blk_free(
     kmp_env_blk_t *block // M: Block of environment variables to free.
     ) {
-
+#ifndef _OPENMP_SGX
   KMP_INTERNAL_FREE(CCAST(kmp_env_var_t *, block->vars));
   __kmp_str_free(&(block->bulk));
 
   block->count = 0;
   block->vars = NULL;
+#endif
 
 } // __kmp_env_blk_free
 

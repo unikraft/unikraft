@@ -29,7 +29,9 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <google/protobuf/stubs/status.h>
 
+#ifndef PB_ENABLE_SGX
 #include <ostream>
+#endif //PB_ENABLE_SGX
 #include <stdio.h>
 #include <string>
 #include <utility>
@@ -123,10 +125,12 @@ std::string Status::ToString() const {
 
 Status OkStatus() { return Status(); }
 
+#ifndef PB_ENABLE_SGX
 std::ostream& operator<<(std::ostream& os, const Status& x) {
   os << x.ToString();
   return os;
 }
+#endif //PB_ENABLE_SGX
 
 bool IsAborted(const Status& status) {
   return status.code() == StatusCode::kAborted;

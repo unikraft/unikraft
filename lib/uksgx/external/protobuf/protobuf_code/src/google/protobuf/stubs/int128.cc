@@ -31,7 +31,9 @@
 #include <google/protobuf/stubs/int128.h>
 
 #include <iomanip>
+#ifndef PB_ENABLE_SGX
 #include <ostream>  // NOLINT(readability/streams)
+#endif //PB_ENABLE_SGX
 #include <sstream>
 
 #include <google/protobuf/stubs/logging.h>
@@ -123,6 +125,7 @@ uint128& uint128::operator%=(const uint128& divisor) {
   return *this;
 }
 
+#ifndef PB_ENABLE_SGX
 std::ostream& operator<<(std::ostream& o, const uint128& b) {
   std::ios_base::fmtflags flags = o.flags();
 
@@ -186,6 +189,7 @@ std::ostream& operator<<(std::ostream& o, const uint128& b) {
   // Stream the final representation in a single "<<" call.
   return o << rep;
 }
+#endif //PB_ENABLE_SGX
 
 }  // namespace protobuf
 }  // namespace google

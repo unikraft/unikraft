@@ -69,6 +69,11 @@
 // Must be included last.
 #include <google/protobuf/port_def.inc>
 
+#ifdef PB_ENABLE_SGX
+#include "sgx_trts.h"
+#include "sgx_error.h"
+#endif //PB_ENABLE_SGX
+
 namespace google {
 namespace protobuf {
 
@@ -1093,9 +1098,16 @@ class Map {
       // iOS, tvOS, watchOS, etc).
       s += mach_absolute_time();
 #elif defined(__x86_64__) && defined(__GNUC__)
+#ifndef PB_ENABLE_SGX
       uint32_t hi, lo;
       asm volatile("rdtsc" : "=a"(lo), "=d"(hi));
       s += ((static_cast<uint64_t>(hi) << 32) | lo);
+#else
+      uint64_t random_num;
+      if (SGX_SUCCESS != sgx_read_rand((unsigned char *)&random_num, sizeof(uint64_t)))
+          abort();
+      s += random_num;
+#endif //PB_ENABLE_SGX
 #elif defined(__aarch64__) && defined(__GNUC__)
       // There is no rdtsc on ARMv8. CNTVCT_EL0 is the virtual counter of the
       // system timer. It runs at a different frequency than the CPU's, but is

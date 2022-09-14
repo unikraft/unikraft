@@ -254,11 +254,13 @@ class PROTOBUF_EXPORT MessageLite {
       int file_descriptor);
   // Parse a protocol buffer from a C++ istream.  If successful, the entire
   // input will be consumed.
+#ifndef PB_ENABLE_SGX
   PROTOBUF_ATTRIBUTE_REINITIALIZES bool ParseFromIstream(std::istream* input);
   // Like ParseFromIstream(), but accepts messages that are missing
   // required fields.
   PROTOBUF_ATTRIBUTE_REINITIALIZES bool ParsePartialFromIstream(
       std::istream* input);
+#endif //PB_ENABLE_SGX
   // Read a protocol buffer from the given zero-copy input stream, expecting
   // the message to be exactly "size" bytes long.  If successful, exactly
   // this many bytes will have been consumed from the input.
@@ -359,9 +361,11 @@ class PROTOBUF_EXPORT MessageLite {
   bool SerializePartialToFileDescriptor(int file_descriptor) const;
   // Serialize the message and write it to the given C++ ostream.  All
   // required fields must be set.
+#ifndef PB_ENABLE_SGX
   bool SerializeToOstream(std::ostream* output) const;
   // Like SerializeToOstream(), but allows missing required fields.
   bool SerializePartialToOstream(std::ostream* output) const;
+#endif //PB_ENABLE_SGX
 
   // Like SerializeToString(), but appends to the data to the string's
   // existing contents.  All required fields must be set.

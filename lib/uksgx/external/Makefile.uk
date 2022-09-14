@@ -5,3 +5,4 @@ $(LIBUKSGX_EXT_BASE)/ippcp_internal/lib/linux/intel64/no_mitigation/libippcp.a:
 
 UK_PREPARE-$(CONFIG_LIBUKSGX) += $(LIBUKSGX_EXT_BASE)/ippcp_internal/lib/linux/intel64/no_mitigation/libippcp.a
 LIBUKSGX_OBJS-y += $(LIBUKSGX_EXT_BASE)/ippcp_internal/lib/linux/intel64/no_mitigation/libippcp.a
+

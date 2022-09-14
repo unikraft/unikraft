@@ -944,6 +944,7 @@ int FTN_STDCALL KMP_EXPAND_NAME(FTN_GET_NUM_DEVICES)(void) {
 #if KMP_MIC || KMP_OS_DARWIN || KMP_OS_WINDOWS || defined(KMP_STUB)
   return 0;
 #else
+  #ifndef _OPENMP_SGX
   int (*fptr)();
   if ((*(void **)(&fptr) = dlsym(RTLD_DEFAULT, "_Offload_number_of_devices"))) {
     return (*fptr)();
@@ -952,6 +953,9 @@ int FTN_STDCALL KMP_EXPAND_NAME(FTN_GET_NUM_DEVICES)(void) {
   } else { // liboffload & libomptarget don't exist
     return 0;
   }
+  #else
+  return 0;
+  #endif
 #endif // KMP_MIC || KMP_OS_DARWIN || KMP_OS_WINDOWS || defined(KMP_STUB)
 }
 
@@ -973,12 +977,16 @@ int FTN_STDCALL FTN_GET_INITIAL_DEVICE(void) {
 #if KMP_MIC || KMP_OS_DARWIN || KMP_OS_WINDOWS || defined(KMP_STUB)
   return KMP_HOST_DEVICE;
 #else
+  #ifndef _OPENMP_SGX
   int (*fptr)();
   if ((*(void **)(&fptr) = dlsym(RTLD_NEXT, "omp_get_initial_device"))) {
     return (*fptr)();
   } else { // liboffload & libomptarget don't exist
     return KMP_HOST_DEVICE;
   }
+  #else
+  return KMP_DEVICE_DEFAULT;
+  #endif
 #endif
 }
 
@@ -1202,6 +1210,7 @@ int FTN_STDCALL KMP_EXPAND_NAME(FTN_TEST_NEST_LOCK)(void **user_lock) {
 #endif
 }
 
+#ifndef _OPENMP_SGX
 double FTN_STDCALL KMP_EXPAND_NAME(FTN_GET_WTIME)(void) {
 #ifdef KMP_STUB
   return __kmps_get_wtime();
@@ -1231,6 +1240,7 @@ double FTN_STDCALL KMP_EXPAND_NAME(FTN_GET_WTICK)(void) {
   return data;
 #endif
 }
+#endif
 
 /* ------------------------------------------------------------------------ */
 

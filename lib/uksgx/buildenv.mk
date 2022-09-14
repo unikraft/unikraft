@@ -160,7 +160,7 @@ else
     $(error Aborting)
 endif
 
-BUILD_DIR := $(ROOT_DIR)/build/linux
+BUILD_DIR := $(ROOT_DIR)/build/
 
 ifeq "$(findstring __INTEL_COMPILER, $(shell $(CC) -E -dM -xc /dev/null))" "__INTEL_COMPILER"
   ifeq ($(shell test -f /usr/bin/dpkg; echo $$?), 0)

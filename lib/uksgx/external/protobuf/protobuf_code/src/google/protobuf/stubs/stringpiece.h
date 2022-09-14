@@ -375,8 +375,10 @@ inline bool operator>=(StringPiece x, StringPiece y) {
   return !(x < y);
 }
 
+#ifndef PB_ENABLE_SGX
 // allow StringPiece to be logged
 extern std::ostream& operator<<(std::ostream& o, StringPiece piece);
+#endif //PB_ENABLE_SGX
 
 }  // namespace stringpiece_internal
 

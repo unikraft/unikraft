@@ -14,6 +14,8 @@
 #ifndef KMP_WRAPPER_GETPID_H
 #define KMP_WRAPPER_GETPID_H
 
+#ifndef _OPENMP_SGX
+
 #if KMP_OS_UNIX
 
 // On Unix-like systems (Linux* OS and OS X*) getpid() is declared in standard
@@ -67,6 +69,8 @@ typedef int pid_t;
 
    (kmp_uint32, kmp_uint64, KMP_UINT64_SPEC, and KMP_UNIT32_SPEC are defined in
    "kmp_os.h".)  */
+
+#endif // _OPENMP_SGX
 
 #endif // KMP_WRAPPER_GETPID_H
 

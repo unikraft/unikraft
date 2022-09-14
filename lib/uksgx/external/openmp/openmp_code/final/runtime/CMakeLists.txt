@@ -20,6 +20,8 @@ set(CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake ${CMAKE_MODULE_PATH})
 set(LIBOMP_VERSION_MAJOR 5)
 set(LIBOMP_VERSION_MINOR 0)
 
+set(BUILD_SGX_OPENMP TRUE)
+
 # These include files are in the cmake/ subdirectory
 include(LibompUtils)
 include(LibompGetArchitecture)
@@ -33,7 +35,7 @@ if(${OPENMP_STANDALONE_BUILD})
   set(LIBOMP_ARCH ${LIBOMP_DETECTED_ARCH} CACHE STRING
     "The architecture to build for (x86_64/i386/arm/ppc64/ppc64le/aarch64/mic/mips/mips64).")
   # Should assertions be enabled?  They are on by default.
-  set(LIBOMP_ENABLE_ASSERTIONS TRUE CACHE BOOL
+  set(LIBOMP_ENABLE_ASSERTIONS FALSE CACHE BOOL
     "enable assertions?")
 else() # Part of LLVM build
   # Determine the native architecture from LLVM.
@@ -282,7 +284,7 @@ if(LIBOMP_STATS)
 endif()
 
 # Shared library can be switched to a static library
-set(LIBOMP_ENABLE_SHARED TRUE CACHE BOOL
+set(LIBOMP_ENABLE_SHARED FALSE CACHE BOOL
   "Shared library instead of static library?")
 
 if(WIN32 AND NOT LIBOMP_ENABLE_SHARED)
@@ -301,8 +303,9 @@ endif()
 
 # OMPT-support defaults to ON for OpenMP 5.0+ and if the requirements in
 # cmake/config-ix.cmake are fulfilled.
+# But we need to disable OMPT for SGX
 set(OMPT_DEFAULT FALSE)
-if ((${LIBOMP_OMP_VERSION} GREATER 49) AND (LIBOMP_HAVE_OMPT_SUPPORT) AND (NOT WIN32))
+if ((${LIBOMP_OMP_VERSION} GREATER 49) AND (LIBOMP_HAVE_OMPT_SUPPORT) AND (NOT WIN32) AND (NOT BUILD_SGX_OPENMP))
   set(OMPT_DEFAULT TRUE)
 endif()
 set(LIBOMP_OMPT_SUPPORT ${OMPT_DEFAULT} CACHE BOOL
@@ -317,6 +320,9 @@ if(LIBOMP_OMPT_SUPPORT AND (NOT LIBOMP_HAVE_OMPT_SUPPORT))
 endif()
 if(LIBOMP_OMPT_SUPPORT AND (${LIBOMP_OMP_VERSION} LESS 50))
   libomp_error_say("OpenMP Tools Interface only available with OpenMP 5.0, LIBOMP_OMP_VERSION is ${LIBOMP_OMP_VERSION}")
+endif()
+if(LIBOMP_OMPT_SUPPORT AND BUILD_SGX_OPENMP)
+  libomp_error_say("OMP tool should not be enabled for SGX environment")
 endif()
 
 # TSAN-support

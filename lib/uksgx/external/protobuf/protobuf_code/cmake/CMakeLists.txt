@@ -23,6 +23,13 @@ endif()
 # Project
 project(protobuf C CXX)
 
+#for SGX
+if(SGX)
+  add_definitions(-DPB_ENABLE_SGX)
+  set(SGX_PROGRAM_SEARCH_PATH)
+  LIST(APPEND CMAKE_PROGRAM_PATH  "/usr/local/bin/"  ${SGX_PROGRAM_SEARCH_PATH} ...)
+endif()
+
 # Add c++11 flags
 if (CYGWIN)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std=gnu++11")
@@ -277,10 +284,20 @@ endif (MSVC)
 
 get_filename_component(protobuf_source_dir ${protobuf_SOURCE_DIR} PATH)
 
-include_directories(
-  ${ZLIB_INCLUDE_DIRECTORIES}
-  ${protobuf_BINARY_DIR}
-  ${protobuf_source_dir}/src)
+if(SGX)
+  include_directories(
+    ${protobuf_BINARY_DIR}
+    ${protobuf_source_dir}/src
+    ${protobuf_source_dir}/../../../common/inc/internal
+    ${protobuf_source_dir}/../../../common/inc/tlibc
+    ${protobuf_source_dir}/../../../common/inc
+    ${protobuf_source_dir}/../../../sdk/tlibcxx/include)
+else()
+  include_directories(
+    ${ZLIB_INCLUDE_DIRECTORIES}
+    ${protobuf_BINARY_DIR}
+    ${protobuf_source_dir}/src)
+endif()
 
 if (MSVC)
   # Add the "lib" prefix for generated .lib outputs.
@@ -296,7 +313,11 @@ if (protobuf_UNICODE)
 endif (protobuf_UNICODE)
 
 include(libprotobuf-lite.cmake)
-include(libprotobuf.cmake)
+if (SGX)
+  include(libsgx_protobuf.cmake)
+else()
+  include(libprotobuf.cmake)
+endif()
 if (protobuf_BUILD_LIBPROTOC)
   include(libprotoc.cmake)
 endif (protobuf_BUILD_LIBPROTOC)

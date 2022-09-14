@@ -74,6 +74,13 @@
 #define KMP_GROUP_AFFINITY 0
 #endif
 
+#ifdef _OPENMP_SGX
+#undef KMP_AFFINITY_SUPPORTED
+#define KMP_AFFINITY_SUPPORTED 0
+#define KMP_GROUP_AFFINITY 0
+#endif
+
+
 /* Check for quad-precision extension. */
 #define KMP_HAVE_QUAD 0
 #if KMP_ARCH_X86 || KMP_ARCH_X86_64
@@ -890,6 +897,11 @@ typedef void (*microtask_t)(int *gtid, int *npr, ...);
 // Enable dynamic user lock
 #if OMP_45_ENABLED
 #define KMP_USE_DYNAMIC_LOCK 1
+#endif
+
+#ifdef _OPENMP_SGX 
+#undef KMP_USE_DYNAMIC_LOCK
+#define KMP_USE_DYNAMIC_LOCK 0
 #endif
 
 // Enable Intel(R) Transactional Synchronization Extensions (Intel(R) TSX) if

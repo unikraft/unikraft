@@ -608,7 +608,7 @@
      (!defined(__APPLE__) && __clang_major__ >= 12))
 #define PROTOBUF_CONSTINIT [[clang::require_constant_initialization]]
 #define PROTOBUF_CONSTEXPR constexpr
-#elif PROTOBUF_GNUC_MIN(12, 0)
+#elif PROTOBUF_GNUC_MIN(13, 0)
 #define PROTOBUF_CONSTINIT __constinit
 #define PROTOBUF_CONSTEXPR constexpr
 #else

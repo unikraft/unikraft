@@ -101,8 +101,10 @@ class PROTOBUF_EXPORT Status {
 // usage of `OkStatus()` when constructing such an OK status.
 PROTOBUF_EXPORT Status OkStatus();
 
+#ifndef PB_ENABLE_SGX
 // Prints a human-readable representation of 'x' to 'os'.
 PROTOBUF_EXPORT std::ostream& operator<<(std::ostream& os, const Status& x);
+#endif //PB_ENABLE_SGX
 
 // These convenience functions return `true` if a given status matches the
 // `StatusCode` error code of its associated function.

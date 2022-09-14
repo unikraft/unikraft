@@ -24,6 +24,7 @@ function(libomp_get_definitions_flags cppflags)
   else()
     libomp_append(cppflags_local "-D _GNU_SOURCE")
     libomp_append(cppflags_local "-D _REENTRANT")
+    libomp_append(cppflags_local "-D _OPENMP_SGX" BUILD_SGX_OPENMP)
   endif()
 
   # CMake doesn't include CPPFLAGS from environment, but we will.

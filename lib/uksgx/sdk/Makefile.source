@@ -66,7 +66,7 @@ LIBTCXX    := $(BUILD_DIR)/libsgx_tcxx.a
 LIBTSE     := $(BUILD_DIR)/libsgx_tservice.a
 
 .PHONY: components
-components: tstdc tcxx tservice trts tcrypto signtool edger8r tcmalloc sgx_encrypt pthread openmp protobuf
+components: tstdc tcxx tservice trts tcrypto tcmalloc pthread openmp protobuf
 
 # ---------------------------------------------------
 #  tstdc
@@ -203,17 +203,17 @@ endif
 # ---------------------------------------------------
 #  tools
 # ---------------------------------------------------
-.PHONY: signtool
-signtool:
-	$(MAKE) -C sign_tool/SignTool/
+# .PHONY: signtool
+# signtool:
+# 	$(MAKE) -C sign_tool/SignTool/
 
-.PHONY: edger8r
-edger8r:
-	$(MAKE) -C edger8r/linux/
+# .PHONY: edger8r
+# edger8r:
+# 	$(MAKE) -C edger8r/linux/
 
-.PHONY: sgx_encrypt
-sgx_encrypt: tservice
-	$(MAKE) -C encrypt_enclave
+# .PHONY: sgx_encrypt
+# sgx_encrypt: tservice
+# 	$(MAKE) -C encrypt_enclave
 
 $(BUILD_DIR):
 	$(MKDIR) $@

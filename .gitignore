@@ -38,3 +38,7 @@ GTAGS
 cscope.*
 ncscope.*
 support/scripts/uk_trace/uk_trace.egg-info/
+
+# sgx files
+lib/uksgx/**/*build
+*.lo

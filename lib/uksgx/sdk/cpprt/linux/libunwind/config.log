@@ -27,14 +27,8 @@ uname -v = #51-Ubuntu SMP Thu Aug 11 07:51:15 UTC 2022
 /usr/bin/oslevel       = unknown
 /bin/universe          = unknown
 
-PATH: /opt/intel/oneapi/dev-utilities/2021.6.0/bin/
-PATH: /opt/intel/oneapi/debugger/2021.6.0/gdb/intel64/bin/
-PATH: /opt/intel/oneapi/compiler/2022.1.0/linux/lib/oclfpga/bin/
-PATH: /opt/intel/oneapi/compiler/2022.1.0/linux/bin/intel64/
-PATH: /opt/intel/oneapi/compiler/2022.1.0/linux/bin/
-PATH: /opt/intel/oneapi/compiler/2022.1.0/linux/lib/oclfpga/bin/
-PATH: /opt/intel/oneapi/compiler/2022.1.0/linux/bin/intel64/
-PATH: /opt/intel/oneapi/compiler/2022.1.0/linux/bin/
+PATH: /home/xiangyi/.local/bin/
+PATH: /home/xiangyi/.vscode-server/bin/784b0177c56c607789f9638da7b6bf3230d47a8c/bin/remote-cli/
 PATH: /home/xiangyi/.local/bin/
 PATH: /home/xiangyi/miniconda3/bin/
 PATH: /home/xiangyi/miniconda3/condabin/
@@ -47,8 +41,6 @@ PATH: /bin/
 PATH: /usr/games/
 PATH: /usr/local/games/
 PATH: /snap/bin/
-PATH: /opt/intel/sgxsdk/bin/
-PATH: /opt/intel/sgxsdk/bin/x64/
 PATH: /opt/intel/sgxsdk/bin/
 PATH: /opt/intel/sgxsdk/bin/x64/
 PATH: /opt/intel/sgxsdk/bin/
@@ -838,8 +830,8 @@ configure:5187: $? = 0
 configure:5199: result: yes
 configure:5219: checking whether make supports the include directive
 configure:5234: make -f confmf.GNU && cat confinc.out
-make[3]: Entering directory '/home/xiangyi/code/unikraft/unikraft/lib/uksgx/sdk/cpprt/linux/libunwind'
-make[3]: Leaving directory '/home/xiangyi/code/unikraft/unikraft/lib/uksgx/sdk/cpprt/linux/libunwind'
+make[7]: Entering directory '/home/xiangyi/code/unikraft/unikraft/lib/uksgx/sdk/cpprt/linux/libunwind'
+make[7]: Leaving directory '/home/xiangyi/code/unikraft/unikraft/lib/uksgx/sdk/cpprt/linux/libunwind'
 this is the am__doit target
 configure:5237: $? = 0
 configure:5256: result: yes (GNU style)
@@ -2197,7 +2189,7 @@ configure:18379: gcc -o conftest -Wjump-misses-init -Wstrict-prototypes -Wunsuff
 conftest.c:67:1: warning: function declaration isn't a prototype [-Wstrict-prototypes]
    67 | char dl_phdr_removals_counter ();
       | ^~~~
-/usr/local/bin/ld: /tmp/ccwQiZQW.o: in function `main':
+/usr/local/bin/ld: /tmp/ccy3fpnB.o: in function `main':
 conftest.c:(.text.startup.main+0xb): undefined reference to `dl_phdr_removals_counter'
 collect2: error: ld returned 1 exit status
 configure:18379: $? = 1
@@ -2289,7 +2281,7 @@ configure:18385: gcc -o conftest -Wjump-misses-init -Wstrict-prototypes -Wunsuff
 conftest.c:67:1: warning: function declaration isn't a prototype [-Wstrict-prototypes]
    67 | char dlmodinfo ();
       | ^~~~
-/usr/local/bin/ld: /tmp/ccLjlvOJ.o: in function `main':
+/usr/local/bin/ld: /tmp/cc0Zgtcq.o: in function `main':
 conftest.c:(.text.startup.main+0xb): undefined reference to `dlmodinfo'
 collect2: error: ld returned 1 exit status
 configure:18385: $? = 1
@@ -2381,7 +2373,7 @@ configure:18391: gcc -o conftest -Wjump-misses-init -Wstrict-prototypes -Wunsuff
 conftest.c:67:1: warning: function declaration isn't a prototype [-Wstrict-prototypes]
    67 | char getunwind ();
       | ^~~~
-/usr/local/bin/ld: /tmp/ccsIFeRr.o: in function `main':
+/usr/local/bin/ld: /tmp/cc8VGiYU.o: in function `main':
 conftest.c:(.text.startup.main+0xb): undefined reference to `getunwind'
 collect2: error: ld returned 1 exit status
 configure:18391: $? = 1
@@ -2473,7 +2465,7 @@ configure:18397: gcc -o conftest -Wjump-misses-init -Wstrict-prototypes -Wunsuff
 conftest.c:67:1: warning: function declaration isn't a prototype [-Wstrict-prototypes]
    67 | char ttrace ();
       | ^~~~
-/usr/local/bin/ld: /tmp/cca3DmnI.o: in function `main':
+/usr/local/bin/ld: /tmp/cceROwzd.o: in function `main':
 conftest.c:(.text.startup.main+0xb): undefined reference to `ttrace'
 collect2: error: ld returned 1 exit status
 configure:18397: $? = 1
@@ -2866,8 +2858,9 @@ config.status:1283: creating src/libunwind-generic.pc
 config.status:1283: creating include/config.h
 config.status:1512: executing depfiles commands
 config.status:1589: cd src       && sed -e '/# am--include-marker/d' Makefile         | make -f - am--depfiles
-make[3]: Entering directory '/home/xiangyi/code/unikraft/unikraft/lib/uksgx/sdk/cpprt/linux/libunwind/src'
-make[3]: Leaving directory '/home/xiangyi/code/unikraft/unikraft/lib/uksgx/sdk/cpprt/linux/libunwind/src'
+make[7]: Entering directory '/home/xiangyi/code/unikraft/unikraft/lib/uksgx/sdk/cpprt/linux/libunwind/src'
+make[7]: Nothing to be done for 'am--depfiles'.
+make[7]: Leaving directory '/home/xiangyi/code/unikraft/unikraft/lib/uksgx/sdk/cpprt/linux/libunwind/src'
 config.status:1594: $? = 0
 config.status:1512: executing libtool commands
 

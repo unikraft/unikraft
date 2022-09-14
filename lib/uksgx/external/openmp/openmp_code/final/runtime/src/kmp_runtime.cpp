@@ -424,6 +424,7 @@ void __kmp_abort_process() {
     __kmp_dump_debug_buffer();
   }
 
+#ifndef _OPENMP_SGX
   if (KMP_OS_WINDOWS) {
     // Let other threads know of abnormal termination and prevent deadlock
     // if abort happened during library initialization or shutdown
@@ -443,7 +444,9 @@ void __kmp_abort_process() {
   } else {
     abort();
   }
-
+#else
+  abort();
+#endif
   __kmp_infinite_loop();
   __kmp_release_bootstrap_lock(&__kmp_exit_lock);
 
@@ -5962,10 +5965,11 @@ static void __kmp_reap_thread(kmp_info_t *thread, int is_root) {
 
 static void __kmp_internal_end(void) {
   int i;
-
+#ifndef _OPENMP_SGX
   /* First, unregister the library */
   __kmp_unregister_library();
 
+#endif
 #if KMP_OS_WINDOWS
   /* In Win static library, we can't tell when a root actually dies, so we
      reclaim the data structures for any root threads that have died but not
@@ -6325,6 +6329,9 @@ void __kmp_internal_end_thread(int gtid_req) {
 #endif
 } // __kmp_internal_end_thread
 
+# ifndef _OPENMP_SGX
+// OpenMP will be static linked to enclave. No need library registration
+
 // -----------------------------------------------------------------------------
 // Library registration stuff.
 
@@ -6458,6 +6465,7 @@ void __kmp_unregister_library(void) {
 
 // End of Library registration stuff.
 // -----------------------------------------------------------------------------
+#endif // _OPENMP_SGX
 
 #if KMP_MIC_SUPPORTED
 
@@ -6498,10 +6506,13 @@ static void __kmp_do_serial_initialize(void) {
   /* Initialize internal memory allocator */
   __kmp_init_allocator();
 
+#ifndef _OPENMP_SGX
   /* Register the library startup via an environment variable and check to see
      whether another copy of the library is already registered. */
 
   __kmp_register_library_startup();
+
+#endif // _OPENMP_SGX
 
   /* TODO reinitialization of library */
   if (TCR_4(__kmp_global.g.g_done)) {
@@ -7130,9 +7141,13 @@ int __kmp_invoke_teams_master(int gtid) {
 
 void __kmp_push_num_threads(ident_t *id, int gtid, int num_threads) {
   kmp_info_t *thr = __kmp_threads[gtid];
-
+#ifndef _OPENMP_SGX
   if (num_threads > 0)
     thr->th.th_set_nproc = num_threads;
+#else
+  if(num_threads > 0 && num_threads <= __kmp_xproc)
+    thr->th.th_set_nproc = num_threads;
+#endif
 }
 
 #if OMP_40_ENABLED
@@ -7497,7 +7512,9 @@ void __kmp_cleanup(void) {
 }
 
 /* ------------------------------------------------------------------------ */
-
+#ifndef _OPENMP_SGX
+// below two APIs are called by __kmpc_begin() and __kmpc_end()
+// Disable them in SGX environment
 int __kmp_ignore_mppbeg(void) {
   char *env;
 
@@ -7519,6 +7536,7 @@ int __kmp_ignore_mppend(void) {
   // By default __kmpc_end() is no-op.
   return TRUE;
 }
+#endif
 
 void __kmp_internal_begin(void) {
   int gtid;
@@ -7872,12 +7890,14 @@ static int __kmp_aux_capture_affinity_field(int gtid, const kmp_info_t *th,
     __kmp_expand_host_name(buf, BUFFER_SIZE);
     rc = __kmp_str_buf_print(field_buffer, format, buf);
   } break;
+#ifndef _OPENMP_SGX
   case 'P':
     rc = __kmp_str_buf_print(field_buffer, format, getpid());
     break;
   case 'i':
     rc = __kmp_str_buf_print(field_buffer, format, __kmp_gettid());
     break;
+#endif
   case 'N':
     rc = __kmp_str_buf_print(field_buffer, format, th->th.th_team->t.t_nproc);
     break;

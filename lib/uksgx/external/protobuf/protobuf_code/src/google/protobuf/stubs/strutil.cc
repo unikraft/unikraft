@@ -39,6 +39,9 @@
 #include <cmath>
 #include <iterator>
 #include <limits>
+#ifdef PB_ENABLE_SGX
+#include <cstring>
+#endif //PB_ENABLE_SGX
 
 #include <google/protobuf/stubs/logging.h>
 #include <google/protobuf/stubs/stl_util.h>
@@ -503,8 +506,14 @@ int CEscapeInternal(const char* src, int src_len, char* dest,
              (last_hex_escape && isxdigit(*src)))) {
           if (dest_len - used < 4) // need space for 4 letter escape
             return -1;
+#ifndef PB_ENABLE_SGX
           sprintf(dest + used, (use_hex ? "\\x%02x" : "\\%03o"),
                   static_cast<uint8>(*src));
+#else
+          snprintf(dest + used, dest_len - used,
+                   (use_hex ? "\\x%02x" : "\\%03o"),
+                   static_cast<uint8>(*src));
+#endif //PB_ENABLE_SGX
           is_hex_escape = use_hex;
           used += 4;
         } else {
@@ -1246,6 +1255,7 @@ char* DoubleToBuffer(double value, char* buffer) {
   // this assert.
   static_assert(DBL_DIG < 20, "DBL_DIG_is_too_big");
 
+#ifndef PB_ENABLE_SGX
   if (value == std::numeric_limits<double>::infinity()) {
     strcpy(buffer, "inf");
     return buffer;
@@ -1256,6 +1266,18 @@ char* DoubleToBuffer(double value, char* buffer) {
     strcpy(buffer, "nan");
     return buffer;
   }
+#else
+  if (value == std::numeric_limits<double>::infinity()) {
+    strncpy(buffer, "inf", strlen("inf"));
+    return buffer;
+  } else if (value == -std::numeric_limits<double>::infinity()) {
+    strncpy(buffer, "-inf", strlen("-inf"));
+    return buffer;
+  } else if (std::isnan(value)) {
+    strncpy(buffer, "nan", strlen("nan"));
+    return buffer;
+  }
+#endif //PB_ENABLE_SGX
 
   int snprintf_result =
     snprintf(buffer, kDoubleToBufferSize, "%.*g", DBL_DIG, value);
@@ -1364,6 +1386,7 @@ char* FloatToBuffer(float value, char* buffer) {
   // this assert.
   static_assert(FLT_DIG < 10, "FLT_DIG_is_too_big");
 
+#ifndef PB_ENABLE_SGX
   if (value == std::numeric_limits<double>::infinity()) {
     strcpy(buffer, "inf");
     return buffer;
@@ -1374,6 +1397,18 @@ char* FloatToBuffer(float value, char* buffer) {
     strcpy(buffer, "nan");
     return buffer;
   }
+#else
+  if (value == std::numeric_limits<double>::infinity()) {
+    strncpy(buffer, "inf", strlen("inf"));
+    return buffer;
+  } else if (value == -std::numeric_limits<double>::infinity()) {
+    strncpy(buffer, "-inf", strlen("-inf"));
+    return buffer;
+  } else if (std::isnan(value)) {
+    strncpy(buffer, "nan", strlen("nan"));
+    return buffer;
+  }
+#endif //PB_ENABLE_SGX
 
   int snprintf_result =
     snprintf(buffer, kFloatToBufferSize, "%.*g", FLT_DIG, value);

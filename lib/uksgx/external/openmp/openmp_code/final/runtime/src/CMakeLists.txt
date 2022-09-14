@@ -46,6 +46,10 @@ include_directories(
   ${LIBOMP_SRC_DIR}/i18n
   ${LIBOMP_INC_DIR}
   ${LIBOMP_SRC_DIR}/thirdparty/ittnotify
+  ${LIBOMP_SRC_DIR}/../../../../../../common/inc/
+  ${LIBOMP_SRC_DIR}/../../../../../../common/inc/tlibc
+  ${LIBOMP_SRC_DIR}/../../../../../../common/inc/internal
+  ${LIBOMP_SRC_DIR}/../../../../../../sdk/tlibcxx/include
 )
 if(${LIBOMP_USE_HWLOC})
   include_directories(${LIBOMP_HWLOC_INSTALL_DIR}/include)
@@ -103,6 +107,7 @@ else()
     libomp_append(LIBOMP_CXXFILES kmp_taskdeps.cpp)
     libomp_append(LIBOMP_CXXFILES kmp_cancel.cpp)
   endif()
+  libomp_append(LIBOMP_CXXFILES sgx_stub.cpp BUILD_SGX_OPENMP)
 endif()
 # Files common to stubs and normal library
 libomp_append(LIBOMP_CXXFILES kmp_ftn_cdecl.cpp)

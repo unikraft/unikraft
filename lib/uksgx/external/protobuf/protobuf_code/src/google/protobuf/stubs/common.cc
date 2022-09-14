@@ -35,7 +35,11 @@
 #include <atomic>
 #include <errno.h>
 #include <sstream>
+#ifndef PB_ENABLE_SGX
 #include <stdio.h>
+#else
+#include <cstdio>
+#endif //PB_ENABLE_SGX
 #include <vector>
 
 #ifdef _WIN32
@@ -157,6 +161,9 @@ inline void DefaultLogHandler(LogLevel level, const char* filename, int line,
 }
 
 #else
+#ifdef PB_ENABLE_SGX
+extern "C" int printf(const char* fmt, ...);
+#endif //PB_ENABLE_SGX
 void DefaultLogHandler(LogLevel level, const char* filename, int line,
                        const std::string& message) {
   if (level < GOOGLE_PROTOBUF_MIN_LOG_LEVEL) {
@@ -166,9 +173,14 @@ void DefaultLogHandler(LogLevel level, const char* filename, int line,
 
   // We use fprintf() instead of cerr because we want this to work at static
   // initialization time.
+#ifndef PB_ENABLE_SGX
   fprintf(stderr, "[libprotobuf %s %s:%d] %s\n",
           level_names[level], filename, line, message.c_str());
   fflush(stderr);  // Needed on MSVC.
+#else
+  printf("[libprotobuf %s %s:%d] %s\n", level_names[level], filename, line,
+         message.c_str());
+#endif //PB_ENABLE_SGX
 }
 #endif
 
@@ -201,9 +213,13 @@ LogMessage& LogMessage::operator<<(const util::Status& status) {
 }
 
 LogMessage& LogMessage::operator<<(const uint128& value) {
+#ifndef PB_ENABLE_SGX
   std::ostringstream str;
   str << value;
   message_ += str.str();
+#else
+  message_ += std::to_string((const long long &)value);
+#endif //PB_ENABLE_SGX
   return *this;
 }
 

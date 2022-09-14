@@ -16,7 +16,9 @@
 #define KMP_H
 
 #include "kmp_config.h"
-
+#ifdef _OPENMP_SGX
+#include "sgx_stub.h"
+#endif
 /* #define BUILD_PARALLEL_ORDERED 1 */
 
 /* This fix replaces gettimeofday with clock_gettime for better scalability on
@@ -50,8 +52,11 @@
 #define TASK_PROXY 1
 #define TASK_FULL 0
 
+#ifndef _OPENMP_SGX
 #define KMP_CANCEL_THREADS
 #define KMP_THREAD_ATTR
+#endif
+
 
 // Android does not have pthread_cancel.  Undefine KMP_CANCEL_THREADS if being
 // built on Android
@@ -59,7 +64,9 @@
 #undef KMP_CANCEL_THREADS
 #endif
 
+#ifndef _OPENMP_SGX
 #include <signal.h>
+#endif
 #include <stdarg.h>
 #include <stddef.h>
 #include <stdio.h>
@@ -100,7 +107,9 @@ class kmp_stats_list;
 #endif
 
 #if KMP_ARCH_X86 || KMP_ARCH_X86_64
+#ifndef _OPENMP_SGX
 #include <xmmintrin.h>
+#endif
 #endif
 
 #include "kmp_debug.h"
@@ -111,7 +120,9 @@ class kmp_stats_list;
 #endif
 #include "kmp_i18n.h"
 
+#ifndef _OPENMP_SGX
 #define KMP_HANDLE_SIGNALS (KMP_OS_UNIX || KMP_OS_WINDOWS)
+#endif
 
 #include "kmp_wrapper_malloc.h"
 #if KMP_OS_UNIX
@@ -560,7 +571,9 @@ typedef int PACKED_REDUCTION_METHOD_T;
 #endif
 
 #if KMP_OS_UNIX
+#ifndef _OPENMP_SGX
 #include <dlfcn.h>
+#endif
 #include <pthread.h>
 #endif
 
@@ -967,7 +980,11 @@ extern kmp_uint64 __kmp_ticks_per_msec;
 #if KMP_COMPILER_ICC
 #define KMP_NOW() ((kmp_uint64)_rdtsc())
 #else
+#ifdef _OPENMP_SGX
+#define KMP_NOW() get_timestamp() 
+#else
 #define KMP_NOW() __kmp_hardware_timestamp()
+#endif
 #endif
 #define KMP_NOW_MSEC() (KMP_NOW() / __kmp_ticks_per_msec)
 #define KMP_BLOCKTIME_INTERVAL(team, tid)                                      \
@@ -1086,7 +1103,16 @@ typedef struct kmp_cpuid {
   kmp_uint32 ecx;
   kmp_uint32 edx;
 } kmp_cpuid_t;
+#ifndef _OPENMP_SGX
 extern void __kmp_x86_cpuid(int mode, int mode2, struct kmp_cpuid *p);
+#else
+
+#include "sgx_cpuid.h"
+static inline void __kmp_x86_cpuid(int leaf, int subleaf, struct kmp_cpuid *p) {
+	sgx_cpuidex((int *)p, leaf, subleaf);
+}
+#endif
+
 #if KMP_ARCH_X86
 extern void __kmp_x86_pause(void);
 #elif KMP_MIC
@@ -1096,7 +1122,11 @@ extern void __kmp_x86_pause(void);
 // on Spec OMP2001 and LCPC tasking tests, no regressions on EPCC.
 static inline void __kmp_x86_pause(void) { _mm_delay_32(300); }
 #else
+#ifndef _OPENMP_SGX
 static inline void __kmp_x86_pause(void) { _mm_pause(); }
+#else
+static inline void __kmp_x86_pause(void) { __builtin_ia32_pause(); }
+#endif
 #endif
 #define KMP_CPU_PAUSE() __kmp_x86_pause()
 #elif KMP_ARCH_PPC64
@@ -1212,6 +1242,9 @@ typedef pthread_key_t kmp_key_t;
 #endif
 
 extern kmp_key_t __kmp_gtid_threadprivate_key;
+#ifdef _OPENMP_SGX
+extern void * __kmp_gtid_threadprivate_data;
+#endif
 
 typedef struct kmp_sys_info {
   long maxrss; /* the maximum resident set size utilized (in kilobytes)     */
@@ -3666,9 +3699,14 @@ extern int __kmp_read_from_file(char const *path, char const *format, ...);
 
 extern void __kmp_query_cpuid(kmp_cpuinfo_t *p);
 
+#ifndef _OPENMP_SGX
 #define __kmp_load_mxcsr(p) _mm_setcsr(*(p))
 static inline void __kmp_store_mxcsr(kmp_uint32 *p) { *p = _mm_getcsr(); }
-
+#else
+// These builtin are referenced from glibc xmmintrin.h
+#define __kmp_load_mxcsr(p) __builtin_ia32_ldmxcsr(*(p))
+static inline void __kmp_store_mxcsr(kmp_uint32 *p) { *p = __builtin_ia32_stmxcsr(); }
+#endif
 extern void __kmp_load_x87_fpu_control_word(kmp_int16 *p);
 extern void __kmp_store_x87_fpu_control_word(kmp_int16 *p);
 extern void __kmp_clear_x87_fpu_status_word();

@@ -20,7 +20,9 @@
 #include "kmp_os.h"
 
 #include <errno.h>
+#ifndef _OPENMP_SGX
 #include <locale.h>
+#endif
 #include <stdarg.h>
 #include <stdio.h>
 #include <string.h>
@@ -61,6 +63,7 @@ static kmp_bootstrap_lock_t lock = KMP_BOOTSTRAP_LOCK_INITIALIZER(lock);
 // wrongly. So we put it outside of function just in case.
 
 void __kmp_i18n_catopen() {
+#ifndef _OPENMP_SGX
   if (status == KMP_I18N_CLOSED) {
     __kmp_acquire_bootstrap_lock(&lock);
     if (status == KMP_I18N_CLOSED) {
@@ -68,12 +71,14 @@ void __kmp_i18n_catopen() {
     }
     __kmp_release_bootstrap_lock(&lock);
   }
+#endif
 } // func __kmp_i18n_catopen
 
 /* Linux* OS and OS X* part */
 #if KMP_OS_UNIX
 #define KMP_I18N_OK
 
+#ifndef _OPENMP_SGX
 #include <nl_types.h>
 
 #define KMP_I18N_NULLCAT ((nl_catd)(-1))
@@ -86,7 +91,6 @@ http://www.opengroup.org/onlinepubs/000095399/basedefs/xbd_chap08.html#tag_08_02
 http://www.opengroup.org/onlinepubs/000095399/functions/catopen.html
 http://www.opengroup.org/onlinepubs/000095399/functions/setlocale.html
 */
-
 void __kmp_i18n_do_catopen() {
   int english = 0;
   char *lang = __kmp_env_get("LANG");
@@ -175,18 +179,21 @@ void __kmp_i18n_do_catopen() {
     __kmp_str_buf_free(&version);
   }
 } // func __kmp_i18n_do_catopen
+#endif
 
 void __kmp_i18n_catclose() {
+#ifndef _OPENMP_SGX
   if (status == KMP_I18N_OPENED) {
     KMP_DEBUG_ASSERT(cat != KMP_I18N_NULLCAT);
     catclose(cat);
     cat = KMP_I18N_NULLCAT;
   }
   status = KMP_I18N_CLOSED;
+#endif
 } // func __kmp_i18n_catclose
 
 char const *__kmp_i18n_catgets(kmp_i18n_id_t id) {
-
+#ifndef _OPENMP_SGX
   int section = get_section(id);
   int number = get_number(id);
   char const *message = NULL;
@@ -209,13 +216,16 @@ char const *__kmp_i18n_catgets(kmp_i18n_id_t id) {
     message = no_message_available;
   }
   return message;
+#else
+  return NULL;
+#endif
 
 } // func __kmp_i18n_catgets
 
 #endif // KMP_OS_UNIX
 
 /* Windows* OS part. */
-
+#ifndef _OPENMP_SGX
 #if KMP_OS_WINDOWS
 #define KMP_I18N_OK
 
@@ -581,6 +591,7 @@ char const *__kmp_i18n_catgets(kmp_i18n_id_t id) {
 } // func __kmp_i18n_catgets
 
 #endif // KMP_OS_WINDOWS
+#endif // _OPENMP_SGX
 
 // -----------------------------------------------------------------------------
 
@@ -591,7 +602,7 @@ char const *__kmp_i18n_catgets(kmp_i18n_id_t id) {
 // -----------------------------------------------------------------------------
 
 void __kmp_i18n_dump_catalog(kmp_str_buf_t *buffer) {
-
+#ifndef _OPENMP_SGX
   struct kmp_i18n_id_range_t {
     kmp_i18n_id_t first;
     kmp_i18n_id_t last;
@@ -617,6 +628,7 @@ void __kmp_i18n_dump_catalog(kmp_str_buf_t *buffer) {
   }
 
   __kmp_printf("%s", buffer->str);
+#endif // _OPENMP_SGX
 
 } // __kmp_i18n_dump_catalog
 
@@ -787,6 +799,7 @@ kmp_msg_t __kmp_msg_error_mesg(char const *mesg) {
 
 // -----------------------------------------------------------------------------
 void __kmp_msg(kmp_msg_severity_t severity, kmp_msg_t message, va_list args) {
+#ifndef _OPENMP_SGX
   kmp_i18n_id_t format; // format identifier
   kmp_msg_t fmsg; // formatted message
   kmp_str_buf_t buffer;
@@ -847,6 +860,7 @@ void __kmp_msg(kmp_msg_severity_t severity, kmp_msg_t message, va_list args) {
 
   // __kmp_release_bootstrap_lock( & lock );  // GEH - this lock causing tests
   // to hang on OS X*.
+#endif // _OPENMP_SGX
 
 } // __kmp_msg
 
@@ -858,6 +872,7 @@ void __kmp_msg(kmp_msg_severity_t severity, kmp_msg_t message, ...) {
 }
 
 void __kmp_fatal(kmp_msg_t message, ...) {
+#ifndef _OPENMP_SGX
   va_list args;
   va_start(args, message);
   __kmp_msg(kmp_ms_fatal, message, args);
@@ -866,6 +881,7 @@ void __kmp_fatal(kmp_msg_t message, ...) {
   // Delay to give message a chance to appear before reaping
   __kmp_thread_sleep(500);
 #endif
+#endif // _OPENMP_SGX
   __kmp_abort_process();
 } // __kmp_fatal
 

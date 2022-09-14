@@ -38,6 +38,7 @@
  * it will be implicitly called by attempts to use other library functions.
  */
 void __kmpc_begin(ident_t *loc, kmp_int32 flags) {
+#ifndef _OPENMP_SGX
   // By default __kmpc_begin() is no-op.
   char *env;
   if ((env = getenv("KMP_INITIAL_THREAD_BIND")) != NULL &&
@@ -49,6 +50,10 @@ void __kmpc_begin(ident_t *loc, kmp_int32 flags) {
     __kmp_internal_begin();
     KC_TRACE(10, ("__kmpc_begin: called\n"));
   }
+#else
+    __kmp_internal_begin();
+    KC_TRACE(10, ("__kmpc_begin: called\n"));
+#endif
 }
 
 /*!
@@ -60,6 +65,7 @@ void __kmpc_begin(ident_t *loc, kmp_int32 flags) {
  * zero.
  */
 void __kmpc_end(ident_t *loc) {
+#ifndef _OPENMP_SGX
   // By default, __kmp_ignore_mppend() returns TRUE which makes __kmpc_end()
   // call no-op. However, this can be overridden with KMP_IGNORE_MPPEND
   // environment variable. If KMP_IGNORE_MPPEND is 0, __kmp_ignore_mppend()
@@ -79,6 +85,12 @@ void __kmpc_end(ident_t *loc) {
   if (ompt_enabled.enabled)
     __kmp_internal_end_library(__kmp_gtid_get_specific());
 #endif
+#else
+    KC_TRACE(10, ("__kmpc_end: called\n"));
+    KA_TRACE(30, ("__kmpc_end\n"));
+
+    __kmp_internal_end_thread(-1);
+#endif // _OPENMP_SGX
 }
 
 /*!

@@ -33,18 +33,21 @@
 #include <algorithm>
 #include <climits>
 #include <string>
+#ifndef PB_ENABLE_SGX
 #include <ostream>
+#endif //PB_ENABLE_SGX
 
 #include <google/protobuf/stubs/logging.h>
 
 namespace google {
 namespace protobuf {
 namespace stringpiece_internal {
-
+#ifndef PB_ENABLE_SGX
 std::ostream& operator<<(std::ostream& o, StringPiece piece) {
   o.write(piece.data(), piece.size());
   return o;
 }
+#endif //PB_ENABLE_SGX
 
 void StringPiece::LogFatalSizeTooBig(size_t size, const char* details) {
   GOOGLE_LOG(FATAL) << "size too big: " << size << " details: " << details;

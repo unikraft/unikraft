@@ -44,10 +44,14 @@ struct timeval {
   int64 tv_usec; /* and microseconds */
 };
 #else
+#ifndef PB_ENABLE_SGX
 #include <winsock2.h>
+#endif //PB_ENABLE_SGX
 #endif  // _XBOX_ONE
 #else
+#ifndef PB_ENABLE_SGX
 #include <sys/time.h>
+#endif //PB_ENABLE_SGX
 #endif
 
 #include <google/protobuf/duration.pb.h>

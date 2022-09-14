@@ -91,5 +91,11 @@
 
 # $(LIBUKSGX_SDK_BASE)/libsgx_tstdc.a: $(LIBUKSGX_SDK_BASE)/tlibc/libtlibc.a
 # TODO: invoke make -C sdk/ to generate those targets
-SDK_TARGETS := libsgx_tstdc.a libsgx_tcxx.a libsgx_tservice.a libsgx_trts.a libsgx_tcrypto.a libsgx_tcmalloc.a libsgx_omp.a libsgx_protobuf.a
+SDK_TARGETS := libsgx_tstdc.a libsgx_tcxx.a libsgx_tservice.a 
+SDK_TARGETS := $(foreach a, $(SDK_TARGETS), $(LIBUKSGX_SDK_BASE)/build/$(a))
+# libsgx_trts.a libsgx_tcrypto.a libsgx_tcmalloc.a libsgx_omp.a libsgx_protobuf.a
 
+$(SDK_TARGETS): 
+	$(call build_cmd, SGXSDK, sgxsdktgt, $(notdir @), \
+	$(MAKE) -C $(LIBUKSGX_SDK_BASE))
+UK_PREPARE-$(CONFIG_LIBUKSGX) += $(SDK_TARGETS)

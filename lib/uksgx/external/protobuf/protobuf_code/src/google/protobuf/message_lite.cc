@@ -265,6 +265,7 @@ bool MessageLite::ParsePartialFromZeroCopyStream(
   return ParseFrom<kParsePartial>(input);
 }
 
+#ifndef PB_ENABLE_SGX
 bool MessageLite::ParseFromFileDescriptor(int file_descriptor) {
   io::FileInputStream input(file_descriptor);
   return ParseFromZeroCopyStream(&input) && input.GetErrno() == 0;
@@ -284,6 +285,7 @@ bool MessageLite::ParsePartialFromIstream(std::istream* input) {
   io::IstreamInputStream zero_copy_input(input);
   return ParsePartialFromZeroCopyStream(&zero_copy_input) && input->eof();
 }
+#endif //PB_ENABLE_SGX
 
 bool MessageLite::MergePartialFromBoundedZeroCopyStream(
     io::ZeroCopyInputStream* input, int size) {
@@ -414,6 +416,7 @@ bool MessageLite::SerializePartialToZeroCopyStream(
   return true;
 }
 
+#ifndef PB_ENABLE_SGX
 bool MessageLite::SerializeToFileDescriptor(int file_descriptor) const {
   io::FileOutputStream output(file_descriptor);
   return SerializeToZeroCopyStream(&output) && output.Flush();
@@ -436,6 +439,7 @@ bool MessageLite::SerializePartialToOstream(std::ostream* output) const {
   io::OstreamOutputStream zero_copy_output(output);
   return SerializePartialToZeroCopyStream(&zero_copy_output);
 }
+#endif //PB_ENABLE_SGX
 
 bool MessageLite::AppendToString(std::string* output) const {
   GOOGLE_DCHECK(IsInitialized()) << InitializationErrorMessage("serialize", *this);

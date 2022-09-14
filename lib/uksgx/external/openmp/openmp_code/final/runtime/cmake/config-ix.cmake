@@ -188,7 +188,7 @@ else()
 endif()
 
 # Check if adaptive locks are available
-if((${IA32} OR ${INTEL64}) AND NOT MSVC)
+if((${IA32} OR ${INTEL64}) AND NOT MSVC AND NOT BUILD_SGX_OPENMP)
   set(LIBOMP_HAVE_ADAPTIVE_LOCKS TRUE)
 else()
   set(LIBOMP_HAVE_ADAPTIVE_LOCKS FALSE)

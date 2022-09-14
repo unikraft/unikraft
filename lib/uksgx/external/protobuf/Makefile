@@ -76,7 +76,7 @@ endif
 
 $(LIBPB): $(CHECK_SOURCE)
 ifeq ("$(wildcard $(PB_DIR)/cmake/libsgx_protobuf.cmake)", "")
-	cd $(PB_DIR) && git apply ../sgx_protobuf.patch&& cd ..
+	cd $(PB_DIR) && patch -p1 < ../sgx_protobuf.patch && cd ..
 endif
 	$(MKDIR) protobuf_code/final_tlibPB/build && cd protobuf_code/final_tlibPB/build && cmake $(PB_CONFIG) -Dprotobuf_BUILD_TESTS=FALSE -DSGX=TRUE ../../cmake && make libprotobuf
 

@@ -22,6 +22,7 @@
 #include "kmp_wait_release.h"
 #include "kmp_wrapper_getpid.h"
 
+#ifndef _OPENMP_SGX
 #if !KMP_OS_DRAGONFLY && !KMP_OS_FREEBSD && !KMP_OS_NETBSD && !KMP_OS_OPENBSD
 #include <alloca.h>
 #endif
@@ -60,9 +61,11 @@
 #include <ctype.h>
 #include <dirent.h>
 #include <fcntl.h>
+#endif // _OPENMP_SGX 
 
 #include "tsan_annotations.h"
 
+#ifndef _OPENMP_SGX
 struct kmp_sys_timer {
   struct timespec start;
 };
@@ -77,6 +80,7 @@ typedef void (*sig_func_t)(int);
 STATIC_EFI2_WORKAROUND struct sigaction __kmp_sighldrs[NSIG];
 static sigset_t __kmp_sigset;
 #endif
+#endif // _OPENMP_SGX
 
 static int __kmp_init_runtime = FALSE;
 
@@ -447,6 +451,8 @@ void __kmp_terminate_thread(int gtid) {
    determined exactly, FALSE if incremental refinement is necessary. */
 static kmp_int32 __kmp_set_stack_info(int gtid, kmp_info_t *th) {
   int stack_data;
+#ifndef _OPENMP_SGX
+// Disable pthread_attr* functions in SGX
 #if KMP_OS_LINUX || KMP_OS_DRAGONFLY || KMP_OS_FREEBSD || KMP_OS_NETBSD ||     \
         KMP_OS_HURD
   pthread_attr_t attr;
@@ -488,6 +494,7 @@ static kmp_int32 __kmp_set_stack_info(int gtid, kmp_info_t *th) {
   }
 #endif /* KMP_OS_LINUX || KMP_OS_DRAGONFLY || KMP_OS_FREEBSD || KMP_OS_NETBSD ||
               KMP_OS_HURD */
+#endif
   /* Use incremental refinement starting from initial conservative estimate */
   TCW_PTR(th->th.th_info.ds.ds_stacksize, 0);
   TCW_PTR(th->th.th_info.ds.ds_stackbase, &stack_data);
@@ -1108,7 +1115,6 @@ void __kmp_reap_worker(kmp_info_t *th) {
                   th->th.th_info.ds.ds_gtid, exit_val));
   }
 #endif /* KMP_DEBUG */
-
   KA_TRACE(10, ("__kmp_reap_worker: done reaping T#%d\n",
                 th->th.th_info.ds.ds_gtid));
 
@@ -1259,6 +1265,7 @@ void __kmp_disable(int *old_state) {
 #endif
 }
 
+#ifndef _OPENMP_SGX
 static void __kmp_atfork_prepare(void) {
   __kmp_acquire_bootstrap_lock(&__kmp_initz_lock);
   __kmp_acquire_bootstrap_lock(&__kmp_forkjoin_lock);
@@ -1360,22 +1367,28 @@ static void __kmp_atfork_child(void) {
   //       startup; look at kmp_global.cpp and etc.
   //__kmp_internal_begin ();
 }
+#endif
 
 void __kmp_register_atfork(void) {
   if (__kmp_need_register_atfork) {
+#ifndef _OPENMP_SGX /*Inside SGX don't support fork(2) function.*/
     int status = pthread_atfork(__kmp_atfork_prepare, __kmp_atfork_parent,
                                 __kmp_atfork_child);
     KMP_CHECK_SYSFAIL("pthread_atfork", status);
+#endif
     __kmp_need_register_atfork = FALSE;
   }
 }
 
 void __kmp_suspend_initialize(void) {
+#ifndef _OPENMP_SGX
+// Disable pthread_attr* in SGX environment
   int status;
   status = pthread_mutexattr_init(&__kmp_suspend_mutex_attr);
   KMP_CHECK_SYSFAIL("pthread_mutexattr_init", status);
   status = pthread_condattr_init(&__kmp_suspend_cond_attr);
   KMP_CHECK_SYSFAIL("pthread_condattr_init", status);
+#endif
 }
 
 static void __kmp_suspend_initialize_thread(kmp_info_t *th) {
@@ -1667,6 +1680,7 @@ void __kmp_resume_monitor() {
 #endif // KMP_USE_MONITOR
 
 void __kmp_yield(int cond) {
+#ifndef _OPENMP_SGX
   if (!cond)
     return;
 #if KMP_USE_MONITOR
@@ -1677,15 +1691,23 @@ void __kmp_yield(int cond) {
     return;
 #endif
   sched_yield();
+#endif
 }
 
 void __kmp_gtid_set_specific(int gtid) {
   if (__kmp_init_gtid) {
-    int status;
-    status = pthread_setspecific(__kmp_gtid_threadprivate_key,
+    int status=0;
+#ifdef _OPENMP_SGX
+    pthread_t self = pthread_self();
+    if(NULL == self)
+        __kmp_gtid_threadprivate_data = (void *)(intptr_t)(gtid + 1);
+    else
+#endif
+      status = pthread_setspecific(__kmp_gtid_threadprivate_key,
                                  (void *)(intptr_t)(gtid + 1));
     KMP_CHECK_SYSFAIL("pthread_setspecific", status);
-  } else {
+
+  } else {	
     KA_TRACE(50, ("__kmp_gtid_set_specific: runtime shutdown, returning\n"));
   }
 }
@@ -1697,6 +1719,11 @@ int __kmp_gtid_get_specific() {
                   "KMP_GTID_SHUTDOWN\n"));
     return KMP_GTID_SHUTDOWN;
   }
+#ifdef _OPENMP_SGX
+  if(NULL == pthread_self())
+    gtid = (int)(size_t)__kmp_gtid_threadprivate_data;
+  else
+#endif
   gtid = (int)(size_t)pthread_getspecific(__kmp_gtid_threadprivate_key);
   if (gtid == 0) {
     gtid = KMP_GTID_DNE;
@@ -1708,6 +1735,14 @@ int __kmp_gtid_get_specific() {
   return gtid;
 }
 
+#ifndef _OPENMP_SGX
+// APIs are not called:
+//      __kmp_read_cpu_time()
+//      __kmp_read_system_info()
+//      __kmp_clear_system_time()
+// The API __kmp_read_system_time() is called by __kmp_register_library_startup()
+// Which is disabled in SGX.
+// So disable all these APIs in SGX.
 double __kmp_read_cpu_time(void) {
   /*clock_t   t;*/
   struct tms buffer;
@@ -1766,15 +1801,24 @@ void __kmp_clear_system_time(void) {
   KMP_CHECK_SYSFAIL_ERRNO("gettimeofday", status);
   TIMEVAL_TO_TIMESPEC(&tval, &__kmp_sys_timer_data.start);
 }
+#endif // _OPENMP_SGX
 
+#ifdef _OPENMP_SGX
+extern "C" size_t get_max_tcs_num();
+extern uint32_t g_cpu_core_num;
+#endif
 static int __kmp_get_xproc(void) {
 
   int r = 0;
 
 #if KMP_OS_LINUX || KMP_OS_DRAGONFLY || KMP_OS_FREEBSD || KMP_OS_NETBSD ||     \
         KMP_OS_OPENBSD || KMP_OS_HURD
-
+#ifndef _OPENMP_SGX
   r = sysconf(_SC_NPROCESSORS_ONLN);
+#else
+  size_t tcs_num = get_max_tcs_num();
+  r = tcs_num > g_cpu_core_num ? g_cpu_core_num : tcs_num;
+#endif
 
 #elif KMP_OS_DARWIN
 
@@ -1804,6 +1848,7 @@ static int __kmp_get_xproc(void) {
 
 } // __kmp_get_xproc
 
+#ifndef _OPENMP_SGX
 int __kmp_read_from_file(char const *path, char const *format, ...) {
   int result;
   va_list args;
@@ -1817,6 +1862,7 @@ int __kmp_read_from_file(char const *path, char const *format, ...) {
 
   return result;
 }
+#endif
 
 void __kmp_runtime_initialize(void) {
   int status;
@@ -1835,6 +1881,7 @@ void __kmp_runtime_initialize(void) {
 
   __kmp_xproc = __kmp_get_xproc();
 
+#ifndef _OPENMP_SGX 
   if (sysconf(_SC_THREADS)) {
 
     /* Query the maximum number of threads */
@@ -1853,19 +1900,27 @@ void __kmp_runtime_initialize(void) {
       __kmp_sys_min_stksize = KMP_MIN_STKSIZE;
     }
   }
+#else
+  __kmp_sys_max_nth = get_max_tcs_num() - 1;
+#endif // _OPENMP_SGX
 
   /* Set up minimum number of threads to switch to TLS gtid */
   __kmp_tls_gtid_min = KMP_TLS_GTID_MIN;
 
+
   status = pthread_key_create(&__kmp_gtid_threadprivate_key,
                               __kmp_internal_end_dest);
   KMP_CHECK_SYSFAIL("pthread_key_create", status);
+#ifndef _OPENMP_SGX
   status = pthread_mutexattr_init(&mutex_attr);
   KMP_CHECK_SYSFAIL("pthread_mutexattr_init", status);
+#endif
   status = pthread_mutex_init(&__kmp_wait_mx.m_mutex, &mutex_attr);
   KMP_CHECK_SYSFAIL("pthread_mutex_init", status);
+#ifndef _OPENMP_SGX
   status = pthread_condattr_init(&cond_attr);
   KMP_CHECK_SYSFAIL("pthread_condattr_init", status);
+#endif
   status = pthread_cond_init(&__kmp_wait_cv.c_cond, &cond_attr);
   KMP_CHECK_SYSFAIL("pthread_cond_init", status);
 #if USE_ITT_BUILD
@@ -1904,10 +1959,19 @@ void __kmp_runtime_destroy(void) {
   __kmp_init_runtime = FALSE;
 }
 
+#ifndef _OPENMP_SGX
 /* Put the thread to sleep for a time period */
 /* NOTE: not currently used anywhere */
 void __kmp_thread_sleep(int millis) { sleep((millis + 500) / 1000); }
+#endif
 
+#ifndef _OPENMP_SGX
+//__kmp_elapsed() is called in __kmp_get_load_balance() if USE_LOAD_BALANCE macro is enabled
+// Disable this function as USE_LOAD_BALANCE is disabled for SGX
+//
+// __kmp_initialize_system_tick() is called by __kmp_register_library_startup()
+// Disable it as we don't need __kmp_register_library_startup() in SGX enclave.
+//
 /* Calculate the elapsed wall clock time for the user */
 void __kmp_elapsed(double *t) {
   int status;
@@ -1959,6 +2023,9 @@ void __kmp_initialize_system_tick() {
 }
 #endif
 
+// This function is called by __kmp_register_library_startup()
+// Disable this function for SGX as we don't need __kmp_register_library_startup()
+//
 /* Determine whether the given address is mapped into the current address
    space. */
 
@@ -2069,6 +2136,8 @@ int __kmp_is_address_mapped(void *addr) {
   return found;
 
 } // __kmp_is_address_mapped
+
+#endif // _OPENMP_SGX
 
 #ifdef USE_LOAD_BALANCE
 

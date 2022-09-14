@@ -38,6 +38,7 @@ namespace google {
 namespace protobuf {
 namespace util {
 
+#ifndef PB_ENABLE_SGX
 bool SerializeDelimitedToFileDescriptor(const MessageLite& message,
                                         int file_descriptor) {
   io::FileOutputStream output(file_descriptor);
@@ -60,6 +61,7 @@ bool ParseDelimitedFromZeroCopyStream(MessageLite* message,
   io::CodedInputStream coded_input(input);
   return ParseDelimitedFromCodedStream(message, &coded_input, clean_eof);
 }
+#endif //PB_ENABLE_SGX
 
 bool ParseDelimitedFromCodedStream(MessageLite* message,
                                    io::CodedInputStream* input,

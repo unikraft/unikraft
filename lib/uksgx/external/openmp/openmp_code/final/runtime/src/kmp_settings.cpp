@@ -480,6 +480,9 @@ static void __kmp_stg_parse_par_range(char const *name, char const *value,
 } // __kmp_stg_parse_par_range
 #endif
 
+#ifdef _OPENMP_SGX
+  extern "C" size_t get_max_tcs_num();
+#endif
 int __kmp_initial_threads_capacity(int req_nproc) {
   int nth = 32;
 
@@ -493,6 +496,14 @@ int __kmp_initial_threads_capacity(int req_nproc) {
   if (nth > __kmp_max_nth)
     nth = __kmp_max_nth;
 
+#ifdef _OPENMP_SGX
+  /* For SGX, threads number should be not greater than (max_tcs_num - 1)*/
+  size_t tcs_num = get_max_tcs_num();
+  if(nth > tcs_num - 1)
+  {
+    nth = tcs_num - 1;
+  }
+#endif
   return nth;
 }
 
@@ -5447,7 +5458,11 @@ void __kmp_env_initialize(char const *string) {
     __kmp_affinity_format =
         (char *)KMP_INTERNAL_MALLOC(sizeof(char) * KMP_AFFINITY_FORMAT_SIZE);
   }
+#ifndef _OPENMP_SGX
   KMP_STRCPY_S(__kmp_affinity_format, KMP_AFFINITY_FORMAT_SIZE, m.str);
+#else
+  KMP_STRNCPY_S(__kmp_affinity_format, KMP_AFFINITY_FORMAT_SIZE, m.str, m.len);
+#endif
   __kmp_str_free(&m.str);
 #endif
 

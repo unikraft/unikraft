@@ -18,6 +18,11 @@
 #endif
 
 kmp_key_t __kmp_gtid_threadprivate_key;
+#ifdef _OPENMP_SGX
+void * __kmp_gtid_threadprivate_data;
+uint64_t __kmp_global_count = 0;
+#endif
+
 
 #if KMP_ARCH_X86 || KMP_ARCH_X86_64
 kmp_cpuinfo_t __kmp_cpuinfo = {0}; // Not initialized

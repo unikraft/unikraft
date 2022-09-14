@@ -292,6 +292,9 @@ void __kmp_query_cpuid(kmp_cpuinfo_t *p) {
 
 void __kmp_expand_host_name(char *buffer, size_t size) {
   KMP_DEBUG_ASSERT(size >= sizeof(unknown));
+#ifdef _OPENMP_SGX
+  KMP_STRNCPY_S(buffer, size, unknown, sizeof(unknown));
+#else
 #if KMP_OS_WINDOWS
   {
     DWORD s = size;
@@ -304,8 +307,10 @@ void __kmp_expand_host_name(char *buffer, size_t size) {
   if (gethostname(buffer, size) || buffer[size - 2] != 0)
     KMP_STRCPY_S(buffer, size, unknown);
 #endif
+#endif // _OPENMP_SGX
 }
 
+#ifndef _OPENMP_SGX
 /* Expand the meta characters in the filename:
  * Currently defined characters are:
  * %H the hostname
@@ -408,3 +413,4 @@ void __kmp_expand_file_name(char *result, size_t rlen, char *pattern) {
 
   *pos = '\0';
 }
+#endif // _OPENMP_SGX

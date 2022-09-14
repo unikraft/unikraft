@@ -125,11 +125,14 @@ static void __kmp_redirect_output(void) {
 }
 
 #else
+#ifndef _OPENMP_SGX
 #define __kmp_stderr (stderr)
 #define __kmp_stdout (stdout)
+#endif /*! _OPENMP_SGX */
 #endif /* KMP_OS_WINDOWS */
 
 void __kmp_vprintf(enum kmp_io out_stream, char const *format, va_list ap) {
+#ifndef _OPENMP_SGX
 #if KMP_OS_WINDOWS
   if (!__kmp_console_exists) {
     __kmp_redirect_output();
@@ -196,6 +199,9 @@ void __kmp_vprintf(enum kmp_io out_stream, char const *format, va_list ap) {
     fflush(stream);
 #endif
   }
+#else
+  return;
+#endif
 }
 
 void __kmp_printf(char const *format, ...) {

@@ -572,11 +572,13 @@ public:
   }
   bool operator!=(const Address &b) const { return !operator==(b); }
   void print() const {
+#ifndef _OPENMP_SGX
     unsigned i;
     printf("Depth: %u --- ", depth);
     for (i = 0; i < depth; i++) {
       printf("%u ", labels[i]);
     }
+#endif
   }
 };
 
@@ -592,9 +594,11 @@ public:
     return *this;
   }
   void print() const {
+#ifndef _OPENMP_SGX
     printf("first = ");
     first.print();
     printf(" --- second = %u", second);
+#endif
   }
   bool operator==(const AddrUnsPair &b) const {
     if (first != b.first)

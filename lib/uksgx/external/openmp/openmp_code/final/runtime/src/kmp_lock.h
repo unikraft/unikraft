@@ -158,11 +158,14 @@ extern void __kmp_destroy_nested_tas_lock(kmp_tas_lock_t *lck);
 #define KMP_LOCK_STILL_HELD 0
 #define KMP_LOCK_ACQUIRED_FIRST 1
 #define KMP_LOCK_ACQUIRED_NEXT 0
+#ifndef _OPENMP_SGX
+// Disable KMP_USE_FUTEX macro
 #ifndef KMP_USE_FUTEX
 #define KMP_USE_FUTEX                                                          \
   (KMP_OS_LINUX && !KMP_OS_CNK &&                                              \
    (KMP_ARCH_X86 || KMP_ARCH_X86_64 || KMP_ARCH_ARM || KMP_ARCH_AARCH64))
 #endif
+#endif // _OPENMP_SGX
 #if KMP_USE_FUTEX
 
 // ----------------------------------------------------------------------------

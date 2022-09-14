@@ -67,6 +67,10 @@
 
 #define DEBUG_STRING_SILENT_MARKER "\t "
 
+#ifdef PB_ENABLE_SGX
+extern "C" int printf(const char* fmt, ...);
+#endif //PB_ENABLE_SGX
+
 namespace google {
 namespace protobuf {
 

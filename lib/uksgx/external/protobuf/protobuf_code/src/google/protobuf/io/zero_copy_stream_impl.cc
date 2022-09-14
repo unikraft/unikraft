@@ -33,15 +33,19 @@
 //  Sanjay Ghemawat, Jeff Dean, and others.
 
 #ifndef _MSC_VER
+#ifndef PB_ENABLE_SGX
 #include <fcntl.h>
 #include <sys/stat.h>
+#endif //PB_ENABLE_SGX
 #include <sys/types.h>
 #include <unistd.h>
 #endif
 #include <errno.h>
 
 #include <algorithm>
+#ifndef PB_ENABLE_SGX
 #include <iostream>
+#endif //PB_ENABLE_SGX
 
 #include <google/protobuf/stubs/common.h>
 #include <google/protobuf/stubs/logging.h>
@@ -67,6 +71,7 @@ using google::protobuf::io::win32::read;
 using google::protobuf::io::win32::write;
 #endif
 
+#ifndef PB_ENABLE_SGX
 namespace {
 
 // EINTR sucks.
@@ -304,6 +309,7 @@ bool OstreamOutputStream::CopyingOstreamOutputStream::Write(const void* buffer,
   output_->write(reinterpret_cast<const char*>(buffer), size);
   return output_->good();
 }
+#endif //PB_ENABLE_SGX
 
 // ===================================================================
 

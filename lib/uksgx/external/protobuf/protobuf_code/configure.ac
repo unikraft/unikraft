@@ -106,7 +106,7 @@ ACX_CHECK_SUNCC
 
 # Have to do libtool after SUNCC, other wise it "helpfully" adds Crun Cstd
 # to the link
-AC_PROG_LIBTOOL
+LT_INIT
 
 # Check whether the linker supports version scripts
 AC_MSG_CHECKING([whether the linker supports version scripts])

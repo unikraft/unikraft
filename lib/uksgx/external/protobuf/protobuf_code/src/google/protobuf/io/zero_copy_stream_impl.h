@@ -54,7 +54,7 @@
 namespace google {
 namespace protobuf {
 namespace io {
-
+#ifndef PB_ENABLE_SGX
 // ===================================================================
 
 // A ZeroCopyInputStream which reads from a file descriptor.
@@ -290,7 +290,7 @@ class PROTOBUF_EXPORT OstreamOutputStream PROTOBUF_FUTURE_FINAL
 
   GOOGLE_DISALLOW_EVIL_CONSTRUCTORS(OstreamOutputStream);
 };
-
+#endif //PB_ENABLE_SGX
 // ===================================================================
 
 // A ZeroCopyInputStream which reads from several other streams in sequence.
