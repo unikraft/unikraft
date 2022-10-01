@@ -161,9 +161,6 @@ In this security-focused project, you will have the opportunity to contribute to
 Interested candidates could also work towards the implementation of additional isolation mechanisms such as Intel SGX or ARM TrustZone.
 Project length variable depending on selected features.
 
-Reading & Related Material
-
-
 #### Reading & Related Material
 
  * https://unikraft.org/docs/features/security/ 

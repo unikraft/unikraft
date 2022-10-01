@@ -1,80 +1,47 @@
-# Unikraft at Google Summer of Code 2022 (GSoC'22)
+# Unikraft at Google Summer of Code
 
-Make your way into open source developement with operating systems, cloud, virtualization and low-level topics.
-Apply to [GSoC22](https://summerofcode.withgoogle.com/) with [Unikraft](https://summerofcode.withgoogle.com/programs/2022/organizations/unikraft).
+This repository contains the official archive of the Unikraft GSoC projects over the years.
 
-[Google Summer of Code 2022](https://summerofcode.withgoogle.com/) (GSoC'22) is a global online program focused on bringing new contributors into open source software development.
-GSoC Contributors work with an open source organization, such as Unikraft, on a 12+ week programming project under the guidance of mentors.
+## File hierarchy
 
-[Unikraft](https://unikraft.org/) is a fast, secure and open-source Unikernel Development Kit.
-By tailoring the operating system, libraries and configuration to the particular needs of your application, it vastly reduces virtual machine and container image sizes to a few KBs, provides blazing performance, and drastically cuts down your software stack’s attack surface.
+Browse the files to investigate what work was done every year, expectations, ideas and more:
 
-Before you apply, see the [GSoC contributor eligibility](https://summerofcode.withgoogle.com/get-started).
+```
+gsoc/
+|---gsoc-year/
+|   |---ideas.md
+|   |---README.md
+|   |---work-product/
+|   |   |---Name-Project/
+|---README.md
+|---work-product-template.md
+```
 
-## How to Apply[^1]
+Let's take a tour of what every file in this hierarchy means:
 
-* Connect to the community
-* Get accustomed to the Unikraft development ecosystem
-* Make a small contribution
-* Decide on a GSoC project
-* Fill out an application
+* For every year, we provided an updated list of ideas that should inspire you decide what you'd like to work on during summer, the `ideas.md` file.
+You can choose from there or you can come up with your own idea; nevertheless, get involved with the community and debate on your project.
 
-### Connect to the community
+* The `README.md` inside the yearly directory contains information specific to the year we are participating in GSoC: general code of conduct, the proposal template and what is expected of you **before** being accepted as a contributor.
 
-First join our [Discord server](https://bit.ly/UnikraftDiscord).
-This is where all (text) discussion and (live video) meetings take place.
-You will find multiple channels, each for a particular topic of the Unikraft ecosystem.
+* Now, onto the `work-product` directory: this is the place where we document what our contributors have worked on during the summer, their progress and more.
+It's also where you will post your work (if you are going to be accepted as a contributor) and it will be what your mentor will revise before giving their final feedback.
 
-As a newcomer, start by presenting yourself (name, university / occupation, interest in Unikraft, current experience).
-It's best if you use a `Firstname Lastname` nickname to make it easy for others to get in touch with you.
+* The main `README.md` is what you are reading now: fun stuff!
 
-Ask any questions, worry not about anything, we're happy to assist you in feeling at home in the Unikraft community.
-In particular, use the `gsoc22` and the `support` channels.
+* The last piece of the puzzle is the `work-product-template.md` file.
+It contains the skeleton that accepted contributors use for their final submission.
 
-### Get accustomed to the Unikraft development ecosystem
+## Best practices
 
-Unikraft development happens on the [Unikaft GitHub organization](https://github.com/unikraft/).
+First and foremost, read the `README.md` file for the year you are applying in.
+Follow the steps documented there as closly as possible: you (literally) get extra points.
 
-For starters, check the first 2 sessions in [Unikraft Summer of Code](https://usoc21.unikraft.org/docs/).
-These give you a very nice set of initial hands-on tasks to get you started with grabbing, configuring, building and running Unikraft.
-Optionally, look into sessions 3, 4 and 5 as well.
+Inspect `ideas.md`.
+Get involved with the community regarding your project idea!
 
-### Make a small contribution
+Take a glance at the `work-product` directory: know what to expect after the summer ends, what previous mentees had to do and their involvement with Unikraft.
 
-The best way to prepare your application is to make small contributions.
+Write your proposal, you'll find the template linked in the `README.md` for the year you are applying in.
 
-First off, browse the [Unikraft Contribution Guidelines](https://unikraft.org/docs/contributing/).
-This gives you an overview of how we expect you to write your code, create commits and make contributions and GitHub pull requests (PRs).
-
-Then aim for small, easy to do contributions.
-Look for items such as:
-* Removing build warnings for any of the repositories in the [Unikraft GitHub organization](https://github.com/unikraft/).
-* Fixing inconsistencies or adding missing information in the [documentation](https://github.com/unikraft/docs) (rendered on the [main Unikraft website](https://unikraft.org/)).
-* Adding [tests](https://unikraft.org/docs/develop/writing-tests/) to Unikraft components.
-
-### Decide on a GSoC project
-
-We put together a [list of project ideas](https://github.com/unikraft/gsoc22/blob/staging/content/en/ideas.md) that you can choose from.
-
-Note that this is not an exclusive list.
-You can suggest new project ideas to the Unikraft GSoC mentors on the `gsoc22` channel on [Discord](https://bit.ly/UnikraftDiscord).
-If your idea has been vetted by a mentor (or more) in the community, then you can submit it as part of your application.
-
-If you fancy a given project idea, ask about that on the `gsoc22` channel on [Discord](https://bit.ly/UnikraftDiscord).
-A mentor will reply and give you extra information.
-If that is indeed a project you want to work on, then you can submit it as part of your application.
-
-### Fill out an application
-
-Once the application period has opened (in the April 4-19, 2022 period), you have to submit your application on the [Google Summer of Code website](https://summerofcode.withgoogle.com/).
-Your application must be written in English.
-It should contain a detailed description of your project proposal.
-
-The application is a document that you will submit and that summarizes your motivation and suitability for the project.
-We recommend you copy our [Google Document template](https://docs.google.com/document/d/1TjoRgWMTjB114QlRVc7N5rZ6rswUzEN-JS-G_gB0Bso/edit?usp=sharing) and make sure you answer all of the questions.
-
-### Still have some doubts/questions?
-
-Ask away on [Discord](https://bit.ly/UnikraftDiscord), on the `gsoc22` channel.
-
-[^1]: Based on the excellent guide from [GNOME](https://gsoc.gnome.org/)
+Submit your proposal and good luck!
