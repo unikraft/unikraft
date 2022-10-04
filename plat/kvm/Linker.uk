@@ -25,19 +25,22 @@ $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 			$(KVM_OLIBS) $(KVM_OLIBS-y) \
 			$(UK_OLIBS) $(UK_OLIBS-y) \
 			-Wl$(comma)--start-group \
-			$(KVM_ALIBS) $(KVM_ALIBS-y) \
-			$(UK_ALIBS) $(UK_ALIBS-y) \
 			$(KVM_LINK_LIBGCC_FLAG) \
 			-Wl$(comma)--end-group \
 			-o $(KVM_IMAGE).ld.o)
 	$(call build_cmd,OBJCOPY,,$(KVM_IMAGE).o,\
-		$(OBJCOPY) -w -G kvmos_* -G _libkvmplat_entry \
-			$(KVM_IMAGE).ld.o $(KVM_IMAGE).o)
+		$(OBJCOPY) $(KVM_IMAGE).ld.o $(KVM_IMAGE).o)
+
 	$(call build_cmd,LD,,$@,\
 	       $(LD) $(LDFLAGS) $(LDFLAGS-y) \
 		     $(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
 		     $(KVM_LD_SCRIPT_FLAGS) \
-		     $(KVM_IMAGE).o -o $@)
+		     $(KVM_IMAGE).o \
+		     -Wl$(comma)--whole-archive \
+		     $(KVM_ALIBS) $(KVM_ALIBS-y) \
+		     $(UK_ALIBS) $(UK_ALIBS-y) \
+		     -Wl$(comma)--no-whole-archive \
+		     -o $@)
 
 $(KVM_IMAGE): $(KVM_IMAGE).dbg
 	$(call build_cmd,SCSTRIP,,$@,\

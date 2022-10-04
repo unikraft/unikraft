@@ -848,10 +848,6 @@ $(call libname2preolib,$(1)): $($(call vprefix_lib,$(1),OBJS)) \
 			      $($(call vprefix_lib,$(1),OBJS-y)) \
 			      $(EACHOLIB_OBJS) \
 			      $(EACHOLIB_OBJS-y) \
-			      $($(call vprefix_lib,$(1),ALIBS)) \
-			      $($(call vprefix_lib,$(1),ALIBS-y)) \
-			      $(EACHOLIB_ALIBS) \
-			      $(EACHOLIB_ALIBS-y) \
 			      $($(call vprefix_lib,$(1),LDS)) \
 			      $($(call vprefix_lib,$(1),LDS-y)) \
 			      $($(call vprefix_lib,$(1),DTB)) \
@@ -865,10 +861,6 @@ $(call libname2preolib,$(1)): $($(call vprefix_lib,$(1),OBJS)) \
 		      $(EACHOLIB_OBJS) \
 		      $(EACHOLIB_OBJS-y) \
 		      -Wl$(comma)--start-group \
-		      $($(call vprefix_lib,$(1),ALIBS)) \
-		      $($(call vprefix_lib,$(1),ALIBS-y)) \
-		      $(EACHOLIB_ALIBS) \
-		      $(EACHOLIB_ALIBS-y) \
 		      -Wl$(comma)--end-group \
 		      -o $(call libname2preolib,$(1)))
 
