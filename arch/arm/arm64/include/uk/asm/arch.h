@@ -36,6 +36,24 @@
 
 #include <uk/asm.h>
 
+/* PSTATE */
+#define PSTATE_V_BIT		(_AC(1, UL) << 31)
+#define PSTATE_C_BIT		(_AC(1, UL) << 30)
+#define PSTATE_Z_BIT		(_AC(1, UL) << 29)
+#define PSTATE_N_BIT		(_AC(1, UL) << 28)
+#define PSTATE_TCO_BIT		(_AC(1, UL) << 25)
+#define PSTATE_DIT_BIT		(_AC(1, UL) << 24)
+#define PSTATE_UAO_BIT		(_AC(1, UL) << 23)
+#define PSTATE_PAN_BIT		(_AC(1, UL) << 22)
+#define PSTATE_ALLINT_BIT	(_AC(1, UL) << 13)
+#define PSTATE_SBSS_BIT		(_AC(1, UL) << 12)
+#define PSTATE_F_BIT		(_AC(1, UL) << 9)
+#define PSTATE_I_BIT		(_AC(1, UL) << 8)
+#define PSTATE_A_BIT		(_AC(1, UL) << 7)
+#define PSTATE_D_BIT		(_AC(1, UL) << 6)
+#define PSTATE_EL_BIT		(_AC(1, UL) << 2)
+#define PSTATE_SPSEL_BIT	(_AC(1, UL))
+
 /**************************************************************************
  * AArch64 System Register Definitions
  *************************************************************************/
@@ -143,6 +161,10 @@
 #define ESR_ISS_ABRT_FSC_LOCKDOWN		0x34
 #define ESR_ISS_ABRT_FSC_UNSUP_EXCL		0x35
 
+/* GCR_EL1: Tag Control Register */
+#define GCR_EL1_RRND_BIT			(_AC(1, UL) << 16)
+#define GCR_EL1_EXCLUDE_MASK			_AC(0xffff, UL)
+
 /* ID_AA64ISAR0_EL1: AArch64 Instruction Set Attributes Register 0 */
 #define ID_AA64ISAR0_EL1_RNDR_SHIFT		_AC(60, ULL)
 #define ID_AA64ISAR0_EL1_RNDR_MASK		_AC(0xf, UL)
@@ -156,6 +178,26 @@
 #define ID_AA64ISAR1_EL1_API_MASK		0xf
 #define ID_AA64ISAR1_EL1_APA_SHIFT		4
 #define ID_AA64ISAR1_EL1_APA_MASK		0xf
+
+/* ID_AA64PFR1_EL1: AArch64 Processor Feature Register 1 */
+#define ID_AA64PFR1_EL1_NMI_SHIFT		_AC(32, UL)
+#define ID_AA64PFR1_EL1_NMI_MASK		_AC(0xf, UL)
+#define ID_AA64PFR1_EL1_CSV2_SHIFT		_AC(28, UL)
+#define ID_AA64PFR1_EL1_CSV2_MASK		_AC(0xf, UL)
+#define ID_AA64PFR1_EL1_RNDR_SHIFT		_AC(24, UL)
+#define ID_AA64PFR1_EL1_RNDR_MASK		_AC(0xf, UL)
+#define ID_AA64PFR1_EL1_SME_SHIFT		_AC(20, UL)
+#define ID_AA64PFR1_EL1_SME_MASK		_AC(0xf, UL)
+#define ID_AA64PFR1_EL1_MPAM_SHIFT		_AC(16, UL)
+#define ID_AA64PFR1_EL1_MPAM_MASK		_AC(0xf, UL)
+#define ID_AA64PFR1_EL1_RAS_SHIFT		_AC(12, UL)
+#define ID_AA64PFR1_EL1_RAS_MASK		_AC(0xf, UL)
+#define ID_AA64PFR1_EL1_MTE_SHIFT		_AC(8, UL)
+#define ID_AA64PFR1_EL1_MTE_MASK		_AC(0xf, UL)
+#define ID_AA64PFR1_EL1_SSBS_SHIFT		_AC(4, UL)
+#define ID_AA64PFR1_EL1_SSBS_MASK		_AC(0xf, UL)
+#define ID_AA64PFR1_EL1_BT_SHIFT		_AC(0, UL)
+#define ID_AA64PFR1_EL1_BT_MASK			_AC(0xf, UL)
 
 /* MAIR_EL1: Memory Attribute Indirection Register */
 #define MAIR_EL1_ATTR_MASK(idx)			(_AC(0xff, UL) << ((idx) * 8))
@@ -212,6 +254,10 @@
 #define ID_AA64MMFR2_EL1_CNP_SHIFT		_AC(0, U)
 #define ID_AA64MMFR2_EL1_CNP_MASK		_AC(0xf, ULL)
 
+/* RGSR_EL1: Random Allocation Tag Seed Register */
+#define RGSR_EL1_SEED_SHIFT		_AC(8, U)
+#define RGSR_EL1_SEED_MASK		_AC(0xffff, UL)
+
 /* SCTLR_EL1: System Control Register */
 #define SCTLR_EL1_M_BIT			(_AC(1, UL) << 0)
 #define SCTLR_EL1_A_BIT			(_AC(1, UL) << 1)
@@ -247,12 +293,21 @@
 #define SCTLR_EL1_EnIA_BIT		(_AC(1, UL) << 31)
 #define SCTLR_EL1_BT0_BIT		(_AC(1, UL) << 35)
 #define SCTLR_EL1_BT1_BIT		(_AC(1, UL) << 36)
-#define SCTLR_EL1_BT_BIT		(_AC(1, UL) << 36)
+#define SCTLR_EL1_TCF0_SHIFT		_AC(38, UL)
+#define SCTLR_EL1_TCF0_MASK		_AC(2, UL)
+#define SCTLR_EL1_TCF_SHIFT		_AC(40, UL)
+#define SCTLR_EL1_TCF_MASK		_AC(2, UL)
+#define SCTLR_EL1_ATA0_BIT		(_AC(1, UL) << 42)
+#define SCTLR_EL1_ATA_BIT		(_AC(1, UL) << 43)
 #define SCTLR_EL1_DSSBS_BIT		(_AC(1, UL) << 44)
 
 /* TCR_EL1 - Translation Control Register */
 #define TCR_EL1_DS_SHIFT		59
 #define TCR_EL1_DS_BIT			(_AC(1, UL) << TCR_EL1_DS_SHIFT)
+#define TCR_EL1_TCMA1_BIT		(_AC(1, UL) << 58)
+#define TCR_EL1_TCMA0_BIT		(_AC(1, UL) << 57)
+#define TCR_EL1_TBI1_BIT		(_AC(1, UL) << 38)
+#define TCR_EL1_TBI0_BIT		(_AC(1, UL) << 37)
 #define TCR_EL1_ASID_SHIFT		36
 #define TCR_EL1_ASID_8			(_AC(0, UL) << TCR_EL1_ASID_SHIFT)
 #define TCR_EL1_ASID_16			(_AC(1, UL) << TCR_EL1_ASID_SHIFT)

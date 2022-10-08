@@ -23,10 +23,15 @@
 
 #include <uk/arch/lcpu.h>
 #include <uk/arch/types.h>
+#include <arm/cpu.h>
 #include <arm/traps.h>
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <gic/gic.h>
+
+#ifdef CONFIG_ARM64_FEAT_MTE
+#include <arm/arm64/mte.h>
+#endif /* CONFIG_ARM64_FEAT_MTE */
 
 /** GIC driver to call interrupt handler */
 extern struct _gic_dev *gic;
@@ -197,6 +202,11 @@ void trap_el1_sync(struct __regs *regs, __u64 far)
 void trap_el1_irq(void)
 {
 	UK_ASSERT(gic);
+
+#ifdef CONFIG_ARM64_FEAT_MTE
+	if (unlikely(mte_async_fault()))
+		UK_CRASH("EL1 async tag check fault\n");
+#endif /* CONFIG_ARM64_FEAT_MTE */
 
 	gic->ops.handle_irq();
 }
