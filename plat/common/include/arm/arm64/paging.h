@@ -152,6 +152,9 @@ pgarch_pte_create(__paddr_t paddr, unsigned long attr, unsigned int level,
 	case PAGE_ATTR_TYPE_DEVICE_GRE:
 		pte |= PTE_ATTR_IDX(DEVICE_GRE);
 		break;
+	case PAGE_ATTR_TYPE_NORMAL_WB_TAGGED:
+		pte |= PTE_ATTR_IDX(NORMAL_WB_TAGGED);
+		break;
 	default:
 		UK_ASSERT(0 && "Invalid memory type\n");
 	}
@@ -211,6 +214,9 @@ pgarch_attr_from_pte(__pte_t pte, unsigned int level __unused)
 		break;
 	case PTE_ATTR_IDX(DEVICE_GRE):
 		attr |= PAGE_ATTR_TYPE_DEVICE_GRE;
+		break;
+	case PAGE_ATTR_TYPE_NORMAL_WB_TAGGED:
+		attr |= PAGE_ATTR_TYPE_NORMAL_WB_TAGGED;
 		break;
 	default:
 		UK_ASSERT(0 && "Invalid memory type\n");

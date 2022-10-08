@@ -47,6 +47,8 @@
 #define MAIR_NORMAL_NC		0x44
 /* Outer + Inner Write-back non-transient */
 #define MAIR_NORMAL_WB		0xff
+/* Tagged Outer + Inner Write-back non-transient */
+#define	MAIR_NORMAL_WB_TAGGED	0xf0
 /* Outer + Inner Write-through non-transient */
 #define MAIR_NORMAL_WT		0xbb
 
@@ -60,8 +62,13 @@
 #define PTE_ATTR_DEVICE_nGnRnE					\
 	(PTE_ATTR_DEFAULT | PTE_ATTR_XN | PTE_ATTR_IDX(DEVICE_nGnRnE))
 
+#ifdef CONFIG_ARM64_FEAT_MTE
+#define PTE_ATTR_NORMAL_RW					\
+	(PTE_ATTR_DEFAULT | PTE_ATTR_XN | PTE_ATTR_IDX(NORMAL_WB_TAGGED))
+#else
 #define PTE_ATTR_NORMAL_RW					\
 	(PTE_ATTR_DEFAULT | PTE_ATTR_XN | PTE_ATTR_IDX(NORMAL_WB))
+#endif /* CONFIG_ARM64_FEAT_MTE */
 
 #define PTE_ATTR_NORMAL_RO					\
 	(PTE_ATTR_DEFAULT | PTE_ATTR_XN |			\
@@ -139,6 +146,7 @@
 #define NORMAL_NC		3
 #define NORMAL_WT		4
 #define NORMAL_WB		5
+#define NORMAL_WB_TAGGED	6
 
 #define MAIR_INIT_ATTR						\
 	(MAIR_EL1_ATTR(MAIR_DEVICE_nGnRnE, DEVICE_nGnRnE) |	\
@@ -146,7 +154,8 @@
 	 MAIR_EL1_ATTR(MAIR_DEVICE_GRE, DEVICE_GRE) |		\
 	 MAIR_EL1_ATTR(MAIR_NORMAL_NC, NORMAL_NC) |		\
 	 MAIR_EL1_ATTR(MAIR_NORMAL_WT, NORMAL_WT) |		\
-	 MAIR_EL1_ATTR(MAIR_NORMAL_WB, NORMAL_WB))
+	 MAIR_EL1_ATTR(MAIR_NORMAL_WB, NORMAL_WB) |		\
+	 MAIR_EL1_ATTR(MAIR_NORMAL_WB_TAGGED, NORMAL_WB_TAGGED))
 
 /* Mapping of TCR_EL1.IPS to number of bits */
 #ifdef __ASSEMBLY__
