@@ -33,6 +33,10 @@
 #include <arm/smccc.h>
 #include <uk/arch/limits.h>
 
+#ifdef CONFIG_HAVE_MEMTAG
+#include <uk/arch/memtag.h>
+#endif /* CONFIG_HAVE_MEMTAG */
+
 #ifdef CONFIG_PAGING
 #include <uk/plat/paging.h>
 #include <uk/plat/common/w_xor_x.h>
@@ -214,6 +218,7 @@ int _init_paging(void)
 	uint64_t start;
 	uint64_t len;
 	unsigned long frames;
+	unsigned long attr;
 	__sz free_memory, res_memory;
 
 	/* Assign all available memory beyond the boot stack
@@ -256,8 +261,9 @@ int _init_paging(void)
 				     _libkvmplat_cfg.heap.start;
 
 	frames = _libkvmplat_cfg.heap.len >> PAGE_SHIFT;
+	attr = PAGE_ATTR_PROT_RW | PAGE_ATTR_TYPE_NORMAL_WB_TAGGED;
 	rc = ukplat_page_map(&kernel_pt, _libkvmplat_cfg.heap.start,
-			     __PADDR_ANY, frames, PAGE_ATTR_PROT_RW, 0);
+			     __PADDR_ANY, frames, attr, 0);
 	if (unlikely(rc))
 		return rc;
 
@@ -304,6 +310,12 @@ void __no_pauth _libkvmplat_start(void *dtb_pointer)
 	enforce_w_xor_x();
 #endif /* CONFIG_ENFORCE_W_XOR_X */
 #endif /* CONFIG_PAGING */
+
+#ifdef CONFIG_HAVE_MEMTAG
+	ret = ukarch_memtag_init();
+	if (unlikely(ret))
+		UK_CRASH("Could not initialize MTE (%d)\n", ret);
+#endif /* CONFIG_HAVE_MEMTAG */
 
 #ifdef CONFIG_RTC_PL031
 	/* Initialize RTC */
