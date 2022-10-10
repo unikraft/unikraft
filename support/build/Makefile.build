@@ -31,8 +31,10 @@ $(eval $(call buildrule_libobj_multitarget,$(L),$(S))) \
 ); \
 $(if $(call qstrip,$($(call uc,$(L))_OBJS) $($(call uc,$(L))_OBJS-y) \
                    $($(call uc,$(L))_ALIBS) $($(call uc,$(L))_ALIBS-y)), \
+$(if $(call qstrip,$($(call uc,$(L))_OBJS) $($(call uc,$(L))_OBJS-y)), \
 $(eval $(call buildrule_olib,$(L))); \
 $(eval UK_OLIBS-y += $(call libname2olib,$(L))); \
+,); \
 $(eval UK_ALIBS-y += $($(call uc,$(L))_ALIBS) $($(call uc,$(L))_ALIBS-y)); \
 , \
 $(call verbose_info,Warning: '$(L)' has no sources or object files$(comma) ignoring...) \
@@ -57,8 +59,10 @@ $(eval $(call buildrule_libobj_multitarget,$(L),$(S))) \
 ); \
 $(if $(call qstrip,$($(call uc,$(L))_OBJS) $($(call uc,$(L))_OBJS-y) \
                    $($(call uc,$(L))_ALIBS) $($(call uc,$(L))_ALIBS-y)), \
+$(if $(call qstrip,$($(call uc,$(L))_OBJS) $($(call uc,$(L))_OBJS-y)), \
 $(eval $(call buildrule_olib,$(L))); \
 $(eval $(call uc,$(P))_OLIBS-y    += $(call libname2olib,$(L))); \
+,); \
 $(eval UK_ALIBS-y += $($(call uc,$(L))_ALIBS) $($(call uc,$(L))_ALIBS-y)); \
 , \
 $(call verbose_info,Warning: '$(L)' has no sources or object files$(comma) ignoring...) \
