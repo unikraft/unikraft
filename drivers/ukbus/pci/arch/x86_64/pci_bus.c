@@ -94,6 +94,7 @@ static inline int pci_driver_add_device(struct pci_driver *drv,
 	config_addr = (PCI_ENABLE_BIT)
 			| (addr->bus << PCI_BUS_SHIFT)
 			| (addr->devid << PCI_DEVICE_SHIFT);
+	dev->config_addr = config_addr;
 	PCI_CONF_READ(__u16, &dev->base, config_addr, IOBAR);
 	PCI_CONF_READ(__u8, &dev->irq, config_addr, IRQ);
 
@@ -238,4 +239,94 @@ int arch_pci_probe(struct uk_alloc *pha)
 	}
 
 	return 0;
+}
+
+
+int arch_pci_find_next_cap(struct pci_device *pci_dev, __u16 vndr_id,
+			   __u8 curr_cap, __u8 *cap);
+
+int arch_pci_find_cap(struct pci_device *pci_dev,
+		      __u16 target_cap_vndr, __u8 *cap)
+{
+	__u8 hdr_type, cap_vndr, nxt_cap, cap_ptr_offset;
+	uint16_t status = 0;
+
+	UK_ASSERT(pci_dev);
+
+	/* Check if capabilities are enabled */
+	PCI_CONF_READ_HEADER(uint16_t, &status, pci_dev->config_addr, STATUS);
+	if (!(status & PCI_CONF_CAP_STATUS_BIT))
+		return -1;
+
+	/* Depending on the header type, the capability pointer is found at
+	 * different offsets
+	 */
+	PCI_CONF_READ_HEADER(__u8, &hdr_type, pci_dev->config_addr, HEADER_TYPE);
+	switch (hdr_type & PCI_CONF_HEADER_TYPE_HEADER_TYPE_MASK) {
+	case PCI_CONF_HEADER_TYPE_STANDARD:
+	case PCI_CONF_HEADER_TYPE_PCI_TO_PCI:
+		cap_ptr_offset = PCI_CONF_CAP_POINTER;
+		break;
+	case PCI_CONF_HEADER_TYPE_CARDBUS_BRIDGE:
+		cap_ptr_offset = PCI_CONF_CARDBUS_BRIDGE_CAP_LIST_PTR;
+		break;
+	default:
+		return -1;
+	}
+
+	PCI_CONF_READ_OFFSET(__u8, &nxt_cap,
+			     pci_dev->config_addr, cap_ptr_offset,
+			     PCI_CONF_CAP_POINTER_SHFT,
+			     PCI_CONF_CAP_POINTER_MASK);
+	if (nxt_cap == 0 || nxt_cap == PCI_HEADER_END)
+		return -1;
+
+	PCI_CONF_READ_OFFSET(__u8, &cap_vndr,
+			     pci_dev->config_addr, nxt_cap,
+			     PCI_CAP_VENDOR_ID_SHIFT,
+			     PCI_CAP_VENDOR_ID_MASK);
+	if (cap_vndr == target_cap_vndr)
+		goto cap_exit;
+	if(0 == arch_pci_find_next_cap(pci_dev, target_cap_vndr,
+					nxt_cap, &nxt_cap))
+		goto cap_exit;
+
+	return -1;
+
+cap_exit:
+	if (cap != NULL)
+		*cap = nxt_cap;
+	return 0;
+}
+
+int arch_pci_find_next_cap(struct pci_device *pci_dev, uint16_t target_vndr,
+			   __u8 curr_cap, __u8 *cap)
+{
+	__u8 vndr, nxt_cap;
+
+	UK_ASSERT(pci_dev);
+	UK_ASSERT(curr_cap != 0);
+
+	PCI_CONF_READ_OFFSET(__u8, &nxt_cap, pci_dev->config_addr,
+			     curr_cap, PCI_CAP_NEXT_SHIFT, PCI_CAP_NEXT_MASK);
+	if (nxt_cap == 0 || nxt_cap == PCI_HEADER_END)
+		return -1;
+
+	do {
+		PCI_CONF_READ_OFFSET(__u8, &vndr,
+				     pci_dev->config_addr, nxt_cap,
+				     PCI_CAP_VENDOR_ID_SHIFT,
+				     PCI_CAP_VENDOR_ID_MASK);
+		if (vndr == target_vndr) {
+			if (cap != NULL)
+				*cap = nxt_cap;
+			return 0;
+		}
+		PCI_CONF_READ_OFFSET(__u8, &nxt_cap,
+				     pci_dev->config_addr, nxt_cap,
+				     PCI_CAP_NEXT_SHIFT,
+				     PCI_CAP_NEXT_MASK);
+	} while (nxt_cap != 0 && nxt_cap != PCI_HEADER_END);
+
+	return -1;
 }
