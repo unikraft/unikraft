@@ -414,7 +414,8 @@ int64_t uk_9p_write(struct uk_9pdev *dev, struct uk_9pfid *fid,
 	struct uk_9preq *req;
 	int64_t rc;
 
-	count = MIN(count, fid->iounit);
+	if (fid->iounit != 0)
+		count = MIN(count, fid->iounit);
 	count = MIN(count, dev->msize - 23);
 
 	uk_pr_debug("TWRITE fid %u offset %lu count %u\n", fid->fid,
