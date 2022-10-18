@@ -72,6 +72,7 @@ static inline int pci_driver_add_device(struct pci_driver *drv,
 	struct pci_device *dev;
 	__u32 config_addr;
 	int ret;
+	__u8 cap_offset;
 
 	UK_ASSERT(drv != NULL);
 	UK_ASSERT(drv->add_dev != NULL);
@@ -97,6 +98,15 @@ static inline int pci_driver_add_device(struct pci_driver *drv,
 	dev->config_addr = config_addr;
 	PCI_CONF_READ(__u16, &dev->base, config_addr, IOBAR);
 	PCI_CONF_READ(__u8, &dev->irq, config_addr, IRQ);
+
+	/* Search for the MSI-X capability, and store it in the device if it
+	 * exists. The other MSI-X related code will use this field to quickly
+	 * access the fields via this.
+	 */
+	if (arch_pci_find_cap(dev, PCI_CAP_MSIX, &cap_offset) == 0)
+		dev->msix_cap_offset = cap_offset;
+	else
+		dev->msix_cap_offset = 0;
 
 	ret = drv->add_dev(dev);
 	if (ret < 0) {
