@@ -250,6 +250,32 @@ int arch_pci_find_next_cap(struct pci_device *pci_dev, __u16 vndr_id,
 		*(ret) = (type) _conf_data;				\
 	} while (0)
 
+/**
+ * Write a register in the configuration space header, located at @p a,
+ * identified by @p s.
+ *
+ * @param a
+ *   Configuration space header address
+ * @param s
+ *   Macro suffix for the register-specific offset, mask and shift
+ * @param value
+ *   The value to write
+ * @param type
+ *   Register type
+ */
+#define PCI_CONF_WRITE_HEADER(type, a, s, value)				\
+	do {									\
+		__u32 _conf_data;						\
+		outl(PCI_CONFIG_ADDR, (a) | PCI_CONF_##s);			\
+		_conf_data = inl(PCI_CONFIG_DATA);				\
+										\
+                _conf_data &= ~(PCI_CONF_##s##_MASK << PCI_CONF_##s##_SHFT);	\
+                _conf_data |=							\
+		    ((value) & PCI_CONF_##s##_MASK) << PCI_CONF_##s##_SHFT;	\
+		outl(PCI_CONFIG_ADDR, (a) | PCI_CONF_##s);			\
+		outl(PCI_CONFIG_DATA, _conf_data);				\
+	} while (0)
+
 #define PCI_REGISTER_DRIVER(b)                  \
 	_PCI_REGISTER_DRIVER(__LIBNAME__, b)
 
@@ -418,6 +444,9 @@ static struct pci_bus_handler ph __unused;
 #define PCI_INTERRUPT_PIN	0x3d	/* 8 bits */
 #define PCI_MIN_GNT		0x3e	/* 8 bits */
 #define PCI_MAX_LAT		0x3f	/* 8 bits */
+
+/* PCI capabilities */
+#define PCI_CAP_MSIX		0x11
 
 struct pci_driver *pci_find_driver(struct pci_device_id *id);
 
