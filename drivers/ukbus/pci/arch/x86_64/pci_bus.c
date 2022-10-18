@@ -72,6 +72,7 @@ static inline int pci_driver_add_device(struct pci_driver *drv,
 	struct pci_device *dev;
 	uint32_t config_addr;
 	int ret;
+	uint8_t cap_offset;
 
 	UK_ASSERT(drv != NULL);
 	UK_ASSERT(drv->add_dev != NULL);
@@ -97,6 +98,11 @@ static inline int pci_driver_add_device(struct pci_driver *drv,
 	dev->config_addr = config_addr;
 	PCI_CONF_READ(uint16_t, &dev->base, config_addr, IOBAR);
 	PCI_CONF_READ(uint8_t, &dev->irq, config_addr, IRQ);
+
+	if (arch_pci_find_cap(dev, PCI_CAP_MSIX, &cap_offset) == 0)
+		dev->msix_cap_offset = cap_offset;
+	else
+		dev->msix_cap_offset = 0;
 
 	ret = drv->add_dev(dev);
 	if (ret < 0) {

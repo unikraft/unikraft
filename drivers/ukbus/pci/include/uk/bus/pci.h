@@ -162,6 +162,8 @@ struct pci_device {
 	unsigned long irq;
 	/* Memory address of the device configuration space */
 	uint32_t config_addr;
+	/* Offset of the MSI-X capability */
+	uint8_t msix_cap_offset;
 };
 
 int arch_pci_find_cap(struct pci_device *pci_dev, uint16_t vndr_id,
@@ -311,6 +313,10 @@ static struct pci_bus_handler ph __unused;
 #define PCI_CONF_SECONDARY_BUS          (0x18)
 #define PCI_CONF_SECONDARY_BUS_SHFT     (0)
 #define PCI_CONF_SECONDARY_BUS_MASK     (0xFF00)
+
+#define PCI_CONF_REVISION_ID		(0x08)
+#define PCI_CONF_REVISION_ID_SHFT	(0)
+#define PCI_CONF_REVISION_ID_MASK	(0xf)
 
 #define PCI_HEADER_TYPE_MSB_MASK	(0x80)
 #define PCI_CONF_HEADER_TYPE		(0x0C)
