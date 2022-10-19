@@ -52,9 +52,18 @@
  */
 
 #include <string.h>
+#include <inttypes.h>
 #include <uk/print.h>
 #include <uk/plat/common/cpu.h>
 #include <uk/bus/pci.h>
+#include <uk/plat/io.h>
+#include <uk/arch/limits.h>
+#ifdef CONFIG_PAGING
+#include <uk/plat/paging.h>
+#include <uk/falloc.h>
+#else
+#include <uk/alloc.h>
+#endif
 
 extern int arch_pci_probe(struct uk_alloc *pha);
 
@@ -158,6 +167,273 @@ void _pci_register_driver(struct pci_driver *drv)
 	uk_list_add_tail(&drv->list, &ph.drv_list);
 }
 
+static int pci_get_bar(struct pci_device *dev, uint8_t idx, __paddr_t *bar_out,
+		       uint8_t *is_64bit)
+{
+	uint32_t cfg, offset, bar_low, bar_high;
+	__paddr_t base;
+
+	UK_ASSERT(dev);
+	UK_ASSERT(bar_out);
+	UK_ASSERT(idx < 6);
+
+	cfg = dev->config_addr;
+	offset = PCI_BASE_ADDRESS_0 + idx * 4;
+
+	PCI_CONF_READ_OFFSET(uint32_t, &bar_low, cfg, offset, 0, UINT32_MAX);
+	if (bar_low & 0x1)
+		return ENOTSUP;
+
+	base = 0;
+	switch ((bar_low >> 1) & 0x3) {
+	case 0x2:
+		/* 64-bit base address */
+		PCI_CONF_READ_OFFSET(uint32_t, &bar_high, cfg, offset + 4, 0,
+				     UINT32_MAX);
+		base = (__paddr_t)bar_high << 32;
+		/* fallthrough */
+	case 0x0:
+		/* 32-bit base address */
+		base |= (__paddr_t)bar_low & ~0xf;
+		break;
+	default:
+		return EINVAL;
+	}
+
+	if (is_64bit != NULL)
+		*is_64bit = ((bar_low >> 1) & 0x3) == 0x2;
+	*bar_out = base;
+	return 0;
+}
+
+static int pci_set_bar(struct pci_device *dev, uint8_t idx, __paddr_t value)
+{
+	uint32_t cfg, offset, bar_low;
+
+	UK_ASSERT(dev);
+	UK_ASSERT(idx < 6);
+
+	cfg = dev->config_addr;
+	offset = PCI_BASE_ADDRESS_0 + idx * 4;
+
+	PCI_CONF_READ_OFFSET(uint32_t, &bar_low, cfg,
+			     offset, 0, UINT32_MAX);
+	if (bar_low & 0x1)
+		return ENOTSUP;
+
+	switch ((bar_low >> 1) & 0x3) {
+	case 0x2:
+		/* 64-bit base address */
+		PCI_CONF_WRITE_OFFSET(uint32_t, cfg, offset + 4, 0, UINT32_MAX,
+				      value >> 32);
+		/* fallthrough */
+	case 0x0:
+		/* 32-bit base address */
+		PCI_CONF_WRITE_OFFSET(uint32_t, cfg, offset, 0, UINT32_MAX,
+				      value & UINT32_MAX);
+		break;
+	default:
+		return EINVAL;
+	}
+
+	return 0;
+}
+
+static int pci_bar_phys_region(struct pci_device *pci_dev, uint32_t idx,
+			__paddr_t *addr_out, size_t *size_out)
+{
+	uint8_t is_64bit;
+	uint64_t saved_value, size;
+	int rc;
+
+	UK_ASSERT(pci_dev);
+	UK_ASSERT(addr_out);
+	UK_ASSERT(size_out);
+	UK_ASSERT(idx < 6);
+
+	rc = pci_get_bar(pci_dev, idx, &saved_value, &is_64bit);
+	if (rc)
+		return rc;
+
+	/* Write all ones to base address register and read actual value back */
+	rc = pci_set_bar(pci_dev, idx, UINT64_MAX);
+	if (rc)
+		return rc;
+	rc = pci_get_bar(pci_dev, idx, &size, NULL);
+	if (rc)
+		return rc;
+
+	/* Hardwired to zero means that it's not there. We also don't have to
+	 * restore the old value in that case.
+	 */
+	if (size == 0)
+		return -ENODEV;
+
+	/* Restore old value */
+	rc = pci_set_bar(pci_dev, idx, saved_value);
+	if (rc)
+		return rc;
+
+	*addr_out = saved_value;
+	if (is_64bit)
+		*size_out = ~size + 1;
+	else
+		*size_out = ~((uint32_t)size) + 1;
+
+	return 0;
+}
+
+/**
+ * Try to allocate the physical memory at @a paddr. This will allocate memory at
+ * another address if the region may be already in use.
+ * @param[inout] paddr the start of the physical memory range. Will be set the
+ *		       address to be used.
+ * @param pages the count of pages to allocate.
+ * @returns zero if the allocation at the specified address was successful, 1
+ *	    if space at a different address was allocated, and a negative errno
+ *	    in case the allocation was not successful.
+ */
+static int phys_alloc(__paddr_t *paddr, __sz pages)
+{
+#ifdef CONFIG_PAGING
+	struct uk_pagetable *pt;
+	int rc;
+
+	pt = ukplat_pt_get_active();
+
+	/* Allocate phys frames for the area. But don't allow that for NULL
+	 * addresses
+	 */
+	if (*paddr != 0)
+		rc = pt->fa->falloc(pt->fa, paddr, pages, 0);
+	else
+		rc = -ENOMEM;
+
+	if (rc == -ENOMEM) {
+		/* Range is already occupied. Move the PCI device */
+		*paddr = __PADDR_ANY;
+		rc = pt->fa->falloc(pt->fa, paddr, pages, 0);
+		if (rc)
+			return rc;
+		return 1;
+	} else if (rc && rc != -EFAULT) {
+		/* Some other error happened (and that error was not that the
+		 * range was outside the frame allocator range)
+		 */
+		return rc;
+	}
+
+	return 0;
+#else
+	void *a;
+
+	/* We have no idea what is used without a frame allocator, therefore
+	 * always allocate memory
+	 */
+	a = uk_malloc(uk_alloc_get_default(), pages * __PAGE_SIZE);
+	if (a == NULL)
+		return -ENOMEM;
+	*paddr = (__paddr_t)a;
+	return 1;
+#endif
+}
+
+static int physmem_free(__paddr_t paddr, __sz pages)
+{
+#ifdef CONFIG_PAGING
+	struct uk_pagetable *pt;
+
+	pt = ukplat_pt_get_active();
+	return pt->fa->ffree(pt->fa, paddr, pages);
+#else
+	(void)pages;
+	uk_free(uk_alloc_get_default(), (void *)paddr);
+	return 0;
+#endif
+}
+
+/* FIXME: We may have to track the maps, because for example msix_* needs an
+ * accessible MSI-X table.
+ */
+
+int pci_map_bar(struct pci_device *dev, __u8 idx, int attr,
+		struct pci_bar_memory *mem)
+{
+	__paddr_t bar_phys;
+	__vaddr_t bar_virt;
+	__sz bar_size;
+	__sz bar_pages;
+	int rc;
+#ifdef CONFIG_PAGING
+	struct uk_pagetable *pt;
+#endif
+
+	UK_ASSERT(mem);
+
+	/* Fetch BAR address and size of the memory region */
+	rc = pci_bar_phys_region(dev, idx, &bar_phys, &bar_size);
+	if (rc)
+		return rc;
+	bar_pages = DIV_ROUND_UP(bar_size, __PAGE_SIZE);
+
+	rc = phys_alloc(&bar_phys, bar_pages);
+	if (rc < 0)
+		return rc;
+	if (rc == 1) {
+		rc = pci_set_bar(dev, idx, bar_phys);
+		if (rc)
+			return rc;
+	}
+
+	/* Map base address memory */
+#ifdef CONFIG_PAGING
+	/* TODO: Allocate virtual address space range */
+	bar_virt = bar_phys;
+
+	pt = ukplat_pt_get_active();
+	uk_pr_debug("Mapping PCI device memory in virtual address space\n");
+	rc = ukplat_page_map(pt, bar_virt, bar_phys, bar_pages, attr, 0);
+	if (unlikely(rc)) {
+		pt->fa->ffree(pt->fa, bar_phys, bar_pages);
+		return rc;
+	}
+#else
+	(void)attr;
+	/* Without paging we can just use the physical address */
+	bar_virt = bar_phys;
+#endif
+
+	uk_pr_debug("Mapped PCI BAR%d to addresses [%#" PRIx64 "-%#" PRIx64 ")\n",
+		    idx, bar_virt, bar_virt + bar_size);
+	mem->start = (void *)bar_virt;
+	mem->size = bar_size;
+
+	return 0;
+}
+
+int pci_unmap_bar(struct pci_device *dev __unused, __u8 idx __unused,
+		  struct pci_bar_memory *mem)
+{
+	int rc = 0;
+	size_t bar_pages;
+#ifdef CONFIG_PAGING
+	struct uk_pagetable *pt;
+#endif
+
+	/* TODO: Do some additional checks/asserts using dev+idx */
+	bar_pages = DIV_ROUND_UP(mem->size, __PAGE_SIZE);
+
+#ifdef CONFIG_PAGING
+	pt = ukplat_pt_get_active();
+	rc = ukplat_page_unmap(pt, (__vaddr_t)mem->start, bar_pages, 0);
+#endif
+	physmem_free(ukplat_virt_to_phys(mem->start), bar_pages);
+
+	mem->start = NULL;
+	mem->size = 0;
+
+	return rc;
+}
 
 /* Register this bus driver to libukbus:
  */
