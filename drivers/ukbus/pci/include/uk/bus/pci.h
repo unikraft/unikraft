@@ -65,6 +65,7 @@
 #define __UK_BUS_PCI_H__
 
 #include <stddef.h>
+#include <uk/arch/types.h>
 #include <uk/bus.h>
 #include <uk/alloc.h>
 #include <uk/ctors.h>
@@ -148,6 +149,16 @@ struct pci_driver {
 enum pci_device_state {
 	PCI_DEVICE_STATE_RESET = 0,
 	PCI_DEVICE_STATE_RUNNING
+};
+
+/**
+ * @brief Description of a mapped BAR.
+ */
+struct pci_bar_memory {
+	/**< Start address of memory region */
+	void *start;
+	/**< Size of the memory region */
+	size_t size;
 };
 
 struct pci_device {
@@ -275,6 +286,36 @@ int arch_pci_find_next_cap(struct pci_device *pci_dev, __u16 vndr_id,
                 _conf_data |=							\
 		    ((value) & PCI_CONF_##s##_MASK) << PCI_CONF_##s##_SHFT;	\
 		outl(PCI_CONFIG_ADDR, (a) | PCI_CONF_##s);			\
+		outl(PCI_CONFIG_DATA, _conf_data);				\
+	} while (0)
+
+/**
+ * Same as PCI_CONF_WRITE_HEADER but allows for register offset, shift
+ * and mask values to be set on runtime, instead of by a macro.
+ *
+ * @param a
+ *   Configuration space header address
+ * @param offset
+ *   The offset of the register in the configuration space
+ * @param shift
+ *   The bit position of the value
+ * @param mask
+ *   The mask used to select the bits after the shift
+ * @param value
+ *   The value to write
+ * @param type
+ *   Register type
+ */
+#define PCI_CONF_WRITE_OFFSET(type, a, offset, shift, mask, value)		\
+	do {									\
+		__u32 _conf_data;						\
+		outl(PCI_CONFIG_ADDR, (a) | (offset));				\
+		_conf_data = inl(PCI_CONFIG_DATA);				\
+										\
+                _conf_data &= ~((mask) << (shift));				\
+                _conf_data |=							\
+		    ((value) & (mask)) << (shift);				\
+		outl(PCI_CONFIG_ADDR, (a) | (offset));				\
 		outl(PCI_CONFIG_DATA, _conf_data);				\
 	} while (0)
 
@@ -461,6 +502,38 @@ int pci_generic_config_read(__u8 bus, __u8 devfn,
 
 int pci_generic_config_write(__u8 bus, __u8 devfn,
 			     int where, int size, __u32 val);
+/**
+ * Create a memory mapping for a memory BAR
+ *
+ * @param dev
+ *   The device to act on
+ * @param idx
+ *   The index of the BAR register
+ * @param mem[out]
+ *   Description of the mapped memory
+ * @param attr
+ *   The page attributes to use for mapping the memory. See the PAGE_ATTR_PROT_*
+ *   constants.
+ * @return
+ *   0 if the memory was mapped successfully, a non-zero value if an error
+ *   occurred.
+ */
+int pci_map_bar(struct pci_device *dev, __u8 idx, int attr,
+		struct pci_bar_memory *mem);
+
+/**
+ * Unmap a previously mapped memory BAR
+ *
+ * @param dev
+ *   The device to act on
+ * @param idx
+ *   The index of the BAR register
+ * @param mem[in]
+ *   Description of the mapped memory
+ * @return 0 if the memory was unmapped successfully, a non-zero value if an
+ *   error occurred.
+ */
+int pci_unmap_bar(struct pci_device *dev, __u8 idx, struct pci_bar_memory *mem);
 
 #ifdef __cplusplus
 }
