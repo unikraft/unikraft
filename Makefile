@@ -582,7 +582,7 @@ LD		:= $(CONFIG_CROSS_COMPILE)$(CONFIG_COMPILER)
 CC		:= $(CONFIG_CROSS_COMPILE)$(CONFIG_COMPILER)
 CPP		:= $(CC)
 CXX		:= $(CPP)
-GOC		:= $(CONFIG_CROSS_COMPILE)gccgo-7
+GOC		:= $(CONFIG_CROSS_COMPILE)gccgo
 # We use rustc because the gcc frontend is experimental and missing features such
 # as borrowing checking
 ifneq ("$(origin LLVM_TARGET_ARCH)","undefined")
