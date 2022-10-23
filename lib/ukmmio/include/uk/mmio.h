@@ -9,7 +9,7 @@ extern "C" {
 #endif
 
 struct uk_mmio_device {
-	int id;
+	unsigned int id;
 	UK_TAILQ_ENTRY(struct uk_mmio_device) _list;
 
 	__u64 size;

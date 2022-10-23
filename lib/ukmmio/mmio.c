@@ -101,6 +101,6 @@ int uk_mmio_add_dev(char *device)
 	dev->dev_id = plat_dev_id;
 	UK_TAILQ_INSERT_TAIL(&uk_mmio_device_list, dev, _list);
 
-	uk_pr_info("New mmio device at %#x of size %#x and irq %u\n", base_addr, size, irq);
+	uk_pr_info("New mmio device at %#lx of size %#lx and irq %lu\n", base_addr, size, irq);
 	return 0;
 }
