@@ -531,11 +531,11 @@ static int virtio_netdev_rxq_dequeue(struct uk_netdev_rx_queue *rxq,
 		*netbuf = NULL;
 		return rxq->nb_desc;
 	}
-	//if (unlikely((len < VIRTIO_HDR_LEN + UK_ETH_HDR_UNTAGGED_LEN)
-	//	     || (len > VIRTIO_PKT_BUFFER_LEN))) {
-	//	uk_pr_err("Received invalid packet size: %"__PRIu32"\n", len);
-	//	return -EINVAL;
-	//}
+	if (unlikely((len < VIRTIO_HDR_LEN + UK_ETH_HDR_UNTAGGED_LEN)
+		     || (len > VIRTIO_PKT_BUFFER_LEN))) {
+		uk_pr_err("Received invalid packet size: %"__PRIu32"\n", len);
+		return -EINVAL;
+	}
 
 	/**
 	 * Copy virtio header flags to netbuf
