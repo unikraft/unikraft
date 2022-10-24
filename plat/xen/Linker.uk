@@ -12,6 +12,9 @@ XEN_RAW_IMAGE   := $(BUILD_DIR)/$(CONFIG_UK_NAME)_xen-$(CONFIG_UK_ARCH)
 endif
 ifeq (arm,$(CONFIG_UK_ARCH))
 XEN_IMAGE       := $(XEN_RAW_IMAGE).elf
+else ifeq (arm64,$(CONFIG_UK_ARCH))
+XEN_RAW_IMAGE   := $(BUILD_DIR)/$(CONFIG_UK_NAME)_xen-$(CONFIG_UK_ARCH)
+XEN_IMAGE       := $(XEN_RAW_IMAGE).elf
 else
 XEN_IMAGE       := $(XEN_RAW_IMAGE)
 endif
@@ -37,7 +40,7 @@ $(XEN_DEBUG_IMAGE): $(XEN_ALIBS) $(XEN_ALIBS-y) $(XEN_OLIBS) $(XEN_OLIBS-y) \
 			-Wl$(comma)--end-group \
 			-o $(XEN_IMAGE).ld.o)
 	$(call build_cmd,OBJCOPY,,$(XEN_IMAGE).o,\
-		$(OBJCOPY) -w -G xenos_* -G _libxenplat_start \
+		$(OBJCOPY) -w -G xenos_* -G _libxenplat_zimageboot \
 			$(XEN_IMAGE).ld.o $(XEN_IMAGE).o)
 	$(call build_cmd,LD,,$@,\
 	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(XEN_LDFLAGS) $(XEN_LDFLAGS-y) \
@@ -60,6 +63,9 @@ $(XEN_IMAGE): $(XEN_DEBUG_IMAGE)
 ifeq (arm,$(CONFIG_UK_ARCH))
 $(XEN_RAW_IMAGE): $(XEN_IMAGE)
 	$(call build_cmd,OBJCOPY,,$@,$(OBJCOPY) -O binary $< $@)
+else ifeq (arm64,$(CONFIG_UK_ARCH))
+$(XEN_RAW_IMAGE): $(XEN_IMAGE)
+	$(call build_cmd,OBJCOPY,,$@,$(OBJCOPY) -O binary $< $@)
 endif
 
 $(XEN_IMAGE).sym: $(XEN_DEBUG_IMAGE)
@@ -68,7 +74,9 @@ $(XEN_IMAGE).sym: $(XEN_DEBUG_IMAGE)
 ifeq (arm,$(CONFIG_UK_ARCH))
 $(XEN_RAW_IMAGE).gz: $(XEN_RAW_IMAGE)
 	$(call build_cmd,GZ,,$@, $(GZIP) -f -9 -c $< >$@)
-
+else ifeq (arm64,$(CONFIG_UK_ARCH))
+$(XEN_RAW_IMAGE).gz: $(XEN_RAW_IMAGE)
+	$(call build_cmd,GZ,,$@, $(GZIP) -f -9 -c $< >$@)
 else
 $(XEN_IMAGE).gz: $(XEN_IMAGE)
 	$(call build_cmd,GZ,,$@, $(GZIP) -f -9 -c $< >$@)
@@ -82,6 +90,9 @@ UK_IMAGES-y                           += $(XEN_IMAGE)
 UK_IMAGES-$(CONFIG_OPTIMIZE_SYMFILE)  += $(XEN_IMAGE).sym
 
 ifeq (arm,$(CONFIG_UK_ARCH))
+UK_IMAGES-y                           += $(XEN_RAW_IMAGE)
+UK_IMAGES-$(CONFIG_OPTIMIZE_COMPRESS) += $(XEN_RAW_IMAGE).gz
+else ifeq (arm64,$(CONFIG_UK_ARCH))
 UK_IMAGES-y                           += $(XEN_RAW_IMAGE)
 UK_IMAGES-$(CONFIG_OPTIMIZE_COMPRESS) += $(XEN_RAW_IMAGE).gz
 else

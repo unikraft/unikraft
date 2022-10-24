@@ -41,8 +41,10 @@ typedef struct __pte pte_t;
 
 typedef __s64 quad_t;
 typedef __u64 u_quad_t;
+#ifndef CONFIG_ARCH_ARM_64
 typedef __u64 uintmax_t;
 typedef __s64 intmax_t;
+#endif
 
 typedef __sptr intptr_t;
 typedef __uptr uintptr_t;
@@ -56,21 +58,21 @@ typedef unsigned long u_long;
 #include <xen/event_channel.h>
 #include <xen-arm/traps.h>
 
-#define PAGE_SHIFT __PAGE_SHIFT
-#define PAGE_MASK  __PAGE_MASK
-#define PAGE_SIZE  __PAGE_SIZE
-
 #define STACK_SIZE_PAGE_ORDER __STACK_SIZE_PAGE_ORDER
 #define STACK_SIZE            __STACK_SIZE
 
 void arch_fini(void);
 void timer_handler(evtchn_port_t port, struct pt_regs *regs, void *ign);
 
+#define BUG() do { asm volatile (".word 0xe7f000f0\n"); } while (1)
+
 #define smp_processor_id() 0
 
 extern void *HYPERVISOR_dtb;
 extern shared_info_t *HYPERVISOR_shared_info;
 
+
+#if defined(__arm__)
 // disable interrupts
 static inline void local_irq_disable(void)
 {
@@ -83,19 +85,19 @@ static inline void local_irq_enable(void)
 	__asm__ __volatile__("cpsie i" ::: "memory");
 }
 
-#define local_irq_save(x)                                                      \
-	{                                                                      \
-		__asm__ __volatile__("mrs %0, cpsr;cpsid i"                    \
+#define local_irq_save(x)                                      \
+	{                                                          \
+		__asm__ __volatile__("mrs %0, cpsr;cpsid i"            \
 				     : "=r"(x)::"memory");                     \
 	}
 
-#define local_irq_restore(x)                                                   \
-	{                                                                      \
+#define local_irq_restore(x)                                           \
+	{                                                                  \
 		__asm__ __volatile__("msr cpsr_c, %0" ::"r"(x) : "memory");    \
 	}
 
-#define local_save_flags(x)                                                    \
-	{                                                                      \
+#define local_save_flags(x)                                            \
+	{                                                                  \
 		__asm__ __volatile__("mrs %0, cpsr" : "=r"(x)::"memory");      \
 	}
 

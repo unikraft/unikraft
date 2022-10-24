@@ -26,9 +26,17 @@
 #include <uk/plat/lcpu.h>
 #include <uk/semaphore.h>
 #include <common/gnttab.h>
+#if defined(__i386__) || defined(__x86_64__)
 #include <xen-x86/mm.h>
 
 #include <xen-x86/hypercall.h>
+#elif defined(__aarch64__)
+#include <xen-arm/mm.h>
+
+#include <xen-arm/hypercall.h>
+#else
+#error "Unsupported architecture"
+#endif
 
 /* NR_GRANT_FRAMES must be less than or equal to that configured in Xen */
 #define NR_GRANT_FRAMES         4
