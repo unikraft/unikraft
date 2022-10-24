@@ -1,17 +1,18 @@
 menuconfig PLAT_XEN
        bool "Xen guest image"
        default n
-       depends on ((ARCH_X86_32 && !HAVE_SMP) || (ARCH_X86_64 && !HAVE_SMP) || (ARCH_ARM_32 && !HAVE_SMP))
-       depends on ((ARCH_X86_32 && !HAVE_SYSCALL) || (ARCH_X86_64 && !HAVE_SYSCALL) || (ARCH_ARM_32 && !HAVE_SYSCALL))
+       depends on ((ARCH_X86_32 && !HAVE_SMP) || (ARCH_X86_64 && !HAVE_SMP) || (ARCH_ARM_32 && !HAVE_SMP) || (ARCH_ARM_64 && !HAVE_SMP))
+       depends on ((ARCH_X86_32 && !HAVE_SYSCALL) || (ARCH_X86_64 && !HAVE_SYSCALL) || (ARCH_ARM_32 && !HAVE_SYSCALL) || (ARCH_ARM_64 && !HAVE_SYSCALL))
        depends on !HAVE_PAGING
        imply XEN_PV_BUILD_P2M
        select LIBUKDEBUG
        select LIBNOLIBC if !HAVE_LIBC
-       select HAVE_FDT if ARCH_ARM32
-       select LIBFDT if ARCH_ARM_32
+       select LIBFDT if (ARCH_ARM_32 || ARCH_ARM_64)
        select XEN_DBGEMERGENCY if ARCH_ARM_32
        select LIBUKRELOC if OPTIMIZE_PIE
-       help
+       select LIBUKOFW if ARCH_ARM_64
+       select HAVE_INTCTLR
+      help
                 Create a Unikraft image that runs as a Xen guest
 
 if (PLAT_XEN)
@@ -31,13 +32,13 @@ menu "Console Options"
 config XEN_KERNEL_HV_CONSOLE
 	bool "Hypervisor console for kernel prints"
 	default y
-	depends on ARCH_X86_64
+	depends on (ARCH_X86_64 || ARCH_ARM_64)
 	help
 		Send kernel messages to the hypervisor console.
 
 config XEN_KERNEL_EMG_CONSOLE
 	bool "Emergency console for kernel prints"
-	default y if ARCH_ARM_32
+	default y if (ARCH_ARM_32 || ARCH_ARM_64)
 	default n
 	help
 		Send kernel messages to the emergency console.
@@ -45,13 +46,13 @@ config XEN_KERNEL_EMG_CONSOLE
 config XEN_DEBUG_HV_CONSOLE
 	bool "Hypervisor console for debug prints"
 	default y
-	depends on ARCH_X86_64
+	depends on (ARCH_X86_64 || ARCH_ARM_64)
 	help
 		Send debug messages to the hypervisor console.
 
 config XEN_DEBUG_EMG_CONSOLE
 	bool "Emergency console for debug prints"
-	default y if ARCH_ARM_32
+	default y if (ARCH_ARM_32 || ARCH_ARM_64)
 	default n
         help
 		Send debug messages to the emergency console.
@@ -69,7 +70,7 @@ config XEN_GNTTAB
 	bool "Grant table support"
 	default y if XEN_PV
 	default n
-	depends on (ARCH_X86_64)
+	depends on (ARCH_X86_64 || ARCH_ARM_64)
 	select LIBUKALLOC
 	select LIBUKLOCK
 	select LIBUKLOCK_SEMAPHORE

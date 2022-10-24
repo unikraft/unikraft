@@ -31,6 +31,9 @@
 #if defined(__x86_64__)
 #include <xen/arch-x86_64.h>
 #define __CONST(x) x ## UL
+#elif defined(__aarch64__)
+#include <xen/arch-arm.h>
+#define __CONST(x) x##UL
 #else
 #error "Unsupported architecture"
 #endif

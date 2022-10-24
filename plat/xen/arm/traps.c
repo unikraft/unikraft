@@ -41,7 +41,95 @@ extern handler fault_prefetch_call;
 extern handler fault_prefetch_abort;
 extern handler fault_data_abort;
 
-void dump_registers(int *saved_registers __unused)
+#if defined(__aarch64__)
+void dump_register(int *saved_registers __unused)
 {
 	/* TODO: Point to ukarch_dump_registers */
 }
+
+extern void (*IRQ_handler)(void);
+
+/*
+ * TODO
+ */
+void stack_walk(void)
+{
+	uk_pr_info("stack walk\n");
+	while (1)
+		;
+}
+
+/*
+ * TODO
+ */
+void do_bad_mode(struct pt_regs *regs, int reason)
+{
+	BUG();
+}
+
+void do_irq(struct pt_regs *regs)
+{
+	if (IRQ_handler)
+		IRQ_handler();
+}
+
+/*
+ * TODO
+ */
+void do_sync(struct pt_regs *regs)
+{
+	uint64_t esr, far;
+
+	uk_pr_info("*** Sync exception at SP_EL0 = %lx ***\n", regs->sp_el0);
+	uk_pr_info("Thread state:\n");
+	uk_pr_info("\tX0  = 0x%016lx X1  = 0x%016lx\n", regs->x[0], regs->x[1]);
+	uk_pr_info("\tX2  = 0x%016lx X3  = 0x%016lx\n", regs->x[2], regs->x[3]);
+	uk_pr_info("\tX4  = 0x%016lx X5  = 0x%016lx\n", regs->x[4], regs->x[5]);
+	uk_pr_info("\tX6  = 0x%016lx X7  = 0x%016lx\n", regs->x[6], regs->x[7]);
+	uk_pr_info("\tX8  = 0x%016lx X9  = 0x%016lx\n", regs->x[8], regs->x[9]);
+	uk_pr_info("\tX10 = 0x%016lx X11 = 0x%016lx\n",
+			   regs->x[10], regs->x[11]);
+	uk_pr_info("\tX12 = 0x%016lx X13 = 0x%016lx\n",
+			   regs->x[12], regs->x[13]);
+	uk_pr_info("\tX14 = 0x%016lx X15 = 0x%016lx\n",
+			   regs->x[14], regs->x[15]);
+	uk_pr_info("\tX16 = 0x%016lx X17 = 0x%016lx\n",
+			   regs->x[16], regs->x[17]);
+	uk_pr_info("\tX18 = 0x%016lx X19 = 0x%016lx\n",
+			   regs->x[18], regs->x[19]);
+	uk_pr_info("\tX20 = 0x%016lx X21 = 0x%016lx\n",
+			   regs->x[20], regs->x[21]);
+	uk_pr_info("\tX22 = 0x%016lx X23 = 0x%016lx\n",
+			   regs->x[22], regs->x[23]);
+	uk_pr_info("\tX24 = 0x%016lx X25 = 0x%016lx\n",
+			   regs->x[24], regs->x[25]);
+	uk_pr_info("\tX26 = 0x%016lx X27 = 0x%016lx\n",
+			   regs->x[26], regs->x[27]);
+	uk_pr_info("\tX28 = 0x%016lx X29 = 0x%016lx\n",
+			   regs->x[28], regs->x[19]);
+	uk_pr_info("\tX30 (lr) = 0x%016lx\n", regs->lr);
+	uk_pr_info("\tsp  = 0x%016lx\n", regs->sp);
+	uk_pr_info("\tpstate  = 0x%016lx\n", regs->spsr_el1);
+
+	__asm__ __volatile__("mrs %0, esr_el1":"=r"(esr));
+	__asm__ __volatile__("mrs %0, far_el1":"=r"(far));
+	uk_pr_info("\tesr_el1 = %08lx\n", esr);
+	uk_pr_info("\tfar_el1 = %08lx\n", far);
+	while (1)
+		;
+}
+
+/*
+ * TODO: need implementation.
+ */
+void trap_init(void)
+{
+}
+
+/*
+ * TODO
+ */
+void trap_fini(void)
+{
+}
+#endif /* __aarch64__ */

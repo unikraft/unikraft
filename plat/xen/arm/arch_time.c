@@ -84,8 +84,17 @@ static inline uint64_t read_virtual_count(void)
 {
 	uint32_t c_lo, c_hi;
 
+#if defined(__arm__)
 	__asm__ __volatile__("mrrc p15, 1, %0, %1, c14":"=r"(c_lo), "=r"(c_hi));
 	return (((uint64_t) c_hi) << 32) + c_lo;
+#elif defined(__aarch64__)
+	uint64_t c;
+
+	isb();
+	__asm__ __volatile__("mrs %0, cntvct_el0":"=r"(c));
+	return c;
+#endif
+
 }
 
 /* monotonic_clock(): returns # of nanoseconds passed since time_init()
@@ -106,16 +115,25 @@ __nsec ukplat_wall_clock(void)
 /* Set the timer and mask. */
 void write_timer_ctl(uint32_t value)
 {
+#if defined(__arm__)
 	__asm__ __volatile__("mcr p15, 0, %0, c14, c3, 1\n"
 			     "isb"::"r"(value));
+#elif defined(__aarch64__)
+	__asm__ __volatile__("msr cntv_ctl_el0, %0" : : "r" (value));
+	isb();
+#endif
+
 }
 
 void set_vtimer_compare(uint64_t value)
 {
 	uk_pr_debug("New CompareValue : %llx\n", value);
 
+#if defined(__arm__)
 	__asm__ __volatile__("mcrr p15, 3, %0, %H0, c14"
 			     ::"r"(value));
+#elif defined(__aarch64__)
+#endif
 
 	/* Enable timer and unmask the output signal */
 	write_timer_ctl(1);
@@ -145,11 +163,21 @@ void block_domain(__snsec until)
 	}
 }
 
+void time_block_until(__snsec until)
+{
+	block_domain(until);
+}
+
 void ukplat_time_init(void)
 {
 	uk_pr_info("Initialising timer interface\n");
 
+#if defined(__arm__)
 	__asm__ __volatile__("mrc p15, 0, %0, c14, c0, 0":"=r"(counter_freq));
+#elif defined(__aarch64__)
+	__asm__ __volatile__("mrs %0, cntfrq_el0":"=r"(counter_freq));
+#endif
+
 	cntvct_at_init = read_virtual_count();
 	uk_pr_debug("Virtual Count register is %llx, freq = %d Hz\n",
 		    cntvct_at_init, counter_freq);
