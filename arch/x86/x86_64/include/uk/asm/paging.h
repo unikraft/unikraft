@@ -193,6 +193,7 @@ static inline int ukarch_vaddr_range_isvalid(__vaddr_t start, __vaddr_t end)
 #define PAGE_ATTR_PROT_READ		0x01 /* Page is readable */
 #define PAGE_ATTR_PROT_WRITE		0x02 /* Page is writeable */
 #define PAGE_ATTR_PROT_EXEC		0x04 /* Page is executable */
+#define PAGE_ATTR_WRITECOMBINE		0x08 /* Page allows write-combining */
 
 /* Page fault error code bits */
 #define X86_PF_EC_P			0x0001UL /* 0=non-present, 1=prot */
