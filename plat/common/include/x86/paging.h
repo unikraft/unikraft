@@ -38,6 +38,7 @@
 #include <uk/arch/limits.h>
 #include <uk/essentials.h>
 #include <uk/plat/paging.h>
+#include <uk/plat/common/cpu.h>
 #include <uk/fallocbuddy.h>
 #include <uk/print.h>
 
@@ -98,13 +99,15 @@ pgarch_pte_create(__paddr_t paddr, unsigned long attr, unsigned int level,
 	if (!(attr & PAGE_ATTR_PROT_EXEC))
 		pte |= X86_PTE_NX;
 
+	if (attr & PAGE_ATTR_WRITECOMBINE) {
+		pte |= X86_PTE_PCD;
+		pte |= X86_PTE_PWT;
+	}
+
 	/* Take all other bits from template */
 	pte |= template & (X86_PTE_US |
-			   X86_PTE_PWT |
-			   X86_PTE_PCD |
 			   X86_PTE_ACCESSED |
 			   X86_PTE_DIRTY |
-			   X86_PTE_PAT(level) |
 			   X86_PTE_GLOBAL |
 			   X86_PTE_USER1_MASK |
 			   X86_PTE_USER2_MASK |
@@ -117,13 +120,18 @@ static inline __pte_t
 pgarch_pte_change_attr(__pte_t pte, unsigned long new_attr,
 		       unsigned int level __unused)
 {
-	pte &= ~(X86_PTE_RW | X86_PTE_NX);
+	pte &= ~(X86_PTE_RW | X86_PTE_NX | X86_PTE_PCD | X86_PTE_PWT);
 
 	if (new_attr & PAGE_ATTR_PROT_WRITE)
 		pte |= X86_PTE_RW;
 
 	if (!(new_attr & PAGE_ATTR_PROT_EXEC))
 		pte |= X86_PTE_NX;
+
+	if (new_attr & PAGE_ATTR_WRITECOMBINE) {
+		pte |= X86_PTE_PCD;
+		pte |= X86_PTE_PWT;
+	}
 
 	return pte;
 }
@@ -138,6 +146,9 @@ pgarch_attr_from_pte(__pte_t pte, unsigned int level __unused)
 
 	if (!(pte & X86_PTE_NX))
 		attr |= PAGE_ATTR_PROT_EXEC;
+
+	if ((pte & X86_PTE_PWT) && (pte & X86_PTE_PCD))
+		attr |= PAGE_ATTR_WRITECOMBINE;
 
 	return attr;
 }
@@ -168,13 +179,16 @@ pgarch_pt_pte_create(struct uk_pagetable *pt __unused, __paddr_t pt_paddr,
 	 */
 	pt_pte |= (X86_PTE_PRESENT | X86_PTE_RW);
 
+	/* Do not use the PWT/PCD bits for the PT PTEs. We only use them for
+	 * page PTEs
+	 */
+	pt_pte &= ~(X86_PTE_PWT | X86_PTE_PCD);
+
 	/* Take all other bits from template. We also keep the flags that are
 	 * ignored by the architecture. The caller might have stored custom
 	 * data in these fields
 	 */
 	pt_pte |= template & (X86_PTE_US |
-			      X86_PTE_PWT |
-			      X86_PTE_PCD |
 			      X86_PTE_ACCESSED |
 			      X86_PTE_DIRTY | /* ignored */
 			      X86_PTE_GLOBAL | /* ignored */
@@ -265,6 +279,15 @@ pgarch_init(void)
 		return -ENOTSUP;
 	}
 #endif /* PT_LEVELS == 5 */
+
+	/* Check for PAT support */
+	ukarch_x86_cpuid(0x1, 0, &eax, &ebx, &ecx, &edx);
+	if (unlikely(!(edx & X86_CPUID1_EDX_PAT))) {
+		uk_pr_crit("Page table attributes are not supported.\n");
+		return -ENOTSUP;
+	}
+	/* Reset PAT to default value */
+	wrmsrl(X86_MSR_PAT, X86_PAT_DEFAULT);
 
 	ukarch_x86_cpuid(0x80000008, 0, &eax, &ebx, &ecx, &edx);
 
