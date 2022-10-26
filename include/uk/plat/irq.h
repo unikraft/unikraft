@@ -32,6 +32,7 @@
 #ifndef __UKPLAT_IRQ_H__
 #define __UKPLAT_IRQ_H__
 
+#include <uk/essentials.h>
 #include <uk/arch/lcpu.h>
 
 #ifdef __cplusplus
@@ -73,6 +74,10 @@ struct ukplat_event_irq_data {
  * Note: this event is usually raised in an interrupt context.
  */
 #define UKPLAT_EVENT_IRQ ukplat_event_irq
+
+int ukplat_irq_alloc(unsigned int *irqs, __u16 count);
+
+int ukplat_irq_free(unsigned int *irqs, __u16 count);
 
 #ifdef __cplusplus
 }

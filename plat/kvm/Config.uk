@@ -213,6 +213,11 @@ config KVM_MAX_IRQ_HANDLER_ENTRIES
        default 8
        depends on (ARCH_X86_64 || ARCH_ARM_64)
 
+config KVM_X86_FULL_IDT
+       bool "Allocate the full IDT"
+       default n
+       depends on ARCH_X86_64
+
 config RTC_PL031
        bool "Arm platform RTC (PL031) driver"
        default y if ARCH_ARM_64

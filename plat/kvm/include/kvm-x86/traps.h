@@ -88,4 +88,9 @@
 #define IDT_DESC_DPL_USER	GDT_DESC_DPL_USER
 
 #define IDT_DESC_OFFSET(n)	GDT_DESC_OFFSET(n)
+#ifdef CONFIG_KVM_X86_FULL_IDT
+#define IDT_NUM_ENTRIES		256
+#else
 #define IDT_NUM_ENTRIES		48
+#endif
+

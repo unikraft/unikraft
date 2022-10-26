@@ -41,6 +41,7 @@
 #ifdef CONFIG_UKPLAT_ISR_ECTX_ASSERTIONS
 #include <uk/arch/ctx.h>
 #endif
+#include <uk/bitmap.h>
 
 UK_EVENT(UKPLAT_EVENT_IRQ);
 
@@ -55,6 +56,7 @@ struct irq_handler {
 
 static struct irq_handler irq_handlers[__MAX_IRQ]
 				[CONFIG_KVM_MAX_IRQ_HANDLER_ENTRIES];
+static unsigned long irqs_allocated[UK_BITS_TO_LONGS(__ALLOCABLE_IRQ_COUNT)];
 
 static inline struct irq_handler *allocate_handler(unsigned long irq)
 {
@@ -87,6 +89,72 @@ int ukplat_irq_register(unsigned long irq, irq_handler_func_t func, void *arg)
 	ukplat_lcpu_restore_irqf(flags);
 
 	intctrl_clear_irq(irq);
+	return 0;
+}
+
+int ukplat_irq_unregister(unsigned long irq, irq_handler_func_t func)
+{
+	struct irq_handler *h = NULL;
+	unsigned long flags;
+	int i;
+
+	UK_ASSERT(func);
+	if (irq >= __MAX_IRQ)
+		return -EINVAL;
+
+	flags = ukplat_lcpu_save_irqf();
+
+	for (i = 0; i < CONFIG_KVM_MAX_IRQ_HANDLER_ENTRIES; i++) {
+		if (irq_handlers[irq][i].func == func) {
+			h = &irq_handlers[irq][i];
+			break;
+		}
+	}
+	if (h == NULL) {
+		ukplat_lcpu_restore_irqf(flags);
+		uk_pr_crit(
+			"attempt to unregister irq handler %p for irq %lu "
+			"which wasn't registered previously", func, irq);
+		return -ENOENT;
+	}
+
+	h->func = NULL;
+	h->arg = NULL;
+
+	ukplat_lcpu_restore_irqf(flags);
+	return 0;
+}
+
+int ukplat_irq_alloc(unsigned int *irqs, __u16 count)
+{
+	unsigned long start, idx;
+
+	start = uk_bitmap_find_next_zero_area(irqs_allocated,
+					      __ALLOCABLE_IRQ_COUNT, 0, count,
+					      0);
+	if (start == __ALLOCABLE_IRQ_COUNT)
+		return -ENOSPC;
+
+	uk_bitmap_set(irqs_allocated, start, count);
+	for (idx = start; idx < (start + count); idx++) {
+		*irqs = idx + __FIRST_ALLOCABLE_IRQ;
+		irqs++;
+	}
+	return 0;
+}
+
+int ukplat_irq_free(unsigned int *irqs, __u16 count)
+{
+	unsigned long i;
+	for (i = 0; i < count; i++) {
+		UK_ASSERT(__FIRST_ALLOCABLE_IRQ <= irqs[i] &&
+			  irqs[i] <= __LAST_ALLOCABLE_IRQ);
+		if (!uk_test_and_clear_bit(irqs[i] - __FIRST_ALLOCABLE_IRQ,
+					   irqs_allocated)) {
+			UK_CRASH("attempted to free unallocated IRQ\n");
+		}
+	}
+
 	return 0;
 }
 
@@ -142,8 +210,13 @@ void _ukplat_irq_handle(struct __regs *regs, unsigned long irq)
 			 */
 			__uk_test_and_set_bit(0, &sched_have_pending_events);
 
-		if (h->func(h->arg) == 1)
+		if (h->func(h->arg) == 1) {
+			/* APIC interrupts are currently ack'ed in the handler */
+			if (irq >= __FIRST_ALLOCABLE_IRQ)
+				return;
+
 			goto exit_ack;
+		}
 	}
 	/*
 	 * Acknowledge interrupts even in the case when there was no handler for
