@@ -59,6 +59,8 @@ typedef int (*irq_handler_func_t)(void *);
  */
 int ukplat_irq_register(unsigned long irq, irq_handler_func_t func, void *arg);
 
+int ukplat_irq_unregister(unsigned long irq, irq_handler_func_t func);
+
 /** The event payload for the #UKPLAT_EVENT_IRQ event */
 struct ukplat_event_irq_data {
 	/** The registers of the interrupted code */
