@@ -760,7 +760,7 @@ case "$ARG_MACHINETYPE" in
 			QEMU_BASE_ARGS+=("pc")
 
 			QEMU_BASE_ARGS+=("-cpu")
-			QEMU_BASE_ARGS+=("qemu64,-vmx,-svm")
+			QEMU_BASE_ARGS+=("qemu64,-vmx,-svm,+pdpe1gb")
 		fi
 
 		# BIOS also on serial
