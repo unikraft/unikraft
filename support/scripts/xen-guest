@@ -1,0 +1,594 @@
+#!/bin/bash
+#
+# Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+#
+# Copyright (c) 2019, NEC Laboratories Europe GmbH,
+#                     NEC Corporation All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+# 1. Redistributions of source code must retain the above copyright
+#    notice, this list of conditions and the following disclaimer.
+# 2. Redistributions in binary form must reproduce the above copyright
+#    notice, this list of conditions and the following disclaimer in the
+#    documentation and/or other materials provided with the distribution.
+# 3. Neither the name of the copyright holder nor the names of its
+#    contributors may be used to endorse or promote products derived from
+#    this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+# ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+# FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+# DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+# OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+# HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+# LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+# OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+# SUCH DAMAGE.
+#
+
+# Expands a numerical list
+# e.g., 2,4-7,0,1,2-3 -> 2 4 5 6 7 0 1 2 3
+_expand_num_list()
+{
+	local -a ARG=(${1//,/ })
+	for R in ${ARG[@]}; do
+		if [[ $R =~ ^[[:digit:]]+$ ]]; then
+			echo "$R"
+		elif [[ $R =~ ^[[:digit:]]+-[[:digit:]]+$ ]]; then
+			local -a SEQ=(${R//-/ })
+			seq ${SEQ[0]} ${SEQ[1]}
+		elif [ ! -z "$R" ]; then
+			echo "Warning: unrecognized range specification: '$R'" 1>&2
+		fi
+	done
+}
+
+# Detects CPUs that are not assigned to any domain yet
+# If no CPU is free, -1 is returned
+detect_freecpus()
+{
+	local NUM_CPUS=$( "$XL_BIN" info | grep -e '^nr_cpus[[:space:]]*:' | awk '{ print $3 }' )
+	#local USED_CPUS=$( "$XL_BIN" vcpu-list | grep '^.\+[[:space:]]\+[[:digit:]]\+[[:space:]]\+[[:digit:]]\+[[:space:]]\+' | awk '{ print $3 }' )
+	local CPU_AFFINITY=$( "$XL_BIN" vcpu-list | grep '^.\+[[:space:]]\+[[:digit:]]\+[[:space:]]\+[[:digit:]]\+[[:space:]]\+[[:space:]]\+...[[:space:]]\+[[:digit:]]\+\(\.[[:digit:]]\+\|\)[[:space:]]\+.*$' | awk '{ print $7 }' )
+	local CPU_BITMAP=()
+	local I=
+	local A=
+	local C=
+	local CL=
+	local RET=()
+	local NUM_USED=
+
+	[ -z "$NUM_CPUS" ] && die "Failed to detect the number of available CPUs"
+
+	# clear bitmap~ish
+	for (( I=0; I<NUM_CPUS; I++ )); do
+	        CPU_BITMAP[$I]=0
+	done
+
+	# set bits
+	for A in $CPU_AFFINITY; do
+		if [ "$A" = "all" ]; then
+			return -1 # nothing is free
+		fi
+
+		CL=$( _expand_num_list "$A" )
+		for C in $CL; do
+		        CPU_BITMAP[$C]=1
+		done
+	done
+
+	# list free
+	local NUM_USED=0
+	for (( I=0; I<NUM_CPUS; I++ )); do
+	        if [ "${CPU_BITMAP[$I]}" = 0 ]; then
+			RET+=("$I")
+		else
+			(( NUM_USED++ ))
+	        fi
+	done
+
+	if [ $NUM_USED = $NUM_CPUS ]; then
+		return -1 # nothing is free
+	fi
+
+	# some are free:
+	printf '%s' "${RET[*]}"
+	return 0
+}
+
+diskid2xvd()
+{
+	local ID=$1
+	local _arr=('a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 'm' 'n' 'o' 'p' 'q' 'r' 's' 't' 'u' 'v' 'w' 'x' 'y' 'z')
+
+	while [ $ID -gt 26 ]; do
+		ID=$(( ID - 26 ))
+	done
+	echo "xvd${_arr[$ID]}"
+}
+
+cpu2pool()
+{
+    local pool=$( "$XL_BIN" cpupool-list -c | grep -e "\([[:space:]]\|[[:digit:]],\)${1}\(\,[[:digit:]].*\|\)$" | head -n1 | awk '{ print $1 }' )
+
+    if [ -z "$pool" ]; then
+	    return 1
+    fi
+    printf '%s' "${pool}"
+    return 0
+}
+
+# 24bit base for mac addresses
+_NETDEV_HWADDR_BASE=$(( (($RANDOM % 256) * 65536) + (($RANDOM % 256) * 256) + ($RANDOM % 256) ))
+
+_netdev_hwaddr()
+{
+    local NICID=${1:-0}
+    local HWADDR=$(( ${_NETDEV_HWADDR_BASE} + ${NICID} ))
+
+    printf '00:16:3e:%02x:%02x:%02x' \
+	   $(( ($HWADDR / 65536) % 256 )) \
+	   $(( ($HWADDR / 256)   % 256 )) \
+	   $((  $HWADDR          % 256 ))
+}
+
+attach_natvif()
+{
+	cat > "${TEMP}/vif-nat" <<EOF
+#!/bin/bash
+dir=\$(dirname "\$0")
+. "\$dir/xen-hotplug-common.sh"
+. "\$dir/xen-network-common.sh"
+
+do_without_error modprobe ip_tables
+do_without_error modprobe ip_conntrack
+do_without_error modprobe ip_conntrack_irc
+do_without_error modprobe ip_conntrack_ftp
+
+command="\$1"
+shift
+
+case "\$command" in
+    "online")
+        setup_virtual_bridge_port "\$vif"
+        ifconfig "\$vif" ${NAT_NET}.1 netmask 255.255.255.252 up
+	echo "1" > /proc/sys/net/ipv4/ip_forward
+	do_without_error iptables -t nat -A POSTROUTING -j MASQUERADE
+        ;;
+    "add")
+        setup_virtual_bridge_port "\$vif"
+        ifconfig "\$vif" ${NAT_NET}.1 netmask 255.255.255.252 up
+	echo "1" > /proc/sys/net/ipv4/ip_forward
+	do_without_error iptables -t nat -A POSTROUTING -j MASQUERADE
+        ;;
+
+    "offline")
+        do_without_error ifconfig "\$dev" down
+        do_without_error iptables -t nat -D POSTROUTING -j MASQUERADE
+        ;;
+esac
+exit 0
+EOF
+	[ "$?" -ne 0 ] && die "Failed to create ${TEMP}/vif-nat"
+	chmod +x "${TEMP}/vif-nat"
+
+	# copy script dependencies
+	cp "${XEN_SCRIPT_DIR}/xen-network-common.sh" "${TEMP}/" || die "Failed to copy ${XEN_SCRIPT_DIR}/xen-network-common.sh"
+	cp "${XEN_SCRIPT_DIR}/xen-hotplug-common.sh" "${TEMP}/" || die "Failed to copy ${XEN_SCRIPT_DIR}/xen-hotplug-common.sh"
+	cp "${XEN_SCRIPT_DIR}/xen-script-common.sh" "${TEMP}/"  || die "Failed to copy ${XEN_SCRIPT_DIR}/xen-script-common.sh"
+	cp "${XEN_SCRIPT_DIR}/hotplugpath.sh" "${TEMP}/"        || die "Failed to copy ${XEN_SCRIPT_DIR}/hotplugpath.sh"
+	cp "${XEN_SCRIPT_DIR}/logging.sh" "${TEMP}/"            || die "Failed to copy ${XEN_SCRIPT_DIR}/logging.sh"
+	cp "${XEN_SCRIPT_DIR}/locking.sh" "${TEMP}/"            || die "Failed to copy ${XEN_SCRIPT_DIR}/locking.sh"
+
+	VIFS_CFG+="'bridge=null,mac=$( _netdev_hwaddr ${NICID} ),script=${TEMP}/vif-nat', "
+	HAS_NATVIF=0
+	(( NICID++ ))
+}
+
+##
+## ARE WE ROOT?
+##
+if [ $( id -u ) != 0 ]; then
+	if [ -x $( which sudo ) ]; then
+		echo "Trying to get root privileges..." 1>&2
+		exec sudo "$0" "$@"
+		exit 2
+	fi
+
+	echo "Please run as root" 1>&2
+	exit 1
+fi
+
+##
+## MAIN
+##
+NL=$'\n'
+XL_BIN=${XL_BIN:-"$( which xl )"}
+GDBSX_BIN=${GDBSX_BIN:-"$( which gdbsx)"}
+XEN_SCRIPT_DIR=${XEN_SCRIPT_DIR:-"/etc/xen/scripts"}
+TEMP="/tmp/$( basename "$0" )-$$"
+
+ARG_MEM=64
+ARG_CORES=1
+#ARG_SOCKETS=1
+#ARG_SMT=1
+ARG_GUESTNAME="$( uuidgen 2>/dev/null )"
+ARG_KERNEL=
+ARG_INITRD=
+ARG_VCPUPIN=
+ARG_APPEND=
+ARG_APPEND_EXTRA=
+ARG_GDBPORT=8888
+
+OPT_BACKGROUND=1
+OPT_VCPUPIN=1
+OPT_KERNEL=1
+OPT_INITRD=1
+OPT_APPEND=1
+OPT_DRYRUN=1
+OPT_GDBPORT=1
+OPT_PAUSED=1
+
+DOMAIN_CFG=
+VIFS_CFG=
+DISKS_CFG=
+NAT_NET=172.62.$(( $$ % 255 ))
+NAT_BRNAME='xnatbr-$(( $$ % 255 ))'
+
+HAS_NATVIF=1
+
+NICID=0
+DISKID=0
+
+if [ ! -d "$XEN_SCRIPT_DIR" ]; then
+	echo "Error: XEN_SCRIPT_DIR=\"${XEN_SCRIPT_DIR}\" does not exists" 1>&2
+	exit 2
+fi
+if [ -z "$( which uuidgen )" ]; then
+	echo "Please install uuidgen" 1>&2
+	exit 2
+fi
+mkdir -p "${TEMP}"
+if [ $? -ne 0 ]; then
+	echo "Error: Could not create ${TEMP}" 1>&2
+	exit 2
+fi
+trap "rm -rf \"${TEMP}\"" exit
+
+usage()
+{
+	echo "Usage: $0 [OPTION]..."
+	echo "Runs a XenPV-based virtual guest. The guest will have no video device"
+	echo "but a serial device attached (hvc0). This device is redirected to stdio."
+	echo ""
+	echo "  -h                         Display help and exit"
+	echo "  -x                         Run guest in background, use xl console to connect to the serial output"
+	echo "  -P                         Create the guest in paused state"
+	echo "  -G [NAME]                  Set name of guest to NAME"
+	echo "  -g [PORT]                  Run a GDB server for the guest at port PORT"
+	echo "                             Note: guest is not destroyed on shutdown/reset"
+	echo "  -c [NUMBER]                NUMBER of guest CPU cores (default ${ARG_CORES})"
+	echo "  -p [CPULIST]               Pin vCPUs to CPULIST (default off)"
+	echo "                             CPULIST can also be a string inidicating an automatic pinning:"
+	echo "                               allfree, free       Pin vCPUs to all free CPUs"
+	echo "                               firstfree, 1free    Pin vCPUs to first free CPU"
+	echo "                               first2free, 2free   Pin vCPUs to first two free CPUs"
+	echo "  -m [MB]                    Assign MB memory to the guest (default ${ARG_MEM})"
+	echo "  -n                         Attach a NAT-ed NIC (netfront) to the guest"
+	echo "                             Note: No pre-setup bridge is required on the host"
+	echo "                             Note: An 172.62.<random>.0/30 network is created, no DNS is provided"
+	echo "  -b [BRIDGE]                Attach a virtual NIC (netfront) to an existing Linux bridge BRIDGE"
+	echo "  -o [OVS]                   Attach a virtual NIC (netfront) to an existing Open vSwitch SWITCH"
+	echo "  -d [IMAGE/DEVICE]          Attach a block storage device based on a raw IMAGE/DEVICE"
+	echo "  -k [KERNEL]                KERNEL image to boot directly"
+	echo "  -i [INITRD]                Init-ramdisk INITRD for -k"
+	echo "  -a [ARGUMENTS]             Kernel arguments for -k"
+	echo "  -D                         Dry-run: Print generated xl domain description and arguments and exit"
+	echo ""
+	echo "Available environment variables (and current value):"
+	echo "  XL_BIN=${XL_BIN}"
+	echo "  XEN_SCRIPT_DIR=${XEN_SCRIPT_DIR}"
+	echo "  GDBSX_BIN=${GDBSX_BIN}"
+	echo ""
+	echo "Examples:"
+	echo "  # guest with 3 vCPUs pinned to cores 1-3, 4GB RAM"
+	echo "  $0 -c 3 -p 1-3 -m 4096 -k vmlinuz"
+	echo ""
+	echo "  # guest with 2 vCPUs, 2 GB RAM, 2 virtio NICs (attached to host bridge virbr0, virbr1),"
+	echo "  # 3 virtual disks: the first one uses a qcow2; the second and the third ones use a physical device"
+	echo "  $0 -c 2 -m 2048 -b virbr0 -b virbr1 -k vmlinuz -d root.raw -d /dev/sdb -d /dev/sdc"
+}
+
+while getopts :h:nb:o:d:k:i:a:c:m:p:xDG:g:P OPT; do
+    case ${OPT} in
+	n)
+		if [ "$HAS_NATVIF" -ne 0 -a "$NICID" -ne 0 ]; then
+			echo "A NAT-ed NIC needs to be the first NIC and can only be added once (-n)" 1>&2
+			return 1
+		fi
+		attach_natvif
+		;;
+	b)
+		VIFS_CFG+="'bridge=${OPTARG},mac=$( _netdev_hwaddr ${NICID} ),script=vif-bridge', "
+		(( NICID++ ))
+		;;
+	o)
+		VIFS_CFG+="'bridge=${OPTARG},mac=$( _netdev_hwaddr ${NICID} ),script=vif-openvswitch', "
+		(( NICID++ ))
+		;;
+	d)
+		if [ -b "$OPTARG" ]; then
+			DISKS_CFG+="'phy:${OPTARG},$( diskid2xvd $DISKID ),rw', "
+		else
+			DISKS_CFG+="'raw:${OPTARG},$( diskid2xvd $DISKID ),rw', "
+		fi
+		(( DISKID++ ))
+		;;
+	c)
+		ARG_CORES=${OPTARG}
+		;;
+	m)
+		ARG_MEM=${OPTARG}
+		;;
+	k)
+		ARG_KERNEL="${OPTARG}"
+		OPT_KERNEL=0
+		;;
+	i)
+		ARG_INITRD="${OPTARG}"
+		OPT_INITRD=0
+		;;
+	a)
+		ARG_APPEND="${OPTARG}"
+		OPT_APPEND=0
+		;;
+	p)
+		if [ "${OPTARG}" = "allfree" -o "${OPTARG}" = "firstfree" -o "${OPTARG}" = "first2free" \
+		     -o "${OPTARG}" = "free" -o "${OPTARG}" = "1free" -o "${OPTARG}" = "2free" ]; then
+			FREE_CPUS=$( detect_freecpus )
+			if [ $? -ne 0 -o -z "${FREE_CPUS}" ]; then
+				echo "Could not find a single free CPU, all in use? (-p)" 1>&2
+				exit 1
+			fi
+			if [ "${OPTARG}" = "firstfree" -o "${OPTARG}" = "1free" ]; then
+				C=
+				for C in $FREE_CPUS; do
+					ARG_VCPUPIN="$C"
+					break
+				done
+			elif [ "${OPTARG}" = "first2free" -o "${OPTARG}" = "2free" ]; then
+				C=
+				I=0
+				for C in $FREE_CPUS; do
+					ARG_VCPUPIN+=" $C"
+					(( I++ ))
+					if [ $I -eq 2 ]; then break; fi
+				done
+
+				if [ $I -ne 2 ]; then
+					echo "Not enough free CPUs found (-p)" 1>&2
+					exit 1
+				fi
+			else
+				ARG_VCPUPIN="$FREE_CPUS"
+			fi
+		else
+			ARG_VCPUPIN=$( _expand_num_list "${OPTARG}" )
+			if [ $? -ne 0 -o -z "${ARG_VCPUPIN}" ]; then
+				echo "Could not parse CPU list (-p)" 1>&2
+				exit 1
+			fi
+		fi
+		OPT_VCPUPIN=0
+		;;
+	x)
+		OPT_BACKGROUND=0
+		;;
+	g)
+		OPT_GDBPORT=0
+		ARG_GDBPORT="${OPTARG}"
+		;;
+	P)
+		OPT_PAUSED=0
+		;;
+	D)
+		OPT_DRYRUN=0
+		;;
+	G)
+		ARG_GUESTNAME="${OPTARG}"
+		;;
+	h)
+		usage
+		exit 0
+		;;
+	\?)
+		echo "Unrecognized option -${OPTARG}"
+		usage
+		exit 1
+		;;
+	esac
+done
+shift $(( OPTIND - 1 ))
+
+[ -z "$XL_BIN" -o ! -x "$XL_BIN" ] && die "xl not found (XL_BIN)"
+[ -z "$XEN_SCRIPT_DIR" -o ! -d "$XEN_SCRIPT_DIR" ] && die "Xen script directory not found (XEN_SCRIPT_DIR)"
+if [ ${OPT_GDBPORT} -eq 0 ]; then
+	[ -z "${GDBSX_BIN}" -o !-x "${GDBSX_BIN}" ] && die "gdbsx not found (GDBSX_BIN)"
+fi
+
+if [ $OPT_INITRD -eq 0 -a $OPT_KERNEL -ne 0 ]; then
+	echo "An init-ramdisk requires a kernel (-k option missing)" 1>&2
+	exit 1
+fi
+if [ $OPT_APPEND -eq 0 -a $OPT_KERNEL -ne 0 ]; then
+	echo "Kernel arguments require a kernel (-k option missing)" 1>&2
+	exit 1
+fi
+
+if [ $OPT_KERNEL -eq 0 -a $OPT_APPEND -ne 0 ]; then
+	# default append
+	ARG_APPEND="console=hvc0"
+	if [ $HAS_NATVIF -eq 0 ]; then
+		ARG_APPEND+=" ip=${NAT_NET}.2::${NAT_NET}.1:255.255.255.252" # note: DNS is not set
+	fi
+	OPT_APPEND=0
+fi
+if [ $OPT_KERNEL -ne 0 ]; then
+	echo "Kernel argument required (-k option missing)" 1>&2
+	exit 1
+fi
+
+DOM_CFG="name          = '${ARG_GUESTNAME}'${NL}"
+DOM_CFG+="vcpus         = '${ARG_CORES}'${NL}"
+P_FIRST=
+if [ ${OPT_VCPUPIN} -eq 0 ]; then
+	# pinning
+	TMP=
+	F=0
+	for P in $ARG_VCPUPIN; do
+	    if [ $F -ne 0 ]; then
+		    TMP+=","
+	    else
+		    # record first CPU to detect cpu pool later
+		    P_FIRST="${P}"
+	    fi
+	    TMP+="${P}"
+	    F=1
+	done
+	DOM_CFG+="cpus          = '${TMP}'${NL}"
+
+	# try to detect CPU pool of pinning (Note: only a single CPU pool per guest is supported)
+	P_POOL="$( cpu2pool "${P_FIRST}" )"
+	if [ $? -eq 0 ]; then
+		DOM_CFG+="pool          = '${P_POOL}'${NL}"
+	fi
+fi
+DOM_CFG+="memory        = '${ARG_MEM}'${NL}"
+DOM_CFG+="on_start      = 'pause'${NL}"
+if [ ${OPT_GDBPORT} -eq 0 ]; then
+	DOM_CFG+="on_crash      = 'preserve'${NL}"
+	DOM_CFG+="on_poweroff   = 'preserve'${NL}"
+	DOM_CFG+="on_reboot     = 'preserve'${NL}"
+else
+	if [ ${OPT_BACKGROUND} -eq 0 ]; then
+		DOM_CFG+="on_crash      = 'restart'${NL}"
+	else
+		DOM_CFG+="on_crash      = 'destroy'${NL}"
+	fi
+	DOM_CFG+="on_poweroff   = 'destroy'${NL}"
+	DOM_CFG+="on_reboot     = 'restart'${NL}"
+fi
+
+DOM_CFG+="kernel        = '${ARG_KERNEL}'${NL}"
+if [ ${OPT_INITRD} -eq 0 ]; then
+	DOM_CFG+="ramdisk       = '${ARG_INITRD}'${NL}"
+fi
+DOM_CFG+="extra         = '${ARG_APPEND}'${NL}"
+DOM_CFG+="disk          = [ ${DISKS_CFG} ]${NL}"
+DOM_CFG+="vif           = [ ${VIFS_CFG}]${NL}"
+
+printf "%s" "${DOM_CFG}" > "${TEMP}/domain.cfg"
+if [ ! -f "${TEMP}/domain.cfg" ]; then
+	echo "Failed to create ${TEMP}/domain.cfg" 1>&2
+	exit 1
+fi
+
+if [ $OPT_DRYRUN -eq 0 ]; then
+	echo "${TEMP}/domain.cfg:"
+	cat "${TEMP}/domain.cfg"
+	echo ""
+
+	if [ $HAS_NATVIF -eq 0 ]; then
+		echo "${TEMP}/vif-nat:"
+		cat "${TEMP}/vif-nat"
+		echo ""
+	fi
+
+	echo "${XL_BIN} create -p \"${TEMP}/domain.cfg\""
+	exit 0
+fi
+${XL_BIN} create -p "${TEMP}/domain.cfg"
+XL_RET=$?
+if [ $XL_RET -ne 0 ]; then
+	exit $XL_RET
+fi
+GUESTID=$( ${XL_BIN} list | grep "${ARG_GUESTNAME}" 2>/dev/null | awk '{print $2}' )
+if [ $? -ne 0 -o -z "$GUESTID" ]; then
+	printf 'Failed to retrieve guest ID\n' 1>&2
+	${XL_BIN} destroy "${ARG_GUESTNAME}"
+	exit 1
+fi
+if [ ${OPT_GDBPORT} -eq 0 ]; then
+	${GDBSX_BIN} -a "$GUESTID" 64 "$ARG_GDBPORT" &
+	GDBPID=$!
+fi
+printf '**************************************************************************\n'
+printf ' Xen:\n'
+printf '\n'
+printf '   Name:                  %s\n' "${ARG_GUESTNAME}"
+printf '   Domain ID:             %s\n' "${GUESTID}"
+printf '   SMP configuration:     %s\n' "sockets=1,cores=${ARG_CORES},threads=1"
+printf '   Memory:                %d MB\n' "${ARG_MEM}"
+if [ ${OPT_VCPUPIN} -eq 0 ]; then
+	printf '   vCPU pin set:          %s\n' "$( echo "${ARG_VCPUPIN}" | tr '\n' ' ' )"
+fi
+if [ ${OPT_KERNEL} -eq 0 ]; then
+	printf '   Kernel:                %s\n' "${ARG_KERNEL}"
+fi
+if [ ${OPT_INITRD} -eq 0 ]; then
+	printf '   InitRD:                %s\n' "${ARG_INITRD}"
+fi
+if [ ${OPT_APPEND} -eq 0 ]; then
+	printf '   Parameters:            %s\n' "${ARG_APPEND}"
+fi
+if [ ${OPT_GDBPORT} -eq 0 ]; then
+	printf '   GDB server:            %s\n' "${ARG_GDBPORT}"
+fi
+printf '\n'
+if [ ${OPT_GDBPORT} -eq 0 -a ${OPT_KERNEL} -eq 0 ]; then
+	printf '   Hint:    Use '"\'"'gdb --eval-command="target remote :%s" %s'"\'"' to connect to the GDB server\n' "${ARG_GDBPORT}" "${ARG_KERNEL}"
+fi
+if [ ${NICID} -eq 0 ]; then
+	printf '   Warning: No networking for guest!\n'
+fi
+if [ ${OPT_BACKGROUND} -ne 0 ]; then
+	printf '   Warning: Guest will be terminated with CTRL+]!\n'
+fi
+printf '**************************************************************************\n'
+
+if [ ${OPT_PAUSED} -eq 0 ]; then
+	printf "Starting VM (paused)...\n"
+else
+	printf "Starting VM...\n"
+fi
+
+if [ ${OPT_BACKGROUND} -ne 0 ]; then
+	printf 'Connecting to serial output...\n'
+	if [ ${OPT_PAUSED} -ne 0 ]; then
+		sleep 0.5 && ${XL_BIN} unpause "${GUESTID}" &
+	fi
+	${XL_BIN} console "${GUESTID}"
+	XL_RET=$?
+
+	${XL_BIN} destroy "${GUESTID}" > /dev/null 2>&1 || true
+	if [ ${OPT_GDBPORT} -eq 0 ]; then
+		kill ${GDBPID}
+	fi
+	stty sane # restore terminal settings
+	exit 0
+else
+	XL_RET=0
+	if [ ${OPT_PAUSED} -ne 0 ]; then
+		${XL_BIN} unpause "${GUESTID}"
+		XL_RET=$?
+	fi
+
+	# remove trap for background guests (keep files because of hotplug scripts)
+	trap "true" exit
+fi
+exit $XL_RET
