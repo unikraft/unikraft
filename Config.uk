@@ -180,6 +180,12 @@ if RECORD_BUILDTIME
 	endchoice
 endif
 
+config BUILD_ARGS_FILE
+	bool "Use file for long build arguments"
+	default n
+	help
+		Uses a file to pass long arguments to the build commands.
+
 config CROSS_COMPILE
 	string "Custom cross-compiler tool prefix (optional)"
 	help
