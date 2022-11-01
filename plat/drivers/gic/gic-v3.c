@@ -51,7 +51,9 @@
 #include <gic/gic-v3.h>
 #include <ofw/fdt.h>
 
-#define GIC_RDIST_REG(gdev, r) ((void *)(gdev.rdist_mem_addr + (r)))
+#define GIC_RDIST_REG(gdev, r)					\
+	((void *)(gdev.rdist_mem_addr + (r) +			\
+	lcpu_get_current()->idx * GICR_STRIDE))
 
 #define GIC_AFF_TO_ROUTER(aff, mode)				\
 	((((uint64_t)(aff) << 8) & MPIDR_AFF3_MASK) | ((aff) & 0xffffff) | \
