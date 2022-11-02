@@ -45,15 +45,35 @@ if LIBSYSCALL_SHIM
 			call and restores it afterwards. This enables the use
 			of different TLS pointers of userland code.
 
-	config LIBSYSCALL_SHIM_DEBUG
-		bool "Enable debug messages"
-		default n
-		select LIBUKDEBUG_PRINTD
+	menu "Debugging"
+		config LIBSYSCALL_SHIM_DEBUG_SYSCALLS
+			bool "Debug message for system calls"
+			default n
+			help
+				Emits a debug message as soon as a registered system call is
+				called.
 
-	config LIBSYSCALL_SHIM_LEGACY_VERBOSE
-		bool "Warn for unmapped legacy syscalls"
-		default y
-		help
-			Generates a warning during the build process for each legacy syscall
-			that is not mapped to a syscall number.
+		config LIBSYSCALL_SHIM_DEBUG_HANDLER
+		depends on LIBSYSCALL_SHIM_HANDLER
+			bool "Debug message for binary system calls"
+			default n
+			help
+				Emits a debug message as soon as a binary system call request
+				is handled.
+
+		config LIBSYSCALL_SHIM_DEBUG
+			bool "Enable all debug messages"
+			select LIBSYSCALL_SHIM_DEBUG_SYSCALLS
+			select LIBSYSCALL_SHIM_DEBUG_HANDLER if LIBSYSCALL_SHIM_HANDLER
+			default n
+			help
+				Enable all debug messages of the syscall_shim library.
+
+		config LIBSYSCALL_SHIM_LEGACY_VERBOSE
+			bool "Build warning for unmapped legacy syscalls"
+			default y
+			help
+				Generates a warning during the build process for each legacy syscall
+				that is not mapped to a syscall number.
+	endmenu
 endif

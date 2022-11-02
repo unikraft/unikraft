@@ -199,7 +199,7 @@ typedef long uk_syscall_arg_t;
 #define UK_S_ARG_CAST_LONG(type, arg)   (long) arg
 #define UK_S_ARG_CAST_ACTUAL(type, arg) (type) arg
 
-#if CONFIG_LIBSYSCALL_SHIM_DEBUG || CONFIG_LIBUKDEBUG_PRINTD
+#if CONFIG_LIBSYSCALL_SHIM_DEBUG_SYSCALLS || CONFIG_LIBUKDEBUG_PRINTD
 #define UK_ARG_FMT_MAP0(...)
 #define UK_ARG_FMT_MAP1(m, type, arg) m(type, arg)
 #define UK_ARG_FMT_MAP2(m, type, arg, ...) m(type, arg) ", " UK_ARG_FMT_MAP1(m, __VA_ARGS__)

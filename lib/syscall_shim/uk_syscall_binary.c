@@ -73,9 +73,12 @@ void ukplat_syscall_handler(struct __regs *r)
 	/* uk_syscall6_r() will clear _uk_syscall_return_addr on return */
 	_uk_syscall_return_addr = r->rip;
 
-	uk_pr_debug("Binary system call request \"%s\" (%lu) at ip:%p (arg0=0x%lx, arg1=0x%lx, ...)\n",
+#if CONFIG_LIBSYSCALL_SHIM_DEBUG_HANDLER
+	_uk_printd(__STR_LIBNAME__, __STR_BASENAME__, __LINE__,
+			"Binary system call request \"%s\" (%lu) at ip:%p (arg0=0x%lx, arg1=0x%lx, ...)\n",
 		    uk_syscall_name(r->rsyscall), r->rsyscall,
 		    (void *) r->rip, r->rarg0, r->rarg1);
+#endif /* CONFIG_LIBSYSCALL_SHIM_DEBUG_HANDLER */
 	r->rret0 = uk_syscall6_r(r->rsyscall,
 				 r->rarg0, r->rarg1, r->rarg2,
 				 r->rarg3, r->rarg4, r->rarg5);
