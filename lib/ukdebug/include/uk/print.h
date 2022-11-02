@@ -60,6 +60,15 @@ extern "C" {
 /*
  * DEBUG PRINTING
  */
+/* Internal debug print functions that are sometimes used
+ * by other libraries with an own debug print switch
+ * (e.g., hexdump, syscall_shim)
+ */
+void _uk_vprintd(const char *libname, const char *srcname,
+		 unsigned int srcline, const char *fmt, va_list ap);
+void _uk_printd(const char *libname, const char *srcname,
+		unsigned int srcline, const char *fmt, ...) __printf(4, 5);
+
 #ifdef __IN_LIBUKDEBUG__
 /*
  * This redefinition of CONFIG_LIBUKDEBUG_PRINTD is doing the trick to avoid
@@ -73,15 +82,6 @@ extern "C" {
 #endif /* __IN_LIBUKDEBUG__ */
 
 #if defined UK_DEBUG || CONFIG_LIBUKDEBUG_PRINTD
-/* please use the uk_printd(), uk_vprintd() macros because
- * they compile in the function calls only if debugging
- * is enabled
- */
-void _uk_vprintd(const char *libname, const char *srcname,
-		 unsigned int srcline, const char *fmt, va_list ap);
-void _uk_printd(const char *libname, const char *srcname,
-		unsigned int srcline, const char *fmt, ...) __printf(4, 5);
-
 #define uk_vprintd(fmt, ap)						\
 	do {								\
 		_uk_vprintd(__STR_LIBNAME__, __STR_BASENAME__,		\
