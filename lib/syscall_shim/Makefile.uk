@@ -1,5 +1,7 @@
 $(eval $(call addlib_s,libsyscall_shim,$(CONFIG_LIBSYSCALL_SHIM)))
 
+LIBSYSCALL_SHIM_CFLAGS-$(CONFIG_LIBSYSCALL_SHIM_DEBUG) += -DUK_DEBUG
+
 LIBSYSCALL_SHIM_INCLUDES_PATH := $(LIBSYSCALL_SHIM_BUILD)/include/uk/bits
 
 LIBSYSCALL_SHIM_PHONY_SRC := syscall_map.h syscall_stubs.h syscall_nrs.h syscall_nrs2.h
