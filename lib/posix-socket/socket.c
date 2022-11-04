@@ -463,11 +463,13 @@ EXIT_ERR:
 	return ret;
 }
 
-/* Not a system call */
+#if UK_LIBC_SYSCALLS
+/* Provide wrapper (if not provided by Musl) or some other libc. */
 ssize_t recv(int sock, void *buf, size_t len, int flags)
 {
 	return recvfrom(sock, buf, len, flags, NULL, NULL);
 }
+#endif /* UK_LIBC_SYSCALLS */
 
 UK_TRACEPOINT(trace_posix_socket_recvmsg, "%d %p %d", int, struct msghdr*, int);
 UK_TRACEPOINT(trace_posix_socket_recvmsg_ret, "%d", int);
@@ -576,11 +578,13 @@ EXIT_ERR:
 	return ret;
 }
 
-/* Not a system call */
+#if UK_LIBC_SYSCALLS
+/* Provide wrapper (if not provided by Musl) or some other libc. */
 ssize_t send(int sock, const void *buf, size_t len, int flags)
 {
 	return sendto(sock, buf, len, flags, NULL, 0);
 }
+#endif /* UK_LIBC_SYSCALLS */
 
 UK_TRACEPOINT(trace_posix_socket_socketpair, "%d %d %d %p", int, int, int,
 	      int *);
