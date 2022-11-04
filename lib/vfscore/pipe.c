@@ -692,7 +692,7 @@ UK_SYSCALL_R_DEFINE(int, pipe2, int*, pipefd, int, flags)
 {
 	int rc;
 
-	rc = pipe(pipefd);
+	rc = uk_syscall_r_pipe((long) pipefd);
 	if (rc)
 		return rc;
 
