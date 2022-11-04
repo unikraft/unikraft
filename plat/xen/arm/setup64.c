@@ -33,15 +33,17 @@
 #include <xen/xen.h>
 #include <uk/plat/memory.h>
 #include <xen/memory.h>
+#include <uk/intctlr.h>
 #include <xen/hvm/params.h>
 #include <libfdt.h>
 #include <xen-arm/setup.h>
+#include <uk/plat/common/lcpu.h>
 #include <uk/plat/common/bootinfo.h>
 
 /*
- * This structure contains start-of-day info, such as pagetable base pointer,
- * address of the shared_info structure, and things like that.
- * On x86, the hypervisor passes it to us. On ARM, we fill it in ourselves.
+ * This structure contains start-of-day info, such as pagetable base
+ * pointer, address of the shared_info structure, and things like that. On
+ * x86, the hypervisor passes it to us. On ARM, we fill it in ourselves.
  */
 
 /*
@@ -205,13 +207,10 @@ static inline void _get_cmdline(struct ukplat_bootinfo *bi)
 static int _init_mem(struct ukplat_bootinfo *const bi, paddr_t physical_offset)
 {
 	int rc;
-	int memory;
-	int prop_len = 0;
-	const uint64_t *regs;
-	uintptr_t end;
-	uint64_t mem_base;
-	uint64_t mem_size;
-	uint64_t heap_len;
+	size_t fdt_size;
+	void *new_dtb;
+	paddr_t start_pfn_p;
+	paddr_t max_pfn_p;
 	struct ukplat_memregion_desc mrd;
 
 	/* init physical address offset gathered by entry32.S */
@@ -312,6 +311,16 @@ void _libxenplat_armentry(void *dtb_pointer, paddr_t physical_offset)
 	if (HYPERVISOR_memory_op(XENMEM_add_to_physmap, &xatp) != 0)
 		BUG();
 	HYPERVISOR_shared_info = (struct shared_info *)shared_info_page;
+
+	/* Initialize interrupt controller */
+	r = uk_intctlr_probe();
+	if (unlikely(r))
+		UK_CRASH("Could not initialize the IRQ controller: %d\n", r);
+
+	/* Initialize logical boot CPU */
+	r = lcpu_init(lcpu_get_bsp());
+	if (unlikely(r))
+		UK_CRASH("Failed to initialize bootstrapping CPU: %d\n", r);
 
 	/* Fill in start_info */
 	get_console();

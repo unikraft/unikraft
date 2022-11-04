@@ -108,6 +108,7 @@ static inline int irqs_disabled(void)
 	local_save_flags(x);
 	return x & 0x80;
 }
+#endif /* __arm__ */
 
 void block_domain(__snsec until);
 

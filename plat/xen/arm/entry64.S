@@ -24,6 +24,8 @@
  */
 /* Taken from Mini-OS */
 
+#include <uk/arch/lcpu.h>
+#include <uk/asm.h>
 #include <xen/xen.h>
 #include <xen/elfnote.h>
 
@@ -595,7 +597,7 @@ END(vector_table)
 el1_sync:
 	trap_entry 1
 	mov     x0, sp
-	bl      do_sync
+	bl      trap_el1_sync
 	trap_exit 1
 	eret
 ENDPROC(el1_sync)
@@ -604,7 +606,7 @@ ENDPROC(el1_sync)
 el1_irq:
 	trap_entry 1
 	mov     x0, sp
-	bl      do_irq
+	bl      trap_el1_irq
 	trap_exit 1
 	eret
 ENDPROC(el1_irq)
@@ -613,7 +615,7 @@ ENDPROC(el1_irq)
 el0_sync:
 	trap_entry 0
 	mov     x0, sp
-	bl      do_sync
+	bl      trap_el1_sync
 	trap_exit 0
 	eret
 ENDPROC(el0_sync)
@@ -622,7 +624,7 @@ ENDPROC(el0_sync)
 el0_irq:
 	trap_entry 0
 	mov     x0, sp
-	bl      do_irq
+	bl      trap_el1_irq
 	trap_exit 0
 	eret
 ENDPROC(el0_irq)
@@ -638,7 +640,7 @@ ENDPROC(el0_irq)
 	.macro invalid, reason
 	mov     x0, sp
 	mov     x1, #\reason
-	b       do_bad_mode
+	b       invalid_trap_handler
 	.endm
 
 el0_sync_invalid:

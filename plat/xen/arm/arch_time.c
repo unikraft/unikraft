@@ -25,6 +25,7 @@
  */
 
 #include <xen-arm/os.h>
+#include <uk/plat/common/irq.h>
 #include <common/events.h>
 #include <xen-arm/traps.h>
 #include <uk/print.h>
@@ -82,10 +83,11 @@ static inline uint64_t ns_to_ticks(s_time_t ns)
 
 static inline uint64_t read_virtual_count(void)
 {
+#if defined(__arm__)
 	uint32_t c_lo, c_hi;
 
-#if defined(__arm__)
-	__asm__ __volatile__("mrrc p15, 1, %0, %1, c14":"=r"(c_lo), "=r"(c_hi));
+	__asm__ __volatile__("mrrc p15, 1, %0, %1, c14"
+			     : "=r"(c_lo), "=r"(c_hi));
 	return (((uint64_t) c_hi) << 32) + c_lo;
 #elif defined(__aarch64__)
 	uint64_t c;

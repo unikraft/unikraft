@@ -41,6 +41,9 @@
 #include <uk/assert.h>
 #include <xenbus/client.h>
 #include <xenbus/xs.h>
+#if defined(__aarch64__)
+#include <xen-arm/mm.h>
+#endif
 #include "blkfront_xb.h"
 
 static int xs_read_backend_id(const char *nodename, domid_t *domid)
