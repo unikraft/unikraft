@@ -40,8 +40,14 @@
 #include <uk/arch/limits.h>
 #include <uk/page.h>
 #include <uk/blkdev_driver.h>
+#if defined(__i386__) || defined(__x86_64__)
 #include <xen-x86/mm.h>
 #include <xen-x86/mm_pv.h>
+#elif defined(__aarch64__)
+#include <xen-arm/mm.h>
+#else
+#error "Unsupported architecture"
+#endif
 #include <xenbus/xenbus.h>
 #include "blkfront.h"
 #include "blkfront_xb.h"

@@ -46,8 +46,15 @@
 #include <uk/arch/spinlock.h>
 #include <common/events.h>
 #include <common/hypervisor.h>
+#if defined(__i386__) || defined(__x86_64__)
 #include <xen-x86/mm.h>
 #include <xen-x86/setup.h>
+#elif defined(__aarch64__)
+#include <xen-arm/mm.h>
+#include <xen-arm/setup.h>
+#else
+#error "Unsupported architecture"
+#endif
 #include <xenbus/client.h>
 #include "xs_comms.h"
 #include "xs_watch.h"
@@ -598,8 +605,14 @@ int xs_comms_init(void)
 	xsh.thread = thread;
 
 	xsh.evtchn = HYPERVISOR_start_info->store_evtchn;
+#if defined(__i386__) || defined(__x86_64__)
 	xsh.buf = mfn_to_virt(HYPERVISOR_start_info->store_mfn);
-
+#elif defined(__aarch64__)
+	xsh.buf = (struct xenstore_domain_interface *)
+		      HYPERVISOR_start_info->store_mfn;
+#else
+#error "Unsupported architecture"
+#endif
 	port = bind_evtchn(xsh.evtchn, xs_evtchn_handler, NULL);
 	UK_ASSERT(port == xsh.evtchn);
 	unmask_evtchn(xsh.evtchn);

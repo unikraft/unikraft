@@ -208,6 +208,10 @@ extern paddr_t _libxenplat_paddr_offset;
 // FIXME
 #define map_frames(f, n) (NULL)
 
+#ifndef __ASSEMBLY__
+void arch_mm_prepare(unsigned long *start_pfn_p, unsigned long *max_pfn_p);
+#endif
+
 #define arch_mm_init(a)
 
 #endif
