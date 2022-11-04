@@ -74,5 +74,10 @@
 #define LEGACY_SYS_pipe /* modern: pipe2 */
 #define LEGACY_SYS_pause /* modern: sigsuspend */
 #define LEGACY_SYS_alarm /* modern: timer_settime */
+#define LEGACY_SYS_poll /* modern: ppoll */
+#define LEGACY_SYS_select /* modern: pselect */
+#define LEGACY_SYS_epoll_create /* modern: epoll_create1 */
+#define LEGACY_SYS_epoll_wait /* modern: epoll_pwait */
+#define LEGACY_SYS_eventfd /* modern: eventfd2 */
 
 #endif
