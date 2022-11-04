@@ -2075,7 +2075,7 @@ UK_SYSCALL_R_DEFINE(int, faccessat, int, dirfd, const char*, pathname, int, mode
 	}
 
 	if (pathname[0] == '/' || dirfd == AT_FDCWD) {
-		return access(pathname, mode);
+		return uk_syscall_r_access(pathname, mode);
 	}
 
 	struct vfscore_file *fp;
@@ -2095,7 +2095,7 @@ UK_SYSCALL_R_DEFINE(int, faccessat, int, dirfd, const char*, pathname, int, mode
 	strlcat(p, "/", PATH_MAX);
 	strlcat(p, pathname, PATH_MAX);
 
-	error = access(p, mode);
+	error = uk_syscall_r_access(p, mode);
 
 	vn_unlock(vp);
 	fdrop(fp);
@@ -2106,7 +2106,7 @@ UK_SYSCALL_R_DEFINE(int, faccessat, int, dirfd, const char*, pathname, int, mode
 
 int euidaccess(const char *pathname, int mode)
 {
-	return access(pathname, mode);
+	return uk_syscall_r_access(pathname, mode);
 }
 
 __weak_alias(euidaccess,eaccess);
