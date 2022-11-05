@@ -433,7 +433,8 @@ static int uk_9pfs_read(struct vnode *vp, struct vfscore_file *fp,
 	struct uk_9pdev *dev = UK_9PFS_MD(vp->v_mount)->dev;
 	struct uk_9pfid *fid = UK_9PFS_FD(fp)->fid;
 	struct iovec *iov;
-	int rc;
+	int64_t bytes;
+	int i = 0;
 
 	if (vp->v_type == VDIR)
 		return EISDIR;
@@ -443,25 +444,32 @@ static int uk_9pfs_read(struct vnode *vp, struct vfscore_file *fp,
 		return EINVAL;
 	if (uio->uio_offset >= (off_t) vp->v_size)
 		return 0;
-
 	if (!uio->uio_resid)
 		return 0;
 
-	iov = uio->uio_iov;
-	while (!iov->iov_len) {
-		uio->uio_iov++;
-		uio->uio_iovcnt--;
+	while (i < uio->uio_iovcnt) {
+		iov = &uio->uio_iov[i];
+		if (!iov->iov_len) {
+			i++;
+			continue;
+		}
+
+		bytes = uk_9p_read(dev, fid, uio->uio_offset,
+				   iov->iov_len, iov->iov_base);
+		if (unlikely(bytes < 0))
+			return -(int)bytes;
+		if (!bytes)
+			break;
+
+		UK_ASSERT(uio->uio_offset <= __OFF_MAX - bytes);
+		UK_ASSERT(uio->uio_resid >= bytes);
+		UK_ASSERT(iov->iov_len >= (uint64_t)bytes);
+
+		iov->iov_base = (char *)iov->iov_base + bytes;
+		iov->iov_len -= bytes;
+		uio->uio_offset += bytes;
+		uio->uio_resid -= bytes;
 	}
-
-	rc = uk_9p_read(dev, fid, uio->uio_offset,
-			   iov->iov_len, iov->iov_base);
-	if (rc < 0)
-		return -rc;
-
-	iov->iov_base = (char *)iov->iov_base + rc;
-	iov->iov_len -= rc;
-	uio->uio_resid -= rc;
-	uio->uio_offset += rc;
 
 	return 0;
 }
@@ -471,7 +479,8 @@ static int uk_9pfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 	struct uk_9pdev *dev = UK_9PFS_MD(vp->v_mount)->dev;
 	struct uk_9pfid *fid;
 	struct iovec *iov;
-	int rc;
+	int64_t bytes;
+	int rc, i = 0;
 
 	if (vp->v_type == VDIR)
 		return EISDIR;
@@ -481,7 +490,7 @@ static int uk_9pfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 		return EINVAL;
 	if (uio->uio_offset >= LONG_MAX)
 		return EFBIG;
-	if (uio->uio_resid == 0)
+	if (!uio->uio_resid)
 		return 0;
 
 	if (ioflag & IO_APPEND)
@@ -496,29 +505,31 @@ static int uk_9pfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 	if (rc < 0)
 		goto out;
 
-	if (!uio->uio_resid)
-		return 0;
+	while (i < uio->uio_iovcnt) {
+		iov = &uio->uio_iov[i];
+		if (!iov->iov_len) {
+			i++;
+			continue;
+		}
 
-	iov = uio->uio_iov;
-	while (!iov->iov_len) {
-		uio->uio_iov++;
-		uio->uio_iovcnt--;
+		bytes = uk_9p_write(dev, fid, uio->uio_offset,
+				    iov->iov_len, iov->iov_base);
+		if (unlikely(bytes < 0)) {
+			rc = (int)bytes;
+			break;
+		}
+		if (!bytes)
+			break;
+
+		UK_ASSERT(uio->uio_offset <= __OFF_MAX - bytes);
+		UK_ASSERT(uio->uio_resid >= bytes);
+		UK_ASSERT(iov->iov_len >= (uint64_t)bytes);
+
+		iov->iov_base = (char *)iov->iov_base + bytes;
+		iov->iov_len -= bytes;
+		uio->uio_offset += bytes;
+		uio->uio_resid -= bytes;
 	}
-
-	rc = uk_9p_write(dev, fid, uio->uio_offset,
-			    iov->iov_len, iov->iov_base);
-	if (rc < 0)
-		return -rc;
-
-	iov->iov_base = (char *)iov->iov_base + rc;
-	iov->iov_len -= rc;
-	uio->uio_resid -= rc;
-	uio->uio_offset += rc;
-
-	if (rc < 0)
-		goto out;
-
-	rc = 0;
 
 	/*
 	 * If the uio offset after completion of the write requests is bigger
