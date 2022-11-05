@@ -881,44 +881,7 @@ UK_SYSCALL_DEFINE(int, fstat, int, fd, struct stat *, st)
 LFS64(fstat);
 
 static int __fxstatat_helper(int ver __unused, int dirfd, const char *pathname,
-		struct stat *st, int flags)
-{
-	if (pathname[0] == '/' || dirfd == AT_FDCWD) {
-		return stat(pathname, st);
-	}
-	// If AT_EMPTY_PATH and pathname is an empty string, fstatat() operates on
-	// dirfd itself, and in that case it doesn't have to be a directory.
-	if ((flags & AT_EMPTY_PATH) && !pathname[0]) {
-		return fstat(dirfd, st);
-	}
-
-	struct vfscore_file *fp;
-	int error = fget(dirfd, &fp);
-	if (error) {
-		errno = error;
-		return -1;
-	}
-
-	struct vnode *vp = fp->f_dentry->d_vnode;
-	vn_lock(vp);
-
-	char p[PATH_MAX];
-	/* build absolute path */
-	strlcpy(p, fp->f_dentry->d_mount->m_path, PATH_MAX);
-	strlcat(p, fp->f_dentry->d_path, PATH_MAX);
-	strlcat(p, "/", PATH_MAX);
-	strlcat(p, pathname, PATH_MAX);
-
-	if (flags & AT_SYMLINK_NOFOLLOW)
-		error = lstat(p, st);
-	else
-		error = stat(p, st);
-
-	vn_unlock(vp);
-	fdrop(fp);
-
-	return error;
-}
+		struct stat *st, int flags);
 
 #if UK_LIBC_SYSCALLS
 int __fxstatat(int ver __unused, int dirfd, const char *pathname,
@@ -1641,6 +1604,44 @@ LFS64(__lxstat);
 UK_SYSCALL_R_DEFINE(int, lstat, const char*, pathname, struct stat*, st)
 {
 	return __lxstat(1, pathname, st);
+}
+
+static int __fxstatat_helper(int ver __unused, int dirfd, const char *pathname,
+		struct stat *st, int flags)
+{
+	if (pathname[0] == '/' || dirfd == AT_FDCWD) {
+		return uk_syscall_r_stat(pathname, st);
+	}
+	// If AT_EMPTY_PATH and pathname is an empty string, fstatat() operates on
+	// dirfd itself, and in that case it doesn't have to be a directory.
+	if ((flags & AT_EMPTY_PATH) && !pathname[0]) {
+		return uk_syscall_r_fstat(dirfd, st);
+	}
+
+	struct vfscore_file *fp;
+	int error = fget(dirfd, &fp);
+	if (error)
+		return -error;
+
+	struct vnode *vp = fp->f_dentry->d_vnode;
+	vn_lock(vp);
+
+	char p[PATH_MAX];
+	/* build absolute path */
+	strlcpy(p, fp->f_dentry->d_mount->m_path, PATH_MAX);
+	strlcat(p, fp->f_dentry->d_path, PATH_MAX);
+	strlcat(p, "/", PATH_MAX);
+	strlcat(p, pathname, PATH_MAX);
+
+	if (flags & AT_SYMLINK_NOFOLLOW)
+		error = uk_syscall_r_lstat(p, st);
+	else
+		error = uk_syscall_r_stat(p, st);
+
+	vn_unlock(vp);
+	fdrop(fp);
+
+	return error;
 }
 
 #ifdef lstat64
