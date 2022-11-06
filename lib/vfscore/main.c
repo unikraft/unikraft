@@ -1724,6 +1724,7 @@ UK_SYSCALL_R_DEFINE(int, fstatfs, int, fd, struct statfs*, buf)
 
 LFS64(fstatfs);
 
+#if UK_LIBC_SYSCALLS
 static int
 statfs_to_statvfs(struct statvfs *dst, struct statfs *src)
 {
@@ -1741,7 +1742,6 @@ statfs_to_statvfs(struct statvfs *dst, struct statfs *src)
 	return 0;
 }
 
-#if UK_LIBC_SYSCALLS
 int
 statvfs(const char *pathname, struct statvfs *buf)
 {
@@ -1757,9 +1757,7 @@ statvfs(const char *pathname, struct statvfs *buf)
 #endif
 
 LFS64(statvfs);
-#endif /* UK_LIBC_SYSCALLS */
 
-#if UK_LIBC_SYSCALLS
 int
 fstatvfs(int fd, struct statvfs *buf)
 {
