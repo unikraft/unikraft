@@ -41,67 +41,6 @@
 #include <arm/smccc.h>
 #include <uk/plat/common/lcpu.h>
 
-/*
- * we should use inline assembly with volatile constraint to access mmio
- * device memory to avoid compiler use load/store instructions of writeback
- * addressing mode which will cause crash when running in hyper mode
- * unless they will be decoded by hypervisor.
- */
-static inline uint8_t ioreg_read8(const volatile uint8_t *address)
-{
-	uint8_t value;
-
-	asm volatile ("ldrb %w0, [%1]" : "=r"(value) : "r"(address));
-	return value;
-}
-
-static inline uint16_t ioreg_read16(const volatile uint16_t *address)
-{
-	uint16_t value;
-
-	asm volatile ("ldrh %w0, [%1]" : "=r"(value) : "r"(address));
-	return value;
-}
-
-static inline uint32_t ioreg_read32(const volatile uint32_t *address)
-{
-	uint32_t value;
-
-	asm volatile ("ldr %w0, [%1]" : "=r"(value) : "r"(address));
-	return value;
-}
-
-static inline uint64_t ioreg_read64(const volatile uint64_t *address)
-{
-	uint64_t value;
-
-	asm volatile ("ldr %0, [%1]" : "=r"(value) : "r"(address));
-	return value;
-}
-
-static inline void ioreg_write8(const volatile uint8_t *address, uint8_t value)
-{
-	asm volatile ("strb %w0, [%1]" : : "rZ"(value), "r"(address));
-}
-
-static inline void ioreg_write16(const volatile uint16_t *address,
-				 uint16_t value)
-{
-	asm volatile ("strh %w0, [%1]" : : "rZ"(value), "r"(address));
-}
-
-static inline void ioreg_write32(const volatile uint32_t *address,
-				 uint32_t value)
-{
-	asm volatile ("str %w0, [%1]" : : "rZ"(value), "r"(address));
-}
-
-static inline void ioreg_write64(const volatile uint64_t *address,
-				 uint64_t value)
-{
-	asm volatile ("str %0, [%1]" : : "rZ"(value), "r"(address));
-}
-
 static inline void _init_cpufeatures(void)
 {
 }
@@ -110,32 +49,6 @@ static inline void _init_cpufeatures(void)
 #define outb(addr, v)   UK_BUG()
 #define outw(addr, v)   UK_BUG()
 #define inb(addr)       UK_BUG()
-
-/* Macros to access system registers */
-#define SYSREG_READ(reg) \
-({	uint64_t val; \
-	__asm__ __volatile__("mrs %0, " __STRINGIFY(reg) \
-			: "=r" (val)); \
-	val; \
-})
-
-#define SYSREG_WRITE(reg, val) \
-	__asm__ __volatile__("msr " __STRINGIFY(reg) ", %0" \
-			: : "r" ((uint64_t)(val)))
-
-#define SYSREG_READ32(reg) \
-({	uint32_t val; \
-	__asm__ __volatile__("mrs %0, " __STRINGIFY(reg) \
-			: "=r" (val)); \
-	val; \
-})
-
-#define SYSREG_WRITE32(reg, val) \
-	__asm__ __volatile__("msr " __STRINGIFY(reg) ", %0" \
-			: : "r" ((uint32_t)(val)))
-
-#define SYSREG_READ64(reg) SYSREG_READ(reg)
-#define SYSREG_WRITE64(reg, val) SYSREG_WRITE(reg, val)
 
 /*
  * PSCI conduit method to call functions, based on the SMC Calling Convention.
