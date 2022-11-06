@@ -34,6 +34,11 @@ config STACK_SIZE_PAGE_ORDER
 		order. Stack size is equal with 2^order * page size (e.g. 4KB).
 		Only change this if you know what you're doing.
 
+config HAVE_MEMTAG
+	bool
+	help
+	  Memory tagging support.
+
 config HAVE_RANDOM
 	bool
 	help
