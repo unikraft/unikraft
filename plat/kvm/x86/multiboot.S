@@ -51,7 +51,7 @@ multiboot_header:
 	.long -(MULTIBOOT_HEADER_MAGIC+MULTIBOOT_FLAGS) /* checksum */
 	.long multiboot_header				/* header addr */
 	.long 0x100000					/* load addr */
-	.long _edata					/* load end addr */
+	.long __bss_start				/* load end addr */
 	.long _end					/* bss end addr */
 	.long multiboot_start32				/* entry addr */
 
