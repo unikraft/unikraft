@@ -184,15 +184,13 @@ UK_LLSYSCALL_R_DEFINE(int, openat, int, dirfd, const char *, pathname,
 		      int, flags, int, mode)
 {
 	if (pathname[0] == '/' || dirfd == AT_FDCWD) {
-		return uk_syscall_e_open((long int)pathname, flags, mode);
+		return uk_syscall_r_open((long int)pathname, flags, mode);
 	}
 
 	struct vfscore_file *fp;
 	int error = fget(dirfd, &fp);
-	if (error) {
-		errno = error;
-		return -1;
-	}
+	if (error)
+		return -error;
 
 	struct vnode *vp = fp->f_dentry->d_vnode;
 	vn_lock(vp);
@@ -205,12 +203,12 @@ UK_LLSYSCALL_R_DEFINE(int, openat, int, dirfd, const char *, pathname,
 	strlcat(p, "/", PATH_MAX);
 	strlcat(p, pathname, PATH_MAX);
 
-	error = uk_syscall_e_open((long int)p, flags, mode);
+	error = uk_syscall_r_open((long int)p, flags, mode);
 
 	vn_unlock(vp);
 	fdrop(fp);
 
-	return -error;
+	return error;
 }
 
 #if UK_LIBC_SYSCALLS
