@@ -131,20 +131,28 @@ int uk_sched_thread_add(struct uk_sched *s,
 
 int uk_sched_thread_remove(struct uk_thread *t);
 
-
-static inline void uk_sched_thread_blocked(struct uk_sched *s,
-		struct uk_thread *t)
+static inline void uk_sched_thread_blocked(struct uk_thread *t)
 {
-	UK_ASSERT(s);
+	struct uk_sched *s;
+
+	UK_ASSERT(t);
+	UK_ASSERT(t->sched);
+	UK_ASSERT(!is_runnable(t));
+
+	s = t->sched;
 	s->thread_blocked(s, t);
 }
 
-static inline void uk_sched_thread_woken(struct uk_sched *s,
-		struct uk_thread *t)
+static inline void uk_sched_thread_woken(struct uk_thread *t)
 {
-	UK_ASSERT(s);
 
-	set_runnable(t);
+	struct uk_sched *s;
+
+	UK_ASSERT(t);
+	UK_ASSERT(t->sched);
+	UK_ASSERT(is_runnable(t));
+
+	s = t->sched;
 	s->thread_woken(s, t);
 }
 
