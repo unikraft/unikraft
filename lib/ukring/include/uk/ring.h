@@ -85,8 +85,8 @@ uk_ring_enqueue(struct uk_ring *br, void *buf)
 					buf, i, br->br_prod_tail, br->br_cons_tail);
 #endif
 	critical_enter();
+	prod_head = br->br_prod_head;
 	do {
-		prod_head = br->br_prod_head;
 		prod_next = (prod_head + 1) & br->br_prod_mask;
 		cons_tail = br->br_cons_tail;
 
@@ -99,8 +99,9 @@ uk_ring_enqueue(struct uk_ring *br, void *buf)
 			}
 			continue;
 		}
-	} while (!ukarch_compare_exchange_sync((uint32_t *) &br->br_prod_head,
-			prod_head, prod_next));
+	} while (!__atomic_compare_exchange_n(&br->br_prod_head, &prod_head,
+					      prod_next, 0, __ATOMIC_ACQUIRE,
+					      __ATOMIC_RELAXED));
 
 #ifdef DEBUG_BUFRING
 	if (br->br_ring[prod_head] != NULL)
@@ -111,17 +112,17 @@ uk_ring_enqueue(struct uk_ring *br, void *buf)
 	/*
 	 * If there are other enqueues in progress
 	 * that preceded us, we need to wait for them
-	 * to complete 
+	 * to complete
 	 */
 	while (br->br_prod_tail != prod_head)
 		ukarch_spinwait();
-	ukarch_store_n(&br->br_prod_tail, prod_next);
+	__atomic_store_n(&br->br_prod_tail, prod_next, __ATOMIC_RELEASE);
 	critical_exit();
 	return 0;
 }
 
 /*
- * multi-consumer safe dequeue 
+ * multi-consumer safe dequeue
  *
  */
 static __inline void *
@@ -131,16 +132,17 @@ uk_ring_dequeue_mc(struct uk_ring *br)
 	void *buf;
 
 	critical_enter();
+	cons_head = br->br_cons_head;
 	do {
-		cons_head = br->br_cons_head;
 		cons_next = (cons_head + 1) & br->br_cons_mask;
 
 		if (cons_head == br->br_prod_tail) {
 			critical_exit();
 			return NULL;
 		}
-	} while (!ukarch_compare_exchange_sync((uint32_t *) &br->br_cons_head,
-			cons_head, cons_next));
+	} while (!__atomic_compare_exchange_n(&br->br_cons_head, &cons_head,
+					      cons_next, 0, __ATOMIC_ACQUIRE,
+					      __ATOMIC_RELAXED));
 
 	buf = br->br_ring[cons_head];
 #ifdef DEBUG_BUFRING
@@ -154,14 +156,14 @@ uk_ring_dequeue_mc(struct uk_ring *br)
 	while (br->br_cons_tail != cons_head)
 		ukarch_spinwait();
 
-	ukarch_store_n(&br->br_cons_tail, cons_next);
+	__atomic_store_n(&br->br_cons_tail, cons_next, __ATOMIC_RELEASE);
 	critical_exit();
 
 	return buf;
 }
 
 /*
- * single-consumer dequeue 
+ * single-consumer dequeue
  * use where dequeue is protected by a lock
  * e.g. a network driver's tx queue lock
  */
@@ -193,18 +195,18 @@ uk_ring_dequeue_sc(struct uk_ring *br)
 	 * br->br_ring[prod_head] = buf;
 	 * atomic_store_rel_32(&br->br_prod_tail, ...);
 	 *                                                                                prod_tail = br->br_prod_tail;
-	 *                                                                                if (cons_head == prod_tail) 
+	 *                                                                                if (cons_head == prod_tail)
 	 *                                                                                        return (NULL);
 	 *                                                                                <condition is false and code uses invalid(old) buf>`
 	 *
 	 * <1> Load (on core 1) from br->br_ring[cons_head] can be reordered (speculative readed) by CPU.
 	 */
 #if defined(CONFIG_ARCH_ARM_32) || defined(CONFIG_ARCH_ARM_64)
-	cons_head = ukarch_load_n(&br->br_cons_head);
+	cons_head = __atomic_load_n(&br->br_cons_head, __ATOMIC_ACQUIRE);
 #else
 	cons_head = br->br_cons_head;
 #endif
-	prod_tail = ukarch_load_n(&br->br_prod_tail);
+	prod_tail = __atomic_load_n(&br->br_prod_tail, __ATOMIC_ACQUIRE);
 
 	cons_next = (cons_head + 1) & br->br_cons_mask;
 #ifdef PREFETCH_DEFINED

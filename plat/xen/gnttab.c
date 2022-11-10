@@ -128,20 +128,19 @@ grant_ref_t gnttab_grant_transfer(domid_t domid, unsigned long mfn)
 /* Reset flags to zero in order to stop using the grant */
 static int gnttab_reset_flags(grant_ref_t gref)
 {
-	__u16 flags, nflags;
+	__u16 nflags;
 	__u16 *pflags;
 
 	pflags = &gnttab.table[gref].flags;
 	nflags = *pflags;
 
 	do {
-		if ((flags = nflags) & (GTF_reading | GTF_writing)) {
+		if (nflags & (GTF_reading | GTF_writing)) {
 			uk_pr_warn("gref=%u still in use! (0x%x)\n",
-				   gref, flags);
+				   gref, nflags);
 			return 0;
 		}
-	} while ((nflags = ukarch_compare_exchange_sync(pflags, flags, 0))
-			!= flags);
+	} while (__atomic_compare_exchange_sync(pflags, &nflags, 0, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST));
 
 	return 1;
 }
@@ -190,8 +189,11 @@ unsigned long gnttab_end_transfer(grant_ref_t gref)
 		gref < NR_GRANT_ENTRIES);
 
 	pflags = &gnttab.table[gref].flags;
-	while (!((flags = *pflags) & GTF_transfer_committed)) {
-		if (ukarch_compare_exchange_sync(pflags, flags, 0) == flags) {
+	flags = *pflags;
+	while (!(flags & GTF_transfer_committed)) {
+		if (!__atomic_compare_exchange_sync(pflags, flags, 0, 0,
+						    __ATOMIC_SEQ_CST,
+						    __ATOMIC_SEQ_CST)) {
 			uk_pr_info("Release unused transfer grant.\n");
 			put_free_entry(gref);
 			return 0;

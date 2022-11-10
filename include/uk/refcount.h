@@ -129,14 +129,14 @@ static inline int uk_refcount_acquire_if_not_zero(__atomic *ref)
 
 	__refcnt_assert(ref != __NULL && ref->counter < __U32_MAX);
 
-	old = ref->counter;
-	for (;;) {
+	old = ukarch_load_n(&ref->counter);
+	do {
 		if (old == 0)
 			return 0;
-		if (ukarch_compare_exchange_sync(&ref->counter, old, (old + 1))
-				== (old + 1))
-			return 1;
-	}
+	} while (!__atomic_compare_exchange_n(&ref->counter, &old, old + 1, 0,
+					      __ATOMIC_SEQ_CST,
+					      __ATOMIC_SEQ_CST));
+	return 1;
 }
 
 /**
@@ -167,14 +167,14 @@ static inline int uk_refcount_release_if_not_last(__atomic *ref)
 
 	__refcnt_assert(ref != __NULL);
 
-	old = ref->counter;
-	for (;;) {
+	old = ukarch_load_n(&ref->counter);
+	do {
 		if (old == 1)
 			return 0;
-		if (ukarch_compare_exchange_sync(&ref->counter, old, (old - 1))
-				== (old - 1))
-			return 1;
-	}
+	} while (!__atomic_compare_exchange_n(&ref->counter, &old, old - 1, 0,
+					      __ATOMIC_SEQ_CST,
+					      __ATOMIC_SEQ_CST));
+	return 1;
 }
 
 #undef __refcnt_assert
