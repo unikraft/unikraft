@@ -39,8 +39,15 @@
 #include <uk/print.h>
 #include <uk/alloc.h>
 #include <uk/netdev_driver.h>
+#if defined(__i386__) || defined(__x86_64__)
 #include <xen-x86/mm.h>
 #include <xen-x86/irq.h>
+#elif defined(__aarch64__)
+#include <xen-arm/mm.h>
+#include <arm/irq.h>
+#else
+#error "Unsupported architecture"
+#endif
 #include <xenbus/xenbus.h>
 #include <uk/essentials.h>
 #include "netfront.h"
