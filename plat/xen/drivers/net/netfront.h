@@ -40,6 +40,9 @@
 #include <xen/io/netif.h>
 #include <common/gnttab.h>
 #include <common/events.h>
+#if defined(__aarch64__)
+#include <xen-arm/mm.h>
+#endif
 
 
 #define NET_TX_RING_SIZE __CONST_RING_SIZE(netif_tx, PAGE_SIZE)

@@ -45,10 +45,15 @@
 static int xs_read_backend_info(struct xenbus_device *xendev)
 {
 	int rc, val;
-	char path[strlen(xendev->nodename) + sizeof("/backend-id")];
+	char *path = NULL;
 
 	/* Read backend id. */
-	sprintf(path, "%s/backend-id", xendev->nodename);
+	rc = asprintf(&path, "%s/backend-id", xendev->nodename);
+	if (rc <= 0) {
+		uk_pr_err("Failed to allocate format path: %d\n", rc);
+		goto out;
+	}
+
 	rc = xs_read_integer(XBT_NIL, path, &val);
 	if (rc)
 		goto out;
@@ -62,6 +67,7 @@ static int xs_read_backend_info(struct xenbus_device *xendev)
 	}
 
 out:
+	free(path);
 	return rc;
 }
 

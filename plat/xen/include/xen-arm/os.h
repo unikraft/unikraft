@@ -71,7 +71,6 @@ void timer_handler(evtchn_port_t port, struct pt_regs *regs, void *ign);
 extern void *HYPERVISOR_dtb;
 extern shared_info_t *HYPERVISOR_shared_info;
 
-
 #if defined(__arm__)
 // disable interrupts
 static inline void local_irq_disable(void)

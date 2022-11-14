@@ -46,8 +46,14 @@
 #include <uk/9preq.h>
 #include <uk/9pdev_trans.h>
 #include <uk/plat/spinlock.h>
+#if defined(__i386__) || defined(__x86_64__)
 #include <xen-x86/mm.h>
 #include <xen-x86/irq.h>
+#elif defined(__aarch64__)
+#include <xen-arm/mm.h>
+#else
+#error "Unsupported architecture"
+#endif
 #include <xenbus/xenbus.h>
 
 #include "9pfront_xb.h"
