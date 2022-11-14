@@ -1,4 +1,3 @@
-uk_sched_default_init
 uk_sched_register
 uk_sched_create
 uk_sched_start

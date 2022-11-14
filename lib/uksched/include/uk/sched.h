@@ -49,10 +49,6 @@ extern "C" {
 #endif
 
 struct uk_sched;
-
-struct uk_sched *uk_sched_default_init(struct uk_alloc *a);
-
-
 extern struct uk_sched *uk_sched_head;
 int uk_sched_register(struct uk_sched *s);
 

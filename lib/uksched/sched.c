@@ -39,27 +39,12 @@
 #include <uk/alloc.h>
 #include <uk/plat/lcpu.h>
 #include <uk/sched.h>
-#if CONFIG_LIBUKSCHEDCOOP
-#include <uk/schedcoop.h>
-#endif
 #include <uk/syscall.h>
 
 struct uk_sched *uk_sched_head;
 
 /* FIXME: Define per CPU (CPU-local variable declaration needed) */
 struct uk_thread *__uk_sched_thread_current;
-
-/* FIXME Support for external schedulers */
-struct uk_sched *uk_sched_default_init(struct uk_alloc *a)
-{
-	struct uk_sched *s = NULL;
-
-#if CONFIG_LIBUKSCHEDCOOP
-	s = uk_schedcoop_create(a);
-#endif
-
-	return s;
-}
 
 int uk_sched_register(struct uk_sched *s)
 {
