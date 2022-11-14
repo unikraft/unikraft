@@ -1,4 +1,5 @@
 config LIBUKSCHEDCOOP
 	bool "ukschedcoop: Cooperative Round-Robin scheduler"
 	default y
-	depends on LIBUKSCHED
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKSCHED

@@ -117,4 +117,20 @@ if LIBUKBOOT
 		bool "None"
 
 	endchoice
+
+	choice LIBUKBOOT_INITSCHED
+	prompt "Initialize scheduler"
+	default LIBUKBOOT_INITSCHEDCOOP
+	depends on !LIBUKBOOT_NOALLOC
+
+		config LIBUKBOOT_INITSCHEDCOOP
+		bool "Cooperative scheduler"
+		select LIBUKSCHEDCOOP
+		help
+		  Initialize ukschedcoop as cooperative scheduler on the boot CPU.
+
+		config LIBUKBOOT_NOSCHED
+		bool "None"
+
+	endchoice
 endif

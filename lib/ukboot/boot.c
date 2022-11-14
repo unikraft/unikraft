@@ -52,7 +52,10 @@
 #endif
 #if CONFIG_LIBUKSCHED
 #include <uk/sched.h>
-#endif
+#endif /* CONFIG_LIBUKSCHED */
+#if CONFIG_LIBUKBOOT_INITSCHEDCOOP
+#include <uk/schedcoop.h>
+#endif /* CONFIG_LIBUKBOOT_INITSCHEDCOOP */
 #include <uk/arch/lcpu.h>
 #include <uk/plat/bootstrap.h>
 #include <uk/plat/memory.h>
@@ -200,13 +203,15 @@ void ukplat_entry(int argc, char *argv[])
 	uk_pr_info("Initialize platform time...\n");
 	ukplat_time_init();
 
-#if CONFIG_LIBUKSCHED
-	/* Init scheduler. */
-	s = uk_sched_default_init(a);
-	if (unlikely(!s))
-		UK_CRASH("Could not initialize the scheduler\n");
-	uk_sched_start(s);
+#if !CONFIG_LIBUKBOOT_NOSCHED
+	uk_pr_info("Initialize scheduling...\n");
+#if CONFIG_LIBUKBOOT_INITSCHEDCOOP
+	s = uk_schedcoop_create(a);
 #endif
+	if (unlikely(!s))
+		UK_CRASH("Failed to initialize scheduling\n");
+	uk_sched_start(s);
+#endif /* !CONFIG_LIBUKBOOT_NOSCHED */
 
 	argc -= kern_args;
 	argv = &argv[kern_args];
