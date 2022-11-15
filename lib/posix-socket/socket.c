@@ -49,6 +49,7 @@ UK_TRACEPOINT(trace_posix_socket_create_err, "%d", int);
 UK_SYSCALL_R_DEFINE(int, socket, int, family, int, type, int, protocol)
 {
 	struct posix_socket_driver *d;
+	struct posix_socket_file dummy;
 	void *sock;
 	int vfs_fd;
 	int ret;
@@ -80,7 +81,13 @@ UK_SYSCALL_R_DEFINE(int, socket, int, family, int, type, int, protocol)
 	trace_posix_socket_create_ret(ret);
 	return ret;
 EXIT_ERR_CLOSE:
-	posix_socket_close(sock);
+	dummy = (struct posix_socket_file){
+		.sock_data = sock,
+		.vfs_file = NULL,
+		.driver = d,
+		.type = VSOCK,
+	};
+	posix_socket_close(&dummy);
 EXIT_ERR:
 	PSOCKET_ERR("socket failed for family %d, type: %d, protocol: %d: %d\n",
 		    family, type, protocol, ret);
@@ -97,6 +104,7 @@ int do_accept4(int sock, struct sockaddr *addr, socklen_t *addr_len,
 	       int flags)
 {
 	struct posix_socket_file *file;
+	struct posix_socket_file dummy;
 	void *new_sock;
 	int vfs_fd;
 	int ret;
@@ -129,7 +137,13 @@ int do_accept4(int sock, struct sockaddr *addr, socklen_t *addr_len,
 	trace_posix_socket_accept_ret(ret);
 	return ret;
 EXIT_ERR_CLOSE:
-	posix_socket_close(new_sock);
+	dummy = (struct posix_socket_file){
+		.sock_data = new_sock,
+		.vfs_file = NULL,
+		.driver = file->driver,
+		.type = VSOCK,
+	};
+	posix_socket_close(&dummy);
 EXIT_ERR_PUT:
 	vfscore_put_file(file->vfs_file);
 EXIT_ERR:
@@ -591,6 +605,7 @@ UK_SYSCALL_R_DEFINE(int, socketpair, int, family, int, type, int, protocol,
 		    int *, usockfd)
 {
 	struct posix_socket_driver *d;
+	struct posix_socket_file dummy;
 	void *usockdata[2];
 	int vfs_fd1, vfs_fd2;
 	int ret;
@@ -629,8 +644,20 @@ UK_SYSCALL_R_DEFINE(int, socketpair, int, family, int, type, int, protocol,
 EXIT_ERR_FREE_FD1:
 	/* TODO: Broken error handling. Leaking vfs_fd1! */
 EXIT_ERR_CLOSE:
-	posix_socket_close(usockdata[0]);
-	posix_socket_close(usockdata[1]);
+	dummy = (struct posix_socket_file){
+		.sock_data = usockdata[0],
+		.vfs_file = NULL,
+		.driver = d,
+		.type = VSOCK,
+	};
+	posix_socket_close(&dummy);
+	dummy = (struct posix_socket_file){
+		.sock_data = usockdata[1],
+		.vfs_file = NULL,
+		.driver = d,
+		.type = VSOCK,
+	};
+	posix_socket_close(&dummy);
 EXIT_ERR:
 	PSOCKET_ERR("socketpair failed: %d\n", ret);
 	trace_posix_socket_socketpair_err(ret);
