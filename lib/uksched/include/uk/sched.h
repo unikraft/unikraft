@@ -1,11 +1,12 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
- *          Simon Kuenzer <simon.kuenzer@neclab.eu>
+ *          Simon Kuenzer <simon@unikraft.io>
  *
  * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
  * Copyright (c) 2022, NEC Laboratories GmbH, NEC Corrporation.
  *                     All rights reserved.
+ * Copyright (c) 2022, Unikraft GmbH. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -49,8 +50,6 @@ extern "C" {
 #endif
 
 struct uk_sched;
-extern struct uk_sched *uk_sched_head;
-int uk_sched_register(struct uk_sched *s);
 
 static inline struct uk_sched *uk_sched_current(void)
 {
@@ -137,33 +136,6 @@ static inline void uk_sched_thread_woken(struct uk_thread *t)
 	s->thread_woken(s, t);
 }
 
-/*
- * Internal scheduler functions
- */
-#define uk_sched_init(s, start_func, yield_func, \
-		thread_add_func, thread_remove_func, \
-		thread_blocked_func, thread_woken_func, \
-		def_allocator) \
-	do { \
-		(s)->sched_start     = start_func; \
-		(s)->yield           = yield_func; \
-		(s)->thread_add      = thread_add_func; \
-		(s)->thread_remove   = thread_remove_func; \
-		(s)->thread_blocked  = thread_blocked_func; \
-		(s)->thread_woken    = thread_woken_func; \
-		uk_sched_register((s)); \
-		\
-		(s)->a = (def_allocator); \
-		(s)->a_stack = (def_allocator); \
-		(s)->a_uktls = (def_allocator); \
-		UK_TAILQ_INIT(&(s)->thread_list); \
-		UK_TAILQ_INIT(&(s)->exited_threads); \
-	} while (0)
-
-/*
- * Public scheduler functions
- */
-
 /**
  * Create a main thread from current context and call thread starter function
  */
@@ -243,56 +215,12 @@ struct uk_thread *uk_sched_thread_create_fn2(struct uk_sched *s,
 				   0x0, false, false,		\
 				   (name), NULL, NULL)
 
-
-
-
-
-/*
- * Internal thread scheduling functions
- */
-
-/**
- * Releases self-exited threads (garbage collection)
- *
- * @return
- *   - (0): No work was done
- *   - (>0): Number of threads that were cleaned up
- */
-unsigned int uk_sched_thread_gc(struct uk_sched *sched);
-
-static inline
-void uk_sched_thread_switch(struct uk_thread *next)
-{
-	struct uk_thread *prev = __uk_sched_thread_current;
-
-	UK_ASSERT(prev);
-
-	__uk_sched_thread_current = next;
-	prev->tlsp = ukplat_tlsp_get();
-	if (prev->ectx)
-		ukarch_ectx_store(prev->ectx);
-
-	/* Load next TLS and extended registers before context switch.
-	 * This avoids requiring special initialization code for newly
-	 * created threads to do the loading.
-	 */
-	ukplat_tlsp_set(next->tlsp);
-	if (next->ectx)
-		ukarch_ectx_load(next->ectx);
-
-	ukarch_ctx_switch(&prev->ctx, &next->ctx);
-}
-
 #define uk_sched_foreach_thread(sched, itr)				\
 	UK_TAILQ_FOREACH((itr), &(sched)->thread_list, thread_list)
 #define uk_sched_foreach_thread_safe(sched, itr, tmp)			\
 	UK_TAILQ_FOREACH_SAFE((itr), &(sched)->thread_list, thread_list, (tmp))
 
 void uk_sched_dumpk_threads(int klvl, struct uk_sched *s);
-
-/*
- * Public thread scheduling functions
- */
 
 void uk_sched_thread_sleep(__nsec nsec);
 
