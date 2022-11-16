@@ -12,6 +12,21 @@ menuconfig PLAT_KVM
 
 if (PLAT_KVM)
 
+config KVM_VMM_QEMU
+        bool "use QEMU to run kvm VM"
+        default y
+        help
+          Build an image that can be run with QEMU/kvm.
+
+config KVM_VMM_FIRECRACKER
+        bool "use Firecracker to run kvm VM [WIP]"
+        default n
+        depends on ARCH_X86_64
+        help
+          Build an image that can be run with Firecracker.
+          This is work in progress; the image will boot,
+          but there is currently no device support.
+
 menu "Console Options"
 
 config KVM_KERNEL_SERIAL_CONSOLE

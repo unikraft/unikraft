@@ -26,7 +26,7 @@
 #include <uk/arch/limits.h> /* for __PAGE_SIZE */
 #include <uk/plat/common/common.lds.h>
 
-ENTRY(_libkvmplat_entry)
+ENTRY(lcpu_start64_firecracker)
 SECTIONS
 {
 	. = 0x100000;

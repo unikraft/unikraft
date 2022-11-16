@@ -52,6 +52,15 @@
 x86_start16_addr:
 	.quad	LOAD_ADDR16
 
+.section .bss
+.space 4096
+lcpu_bootstack:
+
+.section .rodata
+lcpu_boot_startup_args:
+	.quad	_libkvmplat_entry
+	.quad	lcpu_bootstack
+
 /* The following section has to be copied to LOAD_ADDR16 (4KiB max!) at runtime
  * as 16-bit real mode entry point
  */
@@ -218,6 +227,22 @@ END(lcpu_start32)
 
 .code64
 .section .text.boot.64
+ENTRY(lcpu_start64_firecracker)
+	/* Load pml4 pointer */
+    movq 	$x86_bpt_pml4, %rax
+    movq 	%rax, %cr3
+	
+	/* Enable paging */
+	movq %cr0, %rax
+    orl $X86_CR0_PG, %eax
+    movq %rax, %cr0
+
+	/* Startup args for boot CPU */
+	movl	$lcpu_boot_startup_args, %edi
+	jmp lcpu_start64
+
+.code64
+.section .text.boot.64
 ENTRY(lcpu_start64)
 	/* Save the startup args pointer */
 	movq	%rdi, %r8
@@ -284,15 +309,6 @@ no_args:
 	movq	LCPU_STACKP_OFFSET(%rbp), %rsp
 
 jump_to_entry:
-	/* According to System V AMD64 the stack pointer must be aligned to
-	 * 16-bytes. In other words, the value (RSP+8) must be a multiple of
-	 * 16 when control is transferred to the function entry point (i.e.,
-	 * the compiler expects a misalignment due to the return address having
-	 * been pushed onto the stack).
-	 */
-	andq	$~0xf, %rsp
-	subq	$0x8, %rsp
-
 	movq	%rbp, %rdi
 #if !__OMIT_FRAMEPOINTER__
 	/* Reset frame pointer */

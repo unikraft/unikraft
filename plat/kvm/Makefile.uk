@@ -2,20 +2,37 @@
 ## KVM platform registration
 ##
 $(eval $(call addplat_s,kvm,$(CONFIG_PLAT_KVM)))
+$(eval $(call addplat_s,kvmq,$(CONFIG_KVM_VMM_QEMU)))
+UK_PLAT_KVMQ_LINKER := $(UK_PLAT_KVMQ_BASE)/Linker.uk
+$(eval $(call addplat_s,kvmfc,$(CONFIG_KVM_VMM_FIRECRACKER)))
+UK_PLAT_KVMFC_LINKER := $(UK_PLAT_KVMFC_BASE)/Linker.uk
+
+##
+## Populate LIBKVMPLAT_BASE for common files
+##
+ifeq ($(CONFIG_KVM_VMM_QEMU),y)
+LIBKVMPLAT_BASE := $(UK_PLAT_KVMQ_BASE)
+else ifeq ($(CONFIG_KVM_VMM_FIRECRACKER),y)
+LIBKVMPLAT_BASE := $(UK_PLAT_KVMFC_BASE)
+endif
 
 ##
 ## KVM platform library registration
 ##
-$(eval $(call addplatlib,kvm,libkvmplat))
-$(eval $(call addplatlib_s,kvm,libkvmpci,$(CONFIG_KVM_PCI)))
-$(eval $(call addplatlib_s,kvm,libkvmpf,$(CONFIG_KVM_PF)))
-$(eval $(call addplatlib_s,kvm,libkvmvirtio,$(CONFIG_VIRTIO_BUS)))
-$(eval $(call addplatlib_s,kvm,libkvmvirtionet,$(CONFIG_VIRTIO_NET)))
-$(eval $(call addplatlib_s,kvm,libkvmvirtioblk,$(CONFIG_VIRTIO_BLK)))
-$(eval $(call addplatlib_s,kvm,libkvmvirtio9p,$(CONFIG_VIRTIO_9P)))
-$(eval $(call addplatlib_s,kvm,libkvmofw,$(CONFIG_LIBOFW)))
-$(eval $(call addplatlib_s,kvm,libkvmgic,$(CONFIG_LIBGIC)))
-$(eval $(call addplatlib_s,kvm,libkvmpl031,$(CONFIG_RTC_PL031)))
+$(eval $(call addplatlib,kvmq,libkvmqplat,$(CONFIG_KVM_VMM_QEMU)))
+$(eval $(call addplatlib,kvmfc,libkvmfcplat,$(CONFIG_KVM_VMM_FIRECRACKER)))
+$(eval $(call addplatlib_s,kvmq,libkvmpci,$(CONFIG_KVM_PCI)))
+$(eval $(call addplatlib_s,kvmq,libkvmvirtio,$(CONFIG_VIRTIO_BUS)))
+$(eval $(call addplatlib_s,kvmq,libkvmpf,$(CONFIG_KVM_PF)))
+$(eval $(call addplatlib_s,kvmfc,libkvmvirtio,$(CONFIG_VIRTIO_BUS)))
+$(eval $(call addplatlib_s,kvmq,libkvmvirtio,$(CONFIG_VIRTIO_BUS)))
+$(eval $(call addplatlib_s,kvmq,libkvmvirtionet,$(CONFIG_VIRTIO_NET)))
+$(eval $(call addplatlib_s,kvmfc,libkvmvirtionet,$(CONFIG_VIRTIO_NET)))
+$(eval $(call addplatlib_s,kvmq,libkvmvirtioblk,$(CONFIG_VIRTIO_BLK)))
+$(eval $(call addplatlib_s,kvmq,libkvmvirtio9p,$(CONFIG_VIRTIO_9P)))
+$(eval $(call addplatlib_s,kvmq,libkvmofw,$(CONFIG_LIBOFW)))
+$(eval $(call addplatlib_s,kvmq,libkvmgic,$(CONFIG_LIBGIC)))
+$(eval $(call addplatlib_s,kvmq,libkvmpl031,$(CONFIG_RTC_PL031)))
 
 ##
 ## Platform library definitions
@@ -128,6 +145,23 @@ LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/io.c
 LIBKVMPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/lcpu.c|common
 LIBKVMPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/memory.c|common
 LIBKVMPLAT_SRCS-y              += $(UK_PLAT_KVM_DEF_LDS)
+
+ifeq ($(CONFIG_KVM_VMM_QEMU),y)
+LIBKVMQPLAT_SRCS-y        := $(LIBKVMPLAT_SRCS-y)
+LIBKVMQPLAT_ASINCLUDES-y  := $(LIBKVMPLAT_ASINCLUDES-y)
+LIBKVMQPLAT_CINCLUDES-y   := $(LIBKVMPLAT_CINCLUDES-y)
+LIBKVMQPLAT_ASFLAGS       := $(LIBKVMPLAT_ASFLAGS) -DKVMQPLAT
+LIBKVMQPLAT_CFLAGS        := $(LIBKVMPLAT_CFLAGS) -DKVMQPLAT
+LIBKVMQPLAT_CXXFLAGS      := $(LIBKVMPLAT_CXXFLAGS) -DKVMQPLAT
+endif
+ifeq ($(CONFIG_KVM_VMM_FIRECRACKER),y)
+LIBKVMFCPLAT_SRCS-y        := $(LIBKVMPLAT_SRCS-y)
+LIBKVMFCPLAT_ASINCLUDES-y  := $(LIBKVMPLAT_ASINCLUDES-y)
+LIBKVMFCPLAT_CINCLUDES-y   := $(LIBKVMPLAT_CINCLUDES-y)
+LIBKVMFCPLAT_ASFLAGS       := $(LIBKVMPLAT_ASFLAGS) -DKVMFCPLAT
+LIBKVMFCPLAT_CFLAGS        := $(LIBKVMPLAT_CFLAGS) -DKVMFCPLAT
+LIBKVMFCPLAT_CXXFLAGS      := $(LIBKVMPLAT_CXXFLAGS) -DKVMFCPLAT
+endif
 
 ##
 ## PCI library definitions

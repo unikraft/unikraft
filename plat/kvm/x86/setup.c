@@ -34,6 +34,7 @@
 #include <kvm/console.h>
 #include <kvm/intctrl.h>
 #include <kvm-x86/bootinfo.h>
+#include <kvm-x86/bootparams.h>
 #include <kvm-x86/multiboot.h>
 #include <kvm-x86/multiboot_defs.h>
 #include <uk/arch/limits.h>
@@ -51,6 +52,7 @@
 #include <uk/falloc.h>
 #endif /* CONFIG_PAGING */
 
+#define BOOT_PARAM_BASE 0x7000
 #define PLATFORM_MEM_START 0x100000
 #define PLATFORM_MAX_MEM_ADDR 0x100000000 /* 4 GiB */
 
@@ -59,6 +61,80 @@ static char cmdline[MAX_CMDLINE_SIZE];
 
 struct kvmplat_config _libkvmplat_cfg = { 0 };
 struct uk_bootinfo bootinfo = { 0 };
+
+static inline void _bp_get_cmdline(struct boot_params *bp)
+{
+	__u64 cmdline_addr;
+	char *bp_cmdline;
+	size_t bp_cmdline_len = bp->hdr.cmdline_size;
+
+	cmdline_addr = bp->hdr.cmd_line_ptr;
+	cmdline_addr |= (__u64)bp->ext_ramdisk_size << 32;
+	bp_cmdline = (char *)cmdline_addr;
+	uk_pr_info("command line at 0x%lx\n", cmdline_addr);
+	uk_pr_info("command line size 0x%lx\n", bp_cmdline_len);
+
+	if (!bp_cmdline) {
+			uk_pr_info("No command line provided\n");
+			strncpy(cmdline, CONFIG_UK_NAME, sizeof(cmdline));
+			return;
+	}
+
+	if (bp_cmdline_len >= sizeof(cmdline)) {
+			bp_cmdline_len = sizeof(cmdline) - 1;
+			uk_pr_info("Command line too long, truncated\n");
+	}
+	memcpy(cmdline, bp_cmdline, bp_cmdline_len);
+	/* ensure null termination */
+	cmdline[bp_cmdline_len] = '\0';
+
+	uk_pr_info("Command line: %s\n", cmdline);
+}
+
+static inline void _bp_init_mem(struct boot_params *bp)
+{
+	int i;
+	size_t max_addr;
+	struct boot_e820_entry *e820_entry = NULL;
+
+	uk_pr_info("boot_params: %d entries in e820\n", bp->e820_entries);
+	for (i=0; i < bp->e820_entries; i++) {
+			uk_pr_info("  e820 entry %d:\n", i);
+			uk_pr_info("    addr: 0x%lx\n", bp->e820_table[i].addr);
+			uk_pr_info("    size: 0x%lx\n", bp->e820_table[i].size);
+			uk_pr_info("    type: 0x%x\n", bp->e820_table[i].type);
+	}
+
+	for (i = 0; i < bp->e820_entries; i++) {
+			uk_pr_info("Checking e820 entry %d\n", i);
+			if (bp->e820_table[i].addr == PLATFORM_MEM_START
+				&& bp->e820_table[i].type == 0x1) {
+					e820_entry = &bp->e820_table[i];
+					break;
+			}
+	}
+	if (!e820_entry)
+			UK_CRASH("Could not find suitable memory region!\n");
+
+	uk_pr_info("Using e820 memory region %d\n", i);
+	max_addr = e820_entry->addr + e820_entry->size;
+	if (max_addr > PLATFORM_MAX_MEM_ADDR)
+			max_addr = PLATFORM_MAX_MEM_ADDR;
+	UK_ASSERT((size_t)__END <= max_addr);
+
+	_libkvmplat_cfg.heap.start = ALIGN_UP((uintptr_t)__END, __PAGE_SIZE);
+	_libkvmplat_cfg.heap.end   = (uintptr_t) max_addr - __STACK_SIZE;
+	_libkvmplat_cfg.heap.len   = _libkvmplat_cfg.heap.end
+									- _libkvmplat_cfg.heap.start;
+	_libkvmplat_cfg.bstack.start = _libkvmplat_cfg.heap.end;
+	_libkvmplat_cfg.bstack.end   = max_addr;
+	_libkvmplat_cfg.bstack.len   = __STACK_SIZE;
+}
+
+static inline void _bp_init_initrd(struct boot_params *bp __unused)
+{
+    /* Firecracker does not have initrd support yet. */
+}
 
 static void _convert_mbinfo(struct multiboot_info *mi)
 {
@@ -449,7 +525,11 @@ static void __noreturn _libkvmplat_entry2(void)
 
 void _libkvmplat_entry(struct lcpu *lcpu, void *arg)
 {
+#if KVMQPLAT
 	struct multiboot_info *mi = (struct multiboot_info *)arg;
+#elif KVMFCPLAT
+	struct boot_params *bp = (struct boot_params *)BOOT_PARAM_BASE;
+#endif
 	int rc;
 
 	_libkvmplat_init_console();
@@ -466,6 +546,7 @@ void _libkvmplat_entry(struct lcpu *lcpu, void *arg)
 	intctrl_init();
 
 	uk_pr_info("Entering from KVM (x86)...\n");
+#if KVMQPLAT
 	uk_pr_info("     multiboot: %p\n", mi);
 
 	_convert_mbinfo(mi);
@@ -477,6 +558,12 @@ void _libkvmplat_entry(struct lcpu *lcpu, void *arg)
 	_get_cmdline(&bootinfo);
 	_init_mem(&bootinfo);
 	_init_initrd(&bootinfo);
+#elif KVMFCPLAT
+	uk_pr_info("     boot params: %p\n", bp);
+	_bp_init_mem(bp);
+	_bp_get_cmdline(bp);
+	_bp_init_initrd(bp);
+#endif
 #ifdef CONFIG_PAGING
 	_init_paging(mi);
 #endif /* CONFIG_PAGING */
