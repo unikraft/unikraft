@@ -33,7 +33,7 @@
 #include <uk/plat/lcpu.h>
 #include <uk/plat/memory.h>
 #include <uk/plat/time.h>
-#include <uk/sched.h>
+#include <uk/sched_impl.h>
 #include <uk/schedcoop.h>
 #include <uk/essentials.h>
 
