@@ -48,6 +48,9 @@ unsigned long read_cr2(void)
 
 void system_off(void)
 {
+	#if KVMFCPLAT
+        	outb(0x64, 0xFE);
+	#endif
 	/*
 	 * Perform an ACPI shutdown by writing (SLP_TYPa | SLP_EN) to PM1a_CNT.
 	 * Generally speaking, we'd have to jump through a lot of hoops to
