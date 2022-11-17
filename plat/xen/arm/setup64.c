@@ -340,6 +340,9 @@ void _libxenplat_armentry(void *dtb_pointer, paddr_t physical_offset)
 	if (unlikely(r))
 		UK_CRASH("Could not initialize the IRQ controller: %d\n", r);
 
+	/* Set up events. */
+	init_events();
+
 	/* Initialize logical boot CPU */
 	r = lcpu_init(lcpu_get_bsp());
 	if (unlikely(r))
