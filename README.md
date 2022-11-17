@@ -3,6 +3,7 @@
 [![](https://img.shields.io/badge/version-v0.10.0%20(Phoebe)-%23EC591A)][unikraft-latest]
 [![](https://img.shields.io/static/v1?label=license&message=BSD-3&color=%23385177)][unikraft-license]
 [![](https://img.shields.io/discord/762976922531528725.svg?label=discord&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2)][unikraft-discord]
+[![Codacy Badge](https://api.codacy.com/project/badge/Grade/18a2b28f5eee4477acd818312c6d2819)](https://app.codacy.com/gh/unikraft/unikraft?utm_source=github.com&utm_medium=referral&utm_content=unikraft/unikraft&utm_campaign=Badge_Grade_Settings)
 [![](https://img.shields.io/github/contributors/unikraft/unikraft)](https://github.com/unikraft/unikraft/graphs/contributors)
 
 ***Unleash the Power of Unikernels!***
