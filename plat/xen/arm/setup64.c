@@ -345,6 +345,13 @@ void _libxenplat_armentry(void *dtb_pointer, paddr_t physical_offset)
 	if (unlikely(r))
 		UK_CRASH("Failed to initialize bootstrapping CPU: %d\n", r);
 
+#ifdef CONFIG_HAVE_SMP
+	ret = lcpu_mp_init(CONFIG_UKPLAT_LCPU_RUN_IRQ,
+			   CONFIG_UKPLAT_LCPU_WAKEUP_IRQ, _libkvmplat_cfg.dtb);
+	if (unlikely(ret))
+		UK_CRASH("SMP initialization failed: %d\n", ret);
+#endif /* CONFIG_HAVE_SMP */
+
 	/* Fill in start_info */
 	get_console();
 	get_xenbus();
