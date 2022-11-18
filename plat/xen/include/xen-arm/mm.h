@@ -210,6 +210,7 @@ extern paddr_t _libxenplat_paddr_offset;
 
 #ifndef __ASSEMBLY__
 void arch_mm_prepare(unsigned long *start_pfn_p, unsigned long *max_pfn_p);
+void set_pgt_entry(lpae_t *ptr, lpae_t val);
 #endif
 
 #define arch_mm_init(a)
