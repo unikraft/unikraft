@@ -72,6 +72,8 @@ extern paddr_t _libxenplat_paddr_offset;
 #define FIX_GIC_START   (FIX_GIC_TOP - SZ_2M)
 #define FIX_XS_TOP      (FIX_GIC_START)
 #define FIX_XS_START    (FIX_XS_TOP - SZ_2M)
+#define FIX_GNT_TOP     (FIX_XS_START)
+#define FIX_GNT_START   (FIX_GNT_TOP - SZ_2M)
 
 /*
  * Memory types available.
