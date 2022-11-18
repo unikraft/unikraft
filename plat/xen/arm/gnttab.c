@@ -34,6 +34,8 @@
 #include <xen-arm/os.h>
 #include <xen-arm/mm.h>
 
+extern lpae_t fixmap_pgtable[512];
+
 /* Get Xen's suggested physical page assignments for the grant table. */
 static paddr_t get_gnttab_base(void)
 {
@@ -62,11 +64,19 @@ static paddr_t get_gnttab_base(void)
 	return gnttab_base;
 }
 
+static paddr_t map_gnttab(paddr_t phys)
+{
+	uk_pr_debug("%s, phys = 0x%lx\n", __func__, phys);
+
+	set_pgt_entry(&fixmap_pgtable[l2_pgt_idx(FIX_GNT_START)],
+		      ((phys & L2_MASK) | BLOCK_DEF_ATTR | L2_BLOCK));
+
+	return (paddr_t)(FIX_GNT_START + (phys & L2_OFFSET));
+}
+
 grant_entry_v1_t *gnttab_arch_init(int nr_grant_frames)
 {
 	struct xen_add_to_physmap xatp;
-	struct gnttab_setup_table setup;
-	xen_pfn_t frames[nr_grant_frames];
 	paddr_t gnttab_table;
 	int i;
 
@@ -82,15 +92,5 @@ grant_entry_v1_t *gnttab_arch_init(int nr_grant_frames)
 			BUG();
 	}
 
-	setup.dom = DOMID_SELF;
-	setup.nr_frames = nr_grant_frames;
-	set_xen_guest_handle(setup.frame_list, frames);
-	HYPERVISOR_grant_table_op(GNTTABOP_setup_table, &setup, 1);
-	if (setup.status != 0) {
-		uk_pr_debug("GNTTABOP_setup_table failed; status = %d\n",
-					setup.status);
-		BUG();
-	}
-
-	return to_virt(gnttab_table);
+	return (grant_entry_v1_t *)map_gnttab(gnttab_table);
 }
