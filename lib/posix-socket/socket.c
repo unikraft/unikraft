@@ -481,7 +481,7 @@ EXIT_ERR:
 /* Provide wrapper (if not provided by Musl) or some other libc. */
 ssize_t recv(int sock, void *buf, size_t len, int flags)
 {
-	return recvfrom(sock, buf, len, flags, NULL, NULL);
+	return uk_syscall_e_recvfrom(sock, buf, len, flags, NULL, NULL);
 }
 #endif /* UK_LIBC_SYSCALLS */
 
@@ -596,7 +596,7 @@ EXIT_ERR:
 /* Provide wrapper (if not provided by Musl) or some other libc. */
 ssize_t send(int sock, const void *buf, size_t len, int flags)
 {
-	return sendto(sock, buf, len, flags, NULL, 0);
+	return uk_syscall_e_sendto(sock, buf, len, flags, NULL, 0);
 }
 #endif /* UK_LIBC_SYSCALLS */
 
