@@ -1,0 +1,25 @@
+#!/bin/bash
+_SELF=$( readlink -f "$0" )
+_SELF_BASE=$( dirname "${_SELF}" )
+
+if [ -z "${_SELF}" ]; then
+	echo "Failed to detect fully qualified path of '$0'" 1>&2
+	exit 2
+fi
+if [ -z "${_SELF}" -a ! -d "${_SELF_BASE}" ]; then
+	echo "Failed to detect fully qualified base directory of '$0'" 1>&2
+	exit 2
+fi
+
+_CHECKPATCHPL="${_SELF_BASE}/checkpatch.pl"
+if [ ! -x "${_CHECKPATCHPL}" ]; then
+	echo "Failed to find 'checkpatch.pl' under '${_SELF_BASE}'" 1>&2
+	exit 2
+fi
+
+_CHECKPATCHCONF=
+if [ -f "${_SELF_BASE}/../../.checkpatch.conf" ]; then
+	_CHECKPATCHCONF=$( cat "${_SELF_BASE}/../../.checkpatch.conf" )
+fi
+
+exec "${_CHECKPATCHPL}" ${_CHECKPATCHCONF} "$@"
