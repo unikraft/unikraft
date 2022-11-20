@@ -50,7 +50,6 @@
 #include <uk/thread.h>
 #include <uk/thread.h>
 #include <uk/list.h>
-#include <uk/time_types.h>
 #include <uk/sched.h>
 #include <uk/list.h>
 #include <uk/assert.h>
