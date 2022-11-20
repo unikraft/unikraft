@@ -1,7 +1,6 @@
 menuconfig LIBPOSIX_FUTEX
 	bool "posix-futex: Futex"
-	select NOLIBC if !HAVE_LIBC
-	select UKTIME if !HAVE_LIBC
+	select LIBNOLIBC if !HAVE_LIBC
 	select LIBUKSCHED
 	select LIBUKLOCK
 	select LIBUKDEBUG
