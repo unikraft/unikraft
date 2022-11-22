@@ -36,6 +36,7 @@
 #include <uk/config.h>
 
 #include <stddef.h>
+#include <string.h>
 #include <stdio.h>
 #include <errno.h>
 
@@ -52,6 +53,9 @@
 #endif
 #if CONFIG_LIBUKSCHED
 #include <uk/sched.h>
+#endif
+#if CONFIG_LIBUKMMIO
+#include <uk/mmio.h>
 #endif
 #include <uk/arch/lcpu.h>
 #include <uk/plat/bootstrap.h>
@@ -270,6 +274,15 @@ void ukplat_entry(int argc, char *argv[])
 	/* On most platforms the timer depend on an initialized IRQ subsystem */
 	uk_pr_info("Initialize platform time...\n");
 	ukplat_time_init();
+
+#if CONFIG_LIBUKMMIO
+	uk_pr_info("Searching for MMIO devices\n");
+	for (int i = 1; i < argc; i++) {
+		if (!strncmp(argv[i], "virtio_mmio.device=", 19)) {
+			uk_mmio_add_dev(argv[i]);
+		}
+	}
+#endif
 
 #if CONFIG_LIBUKSCHED
 	/* Init scheduler. */

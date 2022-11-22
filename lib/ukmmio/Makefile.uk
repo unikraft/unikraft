@@ -1,0 +1,10 @@
+$(eval $(call addlib_s,libukmmio,$(CONFIG_LIBUKMMIO)))
+
+# Register to uklibparam, sets "virtio_mmio" as parameter prefix (virtio_mmio.*)
+# $(eval $(call addlib_paramprefix,libukmmio,virtio_mmio))
+
+CINCLUDES-y += -I$(LIBUKMMIO_BASE)/include
+
+LIBUKMMIO_CFLAGS-$(call gcc_version_ge,8,0) += -Wno-cast-function-type
+
+LIBUKMMIO_SRCS-y += $(LIBUKMMIO_BASE)/mmio.c

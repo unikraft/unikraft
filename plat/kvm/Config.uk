@@ -93,7 +93,6 @@ config KVM_PCI
 config KVM_PF
        bool "Platform Bus Driver"
        default y
-       depends on (ARCH_ARM_64)
        select LIBUKBUS
        help
                Platform bus driver for probing and operating platform devices
@@ -118,6 +117,15 @@ config VIRTIO_PCI
        select VIRTIO_BUS
        help
                Support virtio devices on PCI bus
+
+config VIRTIO_MMIO
+       bool "Virtio MMIO device support"
+       default n
+       depends on KVM_PF
+       select VIRTIO_BUS
+       select LIBUKMMIO if ARCH_X86_64
+       help
+               Support virtio devices on MMIO bus
 
 config VIRTIO_NET
        bool "Virtio Net device"
