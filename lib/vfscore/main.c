@@ -1609,12 +1609,12 @@ static int __fxstatat_helper(int ver __unused, int dirfd, const char *pathname,
 		struct stat *st, int flags)
 {
 	if (pathname[0] == '/' || dirfd == AT_FDCWD) {
-		return uk_syscall_r_stat(pathname, st);
+		return uk_syscall_r_stat((long) pathname, (long) st);
 	}
 	// If AT_EMPTY_PATH and pathname is an empty string, fstatat() operates on
 	// dirfd itself, and in that case it doesn't have to be a directory.
 	if ((flags & AT_EMPTY_PATH) && !pathname[0]) {
-		return uk_syscall_r_fstat(dirfd, st);
+		return uk_syscall_r_fstat((long) dirfd, (long) st);
 	}
 
 	struct vfscore_file *fp;
@@ -1633,9 +1633,9 @@ static int __fxstatat_helper(int ver __unused, int dirfd, const char *pathname,
 	strlcat(p, pathname, PATH_MAX);
 
 	if (flags & AT_SYMLINK_NOFOLLOW)
-		error = uk_syscall_r_lstat(p, st);
+		error = uk_syscall_r_lstat((long) p, (long) st);
 	else
-		error = uk_syscall_r_stat(p, st);
+		error = uk_syscall_r_stat((long) p, (long) st);
 
 	vn_unlock(vp);
 	fdrop(fp);
@@ -2074,7 +2074,7 @@ UK_SYSCALL_R_DEFINE(int, faccessat, int, dirfd, const char*, pathname, int, mode
 	}
 
 	if (pathname[0] == '/' || dirfd == AT_FDCWD) {
-		return uk_syscall_r_access(pathname, mode);
+		return uk_syscall_r_access((long) pathname, (long) mode);
 	}
 
 	struct vfscore_file *fp;
@@ -2094,7 +2094,7 @@ UK_SYSCALL_R_DEFINE(int, faccessat, int, dirfd, const char*, pathname, int, mode
 	strlcat(p, "/", PATH_MAX);
 	strlcat(p, pathname, PATH_MAX);
 
-	error = uk_syscall_r_access(p, mode);
+	error = uk_syscall_r_access((long) p, (long) mode);
 
 	vn_unlock(vp);
 	fdrop(fp);
@@ -2105,7 +2105,7 @@ UK_SYSCALL_R_DEFINE(int, faccessat, int, dirfd, const char*, pathname, int, mode
 
 int euidaccess(const char *pathname, int mode)
 {
-	return uk_syscall_r_access(pathname, mode);
+	return uk_syscall_r_access((long) pathname, (long) mode);
 }
 
 __weak_alias(euidaccess,eaccess);
