@@ -142,6 +142,9 @@ struct uk_sched *uk_sched_create(struct uk_alloc *a, size_t prv_size)
 void uk_sched_start(struct uk_sched *sched)
 {
 	UK_ASSERT(sched != NULL);
+#ifdef _SHADOW_STACK_
+	__asm __volatile ( "mov x18, %0" : : "r" (sched->idle.shadow_stack) );
+#endif
 	ukplat_thread_ctx_start(&sched->plat_ctx_cbs, sched->idle.ctx);
 }
 
@@ -207,6 +210,9 @@ struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
 {
 	struct uk_thread *thread = NULL;
 	void *stack = NULL;
+#ifdef _SHADOW_STACK_
+	void *shadow_stack = NULL;
+#endif /* _SHADOW_STACK_ */
 	int rc;
 	void *tls = NULL;
 
@@ -222,6 +228,18 @@ struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
 	stack = create_stack(sched->allocator);
 	if (stack == NULL)
 		goto err;
+
+#ifdef _SHADOW_STACK_
+	shadow_stack = create_stack(sched->allocator);
+	if (shadow_stack == NULL)
+		goto err;
+
+	/*
+	 * FIXME: include the shadow stack initialization in the uk_thread_init function
+	 */
+	thread->shadow_stack = shadow_stack;
+#endif /* _SHADOW_STACK_ */
+	
 	if (have_tls_area() && !(tls = uk_thread_tls_create(sched->allocator)))
 		goto err;
 
@@ -244,6 +262,12 @@ err:
 		uk_free(sched->allocator, tls);
 	if (stack)
 		uk_free(sched->allocator, stack);
+
+#ifdef _SHADOW_STACK_
+	if (shadow_stack)
+		uk_free(sched->allocator, shadow_stack);
+#endif /* _SHADOW_STACK_ */
+
 	if (thread)
 		uk_free(sched->allocator, thread);
 
@@ -255,12 +279,18 @@ void uk_sched_thread_destroy(struct uk_sched *sched, struct uk_thread *thread)
 	UK_ASSERT(sched != NULL);
 	UK_ASSERT(thread != NULL);
 	UK_ASSERT(thread->stack != NULL);
+#ifdef _SHADOW_STACK_
+	UK_ASSERT(thread->stack != NULL);
+#endif /* _SHADOW_STACK_ */
 	UK_ASSERT(!have_tls_area() || thread->tls != NULL);
 	UK_ASSERT(is_exited(thread));
 
 	UK_TAILQ_REMOVE(&sched->exited_threads, thread, thread_list);
 	uk_thread_fini(thread, sched->allocator);
 	uk_free(sched->allocator, thread->stack);
+#ifdef _SHADOW_STACK_
+	uk_free(sched->allocator, thread->shadow_stack);
+#endif /* _SHADOW_STACK_ */
 	if (thread->tls)
 		uk_free(sched->allocator, thread->tls);
 	uk_free(sched->allocator, thread);

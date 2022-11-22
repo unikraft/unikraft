@@ -35,9 +35,20 @@
 
 #include <uk/config.h>
 
+/*
+* initial workaround, needed for STACK_SIZE
+*/
+#include <uk/plat/config.h>
+
 #include <stddef.h>
 #include <stdio.h>
 #include <errno.h>
+
+/*
+* DELETEME: we use stdlib for now
+* TODO: use uk allocators later, for better performance
+*/
+#include <stdlib.h>
 
 #if CONFIG_LIBUKBOOT_INITBBUDDY
 #include <uk/allocbbuddy.h>
@@ -81,6 +92,12 @@ struct thread_main_arg {
 	char **argv;
 };
 
+void __attribute__ ((constructor)) __attribute__((no_sanitize("shadow-call-stack"))) setup_x18()
+{
+	void *shadow = malloc(STACK_SIZE);
+	__asm __volatile ( "mov x18, %0" : : "r" (shadow) );
+}
+
 static void main_thread_func(void *arg)
 {
 	int i;
@@ -122,6 +139,10 @@ static void main_thread_func(void *arg)
 	 * mimic what a regular user application (e.g., BSD, Linux) would expect
 	 * from its OS being initialized.
 	 */
+
+#ifndef CONFIG_LIBUKSCHED
+	setup_x18();
+#endif
 	uk_pr_info("Pre-init table at %p - %p\n",
 		   &__preinit_array_start[0], &__preinit_array_end);
 	uk_ctortab_foreach(ctorfn,

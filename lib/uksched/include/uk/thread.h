@@ -55,6 +55,9 @@ struct uk_sched;
 struct uk_thread {
 	const char *name;
 	void *stack;
+#ifdef _SHADOW_STACK_
+	void *shadow_stack;
+#endif
 	void *tls;
 	void *ctx;
 	UK_TAILQ_ENTRY(struct uk_thread) thread_list;

@@ -37,6 +37,7 @@
 #include <uk/assert.h>
 #include <uk/plat/common/tls.h>
 #include <uk/plat/common/cpu.h>
+#include <uk/plat/config.h>
 
 static size_t sw_ctx_size(void);
 static void  sw_ctx_init(void *ctx, unsigned long sp, unsigned long tlsp);
@@ -78,6 +79,7 @@ static void sw_ctx_start(void *ctx)
 	UK_ASSERT(sw_ctx != NULL);
 
 	set_tls_pointer(sw_ctx->tlsp);
+
 	/* Switch stacks and run the thread */
 	asm_ctx_start(sw_ctx->sp, sw_ctx->ip);
 
