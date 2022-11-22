@@ -8,10 +8,11 @@ BEGIN {
 	print "\tswitch (nr) {"
 }
 
-/[a-zA-Z0-9]+-[0-9]+/{
+/#define __NR_/{
+	name = substr($2,6)
 	printf "#ifdef HAVE_uk_syscall_%s\n", name;
-	printf "\tcase SYS_%s:\n", $1
-	printf "\t\treturn \"%s\";\n", $1
+	printf "\tcase SYS_%s:\n", name
+	printf "\t\treturn \"%s\";\n", name
 	printf "#endif /* HAVE_uk_syscall_%s */\n\n", name;
 }
 
