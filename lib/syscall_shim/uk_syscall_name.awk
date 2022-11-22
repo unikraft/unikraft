@@ -9,8 +9,9 @@ BEGIN {
 }
 
 /#define __NR_/{
-	printf "\tcase SYS_%s:\n", substr($2,6)
-	printf "\t\treturn \"%s\";\n", substr($2,6)
+	name = substr($2,6)
+	printf "\tcase SYS_%s:\n", name
+	printf "\t\treturn \"%s\";\n", name
 }
 
 END {
