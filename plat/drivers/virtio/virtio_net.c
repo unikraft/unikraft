@@ -40,6 +40,11 @@
 #include <virtio/virtio_bus.h>
 #include <virtio/virtqueue.h>
 #include <virtio/virtio_net.h>
+#include <uk/plat/time.h>
+
+#ifdef CONFIG_LIBUKRAND_NETWORK_RANDOMNESS
+#include <uk/entropy.h>
+#endif
 
 /**
  * VIRTIO_PKT_BUFFER_LEN = VIRTIO_NET_HDR + ETH_HDR + ETH_PKT_PAYLOAD_LEN
@@ -563,7 +568,11 @@ static int virtio_netdev_rxq_dequeue(struct uk_netdev_rx_queue *rxq,
 static int virtio_netdev_recv(struct uk_netdev *dev __unused,
 			      struct uk_netdev_rx_queue *queue,
 			      struct uk_netbuf **pkt)
-{
+{			
+	#ifdef CONFIG_LIBUKRAND_NETWORK_RANDOMNESS
+	__u64 check_sum = 0;
+	#endif
+
 	int status = 0x0;
 	int rc = 0;
 
@@ -574,13 +583,14 @@ static int virtio_netdev_recv(struct uk_netdev *dev __unused,
 	UK_ASSERT(!(queue->intr_enabled & VTNET_INTR_EN));
 
 	rc = virtio_netdev_rxq_dequeue(queue, pkt);
+
 	if (unlikely(rc < 0)) {
 		uk_pr_err("Failed to dequeue the packet: %d\n", rc);
 		goto err_exit;
 	}
 	status |= (*pkt) ? UK_NETDEV_STATUS_SUCCESS : 0x0;
 	status |= virtio_netdev_rx_fillup(queue, (queue->nb_desc - rc), 1);
-
+	
 	/* Enable interrupt only when user had previously enabled it */
 	if (queue->intr_enabled & VTNET_INTR_USR_EN_MASK) {
 		/* Need to enable the interrupt on the last packet */
@@ -591,6 +601,8 @@ static int virtio_netdev_recv(struct uk_netdev *dev __unused,
 			 * enabling the interrupt
 			 */
 			rc = virtio_netdev_rxq_dequeue(queue, pkt);
+
+
 			if (unlikely(rc < 0)) {
 				uk_pr_err("Failed to dequeue the packet: %d\n",
 					  rc);
@@ -612,6 +624,12 @@ static int virtio_netdev_recv(struct uk_netdev *dev __unused,
 		} else if (*pkt) {
 			/* When we originally got a packet and there is more */
 			status |= (rc == 1) ? UK_NETDEV_STATUS_MORE : 0x0;
+
+			#ifdef CONFIG_LIBUKRAND_NETWORK_RANDOMNESS
+			if ((*pkt)->csum_start && (*pkt)->csum_offset) {
+				check_sum = *(__u32*)(((unsigned char*)(*pkt)->data) + (*pkt)->csum_start + (*pkt)->csum_offset);
+			}
+			#endif
 		}
 	} else if (*pkt) {
 		/**
@@ -619,7 +637,20 @@ static int virtio_netdev_recv(struct uk_netdev *dev __unused,
 		 * packets unless the queue is empty.
 		 */
 		status |= UK_NETDEV_STATUS_MORE;
+
+		#ifdef CONFIG_LIBUKRAND_NETWORK_RANDOMNESS
+		if ((*pkt)->csum_start && (*pkt)->csum_offset) {
+			check_sum = *(__u32*)(((unsigned char*)(*pkt)->data) + (*pkt)->csum_start + (*pkt)->csum_offset);
+		}
+		#endif
 	}
+	
+	#ifdef CONFIG_LIBUKRAND_NETWORK_RANDOMNESS
+	if (check_sum) {
+		uk_add_network_randomness(check_sum);
+	}
+	#endif
+
 	return status;
 
 err_exit:

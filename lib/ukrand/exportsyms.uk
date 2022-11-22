@@ -1,0 +1,16 @@
+getrandom
+uk_syscall_e_getrandom
+uk_syscall_r_getrandom
+uk_swrand_def
+uk_swrand_init_r
+uk_swrand_randr_r
+uk_swrandr_gen_seed32
+uk_swrand_generate_bytes
+uk_hwrand_generate_bytes
+uk_rdrand_generate_bytes
+uk_hwrand_rdseed
+uk_hwrand_rdrand
+uk_add_interrupt_randomness
+uk_add_network_randomness
+uk_hw_get_estimated_entropy
+uk_get_estimated_entropy

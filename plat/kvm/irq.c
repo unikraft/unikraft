@@ -37,6 +37,10 @@
 #include <errno.h>
 #include <uk/bitops.h>
 
+#ifdef CONFIG_LIBUKRAND_INTERRUPT_RANDOMNESS
+#include <uk/entropy.h>
+#endif
+
 /* IRQ handlers declarations */
 struct irq_handler {
 	irq_handler_func_t func;
@@ -91,7 +95,9 @@ void _ukplat_irq_handle(unsigned long irq)
 	struct irq_handler *h;
 	int i;
 
-	UK_ASSERT(irq < __MAX_IRQ);
+	#ifdef CONFIG_LIBUKRAND_INTERRUPT_RANDOMNESS
+	uk_add_interrupt_randomness(irq);
+	#endif
 
 	for (i = 0; i < CONFIG_KVM_MAX_IRQ_HANDLER_ENTRIES; i++) {
 		if (irq_handlers[irq][i].func == NULL)

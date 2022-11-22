@@ -82,6 +82,12 @@ uk_ror32(__u32 word, unsigned int shift)
 	return ((word >> shift) | (word << (32 - shift)));
 }
 
+static inline __u32
+uk_rol32(__u32 word, unsigned int shift)
+{
+	return ((word << shift) | (word >> (32 - shift)));
+}
+
 static inline int uk_get_count_order(unsigned int count)
 {
 	int order;

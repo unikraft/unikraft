@@ -1,0 +1,83 @@
+menuconfig LIBUKRAND
+	bool "ukrand: Random number generator"
+	select LIBUKDEBUG
+	select LIBUKCPUID
+	default n
+
+if LIBUKRAND
+
+config LIBUKRAND_HARDWARE_RANDOMNESS
+	select UKBLAKE3
+	depends on ARCH_X86_64
+	bool "HWRAND"
+	help
+		"Hardware random number generator support"
+	default n
+
+if LIBUKRAND_HARDWARE_RANDOMNESS
+
+config 	LIBUKRAND_INTERRUPT_RANDOMNESS
+	bool "INTERRUPT_RANDOMNESS"
+	help
+		"Gather entropy from interrupts"
+	default y
+
+config 	LIBUKRAND_NETWORK_RANDOMNESS
+	bool "NETWORK_RANDOMNESS"
+	help
+		"Gather entropy from network"
+	default y
+
+endif
+
+
+config LIBUKRAND_SOFTWARE_RANDOMNESS
+	bool "SWRAND"
+	help
+		"Software random number generator support"
+	default n
+
+if LIBUKRAND_SOFTWARE_RANDOMNESS
+choice
+	prompt "Algorithm"
+	default LIBUKRAND_CHACHA
+
+config LIBUKRAND_MWC
+	bool "Multiply-with-carry"
+	help
+		Use multiply-with-carry algorithm
+
+config LIBUKRAND_CHACHA
+	bool "ChaCha20"
+	help
+		Use ChaCha20 algorithm
+endchoice
+
+choice
+    prompt "Initial seed"
+    default LIBUKRAND_INITIALSEED_TIME
+
+config LIBUKRAND_INITIALSEED_TIME
+    bool "Platform timestamp"
+
+config LIBUKRAND_INITIALSEED_RDRAND
+    depends on ARCH_X86_64
+    bool "Hardware seed"
+
+config LIBUKRAND_INITIALSEED_USECONSTANT
+    bool "Compiled-in constant"
+endchoice
+
+config LIBUKRAND_INITIALSEED_CONSTANT
+    int "Initial seed constant"
+    depends on LIBUKRAND_INITIALSEED_USECONSTANT
+    default 23
+endif
+
+config LIBUKRAND_DEVFS
+	bool "Register random and urandom device to devfs"
+	select LIBDEVFS
+	select LIBVFSCORE
+	default n
+
+endif
