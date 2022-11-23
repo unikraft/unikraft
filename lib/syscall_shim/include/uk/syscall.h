@@ -61,6 +61,65 @@ extern "C" {
 #endif /* CONFIG_LIBSYSCALL_SHIM && CONFIG_LIBSYSCALL_SHIM_NOWRAPPER */
 #endif /* UK_LIBC_SYSCALLS */
 
+#ifdef CONFIG_LIBSYSCALL_SHIM
+/**
+ * Library-internal thread-local variable containing the return address
+ * of the caller of the currently called system call.
+ * NOTE: Use the `uk_syscall_return_addr()` macro to retrieve the return address
+ *       within a system call implementation. Please note that this macro is
+ *       only available if `lib/syscall_shim` is part of the build.
+ *       This implies that every system call implementation that require to know
+ *       the return address have a dependency to `lib/syscall_shim`.
+ */
+extern __uk_tls __uptr _uk_syscall_return_addr;
+
+/**
+ * Returns the return address of the currently called system call.
+ */
+#define uk_syscall_return_addr()					\
+	((__uptr)((_uk_syscall_return_addr != 0x0)			\
+		  ? _uk_syscall_return_addr : __return_addr(0)))
+
+#define __UK_SYSCALL_RETADDR_ENTRY();					\
+	do { _uk_syscall_return_addr = uk_syscall_return_addr(); } while (0)
+
+#if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
+/*
+ * In the case the support for userland TLS pointers is enabled, we assume that
+ * some system calls (like `arch_prctl` on `x86_64`) can change the TLS pointer.
+ * In such a case, we need a safe way to access `_uk_syscall_return_addr` for
+ * clearing after a system call handler was executed.
+ */
+#include <uk/thread.h>
+
+#define __UK_SYSCALL_RETADDR_CLEAR();					\
+	do { (uk_thread_uktls_var(uk_thread_current(),			\
+				  _uk_syscall_return_addr)) = 0x0; } while (0)
+#else /* !CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
+/* Without userland TLS pointer support, we assume that we do not have any
+ * system call that changes the TLS pointer (harmfully). This means that we do
+ * not need to rely on `lib/uksched`.
+ */
+#define __UK_SYSCALL_RETADDR_CLEAR();					\
+	do { _uk_syscall_return_addr = 0x0; } while (0)
+#endif /* !CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
+
+#else /* !CONFIG_LIBSYSCALL_SHIM */
+
+/*
+ * NOTE: The usage of `uk_syscall_return_addr()` requires the `syscall_shim`
+ *       library to be present. In order to avoid mis-configurations, we
+ *       inject an always failing compile-time assertion to stop compilation.
+ */
+#define uk_syscall_return_addr()					\
+	({ UK_CTASSERT(0x0); 0xDEADB0B0; })
+
+#define __UK_SYSCALL_RETADDR_ENTRY();					\
+	do { } while (0)
+#define __UK_SYSCALL_RETADDR_CLEAR();					\
+	do { } while (0)
+#endif /* !CONFIG_LIBSYSCALL_SHIM */
+
 #define __uk_scc(X) ((long) (X))
 typedef long uk_syscall_arg_t;
 
@@ -162,21 +221,28 @@ typedef long uk_syscall_arg_t;
 		int _errno = errno;					\
 		long ret;						\
 									\
+		__UK_SYSCALL_RETADDR_ENTRY();				\
 		errno = 0;						\
 		ret = ename(						\
 			UK_ARG_MAPx(x, UK_S_ARG_CAST_LONG, __VA_ARGS__)); \
 		if (ret == -1)						\
 			ret = errno ? -errno : -EFAULT;			\
 		errno = _errno;						\
+		__UK_SYSCALL_RETADDR_CLEAR();				\
 		return ret;						\
 	}								\
 	static inline rtype __##ename(UK_ARG_MAPx(x,			\
 					UK_S_ARG_ACTUAL, __VA_ARGS__)); \
 	long ename(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__))		\
 	{								\
+		long ret;						\
+									\
 		__UK_SYSCALL_PRINTD(x, rtype, ename, __VA_ARGS__);	\
-		return (long) __##ename(				\
+		__UK_SYSCALL_RETADDR_ENTRY();				\
+		ret = (long) __##ename(					\
 			UK_ARG_MAPx(x, UK_S_ARG_CAST_ACTUAL, __VA_ARGS__)); \
+		__UK_SYSCALL_RETADDR_CLEAR();				\
+		return ret;						\
 	}								\
 	static inline rtype __##ename(UK_ARG_MAPx(x,			\
 						  UK_S_ARG_ACTUAL_MAYBE_UNUSED,\
@@ -200,8 +266,13 @@ typedef long uk_syscall_arg_t;
 	long ename(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__));		\
 	rtype name(UK_ARG_MAPx(x, UK_S_ARG_ACTUAL, __VA_ARGS__))	\
 	{								\
-		return (rtype) ename(					\
+		rtype ret;						\
+									\
+		__UK_SYSCALL_RETADDR_ENTRY();				\
+		ret = (rtype) ename(					\
 			UK_ARG_MAPx(x, UK_S_ARG_CAST_LONG, __VA_ARGS__)); \
+		__UK_SYSCALL_RETADDR_CLEAR();				\
+		return ret;						\
 	}								\
 	__UK_LLSYSCALL_DEFINE(x, rtype, name, ename, rname, __VA_ARGS__)
 #define _UK_SYSCALL_DEFINE(...) __UK_SYSCALL_DEFINE(__VA_ARGS__)
@@ -234,8 +305,12 @@ typedef long uk_syscall_arg_t;
 	long rname(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__));		\
 	long ename(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__))		\
 	{								\
-		long ret = rname(					\
+		long ret;						\
+									\
+		__UK_SYSCALL_RETADDR_ENTRY();				\
+		ret = rname(						\
 			UK_ARG_MAPx(x, UK_S_ARG_CAST_LONG, __VA_ARGS__)); \
+		__UK_SYSCALL_RETADDR_CLEAR();				\
 		if (ret < 0 && PTRISERR(ret)) {				\
 			errno = -(int) PTR2ERR(ret);			\
 			return -1;					\
@@ -246,9 +321,14 @@ typedef long uk_syscall_arg_t;
 						 __VA_ARGS__));		\
 	long rname(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__))		\
 	{								\
+		long ret;						\
+									\
 		__UK_SYSCALL_PRINTD(x, rtype, rname, __VA_ARGS__);	\
-		return (long) __##rname(				\
+		__UK_SYSCALL_RETADDR_ENTRY();				\
+		ret = (long) __##rname(					\
 			UK_ARG_MAPx(x, UK_S_ARG_CAST_ACTUAL, __VA_ARGS__)); \
+		__UK_SYSCALL_RETADDR_CLEAR();				\
+		return ret;						\
 	}								\
 	static inline rtype __##rname(UK_ARG_MAPx(x,			\
 						  UK_S_ARG_ACTUAL_MAYBE_UNUSED,\
@@ -272,8 +352,13 @@ typedef long uk_syscall_arg_t;
 	long ename(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__));		\
 	rtype name(UK_ARG_MAPx(x, UK_S_ARG_ACTUAL, __VA_ARGS__))	\
 	{								\
-		return (rtype) ename(					\
+		rtype ret;						\
+									\
+		__UK_SYSCALL_RETADDR_ENTRY();				\
+		ret = (rtype) ename(					\
 			UK_ARG_MAPx(x, UK_S_ARG_CAST_LONG, __VA_ARGS__)); \
+		__UK_SYSCALL_RETADDR_CLEAR();				\
+		return ret;						\
 	}								\
 	__UK_LLSYSCALL_R_DEFINE(x, rtype, name, ename, rname, __VA_ARGS__)
 #define _UK_SYSCALL_R_DEFINE(...) __UK_SYSCALL_R_DEFINE(__VA_ARGS__)
