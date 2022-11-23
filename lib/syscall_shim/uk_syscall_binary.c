@@ -69,6 +69,9 @@ void ukplat_syscall_handler(struct __regs *r)
 	ukplat_tlsp_set(self->uktlsp);
 #endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
 
+	/* uk_syscall6_r() will clear _uk_syscall_return_addr on return */
+	_uk_syscall_return_addr = r->rip;
+
 	uk_pr_debug("Binary system call request \"%s\" (%lu) at ip:%p (arg0=0x%lx, arg1=0x%lx, ...)\n",
 		    uk_syscall_name(r->rsyscall), r->rsyscall,
 		    (void *) r->rip, r->rarg0, r->rarg1);
