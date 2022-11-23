@@ -92,3 +92,4 @@ errno
 # network
 htons
 nthos
+h_errno
