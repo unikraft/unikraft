@@ -20,6 +20,11 @@ if LIBPOSIX_PROCESS_PIDS
 		default n
 endif
 
+	config LIBPOSIX_PROCESS_CLONE
+	bool "Clone system call"
+	default n
+	select LIBPOSIX_PROCESS_PIDS
+
 	config LIBPOSIX_PROCESS_DEBUG
 	bool "Enable debug messages"
 	default n
