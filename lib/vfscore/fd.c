@@ -38,9 +38,9 @@
 #include <vfscore/file.h>
 #include <uk/plat/lcpu.h>
 #include <errno.h>
-#include <uk/ctors.h>
+#include <uk/init.h>
 
-void init_stdio(void);
+int init_stdio(void);
 
 struct fdtable {
 	unsigned long bitmap[UK_BITS_TO_LONGS(FDTABLE_MAX_FILES)];
@@ -203,12 +203,11 @@ exit:
 }
 
 
-/* TODO: move this constructor to main.c */
-static void fdtable_init(void)
+static int fdtable_init(void)
 {
 	memset(&fdtable, 0, sizeof(fdtable));
 
-	init_stdio();
+	return init_stdio();
 }
 
-UK_CTOR_PRIO(fdtable_init, 1);
+uk_early_initcall_prio(fdtable_init, UK_PRIO_EARLIEST);

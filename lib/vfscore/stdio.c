@@ -42,6 +42,7 @@
 #include <vfscore/uio.h>
 #include <vfscore/vnode.h>
 #include <vfscore/mount.h>
+#include <errno.h>
 
 static int __write_fn(void *dst __unused, void *src, size_t *cnt)
 {
@@ -211,15 +212,28 @@ static struct vfscore_file  stdio_file = {
 	.f_ep = UK_LIST_HEAD_INIT(stdio_file.f_ep)
 };
 
-void init_stdio(void)
+int init_stdio(void)
 {
-	int fd __maybe_unused;
+	int fd;
 
 	fd = vfscore_alloc_fd();
-	UK_ASSERT(fd == 0);
+	if (fd != 0) {
+		uk_pr_crit("failed to allocate fd for stdin (fd=0)\n");
+		return (fd < 0) ? fd : -EBADF;
+	}
 	vfscore_install_fd(0, &stdio_file);
-	if (uk_syscall_r_dup2(0, 1) != 1)
-		uk_pr_err("failed to dup to stdin\n");
-	if (uk_syscall_r_dup2(0, 2) != 2)
-		uk_pr_err("failed to dup to stderr\n");
+
+	fd = uk_syscall_r_dup2(0, 1);
+	if (fd != 1) {
+		uk_pr_crit("failed to dup to stdout (fd=1)\n");
+		return (fd < 0) ? fd : -EBADF;
+	}
+
+	fd = uk_syscall_r_dup2(0, 2);
+	if (fd != 2) {
+		uk_pr_crit("failed to dup to stderr (fd=2)\n");
+		return (fd < 0) ? fd : -EBADF;
+	}
+
+	return 0;
 }
