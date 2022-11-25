@@ -50,6 +50,8 @@ extern "C" {
 struct fdtab_file;
 struct fdtab_table;
 
+#define POSIX_FDTAB_REGISTER_PRIO 0
+
 /*
  * Kernel encoding of open mode; separate read and write bits that are
  * independently testable: 1 greater than the above.

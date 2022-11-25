@@ -226,7 +226,7 @@ static struct vfscore_file stdio_file = {
 	.f_vfs_flags = UK_VFSCORE_NOPOS,
 };
 
-int init_stdio(void)
+static int init_stdio(void)
 {
 	int fd;
 
@@ -251,3 +251,5 @@ int init_stdio(void)
 
 	return 0;
 }
+
+uk_lib_initcall_prio(init_stdio, UK_PRIO_AFTER(POSIX_FDTAB_REGISTER_PRIO));

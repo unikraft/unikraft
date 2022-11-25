@@ -40,14 +40,14 @@
 #include <uk/plat/lcpu.h>
 #include <errno.h>
 #include <uk/fdtab/eventpoll.h>
-#include <uk/ctors.h>
+#include <uk/init.h>
 
 struct fdtab_table {
 	unsigned long bitmap[UK_BITS_TO_LONGS(FDTABLE_MAX_FILES)];
 	struct fdtab_file *fds[FDTABLE_MAX_FILES];
 };
 
-static /* FIXME: __uk_tls */ struct fdtab_table *current_tab;
+static __uk_tls struct fdtab_table *current_tab;
 
 struct fdtab_table *fdtab_get_active(void)
 {
@@ -254,9 +254,15 @@ void fdtab_file_init(struct fdtab_file *fp)
 /* The initial fd table */
 static struct fdtab_table init_tab;
 
-static void fdtable_init(void)
+static int fdtable_init(void)
 {
 	fdtab_set_active(&init_tab);
+	return 0;
 }
 
-UK_CTOR_PRIO(fdtable_init, 1);
+#define POSIX_FDTAB_FAMILY_INIT_CLASS UK_INIT_CLASS_LIB
+#define POSIX_FDTAB_FAMILY_INIT_PRIO UK_INIT_CLASS_EARLY
+
+uk_initcall_class_prio(fdtable_init,
+		       POSIX_FDTAB_FAMILY_INIT_CLASS,
+		       POSIX_FDTAB_FAMILY_INIT_PRIO);

@@ -40,12 +40,9 @@
 #include <vfscore/file.h>
 #include <uk/plat/lcpu.h>
 #include <errno.h>
-#include <uk/init.h>
 #if CONFIG_LIBPOSIX_PROCESS_CLONE
 #include <uk/process.h>
 #endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
-
-int init_stdio(void);
 
 int vfscore_alloc_fd(void)
 {
@@ -92,15 +89,6 @@ int fget(int fd, struct vfscore_file **out_fp)
 
 	return ret;
 }
-
-static int fdtable_init(void)
-{
-	memset(&fdtable, 0, sizeof(fdtable));
-
-	return init_stdio();
-}
-
-uk_early_initcall_prio(fdtable_init, UK_PRIO_EARLIEST);
 
 #if CONFIG_LIBPOSIX_PROCESS_CLONE
 static int uk_posix_clone_files(const struct clone_args *cl_args,
