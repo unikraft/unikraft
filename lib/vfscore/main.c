@@ -1598,6 +1598,8 @@ int __lxstat(int ver __unused, const char *pathname, struct stat *st)
 #endif
 
 LFS64(__lxstat);
+#else
+int __lxstat(int ver, const char *pathname, struct stat *st);
 #endif /* UK_LIBC_SYSCALLS */
 
 UK_SYSCALL_R_DEFINE(int, lstat, const char*, pathname, struct stat*, st)
