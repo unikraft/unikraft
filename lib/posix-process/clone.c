@@ -346,6 +346,47 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 
 	flags = cl_args->flags;
 
+#if UK_DEBUG
+	uk_pr_debug("uk_syscall_r_clone(\n");
+	uk_pr_debug(" flags: 0x%lx [", flags);
+	if (flags & CLONE_NEWTIME)		uk_pr_debug(" NEWTIME");
+	if (flags & CLONE_VM)			uk_pr_debug(" VM");
+	if (flags & CLONE_FS)			uk_pr_debug(" FS");
+	if (flags & CLONE_FILES)		uk_pr_debug(" FILES");
+	if (flags & CLONE_SIGHAND)		uk_pr_debug(" SIGHAND");
+	if (flags & CLONE_PIDFD)		uk_pr_debug(" PIDFD");
+	if (flags & CLONE_PTRACE)		uk_pr_debug(" PTRACE");
+	if (flags & CLONE_VFORK)		uk_pr_debug(" VFORK");
+	if (flags & CLONE_PARENT)		uk_pr_debug(" PARENT");
+	if (flags & CLONE_THREAD)		uk_pr_debug(" THREAD");
+	if (flags & CLONE_NEWNS)		uk_pr_debug(" NEWNS");
+	if (flags & CLONE_SYSVSEM)		uk_pr_debug(" SYSVSEM");
+	if (flags & CLONE_SETTLS)		uk_pr_debug(" SETTLS");
+	if (flags & CLONE_PARENT_SETTID)	uk_pr_debug(" PARENT_SETTID");
+	if (flags & CLONE_CHILD_CLEARTID)	uk_pr_debug(" CHILD_CLEARTID");
+	if (flags & CLONE_DETACHED)		uk_pr_debug(" DETACHED");
+	if (flags & CLONE_UNTRACED)		uk_pr_debug(" UNTRACED");
+	if (flags & CLONE_CHILD_SETTID)		uk_pr_debug(" CHILD_SETTID");
+	if (flags & CLONE_NEWCGROUP)		uk_pr_debug(" NEWCGROUP");
+	if (flags & CLONE_NEWUTS)		uk_pr_debug(" NEWUTS");
+	if (flags & CLONE_NEWIPC)		uk_pr_debug(" NEWIPC");
+	if (flags & CLONE_NEWUSER)		uk_pr_debug(" NEWUSER");
+	if (flags & CLONE_NEWPID)		uk_pr_debug(" NEWPID");
+	if (flags & CLONE_NEWNET)		uk_pr_debug(" NEWNET");
+	if (flags & CLONE_IO)			uk_pr_debug(" IO");
+	uk_pr_debug(" ]\n");
+	if (flags & CLONE_PIDFD)
+		uk_pr_debug(" pidfd: %d\n", (int) cl_args->pidfd);
+	if (flags & CLONE_PARENT_SETTID)
+		uk_pr_debug(" parent_tid: %p\n", (void *) cl_args->parent_tid);
+	if (flags & (CLONE_CHILD_CLEARTID | CLONE_CHILD_SETTID))
+		uk_pr_debug(" child_tid: %p\n", (void *) cl_args->child_tid);
+	uk_pr_debug(" stack: %p\n", (void *) cl_args->stack);
+	uk_pr_debug(" tls: %p\n", (void *) cl_args->tls);
+	uk_pr_debug(" <return>: %p\n", (void *) return_addr);
+	uk_pr_debug(")\n");
+#endif /* UK_DEBUG */
+
 	if ((flags & CLONE_SETTLS)
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
 	    && (uk_syscall_ultlsp() == 0x0)
