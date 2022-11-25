@@ -535,3 +535,21 @@ UK_LLSYSCALL_R_DEFINE(long, clone3,
 {
 	return _clone(cl_args, cl_args_len, uk_syscall_return_addr());
 }
+
+/*
+ * Checks that the CLONE_VM is set so that we make sure that
+ * the address space is shared. Unikraft does currently not support
+ * multiple application address spaces.
+ */
+static int uk_posix_clone_checkvm(const struct clone_args *cl_args,
+				  size_t cl_args_len __unused,
+				  struct uk_thread *child __unused,
+				  struct uk_thread *parent __unused)
+{
+	if (!(cl_args->flags & CLONE_VM)) {
+		uk_pr_warn("Cloning thread without CLONE_VM being set: Creating of new address spaces are currently not supported.\n");
+		return -ENOTSUP;
+	}
+	return 0;
+}
+UK_POSIX_CLONE_HANDLER(CLONE_VM, false, uk_posix_clone_checkvm, 0x0);
