@@ -178,14 +178,14 @@ uk_testsuite_run(struct uk_testsuite *suite)
 #endif /* CONFIG_LIBUKTEST_LOG_STATS */
 
 #ifdef CONFIG_LIBUKTEST_LOG_TESTS
-		printf(LVLC_TESTNAME "test:" UK_ANSI_MOD_RESET
-		       " %s->%s",
-		       suite->name,
-		       esac->name);
+		_uk_printk(KLVL_INFO, __NULL, __NULL, 0x0,
+			(LVLC_TESTNAME "test:" UK_ANSI_MOD_RESET
+			" %s->%s"), suite->name, esac->name);
 		if (esac->desc != NULL)
-			printf(": %s\n", esac->desc);
+			_uk_printk(KLVL_INFO, __NULL, __NULL, 0x0, ": %s\n",
+			esac->desc);
 		else
-			printf("\n");
+			_uk_printk(KLVL_INFO, __NULL, __NULL, 0x0, "\n");
 #endif /* CONFIG_LIBUKTEST_LOG_TESTS */
 
 		esac->func(esac);

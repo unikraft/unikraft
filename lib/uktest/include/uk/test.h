@@ -200,10 +200,8 @@
 
 /* Custom print method. */
 #define uk_test_printf(fmt, ...)					\
-	printf("    "							\
-	       LVLC_TESTNAME ":"					\
-	       UK_ANSI_MOD_RESET "\t"					\
-	       fmt, ##__VA_ARGS__)
+	_uk_printk(KLVL_INFO, __NULL, __NULL, 0x0,			\
+	"\t" fmt, ##__VA_ARGS__)
 
 
 /**
