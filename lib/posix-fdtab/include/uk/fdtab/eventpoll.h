@@ -30,8 +30,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _VFSCORE_EVENTPOLL_H_
-#define _VFSCORE_EVENTPOLL_H_
+#ifndef _FDTAB_EVENTPOLL_H_
+#define _FDTAB_EVENTPOLL_H_
 
 #ifdef __cplusplus
 extern "C" {
@@ -98,7 +98,7 @@ struct eventpoll_fd {
 	struct eventpoll *ep;
 
 	/* Reference to the monitored file */
-	struct vfscore_file *vfs_file;
+	struct fdtab_file *vfs_file;
 
 	/* Due to dup() we can have multiple fds point to the same file. We
 	 * thus have to store the fd that has been used to register the file
@@ -125,7 +125,7 @@ struct eventpoll_fd {
 };
 
 static inline void eventpoll_fd_init(struct eventpoll_fd *efd,
-				     struct vfscore_file *fp, int fd,
+				     struct fdtab_file *fp, int fd,
 				     const struct epoll_event *event)
 {
 	UK_ASSERT(efd);
@@ -219,7 +219,7 @@ void eventpoll_fini(struct eventpoll *ep);
  *
  * @return 0 on success, a negative errno value otherwise
  */
-int eventpoll_add(struct eventpoll *ep, int fd, struct vfscore_file *fp,
+int eventpoll_add(struct eventpoll *ep, int fd, struct fdtab_file *fp,
 		  const struct epoll_event *event);
 
 /**
@@ -310,10 +310,10 @@ void eventpoll_signal(struct eventpoll_cb *ecb, unsigned int revents);
  *
  * @param fp the VFS file object which is closed by the VFS
  */
-void eventpoll_notify_close(struct vfscore_file *fp);
+void eventpoll_notify_close(struct fdtab_file *fp);
 
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
 
-#endif /* _VFSCORE_EVENTPOLL_H_ */
+#endif /* _FDTAB_EVENTPOLL_H_ */

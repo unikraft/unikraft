@@ -65,7 +65,7 @@ struct uio {
  * scatter-gather buffers).
  */
 static inline
-int vfscore_uioforeach(int (*f)(void *, void *, size_t *), void *cp,
+int fdtab_uioforeach(int (*f)(void *, void *, size_t *), void *cp,
 		      size_t n, struct uio *uio)
 {
 	int ret = 0;
@@ -103,6 +103,6 @@ int vfscore_uioforeach(int (*f)(void *, void *, size_t *), void *cp,
 	return ret;
 }
 
-int	vfscore_uiomove(void *cp, int n, struct uio *uio);
+int	fdtab_uiomove(void *cp, int n, struct uio *uio);
 
 #endif /* !_UIO_H_ */

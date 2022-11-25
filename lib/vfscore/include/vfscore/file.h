@@ -38,6 +38,7 @@
 #include <sys/types.h>
 #include <vfscore/dentry.h>
 #include <uk/list.h>
+#include <uk/fdtab/fd.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -51,28 +52,22 @@ struct vfscore_file;
 #define UK_VFSCORE_NOPOS ((int) (1 << 0))
 
 struct vfscore_file {
-	int fd;
-	int		f_flags;	/* open flags */
-	int		f_count;	/* reference count */
+	struct fdtab_file f_file;
+
 	off_t		f_offset;	/* current position in file */
 	void		*f_data;        /* file descriptor specific data */
 	int		f_vfs_flags;    /* internal implementation flags */
 	struct dentry   *f_dentry;
 	struct uk_mutex f_lock;
-
-	struct uk_list_head f_ep;	/* List of eventpoll_fd's */
 };
 
-#define FD_LOCK(fp)       uk_mutex_lock(&(fp->f_lock))
-#define FD_UNLOCK(fp)     uk_mutex_unlock(&(fp->f_lock))
-
 int vfscore_alloc_fd(void);
-int vfscore_reserve_fd(int fd);
 int vfscore_put_fd(int fd);
 int vfscore_install_fd(int fd, struct vfscore_file *file);
 struct vfscore_file *vfscore_get_file(int fd);
 void vfscore_put_file(struct vfscore_file *file);
 
+int fget(int fd, struct vfscore_file **out_fp);
 /*
  * File descriptors reference count
  */
@@ -81,8 +76,7 @@ int fdrop(struct vfscore_file* fp);
 
 #define FOF_OFFSET  0x0800    /* Use the offset in uio argument */
 
-/* Also used from posix-sysinfo to determine sysconf(_SC_OPEN_MAX). */
-#define FDTABLE_MAX_FILES 1024
+extern struct fdops vfscore_fdops;
 
 #ifdef __cplusplus
 }

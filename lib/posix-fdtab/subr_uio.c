@@ -43,7 +43,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
-#include <vfscore/uio.h>
+#include <uk/fdtab/uio.h>
 
 static int __memcpy_wrapper(void *dst, void *src, size_t *cnt)
 {
@@ -52,9 +52,9 @@ static int __memcpy_wrapper(void *dst, void *src, size_t *cnt)
 }
 
 int
-vfscore_uiomove(void *cp, int n, struct uio *uio)
+fdtab_uiomove(void *cp, int n, struct uio *uio)
 {
-	int ret = vfscore_uioforeach(__memcpy_wrapper, cp, n, uio);
+	int ret = fdtab_uioforeach(__memcpy_wrapper, cp, n, uio);
 
 	return ret;
 }

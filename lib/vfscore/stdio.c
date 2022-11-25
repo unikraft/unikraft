@@ -39,7 +39,7 @@
 #include <termios.h>
 #include <vfscore/vnode.h>
 #include <unistd.h>
-#include <vfscore/uio.h>
+#include <uk/fdtab/uio.h>
 #include <vfscore/vnode.h>
 #include <vfscore/mount.h>
 #include <errno.h>
@@ -77,7 +77,7 @@ static int stdio_write(struct vnode *vp __unused,
 	if (uio->uio_offset)
 		return ESPIPE;
 
-	return vfscore_uioforeach(__write_fn, NULL, uio->uio_resid, uio);
+	return fdtab_uioforeach(__write_fn, NULL, uio->uio_resid, uio);
 }
 
 
@@ -119,7 +119,7 @@ static int __read_fn(void *dst, void *src __unused, size_t *cnt)
 	*cnt = bytes_total;
 
 	/* The INT_MIN here is a special return code. It makes the
-	 * vfscore_uioforeach to quit from the loop. But this is not
+	 * fdtab_uioforeach to quit from the loop. But this is not
 	 * an error (for example a user hit Ctrl-C). That is why this
 	 * special return value is fixed up to 0 in the stdio_read.
 	 */
@@ -139,7 +139,7 @@ static int stdio_read(struct vnode *vp __unused,
 	if (uio->uio_offset)
 		return ESPIPE;
 
-	ret = vfscore_uioforeach(__read_fn, NULL, uio->uio_resid, uio);
+	ret = fdtab_uioforeach(__read_fn, NULL, uio->uio_resid, uio);
 	ret = (ret == INT_MIN) ? 0 : ret;
 
 	return ret;
@@ -211,16 +211,19 @@ static struct dentry stdio_dentry = {
 	.d_vnode = &stdio_vnode,
 };
 
-static struct vfscore_file  stdio_file = {
-	.fd = 1,
-	.f_flags = UK_FWRITE | UK_FREAD,
+static struct vfscore_file stdio_file = {
+	.f_file = {
+		.fd = 1,
+		.f_flags = UK_FWRITE | UK_FREAD,
+		/* reference count is 2 because close(0) is a valid
+		 * operation. However it is not properly handled in the
+		 * current implementation.
+		 */
+		.f_count = 2,
+		.f_ep = UK_LIST_HEAD_INIT(stdio_file.f_file.f_ep)
+	},
 	.f_dentry = &stdio_dentry,
 	.f_vfs_flags = UK_VFSCORE_NOPOS,
-	/* reference count is 2 because close(0) is a valid
-	 * operation. However it is not properly handled in the
-	 * current implementation. */
-	.f_count = 2,
-	.f_ep = UK_LIST_HEAD_INIT(stdio_file.f_ep)
 };
 
 int init_stdio(void)

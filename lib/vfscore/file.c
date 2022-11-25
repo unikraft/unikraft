@@ -31,46 +31,19 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <uk/fdtab/fd.h>
+#include <vfscore/file.h>
 #include "vfs.h"
 
-#include <unistd.h>
-#include <stdlib.h>
-#include <errno.h>
-#include <uk/print.h>
 #include <uk/assert.h>
-#include <vfscore/file.h>
-#include <vfscore/eventpoll.h>
 
 int fdrop(struct vfscore_file *fp)
 {
-	int prev;
-
 	UK_ASSERT(fp);
-	UK_ASSERT(fp->f_count > 0);
-
-	prev = ukarch_dec(&fp->f_count);
-
-	if (prev == 0)
-		UK_CRASH("Unbalanced fhold/fdrop");
-
-	if (prev == 1) {
-		eventpoll_notify_close(fp);
-
-		/*
-		 * we free the file even in case of an error
-		 * so release the dentry too
-		 */
-		if (vfs_close(fp) != 0)
-			drele(fp->f_dentry);
-
-		free(fp);
-
-		return 1;
-	}
-
-	return 0;
+	return fdtab_fdrop(&fp->f_file);
 }
+
 void fhold(struct vfscore_file *fp)
 {
-	ukarch_inc(&fp->f_count);
+	fdtab_fhold(&fp->f_file);
 }

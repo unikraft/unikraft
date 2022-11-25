@@ -45,9 +45,9 @@
 #include <stdlib.h>
 
 #include <uk/page.h>
+#include <uk/fdtab/uio.h>
 #include <vfscore/vnode.h>
 #include <vfscore/mount.h>
-#include <vfscore/uio.h>
 #include <vfscore/file.h>
 
 #include "ramfs.h"
@@ -314,7 +314,7 @@ ramfs_readlink(struct vnode *vp, struct uio *uio)
 		len = uio->uio_resid;
 
 	set_times_to_now(&(np->rn_atime), NULL, NULL);
-	return vfscore_uiomove(np->rn_buf + uio->uio_offset, len, uio);
+	return fdtab_uiomove(np->rn_buf + uio->uio_offset, len, uio);
 }
 
 /* Remove a directory */
@@ -420,7 +420,7 @@ ramfs_read(struct vnode *vp, struct vfscore_file *fp __unused,
 
 	set_times_to_now(&(np->rn_atime), NULL, NULL);
 
-	return vfscore_uiomove(np->rn_buf + uio->uio_offset, len, uio);
+	return fdtab_uiomove(np->rn_buf + uio->uio_offset, len, uio);
 }
 
 int
@@ -488,8 +488,7 @@ ramfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 	}
 
 	set_times_to_now(&(np->rn_mtime), &(np->rn_ctime), NULL);
-	return vfscore_uiomove(np->rn_buf + uio->uio_offset, uio->uio_resid,
-			       uio);
+	return fdtab_uiomove(np->rn_buf + uio->uio_offset, uio->uio_resid, uio);
 }
 
 static int

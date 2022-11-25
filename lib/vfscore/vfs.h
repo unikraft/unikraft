@@ -121,100 +121,6 @@ struct task {
 int sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fp);
 
 /**
- * Reads data from the descriptor provided by the fp structure into
- * niov buffers of type iovec, starting at offset. The number of read bytes is
- * returned in count.
- *
- * @param fp
- *	Pointer to the vfscore_file structure
- * @param iov
- *	Array of buffers to store the data into
- * @param niov
- *	Number of elements in the iov array
- * @param offset
- *	Offset to start reading at
- * @param[out] count
- *	Number of read bytes
- * @return
- *	- (0):  Completed successfully
- *	- (<0): Negative value with error code
- */
-int sys_read(struct vfscore_file *fp, const struct iovec *iov, size_t niov,
-		off_t offset, size_t *count);
-
-/**
- * Writes data from the array of buffers iov of size niov at the
- * file descriptor provided by the fp structure, starting at offset.
- * The number of written bytes is returned in count.
- *
- * @param fp
- *	Pointer to the vfscore_file structure
- * @param iov
- *	Array of buffers to write the data into
- * @param niov
- *	Number of elements in the iov array
- * @param offset
- *	Offset to start writing at
- * @param[out] count
- *	Number of bytes written
- * @return
- *	- (0):  Completed successfully
- *	- (<0): Negative value with error code
- */
-int sys_write(struct vfscore_file *fp, const struct iovec *iov, size_t niov,
-		off_t offset, size_t *count);
-
-/**
- * Repositions read/write file cursor.
- *
- * @param fp
- *	Pointer to the vfscore_file structure
- * @param off
- *	Offset bytes to reposition the cursor, according to the type
- * @param type
- *	It can be one of the following types:
- *		* SEEK_SET: The file offset is set to offset bytes.
- *		* SEEK_CUR: The file offset is set to its current
- *			location plus offset bytes.
- *		* SEEK_END: The file offset is set to the size of
- *			the file plus offset bytes.
- * @param[out] cur_off
- *	The resulting offset measured from the start of the file
- * @return
- *	- (0):  Completed successfully
- *	- (<0): Negative value with error code
- */
-int sys_lseek(struct vfscore_file *fp, off_t off, int type,
-		off_t *cur_off);
-
-/**
- * Modifies device parameters of special files.
- *
- * @param fp
- *	Pointer to the vfscore_file structure
- * @param request
- *	Device-dependent request code
- * @param buf
- *	Pointer to the data that should be used by call
- * @return
- *	- (0):  Completed successfully
- *	- (<0): Negative value with error code
- */
-int sys_ioctl(struct vfscore_file *fp, unsigned long request, void *buf);
-
-/**
- * Synchronizes the in-core data referred by vfscore_file to the backing
- * store device.
- *
- * @param fp
- *	Pointer to the vfscore_file structure
- * @return
- *	- (0):  Completed successfully
- *	- (<0): Negative value with error code
- */
-int sys_fsync(struct vfscore_file *fp);
-
-/**
  * Gets the next directory entry in the directory stream.
  *
  * @param fp
@@ -407,20 +313,6 @@ int sys_access(char *path, int mode);
 int sys_stat(char *path, struct stat *st);
 
 /**
- * The sys_fstat() function is equivalent to sys_stat(),
- * except that it takes a vfscore_file structure as parameter.
- *
- * @param fp
- *	Pointer to the vfscore_file structure
- * @param[out] st
- *	Buffer to store information about the file
- * @return
- *	- (0):  Completed successfully
- *	- (<0): Negative value with error code
- */
-int sys_fstat(struct vfscore_file *fp, struct stat *st);
-
-/**
  * The sys_lstat() function is equivalent to sys_stat(),
  * except when path refers to a symbolic link.
  * In that case sys_lstat() shall return information about the link,
@@ -478,20 +370,6 @@ int sys_fstatfs(struct vfscore_file *fp, struct statfs *buf);
  *	- (<0): Negative value with error code
  */
 int sys_truncate(char *path, off_t length);
-
-/**
- * Similar to the sys_truncate() function, but it takes a vfscore_file
- * instead of path.
- *
- * @param fp
- *	Pointer to the vfscore_file
- * @param length
- *	The new size (in bytes) of the file to which fp is referring to
- * @return
- *	- (0):  Completed successfully
- *	- (<0): Negative value with error code
- */
-int sys_ftruncate(struct vfscore_file *fp, off_t length);
 
 /**
  * Store at most bufsize bytes from the content to which the symlink
@@ -556,7 +434,6 @@ int sys_utimes(char *path, const struct timeval *times, int flags);
  */
 int sys_utimensat(int dirfd, const char *pathname,
 				   const struct timespec times[2], int flags);
-
 /**
  * Similar to sys_utimensat(), but the file to be updated is specified via
  * an open file descriptor fd.
@@ -571,32 +448,6 @@ int sys_utimensat(int dirfd, const char *pathname,
  *	- (<0): Negative value with error code
  */
 int sys_futimens(int fd, const struct timespec times[2]);
-
-/**
- * Manipulates the file space for the file referred by fd, starting
- * at offset and continuing for len bytes.
- *
- * @param fp
- *	Pointer to a vfscore_file structure
- * @param mode
- *	Specifies how to manipulates the space. The mode can have the
- *	the following values:
- *		* 0 - allocates len bytes starting from offset.
- *		* FALLOC_FL_KEEP_SIZE - the file size will not change even
- *			if offset + len is greater than the file size.
- *		* FALLOC_FL_PUNCH_HOLE - deallocates len bytes starting at
- *			offset and creates a hole in the file. This flag should
- *			always come together with FALLOC_FL_KEEP_SIZE, otherwise
- *			the sys_futimens call will fail.
- * @param offset
- *	Starting byte from which this operation will apply
- * @param len
- *	Number of bytes for which this operation will apply
- * @return
- *	- (0):  Completed successfully
- *	- (<0): Negative value with error code
- */
-int sys_fallocate(struct vfscore_file *fp, int mode, loff_t offset, loff_t len);
 
 /**
  * This function is not used at this point.
@@ -864,19 +715,6 @@ int vfs_stat(struct vfscore_file *fp, struct stat *st);
  *	- (<0): Negative value with error code
  */
 int fget(int fd, struct vfscore_file **out_fp);
-
-/**
- * Allocates a new file descriptor referring the fp structure.
- *
- * @param fp
- *	Pointer to the vfscore_file structure to be referred
- * @param[out] newfd
- *	The new allocated file descriptor pointing to the fp structure
- * @return
- *	- (0):  Completed successfully
- *	- (<0): Negative value with error code
- */
-int fdalloc(struct vfscore_file *fp, int *newfd);
 
 #ifdef DEBUG_VFS
 

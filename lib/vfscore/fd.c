@@ -32,6 +32,7 @@
  */
 
 #include <uk/config.h>
+#include <uk/fdtab/fd.h>
 #include <string.h>
 #include <uk/essentials.h>
 #include <uk/bitmap.h>
@@ -46,129 +47,37 @@
 
 int init_stdio(void);
 
-struct fdtable {
-	unsigned long bitmap[UK_BITS_TO_LONGS(FDTABLE_MAX_FILES)];
-	uint32_t fd_start;
-	struct vfscore_file *files[FDTABLE_MAX_FILES];
-};
-struct fdtable fdtable;
-
 int vfscore_alloc_fd(void)
 {
-	unsigned long flags;
-	int ret;
-
-	flags = ukplat_lcpu_save_irqf();
-	ret = uk_find_next_zero_bit(fdtable.bitmap, FDTABLE_MAX_FILES, 0);
-
-	if (ret == FDTABLE_MAX_FILES) {
-		ret = -ENFILE;
-		goto exit;
-	}
-
-	uk_bitmap_set(fdtable.bitmap, ret, 1);
-
-exit:
-	ukplat_lcpu_restore_irqf(flags);
-	return ret;
-}
-
-int vfscore_reserve_fd(int fd)
-{
-	unsigned long flags;
-	int ret = 0;
-
-	flags = ukplat_lcpu_save_irqf();
-	if (uk_test_bit(fd, fdtable.bitmap)) {
-		ret = -EBUSY;
-		goto exit;
-	}
-
-	uk_bitmap_set(fdtable.bitmap, fd, 1);
-
-exit:
-	ukplat_lcpu_restore_irqf(flags);
-	return ret;
+	return fdtab_alloc_fd(fdtab_get_active());
 }
 
 int vfscore_put_fd(int fd)
 {
-	struct vfscore_file *fp;
-	unsigned long flags;
-
-	UK_ASSERT(fd < (int) FDTABLE_MAX_FILES);
-
-	/* FIXME Currently it is not allowed to free std(in|out|err):
-	 * if (fd <= 2) return -EBUSY;
-	 *
-	 * However, returning -EBUSY in this case breaks dup2 with stdin, out,
-	 * err. Ignoring this should be fine as long as those are not fdrop-ed
-	 * twice, in which case the static fp would be freed, and here be
-	 * dragons.
-	 */
-
-	flags = ukplat_lcpu_save_irqf();
-	uk_bitmap_clear(fdtable.bitmap, fd, 1);
-	fp = fdtable.files[fd];
-	fdtable.files[fd] = NULL;
-	ukplat_lcpu_restore_irqf(flags);
-
-	/*
-	 * Since we can alloc a fd without assigning a
-	 * vfsfile we must protect against NULL ptr
-	 */
-	if (fp)
-		fdrop(fp);
-
-	return 0;
+	return fdtab_put_fd(fdtab_get_active(), fd);
 }
 
 int vfscore_install_fd(int fd, struct vfscore_file *file)
 {
-	unsigned long flags;
-	struct vfscore_file *orig;
-
-	if ((fd >= (int) FDTABLE_MAX_FILES) || (!file))
-		return -EBADF;
-
-	fhold(file);
-
-	file->fd = fd;
-
-	flags = ukplat_lcpu_save_irqf();
-	orig = fdtable.files[fd];
-	fdtable.files[fd] = file;
-	ukplat_lcpu_restore_irqf(flags);
-
-	fdrop(file);
-
-	if (orig)
-		fdrop(orig);
-
-	return 0;
+	return fdtab_install_fd(fdtab_get_active(), fd, &file->f_file);
 }
 
 struct vfscore_file *vfscore_get_file(int fd)
 {
-	unsigned long flags;
-	struct vfscore_file *ret = NULL;
+	struct fdtab_file *fp;
 
-	UK_ASSERT(fd < (int) FDTABLE_MAX_FILES);
+	fp = fdtab_get_file(fdtab_get_active(), fd);
+	if (fp->f_op != &vfscore_fdops) {
+		fdtab_put_file(fp);
+		return NULL;
+	}
 
-	flags = ukplat_lcpu_save_irqf();
-	if (!uk_test_bit(fd, fdtable.bitmap))
-		goto exit;
-	ret = fdtable.files[fd];
-	fhold(ret);
-
-exit:
-	ukplat_lcpu_restore_irqf(flags);
-	return ret;
+	return __containerof(fp, struct vfscore_file, f_file);
 }
 
 void vfscore_put_file(struct vfscore_file *file)
 {
-	fdrop(file);
+	fdtab_fdrop(&file->f_file);
 }
 
 int fget(int fd, struct vfscore_file **out_fp)
@@ -183,29 +92,6 @@ int fget(int fd, struct vfscore_file **out_fp)
 
 	return ret;
 }
-
-int fdalloc(struct vfscore_file *fp, int *newfd)
-{
-	int fd, ret = 0;
-
-	fhold(fp);
-
-	fd = vfscore_alloc_fd();
-	if (fd < 0) {
-		ret = fd;
-		goto exit;
-	}
-
-	ret = vfscore_install_fd(fd, fp);
-	if (ret)
-		fdrop(fp);
-	else
-		*newfd = fd;
-
-exit:
-	return ret;
-}
-
 
 static int fdtable_init(void)
 {

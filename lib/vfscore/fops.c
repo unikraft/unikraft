@@ -96,9 +96,9 @@ int vfs_write(struct vfscore_file *fp, struct uio *uio, int flags)
 
 	vn_lock(vp);
 
-	if (fp->f_flags & O_APPEND)
+	if (fp->f_file.f_flags & O_APPEND)
 		ioflags |= IO_APPEND;
-	if (fp->f_flags & (O_DSYNC|O_SYNC))
+	if (fp->f_file.f_flags & (O_DSYNC|O_SYNC))
 		ioflags |= IO_SYNC;
 
 	if ((flags & FOF_OFFSET) == 0)

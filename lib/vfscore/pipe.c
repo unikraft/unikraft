@@ -39,7 +39,7 @@
 #include <vfscore/fs.h>
 #include <vfscore/mount.h>
 #include <vfscore/vnode.h>
-#include <vfscore/eventpoll.h>
+#include <uk/fdtab/eventpoll.h>
 #include <uk/wait.h>
 #include <uk/syscall.h>
 #include <sys/ioctl.h>
@@ -359,7 +359,7 @@ static int pipe_read(struct vnode *vnode,
 {
 	struct pipe_file *pipe_file = vnode->v_data;
 	struct pipe_buf *pipe_buf = pipe_file->buf;
-	bool nonblocking = (vfscore_file->f_flags & O_NONBLOCK);
+	bool nonblocking = (vfscore_file->f_file.f_flags & O_NONBLOCK);
 	bool data_available = true;
 	int uio_idx = 0;
 
@@ -427,10 +427,10 @@ static int pipe_close(struct vnode *vnode,
 	UK_ASSERT(vfscore_file->f_dentry->d_vnode == vnode);
 	UK_ASSERT(vnode->v_refcnt == 1);
 
-	if (vfscore_file->f_flags & UK_FREAD)
+	if (vfscore_file->f_file.f_flags & UK_FREAD)
 		pipe_file->r_refcount--;
 
-	if (vfscore_file->f_flags & UK_FWRITE)
+	if (vfscore_file->f_file.f_flags & UK_FWRITE)
 		pipe_file->w_refcount--;
 
 	if (!pipe_file->r_refcount && !pipe_file->w_refcount)
@@ -615,15 +615,15 @@ static int pipe_fd_alloc(struct pipe_file *pipe_file, int flags)
 	}
 
 	/* Fill out necessary fields. */
-	vfs_file->fd = vfs_fd;
-	vfs_file->f_flags = flags;
-	vfs_file->f_count = 1;
+	vfs_file->f_file.fd = vfs_fd;
+	vfs_file->f_file.f_flags = flags;
+	vfs_file->f_file.f_count = 1;
 	vfs_file->f_data = pipe_file;
 	vfs_file->f_dentry = p_dentry;
 	vfs_file->f_vfs_flags = UK_VFSCORE_NOPOS;
 
-	uk_mutex_init(&vfs_file->f_lock);
-	UK_INIT_LIST_HEAD(&vfs_file->f_ep);
+	fdtab_file_init(&vfs_file->f_file);
+	vfs_file->f_file.f_op = &vfscore_fdops;
 
 	p_vnode->v_data = pipe_file;
 	p_vnode->v_type = VFIFO;

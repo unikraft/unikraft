@@ -40,11 +40,10 @@
 #include <uk/list.h>
 #include <uk/config.h>
 #include <time.h>
-#include <vfscore/uio.h>
+#include <uk/fdtab/uio.h>
 #include <vfscore/dentry.h>
 
 struct vfsops;
-struct vnops;
 struct vnode;
 struct vfscore_file;
 

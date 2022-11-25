@@ -119,7 +119,7 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 	DPRINTF(VFSDB_SYSCALL, ("sys_open: path=%s flags=%x mode=%x\n",
 				path, flags, mode));
 
-	flags = vfscore_fflags(flags);
+	flags = fdtab_fflags(flags);
 	if (flags & O_CREAT) {
 		error = namei(path, &dp);
 		if (error == ENOENT) {
@@ -195,7 +195,7 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 	}
 
 	fhold(fp);
-	fp->f_flags = flags;
+	fp->f_file.f_flags = flags;
 
 	/*
 	 * Don't need to increase refcount here, we already hold a reference
@@ -203,8 +203,8 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 	 */
 	fp->f_dentry = dp;
 
-	uk_mutex_init(&fp->f_lock);
-	UK_INIT_LIST_HEAD(&fp->f_ep);
+	fdtab_file_init(&fp->f_file);
+	fp->f_file.f_op = &vfscore_fdops;
 
 	vn_lock(vp);
 
@@ -236,154 +236,85 @@ out_drele:
 	return error;
 }
 
-int
-sys_close(struct vfscore_file *fp __unused)
+static int
+sys_free_fd(struct fdtab_file *fp)
 {
+	struct vfscore_file *f = __containerof(fp, struct vfscore_file, f_file);
+
+	/*
+	 * we free the file even in case of an error
+	 * so release the dentry too
+	 */
+	if (vfs_close(f) != 0)
+		drele(f->f_dentry);
+
+	uk_free(uk_alloc_get_default(), f);
 
 	return 0;
 }
 
-int
-sys_read(struct vfscore_file *fp, const struct iovec *iov, size_t niov,
-		off_t offset, size_t *count)
+static int
+sys_read(struct fdtab_file *fp, struct uio *uio, int flags)
 {
-	int error = 0;
-	struct iovec *copy_iov;
-	if ((fp->f_flags & UK_FREAD) == 0)
-		return EBADF;
+	struct vfscore_file *f = __containerof(fp, struct vfscore_file, f_file);
 
-	size_t bytes = 0;
-	const struct iovec *iovp = iov;
-
-	for (unsigned i = 0; i < niov; i++) {
-		if (iovp->iov_len > IOSIZE_MAX - bytes) {
-			return EINVAL;
-		}
-		bytes += iovp->iov_len;
-		iovp++;
-	}
-
-	if (bytes == 0) {
-		*count = 0;
-		return 0;
-	}
-
-	struct uio uio;
-	/* TODO: is it necessary to copy iov within Unikraft?
-	 * OSv did this, mentioning this reason:
-	 *
-	 * "Unfortunately, the current implementation of fp->read
-	 *  zeros the iov_len fields when it reads from disk, so we
-	 *  have to copy iov. "
-	 */
-	copy_iov = calloc(sizeof(struct iovec), niov);
-	if (!copy_iov)
-		return ENOMEM;
-	memcpy(copy_iov, iov, sizeof(struct iovec)*niov);
-
-	uio.uio_iov = copy_iov;
-	uio.uio_iovcnt = niov;
-	uio.uio_offset = offset;
-	uio.uio_resid = bytes;
-	uio.uio_rw = UIO_READ;
-	error = vfs_read(fp, &uio, (offset == -1) ? 0 : FOF_OFFSET);
-	*count = bytes - uio.uio_resid;
-
-	free(copy_iov);
-	return error;
+	return vfs_read(f, uio,
+			flags | ((uio->uio_offset == -1) ? 0 : FOF_OFFSET));
 }
 
-int
-sys_write(struct vfscore_file *fp, const struct iovec *iov, size_t niov,
-		off_t offset, size_t *count)
+static int
+sys_write(struct fdtab_file *fp, struct uio *uio, int flags)
 {
-	struct iovec *copy_iov;
-	int error = 0;
-	if ((fp->f_flags & UK_FWRITE) == 0)
-		return EBADF;
+	struct vfscore_file *f = __containerof(fp, struct vfscore_file, f_file);
 
-	size_t bytes = 0;
-	const struct iovec *iovp = iov;
-	for (unsigned i = 0; i < niov; i++) {
-		if (iovp->iov_len > IOSIZE_MAX - bytes) {
-			return EINVAL;
-		}
-		bytes += iovp->iov_len;
-		iovp++;
-	}
-
-	if (bytes == 0) {
-		*count = 0;
-		return 0;
-	}
-
-	struct uio uio;
-
-	/* TODO: same note as in sys_read. Original comment:
-	 *
-	 * "Unfortunately, the current implementation of fp->write zeros the
-	 *  iov_len fields when it writes to disk, so we have to copy iov.
-	 */
-	/* std::vector<iovec> copy_iov(iov, iov + niov); */
-	copy_iov = calloc(sizeof(struct iovec), niov);
-	if (!copy_iov)
-		return ENOMEM;
-	memcpy(copy_iov, iov, sizeof(struct iovec)*niov);
-
-	uio.uio_iov = copy_iov;
-	uio.uio_iovcnt = niov;
-	uio.uio_offset = offset;
-	uio.uio_resid = bytes;
-	uio.uio_rw = UIO_WRITE;
-	error = vfs_write(fp, &uio, (offset == -1) ? 0 : FOF_OFFSET);
-	*count = bytes - uio.uio_resid;
-
-	free(copy_iov);
-	return error;
+	return vfs_write(f, uio,
+			 flags | ((uio->uio_offset == -1) ? 0 : FOF_OFFSET));
 }
 
-int
-sys_lseek(struct vfscore_file *fp, off_t off, int type, off_t *origin)
+static int
+sys_lseek(struct fdtab_file *fp, off_t off, int type, off_t *origin)
 {
+	struct vfscore_file *f = __containerof(fp, struct vfscore_file, f_file);
 	struct vnode *vp;
 
-	DPRINTF(VFSDB_SYSCALL, ("sys_seek: fp=%p off=%ud type=%d\n",
-				fp, (unsigned int)off, type));
+	DPRINTF(VFSDB_SYSCALL, ("sys_seek: f=%p off=%ud type=%d\n",
+				f, (unsigned int)off, type));
 
-	if (!fp->f_dentry) {
-	    // Linux doesn't implement lseek() on pipes, sockets, or ttys.
-	    // In OSV, we only implement lseek() on regular files, backed by vnode
-	    return ESPIPE;
+	if (!f->f_dentry) {
+		// Linux doesn't implement lseek() on pipes, sockets, or ttys.
+		// In OSV, we only implement lseek() on regular files, backed by vnode
+		return ESPIPE;
 	}
 
-	vp = fp->f_dentry->d_vnode;
+	vp = f->f_dentry->d_vnode;
 	int error = EINVAL;
 	vn_lock(vp);
 	switch (type) {
 	case SEEK_CUR:
-		off = fp->f_offset + off;
+		off = f->f_offset + off;
 		break;
 	case SEEK_END:
 		off = vp->v_size + off;
 		break;
 	}
 	if (off >= 0) {
-		error = VOP_SEEK(vp, fp, fp->f_offset, off);
+		error = VOP_SEEK(vp, f, f->f_offset, off);
 		if (!error) {
 			*origin      = off;
-			fp->f_offset = off;
+			f->f_offset  = off;
 		}
 	}
 	vn_unlock(vp);
 	return error;
 }
 
-int
-sys_ioctl(struct vfscore_file *fp, unsigned long request, void *buf)
+static int
+sys_ioctl(struct fdtab_file *fp, unsigned long request, void *buf)
 {
+	struct vfscore_file *f = __containerof(fp, struct vfscore_file, f_file);
 	int error = 0;
 
-	DPRINTF(VFSDB_SYSCALL, ("sys_ioctl: fp=%p request=%lux\n", fp, request));
+	DPRINTF(VFSDB_SYSCALL, ("%s: f=%p request=%lux\n", __func__f, request));
 
 	if ((fp->f_flags & (UK_FREAD | UK_FWRITE)) == 0)
 		return EBADF;
@@ -396,7 +327,7 @@ sys_ioctl(struct vfscore_file *fp, unsigned long request, void *buf)
 		fp->f_flags &= ~O_CLOEXEC;
 		break;
 	default:
-		error = vfs_ioctl(fp, request, buf);
+		error = vfs_ioctl(f, request, buf);
 		break;
 	}
 
@@ -404,34 +335,33 @@ sys_ioctl(struct vfscore_file *fp, unsigned long request, void *buf)
 	return error;
 }
 
-int
-sys_fsync(struct vfscore_file *fp)
+static int
+sys_fsync(struct fdtab_file *fp)
 {
+	struct vfscore_file *f = __containerof(fp, struct vfscore_file, f_file);
 	struct vnode *vp;
 	int error;
 
-	DPRINTF(VFSDB_SYSCALL, ("sys_fsync: fp=%p\n", fp));
+	DPRINTF(VFSDB_SYSCALL, ("%s: f=%p\n", __func__, f));
 
-	if (!fp->f_dentry)
+	if (!f->f_dentry)
 		return EINVAL;
 
-	vp = fp->f_dentry->d_vnode;
+	vp = f->f_dentry->d_vnode;
 	vn_lock(vp);
-	error = VOP_FSYNC(vp, fp);
+	error = VOP_FSYNC(vp, f);
 	vn_unlock(vp);
 	return error;
 }
 
-int
-sys_fstat(struct vfscore_file *fp, struct stat *st)
+static int
+sys_fstat(struct fdtab_file *fp, struct stat *st)
 {
-	int error = 0;
+	struct vfscore_file *f = __containerof(fp, struct vfscore_file, f_file);
 
-	DPRINTF(VFSDB_SYSCALL, ("sys_fstat: fp=%p\n", fp));
+	DPRINTF(VFSDB_SYSCALL, ("%s: f=%p\n", __func__, f));
 
-	error = vfs_stat(fp, st);
-
-	return error;
+	return vfs_stat(f, st);
 }
 
 /*
@@ -1170,16 +1100,17 @@ sys_truncate(char *path, off_t length)
 	return error;
 }
 
-int
-sys_ftruncate(struct vfscore_file *fp, off_t length)
+static int
+sys_ftruncate(struct fdtab_file *fp, off_t length)
 {
+	struct vfscore_file *f = __containerof(fp, struct vfscore_file, f_file);
 	struct vnode *vp;
 	int error;
 
-	if (!fp->f_dentry)
+	if (!f->f_dentry)
 		return EBADF;
 
-	vp = fp->f_dentry->d_vnode;
+	vp = f->f_dentry->d_vnode;
 	vn_lock(vp);
 	error = VOP_TRUNCATE(vp, length);
 	vn_unlock(vp);
@@ -1472,15 +1403,16 @@ sys_futimens(int fd, const struct timespec times[2])
 	return error;
 }
 
-int
-sys_fallocate(struct vfscore_file *fp, int mode, off_t offset, off_t len)
+static int
+sys_fallocate(struct fdtab_file *fp, int mode, off_t offset, off_t len)
 {
+	struct vfscore_file *f = __containerof(fp, struct vfscore_file, f_file);
 	int error;
 	struct vnode *vp;
 
 	DPRINTF(VFSDB_SYSCALL, ("sys_fallocate: fp=%p", fp));
 
-	if (!fp->f_dentry || !(fp->f_flags & UK_FWRITE))
+	if (!f->f_dentry || !(fp->f_flags & UK_FWRITE))
 		return EBADF;
 
 	if (offset < 0 || len <= 0) {
@@ -1492,7 +1424,7 @@ sys_fallocate(struct vfscore_file *fp, int mode, off_t offset, off_t len)
 		return ENOTSUP;
 	}
 
-	vp = fp->f_dentry->d_vnode;
+	vp = f->f_dentry->d_vnode;
 	vn_lock(vp);
 
 	// NOTE: It's not detected here whether or not the device underlying
@@ -1554,3 +1486,30 @@ sys_fchmod(int fd, mode_t mode)
 		return vn_setmode(f->f_dentry->d_vnode, mode);
 	}
 }
+
+static int sys_poll(struct fdtab_file *fp, unsigned int *revents,
+		    struct eventpoll_cb *cb)
+{
+	struct vfscore_file *f = __containerof(fp, struct vfscore_file, f_file);
+	struct vnode *vnode;
+
+	UK_ASSERT(f->f_dentry);
+	UK_ASSERT(f->f_dentry->d_vnode);
+
+	vnode = f->f_dentry->d_vnode;
+
+	return VOP_POLL(vnode, revents, cb);
+}
+
+struct fdops vfscore_fdops = {
+	.fdop_read = sys_read,
+	.fdop_write = sys_write,
+	.fdop_poll = sys_poll,
+	.fdop_free = sys_free_fd,
+	.fdop_seek = sys_lseek,
+	.fdop_fallocate = sys_fallocate,
+	.fdop_fstat = sys_fstat,
+	.fdop_ioctl = sys_ioctl,
+	.fdop_fsync = sys_fsync,
+	.fdop_truncate = sys_ftruncate,
+};

@@ -30,10 +30,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <vfscore/eventpoll.h>
-#include <vfscore/file.h>
-#include <vfscore/dentry.h>
-#include <vfscore/vnode.h>
+#include <uk/fdtab/eventpoll.h>
+#include <uk/fdtab/fd.h>
 #include <uk/essentials.h>
 #include <uk/plat/time.h>
 #include <uk/print.h>
@@ -53,7 +51,7 @@ UK_TRACEPOINT(trace_efd_signal, "%p %u %u %u", void *, unsigned int,
 	      unsigned int, unsigned int);
 UK_TRACEPOINT(trace_efd_poll, "%p %u %u %u %d", void *, unsigned int,
 	      unsigned int, unsigned int, int);
-UK_TRACEPOINT(trace_efd_add, "%p %u %d", void *, unsigned int, int);
+UK_TRACEPOINT(trace_efd_add, "%p %u", void *, unsigned int);
 UK_TRACEPOINT(trace_efd_del, "%p %u", void *, unsigned int);
 
 void eventpoll_fini(struct eventpoll *ep)
@@ -102,7 +100,7 @@ static struct eventpoll_fd *efd_find(struct eventpoll *ep, int fd)
 
 static int efd_poll(struct eventpoll_fd *efd, unsigned int *revents)
 {
-	struct vnode *vnode;
+	struct fdtab_file *f;
 	unsigned int filter;
 	int ret;
 
@@ -110,12 +108,12 @@ static int efd_poll(struct eventpoll_fd *efd, unsigned int *revents)
 	UK_ASSERT(revents);
 
 	UK_ASSERT(efd->vfs_file);
-	vnode = efd->vfs_file->f_dentry->d_vnode;
+	f = efd->vfs_file;
 
 	filter = (unsigned int)efd->event.events | EPERR_SET;
 
-	UK_ASSERT(vnode->v_op->vop_poll);
-	ret = VOP_POLL(vnode, revents, &efd->cb);
+	UK_ASSERT(f->f_op->fdop_poll);
+	ret = FDOP_POLL(f, revents, &efd->cb);
 	trace_efd_poll(efd->ep, efd->fd, *revents, *revents & filter, ret);
 	if (unlikely(ret))
 		return ret;
@@ -138,16 +136,14 @@ void eventpoll_add_unsafe(struct eventpoll *ep, struct eventpoll_fd *efd)
 	efd->ep = ep;
 
 	UK_ASSERT(efd->vfs_file);
-	UK_ASSERT(efd->vfs_file->f_dentry);
-	UK_ASSERT(efd->vfs_file->f_dentry->d_vnode);
 
 	uk_list_add_tail(&efd->f_link, &efd->vfs_file->f_ep);
 	uk_list_add_tail(&efd->fd_link, &ep->fd_list);
 
-	trace_efd_add(ep, efd->fd, efd->vfs_file->f_dentry->d_vnode->v_type);
+	trace_efd_add(ep, efd->fd);
 }
 
-int eventpoll_add(struct eventpoll *ep, int fd, struct vfscore_file *fp,
+int eventpoll_add(struct eventpoll *ep, int fd, struct fdtab_file *fp,
 		  const struct epoll_event *event)
 {
 	struct eventpoll_fd *efd;
@@ -310,7 +306,7 @@ EXIT:
 	return ret;
 }
 
-void eventpoll_notify_close(struct vfscore_file *fp)
+void eventpoll_notify_close(struct fdtab_file *fp)
 {
 	struct eventpoll_fd *efd;
 	struct uk_list_head *itr;

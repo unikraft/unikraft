@@ -1,0 +1,16 @@
+menuconfig LIBPOSIX_FDTAB
+	bool "posix-fdtab: File-descriptor management"
+	default n
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKDEBUG
+	select LIBUKLOCK
+
+if LIBPOSIX_FDTAB
+
+config LIBPOSIX_FDTAB_MAX_FILES
+	int "Maximum open files per fdtable"
+	default 1024
+	help
+		The maximum count of files that can be registered per fdtable.
+
+endif

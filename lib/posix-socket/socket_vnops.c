@@ -113,15 +113,15 @@ posix_socket_alloc_fd(struct posix_socket_driver *d, int type, void *sock_data)
 	}
 
 	/* Put things together, and fill out necessary fields */
-	vfs_file->fd = vfs_fd;
-	vfs_file->f_flags = UK_FWRITE | UK_FREAD;
-	vfs_file->f_count = 1;
+	vfs_file->f_file.fd = vfs_fd;
+	vfs_file->f_file.f_flags = UK_FWRITE | UK_FREAD;
+	vfs_file->f_file.f_count = 1;
 	vfs_file->f_data = sock;
 	vfs_file->f_dentry = vfs_dentry;
 	vfs_file->f_vfs_flags = UK_VFSCORE_NOPOS;
 
-	uk_mutex_init(&vfs_file->f_lock);
-	UK_INIT_LIST_HEAD(&vfs_file->f_ep);
+	fdtab_file_init(&vfs_file->f_file);
+	vfs_file->f_file.f_op = &vfscore_fdops;
 
 	vfs_vnode->v_data = sock;
 	vfs_vnode->v_type = VSOCK;
@@ -178,7 +178,8 @@ posix_socket_vfscore_close(struct vnode *vnode,
 	uk_free(sock->driver->allocator, sock);
 
 	if (unlikely(ret < 0)) {
-		PSOCKET_ERR("close on socket %d failed: %d\n", fp->fd, ret);
+		PSOCKET_ERR("close on socket %d failed: %d\n", fp->f_file.fd,
+			    ret);
 		return -ret;
 	}
 
@@ -260,8 +261,8 @@ posix_socket_vfscore_read(struct vnode *vnode,
 
 	if (unlikely(ret < 0)) {
 		if (ret != -EAGAIN) /* Don't spam log for legitimate timeouts */
-			PSOCKET_ERR("read on socket %d failed: %d\n", fp->fd,
-				    (int)ret);
+			PSOCKET_ERR("read on socket %d failed: %d\n",
+				    fp->f_file.fd, (int)ret);
 		return (int)-ret;
 	}
 
@@ -285,7 +286,7 @@ posix_socket_vfscore_ioctl(struct vnode *vnode,
 
 	ret = posix_socket_ioctl(sock, request, buf);
 	if (unlikely(ret < 0)) {
-		PSOCKET_ERR("ioctl on socket %d failed: %d\n", fp->fd,
+		PSOCKET_ERR("ioctl on socket %d failed: %d\n", fp->f_file.fd,
 			    (int)ret);
 		return -ret;
 	}
@@ -307,7 +308,7 @@ static int posix_socket_vfscore_poll(struct vnode *vnode, unsigned int *revents,
 	ret = posix_socket_poll(sock, revents, ecb);
 	if (unlikely(ret < 0)) {
 		PSOCKET_ERR("poll on socket %d failed: %d\n",
-			    sock->vfs_file->fd, (int)ret);
+			    sock->vfs_file->f_file.fd, (int)ret);
 		return -ret;
 	}
 
