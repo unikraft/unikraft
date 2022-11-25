@@ -451,7 +451,7 @@ void _uk_thread_struct_free_alloc(struct uk_thread *t)
 	/* Free memory that was allocated by us */
 	if (t->_mem.uktls_a && t->_mem.uktls) {
 #if CONFIG_LIBUKSCHED_TCB_INIT
-		uk_thread_tcb_fini(t, uk_thread_uktcb(t));
+		uk_thread_uktcb_fini(t, uk_thread_uktcb(t));
 #endif /* CONFIG_LIBUKSCHED_TCB_INIT */
 		uk_free(t->_mem.uktls_a, t->_mem.uktls);
 		t->_mem.uktls_a = NULL;
@@ -909,7 +909,7 @@ void uk_thread_release(struct uk_thread *t)
 
 #if CONFIG_LIBUKSCHED_TCB_INIT
 	if (tls_a && tls)
-		uk_thread_tcb_fini(t, uk_thread_uktcb(t));
+		uk_thread_uktcb_fini(t, uk_thread_uktcb(t));
 #endif /* CONFIG_LIBUKSCHED_TCB_INIT */
 	if (t->dtor)
 		t->dtor(t);
