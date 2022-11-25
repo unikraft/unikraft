@@ -94,6 +94,11 @@ off_t lseek(int fd, off_t offset, int whence);
 int rmdir(const char *pathname);
 #endif
 
+#if CONFIG_LIBPOSIX_PIPE
+int pipe(int fildes[2]);
+int pipe2(int pipefd[2], int flags);
+#endif
+
 #if CONFIG_LIBUKSIGNAL
 unsigned int alarm(unsigned int seconds);
 int pause(void);
