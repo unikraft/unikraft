@@ -83,7 +83,7 @@ UK_SYSCALL_R_DEFINE(int, socket, int, family, int, type, int, protocol)
 EXIT_ERR_CLOSE:
 	dummy = (struct posix_socket_file){
 		.sock_data = sock,
-		.vfs_file = NULL,
+		.fd_file = { 0 },
 		.driver = d,
 		.type = type,
 	};
@@ -133,19 +133,19 @@ int do_accept4(int sock, struct sockaddr *addr, socklen_t *addr_len,
 
 	ret = vfs_fd;
 
-	vfscore_put_file(file->vfs_file);
+	fdtab_put_file(&file->fd_file);
 	trace_posix_socket_accept_ret(ret);
 	return ret;
 EXIT_ERR_CLOSE:
 	dummy = (struct posix_socket_file){
 		.sock_data = new_sock,
-		.vfs_file = NULL,
+		.fd_file = { 0 },
 		.driver = file->driver,
 		.type = file->type,
 	};
 	posix_socket_close(&dummy);
 EXIT_ERR_PUT:
-	vfscore_put_file(file->vfs_file);
+	fdtab_put_file(&file->fd_file);
 EXIT_ERR:
 	PSOCKET_ERR("accept on socket %d failed: %d\n", sock, ret);
 	trace_posix_socket_accept_err(ret);
@@ -186,7 +186,7 @@ UK_SYSCALL_R_DEFINE(int, bind, int, sock, const struct sockaddr *, addr,
 	/* Bind an incoming connection */
 	ret = posix_socket_bind(file, addr, addr_len);
 
-	vfscore_put_file(file->vfs_file);
+	fdtab_put_file(&file->fd_file);
 
 	if (unlikely(ret == -1))
 		goto EXIT_ERR;
@@ -219,7 +219,7 @@ UK_SYSCALL_R_DEFINE(int, shutdown, int, sock, int, how)
 	/* Shutdown socket */
 	ret = posix_socket_shutdown(file, how);
 
-	vfscore_put_file(file->vfs_file);
+	fdtab_put_file(&file->fd_file);
 
 	if (unlikely(ret < 0))
 		goto EXIT_ERR;
@@ -255,7 +255,7 @@ UK_SYSCALL_R_DEFINE(int, getpeername, int, sock,
 	/* Get peer name of socket */
 	ret = posix_socket_getpeername(file, addr, addr_len);
 
-	vfscore_put_file(file->vfs_file);
+	fdtab_put_file(&file->fd_file);
 
 	if (unlikely(ret < 0))
 		goto EXIT_ERR;
@@ -291,7 +291,7 @@ UK_SYSCALL_R_DEFINE(int, getsockname, int, sock,
 	/* Get name of socket */
 	ret = posix_socket_getsockname(file, addr, addr_len);
 
-	vfscore_put_file(file->vfs_file);
+	fdtab_put_file(&file->fd_file);
 
 	if (unlikely(ret < 0))
 		goto EXIT_ERR;
@@ -326,7 +326,7 @@ UK_SYSCALL_R_DEFINE(int, getsockopt, int, sock, int, level, int, optname,
 	/* Get socket options */
 	ret = posix_socket_getsockopt(file, level, optname, optval, optlen);
 
-	vfscore_put_file(file->vfs_file);
+	fdtab_put_file(&file->fd_file);
 
 	if (unlikely(ret < 0))
 		goto EXIT_ERR;
@@ -361,7 +361,7 @@ UK_SYSCALL_R_DEFINE(int, setsockopt, int, sock, int, level, int, optname,
 	/* Set socket options */
 	ret = posix_socket_setsockopt(file, level, optname, optval, optlen);
 
-	vfscore_put_file(file->vfs_file);
+	fdtab_put_file(&file->fd_file);
 
 	if (unlikely(ret < 0))
 		goto EXIT_ERR;
@@ -396,7 +396,7 @@ UK_SYSCALL_R_DEFINE(int, connect, int, sock, const struct sockaddr *, addr,
 	/* Connect to the socket */
 	ret = posix_socket_connect(file, addr, addr_len);
 
-	vfscore_put_file(file->vfs_file);
+	fdtab_put_file(&file->fd_file);
 
 	if (unlikely((ret < 0) && (ret != -EINPROGRESS)))
 		goto EXIT_ERR;
@@ -429,7 +429,7 @@ UK_SYSCALL_R_DEFINE(int, listen, int, sock, int, backlog)
 	/* Listen on the socket */
 	ret = posix_socket_listen(file, backlog);
 
-	vfscore_put_file(file->vfs_file);
+	fdtab_put_file(&file->fd_file);
 
 	if (unlikely(ret < 0))
 		goto EXIT_ERR;
@@ -464,7 +464,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, recvfrom, int, sock, void *, buf, size_t, len,
 	/* Receive a buffer from a socket */
 	ret = posix_socket_recvfrom(file, buf, len, flags, from, fromlen);
 
-	vfscore_put_file(file->vfs_file);
+	fdtab_put_file(&file->fd_file);
 
 	if (unlikely((ret < 0) && (ret != -EAGAIN)))
 		goto EXIT_ERR;
@@ -506,7 +506,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, recvmsg, int, sock, struct msghdr *, msg,
 	/* Receive a structured message from a socket */
 	ret = posix_socket_recvmsg(file, msg, flags);
 
-	vfscore_put_file(file->vfs_file);
+	fdtab_put_file(&file->fd_file);
 
 	if (unlikely((ret < 0) && (ret != -EAGAIN)))
 		goto EXIT_ERR;
@@ -541,7 +541,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, sendmsg, int, sock, const struct msghdr *, msg,
 	/* Send a structured message to a socket */
 	ret = posix_socket_sendmsg(file, msg, flags);
 
-	vfscore_put_file(file->vfs_file);
+	fdtab_put_file(&file->fd_file);
 
 	if (unlikely((ret < 0) && (ret != -EAGAIN)))
 		goto EXIT_ERR;
@@ -579,7 +579,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, sendto, int, sock, const void *, buf, size_t, len,
 	ret = posix_socket_sendto(file, buf, len, flags,
 		dest_addr, addrlen);
 
-	vfscore_put_file(file->vfs_file);
+	fdtab_put_file(&file->fd_file);
 
 	if (unlikely((ret < 0) && (ret != -EAGAIN)))
 		goto EXIT_ERR;
@@ -650,14 +650,14 @@ EXIT_ERR_FREE_FD1:
 EXIT_ERR_CLOSE:
 	dummy = (struct posix_socket_file){
 		.sock_data = usockdata[0],
-		.vfs_file = NULL,
+		.fd_file = { 0 },
 		.driver = d,
 		.type = type,
 	};
 	posix_socket_close(&dummy);
 	dummy = (struct posix_socket_file){
 		.sock_data = usockdata[1],
-		.vfs_file = NULL,
+		.fd_file = { 0 },
 		.driver = d,
 		.type = type,
 	};

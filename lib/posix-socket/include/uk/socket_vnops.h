@@ -37,9 +37,6 @@
 #ifndef __UK_SOCKET_VNOPS__
 #define __UK_SOCKET_VNOPS__
 
-#include <vfscore/file.h>
-#include <vfscore/vnode.h>
-
 struct posix_socket_driver;
 
 /**

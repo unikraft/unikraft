@@ -3,7 +3,7 @@ menuconfig LIBPOSIX_SOCKET
 	default n
 	select LIBUKDEBUG
 	select LIBUKALLOC
-	select LIBVFSCORE
+	select LIBPOSIX_FDTAB
 	help
 		This microlibrary allows other microlibraries to register a
 		socket family number, such as AF_INET, for their socket

@@ -44,28 +44,26 @@
 #include <inttypes.h>
 #include <errno.h>
 
-static struct mount posix_socket_mount;
+#define to_sock(fp) \
+	__containerof((fp), struct posix_socket_file, fd_file)
 
-static uint64_t s_inode;
+static struct fdops posix_socket_fdops;
 
 struct posix_socket_file *
 posix_socket_file_get(int sock_fd)
 {
-	struct vfscore_file *fos;
+	struct fdtab_file *fos;
 
-	fos = vfscore_get_file(sock_fd);
+	fos = fdtab_get_file(fdtab_get_active(), sock_fd);
 	if (unlikely(!fos))
 		return ERR2PTR(-ENOENT);
 
-	UK_ASSERT(fos->f_dentry);
-	UK_ASSERT(fos->f_dentry->d_vnode);
-	if (unlikely(fos->f_dentry->d_vnode->v_type != VSOCK)) {
-		vfscore_put_file(fos);
+	if (unlikely(fos->f_op != &posix_socket_fdops)) {
+		fdtab_put_file(fos);
 		return ERR2PTR(-EINVAL);
 	}
 
-	UK_ASSERT(fos->f_data);
-	return (struct posix_socket_file *)fos->f_data;
+	return to_sock(fos);
 }
 
 int
@@ -73,12 +71,11 @@ posix_socket_alloc_fd(struct posix_socket_driver *d, int type, void *sock_data)
 {
 	int vfs_fd, ret;
 	struct posix_socket_file *sock;
-	struct vfscore_file *vfs_file;
-	struct dentry *vfs_dentry;
-	struct vnode *vfs_vnode;
+	struct fdtab_file *fd_file;
+	struct fdtab_table *fdtab = fdtab_get_active();
 
 	/* Reserve file descriptor number */
-	vfs_fd = vfscore_alloc_fd();
+	vfs_fd = fdtab_alloc_fd(fdtab);
 	if (unlikely(vfs_fd < 0)) {
 		ret = -ENFILE;
 		goto ERR_EXIT;
@@ -88,56 +85,27 @@ posix_socket_alloc_fd(struct posix_socket_driver *d, int type, void *sock_data)
 	sock = uk_calloc(d->allocator, 1, sizeof(*sock));
 	if (unlikely(!sock)) {
 		ret = -ENOMEM;
-		goto ERR_MALLOC_FILE;
+		goto ERR_ALLOC_FD;
 	}
 
-	vfs_file = uk_calloc(d->allocator, 1, sizeof(*vfs_file));
-	if (unlikely(!vfs_file)) {
-		ret = -ENOMEM;
-		goto ERR_MALLOC_VFS_FILE;
-	}
-
-	/* TODO: Synchronize inode increment */
-	ret = vfscore_vget(&posix_socket_mount, s_inode++, &vfs_vnode);
-	UK_ASSERT(ret == 0); /* we should not find it in cache */
-	if (unlikely(!vfs_vnode)) {
-		ret = -ENOMEM;
-		goto ERR_ALLOC_VNODE;
-	}
-
-	/* Create an unnamed dentry */
-	vfs_dentry = dentry_alloc(NULL, vfs_vnode, "/");
-	if (unlikely(!vfs_dentry)) {
-		ret = -ENOMEM;
-		goto ERR_ALLOC_DENTRY;
-	}
+	fd_file = &sock->fd_file;
 
 	/* Put things together, and fill out necessary fields */
-	vfs_file->f_file.fd = vfs_fd;
-	vfs_file->f_file.f_flags = UK_FWRITE | UK_FREAD;
-	vfs_file->f_file.f_count = 1;
-	vfs_file->f_data = sock;
-	vfs_file->f_dentry = vfs_dentry;
-	vfs_file->f_vfs_flags = UK_VFSCORE_NOPOS;
+	fd_file->fd = vfs_fd;
+	fd_file->f_flags = UK_FWRITE | UK_FREAD;
+	fd_file->f_count = 1;
+	fd_file->f_op = &posix_socket_fdops;
 
-	fdtab_file_init(&vfs_file->f_file);
-	vfs_file->f_file.f_op = &vfscore_fdops;
+	fdtab_file_init(fd_file);
 
-	vfs_vnode->v_data = sock;
-	vfs_vnode->v_type = VSOCK;
-
-	sock->vfs_file = vfs_file;
 	sock->sock_data = sock_data;
 	sock->driver = d;
 	sock->type = type;
 
 	/* Store within the vfs structure */
-	ret = vfscore_install_fd(vfs_fd, vfs_file);
+	ret = fdtab_install_fd(fdtab, vfs_fd, fd_file);
 	if (unlikely(ret))
-		goto ERR_VFS_INSTALL;
-
-	/* Only the dentry should hold a reference; release ours */
-	vput(vfs_vnode);
+		goto ERR_MALLOC_SOCK;
 
 	uk_pr_debug("Allocated socket %d for %s (%p)\n",
 		    vfs_fd, d->libname, sock_data);
@@ -145,32 +113,20 @@ posix_socket_alloc_fd(struct posix_socket_driver *d, int type, void *sock_data)
 	/* Return file descriptor of our socket */
 	return vfs_fd;
 
-ERR_VFS_INSTALL:
-	drele(vfs_dentry);
-ERR_ALLOC_DENTRY:
-	vput(vfs_vnode);
-ERR_ALLOC_VNODE:
-	uk_free(d->allocator, vfs_file);
-ERR_MALLOC_VFS_FILE:
+ERR_MALLOC_SOCK:
 	uk_free(d->allocator, sock);
-ERR_MALLOC_FILE:
-	vfscore_put_fd(vfs_fd);
+ERR_ALLOC_FD:
+	fdtab_put_fd(fdtab, vfs_fd);
 ERR_EXIT:
 	UK_ASSERT(ret < 0);
 	return ret;
 }
 
 static int
-posix_socket_vfscore_close(struct vnode *vnode,
-			   struct vfscore_file *fp __maybe_unused)
+posix_socket_vfscore_close(struct fdtab_file *fp)
 {
-	struct posix_socket_file *sock;
+	struct posix_socket_file *sock = to_sock(fp);
 	int ret;
-
-	UK_ASSERT(vnode->v_data);
-	UK_ASSERT(vnode->v_type == VSOCK);
-
-	sock = (struct posix_socket_file *)vnode->v_data;
 
 	/* Close and release the network socket */
 	ret = posix_socket_close(sock);
@@ -178,8 +134,7 @@ posix_socket_vfscore_close(struct vnode *vnode,
 	uk_free(sock->driver->allocator, sock);
 
 	if (unlikely(ret < 0)) {
-		PSOCKET_ERR("close on socket %d failed: %d\n", fp->f_file.fd,
-			    ret);
+		PSOCKET_ERR("close on socket %d failed: %d\n", fp->fd, ret);
 		return -ret;
 	}
 
@@ -187,16 +142,11 @@ posix_socket_vfscore_close(struct vnode *vnode,
 }
 
 static int
-posix_socket_vfscore_write(struct vnode *vnode,
+posix_socket_vfscore_write(struct fdtab_file *fp,
 			   struct uio *buf, int ioflag __unused)
 {
-	struct posix_socket_file *sock;
+	struct posix_socket_file *sock = to_sock(fp);
 	ssize_t ret;
-
-	UK_ASSERT(vnode->v_data);
-	UK_ASSERT(vnode->v_type == VSOCK);
-
-	sock = (struct posix_socket_file *)vnode->v_data;
 
 	/* TODO: This is a dirty hack to allow parallel reads and writes on
 	 * the socket. The locking is a problem, for example, when the socket
@@ -221,11 +171,11 @@ posix_socket_vfscore_write(struct vnode *vnode,
 	 * to close the vnode in between as the VFS code holds an own reference
 	 * to the vnode as long as it is working with it.
 	 */
-	vn_unlock(vnode);
+	FD_LOCK(fp);
 
 	ret = posix_socket_write(sock, buf->uio_iov, buf->uio_iovcnt);
 
-	vn_lock(vnode);
+	FD_UNLOCK(fp);
 
 	if (unlikely(ret < 0)) {
 		/* TODO: Add fp when write provides it */
@@ -240,29 +190,23 @@ posix_socket_vfscore_write(struct vnode *vnode,
 }
 
 static int
-posix_socket_vfscore_read(struct vnode *vnode,
-			  struct vfscore_file *fp __maybe_unused,
+posix_socket_vfscore_read(struct fdtab_file *fp,
 			  struct uio *buf, int ioflag __unused)
 {
-	struct posix_socket_file *sock;
+	struct posix_socket_file *sock = to_sock(fp);
 	ssize_t ret;
 
-	UK_ASSERT(vnode->v_data);
-	UK_ASSERT(vnode->v_type == VSOCK);
-
-	sock = (struct posix_socket_file *)vnode->v_data;
-
 	/* TODO: This is not safe. See write() */
-	vn_unlock(vnode);
+	FD_LOCK(fp);
 
 	ret = posix_socket_read(sock, buf->uio_iov, buf->uio_iovcnt);
 
-	vn_lock(vnode);
+	FD_UNLOCK(fp);
 
 	if (unlikely(ret < 0)) {
 		if (ret != -EAGAIN) /* Don't spam log for legitimate timeouts */
 			PSOCKET_ERR("read on socket %d failed: %d\n",
-				    fp->f_file.fd, (int)ret);
+				    fp->fd, (int)ret);
 		return (int)-ret;
 	}
 
@@ -272,72 +216,43 @@ posix_socket_vfscore_read(struct vnode *vnode,
 }
 
 static int
-posix_socket_vfscore_ioctl(struct vnode *vnode,
-			   struct vfscore_file *fp __maybe_unused,
+posix_socket_vfscore_ioctl(struct fdtab_file *fp,
 			   unsigned long request, void *buf)
 {
-	struct posix_socket_file *sock;
+	struct posix_socket_file *sock = to_sock(fp);
 	int ret;
-
-	UK_ASSERT(vnode->v_data);
-	UK_ASSERT(vnode->v_type == VSOCK);
-
-	sock = (struct posix_socket_file *)vnode->v_data;
 
 	ret = posix_socket_ioctl(sock, request, buf);
 	if (unlikely(ret < 0)) {
-		PSOCKET_ERR("ioctl on socket %d failed: %d\n", fp->f_file.fd,
+		PSOCKET_ERR("ioctl on socket %d failed: %d\n", fp->fd,
 			    (int)ret);
 		return -ret;
 	}
 
-	return 0;
+	return ret;
 }
 
-static int posix_socket_vfscore_poll(struct vnode *vnode, unsigned int *revents,
+static int posix_socket_vfscore_poll(struct fdtab_file *fp,
+				     unsigned int *revents,
 				     struct eventpoll_cb *ecb)
 {
-	struct posix_socket_file *sock;
+	struct posix_socket_file *sock = to_sock(fp);
 	int ret;
-
-	UK_ASSERT(vnode->v_data);
-	UK_ASSERT(vnode->v_type == VSOCK);
-
-	sock = (struct posix_socket_file *)vnode->v_data;
 
 	ret = posix_socket_poll(sock, revents, ecb);
 	if (unlikely(ret < 0)) {
-		PSOCKET_ERR("poll on socket %d failed: %d\n",
-			    sock->vfs_file->f_file.fd, (int)ret);
+		PSOCKET_ERR("poll on socket %d failed: %d\n", fp->fd, (int)ret);
 		return -ret;
 	}
 
-	return 0;
+	return ret;
 }
 
-#define posix_socket_vfscore_getattr ((vnop_getattr_t) vfscore_vop_einval)
-#define posix_socket_vfscore_inactive ((vnop_inactive_t) vfscore_vop_nullop)
-
 /* vnode operations */
-struct vnops posix_socket_vnops = {
-	.vop_close = posix_socket_vfscore_close,
-	.vop_write = posix_socket_vfscore_write,
-	.vop_read = posix_socket_vfscore_read,
-	.vop_ioctl = posix_socket_vfscore_ioctl,
-	.vop_getattr = posix_socket_vfscore_getattr,
-	.vop_inactive = posix_socket_vfscore_inactive,
-	.vop_poll = posix_socket_vfscore_poll,
-};
-
-#define posix_socket_vget ((vfsop_vget_t) vfscore_nullop)
-
-/* file system operations */
-static struct vfsops posix_socket_vfsops = {
-	.vfs_vget = posix_socket_vget,
-	.vfs_vnops = &posix_socket_vnops,
-};
-
-/* bogus mount point used by all sockets */
-static struct mount posix_socket_mount = {
-	.m_op = &posix_socket_vfsops
+static struct fdops posix_socket_fdops = {
+	.fdop_free = posix_socket_vfscore_close,
+	.fdop_write = posix_socket_vfscore_write,
+	.fdop_read = posix_socket_vfscore_read,
+	.fdop_ioctl = posix_socket_vfscore_ioctl,
+	.fdop_poll = posix_socket_vfscore_poll,
 };

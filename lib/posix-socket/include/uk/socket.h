@@ -37,7 +37,8 @@
 #ifndef __UK_SOCKET__
 #define __UK_SOCKET__
 
-struct vfscore_file;
+#include <uk/fdtab/fd.h>
+
 struct posix_socket_driver;
 
 struct posix_socket_file {
@@ -46,7 +47,7 @@ struct posix_socket_file {
 	/** Socket type */
 	int type;
 	/** Internal reference to the vfscore_file */
-	struct vfscore_file *vfs_file;
+	struct fdtab_file fd_file;
 	/** The driver to use for this socket */
 	struct posix_socket_driver *driver;
 };
