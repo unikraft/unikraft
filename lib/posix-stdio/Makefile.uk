@@ -1,0 +1,3 @@
+$(eval $(call addlib_s,libposix-stdio,$(CONFIG_LIBPOSIX_STDIO)))
+
+LIBPOSIX-STDIO_SRCS-y += $(LIBPOSIX-STDIO_BASE)/stdio.c

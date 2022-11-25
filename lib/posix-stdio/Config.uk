@@ -1,0 +1,6 @@
+config LIBPOSIX_STDIO
+	bool "posix-stdio: Provides stdout, stdin, and stderr"
+	default n
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKDEBUG
+	select LIBFDTAB

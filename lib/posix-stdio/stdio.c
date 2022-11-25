@@ -31,17 +31,14 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <vfscore/file.h>
-#include <vfscore/fs.h>
 #include <uk/plat/console.h>
 #include <uk/syscall.h>
 #include <uk/essentials.h>
 #include <termios.h>
-#include <vfscore/vnode.h>
 #include <unistd.h>
 #include <uk/fdtab/uio.h>
-#include <vfscore/vnode.h>
-#include <vfscore/mount.h>
+#include <uk/fdtab/fd.h>
+#include <uk/init.h>
 #include <errno.h>
 
 /*
@@ -70,11 +67,10 @@ static int __write_fn(void *dst __unused, void *src, size_t *cnt)
 }
 
 /* One function for stderr and stdout */
-static int stdio_write(struct vnode *vp __unused,
-			   struct uio *uio,
-			   int ioflag __unused)
+static int stdio_write(struct fdtab_file *fp __unused, struct uio *uio,
+		       int ioflag __unused)
 {
-	if (uio->uio_offset)
+	if (uio->uio_offset != -1)
 		return ESPIPE;
 
 	return fdtab_uioforeach(__write_fn, NULL, uio->uio_resid, uio);
@@ -129,8 +125,7 @@ static int __read_fn(void *dst, void *src __unused, size_t *cnt)
 	return 0;
 }
 
-static int stdio_read(struct vnode *vp __unused,
-		      struct vfscore_file *file __unused,
+static int stdio_read(struct fdtab_file *file __unused,
 		      struct uio *uio,
 		      int ioflag __unused)
 {
@@ -145,97 +140,49 @@ static int stdio_read(struct vnode *vp __unused,
 	return ret;
 }
 
-static int
-stdio_getattr(struct vnode *vnode __unused, struct vattr *attr __unused)
+static int stdio_poll(struct fdtab_file *fp __unused,
+		      unsigned int *revents __unused,
+		      struct eventpoll_cb *cb __unused)
 {
-	return 0;
+	return EINVAL;
 }
 
-#define stdio_open	((vnop_open_t)vfscore_nullop)
-#define stdio_close	((vnop_close_t)vfscore_nullop)
-#define stdio_seek	((vnop_seek_t)vfscore_vop_nullop)
-#define stdio_ioctl	((vnop_ioctl_t)vfscore_nullop)
-#define stdio_fsync	((vnop_fsync_t)vfscore_vop_nullop)
-#define stdio_readdir	((vnop_readdir_t)vfscore_vop_einval)
-#define stdio_lookup	((vnop_lookup_t)vfscore_nullop)
-#define stdio_create	((vnop_create_t)vfscore_vop_einval)
-#define stdio_remove	((vnop_remove_t)vfscore_vop_einval)
-#define stdio_rename	((vnop_rename_t)vfscore_vop_einval)
-#define stdio_mkdir	((vnop_mkdir_t)vfscore_vop_einval)
-#define stdio_rmdir	((vnop_rmdir_t)vfscore_vop_einval)
-#define stdio_setattr	((vnop_setattr_t)vfscore_vop_eperm)
-#define stdio_inactive	((vnop_inactive_t)vfscore_vop_nullop)
-#define stdio_truncate	((vnop_truncate_t)vfscore_vop_nullop)
-#define stdio_link	((vnop_link_t)vfscore_vop_eperm)
-#define stdio_fallocate	((vnop_fallocate_t)vfscore_vop_nullop)
-#define stdio_readlink	((vnop_readlink_t)vfscore_vop_nullop)
-#define stdio_symlink	((vnop_symlink_t)vfscore_vop_nullop)
-#define stdio_poll	((vnop_poll_t)vfscore_vop_einval)
+static int stdio_free(struct fdtab_file *fp __unused)
+{
+	/* We ensure the refcount never reaches zero */
+	UK_CRASH("unreachable");
+}
 
-static struct vnops stdio_vnops = {
-	stdio_open,		/* open */
-	stdio_close,		/* close */
-	stdio_read,		/* read */
-	stdio_write,		/* write */
-	stdio_seek,		/* seek */
-	stdio_ioctl,		/* ioctl */
-	stdio_fsync,		/* fsync */
-	stdio_readdir,		/* readdir */
-	stdio_lookup,		/* lookup */
-	stdio_create,		/* create */
-	stdio_remove,		/* remove */
-	stdio_rename,		/* remame */
-	stdio_mkdir,		/* mkdir */
-	stdio_rmdir,		/* rmdir */
-	stdio_getattr,		/* getattr */
-	stdio_setattr,		/* setattr */
-	stdio_inactive,		/* inactive */
-	stdio_truncate,		/* truncate */
-	stdio_link,		/* link */
-	(vnop_cache_t) NULL,	/* arc */
-	stdio_fallocate,	/* fallocate */
-	stdio_readlink,		/* read link */
-	stdio_symlink,		/* symbolic link */
-	stdio_poll,		/* poll */
+static struct fdops stdio_fdops = {
+	.fdop_free = stdio_free,
+	.fdop_read = stdio_read,
+	.fdop_write = stdio_write,
+	.fdop_poll = stdio_poll,
 };
 
-static struct vnode stdio_vnode = {
-	.v_ino = 1,
-	.v_op = &stdio_vnops,
-	.v_lock = UK_MUTEX_INITIALIZER(stdio_vnode.v_lock),
-	.v_refcnt = 1,
-	.v_type = VCHR,
-};
-
-static struct dentry stdio_dentry = {
-	.d_vnode = &stdio_vnode,
-};
-
-static struct vfscore_file stdio_file = {
-	.f_file = {
-		.fd = 1,
-		.f_flags = UK_FWRITE | UK_FREAD,
-		/* reference count is 2 because close(0) is a valid
-		 * operation. However it is not properly handled in the
-		 * current implementation.
-		 */
-		.f_count = 2,
-		.f_ep = UK_LIST_HEAD_INIT(stdio_file.f_file.f_ep)
-	},
-	.f_dentry = &stdio_dentry,
-	.f_vfs_flags = UK_VFSCORE_NOPOS,
+static struct fdtab_file stdio_file = {
+	.fd = 1,
+	.f_flags = UK_FWRITE | UK_FREAD,
+	/* reference count is 2 because close(0) is a valid
+	 * operation. However it is not properly handled in the
+	 * current implementation.
+	 */
+	.f_count = 2,
+	.f_op = &stdio_fdops,
+	.f_ep = UK_LIST_HEAD_INIT(stdio_file.f_ep)
 };
 
 static int init_stdio(void)
 {
 	int fd;
+	struct fdtab_table *tab = fdtab_get_active();
 
-	fd = vfscore_alloc_fd();
+	fd = fdtab_alloc_fd(tab);
 	if (fd != 0) {
 		uk_pr_crit("failed to allocate fd for stdin (fd=0)\n");
 		return (fd < 0) ? fd : -EBADF;
 	}
-	vfscore_install_fd(0, &stdio_file);
+	fdtab_install_fd(tab, 0, &stdio_file);
 
 	fd = uk_syscall_r_dup2(0, 1);
 	if (fd != 1) {
