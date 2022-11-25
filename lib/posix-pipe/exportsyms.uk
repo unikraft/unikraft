@@ -1,0 +1,6 @@
+pipe
+uk_syscall_e_pipe
+uk_syscall_r_pipe
+pipe2
+uk_syscall_e_pipe2
+uk_syscall_r_pipe2

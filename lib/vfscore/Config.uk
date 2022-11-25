@@ -10,12 +10,6 @@ config LIBVFSCORE
 if LIBVFSCORE
 menu "vfscore: Configuration"
 
-config LIBVFSCORE_PIPE_SIZE_ORDER
-	int "Pipe size order"
-	default 16
-	help
-		The size of the internal buffer for anonymous pipes is 2^order.
-
 config LIBVFSCORE_AUTOMOUNT_ROOTFS
 bool "Automatically mount a root filesysytem (/)"
 default n

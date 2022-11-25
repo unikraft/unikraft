@@ -1,0 +1,16 @@
+menuconfig LIBPOSIX_PIPE
+	bool "posix-pipe: POSIX pipes"
+	default n
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKDEBUG
+	select LIBFDTAB
+
+if LIBPOSIX_PIPE
+
+config LIBPOSIX_PIPE_SIZE_ORDER
+	int "Pipe size order"
+	default 16
+	help
+		The size of the internal buffer for anonymous pipes is 2^order.
+
+endif
