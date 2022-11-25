@@ -146,6 +146,9 @@ sys_write(struct fdtab_file *fp, const struct iovec *iov, size_t niov,
 int
 sys_lseek(struct fdtab_file *fp, off_t off, int type, off_t *origin)
 {
+	if (fp->f_op->fdop_seek == NULL)
+		return ESPIPE;
+
 	return FDOP_SEEK(fp, off, type, origin);
 }
 
@@ -165,6 +168,9 @@ sys_ioctl(struct fdtab_file *fp, unsigned long request, void *buf)
 		fp->f_flags &= ~O_CLOEXEC;
 		break;
 	default:
+		if (fp->f_op->fdop_ioctl == NULL)
+			return ENOTTY;
+
 		error = FDOP_IOCTL(fp, request, buf);
 		break;
 	}
@@ -175,18 +181,27 @@ sys_ioctl(struct fdtab_file *fp, unsigned long request, void *buf)
 int
 sys_fsync(struct fdtab_file *fp)
 {
+	if (fp->f_op->fdop_fsync == NULL)
+		return EINVAL;
+
 	return FDOP_FSYNC(fp);
 }
 
 int
 sys_fstat(struct fdtab_file *fp, struct stat *st)
 {
+	if (fp->f_op->fdop_fstat == NULL)
+		return EINVAL;
+
 	return FDOP_FSTAT(fp, st);
 }
 
 int
 sys_ftruncate(struct fdtab_file *fp, off_t length)
 {
+	if (fp->f_op->fdop_truncate == NULL)
+		return EINVAL;
+
 	return FDOP_TRUNCATE(fp, length);
 }
 

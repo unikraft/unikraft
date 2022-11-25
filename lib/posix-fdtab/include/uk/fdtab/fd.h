@@ -94,14 +94,15 @@ struct fdops {
 	fdop_free_t		fdop_free;
 	fdop_read_t		fdop_read;
 	fdop_write_t		fdop_write;
-	fdop_seek_t		fdop_seek;
-	fdop_ioctl_t		fdop_ioctl;
-	fdop_fsync_t		fdop_fsync;
+	fdop_poll_t		fdop_poll;
 
+	/* Optional operations */
+	fdop_ioctl_t		fdop_ioctl;
+	fdop_seek_t		fdop_seek;
+	fdop_fsync_t		fdop_fsync;
 	fdop_fstat_t		fdop_fstat;
 	fdop_truncate_t		fdop_truncate;
 	fdop_fallocate_t	fdop_fallocate;
-	fdop_poll_t		fdop_poll;
 };
 
 /*
