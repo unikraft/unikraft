@@ -19,7 +19,7 @@
 #endif /* CONFIG_HAVE_PAGING */
 #include <vfscore/file.h>
 #include <vfscore/vnode.h>
-#include <vfscore/uio.h>
+#include <uk/fdtab/uio.h>
 #include <uk/isr/string.h>
 
 #ifdef CONFIG_LIBUKVMEM_FILE_BASE

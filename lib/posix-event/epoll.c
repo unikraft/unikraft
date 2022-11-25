@@ -30,12 +30,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <vfscore/eventpoll.h>
 #include <vfscore/fs.h>
 #include <vfscore/file.h>
 #include <vfscore/dentry.h>
 #include <vfscore/vnode.h>
 #include <vfscore/mount.h>
+#include <uk/fdtab/eventpoll.h>
 #include <uk/alloc.h>
 #include <uk/syscall.h>
 #include <uk/config.h>
@@ -150,15 +150,14 @@ static int do_epoll_create(struct uk_alloc *a, int flags)
 	}
 
 	/* Initialize data structures */
-	vfs_file->fd = vfs_fd;
-	vfs_file->f_flags = 0;
-	vfs_file->f_count = 1;
+	vfs_file->f_file.fd = vfs_fd;
+	vfs_file->f_file.f_flags = 0;
+	vfs_file->f_file.f_count = 1;
 	vfs_file->f_data = ep;
 	vfs_file->f_dentry = vfs_dentry;
 	vfs_file->f_vfs_flags = UK_VFSCORE_NOPOS;
 
-	uk_mutex_init(&vfs_file->f_lock);
-	UK_INIT_LIST_HEAD(&vfs_file->f_ep);
+	fdtab_file_init(&vfs_file->f_file);
 
 	vfs_vnode->v_data = ep;
 	vfs_vnode->v_type = VEPOLL;
@@ -250,7 +249,7 @@ static int do_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
 
 	switch (op) {
 	case EPOLL_CTL_ADD:
-		ret = eventpoll_add(ep, fd, fp, event);
+		ret = eventpoll_add(ep, fd, &fp->f_file, event);
 		break;
 	case EPOLL_CTL_MOD:
 		ret = eventpoll_mod(ep, fd, event);

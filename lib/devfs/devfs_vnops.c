@@ -86,7 +86,7 @@ devfs_open(struct vfscore_file *fp)
 	}
 	if (*path == '/')
 		path++;
-	error = device_open(path, fp->f_flags & DO_RWMASK, &dev);
+	error = device_open(path, fp->f_file.f_flags & DO_RWMASK, &dev);
 	if (error) {
 		uk_pr_debug("%s: can not open device = %s error=%d\n",
 			 __func__, path, error);
@@ -100,7 +100,7 @@ static int
 devfs_close(struct vnode *vp, struct vfscore_file *fp)
 {
 
-	uk_pr_debug("%s: fd=%d\n", __func__, fp->fd);
+	uk_pr_debug("%s: fd=%d\n", __func__, fp->f_file.fd);
 
 	if (!strcmp(fp->f_dentry->d_path, "/"))	/* root ? */
 		return 0;

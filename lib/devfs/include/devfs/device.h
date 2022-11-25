@@ -36,7 +36,7 @@
 #include <sys/types.h>
 #include <uk/init.h>
 
-#include <vfscore/uio.h>
+#include <uk/fdtab/uio.h>
 
 #define MAXDEVNAME	12
 #define DO_RWMASK	0x3

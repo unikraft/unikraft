@@ -36,7 +36,7 @@
 #define _GNU_SOURCE
 #include <vfscore/file.h>
 #include <vfscore/vnode.h>
-#include <vfscore/eventpoll.h>
+#include <uk/fdtab/eventpoll.h>
 #include <uk/print.h>
 #include <uk/syscall.h>
 #include <uk/config.h>
@@ -98,7 +98,7 @@ static int do_pselect(int nfds, fd_set *readfds, fd_set *writefds,
 			 * may access the eventpoll.
 			 */
 			e.data.fd = i;
-			eventpoll_fd_init(efd, fp, i, &e);
+			eventpoll_fd_init(efd, &fp->f_file, i, &e);
 			eventpoll_add_unsafe(&ep, efd);
 
 			/* We must add the fd to triggered list so it is

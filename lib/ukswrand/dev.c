@@ -38,7 +38,7 @@
 #include <uk/assert.h>
 #include <uk/config.h>
 #include <uk/essentials.h>
-#include <vfscore/uio.h>
+#include <uk/fdtab/uio.h>
 #include <devfs/device.h>
 
 #define DEV_RANDOM_NAME "random"

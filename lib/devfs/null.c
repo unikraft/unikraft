@@ -35,7 +35,7 @@
 #include <string.h>
 #include <uk/ctors.h>
 #include <uk/print.h>
-#include <vfscore/uio.h>
+#include <uk/fdtab/uio.h>
 #include <devfs/device.h>
 
 

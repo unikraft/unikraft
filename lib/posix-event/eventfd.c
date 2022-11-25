@@ -30,12 +30,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <vfscore/eventpoll.h>
 #include <vfscore/fs.h>
 #include <vfscore/file.h>
 #include <vfscore/dentry.h>
 #include <vfscore/vnode.h>
 #include <vfscore/mount.h>
+#include <uk/fdtab/eventpoll.h>
 #include <uk/syscall.h>
 #include <uk/essentials.h>
 #include <uk/print.h>
@@ -153,7 +153,7 @@ static int eventfd_vfscore_read(struct vnode *vnode,
 	/* Check if the value is 0. In this case, block if the file descriptor
 	 * is not configured to non-blocking operation.
 	 */
-	if ((efd->val == 0) && (fp->f_flags & O_NONBLOCK)) {
+	if ((efd->val == 0) && (fp->f_file.f_flags & O_NONBLOCK)) {
 		uk_mutex_unlock(&efd->lock);
 		return EAGAIN;
 	}
@@ -357,16 +357,15 @@ static int do_eventfd(struct uk_alloc *a, unsigned int initval, int flags)
 	}
 
 	/* Initialize data structures */
-	vfs_file->fd = vfs_fd;
-	vfs_file->f_flags = UK_FREAD | UK_FWRITE;
-	vfs_file->f_count = 1;
+	vfs_file->f_file.fd = vfs_fd;
+	vfs_file->f_file.f_flags = UK_FREAD | UK_FWRITE;
+	vfs_file->f_file.f_count = 1;
 	vfs_file->f_data = efd;
 	vfs_file->f_dentry = vfs_dentry;
 	vfs_file->f_vfs_flags = UK_VFSCORE_NOPOS;
 	vfs_file->f_offset = 0;
 
-	uk_mutex_init(&vfs_file->f_lock);
-	UK_INIT_LIST_HEAD(&vfs_file->f_ep);
+	fdtab_file_init(&vfs_file->f_file);
 
 	vfs_vnode->v_data = efd;
 	vfs_vnode->v_type = VEVENT;

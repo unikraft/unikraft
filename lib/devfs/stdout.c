@@ -35,7 +35,7 @@
 #include <string.h>
 #include <uk/ctors.h>
 #include <uk/print.h>
-#include <vfscore/uio.h>
+#include <uk/fdtab/uio.h>
 #include <devfs/device.h>
 #include <errno.h>
 #include <uk/plat/console.h>
@@ -62,7 +62,7 @@ static int __write_fn(void *dst __unused, void *src, size_t *cnt)
 int dev_stdout_write(struct device *dev __unused, struct uio *uio,
 		   int flags __unused)
 {
-	return vfscore_uioforeach(__write_fn, NULL, uio->uio_resid, uio);
+	return fdtab_uioforeach(__write_fn, NULL, uio->uio_resid, uio);
 }
 
 int dev_stdout_open(struct device *device __unused, int mode __unused)

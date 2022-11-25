@@ -204,11 +204,12 @@ static int uk_9pfs_open(struct vfscore_file *file)
 
 	/* Open cloned fid. */
 	if (md->proto == UK_9P_PROTO_2000L)
-		rc = uk_9p_lopen(dev, openedfid, vfscore_oflags(file->f_flags));
+		rc = uk_9p_lopen(dev, openedfid,
+				 fdtab_oflags(file->f_file.f_flags));
 	else if (md->proto == UK_9P_PROTO_2000U)
 		rc = uk_9p_open(
 		    dev, openedfid,
-		    uk_9pfs_open_mode_from_posix_flags(file->f_flags));
+		    uk_9pfs_open_mode_from_posix_flags(file->f_file.f_flags));
 	else
 		rc = -EOPNOTSUPP;
 
