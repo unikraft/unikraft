@@ -85,7 +85,7 @@ EXIT_ERR_CLOSE:
 		.sock_data = sock,
 		.vfs_file = NULL,
 		.driver = d,
-		.type = VSOCK,
+		.type = type,
 	};
 	posix_socket_close(&dummy);
 EXIT_ERR:
@@ -141,7 +141,7 @@ EXIT_ERR_CLOSE:
 		.sock_data = new_sock,
 		.vfs_file = NULL,
 		.driver = file->driver,
-		.type = VSOCK,
+		.type = file->type,
 	};
 	posix_socket_close(&dummy);
 EXIT_ERR_PUT:
@@ -652,14 +652,14 @@ EXIT_ERR_CLOSE:
 		.sock_data = usockdata[0],
 		.vfs_file = NULL,
 		.driver = d,
-		.type = VSOCK,
+		.type = type,
 	};
 	posix_socket_close(&dummy);
 	dummy = (struct posix_socket_file){
 		.sock_data = usockdata[1],
 		.vfs_file = NULL,
 		.driver = d,
-		.type = VSOCK,
+		.type = type,
 	};
 	posix_socket_close(&dummy);
 EXIT_ERR:
