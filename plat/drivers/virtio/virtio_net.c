@@ -1152,6 +1152,9 @@ static int virtio_net_start(struct uk_netdev *n)
 	virtio_dev_drv_up(d->vdev);
 	uk_pr_info(DRIVER_NAME": %"__PRIu16" started\n", d->uid);
 
+	for (i = 0; i < d->rx_vqueue_cnt; i++)
+		virtqueue_host_notify(d->rxqs[i].vq);
+
 	return 0;
 }
 
