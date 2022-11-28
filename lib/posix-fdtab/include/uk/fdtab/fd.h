@@ -130,8 +130,8 @@ struct fdtab_file {
 	struct uk_list_head f_ep;	/* List of eventpoll_fd's */
 };
 
-#define FD_LOCK(fp)       uk_mutex_lock(&(fp->f_lock))
-#define FD_UNLOCK(fp)     uk_mutex_unlock(&(fp->f_lock))
+#define FD_LOCK(fp)       uk_mutex_lock(&((fp)->f_lock))
+#define FD_UNLOCK(fp)     uk_mutex_unlock(&((fp)->f_lock))
 
 struct fdtab_table *fdtab_get_active(void);
 void fdtab_set_active(struct fdtab_table *tab);
