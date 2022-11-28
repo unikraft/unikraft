@@ -171,6 +171,37 @@ struct fdtab_table *fdtab_get_active(void);
 void fdtab_set_active(struct fdtab_table *tab);
 
 /**
+ * @brief Allocate a new empty file descriptor table.
+ * @param a the allocator to use for the fdtab_table structure.
+ *
+ * @returns the newly allocated and initialized fdtab_table structure.
+ */
+struct fdtab_table *fdtab_alloc(struct uk_alloc *a);
+
+/**
+ * @brief Clone a file descriptor table with a all active file descriptors.
+ * @param a the allocator to use for the fdtab_table structure.
+ * @param tab the fdtab_table to clone.
+ *
+ * @returns the cloned file descriptor table or NULL if the allocation failed.
+ */
+struct fdtab_table *fdtab_clone(struct uk_alloc *a, struct fdtab_table *tab);
+
+/**
+ * @brief Clear all file descriptors from the specified table. Use this function
+ * before freeing a fdtab_table structure.
+ *
+ * If an error occurs while removing a file descriptor, the function will
+ * attempt to continue to clear the remaining file descriptors. In this case,
+ * the first error will be returned.
+ *
+ * @param tab the table to clear.
+ * @return zero if the table was cleared successfully, a negative errno code
+ *         otherwise.
+ */
+int fdtab_clear(struct fdtab_table *tab);
+
+/**
  * @brief Allocate a file descriptor number.
  * @param tab the fdtab_table to act on.
  *

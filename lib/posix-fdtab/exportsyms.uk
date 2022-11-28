@@ -1,3 +1,6 @@
+fdtab_alloc
+fdtab_clear
+fdtab_clone
 fdtab_get_active
 fdtab_set_active
 fdtab_reserve_fd

@@ -61,6 +61,49 @@ void fdtab_set_active(struct fdtab_table *tab)
 	current_tab = tab;
 }
 
+struct fdtab_table *fdtab_alloc(struct uk_alloc *a)
+{
+	return uk_zalloc(a, sizeof(struct fdtab_table));
+}
+
+struct fdtab_table *fdtab_clone(struct uk_alloc *a, struct fdtab_table *tab)
+{
+	unsigned long fd;
+	struct fdtab_table *clone;
+
+	clone = uk_malloc(a, sizeof(*tab));
+	if (clone == NULL)
+		return NULL;
+
+	/* Copy all data to clone */
+	memcpy(clone->bitmap, tab->bitmap, sizeof(clone->bitmap));
+	memcpy(clone->fds, tab->fds, sizeof(clone->fds));
+
+	/* Increase refcount for all file descriptors */
+	uk_for_each_set_bit(fd, clone->bitmap, FDTABLE_MAX_FILES)
+		fdtab_fhold(tab->fds[fd]);
+
+	return clone;
+}
+
+int fdtab_clear(struct fdtab_table *tab)
+{
+	unsigned long fd;
+	unsigned long flags;
+	int ret = 0, err;
+
+	flags = ukplat_lcpu_save_irqf();
+
+	uk_for_each_set_bit(fd, tab->bitmap, FDTABLE_MAX_FILES) {
+		err = fdtab_put_fd(tab, (int)fd);
+		if (err && !ret)
+			ret = err;
+	}
+
+	ukplat_lcpu_restore_irqf(flags);
+	return ret;
+}
+
 int fdtab_alloc_fd(struct fdtab_table *tab)
 {
 	unsigned long flags;
