@@ -12,6 +12,7 @@ ifneq ($(HAVE_STACKPROTECTOR),y)
 COMPFLAGS    += -fno-stack-protector
 endif
 COMPFLAGS    += -Wall -Wextra
+COMPFLAGS-$(call have_clang)	+= -Wdocumentation -Wdocumentation-pedantic
 
 ASFLAGS      += -D__ASSEMBLY__
 
