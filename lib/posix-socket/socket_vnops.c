@@ -91,12 +91,10 @@ posix_socket_alloc_fd(struct posix_socket_driver *d, int type, void *sock_data)
 	fd_file = &sock->fd_file;
 
 	/* Put things together, and fill out necessary fields */
+	fdtab_file_init(fd_file);
 	fd_file->fd = vfs_fd;
 	fd_file->f_flags = UK_FWRITE | UK_FREAD;
-	fd_file->f_count = 1;
 	fd_file->f_op = &posix_socket_fdops;
-
-	fdtab_file_init(fd_file);
 
 	sock->sock_data = sock_data;
 	sock->driver = d;

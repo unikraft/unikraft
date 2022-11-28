@@ -247,6 +247,8 @@ void fdtab_fhold(struct fdtab_file *fp)
 
 void fdtab_file_init(struct fdtab_file *fp)
 {
+	memset(fp, 0, sizeof(*fp));
+	fp->f_count = 1;
 	uk_mutex_init(&fp->f_lock);
 	UK_INIT_LIST_HEAD(&fp->f_ep);
 }

@@ -357,15 +357,13 @@ static int do_eventfd(struct uk_alloc *a, unsigned int initval, int flags)
 	}
 
 	/* Initialize data structures */
+	fdtab_file_init(&vfs_file->f_file);
 	vfs_file->f_file.fd = vfs_fd;
 	vfs_file->f_file.f_flags = UK_FREAD | UK_FWRITE;
-	vfs_file->f_file.f_count = 1;
 	vfs_file->f_data = efd;
 	vfs_file->f_dentry = vfs_dentry;
 	vfs_file->f_vfs_flags = UK_VFSCORE_NOPOS;
 	vfs_file->f_offset = 0;
-
-	fdtab_file_init(&vfs_file->f_file);
 
 	vfs_vnode->v_data = efd;
 	vfs_vnode->v_type = VEVENT;

@@ -195,6 +195,8 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 	}
 
 	fhold(fp);
+	fdtab_file_init(&fp->f_file);
+	fp->f_file.f_op = &vfscore_fdops;
 	fp->f_file.f_flags = flags;
 
 	/*
@@ -202,9 +204,6 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 	 * to dp from namei().
 	 */
 	fp->f_dentry = dp;
-
-	fdtab_file_init(&fp->f_file);
-	fp->f_file.f_op = &vfscore_fdops;
 
 	vn_lock(vp);
 

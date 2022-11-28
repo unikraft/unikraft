@@ -545,7 +545,6 @@ static int pipe_fd_alloc(struct fdtab_table *tab, struct pipe_file *pipe_file,
 	/* Fill out necessary fields. */
 	fp->fd = fd;
 	fp->f_flags = flags;
-	fp->f_count = 1;
 	fp->f_op = &pipe_vnops;
 	pipe->pipe_file = pipe_file;
 
