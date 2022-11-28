@@ -287,7 +287,7 @@ posix_socket_vfscore_ioctl(struct vnode *vnode,
 	if (unlikely(ret < 0)) {
 		PSOCKET_ERR("ioctl on socket %d failed: %d\n", fp->fd,
 			    (int)ret);
-		ret = -ret;
+		return -ret;
 	}
 
 	return 0;
@@ -305,12 +305,10 @@ static int posix_socket_vfscore_poll(struct vnode *vnode, unsigned int *revents,
 	sock = (struct posix_socket_file *)vnode->v_data;
 
 	ret = posix_socket_poll(sock, revents, ecb);
-	if (ret < 0)
-		return -ret;
 	if (unlikely(ret < 0)) {
 		PSOCKET_ERR("poll on socket %d failed: %d\n",
 			    sock->vfs_file->fd, (int)ret);
-		ret = -ret;
+		return -ret;
 	}
 
 	return 0;
