@@ -44,6 +44,17 @@
 #include <vfscore/mount.h>
 #include <errno.h>
 
+/*
+ * When the syscall_shim library is not part of the build, there is warning
+ * of implicit declaration of uk_syscall_r_dup2.
+ * This declaration takes care of that when the syscall_shim library is not
+ * part of the build.
+ */
+
+#if !CONFIG_LIBSYSCALL_SHIM
+long uk_syscall_r_dup2(long oldfd, long newfd);
+#endif /* !CONFIG_LIBSYSCALL_SHIM */
+
 static int __write_fn(void *dst __unused, void *src, size_t *cnt)
 {
 	int ret = ukplat_coutk(src, *cnt);
