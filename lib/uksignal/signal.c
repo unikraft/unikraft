@@ -86,7 +86,7 @@ UK_SYSCALL_R_DEFINE(int, rt_sigpending,
 		    sigset_t *, set,
 		    size_t __unused, sigsetsize)
 {
-	uk_sigemptyset(set);
+	sigemptyset(set);
 
 	return 0;
 }
