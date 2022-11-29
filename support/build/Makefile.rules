@@ -252,30 +252,29 @@ verbose_cmd = @printf '  %-7s %s\n' '$(1)'  '$(2)' && $(3)
 verbose_cmd_inner = printf '  %-7s %s\n' '$(1)'  '$(2)' && $(3)
 endif
 
-# Writes arguments into a build_args file
+# Writes to a file during deferred expansion
 #
-# write_build_args $target,$longargs(optional)
-ifeq ($(CONFIG_BUILD_ARGS_FILE),y)
-write_build_args = $(if $(2),$(file > $(addsuffix .build_args,$(1)),$(2))@$(addsuffix .build_args,$(1)),)
-else
-write_build_args = $(2)
-endif
+# write_file_deferred $filepath,$content
+write_file_deferred = $(if $(UK_DEFERRED_EXPANSION),$(file > $(1),$(2)),$$(file > $(1),$(2)))
 
 # Calls a command that creates an object
 #
-# build_cmd $quietlabel,$libname(optional),$target,$command,$longargs(optional)
+# build_cmd $quietlabel,$libname(optional),$target,$command
 ifeq ($(CONFIG_RECORD_BUILDTIME_TIME),y)
 define build_cmd =
-$(call verbose_cmd,$(1),$(if $(2),$(2)':' ,)$(notdir $(3)),$(TIME) $(TIMEFLAGS) -o $(addsuffix .time,$(3)) $(4) $(call write_build_args,$(3),$(5)))
+$(call write_file_deferred,$(addsuffix .cmd,$(3)),$(strip $(4)))\
+$(call verbose_cmd,$(1),$(if $(2),$(2)':' ,)$(notdir $(3)),$(TIME) $(TIMEFLAGS) -o $(addsuffix .time,$(3)) $(SHELL) $(addsuffix .cmd,$(3)))
 endef
 else
 ifeq ($(CONFIG_RECORD_BUILDTIME_LIFTOFF),y)
 define build_cmd =
-$(call verbose_cmd,$(1),$(if $(2),$(2)':' ,)$(notdir $(3)),$(LIFTOFF) $(LITFOFFFLAGS) -o $(addsuffix .liftoff,$(3)) -- $(4) $(call write_build_args,$(3),$(5)))
+$(call write_file_deferred,$(addsuffix .cmd,$(3)),$(strip $(4)))\
+$(call verbose_cmd,$(1),$(if $(2),$(2)':' ,)$(notdir $(3)),$(LIFTOFF) $(LITFOFFFLAGS) -o $(addsuffix .liftoff,$(3)) -- $(SHELL) $(addsuffix .cmd,$(3)))
 endef
 else
 define build_cmd =
-$(call verbose_cmd,$(1),$(if $(2),$(2)':' ,)$(notdir $(3)),$(4) $(call write_build_args,$(3),$(5)))
+$(call write_file_deferred,$(addsuffix .cmd,$(3)),$(strip $(4)))\
+$(call verbose_cmd,$(1),$(if $(2),$(2)':' ,)$(notdir $(3)), $(SHELL) $(addsuffix .cmd,$(3)))
 endef
 endif
 endif
@@ -290,7 +289,7 @@ tmp_depfile = $(dir $1).$(notdir $1).d
 depflags = -Wp$(comma)-MD$(comma)$(call tmp_depfile,$(1))
 define build_cmd_fixdep =
 	$(call build_cmd,$1,$2,$3,$4)
-	$Q $(UK_FIXDEP) $(call tmp_depfile,$3) $3 '$(call strip,$4)' \
+	$Q $(UK_FIXDEP) $(call tmp_depfile,$3) $3 '$(SHELL) $(addsuffix .cmd,$(3))' \
 		> $(call out2dep,$3) && \
 		$(RM) $(call tmp_depfile,$3)
 endef
@@ -298,15 +297,12 @@ endef
 # Returns a list of files to be cleaned when build_cmd was used
 #
 # build_clean $target
-build_clean = $(1)
+build_clean = $(1) $(addsuffix .cmd,$(1))
 ifeq ($(CONFIG_RECORD_BUILDTIME_TIME),y)
 build_clean += $(addsuffix .time,$(1))
 endif
 ifeq ($(CONFIG_RECORD_BUILDTIME_LIFTOFF),y)
 build_clean += $(addsuffix .liftoff,$(1))
-endif
-ifeq ($(CONFIG_BUILD_ARGS_FILE),y)
-build_clean += $(addsuffix .build_args,$(1))
 endif
 
 # Helper that generates a command for validating a checksum for
@@ -886,8 +882,7 @@ $(call libname2preolib,$(1)): $($(call vprefix_lib,$(1),OBJS)) \
 			      $($(call vprefix_lib,$(1),DTB)) \
 			      $($(call vprefix_lib,$(1),DTB-y))
 	$(call build_cmd,LD,,$(call libname2preolib,$(1)),\
-		$(LD),\
-		      $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
+		$(LD) $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
 		      $($(call vprefix_lib,$(1),LDFLAGS)) \
 		      $($(call vprefix_lib,$(1),LDFLAGS-y)) \
 		      $($(call vprefix_lib,$(1),OBJS)) \
