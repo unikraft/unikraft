@@ -56,9 +56,9 @@ struct uk_9pfs_mount_data {
 	/* Protocol version used. */
 	enum uk_9pfs_proto	proto;
 	/* Username to attempt to mount as on the remote server. */
-	const char		*uname;
+	char			*uname;
 	/* File tree to access when offered multiple exported filesystems. */
-	const char		*aname;
+	char			*aname;
 };
 
 struct uk_9pfs_file_data {
