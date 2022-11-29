@@ -1077,3 +1077,9 @@ help:
 	@echo ''
 
 endif #umask
+
+# This is used to detect if a makefile macro expansion is immediate or deferred.
+# As the last statement in the main makefile, this is read in the end of the
+# immediate expansion phase. Therefore, UK_DEFERRED_EXPANSION is expanded to a
+# empty string in immediate expansion and to 'y' in a deferred expansion.
+UK_DEFERRED_EXPANSION := y

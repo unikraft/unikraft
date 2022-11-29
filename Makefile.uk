@@ -99,3 +99,4 @@ endif
 ASFLAGS-$(call have_clang)     += -mllvm -asm-macro-max-nesting-depth=1000
 COMPFLAGS-$(call have_clang)	+= -fno-builtin -fno-PIC
 LDFLAGS-$(call have_clang)	+= -no-pie
+
