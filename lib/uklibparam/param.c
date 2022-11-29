@@ -221,7 +221,7 @@ static int kernel_arg_fetch(char **args, int nr_args,
 {
 	int i = 0;
 	int rc = 0;
-	char *equals_ptr = NULL, *dupl_ptr = NULL;
+	char *equals_ptr = NULL;
 	int len, cnt = 0, equals = -1;
 
 	UK_ASSERT(rewind && pargs);
@@ -239,14 +239,7 @@ static int kernel_arg_fetch(char **args, int nr_args,
 		if (!equals_ptr)
 			equals_ptr = strchr(args[i], '=');
 		cnt++;
-		/* Check for multiple '=' */
-		dupl_ptr = strrchr(args[i], '=');
-		if (equals_ptr && dupl_ptr && equals_ptr !=  dupl_ptr) {
-			uk_pr_err("Multiple '=' character found. Skipping argument %s\n",
-				   args[i]);
-			rc = -EINVAL;
-			goto exit;
-		} else if (equals < 0) {
+		if (equals < 0) {
 			/* Searching for the parameters */
 			if (equals_ptr && (len > 1) &&
 			   (equals_ptr - args[i]) == (len - 1)) {
