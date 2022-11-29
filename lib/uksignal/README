@@ -1,7 +1,7 @@
-This library provides a basic implementation of signals over
-Unikraft. It supports signals between threads and process wide
-signals.
+This library just provides stubs for the signal-related functions and syscalls
+to allow applications to run that do not dependent on a working signal
+implementation.
 
-It doesn't support signal codes, rt signals and executes the signal
-handlers on the thread stack. It is also not yet integrated with our
-irqs to deliver signals like SIGSEGV.
+This library replaces the previous `uksignal` implementation that is no longer
+working with the new scheduling and thread APIs. A new implementation will be
+part of a future release.

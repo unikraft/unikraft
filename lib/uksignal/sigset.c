@@ -1,7 +1,7 @@
 /* taken from newlib */
+#include "sigset.h"
 
 #include <errno.h>
-#include <uk/uk_signal.h>
 #include <signal.h>
 #include <uk/syscall.h>
 
