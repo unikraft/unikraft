@@ -43,6 +43,8 @@ extern "C" {
 
 /* TODO: do we have gnu statement expression?  */
 /* internal use */
+#if !HAVE_LIBC
+
 #define uk_sigemptyset(ptr)	(*(ptr) = 0)
 #define uk_sigfillset(ptr)  (*(ptr) = ~((__sigset_t) 0))
 #define uk_sigaddset(ptr, signo) (*(ptr) |= (1 << ((signo) - 1)))
@@ -53,6 +55,8 @@ extern "C" {
 #define uk_sigreverseset(ptr)	  (*(ptr) = ~(*(ptr)))
 #define uk_sigismember(ptr, signo) (*(ptr) & (1 << ((signo) - 1)))
 #define uk_sigisempty(ptr) (*(ptr) == 0)
+
+#endif
 
 #ifdef __cplusplus
 }
