@@ -502,7 +502,7 @@ UK_LLSYSCALL_R_DEFINE(int, ioctl, int, fd, unsigned long int, request,
 	error = sys_ioctl(fp, request, arg);
 	fdtab_fdrop(fp);
 
-	if (error)
+	if (error < 0)
 		goto out_errno;
 	trace_vfs_ioctl_ret();
 	return 0;
