@@ -869,44 +869,44 @@ endef
 
 # buildrule_olib $libname
 define buildrule_olib =
-$(call libname2preolib,$(1)): $($(call vprefix_lib,$(1),OBJS)) \
-			      $($(call vprefix_lib,$(1),OBJS-y)) \
-			      $(EACHOLIB_OBJS) \
-			      $(EACHOLIB_OBJS-y) \
-			      $($(call vprefix_lib,$(1),ALIBS)) \
-			      $($(call vprefix_lib,$(1),ALIBS-y)) \
-			      $(EACHOLIB_ALIBS) \
-			      $(EACHOLIB_ALIBS-y) \
-			      $($(call vprefix_lib,$(1),LDS)) \
-			      $($(call vprefix_lib,$(1),LDS-y)) \
-			      $($(call vprefix_lib,$(1),DTB)) \
-			      $($(call vprefix_lib,$(1),DTB-y))
+$(call libname2preolib,$(1)): $$($(call vprefix_lib,$(1),OBJS)) \
+			      $$($(call vprefix_lib,$(1),OBJS-y)) \
+			      $$(EACHOLIB_OBJS) \
+			      $$(EACHOLIB_OBJS-y) \
+			      $$($(call vprefix_lib,$(1),ALIBS)) \
+			      $$($(call vprefix_lib,$(1),ALIBS-y)) \
+			      $$(EACHOLIB_ALIBS) \
+			      $$(EACHOLIB_ALIBS-y) \
+			      $$($(call vprefix_lib,$(1),LDS)) \
+			      $$($(call vprefix_lib,$(1),LDS-y)) \
+			      $$($(call vprefix_lib,$(1),DTB)) \
+			      $$($(call vprefix_lib,$(1),DTB-y))
 	$(call build_cmd,LD,,$(call libname2preolib,$(1)),\
-		$(LD) $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
-		      $($(call vprefix_lib,$(1),LDFLAGS)) \
-		      $($(call vprefix_lib,$(1),LDFLAGS-y)) \
-		      $($(call vprefix_lib,$(1),OBJS)) \
-		      $($(call vprefix_lib,$(1),OBJS-y)) \
-		      $(EACHOLIB_OBJS) \
-		      $(EACHOLIB_OBJS-y) \
+		$(LD) $$(LIBLDFLAGS) $$(LIBLDFLAGS-y) \
+		      $$($(call vprefix_lib,$(1),LDFLAGS)) \
+		      $$($(call vprefix_lib,$(1),LDFLAGS-y)) \
+		      $$($(call vprefix_lib,$(1),OBJS)) \
+		      $$($(call vprefix_lib,$(1),OBJS-y)) \
+		      $$(EACHOLIB_OBJS) \
+		      $$(EACHOLIB_OBJS-y) \
 		      -Wl$(comma)--start-group \
-		      $($(call vprefix_lib,$(1),ALIBS)) \
-		      $($(call vprefix_lib,$(1),ALIBS-y)) \
-		      $(EACHOLIB_ALIBS) \
-		      $(EACHOLIB_ALIBS-y) \
+		      $$($(call vprefix_lib,$(1),ALIBS)) \
+		      $$($(call vprefix_lib,$(1),ALIBS-y)) \
+		      $$(EACHOLIB_ALIBS) \
+		      $$(EACHOLIB_ALIBS-y) \
 		      -Wl$(comma)--end-group \
 		      -o $(call libname2preolib,$(1)))
 
 $(call libname2olib,$(1)): $(call libname2preolib,$(1)) \
-			   $($(call vprefix_lib,$(1),EXPORTS)) $($(call vprefix_lib,$(1),EXPORTS-y)) \
-			   $($(call vprefix_lib,$(1),LOCALS)) $($(call vprefix_lib,$(1),LOCALS-y)) \
-			   $(EACHOLIB_LOCALS) $(EACHOLIB_LOCALS-y)
+			   $$($(call vprefix_lib,$(1),EXPORTS)) $$($(call vprefix_lib,$(1),EXPORTS-y)) \
+			   $$($(call vprefix_lib,$(1),LOCALS)) $$($(call vprefix_lib,$(1),LOCALS-y)) \
+			   $$(EACHOLIB_LOCALS) $$(EACHOLIB_LOCALS-y)
 	$(call build_cmd,OBJCOPY,,$(call libname2olib,$(1)),\
-		$(OBJCOPY) $(addprefix --keep-global-symbols=,$($(call vprefix_lib,$(1),EXPORTS)) $($(call vprefix_lib,$(1),EXPORTS-y))) \
-			   $(addprefix --localize-symbols=,$($(call vprefix_lib,$(1),LOCALS)) $($(call vprefix_lib,$(1),LOCALS-y))) \
-			   $(addprefix --localize-symbols=,$(EACHOLIB_LOCALS) $(EACHOLIB_LOCALS-y)) \
-		           $(OBJCFLAGS) $(OBJCFLAGS-y) \
-		           $($(call vprefix_lib,$(1),OBJCFLAGS)) $($(call vprefix_lib,$(1),OBJCFLAGS-y)) \
+		$(OBJCOPY) $$(addprefix --keep-global-symbols=,$$($(call vprefix_lib,$(1),EXPORTS)) $$($(call vprefix_lib,$(1),EXPORTS-y))) \
+			   $$(addprefix --localize-symbols=,$$($(call vprefix_lib,$(1),LOCALS)) $$($(call vprefix_lib,$(1),LOCALS-y))) \
+			   $$(addprefix --localize-symbols=,$$(EACHOLIB_LOCALS) $$(EACHOLIB_LOCALS-y)) \
+		           $$(OBJCFLAGS) $$(OBJCFLAGS-y) \
+		           $$($(call vprefix_lib,$(1),OBJCFLAGS)) $$($(call vprefix_lib,$(1),OBJCFLAGS-y)) \
 			   $(call libname2preolib,$(1)) $(call libname2olib,$(1)))
 
 $(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(call libname2preolib,$(1))))
