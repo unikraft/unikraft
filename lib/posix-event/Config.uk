@@ -3,7 +3,7 @@ menuconfig LIBPOSIX_EVENT
 	default n
 	select LIBUKDEBUG
 	select LIBUKALLOC
-	select LIBVFSCORE
+	select LIBPOSIX_FDTAB
 	help
 		This library implements the event related functions such as
 		poll(), select(), epoll_*(), and eventfd().

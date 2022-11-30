@@ -30,11 +30,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <vfscore/fs.h>
-#include <vfscore/file.h>
-#include <vfscore/dentry.h>
-#include <vfscore/vnode.h>
-#include <vfscore/mount.h>
+#include <uk/fdtab/fd.h>
 #include <uk/fdtab/eventpoll.h>
 #include <uk/alloc.h>
 #include <uk/syscall.h>
@@ -44,143 +40,93 @@
 #include <stdlib.h>
 #include <errno.h>
 
-static uint64_t e_inode;
+struct epoll_file {
+	struct fdtab_file f_file;
+	struct eventpoll f_ep;
+};
 
-#define epoll_vfscore_inactive ((vnop_inactive_t) vfscore_vop_einval)
+#define to_efd(fp) \
+	__containerof((fp), struct epoll_file, f_file)
 
-static int epoll_vfscore_close(struct vnode *vnode,
-			       struct vfscore_file *fp __unused)
+static int epoll_fdtab_free(struct fdtab_file *fp)
 {
-	struct eventpoll *ep;
-
-	UK_ASSERT(vnode->v_data);
-	UK_ASSERT(vnode->v_type == VEPOLL);
-
-	ep = (struct eventpoll *)vnode->v_data;
+	struct epoll_file *efd = to_efd(fp);
+	struct eventpoll *ep = &efd->f_ep;
 
 	/* Clean up interest lists and release fds */
 	eventpoll_fini(ep);
 
-	uk_free(uk_alloc_get_default(), ep);
+	uk_free(uk_alloc_get_default(), efd);
 
-	vnode->v_data = NULL;
 	return 0;
 }
 
-/* vnode operations */
-static struct vnops epoll_vnops = {
-	.vop_close = epoll_vfscore_close,
-	.vop_inactive = epoll_vfscore_inactive
-};
-
-#define epoll_vget ((vfsop_vget_t) vfscore_nullop)
-
-/* file system operations */
-static struct vfsops epoll_vfsops = {
-	.vfs_vget = epoll_vget,
-	.vfs_vnops = &epoll_vnops
-};
-
-/* bogus mount point used by all epoll objects */
-static struct mount epoll_mount = {
-	.m_op = &epoll_vfsops
-};
-
-static inline int is_epoll_file(struct vfscore_file *fp)
+static int epoll_fdtab_poll()
 {
-	struct vnode *np = fp->f_dentry->d_vnode;
-
-	return (np->v_op == &epoll_vnops);
+	return -EINVAL;
 }
 
-static inline int has_poll(struct vfscore_file *fp)
-{
-	struct vnode *np = fp->f_dentry->d_vnode;
+/* vnode operations */
+static struct fdops epoll_fdops = {
+	.fdop_poll = epoll_fdtab_poll,
+	.fdop_free = epoll_fdtab_free,
+};
 
-	return (np->v_op->vop_poll != NULL);
+static inline int is_epoll_file(struct fdtab_file *fp)
+{
+	return (fp->f_op == &epoll_fdops);
+}
+
+static inline int has_poll(struct fdtab_file *fp)
+{
+	return (fp->f_op->fdop_poll != NULL);
 }
 
 static int do_epoll_create(struct uk_alloc *a, int flags)
 {
 	int vfs_fd, ret;
-	struct eventpoll *ep;
-	struct vfscore_file *vfs_file;
-	struct dentry *vfs_dentry;
-	struct vnode *vfs_vnode;
+	struct epoll_file *efd;
+	struct fdtab_table *tab;
+	struct fdtab_file *file;
 
 	if (unlikely(flags & ~EPOLL_CLOEXEC))
 		return -EINVAL;
 
+	tab = fdtab_get_active();
+
 	/* Reserve a file descriptor number */
-	vfs_fd = vfscore_alloc_fd();
+	vfs_fd = fdtab_alloc_fd(tab);
 	if (unlikely(vfs_fd < 0)) {
 		ret = -ENFILE;
 		goto ERR_EXIT;
 	}
 
 	/* Allocate file, vfs_file, and vnode */
-	ep = uk_malloc(a, sizeof(struct eventpoll));
-	if (unlikely(!ep)) {
+	efd = uk_malloc(a, sizeof(struct epoll_file));
+	if (unlikely(!efd)) {
 		ret = -ENOMEM;
 		goto ERR_MALLOC_FILE;
 	}
-
-	vfs_file = uk_malloc(a, sizeof(struct vfscore_file));
-	if (unlikely(!vfs_file)) {
-		ret = -ENOMEM;
-		goto ERR_MALLOC_VFS_FILE;
-	}
-
-	/* TODO: Synchronize inode increment */
-	ret = vfscore_vget(&epoll_mount, e_inode++, &vfs_vnode);
-	UK_ASSERT(ret == 0); /* we should not find it in the cache */
-	if (unlikely(!vfs_vnode)) {
-		ret = -ENOMEM;
-		goto ERR_ALLOC_VNODE;
-	}
-
-	/*
-	 * It doesn't matter that all the dentries have the same path since
-	 * we never look them up.
-	 */
-	vfs_dentry = dentry_alloc(NULL, vfs_vnode, "/");
-	if (unlikely(!vfs_dentry)) {
-		ret = -ENOMEM;
-		goto ERR_ALLOC_DENTRY;
-	}
+	file = &efd->f_file;
 
 	/* Initialize data structures */
-	fdtab_file_init(&vfs_file->f_file);
-	vfs_file->f_file.fd = vfs_fd;
-	vfs_file->f_data = ep;
-	vfs_file->f_dentry = vfs_dentry;
-	vfs_file->f_vfs_flags = UK_VFSCORE_NOPOS;
+	fdtab_file_init(file);
+	file->fd = vfs_fd;
+	file->f_op = &epoll_fdops;
 
-	vfs_vnode->v_data = ep;
-	vfs_vnode->v_type = VEPOLL;
-
-	eventpoll_init(ep, a);
+	eventpoll_init(&efd->f_ep, a);
 
 	/* Store within the vfs structure */
-	ret = vfscore_install_fd(vfs_fd, vfs_file);
+	ret = fdtab_install_fd(tab, vfs_fd, file);
 	if (unlikely(ret))
-		goto ERR_VFS_INSTALL;
-
-	/* Only the dentry should hold a reference; release ours */
-	vput(vfs_vnode);
+		goto ERR_ALLOC_EFD;
 
 	return vfs_fd;
 
-ERR_VFS_INSTALL:
-	drele(vfs_dentry);
-ERR_ALLOC_DENTRY:
-	vput(vfs_vnode);
-ERR_ALLOC_VNODE:
-	uk_free(a, vfs_file);
-ERR_MALLOC_VFS_FILE:
-	uk_free(a, ep);
+ERR_ALLOC_EFD:
+	uk_free(a, efd);
 ERR_MALLOC_FILE:
-	vfscore_put_fd(vfs_fd);
+	fdtab_put_fd(tab, vfs_fd);
 ERR_EXIT:
 	UK_ASSERT(ret < 0);
 	return ret;
@@ -206,17 +152,20 @@ UK_SYSCALL_R_DEFINE(int, epoll_create, int, size)
 
 static int do_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
 {
-	struct vfscore_file *epf, *fp;
+	struct fdtab_table *tab;
+	struct fdtab_file *epf, *fp;
 	struct eventpoll *ep;
 	int ret;
 
-	epf = vfscore_get_file(epfd);
+	tab = fdtab_get_active();
+
+	epf = fdtab_get_file(tab, epfd);
 	if (unlikely(!epf)) {
 		ret = -EBADF;
 		goto EXIT;
 	}
 
-	fp = vfscore_get_file(fd);
+	fp = fdtab_get_file(tab, fd);
 	if (unlikely(!fp)) {
 		ret = -EBADF;
 		goto ERR_PUT_EPF;
@@ -240,13 +189,11 @@ static int do_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
 		return -EBADF;
 	}
 
-	UK_ASSERT(epf->f_data);
-
-	ep = (struct eventpoll *)epf->f_data;
+	ep = &to_efd(epf)->f_ep;
 
 	switch (op) {
 	case EPOLL_CTL_ADD:
-		ret = eventpoll_add(ep, fd, &fp->f_file, event);
+		ret = eventpoll_add(ep, fd, fp, event);
 		break;
 	case EPOLL_CTL_MOD:
 		ret = eventpoll_mod(ep, fd, event);
@@ -260,9 +207,9 @@ static int do_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
 	}
 
 ERR_PUT_F:
-	vfscore_put_file(fp);
+	fdtab_put_file(fp);
 ERR_PUT_EPF:
-	vfscore_put_file(epf);
+	fdtab_put_file(epf);
 EXIT:
 	return ret;
 }
@@ -277,11 +224,14 @@ static int do_epoll_pwait(int epfd, struct epoll_event *events, int maxevents,
 			  const __nsec *timeout, const sigset_t *sigmask,
 			  size_t sigsegsize __unused)
 {
-	struct vfscore_file *epf;
+	struct fdtab_table *tab;
+	struct fdtab_file *epf;
 	struct eventpoll *ep;
 	int ret;
 
-	epf = vfscore_get_file(epfd);
+	tab = fdtab_get_active();
+
+	epf = fdtab_get_file(tab, epfd);
 	if (unlikely(!epf)) {
 		ret = -EBADF;
 		goto EXIT;
@@ -297,9 +247,7 @@ static int do_epoll_pwait(int epfd, struct epoll_event *events, int maxevents,
 		goto ERR_PUT_EPF;
 	}
 
-	UK_ASSERT(epf->f_data);
-
-	ep = (struct eventpoll *)epf->f_data;
+	ep = &to_efd(epf)->f_ep;
 
 	/* TODO: Implement atomic masking of signals */
 	if (sigmask)
@@ -309,7 +257,7 @@ static int do_epoll_pwait(int epfd, struct epoll_event *events, int maxevents,
 	ret = eventpoll_wait(ep, events, maxevents, timeout);
 
 ERR_PUT_EPF:
-	vfscore_put_file(epf);
+	fdtab_put_file(epf);
 EXIT:
 	return ret;
 }

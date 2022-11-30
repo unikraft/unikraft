@@ -31,8 +31,7 @@
  */
 
 #define _GNU_SOURCE
-#include <vfscore/file.h>
-#include <vfscore/vnode.h>
+#include <uk/fdtab/fd.h>
 #include <uk/fdtab/eventpoll.h>
 #include <uk/print.h>
 #include <uk/syscall.h>
@@ -51,11 +50,14 @@ static int do_ppoll(struct pollfd *fds, nfds_t nfds, const __nsec *timeout,
 	struct epoll_event *events = NULL;
 	struct eventpoll ep;
 	struct eventpoll_fd *efd;
-	struct vfscore_file *fp;
+	struct fdtab_table *tab;
+	struct fdtab_file *fp;
 	int ret, i, fd, num_fds = (int)nfds;
 
 	if (unlikely(nfds > INT_MAX))
 		return -EINVAL;
+
+	tab = fdtab_get_active();
 
 	eventpoll_init(&ep, uk_alloc_get_default());
 
@@ -67,7 +69,7 @@ static int do_ppoll(struct pollfd *fds, nfds_t nfds, const __nsec *timeout,
 		if (fd < 0)
 			continue;
 
-		fp = vfscore_get_file(fd);
+		fp = fdtab_get_file(tab, fd);
 		if (unlikely(!fp)) {
 			ret = -EBADF;
 			goto EXIT;
@@ -75,7 +77,7 @@ static int do_ppoll(struct pollfd *fds, nfds_t nfds, const __nsec *timeout,
 
 		efd = uk_malloc(uk_alloc_get_default(), sizeof(*efd));
 		if (unlikely(!efd)) {
-			vfscore_put_file(fp);
+			fdtab_put_file(fp);
 			ret = -ENOMEM;
 			goto EXIT;
 		}
@@ -86,7 +88,7 @@ static int do_ppoll(struct pollfd *fds, nfds_t nfds, const __nsec *timeout,
 		 */
 		e.data.ptr = &fds[i].revents;
 		e.events = fds[i].events;
-		eventpoll_fd_init(efd, &fp->f_file, fd, &e);
+		eventpoll_fd_init(efd, fp, fd, &e);
 		eventpoll_add_unsafe(&ep, efd);
 
 		/* We must add the fd to triggered list so it is
@@ -96,7 +98,7 @@ static int do_ppoll(struct pollfd *fds, nfds_t nfds, const __nsec *timeout,
 		 */
 		uk_list_add_tail(&efd->tr_link, &ep.tr_list);
 
-		vfscore_put_file(fp);
+		fdtab_put_file(fp);
 	}
 
 	/* We may call poll with no fds to just do a precise wait */

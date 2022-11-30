@@ -34,8 +34,7 @@
  */
 
 #define _GNU_SOURCE
-#include <vfscore/file.h>
-#include <vfscore/vnode.h>
+#include <uk/fdtab/fd.h>
 #include <uk/fdtab/eventpoll.h>
 #include <uk/print.h>
 #include <uk/syscall.h>
@@ -59,12 +58,15 @@ static int do_pselect(int nfds, fd_set *readfds, fd_set *writefds,
 	struct epoll_event *events = NULL;
 	struct eventpoll ep;
 	struct eventpoll_fd *efd;
-	struct vfscore_file *fp;
+	struct fdtab_table *tab;
+	struct fdtab_file *fp;
 	int num_fds = 0;
 	int ret, i;
 
 	if (unlikely(nfds < 0))
 		return -EINVAL;
+
+	tab = fdtab_get_active();
 
 	eventpoll_init(&ep, uk_alloc_get_default());
 
@@ -80,7 +82,7 @@ static int do_pselect(int nfds, fd_set *readfds, fd_set *writefds,
 			e.events |= POLLEX_SET;
 
 		if (e.events) {
-			fp = vfscore_get_file(i);
+			fp = fdtab_get_file(tab, i);
 			if (unlikely(!fp)) {
 				ret = -EBADF;
 				goto EXIT;
@@ -88,7 +90,7 @@ static int do_pselect(int nfds, fd_set *readfds, fd_set *writefds,
 
 			efd = uk_malloc(uk_alloc_get_default(), sizeof(*efd));
 			if (unlikely(!efd)) {
-				vfscore_put_file(fp);
+				fdtab_put_file(fp);
 				ret = -ENOMEM;
 				goto EXIT;
 			}
@@ -98,7 +100,7 @@ static int do_pselect(int nfds, fd_set *readfds, fd_set *writefds,
 			 * may access the eventpoll.
 			 */
 			e.data.fd = i;
-			eventpoll_fd_init(efd, &fp->f_file, i, &e);
+			eventpoll_fd_init(efd, fp, i, &e);
 			eventpoll_add_unsafe(&ep, efd);
 
 			/* We must add the fd to triggered list so it is
@@ -108,7 +110,7 @@ static int do_pselect(int nfds, fd_set *readfds, fd_set *writefds,
 			 */
 			uk_list_add_tail(&efd->tr_link, &ep.tr_list);
 
-			vfscore_put_file(fp);
+			fdtab_put_file(fp);
 
 			num_fds++;
 			e.events = 0;
