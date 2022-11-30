@@ -161,7 +161,7 @@ ramfs_remove_node(struct ramfs_node *dnp, struct ramfs_node *np)
 			 prev = prev->rn_next) {
 			if (prev->rn_next == NULL) {
 				uk_mutex_unlock(&ramfs_lock);
-				return ENOENT;
+				return -ENOENT;
 			}
 		}
 		prev->rn_next = np->rn_next;
@@ -191,7 +191,7 @@ ramfs_rename_node(struct ramfs_node *np, char *name)
 		/* Expand name buffer */
 		tmp = (char *) malloc(len + 1);
 		if (tmp == NULL)
-			return ENOMEM;
+			return -ENOMEM;
 		strlcpy(tmp, name, len + 1);
 		free(np->rn_name);
 		np->rn_name = tmp;
@@ -212,7 +212,7 @@ ramfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
 	*vpp = NULL;
 
 	if (*name == '\0')
-		return ENOENT;
+		return -ENOENT;
 
 	uk_mutex_lock(&ramfs_lock);
 
@@ -228,7 +228,7 @@ ramfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
 	}
 	if (found == 0) {
 		uk_mutex_unlock(&ramfs_lock);
-		return ENOENT;
+		return -ENOENT;
 	}
 	if (vfscore_vget(dvp->v_mount, inode_count++, &vp)) {
 		/* found in cache */
@@ -238,7 +238,7 @@ ramfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
 	}
 	if (!vp) {
 		uk_mutex_unlock(&ramfs_lock);
-		return ENOMEM;
+		return -ENOMEM;
 	}
 	vp->v_data = np;
 	vp->v_mode = UK_ALLPERMS;
@@ -259,14 +259,14 @@ ramfs_mkdir(struct vnode *dvp, char *name, mode_t mode)
 
 	uk_pr_debug("mkdir %s\n", name);
 	if (strlen(name) > NAME_MAX)
-		return ENAMETOOLONG;
+		return -ENAMETOOLONG;
 
 	if (!S_ISDIR(mode))
-		return EINVAL;
+		return -EINVAL;
 
 	np = ramfs_add_node(dvp->v_data, name, VDIR);
 	if (np == NULL)
-		return ENOMEM;
+		return -ENOMEM;
 	np->rn_size = 0;
 
 	return 0;
@@ -279,12 +279,12 @@ ramfs_symlink(struct vnode *dvp, char *name, char *link)
 	size_t len;
 
 	if (strlen(name) > NAME_MAX)
-		return ENAMETOOLONG;
+		return -ENAMETOOLONG;
 
 	np = ramfs_add_node(dvp->v_data, name, VLNK);
 
 	if (np == NULL)
-		return ENOMEM;
+		return -ENOMEM;
 	// Save the link target without the final null, as readlink() wants it.
 	len = strlen(link);
 
@@ -301,9 +301,9 @@ ramfs_readlink(struct vnode *vp, struct uio *uio)
 	size_t len;
 
 	if (vp->v_type != VLNK)
-		return EINVAL;
+		return -EINVAL;
 	if (uio->uio_offset < 0)
-		return EINVAL;
+		return -EINVAL;
 	if (uio->uio_resid == 0)
 		return 0;
 	if (uio->uio_offset >= (off_t) vp->v_size)
@@ -382,15 +382,15 @@ ramfs_create(struct vnode *dvp, char *name, mode_t mode)
 	struct ramfs_node *np;
 
 	if (strlen(name) > NAME_MAX)
-		return ENAMETOOLONG;
+		return -ENAMETOOLONG;
 
 	uk_pr_debug("create %s in %s\n", name, RAMFS_NODE(dvp)->rn_name);
 	if (!S_ISREG(mode))
-		return EINVAL;
+		return -EINVAL;
 
 	np = ramfs_add_node(dvp->v_data, name, VREG);
 	if (np == NULL)
-		return ENOMEM;
+		return -ENOMEM;
 	return 0;
 }
 
@@ -402,11 +402,11 @@ ramfs_read(struct vnode *vp, struct vfscore_file *fp __unused,
 	size_t len;
 
 	if (vp->v_type == VDIR)
-		return EISDIR;
+		return -EISDIR;
 	if (vp->v_type != VREG)
-		return EINVAL;
+		return -EINVAL;
 	if (uio->uio_offset < 0)
-		return EINVAL;
+		return -EINVAL;
 	if (uio->uio_resid == 0)
 		return 0;
 
@@ -429,11 +429,11 @@ ramfs_set_file_data(struct vnode *vp, const void *data, size_t size)
 	struct ramfs_node *np =  vp->v_data;
 
 	if (vp->v_type == VDIR)
-		return EISDIR;
+		return -EISDIR;
 	if (vp->v_type != VREG)
-		return EINVAL;
+		return -EINVAL;
 	if (np->rn_buf)
-		return EINVAL;
+		return -EINVAL;
 
 	np->rn_buf = (char *) data;
 	np->rn_bufsize = size;
@@ -450,13 +450,13 @@ ramfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 	struct ramfs_node *np =  vp->v_data;
 
 	if (vp->v_type == VDIR)
-		return EISDIR;
+		return -EISDIR;
 	if (vp->v_type != VREG)
-		return EINVAL;
+		return -EINVAL;
 	if (uio->uio_offset < 0)
-		return EINVAL;
+		return -EINVAL;
 	if (uio->uio_offset >= LONG_MAX)
-		return EFBIG;
+		return -EFBIG;
 	if (uio->uio_resid == 0)
 		return 0;
 
@@ -473,7 +473,7 @@ ramfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 			void *new_buf = calloc(1, new_size);
 
 			if (!new_buf)
-				return EIO;
+				return -EIO;
 			if (np->rn_size != 0) {
 				memcpy(new_buf, np->rn_buf, vp->v_size);
 				if (np->rn_owns_buf)
@@ -515,7 +515,7 @@ ramfs_rename(struct vnode *dvp1, struct vnode *vp1, char *name1 __unused,
 		old_np = vp1->v_data;
 		np = ramfs_add_node(dvp2->v_data, name2, old_np->rn_type);
 		if (np == NULL)
-			return ENOMEM;
+			return -ENOMEM;
 
 		if (old_np->rn_buf) {
 			/* Copy file data */
@@ -555,14 +555,14 @@ ramfs_readdir(struct vnode *vp, struct vfscore_file *fp, struct dirent *dir)
 		np = dnp->rn_child;
 		if (np == NULL) {
 			uk_mutex_unlock(&ramfs_lock);
-			return ENOENT;
+			return -ENOENT;
 		}
 
 		for (i = 0; i != (fp->f_offset - 2); i++) {
 			np = np->rn_next;
 			if (np == NULL) {
 				uk_mutex_unlock(&ramfs_lock);
-				return ENOENT;
+				return -ENOENT;
 			}
 		}
 		if (np->rn_type == VDIR)

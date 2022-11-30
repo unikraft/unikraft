@@ -133,7 +133,7 @@ posix_socket_vfscore_close(struct fdtab_file *fp)
 
 	if (unlikely(ret < 0)) {
 		PSOCKET_ERR("close on socket %d failed: %d\n", fp->fd, ret);
-		return -ret;
+		return ret;
 	}
 
 	return 0;
@@ -179,7 +179,7 @@ posix_socket_vfscore_write(struct fdtab_file *fp,
 		/* TODO: Add fp when write provides it */
 		if (ret != -EAGAIN) /* Don't spam log for legitimate timeouts */
 			PSOCKET_ERR("write on socket failed: %d\n", (int)ret);
-		return (int)-ret;
+		return (int)ret;
 	}
 
 	buf->uio_resid -= ret;
@@ -205,7 +205,7 @@ posix_socket_vfscore_read(struct fdtab_file *fp,
 		if (ret != -EAGAIN) /* Don't spam log for legitimate timeouts */
 			PSOCKET_ERR("read on socket %d failed: %d\n",
 				    fp->fd, (int)ret);
-		return (int)-ret;
+		return (int)ret;
 	}
 
 	buf->uio_resid -= ret;
@@ -224,7 +224,6 @@ posix_socket_vfscore_ioctl(struct fdtab_file *fp,
 	if (unlikely(ret < 0)) {
 		PSOCKET_ERR("ioctl on socket %d failed: %d\n", fp->fd,
 			    (int)ret);
-		return -ret;
 	}
 
 	return ret;
@@ -240,7 +239,6 @@ static int posix_socket_vfscore_poll(struct fdtab_file *fp,
 	ret = posix_socket_poll(sock, revents, ecb);
 	if (unlikely(ret < 0)) {
 		PSOCKET_ERR("poll on socket %d failed: %d\n", fp->fd, (int)ret);
-		return -ret;
 	}
 
 	return ret;

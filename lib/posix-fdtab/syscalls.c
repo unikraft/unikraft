@@ -48,14 +48,14 @@ sys_read(struct fdtab_file *fp, const struct iovec *iov, size_t niov,
 	struct iovec *copy_iov;
 
 	if ((fp->f_flags & UK_FREAD) == 0)
-		return EBADF;
+		return -EBADF;
 
 	size_t bytes = 0;
 	const struct iovec *iovp = iov;
 
 	for (unsigned int i = 0; i < niov; i++) {
 		if (iovp->iov_len > IOSIZE_MAX - bytes)
-			return EINVAL;
+			return -EINVAL;
 		bytes += iovp->iov_len;
 		iovp++;
 	}
@@ -99,15 +99,14 @@ sys_write(struct fdtab_file *fp, const struct iovec *iov, size_t niov,
 	int error = 0;
 
 	if ((fp->f_flags & UK_FWRITE) == 0)
-		return EBADF;
+		return -EBADF;
 
 	size_t bytes = 0;
 	const struct iovec *iovp = iov;
 
 	for (unsigned int i = 0; i < niov; i++) {
 		if (iovp->iov_len > IOSIZE_MAX - bytes)
-			return EINVAL;
-
+			return -EINVAL;
 		bytes += iovp->iov_len;
 		iovp++;
 	}
@@ -127,7 +126,7 @@ sys_write(struct fdtab_file *fp, const struct iovec *iov, size_t niov,
 	/* std::vector<iovec> copy_iov(iov, iov + niov); */
 	copy_iov = calloc(sizeof(struct iovec), niov);
 	if (!copy_iov)
-		return ENOMEM;
+		return -ENOMEM;
 	memcpy(copy_iov, iov, sizeof(struct iovec)*niov);
 
 	uio.uio_iov = copy_iov;
@@ -147,7 +146,7 @@ int
 sys_lseek(struct fdtab_file *fp, off_t off, int type, off_t *origin)
 {
 	if (fp->f_op->fdop_seek == NULL)
-		return ESPIPE;
+		return -ESPIPE;
 
 	return FDOP_SEEK(fp, off, type, origin);
 }
@@ -158,7 +157,7 @@ sys_ioctl(struct fdtab_file *fp, unsigned long request, void *buf)
 	int error = 0;
 
 	if ((fp->f_flags & (UK_FREAD | UK_FWRITE)) == 0)
-		return EBADF;
+		return -EBADF;
 
 	switch (request) {
 	case FIOCLEX:
@@ -169,7 +168,7 @@ sys_ioctl(struct fdtab_file *fp, unsigned long request, void *buf)
 		break;
 	default:
 		if (fp->f_op->fdop_ioctl == NULL)
-			return ENOTTY;
+			return -ENOTTY;
 
 		error = FDOP_IOCTL(fp, request, buf);
 		break;
@@ -182,7 +181,7 @@ int
 sys_fsync(struct fdtab_file *fp)
 {
 	if (fp->f_op->fdop_fsync == NULL)
-		return EINVAL;
+		return -EINVAL;
 
 	return FDOP_FSYNC(fp);
 }
@@ -191,7 +190,7 @@ int
 sys_fstat(struct fdtab_file *fp, struct stat *st)
 {
 	if (fp->f_op->fdop_fstat == NULL)
-		return EINVAL;
+		return -EINVAL;
 
 	return FDOP_FSTAT(fp, st);
 }
@@ -200,7 +199,7 @@ int
 sys_ftruncate(struct fdtab_file *fp, off_t length)
 {
 	if (fp->f_op->fdop_truncate == NULL)
-		return EINVAL;
+		return -EINVAL;
 
 	return FDOP_TRUNCATE(fp, length);
 }
@@ -211,21 +210,21 @@ sys_fallocate(struct fdtab_file *fp, int mode, off_t offset, off_t len)
 	int error;
 
 	if (!(fp->f_flags & UK_FWRITE))
-		return EBADF;
+		return -EBADF;
 
 	if (offset < 0 || len <= 0)
-		return EINVAL;
+		return -EINVAL;
 
 	// Strange, but that's what Linux returns.
 	if ((mode & FALLOC_FL_PUNCH_HOLE) && !(mode & FALLOC_FL_KEEP_SIZE))
-		return ENOTSUP;
+		return -ENOTSUP;
 
 	if (fp->f_op->fdop_fallocate != NULL) {
 		error = FDOP_FALLOCATE(fp, mode, offset, len);
 	} else {
 		// EOPNOTSUPP here means that the underlying file system
 		// referred by fp doesn't support fallocate.
-		error = EOPNOTSUPP;
+		error = -EOPNOTSUPP;
 	}
 
 	return error;

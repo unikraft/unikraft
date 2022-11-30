@@ -76,7 +76,7 @@ static inline int has_error(int error, int bytes)
 	/* TODO: OSv checks also for ERESTART */
 	return error && (
 		(bytes == 0) ||
-		(error != EWOULDBLOCK && error != EINTR));
+		(error != -EWOULDBLOCK && error != -EINTR));
 }
 
 UK_TRACEPOINT(trace_vfs_close, "%d", int);
@@ -90,7 +90,7 @@ static int fdclose(struct fdtab_table *tab, int fd)
 
 	fp = fdtab_get_file(tab, fd);
 	if (!fp)
-		return EBADF;
+		return -EBADF;
 
 	error = fdtab_put_fd(tab, fd);
 	if (!error)
@@ -116,7 +116,8 @@ UK_SYSCALL_R_DEFINE(int, close, int, fd)
 
 out_error:
 	trace_vfs_close_err(error);
-	return -error;
+	UK_ASSERT(error < 0);
+	return error;
 }
 
 UK_TRACEPOINT(trace_vfs_lseek, "%d 0x%x %d", int, off_t, int);
@@ -144,7 +145,8 @@ UK_SYSCALL_R_DEFINE(off_t, lseek, int, fd, off_t, offset, int, whence)
 
 out_error:
 	trace_vfs_lseek_err(error);
-	return -error;
+	UK_ASSERT(error < 0);
+	return error;
 }
 
 #ifdef lseek64
@@ -175,7 +177,8 @@ static ssize_t do_preadv(struct fdtab_file *fp, const struct iovec *iov,
 	return 0;
 
 out_error:
-	return -error;
+	UK_ASSERT(error < 0);
+	return error;
 }
 
 UK_TRACEPOINT(trace_vfs_preadv, "%d %p 0x%x 0x%x", int, const struct iovec*,
@@ -192,10 +195,8 @@ UK_SYSCALL_R_DEFINE(ssize_t, preadv, int, fd, const struct iovec*, iov,
 
 	trace_vfs_preadv(fd, iov, iovcnt, offset);
 	error = fdtab_fget(fd, &fp);
-	if (error) {
-		error = -error;
+	if (error)
 		goto out_error;
-	}
 
 	error = do_preadv(fp, iov, iovcnt, offset, &bytes);
 
@@ -275,10 +276,8 @@ UK_SYSCALL_R_DEFINE(ssize_t, readv,
 
 	trace_vfs_readv(fd, iov, iovcnt);
 	error = fdtab_fget(fd, &fp);
-	if (error) {
-		error = -error;
+	if (error)
 		goto out_error;
-	}
 
 	error = do_preadv(fp, iov, iovcnt, -1, &bytes);
 
@@ -337,8 +336,9 @@ static int do_pwritev(struct fdtab_file *fp, const struct iovec *iov,
 	return 0;
 
 out_error:
+	UK_ASSERT(error < 0);
 	*bytes = -1;
-	return -error;
+	return error;
 }
 
 UK_TRACEPOINT(trace_vfs_pwritev, "%d %p 0x%x 0x%x", int, const struct iovec*,
@@ -355,10 +355,8 @@ UK_SYSCALL_R_DEFINE(ssize_t, pwritev, int, fd, const struct iovec*, iov,
 
 	trace_vfs_pwritev(fd, iov, iovcnt, offset);
 	error = fdtab_fget(fd, &fp);
-	if (error) {
-		error = -error;
+	if (error)
 		goto out_error;
-	}
 
 	error = do_pwritev(fp, iov, iovcnt, offset, &bytes);
 
@@ -439,10 +437,8 @@ UK_SYSCALL_R_DEFINE(ssize_t, writev,
 
 	trace_vfs_writev(fd, vec, vlen);
 	error = fdtab_fget(fd, &fp);
-	if (error) {
-		error = -error;
+	if (error)
 		goto out_error;
-	}
 
 	error = do_pwritev(fp, vec, vlen, -1, &bytes);
 
@@ -513,7 +509,8 @@ UK_LLSYSCALL_R_DEFINE(int, ioctl, int, fd, unsigned long int, request,
 
 out_errno:
 	trace_vfs_ioctl_err(error);
-	return -error;
+	UK_ASSERT(error < 0);
+	return error;
 }
 
 #if UK_LIBC_SYSCALLS
@@ -554,7 +551,8 @@ UK_SYSCALL_R_DEFINE(int, fsync, int, fd)
 
 out_error:
 	trace_vfs_fsync_err(error);
-	return -error;
+	UK_ASSERT(error < 0);
+	return error;
 }
 
 UK_SYSCALL_R_DEFINE(int, fdatasync, int, fd)
@@ -588,7 +586,7 @@ static int __fxstat_helper(int ver __unused, int fd, struct stat *st)
 
 out_errno:
 	trace_vfs_fstat_err(error);
-	errno = error;
+	errno = -error;
 	return -1;
 }
 
@@ -632,14 +630,15 @@ UK_SYSCALL_R_DEFINE(int, flock, int, fd, int, operation)
 	case LOCK_UN:
 		break;
 	default:
-		error = EINVAL;
+		error = -EINVAL;
 		goto out_error;
 	}
 
 	return 0;
 
 out_error:
-	return -error;
+	UK_ASSERT(error < 0);
+	return error;
 }
 
 UK_TRACEPOINT(trace_vfs_dup, "%d", int);
@@ -673,8 +672,7 @@ out_fdtab_fdrop:
 
 out_error:
 	trace_vfs_dup_err(error);
-	if (error > 0)
-		return -error;
+	UK_ASSERT(error < 0);
 	return error;
 }
 
@@ -735,8 +733,7 @@ UK_SYSCALL_R_DEFINE(int, dup3, int, oldfd, int, newfd, int, flags)
 
 out_error:
 	trace_vfs_dup3_err(error);
-	if (error > 0)
-		return -error;
+	UK_ASSERT(error < 0);
 	return error;
 }
 
@@ -843,7 +840,8 @@ UK_LLSYSCALL_R_DEFINE(int, fcntl, int, fd, unsigned int, cmd, int, arg)
 
 out_errno:
 	trace_vfs_fcntl_err(error);
-	return -error;
+	UK_ASSERT(error < 0);
+	return error;
 }
 
 #if UK_LIBC_SYSCALLS
@@ -887,7 +885,8 @@ UK_SYSCALL_R_DEFINE(int, ftruncate, int, fd, off_t, length)
 
 out_error:
 	trace_vfs_ftruncate_err(error);
-	return -error;
+	UK_ASSERT(error < 0);
+	return error;
 }
 
 #ifdef ftruncate64
@@ -921,7 +920,7 @@ UK_SYSCALL_R_DEFINE(int, fallocate, int, fd, int, mode, loff_t, offset, loff_t,
 
 out_error:
 	trace_vfs_fallocate_err(error);
-	return -error;
+	return error;
 }
 
 #ifdef fallocate64

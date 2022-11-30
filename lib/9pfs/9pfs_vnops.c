@@ -192,7 +192,7 @@ static int uk_9pfs_open(struct vfscore_file *file)
 	/* Allocate memory for file data. */
 	fd = calloc(1, sizeof(*fd));
 	if (!fd)
-		return ENOMEM;
+		return -ENOMEM;
 
 	/* Clone fid. */
 	openedfid = uk_9p_walk(dev, UK_9PFS_VFID(file->f_dentry->d_vnode),
@@ -226,7 +226,7 @@ out_err:
 	uk_9pfid_put(openedfid);
 out:
 	free(fd);
-	return -rc;
+	return rc;
 }
 
 static int uk_9pfs_close(struct vnode *vn __unused, struct vfscore_file *file)
@@ -253,7 +253,7 @@ static int uk_9pfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
 	int rc;
 
 	if (strlen(name) > NAME_MAX)
-		return ENAMETOOLONG;
+		return -ENAMETOOLONG;
 
 	fid = uk_9p_walk(dev, dfid, name);
 	if (PTRISERR(fid)) {
@@ -349,7 +349,7 @@ static int uk_9pfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
 out_fid:
 	uk_9pfid_put(fid);
 out:
-	return -rc;
+	return rc;
 }
 
 static int uk_9pfs_inactive(struct vnode *vp)
@@ -376,7 +376,7 @@ static int uk_9pfs_create_generic(struct vnode *dvp, char *name, mode_t mode)
 			UK_9P_OTRUNC | UK_9P_OWRITE, NULL);
 
 	uk_9pfid_put(fid);
-	return -rc;
+	return rc;
 }
 
 static int uk_9pfs_create(struct vnode *dvp, char *name, mode_t mode)
@@ -405,7 +405,7 @@ static int uk_9pfs_remove_generic(struct vnode *dvp, struct vnode *vp)
 	struct uk_9pdev *dev = UK_9PFS_MD(dvp->v_mount)->dev;
 	struct uk_9pfs_node_data *nd = UK_9PFS_ND(vp);
 
-	return -uk_9p_remove(dev, nd->fid);
+	return uk_9p_remove(dev, nd->fid);
 }
 
 static int uk_9pfs_remove(struct vnode *dvp, struct vnode *vp,
@@ -425,7 +425,7 @@ static int uk_9pfs_remove(struct vnode *dvp, struct vnode *vp,
 static int uk_9pfs_mkdir(struct vnode *dvp, char *name, mode_t mode)
 {
 	if (!S_ISDIR(mode))
-		return EINVAL;
+		return -EINVAL;
 
 	return uk_9pfs_create_generic(dvp, name, mode);
 }
@@ -449,7 +449,7 @@ again:
 	if (!fd->readdir_buf) {
 		fd->readdir_buf = malloc(UK_9PFS_READDIR_BUFSZ);
 		if (!fd->readdir_buf)
-			return ENOMEM;
+			return -ENOMEM;
 
 		/* Currently the readdir() buffer is empty. */
 		fd->readdir_off = 0;
@@ -564,7 +564,7 @@ again:
 	}
 
 out:
-	return -rc;
+	return rc;
 }
 
 static int uk_9pfs_read(struct vnode *vp, struct vfscore_file *fp,
@@ -577,11 +577,11 @@ static int uk_9pfs_read(struct vnode *vp, struct vfscore_file *fp,
 	int i = 0;
 
 	if (vp->v_type == VDIR)
-		return EISDIR;
+		return -EISDIR;
 	if (vp->v_type != VREG)
-		return EINVAL;
+		return -EINVAL;
 	if (uio->uio_offset < 0)
-		return EINVAL;
+		return -EINVAL;
 	if (uio->uio_offset >= (off_t) vp->v_size)
 		return 0;
 	if (!uio->uio_resid)
@@ -597,7 +597,7 @@ static int uk_9pfs_read(struct vnode *vp, struct vfscore_file *fp,
 		bytes = uk_9p_read(dev, fid, uio->uio_offset,
 				   iov->iov_len, iov->iov_base);
 		if (unlikely(bytes < 0))
-			return -(int)bytes;
+			return (int)bytes;
 		if (!bytes)
 			break;
 
@@ -640,7 +640,7 @@ static int uk_9pfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 	/* Clone vnode fid. */
 	fid = uk_9p_walk(dev, UK_9PFS_VFID(vp), NULL);
 	if (PTRISERR(fid))
-		return -PTR2ERR(fid);
+		return PTR2ERR(fid);
 
 	if (md->proto == UK_9P_PROTO_2000L)
 		rc = uk_9p_lopen(dev, fid, O_WRONLY);
@@ -688,7 +688,7 @@ static int uk_9pfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 
 out:
 	uk_9pfid_put(fid);
-	return -rc;
+	return rc;
 }
 
 static int uk_9pfs_getattr(struct vnode *vp, struct vattr *attr)
@@ -759,7 +759,7 @@ static int uk_9pfs_getattr(struct vnode *vp, struct vattr *attr)
 	}
 
 out:
-	return -rc;
+	return rc;
 }
 
 static int uk_9pfs_setattr(struct vnode *vp, struct vattr *attr)

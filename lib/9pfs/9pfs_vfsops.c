@@ -169,7 +169,7 @@ static int uk_9pfs_mount(struct mount *mp, const char *dev,
 	/* Allocate mount data, parse options. */
 	md = malloc(sizeof(*md));
 	if (!md)
-		return ENOMEM;
+		return -ENOMEM;
 
 	rc = uk_9pfs_parse_options(md, data);
 	if (rc)
@@ -180,7 +180,7 @@ static int uk_9pfs_mount(struct mount *mp, const char *dev,
 	/* Establish connection with the given 9P endpoint. */
 	md->dev = uk_9pdev_connect(md->trans, dev, data, NULL);
 	if (PTRISERR(md->dev)) {
-		rc = -PTR2ERR(md->dev);
+		rc = PTR2ERR(md->dev);
 		goto out_free_mdata;
 	}
 
@@ -188,7 +188,7 @@ static int uk_9pfs_mount(struct mount *mp, const char *dev,
 	version_req = uk_9p_version(md->dev, uk_9pfs_proto_str[md->proto],
 			&rcvd_version);
 	if (PTRISERR(version_req)) {
-		rc = -PTR2ERR(version_req);
+		rc = PTR2ERR(version_req);
 		goto out_disconnect;
 	}
 
@@ -197,7 +197,7 @@ static int uk_9pfs_mount(struct mount *mp, const char *dev,
 	uk_9pdev_req_remove(md->dev, version_req);
 
 	if (!version_accepted) {
-		rc = EIO;
+		rc = -EIO;
 		uk_pr_warn("Could not negotiate protocol %s\n",
 				uk_9pfs_proto_str[md->proto]);
 		goto out_disconnect;
@@ -207,13 +207,12 @@ static int uk_9pfs_mount(struct mount *mp, const char *dev,
 	rootfid = uk_9p_attach(md->dev, UK_9P_NOFID, md->uname,
 			md->aname, UK_9P_NONUNAME);
 	if (PTRISERR(rootfid)) {
-		rc = -PTR2ERR(rootfid);
+		rc = PTR2ERR(rootfid);
 		goto out_disconnect;
 	}
 
 	rc = uk_9pfs_allocate_vnode_data(mp->m_root->d_vnode, rootfid);
 	if (rc != 0) {
-		rc = -rc;
 		goto out_disconnect;
 	}
 

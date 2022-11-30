@@ -84,7 +84,7 @@ ramfs_mount(struct mount *mp, const char *dev __unused,
 	/* Create a root node */
 	np = ramfs_allocate_node("/", VDIR);
 	if (np == NULL)
-		return ENOMEM;
+		return -ENOMEM;
 	mp->m_root->d_vnode->v_data = np;
 	return 0;
 }

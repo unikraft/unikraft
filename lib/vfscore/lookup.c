@@ -127,7 +127,7 @@ namei(const char *path, struct dentry **dpp)
 		 * the local node in the file system.
 		 */
 		if (vfs_findroot(fp, &mp, &p)) {
-			return ENOTDIR;
+			return -ENOTDIR;
 		}
 		int mountpoint_len = p - fp - 1;
 		strlcpy(node, "/", sizeof(node));
@@ -194,7 +194,7 @@ namei(const char *path, struct dentry **dpp)
 				if (!dp) {
 					vn_unlock(dvp);
 					drele(ddp);
-					return ENOMEM;
+					return -ENOMEM;
 				}
 			}
 			vn_unlock(dvp);
@@ -219,7 +219,7 @@ namei(const char *path, struct dentry **dpp)
 				node[0] = 0;
 
 				if (++links_followed >= MAXSYMLINKS) {
-					return (ELOOP);
+					return (-ELOOP);
 				}
 				need_continue = 1;
 				break;
@@ -227,7 +227,7 @@ namei(const char *path, struct dentry **dpp)
 
 			if (*p == '/' && ddp->d_vnode->v_type != VDIR) {
 				drele(ddp);
-				return ENOTDIR;
+				return -ENOTDIR;
 			}
 		}
 	} while (need_continue);
@@ -258,18 +258,18 @@ namei_last_nofollow(char *path, struct dentry *ddp, struct dentry **dpp)
 	dvp  = NULL;
 
 	if (path[0] != '/') {
-		return (ENOTDIR);
+		return (-ENOTDIR);
 	}
 
 	name = strrchr(path, '/');
 	if (name == NULL) {
-		return (ENOENT);
+		return (-ENOENT);
 	}
 	name++;
 
 	error = vfs_findroot(path, &mp, &p);
 	if (error != 0) {
-		return (ENOTDIR);
+		return (-ENOTDIR);
 	}
 
 	strlcpy(node, "/", PATH_MAX);
@@ -295,7 +295,7 @@ namei_last_nofollow(char *path, struct dentry *ddp, struct dentry **dpp)
 		vput(vp);
 
 		if (dp == NULL) {
-			error = ENOMEM;
+			error = -ENOMEM;
 			goto out;
 		}
 	}
@@ -336,7 +336,7 @@ lookup(char *path, struct dentry **dpp, char **name)
 	strlcpy(buf, path, sizeof(buf));
 	file = strrchr(buf, '/');
 	if (!buf[0]) {
-		return ENOTDIR;
+		return -ENOTDIR;
 	}
 	if (file == buf) {
 		dir = root;
@@ -352,7 +352,7 @@ lookup(char *path, struct dentry **dpp, char **name)
 	}
 	if (dp->d_vnode->v_type != VDIR) {
 		drele(dp);
-		return ENOTDIR;
+		return -ENOTDIR;
 	}
 
 	*dpp = dp;

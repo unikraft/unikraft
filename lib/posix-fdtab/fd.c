@@ -231,7 +231,7 @@ int fdtab_fget(int fd, struct fdtab_file **out_fp)
 	struct fdtab_file *fp = fdtab_get_file(tab, fd);
 
 	if (!fp)
-		ret = EBADF;
+		ret = -EBADF;
 	else
 		*out_fp = fp;
 

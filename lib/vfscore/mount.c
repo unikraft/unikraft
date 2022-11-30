@@ -152,7 +152,7 @@ UK_SYSCALL_R_DEFINE(int, mount, const char*, dev, const char*, dir,
 	uk_list_for_each_entry(mp, &mount_list, mnt_list) {
 		if (!strcmp(mp->m_path, dir) ||
 		    (device && mp->m_dev == device)) {
-			error = EBUSY;  /* Already mounted */
+			error = -EBUSY;  /* Already mounted */
 			uk_mutex_unlock(&mount_lock);
 			goto err1;
 		}
@@ -163,7 +163,7 @@ UK_SYSCALL_R_DEFINE(int, mount, const char*, dev, const char*, dir,
 	 */
 	mp = malloc(sizeof(struct mount));
 	if (!mp) {
-		error = ENOMEM;
+		error = -ENOMEM;
 		goto err1;
 	}
 	mp->m_count = 0;
@@ -182,12 +182,11 @@ UK_SYSCALL_R_DEFINE(int, mount, const char*, dev, const char*, dir,
 		dp_covered = NULL;
 	} else {
 		if ((error = namei(dir, &dp_covered)) != 0) {
-
-			error = ENOENT;
+			error = -ENOENT;
 			goto err2;
 		}
 		if (dp_covered->d_vnode->v_type != VDIR) {
-			error = ENOTDIR;
+			error = -ENOTDIR;
 			goto err3;
 		}
 	}
@@ -198,7 +197,7 @@ UK_SYSCALL_R_DEFINE(int, mount, const char*, dev, const char*, dir,
 	 */
 	vfscore_vget(mp, 0, &vp);
 	if (vp == NULL) {
-		error = ENOMEM;
+		error = -ENOMEM;
 		goto err3;
 	}
 	vp->v_type = VDIR;
@@ -207,7 +206,7 @@ UK_SYSCALL_R_DEFINE(int, mount, const char*, dev, const char*, dir,
 
 	mp->m_root = dentry_alloc(NULL, vp, "/");
 	if (!mp->m_root) {
-		error = ENOMEM;
+		error = -ENOMEM;
 		vput(vp);
 		goto err3;
 	}
@@ -241,7 +240,7 @@ UK_SYSCALL_R_DEFINE(int, mount, const char*, dev, const char*, dir,
 	if (device)
 		device_close(device);
 
-	return -error;
+	return error;
 }
 
 void
@@ -267,7 +266,7 @@ UK_SYSCALL_R_DEFINE(int, umount2, const char*, path, int, flags)
 
 	pathlen = strlen(path);
 	if (pathlen >= MAXPATHLEN) {
-		error = ENAMETOOLONG;
+		error = -ENAMETOOLONG;
 		goto out;
 	}
 
@@ -279,7 +278,7 @@ UK_SYSCALL_R_DEFINE(int, umount2, const char*, path, int, flags)
 		}
 	}
 
-	error = EINVAL;
+	error = -EINVAL;
 	goto out;
 
 found:
@@ -287,7 +286,7 @@ found:
 	 * Root fs can not be unmounted.
 	 */
 	if (mp->m_covered == NULL && !(flags & MNT_FORCE)) {
-		error = EINVAL;
+		error = -EINVAL;
 		goto out;
 	}
 
@@ -303,7 +302,7 @@ found:
 	if (mp->m_dev)
 		device_close(mp->m_dev);
 	free(mp);
- out:
+out:
 	uk_mutex_unlock(&mount_lock);
 	return error;
 }
@@ -487,7 +486,7 @@ vfscore_nullop()
 int
 vfscore_einval()
 {
-	return EINVAL;
+	return -EINVAL;
 }
 
 #ifdef DEBUG_VFS

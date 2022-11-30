@@ -64,9 +64,9 @@ path_conv(char *wd, const char *cpath, char *full)
 
 	len = strlen(path);
 	if (len >= PATH_MAX)
-		return ENAMETOOLONG;
+		return -ENAMETOOLONG;
 	if (strlen(wd) + len >= PATH_MAX)
-		return ENAMETOOLONG;
+		return -ENAMETOOLONG;
 	src = path;
 	tgt = full;
 	end = src + len;

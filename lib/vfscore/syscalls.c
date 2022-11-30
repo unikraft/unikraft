@@ -86,7 +86,7 @@ open_no_follow_chk(char *path)
 	vp = dp->d_vnode;
 	vn_lock(vp);
 	if (vp->v_type == VLNK) {
-		error = ELOOP;
+		error = -ELOOP;
 		goto out;
 	}
 
@@ -122,7 +122,7 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 	flags = fdtab_fflags(flags);
 	if (flags & O_CREAT) {
 		error = namei(path, &dp);
-		if (error == ENOENT) {
+		if (error == -ENOENT) {
 			/* Create new struct vfscore_file. */
 			if ((error = lookup(path, &ddp, &filename)) != 0)
 				return error;
@@ -151,7 +151,7 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 		} else {
 			/* File already exits */
 			if (flags & O_EXCL) {
-				error = EEXIST;
+				error = -EEXIST;
 				goto out_drele;
 			}
 		}
@@ -176,13 +176,13 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 			if (error)
 				goto out_drele;
 
-			error = EISDIR;
+			error = -EISDIR;
 			if (vp->v_type == VDIR)
 				goto out_drele;
 		}
 		if (flags & O_DIRECTORY) {
 			if (vp->v_type != VDIR) {
-				error = ENOTDIR;
+				error = -ENOTDIR;
 				goto out_drele;
 			}
 		}
@@ -190,7 +190,7 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 
 	fp = calloc(sizeof(struct vfscore_file), 1);
 	if (!fp) {
-		error = ENOMEM;
+		error = -ENOMEM;
 		goto out_drele;
 	}
 
@@ -208,7 +208,7 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 	vn_lock(vp);
 
 	if (flags & O_TRUNC) {
-		error = EINVAL;
+		error = -EINVAL;
 		if (!(flags & UK_FWRITE) || vp->v_type == VDIR)
 			goto out_fp_free_unlock;
 
@@ -282,11 +282,11 @@ sys_lseek(struct fdtab_file *fp, off_t off, int type, off_t *origin)
 	if (!f->f_dentry) {
 		// Linux doesn't implement lseek() on pipes, sockets, or ttys.
 		// In OSV, we only implement lseek() on regular files, backed by vnode
-		return ESPIPE;
+		return -ESPIPE;
 	}
 
 	vp = f->f_dentry->d_vnode;
-	int error = EINVAL;
+	int error = -EINVAL;
 	vn_lock(vp);
 	switch (type) {
 	case SEEK_CUR:
@@ -316,7 +316,7 @@ sys_ioctl(struct fdtab_file *fp, unsigned long request, void *buf)
 	DPRINTF(VFSDB_SYSCALL, ("%s: f=%p request=%lux\n", __func__f, request));
 
 	if ((fp->f_flags & (UK_FREAD | UK_FWRITE)) == 0)
-		return EBADF;
+		return -EBADF;
 
 	switch (request) {
 	case FIOCLEX:
@@ -344,7 +344,7 @@ sys_fsync(struct fdtab_file *fp)
 	DPRINTF(VFSDB_SYSCALL, ("%s: f=%p\n", __func__, f));
 
 	if (!f->f_dentry)
-		return EINVAL;
+		return -EINVAL;
 
 	vp = f->f_dentry->d_vnode;
 	vn_lock(vp);
@@ -385,12 +385,12 @@ check_dir_empty(char *path)
 			break;
 	} while (!strcmp(dir.d_name, ".") || !strcmp(dir.d_name, ".."));
 
-	if (error == ENOENT)
+	if (error == -ENOENT)
 		error = 0;
 	else if (error == 0) {
-	    // Posix specifies to return EEXIST in this case (rmdir of non-empty
-	    // directory, but Linux actually returns ENOTEMPTY).
-		error = ENOTEMPTY;
+		// Posix specifies to return EEXIST in this case (rmdir of
+		// non-empty directory, but Linux actually returns ENOTEMPTY).
+		error = -ENOTEMPTY;
 	}
 	fdrop(fp);
 out_error:
@@ -406,13 +406,13 @@ sys_readdir(struct vfscore_file *fp, struct dirent *dir)
 	DPRINTF(VFSDB_SYSCALL, ("sys_readdir: fp=%p\n", fp));
 
 	if (!fp->f_dentry)
-		return ENOTDIR;
+		return -ENOTDIR;
 
 	dvp = fp->f_dentry->d_vnode;
 	vn_lock(dvp);
 	if (dvp->v_type != VDIR) {
 		vn_unlock(dvp);
-		return ENOTDIR;
+		return -ENOTDIR;
 	}
 	error = VOP_READDIR(dvp, fp, dir);
 	DPRINTF(VFSDB_SYSCALL, ("sys_readdir: error=%d path=%s\n",
@@ -427,13 +427,13 @@ sys_rewinddir(struct vfscore_file *fp)
 	struct vnode *dvp;
 
 	if (!fp->f_dentry)
-		return ENOTDIR;
+		return -ENOTDIR;
 
 	dvp = fp->f_dentry->d_vnode;
 	vn_lock(dvp);
 	if (dvp->v_type != VDIR) {
 		vn_unlock(dvp);
-		return EBADF;
+		return -EBADF;
 	}
 	fp->f_offset = 0;
 	vn_unlock(dvp);
@@ -446,13 +446,13 @@ sys_seekdir(struct vfscore_file *fp, long loc)
 	struct vnode *dvp;
 
 	if (!fp->f_dentry)
-		return ENOTDIR;
+		return -ENOTDIR;
 
 	dvp = fp->f_dentry->d_vnode;
 	vn_lock(dvp);
 	if (dvp->v_type != VDIR) {
 		vn_unlock(dvp);
-		return EBADF;
+		return -EBADF;
 	}
 	fp->f_offset = (off_t)loc;
 	vn_unlock(dvp);
@@ -465,13 +465,13 @@ sys_telldir(struct vfscore_file *fp, long *loc)
 	struct vnode *dvp;
 
 	if (!fp->f_dentry)
-		return ENOTDIR;
+		return -ENOTDIR;
 
 	dvp = fp->f_dentry->d_vnode;
 	vn_lock(dvp);
 	if (dvp->v_type != VDIR) {
 		vn_unlock(dvp);
-		return EBADF;
+		return -EBADF;
 	}
 	*loc = (long)fp->f_offset;
 	vn_unlock(dvp);
@@ -491,7 +491,7 @@ sys_mkdir(char *path, mode_t mode)
 	if (!error) {
 		/* File already exists */
 		drele(dp);
-		return EEXIST;
+		return -EEXIST;
 	}
 
 	if ((error = lookup(path, &ddp, &name)) != 0) {
@@ -533,11 +533,11 @@ sys_rmdir(char *path)
 	if ((error = vn_access(vp, VWRITE)) != 0)
 		goto out;
 	if (vp->v_type != VDIR) {
-		error = ENOTDIR;
+		error = -ENOTDIR;
 		goto out;
 	}
 	if (vp->v_flags & VROOT || vp->v_refcnt >= 2) {
-		error = EBUSY;
+		error = -EBUSY;
 		goto out;
 	}
 	if ((error = lookup(path, &ddp, &name)) != 0)
@@ -576,13 +576,13 @@ sys_mknod(char *path, mode_t mode)
 		/* OK */
 		break;
 	default:
-		return EINVAL;
+		return -EINVAL;
 	}
 
 	error = namei(path, &dp);
 	if (!error) {
 		drele(dp);
-		return EEXIST;
+		return -EEXIST;
 	}
 
 	if ((error = lookup(path, &ddp, &name)) != 0)
@@ -668,7 +668,7 @@ sys_rename(char *src, char *dest)
 	vn_lock(vp1);
 
 	if (vp1->v_type != VDIR && ts) {
-		error = ENOTDIR;
+		error = -ENOTDIR;
 		goto err1;
 	}
 
@@ -695,20 +695,20 @@ sys_rename(char *src, char *dest)
 
 		if (vp2->v_type != VDIR && vp2->v_type != VLNK) {
 			if (vp1->v_type == VDIR || ts) {
-				error = ENOTDIR;
+				error = -ENOTDIR;
 				goto err2;
 			}
 		} else if (vp1->v_type != VDIR && vp2->v_type == VDIR) {
-			error = EISDIR;
+			error = -EISDIR;
 			goto err2;
 		}
 		if (vp2->v_type == VDIR && check_dir_empty(dest)) {
-			error = EEXIST;
+			error = -EEXIST;
 			goto err2;
 		}
-	} else if (error == ENOENT) {
+	} else if (error == -ENOENT) {
 		if (vp1->v_type != VDIR && ts) {
-			error = ENOTDIR;
+			error = -ENOTDIR;
 			goto err2;
 		}
 	} else {
@@ -727,13 +727,13 @@ sys_rename(char *src, char *dest)
 
 	/* Check if target is directory of source */
 	if (is_parent(src, dest)) {
-		error = EINVAL;
+		error = -EINVAL;
 		goto err2;
 	}
 
 	dname = strrchr(dest, '/');
 	if (dname == NULL) {
-		error = ENOTDIR;
+		error = -ENOTDIR;
 		goto err2;
 	}
 	if (dname == dest)
@@ -756,7 +756,7 @@ sys_rename(char *src, char *dest)
 
 	/* The source and dest must be same file system */
 	if (dvp1->v_mount != dvp2->v_mount) {
-		error = EXDEV;
+		error = -EXDEV;
 		goto err3;
 	}
 
@@ -813,7 +813,7 @@ sys_symlink(const char *oldpath, const char *newpath)
 
 	/* parent directory for new path must exist */
 	if ((error = lookup(np, &newdirdp, &name)) != 0) {
-		error = ENOENT;
+		error = -ENOENT;
 		goto out;
 	}
 	vn_lock(newdirdp->d_vnode);
@@ -821,7 +821,7 @@ sys_symlink(const char *oldpath, const char *newpath)
 	/* newpath should not already exist */
 	if (namei_last_nofollow(np, newdirdp, &newdp) == 0) {
 		drele(newdp);
-		error = EEXIST;
+		error = -EEXIST;
 		goto out;
 	}
 
@@ -834,7 +834,7 @@ sys_symlink(const char *oldpath, const char *newpath)
 	size_t tocopy;
 	tocopy = strlcpy(op, oldpath, PATH_MAX);
 	if (tocopy >= PATH_MAX - 1) {
-		error = ENAMETOOLONG;
+		error = -ENAMETOOLONG;
 		goto out;
 	}
 	error = VOP_SYMLINK(newdirdp->d_vnode, name, op);
@@ -868,12 +868,12 @@ sys_link(char *oldpath, char *newpath)
 
 	/* If newpath exists, it shouldn't be overwritten */
 	if (!namei(newpath, &newdp)) {
-		error = EEXIST;
+		error = -EEXIST;
 		goto out;
 	}
 
 	if (vp->v_type == VDIR) {
-		error = EPERM;
+		error = -EPERM;
 		goto out;
 	}
 
@@ -885,7 +885,7 @@ sys_link(char *oldpath, char *newpath)
 
 	/* Both files must reside on the same mounted file system */
 	if (olddp->d_mount != newdirdp->d_mount) {
-		error = EXDEV;
+		error = -EXDEV;
 		goto out1;
 	}
 
@@ -895,7 +895,7 @@ sys_link(char *oldpath, char *newpath)
 
 	/* Map newpath into dentry hash with the same vnode as oldpath */
 	if (!(newdp = dentry_alloc(newdirdp, vp, newpath))) {
-		error = ENOMEM;
+		error = -ENOMEM;
 		goto out1;
 	}
 
@@ -939,11 +939,11 @@ sys_unlink(char *path)
 	if (vp->v_type == VDIR) {
 	    // Posix specifies that we should return EPERM here, but Linux
 	    // actually returns EISDIR.
-		error = EISDIR;
+		error = -EISDIR;
 		goto out;
 	}
 	if (vp->v_flags & VROOT) {
-		error = EBUSY;
+		error = -EBUSY;
 		goto out;
 	}
 
@@ -1069,7 +1069,7 @@ sys_fstatfs(struct vfscore_file *fp, struct statfs *buf)
 	int error = 0;
 
 	if (!fp->f_dentry)
-		return EBADF;
+		return -EBADF;
 
 	vp = fp->f_dentry->d_vnode;
 	memset(buf, 0, sizeof(*buf));
@@ -1107,7 +1107,7 @@ sys_ftruncate(struct fdtab_file *fp, off_t length)
 	int error;
 
 	if (!f->f_dentry)
-		return EBADF;
+		return -EBADF;
 
 	vp = f->f_dentry->d_vnode;
 	vn_lock(vp);
@@ -1123,13 +1123,13 @@ sys_fchdir(struct vfscore_file *fp, char *cwd)
 	struct vnode *dvp;
 
 	if (!fp->f_dentry)
-		return EBADF;
+		return -EBADF;
 
 	dvp = fp->f_dentry->d_vnode;
 	vn_lock(dvp);
 	if (dvp->v_type != VDIR) {
 		vn_unlock(dvp);
-		return EBADF;
+		return -EBADF;
 	}
 	strlcpy(cwd, fp->f_dentry->d_mount->m_path, PATH_MAX);
 	strlcat(cwd, fp->f_dentry->d_path, PATH_MAX);
@@ -1183,7 +1183,7 @@ sys_readlink(char *path, char *buf, size_t bufsize, ssize_t *size)
 	if (dp->d_vnode->v_type != VLNK) {
 		drele(dp);
 		drele(ddp);
-		return (EINVAL);
+		return (-EINVAL);
 	}
 	vec.iov_base	= buf;
 	vec.iov_len	= bufsize;
@@ -1242,7 +1242,7 @@ sys_utimes(char *path, const struct timeval *times, int flags)
 	DPRINTF(VFSDB_SYSCALL, ("sys_utimes: path=%s\n", path));
 
 	if (times && (!is_timeval_valid(&times[0]) || !is_timeval_valid(&times[1])))
-		return EINVAL;
+		return -EINVAL;
 
 	// Convert each element of timeval array to the timespec type
 	convert_timeval(&timespec_times[0], times ? times + 0 : NULL);
@@ -1269,7 +1269,7 @@ sys_utimes(char *path, const struct timeval *times, int flags)
 	}
 
 	if (dp->d_mount->m_flags & MNT_RDONLY) {
-		error = EROFS;
+		error = -EROFS;
 	} else {
 		error = vn_settimes(dp->d_vnode, timespec_times);
 	}
@@ -1311,13 +1311,13 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 
 	/* utimensat should return ENOENT when pathname is empty */
 	if(pathname && pathname[0] == 0)
-		return ENOENT;
+		return -ENOENT;
 
 	if (flags && !(flags & AT_SYMLINK_NOFOLLOW))
-		return EINVAL;
+		return -EINVAL;
 
 	if (times && (!is_timespec_valid(&times[0]) || !is_timespec_valid(&times[1])))
-		return EINVAL;
+		return -EINVAL;
 
 	init_timespec(&timespec_times[0], times ? times + 0 : NULL);
 	init_timespec(&timespec_times[1], times ? times + 1 : NULL);
@@ -1325,27 +1325,27 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 	if (pathname && pathname[0] == '/') {
 		ap = strdup(pathname);
 		if (!ap)
-			return ENOMEM;
+			return -ENOMEM;
 
 	} else if (dirfd == AT_FDCWD) {
 		if (!pathname)
-			return EFAULT;
+			return -EFAULT;
 		error = asprintf(&ap, "%s/%s", main_task->t_cwd, pathname);
 		if (error || !ap)
-			return ENOMEM;
+			return -ENOMEM;
 
 	} else {
 		struct vfscore_file *fp;
 
 		fp = vfscore_get_file(dirfd);
 		if (!fp)
-			return EBADF;
+			return -EBADF;
 
 		if (!fp->f_dentry)
-			return EBADF;
+			return -EBADF;
 
 		if (!(fp->f_dentry->d_vnode->v_type & VDIR))
-			return ENOTDIR;
+			return -ENOTDIR;
 
 		if (pathname)
 			error = asprintf(&ap, "%s/%s/%s", fp->f_dentry->d_mount->m_path,
@@ -1354,7 +1354,7 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 			error = asprintf(&ap, "%s/%s", fp->f_dentry->d_mount->m_path,
 					fp->f_dentry->d_path);
 		if (error || !ap)
-			return ENOMEM;
+			return -ENOMEM;
 	}
 
 	/* FIXME: Add support for AT_SYMLINK_NOFOLLOW */
@@ -1366,16 +1366,16 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 		return error;
 
 	if (dp->d_mount->m_flags & MNT_RDONLY) {
-		error = EROFS;
+		error = -EROFS;
 	} else {
 		if (vn_access(dp->d_vnode, VWRITE)) {
-			return EACCES;
+			return -EACCES;
 		}
 		if (times &&
 			(times[0].tv_nsec != UTIME_NOW || times[1].tv_nsec != UTIME_NOW) &&
 			(times[0].tv_nsec != UTIME_OMIT || times[1].tv_nsec != UTIME_OMIT) &&
 			(!(dp->d_vnode->v_mode & ~VAPPEND)))
-			return EPERM;
+			return -EPERM;
 		error = vn_settimes(dp->d_vnode, timespec_times);
 	}
 
@@ -1392,10 +1392,10 @@ sys_futimens(int fd, const struct timespec times[2])
 
 	fp = vfscore_get_file(fd);
 	if (!fp)
-		return EBADF;
+		return -EBADF;
 
 	if (!fp->f_dentry)
-		return EBADF;
+		return -EBADF;
 
 	pathname = fp->f_dentry->d_path;
 	error = sys_utimensat(AT_FDCWD, pathname, times, 0);
@@ -1412,15 +1412,15 @@ sys_fallocate(struct fdtab_file *fp, int mode, off_t offset, off_t len)
 	DPRINTF(VFSDB_SYSCALL, ("sys_fallocate: fp=%p", fp));
 
 	if (!f->f_dentry || !(fp->f_flags & UK_FWRITE))
-		return EBADF;
+		return -EBADF;
 
 	if (offset < 0 || len <= 0) {
-		return EINVAL;
+		return -EINVAL;
 	}
 
 	// Strange, but that's what Linux returns.
 	if ((mode & FALLOC_FL_PUNCH_HOLE) && !(mode & FALLOC_FL_KEEP_SIZE)) {
-		return ENOTSUP;
+		return -ENOTSUP;
 	}
 
 	vp = f->f_dentry->d_vnode;
@@ -1430,14 +1430,14 @@ sys_fallocate(struct fdtab_file *fp, int mode, off_t offset, off_t len)
 	// the fs is a block device. It's up to the fs itself tell us whether
 	// or not fallocate is supported. See below:
 	if (vp->v_type != VREG && vp->v_type != VDIR) {
-		error = ENODEV;
+		error = -ENODEV;
 		goto ret;
 	}
 
 	// EOPNOTSUPP here means that the underlying file system
 	// referred by vp doesn't support fallocate.
 	if (!vp->v_op->vop_fallocate) {
-		error = EOPNOTSUPP;
+		error = -EOPNOTSUPP;
 		goto ret;
 	}
 
@@ -1457,7 +1457,7 @@ sys_chmod(const char *path, mode_t mode)
 	if (error)
 		return error;
 	if (dp->d_mount->m_flags & MNT_RDONLY) {
-		error = EROFS;
+		error = -EROFS;
 	} else {
 		error = vn_setmode(dp->d_vnode, mode);
 	}
@@ -1470,7 +1470,7 @@ sys_fchmod(int fd, mode_t mode)
 {
 	struct vfscore_file *f = vfscore_get_file(fd);
 	if (!f)
-		return EBADF;
+		return -EBADF;
 	// Posix is ambivalent on what fchmod() should do on an fd that does not
 	// refer to a real file. It suggests an implementation may (but not must)
 	// fail EINVAL on a pipe, can behave in an "unspecified" manner on a
@@ -1480,7 +1480,7 @@ sys_fchmod(int fd, mode_t mode)
 		return 0;
 	}
 	if (f->f_dentry->d_mount->m_flags & MNT_RDONLY) {
-		return EROFS;
+		return -EROFS;
 	} else {
 		return vn_setmode(f->f_dentry->d_vnode, mode);
 	}

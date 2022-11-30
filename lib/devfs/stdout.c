@@ -49,10 +49,7 @@ static int __write_fn(void *dst __unused, void *src, size_t *cnt)
 	int ret = ukplat_coutk(src, *cnt);
 
 	if (ret < 0)
-		/* TODO: remove -1 when vfscore switches to negative
-		 * error numbers
-		 */
-		return ret * -1;
+		return ret;
 
 	*cnt = (size_t) ret;
 	return 0;

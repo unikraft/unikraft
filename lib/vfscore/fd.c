@@ -80,12 +80,14 @@ void vfscore_put_file(struct vfscore_file *file)
 int fget(int fd, struct vfscore_file **out_fp)
 {
 	int ret = 0;
-	struct vfscore_file *fp = vfscore_get_file(fd);
+	struct fdtab_file *fp;
+
+	fdtab_fget(fd, &fp);
 
 	if (!fp)
-		ret = EBADF;
+		ret = -EBADF;
 	else
-		*out_fp = fp;
+		*out_fp = __containerof(fp, struct  vfscore_file, f_file);
 
 	return ret;
 }

@@ -147,7 +147,7 @@ dentry_move(struct dentry *dp, struct dentry *parent_dp, char *path)
 
 	if (!new_path) {
 		// Fail before changing anything to the VFS
-		return ENOMEM;
+		return -ENOMEM;
 	}
 
 	if (old_pdp) {

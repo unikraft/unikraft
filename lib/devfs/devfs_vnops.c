@@ -82,7 +82,7 @@ devfs_open(struct vfscore_file *fp)
 
 	if (vp->v_flags & VPROTDEV) {
 		uk_pr_debug("%s: failed to open protected device.\n", __func__);
-		return EPERM;
+		return -EPERM;
 	}
 	if (*path == '/')
 		path++;
@@ -144,7 +144,7 @@ devfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
 	*vpp = NULL;
 
 	if (*name == '\0')
-		return ENOENT;
+		return -ENOENT;
 
 	i = 0;
 	error = 0;
@@ -152,7 +152,7 @@ devfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
 	for (;;) {
 		error = device_info(&info);
 		if (error)
-			return ENOENT;
+			return -ENOENT;
 
 		if (!strncmp(info.name, name, MAXDEVNAME))
 			break;
@@ -164,7 +164,7 @@ devfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
 		return 0;
 	}
 	if (!vp)
-		return ENOMEM;
+		return -ENOMEM;
 	vp->v_type = (info.flags & D_CHR) ? VCHR : VBLK;
 	/* vfscore_vget does not initialize v_flags and this may cause
 	 * devfs_open to fail at the vp->v_flags & VPROTDEV check
@@ -197,7 +197,7 @@ devfs_readdir(struct vnode *vp __unused, struct vfscore_file *fp, struct dirent 
 	do {
 		error = device_info(&info);
 		if (error)
-			return ENOENT;
+			return -ENOENT;
 	} while (i++ != fp->f_offset);
 
 	dir->d_type = 0;

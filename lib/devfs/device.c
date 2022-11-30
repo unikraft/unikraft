@@ -197,7 +197,7 @@ device_reference_locked(struct device *dev)
 
 	if (!device_valid(dev)) {
 		uk_mutex_unlock(&devfs_lock);
-		return ENODEV;
+		return -ENODEV;
 	}
 	dev->refcnt++;
 	return 0;
@@ -256,7 +256,7 @@ device_destroy_locked(struct device *dev)
 	UK_ASSERT(uk_mutex_is_locked(&devfs_lock));
 	if (!device_valid(dev)) {
 		uk_mutex_unlock(&devfs_lock);
-		return ENODEV;
+		return -ENODEV;
 	}
 	dev->active = 0;
 	device_release(dev);
@@ -270,7 +270,7 @@ device_destroy(struct device *dev)
 	uk_mutex_lock(&devfs_lock);
 	if (!device_valid(dev)) {
 		uk_mutex_unlock(&devfs_lock);
-		return ENODEV;
+		return -ENODEV;
 	}
 	dev->active = 0;
 	uk_mutex_unlock(&devfs_lock);
@@ -298,7 +298,7 @@ device_open(const char *name, int mode, struct device **devp)
 	uk_mutex_lock(&devfs_lock);
 	if ((dev = device_lookup(name)) == NULL) {
 		uk_mutex_unlock(&devfs_lock);
-		return ENXIO;
+		return -ENXIO;
 	}
 
 	error = device_reference_locked(dev);
@@ -407,7 +407,7 @@ device_info(struct devinfo *info)
 	unsigned long target = info->cookie;
 	unsigned long i = 0;
 	struct device *dev;
-	int error = ESRCH;
+	int error = -ESRCH;
 
 	uk_mutex_lock(&devfs_lock);
 	for (dev = device_list; dev != NULL; dev = dev->next) {
@@ -427,7 +427,7 @@ device_info(struct devinfo *info)
 int
 enodev(void)
 {
-	return ENODEV;
+	return -ENODEV;
 }
 
 int
