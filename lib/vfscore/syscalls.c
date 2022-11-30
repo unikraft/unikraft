@@ -1497,6 +1497,9 @@ static int sys_poll(struct fdtab_file *fp, unsigned int *revents,
 
 	vnode = f->f_dentry->d_vnode;
 
+	if (vnode->v_op->vop_poll == NULL)
+		return -EPERM;
+
 	return VOP_POLL(vnode, revents, cb);
 }
 
