@@ -243,9 +243,6 @@ else
 export UK_FULLVERSION := $(UK_VERSION).$(UK_SUBVERSION)$(shell cd $(CONFIG_UK_BASE); $(SCRIPTS_DIR)/gitsha1)
 endif
 
-# Default image name
-export CONFIG_UK_NAME ?= $(notdir $(APP_DIR))
-
 export DATE := $(shell date +%Y%m%d)
 
 # Makefile targets
@@ -351,8 +348,17 @@ UK_HAVE_DOT_CONFIG := y
 endif
 endif
 
+# parameter N: UK_NAME ###
+# # Use N variable if set on the command line, otherwise use directory name
+ifeq ("$(origin N)", "command line")
+CONFIG_UK_NAME := $(N)
+else
+CONFIG_UK_NAME ?= $(notdir $(APP_DIR))
+endif
+
 # remove quotes from CONFIG_UK_NAME
 CONFIG_UK_NAME := $(call qstrip,$(CONFIG_UK_NAME))
+export CONFIG_UK_NAME
 
 ################################################################################
 # Host compiler and linker tools
@@ -1064,6 +1070,8 @@ help:
 	@echo '  C=[PATH]               - path to .config configuration file'
 	@echo '  O=[PATH]               - path to build output (will be created if it does not exist)'
 	@echo '  A=[PATH]               - path to Unikraft application'
+	@echo '  N=[NAME]               - use NAME as image name instead the one found in the configuration'
+	@echo '                           (note: the name in the configuration file is not overwritten)'
 	@echo '  L=[PATH]:[PATH]:..     - colon-separated list of paths to external libraries'
 	@echo '  P=[PATH]:[PATH]:..     - colon-separated list of paths to external platforms'
 	@echo ''
