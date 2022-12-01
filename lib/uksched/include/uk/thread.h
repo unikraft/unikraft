@@ -653,7 +653,7 @@ struct uk_thread_inittab_entry {
 #define __UK_THREAD_INITTAB_ENTRY(init_fn, term_fn, prio, arg_flags)	\
 	static const struct uk_thread_inittab_entry			\
 	__used __section(".uk_thread_inittab" # prio) __align(8)	\
-		__uk_thread_inittab ## prio ## _ ## init_fn ## _ ## fini_fn = {\
+		__uk_thread_inittab ## prio ## _ ## init_fn ## _ ## term_fn = {\
 		.flags = (arg_flags),					\
 		.init = (init_fn),					\
 		.term = (term_fn)					\
