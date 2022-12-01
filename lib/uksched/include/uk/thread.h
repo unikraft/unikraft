@@ -585,6 +585,30 @@ void uk_thread_block(struct uk_thread *thread);
 void uk_thread_wake(struct uk_thread *thread);
 
 /**
+ * Macro to access a Unikraft thread-local (UKTLS) variable of a
+ * (foreign) thread.
+ * This macro computes the offset of the TLS variable address to the
+ * architecture TLS pointer. Since each UKTLS has the same structure,
+ * the offset from the tlsp to the variable should be the same
+ * regardless of which TLS we are looking at.
+ * Because we get the absolute address of a variable with the `&`
+ * operand, we need to subtract the current TLS pointer to retrieve
+ * the variable offset.
+ */
+#define uk_thread_uktls_var(thread, variable)				\
+	(*({								\
+		__uptr _curr_tlsp = ukplat_tlsp_get();			\
+		__sptr _offset;						\
+		typeof(variable) *_ref;					\
+									\
+		UK_ASSERT((thread)->flags & UK_THREADF_UKTLS);		\
+									\
+		_offset = _curr_tlsp - (__uptr) &(variable);		\
+		_ref = (typeof(_ref)) ((thread)->uktlsp - _offset);	\
+		_ref;							\
+	}))
+
+/**
  * Thread initialization callback
  * A thread initialization callback is called during thread creation
  * from the parent context. Libraries can register callbacks with
@@ -615,30 +639,6 @@ typedef int  (*uk_thread_init_func_t)(struct uk_thread *child,
  *  The thread that is going to be removed from the system.
  */
 typedef void (*uk_thread_term_func_t)(struct uk_thread *child);
-
-/**
- * Macro to access a Unikraft thread-local (UKTLS) variable of a
- * (foreign) thread.
- * This macro computes the offset of the TLS variable address to the
- * architecture TLS pointer. Since each UKTLS has the same structure,
- * the offset from the tlsp to the variable should be the same
- * regardless of which TLS we are looking at.
- * Because we get the absolute address of a variable with the `&`
- * operand, we need to subtract the current TLS pointer to retrieve
- * the variable offset.
- */
-#define uk_thread_uktls_var(thread, variable)				\
-	(*({								\
-		__uptr _curr_tlsp = ukplat_tlsp_get();			\
-		__sptr _offset;						\
-		typeof(variable) *_ref;					\
-									\
-		UK_ASSERT((thread)->flags & UK_THREADF_UKTLS);		\
-									\
-		_offset = _curr_tlsp - (__uptr) &(variable);		\
-		_ref = (typeof(_ref)) ((thread)->uktlsp - _offset);	\
-		_ref;							\
-	}))
 
 struct uk_thread_inittab_entry {
 	uint32_t flags;
