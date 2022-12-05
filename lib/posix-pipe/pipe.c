@@ -154,7 +154,7 @@ static unsigned long pipe_buf_write(struct pipe_buf *pipe_buf,
 				    struct iovec *iovec, size_t iovec_off)
 {
 	unsigned long prod_idx, to_write;
-	void *iovec_data = iovec->iov_base + iovec_off;
+	char *iovec_data = (char *)iovec->iov_base + iovec_off;
 	size_t iov_len = iovec->iov_len - iovec_off;
 
 	prod_idx = PIPE_BUF_PROD_IDX(pipe_buf);
@@ -193,7 +193,7 @@ static unsigned long pipe_buf_read(struct pipe_buf *pipe_buf,
 				   struct iovec *iovec, size_t iovec_off)
 {
 	unsigned long cons_idx, to_read;
-	void *iovec_data = iovec->iov_base + iovec_off;
+	char *iovec_data = (char *)iovec->iov_base + iovec_off;
 	size_t iov_len = iovec->iov_len - iovec_off;
 
 	cons_idx = PIPE_BUF_CONS_IDX(pipe_buf);
