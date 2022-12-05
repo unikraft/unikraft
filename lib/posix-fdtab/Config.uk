@@ -13,4 +13,16 @@ config LIBPOSIX_FDTAB_MAX_FILES
 	help
 		The maximum count of files that can be registered per fdtable.
 
+menuconfig LIBPOSIX_FDTAB_TEST
+	bool "Test posix-fdtab"
+	depends on LIBUKTEST
+	select LIBPOSIX_FDTAB_TEST_FDTAB if LIBUKTEST_ALL
+	default n
+
+	if LIBPOSIX_FDTAB_TEST
+	config LIBPOSIX_FDTAB_TEST_FDTAB
+		bool "test: fdtab"
+		default n
+	endif
+
 endif
