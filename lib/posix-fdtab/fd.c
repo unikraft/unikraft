@@ -212,6 +212,13 @@ struct fdtab_file *fdtab_get_file(struct fdtab_table *tab, int fd)
 	if (!uk_test_bit(fd, tab->bitmap))
 		goto exit;
 	ret = tab->fds[fd];
+	/* Optimistic assertion: If f_count is zero, we definitively know that
+	 * something is wrong. In that case, the file description was likely
+	 * already freed, and we are in undefined behaviour territory. That also
+	 * means that the assertion won't catch all cases, for example when the
+	 * memory is already used for something else.
+	 */
+	UK_ASSERT(ret->f_count > 0);
 	fdtab_fhold(ret);
 
 exit:

@@ -727,7 +727,6 @@ UK_SYSCALL_R_DEFINE(int, dup3, int, oldfd, int, newfd, int, flags)
 		goto out_error;
 	}
 
-	fdtab_fdrop(fp);
 	trace_vfs_dup3_ret(newfd);
 	return newfd;
 
