@@ -317,4 +317,4 @@ static int vfscore_automount(struct uk_init_ctx *ictx __unused)
 	return vfscore_automount_fstab_volumes();
 }
 
-uk_rootfs_initcall_prio(vfscore_automount, 4);
+uk_rootfs_initcall_prio(vfscore_automount, 0x0, 4);

@@ -115,7 +115,7 @@ uk_test_print_stats(struct uk_init_ctx *ictx __unused)
 	return 0;
 }
 
-uk_late_initcall(uk_test_print_stats);
+uk_late_initcall(uk_test_print_stats, 0x0);
 #endif /* CONFIG_LIBUKTEST_LOG_STATS */
 
 static void

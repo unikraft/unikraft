@@ -118,6 +118,6 @@ posix_socket_family_lib_init(struct uk_init_ctx *ictx __unused)
 #define POSIX_SOCKET_FAMILY_INIT_PRIO 0
 #define POSIX_SOCKET_FAMILY_REGISTER_PRIO 2
 
-uk_initcall_class_prio(posix_socket_family_lib_init,
+uk_initcall_class_prio(posix_socket_family_lib_init, 0x0,
 		       POSIX_SOCKET_FAMILY_INIT_CLASS,
 		       POSIX_SOCKET_FAMILY_INIT_PRIO);

@@ -395,7 +395,7 @@ static int posix_process_init(struct uk_init_ctx *ictx __unused)
 				       uk_thread_current(), NULL);
 }
 
-uk_late_initcall(posix_process_init);
+uk_late_initcall(posix_process_init, 0x0);
 #endif /* CONFIG_LIBPOSIX_PROCESS_INIT_PIDS */
 
 /* Thread initialization: Assign posix thread only if parent is part of a
