@@ -49,3 +49,14 @@ pub mod c_types;
 pub fn alloc_error(_layout: core::alloc::Layout) -> ! {
         panic!("Alloc error");
 }
+
+extern "C" {
+    fn __ukrust_sys_crash() -> !;
+}
+
+#[panic_handler]
+fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
+    unsafe {
+        __ukrust_sys_crash();
+    }
+}
