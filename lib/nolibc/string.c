@@ -815,3 +815,8 @@ char *strncat(char *dest, const char *src, size_t n)
 	*dest++ = 0;
 	return a;
 }
+
+int bcmp(const void *s1, const void *s2, size_t count)
+{
+	return memcmp(s1, s2, count);
+}
