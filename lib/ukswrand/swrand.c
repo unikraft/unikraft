@@ -93,4 +93,4 @@ static int _uk_swrand_init(struct uk_init_ctx *ictx __unused)
 	return seedc;
 }
 
-uk_early_initcall(_uk_swrand_init);
+uk_early_initcall(_uk_swrand_init, 0x0);

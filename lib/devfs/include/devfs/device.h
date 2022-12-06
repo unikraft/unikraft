@@ -124,6 +124,6 @@ int device_destroy(struct device *dev);
  * To be on the safe side, we do the registration to devfs before both,
  * at priority '3'.
  */
-#define devfs_initcall(fn) uk_rootfs_initcall_prio(fn, 3)
+#define devfs_initcall(fn) uk_rootfs_initcall_prio(fn, 0x0, 3)
 
 #endif /* !__DEVFS_DEVICE_H__ */

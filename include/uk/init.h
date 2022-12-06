@@ -87,11 +87,11 @@ struct uk_inittab_entry {
 		.term = (term_fn)					\
 	}
 
-#define _UK_INITTAB(fn, base, prio)					\
-	__UK_INITTAB_ENTRY(fn, 0x0, base, prio)
+#define _UK_INITTAB(init_fn, term_fn, base, prio)		\
+	__UK_INITTAB_ENTRY(init_fn, term_fn, base, prio)
 
-#define uk_initcall_class_prio(fn, class, prio)				\
-	_UK_INITTAB(fn, class, prio)
+#define uk_initcall_class_prio(init_fn, term_fn, class, prio)	\
+	_UK_INITTAB(init_fn, term_fn, class, prio)
 
 /**
  * Define a library initialization. At this point in time some platform
@@ -99,50 +99,56 @@ struct uk_inittab_entry {
  * to initialized.
  */
 #define UK_INIT_CLASS_EARLY 1
-#define uk_early_initcall_prio(fn, prio) \
-	uk_initcall_class_prio(fn, UK_INIT_CLASS_EARLY, prio)
+#define uk_early_initcall_prio(init_fn, term_fn, prio)		\
+	uk_initcall_class_prio(init_fn, term_fn, UK_INIT_CLASS_EARLY, prio)
 /**
  * Define a stage for platform initialization. Platform at this point read
  * all the device and device are initialized.
  */
 #define UK_INIT_CLASS_PLAT 2
-#define uk_plat_initcall_prio(fn, prio) \
-	uk_initcall_class_prio(fn, UK_INIT_CLASS_PLAT, prio)
+#define uk_plat_initcall_prio(init_fn, term_fn, prio)		\
+	uk_initcall_class_prio(init_fn, term_fn, UK_INIT_CLASS_PLAT, prio)
 /**
  * Define a stage for performing library initialization. This library
  * initialization is performed after the platform is completely initialized.
  */
 #define UK_INIT_CLASS_LIB 3
-#define uk_lib_initcall_prio(fn, prio) \
-	uk_initcall_class_prio(fn, UK_INIT_CLASS_LIB, prio)
+#define uk_lib_initcall_prio(init_fn, term_fn, prio)		\
+	uk_initcall_class_prio(init_fn, term_fn, UK_INIT_CLASS_LIB, prio)
 /**
  * Define a stage for filesystem initialization.
  */
 #define UK_INIT_CLASS_ROOTFS 4
-#define uk_rootfs_initcall_prio(fn, prio) \
-	uk_initcall_class_prio(fn, UK_INIT_CLASS_ROOTFS, prio)
+#define uk_rootfs_initcall_prio(init_fn, term_fn, prio)		\
+	uk_initcall_class_prio(init_fn, term_fn, UK_INIT_CLASS_ROOTFS, prio)
 /**
  * Define a stage for device initialization
  */
 #define UK_INIT_CLASS_SYS 5
-#define uk_sys_initcall_prio(fn, prio) \
-	uk_initcall_class_prio(fn, UK_INIT_CLASS_SYS, prio)
+#define uk_sys_initcall_prio(init_fn, term_fn, prio)		\
+	uk_initcall_class_prio(init_fn, term_fn, UK_INIT_CLASS_SYS, prio)
 /**
  * Define a stage for application pre-initialization
  */
 #define UK_INIT_CLASS_LATE 6
-#define uk_late_initcall_prio(fn, prio) \
-	uk_initcall_class_prio(fn, UK_INIT_CLASS_LATE, prio)
+#define uk_late_initcall_prio(init_fn, term_fn, prio)		\
+	uk_initcall_class_prio(init_fn, term_fn, UK_INIT_CLASS_LATE, prio)
 
 /**
  * Similar interface without priority.
  */
-#define uk_early_initcall(fn)     uk_early_initcall_prio(fn, UK_PRIO_LATEST)
-#define uk_plat_initcall(fn)      uk_plat_initcall_prio(fn, UK_PRIO_LATEST)
-#define uk_lib_initcall(fn)       uk_lib_initcall_prio(fn, UK_PRIO_LATEST)
-#define uk_rootfs_initcall(fn)    uk_rootfs_initcall_prio(fn, UK_PRIO_LATEST)
-#define uk_sys_initcall(fn)       uk_sys_initcall_prio(fn, UK_PRIO_LATEST)
-#define uk_late_initcall(fn)      uk_late_initcall_prio(fn, UK_PRIO_LATEST)
+#define uk_early_initcall(init_fn, term_fn)			\
+	uk_early_initcall_prio(init_fn, term_fn, UK_PRIO_LATEST)
+#define uk_plat_initcall(init_fn, term_fn)			\
+	uk_plat_initcall_prio(init_fn, term_fn, UK_PRIO_LATEST)
+#define uk_lib_initcall(init_fn, term_fn)			\
+	uk_lib_initcall_prio(init_fn, term_fn, UK_PRIO_LATEST)
+#define uk_rootfs_initcall(init_fn, term_fn)			\
+	uk_rootfs_initcall_prio(init_fn, term_fn, UK_PRIO_LATEST)
+#define uk_sys_initcall(init_fn, term_fn)			\
+	uk_sys_initcall_prio(init_fn, term_fn, UK_PRIO_LATEST)
+#define uk_late_initcall(init_fn, term_fn)			\
+	uk_late_initcall_prio(init_fn, term_fn, UK_PRIO_LATEST)
 
 extern const struct uk_inittab_entry uk_inittab_start[];
 extern const struct uk_inittab_entry uk_inittab_end;

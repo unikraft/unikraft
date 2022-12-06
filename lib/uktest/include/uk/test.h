@@ -473,7 +473,7 @@ uk_testsuite_run(struct uk_testsuite *suite);
 	{								\
 		return uk_testsuite_run(&_UK_TESTSUITE_NAME(suite));	\
 	}								\
-	uk_initcall_class_prio(_UK_TESTSUITE_RUN_NAME(suite), class, prio)
+	uk_initcall_class_prio(_UK_TESTSUITE_RUN_NAME(suite), 0x0, class, prio)
 
 
 /**

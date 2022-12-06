@@ -53,7 +53,7 @@ static int init_posix_fdtab(struct uk_init_ctx *ictx __unused)
 }
 
 /* Init fdtab as early as possible, to enable functions that rely on fds */
-uk_early_initcall_prio(init_posix_fdtab, UK_PRIO_EARLIEST);
+uk_early_initcall_prio(init_posix_fdtab, 0x0, UK_PRIO_EARLIEST);
 
 /* TODO: Adapt when multiple processes are supported */
 static inline struct uk_fdtab *_active_tab(void)

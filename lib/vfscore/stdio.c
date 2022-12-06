@@ -257,4 +257,4 @@ static int init_stdio(struct uk_init_ctx *ictx __unused)
 	return 0;
 }
 
-uk_early_initcall(init_stdio);
+uk_early_initcall(init_stdio, 0x0);

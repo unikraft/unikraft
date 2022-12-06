@@ -35,7 +35,7 @@ static int mutex_metrics_ctor(void)
 
 	return 0;
 }
-uk_lib_initcall_prio(mutex_metrics_ctor, 1);
+uk_lib_initcall_prio(mutex_metrics_ctor, 0x0, 1);
 
 /**
  * Makes a copy of mutex metrics to avoid direct user access.
