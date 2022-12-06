@@ -51,6 +51,7 @@ qsort
 
 # string
 memcpy
+bcmp
 memset
 memchr
 memrchr
