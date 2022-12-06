@@ -8,7 +8,7 @@ RUSTCFLAGS-$(CONFIG_LIBUKRUST) += --extern ukrust_sys -L $(LIBUKRUST_BUILD)/ --e
 
 export LIBUKRUST_BINDINGS_FILE=$(LIBUKRUST_BUILD)/bindings_generated.rs
 
-ifeq ($(CONFIG_LIBRUST),y)
+ifeq ($(CONFIG_LIBUKRUST),y)
 # Do not perform these if CONFIG_RUST is not set, as it is not
 # guaranteed that rustc will be available in the system.
 RUSTC_SYSROOT := $(shell $(RUSTC)  --print sysroot)

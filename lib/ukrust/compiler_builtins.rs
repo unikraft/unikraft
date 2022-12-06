@@ -151,14 +151,3 @@ define_panicking_intrinsics!("`u64` division/modulo should not be used", {
     __aeabi_uldivmod,
     __mulodi4,
 });
-
-extern "C" {
-    fn __ukrust_sys_crash() -> !;
-}
-
-#[panic_handler]
-fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
-    unsafe {
-        __ukrust_sys_crash();
-    }
-}
