@@ -36,6 +36,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <uk/plat/config.h>
+#include <uk/plat/time.h>
 #include <uk/alloc.h>
 #include <uk/plat/lcpu.h>
 #include <uk/sched.h>
@@ -380,12 +381,23 @@ void uk_sched_dumpk_threads(int klvl, struct uk_sched *s)
 {
 	struct uk_thread *t, *tmp;
 
+	if (uk_sched_current() == s) {
+		/* Let the scheduler update the thread execution time
+		 * of the current thread with a forced context switch.
+		 */
+		uk_sched_yield();
+	}
+
+	uk_printk(klvl, "sched %p:\n", s);
 	uk_sched_foreach_thread_safe(s, t, tmp) {
 		uk_printk(klvl,
-			  "sched %p: thread %p (%s), ctx: %p, flags: %c%c%c%c\n",
-			  s,
+			  " + thread %p (%s), ctx: %p, "
+			  "execution time: %"__PRInsec".%06"__PRInsec"s, "
+			  "flags: %c%c%c%c\n",
 			  t, t->name ? t->name : "<unnamed>",
 			  &t->ctx,
+			  ukarch_time_nsec_to_sec(t->exec_time),
+			  ukarch_time_nsec_to_usec(t->exec_time) % 1000000,
 			  (t->flags & UK_THREADF_RUNNABLE) ? 'R' : '-',
 			  (t->flags & UK_THREADF_EXITED)   ? 'D' : '-',
 			  (t->flags & UK_THREADF_ECTX)     ? 'E' : '-',

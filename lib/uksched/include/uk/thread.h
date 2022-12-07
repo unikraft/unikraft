@@ -78,6 +78,7 @@ struct uk_thread {
 	uk_thread_dtor_t dtor;		/**< User provided destructor */
 	void *priv;			/**< Private field, free for use */
 
+	__nsec exec_time;		/**< Time the thread was scheduled */
 	const char *name;		/**< Reference to thread name */
 	UK_TAILQ_ENTRY(struct uk_thread) thread_list;
 };
