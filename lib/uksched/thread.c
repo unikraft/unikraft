@@ -241,6 +241,7 @@ static void _uk_thread_struct_init(struct uk_thread *t,
 	t->name = name;
 	t->priv = priv;
 	t->dtor = dtor;
+	t->exec_time = 0;
 
 	if (tlsp && is_uktls) {
 		t->flags |= UK_THREADF_UKTLS;
