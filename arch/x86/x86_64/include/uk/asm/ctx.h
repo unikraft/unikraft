@@ -39,7 +39,7 @@
 		__sp__;					\
 	})
 
-#define UKARCH_SP_ALIGN		(1 << 1)
+#define UKARCH_SP_ALIGN		(1 << 4)
 #define UKARCH_SP_ALIGN_MASK	(UKARCH_SP_ALIGN - 1)
 
 #define ukarch_gen_sp(base, len)					\
