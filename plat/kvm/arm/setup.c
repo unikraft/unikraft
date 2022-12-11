@@ -33,6 +33,10 @@
 #include <arm/smccc.h>
 #include <uk/arch/limits.h>
 
+#ifdef CONFIG_ARM64_FEAT_PAUTH
+#include <arm/arm64/pauth.h>
+#endif /* CONFIG_ARM64_FEAT_PAUTH */
+
 #ifdef CONFIG_HAVE_MEMTAG
 #include <uk/arch/memtag.h>
 #endif /* CONFIG_HAVE_MEMTAG */
@@ -310,6 +314,12 @@ void __no_pauth _libkvmplat_start(void *dtb_pointer)
 	enforce_w_xor_x();
 #endif /* CONFIG_ENFORCE_W_XOR_X */
 #endif /* CONFIG_PAGING */
+
+#ifdef CONFIG_ARM64_FEAT_PAUTH
+	ret = ukplat_pauth_init();
+	if (unlikely(ret))
+		UK_CRASH("Could not initialize PAuth (%d)\n", ret);
+#endif /* CONFIG_ARM64_FEAT_PAUTH */
 
 #ifdef CONFIG_HAVE_MEMTAG
 	ret = ukarch_memtag_init();
