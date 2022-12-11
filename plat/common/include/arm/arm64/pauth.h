@@ -31,28 +31,10 @@
 #ifndef __PLAT_COMMON_ARM64_PAUTH_H__
 #define __PLAT_COMMON_ARM64_PAUTH_H__
 
-/* Generate a PAuth key
+/**
+ * Initialize and enable Pointer Authentication
  *
- * Generate an 128-bit key for PAC generation and verification. This
- * function should be implemented by the platform. Failure to generate
- * a key must be handled internally to this function in a platform-specific
- * way.
- *
- * NOTICE: Definition of this function must use the __no_pauth attribute.
- *         See arch/arm/arm64/compiler.h
- *
- * @param [in/out] key_hi upper 64 key bits
- * @param [in/out] key_lo lower 64 key bits
- */
-void ukplat_pauth_gen_key(__u64 *key_hi, __u64 *key_lo);
-
-/* Initialize and enable Pointer Authentication
- *
- * Initializes and enables Pointer Authentication. This function
- * generates keys by calling ukplat_pauth_gen_key(), programs keys,
- * and enables pointer authentication.
- *
- * @return 0 on success, -1 if FEAT_PAUTH is not implemented.
+ * @return 0 on success, or a negative value on error.
  */
 int ukplat_pauth_init(void);
 

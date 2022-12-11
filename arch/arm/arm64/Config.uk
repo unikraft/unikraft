@@ -148,13 +148,14 @@ endchoice
 menu "Armv8-A Extensions"
 	depends on MCPU_ARM64_NONE
 
-	config ARM64_FEAT_PAUTH
+config ARM64_FEAT_PAUTH
 	bool "Armv8.3 Pointer Authentication"
+	select ARM64_FEAT_RNG
 	help
-		Enable signing and authentication of pointers. This
-		provides protections against classes of attacks that
-		rely on memory corruption, such as stack smashing and
-		ROP.
+	  Enable signing and authentication of pointers. This
+	  provides protections against classes of attacks that
+	  rely on memory corruption, such as stack smashing and
+	  ROP.
 
 	config ARM64_FEAT_BTI
 	bool "Armv8.5 Branch Target Identification"

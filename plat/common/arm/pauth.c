@@ -30,9 +30,31 @@
  */
 #include <arm/arm64/cpu.h>
 #include <arm/arm64/pauth.h>
+#include <errno.h>
 #include <uk/arch/types.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
+
+#ifdef CONFIG_HAVE_RANDOM
+#include <uk/arch/random.h>
+#endif /* CONFIG_HAVE_RANDOM */
+
+static void ukplat_pauth_gen_key(__u64 *key_hi, __u64 *key_lo)
+{
+	int ret;
+
+	ret = ukarch_random_init();
+	if (unlikely(ret))
+		UK_CRASH("Arch random not available (%d)\n", ret);
+
+	ret = ukarch_random_u64(key_lo);
+	if (unlikely(ret))
+		UK_CRASH("Could not generate PAuth key\n");
+
+	ret = ukarch_random_u64(key_hi);
+	if (unlikely(ret))
+		UK_CRASH("Could not generate PAuth key\n");
+}
 
 int __no_pauth ukplat_pauth_init(void)
 {
@@ -49,8 +71,8 @@ int __no_pauth ukplat_pauth_init(void)
 	reg = SYSREG_READ(ID_AA64ISAR1_EL1);
 	apa = (reg >> ID_AA64ISAR1_EL1_APA_SHIFT) & ID_AA64ISAR1_EL1_APA_MASK;
 	api = (reg >> ID_AA64ISAR1_EL1_API_SHIFT) & ID_AA64ISAR1_EL1_API_MASK;
-	if (!apa && !api)
-		return -1;
+	if (unlikely(!apa && !api))
+		return -ENOTSUP;
 
 	/* Program instruction Key A */
 	ukplat_pauth_gen_key(&key_hi, &key_lo);
