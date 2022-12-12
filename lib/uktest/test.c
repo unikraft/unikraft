@@ -69,7 +69,7 @@ static struct uk_test_stats testassert_stats = {0};
 #endif /* !CONFIG_LIBUKDEBUG_ANSI_COLOR */
 
 static int
-uk_test_print_stats(void)
+uk_test_print_stats(struct uk_init_ctx *ictx __unused)
 {
 	int failed;
 

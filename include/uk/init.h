@@ -40,7 +40,16 @@
 extern "C" {
 #endif
 
-typedef int (*uk_init_func_t)(void);
+struct uk_init_ctx {
+	struct {
+		int    argc;
+		char **argv;
+	} cmdline;
+
+	/* reserved for future additions */
+};
+
+typedef int (*uk_init_func_t)(struct uk_init_ctx *);
 
 /**
  * Register a Unikraft init function that is

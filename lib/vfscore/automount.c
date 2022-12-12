@@ -435,7 +435,7 @@ static int vfscore_automount_fstab_volumes(void)
 }
 #endif /* !CONFIG_LIBVFSCORE_FSTAB */
 
-static int vfscore_automount(void)
+static int vfscore_automount(struct uk_init_ctx *ictx __unused)
 {
 	int rc;
 

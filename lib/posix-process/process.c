@@ -388,7 +388,7 @@ void uk_posix_process_kill(struct uk_thread *thread)
 }
 
 #if CONFIG_LIBPOSIX_PROCESS_INIT_PIDS
-static int posix_process_init(void)
+static int posix_process_init(struct uk_init_ctx *ictx __unused)
 {
 	/* Create a POSIX process without parent ("init" process) */
 	return uk_posix_process_create(uk_alloc_get_default(),
