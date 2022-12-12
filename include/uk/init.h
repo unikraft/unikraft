@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Sharan Santhanam <sharan.santhanam@neclab.eu>
+ *          Simon Kuenzer <simon@unikraft.io>
  *
  * Copyright (c) 2019, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2022, Unikraft GmbH. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,6 +35,7 @@
 #define _UK_INIT_H
 
 #include <uk/config.h>
+#include <uk/plat/bootstrap.h>
 #include <uk/essentials.h>
 #include <uk/prio.h>
 
@@ -49,7 +52,19 @@ struct uk_init_ctx {
 	/* reserved for future additions */
 };
 
+struct uk_term_ctx {
+	enum ukplat_gstate target;
+
+	/* reserved for future additions */
+};
+
 typedef int (*uk_init_func_t)(struct uk_init_ctx *);
+typedef void (*uk_term_func_t)(const struct uk_term_ctx *);
+
+struct uk_inittab_entry {
+	uk_init_func_t init;
+	uk_term_func_t term;
+};
 
 /**
  * Register a Unikraft init function that is
@@ -64,13 +79,16 @@ typedef int (*uk_init_func_t)(struct uk_init_ctx *);
  *   Use the UK_PRIO_AFTER() helper macro for computing priority dependencies.
  *   Note: Any other value for level will be ignored
  */
-#define __UK_INITTAB(fn, base, prio)					\
-	static const uk_init_func_t					\
-	__used __section(".uk_inittab" #base #prio)			\
-	__uk_inittab ## base ## prio ## _ ## fn = (fn)
+#define __UK_INITTAB_ENTRY(init_fn, term_fn, base, prio)		\
+	static const struct uk_inittab_entry				\
+	__used __section(".uk_inittab" #base #prio) __align(8)		\
+		__uk_inittab ## base ## prio ## _ ## init_fn ## _ ## term_fn = {\
+		.init = (init_fn),					\
+		.term = (term_fn)					\
+	}
 
 #define _UK_INITTAB(fn, base, prio)					\
-	__UK_INITTAB(fn, base, prio)
+	__UK_INITTAB_ENTRY(fn, 0x0, base, prio)
 
 #define uk_initcall_class_prio(fn, class, prio)				\
 	_UK_INITTAB(fn, class, prio)
@@ -126,25 +144,45 @@ typedef int (*uk_init_func_t)(struct uk_init_ctx *);
 #define uk_sys_initcall(fn)       uk_sys_initcall_prio(fn, UK_PRIO_LATEST)
 #define uk_late_initcall(fn)      uk_late_initcall_prio(fn, UK_PRIO_LATEST)
 
-extern const uk_init_func_t uk_inittab_start[];
-extern const uk_init_func_t uk_inittab_end;
+extern const struct uk_inittab_entry uk_inittab_start[];
+extern const struct uk_inittab_entry uk_inittab_end;
 
 /**
  * Helper macro for iterating over init pointer tables
  * Please note that the table may contain NULL pointer entries
  *
  * @param itr
- *   Iterator variable (uk_init_func_t *) which points to the individual
- *   table entries during iteration
+ *   Iterator variable (struct uk_inittab_entry *) which points to the
+ *   individual table entries during iteration
  * @param inittab_start
- *   Start address of table (type: const uk_init_func_t[])
+ *   Start address of table (type: const struct uk_inittab_entry[])
  * @param inittab_end
- *   End address of table (type: const uk_init_func_t)
+ *   End address of table (type: const struct uk_inittab_entry)
  */
-#define uk_inittab_foreach(itr, inittab_start, inittab_end)	\
-	for ((itr) = DECONST(uk_init_func_t*, inittab_start);	\
-	     (itr) < &(inittab_end);				\
+#define uk_inittab_foreach(itr, inittab_start, inittab_end)		\
+	for ((itr) = DECONST(struct uk_inittab_entry *, inittab_start);	\
+	     (itr) < &(inittab_end);					\
 	     (itr)++)
+
+/*
+ * Reverse iteration
+ * NOTE: The reverse iteration is intended for calling the termination functions
+ *       according to their priorities.
+ */
+#define uk_inittab_foreach_reverse(itr, inittab_start, inittab_end)	\
+	for ((itr) = (DECONST(struct uk_inittab_entry *,		\
+			      (&(inittab_end)))) - 1);			\
+	     (itr) >= DECONST(struct uk_inittab_entry *, inittab_start); \
+	     (itr)--)
+
+/*
+ * Start reverse iteration from itr
+ * NOTE: Iteration includes itr start position.
+ */
+#define uk_inittab_foreach_reverse2(itr, inittab_start)			\
+	for (;								\
+	     (itr) >= DECONST(struct uk_inittab_entry *, inittab_start); \
+	     (itr)--)
 
 #ifdef __cplusplus
 }

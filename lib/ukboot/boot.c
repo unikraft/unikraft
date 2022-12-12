@@ -244,6 +244,8 @@ void ukplat_entry(int argc, char *argv[])
 	char **envp;
 #endif /* CONFIG_LIBPOSIX_ENVIRON */
 	struct uk_init_ctx ictx = { 0 };
+	/* NOTE: Default target is crash for failed initialization (inittab) */
+	struct uk_term_ctx tctx = { .target = UKPLAT_CRASH };
 	int rc = 0;
 #if CONFIG_LIBUKALLOC
 	struct uk_alloc *a = NULL;
@@ -255,7 +257,7 @@ void ukplat_entry(int argc, char *argv[])
 	struct uk_sched *s = NULL;
 #endif
 	uk_ctor_func_t *ctorfn;
-	uk_init_func_t *initfn;
+	struct uk_inittab_entry *init_entry;
 	int i;
 
 	uk_pr_info("Unikraft constructor table at %p - %p\n",
@@ -351,14 +353,18 @@ void ukplat_entry(int argc, char *argv[])
 	 */
 	uk_pr_info("Init Table @ %p - %p\n",
 		   &uk_inittab_start[0], &uk_inittab_end);
-	uk_inittab_foreach(initfn, uk_inittab_start, uk_inittab_end) {
-		UK_ASSERT(*initfn);
-		uk_pr_debug("Call init function: %p(%p)...\n", *initfn, &ictx);
-		rc = (*initfn)(&ictx);
+	uk_inittab_foreach(init_entry, uk_inittab_start, uk_inittab_end) {
+		UK_ASSERT(init_entry);
+
+		if (!init_entry->init)
+			continue;
+
+		uk_pr_debug("Call init function: %p(%p)...\n",
+			    init_entry->init, &ictx);
+		rc = (*init_entry->init)(&ictx);
 		if (rc < 0) {
 			uk_pr_err("Init function at %p returned error %d\n",
-				  *initfn, rc);
-			rc = UKPLAT_CRASH;
+				  init_entry->init, rc);
 			goto exit;
 		}
 	}
@@ -420,9 +426,29 @@ void ukplat_entry(int argc, char *argv[])
 	uk_pr_info("])\n");
 
 	rc = main(ictx.cmdline.argc, ictx.cmdline.argv);
-	uk_pr_info("main returned %d, halting system\n", rc);
-	rc = (rc != 0) ? UKPLAT_CRASH : UKPLAT_HALT;
+	uk_pr_info("main returned %d\n", rc);
+	tctx.target = UKPLAT_HALT;
 
 exit:
-	ukplat_terminate(rc); /* does not return */
+	uk_pr_info("Halting system (%d)\n", tctx.target);
+
+	/**
+	 * Call termination functions from init table in reverse order
+	 */
+	/* NOTE: The init loop left `init_entry` at the position that is one
+	 *       step further after the last successfully initialized  entry
+	 */
+	init_entry--;
+	uk_inittab_foreach_reverse2(init_entry, uk_inittab_start) {
+		UK_ASSERT(init_entry);
+
+		if (!init_entry->term)
+			continue;
+
+		uk_pr_debug("Call term function: %p(%p)...\n",
+			    init_entry->term, &tctx);
+		(*init_entry->term)(&tctx);
+	}
+
+	ukplat_terminate(tctx.target); /* does not return */
 }
