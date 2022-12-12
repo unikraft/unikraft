@@ -232,7 +232,7 @@ static struct vfscore_file  stdio_file = {
 	.f_ep = UK_LIST_HEAD_INIT(stdio_file.f_ep)
 };
 
-static int init_stdio(void)
+static int init_stdio(struct uk_init_ctx *ictx __unused)
 {
 	int fd;
 

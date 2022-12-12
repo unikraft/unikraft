@@ -42,7 +42,6 @@ static int uk_bus_init(struct uk_bus *b, struct uk_alloc *a);
 static int uk_bus_probe(struct uk_bus *b);
 static unsigned int uk_bus_init_all(struct uk_alloc *a);
 static unsigned int uk_bus_probe_all(void);
-static int uk_bus_lib_init(void);
 
 void _uk_bus_register(struct uk_bus *b)
 {
@@ -129,7 +128,7 @@ static unsigned int uk_bus_probe_all(void)
 	return ret;
 }
 
-static int uk_bus_lib_init(void)
+static int uk_bus_lib_init(struct uk_init_ctx *ictx __unused)
 {
 	uk_pr_info("Initialize bus handlers...\n");
 	uk_bus_init_all(uk_alloc_get_default());

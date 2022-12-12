@@ -44,7 +44,7 @@ static struct uk_fdtab init_fdtab = {
 	}
 };
 
-static int init_posix_fdtab(void)
+static int init_posix_fdtab(struct uk_init_ctx *ictx __unused)
 {
 	init_fdtab.alloc = uk_alloc_get_default();
 	/* Consider skipping init for .map (static vars are inited to 0) */

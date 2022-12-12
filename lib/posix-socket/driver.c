@@ -91,7 +91,7 @@ posix_socket_family_init(struct posix_socket_driver *d)
 }
 
 static int
-posix_socket_family_lib_init(void)
+posix_socket_family_lib_init(struct uk_init_ctx *ictx __unused)
 {
 	struct posix_socket_driver *d = posix_socket_driver_list_start;
 	unsigned int ret = 0;

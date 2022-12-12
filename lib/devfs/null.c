@@ -103,7 +103,7 @@ static struct driver drv_zero = {
 };
 #endif /* CONFIG_LIBDEVFS_DEV_ZERO */
 
-static int devfs_register_null(void)
+static int devfs_register_null(struct uk_init_ctx *ictx __unused)
 {
 	int rc;
 

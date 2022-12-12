@@ -243,6 +243,7 @@ void ukplat_entry(int argc, char *argv[])
 #if CONFIG_LIBPOSIX_ENVIRON
 	char **envp;
 #endif /* CONFIG_LIBPOSIX_ENVIRON */
+	struct uk_init_ctx ictx = { 0 };
 	int rc = 0;
 #if CONFIG_LIBUKALLOC
 	struct uk_alloc *a = NULL;
@@ -339,6 +340,9 @@ void ukplat_entry(int argc, char *argv[])
 	uk_sched_start(s);
 #endif /* !CONFIG_LIBUKBOOT_NOSCHED */
 
+	ictx.cmdline.argc = argc;
+	ictx.cmdline.argv = argv;
+
 	/* Enable interrupts before starting the application */
 	ukplat_lcpu_enable_irq();
 
@@ -349,8 +353,8 @@ void ukplat_entry(int argc, char *argv[])
 		   &uk_inittab_start[0], &uk_inittab_end);
 	uk_inittab_foreach(initfn, uk_inittab_start, uk_inittab_end) {
 		UK_ASSERT(*initfn);
-		uk_pr_debug("Call init function: %p()...\n", *initfn);
-		rc = (*initfn)();
+		uk_pr_debug("Call init function: %p(%p)...\n", *initfn, &ictx);
+		rc = (*initfn)(&ictx);
 		if (rc < 0) {
 			uk_pr_err("Init function at %p returned error %d\n",
 				  *initfn, rc);
@@ -407,15 +411,15 @@ void ukplat_entry(int argc, char *argv[])
 	}
 #endif /* CONFIG_LIBPOSIX_ENVIRON */
 
-	uk_pr_info("Calling main(%d, [", argc);
-	for (i = 0; i < argc; ++i) {
-		uk_pr_info("'%s'", argv[i]);
-		if ((i + 1) < argc)
+	uk_pr_info("Calling main(%d, [", ictx.cmdline.argc);
+	for (i = 0; i < ictx.cmdline.argc; ++i) {
+		uk_pr_info("'%s'", ictx.cmdline.argv[i]);
+		if ((i + 1) < ictx.cmdline.argc)
 			uk_pr_info(", ");
 	}
 	uk_pr_info("])\n");
 
-	rc = main(argc, argv);
+	rc = main(ictx.cmdline.argc, ictx.cmdline.argv);
 	uk_pr_info("main returned %d, halting system\n", rc);
 	rc = (rc != 0) ? UKPLAT_CRASH : UKPLAT_HALT;
 
