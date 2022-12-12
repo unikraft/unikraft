@@ -402,8 +402,9 @@ void ukplat_entry(int argc, char *argv[])
 		if (!*ctorfn)
 			continue;
 
-		uk_pr_debug("Call constructor: %p()...\n", *ctorfn);
-		(*ctorfn)();
+		uk_pr_debug("Call constructor: %p(%d, %p)...\n", *ctorfn,
+			    ictx.cmdline.argc, ictx.cmdline.argv);
+		(*ctorfn)(ictx.cmdline.argc, ictx.cmdline.argv);
 	}
 
 #if CONFIG_LIBPOSIX_ENVIRON

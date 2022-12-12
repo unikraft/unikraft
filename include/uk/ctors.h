@@ -42,7 +42,7 @@
 extern "C" {
 #endif
 
-typedef void (*uk_ctor_func_t)(void);
+typedef void (*uk_ctor_func_t)();
 
 /*
  * Function pointer arrays of constructors; provided by
