@@ -86,7 +86,7 @@ int ukplat_irq_register(unsigned long irq, irq_handler_func_t func, void *arg)
  */
 extern unsigned long sched_have_pending_events;
 
-void _ukplat_irq_handle(unsigned long irq)
+void _ukplat_irq_handle(struct __regs *regs, unsigned long irq)
 {
 	struct irq_handler *h;
 	int i;

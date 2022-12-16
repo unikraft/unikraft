@@ -353,7 +353,7 @@ EXIT_UNLOCK:
 	dist_unlock(gicv2_drv);
 }
 
-static void gicv2_handle_irq(void)
+static void gicv2_handle_irq(struct __regs *regs)
 {
 	uint32_t stat, irq;
 
@@ -372,7 +372,7 @@ static void gicv2_handle_irq(void)
 		isb();
 
 		if (irq < GIC_MAX_IRQ) {
-			_ukplat_irq_handle((unsigned long)irq);
+			_ukplat_irq_handle(regs, (unsigned long)irq);
 			gicv2_eoi_irq(stat);
 
 			continue;

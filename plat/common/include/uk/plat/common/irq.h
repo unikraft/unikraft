@@ -63,8 +63,9 @@ enum uk_irq_polarity {
  * Calls the registered IRQ handlers for the given IRQ vector. This will
  * acknowledge the IRQ.
  *
+ * @param regs the registers of the interrupted code
  * @param irq IRQ vector
  */
-void _ukplat_irq_handle(unsigned long irq);
+void _ukplat_irq_handle(struct __regs *regs, unsigned long irq);
 
 #endif /* __PLAT_CMN_IRQ_H__ */
