@@ -199,7 +199,7 @@ void trap_el1_sync(struct __regs *regs, __u64 far)
 	ukplat_crash();
 }
 
-void trap_el1_irq(void)
+void trap_el1_irq(struct __regs *regs)
 {
 	UK_ASSERT(gic);
 
@@ -208,5 +208,5 @@ void trap_el1_irq(void)
 		UK_CRASH("EL1 async tag check fault\n");
 #endif /* CONFIG_ARM64_FEAT_MTE */
 
-	gic->ops.handle_irq();
+	gic->ops.handle_irq(regs);
 }

@@ -93,7 +93,8 @@ ENTRY(cpu_irq_\irqno)
 	PUSH_CALLER_SAVE
 	subq $__REGS_PAD_SIZE, %rsp         /* we have some padding */
 
-	movq $\irqno, %rdi
+	movq %rsp, %rdi
+	movq $\irqno, %rsi
 	call _ukplat_irq_handle
 
 	addq $__REGS_PAD_SIZE, %rsp         /* we have some padding */

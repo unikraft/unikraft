@@ -94,7 +94,7 @@ struct _gic_operations {
 	/** Translate to absolute IRQ according to type e.g. PPI SPI SGI */
 	uint32_t (*irq_translate)(uint32_t type, uint32_t irq);
 	/** Handle IRQ */
-	void (*handle_irq)(void);
+	void (*handle_irq)(struct __regs *regs);
 	/** Send a SGI to the specifiec core */
 	void (*gic_sgi_gen)(uint8_t sgintid, uint32_t cpuid);
 };
