@@ -77,7 +77,9 @@
  *       int rc;
  *
  *       rc = uk_raise_event(myevent, &myevent_data);
- *       if (!rc)
+ *       if (rc < 0)
+ *               uk_pr_crit("an event handler returned an error!\n");
+ *       else if (!rc)
  *               uk_pr_err("myevent not handled!\n");
  * }
  * ```
@@ -251,24 +253,32 @@ struct uk_event {
 
 /**
  * Raise an event by pointer and invoke the handler chain until the first
- * handler successfully handled the event.
+ * handler successfully handled the event or returned a negative error code.
  *
  * @param event
  *   Pointer to the event to raise.
  * @param data
  *   Optional data supplied to the event handlers
- * @return
- *   One of the UK_EVENT_* macros on success, errno on < 0
+ * @returns
+ *   UK_EVENT_HANDLED if at least one handler indicated that it successfully
+ *   handled the event, otherwise returns UK_EVENT_NOT_HANDLED. If a handler
+ *   returns a negative value, then this negative value is returned.
  */
 static inline int uk_raise_event_ptr(struct uk_event *e, void *data)
 {
 	const uk_event_handler_t *itr;
+	int rc;
 	int ret = UK_EVENT_NOT_HANDLED;
 
 	uk_event_handler_foreach(itr, e) {
 		__uk_event_assert(*itr);
-		ret |= ((*itr)(data));
-		if (ret == UK_EVENT_HANDLED)
+		rc = ((*itr)(data));
+		if (unlikely(rc < 0))
+			return rc;
+
+		if (rc > 0)
+			ret = UK_EVENT_HANDLED;
+		if (rc == UK_EVENT_HANDLED)
 			break;
 	}
 
