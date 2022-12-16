@@ -317,12 +317,11 @@ ENTRY(_libxenplat_setup_cpu)
 	 *   NORMAL_WB               11111111 (0xff)
 	 *   NORMAL_WT               10111011 (0xbb)
 	 */
-	ldr     x0, =(MAIR_DEVICE_nGnRnE | \
-	             MAIR_DEVICE_nGnRE | \
-	             MAIR_DEVICE_GRE | \
-	             MAIR_NORMAL_NC | \
-	             MAIR_NORMAL_WB | \
-	             MAIR_NORMAL_WT)
+	ldr     x0, =(MAIR(MAIR_DEVICE_nGnRnE, MT_DEVICE_nGnRnE) | \
+	             MAIR(MAIR_DEVICE_nGnRE, MT_DEVICE_nGnRE) | \
+	             MAIR(MAIR_DEVICE_GRE, MT_DEVICE_GRE) | \
+	             MAIR(MAIR_NORMAL_NC, MT_NORMAL_NC) | \
+	             MAIR(MAIR_NORMAL_WB, MT_NORMAL))
 	msr     mair_el1, x0
 
 	/*
