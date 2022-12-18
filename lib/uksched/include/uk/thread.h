@@ -141,6 +141,14 @@ struct uk_thread *uk_thread_current(void)
 #define UK_THREADF_UKTLS      (0x002)	/**< Unikraft allocated TLS */
 #define UK_THREADF_RUNNABLE   (0x004)
 #define UK_THREADF_EXITED     (0x008)
+/*
+ *  A flag used for marking that a thread could potentially
+ *  be added to the run queue. A thread marked as such must
+ *  neither be running (except when it's about to be scheduled
+ *  out from the CPU during a context switch), nor be already
+ *  present in the run queue.
+ */
+#define UK_THREADF_QUEUEABLE  (0x010)
 
 #define uk_thread_is_exited(t)   ((t)->flags & UK_THREADF_EXITED)
 #define uk_thread_is_runnable(t) (!uk_thread_is_exited(t) \
@@ -148,11 +156,16 @@ struct uk_thread *uk_thread_current(void)
 #define uk_thread_is_blocked(t)  ((t)->flags &				\
 				  (UK_THREADF_EXITED | UK_THREADF_RUNNABLE) == \
 				  0x0)
+#define uk_thread_is_queueable(t) ((t)->flags & UK_THREADF_QUEUEABLE)
 
 #define uk_thread_set_runnable(t) \
 	do { (t)->flags |= UK_THREADF_RUNNABLE; } while (0)
 #define uk_thread_set_blocked(t) \
 	do { (t)->flags &= ~UK_THREADF_RUNNABLE; } while (0)
+#define uk_thread_set_queueable(t) \
+	do { (t)->flags |= UK_THREADF_QUEUEABLE; } while (0)
+#define uk_thread_clear_queueable(t) \
+	do { (t)->flags &= ~UK_THREADF_QUEUEABLE; } while (0)
 /* NOTE: Setting a thread as EXITED cannot be undone. */
 /* NOTE: Never change the EXIT flag manually. Trnasition to exit state reqiures
  * the terminate funcrtiomns to be called.
