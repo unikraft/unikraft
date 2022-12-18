@@ -56,7 +56,7 @@ static paddr_t get_gnttab_base(void)
 		BUG();
 	}
 
-	gnttab_base = fdt64_to_cpu(regs[0]);
+	gnttab_base = fdt64_ld(regs);
 
 	uk_pr_debug("FDT suggests grant table base %llx\n",
 				(unsigned long long) gnttab_base);

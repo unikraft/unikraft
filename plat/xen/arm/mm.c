@@ -138,8 +138,8 @@ void arch_mm_prepare(unsigned long *start_pfn_p, unsigned long *max_pfn_p)
 		UK_CRASH("Bad 'reg' property: %p %d\n", regs, prop_len);
 
 	end = (unsigned long) &_end;
-	mem_base = fdt64_to_cpu(regs[0]);
-	mem_size = fdt64_to_cpu(regs[1]);
+	mem_base = fdt64_ld(regs);
+	mem_size = fdt64_ld(regs + 1);
 
 	uk_pr_debug("Found memory at 0x%llx (len 0x%llx)\n",
 		(unsigned long long) mem_base, (unsigned long long) mem_size);
