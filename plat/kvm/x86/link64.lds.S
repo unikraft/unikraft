@@ -26,6 +26,15 @@
 #include <uk/arch/limits.h> /* for __PAGE_SIZE */
 #include <uk/plat/common/common.lds.h>
 
+PHDRS
+{
+	text PT_LOAD FLAGS(PHDRS_PF_RX);
+	rodata PT_LOAD FLAGS(PHDRS_PF_R);
+	data PT_LOAD;
+	tls PT_TLS;
+	stack PT_GNU_STACK FLAGS(PHDRS_PF_RW);
+}
+
 ENTRY(_libkvmplat_entry)
 SECTIONS
 {
@@ -43,16 +52,8 @@ SECTIONS
 
 		*(.text)
 		*(.text.*)
-	}
+	} :text
 	_etext = .;
-
-	EXCEPTION_SECTIONS
-
-	CTORTAB_SECTION
-
-	INITTAB_SECTION
-
-	EVENTTAB_SECTION
 
 	/* Read-only data */
 	. = ALIGN(__PAGE_SIZE);
@@ -61,8 +62,16 @@ SECTIONS
 	{
 		*(.rodata)
 		*(.rodata.*)
-	}
+	} :rodata
 	_erodata = .;
+
+	EXCEPTION_SECTIONS
+
+	CTORTAB_SECTION
+
+	INITTAB_SECTION
+
+	EVENTTAB_SECTION
 
 	/* Constructor tables (read-only) */
 	. = ALIGN(0x8);

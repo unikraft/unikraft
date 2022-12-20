@@ -18,6 +18,6 @@ BEGIN {
 
 END {
 	print "}"
-	print "INSERT AFTER .text"
+	print "INSERT AFTER .rodata"
 	print ""
 }

@@ -34,6 +34,16 @@
 
 #include <uk/arch/limits.h> /* for __PAGE_SIZE */
 
+/** Executable */
+#define PHDRS_PF_X 0x1
+/** Writeable */
+#define PHDRS_PF_W 0x2
+/** Readable */
+#define PHDRS_PF_R 0x4
+
+#define PHDRS_PF_RX (PHDRS_PF_R | PHDRS_PF_X)
+#define PHDRS_PF_RW (PHDRS_PF_R | PHDRS_PF_W)
+
 /* DWARF debug sections.  Symbols in the DWARF debugging sections are
  * relative to the beginning of the section so we begin them at 0.
  */
@@ -117,7 +127,7 @@
 		*(.tdata)						\
 		*(.tdata.*)						\
 		*(.gnu.linkonce.td.*)					\
-	}								\
+	} :tls								\
 	_etdata = .;							\
 	.tbss :								\
 	{								\
@@ -143,7 +153,7 @@
 	{								\
 		*(.data)						\
 		*(.data.*)						\
-	}								\
+	} :data								\
 	_edata = .;							\
 									\
 	/*								\

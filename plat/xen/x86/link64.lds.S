@@ -29,6 +29,15 @@
 OUTPUT_FORMAT("elf64-x86-64")
 OUTPUT_ARCH(i386:x86-64)
 
+PHDRS
+{
+	text PT_LOAD FLAGS(PHDRS_PF_RX);
+	rodata PT_LOAD FLAGS(PHDRS_PF_R);
+	data PT_LOAD;
+	tls PT_TLS;
+	stack PT_GNU_STACK FLAGS(PHDRS_PF_RW);
+}
+
 ENTRY(_libxenplat_start)
 SECTIONS
 {
@@ -38,9 +47,17 @@ SECTIONS
 		*(.text.boot)
 		*(.text)
 		*(.gnu.warning)
-	} = 0x2000
+	} :text = 0x2000
 
 	_etext = .;			/* End of text section */
+
+	_rodata = .;
+	.rodata : {
+		*(.rodata)
+		*(.rodata.*)
+	} :rodata
+	. = ALIGN(__PAGE_SIZE);
+	_erodata = .;
 
 	EXCEPTION_SECTIONS
 
@@ -49,14 +66,6 @@ SECTIONS
 	INITTAB_SECTION
 
 	EVENTTAB_SECTION
-
-	_rodata = .;
-	.rodata : {
-		*(.rodata)
-		*(.rodata.*)
-	}
-	. = ALIGN(__PAGE_SIZE);
-	_erodata = .;
 
 	. = ALIGN(0x8);
 	_ctors = .;
