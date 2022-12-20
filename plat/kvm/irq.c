@@ -33,9 +33,12 @@
 #include <uk/plat/common/irq.h>
 #include <kvm/intctrl.h>
 #include <uk/assert.h>
+#include <uk/event.h>
 #include <uk/print.h>
 #include <errno.h>
 #include <uk/bitops.h>
+
+UK_EVENT(UKPLAT_EVENT_IRQ);
 
 /* IRQ handlers declarations */
 struct irq_handler {
@@ -90,8 +93,20 @@ void _ukplat_irq_handle(struct __regs *regs, unsigned long irq)
 {
 	struct irq_handler *h;
 	int i;
+	int rc;
+	struct ukplat_event_irq_data ctx;
 
 	UK_ASSERT(irq < __MAX_IRQ);
+
+	ctx.regs = regs;
+	ctx.irq = irq;
+	rc = uk_raise_event(UKPLAT_EVENT_IRQ, &ctx);
+	if (rc == UK_EVENT_HANDLED) {
+		/* Skip all normal handlers if an event handler handled the
+		 * event
+		 */
+		goto exit_ack;
+	}
 
 	for (i = 0; i < CONFIG_KVM_MAX_IRQ_HANDLER_ENTRIES; i++) {
 		if (irq_handlers[irq][i].func == NULL)
