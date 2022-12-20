@@ -7,4 +7,4 @@ SECTIONS
 		PROVIDE(posix_socket_driver_list_end = .);
 	}
 }
-INSERT BEFORE .data;
+INSERT AFTER .data;
