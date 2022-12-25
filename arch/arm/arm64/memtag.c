@@ -75,7 +75,7 @@ int ukarch_memtag_init(void)
 	if (ukarch_random_init())
 		UK_CRASH("Arch random not available\n");
 
-	if (ukarch_random_u64(&seed))
+	if (ukarch_random_seed_u64(&seed))
 		UK_CRASH("Could not generate MTE seed\n");
 
 #if CONFIG_ARM64_FEAT_MTE_TCF_ASYNC
