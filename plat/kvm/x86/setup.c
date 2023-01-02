@@ -11,6 +11,7 @@
 #include <uk/arch/limits.h>
 #include <uk/arch/types.h>
 #include <uk/arch/paging.h>
+#include <uk/asm/cfi.h>
 #include <uk/plat/console.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
@@ -287,6 +288,13 @@ static inline int cmdline_init(struct ukplat_bootinfo *bi)
 
 static void __noreturn _ukplat_entry2(void)
 {
+	/* It's not possible to unwind past this function, because the stack
+	 * pointer was overwritten in lcpu_arch_jump_to. Therefore, mark the
+	 * previous instruction pointer as undefined, so that debuggers or
+	 * profilers stop unwinding here.
+	 */
+	ukarch_cfi_unwind_end();
+
 	ukplat_entry_argp(NULL, cmdline, cmdline_len);
 
 	ukplat_lcpu_halt();
