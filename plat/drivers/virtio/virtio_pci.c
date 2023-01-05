@@ -143,6 +143,10 @@ static int virtio_pci_handle(void *arg)
 	}
 
 	if (isr_status & VIRTIO_PCI_ISR_HAS_INTR) {
+		/* sai TODO: Instead of for each we can only interrupt whose used has been
+		 * changed since previous value
+		 * This will avoid so many callbacks in multiqueue envir.
+		 */
 		UK_TAILQ_FOREACH(vq, &d->vdev.vqs, next) {
 			rc |= virtqueue_ring_interrupt(vq);
 		}
