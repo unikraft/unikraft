@@ -922,6 +922,25 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n)
 		VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_GUEST_CSUM);
 	}
 
+	/* Enable control virtqueue which is 2N, where N = max_virtqueue */
+	if (!VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_CTRL_VQ)) {
+		uk_pr_debug("%p: Host does not offer control virtqueue: control virtqueue disabled.\n",
+			    n);
+	} else {
+		VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_CTRL_VQ);
+	}
+
+	/* Enable multiple queue support*/
+	if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_CTRL_VQ)
+			&& VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_MQ)) {
+
+		VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_MQ);
+	} else {
+		vndev->max_vqueue_pairs = 1;
+		uk_pr_debug("%p: Host does not offer multiple virtqueues : max virtqueue pairs set to %d\n",
+			    n, vndev->max_vqueue_pairs);
+	}
+
 	/**
 	 * Announce our enabled driver features back to the backend device
 	 */
@@ -942,7 +961,7 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n)
 
 	if (VIRTIO_FEATURE_HAS(drv_features, VIRTIO_NET_F_MTU)) {
 		virtio_config_get(vndev->vdev,
-				  __offsetof(struct virtio_net_config, mac),
+				  __offsetof(struct virtio_net_config, mtu),
 				  &vndev->mtu, sizeof(vndev->mtu), 1);
 		vndev->max_mtu = vndev->mtu;
 	} else {
@@ -953,6 +972,13 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n)
 		 * mtu_get as yet, so we're stuck with this for now.
 		 */
 		vndev->max_mtu = vndev->mtu = UK_ETH_PAYLOAD_MAXLEN;
+	}
+
+	if (VIRTIO_FEATURE_HAS(drv_features, VIRTIO_NET_F_MQ)) {
+		virtio_config_get(vndev->vdev,
+				__offsetof(struct virtio_net_config, max_virtqueue_pairs),
+				&vndev->max_vqueue_pairs,
+				sizeof(vndev->max_vqueue_pairs), 1);
 	}
 
 	return 0;
@@ -1201,11 +1227,6 @@ static int virtio_net_add_dev(struct virtio_dev *vdev)
 	rc = 0;
 	vndev->promisc = 0;
 
-	/**
-	 * TODO:
-	 * Adding multiqueue support for the virtio net driver.
-	 */
-	vndev->max_vqueue_pairs = 1;
 	uk_pr_debug("virtio-net device registered with libuknet\n");
 
 exit:
