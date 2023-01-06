@@ -79,3 +79,6 @@ pub fn __rust_alloc_zeroed(size: usize, _align: usize) -> *mut u8 {
 pub fn __rust_alloc_error_handler(_size: usize, _align: usize) -> ! {
     panic!("Alloc error handler");
 }
+
+#[no_mangle]
+static __rust_alloc_error_handler_should_panic: u8 = 1;
