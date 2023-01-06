@@ -35,8 +35,8 @@
     allocator_api,
     alloc_error_handler,
     associated_type_defaults,
-    const_fn_trait_bound,
     const_mut_refs,
+    lang_items,
     receiver_trait,
 )]
 use core;
@@ -47,7 +47,7 @@ pub mod c_types;
 
 #[alloc_error_handler]
 pub fn alloc_error(_layout: core::alloc::Layout) -> ! {
-        panic!("Alloc error");
+    panic!("Alloc error");
 }
 
 extern "C" {
@@ -59,4 +59,9 @@ fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
     unsafe {
         __ukrust_sys_crash();
     }
+}
+
+#[lang = "eh_personality"]
+#[no_mangle]
+pub extern fn rust_eh_personality() {
 }
