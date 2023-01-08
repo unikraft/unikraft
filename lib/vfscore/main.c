@@ -1604,8 +1604,7 @@ UK_TRACEPOINT(trace_vfs_lstat, "pathname=%s, stat=%p", const char*,
 UK_TRACEPOINT(trace_vfs_lstat_ret, "");
 UK_TRACEPOINT(trace_vfs_lstat_err, "errno=%d", int);
 
-#if UK_LIBC_SYSCALLS
-int __lxstat(int ver __unused, const char *pathname, struct stat *st)
+int __lxstat_helper(int ver __unused, const char *pathname, struct stat *st)
 {
 	struct task *t = main_task;
 	char path[PATH_MAX];
@@ -1631,6 +1630,12 @@ int __lxstat(int ver __unused, const char *pathname, struct stat *st)
 	return -error;
 }
 
+#if UK_LIBC_SYSCALLS
+int __lxstat(int ver __unused, const char *pathname, struct stat *st)
+{
+	return __lxstat_helper(1, pathname, st);
+}
+
 #ifdef __lxstat64
 #undef __lxstat64
 #endif
@@ -1642,7 +1647,7 @@ int __lxstat(int ver, const char *pathname, struct stat *st);
 
 UK_SYSCALL_R_DEFINE(int, lstat, const char*, pathname, struct stat*, st)
 {
-	return __lxstat(1, pathname, st);
+	return __lxstat_helper(1, pathname, st);
 }
 
 static int __fxstatat_helper(int ver __unused, int dirfd, const char *pathname,
