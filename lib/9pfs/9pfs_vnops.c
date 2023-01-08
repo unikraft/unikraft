@@ -577,10 +577,41 @@ out:
 	return -rc;
 }
 
+static int
+uk_9pfs_setattr(struct vnode *vnode, struct vattr *attr)
+{
+	struct uk_9pdev *dev = UK_9PFS_MD(vnode->v_mount)->dev;
+	struct uk_9pfid *fid = UK_9PFS_VFID(vnode);
+	struct uk_9p_stat stat;
+	struct uk_9preq *stat_req;
+	int rc = 0;
+
+	stat_req = uk_9p_stat(dev, fid, &stat);
+	if (PTRISERR(stat_req)) {
+		rc = PTR2ERR(stat_req);
+		goto out;
+	}
+
+	uk_9pdev_req_remove(dev, stat_req);
+
+	if (attr->va_mask & AT_ATIME)
+		stat.atime = attr->va_atime.tv_sec;
+
+	if (attr->va_mask & AT_MTIME)
+		stat.mtime = attr->va_mtime.tv_sec;
+
+	if (attr->va_mask & AT_MODE)
+		stat.mode = attr->va_mode;
+
+	rc = uk_9p_wstat(dev, fid, &stat);
+
+out:
+	return -rc;
+}
+
 #define uk_9pfs_seek		((vnop_seek_t)vfscore_vop_nullop)
 #define uk_9pfs_ioctl		((vnop_ioctl_t)vfscore_vop_einval)
 #define uk_9pfs_fsync		((vnop_fsync_t)vfscore_vop_nullop)
-#define uk_9pfs_setattr		((vnop_setattr_t)vfscore_vop_nullop)
 #define uk_9pfs_truncate	((vnop_truncate_t)vfscore_vop_nullop)
 #define uk_9pfs_link		((vnop_link_t)vfscore_vop_eperm)
 #define uk_9pfs_cache		((vnop_cache_t)NULL)
