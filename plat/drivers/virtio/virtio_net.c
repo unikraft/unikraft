@@ -158,6 +158,8 @@ struct virtio_net_device {
 	__u8 state;
 	/* RX promiscuous mode. */
 	__u8 promisc : 1;
+	/* The control queue feature has been negotiated */
+	__u8 ctrl_q : 1;
 };
 
 /**
@@ -1019,7 +1021,9 @@ static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 		goto err_free_txrx;
 	}
 
-	vq_avail = virtio_find_vqs(vndev->vdev, total_vqs, qdesc_size);
+	for (int i = 0; i < total_vqs; i++)
+		vq_avail += virtio_find_vq(vndev->vdev, i, &qdesc_size[i]);
+
 	if (unlikely(vq_avail != total_vqs)) {
 		uk_pr_err("Expected: %d queues, Found: %d queues\n",
 			  total_vqs, vq_avail);
@@ -1036,7 +1040,7 @@ static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 	 * ...
 	 * Virtqueue-ctrlq
 	 */
-	for (i = 0; i < vndev->max_vqueue_pairs; i++) {
+	for (i = 0; i < total_vqs; i++) {
 		/**
 		 * Initialize the received queue with the information received
 		 * from the device.

@@ -343,39 +343,34 @@ err_exit:
 	return vq;
 }
 
-static int vm_find_vqs(struct virtio_dev *vdev, __u16 num_vqs, __u16 *qdesc_size)
+static int vm_find_vq(struct virtio_dev *vdev, __u16 vq_id, __u16 *qdesc_size)
 {
 	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
 	unsigned int irq = vm_dev->pfdev->irq;
 	int i, err;
-	int vq_cnt = 0;
 
 	err = ukplat_irq_register(irq, vm_interrupt, vm_dev);
 	if (err)
 		return err;
 
-	for (i = 0; i < num_vqs; ++i) {
-		/* Select the queue we're interested in */
-		virtio_cwrite32(vm_dev->base, VIRTIO_MMIO_QUEUE_SEL, i);
+	/* Select the queue we're interested in */
+	virtio_cwrite32(vm_dev->base, VIRTIO_MMIO_QUEUE_SEL, vq_id);
 
-		/* Queue shouldn't already be set up. */
-		if (virtio_cread32(vm_dev->base, (vm_dev->version == 1 ?
-				VIRTIO_MMIO_QUEUE_PFN : VIRTIO_MMIO_QUEUE_READY))) {
-			uk_pr_err("vm_find_vqs error mmio queue not ready\n");
-			err = -ENOENT;
-			goto error_exit;
-		}
-
-		qdesc_size[i] = virtio_cread32(vm_dev->base, VIRTIO_MMIO_QUEUE_NUM_MAX);
-		if (qdesc_size[i] == 0) {
-			err = -ENOENT;
-			goto error_exit;
-		}
-
-		vq_cnt++;
+	/* Queue shouldn't already be set up. */
+	if (virtio_cread32(vm_dev->base, (vm_dev->version == 1 ?
+					VIRTIO_MMIO_QUEUE_PFN : VIRTIO_MMIO_QUEUE_READY))) {
+		uk_pr_err("%s error mmio queue not ready\n", __func__);
+		err = -ENOENT;
+		goto error_exit;
 	}
 
-	return vq_cnt;
+	*qdesc_size = virtio_cread32(vm_dev->base, VIRTIO_MMIO_QUEUE_NUM_MAX);
+	if (*qdesc_size == 0) {
+		err = -ENOENT;
+		goto error_exit;
+	}
+
+	return 1;
 error_exit:
 	uk_pr_err("err in vm_find_vqs :%d\n", err);
 	return err;
@@ -389,7 +384,7 @@ static struct virtio_config_ops virtio_mmio_config_ops = {
 	.device_reset	= vm_reset,
 	.features_get	= vm_get_features,
 	.features_set	= vm_set_features,
-	.vqs_find	= vm_find_vqs,
+	.vq_find	= vm_find_vq,
 	.vq_setup	= vm_setup_vq,
 };
 
