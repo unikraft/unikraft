@@ -343,39 +343,34 @@ err_exit:
 	return vq;
 }
 
-static int vm_find_vqs(struct virtio_dev *vdev, __u16 num_vqs, __u16 *qdesc_size)
+static int vm_find_vqs(struct virtio_dev *vdev, __u16 vq_id, __u16 *qdesc_size)
 {
 	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
 	unsigned int irq = vm_dev->pfdev->irq;
 	int i, err;
-	int vq_cnt = 0;
 
 	err = ukplat_irq_register(irq, vm_interrupt, vm_dev);
 	if (err)
 		return err;
 
-	for (i = 0; i < num_vqs; ++i) {
-		/* Select the queue we're interested in */
-		virtio_cwrite32(vm_dev->base, VIRTIO_MMIO_QUEUE_SEL, i);
+	/* Select the queue we're interested in */
+	virtio_cwrite32(vm_dev->base, VIRTIO_MMIO_QUEUE_SEL, vq_id);
 
-		/* Queue shouldn't already be set up. */
-		if (virtio_cread32(vm_dev->base, (vm_dev->version == 1 ?
-				VIRTIO_MMIO_QUEUE_PFN : VIRTIO_MMIO_QUEUE_READY))) {
-			uk_pr_err("vm_find_vqs error mmio queue not ready\n");
-			err = -ENOENT;
-			goto error_exit;
-		}
-
-		qdesc_size[i] = virtio_cread32(vm_dev->base, VIRTIO_MMIO_QUEUE_NUM_MAX);
-		if (qdesc_size[i] == 0) {
-			err = -ENOENT;
-			goto error_exit;
-		}
-
-		vq_cnt++;
+	/* Queue shouldn't already be set up. */
+	if (virtio_cread32(vm_dev->base, (vm_dev->version == 1 ?
+					VIRTIO_MMIO_QUEUE_PFN : VIRTIO_MMIO_QUEUE_READY))) {
+		uk_pr_err("vm_find_vqs error mmio queue not ready\n");
+		err = -ENOENT;
+		goto error_exit;
 	}
 
-	return vq_cnt;
+	*qdesc_size = virtio_cread32(vm_dev->base, VIRTIO_MMIO_QUEUE_NUM_MAX);
+	if (*qdesc_size == 0) {
+		err = -ENOENT;
+		goto error_exit;
+	}
+
+	return 1;
 error_exit:
 	uk_pr_err("err in vm_find_vqs :%d\n", err);
 	return err;
@@ -422,13 +417,13 @@ static int virtio_mmio_probe(struct pf_device *pfdev)
 
 		/* only care about base addr, ignore the size */
 		fdt_get_address(_libkvmplat_cfg.dtb, fdt_vm, 0,
-					&reg_base, &reg_size);
+				&reg_base, &reg_size);
 	}
 
 	pfdev->base = reg_base;
 	pfdev->irq = gic_irq_translate(type, hwirq);
 	uk_pr_info("virtio mmio probe base(0x%lx) irq(%ld)\n",
-				pfdev->base, pfdev->irq);
+			pfdev->base, pfdev->irq);
 	return 0;
 
 error_exit:
@@ -530,7 +525,7 @@ static int virtio_mmio_id_match_compatible(const char *compatible)
 }
 
 static struct pf_device_id virtio_mmio_ids = {
-		.device_id = VIRTIO_MMIO_ID
+	.device_id = VIRTIO_MMIO_ID
 };
 
 static struct pf_driver virtio_mmio_drv = {
@@ -543,7 +538,7 @@ static struct pf_driver virtio_mmio_drv = {
 
 static const struct device_match_table virtio_mmio_match_table[] = {
 	{ .compatible = "virtio,mmio",
-	  .id = &virtio_mmio_ids },
+		.id = &virtio_mmio_ids },
 	{NULL}
 };
 

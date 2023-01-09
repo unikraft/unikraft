@@ -106,7 +106,7 @@ struct virtio_config_ops {
 	__u8 (*status_get)(struct virtio_dev *vdev);
 	void (*status_set)(struct virtio_dev *vdev, __u8 status);
 	/** Find the virtqueue */
-	int (*vqs_find)(struct virtio_dev *vdev, __u16 num_vq, __u16 *vq_size);
+	int (*vqs_find)(struct virtio_dev *vdev, __u16 vq_id, __u16 *vq_size);
 	/** Setup the virtqueue */
 	struct virtqueue *(*vq_setup)(struct virtio_dev *vdev, __u16 num_desc,
 				      __u16 queue_id,
@@ -268,17 +268,16 @@ static inline int virtio_config_get(struct virtio_dev *vdev, __u16 offset,
  * The helper function to find the number of the vqs supported on the device.
  * @param vdev
  *	A reference to the virtio device.
- * @param total_vqs
- *	The total number of virtqueues requested.
+ * @param vq_id
+ *	The virtqueue id whose size needs to be found out (0 to max_virqueues - 1)
  * @param vq_size
- *	An array of max descriptors on each virtqueue found on the
- *	virtio device
+ *	A reference to the virtq size, size of virt queue is stored in it
  * @return int
- *	On success, the function return the number of available virtqueues
+ *	On success, the function return 0
  *	On error,
  *		-ENOTSUP if the function is not supported.
  */
-static inline int virtio_find_vqs(struct virtio_dev *vdev, __u16 total_vqs,
+static inline int virtio_find_vqs(struct virtio_dev *vdev, __u16 vq_id,
 				  __u16 *vq_size)
 {
 	int rc = -ENOTSUP;
@@ -286,7 +285,7 @@ static inline int virtio_find_vqs(struct virtio_dev *vdev, __u16 total_vqs,
 	UK_ASSERT(vdev);
 
 	if (likely(vdev->cops->vqs_find))
-		rc = vdev->cops->vqs_find(vdev, total_vqs, vq_size);
+		rc = vdev->cops->vqs_find(vdev, vq_id, vq_size);
 
 	return rc;
 }

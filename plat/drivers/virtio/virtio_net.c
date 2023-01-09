@@ -158,6 +158,8 @@ struct virtio_net_device {
 	__u8 state;
 	/* RX promiscuous mode. */
 	__u8 promisc : 1;
+	/* The control queue feature has been negotiated */
+	__u8 ctrl_q : 1;
 };
 
 /**
@@ -999,9 +1001,16 @@ static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 	int rc = 0;
 	int i = 0;
 	int vq_avail = 0;
+
+	/* if control queue then add + 1
+	 * Not control queue is 2N, i.e. hwid is max_virqueue * 2
+	 *	this is fix because we need to use control queue to set the max number
+	 *	of queues
+	 */
 	int total_vqs = conf->nb_rx_queues + conf->nb_tx_queues; 
 	__u16 qdesc_size[total_vqs];
 
+	/* TODO: remove this and replace nb_*_queues by nb_rxtx_queue_pairs */
 	if (conf->nb_rx_queues != 1 || conf->nb_tx_queues != 1) {
 		uk_pr_err("Queue combination not supported: %"__PRIu16"/%"__PRIu16" rx/tx\n",
 			  conf->nb_rx_queues, conf->nb_tx_queues);
@@ -1024,7 +1033,9 @@ static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 		goto err_free_txrx;
 	}
 
-	vq_avail = virtio_find_vqs(vndev->vdev, total_vqs, qdesc_size);
+	for(int i = 0; i < total_vqs; i++) {
+		vq_avail += virtio_find_vqs(vndev->vdev, i, &qdesc_size[i]);
+	}
 	if (unlikely(vq_avail != total_vqs)) {
 		uk_pr_err("Expected: %d queues, Found: %d queues\n",
 			  total_vqs, vq_avail);
@@ -1041,7 +1052,10 @@ static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 	 * ...
 	 * Virtqueue-ctrlq
 	 */
-	for (i = 0; i < vndev->max_vqueue_pairs; i++) {
+	/* TODO: initialize only total vqs queues 
+	 * this should be user provided 
+	 */
+	for (i = 0; i < total_vqs; i++) {
 		/**
 		 * Initialize the received queue with the information received
 		 * from the device.
