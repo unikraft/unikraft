@@ -356,6 +356,11 @@ UK_HAVE_DOT_CONFIG := y
 endif
 endif
 
+ifneq ($(CONFIG_HAVE_DRUNTIME), y)
+GDCFLAGS-y := -fno-druntime
+DMDFLAGS-y := -betterC
+endif
+
 # parameter N: UK_NAME ###
 # # Use N variable if set on the command line, otherwise use directory name
 ifeq ("$(origin N)", "command line")

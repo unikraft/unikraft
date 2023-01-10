@@ -625,7 +625,7 @@ endef
 define buildrule_dmd =
 $(4): $(2) | prepare
 	$(call build_cmd,DMD,$(1),$(4),\
-		$(DMD) -betterC $(DMDINCLUDES) $(DMDINCLUDES-y) \
+		$(DMD) $(DMDINCLUDES) $(DMDINCLUDES-y) \
 			$($(call vprefix_lib,$(1),DMDINCLUDES)) $($(call vprefix_lib,$(1),DMDINCLUDES-y)) \
 			$(DMDFLAGS) $(DMDFLAGS-y) $($(call vprefix_lib,$(1),DMDFLAGS)) \
 			$($(call vprefix_lib,$(1),DMDFLAGS-y)) \

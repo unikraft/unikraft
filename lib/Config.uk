@@ -32,3 +32,7 @@ config HAVE_SYSCALL
 config HAVE_X86PKU
 	bool
 	default n
+
+config HAVE_DRUNTIME
+	bool
+	default n
