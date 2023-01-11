@@ -22,6 +22,13 @@
 
 HOSTOSENV := $(shell uname)
 
+# Set initial and basic tools that we need to operate
+ifeq ($(HOSTOSENV),Darwin)
+SED := gsed
+else
+SED := sed
+endif
+
 # Trick for always running with a fixed umask
 UMASK = 0022
 ifneq ($(shell umask),$(UMASK))
@@ -426,7 +433,7 @@ HOSTNM		:= $(shell which $(HOSTNM) || type -p $(HOSTNM) || echo nm)
 HOSTOBJCOPY	:= $(shell which $(HOSTOBJCOPY) || type -p $(HOSTOBJCOPY) || echo objcopy)
 HOSTRANLIB	:= $(shell which $(HOSTRANLIB) || type -p $(HOSTRANLIB) || echo ranlib)
 HOSTCC_VERSION	:= $(shell $(HOSTCC_NOCCACHE) --version | \
-		   sed -n -r 's/^.* ([0-9]*)\.([0-9]*)\.([0-9]*)[ ]*.*/\1 \2/p')
+		   $(SED) -n -r 's/^.* ([0-9]*)\.([0-9]*)\.([0-9]*)[ ]*.*/\1 \2/p')
 
 # For gcc >= 5.x, we only need the major version.
 ifneq ($(firstword $(HOSTCC_VERSION)),4)
@@ -436,7 +443,7 @@ endif
 # Determine the userland we are running on.
 #
 export HOSTARCH := $(shell LC_ALL=C $(HOSTCC_NOCCACHE) -v 2>&1 | \
-		   sed -e '/^Target: \([^-]*\).*/!d' \
+		   $(SED) -e '/^Target: \([^-]*\).*/!d' \
 		       -e 's//\1/' \
 		       -e 's/i.86/x86/' \
 		       -e 's/sun4u/sparc64/' \
@@ -490,7 +497,7 @@ ifeq ($(CONFIG_UK_ARCH),)
 # Set target archicture as set in environment
 ifneq ($(ARCH),)
 export CONFIG_UK_ARCH	?= $(shell echo "$(call qstrip,$(ARCH))" | \
-		   sed -e "s/-.*//" \
+		   $(SED) -e "s/-.*//" \
 		       -e 's//\1/' \
 		       -e 's/i.86/x86/' \
 		       -e 's/sun4u/sparc64/' \
@@ -504,7 +511,7 @@ export CONFIG_UK_ARCH	?= $(shell echo "$(call qstrip,$(ARCH))" | \
 else
 # Nothing set, use detected host architecture
 export CONFIG_UK_ARCH	?= $(shell echo "$(HOSTARCH)" | \
-		   sed -e "s/-.*//" \
+		   $(SED) -e "s/-.*//" \
 		       -e 's//\1/' \
 		       -e 's/i.86/x86/' \
 		       -e 's/sun4u/sparc64/' \
@@ -521,7 +528,7 @@ override ARCH := $(CONFIG_UK_ARCH)
 export CONFIG_UK_ARCH ARCH
 
 export UK_FAMILY ?= $(shell echo "$(CONFIG_UK_ARCH)" | \
-		   sed -e "s/-.*//" \
+		   $(SED) -e "s/-.*//" \
 		       -e 's//\1/' \
 		       -e 's/x86.*/x86/' \
 		       -e 's/sparc64/sparc/' \
@@ -618,7 +625,6 @@ OBJDUMP		:= $(CONFIG_CROSS_COMPILE)objdump
 M4		:= m4
 AR		:= ar
 CAT		:= cat
-SED		:= sed
 # Prefer using GNU AWK because of provided error messages on script errors
 ifeq (, $(shell which gawk))
 AWK		:= awk
