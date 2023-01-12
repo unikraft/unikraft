@@ -187,12 +187,17 @@ void invalid_trap_handler(struct __regs *regs, __u32 el, __u32 reason,
 
 void trap_el1_sync(struct __regs *regs, __u64 far)
 {
+	int rc;
 	struct ukarch_trap_ctx ctx = {regs, regs->esr_el1, 1, 0, far};
 	enum aarch64_trap trap = esr_to_trap(regs->esr_el1);
 
-	if (trap < AARCH64_TRAP_MAX)
-		if (uk_raise_event_ptr(_trap_table[trap].event, &ctx))
+	if (trap < AARCH64_TRAP_MAX) {
+		rc = uk_raise_event_ptr(_trap_table[trap].event, &ctx);
+		if (unlikely(rc < 0))
+			uk_pr_crit("event handler returned error: %d\n", rc);
+		else if (rc)
 			return;
+	}
 
 	uk_pr_crit("EL1 sync trap caught\n");
 	dump_registers(regs, far);
