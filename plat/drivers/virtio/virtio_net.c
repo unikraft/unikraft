@@ -133,6 +133,24 @@ struct uk_netdev_rx_queue {
 	struct uk_sglist_seg sgsegs[NET_MAX_FRAGMENTS];
 };
 
+struct virtio_net_ctrl {
+	/* The virtqueue reference */
+	struct virtqueue *vq;
+	/* The virtqueue hw identifier */
+	uint16_t hwvq_id;
+	/* The nr. of descriptor limit */
+	uint16_t max_nb_desc;
+	/* The flag to interrupt on the transmit queue */
+	uint8_t intr_enabled;
+	/* The virtio net control header */
+	struct virtio_net_ctrl_hdr hdr;
+	/* The acknowlegement to the command provided by the device*/
+	virtio_net_ctrl_ack ack;
+	/* The scatter list and its associated fragements */
+	struct uk_sglist sg;
+	struct uk_sglist_seg sgsegs[NET_MAX_FRAGMENTS];
+};
+
 struct virtio_net_device {
 	/* Virtio Device */
 	struct virtio_dev *vdev;
@@ -146,6 +164,8 @@ struct virtio_net_device {
 	struct   uk_netdev_rx_queue *rxqs;
 	__u16    tx_vqueue_cnt;
 	struct   uk_netdev_tx_queue *txqs;
+	/* Virtio net control queue */
+	struct virtio_net_ctrl *ctrl;
 	/* The netdevice identifier */
 	__u16 uid;
 	/* The max mtu */
@@ -158,8 +178,6 @@ struct virtio_net_device {
 	__u8 state;
 	/* RX promiscuous mode. */
 	__u8 promisc : 1;
-	/* The control queue feature has been negotiated */
-	__u8 ctrl_q : 1;
 };
 
 /**
@@ -984,6 +1002,7 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n)
 				__offsetof(struct virtio_net_config, max_virtqueue_pairs),
 				&vndev->max_vqueue_pairs,
 				sizeof(vndev->max_vqueue_pairs), 1);
+		uk_pr_info("Device supports total %u virtqueues\n", vndev->max_vqueue_pairs);
 	}
 
 	vndev->mtu = vndev->max_mtu;
@@ -1001,6 +1020,7 @@ static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 	int rc = 0;
 	int i = 0;
 	int vq_avail = 0;
+	uint16_t ctrl_size;
 
 	/* if control queue then add + 1
 	 * Not control queue is 2N, i.e. hwid is max_virqueue * 2
@@ -1081,6 +1101,30 @@ static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 	/* sai TODO: Init 2Nth queue: control queue
 	 * Deterine queue size and allocate
 	 */
+	if (VIRTIO_FEATURE_HAS(vndev->vdev->features, VIRTIO_NET_F_CTRL_VQ)) {
+		vq_avail = virtio_find_vqs(vndev->vdev, VIRTIO_NET_CTRLQ_ID(vndev),
+								&ctrl_size);
+		if(vq_avail < 0 || !ctrl_size) {
+			uk_pr_err("Error finding the control queue\n");
+			rc = vq_avail;
+			goto err_free_txrx;
+		}
+		uk_pr_debug("Found virtio control queue %u with size %u\n",
+				vndev->max_vqueue_pairs, ctrl_size);
+		vndev->ctrl = uk_malloc(a, sizeof(*vndev->ctrl));
+		if(!vndev->ctrl) {
+			uk_pr_err("Cannot allocate memory to control queue");
+			rc = -ENOMEM;
+			goto err_free_txrx;
+		}
+		vndev->ctrl->hwvq_id = VIRTIO_NET_CTRLQ_ID(vndev);
+		vndev->ctrl->max_nb_desc = ctrl_size;
+		uk_sglist_init(&vndev->ctrl->sg,
+			       (sizeof(vndev->ctrl->sgsegs) /
+				sizeof(vndev->ctrl->sgsegs[0])),
+			       &vndev->ctrl->sgsegs[0]);
+		uk_pr_info("Control queue initial setup complete\n");
+	}
 exit:
 	return rc;
 
