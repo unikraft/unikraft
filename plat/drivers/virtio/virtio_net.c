@@ -71,6 +71,7 @@
 typedef enum {
 	VNET_RX,
 	VNET_TX,
+	VNET_CTRL,
 } virtq_type_t;
 
 #define VIRTIO_NET_FEATURE_HAS(vndev, feature) \
@@ -162,6 +163,8 @@ struct virtio_net_device {
 	struct uk_netdev netdev;
 	/* Count of the number of the virtqueues */
 	__u16 max_vqueue_pairs;
+	/* User requested vqueue pairs */
+	__u16 vqueue_pairs;
 	/* List of the Rx/Tx queue */
 	__u16    rx_vqueue_cnt;
 	struct   uk_netdev_rx_queue *rxqs;
@@ -717,17 +720,25 @@ static int virtio_netdev_vqueue_setup(struct virtio_net_device *vndev,
 	uint16_t max_desc, hwvq_id;
 	struct virtqueue *vq;
 
-	if (queue_type == VNET_RX) {
+	switch (queue_type) {
+	case VNET_RX:
 		id = vndev->rx_vqueue_cnt;
 		callback = virtio_netdev_recv_done;
 		max_desc = vndev->rxqs[id].max_nb_desc;
 		hwvq_id = vndev->rxqs[id].hwvq_id;
-	} else {
+		break;
+	case VNET_TX:
 		id = vndev->tx_vqueue_cnt;
 		/* We don't support the callback from the txqueue yet */
 		callback = NULL;
 		max_desc = vndev->txqs[id].max_nb_desc;
 		hwvq_id = vndev->txqs[id].hwvq_id;
+		break;
+	case VNET_CTRL:
+		callback = NULL;
+		max_desc = vndev->ctrl->max_nb_desc;
+		hwvq_id = vndev->ctrl->hwvq_id;
+		break;
 	}
 
 	if (unlikely(max_desc < nr_desc)) {
@@ -752,20 +763,27 @@ static int virtio_netdev_vqueue_setup(struct virtio_net_device *vndev,
 		return rc;
 	}
 
-	if (queue_type == VNET_RX) {
+	switch (queue_type) {
+	case VNET_RX:
 		vq->priv = &vndev->rxqs[id];
 		vndev->rxqs[id].ndev = &vndev->netdev;
 		vndev->rxqs[id].vq = vq;
 		vndev->rxqs[id].nb_desc = nr_desc;
 		vndev->rxqs[id].lqueue_id = queue_id;
 		vndev->rx_vqueue_cnt++;
-	} else {
+		break;
+	case VNET_TX:
 		vndev->txqs[id].vq = vq;
 		vndev->txqs[id].ndev = &vndev->netdev;
 		vndev->txqs[id].nb_desc = nr_desc;
 		vndev->txqs[id].lqueue_id = queue_id;
 		vndev->tx_vqueue_cnt++;
+		break;
+	case VNET_CTRL:
+		vndev->ctrl->vq = vq;
+		break;
 	}
+
 	return id;
 }
 
@@ -1022,15 +1040,23 @@ static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 	int vq_avail = 0;
 	int total_vqs = conf->nb_rx_queues + conf->nb_tx_queues;
 	uint16_t ctrl_vq_size;
+	uint16_t vq_pairs;
 
 	__u16 qdesc_size[total_vqs];
 
-	if (conf->nb_rx_queues != 1 || conf->nb_tx_queues != 1) {
+	if (conf->nb_rx_queues != conf->nb_tx_queues) {
 		uk_pr_err("Queue combination not supported: %"__PRIu16"/%"__PRIu16" rx/tx\n",
 			  conf->nb_rx_queues, conf->nb_tx_queues);
+		return -ENOTSUP;
 
+	}
+	if (conf->nb_rx_queues > vndev->max_vqueue_pairs) {
+		uk_pr_err("Device does not support more than %u queue pairs\n",
+				vndev->max_vqueue_pairs);
 		return -ENOTSUP;
 	}
+
+	vndev->vqueue_pairs = conf->nb_rx_queues;
 
 	/**
 	 * TODO:
@@ -1142,10 +1168,9 @@ static int virtio_netdev_configure(struct uk_netdev *n,
 	vndev = to_virtionetdev(n);
 
 	rc = virtio_netdev_rxtx_alloc(vndev, conf);
-	if (rc < 0) {
+	if (rc < 0)
 		uk_pr_err("%p: Failed to initialize rx and tx rings: %d\n",
 			  n, rc);
-	}
 
 	/* Initialize the count of the virtio-net device */
 	vndev->rx_vqueue_cnt = 0;
@@ -1212,9 +1237,15 @@ static void virtio_net_info_get(struct uk_netdev *dev,
 
 static int virtio_net_ctrl_queue_setup(struct virtio_net_device *vndev)
 {
+	int rc = 0;
 
-	virtio_netdev_vqueue_setup(vndev, 0, 0, VNET_CTRL, a);
+	rc = virtio_netdev_vqueue_setup(vndev, 0, 0, VNET_CTRL, a);
 
+	if (rc < 0)
+		uk_pr_err("Failed to set up control queue %d\n", rc);
+
+	uk_pr_info("The control queue setup is completed\n");
+	return rc;
 }
 
 static int virtio_net_send_cmd(struct virtio_net_device *vndev, uint8_t class,
@@ -1222,7 +1253,12 @@ static int virtio_net_send_cmd(struct virtio_net_device *vndev, uint8_t class,
 {
 	struct virtio_net_ctrl *ctrl;
 	int rc;
+	int read_bufs = 0;
+	int write_bufs = 0;
 	uint8_t *buf;
+
+	UK_ASSERT(vndev);
+	UK_ASSERT(VIRTIO_NET_FEATURE_HAS(vndev, VIRTIO_NET_F_CTRL_VQ));
 
 	ctrl = vndev->ctrl;
 	ctrl->hdr.class = class;
@@ -1236,6 +1272,7 @@ static int virtio_net_send_cmd(struct virtio_net_device *vndev, uint8_t class,
 		rc = -ENOMEM;
 		return rc;
 	}
+	read_bufs++;
 	if (data) {
 		rc = uk_sglist_append(&ctrl->sg, data, len);
 		if (unlikely(rc != 0)) {
@@ -1243,6 +1280,7 @@ static int virtio_net_send_cmd(struct virtio_net_device *vndev, uint8_t class,
 			rc = -ENOMEM;
 			return rc;
 		}
+		read_bufs++;
 	}
 	rc = uk_sglist_append(&ctrl->sg, &ctrl->ack, sizeof(ctrl->ack));
 	if (unlikely(rc != 0)) {
@@ -1250,9 +1288,10 @@ static int virtio_net_send_cmd(struct virtio_net_device *vndev, uint8_t class,
 		rc = -ENOMEM;
 		return rc;
 	}
+	write_bufs++;
 
 	rc = virtqueue_buffer_enqueue(ctrl->vq, data, &ctrl->sg,
-					0, ctrl->sg.sg_nseg);
+					read_bufs, write_bufs);
 	if (likely(rc >= 0)) {
 		virtqueue_host_notify(ctrl->vq);
 	} else if (rc == -ENOSPC) {
@@ -1261,8 +1300,7 @@ static int virtio_net_send_cmd(struct virtio_net_device *vndev, uint8_t class,
 		return rc;
 	} else {
 		uk_pr_err("Failed to enqueue descriptors into the ring: %d\n", rc);
-		/* TODO: discuss which is a appropriate errno in this case */
-		rc = -EINVAL;
+		rc = -ENOSPC;
 		return rc;
 	}
 
@@ -1278,7 +1316,8 @@ static int virtio_net_send_cmd(struct virtio_net_device *vndev, uint8_t class,
 	return ctrl->ack;
 }
 
-static int virtio_net_set_mq(virtio_net_device *vndev, uint16_t queue_pairs)
+static int virtio_net_set_mq(struct virtio_net_device *vndev,
+		uint16_t queue_pairs)
 {
 	struct virtio_net_ctrl_mq *mq;
 	int rc;
@@ -1287,7 +1326,7 @@ static int virtio_net_set_mq(virtio_net_device *vndev, uint16_t queue_pairs)
 	UK_ASSERT(VIRTIO_NET_FEATURE_HAS(vndev, VIRTIO_NET_F_MQ));
 
 	if (queue_pairs > vndev->max_vqueue_pairs) {
-		uk_pr_err("Cannot set more than %u queues : %u",
+		uk_pr_err("Cannot set more than %u queue pairs : %u",
 				vndev->max_vqueue_pairs, queue_pairs);
 		return -ENOTSUP;
 	}
@@ -1322,6 +1361,15 @@ static int virtio_net_start(struct uk_netdev *n)
 
 	UK_ASSERT(n != NULL);
 	d = to_virtionetdev(n);
+
+	if (VIRTIO_NET_FEATURE_HAS(d, VIRTIO_NET_F_CTRL_VQ)) {
+		virtio_net_ctrl_queue_setup(d);
+		virtqueue_intr_disable(d->ctrl->vq);
+		d->ctrl->intr_enabled = 0;
+	}
+
+	if (VIRTIO_NET_FEATURE_HAS(d, VIRTIO_NET_F_MQ))
+		virtio_net_set_mq(d, d->vqueue_pairs);
 
 	/*
 	 * By default, interrupts are disabled and it is up to the user or
