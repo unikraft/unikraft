@@ -255,7 +255,7 @@ struct uk_event {
  * Raise an event by pointer and invoke the handler chain until the first
  * handler successfully handled the event or returned a negative error code.
  *
- * @param event
+ * @param e
  *   Pointer to the event to raise.
  * @param data
  *   Optional data supplied to the event handlers
