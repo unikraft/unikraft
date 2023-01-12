@@ -107,17 +107,25 @@ static inline int _raise_event_##event(int trapnr, struct __regs *regs,	\
 #define DECLARE_TRAP(name, str, event)					\
 void do_##name(struct __regs *regs)					\
 {									\
-	if (!_raise_event_##event(TRAP_##name, regs, 0)) {		\
+	int rc;								\
+	rc = _raise_event_##event(TRAP_##name, regs, 0);		\
+	if (unlikely(rc < 0))						\
+		uk_pr_crit("trap handler returned error: %d\n", rc);	\
+									\
+	if (!rc)							\
 		do_unhandled_trap(TRAP_##name, str, regs, 0);		\
-	}								\
 }
 
 #define DECLARE_TRAP_EC(name, str, event)				\
 void do_##name(struct __regs *regs, unsigned long error_code)		\
 {									\
-	if (!_raise_event_##event(TRAP_##name, regs, error_code)) {	\
+	int rc;								\
+	rc = _raise_event_##event(TRAP_##name, regs, error_code);	\
+	if (unlikely(rc < 0))						\
+		uk_pr_crit("trap handler returned error: %d\n", rc);	\
+									\
+	if (!rc)							\
 		do_unhandled_trap(TRAP_##name, str, regs, error_code);	\
-	}								\
 }
 
 void traps_table_init(void);
