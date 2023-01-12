@@ -1255,7 +1255,6 @@ static int virtio_net_send_cmd(struct virtio_net_device *vndev, uint8_t class,
 {
 	struct virtio_net_ctrl *ctrl;
 	int rc;
-	int ack;
 	uint8_t *buf;
 
 	ctrl = vndev->ctrl;
@@ -1267,22 +1266,22 @@ static int virtio_net_send_cmd(struct virtio_net_device *vndev, uint8_t class,
 	rc = uk_sglist_append(&ctrl->sg, &ctrl->hdr, sizeof(ctrl->hdr));
 	if (unlikely(rc != 0)) {
 		uk_pr_err("Failed to append to the sg list\n");
-		ack = -ENOMEM;
-		goto exit;
+		rc = -ENOMEM;
+		return rc;
 	}
 	if(data) {
 		rc = uk_sglist_append(&ctrl->sg, data, len);
 		if (unlikely(rc != 0)) {
 			uk_pr_err("Failed to append to the sg list\n");
-			ack = -ENOMEM;
-			goto exit;
+			rc = -ENOMEM;
+			return rc;
 		}
 	}
 	rc = uk_sglist_append(&ctrl->sg, &ctrl->ack, sizeof(ctrl->ack));
 	if (unlikely(rc != 0)) {
 		uk_pr_err("Failed to append to the sg list\n");
-		ack = -ENOMEM;
-		goto exit;
+		rc = -ENOMEM;
+		return rc;
 	}
 
 	rc = virtqueue_buffer_enqueue(ctrl->vq, data, &ctrl->sg,
@@ -1291,13 +1290,13 @@ static int virtio_net_send_cmd(struct virtio_net_device *vndev, uint8_t class,
 		virtqueue_host_notify(ctrl->vq);
 	} else if (rc == -ENOSPC) {
 		uk_pr_debug("No more descriptor available\n");
-		ack = -ENOSPC;
-		goto exit;
+		rc = -ENOSPC;
+		return rc;
 	} else {
 		uk_pr_err("Failed to enqueue descriptors into the ring: %d\n", rc);
 		/* TODO: discuss which is a appropriate errno in this case */
-		ack = -EINVAL;
-		goto exit;
+		rc = -EINVAL;
+		return rc;
 	}
 
 	while (!virtqueue_hasdata(ctrl->vq))
@@ -1309,8 +1308,7 @@ static int virtio_net_send_cmd(struct virtio_net_device *vndev, uint8_t class,
 			break;
 	}
 
-exit:
-	return ack;
+	return ctrl->ack;
 }
 
 static int virtio_net_set_mq(struct virtio_net_device *vndev, uint16_t queue_pairs)
@@ -1325,6 +1323,10 @@ static int virtio_net_set_mq(struct virtio_net_device *vndev, uint16_t queue_pai
 			VIRTIO_NET_CTRL_MQ_VQ_PAIRS_SET,
 			(void *) mq,
 			sizeof(struct virtio_net_ctrl_mq));
+
+	if (rc != VIRTIO_NET_OK) {
+		uk_pr_err("Could not set virtio queue pairs\n");
+	}
 
 	return rc;
 }
