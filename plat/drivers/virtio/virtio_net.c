@@ -229,7 +229,8 @@ static int virtio_netdev_rxq_enqueue(struct uk_netdev_rx_queue *rxq,
 static int virtio_netdev_recv_done(struct virtqueue *vq, void *priv);
 static int virtio_netdev_rx_fillup(struct uk_netdev_rx_queue *rxq,
 				   __u16 num, int notify);
-
+static int virtio_net_send_cmd(struct virtio_net_device *vndev, uint8_t class,
+		uint8_t cmd, uint8_t *data, uint32_t len);
 /**
  * Static global constants
  */
@@ -1072,9 +1073,6 @@ static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 	 * ...
 	 * Virtqueue-ctrlq
 	 */
-	/* TODO: initialize only total vqs queues 
-	 * this should be user provided 
-	 */
 	for (i = 0; i < total_vqs; i++) {
 		/**
 		 * Initialize the received queue with the information received
@@ -1098,9 +1096,7 @@ static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 				sizeof(vndev->txqs[i].sgsegs[0])),
 			       &vndev->txqs[i].sgsegs[0]);
 	}
-	/* sai TODO: Init 2Nth queue: control queue
-	 * Deterine queue size and allocate
-	 */
+
 	if (VIRTIO_FEATURE_HAS(vndev->vdev->features, VIRTIO_NET_F_CTRL_VQ)) {
 		vq_avail = virtio_find_vqs(vndev->vdev, VIRTIO_NET_CTRLQ_ID(vndev),
 								&ctrl_size);
@@ -1214,6 +1210,93 @@ static void virtio_net_info_get(struct uk_netdev *dev,
 		| (VIRTIO_FEATURE_HAS(vndev->vdev->features, VIRTIO_NET_F_CSUM)
 		   ? UK_NETDEV_F_PARTIAL_CSUM : 0);
 }
+
+static int virtio_net_ctrl_queue_setup(struct virtio_net_device *vndev)
+{
+
+	virtio_netdev_vqueue_setup(vndev, 0, 0, VNET_CTRL, a);
+
+}
+
+static int virtio_net_send_cmd(struct virtio_net_device *vndev, uint8_t class,
+		uint8_t cmd, uint8_t *data, uint32_t len)
+{
+	struct virtio_net_ctrl *ctrl;
+	int rc;
+	int ack;
+	uint8_t *buf;
+
+	ctrl = vndev->ctrl;
+	ctrl->hdr.class = class;
+	ctrl->hdr.cmd = cmd;
+
+	uk_sglist_reset(&ctrl->sg);
+
+	rc = uk_sglist_append(&ctrl->sg, &ctrl->hdr, sizeof(ctrl->hdr));
+	if (unlikely(rc != 0)) {
+		uk_pr_err("Failed to append to the sg list\n");
+		ack = -ENOMEM;
+		goto exit;
+	}
+	if(data) {
+		rc = uk_sglist_append(&ctrl->sg, data, len);
+		if (unlikely(rc != 0)) {
+			uk_pr_err("Failed to append to the sg list\n");
+			ack = -ENOMEM;
+			goto exit;
+		}
+	}
+	rc = uk_sglist_append(&ctrl->sg, &ctrl->ack, sizeof(ctrl->ack));
+	if (unlikely(rc != 0)) {
+		uk_pr_err("Failed to append to the sg list\n");
+		ack = -ENOMEM;
+		goto exit;
+	}
+
+	rc = virtqueue_buffer_enqueue(ctrl->vq, data, &ctrl->sg,
+					0, ctrl->sg.sg_nseg);
+	if (likely(rc >= 0)) {
+		virtqueue_host_notify(ctrl->vq);
+	} else if (rc == -ENOSPC) {
+		uk_pr_debug("No more descriptor available\n");
+		ack = -ENOSPC;
+		goto exit;
+	} else {
+		uk_pr_err("Failed to enqueue descriptors into the ring: %d\n", rc);
+		/* TODO: discuss which is a appropriate errno in this case */
+		ack = -EINVAL;
+		goto exit;
+	}
+
+	while (!virtqueue_hasdata(ctrl->vq))
+		;
+
+	for (;;) {
+		rc = virtqueue_buffer_dequeue(ctrl->vq, (void **) &buf, &len);
+		if(rc < 0)
+			break;
+	}
+
+exit:
+	return ack;
+}
+
+static int virtio_net_set_mq(virtio_net_device *vndev, uint16_t queue_pairs)
+{
+	struct virtio_net_ctrl_mq *mq;
+	int rc;
+
+	mq = uk_malloc(a, sizeof(struct virtio_net_ctrl_mq));
+	mq->virtqueue_pairs = queue_pairs;
+	rc = virtio_net_send_cmd(vndev,
+			VIRTIO_NET_CTRL_MQ,
+			VIRTIO_NET_CTRL_MQ_VQ_PAIRS_SET,
+			mq,
+			sizeof(struct virtio_net_ctrl_mq));
+
+	return rc;
+}
+
 
 static int virtio_net_start(struct uk_netdev *n)
 {
