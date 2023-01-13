@@ -212,7 +212,6 @@ static void vpci_legacy_vq_release(struct virtio_dev *vdev,
 	virtqueue_destroy(vq, a);
 }
 
-/* TODO: change documentation if availabe */
 static int vpci_legacy_pci_vq_find(struct virtio_dev *vdev, __u16 vq_id,
 				   __u16 *qdesc_size)
 {

@@ -269,7 +269,8 @@ static inline int virtio_config_get(struct virtio_dev *vdev, __u16 offset,
  * @param vdev
  *	A reference to the virtio device.
  * @param vq_id
- *	The virtqueue id whose size needs to be found out (0 to max_virqueues - 1)
+ *	The virtqueue id whose size needs to be found out
+ *	(0 to max_virqueues - 1 inclusive)
  * @param vq_size
  *	A reference to the virtq size, size of virt queue is stored in it
  * @return int

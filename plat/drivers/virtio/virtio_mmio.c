@@ -359,7 +359,7 @@ static int vm_find_vqs(struct virtio_dev *vdev, __u16 vq_id, __u16 *qdesc_size)
 	/* Queue shouldn't already be set up. */
 	if (virtio_cread32(vm_dev->base, (vm_dev->version == 1 ?
 					VIRTIO_MMIO_QUEUE_PFN : VIRTIO_MMIO_QUEUE_READY))) {
-		uk_pr_err("vm_find_vqs error mmio queue not ready\n");
+		uk_pr_err("%s error mmio queue not ready\n", __func__);
 		err = -ENOENT;
 		goto error_exit;
 	}
