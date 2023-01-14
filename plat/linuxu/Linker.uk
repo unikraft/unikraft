@@ -8,7 +8,9 @@ LINUXU_DEBUG_IMAGE := $(LINUXU_IMAGE).dbg
 LINUXU_IMAGE_OBJECT := $(LINUXU_IMAGE).o
 LINUXU_ALIB_IMAGE := $(LINUXU_IMAGE).a
 
-LINUXU_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-T$(comma),\
+LINUXU_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-dT$(comma),\
+			 	$(UK_PLAT_LINUXU_DEF_LDS))
+LINUXU_LD_SCRIPT_FLAGS += $(addprefix -Wl$(comma)-T$(comma),\
 			    $(LINUXU_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y))
 
 $(LINUXU_IMAGE_OBJECT): $(LINUXU_ALIBS) $(LINUXU_ALIBS-y) \
