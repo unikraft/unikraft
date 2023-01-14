@@ -75,6 +75,7 @@
 #include <uk/plat/console.h>
 #include <uk/plat/bootstrap.h>
 #include <x86/cpu.h>
+#include <x86/traps.h>
 
 #include <xen/xen.h>
 #include <common/console.h>
@@ -110,7 +111,7 @@ struct ukplat_memregion_desc _libxenplat_mrd[UKPLAT_MEMRD_MAX_ENTRIES];
 
 static inline void _init_traps(void)
 {
-	traps_init();
+	traps_lcpu_init(NULL);
 }
 
 static inline void _init_shared_info(void)
@@ -188,7 +189,6 @@ void _libxenplat_x86entry(void *start_info) __noreturn;
 void _libxenplat_x86entry(void *start_info)
 {
 	_init_traps();
-	_init_cpufeatures();
 	HYPERVISOR_start_info = (start_info_t *)start_info;
 	prepare_console(); /* enables buffering for console */
 

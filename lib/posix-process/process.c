@@ -1,9 +1,12 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Felipe Huici <felipe.huici@neclab.eu>
+ * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ *          Felipe Huici <felipe.huici@neclab.eu>
  *          Costin Lupu <costin.lupu@cs.pub.ro>
  *
  * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2022, NEC Laboratories Europe GmbH, NEC Corporation.
+ *                     All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,194 +33,617 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-
+#include <uk/config.h>
+#include <sys/types.h>
+#include <stddef.h>
 #include <errno.h>
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <sys/prctl.h>
-#include <sys/resource.h>
-#include <uk/process.h>
-#include <uk/print.h>
+#include <uk/config.h>
 #include <uk/syscall.h>
-#include <uk/arch/limits.h>
-#if CONFIG_LIBVFSCORE
-#include <vfscore/file.h>
-#endif
 
-UK_SYSCALL_R_DEFINE(int, fork)
+#if CONFIG_LIBPOSIX_PROCESS_PIDS
+#include <uk/bitmap.h>
+#include <uk/list.h>
+#include <uk/alloc.h>
+#include <uk/sched.h>
+#include <uk/thread.h>
+#include <uk/init.h>
+#include <uk/errptr.h>
+#include <uk/essentials.h>
+#if CONFIG_LIBPOSIX_PROCESS_CLONE
+#include <uk/process.h>
+#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
+
+#include "process.h"
+
+/**
+ * Internal structures
+ */
+struct posix_process {
+	pid_t pid;
+	struct posix_process *parent;
+	struct uk_list_head children; /* child processes */
+	struct uk_list_head child_list_entry;
+	struct uk_list_head threads;
+	struct uk_alloc *_a;
+
+	/* TODO: Mutex */
+};
+
+struct posix_thread {
+	pid_t tid;
+	struct posix_process *process;
+	struct uk_list_head thread_list_entry;
+	struct uk_thread *thread;
+	struct uk_alloc *_a;
+
+	/* TODO: Mutex */
+};
+
+/**
+ * System global lists
+ */
+static struct posix_thread *tid_thread[CONFIG_LIBPOSIX_PROCESS_MAX_PID];
+static unsigned long tid_map[UK_BITS_TO_LONGS(CONFIG_LIBPOSIX_PROCESS_MAX_PID)];
+
+/**
+ * Thread-local posix_thread reference
+ */
+static __uk_tls struct posix_thread *pthread_self = NULL;
+
+/**
+ * Helpers to find and reserve a `pid_t`
+ */
+static inline pid_t find_free_tid(void)
 {
-	/* fork() is not supported on this platform */
-	return -ENOSYS;
-}
+	static pid_t prev = 0;
+	unsigned long found;
 
-UK_SYSCALL_R_DEFINE(int, vfork)
-{
-	/* vfork() is not supported on this platform */
-	return -ENOSYS;
-}
-
-static void exec_warn_argv_variadic(const char *arg, va_list args)
-{
-	int i = 1;
-	char *argi;
-
-	uk_pr_warn(" argv=[%s", arg);
-
-	argi = va_arg(args, char *);
-	while (argi) {
-		uk_pr_warn("%s%s", (i > 0 ? ", " : ""), argi);
-		i++;
-		argi = va_arg(args, char *);
+	/* search starting from last position */
+	found = uk_find_next_zero_bit(tid_map,
+				      CONFIG_LIBPOSIX_PROCESS_MAX_PID, prev);
+	if (found == CONFIG_LIBPOSIX_PROCESS_MAX_PID) {
+		/* search again starting from the beginning */
+		found = uk_find_first_zero_bit(tid_map,
+					       CONFIG_LIBPOSIX_PROCESS_MAX_PID);
 	}
-	uk_pr_warn("]\n");
+	if (found == CONFIG_LIBPOSIX_PROCESS_MAX_PID) {
+		/* no free PID */
+		return -1;
+	}
+
+	prev = found;
+	return found;
 }
 
-static void __exec_warn_array(const char *name, char *const argv[])
+static pid_t find_and_reserve_tid(void)
 {
-	int i = 0;
+	pid_t tid;
 
-	uk_pr_warn(" %s=[", name);
+	/* TODO: Mutex */
+	tid = find_free_tid();
+	if (tid >= 0)
+		uk_set_bit(tid, tid_map);
+	return tid;
+}
 
-	if (argv) {
-		while (argv[i]) {
-			uk_pr_warn("%s%s", (i > 0 ? ", " : ""), argv[i]);
-			i++;
+static void release_tid(pid_t tid)
+{
+	UK_ASSERT(tid >= 0 && tid <= CONFIG_LIBPOSIX_PROCESS_MAX_PID);
+
+	/* TODO: Mutex */
+	uk_clear_bit(tid, tid_map);
+}
+
+/* Allocate a thread for a process */
+static struct posix_thread *pprocess_create_pthread(
+			struct posix_process *pprocess, struct uk_thread *th)
+{
+	struct posix_thread *pthread;
+	struct uk_alloc *a;
+	pid_t tid;
+	int err;
+
+	UK_ASSERT(pprocess);
+	UK_ASSERT(pprocess->_a);
+
+	/* Take allocator from process */
+	a = pprocess->_a;
+
+	tid = find_and_reserve_tid();
+	if (tid < 0) {
+		err = EAGAIN;
+		goto err_out;
+	}
+
+	pthread = uk_zalloc(a, sizeof(*pthread));
+	if (!pthread) {
+		err = ENOMEM;
+		goto err_free_tid;
+	}
+
+	pthread->_a = a;
+	pthread->process = pprocess;
+	pthread->tid = tid;
+	pthread->thread = th;
+	uk_list_add_tail(&pthread->thread_list_entry, &pprocess->threads);
+
+	/* Store reference to pthread with TID */
+	tid_thread[tid] = pthread;
+
+	uk_pr_debug("Process PID %d: New thread TID %d\n",
+		    (int) pprocess->pid, (int) pthread->tid);
+	return pthread;
+
+err_free_tid:
+	release_tid(tid);
+err_out:
+	return ERR2PTR(-err);
+}
+
+/* Free thread that is part of a process
+ * NOTE: The process is not free'd here when its thread list
+ *       becomes empty.
+ */
+static void pprocess_release_pthread(struct posix_thread *pthread)
+{
+	UK_ASSERT(pthread);
+	UK_ASSERT(pthread->_a);
+
+	/* remove from process' thread list */
+	uk_list_del_init(&pthread->thread_list_entry);
+
+	/* release TID */
+	release_tid(pthread->tid);
+	tid_thread[pthread->tid] = NULL;
+
+	/* release memory */
+	uk_free(pthread->_a, pthread);
+}
+
+static void pprocess_release(struct posix_process *pprocess);
+
+/* Create a new posix process for a given thread */
+int uk_posix_process_create(struct uk_alloc *a,
+			    struct uk_thread *thread,
+			    struct uk_thread *parent)
+{
+	struct posix_thread  *parent_pthread  = NULL;
+	struct posix_process *parent_pprocess = NULL;
+	struct posix_thread  **pthread;
+	struct posix_thread  *_pthread;
+	struct posix_process *pprocess;
+	struct posix_process *orig_pprocess;
+	int ret;
+
+	/* Retrieve a reference to the `pthread_self` pointer on the remote TLS:
+	 * Allows us changing the pointer value.
+	 */
+	pthread = &uk_thread_uktls_var(thread, pthread_self);
+
+	if (parent)
+		parent_pthread = uk_thread_uktls_var(parent, pthread_self);
+	if (parent_pthread) {
+		 /* if we have a parent pthread,
+		  *  it must have a surrounding pprocess
+		  */
+		UK_ASSERT(parent_pthread->process);
+
+		parent_pprocess = parent_pthread->process;
+	}
+
+	/* Allocate pprocess structure */
+	pprocess = uk_zalloc(a, sizeof(*pprocess));
+	if (!pprocess) {
+		ret = -ENOMEM;
+		goto err_out;
+	}
+	pprocess->_a = a;
+	UK_INIT_LIST_HEAD(&pprocess->threads);
+	UK_INIT_LIST_HEAD(&pprocess->children);
+
+	/* Check if we have a pthread structure already for this thread
+	 * or if we need to allocate one
+	 */
+	if (!(*pthread)) {
+		_pthread = pprocess_create_pthread(pprocess, thread);
+		if (PTRISERR(_pthread)) {
+			ret = PTR2ERR(_pthread);
+			goto err_free_pprocess;
+		}
+		/* take thread id for process id */
+		pprocess->pid = _pthread->tid;
+		*pthread = _pthread;
+	} else {
+		/* Re-use existing pthread, re-link it and re-use its TID */
+		UK_ASSERT((*pthread)->thread == thread);
+
+		/* Remove thread from original process */
+		orig_pprocess = (*pthread)->process;
+		uk_list_del(&(*pthread)->thread_list_entry);
+
+		/* Re-assign thread to current process */
+		(*pthread)->process = pprocess;
+		pprocess->pid = (*pthread)->tid;
+		uk_list_add_tail(&(*pthread)->thread_list_entry,
+				 &pprocess->threads);
+
+		/* Release original process if it became empty of threads */
+		if (uk_list_empty(&orig_pprocess->threads))
+			pprocess_release(orig_pprocess);
+	}
+
+	pprocess->parent = parent_pprocess;
+	if (parent_pprocess) {
+		uk_list_add_tail(&pprocess->child_list_entry,
+				 &parent_pprocess->children);
+	}
+
+	uk_pr_debug("Process PID %d created (parent PID: %d)\n",
+		    (int) pprocess->pid,
+		    (int) ((pprocess->parent) ? pprocess->parent->pid : -1));
+	return 0;
+
+err_free_pprocess:
+	uk_free(a, pprocess);
+err_out:
+	return ret;
+}
+
+/* Releases pprocess memory and re-links its child to the parent
+ * NOTE: All related threads must be removed already from this pprocess
+ */
+static void pprocess_release(struct posix_process *pprocess)
+{
+	struct posix_process *pchild, *pchildn;
+
+	UK_ASSERT(uk_list_empty(&pprocess->threads));
+
+	uk_list_for_each_entry_safe(pchild, pchildn,
+				    &pprocess->children,
+				    child_list_entry) {
+		/* check for violation of the tree structure */
+		UK_ASSERT(pchild != pprocess);
+
+		uk_list_del(&pchild->child_list_entry);
+		if (pprocess->parent) {
+			pchild->parent = pprocess->parent;
+			uk_list_add(&pchild->child_list_entry,
+				    &pprocess->parent->children);
+			uk_pr_debug("Process PID %d re-assigned to parent PID %d\n",
+				    pchild->pid, pprocess->parent->pid);
+		} else {
+			/* There is no parent, disconnect */
+			pchild->parent = NULL;
+			uk_pr_debug("Process PID %d loses its parent\n",
+				    pchild->pid);
 		}
 	}
-	uk_pr_warn("]\n");
-}
-#define exec_warn_argv(values) __exec_warn_array("argv", values)
-#define exec_warn_envp(values) __exec_warn_array("envp", values)
 
-int execl(const char *path, const char *arg, ...
-		/* (char  *) NULL */)
+	uk_pr_debug("Process PID %d released\n",
+		    pprocess->pid);
+	uk_free(pprocess->_a, pprocess);
+}
+
+static void pprocess_kill(struct posix_process *pprocess)
 {
-	va_list args;
+	struct posix_thread *pthread, *pthreadn;
+	bool self_destruct = false;
 
-	uk_pr_warn("%s(): path=%s\n", __func__, path);
-	va_start(args, arg);
-	exec_warn_argv_variadic(arg, args);
-	va_end(args);
-	errno = ENOSYS;
-	return -1;
+	/* Kill all remaining threads of the process */
+	uk_list_for_each_entry_safe(pthread, pthreadn,
+				    &pprocess->threads, thread_list_entry) {
+		/* Double-check that this thread is part of this process */
+		UK_ASSERT(pthread->process == pprocess);
+
+		if (pthread->thread == uk_thread_current()) {
+			/* Self-destruct this thread as last work of this
+			 * function. The reason is that nothing of this
+			 * function is executed anymore as soon as the
+			 * thread killed itself.
+			 */
+			self_destruct = true;
+			continue;
+		}
+		if (uk_thread_is_exited(pthread->thread)) {
+			/* Thread already exited, might wait for getting
+			 * garbage collected.
+			 */
+			continue;
+		}
+
+		uk_pr_debug("Terminating PID %d: Killing TID %d: thread %p (%s)...\n",
+			    pprocess->pid, pthread->tid,
+			    pthread->thread, pthread->thread->name);
+
+		/* Terminating the thread will lead to calling
+		 * `posix_thread_fini()` which will clean-up the related
+		 * pthread resources and pprocess resources on the last
+		 * thread
+		 */
+		uk_sched_thread_terminate(pthread->thread);
+	}
+
+	if (self_destruct) {
+		uk_pr_debug("Terminating PID %d: Self-killing TID %d...\n",
+			    pprocess->pid, pthread->tid);
+		uk_sched_thread_terminate(uk_thread_current());
+
+		/* NOTE: Nothing will be executed from here on */
+	}
 }
 
-int execlp(const char *file, const char *arg, ...
-		/* (char  *) NULL */)
+void uk_posix_process_kill(struct uk_thread *thread)
 {
-	va_list args;
+	struct posix_thread  **pthread;
+	struct posix_process *pprocess;
 
-	uk_pr_warn("%s(): file=%s\n", __func__, file);
-	va_start(args, arg);
-	exec_warn_argv_variadic(arg, args);
-	va_end(args);
-	errno = ENOSYS;
-	return -1;
+	pthread = &uk_thread_uktls_var(thread, pthread_self);
+
+	UK_ASSERT(*pthread);
+	UK_ASSERT((*pthread)->process);
+
+	pprocess = (*pthread)->process;
+	pprocess_kill(pprocess);
 }
 
-int execle(const char *path, const char *arg, ...
-		/*, (char *) NULL, char * const envp[] */)
+#if CONFIG_LIBPOSIX_PROCESS_INIT_PIDS
+static int posix_process_init(void)
 {
-	va_list args;
-	char * const *envp;
-
-	uk_pr_warn("%s(): path=%s\n", __func__, path);
-	va_start(args, arg);
-	exec_warn_argv_variadic(arg, args);
-	envp = va_arg(args, char * const *);
-	exec_warn_envp(envp);
-	va_end(args);
-	errno = ENOSYS;
-	return -1;
+	/* Create a POSIX process without parent ("init" process) */
+	return uk_posix_process_create(uk_alloc_get_default(),
+				       uk_thread_current(), NULL);
 }
 
-UK_SYSCALL_R_DEFINE(int, execve, const char *, path,
-		    char *const *, argv, char *const *, envp)
+uk_late_initcall(posix_process_init);
+#endif /* CONFIG_LIBPOSIX_PROCESS_INIT_PIDS */
+
+/* Thread initialization: Assign posix thread only if parent is part of a
+ * process
+ */
+static int posix_thread_init(struct uk_thread *child, struct uk_thread *parent)
 {
-	uk_pr_warn("%s(): path=%s\n", __func__, path);
-	exec_warn_argv(argv);
-	exec_warn_envp(envp);
-	return -ENOSYS;
+	struct posix_thread *parent_pthread = NULL;
+	struct posix_thread *pthread;
+
+	if (parent) {
+		parent_pthread = uk_thread_uktls_var(parent,
+						     pthread_self);
+	}
+	if (!parent_pthread) {
+		/* parent has no posix thread, do not setup one for the child */
+		uk_pr_debug("thread %p (%s): Parent %p (%s) has no PID, skipping...\n",
+			    child, child->name, parent,
+			    parent ? parent->name : "<n/a>");
+		pthread_self = NULL;
+		return 0;
+	}
+
+	UK_ASSERT(parent_pthread->process);
+
+	pthread = pprocess_create_pthread(parent_pthread->process,
+					  child);
+	if (PTRISERR(pthread))
+		return PTR2ERR(pthread);
+
+	pthread_self = pthread;
+
+	uk_pr_debug("thread %p (%s): New thread with TID: %d (PID: %d)\n",
+		    child, child->name, (int) pthread->tid,
+		    (int) pthread->process->pid);
+	return 0;
 }
 
-int execv(const char *path, char *const argv[])
+/* Thread release: Release TID and posix_thread */
+static void posix_thread_fini(struct uk_thread *child)
 {
-	uk_pr_warn("%s(): path=%s\n", __func__, path);
-	exec_warn_argv(argv);
-	errno = ENOSYS;
-	return -1;
+	struct posix_process *pprocess;
+
+	if (!pthread_self)
+		return; /* no posix thread was assigned */
+
+	pprocess = pthread_self->process;
+
+	UK_ASSERT(pprocess);
+
+	uk_pr_debug("thread %p (%s): Releasing thread with TID: %d (PID: %d)\n",
+		    child, child->name, (int) pthread_self->tid,
+		    (int) pprocess->pid);
+	pprocess_release_pthread(pthread_self);
+	pthread_self = NULL;
+
+	/* Release process if it became empty of threads */
+	if (uk_list_empty(&pprocess->threads))
+		pprocess_release(pprocess);
 }
 
-int execvp(const char *file, char *const argv[])
+UK_THREAD_INIT_PRIO(posix_thread_init, posix_thread_fini, UK_PRIO_EARLIEST);
+
+static inline struct posix_thread *tid2pthread(pid_t tid)
 {
-	uk_pr_warn("%s(): file=%s\n", __func__, file);
-	exec_warn_argv(argv);
-	errno = ENOSYS;
-	return -1;
+	if (tid >= CONFIG_LIBPOSIX_PROCESS_MAX_PID || tid < 0)
+		return NULL;
+	return tid_thread[tid];
 }
 
-int execvpe(const char *file, char *const argv[], char *const envp[])
+static inline struct posix_process *tid2pprocess(pid_t tid)
 {
-	uk_pr_warn("%s(): file=%s\n", __func__, file);
-	exec_warn_argv(argv);
-	exec_warn_envp(envp);
-	errno = ENOSYS;
-	return -1;
+	struct posix_thread *pthread;
+
+	pthread = tid2pthread(tid);
+	if (!pthread)
+		return NULL;
+
+	return pthread->process;
 }
 
-int system(const char *command)
+struct uk_thread *tid2ukthread(pid_t tid)
 {
-	uk_pr_warn("%s: %s\n", __func__, command);
-	errno = ENOSYS;
-	return -1;
+	struct posix_thread *pthread;
+
+	pthread = tid2pthread(tid);
+	if (!pthread)
+		return NULL;
+
+	return pthread->thread;
 }
 
-FILE *popen(const char *command, const char *type __unused)
+pid_t ukthread2tid(struct uk_thread *thread)
 {
-	uk_pr_warn("%s: %s\n", __func__, command);
-	errno = ENOSYS;
-	return NULL;
+	struct posix_thread *pthread;
+
+	pthread = uk_thread_uktls_var(thread, pthread_self);
+	if (!pthread)
+		return -ENOTSUP;
+
+	return pthread->tid;
 }
 
-int pclose(FILE *stream __unused)
+pid_t ukthread2pid(struct uk_thread *thread)
 {
-	errno = EINVAL;
-	return -1;
+	struct posix_thread *pthread;
+
+	pthread = uk_thread_uktls_var(thread, pthread_self);
+	if (!pthread)
+		return -ENOTSUP;
+
+	UK_ASSERT(pthread->process);
+
+	return pthread->process->pid;
 }
 
-int wait(int *status __unused)
+UK_SYSCALL_R_DEFINE(pid_t, getpid)
 {
-	/* No children */
-	errno = ECHILD;
-	return -1;
+	if (!pthread_self)
+		return -ENOTSUP;
+
+	UK_ASSERT(pthread_self->process);
+	return pthread_self->process->pid;
 }
 
-pid_t waitpid(pid_t pid __unused, int *wstatus __unused, int options __unused)
+UK_SYSCALL_R_DEFINE(pid_t, gettid)
 {
-	/* No children */
-	errno = ECHILD;
-	return -1;
+	if (!pthread_self)
+		return -ENOTSUP;
+
+	return pthread_self->tid;
 }
 
-pid_t wait3(int *wstatus __unused, int options __unused,
-		struct rusage *rusage __unused)
+/* PID of parent process  */
+UK_SYSCALL_R_DEFINE(pid_t, getppid)
 {
-	/* No children */
-	errno = ECHILD;
-	return -1;
+	if (!pthread_self)
+		return -ENOTSUP;
+
+	UK_ASSERT(pthread_self->process);
+
+	if (!pthread_self->process->parent) {
+		 /* no parent, return own PID */
+		return pthread_self->process->pid;
+	}
+
+	return pthread_self->process->parent->pid;
 }
 
-UK_SYSCALL_R_DEFINE(pid_t, wait4, pid_t, pid, int *, wstatus,
-		    int, options, struct rusage *, rusage)
+ /* NOTE: The man pages of _exit(2) say:
+  *       "In glibc up to version 2.3, the _exit() wrapper function invoked
+  *        the kernel system call of the same name.  Since glibc 2.3, the
+  *        wrapper function invokes exit_group(2), in order to terminate all
+  *        of the threads in a process.
+  *        The raw _exit() system call terminates only the calling thread,
+  *        and actions such as reparenting child processes or sending
+  *        SIGCHLD to the parent process are performed only if this is the
+  *        last thread in the thread group."
+  */
+UK_LLSYSCALL_R_DEFINE(int, exit, int, status)
 {
-	/* No children */
-	return -ECHILD;
+	uk_sched_thread_exit(); /* won't return */
+	UK_CRASH("sys_exit() unexpectedly returned\n");
+	return -EFAULT;
 }
+
+UK_LLSYSCALL_R_DEFINE(int, exit_group, int, status)
+{
+	uk_posix_process_kill(uk_thread_current()); /* won't return */
+	UK_CRASH("sys_exit_group() unexpectedly returned\n");
+	return -EFAULT;
+}
+
+#if UK_LIBC_SYSCALLS
+__noreturn void exit(int status)
+{
+	uk_syscall_r_exit_group(status);
+	UK_CRASH("sys_exit_group() unexpectedly returned\n");
+}
+
+__noreturn void exit_group(int status)
+{
+	uk_syscall_r_exit_group(status);
+	UK_CRASH("sys_exit_group() unexpectedly returned\n");
+}
+#endif /* UK_LIBC_SYSCALLS */
+
+#if CONFIG_LIBPOSIX_PROCESS_CLONE
+/* Store child PID at given location for parent */
+static int pprocess_parent_settid(const struct clone_args *cl_args,
+				  size_t cl_args_len __unused,
+				  struct uk_thread *child,
+				  struct uk_thread *parent __unused)
+{
+	pid_t child_tid = ukthread2tid(child);
+
+	UK_ASSERT(child_tid >= 0);
+
+	if (!cl_args->parent_tid)
+		return -EINVAL;
+
+	*((pid_t *) cl_args->parent_tid) = child_tid;
+	return 0;
+}
+UK_POSIX_CLONE_HANDLER(CLONE_PARENT_SETTID, true, pprocess_parent_settid, 0x0);
+
+/* Store child PID at given location in child */
+static int pprocess_child_settid(const struct clone_args *cl_args,
+				 size_t cl_args_len __unused,
+				 struct uk_thread *child,
+				 struct uk_thread *parent __unused)
+{
+	pid_t child_tid = ukthread2tid(child);
+
+	UK_ASSERT(child_tid >= 0);
+
+	if (!cl_args->child_tid)
+		return -EINVAL;
+
+	*((pid_t *) cl_args->child_tid) = child_tid;
+	return 0;
+}
+UK_POSIX_CLONE_HANDLER(CLONE_CHILD_SETTID, true, pprocess_child_settid, 0x0);
+
+static int pprocess_clone_thread(const struct clone_args *cl_args __unused,
+				 size_t cl_args_len __unused,
+				 struct uk_thread *child __unused,
+				 struct uk_thread *parent __unused)
+{
+	UK_WARN_STUBBED();
+
+	return 0;
+}
+UK_POSIX_CLONE_HANDLER(CLONE_THREAD, false, pprocess_clone_thread, 0x0);
+#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
+#else  /* !CONFIG_LIBPOSIX_PROCESS_PIDS */
+
+#define UNIKRAFT_PID      1
+#define UNIKRAFT_TID      1
+#define UNIKRAFT_PPID     0
 
 UK_SYSCALL_R_DEFINE(int, getpid)
 {
 	return UNIKRAFT_PID;
+}
+
+UK_SYSCALL_R_DEFINE(int, gettid)
+{
+	return UNIKRAFT_TID;
 }
 
 UK_SYSCALL_R_DEFINE(pid_t, getppid)
@@ -225,228 +651,4 @@ UK_SYSCALL_R_DEFINE(pid_t, getppid)
 	return UNIKRAFT_PPID;
 }
 
-UK_SYSCALL_R_DEFINE(pid_t, setsid)
-{
-	/* We have a single "session" with a single "process" */
-	return (pid_t) -EPERM;
-}
-
-UK_SYSCALL_R_DEFINE(pid_t, getsid, pid_t, pid)
-{
-	if (pid != 0) {
-		/* We support only calls for the only calling "process" */
-		return (pid_t) -ESRCH;
-	}
-	return UNIKRAFT_SID;
-}
-
-UK_SYSCALL_R_DEFINE(int, setpgid, pid_t, pid, pid_t, pgid)
-{
-	if (pid != 0) {
-		/* We support only calls for the only calling "process" */
-		return (pid_t) -ESRCH;
-	}
-	if (pgid != 0) {
-		/* We have a single "group" with a single "process" */
-		return (pid_t) -EPERM;
-	}
-	return 0;
-}
-
-UK_SYSCALL_R_DEFINE(pid_t, getpgid, pid_t, pid)
-{
-	if (pid != 0) {
-		/* We support only calls for the only calling "process" */
-		return (pid_t) -ESRCH;
-	}
-	return UNIKRAFT_PGID;
-}
-
-UK_SYSCALL_R_DEFINE(pid_t, getpgrp)
-{
-	return UNIKRAFT_PGID;
-}
-
-int setpgrp(void)
-{
-	return setpgid(0, 0);
-}
-
-int tcsetpgrp(int fd __unused, pid_t pgrp)
-{
-	/* TODO check if fd is BADF */
-	if (pgrp != UNIKRAFT_PGID) {
-		errno = EINVAL;
-		return -1;
-	}
-	return 0;
-}
-
-pid_t tcgetpgrp(int fd)
-{
-	/* We have a single "process group" */
-	return UNIKRAFT_PGID;
-}
-
-int nice(int inc __unused)
-{
-	/* We don't support priority updates for unikernels */
-	errno = EPERM;
-	return -1;
-}
-
-UK_SYSCALL_R_DEFINE(int, getpriority, int, which, id_t, who)
-{
-	int rc = 0;
-
-	switch (which) {
-	case PRIO_PROCESS:
-	case PRIO_PGRP:
-	case PRIO_USER:
-		if (who == 0)
-			/* Allow only for the calling "process" */
-			rc = UNIKRAFT_PROCESS_PRIO;
-		else {
-			rc = -ESRCH;
-		}
-		break;
-	default:
-		rc = -EINVAL;
-		break;
-	}
-
-	return rc;
-}
-
-UK_SYSCALL_R_DEFINE(int, setpriority, int, which, id_t, who, int, prio)
-{
-	int rc = 0;
-
-	switch (which) {
-	case PRIO_PROCESS:
-	case PRIO_PGRP:
-	case PRIO_USER:
-		if (who == 0) {
-			/* Allow only for the calling "process" */
-			if (prio != UNIKRAFT_PROCESS_PRIO) {
-				/* Allow setting only the default prio */
-				rc = -EACCES;
-			}
-		} else {
-			rc = -ESRCH;
-		}
-		break;
-default:
-		rc = -EINVAL;
-		break;
-	}
-
-	return rc;
-}
-
-UK_SYSCALL_R_DEFINE(int, prctl, int, option,
-		    unsigned long, arg2,
-		    unsigned long, arg3,
-		    unsigned long, arg4,
-		    unsigned long, arg5)
-{
-	UK_WARN_STUBBED();
-	return 0; /* syscall has no effect */
-}
-
-UK_LLSYSCALL_R_DEFINE(int, prlimit64, int, pid, unsigned int, resource,
-		      struct rlimit *, new_limit, struct rlimit *, old_limit)
-{
-	if (unlikely(pid != 0))
-		uk_pr_debug("Do not support prlimit64 on PID %u, use current process\n",
-			    pid);
-
-	/*
-	 * Lookup if resource can be set/retrieved
-	 */
-	switch (resource) {
-	case RLIMIT_STACK:
-		break;
-#if CONFIG_LIBVFSCORE
-	case RLIMIT_NOFILE:
-		break;
-#endif
-	default:
-		uk_pr_err("Unsupported resource %u\n",
-			  resource);
-		return -EINVAL;
-	}
-
-	/*
-	 * Set resource
-	 */
-	if (new_limit) {
-		switch (resource) {
-		default:
-			uk_pr_err("Ignore updating resource %u: cur = %llu, max = %llu\n",
-				  resource,
-				  (unsigned long long) new_limit->rlim_cur,
-				  (unsigned long long) new_limit->rlim_max);
-			break;
-		}
-	}
-
-	/*
-	 * Get resource
-	 */
-	if (!old_limit)
-		return 0;
-	switch (resource) {
-	case RLIMIT_STACK:
-		old_limit->rlim_cur = __STACK_SIZE;
-		old_limit->rlim_max = __STACK_SIZE;
-		break;
-
-#if CONFIG_LIBVFSCORE
-	case RLIMIT_NOFILE:
-		old_limit->rlim_cur = FDTABLE_MAX_FILES;
-		old_limit->rlim_max = FDTABLE_MAX_FILES;
-		break;
-#endif
-
-	default:
-		break;
-	}
-
-	uk_pr_debug("Resource %u: cur = %llu, max = %llu\n",
-		    resource,
-		    (unsigned long long) old_limit->rlim_cur,
-		    (unsigned long long) old_limit->rlim_max);
-	return 0;
-}
-
-UK_SYSCALL_R_DEFINE(int, getrlimit, int, resource, struct rlimit *, rlim)
-{
-	return uk_syscall_r_prlimit64(0, (long) resource,
-				      (long) NULL, (long) rlim);
-}
-
-UK_SYSCALL_R_DEFINE(int, setrlimit, int, resource, const struct rlimit *, rlim)
-{
-	return uk_syscall_r_prlimit64(0, (long) resource,
-				      (long) rlim, (long) NULL);
-}
-
-UK_SYSCALL_R_DEFINE(int, getrusage, int, who,
-		    struct rusage *, usage)
-{
-	if (!usage)
-		return -EFAULT;
-
-	memset(usage, 0, sizeof(*usage));
-	return 0;
-}
-
-#if UK_LIBC_SYSCALLS
-int prlimit(pid_t pid, int resource, const struct rlimit *new_limit,
-	    struct rlimit *old_limit)
-{
-	return uk_syscall_e_prlimit64(0, (long) resource,
-				      (long) new_limit, (long) old_limit);
-}
-#endif
+#endif /* !CONFIG_LIBPOSIX_PROCESS_PIDS */

@@ -6,8 +6,19 @@ BEGIN {
 }
 
 /[a-zA-Z0-9]+-[0-9]+/{
+	# check if the syscall is not defined
 	printf "\n#ifndef SYS_%s\n", $1;
-	printf "#warning Ignoring system call '%s': No system call number available\n", $1
+	# if a LEGACY_<syscall_name> symbol is defined, the syscall is not required
+	# and we can continue the build process
+	printf "#ifdef LEGACY_SYS_%s\n", $1;
+	printf "#ifdef CONFIG_LIBSYSCALL_SHIM_LEGACY_VERBOSE\n"
+	printf "#warning Ignoring legacy system call '%s': No system call number available\n", $1
+	printf "#endif /* LIBSYSCALL_SHIM_LEGACY_VERBOSE */\n"
+	# if the LEGACY symbol is not defined for this syscall, it means that the
+	# syscall is required and we can't continue without a definition
+	printf "#else\n";
+	printf "#error Failed to map system call '%s': No system call number available\n", $1
+	printf "#endif  /* LEGACY_SYS_%s */\n", $1
 	printf "#else\n";
 	printf "#define HAVE_uk_syscall_%s t\n", $1;
 	printf "UK_SYSCALL_E_PROTO(%s, %s);\n", $2, $1;

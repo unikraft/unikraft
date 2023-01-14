@@ -173,8 +173,9 @@ if RECORD_BUILDTIME
 	config RECORD_BUILDTIME_LIFTOFF
 	bool "liftoff"
 	help
-		Use liftoff to record process statistics during building
-		Get it from https://github.com/sysml/liftoff
+		Use liftoff to record process statistics during building.
+		Get it from https://github.com/unikraft/liftoff and add
+		it to your command-line environment
 
 	endchoice
 endif

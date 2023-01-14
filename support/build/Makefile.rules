@@ -252,21 +252,29 @@ verbose_cmd = @printf '  %-7s %s\n' '$(1)'  '$(2)' && $(3)
 verbose_cmd_inner = printf '  %-7s %s\n' '$(1)'  '$(2)' && $(3)
 endif
 
+# Writes to a file during deferred expansion
+#
+# write_file_deferred $filepath,$content
+write_file_deferred = $(if $(UK_DEFERRED_EXPANSION),$(file > $(1),$(2)),$$(file > $(1),$(2)))
+
 # Calls a command that creates an object
 #
 # build_cmd $quietlabel,$libname(optional),$target,$command
 ifeq ($(CONFIG_RECORD_BUILDTIME_TIME),y)
 define build_cmd =
-$(call verbose_cmd,$(1),$(if $(2),$(2)':' ,)$(notdir $(3)),$(TIME) $(TIMEFLAGS) -o $(addsuffix .time,$(3)) $(4))
+$(call write_file_deferred,$(addsuffix .cmd,$(3)),$(strip $(4)))\
+$(call verbose_cmd,$(1),$(if $(2),$(2)':' ,)$(notdir $(3)),$(TIME) $(TIMEFLAGS) -o $(addsuffix .time,$(3)) $(SHELL) $(addsuffix .cmd,$(3)))
 endef
 else
 ifeq ($(CONFIG_RECORD_BUILDTIME_LIFTOFF),y)
 define build_cmd =
-$(call verbose_cmd,$(1),$(if $(2),$(2)':' ,)$(notdir $(3)),$(LIFTOFF) $(LITFOFFFLAGS) -o $(addsuffix .liftoff,$(3)) -- $(4))
+$(call write_file_deferred,$(addsuffix .cmd,$(3)),$(strip $(4)))\
+$(call verbose_cmd,$(1),$(if $(2),$(2)':' ,)$(notdir $(3)),$(LIFTOFF) $(LITFOFFFLAGS) -o $(addsuffix .liftoff,$(3)) -- $(SHELL) $(addsuffix .cmd,$(3)))
 endef
 else
 define build_cmd =
-$(call verbose_cmd,$(1),$(if $(2),$(2)':' ,)$(notdir $(3)),$(4))
+$(call write_file_deferred,$(addsuffix .cmd,$(3)),$(strip $(4)))\
+$(call verbose_cmd,$(1),$(if $(2),$(2)':' ,)$(notdir $(3)), $(SHELL) $(addsuffix .cmd,$(3)))
 endef
 endif
 endif
@@ -281,7 +289,7 @@ tmp_depfile = $(dir $1).$(notdir $1).d
 depflags = -Wp$(comma)-MD$(comma)$(call tmp_depfile,$(1))
 define build_cmd_fixdep =
 	$(call build_cmd,$1,$2,$3,$4)
-	$Q $(UK_FIXDEP) $(call tmp_depfile,$3) $3 '$(call strip,$4)' \
+	$Q $(UK_FIXDEP) $(call tmp_depfile,$3) $3 '$(SHELL) $(addsuffix .cmd,$(3))' \
 		> $(call out2dep,$3) && \
 		$(RM) $(call tmp_depfile,$3)
 endef
@@ -289,14 +297,12 @@ endef
 # Returns a list of files to be cleaned when build_cmd was used
 #
 # build_clean $target
+build_clean = $(1) $(addsuffix .cmd,$(1))
 ifeq ($(CONFIG_RECORD_BUILDTIME_TIME),y)
-build_clean = $(1) $(addsuffix .time,$(1))
-else
-ifeq ($(CONFIG_RECORD_BUILDTIME_LIFTOFF),y)
-build_clean = $(1) $(addsuffix .liftoff,$(1))
-else
-build_clean = $(1)
+build_clean += $(addsuffix .time,$(1))
 endif
+ifeq ($(CONFIG_RECORD_BUILDTIME_LIFTOFF),y)
+build_clean += $(addsuffix .liftoff,$(1))
 endif
 
 # Helper that generates a command for validating a checksum for
@@ -355,7 +361,7 @@ endef
 # Takes all files from $patchdir, sorts them, and applies each
 # of these patches to the source tree in $source_target_dir
 #
-# patch $libname,$patchdir,$source_target_dir
+# patch $libname,$patchdir,$source_target_dir(optional)
 define patch =
 $(BUILD_DIR)/$(1)/.patched: $(BUILD_DIR)/$(1)/.origin
 	@$(foreach P,$(sort $(wildcard $(2)/*)), \
@@ -373,12 +379,12 @@ endef
 # A variable called LIB[LIBNAME]_ORIGIN is initialized with
 # the path to the extracted files
 #
-# unarchive $libname,$archive_fname,$dir_with_patches(optional),$extra_deps(optional)
+# unarchive $libname,$archive_fname,$extra_deps(optional)
 define unarchive =
-$(if $(filter %.tar.gz %.tgz,$(2)),$(call _extracttoorigin_tgz,$(1),$(2),$(4)),\
-$(if $(filter %.tar.xz %.txz,$(2)),$(call _extracttoorigin_tgz_xz,$(1),$(2),$(4)),\
-$(if $(filter %.tar.bz2 %.tbz2,$(2)),$(call _extracttoorigin_tgz_bz2,$(1),$(2),$(4)),\
-$(if $(filter %.zip,$(2)),$(call          _extracttoorigin_zip,$(1),$(2),$(4)),\
+$(if $(filter %.tar.gz %.tgz,$(2)),$(call _extracttoorigin_tgz,$(1),$(2),$(3)),\
+$(if $(filter %.tar.xz %.txz,$(2)),$(call _extracttoorigin_tgz_xz,$(1),$(2),$(3)),\
+$(if $(filter %.tar.bz2 %.tbz2,$(2)),$(call _extracttoorigin_tgz_bz2,$(1),$(2),$(3)),\
+$(if $(filter %.zip,$(2)),$(call          _extracttoorigin_zip,$(1),$(2),$(3)),\
 $(error $(2): missing extraction rule for archive type)\
 ))))
 UK_FETCH-y += $(BUILD_DIR)/$(1)/.origin \
@@ -419,7 +425,7 @@ endef
 
 # Downloads an archive from remote and invokes unarchive. The target filename
 # (without path!) is specified
-# fetchas $libname,$url,$target_fname(no_path!),$dir_with_patches(optional)
+# fetchas $libname,$url,$target_fname(no_path!)
 define fetchas =
 $(BUILD_DIR)/$(1)/$(3):
 	$(call verbose_cmd,WGET,$(1)':' $(2), \
@@ -427,13 +433,13 @@ $(BUILD_DIR)/$(1)/$(3):
 	 $(RM) $(BUILD_DIR)/$(1)/$(3))
 
 $(call _chksum_origin,$(1),$(BUILD_DIR)/$(1)/$(3),$(BUILD_DIR)/$(1)/.chksum)
-$(call unarchive,$(1),$(BUILD_DIR)/$(1)/$(3),$(4),$(BUILD_DIR)/$(1)/.chksum)
+$(call unarchive,$(1),$(BUILD_DIR)/$(1)/$(3),$(BUILD_DIR)/$(1)/.chksum)
 
 UK_FETCH-y += $(BUILD_DIR)/$(1)/.chksum
 endef
 
 # fetchas2 works like fetchas but supports a secondary URL
-# fetchas2 $libname,$url,$url2,$target_fname(no_path!),$dir_with_patches(optional)
+# fetchas2 $libname,$url,$url2,$target_fname(no_path!)
 define fetchas2 =
 $(BUILD_DIR)/$(1)/$(4):
 	$(call verbose_cmd,WGET,$(1)':' $(2) [retry-with: $(3)], \
@@ -442,21 +448,40 @@ $(BUILD_DIR)/$(1)/$(4):
 	 $(RM) $(BUILD_DIR)/$(1)/$(4))
 
 $(call _chksum_origin,$(1),$(BUILD_DIR)/$(1)/$(4),$(BUILD_DIR)/$(1)/.chksum)
-$(call unarchive,$(1),$(BUILD_DIR)/$(1)/$(4),$(5),$(BUILD_DIR)/$(1)/.chksum)
+$(call unarchive,$(1),$(BUILD_DIR)/$(1)/$(4),$(BUILD_DIR)/$(1)/.chksum)
 
 UK_FETCH-y += $(BUILD_DIR)/$(1)/.chksum
 endef
 
 # Downloads an archive from remote and invokes unarchive
-# fetch $libname,$url,$dir_with_patches(optional)
+# fetch $libname,$url
 define fetch =
-$(call fetchas,$(1),$(2),$(notdir $(2)),$(3))
+$(call fetchas,$(1),$(2),$(notdir $(2)))
 endef
 
 # fetch2 works like fetch but supports a secondary URL
-# fetch2 $libname,$url,$url2,$dir_with_patches(optional)
+# fetch2 $libname,$url,$url2
 define fetch2 =
-$(call fetchas2,$(1),$(2),$(3),$(notdir $(2)),$(4))
+$(call fetchas2,$(1),$(2),$(3),$(notdir $(2)))
+endef
+
+# Clones a git repo
+# NOTE: This command can not clone a specific commit from a
+# specific branch of a repo
+# clone $libname $giturl $branch/tag
+define clone =
+$(BUILD_DIR)/$(1)/.origin:
+	$(call verbose_cmd,GIT,$(1),$(RM) -r $(BUILD_DIR)/$(1)/origin && \
+	$(GIT) clone --recurse-submodules -q --progress --depth 1 --branch $(3) --no-tags $(2) $(BUILD_DIR)/$(1)/origin/ && \
+	$(TOUCH) $(BUILD_DIR)/$(1)/.origin)
+UK_FETCH-y += $(BUILD_DIR)/$(1)/.origin \
+$(eval $(call vprefix_lib,$(1),ORIGIN) = $(BUILD_DIR)/$(1)/origin)
+
+.PRECIOUS: $(BUILD_DIR)/$(1)/origin
+
+$(BUILD_DIR)/$(1)/origin/%: $(BUILD_DIR)/$(1)/.origin
+	@:
+
 endef
 
 
@@ -844,44 +869,44 @@ endef
 
 # buildrule_olib $libname
 define buildrule_olib =
-$(call libname2preolib,$(1)): $($(call vprefix_lib,$(1),OBJS)) \
-			      $($(call vprefix_lib,$(1),OBJS-y)) \
-			      $(EACHOLIB_OBJS) \
-			      $(EACHOLIB_OBJS-y) \
-			      $($(call vprefix_lib,$(1),ALIBS)) \
-			      $($(call vprefix_lib,$(1),ALIBS-y)) \
-			      $(EACHOLIB_ALIBS) \
-			      $(EACHOLIB_ALIBS-y) \
-			      $($(call vprefix_lib,$(1),LDS)) \
-			      $($(call vprefix_lib,$(1),LDS-y)) \
-			      $($(call vprefix_lib,$(1),DTB)) \
-			      $($(call vprefix_lib,$(1),DTB-y))
+$(call libname2preolib,$(1)): $$($(call vprefix_lib,$(1),OBJS)) \
+			      $$($(call vprefix_lib,$(1),OBJS-y)) \
+			      $$(EACHOLIB_OBJS) \
+			      $$(EACHOLIB_OBJS-y) \
+			      $$($(call vprefix_lib,$(1),ALIBS)) \
+			      $$($(call vprefix_lib,$(1),ALIBS-y)) \
+			      $$(EACHOLIB_ALIBS) \
+			      $$(EACHOLIB_ALIBS-y) \
+			      $$($(call vprefix_lib,$(1),LDS)) \
+			      $$($(call vprefix_lib,$(1),LDS-y)) \
+			      $$($(call vprefix_lib,$(1),DTB)) \
+			      $$($(call vprefix_lib,$(1),DTB-y))
 	$(call build_cmd,LD,,$(call libname2preolib,$(1)),\
-		$(LD) $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
-		      $($(call vprefix_lib,$(1),LDFLAGS)) \
-		      $($(call vprefix_lib,$(1),LDFLAGS-y)) \
-		      $($(call vprefix_lib,$(1),OBJS)) \
-		      $($(call vprefix_lib,$(1),OBJS-y)) \
-		      $(EACHOLIB_OBJS) \
-		      $(EACHOLIB_OBJS-y) \
+		$(LD) $$(LIBLDFLAGS) $$(LIBLDFLAGS-y) \
+		      $$($(call vprefix_lib,$(1),LDFLAGS)) \
+		      $$($(call vprefix_lib,$(1),LDFLAGS-y)) \
+		      $$($(call vprefix_lib,$(1),OBJS)) \
+		      $$($(call vprefix_lib,$(1),OBJS-y)) \
+		      $$(EACHOLIB_OBJS) \
+		      $$(EACHOLIB_OBJS-y) \
 		      -Wl$(comma)--start-group \
-		      $($(call vprefix_lib,$(1),ALIBS)) \
-		      $($(call vprefix_lib,$(1),ALIBS-y)) \
-		      $(EACHOLIB_ALIBS) \
-		      $(EACHOLIB_ALIBS-y) \
+		      $$($(call vprefix_lib,$(1),ALIBS)) \
+		      $$($(call vprefix_lib,$(1),ALIBS-y)) \
+		      $$(EACHOLIB_ALIBS) \
+		      $$(EACHOLIB_ALIBS-y) \
 		      -Wl$(comma)--end-group \
 		      -o $(call libname2preolib,$(1)))
 
 $(call libname2olib,$(1)): $(call libname2preolib,$(1)) \
-			   $($(call vprefix_lib,$(1),EXPORTS)) $($(call vprefix_lib,$(1),EXPORTS-y)) \
-			   $($(call vprefix_lib,$(1),LOCALS)) $($(call vprefix_lib,$(1),LOCALS-y)) \
-			   $(EACHOLIB_LOCALS) $(EACHOLIB_LOCALS-y)
+			   $$($(call vprefix_lib,$(1),EXPORTS)) $$($(call vprefix_lib,$(1),EXPORTS-y)) \
+			   $$($(call vprefix_lib,$(1),LOCALS)) $$($(call vprefix_lib,$(1),LOCALS-y)) \
+			   $$(EACHOLIB_LOCALS) $$(EACHOLIB_LOCALS-y)
 	$(call build_cmd,OBJCOPY,,$(call libname2olib,$(1)),\
-		$(OBJCOPY) $(addprefix --keep-global-symbols=,$($(call vprefix_lib,$(1),EXPORTS)) $($(call vprefix_lib,$(1),EXPORTS-y))) \
-			   $(addprefix --localize-symbols=,$($(call vprefix_lib,$(1),LOCALS)) $($(call vprefix_lib,$(1),LOCALS-y))) \
-			   $(addprefix --localize-symbols=,$(EACHOLIB_LOCALS) $(EACHOLIB_LOCALS-y)) \
-		           $(OBJCFLAGS) $(OBJCFLAGS-y) \
-		           $($(call vprefix_lib,$(1),OBJCFLAGS)) $($(call vprefix_lib,$(1),OBJCFLAGS-y)) \
+		$(OBJCOPY) $$(addprefix --keep-global-symbols=,$$($(call vprefix_lib,$(1),EXPORTS)) $$($(call vprefix_lib,$(1),EXPORTS-y))) \
+			   $$(addprefix --localize-symbols=,$$($(call vprefix_lib,$(1),LOCALS)) $$($(call vprefix_lib,$(1),LOCALS-y))) \
+			   $$(addprefix --localize-symbols=,$$(EACHOLIB_LOCALS) $$(EACHOLIB_LOCALS-y)) \
+		           $$(OBJCFLAGS) $$(OBJCFLAGS-y) \
+		           $$($(call vprefix_lib,$(1),OBJCFLAGS)) $$($(call vprefix_lib,$(1),OBJCFLAGS-y)) \
 			   $(call libname2preolib,$(1)) $(call libname2olib,$(1)))
 
 $(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(call libname2preolib,$(1))))

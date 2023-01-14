@@ -41,6 +41,7 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <uk/print.h>
+#include "legacy_syscall.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -60,31 +61,106 @@ extern "C" {
 #endif /* CONFIG_LIBSYSCALL_SHIM && CONFIG_LIBSYSCALL_SHIM_NOWRAPPER */
 #endif /* UK_LIBC_SYSCALLS */
 
+#ifdef CONFIG_LIBSYSCALL_SHIM
+/**
+ * Library-internal thread-local variable containing the return address
+ * of the caller of the currently called system call.
+ * NOTE: Use the `uk_syscall_return_addr()` macro to retrieve the return address
+ *       within a system call implementation. Please note that this macro is
+ *       only available if `lib/syscall_shim` is part of the build.
+ *       This implies that every system call implementation that require to know
+ *       the return address have a dependency to `lib/syscall_shim`.
+ */
+extern __uk_tls __uptr _uk_syscall_return_addr;
+
+/**
+ * Returns the return address of the currently called system call.
+ */
+#define uk_syscall_return_addr()					\
+	((__uptr)((_uk_syscall_return_addr != 0x0)			\
+		  ? _uk_syscall_return_addr : __return_addr(0)))
+
+#define __UK_SYSCALL_RETADDR_ENTRY();					\
+	do { _uk_syscall_return_addr = uk_syscall_return_addr(); } while (0)
+
+#if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
+/*
+ * In the case the support for userland TLS pointers is enabled, we assume that
+ * some system calls (like `arch_prctl` on `x86_64`) can change the TLS pointer.
+ * In such a case, we need a safe way to access `_uk_syscall_return_addr` for
+ * clearing after a system call handler was executed.
+ */
+#include <uk/thread.h>
+
+#define __UK_SYSCALL_RETADDR_CLEAR();					\
+	do { (uk_thread_uktls_var(uk_thread_current(),			\
+				  _uk_syscall_return_addr)) = 0x0; } while (0)
+#else /* !CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
+/* Without userland TLS pointer support, we assume that we do not have any
+ * system call that changes the TLS pointer (harmfully). This means that we do
+ * not need to rely on `lib/uksched`.
+ */
+#define __UK_SYSCALL_RETADDR_CLEAR();					\
+	do { _uk_syscall_return_addr = 0x0; } while (0)
+#endif /* !CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
+
+#else /* !CONFIG_LIBSYSCALL_SHIM */
+
+/*
+ * NOTE: The usage of `uk_syscall_return_addr()` requires the `syscall_shim`
+ *       library to be present. In order to avoid mis-configurations, we
+ *       inject an always failing compile-time assertion to stop compilation.
+ */
+#define uk_syscall_return_addr()					\
+	({ UK_CTASSERT(0x0); 0xDEADB0B0; })
+
+#define __UK_SYSCALL_RETADDR_ENTRY();					\
+	do { } while (0)
+#define __UK_SYSCALL_RETADDR_CLEAR();					\
+	do { } while (0)
+#endif /* !CONFIG_LIBSYSCALL_SHIM */
+
+#if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
+#include <uk/thread.h>
+
+/**
+ * Library-internal thread-local variable containing the current userland
+ * TLS pointer.
+ * NOTE: Use the `uk_syscall_ultlsp()` macro to retrieve the userland TLS
+ *       pointer.
+ * NOTE: Userland TLS pointers are only supported on binary system calls.
+ */
+extern __uk_tls __uptr _uk_syscall_ultlsp;
+
+/**
+ * Returns the userland TLS pointer if it is not equal to the Unikraft tlsp of
+ * the current thread and if it was set. Please note that we must be called
+ * from a binary system call request.
+ */
+static inline __uptr uk_syscall_ultlsp(void)
+{
+	__uptr ultlsp = _uk_syscall_ultlsp;
+	struct uk_thread *self = uk_thread_current();
+
+	UK_ASSERT(self);
+	if (ultlsp && (ultlsp != self->uktlsp))
+		return ultlsp;
+	return 0x0;
+}
+#else /* !CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
+
+/**
+ * If we do not support binary system calls and userland TLS pointers, we do not
+ * know any caller TLS pointer, so we can always return 0.
+ */
+static inline __uptr uk_syscall_ultlsp(void)
+{
+	return 0x0;
+}
+#endif /* !CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
+
 #define __uk_scc(X) ((long) (X))
 typedef long uk_syscall_arg_t;
-
-#define __uk_syscall_fn(syscall_nr, ...) \
-	UK_CONCAT(uk_syscall_fn_, syscall_nr) (__VA_ARGS__)
-#define __uk_syscall_r_fn(syscall_nr, ...) \
-	UK_CONCAT(uk_syscall_r_fn_, syscall_nr) (__VA_ARGS__)
-
-#define __uk_syscall0(n) __uk_syscall_fn(n)
-#define __uk_syscall1(n,a) __uk_syscall_fn(n,__uk_scc(a))
-#define __uk_syscall2(n,a,b) __uk_syscall_fn(n,__uk_scc(a),__uk_scc(b))
-#define __uk_syscall3(n,a,b,c) __uk_syscall_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c))
-#define __uk_syscall4(n,a,b,c,d) __uk_syscall_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d))
-#define __uk_syscall5(n,a,b,c,d,e) __uk_syscall_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e))
-#define __uk_syscall6(n,a,b,c,d,e,f) __uk_syscall_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e),__uk_scc(f))
-#define __uk_syscall7(n,a,b,c,d,e,f,g) __uk_syscall_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e),__uk_scc(f),__uk_scc(g))
-
-#define __uk_syscall0_r(n) __uk_syscall_r_fn(n)
-#define __uk_syscall1_r(n,a) __uk_syscall_r_fn(n,__uk_scc(a))
-#define __uk_syscall2_r(n,a,b) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b))
-#define __uk_syscall3_r(n,a,b,c) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c))
-#define __uk_syscall4_r(n,a,b,c,d) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d))
-#define __uk_syscall5_r(n,a,b,c,d,e) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e))
-#define __uk_syscall6_r(n,a,b,c,d,e,f) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e),__uk_scc(f))
-#define __uk_syscall7_r(n,a,b,c,d,e,f,g) __uk_syscall_r_fn(n,__uk_scc(a),__uk_scc(b),__uk_scc(c),__uk_scc(d),__uk_scc(e),__uk_scc(f),__uk_scc(g))
 
 #define __UK_SYSCALL_NARGS_X(a,b,c,d,e,f,g,h,n,...) n
 #define __UK_SYSCALL_NARGS(...) __UK_SYSCALL_NARGS_X(__VA_ARGS__,7,6,5,4,3,2,1,0,)
@@ -123,7 +199,7 @@ typedef long uk_syscall_arg_t;
 #define UK_S_ARG_CAST_LONG(type, arg)   (long) arg
 #define UK_S_ARG_CAST_ACTUAL(type, arg) (type) arg
 
-#if CONFIG_LIBSYSCALL_SHIM_DEBUG || CONFIG_LIBUKDEBUG_PRINTD
+#if CONFIG_LIBSYSCALL_SHIM_DEBUG_SYSCALLS || CONFIG_LIBUKDEBUG_PRINTD
 #define UK_ARG_FMT_MAP0(...)
 #define UK_ARG_FMT_MAP1(m, type, arg) m(type, arg)
 #define UK_ARG_FMT_MAP2(m, type, arg, ...) m(type, arg) ", " UK_ARG_FMT_MAP1(m, __VA_ARGS__)
@@ -161,21 +237,28 @@ typedef long uk_syscall_arg_t;
 		int _errno = errno;					\
 		long ret;						\
 									\
+		__UK_SYSCALL_RETADDR_ENTRY();				\
 		errno = 0;						\
 		ret = ename(						\
 			UK_ARG_MAPx(x, UK_S_ARG_CAST_LONG, __VA_ARGS__)); \
 		if (ret == -1)						\
 			ret = errno ? -errno : -EFAULT;			\
 		errno = _errno;						\
+		__UK_SYSCALL_RETADDR_CLEAR();				\
 		return ret;						\
 	}								\
 	static inline rtype __##ename(UK_ARG_MAPx(x,			\
 					UK_S_ARG_ACTUAL, __VA_ARGS__)); \
 	long ename(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__))		\
 	{								\
+		long ret;						\
+									\
 		__UK_SYSCALL_PRINTD(x, rtype, ename, __VA_ARGS__);	\
-		return (long) __##ename(				\
+		__UK_SYSCALL_RETADDR_ENTRY();				\
+		ret = (long) __##ename(					\
 			UK_ARG_MAPx(x, UK_S_ARG_CAST_ACTUAL, __VA_ARGS__)); \
+		__UK_SYSCALL_RETADDR_CLEAR();				\
+		return ret;						\
 	}								\
 	static inline rtype __##ename(UK_ARG_MAPx(x,			\
 						  UK_S_ARG_ACTUAL_MAYBE_UNUSED,\
@@ -199,8 +282,13 @@ typedef long uk_syscall_arg_t;
 	long ename(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__));		\
 	rtype name(UK_ARG_MAPx(x, UK_S_ARG_ACTUAL, __VA_ARGS__))	\
 	{								\
-		return (rtype) ename(					\
+		rtype ret;						\
+									\
+		__UK_SYSCALL_RETADDR_ENTRY();				\
+		ret = (rtype) ename(					\
 			UK_ARG_MAPx(x, UK_S_ARG_CAST_LONG, __VA_ARGS__)); \
+		__UK_SYSCALL_RETADDR_CLEAR();				\
+		return ret;						\
 	}								\
 	__UK_LLSYSCALL_DEFINE(x, rtype, name, ename, rname, __VA_ARGS__)
 #define _UK_SYSCALL_DEFINE(...) __UK_SYSCALL_DEFINE(__VA_ARGS__)
@@ -233,8 +321,12 @@ typedef long uk_syscall_arg_t;
 	long rname(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__));		\
 	long ename(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__))		\
 	{								\
-		long ret = rname(					\
+		long ret;						\
+									\
+		__UK_SYSCALL_RETADDR_ENTRY();				\
+		ret = rname(						\
 			UK_ARG_MAPx(x, UK_S_ARG_CAST_LONG, __VA_ARGS__)); \
+		__UK_SYSCALL_RETADDR_CLEAR();				\
 		if (ret < 0 && PTRISERR(ret)) {				\
 			errno = -(int) PTR2ERR(ret);			\
 			return -1;					\
@@ -245,9 +337,14 @@ typedef long uk_syscall_arg_t;
 						 __VA_ARGS__));		\
 	long rname(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__))		\
 	{								\
+		long ret;						\
+									\
 		__UK_SYSCALL_PRINTD(x, rtype, rname, __VA_ARGS__);	\
-		return (long) __##rname(				\
+		__UK_SYSCALL_RETADDR_ENTRY();				\
+		ret = (long) __##rname(					\
 			UK_ARG_MAPx(x, UK_S_ARG_CAST_ACTUAL, __VA_ARGS__)); \
+		__UK_SYSCALL_RETADDR_CLEAR();				\
+		return ret;						\
 	}								\
 	static inline rtype __##rname(UK_ARG_MAPx(x,			\
 						  UK_S_ARG_ACTUAL_MAYBE_UNUSED,\
@@ -271,8 +368,13 @@ typedef long uk_syscall_arg_t;
 	long ename(UK_ARG_MAPx(x, UK_S_ARG_LONG, __VA_ARGS__));		\
 	rtype name(UK_ARG_MAPx(x, UK_S_ARG_ACTUAL, __VA_ARGS__))	\
 	{								\
-		return (rtype) ename(					\
+		rtype ret;						\
+									\
+		__UK_SYSCALL_RETADDR_ENTRY();				\
+		ret = (rtype) ename(					\
 			UK_ARG_MAPx(x, UK_S_ARG_CAST_LONG, __VA_ARGS__)); \
+		__UK_SYSCALL_RETADDR_CLEAR();				\
+		return ret;						\
 	}								\
 	__UK_LLSYSCALL_R_DEFINE(x, rtype, name, ename, rname, __VA_ARGS__)
 #define _UK_SYSCALL_R_DEFINE(...) __UK_SYSCALL_R_DEFINE(__VA_ARGS__)
@@ -330,6 +432,8 @@ typedef long uk_syscall_arg_t;
 #include <uk/bits/syscall_map.h>
 #include <uk/bits/provided_syscalls.h>
 #include <uk/bits/syscall_stubs.h>
+#include <uk/bits/syscall_static.h>
+#include <uk/bits/syscall_r_static.h>
 
 /* System call, returns -1 and sets errno on errors */
 long uk_syscall(long nr, ...);
@@ -342,8 +446,24 @@ long uk_syscall6(long nr, long arg1, long arg2, long arg3,
  * is a constant. This macro maps the function call directly to the target
  * handler instead of doing a look-up at runtime
  */
-#define uk_syscall_static(...)						\
-	UK_CONCAT(__uk_syscall, __UK_SYSCALL_NARGS(__VA_ARGS__))(__VA_ARGS__)
+#define uk_syscall_static0(syscall_nr) \
+	UK_CONCAT(uk_syscall0_fn, syscall_nr)()
+#define uk_syscall_static1(syscall_nr, a) \
+	UK_CONCAT(uk_syscall1_fn, syscall_nr)(a)
+#define uk_syscall_static2(syscall_nr, a, b) \
+	UK_CONCAT(uk_syscall2_fn, syscall_nr)(a, b)
+#define uk_syscall_static3(syscall_nr, a, b, c) \
+	UK_CONCAT(uk_syscall3_fn, syscall_nr)(a, b, c)
+#define uk_syscall_static4(syscall_nr, a, b, c, d) \
+	UK_CONCAT(uk_syscall4_fn, syscall_nr)(a, b, c, d)
+#define uk_syscall_static5(syscall_nr, a, b, c, d, e) \
+	UK_CONCAT(uk_syscall5_fn, syscall_nr)(a, b, c, d, e)
+#define uk_syscall_static6(syscall_nr, a, b, c, d, e, f) \
+	UK_CONCAT(uk_syscall6_fn, syscall_nr)(a, b, c, d, e, f)
+
+#define uk_syscall_static(...)					\
+	UK_CONCAT(uk_syscall_static,				\
+		  __UK_SYSCALL_NARGS(__VA_ARGS__))(__VA_ARGS__)
 
 /* Raw system call, returns negative codes on errors */
 long uk_syscall_r(long nr, ...);
@@ -356,9 +476,24 @@ long uk_syscall6_r(long nr, long arg1, long arg2, long arg3,
  * is a constant. This macro maps the function call directly to the target
  * handler instead of doing a look-up at runtime
  */
-#define uk_syscall_r_static(...)					\
-	UK_CONCAT(__uk_syscall,						\
-		  UK_CONCAT(__UK_SYSCALL_NARGS(__VA_ARGS__)), _r)(__VA_ARGS__)
+#define uk_syscall_r_static0(syscall_nr) \
+	UK_CONCAT(uk_syscall_r0_fn, syscall_nr)()
+#define uk_syscall_r_static1(syscall_nr, a) \
+	UK_CONCAT(uk_syscall_r1_fn, syscall_nr)(a)
+#define uk_syscall_r_static2(syscall_nr, a, b) \
+	UK_CONCAT(uk_syscall_r2_fn, syscall_nr)(a, b)
+#define uk_syscall_r_static3(syscall_nr, a, b, c) \
+	UK_CONCAT(uk_syscall_r3_fn, syscall_nr)(a, b, c)
+#define uk_syscall_r_static4(syscall_nr, a, b, c, d) \
+	UK_CONCAT(uk_syscall_r4_fn, syscall_nr)(a, b, c, d)
+#define uk_syscall_r_static5(syscall_nr, a, b, c, d, e) \
+	UK_CONCAT(uk_syscall_r5_fn, syscall_nr)(a, b, c, d, e)
+#define uk_syscall_r_static6(syscall_nr, a, b, c, d, e, f) \
+	UK_CONCAT(uk_syscall_r6_fn, syscall_nr)(a, b, c, d, e, f)
+
+#define uk_syscall_r_static(...)				\
+	UK_CONCAT(uk_syscall_r_static,				\
+		  __UK_SYSCALL_NARGS(__VA_ARGS__))(__VA_ARGS__)
 
 /**
  * Returns a string with the name of the system call number `nr`.

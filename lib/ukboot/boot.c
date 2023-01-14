@@ -52,7 +52,10 @@
 #endif
 #if CONFIG_LIBUKSCHED
 #include <uk/sched.h>
-#endif
+#endif /* CONFIG_LIBUKSCHED */
+#if CONFIG_LIBUKBOOT_INITSCHEDCOOP
+#include <uk/schedcoop.h>
+#endif /* CONFIG_LIBUKBOOT_INITSCHEDCOOP */
 #include <uk/arch/lcpu.h>
 #include <uk/plat/bootstrap.h>
 #include <uk/plat/memory.h>
@@ -70,6 +73,8 @@
 #ifdef CONFIG_LIBUKSP
 #include <uk/sp.h>
 #endif
+#include <uk/arch/tls.h>
+#include <uk/plat/tls.h>
 #include "banner.h"
 #ifdef CONFIG_LIBPROCFS_CMDLINE
 #include <string.h>
@@ -217,21 +222,21 @@ void ukplat_entry_argp(char *arg0, char *argb, __sz argb_len)
 /* defined in <uk/plat.h> */
 void ukplat_entry(int argc, char *argv[])
 {
-	struct thread_main_arg tma;
 	int kern_args = 0;
-	int rc __maybe_unused = 0;
+	int rc = 0;
 #if CONFIG_LIBUKALLOC
 	struct uk_alloc *a = NULL;
 #endif
 #if !CONFIG_LIBUKBOOT_NOALLOC
 	struct ukplat_memregion_desc md;
+	void *tls = NULL;
 #endif
 #if CONFIG_LIBUKSCHED
 	struct uk_sched *s = NULL;
-	struct uk_thread *main_thread = NULL;
 #endif
-
 	uk_ctor_func_t *ctorfn;
+	uk_init_func_t *initfn;
+	int i;
 
 	uk_pr_info("Unikraft constructor table at %p - %p\n",
 		   &uk_ctortab_start[0], &uk_ctortab_end);
@@ -289,13 +294,25 @@ void ukplat_entry(int argc, char *argv[])
 		}
 	}
 	if (unlikely(!a))
-		uk_pr_warn("No suitable memory region for memory allocator. Continue without heap\n");
+		UK_CRASH("No suitable memory region for memory allocator\n");
 	else {
 		rc = ukplat_memallocator_set(a);
 		if (unlikely(rc != 0))
 			UK_CRASH("Could not set the platform memory allocator\n");
 	}
-#endif
+
+	/* Allocate a TLS for this execution context */
+	tls = uk_memalign(a,
+			  ukarch_tls_area_align(),
+			  ukarch_tls_area_size());
+	if (!tls)
+		UK_CRASH("Failed to allocate and initialize TLS\n");
+
+	/* Copy from TLS master template */
+	ukarch_tls_area_init(tls);
+	/* Activate TLS */
+	ukplat_tlsp_set(ukarch_tls_tlsp(tls));
+#endif /* !CONFIG_LIBUKBOOT_NOALLOC */
 
 #if CONFIG_LIBUKALLOC
 	uk_pr_info("Initialize IRQ subsystem...\n");
@@ -308,24 +325,88 @@ void ukplat_entry(int argc, char *argv[])
 	uk_pr_info("Initialize platform time...\n");
 	ukplat_time_init();
 
-#if CONFIG_LIBUKSCHED
-	/* Init scheduler. */
-	s = uk_sched_default_init(a);
-	if (unlikely(!s))
-		UK_CRASH("Could not initialize the scheduler\n");
+#if !CONFIG_LIBUKBOOT_NOSCHED
+	uk_pr_info("Initialize scheduling...\n");
+#if CONFIG_LIBUKBOOT_INITSCHEDCOOP
+	s = uk_schedcoop_create(a);
 #endif
-
-	tma.argc = argc - kern_args;
-	tma.argv = &argv[kern_args];
-
-#if CONFIG_LIBUKSCHED
-	main_thread = uk_thread_create("main", main_thread_func, &tma);
-	if (unlikely(!main_thread))
-		UK_CRASH("Could not create main thread\n");
+	if (unlikely(!s))
+		UK_CRASH("Failed to initialize scheduling\n");
 	uk_sched_start(s);
-#else
+#endif /* !CONFIG_LIBUKBOOT_NOSCHED */
+
+	argc -= kern_args;
+	argv = &argv[kern_args];
+
 	/* Enable interrupts before starting the application */
 	ukplat_lcpu_enable_irq();
-	main_thread_func(&tma);
+
+	/**
+	 * Run init table
+	 */
+	uk_pr_info("Init Table @ %p - %p\n",
+		   &uk_inittab_start[0], &uk_inittab_end);
+	uk_inittab_foreach(initfn, uk_inittab_start, uk_inittab_end) {
+		UK_ASSERT(*initfn);
+		uk_pr_debug("Call init function: %p()...\n", *initfn);
+		rc = (*initfn)();
+		if (rc < 0) {
+			uk_pr_err("Init function at %p returned error %d\n",
+				  *initfn, rc);
+			rc = UKPLAT_CRASH;
+			goto exit;
+		}
+	}
+
+#ifdef CONFIG_LIBUKSP
+	uk_stack_chk_guard_setup();
 #endif
+
+	print_banner(stdout);
+	fflush(stdout);
+
+	/*
+	 * Application
+	 *
+	 * We are calling the application constructors right before calling
+	 * the application's main(). All of our Unikraft systems, VFS,
+	 * networking stack is initialized at this point. This way we closely
+	 * mimic what a regular user application (e.g., BSD, Linux) would expect
+	 * from its OS being initialized.
+	 */
+	uk_pr_info("Pre-init table at %p - %p\n",
+		   &__preinit_array_start[0], &__preinit_array_end);
+	uk_ctortab_foreach(ctorfn,
+			   __preinit_array_start, __preinit_array_end) {
+		if (!*ctorfn)
+			continue;
+
+		uk_pr_debug("Call pre-init constructor: %p()...\n", *ctorfn);
+		(*ctorfn)();
+	}
+
+	uk_pr_info("Constructor table at %p - %p\n",
+		   &__init_array_start[0], &__init_array_end);
+	uk_ctortab_foreach(ctorfn, __init_array_start, __init_array_end) {
+		if (!*ctorfn)
+			continue;
+
+		uk_pr_debug("Call constructor: %p()...\n", *ctorfn);
+		(*ctorfn)();
+	}
+
+	uk_pr_info("Calling main(%d, [", argc);
+	for (i = 0; i < argc; ++i) {
+		uk_pr_info("'%s'", argv[i]);
+		if ((i + 1) < argc)
+			uk_pr_info(", ");
+	}
+	uk_pr_info("])\n");
+
+	rc = main(argc, argv);
+	uk_pr_info("main returned %d, halting system\n", rc);
+	rc = (rc != 0) ? UKPLAT_CRASH : UKPLAT_HALT;
+
+exit:
+	ukplat_terminate(rc); /* does not return */
 }

@@ -54,6 +54,7 @@
 /*
  * Basic CPU control in CR0
  */
+#define X86_CR0_PE              (1 << 0)    /* Protection Enable */
 #define X86_CR0_MP              (1 << 1)    /* Monitor Coprocessor */
 #define X86_CR0_EM              (1 << 2)    /* Emulation */
 #define X86_CR0_TS              (1 << 3)    /* Task Switched */
@@ -75,22 +76,6 @@
  * Intel CPU features in EFER
  */
 #define X86_EFER_LME            (1 << 8)    /* Long mode enable (R/W) */
-
-/* CPUID feature bits in ECX and EDX when EAX=1 */
-#define X86_CPUID1_ECX_XSAVE    (1 << 26)
-#define X86_CPUID1_ECX_OSXSAVE  (1 << 27)
-#define X86_CPUID1_ECX_AVX      (1 << 28)
-#define X86_CPUID1_EDX_FPU      (1 << 0)
-#define X86_CPUID1_EDX_FXSR     (1 << 24)
-#define X86_CPUID1_EDX_SSE      (1 << 25)
-/* CPUID feature bits in EBX and ECX when EAX=7, ECX=0 */
-#define X86_CPUID7_EBX_FSGSBASE (1 << 0)
-#define X86_CPUID7_ECX_PKU	(1 << 3)
-#define X86_CPUID7_ECX_OSPKE	(1 << 4)
-/* CPUID feature bits when EAX=0xd, ECX=1 */
-#define X86_CPUIDD1_EAX_XSAVEOPT (1<<0)
-/* CPUID 80000001H:EDX feature list */
-#define X86_CPUID3_SYSCALL      (1 << 11)
 
 /*
  * Extended Control Register 0 (XCR0)

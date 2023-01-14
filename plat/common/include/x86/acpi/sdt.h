@@ -2,7 +2,7 @@
 /*
  * Authors: Cristian Vijelie <cristianvijelie@gmail.com>
  *
- * Copyright (c) 2021, University Politehnica of Bucharest. All rights reserved.
+ * Copyright (c) 2021, University POLITEHNICA of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions

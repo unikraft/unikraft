@@ -161,6 +161,53 @@ menu "Armv8-A Extensions"
 	help
 		BTI protects against JOP-like attacks by placing and
 		verifying landing pads on branch targets.
+
+menuconfig ARM64_FEAT_MTE
+	bool "Armv8.5 Memory Tagging Extensions"
+	select ARM64_FEAT_RNG
+	select HAVE_MEMTAG
+	select PAGING
+	help
+	  Protects against memory safety violations by restricting
+	  access to tagged memory regions.
+
+if ARM64_FEAT_MTE
+choice ARM64_FEAT_MTE_TCF
+	prompt "Tag Check Fault Reporting"
+	default ARM64_FEAT_MTE_TCF_ASYNC
+
+config ARM64_FEAT_MTE_TCF_SYNC
+	bool "Synchronous"
+	help
+	  This option causes TCFs to trigger a Data Abort.
+	  Choose this option for high precision, at the
+	  cost of less performance.
+
+config ARM64_FEAT_MTE_TCF_ASYNC
+	bool "Asynchronous"
+	help
+	  This option causes TCFs to be accumulated and
+	  reported asynchronously.
+	  Choose this option for high performance at
+	  the cost of reduced precision.
+
+config ARM64_FEAT_MTE_TCF_ASYMMETRIC
+	bool "Asymmetric"
+	help
+	  This option causes synchronous TCF reporting on
+	  reads and asynchronous TCF reporting on writes.
+
+endchoice
+endif
+
+config ARM64_FEAT_RNG
+	bool "Armv8.5 Random Number Generator"
+	select HAVE_RANDOM
+	help
+	  This enables the hardware RNG functionality provided by the
+	  processor. The architecture specifies that this is implemented
+	  by a Deterministic Random Bit Generator (DRBG) that is seeded
+	  from a TRNG.
 endmenu
 
 config ARM64_ERRATUM_858921

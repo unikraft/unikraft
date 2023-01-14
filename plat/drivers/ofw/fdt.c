@@ -252,19 +252,26 @@ bail:
 int fdt_get_address(const void *fdt, int nodeoffset, uint32_t index,
 			uint64_t *addr, uint64_t *size)
 {
-	int off = nodeoffset;
+	int parentoffset;
 	int len, prop_addr, prop_size;
 	int naddr, nsize, term_size;
 	const void *regs;
 
 	UK_ASSERT(addr && size);
 
-	/* Get address,size cell from parent */
-	naddr = fdt_address_cells(fdt, off);
+	/*
+	 * Get address,size cell from parent
+	 * DT Spec v0.2, section 2.3.5 "#address-cells and #size-cells"
+	 */
+	parentoffset = fdt_parent_offset(fdt, nodeoffset);
+	if (parentoffset < 0)
+		return parentoffset;
+
+	naddr = fdt_address_cells(fdt, parentoffset);
 	if (naddr < 0 || naddr >= FDT_MAX_NCELLS)
 		return naddr;
 
-	nsize = fdt_size_cells(fdt, off);
+	nsize = fdt_size_cells(fdt, parentoffset);
 	if (nsize < 0 || nsize >= FDT_MAX_NCELLS)
 		return nsize;
 
@@ -284,6 +291,7 @@ int fdt_get_address(const void *fdt, int nodeoffset, uint32_t index,
 	*size = fdt_reg_read_number(regs + prop_size, nsize);
 	*addr = fdt_translate_address_by_ranges(fdt, nodeoffset,
 						regs + prop_addr);
+
 	if (*addr == FDT_BAD_ADDR)
 		return -FDT_ERR_NOTFOUND;
 	return 0;

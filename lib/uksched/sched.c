@@ -1,8 +1,11 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
+ *          Simon Kuenzer <simon.kuenzer@neclab.eu>
  *
  * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2022, NEC Laboratories GmbH, NEC Corrporation,
+ *                     All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,35 +36,15 @@
 #include <stdlib.h>
 #include <string.h>
 #include <uk/plat/config.h>
-#include <uk/plat/thread.h>
 #include <uk/alloc.h>
+#include <uk/plat/lcpu.h>
 #include <uk/sched.h>
-#include <uk/arch/tls.h>
-#if CONFIG_LIBUKSCHEDCOOP
-#include <uk/schedcoop.h>
-#endif
-#if CONFIG_LIBUKSIGNAL
-#include <uk/uk_signal.h>
-#endif
 #include <uk/syscall.h>
 
 struct uk_sched *uk_sched_head;
 
-/* FIXME Support for external schedulers */
-struct uk_sched *uk_sched_default_init(struct uk_alloc *a)
-{
-	struct uk_sched *s = NULL;
-
-#if CONFIG_LIBUKSIGNAL
-	uk_proc_sig_init(&uk_proc_sig);
-#endif
-
-#if CONFIG_LIBUKSCHEDCOOP
-	s = uk_schedcoop_init(a);
-#endif
-
-	return s;
-}
+/* FIXME: Define per CPU (CPU-local variable declaration needed) */
+struct uk_thread *__uk_sched_thread_current;
 
 int uk_sched_register(struct uk_sched *s)
 {
@@ -80,195 +63,264 @@ int uk_sched_register(struct uk_sched *s)
 	return 0;
 }
 
-struct uk_sched *uk_sched_get_default(void)
+struct uk_thread *uk_sched_thread_create_fn0(struct uk_sched *s,
+					     uk_thread_fn0_t fn0,
+					     size_t stack_len,
+					     bool no_uktls,
+					     bool no_ectx,
+					     const char *name,
+					     void *priv,
+					     uk_thread_dtor_t dtor)
 {
-	return uk_sched_head;
-}
-
-int uk_sched_set_default(struct uk_sched *s)
-{
-	struct uk_sched *head, *this, *prev;
-
-	head = uk_sched_get_default();
-
-	if (s == head)
-		return 0;
-
-	if (!head) {
-		uk_sched_head = s;
-		return 0;
-	}
-
-	this = head;
-	while (this->next) {
-		prev = this;
-		this = this->next;
-		if (s == this) {
-			prev->next = this->next;
-			this->next = head->next;
-			head = this;
-			// Update the default scheduler to head
-			uk_sched_head = head;
-			return 0;
-		}
-	}
-
-	/* s is not registered yet. Add in front of the queue. */
-	s->next = head;
-	uk_sched_head = s;
-	return 0;
-}
-
-struct uk_sched *uk_sched_create(struct uk_alloc *a, size_t prv_size)
-{
-	struct uk_sched *sched = NULL;
-
-	UK_ASSERT(a != NULL);
-
-	sched = uk_malloc(a, sizeof(struct uk_sched) + prv_size);
-	if (sched == NULL) {
-		uk_pr_warn("Failed to allocate scheduler\n");
-		return NULL;
-	}
-
-	sched->threads_started = false;
-	sched->allocator = a;
-	UK_TAILQ_INIT(&sched->exited_threads);
-	sched->prv = (void *) sched + sizeof(struct uk_sched);
-
-	return sched;
-}
-
-void uk_sched_start(struct uk_sched *sched)
-{
-	UK_ASSERT(sched != NULL);
-	ukplat_thread_ctx_start(&sched->plat_ctx_cbs, sched->idle.ctx);
-}
-
-static void *create_stack(struct uk_alloc *allocator)
-{
-	void *stack;
-
-	if (uk_posix_memalign(allocator, &stack,
-			      STACK_SIZE, STACK_SIZE) != 0) {
-		uk_pr_err("Failed to allocate thread stack: Not enough memory\n");
-		return NULL;
-	}
-
-	return stack;
-}
-
-static void *uk_thread_tls_create(struct uk_alloc *allocator)
-{
-	void *tls;
-
-	if (uk_posix_memalign(allocator, &tls, ukarch_tls_area_align(),
-			      ukarch_tls_area_size()) != 0) {
-		uk_pr_err("Failed to allocate thread TLS area\n");
-		return NULL;
-	}
-	ukarch_tls_area_copy(tls);
-	return tls;
-}
-
-void uk_sched_idle_init(struct uk_sched *sched,
-		void *stack, void (*function)(void *))
-{
-	struct uk_thread *idle;
+	struct uk_thread *t;
 	int rc;
-	void *tls = NULL;
 
-	UK_ASSERT(sched != NULL);
+	UK_ASSERT(s);
+	UK_ASSERT(s->a_stack);
 
-	if (stack == NULL)
-		stack = create_stack(sched->allocator);
-	UK_ASSERT(stack != NULL);
-	if (have_tls_area() && !(tls = uk_thread_tls_create(sched->allocator)))
-		goto out_crash;
+	if (!no_uktls && !s->a_uktls)
+		goto err_out;
 
-	idle = &sched->idle;
+	t = uk_thread_create_fn0(s->a,
+				 fn0,
+				 s->a_stack, stack_len,
+				 no_uktls ? NULL : s->a_uktls,
+				 no_ectx,
+				 name,
+				 priv,
+				 dtor);
+	if (!t)
+		goto err_out;
 
-	rc = uk_thread_init(idle,
-			&sched->plat_ctx_cbs, sched->allocator,
-			"Idle", stack, tls, function, NULL);
-	if (rc)
-		goto out_crash;
+	rc = uk_sched_thread_add(s, t);
+	if (rc < 0)
+		goto err_free_t;
 
-	idle->sched = sched;
-	return;
+	return t;
 
-out_crash:
-	UK_CRASH("Failed to initialize `idle` thread\n");
-}
-
-struct uk_thread *uk_sched_thread_create(struct uk_sched *sched,
-		const char *name, const uk_thread_attr_t *attr,
-		void (*function)(void *), void *arg)
-{
-	struct uk_thread *thread = NULL;
-	void *stack = NULL;
-	int rc;
-	void *tls = NULL;
-
-	thread = uk_malloc(sched->allocator, sizeof(struct uk_thread));
-	if (thread == NULL) {
-		uk_pr_err("Failed to allocate thread\n");
-		goto err;
-	}
-
-	/* We can't use lazy allocation here
-	 * since the trap handler runs on the stack
-	 */
-	stack = create_stack(sched->allocator);
-	if (stack == NULL)
-		goto err;
-	if (have_tls_area() && !(tls = uk_thread_tls_create(sched->allocator)))
-		goto err;
-
-	rc = uk_thread_init(thread,
-			&sched->plat_ctx_cbs, sched->allocator,
-			name, stack, tls, function, arg);
-	if (rc)
-		goto err;
-
-	rc = uk_sched_thread_add(sched, thread, attr);
-	if (rc)
-		goto err_add;
-
-	return thread;
-
-err_add:
-	uk_thread_fini(thread, sched->allocator);
-err:
-	if (tls)
-		uk_free(sched->allocator, tls);
-	if (stack)
-		uk_free(sched->allocator, stack);
-	if (thread)
-		uk_free(sched->allocator, thread);
-
+err_free_t:
+	uk_thread_release(t);
+err_out:
 	return NULL;
 }
 
-void uk_sched_thread_destroy(struct uk_sched *sched, struct uk_thread *thread)
+struct uk_thread *uk_sched_thread_create_fn1(struct uk_sched *s,
+					     uk_thread_fn1_t fn1,
+					     void *argp,
+					     size_t stack_len,
+					     bool no_uktls,
+					     bool no_ectx,
+					     const char *name,
+					     void *priv,
+					     uk_thread_dtor_t dtor)
 {
-	UK_ASSERT(sched != NULL);
-	UK_ASSERT(thread != NULL);
-	UK_ASSERT(thread->stack != NULL);
-	UK_ASSERT(!have_tls_area() || thread->tls != NULL);
-	UK_ASSERT(is_exited(thread));
+	struct uk_thread *t;
+	int rc;
 
-	UK_TAILQ_REMOVE(&sched->exited_threads, thread, thread_list);
-	uk_thread_fini(thread, sched->allocator);
-	uk_free(sched->allocator, thread->stack);
-	if (thread->tls)
-		uk_free(sched->allocator, thread->tls);
-	uk_free(sched->allocator, thread);
+	UK_ASSERT(s);
+	UK_ASSERT(s->a_stack);
+
+	if (!no_uktls && !s->a_uktls)
+		goto err_out;
+
+	t = uk_thread_create_fn1(s->a,
+				 fn1, argp,
+				 s->a_stack, stack_len,
+				 no_uktls ? NULL : s->a_uktls,
+				 no_ectx,
+				 name,
+				 priv,
+				 dtor);
+	if (!t)
+		goto err_out;
+
+	rc = uk_sched_thread_add(s, t);
+	if (rc < 0)
+		goto err_free_t;
+
+	return t;
+
+err_free_t:
+	uk_thread_release(t);
+err_out:
+	return NULL;
 }
 
-void uk_sched_thread_kill(struct uk_sched *sched, struct uk_thread *thread)
+struct uk_thread *uk_sched_thread_create_fn2(struct uk_sched *s,
+					     uk_thread_fn2_t fn2,
+					     void *argp0, void *argp1,
+					     size_t stack_len,
+					     bool no_uktls,
+					     bool no_ectx,
+					     const char *name,
+					     void *priv,
+					     uk_thread_dtor_t dtor)
 {
-	uk_sched_thread_remove(sched, thread);
+	struct uk_thread *t;
+	int rc;
+
+	UK_ASSERT(s);
+	UK_ASSERT(s->a_stack);
+
+	if (!no_uktls && !s->a_uktls)
+		goto err_out;
+
+	t = uk_thread_create_fn2(s->a,
+				 fn2, argp0, argp1,
+				 s->a_stack, stack_len,
+				 no_uktls ? NULL : s->a_uktls,
+				 no_ectx,
+				 name,
+				 priv,
+				 dtor);
+	if (!t)
+		goto err_out;
+
+	rc = uk_sched_thread_add(s, t);
+	if (rc < 0)
+		goto err_free_t;
+
+	return t;
+
+err_free_t:
+	uk_thread_release(t);
+err_out:
+	return NULL;
+}
+
+int uk_sched_start(struct uk_sched *s)
+{
+	struct uk_thread *main_thread;
+	uintptr_t tlsp;
+	int ret;
+
+	UK_ASSERT(s);
+	UK_ASSERT(s->sched_start);
+	UK_ASSERT(!s->is_started);
+	UK_ASSERT(!uk_thread_current()); /* No other thread runs */
+
+	/* Allocate an `uk_thread` instance for current context
+	 * NOTE: We assume that if we have a TLS pointer, it points to
+	 *       an TLS that is derived from the Unikraft TLS template.
+	 */
+	tlsp = ukplat_tlsp_get();
+	main_thread = uk_thread_create_bare(s->a,
+					    0x0, 0x0, tlsp, !(!tlsp), false,
+					    "init", NULL, NULL);
+	if (!main_thread) {
+		ret = -ENOMEM;
+		goto err_out;
+	}
+	main_thread->sched = s;
+
+	/* Because `main_thread` acts as container for storing the current
+	 * context, it does not have IP and SP set. We have to manually mark
+	 * the thread as RUNNABLE.
+	 */
+	uk_thread_set_runnable(main_thread);
+
+	/* Set main_thread as current scheduled thread */
+	__uk_sched_thread_current = main_thread;
+
+	/* Add main to the scheduler's thread list */
+	UK_TAILQ_INSERT_TAIL(&s->thread_list, main_thread, thread_list);
+
+	/* Enable scheduler, like time slicing, etc. and notify that `s`
+	 * has an (already) scheduled thread
+	 */
+	ret = s->sched_start(s, main_thread);
+	if (ret < 0)
+		goto err_unset_thread_current;
+	s->is_started = true;
+	return 0;
+
+err_unset_thread_current:
+	__uk_sched_thread_current = NULL;
+	uk_thread_release(main_thread);
+err_out:
+	return ret;
+}
+
+unsigned int uk_sched_thread_gc(struct uk_sched *sched)
+{
+	struct uk_thread *thread, *tmp;
+	unsigned int num = 0;
+
+	/* Cleanup finished threads */
+	UK_TAILQ_FOREACH_SAFE(thread, &sched->exited_threads,
+			      thread_list, tmp) {
+		UK_ASSERT(thread != uk_thread_current());
+		UK_ASSERT(uk_thread_is_exited(thread));
+
+		uk_pr_debug("%p: garbage collect thread %p (%s)\n",
+			    sched, thread,
+			    thread->name ? thread->name : "<unnamed>");
+
+		UK_TAILQ_REMOVE(&sched->exited_threads, thread, thread_list);
+		if (thread->_gc_fn)
+			thread->_gc_fn(thread,  thread->_gc_argp);
+		uk_thread_release(thread);
+		++num;
+	}
+
+	return num;
+}
+
+void uk_sched_thread_terminate(struct uk_thread *thread)
+{
+	struct uk_sched *sched;
+
+	UK_ASSERT(thread);
+	 /* NOTE: The following assertion can also fail on a double-termination.
+	  *       This can happen when the thread was already put on the
+	  *       exited_thread list and waits for getting garbage collected.
+	  *       Double-termination can be avoided by testing for the exited
+	  *       flag.
+	  */
+	UK_ASSERT(thread->sched);
+
+	sched = thread->sched;
+
+	uk_pr_debug("%p: thread %p (%s) terminated\n",
+		    sched, thread, thread->name ? thread->name : "<unnamed>");
+
+	/* remove from scheduling queue */
+	uk_sched_thread_remove(thread);
+	/* causes calling termination table */
+	uk_thread_set_exited(thread);
+
+	if (thread == uk_thread_current()) {
+		/* enqueue thread for garbage collecting */
+		uk_pr_debug("%p: thread %p (%s) on gc list\n",
+			    sched, thread, thread->name ?
+					   thread->name : "<unnamed>");
+		UK_TAILQ_INSERT_TAIL(&sched->exited_threads, thread,
+				     thread_list);
+
+		/* leave this thread */
+		sched->yield(sched); /* we won't return */
+		UK_CRASH("Unexpectedly returned to exited thread %p\n", thread);
+	} else {
+		/* free thread resources immediately */
+		uk_thread_release(thread);
+	}
+}
+
+/* This function has the __noreturn attribute set */
+void uk_sched_thread_exit2(uk_thread_gc_t gc_fn, void *gc_argp)
+{
+	struct uk_thread *t = uk_thread_current();
+
+	t->_gc_fn   = gc_fn;
+	t->_gc_argp = gc_argp;
+	uk_sched_thread_terminate(t);
+	UK_CRASH("Unexpectedly returned to exited thread %p\n", t);
+}
+
+/* This function has the __noreturn attribute set */
+void uk_sched_thread_exit(void)
+{
+	uk_sched_thread_exit2(NULL, NULL);
 }
 
 void uk_sched_thread_sleep(__nsec nsec)
@@ -280,18 +332,64 @@ void uk_sched_thread_sleep(__nsec nsec)
 	uk_sched_yield();
 }
 
-void uk_sched_thread_exit(void)
+int uk_sched_thread_add(struct uk_sched *s, struct uk_thread *t)
 {
-	struct uk_thread *thread;
+	unsigned long flags;
+	int rc;
 
-	thread = uk_thread_current();
-	UK_ASSERT(thread->sched);
-	uk_sched_thread_remove(thread->sched, thread);
-	UK_CRASH("Failed to stop the thread\n");
+	UK_ASSERT(s);
+	UK_ASSERT(t);
+	UK_ASSERT(!t->sched);
+
+	flags = ukplat_lcpu_save_irqf();
+
+	rc = s->thread_add(s, t);
+	if (rc < 0)
+		goto out;
+
+	t->sched = s;
+	UK_TAILQ_INSERT_TAIL(&s->thread_list, t, thread_list);
+out:
+	ukplat_lcpu_restore_irqf(flags);
+	return rc;
+}
+
+int uk_sched_thread_remove(struct uk_thread *t)
+{
+	unsigned long flags;
+	struct uk_sched *s;
+
+	UK_ASSERT(t);
+	UK_ASSERT(t->sched);
+
+	flags = ukplat_lcpu_save_irqf();
+	s = t->sched;
+	s->thread_remove(s, t);
+	t->sched = NULL;
+	UK_TAILQ_REMOVE(&s->thread_list, t, thread_list);
+	ukplat_lcpu_restore_irqf(flags);
+	return 0;
 }
 
 UK_SYSCALL_R_DEFINE(int, sched_yield)
 {
 	uk_sched_yield();
 	return 0;
+}
+
+void uk_sched_dumpk_threads(int klvl, struct uk_sched *s)
+{
+	struct uk_thread *t, *tmp;
+
+	uk_sched_foreach_thread_safe(s, t, tmp) {
+		uk_printk(klvl,
+			  "sched %p: thread %p (%s), ctx: %p, flags: %c%c%c%c\n",
+			  s,
+			  t, t->name ? t->name : "<unnamed>",
+			  &t->ctx,
+			  (t->flags & UK_THREADF_RUNNABLE) ? 'R' : '-',
+			  (t->flags & UK_THREADF_EXITED)   ? 'D' : '-',
+			  (t->flags & UK_THREADF_ECTX)     ? 'E' : '-',
+			  (t->flags & UK_THREADF_UKTLS)    ? 'T' : '-');
+	}
 }

@@ -124,8 +124,42 @@
 		*(.tbss)						\
 		*(.tbss.*)						\
 		*(.gnu.linkonce.tb.*)					\
-		. = ALIGN(0x20);					\
+		*(.tcommon)						\
 	}								\
+	/*								\
+	 * NOTE: Because the .tbss section is zero-sized in the final	\
+	 *       ELF image, just setting _tls_end to the end of it	\
+	 *       does not give us the the size of the memory area once	\
+	 *       loaded, so we use SIZEOF to have it point to the end.	\
+	 *       _tls_end is only used to compute the .tbss size.	\
+	 */								\
 	_tls_end = . + SIZEOF(.tbss);
+
+#define DATA_SECTIONS							\
+	/* Read-write data (initialized) */				\
+	. = ALIGN(__PAGE_SIZE);						\
+	_data = .;							\
+	.data :								\
+	{								\
+		*(.data)						\
+		*(.data.*)						\
+	}								\
+	_edata = .;							\
+									\
+	/*								\
+	 * NOTE: linker will insert any extra sections here,		\
+	 * just before .bss						\
+	 */								\
+									\
+	/* Read-write data (uninitialized) */				\
+	. = ALIGN(__PAGE_SIZE);						\
+	__bss_start = .;						\
+	.bss :								\
+	{								\
+		*(.bss)							\
+		*(.bss.*)						\
+		*(COMMON)						\
+		. = ALIGN(__PAGE_SIZE);					\
+	}
 
 #endif /* __UK_COMMON_LDS_H */

@@ -8,7 +8,7 @@ RUSTCFLAGS-$(CONFIG_LIBUKRUST) += --extern ukrust_sys -L $(LIBUKRUST_BUILD)/ --e
 
 export LIBUKRUST_BINDINGS_FILE=$(LIBUKRUST_BUILD)/bindings_generated.rs
 
-ifeq ($(CONFIG_LIBRUST),y)
+ifeq ($(CONFIG_LIBUKRUST),y)
 # Do not perform these if CONFIG_RUST is not set, as it is not
 # guaranteed that rustc will be available in the system.
 RUSTC_SYSROOT := $(shell $(RUSTC)  --print sysroot)
@@ -16,10 +16,10 @@ RUST_LIB_SRC ?= $(RUSTC_SYSROOT)/lib/rustlib/src/rust/library
 endif
 
 # Common flags
-LIBUKRUST_COMMON_FLAGS = --target=$(LIBUKRUST_BASE)/target.json --emit=dep-info,obj,metadata --edition=2018 \
+LIBUKRUST_COMMON_FLAGS = --target=$(LIBUKRUST_BASE)/target.json --emit=dep-info,obj,metadata --edition=2021 \
 	-Cpanic=abort -Cembed-bitcode=n -Clto=n -Crpath=n \
 	-Cforce-unwind-tables=n -Ccodegen-units=1 \
-	-Zbinary_dep_depinfo=y -Zsymbol-mangling-version=v0 \
+	-Zbinary_dep_depinfo=y -Csymbol-mangling-version=v0 \
 	-Dunsafe_op_in_unsafe_fn -Drust_2018_idioms \
 	--crate-type rlib
 

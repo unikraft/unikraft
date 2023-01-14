@@ -1,0 +1,4 @@
+uk_syscall_e_futex
+uk_syscall_r_futex
+uk_syscall_e_set_tid_address
+uk_syscall_r_set_tid_address

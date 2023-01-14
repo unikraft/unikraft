@@ -29,6 +29,7 @@
 extern "C" {
 #endif
 
+#include <uk/config.h>
 #include <uk/arch/lcpu.h>
 
 #ifdef CONFIG_HAVE_SMP
@@ -40,13 +41,16 @@ typedef struct __spinlock __spinlock;
 /**
  * UKARCH_SPINLOCK_INITIALIZER() macro
  *
- * Statically initialize a spinlock to unlocked stated.
+ * Statically initialize a spinlock to unlocked state.
  */
+#ifndef UKARCH_SPINLOCK_INITIALIZER
+#error The spinlock implementation must define UKARCH_SPINLOCK_INITIALIZER
+#endif /* UKARCH_SPINLOCK_INITIALIZER */
 
 /**
  * Initialize a spinlock to unlocked state.
  *
- * @param [in/out] lock Pointer to spinlock.
+ * @param [in,out] lock Pointer to spinlock.
  */
 void ukarch_spin_init(__spinlock *lock);
 
@@ -54,14 +58,14 @@ void ukarch_spin_init(__spinlock *lock);
  * Acquire spinlock. It is guaranteed that the spinlock will be held
  * exclusively.
  *
- * @param [in/out] lock Pointer to spinlock.
+ * @param [in,out] lock Pointer to spinlock.
  */
 void ukarch_spin_lock(__spinlock *lock);
 
 /**
  * Release previously acquired spinlock.
  *
- * @param [in/out] lock Pointer to spinlock.
+ * @param [in,out] lock Pointer to spinlock.
  */
 void ukarch_spin_unlock(__spinlock *lock);
 
@@ -69,7 +73,7 @@ void ukarch_spin_unlock(__spinlock *lock);
  * Try to acquire spinlock. If the lock is already acquired (busy), this
  * function returns instead of spinning.
  *
- * @param [in/out] lock Pointer to spinlock.
+ * @param [in,out] lock Pointer to spinlock.
  *
  * @return A non-zero value if spinlock was acquired, 0 otherwise.
  */
@@ -78,7 +82,7 @@ int ukarch_spin_trylock(__spinlock *lock);
 /**
  * Read spinlock state. No lock/unlock operations are performed on the lock.
  *
- * @param [in/out] lock Pointer to spinlock.
+ * @param [in,out] lock Pointer to spinlock.
  *
  * @return A non-zero value if spinlock is acquired, 0 otherwise.
  */

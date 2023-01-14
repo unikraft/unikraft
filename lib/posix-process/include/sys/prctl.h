@@ -6,6 +6,7 @@ extern "C" {
 #endif
 
 #include <stdint.h>
+#include <uk/syscall.h>
 
 #define PR_SET_PDEATHSIG  1
 #define PR_GET_PDEATHSIG  2
@@ -154,11 +155,13 @@ struct prctl_mm_map {
 #define PR_PAC_APDBKEY (1UL << 3)
 #define PR_PAC_APGAKEY (1UL << 4)
 
+#if UK_LIBC_SYSCALLS
 int prctl(int option,
 	  unsigned long arg2,
 	  unsigned long arg3,
 	  unsigned long arg4,
 	  unsigned long arg5);
+#endif /* UK_LIBC_SYSCALLS */
 
 #ifdef __cplusplus
 }

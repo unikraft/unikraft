@@ -62,7 +62,8 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
 		m->base  = (void *) __TEXT;
 		m->len   = (size_t) __ETEXT - (size_t) __TEXT;
 		m->flags = (UKPLAT_MEMRF_RESERVED
-			    | UKPLAT_MEMRF_READABLE);
+			    | UKPLAT_MEMRF_READABLE
+			    | UKPLAT_MEMRF_EXECUTABLE);
 #if CONFIG_UKPLAT_MEMRNAME
 		m->name  = "text";
 #endif
@@ -155,11 +156,4 @@ int _ukplat_mem_mappings_init(void)
 	gnttab_init();
 #endif
 	return 0;
-}
-
-void ukplat_stack_set_current_thread(void *thread_addr)
-{
-	/* TODO revisit for HVM */
-	extern char irqstack[];
-	*((unsigned long *) irqstack) = (unsigned long) thread_addr;
 }

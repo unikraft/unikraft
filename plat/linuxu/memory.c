@@ -192,8 +192,3 @@ int _ukplat_mem_mappings_init(void)
 {
 	return 0;
 }
-
-void ukplat_stack_set_current_thread(void *thread_addr __unused)
-{
-	/* For now, signals use the current process stack */
-}

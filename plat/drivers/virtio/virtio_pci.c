@@ -273,10 +273,15 @@ static int vpci_legacy_pci_config_get(struct virtio_dev *vdev, __u16 offset,
 				VIRTIO_PCI_CONFIG_OFF + offset, buf, len,
 				type_len);
 	} else {
+		__u32 len_bytes;
+
+		if (__builtin_umul_overflow(len, type_len, &len_bytes))
+			return -EFAULT;
+
 		rc = virtio_cread_bytes_many(
 				(void *) (unsigned long)vpdev->pci_base_addr,
-				VIRTIO_PCI_CONFIG_OFF + offset,	buf, len);
-		if (rc != (int)len)
+				VIRTIO_PCI_CONFIG_OFF + offset,	buf, len_bytes);
+		if (unlikely(rc != (int) len_bytes))
 			return -EFAULT;
 	}
 

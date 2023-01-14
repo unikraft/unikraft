@@ -3,6 +3,7 @@ menuconfig LIBUKTEST
 	default n
 	select LIBNOLIBC if !HAVE_LIBC
 	select LIBUKDEBUG
+	select LIBUKDEBUG_PRINTK
 
 if LIBUKTEST
 

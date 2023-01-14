@@ -27,12 +27,23 @@
 #endif /* CONFIG_RTC_PL031 */
 #include <kvm/config.h>
 #include <uk/assert.h>
-#include <kvm-arm/mm.h>
 #include <kvm/intctrl.h>
 #include <arm/cpu.h>
 #include <arm/arm64/cpu.h>
 #include <arm/smccc.h>
 #include <uk/arch/limits.h>
+
+#ifdef CONFIG_HAVE_MEMTAG
+#include <uk/arch/memtag.h>
+#endif /* CONFIG_HAVE_MEMTAG */
+
+#ifdef CONFIG_PAGING
+#include <uk/plat/paging.h>
+#include <uk/plat/common/w_xor_x.h>
+#include <uk/falloc.h>
+
+struct uk_pagetable kernel_pt;
+#endif /* CONFIG_PAGING */
 
 struct kvmplat_config _libkvmplat_cfg = { 0 };
 
@@ -151,12 +162,6 @@ static void _init_dtb_mem(void)
 		UK_CRASH("Fatal: Image outside of RAM\n");
 
 	max_addr = mem_base + mem_size;
-	_libkvmplat_cfg.pagetable.start = ALIGN_DOWN((uintptr_t)__END,
-						     __PAGE_SIZE);
-	_libkvmplat_cfg.pagetable.len   = ALIGN_UP(page_table_size,
-						   __PAGE_SIZE);
-	_libkvmplat_cfg.pagetable.end   = _libkvmplat_cfg.pagetable.start
-					  + _libkvmplat_cfg.pagetable.len;
 
 	/* AArch64 require stack be 16-bytes alignment by default */
 	_libkvmplat_cfg.bstack.end   = ALIGN_DOWN(max_addr,
@@ -166,7 +171,7 @@ static void _init_dtb_mem(void)
 	_libkvmplat_cfg.bstack.start = _libkvmplat_cfg.bstack.end
 				       - _libkvmplat_cfg.bstack.len;
 
-	_libkvmplat_cfg.heap.start = _libkvmplat_cfg.pagetable.end;
+	_libkvmplat_cfg.heap.start = ALIGN_DOWN((uintptr_t)__END, __PAGE_SIZE);
 	_libkvmplat_cfg.heap.end   = _libkvmplat_cfg.bstack.start;
 	_libkvmplat_cfg.heap.len   = _libkvmplat_cfg.heap.end
 				     - _libkvmplat_cfg.heap.start;
@@ -205,6 +210,78 @@ enocmdl:
 	uk_pr_info("No command line found\n");
 }
 
+#ifdef CONFIG_PAGING
+
+int _init_paging(void)
+{
+	int rc;
+	uint64_t start;
+	uint64_t len;
+	unsigned long frames;
+	unsigned long attr;
+	__sz free_memory, res_memory;
+
+	/* Assign all available memory beyond the boot stack
+	 * to the frame allocator.
+	 */
+	start = ALIGN_UP(__END + __STACK_SIZE, PAGE_SIZE);
+	len   = _libkvmplat_cfg.bstack.end - start;
+
+	rc = ukplat_pt_init(&kernel_pt, start, len);
+	if (unlikely(rc))
+		return rc;
+
+	/* Switch to the new page tables */
+	rc = ukplat_pt_set_active(&kernel_pt);
+	if (unlikely(rc))
+		return rc;
+
+	/* Unmap all available memory */
+	rc = ukplat_page_unmap(&kernel_pt, start, len >> PAGE_SHIFT,
+			       PAGE_FLAG_KEEP_FRAMES);
+	if (unlikely(rc))
+		return rc;
+
+	/* Reserve memory for the new pagetables that will be created
+	 * by the frame allocator for new mappings. Assume the worst
+	 * case, that is page size.
+	 */
+	free_memory = len;
+	frames = free_memory >> PAGE_SHIFT;
+
+	res_memory = _libkvmplat_cfg.bstack.len;	/* boot stack */
+	res_memory += PT_PAGES(frames) << PAGE_SHIFT;	/* page tables */
+
+	/* Map the heap after the boot stack */
+	_libkvmplat_cfg.heap.start = start;
+	_libkvmplat_cfg.heap.end   = _libkvmplat_cfg.heap.start +
+				     free_memory - res_memory;
+
+	_libkvmplat_cfg.heap.len   = _libkvmplat_cfg.heap.end -
+				     _libkvmplat_cfg.heap.start;
+
+	frames = _libkvmplat_cfg.heap.len >> PAGE_SHIFT;
+	attr = PAGE_ATTR_PROT_RW | PAGE_ATTR_TYPE_NORMAL_WB_TAGGED;
+	rc = ukplat_page_map(&kernel_pt, _libkvmplat_cfg.heap.start,
+			     __PADDR_ANY, frames, attr, 0);
+	if (unlikely(rc))
+		return rc;
+
+	/* Map the stack right after the heap */
+	_libkvmplat_cfg.bstack.start = _libkvmplat_cfg.heap.end;
+	_libkvmplat_cfg.bstack.end   = _libkvmplat_cfg.heap.end +
+				       _libkvmplat_cfg.bstack.len;
+
+	frames = _libkvmplat_cfg.bstack.len >> PAGE_SHIFT;
+	rc = ukplat_page_map(&kernel_pt, _libkvmplat_cfg.bstack.start,
+			     __PADDR_ANY, frames, PAGE_ATTR_PROT_RW, 0);
+	if (unlikely(rc))
+		return rc;
+
+	return 0;
+}
+#endif /* CONFIG_PAGING */
+
 void __no_pauth _libkvmplat_start(void *dtb_pointer)
 {
 	int ret;
@@ -223,6 +300,22 @@ void __no_pauth _libkvmplat_start(void *dtb_pointer)
 
 	/* Initialize memory from DTB */
 	_init_dtb_mem();
+
+#ifdef CONFIG_PAGING
+	/* Initialize paging */
+	ret = _init_paging();
+	if (unlikely(ret))
+		UK_CRASH("Could not initialize paging (%d)\n", ret);
+#ifdef CONFIG_ENFORCE_W_XOR_X
+	enforce_w_xor_x();
+#endif /* CONFIG_ENFORCE_W_XOR_X */
+#endif /* CONFIG_PAGING */
+
+#ifdef CONFIG_HAVE_MEMTAG
+	ret = ukarch_memtag_init();
+	if (unlikely(ret))
+		UK_CRASH("Could not initialize MTE (%d)\n", ret);
+#endif /* CONFIG_HAVE_MEMTAG */
 
 #ifdef CONFIG_RTC_PL031
 	/* Initialize RTC */
@@ -245,8 +338,6 @@ void __no_pauth _libkvmplat_start(void *dtb_pointer)
 		UK_CRASH("SMP initialization failed: %d.\n", ret);
 #endif /* CONFIG_HAVE_SMP */
 
-	uk_pr_info("pagetable start: %p\n",
-		   (void *) _libkvmplat_cfg.pagetable.start);
 	uk_pr_info("     heap start: %p\n",
 		   (void *) _libkvmplat_cfg.heap.start);
 	uk_pr_info("      stack top: %p\n",

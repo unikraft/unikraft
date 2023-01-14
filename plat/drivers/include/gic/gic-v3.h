@@ -117,6 +117,7 @@
 #define GICR_TYPER_PROC_NUM_MASK	(0xffff << GICR_TYPER_PROC_NUM_SHIFT)
 
 /* GICR frames offset */
+#define GICR_STRIDE			(0x20000)
 #define GICR_RD_BASE			(0)
 #define GICR_SGI_BASE			(0x10000)
 

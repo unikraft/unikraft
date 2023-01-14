@@ -43,22 +43,22 @@
 #include <uk/essentials.h>
 #include <x86/acpi/acpi.h>
 
+#include <uk/plat/lcpu.h>
+#include <uk/plat/common/lcpu.h>
+
 #ifdef CONFIG_PAGING
 #include <uk/plat/paging.h>
 #include <uk/falloc.h>
 #endif /* CONFIG_PAGING */
 
 #define PLATFORM_MEM_START 0x100000
-#define PLATFORM_MAX_MEM_ADDR 0x40000000
+#define PLATFORM_MAX_MEM_ADDR 0x100000000 /* 4 GiB */
 
 #define MAX_CMDLINE_SIZE 8192
 static char cmdline[MAX_CMDLINE_SIZE];
 
 struct kvmplat_config _libkvmplat_cfg = { 0 };
 struct uk_bootinfo bootinfo = { 0 };
-
-extern void _libkvmplat_newstack(uintptr_t stack_start, void (*tramp)(void *),
-				 void *arg);
 
 static void _convert_mbinfo(struct multiboot_info *mi)
 {
@@ -296,7 +296,8 @@ static void _init_paging(struct multiboot_info *mi)
 	struct kvmplat_config_memregion *mr[2];
 	multiboot_memory_map_t *m;
 	__sz offset, len;
-	__paddr_t start;
+	__paddr_t start, paddr;
+	__vaddr_t vaddr;
 	__sz free_memory, res_memory;
 	unsigned long frames;
 	int rc;
@@ -330,30 +331,15 @@ static void _init_paging(struct multiboot_info *mi)
 
 	ukplat_pt_add_mem(&kernel_pt, start, len);
 
-	/* Add remaining physical memory that has not been added to the heaps
-	 * previously
-	 */
-	for (offset = 0; offset < mi->mmap_length;
-	     offset += m->size + sizeof(m->size)) {
-		m = (void *)(__uptr)(mi->mmap_addr + offset);
-
-		if ((m->type != MULTIBOOT_MEMORY_AVAILABLE) ||
-		    (m->addr <= PLATFORM_MEM_START))
-			continue;
-
-		rc = ukplat_pt_add_mem(&kernel_pt, m->addr, m->len);
-		if (unlikely(rc))
-			goto EXIT_FATAL;
-	}
-
 	/* Switch to new page table */
 	rc = ukplat_pt_set_active(&kernel_pt);
 	if (unlikely(rc))
 		goto EXIT_FATAL;
 
-	/* Unmap all 1:1 mappings extending over the kernel image and initrd.
-	 * The boot page table maps the first 1 GiB with everything starting
-	 * from 2 MiB mapped as 2 MiB large pages (see pagetable64.S).
+	/* Unmap all 1:1 mappings extending over the first megabyte, the kernel
+	 * image and initrd. The boot page table maps the first 4 GiB with
+	 * everything starting from 2 MiB mapped as 2 MiB large pages (see
+	 * pagetable64.S).
 	 */
 	offset = mr[0]->start - PAGE_LARGE_ALIGN_UP(mr[0]->start);
 	start  = PAGE_LARGE_ALIGN_UP(mr[0]->start);
@@ -364,6 +350,33 @@ static void _init_paging(struct multiboot_info *mi)
 			       PAGE_FLAG_KEEP_FRAMES);
 	if (unlikely(rc))
 		goto EXIT_FATAL;
+
+	/* Add remaining physical memory that has not been added to the heaps
+	 * previously. Also map regions marked as RESERVED 1:1 because this
+	 * will include memory-mapped ACPI and APIC tables and registers. For
+	 * now, we map these ranges as read-only.
+	 */
+	for (offset = 0; offset < mi->mmap_length;
+	     offset += m->size + sizeof(m->size)) {
+		m = (void *)(__uptr)(mi->mmap_addr + offset);
+
+		if (m->addr <= PLATFORM_MEM_START)
+			continue;
+
+		if (m->type == MULTIBOOT_MEMORY_RESERVED) {
+			vaddr  = paddr = PAGE_ALIGN_DOWN(m->addr);
+			frames = DIV_ROUND_UP(m->len, PAGE_SIZE);
+
+			rc = ukplat_page_map(&kernel_pt, vaddr, paddr, frames,
+					     PAGE_ATTR_PROT_READ, 0);
+			if (unlikely(rc))
+				goto EXIT_FATAL;
+		} else if (m->type == MULTIBOOT_MEMORY_AVAILABLE) {
+			rc = ukplat_pt_add_mem(&kernel_pt, m->addr, m->len);
+			if (unlikely(rc))
+				goto EXIT_FATAL;
+		}
+	}
 
 	/* Setup and map heap */
 
@@ -427,18 +440,28 @@ EXIT_FATAL:
 #define _init_paging(mi) do { } while (0)
 #endif /* CONFIG_PAGING */
 
-static void _libkvmplat_entry2(void *arg __attribute__((unused)))
+static void __noreturn _libkvmplat_entry2(void)
 {
 	ukplat_entry_argp(NULL, cmdline, sizeof(cmdline));
+
+	ukplat_lcpu_halt();
 }
 
-void _libkvmplat_entry(void *arg)
+void _libkvmplat_entry(struct lcpu *lcpu, void *arg)
 {
 	struct multiboot_info *mi = (struct multiboot_info *)arg;
+	int rc;
 
-	_init_cpufeatures();
 	_libkvmplat_init_console();
-	traps_init();
+
+	/* Initialize trap vector table */
+	traps_table_init();
+
+	/* Initialize LCPU of bootstrap processor */
+	rc = lcpu_init(lcpu);
+	if (unlikely(rc))
+		UK_CRASH("Failed to init bootstrap processor\n");
+
 	intctrl_init();
 
 	uk_pr_info("Entering from KVM (x86)...\n");
@@ -453,6 +476,9 @@ void _libkvmplat_entry(void *arg)
 	_get_cmdline(&bootinfo);
 	_init_mem(&bootinfo);
 	_init_initrd(&bootinfo);
+#ifdef CONFIG_PAGING
+	_init_paging(mi);
+#endif /* CONFIG_PAGING */
 
 	if (_libkvmplat_cfg.initrd.len)
 		uk_pr_info("        initrd: %p\n",
@@ -465,7 +491,16 @@ void _libkvmplat_entry(void *arg)
 		   (void *)_libkvmplat_cfg.bstack.start);
 
 #ifdef CONFIG_HAVE_SMP
-	acpi_init();
+	rc = acpi_init();
+	if (likely(rc == 0)) {
+		rc = lcpu_mp_init(CONFIG_UKPLAT_LCPU_RUN_IRQ,
+				  CONFIG_UKPLAT_LCPU_WAKEUP_IRQ,
+				  NULL);
+		if (unlikely(rc))
+			uk_pr_err("SMP init failed: %d\n", rc);
+	} else {
+		uk_pr_err("ACPI init failed: %d\n", rc);
+	}
 #endif /* CONFIG_HAVE_SMP */
 
 #ifdef CONFIG_HAVE_SYSCALL
@@ -481,5 +516,6 @@ void _libkvmplat_entry(void *arg)
 	 */
 	uk_pr_info("Switch from bootstrap stack to stack @%p\n",
 		   (void *)_libkvmplat_cfg.bstack.end);
-	_libkvmplat_newstack(_libkvmplat_cfg.bstack.end, _libkvmplat_entry2, 0);
+	lcpu_arch_jump_to((void *)_libkvmplat_cfg.bstack.end,
+			  _libkvmplat_entry2);
 }

@@ -32,7 +32,6 @@
 
 #include <uk/arch/types.h>
 #include <x86/cpu_defs.h>
-#include <uk/plat/common/sw_ctx.h>
 #include <stdint.h>
 #include <uk/assert.h>
 #include <uk/alloc.h>
@@ -41,24 +40,6 @@
 void halt(void);
 void system_off(void);
 
-enum save_cmd {
-	X86_SAVE_NONE,
-	X86_SAVE_FSAVE,
-	X86_SAVE_FXSAVE,
-	X86_SAVE_XSAVE,
-	X86_SAVE_XSAVEOPT
-};
-
-struct _x86_features {
-	unsigned long extregs_size;	/* Size of the extregs area */
-	unsigned long extregs_align;	/* Alignment of the extregs area */
-	enum save_cmd save;		/* which CPU instruction to use for
-					 * saving/restoring extregs.
-					 */
-};
-
-extern struct _x86_features x86_cpu_features;
-
 static inline void cpuid(__u32 fn, __u32 subfn,
 			 __u32 *eax, __u32 *ebx,
 			 __u32 *ecx, __u32 *edx)
@@ -66,95 +47,6 @@ static inline void cpuid(__u32 fn, __u32 subfn,
 	asm volatile("cpuid"
 		     : "=a"(*eax), "=b"(*ebx), "=c"(*ecx), "=d"(*edx)
 		     : "a"(fn), "c" (subfn));
-}
-
-static inline void save_extregs(struct sw_ctx *ctx)
-{
-	switch (x86_cpu_features.save) {
-	case X86_SAVE_NONE:
-		/* nothing to do */
-		break;
-	case X86_SAVE_FSAVE:
-		asm volatile("fsave (%0)" :: "r"(ctx->extregs) : "memory");
-		break;
-	case X86_SAVE_FXSAVE:
-		asm volatile("fxsave (%0)" :: "r"(ctx->extregs) : "memory");
-		break;
-	case X86_SAVE_XSAVE:
-		asm volatile("xsave (%0)" :: "r"(ctx->extregs),
-				"a"(0xffffffff), "d"(0xffffffff) : "memory");
-		break;
-	case X86_SAVE_XSAVEOPT:
-		asm volatile("xsaveopt (%0)" :: "r"(ctx->extregs),
-				"a"(0xffffffff), "d"(0xffffffff) : "memory");
-		break;
-	}
-}
-static inline void restore_extregs(struct sw_ctx *ctx)
-{
-	switch (x86_cpu_features.save) {
-	case X86_SAVE_NONE:
-		/* nothing to do */
-		break;
-	case X86_SAVE_FSAVE:
-		asm volatile("frstor (%0)" :: "r"(ctx->extregs));
-		break;
-	case X86_SAVE_FXSAVE:
-		asm volatile("fxrstor (%0)" :: "r"(ctx->extregs));
-		break;
-	case X86_SAVE_XSAVE:
-	case X86_SAVE_XSAVEOPT:
-		asm volatile("xrstor (%0)" :: "r"(ctx->extregs),
-				"a"(0xffffffff), "d"(0xffffffff));
-		break;
-	}
-}
-
-static inline __sz arch_extregs_size(void)
-{
-	/* Make sure that _init_cpufeatures() was called before */
-	UK_ASSERT(x86_cpu_features.extregs_size > 0);
-
-	return x86_cpu_features.extregs_align + x86_cpu_features.extregs_size;
-}
-
-static inline void arch_init_extregs(struct sw_ctx *ctx)
-{
-	ctx->extregs = ALIGN_UP((uintptr_t)ctx->_extregs,
-				x86_cpu_features.extregs_align);
-	// Initialize extregs area: zero out, then save a valid layout to it.
-	memset((void *)ctx->extregs, 0, x86_cpu_features.extregs_size);
-}
-
-static inline void _init_cpufeatures(void)
-{
-	__u32 eax, ebx, ecx, edx;
-
-	/* Why are we saving the eax register content to the eax variable with
-	 * "=a(eax)", but then never use it?
-	 * Because gcc otherwise will assume that the eax register still
-	 * contains "1" after this asm expression. See the "Warning" note at
-	 * https://gcc.gnu.org/onlinedocs/gcc/Extended-Asm.html#InputOperands
-	 */
-	cpuid(1, 0, &eax, &ebx, &ecx, &edx);
-	if (ecx & X86_CPUID1_ECX_OSXSAVE) {
-		cpuid(0xd, 1, &eax, &ebx, &ecx, &edx);
-		if (eax & X86_CPUIDD1_EAX_XSAVEOPT)
-			x86_cpu_features.save = X86_SAVE_XSAVEOPT;
-		else
-			x86_cpu_features.save = X86_SAVE_XSAVE;
-		cpuid(0xd, 0, &eax, &ebx, &ecx, &edx);
-		x86_cpu_features.extregs_size = ebx;
-		x86_cpu_features.extregs_align = 64;
-	} else if (edx & X86_CPUID1_EDX_FXSR) {
-		x86_cpu_features.save = X86_SAVE_FXSAVE;
-		x86_cpu_features.extregs_size = 512;
-		x86_cpu_features.extregs_align = 16;
-	} else {
-		x86_cpu_features.save = X86_SAVE_FSAVE;
-		x86_cpu_features.extregs_size = 108;
-		x86_cpu_features.extregs_align = 1;
-	}
 }
 
 unsigned long read_cr2(void);
@@ -309,9 +201,9 @@ static inline void _init_syscall(void)
 	int have_syscall = 0;
 
 	/* Check for availability of extended features */
-	cpuid(0x80000000, 0, &eax, &ebx, &ecx, &edx);
+	ukarch_x86_cpuid(0x80000000, 0, &eax, &ebx, &ecx, &edx);
 	if (eax >= 0x80000001) {
-		cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx);
+		ukarch_x86_cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx);
 		have_syscall = (edx & X86_CPUID3_SYSCALL);
 	}
 

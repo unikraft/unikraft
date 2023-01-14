@@ -131,12 +131,26 @@ static inline void ukarch_spinwait(void)
 }
 #endif /* !__ASSEMBLY__ */
 
+/* CPUID feature bits in ECX and EDX when EAX=1 */
+#define X86_CPUID1_ECX_x2APIC   (1 << 21)
+#define X86_CPUID1_ECX_XSAVE    (1 << 26)
+#define X86_CPUID1_ECX_OSXSAVE  (1 << 27)
+#define X86_CPUID1_ECX_AVX      (1 << 28)
+#define X86_CPUID1_EDX_FPU      (1 << 0)
+#define X86_CPUID1_EDX_FXSR     (1 << 24)
+#define X86_CPUID1_EDX_SSE      (1 << 25)
 /* CPUID feature bits in EBX and ECX when EAX=7, ECX=0 */
+#define X86_CPUID7_EBX_FSGSBASE (1 << 0)
+#define X86_CPUID7_ECX_PKU	(1 << 3)
+#define X86_CPUID7_ECX_OSPKE	(1 << 4)
 #define X86_CPUID7_ECX_LA57		(1 << 16)
+/* CPUID feature bits when EAX=0xd, ECX=1 */
+#define X86_CPUIDD1_EAX_XSAVEOPT (1<<0)
 /* CPUID 80000001H:EDX feature list */
 #define X86_CPUID81_NX			(1 << 20)
 #define X86_CPUID81_PAGE1GB		(1 << 26)
 #define X86_CPUID81_LM			(1 << 29)
+#define X86_CPUID3_SYSCALL      (1 << 11)
 
 #ifndef __ASSEMBLY__
 static inline void ukarch_x86_cpuid(__u32 fn, __u32 subfn,

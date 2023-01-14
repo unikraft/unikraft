@@ -369,11 +369,13 @@ found:
 	return error;
 }
 
+#if UK_LIBC_SYSCALLS
 int
 umount(const char *path)
 {
 	return umount2(path, 0);
 }
+#endif /* UK_LIBC_SYSCALLS */
 
 #if 0
 int
@@ -447,7 +449,7 @@ void sync(void)
 {
 	uk_syscall_e_sync();
 }
-#endif
+#endif /* UK_LIBC_SYSCALLS */
 
 /*
  * Compare two path strings. Return matched length.

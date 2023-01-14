@@ -1,0 +1,13 @@
+[package]
+license-file = "../../COPYING.md"
+name = "ukrust"
+version = "0.1.0"
+edition = "2021"
+
+[profile.dev]
+panic = "abort"
+lto = "no"
+
+[profile.release]
+panic = "abort"
+lto = "no"

@@ -8,9 +8,11 @@ ARCHFLAGS     += -D__ARM_64__
 else
 ARCHFLAGS     += -D__ARM_64__ -mgeneral-regs-only
 endif
+ARCHFLAGS-$(call gcc_version_ge,9,4) += -mno-outline-atomics
 
 # Disable FPU for trap/exception/interrupt handlers
 ISR_ARCHFLAGS += -D__ARM_64__ -mgeneral-regs-only
+ISR_ARCHFLAGS-$(call gcc_version_ge,9,4) += -mno-outline-atomics
 
 CINCLUDES   += -I$(CONFIG_UK_BASE)/arch/arm/arm64/include
 ASINCLUDES  += -I$(CONFIG_UK_BASE)/arch/arm/arm64/include
@@ -41,9 +43,23 @@ else
 endif
 endif
 
+ifeq ($(CONFIG_ARM64_FEAT_MTE),y)
+# MTE support introduced in GCC-10
+$(call error_if_gcc_version_lt,10,0)
+ARCH_REV := armv8.5-a
+ARCH_OPT := $(ARCH_OPT)+memtag
+endif
+
+ifeq ($(CONFIG_ARM64_FEAT_RNG),y)
+# FEAT_RNG support introduced in GCC-9
+$(call error_if_gcc_version_lt,9,0)
+ARCH_REV := armv8.5-a
+ARCH_OPT := $(ARCH_OPT)+rng
+endif
+
 ifdef ARCH_REV
-ARCHFLAGS-y += -march=$(ARCH_REV)
-ISR_ARCHFLAGS-y += -march=$(ARCH_REV)
+ARCHFLAGS-y += -march=$(ARCH_REV)$(ARCH_OPT)
+ISR_ARCHFLAGS-y += -march=$(ARCH_REV)$(ARCH_OPT)
 endif
 
 ifdef BRANCH_PROTECTION
@@ -251,3 +267,6 @@ $(call error_if_gcc_version_lt,10,1)
 ARCHFLAGS-$(call gcc_version_ge,10,1)     += -mcpu=neoverse-v1 -mtune=neoverse-v1
 ISR_ARCHFLAGS-$(call gcc_version_ge,10,1) += -mcpu=neoverse-v1 -mtune=neoverse-v1
 endif
+
+$(eval $(call addlib,libarm64arch))
+LIBARM64ARCH_SRCS-$(CONFIG_ARM64_FEAT_MTE) += $(CONFIG_UK_BASE)/arch/arm/arm64/memtag.c

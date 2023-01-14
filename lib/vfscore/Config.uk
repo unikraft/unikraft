@@ -2,9 +2,9 @@ config LIBVFSCORE
 	bool "vfscore: VFS Core Interface"
 	default n
 	select LIBNOLIBC if !HAVE_LIBC
-	select LIBUKTIME if !HAVE_LIBC
 	select LIBUKDEBUG
 	select LIBUKLOCK
+	select LIBPOSIX_TIME
 
 if LIBVFSCORE
 menu "vfscore: Configuration"

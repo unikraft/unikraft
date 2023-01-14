@@ -64,10 +64,6 @@ typedef __off off_t;
 #define __DEFINED_off_t
 #endif
 
-#if CONFIG_HAVE_TIME
-#include <uk/time_types.h>
-#endif
-
 #if (defined __NEED_mode_t && !defined __DEFINED_mode_t)
 typedef unsigned mode_t;
 #define __DEFINED_mode_t
@@ -153,4 +149,57 @@ typedef __sigset_t sigset_t;
 typedef int __sig_atomic_t;
 typedef __sig_atomic_t sig_atomic_t;
 #define __DEFINED_sig_atomic_t
+#endif
+
+#if defined(__NEED_socklen_t) && !defined(__DEFINED_socklen_t)
+typedef unsigned int __socklen_t;
+typedef __socklen_t socklen_t;
+#define __DEFINED_socklen_t
+#endif
+
+#if (defined __NEED_time_t && !defined __DEFINED_time_t)
+typedef long time_t;
+#define __DEFINED_time_t
+#endif
+
+#if (defined __NEED_suseconds_t && !defined __DEFINED_suseconds_t)
+typedef long suseconds_t;
+#define __DEFINED_suseconds_t
+#endif
+
+#if (defined __NEED_struct_timeval && !defined __DEFINED_struct_timeval)
+struct timeval {
+	time_t      tv_sec;
+	suseconds_t tv_usec;
+};
+#define __DEFINED_struct_timeval
+#endif
+
+#if (defined __NEED_struct_timespec && !defined __DEFINED_struct_timespec)
+struct timespec {
+	time_t tv_sec;
+	long   tv_nsec;
+};
+#define __DEFINED_struct_timespec
+#endif
+
+#if defined(__NEED_timer_t) && !defined(__DEFINED_timer_t)
+typedef void *timer_t;
+#define __DEFINED_timer_t
+#endif
+
+#if (defined __NEED_clockid_t && !defined __DEFINED_clockid_t)
+typedef int clockid_t;
+#define __DEFINED_clockid_t
+#endif
+
+#if defined(__NEED_clock_t) && !defined(__DEFINED_clock_t)
+typedef long clock_t;
+#define __DEFINED_clock_t
+#endif
+
+#if defined(__NEED_sa_family_t) && !defined(__DEFINED_sa_family_t)
+typedef unsigned short __sa_family_t;
+typedef __sa_family_t sa_family_t;
+#define __DEFINED_sa_family_t
 #endif

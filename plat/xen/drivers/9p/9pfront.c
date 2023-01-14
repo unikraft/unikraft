@@ -68,7 +68,7 @@ static void p9front_recv(struct p9front_dev_ring *ring);
 
 #if CONFIG_LIBUKSCHED
 
-static void p9front_bh_handler(void *arg)
+static __noreturn void p9front_bh_handler(void *arg)
 {
 	struct p9front_dev_ring *ring = arg;
 
@@ -184,7 +184,7 @@ static void p9front_free_dev_ring(struct p9front_dev *p9fdev, int idx)
 
 	if (ring->bh_thread_name)
 		free(ring->bh_thread_name);
-	uk_thread_kill(ring->bh_thread);
+	uk_sched_thread_terminate(ring->bh_thread);
 	unbind_evtchn(ring->evtchn);
 	for (i = 0; i < (1 << p9fdev->ring_order); i++)
 		gnttab_end_access(ring->intf->ref[i]);
@@ -264,10 +264,12 @@ static int p9front_allocate_dev_ring(struct p9front_dev *p9fdev, int idx)
 
 	rc = asprintf(&ring->bh_thread_name, DRIVER_NAME"-recv-%s-%u",
 			p9fdev->tag, idx);
-	ring->bh_thread = uk_thread_create(ring->bh_thread_name,
-			p9front_bh_handler, ring);
-	if (!ring->bh_thread) {
-		rc = -ENOMEM;
+	ring->bh_thread = uk_sched_thread_create(uk_sched_current(),
+						 p9front_bh_handler, ring,
+						 ring->bh_thread_name);
+	if (PTRISERR(ring->bh_thread)) {
+		rc = PTR2ERR(ring->bh_thread);
+		ring->bh_thread = NULL;
 		goto out_free_grants;
 	}
 #endif
@@ -290,7 +292,7 @@ static int p9front_allocate_dev_ring(struct p9front_dev *p9fdev, int idx)
 out_free_thread:
 	if (ring->bh_thread_name)
 		free(ring->bh_thread_name);
-	uk_thread_kill(ring->bh_thread);
+	uk_sched_thread_terminate(ring->bh_thread);
 out_free_grants:
 	for (i = 0; i < (1 << p9fdev->ring_order); i++)
 		gnttab_end_access(ring->intf->ref[i]);

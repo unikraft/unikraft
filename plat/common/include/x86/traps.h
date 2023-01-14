@@ -36,6 +36,7 @@
 
 #include <uk/arch/lcpu.h>
 #include <uk/arch/traps.h>
+#include <uk/plat/common/lcpu.h>
 
 #define TRAP_divide_error        0
 #define TRAP_debug               1
@@ -119,9 +120,8 @@ void do_##name(struct __regs *regs, unsigned long error_code)		\
 	}								\
 }
 
-void traps_init(void);
-void traps_fini(void);
-
-#endif
+void traps_table_init(void);
+void traps_lcpu_init(struct lcpu *current);
+#endif /* !__ASSEMBLY__ */
 
 #endif /* __UKARCH_TRAPS_X86_64_H__ */

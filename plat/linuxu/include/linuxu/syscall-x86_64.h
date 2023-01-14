@@ -36,27 +36,27 @@
 
 #include <stdint.h>
 
-#define __SC_READ    0
-#define __SC_WRITE   1
-#define __SC_OPENAT  257
-#define __SC_CLOSE   3
-#define __SC_FSTAT   5
-#define __SC_MMAP    9
-#define __SC_MUNMAP 11
-#define __SC_RT_SIGACTION   13
-#define __SC_RT_SIGPROCMASK 14
-#define __SC_IOCTL  16
-#define __SC_SOCKET 41
-#define __SC_EXIT   60
-#define __SC_FCNTL  72
-#define __SC_ARCH_PRCTL       158
-#define __SC_TIMER_CREATE     222
-#define __SC_TIMER_SETTIME    223
-#define __SC_TIMER_GETTIME    224
-#define __SC_TIMER_GETOVERRUN 225
-#define __SC_TIMER_DELETE     226
-#define __SC_CLOCK_GETTIME    228
-#define __SC_PSELECT6 270
+#define __SC_READ	0
+#define __SC_WRITE	1
+#define __SC_CLOSE	3
+#define __SC_FSTAT	5
+#define __SC_MMAP	9
+#define __SC_MUNMAP	11
+#define __SC_RT_SIGACTION	13
+#define __SC_RT_SIGPROCMASK	14
+#define __SC_IOCTL	16
+#define __SC_SOCKET	41
+#define __SC_EXIT	60
+#define __SC_FCNTL	72
+#define __SC_ARCH_PRCTL	158
+#define __SC_TIMER_CREATE	222
+#define __SC_TIMER_SETTIME	223
+#define __SC_TIMER_GETTIME	224
+#define __SC_TIMER_GETOVERRUN	225
+#define __SC_TIMER_DELETE	226
+#define __SC_CLOCK_GETTIME	228
+#define __SC_OPENAT	257
+#define __SC_PSELECT6	270
 
 
 #ifndef O_TMPFILE

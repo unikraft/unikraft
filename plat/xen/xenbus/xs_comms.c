@@ -560,7 +560,7 @@ static void xs_recv(void)
 	}
 }
 
-static void xs_thread_func(void *ign __unused)
+static __noreturn void xs_thread_func(void *ign __unused)
 {
 	for (;;) {
 		uk_waitq_wait_event(&xsh.waitq, xs_avail_work());
@@ -589,7 +589,9 @@ int xs_comms_init(void)
 
 	uk_waitq_init(&xsh.waitq);
 
-	thread = uk_thread_create("xenstore", xs_thread_func, NULL);
+	thread = uk_sched_thread_create(uk_sched_current(),
+					xs_thread_func, NULL,
+					"xenstore");
 	if (PTRISERR(thread))
 		return PTR2ERR(thread);
 
@@ -615,7 +617,7 @@ void xs_comms_fini(void)
 
 	xsh.buf = NULL;
 
-	/* TODO stop thread, instead of killing it */
-	uk_thread_kill(xsh.thread);
+	/* TODO: self-terminate thread, instead of killing it */
+	uk_sched_thread_terminate(xsh.thread);
 	xsh.thread = NULL;
 }

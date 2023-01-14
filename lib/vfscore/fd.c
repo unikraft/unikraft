@@ -31,6 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <uk/config.h>
 #include <string.h>
 #include <uk/essentials.h>
 #include <uk/bitmap.h>
@@ -38,9 +39,12 @@
 #include <vfscore/file.h>
 #include <uk/plat/lcpu.h>
 #include <errno.h>
-#include <uk/ctors.h>
+#include <uk/init.h>
+#if CONFIG_LIBPOSIX_PROCESS_CLONE
+#include <uk/process.h>
+#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 
-void init_stdio(void);
+int init_stdio(void);
 
 struct fdtable {
 	unsigned long bitmap[UK_BITS_TO_LONGS(FDTABLE_MAX_FILES)];
@@ -203,12 +207,30 @@ exit:
 }
 
 
-/* TODO: move this constructor to main.c */
-static void fdtable_init(void)
+static int fdtable_init(void)
 {
 	memset(&fdtable, 0, sizeof(fdtable));
 
-	init_stdio();
+	return init_stdio();
 }
 
-UK_CTOR_PRIO(fdtable_init, 1);
+uk_early_initcall_prio(fdtable_init, UK_PRIO_EARLIEST);
+
+#if CONFIG_LIBPOSIX_PROCESS_CLONE
+static int uk_posix_clone_files(const struct clone_args *cl_args,
+				size_t cl_args_len __unused,
+				struct uk_thread *child __unused,
+				struct uk_thread *parent __unused)
+{
+	if (unlikely(!(cl_args->flags & CLONE_FILES))) {
+		uk_pr_warn("CLONE_FILES not set");
+		return -ENOTSUP;
+	}
+
+	/* CLONE_FILES says that file descriptor table is shared
+	 * with the child, this is what we have implemented at the moment
+	 */
+	return 0;
+}
+UK_POSIX_CLONE_HANDLER(CLONE_FILES, false, uk_posix_clone_files, 0x0);
+#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */

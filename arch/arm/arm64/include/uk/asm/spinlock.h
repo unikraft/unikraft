@@ -34,6 +34,7 @@
 #error Do not include this header directly
 #endif
 
+#include <uk/essentials.h>
 #include <uk/arch/atomic.h>
 
 struct __align(8) __spinlock {

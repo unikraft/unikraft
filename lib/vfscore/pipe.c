@@ -39,6 +39,7 @@
 #include <vfscore/fs.h>
 #include <vfscore/mount.h>
 #include <vfscore/vnode.h>
+#include <vfscore/eventpoll.h>
 #include <uk/wait.h>
 #include <uk/syscall.h>
 #include <sys/ioctl.h>
@@ -81,6 +82,11 @@ struct pipe_file {
 	int r_refcount;
 	/* Flags */
 	int flags;
+
+	/* Eventpoll lock */
+	struct uk_mutex evp_lock;
+	/* List of registered eventpolls */
+	struct uk_list_head evp_list;
 };
 
 
@@ -239,6 +245,9 @@ struct pipe_file *pipe_file_alloc(int capacity, int flags)
 	pipe_file->r_refcount = 1;
 	pipe_file->flags = flags;
 
+	uk_mutex_init(&pipe_file->evp_lock);
+	UK_INIT_LIST_HEAD(&pipe_file->evp_list);
+
 	return pipe_file;
 }
 
@@ -246,6 +255,43 @@ void pipe_file_free(struct pipe_file *pipe_file)
 {
 	pipe_buf_free(pipe_file->buf);
 	free(pipe_file);
+}
+
+static void
+pipe_file_event(struct pipe_file *pipe_file, unsigned int event)
+{
+	struct eventpoll_cb *ecb;
+	struct uk_list_head *itr;
+
+	UK_ASSERT(pipe_file);
+
+	uk_mutex_lock(&pipe_file->evp_lock);
+	uk_list_for_each(itr, &pipe_file->evp_list) {
+		ecb = uk_list_entry(itr, struct eventpoll_cb, cb_link);
+
+		UK_ASSERT(ecb->unregister);
+
+		eventpoll_signal(ecb, event);
+	}
+	uk_mutex_unlock(&pipe_file->evp_lock);
+}
+
+static void
+pipe_file_unregister_eventpoll(struct eventpoll_cb *ecb)
+{
+	struct pipe_file *pipe_file;
+
+	UK_ASSERT(ecb);
+	UK_ASSERT(ecb->data);
+	pipe_file = (struct pipe_file *)ecb->data;
+
+	uk_mutex_lock(&pipe_file->evp_lock);
+	UK_ASSERT(!uk_list_empty(&ecb->cb_link));
+	uk_list_del(&ecb->cb_link);
+
+	ecb->data = NULL;
+	ecb->unregister = NULL;
+	uk_mutex_unlock(&pipe_file->evp_lock);
 }
 
 static int pipe_write(struct vnode *vnode,
@@ -295,6 +341,8 @@ static int pipe_write(struct vnode *vnode,
 
 				/* wake some readers */
 				uk_waitq_wake_up(&pipe_buf->rdwq);
+				pipe_file_event(pipe_file,
+						EPOLLIN | EPOLLRDNORM);
 			}
 		}
 
@@ -357,6 +405,8 @@ static int pipe_read(struct vnode *vnode,
 
 				/* wake some writers */
 				uk_waitq_wake_up(&pipe_buf->wrwq);
+				pipe_file_event(pipe_file,
+						EPOLLOUT | EPOLLWRNORM);
 
 				break;
 			}
@@ -415,6 +465,55 @@ static int pipe_ioctl(struct vnode *vnode,
 	}
 }
 
+static unsigned int
+get_pipe_file_events(struct pipe_file *pipe_file)
+{
+	struct pipe_buf *pipe_buf = pipe_file->buf;
+	unsigned int events = 0;
+
+	UK_ASSERT(pipe_file);
+
+	uk_mutex_lock(&pipe_buf->rdlock);
+	if (pipe_buf_can_read(pipe_buf))
+		events |= EPOLLIN | EPOLLRDNORM;
+	uk_mutex_unlock(&pipe_buf->rdlock);
+
+	uk_mutex_lock(&pipe_buf->wrlock);
+	if (pipe_buf_can_write(pipe_buf))
+		events |= EPOLLOUT | EPOLLWRNORM;
+	uk_mutex_unlock(&pipe_buf->wrlock);
+
+	return events;
+}
+
+static int
+pipe_poll(struct vnode *vnode, unsigned int *revents,
+	  struct eventpoll_cb *ecb)
+{
+	struct pipe_file *pipe_file = vnode->v_data;
+
+	UK_ASSERT(revents);
+
+	*revents = get_pipe_file_events(pipe_file);
+
+	uk_mutex_lock(&pipe_file->evp_lock);
+	if (!ecb->unregister) {
+		UK_ASSERT(uk_list_empty(&ecb->cb_link));
+		UK_ASSERT(!ecb->data);
+		/* This is the first time we see this cb. Add it to the
+		 * eventpoll list and set the unregister callback so
+		 * we remove it when the eventpoll is freed.
+		 */
+		uk_list_add_tail(&ecb->cb_link, &pipe_file->evp_list);
+
+		ecb->data = pipe_file;
+		ecb->unregister = pipe_file_unregister_eventpoll;
+	}
+	uk_mutex_unlock(&pipe_file->evp_lock);
+
+	return 0;
+}
+
 #define pipe_open        ((vnop_open_t) vfscore_vop_einval)
 #define pipe_fsync       ((vnop_fsync_t) vfscore_vop_nullop)
 #define pipe_readdir     ((vnop_readdir_t) vfscore_vop_einval)
@@ -457,7 +556,8 @@ static struct vnops pipe_vnops = {
 	.vop_cache     = pipe_cache,
 	.vop_fallocate = pipe_fallocate,
 	.vop_readlink  = pipe_readlink,
-	.vop_symlink   = pipe_symlink
+	.vop_symlink   = pipe_symlink,
+	.vop_poll      = pipe_poll,
 };
 
 #define pipe_vget  ((vfsop_vget_t) vfscore_vop_nullop)
@@ -521,6 +621,9 @@ static int pipe_fd_alloc(struct pipe_file *pipe_file, int flags)
 	vfs_file->f_data = pipe_file;
 	vfs_file->f_dentry = p_dentry;
 	vfs_file->f_vfs_flags = UK_VFSCORE_NOPOS;
+
+	uk_mutex_init(&vfs_file->f_lock);
+	UK_INIT_LIST_HEAD(&vfs_file->f_ep);
 
 	p_vnode->v_data = pipe_file;
 	p_vnode->v_type = VFIFO;
@@ -589,7 +692,7 @@ UK_SYSCALL_R_DEFINE(int, pipe2, int*, pipefd, int, flags)
 {
 	int rc;
 
-	rc = pipe(pipefd);
+	rc = uk_syscall_r_pipe((long) pipefd);
 	if (rc)
 		return rc;
 
@@ -604,6 +707,7 @@ UK_SYSCALL_R_DEFINE(int, pipe2, int*, pipefd, int, flags)
 	return 0;
 }
 
+#if UK_LIBC_SYSCALLS
 /* TODO maybe find a better place for this when it will be implemented */
 int mkfifo(const char *path __unused, mode_t mode __unused)
 {
@@ -611,3 +715,4 @@ int mkfifo(const char *path __unused, mode_t mode __unused)
 	errno = ENOTSUP;
 	return -1;
 }
+#endif /* UK_LIBC_SYSCALLS */

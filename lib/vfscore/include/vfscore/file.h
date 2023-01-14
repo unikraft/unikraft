@@ -37,6 +37,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <vfscore/dentry.h>
+#include <uk/list.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -58,6 +59,8 @@ struct vfscore_file {
 	int		f_vfs_flags;    /* internal implementation flags */
 	struct dentry   *f_dentry;
 	struct uk_mutex f_lock;
+
+	struct uk_list_head f_ep;	/* List of eventpoll_fd's */
 };
 
 #define FD_LOCK(fp)       uk_mutex_lock(&(fp->f_lock))

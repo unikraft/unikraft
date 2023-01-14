@@ -27,135 +27,190 @@
 #include <string.h>
 #include <uk/essentials.h>
 #include <uk/arch/lcpu.h>
+#include <uk/arch/paging.h>
+#include <uk/plat/lcpu.h>
 #include <uk/plat/config.h>
 #include <x86/desc.h>
 #include <kvm-x86/traps.h>
 
-static struct seg_desc32 cpu_gdt64[GDT_NUM_ENTRIES] __align64b;
-
 /*
- * The monitor (ukvm) or bootloader + bootstrap (virtio) starts us up with a
- * bootstrap GDT which is "invisible" to the guest, init and switch to our own
- * GDT.
+ * CPUs should get dedicated IRQ and exception stacks. We use the interrupt
+ * stack table (IST) feature for switching to the stack. This means when an
+ * IRQ or a critical exception (e.g., a double fault) occurs, the CPU
+ * automatically switches to the stack pointer configured in the IST entry.
+ * Since the IST is part of the 64-bit task state segment (TSS), we need one
+ * TSS per CPU. The TSS in turn is referenced by the global descriptor
+ * table (GDT). Consequently, we also need separate GDTs per CPU.
  *
- * This is done primarily since we need to do LTR later in a predictable
- * fashion.
+ *  CPU ─────┐ per CPU
+ *           ▼
+ *  ┌──────────────────┐
+ *  │       GDT        │     ┌──────────────────┐
+ *  ├──────────────────┤  ┌─►│       TSS        │
+ *  │   null segment   │  │  ├──────────────────┤    ┌────────────────────┐
+ *  ├──────────────────┤  │  │   IST stack[0] ──┼───►│     IRQ Stack      ├─┐
+ *  │    cs  segment   │  │  │   IST stack[1] ──┼────│                  │ │ │
+ *  ├──────────────────┤  │  │   IST stack[2]   │    │                  │ │ │
+ *  │    ds  segment   │  │  │        .         │    │                  │ │ │
+ *  ├──────────────────┤  │  │        .         │    │                  ▼ │ │
+ *  │   tss  segment   ├──┘  │        .         │    └─┬──────────────────┘ │
+ *  └──────────────────┘     └──────────────────┘      └────────────────────┘
  */
-static void gdt_init(void)
+__section(".intrstack") __align(STACK_SIZE) /* IST1 */
+char cpu_intr_stack[CONFIG_UKPLAT_LCPU_MAXCOUNT][STACK_SIZE];
+__section(".intrstack") __align(STACK_SIZE) /* IST2 */
+char cpu_trap_stack[CONFIG_UKPLAT_LCPU_MAXCOUNT][STACK_SIZE];
+
+static __align(8)
+struct tss64 cpu_tss[CONFIG_UKPLAT_LCPU_MAXCOUNT];
+
+static __align(8)
+struct seg_desc32 cpu_gdt64[CONFIG_UKPLAT_LCPU_MAXCOUNT][GDT_NUM_ENTRIES];
+
+static void gdt_init(__lcpuidx idx)
 {
-	volatile struct desc_table_ptr64 gdtptr;
+	volatile struct desc_table_ptr64 gdtptr; /* needs to be volatile so
+						  * setting its values is not
+						  * optimized out
+						  */
 
-	memset(cpu_gdt64, 0, sizeof(cpu_gdt64));
-	cpu_gdt64[GDT_DESC_CODE].raw = GDT_DESC_CODE_VAL;
-	cpu_gdt64[GDT_DESC_DATA].raw = GDT_DESC_DATA_VAL;
+	cpu_gdt64[idx][GDT_DESC_CODE].raw = GDT_DESC_CODE64_VAL;
+	cpu_gdt64[idx][GDT_DESC_DATA].raw = GDT_DESC_DATA64_VAL;
 
-	gdtptr.limit = sizeof(cpu_gdt64) - 1;
-	gdtptr.base = (__u64) &cpu_gdt64;
-	__asm__ __volatile__("lgdt (%0)" ::"r"(&gdtptr));
-	/*
-	 * TODO: Technically we should reload all segment registers here, in
-	 * practice this doesn't matter since the bootstrap GDT matches ours,
-	 * for now.
-	 */
-}
+	gdtptr.limit = sizeof(cpu_gdt64[idx]) - 1;
+	gdtptr.base = (__u64) &cpu_gdt64[idx];
 
-static struct tss64 cpu_tss;
+	__asm__ goto(
+		/* Load the global descriptor table */
+		"lgdt	%0\n"
 
-__section(".intrstack")  __align(STACK_SIZE)
-char cpu_intr_stack[STACK_SIZE];  /* IST1 */
-__section(".intrstack")  __align(STACK_SIZE)
-char cpu_trap_stack[STACK_SIZE];  /* IST2 */
-static char cpu_nmi_stack[4096];  /* IST3 */
+		/* Perform a far return to enable the new CS */
+		"leaq	%l[jump_to_new_cs](%%rip), %%rax\n"
 
-static void tss_init(void)
-{
-	struct seg_desc64 *td = (void *) &cpu_gdt64[GDT_DESC_TSS_LO];
-
-	cpu_tss.ist[0] = (__u64) &cpu_intr_stack[sizeof(cpu_intr_stack)];
-	cpu_tss.ist[1] = (__u64) &cpu_trap_stack[sizeof(cpu_trap_stack)];
-	cpu_tss.ist[2] = (__u64) &cpu_nmi_stack[sizeof(cpu_nmi_stack)];
-
-	td->limit_lo = sizeof(cpu_tss);
-	td->base_lo = (__u64) &cpu_tss;
-	td->type = 0x9;
-	td->zero = 0;
-	td->dpl = 0;
-	td->p = 1;
-	td->limit_hi = 0;
-	td->gran = 0;
-	td->base_hi = (__u64) &cpu_tss >> 24;
-	td->zero1 = 0;
-
-	barrier();
-	__asm__ __volatile__(
-		"ltr %0"
+		"pushq	%1\n"
+		"pushq	%%rax\n"
+		"lretq\n"
 		:
-		: "r" ((unsigned short) (GDT_DESC_TSS_LO * 8))
-	);
+		: "m"(gdtptr),
+		  "i"(GDT_DESC_OFFSET(GDT_DESC_CODE))
+		: "rax", "memory" : jump_to_new_cs);
+jump_to_new_cs:
+
+	__asm__ __volatile__(
+		/* Update remaining segment registers */
+		"movl	%0, %%es\n"
+		"movl	%0, %%ss\n"
+		"movl	%0, %%ds\n"
+
+		/* Initialize fs and gs to 0 */
+		"movl	%1, %%fs\n"
+		"movl	%1, %%gs\n"
+		:
+		: "r"(GDT_DESC_OFFSET(GDT_DESC_DATA)),
+		  "r"(0));
 }
 
+static void tss_init(__lcpuidx idx)
+{
+	struct seg_desc64 *tss_desc;
+
+	cpu_tss[idx].ist[0] =
+		(__u64) &cpu_intr_stack[idx][sizeof(cpu_intr_stack[idx])];
+	cpu_tss[idx].ist[1] =
+		(__u64) &cpu_trap_stack[idx][sizeof(cpu_trap_stack[idx])];
+
+	tss_desc = (void *) &cpu_gdt64[idx][GDT_DESC_TSS_LO];
+	tss_desc->limit_lo	= sizeof(cpu_tss[idx]);
+	tss_desc->base_lo	= (__u64) &(cpu_tss[idx]);
+	tss_desc->base_hi	= (__u64) &(cpu_tss[idx]) >> 24;
+	tss_desc->type		= GDT_DESC_TYPE_TSS_AVAIL;
+	tss_desc->p		= 1;
+
+	__asm__ __volatile__(
+		"ltr	%0\n"
+		:
+		: "r"((__u16) (GDT_DESC_OFFSET(GDT_DESC_TSS_LO))));
+}
 
 /* Declare the traps used only by this platform: */
 DECLARE_TRAP_EC(nmi,           "NMI",                  NULL)
 DECLARE_TRAP_EC(double_fault,  "double fault",         NULL)
 DECLARE_TRAP_EC(virt_error,    "virtualization error", NULL)
 
+static struct seg_gate_desc64 cpu_idt[IDT_NUM_ENTRIES] __align(8);
+static struct desc_table_ptr64 idtptr;
 
-static struct seg_gate_desc64 cpu_idt[IDT_NUM_ENTRIES] __align64b;
-
-static void idt_fillgate(unsigned int num, void *fun, unsigned int ist)
+static inline void idt_fillgate(unsigned int num, void *fun, unsigned int ist)
 {
 	struct seg_gate_desc64 *desc = &cpu_idt[num];
 
 	/*
 	 * All gates are interrupt gates, all handlers run with interrupts off.
 	 */
-	desc->offset_hi = (__u64) fun >> 16;
-	desc->offset_lo = (__u64) fun & 0xffff;
-	desc->selector = GDT_DESC_OFFSET(GDT_DESC_CODE);
-	desc->ist = ist;
-	desc->type = 14; /* == 0b1110 */
-	desc->dpl = 0;
-	desc->p = 1;
+	desc->offset_hi	= (__u64) fun >> 16;
+	desc->offset_lo	= (__u64) fun & 0xffff;
+	desc->selector	= IDT_DESC_OFFSET(IDT_DESC_CODE);
+	desc->ist	= ist;
+	desc->type	= IDT_DESC_TYPE_INTR;
+	desc->dpl	= IDT_DESC_DPL_KERNEL;
+	desc->p		= 1;
 }
-
-volatile struct desc_table_ptr64 idtptr;
 
 static void idt_init(void)
 {
+	/* Ensure that traps_table_init has been called */
+	UK_ASSERT(idtptr.limit != 0);
+
+	__asm__ __volatile__("lidt %0" :: "m" (idtptr));
+}
+
+void traps_table_init(void)
+{
 	/*
-	 * Load trap vectors. All traps run on IST2 (cpu_trap_stack), except for
-	 * the exceptions.
+	 * Load trap vectors. All traps run on the current stack, except
+	 * for critical and debug exceptions.
+	 *
+	 * NOTE: Nested IRQs/exceptions must not use IST as the CPU switches
+	 * to the configured stack pointer irrespective of the fact that it may
+	 * already run on the same stack. For example, if we would cause a
+	 * page fault in the debug trap and both would use the same IST entry,
+	 * the page fault handler corrupts the stack (of the debug trap) and
+	 * the system eventually crashes when returning from the page fault
+	 * handler.
 	 */
-#define FILL_TRAP_GATE(name, ist) extern void cpu_trap_##name(void); \
+#define FILL_TRAP_GATE(name, ist)					\
+	extern void cpu_trap_##name(void);				\
 	idt_fillgate(TRAP_##name, ASM_TRAP_SYM(name), ist)
-	FILL_TRAP_GATE(divide_error,    2);
-	FILL_TRAP_GATE(debug,           2);
-	FILL_TRAP_GATE(nmi,             3); /* #NMI runs on IST3 (cpu_nmi_stack) */
-	FILL_TRAP_GATE(int3,            2);
-	FILL_TRAP_GATE(overflow,        2);
-	FILL_TRAP_GATE(bounds,          2);
-	FILL_TRAP_GATE(invalid_op,      2);
-	FILL_TRAP_GATE(no_device,       2);
-	FILL_TRAP_GATE(double_fault,    3); /* #DF runs on IST3 (cpu_nmi_stack) */
 
-	FILL_TRAP_GATE(invalid_tss,     2);
-	FILL_TRAP_GATE(no_segment,      2);
-	FILL_TRAP_GATE(stack_error,     2);
-	FILL_TRAP_GATE(gp_fault,        2);
-	FILL_TRAP_GATE(page_fault,      2);
+	FILL_TRAP_GATE(divide_error,	0);
+	FILL_TRAP_GATE(debug,		2); /* runs on IST2 (cpu_trap_stack) */
+	FILL_TRAP_GATE(nmi,		2); /* runs on IST2 (cpu_trap_stack) */
+	FILL_TRAP_GATE(int3,		2); /* runs on IST2 (cpu_trap_stack) */
+	FILL_TRAP_GATE(overflow,	0);
+	FILL_TRAP_GATE(bounds,		0);
+	FILL_TRAP_GATE(invalid_op,	0);
+	FILL_TRAP_GATE(no_device,	0);
+	FILL_TRAP_GATE(double_fault,	2); /* runs on IST2 (cpu_trap_stack) */
 
-	FILL_TRAP_GATE(coproc_error,    2);
-	FILL_TRAP_GATE(alignment_check, 2);
-	FILL_TRAP_GATE(machine_check,   2);
-	FILL_TRAP_GATE(simd_error,      2);
-	FILL_TRAP_GATE(virt_error,      2);
+	FILL_TRAP_GATE(invalid_tss,	0);
+	FILL_TRAP_GATE(no_segment,	0);
+	FILL_TRAP_GATE(stack_error,	0);
+	FILL_TRAP_GATE(gp_fault,	0);
+	FILL_TRAP_GATE(page_fault,	0);
+
+	FILL_TRAP_GATE(coproc_error,	0);
+	FILL_TRAP_GATE(alignment_check,	0);
+	FILL_TRAP_GATE(machine_check,	2); /* runs on IST2 (cpu_trap_stack) */
+	FILL_TRAP_GATE(simd_error,	0);
+	FILL_TRAP_GATE(virt_error,	0);
 
 	/*
-	 * Load irq vectors. All irqs run on IST1 (cpu_intr_stack).
+	 * Load IRQ vectors. All IRQs run on IST1 (cpu_intr_stack).
 	 */
-#define FILL_IRQ_GATE(num, ist) extern void cpu_irq_##num(void); \
+#define FILL_IRQ_GATE(num, ist)						\
+	extern void cpu_irq_##num(void);				\
 	idt_fillgate(32 + num, cpu_irq_##num, ist)
+
 	FILL_IRQ_GATE(0, 1);
 	FILL_IRQ_GATE(1, 1);
 	FILL_IRQ_GATE(2, 1);
@@ -175,16 +230,11 @@ static void idt_init(void)
 
 	idtptr.limit = sizeof(cpu_idt) - 1;
 	idtptr.base = (__u64) &cpu_idt;
-	__asm__ __volatile__("lidt (%0)" :: "r" (&idtptr));
 }
 
-void traps_init(void)
+void traps_lcpu_init(struct lcpu *this_lcpu)
 {
-	gdt_init();
-	tss_init();
+	gdt_init(this_lcpu->idx);
+	tss_init(this_lcpu->idx);
 	idt_init();
-}
-
-void traps_fini(void)
-{
 }

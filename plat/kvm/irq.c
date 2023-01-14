@@ -31,7 +31,6 @@
 #include <uk/plat/time.h>
 #include <uk/plat/irq.h>
 #include <uk/plat/common/irq.h>
-#include <kvm/irq.h>
 #include <kvm/intctrl.h>
 #include <uk/assert.h>
 #include <uk/print.h>

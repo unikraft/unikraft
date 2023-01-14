@@ -2,3 +2,10 @@
 ifeq ($(CONFIG_ARCH_X86_64),y)
 	include $(CONFIG_UK_BASE)/arch/x86/x86_64/Makefile.uk
 endif
+
+$(eval $(call addlib,libcontext))
+
+LIBCONTEXT_SRCS-y += $(LIBCONTEXT_BASE)/ctx.c|isr
+LIBCONTEXT_SRCS-y += $(LIBCONTEXT_BASE)/ectx.c|isr
+LIBCONTEXT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBCONTEXT_BASE)/x86_64/ctx.S|x86_64
+LIBCONTEXT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBCONTEXT_BASE)/x86_64/tls.c|x86_64

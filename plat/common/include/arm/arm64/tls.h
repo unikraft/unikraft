@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Copyright (c) 2019, NEC Laboratories Europe GmbH. All rights reserved.
+ * Copyright (c) 2022, OpenSynergy GmbH All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,6 +31,13 @@
 #ifndef __PLAT_CMN_ARM64_TLS_H__
 #define __PLAT_CMN_ARM64_TLS_H__
 
-#define set_tls_pointer(ptr) do { } while (0)
+#include <arm/arm64/cpu.h> /* SYSREG_READ, SYSREG_WRITE */
+
+#define get_tls_pointer() SYSREG_READ(tpidr_el0)
+
+/* like SYSREG_WRITE, but with compiler barrier */
+#define set_tls_pointer(ptr) \
+	__asm__ __volatile__("msr tpidr_el0, %0" \
+			: : "r" ((uint64_t)(ptr)) : "memory")
 
 #endif /* __PLAT_CMN_ARM64_TLS_H__ */

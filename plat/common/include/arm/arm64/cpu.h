@@ -35,72 +35,10 @@
 
 #include <inttypes.h>
 #include <uk/essentials.h>
-#include <uk/plat/common/sw_ctx.h>
 #include <uk/alloc.h>
 #include <uk/assert.h>
 #include <arm/smccc.h>
 #include <uk/plat/common/lcpu.h>
-
-/*
- * we should use inline assembly with volatile constraint to access mmio
- * device memory to avoid compiler use load/store instructions of writeback
- * addressing mode which will cause crash when running in hyper mode
- * unless they will be decoded by hypervisor.
- */
-static inline uint8_t ioreg_read8(const volatile uint8_t *address)
-{
-	uint8_t value;
-
-	asm volatile ("ldrb %w0, [%1]" : "=r"(value) : "r"(address));
-	return value;
-}
-
-static inline uint16_t ioreg_read16(const volatile uint16_t *address)
-{
-	uint16_t value;
-
-	asm volatile ("ldrh %w0, [%1]" : "=r"(value) : "r"(address));
-	return value;
-}
-
-static inline uint32_t ioreg_read32(const volatile uint32_t *address)
-{
-	uint32_t value;
-
-	asm volatile ("ldr %w0, [%1]" : "=r"(value) : "r"(address));
-	return value;
-}
-
-static inline uint64_t ioreg_read64(const volatile uint64_t *address)
-{
-	uint64_t value;
-
-	asm volatile ("ldr %0, [%1]" : "=r"(value) : "r"(address));
-	return value;
-}
-
-static inline void ioreg_write8(const volatile uint8_t *address, uint8_t value)
-{
-	asm volatile ("strb %w0, [%1]" : : "rZ"(value), "r"(address));
-}
-
-static inline void ioreg_write16(const volatile uint16_t *address,
-				 uint16_t value)
-{
-	asm volatile ("strh %w0, [%1]" : : "rZ"(value), "r"(address));
-}
-
-static inline void ioreg_write32(const volatile uint32_t *address,
-				 uint32_t value)
-{
-	asm volatile ("str %w0, [%1]" : : "rZ"(value), "r"(address));
-}
-
-static inline void ioreg_write64(const volatile uint64_t *address,
-				 uint64_t value)
-{
-	asm volatile ("str %0, [%1]" : : "rZ"(value), "r"(address));
-}
 
 static inline void _init_cpufeatures(void)
 {
@@ -110,32 +48,6 @@ static inline void _init_cpufeatures(void)
 #define outb(addr, v)   UK_BUG()
 #define outw(addr, v)   UK_BUG()
 #define inb(addr)       UK_BUG()
-
-/* Macros to access system registers */
-#define SYSREG_READ(reg) \
-({	uint64_t val; \
-	__asm__ __volatile__("mrs %0, " __STRINGIFY(reg) \
-			: "=r" (val)); \
-	val; \
-})
-
-#define SYSREG_WRITE(reg, val) \
-	__asm__ __volatile__("msr " __STRINGIFY(reg) ", %0" \
-			: : "r" ((uint64_t)(val)))
-
-#define SYSREG_READ32(reg) \
-({	uint32_t val; \
-	__asm__ __volatile__("mrs %0, " __STRINGIFY(reg) \
-			: "=r" (val)); \
-	val; \
-})
-
-#define SYSREG_WRITE32(reg, val) \
-	__asm__ __volatile__("msr " __STRINGIFY(reg) ", %0" \
-			: : "r" ((uint32_t)(val)))
-
-#define SYSREG_READ64(reg) SYSREG_READ(reg)
-#define SYSREG_WRITE64(reg, val) SYSREG_WRITE(reg, val)
 
 /*
  * PSCI conduit method to call functions, based on the SMC Calling Convention.
@@ -151,6 +63,7 @@ int cpu_on(__lcpuid id, __paddr_t entry, void *arg);
 #endif /* CONFIG_HAVE_SMP */
 
 #ifdef CONFIG_FPSIMD
+
 struct fpsimd_state {
 	__u64		regs[32 * 2];
 	__u32		fpsr;
@@ -160,57 +73,34 @@ struct fpsimd_state {
 extern void fpsimd_save_state(uintptr_t ptr);
 extern void fpsimd_restore_state(uintptr_t ptr);
 
-static inline void save_extregs(struct sw_ctx *ctx)
+static inline void save_extregs(void *ectx)
 {
-	fpsimd_save_state(ctx->extregs);
+	fpsimd_save_state((uintptr_t) ectx);
 
 	/* make sure sysreg writing takes effects */
 	isb();
 }
 
-static inline void restore_extregs(struct sw_ctx *ctx)
+static inline void restore_extregs(void *ectx)
 {
-	fpsimd_restore_state(ctx->extregs);
+	fpsimd_restore_state((uintptr_t) ectx);
 
 	/* make sure sysreg writing takes effects */
 	isb();
-}
-
-static inline void arch_init_extregs(struct sw_ctx *ctx)
-{
-	if (ctx)
-		ctx->extregs = (uintptr_t)ctx->_extregs;
-
-	uk_pr_debug("Allocating %lu + %lu bytes for sw ctx at %p, extregs at %p\n",
-		sizeof(struct sw_ctx), sizeof(struct fpsimd_state),
-		ctx, (void *)ctx->extregs);
-}
-
-static inline __sz arch_extregs_size(void)
-{
-	return sizeof(struct fpsimd_state);
 }
 
 #else /* !CONFIG_FPSIMD */
-static inline void save_extregs(struct sw_ctx *ctx __unused)
+
+struct fpsimd_state { };
+
+static inline void save_extregs(void *ectx __unused)
 {
 }
 
-static inline void restore_extregs(struct sw_ctx *ctx __unused)
+static inline void restore_extregs(void *ectx __unused)
 {
 }
 
-static inline void arch_init_extregs(struct sw_ctx *ctx)
-{
-	if (ctx)
-		ctx->extregs = (uintptr_t)ctx->_extregs;
-}
-
-static inline __sz arch_extregs_size(void)
-{
-	return 0;
-}
 #endif /* CONFIG_FPSIMD */
-
 
 #endif /* __PLAT_COMMON_ARM64_CPU_H__ */

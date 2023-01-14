@@ -93,6 +93,12 @@ extern "C" {
 #ifndef __unalign
 #define __unalign              __align(1)
 #endif
+#ifndef __noinline
+#define __noinline             __attribute__((noinline))
+#endif
+#ifndef __check_result
+#define __check_result         __attribute__((warn_unused_result))
+#endif
 
 #ifndef __alias
 #define __alias(old, new) \
@@ -214,6 +220,11 @@ extern "C" {
 #define ALIGN_DOWN(v, a) ((v) & ~((a)-1))
 #endif
 
+/* Note: a has to be a power of 2 */
+#ifndef IS_ALIGNED
+#define IS_ALIGNED(v, a) (((v) & ~((a)-1)) == (v))
+#endif
+
 /**
  * Tests if `val` is part of the range defined by `base` and `len`
  */
@@ -237,7 +248,7 @@ extern "C" {
  */
 #define RANGE_CONTAIN(base0, len0, base1, len1)				\
 	(IN_RANGE((base1), (base0), (len0))				\
-	 && (((base1) + (len1)) > (base0))				\
+	 && (((base1) + (len1)) >= (base0))				\
 	 && (((base1) + (len1)) <= ((base0) + (len0))))
 
 /**
@@ -311,6 +322,27 @@ extern "C" {
 	DEQUALIFY(s *, (const volatile char *)(x) - __offsetof(s, m))
 #endif
 #endif /* !__containerof */
+
+/* Computes the offsset and size of a field within a struct and checks
+ * if it is within bounds
+ */
+#ifndef __contains
+#define __contains(t, field, size)					\
+	((__offsetof(t, field) + sizeof(((t *)0)->field)) <= (size))
+#endif
+
+#ifdef __GNUC__
+#ifndef __return_addr
+#define __return_addr(lvl) \
+	((__uptr) __builtin_extract_return_addr(__builtin_return_address(lvl)))
+#endif
+#ifndef __frame_addr
+#define __frame_addr(lvl) \
+	((__uptr) __builtin_frame_address(lvl))
+#endif
+#else
+	/* to be defined */
+#endif /* !__GNUC__ */
 
 #ifndef UK_CTASSERT
 #define UK_CTASSERT(x)             _UK_CTASSERT(x, __LINE__)

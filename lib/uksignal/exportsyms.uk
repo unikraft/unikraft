@@ -1,20 +1,38 @@
-# uk_signal.h
-uk_proc_sig
-
-uk_sig_handle_signals
-uk_proc_sig_init
-uk_sig_thread_kill
-uk_thread_sigmask
-
 # signal.h
 sigaction
 signal
+rt_sigaction
+uk_syscall_e_rt_sigaction
+uk_syscall_r_rt_sigaction
+
 sigprocmask
+rt_sigprocmask
+uk_syscall_e_rt_sigprocmask
+uk_syscall_r_rt_sigprocmask
+
 sigsuspend
+rt_sigsuspend
+uk_syscall_e_rt_sigsuspend
+uk_syscall_r_rt_sigsuspend
+
 sigpending
+rt_sigpending
+uk_syscall_e_rt_sigpending
+uk_syscall_r_rt_sigpending
+
 sigwait
+rt_sigtimedwait
+uk_syscall_e_rt_sigtimedwait
+uk_syscall_r_rt_sigtimedwait
+
 kill
+uk_syscall_e_kill
+uk_syscall_r_kill
 killpg
+tkill
+uk_syscall_e_tkill
+uk_syscall_r_tkill
+
 raise
 siginterrupt
 

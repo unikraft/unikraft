@@ -1,11 +1,17 @@
 $(eval $(call addlib_s,libuksched,$(CONFIG_LIBUKSCHED)))
 
+# NOTE: Additional flags might be set to
+#       `LIBUKSCHED_THREAD_FLAGS-y`, `CFLAGS-y`, and `CXXFLAGS-y`
+#       by `Makefiles.rules`
+
 CINCLUDES-$(CONFIG_LIBUKSCHED)     += -I$(LIBUKSCHED_BASE)/include
 CXXINCLUDES-$(CONFIG_LIBUKSCHED)   += -I$(LIBUKSCHED_BASE)/include
 
+LIBUKSCHED_CFLAGS-$(CONFIG_LIBUKSCHED_DEBUG) += -DUK_DEBUG
+
 LIBUKSCHED_SRCS-y += $(LIBUKSCHED_BASE)/sched.c
 LIBUKSCHED_SRCS-y += $(LIBUKSCHED_BASE)/thread.c
-LIBUKSCHED_SRCS-y += $(LIBUKSCHED_BASE)/thread_attr.c
+LIBUKSCHED_THREAD_FLAGS-$(call gcc_version_ge,8,0) += -Wno-cast-function-type
 LIBUKSCHED_SRCS-y += $(LIBUKSCHED_BASE)/extra.ld
 
 UK_PROVIDED_SYSCALLS-$(CONFIG_LIBUKSCHED) += sched_yield-0

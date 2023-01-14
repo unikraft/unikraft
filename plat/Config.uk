@@ -30,12 +30,14 @@ config UKPLAT_LCPU_IDISIDX
 config UKPLAT_LCPU_RUN_IRQ
 	int "Remote Function IRQ#"
 	default 5 if ARCH_ARM_64
-	depends on (ARCH_ARM_64 && PLAT_KVM)
+	default 13 if ARCH_X86_64
+	depends on ((ARCH_ARM_64 || ARCH_X86_64) && PLAT_KVM)
 
 config UKPLAT_LCPU_WAKEUP_IRQ
 	int "Wakeup IRQ#"
 	default 6 if ARCH_ARM_64
-	depends on (ARCH_ARM_64 && PLAT_KVM)
+	default 14 if ARCH_X86_64
+	depends on ((ARCH_ARM_64 || ARCH_X86_64) && PLAT_KVM)
 
 endmenu
 
@@ -71,6 +73,14 @@ config HAVE_PAGING_DIRECTMAP
 	default y if PAGING && ARCH_X86_64
 	default n
 
+config ENFORCE_W_XOR_X
+	bool "Enforce W^X"
+	depends on PAGING && ARCH_ARM_64
+	default y
+	help
+		During boot the protection settings of all memory
+		ranges are updated to enforce write XOR execute (W^X)
+		and mitigate code injection attacks.
 endmenu
 
 config HZ
@@ -93,7 +103,7 @@ menuconfig LIBGIC
 	select LIBOFW
 	default y if ARCH_ARM_64
 	depends on ARCH_ARM_64
-	depends on PLAT_KVM
+	depends on UKPLAT_ALLOW_GIC
 if LIBGIC
 config LIBGICV2
 	bool "Version 2"

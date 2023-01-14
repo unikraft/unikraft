@@ -450,7 +450,11 @@ vnode_dump(void)
 	struct vnode *vp;
 	struct mount *mp;
 	char type[][6] = { "VNON ", "VREG ", "VDIR ", "VBLK ", "VCHR ",
-			   "VLNK ", "VSOCK", "VFIFO" };
+			   "VLNK ", "VSOCK", "VFIFO",
+#ifdef CONFIG_LIBPOSIX_EVENT
+			   "VEPLL", "VEVNT",
+#endif /* CONFIG_LIBPOSIX_EVENT */
+			 };
 
 	VNODE_LOCK();
 

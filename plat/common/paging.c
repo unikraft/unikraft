@@ -49,7 +49,9 @@
 #include <uk/falloc.h>
 
 #define __PLAT_CMN_ARCH_PAGING_H__
-#ifdef CONFIG_ARCH_X86_64
+#if defined CONFIG_ARCH_ARM_64
+#include <arm/arm64/paging.h>
+#elif defined CONFIG_ARCH_X86_64
 #include <x86/paging.h>
 #else
 #error "Architecture not supported by paging API"
