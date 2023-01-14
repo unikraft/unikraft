@@ -12,6 +12,7 @@ endif
 KVM_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_kvm-$(CONFIG_UK_ARCH)
 KVM_DEBUG_IMAGE := $(KVM_IMAGE).dbg
 KVM_IMAGE_OBJECT := $(KVM_IMAGE).o
+KVM_ALIB_IMAGE := $(KVM_IMAGE).a
 
 KVM_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-dT$(comma),\
 			 $(UK_PLAT_KVM_DEF_LDS))
@@ -56,12 +57,17 @@ $(KVM_IMAGE).sym: $(KVM_DEBUG_IMAGE)
 $(KVM_IMAGE).gz: $(KVM_IMAGE)
 	$(call build_cmd,GZ,,$@, $(GZIP) -f -9 -c $< >$@)
 
+$(KVM_ALIB_IMAGE): $(KVM_IMAGE_OBJECT)
+	$(call build_cmd,AR,,$@,\
+	       $(AR) $(ARFLAGS) $@ $<)
+
 # register images to the build
 ifeq ($(CONFIG_PLAT_KVM),y)
 UK_DEBUG_IMAGES-y                     += $(KVM_DEBUG_IMAGE)
 UK_IMAGES-y                           += $(KVM_IMAGE)
 UK_IMAGES-$(CONFIG_OPTIMIZE_SYMFILE)  += $(KVM_IMAGE).sym
 UK_IMAGES-$(CONFIG_OPTIMIZE_COMPRESS) += $(KVM_IMAGE).gz
+UK_ALIB_IMAGES-y                      += $(KVM_ALIB_IMAGE)
 endif
 
 # ...for cleaning:

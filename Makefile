@@ -298,6 +298,8 @@ UK_OBJS:=
 UK_OBJS-y:=
 UK_IMAGES:=
 UK_IMAGES-y:=
+UK_ALIB_IMAGES:=
+UK_ALIB_IMAGES-y:=
 UK_CLEAN :=
 UK_CLEAN-y :=
 ARCHFLAGS :=
@@ -716,6 +718,8 @@ libs: $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y)
 
 images: $(UK_DEBUG_IMAGES) $(UK_DEBUG_IMAGES-y) $(UK_IMAGES) $(UK_IMAGES-y)
 
+alib_images: $(UK_ALIB_IMAGES) $(UK_ALIB_IMAGES-y)
+
 GDB_HELPER_LINKS := $(addsuffix .gdb.py,$(UK_DEBUG_IMAGES) $(UK_DEBUG_IMAGES-y))
 $(GDB_HELPER_LINKS):
 	$(call verbose_cmd,LN,$(notdir $@),$(HOSTLN) -sf uk-gdb.py $@)
@@ -727,7 +731,7 @@ $(BUILD_DIR)/uk-gdb.py: $(SCRIPTS_DIR)/uk-gdb.py
 
 gdb_helpers: $(GDB_HELPER_LINKS) $(BUILD_DIR)/uk-gdb.py
 
-all: images gdb_helpers
+all: images alib_images gdb_helpers
 ################################################################################
 # Cleanup rules
 ################################################################################
@@ -744,7 +748,8 @@ clean: clean-libs
 		$(UK_CONFIG_OUT) \
 		$(call build_clean,\
 			$(UK_DEBUG_IMAGES) $(UK_DEBUG_IMAGES-y) \
-			$(UK_IMAGES) $(UK_IMAGES-y)) \
+			$(UK_IMAGES) $(UK_IMAGES-y) \
+			$(UK_ALIB_IMAGES) $(UK_ALIB_IMAGES-y)) \
 		$(GDB_HELPER_LINKS) $(BUILD_DIR)/uk-gdb.py \
 		$(UK_CLEAN) $(UK_CLEAN-y))
 
@@ -771,6 +776,8 @@ objs: ukconfig
 libs: ukconfig
 
 images: ukconfig
+
+alib_images: ukconfig
 
 clean-libs clean:
 	$(error Do not know which files to clean without having a configuration. Did you mean 'properclean' or 'distclean'?)
@@ -1038,6 +1045,7 @@ help:
 	@echo 'Building:'
 	@echo '* all                    - build everything (default target)'
 	@echo '  images                 - build kernel images for selected platforms'
+	@echo '  alib_images            - build kernel images for selected platforms as static library (no final linking)'
 	@echo '  libs                   - build libraries and objects'
 	@echo '  [LIBNAME]              - build a single library'
 	@echo '  objs                   - build objects only'
