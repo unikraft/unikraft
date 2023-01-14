@@ -7,6 +7,8 @@ LINUXU_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_linuxu-$(CONFIG_UK_ARCH)
 LINUXU_DEBUG_IMAGE := $(LINUXU_IMAGE).dbg
 LINUXU_IMAGE_OBJECT := $(LINUXU_IMAGE).o
 LINUXU_ALIB_IMAGE := $(LINUXU_IMAGE).a
+LINUXU_ALIB_DEF_LDS := $(LINUXU_IMAGE).def.lds
+LINUXU_ALIB_LDS := $(LINUXU_IMAGE).lds
 
 LINUXU_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-dT$(comma),\
 			 	$(UK_PLAT_LINUXU_DEF_LDS))
@@ -45,7 +47,15 @@ $(LINUXU_IMAGE): $(LINUXU_DEBUG_IMAGE)
 $(LINUXU_IMAGE).sym: $(LINUXU_DEBUG_IMAGE)
 	$(call build_cmd,NM,,$@, $(NM) -n $< > $@)
 
-$(LINUXU_ALIB_IMAGE): $(LINUXU_IMAGE_OBJECT)
+$(LINUXU_ALIB_DEF_LDS):
+	$(call build_cmd,TOUCH,,$@,\
+			$(CP) $(UK_PLAT_LINUXU_DEF_LDS) $@)
+
+$(LINUXU_ALIB_LDS):
+	$(call build_cmd,CAT,,$@,\
+			$(CAT) $(LINUXU_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y) > $@)
+
+$(LINUXU_ALIB_IMAGE): $(LINUXU_IMAGE_OBJECT) $(LINUXU_ALIB_DEF_LDS) $(LINUXU_ALIB_LDS)
 	$(call build_cmd,AR,,$@,\
 	       $(AR) $(ARFLAGS) $@ $<)
 
@@ -59,3 +69,5 @@ endif
 
 # ...for cleaning:
 LIBLINUXUPLAT_CLEAN += $(call build_clean,$(LINUXU_IMAGE_OBJECT))
+LIBLINUXUPLAT_CLEAN += $(call build_clean,$(LINUXU_ALIB_DEF_LDS))
+LIBLINUXUPLAT_CLEAN += $(call build_clean,$(LINUXU_ALIB_LDS))

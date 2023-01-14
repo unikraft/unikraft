@@ -13,6 +13,8 @@ KVM_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_kvm-$(CONFIG_UK_ARCH)
 KVM_DEBUG_IMAGE := $(KVM_IMAGE).dbg
 KVM_IMAGE_OBJECT := $(KVM_IMAGE).o
 KVM_ALIB_IMAGE := $(KVM_IMAGE).a
+KVM_ALIB_DEF_LDS := $(KVM_IMAGE).def.lds
+KVM_ALIB_LDS := $(KVM_IMAGE).lds
 
 KVM_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-dT$(comma),\
 			 $(UK_PLAT_KVM_DEF_LDS))
@@ -57,7 +59,15 @@ $(KVM_IMAGE).sym: $(KVM_DEBUG_IMAGE)
 $(KVM_IMAGE).gz: $(KVM_IMAGE)
 	$(call build_cmd,GZ,,$@, $(GZIP) -f -9 -c $< >$@)
 
-$(KVM_ALIB_IMAGE): $(KVM_IMAGE_OBJECT)
+$(KVM_ALIB_DEF_LDS):
+	$(call build_cmd,CP,,$@,\
+			$(CP) $(UK_PLAT_KVM_DEF_LDS) $@)
+
+$(KVM_ALIB_LDS):
+	$(call build_cmd,CAT,,$@,\
+			$(CAT) $(KVM_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y) > $@)
+
+$(KVM_ALIB_IMAGE): $(KVM_IMAGE_OBJECT) $(KVM_ALIB_LDS) $(KVM_ALIB_DEF_LDS)
 	$(call build_cmd,AR,,$@,\
 	       $(AR) $(ARFLAGS) $@ $<)
 
@@ -73,3 +83,5 @@ endif
 # ...for cleaning:
 LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_IMAGE_OBJECT))
 LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_IMAGE).ld.o)
+LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_ALIB_DEF_LDS))
+LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_ALIB_LDS))
