@@ -68,9 +68,9 @@ Unikraft supports the construction of multiple architectures, platforms, and ima
 
 ## Getting Started
 
-The fastest way to get started configuring, building and deploying Unikraft unikernels is to use our companion tool, [**kraft**][kraft].
+The fastest way to get started configuring, building and deploying Unikraft unikernels is to use our companion tool, [**kraftkit**][kraftkit].
 
-With kraft installed, you can download Unikraft components, configure your unikernel to your needs, build it and run it -- there's no need to be an expert!
+With `kraft` installed, you can download Unikraft components, configure your unikernel to your needs, build it and run it -- there's no need to be an expert!
 
 ## Contributing
 
@@ -108,7 +108,7 @@ Unikraft is licensed under a BSD-3-Clause.  For more information, please refer t
 [unikraft-security]: https://unikraft.org/docs/features/security/
 [unikraft-green]: https://unikraft.org/docs/features/green/
 [unikraft-discord]: https://bit.ly/UnikraftDiscord
-[kraft]: https://github.com/unikraft/kraft/
+[kraftkit]: https://github.com/unikraft/kraftkit/
 [github-issues]: https://github.com/unikraft/unikraft/issues
 [github-projects]: https://github.com/unikraft/unikraft/labels/kind/project
 [dockerhub-kraft]: https://hub.docker.com/r/unikraft/kraft
