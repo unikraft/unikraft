@@ -34,6 +34,7 @@
 #ifndef __UKPLAT_MEMORY_H__
 #define __UKPLAT_MEMORY_H__
 
+#include <uk/essentials.h>
 #include <uk/arch/types.h>
 #include <uk/alloc.h>
 #include <uk/config.h>
@@ -42,32 +43,47 @@
 extern "C" {
 #endif
 
+/* Memory region types */
+#define UKPLAT_MEMRT_ANY		0xffff
+
+#define UKPLAT_MEMRT_FREE		0x0001	/* Uninitialized memory */
+#define UKPLAT_MEMRT_RESERVED		0x0002	/* In use by platform */
+#define UKPLAT_MEMRT_KERNEL		0x0004	/* Kernel binary segment */
+#define UKPLAT_MEMRT_INITRD		0x0008	/* Initramdisk */
+#define UKPLAT_MEMRT_CMDLINE		0x0010	/* Command line */
+#define UKPLAT_MEMRT_DEVICETREE		0x0020	/* Device tree */
+#define UKPLAT_MEMRT_STACK		0x0040	/* Thread stack */
+
 /* Memory region flags */
-#define UKPLAT_MEMRF_FREE	(0x1)	/* Region with uninitialized memory */
-#define UKPLAT_MEMRF_RESERVED	(0x2)	/* Region is in use by platform */
-#define UKPLAT_MEMRF_EXTRADATA	(0x4)	/* Contains additional loaded data \
-					 * (e.g., initramdisk) \
-					 */
-#define UKPLAT_MEMRF_READABLE	(0x10)	/* Region is readable */
-#define UKPLAT_MEMRF_WRITABLE	(0x20)	/* Region is writable */
-#define UKPLAT_MEMRF_EXECUTABLE	(0x40)	/* Region is executable */
+#define UKPLAT_MEMRF_ALL		0xffff
 
-#define UKPLAT_MEMRF_ALLOCATABLE (UKPLAT_MEMRF_FREE \
-				  | UKPLAT_MEMRF_READABLE \
-				  | UKPLAT_MEMRF_WRITABLE)
+#define UKPLAT_MEMRF_PERMS		0x0007
+#define UKPLAT_MEMRF_READ		0x0001	/* Region is readable */
+#define UKPLAT_MEMRF_WRITE		0x0002	/* Region is writable */
+#define UKPLAT_MEMRF_EXECUTE		0x0004	/* Region is executable */
 
-#define UKPLAT_MEMRF_INITRD      (UKPLAT_MEMRF_EXTRADATA \
-				  | UKPLAT_MEMRF_READABLE)
+#define UKPLAT_MEMRF_UNMAP		0x0010	/* Must be unmapped at boot */
+#define UKPLAT_MEMRF_MAP		0x0020	/* Must be mapped at boot */
 
-/* Descriptor of a memory region */
+/**
+ * Descriptor of a memory region
+ */
 struct ukplat_memregion_desc {
-	void *base;
+	/** Physical base address */
+	__paddr_t pbase;
+	/** Virtual base address */
+	__vaddr_t vbase;
+	/** Length in bytes */
 	__sz len;
-	int flags;
-#if CONFIG_UKPLAT_MEMRNAME
-	const char *name;
-#endif
-};
+	/** Memory region type (see UKPLAT_MEMRT_*) */
+	__u16 type;
+	/** Memory region flags (see UKPLAT_MEMRF_*) */
+	__u16 flags;
+#ifdef CONFIG_UKPLAT_MEMRNAME
+	/** Region name */
+	char name[36];
+#endif /* CONFIG_UKPLAT_MEMRNAME */
+} __packed __align(__SIZEOF_LONG__);
 
 /**
  * Returns the number of available memory regions
