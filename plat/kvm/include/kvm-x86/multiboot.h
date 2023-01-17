@@ -20,9 +20,25 @@
  */
 /* multiboot.h - Multiboot header file.  */
 
-#ifndef MULTIBOOT_HEADER
-#define MULTIBOOT_HEADER 1
+#ifndef __MULTIBOOT_H__
+#define __MULTIBOOT_H__
 
+/* The magic field should contain this. */
+#define MULTIBOOT_HEADER_MAGIC			0x1BADB002
+
+/* This should be in %eax. */
+#define MULTIBOOT_BOOTLOADER_MAGIC		0x2BADB002
+
+/* Align all boot modules on i386 page (4KB) boundaries. */
+#define MULTIBOOT_PAGE_ALIGN			0x00000001
+
+/* Must pass memory information to OS. */
+#define MULTIBOOT_MEMORY_INFO			0x00000002
+
+/* This flag indicates the use of the address fields in the header. */
+#define MULTIBOOT_AOUT_KLUDGE			0x00010000
+
+#ifndef __ASSEMBLY__
 #include <uk/essentials.h>
 
 typedef unsigned char multiboot_uint8_t;
@@ -193,4 +209,5 @@ struct multiboot_apm_info {
 	multiboot_uint16_t dseg_len;
 };
 
-#endif /* ! MULTIBOOT_HEADER */
+#endif /* !__ASSEMBLY__ */
+#endif /* ! __MULTIBOOT_H__ */
