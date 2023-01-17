@@ -42,7 +42,7 @@
 #endif /* CONFIG_ARCH_ARM_64 */
 
 #ifdef CONFIG_UKPLAT_MEMRNAME
-#define WXORX_REGION_NAME d.name
+#define WXORX_REGION_NAME d->name
 #else /* !CONFIG_UKPLAT_MEMRNAME */
 #define WXORX_REGION_NAME "memory range"
 #endif /* CONFIG_UKPLAT_MEMRNAME */
@@ -59,16 +59,19 @@
 
 void __weak enforce_w_xor_x(void)
 {
-	struct ukplat_memregion_desc d;
-	void *base;
-	void *end;
+	struct ukplat_memregion_desc *d;
+	__vaddr_t base;
+	__vaddr_t end;
 	unsigned long prot, pages;
 	int rc, i = 0;
 
 	while ((rc = ukplat_memregion_get(i++, &d)) >= 0) {
+		if (d->type == UKPLAT_MEMRT_FREE)
+			continue;
+
 #ifdef CONFIG_ARCH_ARM_64
 		/* Skip RW regions. These will be protected by WXN */
-		if (d.flags & UKPLAT_MEMRF_WRITABLE)
+		if (d->flags & UKPLAT_MEMRF_WRITE)
 			continue;
 #endif /* CONFIG_ARCH_ARM64 */
 
@@ -76,33 +79,31 @@ void __weak enforce_w_xor_x(void)
 		 * that is, if multiple sections reside in the same
 		 * page, they should have consistent protections.
 		 */
-		base = (void *)ALIGN_DOWN((__uptr)d.base, PAGE_SIZE);
-		end  = (void *)ALIGN_UP((__uptr)d.base + d.len, PAGE_SIZE);
+		base  = ALIGN_DOWN(d->vbase, PAGE_SIZE);
+		end   = ALIGN_UP(d->vbase + d->len, PAGE_SIZE);
 		pages = DIV_ROUND_UP(end - base, PAGE_SIZE);
-		prot = PAGE_ATTR_PROT_READ;
+		prot  = PAGE_ATTR_PROT_READ;
 
-		if (d.flags & UKPLAT_MEMRF_EXECUTABLE)
+		if (d->flags & UKPLAT_MEMRF_EXECUTE)
 			prot |= PAGE_ATTR_PROT_EXEC;
-		else if (d.flags & UKPLAT_MEMRF_WRITABLE)
+		else if (d->flags & UKPLAT_MEMRF_WRITE)
 			prot |= PAGE_ATTR_PROT_WRITE;
 
 		uk_pr_debug("Setting protections for %s: %"
 			    __PRIvaddr " - %" __PRIvaddr " [R%c%c]\n",
 			    WXORX_REGION_NAME,
-			    (__vaddr_t)base,
-			    (__vaddr_t)base + pages * PAGE_SIZE,
+			    base, base + pages * PAGE_SIZE,
 			    (prot & PAGE_ATTR_PROT_WRITE) ? 'W' : '-',
 			    (prot & PAGE_ATTR_PROT_EXEC) ? 'X' : '-');
 
 		rc = ukplat_page_set_attr(ukplat_pt_get_active(),
-					  (__vaddr_t)base, pages, prot, 0);
+					  base, pages, prot, 0);
 
 		if (unlikely(rc)) {
 			uk_pr_err("Failed to set protections for %s: %"
 				  __PRIvaddr " - %" __PRIvaddr " [R%c%c]: %d\n",
 				  WXORX_REGION_NAME,
-				  (__vaddr_t)base,
-				  (__vaddr_t)base + pages * PAGE_SIZE,
+				  base, base + pages * PAGE_SIZE,
 				  (prot & PAGE_ATTR_PROT_WRITE) ? 'W' : '-',
 				  (prot & PAGE_ATTR_PROT_EXEC) ? 'X' : '-',
 				  rc);
