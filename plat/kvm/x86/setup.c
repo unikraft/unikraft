@@ -440,14 +440,14 @@ EXIT_FATAL:
 #define _init_paging(mi) do { } while (0)
 #endif /* CONFIG_PAGING */
 
-static void __noreturn _libkvmplat_entry2(void)
+static void __noreturn _libkvmplat_start2(void)
 {
 	ukplat_entry_argp(NULL, cmdline, sizeof(cmdline));
 
 	ukplat_lcpu_halt();
 }
 
-void _libkvmplat_entry(struct lcpu *lcpu, void *arg)
+void _libkvmplat_start(struct lcpu *lcpu, void *arg)
 {
 	struct multiboot_info *mi = (struct multiboot_info *)arg;
 	int rc;
@@ -517,5 +517,5 @@ void _libkvmplat_entry(struct lcpu *lcpu, void *arg)
 	uk_pr_info("Switch from bootstrap stack to stack @%p\n",
 		   (void *)_libkvmplat_cfg.bstack.end);
 	lcpu_arch_jump_to((void *)_libkvmplat_cfg.bstack.end,
-			  _libkvmplat_entry2);
+			  _libkvmplat_start2);
 }
