@@ -92,72 +92,97 @@ struct ukplat_memregion_desc {
 int ukplat_memregion_count(void);
 
 /**
- * Reads a memory region to mrd
- * @param i Memory region number
- * @param mrd Pointer to memory region descriptor that will be filled out
- * @return 0 on success, < 0 otherwise
+ * Returns a pointer to the requested memory region descriptor
+ *
+ * @param i
+ *   Memory region number
+ * @param[out] mrd
+ *   A pointer to a memory region descriptor that will be updated
+ *
+ * @return
+ *   0 on success, < 0 otherwise
  */
-int ukplat_memregion_get(int i, struct ukplat_memregion_desc *mrd);
+int ukplat_memregion_get(int i, struct ukplat_memregion_desc **mrd);
 
 /**
- * Searches for the next memory region after `i` that has at least `sflags`
- * flags set.
- * @param i Memory region number to start searching
- *        To start searching from the beginning, set `i` to `-1`
- * @param sflags Find only memory regions that have at least `sflags` flags set.
- *        If no flags are given (`0x0`), any found region is returned
- * @Param mrd Pointer to memory region descriptor that will be filled out
- * @return On success the function returns the next region number after `i`
- *         that fulfills `sflags`. `mrd` is filled out with the memory region
- *         details. A value < 0 is returned if no more region could be found
- *         that fulfills the search criteria. `mrd` may be filled out with
- *         undefined values.
+ * Searches for the next memory region after i that fulfills the given search
+ * criteria.
+ *
+ * @param i
+ *   Memory region number to start searching. Use -1 to start from the
+ *   beginning.
+ * @param type
+ *   The set of memory region types to look for. Can be UKPLAT_MEMRT_ANY or a
+ *   combination of specific types (UKPLAT_MEMRT_*). If 0 is specified, the
+ *   type is ignored.
+ * @param flags
+ *   Find only memory regions that have the specified flags set
+ * @param fmask
+ *   Only consider the flags provided in this mask when searching for a region
+ * @param[out] mrd
+ *   Pointer to a memory region descriptor that will be updated on success
+ *
+ * @return
+ *   On success the function returns the next region after i that has any of
+ *   the specified types and fulfills the given flags. A value < 0 is returned
+ *   if no more region could be found that fulfills the search criteria. In
+ *   that case mrd is not changed.
  */
-static inline int ukplat_memregion_find_next(int i, int sflags,
-					     struct ukplat_memregion_desc *mrd)
+static inline int
+ukplat_memregion_find_next(int i, __u32 type, __u32 flags, __u32 fmask,
+			   struct ukplat_memregion_desc **mrd)
 {
-	int rc, count;
+	struct ukplat_memregion_desc *desc;
+	__u32 stype, sflags;
+	int rc;
 
-	count = ukplat_memregion_count();
+	do {
+		rc = ukplat_memregion_get(++i, &desc);
+		if (rc < 0)
+			return -1;
 
-	if (i >= count)
-		return -1;
+		stype  = desc->type & type;
+		sflags = desc->flags & fmask;
+	} while ((type && !stype) || (sflags != flags));
 
-	do
-		rc = ukplat_memregion_get(++i, mrd);
-	while (i < count && (rc < 0 || ((mrd->flags & sflags) != sflags)));
-
-	if (i == count)
-		return -1;
+	*mrd = desc;
 	return i;
 }
 
 /**
- * Iterates over all memory regions that have at least `sflags` flags set.
- * @param mrd Pointer to memory region descriptor that will be filled out
- *        during iteration
- * @param sflags Iterate only over memory regions that have at least `sflags`
- *        flags set. If no flags are given (`0x0`), every existing region is
- *        iterated.
+ * Iterates over all memory regions that fulfill the given search criteria.
+ *
+ * @param[out] mrd
+ *   Pointer to memory region descriptor
+ * @param type
+ *   The set of memory region types to look for. Can be UKPLAT_MEMRT_ANY or
+ *   a combination of specific types (UKPLAT_MEMRT_*). If 0 is specified, the
+ *   type is ignored.
+ * @param flags
+ *   Find only memory regions that have the specified flags set
+ * @param fmask
+ *   Only consider the flags provided in this mask when searching for a region
  */
-#define ukplat_memregion_foreach(mrd, sflags)				\
+#define ukplat_memregion_foreach(mrd, type, flags, fmask)		\
 	for (int __ukplat_memregion_foreach_i				\
-		     = ukplat_memregion_find_next(-1, (sflags), (mrd));	\
+		     = ukplat_memregion_find_next(-1, type, flags, fmask, mrd);\
 	     __ukplat_memregion_foreach_i >= 0;				\
 	     __ukplat_memregion_foreach_i				\
 		     = ukplat_memregion_find_next(__ukplat_memregion_foreach_i,\
-						  (sflags), (mrd)))
+						  type, flags, fmask, mrd))
 
 /**
- * Searches for the first initrd module
- * @param mrd Pointer to memory region descriptor that will be filled out
- * @return On success, returns the region number of the first initrd module,
- *         `mrd` is filled out with the memory region details.
- *         A return value < 0 means that there is no initrd module,
- *         `mrd` may be filled out with undefined values.
+ * Searches for the first initrd module.
+ *
+ * @param[out] mrd
+ *   Pointer to memory region descriptor that will be updated on success
+ *
+ * @return
+ *   On success, returns the region number of the first initrd module. A
+ *   return value < 0 means that there is no initrd module.
  */
 #define ukplat_memregion_find_initrd0(mrd) \
-	ukplat_memregion_find_next(-1, UKPLAT_MEMRF_INITRD, (mrd))
+	ukplat_memregion_find_next(-1, UKPLAT_MEMRF_INITRD, 0, 0, mrd)
 
 /**
  * Sets the platform memory allocator and triggers the platform memory mappings
