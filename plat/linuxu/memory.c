@@ -32,6 +32,7 @@
  */
 
 #include <errno.h>
+#include <string.h>
 #include <uk/arch/types.h>
 #include <linuxu/setup.h>
 #include <uk/errptr.h>
@@ -149,39 +150,39 @@ int ukplat_memregion_count(void)
 	return have_heap + have_initrd;
 }
 
-int ukplat_memregion_get(int i, struct ukplat_memregion_desc *m)
+int ukplat_memregion_get(int i, struct ukplat_memregion_desc **m)
 {
+	static struct ukplat_memregion_desc mrd[2];
 	int ret;
 
 	UK_ASSERT(m);
 
 	if (i == 0 && _liblinuxuplat_opts.heap.base) {
-		m->base  = _liblinuxuplat_opts.heap.base;
-		m->len   = _liblinuxuplat_opts.heap.len;
-		m->flags = UKPLAT_MEMRF_ALLOCATABLE;
+		mrd[0].pbase = (__paddr_t)_liblinuxuplat_opts.heap.base;
+		mrd[0].vbase = mrd[0].pbase;
+		mrd[0].len   = _liblinuxuplat_opts.heap.len;
+		mrd[0].type  = UKPLAT_MEMRT_FREE;
+		mrd[0].flags = 0;
 #if CONFIG_UKPLAT_MEMRNAME
-		m->name  = "heap";
+		strncpy(mrd[0].name, "heap", sizeof(mrd[0].name) - 1);
 #endif
+		*m = &mrd[0];
 		ret = 0;
 	} else if ((i == 0 && !_liblinuxuplat_opts.heap.base
 				&& _liblinuxuplat_opts.initrd.base)
 				|| (i == 1 && _liblinuxuplat_opts.heap.base
 					&& _liblinuxuplat_opts.initrd.base)) {
-		m->base = _liblinuxuplat_opts.initrd.base;
-		m->len = _liblinuxuplat_opts.initrd.len;
-		m->flags = UKPLAT_MEMRF_INITRD | UKPLAT_MEMRF_WRITABLE;
+		mrd[1].pbase = (__paddr_t)_liblinuxuplat_opts.initrd.base;
+		mrd[1].vbase = mrd[1].pbase;
+		mrd[1].len   = _liblinuxuplat_opts.initrd.len;
+		mrd[1].type  = UKPLAT_MEMRT_INITRD;
+		mrd[1].flags = UKPLAT_MEMRF_WRITE | UKPLAT_MEMRF_MAP;
 #if CONFIG_UKPLAT_MEMRNAME
-		m->name = "initrd";
+		strncpy(mrd[1].name, "initrd", sizeof(mrd[1].name) - 1);
 #endif
+		*m = &mrd[1];
 		ret = 0;
 	} else {
-		/* invalid memory region index or no heap allocated */
-		m->base  = __NULL;
-		m->len   = 0;
-		m->flags = 0x0;
-#if CONFIG_UKPLAT_MEMRNAME
-		m->name  = __NULL;
-#endif
 		ret = -1;
 	}
 
