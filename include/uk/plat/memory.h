@@ -2,7 +2,6 @@
 /*
  * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
  *
- *
  * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -87,7 +86,6 @@ struct ukplat_memregion_desc {
 
 /**
  * Returns the number of available memory regions
- * @return Number of memory regions
  */
 int ukplat_memregion_count(void);
 
@@ -187,14 +185,16 @@ ukplat_memregion_find_next(int i, __u32 type, __u32 flags, __u32 fmask,
 /**
  * Sets the platform memory allocator and triggers the platform memory mappings
  * for which an allocator is needed.
- * @param a Memory allocator
- * @return 0 on success, < 0 otherwise
+ *
+ * @param a
+ *   Memory allocator to use within the platform
+ * @return
+ *   0 on success, < 0 otherwise
  */
 int ukplat_memallocator_set(struct uk_alloc *a);
 
 /**
  * Returns the platform memory allocator
- * @return Platform memory allocator address
  */
 struct uk_alloc *ukplat_memallocator_get(void);
 
