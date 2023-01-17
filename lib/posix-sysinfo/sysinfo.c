@@ -41,6 +41,11 @@
 #include <sys/sysinfo.h>
 #include <uk/syscall.h>
 
+#ifdef CONFIG_PAGING
+#include <uk/plat/paging.h>
+#include <uk/falloc.h>
+#endif
+
 #if CONFIG_LIBVFSCORE
 /* For FDTABLE_MAX_FILES. */
 #include <vfscore/file.h>
@@ -97,6 +102,13 @@ long sysconf(int name)
 
 	if (name == _SC_PAGESIZE)
 		return __PAGE_SIZE;
+
+		if (name == _SC_PHYS_PAGES){
+		struct uk_pagetable *pt = ukplat_pt_get_active();
+		__sz total_memory = pt->fa->total_memory;
+		__sz total_pages = total_memory/__PAGE_SIZE;
+		return total_pages;
+	}
 
 #if CONFIG_LIBVFSCORE
 	if (name == _SC_OPEN_MAX)
