@@ -168,20 +168,24 @@ static inline void _dtb_init_mem(uint32_t physical_offset)
 	/* Fill out mrd array
 	 */
 	/* heap */
-	_libxenplat_mrd[0].base  = to_virt(start_pfn_p << __PAGE_SHIFT);
-	_libxenplat_mrd[0].len   = (size_t) to_virt(max_pfn_p << __PAGE_SHIFT)
-		- (size_t) to_virt(start_pfn_p << __PAGE_SHIFT);
-	_libxenplat_mrd[0].flags = (UKPLAT_MEMRF_ALLOCATABLE);
+	_libxenplat_mrd[0].pbase = start_pfn_p << __PAGE_SHIFT;
+	_libxenplat_mrd[0].vbase = (__vaddr_t)to_virt(_libxenplat_mrd[0].pbase);
+	_libxenplat_mrd[0].len   = (max_pfn_p - start_pfn_p) << __PAGE_SHIFT;
+	_libxenplat_mrd[0].type  = UKPLAT_MEMRT_FREE;
+	_libxenplat_mrd[0].flags = 0;
 #if CONFIG_UKPLAT_MEMRNAME
-	_libxenplat_mrd[0].name  = "heap";
+	strncpy(_libxenplat_mrd[0].name, "heap",
+		sizeof(_libxenplat_mrd[0].name) - 1);
 #endif
 	/* dtb */
-	_libxenplat_mrd[1].base  = HYPERVISOR_dtb;
+	_libxenplat_mrd[1].pbase = (__vaddr_t)HYPERVISOR_dtb;
+	_libxenplat_mrd[1].vbase = _libxenplat_mrd[1].pbase;
 	_libxenplat_mrd[1].len   = fdt_size;
-	_libxenplat_mrd[1].flags = (UKPLAT_MEMRF_RESERVED
-				    | UKPLAT_MEMRF_READABLE);
+	_libxenplat_mrd[1].type  = UKPLAT_MEMRT_DEVICETREE;
+	_libxenplat_mrd[1].flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
 #if CONFIG_UKPLAT_MEMRNAME
-	_libxenplat_mrd[1].name  = "dtb";
+	strncpy(_libxenplat_mrd[1].name, "dtb",
+		sizeof(_libxenplat_mrd[1].name) - 1);
 #endif
 	_libxenplat_mrd_num = 2;
 }
