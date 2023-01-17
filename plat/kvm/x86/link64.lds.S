@@ -35,7 +35,6 @@ PHDRS
 	stack PT_GNU_STACK FLAGS(PHDRS_PF_RW);
 }
 
-ENTRY(_libkvmplat_entry)
 SECTIONS
 {
 	. = 0x100000;
