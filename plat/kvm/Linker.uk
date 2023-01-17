@@ -21,7 +21,7 @@ KVM_LD_SCRIPT_FLAGS += $(addprefix -Wl$(comma)-T$(comma),\
 
 $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y)
-	$(call build_cmd,LD,,$(KVM_IMAGE).ld.o,\
+	$(call build_cmd,LD,,$(KVM_IMAGE).o,\
 	       $(LD) -r $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
 			$(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
 			$(KVM_OLIBS) $(KVM_OLIBS-y) \
@@ -31,10 +31,7 @@ $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 			$(UK_ALIBS) $(UK_ALIBS-y) \
 			$(KVM_LINK_LIBGCC_FLAG) \
 			-Wl$(comma)--end-group \
-			-o $(KVM_IMAGE).ld.o)
-	$(call build_cmd,OBJCOPY,,$(KVM_IMAGE).o,\
-		$(OBJCOPY) -w -G kvmos_* -G _libkvmplat_entry \
-			$(KVM_IMAGE).ld.o $(KVM_IMAGE).o)
+			-o $(KVM_IMAGE).o)
 	$(call build_cmd,LD,,$@,\
 	       $(LD) $(LDFLAGS) $(LDFLAGS-y) \
 		     $(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
@@ -65,4 +62,3 @@ endif
 
 # ...for cleaning:
 LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_IMAGE).o)
-LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_IMAGE).ld.o)
