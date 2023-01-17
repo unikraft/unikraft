@@ -37,7 +37,7 @@
 #include <uk/config.h>
 #include <uk/asm.h>
 
-#include <kvm-x86/multiboot_defs.h>
+#include <kvm-x86/multiboot.h>
 
 #define MULTIBOOT_FLAGS \
 	(MULTIBOOT_PAGE_ALIGN | MULTIBOOT_MEMORY_INFO)
@@ -50,7 +50,7 @@ multiboot_header:
 	.long MULTIBOOT_FLAGS
 	.long -(MULTIBOOT_HEADER_MAGIC+MULTIBOOT_FLAGS) /* checksum */
 
-/*
+/**
  * Stack and entry function to use during CPU initialization
  */
 .section .bss
@@ -59,10 +59,10 @@ lcpu_bootstack:
 
 .section .rodata
 lcpu_boot_startup_args:
-	.quad	_libkvmplat_start
+	.quad	multiboot_entry
 	.quad	lcpu_bootstack
 
-/*
+/**
  * 32-bit multiboot entry function
  *
  * EAX contains magic value, EBX contains 32-bit physical address of multiboot
@@ -72,7 +72,7 @@ lcpu_boot_startup_args:
  */
 .code32
 .section .text.32.boot
-ENTRY(_libkvmplat_entry)
+ENTRY(_multiboot_entry)
 	/* only multiboot is supported for now */
 	cmpl	$MULTIBOOT_BOOTLOADER_MAGIC, %eax
 	jne	no_multiboot
@@ -87,4 +87,4 @@ no_multiboot:
 1:
 	hlt
 	jmp	1b
-END(_libkvmplat_entry)
+END(_multiboot_entry)
