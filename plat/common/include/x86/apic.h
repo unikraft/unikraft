@@ -41,9 +41,25 @@
 #include <uk/arch/limits.h>
 #include <x86/cpu.h>
 #include <x86/apic_defs.h>
+#include <x86/lvt.h>
 
 #include <errno.h>
 
+static inline void x2apic_lvt_init(void)
+{
+	union LVTEntry entry = INTIALIZE_LVT_ENTRY();
+	__u32 eax, edx;
+
+	eax = entry.dword;
+	edx = 0;
+
+	wrmsr(APIC_MSR_LVT_TIMER, eax, edx);
+	wrmsr(APIC_MSR_LVT_THERMAL, eax, edx);
+	wrmsr(APIC_MSR_LVT_PERF, eax, edx);
+	wrmsr(APIC_MSR_LVT_LINT0, eax, edx);
+	wrmsr(APIC_MSR_LVT_LINT1, eax, edx);
+	wrmsr(APIC_MSR_LVT_ERROR, eax, edx);
+}
 static inline int x2apic_enable(void)
 {
 	__u32 eax, ebx, ecx, edx;
@@ -68,6 +84,8 @@ static inline int x2apic_enable(void)
 		eax |= APIC_SVR_EN;
 		wrmsr(APIC_MSR_SVR, eax, edx);
 	}
+
+	x2apic_lvt_init();
 
 	/*
 	 * TODO: Configure spurious interrupt vector number
