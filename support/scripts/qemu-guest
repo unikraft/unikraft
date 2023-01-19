@@ -1,9 +1,10 @@
 #!/bin/bash
 #
-# Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+# Authors: Simon Kuenzer <simon@unikraft.io>
 #
 # Copyright (c) 2019, NEC Laboratories Europe GmbH,
 #                     NEC Corporation All rights reserved.
+# Copyright (c) 2022, Unikraft GmbH
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -760,7 +761,7 @@ case "$ARG_MACHINETYPE" in
 			QEMU_BASE_ARGS+=("pc")
 
 			QEMU_BASE_ARGS+=("-cpu")
-			QEMU_BASE_ARGS+=("qemu64,-vmx,-svm,+pdpe1gb")
+			QEMU_BASE_ARGS+=("qemu64,-vmx,-svm,+x2apic,+pdpe1gb")
 		fi
 
 		# BIOS also on serial
@@ -781,7 +782,7 @@ case "$ARG_MACHINETYPE" in
 			QEMU_BASE_ARGS+=("q35")
 
 			QEMU_BASE_ARGS+=("-cpu")
-			QEMU_BASE_ARGS+=("qemu64,-vmx,-svm")
+			QEMU_BASE_ARGS+=("qemu64,-vmx,-svm,+x2apic,+pdpe1gb")
 		fi
 
 		# BIOS also on serial
