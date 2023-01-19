@@ -251,6 +251,27 @@ struct MADTType10Entry {
 	__u64 MailBoxAddress;
 } __packed;
 
+union MADTEntry {
+	struct MADTEntryHeader *h;
+	struct MADTType0Entry *e0;
+	struct MADTType1Entry *e1;
+	struct MADTType2Entry *e2;
+	struct MADTType3Entry *e3;
+	struct MADTType4Entry *e4;
+	struct MADTType5Entry *e5;
+	struct MADTType6Entry *e6;
+	struct MADTType7Entry *e7;
+	struct MADTType8Entry *e8;
+	struct MADTType9Entry *e9;
+	struct MADTTypeAEntry *eA;
+	struct MADTTypeBEntry *eB;
+	struct MADTTypeCEntry *eC;
+	struct MADTTypeDEntry *eD;
+	struct MADTTypeEEntry *eE;
+	struct MADTTypeFEntry *eF;
+	struct MADTType10Entry *e10;
+};
+
 /**
  * Return the Multiple APIC Descriptor Table (MADT). ACPI needs to be
  * initialized first.

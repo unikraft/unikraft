@@ -115,11 +115,7 @@ extern void *x86_start16_end[];
 int lcpu_arch_mp_init(void *arg __unused)
 {
 	struct MADT *madt;
-	union {
-		struct MADTEntryHeader *h;
-		struct MADTType0Entry *e0;
-		struct MADTType9Entry *e9;
-	} m;
+	union MADTEntry m;
 	__sz off, len;
 	struct lcpu *lcpu;
 	__lcpuid cpu_id;

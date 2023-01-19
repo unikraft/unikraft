@@ -161,7 +161,7 @@ static inline void x2apic_clear_errors(void)
 	wrmsr(APIC_MSR_ESR, 0, 0);
 }
 
-static inline void x2apic_ack_interrupt(void)
+static inline void x2apic_ack_interrupt(unsigned int irq __unused)
 {
 	wrmsr(APIC_MSR_EOI, 0, 0);
 }

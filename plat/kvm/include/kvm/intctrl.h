@@ -29,6 +29,38 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#include <x86/apic.h>
+#include <stdint.h>
+
+struct IntCtrlOps {
+	/** Initialize GIC controller */
+	int (*initialize)(void);
+	/** Acknowledging IRQ */
+	void (*ack_irq)(unsigned int irq);
+	/** Enable IRQ */
+	void (*enable_irq)(unsigned int irq);
+	/** Disable IRQ */
+	void (*disable_irq)(unsigned int irq);
+	/** Set IRQ trigger type */
+	void (*set_irq_type)(unsigned int irq, uint8_t trigger);
+	/** Set priority for IRQ */
+	void (*set_irq_prio)(unsigned int irq, uint8_t priority);
+	/** Select destination processor */
+	void (*set_irq_affinity)(unsigned int irq, uint8_t affinity);
+	/** Handle IRQ */
+	void (*handle_irq)(void);
+	/* Get max IRQs */
+	uint32_t (*get_max_irqs)(void);
+};
+
+struct IntCtrl {
+	/* Detect IOAPIC */
+	__u8 is_ioapic_present;
+	/* Interrupt controller status */
+	__u8 is_initialized;
+	/* Interrupt controller operations */
+	struct IntCtrlOps *intctrl_ops;
+};
 
 void intctrl_init(void);
 void intctrl_clear_irq(unsigned int irq);
