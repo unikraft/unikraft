@@ -44,18 +44,34 @@ union LVTEntry {
 	};
 };
 
-#define INTIALIZE_LVT_ENTRY() { \
-	.vector = 0, \
-	.delivery_mode = LVT_DELIVERY_MODE_FIXED, \
-	.reserved1 = 0, \
-	.delivery_status = LVT_DELIVERY_STATUS_IDLE, \
-	.polarity = LVT_INT_POLARITY_ACT_HIGH, \
-	.remote_irr = 0, \
-	.trigger_mode = LVT_EDGE_TRIGGER_MODE, \
-	.mask = LVT_INT_MASK_SET, \
-	.timer_mode = LVT_TIMER_MODE_ONE_SHOT, \
-	.reserved2 = 0, \
+#define INTIALIZE_LVT_ENTRY() {						\
+	.vector = 0,									\
+	.delivery_mode = LVT_DELIVERY_MODE_FIXED,		\
+	.reserved1 = 0,									\
+	.delivery_status = LVT_DELIVERY_STATUS_IDLE,	\
+	.polarity = LVT_INT_POLARITY_ACT_HIGH,			\
+	.remote_irr = 0,								\
+	.trigger_mode = LVT_EDGE_TRIGGER_MODE,			\
+	.mask = LVT_INT_MASK_SET,						\
+	.timer_mode = LVT_TIMER_MODE_ONE_SHOT,			\
+	.reserved2 = 0,									\
 }
+
+#define set_lvt_entry_attr(msr, attr, value) ({	\
+		union LVTEntry __entry;					\
+		__u32 edx = 0;							\
+		rdmsr(msr, &__entry.dword, &edx);		\
+		__entry.attr = value;					\
+		wrmsr(msr, __entry.dword, edx);			\
+	})
+
+#define get_lvt_entry_attr(msr, attr, value) ({	\
+		union LVTEntry __entry;					\
+		__u32 edx;								\
+		rdmsr(msr, &__entry.dword, &edx);		\
+		__entry.attr;							\
+	})
+
 
 
 #endif

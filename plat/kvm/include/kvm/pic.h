@@ -1,4 +1,10 @@
+#ifndef __PLAT_KVM_X86_PIC_H
+#define __PLAT_KVM_X86_PIC_H
+
 #include <stdint.h>
+#include <kvm/intctrl.h>
+#include <x86/acpi/acpi.h>
+
 #define IMCR_ADDR        0x22
 #define IMCR_DATA		 0x23
 
@@ -27,14 +33,10 @@
 #define PIC_LEVEL_TRIGGER_MODE 0
 #define PIC_EDGE_TRIGGER_MODE 1
 
-int pic_init(void);
-void pic_ack_irq(unsigned int irq);
-void pic_mask_irq(unsigned int irq);
-void pic_clear_irq(unsigned int irq);
-void pic_set_trigger_type(unsigned int irq, __u8 trigger);
-uint32_t pic_get_max_irqs(void);
 
 #define MAX_PIC_INTR 15
+
+void pic_mask_irq(uint32_t irq);
 
 static inline
 void disable_pic(void)
@@ -44,7 +46,5 @@ void disable_pic(void)
 	}
 }
 
-/* Dummy functions */
-void pic_set_irq_prio(unsigned int irq, uint8_t priority);
-void pic_set_irq_affinity(unsigned int irq, uint8_t affinity);
-void pic_handle_irq(void);
+int pic_probe(const struct MADT *madt, struct _pic_dev **dev);
+#endif

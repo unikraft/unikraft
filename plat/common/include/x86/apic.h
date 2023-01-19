@@ -85,7 +85,9 @@ static inline int x2apic_enable(void)
 		wrmsr(APIC_MSR_SVR, eax, edx);
 	}
 
+#if CONFIG_HAVE_SMP
 	x2apic_lvt_init();
+#endif
 
 	/*
 	 * TODO: Configure spurious interrupt vector number

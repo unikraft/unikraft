@@ -1,5 +1,5 @@
-#ifndef __PLAT_CMN_X86_IOAPIC_H
-#define __PLAT_CMN_X86_IOAPIC_H
+#ifndef __PLAT_KVM_X86_IOAPIC_H
+#define __PLAT_KVM_X86_IOAPIC_H
 /* ACPI:
  *	MADT structure: type 1
  *	field			 byte_len byte_off Description
@@ -10,8 +10,10 @@
  *	I/O APIC address 4		  4		   32 bit physical address of the IOAPIC base
  */
 
-#include <x86/redtbl.h>
+#include <kvm/redtbl.h>
+#include <kvm/intctrl.h>
 #include <x86/apic.h>
+#include <x86/acpi/acpi.h>
 #include <uk/essentials.h>
 #include <uk/arch/types.h>
 #include <stdint.h>
@@ -96,16 +98,6 @@ union IOAPICArb{
 #define IOAPIC_INT_MASK_UNSET	0
 
 
+int ioapic_probe(const struct MADT *madt, struct _pic_dev **dev);
 /* init the vectors to disabled state */
-int ioapic_enable(void);
-int ioapic_init(void);
-void ioapic_mask_irq(unsigned int irq);
-void ioapic_clear_irq(unsigned int irq);
-void ioapic_set_trigger_type(unsigned int irq, __u8 trigger);
-void ioapic_set_irq_affinity(unsigned int irq, __u8 affinity);
-uint32_t ioapic_get_max_irqs(void);
-
-/* Dummy functions */
-void ioapic_set_irq_prio(unsigned int irq, uint8_t priority);
-void ioapic_handle_irq(void);
 #endif

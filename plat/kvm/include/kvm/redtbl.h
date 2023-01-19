@@ -2,7 +2,6 @@
 #define __PLAT_CMN_X86_REDTBL_H
 
 #include <uk/arch/types.h>
-#include <x86/ioapic.h>
 
 /* I/O APIC redirection table entry */
 union REDTBLEntry {

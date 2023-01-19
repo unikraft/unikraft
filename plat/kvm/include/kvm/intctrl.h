@@ -29,41 +29,45 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include <x86/apic.h>
+#ifndef __PLAT_KVM_X86_INTCTRL_H
+#define __PLAT_KVM_X86_INTCTRL_H
+
 #include <stdint.h>
 
-struct IntCtrlOps {
+struct _pic_operations {
 	/** Initialize GIC controller */
 	int (*initialize)(void);
 	/** Acknowledging IRQ */
-	void (*ack_irq)(unsigned int irq);
+	void (*ack_irq)(uint32_t irq);
 	/** Enable IRQ */
-	void (*enable_irq)(unsigned int irq);
+	void (*enable_irq)(uint32_t irq);
 	/** Disable IRQ */
-	void (*disable_irq)(unsigned int irq);
+	void (*disable_irq)(uint32_t irq);
 	/** Set IRQ trigger type */
-	void (*set_irq_type)(unsigned int irq, uint8_t trigger);
+	void (*set_irq_type)(uint32_t irq, uint8_t trigger);
 	/** Set priority for IRQ */
-	void (*set_irq_prio)(unsigned int irq, uint8_t priority);
+	void (*set_irq_prio)(uint32_t irq, uint8_t priority);
 	/** Select destination processor */
-	void (*set_irq_affinity)(unsigned int irq, uint8_t affinity);
+	void (*set_irq_affinity)(uint32_t irq, uint8_t affinity);
 	/** Handle IRQ */
 	void (*handle_irq)(void);
 	/* Get max IRQs */
 	uint32_t (*get_max_irqs)(void);
 };
 
-struct IntCtrl {
-	/* Detect IOAPIC */
-	__u8 is_ioapic_present;
+struct _pic_dev {
+	/* Probe status */
+	uint8_t is_probed;
 	/* Interrupt controller status */
-	__u8 is_initialized;
+	uint8_t is_initialized;
 	/* Interrupt controller operations */
-	struct IntCtrlOps *intctrl_ops;
+	struct _pic_operations ops;
 };
 
 void intctrl_init(void);
-void intctrl_clear_irq(unsigned int irq);
-void intctrl_mask_irq(unsigned int irq);
-void intctrl_ack_irq(unsigned int irq);
+void intctrl_clear_irq(uint32_t irq);
+void intctrl_mask_irq(uint32_t irq);
+void intctrl_ack_irq(uint32_t irq);
 void intctrl_send_ipi(uint8_t sgintid, uint32_t cpuid);
+
+#endif
