@@ -41,9 +41,9 @@ void pic_mask_irq(uint32_t irq);
 static inline
 void disable_pic(void)
 {
-	for (int i = 0; i < MAX_PIC_INTR; i++) {
+	/*  TODO: change this to single outb */
+	for (int i = 0; i < MAX_PIC_INTR; i++)
 		pic_mask_irq(i);
-	}
 }
 
 int pic_probe(const struct MADT *madt, struct _pic_dev **dev);

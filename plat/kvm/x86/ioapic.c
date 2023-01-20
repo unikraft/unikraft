@@ -13,12 +13,13 @@
 #define __IOAPIC_MAX_INTR 24
 #define IRQ_VECTOR_BASE   32
 
-volatile struct IOAPIC *ioapic;
+static volatile struct IOAPIC *ioapic;
 static struct MADTType2Entry *interrupt_override[__IOAPIC_MAX_INTR] = { 0 };
 
 #define IOAPIC_OVERRIDE_IRQ(irq) \
-	(interrupt_override[irq] ? interrupt_override[irq]->GlobalSystemInterrupt \
-							: irq)
+	(interrupt_override[irq] ? \
+	 interrupt_override[irq]->GlobalSystemInterrupt \
+	 : irq)
 
 int ioapic_enable(void);
 int ioapic_init(void);
@@ -88,19 +89,21 @@ static int ioapic_do_probe(const struct MADT *madt)
 	len = madt->h.Length - sizeof(struct MADT);
 
 	for (off = 0; off < len; off += m.h->Length) {
+
 		m.h = (struct MADTEntryHeader *)(madt->Entries + off);
-		switch(m.h->Type) {
-			case MADT_TYPE_IO_APIC:
-				/* TODO: Add support for multiple IRQ */
-				if(ioapic == NULL)
-					ioapic = (struct IOAPIC *)((__u64) m.e1->IOAPICAddress);
-				break;
-			case MADT_TYPE_INT_SRC_OVERRIDE:
-				interrupt_override[m.e2->IRQSource] = m.e2;
-				break;
-			case MADT_TYPE_NMI_SOURCE:
-				/* TODO parse NMI sources */
-				break;
+
+		switch (m.h->Type) {
+		case MADT_TYPE_IO_APIC:
+			/* TODO: Add support for multiple IRQ */
+			if (ioapic == NULL)
+				ioapic = (struct IOAPIC *)((__u64) m.e1->IOAPICAddress);
+			break;
+		case MADT_TYPE_INT_SRC_OVERRIDE:
+			interrupt_override[m.e2->IRQSource] = m.e2;
+			break;
+		case MADT_TYPE_NMI_SOURCE:
+			/* TODO parse NMI sources */
+			break;
 		}
 	}
 
@@ -142,8 +145,8 @@ int ioapic_init(void)
 	union REDTBLEntry e = INIT_REDTBL_ENTRY();
 
 	ver.dword = _rioapic_reg(IOAPIC_VER_REG);
-	if(ver.ioapic_version != IOAPIC_VER)
-		return -1;
+	if (ver.ioapic_version != IOAPIC_VER)
+		return -ENODEV;
 
 	max_entries = ver.max_red_entry + 1;
 
@@ -154,9 +157,9 @@ int ioapic_init(void)
 	}
 
 	for (int irq_no = 0; irq_no < max_entries; irq_no++) {
-		if(!interrupt_override[irq_no])
+		if (!interrupt_override[irq_no])
 			continue;
-		global_system_interrupt = 
+		global_system_interrupt =
 			interrupt_override[irq_no]->GlobalSystemInterrupt;
 		e.vector = IRQ_VECTOR_BASE + irq_no;
 		_wioapic_entry(global_system_interrupt, e.qword);

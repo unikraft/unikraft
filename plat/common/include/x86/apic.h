@@ -47,7 +47,7 @@
 
 static inline void x2apic_lvt_init(void)
 {
-	union LVTEntry entry = INTIALIZE_LVT_ENTRY();
+	union LVTEntry entry = INITIALIZE_LVT_ENTRY();
 	__u32 eax, edx;
 
 	eax = entry.dword;

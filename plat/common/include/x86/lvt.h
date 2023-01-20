@@ -44,7 +44,7 @@ union LVTEntry {
 	};
 };
 
-#define INTIALIZE_LVT_ENTRY() {						\
+#define INITIALIZE_LVT_ENTRY() {					\
 	.vector = 0,									\
 	.delivery_mode = LVT_DELIVERY_MODE_FIXED,		\
 	.reserved1 = 0,									\

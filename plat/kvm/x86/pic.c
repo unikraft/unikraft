@@ -56,7 +56,7 @@ int pic_probe(const struct MADT *madt __unused, struct _pic_dev **dev)
 	};
 
 	/* PIC is always present in x86 systems */
-	pic_drv.ops = pic_ops; 
+	pic_drv.ops = pic_ops;
 	pic_drv.is_probed = 1;
 	*dev = &pic_drv;
 
@@ -87,7 +87,9 @@ static void PIC_remap(int offset1, int offset2)
 	outb(PIC2_DATA, offset2);
 	/* ICW3: tell Master PIC there is a slave PIC at IRQ2 (0000 0100) */
 	outb(PIC1_DATA, 4);
-	/* ICW3: tell Slave PIC its cascade identity (0000 0010) */ outb(PIC2_DATA, 2); outb(PIC1_DATA, ICW4_8086);
+	/* ICW3: tell Slave PIC its cascade identity (0000 0010) */
+	outb(PIC2_DATA, 2);
+	outb(PIC1_DATA, ICW4_8086);
 	outb(PIC2_DATA, ICW4_8086);
 
 	outb(PIC1_DATA, a1); /* restore saved masks. */
@@ -96,7 +98,6 @@ static void PIC_remap(int offset1, int offset2)
 
 int pic_init(void)
 {
-	uk_pr_debug("PIC init\n");
 	PIC_remap(32, 40);
 	pic_drv.is_initialized = 1;
 	return 0;

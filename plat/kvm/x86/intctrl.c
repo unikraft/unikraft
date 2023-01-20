@@ -23,7 +23,6 @@ int _madt_init_pic(struct MADT *madt, struct _pic_dev **pic)
 	if (rc == 0)
 		return 0;
 
-
 	return rc;
 }
 
@@ -34,16 +33,16 @@ void intctrl_init(void)
 
 #if CONFIG_HAVE_SMP
 	madt = acpi_get_madt();
-	if(madt == NULL)
+	if (madt == NULL)
 		goto EXIT_ERR;
 #endif
 
 	rc = _madt_init_pic(madt, &pic);
-	if(unlikely(rc))
+	if (unlikely(rc))
 		goto EXIT_ERR;
 
 	rc = pic->ops.initialize();
-	if(unlikely(rc))
+	if (unlikely(rc))
 		goto EXIT_ERR;
 
 	return;
