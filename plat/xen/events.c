@@ -102,6 +102,8 @@ int do_event(evtchn_port_t port, struct __regs *regs)
 	ctx.regs = regs;
 	ctx.irq = port;
 	rc = uk_raise_event(UKPLAT_EVENT_IRQ, &ctx);
+	if (unlikely(rc < 0))
+		UK_CRASH("IRQ event handler returned error: %d\n", rc);
 	if (rc == UK_EVENT_HANDLED)
 		return 1;
 
