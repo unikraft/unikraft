@@ -1,0 +1,6 @@
+uk_nofault_probe_r
+uk_nofault_probe_r_nopage
+uk_nofault_probe_rw
+uk_nofault_probe_rw_nopage
+uk_nofault_memcpy
+uk_nofault_memcpy_nopage
