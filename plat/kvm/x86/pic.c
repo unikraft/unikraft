@@ -23,17 +23,18 @@
 /* Taken from solo5 platform_intr.c */
 
 #include <kvm/pic.h>
-#include <x86/apic.h>
-#include <uk/arch/types.h>
 #include <kvm/intctrl.h>
+#include <x86/apic.h>
 #include <x86/cpu.h>
+#include <uk/arch/types.h>
+#include <uk/plat/common/irq.h>
 
 int pic_init(void);
 void pic_handle_irq(void);
 void pic_set_irq_affinity(uint32_t irq __unused, uint8_t affinity __unused);
 void pic_set_irq_prio(uint32_t irq __unused, __u8 priority __unused);
 uint32_t pic_get_max_irqs(void);
-void pic_set_trigger_type(uint32_t irq, uint8_t trigger);
+void pic_set_trigger_type(uint32_t irq, enum uk_irq_trigger trigger);
 void pic_clear_irq(uint32_t irq);
 void pic_mask_irq(uint32_t irq);
 void pic_ack_irq(uint32_t irq);
@@ -134,7 +135,7 @@ uint32_t pic_get_max_irqs(void)
 }
 
 /* Dummy functions */
-void pic_set_trigger_type(uint32_t irq __unused, uint8_t trigger __unused)
+void pic_set_trigger_type(uint32_t irq __unused, enum uk_irq_trigger __unused)
 {
 	return;
 }

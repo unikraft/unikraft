@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <kvm/intctrl.h>
 #include <x86/acpi/acpi.h>
+#include <x86/cpu.h>
 
 #define IMCR_ADDR        0x22
 #define IMCR_DATA		 0x23
@@ -41,10 +42,22 @@ void pic_mask_irq(uint32_t irq);
 static inline
 void disable_pic(void)
 {
-	/*  TODO: change this to single outb */
-	for (int i = 0; i < MAX_PIC_INTR; i++)
-		pic_mask_irq(i);
+	__u16 port;
+
+	port = PIC1_DATA;
+	outb(port, 0xff);
+	port = PIC2_DATA;
+	outb(port, 0xff);
 }
 
+/* Probe the APIC using ACPI MADT 
+ * 
+ * @param madt
+ *  The ACPI madt structure
+ *
+ * @param dev
+ *  The interrupt controller device, which is to be initialized
+ */
 int pic_probe(const struct MADT *madt, struct _pic_dev **dev);
+
 #endif

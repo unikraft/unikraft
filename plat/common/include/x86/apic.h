@@ -42,7 +42,6 @@
 #include <x86/cpu.h>
 #include <x86/apic_defs.h>
 #include <x86/lvt.h>
-
 #include <errno.h>
 
 static inline void x2apic_lvt_init(void)
@@ -53,6 +52,9 @@ static inline void x2apic_lvt_init(void)
 	eax = entry.dword;
 	edx = 0;
 
+	/* Initialize the local vector table 
+	 * all entries are masked
+	 */
 	wrmsr(APIC_MSR_LVT_TIMER, eax, edx);
 	wrmsr(APIC_MSR_LVT_THERMAL, eax, edx);
 	wrmsr(APIC_MSR_LVT_PERF, eax, edx);
@@ -60,6 +62,7 @@ static inline void x2apic_lvt_init(void)
 	wrmsr(APIC_MSR_LVT_LINT1, eax, edx);
 	wrmsr(APIC_MSR_LVT_ERROR, eax, edx);
 }
+
 static inline int x2apic_enable(void)
 {
 	__u32 eax, ebx, ecx, edx;

@@ -43,6 +43,9 @@ struct irq_handler {
 	void *arg;
 };
 
+/* TODO: determine this dynamically by reading the max irq of the given
+ * interrupt controller
+ */
 static struct irq_handler irq_handlers[__MAX_IRQ]
 				[CONFIG_KVM_MAX_IRQ_HANDLER_ENTRIES];
 

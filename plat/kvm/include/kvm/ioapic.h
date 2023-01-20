@@ -18,7 +18,8 @@
 #include <uk/arch/types.h>
 #include <stdint.h>
 
-#define IOAPIC_VER					0x11
+
+#define IOAPIC_VER					0x11 /* The version our driver supports */
 
 #define IOAPIC_ID_REG				0x00
 #define IOAPIC_VER_REG				0x01
@@ -30,12 +31,24 @@
 
 #define IOAPIC_REDTBL_ENTRY(index) (IOAPIC_REDTBL_BASE_REG + index * 2)
 
+/* This structure points to the memory mapped IOAPIC
+ * The start of memory is found out by reading the ACPI MADT entry
+ */
 struct IOAPIC {
 	__u32 ioregsel;
 	__u32 __padding[3];
 	__u32 iowin;
 } __packed;
 
+/* IOAPIC identification register 
+ *
+ * 	This register contains the physical IOAPIC id which is used during the bus
+ * 	arbitration
+ *
+ * 	In multiple IOAPIC environment each IOAPIC must programmed with unique
+ *
+ * 	IOAPIC during initialization
+ */
 union IOAPICID {
 	struct {
 		__u32 dword;
@@ -47,6 +60,8 @@ union IOAPICID {
 	};
 } __packed;
 
+/* IOAPIC version register 
+ */
 union IOAPICVer {
 	struct {
 		__u32 dword;
@@ -59,6 +74,14 @@ union IOAPICVer {
 	};
 } __packed;
 
+/* IOAPIC arbitration register
+ *
+ * 	This register contains the arbitration priority of the IOAPIC 
+ *
+ * 	The APIC uses the rotating priority to win bus ownership
+ * 	
+ * 	This is initially loaded with the IOAPIC id
+ */
 union IOAPICArb{
 	struct {
 		__u32 dword;
@@ -79,7 +102,6 @@ union IOAPICArb{
 #define	IOAPIC_DELIVERY_MODE_RESERVED1			6
 #define	IOAPIC_DELIVERY_MODE_EXTINT				7
 
-
 #define IOAPIC_DEST_MODE_PHYSICAL	0
 #define IOAPIC_DEST_MODE_LOGICAL	1
 
@@ -87,7 +109,7 @@ union IOAPICArb{
 #define IOAPIC_DELIVERY_STATUS_SENDING	0
 
 #define IOAPIC_INT_POLARITY_ACT_HIGH	0
-#define IOAPIC_INT_POLARITY_ACT_LOW	0
+#define IOAPIC_INT_POLARITY_ACT_LOW		0
 
 #define IOAPIC_REMOTE_IRR_ACCEPTED	1
 
@@ -97,7 +119,13 @@ union IOAPICArb{
 #define IOAPIC_INT_MASK_SET	1
 #define IOAPIC_INT_MASK_UNSET	0
 
-
+/* Probe the IOAPIC using ACPI MADT 
+ * 
+ * @param madt
+ *  The ACPI madt structure
+ *
+ * @param dev
+ *  The interrupt controller device, which is to be initialized
+ */
 int ioapic_probe(const struct MADT *madt, struct _pic_dev **dev);
-/* init the vectors to disabled state */
 #endif

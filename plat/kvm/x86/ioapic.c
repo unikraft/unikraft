@@ -5,6 +5,7 @@
 #include <kvm/ioapic.h>
 #include <kvm/pic.h>
 #include <kvm/intctrl.h>
+#include <uk/plat/common/irq.h>
 #include <errno.h>
 #include <stddef.h>
 
@@ -14,6 +15,15 @@
 #define IRQ_VECTOR_BASE   32
 
 static volatile struct IOAPIC *ioapic;
+
+/* Interrupt Source Overrides are necessary to describe variances between 
+ * the IA-PC standard dual 8259 interrupt definition and the platform’s
+ * implementation.
+ * For example, if your machine has the ISA Programmable Interrupt Timer (PIT)
+ * connected to ISA IRQ 0, but in APIC mode, it is connected to I/O APIC 
+ * interrupt input 2, then you would need an Interrupt Source Override where 
+ * the source entry is ‘0’ and the Global System Interrupt is ‘2.’
+ */
 static struct MADTType2Entry *interrupt_override[__IOAPIC_MAX_INTR] = { 0 };
 
 #define IOAPIC_OVERRIDE_IRQ(irq) \
@@ -23,39 +33,39 @@ static struct MADTType2Entry *interrupt_override[__IOAPIC_MAX_INTR] = { 0 };
 
 int ioapic_enable(void);
 int ioapic_init(void);
-void ioapic_mask_irq(unsigned int irq);
-void ioapic_clear_irq(unsigned int irq);
-void ioapic_set_trigger_type(unsigned int irq, __u8 trigger);
-void ioapic_set_irq_affinity(unsigned int irq, __u8 affinity);
+void ioapic_mask_irq(uint32_t irq);
+void ioapic_clear_irq(uint32_t irq);
+void ioapic_set_trigger_type(uint32_t irq, enum uk_irq_trigger trigger);
+void ioapic_set_irq_affinity(uint32_t irq, uint8_t affinity);
 uint32_t ioapic_get_max_irqs(void);
-void ioapic_set_irq_prio(unsigned int irq, uint8_t priority);
+void ioapic_set_irq_prio(uint32_t irq, uint8_t priority);
 void ioapic_handle_irq(void);
 
-static inline void _wioapic_reg(__u8 reg, __u32 val)
+static inline void _wioapic_reg(uint8_t reg, __u32 val)
 {
 	ioapic->ioregsel = reg;
 	ioapic->iowin = val;
 }
 
-static inline uint32_t _rioapic_reg(__u8 reg)
+static inline uint32_t _rioapic_reg(uint8_t reg)
 {
 	ioapic->ioregsel = reg;
 	return ioapic->iowin;
 }
 
 
-static inline void _wioapic_entry(__u8 index, __u64 entry)
+static inline void _wioapic_entry(uint8_t index, __u64 entry)
 {
-	__u8 entry_reg;
+	uint8_t entry_reg;
 
 	entry_reg = IOAPIC_REDTBL_ENTRY(index);
 	_wioapic_reg(entry_reg, entry & 0xffffffff);
 	_wioapic_reg(entry_reg + 1, entry >> 32);
 }
 
-static inline uint32_t _rioapic_entry(__u8 index)
+static inline uint32_t _rioapic_entry(uint8_t index)
 {
-	__u8 entry_reg;
+	uint8_t entry_reg;
 	__u64 entry;
 
 	entry_reg = IOAPIC_REDTBL_ENTRY(index);
@@ -88,6 +98,7 @@ static int ioapic_do_probe(const struct MADT *madt)
 
 	len = madt->h.Length - sizeof(struct MADT);
 
+	/* Search the MADT entry for IOAPIC */
 	for (off = 0; off < len; off += m.h->Length) {
 
 		m.h = (struct MADTEntryHeader *)(madt->Entries + off);
@@ -108,7 +119,7 @@ static int ioapic_do_probe(const struct MADT *madt)
 	}
 
 	if (ioapic == NULL)
-		return -ENODEV;
+		return -ENODEV; /* IOAPIC not found */
 
 	ioapic_drv.ops = ioapic_ops;
 	ioapic_drv.is_probed = 1;
@@ -129,6 +140,8 @@ int ioapic_probe(const struct MADT *madt, struct _pic_dev **dev)
 	if (unlikely(rc))
 		return rc;
 
+	/* Switch from the virtual-wire/PIC mode to symmetric mode 
+	 */
 	outb(IMCR_ADDR, 0x70);
 	outb(IMCR_DATA, 0x01);
 
@@ -140,7 +153,7 @@ int ioapic_probe(const struct MADT *madt, struct _pic_dev **dev)
 int ioapic_init(void)
 {
 	uint8_t max_entries;
-	unsigned int global_system_interrupt;
+	uint32_t global_system_interrupt;
 	union IOAPICVer ver;
 	union REDTBLEntry e = INIT_REDTBL_ENTRY();
 
@@ -150,12 +163,14 @@ int ioapic_init(void)
 
 	max_entries = ver.max_red_entry + 1;
 
+	/* Intialize the redirection table entries (32 onwards) */
 	for (int irq_no = 0; irq_no < max_entries; irq_no++) {
+		e.vector = IRQ_VECTOR_BASE + irq_no;
 		_wioapic_entry(irq_no, e.qword);
 		e.qword = _rioapic_entry(irq_no);
-		e.vector++;
 	}
 
+	/* Reassign the Interrupt vector based on interrupt override structure */
 	for (int irq_no = 0; irq_no < max_entries; irq_no++) {
 		if (!interrupt_override[irq_no])
 			continue;
@@ -170,7 +185,7 @@ int ioapic_init(void)
 	return 0;
 }
 
-void ioapic_mask_irq(unsigned int irq)
+void ioapic_mask_irq(uint32_t irq)
 {
 	union REDTBLEntry e;
 
@@ -180,7 +195,7 @@ void ioapic_mask_irq(unsigned int irq)
 	_wioapic_entry(irq, e.qword);
 }
 
-void ioapic_clear_irq(unsigned int irq)
+void ioapic_clear_irq(uint32_t irq)
 {
 	union REDTBLEntry e;
 
@@ -198,7 +213,7 @@ uint32_t ioapic_get_max_irqs(void)
 	return (uint32_t)ver.max_red_entry + 1;
 }
 
-void ioapic_set_irq_affinity(unsigned int irq, __u8 affinity)
+void ioapic_set_irq_affinity(uint32_t irq, uint8_t affinity)
 {
 	union REDTBLEntry e;
 
@@ -208,18 +223,26 @@ void ioapic_set_irq_affinity(unsigned int irq, __u8 affinity)
 	_wioapic_entry(irq, e.qword);
 }
 
-void ioapic_set_trigger_type(unsigned int irq, __u8 trigger)
+void ioapic_set_trigger_type(uint32_t irq, enum uk_irq_trigger trigger)
 {
 	union REDTBLEntry e;
+	uint8_t tgr;
+
+	if (trigger == UK_IRQ_TRIGGER_NONE)
+		return;
+	else if (UK_IRQ_TRIGGER_EDGE)
+		tgr = IOAPIC_EDGE_TRIGGER_MODE;
+	else
+		tgr = IOAPIC_LEVEL_TRIGGER_MODE;
 
 	irq = IOAPIC_OVERRIDE_IRQ(irq);
 	e.qword = _rioapic_entry(irq);
-	e.trigger_mode = trigger;
+	e.trigger_mode = tgr;
 	_wioapic_entry(irq, e.qword);
 }
 
 /* Dummy functions */
-void ioapic_set_irq_prio(unsigned int irq __unused, __u8 priority __unused)
+void ioapic_set_irq_prio(uint32_t irq __unused, uint8_t priority __unused)
 {
 	return;
 }

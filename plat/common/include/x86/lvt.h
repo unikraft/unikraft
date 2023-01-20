@@ -31,47 +31,48 @@ union LVTEntry {
 		__u32 dword;
 	};
 	struct {
-		__u32 vector:8;
-		__u32 delivery_mode:3;
-		__u32 reserved1:1;
-		__u32 delivery_status:1;
-		__u32 polarity:1;
-		__u32 remote_irr:1;
-		__u32 trigger_mode:1;
-		__u32 mask:1;
-		__u32 timer_mode:2;
-		__u32 reserved2:13;
+		__u32 vector:8; /* IRQ vector */
+		__u32 delivery_mode:3; /* Type of interrupt */
+		__u32 reserved1:1; /* Reserved */
+		__u32 delivery_status:1; /* Indicates interrupt delivery status (r-only)*/
+		__u32 polarity:1; /* Polarity of the interrupt pin */
+		__u32 remote_irr:1; /* Interrupt accepted by LAPIC (r-only) */
+		__u32 trigger_mode:1; /* Selects the trigger mode for LINT0 and LINT1 */
+		__u32 mask:1; /* Interrupt mask */
+		__u32 timer_mode:2; /* Timer mode */
+		__u32 reserved2:13; /* Reserved */
 	};
 };
 
-#define INITIALIZE_LVT_ENTRY() {					\
-	.vector = 0,									\
-	.delivery_mode = LVT_DELIVERY_MODE_FIXED,		\
-	.reserved1 = 0,									\
-	.delivery_status = LVT_DELIVERY_STATUS_IDLE,	\
-	.polarity = LVT_INT_POLARITY_ACT_HIGH,			\
-	.remote_irr = 0,								\
-	.trigger_mode = LVT_EDGE_TRIGGER_MODE,			\
-	.mask = LVT_INT_MASK_SET,						\
-	.timer_mode = LVT_TIMER_MODE_ONE_SHOT,			\
-	.reserved2 = 0,									\
+#define INITIALIZE_LVT_ENTRY() { \
+	.vector = 0, \
+	.delivery_mode = LVT_DELIVERY_MODE_FIXED, \
+	.reserved1 = 0,	\
+	.delivery_status = LVT_DELIVERY_STATUS_IDLE, \
+	.polarity = LVT_INT_POLARITY_ACT_HIGH, \
+	.remote_irr = 0, \
+	.trigger_mode = LVT_EDGE_TRIGGER_MODE, \
+	.mask = LVT_INT_MASK_SET, \
+	.timer_mode = LVT_TIMER_MODE_ONE_SHOT, \
+	.reserved2 = 0,	\
 }
 
-#define set_lvt_entry_attr(msr, attr, value) ({	\
-		union LVTEntry __entry;					\
-		__u32 edx = 0;							\
-		rdmsr(msr, &__entry.dword, &edx);		\
-		__entry.attr = value;					\
-		wrmsr(msr, __entry.dword, edx);			\
-	})
+#ifdef CONFIG_HAVE_SMP 
+	#define set_lvt_entry_attr(msr, attr, value) ({	\
+			union LVTEntry __entry;	\
+			__u32 edx = 0; \
+			rdmsr(msr, &__entry.dword, &edx); \
+			__entry.attr = value; \
+			wrmsr(msr, __entry.dword, edx);	\
+		})
 
-#define get_lvt_entry_attr(msr, attr, value) ({	\
-		union LVTEntry __entry;					\
-		__u32 edx;								\
-		rdmsr(msr, &__entry.dword, &edx);		\
-		__entry.attr;							\
-	})
-
+	#define get_lvt_entry_attr(msr, attr, value) ({	\
+			union LVTEntry __entry;	\
+			__u32 edx; \
+			rdmsr(msr, &__entry.dword, &edx); \
+			__entry.attr; \
+		})
+#endif
 
 
 #endif

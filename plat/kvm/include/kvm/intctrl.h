@@ -33,9 +33,10 @@
 #define __PLAT_KVM_X86_INTCTRL_H
 
 #include <stdint.h>
+#include <uk/plat/common/irq.h>
 
 struct _pic_operations {
-	/** Initialize GIC controller */
+	/** Initialize PIC controller */
 	int (*initialize)(void);
 	/** Acknowledging IRQ */
 	void (*ack_irq)(uint32_t irq);
@@ -44,7 +45,7 @@ struct _pic_operations {
 	/** Disable IRQ */
 	void (*disable_irq)(uint32_t irq);
 	/** Set IRQ trigger type */
-	void (*set_irq_type)(uint32_t irq, uint8_t trigger);
+	void (*set_irq_type)(uint32_t irq, enum uk_irq_trigger trigger);
 	/** Set priority for IRQ */
 	void (*set_irq_prio)(uint32_t irq, uint8_t priority);
 	/** Select destination processor */
@@ -64,10 +65,39 @@ struct _pic_dev {
 	struct _pic_operations ops;
 };
 
+/* Initialize the interrupt controller 
+ */
 void intctrl_init(void);
+
+/* Unmask the interrupt
+ *
+ * @param irq
+ *  The interrupt to be unmasked
+ */
 void intctrl_clear_irq(uint32_t irq);
+
+/* Mask the interrupt
+ *
+ * @param irq
+ *  The interrupt to be mask
+ */
 void intctrl_mask_irq(uint32_t irq);
+
+/* Acknowlege the interrupt
+ *
+ * @param irq
+ *  The interrupt to be acknowledge
+ */
 void intctrl_ack_irq(uint32_t irq);
+
+/* Send interprocessor interrupt
+ *
+ * @param cpuid
+ *  The destination cpuid
+ *
+ * @sgintid
+ *  The softward generated interrupt id
+ */
 void intctrl_send_ipi(uint8_t sgintid, uint32_t cpuid);
 
 #endif
