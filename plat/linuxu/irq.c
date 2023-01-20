@@ -161,6 +161,8 @@ static void _irq_handle(int irq)
 	ctx.regs = NULL;
 	ctx.irq = irq;
 	rc = uk_raise_event(UKPLAT_EVENT_IRQ, &ctx);
+	if (unlikely(rc < 0))
+		UK_CRASH("IRQ event handler returned error: %d\n", rc);
 	if (rc == UK_EVENT_HANDLED)
 		return;
 

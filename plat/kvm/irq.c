@@ -101,6 +101,8 @@ void _ukplat_irq_handle(struct __regs *regs, unsigned long irq)
 	ctx.regs = regs;
 	ctx.irq = irq;
 	rc = uk_raise_event(UKPLAT_EVENT_IRQ, &ctx);
+	if (unlikely(rc < 0))
+		UK_CRASH("IRQ event handler returned error: %d\n", rc);
 	if (rc == UK_EVENT_HANDLED) {
 		/* Skip all normal handlers if an event handler handled the
 		 * event
