@@ -63,16 +63,17 @@ static inline void _wioapic_entry(uint8_t index, __u64 entry)
 	_wioapic_reg(entry_reg + 1, entry >> 32);
 }
 
-static inline uint32_t _rioapic_entry(uint8_t index)
+static inline __u64 _rioapic_entry(uint8_t index)
 {
-	uint8_t entry_reg;
-	__u64 entry;
+	__u8 entry_reg;
+	__u64 low;
+	__u64 high;
 
 	entry_reg = IOAPIC_REDTBL_ENTRY(index);
-	entry = _rioapic_reg(entry_reg);
-	entry |= ((__u64) _rioapic_reg(entry_reg + 1)) << 32;
+	low = _rioapic_reg(entry_reg);
+	high = _rioapic_reg(entry_reg + 1);
 
-	return entry;
+	return low | (high << 32);
 }
 
 
@@ -165,9 +166,9 @@ int ioapic_init(void)
 
 	/* Intialize the redirection table entries (32 onwards) */
 	for (int irq_no = 0; irq_no < max_entries; irq_no++) {
+		//e.destination_field = 1;
 		e.vector = IRQ_VECTOR_BASE + irq_no;
 		_wioapic_entry(irq_no, e.qword);
-		e.qword = _rioapic_entry(irq_no);
 	}
 
 	/* Reassign the Interrupt vector based on interrupt override structure */
@@ -202,7 +203,7 @@ void ioapic_clear_irq(uint32_t irq)
 	irq = IOAPIC_OVERRIDE_IRQ(irq);
 	e.qword = _rioapic_entry(irq);
 	e.mask = IOAPIC_INT_MASK_UNSET;
-	_wioapic_entry(irq, e.qword); \
+	_wioapic_entry(irq, e.qword);
 }
 
 uint32_t ioapic_get_max_irqs(void)
@@ -212,6 +213,7 @@ uint32_t ioapic_get_max_irqs(void)
 	ver.dword = _rioapic_reg(IOAPIC_VER_REG);
 	return (uint32_t)ver.max_red_entry + 1;
 }
+
 
 void ioapic_set_irq_affinity(uint32_t irq, uint8_t affinity)
 {
