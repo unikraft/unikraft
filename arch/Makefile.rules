@@ -12,3 +12,10 @@ $(if $(strip $(_UKARCH_TLS_HAVE_TCB)),
 		$(eval CXXFLAGS-y+=-DCONFIG_UKARCH_TLS_HAVE_TCB=1) \
 		$(eval _UKARCH_TLS_HAVE_TCB:=1))
 endef
+
+# Indicate that no block of bytes is reserved at the end of the TCB
+# Usage:
+#  $(eval $(call aarch64_no_reserved_tcb_overlap))
+define aarch64_no_reserved_tcb_overlap =
+	$(eval LIBCONTEXT_CFLAGS-y+=-DCONFIG_AARCH64_NO_TCB_OVERLAP=1)
+endef
