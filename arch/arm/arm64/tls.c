@@ -59,11 +59,27 @@
 
 /*
  * Aarch64 ABI requires 16 bytes of space after the tlsp as part of the TCB.
- * NOTE: We assume that libraries (like musl) reserve this space when using
- *       this TLS API. You can find more information here:
+ * NOTE: Some libraries, such as older versions of musl, reserve this space
+ *       when using this TLS API. You can find more information here:
  *       https://www.openwall.com/lists/musl/2018/02/09/7
+ *
+ * Newer versions of musl, however, simply ignore this block of 16 bytes
+ * described by the ABI and expect the tlsp to point just at the end of
+ * the TCB. More details can be found here:
+ * https://www.openwall.com/lists/musl/2018/06/01/14
+ *
+ * Therefore, when such libraries are used, they can call the makefile rule
+ * `aarch64_no_reserved_tcb_overlap` which sets a macro if the library
+ * **does not** expect a 16 bytes reserved block as part of the TCB,
+ *  as is the case with newer versions of musl.
  */
 #define AARCH64_RESERVED 16
+
+#ifdef CONFIG_AARCH64_NO_TCB_OVERLAP
+#define AARCH64_TCB_OVERLAP 0
+#else
+#define AARCH64_TCB_OVERLAP AARCH64_RESERVED
+#endif
 
 #ifndef __UKARCH_TLS_HAVE_TCB__
 #ifndef TCB_SIZE
@@ -86,7 +102,7 @@ extern char _tls_start[], _etdata[], _tls_end[];
  *             | Custom TCB format       | |   > Thread Control Block (TCB)
  *             | (might be used          | |  |  (length: TCB_SIZE)
  *             |  by a libC)             | |  |
- *       tlsp -+-> AARCH64_RESERVED      | |  |
+ *       tlsp -+-> AARCH64_TCB_OVERLAP   | |  |
  *          |  +-------------------------+ |  /
  * data_off<   | / PADDING 2 / / / / / / |  > tls_area_size()
  *          \->+-------------------------+ |  \
@@ -99,15 +115,15 @@ extern char _tls_start[], _etdata[], _tls_end[];
  *             |                         | |  |
  *             +-------------------------+ /  /
  *
- * Note: ukarch_tlsp_get() points to the last 16 bytes of TCB of the thread.
- *       AARCH64 ABI requires the tlsp to point to 2 pointers (16 bytes):
- *       the pointer to the DTV and the implementation specific pointer.
+ * Note: ukarch_tlsp_get() points to the last AARCH64_TCB_OVERLAP bytes of
+ *       TCB of the thread; AARCH64 ABI requires the tlsp to point to 2
+ *       pointers (16 bytes): the pointer to the DTV and the
+ *       implementation specific pointer.
  *
  *       In reality, this 16 bytes area is never used by the compiler
- *       generated code, so eg. musl just uses it for the last
- *       member(s) of the TCB.
- *       (source: https://www.openwall.com/lists/musl/2018/02/09/7
- *        "Re: TLS storage offsets for TLS_ABOVE_TP", Fri, 9 Feb 2018)
+ *       generated code, so eg. Old versions of musl use it for the
+ *       last member(s) of the TCB, meanwhile newer versions completely
+ *	 ignore it and do not consider it as part of the TCB.
  */
 
 /*
@@ -138,7 +154,7 @@ static __sz tls_padding_2_size(void)
 	 * rest of it. The size of this padding is therefore determined by the
 	 * ABI.
 	 */
-	return tls_data_offset() - AARCH64_RESERVED;
+	return tls_data_offset() - AARCH64_TCB_OVERLAP;
 }
 
 static __sz tls_tdata_size(void)
@@ -159,7 +175,7 @@ static __sz tls_padding_1_size(void)
 	 * Adding tls_data_offset does not break alignment, so we can just align
 	 * tlsp. This padding rounds up the size of the TCB before tlsp.
 	 */
-	const __sz tcb_before_tlsp = TCB_SIZE - AARCH64_RESERVED;
+	const __sz tcb_before_tlsp = TCB_SIZE - AARCH64_TCB_OVERLAP;
 
 	return ALIGN_UP(tcb_before_tlsp, TLS_AREA_ALIGN) - tcb_before_tlsp;
 }
@@ -183,12 +199,12 @@ __uptr ukarch_tls_tlsp(void *tls_area)
 {
 	/*
 	 * arch pointer points to the last
-	 * AARCH64_RESERVED bytes of the TCB
+	 * AARCH64_TCB_OVERLAP bytes of the TCB
 	 */
 	return ((__uptr) tls_area)
 		+ tls_padding_1_size()
 		+ ukarch_tls_tcb_size()
-		- AARCH64_RESERVED;
+		- AARCH64_TCB_OVERLAP;
 }
 
 /* arch pointer (tidr_el0) to area */
@@ -196,7 +212,7 @@ void *ukarch_tls_area_get(__uptr tlsp)
 {
 	/* inverse of ukarch_tls_tlsp */
 	return (void *) (tlsp
-		+ AARCH64_RESERVED
+		+ AARCH64_TCB_OVERLAP
 		- ukarch_tls_tcb_size()
 		- tls_padding_1_size());
 }
@@ -205,7 +221,7 @@ void *ukarch_tls_area_get(__uptr tlsp)
 void *ukarch_tls_tcb_get(__uptr tlsp)
 {
 	return (void *) (tlsp
-		+ AARCH64_RESERVED
+		+ AARCH64_TCB_OVERLAP
 		- ukarch_tls_tcb_size());
 }
 
@@ -241,7 +257,7 @@ void ukarch_tls_area_init(void *tls_area)
 #endif /*!CONFIG_UKARCH_TLS_HAVE_TCB */
 	writepos += ukarch_tls_tcb_size();
 	UK_ASSERT(ukarch_tls_tlsp(tls_area) ==
-		  ((__uptr) writepos) - AARCH64_RESERVED);
+		  ((__uptr) writepos) - AARCH64_TCB_OVERLAP);
 
 	/* padding 2 */
 	uk_pr_debug("tls_area_init: pad: %"__PRIsz" bytes\n",
