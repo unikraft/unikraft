@@ -1268,6 +1268,38 @@ out_errno:
 	return -error;
 }
 
+UK_SYSCALL_R_DEFINE(int, mkdirat, int, dirfd,
+		    const char*, pathname, mode_t, mode)
+{
+	struct vfscore_file *fp;
+	struct vnode *vp;
+	char p[PATH_MAX];
+	int error;
+
+	if (pathname[0] == '/' || dirfd == AT_FDCWD)
+		return uk_syscall_r_mkdir((long) pathname, (long) mode);
+
+	error = fget(dirfd, &fp);
+	if (error)
+		return error;
+
+	vp = fp->f_dentry->d_vnode;
+	vn_lock(vp);
+
+	/* build absolute path */
+	strlcpy(p, fp->f_dentry->d_mount->m_path, PATH_MAX);
+	strlcat(p, fp->f_dentry->d_path, PATH_MAX);
+	strlcat(p, "/", PATH_MAX);
+	strlcat(p, pathname, PATH_MAX);
+
+	error = uk_syscall_r_mkdir((long) p, (long) mode);
+
+	vn_unlock(vp);
+	fdrop(fp);
+
+	return error;
+}
+
 UK_TRACEPOINT(trace_vfs_rmdir, "\"%s\"", const char*);
 UK_TRACEPOINT(trace_vfs_rmdir_ret, "");
 UK_TRACEPOINT(trace_vfs_rmdir_err, "%d", int);
