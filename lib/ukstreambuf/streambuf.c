@@ -165,3 +165,17 @@ __sz uk_streambuf_strcpy(struct uk_streambuf *sb, const char *src)
 	sb->seek = uk_streambuf_seek(sb) + wlen;
 	return wlen;
 }
+
+__sz uk_streambuf_memcpy(struct uk_streambuf *sb, const void *src, __sz srclen)
+{
+	__sz cpylen;
+
+	UK_ASSERT(src);
+
+	cpylen = MIN(uk_streambuf_left(sb), srclen);
+	if (cpylen < srclen)
+		sb->flags |= UK_STREAMBUF_S_TRUNCATED;
+	memcpy(uk_streambuf_wptr(sb), src, cpylen);
+	sb->seek = uk_streambuf_seek(sb) + cpylen;
+	return cpylen;
+}

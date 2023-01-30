@@ -229,6 +229,59 @@ __sz uk_streambuf_vprintf(struct uk_streambuf *sb, const char *fmt, va_list ap);
  */
 __sz uk_streambuf_strcpy(struct uk_streambuf *sb, const char *src);
 
+/**
+ * Append a copy of a binary memory blob to the buffer of a streambuf object at
+ * the current seek position. If the left space on the buffer is too small for
+ * holding the given memory blob, the output is truncated to fit the buffer size
+ * and `UK_STREAMBUF_S_TRUNCATED` is set (see: `uk_streambuf_istruncated()`).
+ * NOTE: Please note that no extra termination symbol is added by this function.
+ *       A successive append call to a streambuf object that is configured
+ *       with `UK_STREAMBUF_C_TERMSHIFT` will cause overwriting the last byte of
+ *       the copied binary blob.
+ * HINT: With `uk_streambuf_reserve(sb, 1)`, the seek position can be moved
+ *       further by one byte, afterwards.
+ *
+ * @param sb Streambuf object
+ * @param src Pointer to binary data to copy
+ * @param len Number of bytes of the binary blob
+ * @return Number of bytes written to the buffer (if it is equal to `len`,
+ *         no truncation happened)
+ */
+__sz uk_streambuf_memcpy(struct uk_streambuf *sb, const void *src, __sz len);
+
+/**
+ * Returns a pointer at the current seek position of the corresponding buffer of
+ * a streambuf object. A given length is reserved on the buffer for in-place
+ * writing (zero-copy). The seek is increased by this reservation length for
+ * successive calls.
+ * NOTE: Please note that no extra termination symbol is added by this function.
+ *       A successive append call to a streambuf object that is configured
+ *       with `UK_STREAMBUF_C_TERMSHIFT` will cause overwriting the last byte
+ *       of the returned buffer area. It also means that writing this last byte
+ *       after a successive call, will cause overwriting the first byte of the
+ *       successive call.
+ * NOTE: Instead of truncating, this function returns `__NULL` if there is not
+ *       enough space left on the corresponding buffer.
+ * HINT: With `uk_streambuf_reserve(sb, 1)`, the seek position can be moved
+ *       further by one byte, afterwards.
+ *
+ * @param sb Streambuf object
+ * @param len Number of bytes to reserve
+ * @return Pointer to location in buffer that was reserved. `__NULL` when there
+ *         is not enough space left to reserve `len` bytes.
+ */
+static inline void *uk_streambuf_reserve(struct uk_streambuf *sb, __sz len)
+{
+	void *ret;
+
+	if (uk_streambuf_left(sb) < len)
+		return __NULL;
+
+	ret = uk_streambuf_wptr(sb);
+	sb->seek = uk_streambuf_seek(sb) + len;
+	return ret;
+}
+
 #ifdef __cplusplus
 }
 #endif
