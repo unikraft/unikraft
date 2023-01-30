@@ -1,0 +1,7 @@
+config LIBUKSTREAMBUF
+	bool "ukstreambuf: Stream buffers"
+	default n
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKDEBUG
+	help
+		Helper functions to simplify appending data to buffers
