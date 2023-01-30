@@ -9,6 +9,36 @@
 #include <uk/streambuf.h>
 #include <uk/assert.h>
 
+__ssz fastncat(char *buf, __sz buflen, const char *src)
+{
+	char *wptr = buf;
+	const char *rptr = src;
+	__sz left = buflen;
+
+	UK_ASSERT(wptr);
+
+	if (unlikely(!rptr || (left == 0)))
+		return 0;
+
+	/* Copy string to wptr position */
+	while ((*rptr != '\0') && (left > 1)) {
+		*(wptr++) = *(rptr++);
+		left--;
+	}
+	/* Ensure NULL-termination */
+	*(wptr++) = '\0';
+
+	if (*rptr != '\0') {
+		/* If we get here the target buffer is full and there
+		 * are still characters available on the source string
+		 */
+		return -1;
+	}
+
+	/* Return the number of appended bytes (including '\0' termination) */
+	return (__ssz)((__uptr) wptr - (__uptr) buf);
+}
+
 void uk_streambuf_reset(struct uk_streambuf *sb)
 {
 	sb->seek = 0;
@@ -66,3 +96,72 @@ void uk_streambuf_free(struct uk_streambuf *sb)
 	uk_free(sb->_a, sb);
 }
 #endif /* CONFIG_LIBUKALLOC */
+
+__sz uk_streambuf_vprintf(struct uk_streambuf *sb, const char *fmt, va_list ap)
+{
+	int rc;
+
+	if (uk_streambuf_left((sb)) == 0) {
+		(sb)->flags |= UK_STREAMBUF_S_TRUNCATED;
+		return 0;
+	}
+	if (uk_streambuf_left((sb)) == 1) {
+		/* No need to call vsnprintf(), there is only space for '\0' */
+		*((char *) uk_streambuf_wptr(sb)) = '\0';
+		sb->seek = uk_streambuf_seek(sb) + 1;
+		sb->flags |= UK_STREAMBUF_S_TRUNCATED;
+		return 1;
+	}
+
+	rc = vsnprintf(uk_streambuf_wptr(sb), uk_streambuf_left(sb), fmt, ap);
+	if (rc < 0) {
+		/* Error happened, we undo operation: Wipe with putting
+		 * terminating '\0' at current position
+		 */
+		*((char *) uk_streambuf_wptr(sb)) = '\0';
+		return 0;
+	} else if ((__sz) rc >= uk_streambuf_left(sb)) {
+		/* We did not have enough space, snprintf should have filled
+		 * up everything of our buffer
+		 */
+		rc = uk_streambuf_left(sb);
+		sb->flags |= UK_STREAMBUF_S_TRUNCATED;
+	} else {
+		/* vsnprintf() returns number of bytes without terminating '\0',
+		 * so we need to add 1
+		 */
+		rc += 1;
+	}
+
+	sb->seek = uk_streambuf_seek(sb) + rc;
+
+	UK_ASSERT(sb->seek <= sb->buflen);
+	return (__sz) rc;
+}
+
+__sz uk_streambuf_printf(struct uk_streambuf *sb, const char *fmt, ...)
+{
+	__sz ret;
+	va_list ap;
+
+	va_start(ap, fmt);
+	ret = uk_streambuf_vprintf(sb, fmt, ap);
+	va_end(ap);
+
+	return ret;
+}
+
+__sz uk_streambuf_strcpy(struct uk_streambuf *sb, const char *src)
+{
+	__ssz wlen;
+
+	wlen = fastncat(uk_streambuf_wptr(sb), uk_streambuf_left(sb), src);
+	if (wlen < 0) {
+		/* We could not copy everything from the source string */
+		wlen = (__ssz) uk_streambuf_left(sb);
+		(sb)->flags |= UK_STREAMBUF_S_TRUNCATED;
+	}
+
+	sb->seek = uk_streambuf_seek(sb) + wlen;
+	return wlen;
+}
