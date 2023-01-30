@@ -278,6 +278,196 @@ UK_TESTCASE(ukstreambuf, streambuf_printf_termshift)
 	UK_TEST_EXPECT_ZERO(memcmp(buf, result, ARRAY_SIZE(buf)));
 }
 
+UK_TESTCASE(ukstreambuf, streambuf_memcpy)
+{
+	struct uk_streambuf sb;
+	char buf[10];
+	const char str_test1[] = "test1";
+	const char str_minus[] = "-";
+	const char str_test2[] = "test2";
+	const char result[10] = { 't', 'e', 's', 't', '1', '\0',
+				  '-', '\0', 't', 'e' };
+	__sz ret;
+
+	uk_streambuf_init(&sb, buf, ARRAY_SIZE(buf), 0x0);
+
+	/* First memcpy */
+	ret = uk_streambuf_memcpy(&sb, str_test1, 6);
+	UK_TEST_EXPECT_SNUM_EQ(ret, 6);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_seek(&sb), 6);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_len(&sb), 6);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_left(&sb), 4);
+	UK_TEST_EXPECT_PTR_EQ(uk_streambuf_wptr(&sb), &buf[6]);
+	UK_TEST_EXPECT_ZERO(uk_streambuf_istruncated(&sb));
+
+	/* Another memcpy */
+	ret = uk_streambuf_memcpy(&sb, str_minus, 2);
+	UK_TEST_EXPECT_SNUM_EQ(ret, 2);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_seek(&sb), 8);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_len(&sb), 8);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_left(&sb), 2);
+	UK_TEST_EXPECT_PTR_EQ(uk_streambuf_wptr(&sb), &buf[8]);
+	UK_TEST_EXPECT_ZERO(uk_streambuf_istruncated(&sb));
+
+	/* Running out of space */
+	ret = uk_streambuf_memcpy(&sb, str_test2, 6);
+	UK_TEST_EXPECT_SNUM_EQ(ret, 2);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_seek(&sb), 10);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_len(&sb), 10);
+	UK_TEST_EXPECT_ZERO(uk_streambuf_left(&sb));
+	UK_TEST_EXPECT_PTR_EQ(uk_streambuf_wptr(&sb), &buf[10]);
+	UK_TEST_EXPECT_NOT_ZERO(uk_streambuf_istruncated(&sb));
+
+	/* No space left */
+	ret = uk_streambuf_memcpy(&sb, str_minus, 2);
+	UK_TEST_EXPECT_SNUM_EQ(ret, 0);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_seek(&sb), 10);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_len(&sb), 10);
+	UK_TEST_EXPECT_ZERO(uk_streambuf_left(&sb));
+	UK_TEST_EXPECT_PTR_EQ(uk_streambuf_wptr(&sb), &buf[10]);
+	UK_TEST_EXPECT_NOT_ZERO(uk_streambuf_istruncated(&sb));
+
+	/* Result on buf as expected? */
+	UK_TEST_EXPECT_ZERO(memcmp(buf, result, ARRAY_SIZE(buf)));
+}
+
+UK_TESTCASE(ukstreambuf, streambuf_memcpy_termshift)
+{
+	struct uk_streambuf sb;
+	char buf[10];
+	const char str_test1[] = "test1";
+	const char str_minus[] = "-";
+	const char str_test2[] = "test2";
+	const char result[10] = { 't', 'e', 's', 't', '1', '-',
+				  't', 'e', 's', '-' };
+	__sz ret;
+
+	/*
+	 * NOTE: With TERMSHIFT, the wptr should move one position backwards
+	 *       for successive writes (resulting in C-string concatenation).
+	 */
+	uk_streambuf_init(&sb, buf, ARRAY_SIZE(buf), UK_STREAMBUF_C_TERMSHIFT);
+
+	/* First string */
+	ret = uk_streambuf_memcpy(&sb, str_test1, 6);
+	UK_TEST_EXPECT_SNUM_EQ(ret, 6);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_seek(&sb), 5);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_len(&sb), 6);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_left(&sb), 5);
+	UK_TEST_EXPECT_PTR_EQ(uk_streambuf_wptr(&sb), &buf[5]);
+	UK_TEST_EXPECT_SNUM_EQ(buf[5], '\0');
+	UK_TEST_EXPECT_ZERO(uk_streambuf_istruncated(&sb));
+
+	/* Append another string */
+	ret = uk_streambuf_memcpy(&sb, str_minus, 2);
+	UK_TEST_EXPECT_SNUM_EQ(ret, 2);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_seek(&sb), 6);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_len(&sb), 7);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_left(&sb), 4);
+	UK_TEST_EXPECT_PTR_EQ(uk_streambuf_wptr(&sb), &buf[6]);
+	UK_TEST_EXPECT_SNUM_EQ(buf[6], '\0');
+	UK_TEST_EXPECT_ZERO(uk_streambuf_istruncated(&sb));
+
+	/* Running out of space */
+	ret = uk_streambuf_memcpy(&sb, str_test2, 6);
+	UK_TEST_EXPECT_SNUM_EQ(ret, 4);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_seek(&sb), 9);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_len(&sb), 10);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_left(&sb), 1);
+	UK_TEST_EXPECT_PTR_EQ(uk_streambuf_wptr(&sb), &buf[9]);
+	UK_TEST_EXPECT_SNUM_NQ(buf[9], '\0');
+	UK_TEST_EXPECT_NOT_ZERO(uk_streambuf_istruncated(&sb));
+
+	/*
+	 * No space left but the last character (due to TERMSHIFT) should
+	 * be over-writable
+	 */
+	ret = uk_streambuf_memcpy(&sb, str_minus, 2);
+	UK_TEST_EXPECT_SNUM_EQ(ret, 1); /* '-' written */
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_seek(&sb), 9);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_len(&sb), 10);
+	/* Last '\0' stays overwritable (but only with '\0')*/
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_left(&sb), 1);
+	UK_TEST_EXPECT_PTR_EQ(uk_streambuf_wptr(&sb), &buf[9]);
+	UK_TEST_EXPECT_SNUM_NQ(buf[9], '\0');
+	UK_TEST_EXPECT_NOT_ZERO(uk_streambuf_istruncated(&sb));
+
+	/* Result on buf as expected? */
+	UK_TEST_EXPECT_ZERO(memcmp(buf, result, ARRAY_SIZE(buf)));
+}
+
+UK_TESTCASE(ukstreambuf, streambuf_reserve)
+{
+	struct uk_streambuf sb;
+	char buf[10];
+	void *ret;
+
+	uk_streambuf_init(&sb, buf, ARRAY_SIZE(buf), 0x0);
+
+	/* First blob */
+	ret = uk_streambuf_reserve(&sb, 6);
+	UK_TEST_EXPECT_PTR_EQ(ret, &buf[0]);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_seek(&sb), 6);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_len(&sb), 6);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_left(&sb), 4);
+	UK_TEST_EXPECT_PTR_EQ(uk_streambuf_wptr(&sb), &buf[6]);
+	UK_TEST_EXPECT_ZERO(uk_streambuf_istruncated(&sb));
+
+	/* Another blob */
+	ret = uk_streambuf_reserve(&sb, 2);
+	UK_TEST_EXPECT_PTR_EQ(ret, &buf[6]);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_seek(&sb), 8);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_len(&sb), 8);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_left(&sb), 2);
+	UK_TEST_EXPECT_PTR_EQ(uk_streambuf_wptr(&sb), &buf[8]);
+	UK_TEST_EXPECT_ZERO(uk_streambuf_istruncated(&sb));
+
+	/* Out of space */
+	ret = uk_streambuf_reserve(&sb, 6);
+	UK_TEST_EXPECT_NULL(ret);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_seek(&sb), 8);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_len(&sb), 8);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_left(&sb), 2);
+	UK_TEST_EXPECT_PTR_EQ(uk_streambuf_wptr(&sb), &buf[8]);
+	UK_TEST_EXPECT_ZERO(uk_streambuf_istruncated(&sb));
+}
+
+UK_TESTCASE(ukstreambuf, streambuf_reserve_termshift)
+{
+	struct uk_streambuf sb;
+	char buf[10];
+	void *ret;
+
+	uk_streambuf_init(&sb, buf, ARRAY_SIZE(buf), UK_STREAMBUF_C_TERMSHIFT);
+
+	/* First blob */
+	ret = uk_streambuf_reserve(&sb, 6);
+	UK_TEST_EXPECT_PTR_EQ(ret, &buf[0]);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_seek(&sb), 5);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_len(&sb), 6);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_left(&sb), 5);
+	UK_TEST_EXPECT_PTR_EQ(uk_streambuf_wptr(&sb), &buf[5]);
+	UK_TEST_EXPECT_ZERO(uk_streambuf_istruncated(&sb));
+
+	/* Another blob */
+	ret = uk_streambuf_reserve(&sb, 2);
+	UK_TEST_EXPECT_PTR_EQ(ret, &buf[5]);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_seek(&sb), 6);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_len(&sb), 7);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_left(&sb), 4);
+	UK_TEST_EXPECT_PTR_EQ(uk_streambuf_wptr(&sb), &buf[6]);
+	UK_TEST_EXPECT_ZERO(uk_streambuf_istruncated(&sb));
+
+	/* Out of space */
+	ret = uk_streambuf_reserve(&sb, 6);
+	UK_TEST_EXPECT_NULL(ret);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_seek(&sb), 6);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_len(&sb), 7);
+	UK_TEST_EXPECT_SNUM_EQ(uk_streambuf_left(&sb), 4);
+	UK_TEST_EXPECT_PTR_EQ(uk_streambuf_wptr(&sb), &buf[6]);
+	UK_TEST_EXPECT_ZERO(uk_streambuf_istruncated(&sb));
+}
+
 /*
  * NOTE: `uk_streambuf_printf()` relies on `snprintf()` which may require a
  *       TLS (depending on selected libc):
