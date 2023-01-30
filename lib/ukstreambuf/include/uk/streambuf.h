@@ -187,6 +187,48 @@ void uk_streambuf_free(struct uk_streambuf *sb);
 #define uk_streambuf_istruncated(sb)					\
 	((sb)->flags & UK_STREAMBUF_S_TRUNCATED)
 
+/**
+ * Append a formatted string to the corresponding buffer at the current seek
+ * position. '\0'-termination is always ensured. If the left space on the buffer
+ * is too small for the generated string, the output is truncated to fit the
+ * buffer and `UK_STREAMBUF_S_TRUNCATED` is set (see:
+ * `uk_streambuf_istruncated()`).
+ *
+ * @param sb Streambuf object
+ * @param fmt Format string (see `printf()`)
+ * @param ... Additional arguments depending on the format string
+ * @return Number of bytes written to the buffer
+ */
+__sz uk_streambuf_printf(struct uk_streambuf *sb, const char *fmt, ...)
+	__printf(2, 3);
+
+/**
+ * Append a formatted string to the corresponding buffer at the current seek
+ * position. '\0'-termination is always ensured. If the left space on the buffer
+ * is too small for the generated string, the output is truncated to fit the
+ * buffer and `UK_STREAMBUF_S_TRUNCATED` is set (see:
+ * `uk_streambuf_istruncated()`).
+ *
+ * @param sb Streambuf object
+ * @param fmt Format string (see `printf()`)
+ * @param ap Additional arguments depending on the format string
+ * @return Number of bytes written to the buffer
+ */
+__sz uk_streambuf_vprintf(struct uk_streambuf *sb, const char *fmt, va_list ap);
+
+/**
+ * Copy a given '\0'-terminated string to the buffer of a streambuf object at
+ * the current seek position. '\0'-termination is always ensured. If the left
+ * space on the buffer is too small to hold the given string, the output is
+ * truncated to fit the buffer and `UK_STREAMBUF_S_TRUNCATED` is set (see:
+ * `uk_streambuf_istruncated()`).
+ *
+ * @param sb Streambuf object
+ * @param src Reference to C-string to copy
+ * @return Number of bytes written to the buffer
+ */
+__sz uk_streambuf_strcpy(struct uk_streambuf *sb, const char *src);
+
 #ifdef __cplusplus
 }
 #endif
