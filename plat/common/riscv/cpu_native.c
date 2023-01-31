@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Wei Chen <wei.chen@arm.com>
+ * Authors: Eduard Vintila <eduard.vintila47@gmail.com>
  *
- * Copyright (c) 2018, Arm Ltd., All rights reserved.
+ * Copyright (c) 2022, University of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,45 +29,31 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#include <uk/config.h>
+#include <uk/plat/common/cpu.h>
+#include <riscv/sbi.h>
+#include <riscv/cpu.h>
+#include <riscv/cpu_defs.h>
+#include <uk/assert.h>
 
-#ifndef __PLAT_CMN_IRQ_H__
-#define __PLAT_CMN_IRQ_H__
+/* Halts the CPU until an interrupt is pending */
+void halt(void)
+{
+	/*
+	 * From the RISC-V privileged manual:
+	 *
+	 * "As implementations are free to implement WFI as a NOP,
+	 * software must explicitly check for any relevant pending but disabled
+	 * interrupts in the code following an WFI, and should loop back
+	 * to the WFI if no suitable interrupt was detected."
+	 */
+	while (!_csr_read(CSR_SIP))
+		__asm__ __volatile__("wfi");
+}
 
-#include <uk/plat/irq.h>
-
-#if defined(__X86_64__)
-#include <x86/irq.h>
-#elif defined(__ARM_64__)
-#include <arm/irq.h>
-#elif defined(__RISCV_64__)
-#include <riscv/irq.h>
-#else
-#error "Add irq.h for current architecture."
-#endif
-
-/* define IRQ trigger types */
-enum uk_irq_trigger {
-	UK_IRQ_TRIGGER_NONE = 0,
-	UK_IRQ_TRIGGER_EDGE = 1,
-	UK_IRQ_TRIGGER_LEVEL = 2,
-	UK_IRQ_TRIGGER_MAX
-};
-
-/* define IRQ trigger polarities */
-enum uk_irq_polarity {
-	UK_IRQ_POLARITY_NONE = 0,
-	UK_IRQ_POLARITY_HIGH = 1,
-	UK_IRQ_POLARITY_LOW = 2,
-	UK_IRQ_POLARITY_MAX
-};
-
-/**
- * Calls the registered IRQ handlers for the given IRQ vector. This will
- * acknowledge the IRQ.
- *
- * @param regs the registers of the interrupted code
- * @param irq IRQ vector
- */
-void _ukplat_irq_handle(struct __regs *regs, unsigned long irq);
-
-#endif /* __PLAT_CMN_IRQ_H__ */
+void system_off(void)
+{
+	/* Shutdown the system using an SBI call */
+	sbi_system_reset(SBI_SRST_RESET_TYPE_SHUTDOWN,
+			 SBI_SRST_RESET_REASON_NONE);
+}

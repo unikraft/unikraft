@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Wei Chen <wei.chen@arm.com>
+ * Authors: Eduard Vintila <eduard.vintila47@gmail.com>
  *
- * Copyright (c) 2018, Arm Ltd., All rights reserved.
+ * Copyright (c) 2022, University of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,45 +29,18 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-
-#ifndef __PLAT_CMN_IRQ_H__
-#define __PLAT_CMN_IRQ_H__
-
+#ifndef __PLAT_COMMON_RISCV64_PLIC_H__
+#define __PLAT_COMMON_RISCV64_PLIC_H__
+#include <uk/arch/types.h>
 #include <uk/plat/irq.h>
 
-#if defined(__X86_64__)
-#include <x86/irq.h>
-#elif defined(__ARM_64__)
-#include <arm/irq.h>
-#elif defined(__RISCV_64__)
-#include <riscv/irq.h>
-#else
-#error "Add irq.h for current architecture."
+int init_plic(void *dtb);
+void plic_enable_irq(unsigned int irq);
+void plic_disable_irq(unsigned int irq);
+void plic_set_priority(unsigned int irq, __u32 priority);
+void plic_set_priority_threshold(__u32 threshold);
+unsigned int plic_claim(void);
+void plic_complete(unsigned int irq);
+void plic_handle_irq(struct __regs *regs);
+
 #endif
-
-/* define IRQ trigger types */
-enum uk_irq_trigger {
-	UK_IRQ_TRIGGER_NONE = 0,
-	UK_IRQ_TRIGGER_EDGE = 1,
-	UK_IRQ_TRIGGER_LEVEL = 2,
-	UK_IRQ_TRIGGER_MAX
-};
-
-/* define IRQ trigger polarities */
-enum uk_irq_polarity {
-	UK_IRQ_POLARITY_NONE = 0,
-	UK_IRQ_POLARITY_HIGH = 1,
-	UK_IRQ_POLARITY_LOW = 2,
-	UK_IRQ_POLARITY_MAX
-};
-
-/**
- * Calls the registered IRQ handlers for the given IRQ vector. This will
- * acknowledge the IRQ.
- *
- * @param regs the registers of the interrupted code
- * @param irq IRQ vector
- */
-void _ukplat_irq_handle(struct __regs *regs, unsigned long irq);
-
-#endif /* __PLAT_CMN_IRQ_H__ */

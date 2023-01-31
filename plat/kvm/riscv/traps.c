@@ -75,7 +75,7 @@ void _trap_handler(struct __regs *regs)
 
 	switch (scause) {
 	case CAUSE_SUPERVISOR_EXT:
-		plic_handle_irq();
+		plic_handle_irq(regs);
 		break;
 
 	case CAUSE_SUPERVISOR_TIMER:
@@ -83,7 +83,7 @@ void _trap_handler(struct __regs *regs)
 		 * Timer interrupts are not routed through the PLIC, so
 		 * call _ukplat_irq_handle directly.
 		 */
-		_ukplat_irq_handle(0);
+		_ukplat_irq_handle(regs, 0);
 		break;
 
 	case CAUSE_LOAD_PAGE_FAULT:
