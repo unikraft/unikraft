@@ -1,11 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
- *          Wei Chen <Wei.Chen@arm.com>
+ * Authors: Eduard Vintila <eduard.vintila47@gmail.com>
  *
- * Copyright (c) 2019, NEC Laboratories Europe GmbH, NEC Corporation,
- *                     All rights reserved.
- * Copyright (c) 2018, Arm Ltd., All rights reserved.
+ * Copyright (c) 2022, University of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,32 +30,59 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __KVM_CONFIG_H__
-#define __KVM_CONFIG_H__
+#include <uk/arch/limits.h>
+#include <uk/asm.h>
+#include <uk/plat/common/sections.h>
+#include <uk/config.h>
 
-#include <inttypes.h>
-#include <sys/types.h>
+.section .bss
+.space 4096
+bootstack:
+.balign __STACK_ALIGN_SIZE
 
-struct kvmplat_config_memregion {
-	uintptr_t start;
-	uintptr_t end;
-	size_t len;
-};
+.section .data.boot
+#include "pagetable64.S"
 
-struct kvmplat_config {
-	struct kvmplat_config_memregion heap;
-	struct kvmplat_config_memregion bstack;
-	struct kvmplat_config_memregion initrd;
-	/* `heap2` potentially exists only if `heap` exists */
-	struct kvmplat_config_memregion heap2;
+#define SATP_MODE_SV39 8
+#define SATP_MODE_SHIFT 60
 
-#if defined(CONFIG_ARCH_ARM_64) || defined(CONFIG_ARCH_RISCV_64)
-	struct kvmplat_config_memregion pagetable;
-	void *dtb;
-#endif
-};
+.section .text
+ENTRY(_libkvmplat_entry)
+	/*
+	 * As per the RISC-V SBI spec, execution starts in supervisor mode,
+	 * with each hart (hardware thread) having its hartid placed in
+	 * the a0 register. Choose the hart with the id 0 to manage the
+	 * booting process and suspend the others for the moment.
+	 */
+	bnez a0, 2f
 
-/* Initialized and defined in setup.c */
-extern struct kvmplat_config _libkvmplat_cfg;
+	/* Enable paging */
+	li t0, SATP_MODE_SV39
+	slli t0, t0, SATP_MODE_SHIFT
+	la t1, riscv64_pt_l2_0
+	srli t1, t1, PAGE_SHIFT
+	or t1, t0, t1
+	csrw satp, t1
+	sfence.vma x0, x0
 
-#endif /* __KVM_CONFIG_H__ */
+	/* Setup the temporary bootstack */
+	la sp, bootstack
+
+	/* The a1 register holds the address of the DTB  */
+	call _libkvmplat_start
+2:
+	wfi
+	j 2b
+
+END(_libkvmplat_entry)
+
+ENTRY(_libkvmplat_newstack)
+	/* Switch to the new stack */
+	mv sp, a0
+
+	/* Load argument for the next function */
+	mv a0, a2
+
+	/* Jump to the next function */
+	jr a1
+END(_libkvmplat_newstack)
