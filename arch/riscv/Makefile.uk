@@ -2,3 +2,11 @@
 ifeq ($(CONFIG_UK_ARCH),riscv64)
 	include $(CONFIG_UK_BASE)/arch/riscv/riscv64/Makefile.uk
 endif
+
+$(eval $(call addlib,libcontext))
+
+LIBCONTEXT_CINCLUDES-y += -I$(UK_PLAT_COMMON_BASE)/include
+LIBCONTEXT_SRCS-y += $(LIBCONTEXT_BASE)/ctx.c|isr
+LIBCONTEXT_SRCS-y += $(LIBCONTEXT_BASE)/ectx.c|isr
+LIBCONTEXT_SRCS-$(CONFIG_ARCH_RISCV_64) += $(LIBCONTEXT_BASE)/riscv64/ctx.S|riscv64
+LIBCONTEXT_SRCS-$(CONFIG_ARCH_RISCV_64) += $(LIBCONTEXT_BASE)/riscv64/tls.c|riscv64
