@@ -1,0 +1,13 @@
+ifeq ($(CONFIG_FPSIMD),y)
+ARCHFLAGS     += -D__RISCV_64__ -mabi=lp64d -march=rv64gc -mcmodel=medany
+else
+# Disable FPU usage when CONFIG_FPSIMD is not selected
+ARCHFLAGS     += -D__RISCV_64__ -mabi=lp64d -march=rv64gc -mcmodel=medany -mno-fdiv
+endif
+
+# Don't use floating point registers for interrupt-safe routines.
+ISR_ARCHFLAGS += -D__RISCV_64__ -mabi=lp64d -march=rv64gc -mcmodel=medany -mno-fdiv
+
+CINCLUDES   += -I$(CONFIG_UK_BASE)/arch/riscv/riscv64/include
+ASINCLUDES  += -I$(CONFIG_UK_BASE)/arch/riscv/riscv64/include
+CXXINCLUDES += -I$(CONFIG_UK_BASE)/arch/riscv/riscv64/include

@@ -476,6 +476,7 @@ export CONFIG_UK_ARCH	?= $(shell echo "$(call qstrip,$(ARCH))" | \
 		       -e 's/sun4u/sparc64/' \
 		       -e 's/arm64.*/arm64/' -e 's/aarch64.*/arm64/' \
 		       -e '/arm64/! s/arm.*/arm/' \
+			   -e 's/riscv/riscv64/' \
 		       -e 's/sa110/arm/' \
 		       -e 's/ppc64/powerpc64/' \
 		       -e 's/ppc/powerpc/' \
@@ -490,6 +491,7 @@ export CONFIG_UK_ARCH	?= $(shell echo "$(HOSTARCH)" | \
 		       -e 's/sun4u/sparc64/' \
 		       -e 's/arm64.*/arm64/' -e 's/aarch64.*/arm64/' \
 		       -e '/arm64/! s/arm.*/arm/' \
+			   -e 's/riscv/riscv64/' \
 		       -e 's/sa110/arm/' \
 		       -e 's/ppc64/powerpc64/' \
 		       -e 's/ppc/powerpc/' \
@@ -506,6 +508,7 @@ export UK_FAMILY ?= $(shell echo "$(CONFIG_UK_ARCH)" | \
 		       -e 's/x86.*/x86/' \
 		       -e 's/sparc64/sparc/' \
 		       -e 's/arm.*/arm/' \
+			   -e 's/riscv64/riscv/' \
 		       -e 's/powerpc.*/powerpc/' \
 		       -e 's/sh.*/sh/' )
 

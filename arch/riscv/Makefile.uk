@@ -1,0 +1,4 @@
+# Include corresponding Makefiles for specified architechtures
+ifeq ($(CONFIG_UK_ARCH),riscv64)
+	include $(CONFIG_UK_BASE)/arch/riscv/riscv64/Makefile.uk
+endif
