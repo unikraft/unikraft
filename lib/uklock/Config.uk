@@ -38,4 +38,5 @@ if LIBUKLOCK
 			Metrics related to mutex objects: current amount of (un)locked
 			objects, as well as number of successful/failed locking attempts
 			since startup.
+
 endif
