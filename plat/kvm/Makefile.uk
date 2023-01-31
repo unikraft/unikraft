@@ -16,6 +16,7 @@ $(eval $(call addplatlib_s,kvm,libkvmvirtio9p,$(CONFIG_VIRTIO_9P)))
 $(eval $(call addplatlib_s,kvm,libkvmofw,$(CONFIG_LIBOFW)))
 $(eval $(call addplatlib_s,kvm,libkvmgic,$(CONFIG_LIBGIC)))
 $(eval $(call addplatlib_s,kvm,libkvmpl031,$(CONFIG_RTC_PL031)))
+$(eval $(call addplatlib_s,kvm,libkvmgoldfish,$(CONFIG_ARCH_RISCV_64)))
 
 ##
 ## Platform library definitions
@@ -37,6 +38,10 @@ UK_PLAT_KVM_DEF_LDS            := $(CONFIG_UK_BASE)/plat/kvm/x86/link64.lds.S
 else
 ifeq ($(CONFIG_ARCH_ARM_64),y)
 UK_PLAT_KVM_DEF_LDS            := $(CONFIG_UK_BASE)/plat/kvm/arm/link64.lds.S
+else
+ifeq ($(CONFIG_ARCH_RISCV_64),y)
+UK_PLAT_KVM_DEF_LDS            := $(CONFIG_UK_BASE)/plat/kvm/riscv/link64.lds.S
+endif
 endif
 endif
 
@@ -104,7 +109,9 @@ LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/generic_time
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/lcpu.c|arm64_common
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/traps_arm64.c|isr
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/tls.c|common
-LIBKVMPLAT_SRCS-$(CONFIG_FPSIMD)      += $(UK_PLAT_COMMON_BASE)/arm/fp_arm64.c|isr
+ifeq ($(CONFIG_FPSIMD),y)
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/fp_arm64.c|isr
+endif
 ifeq ($(CONFIG_HAVE_SMP),y)
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/lcpu_start.S
 endif
@@ -118,6 +125,36 @@ LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/setup.c
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/lcpu.c
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/intctrl.c
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/memory.c
+
+##
+## Architecture library definitions for riscv64
+##
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_RISCV_64) += $(LIBKVMPLAT_BASE)/riscv/entry64.S
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_RISCV_64) += $(LIBKVMPLAT_BASE)/riscv/setup.c
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_RISCV_64) += $(LIBKVMPLAT_BASE)/riscv/traps.c|isr
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_RISCV_64) += $(LIBKVMPLAT_BASE)/riscv/exceptions.S|isr
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_RISCV_64) += $(LIBKVMPLAT_BASE)/riscv/lcpu.c
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_RISCV_64) += $(LIBKVMPLAT_BASE)/riscv/time.c
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_RISCV_64) += $(LIBKVMPLAT_BASE)/riscv/intctrl.c
+
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_RISCV_64) += $(UK_PLAT_COMMON_BASE)/riscv/cpu_native.c|common
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_RISCV_64) += $(UK_PLAT_COMMON_BASE)/riscv/timer.c|common
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_RISCV_64) += $(UK_PLAT_COMMON_BASE)/riscv/plic.c|common
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_RISCV_64)   += $(UK_PLAT_COMMON_BASE)/tls.c|common
+
+ifeq ($(CONFIG_FPSIMD),y)
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_RISCV_64) += $(UK_PLAT_COMMON_BASE)/riscv/fp_riscv64.c|isr
+endif
+
+ifeq ($(CONFIG_PAGING),y)
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_RISCV_64) += $(UK_PLAT_COMMON_BASE)/paging.c|common
+# Needed for riscv/cpu_* headers included in the riscv64 implementation of asm/paging.h
+LIBUKFALLOCBUDDY_CINCLUDES-y += -I$(UK_PLAT_COMMON_BASE)/include
+endif
+
+ifeq ($(findstring y,$(CONFIG_KVM_KERNEL_SERIAL_CONSOLE) $(CONFIG_KVM_DEBUG_SERIAL_CONSOLE)),y)
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_RISCV_64) += $(UK_PLAT_DRIVERS_BASE)/uart/ns16550.c
+endif
 
 LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/shutdown.c
 LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/irq.c
@@ -141,14 +178,18 @@ LIBKVMPCI_SRCS-$(CONFIG_ARCH_ARM_64) += \
 				$(UK_PLAT_COMMON_BASE)/arm/pci_bus_arm64.c|arm
 LIBKVMPCI_SRCS-$(CONFIG_ARCH_ARM_64) += \
 				$(UK_PLAT_COMMON_BASE)/pci_ecam.c|arm
+LIBKVMPCI_SRCS-$(CONFIG_ARCH_RISCV_64) += \
+				$(UK_PLAT_COMMON_BASE)/riscv/pci_bus_riscv64.c|riscv
+LIBKVMPCI_SRCS-$(CONFIG_ARCH_RISCV_64) += \
+				$(UK_PLAT_COMMON_BASE)/pci_ecam.c|riscv
 
 ##
 ## Platform bus library definitions
 ##
-LIBKVMPF_ASINCLUDES-$(CONFIG_ARCH_ARM_64)  += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMPF_CINCLUDES-$(CONFIG_ARCH_ARM_64)   += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMPF_CINCLUDES-$(CONFIG_ARCH_ARM_64)   += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMPF_CINCLUDES-$(CONFIG_ARCH_ARM_64)   += -I$(UK_PLAT_DRIVERS_BASE)/include
+LIBKVMPF_ASINCLUDES-$(CONFIG_KVM_PF)  += -I$(UK_PLAT_COMMON_BASE)/include
+LIBKVMPF_CINCLUDES-$(CONFIG_KVM_PF)   += -I$(UK_PLAT_COMMON_BASE)/include
+LIBKVMPF_CINCLUDES-$(CONFIG_KVM_PF)   += -I$(LIBKVMPLAT_BASE)/include
+LIBKVMPF_CINCLUDES-$(CONFIG_KVM_PF)   += -I$(UK_PLAT_DRIVERS_BASE)/include
 LIBKVMPF_SRCS-$(CONFIG_KVM_PF) += $(UK_PLAT_COMMON_BASE)/platform_bus.c|common
 
 ##
@@ -167,6 +208,8 @@ LIBKVMVIRTIO_SRCS-$(CONFIG_VIRTIO_BUS) +=\
 LIBKVMVIRTIO_SRCS-$(CONFIG_VIRTIO_PCI) +=\
 			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_pci.c
 LIBKVMVIRTIO_SRCS-$(CONFIG_ARCH_ARM_64)	+=\
+			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_mmio.c
+LIBKVMVIRTIO_SRCS-$(CONFIG_ARCH_RISCV_64) +=\
 			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_mmio.c
 ##
 ## Virtio Net library definition
@@ -238,3 +281,13 @@ LIBKVMPL031_CINCLUDES-y		+= -I$(UK_PLAT_DRIVERS_BASE)/include
 
 LIBKVMPL031_SRCS-y		+= $(UK_PLAT_DRIVERS_BASE)/rtc/pl031.c
 LIBKVMPL031_SRCS-y		+= $(UK_PLAT_DRIVERS_BASE)/rtc/rtc.c
+
+##
+## Goldfish RTC library definitions
+##
+LIBKVMGOLDFISH_CINCLUDES-y		+= -I$(LIBKVMPLAT_BASE)/include
+LIBKVMGOLDFISH_CINCLUDES-y		+= -I$(UK_PLAT_COMMON_BASE)/include
+LIBKVMGOLDFISH_CINCLUDES-y		+= -I$(UK_PLAT_DRIVERS_BASE)/include
+
+LIBKVMGOLDFISH_SRCS-y		+= $(UK_PLAT_DRIVERS_BASE)/rtc/goldfish.c
+LIBKVMGOLDFISH_SRCS-y		+= $(UK_PLAT_DRIVERS_BASE)/rtc/rtc.c

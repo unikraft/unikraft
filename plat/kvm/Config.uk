@@ -1,12 +1,13 @@
 menuconfig PLAT_KVM
        bool "KVM guest"
        default n
-       depends on (ARCH_X86_64 || (ARCH_ARM_64 && !HAVE_SYSCALL))
+       depends on (ARCH_X86_64 || (ARCH_ARM_64 && !HAVE_SYSCALL) || (ARCH_RISCV_64 && !HAVE_SMP && !HAVE_SYSCALL))
        select LIBUKDEBUG
        select LIBUKALLOC
        select LIBUKTIMECONV
        select LIBNOLIBC if !HAVE_LIBC
-       select LIBFDT if ARCH_ARM_64
+       select LIBFDT if (ARCH_ARM_64 || ARCH_RISCV_64)
+       select LIBOFW if ARCH_RISCV_64
        help
                 Create a Unikraft image that runs as a KVM guest
 
@@ -17,7 +18,7 @@ menu "Console Options"
 config KVM_KERNEL_SERIAL_CONSOLE
         bool "Serial console for the kernel prints"
         default y
-        depends on (ARCH_X86_64 || ARCH_ARM_64)
+        depends on (ARCH_X86_64 || ARCH_ARM_64 || ARCH_RISCV_64)
 	select UART_PL011 if ARCH_ARM_64
         help
           Choose serial console for the kernel printing
@@ -32,7 +33,7 @@ config KVM_KERNEL_VGA_CONSOLE
 config KVM_DEBUG_SERIAL_CONSOLE
         bool "Serial console for the debug prints"
         default y
-        depends on (ARCH_X86_64 || ARCH_ARM_64)
+        depends on (ARCH_X86_64 || ARCH_ARM_64 || ARCH_RISCV_64)
         help
           Choose serial console for the debug printing
 
@@ -80,20 +81,21 @@ endmenu
 config KVM_MAX_IRQ_HANDLER_ENTRIES
        int "Maximum number of handlers per IRQ"
        default 8
-       depends on (ARCH_X86_64 || ARCH_ARM_64)
+       depends on (ARCH_X86_64 || ARCH_ARM_64 || ARCH_RISCV_64)
 
 config KVM_PCI
        bool "PCI Bus Driver"
        default y
-       depends on (ARCH_X86_64 || ARCH_ARM_64)
+       depends on (ARCH_X86_64 || ARCH_ARM_64 || ARCH_RISCV_64)
        select LIBUKBUS
+	select LIBOFW if (ARCH_ARM_64 || ARCH_RISCV_64)
        help
                 PCI bus driver for probing and operating PCI devices
 
 config KVM_PF
        bool "Platform Bus Driver"
        default y
-       depends on (ARCH_ARM_64)
+       depends on (ARCH_ARM_64 || ARCH_RISCV_64)
        select LIBUKBUS
        help
                Platform bus driver for probing and operating platform devices
@@ -101,7 +103,7 @@ config KVM_PF
 config VIRTIO_BUS
       bool  "Virtio bus driver"
       default y
-      depends on (ARCH_X86_64 || ARCH_ARM_64)
+      depends on (ARCH_X86_64 || ARCH_ARM_64 || ARCH_RISCV_64)
       depends on LIBUKBUS
       select LIBUKALLOC
       select LIBUKSGLIST
@@ -160,7 +162,7 @@ config RTC_PL031
 config LIBOFW
        bool "Open Firmware library support"
        default n
-       depends on ARCH_ARM_64
+       depends on (ARCH_ARM_64 || ARCH_RISCV_64)
        select LIBFDT
 
 config UKPLAT_ALLOW_GIC
