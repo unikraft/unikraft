@@ -97,6 +97,14 @@ struct uk_thread *uk_thread_current(void)
 	return __uk_sched_thread_current;
 }
 
+static inline
+unsigned long uk_get_stack_bottom(void)
+{
+	unsigned long sp = ukarch_read_sp();
+
+	return sp & ~((unsigned long) UKARCH_SP_ALIGN_MASK);
+}
+
 /*
  * STATES OF THREADS
  * =================
@@ -136,6 +144,8 @@ struct uk_thread *uk_thread_current(void)
  *       transition the thread to the exited state first and will cause the
  *       termination callbacks as well.
  */
+
+
 
 #define UK_THREADF_ECTX       (0x001)	/**< Extended context available */
 #define UK_THREADF_UKTLS      (0x002)	/**< Unikraft allocated TLS */
