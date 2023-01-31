@@ -33,6 +33,9 @@
 #ifndef __UK_SPINLOCK_H__
 #define __UK_SPINLOCK_H__
 
+#include <uk/plat/lcpu.h>
+#include <uk/essentials.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -73,6 +76,44 @@ extern "C" {
 #endif /* uk_spinlock */
 
 #endif	/* CONFIG_LIBUKLOCK_TICKETLOCK */
+
+#define uk_spin_lock_irq(lock)						\
+	do {								\
+		ukplat_lcpu_disable_irq();				\
+		uk_spin_lock(lock);					\
+	} while (0)
+
+#define uk_spin_unlock_irq(lock)					\
+	do {								\
+		uk_spin_unlock(lock);					\
+		ukplat_lcpu_enable_irq();				\
+	} while (0)
+
+#define uk_spin_trylock_irq(lock)					\
+	do {								\
+		ukplat_lcpu_disable_irq();				\
+		if (unlikely(uk_spin_trylock(lock) == 0))		\
+			ukplat_lcpu_enable_irq();			\
+	} while (0)
+
+#define uk_spin_lock_irqsave(lock, flags)				\
+	do {								\
+		flags = ukplat_lcpu_save_irqf();			\
+		uk_spin_lock(lock);					\
+	} while (0)
+
+#define uk_spin_unlock_irqrestore(lock, flags)				\
+	do {								\
+		uk_spin_unlock(lock);					\
+		ukplat_lcpu_restore_irqf(flags);			\
+	} while (0)
+
+#define uk_spin_trylock_irqsave(lock, flags)				\
+	do {								\
+		flags = ukplat_lcpu_save_irqf();			\
+		if (unlikely(uk_spin_trylock(lock) == 0))		\
+			ukplat_lcpu_restore_irqf(flags);		\
+	} while (0)
 
 #ifdef __cplusplus
 }
