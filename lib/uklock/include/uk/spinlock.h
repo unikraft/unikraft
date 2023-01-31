@@ -74,6 +74,25 @@ extern "C" {
 
 #endif	/* CONFIG_LIBUKLOCK_TICKETLOCK */
 
+#define uk_spin_lock_irqf(lock) ({					\
+	unsigned int __irqf = ukplat_lcpu_save_irqf();	\
+	uk_spin_lock(lock);								\
+	__irqf;											\
+})
+
+#define uk_spin_unlock_irqf(lock, irqf) ({			\
+	uk_spin_unlock(lock);							\
+	ukplat_lcpu_restore_irqf(irqf);					\
+})
+
+#define uk_spin_trylock_irqf(lock, r) ({			\
+	unsigned int __irqf = ukplat_lcpu_save_irqf();	\
+	r = uk_spin_trylock(lock);						\
+	if (r == 0)										\
+		ukplat_lcpu_restore_irqf(__irqf);			\
+	__irqf;											\
+})
+
 #ifdef __cplusplus
 }
 #endif
