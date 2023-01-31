@@ -39,7 +39,8 @@ extern "C" {
 static inline
 void uk_waitq_init(struct uk_waitq *wq)
 {
-	UK_STAILQ_INIT(wq);
+	ukarch_spin_init(&(wq->sl));
+	UK_STAILQ_INIT(&(wq->wait_list));
 }
 
 static inline
@@ -53,7 +54,7 @@ void uk_waitq_entry_init(struct uk_waitq_entry *entry,
 static inline
 int uk_waitq_empty(struct uk_waitq *wq)
 {
-	return UK_STAILQ_EMPTY(wq);
+	return UK_STAILQ_EMPTY(&(wq->wait_list));
 }
 
 static inline
@@ -61,7 +62,7 @@ void uk_waitq_add(struct uk_waitq *wq,
 		struct uk_waitq_entry *entry)
 {
 	if (!entry->waiting) {
-		UK_STAILQ_INSERT_TAIL(wq, entry, thread_list);
+		UK_STAILQ_INSERT_TAIL(&(wq->wait_list), entry, thread_list);
 		entry->waiting = 1;
 	}
 }
@@ -71,7 +72,8 @@ void uk_waitq_remove(struct uk_waitq *wq,
 		struct uk_waitq_entry *entry)
 {
 	if (entry->waiting) {
-		UK_STAILQ_REMOVE(wq, entry, struct uk_waitq_entry, thread_list);
+		UK_STAILQ_REMOVE(&(wq->wait_list), entry,
+				 struct uk_waitq_entry, thread_list);
 		entry->waiting = 0;
 	}
 }
@@ -79,18 +81,18 @@ void uk_waitq_remove(struct uk_waitq *wq,
 #define uk_waitq_add_waiter(wq, w) \
 do { \
 	unsigned long flags; \
-	flags = ukplat_lcpu_save_irqf(); \
+	ukplat_spin_lock_irqsave(&((wq)->sl), flags); \
 	uk_waitq_add(wq, w); \
+	ukplat_spin_unlock_irqrestore(&((wq)->sl), flags); \
 	uk_thread_block(uk_thread_current()); \
-	ukplat_lcpu_restore_irqf(flags); \
 } while (0)
 
 #define uk_waitq_remove_waiter(wq, w) \
 do { \
 	unsigned long flags; \
-	flags = ukplat_lcpu_save_irqf(); \
+	ukplat_spin_lock_irqsave(&((wq)->sl), flags); \
 	uk_waitq_remove(wq, w); \
-	ukplat_lcpu_restore_irqf(flags); \
+	ukplat_spin_unlock_irqrestore(&((wq)->sl), flags); \
 } while (0)
 
 #define __wq_wait_event_deadline(wq, condition, deadline, deadline_condition, \
@@ -104,16 +106,17 @@ do { \
 		__current = uk_thread_current(); \
 		for (;;) { \
 			/* protect the list */ \
-			flags = ukplat_lcpu_save_irqf(); \
+			ukplat_spin_lock_irqsave(&((wq)->sl), flags); \
 			if (condition) { \
-				ukplat_lcpu_restore_irqf(flags); \
+				ukplat_spin_unlock_irqrestore(&((wq)->sl), \
+							      flags); \
 				break; \
 			} \
 			uk_waitq_add(wq, &__wait); \
 			__current->wakeup_time = deadline; \
 			uk_thread_set_blocked(__current); \
 			uk_sched_thread_blocked(__current); \
-			ukplat_lcpu_restore_irqf(flags); \
+			ukplat_spin_unlock_irqrestore(&((wq)->sl), flags); \
 			if (lock) \
 				unlock_fn(lock); \
 			uk_sched_yield(); \
@@ -126,11 +129,11 @@ do { \
 				break; \
 			} \
 		} \
-		flags = ukplat_lcpu_save_irqf(); \
+		ukplat_spin_lock_irqsave(&((wq)->sl), flags); \
 		/* need to wake up */ \
 		uk_thread_wake(__current); \
 		uk_waitq_remove(wq, &__wait); \
-		ukplat_lcpu_restore_irqf(flags); \
+		ukplat_spin_unlock_irqrestore(&((wq)->sl), flags); \
 	} \
 	timedout; \
 })
@@ -161,13 +164,13 @@ static inline void __lock_dummy(void *lock __unused) {}
 static inline
 void uk_waitq_wake_up(struct uk_waitq *wq)
 {
-	unsigned long flags;
 	struct uk_waitq_entry *curr, *tmp;
+	unsigned long flags;
 
-	flags = ukplat_lcpu_save_irqf();
-	UK_STAILQ_FOREACH_SAFE(curr, wq, thread_list, tmp)
+	ukplat_spin_lock_irqsave(&(wq->sl), flags);
+	UK_STAILQ_FOREACH_SAFE(curr, &(wq->wait_list), thread_list, tmp)
 		uk_thread_wake(curr->thread);
-	ukplat_lcpu_restore_irqf(flags);
+	ukplat_spin_unlock_irqrestore(&(wq->sl), flags);
 }
 
 #ifdef __cplusplus
