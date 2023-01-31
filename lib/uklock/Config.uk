@@ -38,4 +38,11 @@ if LIBUKLOCK
 			Metrics related to mutex objects: current amount of (un)locked
 			objects, as well as number of successful/failed locking attempts
 			since startup.
+
+	config LIBUKLOCK_MUTEX_RECURSE
+		bool "Recursive mutex lock"
+		default n
+		depends on LIBUKLOCK_MUTEX
+		help
+			Enable recursive locking for mutex
 endif

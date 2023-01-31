@@ -57,7 +57,9 @@ extern "C" {
  * uses wait queues for threads
  */
 struct uk_mutex {
+#ifdef CONFIG_LIBUKLOCK_MUTEX_RECURSE
 	int lock_count;
+#endif
 	struct uk_thread *owner;
 	struct uk_waitq wait;
 };
@@ -98,53 +100,68 @@ void uk_mutex_get_metrics(struct uk_mutex_metrics *dst);
 static inline void uk_mutex_lock(struct uk_mutex *m)
 {
 	struct uk_thread *current;
-	unsigned long irqf;
 
 	UK_ASSERT(m);
 
 	current = uk_thread_current();
 
+	/* if the owner is current thread then it definitely can't unlock during
+	 * uk_mutex_lock, hence if the owner is current thread then we can simply
+	 * increment the lock count
+	 */
+#ifdef CONFIG_LIBUKLOCK_MUTEX_RECURSE
+	if (unlikely(m->owner == current)) {
+		ukarch_inc(&(m->lock_count));
+		return;
+	}
+#else
+	UK_ASSERT(m->owner != current);
+#endif
+
+
 	for (;;) {
-		uk_waitq_wait_event(&m->wait,
-			m->lock_count == 0 || m->owner == current);
-		irqf = ukplat_lcpu_save_irqf();
-		if (m->lock_count == 0 || m->owner == current)
+		uk_waitq_wait_event(&m->wait, m->owner == NULL);
+
+		/* If there is no owner for the lock we can grab it and increment the
+		 * lock count
+		 *
+		 * The owner act as the lock
+		 * We dont need to disable interrupts because the compare exchange
+		 * is atomic even on the single processor
+		 */
+		if (ukarch_compare_exchange_sync(&m->owner, 0, current) == current) {
+#ifdef CONFIG_LIBUKLOCK_MUTEX_RECURSE
+			ukarch_inc(&(m->lock_count));
+#endif
 			break;
-		ukplat_lcpu_restore_irqf(irqf);
+		}
 	}
 #ifdef CONFIG_LIBUKLOCK_MUTEX_METRICS
 	ukarch_spin_lock(&_uk_mutex_metrics_lock);
-#endif /* CONFIG_LIBUKLOCK_MUTEX_METRICS */
 
-	m->lock_count++;
-	m->owner = current;
-
-#ifdef CONFIG_LIBUKLOCK_MUTEX_METRICS
 	_uk_mutex_metrics.active_locked   += (m->lock_count == 1);
 	_uk_mutex_metrics.active_unlocked -= (m->lock_count == 1);
 	_uk_mutex_metrics.total_locks++;
 
 	ukarch_spin_unlock(&_uk_mutex_metrics_lock);
 #endif /* CONFIG_LIBUKLOCK_MUTEX_METRICS */
-	ukplat_lcpu_restore_irqf(irqf);
 }
 
 static inline int uk_mutex_trylock(struct uk_mutex *m)
 {
 	struct uk_thread *current;
-	unsigned long irqf;
 	int ret = 0;
 
 	UK_ASSERT(m);
 
 	current = uk_thread_current();
 
-	irqf = ukplat_lcpu_save_irqf();
-	if (m->lock_count == 0 || m->owner == current) {
+#ifdef CONFIG_LIBUKLOCK_MUTEX_RECURSE
+	if (m->owner == current)
 		ret = 1;
-		m->lock_count++;
-		m->owner = current;
-	}
+#endif
+	if (!ret && ukarch_compare_exchange_sync(&m->owner, 0, current) == current)
+		ret = 1;
 
 #ifdef CONFIG_LIBUKLOCK_MUTEX_METRICS
 	_uk_mutex_metrics.active_locked += (ret == 1) && (m->lock_count == 1);
@@ -153,32 +170,41 @@ static inline int uk_mutex_trylock(struct uk_mutex *m)
 	_uk_mutex_metrics.total_failed_trylocks += !ret;
 #endif /* CONFIG_LIBUKLOCK_MUTEX_METRICS */
 
-	ukplat_lcpu_restore_irqf(irqf);
+#ifdef CONFIG_LIBUKLOCK_MUTEX_RECURSE
+	if (ret)
+		ukarch_inc(&(m->lock_count));
+#endif
+
 	return ret;
 }
 
 static inline int uk_mutex_is_locked(struct uk_mutex *m)
 {
-	return m->lock_count > 0;
+	UK_ASSERT(m);
+	return m->owner != NULL;
 }
 
 static inline void uk_mutex_unlock(struct uk_mutex *m)
 {
-	unsigned long irqf;
 
 	UK_ASSERT(m);
-
-	irqf = ukplat_lcpu_save_irqf();
 
 #ifdef CONFIG_LIBUKLOCK_MUTEX_METRICS
 	ukarch_spin_lock(&_uk_mutex_metrics_lock);
 #endif /* CONFIG_LIBUKLOCK_MUTEX_METRICS */
 
+#ifdef CONFIG_LIBUKLOCK_MUTEX_RECURSE
 	UK_ASSERT(m->lock_count > 0);
-	if (--m->lock_count == 0) {
+#endif
+
+#ifdef CONFIG_LIBUKLOCK_MUTEX_RECURSE
+	if (ukarch_sub_fetch(&(m->lock_count), 1) == 0) {
+#endif
 		m->owner = NULL;
 		uk_waitq_wake_up(&m->wait);
+#ifdef CONFIG_LIBUKLOCK_MUTEX_RECURSE
 	}
+#endif
 
 #ifdef CONFIG_LIBUKLOCK_MUTEX_METRICS
 	_uk_mutex_metrics.active_locked   -= (m->lock_count == 0);
@@ -188,7 +214,6 @@ static inline void uk_mutex_unlock(struct uk_mutex *m)
 	ukarch_spin_unlock(&_uk_mutex_metrics_lock);
 #endif /* CONFIG_LIBUKLOCK_MUTEX_METRICS */
 
-	ukplat_lcpu_restore_irqf(irqf);
 }
 
 #define uk_waitq_wait_event_mutex(wq, condition, mutex) \

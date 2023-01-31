@@ -10,7 +10,9 @@ __spinlock              _uk_mutex_metrics_lock;
 
 void uk_mutex_init(struct uk_mutex *m)
 {
+#ifdef CONFIG_LIBUKLOCK_MUTEX_RECURSE
 	m->lock_count = 0;
+#endif
 	m->owner = NULL;
 	uk_waitq_init(&m->wait);
 
