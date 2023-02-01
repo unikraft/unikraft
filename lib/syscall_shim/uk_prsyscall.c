@@ -267,6 +267,7 @@ enum param_type {
 	PT_SOCKETAF,
 	PT_SOCKETTYPE,
 	PT_MSGFLAGS,
+	PT_CLONEFLAGS,
 };
 #define PT_BUFP(len)							\
 	(long)(_PT_BUFP | ((MIN((unsigned long) __U16_MAX,		\
@@ -485,6 +486,43 @@ static inline void param_msgflags(struct uk_streambuf *sb, int fmtf, int flags)
 }
 #endif /* CONFIG_LIBPOSIX_SOCKET */
 
+#if CONFIG_LIBPOSIX_PROCESS_CLONE
+#include <uk/process.h>
+
+static inline void param_cloneflags(struct uk_streambuf *sb, int fmtf,
+				    int flags)
+{
+	__sz orig_seek = uk_streambuf_seek(sb);
+
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, NEWTIME,        flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, VM,             flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, FS,             flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, FILES,          flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, SIGHAND,        flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, PIDFD,          flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, PTRACE,         flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, VFORK,          flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, PARENT,         flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, THREAD,         flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, NEWNS,          flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, SYSVSEM,        flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, SETTLS,         flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, PARENT_SETTID,  flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, CHILD_CLEARTID, flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, DETACHED,       flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, UNTRACED,       flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, CHILD_SETTID,   flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, NEWCGROUP,      flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, NEWUTS,         flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, NEWIPC,         flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, NEWUSER,        flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, NEWPID,         flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, NEWNET,         flags);
+	PR_FLAG(sb, fmtf, orig_seek, CLONE_, IO,             flags);
+	PR_FLAG_END(sb, fmtf, orig_seek, flags);
+}
+#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
+
 /* Pretty print a single parameter */
 static void pr_param(struct uk_streambuf *sb, int fmtf,
 		     enum param_type type, long param)
@@ -633,6 +671,11 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 		param_msgflags(sb, fmtf, param);
 		break;
 #endif /* CONFIG_LIBPOSIX_SOCKET */
+#if CONFIG_LIBPOSIX_PROCESS_CLONE
+	case PT_CLONEFLAGS:
+		param_cloneflags(sb, fmtf, param);
+		break;
+#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 	default:
 		uk_streambuf_shcc(sb, fmtf, VALUE);
 		uk_streambuf_printf(sb, "0x%lx", (unsigned long) param);
@@ -1002,6 +1045,25 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		break;
 
 #endif /* HAVE_uk_syscall_socket */
+
+#ifdef HAVE_uk_syscall_clone
+	case SYS_clone:
+#if CONFIG_ARCH_X86_64
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, PT_CLONEFLAGS,
+			    PT_VADDR, /* sp */
+			    PT_TID | PT_REF, /* ref to parent tid */
+			    PT_TID | PT_REF, /* ref to child tid */
+			    PT_VADDR /* tlsp */);
+#else /* !CONFIG_ARCH_X86_64 */
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, PT_CLONEFLAGS,
+			    PT_VADDR, /* sp */
+			    PT_TID | PT_REF, /* ref to parent tid */
+			    PT_VADDR, /* tlsp */
+			    PT_TID | PT_REF /* ref to child tid */);
+#endif /* !CONFIG_ARCH_X86_64 */
+		PR_SYSRET(sb, fmtf, PT_TID, rc);
+		break;
+#endif /* HAVE_uk_syscall_clone */
 
 	default:
 		do {
