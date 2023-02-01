@@ -4,7 +4,6 @@ menuconfig LIBPOSIX_FUTEX
 	select LIBUKSCHED
 	select LIBUKLOCK
 	select LIBUKDEBUG
-	select LIBSYSCALL_SHIM if LIBUKTEST_ALL
 	default n
 	help
 		Linux-compatible futex calls
@@ -15,6 +14,4 @@ config LIBPOSIX_FUTEX_TEST
 	bool "Enable tests"
 	default n
 	select LIBUKTEST
-	select LIBSYSCALL_SHIM
-
 endif
