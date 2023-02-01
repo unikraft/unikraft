@@ -291,13 +291,15 @@ static int eventfd_vfscore_poll(struct vnode *vnode, unsigned int *revents,
 
 /* vnode operations */
 #define eventfd_vfscore_inactive ((vnop_inactive_t) vfscore_vop_einval)
+#define eventfd_vfscore_ioctl ((vnop_ioctl_t) vfscore_vop_einval)
 
 static struct vnops eventfd_vnops = {
 	.vop_close = eventfd_vfscore_close,
 	.vop_inactive = eventfd_vfscore_inactive,
 	.vop_read = eventfd_vfscore_read,
 	.vop_write = eventfd_vfscore_write,
-	.vop_poll = eventfd_vfscore_poll
+	.vop_poll = eventfd_vfscore_poll,
+	.vop_ioctl = eventfd_vfscore_ioctl
 };
 
 /* file system operations */
