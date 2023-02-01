@@ -263,6 +263,7 @@ enum param_type {
 	PT_PROTFLAGS,
 	PT_MAPFLAGS,
 	PT_FUTEXOP,
+	PT_CLOCKID,
 };
 #define PT_BUFP(len)							\
 	(long)(_PT_BUFP | ((MIN((unsigned long) __U16_MAX,		\
@@ -276,6 +277,7 @@ enum param_type {
 #define PT_PATH PT_CHARP
 #define PT_TID PT_PID
 #define PT_STRUCTSTAT PT_VADDR
+#define PT_TIMESPEC PT_VADDR
 
 /*
  * Individual parameter type formats
@@ -420,6 +422,19 @@ static inline void param_futexop(struct uk_streambuf *sb, int fmtf, int op)
 }
 #endif /* CONFIG_POSIX_FUTEX */
 
+#include <time.h>
+
+static inline void param_clockid(struct uk_streambuf *sb, int fmtf, int clockid)
+{
+	switch (clockid) {
+		PR_TYPE(sb, fmtf, CLOCK_, REALTIME);
+		PR_TYPE(sb, fmtf, CLOCK_, MONOTONIC);
+		PR_TYPE(sb, fmtf, CLOCK_, PROCESS_CPUTIME_ID);
+		PR_TYPE(sb, fmtf, CLOCK_, THREAD_CPUTIME_ID);
+		PR_TYPE_DEFAULT(sb, fmtf, CLOCK_, clockid);
+	}
+}
+
 /* Pretty print a single parameter */
 static void pr_param(struct uk_streambuf *sb, int fmtf,
 		     enum param_type type, long param)
@@ -554,6 +569,9 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 		param_futexop(sb, fmtf, param);
 		break;
 #endif /* CONFIG_POSIX_FUTEX */
+	case PT_CLOCKID:
+		param_clockid(sb, fmtf, param);
+		break;
 	default:
 		uk_streambuf_shcc(sb, fmtf, VALUE);
 		uk_streambuf_printf(sb, "0x%lx", (unsigned long) param);
@@ -860,6 +878,14 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		} while (0);
 		break;
 #endif /* HAVE_uk_syscall_futex */
+
+#ifdef HAVE_uk_syscall_clock_gettime
+	case SYS_clock_gettime:
+		VPR_SYSCALL(sb, fmtf, syscall_num, args,
+			    PT_CLOCKID, PT_TIMESPEC);
+		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
+		break;
+#endif /* HAVE_uk_syscall_clock_gettime */
 
 	default:
 		do {
