@@ -264,6 +264,9 @@ enum param_type {
 	PT_MAPFLAGS,
 	PT_FUTEXOP,
 	PT_CLOCKID,
+	PT_SOCKETAF,
+	PT_SOCKETTYPE,
+	PT_MSGFLAGS,
 };
 #define PT_BUFP(len)							\
 	(long)(_PT_BUFP | ((MIN((unsigned long) __U16_MAX,		\
@@ -435,6 +438,53 @@ static inline void param_clockid(struct uk_streambuf *sb, int fmtf, int clockid)
 	}
 }
 
+#if CONFIG_LIBPOSIX_SOCKET
+#include <sys/socket.h>
+
+static inline void param_socketaf(struct uk_streambuf *sb, int fmtf, int domain)
+{
+	switch (domain) {
+		PR_TYPE(sb, fmtf, AF_, UNIX); /* LOCAL, FILE */
+		PR_TYPE(sb, fmtf, AF_, INET);
+		PR_TYPE(sb, fmtf, AF_, INET6);
+		PR_TYPE(sb, fmtf, AF_, NETLINK);
+		PR_TYPE_DEFAULT(sb, fmtf, AF_, domain);
+	}
+}
+
+static inline void param_sockettype(struct uk_streambuf *sb, int fmtf, int type)
+{
+	__sz orig_seek = uk_streambuf_seek(sb);
+
+	PR_FLAG(sb, fmtf, orig_seek, SOCK_, NONBLOCK, type);
+	PR_FLAG(sb, fmtf, orig_seek, SOCK_, CLOEXEC, type);
+	if (uk_streambuf_seek(sb) > (orig_seek))
+		uk_streambuf_strcpy(sb, "|");
+	switch (type) {
+		PR_TYPE(sb, fmtf, SOCK_, STREAM);
+		PR_TYPE(sb, fmtf, SOCK_, DGRAM);
+		PR_TYPE(sb, fmtf, SOCK_, RAW);
+		PR_TYPE(sb, fmtf, SOCK_, SEQPACKET);
+		PR_TYPE(sb, fmtf, SOCK_, RDM);
+		PR_TYPE_DEFAULT(sb, fmtf, SOCK_, type);
+	}
+}
+
+static inline void param_msgflags(struct uk_streambuf *sb, int fmtf, int flags)
+{
+	__sz orig_seek = uk_streambuf_seek(sb);
+
+	PR_FLAG(sb, fmtf, orig_seek, MSG_, CONFIRM, flags);
+	PR_FLAG(sb, fmtf, orig_seek, MSG_, DONTROUTE, flags);
+	PR_FLAG(sb, fmtf, orig_seek, MSG_, DONTWAIT, flags);
+	PR_FLAG(sb, fmtf, orig_seek, MSG_, EOR, flags);
+	PR_FLAG(sb, fmtf, orig_seek, MSG_, MORE, flags);
+	PR_FLAG(sb, fmtf, orig_seek, MSG_, NOSIGNAL, flags);
+	PR_FLAG(sb, fmtf, orig_seek, MSG_, OOB, flags);
+	PR_FLAG_END(sb, fmtf, orig_seek, flags);
+}
+#endif /* CONFIG_LIBPOSIX_SOCKET */
+
 /* Pretty print a single parameter */
 static void pr_param(struct uk_streambuf *sb, int fmtf,
 		     enum param_type type, long param)
@@ -572,6 +622,17 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 	case PT_CLOCKID:
 		param_clockid(sb, fmtf, param);
 		break;
+#if CONFIG_LIBPOSIX_SOCKET
+	case PT_SOCKETAF:
+		param_socketaf(sb, fmtf, param);
+		break;
+	case PT_SOCKETTYPE:
+		param_sockettype(sb, fmtf, param);
+		break;
+	case PT_MSGFLAGS:
+		param_msgflags(sb, fmtf, param);
+		break;
+#endif /* CONFIG_LIBPOSIX_SOCKET */
 	default:
 		uk_streambuf_shcc(sb, fmtf, VALUE);
 		uk_streambuf_printf(sb, "0x%lx", (unsigned long) param);
@@ -886,6 +947,61 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
 		break;
 #endif /* HAVE_uk_syscall_clock_gettime */
+
+#ifdef HAVE_uk_syscall_socket
+	case SYS_socket:
+		do {
+			int domain = (int) va_arg(args, long);
+			int type = (int) va_arg(args, long);
+			int protocol = (int) va_arg(args, long);
+
+			PR_SYSCALL(sb, fmtf, syscall_num,
+					PT_SOCKETAF, domain,
+					PT_SOCKETTYPE, type,
+					PT_UDEC, protocol);
+		} while (0);
+		PR_SYSRET(sb, fmtf, PT_FD, rc);
+		break;
+
+	case SYS_bind:
+		VPR_SYSCALL(sb, fmtf, syscall_num, args,
+			    PT_FD, PT_VADDR, PT_UDEC);
+		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
+		break;
+
+	case SYS_sendto:
+		do {
+			int fd = (int) va_arg(args, long);
+			void *buf = (void *) va_arg(args, long);
+			__sz len = (__sz) va_arg(args, long);
+			int flags = (int) va_arg(args, long);
+			void *dst_addr = (void *) va_arg(args, long);
+			long dst_len = (long) va_arg(args, long);
+
+			PR_SYSCALL(sb, fmtf, syscall_num,
+				   PT_FD, fd, PT_BUFP(len), buf,
+				   PT_UDEC, len, PT_MSGFLAGS, flags,
+				   PT_VADDR, dst_addr, PT_UDEC, dst_len);
+		} while (0);
+		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
+		break;
+
+	case SYS_recvmsg:
+		do {
+			int fd = (int) va_arg(args, long);
+			void *buf = (void *) va_arg(args, long);
+			__sz maxlen = (__sz) va_arg(args, long);
+			int flags = (int) va_arg(args, long);
+
+			PR_SYSCALL(sb, fmtf, syscall_num,
+				   PT_FD, fd,
+				   PT_BUFP(rc > 0 ? (__sz) rc : maxlen), buf,
+				   PT_UDEC, maxlen, PT_MSGFLAGS, flags);
+		} while (0);
+		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
+		break;
+
+#endif /* HAVE_uk_syscall_socket */
 
 	default:
 		do {
