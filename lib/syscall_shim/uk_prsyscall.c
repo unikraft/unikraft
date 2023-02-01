@@ -262,6 +262,7 @@ enum param_type {
 	PT_OFLAGS,
 	PT_PROTFLAGS,
 	PT_MAPFLAGS,
+	PT_FUTEXOP,
 };
 #define PT_BUFP(len)							\
 	(long)(_PT_BUFP | ((MIN((unsigned long) __U16_MAX,		\
@@ -381,6 +382,43 @@ static inline void param_mapflags(struct uk_streambuf *sb, int fmtf,
 	PR_FLAG_END(sb, fmtf, orig_seek, mapflags);
 }
 #endif /* CONFIG_LIBPOSIX_MMAP || CONFIG_LIBUKMMAP */
+
+#if CONFIG_LIBPOSIX_FUTEX
+#include <linux/futex.h>
+
+static inline void param_futexop(struct uk_streambuf *sb, int fmtf, int op)
+{
+	__sz orig_seek = uk_streambuf_seek(sb);
+	int flags;
+
+	flags = op & ~(FUTEX_CMD_MASK);
+	op &= FUTEX_CMD_MASK;
+
+	switch (op) {
+		PR_TYPE(sb, fmtf, FUTEX_, WAIT);
+		PR_TYPE(sb, fmtf, FUTEX_, WAKE);
+		PR_TYPE(sb, fmtf, FUTEX_, FD);
+		PR_TYPE(sb, fmtf, FUTEX_, REQUEUE);
+		PR_TYPE(sb, fmtf, FUTEX_, CMP_REQUEUE);
+		PR_TYPE(sb, fmtf, FUTEX_, WAKE_OP);
+		PR_TYPE(sb, fmtf, FUTEX_, LOCK_PI);
+		PR_TYPE(sb, fmtf, FUTEX_, UNLOCK_PI);
+		PR_TYPE(sb, fmtf, FUTEX_, TRYLOCK_PI);
+		PR_TYPE(sb, fmtf, FUTEX_, WAIT_BITSET);
+		PR_TYPE(sb, fmtf, FUTEX_, WAKE_BITSET);
+		PR_TYPE(sb, fmtf, FUTEX_, WAIT_REQUEUE_PI);
+		PR_TYPE(sb, fmtf, FUTEX_, CMP_REQUEUE_PI);
+		PR_TYPE(sb, fmtf, FUTEX_, LOCK_PI2);
+		PR_TYPE_DEFAULT(sb, fmtf, FUTEX_, op);
+	}
+
+	if (flags) {
+		PR_FLAG(sb, fmtf, orig_seek, FUTEX_, PRIVATE_FLAG, flags);
+		PR_FLAG(sb, fmtf, orig_seek, FUTEX_, CLOCK_REALTIME, flags);
+		PR_FLAG_END(sb, fmtf, orig_seek, flags);
+	}
+}
+#endif /* CONFIG_POSIX_FUTEX */
 
 /* Pretty print a single parameter */
 static void pr_param(struct uk_streambuf *sb, int fmtf,
@@ -511,6 +549,11 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 		param_mapflags(sb, fmtf, param);
 		break;
 #endif /* CONFIG_LIBPOSIX_MMAP || CONFIG_LIBUKMMAP */
+#if CONFIG_LIBPOSIX_FUTEX
+	case PT_FUTEXOP:
+		param_futexop(sb, fmtf, param);
+		break;
+#endif /* CONFIG_POSIX_FUTEX */
 	default:
 		uk_streambuf_shcc(sb, fmtf, VALUE);
 		uk_streambuf_printf(sb, "0x%lx", (unsigned long) param);
@@ -763,6 +806,60 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
 		break;
 #endif /* HAVE_uk_syscall_mprotect */
+
+#ifdef HAVE_uk_syscall_futex
+	case SYS_futex:
+		do {
+			long addr = (long) va_arg(args, long);
+			int op = (int) va_arg(args, long);
+			unsigned long val = (unsigned long) va_arg(args, long);
+			const struct timespec *timeout =
+				(const struct timespec *) va_arg(args, long);
+			long addr2 = (long) va_arg(args, long);
+			unsigned long val2 = (unsigned long) va_arg(args, long);
+
+			switch (op) {
+			case FUTEX_WAIT:
+			case FUTEX_WAIT_PRIVATE:
+				PR_SYSCALL(sb, fmtf, syscall_num,
+						PT_VADDR, addr,
+						PT_FUTEXOP, op,
+						PT_HEX, val,
+						PT_TIMESPEC, timeout);
+				PR_SYSRET(sb, fmtf, PT_STATUS, rc);
+				break;
+
+			case FUTEX_WAKE:
+			case FUTEX_WAKE_PRIVATE:
+				PR_SYSCALL(sb, fmtf, syscall_num,
+						PT_VADDR, addr,
+						PT_FUTEXOP, op,
+						PT_HEX, val);
+				PR_SYSRET(sb, fmtf, PT_STATUS, rc);
+				break;
+
+			case FUTEX_CMP_REQUEUE:
+				PR_SYSCALL(sb, fmtf, syscall_num,
+						PT_VADDR, addr,
+						PT_FUTEXOP, op,
+						PT_HEX, val,
+						PT_VADDR, addr2,
+						PT_HEX, val2);
+				PR_SYSRET(sb, fmtf, PT_STATUS, rc);
+				break;
+
+			case FUTEX_FD:
+			case FUTEX_REQUEUE:
+			default:
+				PR_SYSCALL(sb, fmtf, syscall_num,
+						PT_VADDR, addr,
+						PT_FUTEXOP, op);
+				PR_SYSRET(sb, fmtf, PT_STATUS, rc);
+				break;
+			}
+		} while (0);
+		break;
+#endif /* HAVE_uk_syscall_futex */
 
 	default:
 		do {
