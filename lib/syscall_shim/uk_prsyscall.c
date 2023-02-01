@@ -260,6 +260,8 @@ enum param_type {
 	PT_DIRFD, /* File descriptor number of directory */
 	PT_PID, /* PID number */
 	PT_OFLAGS,
+	PT_PROTFLAGS,
+	PT_MAPFLAGS,
 };
 #define PT_BUFP(len)							\
 	(long)(_PT_BUFP | ((MIN((unsigned long) __U16_MAX,		\
@@ -331,6 +333,54 @@ static inline void param_oflags(struct uk_streambuf *sb, int fmtf, int oflags)
 	PR_FLAG(sb, fmtf, orig_seek, O_, TRUNC,     oflags);
 	PR_FLAG_END(sb, fmtf, orig_seek, oflags);
 }
+
+#if CONFIG_LIBPOSIX_MMAP || CONFIG_LIBUKMMAP
+#include <sys/mman.h>
+
+static inline void param_protflags(struct uk_streambuf *sb, int fmtf,
+				   int protflags)
+{
+	__sz orig_seek = uk_streambuf_seek(sb);
+
+	if (protflags == 0) {
+		uk_streambuf_shcc(sb, fmtf, FLAGS);
+		uk_streambuf_strcpy(sb, "PROT_NONE");
+		uk_streambuf_shcc(sb, fmtf, RESET);
+		return;
+	}
+	PR_FLAG(sb, fmtf, orig_seek, PROT_, EXEC,  protflags);
+	PR_FLAG(sb, fmtf, orig_seek, PROT_, READ,  protflags);
+	PR_FLAG(sb, fmtf, orig_seek, PROT_, WRITE, protflags);
+	PR_FLAG_END(sb, fmtf, orig_seek, protflags);
+}
+
+static inline void param_mapflags(struct uk_streambuf *sb, int fmtf,
+				  int mapflags)
+{
+	__sz orig_seek = uk_streambuf_seek(sb);
+
+	if (mapflags == 0) {
+		uk_streambuf_shcc(sb, fmtf, FLAGS);
+		uk_streambuf_strcpy(sb, "MAP_NONE");
+		uk_streambuf_shcc(sb, fmtf, RESET);
+		return;
+	}
+	PR_FLAG(sb, fmtf, orig_seek, MAP_, SHARED,     mapflags);
+	PR_FLAG(sb, fmtf, orig_seek, MAP_, PRIVATE,    mapflags);
+	PR_FLAG(sb, fmtf, orig_seek, MAP_, ANONYMOUS,  mapflags);
+	PR_FLAG(sb, fmtf, orig_seek, MAP_, DENYWRITE,  mapflags);
+	PR_FLAG(sb, fmtf, orig_seek, MAP_, EXECUTABLE, mapflags);
+	PR_FLAG(sb, fmtf, orig_seek, MAP_, FILE,       mapflags);
+	PR_FLAG(sb, fmtf, orig_seek, MAP_, FIXED,      mapflags);
+	PR_FLAG(sb, fmtf, orig_seek, MAP_, GROWSDOWN,  mapflags);
+	PR_FLAG(sb, fmtf, orig_seek, MAP_, HUGETLB,    mapflags);
+	PR_FLAG(sb, fmtf, orig_seek, MAP_, LOCKED,     mapflags);
+	PR_FLAG(sb, fmtf, orig_seek, MAP_, NONBLOCK,   mapflags);
+	PR_FLAG(sb, fmtf, orig_seek, MAP_, POPULATE,   mapflags);
+	PR_FLAG(sb, fmtf, orig_seek, MAP_, STACK,      mapflags);
+	PR_FLAG_END(sb, fmtf, orig_seek, mapflags);
+}
+#endif /* CONFIG_LIBPOSIX_MMAP || CONFIG_LIBUKMMAP */
 
 /* Pretty print a single parameter */
 static void pr_param(struct uk_streambuf *sb, int fmtf,
@@ -453,6 +503,14 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 	case PT_OFLAGS:
 		param_oflags(sb, fmtf, param);
 		break;
+#if CONFIG_LIBPOSIX_MMAP || CONFIG_LIBUKMMAP
+	case PT_PROTFLAGS:
+		param_protflags(sb, fmtf, param);
+		break;
+	case PT_MAPFLAGS:
+		param_mapflags(sb, fmtf, param);
+		break;
+#endif /* CONFIG_LIBPOSIX_MMAP || CONFIG_LIBUKMMAP */
 	default:
 		uk_streambuf_shcc(sb, fmtf, VALUE);
 		uk_streambuf_printf(sb, "0x%lx", (unsigned long) param);
@@ -682,6 +740,29 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		PR_SYSRET(sb, fmtf, PT_PID, rc);
 		break;
 #endif /* HAVE_uk_syscall_getpid */
+
+#ifdef HAVE_uk_syscall_munmap
+	case SYS_munmap:
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, PT_VADDR);
+		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
+		break;
+#endif /* HAVE_uk_syscall_munmap */
+
+#ifdef HAVE_uk_syscall_mmap
+	case SYS_mmap:
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, PT_VADDR, PT_UDEC,
+			    PT_PROTFLAGS, PT_MAPFLAGS, PT_FD, PT_UDEC);
+		PR_SYSRET(sb, fmtf, PT_VADDR, rc);
+		break;
+#endif /* HAVE_uk_syscall_mmap */
+
+#ifdef HAVE_uk_syscall_mprotect
+	case SYS_mprotect:
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, PT_VADDR, PT_UDEC,
+			    PT_PROTFLAGS);
+		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
+		break;
+#endif /* HAVE_uk_syscall_mprotect */
 
 	default:
 		do {
