@@ -478,6 +478,9 @@ enum param_type {
 	PT_SOCKETTYPE,
 	PT_STRUCT(sockaddr),
 	PT_MSGFLAGS,
+#if CONFIG_LIBPOSIX_NETLINK
+	PT_NETLINK_PROTOCOL, /* Netlink family */
+#endif /* CONFIG_LIBPOSIX_NETLINK */
 #endif /* CONFIG_LIBPOSIX_SOCKET */
 	PT_CLONEFLAGS,
 	PT_STRUCT(timespec),
@@ -740,6 +743,42 @@ static inline void param_msgflags(struct uk_streambuf *sb, int fmtf, long val)
 	PR_FLAG(sb, fmtf, orig_seek, MSG_, OOB, flags);
 	PR_FLAG_END(sb, fmtf, orig_seek, flags);
 }
+
+#if CONFIG_LIBPOSIX_NETLINK
+#include <linux/netlink.h>
+
+static inline void param_netlink_protocol(struct uk_streambuf *sb, int fmtf,
+					  long val)
+{
+	int family = (int)val;
+
+	switch (family) {
+		PR_TYPE(sb, fmtf, NETLINK_, ROUTE);
+		PR_TYPE(sb, fmtf, NETLINK_, UNUSED);
+		PR_TYPE(sb, fmtf, NETLINK_, USERSOCK);
+		PR_TYPE(sb, fmtf, NETLINK_, FIREWALL);
+		PR_TYPE(sb, fmtf, NETLINK_, SOCK_DIAG);
+		PR_TYPE(sb, fmtf, NETLINK_, NFLOG);
+		PR_TYPE(sb, fmtf, NETLINK_, XFRM);
+		PR_TYPE(sb, fmtf, NETLINK_, SELINUX);
+		PR_TYPE(sb, fmtf, NETLINK_, ISCSI);
+		PR_TYPE(sb, fmtf, NETLINK_, AUDIT);
+		PR_TYPE(sb, fmtf, NETLINK_, FIB_LOOKUP);
+		PR_TYPE(sb, fmtf, NETLINK_, CONNECTOR);
+		PR_TYPE(sb, fmtf, NETLINK_, NETFILTER);
+		PR_TYPE(sb, fmtf, NETLINK_, IP6_FW);
+		PR_TYPE(sb, fmtf, NETLINK_, DNRTMSG);
+		PR_TYPE(sb, fmtf, NETLINK_, KOBJECT_UEVENT);
+		PR_TYPE(sb, fmtf, NETLINK_, GENERIC);
+		PR_TYPE(sb, fmtf, NETLINK_, SCSITRANSPORT);
+		PR_TYPE(sb, fmtf, NETLINK_, ECRYPTFS);
+		PR_TYPE(sb, fmtf, NETLINK_, RDMA);
+		PR_TYPE(sb, fmtf, NETLINK_, CRYPTO);
+		PR_TYPE(sb, fmtf, NETLINK_, SMC);
+		PR_TYPE_DEFAULT(sb, fmtf, NETLINK_, family);
+	}
+}
+#endif /* CONFIG_LIBPOSIX_NETLINK */
 #endif /* CONFIG_LIBPOSIX_SOCKET */
 
 #if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
@@ -955,6 +994,11 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 	case PT_MSGFLAGS:
 		param_msgflags(sb, fmtf, param);
 		break;
+#if CONFIG_LIBPOSIX_NETLINK
+	case PT_NETLINK_PROTOCOL:
+		param_netlink_protocol(sb, fmtf, param);
+		break;
+#endif /* CONFIG_LIBPOSIX_NETLINK */
 #endif /* CONFIG_LIBPOSIX_SOCKET */
 #if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 	case PT_CLONEFLAGS:
@@ -1419,10 +1463,23 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 			int type = (int) va_arg(args, long);
 			int protocol = (int) va_arg(args, long);
 
-			PR_SYSCALL(sb, fmtf, syscall_num, rc >= 0,
-					PT_SOCKETAF, domain,
-					PT_SOCKETTYPE, type,
-					PT_UDEC, protocol);
+			switch (domain) {
+#if CONFIG_LIBPOSIX_NETLINK
+			case AF_NETLINK:
+				PR_SYSCALL(sb, fmtf, syscall_num, rc >= 0,
+					   PT_SOCKETAF, domain,
+					   PT_SOCKETTYPE, type,
+					   PT_NETLINK_PROTOCOL,
+					   protocol);
+				break;
+#endif /* CONFIG_LIBPOSIX_NETLINK */
+			default:
+				PR_SYSCALL(sb, fmtf, syscall_num, rc >= 0,
+					   PT_SOCKETAF, domain,
+					   PT_SOCKETTYPE, type,
+					   PT_UDEC, protocol);
+				break;
+			}
 		} while (0);
 		PR_SYSRET(sb, fmtf, PT_FD, rc);
 		break;
@@ -1463,20 +1520,43 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 			int *fds = (int *) va_arg(args, long);
 
 			if (rc == 0) {
-				PR_SYSCALL(sb, fmtf, syscall_num,
-					   rc == 0,
-					   PT_SOCKETAF, domain,
-					   PT_SOCKETTYPE, type,
-					   PT_UDEC, protocol,
-					   PT_FD | PT_OUT, fds[0],
-					   PT_FD | PT_OUT, fds[1]);
+#if CONFIG_LIBPOSIX_NETLINK
+				if (domain == AF_NETLINK)
+					PR_SYSCALL(sb, fmtf, syscall_num,
+						   rc == 0,
+						   PT_SOCKETAF, domain,
+						   PT_SOCKETTYPE, type,
+						   PT_NETLINK_PROTOCOL,
+						   protocol,
+						   PT_FD | PT_OUT, fds[0],
+						   PT_FD | PT_OUT, fds[1]);
+				else
+#endif /* CONFIG_LIBPOSIX_NETLINK */
+					PR_SYSCALL(sb, fmtf, syscall_num,
+						   rc == 0,
+						   PT_SOCKETAF, domain,
+						   PT_SOCKETTYPE, type,
+						   PT_UDEC, protocol,
+						   PT_FD | PT_OUT, fds[0],
+						   PT_FD | PT_OUT, fds[1]);
 			} else {
-				PR_SYSCALL(sb, fmtf, syscall_num,
-					   rc == 0,
-					   PT_SOCKETAF, domain,
-					   PT_SOCKETTYPE, type,
-					   PT_UDEC, protocol,
-					   PT_HEX, fds);
+#if CONFIG_LIBPOSIX_NETLINK
+				if (domain == AF_NETLINK)
+					PR_SYSCALL(sb, fmtf, syscall_num,
+						   rc == 0,
+						   PT_SOCKETAF, domain,
+						   PT_SOCKETTYPE, type,
+						   PT_NETLINK_PROTOCOL,
+						   protocol,
+						   PT_HEX, fds);
+				else
+#endif /* CONFIG_LIBPOSIX_NETLINK */
+					PR_SYSCALL(sb, fmtf, syscall_num,
+						   rc == 0,
+						   PT_SOCKETAF, domain,
+						   PT_SOCKETTYPE, type,
+						   PT_UDEC, protocol,
+						   PT_HEX, fds);
 			}
 		} while (0);
 		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
