@@ -1,5 +1,4 @@
-/* SPDX-License-Identifier: ISC */
-/*
+/* SPDX-License-Identifier: ISC
  * Authors: Dan Williams
  *          Martin Lucina
  *          Ricardo Koller
@@ -42,6 +41,9 @@
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include <x86/acpi/acpi.h>
+#ifdef CONFIG_RUNTIME_ASLR
+#include <uk/swrand.h>
+#endif
 
 #include <uk/plat/lcpu.h>
 #include <uk/plat/common/lcpu.h>
@@ -155,6 +157,37 @@ static inline void _get_cmdline(struct uk_bootinfo *bi)
 
 static inline void _init_mem(struct uk_bootinfo *bi)
 {
+#ifdef CONFIG_RUNTIME_ASLR
+	int ASLR_offset;
+	int divisor = 1;
+	/*
+	 * Since we can't modify __STACK_SIZE which is a macro, we place first the 
+	 * stack and then the heap. 
+	 */
+	ASLR_offset = uk_swrand_randr() % (bi->max_addr/4);
+	_libkvmplat_cfg.bstack.end = ALIGN_UP(bi->max_addr - ASLR_offset, __PAGE_SIZE);
+	_libkvmplat_cfg.bstack.start   = _libkvmplat_cfg.bstack.end-__STACK_SIZE;
+	_libkvmplat_cfg.bstack.len   = __STACK_SIZE;
+	
+	uk_pr_info(" ASLR - Stack : s: %p e: %p\n",_libkvmplat_cfg.bstack.start,
+	_libkvmplat_cfg.bstack.end);
+	
+	do{
+	ASLR_offset = uk_swrand_randr() % (bi->max_addr/(4*divisor));
+	_libkvmplat_cfg.heap.start = ALIGN_UP((uintptr_t) __END+ASLR_offset, __PAGE_SIZE);
+	divisor++;
+	}
+	while(_libkvmplat_cfg.heap.start >= _libkvmplat_cfg.bstack.start);
+
+	_libkvmplat_cfg.heap.end = (uintptr_t) _libkvmplat_cfg.bstack.start;
+	_libkvmplat_cfg.heap.len   = _libkvmplat_cfg.heap.end
+				     - _libkvmplat_cfg.heap.start;
+	uk_pr_info(" ASLR - Heap : s: %p e: %p len: %p\n",_libkvmplat_cfg.heap.start,
+	_libkvmplat_cfg.heap.end,_libkvmplat_cfg.heap.len );
+				 
+	
+	
+#else
 	_libkvmplat_cfg.heap.start = ALIGN_UP((uintptr_t)__END, __PAGE_SIZE);
 	_libkvmplat_cfg.heap.end = (uintptr_t)bi->max_addr - __STACK_SIZE;
 	_libkvmplat_cfg.heap.len =
@@ -162,6 +195,7 @@ static inline void _init_mem(struct uk_bootinfo *bi)
 	_libkvmplat_cfg.bstack.start = _libkvmplat_cfg.heap.end;
 	_libkvmplat_cfg.bstack.end = bi->max_addr;
 	_libkvmplat_cfg.bstack.len = __STACK_SIZE;
+#endif
 }
 
 static inline void _init_initrd(struct uk_bootinfo *bi)
@@ -446,7 +480,32 @@ static void __noreturn _libkvmplat_entry2(void)
 
 	ukplat_lcpu_halt();
 }
+#ifdef CONFIG_RUNTIME_ASLR
+__u32 _gen_seed32(){
+	__u32 low,high;
+	__asm__ __volatile__ ("rdtsc" : "=a" (low), "=d" (high));
+	return ((unsigned long long)high << 32) | low;
+}
+static int uk_swrand_init(void)
+{
+	unsigned int i;
+#ifdef CONFIG_LIBUKSWRAND_CHACHA
+	unsigned int seedc = 10;
+	__u32 seedv[10];
+#else
+	unsigned int seedc = 2;
+	__u32 seedv[2];
+#endif
+	uk_pr_info("Initialize random number generator...\n");
 
+	for (i = 0; i < seedc; i++)
+		seedv[i] = _gen_seed32();
+
+	uk_swrand_init_r(&uk_swrand_def, seedc, seedv);
+
+	return seedc;
+}
+#endif
 void _libkvmplat_entry(struct lcpu *lcpu, void *arg)
 {
 	struct multiboot_info *mi = (struct multiboot_info *)arg;
@@ -464,6 +523,10 @@ void _libkvmplat_entry(struct lcpu *lcpu, void *arg)
 
 	intctrl_init();
 
+	#ifdef CONFIG_RUNTIME_ASLR
+	uk_swrand_init();
+	#endif
+	
 	uk_pr_info("Entering from KVM (x86)...\n");
 	uk_pr_info("     multiboot: %p\n", mi);
 
