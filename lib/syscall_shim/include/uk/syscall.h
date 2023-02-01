@@ -526,6 +526,70 @@ const char *uk_syscall_name_p(long nr);
  */
 long (*uk_syscall_r_fn(long nr))(void);
 
+/*
+ * Format flags for system call print functions `uk_snprsyscall()`  and
+ * `uk_vsnprsyscall()`
+ */
+/* Append a newline at the end of the generated string */
+#define UK_PRSYSCALL_FMTF_NEWLINE   0x1
+/* Apply syntax highlighting with ANSI color sequences */
+#define UK_PRSYSCALL_FMTF_ANSICOLOR 0x2
+
+/**
+ * Pretty prints a system call request and response to a given C-string buffer.
+ * The function ensures that the generated string is NULL terminated. The
+ * function truncates the output string if there is not enough space on the
+ * target buffer.
+ *
+ * @param buf
+ *  Reference to a buffer where the resulting string is stored
+ * @param maxlen
+ *  Maximum length that can be used omn the buffer. If it is shorter than
+ *  the generated string, the string will be truncated but NULL-terminated
+ *  to fit into the buffer
+ * @param fmtf
+ *  Format flags that influence the generated string
+ * @param syscall_num
+ *  The system call number
+ * @param sysret
+ *  The return code of the system call
+ * @param ...
+ *  The system call arguments, each of it has to be passed as `long`
+ * @return
+ *  Number of characters of the generated string written to the buffer
+ *  (excluding terminating '\0')
+ */
+int uk_snprsyscall(char *buf, __sz maxlen, int fmtf, long syscall_num,
+		   long sysret, ...);
+
+/**
+ * Pretty prints a system call request and response to a given C-string buffer.
+ * The function ensures that the generated string is NULL terminated. The
+ * function truncates the output string if there is not enough space on the
+ * target buffer.
+ *
+ * @param buf
+ *  Reference to a buffer where the resulting string is stored
+ * @param maxlen
+ *  Maximum length that can be used omn the buffer. If it is shorter than
+ *  the generated string, the string will be truncated but NULL-terminated
+ *  to fit into the buffer
+ * @param fmtf
+ *  Format flags that influence the generated string
+ * @param syscall_num
+ *  The system call number
+ * @param sysret
+ *  The return code of the system call
+ * @param args
+ *  Variadic list of the system call arguments, each of it has to be passed
+ *  as `long`
+ * @return
+ *  Number of bytes of the generated string written to the buffer
+ *  (excluding terminating '\0')
+ */
+int uk_vsnprsyscall(char *buf, __sz maxlen, int fmtf, long syscall_num,
+		    long sysret, va_list args);
+
 #endif /* CONFIG_LIBSYSCALL_SHIM */
 
 #ifdef __cplusplus
