@@ -316,7 +316,7 @@ static int do_eventfd(struct uk_alloc *a, unsigned int initval, int flags)
 	struct dentry *vfs_dentry;
 	struct vnode *vfs_vnode;
 
-	if (unlikely(flags & ~(EFD_CLOEXEC | EFD_SEMAPHORE)))
+	if (unlikely(flags & ~(EFD_CLOEXEC | EFD_SEMAPHORE | EFD_NONBLOCK)))
 		return -EINVAL;
 
 	/* Reserve a file descriptor number */
@@ -380,6 +380,12 @@ static int do_eventfd(struct uk_alloc *a, unsigned int initval, int flags)
 
 	/* Only the dentry should hold a reference; release ours */
 	vput(vfs_vnode);
+
+	if (flags & EFD_NONBLOCK) {
+		ret = fcntl(vfs_fd, F_SETFL, O_NONBLOCK);
+		/* Setting the O_NONBLOCK here must not fail */
+		UK_ASSERT(ret != -1);
+	}
 
 	return vfs_fd;
 
