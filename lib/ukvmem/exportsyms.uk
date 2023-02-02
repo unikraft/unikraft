@@ -1,0 +1,16 @@
+uk_vas_get_active
+uk_vas_set_active
+uk_vas_init
+uk_vas_destroy
+
+uk_vma_find
+uk_vma_map
+uk_vma_unmap
+uk_vma_set_attr
+uk_vma_advise
+
+uk_vma_anon_ops
+uk_vma_dma_ops
+uk_vma_file_ops
+uk_vma_rsvd_ops
+uk_vma_stack_ops
