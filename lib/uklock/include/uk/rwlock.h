@@ -14,7 +14,7 @@
 
 /* TODO: in future give spin as well as wait options to the user */
 
-#define FLAG_BITS		(5)
+#define FLAG_BITS		(4)
 #define READERS_SHIFT		(FLAG_BITS)
 #define FLAG_MASK		((1 << READERS_SHIFT) - 1)
 
@@ -119,6 +119,7 @@ void uk_rwlock_wlock(struct uk_rwlock *rwl)
 		 * acquire that lock
 		 * Try to set the owner field and flag mask except reader flag
 		 */
+
 		v = rwl->rwlock;
 		setv = stackbottom | (v & UK_RWLOCK_WAITERS);
 
@@ -187,6 +188,7 @@ void uk_rwlock_runlock(struct uk_rwlock *rwl)
 	if (queue)
 		uk_waitq_wake_up(queue);
 }
+
 
 static inline
 void uk_rwlock_wunlock(struct uk_rwlock *rwl)
