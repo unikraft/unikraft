@@ -96,10 +96,12 @@ struct uk_pagetable *ukplat_pt_get_active(void);
 /**
  * Switches the active page table to the specified one.
  *
- * @param pt the page table instance to switch to. The code of the function
+ * @param pt
+ *   The page table instance to switch to. The code of the function
  *   must be mapped into the new address space at the same virtual address.
  *
- * @return 0 on success, a non-zero value otherwise
+ * @return
+ *   0 on success, a non-zero value otherwise
  */
 int ukplat_pt_set_active(struct uk_pagetable *pt);
 
@@ -108,15 +110,19 @@ int ukplat_pt_set_active(struct uk_pagetable *pt);
  * in hardware and assigns the given physical address range to be available
  * for allocations and mappings.
  *
- * @param pt pointer to an uninitialized page table that will be set to the
- *   page table hierarchy currently configured in hardware.
- * @param start start of the physical address range that will be available
+ * @param pt
+ *   An uninitialized page table that will be set to the page table hierarchy
+ *   currently configured in hardware
+ * @param start
+ *   Start of the physical address range that will be available
  *   for allocations of physical memory (e.g., mapping with __PADDR_ANY).
  *   The function may reserve some memory in this area for own purposes. The
  *   range must not be assigned to other page tables.
- * @param len the length (in bytes) of the physical address range.
+ * @param len
+ *   The length (in bytes) of the physical address range
  *
- * @return 0 on success, a non-zero value otherwise.
+ * @return
+ *   0 on success, a non-zero value otherwise
  */
 int ukplat_pt_init(struct uk_pagetable *pt, __paddr_t start, __sz len);
 
@@ -125,13 +131,16 @@ int ukplat_pt_init(struct uk_pagetable *pt, __paddr_t start, __sz len);
  * The physical memory is available to all page tables sharing the same frame
  * allocator.
  *
- * @param start start of the physical address range that will be available
- *   for allocations of physical memory (e.g., mapping with __PADDR_ANY).
- *   The function may reserve some memory in this area for own purposes. The
- *   range must not be assigned to other page tables.
- * @param len the length (in bytes) of the physical address range.
+ * @param start
+ *   Start of the physical address range that will be available for allocations
+ *   of physical memory (e.g., mapping with __PADDR_ANY). The function may
+ *   reserve some memory in this area for own purposes. The range must not be
+ *   assigned to other page tables.
+ * @param len
+ *   The length (in bytes) of the physical address range
  *
- * @return 0 on success, a non-zero value otherwise
+ * @return
+ *   0 on success, a non-zero value otherwise
  */
 int ukplat_pt_add_mem(struct uk_pagetable *pt, __paddr_t start, __sz len);
 
@@ -140,15 +149,20 @@ int ukplat_pt_add_mem(struct uk_pagetable *pt, __paddr_t start, __sz len);
  * table shares the physical address range available for new allocations and
  * mappings with the source page table.
  *
- * @param pt pointer to an uninitialized page table that will receive a
- *   clone of the source page table.
- * @param pt_src pointer to the source page table that will be cloned.
- * @param flags clone flags (PAGE_FLAG_CLONE_*). If PAGE_FLAG_CLONE_NEW is
- *   specified, a new (empty) top-level page table is created. Note that
- *   this page table will be completely empty and thus do not map any code or
- *   data segments of the kernel.
+ * @param pt
+ *   An uninitialized page table that will receive a clone of the source page
+ *   table
+ * @param pt_src
+ *   The source page table that will be cloned
+ * @param flags
+ *   Clone flags (PAGE_FLAG_CLONE_*)
  *
- * @return 0 on success, a non-zero value otherwise.
+ *   If PAGE_FLAG_CLONE_NEW is specified, a new (empty) top-level page table is
+ *   created. Note that this page table will be completely empty and thus do
+ *   not map any code or data segments of the kernel.
+ *
+ * @return
+ *   0 on success, a non-zero value otherwise
  */
 int ukplat_pt_clone(struct uk_pagetable *pt, struct uk_pagetable *pt_src,
 		    unsigned long flags);
@@ -158,28 +172,42 @@ int ukplat_pt_clone(struct uk_pagetable *pt, struct uk_pagetable *pt_src,
  * and all mapped physical memory. Mapped physical memory not belonging to the
  * page table is not freed.
  *
- * @param pt the page table hierarchy to release.
- * @param flags page flags (PAGE_FLAG_* flags). If PAGE_FLAG_KEEP_FRAMES is
- *   specified, mapped physical memory is not freed.
+ * @param pt
+ *   The page table hierarchy to release
+ * @param flags
+ *   Page flags (PAGE_FLAG_* flags)
+ *
+ *   If PAGE_FLAG_KEEP_FRAMES is specified, the physical memory is not freed
+ *   and may be mapped again. The caller is responsible for freeing the
+ *   physical memory. Note that the physical memory might not be contiguous.
+ *
+ * @return
+ *   0 on success, a non-zero value otherwise
  */
 int ukplat_pt_free(struct uk_pagetable *pt, unsigned long flags);
 
 /**
  * Performs a page table walk
  *
- * @param pt the page table instance on which to operate.
- * @param vaddr the virtual address to translate.
- * @param [in,out] level the level in which the walk should stop. Use PAGE_LEVEL
- *   to perform a complete walk. The parameter returns the level in the page
- *   table where the translation ended. This value might be higher than the
- *   specified level, depending on the page table. Can be NULL in which case
- *   PAGE_LEVEL is assumed.
- * @param [out] pt_vaddr the virtual address of the page table where the
- *   translation ended. Can be NULL. Can be used with ukarch_pte_write() and
- *   PT_Lx_IDX() to update the PTE.
- * @param [out] pte the PTE where the translation ended. Can be NULL.
+ * @param pt
+ *   The page table instance on which to operate
+ * @param vaddr
+ *   The virtual address to translate
+ * @param[in,out] level
+ *   The level in which the walk should stop. Use PAGE_LEVEL to perform a
+ *   complete walk. The parameter returns the level in the page table where the
+ *   translation ended. This value might be higher than the specified level,
+ *   depending on the page table. Can be NULL in which case PAGE_LEVEL is
+ *   assumed.
+ * @param[out] pt_vaddr
+ *   The virtual address of the page table where the translation ended. Can be
+ *   NULL. Can be used with ukarch_pte_write() and PT_Lx_IDX() to update the
+ *   PTE.
+ * @param[out] pte
+ *   The PTE where the translation ended. Can be NULL.
  *
- * @return 0 on success, a non-zero value otherwise.
+ * @return
+ *   0 on success, a non-zero value otherwise.
  */
 int ukplat_pt_walk(struct uk_pagetable *pt, __vaddr_t vaddr,
 		   unsigned int *level, __vaddr_t *pt_vaddr, __pte_t *pte);
@@ -302,49 +330,65 @@ int ukplat_page_mapx(struct uk_pagetable *pt, __vaddr_t vaddr,
 	ukplat_page_mapx(pt, va, pa, pages, attr, flags, __NULL)
 
 /**
- * Removes the mappings from a range of continuous virtual addresses and frees
- * the underlying frames.
+ * Removes the mappings from a range of contiguous virtual addresses and frees
+ * the underlying frames. The operation skips address ranges that do not have a
+ * valid mapping.
  *
- * @param pt the page table instance on which to operate.
- * @param vaddr the virtual address of the first page that is to be unmapped.
- * @param pages the number of pages in requested page size to unmap.
- * @param flags page flags (PAGE_FLAG_* flags). The page size can be specified
- *   with PAGE_FLAG_SIZE(). If PAGE_FLAG_FORCE_SIZE is not specified,
- *   the range is split into pages of the largest sizes that satisfy the
- *   requested operation. If PAGE_FLAG_KEEP_FRAMES is specified, the physical
- *   memory is not freed and may be mapped again. Note that if the mapping has
- *   been created with __PADDR_ANY the physical memory might not be
- *   contiguous.
+ * @param pt
+ *   The page table instance on which to operate
+ * @param vaddr
+ *   The virtual address of the first page that is to be unmapped
+ * @param pages
+ *   The number of pages in requested page size to unmap
+ * @param flags
+ *   Page flags (PAGE_FLAG_* flags)
  *
- * @return 0 on success, a non-zero value otherwise. May fail if:
- *   - the virtual address is not aligned to the page size;
+ *   The page size can be specified with PAGE_FLAG_SIZE(). If
+ *   PAGE_FLAG_FORCE_SIZE is not specified, the range is split into pages of
+ *   the largest sizes that satisfy the requested operation.
+ *
+ *   If PAGE_FLAG_KEEP_FRAMES is specified, the physical memory is not freed
+ *   and may be mapped again. The caller is responsible for freeing the
+ *   physical memory. Note that the physical memory might not be contiguous.
+ *
+ *   If PAGE_FLAG_KEEP_PTES is specified, the page table hierarchy will stay
+ *   intact. PTEs will only be invalidated (e.g., unsetting the present bit).
+ * @return
+ *   0 on success, a non-zero value otherwise. May fail if:
+ *   - the virtual address is not aligned to the page size
  *   - the platform rejected the operation
  *
  *   Note that it is not an error to unmap physical memory not previously being
  *   allocated with the associated frame allocator. However, unmapping one of
  *   multiple mappings of the same physical frame will release the frame if it
- *   belongs to this page table's frame allocator. In this case, use
- *   PAGE_FLAG_KEEP_FRAMES for all mapping but the last one.
+ *   belongs to this page table's frame allocator (i.e., no reference counting).
+ *   In this case, use PAGE_FLAG_KEEP_FRAMES for all mappings but the last one.
  */
 int ukplat_page_unmap(struct uk_pagetable *pt, __vaddr_t vaddr,
 		      unsigned long pages, unsigned long flags);
 
 /**
- * Sets new attributes for a range of continuous virtual addresses.
+ * Sets new attributes for a range of continuous virtual addresses. The
+ * operation skips address ranges that do not have a valid mapping.
  *
- * @param pt the page table instance on which to operate.
- * @param vaddr the virtual address of the first page whose attributes should
- *   be changed.
- * @param pages the number of pages in requested page size to change.
- * @param new_attr the new page attributes (PAGE_ATTR_* flags).
- * @param flags page flags (PAGE_FLAG_* flags). The page size can be specified
- *   with PAGE_FLAG_SIZE(). If PAGE_FLAG_FORCE_SIZE is not specified,
- *   the range is split into pages of the largest sizes that satisfy the
- *   requested operation.
+ * @param pt
+ *   The page table instance on which to operate
+ * @param vaddr
+ *   The virtual address of the first page whose attributes should be changed
+ * @param pages
+ *   The number of pages in requested page size to change
+ * @param new_attr
+ *   The new page attributes (PAGE_ATTR_* flags)
+ * @param flags
+ *   Page flags (PAGE_FLAG_* flags)
  *
- * @return 0 on success, a non-zero value otherwise. May fail if:
- *   - the virtual address is not aligned to the page size;
- *   - there is an invalid mapping in the range;
+ *   The page size can be specified with PAGE_FLAG_SIZE(). If
+ *   PAGE_FLAG_FORCE_SIZE is not specified, the range is split into pages of
+ *   the largest sizes that satisfy the requested operation.
+ *
+ * @return
+ *   0 on success, a non-zero value otherwise. May fail if:
+ *   - the virtual address is not aligned to the page size
  *   - the platform rejected the operation
  */
 int ukplat_page_set_attr(struct uk_pagetable *pt, __vaddr_t vaddr,
