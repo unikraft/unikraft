@@ -424,11 +424,13 @@ static inline void pg_ffree(struct uk_pagetable *pt, __paddr_t paddr,
 	/* We expect the free to succeed or to fail with -EFAULT if
 	 * the address is not in the range managed by the allocator (e.g.,
 	 * mapping of the kernel code segment), or -ENOMEM if the memory has
-	 * not been previously allocated. We treat the latter as an error that
-	 * we report with an assertion but silently ignore otherwise as the
-	 * frame allocator is able to gracefully handle this scenario.
+	 * not been previously allocated or already been freed (e.g., due to
+	 * a stale mapping or multiple mappings pointing to the same frame
+	 * during unmap). We silently ignore all of these as the frame
+	 * allocator must be able to gracefully handle these scenarios. Just
+	 * capture unexpected errors with this assert.
 	 */
-	UK_ASSERT(rc == 0 || rc == -EFAULT);
+	UK_ASSERT(rc == 0 || rc == -EFAULT || rc == -ENOMEM);
 }
 
 static inline int pg_pt_alloc(struct uk_pagetable *pt, __vaddr_t *pt_vaddr,
