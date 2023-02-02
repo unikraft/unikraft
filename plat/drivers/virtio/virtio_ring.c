@@ -43,6 +43,12 @@
 #include <uk/plat/io.h>
 #include <virtio/virtio_ring.h>
 #include <virtio/virtqueue.h>
+#ifdef CONFIG_LIBUKVMEM
+#include <uk/arch/paging.h>
+#include <uk/plat/paging.h>
+#include <uk/vmem.h>
+#include <uk/falloc.h>
+#endif /* CONFIG_LIBUKVMEM */
 
 #define VIRTQUEUE_MAX_SIZE  32768
 #define to_virtqueue_vring(vq)			\
@@ -411,12 +417,31 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 	vrq->vring_mem = NULL;
 
 	ring_size = vring_size(nr_descs, align);
+#ifdef CONFIG_LIBUKVMEM
+	struct uk_pagetable *pt = ukplat_pt_get_active();
+	__paddr_t paddr = __PADDR_ANY;
+	__vaddr_t vaddr = __VADDR_ANY;
+
+	ring_size = PAGE_ALIGN_UP(ring_size);
+
+	rc = pt->fa->falloc(pt->fa, &paddr, ring_size >> PAGE_SHIFT, 0);
+	if (unlikely(rc))
+		goto err_freevq;
+
+	rc = uk_vma_map_dma(uk_vas_get_active(), &vaddr, ring_size,
+			    PAGE_ATTR_PROT_RW, UK_VMA_MAP_POPULATE,
+			    "virtqueue", paddr);
+	if (unlikely(rc))
+		goto err_freevq;
+
+	vrq->vring_mem = (void *)vaddr;
+#else /* CONFIG_LIBUKVMEM */
 	if (uk_posix_memalign(a, &vrq->vring_mem,
 			      __PAGE_SIZE, ring_size) != 0) {
-		uk_pr_err("Allocation of vring failed\n");
 		rc = -ENOMEM;
 		goto err_freevq;
 	}
+#endif /* !CONFIG_LIBUKVMEM */
 	memset(vrq->vring_mem, 0, ring_size);
 	virtqueue_vring_init(vrq, nr_descs, align);
 
@@ -428,6 +453,7 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 	return vq;
 
 err_freevq:
+	uk_pr_err("Allocation of vring failed\n");
 	uk_free(a, vrq);
 err_exit:
 	return ERR2PTR(rc);
