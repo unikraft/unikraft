@@ -75,7 +75,8 @@ struct uk_pagetable {
 				      */
 
 #define PAGE_FLAG_SIZE_SHIFT	4
-#define PAGE_FLAG_SIZE_MASK	((1UL << PAGE_FLAG_SIZE_SHIFT) - 1)
+#define PAGE_FLAG_SIZE_BITS	4
+#define PAGE_FLAG_SIZE_MASK	((1UL << PAGE_FLAG_SIZE_BITS) - 1)
 
 #define PAGE_FLAG_SIZE(lvl)					\
 	(((lvl) & PAGE_FLAG_SIZE_MASK) << PAGE_FLAG_SIZE_SHIFT)
