@@ -351,6 +351,57 @@ int ukplat_page_set_attr(struct uk_pagetable *pt, __vaddr_t vaddr,
 			 unsigned long pages, unsigned long new_attr,
 			 unsigned long flags);
 
+/**
+ * Creates a temporary writable virtual mapping of the given physical address
+ * range for kernel use.
+ *
+ * The function should only be used for short-lived kernel-internal mappings,
+ * for instance, to initialize the contents of a frame before mapping it
+ * somewhere else. The mapping will be done in an architecture-dependent
+ * reserved area in the virtual address space. The mapping is guaranteed to
+ * succeed without memory allocations (physical and virtual).
+ *
+ * However, note that the number of concurrently k'mapped pages may be limited.
+ *
+ * @param pt
+ *   The page table instance on which to operate
+ * @param paddr
+ *   The base address of the physical address range to map
+ * @param pages
+ *   The number of pages in requested page size to map
+ * @param flags
+ *   Page flags (PAGE_FLAG_* flags)
+ *
+ *   Currently, the only valid flag is PAGE_FLAG_SIZE() to specify the page
+ *   size. Note that the actual mapping in the page table may use an arbitrary
+ *   page size.
+ *
+ * @return
+ *   The virtual address of the temporary mapping on success, __VADDR_INV
+ *   otherwise
+ */
+__vaddr_t ukplat_page_kmap(struct uk_pagetable *pt, __paddr_t paddr,
+			   unsigned long pages, unsigned long flags);
+
+/**
+ * Removes a temporary mapping previously established using ukplat_page_kmap().
+ * The function must not be used to unmap arbitrary address ranges.
+ *
+ * @param pt
+ *   The page table instance on which to operate
+ * @param vaddr
+ *   The virtual address of the temporary mapping which should be unmapped
+ * @param pages
+ *   The number of pages in requested page size to unmap
+ * @param flags
+ *   Page flags (PAGE_FLAG_* flags)
+ *
+ *   Currently, the only valid flag is PAGE_FLAG_SIZE() to specify the page
+ *   size for the purpose of describing the mapping length.
+ */
+void ukplat_page_kunmap(struct uk_pagetable *pt, __vaddr_t vaddr,
+			unsigned long pages, unsigned long flags);
+
 #ifdef __cplusplus
 }
 #endif

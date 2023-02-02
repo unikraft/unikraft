@@ -266,6 +266,21 @@ pgarch_pt_unmap(struct uk_pagetable *pt __unused, __vaddr_t pt_vaddr,
 	return arm64_directmap_vaddr_to_paddr(pt_vaddr);
 }
 
+/* Temporary kernel mapping */
+static inline __vaddr_t
+pgarch_kmap(struct uk_pagetable *pt __unused, __paddr_t paddr,
+	    __sz len __unused)
+{
+	return arm64_directmap_paddr_to_vaddr(paddr);
+}
+
+static inline void
+pgarch_kunmap(struct uk_pagetable *pt __unused, __vaddr_t vaddr __unused,
+	      __sz len __unused)
+{
+	/* nothing to do */
+}
+
 static inline int pgarch_init(void)
 {
 	/* Sanity checks to make sure that the PE supports the minimum
