@@ -158,6 +158,7 @@ __pte_t PT_Lx_PTE_INVALID(unsigned int level);
 #ifndef PT_Lx_PTE_PADDR
 __paddr_t PT_Lx_PTE_PADDR(__pte_t pte, unsigned int lvl);
 #endif
+#endif /* !__ASSEMBLY__ */
 
 /**
  * PAGE_Lx_SHIFT(lvl)
@@ -173,7 +174,20 @@ __paddr_t PT_Lx_PTE_PADDR(__pte_t pte, unsigned int lvl);
 #ifndef PAGE_Lx_SHIFT
 #error PAGE_Lx_SHIFT not defined
 #endif
-#endif /* !__ASSEMBLY__ */
+
+/**
+ * PAGE_SHIFT_Lx(shift)
+ *
+ * NOTE: Must be compile-time resolvable
+ *
+ * @param shift the order of the page size
+ *
+ * @return the page table level [0..PT_LEVELS - 1] corresponding to the
+ *    given page size order
+ */
+#ifndef PAGE_SHIFT_Lx
+#error PAGE_SHIFT_Lx not defined
+#endif
 
 /**
  * PAGE_Lx_SIZE(lvl)
