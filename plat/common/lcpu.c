@@ -300,7 +300,7 @@ static int lcpu_ipi_run_handler(void *args __unused)
 
 #ifdef CONFIG_ARCH_X86_64
 	/* TODO: Remove when we have unified IRQ handling */
-	apic_ack_interrupt();
+	apic_ack_interrupt(0);
 #endif /* CONFIG_ARCH_X86_64 */
 
 	return 1;
@@ -310,7 +310,7 @@ static int lcpu_ipi_wakeup_handler(void *args __unused)
 {
 #ifdef CONFIG_ARCH_X86_64
 	/* TODO: Remove when we have unified IRQ handling */
-	apic_ack_interrupt();
+	apic_ack_interrupt(0);
 #endif /* CONFIG_ARCH_X86_64 */
 
 	/* Nothing to do */

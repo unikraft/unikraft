@@ -29,9 +29,75 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#ifndef __PLAT_KVM_X86_INTCTRL_H
+#define __PLAT_KVM_X86_INTCTRL_H
 
+#include <stdint.h>
+#include <uk/plat/common/irq.h>
+
+struct _pic_operations {
+	/** Initialize PIC controller */
+	int (*initialize)(void);
+	/** Acknowledging IRQ */
+	void (*ack_irq)(uint32_t irq);
+	/** Enable IRQ */
+	void (*enable_irq)(uint32_t irq);
+	/** Disable IRQ */
+	void (*disable_irq)(uint32_t irq);
+	/** Set IRQ trigger type */
+	void (*set_irq_type)(uint32_t irq, enum uk_irq_trigger trigger);
+	/** Set priority for IRQ */
+	void (*set_irq_prio)(uint32_t irq, uint8_t priority);
+	/** Select destination processor */
+	void (*set_irq_affinity)(uint32_t irq, uint8_t affinity);
+	/** Handle IRQ */
+	void (*handle_irq)(void);
+	/* Get max IRQs */
+	uint32_t (*get_max_irqs)(void);
+};
+
+struct _pic_dev {
+	/* Probe status */
+	uint8_t is_probed;
+	/* Interrupt controller status */
+	uint8_t is_initialized;
+	/* Interrupt controller operations */
+	struct _pic_operations ops;
+};
+
+/* Initialize the interrupt controller 
+ */
 void intctrl_init(void);
-void intctrl_clear_irq(unsigned int irq);
-void intctrl_mask_irq(unsigned int irq);
-void intctrl_ack_irq(unsigned int irq);
+
+/* Unmask the interrupt
+ *
+ * @param irq
+ *  The interrupt to be unmasked
+ */
+void intctrl_clear_irq(uint32_t irq);
+
+/* Mask the interrupt
+ *
+ * @param irq
+ *  The interrupt to be mask
+ */
+void intctrl_mask_irq(uint32_t irq);
+
+/* Acknowlege the interrupt
+ *
+ * @param irq
+ *  The interrupt to be acknowledge
+ */
+void intctrl_ack_irq(uint32_t irq);
+
+/* Send interprocessor interrupt
+ *
+ * @param cpuid
+ *  The destination cpuid
+ *
+ * @sgintid
+ *  The softward generated interrupt id
+ */
 void intctrl_send_ipi(uint8_t sgintid, uint32_t cpuid);
+
+#endif

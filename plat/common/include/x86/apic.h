@@ -41,8 +41,27 @@
 #include <uk/arch/limits.h>
 #include <x86/cpu.h>
 #include <x86/apic_defs.h>
-
+#include <x86/lvt.h>
 #include <errno.h>
+
+static inline void x2apic_lvt_init(void)
+{
+	union LVTEntry entry = INITIALIZE_LVT_ENTRY();
+	__u32 eax, edx;
+
+	eax = entry.dword;
+	edx = 0;
+
+	/* Initialize the local vector table 
+	 * all entries are masked
+	 */
+	wrmsr(APIC_MSR_LVT_TIMER, eax, edx);
+	wrmsr(APIC_MSR_LVT_THERMAL, eax, edx);
+	wrmsr(APIC_MSR_LVT_PERF, eax, edx);
+	wrmsr(APIC_MSR_LVT_LINT0, eax, edx);
+	wrmsr(APIC_MSR_LVT_LINT1, eax, edx);
+	wrmsr(APIC_MSR_LVT_ERROR, eax, edx);
+}
 
 static inline int x2apic_enable(void)
 {
@@ -68,6 +87,10 @@ static inline int x2apic_enable(void)
 		eax |= APIC_SVR_EN;
 		wrmsr(APIC_MSR_SVR, eax, edx);
 	}
+
+#if CONFIG_HAVE_SMP
+	x2apic_lvt_init();
+#endif
 
 	/*
 	 * TODO: Configure spurious interrupt vector number
@@ -143,7 +166,7 @@ static inline void x2apic_clear_errors(void)
 	wrmsr(APIC_MSR_ESR, 0, 0);
 }
 
-static inline void x2apic_ack_interrupt(void)
+static inline void x2apic_ack_interrupt(unsigned int irq __unused)
 {
 	wrmsr(APIC_MSR_EOI, 0, 0);
 }

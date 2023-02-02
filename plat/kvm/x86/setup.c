@@ -462,6 +462,10 @@ void _libkvmplat_start(struct lcpu *lcpu, void *arg)
 	if (unlikely(rc))
 		UK_CRASH("Failed to init bootstrap processor\n");
 
+#ifdef CONFIG_HAVE_SMP
+	rc = acpi_init();
+#endif
+
 	intctrl_init();
 
 	uk_pr_info("Entering from KVM (x86)...\n");
@@ -491,7 +495,6 @@ void _libkvmplat_start(struct lcpu *lcpu, void *arg)
 		   (void *)_libkvmplat_cfg.bstack.start);
 
 #ifdef CONFIG_HAVE_SMP
-	rc = acpi_init();
 	if (likely(rc == 0)) {
 		rc = lcpu_mp_init(CONFIG_UKPLAT_LCPU_RUN_IRQ,
 				  CONFIG_UKPLAT_LCPU_WAKEUP_IRQ,

@@ -90,6 +90,11 @@ static inline int irqs_disabled(void)
 #define local_irq_enable()       __sti()
 #define local_irq_enable_halt()  __sti_hlt()
 
-#define __MAX_IRQ	16
+#ifdef CONFIG_HAVE_SMP
+	#define __MAX_IRQ	16
+#else
+	#define __MAX_IRQ 	24
+#endif
+
 
 #endif /* __PLAT_CMN_X86_IRQ_H__ */
