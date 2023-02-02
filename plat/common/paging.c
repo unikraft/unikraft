@@ -1383,3 +1383,35 @@ int ukplat_page_set_attr(struct uk_pagetable *pt, __vaddr_t vaddr,
 	return pg_page_set_attr(pt, pt->pt_vbase, PT_LEVELS - 1, vaddr, len,
 				new_attr, flags);
 }
+
+__vaddr_t ukplat_page_kmap(struct uk_pagetable *pt, __paddr_t paddr,
+			   unsigned long pages, unsigned long flags)
+{
+	unsigned int level = PAGE_FLAG_SIZE_TO_LEVEL(flags);
+	__sz len = __SZ_MAX;
+
+	UK_ASSERT(pages > 0);
+	UK_ASSERT(level < PT_LEVELS);
+	UK_ASSERT(PAGE_Lx_HAS(level));
+	UK_ASSERT(pages <= (__SZ_MAX / PAGE_Lx_SIZE(level)));
+
+	len = pages * PAGE_Lx_SIZE(level);
+
+	return pgarch_kmap(pt, paddr, len);
+}
+
+void ukplat_page_kunmap(struct uk_pagetable *pt, __vaddr_t vaddr,
+			unsigned long pages, unsigned long flags)
+{
+	unsigned int level = PAGE_FLAG_SIZE_TO_LEVEL(flags);
+	__sz len = __SZ_MAX;
+
+	UK_ASSERT(pages > 0);
+	UK_ASSERT(level < PT_LEVELS);
+	UK_ASSERT(PAGE_Lx_HAS(level));
+	UK_ASSERT(pages <= (__SZ_MAX / PAGE_Lx_SIZE(level)));
+
+	len = pages * PAGE_Lx_SIZE(level);
+
+	pgarch_kunmap(pt, vaddr, len);
+}
