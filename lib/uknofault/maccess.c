@@ -87,7 +87,7 @@ UK_EVENT_HANDLER_PRIO(UKARCH_TRAP_X86_GP,     nf_mem_fault_handler,
 
 __sz uk_nofault_probe_r(__vaddr_t vaddr, __sz len, unsigned long flags)
 {
-	nf_paging_state_t ps;
+	nf_paging_state_t ps = 0;
 	__sz l = len;
 	__sz bytes = 0;
 
@@ -136,7 +136,7 @@ __sz uk_nofault_probe_rw(__vaddr_t vaddr, __sz len, unsigned long flags)
 __sz uk_nofault_memcpy(char *dst, const char *src, __sz len,
 		       unsigned long flags)
 {
-	nf_paging_state_t ps;
+	nf_paging_state_t ps = 0;
 	__sz l = len;
 	__sz bytes = 0;
 
