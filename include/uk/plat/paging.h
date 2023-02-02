@@ -67,10 +67,6 @@ struct uk_pagetable {
 #endif /* CONFIG_PAGING_STATS */
 };
 
-/* Page attributes. See <uk/asm/paging.h> for more */
-#define PAGE_ATTR_PROT_RW	(PAGE_ATTR_PROT_READ | PAGE_ATTR_PROT_WRITE)
-#define PAGE_ATTR_PROT_RWX	(PAGE_ATTR_PROT_RW | PAGE_ATTR_PROT_EXEC)
-
 /* Page operation flags */
 #define PAGE_FLAG_KEEP_PTES	0x01 /* Preserve PTEs on map/unmap */
 #define PAGE_FLAG_KEEP_FRAMES	0x02 /* Preserve frames on unmap */

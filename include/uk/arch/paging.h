@@ -41,6 +41,10 @@ extern "C" {
 #include <uk/arch/types.h>
 #include <uk/asm/paging.h>
 
+/* Page attributes. See <uk/asm/paging.h> for more */
+#define PAGE_ATTR_PROT_RW	(PAGE_ATTR_PROT_READ | PAGE_ATTR_PROT_WRITE)
+#define PAGE_ATTR_PROT_RWX	(PAGE_ATTR_PROT_RW | PAGE_ATTR_PROT_EXEC)
+
 /**
  * PT_LEVELS definition
  *
