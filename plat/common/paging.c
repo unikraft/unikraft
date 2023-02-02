@@ -1245,80 +1245,81 @@ static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 		if (unlikely(rc))
 			return rc;
 
-		if (!PT_Lx_PTE_PRESENT(pte, lvl))
-			return -EFAULT;
+		if (PT_Lx_PTE_PRESENT(pte, lvl)) {
+			/* Check if there is a page table at this PTE. In that
+			 * case descent, if allowed.
+			 */
+			if (!PAGE_Lx_IS(pte, lvl)) {
+				if ((flags & PAGE_FLAG_FORCE_SIZE) &&
+				    (lvl == to_lvl))
+					return -EFAULT;
 
-		/* There is a page table at this PTE. Descent, if allowed. */
-		if (!PAGE_Lx_IS(pte, lvl)) {
-			if ((flags & PAGE_FLAG_FORCE_SIZE) &&
-			    (lvl == to_lvl))
-				return -EFAULT;
+				pt_vaddr = pgarch_pt_pte_to_vaddr(pt, pte, lvl);
 
-			pt_vaddr = pgarch_pt_pte_to_vaddr(pt, pte, lvl);
+				pte_idx_cache[lvl] = pte_idx;
 
-			pte_idx_cache[lvl] = pte_idx;
+				UK_ASSERT(lvl > PAGE_LEVEL);
+				lvl--;
 
-			UK_ASSERT(lvl > PAGE_LEVEL);
-			lvl--;
+				pt_vaddr_cache[lvl] = pt_vaddr;
 
-			pt_vaddr_cache[lvl] = pt_vaddr;
+				if (vaddr == __VADDR_ANY) {
+					pte_idx = 0;
+					UK_ASSERT(page_size == 0);
+				} else {
+					pte_idx = PT_Lx_IDX(vaddr, lvl);
+					page_size = PAGE_Lx_SIZE(lvl);
+				}
 
-			if (vaddr == __VADDR_ANY) {
-				pte_idx = 0;
-				UK_ASSERT(page_size == 0);
-			} else {
-				pte_idx = PT_Lx_IDX(vaddr, lvl);
-				page_size = PAGE_Lx_SIZE(lvl);
+				continue;
 			}
 
-			continue;
-		}
+			UK_ASSERT(PAGE_Lx_IS(pte, lvl));
 
-		UK_ASSERT(PAGE_Lx_IS(pte, lvl));
+			/* At this point, we know that there is a page mapped
+			 * here. If we do not enforce a certain page size we
+			 * might have to split the page (i.e., it is larger
+			 * than the remaining len to change, or it is not
+			 * aligned to the current vaddr).
+			 */
+			if ((flags & PAGE_FLAG_FORCE_SIZE) && (lvl != to_lvl))
+				return -EFAULT;
 
-		/* At this point, we know that there is a page mapped here. If
-		 * we do not enforce a certain page size we might have to split
-		 * the page (i.e., it is larger than the remaining len to
-		 * change, or it is not aligned to the current vaddr).
-		 */
-		if ((flags & PAGE_FLAG_FORCE_SIZE) && (lvl != to_lvl))
-			return -EFAULT;
+			if ((page_size > len) ||
+			    (!PAGE_Lx_ALIGNED(vaddr, lvl))) {
+				UK_ASSERT(lvl > PAGE_LEVEL);
 
-		if ((page_size > len) ||
-		    (!PAGE_Lx_ALIGNED(vaddr, lvl))) {
-			UK_ASSERT(lvl > PAGE_LEVEL);
+				rc = pg_page_split(pt, pt_vaddr,
+					PAGE_Lx_ALIGN_DOWN(vaddr, lvl), lvl);
+				if (unlikely(rc))
+					return rc;
 
-			rc = pg_page_split(pt, pt_vaddr,
-				PAGE_Lx_ALIGN_DOWN(vaddr, lvl), lvl);
+				continue;
+			}
+
+			UK_ASSERT(PAGE_Lx_ALIGNED(vaddr, lvl));
+
+			/* At this point, we know that we can safely change the
+			 * current PTE as it is a page with a size that is
+			 * below the remaining len to change and the address we
+			 * want to change is aligned to the page size.
+			 */
+			new_pte = pgarch_pte_create(PT_Lx_PTE_PADDR(pte, lvl),
+						    new_attr, lvl, pte, lvl);
+
+			rc = ukarch_pte_write(pt_vaddr, lvl, pte_idx, new_pte);
 			if (unlikely(rc))
 				return rc;
 
-			continue;
+			if (vaddr != __VADDR_ANY)
+				ukarch_tlb_flush_entry(vaddr);
 		}
 
-		UK_ASSERT(PAGE_Lx_ALIGNED(vaddr, lvl));
-
-		/* At this point, we know that we can safely change the current
-		 * PTE as it is a page with a size that is below the remaining
-		 * len to change and the address we want to change is aligned
-		 * to the page size.
-		 */
-		new_pte = pgarch_pte_create(PT_Lx_PTE_PADDR(pte, lvl), new_attr,
-					    lvl, pte, lvl);
-
-		rc = ukarch_pte_write(pt_vaddr, lvl, pte_idx, new_pte);
-		if (unlikely(rc))
-			return rc;
-
-		if (vaddr != __VADDR_ANY)
-			ukarch_tlb_flush_entry(vaddr);
-
-		UK_ASSERT(len >= page_size);
-		len -= page_size;
-
 		/* Bail out if there is nothing more to do */
-		if (len == 0)
+		if (page_size >= len)
 			break;
+
+		len -= page_size;
 
 		UK_ASSERT(vaddr <= __VADDR_MAX - page_size);
 		vaddr += page_size;
