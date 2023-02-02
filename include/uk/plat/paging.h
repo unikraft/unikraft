@@ -184,35 +184,122 @@ int ukplat_pt_free(struct uk_pagetable *pt, unsigned long flags);
 int ukplat_pt_walk(struct uk_pagetable *pt, __vaddr_t vaddr,
 		   unsigned int *level, __vaddr_t *pt_vaddr, __pte_t *pte);
 
+/* Forward declaration */
+struct ukplat_page_mapx;
+
 /**
- * Creates a mapping from a range of continuous virtual addresses to a range of
+ * Page mapper function that allows controlling the mappings that are created
+ * in a call to ukplat_page_mapx().
+ *
+ * @param pt
+ *   The page table that the mapping is done in
+ * @param vaddr
+ *   The virtual address for which a mapping is established
+ * @param pt_vaddr
+ *   The virtual address of the actual hardware page table that is modified.
+ *   Use this to retrieve the current PTE, if needed.
+ * @param level
+ *   The page table level at which the mapping will be created
+ * @param[in,out] pte
+ *   The new PTE that will be set. The handler may freely modify the PTE to
+ *   control the mapping.
+ * @param ctx
+ *   An optional user-supplied context
+ *
+ * @return
+ *   - 0 on success (i.e., the PTE should be applied)
+ *   - a negative error code to indicate a fatal error
+ *   - UKPLAT_PAGE_MAPX_ESKIP to skip the current PTE (do not apply the changes)
+ *   - UKPLAT_PAGE_MAPX_ETOOBIG to indicate that the mapping should be retried
+ *     using a smaller page size
+ */
+typedef int (*ukplat_page_mapx_func_t)(struct uk_pagetable *pt,
+				       __vaddr_t vaddr, __vaddr_t pt_vaddr,
+				       unsigned int level, __pte_t *pte,
+				       void *ctx);
+
+/* Page mapper function return codes */
+#define UKPLAT_PAGE_MAPX_ESKIP		1 /* Skip the current PTE */
+#define UKPLAT_PAGE_MAPX_ETOOBIG	2 /* Retry with smaller page */
+
+struct ukplat_page_mapx {
+	/** Handler called before updating the PTE in the page table */
+	ukplat_page_mapx_func_t map;
+	/** Optional user context */
+	void *ctx;
+};
+
+/**
+ * Creates a mapping from a range of contiguous virtual addresses to a range of
  * physical addresses using the specified attributes.
  *
- * @param pt the page table instance on which to operate.
- * @param vaddr the virtual address of the first page in the new mapping.
- * @param paddr the physical address of the memory which the virtual region is
- *   mapped to. This parameter can be __PADDR_ANY to dynamically allocate
- *   physical memory as needed.
- * @param pages the number of pages in requested page size to map.
- * @param attr page attributes to set for the new mapping (PAGE_ATTR_* flags).
- * @param flags page flags (PAGE_FLAG_* flags). The page size can be specified
- *   with PAGE_FLAG_SIZE(). If PAGE_FLAG_FORCE_SIZE is not specified, the
- *   function tries to map the given range (i.e., pages * requested page size)
- *   using the largest possible pages. The actual mapping thus may use larger
- *   or smaller pages than requested depending on address alignment, supported
- *   page sizes, and available continuous physical memory (if paddr is
- *   __PADDR_ANY).
+ * @param pt
+ *   The page table instance on which to operate
+ * @param vaddr
+ *   The virtual address of the first page in the new mapping
+ * @param paddr
+ *   The physical address of the memory which the virtual region is mapped to.
+ *   This parameter can be __PADDR_ANY to dynamically allocate physical memory
+ *   as needed. Note that, the physical memory might not be contiguous.
  *
- * @return 0 on success, a non-zero value otherwise. May fail if:
- *   - the physical or virtual address is not aligned to the page size;
- *   - a page in the region is already mapped;
- *   - a page table could not be set up;
- *   - if __PADDR_ANY flag is set and there are no more free frames;
+ *   paddr should be 0 if physical addresses should be handled by the mapx page
+ *   mapper.
+ * @param pages
+ *   The number of pages in requested page size to map
+ * @param attr
+ *   Page attributes to set for the new mapping (see PAGE_ATTR_* flags)
+ * @param flags
+ *   Page flags (see PAGE_FLAG_* flags)
+ *
+ *   The page size can be specified with PAGE_FLAG_SIZE(). If
+ *   PAGE_FLAG_FORCE_SIZE is not specified, the function tries to map the given
+ *   range (i.e., pages * requested page size) using the largest possible pages.
+ *   The actual mapping thus may use larger or smaller pages than requested
+ *   depending on address alignment, supported page sizes, and, if paddr is
+ *   __PADDR_ANY, the available contiguous physical memory. If
+ *   PAGE_FLAG_FORCE_SIZE is specified, only mappings of the given page size
+ *   are created.
+ *
+ *   If PAGE_FLAG_KEEP_PTES is specified, the new mapping will incorporate the
+ *   PTEs currently present in the page table. The physical address and
+ *   permission flags will be updated according to the new mapping.
+ * @param mapx
+ *   Optional page mapper object. If the page mapper is supplied, it is called
+ *   right before applying a new PTE, giving the mapper a chance to affect the
+ *   mapping. Depending on the return code of the mapper it is also possible to
+ *   skip the current PTE or force a smaller page size (if PAGE_FLAG_FORCE_SIZE
+ *   is not set). Note that the page mapper is not called for PTEs referencing
+ *   other page tables.
+ *
+ *   If paddr is __PADDR_ANY, the PTE supplied to the mapper will point to newly
+ *   allocated physical memory that can be initialized before becoming visible.
+ *   Use PT_Lx_PTE_PADDR() to retrieve the physical address from the PTE and
+ *   ukplat_page_kmap() to temporarily map the physical memory. Note that, if
+ *   the PTE currently present in the page table already points to a valid
+ *   mapping (i.e., PT_Lx_PTE_PRESENT() returns a non-zero value), no new
+ *   physical memory will be allocated. Instead, the physical address will
+ *   remain unchanged. It is the mapper's responsibilty to properly free the
+ *   referenced physical memory, if the physical address is changed.
+ *
+ *   Before calling the page mapper, existing large pages may be split up if a
+ *   smaller page size is enforced.
+ *
+ * @return
+ *   0 on success, a non-zero value otherwise. May fail if:
+ *   - the physical or virtual address is not aligned to the page size
+ *   - a page in the region is already mapped and no mapx is supplied
+ *   - a page table could not be set up
+ *   - if __PADDR_ANY flag is set and there are no more free frames
  *   - the platform rejected the operation
+ *   - the mapx page mapper returned a fatal error
  */
-int ukplat_page_map(struct uk_pagetable *pt, __vaddr_t vaddr,
-		    __paddr_t paddr, unsigned long pages,
-		    unsigned long attr, unsigned long flags);
+int ukplat_page_mapx(struct uk_pagetable *pt, __vaddr_t vaddr,
+		     __paddr_t paddr, unsigned long pages,
+		     unsigned long attr, unsigned long flags,
+		     struct ukplat_page_mapx *mapx);
+
+#define ukplat_page_map(pt, va, pa, pages, attr, flags)			\
+	ukplat_page_mapx(pt, va, pa, pages, attr, flags, __NULL)
 
 /**
  * Removes the mappings from a range of continuous virtual addresses and frees
