@@ -124,6 +124,9 @@ struct ukarch_pagetable {
 #define PAGE_Lx_SHIFT(lvl)					\
 	(PAGE_SHIFT + (PT_LEVEL_SHIFT * lvl))
 
+#define PAGE_SHIFT_Lx(shift)					\
+	(((shift) - PAGE_SHIFT) / PT_LEVEL_SHIFT)
+
 #define PT_Lx_IDX(vaddr, lvl)					\
 	(((vaddr) >> PAGE_Lx_SHIFT(lvl)) & (PT_PTES_PER_LEVEL - 1))
 

@@ -65,6 +65,8 @@ struct ukarch_pagetable {
 #define X86_PT_L0_SHIFT			12
 #define X86_PT_Lx_SHIFT(lvl)					\
 	(X86_PT_L0_SHIFT + (X86_PT_LEVEL_SHIFT * lvl))
+#define X86_PT_SHIFT_Lx(shift)					\
+	(((shift) - X86_PT_L0_SHIFT) / X86_PT_LEVEL_SHIFT)
 
 #define PT_Lx_IDX(vaddr, lvl)					\
 	(((vaddr) >> X86_PT_Lx_SHIFT(lvl)) & (X86_PT_PTES_PER_LEVEL - 1))
@@ -72,6 +74,7 @@ struct ukarch_pagetable {
 #define PT_Lx_PTES(lvl)			X86_PT_PTES_PER_LEVEL
 
 #define PAGE_Lx_SHIFT(lvl)		X86_PT_Lx_SHIFT(lvl)
+#define PAGE_SHIFT_Lx(shift)		X86_PT_SHIFT_Lx(shift)
 
 /* We use plain values here so we do not create dependencies on external helper
  * macros, which would forbit us to use the macros in functions defined further
