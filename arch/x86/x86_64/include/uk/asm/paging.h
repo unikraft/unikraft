@@ -157,6 +157,10 @@ static inline int ukarch_vaddr_range_isvalid(__vaddr_t start, __vaddr_t end)
 #define PT_Lx_PTE_PADDR(pte, lvl)				\
 	(((__paddr_t)(pte) & X86_PTE_PADDR_MASK) & PAGE_MASK)
 
+#define PT_Lx_PTE_SET_PADDR(pte, lvl, paddr)			\
+	((pte & ~(X86_PTE_PADDR_MASK & PAGE_MASK)) |		\
+	 (__pte_t)(paddr & X86_PTE_PADDR_MASK))
+
 #define PT_Lx_PTE_INVALID(lvl)		0x0UL
 
 /* Note: Some flags only apply to page PTEs, not page table PTEs */

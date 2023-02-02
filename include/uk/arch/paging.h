@@ -158,6 +158,19 @@ __pte_t PT_Lx_PTE_INVALID(unsigned int level);
 #ifndef PT_Lx_PTE_PADDR
 __paddr_t PT_Lx_PTE_PADDR(__pte_t pte, unsigned int lvl);
 #endif
+
+/**
+ * PT_Lx_PTE_SET_PADDR(pte, lvl, paddr)
+ *
+ * @param pte a page table entry from a page table at the given level
+ * @param lvl a page table level [0..PT_LEVELS - 1]
+ * @param paddr the physical address which to set in the PTE
+ *
+ * @return the PTE with the updated physical address
+ */
+#ifndef PT_Lx_PTE_SET_PADDR
+__pte_t PT_Lx_PTE_SET_PADDR(__pte_t pte, unsigned int lvl, __paddr_t paddr);
+#endif
 #endif /* !__ASSEMBLY__ */
 
 /**
