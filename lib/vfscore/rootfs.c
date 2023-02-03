@@ -104,9 +104,10 @@ static int vfscore_rootfs(void)
 		}
 
 		uk_pr_info("Extracting initrd @ %p (%"__PRIsz" bytes) to /...\n",
-			   initrd->vbase, initrd->len);
+			   (void *) initrd->vbase, initrd->len);
 
-		error = ukcpio_extract("/", initrd->vbase, initrd->len);
+		error = ukcpio_extract("/", (void *) initrd->vbase,
+				       initrd->len);
 		if (error != UKCPIO_SUCCESS) {
 			uk_pr_crit("Failed to extract cpio archive to /: %d\n",
 				   error);
