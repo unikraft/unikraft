@@ -228,7 +228,8 @@ static __noreturn void idle_thread_fn(void *argp)
 	}
 }
 
-static int schedcoop_start(struct uk_sched *s, struct uk_thread *main_thread)
+static int schedcoop_start(struct uk_sched *s __maybe_unused,
+			   struct uk_thread *main_thread __maybe_unused)
 {
 	UK_ASSERT(main_thread);
 	UK_ASSERT(main_thread->sched == s);
