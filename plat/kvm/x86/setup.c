@@ -287,7 +287,7 @@ static inline int cmdline_init(struct ukplat_bootinfo *bi)
 
 static void __noreturn _ukplat_entry2(void)
 {
-	ukplat_entry_argp(NULL, cmdline, sizeof(cmdline));
+	ukplat_entry_argp(NULL, cmdline, cmdline_len);
 
 	ukplat_lcpu_halt();
 }
