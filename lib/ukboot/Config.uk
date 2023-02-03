@@ -77,6 +77,10 @@ if LIBUKBOOT
 	int "Maximum number of arguments (max. size of argv)"
 	default 60
 
+	config LIBUKBOOT_DISABLE_WEAK_MAIN
+	bool
+	default n
+
 	choice LIBUKBOOT_INITALLOC
 	prompt "Initialize memory allocator"
 	default LIBUKBOOT_INITBBUDDY
