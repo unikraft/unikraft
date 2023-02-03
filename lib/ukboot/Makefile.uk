@@ -19,4 +19,6 @@ endif
 # incremental linking (ld -r). This possibly will be fixed in gcc
 # v9. But we have to deal with it now.
 $(eval $(call addlib_s,libukboot_main,$(CONFIG_LIBUKBOOT)))
+ifneq ($(CONFIG_LIBUKBOOT_DISABLE_WEAK_MAIN),y)
 LIBUKBOOT_MAIN_SRCS-y += $(LIBUKBOOT_BASE)/weak_main.c
+endif
