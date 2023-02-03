@@ -5,12 +5,10 @@
 # You may not use this file except in compliance with the License.
 
 import argparse
-import subprocess
-import re
 import os
-
-SECINFO_EXP = r'^\s+\d+\s+.uk_bootinfo\s+([0-9,a-f]+)'
-PHDRS_EXP = r'^\s+LOAD.+vaddr\s(0x[0-9,a-f]+).+\n.+memsz\s(0x[0-9,a-f]+)\sflags\s([rwx|-]{3})$'
+import struct
+from elftools.elf.elffile import ELFFile
+from elftools.elf.constants import P_FLAGS
 
 # Memory region types (see include/uk/plat/memory.h)
 UKPLAT_MEMRT_KERNEL     = 0x0004   # Kernel binary segment
@@ -21,9 +19,6 @@ UKPLAT_MEMRF_WRITE      = 0x0002   # Region is writable
 UKPLAT_MEMRF_EXECUTE    = 0x0004   # Region is executable
 
 UKPLAT_MEMR_NAME_LEN    = 36
-
-# Boot info structure (see include/uk/plat/common/bootinfo.h)
-UKPLAT_BOOTINFO_SIZE    = 56
 
 UKPLAT_BOOTINFO_MAGIC   = 0xB007B0B0 # Boot Bobo
 UKPLAT_BOOTINFO_VERSION = 0x01
@@ -49,97 +44,80 @@ def main():
     if (opt.arch != 'x86_64') and (opt.arch != 'arm64'):
         raise Exception("Unsupported architecture: {}".format(opt.arch))
 
-    endianness = 'big' if opt.big else 'little'
-    mrd_size  = 64 if opt.names else 32
+    endianness = '>' if opt.big else '<'
+    # Use "sx" to null-terminate strings
+    struct_ukplat_bootinfo = endianness + "IB3x15sx15sxQII"
+    struct_ukplat_memregion_desc = endianness + "QQQHH35sx" if opt.names else endianness + "QQQHH4x"
 
     # Extract name of the unikernel binary for KERNEL segments
     if opt.names:
         name = os.path.splitext(os.path.basename(opt.kernel))[0]
         name = bytes(name, 'ASCII')[:(UKPLAT_MEMR_NAME_LEN - 1)]
-        name = name + b'\0' * (UKPLAT_MEMR_NAME_LEN - len(name))
     else:
-        name = b'\0' * 4 # padding
+        name = None
 
-    # Check for the presence and size of the .uk_bootinfo section. We want
-    # to create a binary blob that has exactly this size so we can replace it
-    # in the binary.
-    out = subprocess.check_output(["objdump", "-h", opt.kernel])
-    match = re.findall(SECINFO_EXP, out.decode('ASCII'), re.MULTILINE)
+    with open(opt.kernel, 'rb') as kernelfile:
+        elf = ELFFile(kernelfile)
+        bootsec = elf.get_section_by_name(".uk_bootinfo")
+        if bootsec is None:
+            raise Exception(".uk_bootinfo section not found")
+        bootsec_size = bootsec.data_size
 
-    if len(match) != 1:
-        raise Exception(".uk_bootinfo section not found")
+        # The boot info is a struct ukplat_bootinfo
+        # (see plat/common/include/uk/plat/common/bootinfo.h) followed by a list of
+        # struct ukplat_memregion_desc (see include/uk/plat/memory.h).
+        with open(opt.output, 'wb') as secobj:
+            last_pbase = 0
 
-    bootsec_size = int(match[0], 16)
+            cap = bootsec_size
+            cap = cap - struct.calcsize(struct_ukplat_bootinfo)
+            cap = cap // struct.calcsize(struct_ukplat_memregion_desc)
 
-    # Retrieve info about ELF segments in unikernel
-    out = subprocess.check_output(["objdump", "-p", opt.kernel])
-    phdrs = re.findall(PHDRS_EXP, out.decode('ASCII'), re.MULTILINE)
+            bootinfo = [UKPLAT_BOOTINFO_MAGIC, UKPLAT_BOOTINFO_VERSION, b'', b'', 0, cap]
+            secdata = []
 
-    # The boot info is a struct ukplat_bootinfo
-    # (see plat/common/include/uk/plat/common/bootinfo.h) followed by a list of
-    # struct ukplat_memregion_desc (see include/uk/plat/memory.h).
-    with open(opt.output, 'wb') as secobj:
-        nsecs      = 0
-        last_pbase = 0
+            for phdr in elf.iter_segments():
+                if phdr['p_type'] != 'PT_LOAD':
+                    continue
 
-        cap = bootsec_size
-        cap = cap - UKPLAT_BOOTINFO_SIZE
-        cap = cap // mrd_size
+                pbase = phdr['p_vaddr']
+                if pbase < opt.min_address:
+                    continue
 
-        secobj.write(UKPLAT_BOOTINFO_MAGIC.to_bytes(4, endianness)) # magic
-        secobj.write(UKPLAT_BOOTINFO_VERSION.to_bytes(1, endianness)) # version
-        secobj.write(b'\0' * 3) # _pad0
-        secobj.write(b'\0' * 16) # bootloader
-        secobj.write(b'\0' * 16) # bootprotocol
-        secobj.write(b'\0' * 8) # cmdline
-        secobj.write(cap.to_bytes(4, endianness)) # mrds.capacity
-        secobj.write(b'\0' * 4) # mrds.count
+                if pbase != (pbase & ~(PAGE_SIZE - 1)):
+                    raise Exception("Segment base address 0x{:x} is not page-aligned".format(pbase))
 
-        assert secobj.tell() == UKPLAT_BOOTINFO_SIZE
+                flags = 0
+                if phdr['p_flags'] & P_FLAGS.PF_R:
+                    flags |= UKPLAT_MEMRF_READ
+                if phdr['p_flags'] & P_FLAGS.PF_W:
+                    flags |= UKPLAT_MEMRF_WRITE
+                if phdr['p_flags'] & P_FLAGS.PF_X:
+                    flags |= UKPLAT_MEMRF_EXECUTE
 
-        for phdr in phdrs:
-            if len(phdr) != 3:
-                continue
+                # We have 1:1 mapping
+                vbase = pbase
 
-            pbase = int(phdr[0], base=16)
-            if pbase < opt.min_address:
-                continue
+                # Align size up to page size
+                size = (phdr['p_memsz'] + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1)
 
-            if pbase != (pbase & ~(PAGE_SIZE - 1)):
-                raise Exception("Segment base address 0x{:x} is not page-aligned".format(pbase))
+                assert len(secdata) < cap
+                assert pbase >= last_pbase
+                last_pbase = pbase
 
-            flags = 0
-            if phdr[2][0] == 'r':
-                flags |= UKPLAT_MEMRF_READ
-            if phdr[2][1] == 'w':
-                flags |= UKPLAT_MEMRF_WRITE
-            if phdr[2][2] == 'x':
-                flags |= UKPLAT_MEMRF_EXECUTE
+                secdata.append([pbase, vbase, size, UKPLAT_MEMRT_KERNEL, flags])
 
-            # We have 1:1 mapping
-            vbase = pbase
+            # Update the number of memory regions
+            bootinfo.append(len(secdata))
 
-            # Align size up to page size
-            size = (int(phdr[1], base=16) + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1)
+            secobj.write(struct.pack(struct_ukplat_bootinfo, *bootinfo))
+            for sec in secdata:
+                if opt.names:
+                    sec.append(name)
+                secobj.write(struct.pack(struct_ukplat_memregion_desc, *sec))
 
-            assert nsecs < cap
-            assert pbase >= last_pbase
-            last_pbase = pbase
-            nsecs += 1
-
-            secobj.write(pbase.to_bytes(8, endianness)) # pbase
-            secobj.write(vbase.to_bytes(8, endianness)) # vbase
-            secobj.write(size.to_bytes(8, endianness)) # len
-            secobj.write(UKPLAT_MEMRT_KERNEL.to_bytes(2, endianness)) # type
-            secobj.write(flags.to_bytes(2, endianness)) # flags
-            secobj.write(name) # name or padding
-
-        # Update the number of memory regions
-        secobj.seek(UKPLAT_BOOTINFO_SIZE - 4, os.SEEK_SET)
-        secobj.write(nsecs.to_bytes(4, endianness)) # mrds.count
-
-        # Jump to end of section to fill remaining space with 0s
-        secobj.truncate(bootsec_size)
+            # Fill remaining space with 0s
+            secobj.truncate(bootsec_size)
 
 
 if __name__ == '__main__':
