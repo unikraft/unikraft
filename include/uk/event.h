@@ -260,9 +260,14 @@ struct uk_event {
  * @param data
  *   Optional data supplied to the event handlers
  * @returns
- *   UK_EVENT_HANDLED if at least one handler indicated that it successfully
- *   handled the event, otherwise returns UK_EVENT_NOT_HANDLED. If a handler
- *   returns a negative value, then this negative value is returned.
+ *   A negative error value if a handler returns one. Event processing
+ *   immediately stops in this case. Otherwise:
+ *   - UK_EVENT_HANDLED if a handler indicated that it successfully handled
+ *     the event and event processing should stop with this handler.
+ *   - UK_EVENT_HANDLED_CONT if at least one handler indicated that it
+ *     successfully handled the event but event handling can continue, and no
+ *     other handler returned UK_EVENT_HANDLED.
+ *   - UK_EVENT_NOT_HANDLED if no handler handled the event.
  */
 static inline int uk_raise_event_ptr(struct uk_event *e, void *data)
 {
@@ -276,10 +281,11 @@ static inline int uk_raise_event_ptr(struct uk_event *e, void *data)
 		if (unlikely(rc < 0))
 			return rc;
 
-		if (rc > 0)
-			ret = UK_EVENT_HANDLED;
 		if (rc == UK_EVENT_HANDLED)
-			break;
+			return UK_EVENT_HANDLED;
+
+		if (rc == UK_EVENT_HANDLED_CONT)
+			ret = UK_EVENT_HANDLED_CONT;
 	}
 
 	return ret;
