@@ -180,7 +180,7 @@ ukplat_memregion_find_next(int i, __u32 type, __u32 flags, __u32 fmask,
  *   return value < 0 means that there is no initrd module.
  */
 #define ukplat_memregion_find_initrd0(mrd) \
-	ukplat_memregion_find_next(-1, UKPLAT_MEMRF_INITRD, 0, 0, mrd)
+	ukplat_memregion_find_next(-1, UKPLAT_MEMRT_INITRD, 0, 0, mrd)
 
 /**
  * Sets the platform memory allocator and triggers the platform memory mappings
