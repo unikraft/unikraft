@@ -26,4 +26,10 @@ config LIBUKFALLOCBUDDY_STATS
 	bool "Collect frame allocation statistics"
 	default n
 
+config LIBUKFALLOCBUDDY_TEST
+	bool "Enable tests"
+	default n
+	select LIBUKTEST
+
 endif
+
