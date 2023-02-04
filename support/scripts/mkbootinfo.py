@@ -80,7 +80,6 @@ def main():
     # struct ukplat_memregion_desc (see include/uk/plat/memory.h).
     with open(opt.output, 'wb') as secobj:
         nsecs      = 0
-        last_pbase = 0
 
         cap = bootsec_size
         cap = cap - UKPLAT_BOOTINFO_SIZE
@@ -105,9 +104,6 @@ def main():
             if pbase < opt.min_address:
                 continue
 
-            if pbase != (pbase & ~(PAGE_SIZE - 1)):
-                raise Exception("Segment base address 0x{:x} is not page-aligned".format(pbase))
-
             flags = 0
             if phdr[2][0] == 'r':
                 flags |= UKPLAT_MEMRF_READ
@@ -123,8 +119,6 @@ def main():
             size = (int(phdr[1], base=16) + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1)
 
             assert nsecs < cap
-            assert pbase >= last_pbase
-            last_pbase = pbase
             nsecs += 1
 
             secobj.write(pbase.to_bytes(8, endianness)) # pbase
