@@ -368,7 +368,7 @@ static int _uk_thread_struct_init_alloc(struct uk_thread *t,
 	int rc;
 
 	if (a_stack && stack_len) {
-		stack = uk_malloc(a_stack, stack_len);
+		stack = uk_memalign(a_stack, UKARCH_SP_ALIGN, stack_len);
 		if (!stack) {
 			rc = -ENOMEM;
 			goto err_out;
