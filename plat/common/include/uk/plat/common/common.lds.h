@@ -127,7 +127,7 @@
 		*(.tdata)						\
 		*(.tdata.*)						\
 		*(.gnu.linkonce.td.*)					\
-	} :tls								\
+	} :tls :tls_load						\
 	_etdata = .;							\
 	.tbss :								\
 	{								\
