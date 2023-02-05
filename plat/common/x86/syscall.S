@@ -74,7 +74,18 @@ ENTRY(_ukplat_syscall)
 	 *       (calling convention: 1st arg on %rdi)
 	 */
 	movq %rsp, %rdi
+
+	/*
+	 * Make sure the stack is aligned to 16-bytes. We store the original
+	 * stack pointer in the frame pointer (callee saved)
+	 */
+	movq %rsp, %rbp
+	and $~15, %rsp
+
 	call ukplat_syscall_handler
+
+	/* Restore original stack pointer */
+	movq %rbp, %rsp
 
 	cli
 	/* Load the updated state back to registers */
