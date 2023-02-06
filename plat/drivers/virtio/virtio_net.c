@@ -531,12 +531,29 @@ static int virtio_netdev_rxq_enqueue(struct uk_netdev_rx_queue *rxq,
 	uk_sglist_reset(sg);
 
 	/* Appending the header buffer to the sglist */
-	uk_sglist_append(sg, rxhdr, sizeof(struct virtio_net_hdr));
+	rc = uk_sglist_append(sg, rxhdr, sizeof(struct virtio_net_hdr));
+	if (unlikely(rc != 0)) {
+		uk_pr_err("Failed to append to the sg list\n");
+		goto err_remove_vhdr;
+	}
 
 	/* Appending the data buffer to the sglist */
-	uk_sglist_append(sg, buf_start, buf_len);
+	rc = uk_sglist_append(sg, buf_start, buf_len);
+	if (unlikely(rc != 0)) {
+		uk_pr_err("Failed to append to the sg list\n");
+		goto err_remove_vhdr;
+	}
 
 	rc = virtqueue_buffer_enqueue(rxq->vq, netbuf, sg, 0, sg->sg_nseg);
+	if (rc < 0) {
+		uk_pr_err("Failed to enqueue descriptors into the ring: %d\n",
+			  rc);
+		goto err_remove_vhdr;
+	}
+	return rc;
+
+err_remove_vhdr:
+	uk_netbuf_header(netbuf, -header_sz);
 	return rc;
 }
 
