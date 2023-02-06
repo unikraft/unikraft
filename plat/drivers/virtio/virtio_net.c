@@ -37,6 +37,7 @@
 #include <uk/netdev.h>
 #include <uk/netdev_core.h>
 #include <uk/netdev_driver.h>
+#include <uk/spinlock.h>
 #include <virtio/virtio_bus.h>
 #include <virtio/virtqueue.h>
 #include <virtio/virtio_net.h>
@@ -106,6 +107,8 @@ struct uk_netdev_tx_queue {
 	uint8_t intr_enabled;
 	/* Reference to the uk_netdev */
 	struct uk_netdev *ndev;
+	/* The lock to protect the queue */
+	struct uk_spinlock queue_lock;
 	/* The scatter list and its associated fragements */
 	struct uk_sglist sg;
 	struct uk_sglist_seg sgsegs[NET_MAX_FRAGMENTS];
@@ -132,6 +135,8 @@ struct uk_netdev_rx_queue {
 	void *alloc_rxpkts_argp;
 	/* Reference to the uk_netdev */
 	struct uk_netdev *ndev;
+	/* The lock to protect the queue */
+	struct uk_spinlock queue_lock;
 	/* The scatter list and its associated fragements */
 	struct uk_sglist sg;
 	struct uk_sglist_seg sgsegs[NET_MAX_FRAGMENTS];
@@ -150,6 +155,8 @@ struct virtio_net_ctrl {
 	struct virtio_net_ctrl_hdr hdr;
 	/* The acknowlegement to the command provided by the device*/
 	virtio_net_ctrl_ack ack;
+	/* The lock to protect the queue */
+	struct uk_spinlock queue_lock;
 	/* The scatter list and its associated fragements */
 	struct uk_sglist sg;
 	struct uk_sglist_seg sgsegs[NET_MAX_FRAGMENTS];
@@ -1108,6 +1115,7 @@ static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 		 */
 		vndev->rxqs[i].hwvq_id = 2 * i;
 		vndev->rxqs[i].max_nb_desc = qdesc_size[vndev->rxqs[i].hwvq_id];
+		uk_spin_init(&(vndev->rxqs[i].queue_lock));
 		uk_sglist_init(&vndev->rxqs[i].sg,
 			       (sizeof(vndev->rxqs[i].sgsegs) /
 				sizeof(vndev->rxqs[i].sgsegs[0])),
@@ -1119,6 +1127,7 @@ static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 		 */
 		vndev->txqs[i].hwvq_id = (2 * i) + 1;
 		vndev->txqs[i].max_nb_desc = qdesc_size[vndev->txqs[i].hwvq_id];
+		uk_spin_init(&(vndev->txqs[i].queue_lock));
 		uk_sglist_init(&vndev->txqs[i].sg,
 			       (sizeof(vndev->txqs[i].sgsegs) /
 				sizeof(vndev->txqs[i].sgsegs[0])),
@@ -1143,6 +1152,7 @@ static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 		}
 		vndev->ctrl->hwvq_id = VIRTIO_NET_CTRLQ_ID(vndev);
 		vndev->ctrl->max_nb_desc = ctrl_size;
+		uk_spin_init(&(vndev->ctrl->queue_lock));
 		uk_sglist_init(&vndev->ctrl->sg,
 			       (sizeof(vndev->ctrl->sgsegs) /
 				sizeof(vndev->ctrl->sgsegs[0])),
