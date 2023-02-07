@@ -93,7 +93,14 @@
 		*(.eh_frame_hdr)					\
 		*(.eh_frame_hdr.*)					\
 	}								\
-	__eh_frame_hdr_end = .;
+	__eh_frame_hdr_end = .;						\
+	__gcc_except_table_start = .;					\
+	.gcc_except_table :						\
+	{								\
+		*(.gcc_except_table)					\
+		*(.gcc_except_table.*)					\
+	}								\
+	__gcc_except_table_end = .;
 
 #define CTORTAB_SECTION							\
 	. = ALIGN(__PAGE_SIZE);						\
