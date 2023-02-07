@@ -26,8 +26,12 @@
 #include <uk/arch/limits.h> /* for __PAGE_SIZE */
 #include <uk/plat/common/common.lds.h>
 
+#define BASE_ADDR 0x100000
+
 PHDRS
 {
+	phdrs PT_PHDR PHDRS;
+	headers PT_LOAD PHDRS FILEHDR FLAGS(PHDRS_PF_R);
 	text PT_LOAD FLAGS(PHDRS_PF_RX);
 	rodata PT_LOAD FLAGS(PHDRS_PF_R);
 	data PT_LOAD;
@@ -38,17 +42,23 @@ PHDRS
 
 SECTIONS
 {
-	. = 0x100000;
+	PROVIDE(__executable_start = BASE_ADDR);
+	. = BASE_ADDR + SIZEOF_HEADERS;
+	PROVIDE(__phdr = .);
 
-	_base_addr = .;		/* Symbol to represent the load base address */
+	_base_addr = BASE_ADDR;	/* Symbol to represent the load base address */
+
+	.headers :
+	{
+		/* prevent linker gc from removing multiboot header */
+		KEEP (*(.data.boot))
+		KEEP (*(.data.boot.*))
+	} :headers
 
 	/* Code */
 	_text = .;
 	.text :
 	{
-		/* prevent linker gc from removing multiboot header */
-		KEEP (*(.data.boot))
-		KEEP (*(.data.boot.*))
 		*(.text.boot)
 		*(.text.boot.*)
 
