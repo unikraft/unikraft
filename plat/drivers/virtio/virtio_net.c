@@ -1346,6 +1346,8 @@ static int virtio_net_set_mq(struct virtio_net_device *vndev,
 			(void *) mq,
 			sizeof(struct virtio_net_ctrl_mq));
 
+	uk_free(a, mq);
+
 	if (rc != VIRTIO_NET_OK)
 		uk_pr_err("Could not set virtio queue pairs\n");
 
