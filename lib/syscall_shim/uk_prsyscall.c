@@ -624,7 +624,7 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 					uk_streambuf_printf(sb, "%c", *c);
 				else
 					uk_streambuf_printf(sb, "\\x%02X",
-							    (int) *c);
+							    (int) ((__u8) *c));
 			}
 			uk_streambuf_strcpy(sb, "\"");
 			uk_streambuf_shcc(sb, fmtf, RESET);
