@@ -1319,12 +1319,16 @@ static int virtio_net_send_cmd(struct virtio_net_device *vndev, uint8_t class,
 	int rc;
 	int read_bufs = 0;
 	int write_bufs = 0;
+	unsigned int irqf;
 	uint8_t *buf;
 
 	UK_ASSERT(vndev);
 	UK_ASSERT(VIRTIO_NET_FEATURE_HAS(vndev, VIRTIO_NET_F_CTRL_VQ));
 
 	ctrl = vndev->ctrl;
+
+	irqf = uk_spin_lock_irqf(&ctrl->queue_lock);
+
 	ctrl->hdr.class = class;
 	ctrl->hdr.cmd = cmd;
 
@@ -1377,7 +1381,10 @@ static int virtio_net_send_cmd(struct virtio_net_device *vndev, uint8_t class,
 			break;
 	}
 
-	return ctrl->ack;
+	rc = ctrl->ack;
+	uk_spin_unlock_irqf(&ctrl->queue_lock, irqf);
+
+	return rc;
 }
 
 static int virtio_net_set_mq(struct virtio_net_device *vndev,
