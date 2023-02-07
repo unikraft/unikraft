@@ -275,9 +275,13 @@ static void virtio_netdev_xmit_free(struct uk_netdev_tx_queue *txq)
 	struct uk_netbuf *pkt = NULL;
 	int cnt = 0;
 	int rc;
+	unsigned int irqf;
 
 	for (;;) {
+		irqf = uk_spin_lock_irqf(&txq->queue_lock);
 		rc = virtqueue_buffer_dequeue(txq->vq, (void **) &pkt, NULL);
+		uk_spin_unlock_irqf(&txq->queue_lock, irqf);
+
 		if (rc < 0)
 			break;
 
@@ -303,6 +307,7 @@ static int virtio_netdev_rx_fillup(struct uk_netdev_rx_queue *rxq,
 	struct uk_netbuf *netbuf[RX_FILLUP_BATCHLEN];
 	int rc = 0;
 	int status = 0x0;
+	unsigned int irqf;
 	__u16 i, j;
 	__u16 req;
 	__u16 cnt = 0;
@@ -355,8 +360,11 @@ out:
 	/**
 	 * Notify the host, when we submit new descriptor(s).
 	 */
-	if (notify && filled)
+	if (notify && filled) {
+		irqf = uk_spin_lock_irqf(&rxq->queue_lock);
 		virtqueue_host_notify(rxq->vq);
+		uk_spin_unlock_irqf(&rxq->queue_lock, irqf);
+	}
 
 	return status;
 }
@@ -374,6 +382,7 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 	size_t total_len = 0;
 	__u8  *buf_start;
 	size_t buf_len;
+	unsigned int irqf;
 
 	UK_ASSERT(dev);
 	UK_ASSERT(pkt && queue);
@@ -421,6 +430,7 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 	}
 	vhdr->gso_type = VIRTIO_NET_HDR_GSO_NONE;
 
+	irqf = uk_spin_lock_irqf(&queue->queue_lock);
 	/**
 	 * Prepare the sglist and enqueue the buffer to the virtio-ring.
 	 */
@@ -487,9 +497,11 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 			  rc);
 		goto err_remove_vhdr;
 	}
+	uk_spin_unlock_irqf(&queue->queue_lock, irqf);
 	return status;
 
 err_remove_vhdr:
+	uk_spin_unlock_irqf(&queue->queue_lock, irqf);
 	uk_netbuf_header(pkt, -header_sz);
 err_exit:
 	UK_ASSERT(rc < 0);
@@ -505,8 +517,12 @@ static int virtio_netdev_rxq_enqueue(struct uk_netdev_rx_queue *rxq,
 	__u8 *buf_start;
 	size_t buf_len = 0;
 	struct uk_sglist *sg;
+	unsigned int irqf;
+
+	irqf = uk_spin_lock_irqf(&rxq->queue_lock);
 
 	if (virtqueue_is_full(rxq->vq)) {
+		uk_spin_unlock_irqf(&rxq->queue_lock, irqf);
 		uk_pr_debug("The virtqueue is full\n");
 		return -ENOSPC;
 	}
@@ -522,6 +538,7 @@ static int virtio_netdev_rxq_enqueue(struct uk_netdev_rx_queue *rxq,
 	 */
 	rc = uk_netbuf_header(netbuf, header_sz);
 	if (unlikely(rc != 1)) {
+		uk_spin_unlock_irqf(&rxq->queue_lock, irqf);
 		uk_pr_err("Failed to allocate space to prepend virtio header\n");
 		return -EINVAL;
 	}
@@ -550,9 +567,11 @@ static int virtio_netdev_rxq_enqueue(struct uk_netdev_rx_queue *rxq,
 			  rc);
 		goto err_remove_vhdr;
 	}
+	uk_spin_unlock_irqf(&rxq->queue_lock, irqf);
 	return rc;
 
 err_remove_vhdr:
+	uk_spin_unlock_irqf(&rxq->queue_lock, irqf);
 	uk_netbuf_header(netbuf, -header_sz);
 	return rc;
 }
@@ -564,11 +583,15 @@ static int virtio_netdev_rxq_dequeue(struct uk_netdev_rx_queue *rxq,
 	int rc __maybe_unused = 0;
 	struct uk_netbuf *buf = NULL;
 	struct virtio_net_hdr *vhdr;
+	unsigned int irqf;
 	__u32 len;
 
 	UK_ASSERT(netbuf);
 
+	irqf = uk_spin_lock_irqf(&rxq->queue_lock);
 	ret = virtqueue_buffer_dequeue(rxq->vq, (void **) &buf, &len);
+	uk_spin_unlock_irqf(&rxq->queue_lock, irqf);
+
 	if (ret < 0) {
 		uk_pr_debug("No data available in the queue\n");
 		*netbuf = NULL;
@@ -617,6 +640,7 @@ static int virtio_netdev_recv(struct uk_netdev *dev __unused,
 {
 	int status = 0x0;
 	int rc = 0;
+	unsigned int irqf;
 
 	UK_ASSERT(dev && queue);
 	UK_ASSERT(pkt);
@@ -632,10 +656,16 @@ static int virtio_netdev_recv(struct uk_netdev *dev __unused,
 	status |= (*pkt) ? UK_NETDEV_STATUS_SUCCESS : 0x0;
 	status |= virtio_netdev_rx_fillup(queue, (queue->nb_desc - rc), 1);
 
+	irqf = uk_spin_lock_irqf(&queue->queue_lock);
+
 	/* Enable interrupt only when user had previously enabled it */
 	if (queue->intr_enabled & VTNET_INTR_USR_EN_MASK) {
+
 		/* Need to enable the interrupt on the last packet */
 		rc = virtqueue_intr_enable(queue->vq);
+
+		uk_spin_unlock_irqf(&queue->queue_lock, irqf);
+
 		if (rc == 1 && !(*pkt)) {
 			/**
 			 * Packet arrive after reading the queue and before
@@ -658,18 +688,23 @@ static int virtio_netdev_recv(struct uk_netdev *dev __unused,
 							  1);
 
 			/* Need to enable the interrupt on the last packet */
+			irqf = uk_spin_lock_irqf(&queue->queue_lock);
 			rc = virtqueue_intr_enable(queue->vq);
+			uk_spin_unlock_irqf(&queue->queue_lock, irqf);
+
 			status |= (rc == 1) ? UK_NETDEV_STATUS_MORE : 0x0;
 		} else if (*pkt) {
 			/* When we originally got a packet and there is more */
 			status |= (rc == 1) ? UK_NETDEV_STATUS_MORE : 0x0;
 		}
-	} else if (*pkt) {
+	} else {
+		uk_spin_unlock_irqf(&queue->queue_lock, irqf);
 		/**
 		 * For polling case, we report always there are further
 		 * packets unless the queue is empty.
 		 */
-		status |= UK_NETDEV_STATUS_MORE;
+		if (*pkt)
+			status |= UK_NETDEV_STATUS_MORE;
 	}
 	return status;
 
