@@ -53,11 +53,4 @@ if LIBUKLOCK
 		depends on LIBUKLOCK_MUTEX
 		help
 			Enable recursive locking for mutex
-
-	config LIBUKLOCK_RWLOCK_WRITE_RECURSE
-		bool "Recursive writer lock"
-		default n
-		depends on LIBUKLOCK_RWLOCK
-		help
-			Enable recursive writer lock
 endif
