@@ -40,29 +40,24 @@
 #define _rw_can_upgrade(rwlock) \
 	((rwlock & UK_RWLOCK_READ) && UK_RW_READERS(rwlock) == 1)
 
-#ifdef CONFIG_RWLOCK_WRITE_RECURSE
-	#define UK_RWLOCK_INITIALIZER(name) {			\
-		UK_RW_UNLOCK,								\
-		0,											\
-		__WAIT_QUEUE_INITIALIZER((name.shared)),	\
-		__WAIT_QUEUE_INITIALIZER((name.exclusive)) }
-#else
-	#define UK_RWLOCK_INITIALIZER(name) {			\
-		UK_RW_UNLOCK,								\
-		__WAIT_QUEUE_INITIALIZER((name.shared)),	\
-		__WAIT_QUEUE_INITIALIZER((name.exclusive)) }
-#endif /* CONFIG_RWLOCK_WRITE_RECURSE */
+#define UK_RWLOCK_INITIALIZER(name) {			\
+	UK_RW_UNLOCK,								\
+	0,											\
+	0,											\
+	__WAIT_QUEUE_INITIALIZER((name.shared)),	\
+	__WAIT_QUEUE_INITIALIZER((name.exclusive)) }
 
 struct __align(8) uk_rwlock {
 	uintptr_t rwlock;
-#ifdef CONFIG_RWLOCK_WRITE_RECURSE
+#define UK_RW_CONFIG_SPIN			0x01
+#define UK_RW_CONFIG_WRITE_RECURSE 	0x02
+	uint8_t config_flags;
 	unsigned int write_recurse;
-#endif /* CONFIG_RWLOCK_WRITE_RECURSE */
 	struct uk_waitq shared;
 	struct uk_waitq exclusive;
 };
 
-void uk_rwlock_init(struct uk_rwlock *rwl);
+void __uk_rwlock_init(struct uk_rwlock *rwl, uint8_t config_flags);
 
 void uk_rwlock_rlock(struct uk_rwlock *rwl);
 
@@ -75,5 +70,11 @@ void uk_rwlock_wunlock(struct uk_rwlock *rwl);
 void uk_rwlock_upgrade(struct uk_rwlock *rwl);
 
 void uk_rwlock_downgrade(struct uk_rwlock *rwl);
+
+#define uk_rwlock_init(rwl) __uk_rwlock_init(rwl, 0)
+
+#define uk_rwlock_init_config(rwl, config_flags) \
+	__uk_rwlock_init(rwl, config_flags)
+
 
 #endif /* __UK_RWLOCK_H__ */

@@ -2,14 +2,16 @@
 #include <uk/assert.h>
 #include <uk/config.h>
 
-void uk_rwlock_init(struct uk_rwlock *rwl)
+#define __IS_CONFIG_SPIN(flag)			(flag & UK_RW_CONFIG_SPIN)
+#define __IS_CONFIG_WRITE_RECURSE(flag)	(flag & UK_RW_CONFIG_WRITE_RECURSE)
+
+void __uk_rwlock_init(struct uk_rwlock *rwl, uint8_t config_flags)
 {
 	UK_ASSERT(rwl);
 
 	rwl->rwlock = UK_RW_UNLOCK;
-#ifdef CONFIG_RWLOCK_WRITE_RECURSE
 	rwl->write_recurse = 0;
-#endif
+	rwl->config_flags = config_flags;
 	uk_waitq_init(&rwl->shared);
 	uk_waitq_init(&rwl->exclusive);
 }
@@ -36,7 +38,11 @@ void uk_rwlock_rlock(struct uk_rwlock *rwl)
 			ukarch_or(&rwl->rwlock, UK_RWLOCK_READ_WAITERS);
 
 		/* Wait for the unlock event */
-		uk_waitq_wait_event(&rwl->shared, _rw_can_read(rwl->rwlock));
+		if (__IS_CONFIG_SPIN(rwl->config_flags))
+			while (_rw_can_read(rwl->rwlock) == 0)
+				;
+		else
+			uk_waitq_wait_event(&rwl->shared, _rw_can_read(rwl->rwlock));
 	}
 }
 
@@ -53,14 +59,13 @@ void uk_rwlock_wlock(struct uk_rwlock *rwl)
 	 * thread then simply increment the write recurse count
 	 */
 
-#ifdef CONFIG_RWLOCK_WRITE_RECURSE
-	if (!(v & UK_RWLOCK_READ) && OWNER(v) == stackbottom) {
+	if (__IS_CONFIG_WRITE_RECURSE(rwl->config_flags)
+			&& !(v & UK_RWLOCK_READ) && OWNER(v) == stackbottom) {
 		ukarch_inc(&(rwl->write_recurse));
 		return;
+	} else {
+		UK_ASSERT(OWNER(v) != stackbottom);
 	}
-#else
-	UK_ASSERT(OWNER(v) != stackbottom);
-#endif
 
 	for (;;) {
 
@@ -74,9 +79,8 @@ void uk_rwlock_wlock(struct uk_rwlock *rwl)
 
 		if (_rw_can_write(v)) {
 			if (ukarch_compare_exchange_sync(&rwl->rwlock, v, setv) == setv) {
-#ifdef CONFIG_RWLOCK_WRITE_RECURSE
-				ukarch_inc(&(rwl->write_recurse));
-#endif
+				if (__IS_CONFIG_WRITE_RECURSE(rwl->config_flags))
+					ukarch_inc(&(rwl->write_recurse));
 				break;
 			}
 			continue;
@@ -86,7 +90,11 @@ void uk_rwlock_wlock(struct uk_rwlock *rwl)
 		ukarch_or(&rwl->rwlock, UK_RWLOCK_WRITE_WAITERS);
 
 		/* Wait for the unlock event */
-		uk_waitq_wait_event(&rwl->exclusive, _rw_can_write(rwl->rwlock));
+		if (__IS_CONFIG_SPIN(rwl->config_flags))
+			while (_rw_can_write(rwl->rwlock) == 0)
+				;
+		else
+			uk_waitq_wait_event(&rwl->exclusive, _rw_can_write(rwl->rwlock));
 	}
 }
 
@@ -114,7 +122,9 @@ void uk_rwlock_runlock(struct uk_rwlock *rwl)
 		/* If there are waiters then select the appropriate queue
 		 * Since we are giving priority try to select writer's queue
 		 */
-		if (UK_RW_READERS(setv) == 0 && (v & UK_RWLOCK_WAITERS)) {
+		if (!__IS_CONFIG_SPIN(rwl->config_flags)
+				&& UK_RW_READERS(setv) == 0 && (v & UK_RWLOCK_WAITERS)) {
+
 			queue = &rwl->shared;
 			if (v & UK_RWLOCK_WRITE_WAITERS) {
 				setv |= (v & UK_RWLOCK_READ_WAITERS);
@@ -153,10 +163,9 @@ void uk_rwlock_wunlock(struct uk_rwlock *rwl)
 	/* Handle recursion
 	 * If the number of recursive writers are not zero then return
 	 */
-#ifdef CONFIG_RWLOCK_WRITE_RECURSE
-	if (ukarch_sub_fetch(&(rwl->write_recurse), 1) != 0)
+	if (__IS_CONFIG_WRITE_RECURSE(rwl->config_flags) &&
+			ukarch_sub_fetch(&(rwl->write_recurse), 1) != 0)
 		return;
-#endif
 
 	/* All recusive locks have been released, time to unlock*/
 	for (;;) {
@@ -164,7 +173,7 @@ void uk_rwlock_wunlock(struct uk_rwlock *rwl)
 		setv = UK_RW_UNLOCK;
 
 		/* Check if there are waiters, if yes select the appropriate queue */
-		if (v & UK_RWLOCK_WAITERS) {
+		if (!__IS_CONFIG_SPIN(rwl->config_flags) && (v & UK_RWLOCK_WAITERS)) {
 			queue = &rwl->shared;
 			if (v & UK_RWLOCK_WRITE_WAITERS) {
 				setv |= (v & UK_RWLOCK_READ_WAITERS);
@@ -205,36 +214,43 @@ void uk_rwlock_upgrade(struct uk_rwlock *rwl)
 
 		if (_rw_can_upgrade(v)) {
 			if (ukarch_compare_exchange_sync(&rwl->rwlock, v, setv) == setv) {
-#ifdef CONFIG_RWLOCK_WRITE_RECURSE
-				ukarch_inc(&(rwl->write_recurse));
-#endif
+				if (__IS_CONFIG_WRITE_RECURSE(rwl->config_flags))
+					ukarch_inc(&(rwl->write_recurse));
 				break;
 			}
 			continue;
 		}
 		/* If we cannot upgrade wait till readers count is 0 */
 		ukarch_or(&rwl->rwlock, UK_RWLOCK_WRITE_WAITERS);
-		uk_waitq_wait_event(&rwl->exclusive, _rw_can_upgrade(rwl->rwlock));
+		if (__IS_CONFIG_SPIN(rwl->config_flags))
+			while (_rw_can_upgrade(rwl->rwlock) == 0)
+				;
+		else
+			uk_waitq_wait_event(&rwl->exclusive, _rw_can_upgrade(rwl->rwlock));
 	}
 }
 
 void uk_rwlock_downgrade(struct uk_rwlock *rwl)
 {
 	uintptr_t v, setv, stackbottom;
+	struct uk_waitq *queue = NULL;
+
+	UK_ASSERT(rwl);
 
 	stackbottom = uk_get_stack_bottom();
 	v = rwl->rwlock;
 
-	UK_ASSERT(rwl);
-
 	if ((v & UK_RWLOCK_READ) || OWNER(v) != stackbottom)
 		return;
 
-#ifdef CONFIG_RWLOCK_WRITE_RECURSE
-	rwl->write_recurse = 0;
-#endif
+	if (__IS_CONFIG_WRITE_RECURSE(rwl->config_flags))
+		rwl->write_recurse = 0;
 
 	for (;;) {
+		if (!__IS_CONFIG_SPIN(rwl->config_flags)
+				&& (v & UK_RWLOCK_READ_WAITERS)) {
+			queue = &rwl->shared;
+		}
 		/* Set only write waiter flags since we are waking up the reads */
 		setv = (UK_RW_UNLOCK + UK_RW_ONE_READER)
 				| (v & UK_RWLOCK_WRITE_WAITERS);
@@ -245,5 +261,6 @@ void uk_rwlock_downgrade(struct uk_rwlock *rwl)
 		v = rwl->rwlock;
 	}
 
-	uk_waitq_wake_up(&rwl->shared);
+	if (queue)
+		uk_waitq_wake_up(queue);
 }

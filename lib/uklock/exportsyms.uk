@@ -3,7 +3,7 @@ uk_mutex_init
 uk_mutex_get_metrics
 _uk_mutex_metrics
 _uk_mutex_metrics_lock
-uk_rwlock_init
+__uk_rwlock_init
 uk_rwlock_rlock
 uk_rwlock_wlock
 uk_rwlock_runlock
