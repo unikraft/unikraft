@@ -35,6 +35,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <uk/spinlock.h>
 #include <uk/netdev.h>
 #include <uk/print.h>
 #include <uk/libparam.h>
@@ -164,6 +165,8 @@ int uk_netdev_drv_register(struct uk_netdev *dev, struct uk_alloc *a,
 		if (PTRISERR(dev->_einfo))
 			return PTR2ERR(dev->_einfo);
 	}
+
+	uk_spin_init(&dev->netdev_lock);
 
 	UK_TAILQ_INSERT_TAIL(&uk_netdev_list, dev, _list);
 	uk_pr_info("Registered netdev%"PRIu16": %p (%s)\n",
