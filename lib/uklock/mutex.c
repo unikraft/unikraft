@@ -8,11 +8,10 @@ struct uk_mutex_metrics _uk_mutex_metrics = { 0 };
 __spinlock              _uk_mutex_metrics_lock;
 #endif /* CONFIG_LIBUKLOCK_MUTEX_METRICS */
 
-void uk_mutex_init(struct uk_mutex *m)
+void __uk_mutex_init(struct uk_mutex *m, uint8_t config_flags)
 {
-#ifdef CONFIG_LIBUKLOCK_MUTEX_RECURSE
 	m->lock_count = 0;
-#endif
+	m->config_flags = config_flags;
 	m->owner = NULL;
 	uk_waitq_init(&m->wait);
 
