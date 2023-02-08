@@ -256,10 +256,13 @@ static struct uk_alloc *a;
 static int virtio_netdev_recv_done(struct virtqueue *vq, void *priv)
 {
 	struct uk_netdev_rx_queue *rxq = NULL;
+	unsigned int irqf;
 
 	UK_ASSERT(vq && priv);
 
 	rxq = (struct uk_netdev_rx_queue *) priv;
+
+	irqf = uk_spin_lock_irqf(&rxq->queue_lock);
 
 	/* Disable the interrupt for the ring */
 	virtqueue_intr_disable(vq);
@@ -267,6 +270,8 @@ static int virtio_netdev_recv_done(struct virtqueue *vq, void *priv)
 
 	/* Indicate to the network stack about an event */
 	uk_netdev_drv_rx_event(rxq->ndev, rxq->lqueue_id);
+
+	uk_spin_unlock_irqf(&rxq->queue_lock, irqf);
 	return 1;
 }
 
@@ -1250,9 +1255,12 @@ static int virtio_net_rx_intr_enable(struct uk_netdev *n,
 {
 	struct virtio_net_device *d __unused;
 	int rc = 0;
+	unsigned int irqf;
 
 	UK_ASSERT(n);
 	d = to_virtionetdev(n);
+
+	irqf = uk_spin_lock_irqf(&queue->queue_lock);
 	/* If the interrupt is enabled */
 	if (queue->intr_enabled & VTNET_INTR_EN)
 		return 0;
@@ -1267,6 +1275,8 @@ static int virtio_net_rx_intr_enable(struct uk_netdev *n,
 	if (!rc)
 		queue->intr_enabled |= VTNET_INTR_EN;
 
+	uk_spin_unlock_irqf(&queue->queue_lock, irqf);
+
 	return rc;
 }
 
@@ -1274,11 +1284,18 @@ static int virtio_net_rx_intr_disable(struct uk_netdev *n,
 				      struct uk_netdev_rx_queue *queue)
 {
 	struct virtio_net_device *vndev __unused;
+	unsigned int irqf;
 
 	UK_ASSERT(n);
 	vndev = to_virtionetdev(n);
+
+	irqf = uk_spin_lock_irqf(&queue->queue_lock);
+
 	virtqueue_intr_disable(queue->vq);
 	queue->intr_enabled &= ~(VTNET_INTR_USR_EN | VTNET_INTR_EN);
+
+	uk_spin_unlock_irqf(&queue->queue_lock, irqf);
+
 	return 0;
 }
 
@@ -1428,14 +1445,20 @@ static int virtio_net_start(struct uk_netdev *n)
 {
 	struct virtio_net_device *d;
 	int i = 0;
+	unsigned int irqf;
 
 	UK_ASSERT(n != NULL);
 	d = to_virtionetdev(n);
 
 	if (VIRTIO_NET_FEATURE_HAS(d, VIRTIO_NET_F_CTRL_VQ)) {
 		virtio_net_ctrl_queue_setup(d);
+
+		irqf = uk_spin_lock_irqf(&d->ctrl->queue_lock);
+
 		virtqueue_intr_disable(d->ctrl->vq);
 		d->ctrl->intr_enabled = 0;
+
+		uk_spin_unlock_irqf(&d->ctrl->queue_lock, irqf);
 	}
 
 	if (VIRTIO_NET_FEATURE_HAS(d, VIRTIO_NET_F_MQ)) {
@@ -1448,13 +1471,23 @@ static int virtio_net_start(struct uk_netdev *n)
 	 * enable_tx|rx_intr()
 	 */
 	for (i = 0; i < d->rx_vqueue_cnt; i++) {
+
+		irqf = uk_spin_lock_irqf(&d->rxqs[i].queue_lock);
+
 		virtqueue_intr_disable(d->rxqs[i].vq);
 		d->rxqs[i].intr_enabled = 0;
+
+		uk_spin_unlock_irqf(&d->rxqs[i].queue_lock, irqf);
 	}
 
 	for (i = 0; i < d->tx_vqueue_cnt; i++) {
+
+		irqf = uk_spin_lock_irqf(&d->txqs[i].queue_lock);
+
 		virtqueue_intr_disable(d->txqs[i].vq);
 		d->txqs[i].intr_enabled = 0;
+
+		uk_spin_unlock_irqf(&d->txqs[i].queue_lock, irqf);
 	}
 
 	/*
