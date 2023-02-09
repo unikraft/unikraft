@@ -53,7 +53,7 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 	struct ukplat_memregion_desc *mrdp;
 	multiboot_memory_map_t *m;
 	multiboot_module_t *mods;
-	__sz offset;
+	__sz offset, cmdline_len;
 	__paddr_t start, end;
 	__u32 i;
 
@@ -64,15 +64,17 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 	/* Add the cmdline */
 	if (mi->flags & MULTIBOOT_INFO_CMDLINE) {
 		if (mi->cmdline) {
+			cmdline_len = strlen((const char *)(__uptr)mi->cmdline);
 			mrd.pbase = mi->cmdline;
 			mrd.vbase = mi->cmdline; /* 1:1 mapping */
-			mrd.len   = strlen((const char *)(__uptr)mi->cmdline);
+			mrd.len   = cmdline_len;
 			mrd.type  = UKPLAT_MEMRT_CMDLINE;
 			mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
 
 			mrd_insert(bi, &mrd);
 
 			bi->cmdline = mi->cmdline;
+			bi->cmdline_len = cmdline_len;
 		}
 	}
 

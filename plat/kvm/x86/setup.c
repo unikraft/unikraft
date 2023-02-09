@@ -274,15 +274,23 @@ static __sz cmdline_len;
 
 static inline int cmdline_init(struct ukplat_bootinfo *bi)
 {
-	char *cmdl = (bi->cmdline) ? (char *)bi->cmdline : CONFIG_UK_NAME;
+	char *cmdl;
 
-	cmdline_len = strlen(cmdl) + 1;
+	if (bi->cmdline_len) {
+		cmdl = (char *)bi->cmdline;
+		cmdline_len = bi->cmdline_len;
+	} else {
+		cmdl = CONFIG_UK_NAME;
+		cmdline_len = sizeof(CONFIG_UK_NAME) - 1;
+	}
 
-	cmdline = bootmemory_palloc(cmdline_len, UKPLAT_MEMRT_CMDLINE);
+	cmdline = bootmemory_palloc(cmdline_len + 1, UKPLAT_MEMRT_CMDLINE);
 	if (unlikely(!cmdline))
 		return -ENOMEM;
 
-	strncpy(cmdline, cmdl, cmdline_len);
+	memcpy(cmdline, cmdl, cmdline_len);
+	cmdline[cmdline_len] = 0;
+
 	return 0;
 }
 
