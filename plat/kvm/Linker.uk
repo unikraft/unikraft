@@ -3,6 +3,8 @@ ifeq ($(CONFIG_KVM_BOOT_PROTO_MULTIBOOT),y)
 KVM_LDFLAGS-y += -Wl,-m,elf_x86_64
 KVM_LDFLAGS-y += -Wl,--entry=_multiboot_entry
 KVM_STRIPFLAGS += --output-target elf32-i386
+else ifeq ($(CONFIG_KVM_BOOT_PROTO_LXBOOT),y)
+KVM_LDFLAGS-y += -Wl,--entry=_lxboot_entry
 endif
 else ifeq (arm64,$(CONFIG_UK_ARCH))
 KVM_LDFLAGS-y += -Wl,-m,aarch64elf

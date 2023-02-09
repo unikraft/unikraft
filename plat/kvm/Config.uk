@@ -17,13 +17,20 @@ if (ARCH_X86_64)
 config KVM_BOOT_PROTO_MULTIBOOT
 	bool
 
-choice
-	prompt "Hypervisor"
-	default KVM_HYPERVISOR_QEMU
+config KVM_BOOT_PROTO_LXBOOT
+	bool
 
-config KVM_HYPERVISOR_QEMU
+choice
+	prompt "Virtual Machine Monitor"
+	default KVM_VMM_QEMU
+
+config KVM_VMM_QEMU
 	bool "QEMU"
 	select KVM_BOOT_PROTO_MULTIBOOT
+
+config KVM_VMM_FIRECRACKER
+	bool "Firecracker"
+	select KVM_BOOT_PROTO_LXBOOT
 
 endchoice
 endif
@@ -101,7 +108,7 @@ config KVM_MAX_IRQ_HANDLER_ENTRIES
 config KVM_PCI
        bool "PCI Bus Driver"
        default y
-       depends on (ARCH_X86_64 || ARCH_ARM_64) && KVM_HYPERVISOR_QEMU
+       depends on (ARCH_X86_64 || ARCH_ARM_64) && KVM_VMM_QEMU
        select LIBUKBUS
        help
                 PCI bus driver for probing and operating PCI devices
