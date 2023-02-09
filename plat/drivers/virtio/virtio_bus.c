@@ -117,7 +117,7 @@ static int virtio_device_reinit(struct virtio_dev *vdev)
 	}
 
 	/* Acknowledge the virtio driver */
-	rc = virtio_dev_status_update(vdev, VIRTIO_CONFIG_STATUS_DRIVER);
+	rc = virtio_dev_status_update(vdev, (VIRTIO_CONFIG_STATUS_ACK | VIRTIO_CONFIG_STATUS_DRIVER));
 	if (rc != 0) {
 		uk_pr_err("Failed to acknowledge the virtio driver %p: %d\n",
 			  vdev, rc);
