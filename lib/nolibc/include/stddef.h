@@ -48,6 +48,7 @@ typedef __sptr ptrdiff_t;
 
 #define __NEED_NULL
 #define __NEED_size_t
+#define __NEED_max_align_t
 #include <nolibc-internal/shareddefs.h>
 
 #ifdef __cplusplus
