@@ -152,8 +152,7 @@ gdt64_ptr:
 	  X86_CR4_PAE	/* Physical Address Extension */
 
 #define EFER_BOOT32_SETTINGS						\
-	  X86_EFER_LME	/* IA-32e Mode */				\
-	| X86_EFER_NXE	/* Execute Disable Bit */
+	  X86_EFER_LME	/* IA-32e Mode */
 
 #define CR0_BOOT32_SETTINGS						\
 	  X86_CR0_PE	/* Protected mode */				\
