@@ -43,6 +43,9 @@
 
 #include <errno.h>
 
+#include "cpu_defs.h"
+#include "cpu.h"
+
 /* We do not support 32-bit virtual address spaces as they do not provide
  * enough space for the direct mapping of page tables. In this case, we would
  * have to use temporary mappings or recursive page table mapping
@@ -240,6 +243,7 @@ pgarch_init(void)
 {
 	__u32 eax, ebx, ecx, edx;
 	__u32 max_addr_bit;
+	__u64 efer;
 
 	/* Check for availability of extended features */
 	ukarch_x86_cpuid(0x80000000, 0, &eax, &ebx, &ecx, &edx);
@@ -256,6 +260,11 @@ pgarch_init(void)
 		uk_pr_crit("%s not supported.\n", "1GiB pages");
 		return -ENOTSUP;
 	}
+
+	/* Enable the NX bit */
+	efer = rdmsrl(X86_MSR_EFER);
+	efer |= X86_EFER_NXE;
+	wrmsrl(X86_MSR_EFER, efer);
 
 #if PT_LEVELS == 5
 	ukarch_x86_cpuid(0x7, 0, &eax, &ebx, &ecx, &edx);
