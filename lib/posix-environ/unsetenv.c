@@ -10,17 +10,16 @@
  * File: src/env/unsetenv.c
  */
 
+#define _GNU_SOURCE
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
-
-static void dummy(char *old, char *new) {}
-weak_alias(dummy, __env_rm_add);
+#include "environ.h"
 
 int unsetenv(const char *name)
 {
-	size_t l = __strchrnul(name, '=') - name;
+	size_t l = strchrnul(name, '=') - name;
 	if (!l || name[l]) {
 		errno = EINVAL;
 		return -1;

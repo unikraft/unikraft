@@ -1,0 +1,6 @@
+setenv
+unsetenv
+clearenv
+putenv
+getenv
+__environ

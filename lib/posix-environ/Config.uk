@@ -1,0 +1,4 @@
+config LIBPOSIX_ENVIRON
+	bool "posix-environ: Environment variables"
+	default n
+	select LIBNOLIBC if !HAVE_LIBC
