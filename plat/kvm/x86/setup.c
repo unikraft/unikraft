@@ -195,7 +195,10 @@ static int paging_init(void)
 
 		rc = ukplat_page_map(&kernel_pt, vaddr, paddr,
 				     len >> PAGE_SHIFT, prot, 0);
-		if (unlikely(rc))
+		/* Unmappings are currently not performed on the low-mem.
+		 * Ignore any errors caused by already existing mappings.
+		 */
+		if (unlikely(rc && rc != -EEXIST))
 			return rc;
 	}
 
