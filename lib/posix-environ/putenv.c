@@ -10,12 +10,11 @@
  * File: src/env/putenv.c
  */
 
+#define _GNU_SOURCE
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
-static void dummy(char *old, char *new) {}
-weak_alias(dummy, __env_rm_add);
+#include "environ.h"
 
 int __putenv(char *s, size_t l, char *r)
 {
@@ -52,7 +51,7 @@ oom:
 
 int putenv(char *s)
 {
-	size_t l = __strchrnul(s, '=') - s;
+	size_t l = strchrnul(s, '=') - s;
 	if (!l || !s[l]) return unsetenv(s);
 	return __putenv(s, l, 0);
 }

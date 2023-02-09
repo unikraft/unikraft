@@ -122,6 +122,14 @@ void exit(int status) __noreturn;
 void qsort(void *base, size_t nmemb, size_t size,
            int (*compar)(const void *, const void *));
 
+#if CONFIG_LIBPOSIX_ENVIRON
+int setenv(const char *name, const char *value, int overwrite);
+int unsetenv(const char *name);
+int clearenv(void);
+int putenv(char *string);
+char *getenv(const char *name);
+#endif /* CONFIG_LIBPOSIX_ENVIRON */
+
 #if CONFIG_LIBPOSIX_PROCESS
 int system(const char *command);
 #endif

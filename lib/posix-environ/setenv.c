@@ -10,9 +10,11 @@
  * File: src/env/setenv.c
  */
 
+#define _GNU_SOURCE
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include "environ.h"
 
 void __env_rm_add(char *old, char *new)
 {
@@ -38,7 +40,7 @@ int setenv(const char *var, const char *value, int overwrite)
 	char *s;
 	size_t l1, l2;
 
-	if (!var || !(l1 = __strchrnul(var, '=') - var) || var[l1]) {
+	if (!var || !(l1 = strchrnul(var, '=') - var) || var[l1]) {
 		errno = EINVAL;
 		return -1;
 	}
