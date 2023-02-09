@@ -34,6 +34,7 @@
 
 #include <errno.h>
 #include <string.h>
+#include <stddef.h>
 #include <uk/alloc_impl.h>
 #include <uk/config.h>
 #include <uk/essentials.h>
@@ -89,6 +90,11 @@ struct metadata_ifpages {
 #define METADATA_IFPAGES_SIZE_POW2 32
 UK_CTASSERT(!(sizeof(struct metadata_ifpages) > METADATA_IFPAGES_SIZE_POW2));
 
+/* The METADATA_IFPAGES_SIZE_POW2 size must not break any alignments */
+UK_CTASSERT(
+	METADATA_IFPAGES_SIZE_POW2 % __alignof__(max_align_t) == 0
+);
+
 static struct metadata_ifpages *uk_get_metadata(const void *ptr)
 {
 	__uptr metadata;
@@ -100,7 +106,7 @@ static struct metadata_ifpages *uk_get_metadata(const void *ptr)
 	 * we need space to store metadata.
 	 */
 	UK_ASSERT((__uptr) ptr >= __PAGE_SIZE +
-		  sizeof(struct metadata_ifpages));
+		  METADATA_IFPAGES_SIZE_POW2);
 
 	metadata = ALIGN_DOWN((__uptr) ptr, (__uptr) __PAGE_SIZE);
 	if (metadata == (__uptr) ptr) {
@@ -161,9 +167,12 @@ void *uk_malloc_ifpages(struct uk_alloc *a, __sz size)
 	metadata->base = (void *) intptr;
 
 #ifdef CONFIG_HAVE_MEMTAG
-	return ukarch_memtag_region((void *)(intptr + sizeof(*metadata)), size);
+	return ukarch_memtag_region(
+		(void *)(intptr + METADATA_IFPAGES_SIZE_POW2),
+		size
+	);
 #else
-	return (void *)(intptr + sizeof(*metadata));
+	return (void *)(intptr + METADATA_IFPAGES_SIZE_POW2);
 #endif /* CONFIG_HAVE_MEMTAG */
 }
 
