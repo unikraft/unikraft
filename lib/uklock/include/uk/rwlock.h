@@ -2,17 +2,15 @@
 #define __UK_RWLOCK_H__
 
 #include <uk/config.h>
-
 #include <uk/essentials.h>
 #include <uk/arch/atomic.h>
 #include <stddef.h>
 #include <uk/assert.h>
 #include <uk/wait.h>
 #include <uk/wait_types.h>
+#include <uk/lock-common.h>
 
 #include <uk/print.h>
-
-/* TODO: in future give spin as well as wait options to the user */
 
 #define FLAG_BITS			(4)
 #define READERS_SHIFT		(FLAG_BITS)
@@ -76,5 +74,10 @@ void uk_rwlock_downgrade(struct uk_rwlock *rwl);
 #define uk_rwlock_init_config(rwl, config_flags) \
 	__uk_rwlock_init(rwl, config_flags)
 
+_LOCK_IRQF(struct uk_rwlock *,  uk_rwlock_rlock)
+_LOCK_IRQF(struct uk_rwlock *,  uk_rwlock_wlock)
+
+_UNLOCK_IRQF(struct uk_rwlock *, uk_rwlock_runlock)
+_UNLOCK_IRQF(struct uk_rwlock *, uk_rwlock_wunlock)
 
 #endif /* __UK_RWLOCK_H__ */
