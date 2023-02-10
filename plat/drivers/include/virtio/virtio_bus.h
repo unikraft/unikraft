@@ -40,6 +40,7 @@
 #include <uk/arch/lcpu.h>
 #include <uk/alloc.h>
 #include <uk/bus.h>
+#include <uk/spinlock.h>
 #include <virtio/virtio_config.h>
 #include <virtio/virtqueue.h>
 #include <uk/ctors.h>
@@ -148,6 +149,8 @@ struct virtio_dev {
 	struct virtio_driver *vdrv;
 	/* Status of the device */
 	enum virtio_dev_status status;
+	/* Lock to ensure atomic writes */
+	struct uk_spinlock dev_lock;
 };
 
 /**
