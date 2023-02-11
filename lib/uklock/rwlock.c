@@ -36,8 +36,11 @@ void uk_rwlock_rlock(struct uk_rwlock *rwl)
 		}
 
 		/* Set the read waiter flag if previously it is unset */
-		if (!(rwl->rwlock & UK_RWLOCK_READ_WAITERS))
-			ukarch_or(&rwl->rwlock, UK_RWLOCK_READ_WAITERS);
+		setv = v | UK_RWLOCK_READ_WAITERS;
+
+		if (!(rwl->rwlock & UK_RWLOCK_READ_WAITERS) &&
+			ukarch_compare_exchange_sync(&rwl->rwlock, v, setv) != setv)
+			continue;
 
 		/* Wait for the unlock event */
 		if (__IS_CONFIG_SPIN(rwl->config_flags))
@@ -92,8 +95,11 @@ void uk_rwlock_wlock(struct uk_rwlock *rwl)
 			continue;
 		}
 
-		/* If the acquire operation fails set the write waiters flag*/
-		ukarch_or(&rwl->rwlock, UK_RWLOCK_WRITE_WAITERS);
+		setv = v | UK_RWLOCK_WRITE_WAITERS;
+
+		if (!(rwl->rwlock & UK_RWLOCK_WRITE_WAITERS) &&
+			ukarch_compare_exchange_sync(&rwl->rwlock, v, setv) != setv)
+			continue;
 
 		/* Wait for the unlock event */
 		if (__IS_CONFIG_SPIN(rwl->config_flags))
@@ -106,9 +112,6 @@ void uk_rwlock_wlock(struct uk_rwlock *rwl)
 	ukarch_store_n(&rwl->owner, current_thread);
 }
 
-/* FIXME: lost wakeup problem
- *			one solution: use deadline base waking up
- */
 void uk_rwlock_runlock(struct uk_rwlock *rwl)
 {
 	uint32_t v, setv;
@@ -220,8 +223,8 @@ void uk_rwlock_upgrade(struct uk_rwlock *rwl)
 	for (;;) {
 
 		/* Try to set the owner and relevant waiter flags */
-		setv = v & UK_RWLOCK_WAITERS;
 		v = rwl->rwlock;
+		setv = v & UK_RWLOCK_WAITERS;
 
 		if (_rw_can_upgrade(v)) {
 			if (ukarch_compare_exchange_sync(&rwl->rwlock, v, setv) == setv) {
@@ -232,7 +235,12 @@ void uk_rwlock_upgrade(struct uk_rwlock *rwl)
 			continue;
 		}
 		/* If we cannot upgrade wait till readers count is 0 */
-		ukarch_or(&rwl->rwlock, UK_RWLOCK_WRITE_WAITERS);
+		setv = v | UK_RWLOCK_WRITE_WAITERS;
+
+		if (!(rwl->rwlock & UK_RWLOCK_WRITE_WAITERS) &&
+			ukarch_compare_exchange_sync(&rwl->rwlock, v, setv) != setv)
+			continue;
+
 		if (__IS_CONFIG_SPIN(rwl->config_flags))
 			while (_rw_can_upgrade(rwl->rwlock) == 0)
 				;
