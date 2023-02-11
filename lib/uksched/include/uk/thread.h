@@ -97,14 +97,6 @@ struct uk_thread *uk_thread_current(void)
 	return __uk_sched_thread_current;
 }
 
-static inline
-unsigned long uk_get_stack_bottom(void)
-{
-	unsigned long sp = ukarch_read_sp();
-
-	return sp & ~((unsigned long) UKARCH_SP_ALIGN_MASK);
-}
-
 /*
  * STATES OF THREADS
  * =================

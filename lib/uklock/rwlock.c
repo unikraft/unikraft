@@ -1,3 +1,4 @@
+#include <uk/thread.h>
 #include <uk/rwlock.h>
 #include <uk/assert.h>
 #include <uk/config.h>
@@ -10,6 +11,7 @@ void __uk_rwlock_init(struct uk_rwlock *rwl, uint8_t config_flags)
 	UK_ASSERT(rwl);
 
 	rwl->rwlock = UK_RW_UNLOCK;
+	rwl->owner = NULL;
 	rwl->write_recurse = 0;
 	rwl->config_flags = config_flags;
 	uk_waitq_init(&rwl->shared);
@@ -18,7 +20,7 @@ void __uk_rwlock_init(struct uk_rwlock *rwl, uint8_t config_flags)
 
 void uk_rwlock_rlock(struct uk_rwlock *rwl)
 {
-	uintptr_t v, setv;
+	uint32_t v, setv;
 
 	UK_ASSERT(rwl);
 
@@ -48,11 +50,15 @@ void uk_rwlock_rlock(struct uk_rwlock *rwl)
 
 void uk_rwlock_wlock(struct uk_rwlock *rwl)
 {
-	uintptr_t v, setv, stackbottom;
+	uint32_t v, setv;
+	struct uk_thread *current_thread, *owner;
+
 
 	UK_ASSERT(rwl);
 
-	stackbottom = uk_get_stack_bottom();
+	current_thread = uk_thread_current();
+	owner = rwl->owner;
+
 	v = rwl->rwlock;
 
 	/* If the lock is not held by reader and owner of the lock is current
@@ -60,11 +66,11 @@ void uk_rwlock_wlock(struct uk_rwlock *rwl)
 	 */
 
 	if (__IS_CONFIG_WRITE_RECURSE(rwl->config_flags)
-			&& !(v & UK_RWLOCK_READ) && OWNER(v) == stackbottom) {
+			&& !(v & UK_RWLOCK_READ) && owner == current_thread) {
 		ukarch_inc(&(rwl->write_recurse));
 		return;
 	} else {
-		UK_ASSERT(OWNER(v) != stackbottom);
+		UK_ASSERT(owner != current_thread);
 	}
 
 	for (;;) {
@@ -75,7 +81,7 @@ void uk_rwlock_wlock(struct uk_rwlock *rwl)
 		 */
 
 		v = rwl->rwlock;
-		setv = stackbottom | (v & UK_RWLOCK_WAITERS);
+		setv = v & UK_RWLOCK_WAITERS;
 
 		if (_rw_can_write(v)) {
 			if (ukarch_compare_exchange_sync(&rwl->rwlock, v, setv) == setv) {
@@ -96,6 +102,8 @@ void uk_rwlock_wlock(struct uk_rwlock *rwl)
 		else
 			uk_waitq_wait_event(&rwl->exclusive, _rw_can_write(rwl->rwlock));
 	}
+
+	ukarch_store_n(&rwl->owner, current_thread);
 }
 
 /* FIXME: lost wakeup problem
@@ -103,7 +111,7 @@ void uk_rwlock_wlock(struct uk_rwlock *rwl)
  */
 void uk_rwlock_runlock(struct uk_rwlock *rwl)
 {
-	uintptr_t v, setv;
+	uint32_t v, setv;
 	struct uk_waitq *queue = NULL;
 
 	UK_ASSERT(rwl);
@@ -148,16 +156,19 @@ void uk_rwlock_runlock(struct uk_rwlock *rwl)
 
 void uk_rwlock_wunlock(struct uk_rwlock *rwl)
 {
-	uintptr_t v, setv, stackbottom;
+	uint32_t v, setv;
+	struct uk_thread *owner, *current_thread;
 	struct uk_waitq *queue;
 
 	UK_ASSERT(rwl);
 
 	v = rwl->rwlock;
-	stackbottom = uk_get_stack_bottom();
+	owner = rwl->owner;
+	current_thread = uk_thread_current();
+
 	queue = NULL;
 
-	if ((v & UK_RWLOCK_READ) || OWNER(v) != stackbottom)
+	if ((v & UK_RWLOCK_READ) || owner != current_thread)
 		return;
 
 	/* Handle recursion
@@ -166,6 +177,8 @@ void uk_rwlock_wunlock(struct uk_rwlock *rwl)
 	if (__IS_CONFIG_WRITE_RECURSE(rwl->config_flags) &&
 			ukarch_sub_fetch(&(rwl->write_recurse), 1) != 0)
 		return;
+
+	ukarch_store_n(&rwl->owner, NULL);
 
 	/* All recusive locks have been released, time to unlock*/
 	for (;;) {
@@ -180,7 +193,6 @@ void uk_rwlock_wunlock(struct uk_rwlock *rwl)
 				queue = &rwl->exclusive;
 			}
 		}
-
 		/* Try to set the lock */
 		if (ukarch_compare_exchange_sync(&rwl->rwlock, v, setv) == setv)
 			break;
@@ -195,11 +207,10 @@ void uk_rwlock_wunlock(struct uk_rwlock *rwl)
 
 void uk_rwlock_upgrade(struct uk_rwlock *rwl)
 {
-	uintptr_t v, setv, stackbottom;
+	uint32_t v, setv;
 
 	UK_ASSERT(rwl);
 
-	stackbottom = uk_get_stack_bottom();
 	v = rwl->rwlock;
 
 	/* If there are no readers then upgrade is invalid */
@@ -209,7 +220,7 @@ void uk_rwlock_upgrade(struct uk_rwlock *rwl)
 	for (;;) {
 
 		/* Try to set the owner and relevant waiter flags */
-		setv = stackbottom | (v & UK_RWLOCK_WAITERS);
+		setv = v & UK_RWLOCK_WAITERS;
 		v = rwl->rwlock;
 
 		if (_rw_can_upgrade(v)) {
@@ -228,23 +239,29 @@ void uk_rwlock_upgrade(struct uk_rwlock *rwl)
 		else
 			uk_waitq_wait_event(&rwl->exclusive, _rw_can_upgrade(rwl->rwlock));
 	}
+
+	rwl->owner = uk_thread_current();
 }
 
 void uk_rwlock_downgrade(struct uk_rwlock *rwl)
 {
-	uintptr_t v, setv, stackbottom;
+	uint32_t v, setv;
+	struct uk_thread *current_thread, *owner;
 	struct uk_waitq *queue = NULL;
 
 	UK_ASSERT(rwl);
 
-	stackbottom = uk_get_stack_bottom();
+	current_thread = uk_thread_current();
+	owner = rwl->owner;
 	v = rwl->rwlock;
 
-	if ((v & UK_RWLOCK_READ) || OWNER(v) != stackbottom)
+	if ((v & UK_RWLOCK_READ) || owner != current_thread)
 		return;
 
 	if (__IS_CONFIG_WRITE_RECURSE(rwl->config_flags))
 		rwl->write_recurse = 0;
+
+	ukarch_store_n(&rwl->owner, NULL);
 
 	for (;;) {
 		if (!__IS_CONFIG_SPIN(rwl->config_flags)
