@@ -113,6 +113,88 @@ ukplat_memregion_list_insert(struct ukplat_memregion_list *list,
 }
 
 /**
+ * Insert a new region into the memory region list. This extends
+ * ukplat_memregion_list_insert to carve out the area of any pre-existing
+ * overlapping regions. The virtual addresses will leave out any carved out
+ * region.
+ * If there is not enough space for all resulting regions, the function will
+ * insert as many as possible and then return an error.
+ * @param list
+ *   The memory region list to insert the range into
+ * @param mrd
+ *   The memory range to insert
+ * @param min_size
+ *   The minimum size an inserted region has to have. Regions smaller than this
+ *   size won't be added. Setting this parameter to zero will disable this
+ *   behavior.
+ * @returns
+ *   Zero if the operation was successful, a negative errno otherwise
+ */
+static inline int
+ukplat_memregion_list_insert_split_phys(struct ukplat_memregion_list *list,
+					const struct ukplat_memregion_desc *mrd,
+					const __sz min_size)
+{
+	struct ukplat_memregion_desc *mrdp;
+	struct ukplat_memregion_desc mrdc;
+	__paddr_t pstart, pend;
+	__vaddr_t voffset;
+	int i;
+	int rc;
+
+	voffset = mrd->vbase - mrd->pbase;
+	pstart = mrd->pbase;
+	pend = mrd->pbase + mrd->len;
+
+	mrdc = *mrd;
+
+	/* TODO: The following code does not make use of the tracked iteration
+	 * index to insert elements at the correct location and instead uses the
+	 * generic insertion routine. For large memory region lists this could
+	 * be potentially slow.
+	 */
+	for (i = 0; i < (int)list->count; i++) {
+		mrdp = &list->mrds[i];
+		if (!ukplat_memregion_desc_overlap(mrdp, pstart, pend))
+			continue;
+		if (pend <= mrdp->pbase)
+			break;
+
+		if (!mrdp->type)
+			continue;
+
+		if (pstart < mrdp->pbase) {
+			/* Some part of the inserted region is before the
+			 * overlapping region. Try to insert that part if it's
+			 * large enough.
+			 */
+			mrdc.pbase = pstart;
+			mrdc.vbase = pstart + voffset;
+			mrdc.len   = mrdp->pbase - pstart;
+
+			if (mrdc.len >= min_size) {
+				rc = ukplat_memregion_list_insert(list, &mrdc);
+				if (unlikely(rc < 0))
+					return rc;
+			}
+		}
+
+		pstart = mrdp->pbase + mrdp->len;
+	}
+
+	if (pend - pstart < min_size)
+		return 0;
+
+	mrdc.pbase = pstart;
+	mrdc.vbase = pstart + voffset;
+	mrdc.len = pend - pstart;
+
+	/* Add the remaining region */
+	rc = ukplat_memregion_list_insert(list, &mrdc);
+	return rc < 0 ? rc : 0;
+}
+
+/**
  * Delete the specified region from the memory list.
  *
  * @param list

@@ -85,6 +85,27 @@ struct ukplat_memregion_desc {
 } __packed __align(__SIZEOF_LONG__);
 
 /**
+ * Check whether the memory region descriptor overlaps with [pstart, pend) in
+ * the physical address space.
+ *
+ * @param mrd
+ *   Pointer to the memory region descriptor to check against
+ * @param pstart
+ *   Start of the physical memory region
+ * @param pend
+ *   End of the physical memory region
+ * @return
+ *   Zero if the two specified regions have no overlap, a non-zero value
+ *   otherwise
+ */
+static inline int
+ukplat_memregion_desc_overlap(const struct ukplat_memregion_desc *mrd,
+			      __paddr_t pstart, __paddr_t pend)
+{
+	return RANGE_OVERLAP(mrd->pbase, mrd->len, pstart, pend - pstart);
+}
+
+/**
  * Returns the number of available memory regions
  */
 int ukplat_memregion_count(void);
