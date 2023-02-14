@@ -114,7 +114,7 @@ int virtqueue_intr_enable(struct virtqueue *vq)
 	vrq = to_virtqueue_vring(vq);
 	/* Check if there are no more packets enabled */
 	if (!virtqueue_hasdata(vq)) {
-		if (vrq->vring.avail->flags | VRING_AVAIL_F_NO_INTERRUPT) {
+		if (vrq->vring.avail->flags & VRING_AVAIL_F_NO_INTERRUPT) {
 			vrq->vring.avail->flags &=
 				(~VRING_AVAIL_F_NO_INTERRUPT);
 			/**
