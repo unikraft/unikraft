@@ -65,6 +65,8 @@ static struct utsname utsname = {
 	.machine	= "arm64"
 #elif CONFIG_ARCH_ARM_32
 	.machine	= "arm32"
+#elif CONFIG_ARCH_RISCV_64
+	.machine	= "riscv64"
 #else
 #error "Set your machine architecture!"
 #endif
