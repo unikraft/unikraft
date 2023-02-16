@@ -38,6 +38,8 @@
 #include <x86/cpu.h>
 #elif defined(__ARM_32__) || defined(__ARM_64__)
 #include <arm/cpu.h>
+#elif defined(__RISCV_64__)
+#include <riscv/cpu.h>
 #else
 #error "Add cpu.h for current architecture."
 #endif
