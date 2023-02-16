@@ -46,6 +46,7 @@
 #include <uk/plat/common/lcpu.h>
 #include <uk/plat/common/_time.h>
 #include <uk/print.h>
+#include <uk/assert.h>
 
 #include <limits.h>
 #include <errno.h>
