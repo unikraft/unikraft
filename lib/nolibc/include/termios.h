@@ -7,7 +7,8 @@ extern "C" {
 
 #include <uk/config.h>
 #if ((!defined CONFIG_ARCH_X86_64) && (!defined CONFIG_ARCH_ARM_64) \
-			&& (!defined CONFIG_ARCH_ARM_32))
+		&& (!defined CONFIG_ARCH_ARM_32) && \
+		 (!defined CONFIG_ARCH_RISCV_64))
 #error Please make sure this termios.h declaration match your architecture
 #endif
 
