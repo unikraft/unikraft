@@ -340,7 +340,7 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 	struct virtio_net_device *vndev;
 	struct virtio_net_hdr *vhdr;
 	struct virtio_net_hdr_padded *padded_hdr;
-	int16_t header_sz = sizeof(*padded_hdr);
+	int16_t header_sz;
 	int rc = 0;
 	int status = 0x0;
 	size_t total_len = 0;
@@ -351,6 +351,9 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 	UK_ASSERT(pkt && queue);
 
 	vndev = to_virtionetdev(dev);
+
+	header_sz = vndev->modern ? VIRTIO_HDR_LEN : sizeof(*vhdr);
+
 	/**
 	 * We are reclaiming the free descriptors from buffers. The function is
 	 * not protected by means of locks. We need to be careful if there are
@@ -363,7 +366,7 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 	/**
 	 * Use the preallocated header space for the virtio header.
 	 */
-	rc = uk_netbuf_header(pkt, VIRTIO_HDR_LEN);
+	rc = uk_netbuf_header(pkt, vndev->modern ? VIRTIO_HDR_LEN : sizeof(*padded_hdr));
 	if (unlikely(rc != 1)) {
 		uk_pr_err("Failed to prepend virtio header\n");
 		rc = -ENOSPC;
@@ -384,11 +387,11 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 	 *       to `uk_sglist_append_netbuf()`. However, a netbuf
 	 *       chain can only once have set the PARTIAL_CSUM flag.
 	 */
-	memset(vhdr, 0, VIRTIO_HDR_LEN);
+	memset(vhdr, 0, header_sz);
 	if (pkt->flags & UK_NETBUF_F_PARTIAL_CSUM) {
 		vhdr->flags       |= VIRTIO_NET_HDR_F_NEEDS_CSUM;
 		/* `csum_start` is without header size */
-		vhdr->csum_start   = pkt->csum_start - header_sz;
+		vhdr->csum_start   = pkt->csum_start - (vndev->modern ? VIRTIO_HDR_LEN : sizeof(*padded_hdr));
 		vhdr->csum_offset  = pkt->csum_offset;
 	}
 	if (pkt->flags & UK_NETBUF_F_GSO_TCPV4) {

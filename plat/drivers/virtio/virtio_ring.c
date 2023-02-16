@@ -253,6 +253,8 @@ __u64 virtqueue_feature_negotiate(__u64 feature_set)
 {
 	__u64 feature = (1ULL << VIRTIO_TRANSPORT_F_START) - 1;
 
+	/* Allow version 1 flag */
+	feature |= 1ULL << VIRTIO_F_VERSION_1;
 	/* Allow event index feature */
 	feature |= 1ULL << VIRTIO_F_EVENT_IDX;
 

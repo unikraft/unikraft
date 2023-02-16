@@ -114,7 +114,7 @@ static void vm_set_features(struct virtio_dev *vdev,
 	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
 
 	/* Give virtio_ring a chance to accept features. */
-	virtqueue_feature_negotiate(features);
+	features = virtqueue_feature_negotiate(features);
 
 	/* Make sure there are no mixed devices */
 	if (vm_dev->version == 2 &&
