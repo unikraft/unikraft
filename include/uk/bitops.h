@@ -253,12 +253,21 @@ uk_find_next_zero_bit(const unsigned long *addr, unsigned long size,
 static inline int
 uk_test_and_clear_bit(long nr, volatile unsigned long *addr)
 {
+#ifdef __RISCV_64__
+	/*
+	 * Atomic operations on 8/16 bit types are not
+	 * currently supported for RISC-V.
+	 */
+	volatile __u32 *ptr = ((__u32 *) addr) + (nr >> 5);
+	__u32 mask = 1 << (nr & 31);
+	__u32 orig;
+#else
 	volatile __u8 *ptr = ((__u8 *) addr) + (nr >> 3);
 	__u8 mask = 1 << (nr & 7);
 	__u8 orig;
+#endif
 
 	orig = __atomic_fetch_and(ptr, ~mask, __ATOMIC_SEQ_CST);
-
 	return (orig & mask) != 0;
 }
 
@@ -277,12 +286,21 @@ uk_test_and_clear_bit(long nr, volatile unsigned long *addr)
 static inline int
 __uk_test_and_clear_bit(long nr, volatile unsigned long *addr)
 {
+	#ifdef __RISCV_64__
+	/*
+	 * Atomic operations on 8/16 bit types are not
+	 * currently supported for RISC-V.
+	 */
+	volatile __u32 *ptr = ((__u32 *) addr) + (nr >> 5);
+	__u32 mask = 1 << (nr & 31);
+	__u32 orig;
+	#else
 	volatile __u8 *ptr = ((__u8 *) addr) + (nr >> 3);
 	__u8 mask = 1 << (nr & 7);
 	__u8 orig;
+	#endif
 
 	orig = __atomic_fetch_and(ptr, ~mask, __ATOMIC_RELAXED);
-
 	return (orig & mask) != 0;
 }
 
@@ -297,12 +315,21 @@ __uk_test_and_clear_bit(long nr, volatile unsigned long *addr)
 static inline int
 uk_test_and_set_bit(long nr, volatile unsigned long *addr)
 {
+	#ifdef __RISCV_64__
+	/*
+	 * Atomic operations on 8/16 bit types are not
+	 * currently supported for RISC-V.
+	 */
+	volatile __u32 *ptr = ((__u32 *) addr) + (nr >> 5);
+	__u32 mask = 1 << (nr & 31);
+	__u32 orig;
+	#else
 	volatile __u8 *ptr = ((__u8 *) addr) + (nr >> 3);
 	__u8 mask = 1 << (nr & 7);
 	__u8 orig;
+	#endif
 
 	orig = __atomic_fetch_or(ptr, mask, __ATOMIC_SEQ_CST);
-
 	return (orig & mask) != 0;
 }
 
@@ -321,12 +348,21 @@ uk_test_and_set_bit(long nr, volatile unsigned long *addr)
 static inline int
 __uk_test_and_set_bit(long nr, volatile unsigned long *addr)
 {
+	#ifdef __RISCV_64__
+	/*
+	 * Atomic operations on 8/16 bit types are not
+	 * currently supported for RISC-V.
+	 */
+	volatile __u32 *ptr = ((__u32 *) addr) + (nr >> 5);
+	__u32 mask = 1 << (nr & 31);
+	__u32 orig;
+	#else
 	volatile __u8 *ptr = ((__u8 *) addr) + (nr >> 3);
 	__u8 mask = 1 << (nr & 7);
 	__u8 orig;
+	#endif
 
 	orig = __atomic_fetch_or(ptr, mask, __ATOMIC_RELAXED);
-
 	return (orig & mask) != 0;
 }
 
