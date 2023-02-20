@@ -169,7 +169,8 @@ static inline void vring_init(struct vring *vr, unsigned int num, uint8_t *p,
 	vr->avail = (struct vring_avail *) (p +
 			num * sizeof(struct vring_desc));
 	vr->used = (void *)
-	(((unsigned long) &vr->avail->ring[num] + align - 1) & ~(align - 1));
+		(((unsigned long) &vr->avail->ring[num] + sizeof(uint16_t) +
+			align - 1) & ~(align - 1));
 }
 
 static inline unsigned int vring_size(unsigned int num, unsigned long align)
@@ -188,7 +189,8 @@ static inline unsigned int vring_size(unsigned int num, unsigned long align)
 static inline int vring_need_event(__u16 event_idx, __u16 new_idx,
 				   __u16 old_idx)
 {
-	return (new_idx - event_idx - 1) < (new_idx - old_idx);
+	return (uint16_t)(new_idx - event_idx - 1) <
+		(uint16_t)(new_idx - old_idx);
 }
 
 #ifdef __cplusplus
