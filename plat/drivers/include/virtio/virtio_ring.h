@@ -157,7 +157,7 @@ struct vring {
  * versa. They are at the end for backwards compatibility.
  */
 #define vring_used_event(vr) ((vr)->avail->ring[(vr)->num])
-#define vring_avail_event(vr) (*(__virtio16 *)&(vr)->used->ring[(vr)->num])
+#define vring_avail_event(vr) (*(__virtio_le16 *)&(vr)->used->ring[(vr)->num])
 
 static inline void vring_init(struct vring *vr, unsigned int num, uint8_t *p,
 			      unsigned long align)
@@ -167,7 +167,8 @@ static inline void vring_init(struct vring *vr, unsigned int num, uint8_t *p,
 	vr->avail = (struct vring_avail *) (p +
 			num * sizeof(struct vring_desc));
 	vr->used = (void *)
-	(((unsigned long) &vr->avail->ring[num] + align - 1) & ~(align - 1));
+		(((unsigned long) &vr->avail->ring[num] + sizeof(uint16_t) +
+			align - 1) & ~(align - 1));
 }
 
 static inline unsigned int vring_size(unsigned int num, unsigned long align)
@@ -186,7 +187,8 @@ static inline unsigned int vring_size(unsigned int num, unsigned long align)
 static inline int vring_need_event(__u16 event_idx, __u16 new_idx,
 				   __u16 old_idx)
 {
-	return (new_idx - event_idx - 1) < (new_idx - old_idx);
+	return (uint16_t)(new_idx - event_idx - 1) <
+		(uint16_t)(new_idx - old_idx);
 }
 
 #ifdef __cplusplus

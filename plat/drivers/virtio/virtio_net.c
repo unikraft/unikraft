@@ -929,6 +929,16 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n)
 	}
 
 	/**
+	 * Use index based event supression when it's available.
+	 * This allows a more fine-grained control when the hypervisor should
+	 * notify the guest. Some hypervisors such as firecracker also do not
+	 * support the original flag.
+	 */
+	if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_F_EVENT_IDX)) {
+		VIRTIO_FEATURE_SET(drv_features, VIRTIO_F_EVENT_IDX);
+	}
+
+	/**
 	 * TCP Segmentation Offload
 	 * NOTE: This enables sending and receiving of packets marked with
 	 *       VIRTIO_NET_HDR_GSO_TCPV4
