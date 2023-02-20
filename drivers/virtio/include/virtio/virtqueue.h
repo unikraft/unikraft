@@ -66,6 +66,8 @@ struct virtqueue {
 	virtqueue_callback_t vq_callback;
 	/* Next entry of the queue */
 	UK_TAILQ_ENTRY(struct virtqueue) next;
+	/* EVENT_IDX notification suppression is used */
+	__u8 uses_event_idx;
 	/* Private data structure used by the driver of the queue */
 	void *priv;
 };

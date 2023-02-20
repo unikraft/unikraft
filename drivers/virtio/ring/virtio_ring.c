@@ -43,6 +43,7 @@
 #include <uk/plat/io.h>
 #include <virtio/virtio_ring.h>
 #include <virtio/virtqueue.h>
+#include <virtio/virtio_bus.h>
 #ifdef CONFIG_LIBUKVMEM
 #include <uk/arch/paging.h>
 #include <uk/plat/paging.h>
@@ -101,6 +102,12 @@ void virtqueue_intr_disable(struct virtqueue *vq)
 	UK_ASSERT(vq);
 
 	vrq = to_virtqueue_vring(vq);
+
+	if (vq->uses_event_idx) {
+		vring_used_event(&vrq->vring) =
+			vrq->last_used_desc_idx - vrq->vring.num - 1;
+		return;
+	}
 	vrq->vring.avail->flags |= (VRING_AVAIL_F_NO_INTERRUPT);
 }
 
@@ -114,24 +121,33 @@ int virtqueue_intr_enable(struct virtqueue *vq)
 	vrq = to_virtqueue_vring(vq);
 	/* Check if there are no more packets enabled */
 	if (!virtqueue_hasdata(vq)) {
-		if (vrq->vring.avail->flags & VRING_AVAIL_F_NO_INTERRUPT) {
+		if (vq->uses_event_idx) {
+			/* TODO: This allows delaying the interrupts by a
+			 *       adjustable count of descriptors. This is could
+			 *       be useful for TXQ interrupts, which can be
+			 *       handled in a batched fashion.
+			 */
+			vring_used_event(&vrq->vring) =
+			    vrq->last_used_desc_idx + 0;
+		} else {
 			vrq->vring.avail->flags &=
 				(~VRING_AVAIL_F_NO_INTERRUPT);
-			/**
-			 * We enabled the interrupts. We ensure it using the
-			 * memory barrier and check if there are any further
-			 * data available in the queue. The check for data
-			 * after enabling the interrupt is to make sure we do
-			 * not miss any interrupt while transitioning to enable
-			 * interrupt. This is inline with the requirement from
-			 * virtio specification section 3.2.2
-			 */
-			mb();
-			/* Check if there are further descriptors */
-			if (virtqueue_hasdata(vq)) {
-				virtqueue_intr_disable(vq);
-				rc = 1;
-			}
+		}
+
+		/**
+		 * We enabled the interrupts. We ensure it using the
+		 * memory barrier and check if there are any further
+		 * data available in the queue. The check for data
+		 * after enabling the interrupt is to make sure we do
+		 * not miss any interrupt while transitioning to enable
+		 * interrupt. This is inline with the requirement from
+		 * virtio specification section 3.2.2
+		 */
+		mb();
+		/* Check if there are further descriptors */
+		if (virtqueue_hasdata(vq)) {
+			virtqueue_intr_disable(vq);
+			rc = 1;
 		}
 	} else {
 		/**
@@ -186,9 +202,21 @@ static inline void virtqueue_detach_desc(struct virtqueue_vring *vrq,
 int virtqueue_notify_enabled(struct virtqueue *vq)
 {
 	struct virtqueue_vring *vrq;
+	uint16_t old, new;
 
 	UK_ASSERT(vq);
 	vrq = to_virtqueue_vring(vq);
+	if (vq->uses_event_idx) {
+		new = vrq->vring.avail->idx;
+		/* TODO: Use the actually submitted count instead of assuming
+		 *       that a single descriptor was submitted. This would be
+		 *       more efficient when we would have batching implemented.
+		 */
+		old = new - 1;
+
+		return vring_need_event(vring_avail_event(&vrq->vring),
+					new, old);
+	}
 
 	return ((vrq->vring.used->flags & VRING_USED_F_NO_NOTIFY) == 0);
 }
@@ -235,6 +263,8 @@ __u64 virtqueue_feature_negotiate(__u64 feature_set)
 
 	/* Allow version 1 flag */
 	feature |= 1ULL << VIRTIO_F_VERSION_1;
+	/* Allow event index feature */
+	feature |= 1ULL << VIRTIO_F_EVENT_IDX;
 
 	feature &= feature_set;
 	return feature;
@@ -451,6 +481,8 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 	vq->vdev = vdev;
 	vq->vq_callback = callback;
 	vq->vq_notify_host = notify;
+	vq->uses_event_idx =
+	    VIRTIO_FEATURE_HAS(vdev->features, VIRTIO_F_EVENT_IDX);
 	return vq;
 
 err_freevq:
