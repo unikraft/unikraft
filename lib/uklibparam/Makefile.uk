@@ -4,4 +4,7 @@ ASINCLUDES-y	+= -I$(LIBUKLIBPARAM_BASE)/include
 CINCLUDES-y	+= -I$(LIBUKLIBPARAM_BASE)/include
 CXXINCLUDES-y	+= -I$(LIBUKLIBPARAM_BASE)/include
 
-LIBUKLIBPARAM_SRCS-y += $(LIBUKLIBPARAM_BASE)/param.c
+LIBUKLIBPARAM_SRCS-y += $(LIBUKLIBPARAM_BASE)/parser.c
+
+# Push linker script to each library for making the section available
+EACHOLIB_SRCS-$(CONFIG_LIBUKLIBPARAM) += $(LIBUKLIBPARAM_BASE)/libparam.lds.S|uklibparam
