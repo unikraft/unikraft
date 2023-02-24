@@ -264,6 +264,22 @@ int uk_libparam_parse(int argc, char **argv, int flags);
 	_UK_LIBPARAM_PARAM_DEFINE(var, &var, type, 1, desc)
 
 /*
+ * Register a single parameter with a custom name
+ *
+ * @param name
+ *      Name used for library parameter
+ * @param addr
+ *      Reference to variable/memory address of parameter
+ * @param type
+ *      Data type: bool, char, uchar, int, uint, charp, __s8, __u8, __s16,
+ *                 __u16, __s32, __u32, __s64, __u64, __uptr
+ * @param desc
+ *      C string with parameter description. Optional, can be __NULL.
+ */
+#define UK_LIBPARAM_PARAM_ALIAS(name, addr, type, desc)		\
+	_UK_LIBPARAM_PARAM_DEFINE(name, (addr), type, 1, desc)
+
+/*
  * Register a parameter array
  *
  * @param var
@@ -279,6 +295,25 @@ int uk_libparam_parse(int argc, char **argv, int flags);
  */
 #define UK_LIBPARAM_PARAM_ARR(var, type, count, desc) \
 	_UK_LIBPARAM_PARAM_DEFINE(var, &var, type, (count), desc)
+
+/*
+ * Register a parameter array with a custom name
+ *
+ * @param name
+ *      Name used for library parameter
+ * @param addr
+ *      Reference to first array element/memory address of parameter
+ * @param type
+ *      Data type of array elements: bool, char, uchar, int, uint, charp, __s8,
+ *                                   __u8, __s16, __u16, __s32, __u32, __s64,
+ *                                   __u64, __uptr
+ * @param count
+ *      Number of elements in the array that can be filled (<= array size)
+ * @param desc
+ *      C string with parameter description. Optional, can be __NULL.
+ */
+#define UK_LIBPARAM_PARAM_ARR_ALIAS(name, addr, type, count, desc)	\
+	_UK_LIBPARAM_PARAM_DEFINE(name, (addr), type, (count), desc)
 
 /* Deprecated registration macros */
 /* WARNING: These interfaces are here for backwards compatibility and will be
