@@ -819,10 +819,10 @@ $(BUILD_DIR)/uk-gdb.py: $(SCRIPTS_DIR)/uk-gdb.py
 
 ifeq ($(CONFIG_LINK_ASLR),y)
 prepare-ASLR:
-	$(eval ASLR_BASE_ADDRESS := $(shell $(SCRIPTS_DIR)/ASLR/ASLR.py --setup_file="$(LIBKVMPLAT_BASE)/x86/entry64.S"))
+	$(eval ASLR_BASE_ADDRESS := $(shell $(SCRIPTS_DIR)/ASLR/ASLR.py --setup_file="$(LIBKVMPLAT_BASE)/x86/multiboot.S"))
 else
 prepare-ASLR:
-	$(eval ASLR_BASE_ADDRESS :=  $(shell $(SCRIPTS_DIR)/ASLR/ASLR.py --setup_file="$(LIBKVMPLAT_BASE)/x86/entry64.S" \
+	$(eval ASLR_BASE_ADDRESS :=  $(shell $(SCRIPTS_DIR)/ASLR/ASLR.py --setup_file="$(LIBKVMPLAT_BASE)/x86/multiboot.S" \
 		--base_addr="100000"))
 endif
 

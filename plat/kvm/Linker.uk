@@ -76,7 +76,7 @@ ifeq (y,$(CONFIG_LINK_ASLR))
 $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y)
 
-	$(call build_cmd,ASLR,,$@,\
+	$(call build_cmd,ASLR,,ASLR,\
 		$(SCRIPTS_DIR)/ASLR/ASLR.py \
 			$(ASLR_args))
 
@@ -96,7 +96,7 @@ $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 		$(OBJCOPY) -w -G kvmos_* -G _libkvmplat_entry \
 			$(KVM_IMAGE).ld.o $(KVM_IMAGE).o)
 	
-	$(call build_cmd,COPY,,ASLR scripts,\
+	$(call build_cmd,COPY,,ASLR_scripts,\
 		cp $(SCRIPTS_DIR)/ASLR/relink_ELF.sh ./../; \
 		cp $(SCRIPTS_DIR)/ASLR/string_script.py ./../)
 	

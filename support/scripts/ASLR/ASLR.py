@@ -332,7 +332,7 @@ if __name__ == '__main__':
 	#Gets back the path of the linker script to modify
 	parser = argparse.ArgumentParser(prog="Unikraft ASLR, linker script implementation")
 
-	parser.add_argument('--setup_file', dest='setup', default='./', help="Path leading to the entry64.S file.")	
+	parser.add_argument('--setup_file', dest='setup', default='./', help="Path leading to the multiboot.S file.")	
 	
 	parser.add_argument('--base_addr', dest='baseAddr', default='-1', help="ASLR's base address")
 	
