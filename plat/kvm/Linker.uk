@@ -33,8 +33,8 @@ $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) \
 		    $(KVM_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y) \
 		    $(UK_PLAT_KVM_DEF_LDS)
-	$(call build_cmd,LD,,$(KVM_IMAGE).o,\
-	       $(LD) -r $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
+	$(call build_cmd,LD,,$@,\
+	       $(LD) \
 			$(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
 			$(KVM_OLIBS) $(KVM_OLIBS-y) \
 			$(UK_OLIBS) $(UK_OLIBS-y) \
@@ -43,12 +43,9 @@ $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 			$(UK_ALIBS) $(UK_ALIBS-y) \
 			$(KVM_LINK_LIBGCC_FLAG) \
 			-Wl$(comma)--end-group \
-			-o $(KVM_IMAGE).o)
-	$(call build_cmd,LD,,$@,\
-	       $(LD) $(LDFLAGS) $(LDFLAGS-y) \
-		     $(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
-		     $(KVM_LD_SCRIPT_FLAGS) \
-		     $(KVM_IMAGE).o -o $@)
+			$(LDFLAGS) $(LDFLAGS-y) \
+			$(KVM_LD_SCRIPT_FLAGS) \
+			-o $@)
 	$(call build_bootinfo,$@)
 
 $(KVM_IMAGE): $(KVM_IMAGE).dbg
@@ -74,5 +71,4 @@ UK_IMAGES-$(CONFIG_OPTIMIZE_COMPRESS) += $(KVM_IMAGE).gz
 endif
 
 # ...for cleaning:
-LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_IMAGE).o)
 LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_DEBUG_IMAGE).bootinfo)
