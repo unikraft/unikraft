@@ -104,4 +104,17 @@ if LIBPOSIX_ENVIRON
 		bool
 		default y if LIBPOSIX_ENVIRON_ENVP15 != ""
 	endmenu
+
+	config LIBPOSIX_ENVIRON_LIBPARAM
+	bool "Parse kernel command line arguments"
+	default n
+	select LIBUKLIBPARAM
+
+	config LIBPOSIX_ENVIRON_LIBPARAM_MAXCOUNT
+	int "Additional reserved entries for vars from command line"
+	default 8
+	depends on LIBPOSIX_ENVIRON_LIBPARAM
+	help
+		This number defines the maximum number of variables that
+		can be handed over with the kernel command line.
 endif
