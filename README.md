@@ -72,7 +72,7 @@ The fastest way to get started configuring, building and deploying Unikraft unik
 
 You can quickly and easily install KraftKit using the interactive installer. Simply run the following command to get started:
 
-```
+```bash
 curl --proto '=https' --tlsv1.2 -sSf https://get.kraftkit.sh | sh
 ```
 
