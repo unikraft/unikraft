@@ -636,6 +636,8 @@ CFLAGS		+= -DCC_VERSION=$(CC_VERSION)
 CXXFLAGS	+= -DCC_VERSION=$(CC_VERSION)
 GOCFLAGS	+= -DCC_VERSION=$(CC_VERSION)
 
+CC_NAME		:= $(shell $(CC) -v 2>&1 | grep -E "\\w+ version" | sed 's/\s.*$$//')
+
 # ensure $(BUILD_DIR)/kconfig, $(BUILD_DIR)/include and $(BUILD_DIR)/include/uk exists
 $(call mk_sub_build_dir,kconfig)
 $(call mk_sub_build_dir,include)
