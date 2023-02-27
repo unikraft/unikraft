@@ -465,6 +465,7 @@ struct uk_netdev_einfo {
 	const char *ipv4_addr;
 	const char *ipv4_net_mask;
 	const char *ipv4_gw_addr;
+	const char *ipv4_dns0_addr;
 };
 
 struct uk_netdev_tx_stats {
