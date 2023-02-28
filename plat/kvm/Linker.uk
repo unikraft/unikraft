@@ -58,6 +58,9 @@ $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 			$(LDFLAGS) $(LDFLAGS-y) \
 			$(KVM_LD_SCRIPT_FLAGS) \
 			-o $@)
+ifeq ($(CONFIG_OPTIMIZE_PIE),y)
+	$(call build_uk_reloc,$@)
+endif
 
 $(KVM_IMAGE): $(KVM_IMAGE).dbg
 	$(call build_cmd,SCSTRIP,,$@,\
@@ -65,7 +68,9 @@ $(KVM_IMAGE): $(KVM_IMAGE).dbg
 			$(SECT_STRIP_FLAGS) $(SECT_STRIP_FLAGS-y) \
 			$(KVM_STRIPFLAGS) \
 			$< -o $@ 2>&1 | \
-			{ grep -v "Empty loadable segment detected" || true; })
+			{ grep -Ev \
+				"Empty loadable segment detected|section.*lma.*adjusted to.*" || \
+				true; })
 	$(call build_bootinfo,$@)
 ifeq ($(ELF64_TO_32),y)
 	$(call build_elf64_to_32,$@)
