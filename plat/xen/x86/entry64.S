@@ -30,6 +30,7 @@
 #include <uk/config.h>
 #include <xen/xen.h>
 #include <xen/elfnote.h>
+#include <uk/asm.h>
 
 #define ELFNOTE(name, type, desc)           \
     .pushsection .note.name               ; \
@@ -42,8 +43,6 @@
 3:desc                  /* desc   */      ; \
 4:.align 4                                ; \
     .popsection
-
-#define ENTRY(X) .globl X ; X :
 
 #ifdef CONFIG_PARAVIRT
 ELFNOTE(Xen, XEN_ELFNOTE_GUEST_OS, .asciz "Unikraft")
