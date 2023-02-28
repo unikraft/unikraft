@@ -187,12 +187,12 @@ static struct uk_alloc *heap_init()
 	 */
 	ukplat_memregion_foreach(&md, UKPLAT_MEMRT_FREE, 0, 0) {
 		uk_pr_debug("Trying %p-%p 0x%02x %s\n",
-			    (void *)md->vbase, (void *)(md->vbase + md->len),
-			    md->flags,
+			    (void *)md->vbase, (void *)(md->vbase + md->len)
+			    ,md->flags
 #if CONFIG_UKPLAT_MEMRNAME
-			    md->name
+			    ,md->name
 #else /* CONFIG_UKPLAT_MEMRNAME */
-			    ""
+			    ,""
 #endif /* !CONFIG_UKPLAT_MEMRNAME */
 			    );
 

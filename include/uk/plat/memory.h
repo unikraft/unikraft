@@ -132,7 +132,15 @@ ukplat_memregion_find_next(int i, __u32 type, __u32 flags, __u32 fmask,
 {
 	struct ukplat_memregion_desc *desc;
 	__u32 stype, sflags;
-	int rc;
+	int rc, count;
+    	count = ukplat_memregion_count();
+
+	/* Sanity check before to get a memory region using ukplat_memregion_get
+	 * this prevent  Initialize memory allocator in platform linuxu 
+	 * */
+    	if(i >= count){
+            return -1;
+    	}
 
 	do {
 		rc = ukplat_memregion_get(++i, &desc);
