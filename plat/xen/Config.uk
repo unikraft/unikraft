@@ -9,6 +9,7 @@ menuconfig PLAT_XEN
        select LIBNOLIBC if !HAVE_LIBC
        select LIBFDT if ARCH_ARM_32
        select XEN_DBGEMERGENCY if ARCH_ARM_32
+       select LIBUKRELOC if OPTIMIZE_PIE
        help
                 Create a Unikraft image that runs as a Xen guest
 
