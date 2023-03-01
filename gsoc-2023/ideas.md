@@ -140,6 +140,31 @@ Time permitting, the project could be extended to include support for other devi
 
 ---
 
+### Driver Probing Framework
+
+| | |
+|-|-|
+| **Difficulty** | 3/5 |
+| **Project Size** | Variable (175 or 350 hours) |
+| **Maximum instances** | 1 |
+| **Constraints/requirements** | C programming skills, OS/driver concepts, device tree. |
+
+#### Description
+
+Unlike devices connected to enumeration-capable busses like PCI and USB, non-discoverable devices require that the operating system is manually provided with information on their presence, configuration, and their relation to other devices. Some commonly used methods to provide this information are ACPI, FDT (device-tree), or even the kernel's command line.
+
+This task involves introducing a generic driver probing framework to Unikraft. At a minimum, the framework must provide a way for drivers to associate themselves to compatible devices, and have these drivers probe devices based on the information provided by the underlying framework (eg FDT). More complex tasks involve handling device dependencies, deferred probing, and device prioritization. Common cases for such dependencies are clocks and crypto devices.
+
+The main focus will be on the device-tree, with additional options being available depending on the progress.
+
+#### Reading & Related Material
+
+* https://www.devicetree.org/specifications/
+* https://lwn.net/Articles/662820/
+* https://lwn.net/Articles/450460/
+
+---
+
 ### Security Features
 
 | | |
