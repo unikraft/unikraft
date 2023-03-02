@@ -50,7 +50,7 @@ extern "C" {
 
 extern struct uk_sched *uk_sched_head;
 
-int uk_sched_register(struct uk_sched *s);
+int uk_sched_register(struct uk_sched *s) __nonnull;
 
 #define uk_sched_init(s, start_func, yield_func, \
 		thread_add_func, thread_remove_func, \
@@ -79,7 +79,7 @@ int uk_sched_register(struct uk_sched *s);
  *   - (0): No work was done
  *   - (>0): Number of threads that were cleaned up
  */
-unsigned int uk_sched_thread_gc(struct uk_sched *sched);
+unsigned int uk_sched_thread_gc(struct uk_sched *sched) __nonnull;
 
 static inline
 void uk_sched_thread_switch(struct uk_thread *next)

@@ -107,9 +107,9 @@ static inline void uk_sched_yield(void)
 	s->yield(s);
 }
 
-int uk_sched_thread_add(struct uk_sched *s, struct uk_thread *t);
+int uk_sched_thread_add(struct uk_sched *s, struct uk_thread *t) __nonnull;
 
-int uk_sched_thread_remove(struct uk_thread *t);
+int uk_sched_thread_remove(struct uk_thread *t) __nonnull;
 
 static inline void uk_sched_thread_blocked(struct uk_thread *t)
 {
@@ -139,7 +139,7 @@ static inline void uk_sched_thread_woken(struct uk_thread *t)
 /**
  * Create a main thread from current context and call thread starter function
  */
-int uk_sched_start(struct uk_sched *sched);
+int uk_sched_start(struct uk_sched *sched) __nonnull;
 
 /**
  * Allocates a uk_thread and assigns it to a scheduler.
@@ -179,7 +179,7 @@ struct uk_thread *uk_sched_thread_create_fn0(struct uk_sched *s,
 					     bool no_ectx,
 					     const char *name,
 					     void *priv,
-					     uk_thread_dtor_t dtor);
+					     uk_thread_dtor_t dtor) __nonnull;
 
 /**
  * Similar to `uk_sched_thread_create_fn0()` but with a thread function
@@ -193,7 +193,7 @@ struct uk_thread *uk_sched_thread_create_fn1(struct uk_sched *s,
 					     bool no_ectx,
 					     const char *name,
 					     void *priv,
-					     uk_thread_dtor_t dtor);
+					     uk_thread_dtor_t dtor) __nonnull;
 
 /**
  * Similar to `uk_sched_thread_create_fn0()` but with a thread function
@@ -207,7 +207,7 @@ struct uk_thread *uk_sched_thread_create_fn2(struct uk_sched *s,
 					     bool no_ectx,
 					     const char *name,
 					     void *priv,
-					     uk_thread_dtor_t dtor);
+					     uk_thread_dtor_t dtor) __nonnull;
 
 /* Shortcut for creating a thread with default settings */
 #define uk_sched_thread_create(s, fn1, argp, name)		\
@@ -220,7 +220,7 @@ struct uk_thread *uk_sched_thread_create_fn2(struct uk_sched *s,
 #define uk_sched_foreach_thread_safe(sched, itr, tmp)			\
 	UK_TAILQ_FOREACH_SAFE((itr), &(sched)->thread_list, thread_list, (tmp))
 
-void uk_sched_dumpk_threads(int klvl, struct uk_sched *s);
+void uk_sched_dumpk_threads(int klvl, struct uk_sched *s) __nonnull;
 
 void uk_sched_thread_sleep(__nsec nsec);
 
@@ -233,7 +233,7 @@ void uk_sched_thread_exit(void) __noreturn;
 void uk_sched_thread_exit2(uk_thread_gc_t gc_fn, void *gc_argp) __noreturn;
 
 /* Terminates another thread */
-void uk_sched_thread_terminate(struct uk_thread *thread);
+void uk_sched_thread_terminate(struct uk_thread *thread) __nonnull;
 
 #ifdef __cplusplus
 }

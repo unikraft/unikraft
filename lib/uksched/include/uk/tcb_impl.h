@@ -67,7 +67,7 @@ extern "C" {
  *   - (>=0): Success, tcb is initialized.
  *   - (<0): Negative error code, thread creation is canceled.
  */
-int uk_thread_uktcb_init(struct uk_thread *thread, void *tcb);
+int uk_thread_uktcb_init(struct uk_thread *thread, void *tcb) __nonnull;
 
 /**
  * Called by `libuksched` as soon as a thread is released or uninitialized
@@ -79,7 +79,7 @@ int uk_thread_uktcb_init(struct uk_thread *thread, void *tcb);
  * @param tcb Reference to reserved space to custom thread control block
  *            that should be uninitialized.
  */
-void uk_thread_uktcb_fini(struct uk_thread *thread, void *tcb);
+void uk_thread_uktcb_fini(struct uk_thread *thread, void *tcb) __nonnull;
 #endif /* CONFIG_LIBUKSCHED_TCB_INIT */
 
 /**
