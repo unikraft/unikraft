@@ -34,6 +34,7 @@
 #include <uk/arch/lcpu.h>
 #include <uk/arch/time.h>
 #include <uk/arch/ctx.h>
+#include <uk/plat/lcpu.h>
 #include <uk/plat/tls.h>
 #include <uk/wait_types.h>
 #include <uk/list.h>
@@ -89,12 +90,12 @@ UK_TAILQ_HEAD(uk_thread_list, struct uk_thread);
 	uk_sched_thread_exit()
 
 /* managed by sched.c */
-extern struct uk_thread *__uk_sched_thread_current;
+extern UKPLAT_PER_LCPU_DEFINE(struct uk_thread *, __uk_sched_thread_current);
 
 static inline
 struct uk_thread *uk_thread_current(void)
 {
-	return __uk_sched_thread_current;
+	return ukplat_per_lcpu_current(__uk_sched_thread_current);
 }
 
 /*
