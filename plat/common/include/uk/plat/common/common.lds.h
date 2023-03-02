@@ -82,16 +82,16 @@
 	__eh_frame_start = .;						\
 	.eh_frame :							\
 	{								\
-		*(.eh_frame)						\
-		*(.eh_frame.*)						\
+		KEEP(*(.eh_frame))					\
+		KEEP(*(.eh_frame.*))					\
 	}								\
 	__eh_frame_end = .;						\
 									\
 	__eh_frame_hdr_start = .;					\
 	.eh_frame_hdr :							\
 	{								\
-		*(.eh_frame_hdr)					\
-		*(.eh_frame_hdr.*)					\
+		KEEP(*(.eh_frame_hdr))					\
+		KEEP(*(.eh_frame_hdr.*))				\
 	}								\
 	__eh_frame_hdr_end = .;
 
