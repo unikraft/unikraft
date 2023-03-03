@@ -23,7 +23,7 @@ Mentors will be assigned when the project is initiated.  Please feel free to rea
 | [Alexander Jung](https://github.com/nderjung) | alex@unikraft.io |
 | [Simon Kuenzer](https://github.com/skuenzer) | simon@unikraft.io |
 | [Cezar Crăciunoiu](https://github.com/craciunoiuc) | cezar@unikraft.io |
-| [Michalis Pappas](https://github.com/michpappas) | mpappas@fastmail.fm |
+| [Michalis Pappas](https://github.com/michpappas) | michalis@unikraft.io |
 | [Andra Paraschiv](https://github.com/andraprs) | andra@unikraft.io |
 | [Ștefan Jumărea](https://github.com/StefanJum) | stefanjumarea02@gmail.com |
 | [Maria Sfîrăială](https://github.com/mariasfiraiala) | maria.sfiraiala@gmail.com |
