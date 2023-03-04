@@ -1,0 +1,76 @@
+menuconfig LIBUKMINBOOT
+	bool "minimal-ukboot: Minimal Unikraft bootstrapping (testing)"
+	depends on !LIBUKBOOT
+	select HAVE_BOOTENTRY
+	default y
+
+if LIBUKMINBOOT
+	choice LIBUKMINBOOT_BANNER
+	prompt "Unikraft banner"
+	default LIBUKMINBOOT_BANNER_POWEREDBY
+		config LIBUKMINBOOT_BANNER_NONE
+		bool "None"
+
+		config LIBUKMINBOOT_BANNER_MINIMAL
+		bool "One liner"
+
+		config LIBUKMINBOOT_BANNER_CLASSIC
+		bool "Classic banner"
+
+		config LIBUKMINBOOT_BANNER_POWEREDBY
+		bool "Powered by Unikraft"
+
+		config LIBUKMINBOOT_BANNER_POWEREDBY_ANSI
+		bool "Powered by Unikraft (blue, ANSI)"
+		help
+		  Please make sure that your console display supports
+		  ANSI colors
+
+		config LIBUKMINBOOT_BANNER_POWEREDBY_ANSI2
+		bool "Powered by Unikraft (gray, ANSI)"
+		help
+		  Please make sure that your console display supports
+		  ANSI colors
+
+		config LIBUKMINBOOT_BANNER_POWEREDBY_EA
+		bool "Powered by Unikraft (ASCII)"
+		help
+		  Please make sure that your console display supports
+		  extended ASCII characters
+
+		config LIBUKMINBOOT_BANNER_POWEREDBY_EAANSI
+		bool "Powered by Unikraft (ASCII, blue, ANSI)"
+		help
+		  Please make sure that your console display supports
+		  extended ASCII characters and ANSI colors
+
+		config LIBUKMINBOOT_BANNER_POWEREDBY_EAANSI2
+		bool "Powered by Unikraft (ASCII, gray, ANSI)"
+		help
+		  Please make sure that your console display supports
+		  extended ASCII characters and ANSI colors
+
+		config LIBUKMINBOOT_BANNER_POWEREDBY_U8
+		bool "Powered by Unikraft (UTF-8)"
+		help
+		  Please make sure that your console display supports
+		  UTF-8
+
+		config LIBUKMINBOOT_BANNER_POWEREDBY_U8ANSI
+		bool "Powered by Unikraft (UTF-8, blue, ANSI)"
+		help
+		  Please make sure that your console display supports
+		  UTF-8 and ANSI colors
+
+		config LIBUKMINBOOT_BANNER_POWEREDBY_U8ANSI2
+		bool "Powered by Unikraft (UTF-8, gray, ANSI)"
+		help
+		  Please make sure that your console display supports
+		  UTF-8 and ANSI colors
+	endchoice
+
+	config LIBUKMINBOOT_MAXNBARGS
+	int "Maximum number of arguments (max. size of argv)"
+	default 60
+
+endif
