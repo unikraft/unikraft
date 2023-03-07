@@ -127,10 +127,13 @@ static int __linuxu_plat_initrd_init(void)
 
 int ukplat_memregion_count(void)
 {
+	static int init = 0;
 	static int have_heap = 0;
 	static int have_initrd = 0;
 	int rc = 0;
 
+	if (init)
+		return init;
 	/*
 	 * NOTE: The heap size and initrd file can be changed by a
 	 * library parameter. We assume that those ones are processed
@@ -147,7 +150,9 @@ int ukplat_memregion_count(void)
 		have_initrd = (rc == 0) ? 1 : 0;
 	}
 
-	return have_heap + have_initrd;
+	init = have_heap + have_initrd;
+
+	return init;
 }
 
 int ukplat_memregion_get(int i, struct ukplat_memregion_desc **m)
@@ -182,6 +187,9 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc **m)
 #endif
 		*m = &mrd[1];
 		ret = 0;
+	} else if (i < 0 || i >= ukplat_memregion_count()) {
+		ret = -1;
+
 	} else {
 		ret = -1;
 	}
