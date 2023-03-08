@@ -123,6 +123,12 @@ typedef void (*uk_netbuf_dtor_t)(struct uk_netbuf *);
 #define UK_NETBUF_F_PARTIAL_CSUM_BIT 1
 #define UK_NETBUF_F_PARTIAL_CSUM     (1 << UK_NETBUF_F_PARTIAL_CSUM_BIT)
 
+/* Indicates the packet should be sent with the help of TCP Segmentation
+ * Offloading. This requires that the device supports this.
+ */
+#define UK_NETBUF_F_GSO_TCPV4_BIT    2
+#define UK_NETBUF_F_GSO_TCPV4        (1 << UK_NETBUF_F_GSO_TCPV4_BIT)
+
 struct uk_netbuf {
 	struct uk_netbuf *next;
 	struct uk_netbuf *prev;
@@ -145,6 +151,14 @@ struct uk_netbuf {
 	uint16_t csum_offset;  /**< Used if UK_NETBUF_F_PARTIAL_CSUM is set;
 				 * Number of bytes starting from `csum_start`
 				 * pointing to the checksum field
+				 */
+
+	uint16_t header_len;   /**< Used if UK_NETBUF_F_GSO_* is set;
+				 * Number of bytes to copy into each split
+				 * packet as a header
+				 */
+	uint16_t gso_size;     /**< Used if UK_NETBUF_F_GSO_* is set;
+				 * Maximum size of each packet beyond the header
 				 */
 
 	uk_netbuf_dtor_t dtor; /**< Destructor callback */
