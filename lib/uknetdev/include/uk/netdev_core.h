@@ -142,13 +142,19 @@ struct uk_hwaddr {
 #define UK_NETDEV_F_PARTIAL_CSUM_BIT	2
 #define UK_NETDEV_F_PARTIAL_CSUM	(1UL << UK_NETDEV_F_PARTIAL_CSUM_BIT)
 
+/* Indicates that the network device supports sending netbufs with the
+ * UK_NETBUF_F_GSO_TCPV4 bit set. */
+#define UK_NETDEV_F_TSO4_BIT		3
+#define UK_NETDEV_F_TSO4		(1UL << UK_NETDEV_F_TSO4_BIT)
+
 #define uk_netdev_rxintr_supported(feature)	\
 	(feature & (UK_NETDEV_F_RXQ_INTR))
 #define uk_netdev_txintr_supported(feature)	\
 	(feature & (UK_NETDEV_F_TXQ_INTR))
 #define uk_netdev_partial_csum_supported(feature)	\
 	(feature & (UK_NETDEV_F_PARTIAL_CSUM))
-
+#define uk_netdev_tso4_supported(feature) \
+	(feature & (UK_NETDEV_F_TSO4))
 /**
  * A structure used to describe network device capabilities.
  */
