@@ -64,7 +64,7 @@ def main():
     # to create a binary blob that has exactly this size so we can replace it
     # in the binary.
     out = subprocess.check_output(["objdump", "-h", opt.kernel])
-    match = re.findall(SECINFO_EXP, out.decode('ASCII'), re.MULTILINE)
+    match = re.findall(SECINFO_EXP, out.decode('utf-8'), re.MULTILINE)
 
     if len(match) != 1:
         raise Exception(".uk_bootinfo section not found")
@@ -73,7 +73,7 @@ def main():
 
     # Retrieve info about ELF segments in unikernel
     out = subprocess.check_output(["objdump", "-p", opt.kernel])
-    phdrs = re.findall(PHDRS_EXP, out.decode('ASCII'), re.MULTILINE)
+    phdrs = re.findall(PHDRS_EXP, out.decode('utf-8'), re.MULTILINE)
 
     # The boot info is a struct ukplat_bootinfo
     # (see plat/common/include/uk/plat/common/bootinfo.h) followed by a list of
