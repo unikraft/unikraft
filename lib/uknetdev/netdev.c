@@ -433,7 +433,7 @@ static __noreturn void _dispatcher(void *arg)
 	UK_ASSERT(handler->callback);
 
 	for (;;) {
-		uk_semaphore_down(&handler->events);
+		uk_semaphore_down_all(&handler->events);
 		handler->callback(handler->dev,
 				  handler->queue_id,
 				  handler->cookie);
