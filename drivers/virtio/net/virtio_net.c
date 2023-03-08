@@ -385,7 +385,11 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 		vhdr->csum_start   = pkt->csum_start - header_sz;
 		vhdr->csum_offset  = pkt->csum_offset;
 	}
-	vhdr->gso_type = VIRTIO_NET_HDR_GSO_NONE;
+	if (pkt->flags & UK_NETBUF_F_GSO_TCPV4) {
+		vhdr->gso_type     = VIRTIO_NET_HDR_GSO_TCPV4;
+		vhdr->hdr_len      = pkt->header_len;
+		vhdr->gso_size     = pkt->gso_size;
+	}
 
 	/**
 	 * Prepare the sglist and enqueue the buffer to the virtio-ring.
@@ -413,17 +417,19 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 	if (pkt->next) {
 		rc = uk_sglist_append_netbuf(&queue->sg, pkt->next);
 		if (unlikely(rc != 0)) {
-			uk_pr_err("Failed to append to the sg list\n");
+			uk_pr_err("Failed to append to the sg list: %d\n", rc);
 			goto err_remove_vhdr;
 		}
 	}
 
-	total_len = uk_sglist_length(&queue->sg);
-	if (unlikely(total_len > VIRTIO_PKT_BUFFER_LEN)) {
-		uk_pr_err("Packet size too big: %lu, max:%u\n",
-			  total_len, VIRTIO_PKT_BUFFER_LEN);
-		rc = -ENOTSUP;
-		goto err_remove_vhdr;
+	if (!(pkt->flags & UK_NETBUF_F_GSO_TCPV4)) {
+		total_len = uk_sglist_length(&queue->sg);
+		if (unlikely(total_len > VIRTIO_PKT_BUFFER_LEN)) {
+			uk_pr_err("Packet size too big: %lu, max:%u\n",
+				  total_len, VIRTIO_PKT_BUFFER_LEN);
+			rc = -ENOTSUP;
+			goto err_remove_vhdr;
+		}
 	}
 
 	/**
@@ -923,6 +929,16 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n)
 	}
 
 	/**
+	 * TCP Segmentation Offload
+	 * NOTE: This enables sending and receiving of packets marked with
+	 *       VIRTIO_NET_HDR_GSO_TCPV4
+	 */
+	if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_GSO))
+		VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_GSO);
+	if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_HOST_TSO4))
+		VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_HOST_TSO4);
+
+	/**
 	 * Announce our enabled driver features back to the backend device
 	 */
 	vndev->vdev->features = drv_features;
@@ -1119,9 +1135,15 @@ static void virtio_net_info_get(struct uk_netdev *dev,
 	dev_info->nb_encap_tx = sizeof(struct virtio_net_hdr_padded);
 	dev_info->nb_encap_rx = sizeof(struct virtio_net_hdr_padded);
 	dev_info->ioalign = sizeof(void *); /* word size alignment */
+
 	dev_info->features = UK_NETDEV_F_RXQ_INTR
 		| (VIRTIO_FEATURE_HAS(vndev->vdev->features, VIRTIO_NET_F_CSUM)
-		   ? UK_NETDEV_F_PARTIAL_CSUM : 0);
+		   ? UK_NETDEV_F_PARTIAL_CSUM : 0)
+		| ((VIRTIO_FEATURE_HAS(vndev->vdev->features,
+				       VIRTIO_NET_F_HOST_TSO4)
+		    || VIRTIO_FEATURE_HAS(vndev->vdev->features,
+					  VIRTIO_NET_F_GSO))
+		   ? UK_NETDEV_F_TSO4 : 0);
 }
 
 static int virtio_net_start(struct uk_netdev *n)
