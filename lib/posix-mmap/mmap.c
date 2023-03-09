@@ -184,6 +184,7 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 		vaddr = __VADDR_ANY;
 	} while (1);
 
+	*addr = (void *)vaddr;
 	return rc;
 }
 
