@@ -144,6 +144,8 @@ struct vattr {
 
 #define IO_APPEND	0x0001
 #define IO_SYNC		0x0002
+#define IO_ASYNC	0x0004	/* start the storage I/O asynchronously */
+#define IO_DIRECT	0x0008	/* try to bypass the buffer cache */
 
 /*
  * ARC actions
@@ -237,7 +239,7 @@ struct vnops {
 #define VOP_LINK(DVP, SVP, N) 	   ((DVP)->v_op->vop_link)(DVP, SVP, N)
 #define VOP_FALLOCATE(VP, M, OFF, LEN) ((VP)->v_op->vop_fallocate)(VP, M, OFF, LEN)
 #define VOP_READLINK(VP, U)        ((VP)->v_op->vop_readlink)(VP, U)
-#define VOP_SYMLINK(DVP, OP, NP)   ((DVP)->v_op->vop_symlink)(DVP, OP, NP)
+#define VOP_SYMLINK(DVP, NP, OP)   ((DVP)->v_op->vop_symlink)(DVP, NP, OP)
 #define VOP_POLL(VP, EP, ECP)	   ((VP)->v_op->vop_poll)(VP, EP, ECP)
 
 int vfscore_vop_nullop();

@@ -171,13 +171,13 @@ out:
 /** Iterates over registered thread termination functions */
 static int _uk_thread_call_termtab(struct uk_thread *child)
 {
-	struct uk_thread *parent = uk_thread_current();
 	struct uk_thread_inittab_entry *itr;
 	struct _inittab_call_term_args term_args;
 	int ret = 0;
 
 	/* Either we run without scheduling or we have support for ectx */
-	UK_ASSERT(!parent || parent->flags & UK_THREADF_ECTX);
+	UK_ASSERT(!uk_thread_current() ||
+		   uk_thread_current()->flags & UK_THREADF_ECTX);
 
 	/* Go over thread termination functions that match with
 	 * child's ECTX and UKTLS feature requirements
@@ -368,7 +368,7 @@ static int _uk_thread_struct_init_alloc(struct uk_thread *t,
 	int rc;
 
 	if (a_stack && stack_len) {
-		stack = uk_malloc(a_stack, stack_len);
+		stack = uk_memalign(a_stack, UKARCH_SP_ALIGN, stack_len);
 		if (!stack) {
 			rc = -ENOMEM;
 			goto err_out;

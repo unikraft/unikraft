@@ -145,40 +145,52 @@ static inline void _init_mem(void)
 
 	/* Fill out mrd array */
 	/* heap */
-	_libxenplat_mrd[0].base  = to_virt(start_pfn << __PAGE_SHIFT);
-	_libxenplat_mrd[0].len   = (size_t) to_virt(max_pfn << __PAGE_SHIFT)
-		- (size_t) to_virt(start_pfn << __PAGE_SHIFT);
-	_libxenplat_mrd[0].flags = (UKPLAT_MEMRF_ALLOCATABLE);
+	_libxenplat_mrd[0].pbase = start_pfn << PAGE_SHIFT;
+	_libxenplat_mrd[0].vbase = (__vaddr_t)to_virt(_libxenplat_mrd[0].pbase);
+	_libxenplat_mrd[0].len   = (max_pfn - start_pfn) << PAGE_SHIFT;
+	_libxenplat_mrd[0].type  = UKPLAT_MEMRT_FREE;
+	_libxenplat_mrd[0].flags = 0;
 #if CONFIG_UKPLAT_MEMRNAME
-	_libxenplat_mrd[0].name  = "heap";
+	strncpy(_libxenplat_mrd[0].name, "heap",
+		sizeof(_libxenplat_mrd[0].name) - 1);
 #endif
 
 	/* demand area */
-	_libxenplat_mrd[1].base  = (void *) VIRT_DEMAND_AREA;
+	_libxenplat_mrd[1].pbase = __PADDR_MAX;
+	_libxenplat_mrd[1].vbase = VIRT_DEMAND_AREA;
 	_libxenplat_mrd[1].len   = DEMAND_MAP_PAGES * PAGE_SIZE;
-	_libxenplat_mrd[1].flags = UKPLAT_MEMRF_RESERVED;
+	_libxenplat_mrd[1].type  = UKPLAT_MEMRT_RESERVED;
+	_libxenplat_mrd[1].flags = 0;
 #if CONFIG_UKPLAT_MEMRNAME
-	_libxenplat_mrd[1].name  = "demand";
+	strncpy(_libxenplat_mrd[1].name, "demand",
+		sizeof(_libxenplat_mrd[1].name) - 1);
 #endif
-	_init_mem_demand_area((unsigned long) _libxenplat_mrd[1].base,
+	_init_mem_demand_area((unsigned long) _libxenplat_mrd[1].vbase,
 			DEMAND_MAP_PAGES);
 
 	_libxenplat_mrd_num = 2;
 
 	/* initrd */
 	if (HYPERVISOR_start_info->mod_len) {
-		if (HYPERVISOR_start_info->flags & SIF_MOD_START_PFN)
-			_libxenplat_mrd[2].base  =
-				to_virt(HYPERVISOR_start_info->mod_start);
-		else
-			_libxenplat_mrd[2].base  =
-				(void *) HYPERVISOR_start_info->mod_start;
+		if (HYPERVISOR_start_info->flags & SIF_MOD_START_PFN) {
+			_libxenplat_mrd[2].pbase =
+				HYPERVISOR_start_info->mod_start;
+			_libxenplat_mrd[2].vbase =
+				(__vaddr_t)to_virt(_libxenplat_mrd[2].pbase);
+		} else {
+			_libxenplat_mrd[2].pbase =
+				HYPERVISOR_start_info->mod_start;
+			_libxenplat_mrd[2].vbase =
+				_libxenplat_mrd[2].pbase;
+		}
 		_libxenplat_mrd[2].len   =
 			(size_t) HYPERVISOR_start_info->mod_len;
-		_libxenplat_mrd[2].flags = (UKPLAT_MEMRF_INITRD
-					    | UKPLAT_MEMRF_WRITABLE);
+		_libxenplat_mrd[2].type  = UKPLAT_MEMRT_INITRD;
+		_libxenplat_mrd[2].flags = (UKPLAT_MEMRF_WRITE
+					    | UKPLAT_MEMRF_MAP);
 #if CONFIG_UKPLAT_MEMRNAME
-		_libxenplat_mrd[2].name  = "initrd";
+		strncpy(_libxenplat_mrd[2].name, "initrd",
+			sizeof(_libxenplat_mrd[2].name) - 1);
 #endif
 		_libxenplat_mrd_num++;
 	}

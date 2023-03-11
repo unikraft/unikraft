@@ -38,10 +38,14 @@
 #include <common/events.h>
 #include <xen/xen.h>
 #include <uk/print.h>
+#include <uk/plat/irq.h>
+#include <uk/event.h>
 #include <uk/assert.h>
 #include <uk/bitops.h>
 
 #define NR_EVS 1024
+
+UK_EVENT(UKPLAT_EVENT_IRQ);
 
 /* this represents a event handler. Chaining or sharing is not allowed */
 typedef struct _ev_action_t {
@@ -85,6 +89,8 @@ void unbind_all_ports(void)
 int do_event(evtchn_port_t port, struct __regs *regs)
 {
 	ev_action_t *action;
+	int rc;
+	struct ukplat_event_irq_data ctx;
 
 	clear_evtchn(port);
 
@@ -92,6 +98,14 @@ int do_event(evtchn_port_t port, struct __regs *regs)
 		uk_pr_err("%s: Port number too large: %d\n", __func__, port);
 		return 1;
 	}
+
+	ctx.regs = regs;
+	ctx.irq = port;
+	rc = uk_raise_event(UKPLAT_EVENT_IRQ, &ctx);
+	if (unlikely(rc < 0))
+		UK_CRASH("IRQ event handler returned error: %d\n", rc);
+	if (rc == UK_EVENT_HANDLED)
+		return 1;
 
 	action = &ev_actions[port];
 	action->count++;

@@ -28,6 +28,17 @@
 
 OUTPUT_ARCH(arm)
 ENTRY(_libxenplat_start)
+
+PHDRS
+{
+	text PT_LOAD FLAGS(PHDRS_PF_RX);
+	rodata PT_LOAD FLAGS(PHDRS_PF_R);
+	data PT_LOAD;
+	tls PT_TLS;
+	tls_load PT_LOAD;
+	stack PT_GNU_STACK FLAGS(PHDRS_PF_RW);
+}
+
 SECTIONS
 {
 	/* Note: we currently assume that Xen will load the kernel image
@@ -45,9 +56,19 @@ SECTIONS
 
 		*(.text)
 		*(.gnu.warning)
-	} = 0x9090
+	} :text = 0x9090
 
 	_etext = .;			/* End of text section */
+
+	/* Read-only data */
+	_rodata = .;
+	.rodata :
+	{
+		*(.rodata)
+		*(.rodata.*)
+	} :rodata
+	. = ALIGN(__PAGE_SIZE);
+	_erodata = .;
 
 	EXCEPTION_SECTIONS
 
@@ -56,16 +77,6 @@ SECTIONS
 	INITTAB_SECTION
 
 	EVENTTAB_SECTION
-
-	/* Read-only data */
-	_rodata = .;
-	.rodata :
-	{
-		*(.rodata)
-		*(.rodata.*)
-	}
-	. = ALIGN(__PAGE_SIZE);
-	_erodata = .;
 
 	. = ALIGN(0x8);
 	_ctors = .;

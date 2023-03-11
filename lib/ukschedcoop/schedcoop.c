@@ -115,6 +115,16 @@ static void schedcoop_schedule(struct uk_sched *s)
 		next = &c->idle;
 	}
 
+	if (next != prev) {
+		/*
+		 * Queueable is used to cover the case when during a
+		 * context switch, the thread that is about to be
+		 * evacuated is interrupted and woken up.
+		 */
+		uk_thread_set_queueable(prev);
+		uk_thread_clear_queueable(next);
+	}
+
 	ukplat_lcpu_restore_irqf(flags);
 
 	/* Interrupting the switch is equivalent to having the next thread
@@ -168,8 +178,10 @@ static void schedcoop_thread_woken(struct uk_sched *s, struct uk_thread *t)
 
 	if (t->wakeup_time > 0)
 		UK_TAILQ_REMOVE(&c->sleep_queue, t, queue);
-	if (t != uk_thread_current() && uk_thread_is_runnable(t))
+	if (uk_thread_is_queueable(t) && uk_thread_is_runnable(t)) {
 		UK_TAILQ_INSERT_TAIL(&c->run_queue, t, queue);
+		uk_thread_clear_queueable(t);
+	}
 }
 
 static __noreturn void idle_thread_fn(void *argp)
@@ -216,7 +228,8 @@ static __noreturn void idle_thread_fn(void *argp)
 	}
 }
 
-static int schedcoop_start(struct uk_sched *s, struct uk_thread *main_thread)
+static int schedcoop_start(struct uk_sched *s __maybe_unused,
+			   struct uk_thread *main_thread __maybe_unused)
 {
 	UK_ASSERT(main_thread);
 	UK_ASSERT(main_thread->sched == s);

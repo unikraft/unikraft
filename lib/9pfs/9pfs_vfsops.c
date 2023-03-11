@@ -37,6 +37,7 @@
 #include <vfscore/mount.h>
 #include <vfscore/dentry.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include "9pfs.h"
 
@@ -69,25 +70,86 @@ static struct vfscore_fs_type uk_9pfs_fs = {
 UK_FS_REGISTER(uk_9pfs_fs);
 
 static const char *uk_9pfs_proto_str[UK_9P_PROTO_MAX] = {
-	[UK_9P_PROTO_2000U] = "9P2000.u"
+	[UK_9P_PROTO_2000U] = "9P2000.u",
+	[UK_9P_PROTO_2000L] = "9P2000.L"
 };
+
+static int uk_9pfs_parse_option(struct uk_9pfs_mount_data *md,
+		const char *option)
+{
+	if (strncmp(option, "version=", 8) == 0) {
+		const char *protoname = option + 8;
+		enum uk_9pfs_proto i;
+
+		for (i = 0; i < UK_9P_PROTO_MAX; i++)
+			if (strcmp(protoname, uk_9pfs_proto_str[i]) == 0) {
+				md->proto = i;
+				return 0;
+			}
+
+		return -EINVAL;
+	} else if (strncmp(option, "uname=", 6) == 0) {
+		free(md->uname);
+		md->uname = strdup(option + 6);
+		if (!md->uname)
+			return -ENOMEM;
+	} else if (strncmp(option, "aname=", 6) == 0) {
+		free(md->aname);
+		md->aname = strdup(option + 6);
+		if (!md->aname)
+			return -ENOMEM;
+	}
+
+	return 0;
+}
 
 static int uk_9pfs_parse_options(struct uk_9pfs_mount_data *md,
 		const void *data __unused)
 {
 	int rc = 0;
+	char *options = NULL, *options_tok = NULL, *options_save = NULL;
+	char *option;
 
 	md->trans = uk_9pdev_trans_get_default();
-	if (!md->trans)
-		goto out;
+	if (!md->trans) {
+		rc = ENODEV;
+		goto err;
+	}
 
-	/* Currently, no options are supported. */
+	/*
+	 * musl/nolibc strtok_r resets saveptr at the end, so we need to feed
+	 * the option string only once; otherwise strtok_r would loop over the
+	 * options string forever
+	 */
+	options = options_tok = strdup(data);
 
 	md->proto = UK_9P_PROTO_2000U;
-	md->uname = "";
-	md->aname = "";
+	md->uname = strdup("");
+	md->aname = strdup("");
 
-out:
+	while ((option = strtok_r(options_tok, ",", &options_save))) {
+		options_tok = NULL;
+		rc = uk_9pfs_parse_option(md, option);
+		if (rc < 0) {
+			rc = -rc;
+			goto err;
+		}
+	}
+
+	if (!md->uname || !md->aname) {
+		rc = ENOMEM;
+		goto err;
+	}
+
+	free(options);
+	return rc;
+
+err:
+	free(md->uname);
+	md->uname = NULL;
+	free(md->aname);
+	md->aname = NULL;
+	free(options);
 	return rc;
 }
 
@@ -181,6 +243,8 @@ static int uk_9pfs_unmount(struct mount *mp, int flags __unused)
 	uk_9pfs_release_tree_fids(mp->m_root);
 	vfscore_release_mp_dentries(mp);
 	uk_9pdev_disconnect(md->dev);
+	free(md->uname);
+	free(md->aname);
 	free(md);
 
 	return 0;

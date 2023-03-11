@@ -12,6 +12,7 @@ ifneq ($(HAVE_STACKPROTECTOR),y)
 COMPFLAGS    += -fno-stack-protector
 endif
 COMPFLAGS    += -Wall -Wextra
+COMPFLAGS-$(call have_clang)	+= -Wdocumentation -Wdocumentation-pedantic
 
 ASFLAGS      += -D__ASSEMBLY__
 
@@ -47,10 +48,7 @@ endif
 LIBLDFLAGS  += -nostdlib -Wl,-r -Wl,-d -Wl,--build-id=none -no-pie
 LIBLDFLAGS-$(call have_gcc)	+= -nostdinc
 
-# Set the text and data sections to be readable and writable. Also,
-# do not page-align the data segment. If the output format supports
-# Unix style magic numbers, mark the output as OMAGIC.
-LDFLAGS	+= -nostdlib -Wl,--omagic -Wl,--build-id=none
+LDFLAGS	+= -nostdlib -Wl,--build-id=none
 LDFLAGS-$(call have_gcc)	+= -nostdinc
 
 COMPFLAGS-$(CONFIG_OPTIMIZE_NONE)         += -O0 -fno-optimize-sibling-calls -fno-tree-vectorize

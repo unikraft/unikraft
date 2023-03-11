@@ -77,7 +77,9 @@
  *       int rc;
  *
  *       rc = uk_raise_event(myevent, &myevent_data);
- *       if (!rc)
+ *       if (rc < 0)
+ *               uk_pr_crit("an event handler returned an error!\n");
+ *       else if (!rc)
  *               uk_pr_err("myevent not handled!\n");
  * }
  * ```
@@ -103,9 +105,9 @@
  *       return UK_EVENT_HANDLED;
  * }
  *
- * UK_EVENT_HANDLER_PRIO(handler1, UK_PRIO_EARLIEST);
- * UK_EVENT_HANDLER_PRIO(handler2, UK_PRIO_LATEST);
- * UK_EVENT_HANDLER_PRIO(handler3, UK_PRIO_LATEST);
+ * UK_EVENT_HANDLER_PRIO(event, handler1, UK_PRIO_EARLIEST);
+ * UK_EVENT_HANDLER_PRIO(event, handler2, UK_PRIO_LATEST);
+ * UK_EVENT_HANDLER_PRIO(event, handler3, UK_PRIO_LATEST);
  * ```
  */
 
@@ -251,25 +253,39 @@ struct uk_event {
 
 /**
  * Raise an event by pointer and invoke the handler chain until the first
- * handler successfully handled the event.
+ * handler successfully handled the event or returned a negative error code.
  *
- * @param event
+ * @param e
  *   Pointer to the event to raise.
  * @param data
  *   Optional data supplied to the event handlers
- * @return
- *   One of the UK_EVENT_* macros on success, errno on < 0
+ * @returns
+ *   A negative error value if a handler returns one. Event processing
+ *   immediately stops in this case. Otherwise:
+ *   - UK_EVENT_HANDLED if a handler indicated that it successfully handled
+ *     the event and event processing should stop with this handler.
+ *   - UK_EVENT_HANDLED_CONT if at least one handler indicated that it
+ *     successfully handled the event but event handling can continue, and no
+ *     other handler returned UK_EVENT_HANDLED.
+ *   - UK_EVENT_NOT_HANDLED if no handler handled the event.
  */
 static inline int uk_raise_event_ptr(struct uk_event *e, void *data)
 {
 	const uk_event_handler_t *itr;
+	int rc;
 	int ret = UK_EVENT_NOT_HANDLED;
 
 	uk_event_handler_foreach(itr, e) {
 		__uk_event_assert(*itr);
-		ret |= ((*itr)(data));
-		if (ret == UK_EVENT_HANDLED)
-			break;
+		rc = ((*itr)(data));
+		if (unlikely(rc < 0))
+			return rc;
+
+		if (rc == UK_EVENT_HANDLED)
+			return UK_EVENT_HANDLED;
+
+		if (rc == UK_EVENT_HANDLED_CONT)
+			ret = UK_EVENT_HANDLED_CONT;
 	}
 
 	return ret;

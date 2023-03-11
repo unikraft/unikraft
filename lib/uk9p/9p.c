@@ -291,6 +291,33 @@ out:
 	return rc;
 }
 
+int uk_9p_lopen(struct uk_9pdev *dev, struct uk_9pfid *fid, uint32_t flags)
+{
+	struct uk_9preq *req;
+	int rc = 0;
+
+	req = request_create(dev, UK_9P_TLOPEN);
+	if (PTRISERR(req))
+		return PTR2ERR(req);
+
+	uk_pr_debug("TLOPEN fid %u flags %u\n", fid->fid, flags);
+
+	if ((rc = uk_9preq_write32(req, fid->fid)) ||
+		(rc = uk_9preq_write32(req, flags)) ||
+		(rc = send_and_wait_no_zc(dev, req)) ||
+		(rc = uk_9preq_readqid(req, &fid->qid)) ||
+		(rc = uk_9preq_read32(req, &fid->iounit)))
+		goto out;
+
+	uk_pr_debug("RLOPEN qid type %u version %u path %lu iounit %u\n",
+			fid->qid.type, fid->qid.version, fid->qid.path,
+			fid->iounit);
+
+out:
+	uk_9pdev_req_remove(dev, req);
+	return rc;
+}
+
 int uk_9p_create(struct uk_9pdev *dev, struct uk_9pfid *fid,
 		const char *name, uint32_t perm, uint32_t mode,
 		const char *extension)
@@ -320,6 +347,40 @@ int uk_9p_create(struct uk_9pdev *dev, struct uk_9pfid *fid,
 		goto out;
 
 	uk_pr_debug("RCREATE qid type %u version %u path %lu iounit %u\n",
+			fid->qid.type, fid->qid.version, fid->qid.path,
+			fid->iounit);
+
+out:
+	uk_9pdev_req_remove(dev, req);
+	return rc;
+}
+
+int uk_9p_lcreate(struct uk_9pdev *dev, struct uk_9pfid *fid,
+		const char *name, uint32_t flags, uint32_t mode, uint32_t gid)
+{
+	struct uk_9preq *req;
+	struct uk_9p_str name_str;
+	int rc = 0;
+
+	uk_9p_str_init(&name_str, name);
+
+	req = request_create(dev, UK_9P_TLCREATE);
+	if (PTRISERR(req))
+		return PTR2ERR(req);
+
+	uk_pr_debug("TLCREATE fid %u mode %u\n", fid->fid, mode);
+
+	if ((rc = uk_9preq_write32(req, fid->fid)) ||
+		(rc = uk_9preq_writestr(req, &name_str)) ||
+		(rc = uk_9preq_write32(req, flags)) ||
+		(rc = uk_9preq_write32(req, mode)) ||
+		(rc = uk_9preq_write32(req, gid)) ||
+		(rc = send_and_wait_no_zc(dev, req)) ||
+		(rc = uk_9preq_readqid(req, &fid->qid)) ||
+		(rc = uk_9preq_read32(req, &fid->iounit)))
+		goto out;
+
+	uk_pr_debug("RLCREATE qid type %u version %u path %lu iounit %u\n",
 			fid->qid.type, fid->qid.version, fid->qid.path,
 			fid->iounit);
 
@@ -414,7 +475,8 @@ int64_t uk_9p_write(struct uk_9pdev *dev, struct uk_9pfid *fid,
 	struct uk_9preq *req;
 	int64_t rc;
 
-	count = MIN(count, fid->iounit);
+	if (fid->iounit != 0)
+		count = MIN(count, fid->iounit);
 	count = MIN(count, dev->msize - 23);
 
 	uk_pr_debug("TWRITE fid %u offset %lu count %u\n", fid->fid,
@@ -498,4 +560,279 @@ int uk_9p_wstat(struct uk_9pdev *dev, struct uk_9pfid *fid,
 out:
 	uk_9pdev_req_remove(dev, req);
 	return rc;
+}
+
+int uk_9p_fsync(struct uk_9pdev *dev, struct uk_9pfid *fid)
+{
+	struct uk_9preq *req;
+	int rc = 0;
+
+	uk_pr_debug("TFSYNC fid %u\n", fid->fid);
+	req = request_create(dev, UK_9P_TFSYNC);
+	if (PTRISERR(req))
+		return PTR2ERR(req);
+
+	if ((rc = uk_9preq_write32(req, fid->fid)) ||
+		(rc = uk_9preq_write32(req, 0)) || /* full file sync */
+		(rc = send_and_wait_no_zc(dev, req)))
+		goto out;
+
+	uk_pr_debug("RFSYNC\n");
+
+out:
+	uk_9pdev_req_remove(dev, req);
+	return rc;
+}
+
+int64_t uk_9p_readdir(struct uk_9pdev *dev, struct uk_9pfid *fid,
+		uint64_t offset, uint32_t count, char *buf)
+{
+	struct uk_9preq *req;
+	int64_t rc;
+
+	if (fid->iounit != 0)
+		count = MIN(count, fid->iounit);
+	count = MIN(count, dev->msize - 11);
+
+	uk_pr_debug("TREADDIR fid %u offset %lu count %u\n", fid->fid,
+			offset, count);
+
+	req = request_create(dev, UK_9P_TREADDIR);
+	if (PTRISERR(req))
+		return PTR2ERR(req);
+
+	if ((rc = uk_9preq_write32(req, fid->fid)) ||
+		(rc = uk_9preq_write64(req, offset)) ||
+		(rc = uk_9preq_write32(req, count)) ||
+		(rc = send_and_wait_zc(dev, req, UK_9PREQ_ZCDIR_READ, buf,
+				       count, 11)) ||
+		(rc = uk_9preq_read32(req, &count)))
+		goto out;
+
+	uk_pr_debug("RREADDIR count %u\n", count);
+
+	rc = count;
+
+out:
+	uk_9pdev_req_remove(dev, req);
+	return rc;
+}
+
+struct uk_9preq *uk_9p_getattr(struct uk_9pdev *dev, struct uk_9pfid *fid,
+		uint64_t request_mask, struct uk_9p_attr *attr)
+{
+	struct uk_9preq *req;
+	int rc = 0;
+
+	req = request_create(dev, UK_9P_TGETATTR);
+	if (PTRISERR(req))
+		return req;
+
+	uk_pr_debug("TGETATTR fid %u\n", fid->fid);
+
+	if ((rc = uk_9preq_write32(req, fid->fid)) ||
+		(rc = uk_9preq_write64(req, request_mask)) ||
+		(rc = send_and_wait_no_zc(dev, req)) ||
+		(rc = uk_9preq_readattr(req, attr)))
+		goto out;
+
+	uk_pr_debug("RGETATTR\n");
+
+	return req;
+
+out:
+	uk_9pdev_req_remove(dev, req);
+	return ERR2PTR(rc);
+}
+
+int uk_9p_setattr(struct uk_9pdev *dev, struct uk_9pfid *fid,
+		uint32_t valid, uint32_t mode, uint32_t uid, uint32_t gid,
+		uint64_t size, uint64_t atime_sec, uint64_t atime_nsec,
+		uint64_t mtime_sec, uint64_t mtime_nsec)
+{
+	struct uk_9preq *req;
+	int rc = 0;
+
+	req = request_create(dev, UK_9P_TSETATTR);
+	if (PTRISERR(req))
+		return PTR2ERR(req);
+
+	uk_pr_debug("TSETATTR fid %u\n", fid->fid);
+
+	if ((rc = uk_9preq_write32(req, fid->fid)) ||
+		(rc = uk_9preq_write32(req, valid)) ||
+		(rc = uk_9preq_write32(req, mode)) ||
+		(rc = uk_9preq_write32(req, uid)) ||
+		(rc = uk_9preq_write32(req, gid)) ||
+		(rc = uk_9preq_write64(req, size)) ||
+		(rc = uk_9preq_write64(req, atime_sec)) ||
+		(rc = uk_9preq_write64(req, atime_nsec)) ||
+		(rc = uk_9preq_write64(req, mtime_sec)) ||
+		(rc = uk_9preq_write64(req, mtime_nsec)) ||
+		(rc = send_and_wait_no_zc(dev, req)))
+		goto out;
+
+	uk_pr_debug("RSETATTR\n");
+
+out:
+	uk_9pdev_req_remove(dev, req);
+	return rc;
+}
+
+int uk_9p_renameat(struct uk_9pdev *dev, struct uk_9pfid *olddfid,
+		const char *oldname, struct uk_9pfid *newdfid,
+		const char *newname)
+{
+	struct uk_9preq *req;
+	struct uk_9p_str oldname_str, newname_str;
+	int rc = 0;
+
+	uk_9p_str_init(&oldname_str, oldname);
+	uk_9p_str_init(&newname_str, newname);
+
+	req = request_create(dev, UK_9P_TRENAMEAT);
+	if (PTRISERR(req))
+		return PTR2ERR(req);
+
+	uk_pr_debug("TRENAMEAT olddfid %u newdfid %u\n",
+			olddfid->fid, newdfid->fid);
+
+	if ((rc = uk_9preq_write32(req, olddfid->fid)) ||
+		(rc = uk_9preq_writestr(req, &oldname_str)) ||
+		(rc = uk_9preq_write32(req, newdfid->fid)) ||
+		(rc = uk_9preq_writestr(req, &newname_str)) ||
+		(rc = send_and_wait_no_zc(dev, req)))
+		goto out;
+
+	uk_pr_debug("RRENAMEAT\n");
+
+out:
+	uk_9pdev_req_remove(dev, req);
+	return rc;
+}
+
+int uk_9p_rename(struct uk_9pdev *dev, struct uk_9pfid *fid,
+		struct uk_9pfid *dfid, const char *name)
+{
+	struct uk_9preq *req;
+	struct uk_9p_str name_str;
+	int rc = 0;
+
+	uk_9p_str_init(&name_str, name);
+
+	req = request_create(dev, UK_9P_TRENAME);
+	if (PTRISERR(req))
+		return PTR2ERR(req);
+
+	uk_pr_debug("TRENAME fid %u dfid %u\n", fid->fid, dfid->fid);
+
+	if ((rc = uk_9preq_write32(req, fid->fid)) ||
+		(rc = uk_9preq_write32(req, dfid->fid)) ||
+		(rc = uk_9preq_writestr(req, &name_str)) ||
+		(rc = send_and_wait_no_zc(dev, req)))
+		goto out;
+
+	uk_pr_debug("RRENAMEAT\n");
+
+out:
+	uk_9pdev_req_remove(dev, req);
+	return rc;
+}
+
+int uk_9p_link(struct uk_9pdev *dev, struct uk_9pfid *dfid,
+		struct uk_9pfid *fid, const char *name)
+{
+	struct uk_9preq *req;
+	struct uk_9p_str name_str;
+	int rc = 0;
+
+	uk_9p_str_init(&name_str, name);
+
+	req = request_create(dev, UK_9P_TLINK);
+	if (PTRISERR(req))
+		return PTR2ERR(req);
+
+	uk_pr_debug("TLINK dfid %u fid %u\n", dfid->fid, fid->fid);
+
+	if ((rc = uk_9preq_write32(req, dfid->fid)) ||
+		(rc = uk_9preq_write32(req, fid->fid)) ||
+		(rc = uk_9preq_writestr(req, &name_str)) ||
+		(rc = send_and_wait_no_zc(dev, req)))
+		goto out;
+
+	uk_pr_debug("RLINK\n");
+
+out:
+	uk_9pdev_req_remove(dev, req);
+	return rc;
+}
+
+struct uk_9preq *uk_9p_readlink(struct uk_9pdev *dev, struct uk_9pfid *fid,
+		struct uk_9p_str *target)
+{
+	struct uk_9preq *req;
+	int rc = 0;
+
+	req = request_create(dev, UK_9P_TREADLINK);
+	if (PTRISERR(req))
+		return req;
+
+	uk_pr_debug("TREADLINK fid %u\n", fid->fid);
+
+	if ((rc = uk_9preq_write32(req, fid->fid)) ||
+		(rc = send_and_wait_no_zc(dev, req)) ||
+		(rc = uk_9preq_readstr(req, target)))
+		goto out;
+
+	uk_pr_debug("RREADLINK\n");
+
+	return req;
+
+out:
+	uk_9pdev_req_remove(dev, req);
+	return ERR2PTR(rc);
+}
+
+struct uk_9pfid *uk_9p_symlink(struct uk_9pdev *dev, struct uk_9pfid *sfid,
+		const char *name, const char *symtgt, uint32_t gid)
+{
+	struct uk_9preq *req;
+	struct uk_9pfid *fid;
+	struct uk_9p_str name_str;
+	struct uk_9p_str symtgt_str;
+	int rc = 0;
+
+	uk_9p_str_init(&name_str, name);
+	uk_9p_str_init(&symtgt_str, symtgt);
+
+	fid = uk_9pdev_fid_create(dev);
+	if (PTRISERR(fid))
+		return fid;
+
+	req = request_create(dev, UK_9P_TSYMLINK);
+	if (PTRISERR(req)) {
+		uk_9pdev_fid_release(fid);
+		return (void *)req;
+	}
+
+	uk_pr_debug("TSYMLINK fid %u\n", sfid->fid);
+
+	if ((rc = uk_9preq_write32(req, sfid->fid)) ||
+		(rc = uk_9preq_writestr(req, &name_str)) ||
+		(rc = uk_9preq_writestr(req, &symtgt_str)) ||
+		(rc = uk_9preq_write32(req, gid)) ||
+		(rc = send_and_wait_no_zc(dev, req)) ||
+		(rc = uk_9preq_readqid(req, &fid->qid)))
+		goto out;
+
+	uk_pr_debug("RSYMLINK qid type %u version %u path %lu\n",
+			fid->qid.type, fid->qid.version, fid->qid.path);
+
+	uk_9pdev_req_remove(dev, req);
+	return fid;
+
+out:
+	uk_9pdev_fid_release(fid);
+	uk_9pdev_req_remove(dev, req);
+	return ERR2PTR(rc);
 }

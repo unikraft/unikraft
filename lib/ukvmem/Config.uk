@@ -1,0 +1,81 @@
+menuconfig LIBUKVMEM
+	bool "ukvmem: Virtual address space management"
+	default n
+	select LIBUKDEBUG
+	select LIBUKALLOC
+	select LIBISRLIB
+	# ARM architecture is not yet compatible
+	depends on ARCH_X86_64
+	help
+		This library implements virtual address management by
+		providing methods for working with virtual address space
+		areas (VMAs) and performing paging decisions.
+
+if LIBUKVMEM
+
+config LIBUKVMEM_DEMAND_PAGE_IN_SIZE
+	int "Page size in log2 for demand-paging"
+	default 12
+	help
+		When a page fault occurs with demand paging the offending
+		page is paged-in. This option decides which page size to
+		use for the page-in operation if the VMA does not specify
+		a page size.
+
+config LIBUKVMEM_PAGEFAULT_HANDLER_PRIO
+	int "Fault handler priority [0-9]"
+	default 4
+	range 0 9
+	help
+		Priority of the page fault handler. Determines the order in
+		which the handler is called with respect to other handlers,
+		0 (earliest) to 9 (latest). Faults handled by ukvmem are not
+		propagated.
+
+config LIBUKVMEM_DEFAULT_BASE
+	hex "Default base address"
+	default 0x0000001000000000
+
+config LIBUKVMEM_DEDICATED_ANON_BASE
+	bool "Use dedicated anonymous base"
+	default no
+
+config LIBUKVMEM_ANON_BASE
+	hex "Anonymous memory"
+	default 0x0000001000000000
+	depends on LIBUKVMEM_DEDICATED_ANON_BASE
+
+config LIBUKVMEM_DEDICATED_DMA_BASE
+	bool "Use dedicated DMA base"
+	default no
+
+config LIBUKVMEM_DMA_BASE
+	hex "Direct physical memory (DMA)"
+	default 0x0000002000000000
+	depends on LIBUKVMEM_DEDICATED_DMA_BASE
+
+config LIBUKVMEM_DEDICATED_FILE_BASE
+	bool "Use dedicated file base"
+	default no
+
+config LIBUKVMEM_FILE_BASE
+	hex "File mappings"
+	default 0x0000003000000000
+	depends on LIBUKVMEM_DEDICATED_FILE_BASE
+
+config LIBUKVMEM_DEDICATED_STACK_BASE
+	bool "Use dedicated stack base"
+	default no
+
+config LIBUKVMEM_STACK_BASE
+	hex "Stacks"
+	default 0x0000004000000000
+	depends on LIBUKVMEM_DEDICATED_STACK_BASE
+
+config LIBUKVMEM_TEST
+	bool "Enable unit tests"
+	default n
+	select LIBUKTEST
+	select LIBUKNOFAULT
+
+endif

@@ -43,6 +43,9 @@
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include "arch/regmap_linuxabi.h"
+#if CONFIG_LIBSYSCALL_SHIM_STRACE
+#include <uk/plat/console.h> /* ukplat_coutk */
+#endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
 
 void ukplat_syscall_handler(struct __regs *r)
 {
@@ -55,6 +58,14 @@ void ukplat_syscall_handler(struct __regs *r)
 	__u8 ectxbuf[ukarch_ectx_size() + ectx_align];
 	struct ukarch_ectx *ectx = (struct ukarch_ectx *)
 					 ALIGN_UP((__uptr) ectxbuf, ectx_align);
+#if CONFIG_LIBSYSCALL_SHIM_STRACE
+#if CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR
+	char prsyscallbuf[512]; /* ANSI color is pretty hungry */
+#else /* !CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR */
+	char prsyscallbuf[256];
+#endif /* !CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR */
+	int prsyscalllen;
+#endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
 
 	UK_ASSERT(r);
 
@@ -82,6 +93,22 @@ void ukplat_syscall_handler(struct __regs *r)
 	r->rret0 = uk_syscall6_r(r->rsyscall,
 				 r->rarg0, r->rarg1, r->rarg2,
 				 r->rarg3, r->rarg4, r->rarg5);
+#if CONFIG_LIBSYSCALL_SHIM_STRACE
+	prsyscalllen = uk_snprsyscall(prsyscallbuf, ARRAY_SIZE(prsyscallbuf),
+#if CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR
+		     UK_PRSYSCALL_FMTF_ANSICOLOR | UK_PRSYSCALL_FMTF_NEWLINE,
+#else /* !CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR */
+		     UK_PRSYSCALL_FMTF_NEWLINE,
+#endif /* !CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR */
+		     r->rsyscall, r->rret0, r->rarg0, r->rarg1, r->rarg2,
+		     r->rarg3, r->rarg4, r->rarg5);
+	/*
+	 * FIXME:
+	 * We directly use `ukplat_coutk()` until lib/ukdebug printing
+	 * allows us to generate shortened output (avoiding list of details).
+	 */
+	ukplat_coutk(prsyscallbuf, (__sz) prsyscalllen);
+#endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
 
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
 	uk_thread_uktls_var(self, _uk_syscall_ultlsp) = 0x0;

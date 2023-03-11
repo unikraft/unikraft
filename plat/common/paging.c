@@ -64,6 +64,9 @@ static inline int pg_pt_alloc(struct uk_pagetable *pt, __vaddr_t *pt_vaddr,
 static inline void pg_pt_free(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			      unsigned int level);
 
+static int pg_page_split(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
+			 __vaddr_t vaddr, unsigned int level);
+
 static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			 unsigned int level, __vaddr_t vaddr, __sz len,
 			 unsigned long flags);
@@ -421,11 +424,13 @@ static inline void pg_ffree(struct uk_pagetable *pt, __paddr_t paddr,
 	/* We expect the free to succeed or to fail with -EFAULT if
 	 * the address is not in the range managed by the allocator (e.g.,
 	 * mapping of the kernel code segment), or -ENOMEM if the memory has
-	 * not been previously allocated. We treat the latter as an error that
-	 * we report with an assertion but silently ignore otherwise as the
-	 * frame allocator is able to gracefully handle this scenario.
+	 * not been previously allocated or already been freed (e.g., due to
+	 * a stale mapping or multiple mappings pointing to the same frame
+	 * during unmap). We silently ignore all of these as the frame
+	 * allocator must be able to gracefully handle these scenarios. Just
+	 * capture unexpected errors with this assert.
 	 */
-	UK_ASSERT(rc == 0 || rc == -EFAULT);
+	UK_ASSERT(rc == 0 || rc == -EFAULT || rc == -ENOMEM);
 }
 
 static inline int pg_pt_alloc(struct uk_pagetable *pt, __vaddr_t *pt_vaddr,
@@ -504,10 +509,11 @@ static inline int pg_largest_level(__vaddr_t vaddr, __paddr_t paddr, __sz len,
 	return lvl;
 }
 
-static int pg_page_map(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
-		       unsigned int level, __vaddr_t vaddr, __paddr_t paddr,
-		       __sz len, unsigned long attr, unsigned long flags,
-		       __pte_t template, unsigned int template_level)
+static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
+			unsigned int level, __vaddr_t vaddr, __paddr_t paddr,
+			__sz len, unsigned long attr, unsigned long flags,
+			__pte_t template, unsigned int template_level,
+			struct ukplat_page_mapx *mapx)
 {
 	unsigned int to_lvl = PAGE_FLAG_SIZE_TO_LEVEL(flags);
 	unsigned int max_lvl = pg_page_largest_level;
@@ -515,7 +521,7 @@ static int pg_page_map(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 	unsigned int tmp_lvl;
 	__vaddr_t pt_vaddr_cache[PT_LEVELS];
 	__paddr_t pt_paddr;
-	__pte_t pte;
+	__pte_t pte, orig_pte;
 	__sz page_size;
 	unsigned int pte_idx;
 	int rc, alloc_pmem;
@@ -560,10 +566,22 @@ static int pg_page_map(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 
 			if (PT_Lx_PTE_PRESENT(pte, lvl)) {
 				/* If there is already a larger page mapped
-				 * at this address return an error.
+				 * at this address and we have a mapx, we
+				 * split the page until we reach the target
+				 * level and let the mapx decide what to do.
+				 * Otherwise, we bail out.
 				 */
-				if (PAGE_Lx_IS(pte, lvl))
-					return -EEXIST;
+				if (PAGE_Lx_IS(pte, lvl)) {
+					if (!mapx)
+						return -EEXIST;
+
+					rc = pg_page_split(pt, pt_vaddr, vaddr,
+							   lvl);
+					if (unlikely(rc))
+						return rc;
+
+					continue;
+				}
 
 				pt_vaddr = pgarch_pt_pte_to_vaddr(pt, pte, lvl);
 			} else {
@@ -609,6 +627,8 @@ static int pg_page_map(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 		if (unlikely(rc))
 			return rc;
 
+		orig_pte = pte;
+
 		if (PT_Lx_PTE_PRESENT(pte, lvl)) {
 			/* It could be that there is a page table linked at
 			 * this PTE. In this case, we descent further down to
@@ -624,17 +644,22 @@ static int pg_page_map(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 				continue;
 			}
 
-			return -EEXIST;
-		}
+			/* This is not a page table. However, we are on the
+			 * correct level. If we have a mapping function we let
+			 * the mapping function decide what we should do with
+			 * the existing mapping. Otherwise, bail out.
+			 */
+			if (!mapx)
+				return -EEXIST;
 
-		UK_ASSERT(!PT_Lx_PTE_PRESENT(pte, lvl));
+			paddr = PT_Lx_PTE_PADDR(pte, lvl);
+		} else if (alloc_pmem) {
+			UK_ASSERT(!PT_Lx_PTE_PRESENT(pte, lvl));
 
-		/* This is a non-present PTE so we can map the new page here */
-		if (alloc_pmem) {
 			paddr = __PADDR_ANY;
-
 			rc = pg_falloc(pt, &paddr, lvl);
-			if (rc) {
+			if (unlikely(rc)) {
+TOO_BIG:
 				/* We could not allocate a contiguous,
 				 * self-aligned block of physical memory with
 				 * the requested size. If we should map largest
@@ -654,6 +679,10 @@ static int pg_page_map(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 
 				continue;
 			}
+
+			/* If something goes wrong in the following, we must
+			 * free the physical memory!
+			 */
 		}
 
 		UK_ASSERT(PAGE_Lx_ALIGNED(vaddr, lvl));
@@ -665,9 +694,40 @@ static int pg_page_map(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			template_level = lvl;
 
 		pte = pgarch_pte_create(paddr, attr, lvl, pte, template_level);
+
+		if (mapx) {
+			/* pte will always be prepared with the PTE that we
+			 * intend to write if the mapx returns success.
+			 * Accessing the current PTE can be done by reading it
+			 * from the page table.
+			 */
+			UK_ASSERT(mapx->map);
+			rc = mapx->map(pt, vaddr, pt_vaddr, lvl, &pte,
+				       mapx->ctx);
+			if (unlikely(rc)) {
+				if (alloc_pmem &&
+				    !PT_Lx_PTE_PRESENT(orig_pte, lvl))
+					pg_ffree(pt, paddr, lvl);
+
+				if (rc == UKPLAT_PAGE_MAPX_ESKIP)
+					goto NEXT_PTE;
+
+				if (rc == UKPLAT_PAGE_MAPX_ETOOBIG) {
+					rc = -ENOMEM;
+					goto TOO_BIG;
+				}
+
+				UK_ASSERT(rc < 0);
+				return rc;
+			}
+		}
+
+		UK_ASSERT(PAGE_Lx_ALIGNED(PT_Lx_PTE_PADDR(pte, lvl), lvl));
+
 		rc = ukarch_pte_write(pt_vaddr, lvl, pte_idx, pte);
 		if (unlikely(rc)) {
-			if (alloc_pmem)
+			if (alloc_pmem &&
+			    !PT_Lx_PTE_PRESENT(orig_pte, lvl))
 				pg_ffree(pt, paddr, lvl);
 
 			return rc;
@@ -678,6 +738,10 @@ static int pg_page_map(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			pt->nr_lx_pages[lvl]++;
 #endif /* CONFIG_PAGING_STATS */
 
+		if (PT_Lx_PTE_PRESENT(orig_pte, lvl))
+			ukarch_tlb_flush_entry(vaddr);
+
+NEXT_PTE:
 		UK_ASSERT(len >= page_size);
 		len -= page_size;
 
@@ -754,9 +818,10 @@ static int pg_page_map(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 	return 0;
 }
 
-int ukplat_page_map(struct uk_pagetable *pt, __vaddr_t vaddr,
-		    __paddr_t paddr, unsigned long pages,
-		    unsigned long attr, unsigned long flags)
+int ukplat_page_mapx(struct uk_pagetable *pt, __vaddr_t vaddr,
+		     __paddr_t paddr, unsigned long pages,
+		     unsigned long attr, unsigned long flags,
+		     struct ukplat_page_mapx *mapx)
 {
 	unsigned int level = PAGE_FLAG_SIZE_TO_LEVEL(flags);
 	__sz len;
@@ -777,9 +842,9 @@ int ukplat_page_map(struct uk_pagetable *pt, __vaddr_t vaddr,
 	UK_ASSERT(pt->pt_vbase != __VADDR_INV);
 	UK_ASSERT(pt->pt_pbase != __PADDR_INV);
 
-	return pg_page_map(pt, pt->pt_vbase, PT_LEVELS - 1, vaddr, paddr, len,
-			   attr, flags, PT_Lx_PTE_INVALID(PAGE_LEVEL),
-			   PAGE_LEVEL);
+	return pg_page_mapx(pt, pt->pt_vbase, PT_LEVELS - 1, vaddr, paddr, len,
+			    attr, flags, PT_Lx_PTE_INVALID(PAGE_LEVEL),
+			    PAGE_LEVEL, mapx);
 }
 
 static int pg_page_split(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
@@ -826,8 +891,8 @@ static int pg_page_split(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 	 * contiguous range of physical memory than the input page
 	 */
 	paddr = PT_Lx_PTE_PADDR(pte, level);
-	rc = pg_page_map(pt, new_pt_vaddr, level - 1, vaddr, paddr,
-			 PAGE_Lx_SIZE(level), attr, flags, pte, level);
+	rc = pg_page_mapx(pt, new_pt_vaddr, level - 1, vaddr, paddr,
+			  PAGE_Lx_SIZE(level), attr, flags, pte, level, NULL);
 	if (unlikely(rc))
 		goto EXIT_FREE;
 
@@ -1180,80 +1245,81 @@ static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 		if (unlikely(rc))
 			return rc;
 
-		if (!PT_Lx_PTE_PRESENT(pte, lvl))
-			return -EFAULT;
+		if (PT_Lx_PTE_PRESENT(pte, lvl)) {
+			/* Check if there is a page table at this PTE. In that
+			 * case descent, if allowed.
+			 */
+			if (!PAGE_Lx_IS(pte, lvl)) {
+				if ((flags & PAGE_FLAG_FORCE_SIZE) &&
+				    (lvl == to_lvl))
+					return -EFAULT;
 
-		/* There is a page table at this PTE. Descent, if allowed. */
-		if (!PAGE_Lx_IS(pte, lvl)) {
-			if ((flags & PAGE_FLAG_FORCE_SIZE) &&
-			    (lvl == to_lvl))
-				return -EFAULT;
+				pt_vaddr = pgarch_pt_pte_to_vaddr(pt, pte, lvl);
 
-			pt_vaddr = pgarch_pt_pte_to_vaddr(pt, pte, lvl);
+				pte_idx_cache[lvl] = pte_idx;
 
-			pte_idx_cache[lvl] = pte_idx;
+				UK_ASSERT(lvl > PAGE_LEVEL);
+				lvl--;
 
-			UK_ASSERT(lvl > PAGE_LEVEL);
-			lvl--;
+				pt_vaddr_cache[lvl] = pt_vaddr;
 
-			pt_vaddr_cache[lvl] = pt_vaddr;
+				if (vaddr == __VADDR_ANY) {
+					pte_idx = 0;
+					UK_ASSERT(page_size == 0);
+				} else {
+					pte_idx = PT_Lx_IDX(vaddr, lvl);
+					page_size = PAGE_Lx_SIZE(lvl);
+				}
 
-			if (vaddr == __VADDR_ANY) {
-				pte_idx = 0;
-				UK_ASSERT(page_size == 0);
-			} else {
-				pte_idx = PT_Lx_IDX(vaddr, lvl);
-				page_size = PAGE_Lx_SIZE(lvl);
+				continue;
 			}
 
-			continue;
-		}
+			UK_ASSERT(PAGE_Lx_IS(pte, lvl));
 
-		UK_ASSERT(PAGE_Lx_IS(pte, lvl));
+			/* At this point, we know that there is a page mapped
+			 * here. If we do not enforce a certain page size we
+			 * might have to split the page (i.e., it is larger
+			 * than the remaining len to change, or it is not
+			 * aligned to the current vaddr).
+			 */
+			if ((flags & PAGE_FLAG_FORCE_SIZE) && (lvl != to_lvl))
+				return -EFAULT;
 
-		/* At this point, we know that there is a page mapped here. If
-		 * we do not enforce a certain page size we might have to split
-		 * the page (i.e., it is larger than the remaining len to
-		 * change, or it is not aligned to the current vaddr).
-		 */
-		if ((flags & PAGE_FLAG_FORCE_SIZE) && (lvl != to_lvl))
-			return -EFAULT;
+			if ((page_size > len) ||
+			    (!PAGE_Lx_ALIGNED(vaddr, lvl))) {
+				UK_ASSERT(lvl > PAGE_LEVEL);
 
-		if ((page_size > len) ||
-		    (!PAGE_Lx_ALIGNED(vaddr, lvl))) {
-			UK_ASSERT(lvl > PAGE_LEVEL);
+				rc = pg_page_split(pt, pt_vaddr,
+					PAGE_Lx_ALIGN_DOWN(vaddr, lvl), lvl);
+				if (unlikely(rc))
+					return rc;
 
-			rc = pg_page_split(pt, pt_vaddr,
-				PAGE_Lx_ALIGN_DOWN(vaddr, lvl), lvl);
+				continue;
+			}
+
+			UK_ASSERT(PAGE_Lx_ALIGNED(vaddr, lvl));
+
+			/* At this point, we know that we can safely change the
+			 * current PTE as it is a page with a size that is
+			 * below the remaining len to change and the address we
+			 * want to change is aligned to the page size.
+			 */
+			new_pte = pgarch_pte_create(PT_Lx_PTE_PADDR(pte, lvl),
+						    new_attr, lvl, pte, lvl);
+
+			rc = ukarch_pte_write(pt_vaddr, lvl, pte_idx, new_pte);
 			if (unlikely(rc))
 				return rc;
 
-			continue;
+			if (vaddr != __VADDR_ANY)
+				ukarch_tlb_flush_entry(vaddr);
 		}
 
-		UK_ASSERT(PAGE_Lx_ALIGNED(vaddr, lvl));
-
-		/* At this point, we know that we can safely change the current
-		 * PTE as it is a page with a size that is below the remaining
-		 * len to change and the address we want to change is aligned
-		 * to the page size.
-		 */
-		new_pte = pgarch_pte_create(PT_Lx_PTE_PADDR(pte, lvl), new_attr,
-					    lvl, pte, lvl);
-
-		rc = ukarch_pte_write(pt_vaddr, lvl, pte_idx, new_pte);
-		if (unlikely(rc))
-			return rc;
-
-		if (vaddr != __VADDR_ANY)
-			ukarch_tlb_flush_entry(vaddr);
-
-		UK_ASSERT(len >= page_size);
-		len -= page_size;
-
 		/* Bail out if there is nothing more to do */
-		if (len == 0)
+		if (page_size >= len)
 			break;
+
+		len -= page_size;
 
 		UK_ASSERT(vaddr <= __VADDR_MAX - page_size);
 		vaddr += page_size;
@@ -1319,4 +1385,36 @@ int ukplat_page_set_attr(struct uk_pagetable *pt, __vaddr_t vaddr,
 
 	return pg_page_set_attr(pt, pt->pt_vbase, PT_LEVELS - 1, vaddr, len,
 				new_attr, flags);
+}
+
+__vaddr_t ukplat_page_kmap(struct uk_pagetable *pt, __paddr_t paddr,
+			   unsigned long pages, unsigned long flags)
+{
+	unsigned int level = PAGE_FLAG_SIZE_TO_LEVEL(flags);
+	__sz len = __SZ_MAX;
+
+	UK_ASSERT(pages > 0);
+	UK_ASSERT(level < PT_LEVELS);
+	UK_ASSERT(PAGE_Lx_HAS(level));
+	UK_ASSERT(pages <= (__SZ_MAX / PAGE_Lx_SIZE(level)));
+
+	len = pages * PAGE_Lx_SIZE(level);
+
+	return pgarch_kmap(pt, paddr, len);
+}
+
+void ukplat_page_kunmap(struct uk_pagetable *pt, __vaddr_t vaddr,
+			unsigned long pages, unsigned long flags)
+{
+	unsigned int level = PAGE_FLAG_SIZE_TO_LEVEL(flags);
+	__sz len = __SZ_MAX;
+
+	UK_ASSERT(pages > 0);
+	UK_ASSERT(level < PT_LEVELS);
+	UK_ASSERT(PAGE_Lx_HAS(level));
+	UK_ASSERT(pages <= (__SZ_MAX / PAGE_Lx_SIZE(level)));
+
+	len = pages * PAGE_Lx_SIZE(level);
+
+	pgarch_kunmap(pt, vaddr, len);
 }

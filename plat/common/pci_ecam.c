@@ -226,7 +226,7 @@ int gen_pci_irq_parse(const fdt32_t *addr, struct fdt_phandle_args *out_irq)
 	fdt32_t initial_match_array[16];
 	const fdt32_t *match_array = initial_match_array;
 	const fdt32_t *tmp, *imap, *imask;
-	const fdt32_t dummy_imask[] = { [0 ... 16] = cpu_to_fdt32(~0) };
+	fdt32_t dummy_imask[17];
 	int intsize, newintsize;
 	int addrsize, newaddrsize = 0;
 	int imaplen, match, i, rc = -EINVAL;
@@ -234,6 +234,7 @@ int gen_pci_irq_parse(const fdt32_t *addr, struct fdt_phandle_args *out_irq)
 	const fdt32_t *prop;
 
 	ipar = gen_pci_fdt;
+	memset((void *)dummy_imask, cpu_to_fdt32(~0), ARRAY_SIZE(dummy_imask));
 
 	/* First get the #interrupt-cells property of the current cursor
 	 * that tells us how to interpret the passed-in intspec. If there

@@ -40,11 +40,10 @@ $(XEN_DEBUG_IMAGE): $(XEN_ALIBS) $(XEN_ALIBS-y) $(XEN_OLIBS) $(XEN_OLIBS-y) \
 
 $(XEN_IMAGE): $(XEN_DEBUG_IMAGE)
 	$(call build_cmd,SCSTRIP,,$@,\
-		$(SCRIPTS_DIR)/sect-strip.py \
+		$(STRIP) -s \
 			$(SECT_STRIP_FLAGS) $(SECT_STRIP_FLAGS-y) \
-			--with-objcopy=$(OBJCOPY) \
-			$< -o $@ && \
-		$(STRIP) -s $@)
+			$< -o $@ 2>&1 | \
+			{ grep -v "Empty loadable segment detected" || true; })
 
 ifeq (arm,$(CONFIG_UK_ARCH))
 $(XEN_RAW_IMAGE): $(XEN_IMAGE)

@@ -1,0 +1,6 @@
+uk_streambuf_init
+uk_streambuf_alloc2
+uk_streambuf_strcpy
+uk_streambuf_printf
+uk_streambuf_vprintf
+uk_streambuf_memcpy

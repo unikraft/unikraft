@@ -205,6 +205,8 @@ __u64 tscclock_monotonic(void)
 	 */
 	tsc_now = rdtsc();
 	tsc_delta = tsc_now - tsc_base;
+	if (tsc_delta >= UINT64_MAX / 2)
+		tsc_delta = 1;
 	time_base += mul64_32(tsc_delta, tsc_mult);
 	tsc_base = tsc_now;
 

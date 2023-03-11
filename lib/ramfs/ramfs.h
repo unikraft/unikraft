@@ -36,29 +36,75 @@
 #include <vfscore/prex.h>
 #include <stdbool.h>
 
-/*
- * File/directory node for RAMFS
+/**
+ * struct ramfs_node - A filesystem entry node for RamFS
  */
 struct ramfs_node {
-	struct ramfs_node *rn_next;   /* next node in the same directory */
-	struct ramfs_node *rn_child;  /* first child node */
-	int rn_type;    /* file or directory */
-	char *rn_name;    /* name (null-terminated) */
-	size_t rn_namelen;    /* length of name not including terminator */
-	size_t rn_size;    /* file size */
-	char *rn_buf;    /* buffer to the file data */
-	size_t rn_bufsize;    /* allocated buffer size */
+	/* Next node in the same directory */
+	struct ramfs_node *rn_next;
+	/*
+	 * First child node if the current node is a directory,
+	 * else NULL
+	 */
+	struct ramfs_node *rn_child;
+	/*
+	 * Entry type: regular file - VREG, symbolic link - VLNK,
+	 * or directory - VDIR
+	 */
+	int rn_type;
+	/* Name of the file/directory (NULL-terminated) */
+	char *rn_name;
+	/* Length of the name not including the terminator */
+	size_t rn_namelen;
+	/* Size of the file */
+	size_t rn_size;
+	/* Buffer to the file data */
+	char *rn_buf;
+	/* Size of the allocated buffer */
+	size_t rn_bufsize;
+	/* Last change time */
 	struct timespec rn_ctime;
+	/* Last access time */
 	struct timespec rn_atime;
+	/* Last modification time */
 	struct timespec rn_mtime;
+	/* Node access mode */
 	int rn_mode;
+	/* Whether the rn_buf was allocated in this ramfs_node */
 	bool rn_owns_buf;
 };
 
+/**
+ * Allocates a new ramfs node.
+ *
+ * @param name
+ *   The entry name
+ * @param type
+ *   The entry type (regular file - VREG, symbolic link - VLNK,
+ *   or directory - VDIR)
+ * @return
+ *   Pointer to the new ramfs_node
+ */
 struct ramfs_node *ramfs_allocate_node(const char *name, int type);
 
+/**
+ * Frees a ramfs node.
+ *
+ * @param node
+ *   Pointer to the ramfs_node that will be freed
+ */
 void ramfs_free_node(struct ramfs_node *node);
 
-#define RAMFS_NODE(vnode) ((struct ramfs_node *) vnode->v_data)
+/**
+ * Transforms a vnode into a ramfs_node.
+ *
+ * @param vnode
+ *   Virtual node (abstraction offered by vfscore)
+ *   holding a reference to a ramfs_node
+
+ * @return
+ *   Pointer to the corresponding ramfs_node
+ */
+#define RAMFS_NODE(vnode) ((struct ramfs_node *) (vnode->v_data))
 
 #endif /* !_RAMFS_H */

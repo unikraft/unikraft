@@ -87,7 +87,7 @@ static int vfscore_rootfs(void)
 
 #if CONFIG_LIBVFSCORE_ROOTFS_INITRD
 	if (strncmp(rootfs, "initrd", 5) == 0) {
-		struct ukplat_memregion_desc initrd;
+		struct ukplat_memregion_desc *initrd;
 		enum ukcpio_error error;
 
 		if (ukplat_memregion_find_initrd0(&initrd) < 0) {
@@ -104,9 +104,10 @@ static int vfscore_rootfs(void)
 		}
 
 		uk_pr_info("Extracting initrd @ %p (%"__PRIsz" bytes) to /...\n",
-			   initrd.base, initrd.len);
+			   (void *) initrd->vbase, initrd->len);
 
-		error = ukcpio_extract("/", initrd.base, initrd.len);
+		error = ukcpio_extract("/", (void *) initrd->vbase,
+				       initrd->len);
 		if (error != UKCPIO_SUCCESS) {
 			uk_pr_crit("Failed to extract cpio archive to /: %d\n",
 				   error);

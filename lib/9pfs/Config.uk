@@ -3,3 +3,13 @@ config LIB9PFS
 	default y
 	depends on LIBVFSCORE
 	depends on LIBUK9P
+	help
+		Enable support for the 9P filesystem.
+		The following mount options are supported:
+		version={"9P2000.u"|"9P2000.L"}
+			9P protocol version (case sensitive).
+			Defaults to "9P2000.u".
+		uname=
+			The user name to use.
+		aname=
+			The file tree to access.

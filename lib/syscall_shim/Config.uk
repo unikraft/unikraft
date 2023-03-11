@@ -1,6 +1,7 @@
 menuconfig LIBSYSCALL_SHIM
 	bool "syscall-shim: Syscall shim layer"
 	default n
+	select LIBUKSTREAMBUF
 
 if LIBSYSCALL_SHIM
 	# Hidden configuration option that can be set by libc's in order to
@@ -60,6 +61,21 @@ if LIBSYSCALL_SHIM
 			help
 				Emits a debug message as soon as a binary system call request
 				is handled.
+
+		menuconfig LIBSYSCALL_SHIM_STRACE
+		depends on LIBSYSCALL_SHIM_HANDLER
+			bool "'strace'-like messages for binary system calls"
+			default n
+			help
+				Emits a `strace`-like message as soon as a binary system call request
+				was finished handling. The result/return code of the system call is
+				printed as well.
+		if LIBSYSCALL_SHIM_STRACE
+			config LIBSYSCALL_SHIM_STRACE_ANSI_COLOR
+			bool "Use ANSI-colored syntax highlighting"
+			default n
+			default y if LIBUKDEBUG_ANSI_COLOR
+		endif
 
 		config LIBSYSCALL_SHIM_DEBUG
 			bool "Enable all debug messages"

@@ -6,4 +6,4 @@ SECTIONS
 		PROVIDE(_uk_alloc_libstats_end = .);
 	}
 }
-INSERT BEFORE .data;
+INSERT AFTER .data;

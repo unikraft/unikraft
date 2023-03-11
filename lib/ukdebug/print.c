@@ -39,6 +39,7 @@
 #include <string.h>
 #include <stdarg.h>
 
+#include <uk/essentials.h>
 #include <uk/plat/console.h>
 #include <uk/plat/time.h>
 #include <uk/print.h>
@@ -309,8 +310,9 @@ static void _vprint(struct _vprint_console *cons,
 #define _VPRINT_ARGS_CALLER()
 #endif /* CONFIG_LIBUKDEBUG_PRINT_CALLER */
 
-void _uk_vprintd(const char *libname, const char *srcname,
-		 unsigned int srcline, const char *fmt, va_list ap)
+void _uk_vprintd(const char *libname, const char *srcname __maybe_unused,
+		 unsigned int srcline __maybe_unused, const char *fmt,
+		 va_list ap)
 {
 
 #if CONFIG_LIBUKDEBUG_REDIR_PRINTD
@@ -326,8 +328,8 @@ void _uk_vprintd(const char *libname, const char *srcname,
 #endif /* !CONFIG_LIBUKDEBUG_REDIR_PRINTD */
 }
 
-void _uk_printd(const char *libname, const char *srcname,
-		unsigned int srcline, const char *fmt, ...)
+void _uk_printd(const char *libname, const char *srcname __maybe_unused,
+		unsigned int srcline __maybe_unused, const char *fmt, ...)
 {
 	va_list ap;
 
@@ -353,8 +355,10 @@ void _uk_printd(const char *libname, const char *srcname,
  *  enabled.
  */
 #if CONFIG_LIBUKDEBUG_PRINTK
-void _uk_vprintk(int lvl, const char *libname, const char *srcname,
-		 unsigned int srcline, const char *fmt, va_list ap)
+void _uk_vprintk(int lvl, const char *libname,
+		 const char *srcname __maybe_unused,
+		 unsigned int srcline __maybe_unused,
+		 const char *fmt, va_list ap)
 {
 #if CONFIG_LIBUKDEBUG_REDIR_PRINTK
 	_vprint(&debug, lvl, libname,
@@ -369,8 +373,10 @@ void _uk_vprintk(int lvl, const char *libname, const char *srcname,
 #endif /* !CONFIG_LIBUKDEBUG_REDIR_PRINTK */
 }
 
-void _uk_printk(int lvl, const char *libname, const char *srcname,
-		unsigned int srcline, const char *fmt, ...)
+void _uk_printk(int lvl, const char *libname,
+		const char *srcname __maybe_unused,
+		unsigned int srcline __maybe_unused,
+		const char *fmt, ...)
 {
 	va_list ap;
 

@@ -45,8 +45,8 @@ struct sysinfo {
 	unsigned short procs, pad;
 	unsigned long totalhigh;
 	unsigned long freehigh;
-	unsigned mem_unit;
-	char __reserved[256];
+	unsigned int mem_unit;
+	char _f[20-2*sizeof(unsigned long)-sizeof(unsigned int)];
 };
 
 int sysinfo (struct sysinfo *);

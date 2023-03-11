@@ -32,6 +32,8 @@
 #ifndef __UKPLAT_IRQ_H__
 #define __UKPLAT_IRQ_H__
 
+#include <uk/arch/lcpu.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -55,6 +57,22 @@ typedef int (*irq_handler_func_t)(void *);
  * @return 0 on success, a negative errno value on errors
  */
 int ukplat_irq_register(unsigned long irq, irq_handler_func_t func, void *arg);
+
+/** The event payload for the #UKPLAT_EVENT_IRQ event */
+struct ukplat_event_irq_data {
+	/** The registers of the interrupted code */
+	struct __regs *regs;
+	/** The platform specific interrupt vector number */
+	unsigned long irq;
+};
+
+/**
+ * This event is raised before the platform code handles an IRQ. The normal
+ * IRQ handling will continue or stop according to the returned `UK_EVENT_*`
+ * value.
+ * Note: this event is usually raised in an interrupt context.
+ */
+#define UKPLAT_EVENT_IRQ ukplat_event_irq
 
 #ifdef __cplusplus
 }

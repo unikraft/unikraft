@@ -42,6 +42,16 @@ OUTPUT_FORMAT("elf64-littleaarch64")
 OUTPUT_ARCH(aarch64)
 ENTRY(_libkvmplat_entry)
 
+PHDRS
+{
+	text PT_LOAD FLAGS(PHDRS_PF_RX);
+	rodata PT_LOAD FLAGS(PHDRS_PF_R);
+	data PT_LOAD;
+	tls PT_TLS;
+	tls_load PT_LOAD;
+	stack PT_GNU_STACK FLAGS(PHDRS_PF_RW);
+}
+
 /*
  * We use mmu to control each section's attribute, so the boundaries
  * of sections with different memory attributes must be 4KiB alignment.
@@ -63,18 +73,10 @@ SECTIONS {
 	{
 		*(.text)
 		*(.text.*)
-	}
+	} :text
 
 	. = ALIGN(__PAGE_SIZE);
 	_etext = .;
-
-	EXCEPTION_SECTIONS
-
-	CTORTAB_SECTION
-
-	INITTAB_SECTION
-
-	EVENTTAB_SECTION
 
 	/* Read-only data */
 	. = ALIGN(__PAGE_SIZE);
@@ -83,8 +85,15 @@ SECTIONS {
 	{
 		*(.rodata)
 		*(.rodata.*)
-	}
+	} :rodata
 
+	EXCEPTION_SECTIONS
+
+	CTORTAB_SECTION
+
+	INITTAB_SECTION
+
+	EVENTTAB_SECTION
 
 	_erodata = .;
 

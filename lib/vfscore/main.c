@@ -1268,6 +1268,38 @@ out_errno:
 	return -error;
 }
 
+UK_SYSCALL_R_DEFINE(int, mkdirat, int, dirfd,
+		    const char*, pathname, mode_t, mode)
+{
+	struct vfscore_file *fp;
+	struct vnode *vp;
+	char p[PATH_MAX];
+	int error;
+
+	if (pathname[0] == '/' || dirfd == AT_FDCWD)
+		return uk_syscall_r_mkdir((long) pathname, (long) mode);
+
+	error = fget(dirfd, &fp);
+	if (error)
+		return error;
+
+	vp = fp->f_dentry->d_vnode;
+	vn_lock(vp);
+
+	/* build absolute path */
+	strlcpy(p, fp->f_dentry->d_mount->m_path, PATH_MAX);
+	strlcat(p, fp->f_dentry->d_path, PATH_MAX);
+	strlcat(p, "/", PATH_MAX);
+	strlcat(p, pathname, PATH_MAX);
+
+	error = uk_syscall_r_mkdir((long) p, (long) mode);
+
+	vn_unlock(vp);
+	fdrop(fp);
+
+	return error;
+}
+
 UK_TRACEPOINT(trace_vfs_rmdir, "\"%s\"", const char*);
 UK_TRACEPOINT(trace_vfs_rmdir_ret, "");
 UK_TRACEPOINT(trace_vfs_rmdir_err, "%d", int);
@@ -1604,8 +1636,7 @@ UK_TRACEPOINT(trace_vfs_lstat, "pathname=%s, stat=%p", const char*,
 UK_TRACEPOINT(trace_vfs_lstat_ret, "");
 UK_TRACEPOINT(trace_vfs_lstat_err, "errno=%d", int);
 
-#if UK_LIBC_SYSCALLS
-int __lxstat(int ver __unused, const char *pathname, struct stat *st)
+int __lxstat_helper(int ver __unused, const char *pathname, struct stat *st)
 {
 	struct task *t = main_task;
 	char path[PATH_MAX];
@@ -1631,6 +1662,12 @@ int __lxstat(int ver __unused, const char *pathname, struct stat *st)
 	return -error;
 }
 
+#if UK_LIBC_SYSCALLS
+int __lxstat(int ver __unused, const char *pathname, struct stat *st)
+{
+	return __lxstat_helper(1, pathname, st);
+}
+
 #ifdef __lxstat64
 #undef __lxstat64
 #endif
@@ -1642,7 +1679,7 @@ int __lxstat(int ver, const char *pathname, struct stat *st);
 
 UK_SYSCALL_R_DEFINE(int, lstat, const char*, pathname, struct stat*, st)
 {
-	return __lxstat(1, pathname, st);
+	return __lxstat_helper(1, pathname, st);
 }
 
 static int __fxstatat_helper(int ver __unused, int dirfd, const char *pathname,

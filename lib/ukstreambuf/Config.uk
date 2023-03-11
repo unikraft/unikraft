@@ -1,0 +1,14 @@
+menuconfig LIBUKSTREAMBUF
+	bool "ukstreambuf: Stream buffers"
+	default n
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKDEBUG
+	help
+		Helper functions to simplify appending data to buffers
+
+if LIBUKSTREAMBUF
+config LIBUKSTREAMBUF_TEST
+	bool "Enable unit tests"
+	default n
+	select LIBUKTEST
+endif

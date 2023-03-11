@@ -59,6 +59,7 @@ DECLARE_TRAP_EVENT(UKARCH_TRAP_PAGE_FAULT);
 DECLARE_TRAP_EVENT(UKARCH_TRAP_BUS_ERROR);
 DECLARE_TRAP_EVENT(UKARCH_TRAP_MATH);
 DECLARE_TRAP_EVENT(UKARCH_TRAP_SECURITY);
+DECLARE_TRAP_EVENT(UKARCH_TRAP_X86_GP);
 
 DECLARE_TRAP_EC(divide_error,    "divide error",         UKARCH_TRAP_MATH)
 DECLARE_TRAP   (debug,           "debug",                UKARCH_TRAP_DEBUG)
@@ -70,7 +71,7 @@ DECLARE_TRAP_EC(no_device,       "device not available", UKARCH_TRAP_MATH)
 DECLARE_TRAP_EC(invalid_tss,     "invalid TSS",          NULL)
 DECLARE_TRAP_EC(no_segment,      "segment not present",  UKARCH_TRAP_BUS_ERROR)
 DECLARE_TRAP_EC(stack_error,     "stack segment",        UKARCH_TRAP_BUS_ERROR)
-DECLARE_TRAP_EC(gp_fault,        "general protection",   NULL)
+DECLARE_TRAP_EC(gp_fault,        "general protection",   UKARCH_TRAP_X86_GP)
 DECLARE_TRAP   (coproc_error,    "coprocessor",          UKARCH_TRAP_MATH)
 DECLARE_TRAP_EC(alignment_check, "alignment check",      UKARCH_TRAP_BUS_ERROR)
 DECLARE_TRAP_EC(machine_check,   "machine check",        NULL)
@@ -91,10 +92,14 @@ void do_unhandled_trap(int trapnr, char *str, struct __regs *regs,
 
 void do_page_fault(struct __regs *regs, unsigned long error_code)
 {
+	int rc;
 	unsigned long vaddr = read_cr2();
 	struct ukarch_trap_ctx ctx = {regs, TRAP_page_fault, error_code, vaddr};
 
-	if (uk_raise_event(UKARCH_TRAP_PAGE_FAULT, &ctx))
+	rc = uk_raise_event(UKARCH_TRAP_PAGE_FAULT, &ctx);
+	if (unlikely(rc < 0))
+		uk_pr_crit("page fault handler returned error: %d\n", rc);
+	else if (rc)
 		return;
 
 	dump_regs(regs);

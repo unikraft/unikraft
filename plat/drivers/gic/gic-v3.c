@@ -499,7 +499,7 @@ static void gicv3_init_dist(void)
 	uk_pr_info("GICv3 distributor initialized.\n");
 }
 
-static void gicv3_handle_irq(void)
+static void gicv3_handle_irq(struct __regs *regs)
 {
 	uint32_t stat, irq;
 
@@ -518,7 +518,7 @@ static void gicv3_handle_irq(void)
 		isb();
 
 		if (irq < GIC_MAX_IRQ) {
-			_ukplat_irq_handle((unsigned long)irq);
+			_ukplat_irq_handle(regs, (unsigned long)irq);
 			gicv3_eoi_irq(stat);
 
 			continue;

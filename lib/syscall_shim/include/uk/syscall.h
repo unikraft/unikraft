@@ -162,34 +162,28 @@ static inline __uptr uk_syscall_ultlsp(void)
 #define __uk_scc(X) ((long) (X))
 typedef long uk_syscall_arg_t;
 
-#define __UK_SYSCALL_NARGS_X(a,b,c,d,e,f,g,h,n,...) n
-#define __UK_SYSCALL_NARGS(...) __UK_SYSCALL_NARGS_X(__VA_ARGS__,7,6,5,4,3,2,1,0,)
-
-#define __UK_SYSCALL_DEF_NARGS_X(z, a1,a2, b1,b2, c1,c2, d1,d2, e1,e2, f1,f2, g1,g2, nr, ...) nr
-#define __UK_SYSCALL_DEF_NARGS(...) __UK_SYSCALL_DEF_NARGS_X(__VA_ARGS__, 7,7, 6,6, 5,5, 4,4, 3,3, 2,2, 1,1,0)
-
 #define __UK_NAME2SCALLE_FN(name) UK_CONCAT(uk_syscall_e_, name)
 #define __UK_NAME2SCALLR_FN(name) UK_CONCAT(uk_syscall_r_, name)
 
-#define UK_ARG_MAP0(...)
-#define UK_ARG_MAP1(m, type, arg) m(type, arg)
-#define UK_ARG_MAP2(m, type, arg, ...) m(type, arg), UK_ARG_MAP1(m, __VA_ARGS__)
-#define UK_ARG_MAP3(m, type, arg, ...) m(type, arg), UK_ARG_MAP2(m, __VA_ARGS__)
-#define UK_ARG_MAP4(m, type, arg, ...) m(type, arg), UK_ARG_MAP3(m, __VA_ARGS__)
-#define UK_ARG_MAP5(m, type, arg, ...) m(type, arg), UK_ARG_MAP4(m, __VA_ARGS__)
-#define UK_ARG_MAP6(m, type, arg, ...) m(type, arg), UK_ARG_MAP5(m, __VA_ARGS__)
-#define UK_ARG_MAP7(m, type, arg, ...) m(type, arg), UK_ARG_MAP6(m, __VA_ARGS__)
+#define  UK_ARG_MAP0(...)
+#define  UK_ARG_MAP2(m, type, arg) m(type, arg)
+#define  UK_ARG_MAP4(m, type, arg, ...) m(type, arg), UK_ARG_MAP2(m, __VA_ARGS__)
+#define  UK_ARG_MAP6(m, type, arg, ...) m(type, arg), UK_ARG_MAP4(m, __VA_ARGS__)
+#define  UK_ARG_MAP8(m, type, arg, ...) m(type, arg), UK_ARG_MAP6(m, __VA_ARGS__)
+#define UK_ARG_MAP10(m, type, arg, ...) m(type, arg), UK_ARG_MAP8(m, __VA_ARGS__)
+#define UK_ARG_MAP12(m, type, arg, ...) m(type, arg), UK_ARG_MAP10(m, __VA_ARGS__)
+#define UK_ARG_MAP14(m, type, arg, ...) m(type, arg), UK_ARG_MAP12(m, __VA_ARGS__)
 #define UK_ARG_MAPx(nr_args, ...) UK_CONCAT(UK_ARG_MAP, nr_args)(__VA_ARGS__)
 
 /* Variant of UK_ARG_MAPx() but prepends a comma if nr_args > 0 */
-#define UK_ARG_EMAP0(...)
-#define UK_ARG_EMAP1(m, type, arg) , m(type, arg)
-#define UK_ARG_EMAP2(m, type, arg, ...) , m(type, arg), UK_ARG_MAP1(m, __VA_ARGS__)
-#define UK_ARG_EMAP3(m, type, arg, ...) , m(type, arg), UK_ARG_MAP2(m, __VA_ARGS__)
-#define UK_ARG_EMAP4(m, type, arg, ...) , m(type, arg), UK_ARG_MAP3(m, __VA_ARGS__)
-#define UK_ARG_EMAP5(m, type, arg, ...) , m(type, arg), UK_ARG_MAP4(m, __VA_ARGS__)
-#define UK_ARG_EMAP6(m, type, arg, ...) , m(type, arg), UK_ARG_MAP5(m, __VA_ARGS__)
-#define UK_ARG_EMAP7(m, type, arg, ...) , m(type, arg), UK_ARG_MAP6(m, __VA_ARGS__)
+#define  UK_ARG_EMAP0(...)
+#define  UK_ARG_EMAP2(m, type, arg) , m(type, arg)
+#define  UK_ARG_EMAP4(m, type, arg, ...) , m(type, arg), UK_ARG_MAP2(m, __VA_ARGS__)
+#define  UK_ARG_EMAP6(m, type, arg, ...) , m(type, arg), UK_ARG_MAP4(m, __VA_ARGS__)
+#define  UK_ARG_EMAP8(m, type, arg, ...) , m(type, arg), UK_ARG_MAP6(m, __VA_ARGS__)
+#define UK_ARG_EMAP10(m, type, arg, ...) , m(type, arg), UK_ARG_MAP8(m, __VA_ARGS__)
+#define UK_ARG_EMAP12(m, type, arg, ...) , m(type, arg), UK_ARG_MAP10(m, __VA_ARGS__)
+#define UK_ARG_EMAP14(m, type, arg, ...) , m(type, arg), UK_ARG_MAP12(m, __VA_ARGS__)
 #define UK_ARG_EMAPx(nr_args, ...) UK_CONCAT(UK_ARG_EMAP, nr_args)(__VA_ARGS__)
 
 #define UK_S_ARG_LONG(type, arg)   long arg
@@ -201,13 +195,13 @@ typedef long uk_syscall_arg_t;
 
 #if CONFIG_LIBSYSCALL_SHIM_DEBUG_SYSCALLS || CONFIG_LIBUKDEBUG_PRINTD
 #define UK_ARG_FMT_MAP0(...)
-#define UK_ARG_FMT_MAP1(m, type, arg) m(type, arg)
-#define UK_ARG_FMT_MAP2(m, type, arg, ...) m(type, arg) ", " UK_ARG_FMT_MAP1(m, __VA_ARGS__)
-#define UK_ARG_FMT_MAP3(m, type, arg, ...) m(type, arg) ", " UK_ARG_FMT_MAP2(m, __VA_ARGS__)
-#define UK_ARG_FMT_MAP4(m, type, arg, ...) m(type, arg) ", " UK_ARG_FMT_MAP3(m, __VA_ARGS__)
-#define UK_ARG_FMT_MAP5(m, type, arg, ...) m(type, arg) ", " UK_ARG_FMT_MAP4(m, __VA_ARGS__)
-#define UK_ARG_FMT_MAP6(m, type, arg, ...) m(type, arg) ", " UK_ARG_FMT_MAP5(m, __VA_ARGS__)
-#define UK_ARG_FMT_MAP7(m, type, arg, ...) m(type, arg) ", " UK_ARG_FMT_MAP6(m, __VA_ARGS__)
+#define UK_ARG_FMT_MAP2(m, type, arg) m(type, arg)
+#define UK_ARG_FMT_MAP4(m, type, arg, ...) m(type, arg) ", " UK_ARG_FMT_MAP2(m, __VA_ARGS__)
+#define UK_ARG_FMT_MAP6(m, type, arg, ...) m(type, arg) ", " UK_ARG_FMT_MAP4(m, __VA_ARGS__)
+#define UK_ARG_FMT_MAP8(m, type, arg, ...) m(type, arg) ", " UK_ARG_FMT_MAP6(m, __VA_ARGS__)
+#define UK_ARG_FMT_MAP10(m, type, arg, ...) m(type, arg) ", " UK_ARG_FMT_MAP8(m, __VA_ARGS__)
+#define UK_ARG_FMT_MAP12(m, type, arg, ...) m(type, arg) ", " UK_ARG_FMT_MAP10(m, __VA_ARGS__)
+#define UK_ARG_FMT_MAP14(m, type, arg, ...) m(type, arg) ", " UK_ARG_FMT_MAP12(m, __VA_ARGS__)
 #define UK_ARG_FMT_MAPx(nr_args, ...) UK_CONCAT(UK_ARG_FMT_MAP, nr_args)(__VA_ARGS__)
 
 #define UK_S_ARG_FMT_LONG(type, arg)  "(" STRINGIFY(type) ") %ld"
@@ -265,7 +259,7 @@ typedef long uk_syscall_arg_t;
 						  __VA_ARGS__))
 #define _UK_LLSYSCALL_DEFINE(...) __UK_LLSYSCALL_DEFINE(__VA_ARGS__)
 #define UK_LLSYSCALL_DEFINE(rtype, name, ...)				\
-	_UK_LLSYSCALL_DEFINE(__UK_SYSCALL_DEF_NARGS(__VA_ARGS__),	\
+	_UK_LLSYSCALL_DEFINE(UK_NARGS(__VA_ARGS__),			\
 			     rtype,					\
 			     name,					\
 			     __UK_NAME2SCALLE_FN(name),			\
@@ -293,7 +287,7 @@ typedef long uk_syscall_arg_t;
 	__UK_LLSYSCALL_DEFINE(x, rtype, name, ename, rname, __VA_ARGS__)
 #define _UK_SYSCALL_DEFINE(...) __UK_SYSCALL_DEFINE(__VA_ARGS__)
 #define UK_SYSCALL_DEFINE(rtype, name, ...)				\
-	_UK_SYSCALL_DEFINE(__UK_SYSCALL_DEF_NARGS(__VA_ARGS__),		\
+	_UK_SYSCALL_DEFINE(UK_NARGS(__VA_ARGS__),			\
 			   rtype,					\
 			   name,					\
 			   __UK_NAME2SCALLE_FN(name),			\
@@ -301,7 +295,7 @@ typedef long uk_syscall_arg_t;
 			   __VA_ARGS__)
 #else
 #define UK_SYSCALL_DEFINE(rtype, name, ...)				\
-	_UK_LLSYSCALL_DEFINE(__UK_SYSCALL_DEF_NARGS(__VA_ARGS__),	\
+	_UK_LLSYSCALL_DEFINE(UK_NARGS(__VA_ARGS__),			\
 			     rtype,					\
 			     name,					\
 			     __UK_NAME2SCALLE_FN(name),			\
@@ -351,7 +345,7 @@ typedef long uk_syscall_arg_t;
 						  __VA_ARGS__))
 #define _UK_LLSYSCALL_R_DEFINE(...) __UK_LLSYSCALL_R_DEFINE(__VA_ARGS__)
 #define UK_LLSYSCALL_R_DEFINE(rtype, name, ...)				\
-	_UK_LLSYSCALL_R_DEFINE(__UK_SYSCALL_DEF_NARGS(__VA_ARGS__),	\
+	_UK_LLSYSCALL_R_DEFINE(UK_NARGS(__VA_ARGS__),			\
 			       rtype,					\
 			       name,					\
 			       __UK_NAME2SCALLE_FN(name),		\
@@ -379,7 +373,7 @@ typedef long uk_syscall_arg_t;
 	__UK_LLSYSCALL_R_DEFINE(x, rtype, name, ename, rname, __VA_ARGS__)
 #define _UK_SYSCALL_R_DEFINE(...) __UK_SYSCALL_R_DEFINE(__VA_ARGS__)
 #define UK_SYSCALL_R_DEFINE(rtype, name, ...)				\
-	_UK_SYSCALL_R_DEFINE(__UK_SYSCALL_DEF_NARGS(__VA_ARGS__),	\
+	_UK_SYSCALL_R_DEFINE(UK_NARGS(__VA_ARGS__),			\
 			     rtype,					\
 			     name,					\
 			     __UK_NAME2SCALLE_FN(name),			\
@@ -387,7 +381,7 @@ typedef long uk_syscall_arg_t;
 			     __VA_ARGS__)
 #else
 #define UK_SYSCALL_R_DEFINE(rtype, name, ...)				\
-	_UK_LLSYSCALL_R_DEFINE(__UK_SYSCALL_DEF_NARGS(__VA_ARGS__),	\
+	_UK_LLSYSCALL_R_DEFINE(UK_NARGS(__VA_ARGS__),			\
 			       rtype,					\
 			       name,					\
 			       __UK_NAME2SCALLE_FN(name),		\
@@ -446,7 +440,7 @@ long uk_syscall6(long nr, long arg1, long arg2, long arg3,
  * is a constant. This macro maps the function call directly to the target
  * handler instead of doing a look-up at runtime
  */
-#define uk_syscall_static0(syscall_nr) \
+#define uk_syscall_static0(syscall_nr, ...) \
 	UK_CONCAT(uk_syscall0_fn, syscall_nr)()
 #define uk_syscall_static1(syscall_nr, a) \
 	UK_CONCAT(uk_syscall1_fn, syscall_nr)(a)
@@ -461,9 +455,9 @@ long uk_syscall6(long nr, long arg1, long arg2, long arg3,
 #define uk_syscall_static6(syscall_nr, a, b, c, d, e, f) \
 	UK_CONCAT(uk_syscall6_fn, syscall_nr)(a, b, c, d, e, f)
 
-#define uk_syscall_static(...)					\
+#define uk_syscall_static(syscall_nr, ...)			\
 	UK_CONCAT(uk_syscall_static,				\
-		  __UK_SYSCALL_NARGS(__VA_ARGS__))(__VA_ARGS__)
+		  UK_NARGS(__VA_ARGS__))(syscall_nr, __VA_ARGS__)
 
 /* Raw system call, returns negative codes on errors */
 long uk_syscall_r(long nr, ...);
@@ -476,7 +470,7 @@ long uk_syscall6_r(long nr, long arg1, long arg2, long arg3,
  * is a constant. This macro maps the function call directly to the target
  * handler instead of doing a look-up at runtime
  */
-#define uk_syscall_r_static0(syscall_nr) \
+#define uk_syscall_r_static0(syscall_nr, ...) \
 	UK_CONCAT(uk_syscall_r0_fn, syscall_nr)()
 #define uk_syscall_r_static1(syscall_nr, a) \
 	UK_CONCAT(uk_syscall_r1_fn, syscall_nr)(a)
@@ -491,9 +485,9 @@ long uk_syscall6_r(long nr, long arg1, long arg2, long arg3,
 #define uk_syscall_r_static6(syscall_nr, a, b, c, d, e, f) \
 	UK_CONCAT(uk_syscall_r6_fn, syscall_nr)(a, b, c, d, e, f)
 
-#define uk_syscall_r_static(...)				\
+#define uk_syscall_r_static(syscall_nr, ...)			\
 	UK_CONCAT(uk_syscall_r_static,				\
-		  __UK_SYSCALL_NARGS(__VA_ARGS__))(__VA_ARGS__)
+		  UK_NARGS(__VA_ARGS__))(syscall_nr, __VA_ARGS__)
 
 /**
  * Returns a string with the name of the system call number `nr`.
@@ -531,6 +525,70 @@ const char *uk_syscall_name_p(long nr);
  *  - (NULL): if system call handler is not provided
  */
 long (*uk_syscall_r_fn(long nr))(void);
+
+/*
+ * Format flags for system call print functions `uk_snprsyscall()`  and
+ * `uk_vsnprsyscall()`
+ */
+/* Append a newline at the end of the generated string */
+#define UK_PRSYSCALL_FMTF_NEWLINE   0x1
+/* Apply syntax highlighting with ANSI color sequences */
+#define UK_PRSYSCALL_FMTF_ANSICOLOR 0x2
+
+/**
+ * Pretty prints a system call request and response to a given C-string buffer.
+ * The function ensures that the generated string is NULL terminated. The
+ * function truncates the output string if there is not enough space on the
+ * target buffer.
+ *
+ * @param buf
+ *  Reference to a buffer where the resulting string is stored
+ * @param maxlen
+ *  Maximum length that can be used omn the buffer. If it is shorter than
+ *  the generated string, the string will be truncated but NULL-terminated
+ *  to fit into the buffer
+ * @param fmtf
+ *  Format flags that influence the generated string
+ * @param syscall_num
+ *  The system call number
+ * @param sysret
+ *  The return code of the system call
+ * @param ...
+ *  The system call arguments, each of it has to be passed as `long`
+ * @return
+ *  Number of characters of the generated string written to the buffer
+ *  (excluding terminating '\0')
+ */
+int uk_snprsyscall(char *buf, __sz maxlen, int fmtf, long syscall_num,
+		   long sysret, ...);
+
+/**
+ * Pretty prints a system call request and response to a given C-string buffer.
+ * The function ensures that the generated string is NULL terminated. The
+ * function truncates the output string if there is not enough space on the
+ * target buffer.
+ *
+ * @param buf
+ *  Reference to a buffer where the resulting string is stored
+ * @param maxlen
+ *  Maximum length that can be used omn the buffer. If it is shorter than
+ *  the generated string, the string will be truncated but NULL-terminated
+ *  to fit into the buffer
+ * @param fmtf
+ *  Format flags that influence the generated string
+ * @param syscall_num
+ *  The system call number
+ * @param sysret
+ *  The return code of the system call
+ * @param args
+ *  Variadic list of the system call arguments, each of it has to be passed
+ *  as `long`
+ * @return
+ *  Number of bytes of the generated string written to the buffer
+ *  (excluding terminating '\0')
+ */
+int uk_vsnprsyscall(char *buf, __sz maxlen, int fmtf, long syscall_num,
+		    long sysret, va_list args);
 
 #endif /* CONFIG_LIBSYSCALL_SHIM */
 

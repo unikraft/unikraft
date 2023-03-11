@@ -41,6 +41,10 @@ extern "C" {
 #include <uk/arch/types.h>
 #include <uk/asm/paging.h>
 
+/* Page attributes. See <uk/asm/paging.h> for more */
+#define PAGE_ATTR_PROT_RW	(PAGE_ATTR_PROT_READ | PAGE_ATTR_PROT_WRITE)
+#define PAGE_ATTR_PROT_RWX	(PAGE_ATTR_PROT_RW | PAGE_ATTR_PROT_EXEC)
+
 /**
  * PT_LEVELS definition
  *
@@ -156,6 +160,20 @@ __paddr_t PT_Lx_PTE_PADDR(__pte_t pte, unsigned int lvl);
 #endif
 
 /**
+ * PT_Lx_PTE_SET_PADDR(pte, lvl, paddr)
+ *
+ * @param pte a page table entry from a page table at the given level
+ * @param lvl a page table level [0..PT_LEVELS - 1]
+ * @param paddr the physical address which to set in the PTE
+ *
+ * @return the PTE with the updated physical address
+ */
+#ifndef PT_Lx_PTE_SET_PADDR
+__pte_t PT_Lx_PTE_SET_PADDR(__pte_t pte, unsigned int lvl, __paddr_t paddr);
+#endif
+#endif /* !__ASSEMBLY__ */
+
+/**
  * PAGE_Lx_SHIFT(lvl)
  *
  * NOTE: Must be compile-time resolvable
@@ -169,7 +187,20 @@ __paddr_t PT_Lx_PTE_PADDR(__pte_t pte, unsigned int lvl);
 #ifndef PAGE_Lx_SHIFT
 #error PAGE_Lx_SHIFT not defined
 #endif
-#endif /* !__ASSEMBLY__ */
+
+/**
+ * PAGE_SHIFT_Lx(shift)
+ *
+ * NOTE: Must be compile-time resolvable
+ *
+ * @param shift the order of the page size
+ *
+ * @return the page table level [0..PT_LEVELS - 1] corresponding to the
+ *    given page size order
+ */
+#ifndef PAGE_SHIFT_Lx
+#error PAGE_SHIFT_Lx not defined
+#endif
 
 /**
  * PAGE_Lx_SIZE(lvl)

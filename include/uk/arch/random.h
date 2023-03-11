@@ -50,7 +50,7 @@ extern "C" {
 int ukarch_random_init(void);
 
 /**
- * Get a 64-bit random integer
+ * Get a 32-bit random integer
  *
  * @param [out] val Pointer to store the generated value
  * @return 0 on success, negative value on failure
@@ -58,7 +58,7 @@ int ukarch_random_init(void);
 int __check_result ukarch_random_u32(__u32 *val);
 
 /**
- * Get a 32-bit random integer
+ * Get a 64-bit random integer
  *
  * @param [out] val Pointer to store the generated value
  * @return 0 on success, negative value on failure
@@ -66,7 +66,7 @@ int __check_result ukarch_random_u32(__u32 *val);
 int __check_result ukarch_random_u64(__u64 *val);
 
 /**
- * Reseed the RNG and get a 64-bit random integer
+ * Get a 32-bit random integer suitable for seeding
  *
  * @param [out] val Pointer to store the generated value
  * @return 0 on success, negative value on failure
@@ -74,7 +74,7 @@ int __check_result ukarch_random_u64(__u64 *val);
 int __check_result ukarch_random_seed_u32(__u32 *val);
 
 /**
- * Reseed the RNG and get a 32-bit random integer
+ * Get a 64-bit random integer suitable for seeding
  *
  * @param [out] val Pointer to store the generated value
  * @return 0 on success, negative value on failure

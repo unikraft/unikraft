@@ -896,14 +896,12 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n)
 	VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_MAC);
 
 	/**
-	 * MTU information (needed)
+	 * MTU information
 	 */
-	if (!VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_STATUS)) {
-		uk_pr_err("%p: Host system does not offer MTU feature\n", n);
-		rc = -EINVAL;
-		goto err_negotiate_feature;
-	}
-	VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_STATUS);
+	if (!VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_MTU))
+		uk_pr_debug("%p: Host system does not offer MTU feature\n", n);
+	else
+		VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_MTU);
 
 	/**
 	 * Gratuitous ARP
@@ -941,6 +939,21 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n)
 				   __offsetof(struct virtio_net_config, mac),
 				   &vndev->hw_addr.addr_bytes[0],
 				   UK_NETDEV_HWADDR_LEN, 1);
+
+	if (VIRTIO_FEATURE_HAS(drv_features, VIRTIO_NET_F_MTU)) {
+		virtio_config_get(vndev->vdev,
+				  __offsetof(struct virtio_net_config, mac),
+				  &vndev->mtu, sizeof(vndev->mtu), 1);
+		vndev->max_mtu = vndev->mtu;
+	} else {
+		/**
+		 * Report some reasonable defaults. This breaks down in cases
+		 * where MTU is <UK_ETH_PAYLOAD_MAXLEN (e.g. encapsulation),
+		 * but there's no way to signal the lack of MTU reporting in
+		 * mtu_get as yet, so we're stuck with this for now.
+		 */
+		vndev->max_mtu = vndev->mtu = UK_ETH_PAYLOAD_MAXLEN;
+	}
 
 	return 0;
 
@@ -1139,6 +1152,9 @@ static int virtio_net_start(struct uk_netdev *n)
 	virtio_dev_drv_up(d->vdev);
 	uk_pr_info(DRIVER_NAME": %"__PRIu16" started\n", d->uid);
 
+	for (i = 0; i < d->rx_vqueue_cnt; i++)
+		virtqueue_host_notify(d->rxqs[i].vq);
+
 	return 0;
 }
 
@@ -1183,8 +1199,6 @@ static int virtio_net_add_dev(struct virtio_dev *vdev)
 	}
 	vndev->uid = rc;
 	rc = 0;
-	vndev->max_mtu = UK_ETH_PAYLOAD_MAXLEN;
-	vndev->mtu = vndev->max_mtu;
 	vndev->promisc = 0;
 
 	/**

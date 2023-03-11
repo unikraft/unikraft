@@ -11,8 +11,9 @@
  *      Author: Rolf Neugebauer (neugebar@dcs.gla.ac.uk)
  *     Changes: Grzegorz Milos
  *     Changes: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ *     Changes: Nour-eddine Taleb <contact@noureddine.xyz>
  *
- *        Date: Aug 2003, changes Aug 2005, changes Oct 2017
+ *        Date: Aug 2003, changes Aug 2005, changes Oct 2017, changes Dec 2022
  *
  * Environment: Unikraft
  * Description: buddy page allocator from Xen.
@@ -432,9 +433,7 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 	 * where: bitmap_size = page_num / BITS_PER_BYTE
 	 *
 	 */
-	memr->nr_pages =
-		BITS_PER_BYTE * (range - sizeof(*memr)) /
-		(BITS_PER_BYTE * __PAGE_SIZE + 1);
+	memr->nr_pages = range >> __PAGE_SHIFT;
 	memr->mm_alloc_bitmap = (unsigned long *) (min + sizeof(*memr));
 	memr_size = round_pgup(sizeof(*memr) +
 		DIV_ROUND_UP(memr->nr_pages, BITS_PER_BYTE));
@@ -442,6 +441,7 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 
 	min += memr_size;
 	range -= memr_size;
+	memr->nr_pages -= memr_size >> __PAGE_SHIFT;
 
 	/*
 	 * Initialize region's bitmap
@@ -530,10 +530,10 @@ struct uk_alloc *uk_allocbbuddy_init(void *base, size_t len)
 			     bbuddy_pmaxalloc, bbuddy_pavailmem,
 			     bbuddy_addmem);
 
-	if (max > min + metalen) {
+	if (max > min) {
 		/* add left memory - ignore return value */
-		bbuddy_addmem(a, (void *)(min + metalen),
-				 (size_t)(max - min - metalen));
+		bbuddy_addmem(a, (void *)(min),
+				 (size_t)(max - min));
 	}
 
 	return a;

@@ -120,6 +120,30 @@ static int uk_9pfs_vtype_from_mode(int mode)
 	return VREG;
 }
 
+static int uk_9pfs_vtype_from_mode_l(int mode)
+{
+	switch (mode & S_IFMT) {
+	case S_IFREG:
+		return VREG;
+	case S_IFDIR:
+		return VDIR;
+	case S_IFBLK:
+		return VBLK;
+	case S_IFCHR:
+		return VCHR;
+	case S_IFLNK:
+		return VLNK;
+	case S_IFSOCK:
+		return VSOCK;
+	case S_IFIFO:
+		return VFIFO;
+	case 0:
+		return VNON;
+	default:
+		return VBAD;
+	}
+}
+
 static uint64_t uk_9pfs_ino(struct uk_9p_stat *stat)
 {
 	return stat->qid.path;
@@ -159,7 +183,8 @@ void uk_9pfs_free_vnode_data(struct vnode *vp)
 
 static int uk_9pfs_open(struct vfscore_file *file)
 {
-	struct uk_9pdev *dev = UK_9PFS_MD(file->f_dentry->d_mount)->dev;
+	struct uk_9pfs_mount_data *md = UK_9PFS_MD(file->f_dentry->d_mount);
+	struct uk_9pdev *dev = md->dev;
 	struct uk_9pfid *openedfid;
 	struct uk_9pfs_file_data *fd;
 	int rc;
@@ -178,15 +203,21 @@ static int uk_9pfs_open(struct vfscore_file *file)
 	}
 
 	/* Open cloned fid. */
-	rc = uk_9p_open(dev, openedfid,
-		uk_9pfs_open_mode_from_posix_flags(file->f_flags));
+	if (md->proto == UK_9P_PROTO_2000L)
+		rc = uk_9p_lopen(dev, openedfid, vfscore_oflags(file->f_flags));
+	else if (md->proto == UK_9P_PROTO_2000U)
+		rc = uk_9p_open(
+		    dev, openedfid,
+		    uk_9pfs_open_mode_from_posix_flags(file->f_flags));
+	else
+		rc = -EOPNOTSUPP;
 
 	if (rc)
 		goto out_err;
 
 	fd->fid = openedfid;
 	file->f_data = fd;
- 	UK_9PFS_ND(file->f_dentry->d_vnode)->nb_open_files++;
+	UK_9PFS_ND(file->f_dentry->d_vnode)->nb_open_files++;
 
 	return 0;
 
@@ -213,11 +244,10 @@ static int uk_9pfs_close(struct vnode *vn __unused, struct vfscore_file *file)
 
 static int uk_9pfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
 {
-	struct uk_9pdev *dev = UK_9PFS_MD(dvp->v_mount)->dev;
+	struct uk_9pfs_mount_data *md = UK_9PFS_MD(dvp->v_mount);
+	struct uk_9pdev *dev = md->dev;
 	struct uk_9pfid *dfid = UK_9PFS_VFID(dvp);
 	struct uk_9pfid *fid;
-	struct uk_9p_stat stat;
-	struct uk_9preq *stat_req;
 	struct vnode *vp;
 	int rc;
 
@@ -230,33 +260,82 @@ static int uk_9pfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
 		goto out;
 	}
 
-	stat_req = uk_9p_stat(dev, fid, &stat);
-	if (PTRISERR(stat_req)) {
-		rc = PTR2ERR(stat_req);
-		goto out_fid;
-	}
-
-	/* No stat string fields are used below. */
-	uk_9pdev_req_remove(dev, stat_req);
-
-	if (vfscore_vget(dvp->v_mount, uk_9pfs_ino(&stat), &vp)) {
-		/* Already in cache. */
-		rc = 0;
-		*vpp = vp;
-		/* if the vnode already has node data, it may be reused. */
-		if (vp->v_data)
+	if (md->proto == UK_9P_PROTO_2000L) {
+		struct uk_9p_attr stat;
+		struct uk_9preq *stat_req = uk_9p_getattr(
+		    dev, fid, UK_9P_GETATTR_MODE | UK_9P_GETATTR_SIZE, &stat);
+		if (PTRISERR(stat_req)) {
+			rc = PTR2ERR(stat_req);
 			goto out_fid;
-	}
+		}
+		if (!(stat.valid & UK_9P_GETATTR_MODE)
+		    || !(stat.valid & UK_9P_GETATTR_SIZE)) {
+			rc = -EIO;
+			goto out;
+		}
 
-	if (!vp) {
-		rc = -ENOMEM;
+		uk_9pdev_req_remove(dev, stat_req);
+
+		if (vfscore_vget(dvp->v_mount, stat.qid.path, &vp)) {
+			/* Already in cache. */
+			rc = 0;
+			*vpp = vp;
+			/*
+			 * if the vnode already has node data,
+			 * it may be reused.
+			 */
+			if (vp->v_data)
+				goto out_fid;
+		}
+
+		if (!vp) {
+			rc = -ENOMEM;
+			goto out_fid;
+		}
+
+		vp->v_flags = 0;
+		vp->v_mode = stat.mode;
+		vp->v_type = uk_9pfs_vtype_from_mode_l(stat.mode);
+		vp->v_size = stat.size;
+
+	} else if (md->proto == UK_9P_PROTO_2000U) {
+		struct uk_9p_stat stat;
+		struct uk_9preq *stat_req = uk_9p_stat(dev, fid, &stat);
+
+		if (PTRISERR(stat_req)) {
+			rc = PTR2ERR(stat_req);
+			goto out_fid;
+		}
+
+		/* No stat string fields are used below. */
+		uk_9pdev_req_remove(dev, stat_req);
+
+		if (vfscore_vget(dvp->v_mount, uk_9pfs_ino(&stat), &vp)) {
+			/* Already in cache. */
+			rc = 0;
+			*vpp = vp;
+			/*
+			 * if the vnode already has node data,
+			 * it may be reused.
+			 */
+			if (vp->v_data)
+				goto out_fid;
+		}
+
+		if (!vp) {
+			rc = -ENOMEM;
+			goto out_fid;
+		}
+
+		vp->v_flags = 0;
+		vp->v_mode = uk_9pfs_posix_mode_from_mode(stat.mode);
+		vp->v_type = uk_9pfs_vtype_from_mode(stat.mode);
+		vp->v_size = stat.length;
+
+	} else {
+		rc = -EOPNOTSUPP;
 		goto out_fid;
 	}
-
-	vp->v_flags = 0;
-	vp->v_mode = uk_9pfs_posix_mode_from_mode(stat.mode);
-	vp->v_type = uk_9pfs_vtype_from_mode(stat.mode);
-	vp->v_size = stat.length;
 
 	rc = uk_9pfs_allocate_vnode_data(vp, fid);
 	if (rc != 0)
@@ -301,10 +380,23 @@ static int uk_9pfs_create_generic(struct vnode *dvp, char *name, mode_t mode)
 
 static int uk_9pfs_create(struct vnode *dvp, char *name, mode_t mode)
 {
+	struct uk_9pfs_mount_data *md = UK_9PFS_MD(dvp->v_mount);
+
 	if (!S_ISREG(mode))
 		return EINVAL;
 
-	return uk_9pfs_create_generic(dvp, name, mode);
+	if (md->proto == UK_9P_PROTO_2000L) {
+		struct uk_9pfid *fid =
+		    uk_9p_walk(md->dev, UK_9PFS_VFID(dvp), NULL);
+		return -uk_9p_lcreate(md->dev, fid, name, O_WRONLY | O_TRUNC,
+				      mode, 0);
+
+	} else if (md->proto == UK_9P_PROTO_2000U) {
+		return uk_9pfs_create_generic(dvp, name, mode);
+
+	} else {
+		return EOPNOTSUPP;
+	}
 }
 
 static int uk_9pfs_remove_generic(struct vnode *dvp, struct vnode *vp)
@@ -346,10 +438,10 @@ static int uk_9pfs_rmdir(struct vnode *dvp, struct vnode *vp,
 static int uk_9pfs_readdir(struct vnode *vp, struct vfscore_file *fp,
 		struct dirent *dir)
 {
-	struct uk_9pdev *dev = UK_9PFS_MD(vp->v_mount)->dev;
+	struct uk_9pfs_mount_data *md = UK_9PFS_MD(vp->v_mount);
+	struct uk_9pdev *dev = md->dev;
 	struct uk_9pfs_file_data *fd = UK_9PFS_FD(fp);
 	int rc;
-	struct uk_9p_stat stat;
 	struct uk_9preq fake_request;
 
 again:
@@ -365,8 +457,18 @@ again:
 
 	if (fd->readdir_off == fd->readdir_sz) {
 		fd->readdir_off = 0;
-		fd->readdir_sz = uk_9p_read(dev, fd->fid, fp->f_offset,
-				UK_9PFS_READDIR_BUFSZ, fd->readdir_buf);
+
+		if (md->proto == UK_9P_PROTO_2000L)
+			fd->readdir_sz = uk_9p_readdir(
+			    dev, fd->fid, fp->f_offset, UK_9PFS_READDIR_BUFSZ,
+			    fd->readdir_buf);
+		else if (md->proto == UK_9P_PROTO_2000U)
+			fd->readdir_sz =
+			    uk_9p_read(dev, fd->fid, fp->f_offset,
+				       UK_9PFS_READDIR_BUFSZ, fd->readdir_buf);
+		else
+			fd->readdir_sz = -EOPNOTSUPP;
+
 		if (fd->readdir_sz < 0) {
 			rc = fd->readdir_sz;
 			goto out;
@@ -381,8 +483,10 @@ again:
 		/*
 		 * Update offset for the next readdir() call which requires
 		 * the next chunk of data to be transferred.
+		 * 9p2000.L updates f_offset on each entry read.
 		 */
-		fp->f_offset += fd->readdir_sz;
+		if (md->proto == UK_9P_PROTO_2000U)
+			fp->f_offset += fd->readdir_sz;
 	}
 
 	/*
@@ -393,35 +497,70 @@ again:
 	fake_request.recv.size = fd->readdir_sz;
 	fake_request.recv.offset = fd->readdir_off;
 	fake_request.state = UK_9PREQ_RECEIVED;
-	rc = uk_9preq_readstat(&fake_request, &stat);
+	if (md->proto == UK_9P_PROTO_2000L) {
+		struct uk_9p_qid qid;
+		uint64_t offset;
+		uint8_t type;
+		struct uk_9p_str name;
 
-	if (rc == -ENOBUFS) {
+		rc = uk_9preq_readdirent(&fake_request, &qid, &offset, &type,
+					 &name);
+
+		if (rc == -ENOBUFS) {
+			/*
+			 * Retry with a clean buffer, maybe the stat structure
+			 * got chunked and is not whole, although the RFC says
+			 * this should not happen.
+			 */
+			fd->readdir_off = 0;
+			fd->readdir_sz = 0;
+			goto again;
+		}
+
 		/*
-		 * Retry with a clean buffer, maybe the stat structure got
-		 * chunked and is not whole, although the RFC says this should
-		 * not happen.
+		 * Update the readdir() offset to the offset after
+		 * deserialization.
 		 */
-		fd->readdir_off = 0;
-		fd->readdir_sz = 0;
-		goto again;
-	}
+		fd->readdir_off = fake_request.recv.offset;
+		fp->f_offset = offset;
 
-	/* Update the readdir() offset to the offset after deserialization. */
-	fd->readdir_off = fake_request.recv.offset;
+		/*
+		 * Any other error besides ENOBUFS when deserializing is
+		 * considered an IO error.
+		 */
+		if (rc) {
+			rc = -EIO;
+			goto out;
+		}
 
-	/*
-	 * Any other error besides ENOBUFS when deserializing is considered
-	 * an IO error.
-	 */
-	if (rc) {
-		rc = -EIO;
-		goto out;
-	}
+		dir->d_type = type;
+		dir->d_ino = qid.path;
+		strlcpy((char *)&dir->d_name, name.data,
+			MIN(sizeof(dir->d_name), name.size + 1U));
 
-	dir->d_type = uk_9pfs_dttype_from_mode(stat.mode);
-	dir->d_ino = uk_9pfs_ino(&stat);
-	strlcpy((char *) &dir->d_name, stat.name.data,
+	} else if (md->proto == UK_9P_PROTO_2000U) {
+		struct uk_9p_stat stat;
+
+		rc = uk_9preq_readstat(&fake_request, &stat);
+
+		if (rc == -ENOBUFS) {
+			fd->readdir_off = 0;
+			fd->readdir_sz = 0;
+			goto again;
+		}
+
+		fd->readdir_off = fake_request.recv.offset;
+
+		if (rc) {
+			rc = -EIO;
+			goto out;
+		}
+
+		dir->d_type = uk_9pfs_dttype_from_mode(stat.mode);
+		dir->d_ino = uk_9pfs_ino(&stat);
+		strlcpy((char *)&dir->d_name, stat.name.data,
 			MIN(sizeof(dir->d_name), stat.name.size + 1U));
+	}
 
 out:
 	return -rc;
@@ -476,7 +615,8 @@ static int uk_9pfs_read(struct vnode *vp, struct vfscore_file *fp,
 
 static int uk_9pfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 {
-	struct uk_9pdev *dev = UK_9PFS_MD(vp->v_mount)->dev;
+	struct uk_9pfs_mount_data *md = UK_9PFS_MD(vp->v_mount);
+	struct uk_9pdev *dev = md->dev;
 	struct uk_9pfid *fid;
 	struct iovec *iov;
 	int64_t bytes;
@@ -501,7 +641,13 @@ static int uk_9pfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 	if (PTRISERR(fid))
 		return -PTR2ERR(fid);
 
-	rc = uk_9p_open(dev, fid, UK_9P_OWRITE);
+	if (md->proto == UK_9P_PROTO_2000L)
+		rc = uk_9p_lopen(dev, fid, O_WRONLY);
+	else if (md->proto == UK_9P_PROTO_2000U)
+		rc = uk_9p_open(dev, fid, UK_9P_OWRITE);
+	else
+		rc = -EOPNOTSUPP;
+
 	if (rc < 0)
 		goto out;
 
@@ -546,48 +692,286 @@ out:
 
 static int uk_9pfs_getattr(struct vnode *vp, struct vattr *attr)
 {
-	struct uk_9pdev *dev = UK_9PFS_MD(vp->v_mount)->dev;
+	struct uk_9pfs_mount_data *md = UK_9PFS_MD(vp->v_mount);
+	struct uk_9pdev *dev = md->dev;
 	struct uk_9pfid *fid = UK_9PFS_VFID(vp);
-	struct uk_9p_stat stat;
 	struct uk_9preq *stat_req;
 	int rc = 0;
 
-	stat_req = uk_9p_stat(dev, fid, &stat);
-	if (PTRISERR(stat_req)) {
-		rc = PTR2ERR(stat_req);
-		goto out;
+	if (md->proto == UK_9P_PROTO_2000L) {
+		struct uk_9p_attr stat;
+
+		stat_req = uk_9p_getattr(dev, fid, UK_9P_GETATTR_BASIC, &stat);
+		if (PTRISERR(stat_req)) {
+			rc = PTR2ERR(stat_req);
+			goto out;
+		}
+
+		uk_9pdev_req_remove(dev, stat_req);
+
+		if ((stat.valid & UK_9P_GETATTR_BASIC) != UK_9P_GETATTR_BASIC) {
+			rc = -EIO;
+			goto out;
+		}
+
+		attr->va_type = stat.mode & S_IFMT;
+		attr->va_mode = stat.mode & UK_ALLPERMS;
+		attr->va_nlink = stat.nlink;
+		attr->va_uid = stat.uid;
+		attr->va_gid = stat.gid;
+		attr->va_nodeid = vp->v_ino;
+		attr->va_atime.tv_sec = stat.atime_sec;
+		attr->va_atime.tv_nsec = stat.atime_nsec;
+		attr->va_mtime.tv_sec = stat.mtime_sec;
+		attr->va_mtime.tv_nsec = stat.mtime_nsec;
+		attr->va_ctime.tv_sec = stat.ctime_sec;
+		attr->va_ctime.tv_nsec = stat.ctime_nsec;
+		attr->va_rdev = stat.rdev;
+		attr->va_nblocks = stat.blocks;
+		attr->va_size = stat.size;
+
+	} else if (md->proto == UK_9P_PROTO_2000U) {
+		struct uk_9p_stat stat;
+
+		stat_req = uk_9p_stat(dev, fid, &stat);
+		if (PTRISERR(stat_req)) {
+			rc = PTR2ERR(stat_req);
+			goto out;
+		}
+
+		/* No stat string fields are used below. */
+		uk_9pdev_req_remove(dev, stat_req);
+
+		attr->va_type = uk_9pfs_vtype_from_mode(stat.mode);
+		attr->va_mode = uk_9pfs_posix_mode_from_mode(stat.mode);
+		attr->va_nodeid = vp->v_ino;
+		attr->va_size = stat.length;
+
+		attr->va_atime.tv_sec = stat.atime;
+		attr->va_atime.tv_nsec = 0;
+		attr->va_mtime.tv_sec = stat.mtime;
+		attr->va_mtime.tv_nsec = 0;
+		attr->va_ctime.tv_sec = 0;
+		attr->va_ctime.tv_nsec = 0;
+	} else {
+		rc = -EOPNOTSUPP;
 	}
-
-	/* No stat string fields are used below. */
-	uk_9pdev_req_remove(dev, stat_req);
-
-	attr->va_type = uk_9pfs_vtype_from_mode(stat.mode);
-	attr->va_mode = uk_9pfs_posix_mode_from_mode(stat.mode);
-	attr->va_nodeid = vp->v_ino;
-	attr->va_size = stat.length;
-
-	attr->va_atime.tv_sec = stat.atime;
-	attr->va_atime.tv_nsec = 0;
-	attr->va_mtime.tv_sec = stat.mtime;
-	attr->va_mtime.tv_nsec = 0;
-	attr->va_ctime.tv_sec = 0;
-	attr->va_ctime.tv_nsec = 0;
 
 out:
 	return -rc;
 }
 
+static int uk_9pfs_setattr(struct vnode *vp, struct vattr *attr)
+{
+	struct uk_9pfs_mount_data *md = UK_9PFS_MD(vp->v_mount);
+	struct uk_9pdev *dev = md->dev;
+	struct uk_9pfid *fid = UK_9PFS_VFID(vp);
+
+	if (md->proto == UK_9P_PROTO_2000L) {
+		uint32_t valid = 0;
+		uint32_t mode = 0;
+		uint32_t uid = 0;
+		uint32_t gid = 0;
+		uint64_t size = 0;
+		uint64_t atime_sec = 0, atime_nsec = 0;
+		uint64_t mtime_sec = 0, mtime_nsec = 0;
+
+		if (attr->va_mask & AT_MODE) {
+			valid |= UK_9P_SETATTR_MODE;
+			mode = attr->va_mode & UK_ALLPERMS;
+		}
+		if (attr->va_mask & AT_UID) {
+			valid |= UK_9P_SETATTR_UID;
+			uid = attr->va_uid;
+		}
+		if (attr->va_mask & AT_GID) {
+			valid |= UK_9P_SETATTR_GID;
+			uid = attr->va_uid;
+		}
+		if (attr->va_mask & AT_SIZE) {
+			valid |= UK_9P_SETATTR_SIZE;
+			size = attr->va_size;
+		}
+		if (attr->va_mask & AT_ATIME) {
+			valid |= UK_9P_SETATTR_ATIME | UK_9P_SETATTR_ATIME_SET;
+			atime_sec = attr->va_atime.tv_sec;
+			atime_nsec = attr->va_atime.tv_nsec;
+		}
+		if (attr->va_mask & AT_MTIME) {
+			valid |= UK_9P_SETATTR_MTIME | UK_9P_SETATTR_MTIME_SET;
+			mtime_sec = attr->va_mtime.tv_sec;
+			mtime_nsec = attr->va_mtime.tv_nsec;
+		}
+
+		return -uk_9p_setattr(dev, fid, valid, mode, uid, gid, size,
+				      atime_sec, atime_nsec, mtime_sec,
+				      mtime_nsec);
+
+	} else if (md->proto == UK_9P_PROTO_2000U) {
+		struct uk_9p_stat stat;
+		struct uk_9preq *stat_req;
+		int rc = 0;
+
+		stat_req = uk_9p_stat(dev, fid, &stat);
+		if (PTRISERR(stat_req)) {
+			rc = PTR2ERR(stat_req);
+			return -rc;
+		}
+
+		uk_9pdev_req_remove(dev, stat_req);
+
+		if (attr->va_mask & AT_ATIME)
+			stat.atime = attr->va_atime.tv_sec;
+
+		if (attr->va_mask & AT_MTIME)
+			stat.mtime = attr->va_mtime.tv_sec;
+
+		if (attr->va_mask & AT_MODE)
+			stat.mode = attr->va_mode;
+
+		rc = uk_9p_wstat(dev, fid, &stat);
+
+		return -rc;
+	} else {
+		return 0;
+	}
+}
+
+static int uk_9pfs_fsync(struct vnode *vp, struct vfscore_file *fp)
+{
+	struct uk_9pfs_mount_data *md = UK_9PFS_MD(vp->v_mount);
+	struct uk_9pfid *fid = UK_9PFS_FD(fp)->fid;
+
+	if (md->proto == UK_9P_PROTO_2000L)
+		return -uk_9p_fsync(md->dev, fid);
+	else
+		return 0;
+}
+
+static int uk_9pfs_truncate(struct vnode *vp, off_t off)
+{
+	struct uk_9pfs_mount_data *md = UK_9PFS_MD(vp->v_mount);
+
+	if (md->proto == UK_9P_PROTO_2000L) {
+		struct vattr attr = {
+		    .va_mask = AT_SIZE,
+		    .va_size = off,
+		};
+		return uk_9pfs_setattr(vp, &attr);
+	} else {
+		return 0;
+	}
+}
+
+static int uk_9pfs_rename(struct vnode *dvp1, struct vnode *vp1, char *name1,
+			  struct vnode *dvp2, struct vnode *vp2 __unused,
+			  char *name2)
+{
+	struct uk_9pfs_mount_data *dmd1 = UK_9PFS_MD(dvp1->v_mount);
+	struct uk_9pfid *dfid1 = UK_9PFS_VFID(dvp1);
+	struct uk_9pfid *fid1 = UK_9PFS_VFID(vp1);
+	struct uk_9pfs_mount_data *dmd2 = UK_9PFS_MD(dvp2->v_mount);
+	struct uk_9pfid *dfid2 = UK_9PFS_VFID(dvp2);
+	int rc = 0;
+
+	if (dmd1->dev != dmd2->dev)
+		return EXDEV;
+
+	if (dmd1->proto == UK_9P_PROTO_2000L) {
+		rc = uk_9p_renameat(dmd1->dev, dfid1, name1, dfid2, name2);
+		if (rc == -EOPNOTSUPP)
+			rc = uk_9p_rename(dmd1->dev, fid1, dfid2, name2);
+	} else {
+		return EINVAL;
+	}
+
+	return -rc;
+}
+
+static int uk_9pfs_link(struct vnode *dvp, struct vnode *svp, char *name)
+{
+	struct uk_9pfs_mount_data *dmd = UK_9PFS_MD(dvp->v_mount);
+	struct uk_9pfid *dfid = UK_9PFS_VFID(dvp);
+	struct uk_9pfs_mount_data *smd = UK_9PFS_MD(svp->v_mount);
+	struct uk_9pfid *sfid = UK_9PFS_VFID(svp);
+
+	if (dmd->dev != smd->dev)
+		return EXDEV;
+
+	if (dmd->proto == UK_9P_PROTO_2000L)
+		return -uk_9p_link(dmd->dev, dfid, sfid, name);
+	else
+		return EPERM;
+}
+
+static int uk_9pfs_readlink(struct vnode *vp, struct uio *uio)
+{
+	struct uk_9pfs_mount_data *md = UK_9PFS_MD(vp->v_mount);
+	struct uk_9pdev *dev = md->dev;
+	struct uk_9pfid *fid = UK_9PFS_VFID(vp);
+	struct uk_9p_str target;
+	struct iovec *iov;
+	struct uk_9preq *req;
+
+	if (md->proto != UK_9P_PROTO_2000L)
+		return EINVAL;
+
+	if (vp->v_type == VDIR)
+		return EISDIR;
+	if (vp->v_type != VLNK)
+		return EINVAL;
+	if (uio->uio_offset != 0)
+		return EINVAL;
+
+	if (!uio->uio_resid)
+		return 0;
+
+	iov = uio->uio_iov;
+	while (!iov->iov_len) {
+		uio->uio_iov++;
+		uio->uio_iovcnt--;
+	}
+
+	req = uk_9p_readlink(dev, fid, &target);
+	if (PTRISERR(req))
+		return -PTR2ERR(req);
+
+	if (uio->uio_offset >= target.size) {
+		uk_9pdev_req_remove(dev, req);
+		return 0;
+	}
+
+	strlcpy((char *)iov->iov_base, target.data + uio->uio_offset,
+		MIN(iov->iov_len, (size_t)target.size - uio->uio_offset + 1U));
+
+	uio->uio_resid -= target.size;
+	uio->uio_offset += target.size;
+
+	uk_9pdev_req_remove(dev, req);
+	return 0;
+}
+
+static int uk_9pfs_symlink(struct vnode *dvp, char *op, char *np)
+{
+	struct uk_9pfs_mount_data *md = UK_9PFS_MD(dvp->v_mount);
+	struct uk_9pfid *dfid = UK_9PFS_VFID(dvp);
+	struct uk_9pfid *fid;
+
+	if (md->proto != UK_9P_PROTO_2000L)
+		return EPERM;
+
+	fid = uk_9p_symlink(md->dev, dfid, op, np, 0);
+	if (PTRISERR(fid))
+		return -PTR2ERR(fid);
+
+	uk_9pfid_put(fid);
+	return 0;
+}
+
 #define uk_9pfs_seek		((vnop_seek_t)vfscore_vop_nullop)
 #define uk_9pfs_ioctl		((vnop_ioctl_t)vfscore_vop_einval)
-#define uk_9pfs_fsync		((vnop_fsync_t)vfscore_vop_nullop)
-#define uk_9pfs_setattr		((vnop_setattr_t)vfscore_vop_nullop)
-#define uk_9pfs_truncate	((vnop_truncate_t)vfscore_vop_nullop)
-#define uk_9pfs_link		((vnop_link_t)vfscore_vop_eperm)
 #define uk_9pfs_cache		((vnop_cache_t)NULL)
-#define uk_9pfs_readlink	((vnop_readlink_t)vfscore_vop_einval)
-#define uk_9pfs_symlink		((vnop_symlink_t)vfscore_vop_eperm)
 #define uk_9pfs_fallocate	((vnop_fallocate_t)vfscore_vop_nullop)
-#define uk_9pfs_rename		((vnop_rename_t)vfscore_vop_einval)
 #define uk_9pfs_poll		((vnop_poll_t)vfscore_vop_einval)
 
 struct vnops uk_9pfs_vnops = {

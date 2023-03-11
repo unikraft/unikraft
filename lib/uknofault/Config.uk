@@ -1,0 +1,26 @@
+menuconfig LIBUKNOFAULT
+	bool "uknofault: Fault-safe memory access functions"
+	default n
+	help
+		Provides functions for probing memory addresses and
+		performing memcpy's that do not crash or fault in case memory
+		is not accessible but return an error code instead.
+
+if LIBUKNOFAULT
+
+config LIBUKNOFAULT_FAULT_PRIO
+	int "Fault handler priority [0..9]"
+	default 8
+	range 0 9
+	help
+		Priority of the fault handlers with respect to other handlers,
+		0 (earliest) to 9 (latest). Events handled by uknofault are not
+		propagated.
+
+config LIBUKNOFAULT_TEST
+	bool "Enable tests"
+	default n
+	select LIBUKTEST
+	select PAGING
+
+endif

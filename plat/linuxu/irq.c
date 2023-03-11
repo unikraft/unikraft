@@ -36,6 +36,7 @@
 #include <uk/plat/irq.h>
 #include <uk/assert.h>
 #include <uk/print.h>
+#include <uk/event.h>
 #include <linuxu/syscall.h>
 #include <linuxu/signal.h>
 #if defined(__X86_32__) || defined(__x86_64__)
@@ -48,6 +49,8 @@
 
 #define __MAX_IRQ 16
 #define HANDLER_RESERVED ((void *) 0x1)
+
+UK_EVENT(UKPLAT_EVENT_IRQ);
 
 /* IRQ handlers declarations */
 struct irq_handler {
@@ -150,8 +153,18 @@ static void _irq_handle(int irq)
 {
 	struct irq_handler *h;
 	int i;
+	int rc;
+	struct ukplat_event_irq_data ctx;
 
 	UK_ASSERT(irq >= 0 && irq < __MAX_IRQ);
+
+	ctx.regs = NULL;
+	ctx.irq = irq;
+	rc = uk_raise_event(UKPLAT_EVENT_IRQ, &ctx);
+	if (unlikely(rc < 0))
+		UK_CRASH("IRQ event handler returned error: %d\n", rc);
+	if (rc == UK_EVENT_HANDLED)
+		return;
 
 	for (i = 0; i < CONFIG_LINUXU_MAX_IRQ_HANDLER_ENTRIES; i++) {
 		if (irq_handlers[irq][i].func == NULL)

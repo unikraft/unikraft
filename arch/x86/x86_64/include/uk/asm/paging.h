@@ -65,6 +65,8 @@ struct ukarch_pagetable {
 #define X86_PT_L0_SHIFT			12
 #define X86_PT_Lx_SHIFT(lvl)					\
 	(X86_PT_L0_SHIFT + (X86_PT_LEVEL_SHIFT * lvl))
+#define X86_PT_SHIFT_Lx(shift)					\
+	(((shift) - X86_PT_L0_SHIFT) / X86_PT_LEVEL_SHIFT)
 
 #define PT_Lx_IDX(vaddr, lvl)					\
 	(((vaddr) >> X86_PT_Lx_SHIFT(lvl)) & (X86_PT_PTES_PER_LEVEL - 1))
@@ -72,6 +74,7 @@ struct ukarch_pagetable {
 #define PT_Lx_PTES(lvl)			X86_PT_PTES_PER_LEVEL
 
 #define PAGE_Lx_SHIFT(lvl)		X86_PT_Lx_SHIFT(lvl)
+#define PAGE_SHIFT_Lx(shift)		X86_PT_SHIFT_Lx(shift)
 
 /* We use plain values here so we do not create dependencies on external helper
  * macros, which would forbit us to use the macros in functions defined further
@@ -154,6 +157,10 @@ static inline int ukarch_vaddr_range_isvalid(__vaddr_t start, __vaddr_t end)
 #define PT_Lx_PTE_PADDR(pte, lvl)				\
 	(((__paddr_t)(pte) & X86_PTE_PADDR_MASK) & PAGE_MASK)
 
+#define PT_Lx_PTE_SET_PADDR(pte, lvl, paddr)			\
+	((pte & ~(X86_PTE_PADDR_MASK & PAGE_MASK)) |		\
+	 (__pte_t)(paddr & X86_PTE_PADDR_MASK))
+
 #define PT_Lx_PTE_INVALID(lvl)		0x0UL
 
 /* Note: Some flags only apply to page PTEs, not page table PTEs */
@@ -186,6 +193,17 @@ static inline int ukarch_vaddr_range_isvalid(__vaddr_t start, __vaddr_t end)
 #define PAGE_ATTR_PROT_READ		0x01 /* Page is readable */
 #define PAGE_ATTR_PROT_WRITE		0x02 /* Page is writeable */
 #define PAGE_ATTR_PROT_EXEC		0x04 /* Page is executable */
+
+/* Page fault error code bits */
+#define X86_PF_EC_P			0x0001UL /* 0=non-present, 1=prot */
+#define X86_PF_EC_WR			0x0002UL /* 0=read, 1=write */
+#define X86_PF_EC_US			0x0004UL /* 0=kernel, 1=user */
+#define X86_PF_EC_RSVD			0x0008UL /* reserved bit in PTE */
+#define X86_PF_EC_ID			0x0010UL /* instruction fetch */
+#define X86_PF_EC_PK			0x0020UL /* protection key violation */
+#define X86_PF_EC_SS			0x0040UL /* shadow stack access */
+#define X86_PF_EC_SGX			0x8000UL /* SGX access control viol. */
+#define X86_PF_EC_HLAT			0x0080UL /* no translation using HLAT */
 
 #ifndef CONFIG_PARAVIRT
 #ifndef __ASSEMBLY__

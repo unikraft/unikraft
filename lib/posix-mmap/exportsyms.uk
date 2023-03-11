@@ -1,0 +1,12 @@
+mmap
+uk_syscall_e_mmap
+uk_syscall_r_mmap
+munmap
+uk_syscall_e_munmap
+uk_syscall_r_munmap
+mprotect
+uk_syscall_e_mprotect
+uk_syscall_r_mprotect
+madvise
+uk_syscall_e_madvise
+uk_syscall_r_madvise

@@ -26,7 +26,16 @@
 #include <uk/arch/limits.h> /* for __PAGE_SIZE */
 #include <uk/plat/common/common.lds.h>
 
-ENTRY(_libkvmplat_entry)
+PHDRS
+{
+	text PT_LOAD FLAGS(PHDRS_PF_RX);
+	rodata PT_LOAD FLAGS(PHDRS_PF_R);
+	data PT_LOAD;
+	tls PT_TLS;
+	tls_load PT_LOAD;
+	stack PT_GNU_STACK FLAGS(PHDRS_PF_RW);
+}
+
 SECTIONS
 {
 	. = 0x100000;
@@ -43,16 +52,8 @@ SECTIONS
 
 		*(.text)
 		*(.text.*)
-	}
+	} :text
 	_etext = .;
-
-	EXCEPTION_SECTIONS
-
-	CTORTAB_SECTION
-
-	INITTAB_SECTION
-
-	EVENTTAB_SECTION
 
 	/* Read-only data */
 	. = ALIGN(__PAGE_SIZE);
@@ -61,8 +62,16 @@ SECTIONS
 	{
 		*(.rodata)
 		*(.rodata.*)
-	}
+	} :rodata
 	_erodata = .;
+
+	EXCEPTION_SECTIONS
+
+	CTORTAB_SECTION
+
+	INITTAB_SECTION
+
+	EVENTTAB_SECTION
 
 	/* Constructor tables (read-only) */
 	. = ALIGN(0x8);
@@ -85,16 +94,6 @@ SECTIONS
 	TLS_SECTIONS
 
 	DATA_SECTIONS
-
-	/* We keep the interrupt stack on a different section
-	 * given that it may have a big alignment and it would
-	 * change the entire binary layout
-	 */
-	.intrstack :
-	{
-		*(.intrstack)
-		. = ALIGN(__PAGE_SIZE);
-	}
 
 	_end = .;
 

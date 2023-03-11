@@ -200,6 +200,21 @@ pgarch_pt_unmap(struct uk_pagetable *pt __unused, __vaddr_t pt_vaddr,
 	return x86_directmap_vaddr_to_paddr(pt_vaddr);
 }
 
+/* Temporary kernel mapping */
+static inline __vaddr_t
+pgarch_kmap(struct uk_pagetable *pt __unused, __paddr_t paddr,
+	    __sz len __unused)
+{
+	return x86_directmap_paddr_to_vaddr(paddr);
+}
+
+static inline void
+pgarch_kunmap(struct uk_pagetable *pt __unused, __vaddr_t vaddr __unused,
+	      __sz len __unused)
+{
+	/* nothing to do */
+}
+
 #define X86_PG_VADDR_SHIFT		8
 #define X86_PG_VADDR_BITS		16
 #define X86_PG_VADDR_MASK					\

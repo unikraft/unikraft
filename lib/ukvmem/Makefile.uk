@@ -1,0 +1,21 @@
+$(eval $(call addlib_s,libukvmem,$(CONFIG_LIBUKVMEM)))
+
+CINCLUDES-y   += -I$(LIBUKVMEM_BASE)/include
+CXXINCLUDES-y += -I$(LIBUKVMEM_BASE)/include
+
+LIBUKVMEM_SRCS-y += $(LIBUKVMEM_BASE)/vmem.c|isr
+LIBUKVMEM_SRCS-y += $(LIBUKVMEM_BASE)/vma_rsvd.c
+LIBUKVMEM_SRCS-y += $(LIBUKVMEM_BASE)/vma_anon.c
+LIBUKVMEM_SRCS-y += $(LIBUKVMEM_BASE)/vma_stack.c
+LIBUKVMEM_SRCS-y += $(LIBUKVMEM_BASE)/vma_dma.c
+ifeq ($(CONFIG_LIBVFSCORE),y)
+LIBUKVMEM_SRCS-y += $(LIBUKVMEM_BASE)/vma_file.c
+endif
+
+ifeq ($(CONFIG_HAVE_PAGING),y)
+LIBUKVMEM_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBUKVMEM_BASE)/arch/x86_64/pagefault.c
+endif
+
+ifneq ($(filter y,$(CONFIG_LIBUKVMEM_TEST) $(CONFIG_LIBUKTEST_ALL)),)
+LIBUKVMEM_SRCS-y += $(LIBUKVMEM_BASE)/tests/test_vmem.c
+endif
