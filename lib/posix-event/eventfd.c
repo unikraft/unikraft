@@ -173,6 +173,9 @@ static int eventfd_vfscore_read(struct vnode *vnode,
 
 	uk_mutex_unlock(&efd->lock);
 
+	buf->uio_resid = 0;
+	buf->uio_offset = sizeof(uint64_t);
+
 	return 0;
 }
 
