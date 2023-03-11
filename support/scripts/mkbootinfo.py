@@ -9,7 +9,7 @@ import subprocess
 import re
 import os
 
-SECINFO_EXP = r'^\s+\d+\s+.uk_bootinfo\s+([0-9,a-f]+)'
+SECINFO_EXP = r'^\s*\d+\s+\.uk_bootinfo\s+([0-9,a-f]+)'
 PHDRS_EXP = r'^\s+LOAD.+vaddr\s(0x[0-9,a-f]+).+\n.+memsz\s(0x[0-9,a-f]+)\sflags\s([rwx|-]{3})$'
 
 # Memory region types (see include/uk/plat/memory.h)
