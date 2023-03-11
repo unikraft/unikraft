@@ -197,7 +197,7 @@ UK_SYSCALL_DEFINE(void *, mmap, void *, addr, size_t, len, int, prot,
 
 	rc = do_mmap(&addr, len, prot, flags, fd, offset);
 	if (unlikely(rc)) {
-		errno = rc;
+		errno = -rc;
 		return MAP_FAILED;
 	}
 
