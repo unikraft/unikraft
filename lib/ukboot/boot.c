@@ -190,7 +190,7 @@ static struct uk_alloc *heap_init()
 			    (void *)md->vbase, (void *)(md->vbase + md->len),
 			    md->flags,
 #if CONFIG_UKPLAT_MEMRNAME
-			    md->name
+			    md->name,
 #else /* CONFIG_UKPLAT_MEMRNAME */
 			    ""
 #endif /* !CONFIG_UKPLAT_MEMRNAME */
