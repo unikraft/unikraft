@@ -138,6 +138,38 @@ do { \
 	timedout; \
 })
 
+#define uk_waitq_wait_deadline(wq, lock_fn, unlock_fn, lock, deadline, \
+			       deadline_condition) \
+({ \
+	struct uk_thread *__current; \
+	unsigned long flags; \
+	int timedout = 0; \
+	DEFINE_WAIT(__wait); \
+	__current = uk_thread_current(); \
+	ukplat_spin_lock_irqsave(&((wq)->sl), flags); \
+	uk_waitq_add(wq, &__wait); \
+	__current->wakeup_time = deadline; \
+	uk_thread_set_blocked(__current); \
+	uk_sched_thread_blocked(__current); \
+	ukplat_spin_unlock_irqrestore(&((wq)->sl), flags); \
+	if (lock) \
+		unlock_fn(lock); \
+	uk_sched_yield(); \
+	if (lock) \
+		lock_fn(lock); \
+	if (deadline_condition) \
+		timedout = 1; \
+	ukplat_spin_lock_irqsave(&((wq)->sl), flags); \
+	/* need to wake up */ \
+	uk_thread_wake(__current); \
+	uk_waitq_remove(wq, &__wait); \
+	ukplat_spin_unlock_irqrestore(&((wq)->sl), flags); \
+	timedout; \
+})
+
+#define uk_waitq_wait_locked(wq, lock_fn, unlock_fn, lock) \
+	uk_waitq_wait_deadline(wq, lock_fn, unlock_fn, lock, 0, 0)
+
 static inline void __lock_dummy(void *lock __unused) {}
 
 #define uk_waitq_wait_event(wq, condition) \
@@ -170,6 +202,19 @@ void uk_waitq_wake_up(struct uk_waitq *wq)
 	ukplat_spin_lock_irqsave(&(wq->sl), flags);
 	UK_STAILQ_FOREACH_SAFE(curr, &(wq->wait_list), thread_list, tmp)
 		uk_thread_wake(curr->thread);
+	ukplat_spin_unlock_irqrestore(&(wq->sl), flags);
+}
+
+static inline
+void uk_waitq_wake_up_one(struct uk_waitq *wq)
+{
+	struct uk_waitq_entry *head;
+	unsigned long flags;
+
+	ukplat_spin_lock_irqsave(&(wq->sl), flags);
+	head = UK_STAILQ_FIRST(&wq->wait_list);
+	if (head)
+		uk_thread_wake(head->thread);
 	ukplat_spin_unlock_irqrestore(&(wq->sl), flags);
 }
 
