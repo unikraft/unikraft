@@ -218,6 +218,20 @@ static inline void __uk_trace_finalize_buff(char *new_buff_pos, void *cookie)
 	struct uk_tracepoint_header *head =
 		(struct uk_tracepoint_header *) uk_trace_buffer_writep;
 
+	if (uk_trace_buffer_free == 0) {
+		/**
+		 * This means that the buffer was large enough for the header.
+		 * (__uk_trace_get_buff would have return NULL and the
+		 * tracepoint would have short-circuited), but the tracepoint
+		 * wanted to write some data which did not fit into the
+		 * remaining space. Therefore, the free variable was also set to
+		 * zero.
+		 * This implies that the event is incomplete and we must not
+		 * mark it as usable via the magic variable.
+		 */
+		return;
+	}
+
 	size = new_buff_pos - uk_trace_buffer_writep;
 	uk_trace_buffer_writep += size;
 	uk_trace_buffer_free -= size;
