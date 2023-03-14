@@ -145,6 +145,123 @@ static void *bootmemory_palloc(__sz size, int type)
 	return NULL;
 }
 
+#ifdef CONFIG_RUNTIME_ASLR
+static void *stackmemory_aslr_palloc(__sz size) {
+	struct ukplat_memregion_desc *mrd;
+	__paddr_t pstart, pend;
+	__paddr_t tmp_pstart, tmp_len;
+	int rc_b, rc_s, rc_a;
+	unsigned long ASLR_offset;
+	struct ukplat_memregion_desc old_mrd;
+
+	size = PAGE_ALIGN_UP(size);
+	ukplat_memregion_foreach(&mrd, UKPLAT_MEMRT_FREE, 0, 0) {
+		UK_ASSERT(mrd->pbase <= __U64_MAX - size);
+		pstart = PAGE_ALIGN_UP(mrd->pbase);
+		pend   = pstart + size;
+
+		if (pend > PLATFORM_MAX_MEM_ADDR ||
+		    pend > mrd->pbase + mrd->len)
+			continue;
+
+		UK_ASSERT((mrd->flags & UKPLAT_MEMRF_PERMS) ==
+			  (UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE));
+		
+		old_mrd.vbase = mrd->vbase;
+		old_mrd.pbase = mrd->pbase;
+		old_mrd.len   = mrd->len;
+		old_mrd.type  = UKPLAT_MEMRT_FREE;
+		old_mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE | UKPLAT_MEMRF_MAP;
+
+		// TODO:
+		// 3. Check if the this approach "%" is fine
+		// 4. How can I see the start of the heap address?
+		ASLR_offset = uk_swrand_randr() % (mrd->len - size);
+		uk_pr_info("ASLR_offset: %x\n", ASLR_offset);
+		uk_pr_info("pbase: %x\n", mrd->pbase);
+		uk_pr_info("stack start: %x\n", PAGE_ALIGN_UP(mrd->pbase + ASLR_offset));
+		uk_pr_info("pend: %x\n", PAGE_ALIGN_UP(mrd->pbase + ASLR_offset + size));
+		pstart = PAGE_ALIGN_UP(mrd->pbase + ASLR_offset);
+		pend = PAGE_ALIGN_UP(pstart + size);
+
+		tmp_pstart = mrd->pbase;
+		tmp_len = mrd->len;
+
+		/* Delete the old memory region to make space for the three new regions (before stack, stack, after stack) */
+		ukplat_memregion_list_delete(&ukplat_bootinfo_get()->mrds, __ukplat_memregion_foreach_i);
+
+		// Insert the free region before the stack start address
+		rc_b = ukplat_memregion_list_insert(&ukplat_bootinfo_get()->mrds,
+			&(struct ukplat_memregion_desc){
+				.vbase = PAGE_ALIGN_UP(tmp_pstart),
+				.pbase = PAGE_ALIGN_UP(tmp_pstart),
+				.len   = PAGE_ALIGN_UP(ASLR_offset),
+				.type  = UKPLAT_MEMRT_FREE,
+				.flags = UKPLAT_MEMRF_READ |
+					UKPLAT_MEMRF_WRITE |
+					UKPLAT_MEMRF_MAP,
+			});
+		if (unlikely(rc_b < 0)) {
+			/* Restore original region */
+			ukplat_memregion_list_insert(&ukplat_bootinfo_get()->mrds, &old_mrd);
+
+			return NULL;
+		}
+
+		/* Insert the stack region */
+		rc_s = ukplat_memregion_list_insert(&ukplat_bootinfo_get()->mrds,
+			&(struct ukplat_memregion_desc){
+				.vbase = pstart,
+				.pbase = pstart,
+				.len   = size,
+				.type  = UKPLAT_MEMRT_STACK,
+				.flags = UKPLAT_MEMRF_READ |
+					 UKPLAT_MEMRF_WRITE |
+					 UKPLAT_MEMRF_MAP,
+			});
+		if (unlikely(rc_s < 0)) {
+			/* Delete previously inserted region */
+			ukplat_memregion_list_delete(&ukplat_bootinfo_get()->mrds, rc_b);
+
+			/* Restore original region */
+			ukplat_memregion_list_insert(&ukplat_bootinfo_get()->mrds, &old_mrd);
+
+			return NULL;
+		}
+
+		/* Adjust the len and start of the after the stack region */
+		tmp_len  = tmp_pstart + tmp_len - pend;
+		tmp_pstart = pend;
+
+		// Insert the free region after the stack start address
+		rc_a = ukplat_memregion_list_insert(&ukplat_bootinfo_get()->mrds,
+			&(struct ukplat_memregion_desc){
+				.vbase = PAGE_ALIGN_UP(tmp_pstart),
+				.pbase = PAGE_ALIGN_UP(tmp_pstart),
+				.len   = PAGE_ALIGN_UP(tmp_len),
+				.type  = UKPLAT_MEMRT_FREE,
+				.flags = UKPLAT_MEMRF_READ |
+					UKPLAT_MEMRF_WRITE |
+					UKPLAT_MEMRF_MAP,
+			});
+		if (unlikely(rc_a < 0)) {
+			/* Delete previously inserted region */
+			ukplat_memregion_list_delete(&ukplat_bootinfo_get()->mrds, rc_b);
+			ukplat_memregion_list_delete(&ukplat_bootinfo_get()->mrds, rc_s);
+
+			/* Restore original region */
+			ukplat_memregion_list_insert(&ukplat_bootinfo_get()->mrds, &old_mrd);
+
+			return NULL;
+		}
+
+		return (void *)pstart;
+	}
+
+	return NULL;
+}
+#endif
+
 #ifdef CONFIG_HAVE_PAGING
 /* Initial page table struct used for paging API to absorb statically defined
  * startup page table.
@@ -417,10 +534,12 @@ void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi)
 	#endif
 
 	/* Allocate boot stack */
-	bstack = ukplat_memregion_alloc(__STACK_SIZE, UKPLAT_MEMRT_STACK,
-					UKPLAT_MEMRF_READ |
-					UKPLAT_MEMRF_WRITE |
-					UKPLAT_MEMRF_MAP);
+	ukplat_bootinfo_print();
+	#ifdef CONFIG_RUNTIME_ASLR
+	bstack = stackmemory_aslr_palloc(__STACK_SIZE);
+	#else
+	bstack = bootmemory_palloc(__STACK_SIZE, UKPLAT_MEMRT_STACK);
+	#endif
 	if (unlikely(!bstack))
 		UK_CRASH("Boot stack alloc failed\n");
 
