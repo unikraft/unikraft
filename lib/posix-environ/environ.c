@@ -124,3 +124,6 @@ UK_LIBPARAM_PARAM_ARR_ALIAS(vars,
 #endif
 
 char **__environ = __init_env;
+__weak_alias(__environ, ___environ);
+__weak_alias(__environ, _environ);
+__weak_alias(__environ, environ);
