@@ -599,7 +599,12 @@ M4		:= m4
 AR		:= ar
 CAT		:= cat
 SED		:= sed
+# Prefer using GNU AWK because of provided error messages on script errors
+ifeq (, $(shell which gawk))
 AWK		:= awk
+else
+AWK		:= gawk --lint
+endif
 YACC		:= bison
 LEX     	:= flex
 PATCH		:= patch
