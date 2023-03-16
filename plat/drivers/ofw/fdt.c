@@ -300,14 +300,17 @@ int fdt_get_address(const void *fdt, int nodeoffset, uint32_t index,
 int fdt_node_offset_by_compatible_list(const void *fdt, int startoffset,
 				  const char * const compatibles[])
 {
-	int idx, offset;
+	int idx, min_offset = INT_MAX, offset;
 
 	for (idx = 0; compatibles[idx] != NULL; idx++) {
 		offset = fdt_node_offset_by_compatible(fdt, startoffset,
 				  compatibles[idx]);
-		if (offset >= 0)
-			return offset;
+		if (offset >= 0 && offset < min_offset)
+			min_offset = offset;
 	}
+
+	if (min_offset != INT_MAX)
+		return min_offset;
 
 	return -FDT_ERR_NOTFOUND;
 }
@@ -315,18 +318,22 @@ int fdt_node_offset_by_compatible_list(const void *fdt, int startoffset,
 int fdt_node_offset_idx_by_compatible_list(const void *fdt, int startoffset,
 			  const char * const compatibles[], int *index)
 {
-	int idx, offset;
+	int idx, min_offset = INT_MAX, offset, compatible_idx;
 
 	for (idx = 0; compatibles[idx] != NULL; idx++) {
 		offset = fdt_node_offset_by_compatible(fdt, startoffset,
 				  compatibles[idx]);
-		if (offset >= 0) {
-			*index = idx;
-			return offset;
+		if (offset >= 0 && offset < min_offset) {
+			min_offset = offset;
+			compatible_idx = idx;
 		}
 	}
 
-	*index = idx;
+	if (min_offset != INT_MAX) {
+		*index = compatible_idx;
+		return min_offset;
+	}
+
 	return -FDT_ERR_NOTFOUND;
 }
 
