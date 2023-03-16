@@ -224,9 +224,16 @@ void ukplat_entry_argp(char *arg0, char *argb, __sz argb_len)
 	ukplat_entry(argc, argv);
 }
 
+#if CONFIG_LIBPOSIX_ENVIRON
+extern char **environ;
+#endif /* CONFIG_LIBPOSIX_ENVIRON */
+
 /* defined in <uk/plat.h> */
 void ukplat_entry(int argc, char *argv[])
 {
+#if CONFIG_LIBPOSIX_ENVIRON
+	char **envp;
+#endif /* CONFIG_LIBPOSIX_ENVIRON */
 	int rc = 0;
 #if CONFIG_LIBUKALLOC
 	struct uk_alloc *a = NULL;
@@ -379,6 +386,17 @@ void ukplat_entry(int argc, char *argv[])
 		uk_pr_debug("Call constructor: %p()...\n", *ctorfn);
 		(*ctorfn)();
 	}
+
+#if CONFIG_LIBPOSIX_ENVIRON
+	envp = environ;
+	if (envp) {
+		uk_pr_info("Environment variables:\n");
+		while (*envp) {
+			uk_pr_info("\t%s\n", *envp);
+			envp++;
+		}
+	}
+#endif /* CONFIG_LIBPOSIX_ENVIRON */
 
 	uk_pr_info("Calling main(%d, [", argc);
 	for (i = 0; i < argc; ++i) {
