@@ -158,7 +158,7 @@ static int fdt_translate_one(const void *fdt, int parent, fdt32_t *addr,
 	if (!ranges)
 		return 1;
 	if (rlen == 0) {
-		offset = fdt_reg_read_number(addr, na);
+		offset = 0;
 		uk_pr_debug("empty ranges, 1:1 translation\n");
 		goto finish;
 	}
@@ -179,7 +179,7 @@ static int fdt_translate_one(const void *fdt, int parent, fdt32_t *addr,
 	memcpy(addr, ranges + na, 4 * pna);
 
 finish:
-	uk_pr_info("parent translation for:%p %x", addr, pna);
+	uk_pr_info("parent translation for:%p %x\n", addr, pna);
 
 	/* Translate it into parent bus space */
 	return fdt_default_translate(addr, offset, pna);
