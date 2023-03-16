@@ -115,3 +115,12 @@ config FPSIMD
 	depends on ARCH_ARM_64
 	help
 		Enable support FPU usage in application
+
+config DTB_INTERRUPT_ADDRESS_CELLS_ERRATA
+	bool "Errata for uncomplying device trees"
+	default n
+	depends on ARCH_ARM_64
+	help
+		Errata for parsing certain uncomplying device trees
+		which lack the #address-cells property for interrupt
+		controllers.
