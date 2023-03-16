@@ -153,6 +153,8 @@
 	{								\
 		*(.data)						\
 		*(.data.*)						\
+		*(.sdata)						\
+		*(.sdata.*)						\
 	} :data								\
 	_edata = .;							\
 									\
@@ -168,6 +170,8 @@
 	{								\
 		*(.bss)							\
 		*(.bss.*)						\
+		*(.sbss)						\
+		*(.sbss.*)						\
 		*(COMMON)						\
 		. = ALIGN(__PAGE_SIZE);					\
 	}
