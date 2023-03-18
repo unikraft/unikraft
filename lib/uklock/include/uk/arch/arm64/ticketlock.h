@@ -50,61 +50,122 @@ struct __align(8) __ticketlock {
 /* Initialize a ticketlock to unlocked state */
 #define UKARCH_TICKETLOCK_INITIALIZER() { 0 }
 
+
+/**
+ *  Initialize a ticketlock.
+ *  Current and next tickets are set to 0.
+ *
+ * @param lock
+ *     The ticketlock to be initialized.
+ */
 static inline void ukarch_ticket_init(struct __ticketlock *lock)
 {
 	lock->next = 0;
 	lock->current = 0;
 }
 
+/**
+ *  Let a thread acquire a ticketlock.
+ *  This happens only if the thread has appropriate ticket number.
+ *  This function will block until the lock is acquired.
+ *
+ * @param lock
+ *     The ticketlock to be acquired.
+ */
+
 static inline void ukarch_ticket_lock(struct __ticketlock *lock)
 {
 	unsigned int r, r1, r2;
 
 	__asm__ __volatile__(
-		"	prfm pstl1keep, [%3]\n"      /* preload lock */
-		"1:	ldaxr	%w0, [%3]\n"         /* read current/next */
-		"	add	%w1, %w0, #0x10000\n"/* increment next */
-		"	stxr	%w2, %w1, [%3]\n"    /* try store-exclusive */
-		"	cbnz	%w2, 1b\n"           /* retry if excl failed */
-		"	and	%w2, %w0, #0xffff\n" /* get current */
-		"	cmp	%w2, %w0, lsr #16\n" /* is it our ticket? */
-		"	b.eq	3f\n"                /* if yes, lock acquired */
-		"	sevl\n"                      /* invalidate next wfe */
-		"2:	wfe\n"                       /* wait for unlock event */
-		"	ldaxrh	%w2, [%3]\n"         /* load current */
-		"	cmp	%w2, %w0, lsr #16\n" /* is it our ticket? */
-		"	b.ne	2b\n"                /* if not, try again */
-		"3:"                                 /* critical section */
+		/* preload lock */
+		"	prfm pstl1keep, [%3]\n"
+
+		/* read current/next */
+		"1:	ldaxr	%w0, [%3]\n"
+		/* increment next */
+		"	add	%w1, %w0, #0x10000\n"
+		/* try store-exclusive */
+		"	stxr	%w2, %w1, [%3]\n"
+		/* retry if excl failed */
+		"	cbnz	%w2, 1b\n"
+		/* get current */
+		"	and	%w2, %w0, #0xffff\n"
+		/* is it our ticket? */
+		"	cmp	%w2, %w0, lsr #16\n"
+		/* if yes, lock acquired */
+		"	b.eq	3f\n"
+		/* invalidate next wfe */
+		"	sevl\n"
+
+		/* wait for unlock event */
+		"2:	wfe\n"
+		/* load current */
+		"	ldaxrh	%w2, [%3]\n"
+		/* is it our ticket? */
+		"	cmp	%w2, %w0, lsr #16\n"
+		/* if not, try again */
+		"	b.ne	2b\n"
+
+		/* critical section */
+		"3:"
 		: "=&r" (r), "=&r" (r1), "=&r" (r2)
 		: "r" (lock)
 		: "memory");
 }
 
+/**
+ *  Releases the ticketlock.
+ *  This will increment the current value of the lock by 1.
+ *
+ * @param lock
+ *     The ticketlock to be released.
+ */
 static inline void ukarch_ticket_unlock(struct __ticketlock *lock)
 {
 	unsigned int r;
 
 	__asm__ __volatile__(
-		"	ldrh	%w0, %1\n"     /* read current */
-		"	add	%w0, %w0, #1\n"/* increment current */
-		"	stlrh	%w0, %1\n"     /* update lock */
+		/* read current */
+		"	ldrh	%w0, %1\n"
+		/* increment current */
+		"	add	%w0, %w0, #1\n"
+		/* update lock */
+		"	stlrh	%w0, %1\n"
 		: "=&r" (r), "=Q" (lock->current)
 		:
 		: "memory");
 }
 
+/**
+ *  Attempts to acquire a ticketlock.
+ *  If current == next, the lock is acquired.
+ *  Otherwise, increment next value by 1.
+ *
+ * @param lock
+ *     The ticketlock to be released.
+ * @return
+ *     0 if the lock was acquired, 1 otherwise.
+ */
 static inline int ukarch_ticket_trylock(struct __ticketlock *lock)
 {
 	unsigned int r, r1;
 
 	__asm__ __volatile__(
-		"	prfm pstl1keep, [%2]\n"          /* preload lock */
-		"1:	ldaxr	%w0, [%2]\n"             /* read current/next */
-		"	eor	%w1, %w0, %w0, ror #16\n"/* current == next ? */
-		"	cbnz	%w1, 2f\n"               /* bail if locked */
-		"	add	%w1, %w0, #0x10000\n"    /* increment next */
-		"	stxr	%w0, %w1, [%2]\n"        /* try update next */
-		"	cbnz	%w0, 1b\n"               /* retry if failed */
+		/* preload lock */
+		"	prfm pstl1keep, [%2]\n"
+		/* read current/next */
+		"1:	ldaxr	%w0, [%2]\n"
+		/* current == next ? */
+		"	eor	%w1, %w0, %w0, ror #16\n"
+		/* bail if locked */
+		"	cbnz	%w1, 2f\n"
+		/* increment next */
+		"	add	%w1, %w0, #0x10000\n"
+		/* try update next */
+		"	stxr	%w0, %w1, [%2]\n"
+		/* retry if failed */
+		"	cbnz	%w0, 1b\n"
 		"2:"
 		: "=&r" (r), "=&r" (r1)
 		: "r" (lock)
@@ -112,6 +173,14 @@ static inline int ukarch_ticket_trylock(struct __ticketlock *lock)
 	return !r;
 }
 
+/**
+ * Check if a ticketlock is locked.
+ *
+ * @param lock
+ *     The ticketlock being checked.
+ * @return
+ *     1 if the lock is locked, 0 otherwise.
+ */
 static inline int ukarch_ticket_is_locked(struct __ticketlock *lock)
 {
 	return !(lock->next == lock->current);

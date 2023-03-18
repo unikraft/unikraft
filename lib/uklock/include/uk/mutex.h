@@ -95,6 +95,16 @@ extern __spinlock              _uk_mutex_metrics_lock;
 void uk_mutex_init(struct uk_mutex *m);
 void uk_mutex_get_metrics(struct uk_mutex_metrics *dst);
 
+/**
+ * Current thread acquires a mutex lock.
+ * Thread is blocked until
+ *     1) Lock count of mutex becomes 0.
+ *     2) Thread itself owns the mutex.
+ * Checks status between dis/enabling interrupts.
+ *
+ * @param m
+ *     A pointer to the mutex
+ */
 static inline void uk_mutex_lock(struct uk_mutex *m)
 {
 	struct uk_thread *current;
@@ -129,6 +139,17 @@ static inline void uk_mutex_lock(struct uk_mutex *m)
 	ukplat_lcpu_restore_irqf(irqf);
 }
 
+/**
+ * Current thread attempts to acquire a mutex lock.
+ * If unavailable, thread returns immediately returns
+ * Otherwise, updates mutex state, and its metrics.
+ *
+ * @param m
+ *     A pointer to the mutex
+ * @return
+ *     1 if lock was acquired, 0 otherwise
+ */
+
 static inline int uk_mutex_trylock(struct uk_mutex *m)
 {
 	struct uk_thread *current;
@@ -157,11 +178,27 @@ static inline int uk_mutex_trylock(struct uk_mutex *m)
 	return ret;
 }
 
+/**
+ * Checks if the mutex is acquired.
+ *
+ * @param m
+ *     A pointer to the mutex
+ * @return
+ *     1 if acquired, 0 otherwise
+ */
 static inline int uk_mutex_is_locked(struct uk_mutex *m)
 {
 	return m->lock_count > 0;
 }
 
+/**
+ * Releases the lock held by a thread.
+ * Decrement lock count, set owner to NULL, and wake up wait queue.
+ * Interrupts are disabled during this operation.
+ *
+ * @param m
+ *     A pointer to the mutex
+ */
 static inline void uk_mutex_unlock(struct uk_mutex *m)
 {
 	unsigned long irqf;

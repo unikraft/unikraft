@@ -3,6 +3,15 @@
 #include <uk/process.h>
 #endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 
+/**
+ * Initializes a semaphore with count resources.
+ * Initializes the wait queue, then prints debug message.
+ *
+ * @param s
+ *     The semaphore to initialize.
+ * @param count
+ *     Initial number of "resources" a thread can acquire.
+ */
 void uk_semaphore_init(struct uk_semaphore *s, long count)
 {
 	s->count = count;
