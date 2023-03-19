@@ -71,6 +71,9 @@ extern char _tls_start[], _tls_end[];
 /* _etdata: denotes end of .tdata (and start of .tbss */
 extern char _etdata[];
 
+/* [_uk_reloc_start, _uk_reloc_end]: contains *(.ukeloc) */
+extern char _uk_reloc_start[], _uk_reloc_end[];
+
 /* __bss_start: start of BSS sections */
 extern char __bss_start[];
 
@@ -93,6 +96,8 @@ extern char _end[];
 #define __EDATA                 __uk_image_symbol(_edata)
 #define __CTORS                 __uk_image_symbol(_ctors)
 #define __ECTORS                __uk_image_symbol(_ectors)
+#define __UKRELOC_START         __uk_image_symbol(_uk_reloc_start)
+#define __UKRELOC_END           __uk_image_symbol(_uk_reloc_end)
 #define __BSS_START             __uk_image_symbol(__bss_start)
 #define __END                   __uk_image_symbol(_end)
 
