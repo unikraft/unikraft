@@ -179,7 +179,7 @@ struct uk_thread *uk_sched_thread_create_fn0(struct uk_sched *s,
 					     bool no_ectx,
 					     const char *name,
 					     void *priv,
-					     uk_thread_dtor_t dtor) __nonnull;
+					     uk_thread_dtor_t dtor);
 
 /**
  * Similar to `uk_sched_thread_create_fn0()` but with a thread function
@@ -193,7 +193,7 @@ struct uk_thread *uk_sched_thread_create_fn1(struct uk_sched *s,
 					     bool no_ectx,
 					     const char *name,
 					     void *priv,
-					     uk_thread_dtor_t dtor) __nonnull;
+					     uk_thread_dtor_t dtor);
 
 /**
  * Similar to `uk_sched_thread_create_fn0()` but with a thread function
@@ -207,7 +207,7 @@ struct uk_thread *uk_sched_thread_create_fn2(struct uk_sched *s,
 					     bool no_ectx,
 					     const char *name,
 					     void *priv,
-					     uk_thread_dtor_t dtor) __nonnull;
+					     uk_thread_dtor_t dtor);
 
 /* Shortcut for creating a thread with default settings */
 #define uk_sched_thread_create(s, fn1, argp, name)		\

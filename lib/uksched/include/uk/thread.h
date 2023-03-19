@@ -225,7 +225,7 @@ int uk_thread_init_bare(struct uk_thread *t,
 			struct ukarch_ectx *ectx,
 			const char *name,
 			void *priv,
-			uk_thread_dtor_t dtor) __nonnull;
+			uk_thread_dtor_t dtor);
 
 /**
  * Initializes a given uk_thread structure. Such a thread can then be
@@ -271,7 +271,7 @@ int uk_thread_init_bare_fn0(struct uk_thread *t,
 			    struct ukarch_ectx *ectx,
 			    const char *name,
 			    void *priv,
-			    uk_thread_dtor_t dtor) __nonnull;
+			    uk_thread_dtor_t dtor);
 
 /**
  * Similar to `uk_thread_init_bare_fn0()` but with a thread function accepting
@@ -286,7 +286,7 @@ int uk_thread_init_bare_fn1(struct uk_thread *t,
 			    struct ukarch_ectx *ectx,
 			    const char *name,
 			    void *priv,
-			    uk_thread_dtor_t dtor) __nonnull;
+			    uk_thread_dtor_t dtor);
 
 /**
  * Similar to `uk_thread_init_bare_fn0()` but with a thread function accepting
@@ -301,7 +301,7 @@ int uk_thread_init_bare_fn2(struct uk_thread *t,
 			    struct ukarch_ectx *ectx,
 			    const char *name,
 			    void *priv,
-			    uk_thread_dtor_t dtor) __nonnull;
+			    uk_thread_dtor_t dtor);
 
 /**
  * Initializes a `uk_thread` structure and allocates stack and optionally TLS.
@@ -351,7 +351,7 @@ int uk_thread_init_fn0(struct uk_thread *t,
 		       struct ukarch_ectx *ectx,
 		       const char *name,
 		       void *priv,
-		       uk_thread_dtor_t dtor) __nonnull;
+		       uk_thread_dtor_t dtor);
 
 /**
  * Similar to `uk_thread_init_fn0()` but with a thread function accepting
@@ -367,7 +367,7 @@ int uk_thread_init_fn1(struct uk_thread *t,
 		       struct ukarch_ectx *ectx,
 		       const char *name,
 		       void *priv,
-		       uk_thread_dtor_t dtor) __nonnull;
+		       uk_thread_dtor_t dtor);
 
 /**
  * Similar to `uk_thread_init_fn0()` but with a thread function accepting
@@ -383,7 +383,7 @@ int uk_thread_init_fn2(struct uk_thread *t,
 		       struct ukarch_ectx *ectx,
 		       const char *name,
 		       void *priv,
-		       uk_thread_dtor_t dtor) __nonnull;
+		       uk_thread_dtor_t dtor);
 
 /**
  * Allocates a bare uk_thread structure. Such a thread can then be assigned
@@ -425,7 +425,7 @@ struct uk_thread *uk_thread_create_bare(struct uk_alloc *a,
 					bool no_ectx,
 					const char *name,
 					void *priv,
-					uk_thread_dtor_t dtor) __nonnull;
+					uk_thread_dtor_t dtor);
 
 /**
  * Allocates a uk_thread container with stack and TLS. The entry point is not
@@ -466,7 +466,7 @@ struct uk_thread *uk_thread_create_container(struct uk_alloc *a,
 					     bool no_ectx,
 					     const char *name,
 					     void *priv,
-					     uk_thread_dtor_t dtor) __nonnull;
+					     uk_thread_dtor_t dtor);
 
 /**
  * Allocates a uk_thread container. Stack and TLS are given by the caller.
@@ -507,7 +507,7 @@ struct uk_thread *uk_thread_create_container2(struct uk_alloc *a,
 					      bool no_ectx,
 					      const char *name,
 					      void *priv,
-					      uk_thread_dtor_t dtor) __nonnull;
+					      uk_thread_dtor_t dtor);
 
 /*
  * Helper functions for initializing a thread container and setting it
@@ -561,7 +561,7 @@ struct uk_thread *uk_thread_create_fn0(struct uk_alloc *a,
 				       bool no_ectx,
 				       const char *name,
 				       void *priv,
-				       uk_thread_dtor_t dtor) __nonnull;
+				       uk_thread_dtor_t dtor);
 
 /**
  * Similar to `uk_thread_create_fn0()` but with a thread function accepting
@@ -575,7 +575,7 @@ struct uk_thread *uk_thread_create_fn1(struct uk_alloc *a,
 				       bool no_ectx,
 				       const char *name,
 				       void *priv,
-				       uk_thread_dtor_t dtor) __nonnull;
+				       uk_thread_dtor_t dtor);
 
 /**
  * Similar to `uk_thread_create_fn0()` but with a thread function accepting
@@ -590,7 +590,7 @@ struct uk_thread *uk_thread_create_fn2(struct uk_alloc *a,
 				       bool no_ectx,
 				       const char *name,
 				       void *priv,
-				       uk_thread_dtor_t dtor) __nonnull;
+				       uk_thread_dtor_t dtor);
 
 void uk_thread_release(struct uk_thread *t) __nonnull;
 void uk_thread_block_timeout(struct uk_thread *thread, __nsec nsec) __nonnull;
