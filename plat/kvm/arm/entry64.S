@@ -49,7 +49,7 @@ lcpu_bootstack:
  */
 
 .text
-ENTRY(_libkvmplat_entry)
+ENTRY(qemu_virt_entry)
 	ur_ldr  x25, _dtb
 
 #ifdef CONFIG_FPSIMD
@@ -104,5 +104,5 @@ ENTRY(_libkvmplat_entry)
 
 	bl ukplat_bootinfo_get
 	b _ukplat_entry
-END(_libkvmplat_entry)
+END(qemu_virt_entry)
 

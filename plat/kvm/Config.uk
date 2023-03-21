@@ -14,11 +14,75 @@ menuconfig PLAT_KVM
 
 if (PLAT_KVM)
 
+choice
+	prompt "Booting environment"
+
 config KVM_BOOT_PROTO_MULTIBOOT
-	bool
+	bool "Multiboot"
+	depends on KVM_VMM_QEMU && !KVM_VMM_FIRECRACKER && ARCH_X86_64
+	help
+		Multiboot Boot Protocol Version 1
 
 config KVM_BOOT_PROTO_LXBOOT
-	bool
+	bool "Lxboot"
+	depends on !KVM_VMM_QEMU && KVM_VMM_FIRECRACKER && ARCH_X86_64
+	help
+		Linux 64-bit Boot Protocol
+
+config KVM_BOOT_QEMU_VIRT
+	bool "QEMU Virt"
+	depends on KVM_VMM_QEMU && !KVM_VMM_FIRECRACKER && ARCH_ARM_64
+	help
+		Default QEMU Virt environment
+
+config KVM_BOOT_EFI_STUB
+	bool "EFI stub"
+	depends on KVM_VMM_QEMU && !KVM_VMM_FIRECRACKER
+	select OPTIMIZE_PIE
+	select UKPLAT_ACPI
+	depends on !PLAT_LINUXU
+	help
+		Prepend a fake, architecture specific, PE header to the
+		final image, patched by mkefi.py. The new entry point
+		will be architecture specific initial stub, followed by
+		an architecture generic EFI stub that sets up everything
+		required to be able to enter a valid initial state of the
+		platform.
+
+endchoice
+
+if KVM_BOOT_EFI_STUB
+
+config KVM_BOOT_EFI_STUB_DEBUG
+	bool "Enable EFI stub crash messages"
+	default n
+
+config KVM_BOOT_EFI_STUB_CMDLINE_FNAME
+	string "Name of the command line arguments file"
+	default "$(UK_NAME).cmdl"
+
+config KVM_BOOT_EFI_STUB_INITRD_FNAME
+	string "Name of the initial RAM disk file"
+	default "$(UK_NAME).initrd"
+
+config KVM_BOOT_EFI_STUB_DTB_FNAME
+	string "Name of the Devicetree Blob file"
+	default "$(UK_NAME).dtb"
+
+config KVM_BOOT_EFI_STUB_RST_ATK_MITIGATION
+	bool "TCG Reset Attack Mitigation"
+	default n
+	help
+		Enable Trusted Computing Group's Reset Attack Mitigation.
+		Whenever a machine shuts down or reboots, due to lack of
+		electric charge, the contents of RAM may dissipate after a short
+		amount of time. However this may be enough for an attacker to
+		quickly boot again into a custom program and dump memory
+		contents. Thus, by using this, the OS instructs POST BIOS to
+		overwrite memory contents before continuing to boot into the
+		rest of the BIOS code.
+
+endif
 
 choice
 	prompt "Virtual Machine Monitor"
@@ -26,7 +90,6 @@ choice
 
 config KVM_VMM_QEMU
 	bool "QEMU"
-	select KVM_BOOT_PROTO_MULTIBOOT
 
 config KVM_VMM_FIRECRACKER
 	bool "Firecracker"

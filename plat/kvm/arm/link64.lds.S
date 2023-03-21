@@ -40,7 +40,6 @@
 
 OUTPUT_FORMAT("elf64-littleaarch64")
 OUTPUT_ARCH(aarch64)
-ENTRY(_libkvmplat_entry)
 
 PHDRS
 {
@@ -73,6 +72,7 @@ SECTIONS {
 	_text = .;
 	.text :
 	{
+		KEEP (*(.data.boot))
 		*(.text)
 		*(.text.*)
 	} :text
