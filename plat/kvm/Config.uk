@@ -39,6 +39,14 @@ config KVM_BOOT_EFI_STUB
 
 endchoice
 
+if KVM_BOOT_EFI_STUB
+
+config KVM_BOOT_EFI_STUB_DEBUG
+	bool "Enable EFI stub crash messages"
+	default n
+
+endif
+
 choice
 	prompt "Virtual Machine Monitor"
 	default KVM_VMM_QEMU
