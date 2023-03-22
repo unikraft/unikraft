@@ -1,0 +1,4 @@
+config LIBUKRELOC
+	bool "ukreloc: Self relocation and symbol-based relocations"
+	depends on OPTIMIZE_PIE
+	default n

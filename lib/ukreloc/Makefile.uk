@@ -1,0 +1,10 @@
+$(eval $(call addlib_s,libukreloc,$(CONFIG_LIBUKRELOC)))
+
+ASINCLUDES-y  += -I$(LIBUKRELOC_BASE)/include
+CINCLUDES-y   += -I$(LIBUKRELOC_BASE)/include
+CXXINCLUDES-y += -I$(LIBUKRELOC_BASE)/include
+
+# FIXME: Remove this and make the library self contained
+LIBUKRELOC_ASINCLUDES-y  += -I$(UK_PLAT_COMMON_BASE)/include
+LIBUKRELOC_CINCLUDES-y   += -I$(UK_PLAT_COMMON_BASE)/include
+LIBUKRELOC_CXXINCLUDES-y += -I$(UK_PLAT_COMMON_BASE)/include

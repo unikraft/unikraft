@@ -97,6 +97,7 @@ config OPTIMIZE_LTO
 
 config OPTIMIZE_PIE
 	bool "Build the Unikernel as a static PIE"
+	select LIBUKRELOC
 	help
 		Build the Unikernel as a static PIE.
 
