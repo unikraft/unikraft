@@ -95,6 +95,13 @@ config OPTIMIZE_LTO
 		will increase overall building time but creates more efficient
 		Unikraft binaries.
 
+config OPTIMIZE_PIE
+	bool "Build the Unikernel as a static PIE"
+	depends on !PLAT_LINUXU
+	select LIBUKRELOC
+	help
+		Build the Unikernel as a static PIE.
+
 choice
 	prompt "Debug information level"
 	default DEBUG_SYMBOLS_LVL3

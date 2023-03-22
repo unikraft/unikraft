@@ -1,0 +1,3 @@
+config LIBUKRELOC
+	bool "ukreloc: Self relocation and symbol based relocations"
+	default y

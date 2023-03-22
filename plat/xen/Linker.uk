@@ -39,13 +39,18 @@ $(XEN_DEBUG_IMAGE): $(XEN_ALIBS) $(XEN_ALIBS-y) $(XEN_OLIBS) $(XEN_OLIBS-y) \
 	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(XEN_LDFLAGS) $(XEN_LDFLAGS-y) \
 		     $(XEN_LD_SCRIPT_FLAGS) \
 		     $(XEN_IMAGE).o -o $@)
+ifeq ($(CONFIG_OPTIMIZE_PIE),y)
+	$(call build_ukreloc,$@)
+endif
 
 $(XEN_IMAGE): $(XEN_DEBUG_IMAGE)
 	$(call build_cmd,SCSTRIP,,$@,\
 		$(STRIP) -s \
 			$(SECT_STRIP_FLAGS) $(SECT_STRIP_FLAGS-y) \
 			$< -o $@ 2>&1 | \
-			{ grep -v "Empty loadable segment detected" || true; })
+		        { grep -Ev \
+				"Empty loadable segment detected|section.*lma.*adjusted to.*" || \
+				true; })
 
 ifeq (arm,$(CONFIG_UK_ARCH))
 $(XEN_RAW_IMAGE): $(XEN_IMAGE)

@@ -34,6 +34,7 @@
 #include <uk/asm.h>
 #include <uk/plat/common/sections.h>
 #include <uk/config.h>
+#include <arch/reloc.h>
 
 /*
  * The registers used by _libkvmplat_start:
@@ -42,9 +43,9 @@
 
 .text
 ENTRY(_libkvmplat_entry)
+	ur_ldr  x25, _dtb
 
-	ldr x25, =_dtb
-	ldr x26, =_end
+	ur_ldr  x26, _end
 
 #ifdef CONFIG_FPSIMD
 	/* Enable fp/simd support */
@@ -62,7 +63,8 @@ ENTRY(_libkvmplat_entry)
 	 * just need to invalidate what we are going to use:
 	 * DTB, TEXT, DATA, BSS, and bootstack.
 	 */
-	ldr x0, = _start_ram_addr;
+	ur_ldr  x0, _start_ram_addr
+
 	add x27, x26, #__STACK_SIZE
 	sub x1, x27, x25
 	bl clean_and_invalidate_dcache_range
@@ -81,15 +83,20 @@ ENTRY(_libkvmplat_entry)
 	/* Set the context id */
 	msr contextidr_el1, xzr
 
+	mov     x0, xzr
+	mov     x1, xzr
+	bl      do_ukreloc
+
 	/* Setup exception vector table address before enable MMU */
-	ldr x29, =vector_table
+	ur_ldr  x29, vector_table
 	msr VBAR_EL1, x29
 
 	/* Enable the mmu */
 	bl start_mmu
 
 	/* Load dtb address to x0 as a parameter */
-	ldr x0, =_dtb
+	ur_ldr  x0, _dtb
+
 	b _libkvmplat_start
 END(_libkvmplat_entry)
 

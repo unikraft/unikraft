@@ -46,9 +46,12 @@
 
 #include <uk/plat/lcpu.h>
 #include <uk/plat/common/lcpu.h>
+#include <uk/reloc.h>
 
 #include <string.h>
 #include <errno.h>
+
+#include "start16_helpers.h"
 
 __lcpuid lcpu_arch_id(void)
 {
@@ -106,11 +109,38 @@ void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
  * corresponding boot code somewhere in the first 1 MiB. We copy the trampoline
  * code to the target address during MP initialization.
  */
-extern __vaddr_t x86_start16_addr; /* target address */
-extern void *x86_start16_begin[];
-extern void *x86_start16_end[];
-#define X86_START16_SIZE						\
-	((__uptr)x86_start16_end - (__uptr)x86_start16_begin)
+IMPORT_START16_UKRELOC_SYM(gdt32_ptr, 2, MOV);
+IMPORT_START16_UKRELOC_SYM(gdt32, 4, DATA);
+IMPORT_START16_UKRELOC_SYM(lcpu_start16, 2, MOV);
+IMPORT_START16_UKRELOC_SYM(jump_to32, 2, MOV);
+IMPORT_START16_UKRELOC_SYM(lcpu_start32, 4, MOV);
+
+static void ukreloc_mp_init(void)
+{
+	size_t i;
+	struct ukreloc x86_start16_relocs[] = {
+		START16_UKRELOC_ENTRY(lcpu_start16, 2, MOV),
+		START16_UKRELOC_ENTRY(gdt32, 4, DATA),
+		START16_UKRELOC_ENTRY(gdt32_ptr, 2, MOV),
+		START16_UKRELOC_ENTRY(jump_to32, 2, MOV),
+	};
+
+	for (i = 0; i < ARRAY_SIZE(x86_start16_relocs); i++)
+		apply_ukreloc(&x86_start16_relocs[i],
+			      (__u64)x86_start16_addr +
+			      x86_start16_relocs[i].r_addr,
+			      (void *)x86_start16_addr);
+
+	/* Unlike the other entries, lcpu_start32 must stay the same
+	 * as it is not part of the start16 section
+	 */
+	apply_ukreloc(&(struct ukreloc)UKRELOC_ENTRY(
+				START16_UKRELOC_MOV_OFF(lcpu_start32, 4),
+				(__u64)lcpu_start32, 4,
+				UKRELOC_FLAGS_PHYS_REL),
+		       (__u64)lcpu_start32,
+		       (void *)x86_start16_addr);
+}
 
 int lcpu_arch_mp_init(void *arg __unused)
 {
@@ -181,6 +211,9 @@ int lcpu_arch_mp_init(void *arg __unused)
 	UK_ASSERT(x86_start16_addr < 0x100000);
 	memcpy((void *)x86_start16_addr, &x86_start16_begin,
 	       X86_START16_SIZE);
+
+	ukreloc_mp_init();
+
 	uk_pr_debug("Copied AP 16-bit boot code to 0x%"__PRIvaddr"\n",
 		    x86_start16_addr);
 

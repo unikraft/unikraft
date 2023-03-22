@@ -1,0 +1,3 @@
+define build_elf64_to_32 =
+	@$(SCRIPTS_DIR)/elf64_to_32.py $(1) -o $(1)
+endef

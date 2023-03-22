@@ -7,6 +7,8 @@ menuconfig PLAT_KVM
        select LIBUKTIMECONV
        select LIBNOLIBC if !HAVE_LIBC
        select LIBFDT if ARCH_ARM_64
+       select ELF64_TO_32 if ARCH_X86_64
+       select LIBUKRELOC
        help
                 Create a Unikraft image that runs as a KVM guest
 

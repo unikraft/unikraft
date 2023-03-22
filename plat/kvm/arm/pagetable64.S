@@ -35,6 +35,7 @@
 #include <uk/arch/lcpu.h>
 #include <uk/arch/limits.h>
 #include <uk/asm.h>
+#include <arch/reloc.h>
 
 ENTRY(start_mmu)
 	/*
@@ -44,7 +45,7 @@ ENTRY(start_mmu)
 	dsb sy
 
 	/* Load ttbr0, pagetable starts from _end */
-	ldr x27, =arm64_bpt_l3_pt0
+	ur_ldr  x27, arm64_bpt_l3_pt0
 	msr ttbr0_el1, x27
 	isb
 
@@ -67,7 +68,7 @@ ENTRY(start_mmu)
 #else /* CONFIG_PAGING */
 	/* Get VIRT_BITS from id_aa64mmfr0_el1.PARange */
 	mrs x3, id_aa64mmfr0_el1
-	ldr x5, =tcr_ips_bits
+	ur_ldr  x5, tcr_ips_bits
 	ubfx x4, x3, #0, #4
 	ldrb w4, [x5, x4]
 	cmp x4, #52
@@ -99,8 +100,9 @@ setup_tcr_el1:
 	 * in D-Cache. Invalidate ranges that may have been modified:
 	 * DATA, BSS, PAGETABLE and BOOTSTACK.
 	 */
-	ldr x0, =_data
-	ldr x1, =_end
+	ur_ldr  x0, _data
+	ur_ldr  x1, _end
+
 	add x1, x1, #__STACK_SIZE
 	sub x1, x1, x0
 	bl clean_and_invalidate_dcache_range

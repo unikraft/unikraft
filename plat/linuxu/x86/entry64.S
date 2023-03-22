@@ -33,6 +33,13 @@
 
 .section .text
 
+/* For now, although inaccurate, set the
+ * _base_addr symbol to _liblinuxuplat_start, since that is where most images
+ * happen to begin anyway. We do not use it in linuxu anyway, so we do not care.
+ */
+.globl	_base_addr
+.set	_base_addr, _liblinuxuplat_start
+
 .global _liblinuxuplat_start
 _liblinuxuplat_start:
 	xorl %ebp, %ebp		# mark the outmost frame (clear the frame pointer)

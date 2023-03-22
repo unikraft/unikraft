@@ -37,23 +37,48 @@
 #include <uk/config.h>
 #include <uk/asm.h>
 #include <uk/plat/common/lcpu.h>
+#include <arch/reloc.h>
 #include <x86/cpu_defs.h>
 #include <kvm-x86/traps.h>
+#include "lcpu_helpers.S"
 
 #define SEC_BEGIN(x)		.globl x86_##x##_begin; x86_##x##_begin = .;
 #define SEC_END(x)		.globl x86_##x##_end; x86_##x##_end = .;
-#define SEC_RELOC(x, s, addr)	(x - x86_##s##_begin + addr)
 
-#define LOAD_ADDR16		0x8000
-#define RELOC16(x)		SEC_RELOC(x, start16, LOAD_ADDR16)
+#define START16_PLACEHOLDER	0x1516	/* IS16 */
 
-.section .data.boot
+.section .data.boot.16
 .globl x86_start16_addr
 x86_start16_addr:
-	.quad	LOAD_ADDR16
+	.quad	START16_PLACEHOLDER
+
+/* Implement dedicate ur_* macro's whose only use-case is this file to cope with
+ * the existence of 16-bit code. This is so it does not interfere with the other
+ * uses of the ur_* macro's. For example, we not want symbols for these to
+ * occupy unnecessary space in .ukreloc.
+ */
+.macro ur_mov_start16	sym:req, reg:req, bytes:req
+	mov	$START16_PLACEHOLDER, \reg
+.globl	\sym\()_ukreloc_imm\bytes\()_start16
+.set	\sym\()_ukreloc_imm\bytes\()_start16, (. - \bytes)
+	nop
+.endm
+
+.macro ur_data_start16	type:req, sym:req, bytes:req
+.globl	\sym\()_ukreloc_data\bytes\()_start16
+.set	\sym\()_ukreloc_data\bytes\()_start16, .
+	.\type	START16_PLACEHOLDER
+.endm
 
 /* The following section has to be copied to LOAD_ADDR16 (4KiB max!) at runtime
- * as 16-bit real mode entry point
+ * as 16-bit real mode entry point.
+ * `ukreloc_{mov|data}` may be used in start16 to be able to cope with the
+ * fact that R_X86_64_16, R_X86_64_32 and R_X86_64_32S relocations are
+ * incompatible with an x86-64 PIE but they will not appear in the final binary,
+ * as mkukreloc.py will know they are redundant for the early relocator.
+ * Instead, these ukreloc's will be hardcoded in a corresponding locally
+ * declared `struct ukreloc` residing in the frame of the method that relocates
+ * this very code, during Application Processor environment setup.
  */
 .section .text.boot.16
 SEC_BEGIN(start16)
@@ -64,7 +89,15 @@ ENTRY(lcpu_start16_ap)
 	xorl	%edi, %edi
 	xorl	%esi, %esi
 
-	jmp	lcpu_start16
+	ur_mov_start16	lcpu_start16, %ax, 2
+	/* On start-up a core's %cs is set depending on the value of the vector
+	 * inside the SIPI message, so make sure we are jumping to the
+	 * proper address w.r.t. segmentation.
+	 */
+	movl	%cs, %ebx
+	shll	$4, %ebx
+	subl	%ebx, %eax
+	jmp	*%eax
 END(lcpu_start16_ap)
 
 /*
@@ -73,6 +106,7 @@ END(lcpu_start16_ap)
  * It is only used as entry point for APs in SMP configuration.
  */
 .align 16
+.globl gdt32
 gdt32:
 /* We can repurpose the null segment to encode the GDT pointer because
  * the null segment is not accessed by the processor in 32-bit mode. We also
@@ -81,9 +115,10 @@ gdt32:
  */
 gdt32_null:
 	.word	0x0000
+.globl gdt32_ptr
 gdt32_ptr:
 	.word	(gdt32_end - gdt32 - 1)	/* size - 1	*/
-	.long	RELOC16(gdt32)		/* GDT address	*/
+	ur_data_start16	long, gdt32, 4	/* GDT address	*/
 gdt32_cs:
 	.quad	GDT_DESC_CODE32_VAL	/* 32-bit CS	*/
 gdt32_ds:
@@ -103,9 +138,30 @@ ENTRY(lcpu_start16)
 	movl	%eax, %cr0
 
 	/* Load 32-bit GDT and jump into 32-bit code segment */
-	lgdt	RELOC16(gdt32_ptr)
-	ljmp	$(gdt32_cs - gdt32), $RELOC16(jump_to32)
+	ur_mov_start16	gdt32_ptr, %ax, 2
+	lgdt	(%eax)
+
+	/* ljmp encoding has 5 opcodes, thus 40 bits, which in our case
+	 * represent:
+	 * [39:31] = 0xea - the identifier opcode of ljmp itself
+	 * [31:15] = intersegment 2 byte immediate address to place into %eip
+	 * [15: 0] = value to be placed into code segment register
+	 * Thus, since we do not know the address of jump_to32 at runtime, we
+	 * will generate a reloc symbol to be resolved.
+	 * When we get to this point we would place into %eax the address
+	 * of jump_to32. For the ljmp to jump to this address we replace the
+	 * initial RELOC16(jump_to32) value with jump_to32 by patching at
+	 * runtime the [31:15] fields of ljmp - known to be at an offset
+	 * of -4 bytes ([15: 0] + [31:15]) from jump_to32, since this
+	 * address corresponds to the very next instruction in memory
+	 * after our ljmp.
+	 */
+	ur_mov_start16	jump_to32, %ax, 2
+	movw	%ax, -4(%eax)
+	ljmp	$(gdt32_cs - gdt32), $START16_PLACEHOLDER
+
 .code32
+.globl jump_to32
 jump_to32:
 	/* Set up remaining segment registers */
 	movl	$(gdt32_ds - gdt32), %eax
@@ -117,7 +173,8 @@ jump_to32:
 	movl	%eax, %fs
 	movl	%eax, %gs
 
-	leal	lcpu_start32, %eax
+	ur_mov_start16	lcpu_start32, %eax, 4
+
 	jmp	*%eax
 END(lcpu_start16)
 
@@ -134,6 +191,7 @@ SEC_END(start16)
  * potential platform boot arguments in ESI (e.g., multiboot) if this is the
  * first boot.
  */
+
 .section .data.boot.32
 .align 16
 gdt64:
@@ -146,7 +204,7 @@ gdt64_ds:
 gdt64_end:
 gdt64_ptr:
 	.word	gdt64_end - gdt64 - 1
-	.quad	gdt64
+	ur_data	quad, gdt64, 8, _phys
 
 #define CR4_BOOT32_SETTINGS						\
 	  X86_CR4_PAE	/* Physical Address Extension */
@@ -173,15 +231,26 @@ ENTRY(lcpu_start32)
 	wrmsr
 
 	/* Set boot page table and enable paging */
-	movl	$x86_bpt_pml4, %eax
+	ur_mov	x86_bpt_pml4, %eax, 4, _phys
 	movl	%eax, %cr3
 
 	movl	$CR0_BOOT32_SETTINGS, %eax
 	movl	%eax, %cr0
 
 	/* Load 64-bit GDT and jump to 64-bit code segment */
-	lgdt	gdt64_ptr
-	ljmp	$(gdt64_cs - gdt64), $jump_to64
+	ur_mov	gdt64_ptr, %eax, 4
+	lgdt	(%eax)
+
+	/* Again, we use the same strategy, only this time we generate an actual
+	 * ukreloc entry to be automatically resolved by the early relocator,
+	 * instead of relying on the code that relocates the start16 section
+	 * before starting the Application Processors, since execution of
+	 * lcpu_start32 comes before that.
+	 */
+	ur_mov	jump_to64, %eax, 4
+	movl	%eax, -6(%eax)
+	ljmp	$(gdt64_cs - gdt64), $UKRELOC_PLACEHOLDER
+
 .code64
 jump_to64:
 	/* Set up remaining segment registers */
@@ -194,7 +263,7 @@ jump_to64:
 	movl	%eax, %fs
 	movl	%eax, %gs
 
-	leaq	lcpu_start64, %rcx
+	leaq	lcpu_start64(%rip), %rcx
 	jmp	*%rcx
 END(lcpu_start32)
 
@@ -213,7 +282,6 @@ END(lcpu_start32)
  *
  * NOTE: Code should be position-independent
  */
-#include "lcpu_helpers.S"
 
 .code64
 .section .text.boot.64

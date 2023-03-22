@@ -43,6 +43,9 @@
 /* _dtb: start of device tree */
 extern char _dtb[];
 
+/* _base_addr: base reference address as of link time */
+extern char _base_addr[];
+
 /* [_text, _etext]: contains .text.* sections */
 extern char _text[], _etext[];
 
@@ -66,6 +69,9 @@ extern char _tls_start[], _tls_end[];
 /* _etdata: denotes end of .tdata (and start of .tbss */
 extern char _etdata[];
 
+/* [_ukreloc_start, _ukreloc_end]: contains *(.ukeloc) */
+extern char _ukreloc_start[], _ukreloc_end[];
+
 /* __bss_start: start of BSS sections */
 extern char __bss_start[];
 
@@ -75,6 +81,7 @@ extern char _end[];
 #define __uk_image_symbol(addr)    ((unsigned long)(addr))
 
 #define __DTB                   __uk_image_symbol(_dtb)
+#define __BASE_ADDR             __uk_image_symbol(_base_addr)
 #define __TEXT                  __uk_image_symbol(_text)
 #define __ETEXT                 __uk_image_symbol(_etext)
 #define __EH_FRAME_START        __uk_image_symbol(__eh_frame_start)
@@ -87,6 +94,8 @@ extern char _end[];
 #define __EDATA                 __uk_image_symbol(_edata)
 #define __CTORS                 __uk_image_symbol(_ctors)
 #define __ECTORS                __uk_image_symbol(_ectors)
+#define __UKRELOC_START         __uk_image_symbol(_ukreloc_start)
+#define __UKRELOC_END           __uk_image_symbol(_ukreloc_end)
 #define __BSS_START             __uk_image_symbol(__bss_start)
 #define __END                   __uk_image_symbol(_end)
 

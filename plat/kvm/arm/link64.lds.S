@@ -67,6 +67,8 @@ SECTIONS {
 	_start_ram_addr = .;
 	. = . + DTB_RESERVED_SIZE;
 
+	_base_addr = .;		/* Symbol to represent the load base address */
+
 	/* Code */
 	_text = .;
 	.text :
@@ -131,5 +133,5 @@ SECTIONS {
 	.comment       0 : { *(.comment) }
 	DEBUG_SYMBOLS
 
-	/DISCARD/ : { *(.note.gnu.build-id) }
+	DISCARDS
 }

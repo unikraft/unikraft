@@ -35,6 +35,7 @@
 #include <uk/arch/lcpu.h>
 #include <uk/arch/paging.h>
 #include <uk/asm.h>
+#include <arch/reloc.h>
 
 #define PTE_BLOCK_DEVICE_nGnRnE	(PTE_ATTR_DEVICE_nGnRnE + PTE_TYPE_BLOCK)
 #define PTE_BLOCK_DEVICE_nGnRE	(PTE_ATTR_DEVICE_nGnRE + PTE_TYPE_BLOCK)
@@ -121,11 +122,11 @@
  */
 .align 12
 arm64_bpt_l3_pt0:
-	pte_tbl_desc	arm64_bpt_l2_pt0
-	pte_tbl_desc	arm64_bpt_l2_pt1
+	ur_pte  arm64_bpt_l2_pt0, PTE_TYPE_TABLE
+	ur_pte  arm64_bpt_l2_pt1, PTE_TYPE_TABLE
 	pte_zero	, 509
 #ifdef CONFIG_PAGING
-	pte_tbl_desc	arm64_bpt_l2_pt511
+	ur_pte  arm64_bpt_l2_pt511, PTE_TYPE_TABLE
 #else
 	pte_zero	, 1
 #endif /* CONFIG_PAGING */
@@ -139,8 +140,8 @@ arm64_bpt_l3_pt0:
  */
 .align 12
 arm64_bpt_l2_pt0:
-	pte_tbl_desc	arm64_bpt_l1_pt0
-	pte_tbl_desc	arm64_bpt_l1_pt1
+	ur_pte  arm64_bpt_l1_pt0, PTE_TYPE_TABLE
+	ur_pte  arm64_bpt_l1_pt1, PTE_TYPE_TABLE
 	pte_fill	0x0000000080000000, 254, 2, PTE_BLOCK_NORMAL_RW
 	pte_fill	0x0000004000000000, 256, 2, PTE_BLOCK_DEVICE_nGnRnE
 
@@ -179,7 +180,7 @@ arm64_bpt_l1_pt0:
  */
 .align 12
 arm64_bpt_l1_pt1:
-	pte_tbl_desc	arm64_bpt_l0_pt0
+	ur_pte  arm64_bpt_l0_pt0, PTE_TYPE_TABLE
 	pte_fill	0x0000000040200000, 511, 1, PTE_BLOCK_NORMAL_RWX
 
 /* L0: 1GiB - 1.2GiB (4KiB / entry)

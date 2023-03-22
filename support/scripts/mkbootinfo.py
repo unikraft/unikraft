@@ -75,6 +75,9 @@ def main():
     out = subprocess.check_output(["objdump", "-p", opt.kernel])
     phdrs = re.findall(PHDRS_EXP, out.decode('utf-8'), re.MULTILINE)
 
+    # Make sure they are sorted by their addresses
+    phdrs = sorted(phdrs, key=lambda x: x[0])
+
     # The boot info is a struct ukplat_bootinfo
     # (see plat/common/include/uk/plat/common/bootinfo.h) followed by a list of
     # struct ukplat_memregion_desc (see include/uk/plat/memory.h).
