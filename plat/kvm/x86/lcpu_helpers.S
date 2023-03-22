@@ -56,15 +56,19 @@
 
 	fninit
 #if __SSE__
-	jmp 2f
-1:
+	jmp	ldmxcsr_rval_addr + 0x4
+
+ldmxcsr_rval_addr:
 	.long	0x1f80		/* Power-on default */
-2:
+
 	movq	%cr4, %rdi
 	orl	$(X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT), %edi
 	movq	%rdi, %cr4
 
-	ldmxcsr (1b)
+	ur_mov	ldmxcsr_rval_addr, %ebx, 4
+
+	ldmxcsr	(%ebx)
+
 #endif /* __SSE__ */
 .endm
 
