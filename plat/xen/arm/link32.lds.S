@@ -122,5 +122,5 @@ SECTIONS
 
 	DEBUG_SYMBOLS
 
-	/DISCARD/ : { *(.note.gnu.build-id) }
+	DISCARDS
 }

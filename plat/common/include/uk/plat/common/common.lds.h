@@ -189,4 +189,10 @@
 		. = ALIGN(__PAGE_SIZE);					\
 	}
 
+#define DISCARDS							\
+	/DISCARD/ :							\
+	{								\
+		*(.note.gnu.build-id)					\
+	}
+
 #endif /* __UK_COMMON_LDS_H */
