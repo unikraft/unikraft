@@ -131,5 +131,5 @@ SECTIONS {
 	.comment       0 : { *(.comment) }
 	DEBUG_SYMBOLS
 
-	/DISCARD/ : { *(.note.gnu.build-id) }
+	DISCARDS
 }
