@@ -40,6 +40,8 @@ SECTIONS
 {
 	. = 0x100000;
 
+	_base_addr = .;		/* Symbol to represent the load base address */
+
 	/* Code */
 	_text = .;
 	.text :
