@@ -88,6 +88,12 @@
 #endif /* !CONFIG_LIBUKRELOC */
 .endm
 
+#if !CONFIG_LIBUKRELOC
+.align 4
+do_uk_reloc:
+	ret
+#endif /* !CONFIG_LIBUKRELOC */
+
 #else  /* __ASSEMBLY__ */
 
 #include <uk/arch/types.h>
@@ -156,6 +162,22 @@ apply_uk_reloc(struct uk_reloc *ur, __u64 val, void *baddr)
 		break;
 	}
 }
+
+/* Relocates initial mkbootinfo.py memory regions and applies all uk_reloc
+ * entries in the current image's .uk_reloc section.
+ *
+ * @param r_paddr The physical address relative to which we apply a relocation,
+ *                used if UKRELOC_FLAGS_PHYS_REL flag is set.
+ *		  If 0, the current runtime base address is used.
+ * @param r_vaddr The virtual address relative to which we apply a relocation.
+ *		  If 0, the current runtime base address is used.
+ */
+#if CONFIG_LIBUKRELOC
+void do_uk_reloc(__paddr_t r_paddr, __vaddr_t r_vaddr);
+#else  /* CONFIG_LIBUKRELOC */
+static inline void do_uk_reloc(__paddr_t r_paddr __unused,
+			       __vaddr_t r_vaddr __unused) { }
+#endif /* !CONFIG_LIBUKRELOC */
 
 #endif /* !__ASSEMBLY__ */
 
