@@ -14,6 +14,8 @@
 #define UKRELOC_ALIGNMENT		0x1000
 #endif /* CONFIG_LIBUKRELOC */
 
+#include <asm/reloc.h>
+
 #ifdef __ASSEMBLY__
 
 #if CONFIG_LIBUKRELOC
