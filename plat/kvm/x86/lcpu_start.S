@@ -57,6 +57,10 @@ x86_start16_addr:
  * the existence of 16-bit code. This is so it does not interfere with the other
  * uses of the ur_* macro's. For example, we not want symbols for these to
  * occupy unnecessary space in .uk_reloc.
+ *
+ * NOTE:IF ADDING/REMOVING RELOCATIONS FROM HERE, THEN ADD/REMOVE
+ *	CORRESPONDENT SYMBOL TO `lcpu.c` (see IMPORT_START16_UKRELOC_SYM
+ *	start16_helpers.h macros being used on start16 symbols)
  */
 .macro ur_mov_start16	sym:req, reg:req, bytes:req
 	mov	$START16_PLACEHOLDER, \reg
@@ -107,6 +111,7 @@ END(lcpu_start16_ap)
  * It is only used as entry point for APs in SMP configuration.
  */
 .align 16
+.globl gdt32
 gdt32:
 /* We can repurpose the null segment to encode the GDT pointer because
  * the null segment is not accessed by the processor in 32-bit mode. We also
@@ -115,6 +120,7 @@ gdt32:
  */
 gdt32_null:
 	.word	0x0000
+.globl gdt32_ptr
 gdt32_ptr:
 	.word	(gdt32_end - gdt32 - 1)	/* size - 1	*/
 	ur_data_start16	long, gdt32, 4	/* GDT address	*/
@@ -160,6 +166,7 @@ ENTRY(lcpu_start16)
 	ljmp	$(gdt32_cs - gdt32), $START16_PLACEHOLDER
 
 .code32
+.globl jump_to32
 jump_to32:
 	/* Set up remaining segment registers */
 	movl	$(gdt32_ds - gdt32), %eax
