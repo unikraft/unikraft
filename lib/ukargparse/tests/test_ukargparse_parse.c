@@ -103,4 +103,43 @@ UK_TESTCASE(ukargparse, parse_quotes)
 		UK_TEST_EXPECT_SNUM_EQ(strcmp(arg_ex[i], arg_out[i]), 0);
 }
 
+UK_TESTCASE(ukargparse, parse_quotes_escaped)
+{
+	int argc, i;
+	char *arg_vec[0x10] = { NULL };
+	char arg_str[] =
+		"\\'"
+		" \\\""
+		" \"arg0\\\"\""
+		" \"\\\"arg1 '-'\\\"\"-\" \\\\ arg2\\\"\""
+		" '\" \\\\ \\\" \\''\"'"
+		" \\a\\b\\\"\\c\\\""
+		" \"\\a\\b\\\"\\c\\\"\""
+		" '\\a\\b\\\"\\c\\\"'"
+		" '\\'a\\'"
+		" a\\ b"
+		" \\";
+	static const char * const arg_exp[] = {
+		"'",
+		"\"",
+		"arg0\"",
+		"\"arg1 '-'\"- \\ arg2\"",
+		"\" \\\\ \\\" \\\"",
+		"ab\"c\"",
+		"\\a\\b\"\\c\"",
+		"\\a\\b\\\"\\c\\\"",
+		"\\a'",
+		"a b",
+		"\\"
+	};
+
+	argc = uk_argparse(arg_str, arg_vec, ARRAY_SIZE(arg_vec) - 1);
+	UK_TEST_EXPECT_SNUM_EQ(argc, ARRAY_SIZE(arg_exp));
+	if (argc != ARRAY_SIZE(arg_exp))
+		return;
+
+	for (i = 0; i < (int) ARRAY_SIZE(arg_exp); ++i)
+		UK_TEST_EXPECT_SNUM_EQ(strcmp(arg_exp[i], arg_vec[i]), 0);
+}
+
 uk_testsuite_register(ukargparse, NULL);
