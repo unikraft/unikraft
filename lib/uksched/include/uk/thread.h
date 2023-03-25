@@ -112,7 +112,7 @@ struct uk_thread *uk_thread_current(void)
  *           |     v    v       |
  *           |    BLOCKED [--]  |
  *           |  /  |            |
- *            \|   | block()    | wake()
+ *            \|   | wake()     | block()
  *             \   |            |
  *             |\  |            |
  *             | v v            |
