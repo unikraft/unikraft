@@ -67,17 +67,20 @@ struct lcpu_arch { };
  */
 #define LCPU_SARGS_ENTRY_OFFSET		0x00
 #define LCPU_SARGS_STACKP_OFFSET	(LCPU_SARGS_ENTRY_OFFSET + 0x08)
+#define LCPU_SARGS_BPT_OFFSET		(LCPU_SARGS_ENTRY_OFFSET + 0x10)
 
-#define LCPU_SARGS_SIZE			0x10
+#define LCPU_SARGS_SIZE			0x18
 
 #ifndef __ASSEMBLY__
 struct lcpu_sargs {
 	ukplat_lcpu_entry_t entry;
 	void *stackp;
+	void *bpt;
 };
 
 UK_CTASSERT(__offsetof(struct lcpu_sargs, entry)  == LCPU_SARGS_ENTRY_OFFSET);
 UK_CTASSERT(__offsetof(struct lcpu_sargs, stackp) == LCPU_SARGS_STACKP_OFFSET);
+UK_CTASSERT(__offsetof(struct lcpu_sargs, bpt)    == LCPU_SARGS_BPT_OFFSET);
 
 UK_CTASSERT(sizeof(struct lcpu_sargs) == LCPU_SARGS_SIZE);
 #endif /* !__ASSEMBLY__ */
@@ -90,8 +93,9 @@ UK_CTASSERT(sizeof(struct lcpu_sargs) == LCPU_SARGS_SIZE);
 #define LCPU_ID_OFFSET			(LCPU_IDX_OFFSET   + 0x04)
 #define LCPU_ENTRY_OFFSET		(LCPU_ID_OFFSET    + 0x08)
 #define LCPU_STACKP_OFFSET		(LCPU_ENTRY_OFFSET + 0x08)
+#define LCPU_BPT_OFFSET			(LCPU_ENTRY_OFFSET + 0x10)
 #define LCPU_ERR_OFFSET			(LCPU_ENTRY_OFFSET + 0x00)
-#define LCPU_ARCH_OFFSET		(LCPU_ENTRY_OFFSET + 0x10)
+#define LCPU_ARCH_OFFSET		(LCPU_ENTRY_OFFSET + 0x18)
 
 #ifdef CONFIG_HAVE_SMP
 #define LCPU_FUNC_SIZE			0x10

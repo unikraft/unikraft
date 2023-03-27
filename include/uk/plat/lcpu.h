@@ -148,6 +148,9 @@ __u32 ukplat_lcpu_count(void);
  *   elements in lcpuidx, and [OUT] the number of successfully started CPUs in
  *   sequential order of lcpuidx. If the call succeeds, input and output values
  *   are equal. Must be NULL if lcpuidx is NULL
+ * @param pt_base array of pointers to the base of pagetables, on for each
+ *        logical CPU. If lcpuidx is NULL, must be ukplat_lcpu_count() - 1
+ *        pointers.
  * @param sp array of stack pointers, one for each logical CPU to start. If
  *   lcpuidx is NULL, must be ukplat_lcpu_count() - 1 stack pointers. The
  *   stacks may be specifically prepared to contain arguments for the entry
@@ -163,8 +166,9 @@ __u32 ukplat_lcpu_count(void);
  *
  * @return 0 on success, an errno-type error value otherwise
  */
-int ukplat_lcpu_start(const __lcpuidx lcpuidx[], unsigned int *num, void *sp[],
-		      const ukplat_lcpu_entry_t entry[], unsigned long flags);
+int ukplat_lcpu_start(const __lcpuidx lcpuidx[], unsigned int *num, void *pt_base[],
+		      void *sp[], const ukplat_lcpu_entry_t entry[],
+		      unsigned long flags);
 
 /**
  * Waits for the specified logical CPUs to enter idle state, or until the
