@@ -14,6 +14,9 @@ menuconfig PLAT_KVM
 
 if (PLAT_KVM)
 
+choice
+	prompt "Booting environment"
+
 config KVM_BOOT_PROTO_MULTIBOOT
 	bool "Multiboot"
 	depends on KVM_VMM_QEMU && !KVM_VMM_FIRECRACKER && ARCH_X86_64
@@ -26,13 +29,22 @@ config KVM_BOOT_PROTO_LXBOOT
 	help
 		Linux 64-bit Boot Protocol
 
+config KVM_BOOT_EFI_STUB
+	bool "EFI stub"
+	depends on KVM_VMM_QEMU && !KVM_VMM_FIRECRACKER
+	depends on OPTIMIZE_PIE
+	select UKPLAT_ACPI
+	help
+		Make Unikraft bootable by UEFI firmware
+
+endchoice
+
 choice
 	prompt "Virtual Machine Monitor"
 	default KVM_VMM_QEMU
 
 config KVM_VMM_QEMU
 	bool "QEMU"
-	select KVM_BOOT_PROTO_MULTIBOOT
 
 config KVM_VMM_FIRECRACKER
 	bool "Firecracker"
