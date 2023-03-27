@@ -45,6 +45,10 @@ config KVM_BOOT_EFI_STUB_DEBUG
 	bool "Enable EFI stub crash messages"
 	default n
 
+config KVM_BOOT_EFI_STUB_CMDLINE_FNAME
+	string "Name of the command line arguments file"
+	default "$(UK_NAME).cmdl"
+
 endif
 
 choice
