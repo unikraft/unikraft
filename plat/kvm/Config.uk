@@ -49,6 +49,10 @@ config KVM_BOOT_EFI_STUB_CMDLINE_FNAME
 	string "Name of the command line arguments file"
 	default "$(UK_NAME).cmdl"
 
+config KVM_BOOT_EFI_STUB_INITRD_FNAME
+	string "Name of the initial RAM disk file"
+	default "$(UK_NAME).initrd"
+
 endif
 
 choice
