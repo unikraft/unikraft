@@ -53,6 +53,10 @@ config KVM_BOOT_EFI_STUB_INITRD_FNAME
 	string "Name of the initial RAM disk file"
 	default "$(UK_NAME).initrd"
 
+config KVM_BOOT_EFI_STUB_DTB_FNAME
+	string "Name of the Devicetree Blob file"
+	default "$(UK_NAME).dtb"
+
 endif
 
 choice
