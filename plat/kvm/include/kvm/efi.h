@@ -552,4 +552,142 @@ struct uk_efi_ld_img_hndl {
 	uk_efi_status_t	(__uk_efi_api *unload)(uk_efi_hndl_t img_hndl);
 };
 
+#define UK_EFI_FILE_INFO_ID_GUID					\
+	(&(struct uk_efi_guid){						\
+		.b0_3 = 0x09576e92,					\
+		.b4_5 = 0x6d3f,						\
+		.b6_7 = 0x11d2,						\
+		.b8_15 = {0x8e, 0x39, 0x00, 0xa0,			\
+			  0xc9, 0x69, 0x72, 0x3b},			\
+	})
+struct uk_efi_file_info_id {
+	__u64 size;
+	__u64 file_size;
+	__u64 physical_size;
+	struct uk_efi_time create_time;
+	struct uk_efi_time last_access_time;
+	struct uk_efi_time modification_time;
+	__u64 attribute;
+	__s16 file_name[];
+};
+
+#define UK_EFI_FILE_SYSTEM_INFO_ID_GUID					\
+	(&(struct uk_efi_guid){						\
+		.b0_3 = 0x09576e93,					\
+		.b4_5 = 0x6d3f,						\
+		.b6_7 = 0x11d2,						\
+		.b8_15 = {0x8e, 0x39, 0x00, 0xa0,			\
+			  0xc9, 0x69, 0x72, 0x3b},			\
+	})
+struct uk_efi_file_system_info_id {
+	__u64 size;
+	bool read_only;
+	__u64 volume_size;
+	__u64 free_space;
+	__u32 block_size;
+	__s16 volume_label[];
+};
+
+#define UK_EFI_FILE_SYSTEM_VOLUME_LABEL_ID_GUID				\
+	(&(struct uk_efi_guid){						\
+		.b0_3 = 0xdb47d7d3,					\
+		.b4_5 = 0xfe81,						\
+		.b6_7 = 0x11d3,						\
+		.b8_15 = {0x9a, 0x35, 0x00, 0x90,			\
+			  0x27, 0x3f, 0xc1, 0x4d},			\
+	})
+struct uk_efi_file_system_volume_label_id {
+	__s16 volume_label[0];
+};
+
+struct uk_efi_file_io_token {
+	uk_efi_event_t event;
+	uk_efi_status_t status;
+	uk_efi_uintn_t buffer_size;
+	void *buffer;
+};
+
+#define UK_EFI_FILE_MODE_READ				0x0000000000000001
+#define UK_EFI_FILE_MODE_WRITE				0x0000000000000002
+#define UK_EFI_FILE_MODE_CREATE				0x8000000000000000
+
+#define UK_EFI_FILE_READ_ONLY				0x0000000000000001
+#define UK_EFI_FILE_HIDDEN				0x0000000000000002
+#define UK_EFI_FILE_SYSTEM				0x0000000000000004
+#define UK_EFI_FILE_RESERVED				0x0000000000000008
+#define UK_EFI_FILE_DIRECTORY				0x0000000000000010
+#define UK_EFI_FILE_ARCHIVE				0x0000000000000020
+#define UK_EFI_FILE_VALID_ATTR				0x0000000000000037
+struct uk_efi_file_proto {
+	__u64 revision;
+	uk_efi_status_t
+	(__uk_efi_api *open)(struct uk_efi_file_proto *this,
+			     struct uk_efi_file_proto **new_hndl,
+			     __s16 *file_name,
+			     __u64 open_mode,
+			     __u64 attr);
+	uk_efi_status_t
+	(__uk_efi_api *close)(struct uk_efi_file_proto *this);
+	uk_efi_status_t
+	(__uk_efi_api *delete)(struct uk_efi_file_proto *this);
+	uk_efi_status_t
+	(__uk_efi_api *read)(struct uk_efi_file_proto *this,
+			     uk_efi_uintn_t *buf_sz,
+			     void *buf);
+	uk_efi_status_t
+	(__uk_efi_api *write)(struct uk_efi_file_proto *this,
+			      uk_efi_uintn_t *buf_sz,
+			      void *buf);
+	uk_efi_status_t
+	(__uk_efi_api *get_position)(struct uk_efi_file_proto *this,
+				     __u64 *pos);
+	uk_efi_status_t
+	(__uk_efi_api *set_position)(struct uk_efi_file_proto *this,
+				     __u64 *pos);
+	uk_efi_status_t
+	(__uk_efi_api *get_info)(struct uk_efi_file_proto *this,
+				 struct uk_efi_guid *info_type,
+				 uk_efi_uintn_t *buf_sz,
+				 void *buf);
+	uk_efi_status_t
+	(__uk_efi_api *set_info)(struct uk_efi_file_proto *this,
+				 struct uk_efi_guid *info_type,
+				 uk_efi_uintn_t buf_sz,
+				 void *buf);
+	uk_efi_status_t
+	(__uk_efi_api *flush)(struct uk_efi_file_proto *this);
+
+	uk_efi_status_t
+	(__uk_efi_api *open_ex)(struct uk_efi_file_proto *this,
+				struct uk_efi_file_proto **new_hndl,
+				__s16 *file_name,
+				__u64 open_mode,
+				__u64 attr,
+				struct uk_efi_file_io_token *token);
+	uk_efi_status_t
+	(__uk_efi_api *read_ex)(struct uk_efi_file_proto *this,
+				struct uk_efi_file_io_token *token);
+	uk_efi_status_t
+	(__uk_efi_api *write_ex)(struct uk_efi_file_proto *this,
+				 struct uk_efi_file_io_token *token);
+	uk_efi_status_t
+	(__uk_efi_api *flush_ex)(struct uk_efi_file_proto *this,
+				 struct uk_efi_file_io_token *token);
+};
+
+#define UK_EFI_SIMPLE_FILE_SYSTEM_PROTOCOL_GUID				\
+	(&(struct uk_efi_guid){						\
+		.b0_3 = 0x0964e5b22,					\
+		.b4_5 = 0x6459,						\
+		.b6_7 = 0x11d2,						\
+		.b8_15 = {0x8e, 0x39, 0x00, 0xa0,			\
+			  0xc9, 0x69, 0x72, 0x3b},			\
+	})
+struct uk_efi_simple_fs_proto {
+	__u64 revision;
+	uk_efi_status_t
+	(__uk_efi_api *open_volume)(struct uk_efi_simple_fs_proto *this,
+				    struct uk_efi_file_proto **root);
+};
+
 #endif /* __PLAT_CMN_EFI_H__ */
