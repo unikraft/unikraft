@@ -155,6 +155,8 @@ override C := $(realpath $(dir $(C)))/$(notdir $(C))
 endif
 UK_CONFIG  := $(C)
 CONFIG_DIR := $(dir $(C))
+# As UK_CONFIG could be different files, always assume it has a newer version
+.PHONY: $(UK_CONFIG)
 
 # EPLAT_DIR (list of external platform libraries)
 # Retrieved from P variable from the command line (paths separated by colon)
