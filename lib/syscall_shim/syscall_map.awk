@@ -1,7 +1,7 @@
 BEGIN {
 	max_args = 6
 	print "/* Automatically generated file; DO NOT EDIT */\n"
-	print "#include <uk/bits/provided_syscalls.h>\n"
+	print "#include <uk/bits/syscall_provided.h>\n"
 	print "#define _uk_syscall_e_enosys() \\"
 	print "\t({ errno = ENOSYS; (-1); })"
 	print "#define _uk_syscall_r_enosys() \\"
