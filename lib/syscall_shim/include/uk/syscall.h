@@ -424,7 +424,7 @@ typedef long uk_syscall_arg_t;
 #ifdef CONFIG_LIBSYSCALL_SHIM
 #include <uk/bits/syscall_nrs.h>
 #include <uk/bits/syscall_map.h>
-#include <uk/bits/provided_syscalls.h>
+#include <uk/bits/syscall_provided.h>
 #include <uk/bits/syscall_stubs.h>
 #include <uk/bits/syscall_static.h>
 #include <uk/bits/syscall_r_static.h>
