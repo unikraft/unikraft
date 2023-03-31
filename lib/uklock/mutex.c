@@ -8,6 +8,13 @@ struct uk_mutex_metrics _uk_mutex_metrics = { 0 };
 __spinlock              _uk_mutex_metrics_lock;
 #endif /* CONFIG_LIBUKLOCK_MUTEX_METRICS */
 
+/**
+ * Initializes a mutex and its wait queue.
+ * Increments active mutex count using the spinlock.
+ *
+ * @param m
+ *     The mutex to initialize.
+ */
 void uk_mutex_init(struct uk_mutex *m)
 {
 	m->lock_count = 0;
@@ -38,7 +45,9 @@ uk_lib_initcall_prio(mutex_metrics_ctor, 1);
 
 /**
  * Makes a copy of mutex metrics to avoid direct user access.
- * @dst : destination buffer (must have been already allocated)
+ *
+ * @param dst
+ *     Destination buffer (must have been already allocated)
  */
 void uk_mutex_get_metrics(struct uk_mutex_metrics *dst)
 {

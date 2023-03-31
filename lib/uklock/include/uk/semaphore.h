@@ -51,6 +51,13 @@ struct uk_semaphore {
 
 void uk_semaphore_init(struct uk_semaphore *s, long count);
 
+/**
+ * Atomically decrements count (resource) by 1.
+ * Thread blocks until there's resource available.
+ *
+ * @param s
+ *     The semaphore that'll be called.
+ */
 static inline void uk_semaphore_down(struct uk_semaphore *s)
 {
 	unsigned long irqf;
@@ -71,6 +78,15 @@ static inline void uk_semaphore_down(struct uk_semaphore *s)
 	ukplat_lcpu_restore_irqf(irqf);
 }
 
+/**
+ * Atomically decrements count (resource) by 1.
+ * Thread doesn't block, but returns immediately.
+ *
+ * @param s
+ *     The semaphore that'll be called.
+ * @return
+ *     1 if semaphore was successfully downed, 0 otherwise.
+ */
 static inline int uk_semaphore_down_try(struct uk_semaphore *s)
 {
 	unsigned long irqf;
@@ -91,7 +107,15 @@ static inline int uk_semaphore_down_try(struct uk_semaphore *s)
 	return ret;
 }
 
-/* Returns __NSEC_MAX on timeout, expired time when down was successful */
+/**
+ * Atomically decrements count (resource) by 1.
+ * Thread can only block upto timeout amount of ticks.
+ *
+ * @param s
+ *     The semaphore that'll be called.
+ * @return
+ *     __NSEC_MAX on timeout, expired time when down was successful.
+ */
 static inline __nsec uk_semaphore_down_to(struct uk_semaphore *s,
 					  __nsec timeout)
 {
@@ -128,6 +152,13 @@ static inline __nsec uk_semaphore_down_to(struct uk_semaphore *s,
 	return __NSEC_MAX;
 }
 
+/**
+ * Atomically increments count (resource) by 1.
+ * Then wakes up a thread waiting on the semaphore.
+ *
+ * @param s
+ *     The semaphore that'll be called.
+ */
 static inline void uk_semaphore_up(struct uk_semaphore *s)
 {
 	unsigned long irqf;
