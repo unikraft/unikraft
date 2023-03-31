@@ -11,5 +11,8 @@ _uk_asmdumpd
 _uk_asmndumpd
 _uk_asmdumpk
 _uk_asmndumpk
+_uk_crashdumpd
+_uk_crashdumpk
 uk_trace_buffer_free
 uk_trace_buffer_writep
+_uk_crash
