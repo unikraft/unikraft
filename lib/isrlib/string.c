@@ -110,24 +110,21 @@ void *memmove_isr(void *dst, const void *src, size_t len)
 	uint8_t *d = dst;
     const uint8_t *s = src;
 
-    if ((intptr_t)src == (intptr_t)dst) {
-	return dst;
-    }
+    if ((intptr_t)src == (intptr_t)dst)
+        return dst;
 
     if ((intptr_t)src > (intptr_t)dst) {
-	for (; len > 0; --len) {
-	    *(d++) = *(s++);
-	}
+        for (; len > 0; --len)
+            *(d++) = *(s++);
     } else {
-	s += len;
-	d += len;
+        s += len;
+        d += len;
 
-	for (; len > 0; --len) {
-	    *(d--) = *(s--);
-	}
+        for (; len > 0; --len)
+            *(d--) = *(s--);
     }
 
-    return dst;
+	return dst;
 }
 
 int memcmp_isr(const void *ptr1, const void *ptr2, size_t len)
@@ -151,7 +148,6 @@ size_t strlen_isr(const char *str)
 size_t strnlen_isr(const char *str, size_t len)
 {
 	const char *p = memchr_isr(str, 0, len);
-
 	return p ? (size_t) (p - str) : len;
 }
 
@@ -230,7 +226,6 @@ char *strchrnul_isr(const char *s, int c)
 char *strchr_isr(const char *str, int c)
 {
 	char *r = strchrnul_isr(str, c);
-
 	return *(unsigned char *)r == (unsigned char)c ? r : 0;
 }
 
@@ -327,7 +322,6 @@ finish:
 size_t strlcat_isr(char *d, const char *s, size_t n)
 {
 	size_t l = strnlen_isr(d, n);
-
 	if (l == n)
 		return l + strlen_isr(s);
 	return l + strlcpy_isr(d+l, s, n-l);
