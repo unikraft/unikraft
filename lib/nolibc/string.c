@@ -109,7 +109,11 @@ void *memmove(void *dst, const void *src, size_t len)
 	uint8_t *d = dst;
 	const uint8_t *s = src;
 
-	if (src > dst) {
+	if ((intptr_t)src == (intptr_t)dst) {
+        return dst;
+    }
+	
+	if ((intptr_t)src > (intptr_t)dst) {
 		for (; len > 0; --len)
 			*(d++) = *(s++);
 	} else {

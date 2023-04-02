@@ -107,21 +107,27 @@ void *memrchr_isr(const void *m, int c, size_t n)
 
 void *memmove_isr(void *dst, const void *src, size_t len)
 {
-	uint8_t *d = dst;
-	const uint8_t *s = src;
+	uint8_t *d = dst; 
+    const uint8_t *s = src; 
 
-	if (src > dst) {
-		for (; len > 0; --len)
-			*(d++) = *(s++);
-	} else {
-		s += len;
-		d += len;
+    if ((intptr_t)src == (intptr_t)dst) {
+        return dst;
+    }
 
-		for (; len > 0; --len)
-			*(d--) = *(s--);
-	}
+    if ((intptr_t)src > (intptr_t)dst) {
+        for (; len > 0; --len) {
+            *(d++) = *(s++);
+        }
+    } else {
+        s += len;
+        d += len;
 
-	return dst;
+        for (; len > 0; --len) {
+            *(d--) = *(s--);
+        }
+    }
+
+    return dst;
 }
 
 int memcmp_isr(const void *ptr1, const void *ptr2, size_t len)
