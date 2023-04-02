@@ -32,8 +32,6 @@
 #ifndef _VFSCORE_SYS_MOUNT_H_
 #define _VFSCORE_SYS_MOUNT_H_
 
-#define _BSD_SOURCE
-
 #include <sys/mount.h>
 #include <sys/statfs.h>
 #include <limits.h>

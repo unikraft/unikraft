@@ -31,6 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _BSD_SOURCE
+
 #include <vfscore/file.h>
 #include <vfscore/fs.h>
 #include <uk/plat/console.h>
