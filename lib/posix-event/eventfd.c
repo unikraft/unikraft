@@ -30,6 +30,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _BSD_SOURCE
+
 #include <vfscore/eventpoll.h>
 #include <vfscore/fs.h>
 #include <vfscore/file.h>

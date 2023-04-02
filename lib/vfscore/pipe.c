@@ -31,6 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _BSD_SOURCE
+
 #include <uk/config.h>
 #include <stdlib.h>
 #include <stdio.h>
