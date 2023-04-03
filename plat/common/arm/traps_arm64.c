@@ -29,6 +29,7 @@
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <uk/intctlr/gic.h>
+#include <uk/plat/lcpu.h>
 #include <uk/plat/syscall.h>
 
 #ifdef CONFIG_ARM64_FEAT_MTE
@@ -162,6 +163,21 @@ static enum aarch64_trap esr_to_trap(__u64 esr)
 	}
 
 	return AARCH64_TRAP_MAX;
+}
+
+/* TODO Move into a per-cpu once we are able to access
+ *      per-cpu vars from asm.
+ */
+__u8 ukarch_except_switch_stack;
+
+void ukarch_push_nested_exceptions(void)
+{
+	ukarch_except_switch_stack++;
+}
+
+void ukarch_pop_nested_exceptions(void)
+{
+	--ukarch_except_switch_stack;
 }
 
 static void dump_registers(struct __regs *regs, __u64 far)

@@ -26,15 +26,18 @@
  * SUCH DAMAGE.
  *
  */
+#include <uk/arch/ctx.h>
 #include <uk/arch/lcpu.h>
 #include <uk/asm.h>
 #include <uk/plat/common/lcpu.h>
 #include <uk/plat/config.h>
-#include <uk/arch/ctx.h>
+#include <uk/reloc.h>
 
 #define TYPE_CRIT				0
 #define TYPE_TRAP				1
 #define TYPE_IRQ				2
+
+.extern ukarch_except_switch_stack
 
 .macro EXCHANGE_SP_WITH_X0
 	add sp, sp, x0	// new_sp = sp + x0
@@ -81,6 +84,11 @@
 	 */
 	msr     tpidrro_el0, x0
 
+	ur_ldr	x0, ukarch_except_switch_stack
+	cbz	x0, 0f
+	EXCHANGE_SP_WITH_X0
+	b	1f
+0:
 	/* Fetch `lcpu_except_stack` of LCPU:
 	 *  CPU_EXCEPT_STACK_SIZE  CPU_EXCEPT_STACK_SIZE  CPU_EXCEPT_STACK_SIZE
 	 *<--------------------><---------------------><-------------------->
@@ -110,6 +118,7 @@
 	add     sp, sp, #CPU_EXCEPT_STACK_SIZE * 3
 .endif
 
+1:
 	/* Store old SP previously saved into x0 */
 	str     x0, [sp, #-16]
 
@@ -119,7 +128,7 @@
 	and	x0, x0, #ESR_EC_MASK
 	orr	x0, xzr, x0, lsr #ESR_EC_SHIFT
 	cmp	x0, #ESR_EL1_EC_SVC64
-	bne	0f
+	bne	2f
 
 	/* If we are in a system call trap then switch to auxiliary stack
 	 * from the current lcpu pointer
@@ -192,11 +201,11 @@
 	mrs	x0, tpidr_el1
 	ldr	x0, [x0, #LCPU_AUXSP_OFFSET]
 	str	x0, [sp, #UKARCH_EXECENV_SIZE]
-	b	1f
+	b	3f
 .endif
-0:
+2:
 	sub	sp, sp, #__TRAP_STACK_SIZE
-1:
+3:
 	/* Restore x0 */
 	mrs     x0, tpidrro_el0
 

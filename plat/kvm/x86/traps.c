@@ -151,6 +151,69 @@ static void tss_init(__lcpuidx idx)
 		: "r"((__u16) (GDT_DESC_OFFSET(GDT_DESC_TSS_LO))));
 }
 
+static __align(8)
+UKPLAT_PER_LCPU_ARRAY_DEFINE(struct seg_gate_desc64, cpu_idt, IDT_NUM_ENTRIES);
+
+static
+UKPLAT_PER_LCPU_DEFINE(__u8, idt_ist_disable_nesting);
+
+#define IDT_IST_SAVE_LEN 32
+/* Space for the IST values of all exception vectors */
+static UKPLAT_PER_LCPU_ARRAY_DEFINE(__u8, idt_ist_saved, IDT_IST_SAVE_LEN);
+
+void ukarch_push_nested_exceptions(void)
+{
+	struct seg_gate_desc64 *desc;
+	struct seg_gate_desc64 *idt;
+	__u8 *disable_nesting;
+	__u8 *ist_saved;
+	struct lcpu *lcpu;
+	unsigned int i;
+
+	disable_nesting = &ukplat_per_lcpu_current(idt_ist_disable_nesting);
+	UK_ASSERT(*disable_nesting < __U8_MAX);
+
+	if (*disable_nesting++)
+		return;
+
+	lcpu = lcpu_get_current_in_except();
+	idt = ukplat_per_lcpu(cpu_idt, lcpu->idx);
+	ist_saved = ukplat_per_lcpu(idt_ist_saved, lcpu->idx);
+
+	/* Save the value of the IST field and disable IST for the exception */
+	for (i = 0; i < IDT_IST_SAVE_LEN; i++) {
+		desc = &idt[i];
+		ist_saved[i] = desc->ist;
+		desc->ist = 0;
+	}
+}
+
+void ukarch_pop_nested_exceptions(void)
+{
+	struct seg_gate_desc64 *desc;
+	struct seg_gate_desc64 *idt;
+	__u8 *disable_nesting;
+	__u8 *ist_saved;
+	struct lcpu *lcpu;
+	unsigned int i;
+
+	disable_nesting = &ukplat_per_lcpu_current(idt_ist_disable_nesting);
+	UK_ASSERT(*disable_nesting > 1);
+
+	if (--*disable_nesting != 0)
+		return;
+
+	lcpu = lcpu_get_current_in_except();
+	idt = ukplat_per_lcpu(cpu_idt, lcpu->idx);
+	ist_saved = ukplat_per_lcpu(idt_ist_saved, lcpu->idx);
+
+	/* Restore the IST field values */
+	for (i = 0; i < IDT_IST_SAVE_LEN; i++) {
+		desc = &idt[i];
+		desc->ist = ist_saved[i];
+	}
+}
+
 /* Declare the traps used only by this platform: */
 DECLARE_TRAP_EVENT(UKARCH_TRAP_NMI);
 
@@ -158,12 +221,15 @@ DECLARE_TRAP_EC(nmi,           "NMI",                  UKARCH_TRAP_NMI)
 DECLARE_TRAP_EC(double_fault,  "double fault",         NULL)
 DECLARE_TRAP_EC(virt_error,    "virtualization error", NULL)
 
-static struct seg_gate_desc64 cpu_idt[IDT_NUM_ENTRIES] __align(8);
 static struct desc_table_ptr64 idtptr;
 
 static inline void idt_fillgate(unsigned int num, void *fun, unsigned int ist)
 {
-	struct seg_gate_desc64 *desc = &cpu_idt[num];
+	struct seg_gate_desc64 *desc;
+	struct seg_gate_desc64 *idt;
+
+	idt = ukplat_per_lcpu_current(cpu_idt);
+	desc = &idt[num];
 
 	/*
 	 * All gates are interrupt gates, all handlers run with interrupts off.
