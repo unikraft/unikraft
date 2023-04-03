@@ -136,15 +136,55 @@ static void tss_init(__lcpuidx idx)
 		: "r"((__u16) (GDT_DESC_OFFSET(GDT_DESC_TSS_LO))));
 }
 
+static struct seg_gate_desc64 cpu_idt[IDT_NUM_ENTRIES] __align(8);
+static struct desc_table_ptr64 idtptr;
+
+static __u8 idt_ist_disable_nesting = 0;
+#define IDT_IST_SAVE_LEN 32
+/* Space for the IST values of all exception vectors */
+static __u8 idt_ist_saved[IDT_IST_SAVE_LEN];
+
+void ukarch_push_nested_exceptions(void)
+{
+	struct seg_gate_desc64 *desc;
+	unsigned int i;
+
+	UK_ASSERT(idt_ist_disable_nesting < __U8_MAX);
+
+	if (idt_ist_disable_nesting++)
+		return;
+
+	/* Save the value of the IST field and disable IST for the exception */
+	for (i = 0; i < IDT_IST_SAVE_LEN; i++) {
+		desc = &cpu_idt[i];
+		idt_ist_saved[i] = desc->ist;
+		desc->ist = 0;
+	}
+}
+
+void ukarch_pop_nested_exceptions(void)
+{
+	struct seg_gate_desc64 *desc;
+	unsigned int i;
+
+	UK_ASSERT(idt_ist_disable_nesting > 1);
+
+	if (--idt_ist_disable_nesting != 0)
+		return;
+
+	/* Restore the IST field values */
+	for (i = 0; i < IDT_IST_SAVE_LEN; i++) {
+		desc = &cpu_idt[i];
+		desc->ist = idt_ist_saved[i];
+	}
+}
+
 /* Declare the traps used only by this platform: */
 DECLARE_TRAP_EVENT(UKARCH_TRAP_NMI);
 
 DECLARE_TRAP_EC(nmi,           "NMI",                  UKARCH_TRAP_NMI)
 DECLARE_TRAP_EC(double_fault,  "double fault",         NULL)
 DECLARE_TRAP_EC(virt_error,    "virtualization error", NULL)
-
-static struct seg_gate_desc64 cpu_idt[IDT_NUM_ENTRIES] __align(8);
-static struct desc_table_ptr64 idtptr;
 
 static inline void idt_fillgate(unsigned int num, void *fun, unsigned int ist)
 {

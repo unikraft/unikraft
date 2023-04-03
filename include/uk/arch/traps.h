@@ -44,6 +44,19 @@ extern "C" {
 
 #include <uk/asm/traps.h>
 
+#ifndef __ASSEMBLY__
+/**
+ * Enable support for nested exception handling.
+ */
+void ukarch_push_nested_exceptions(void);
+
+/**
+ * Disable support for nested exception handling.
+ */
+void ukarch_pop_nested_exceptions(void);
+
+#endif /* !__ASSEMBLY__ */
+
 #ifdef __cplusplus
 }
 #endif
