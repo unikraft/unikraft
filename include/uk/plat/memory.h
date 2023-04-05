@@ -219,6 +219,22 @@ int ukplat_memallocator_set(struct uk_alloc *a);
  */
 struct uk_alloc *ukplat_memallocator_get(void);
 
+/**
+ * Allocates page-aligned memory by taking it away from the free physical
+ * memory. Only memory up to the platform's static page table mapped
+ * maximum address is used so that it is accessible.
+ * Note, the memory cannot be released!
+ *
+ * @param size
+ *   The size to allocate. Will be rounded up to next multiple of page size.
+ * @param type
+ *   Memory region type to use for the allocated memory. Can be 0.
+ *
+ * @return
+ *   A pointer to the allocated memory on success, NULL otherwise.
+ */
+void *ukplat_memregion_alloc(__sz size, int type);
+
 #ifdef __cplusplus
 }
 #endif

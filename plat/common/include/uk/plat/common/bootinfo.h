@@ -9,6 +9,7 @@
 
 #include <uk/arch/types.h>
 #include <uk/arch/limits.h>
+#include <uk/plat/memory.h>
 #include <uk/plat/common/memory.h>
 
 /** Unikraft boot info */

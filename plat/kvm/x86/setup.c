@@ -31,88 +31,6 @@
 
 #define PLATFORM_MAX_MEM_ADDR 0x100000000 /* 4 GiB */
 
-/**
- * Allocates page-aligned memory by taking it away from the free physical
- * memory. Only memory in the first 4 GiB is used so that it is accessible also
- * with the static 1:1 boot page table. Note, the memory cannot be released!
- *
- * @param size
- *   The size to allocate. Will be rounded up to next multiple of page size.
- * @param type
- *   Memory region type to use for the allocated memory. Can be 0.
- *
- * @return
- *   A pointer to the allocated memory on success, NULL otherwise
- */
-static void *bootmemory_palloc(__sz size, int type)
-{
-	struct ukplat_memregion_desc *mrd;
-	__paddr_t pstart, pend;
-	__paddr_t ostart, olen;
-	int rc;
-
-	size = PAGE_ALIGN_UP(size);
-	ukplat_memregion_foreach(&mrd, UKPLAT_MEMRT_FREE, 0, 0) {
-		UK_ASSERT(mrd->pbase <= __U64_MAX - size);
-		pstart = PAGE_ALIGN_UP(mrd->pbase);
-		pend   = pstart + size;
-
-		if (pend > PLATFORM_MAX_MEM_ADDR ||
-		    pend > mrd->pbase + mrd->len)
-			continue;
-
-		UK_ASSERT((mrd->flags & UKPLAT_MEMRF_PERMS) ==
-			  (UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE));
-
-		ostart = mrd->pbase;
-		olen   = mrd->len;
-
-		/* If fragmenting this memory region leaves it with length 0,
-		 * then simply overwrite and return it instead
-		 */
-		if (olen - (pstart - ostart) == size) {
-			mrd->pbase = pstart;
-			mrd->vbase = pstart;
-			mrd->len = pend - pstart;
-			mrd->type = type;
-			mrd->flags = UKPLAT_MEMRF_READ |
-				     UKPLAT_MEMRF_WRITE |
-				     UKPLAT_MEMRF_MAP;
-
-			return (void *)pstart;
-		}
-
-		/* Adjust free region */
-		mrd->len  -= pend - mrd->pbase;
-		mrd->pbase = pend;
-
-		mrd->vbase = (__vaddr_t)mrd->pbase;
-
-		/* Insert allocated region */
-		rc = ukplat_memregion_list_insert(&ukplat_bootinfo_get()->mrds,
-			&(struct ukplat_memregion_desc){
-				.vbase = pstart,
-				.pbase = pstart,
-				.len   = size,
-				.type  = type,
-				.flags = UKPLAT_MEMRF_READ |
-					 UKPLAT_MEMRF_WRITE |
-					 UKPLAT_MEMRF_MAP,
-			});
-		if (unlikely(rc < 0)) {
-			/* Restore original region */
-			mrd->vbase = ostart;
-			mrd->len   = olen;
-
-			return NULL;
-		}
-
-		return (void *)pstart;
-	}
-
-	return NULL;
-}
-
 #ifdef CONFIG_HAVE_PAGING
 /* Initial page table struct used for paging API to absorb statically defined
  * startup page table.
@@ -302,7 +220,7 @@ static inline int cmdline_init(struct ukplat_bootinfo *bi)
 		cmdline_len = sizeof(CONFIG_UK_NAME) - 1;
 	}
 
-	cmdline = bootmemory_palloc(cmdline_len + 1, UKPLAT_MEMRT_CMDLINE);
+	cmdline = ukplat_memregion_alloc(cmdline_len + 1, UKPLAT_MEMRT_CMDLINE);
 	if (unlikely(!cmdline))
 		return -ENOMEM;
 
@@ -350,7 +268,7 @@ void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi)
 		UK_CRASH("Cmdline init failed: %d\n", rc);
 
 	/* Allocate boot stack */
-	bstack = bootmemory_palloc(__STACK_SIZE, UKPLAT_MEMRT_STACK);
+	bstack = ukplat_memregion_alloc(__STACK_SIZE, UKPLAT_MEMRT_STACK);
 	if (unlikely(!bstack))
 		UK_CRASH("Boot stack alloc failed\n");
 
