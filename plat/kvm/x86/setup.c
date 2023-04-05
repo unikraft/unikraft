@@ -67,6 +67,21 @@ static void *bootmemory_palloc(__sz size, int type)
 		ostart = mrd->pbase;
 		olen   = mrd->len;
 
+		/* If fragmenting this memory region leaves it with length 0,
+		 * then simply overwrite and return it instead
+		 */
+		if (olen - (pstart - ostart) == size) {
+			mrd->pbase = pstart;
+			mrd->vbase = pstart;
+			mrd->len = pend - pstart;
+			mrd->type = type;
+			mrd->flags = UKPLAT_MEMRF_READ |
+				     UKPLAT_MEMRF_WRITE |
+				     UKPLAT_MEMRF_MAP;
+
+			return (void *)pstart;
+		}
+
 		/* Adjust free region */
 		mrd->len  -= pend - mrd->pbase;
 		mrd->pbase = pend;
