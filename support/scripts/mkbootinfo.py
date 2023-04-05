@@ -23,7 +23,7 @@ UKPLAT_MEMRF_EXECUTE    = 0x0004   # Region is executable
 UKPLAT_MEMR_NAME_LEN    = 36
 
 # Boot info structure (see include/uk/plat/common/bootinfo.h)
-UKPLAT_BOOTINFO_SIZE    = 64
+UKPLAT_BOOTINFO_SIZE    = 72
 
 UKPLAT_BOOTINFO_MAGIC   = 0xB007B0B0 # Boot Bobo
 UKPLAT_BOOTINFO_VERSION = 0x01
@@ -95,6 +95,7 @@ def main():
         secobj.write(b'\0' * 16) # bootprotocol
         secobj.write(b'\0' * 8) # cmdline
         secobj.write(b'\0' * 8) # cmdline_len
+        secobj.write(b'\0' * 8) # dtb
         secobj.write(cap.to_bytes(4, endianness)) # mrds.capacity
         secobj.write(b'\0' * 4) # mrds.count
 
