@@ -161,5 +161,7 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 		}
 	}
 
+	ukplat_memregion_list_coalesce(&bi->mrds);
+
 	_ukplat_entry(lcpu, bi);
 }
