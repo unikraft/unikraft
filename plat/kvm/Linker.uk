@@ -10,7 +10,6 @@ else ifeq (arm64,$(CONFIG_UK_ARCH))
 KVM_LDFLAGS-y += -Wl,-m,aarch64elf
 KVM_LINK_LIBGCC_FLAG := -lgcc
 endif
-KVM_BINFO_FLAGS := -a $(CONFIG_UK_ARCH)
 
 ##
 ## Link image
@@ -30,16 +29,6 @@ KVM_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-dT$(comma),\
 			 $(UK_PLAT_KVM_DEF_LDS))
 KVM_LD_SCRIPT_FLAGS += $(addprefix -Wl$(comma)-T$(comma),\
 			$(KVM_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y))
-
-ifeq ($(CONFIG_UKPLAT_MEMRNAME),y)
-KVM_BINFO_FLAGS += -n
-endif
-
-define build_bootinfo =
-	$(call build_cmd,UKBI,,$(1).bootinfo,\
-		$(SCRIPTS_DIR)/mkbootinfo.py $(1) $(1).bootinfo $(KVM_BINFO_FLAGS) && \
-		$(OBJCOPY) $(1) --update-section .uk_bootinfo=$(1).bootinfo)
-endef
 
 $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) \
