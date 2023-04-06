@@ -40,8 +40,6 @@
 #include <xen/arch-x86/hvm/start_info.h>
 #include <uk/plat/memory.h>
 
-extern unsigned int _libxenplat_mrd_num;
-extern struct ukplat_memregion_desc _libxenplat_mrd[];
 extern char _libxenplat_bootstack[];
 
 extern start_info_t *HYPERVISOR_start_info;
