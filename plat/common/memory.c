@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
+ *          Sergiu Moga <sergiu.moga@protonmail.com>
  *
  * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2023, University Politehnica of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -136,4 +138,191 @@ void *ukplat_memregion_alloc(__sz size, int type)
 	}
 
 	return NULL;
+}
+
+/* We want a criteria based on which we decide which memory region to keep,
+ * split or discard when coalescing.
+ * - UKPLAT_MEMRT_RESERVED is of highest priority since we should not touch it
+ * - UKPLAT_MEMRT_FREE is of lowest priority since it is supposedly free
+ * - the others are all allocated for Unikraft so they will have the same
+ * priority
+ */
+static inline int get_mrd_prio(struct ukplat_memregion_desc *const m)
+{
+	switch (m->type) {
+	case UKPLAT_MEMRT_FREE:
+		return 0;
+	case UKPLAT_MEMRT_INITRD:
+	case UKPLAT_MEMRT_CMDLINE:
+	case UKPLAT_MEMRT_STACK:
+	case UKPLAT_MEMRT_DEVICETREE:
+	case UKPLAT_MEMRT_KERNEL:
+		return 1;
+	case UKPLAT_MEMRT_RESERVED:
+		return 2;
+	default:
+		return -1;
+	}
+}
+
+/* Memory region with lower priority must be adjusted in favor of the one
+ * with higher priority, e.g. if left memory region is of lower priority but
+ * contains the right memory region of higher priority, then split the left one
+ * in two, by adjusting the current left one and inserting a new memory region
+ * descriptor.
+ */
+static inline void overlapping_mrd_fixup(struct ukplat_memregion_list *list,
+					 struct ukplat_memregion_desc *const ml,
+					 struct ukplat_memregion_desc *const mr,
+					 int ml_prio, int mr_prio,
+					 __u32 lidx __unused, __u32 ridx)
+{
+	/* If left memory region is of higher priority */
+	if (ml_prio > mr_prio) {
+		/* If the right region is contained within the left region,
+		 * drop it entirely
+		 */
+		if (RANGE_CONTAIN(ml->pbase, ml->len, mr->pbase, mr->len)) {
+			mr->len = 0;
+
+		/* If the right region has a part of itself in the left region,
+		 * drop that part of the right region only
+		 */
+		} else {
+			mr->len -= ml->pbase + ml->len - mr->pbase;
+			mr->pbase = ml->pbase + ml->len;
+			mr->vbase = mr->pbase;
+		}
+
+	/* If left memory region is of lower priority */
+	} else {
+		/* If the left memory region is contained within the right
+		 * region, drop it entirely
+		 */
+		if (RANGE_CONTAIN(mr->pbase, mr->len, ml->pbase, ml->len)) {
+			ml->len = 0;
+
+		/* If the left region has a part of itself in the right region,
+		 * drop that part of the left region only and split by creating
+		 * a new one if the left region is larger than the right region.
+		 */
+		} else {
+			if (RANGE_CONTAIN(ml->pbase, ml->len,
+					  mr->pbase, mr->len))
+				/* Ignore insertion failure as there is nothing
+				 * we can do about it and it is not worth caring
+				 * about.
+				 */
+				ukplat_memregion_list_insert_at_idx(list,
+					&(struct ukplat_memregion_desc){
+						.vbase = mr->pbase + mr->len,
+						.pbase = mr->pbase + mr->len,
+						.len   = ml->pbase + ml->len -
+							 mr->pbase - mr->len,
+						.type  = ml->type,
+						.flags = ml->flags
+					}, ridx + 1);
+
+			ml->len = mr->pbase - ml->pbase;
+		}
+	}
+}
+
+int ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
+{
+	struct ukplat_memregion_desc *m, *ml, *mr;
+	int ml_prio, mr_prio;
+	__u32 i;
+
+	i = 0;
+	m = list->mrds;
+	while (i + 1 < list->count) {
+		/* Make sure first that they are ordered. If not, swap them */
+		if (m[i].pbase > m[i + 1].pbase ||
+		    (m[i].pbase == m[i + 1].pbase &&
+		     m[i].pbase + m[i].len > m[i + 1].pbase + m[i + 1].len)) {
+			struct ukplat_memregion_desc tmp;
+
+			tmp = m[i];
+			m[i] = m[i + 1];
+			m[i + 1] = tmp;
+		}
+		ml = &m[i];
+		mr = &m[i + 1];
+		ml_prio = get_mrd_prio(ml);
+		mr_prio = get_mrd_prio(mr);
+
+		/* If they overlap */
+		if (RANGE_OVERLAP(ml->pbase,  ml->len, mr->pbase, mr->len)) {
+			/* If they are not of the same priority */
+			if (ml_prio != mr_prio) {
+				overlapping_mrd_fixup(list, ml, mr, ml_prio,
+						      mr_prio, i, i + 1);
+
+				/* Remove dropped regions */
+				if (ml->len == 0)
+					ukplat_memregion_list_delete(list, i);
+				else if (mr->len == 0)
+					ukplat_memregion_list_delete(list,
+								     i + 1);
+				else
+					i++;
+
+			} else if (ml->flags != mr->flags) {
+				return -EINVAL;
+
+			/* If they have the same priority and same flags, merge
+			 * them. If they are contained within each other, drop
+			 * the contained one.
+			 */
+			} else {
+				/* If the left region is contained within the
+				 * right region, drop it
+				 */
+				if (RANGE_CONTAIN(mr->pbase, mr->len,
+						  ml->pbase, ml->len)) {
+					ukplat_memregion_list_delete(list, i);
+
+					continue;
+
+				/* If the right region is contained within the
+				 * left region, drop it
+				 */
+				} else if (RANGE_CONTAIN(ml->pbase, ml->len,
+							 mr->pbase, mr->len)) {
+					ukplat_memregion_list_delete(list,
+								     i + 1);
+
+					continue;
+				}
+
+				/* If they are not contained within each other,
+				 * merge them.
+				 */
+				ml->len += mr->len;
+
+				/* In case they overlap, delete duplicate
+				 * overlapping region
+				 */
+				ml->len -= ml->pbase + ml->len - mr->pbase;
+
+				/* Delete the memory region we just merged into
+				 * the previous region.
+				 */
+				ukplat_memregion_list_delete(list, i + 1);
+			}
+
+		/* If they do not overlap but they are contiguous and have the
+		 * same flags and priority.
+		 */
+		} else if (ml->pbase + ml->len == mr->pbase &&
+			   ml_prio == mr_prio && ml->flags == mr->flags) {
+			ml->len += mr->len;
+			ukplat_memregion_list_delete(list, i + 1);
+		} else {
+			i++;
+		}
+	}
+
+	return 0;
 }

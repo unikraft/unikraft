@@ -245,6 +245,17 @@ ukplat_memregion_list_delete(struct ukplat_memregion_list *list, __u32 idx)
 }
 
 /**
+ * Coalesces the memory regions of a given memory region descriptor list.
+ *
+ * @param list
+ *   The list whose memory region descriptors to coalesce.
+ *
+ * @return
+ *   0 on success, < 0 otherwise.
+ */
+int ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list);
+
+/**
  * Initializes the platform memory mappings which require an allocator. This
  * function must always be called after initializing a memory allocator and
  * before initializing the subsystems that require memory allocation. It is an
