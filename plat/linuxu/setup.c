@@ -39,16 +39,14 @@
 #include <stdlib.h>
 #include <linuxu/setup.h>
 #include <linuxu/console.h>
+#include <linuxu/syscall.h>
 #include <uk/plat/console.h>
 #include <uk/plat/bootstrap.h>
-#include <linuxu/syscall.h>
-#include <uk/plat/memory.h>
-#include <uk/libparam.h>
 #include <uk/assert.h>
 #include <uk/errptr.h>
 #include <uk/plat/common/cpu.h>
-
-extern int ukplat_linuxu_memregion_count;
+#include <uk/plat/common/bootinfo.h>
+#include <uk/libparam.h>
 
 struct liblinuxuplat_opts _liblinuxuplat_opts = { 0 };
 
@@ -60,35 +58,47 @@ UK_LIB_PARAM(heap_size, __u32);
 static const char *initrd;
 UK_LIB_PARAM_STR(initrd);
 
-int __linuxu_plat_heap_init(void)
+static void __linuxu_plat_heap_init(void)
 {
 	void *pret;
-	int rc = 0;
+	__u32 len;
+	int rc;
 
-	_liblinuxuplat_opts.heap.len = heap_size * MB2B;
+	len = heap_size * MB2B;
 	uk_pr_info("Allocate memory for heap (%u MiB)\n", heap_size);
 
 	/**
 	 * Allocate heap memory
 	 */
-	if (_liblinuxuplat_opts.heap.len > 0) {
-		pret = sys_mapmem(NULL, _liblinuxuplat_opts.heap.len);
+	if (len > 0) {
+		pret = sys_mapmem(NULL, len);
 		if (PTRISERR(pret)) {
 			rc = PTR2ERR(pret);
 			uk_pr_err("Failed to allocate memory for heap: %d\n",
 				  rc);
 		} else {
-			_liblinuxuplat_opts.heap.base = pret;
+			rc = ukplat_memregion_list_insert(
+				&ukplat_bootinfo_get()->mrds,
+				&(struct ukplat_memregion_desc){
+					.vbase = (__vaddr_t)pret,
+					.pbase = (__paddr_t)pret,
+					.len   = len,
+					.type  = UKPLAT_MEMRT_FREE,
+					.flags = UKPLAT_MEMRF_READ |
+						 UKPLAT_MEMRF_WRITE |
+						 UKPLAT_MEMRF_MAP,
+				});
+			if (unlikely(rc < 0))
+				uk_pr_err("Failed to add heap memory region descriptor.");
 		}
 	}
-
-	return rc;
 }
 
-int __linuxu_plat_initrd_init(void)
+static void __linuxu_plat_initrd_init(void)
 {
 	void *pret;
-	int rc = 0;
+	__u32 len;
+	int rc;
 	struct k_stat file_info;
 
 	if (!initrd) {
@@ -97,10 +107,8 @@ int __linuxu_plat_initrd_init(void)
 		uk_pr_debug("Mapping in initrd file: %s\n", initrd);
 		int initrd_fd = sys_open(initrd, K_O_RDONLY, 0);
 
-		if (initrd_fd < 0) {
+		if (initrd_fd < 0)
 			uk_pr_crit("Failed to open %s for initrd\n", initrd);
-			return -1;
-		}
 
 		/**
 		 * Find initrd file size
@@ -108,15 +116,13 @@ int __linuxu_plat_initrd_init(void)
 		if (sys_fstat(initrd_fd, &file_info) < 0) {
 			uk_pr_crit("sys_fstat failed for initrd file\n");
 			sys_close(initrd_fd);
-			return -1;
 		}
-		_liblinuxuplat_opts.initrd.len = file_info.st_size;
+		len = file_info.st_size;
 		/**
 		 * Allocate initrd memory
 		 */
-		if (_liblinuxuplat_opts.initrd.len > 0) {
-			pret = sys_mmap(NULL,
-					_liblinuxuplat_opts.initrd.len,
+		if (len > 0) {
+			pret = sys_mmap(NULL, len,
 					PROT_READ | PROT_WRITE | PROT_EXEC,
 					MAP_PRIVATE, initrd_fd, 0);
 			if (PTRISERR(pret)) {
@@ -124,16 +130,26 @@ int __linuxu_plat_initrd_init(void)
 				uk_pr_crit("Failed to memory-map initrd: %d\n",
 					   rc);
 				sys_close(initrd_fd);
-				return -1;
 			}
-			_liblinuxuplat_opts.initrd.base = pret;
+
+			rc = ukplat_memregion_list_insert(
+				&ukplat_bootinfo_get()->mrds,
+				&(struct ukplat_memregion_desc){
+					.vbase = (__vaddr_t)pret,
+					.pbase = (__paddr_t)pret,
+					.len   = len,
+					.type  = UKPLAT_MEMRT_INITRD,
+					.flags = UKPLAT_MEMRF_READ |
+						 UKPLAT_MEMRF_WRITE |
+						 UKPLAT_MEMRF_MAP,
+				});
+			if (unlikely(rc < 0))
+				uk_pr_err("Failed to add initrd memory region descriptor.");
 		} else {
 			uk_pr_info("Ignoring empty initrd file.\n");
 			sys_close(initrd_fd);
-			return 0;
 		}
 	}
-	return rc;
 }
 
 void _liblinuxuplat_entry(int argc, char *argv[]) __noreturn;
@@ -145,8 +161,9 @@ void _liblinuxuplat_entry(int argc, char *argv[])
 	 */
 	_liblinuxuplat_init_console();
 
-	ukplat_linuxu_memregion_count = __linuxu_plat_heap_init() == 0 ? 1 : 0 +
-					__linuxu_plat_initrd_init() == 0 ? 1 : 0;
+	__linuxu_plat_heap_init();
+
+	__linuxu_plat_initrd_init();
 
 	/*
 	 * Enter Unikraft
