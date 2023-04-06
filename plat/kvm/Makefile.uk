@@ -77,7 +77,6 @@ LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/lcpu_start.S
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/intctrl.c
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/tscclock.c
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/time.c
-LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/memory.c
 ifeq ($(findstring y,$(CONFIG_KVM_KERNEL_VGA_CONSOLE) $(CONFIG_KVM_DEBUG_VGA_CONSOLE)),y)
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/vga_console.c
 endif
@@ -124,12 +123,13 @@ LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/lcpu.c
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/intctrl.c
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/memory.c
 
-LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/shutdown.c
-LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/irq.c
-LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/io.c
-LIBKVMPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/lcpu.c|common
-LIBKVMPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/memory.c|common
-LIBKVMPLAT_SRCS-y              += $(UK_PLAT_KVM_DEF_LDS)
+LIBKVMPLAT_SRCS-y                          += $(LIBKVMPLAT_BASE)/shutdown.c
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64)      += $(LIBKVMPLAT_BASE)/memory.c
+LIBKVMPLAT_SRCS-y                          += $(LIBKVMPLAT_BASE)/irq.c
+LIBKVMPLAT_SRCS-y                          += $(LIBKVMPLAT_BASE)/io.c
+LIBKVMPLAT_SRCS-y                          += $(UK_PLAT_COMMON_BASE)/lcpu.c|common
+LIBKVMPLAT_SRCS-y                          += $(UK_PLAT_COMMON_BASE)/memory.c|common
+LIBKVMPLAT_SRCS-y                          += $(UK_PLAT_KVM_DEF_LDS)
 
 ##
 ## PCI library definitions
