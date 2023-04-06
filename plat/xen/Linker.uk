@@ -51,6 +51,7 @@ $(XEN_IMAGE): $(XEN_DEBUG_IMAGE)
 		        { grep -Ev \
 				"Empty loadable segment detected|section.*lma.*adjusted to.*" || \
 				true; })
+	$(call build_bootinfo,$@)
 
 ifeq (arm,$(CONFIG_UK_ARCH))
 $(XEN_RAW_IMAGE): $(XEN_IMAGE)
