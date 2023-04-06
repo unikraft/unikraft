@@ -121,10 +121,6 @@ lxboot_init_mem(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 			mrd.type = UKPLAT_MEMRT_FREE;
 			mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE;
 
-			rc = ukplat_memregion_list_insert_split_phys(
-				&bi->mrds, &mrd, __PAGE_SIZE);
-			if (unlikely(rc < 0))
-				lxboot_crash(rc, "Unable to add ram mapping");
 		} else {
 			mrd.type = UKPLAT_MEMRT_RESERVED;
 			mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
@@ -132,10 +128,12 @@ lxboot_init_mem(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 			/* We assume that reserved regions cannot
 			 * overlap with loaded modules.
 			 */
-			rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
-			if (unlikely(rc < 0))
-				lxboot_crash(rc, "Unable to add ram mapping");
 		}
+
+		rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
+		if (unlikely(rc < 0))
+			lxboot_crash(rc, "Unable to add ram mapping");
+
 	}
 }
 
@@ -153,6 +151,7 @@ void lxboot_entry(struct lcpu *lcpu, struct lxboot_params *bp)
 	lxboot_init_cmdline(bi, bp);
 	lxboot_init_initrd(bi, bp);
 	lxboot_init_mem(bi, bp);
+	ukplat_memregion_list_coalesce(&bi->mrds);
 
 	memcpy(bi->bootprotocol, "lxboot", sizeof("lxboot"));
 
