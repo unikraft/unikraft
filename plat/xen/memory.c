@@ -31,11 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <string.h>
 #include <stdint.h>
-#include <stddef.h>
-#include <uk/plat/common/sections.h>
-#include <uk/plat/memory.h>
 
 #include <common/gnttab.h>
 #if (defined __X86_32__) || (defined __X86_64__)
@@ -45,110 +41,6 @@
 #include <xen-arm/setup.h>
 #include <xen-arm/mm.h>
 #endif
-
-#include <uk/assert.h>
-
-/* TODO: Replace with proper initialization of bootinfo */
-
-int ukplat_memregion_count(void)
-{
-	return (int) _libxenplat_mrd_num + 7;
-}
-
-int ukplat_memregion_get(int i, struct ukplat_memregion_desc **m)
-{
-	static struct ukplat_memregion_desc mrd[7];
-
-	UK_ASSERT(m);
-
-	switch (i) {
-	case 0: /* text */
-		mrd[i].pbase = __TEXT;
-		mrd[i].vbase = __TEXT;
-		mrd[i].len   = __ETEXT - __TEXT;
-		mrd[i].type  = UKPLAT_MEMRT_KERNEL;
-		mrd[i].flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_EXECUTE;
-#if CONFIG_UKPLAT_MEMRNAME
-		strncpy(mrd[i].name, "text", sizeof(mrd[i].name) - 1);
-#endif
-		*m = &mrd[i];
-		break;
-	case 1: /* eh_frame */
-		mrd[i].pbase = __EH_FRAME_START;
-		mrd[i].vbase = __EH_FRAME_START;
-		mrd[i].len   = __EH_FRAME_END - __EH_FRAME_START;
-		mrd[i].type  = UKPLAT_MEMRT_KERNEL;
-		mrd[i].flags = UKPLAT_MEMRF_READ;
-#if CONFIG_UKPLAT_MEMRNAME
-		strncpy(mrd[i].name, "eh_frame", sizeof(mrd[i].name) - 1);
-#endif
-		*m = &mrd[i];
-		break;
-	case 2: /* eh_frame_hdr */
-		mrd[i].pbase = __EH_FRAME_HDR_START;
-		mrd[i].vbase = __EH_FRAME_HDR_START;
-		mrd[i].len   = __EH_FRAME_HDR_END - __EH_FRAME_HDR_START;
-		mrd[i].type  = UKPLAT_MEMRT_KERNEL;
-		mrd[i].flags = UKPLAT_MEMRF_READ;
-#if CONFIG_UKPLAT_MEMRNAME
-		strncpy(mrd[i].name, "eh_frame_hdr", sizeof(mrd[i].name) - 1);
-#endif
-		*m = &mrd[i];
-		break;
-	case 3:	/* ro data */
-		mrd[i].pbase = __RODATA;
-		mrd[i].vbase = __RODATA;
-		mrd[i].len   = __ERODATA - __RODATA;
-		mrd[i].type  = UKPLAT_MEMRT_KERNEL;
-		mrd[i].flags = UKPLAT_MEMRF_READ;
-#if CONFIG_UKPLAT_MEMRNAME
-		strncpy(mrd[i].name, "rodata", sizeof(mrd[i].name) - 1);
-#endif
-		*m = &mrd[i];
-		break;
-	case 4: /* ctors */
-		mrd[i].pbase = __CTORS;
-		mrd[i].vbase = __CTORS;
-		mrd[i].len   = __ECTORS - __CTORS;
-		mrd[i].type  = UKPLAT_MEMRT_KERNEL;
-		mrd[i].flags = UKPLAT_MEMRF_READ;
-#if CONFIG_UKPLAT_MEMRNAME
-		strncpy(mrd[i].name, "ctors", sizeof(mrd[i].name) - 1);
-#endif
-		*m = &mrd[i];
-		break;
-	case 5: /* data */
-		mrd[i].pbase = __DATA;
-		mrd[i].vbase = __DATA;
-		mrd[i].len   = __EDATA - __DATA;
-		mrd[i].type  = UKPLAT_MEMRT_KERNEL;
-		mrd[i].flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE;
-#if CONFIG_UKPLAT_MEMRNAME
-		strncpy(mrd[i].name, "data", sizeof(mrd[i].name) - 1);
-#endif
-		*m = &mrd[i];
-		break;
-	case 6: /* bss */
-		mrd[i].pbase = __BSS_START;
-		mrd[i].vbase = __BSS_START;
-		mrd[i].len   = __END - __BSS_START;
-		mrd[i].type  = UKPLAT_MEMRT_KERNEL;
-		mrd[i].flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE;
-#if CONFIG_UKPLAT_MEMRNAME
-		strncpy(mrd[i].name, "bss", sizeof(mrd[i].name) - 1);
-#endif
-		*m = &mrd[i];
-		break;
-	default:
-		if (i < 0 || i >= ukplat_memregion_count())
-			return -1;
-
-		*m = &_libxenplat_mrd[i - 7];
-		break;
-	}
-
-	return 0;
-}
 
 void mm_init(void)
 {
