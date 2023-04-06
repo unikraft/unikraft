@@ -420,3 +420,12 @@ TRAP_ENTRY alignment_check,     1
 /* no Machine Check */
 TRAP_ENTRY simd_error,          0
 /* no Virtualization Exception */
+
+/*
+ * We do not want to unmap anything.
+ */
+.section .bss
+.align	4
+.globl	bpt_unmap_mrd
+bpt_unmap_mrd:
+.space	64

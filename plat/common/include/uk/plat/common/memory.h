@@ -112,6 +112,94 @@ ukplat_memregion_list_insert(struct ukplat_memregion_list *list,
 	return (int)i;
 }
 
+#if defined(__X86_64__)
+#define	X86_HI_MEM_START		0xA0000
+#define X86_HI_MEM_LEN			0x50000
+
+static inline int
+ukplat_memregion_list_insert_legacy_hi_mem(struct ukplat_memregion_list *list)
+{
+	struct ukplat_memregion_desc mrd = {0};
+
+	/* Note that we are mapping it as writable as well to cope with the
+	 * potential existence of the VGA framebuffer/SMM shadow memory.
+	 * This is fine, as writes to the mapped BIOS ROM in non-SMM are
+	 * ignored by the MCH once the BIOS gets towards the end of POST
+	 * by writing PCI config cycles to Programmable Attribute Map
+	 * registers mapped as a PCI device.
+	 */
+	mrd.vbase = (__vaddr_t)X86_HI_MEM_START;
+	mrd.pbase = (__paddr_t)X86_HI_MEM_START;
+	mrd.len = X86_HI_MEM_LEN;
+	mrd.type = UKPLAT_MEMRT_RESERVED;
+	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE | UKPLAT_MEMRF_MAP;
+
+	return ukplat_memregion_list_insert(list, &mrd);
+}
+
+#if defined(CONFIG_HAVE_SMP)
+extern void *x86_start16_begin[];
+extern void *x86_start16_end[];
+extern __uptr x86_start16_addr; /* target address */
+
+static inline int
+ukplat_memregion_alloc_sipi_vect(void)
+{
+	__sz len;
+
+	len = (__sz)((__uptr)x86_start16_end - (__uptr)x86_start16_begin);
+	x86_start16_addr = (__uptr)ukplat_memregion_alloc(len,
+							  UKPLAT_MEMRT_RESERVED,
+							  UKPLAT_MEMRF_READ  |
+							  UKPLAT_MEMRF_WRITE |
+							  UKPLAT_MEMRF_MAP);
+	if (unlikely(!x86_start16_addr || x86_start16_addr >= X86_HI_MEM_START))
+		return -ENOMEM;
+
+	return 0;
+}
+#else
+static inline int
+ukplat_memregion_alloc_sipi_vect(void)
+{
+	return 0;
+}
+#endif
+#endif
+
+/**
+ * Inserts the region into the memory region list by index. The list is kept in
+ * ascending order of physical base addresses. Order is only preserved among
+ * ranges that do not overlap.
+ *
+ * @param list
+ *   The memory region list to insert the range into
+ * @param mrd
+ *   The memory range to insert
+ * @param idx
+ *   The index at which to insert the memory region into the list
+ *
+ * @return
+ *   The index of the element added on success, an negative errno otherwise
+ */
+static inline int
+ukplat_memregion_list_insert_at_idx(struct ukplat_memregion_list *list,
+				    const struct ukplat_memregion_desc *mrd,
+				    __u32 idx)
+{
+	struct ukplat_memregion_desc *p;
+
+	if (unlikely(list->count == list->capacity))
+		return -ENOMEM;
+
+	p = &list->mrds[idx];
+	memmove(p + 1, p, sizeof(*p) * (list->count - idx));
+
+	*p = *mrd;
+	list->count++;
+	return (int)idx;
+}
+
 /**
  * Insert a new region into the memory region list. This extends
  * ukplat_memregion_list_insert to carve out the area of any pre-existing
@@ -148,11 +236,6 @@ ukplat_memregion_list_insert_split_phys(struct ukplat_memregion_list *list,
 
 	mrdc = *mrd;
 
-	/* TODO: The following code does not make use of the tracked iteration
-	 * index to insert elements at the correct location and instead uses the
-	 * generic insertion routine. For large memory region lists this could
-	 * be potentially slow.
-	 */
 	for (i = 0; i < (int)list->count; i++) {
 		mrdp = &list->mrds[i];
 		if (!ukplat_memregion_desc_overlap(mrdp, pstart, pend))
@@ -173,7 +256,9 @@ ukplat_memregion_list_insert_split_phys(struct ukplat_memregion_list *list,
 			mrdc.len   = mrdp->pbase - pstart;
 
 			if (mrdc.len >= min_size) {
-				rc = ukplat_memregion_list_insert(list, &mrdc);
+				rc = ukplat_memregion_list_insert_at_idx(list,
+									 &mrdc,
+									 i - 1);
 				if (unlikely(rc < 0))
 					return rc;
 			}
@@ -216,6 +301,17 @@ ukplat_memregion_list_delete(struct ukplat_memregion_list *list, __u32 idx)
 
 	list->count--;
 }
+
+/**
+ * Coalesces the memory regions of a given memory region descriptor list.
+ *
+ * @param list
+ *   The list whose memory region descriptors to coalesce.
+ *
+ * @return
+ *   0 on success, < 0 otherwise.
+ */
+int ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list);
 
 /**
  * Initializes the platform memory mappings which require an allocator. This

@@ -39,6 +39,8 @@ LIBLINUXUPLAT_SRCS-y              += $(LIBLINUXUPLAT_BASE)/time.c
 LIBLINUXUPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/lcpu.c|common
 LIBLINUXUPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/memory.c|common
 LIBLINUXUPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/tls.c|common
+LIBLINUXUPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/bootinfo.c|common
+LIBLINUXUPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/bootinfo.lds.S|common
 
 LIBLINUXUPLAT_SRCS-y              += $(LIBLINUXUPLAT_BASE)/io.c
 LIBLINUXUPLAT_SRCS-$(CONFIG_TAP_NET) += $(LIBLINUXUPLAT_BASE)/tap_io.c

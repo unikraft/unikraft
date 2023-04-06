@@ -42,7 +42,7 @@
 #include <uk/bitops.h>
 #include <libfdt.h>
 #include <ofw/fdt.h>
-#include <kvm/config.h>
+#include <uk/plat/common/bootinfo.h>
 
 #include <platform_bus.h>
 #include <virtio/virtio_config.h>
@@ -400,12 +400,14 @@ static int virtio_mmio_probe(struct pf_device *pfdev)
 	int fdt_vm = pfdev->fdt_offset;
 	__u64 reg_base;
 	__u64 reg_size;
+	void *dtb;
 
+	dtb = (void *)ukplat_bootinfo_get()->dtb;
 	if (fdt_vm == -FDT_ERR_NOTFOUND) {
 		uk_pr_info("device not found in fdt\n");
 		goto error_exit;
 	} else {
-		prop = fdt_getprop(_libkvmplat_cfg.dtb, fdt_vm, "interrupts", &prop_len);
+		prop = fdt_getprop(dtb, fdt_vm, "interrupts", &prop_len);
 		if (!prop) {
 			uk_pr_err("irq of device not found in fdt\n");
 			goto error_exit;
@@ -414,15 +416,14 @@ static int virtio_mmio_probe(struct pf_device *pfdev)
 		type = fdt32_to_cpu(prop[0]);
 		hwirq = fdt32_to_cpu(prop[1]);
 
-		prop = fdt_getprop(_libkvmplat_cfg.dtb, fdt_vm, "reg", &prop_len);
+		prop = fdt_getprop(dtb, fdt_vm, "reg", &prop_len);
 		if (!prop) {
 			uk_pr_err("reg of device not found in fdt\n");
 			goto error_exit;
 		}
 
 		/* only care about base addr, ignore the size */
-		fdt_get_address(_libkvmplat_cfg.dtb, fdt_vm, 0,
-					&reg_base, &reg_size);
+		fdt_get_address(dtb, fdt_vm, 0, &reg_base, &reg_size);
 	}
 
 	pfdev->base = reg_base;

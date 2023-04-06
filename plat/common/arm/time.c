@@ -39,6 +39,7 @@
 #include <uk/bitops.h>
 #include <uk/plat/common/cpu.h>
 #include <uk/plat/common/sections.h>
+#include <uk/plat/common/bootinfo.h>
 #include <ofw/gic_fdt.h>
 #include <uk/plat/common/irq.h>
 #include <gic/gic.h>
@@ -51,6 +52,7 @@ static const char * const arch_timer_list[] = {
 };
 
 static uint32_t timer_irq;
+static void *dtb;
 
 void generic_timer_mask_irq(void)
 {
@@ -78,7 +80,7 @@ uint32_t generic_timer_get_frequency(int fdt_timer)
 	* by the firmware. A property in the DT (clock-frequency) has
 	* been introduced to workaround those firmware.
 	*/
-	fdt_freq = fdt_getprop(_dtb, fdt_timer, "clock-frequency", &len);
+	fdt_freq = fdt_getprop(dtb, fdt_timer, "clock-frequency", &len);
 	if (!fdt_freq || (len <= 0)) {
 		uk_pr_info("No clock-frequency found, reading from register directly.\n");
 
@@ -112,6 +114,8 @@ void ukplat_time_init(void)
 	uint32_t irq_type, hwirq;
 	uint32_t trigger_type;
 
+	dtb = (void *)ukplat_bootinfo_get()->dtb;
+
 	/*
 	 * Monotonic time begins at boot_ticks (first read of counter
 	 * before calibration).
@@ -119,7 +123,7 @@ void ukplat_time_init(void)
 	generic_timer_update_boot_ticks();
 
 	/* Currently, we only support 1 timer per system */
-	fdt_timer = fdt_node_offset_by_compatible_list(_dtb, -1,
+	fdt_timer = fdt_node_offset_by_compatible_list(dtb, -1,
 						       arch_timer_list);
 	if (fdt_timer < 0)
 		UK_CRASH("Could not find arch timer!\n");
@@ -128,7 +132,7 @@ void ukplat_time_init(void)
 	if (rc < 0)
 		UK_CRASH("Failed to initialize platform time\n");
 
-	rc = gic_get_irq_from_dtb(_dtb, fdt_timer, 2, &irq_type, &hwirq,
+	rc = gic_get_irq_from_dtb(dtb, fdt_timer, 2, &irq_type, &hwirq,
 				  &trigger_type);
 	if (rc < 0)
 		UK_CRASH("Failed to find IRQ number from DTB\n");

@@ -36,6 +36,13 @@
 #include <uk/config.h>
 #include <arch/reloc.h>
 
+/* Prefer using in-image stack, to avoid conflicts when unmapping is done by
+ * paging_init (it invalidates our stack)
+ */
+.section .bss
+.space 4096
+lcpu_bootstack:
+
 /*
  * The registers used by _libkvmplat_start:
  * x0 - FDT pointer
@@ -44,8 +51,6 @@
 .text
 ENTRY(_libkvmplat_entry)
 	ur_ldr  x25, _dtb
-
-	ur_ldr  x26, _end
 
 #ifdef CONFIG_FPSIMD
 	/* Enable fp/simd support */
@@ -63,10 +68,8 @@ ENTRY(_libkvmplat_entry)
 	 * just need to invalidate what we are going to use:
 	 * DTB, TEXT, DATA, BSS, and bootstack.
 	 */
-	ur_ldr  x0, _start_ram_addr
-
-	add x27, x26, #__STACK_SIZE
-	sub x1, x27, x25
+	ur_ldr	x0, _start_ram_addr
+	ur_ldr	x1, _end
 	bl clean_and_invalidate_dcache_range
 
 	/* Disable the MMU and D-Cache. */
@@ -78,7 +81,8 @@ ENTRY(_libkvmplat_entry)
 	isb
 
 	/* Set the boot stack */
-	mov sp, x27
+	ur_ldr x26, lcpu_bootstack
+	mov sp, x26
 
 	/* Set the context id */
 	msr contextidr_el1, xzr
@@ -96,7 +100,9 @@ ENTRY(_libkvmplat_entry)
 
 	/* Load dtb address to x0 as a parameter */
 	ur_ldr  x0, _dtb
+	bl ukplat_bootinfo_fdt_setup
 
-	b _libkvmplat_start
+	bl ukplat_bootinfo_get
+	b _ukplat_entry
 END(_libkvmplat_entry)
 

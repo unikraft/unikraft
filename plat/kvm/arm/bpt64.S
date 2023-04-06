@@ -110,6 +110,21 @@
  * Notice: The page tables below use the Unikraft indexing convention (x86).
  */
 .section .data
+.align 4
+.global bpt_unmap_mrd
+bpt_unmap_mrd:
+	.quad	0x0000000040000000		/* 1 GiB */
+	.quad	0x0000000040000000		/* 1 GiB */
+	/* QEMU-VIRT's legacy RAM max is 255 GiB, but it can also depend on the
+	 * settings, see QEMU upstream commit:
+	 * 50a17297e2f0c ("hw/arm/virt: Bump the 255GB initial RAM limit").
+	 * In our case, here we assume that the RAM can only go up to the PCIe
+	 * high memory.
+	 */
+	.quad	(255 - 1) * 0x0000000040000000
+	.short	0x0000000000000000
+	.short	0x0000000000000010		/* UKPLAT_MEMRF_UNMAP */
+	.space	36
 
 .global arm64_bpt_l3_pt0
 
@@ -188,6 +203,6 @@ arm64_bpt_l1_pt1:
  * 0x0000000040000000 - 0x00000000401fffff	Kernel	@ 1GiB
  */
 .align 12
+.globl arm64_bpt_l0_pt0
 arm64_bpt_l0_pt0:
-	pte_fill	0x0000000040000000, 256, 0, PTE_PAGE_NORMAL_RO
-	pte_fill	0x0000000040100000, 256, 0, PTE_PAGE_NORMAL_RWX
+	pte_fill	0x0000000040000000, 512, 0, PTE_PAGE_NORMAL_RWX
