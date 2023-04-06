@@ -326,3 +326,26 @@ int ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 
 	return 0;
 }
+
+int ukplat_memregion_count(void)
+{
+	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
+
+	UK_ASSERT(bi);
+
+	return (int)bi->mrds.count;
+}
+
+int ukplat_memregion_get(int i, struct ukplat_memregion_desc **mrd)
+{
+	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
+
+	UK_ASSERT(bi);
+	UK_ASSERT(i >= 0);
+
+	if (unlikely((__u32)i >= bi->mrds.count))
+		return -1;
+
+	*mrd = &bi->mrds.mrds[i];
+	return 0;
+}
