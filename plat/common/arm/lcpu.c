@@ -50,6 +50,19 @@ __lcpuid lcpu_arch_id(void)
 	return mpidr_reg & CPU_ID_MASK;
 }
 
+void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
+{
+	__asm__ __volatile__ (
+		"mov	sp, %0\n" /* set the sp  */
+		"br	%1\n"     /* branch to the entry function */
+		:
+		: "r"(sp), "r"(entry)
+		: /* sp not needed */);
+
+	/* just make the compiler happy about returning function */
+	__builtin_unreachable();
+}
+
 #ifdef CONFIG_HAVE_SMP
 /**
  * The number of cells for the size field should be 0 in cpu nodes.
@@ -77,19 +90,6 @@ int lcpu_arch_init(struct lcpu *this_lcpu)
 	}
 
 	return ret;
-}
-
-void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
-{
-	__asm__ __volatile__ (
-		"mov	sp, %0\n" /* set the sp  */
-		"br	%1\n"     /* branch to the entry function */
-		:
-		: "r"(sp), "r"(entry)
-		: /* sp not needed */);
-
-	/* just make the compiler happy about returning function */
-	__builtin_unreachable();
 }
 
 int lcpu_arch_mp_init(void *arg)
