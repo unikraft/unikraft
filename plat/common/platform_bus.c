@@ -32,14 +32,15 @@
 
 #include <string.h>
 #include <uk/print.h>
+#include <uk/plat/memory.h>
 #include <uk/plat/common/cpu.h>
 #include <platform_bus.h>
 #include <libfdt.h>
-#include <kvm/config.h>
 #include <gic/gic-v2.h>
 #include <ofw/fdt.h>
+#include <uk/plat/common/bootinfo.h>
 
-#define fdt_start (_libkvmplat_cfg.dtb)
+static void *dtb;
 
 struct pf_bus_handler {
 	struct uk_bus b;
@@ -140,9 +141,11 @@ static int pf_probe(void)
 
 	uk_pr_info("Probe PF\n");
 
+	dtb = (void *)ukplat_bootinfo_get()->dtb;
+
 	/* Search all the platform bus devices provided by fdt */
 	do {
-		fdt_pf = fdt_node_offset_idx_by_compatible_list(_libkvmplat_cfg.dtb,
+		fdt_pf = fdt_node_offset_idx_by_compatible_list(dtb,
 						fdt_pf, pf_device_compatible_list, &idx);
 		if (fdt_pf < 0) {
 			uk_pr_info("End of searching platform devices\n");

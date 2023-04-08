@@ -100,7 +100,9 @@ ENTRY(_libkvmplat_entry)
 
 	/* Load dtb address to x0 as a parameter */
 	ur_ldr  x0, _dtb
+	bl ukplat_bootinfo_fdt_setup
 
-	b _libkvmplat_start
+	bl ukplat_bootinfo_get
+	b _ukplat_entry
 END(_libkvmplat_entry)
 
