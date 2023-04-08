@@ -37,7 +37,6 @@
 #include <string.h>
 #include <getopt.h>
 #include <stdlib.h>
-#include <linuxu/setup.h>
 #include <linuxu/console.h>
 #include <linuxu/syscall.h>
 #include <uk/plat/console.h>
@@ -47,8 +46,6 @@
 #include <uk/plat/common/cpu.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/libparam.h>
-
-struct liblinuxuplat_opts _liblinuxuplat_opts = { 0 };
 
 #define MB2B		(1024 * 1024)
 
