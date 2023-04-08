@@ -32,6 +32,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <uk/plat/common/sections.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/asm/limits.h>
 #include <uk/alloc.h>
@@ -91,6 +92,13 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags)
 		ostart = mrd->pbase;
 		olen   = mrd->len;
 
+		/* Check whether we are allocating from an in-image memory hole
+		 * or not. If no, then it is not already mapped.
+		 */
+		if (!RANGE_CONTAIN(__BASE_ADDR, __END - __BASE_ADDR,
+				   pstart, size))
+			flags |= UKPLAT_MEMRF_MAP;
+
 		/* If fragmenting this memory region leaves it with length 0,
 		 * then simply overwrite and return it instead.
 		 */
@@ -99,7 +107,7 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags)
 			mrd->vbase = pstart;
 			mrd->len = pend - pstart;
 			mrd->type = type;
-			mrd->flags = flags | UKPLAT_MEMRF_MAP;
+			mrd->flags = flags;
 
 			return (void *)pstart;
 		}
