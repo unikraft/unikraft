@@ -203,6 +203,6 @@ arm64_bpt_l1_pt1:
  * 0x0000000040000000 - 0x00000000401fffff	Kernel	@ 1GiB
  */
 .align 12
+.globl arm64_bpt_l0_pt0
 arm64_bpt_l0_pt0:
-	pte_fill	0x0000000040000000, 256, 0, PTE_PAGE_NORMAL_RO
-	pte_fill	0x0000000040100000, 256, 0, PTE_PAGE_NORMAL_RWX
+	pte_fill	0x0000000040000000, 512, 0, PTE_PAGE_NORMAL_RWX
