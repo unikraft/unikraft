@@ -229,11 +229,13 @@ struct uk_alloc *ukplat_memallocator_get(void);
  *   The size to allocate. Will be rounded up to next multiple of page size.
  * @param type
  *   Memory region type to use for the allocated memory. Can be 0.
+ * @param flags
+ *   Flags of the allocated memory region.
  *
  * @return
  *   A pointer to the allocated memory on success, NULL otherwise.
  */
-void *ukplat_memregion_alloc(__sz size, int type);
+void *ukplat_memregion_alloc(__sz size, int type, __u16 flags);
 
 #ifdef __cplusplus
 }
