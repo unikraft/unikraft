@@ -204,7 +204,8 @@ static void _libxenplat_x86bootinfo_setup_cmdl(struct ukplat_bootinfo *bi)
 	if (!cmdline_len)
 		cmdline_len = sizeof(CONFIG_UK_NAME) - 1;
 
-	cmdline = ukplat_memregion_alloc(cmdline_len, UKPLAT_MEMRT_CMDLINE);
+	cmdline = ukplat_memregion_alloc(cmdline_len, UKPLAT_MEMRT_CMDLINE,
+					 UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP);
 	if (unlikely(!cmdline))
 		UK_CRASH("Could not allocate command-line memory");
 
@@ -218,7 +219,8 @@ static void _libxenplat_x86bootinfo_setup_cmdl(struct ukplat_bootinfo *bi)
 	/* Tag this scratch cmdline as a kernel resource, to distinguish it
 	 * from the original cmdline obtained above
 	 */
-	cmdline = ukplat_memregion_alloc(cmdline_len, UKPLAT_MEMRT_KERNEL);
+	cmdline = ukplat_memregion_alloc(cmdline_len, UKPLAT_MEMRT_KERNEL,
+					 UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP);
 	if (unlikely(!cmdline))
 		UK_CRASH("Could not allocate scratch command-line memory");
 
