@@ -105,7 +105,7 @@ typedef __u64 ino_t;
 #endif
 
 #if defined(__NEED_nlink_t) && !defined(__DEFINED_nlink_t)
-typedef __u32 nlink_t;
+typedef __u64 nlink_t;
 #define __DEFINED_nlink_t
 #endif
 
