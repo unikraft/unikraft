@@ -117,6 +117,10 @@ static int uk_9pfs_vtype_from_mode(int mode)
 {
 	if (mode & UK_9P_DMDIR)
 		return VDIR;
+
+	if (mode & UK_9P_DMSYMLINK)
+		return VLNK;
+
 	return VREG;
 }
 
@@ -913,9 +917,6 @@ static int uk_9pfs_readlink(struct vnode *vp, struct uio *uio)
 	struct iovec *iov;
 	struct uk_9preq *req;
 
-	if (md->proto != UK_9P_PROTO_2000L)
-		return EINVAL;
-
 	if (vp->v_type == VDIR)
 		return EISDIR;
 	if (vp->v_type != VLNK)
@@ -956,9 +957,6 @@ static int uk_9pfs_symlink(struct vnode *dvp, char *op, char *np)
 	struct uk_9pfs_mount_data *md = UK_9PFS_MD(dvp->v_mount);
 	struct uk_9pfid *dfid = UK_9PFS_VFID(dvp);
 	struct uk_9pfid *fid;
-
-	if (md->proto != UK_9P_PROTO_2000L)
-		return EPERM;
 
 	fid = uk_9p_symlink(md->dev, dfid, op, np, 0);
 	if (PTRISERR(fid))
