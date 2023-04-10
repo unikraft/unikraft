@@ -129,7 +129,9 @@ namei(const char *path, struct dentry **dpp)
 		if (vfs_findroot(fp, &mp, &p)) {
 			return ENOTDIR;
 		}
-		int mountpoint_len = p - fp - 1;
+
+		size_t mountpoint_len = p - fp;
+
 		strlcpy(node, "/", sizeof(node));
 		strlcat(node, p, sizeof(node));
 		dp = dentry_lookup(mp, node);
