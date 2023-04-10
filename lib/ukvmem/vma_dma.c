@@ -29,8 +29,8 @@ static __vaddr_t vma_op_dma_get_base(struct uk_vas *vas __unused,
 #endif /* CONFIG_LIBUKVMEM_DMA_BASE */
 
 int vma_op_dma_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
-		   __sz len __unused, void *data, unsigned long *flags __unused,
-		   struct uk_vma **vma)
+		   __sz len __unused, void *data, unsigned long attr __unused,
+		   unsigned long *flags __unused, struct uk_vma **vma)
 {
 	struct uk_vma_dma_args *args = (struct uk_vma_dma_args *)data;
 	struct uk_vma_dma *vma_dma;
