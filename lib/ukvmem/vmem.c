@@ -669,7 +669,7 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 		/* Split also needs to allocate a new VMA */
 		UK_ASSERT(ops->split);
 
-		rc = ops->new(vas, va, len, args, &flags, &vma);
+		rc = ops->new(vas, va, len, args, attr, &flags, &vma);
 		if (unlikely(rc))
 			return rc;
 	} else {
