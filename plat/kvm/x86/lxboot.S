@@ -6,6 +6,7 @@
 
 #include <uk/config.h>
 #include <uk/asm.h>
+#include <uk/plat/common/lcpu.h>
 
 #include <kvm-x86/lxboot.h>
 
@@ -16,10 +17,9 @@
 .space 4096
 lcpu_bootstack:
 
-.section .rodata
 lcpu_boot_startup_args:
-	.quad	lxboot_entry
-	.quad	lcpu_bootstack
+	.quad	0
+	.quad	0
 
 /**
  * 64-bit Linux Boot Protocol entry function
@@ -35,9 +35,14 @@ ENTRY(_lxboot_entry)
 	cmpl	$LXBOOT_HDR_HEADER_MAGIC, LXBOOT_HDR_HEADER_OFFSET(%rsi)
 	jne	no_lxboot
 
-	movq	$lcpu_boot_startup_args, %rdi	/* startup args for boot CPU */
+	/* startup args for boot CPU */
+	leaq	lcpu_boot_startup_args(%rip), %rdi
+	leaq	lxboot_entry(%rip), %rax
+	movq	%rax, LCPU_SARGS_ENTRY_OFFSET(%rdi)
+	leaq	lcpu_bootstack(%rip), %rax
+	movq	%rax, LCPU_SARGS_STACKP_OFFSET(%rdi)
 
-	movq	$x86_bpt_pml4, %rax
+	leaq	x86_bpt_pml4(%rip), %rax
 	movq	%rax, %cr3
 
 	jmp	lcpu_start64
