@@ -885,10 +885,15 @@ static int uk_9pfs_fsync(struct vnode *vp, struct vfscore_file *fp)
 	struct uk_9pfs_mount_data *md = UK_9PFS_MD(vp->v_mount);
 	struct uk_9pfid *fid = UK_9PFS_FD(fp)->fid;
 
-	if (md->proto == UK_9P_PROTO_2000L)
+	if (md->proto == UK_9P_PROTO_2000L) {
 		return -uk_9p_fsync(md->dev, fid);
-	else
+	} else if (md->proto == UK_9P_PROTO_2000U) {
+		return uk_9pfs_setattr(vp, &(struct vattr){
+			.va_mask = 0
+		});
+	} else {
 		return 0;
+	}
 }
 
 static int uk_9pfs_truncate(struct vnode *vp, off_t off)
