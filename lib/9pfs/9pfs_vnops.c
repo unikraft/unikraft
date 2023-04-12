@@ -812,17 +812,32 @@ static int uk_9pfs_setattr(struct vnode *vp, struct vattr *attr)
 				      mtime_nsec);
 
 	} else if (md->proto == UK_9P_PROTO_2000U) {
-		struct uk_9p_stat stat;
-		struct uk_9preq *stat_req;
-		int rc = 0;
+		static const struct uk_9p_stat donttouch_stat = {
+			.type = (uint16_t)-1,
+			.dev = (uint32_t)-1,
+			.qid.type = (uint8_t)-1,
+			.qid.version = (uint32_t)-1,
+			.qid.path = (uint64_t)-1,
+			.mode = (uint32_t)-1,
+			.atime = (uint32_t)-1,
+			.mtime = (uint32_t)-1,
+			.length = (uint64_t)-1,
+			.name.size = 0,
+			.uid.size = 0,
+			.gid.size = 0,
+			.muid.size = 0,
+			.extension.size = 0,
+			.n_uid = (uint32_t)-1,
+			.n_gid = (uint32_t)-1,
+			.n_muid = (uint32_t)-1,
+		};
+		struct uk_9p_stat stat = donttouch_stat;
+		int rc;
 
-		stat_req = uk_9p_stat(dev, fid, &stat);
-		if (PTRISERR(stat_req)) {
-			rc = PTR2ERR(stat_req);
-			return -rc;
-		}
-
-		uk_9pdev_req_remove(dev, stat_req);
+		/* Sending an unmodified donttouch stat will fsync() the file.
+		 * Otherwise, the fields which differ from the donttouch stat
+		 * will be updated.
+		 */
 
 		if (attr->va_mask & AT_ATIME)
 			stat.atime = attr->va_atime.tv_sec;
@@ -830,8 +845,32 @@ static int uk_9pfs_setattr(struct vnode *vp, struct vattr *attr)
 		if (attr->va_mask & AT_MTIME)
 			stat.mtime = attr->va_mtime.tv_sec;
 
-		if (attr->va_mask & AT_MODE)
+		if (attr->va_mask & AT_MODE) {
 			stat.mode = attr->va_mode;
+
+			switch (vp->v_type) {
+			case VDIR:
+				stat.mode |= UK_9P_DMDIR;
+				break;
+			case VBLK:
+			case VCHR:
+				stat.mode |= UK_9P_DMDEVICE;
+				break;
+			case VLNK:
+				stat.mode |= UK_9P_DMSYMLINK;
+				break;
+			case VSOCK:
+				stat.mode |= UK_9P_DMSOCKET;
+				break;
+			case VFIFO:
+				stat.mode |= UK_9P_DMNAMEDPIPE;
+			}
+		}
+
+		if (attr->va_mask & AT_SIZE) {
+			UK_ASSERT(vp->v_type == VREG);
+			stat.length = attr->va_size;
+		}
 
 		rc = uk_9p_wstat(dev, fid, &stat);
 
