@@ -47,6 +47,12 @@
 #include <sys/types.h>
 #include "sigset.h"
 
+UK_SYSCALL_R_DEFINE(int, sigaltstack, const stack_t *, ss,
+		    stack_t *, old_ss)
+{
+	return 0;
+}
+
 UK_SYSCALL_R_DEFINE(int, rt_sigaction, int, signum,
 		    const struct sigaction *__unused, act,
 		    struct sigaction *, oldact,
