@@ -1,4 +1,8 @@
 # signal.h
+sigaltstack
+uk_syscall_e_sigaltstack
+uk_syscall_r_sigaltstack
+
 sigaction
 signal
 rt_sigaction
