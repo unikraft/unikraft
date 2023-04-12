@@ -898,17 +898,10 @@ static int uk_9pfs_fsync(struct vnode *vp, struct vfscore_file *fp)
 
 static int uk_9pfs_truncate(struct vnode *vp, off_t off)
 {
-	struct uk_9pfs_mount_data *md = UK_9PFS_MD(vp->v_mount);
-
-	if (md->proto == UK_9P_PROTO_2000L) {
-		struct vattr attr = {
-		    .va_mask = AT_SIZE,
-		    .va_size = off,
-		};
-		return uk_9pfs_setattr(vp, &attr);
-	} else {
-		return 0;
-	}
+	return uk_9pfs_setattr(vp, &(struct vattr){
+		.va_mask = AT_SIZE,
+		.va_size = off,
+	});
 }
 
 static int uk_9pfs_rename(struct vnode *dvp1, struct vnode *vp1, char *name1,
