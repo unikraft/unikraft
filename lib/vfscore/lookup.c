@@ -118,6 +118,8 @@ namei(const char *path, struct dentry **dpp)
 	DPRINTF(VFSDB_VNODE, ("namei: path=%s\n", path));
 
 	links_followed = 0;
+
+	memset(fp, 0, PATH_MAX);
 	strlcpy(fp, path, PATH_MAX);
 
 	do {
