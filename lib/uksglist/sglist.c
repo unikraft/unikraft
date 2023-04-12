@@ -46,6 +46,10 @@
 #include <uk/alloc.h>
 #endif /* CONFIG_LIBUKALLOC */
 #include <uk/sglist.h>
+#ifdef CONFIG_LIBUKVMEM
+#include <uk/arch/paging.h>
+#include <uk/vmem.h>
+#endif /* CONFIG_LIBUKVMEM*/
 
 /*
  * Convenience macros to save the state of an sglist so it can be restored
@@ -125,9 +129,20 @@ static inline int _sglist_append_buf(struct uk_sglist *sg, void *buf,
 	if (len == 0)
 		return 0;
 
-	/* Do the first page.  It may have an offset. */
 	vaddr = (__vaddr_t)buf;
 	offset = page_off(vaddr);
+
+#ifdef CONFIG_LIBUKVMEM
+	/* Ensure the buffer is backed by physical memory */
+	error = uk_vma_advise(uk_vas_get_active(),
+			      PAGE_ALIGN_DOWN(vaddr),
+			      PAGE_ALIGN_UP(len + offset), UK_VMA_ADV_WILLNEED,
+			      UK_VMA_FLAG_UNINITIALIZED);
+	if (unlikely(error))
+		return error;
+#endif /* CONFIG_LIBUKVMEM */
+
+	/* Do the first page. It may have an offset. */
 	paddr = ukplat_virt_to_phys((void *)vaddr);
 	seglen = MIN(len, __PAGE_SIZE - offset);
 	if (sg->sg_nseg == 0) {
