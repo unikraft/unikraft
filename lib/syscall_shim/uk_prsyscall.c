@@ -7,6 +7,8 @@
 #include <string.h>
 #include <fcntl.h>
 
+#include <sys/stat.h>
+
 #include <uk/arch/types.h>
 #include <uk/plat/console.h> /* ANSI definitions */
 #include <uk/arch/limits.h>
@@ -334,6 +336,7 @@ enum param_type {
 	PT_MSGFLAGS,
 	PT_CLONEFLAGS,
 	PT_STRUCT(timespec),
+	PT_STRUCT(stat),
 };
 #define PT_BUFP(len)							\
 	(long)(_PT_BUFP | ((MIN((unsigned long) __U16_MAX,		\
@@ -346,7 +349,6 @@ enum param_type {
 #define PT_STATUS PT_BOOL
 #define PT_PATH PT_CHARP
 #define PT_TID PT_PID
-#define PT_STRUCTSTAT PT_VADDR
 
 /*
  * Individual parameter type formats
@@ -759,6 +761,11 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 			  PT_UDEC, tv_sec,
 			  PT_UDEC, tv_nsec);
 		break;
+	case PT_STRUCT(stat):
+		PR_STRUCT(sb, fmtf, stat, flags, param, 1, succ,
+			  PT_UDEC, st_size,
+			  PT_OCTAL, st_mode);
+		break;
 	default:
 		uk_streambuf_shcc(sb, fmtf, VALUE);
 		uk_streambuf_printf(sb, "0x%lx", (unsigned long) param);
@@ -947,7 +954,7 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 #ifdef HAVE_uk_syscall_stat
 	case SYS_stat:
 		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
-			    PT_PATH, PT_STRUCTSTAT);
+			    PT_PATH, PT_STRUCT(stat) | PT_OUT);
 		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
 		break;
 #endif /* HAVE_uk_syscall_stat */
@@ -955,7 +962,7 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 #ifdef HAVE_uk_syscall_fstat
 	case SYS_fstat:
 		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
-			    PT_FD, PT_STRUCTSTAT);
+			    PT_FD, PT_STRUCT(stat) | PT_OUT);
 		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
 		break;
 #endif /* HAVE_uk_syscall_fstat */
