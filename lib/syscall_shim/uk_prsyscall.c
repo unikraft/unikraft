@@ -262,6 +262,7 @@ enum param_type {
 	PT_BOOL, /* Boolean: true, false */
 	PT_UDEC, /* Unsigned decimal */
 	PT_HEX, /* Hexadecimal */
+	PT_OCTAL, /* Octal */
 	PT_CHARP, /* Reference to '\0' terminated string (char *) */
 	_PT_BUFP, /* Dump of reference to memory buffer, use PT_BUFP(len) */
 	PT_VADDR, /* Virtual address */
@@ -591,6 +592,11 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 	case PT_HEX:
 		uk_streambuf_shcc(sb, fmtf, VALUE);
 		uk_streambuf_printf(sb, "%lx", (unsigned long) param);
+		uk_streambuf_shcc(sb, fmtf, RESET);
+		break;
+	case PT_OCTAL:
+		uk_streambuf_shcc(sb, fmtf, VALUE);
+		uk_streambuf_printf(sb, "0%lo", (unsigned long) param);
 		uk_streambuf_shcc(sb, fmtf, RESET);
 		break;
 	case PT_VADDR:
