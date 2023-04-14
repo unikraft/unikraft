@@ -81,13 +81,22 @@
 		uk_streambuf_shcc((sb), (fmtf), RESET);			\
 		break;
 
-/* Helper to generate a typed value string */
-#define PR_PARAM(sb, fmtf, type_prefix, ...)				\
+#ifdef CONFIG_LIBSYSCALL_SHIM_STRACE_PRINT_TYPE
+#define PR_PARAM_TYPE(sb, fmtf, type_prefix)				\
 	do {								\
 		uk_streambuf_shcc((sb), (fmtf), TYPE);			\
 		uk_streambuf_strcpy((sb), type_prefix);			\
 		uk_streambuf_shcc((sb), (fmtf), RESET);			\
 		uk_streambuf_strcpy((sb), ":");				\
+	} while (0)
+#else
+#define PR_PARAM_TYPE(sb, fmtf, type_prefix) do { } while (0)
+#endif /* !CONFIG_LIBSYSCALL_SHIM_STRACE_PRINT_TYPE */
+
+/* Helper to generate a typed value string */
+#define PR_PARAM(sb, fmtf, type_prefix, ...)				\
+	do {								\
+		PR_PARAM_TYPE((sb), (fmtf), type_prefix);		\
 		uk_streambuf_shcc((sb), (fmtf), VALUE);			\
 		uk_streambuf_printf((sb), __VA_ARGS__);			\
 		uk_streambuf_shcc((sb), (fmtf), RESET);			\
