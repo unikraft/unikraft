@@ -4,10 +4,15 @@
  * You may not use this file except in compliance with the License.
  */
 
+#include <uk/config.h>
+
 #include <string.h>
 #include <fcntl.h>
 
 #include <sys/stat.h>
+#ifdef CONFIG_LIBPOSIX_SYSINFO
+#include <sys/utsname.h>
+#endif /* CONFIG_LIBPOSIX_SYSINFO */
 
 #include <uk/arch/types.h>
 #include <uk/plat/console.h> /* ANSI definitions */
@@ -337,6 +342,9 @@ enum param_type {
 	PT_CLONEFLAGS,
 	PT_STRUCT(timespec),
 	PT_STRUCT(stat),
+#ifdef CONFIG_LIBPOSIX_SYSINFO
+	PT_STRUCT(utsname),
+#endif /* CONFIG_LIBPOSIX_SYSINFO */
 };
 #define PT_BUFP(len)							\
 	(long)(_PT_BUFP | ((MIN((unsigned long) __U16_MAX,		\
@@ -766,6 +774,13 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 			  PT_UDEC, st_size,
 			  PT_OCTAL, st_mode);
 		break;
+#ifdef CONFIG_LIBPOSIX_SYSINFO
+	case PT_STRUCT(utsname):
+		PR_STRUCT(sb, fmtf, utsname, flags, param, 1, succ,
+			  PT_CHARP | PT_SVAL, sysname,
+			  PT_CHARP | PT_SVAL, nodename);
+		break;
+#endif /* CONFIG_LIBPOSIX_SYSINFO */
 	default:
 		uk_streambuf_shcc(sb, fmtf, VALUE);
 		uk_streambuf_printf(sb, "0x%lx", (unsigned long) param);
@@ -1163,6 +1178,14 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		PR_SYSRET(sb, fmtf, PT_TID, rc);
 		break;
 #endif /* HAVE_uk_syscall_clone */
+
+#ifdef HAVE_uk_syscall_uname
+	case SYS_uname:
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
+			    PT_STRUCT(utsname) | PT_OUT);
+		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
+		break;
+#endif /* HAVE_uk_syscall_uname */
 
 	default:
 		do {
