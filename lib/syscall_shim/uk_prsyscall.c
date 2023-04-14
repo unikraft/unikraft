@@ -228,6 +228,57 @@
 #define VARG2_EXPAND(m, earg, succ, ...); \
 	_VARG2_EXPAND(UK_NARGS(__VA_ARGS__), m, earg, succ, __VA_ARGS__)
 
+/* Helper for defining structs */
+#define PT_STRUCT(name) PT_STRUCT_ ## name
+
+/* Helpers for pretty printing structs.
+ * For structs as well as strings we expect to get a pointer per default.
+ * However, we might also have embedded values. To be able to pass these as
+ * long param, we simply always pass pointers to struct members and usually
+ * just dereference with PT_REF again.
+ */
+#define __PR_STRUCT_FIELD_PRINT(i, earg, succ, type, arg)		\
+	do {								\
+		if ((i) != 0)						\
+			uk_streambuf_strcpy((earg).sb, ", ");		\
+		uk_streambuf_strcpy((earg).sb, STRINGIFY(arg) "=");	\
+		pr_param((earg).sb, fmtf,				\
+			 ((type) & PT_SVAL) ? (type) : (type)		\
+				| PT_REF  /* Dereference */		\
+				| PT_SVAL /* Suppress <ref>-text */,	\
+			 (long) &(earg).s->arg,				\
+			 succ);						\
+	} while (0);
+
+#define PR_STRUCT(sb, fmtf, name, flags, param, more, succ, ...)	\
+	do {								\
+		struct {						\
+			struct name *s;					\
+			struct uk_streambuf *sb;			\
+		} s_##name = {						\
+			(struct name *)(param),				\
+			(sb),						\
+		};							\
+		PR_PARAM_TYPE((sb), (fmtf), STRINGIFY(name));		\
+		if ((param) == 0) {					\
+			uk_streambuf_shcc((sb), (fmtf), MACRO);		\
+			uk_streambuf_strcpy((sb), "NULL");		\
+			uk_streambuf_shcc((sb), (fmtf), RESET);		\
+		} else if (!((flags) & PT_OUT) || succ)	{		\
+			uk_streambuf_strcpy((sb), "{");			\
+			VARG2_EXPAND(__PR_STRUCT_FIELD_PRINT, s_##name,	\
+				     succ, __VA_ARGS__);		\
+			if (more)					\
+				uk_streambuf_strcpy((sb), ", ...");	\
+			uk_streambuf_strcpy((sb), "}");			\
+		} else {						\
+			uk_streambuf_shcc((sb), (fmtf), VALUE);		\
+			uk_streambuf_printf((sb), "0x%lx",		\
+				 (unsigned long) (param));		\
+			uk_streambuf_shcc((sb), (fmtf), RESET);		\
+		}							\
+	} while (0)
+
 /*
  * Parameter types (`PT_*`)
  *
@@ -251,7 +302,11 @@
 			    * NOTE: If type is already a reference,
 			    * specifying PT_REF causes a double-ref
 			    */
-#define PT_OUT      0x2000 /* output parameter (implies PT_REF) */
+#define PT_OUT      0x2000 /* output parameter */
+#define PT_SVAL     0x4000 /* Parameter is embedded in a struct of a type
+			    * which per-default is expected to be a pointer
+			    * (e.g., an PT_STRUCT or PT_CHARP).
+			    */
 
 /*
  * Type definition (because of the binary representation,
@@ -565,10 +620,12 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 
 			goto out; /* Don't print the actual param */
 		} else {
-			uk_streambuf_shcc(sb, fmtf, PROPERTY);
-			uk_streambuf_printf(sb, "<ref:0x%lx>",
-					    (unsigned long) param);
-			uk_streambuf_shcc(sb, fmtf, RESET);
+			if (!(flags & PT_SVAL)) {
+				uk_streambuf_shcc(sb, fmtf, PROPERTY);
+				uk_streambuf_printf(sb, "<ref:0x%lx>",
+						    (unsigned long) param);
+				uk_streambuf_shcc(sb, fmtf, RESET);
+			}
 
 			/* De-reference parameter if not NULL */
 			param = *((long *) param);
