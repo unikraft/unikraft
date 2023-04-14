@@ -4,6 +4,7 @@
  * You may not use this file except in compliance with the License.
  */
 
+#define _GNU_SOURCE
 #include <uk/config.h>
 
 #include <string.h>
@@ -332,6 +333,7 @@ enum param_type {
 	PT_DIRFD, /* File descriptor number of directory */
 	PT_PID, /* PID number */
 	PT_OFLAGS,
+	PT_OKFLAGS,
 	PT_PROTFLAGS,
 	PT_MAPFLAGS,
 	PT_FUTEXOP,
@@ -414,6 +416,22 @@ static inline void param_oflags(struct uk_streambuf *sb, int fmtf, int oflags)
 	PR_FLAG(sb, fmtf, orig_seek, O_, TMPFILE,   oflags);
 	PR_FLAG(sb, fmtf, orig_seek, O_, TRUNC,     oflags);
 	PR_FLAG_END(sb, fmtf, orig_seek, oflags);
+}
+
+static inline void param_okflag(struct uk_streambuf *sb, int fmtf, int okflags)
+{
+	__sz orig_seek = uk_streambuf_seek(sb);
+
+	if (okflags == 0) {
+		uk_streambuf_shcc(sb, fmtf, FLAGS);
+		uk_streambuf_strcpy(sb, "F_OK");
+		uk_streambuf_shcc(sb, fmtf, RESET);
+		return;
+	}
+	PR_FLAG(sb, fmtf, orig_seek, R_, OK, okflags);
+	PR_FLAG(sb, fmtf, orig_seek, W_, OK, okflags);
+	PR_FLAG(sb, fmtf, orig_seek, X_, OK, okflags);
+	PR_FLAG_END(sb, fmtf, orig_seek, okflags);
 }
 
 #if CONFIG_LIBPOSIX_MMAP || CONFIG_LIBUKMMAP
@@ -731,6 +749,9 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 		break;
 	case PT_OFLAGS:
 		param_oflags(sb, fmtf, param);
+		break;
+	case PT_OKFLAGS:
+		param_okflag(sb, fmtf, param);
 		break;
 #if CONFIG_LIBPOSIX_MMAP || CONFIG_LIBUKMMAP
 	case PT_PROTFLAGS:
@@ -1195,6 +1216,14 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		PR_SYSRET(sb, fmtf, PT_TID, rc);
 		break;
 #endif /* HAVE_uk_syscall_clone */
+
+#ifdef HAVE_uk_syscall_access
+	case SYS_access:
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
+			    PT_PATH, PT_OKFLAGS);
+		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
+		break;
+#endif /* HAVE_uk_syscall_access */
 
 #ifdef HAVE_uk_syscall_uname
 	case SYS_uname:
