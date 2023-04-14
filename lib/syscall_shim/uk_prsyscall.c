@@ -591,7 +591,7 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 		break;
 	case PT_HEX:
 		uk_streambuf_shcc(sb, fmtf, VALUE);
-		uk_streambuf_printf(sb, "%lx", (unsigned long) param);
+		uk_streambuf_printf(sb, "0x%lx", (unsigned long) param);
 		uk_streambuf_shcc(sb, fmtf, RESET);
 		break;
 	case PT_OCTAL:
