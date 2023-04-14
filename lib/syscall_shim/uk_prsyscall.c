@@ -966,6 +966,23 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		break;
 #endif /* HAVE_uk_syscall_read && HAVE_uk_syscall_write */
 
+#ifdef HAVE_uk_syscall_pread64
+	case SYS_pread64:
+		do {
+			int fd    = (int)    va_arg(args, long);
+			void *buf = (void *) va_arg(args, long);
+			__sz len  = (__sz)   va_arg(args, long);
+			__sz off  = (__sz)   va_arg(args, long);
+
+			PR_SYSCALL(sb, fmtf, syscall_num, rc >= 0, PT_FD, fd,
+				   PT_BUFP(((rc >= 0) ? (__sz) rc : len))
+				   | PT_OUT, buf,
+				   PT_UDEC, len, PT_UDEC, off);
+			PR_SYSRET(sb, fmtf, PT_UDEC, rc);
+		} while (0);
+		break;
+#endif /* HAVE_uk_syscall_pread64 */
+
 #ifdef HAVE_uk_syscall_stat
 	case SYS_stat:
 		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
