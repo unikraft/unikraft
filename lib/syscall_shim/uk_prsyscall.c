@@ -333,6 +333,7 @@ enum param_type {
 	PT_SOCKETTYPE,
 	PT_MSGFLAGS,
 	PT_CLONEFLAGS,
+	PT_STRUCT(timespec),
 };
 #define PT_BUFP(len)							\
 	(long)(_PT_BUFP | ((MIN((unsigned long) __U16_MAX,		\
@@ -346,7 +347,6 @@ enum param_type {
 #define PT_PATH PT_CHARP
 #define PT_TID PT_PID
 #define PT_STRUCTSTAT PT_VADDR
-#define PT_TIMESPEC PT_VADDR
 
 /*
  * Individual parameter type formats
@@ -754,6 +754,11 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 		param_cloneflags(sb, fmtf, param);
 		break;
 #endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
+	case PT_STRUCT(timespec):
+		PR_STRUCT(sb, fmtf, timespec, flags, param, 0, succ,
+			  PT_UDEC, tv_sec,
+			  PT_UDEC, tv_nsec);
+		break;
 	default:
 		uk_streambuf_shcc(sb, fmtf, VALUE);
 		uk_streambuf_printf(sb, "0x%lx", (unsigned long) param);
@@ -1032,7 +1037,7 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 						PT_VADDR, addr,
 						PT_FUTEXOP, op,
 						PT_HEX, val,
-						PT_TIMESPEC, timeout);
+						PT_STRUCT(timespec), timeout);
 				PR_SYSRET(sb, fmtf, PT_STATUS, rc);
 				break;
 
@@ -1071,7 +1076,7 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 #ifdef HAVE_uk_syscall_clock_gettime
 	case SYS_clock_gettime:
 		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
-			    PT_CLOCKID, PT_TIMESPEC);
+			    PT_CLOCKID, PT_STRUCT(timespec) | PT_OUT);
 		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
 		break;
 #endif /* HAVE_uk_syscall_clock_gettime */
