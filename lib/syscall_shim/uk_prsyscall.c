@@ -135,31 +135,31 @@
 #define __VARG_EXPAND_IDX(x, y) UK_CONCAT(UK_CONCAT(__VARG_EXPAND_IDX, x), y)
 
 #define __VARG_EXPAND0(x, ...)
-#define __VARG_EXPAND1(x, m, earg, type)		\
-	m(__VARG_EXPAND_IDX(x, 1), earg, type)
-#define __VARG_EXPAND2(x, m, earg, type, ...)		\
-	m(__VARG_EXPAND_IDX(x, 2), earg, type)		\
-	__VARG_EXPAND1(x, m, earg, __VA_ARGS__)
-#define __VARG_EXPAND3(x, m, earg, type, ...)		\
-	m(__VARG_EXPAND_IDX(x, 3), earg, type)		\
-	__VARG_EXPAND2(x, m, earg, __VA_ARGS__)
-#define __VARG_EXPAND4(x, m, earg, type, ...)		\
-	m(__VARG_EXPAND_IDX(x, 4), earg, type)		\
-	__VARG_EXPAND3(x, m, earg, __VA_ARGS__)
-#define __VARG_EXPAND5(x, m, earg, type, ...)		\
-	m(__VARG_EXPAND_IDX(x, 5), earg, type)		\
-	__VARG_EXPAND4(x, m, earg, __VA_ARGS__)
-#define __VARG_EXPAND6(x, m, earg, type, ...)		\
-	m(__VARG_EXPAND_IDX(x, 6), earg, type)		\
-	__VARG_EXPAND5(x, m, earg, __VA_ARGS__)
-#define __VARG_EXPAND7(x, m, earg, type, ...)		\
-	m(__VARG_EXPAND_IDX(x, 7), earg, type)		\
-	__VARG_EXPAND6(x, m, earg, __VA_ARGS__)
-#define __VARG_EXPANDx(nr_args, ...)			\
+#define __VARG_EXPAND1(x, m, earg, succ, type)				\
+	m(__VARG_EXPAND_IDX(x, 1), earg, succ, type)
+#define __VARG_EXPAND2(x, m, earg, succ, type, ...)			\
+	m(__VARG_EXPAND_IDX(x, 2), earg, succ, type)			\
+	__VARG_EXPAND1(x, m, earg, succ, __VA_ARGS__)
+#define __VARG_EXPAND3(x, m, earg, succ, type, ...)			\
+	m(__VARG_EXPAND_IDX(x, 3), earg, succ, type)			\
+	__VARG_EXPAND2(x, m, earg, succ, __VA_ARGS__)
+#define __VARG_EXPAND4(x, m, earg, succ, type, ...)			\
+	m(__VARG_EXPAND_IDX(x, 4), earg, succ, type)			\
+	__VARG_EXPAND3(x, m, earg, succ, __VA_ARGS__)
+#define __VARG_EXPAND5(x, m, earg, succ, type, ...)			\
+	m(__VARG_EXPAND_IDX(x, 5), earg, succ, type)			\
+	__VARG_EXPAND4(x, m, earg, succ, __VA_ARGS__)
+#define __VARG_EXPAND6(x, m, earg, succ, type, ...)			\
+	m(__VARG_EXPAND_IDX(x, 6), earg, succ, type)			\
+	__VARG_EXPAND5(x, m, earg, succ, __VA_ARGS__)
+#define __VARG_EXPAND7(x, m, earg, succ, type, ...)			\
+	m(__VARG_EXPAND_IDX(x, 7), earg, succ, type)			\
+	__VARG_EXPAND6(x, m, earg, succ, __VA_ARGS__)
+#define __VARG_EXPANDx(nr_args, ...)					\
 	UK_CONCAT(__VARG_EXPAND, nr_args)(nr_args, __VA_ARGS__)
 #define _VARG_EXPAND(...) __VARG_EXPANDx(__VA_ARGS__)
-#define VARG_EXPAND(m, earg, ...); \
-	_VARG_EXPAND(UK_NARGS(__VA_ARGS__), m, earg, __VA_ARGS__)
+#define VARG_EXPAND(m, earg, succ, ...); \
+	_VARG_EXPAND(UK_NARGS(__VA_ARGS__), m, earg, succ, __VA_ARGS__)
 
 /* Like VARG_EXPAND() but takes two variadic arguments per expansion step  */
 #define __VARG2_EXPAND_IDX1414 0
@@ -193,31 +193,31 @@
 #define __VARG2_EXPAND_IDX(x, y) UK_CONCAT(UK_CONCAT(__VARG2_EXPAND_IDX, x), y)
 
 #define  __VARG2_EXPAND0(x, ...)
-#define  __VARG2_EXPAND2(x, m, earg, type, param)		\
-	m(__VARG2_EXPAND_IDX(x, 2), earg, type, param)
-#define  __VARG2_EXPAND4(x, m, earg, type, param, ...)		\
-	m(__VARG2_EXPAND_IDX(x, 4), earg, type, param)		\
-	__VARG2_EXPAND2(x, m, earg, __VA_ARGS__)
-#define  __VARG2_EXPAND6(x, m, earg, type, param, ...)		\
-	m(__VARG2_EXPAND_IDX(x, 6), earg, type, param)		\
-	__VARG2_EXPAND4(x, m, earg, __VA_ARGS__)
-#define  __VARG2_EXPAND8(x, m, earg, type, param, ...)		\
-	m(__VARG2_EXPAND_IDX(x, 8), earg, type, param)		\
-	__VARG2_EXPAND6(x, m, earg, __VA_ARGS__)
-#define __VARG2_EXPAND10(x, m, earg, type, param, ...)		\
-	m(__VARG2_EXPAND_IDX(x, 10), earg, type, param)		\
-	__VARG2_EXPAND8(x, m, earg, __VA_ARGS__)
-#define __VARG2_EXPAND12(x, m, earg, type, param, ...)		\
-	m(__VARG2_EXPAND_IDX(x, 12), earg, type, param)		\
-	__VARG2_EXPAND10(x, m, earg, __VA_ARGS__)
-#define __VARG2_EXPAND14(x, m, earg, type, param, ...)		\
-	m(__VARG2_EXPAND_IDX(x, 14), earg, type, param)		\
-	__VARG2_EXPAND12(x, m, earg, __VA_ARGS__)
-#define __VARG2_EXPANDx(nr_args, ...)				\
+#define  __VARG2_EXPAND2(x, m, earg, succ, type, param)			\
+	m(__VARG2_EXPAND_IDX(x, 2), earg, succ, type, param)
+#define  __VARG2_EXPAND4(x, m, earg, succ, type, param, ...)		\
+	m(__VARG2_EXPAND_IDX(x, 4), earg, succ, type, param)		\
+	__VARG2_EXPAND2(x, m, earg, succ, __VA_ARGS__)
+#define  __VARG2_EXPAND6(x, m, earg, succ, type, param, ...)		\
+	m(__VARG2_EXPAND_IDX(x, 6), earg, succ, type, param)		\
+	__VARG2_EXPAND4(x, m, earg, succ, __VA_ARGS__)
+#define  __VARG2_EXPAND8(x, m, earg, succ, type, param, ...)		\
+	m(__VARG2_EXPAND_IDX(x, 8), earg, succ, type, param)		\
+	__VARG2_EXPAND6(x, m, earg, succ, __VA_ARGS__)
+#define __VARG2_EXPAND10(x, m, earg, succ, type, param, ...)		\
+	m(__VARG2_EXPAND_IDX(x, 10), earg, succ, type, param)		\
+	__VARG2_EXPAND8(x, m, earg, succ, __VA_ARGS__)
+#define __VARG2_EXPAND12(x, m, earg, succ, type, param, ...)		\
+	m(__VARG2_EXPAND_IDX(x, 12), earg, succ, type, param)		\
+	__VARG2_EXPAND10(x, m, earg, succ, __VA_ARGS__)
+#define __VARG2_EXPAND14(x, m, earg, succ, type, param, ...)		\
+	m(__VARG2_EXPAND_IDX(x, 14), earg, succ, type, param)		\
+	__VARG2_EXPAND12(x, m, earg, succ, __VA_ARGS__)
+#define __VARG2_EXPANDx(nr_args, ...)					\
 	UK_CONCAT(__VARG2_EXPAND, nr_args)(nr_args, __VA_ARGS__)
 #define _VARG2_EXPAND(...) __VARG2_EXPANDx(__VA_ARGS__)
-#define VARG2_EXPAND(m, earg, ...); \
-	_VARG2_EXPAND(UK_NARGS(__VA_ARGS__), m, earg, __VA_ARGS__)
+#define VARG2_EXPAND(m, earg, succ, ...); \
+	_VARG2_EXPAND(UK_NARGS(__VA_ARGS__), m, earg, succ, __VA_ARGS__)
 
 /*
  * Parameter types (`PT_*`)
@@ -525,7 +525,7 @@ static inline void param_cloneflags(struct uk_streambuf *sb, int fmtf,
 
 /* Pretty print a single parameter */
 static void pr_param(struct uk_streambuf *sb, int fmtf,
-		     enum param_type type, long param)
+		     enum param_type type, long param, int succ)
 {
 	unsigned int arg;
 	int flags;
@@ -599,10 +599,13 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 			uk_streambuf_shcc(sb, fmtf, MACRO);
 			uk_streambuf_strcpy(sb, "NULL");
 			uk_streambuf_shcc(sb, fmtf, RESET);
-		} else {
+		} else if (!(flags & PT_OUT) || succ) {
 			uk_streambuf_shcc(sb, fmtf, CHARP);
 			uk_streambuf_printf(sb, "\"%s\"", (const char *) param);
 			uk_streambuf_shcc(sb, fmtf, RESET);
+		} else {
+			PR_PARAM(sb, fmtf, "charp", "0x%lx",
+				 (unsigned long) param);
 		}
 		break;
 	case _PT_BUFP:
@@ -610,7 +613,7 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 			uk_streambuf_shcc(sb, fmtf, MACRO);
 			uk_streambuf_strcpy(sb, "NULL");
 			uk_streambuf_shcc(sb, fmtf, RESET);
-		} else {
+		} else if (!(flags & PT_OUT) || succ) {
 			unsigned int left;
 			char *c;
 
@@ -630,6 +633,9 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 			uk_streambuf_shcc(sb, fmtf, RESET);
 			if (arg > __PR_BUFP_MAXLEN)
 				uk_streambuf_strcpy(sb, "...");
+		} else {
+			PR_PARAM(sb, fmtf, "buf", "0x%lx",
+				 (unsigned long) param);
 		}
 		break;
 	case PT_FD:
@@ -706,7 +712,7 @@ static void pr_retcode(struct uk_streambuf *sb, int fmtf,
 		uk_streambuf_shcc(sb, fmtf, RESET);
 	} else {
 		/* Use same formatting as for parameters */
-		pr_param(sb, fmtf, type, retval);
+		pr_param(sb, fmtf, type, retval, 1);
 	}
 }
 
@@ -715,44 +721,47 @@ static void pr_retcode(struct uk_streambuf *sb, int fmtf,
  * VPR_SYSCALL) and to pretty print the return code of a system call
  * (PR_SYSRET).
  */
-#define __PR_SYSCALL_PARAM_PRINT(i, sb, type, arg)			\
+#define __PR_SYSCALL_PARAM_PRINT(i, sb, succ, type, arg)		\
 	do {								\
 		if ((i) != 0)						\
 			uk_streambuf_strcpy((sb), ", ");		\
-		pr_param((sb), fmtf, (type), (long) (arg));		\
+		pr_param((sb), fmtf, (type), (long) (arg), succ);	\
 	} while (0);
 
-#define PR_SYSCALL(sb, fmtf, syscall_num, ...)				\
+#define PR_SYSCALL(sb, fmtf, syscall_num, succ, ...)			\
 	do {								\
 		uk_streambuf_shcc(sb, fmtf, SYSCALL);			\
-		uk_streambuf_strcpy(sb, uk_syscall_name((syscall_num))); \
+		uk_streambuf_strcpy(sb, uk_syscall_name((syscall_num)));\
 		uk_streambuf_shcc(sb, fmtf, RESET);			\
 		uk_streambuf_strcpy(sb, "(");				\
-		VARG2_EXPAND(__PR_SYSCALL_PARAM_PRINT, sb, __VA_ARGS__); \
+		VARG2_EXPAND(__PR_SYSCALL_PARAM_PRINT, sb, succ,	\
+			     __VA_ARGS__);				\
 		uk_streambuf_strcpy(sb, ")");				\
 	} while (0)
 
-#define __VPR_SYSCALL_PARAM_DECL(i, unused, type)			\
+#define __VPR_SYSCALL_PARAM_DECL(i, unused0, unused1, type)		\
 	long UK_CONCAT(arg, i);
-#define __VPR_SYSCALL_PARAM_VALOAD(i, ap, type)				\
+#define __VPR_SYSCALL_PARAM_VALOAD(i, ap, unused, type)			\
 	UK_CONCAT(arg, i) = va_arg(ap, long);
-#define __VPR_SYSCALL_PARAM_PRINT(i, sb, type)				\
+#define __VPR_SYSCALL_PARAM_PRINT(i, sb, succ, type)			\
 	do {								\
 		if ((i) != 0)						\
 			uk_streambuf_strcpy((sb), ", ");		\
-		pr_param((sb), fmtf, (type), UK_CONCAT(arg, i));	\
+		pr_param((sb), fmtf, (type), UK_CONCAT(arg, i), succ);	\
 	} while (0);
 
-#define VPR_SYSCALL(sb, fmtf, syscall_num, ap, ...)			\
+#define VPR_SYSCALL(sb, fmtf, syscall_num, ap, succ, ...)		\
 	do {								\
-		VARG_EXPAND(__VPR_SYSCALL_PARAM_DECL, 0, __VA_ARGS__)	\
-		VARG_EXPAND(__VPR_SYSCALL_PARAM_VALOAD, ap, __VA_ARGS__) \
+		VARG_EXPAND(__VPR_SYSCALL_PARAM_DECL, 0, 0, __VA_ARGS__)\
+		VARG_EXPAND(__VPR_SYSCALL_PARAM_VALOAD, ap, 0,		\
+			    __VA_ARGS__)				\
 									\
-		uk_streambuf_shcc(sb, fmtf, SYSCALL);		\
-		uk_streambuf_strcpy(sb, uk_syscall_name((syscall_num))); \
+		uk_streambuf_shcc(sb, fmtf, SYSCALL);			\
+		uk_streambuf_strcpy(sb, uk_syscall_name((syscall_num)));\
 		uk_streambuf_shcc(sb, fmtf, RESET);			\
 		uk_streambuf_strcpy(sb, "(");				\
-		VARG_EXPAND(__VPR_SYSCALL_PARAM_PRINT, sb, __VA_ARGS__) \
+		VARG_EXPAND(__VPR_SYSCALL_PARAM_PRINT, sb, succ,	\
+			    __VA_ARGS__)				\
 		uk_streambuf_strcpy(sb, ")");				\
 	} while (0)
 
@@ -773,8 +782,8 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 	case SYS_brk: {
 			long addr = (long) va_arg(args, long);
 
-			PR_SYSCALL(sb, fmtf, syscall_num,
-					PT_VADDR, addr);
+			PR_SYSCALL(sb, fmtf, syscall_num, 1,
+				   PT_VADDR, addr);
 			PR_SYSRET(sb, fmtf, PT_VADDR, rc);
 		}
 		break;
@@ -782,15 +791,16 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 
 #ifdef HAVE_uk_syscall_open
 	case SYS_open:
-		VPR_SYSCALL(sb, fmtf, syscall_num, args, PT_PATH, PT_OFLAGS);
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
+			    PT_PATH, PT_OFLAGS);
 		PR_SYSRET(sb, fmtf, PT_FD, rc);
 		break;
 #endif /* HAVE_uk_syscall_open */
 
 #ifdef HAVE_uk_syscall_openat
 	case SYS_openat:
-		VPR_SYSCALL(sb, fmtf, syscall_num, args, PT_DIRFD, PT_PATH,
-			    PT_OFLAGS);
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
+			    PT_DIRFD, PT_PATH, PT_OFLAGS);
 		PR_SYSRET(sb, fmtf, PT_FD, rc);
 		break;
 #endif /* HAVE_uk_syscall_openat */
@@ -802,9 +812,10 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 			void *buf  = (void *) va_arg(args, long);
 			__sz len   = (__sz)   va_arg(args, long);
 
-			PR_SYSCALL(sb, fmtf, syscall_num, PT_PATH, path,
+			PR_SYSCALL(sb, fmtf, syscall_num, rc >= 0,
+				   PT_PATH, path,
 				   PT_BUFP(((rc >= 0) ? (__sz) rc : len))
-				   | ((rc >= 0) ? PT_OUT : 0x0), buf,
+				   | PT_OUT, buf,
 				   PT_UDEC, len);
 			PR_SYSRET(sb, fmtf, PT_UDEC, rc);
 		} while (0);
@@ -819,10 +830,10 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 			void *buf  = (void *) va_arg(args, long);
 			__sz len   = (__sz)   va_arg(args, long);
 
-			PR_SYSCALL(sb, fmtf, syscall_num,
+			PR_SYSCALL(sb, fmtf, syscall_num, rc >= 0,
 				   PT_DIRFD, dirfd, PT_PATH, path,
 				   PT_BUFP(((rc >= 0) ? (__sz) rc : len))
-				   | ((rc >= 0) ? PT_OUT : 0x0), buf,
+				   | PT_OUT, buf,
 				   PT_UDEC, len);
 			PR_SYSRET(sb, fmtf, PT_UDEC, rc);
 		} while (0);
@@ -836,7 +847,7 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 			void *buf = (void *) va_arg(args, long);
 			__sz len  = (__sz)   va_arg(args, long);
 
-			PR_SYSCALL(sb, fmtf, syscall_num, PT_FD, fd,
+			PR_SYSCALL(sb, fmtf, syscall_num, rc >= 0, PT_FD, fd,
 				   PT_BUFP(len), buf, PT_UDEC, len);
 			PR_SYSRET(sb, fmtf, PT_UDEC, rc);
 		} while (0);
@@ -847,9 +858,9 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 			void *buf = (void *) va_arg(args, long);
 			__sz len  = (__sz)   va_arg(args, long);
 
-			PR_SYSCALL(sb, fmtf, syscall_num, PT_FD, fd,
+			PR_SYSCALL(sb, fmtf, syscall_num, rc >= 0, PT_FD, fd,
 				   PT_BUFP(((rc >= 0) ? (__sz) rc : len))
-				   | ((rc >= 0) ? PT_OUT : 0x0), buf,
+				   | PT_OUT, buf,
 				   PT_UDEC, len);
 			PR_SYSRET(sb, fmtf, PT_UDEC, rc);
 		} while (0);
@@ -858,7 +869,7 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 
 #ifdef HAVE_uk_syscall_stat
 	case SYS_stat:
-		VPR_SYSCALL(sb, fmtf, syscall_num, args,
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
 			    PT_PATH, PT_STRUCTSTAT);
 		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
 		break;
@@ -866,56 +877,58 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 
 #ifdef HAVE_uk_syscall_fstat
 	case SYS_fstat:
-		VPR_SYSCALL(sb, fmtf, syscall_num, args, PT_FD, PT_STRUCTSTAT);
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
+			    PT_FD, PT_STRUCTSTAT);
 		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
 		break;
 #endif /* HAVE_uk_syscall_fstat */
 
 #ifdef HAVE_uk_syscall_close
 	case SYS_close:
-		VPR_SYSCALL(sb, fmtf, syscall_num, args, PT_FD);
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0, PT_FD);
 		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
 		break;
 #endif /* HAVE_uk_syscall_close */
 
 #ifdef HAVE_uk_syscall_dup
 	case SYS_dup:
-		VPR_SYSCALL(sb, fmtf, syscall_num, args, PT_FD);
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc >= 0, PT_FD);
 		PR_SYSRET(sb, fmtf, PT_FD, rc);
 		break;
 #endif /* HAVE_uk_syscall_dup */
 
 #ifdef HAVE_uk_syscall_dup2
 	case SYS_dup2:
-		VPR_SYSCALL(sb, fmtf, syscall_num, args, PT_FD, PT_FD);
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc >= 0, PT_FD, PT_FD);
 		PR_SYSRET(sb, fmtf, PT_FD, rc);
 		break;
 #endif /* HAVE_uk_syscall_dup2 */
 
 #ifdef HAVE_uk_syscall_gettid
 	case SYS_gettid:
-		VPR_SYSCALL(sb, fmtf, syscall_num, args);
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, 1);
 		PR_SYSRET(sb, fmtf, PT_TID, rc);
 		break;
 #endif /* HAVE_uk_syscall_gettid */
 
 #ifdef HAVE_uk_syscall_getpid
 	case SYS_getpid:
-		VPR_SYSCALL(sb, fmtf, syscall_num, args);
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, 1);
 		PR_SYSRET(sb, fmtf, PT_PID, rc);
 		break;
 #endif /* HAVE_uk_syscall_getpid */
 
 #ifdef HAVE_uk_syscall_munmap
 	case SYS_munmap:
-		VPR_SYSCALL(sb, fmtf, syscall_num, args, PT_VADDR);
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0, PT_VADDR);
 		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
 		break;
 #endif /* HAVE_uk_syscall_munmap */
 
 #ifdef HAVE_uk_syscall_mmap
 	case SYS_mmap:
-		VPR_SYSCALL(sb, fmtf, syscall_num, args, PT_VADDR, PT_UDEC,
+		VPR_SYSCALL(sb, fmtf, syscall_num, args,
+			    (void *)rc != MAP_FAILED, PT_VADDR, PT_UDEC,
 			    PT_PROTFLAGS, PT_MAPFLAGS, PT_FD, PT_UDEC);
 		PR_SYSRET(sb, fmtf, PT_VADDR, rc);
 		break;
@@ -923,8 +936,8 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 
 #ifdef HAVE_uk_syscall_mprotect
 	case SYS_mprotect:
-		VPR_SYSCALL(sb, fmtf, syscall_num, args, PT_VADDR, PT_UDEC,
-			    PT_PROTFLAGS);
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
+			    PT_VADDR, PT_UDEC, PT_PROTFLAGS);
 		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
 		break;
 #endif /* HAVE_uk_syscall_mprotect */
@@ -943,7 +956,7 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 			switch (op) {
 			case FUTEX_WAIT:
 			case FUTEX_WAIT_PRIVATE:
-				PR_SYSCALL(sb, fmtf, syscall_num,
+				PR_SYSCALL(sb, fmtf, syscall_num, rc == 0,
 						PT_VADDR, addr,
 						PT_FUTEXOP, op,
 						PT_HEX, val,
@@ -953,7 +966,7 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 
 			case FUTEX_WAKE:
 			case FUTEX_WAKE_PRIVATE:
-				PR_SYSCALL(sb, fmtf, syscall_num,
+				PR_SYSCALL(sb, fmtf, syscall_num, rc == 0,
 						PT_VADDR, addr,
 						PT_FUTEXOP, op,
 						PT_HEX, val);
@@ -961,7 +974,7 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 				break;
 
 			case FUTEX_CMP_REQUEUE:
-				PR_SYSCALL(sb, fmtf, syscall_num,
+				PR_SYSCALL(sb, fmtf, syscall_num, rc == 0,
 						PT_VADDR, addr,
 						PT_FUTEXOP, op,
 						PT_HEX, val,
@@ -973,7 +986,7 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 			case FUTEX_FD:
 			case FUTEX_REQUEUE:
 			default:
-				PR_SYSCALL(sb, fmtf, syscall_num,
+				PR_SYSCALL(sb, fmtf, syscall_num, rc == 0,
 						PT_VADDR, addr,
 						PT_FUTEXOP, op);
 				PR_SYSRET(sb, fmtf, PT_STATUS, rc);
@@ -985,7 +998,7 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 
 #ifdef HAVE_uk_syscall_clock_gettime
 	case SYS_clock_gettime:
-		VPR_SYSCALL(sb, fmtf, syscall_num, args,
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
 			    PT_CLOCKID, PT_TIMESPEC);
 		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
 		break;
@@ -998,7 +1011,7 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 			int type = (int) va_arg(args, long);
 			int protocol = (int) va_arg(args, long);
 
-			PR_SYSCALL(sb, fmtf, syscall_num,
+			PR_SYSCALL(sb, fmtf, syscall_num, rc >= 0,
 					PT_SOCKETAF, domain,
 					PT_SOCKETTYPE, type,
 					PT_UDEC, protocol);
@@ -1007,7 +1020,7 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		break;
 
 	case SYS_bind:
-		VPR_SYSCALL(sb, fmtf, syscall_num, args,
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
 			    PT_FD, PT_VADDR, PT_UDEC);
 		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
 		break;
@@ -1021,7 +1034,7 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 			void *dst_addr = (void *) va_arg(args, long);
 			long dst_len = (long) va_arg(args, long);
 
-			PR_SYSCALL(sb, fmtf, syscall_num,
+			PR_SYSCALL(sb, fmtf, syscall_num, rc = 0,
 				   PT_FD, fd, PT_BUFP(len), buf,
 				   PT_UDEC, len, PT_MSGFLAGS, flags,
 				   PT_VADDR, dst_addr, PT_UDEC, dst_len);
@@ -1036,7 +1049,7 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 			__sz maxlen = (__sz) va_arg(args, long);
 			int flags = (int) va_arg(args, long);
 
-			PR_SYSCALL(sb, fmtf, syscall_num,
+			PR_SYSCALL(sb, fmtf, syscall_num, rc == 0,
 				   PT_FD, fd,
 				   PT_BUFP(rc > 0 ? (__sz) rc : maxlen), buf,
 				   PT_UDEC, maxlen, PT_MSGFLAGS, flags);
@@ -1049,13 +1062,15 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 #ifdef HAVE_uk_syscall_clone
 	case SYS_clone:
 #if CONFIG_ARCH_X86_64
-		VPR_SYSCALL(sb, fmtf, syscall_num, args, PT_CLONEFLAGS,
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc >= 0,
+			    PT_CLONEFLAGS,
 			    PT_VADDR, /* sp */
 			    PT_TID | PT_REF, /* ref to parent tid */
 			    PT_TID | PT_REF, /* ref to child tid */
 			    PT_VADDR /* tlsp */);
 #else /* !CONFIG_ARCH_X86_64 */
-		VPR_SYSCALL(sb, fmtf, syscall_num, args, PT_CLONEFLAGS,
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc >= 0,
+			    PT_CLONEFLAGS,
 			    PT_VADDR, /* sp */
 			    PT_TID | PT_REF, /* ref to parent tid */
 			    PT_VADDR, /* tlsp */
