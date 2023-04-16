@@ -537,7 +537,7 @@ extern struct shared_info _libxenplat_shared_info;
 void _init_mem_set_readonly(void *text, void *etext)
 {
     unsigned long start_address =
-        ((unsigned long) text + PAGE_SIZE - 1) & PAGE_MASK;
+        PAGE_ALIGN((unsigned long)text);
     unsigned long end_address = (unsigned long) etext;
     pgentry_t *tab = pt_base, page;
     unsigned long mfn;
