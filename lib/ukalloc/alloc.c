@@ -212,7 +212,7 @@ void *uk_realloc_ifpages(struct uk_alloc *a, void *ptr, __sz size)
 	if (!ptr)
 		return uk_malloc_ifpages(a, size);
 
-	if (ptr && !size) {
+	if (!size) {
 		uk_free_ifpages(a, ptr);
 		return __NULL;
 	}
@@ -423,7 +423,7 @@ void *uk_realloc_ifmalloc(struct uk_alloc *a, void *ptr, __sz size)
 	if (!ptr)
 		return uk_malloc_ifmalloc(a, size);
 
-	if (ptr && !size) {
+	if (!size) {
 		uk_free_ifmalloc(a, ptr);
 		return __NULL;
 	}
@@ -529,7 +529,7 @@ void *uk_realloc_compat(struct uk_alloc *a, void *ptr, __sz size)
 	if (!ptr)
 		return uk_malloc(a, size);
 
-	if (ptr && !size) {
+	if (!size) {
 		uk_free(a, ptr);
 		return __NULL;
 	}
