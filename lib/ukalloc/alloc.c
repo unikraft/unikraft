@@ -41,13 +41,14 @@
 #include <uk/assert.h>
 #include <uk/arch/limits.h>
 #include <uk/arch/lcpu.h>
+#include <uk/arch/paging.h>
 
 #if CONFIG_HAVE_MEMTAG
 #include <uk/arch/memtag.h>
 #endif
 
 #define size_to_num_pages(size) \
-	(ALIGN_UP((unsigned long)(size), __PAGE_SIZE) / __PAGE_SIZE)
+	(PAGE_ALIGN_UP((unsigned long)(size)) / __PAGE_SIZE)
 #define page_off(x) ((unsigned long)(x) & (__PAGE_SIZE - 1))
 
 struct uk_alloc *_uk_alloc_head;
@@ -108,7 +109,7 @@ static struct metadata_ifpages *uk_get_metadata(const void *ptr)
 	UK_ASSERT((__uptr) ptr >= __PAGE_SIZE +
 		  METADATA_IFPAGES_SIZE_POW2);
 
-	metadata = ALIGN_DOWN((__uptr) ptr, (__uptr) __PAGE_SIZE);
+	metadata = PAGE_ALIGN_DOWN((__uptr)ptr);
 	if (metadata == (__uptr) ptr) {
 		/* special case: the memory was page-aligned.
 		 * In this case the metadata lies at the start of the
