@@ -283,9 +283,8 @@ UK_LLSYSCALL_R_DEFINE(int, futex, uint32_t *, uaddr, int, futex_op,
 	 * Unikraft. Therefore, we can just use CLOCK_MONOTONIC for timeouts in
 	 * the following code.
 	 */
-	switch (futex_op) {
+	switch (futex_op & FUTEX_CMD_MASK) {
 	case FUTEX_WAIT:
-	case FUTEX_WAIT_PRIVATE:
 		/*
 		 * `timeout` is relative to "now" (whenever that is). To
 		 * simplify the implementation regarding overflows, we will only
@@ -298,7 +297,6 @@ UK_LLSYSCALL_R_DEFINE(int, futex, uint32_t *, uaddr, int, futex_op,
 		return futex_wait(uaddr, val, timeout ? &timeout_ns : NULL);
 
 	case FUTEX_WAIT_BITSET:
-	case FUTEX_WAIT_BITSET_PRIVATE:
 		/*
 		 * Special case implementation for cases where the val3/mask has
 		 * all bits set. Some applications do this to use the absolute
@@ -314,7 +312,6 @@ UK_LLSYSCALL_R_DEFINE(int, futex, uint32_t *, uaddr, int, futex_op,
 		return futex_wait(uaddr, val, timeout ? &timeout_ns : NULL);
 
 	case FUTEX_WAKE:
-	case FUTEX_WAKE_PRIVATE:
 		return futex_wake(uaddr, val);
 
 	case FUTEX_FD:
