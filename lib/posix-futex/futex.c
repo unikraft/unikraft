@@ -277,13 +277,22 @@ UK_LLSYSCALL_R_DEFINE(int, futex, uint32_t *, uaddr, int, futex_op,
 		      uint32_t *, uaddr2, uint32_t, val3)
 {
 	__nsec timeout_ns;
+ 	int cmd = futex_op & FUTEX_CMD_MASK;
+
+	/* Reject invalid combinations of the realtime clock flag */
+	if (futex_op & FUTEX_CLOCK_REALTIME && !(
+		cmd == FUTEX_WAIT ||
+		cmd == FUTEX_WAIT_BITSET ||
+		cmd == FUTEX_LOCK_PI2 ||
+		cmd == FUTEX_WAIT_REQUEUE_PI))
+		return -ENOSYS;
 
 	/*
 	 * N.B. CLOCK_(MONOTONIC|REALTIME|...) are at the moment all the same in
 	 * Unikraft. Therefore, we can just use CLOCK_MONOTONIC for timeouts in
 	 * the following code.
 	 */
-	switch (futex_op & FUTEX_CMD_MASK) {
+	switch (cmd) {
 	case FUTEX_WAIT:
 		/*
 		 * `timeout` is relative to "now" (whenever that is). To
