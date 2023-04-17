@@ -15,7 +15,15 @@ KVM_BINFO_FLAGS := -a $(CONFIG_UK_ARCH)
 ##
 ## Link image
 ##
-KVM_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_kvm-$(CONFIG_UK_ARCH)
+ifeq ($(CONFIG_KVM_VMM_QEMU),y)
+KVM_VMM := qemu
+else ifeq ($(CONFIG_KVM_VMM_FIRECRACKER),y)
+KVM_VMM := fc
+else
+KVM_VMM := kvm
+endif
+
+KVM_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_$(KVM_VMM)-$(CONFIG_UK_ARCH)
 KVM_DEBUG_IMAGE := $(KVM_IMAGE).dbg
 
 KVM_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-dT$(comma),\
