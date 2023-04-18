@@ -741,7 +741,7 @@ TOO_BIG:
 			pt->nr_lx_pages[lvl]++;
 #endif /* CONFIG_PAGING_STATS */
 
-		if (PT_Lx_PTE_PRESENT(orig_pte, lvl))
+		if (PT_Lx_PTE_PRESENT(orig_pte, lvl) && pt == pg_active_pt)
 			ukarch_tlb_flush_entry(vaddr);
 
 NEXT_PTE:
@@ -1042,7 +1042,7 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			if (unlikely(rc))
 				return rc;
 
-			if (vaddr != __VADDR_ANY)
+			if (vaddr != __VADDR_ANY && pt == pg_active_pt)
 				ukarch_tlb_flush_entry(vaddr);
 
 #ifdef CONFIG_PAGING_STATS
@@ -1152,7 +1152,7 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			if (unlikely(rc))
 				return rc;
 
-			if (vaddr != __VADDR_ANY)
+			if (vaddr != __VADDR_ANY && pt == pg_active_pt)
 				ukarch_tlb_flush_entry(vaddr);
 
 			pg_pt_free(pt, pt_vaddr_cache[plvl], plvl);
@@ -1176,7 +1176,7 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 
 	} while (1);
 
-	if (vaddr == __VADDR_ANY)
+	if (vaddr == __VADDR_ANY && pt == pg_active_pt)
 		ukarch_tlb_flush();
 
 	return 0;
@@ -1314,7 +1314,7 @@ static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			if (unlikely(rc))
 				return rc;
 
-			if (vaddr != __VADDR_ANY)
+			if (vaddr != __VADDR_ANY && pt == pg_active_pt)
 				ukarch_tlb_flush_entry(vaddr);
 		}
 
@@ -1354,7 +1354,7 @@ static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 
 	} while (1);
 
-	if (vaddr == __VADDR_ANY)
+	if (vaddr == __VADDR_ANY && pt == pg_active_pt)
 		ukarch_tlb_flush();
 
 	return 0;
