@@ -104,6 +104,10 @@ struct ukarch_pagetable {
 #define PAGE_ATTR_SHAREABLE_IS		(1 << PAGE_ATTR_SHAREABLE_SHIFT)
 #define PAGE_ATTR_SHAREABLE_OS		(2 << PAGE_ATTR_SHAREABLE_SHIFT)
 
+/* Page fault error code bits */
+#define ARM64_PF_ESR_WnR		0x0000040UL
+#define ARM64_PF_ESR_ISV		0x1000000UL
+
 #define ARM64_PADDR_BITS		48
 #define ARM64_VADDR_BITS		48
 
@@ -171,6 +175,31 @@ static inline __paddr_t PT_Lx_PTE_PADDR(__pte_t pte, unsigned int lvl)
 		paddr = pte & PTE_Lx_TABLE_PADDR_MASK;
 	}
 	return paddr;
+}
+
+static inline __paddr_t PT_Lx_PTE_SET_PADDR(__pte_t pte, unsigned int lvl,
+					     __paddr_t paddr)
+{
+	static __u64 pte_lx_map_paddr_mask[] = {
+		PTE_L0_PAGE_PADDR_MASK,
+		PTE_L1_BLOCK_PADDR_MASK,
+		PTE_L2_BLOCK_PADDR_MASK
+	};
+
+	if (PAGE_Lx_IS(pte, lvl)) {
+#ifdef CONFIG_LIBUKDEBUG
+		UK_ASSERT(lvl <= PT_MAP_LEVEL_MAX);
+#endif /* CONFIG_LIBUKDEBUG */
+		paddr &= pte_lx_map_paddr_mask[lvl];
+		pte &= ~pte_lx_map_paddr_mask[lvl];
+	} else {
+#ifdef CONFIG_LIBUKDEBUG
+		UK_ASSERT(lvl > PAGE_LEVEL && lvl < PT_LEVELS);
+#endif /* CONFIG_LIBUKDEBUG */
+		paddr &= PTE_Lx_TABLE_PADDR_MASK;
+		pte &= ~PTE_Lx_TABLE_PADDR_MASK;
+	}
+	return pte | paddr;
 }
 
 static inline int ukarch_paddr_range_isvalid(__paddr_t start, __paddr_t end)
