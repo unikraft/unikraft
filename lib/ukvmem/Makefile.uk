@@ -15,6 +15,8 @@ endif
 ifeq ($(CONFIG_HAVE_PAGING),y)
 LIBUKVMEM_SRCS-$(CONFIG_ARCH_X86_64) += \
 	$(LIBUKVMEM_BASE)/arch/x86_64/pagefault.c|isr
+LIBUKVMEM_SRCS-$(CONFIG_ARCH_ARM_64) += \
+	$(LIBUKVMEM_BASE)/arch/arm/pagefault64.c|isr
 endif
 
 ifneq ($(filter y,$(CONFIG_LIBUKVMEM_TEST) $(CONFIG_LIBUKTEST_ALL)),)
