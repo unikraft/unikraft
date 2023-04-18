@@ -446,6 +446,14 @@ __vaddr_t ukplat_page_kmap(struct uk_pagetable *pt, __paddr_t paddr,
 void ukplat_page_kunmap(struct uk_pagetable *pt, __vaddr_t vaddr,
 			unsigned long pages, unsigned long flags);
 
+/**
+ * Initialize paging subsystem. This function is architecurally generic. It
+ * begins by assigning the free memory regions to the page frame allocator,
+ * unmapping the static boot page tables and finishes by mapping all the
+ * memory regions flagged as UKPLAT_MEMRF_MAP.
+ */
+int ukplat_paging_init(void);
+
 #ifdef __cplusplus
 }
 #endif
