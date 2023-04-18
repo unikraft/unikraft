@@ -104,6 +104,10 @@ struct ukarch_pagetable {
 #define PAGE_ATTR_SHAREABLE_IS		(1 << PAGE_ATTR_SHAREABLE_SHIFT)
 #define PAGE_ATTR_SHAREABLE_OS		(2 << PAGE_ATTR_SHAREABLE_SHIFT)
 
+/* Page fault error code bits */
+#define ARM64_PF_ESR_WnR		0x0000040UL
+#define ARM64_PF_ESR_ISV		0x1000000UL
+
 #define ARM64_PADDR_BITS		48
 #define ARM64_VADDR_BITS		48
 
