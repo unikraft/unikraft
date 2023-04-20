@@ -52,6 +52,7 @@
 #include <string.h>
 
 #include <vfscore/prex.h>
+#include <vfscore/uio.h>
 #include <uk/essentials.h>
 #include <uk/mutex.h>
 
@@ -425,14 +426,13 @@ device_info(struct devinfo *info)
 }
 
 int
-enodev(void)
-{
-	return ENODEV;
-}
-
-int
-nullop(void)
+devop_noop()
 {
 	return 0;
 }
 
+int
+devop_eperm()
+{
+	return EPERM;
+}

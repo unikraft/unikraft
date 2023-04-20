@@ -36,12 +36,10 @@
 #include <sys/types.h>
 #include <uk/init.h>
 
-#include <vfscore/uio.h>
-
 #define MAXDEVNAME	12
 #define DO_RWMASK	0x3
 
-struct bio;
+struct uio;
 struct device;
 
 /*
@@ -62,13 +60,11 @@ struct devinfo {
 #define D_REM		0x00000004	/* removable device */
 #define D_TTY		0x00000010	/* tty device */
 
-typedef int (*devop_open_t)   (struct device *, int);
-typedef int (*devop_close_t)  (struct device *);
-typedef int (*devop_read_t)   (struct device *, struct uio *, int);
-typedef int (*devop_write_t)  (struct device *, struct uio *, int);
-typedef int (*devop_ioctl_t)  (struct device *, unsigned long, void *);
-typedef int (*devop_devctl_t) (struct device *, unsigned long, void *);
-typedef void (*devop_strategy_t)(struct bio *);
+typedef int (*devop_open_t)(struct device *, int);
+typedef int (*devop_close_t)(struct device *);
+typedef int (*devop_read_t)(struct device *, struct uio *, int);
+typedef int (*devop_write_t)(struct device *, struct uio *, int);
+typedef int (*devop_ioctl_t)(struct device *, unsigned long, void *);
 
 /*
  * Device operations
@@ -79,17 +75,11 @@ struct devops {
 	devop_read_t	read;
 	devop_write_t	write;
 	devop_ioctl_t	ioctl;
-	devop_devctl_t	devctl;
-	devop_strategy_t strategy;
 };
 
-
-#define	no_open		((devop_open_t)nullop)
-#define	no_close	((devop_close_t)nullop)
-#define	no_read		((devop_read_t)enodev)
-#define	no_write	((devop_write_t)enodev)
-#define	no_ioctl	((devop_ioctl_t)enodev)
-#define	no_devctl	((devop_devctl_t)nullop)
+#define	dev_noop_open	((devop_open_t)devop_noop)
+#define	dev_noop_close	((devop_close_t)devop_noop)
+#define dev_noop_ioctl	((devop_ioctl_t)devop_eperm)
 
 /*
  * Driver object
@@ -200,8 +190,8 @@ int device_info(struct devinfo *info);
 int bdev_read(struct device *dev, struct uio *uio, int ioflags);
 int bdev_write(struct device *dev, struct uio *uio, int ioflags);
 
-int	enodev(void);
-int	nullop(void);
+int devop_noop();
+int devop_eperm();
 
 struct device *device_create(struct driver *drv, const char *name, int flags);
 int device_destroy(struct device *dev);
