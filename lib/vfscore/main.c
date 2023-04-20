@@ -34,6 +34,7 @@
 
 #include <sys/statvfs.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 #include <limits.h>
 #include <string.h>
 #include <stdlib.h>
@@ -2009,9 +2010,7 @@ UK_LLSYSCALL_R_DEFINE(int, fcntl, int, fd, unsigned int, cmd, int, arg)
 {
 	struct vfscore_file *fp;
 	int ret = 0, error;
-#if defined(FIONBIO) && defined(FIOASYNC)
-	int tmp;
-#endif
+	int tmp, oldf;
 
 	trace_vfs_fcntl(fd, cmd, arg);
 	error = fget(fd, &fp);
@@ -2048,17 +2047,44 @@ UK_LLSYSCALL_R_DEFINE(int, fcntl, int, fd, unsigned int, cmd, int, arg)
 		break;
 	case F_SETFL:
 		FD_LOCK(fp);
-		fp->f_flags = vfscore_fflags((vfscore_oflags(fp->f_flags) & ~SETFL) |
-				(arg & SETFL));
-		FD_UNLOCK(fp);
+		oldf = fp->f_flags;
+		tmp  = vfscore_oflags(fp->f_flags) & ~SETFL;
+		fp->f_flags = vfscore_fflags(tmp | (arg & SETFL));
 
-#if defined(FIONBIO) && defined(FIOASYNC)
-		/* Sync nonblocking/async state with file flags */
+		/* Sync nonblocking/async state with file flags
+		 * To make sure that the actual state of the underlying file
+		 * is in sync with the configured flag, we need to perform the
+		 * ioctl while holding the lock. This is not optimal since we
+		 * hold the lock for the duration of potentially expensive
+		 * operations. It would be better to just set the flag here and
+		 * make sure that all components directly consume this flag
+		 * instead of synching it to other places.
+		 */
 		tmp = fp->f_flags & FNONBLOCK;
-		vfs_ioctl(fp, FIONBIO, &tmp);
+		if ((tmp ^ oldf) & FNONBLOCK) {
+			error = vfs_ioctl(fp, FIONBIO, &tmp);
+			if (unlikely(error)) {
+				fp->f_flags = oldf;
+				FD_UNLOCK(fp);
+				break;
+			}
+		}
+
 		tmp = fp->f_flags & FASYNC;
-		vfs_ioctl(fp, FIOASYNC, &tmp);
-#endif
+		if ((tmp ^ oldf) & FASYNC) {
+			error = vfs_ioctl(fp, FIOASYNC, &tmp);
+			if (unlikely(error)) {
+				tmp = oldf & FNONBLOCK;
+				if ((tmp ^ fp->f_flags) & FNONBLOCK)
+					(void)vfs_ioctl(fp, FIONBIO, &tmp);
+
+				fp->f_flags = oldf;
+				FD_UNLOCK(fp);
+				break;
+			}
+		}
+
+		FD_UNLOCK(fp);
 		break;
 	case F_DUPFD_CLOEXEC:
 		error = fdalloc(fp, &ret);
