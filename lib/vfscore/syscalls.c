@@ -883,10 +883,9 @@ sys_symlink(const char *oldpath, const char *newpath)
 	}
 
 	/* parent directory for new path must exist */
-	if ((error = lookup(np, &newdirdp, &name)) != 0) {
-		error = ENOENT;
+	if ((error = lookup(np, &newdirdp, &name)) != 0)
 		goto out;
-	}
+
 	vn_lock(newdirdp->d_vnode);
 
 	/* newpath should not already exist */
