@@ -30,8 +30,8 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _DEVICE_H
-#define _DEVICE_H
+#ifndef __DEVFS_DEVICE_H__
+#define __DEVFS_DEVICE_H__
 
 #include <sys/types.h>
 #include <uk/init.h>
@@ -125,4 +125,4 @@ int device_destroy(struct device *dev);
  */
 #define devfs_initcall(fn) uk_rootfs_initcall_prio(fn, 3)
 
-#endif /* !_DEVICE_H */
+#endif /* !__DEVFS_DEVICE_H__ */
