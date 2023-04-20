@@ -62,7 +62,6 @@
 #include <uk/init.h>
 #include <uk/print.h>
 
-#include "devfs.h"
 #include <devfs/device.h>
 
 static uint64_t inode_count = 1; /* inode 0 is reserved to root */
