@@ -114,7 +114,8 @@ int device_info(struct devinfo *info);
 int devop_noop();
 int devop_eperm();
 
-struct device *device_create(struct driver *drv, const char *name, int flags);
+int device_create(struct driver *drv, const char *name, int flags,
+		  struct device **devp);
 int device_destroy(struct device *dev);
 
 /*
