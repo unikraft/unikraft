@@ -30,18 +30,18 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <uk/config.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
+
+#include <uk/config.h>
 #include <uk/ctors.h>
 #include <uk/print.h>
 #include <vfscore/uio.h>
 #include <devfs/device.h>
-#include <errno.h>
 #include <uk/plat/console.h>
 
 #ifdef CONFIG_LIBDEVFS_DEV_STDOUT
-
 #define DEV_STDOUT_NAME "stdout"
 
 static int __write_fn(void *dst __unused, void *src, size_t *cnt)
@@ -59,34 +59,25 @@ static int __write_fn(void *dst __unused, void *src, size_t *cnt)
 }
 
 /* One function for stderr and stdout */
-int dev_stdout_write(struct device *dev __unused, struct uio *uio,
-		   int flags __unused)
+static int dev_stdout_write(struct device *dev __unused, struct uio *uio,
+			    int flags __unused)
 {
 	return vfscore_uioforeach(__write_fn, NULL, uio->uio_resid, uio);
 }
 
-int dev_stdout_open(struct device *device __unused, int mode __unused)
-{
-	return 0;
-}
-
-int dev_stdout_close(struct device *device __unused)
-{
-	return 0;
-}
-
-int dev_stdout_read(struct device *dev __unused, struct uio *uio,
-		  int flags __unused)
+static int dev_stdout_read(struct device *dev __unused, struct uio *uio,
+			   int flags __unused)
 {
 	uio->uio_resid = uio->uio_iov->iov_len;
 	return 0;
 }
 
 static struct devops stdout_devops = {
+	.open = dev_noop_open,
+	.close = dev_noop_close,
 	.read = dev_stdout_read,
 	.write = dev_stdout_write,
-	.open = dev_stdout_open,
-	.close = dev_stdout_close,
+	.ioctl = dev_noop_ioctl,
 };
 
 static struct driver drv_stdout = {
@@ -94,22 +85,21 @@ static struct driver drv_stdout = {
 	.devsz = 0,
 	.name = DEV_STDOUT_NAME
 };
-
 #endif /* CONFIG_LIBDEVFS_DEV_STDOUT */
 
 static int devfs_register_stdout(void)
 {
-	struct device *dev;
+	int rc;
 
 #ifdef CONFIG_LIBDEVFS_DEV_STDOUT
 	uk_pr_debug("Register '%s' to devfs\n", DEV_STDOUT_NAME);
 
 	/* register /dev/stdout */
-	dev = device_create(&drv_stdout, DEV_STDOUT_NAME, D_CHR);
-	if (dev == NULL) {
-		uk_pr_err("Failed to register '%s' to devfs\n",
-			DEV_STDOUT_NAME);
-		return -1;
+	rc = device_create(&drv_stdout, DEV_STDOUT_NAME, D_CHR, NULL);
+	if (unlikely(rc)) {
+		uk_pr_err("Failed to register '%s' to devfs: %d\n",
+			  DEV_STDOUT_NAME, rc);
+		return -rc;
 	}
 #endif /* LIBDEVFS_DEV_STDOUT */
 
