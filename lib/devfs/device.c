@@ -78,20 +78,6 @@ device_lookup(const char *name)
 	return NULL;
 }
 
-struct partition_table_entry {
-	uint8_t  bootable;
-	uint8_t  starting_head;
-	uint16_t starting_sector:6;
-	uint16_t starting_cylinder:10;
-	uint8_t  system_id;
-	uint8_t  ending_head;
-	uint16_t ending_sector:6;
-	uint16_t ending_cylinder:10;
-	uint32_t rela_sector;
-	uint32_t total_sectors;
-} __packed;
-
-
 void device_register(struct device *dev, const char *name, int flags)
 {
 	size_t len;
@@ -123,10 +109,8 @@ void device_register(struct device *dev, const char *name, int flags)
 	dev->flags = flags;
 	dev->active = 1;
 	dev->refcnt = 1;
-	dev->offset = 0;
 	dev->private_data = priv;
 	dev->next = device_list;
-	dev->max_io_size = UINT_MAX;
 	device_list = dev;
 
 	uk_mutex_unlock(&devfs_lock);
