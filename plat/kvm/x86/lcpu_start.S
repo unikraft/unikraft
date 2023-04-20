@@ -179,16 +179,45 @@ ENTRY(lcpu_start32)
 	cpuid
 	shrl	$24, %ebx
 
+#if CONFIG_UKPLAT_LCPU_IDISIDX
 	/* Use APIC_ID * LCPU_SIZE for indexing the cpu structure */
-	movl	$LCPU_SIZE, %eax
-	imul	%ebx, %eax
+	movl    $LCPU_SIZE, %eax
+	imul    %ebx, %eax
 
 	/* Compute pointer into CPU struct array and store it in EDX
 	 */
+	movl    $lcpus, %edx
+	add     %eax, %edx
+#else
+	/* Iterate the lcpu structure until we find a matching cpu id.
+	 * Store pointer to EDX.
+	 */
+	movl	$0, %ecx
+next_lcpu:
 	movl	$lcpus, %edx
+	movl	$LCPU_SIZE, %eax
+
+	/* Compute index to lcpu array */
+	imul	%ecx, %eax
 	add	%eax, %edx
 
+	/* Check match */
+	mov	LCPU_ID_OFFSET(%edx), %ebp
+	cmp	%ebp, %ebx
+	jz	check_args
+
+	/* Next lcpu */
+	inc	%ecx
+	movl	$CONFIG_UKPLAT_LCPU_MAXCOUNT, %edx
+	cmp	%ecx, %edx
+	jne	next_lcpu
+
+	/* No match */
+	jmp	fail32
+#endif /* CONFIG_UKPLAT_LCPU_IDISIDX */
+
 	/* Check if we have startup arguments supplied */
+check_args:
 	test	%edi, %edi
 	jz	no_args32
 
@@ -223,6 +252,15 @@ jump_to64:
 
 	leaq	lcpu_start64, %rcx
 	jmp	*%rcx
+
+fail32:
+	movl	$LCPU_STATE_HALTED, LCPU_STATE_OFFSET(%edx)
+
+fail_loop32:
+	cli
+1:
+	hlt
+	jmp	1b
 END(lcpu_start32)
 
 /*
@@ -257,10 +295,10 @@ ENTRY(lcpu_start64)
 
 #if (__AVX__ || CONFIG_HAVE_X86PKU)
 	/* Enable XSAVE feature */
-	LCPU_ENABLE_XSAVE fail
+	LCPU_ENABLE_XSAVE fail64
 #if __AVX__
 	/* Enable AVX */
-	LCPU_ENABLE_AVX fail
+	LCPU_ENABLE_AVX fail64
 #endif /* __AVX__ */
 #endif /* __AVX__ || CONFIG_HAVE_X86PKU */
 
@@ -314,10 +352,10 @@ jump_to_entry:
 	 */
 	jmp	*%rax
 
-fail:
+fail64:
 	movl	$LCPU_STATE_HALTED, LCPU_STATE_OFFSET(%r9)
 
-fail_loop:
+fail_loop64:
 	cli
 1:
 	hlt
