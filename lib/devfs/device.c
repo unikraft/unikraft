@@ -48,19 +48,19 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
-#include <uk/assert.h>
 #include <string.h>
 
 #include <vfscore/prex.h>
 #include <vfscore/uio.h>
 #include <uk/essentials.h>
 #include <uk/mutex.h>
+#include <uk/assert.h>
 
 #include <devfs/device.h>
 
 static struct uk_mutex devfs_lock = UK_MUTEX_INITIALIZER(devfs_lock);
 
-/* list head of the devices */
+/* List head of the devices */
 static struct device *device_list;
 
 /*
