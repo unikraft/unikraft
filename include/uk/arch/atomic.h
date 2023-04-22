@@ -39,25 +39,27 @@ extern "C" {
 #include <uk/asm/atomic.h>
 
 /**
- * Perform a atomic load operation.
+ * Perform an atomic load operation.
  */
 #define ukarch_load_n(src) \
 	__atomic_load_n(src, __ATOMIC_SEQ_CST)
 
 /**
- * Perform a atomic store operation.
+ * Perform an atomic store operation.
  */
 #define ukarch_store_n(src, value) \
 	__atomic_store_n(src, value, __ATOMIC_SEQ_CST)
 
 /**
- * Perform a atomic fetch and add operation.
+ * Perform an atomic fetch and add/sub operation.
  */
 #define ukarch_fetch_add(src, value) \
 	__atomic_fetch_add(src, value, __ATOMIC_SEQ_CST)
+#define ukarch_fetch_sub(src, value) \
+	__atomic_fetch_sub(src, value, __ATOMIC_SEQ_CST)
 
 /**
- * Perform a atomic increment/decrement operation and return the
+ * Perform an atomic increment/decrement operation and return the
  * previous value.
  */
 #define ukarch_inc(src) \
