@@ -211,6 +211,7 @@ static struct vnode stdio_vnode = {
 
 static struct dentry stdio_dentry = {
 	.d_vnode = &stdio_vnode,
+	.d_refcnt = 1,
 };
 
 static struct vfscore_file  stdio_file = {
