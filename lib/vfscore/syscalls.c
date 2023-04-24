@@ -1462,11 +1462,6 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 		if (vn_access(dp->d_vnode, VWRITE)) {
 			return EACCES;
 		}
-		if (times &&
-			(times[0].tv_nsec != UTIME_NOW || times[1].tv_nsec != UTIME_NOW) &&
-			(times[0].tv_nsec != UTIME_OMIT || times[1].tv_nsec != UTIME_OMIT) &&
-			(!(dp->d_vnode->v_mode & ~VAPPEND)))
-			return EPERM;
 		error = vn_settimes(dp->d_vnode, timespec_times);
 	}
 
