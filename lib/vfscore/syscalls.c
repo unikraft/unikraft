@@ -1401,18 +1401,30 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 	struct dentry *dp = NULL;
 	struct vfscore_file *fp = NULL;
 
+	if (times) {
+		/* Make the behavior compatible with Linux */
+		if (unlikely(times[0].tv_nsec == UTIME_OMIT &&
+			     times[1].tv_nsec == UTIME_OMIT))
+			return 0;
+
+		if (unlikely(!is_timespec_valid(&times[0]) ||
+			     !is_timespec_valid(&times[1])))
+			return EINVAL;
+
+		init_timespec(&timespec_times[0], times + 0);
+		init_timespec(&timespec_times[1], times + 1);
+	} else {
+		init_timespec(&timespec_times[0], NULL);
+		init_timespec(&timespec_times[1], NULL);
+	}
+
 	/* utimensat should return ENOENT when pathname is empty */
 	if(pathname && pathname[0] == 0)
 		return ENOENT;
 
+	/* Only the AT_SYMLINK_NOFOLLOW is allowed */
 	if (flags && !(flags & AT_SYMLINK_NOFOLLOW))
 		return EINVAL;
-
-	if (times && (!is_timespec_valid(&times[0]) || !is_timespec_valid(&times[1])))
-		return EINVAL;
-
-	init_timespec(&timespec_times[0], times ? times + 0 : NULL);
-	init_timespec(&timespec_times[1], times ? times + 1 : NULL);
 
 	if (pathname && pathname[0] == '/') {
 		ap = strdup(pathname);
