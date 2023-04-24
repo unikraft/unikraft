@@ -1422,9 +1422,8 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 		if (!pathname)
 			return EFAULT;
 		error = asprintf(&ap, "%s/%s", main_task->t_cwd, pathname);
-		if (error || !ap)
+		if (unlikely(error == -1))
 			return ENOMEM;
-
 	} else {
 		struct vfscore_file *fp;
 
@@ -1444,7 +1443,7 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 		else
 			error = asprintf(&ap, "%s/%s", fp->f_dentry->d_mount->m_path,
 					fp->f_dentry->d_path);
-		if (error || !ap)
+		if (unlikely(error == -1))
 			return ENOMEM;
 	}
 
