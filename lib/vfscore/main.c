@@ -1938,7 +1938,7 @@ UK_TRACEPOINT(trace_vfs_dup3_err, "%d", int);
  */
 UK_SYSCALL_R_DEFINE(int, dup3, int, oldfd, int, newfd, int, flags)
 {
-	struct vfscore_file *fp, *fp_new;
+	struct vfscore_file *fp;
 	int error;
 
 	trace_vfs_dup3(oldfd, newfd, flags);
@@ -1960,33 +1960,27 @@ UK_SYSCALL_R_DEFINE(int, dup3, int, oldfd, int, newfd, int, flags)
 	if (error)
 		goto out_error;
 
-	error = fget(newfd, &fp_new);
-	if (error == 0) {
-		/* if newfd is open, then close it */
-		error = close(newfd);
-		if (error)
-			goto out_error;
-	}
+	/* BUG: The close and reserve operation must be atomic */
+	error = uk_syscall_r_close(newfd);
+	if (error && error != -EBADF)
+		goto out_error_drop;
 
 	error = vfscore_reserve_fd(newfd);
 	if (error)
-		goto out_error;
+		goto out_error_drop;
 
 	error = vfscore_install_fd(newfd, fp);
-	if (error) {
-		fdrop(fp);
-		goto out_error;
-	}
+	if (error)
+		goto out_error_drop;
 
-	fdrop(fp);
 	trace_vfs_dup3_ret(newfd);
 	return newfd;
 
-	out_error:
+out_error_drop:
+	fdrop(fp);
+out_error:
 	trace_vfs_dup3_err(error);
-	if(error > 0)
-		return -error;
-	return error;
+	return (error > 0) ? -error : error;
 }
 
 UK_SYSCALL_R_DEFINE(int, dup2, int, oldfd, int, newfd)
