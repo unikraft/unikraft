@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Cristian Vijelie <cristianvijelie@gmail.com>
+ *          Sergiu Moga <sergiu.moga@protonmail.com>
  *
- * Copyright (c) 2021, University POLITEHNICA of Bucharest. All rights reserved.
+ * Copyright (c) 2023, University POLITEHNICA of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,25 +38,23 @@
 #include <x86/acpi/sdt.h>
 #include <x86/acpi/madt.h>
 
-struct RSDPDescriptor {
-	char Signature[8];
-	__u8 Checksum;
-	char OEMID[6];
-	__u8 Revision;
-	__u32 RsdtAddress;
-} __packed;
+#define RSDP_SIG		"RSD PTR "
+#define RSDP_SIG_LEN		8
 
-struct RSDPDescriptor20 {
-	struct RSDPDescriptor v1;
-
-	__u32 Length;
-	__u64 XsdtAddress;
-	__u8 ExtendedChecksum;
-	__u8 Reserved[3];
+struct acpi_rsdp {
+	char sig[RSDP_SIG_LEN];
+	__u8 checksum;
+	char oem_id[ACPI_OEM_ID_LEN];
+	__u8 revision;
+	__u32 rsdt_paddr;
+	__u32 tab_len;
+	__u64 xsdt_paddr;
+	__u8 xchecksum;
+	__u8 reserved[3];
 } __packed;
 
 /**
- * Detect ACPI version and discover ACPI tables.
+ * Detect ACPI version and fetch ACPI tables.
  *
  * @return 0 on success, -errno otherwise.
  */

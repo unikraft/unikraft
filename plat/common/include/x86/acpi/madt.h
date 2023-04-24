@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Cristian Vijelie <cristianvijelie@gmail.com>
+ *          Sergiu Moga <sergiu.moga@protonmail.com>
  *
- * Copyright (c) 2021, University POLITEHNICA of Bucharest. All rights reserved.
+ * Copyright (c) 2023, University POLITEHNICA of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,41 +35,34 @@
 #ifndef __PLAT_CMN_X86_MADT_H__
 #define __PLAT_CMN_X86_MADT_H__
 
-#include <uk/arch/types.h>
 #include <x86/acpi/sdt.h>
-#include <uk/essentials.h>
 
-struct MADT {
-	struct ACPISDTHeader h;
-	__u32 LocalAPICAddress;
-	__u32 Flags;
-	__u8 Entries[];
+#define ACPI_MADT_SIG						"APIC"
+#define ACPI_MADT_FLAGS_PCAT_COMPAT				0x0001
+struct acpi_madt {
+	struct acpi_sdt_hdr hdr;
+	__u32 lapic_paddr;
+	__u32 flags;
+	__u8 entries[];
 } __packed;
 
-#define MADT_FLAGS_PCAT_COMPAT			0x01
-
-struct MADTEntryHeader {
-	__u8 Type;
-	__u8 Length;
-} __packed;
-
-#define MADT_TYPE_LAPIC				0x00
-#define MADT_TYPE_IO_APIC			0x01
-#define MADT_TYPE_INT_SRC_OVERRIDE		0x02
-#define MADT_TYPE_NMI_SOURCE			0x03
-#define MADT_TYPE_LAPIC_NMI			0x04
-#define MADT_TYPE_LAPIC_ADDRESS_OVERRIDE	0x05
-#define MADT_TYPE_IO_SAPIC			0x06
-#define MADT_TYPE_LSAPIC			0x07
-#define MADT_TYPE_PLATFORM_INT_SOURCES		0x08
-#define MADT_TYPE_LX2APIC			0x09
-#define MADT_TYPE_LX2APIC_NMI			0x0a
-#define MADT_TYPE_GICC				0x0b
-#define MADT_TYPE_GICD				0x0c
-#define MADT_TYPE_GIC_MSI			0x0d
-#define MADT_TYPE_GICR				0x0e
-#define MADT_TYPE_GIC_ITS			0x0f
-#define MADT_TYPE_MP_WAKEUP			0x10
+#define ACPI_MADT_LAPIC						0x00
+#define ACPI_MADT_IO_APIC					0x01
+#define ACPI_MADT_IRQ_SRC_OVRD					0x02
+#define ACPI_MADT_NMI_SOURCE					0x03
+#define ACPI_MADT_LAPIC_NMI					0x04
+#define ACPI_MADT_LAPIC_ADDR_OVRD				0x05
+#define ACPI_MADT_IO_SAPIC					0x06
+#define ACPI_MADT_LSAPIC					0x07
+#define ACPI_MADT_PLAT_IRQ_SRCS					0x08
+#define ACPI_MADT_LX2APIC					0x09
+#define ACPI_MADT_LX2APIC_NMI					0x0a
+#define ACPI_MADT_GICC						0x0b
+#define ACPI_MADT_GICD						0x0c
+#define ACPI_MADT_GIC_MSI					0x0d
+#define ACPI_MADT_GICR						0x0e
+#define ACPI_MADT_GIC_ITS					0x0f
+#define ACPI_MADT_MP_WKP					0x10
 
 /*
  * The following structures are declared according to the ACPI
@@ -79,176 +73,174 @@ struct MADTEntryHeader {
  */
 
 /* Processor Local APIC Structure */
-struct MADTType0Entry {
-	struct MADTEntryHeader eh;
-	__u8 ACPIProcessorUID;
-	__u8 APICID;
-	__u32 Flags;
+#define ACPI_MADT_LAPIC_FLAGS_EN				0x01
+#define ACPI_MADT_LAPIC_FLAGS_ON_CAP				0x02
+struct acpi_madt_lapic {
+	struct acpi_subsdt_hdr hdr;
+	__u8 cpu_id;
+	__u8 lapic_id;
+	__u32 flags;
 } __packed;
 
-#define MADT_T0_FLAGS_ENABLED			0x01
-#define MADT_T0_FLAGS_ONLINE_CAPABLE		0x02
-
 /* I/O APIC Structure */
-struct MADTType1Entry {
-	struct MADTEntryHeader eh;
-	__u8 IOAPICID;
-	__u8 Reserved;
-	__u32 IOAPICAddress;
-	__u32 GlobalSystemInterruptBase;
+struct acpi_madt_ioapic {
+	struct acpi_subsdt_hdr hdr;
+	__u8 ioapic_id;
+	__u8 reserved;
+	__u32 ioapic_paddr;
+	__u32 gsi_base;
 } __packed;
 
 /* Interrupt Source Override Structure */
-struct MADTType2Entry {
-	struct MADTEntryHeader eh;
-	__u8 BusSource;
-	__u8 IRQSource;
-	__u32 GlobalSystemInterrupt;
-	__u16 Flags;
+struct acpi_madt_irq_src_ovrd {
+	struct acpi_subsdt_hdr hdr;
+	__u8 bus;
+	__u8 src_irq;
+	__u32 gsi;
+	__u16 flags;
 } __packed;
 
 /* Non-Maskable Interrupt (NMI) Source Structure */
-struct MADTType3Entry {
-	struct MADTEntryHeader eh;
-	__u16 Flags;
-	__u32 GlobalSystemInterrupt;
+struct acpi_madt_nmi_src {
+	struct acpi_subsdt_hdr hdr;
+	__u16 flags;
+	__u32 gsi;
 } __packed;
 
 /* Local APIC NMI Structure */
-struct MADTType4Entry {
-	struct MADTEntryHeader eh;
-	__u8 ACPIProcessorID;
-	__u16 Flags;
-	__u8 LINT;
+struct acpi_madt_lapic_nmi {
+	struct acpi_subsdt_hdr hdr;
+	__u8 cpu_id;
+	__u16 flags;
+	__u8 lint;
 } __packed;
 
 /* Local APIC Address Override Structure */
-struct MADTType5Entry {
-	struct MADTEntryHeader eh;
-	__u16 Reserved;
-	__u64 LAPICOverride;
+struct acpi_madt_lapic_addr_ovrd {
+	struct acpi_subsdt_hdr hdr;
+	__u16 reserved;
+	__u64 lapic_paddr;
 } __packed;
 
 /* I/O SAPIC Structure */
-struct MADTType6Entry {
-	struct MADTEntryHeader eh;
-	__u8 IOAPICID;
-	__u8 Reserved;
-	__u32 GlobalSystemInterruptBase;
-	__u64 IOSAPICAddress;
+struct acpi_madt_iosapic {
+	struct acpi_subsdt_hdr hdr;
+	__u8 iosapic_id;
+	__u8 reserved;
+	__u32 gsi_base;
+	__u64 iosapic_paddr;
 } __packed;
 
 /* Local SAPIC Structure */
-struct MADTType7Entry {
-	struct MADTEntryHeader eh;
-	__u8 ACPIProcessorID;
-	__u8 LocalSAPICID;
-	__u8 LocalSAPICEID;
-	__u8 Reserved[3];
-	__u32 Flags;
-	__u32 ACPIProcessorUIDValue;
-	__u32 ACPIProcessorUIDString[];
+struct acpi_madt_lsapic {
+	struct acpi_subsdt_hdr hdr;
+	__u8 cpu_id;
+	__u8 lsapic_id;
+	__u8 lsapic_eid;
+	__u8 reserved[3];
+	__u32 flags;
+	__u32 uid;
+	char uid_string[1];
 } __packed;
 
 /* Platform Interrupt Source Structure */
-struct MADTType8Entry {
-	struct MADTEntryHeader eh;
-	__u16 Flags;
-	__u8 InterruptType;
-	__u8 ProcessorID;
-	__u8 ProcessorEID;
-	__u8 IOSAPICVector;
-	__u32 GlobalSystemInterrupt;
-	__u32 PlatformInterruptSourceFlags;
+struct acpi_madt_irq_src {
+	struct acpi_subsdt_hdr hdr;
+	__u16 mps_inti_flags;
+	__u8 irq_type;
+	__u8 cpu_id;
+	__u8 cpu_eid;
+	__u8 io_sapic_vector;
+	__u32 gsi;
+	__u32 flags;
 } __packed;
 
 /* Processor Local x2APIC Structure */
-struct MADTType9Entry {
-	struct MADTEntryHeader eh;
-	__u16 Reserved;
-	__u32 X2APICID;
-	__u32 Flags;
-	__u32 ACPIProcessorUID;
+#define ACPI_MADT_X2APIC_FLAGS_EN				0x01
+#define ACPI_MADT_X2APIC_FLAGS_ON_CAP				0x02
+struct acpi_madt_x2apic {
+	struct acpi_subsdt_hdr hdr;
+	__u16 reserved;
+	__u32 lapic_id;
+	__u32 flags;
+	__u32 uid;
 } __packed;
 
-#define MADT_T9_FLAGS_ENABLED			0x01
-#define MADT_T9_FLAGS_ONLINE_CAPABLE		0x02
-
 /* Local x2APIC NMI Structure */
-struct MADTTypeAEntry {
-	struct MADTEntryHeader eh;
-	__u16 Flags;
-	__u32 ACPIProcessorUID;
-	__u8 Localx2APICLINTNr;
-	__u8 Reserved[3];
+struct acpi_madt_x2apic_nmi {
+	struct acpi_subsdt_hdr hdr;
+	__u16 mps_inti_flags;
+	__u32 uid;
+	__u8 lint;
+	__u8 reserved[3];
 } __packed;
 
 /* GIC CPU Interface (GICC) Structure */
-struct MADTTypeBEntry {
-	struct MADTEntryHeader eh;
-	__u16 Reserved;
-	__u32 CPUInterfaceNumber;
-	__u32 ACPIProcessorUID;
-	__u32 Flags;
-	__u32 ParkingProtocolVersion;
-	__u32 PerformanceInterruptGSIV;
-	__u64 ParkedAddress;
-	__u64 PhysicalBaseAddress;
-	__u64 GICV;
-	__u64 GICH;
-	__u32 VGICMaintenanceInterrupt;
-	__u64 GICRBaseAddress;
-	__u64 MPIDR;
-	__u8 ProcessorPowerEfficiencyClass;
-	__u8 Reserved2;
-	__u16 SPEOverflowInterrupt;
+struct acpi_madt_gicc {
+	struct acpi_subsdt_hdr hdr;
+	__u16 reserved;
+	__u32 cpu_if;
+	__u32 uid;
+	__u32 flags;
+	__u32 parking_version;
+	__u32 perf_mon_gsiv;
+	__u64 parked_paddr;
+	__u64 paddr;
+	__u64 gicv;
+	__u64 gich;
+	__u32 vgic_maintenance_gsiv;
+	__u64 gicr_paddr;
+	__u64 mpidr;
+	__u8 power_efficiency;
+	__u8 reserved2;
+	__u16 spe_gsiv;
 } __packed;
 
 /* GIC Distributor (GICD) Structure */
-struct MADTTypeCEntry {
-	struct MADTEntryHeader eh;
-	__u16 Reserved;
-	__u32 GICID;
-	__u64 PhysicalBaseAddress;
-	__u32 SystemVectorBase;
-	__u8 GICVersion;
-	__u8 Reserved2[3];
+struct acpi_madt_gicd {
+	struct acpi_subsdt_hdr hdr;
+	__u16 reserved;
+	__u32 gic_id;
+	__u64 paddr;
+	__u32 gsi_base;
+	__u8 version;
+	__u8 reserved2[3];
 } __packed;
 
 /* GIC MSI Frame Structure */
-struct MADTTypeDEntry {
-	struct MADTEntryHeader eh;
-	__u16 Reserved;
-	__u32 GICMSIFrameID;
-	__u64 PhysicalBaseAddress;
-	__u32 Flags;
-	__u16 SPICount;
-	__u16 SPIBase;
+struct acpi_madt_gic_msi_frame {
+	struct acpi_subsdt_hdr hdr;
+	__u16 reserved;
+	__u32 msi_frame_id;
+	__u64 paddr;
+	__u32 flags;
+	__u16 spi_count;
+	__u16 spi_base;
 } __packed;
 
 /* GIC Redistributor (GICR) Structure */
-struct MADTTypeEEntry {
-	struct MADTEntryHeader eh;
-	__u16 Reserved;
-	__u64 DiscoveryRangeBaseAddress;
-	__u64 DiscoveryRangeLength;
+struct acpi_madt_gicr {
+	struct acpi_subsdt_hdr hdr;
+	__u16 reserved;
+	__u64 paddr;
+	__u32 len;
 } __packed;
 
 /* GIC Interrupt Translation Service (ITS) Structure */
-struct MADTTypeFEntry {
-	struct MADTEntryHeader eh;
-	__u16 Reserved;
-	__u32 GICITSID;
-	__u64 PhysicalBaseAddress;
-	__u32 Reserved2;
+struct acpi_madt_gic_its {
+	struct acpi_subsdt_hdr hdr;
+	__u16 reserved;
+	__u32 id;
+	__u64 paddr;
+	__u32 reserved2;
 } __packed;
 
 /* Multiprocessor Wakeup Structure */
-struct MADTType10Entry {
-	struct MADTEntryHeader eh;
-	__u16 MailBoxVersion;
-	__u32 Reserved;
-	__u64 MailBoxAddress;
+struct acpi_madt_mp_wkp_src {
+	struct acpi_subsdt_hdr hdr;
+	__u16 mbox_version;
+	__u32 reserved;
+	__u64 mbox_paddr;
 } __packed;
 
 /**
@@ -257,6 +249,6 @@ struct MADTType10Entry {
  *
  * @return Pointer to MADT.
  */
-struct MADT *acpi_get_madt(void);
+struct acpi_madt *acpi_get_madt(void);
 
 #endif /* __PLAT_CMN_X86_MADT_H__ */

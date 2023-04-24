@@ -34,23 +34,22 @@
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <x86/acpi/acpi.h>
-#include <x86/acpi/madt.h>
 
 #include <string.h>
 #include <errno.h>
 
-#define RSDT_ENTRIES(rsdt) (((rsdt)->h.Length - sizeof((rsdt)->h)) / 4)
+#define RSDT_ENTRIES(rsdt) (((rsdt)->hdr.tab_len - sizeof((rsdt)->hdr)) / 4)
 
 static __u8 acpi_version;
-static struct RSDPDescriptor *acpi_rsdp;
-static struct RSDT *acpi_rsdt;
-static struct MADT *acpi_madt;
+static struct acpi_rsdp *acpi_rsdp;
+static struct acpi_rsdt *acpi_rsdt;
+static struct acpi_madt *acpi_madt;
 
 /*
  * Compute checksum for ACPI RSDP table.
  */
 
-static inline int verify_rsdp_checksum(struct RSDPDescriptor *rsdp)
+static inline int verify_rsdp_checksum(struct acpi_rsdp *rsdp)
 {
 	__u8 checksum = 0;
 	__u8 *ptr = (__u8 *)rsdp;
@@ -65,12 +64,12 @@ static inline int verify_rsdp_checksum(struct RSDPDescriptor *rsdp)
  * Compute checksum for any ACPI table, except RSDP.
  */
 
-static inline int verify_acpi_checksum(struct ACPISDTHeader *h)
+static inline int verify_acpi_checksum(struct acpi_sdt_hdr *h)
 {
 	__u8 checksum = 0;
 	__u32 i;
 
-	for (i = 0; i < h->Length; i++)
+	for (i = 0; i < h->tab_len; i++)
 		checksum += ((__u8 *)h)[i];
 
 	return checksum == 0 ? 0 : -1;
@@ -95,7 +94,7 @@ static int detect_acpi_version(void)
 
 	for (ptr = start_addr; ptr < end_addr; ptr += 16) {
 		if (!memcmp(ptr, "RSD PTR ", 8)) {
-			acpi_rsdp = (struct RSDPDescriptor *)ptr;
+			acpi_rsdp = (struct acpi_rsdp *)ptr;
 			uk_pr_debug("ACPI RSDP present at %p\n", ptr);
 			break;
 		}
@@ -114,7 +113,7 @@ static int detect_acpi_version(void)
 	}
 
 	uk_pr_info("ACPI version detected: ");
-	if (acpi_rsdp->Revision == 0) {
+	if (acpi_rsdp->revision == 0) {
 		uk_pr_info("1.0\n");
 
 		acpi_version = 1;
@@ -141,10 +140,10 @@ static int acpi10_find_rsdt(void)
 	UK_ASSERT(acpi_version == 1);
 	UK_ASSERT(acpi_rsdp);
 
-	acpi_rsdt = (struct RSDT *)((__uptr)acpi_rsdp->RsdtAddress);
+	acpi_rsdt = (struct acpi_rsdt *)((__uptr)acpi_rsdp->rsdt_paddr);
 	uk_pr_debug("ACPI RSDT present at %p\n", acpi_rsdt);
 
-	if (unlikely(verify_acpi_checksum(&acpi_rsdt->h) != 0)) {
+	if (unlikely(verify_acpi_checksum(&acpi_rsdt->hdr) != 0)) {
 		uk_pr_err("ACPI RSDT corrupted\n");
 
 		acpi_rsdt = NULL;
@@ -163,7 +162,7 @@ static int acpi10_find_rsdt(void)
 static int acpi10_find_madt(void)
 {
 	int entries, i;
-	struct ACPISDTHeader *h;
+	struct acpi_sdt_hdr *h;
 
 	UK_ASSERT(acpi_version == 1);
 	UK_ASSERT(acpi_rsdt);
@@ -172,9 +171,9 @@ static int acpi10_find_madt(void)
 	entries = RSDT_ENTRIES(acpi_rsdt);
 
 	for (i = 0; i < entries; i++) {
-		h = (struct ACPISDTHeader *)((__uptr)acpi_rsdt->Entry[i]);
+		h = (struct acpi_sdt_hdr *)((__uptr)acpi_rsdt->entry[i]);
 
-		if (memcmp(h->Signature, "APIC", 4) != 0)
+		if (memcmp(h->sig, "APIC", 4) != 0)
 			continue; /* Not an APIC entry */
 
 		uk_pr_debug("ACPI MADT present at %p\n", h);
@@ -184,7 +183,7 @@ static int acpi10_find_madt(void)
 			return -ENOENT;
 		}
 
-		acpi_madt = (struct MADT *)h;
+		acpi_madt = (struct acpi_madt *)h;
 		return 0;
 	}
 
@@ -200,7 +199,7 @@ static int acpi10_find_madt(void)
 static void acpi10_list_tables(void)
 {
 	int entries, i;
-	struct ACPISDTHeader *h;
+	struct acpi_sdt_hdr *h;
 
 	UK_ASSERT(acpi_version == 1);
 	UK_ASSERT(acpi_rsdt);
@@ -210,8 +209,8 @@ static void acpi10_list_tables(void)
 	uk_pr_debug("%d ACPI tables found\n", entries);
 
 	for (i = 0; i < entries; i++) {
-		h = (struct ACPISDTHeader *)((__uptr)acpi_rsdt->Entry[i]);
-		uk_pr_debug("%p: %.4s\n", h, h->Signature);
+		h = (struct acpi_sdt_hdr *)((__uptr)acpi_rsdt->entry[i]);
+		uk_pr_debug("%p: %.4s\n", h, h->sig);
 	}
 }
 #endif /* UK_DEBUG */
@@ -281,7 +280,7 @@ int acpi_get_version(void)
  * Return the Multiple APIC Descriptor Table (MADT).
  */
 
-struct MADT *acpi_get_madt(void)
+struct acpi_madt *acpi_get_madt(void)
 {
 	UK_ASSERT(acpi_version);
 	UK_ASSERT(acpi_madt);
