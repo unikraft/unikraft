@@ -15,6 +15,10 @@ config UKPLAT_MEMREGION_MAX_COUNT
 		the amount of statically allocated space in the image made available
 		for storing memory region descriptors' metadata.
 
+config UKPLAT_ACPI_CHECKSUM
+	bool "Verify ACPI structures' checksum"
+	default n
+
 config UKPLAT_LCPU_MAXCOUNT
 	int "Maximum number of supported logical CPUs"
 	range 1 256

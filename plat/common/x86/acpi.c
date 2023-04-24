@@ -39,40 +39,27 @@
 #include <errno.h>
 
 #define RSDT_ENTRIES(rsdt) (((rsdt)->hdr.tab_len - sizeof((rsdt)->hdr)) / 4)
+#define RSDP10_LEN		20
 
 static __u8 acpi_version;
 static struct acpi_rsdp *acpi_rsdp;
 static struct acpi_rsdt *acpi_rsdt;
 static struct acpi_madt *acpi_madt;
 
-/*
- * Compute checksum for ACPI RSDP table.
- */
-
-static inline int verify_rsdp_checksum(struct acpi_rsdp *rsdp)
+static __u8 get_acpi_checksum(void __maybe_unused *buf, __sz __maybe_unused len)
 {
+#ifdef CONFIG_UKPLAT_ACPI_CHECKSUM
+	const __u8 *const ptr_end = (__u8 *)buf + len;
+	const __u8 *ptr = (__u8 *)buf;
 	__u8 checksum = 0;
-	__u8 *ptr = (__u8 *)rsdp;
 
-	while (ptr < (__u8 *)(rsdp + 1))
+	while (ptr < ptr_end)
 		checksum += *ptr++;
 
-	return checksum == 0 ? 0 : -1;
-}
-
-/*
- * Compute checksum for any ACPI table, except RSDP.
- */
-
-static inline int verify_acpi_checksum(struct acpi_sdt_hdr *h)
-{
-	__u8 checksum = 0;
-	__u32 i;
-
-	for (i = 0; i < h->tab_len; i++)
-		checksum += ((__u8 *)h)[i];
-
-	return checksum == 0 ? 0 : -1;
+	return checksum;
+#else
+	return 0;
+#endif
 }
 
 /**
@@ -105,7 +92,7 @@ static int detect_acpi_version(void)
 		return -ENOENT;
 	}
 
-	if (verify_rsdp_checksum(acpi_rsdp) != 0) {
+	if (unlikely(!get_acpi_checksum(acpi_rsdp, RSDP10_LEN))) {
 		uk_pr_err("ACPI RSDP corrupted\n");
 
 		acpi_rsdp = NULL;
@@ -143,7 +130,8 @@ static int acpi10_find_rsdt(void)
 	acpi_rsdt = (struct acpi_rsdt *)((__uptr)acpi_rsdp->rsdt_paddr);
 	uk_pr_debug("ACPI RSDT present at %p\n", acpi_rsdt);
 
-	if (unlikely(verify_acpi_checksum(&acpi_rsdt->hdr) != 0)) {
+	if (unlikely(!get_acpi_checksum(&acpi_rsdt->hdr,
+		     acpi_rsdt->hdr.tab_len))) {
 		uk_pr_err("ACPI RSDT corrupted\n");
 
 		acpi_rsdt = NULL;
@@ -178,7 +166,7 @@ static int acpi10_find_madt(void)
 
 		uk_pr_debug("ACPI MADT present at %p\n", h);
 
-		if (verify_acpi_checksum(h) != 0) {
+		if (unlikely(!get_acpi_checksum(h, h->tab_len))) {
 			uk_pr_err("ACPI MADT corrupted\n");
 			return -ENOENT;
 		}
