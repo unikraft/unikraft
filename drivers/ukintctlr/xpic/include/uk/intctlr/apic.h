@@ -148,6 +148,38 @@ static inline void x2apic_ack_interrupt(void)
 	wrmsr(APIC_MSR_EOI, 0, 0);
 }
 
+static inline void x2apic_set_timer(int timer_mode, __u32 irqno)
+{
+	__u32 lo, hi;
+
+	UK_ASSERT(timer_mode == APIC_TIMER_MODE_ONE_SHOT
+		  || timer_mode == APIC_TIMER_MODE_PERIODIC
+		  || timer_mode == APIC_TIMER_MODE_TSC_DEADLINE);
+
+	rdmsr(APIC_MSR_LVT_TIMER, &lo, &hi);
+
+	lo &= APIC_LVT_MASK_MASK;
+	lo |= (timer_mode & APIC_TIMER_MODE_MASK) |
+	      (irqno & APIC_LVT_VECTOR_MASK);
+
+	wrmsr(APIC_MSR_LVT_TIMER, lo, hi);
+}
+
+static inline void x2apic_set_timer_mask(int mask)
+{
+	__u32 lo, hi;
+
+	rdmsr(APIC_MSR_LVT_TIMER, &lo, &hi);
+	lo &= ~(APIC_LVT_MASK_MASK);
+	lo |= mask ? APIC_LVT_MASK_MASK : 0;
+	wrmsr(APIC_MSR_LVT_TIMER, lo, hi);
+}
+
+static inline void x2apic_set_timer_counter(__u32 value)
+{
+	wrmsr(APIC_MSR_TIMER_IC, value, 0);
+}
+
 /* We only support x2APIC at the moment */
 #define apic_enable		x2apic_enable
 #define apic_send_ipi		x2apic_send_ipi
@@ -157,5 +189,8 @@ static inline void x2apic_ack_interrupt(void)
 #define apic_send_iipi_deassert x2apic_send_iipi_deassert
 #define apic_clear_errors	x2apic_clear_errors
 #define apic_ack_interrupt	x2apic_ack_interrupt
+#define apic_set_timer		x2apic_set_timer
+#define apic_set_timer_mask	x2apic_set_timer_mask
+#define apic_set_timer_counter	x2apic_set_timer_counter
 
 #endif /* __PLAT_CMN_X86_APIC_H__ */
