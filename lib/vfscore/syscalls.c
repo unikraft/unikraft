@@ -1471,14 +1471,11 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 		UK_ASSERT(dp);
 	}
 
-	if (dp->d_mount->m_flags & MNT_RDONLY) {
-		error = EROFS;
-	} else {
-		if (vn_access(dp->d_vnode, VWRITE)) {
-			return EACCES;
-		}
-		error = vn_settimes(dp->d_vnode, timespec_times);
-	}
+	error = vn_access(dp->d_vnode, VWRITE);
+	if (unlikely(error))
+		goto exit_rel;
+
+	error = vn_settimes(dp->d_vnode, timespec_times);
 
 exit_rel:
 	if (fp)
