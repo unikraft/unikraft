@@ -81,6 +81,7 @@ static void schedcoop_schedule(struct uk_sched *s)
 		 */
 		next = &c->idle;
 	}
+	uktimer_set_idle(next == &c->idle);
 
 	if (next != prev) {
 		/*
