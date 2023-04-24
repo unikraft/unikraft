@@ -36,19 +36,18 @@
 #include <uk/sched_impl.h>
 #include <uk/schedcoop.h>
 #include <uk/essentials.h>
+#include <uk/tick.h>
 #include "schedcoop.h"
 
 static void schedcoop_schedule(struct uk_sched *s)
 {
 	struct schedcoop *c = uksched2schedcoop(s);
-	struct uk_thread *prev, *next, *thread, *tmp;
-	__snsec now, min_wakeup_time;
+	struct uk_thread *prev, *next;
 	unsigned long flags;
 
 	if (unlikely(ukplat_lcpu_irqs_disabled()))
 		UK_CRASH("Must not call %s with IRQs disabled\n", __func__);
 
-	now = ukplat_monotonic_clock();
 	prev = uk_thread_current();
 	flags = ukplat_lcpu_save_irqf();
 
@@ -56,29 +55,6 @@ static void schedcoop_schedule(struct uk_sched *s)
 	if (in_callback)
 		UK_CRASH("Must not call %s from a callback\n", __func__);
 #endif
-
-	/* Update execution time of current thread */
-	/* WARNING: We assume here that scheduler `s` is only responsible for
-	 *          the current logical CPU. Otherwise, we would have to store
-	 *          the time of the last context switch per logical core.
-	 */
-	prev->exec_time += now - c->ts_prev_switch;
-	c->ts_prev_switch = now;
-
-	/* Examine all sleeping threads.
-	 * Wake up expired ones and find the time when the next timeout expires.
-	 */
-	min_wakeup_time = 0;
-	UK_TAILQ_FOREACH_SAFE(thread, &c->sleep_queue,
-			      queue, tmp) {
-		if (likely(thread->wakeup_time)) {
-			if (thread->wakeup_time <= now)
-				uk_thread_wake(thread);
-			else if (!min_wakeup_time
-				 || thread->wakeup_time < min_wakeup_time)
-				min_wakeup_time = thread->wakeup_time;
-		}
-	}
 
 	next = UK_TAILQ_FIRST(&c->run_queue);
 	if (next) {
@@ -103,7 +79,6 @@ static void schedcoop_schedule(struct uk_sched *s)
 		 * We select the idle thread only if we do not have anything
 		 * else to execute
 		 */
-		c->idle_return_time = min_wakeup_time;
 		next = &c->idle;
 	}
 
@@ -158,14 +133,11 @@ static void schedcoop_thread_blocked(struct uk_sched *s, struct uk_thread *t)
 
 	if (t != uk_thread_current())
 		UK_TAILQ_REMOVE(&c->run_queue, t, queue);
-	if (t->wakeup_time > 0)
-		UK_TAILQ_INSERT_TAIL(&c->sleep_queue, t, queue);
 }
 
 static __noreturn void idle_thread_fn(void *argp)
 {
 	struct schedcoop *c = (struct schedcoop *) argp;
-	__nsec now, wake_up_time;
 	unsigned long flags;
 
 	UK_ASSERT(c);
@@ -196,19 +168,15 @@ static __noreturn void idle_thread_fn(void *argp)
 			continue;
 		}
 
-		/* Read return time set by last schedule operation */
-		wake_up_time = (volatile __nsec) c->idle_return_time;
-		now = ukplat_monotonic_clock();
+		/* Check whether a timer woke a thread up and don't halt if
+		 * that is the case.
+		 */
+		if (!UK_READ_ONCE(c->have_pending_events))
+			ukplat_lcpu_halt_irq();
+		UK_WRITE_ONCE(c->have_pending_events, 0);
 
-		if (!wake_up_time || wake_up_time > now) {
-			if (wake_up_time)
-				ukplat_lcpu_halt_irq_until(wake_up_time);
-			else
-				ukplat_lcpu_halt_irq();
-
-			/* handle pending events if any */
-			ukplat_lcpu_irqs_handle_pending();
-		}
+		/* handle pending events if any */
+		ukplat_lcpu_irqs_handle_pending();
 
 		ukplat_lcpu_restore_irqf(flags);
 

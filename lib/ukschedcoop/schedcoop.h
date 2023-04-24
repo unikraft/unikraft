@@ -12,6 +12,7 @@ struct schedcoop {
 	struct uk_sched sched;
 	struct uk_thread_list run_queue;
 	struct uk_thread_list sleep_queue;
+	unsigned long have_pending_events;
 
 	struct uk_thread idle;
 	__nsec idle_return_time;
