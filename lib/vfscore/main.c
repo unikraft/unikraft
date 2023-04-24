@@ -1985,8 +1985,17 @@ out_error:
 
 UK_SYSCALL_R_DEFINE(int, dup2, int, oldfd, int, newfd)
 {
-	if (oldfd == newfd)
+	struct vfscore_file *fp;
+	int error;
+
+	if (unlikely(oldfd == newfd)) {
+		error = fget(oldfd, &fp);
+		if (unlikely(error))
+			return -error;
+
+		fdrop(fp);
 		return newfd;
+	}
 
 	return uk_syscall_r_dup3(oldfd, newfd, 0);
 }
