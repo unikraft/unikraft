@@ -42,7 +42,7 @@
 #include <x86/cpu.h>
 #include <x86/traps.h>
 #include <x86/delay.h>
-#include <x86/acpi/madt.h>
+#include <uk/plat/common/acpi.h>
 
 #include <uk/plat/lcpu.h>
 #include <uk/plat/common/lcpu.h>
@@ -144,44 +144,43 @@ static void ukreloc_mp_init(void)
 
 int lcpu_arch_mp_init(void *arg __unused)
 {
-	struct MADT *madt;
-	union {
-		struct MADTEntryHeader *h;
-		struct MADTType0Entry *e0;
-		struct MADTType9Entry *e9;
-	} m;
-	__sz off, len;
-	struct lcpu *lcpu;
-	__lcpuid cpu_id;
 	__lcpuid bsp_cpu_id = lcpu_get(0)->id;
+	union {
+		acpi_madt_x2apic_t *x2apic;
+		acpi_madt_lapic_t *lapic;
+		acpi_subsdt_hdr_t *h;
+	} m;
 	int bsp_found __maybe_unused = 0;
+	struct lcpu *lcpu;
+	acpi_madt_t *madt;
+	__lcpuid cpu_id;
+	__sz off, len;
 
-	uk_pr_info("Bootstrapping processor has the ID %ld\n",
-		   bsp_cpu_id);
+	uk_pr_info("Bootstrapping processor has the ID %ld\n", bsp_cpu_id);
 
 	/* Enumerate all other CPUs */
 	madt = acpi_get_madt();
 	UK_ASSERT(madt);
 
-	len = madt->h.Length - sizeof(struct MADT);
-	for (off = 0; off < len; off += m.h->Length) {
-		m.h = (struct MADTEntryHeader *)(madt->Entries + off);
+	len = madt->hdr.tab_len - sizeof(*madt);
+	for (off = 0; off < len; off += m.h->len) {
+		m.h = (acpi_subsdt_hdr_t *)(madt->entries + off);
 
-		switch (m.h->Type) {
-		case MADT_TYPE_LAPIC:
-			if (!(m.e0->Flags & MADT_T0_FLAGS_ENABLED) &&
-			    !(m.e0->Flags & MADT_T0_FLAGS_ONLINE_CAPABLE))
+		switch (m.h->type) {
+		case ACPI_MADT_LAPIC:
+			if (!(m.lapic->flags & ACPI_MADT_LAPIC_FLAGS_EN) &&
+			    !(m.lapic->flags & ACPI_MADT_LAPIC_FLAGS_ON_CAP))
 				continue; /* goto next MADT entry */
 
-			cpu_id = m.e0->APICID;
+			cpu_id = m.lapic->lapic_id;
 			break;
 
-		case MADT_TYPE_LX2APIC:
-			if (!(m.e9->Flags & MADT_T9_FLAGS_ENABLED) &&
-			    !(m.e9->Flags & MADT_T9_FLAGS_ONLINE_CAPABLE))
+		case ACPI_MADT_LX2APIC:
+			if (!(m.x2apic->flags & ACPI_MADT_X2APIC_FLAGS_EN) &&
+			    !(m.x2apic->flags & ACPI_MADT_X2APIC_FLAGS_ON_CAP))
 				continue; /* goto next MADT entry */
 
-			cpu_id = m.e9->X2APICID;
+			cpu_id = m.x2apic->lapic_id;
 			break;
 
 		default:
@@ -209,8 +208,7 @@ int lcpu_arch_mp_init(void *arg __unused)
 
 	/* Copy AP startup code to target address in first 1MiB */
 	UK_ASSERT(x86_start16_addr < 0x100000);
-	memcpy((void *)x86_start16_addr, &x86_start16_begin,
-	       X86_START16_SIZE);
+	memcpy((void *)x86_start16_addr, &x86_start16_begin, X86_START16_SIZE);
 
 	ukreloc_mp_init();
 

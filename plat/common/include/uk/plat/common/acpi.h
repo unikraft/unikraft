@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Cristian Vijelie <cristianvijelie@gmail.com>
+ *          Sergiu Moga <sergiu.moga@protonmail.com>
  *
- * Copyright (c) 2021, University POLITEHNICA of Bucharest. All rights reserved.
+ * Copyright (c) 2023, University POLITEHNICA of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,32 +32,46 @@
  *
  */
 
-#ifndef __PLAT_CMN_X86_SDT_H__
-#define __PLAT_CMN_X86_SDT_H__
+#ifndef __PLAT_CMN_ACPI_H__
+#define __PLAT_CMN_ACPI_H__
 
-#include <uk/arch/types.h>
-#include <uk/essentials.h>
+#include "sdt.h"
+#include "madt.h"
 
-struct ACPISDTHeader {
-	char Signature[4];
-	__u32 Length;
-	__u8 Revision;
-	__u8 Checksum;
-	char OEMID[6];
-	char OEMTableID[8];
-	__u32 OEMRevision;
-	__u32 CreatorID;
-	__u32 CreatorRevision;
-} __packed;
+#define RSDP_SIG		"RSD PTR "
+#define RSDP_SIG_LEN		8
 
-struct RSDT {
-	struct ACPISDTHeader h;
-	__u32 Entry[];
-} __packed;
+typedef struct acpi_rsdp {
+	char sig[RSDP_SIG_LEN];
+	__u8 checksum;
+	char oem_id[ACPI_OEM_ID_LEN];
+	__u8 revision;
+	__u32 rsdt_paddr;
+	__u32 tab_len;
+	__u64 xsdt_paddr;
+	__u8 xchecksum;
+	__u8 reserved[3];
+} __packed acpi_rsdp_t;
 
-struct XSDT {
-	struct ACPISDTHeader h;
-	__u64 Entry[];
-} __packed;
+/**
+ * Get the Multiple APIC Descriptor Table (MADT).
+ *
+ * @return ACPI table pointer on success, NULL otherwise.
+ */
+acpi_madt_t *acpi_get_madt(void);
 
-#endif /* __PLAT_CMN_X86_SDT_H__ */
+/**
+ * Get the Fixed ACPI Description Table (FADT).
+ *
+ * @return ACPI table pointer on success, NULL otherwise.
+ */
+acpi_fadt_t *acpi_get_fadt(void);
+
+/**
+ * Detect ACPI version and fetch ACPI tables.
+ *
+ * @return 0 on success, -errno otherwise.
+ */
+int acpi_init(void);
+
+#endif /* __PLAT_CMN_ACPI_H__ */
