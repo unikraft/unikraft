@@ -1,0 +1,6 @@
+$(eval $(call addlib_s,libuktimer,$(CONFIG_LIBUKTIMER)))
+
+CINCLUDES-$(CONFIG_LIBUKTIMER)   += -I$(LIBUKTIMER_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBUKTIMER) += -I$(LIBUKTIMER_BASE)/include
+
+LIBUKTIMER_SRCS-y += $(LIBUKTIMER_BASE)/hrtimer.c|isr

@@ -1,0 +1,10 @@
+menuconfig LIBUKTIMER
+	bool "ukttimer: Unikraft Timer facilities"
+	default y
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKDEBUG
+	select LIBUKCLOCKEVENT
+
+if LIBUKTIMER
+
+endif # LIBUKTIMER
