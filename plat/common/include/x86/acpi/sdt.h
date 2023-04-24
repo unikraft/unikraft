@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Cristian Vijelie <cristianvijelie@gmail.com>
+ *          Sergiu Moga <sergiu.moga@protonmail.com>
  *
- * Copyright (c) 2021, University POLITEHNICA of Bucharest. All rights reserved.
+ * Copyright (c) 2023, University POLITEHNICA of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -37,26 +38,38 @@
 #include <uk/arch/types.h>
 #include <uk/essentials.h>
 
-struct ACPISDTHeader {
-	char Signature[4];
-	__u32 Length;
-	__u8 Revision;
-	__u8 Checksum;
-	char OEMID[6];
-	char OEMTableID[8];
-	__u32 OEMRevision;
-	__u32 CreatorID;
-	__u32 CreatorRevision;
+#define ACPI_OEM_ID_LEN					6
+#define ACPI_OEM_TAB_ID_LEN				8
+#define ACPI_SDT_SIG_LEN				4
+#define ACPI_SDT_CREATOR_ID_LEN				4
+
+struct acpi_sdt_hdr {
+	char sig[ACPI_SDT_SIG_LEN];
+	__u32 tab_len;
+	__u8 revision;
+	__u8 checksum;
+	char oem_id[ACPI_OEM_ID_LEN];
+	char oem_table_id[ACPI_OEM_TAB_ID_LEN];
+	__u32 oem_revision;
+	char creator_id[ACPI_SDT_CREATOR_ID_LEN];
+	__u32 creator_revision;
 } __packed;
 
-struct RSDT {
-	struct ACPISDTHeader h;
-	__u32 Entry[];
+struct acpi_subsdt_hdr {
+	__u8 type;
+	__u8 len;
 } __packed;
 
-struct XSDT {
-	struct ACPISDTHeader h;
-	__u64 Entry[];
+#define ACPI_RSDT_SIG					"RSDT"
+struct acpi_rsdt {
+	struct acpi_sdt_hdr hdr;
+	__u32 entry[];
+} __packed;
+
+#define ACPI_XSDT_SIG					"XSDT"
+struct acpi_xsdt {
+	struct acpi_sdt_hdr hdr;
+	__u64 entry[];
 } __packed;
 
 #endif /* __PLAT_CMN_X86_SDT_H__ */
