@@ -1,8 +1,9 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Cristian Vijelie <cristianvijelie@gmail.com>
+ *          Sergiu Moga <sergiu.moga@protonmail.com>
  *
- * Copyright (c) 2021, University POLITEHNICA of Bucharest. All rights reserved.
+ * Copyright (c) 2023, University POLITEHNICA of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,17 +35,39 @@
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <x86/acpi/acpi.h>
-
 #include <string.h>
 #include <errno.h>
+#include <uk/plat/common/bootinfo.h>
 
-#define RSDT_ENTRIES(rsdt) (((rsdt)->hdr.tab_len - sizeof((rsdt)->hdr)) / 4)
 #define RSDP10_LEN		20
+#define BIOS_ROM_START		0xE0000UL
+#define BIOS_ROM_END		0xFFFFFUL
+#define BIOS_ROM_STEP		16
 
-static __u8 acpi_version;
-static struct acpi_rsdp *acpi_rsdp;
-static struct acpi_rsdt *acpi_rsdt;
 static struct acpi_madt *acpi_madt;
+static __u8 acpi_rsdt_entries;
+static void *acpi_rsdt;
+static __u8 acpi10;
+
+static struct {
+	struct acpi_sdt_hdr **sdt;
+	const char *sig;
+} acpi_sdts[] = {
+	{
+		.sdt = (struct acpi_sdt_hdr **)&acpi_madt,
+		.sig = ACPI_MADT_SIG,
+	},
+};
+
+static inline __paddr_t get_rsdt_entry(int idx)
+{
+	__u8 *entryp = (__u8 *)acpi_rsdt + sizeof(struct acpi_sdt_hdr);
+
+	if (acpi10)
+		return ((__u32 *)entryp)[idx];
+
+	return ((__u64 *)entryp)[idx];
+}
 
 static __u8 get_acpi_checksum(void __maybe_unused *buf, __sz __maybe_unused len)
 {
@@ -62,216 +85,136 @@ static __u8 get_acpi_checksum(void __maybe_unused *buf, __sz __maybe_unused len)
 #endif
 }
 
-/**
- * Find the Root System Descriptor Pointer (RSDP) in the physical memory area
- * 0xe0000 -> 0xfffff and determine ACPI version.
- *
- * @return 0 on success, -ENOENT if the table is not found, or invalid,
- * -ENOTSUP if the ACPI version is not supported.
- */
-
-static int detect_acpi_version(void)
+static void acpi_init_tables(void)
 {
-	__u8 *start_addr = (__u8 *)0xe0000; /* BIOS read-only memory space */
-	__u8 *end_addr = (__u8 *)0xfffff;
-	__u8 *ptr;
-
-	UK_ASSERT(!acpi_rsdp);
-	UK_ASSERT(!acpi_version);
-
-	for (ptr = start_addr; ptr < end_addr; ptr += 16) {
-		if (!memcmp(ptr, "RSD PTR ", 8)) {
-			acpi_rsdp = (struct acpi_rsdp *)ptr;
-			uk_pr_debug("ACPI RSDP present at %p\n", ptr);
-			break;
-		}
-	}
-
-	if (!acpi_rsdp) {
-		uk_pr_debug("ACPI RSDP not found\n");
-		return -ENOENT;
-	}
-
-	if (unlikely(!get_acpi_checksum(acpi_rsdp, RSDP10_LEN))) {
-		uk_pr_err("ACPI RSDP corrupted\n");
-
-		acpi_rsdp = NULL;
-		return -ENOENT;
-	}
-
-	uk_pr_info("ACPI version detected: ");
-	if (acpi_rsdp->revision == 0) {
-		uk_pr_info("1.0\n");
-
-		acpi_version = 1;
-	} else {
-		uk_pr_info(">= 2\n");
-
-		/*
-		 * TODO: add support for ACPI version 2 and greater
-		 */
-		uk_pr_err("ACPI version not supported\n");
-
-		return -ENOTSUP;
-	}
-
-	return 0;
-}
-
-/*
- * Find the ACPI Root System Descriptor Table (RSDT) and check if it's valid.
- */
-
-static int acpi10_find_rsdt(void)
-{
-	UK_ASSERT(acpi_version == 1);
-	UK_ASSERT(acpi_rsdp);
-
-	acpi_rsdt = (struct acpi_rsdt *)((__uptr)acpi_rsdp->rsdt_paddr);
-	uk_pr_debug("ACPI RSDT present at %p\n", acpi_rsdt);
-
-	if (unlikely(!get_acpi_checksum(&acpi_rsdt->hdr,
-		     acpi_rsdt->hdr.tab_len))) {
-		uk_pr_err("ACPI RSDT corrupted\n");
-
-		acpi_rsdt = NULL;
-		return -ENOENT;
-	}
-
-	return 0;
-}
-
-/*
- * Find the Multiple APIC Descriptor Table (MADT) in the RSDT and check if
- * it's valid. MADT can be found by searching for the string "APIC" in the
- * first 4 bytes of each table entry.
- */
-
-static int acpi10_find_madt(void)
-{
-	int entries, i;
 	struct acpi_sdt_hdr *h;
+	const char *sig;
+	__sz i, j;
 
-	UK_ASSERT(acpi_version == 1);
 	UK_ASSERT(acpi_rsdt);
-	UK_ASSERT(!acpi_madt);
 
-	entries = RSDT_ENTRIES(acpi_rsdt);
+	for (i = 0; i < acpi_rsdt_entries; i++)
+		for (j = 0; j < ARRAY_SIZE(acpi_sdts); j++) {
+			if (*acpi_sdts[j].sdt)
+				continue;
 
-	for (i = 0; i < entries; i++) {
-		h = (struct acpi_sdt_hdr *)((__uptr)acpi_rsdt->entry[i]);
+			h = (struct acpi_sdt_hdr *)get_rsdt_entry(i);
+			sig = acpi_sdts[j].sig;
 
-		if (memcmp(h->sig, "APIC", 4) != 0)
-			continue; /* Not an APIC entry */
+			if (!memcmp(h->sig, sig, ACPI_SDT_SIG_LEN)) {
+				if (unlikely(get_acpi_checksum(h,
+							       h->tab_len))) {
+					uk_pr_warn("ACPI %s corrupted\n", sig);
 
-		uk_pr_debug("ACPI MADT present at %p\n", h);
+					continue;
+				}
 
-		if (unlikely(!get_acpi_checksum(h, h->tab_len))) {
-			uk_pr_err("ACPI MADT corrupted\n");
-			return -ENOENT;
+				*acpi_sdts[j].sdt = h;
+
+				continue;
+			}
 		}
-
-		acpi_madt = (struct acpi_madt *)h;
-		return 0;
-	}
-
-	/* no MADT was found */
-	return -ENOENT;
 }
 
 /*
  * Print the detected ACPI tables to the debug output.
  */
-
 #ifdef UK_DEBUG
-static void acpi10_list_tables(void)
+static void acpi_list_tables(void)
 {
-	int entries, i;
-	struct acpi_sdt_hdr *h;
+	int i;
 
-	UK_ASSERT(acpi_version == 1);
 	UK_ASSERT(acpi_rsdt);
 
-	entries = RSDT_ENTRIES(acpi_rsdt);
+	uk_pr_debug("%d ACPI tables found from %.4s\n", acpi_rsdt_entries,
+		    acpi10 ? ACPI_RSDT_SIG : ACPI_XSDT_SIG);
+	for (i = 0; i < ARRAY_SIZE(acpi_sdts); i++) {
+		if (!acpi_sdts[i].sdt)
+			continue;
 
-	uk_pr_debug("%d ACPI tables found\n", entries);
-
-	for (i = 0; i < entries; i++) {
-		h = (struct acpi_sdt_hdr *)((__uptr)acpi_rsdt->entry[i]);
-		uk_pr_debug("%p: %.4s\n", h, h->sig);
+		uk_pr_debug("%p: %.4s\n", acpi_sdts[i].sdt, acpi_sdts[i].sig);
 	}
 }
 #endif /* UK_DEBUG */
 
-/*
- * Initialize ACPI 1.0 data structures.
- */
-
-static int acpi10_init(void)
+#if defined(__X86_64__)
+static struct acpi_rsdp *acpi_get_bios_rom_rsdp(void)
 {
-	int ret;
+	__paddr_t ptr;
 
-	UK_ASSERT(acpi_version == 1);
+	for (ptr = BIOS_ROM_START; ptr < BIOS_ROM_END; ptr += BIOS_ROM_STEP)
+		if (!memcmp((void *)ptr, RSDP_SIG, sizeof(RSDP_SIG) - 1)) {
+			uk_pr_debug("ACPI RSDP present at %lx\n", ptr);
 
-	if ((ret = acpi10_find_rsdt()) != 0)
-		return ret;
+			return (struct acpi_rsdp *)ptr;
+		}
 
-#ifdef UK_DEBUG
-	acpi10_list_tables();
+	return NULL;
+}
 #endif
 
-	if ((ret = acpi10_find_madt()) != 0)
-		return ret;
-
-	return 0;
+static struct acpi_rsdp *acpi_get_rsdp(void)
+{
+	return acpi_get_bios_rom_rsdp();
 }
 
 /*
  * Detect ACPI version and discover ACPI tables.
  */
-
 int acpi_init(void)
 {
-	int ret;
+	struct acpi_rsdp *rsdp;
+	struct acpi_sdt_hdr *h;
 
-	UK_ASSERT(!acpi_version);
+	rsdp = acpi_get_rsdp();
+	if (unlikely(!rsdp))
+		return -ENOENT;
 
-	if ((ret = detect_acpi_version()) != 0)
-		return ret;
+	if (unlikely(get_acpi_checksum(rsdp, RSDP10_LEN))) {
+		uk_pr_err("ACPI 1.0 RSDP corrupted\n");
 
-	/* Try to initialize the respective ACPI support. If it fails, we reset
-	 * acpi_version to indicate that ACPI support is not provided.
-	 */
-	if (acpi_version == 1) {
-		if ((ret = acpi10_init()) != 0) {
-			acpi_version = 0;
-			return ret;
-		}
-	} else {
-		UK_ASSERT(!acpi_version);
-		return -ENOTSUP;
+		return -ENOENT;
 	}
+
+	if (rsdp->revision == 0) {
+		h = (struct acpi_sdt_hdr *)((__uptr)rsdp->rsdt_paddr);
+		acpi_rsdt_entries = (h->tab_len - sizeof(*h)) / 4;
+		acpi10 = 1;
+	} else {
+		if (unlikely(get_acpi_checksum(rsdp, sizeof(*rsdp)))) {
+			uk_pr_err("ACPI 1.0 RSDP corrupted\n");
+
+			return -ENOENT;
+		}
+
+		h = (struct acpi_sdt_hdr *)rsdp->xsdt_paddr;
+		acpi_rsdt_entries = (h->tab_len - sizeof(*h)) / 8;
+	}
+
+	UK_ASSERT(h);
+
+	if (unlikely(get_acpi_checksum(h, h->tab_len))) {
+		uk_pr_err("ACPI RSDT corrupted\n");
+
+		return -ENOENT;
+	}
+
+	acpi_rsdt = h;
+
+	acpi_init_tables();
+
+#ifdef UK_DEBUG
+	acpi_list_tables();
+#endif
 
 	return 0;
 }
 
-/*
- * Return detected ACPI version.
- */
-
-int acpi_get_version(void)
-{
-	return acpi_version;
-}
 
 /*
  * Return the Multiple APIC Descriptor Table (MADT).
  */
-
 struct acpi_madt *acpi_get_madt(void)
 {
-	UK_ASSERT(acpi_version);
-	UK_ASSERT(acpi_madt);
-
 	return acpi_madt;
 }

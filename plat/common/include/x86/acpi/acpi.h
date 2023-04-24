@@ -54,18 +54,17 @@ struct acpi_rsdp {
 } __packed;
 
 /**
+ * Get the Multiple APIC Descriptor Table (MADT).
+ *
+ * @return ACPI table pointer on success, NULL otherwise.
+ */
+struct acpi_madt *acpi_get_madt(void);
+
+/**
  * Detect ACPI version and fetch ACPI tables.
  *
  * @return 0 on success, -errno otherwise.
  */
 int acpi_init(void);
-
-/**
- * Return the detected ACPI version.
- *
- * @return 0 if ACPI is not initialized or initialization failed, ACPI version
- *    otherwise.
- */
-int acpi_get_version(void);
 
 #endif /* __PLAT_CMN_X86_ACPI_H__ */
