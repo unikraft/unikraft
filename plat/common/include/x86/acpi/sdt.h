@@ -72,4 +72,13 @@ struct acpi_xsdt {
 	__u64 entry[];
 } __packed;
 
+#define ACPI_MADT_SIG					"APIC"
+#define ACPI_MADT_FLAGS_PCAT_COMPAT			0x0001
+struct acpi_madt {
+	struct acpi_sdt_hdr hdr;
+	__u32 lapic_paddr;
+	__u32 flags;
+	__u8 entries[];
+} __packed;
+
 #endif /* __PLAT_CMN_X86_SDT_H__ */
