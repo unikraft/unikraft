@@ -1502,20 +1502,7 @@ exit_rel:
 int
 sys_futimens(int fd, const struct timespec times[2])
 {
-	int error;
-	struct vfscore_file *fp;
-	char *pathname;
-
-	fp = vfscore_get_file(fd);
-	if (!fp)
-		return EBADF;
-
-	if (!fp->f_dentry)
-		return EBADF;
-
-	pathname = fp->f_dentry->d_path;
-	error = sys_utimensat(AT_FDCWD, pathname, times, 0);
-	return error;
+	return sys_utimensat(fd, NULL, times, 0);
 }
 
 int
