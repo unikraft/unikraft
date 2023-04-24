@@ -1372,27 +1372,27 @@ sys_utimes(char *path, const struct timeval *times, int flags)
 /*
  * Check the validity of members of a struct timespec
  */
-static int is_timespec_valid(const struct timespec *time)
+static int timespec_is_valid(const struct timespec *time)
 {
 	return (time->tv_sec >= 0) &&
-	   ((time->tv_nsec >= 0 && time->tv_nsec <= 999999999) ||
-	    time->tv_nsec == UTIME_NOW ||
-	    time->tv_nsec == UTIME_OMIT);
+	       ((time->tv_nsec >= 0 && time->tv_nsec <= 999999999) ||
+		time->tv_nsec == UTIME_NOW ||
+		time->tv_nsec == UTIME_OMIT);
 }
 
-void init_timespec(struct timespec *_times, const struct timespec *times)
+static void timespec_init(struct timespec *out, const struct timespec *in)
 {
-	if (times == NULL || times->tv_nsec == UTIME_NOW) {
-		clock_gettime(CLOCK_REALTIME, _times);
+	if (in == NULL || in->tv_nsec == UTIME_NOW) {
+		clock_gettime(CLOCK_REALTIME, out);
 	} else {
-		_times->tv_sec = times->tv_sec;
-		_times->tv_nsec = times->tv_nsec;
+		out->tv_sec = in->tv_sec;
+		out->tv_nsec = in->tv_nsec;
 	}
-	return;
 }
 
 int
-sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags)
+sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2],
+	      int flags)
 {
 	int error;
 	char *ap;
@@ -1407,15 +1407,15 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 			     times[1].tv_nsec == UTIME_OMIT))
 			return 0;
 
-		if (unlikely(!is_timespec_valid(&times[0]) ||
-			     !is_timespec_valid(&times[1])))
+		if (unlikely(!timespec_is_valid(&times[0]) ||
+			     !timespec_is_valid(&times[1])))
 			return EINVAL;
 
-		init_timespec(&timespec_times[0], times + 0);
-		init_timespec(&timespec_times[1], times + 1);
+		timespec_init(&timespec_times[0], times + 0);
+		timespec_init(&timespec_times[1], times + 1);
 	} else {
-		init_timespec(&timespec_times[0], NULL);
-		init_timespec(&timespec_times[1], NULL);
+		timespec_init(&timespec_times[0], NULL);
+		timespec_init(&timespec_times[1], NULL);
 	}
 
 	/* utimensat should return ENOENT when pathname is empty */
