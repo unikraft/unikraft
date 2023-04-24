@@ -3,3 +3,7 @@ uktimer_hr_update
 uktimer_hr_try_remove
 uktimer_hr_remove
 uktimer_hr_dump
+
+uk_jiffies
+
+uktimer_set_idle
