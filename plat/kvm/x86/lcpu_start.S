@@ -47,7 +47,7 @@
 #define LOAD_ADDR16		0x8000
 #define RELOC16(x)		SEC_RELOC(x, start16, LOAD_ADDR16)
 
-.section .data.boot
+.section .data.boot.16
 .globl x86_start16_addr
 x86_start16_addr:
 	.quad	LOAD_ADDR16
