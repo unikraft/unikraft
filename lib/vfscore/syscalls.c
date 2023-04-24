@@ -1398,7 +1398,8 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 	char *ap;
 	struct timespec timespec_times[2];
 	extern struct task *main_task;
-	struct dentry *dp;
+	struct dentry *dp = NULL;
+	struct vfscore_file *fp = NULL;
 
 	/* utimensat should return ENOENT when pathname is empty */
 	if(pathname && pathname[0] == 0)
@@ -1425,8 +1426,6 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 		if (unlikely(error == -1))
 			return ENOMEM;
 	} else {
-		struct vfscore_file *fp;
-
 		fp = vfscore_get_file(dirfd);
 		if (!fp)
 			return EBADF;
@@ -1434,26 +1433,43 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 		if (!fp->f_dentry)
 			return EBADF;
 
-		if (!(fp->f_dentry->d_vnode->v_type & VDIR))
-			return ENOTDIR;
+		if (pathname) {
+			if (unlikely(!(fp->f_dentry->d_vnode->v_type & VDIR))) {
+				fdrop(fp);
+				return ENOTDIR;
+			}
 
-		if (pathname)
-			error = asprintf(&ap, "%s/%s/%s", fp->f_dentry->d_mount->m_path,
-					fp->f_dentry->d_path, pathname);
-		else
-			error = asprintf(&ap, "%s/%s", fp->f_dentry->d_mount->m_path,
-					fp->f_dentry->d_path);
-		if (unlikely(error == -1))
-			return ENOMEM;
+			error = asprintf(&ap, "%s/%s/%s",
+					 fp->f_dentry->d_mount->m_path,
+					 fp->f_dentry->d_path, pathname);
+
+			fdrop(fp);
+			fp = NULL;
+
+			if (unlikely(error == -1))
+				return ENOMEM;
+		} else {
+			/* On Linux, if pathname is NULL dirfd does not need to
+			 * be a directory. The change is applied to whatever
+			 * file dirfd refers to.
+			 */
+			dp = fp->f_dentry;
+		}
 	}
 
-	/* FIXME: Add support for AT_SYMLINK_NOFOLLOW */
+	if (!dp) {
+		UK_ASSERT(!fp);
+		UK_ASSERT(ap);
 
-	error = namei(ap, &dp);
-	free(ap);
+		/* FIXME: Add support for AT_SYMLINK_NOFOLLOW */
+		error = namei(ap, &dp);
+		free(ap);
 
-	if (error)
-		return error;
+		if (unlikely(error))
+			return error;
+
+		UK_ASSERT(dp);
+	}
 
 	if (dp->d_mount->m_flags & MNT_RDONLY) {
 		error = EROFS;
@@ -1464,7 +1480,12 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 		error = vn_settimes(dp->d_vnode, timespec_times);
 	}
 
-	drele(dp);
+exit_rel:
+	if (fp)
+		fdrop(fp);
+	else
+		drele(dp);
+
 	return error;
 }
 
