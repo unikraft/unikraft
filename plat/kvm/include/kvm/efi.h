@@ -516,6 +516,22 @@ struct uk_efi_mem_attr_tbl {
 	struct uk_efi_mem_desc entry[1];
 };
 
+#define UK_EFI_ACPI10_TABLE_GUID					\
+	(&(struct uk_efi_guid){						\
+		.b0_3 = 0xeb9d2d30,					\
+		.b4_5 = 0x2d88,						\
+		.b6_7 = 0x11d3,						\
+		.b8_15 = {0x9a, 0x16, 0x00, 0x90,			\
+			  0x27, 0x3f, 0xc1, 0x4d},			\
+	})
+#define UK_EFI_ACPI20_TABLE_GUID					\
+	(&(struct uk_efi_guid){						\
+		.b0_3 = 0x8868e871,					\
+		.b4_5 = 0xe4f1,						\
+		.b6_7 = 0x11d3,						\
+		.b8_15 = {0xbc, 0x22, 0x00, 0x80,			\
+			  0xc7, 0x3c, 0x88, 0x81},			\
+	})
 struct uk_efi_cfg_tbl {
 	struct uk_efi_guid vendor_guid;
 	void *vendor_table;
