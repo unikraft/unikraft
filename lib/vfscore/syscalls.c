@@ -1419,30 +1419,31 @@ sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], i
 	}
 
 	/* utimensat should return ENOENT when pathname is empty */
-	if(pathname && pathname[0] == 0)
+	if (unlikely(pathname && pathname[0] == 0))
 		return ENOENT;
 
 	/* Only the AT_SYMLINK_NOFOLLOW is allowed */
-	if (flags && !(flags & AT_SYMLINK_NOFOLLOW))
+	if (unlikely(flags & ~AT_SYMLINK_NOFOLLOW))
 		return EINVAL;
 
 	if (pathname && pathname[0] == '/') {
 		ap = strdup(pathname);
-		if (!ap)
+		if (unlikely(!ap))
 			return ENOMEM;
 
 	} else if (dirfd == AT_FDCWD) {
-		if (!pathname)
+		if (unlikely(!pathname))
 			return EFAULT;
+
 		error = asprintf(&ap, "%s/%s", main_task->t_cwd, pathname);
 		if (unlikely(error == -1))
 			return ENOMEM;
 	} else {
 		fp = vfscore_get_file(dirfd);
-		if (!fp)
+		if (unlikely(!fp))
 			return EBADF;
 
-		if (!fp->f_dentry)
+		if (unlikely(!fp->f_dentry))
 			return EBADF;
 
 		if (pathname) {
