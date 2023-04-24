@@ -138,6 +138,7 @@ static inline void ukarch_spinwait(void)
 
 /* CPUID feature bits in ECX and EDX when EAX=1 */
 #define X86_CPUID1_ECX_x2APIC   (1 << 21)
+#define X86_CPUID1_ECX_TSC_DEADLINE	(1 << 24)
 #define X86_CPUID1_ECX_XSAVE    (1 << 26)
 #define X86_CPUID1_ECX_OSXSAVE  (1 << 27)
 #define X86_CPUID1_ECX_AVX      (1 << 28)
