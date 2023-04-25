@@ -253,20 +253,12 @@ extern "C" {
 
 /**
  * Tests if two ranges overlap
- * This is the case when at least one of the following conditions is true:
- *  - The start of range 1 is within range 0
- *  - The end of range 1 is within range 0
- *  - The start of range 1 is smaller than the start of range 0 while
- *    the end of range 1 is bigger than the end of range 0
  *  NOTE: The expressions take into account that `base + len` points to
  *        the first value that is outside of a range.
  */
 #define RANGE_OVERLAP(base0, len0, base1, len1)				\
-	(IN_RANGE((base1), (base0), (len0))				\
-	 || ((((base1) + (len1)) > (base0))				\
-	     && (((base1) + (len1)) <= (base0) + (len0)))		\
-	 || (((base1) <= (base0))					\
-	     && (((base1) + (len1)) >= ((base0) + (len0)))))
+	(((((base1) + (len1)) > (base0))) &&				\
+	((base1) < ((base0) + (len0))))
 
 #ifndef ARRAY_SIZE
 #define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
