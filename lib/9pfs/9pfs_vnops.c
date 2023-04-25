@@ -246,7 +246,8 @@ static int uk_9pfs_close(struct vnode *vn __unused, struct vfscore_file *file)
 	return 0;
 }
 
-static int uk_9pfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
+static int uk_9pfs_lookup(struct vnode *dvp, const char *name,
+			  struct vnode **vpp)
 {
 	struct uk_9pfs_mount_data *md = UK_9PFS_MD(dvp->v_mount);
 	struct uk_9pdev *dev = md->dev;
@@ -363,7 +364,8 @@ static int uk_9pfs_inactive(struct vnode *vp)
 	return 0;
 }
 
-static int uk_9pfs_create_generic(struct vnode *dvp, char *name, mode_t mode)
+static int uk_9pfs_create_generic(struct vnode *dvp, const char *name,
+				  mode_t mode)
 {
 	struct uk_9pdev *dev = UK_9PFS_MD(dvp->v_mount)->dev;
 	struct uk_9pfid *fid;
@@ -382,7 +384,7 @@ static int uk_9pfs_create_generic(struct vnode *dvp, char *name, mode_t mode)
 	return -rc;
 }
 
-static int uk_9pfs_create(struct vnode *dvp, char *name, mode_t mode)
+static int uk_9pfs_create(struct vnode *dvp, const char *name, mode_t mode)
 {
 	struct uk_9pfs_mount_data *md = UK_9PFS_MD(dvp->v_mount);
 
@@ -412,7 +414,7 @@ static int uk_9pfs_remove_generic(struct vnode *dvp, struct vnode *vp)
 }
 
 static int uk_9pfs_remove(struct vnode *dvp, struct vnode *vp,
-		char *name __unused)
+			  const char *name __unused)
 {
 	struct uk_9pfs_node_data *nd = UK_9PFS_ND(vp);
 	int rc = 0;
@@ -425,7 +427,7 @@ static int uk_9pfs_remove(struct vnode *dvp, struct vnode *vp,
 	return rc;
 }
 
-static int uk_9pfs_mkdir(struct vnode *dvp, char *name, mode_t mode)
+static int uk_9pfs_mkdir(struct vnode *dvp, const char *name, mode_t mode)
 {
 	if (!S_ISDIR(mode))
 		return EINVAL;
@@ -434,7 +436,7 @@ static int uk_9pfs_mkdir(struct vnode *dvp, char *name, mode_t mode)
 }
 
 static int uk_9pfs_rmdir(struct vnode *dvp, struct vnode *vp,
-		char *name __unused)
+			 const char *name __unused)
 {
 	return uk_9pfs_remove_generic(dvp, vp);
 }
@@ -904,9 +906,10 @@ static int uk_9pfs_truncate(struct vnode *vp, off_t off)
 	});
 }
 
-static int uk_9pfs_rename(struct vnode *dvp1, struct vnode *vp1, char *name1,
+static int uk_9pfs_rename(struct vnode *dvp1, struct vnode *vp1,
+			  const char *name1,
 			  struct vnode *dvp2, struct vnode *vp2 __unused,
-			  char *name2)
+			  const char *name2)
 {
 	struct uk_9pfs_mount_data *dmd1 = UK_9PFS_MD(dvp1->v_mount);
 	struct uk_9pfid *dfid1 = UK_9PFS_VFID(dvp1);
@@ -929,7 +932,7 @@ static int uk_9pfs_rename(struct vnode *dvp1, struct vnode *vp1, char *name1,
 	return -rc;
 }
 
-static int uk_9pfs_link(struct vnode *dvp, struct vnode *svp, char *name)
+static int uk_9pfs_link(struct vnode *dvp, struct vnode *svp, const char *name)
 {
 	struct uk_9pfs_mount_data *dmd = UK_9PFS_MD(dvp->v_mount);
 	struct uk_9pfid *dfid = UK_9PFS_VFID(dvp);
@@ -989,7 +992,7 @@ static int uk_9pfs_readlink(struct vnode *vp, struct uio *uio)
 	return 0;
 }
 
-static int uk_9pfs_symlink(struct vnode *dvp, char *op, char *np)
+static int uk_9pfs_symlink(struct vnode *dvp, const char *op, const char *np)
 {
 	struct uk_9pfs_mount_data *md = UK_9PFS_MD(dvp->v_mount);
 	struct uk_9pfid *dfid = UK_9PFS_VFID(dvp);
