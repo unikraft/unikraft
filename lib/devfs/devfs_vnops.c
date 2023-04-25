@@ -132,7 +132,7 @@ devfs_ioctl(struct vnode *vp, struct vfscore_file *fp __unused,
 }
 
 static int
-devfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
+devfs_lookup(struct vnode *dvp, const char *name, struct vnode **vpp)
 {
 	struct devinfo info;
 	struct vnode *vp;
