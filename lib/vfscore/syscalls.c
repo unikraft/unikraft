@@ -881,55 +881,48 @@ sys_rename(char *src, char *dest)
 int
 sys_symlink(const char *oldpath, const char *newpath)
 {
-	struct task	*t = main_task;
-	int		error;
-	char		np[PATH_MAX];
-	struct dentry	*newdp;
-	struct dentry	*newdirdp;
-	char		*name;
-
-	if (oldpath == NULL || newpath == NULL) {
-		return (EFAULT);
-	}
+	struct dentry *newdirdp = NULL;
+	struct dentry *newdp = NULL;
+	char np[PATH_MAX];
+	char *name;
+	int error;
 
 	DPRINTF(VFSDB_SYSCALL, ("sys_link: oldpath=%s newpath=%s\n",
 				oldpath, newpath));
 
-	newdp		= NULL;
-	newdirdp	= NULL;
+	error = task_conv(main_task, newpath, VWRITE, np);
+	if (unlikely(error))
+		goto out;
 
-	error = task_conv(t, newpath, VWRITE, np);
-	if (error != 0) {
-		return (error);
-	}
-
-	/* parent directory for new path must exist */
-	if ((error = lookup(np, &newdirdp, &name)) != 0)
+	/* parent directory for newpath must exist */
+	error = lookup(np, &newdirdp, &name);
+	if (unlikely(error))
 		goto out;
 
 	vn_lock(newdirdp->d_vnode);
 
 	/* newpath should not already exist */
-	if (namei_last_nofollow(np, newdirdp, &newdp) == 0) {
+	if (unlikely(namei_last_nofollow(np, newdirdp, &newdp) == 0)) {
 		drele(newdp);
 		error = EEXIST;
-		goto out;
+		goto out_unlock;
 	}
 
+	UK_ASSERT(!newdp);
+
 	/* check for write access at newpath */
-	if ((error = vn_access(newdirdp->d_vnode, VWRITE)) != 0) {
-		goto out;
-	}
+	error = vn_access(newdirdp->d_vnode, VWRITE);
+	if (unlikely(error))
+		goto out_unlock;
 
 	error = VOP_SYMLINK(newdirdp->d_vnode, name, oldpath);
 
-out:
-	if (newdirdp != NULL) {
-		vn_unlock(newdirdp->d_vnode);
-		drele(newdirdp);
-	}
+out_unlock:
+	vn_unlock(newdirdp->d_vnode);
+	drele(newdirdp);
 
-	return (error);
+out:
+	return error;
 }
 
 int
