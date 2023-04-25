@@ -883,7 +883,6 @@ sys_symlink(const char *oldpath, const char *newpath)
 {
 	struct task	*t = main_task;
 	int		error;
-	char		op[PATH_MAX];
 	char		np[PATH_MAX];
 	struct dentry	*newdp;
 	struct dentry	*newdirdp;
@@ -922,14 +921,7 @@ sys_symlink(const char *oldpath, const char *newpath)
 		goto out;
 	}
 
-	/* oldpath may not be const char * to VOP_SYMLINK - need to copy */
-	size_t tocopy;
-	tocopy = strlcpy(op, oldpath, PATH_MAX);
-	if (tocopy >= PATH_MAX - 1) {
-		error = ENAMETOOLONG;
-		goto out;
-	}
-	error = VOP_SYMLINK(newdirdp->d_vnode, name, op);
+	error = VOP_SYMLINK(newdirdp->d_vnode, name, oldpath);
 
 out:
 	if (newdirdp != NULL) {
