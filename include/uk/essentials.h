@@ -99,6 +99,9 @@ extern "C" {
 #ifndef __check_result
 #define __check_result         __attribute__((warn_unused_result))
 #endif
+#ifndef __may_alias
+#define __may_alias            __attribute__((may_alias))
+#endif
 
 #ifndef __alias
 #define __alias(old, new) \
