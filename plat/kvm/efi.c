@@ -567,12 +567,48 @@ static void uk_efi_exit_bs(void)
 		uk_efi_crash("Failed to to exit Boot Services\n");
 }
 
+/* Sect 4. of TCG Platform Reset Attack Mitigation Specification Version 1.10
+ * Rev. 17
+ */
+static void uk_efi_reset_attack_mitigation_enable(void)
+{
+#ifdef CONFIG_KVM_BOOT_EFI_STUB_RST_ATK_MITIGATION
+	/* The UTF-16 encoding of the "MemoryOverwriteRequestControl" string */
+	char var_name[] = "M\0e\0m\0o\0r\0y\0O\0v\0e\0r\0w\0r\0i\0t\0e\0R\0e"
+			  "\0q\0u\0e\0s\0t\0C\0o\0n\0t\0r\0o\0l\0";
+	uk_efi_uintn_t data_sz;
+	uk_efi_status_t status;
+	__u8 enable = 1;
+
+	status = uk_efi_rs->get_variable((__s16 *)var_name,
+					 MEMORY_ONLY_RESET_CONTROL_GUID,
+					 NULL, &data_sz, NULL);
+	/* There is either no such variable in the firmware database, or no
+	 * variable storage is supported
+	 */
+	if (status == UK_EFI_UNSUPPORTED || status == UK_EFI_NOT_FOUND)
+		return;
+	else if (unlikely(status != UK_EFI_SUCCESS))
+		uk_efi_crash("Failed to get MemoryOverwriteRequestControl variable\n");
+
+	status = uk_efi_rs->set_variable((__s16 *)var_name,
+					 MEMORY_ONLY_RESET_CONTROL_GUID,
+					 UK_EFI_VARIABLE_NON_VOLATILE	     |
+					 UK_EFI_VARIABLE_BOOTSERVICE_ACCESS  |
+					 UK_EFI_VARIABLE_RUNTIME_ACCESS,
+					 sizeof(enable), &enable);
+	if (unlikely(status != UK_EFI_SUCCESS))
+		uk_efi_crash("Failed to enable reset attack mitigation\n");
+#endif
+}
+
 void __uk_efi_api __noreturn uk_efi_main(uk_efi_hndl_t self_hndl,
 					 struct uk_efi_sys_tbl *sys_tbl)
 {
 	uk_efi_init_vars(self_hndl, sys_tbl);
 	uk_efi_cls();
 	uk_efi_setup_bootinfo();
+	uk_efi_reset_attack_mitigation_enable();
 	uk_efi_exit_bs();
 
 	/* Jump to arch specific post-EFI entry */

@@ -63,6 +63,19 @@ config KVM_BOOT_EFI_STUB_DTB_FNAME
 	string "Name of the Devicetree Blob file"
 	default "$(UK_NAME).dtb"
 
+config KVM_BOOT_EFI_STUB_RST_ATK_MITIGATION
+	bool "TCG Reset Attack Mitigation"
+	default n
+	help
+		Enable Trusted Computing Group's Reset Attack Mitigation.
+		Whenever a machine shuts down or reboots, due to lack of
+		electric charge, the contents of RAM may dissipate after a short
+		amount of time. However this may be enough for an attacker to
+		quickly boot again into a custom program and dump memory
+		contents. Thus, by using this, the OS instructs POST BIOS to
+		overwrite memory contents before continuing to boot into the
+		rest of the BIOS code.
+
 endif
 
 choice
