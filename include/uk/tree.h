@@ -322,6 +322,9 @@ struct {								\
 	struct type *rbe_link[3];					\
 }
 
+/* Work-around for type-punning mechanism of the rb tree implementation */
+typedef __uptr __may_alias _rb_uptr_ma;
+
 /*
  * With the expectation that any object of struct type has an
  * address that is a multiple of 4, and that therefore the
@@ -334,7 +337,7 @@ struct {								\
 #define UK__RB_L			((__uptr)1)
 #define UK__RB_R			((__uptr)2)
 #define UK__RB_LR			((__uptr)3)
-#define UK__RB_BITS(elm)		(*(__uptr *)&elm)
+#define UK__RB_BITS(elm)		(*(_rb_uptr_ma *)&elm)
 #define UK__RB_BITSUP(elm, field)	UK__RB_BITS(UK__RB_UP(elm, field))
 #define UK__RB_PTR(elm)			(__typeof(elm))			\
 					((__uptr)elm & ~UK__RB_LR)
