@@ -82,8 +82,8 @@ device_lookup(const char *name)
  * device_create - create new device object.
  *
  * A device object is created by the device driver to provide
- * I/O services to applications.  Returns device ID on
- * success, or 0 on failure.
+ * I/O services to applications. Returns 0 on success, an errno
+ * number otherwise.
  */
 int
 device_create(struct driver *drv, const char *name, int flags,
