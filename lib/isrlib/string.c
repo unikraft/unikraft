@@ -119,7 +119,6 @@ void *memmove_isr(void *dst, const void *src, size_t len)
     } else {
         s += len;
         d += len;
-
         for (; len > 0; --len)
             *(d--) = *(s--);
     }
