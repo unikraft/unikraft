@@ -54,6 +54,8 @@
 
 #include <uk/plat/lcpu.h>
 #include <uk/plat/time.h>
+#include <uk/clock_event.h>
+#include <uk/intctlr.h>
 #include <x86/cpu.h>
 #include <uk/timeconv.h>
 #include <uk/print.h>
@@ -225,6 +227,87 @@ __u64 tscclock_ns_to_tsc_delta(__nsec ts)
 	 */
 	return mul64_32(sbintime, tsc_freq);
 }
+
+/*
+ * Minimum delta to sleep using PIT. Programming seems to have an overhead of
+ * 3-4us, but play it safe here.
+ */
+#define PIT_MIN_DELTA	16
+
+static int tscclock_pit_set_next_event(struct uk_clock_event *ce, __nsec at)
+{
+	__u64 now, delta_ns;
+	__u64 delta_ticks;
+	unsigned int ticks;
+
+	now = ukplat_monotonic_clock();
+
+	if (at <= now)
+		goto immediate_expire;
+
+	/*
+	 * Compute delta in PIT ticks. Return if it is less than minimum safe
+	 * amount of ticks.  Essentially this will cause us to spin until
+	 * the timeout.
+	 */
+	delta_ns = at - now;
+	delta_ticks = mul64_32(delta_ns, pit_mult);
+	if (delta_ticks < PIT_MIN_DELTA)
+		goto immediate_expire;
+
+	/*
+	 * Program the timer to interrupt the CPU after the delay has expired.
+	 * Maximum timer delay is 65535 ticks.
+	 */
+	if (delta_ticks > 65535)
+		ticks = 65535;
+	else
+		ticks = delta_ticks;
+
+	/*
+	 * Note that according to the Intel 82C54 datasheet, p12 the
+	 * interrupt is actually delivered in N + 1 ticks.
+	 */
+	ticks -= 1;
+	outb(TIMER_MODE, TIMER_SEL0 | TIMER_ONESHOT | TIMER_16BIT);
+	outb(TIMER_CNTR, ticks & 0xff);
+	outb(TIMER_CNTR, ticks >> 8);
+
+	return 0;
+
+immediate_expire:
+	if (ce->event_handler)
+		ce->event_handler(ce);
+
+	return 0;
+}
+
+static int tscclock_pit_disable(struct uk_clock_event *ce __unused)
+{
+	outb(TIMER_MODE, TIMER_SEL0 | TIMER_ONESHOT | TIMER_16BIT);
+	outb(TIMER_CNTR, 0);
+	outb(TIMER_CNTR, 0);
+
+	return 0;
+}
+
+static int pit_timer_handler(void *arg)
+{
+	struct uk_clock_event *ce = arg;
+
+	tscclock_pit_disable(ce);
+	if (ce->event_handler)
+		ce->event_handler(ce);
+
+	return 1;
+}
+
+static struct uk_clock_event pit_clock_event = {
+	.name = "PIT",
+	.priority = 0,
+	.set_next_event = tscclock_pit_set_next_event,
+	.disable = tscclock_pit_disable,
+};
 
 /*
  * Return monotonic time using TSC clock.
@@ -410,6 +493,7 @@ void tscclock_pit_init(void)
 int tscclock_init(void)
 {
 	__u32 eax, ebx, ecx, edx;
+	int rc;
 
 	/* Initialise i8254 timer channel 0 to mode 2 at CONFIG_HZ frequency */
 	outb(TIMER_MODE, TIMER_SEL0 | TIMER_RATEGEN | TIMER_16BIT);
@@ -440,12 +524,13 @@ int tscclock_init(void)
 	if (!tsc_mult)
 		tscclock_pit_init();
 
-	/*
-	 * Initialise i8254 timer channel 0 to mode 4 (one shot).
-	 */
-	outb(TIMER_MODE, TIMER_SEL0 | TIMER_ONESHOT | TIMER_16BIT);
-	outb(TIMER_CNTR, 0);
-	outb(TIMER_CNTR, 0);
+	/* Register PIT clock event */
+	pit_clock_event.disable(&pit_clock_event);
+	rc = uk_intctlr_irq_register(ukplat_time_get_irq(), pit_timer_handler,
+				     &pit_clock_event);
+	if (rc < 0)
+		UK_CRASH("Failed to register timer interrupt handler\n");
+	uk_clock_event_register(&pit_clock_event);
 
 	return 0;
 }
@@ -457,12 +542,6 @@ __u64 tscclock_epochoffset(void)
 {
 	return rtc_epochoffset;
 }
-
-/*
- * Minimum delta to sleep using PIT. Programming seems to have an overhead of
- * 3-4us, but play it safe here.
- */
-#define PIT_MIN_DELTA	16
 
 /*
  * Returns early if any interrupts are serviced, or if the requested delay is
@@ -477,49 +556,12 @@ __u64 tscclock_epochoffset(void)
  */
 static void tscclock_cpu_block(__u64 until)
 {
-	__u64 now, delta_ns;
-	__u64 delta_ticks;
-	unsigned int ticks;
-
 	UK_ASSERT(ukplat_lcpu_irqs_disabled());
-
-	now = ukplat_monotonic_clock();
-
-	/*
-	 * Compute delta in PIT ticks. Return if it is less than minimum safe
-	 * amount of ticks.  Essentially this will cause us to spin until
-	 * the timeout.
+	/* If this function is used then we can't use the PIT for other purposes
 	 */
-	delta_ns = until - now;
-	delta_ticks = mul64_32(delta_ns, pit_mult);
-	if (delta_ticks < PIT_MIN_DELTA) {
-		/*
-		 * Since we are "spinning", quickly enable interrupts in
-		 * the hopes that we might get new work and can do something
-		 * else than spin.
-		 */
-		ukplat_lcpu_enable_irq();
-		nop(); /* ints are enabled 1 instr after sti */
-		ukplat_lcpu_disable_irq();
-		return;
-	}
+	UK_ASSERT(pit_clock_event.event_handler == NULL);
 
-	/*
-	 * Program the timer to interrupt the CPU after the delay has expired.
-	 * Maximum timer delay is 65535 ticks.
-	 */
-	if (delta_ticks > 65535)
-		ticks = 65535;
-	else
-		ticks = delta_ticks;
-
-	/*
-	 * Note that according to the Intel 82C54 datasheet, p12 the
-	 * interrupt is actually delivered in N + 1 ticks.
-	 */
-	ticks -= 1;
-	outb(TIMER_CNTR, ticks & 0xff);
-	outb(TIMER_CNTR, ticks >> 8);
+	pit_clock_event.set_next_event(&pit_clock_event, until);
 
 	/*
 	 * Wait for any interrupt. If we got an interrupt then just

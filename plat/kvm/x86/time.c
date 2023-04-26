@@ -38,9 +38,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdlib.h>
 #include <uk/plat/time.h>
-#include <uk/intctlr.h>
 #include <kvm/tscclock.h>
 #include <uk/assert.h>
 
@@ -56,24 +54,10 @@ __nsec ukplat_wall_clock(void)
 	return tscclock_monotonic() + tscclock_epochoffset();
 }
 
-/* NB: If this ever does more than an immediate return, it will need to be
- * compiled with NO_X86_EXTREGS_FLAGS to prevent potential clobbering of
- * registers that are not saved on interrupt handling.
- */
-static int timer_handler(void *arg __unused)
-{
-	/* Yes, we handled the irq. */
-	return 1;
-}
-
 /* must be called before interrupts are enabled */
 void ukplat_time_init(void)
 {
 	int rc;
-
-	rc = uk_intctlr_irq_register(0, timer_handler, NULL);
-	if (rc < 0)
-		UK_CRASH("Failed to register timer interrupt handler\n");
 
 	rc = tscclock_init();
 	if (rc < 0)
