@@ -205,6 +205,27 @@ static inline int ukarch_vaddr_range_isvalid(__vaddr_t start, __vaddr_t end)
 #define X86_PF_EC_SGX			0x8000UL /* SGX access control viol. */
 #define X86_PF_EC_HLAT			0x0080UL /* no translation using HLAT */
 
+/* Page attribute table (PAT) */
+#define X86_PAT_UC			0x00 /* Uncacheable (UC)*/
+#define X86_PAT_WC			0x01 /* Write combining (WC) */
+#define X86_PAT_WT			0x04 /* Write through (WT) */
+#define X86_PAT_WP			0x05 /* Write protected (WP) */
+#define X86_PAT_WB			0x06 /* Write back (WB) */
+#define X86_PAT_UCM			0x07 /* Uncached (UC-) */
+
+#define X86_PAT_ENTRY(i, val)		((unsigned long)(val) << ((i) * 8UL))
+
+/* Default PAT value (see SDM Vol 3, 11.12.4 Programming the PAT) */
+#define X86_PAT_DEFAULT						\
+	(X86_PAT_ENTRY(0, X86_PAT_WB) |				\
+	 X86_PAT_ENTRY(1, X86_PAT_WT) |				\
+	 X86_PAT_ENTRY(2, X86_PAT_UCM) |			\
+	 X86_PAT_ENTRY(3, X86_PAT_UC) |				\
+	 X86_PAT_ENTRY(4, X86_PAT_WB) |				\
+	 X86_PAT_ENTRY(5, X86_PAT_WT) |				\
+	 X86_PAT_ENTRY(6, X86_PAT_UCM) |			\
+	 X86_PAT_ENTRY(7, X86_PAT_UC))
+
 #ifndef CONFIG_PARAVIRT
 #ifndef __ASSEMBLY__
 static inline int ukarch_pte_read(__vaddr_t pt_vaddr, unsigned int lvl,
