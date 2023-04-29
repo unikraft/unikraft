@@ -65,7 +65,7 @@ extern "C" {
 #define ukarch_inc(src) \
 	ukarch_fetch_add(src, 1)
 #define ukarch_dec(src) \
-	__atomic_fetch_sub(src, 1, __ATOMIC_SEQ_CST)
+	ukarch_fetch_sub(src, 1)
 /**
  * Writes *src into *dst, and returns the previous contents of *dst.
  */
