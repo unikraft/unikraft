@@ -100,6 +100,5 @@ __s32 e1000_check_for_ack(struct e1000_hw *, __u16);
 __s32 e1000_check_for_rst(struct e1000_hw *, __u16);
 void e1000_init_mbx_ops_generic(struct e1000_hw *hw);
 __s32 e1000_init_mbx_params_vf(struct e1000_hw *);
-__s32 e1000_init_mbx_params_pf(struct e1000_hw *);
 
 #endif /* _E1000_MBX_H_ */

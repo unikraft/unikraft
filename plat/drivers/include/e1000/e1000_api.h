@@ -104,19 +104,10 @@ void e1000_reload_nvm(struct e1000_hw *hw);
 __s32 e1000_update_nvm_checksum(struct e1000_hw *hw);
 __s32 e1000_validate_nvm_checksum(struct e1000_hw *hw);
 __s32 e1000_read_nvm(struct e1000_hw *hw, __u16 offset, __u16 words, __u16 *data);
-__s32 e1000_read_kmrn_reg(struct e1000_hw *hw, __u32 offset, __u16 *data);
-__s32 e1000_write_kmrn_reg(struct e1000_hw *hw, __u32 offset, __u16 data);
 __s32 e1000_write_nvm(struct e1000_hw *hw, __u16 offset, __u16 words, __u16 *data);
 __s32 e1000_set_d3_lplu_state(struct e1000_hw *hw, bool active);
 __s32 e1000_set_d0_lplu_state(struct e1000_hw *hw, bool active);
 bool e1000_check_mng_mode(struct e1000_hw *hw);
-bool e1000_enable_tx_pkt_filtering(struct e1000_hw *hw);
-__s32 e1000_mng_enable_host_if(struct e1000_hw *hw);
-__s32 e1000_mng_host_if_write(struct e1000_hw *hw, __u8 *buffer, __u16 length,
-			    __u16 offset, __u8 *sum);
-__s32 e1000_mng_write_cmd_header(struct e1000_hw *hw,
-			       struct e1000_host_mng_command_header *hdr);
-__s32 e1000_mng_write_dhcp_info(struct e1000_hw *hw, __u8 *buffer, __u16 length);
 __u32  e1000_translate_register_82542(__u32 reg);
 
 

@@ -57,7 +57,6 @@ __s32  e1000_disable_pcie_master_generic(struct e1000_hw *hw);
 __s32  e1000_force_mac_fc_generic(struct e1000_hw *hw);
 __s32  e1000_get_auto_rd_done_generic(struct e1000_hw *hw);
 __s32  e1000_get_bus_info_pci_generic(struct e1000_hw *hw);
-__s32  e1000_get_bus_info_pcie_generic(struct e1000_hw *hw);
 void e1000_set_lan_id_single_port(struct e1000_hw *hw);
 void e1000_set_lan_id_multi_port_pci(struct e1000_hw *hw);
 __s32  e1000_get_hw_semaphore_generic(struct e1000_hw *hw);

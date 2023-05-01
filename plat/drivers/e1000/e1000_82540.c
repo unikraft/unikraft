@@ -294,7 +294,7 @@ static __s32 e1000_reset_hw_82540(struct e1000_hw *hw)
 static __s32 e1000_init_hw_82540(struct e1000_hw *hw)
 {
 	struct e1000_mac_info *mac = &hw->mac;
-	__u32 txdctl, ctrl_ext;
+	__u32 txdctl;
 	__s32 ret_val;
 	__u16 i;
 
@@ -411,7 +411,6 @@ out:
  **/
 static __s32 e1000_setup_fiber_serdes_link_82540(struct e1000_hw *hw)
 {
-	struct e1000_mac_info *mac = &hw->mac;
 	__s32 ret_val = E1000_SUCCESS;
 
 	// uk_pr_info("e1000_setup_fiber_serdes_link_82540\n");

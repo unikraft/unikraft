@@ -218,52 +218,6 @@ __s32 e1000_get_bus_info_pci_generic(struct e1000_hw *hw)
 }
 
 /**
- *  e1000_get_bus_info_pcie_generic - Get PCIe bus information
- *  @hw: pointer to the HW structure
- *
- *  Determines and stores the system bus information for a particular
- *  network interface.  The following bus information is determined and stored:
- *  bus speed, bus width, type (PCIe), and PCIe function.
- **/
-__s32 e1000_get_bus_info_pcie_generic(struct e1000_hw *hw)
-{
-	// struct e1000_mac_info *mac = &hw->mac;
-	// struct e1000_bus_info *bus = &hw->bus;
-	// __s32 ret_val;
-	// __u16 pcie_link_status;
-
-	// debug_uk_pr_info("e1000_get_bus_info_pcie_generic\n");
-
-	// bus->type = e1000_bus_type_pci_express;
-
-	// ret_val = e1000_read_pcie_cap_reg(hw, PCIE_LINK_STATUS,
-	// 				  &pcie_link_status);
-	// if (ret_val) {
-	// 	bus->width = e1000_bus_width_unknown;
-	// 	bus->speed = e1000_bus_speed_unknown;
-	// } else {
-	// 	switch (pcie_link_status & PCIE_LINK_SPEED_MASK) {
-	// 	case PCIE_LINK_SPEED_2500:
-	// 		bus->speed = e1000_bus_speed_2500;
-	// 		break;
-	// 	case PCIE_LINK_SPEED_5000:
-	// 		bus->speed = e1000_bus_speed_5000;
-	// 		break;
-	// 	default:
-	// 		bus->speed = e1000_bus_speed_unknown;
-	// 		break;
-	// 	}
-
-	// 	bus->width = (enum e1000_bus_width)((pcie_link_status &
-	// 		      PCIE_LINK_WIDTH_MASK) >> PCIE_LINK_WIDTH_SHIFT);
-	// }
-
-	// mac->ops.set_lan_id(hw);
-
-	return E1000_SUCCESS;
-}
-
-/**
  *  e1000_set_lan_id_multi_port_pcie - Set LAN id for PCIe multiple port devices
  *
  *  @hw: pointer to the HW structure
@@ -294,10 +248,11 @@ static void e1000_set_lan_id_multi_port_pcie(struct e1000_hw *hw)
 void e1000_set_lan_id_multi_port_pci(struct e1000_hw *hw)
 {
 	struct e1000_bus_info *bus = &hw->bus;
-	__u16 pci_header_type;
+	__u16 pci_header_type = 0;
 	__u32 status;
 
 	debug_uk_pr_info("e1000_set_lan_id_multi_port_pci\n");
+	// TODO
 	// e1000_read_pci_cfg(hw, PCI_HEADER_TYPE_REGISTER, &pci_header_type);
 	if (pci_header_type & PCI_HEADER_TYPE_MULTIFUNC) {
 		status = E1000_READ_REG(hw, E1000_STATUS);

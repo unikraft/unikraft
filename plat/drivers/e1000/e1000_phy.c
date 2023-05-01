@@ -1303,8 +1303,8 @@ __s32 e1000_copper_link_setup_m88_gen2(struct e1000_hw *hw)
 		/* M88E1112 does not support this mode) */
 		if (phy->id != M88E1112_E_PHY_ID) {
 			phy_data |= M88E1000_PSCR_AUTO_X_1000T;
-			break;
 		}
+		break;
 	case 0:
 	default:
 		phy_data |= M88E1000_PSCR_AUTO_X_MODE;

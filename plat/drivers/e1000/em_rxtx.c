@@ -348,7 +348,7 @@ em_xmit_cleanup(struct em_tx_queue *txq)
 // eth_em_xmit_pkts(void *tx_queue, struct rte_mbuf **tx_pkts,
 // 		uint16_t nb_pkts)
 // {
-int eth_em_xmit_pkts(struct uk_netdev *dev,
+int eth_em_xmit_pkts(__unused struct uk_netdev *dev,
 	struct uk_netdev_tx_queue *queue,
 	struct uk_netbuf *pkt)
 {
@@ -363,15 +363,11 @@ int eth_em_xmit_pkts(struct uk_netdev *dev,
 	uint32_t popts_spec;
 	uint32_t cmd_type_len;
 	uint16_t slen;
-	uint64_t ol_flags;
 	uint16_t tx_id;
 	uint16_t tx_last;
 	uint16_t nb_tx;
 	uint16_t nb_used;
-	uint64_t tx_ol_req;
-	uint32_t ctx;
 	uint32_t new_ctx;
-	union em_vlan_macip hdrlen;
 	// uk_pr_info("eth_em_xmit_pkts\n");
 
 	txq = queue;
@@ -611,7 +607,7 @@ end_of_tx:
 // 		uint16_t nb_pkts)
 // {
 int
-eth_em_recv_pkts(struct uk_netdev *dev, struct uk_netdev_rx_queue *rx_queue, 
+eth_em_recv_pkts(__unused struct uk_netdev *dev, struct uk_netdev_rx_queue *rx_queue, 
 	struct uk_netbuf **pkt)
 {
 	volatile struct e1000_rx_desc *rx_ring;
@@ -697,7 +693,7 @@ eth_em_recv_pkts(struct uk_netdev *dev, struct uk_netdev_rx_queue *rx_queue,
 
 
 		struct uk_netbuf *mbufs[1];
-		int cnt = rxq->alloc_rxpkts(rxq->alloc_rxpkts_argp, mbufs, 1);
+		rxq->alloc_rxpkts(rxq->alloc_rxpkts_argp, mbufs, 1);
 		nmb = mbufs[0];
 		// nmb = uk_netbuf_alloc_buf(rxq->a, 2048, 128, 128, 0, NULL);
 		if (nmb == NULL) {
@@ -855,17 +851,15 @@ struct uk_netdev_tx_queue *
 eth_em_tx_queue_setup(struct uk_netdev *dev,
 			 uint16_t queue_idx,
 			 uint16_t nb_desc,
-			 const struct uk_netdev_txqueue_conf *tx_conf)
+			 __unused struct uk_netdev_txqueue_conf *tx_conf)
 {
 	debug_uk_pr_info("eth_em_tx_queue_setup\n");
 
 	void *mem;
 	struct em_tx_queue *txq;
 	struct e1000_hw     *hw;
-	uint32_t tsize;
 	uint16_t tx_rs_thresh, tx_free_thresh;
-	// uint64_t offloads;
-
+	
 	hw = to_e1000dev(dev);
 
 	debug_uk_pr_info("dev->_rx_queue[0] = %p\n", dev->_rx_queue[0]);
@@ -877,7 +871,8 @@ eth_em_tx_queue_setup(struct uk_netdev *dev,
 	if (nb_desc % EM_TXD_ALIGN != 0 ||
 			(nb_desc > E1000_MAX_RING_DESC) ||
 			(nb_desc < E1000_MIN_RING_DESC)) {
-		return -(EINVAL);
+		return NULL;
+		// return -(EINVAL);
 	}
 
 	tx_free_thresh = DEFAULT_TX_FREE_THRESH;
@@ -888,7 +883,8 @@ eth_em_tx_queue_setup(struct uk_netdev *dev,
 			     "number of TX descriptors minus 3. "
 			     "(tx_free_thresh=%u queue=%d)",
 			     (unsigned int)tx_free_thresh, (int)queue_idx);
-		return -(EINVAL);
+		return NULL;
+		// return -(EINVAL);
 	}
 	if (tx_rs_thresh > tx_free_thresh) {
 		uk_pr_err("tx_rs_thresh must be less than or equal to "
@@ -897,7 +893,8 @@ eth_em_tx_queue_setup(struct uk_netdev *dev,
 			     (unsigned int)tx_free_thresh,
 			     (unsigned int)tx_rs_thresh,
 			     (int)queue_idx);
-		return -(EINVAL);
+		return NULL;
+		// return -(EINVAL);
 	}
 
 	// /*
@@ -925,20 +922,24 @@ eth_em_tx_queue_setup(struct uk_netdev *dev,
 	 * handle the maximum ring size is allocated in order to allow for
 	 * resizing in later calls to the queue setup function.
 	 */
-	tsize = sizeof(txq->tx_ring[0]) * E1000_MAX_RING_DESC;
 	mem = uk_calloc(hw->a, E1000_MAX_RING_DESC, sizeof(txq->tx_ring[0]));
-	if (mem == NULL)
-		return -ENOMEM;
+	if (mem == NULL) {
+		return NULL;
+		// return -ENOMEM;
+	}
 
 	/* Allocate the tx queue data structure. */
-	if ((txq = uk_calloc(hw->a, 1, sizeof(*txq))) == NULL)
-		return -ENOMEM;
+	if ((txq = uk_calloc(hw->a, 1, sizeof(*txq))) == NULL) {
+		return NULL;
+		// return -ENOMEM;
+	}
 
 	// /* Allocate software ring */
 	if ((txq->sw_ring = uk_calloc(hw->a, nb_desc,
 			sizeof(txq->sw_ring[0]))) == NULL) {
 		em_tx_queue_release(txq);
-		return -ENOMEM;
+		return NULL;
+		// return -ENOMEM;
 	}
 
 	txq->nb_tx_desc = nb_desc;
@@ -1026,8 +1027,6 @@ eth_em_rx_queue_setup(struct uk_netdev *dev,
 	void *mem;
 	struct em_rx_queue *rxq;
 	struct e1000_hw     *hw;
-	uint32_t rsize;
-	uint64_t offloads;
 
 	hw = to_e1000dev(dev);
 
@@ -1040,7 +1039,8 @@ eth_em_rx_queue_setup(struct uk_netdev *dev,
 			(nb_desc > E1000_MAX_RING_DESC) ||
 			(nb_desc < E1000_MIN_RING_DESC)) {
 		uk_pr_err("Invalid number of received descriptors %d\n", nb_desc);
-		return -EINVAL;
+		return NULL;
+		// return -EINVAL;
 	}
 
 	/* Free memory prior to re-allocation if needed. */
@@ -1052,24 +1052,26 @@ eth_em_rx_queue_setup(struct uk_netdev *dev,
 	}
 
 	/* Allocate RX ring for max possible mumber of hardware descriptors. */
-	rsize = sizeof(rxq->rx_ring[0]) * E1000_MAX_RING_DESC;
 	mem = uk_calloc(hw->a, E1000_MAX_RING_DESC, sizeof(rxq->rx_ring[0]));
 	if (mem == NULL) {
 		uk_pr_err("Failed to allocate RX ring\n");
-		return -ENOMEM;
+		return NULL;
+		// return -ENOMEM;
 	}
 
 	/* Allocate the RX queue data structure. */
 	if ((rxq = uk_calloc(hw->a, 1, sizeof(*rxq))) == NULL) {
 		uk_pr_err("Failed to allocate RX queue data\n");
-		return -ENOMEM;
+		return NULL;
+		// return -ENOMEM;
 	}
 
 	/* Allocate software ring. */
 	if ((rxq->sw_ring = uk_calloc(hw->a, nb_desc, sizeof (rxq->sw_ring[0]))) == NULL) {
 		uk_pr_err("Failed to allocate software ring\n");
 		em_rx_queue_release(rxq);
-		return -ENOMEM;
+		return NULL;
+		// return -ENOMEM;
 	}
 
 	// uk_sglist_init(&rxq->sg, (sizeof(rxq.sgsegs) / sizeof(rxq.sgsegs[0])), &rxq.sgsegs[0]);
@@ -1326,7 +1328,7 @@ em_alloc_rx_queue_mbufs(struct em_rx_queue *rxq)
 		
 		// struct uk_netbuf *mbuf = uk_netbuf_alloc_buf(rxq->a, 2048, 128, 128, 0, NULL);
 		struct uk_netbuf *mbufs[1];
-		int cnt = rxq->alloc_rxpkts(rxq->alloc_rxpkts_argp, mbufs, 1);
+		rxq->alloc_rxpkts(rxq->alloc_rxpkts_argp, mbufs, 1);
 		struct uk_netbuf *mbuf = mbufs[0];
 
 		debug_uk_pr_info("after uk_netbuf_alloc_buf\n");
@@ -1361,7 +1363,6 @@ eth_em_rx_init(struct e1000_hw *hw)
 {
 	struct em_rx_queue *rxq;
 	struct uk_netdev *dev;
-	struct rte_eth_rxmode *rxmode;
 	uint32_t rctl;
 	uint32_t rfctl;
 	uint32_t rxcsum;
@@ -1539,8 +1540,8 @@ eth_em_tx_init(struct e1000_hw *hw)
 }
 
 int
-em_rxq_info_get(struct uk_netdev *dev, uint16_t queue_id,
-	struct uk_netdev_queue_info *qinfo)
+em_rxq_info_get(__unused struct uk_netdev *dev, __unused uint16_t queue_id,
+	__unused struct uk_netdev_queue_info *qinfo)
 {
 	// TODO: uncomment
 	debug_uk_pr_info("em_rxq_info_get\n");
@@ -1559,8 +1560,8 @@ em_rxq_info_get(struct uk_netdev *dev, uint16_t queue_id,
 }
 
 int
-em_txq_info_get(struct uk_netdev *dev, uint16_t queue_id,
-	struct uk_netdev_queue_info *qinfo)
+em_txq_info_get(__unused struct uk_netdev *dev, __unused uint16_t queue_id,
+	__unused struct uk_netdev_queue_info *qinfo)
 {
 	// TODO: uncomment
 	debug_uk_pr_info("em_txq_info_get\n");

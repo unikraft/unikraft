@@ -223,7 +223,7 @@ static void probe_bus(uint32_t bus)
 
 int arch_pci_probe(struct uk_alloc *pha)
 {
-	uint32_t config_addr, function, header_type, vendor_id;
+	uint32_t config_addr, header_type; // function, vendor_id
 
 	uk_pr_debug("Probe PCI\n");
 

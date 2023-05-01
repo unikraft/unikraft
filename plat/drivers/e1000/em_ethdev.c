@@ -48,7 +48,6 @@ static int eth_em_configure(struct uk_netdev *dev, const struct uk_netdev_conf *
 static int eth_em_start(struct uk_netdev *dev);
 static void eth_em_stop(struct uk_netdev *dev);
 // static void eth_em_close(struct pci_device *dev);
-static void eth_em_promiscuous_set(struct uk_netdev *dev, unsigned mode);
 static unsigned eth_em_promiscuous_get(struct uk_netdev *dev);
 static int eth_em_link_update(struct uk_netdev *dev,
 				int wait_to_complete);
@@ -112,7 +111,6 @@ static const struct uk_netdev_ops eth_em_dev_ops = {
 	.mtu_set                        = eth_em_mtu_set,          /* optional */
 
 	/** Promiscuous mode. */
-	.promiscuous_set                = eth_em_promiscuous_set,  /* optional */
 	.promiscuous_get                = eth_em_promiscuous_get,
 
 	/** Device/driver capabilities and info. */
@@ -329,9 +327,9 @@ error:
 }
 
 static int
-eth_em_configure(struct uk_netdev *dev, const struct uk_netdev_conf *conf)
+eth_em_configure(__unused struct uk_netdev *dev, __unused const struct uk_netdev_conf *conf)
 {
-	struct e1000_hw *hw = to_e1000dev(dev);
+	// struct e1000_hw *hw = to_e1000dev(dev);
 
 	uk_pr_info("eth_em_configure\n");
 	// struct e1000_interrupt *intr =
@@ -391,12 +389,8 @@ eth_em_start(struct uk_netdev *dev)
 	struct e1000_hw *hw = to_e1000dev(dev);
 	// struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(dev);
 	// struct rte_intr_handle *intr_handle = &pci_dev->intr_handle;
-	int ret, mask;
-	uint32_t intr_vector = 0;
-	uint32_t *speeds;
-	int num_speeds;
-	bool autoneg;
-
+	int ret;
+	
 	uk_pr_info("dev->_rx_queue[0] = %p\n", dev->_rx_queue[0]);
 	eth_em_stop(dev);
 	uk_pr_info("dev->_rx_queue[0] = %p\n", dev->_rx_queue[0]);
@@ -520,7 +514,7 @@ eth_em_start(struct uk_netdev *dev)
  *
  **********************************************************************/
 static void
-eth_em_stop(struct uk_netdev *dev)
+eth_em_stop(__unused struct uk_netdev *dev)
 {
 	// struct rte_eth_link link;
 	// struct e1000_hw *hw = to_e1000dev(dev);
@@ -642,7 +636,7 @@ em_hardware_init(struct e1000_hw *hw)
 }
 
 static int
-eth_em_rx_queue_intr_enable(struct uk_netdev *dev, struct uk_netdev_rx_queue *queue)
+eth_em_rx_queue_intr_enable(__unused struct uk_netdev *dev, __unused struct uk_netdev_rx_queue *queue)
 {
 	uk_pr_info("eth_em_rx_queue_intr_enable\n");
 
@@ -658,7 +652,7 @@ eth_em_rx_queue_intr_enable(struct uk_netdev *dev, struct uk_netdev_rx_queue *qu
 }
 
 static int
-eth_em_rx_queue_intr_disable(struct uk_netdev *dev, struct uk_netdev_rx_queue *queue)
+eth_em_rx_queue_intr_disable(__unused struct uk_netdev *dev, __unused struct uk_netdev_rx_queue *queue)
 {
 	uk_pr_info("eth_em_rx_queue_intr_disable\n");
 	// TODO: uncomment
@@ -672,8 +666,6 @@ eth_em_rx_queue_intr_disable(struct uk_netdev *dev, struct uk_netdev_rx_queue *q
 static void
 eth_em_infos_get(struct uk_netdev *dev, struct uk_netdev_info *dev_info)
 {
-	struct e1000_hw *hw = to_e1000dev(dev);
-
 	uk_pr_info("eth_em_infos_get\n");
 
 	dev_info->max_rx_queues = 1;
@@ -741,7 +733,7 @@ eth_em_link_update(struct uk_netdev *dev, int wait_to_complete)
 static void
 em_hw_control_acquire(struct e1000_hw *hw)
 {
-	uint32_t ctrl_ext, swsm;
+	uint32_t ctrl_ext;
 
 	uk_pr_info("em_hw_control_acquire\n");
 
@@ -767,31 +759,12 @@ em_hw_control_release(struct e1000_hw *hw)
         ctrl_ext & ~E1000_CTRL_EXT_DRV_LOAD);
 }
 
-static void
-eth_em_promiscuous_set(struct uk_netdev *dev, unsigned mode)
-{
-	uk_pr_info("eth_em_promiscuous_set\n");
-	struct e1000_hw *hw = to_e1000dev(dev);
-
-	uint32_t rctl;
-
-    rctl = E1000_READ_REG(hw, E1000_RCTL);
-    if (mode) {
-        rctl |= (E1000_RCTL_UPE | E1000_RCTL_MPE);
-    } else {
-        rctl &= ~(E1000_RCTL_UPE | E1000_RCTL_SBP);
-        rctl &= (~E1000_RCTL_MPE);
-    }
-    E1000_WRITE_REG(hw, E1000_RCTL, rctl);
-}
-
 static unsigned
-eth_em_promiscuous_get(struct uk_netdev *dev) {
+eth_em_promiscuous_get(__unused struct uk_netdev *dev) {
 	uk_pr_info("eth_em_promiscuous_get\n");
 
 	return 0;
 }
-
 
 
 /*
@@ -967,12 +940,13 @@ eth_em_promiscuous_get(struct uk_netdev *dev) {
  *  void
  */
 static int
-eth_em_interrupt_handler(void *param)
+eth_em_interrupt_handler(__unused void *param)
 {
 	// struct e1000_hw *dev = (struct e1000_hw *)param;
 
 	// eth_em_interrupt_get_status(dev);
 	// eth_em_interrupt_action(dev, dev->intr_handle);
+	return 0;
 }
 
 // static int
@@ -1008,8 +982,8 @@ eth_em_default_mac_addr_get(struct uk_netdev *n)
 }
 
 static int
-eth_em_default_mac_addr_set(struct uk_netdev *dev,
-			    const struct uk_hwaddr *hwaddr)
+eth_em_default_mac_addr_set(__unused struct uk_netdev *dev,
+			    __unused const struct uk_hwaddr *hwaddr)
 {
 	uk_pr_info("eth_em_default_mac_addr_set\n");
 	// TODO: uncomment
@@ -1020,7 +994,7 @@ eth_em_default_mac_addr_set(struct uk_netdev *dev,
 }
 
 static uint16_t
-eth_em_mtu_get(struct uk_netdev *dev)
+eth_em_mtu_get(__unused struct uk_netdev *dev)
 {
 	uk_pr_info("eth_em_mtu_get\n");
 
@@ -1030,7 +1004,7 @@ eth_em_mtu_get(struct uk_netdev *dev)
 
 
 static int
-eth_em_mtu_set(struct uk_netdev *dev, uint16_t mtu)
+eth_em_mtu_set(__unused struct uk_netdev *dev, __unused uint16_t mtu)
 {
 	uk_pr_info("eth_em_mtu_set\n");
 	// TODO: uncomment

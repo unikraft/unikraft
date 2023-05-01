@@ -586,7 +586,7 @@ __s32 e1000_read_nvm_eerd(struct e1000_hw *hw, __u16 offset, __u16 words, __u16 
 	}
 
 	if (ret_val)
-		// DEBUGOUT1("NVM read error: %d\n", ret_val);
+		uk_pr_err("NVM read error: %d\n", ret_val);
 
 	return ret_val;
 }
@@ -1235,7 +1235,7 @@ __s32 e1000_update_nvm_checksum_generic(struct e1000_hw *hw)
 	for (i = 0; i < NVM_CHECKSUM_REG; i++) {
 		ret_val = hw->nvm.ops.read(hw, i, 1, &nvm_data);
 		if (ret_val) {
-			// DEBUGOUT("NVM Read Error while updating checksum.\n");
+			uk_pr_err("NVM Read Error while updating checksum.\n");
 			return ret_val;
 		}
 		checksum += nvm_data;
@@ -1243,7 +1243,7 @@ __s32 e1000_update_nvm_checksum_generic(struct e1000_hw *hw)
 	checksum = (__u16) NVM_SUM - checksum;
 	ret_val = hw->nvm.ops.write(hw, NVM_CHECKSUM_REG, 1, &checksum);
 	if (ret_val)
-		// DEBUGOUT("NVM Write Error while updating checksum.\n");
+		uk_pr_err("NVM Write Error while updating checksum.\n");
 
 	return ret_val;
 }
@@ -1277,51 +1277,13 @@ STATIC void e1000_reload_nvm_generic(struct e1000_hw *hw)
  **/
 void e1000_get_fw_version(struct e1000_hw *hw, struct e1000_fw_version *fw_vers)
 {
-	__u16 eeprom_verh, eeprom_verl, etrack_test, fw_version;
-	__u8 q, hval, rem, result;
-	__u16 comb_verh, comb_verl, comb_offset;
+	__u16 etrack_test;
 
 	memset(fw_vers, 0, sizeof(struct e1000_fw_version));
 
 	/* basic eeprom version numbers, bits used vary by part and by tool
 	 * used to create the nvm images */
 	/* Check which data format we have */
-	switch (hw->mac.type) {
-		hw->nvm.ops.read(hw, NVM_ETRACK_HIWORD, 1, &etrack_test);
-		return;
-	}
-	hw->nvm.ops.read(hw, NVM_VERSION, 1, &fw_version);
-	fw_vers->eep_major = (fw_version & NVM_MAJOR_MASK)
-			      >> NVM_MAJOR_SHIFT;
-
-	/* check for old style version format in newer images*/
-	if ((fw_version & NVM_NEW_DEC_MASK) == 0x0) {
-		eeprom_verl = (fw_version & NVM_COMB_VER_MASK);
-	} else {
-		eeprom_verl = (fw_version & NVM_MINOR_MASK)
-				>> NVM_MINOR_SHIFT;
-	}
-	/* Convert minor value to hex before assigning to output struct
-	 * Val to be converted will not be higher than 99, per tool output
-	 */
-	q = eeprom_verl / NVM_HEX_CONV;
-	hval = q * NVM_HEX_TENS;
-	rem = eeprom_verl % NVM_HEX_CONV;
-	result = hval + rem;
-	fw_vers->eep_minor = result;
-
-etrack_id:
-	if ((etrack_test &  NVM_MAJOR_MASK) == NVM_ETRACK_VALID) {
-		hw->nvm.ops.read(hw, NVM_ETRACK_WORD, 1, &eeprom_verl);
-		hw->nvm.ops.read(hw, (NVM_ETRACK_WORD + 1), 1, &eeprom_verh);
-		fw_vers->etrack_id = (eeprom_verh << NVM_ETRACK_SHIFT)
-			| eeprom_verl;
-	} else if ((etrack_test & NVM_ETRACK_VALID) == 0) {
-		hw->nvm.ops.read(hw, NVM_ETRACK_WORD, 1, &eeprom_verh);
-		hw->nvm.ops.read(hw, (NVM_ETRACK_WORD + 1), 1, &eeprom_verl);
-		fw_vers->etrack_id = (eeprom_verh << NVM_ETRACK_SHIFT) |
-				     eeprom_verl;
-	}
+	hw->nvm.ops.read(hw, NVM_ETRACK_HIWORD, 1, &etrack_test);
+	return;
 }
-
-

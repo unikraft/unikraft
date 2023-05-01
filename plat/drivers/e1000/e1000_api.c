@@ -328,20 +328,6 @@ bool e1000_check_mng_mode(struct e1000_hw *hw)
 }
 
 /**
- *  e1000_mng_write_dhcp_info - Writes DHCP info to host interface
- *  @hw: pointer to the HW structure
- *  @buffer: pointer to the host interface
- *  @length: size of the buffer
- *
- *  Writes the DHCP information to the host interface.
- **/
-__s32 e1000_mng_write_dhcp_info(struct e1000_hw *hw, __u8 *buffer, __u16 length)
-{
-	return 0;
-	// return e1000_mng_write_dhcp_info_generic(hw, buffer, length);
-}
-
-/**
  *  e1000_reset_hw - Reset hardware
  *  @hw: pointer to the HW structure
  *
@@ -596,70 +582,6 @@ __u32 e1000_hash_mc_addr(struct e1000_hw *hw, __u8 *mc_addr)
 }
 
 /**
- *  e1000_enable_tx_pkt_filtering - Enable packet filtering on TX
- *  @hw: pointer to the HW structure
- *
- *  Enables packet filtering on transmit packets if manageability is enabled
- *  and host interface is enabled.
- *  Currently no func pointer exists and all implementations are handled in the
- *  generic version of this function.
- **/
-bool e1000_enable_tx_pkt_filtering(struct e1000_hw *hw)
-{
-	return 0;
-	// return e1000_enable_tx_pkt_filtering_generic(hw);
-}
-
-/**
- *  e1000_mng_host_if_write - Writes to the manageability host interface
- *  @hw: pointer to the HW structure
- *  @buffer: pointer to the host interface buffer
- *  @length: size of the buffer
- *  @offset: location in the buffer to write to
- *  @sum: sum of the data (not checksum)
- *
- *  This function writes the buffer content at the offset given on the host if.
- *  It also does alignment considerations to do the writes in most efficient
- *  way.  Also fills up the sum of the buffer in *buffer parameter.
- **/
-__s32 e1000_mng_host_if_write(struct e1000_hw *hw, __u8 *buffer, __u16 length,
-			    __u16 offset, __u8 *sum)
-{
-	return 0;
-	// return e1000_mng_host_if_write_generic(hw, buffer, length, offset, sum);
-}
-
-/**
- *  e1000_mng_write_cmd_header - Writes manageability command header
- *  @hw: pointer to the HW structure
- *  @hdr: pointer to the host interface command header
- *
- *  Writes the command header after does the checksum calculation.
- **/
-__s32 e1000_mng_write_cmd_header(struct e1000_hw *hw,
-			       struct e1000_host_mng_command_header *hdr)
-{
-	return 0;
-	// return e1000_mng_write_cmd_header_generic(hw, hdr);
-}
-
-/**
- *  e1000_mng_enable_host_if - Checks host interface is enabled
- *  @hw: pointer to the HW structure
- *
- *  Returns E1000_success upon success, else E1000_ERR_HOST_INTERFACE_COMMAND
- *
- *  This function checks whether the HOST IF is enabled for command operation
- *  and also checks whether the previous command is completed.  It busy waits
- *  in case of previous command is not completed.
- **/
-__s32 e1000_mng_enable_host_if(struct e1000_hw *hw)
-{
-	return 0;
-	// return e1000_mng_enable_host_if_generic(hw);
-}
-
-/**
  *  e1000_check_reset_block - Verifies PHY can be reset
  *  @hw: pointer to the HW structure
  *
@@ -746,38 +668,6 @@ __s32 e1000_cfg_on_link_up(struct e1000_hw *hw)
 		return hw->phy.ops.cfg_on_link_up(hw);
 
 	return E1000_SUCCESS;
-}
-
-/**
- *  e1000_read_kmrn_reg - Reads register using Kumeran interface
- *  @hw: pointer to the HW structure
- *  @offset: the register to read
- *  @data: the location to store the 16-bit value read.
- *
- *  Reads a register out of the Kumeran interface. Currently no func pointer
- *  exists and all implementations are handled in the generic version of
- *  this function.
- **/
-__s32 e1000_read_kmrn_reg(struct e1000_hw *hw, __u32 offset, __u16 *data)
-{
-	return 0;
-	// return e1000_read_kmrn_reg_generic(hw, offset, data);
-}
-
-/**
- *  e1000_write_kmrn_reg - Writes register using Kumeran interface
- *  @hw: pointer to the HW structure
- *  @offset: the register to write
- *  @data: the value to write.
- *
- *  Writes a register to the Kumeran interface. Currently no func pointer
- *  exists and all implementations are handled in the generic version of
- *  this function.
- **/
-__s32 e1000_write_kmrn_reg(struct e1000_hw *hw, __u32 offset, __u16 data)
-{
-	return 0;
-	// return e1000_write_kmrn_reg_generic(hw, offset, data);
 }
 
 /**

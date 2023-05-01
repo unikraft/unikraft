@@ -35,14 +35,6 @@ POSSIBILITY OF SUCH DAMAGE.
 #define _E1000_MANAGE_H_
 
 bool e1000_check_mng_mode_generic(struct e1000_hw *hw);
-bool e1000_enable_tx_pkt_filtering_generic(struct e1000_hw *hw);
-__s32  e1000_mng_enable_host_if_generic(struct e1000_hw *hw);
-__s32  e1000_mng_host_if_write_generic(struct e1000_hw *hw, __u8 *buffer,
-				     __u16 length, __u16 offset, __u8 *sum);
-__s32  e1000_mng_write_cmd_header_generic(struct e1000_hw *hw,
-				     struct e1000_host_mng_command_header *hdr);
-__s32  e1000_mng_write_dhcp_info_generic(struct e1000_hw *hw,
-				       __u8 *buffer, __u16 length);
 bool e1000_enable_mng_pass_thru(struct e1000_hw *hw);
 __u8 e1000_calculate_checksum(__u8 *buffer, __u32 length);
 __s32 e1000_host_interface_command(struct e1000_hw *hw, __u8 *buffer, __u32 length);

@@ -180,7 +180,7 @@ int eth_em_rx_descriptor_status(void *rx_queue, uint16_t offset);
 int eth_em_tx_descriptor_status(void *tx_queue, uint16_t offset);
 
 struct uk_netdev_tx_queue * eth_em_tx_queue_setup(struct uk_netdev *dev, uint16_t tx_queue_id,
-		uint16_t nb_tx_desc, const struct uk_netdev_txqueue_conf *tx_conf);
+		uint16_t nb_tx_desc, struct uk_netdev_txqueue_conf *tx_conf);
 
 int eth_em_rx_init(struct e1000_hw *hw);
 
