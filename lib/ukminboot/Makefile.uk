@@ -1,13 +1,9 @@
 $(eval $(call addlib_s,libukminboot,$(CONFIG_LIBUKMINBOOT)))
 
 CINCLUDES-$(CONFIG_LIBUKMINBOOT)		+= -I$(LIBUKMINBOOT_BASE)/include
-CXXINCLUDES-$(CONFIG_LIBUKMINBOOT)	    += -I$(LIBUKMINBOOT_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBUKMINBOOT)		+= -I$(LIBUKMINBOOT_BASE)/include
 
 LIBUKMINBOOT_SRCS-y += $(LIBUKMINBOOT_BASE)/boot.c
-LIBUKMINBOOT_SRCS-y += $(LIBUKMINBOOT_BASE)/version.c
-ifneq ($(CONFIG_LIBUKMINBOOT_BANNER_NONE),y)
-LIBUKMINBOOT_SRCS-y += $(LIBUKMINBOOT_BASE)/banner.c
-endif
 
 # The main() is in the separate library to fool the LTO. Which is
 # trying to resolve the main() function call to whatever is available
