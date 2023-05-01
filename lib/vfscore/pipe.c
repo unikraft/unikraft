@@ -462,6 +462,9 @@ static int pipe_ioctl(struct vnode *vnode,
 		*((int *) data) = pipe_buf_get_available(pipe_buf);
 		uk_mutex_unlock(&pipe_buf->rdlock);
 		return 0;
+	case FIONBIO:
+		/* sys_ioctl() already sets f_flags, no need to do anything */
+		return 0;
 	default:
 		return -EINVAL;
 	}
