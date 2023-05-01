@@ -68,7 +68,9 @@ int lcpu_arch_init(struct lcpu *this_lcpu)
 		return rc;
 #endif /* CONFIG_HAVE_SMP */
 
+#ifndef CONFIG_LIBUKMINBOOT
 	traps_lcpu_init(this_lcpu);
+#endif
 
 	return 0;
 }

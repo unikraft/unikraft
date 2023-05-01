@@ -104,6 +104,7 @@ ENTRY(cpu_irq_\irqno)
 	iretq
 .endm
 
+#ifndef CONFIG_LIBUKMINBOOT
 TRAP_ENTRY divide_error,     0
 TRAP_ENTRY debug,            0
 TRAP_ENTRY nmi,              0
@@ -140,3 +141,4 @@ IRQ_ENTRY 12
 IRQ_ENTRY 13
 IRQ_ENTRY 14
 IRQ_ENTRY 15
+#endif
