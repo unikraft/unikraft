@@ -4,6 +4,7 @@ $(eval $(call addlib_s,libuksched,$(CONFIG_LIBUKSCHED)))
 #       `LIBUKSCHED_THREAD_FLAGS-y`, `CFLAGS-y`, and `CXXFLAGS-y`
 #       by `Makefiles.rules`
 
+ifeq ($(CONFIG_LIBUKMINBOOT), n)
 CINCLUDES-$(CONFIG_LIBUKSCHED)     += -I$(LIBUKSCHED_BASE)/include
 CXXINCLUDES-$(CONFIG_LIBUKSCHED)   += -I$(LIBUKSCHED_BASE)/include
 
@@ -15,3 +16,4 @@ LIBUKSCHED_THREAD_FLAGS-$(call gcc_version_ge,8,0) += -Wno-cast-function-type
 LIBUKSCHED_SRCS-y += $(LIBUKSCHED_BASE)/extra.ld
 
 UK_PROVIDED_SYSCALLS-$(CONFIG_LIBUKSCHED) += sched_yield-0
+endif
