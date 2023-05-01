@@ -71,9 +71,11 @@ void ukplat_time_init(void)
 {
 	int rc;
 
+#ifndef CONFIG_LIBUKMINBOOT
 	rc = ukplat_irq_register(0, timer_handler, NULL);
 	if (rc < 0)
 		UK_CRASH("Failed to register timer interrupt handler\n");
+#endif
 
 	rc = tscclock_init();
 	if (rc < 0)
