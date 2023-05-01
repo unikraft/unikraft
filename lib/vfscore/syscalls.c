@@ -382,23 +382,45 @@ int
 sys_ioctl(struct vfscore_file *fp, unsigned long request, void *buf)
 {
 	int error = 0;
+	int oldf;
 
 	DPRINTF(VFSDB_SYSCALL, ("sys_ioctl: fp=%p request=%lux\n", fp, request));
 
 	if ((fp->f_flags & (UK_FREAD | UK_FWRITE)) == 0)
 		return EBADF;
 
+	FD_LOCK(fp);
+	oldf = fp->f_flags;
+
 	switch (request) {
 	case FIOCLEX:
 		fp->f_flags |= O_CLOEXEC;
-		break;
+		goto exit;
 	case FIONCLEX:
 		fp->f_flags &= ~O_CLOEXEC;
+		goto exit;
+	case FIONBIO:
+		UK_ASSERT(buf);
+		if (*(int *)buf)
+			fp->f_flags |= FNONBLOCK;
+		else
+			fp->f_flags &= ~FNONBLOCK;
 		break;
-	default:
-		error = vfs_ioctl(fp, request, buf);
+	case FIOASYNC:
+		UK_ASSERT(buf);
+		if (*(int *)buf)
+			fp->f_flags |= FASYNC;
+		else
+			fp->f_flags &= ~FASYNC;
 		break;
 	}
+
+	error = vfs_ioctl(fp, request, buf);
+	if (unlikely(error))
+		fp->f_flags = oldf;
+
+exit:
+	FD_UNLOCK(fp);
 
 	DPRINTF(VFSDB_SYSCALL, ("sys_ioctl: comp error=%d\n", error));
 	return error;
@@ -883,10 +905,9 @@ sys_symlink(const char *oldpath, const char *newpath)
 	}
 
 	/* parent directory for new path must exist */
-	if ((error = lookup(np, &newdirdp, &name)) != 0) {
-		error = ENOENT;
+	if ((error = lookup(np, &newdirdp, &name)) != 0)
 		goto out;
-	}
+
 	vn_lock(newdirdp->d_vnode);
 
 	/* newpath should not already exist */

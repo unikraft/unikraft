@@ -117,6 +117,10 @@ static int uk_9pfs_vtype_from_mode(int mode)
 {
 	if (mode & UK_9P_DMDIR)
 		return VDIR;
+
+	if (mode & UK_9P_DMSYMLINK)
+		return VLNK;
+
 	return VREG;
 }
 
@@ -808,17 +812,32 @@ static int uk_9pfs_setattr(struct vnode *vp, struct vattr *attr)
 				      mtime_nsec);
 
 	} else if (md->proto == UK_9P_PROTO_2000U) {
-		struct uk_9p_stat stat;
-		struct uk_9preq *stat_req;
-		int rc = 0;
+		static const struct uk_9p_stat donttouch_stat = {
+			.type = (uint16_t)-1,
+			.dev = (uint32_t)-1,
+			.qid.type = (uint8_t)-1,
+			.qid.version = (uint32_t)-1,
+			.qid.path = (uint64_t)-1,
+			.mode = (uint32_t)-1,
+			.atime = (uint32_t)-1,
+			.mtime = (uint32_t)-1,
+			.length = (uint64_t)-1,
+			.name.size = 0,
+			.uid.size = 0,
+			.gid.size = 0,
+			.muid.size = 0,
+			.extension.size = 0,
+			.n_uid = (uint32_t)-1,
+			.n_gid = (uint32_t)-1,
+			.n_muid = (uint32_t)-1,
+		};
+		struct uk_9p_stat stat = donttouch_stat;
+		int rc;
 
-		stat_req = uk_9p_stat(dev, fid, &stat);
-		if (PTRISERR(stat_req)) {
-			rc = PTR2ERR(stat_req);
-			return -rc;
-		}
-
-		uk_9pdev_req_remove(dev, stat_req);
+		/* Sending an unmodified donttouch stat will fsync() the file.
+		 * Otherwise, the fields which differ from the donttouch stat
+		 * will be updated.
+		 */
 
 		if (attr->va_mask & AT_ATIME)
 			stat.atime = attr->va_atime.tv_sec;
@@ -826,8 +845,32 @@ static int uk_9pfs_setattr(struct vnode *vp, struct vattr *attr)
 		if (attr->va_mask & AT_MTIME)
 			stat.mtime = attr->va_mtime.tv_sec;
 
-		if (attr->va_mask & AT_MODE)
+		if (attr->va_mask & AT_MODE) {
 			stat.mode = attr->va_mode;
+
+			switch (vp->v_type) {
+			case VDIR:
+				stat.mode |= UK_9P_DMDIR;
+				break;
+			case VBLK:
+			case VCHR:
+				stat.mode |= UK_9P_DMDEVICE;
+				break;
+			case VLNK:
+				stat.mode |= UK_9P_DMSYMLINK;
+				break;
+			case VSOCK:
+				stat.mode |= UK_9P_DMSOCKET;
+				break;
+			case VFIFO:
+				stat.mode |= UK_9P_DMNAMEDPIPE;
+			}
+		}
+
+		if (attr->va_mask & AT_SIZE) {
+			UK_ASSERT(vp->v_type == VREG);
+			stat.length = attr->va_size;
+		}
 
 		rc = uk_9p_wstat(dev, fid, &stat);
 
@@ -842,25 +885,23 @@ static int uk_9pfs_fsync(struct vnode *vp, struct vfscore_file *fp)
 	struct uk_9pfs_mount_data *md = UK_9PFS_MD(vp->v_mount);
 	struct uk_9pfid *fid = UK_9PFS_FD(fp)->fid;
 
-	if (md->proto == UK_9P_PROTO_2000L)
+	if (md->proto == UK_9P_PROTO_2000L) {
 		return -uk_9p_fsync(md->dev, fid);
-	else
+	} else if (md->proto == UK_9P_PROTO_2000U) {
+		return uk_9pfs_setattr(vp, &(struct vattr){
+			.va_mask = 0
+		});
+	} else {
 		return 0;
+	}
 }
 
 static int uk_9pfs_truncate(struct vnode *vp, off_t off)
 {
-	struct uk_9pfs_mount_data *md = UK_9PFS_MD(vp->v_mount);
-
-	if (md->proto == UK_9P_PROTO_2000L) {
-		struct vattr attr = {
-		    .va_mask = AT_SIZE,
-		    .va_size = off,
-		};
-		return uk_9pfs_setattr(vp, &attr);
-	} else {
-		return 0;
-	}
+	return uk_9pfs_setattr(vp, &(struct vattr){
+		.va_mask = AT_SIZE,
+		.va_size = off,
+	});
 }
 
 static int uk_9pfs_rename(struct vnode *dvp1, struct vnode *vp1, char *name1,
@@ -913,9 +954,6 @@ static int uk_9pfs_readlink(struct vnode *vp, struct uio *uio)
 	struct iovec *iov;
 	struct uk_9preq *req;
 
-	if (md->proto != UK_9P_PROTO_2000L)
-		return EINVAL;
-
 	if (vp->v_type == VDIR)
 		return EISDIR;
 	if (vp->v_type != VLNK)
@@ -956,9 +994,6 @@ static int uk_9pfs_symlink(struct vnode *dvp, char *op, char *np)
 	struct uk_9pfs_mount_data *md = UK_9PFS_MD(dvp->v_mount);
 	struct uk_9pfid *dfid = UK_9PFS_VFID(dvp);
 	struct uk_9pfid *fid;
-
-	if (md->proto != UK_9P_PROTO_2000L)
-		return EPERM;
 
 	fid = uk_9p_symlink(md->dev, dfid, op, np, 0);
 	if (PTRISERR(fid))

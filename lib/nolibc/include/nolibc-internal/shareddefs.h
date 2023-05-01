@@ -79,6 +79,15 @@ typedef unsigned gid_t;
 #define __DEFINED_gid_t
 #endif
 
+#if defined(__NEED_max_align_t) && !defined(__DEFINED_max_align_t)
+typedef struct {
+	long long __longlongf;
+
+	long double __longdoublef;
+} max_align_t;
+#define __DEFINED_max_align_t
+#endif
+
 #if defined(__NEED_useconds_t) && !defined(__DEFINED_useconds_t)
 typedef unsigned useconds_t;
 #define __DEFINED_useconds_t
@@ -105,7 +114,7 @@ typedef __u64 ino_t;
 #endif
 
 #if defined(__NEED_nlink_t) && !defined(__DEFINED_nlink_t)
-typedef __u32 nlink_t;
+typedef __u64 nlink_t;
 #define __DEFINED_nlink_t
 #endif
 

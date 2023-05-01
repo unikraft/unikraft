@@ -128,7 +128,7 @@ static int do_ppoll(struct pollfd *fds, nfds_t nfds, const __nsec *timeout,
 		UK_ASSERT(events[i].data.ptr);
 
 		/* We have a pointer to revents of the corresponding pollfd */
-		*((int *)events[i].data.ptr) = events[i].events;
+		*((short *)events[i].data.ptr) = events[i].events;
 	}
 
 ERR_FREE_EVENTS:

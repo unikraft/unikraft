@@ -30,6 +30,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _BSD_SOURCE
+
 #include <uk/config.h>
 #include <uk/errptr.h>
 #include <uk/9p.h>

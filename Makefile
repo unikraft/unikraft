@@ -155,6 +155,8 @@ override C := $(realpath $(dir $(C)))/$(notdir $(C))
 endif
 UK_CONFIG  := $(C)
 CONFIG_DIR := $(dir $(C))
+# As UK_CONFIG could be different files, always assume it has a newer version
+.PHONY: $(UK_CONFIG)
 
 # EPLAT_DIR (list of external platform libraries)
 # Retrieved from P variable from the command line (paths separated by colon)
@@ -599,7 +601,12 @@ M4		:= m4
 AR		:= ar
 CAT		:= cat
 SED		:= sed
+# Prefer using GNU AWK because of provided error messages on script errors
+ifeq (, $(shell which gawk))
 AWK		:= awk
+else
+AWK		:= gawk --lint
+endif
 YACC		:= bison
 LEX     	:= flex
 PATCH		:= patch

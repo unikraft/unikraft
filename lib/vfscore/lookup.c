@@ -118,6 +118,8 @@ namei(const char *path, struct dentry **dpp)
 	DPRINTF(VFSDB_VNODE, ("namei: path=%s\n", path));
 
 	links_followed = 0;
+
+	memset(fp, 0, PATH_MAX);
 	strlcpy(fp, path, PATH_MAX);
 
 	do {
@@ -129,7 +131,9 @@ namei(const char *path, struct dentry **dpp)
 		if (vfs_findroot(fp, &mp, &p)) {
 			return ENOTDIR;
 		}
-		int mountpoint_len = p - fp - 1;
+
+		size_t mountpoint_len = p - fp;
+
 		strlcpy(node, "/", sizeof(node));
 		strlcat(node, p, sizeof(node));
 		dp = dentry_lookup(mp, node);
