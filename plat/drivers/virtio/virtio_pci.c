@@ -116,11 +116,17 @@ static struct virtio_config_ops vpci_legacy_ops = {
 static int vpci_legacy_notify(struct virtio_dev *vdev, __u16 queue_id)
 {
 	struct virtio_pci_dev *vpdev;
+	unsigned int irqf;
 
 	UK_ASSERT(vdev);
 	vpdev = to_virtiopcidev(vdev);
+
+	irqf = uk_spin_lock_irqf(&vdev->dev_lock);
+
 	virtio_cwrite16((void *)(unsigned long) vpdev->pci_base_addr,
 			VIRTIO_PCI_QUEUE_NOTIFY, queue_id);
+
+	uk_spin_unlock_irqf(&vdev->dev_lock, irqf);
 
 	return 0;
 }
@@ -131,11 +137,15 @@ static int virtio_pci_handle(void *arg)
 	uint8_t isr_status;
 	struct virtqueue *vq;
 	int rc = 0;
+	unsigned int irqf;
 
 	UK_ASSERT(arg);
 
+	irqf = uk_spin_lock_irqf(&d->vdev.dev_lock);
+
 	/* Reading the isr status is used to acknowledge the interrupt */
 	isr_status = virtio_cread8((void *)(unsigned long)d->pci_isr_addr, 0);
+
 	/* We don't support configuration interrupt on the device */
 	if (isr_status & VIRTIO_PCI_ISR_CONFIG) {
 		uk_pr_warn("Unsupported config change interrupt received on virtio-pci device %p\n",
@@ -147,6 +157,8 @@ static int virtio_pci_handle(void *arg)
 			rc |= virtqueue_ring_interrupt(vq);
 		}
 	}
+
+	uk_spin_unlock_irqf(&d->vdev.dev_lock, irqf);
 	return rc;
 }
 
@@ -159,7 +171,7 @@ static struct virtqueue *vpci_legacy_vq_setup(struct virtio_dev *vdev,
 	struct virtio_pci_dev *vpdev = NULL;
 	struct virtqueue *vq;
 	__paddr_t addr;
-	long flags;
+	unsigned int irqf;
 
 	UK_ASSERT(vdev != NULL);
 
@@ -175,15 +187,18 @@ static struct virtqueue *vpci_legacy_vq_setup(struct virtio_dev *vdev,
 	/* Physical address of the queue */
 	addr = virtqueue_physaddr(vq);
 	/* Select the queue of interest */
+
+	irqf = uk_spin_lock_irqf(&vdev->dev_lock);
+
 	virtio_cwrite16((void *)(unsigned long)vpdev->pci_base_addr,
 			VIRTIO_PCI_QUEUE_SEL, queue_id);
 	virtio_cwrite32((void *)(unsigned long)vpdev->pci_base_addr,
 			VIRTIO_PCI_QUEUE_PFN,
 			addr >> VIRTIO_PCI_QUEUE_ADDR_SHIFT);
 
-	flags = ukplat_lcpu_save_irqf();
 	UK_TAILQ_INSERT_TAIL(&vpdev->vdev.vqs, vq, next);
-	ukplat_lcpu_restore_irqf(flags);
+
+	uk_spin_unlock_irqf(&vdev->dev_lock, irqf);
 
 err_exit:
 	return vq;
@@ -193,11 +208,13 @@ static void vpci_legacy_vq_release(struct virtio_dev *vdev,
 		struct virtqueue *vq, struct uk_alloc *a)
 {
 	struct virtio_pci_dev *vpdev = NULL;
-	long flags;
+	unsigned int irqf;
 
 	UK_ASSERT(vq != NULL);
 	UK_ASSERT(a != NULL);
 	vpdev = to_virtiopcidev(vdev);
+
+	irqf = uk_spin_lock_irqf(&vdev->dev_lock);
 
 	/* Select and deactivate the queue */
 	virtio_cwrite16((void *)(unsigned long)vpdev->pci_base_addr,
@@ -205,54 +222,53 @@ static void vpci_legacy_vq_release(struct virtio_dev *vdev,
 	virtio_cwrite32((void *)(unsigned long)vpdev->pci_base_addr,
 			VIRTIO_PCI_QUEUE_PFN, 0);
 
-	flags = ukplat_lcpu_save_irqf();
 	UK_TAILQ_REMOVE(&vpdev->vdev.vqs, vq, next);
-	ukplat_lcpu_restore_irqf(flags);
+
+	uk_spin_unlock_irqf(&vdev->dev_lock, irqf);
 
 	virtqueue_destroy(vq, a);
 }
 
-static int vpci_legacy_pci_vq_find(struct virtio_dev *vdev, __u16 num_vqs,
+static int vpci_legacy_pci_vq_find(struct virtio_dev *vdev, __u16 vq_id,
 				   __u16 *qdesc_size)
 {
 	struct virtio_pci_dev *vpdev = NULL;
-	int vq_cnt = 0, i = 0, rc = 0;
+	unsigned int irqf;
 
 	UK_ASSERT(vdev);
 	vpdev = to_virtiopcidev(vdev);
 
-	/* Registering the interrupt for the queue */
-	rc = ukplat_irq_register(vpdev->pdev->irq, virtio_pci_handle, vpdev);
-	if (rc != 0) {
-		uk_pr_err("Failed to register the interrupt\n");
-		return rc;
-	}
+	irqf = uk_spin_lock_irqf(&vdev->dev_lock);
 
-	for (i = 0; i < num_vqs; i++) {
-		virtio_cwrite16((void *) (unsigned long)vpdev->pci_base_addr,
-				VIRTIO_PCI_QUEUE_SEL, i);
-		qdesc_size[i] = virtio_cread16(
-				(void *) (unsigned long)vpdev->pci_base_addr,
-				VIRTIO_PCI_QUEUE_SIZE);
-		if (unlikely(!qdesc_size[i])) {
-			uk_pr_err("Virtqueue %d not available\n", i);
-			continue;
-		}
-		vq_cnt++;
-	}
-	return vq_cnt;
+	virtio_cwrite16((void *) (unsigned long)vpdev->pci_base_addr,
+			VIRTIO_PCI_QUEUE_SEL, vq_id);
+	*qdesc_size = virtio_cread16(
+			(void *) (unsigned long)vpdev->pci_base_addr,
+			VIRTIO_PCI_QUEUE_SIZE);
+
+	uk_spin_unlock_irqf(&vdev->dev_lock, irqf);
+
+	if (unlikely(!*qdesc_size))
+		uk_pr_err("Virtqueue %d not available\n", vq_id);
+
+	return 1;
 }
 
 static int vpci_legacy_pci_config_set(struct virtio_dev *vdev, __u16 offset,
 				      const void *buf, __u32 len)
 {
 	struct virtio_pci_dev *vpdev = NULL;
+	unsigned int irqf;
 
 	UK_ASSERT(vdev);
 	vpdev = to_virtiopcidev(vdev);
 
+	irqf = uk_spin_lock_irqf(&vdev->dev_lock);
+
 	_virtio_cwrite_bytes((void *)(unsigned long)vpdev->pci_base_addr,
 			     VIRTIO_PCI_CONFIG_OFF + offset, buf, len, 1);
+
+	uk_spin_unlock_irqf(&vdev->dev_lock, irqf);
 
 	return 0;
 }
@@ -262,25 +278,37 @@ static int vpci_legacy_pci_config_get(struct virtio_dev *vdev, __u16 offset,
 {
 	struct virtio_pci_dev *vpdev = NULL;
 	int rc = 0;
+	unsigned int irqf;
 
 	UK_ASSERT(vdev);
 	vpdev = to_virtiopcidev(vdev);
 
 	/* Reading an entity less than 4 bytes are atomic */
 	if (type_len == len && type_len <= 4) {
+
+		irqf = uk_spin_lock_irqf(&vdev->dev_lock);
+
 		_virtio_cread_bytes(
 				(void *) (unsigned long)vpdev->pci_base_addr,
 				VIRTIO_PCI_CONFIG_OFF + offset, buf, len,
 				type_len);
+
+		uk_spin_unlock_irqf(&vdev->dev_lock, irqf);
+
 	} else {
 		__u32 len_bytes;
 
 		if (__builtin_umul_overflow(len, type_len, &len_bytes))
 			return -EFAULT;
 
+		irqf = uk_spin_lock_irqf(&vdev->dev_lock);
+
 		rc = virtio_cread_bytes_many(
 				(void *) (unsigned long)vpdev->pci_base_addr,
 				VIRTIO_PCI_CONFIG_OFF + offset,	buf, len_bytes);
+
+		uk_spin_unlock_irqf(&vdev->dev_lock, irqf);
+
 		if (unlikely(rc != (int) len_bytes))
 			return -EFAULT;
 	}
@@ -291,17 +319,26 @@ static int vpci_legacy_pci_config_get(struct virtio_dev *vdev, __u16 offset,
 static __u8 vpci_legacy_pci_status_get(struct virtio_dev *vdev)
 {
 	struct virtio_pci_dev *vpdev = NULL;
+	__u8 ret;
+	unsigned int irqf;
 
 	UK_ASSERT(vdev);
 	vpdev = to_virtiopcidev(vdev);
-	return virtio_cread8((void *) (unsigned long) vpdev->pci_base_addr,
+
+	irqf = uk_spin_lock_irqf(&vdev->dev_lock);
+
+	ret = virtio_cread8((void *) (unsigned long) vpdev->pci_base_addr,
 			     VIRTIO_PCI_STATUS);
+
+	uk_spin_unlock_irqf(&vdev->dev_lock, irqf);
+	return ret;
 }
 
 static void vpci_legacy_pci_status_set(struct virtio_dev *vdev, __u8 status)
 {
 	struct virtio_pci_dev *vpdev = NULL;
 	__u8 curr_status = 0;
+	unsigned int irqf;
 
 	/* Reset should be performed using the reset interface */
 	UK_ASSERT(vdev || status != VIRTIO_CONFIG_STATUS_RESET);
@@ -309,18 +346,25 @@ static void vpci_legacy_pci_status_set(struct virtio_dev *vdev, __u8 status)
 	vpdev = to_virtiopcidev(vdev);
 	curr_status = vpci_legacy_pci_status_get(vdev);
 	status |= curr_status;
+
+	irqf = uk_spin_lock_irqf(&vdev->dev_lock);
+
 	virtio_cwrite8((void *)(unsigned long) vpdev->pci_base_addr,
 		       VIRTIO_PCI_STATUS, status);
+
+	uk_spin_unlock_irqf(&vdev->dev_lock, irqf);
 }
 
 static void vpci_legacy_pci_dev_reset(struct virtio_dev *vdev)
 {
 	struct virtio_pci_dev *vpdev = NULL;
+	unsigned int irqf;
 	__u8 status;
 
 	UK_ASSERT(vdev);
 
 	vpdev = to_virtiopcidev(vdev);
+	irqf = uk_spin_lock_irqf(&vdev->dev_lock);
 	/**
 	 * Resetting the device.
 	 */
@@ -338,18 +382,27 @@ static void vpci_legacy_pci_dev_reset(struct virtio_dev *vdev)
 				(void *)(unsigned long)vpdev->pci_base_addr,
 				VIRTIO_PCI_STATUS);
 	} while (status != VIRTIO_CONFIG_STATUS_RESET);
+
+	uk_spin_unlock_irqf(&vdev->dev_lock, irqf);
 }
 
 static __u64 vpci_legacy_pci_features_get(struct virtio_dev *vdev)
 {
 	struct virtio_pci_dev *vpdev = NULL;
+	unsigned int irqf;
 	__u64  features;
 
 	UK_ASSERT(vdev);
 
 	vpdev = to_virtiopcidev(vdev);
+
+	irqf = uk_spin_lock_irqf(&vdev->dev_lock);
+
 	features = virtio_cread32((void *) (unsigned long)vpdev->pci_base_addr,
 				  VIRTIO_PCI_HOST_FEATURES);
+
+	uk_spin_unlock_irqf(&vdev->dev_lock, irqf);
+
 	return features;
 }
 
@@ -357,13 +410,19 @@ static void vpci_legacy_pci_features_set(struct virtio_dev *vdev,
 					 __u64 features)
 {
 	struct virtio_pci_dev *vpdev = NULL;
+	unsigned int irqf;
 
 	UK_ASSERT(vdev);
 	vpdev = to_virtiopcidev(vdev);
+
+	irqf = uk_spin_lock_irqf(&vdev->dev_lock);
+
 	/* Mask out features not supported by the virtqueue driver */
 	features = virtqueue_feature_negotiate(features);
 	virtio_cwrite32((void *) (unsigned long)vpdev->pci_base_addr,
 			VIRTIO_PCI_GUEST_FEATURES, (__u32)features);
+
+	uk_spin_unlock_irqf(&vdev->dev_lock, irqf);
 }
 
 static int virtio_pci_legacy_add_dev(struct pci_device *pci_dev,
@@ -388,6 +447,10 @@ static int virtio_pci_legacy_add_dev(struct pci_device *pci_dev,
 
 	/* Mapping the virtio device identifier */
 	vpci_dev->vdev.id.virtio_device_id = pci_dev->id.subsystem_device_id;
+
+	/* Initlialize the device lock */
+	uk_spin_init(&vpci_dev->vdev.dev_lock);
+
 	return 0;
 }
 
@@ -423,6 +486,17 @@ static int virtio_pci_add_dev(struct pci_device *pci_dev)
 	rc = virtio_bus_register_device(&vpci_dev->vdev);
 	if (rc != 0) {
 		uk_pr_err("Failed to register the virtio device: %d\n", rc);
+		goto free_pci_dev;
+	}
+
+	/* Registering the interrupt for the queue
+	 * The early registration of the interrupt handler does not harm us,
+	 * the interrupt handler enumerates vqs list, which is empty at the
+	 * start, hence returns safely in case where queue setup is still pending.
+	 */
+	rc = ukplat_irq_register(pci_dev->irq, virtio_pci_handle, &vpci_dev->vdev);
+	if (rc != 0) {
+		uk_pr_err("Failed to register the interrupt\n");
 		goto free_pci_dev;
 	}
 

@@ -138,6 +138,8 @@ struct uk_thread *uk_thread_current(void)
  *       termination callbacks as well.
  */
 
+
+
 #define UK_THREADF_ECTX       (0x001)	/**< Extended context available */
 #define UK_THREADF_UKTLS      (0x002)	/**< Unikraft allocated TLS */
 #define UK_THREADF_RUNNABLE   (0x004)

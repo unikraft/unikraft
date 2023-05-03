@@ -34,6 +34,7 @@
  */
 
 #include "snprintf.h"
+#include <uk/spinlock.h>
 #include <stdint.h>
 #include <limits.h>
 #include <string.h>
@@ -91,6 +92,8 @@
 #define BUFLEN 192
 /* special level for printk redirection, used internally only */
 #define KLVL_DEBUG (-1)
+
+struct uk_spinlock con_lock = UK_SPINLOCK_INITIALIZER();
 
 typedef int (*_ukplat_cout_t)(const char *, unsigned int);
 
@@ -178,6 +181,8 @@ static void _vprint(struct _vprint_console *cons,
 #endif /* CONFIG_LIBUKDEBUG_PRINT_CALLER */
 		    const char *fmt, va_list ap)
 {
+	uk_spin_lock(&con_lock);
+
 	char lbuf[BUFLEN];
 	int len, llen;
 	const char *msghdr = NULL;
@@ -205,6 +210,7 @@ static void _vprint(struct _vprint_console *cons,
 		msghdr = LVLC_RESET LVLC_INFO  "Info:" LVLC_RESET " ";
 		break;
 	default:
+		uk_spin_unlock(&con_lock);
 		/* unknown type: ignore */
 		return;
 	}
@@ -287,6 +293,7 @@ static void _vprint(struct _vprint_console *cons,
 		len -= llen;
 		lptr = nlptr + 1;
 	}
+	uk_spin_unlock(&con_lock);
 }
 
 /*
@@ -327,6 +334,7 @@ void _uk_vprintd(const char *libname, const char *srcname __maybe_unused,
 		fmt, ap);
 #endif /* !CONFIG_LIBUKDEBUG_REDIR_PRINTD */
 }
+
 
 void _uk_printd(const char *libname, const char *srcname __maybe_unused,
 		unsigned int srcline __maybe_unused, const char *fmt, ...)

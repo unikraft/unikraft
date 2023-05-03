@@ -14,6 +14,7 @@ if LIBUKLOCK
 
 		config LIBUKLOCK_TICKETLOCK
 			bool "Ticketlocks"
+
 	endchoice
 
 	config LIBUKLOCK_SEMAPHORE
@@ -29,6 +30,13 @@ if LIBUKLOCK
 		default y
 		help
 			Enable mutex based synchornization
+
+	config LIBUKLOCK_RWLOCK
+		bool "Reader-Writer"
+		select LIBUKSCHED
+		default y
+		help
+			Enable Reader-Writer based synchornization
 
 	config LIBUKLOCK_MUTEX_METRICS
 		bool "Metrics for mutex objects"

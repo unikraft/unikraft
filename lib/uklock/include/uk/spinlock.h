@@ -37,6 +37,10 @@
 extern "C" {
 #endif
 
+#include <uk/lock-common.h>
+#define _IRQFNAME(funcname) funcname##_irqf
+
+
 /* See uk/arch/spinlock.h for the interface documentation */
 
 #ifndef CONFIG_LIBUKLOCK_TICKETLOCK
@@ -73,6 +77,12 @@ extern "C" {
 #endif /* uk_spinlock */
 
 #endif	/* CONFIG_LIBUKLOCK_TICKETLOCK */
+
+_LOCK_IRQF(uk_spinlock *, uk_spin_lock)
+
+_UNLOCK_IRQF(uk_spinlock *, uk_spin_unlock)
+
+_TRYLOCK_IRQF(uk_spinlock *, uk_spin_trylock)
 
 #ifdef __cplusplus
 }

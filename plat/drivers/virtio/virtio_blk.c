@@ -648,7 +648,10 @@ static int virtio_blkdev_queues_alloc(struct virtio_blk_device *vbdev,
 	}
 
 	vbdev->nb_queues = conf->nb_queues;
-	vq_avail = virtio_find_vqs(vbdev->vdev, conf->nb_queues, qdesc_size);
+
+	for (int i = 0; i < conf->nb_queues; i++)
+		vq_avail += virtio_find_vqs(vbdev->vdev, i, &qdesc_size[i]);
+
 	if (unlikely(vq_avail != conf->nb_queues)) {
 		uk_pr_err("Expected: %d queues, Found: %d queues\n",
 				conf->nb_queues, vq_avail);

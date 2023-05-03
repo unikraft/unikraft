@@ -43,6 +43,7 @@
 #include <uk/list.h>
 #include <uk/alloc.h>
 #include <uk/essentials.h>
+#include <uk/spinlock.h>
 #ifdef CONFIG_LIBUKNETDEV_DISPATCHERTHREADS
 #include <uk/sched.h>
 #include <uk/semaphore.h>
@@ -487,6 +488,9 @@ struct uk_netdev {
 
 	/** Netdevice address configuration */
 	struct uk_netdev_einfo *_einfo;
+
+	/* Lock to protect the netdevice */
+	struct uk_spinlock netdev_lock;
 
 #if (CONFIG_UK_NETDEV_SCRATCH_SIZE > 0)
 	char scratch_pad[CONFIG_UK_NETDEV_SCRATCH_SIZE];

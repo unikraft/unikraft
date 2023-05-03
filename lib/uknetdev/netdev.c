@@ -35,6 +35,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <uk/spinlock.h>
 #include <uk/netdev.h>
 #include <uk/print.h>
 #include <uk/libparam.h>
@@ -165,6 +166,8 @@ int uk_netdev_drv_register(struct uk_netdev *dev, struct uk_alloc *a,
 			return PTR2ERR(dev->_einfo);
 	}
 
+	uk_spin_init(&dev->netdev_lock);
+
 	UK_TAILQ_INSERT_TAIL(&uk_netdev_list, dev, _list);
 	uk_pr_info("Registered netdev%"PRIu16": %p (%s)\n",
 		   netdev_count, dev, drv_name);
@@ -211,35 +214,43 @@ enum uk_netdev_state uk_netdev_state_get(struct uk_netdev *dev)
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->_data);
 
-	return dev->_data->state;
+	return ukarch_load_n(&dev->_data->state);
 }
 
 int uk_netdev_probe(struct uk_netdev *dev)
 {
+	unsigned int irqf;
+	enum uk_netdev_state state = ukarch_load_n(&dev->_data->state);
 	int ret = 0;
 
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->ops);
 	UK_ASSERT(dev->_data);
-	UK_ASSERT(dev->_data->state == UK_NETDEV_UNPROBED);
+	UK_ASSERT(state == UK_NETDEV_UNPROBED);
+
+	irqf = uk_spin_lock_irqf(&dev->netdev_lock);
 
 	if (dev->ops->probe)
 		ret = dev->ops->probe(dev);
 	if (ret < 0)
 		return ret;
 
-	dev->_data->state = UK_NETDEV_UNCONFIGURED;
+	ukarch_store_n(&dev->_data->state, UK_NETDEV_UNCONFIGURED);
+
+	uk_spin_unlock_irqf(&dev->netdev_lock, irqf);
 	return ret;
 }
 
 void uk_netdev_info_get(struct uk_netdev *dev,
 			struct uk_netdev_info *dev_info)
 {
+	enum uk_netdev_state state = ukarch_load_n(&dev->_data->state);
+
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->ops);
 	UK_ASSERT(dev->ops->info_get);
 	UK_ASSERT(dev_info);
-	UK_ASSERT(dev->_data->state >= UK_NETDEV_UNCONFIGURED);
+	UK_ASSERT(state >= UK_NETDEV_UNCONFIGURED);
 
 	/* Clear values before querying driver for capabilities */
 	memset(dev_info, 0, sizeof(*dev_info));
@@ -279,9 +290,11 @@ static const void *_netdev_einfo_get(struct uk_netdev *dev,
 const void *uk_netdev_einfo_get(struct uk_netdev *dev,
 				enum uk_netdev_einfo_type einfo)
 {
+	enum uk_netdev_state state = ukarch_load_n(&dev->_data->state);
+
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->ops);
-	UK_ASSERT(dev->_data->state >= UK_NETDEV_UNCONFIGURED);
+	UK_ASSERT(state >= UK_NETDEV_UNCONFIGURED);
 
 	if (dev->_einfo)
 		return _netdev_einfo_get(dev, einfo);
@@ -323,6 +336,8 @@ int uk_netdev_configure(struct uk_netdev *dev,
 {
 	struct uk_netdev_info dev_info;
 	int ret;
+	unsigned int irqf;
+	enum uk_netdev_state state = ukarch_load_n(&dev->_data->state);
 
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->_data);
@@ -330,24 +345,35 @@ int uk_netdev_configure(struct uk_netdev *dev,
 	UK_ASSERT(dev->ops->configure);
 	UK_ASSERT(dev_conf);
 
-	if (dev->_data->state != UK_NETDEV_UNCONFIGURED)
-		return -EINVAL;
+	irqf = uk_spin_lock_irqf(&dev->netdev_lock);
+
+	if (state != UK_NETDEV_UNCONFIGURED) {
+		ret = -EINVAL;
+		goto exit;
+	}
 
 	uk_netdev_info_get(dev, &dev_info);
-	if (dev_conf->nb_rx_queues > dev_info.max_rx_queues)
-		return -EINVAL;
-	if (dev_conf->nb_tx_queues > dev_info.max_tx_queues)
-		return -EINVAL;
+	if (dev_conf->nb_rx_queues > dev_info.max_rx_queues) {
+		ret = -EINVAL;
+		goto exit;
+	}
+	if (dev_conf->nb_tx_queues > dev_info.max_tx_queues) {
+		ret = -EINVAL;
+		goto exit;
+	}
 
 	ret = dev->ops->configure(dev, dev_conf);
 	if (ret >= 0) {
 		uk_pr_info("netdev%"PRIu16": Configured interface\n",
 			   dev->_data->id);
-		dev->_data->state = UK_NETDEV_CONFIGURED;
+		ukarch_store_n(&dev->_data->state, UK_NETDEV_CONFIGURED);
 	} else {
 		uk_pr_err("netdev%"PRIu16": Failed to configure interface: %d\n",
 			  dev->_data->id, ret);
 	}
+
+exit:
+	uk_spin_unlock_irqf(&dev->netdev_lock, irqf);
 	return ret;
 }
 
@@ -444,6 +470,8 @@ int uk_netdev_rxq_configure(struct uk_netdev *dev, uint16_t queue_id,
 			    struct uk_netdev_rxqueue_conf *rx_conf)
 {
 	int err;
+	unsigned int irqf;
+	enum uk_netdev_state state = ukarch_load_n(&dev->_data->state);
 
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->_data);
@@ -457,12 +485,18 @@ int uk_netdev_rxq_configure(struct uk_netdev *dev, uint16_t queue_id,
 		  || !rx_conf->callback);
 #endif
 
-	if (dev->_data->state != UK_NETDEV_CONFIGURED)
-		return -EINVAL;
+	irqf = uk_spin_lock_irqf(&dev->netdev_lock);
+
+	if (state != UK_NETDEV_CONFIGURED) {
+		err = -EINVAL;
+		goto err_out;
+	}
 
 	/* Make sure that we are not initializing this queue a second time */
-	if (!PTRISERR(dev->_rx_queue[queue_id]))
-		return -EBUSY;
+	if (!PTRISERR(dev->_rx_queue[queue_id])) {
+		err = -EBUSY;
+		goto err_out;
+	}
 
 	err = _create_event_handler(rx_conf->callback, rx_conf->callback_cookie,
 #ifdef CONFIG_LIBUKNETDEV_DISPATCHERTHREADS
@@ -479,6 +513,7 @@ int uk_netdev_rxq_configure(struct uk_netdev *dev, uint16_t queue_id,
 		goto err_destroy_handler;
 	}
 
+	uk_spin_unlock_irqf(&dev->netdev_lock, irqf);
 	uk_pr_info("netdev%"PRIu16": Configured receive queue %"PRIu16"\n",
 		   dev->_data->id, queue_id);
 	return 0;
@@ -486,6 +521,7 @@ int uk_netdev_rxq_configure(struct uk_netdev *dev, uint16_t queue_id,
 err_destroy_handler:
 	_destroy_event_handler(&dev->_data->rxq_handler[queue_id]);
 err_out:
+	uk_spin_unlock_irqf(&dev->netdev_lock, irqf);
 	return err;
 }
 
@@ -493,6 +529,9 @@ int uk_netdev_txq_configure(struct uk_netdev *dev, uint16_t queue_id,
 			    uint16_t nb_desc,
 			    struct uk_netdev_txqueue_conf *tx_conf)
 {
+	int err;
+	unsigned int irqf;
+
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->_data);
 	UK_ASSERT(dev->ops);
@@ -500,12 +539,18 @@ int uk_netdev_txq_configure(struct uk_netdev *dev, uint16_t queue_id,
 	UK_ASSERT(tx_conf);
 	UK_ASSERT(queue_id < CONFIG_LIBUKNETDEV_MAXNBQUEUES);
 
-	if (dev->_data->state != UK_NETDEV_CONFIGURED)
-		return -EINVAL;
+	irqf = uk_spin_lock_irqf(&dev->netdev_lock);
+
+	if (dev->_data->state != UK_NETDEV_CONFIGURED) {
+		err = -EINVAL;
+		goto err_out;
+	}
 
 	/* Make sure that we are not initializing this queue a second time */
-	if (!PTRISERR(dev->_tx_queue[queue_id]))
-		return -EBUSY;
+	if (!PTRISERR(dev->_tx_queue[queue_id])) {
+		err = -EBUSY;
+		goto err_out;
+	}
 
 	dev->_tx_queue[queue_id] = dev->ops->txq_configure(dev, queue_id,
 							   nb_desc, tx_conf);
@@ -514,52 +559,79 @@ int uk_netdev_txq_configure(struct uk_netdev *dev, uint16_t queue_id,
 
 	uk_pr_info("netdev%"PRIu16": Configured transmit queue %"PRIu16"\n",
 			   dev->_data->id, queue_id);
+
+	uk_spin_unlock_irqf(&dev->netdev_lock, irqf);
 	return 0;
+
+err_out:
+	uk_spin_unlock_irqf(&dev->netdev_lock, irqf);
+	return err;
 }
 
 int uk_netdev_start(struct uk_netdev *dev)
 {
 	int ret;
+	unsigned int irqf;
 
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->_data);
 	UK_ASSERT(dev->ops);
 	UK_ASSERT(dev->ops->start);
 
-	if (dev->_data->state != UK_NETDEV_CONFIGURED)
-		return -EINVAL;
+	irqf = uk_spin_lock_irqf(&dev->netdev_lock);
+
+	if (dev->_data->state != UK_NETDEV_CONFIGURED) {
+		ret = -EINVAL;
+		goto exit;
+	}
 
 	ret = dev->ops->start(dev);
 	if (ret >= 0) {
 		uk_pr_info("netdev%"PRIu16": Started interface\n",
 			   dev->_data->id);
-		dev->_data->state = UK_NETDEV_RUNNING;
+		ukarch_store_n(&dev->_data->state, UK_NETDEV_RUNNING);
 	}
+
+exit:
+	uk_spin_unlock_irqf(&dev->netdev_lock, irqf);
 	return ret;
 }
 
 int uk_netdev_hwaddr_set(struct uk_netdev *dev,
 			 const struct uk_hwaddr *hwaddr)
 {
+	int ret;
+	unsigned int irqf;
+	enum uk_netdev_state state = ukarch_load_n(&dev->_data->state);
+
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->_data);
 	UK_ASSERT(dev->ops);
 	UK_ASSERT(hwaddr);
 
+	irqf = uk_spin_lock_irqf(&dev->netdev_lock);
+
 	/* We do support changing of hwaddr
 	 * only when device was configured
 	 */
-	UK_ASSERT(dev->_data->state == UK_NETDEV_CONFIGURED
-		  || dev->_data->state == UK_NETDEV_RUNNING);
+	UK_ASSERT(state == UK_NETDEV_CONFIGURED || state == UK_NETDEV_RUNNING);
 
-	if (dev->ops->hwaddr_set == NULL)
-		return -ENOTSUP;
+	if (dev->ops->hwaddr_set == NULL) {
+		ret = -ENOTSUP;
+		goto exit;
+	}
 
-	return dev->ops->hwaddr_set(dev, hwaddr);
+	ret = dev->ops->hwaddr_set(dev, hwaddr);
+
+exit:
+	uk_spin_unlock_irqf(&dev->netdev_lock, irqf);
+	return ret;
 }
 
 const struct uk_hwaddr *uk_netdev_hwaddr_get(struct uk_netdev *dev)
 {
+	enum uk_netdev_state state = ukarch_load_n(&dev->_data->state);
+
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->_data);
 	UK_ASSERT(dev->ops);
@@ -567,8 +639,7 @@ const struct uk_hwaddr *uk_netdev_hwaddr_get(struct uk_netdev *dev)
 	/* We do support retrieving of hwaddr
 	 * only when device was configured
 	 */
-	UK_ASSERT(dev->_data->state == UK_NETDEV_CONFIGURED
-		  || dev->_data->state == UK_NETDEV_RUNNING);
+	UK_ASSERT(state == UK_NETDEV_CONFIGURED || state == UK_NETDEV_RUNNING);
 
 	if (!dev->ops->hwaddr_get)
 		return NULL;
@@ -578,6 +649,8 @@ const struct uk_hwaddr *uk_netdev_hwaddr_get(struct uk_netdev *dev)
 
 unsigned uk_netdev_promiscuous_get(struct uk_netdev *dev)
 {
+	enum uk_netdev_state state = ukarch_load_n(&dev->_data->state);
+
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->_data);
 	UK_ASSERT(dev->ops);
@@ -586,14 +659,17 @@ unsigned uk_netdev_promiscuous_get(struct uk_netdev *dev)
 	/* We do support retrieving of promiscuous mode
 	 * only when device was configured
 	 */
-	UK_ASSERT(dev->_data->state == UK_NETDEV_CONFIGURED ||
-		  dev->_data->state == UK_NETDEV_RUNNING);
+	UK_ASSERT(state == UK_NETDEV_CONFIGURED || state == UK_NETDEV_RUNNING);
 
 	return dev->ops->promiscuous_get(dev);
 }
 
 int uk_netdev_promiscuous_set(struct uk_netdev *dev, unsigned mode)
 {
+	int ret;
+	unsigned int irqf;
+	enum uk_netdev_state state = ukarch_load_n(&dev->_data->state);
+
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->_data);
 	UK_ASSERT(dev->ops);
@@ -601,17 +677,26 @@ int uk_netdev_promiscuous_set(struct uk_netdev *dev, unsigned mode)
 	/* We do support setting of promiscuous mode
 	 * only when device was configured
 	 */
-	UK_ASSERT(dev->_data->state == UK_NETDEV_CONFIGURED
-		  || dev->_data->state == UK_NETDEV_RUNNING);
+	UK_ASSERT(state == UK_NETDEV_CONFIGURED || state == UK_NETDEV_RUNNING);
 
-	if (unlikely(!dev->ops->promiscuous_set))
-		return -ENOTSUP;
+	irqf = uk_spin_lock_irqf(&dev->netdev_lock);
 
-	return dev->ops->promiscuous_set(dev, mode ? 1 : 0);
+	if (unlikely(!dev->ops->promiscuous_set)) {
+		ret = -ENOTSUP;
+		goto exit;
+	}
+
+	ret = dev->ops->promiscuous_set(dev, mode ? 1 : 0);
+
+exit:
+	uk_spin_unlock_irqf(&dev->netdev_lock, irqf);
+	return ret;
 }
 
 uint16_t uk_netdev_mtu_get(struct uk_netdev *dev)
 {
+	enum uk_netdev_state state = ukarch_load_n(&dev->_data->state);
+
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->_data);
 	UK_ASSERT(dev->ops);
@@ -620,26 +705,35 @@ uint16_t uk_netdev_mtu_get(struct uk_netdev *dev)
 	/* We do support getting of MTU
 	 * only when device was configured
 	 */
-	UK_ASSERT(dev->_data->state == UK_NETDEV_CONFIGURED
-		  || dev->_data->state == UK_NETDEV_RUNNING);
+	UK_ASSERT(state == UK_NETDEV_CONFIGURED || state == UK_NETDEV_RUNNING);
 
 	return dev->ops->mtu_get(dev);
 }
 
 int uk_netdev_mtu_set(struct uk_netdev *dev, uint16_t mtu)
 {
+	int ret;
+	unsigned int irqf;
+	enum uk_netdev_state state = ukarch_load_n(&dev->_data->state);
+
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->_data);
 	UK_ASSERT(dev->ops);
 
+	irqf = uk_spin_lock_irqf(&dev->netdev_lock);
 	/* We do support setting of MTU
 	 * only when device was configured
 	 */
-	UK_ASSERT(dev->_data->state == UK_NETDEV_CONFIGURED
-		  || dev->_data->state == UK_NETDEV_RUNNING);
+	UK_ASSERT(state == UK_NETDEV_CONFIGURED || state == UK_NETDEV_RUNNING);
 
-	if (dev->ops->mtu_set == NULL)
-		return -ENOTSUP;
+	if (dev->ops->mtu_set == NULL) {
+		ret = -ENOTSUP;
+		goto exit;
+	}
 
-	return dev->ops->mtu_set(dev, mtu);
+	ret = dev->ops->mtu_set(dev, mtu);
+
+exit:
+	uk_spin_unlock_irqf(&dev->netdev_lock, irqf);
+	return ret;
 }
