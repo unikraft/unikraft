@@ -41,20 +41,37 @@ extern "C" {
 /**
  * Perform a atomic load operation.
  */
+// #TODO: This (and the other compile guards in this file for CONFIG_PLAT_RASPI) is a workaround until we get proper
+// atomic operations working on ARM64 baremetal.
+// Mainly, whenever we try to execute a ldaxr or stlxr instruction on baremetal with the current memory configuration,
+// the CPU simply hangs. This should be fixed by enabling the caches and/or setting up a compatible memory configuration.
+#if CONFIG_PLAT_RASPI
+#define ukarch_load_n(src)		(*(src))
+#else
 #define ukarch_load_n(src) \
 	__atomic_load_n(src, __ATOMIC_SEQ_CST)
+#endif
+
 
 /**
  * Perform a atomic store operation.
  */
+#if CONFIG_PLAT_RASPI
+#define ukarch_store_n(src, value)	((*(src)) = value)
+#else
 #define ukarch_store_n(src, value) \
 	__atomic_store_n(src, value, __ATOMIC_SEQ_CST)
+#endif
 
 /**
  * Perform a atomic fetch and add operation.
  */
+#if CONFIG_PLAT_RASPI
+#define ukarch_fetch_add(src, value)	((*(src))++)
+#else
 #define ukarch_fetch_add(src, value) \
 	__atomic_fetch_add(src, value, __ATOMIC_SEQ_CST)
+#endif
 
 /**
  * Perform a atomic increment/decrement operation and return the
@@ -62,20 +79,49 @@ extern "C" {
  */
 #define ukarch_inc(src) \
 	ukarch_fetch_add(src, 1)
+#if CONFIG_PLAT_RASPI
+#define ukarch_dec(src)		((*(src))--)
+#else
 #define ukarch_dec(src) \
 	__atomic_fetch_sub(src, 1, __ATOMIC_SEQ_CST)
+#endif
+
 /**
  * Writes *src into *dst, and returns the previous contents of *dst.
  */
+#if CONFIG_PLAT_RASPI
+#define ukarch_exchange(dst, src)		\
+	({									\
+		__typeof__(*dst) prev = *dst;	\
+		*dst = *src;					\
+		prev;							\
+	})
+#else
 #define ukarch_exchange(dst, src) \
 	__atomic_exchange(dst, src, __ATOMIC_SEQ_CST)
+#endif
 
 /**
  * Writes v into *dst, and returns the previous contents of *dst.
  */
+#if CONFIG_PLAT_RASPI
+#define ukarch_exchange_n(dst, v)		\
+	({									\
+		__typeof__(*dst) prev = *dst;	\
+		*dst = v;						\
+		prev;							\
+	})
+#else
 #define ukarch_exchange_n(dst, v) \
 	__atomic_exchange_n(dst, v, __ATOMIC_SEQ_CST)
+#endif
 
+#if CONFIG_PLAT_RASPI
+#define ukarch_compare_exchange_sync(ptr, old, new)						\
+	({																	\
+		(*ptr == old) ? (*ptr = new) : old;								\
+	})
+#else
 #define ukarch_compare_exchange_sync(ptr, old, new)                            \
 	({                                                                     \
 		__typeof__(*ptr) stored = old;                                 \
@@ -84,6 +130,7 @@ extern "C" {
 		    ? new                                                      \
 		    : old;                                                     \
 	})
+#endif
 
 #ifdef __cplusplus
 }
