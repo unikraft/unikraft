@@ -171,7 +171,7 @@ struct uk_thread *uk_thread_current(void)
 /* NOTE: Never change the EXIT flag manually. Trnasition to exit state reqiures
  * the terminate funcrtiomns to be called.
  */
-void uk_thread_set_exited(struct uk_thread *t);
+void uk_thread_set_exited(struct uk_thread *t) __nonnull;
 
 /*
  * WARNING: The following functions allow threads being created without extended
@@ -514,13 +514,13 @@ struct uk_thread *uk_thread_create_container2(struct uk_alloc *a,
  * Helper functions for initializing a thread container and setting it
  * as runnable
  */
-void uk_thread_container_init_bare(struct uk_thread *t, uintptr_t ip);
-void uk_thread_container_init_fn0(struct uk_thread *t, uk_thread_fn0_t fn);
+void uk_thread_container_init_bare(struct uk_thread *t, uintptr_t ip) __nonnull;
+void uk_thread_container_init_fn0(struct uk_thread *t, uk_thread_fn0_t fn) __nonnull;
 void uk_thread_container_init_fn1(struct uk_thread *t, uk_thread_fn1_t fn,
-						       void *argp);
+						       void *argp) __nonnull;
 void uk_thread_container_init_fn2(struct uk_thread *t, uk_thread_fn2_t fn,
 						       void *argp0,
-						       void *argp1);
+						       void *argp1) __nonnull;
 
 /**
  * Allocates a raw uk_thread structure. Such a thread can then be assigned
@@ -593,10 +593,10 @@ struct uk_thread *uk_thread_create_fn2(struct uk_alloc *a,
 				       void *priv,
 				       uk_thread_dtor_t dtor);
 
-void uk_thread_release(struct uk_thread *t);
-void uk_thread_block_timeout(struct uk_thread *thread, __nsec nsec);
-void uk_thread_block(struct uk_thread *thread);
-void uk_thread_wake(struct uk_thread *thread);
+void uk_thread_release(struct uk_thread *t) __nonnull;
+void uk_thread_block_timeout(struct uk_thread *thread, __nsec nsec) __nonnull;
+void uk_thread_block(struct uk_thread *thread) __nonnull;
+void uk_thread_wake(struct uk_thread *thread) __nonnull;
 
 /**
  * Macro to access a Unikraft thread-local (UKTLS) variable of a
