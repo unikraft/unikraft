@@ -80,7 +80,15 @@ ENTRY(ASM_TRAP_SYM(\trapname))
 	.cfi_offset rip, -8
 	/* Description of the stack with active IST */
 	.cfi_offset cs, 0
+
+#ifdef __clang__
+	.cfi_offset flags, 8
+#elif __GNUC__
 	.cfi_offset rflags, 8
+#else
+#error "Unsupported Compiler"
+#endif
+
 	.cfi_offset rsp, 16
 	.cfi_offset ss, 24
 	cld
@@ -115,7 +123,15 @@ ENTRY(cpu_irq_\irqno)
 
 	/* Description of the stack with active IST */
 	.cfi_offset cs, 0
+
+#ifdef __clang__
+	.cfi_offset flags, 8
+#elif __GNUC__
 	.cfi_offset rflags, 8
+#else
+#error "Unsupported Compiler"
+#endif
+
 	.cfi_offset rsp, 16
 	.cfi_offset ss, 24
 	cld
