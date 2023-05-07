@@ -31,7 +31,12 @@
 #include <uk/config.h>
 #include <uk/plat/console.h>
 #include <uk/assert.h>
+
+#ifdef CONFIG_ARCH_ARM_64
 #include <arm/cpu.h>
+#elif CONFIG_ARCH_RISCV_64
+#include <riscv/cpu.h>
+#endif
 
 #define NS16550_THR_OFFSET	0x00U
 #define NS16550_RBR_OFFSET	0x00U
@@ -42,8 +47,6 @@
 #define NS16550_MCR_OFFSET	0x04U
 #define NS16550_LSR_OFFSET	0x05U
 #define NS16550_MSR_OFFSET	0x06U
-
-#define NS16550_REG_SHIFT	0x02U
 
 #define NS16550_LCR_DLAB	0x80U
 #define NS16550_IIR_NO_INT	0x01U
@@ -67,11 +70,10 @@ static uint8_t ns16550_uart_initialized;
 static uint64_t ns16550_uart_base;
 #endif
 
-/* Macros to access ns16550 registers with base address and reg shift */
-#define NS16550_REG(r)			((uint16_t *)(ns16550_uart_base + \
-					(r << NS16550_REG_SHIFT)))
-#define NS16550_REG_READ(r)		ioreg_read16(NS16550_REG(r))
-#define NS16550_REG_WRITE(r, v)	ioreg_write16(NS16550_REG(r), v)
+/* Macros to access ns16550 registers with base address */
+#define NS16550_REG(r)			(((uint8_t *)(ns16550_uart_base) + r))
+#define NS16550_REG_READ(r)		ioreg_read8(NS16550_REG(r))
+#define NS16550_REG_WRITE(r, v)	ioreg_write8(NS16550_REG(r), v)
 
 static void init_ns16550(uint64_t base)
 {
@@ -80,7 +82,7 @@ static void init_ns16550(uint64_t base)
 
 	/* Disable all interrupts */
 	NS16550_REG_WRITE(NS16550_IER_OFFSET,
-		NS16550_REG_READ(NS16550_FCR_OFFSET) & ~(NS16550_IIR_NO_INT));
+		NS16550_REG_READ(NS16550_IER_OFFSET) & ~(NS16550_IIR_NO_INT));
 
 	/* Disable FIFOs */
 	NS16550_REG_WRITE(NS16550_FCR_OFFSET,

@@ -70,7 +70,7 @@ config HAVE_PAGING
 
 config HAVE_PAGING_DIRECTMAP
 	bool
-	default y if PAGING && ARCH_X86_64
+	default y if PAGING && (ARCH_X86_64 || ARCH_RISCV_64)
 	default n
 
 config ENFORCE_W_XOR_X
@@ -92,9 +92,9 @@ config HZ
 		Only change this if you know what you're doing.
 
 config FPSIMD
-	bool "floating point & simd support in application"
+	bool "Floating point & SIMD support in application"
 	default n
-	depends on ARCH_ARM_64
+	depends on (ARCH_ARM_64 || ARCH_RISCV_64)
 	help
 		Enable support FPU usage in application
 

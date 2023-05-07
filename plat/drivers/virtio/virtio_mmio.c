@@ -49,7 +49,9 @@
 #include <virtio/virtio_bus.h>
 #include <virtio/virtqueue.h>
 #include <virtio/virtio_mmio.h>
+#if defined(CONFIG_ARCH_ARM_64) || defined(CONFIG_ARCH_ARM_32)
 #include <gic/gic-v2.h>
+#endif
 
 /*
  * The alignment to use between consumer and producer parts of vring.
@@ -412,7 +414,12 @@ static int virtio_mmio_probe(struct pf_device *pfdev)
 		}
 
 		type = fdt32_to_cpu(prop[0]);
+#if defined(CONFIG_ARCH_ARM_64) || defined(CONFIG_ARCH_ARM_32)
 		hwirq = fdt32_to_cpu(prop[1]);
+#else
+		/* The RISC-V DTB doesn't have 2 interrupt cells */
+		hwirq = fdt32_to_cpu(prop[0]);
+#endif
 
 		prop = fdt_getprop(_libkvmplat_cfg.dtb, fdt_vm, "reg", &prop_len);
 		if (!prop) {
@@ -426,7 +433,12 @@ static int virtio_mmio_probe(struct pf_device *pfdev)
 	}
 
 	pfdev->base = reg_base;
+#if defined(CONFIG_ARCH_ARM_64) || defined(CONFIG_ARCH_ARM_32)
 	pfdev->irq = gic_irq_translate(type, hwirq);
+#else
+	/* No IRQ translation necessary */
+	pfdev->irq = hwirq;
+#endif
 	uk_pr_info("virtio mmio probe base(0x%lx) irq(%ld)\n",
 				pfdev->base, pfdev->irq);
 	return 0;

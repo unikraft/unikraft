@@ -36,7 +36,6 @@
 #include <platform_bus.h>
 #include <libfdt.h>
 #include <kvm/config.h>
-#include <gic/gic-v2.h>
 #include <ofw/fdt.h>
 
 #define fdt_start (_libkvmplat_cfg.dtb)

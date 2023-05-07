@@ -471,7 +471,7 @@ usage()
 	echo "  -h                         Display help and exit"
 	echo "  -x                         Run guest in background, a socket is created for the serial output"
 	echo "  -P                         Create the guest in paused state"
-	echo "  -t [TYPE]                  Set guest type: x86pc, x86q35, arm64v"
+	echo "  -t [TYPE]                  Set guest type: x86pc, x86q35, arm64v, riscv64gc"
 	echo "  -G [NAME]                  Set name of guest to NAME"
 	echo "  -g [PORT]                  Run a GDB server for the guest at port PORT (e.g., 1234)"
 	echo "                             Note: QEMU process stays alive on guest shutdown/reset"
@@ -745,6 +745,12 @@ case "$ARG_MACHINETYPE" in
 
 		QEMU_BASE_ARGS+=("-cpu")
 		QEMU_BASE_ARGS+=("cortex-a53")
+		;;
+	"riscv64gc")
+		QEMU_BIN=${QEMU_BIN:-"$( which qemu-system-riscv64 )"}
+
+		QEMU_BASE_ARGS+=("-machine")
+		QEMU_BASE_ARGS+=("virt")
 		;;
 	"x86pc")
 		QEMU_BIN=${QEMU_BIN:-"$( which qemu-system-x86_64 )"}

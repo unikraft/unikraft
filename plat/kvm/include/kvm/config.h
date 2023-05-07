@@ -52,7 +52,7 @@ struct kvmplat_config {
 	/* `heap2` potentially exists only if `heap` exists */
 	struct kvmplat_config_memregion heap2;
 
-#ifdef CONFIG_ARCH_ARM_64
+#if defined(CONFIG_ARCH_ARM_64) || defined(CONFIG_ARCH_RISCV_64)
 	struct kvmplat_config_memregion pagetable;
 	void *dtb;
 #endif

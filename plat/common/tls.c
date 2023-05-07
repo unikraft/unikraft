@@ -42,6 +42,8 @@
 #include <x86/tls.h>
 #elif defined(__ARM_64__)
 #include <arm/arm64/tls.h>
+#elif defined(__RISCV_64__)
+#include <riscv/tls.h>
 #else
 #error "For thread-local storage support, add tls.h for current architecture."
 #endif

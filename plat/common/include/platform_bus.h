@@ -35,6 +35,7 @@
 
 #include <uk/bus.h>
 #include <uk/alloc.h>
+#include <stdint.h>
 
 /**
  * A structure describing an ID for a Platform driver. Each driver provides a

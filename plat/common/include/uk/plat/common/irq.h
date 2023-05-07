@@ -39,6 +39,8 @@
 #include <x86/irq.h>
 #elif defined(__ARM_64__)
 #include <arm/irq.h>
+#elif defined(__RISCV_64__)
+#include <riscv/irq.h>
 #else
 #error "Add irq.h for current architecture."
 #endif

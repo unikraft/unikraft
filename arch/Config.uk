@@ -2,6 +2,7 @@ choice
 	prompt "Architecture"
 	default ARCH_ARM_32 if ($(shell,$(CC) -dumpmachine | cut -d '-' -f1) = "arm")
 	default ARCH_ARM_64 if ($(shell,$(CC) -dumpmachine | cut -d '-' -f1) = "arm64")
+	default ARCH_RISCV_64 if ($(shell,$(CC) -dumpmachine | cut -d '-' -f1) = "riscv64")
 	default ARCH_X86_64
 	help
 	  Select the target CPU architecture.
@@ -12,6 +13,8 @@ config ARCH_ARM_64
        bool "Armv8 compatible (64 bits)"
 config ARCH_ARM_32
        bool "Armv7 compatible (32 bits)"
+config ARCH_RISCV_64
+	   bool "RISCV64 compatible (64 bits)"
 
 endchoice
 
@@ -23,6 +26,9 @@ if (ARCH_ARM_32)
 endif
 if (ARCH_ARM_64)
 	source "$(UK_BASE)/arch/arm/arm64/Config.uk"
+endif
+if (ARCH_RISCV_64)
+	source "$(UK_BASE)/arch/riscv/riscv64/Config.uk"
 endif
 
 config STACK_SIZE_PAGE_ORDER

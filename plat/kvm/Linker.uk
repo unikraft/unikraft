@@ -5,6 +5,8 @@ KVM_STRIPFLAGS += --output-target elf32-i386
 else ifeq (arm64,$(CONFIG_UK_ARCH))
 KVM_LDFLAGS-y += -Wl,-m,aarch64elf
 KVM_LINK_LIBGCC_FLAG := -lgcc
+else ifeq (riscv64,$(CONFIG_UK_ARCH))
+KVM_LINK_LIBGCC_FLAG := -lgcc
 endif
 KVM_BINFO_FLAGS := -a $(CONFIG_UK_ARCH)
 
