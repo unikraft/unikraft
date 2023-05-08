@@ -11,6 +11,8 @@ COMPFLAGS-$(call have_gcc)	+= -fno-tree-sra -fno-split-stack -nostdinc
 ifneq ($(HAVE_STACKPROTECTOR),y)
 COMPFLAGS    += -fno-stack-protector
 endif
+COMPFLAGS    += -fcf-protection=none
+
 COMPFLAGS    += -Wall -Wextra
 COMPFLAGS-$(call have_clang)	+= -Wdocumentation -Wdocumentation-pedantic
 
