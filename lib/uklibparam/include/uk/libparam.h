@@ -62,7 +62,7 @@ extern C {
 /*
  * Name (prefixes) used for a per-library section that stores all references
  * to parameters (struct uk_libparam_param) available for one library. This
- * section is basically compiles into an array of pointers.
+ * section is basically compiled into an array of pointers.
  * A library parameter descriptor (struct uk_libparam_desc) is referencing to
  * the section's base address for iteration.
  */
@@ -78,7 +78,7 @@ extern C {
 
 #ifndef __ASSEMBLY__
 #ifdef CONFIG_LIBUKLIBPARAM
-/* The following symbols are provided by ther per-library linker script. They
+/* The following symbols are provided by the per-library linker script.
  * They define the start and the end of the library parameters reference array
  */
 extern struct uk_libparam_param * const UK_LIBPARAM_PARAMSECTION_STARTSYM[];
@@ -118,7 +118,7 @@ struct uk_libparam_param {
 	/* Reference to corresponding variable */
 	void * const addr;
 
-	/* Internally use by parser for array parameters */
+	/* Internally used by parser for array parameters */
 	__sz __widx;
 };
 
@@ -146,7 +146,7 @@ struct uk_libparam_libdesc {
  *        library. A solution could be to create a file in uklibparam that
  *        declares an array of structs, one struct per library. Ideally the
  *        fields are filled out at compile/link time. This can be done as soon
- *        as a library is available that can export the the list of included
+ *        as a library is available that can export the list of included
  *        libraries of a build.
  * NOTE: Double declaration within one source file is avoided by the header's
  *       include guards.

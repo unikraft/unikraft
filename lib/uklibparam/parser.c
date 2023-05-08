@@ -133,7 +133,7 @@ static void uk_usage(void)
 	uk_pr_info("Valid boolean values for 'true' are: \"true\", \"on\", \"yes\", a non-zero number.\n"
 		   "Valid boolean values for 'false' are: \"false\", \"off\", \"no\", a zero number (e.g., \"0\").\n");
 	uk_pr_info("Boolean parameters that are passed without a value will be set to 'true'.\n");
-	uk_pr_info("Array parameters can be passed with multiple 'LIBRARY%cPARAMETER%cVALUE' tokens,\n",
+	uk_pr_info("Array parameters can be passed with multiple 'PREFIX%cPARAMETER%cVALUE' tokens,\n",
 		   PARSE_PARAM_SEP, PARSE_VALUE_SEP);
 	uk_pr_info("using a list: 'PREFIX%cPARAMETER%c%c VALUE0 VALUE1 ... %c', or a combination of both.\n",
 		   PARSE_PARAM_SEP, PARSE_VALUE_SEP, PARSE_LIST_START,
@@ -535,7 +535,7 @@ static int parse_arg(struct parse_arg_ctx *ctx, char *strbuf, int scan_only)
 	switch (ctx->state) {
 	case PAS_PARAM:
 		/*
-		 * Catch stop sequence ('---') or usage command ('help')
+		 * Catch stop sequence ('--') or usage command ('help')
 		 */
 		if (strcmp(strbuf, PARSE_STOP) == 0) {
 			ctx->hit_stop = 1;
