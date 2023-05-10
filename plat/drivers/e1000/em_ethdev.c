@@ -134,7 +134,7 @@ eth_em_dev_init(struct pci_device * pci_dev)
 
     UK_ASSERT(pci_dev != NULL);
 
-	hw = uk_malloc(a, sizeof(*hw));
+	hw = uk_calloc(a, sizeof(*hw), 1);
 	hw->a = a;
 	uk_pr_info("hw->a %p\n", hw->a);
 	if (!hw) {
