@@ -157,6 +157,9 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc **m)
 
 	UK_ASSERT(m);
 
+	if (i >= ukplat_memregion_count())
+		return -1;
+
 	if (i == 0 && _liblinuxuplat_opts.heap.base) {
 		mrd[0].pbase = (__paddr_t)_liblinuxuplat_opts.heap.base;
 		mrd[0].vbase = mrd[0].pbase;
