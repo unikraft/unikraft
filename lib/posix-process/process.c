@@ -40,6 +40,8 @@
 #include <uk/config.h>
 #include <uk/syscall.h>
 
+#define TIDMAP_SIZE (CONFIG_LIBPOSIX_PROCESS_MAX_PID + 1)
+
 #if CONFIG_LIBPOSIX_PROCESS_PIDS
 #include <uk/bitmap.h>
 #include <uk/list.h>
@@ -82,8 +84,8 @@ struct posix_thread {
 /**
  * System global lists
  */
-static struct posix_thread *tid_thread[CONFIG_LIBPOSIX_PROCESS_MAX_PID];
-static unsigned long tid_map[UK_BITS_TO_LONGS(CONFIG_LIBPOSIX_PROCESS_MAX_PID)];
+static struct posix_thread *tid_thread[TIDMAP_SIZE];
+static unsigned long tid_map[UK_BITS_TO_LONGS(TIDMAP_SIZE)];
 
 /**
  * Thread-local posix_thread reference
@@ -99,14 +101,12 @@ static inline pid_t find_free_tid(void)
 	unsigned long found;
 
 	/* search starting from last position */
-	found = uk_find_next_zero_bit(tid_map,
-				      CONFIG_LIBPOSIX_PROCESS_MAX_PID, prev);
-	if (found == CONFIG_LIBPOSIX_PROCESS_MAX_PID) {
+	found = uk_find_next_zero_bit(tid_map, TIDMAP_SIZE, prev);
+	if (found == TIDMAP_SIZE) {
 		/* search again starting from the beginning */
-		found = uk_find_first_zero_bit(tid_map,
-					       CONFIG_LIBPOSIX_PROCESS_MAX_PID);
+		found = uk_find_first_zero_bit(tid_map, TIDMAP_SIZE);
 	}
-	if (found == CONFIG_LIBPOSIX_PROCESS_MAX_PID) {
+	if (found == TIDMAP_SIZE) {
 		/* no free PID */
 		return -1;
 	}
@@ -121,14 +121,14 @@ static pid_t find_and_reserve_tid(void)
 
 	/* TODO: Mutex */
 	tid = find_free_tid();
-	if (tid >= 0)
+	if (tid > 0)
 		uk_set_bit(tid, tid_map);
 	return tid;
 }
 
 static void release_tid(pid_t tid)
 {
-	UK_ASSERT(tid >= 0 && tid <= CONFIG_LIBPOSIX_PROCESS_MAX_PID);
+	UK_ASSERT(tid > 0 && tid <= CONFIG_LIBPOSIX_PROCESS_MAX_PID);
 
 	/* TODO: Mutex */
 	uk_clear_bit(tid, tid_map);
@@ -280,7 +280,7 @@ int uk_posix_process_create(struct uk_alloc *a,
 
 	uk_pr_debug("Process PID %d created (parent PID: %d)\n",
 		    (int) pprocess->pid,
-		    (int) ((pprocess->parent) ? pprocess->parent->pid : -1));
+		    (int) ((pprocess->parent) ? pprocess->parent->pid : 0));
 	return 0;
 
 err_free_pprocess:
@@ -537,8 +537,8 @@ UK_SYSCALL_R_DEFINE(pid_t, getppid)
 	UK_ASSERT(pthread_self->process);
 
 	if (!pthread_self->process->parent) {
-		 /* no parent, return own PID */
-		return pthread_self->process->pid;
+		 /* no parent, return 0 */
+		return 0;
 	}
 
 	return pthread_self->process->parent->pid;
@@ -591,7 +591,7 @@ static int pprocess_parent_settid(const struct clone_args *cl_args,
 {
 	pid_t child_tid = ukthread2tid(child);
 
-	UK_ASSERT(child_tid >= 0);
+	UK_ASSERT(child_tid > 0);
 
 	if (!cl_args->parent_tid)
 		return -EINVAL;
@@ -609,7 +609,7 @@ static int pprocess_child_settid(const struct clone_args *cl_args,
 {
 	pid_t child_tid = ukthread2tid(child);
 
-	UK_ASSERT(child_tid >= 0);
+	UK_ASSERT(child_tid > 0);
 
 	if (!cl_args->child_tid)
 		return -EINVAL;
