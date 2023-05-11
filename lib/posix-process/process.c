@@ -83,9 +83,11 @@ struct posix_thread {
 
 /**
  * System global lists
+ * NOTE: We pre-allocate PID/TID 0 which is reserved by the kernel.
+ *       An application should never get PID/TID 0 assigned.
  */
 static struct posix_thread *tid_thread[TIDMAP_SIZE];
-static unsigned long tid_map[UK_BITS_TO_LONGS(TIDMAP_SIZE)];
+static unsigned long tid_map[UK_BITS_TO_LONGS(TIDMAP_SIZE)] = { [0] = 0x01UL };
 
 /**
  * Thread-local posix_thread reference
