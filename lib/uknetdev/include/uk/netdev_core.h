@@ -47,6 +47,10 @@
 #include <uk/sched.h>
 #include <uk/semaphore.h>
 #endif
+#ifdef CONFIG_LIBUKNETDEV_STATS
+#include <uk/arch/spinlock.h>
+#endif /* CONFIG_LIBUKNETDEV_STATS */
+
 
 /**
  * Unikraft network API common declarations.
@@ -457,6 +461,39 @@ struct uk_netdev_einfo {
 	const char *ipv4_gw_addr;
 };
 
+struct uk_netdev_tx_stats {
+	/** The total number of bytes of data transmitted by the interface */
+	size_t bytes;
+
+	/** The total number of packets of data transmitted by the interface */
+	size_t packets;
+
+	/** The total number of transmit errors detected by the device driver */
+	size_t errors;
+
+	/** The number of FIFO buffer errors */
+	size_t fifo;
+};
+
+struct uk_netdev_rx_stats {
+	/** The total number of bytes of data received by the interface */
+	size_t bytes;
+
+	/** The total number of packets of data received by the interface */
+	size_t packets;
+
+	/** The total number of receive errors detected by the device driver */
+	size_t errors;
+
+	/** The number of FIFO buffer errors */
+	size_t fifo;
+};
+
+struct uk_netdev_stats {
+	struct uk_netdev_tx_stats tx_m;
+	struct uk_netdev_rx_stats rx_m;
+};
+
 /**
  * NETDEV
  * A structure used to interact with a network device.
@@ -491,6 +528,12 @@ struct uk_netdev {
 #if (CONFIG_UK_NETDEV_SCRATCH_SIZE > 0)
 	char scratch_pad[CONFIG_UK_NETDEV_SCRATCH_SIZE];
 #endif /* CONFIG_UK_NETDEV_SCRATCH_SIZE */
+
+#ifdef CONFIG_LIBUKNETDEV_STATS
+	/* TODO: Per-queue stats to reduce contention */
+	struct uk_netdev_stats _stats;
+	__spinlock _stats_lock;
+#endif /* CONFIG_LIBUKNETDEV_STATS */
 };
 
 #ifdef __cplusplus

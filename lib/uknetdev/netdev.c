@@ -39,6 +39,10 @@
 #include <uk/print.h>
 #include <uk/libparam.h>
 
+#if CONFIG_LIBUKNETDEV_STATS
+#include "stats.h"
+#endif /* CONFIG_LIBUKNETDEV_STATS */
+
 struct uk_netdev_list uk_netdev_list =
 	UK_TAILQ_HEAD_INITIALIZER(uk_netdev_list);
 static uint16_t netdev_count;
@@ -344,6 +348,15 @@ int uk_netdev_configure(struct uk_netdev *dev,
 		uk_pr_info("netdev%"PRIu16": Configured interface\n",
 			   dev->_data->id);
 		dev->_data->state = UK_NETDEV_CONFIGURED;
+
+#ifdef CONFIG_LIBUKNETDEV_STATS
+	ret = uk_netdev_stats_init(dev);
+	if (unlikely(ret)) {
+		uk_pr_err("Could not initialize netdev stats\n");
+		return ret;
+	}
+#endif /* CONFIG_LIBUKNETDEV_STATS */
+
 	} else {
 		uk_pr_err("netdev%"PRIu16": Failed to configure interface: %d\n",
 			  dev->_data->id, ret);

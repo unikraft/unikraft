@@ -474,6 +474,8 @@ static inline int uk_netdev_rxq_intr_disable(struct uk_netdev *dev,
 static inline int uk_netdev_rx_one(struct uk_netdev *dev, uint16_t queue_id,
 				   struct uk_netbuf **pkt)
 {
+	int ret;
+
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->rx_one);
 	UK_ASSERT(queue_id < CONFIG_LIBUKNETDEV_MAXNBQUEUES);
@@ -481,7 +483,35 @@ static inline int uk_netdev_rx_one(struct uk_netdev *dev, uint16_t queue_id,
 	UK_ASSERT(!PTRISERR(dev->_rx_queue[queue_id]));
 	UK_ASSERT(pkt);
 
-	return dev->rx_one(dev, dev->_rx_queue[queue_id], pkt);
+
+	ret = dev->rx_one(dev, dev->_rx_queue[queue_id], pkt);
+
+#ifdef CONFIG_LIBUKNETDEV_STATS
+	if (ret >= 0 && (ret & UK_NETDEV_STATUS_SUCCESS)) {
+		struct uk_netbuf *nb;
+
+		ukarch_spin_lock(&dev->_stats_lock);
+		UK_NETBUF_CHAIN_FOREACH(nb, *pkt)
+			dev->_stats.rx_m.bytes += (*pkt)->len;
+		dev->_stats.rx_m.packets++;
+		ukarch_spin_unlock(&dev->_stats_lock);
+		return ret;
+	}
+	if (ret >= 0 && (ret & UK_NETDEV_STATUS_UNDERRUN)) {
+		ukarch_spin_lock(&dev->_stats_lock);
+		dev->_stats.rx_m.fifo++;
+		ukarch_spin_unlock(&dev->_stats_lock);
+		return ret;
+	}
+	if (ret < 0) {
+		ukarch_spin_lock(&dev->_stats_lock);
+		dev->_stats.rx_m.errors++;
+		ukarch_spin_unlock(&dev->_stats_lock);
+		return ret;
+	}
+#endif /* CONFIG_LIBUKNETDEV_STATS */
+
+	return ret;
 }
 
 /**
@@ -513,6 +543,8 @@ static inline int uk_netdev_rx_one(struct uk_netdev *dev, uint16_t queue_id,
 static inline int uk_netdev_tx_one(struct uk_netdev *dev, uint16_t queue_id,
 				   struct uk_netbuf *pkt)
 {
+	int ret;
+
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->tx_one);
 	UK_ASSERT(queue_id < CONFIG_LIBUKNETDEV_MAXNBQUEUES);
@@ -520,7 +552,34 @@ static inline int uk_netdev_tx_one(struct uk_netdev *dev, uint16_t queue_id,
 	UK_ASSERT(!PTRISERR(dev->_tx_queue[queue_id]));
 	UK_ASSERT(pkt);
 
-	return dev->tx_one(dev, dev->_tx_queue[queue_id], pkt);
+	ret = dev->tx_one(dev, dev->_tx_queue[queue_id], pkt);
+
+#ifdef CONFIG_LIBUKNETDEV_STATS
+	if (ret >= 0 && (ret & UK_NETDEV_STATUS_SUCCESS)) {
+		struct uk_netbuf *nb;
+
+		ukarch_spin_lock(&dev->_stats_lock);
+		UK_NETBUF_CHAIN_FOREACH(nb, pkt)
+			dev->_stats.tx_m.bytes += nb->len;
+		dev->_stats.tx_m.packets++;
+		ukarch_spin_unlock(&dev->_stats_lock);
+		return ret;
+	}
+	if (ret >= 0 && (ret & UK_NETDEV_STATUS_UNDERRUN)) {
+		ukarch_spin_lock(&dev->_stats_lock);
+		dev->_stats.tx_m.fifo++;
+		ukarch_spin_unlock(&dev->_stats_lock);
+		return ret;
+	}
+	if (ret < 0) {
+		ukarch_spin_lock(&dev->_stats_lock);
+		dev->_stats.tx_m.errors++;
+		ukarch_spin_unlock(&dev->_stats_lock);
+		return ret;
+	}
+#endif /* CONFIG_LIBUKNETDEV_STATS */
+
+	return ret;
 }
 
 /**
