@@ -7,27 +7,33 @@ menuconfig LIBUKNETDEV
 	imply LIBUKLIBPARAM
 
 if LIBUKNETDEV
-	config LIBUKNETDEV_MAXNBQUEUES
-		int "Maximum number of receive-transmit queue pairs"
-		default 1
-		help
-			Upper limit for supported number of transmit and receive
-			queues with the uknetdev API. Please note that drivers
-			have their own limits (use API getters to figure out
-			device capabilities). As example, one driver may support
-			only a single receive-transmit queue pair although
-			uknetdev would support 16.
+config LIBUKNETDEV_MAXNBQUEUES
+	int "Maximum number of receive-transmit queue pairs"
+	default 1
+	help
+		Upper limit for supported number of transmit and receive
+		queues with the uknetdev API. Please note that drivers
+		have their own limits (use API getters to figure out
+		device capabilities). As example, one driver may support
+		only a single receive-transmit queue pair although
+		uknetdev would support 16.
 
-	config LIBUKNETDEV_DISPATCHERTHREADS
-		bool "Dispatcher threads for event callbacks"
-		select LIBUKSCHED
-		select LIBUKLOCK
-		select LIBUKLOCK_SEMAPHORE
-		default n
-		help
-			Event callbacks are dispatched in a bottom half
-			thread context instead of the device interrupt context.
-			When this option is enabled a dispatcher thread is
-			allocated for each configured receive queue.
-			libuksched is required for this option.
+config LIBUKNETDEV_DISPATCHERTHREADS
+	bool "Dispatcher threads for event callbacks"
+	select LIBUKSCHED
+	select LIBUKLOCK
+	select LIBUKLOCK_SEMAPHORE
+	default n
+	help
+		Event callbacks are dispatched in a bottom half
+		thread context instead of the device interrupt context.
+		When this option is enabled a dispatcher thread is
+		allocated for each configured receive queue.
+		libuksched is required for this option.
+
+config LIBUKNETDEV_STATS
+	bool "Collect network statistics"
+	default n
+	help
+		Collect per-interface and global statistics.
 endif
