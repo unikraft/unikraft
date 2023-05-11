@@ -328,8 +328,7 @@ static void pprocess_release(struct posix_process *pprocess)
 
 static void pprocess_kill(struct posix_process *pprocess)
 {
-	struct posix_thread *pthread, *pthreadn;
-	bool self_destruct = false;
+	struct posix_thread *pthread, *pthreadn, *pthread_self = NULL;
 
 	/* Kill all remaining threads of the process */
 	uk_list_for_each_entry_safe(pthread, pthreadn,
@@ -343,7 +342,7 @@ static void pprocess_kill(struct posix_process *pprocess)
 			 * function is executed anymore as soon as the
 			 * thread killed itself.
 			 */
-			self_destruct = true;
+			pthread_self = pthread;
 			continue;
 		}
 		if (uk_thread_is_exited(pthread->thread)) {
@@ -365,9 +364,9 @@ static void pprocess_kill(struct posix_process *pprocess)
 		uk_sched_thread_terminate(pthread->thread);
 	}
 
-	if (self_destruct) {
+	if (pthread_self) {
 		uk_pr_debug("Terminating PID %d: Self-killing TID %d...\n",
-			    pprocess->pid, pthread->tid);
+			    pprocess->pid, pthread_self->tid);
 		uk_sched_thread_terminate(uk_thread_current());
 
 		/* NOTE: Nothing will be executed from here on */
@@ -413,7 +412,7 @@ static int posix_thread_init(struct uk_thread *child, struct uk_thread *parent)
 	}
 	if (!parent_pthread) {
 		/* parent has no posix thread, do not setup one for the child */
-		uk_pr_debug("thread %p (%s): Parent %p (%s) has no PID, skipping...\n",
+		uk_pr_debug("thread %p (%s): Parent %p (%s) without process context, skipping...\n",
 			    child, child->name, parent,
 			    parent ? parent->name : "<n/a>");
 		pthread_self = NULL;
