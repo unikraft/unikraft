@@ -1,33 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*
- * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
- *
- * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+/* Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2025, Unikraft GmbH and The Unikraft Authors.
+ * Licensed under the BSD-3-Clause License (the "License").
+ * You may not use this file except in compliance with the License.
  */
 /* Ported from Mini-OS */
 
@@ -96,9 +71,12 @@ void do_unhandled_trap(int trapnr, char *str, struct __regs *regs,
 
 #define DECLARE_TRAP_EVENT(event)					\
 UK_EVENT(event);							\
-static inline int _raise_event_##event(int trapnr, struct __regs *regs,	\
-		unsigned long error_code) {				\
-	struct ukarch_trap_ctx ctx = {regs, trapnr, error_code, 0};	\
+static inline int _raise_event_##event(int trapnr, const char *str,	\
+				       struct __regs *regs,		\
+					unsigned long error_code) {	\
+	struct ukarch_trap_ctx ctx = {regs, trapnr, str, error_code,	\
+				      0, /* filled by handler */	\
+				      read_cr2()}; /* pf addr */	\
 	return uk_raise_event(event, &ctx);				\
 }
 
@@ -108,11 +86,11 @@ static inline int _raise_event_##event(int trapnr, struct __regs *regs,	\
 void do_##name(struct __regs *regs)					\
 {									\
 	int rc;								\
-	rc = _raise_event_##event(TRAP_##name, regs, 0);		\
+	rc = _raise_event_##event(TRAP_##name, str, regs, 0);		\
 	if (unlikely(rc < 0))						\
 		uk_pr_crit("trap handler returned error: %d\n", rc);	\
 									\
-	if (!rc)							\
+	if (rc == UK_EVENT_NOT_HANDLED)					\
 		do_unhandled_trap(TRAP_##name, str, regs, 0);		\
 }
 
@@ -120,11 +98,11 @@ void do_##name(struct __regs *regs)					\
 void do_##name(struct __regs *regs, unsigned long error_code)		\
 {									\
 	int rc;								\
-	rc = _raise_event_##event(TRAP_##name, regs, error_code);	\
+	rc = _raise_event_##event(TRAP_##name, str, regs, error_code);	\
 	if (unlikely(rc < 0))						\
 		uk_pr_crit("trap handler returned error: %d\n", rc);	\
 									\
-	if (!rc)							\
+	if (rc == UK_EVENT_NOT_HANDLED)					\
 		do_unhandled_trap(TRAP_##name, str, regs, error_code);	\
 }
 

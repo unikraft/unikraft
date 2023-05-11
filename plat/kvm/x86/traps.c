@@ -31,6 +31,7 @@
 #include <uk/arch/paging.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/config.h>
+#include <x86/cpu.h>
 #include <x86/desc.h>
 #include <kvm-x86/traps.h>
 
