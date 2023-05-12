@@ -839,19 +839,23 @@ sys_rename(char *src, char *dest)
 	vn_lock(dvp1);
 
 	dvp2 = ddp2->d_vnode;
-	vn_lock(dvp2);
+	if (dvp1 != dvp2) {
+		vn_lock(dvp2);
 
-	/* Source and destination directions should be writable) */
-	if ((error = vn_access(dvp1, VWRITE)) != 0)
-	    goto err3;
-	if ((error = vn_access(dvp2, VWRITE)) != 0)
-	    goto err3;
+		/* Source and destination must be on the same file system */
+		if (dvp1->v_mount != dvp2->v_mount) {
+			error = EXDEV;
+			goto err3;
+		}
 
-	/* The source and dest must be same file system */
-	if (dvp1->v_mount != dvp2->v_mount) {
-		error = EXDEV;
-		goto err3;
+		/* Destination directory must be writable */
+		if ((error = vn_access(dvp2, VWRITE)) != 0)
+			goto err3;
 	}
+
+	/* Source directory must be writable */
+	if ((error = vn_access(dvp1, VWRITE)) != 0)
+		goto err3;
 
 	error = VOP_RENAME(dvp1, vp1, sname, dvp2, vp2, dname);
 	if (error)
@@ -863,7 +867,8 @@ sys_rename(char *src, char *dest)
 		dentry_remove(dp2);
 
  err3:
-	vn_unlock(dvp2);
+	if (dvp2 != dvp1)
+		vn_unlock(dvp2);
 	vn_unlock(dvp1);
  err2:
 	if (vp2) {
