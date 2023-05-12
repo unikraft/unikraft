@@ -767,11 +767,11 @@ out:
 	return -rc;
 }
 
-static int uk_9pfs_setattr(struct vnode *vp, struct vattr *attr)
+static int uk_9pfs_do_setattr(struct vnode *vp, struct uk_9pfid *fid,
+			      struct vattr *attr)
 {
 	struct uk_9pfs_mount_data *md = UK_9PFS_MD(vp->v_mount);
 	struct uk_9pdev *dev = md->dev;
-	struct uk_9pfid *fid = UK_9PFS_VFID(vp);
 
 	if (md->proto == UK_9P_PROTO_2000L) {
 		uint32_t valid = 0;
@@ -882,6 +882,11 @@ static int uk_9pfs_setattr(struct vnode *vp, struct vattr *attr)
 	}
 }
 
+static int uk_9pfs_setattr(struct vnode *vp, struct vattr *attr)
+{
+	return uk_9pfs_do_setattr(vp, UK_9PFS_VFID(vp), attr);
+}
+
 static int uk_9pfs_fsync(struct vnode *vp, struct vfscore_file *fp)
 {
 	struct uk_9pfs_mount_data *md = UK_9PFS_MD(vp->v_mount);
@@ -890,7 +895,7 @@ static int uk_9pfs_fsync(struct vnode *vp, struct vfscore_file *fp)
 	if (md->proto == UK_9P_PROTO_2000L) {
 		return -uk_9p_fsync(md->dev, fid);
 	} else if (md->proto == UK_9P_PROTO_2000U) {
-		return uk_9pfs_setattr(vp, &(struct vattr){
+		return uk_9pfs_do_setattr(vp, fid, &(struct vattr){
 			.va_mask = 0
 		});
 	} else {
@@ -900,7 +905,7 @@ static int uk_9pfs_fsync(struct vnode *vp, struct vfscore_file *fp)
 
 static int uk_9pfs_truncate(struct vnode *vp, off_t off)
 {
-	return uk_9pfs_setattr(vp, &(struct vattr){
+	return uk_9pfs_do_setattr(vp, UK_9PFS_VFID(vp), &(struct vattr){
 		.va_mask = AT_SIZE,
 		.va_size = off,
 	});
