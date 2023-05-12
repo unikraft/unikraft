@@ -68,7 +68,7 @@ extern int vfs_debug;
  *	Format string, followed by a variable-length list of arguments,
  *	similar to arguments passed to printf().
  */
-#define DPRINTF(_m, X)	do {if (vfs_debug & (_m)) uk_pr_debug X} while (0)
+#define DPRINTF(_m, X)	do { if (vfs_debug & (_m)) uk_pr_debug X; } while (0)
 #else
 #define DPRINTF(_m, X)
 #endif
