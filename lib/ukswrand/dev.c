@@ -32,6 +32,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 #include <uk/ctors.h>
 #include <uk/print.h>
 #include <uk/swrand.h>
