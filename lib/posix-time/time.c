@@ -207,6 +207,16 @@ UK_SYSCALL_R_DEFINE(int, clock_settime, clockid_t, clk_id,
 	return 0;
 }
 
+UK_SYSCALL_R_DEFINE(int, clock_nanosleep, clockid_t, clockid, int, flags,
+		    const struct timespec *, request, struct timespec *, remain)
+{
+	if ((clockid == CLOCK_REALTIME) && !(flags & TIMER_ABSTIME))
+		return uk_syscall_r_nanosleep((long) request, (long) remain);
+
+	UK_WARN_STUBBED();
+	return 0;
+}
+
 UK_SYSCALL_R_DEFINE(int, times, struct tm *, buf)
 {
 	return -ENOTSUP;
