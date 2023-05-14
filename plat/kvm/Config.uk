@@ -21,7 +21,10 @@ config KVM_BOOT_PROTO_MULTIBOOT
 		Multiboot Boot Protocol Version 1
 
 config KVM_BOOT_PROTO_LXBOOT
-	bool
+	bool "Lxboot"
+	depends on !KVM_VMM_QEMU && KVM_VMM_FIRECRACKER && ARCH_X86_64
+	help
+		Linux 64-bit Boot Protocol
 
 choice
 	prompt "Virtual Machine Monitor"
