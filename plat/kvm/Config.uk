@@ -15,7 +15,10 @@ menuconfig PLAT_KVM
 if (PLAT_KVM)
 
 config KVM_BOOT_PROTO_MULTIBOOT
-	bool
+	bool "Multiboot"
+	depends on KVM_VMM_QEMU && !KVM_VMM_FIRECRACKER && ARCH_X86_64
+	help
+		Multiboot Boot Protocol Version 1
 
 config KVM_BOOT_PROTO_LXBOOT
 	bool
