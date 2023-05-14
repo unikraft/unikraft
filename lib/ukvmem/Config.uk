@@ -4,6 +4,7 @@ menuconfig LIBUKVMEM
 	select LIBUKDEBUG
 	select LIBUKALLOC
 	select LIBISRLIB
+	select PAGING
 	help
 		This library implements virtual address management by
 		providing methods for working with virtual address space
