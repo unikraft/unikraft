@@ -86,4 +86,9 @@ void ukplat_bootinfo_set(struct ukplat_bootinfo *bi);
  */
 void ukplat_bootinfo_print(void);
 
+/**
+ * Given the pointer to the FDT, sets up the bootinfo structure based on it.
+ */
+void ukplat_bootinfo_fdt_setup(void *fdtp);
+
 #endif /* __PLAT_CMN_BOOTINFO_H__ */
