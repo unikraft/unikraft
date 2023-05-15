@@ -12,6 +12,55 @@ config LIBUKDEBUG_ENABLE_ASSERT
 	help
 	  Build code with assertions.
 
+menuconfig LIBUKDEBUG_CRASH_SCREEN
+	bool "Enable crash report"
+	default y
+	depends on LIBUKPRINT
+	help
+		Output information on the kernel console if a crash occurred.
+
+if LIBUKDEBUG_CRASH_SCREEN
+config LIBUKDEBUG_CRASH_PRINT_STACK
+	bool "Print stack"
+	default y if LIBUKNOFAULT
+	help
+		Output a hexdump of the last words on the stack. Selecting this
+		option without enabling libuknofault may result into an infinite
+		exception loop if the stack pointer is corrupted.
+
+config LIBUKDEBUG_CRASH_PRINT_STACK_WORDS
+	int "Number of stack words to print"
+	default 8
+	depends on LIBUKDEBUG_CRASH_PRINT_STACK
+
+config LIBUKDEBUG_CRASH_PRINT_CALL_TRACE
+	bool "Print call trace"
+	default y if LIBUKNOFAULT
+	help
+		Output a call trace. Selecting this option without enabling
+		libuknofault may result into an infinite exception loop if
+		one of the frame pointers in the call chain is corrupted.
+endif
+
+choice
+	prompt "Crash action"
+	default LIBUKDEBUG_CRASH_ACTION_HALT
+	depends on HAVE_REBOOT
+	help
+		The action to be performed in case of a crash.
+
+config LIBUKDEBUG_CRASH_ACTION_HALT
+	bool "Halt the system"
+
+config LIBUKDEBUG_CRASH_ACTION_REBOOT
+	bool "Reboot the system"
+
+config LIBUKDEBUG_CRASH_REBOOT_DELAY
+	depends on LIBUKDEBUG_CRASH_ACTION_REBOOT
+	default 10
+	int "Reboot delay"
+endchoice
+
 menuconfig LIBUKDEBUG_TRACEPOINTS
 	bool "Enable tracepoints"
 	default n

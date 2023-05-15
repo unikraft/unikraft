@@ -36,11 +36,13 @@
 #ifndef __UKDEBUG_ASSERT_H__
 #define __UKDEBUG_ASSERT_H__
 
-#include <uk/plat/bootstrap.h>
 #include <uk/arch/lcpu.h>
-#include <uk/essentials.h>
-#include <uk/print.h>
+#include <uk/arch/crash.h>
 #include <uk/config.h>
+#include <uk/crash.h>
+#include <uk/essentials.h>
+#include <uk/plat/bootstrap.h>
+#include <uk/print.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,8 +54,7 @@ extern "C" {
 		if (unlikely(!(x))) {					\
 			uk_pr_crit("Assertion failure: %s\n",		\
 				   STRINGIFY(x));			\
-			/* TODO: stack trace */				\
-			ukplat_terminate(UKPLAT_CRASH);			\
+			uk_crash_trigger();				\
 		}							\
 	} while (0)
 
@@ -80,13 +81,6 @@ extern "C" {
 
 #define UK_BUG()							\
 	UK_BUGON(1)
-
-#define UK_CRASH(fmt, ...)						\
-	do {								\
-		uk_pr_crit((fmt), ##__VA_ARGS__);			\
-		/* TODO: stack trace */					\
-		ukplat_terminate(UKPLAT_CRASH);				\
-	} while (0)
 
 #ifdef __cplusplus
 }

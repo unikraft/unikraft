@@ -8,9 +8,9 @@
 #include "gdbsup.h"
 #include "../../gdbstub.h"
 
-#include <uk/arch/traps.h>
 #include <uk/bitops.h>
 #include <uk/isr/string.h>
+#include <uk/plat/lcpu.h>
 
 #ifndef X86_EFLAGS_TF
 #define X86_EFLAGS_TF UK_BIT(8)
