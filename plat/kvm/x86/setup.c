@@ -24,81 +24,6 @@
 #include <uk/plat/common/sections.h>
 #include <uk/plat/common/bootinfo.h>
 
-#ifdef CONFIG_HAVE_PAGING
-#include <uk/plat/paging.h>
-#include <uk/falloc.h>
-#endif /* CONFIG_HAVE_PAGING */
-
-#define PLATFORM_MAX_MEM_ADDR 0x100000000 /* 4 GiB */
-
-#ifdef CONFIG_HAVE_PAGING
-static int mem_init(struct ukplat_bootinfo *bi)
-{
-	int rc;
-
-	/* TODO: Until we generate the boot page table at compile time, we
-	 * manually add an untyped unmap region to the boot info to force an
-	 * unmapping of the 1:1 mapping after the kernel image before mapping
-	 * only the necessary parts.
-	 */
-	rc = ukplat_memregion_list_insert(&bi->mrds,
-		&(struct ukplat_memregion_desc){
-			.vbase = PAGE_ALIGN_UP(__END),
-			.pbase = 0,
-			.len   = PLATFORM_MAX_MEM_ADDR - PAGE_ALIGN_UP(__END),
-			.type  = 0,
-			.flags = UKPLAT_MEMRF_UNMAP,
-		});
-	if (unlikely(rc < 0))
-		return rc;
-
-	return ukplat_paging_init();
-}
-#else /* CONFIG_HAVE_PAGING */
-static int mem_init(struct ukplat_bootinfo *bi)
-{
-	struct ukplat_memregion_desc *mrdp;
-	int i;
-
-	/* The static boot page table maps only the first 4 GiB. Remove all
-	 * free memory regions above this limit so we won't use them for the
-	 * heap. Start from the tail as the memory list is ordered by address.
-	 * We can stop at the first area that is completely in the mapped area.
-	 */
-	for (i = (int)bi->mrds.count - 1; i >= 0; i--) {
-		ukplat_memregion_get(i, &mrdp);
-		if (mrdp->vbase >= PLATFORM_MAX_MEM_ADDR) {
-			/* Region is outside the mapped area */
-			uk_pr_info("Memory %012lx-%012lx outside mapped area\n",
-				   mrdp->vbase, mrdp->vbase + mrdp->len);
-
-			if (mrdp->type == UKPLAT_MEMRT_FREE)
-				ukplat_memregion_list_delete(&bi->mrds, i);
-		} else if (mrdp->vbase + mrdp->len > PLATFORM_MAX_MEM_ADDR) {
-			/* Region overlaps with unmapped area */
-			uk_pr_info("Memory %012lx-%012lx outside mapped area\n",
-				   PLATFORM_MAX_MEM_ADDR,
-				   mrdp->vbase + mrdp->len);
-
-			if (mrdp->type == UKPLAT_MEMRT_FREE)
-				mrdp->len -= (mrdp->vbase + mrdp->len) -
-						PLATFORM_MAX_MEM_ADDR;
-
-			/* Since regions are non-overlapping and ordered, we
-			 * can stop here, as the next region would be fully
-			 * mapped anyways
-			 */
-			break;
-		} else {
-			/* Region is fully mapped */
-			break;
-		}
-	}
-
-	return 0;
-}
-#endif /* !CONFIG_HAVE_PAGING */
-
 static char *cmdline;
 static __sz cmdline_len;
 
@@ -179,7 +104,7 @@ void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi)
 	bstack = (void *)((__uptr)bstack + __STACK_SIZE);
 
 	/* Initialize memory */
-	rc = mem_init(bi);
+	rc = ukplat_mem_init();
 	if (unlikely(rc))
 		UK_CRASH("Mem init failed: %d\n", rc);
 
