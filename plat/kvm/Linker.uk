@@ -58,7 +58,6 @@ $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 			$(LDFLAGS) $(LDFLAGS-y) \
 			$(KVM_LD_SCRIPT_FLAGS) \
 			-o $@)
-	$(call build_bootinfo,$@)
 
 $(KVM_IMAGE): $(KVM_IMAGE).dbg
 	$(call build_cmd,SCSTRIP,,$@,\
@@ -67,6 +66,7 @@ $(KVM_IMAGE): $(KVM_IMAGE).dbg
 			$(KVM_STRIPFLAGS) \
 			$< -o $@ 2>&1 | \
 			{ grep -v "Empty loadable segment detected" || true; })
+	$(call build_bootinfo,$@)
 
 $(KVM_IMAGE).sym: $(KVM_DEBUG_IMAGE)
 	$(call build_cmd,NM,,$@, $(NM) -n $< > $@)
