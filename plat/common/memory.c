@@ -31,13 +31,14 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-
+#include <stdbool.h>
+#include <stddef.h>
 #include <uk/plat/common/sections.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/asm/limits.h>
 #include <uk/alloc.h>
-#include <stddef.h>
-#include <stdbool.h>
+
+extern struct ukplat_memregion_desc bpt_unmap_mrd;
 
 static struct uk_alloc *plat_allocator;
 
@@ -353,3 +354,116 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc **mrd)
 	*mrd = &bi->mrds.mrds[i];
 	return 0;
 }
+
+#ifdef CONFIG_HAVE_PAGING
+#include <uk/plat/paging.h>
+
+static int ukplat_memregion_list_insert_unmaps(struct ukplat_bootinfo *bi)
+{
+	__vaddr_t unmap_start, unmap_end;
+	int rc;
+
+	if (!bpt_unmap_mrd.len)
+		return 0;
+
+	/* Be PIE aware: split the unmap memory region so that we do no unmap
+	 * the Kernel image.
+	 */
+	unmap_start = ALIGN_DOWN(bpt_unmap_mrd.vbase, __PAGE_SIZE);
+	unmap_end = unmap_start + ALIGN_DOWN(bpt_unmap_mrd.len, __PAGE_SIZE);
+
+	/* After Kernel image */
+	rc = ukplat_memregion_list_insert(&bi->mrds,
+			&(struct ukplat_memregion_desc){
+				.vbase = ALIGN_UP(__END, __PAGE_SIZE),
+				.pbase = 0,
+				.len   = unmap_end -
+					 ALIGN_UP(__END, __PAGE_SIZE),
+				.type  = 0,
+				.flags = UKPLAT_MEMRF_UNMAP,
+			});
+	if (unlikely(rc < 0))
+		return rc;
+
+	/* Before Kernel image */
+	return ukplat_memregion_list_insert(&bi->mrds,
+			&(struct ukplat_memregion_desc){
+				.vbase = unmap_start,
+				.pbase = 0,
+				.len   = ALIGN_DOWN(__BASE_ADDR, __PAGE_SIZE) -
+					 unmap_start,
+				.type  = 0,
+				.flags = UKPLAT_MEMRF_UNMAP,
+			});
+}
+
+int ukplat_mem_init(void)
+{
+	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
+	int rc;
+
+	UK_ASSERT(bi);
+
+	rc = ukplat_memregion_list_insert_unmaps(bi);
+	if (unlikely(rc < 0))
+		return rc;
+
+	rc = ukplat_paging_init();
+	if (unlikely(rc < 0))
+		return rc;
+
+	/* Remove the two memory regions inserted by
+	 * ukplat_memregion_list_insert_unmaps(). Due to their `pbase` nature
+	 * and us never adding regions starting from zero-page, they are
+	 * guaranteed to be the first in the list
+	 */
+	ukplat_memregion_list_delete(&bi->mrds, 0);
+	ukplat_memregion_list_delete(&bi->mrds, 0);
+
+	return 0;
+}
+#else /* CONFIG_HAVE_PAGING */
+int ukplat_mem_init(void)
+{
+	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
+	struct ukplat_memregion_desc *mrdp;
+	__vaddr_t unmap_end;
+	int i;
+
+	UK_ASSERT(bi);
+
+	unmap_end = ALIGN_DOWN(bpt_unmap_mrd.vbase + bpt_unmap_mrd.len,
+			       __PAGE_SIZE);
+	for (i = (int)bi->mrds.count - 1; i >= 0; i--) {
+		ukplat_memregion_get(i, &mrdp);
+		if (mrdp->vbase >= unmap_end) {
+			/* Region is outside the mapped area */
+			uk_pr_info("Memory %012lx-%012lx outside mapped area\n",
+				   mrdp->vbase, mrdp->vbase + mrdp->len);
+
+			if (mrdp->type == UKPLAT_MEMRT_FREE)
+				ukplat_memregion_list_delete(&bi->mrds, i);
+		} else if (mrdp->vbase + mrdp->len > unmap_end) {
+			/* Region overlaps with unmapped area */
+			uk_pr_info("Memory %012lx-%012lx outside mapped area\n",
+				   unmap_end,
+				   mrdp->vbase + mrdp->len);
+
+			if (mrdp->type == UKPLAT_MEMRT_FREE)
+				mrdp->len -= (mrdp->vbase + mrdp->len) -
+					     unmap_end;
+
+			/* Since regions are non-overlapping and ordered, we
+			 * can stop here, as the next region would be fully
+			 * mapped anyways
+			 */
+			break;
+		} else {
+			/* Region is fully mapped */
+			break;
+		}
+	}
+
+	return 0;
+}
+#endif /* !CONFIG_HAVE_PAGING */

@@ -237,6 +237,21 @@ struct uk_alloc *ukplat_memallocator_get(void);
  */
 void *ukplat_memregion_alloc(__sz size, int type, __u16 flags);
 
+/**
+ * Initializes the memory mapping based on the platform or architecture defined
+ * unmapping memory region descriptor (named `bpt_unmap_mrd`). Based on this
+ * descriptor, the function surrounds the kernel image with the unmappings,
+ * adding an unmapping region before and after the kernel. Therefore,
+ * `bpt_unmap_mrd`'s range must contain the kernel image range.
+ *
+ * @param bi
+ *   Pointer to the image's `struct ukplat_bootinfo` structure.
+ *
+ * @return
+ *   0 on success, not 0 otherwise.
+ */
+int ukplat_mem_init(void);
+
 #ifdef __cplusplus
 }
 #endif
