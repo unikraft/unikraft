@@ -61,6 +61,9 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 	 */
 	do_uk_reloc_kmrds(0, 0);
 
+	/* Ensure that the memory map contains the legacy high mem area */
+	ukplat_memregion_list_insert_legacy_hi_mem(&bi->mrds);
+
 	/* Add the cmdline */
 	if (mi->flags & MULTIBOOT_INFO_CMDLINE) {
 		if (mi->cmdline) {
