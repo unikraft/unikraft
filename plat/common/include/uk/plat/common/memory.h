@@ -112,6 +112,32 @@ ukplat_memregion_list_insert(struct ukplat_memregion_list *list,
 	return (int)i;
 }
 
+#if defined(__X86_64__)
+#define	X86_HI_MEM_START		0xA0000
+#define X86_HI_MEM_LEN			0x50000
+
+static inline int
+ukplat_memregion_list_insert_legacy_hi_mem(struct ukplat_memregion_list *list)
+{
+	struct ukplat_memregion_desc mrd = {0};
+
+	/* Note that we are mapping it as writable as well to cope with the
+	 * potential existence of the VGA framebuffer/SMM shadow memory.
+	 * This is fine, as writes to the mapped BIOS ROM in non-SMM are
+	 * ignored by the MCH once the BIOS gets towards the end of POST
+	 * by writing PCI config cycles to Programmable Attribute Map
+	 * registers mapped as a PCI device.
+	 */
+	mrd.vbase = (__vaddr_t)X86_HI_MEM_START;
+	mrd.pbase = (__paddr_t)X86_HI_MEM_START;
+	mrd.len = X86_HI_MEM_LEN;
+	mrd.type = UKPLAT_MEMRT_RESERVED;
+	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE | UKPLAT_MEMRF_MAP;
+
+	return ukplat_memregion_list_insert(list, &mrd);
+}
+#endif
+
 /**
  * Inserts the region into the memory region list by index. The list is kept in
  * ascending order of physical base addresses. Order is only preserved among
