@@ -46,6 +46,7 @@
 #define BIOS_ROM_STEP		16
 
 static struct acpi_madt *acpi_madt;
+static struct acpi_fadt *acpi_fadt;
 static __u8 acpi_rsdt_entries;
 static void *acpi_rsdt;
 static __u8 acpi10;
@@ -54,6 +55,10 @@ static struct {
 	struct acpi_sdt_hdr **sdt;
 	const char *sig;
 } acpi_sdts[] = {
+	{
+		.sdt = (struct acpi_sdt_hdr **)&acpi_fadt,
+		.sig = ACPI_FADT_SIG,
+	},
 	{
 		.sdt = (struct acpi_sdt_hdr **)&acpi_madt,
 		.sig = ACPI_MADT_SIG,
@@ -259,4 +264,12 @@ int acpi_init(void)
 struct acpi_madt *acpi_get_madt(void)
 {
 	return acpi_madt;
+}
+
+/*
+ * Return the Fixed ACPI Description Table (FADT).
+ */
+struct acpi_fadt *acpi_get_fadt(void)
+{
+	return acpi_fadt;
 }
