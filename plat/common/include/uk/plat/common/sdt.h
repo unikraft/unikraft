@@ -32,8 +32,8 @@
  *
  */
 
-#ifndef __PLAT_CMN_X86_SDT_H__
-#define __PLAT_CMN_X86_SDT_H__
+#ifndef __PLAT_CMN_SDT_H__
+#define __PLAT_CMN_SDT_H__
 
 #include <uk/arch/types.h>
 #include <uk/essentials.h>
@@ -191,4 +191,4 @@ struct acpi_fadt {
 	__u64 hyp_id;
 } __packed;
 
-#endif /* __PLAT_CMN_X86_SDT_H__ */
+#endif /* __PLAT_CMN_SDT_H__ */

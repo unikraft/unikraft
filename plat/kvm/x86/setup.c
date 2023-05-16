@@ -7,7 +7,7 @@
 #include <string.h>
 #include <x86/cpu.h>
 #include <x86/traps.h>
-#include <x86/acpi/acpi.h>
+#include <uk/plat/common/acpi.h>
 #include <uk/arch/limits.h>
 #include <uk/arch/types.h>
 #include <uk/arch/paging.h>
@@ -111,7 +111,7 @@ void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi)
 	/* Print boot information */
 	ukplat_bootinfo_print();
 
-#ifdef CONFIG_HAVE_SMP
+#if defined(CONFIG_HAVE_SMP) && defined(CONFIG_UKPLAT_ACPI)
 	rc = acpi_init();
 	if (likely(rc == 0)) {
 		rc = lcpu_mp_init(CONFIG_UKPLAT_LCPU_RUN_IRQ,
@@ -122,7 +122,7 @@ void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi)
 	} else {
 		uk_pr_err("ACPI init failed: %d\n", rc);
 	}
-#endif /* CONFIG_HAVE_SMP */
+#endif /* CONFIG_HAVE_SMP && CONFIG_UKPLAT_ACPI */
 
 #ifdef CONFIG_HAVE_SYSCALL
 	_init_syscall();

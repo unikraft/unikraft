@@ -55,9 +55,6 @@ LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/tls.c|common
 ifeq ($(CONFIG_HAVE_SYSCALL),y)
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/syscall.S|common
 endif
-ifeq ($(CONFIG_HAVE_SMP),y)
-LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/acpi.c|common
-endif
 ifeq ($(CONFIG_KVM_BOOT_PROTO_MULTIBOOT),y)
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/multiboot.S|x86
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/multiboot.c
@@ -133,6 +130,7 @@ LIBKVMPLAT_SRCS-y                          += $(LIBKVMPLAT_BASE)/io.c
 LIBKVMPLAT_SRCS-y                          += $(UK_PLAT_COMMON_BASE)/lcpu.c|common
 LIBKVMPLAT_SRCS-y                          += $(UK_PLAT_COMMON_BASE)/memory.c|common
 LIBKVMPLAT_SRCS-y                          += $(UK_PLAT_KVM_DEF_LDS)
+LIBKVMPLAT_SRCS-$(CONFIG_UKPLAT_ACPI)      += $(UK_PLAT_COMMON_BASE)/acpi.c|common
 ifeq ($(CONFIG_KVM_BOOT_EFI_STUB),y)
 LIBKVMPLAT_SRCS-y                          += $(LIBKVMPLAT_BASE)/efi.c|common
 endif
