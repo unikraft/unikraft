@@ -38,6 +38,9 @@
 #include <uk/print.h>
 #include <errno.h>
 #include <uk/bitops.h>
+#ifdef CONFIG_UKPLAT_ISR_ECTX_ASSERTIONS
+#include <uk/arch/ctx.h>
+#endif
 
 UK_EVENT(UKPLAT_EVENT_IRQ);
 
@@ -99,6 +102,14 @@ void _ukplat_irq_handle(struct __regs *regs, unsigned long irq)
 	int i;
 	int rc;
 	struct ukplat_event_irq_data ctx;
+#ifdef CONFIG_UKPLAT_ISR_ECTX_ASSERTIONS
+	__sz ectx_align = ukarch_ectx_align();
+	__u8 ectxbuf[ukarch_ectx_size() + ectx_align];
+	struct ukarch_ectx *ectx = (struct ukarch_ectx *)
+		ALIGN_UP((__uptr) ectxbuf, ectx_align);
+
+	ukarch_ectx_init(ectx);
+#endif
 
 	UK_ASSERT(irq < __MAX_IRQ);
 
@@ -143,6 +154,9 @@ void _ukplat_irq_handle(struct __regs *regs, unsigned long irq)
 	trace_plat_kvm_unhandled_irq(irq);
 
 exit_ack:
+#ifdef CONFIG_UKPLAT_ISR_ECTX_ASSERTIONS
+	ukarch_ectx_assert_equal(ectx);
+#endif
 	intctrl_ack_irq(irq);
 }
 
