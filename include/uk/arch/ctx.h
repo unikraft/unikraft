@@ -240,5 +240,16 @@ void ukarch_ectx_store(struct ukarch_ectx *state);
  */
 void ukarch_ectx_load(struct ukarch_ectx *state);
 
+#ifdef CONFIG_ARCH_X86_64
+/**
+ * Compare the given extended context with the state of the currently executing
+ * CPU. If the state is different, crash the kernel.
+ *
+ * @param state
+ *   Reference to extended context to compare to
+ */
+void ukarch_ectx_assert_equal(struct ukarch_ectx *state);
+#endif
+
 #endif /* !__ASSEMBLY__ */
 #endif /* __UKARCH_CTX_H__ */
