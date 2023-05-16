@@ -42,7 +42,7 @@
 #include <x86/cpu.h>
 #include <x86/traps.h>
 #include <x86/delay.h>
-#include <x86/acpi/acpi.h>
+#include <uk/plat/common/acpi.h>
 
 #include <uk/plat/lcpu.h>
 #include <uk/plat/common/lcpu.h>

@@ -15,9 +15,21 @@ config UKPLAT_MEMREGION_MAX_COUNT
 		the amount of statically allocated space in the image made available
 		for storing memory region descriptors' metadata.
 
+if ARCH_X86_64 || (KVM_BOOT_EFI_STUB && ARCH_ARM_64)
+
+config UKPLAT_ACPI
+	bool "Enable parsing of ACPI structures"
+	default n
+
+if UKPLAT_ACPI
+
 config UKPLAT_ACPI_CHECKSUM
 	bool "Verify ACPI structures' checksum"
 	default n
+
+endif
+
+endif
 
 config UKPLAT_LCPU_MAXCOUNT
 	int "Maximum number of supported logical CPUs"
@@ -28,6 +40,7 @@ config HAVE_SMP
 	bool
 	default y if UKPLAT_LCPU_MAXCOUNT > 1
 	default n
+	select UKPLAT_ACPI if ARCH_X86_64
 
 menu "Multiprocessor Configuration"
 	depends on HAVE_SMP

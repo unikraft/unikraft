@@ -32,10 +32,10 @@
  *
  */
 
-#ifndef __PLAT_CMN_X86_MADT_H__
-#define __PLAT_CMN_X86_MADT_H__
+#ifndef __PLAT_CMN_MADT_H__
+#define __PLAT_CMN_MADT_H__
 
-#include <x86/acpi/sdt.h>
+#include "sdt.h"
 
 #define ACPI_MADT_LAPIC						0x00
 #define ACPI_MADT_IO_APIC					0x01
@@ -235,11 +235,10 @@ struct acpi_madt_mp_wkp_src {
 } __packed;
 
 /**
- * Return the Multiple APIC Descriptor Table (MADT). ACPI needs to be
- * initialized first.
+ * Return the Multiple APIC Descriptor Table (MADT).
  *
  * @return Pointer to MADT.
  */
 struct acpi_madt *acpi_get_madt(void);
 
-#endif /* __PLAT_CMN_X86_MADT_H__ */
+#endif /* __PLAT_CMN_MADT_H__ */
