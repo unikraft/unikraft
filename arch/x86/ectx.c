@@ -40,6 +40,7 @@
 #include <uk/essentials.h>
 #include <uk/assert.h>
 #include <uk/print.h>
+#include <uk/hexdump.h>
 #include <string.h> /* memset */
 
 enum x86_save_method {
@@ -173,3 +174,30 @@ void ukarch_ectx_load(struct ukarch_ectx *state)
 		break;
 	}
 }
+
+#ifdef CONFIG_ARCH_X86_64
+void ukarch_ectx_assert_equal(struct ukarch_ectx *state)
+{
+	__u8 ectxbuf[ectx_size + ectx_align];
+	struct ukarch_ectx *current;
+
+	/* Store the current state */
+	current = (struct ukarch_ectx *)ALIGN_UP((__uptr)ectxbuf, ectx_align);
+	ukarch_ectx_init(current);
+
+	if (memcmp(current, state, ectx_size) != 0) {
+		uk_pr_crit("Modified ECTX detected!\n");
+		uk_pr_crit("Current:\n");
+		uk_hexdumpk(KLVL_CRIT, current, ectx_size,
+			    UK_HXDF_ADDR | UK_HXDF_GRPQWORD | UK_HXDF_COMPRESS,
+			    2);
+
+		uk_pr_crit("Expected:\n");
+		uk_hexdumpk(KLVL_CRIT, state, ectx_size,
+			    UK_HXDF_ADDR | UK_HXDF_GRPQWORD | UK_HXDF_COMPRESS,
+			    2);
+
+		UK_CRASH("Modified ECTX\n");
+	}
+}
+#endif
