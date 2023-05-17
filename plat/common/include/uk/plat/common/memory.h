@@ -232,11 +232,6 @@ ukplat_memregion_list_insert_split_phys(struct ukplat_memregion_list *list,
 
 	mrdc = *mrd;
 
-	/* TODO: The following code does not make use of the tracked iteration
-	 * index to insert elements at the correct location and instead uses the
-	 * generic insertion routine. For large memory region lists this could
-	 * be potentially slow.
-	 */
 	for (i = 0; i < (int)list->count; i++) {
 		mrdp = &list->mrds[i];
 		if (!ukplat_memregion_desc_overlap(mrdp, pstart, pend))
@@ -257,7 +252,9 @@ ukplat_memregion_list_insert_split_phys(struct ukplat_memregion_list *list,
 			mrdc.len   = mrdp->pbase - pstart;
 
 			if (mrdc.len >= min_size) {
-				rc = ukplat_memregion_list_insert(list, &mrdc);
+				rc = ukplat_memregion_list_insert_at_idx(list,
+									 &mrdc,
+									 i - 1);
 				if (unlikely(rc < 0))
 					return rc;
 			}
