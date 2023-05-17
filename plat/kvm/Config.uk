@@ -12,8 +12,6 @@ menuconfig PLAT_KVM
 
 if (PLAT_KVM)
 
-if (ARCH_X86_64)
-
 config KVM_BOOT_PROTO_MULTIBOOT
 	bool
 
@@ -31,9 +29,9 @@ config KVM_VMM_QEMU
 config KVM_VMM_FIRECRACKER
 	bool "Firecracker"
 	select KVM_BOOT_PROTO_LXBOOT
+	depends on ARCH_X86_64
 
 endchoice
-endif
 
 menu "Console Options"
 
