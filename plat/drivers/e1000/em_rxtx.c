@@ -922,7 +922,8 @@ eth_em_tx_queue_setup(struct uk_netdev *dev,
 	 * handle the maximum ring size is allocated in order to allow for
 	 * resizing in later calls to the queue setup function.
 	 */
-	mem = uk_calloc(hw->a, E1000_MAX_RING_DESC, sizeof(txq->tx_ring[0]));
+	// mem = uk_calloc(hw->a, E1000_MAX_RING_DESC, sizeof(txq->tx_ring[0]));
+	mem = uk_memalign(hw->a, 16, E1000_MAX_RING_DESC * sizeof(txq->tx_ring[0]));
 	if (mem == NULL) {
 		return NULL;
 		// return -ENOMEM;
@@ -1013,7 +1014,6 @@ em_reset_rx_queue(struct em_rx_queue *rxq)
 	rxq->pkt_last_seg = NULL;
 }
 
-
 struct uk_netdev_rx_queue *
 eth_em_rx_queue_setup(struct uk_netdev *dev,
 		uint16_t queue_idx,
@@ -1052,7 +1052,9 @@ eth_em_rx_queue_setup(struct uk_netdev *dev,
 	}
 
 	/* Allocate RX ring for max possible mumber of hardware descriptors. */
-	mem = uk_calloc(hw->a, E1000_MAX_RING_DESC, sizeof(rxq->rx_ring[0]));
+	// mem = uk_calloc(hw->a, E1000_MAX_RING_DESC, sizeof(rxq->rx_ring[0]));
+	// mem = uk_malloc(hw->a, ALIGN_UP(E1000_MAX_RING_DESC * sizeof(rxq->rx_ring[0]), 16));
+	mem = uk_memalign(hw->a, 16, E1000_MAX_RING_DESC * sizeof(rxq->rx_ring[0]));
 	if (mem == NULL) {
 		uk_pr_err("Failed to allocate RX ring\n");
 		return NULL;
