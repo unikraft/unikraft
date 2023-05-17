@@ -43,6 +43,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <time.h>
+#include <inttypes.h>
 
 #include <linux/futex.h>
 #include <uk/syscall.h>
@@ -52,7 +53,7 @@
 #include <uk/list.h>
 #if CONFIG_LIBPOSIX_PROCESS_CLONE
 #include <uk/process.h>
-#endif
+#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 #include <uk/sched.h>
 #include <uk/list.h>
 #include <uk/assert.h>
@@ -102,6 +103,9 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
 	struct uk_futex f = {.uaddr = uaddr, .thread = current};
 
 	if (ukarch_load_n(uaddr) == val) {
+		uk_pr_debug("FUTEX_WAIT: Condition =%"PRIu32" met (uaddr: %p)\n",
+			    val, uaddr);
+
 		irqf = ukplat_lcpu_save_irqf();
 		uk_spin_lock(&futex_list_lock);
 
@@ -111,15 +115,20 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
 		uk_spin_unlock(&futex_list_lock);
 		ukplat_lcpu_restore_irqf(irqf);
 
-		if (timeout)
+		if (timeout) {
 			/* Block at most until `timeout` nanosecs */
-			uk_thread_block_until(current, (__snsec)*timeout);
-		else
+			uk_pr_debug("FUTEX_WAIT: Wait %"__PRIsnsec" nsec for wake-up\n",
+				    (__snsec) (*timeout));
+			uk_thread_block_until(current, (__snsec) (*timeout));
+		} else {
 			/* Block indefinitely */
+			uk_pr_debug("FUTEX_WAIT: Wait indefinitely for wake-up\n");
 			uk_thread_block(current);
+		}
 
 		uk_sched_yield();
 
+		uk_pr_debug("FUTEX_WAIT: Woke up (uaddr: %p)\n", uaddr);
 		irqf = ukplat_lcpu_save_irqf();
 		uk_spin_lock(&futex_list_lock);
 
@@ -133,6 +142,7 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
 				uk_spin_unlock(&futex_list_lock);
 				ukplat_lcpu_restore_irqf(irqf);
 
+				uk_pr_debug("FUTEX_WAIT: Woke up because of timeout\n");
 				return -ETIMEDOUT;
 			}
 		}
@@ -141,6 +151,9 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
 		ukplat_lcpu_restore_irqf(irqf);
 
 		return 0;
+	} else {
+		uk_pr_debug("FUTEX_WAIT: Condition =%"PRIu32" not met (uaddr: %p)\n",
+			    val, uaddr);
 	}
 
 	/* Futex word does not contain expected val */
