@@ -113,6 +113,33 @@ ukplat_memregion_list_insert(struct ukplat_memregion_list *list,
 }
 
 /**
+ * Inserts the region into the memory region list by index. The list is kept in
+ * ascending order of physical base addresses. Order is only preserved among
+ * ranges that do not overlap.
+ *
+ * NOTE:This function assumes that the caller knows what they are doing, as
+ *	it is expected that the memory region descriptor list is always
+ *	ordered. USE WITH CAUTION!
+ */
+static inline int
+ukplat_memregion_list_insert_at_idx(struct ukplat_memregion_list *list,
+				    const struct ukplat_memregion_desc *mrd,
+				    __u32 idx)
+{
+	struct ukplat_memregion_desc *p;
+
+	if (unlikely(list->count == list->capacity))
+		return -ENOMEM;
+
+	p = &list->mrds[idx];
+	memmove(p + 1, p, sizeof(*p) * (list->count - idx));
+
+	*p = *mrd;
+	list->count++;
+	return (int)idx;
+}
+
+/**
  * Insert a new region into the memory region list. This extends
  * ukplat_memregion_list_insert to carve out the area of any pre-existing
  * overlapping regions. The virtual addresses will leave out any carved out
