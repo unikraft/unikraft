@@ -1047,6 +1047,22 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		break;
 #endif /* HAVE_uk_syscall_dup2 */
 
+#ifdef HAVE_uk_syscall_eventfd
+	case SYS_eventfd:
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
+			    PT_DEC);
+		PR_SYSRET(sb, fmtf, PT_FD, rc);
+		break;
+#endif /* HAVE_uk_syscall_eventfd */
+
+#ifdef HAVE_uk_syscall_eventfd2
+	case SYS_eventfd2:
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
+			    PT_DEC, PT_OFLAGS);
+		PR_SYSRET(sb, fmtf, PT_FD, rc);
+		break;
+#endif /* HAVE_uk_syscall_eventfd2 */
+
 #ifdef HAVE_uk_syscall_gettid
 	case SYS_gettid:
 		VPR_SYSCALL(sb, fmtf, syscall_num, args, 1);
