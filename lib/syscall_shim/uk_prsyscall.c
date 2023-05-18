@@ -323,6 +323,7 @@
 enum param_type {
 	PT_UNKNOWN = 0x0,
 	PT_BOOL, /* Boolean: true, false */
+	PT_DEC, /* Signed decimal */
 	PT_UDEC, /* Unsigned decimal */
 	PT_HEX, /* Hexadecimal */
 	PT_OCTAL, /* Octal */
@@ -672,6 +673,11 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 	case PT_UDEC:
 		uk_streambuf_shcc(sb, fmtf, VALUE);
 		uk_streambuf_printf(sb, "%lu", (unsigned long) param);
+		uk_streambuf_shcc(sb, fmtf, RESET);
+		break;
+	case PT_DEC:
+		uk_streambuf_shcc(sb, fmtf, VALUE);
+		uk_streambuf_printf(sb, "%ld", (long) param);
 		uk_streambuf_shcc(sb, fmtf, RESET);
 		break;
 	case PT_HEX:
