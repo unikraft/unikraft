@@ -318,6 +318,9 @@ static struct mount eventfd_mount = {
 	.m_op = &eventfd_vfsops
 };
 
+/* Prototype of fcntl system call is needed when lib/syscall_shim is off */
+long uk_syscall_r_fcntl(long, long, long);
+
 static int do_eventfd(struct uk_alloc *a, unsigned int initval, int flags)
 {
 	int vfs_fd, ret;
@@ -392,9 +395,11 @@ static int do_eventfd(struct uk_alloc *a, unsigned int initval, int flags)
 	vput(vfs_vnode);
 
 	if (flags & EFD_NONBLOCK) {
-		ret = fcntl(vfs_fd, F_SETFL, O_NONBLOCK);
-		/* Setting the O_NONBLOCK here must not fail */
-		UK_ASSERT(ret != -1);
+		ret = uk_syscall_r_fcntl(vfs_fd, F_SETFL, O_NONBLOCK);
+		/* Setting the O_NONBLOCK here must not fail.
+		 * According to `man` pages, `F_SETFL` returns zero on success.
+		 */
+		UK_ASSERT(ret == 0);
 	}
 
 	return vfs_fd;
