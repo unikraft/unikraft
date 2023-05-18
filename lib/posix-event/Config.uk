@@ -9,5 +9,8 @@ menuconfig LIBPOSIX_EVENT
 		poll(), select(), epoll_*(), and eventfd().
 
 if LIBPOSIX_EVENT
+config LIBPOSIX_EVENT_DEBUG
+	bool "Enable debug messages"
+	default n
 
 endif
