@@ -48,6 +48,7 @@
 #include <uk/init.h>
 
 #include <sys/eventfd.h>
+#include <sys/ioctl.h>
 #include <inttypes.h>
 #include <errno.h>
 #include <string.h>
@@ -292,9 +293,26 @@ static int eventfd_vfscore_poll(struct vnode *vnode, unsigned int *revents,
 	return 0;
 }
 
+static int eventfd_vfscore_ioctl(struct vnode *vnode __unused,
+				 struct vfscore_file *fp __unused,
+				 unsigned long request, void *buf __unused)
+{
+
+	switch (request) {
+	case FIONBIO:
+		/* eventfd operations look for O_NONBLOCK flag. We only need to
+		 * confirm here that we support O_NONBLOCK. Setting O_NONBLOCK
+		 * is implemented with an `ioctl` call with the FIONBIO flag).
+		 */
+		return 0;
+	default:
+		break;
+	}
+	return EINVAL;
+}
+
 /* vnode operations */
 #define eventfd_vfscore_inactive ((vnop_inactive_t) vfscore_vop_einval)
-#define eventfd_vfscore_ioctl ((vnop_ioctl_t) vfscore_vop_einval)
 
 static struct vnops eventfd_vnops = {
 	.vop_close = eventfd_vfscore_close,
