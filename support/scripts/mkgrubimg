@@ -9,7 +9,7 @@ usage()
 	echo "  -h                         Display help and exit"
 	echo "  -f                         Output format (supported: iso)"
 	echo "  -k                         Path to the Unikraft kernel image"
-	echo "  -a                         Kernel command-line parameters (optional)"
+	echo "  -c                         Kernel command-line parameters file (optional)"
 	echo "  -i                         Path to initrd cpio file (optional)"
 	exit 1
 }
@@ -39,12 +39,17 @@ mkgrubiso()
 	fi
 	cp "${OPTKERNELIMG}" "${BUILDDIR}/boot/" || exit 1
 
+	MBCMDL=
+	if [ -n "${OPTCMDLINE}" ]; then
+		MBCMDL=$(tr '\n' ' ' < "${OPTCMDLINE}")
+	fi
+
 	cat >"${BUILDDIR}/boot/grub/grub.cfg" <<EOF
 set default=0
 set timeout=0
 
 menuentry "${OPTKERNELNAME}" {
-	multiboot /boot/${OPTKERNELNAME} /${OPTKERNELNAME} ${OPTCMDLINE}
+	multiboot /boot/${OPTKERNELNAME} /${OPTKERNELNAME} ${MBCMDL}
 	${GRUB_CFG_INITRD}
 	boot
 }
@@ -59,7 +64,7 @@ EOF
 }
 
 # process options
-while getopts "hk:i:f:a:" OPT; do
+while getopts "hk:c:i:f:" OPT; do
 	case "${OPT}" in
 		h)
 			usage
@@ -70,7 +75,7 @@ while getopts "hk:i:f:a:" OPT; do
 		k)
 			OPTKERNELIMG="${OPTARG}"
 			;;
-		a)
+		c)
 			OPTCMDLINE="${OPTARG}"
 			;;
 		i)
