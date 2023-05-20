@@ -13,6 +13,7 @@ usage()
 	echo "  -i                         Path to initrd cpio file (optional)"
 	echo "  -b                         Bootloader: grub (GRUB), ukefi (Unikraft EFI stub)"
 	echo "  -a                         Architecture: X64 (x86_64), AA64 (Aarch64)"
+	echo "  -d                         Path to Devicetree Blob (optional, for ukefi only!)"
 	exit 1
 }
 
@@ -21,6 +22,7 @@ OPTFORMAT="iso"
 OPTCMDLINE=""
 OPTOUTPUT=${1}
 OPTARCH=
+OPTDTB=
 
 # cleanup
 BUILDDIR=
@@ -87,6 +89,10 @@ mkukefiiso()
 		sudo cp ${OPTCMDLINE} ${BUILDDIR}/mnt/EFI/BOOT/
 	fi
 
+	if [ ! -z ${OPTDTB} ]; then
+		sudo cp ${OPTDTB} ${BUILDDIR}/mnt/EFI/BOOT/
+	fi
+
 	sudo cp ${OPTKERNELIMG} ${BUILDDIR}/mnt/EFI/BOOT/BOOT${OPTARCH}.EFI
 
 	sudo umount ${BUILDDIR}/mnt
@@ -94,11 +100,12 @@ mkukefiiso()
 
 	mkdir ${BUILDDIR}/iso_dir
 	cp ${BUILDDIR}/fs.img ${BUILDDIR}/iso_dir
+	echo ${OPTOUTPUT}
 	xorriso -as mkisofs -R -f -e fs.img -no-emul-boot -o ${OPTOUTPUT} ${BUILDDIR}/iso_dir
 }
 
 # process options
-while getopts "hk:c:i:f:a:b:" OPT; do
+while getopts "hk:c:i:f:a:b:d" OPT; do
 	case "${OPT}" in
 		h)
 			usage
@@ -120,6 +127,9 @@ while getopts "hk:c:i:f:a:b:" OPT; do
 			;;
 		a)
 			OPTARCH="${OPTARG}"
+			;;
+		d)
+			OPTDTB="${OPTARG}"
 			;;
 		*)
 			usage
