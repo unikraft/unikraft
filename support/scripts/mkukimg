@@ -3,7 +3,7 @@
 # help menu
 usage()
 {
-	echo "Usage: $0 [options] [output file]"
+	echo "Usage: $0 [options]"
 	echo "Creates bootable images from Unikraft kernel images."
 	echo ""
 	echo "  -h                         Display help and exit"
@@ -14,13 +14,14 @@ usage()
 	echo "  -b                         Bootloader: grub (GRUB), ukefi (Unikraft EFI stub)"
 	echo "  -a                         Architecture: X64 (x86_64), AA64 (Aarch64)"
 	echo "  -d                         Path to Devicetree Blob (optional, for ukefi only!)"
+	echo "  -o                         Path to output file"
 	exit 1
 }
 
 # default options
 OPTFORMAT="iso"
 OPTCMDLINE=""
-OPTOUTPUT=${1}
+OPTOUTPUT=
 OPTARCH=
 OPTDTB=
 
@@ -105,7 +106,7 @@ mkukefiiso()
 }
 
 # process options
-while getopts "hk:c:i:f:a:b:d" OPT; do
+while getopts "hk:c:i:f:a:b:d:o:" OPT; do
 	case "${OPT}" in
 		h)
 			usage
@@ -130,6 +131,9 @@ while getopts "hk:c:i:f:a:b:d" OPT; do
 			;;
 		d)
 			OPTDTB="${OPTARG}"
+			;;
+		o)
+			OPTOUTPUT="${OPTARG}"
 			;;
 		*)
 			usage
