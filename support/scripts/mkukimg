@@ -4,13 +4,15 @@
 usage()
 {
 	echo "Usage: $0 [options] [output file]"
-	echo "Creates bootable GRUB images from Unikraft kernel images."
+	echo "Creates bootable images from Unikraft kernel images."
 	echo ""
 	echo "  -h                         Display help and exit"
 	echo "  -f                         Output format (supported: iso)"
 	echo "  -k                         Path to the Unikraft kernel image"
 	echo "  -c                         Kernel command-line parameters file (optional)"
 	echo "  -i                         Path to initrd cpio file (optional)"
+	echo "  -b                         Bootloader: grub (GRUB), ukefi (Unikraft EFI stub)"
+	echo "  -a                         Architecture: X64 (x86_64), AA64 (Aarch64)"
 	exit 1
 }
 
@@ -18,6 +20,7 @@ usage()
 OPTFORMAT="iso"
 OPTCMDLINE=""
 OPTOUTPUT=${1}
+OPTARCH=
 
 # cleanup
 BUILDDIR=
@@ -63,8 +66,39 @@ EOF
 	fi
 }
 
+mkukefiiso()
+{
+	# create initial empty image we will format as FAT32
+	# ESP must be at least 100MB
+	dd if=/dev/zero of=${BUILDDIR}/fs.img bs=1M count=100
+
+	mkfs.vfat -F 32 ${BUILDDIR}/fs.img
+
+	LOOPDEV=$(sudo losetup --find --show ${BUILDDIR}/fs.img)
+	mkdir ${BUILDDIR}/mnt
+	sudo mount ${LOOPDEV} ${BUILDDIR}/mnt
+	sudo mkdir -p ${BUILDDIR}/mnt/EFI/BOOT/
+
+	if [ ! -z ${OPTINITRD} ]; then
+		sudo cp ${OPTINITRD} ${BUILDDIR}/mnt/EFI/BOOT/
+	fi
+
+	if [ ! -z ${OPTCMDLINE} ]; then
+		sudo cp ${OPTCMDLINE} ${BUILDDIR}/mnt/EFI/BOOT/
+	fi
+
+	sudo cp ${OPTKERNELIMG} ${BUILDDIR}/mnt/EFI/BOOT/BOOT${OPTARCH}.EFI
+
+	sudo umount ${BUILDDIR}/mnt
+	sudo losetup -d ${LOOPDEV}
+
+	mkdir ${BUILDDIR}/iso_dir
+	cp ${BUILDDIR}/fs.img ${BUILDDIR}/iso_dir
+	xorriso -as mkisofs -R -f -e fs.img -no-emul-boot -o ${OPTOUTPUT} ${BUILDDIR}/iso_dir
+}
+
 # process options
-while getopts "hk:c:i:f:" OPT; do
+while getopts "hk:c:i:f:a:b:" OPT; do
 	case "${OPT}" in
 		h)
 			usage
@@ -80,6 +114,12 @@ while getopts "hk:c:i:f:" OPT; do
 			;;
 		i)
 			OPTINITRD="${OPTARG}"
+			;;
+		b)
+			OPTBOOTLOADER="${OPTARG}"
+			;;
+		a)
+			OPTARCH="${OPTARG}"
 			;;
 		*)
 			usage
@@ -105,6 +145,10 @@ if [ -n "${OPTINITRD}" ] && [ ! -f "${OPTINITRD}" ]; then
 	echo "${OPTINITRD} does not exist or is not a file" 1>&2
 	exit 1
 fi
+if [ "${OPTARCH}" != "AA64" ] && [ "${OPTARCH}" != "X64" ]; then
+	echo "Invalid architecture" 1>&2
+	usage
+fi
 
 # Register exit handler and create BUILDDIR
 trap sighandler_exit exit
@@ -118,9 +162,19 @@ OPTKERNELNAME="${OPTKERNELIMG##*/}"
 OPTINITRDNAME="${OPTINITRD##*/}"
 
 case "${OPTFORMAT}" in
-	# generate grub iso image
 	iso)
-		mkgrubiso
+		case "${OPTBOOTLOADER}" in
+		grub)
+			mkgrubiso
+			;;
+		ukefi)
+			mkukefiiso
+			;;
+		*)
+			echo -e "\"${OPTBOOTLOADER}\" not a supported bootloader." 1>&2
+			usage
+			;;
+		esac
 		;;
 	*)
 		echo -e "\"${OPTFORMAT}\" not a supported format." 1>&2
