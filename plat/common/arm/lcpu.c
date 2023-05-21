@@ -30,6 +30,8 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#include <uk/plat/common/bootinfo.h>
+#include <uk/plat/common/acpi.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/io.h>
 #include <arm/smccc.h>
@@ -73,7 +75,6 @@ void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
 #define FDT_SIZE_CELLS_DEFAULT 0
 #define FDT_ADDR_CELLS_DEFAULT 2
 
-static void *dtb;
 void lcpu_start(struct lcpu *cpu);
 static __paddr_t lcpu_start_paddr;
 extern struct _gic_dev *gic;
@@ -92,7 +93,59 @@ int lcpu_arch_init(struct lcpu *this_lcpu)
 	return ret;
 }
 
-int lcpu_arch_mp_init(void *arg)
+#ifdef CONFIG_UKPLAT_ACPI
+static int _lcpu_arch_mp_init(void *arg __unused)
+{
+	__lcpuid bsp_cpu_id = lcpu_get(0)->id;
+	int bsp_found __maybe_unused = 0;
+	union {
+		acpi_madt_gicc_t *gicc;
+		acpi_subsdt_hdr_t *h;
+	} m;
+	struct lcpu *lcpu;
+	acpi_madt_t *madt;
+	__lcpuid cpu_id;
+	__sz off, len;
+
+	uk_pr_info("Bootstrapping processor has the ID %ld\n", bsp_cpu_id);
+
+	/* Enumerate all other CPUs */
+	madt = acpi_get_madt();
+	UK_ASSERT(madt);
+
+	len = madt->hdr.tab_len - sizeof(*madt);
+	for (off = 0; off < len; off += m.h->len) {
+		m.h = (acpi_subsdt_hdr_t *)(madt->entries + off);
+
+		if (m.h->type != ACPI_MADT_GICC ||
+		    !(m.gicc->flags & ACPI_MADT_GICC_FLAGS_EN))
+			continue;
+
+		cpu_id = m.gicc->mpidr & CPU_ID_MASK;
+
+		if (bsp_cpu_id == cpu_id) {
+			UK_ASSERT(!bsp_found);
+
+			bsp_found = 1;
+			continue;
+		}
+
+		lcpu = lcpu_alloc(cpu_id);
+		if (unlikely(!lcpu)) {
+			/* If we cannot allocate another LCPU, we probably have
+			 * reached the maximum number of supported CPUs. So
+			 * just stop here.
+			 */
+			uk_pr_warn("Maximum number of cores exceeded.\n");
+			return 0;
+		}
+	}
+	UK_ASSERT(bsp_found);
+
+	return 0;
+}
+#else
+static int _lcpu_arch_mp_init(void *arg)
 {
 	int fdt_cpu;
 	const fdt32_t *naddr_prop, *nsize_prop, *id_reg;
@@ -103,17 +156,12 @@ int lcpu_arch_mp_init(void *arg)
 	__lcpuid bsp_cpu_id;
 	char bsp_found __maybe_unused = 0;
 	struct lcpu *lcpu;
+	void *dtb;
 
 	/* MP support is dependent on an initialized GIC */
 	UK_ASSERT(gic);
 
 	dtb = arg;
-	/**
-	 * We have to provide the physical address of the start routine when
-	 * starting secondary CPUs. We thus do the translation here once and
-	 * cache the result.
-	 */
-	lcpu_start_paddr = ukplat_virt_to_phys(lcpu_start);
 
 	bsp_cpu_id = lcpu_arch_id();
 	uk_pr_info("Bootstrapping processor has the ID %ld\n",
@@ -215,6 +263,19 @@ int lcpu_arch_mp_init(void *arg)
 	UK_ASSERT(bsp_found);
 
 	return 0;
+}
+#endif
+
+int lcpu_arch_mp_init(void *arg)
+{
+	/**
+	 * We have to provide the physical address of the start routine when
+	 * starting secondary CPUs. We thus do the translation here once and
+	 * cache the result.
+	 */
+	lcpu_start_paddr = ukplat_virt_to_phys(lcpu_start);
+
+	return _lcpu_arch_mp_init(arg);
 }
 
 int lcpu_arch_start(struct lcpu *lcpu, unsigned long flags __unused)

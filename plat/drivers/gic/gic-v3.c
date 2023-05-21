@@ -44,6 +44,8 @@
 #include <uk/bitops.h>
 #include <uk/asm.h>
 #include <uk/plat/lcpu.h>
+#include <uk/plat/common/acpi.h>
+#include <uk/plat/common/bootinfo.h>
 #include <uk/plat/common/irq.h>
 #include <uk/plat/spinlock.h>
 #include <arm/cpu.h>
@@ -78,7 +80,7 @@ struct _gic_dev gicv3_drv = {
 #endif /* CONFIG_HAVE_SMP */
 };
 
-static const char * const gic_device_list[] = {
+static const char * const gic_device_list[] __maybe_unused = {
 	"arm,gic-v3",
 	NULL
 };
@@ -561,9 +563,8 @@ static int gicv3_initialize(void)
 	return 0;
 }
 
-static int gicv3_do_probe(const void *fdt)
+static inline void gicv3_set_ops(void)
 {
-	int fdt_gic, r;
 	struct _gic_operations drv_ops = {
 		.initialize        = gicv3_initialize,
 		.ack_irq           = gicv3_ack_irq,
@@ -580,6 +581,71 @@ static int gicv3_do_probe(const void *fdt)
 
 	/* Set driver functions */
 	gicv3_drv.ops = drv_ops;
+}
+
+#if defined(CONFIG_UKPLAT_ACPI)
+static int acpi_get_gicr(struct _gic_dev *g)
+{
+	union {
+		acpi_madt_gicr_t *gicr;
+		acpi_subsdt_hdr_t *h;
+	} m;
+	acpi_madt_t *madt;
+	__sz off, len;
+
+	madt = acpi_get_madt();
+	UK_ASSERT(madt);
+
+	/* We do not count the Redistributor regions, instead we rely on QEMU
+	 * Virt having its GICv3 in an always-on power domain so that we are
+	 * aligned with the current state of the driver, which only supports
+	 * contiguous GIC Redistributors...
+	 */
+	len = madt->hdr.tab_len - sizeof(*madt);
+	for (off = 0; off < len; off += m.h->len) {
+		m.h = (acpi_subsdt_hdr_t *)(madt->entries + off);
+
+		if (m.h->type != ACPI_MADT_GICR)
+			continue;
+
+		g->rdist_mem_addr = m.gicr->paddr;
+		g->rdist_mem_size = m.gicr->len;
+
+		/* We assume we only have one redistributor region */
+		return 0;
+	}
+
+	return -ENOENT;
+}
+
+static int gicv3_do_probe(void)
+{
+	int rc;
+
+	rc = acpi_get_gicd(&gicv3_drv);
+	if (unlikely(rc < 0))
+		return rc;
+
+	/* Normally we should check first if there exists a Redistributor.
+	 * If there is none then we must get its address from the GICC
+	 * structure, since that means that the Redistributors are not in an
+	 * always-on power domain. Otherwise there could be a GICR for each
+	 * Redistributor region and the DT probe version does not accommodate
+	 * anyway for multiple regions. So, until there is need for that (not
+	 * the case for QEMU Virt), align ACPI probe with DT probe and assume
+	 * we only have one Redistributor region.
+	 */
+	return acpi_get_gicr(&gicv3_drv);
+}
+#else /* CONFIG_UKPLAT_ACPI */
+static int gicv3_do_probe(void)
+{
+	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
+	int fdt_gic, r;
+	void *fdt;
+
+	UK_ASSERT(bi);
+	fdt = (void *)bi->dtb;
 
 	/* Currently, we only support 1 GIC per system */
 	fdt_gic = fdt_node_offset_by_compatible_list(fdt, -1, gic_device_list);
@@ -589,42 +655,42 @@ static int gicv3_do_probe(const void *fdt)
 	/* Get address and size of the GIC's register regions */
 	r = fdt_get_address(fdt, fdt_gic, 0, &gicv3_drv.dist_mem_addr,
 				&gicv3_drv.dist_mem_size);
-	if (r < 0) {
+	if (unlikely(r < 0)) {
 		uk_pr_err("Could not find GICv3 distributor region!\n");
 		return r;
 	}
 
+	/* TODO: Redistributors may be spread out in different regions.
+	 * Make sure we get the count of such regions and enumerate properly
+	 * using the `#redistributor-regions"` DT property. Furthermore,
+	 * we should also check for the `redistributor-stride` property,
+	 * since there are `Devicetree`'s that have `GICv4` nodes that use the
+	 * `GICv3` compatible (there is also mixed `GICv3/4`, see Chapter 9.7
+	 * from `GICv3 and GICv4 Software Overview`). The main difference
+	 * between `GICv3/4` is the support for `vLPI`'s which basically
+	 * doubles the address space range (with some exceptions):
+	 * RD + SGI + vLPI + reserved.
+	 */
 	r = fdt_get_address(fdt, fdt_gic, 1, &gicv3_drv.rdist_mem_addr,
 				&gicv3_drv.rdist_mem_size);
-	if (r < 0) {
+	if (unlikely(r < 0)) {
 		uk_pr_err("Could not find GICv3 redistributor region!\n");
 		return r;
 	}
 
-	uk_pr_info("Found GICv3 on:\n");
-	uk_pr_info("\tDistributor  : 0x%lx - 0x%lx\n",
-		gicv3_drv.dist_mem_addr,
-		gicv3_drv.dist_mem_addr + gicv3_drv.dist_mem_size - 1);
-	uk_pr_info("\tRedistributor: 0x%lx - 0x%lx\n",
-		gicv3_drv.rdist_mem_addr,
-		gicv3_drv.rdist_mem_addr + gicv3_drv.rdist_mem_size - 1);
-
-	/* GICv3 is present */
-	gicv3_drv.is_present = 1;
-
 	return 0;
 }
+#endif /* !CONFIG_UKPLAT_ACPI */
 
 /**
  * Probe device tree for GICv3
  * NOTE: First time must not be called from multiple CPUs in parallel
  *
- * @param [in] fdt pointer to device tree
  * @param [out] dev receives pointer to GICv3 if available, NULL otherwise
  *
  * @return 0 if device is available, an FDT (FDT_ERR_*) error otherwise
  */
-int gicv3_probe(const void *fdt, struct _gic_dev **dev)
+int gicv3_probe(struct _gic_dev **dev)
 {
 	int rc;
 
@@ -643,11 +709,21 @@ int gicv3_probe(const void *fdt, struct _gic_dev **dev)
 
 	gicv3_drv.is_probed = 1;
 
-	rc = gicv3_do_probe(fdt);
+	rc = gicv3_do_probe();
 	if (rc) {
 		*dev = NULL;
 		return rc;
 	}
+
+	uk_pr_info("Found GICv3 on:\n");
+	uk_pr_info("\tDistributor  : 0x%lx - 0x%lx\n",	gicv3_drv.dist_mem_addr,
+		   gicv3_drv.dist_mem_addr + gicv3_drv.dist_mem_size - 1);
+	uk_pr_info("\tRedistributor: 0x%lx - 0x%lx\n", gicv3_drv.rdist_mem_addr,
+		   gicv3_drv.rdist_mem_addr + gicv3_drv.rdist_mem_size - 1);
+
+	/* GICv3 is present */
+	gicv3_drv.is_present = 1;
+	gicv3_set_ops();
 
 	*dev = &gicv3_drv;
 	return 0;

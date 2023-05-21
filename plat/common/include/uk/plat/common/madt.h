@@ -167,6 +167,9 @@ typedef struct acpi_madt_x2apic_nmi {
 } __packed acpi_madt_x2apic_nmi_t;
 
 /* GIC CPU Interface (GICC) Structure */
+#define ACPI_MADT_GICC_FLAGS_EN					0x01
+#define ACPI_MADT_GICC_FLAGS_PERF_IRQ_MODE			0x02
+#define ACPI_MADT_GICC_FLAGS_VGIC_IRQ_MODE			0x03
 typedef struct acpi_madt_gicc {
 	struct acpi_subsdt_hdr hdr;
 	__u16 reserved;
@@ -188,6 +191,11 @@ typedef struct acpi_madt_gicc {
 } __packed acpi_madt_gicc_t;
 
 /* GIC Distributor (GICD) Structure */
+#define ACPI_MADT_GICD_VERSION_NONE				0x0
+#define ACPI_MADT_GICD_VERSION_1				0x1
+#define ACPI_MADT_GICD_VERSION_2				0x2
+#define ACPI_MADT_GICD_VERSION_3				0x3
+#define ACPI_MADT_GICD_VERSION_4				0x4
 typedef struct acpi_madt_gicd {
 	struct acpi_subsdt_hdr hdr;
 	__u16 reserved;

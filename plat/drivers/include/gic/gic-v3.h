@@ -67,6 +67,9 @@
  */
 #define GICC_CTLR_EL1_EOImode_drop	(1U << 1)
 
+/* Default size from the specification */
+#define GICD_V3_MEM_SZ			0x10000
+
 #define GICD_STATUSR			(0x010)
 #define GICD_SETSPI_NSR			(0x040)
 #define GICD_CLRSPI_NSR			(0x048)
@@ -366,13 +369,12 @@
 #define GICC_IAR_INTID_SPURIOUS	1023
 
 /**
- * Probe device tree for GICv3
+ * Probe device tree or ACPI for GICv3
  * NOTE: First time must not be called from multiple CPUs in parallel
  *
- * @param [in] fdt pointer to device tree
  * @param [out] dev receives pointer to GICv3 if available, NULL otherwise
- * @return 0 if device is available, an FDT (FDT_ERR_*) error otherwise
+ * @return 0 if device is available, < 0 otherwise
  */
-int gicv3_probe(const void *fdt, struct _gic_dev **dev);
+int gicv3_probe(struct _gic_dev **dev);
 
 #endif /* __PLAT_DRV_ARM_GICV3_H__ */

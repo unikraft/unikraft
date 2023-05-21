@@ -35,6 +35,9 @@
 
 #include <gic/gic.h>
 
+/* GICv2 GICC register map size page aligned up according to the spec. */
+#define GICD_V2_MEM_SZ					0x01000
+
 /*
  * Distributor registers. Unikraft only supports running on non-secure
  * so we just describe non-secure registers.
@@ -306,13 +309,12 @@ void gicv2_sgi_gen_to_others(uint32_t sgintid);
 void gicv2_sgi_gen_to_self(uint32_t sgintid);
 
 /**
- * Probe device tree for GICv2
+ * Probe device tree or ACPI for GICv2
  * NOTE: First time must not be called from multiple CPUs in parallel
  *
- * @param [in] fdt pointer to device tree
  * @param [out] dev receives pointer to GICv2 if available, NULL otherwise
- * @return 0 if device is available, an FDT (FDT_ERR_*) error otherwise
+ * @return 0 if device is available, < 0 otherwise
  */
-int gicv2_probe(const void *fdt, struct _gic_dev **dev);
+int gicv2_probe(struct _gic_dev **dev);
 
 #endif /* __PLAT_DRV_ARM_GICV2_H__ */
