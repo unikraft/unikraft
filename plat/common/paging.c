@@ -1436,6 +1436,8 @@ static inline unsigned long bootinfo_to_page_attr(__u16 flags)
 	return prot;
 }
 
+extern struct ukplat_memregion_desc bpt_unmap_mrd;
+
 int ukplat_paging_init(void)
 {
 	struct ukplat_memregion_desc *mrd;
@@ -1504,6 +1506,13 @@ int ukplat_paging_init(void)
 		vaddr = PAGE_ALIGN_DOWN(mrd->vbase);
 		paddr = PAGE_ALIGN_DOWN(mrd->pbase);
 		len   = PAGE_ALIGN_UP(mrd->len + (mrd->vbase - vaddr));
+
+#if defined(CONFIG_ARCH_ARM_64)
+		if (!RANGE_CONTAIN(bpt_unmap_mrd.pbase, bpt_unmap_mrd.len,
+				   paddr, len))
+			continue;
+#endif
+
 		prot  = bootinfo_to_page_attr(mrd->flags);
 
 		rc = ukplat_page_map(&kernel_pt, vaddr, paddr,
