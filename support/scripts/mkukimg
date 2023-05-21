@@ -7,7 +7,7 @@ usage()
 	echo "Creates bootable images from Unikraft kernel images."
 	echo ""
 	echo "  -h                         Display help and exit"
-	echo "  -f                         Output format (supported: iso)"
+	echo "  -f                         Output format: iso, disk (ukefi only)"
 	echo "  -k                         Path to the Unikraft kernel image"
 	echo "  -c                         Kernel command-line parameters file (optional)"
 	echo "  -i                         Path to initrd cpio file (optional)"
@@ -69,40 +69,95 @@ EOF
 	fi
 }
 
+# Helper function for mkukefi{iso,disk}
+# Given a directory, creates an EFI System Partition layout
+mkukefiesp()
+{
+	ESP=${1}
+	if [ -z "${ESP}" ]; then
+		echo "mkukefiesp() must receive the directory where the ESP is mounted"
+		exit 1
+	fi
+
+	sudo mkdir -p "${ESP}"/EFI/BOOT/
+
+	if [ -n "${OPTINITRD}" ]; then
+		sudo cp "${OPTINITRD}" "${ESP}/EFI/BOOT/"
+	fi
+
+	if [ -n "${OPTCMDLINE}" ]; then
+		sudo cp "${OPTCMDLINE}" "${ESP}/EFI/BOOT/"
+	fi
+
+	if [ -n "${OPTDTB}" ]; then
+		sudo cp "${OPTDTB}" "${ESP}/EFI/BOOT/"
+	fi
+
+	sudo cp "${OPTKERNELIMG}" "${ESP}/EFI/BOOT/BOOT${OPTARCH}.EFI"
+}
+
 mkukefiiso()
 {
 	# create initial empty image we will format as FAT32
 	# ESP must be at least 100MB
-	dd if=/dev/zero of=${BUILDDIR}/fs.img bs=1M count=100
+	dd if=/dev/zero of="${BUILDDIR}/fs.img" bs=1M count=100
 
-	mkfs.vfat -F 32 ${BUILDDIR}/fs.img
+	mkfs.vfat -F 32 "${BUILDDIR}/fs.img"
 
-	LOOPDEV=$(sudo losetup --find --show ${BUILDDIR}/fs.img)
-	mkdir ${BUILDDIR}/mnt
-	sudo mount ${LOOPDEV} ${BUILDDIR}/mnt
-	sudo mkdir -p ${BUILDDIR}/mnt/EFI/BOOT/
+	LOOPDEV=$(sudo losetup --find --show "${BUILDDIR}/fs.img")
+	mkdir "${BUILDDIR}/mnt"
+	sudo mount "${LOOPDEV}" "${BUILDDIR}/mnt"
 
-	if [ ! -z ${OPTINITRD} ]; then
-		sudo cp ${OPTINITRD} ${BUILDDIR}/mnt/EFI/BOOT/
-	fi
+	mkukefiesp "${BUILDDIR}/mnt"
 
-	if [ ! -z ${OPTCMDLINE} ]; then
-		sudo cp ${OPTCMDLINE} ${BUILDDIR}/mnt/EFI/BOOT/
-	fi
+	sudo umount "${BUILDDIR}/mnt"
+	sudo losetup -d "${LOOPDEV}"
 
-	if [ ! -z ${OPTDTB} ]; then
-		sudo cp ${OPTDTB} ${BUILDDIR}/mnt/EFI/BOOT/
-	fi
+	mkdir "${BUILDDIR}/iso_dir"
+	cp "${BUILDDIR}/fs.img" "${BUILDDIR}/iso_dir"
+	echo "${OPTOUTPUT}"
+	xorriso -as mkisofs -R -f -e fs.img -no-emul-boot -o "${OPTOUTPUT}" "${BUILDDIR}/iso_dir"
+}
 
-	sudo cp ${OPTKERNELIMG} ${BUILDDIR}/mnt/EFI/BOOT/BOOT${OPTARCH}.EFI
+mkukefidisk()
+{
+	# create initial empty image we will format as GPT
+	# ESP must be at least 100MB and must be FAT12/16/32, but leave some
+	# room for the GPT and the backup GPT as well as the PMBR (5MB is enough)
+	dd if=/dev/zero of="${OPTOUTPUT}" bs=1M count=105
 
-	sudo umount ${BUILDDIR}/mnt
-	sudo losetup -d ${LOOPDEV}
+	# Create the partition table
+	#	g\n	Create new GPT
+	#	n\n	Create new partition
+	#	1\n	Select partition number as 1
+	#	\n	Default first sector
+	#	\n	Default last sector
+	#	t\n	Change type of partition (default partition 1)
+	#	1\n	Mark partition 1 as EFI System Partition
+	#	w\n	Write the changes to the disk image
+	echo -e	"								\
+		g\n								\
+		n\n								\
+		1\n								\
+		\n								\
+		\n								\
+		t\n								\
+		1\n								\
+		w\n								\
+		" | fdisk -W always "${OPTOUTPUT}"	# Wipe filesystem, RAID	\
+							# and partition-table signatures
 
-	mkdir ${BUILDDIR}/iso_dir
-	cp ${BUILDDIR}/fs.img ${BUILDDIR}/iso_dir
-	echo ${OPTOUTPUT}
-	xorriso -as mkisofs -R -f -e fs.img -no-emul-boot -o ${OPTOUTPUT} ${BUILDDIR}/iso_dir
+	LOOPDEV=$(sudo losetup --find --show "${OPTOUTPUT}")
+	sudo partprobe "${LOOPDEV}"
+	sudo mkfs.vfat -F 32 "${LOOPDEV}p1"
+
+	mkdir "${BUILDDIR}/mnt"
+	sudo mount "${LOOPDEV}p1" "${BUILDDIR}/mnt"	# We only have one partition
+
+	mkukefiesp "${BUILDDIR}/mnt"
+
+	sudo umount "${BUILDDIR}/mnt"
+	sudo losetup -d "${LOOPDEV}"
 }
 
 # process options
@@ -185,7 +240,18 @@ case "${OPTFORMAT}" in
 			mkukefiiso
 			;;
 		*)
-			echo -e "\"${OPTBOOTLOADER}\" not a supported bootloader." 1>&2
+			echo -e "\"${OPTBOOTLOADER}\" not a supported bootloader for ISO images." 1>&2
+			usage
+			;;
+		esac
+		;;
+	disk)
+		case "${OPTBOOTLOADER}" in
+		ukefi)
+			mkukefidisk
+			;;
+		*)
+			echo -e "\"${OPTBOOTLOADER}\" not a supported bootloader for DISK images." 1>&2
 			usage
 			;;
 		esac
