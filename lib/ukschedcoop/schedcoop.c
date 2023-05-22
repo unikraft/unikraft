@@ -273,6 +273,18 @@ static int schedcoop_start(struct uk_sched *s,
 	return 0;
 }
 
+static const struct uk_thread *schedcoop_idle_thread(struct uk_sched *s,
+						     unsigned int proc_id)
+{
+	struct schedcoop *c = uksched2schedcoop(s);
+
+	/* NOTE: We only support one processing LCPU (for now) */
+	if (proc_id > 0)
+		return NULL;
+
+	return &(c->idle);
+}
+
 struct uk_sched *uk_schedcoop_create(struct uk_alloc *a)
 {
 	struct schedcoop *c = NULL;
@@ -307,7 +319,7 @@ struct uk_sched *uk_schedcoop_create(struct uk_alloc *a)
 			schedcoop_thread_remove,
 			schedcoop_thread_blocked,
 			schedcoop_thread_woken,
-			NULL,
+			schedcoop_idle_thread,
 			a);
 
 	/* Add idle thread to the scheduler's thread list */
