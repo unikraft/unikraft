@@ -31,12 +31,12 @@ uc = $(subst a,A,$(subst b,B,$(subst c,C,$(subst d,D,$(subst e,E,$(subst f,F,$(s
 
 # test if GCC is set as a compiler
 define have_gcc =
-$(if $(filter gcc,$(CC_NAME)),y,n)
+$(if $(filter GCC,$(CC_NAME)),y,n)
 endef
 
 # test if CLANG is set as a compiler
 define have_clang =
-$(if $(filter clang,$(CC_NAME)),y,n)
+$(if $(filter Clang,$(CC_NAME)),y,n)
 endef
 
 # test whether GCC version is greater than or equal to the minimum requirement
