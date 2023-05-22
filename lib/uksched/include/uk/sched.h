@@ -72,6 +72,9 @@ typedef void  (*uk_sched_thread_blocked_func_t)
 typedef void  (*uk_sched_thread_woken_func_t)
 		(struct uk_sched *s, struct uk_thread *t);
 
+typedef const struct uk_thread * (*uk_sched_idle_thread_func_t)
+		(struct uk_sched *s, unsigned int proc_id);
+
 typedef int   (*uk_sched_start_t)(struct uk_sched *s, struct uk_thread *main);
 
 struct uk_sched {
@@ -81,6 +84,7 @@ struct uk_sched {
 	uk_sched_thread_remove_func_t   thread_remove;
 	uk_sched_thread_blocked_func_t  thread_blocked;
 	uk_sched_thread_woken_func_t    thread_woken;
+	uk_sched_idle_thread_func_t     idle_thread;
 
 	uk_sched_start_t sched_start;
 
@@ -134,6 +138,25 @@ static inline void uk_sched_thread_woken(struct uk_thread *t)
 
 	s = t->sched;
 	s->thread_woken(s, t);
+}
+
+/**
+ * Returns the reference to the idle thread that is responsible for
+ * the processing unit `proc_id`. Please note that `proc_id` is not
+ * a logical core ID; it is a linear increasing number over the managed
+ * logical cores by the scheduler instance `s`.
+ * It is possible that a scheduler implementation does not operate with idle
+ * threads and returns `NULL`.
+ */
+static inline const struct uk_thread *uk_sched_idle_thread(struct uk_sched *s,
+							   unsigned int proc_id)
+{
+	UK_ASSERT(s);
+
+	if (unlikely(!s->idle_thread))
+		return NULL;
+
+	return s->idle_thread(s, proc_id);
 }
 
 /**

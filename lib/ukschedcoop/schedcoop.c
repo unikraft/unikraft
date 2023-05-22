@@ -307,6 +307,7 @@ struct uk_sched *uk_schedcoop_create(struct uk_alloc *a)
 			schedcoop_thread_remove,
 			schedcoop_thread_blocked,
 			schedcoop_thread_woken,
+			NULL,
 			a);
 
 	/* Add idle thread to the scheduler's thread list */
