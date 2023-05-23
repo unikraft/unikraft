@@ -102,62 +102,57 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
 	struct uk_thread *current = uk_thread_current();
 	struct uk_futex f = {.uaddr = uaddr, .thread = current};
 
-	if (ukarch_load_n(uaddr) == val) {
-		uk_pr_debug("FUTEX_WAIT: Condition =%"PRIu32" met (uaddr: %p)\n",
+	if (ukarch_load_n(uaddr) != val) {
+		uk_pr_debug("FUTEX_WAIT: Condition not met (*uaddr != %"PRIu32", uaddr: %p)\n",
 			    val, uaddr);
-
-		irqf = ukplat_lcpu_save_irqf();
-		uk_spin_lock(&futex_list_lock);
-
-		/* Enqueue thread to wait list */
-		uk_list_add_tail(&f.list_node, &futex_list);
-
-		uk_spin_unlock(&futex_list_lock);
-		ukplat_lcpu_restore_irqf(irqf);
-
-		if (timeout) {
-			/* Block at most until `timeout` nanosecs */
-			uk_pr_debug("FUTEX_WAIT: Wait %"__PRIsnsec" nsec for wake-up\n",
-				    (__snsec) (*timeout));
-			uk_thread_block_until(current, (__snsec) (*timeout));
-		} else {
-			/* Block indefinitely */
-			uk_pr_debug("FUTEX_WAIT: Wait indefinitely for wake-up\n");
-			uk_thread_block(current);
-		}
-
-		uk_sched_yield();
-
-		uk_pr_debug("FUTEX_WAIT: Woke up (uaddr: %p)\n", uaddr);
-		irqf = ukplat_lcpu_save_irqf();
-		uk_spin_lock(&futex_list_lock);
-
-		/* If the futex is still in the wait list, then it timed out */
-		uk_list_for_each_safe(itr, tmp, &futex_list) {
-			f_tmp = uk_list_entry(itr, struct uk_futex, list_node);
-
-			if (f_tmp->uaddr == uaddr && f_tmp->thread == current) {
-				/* Remove the thread from the futex list */
-				uk_list_del(&f_tmp->list_node);
-				uk_spin_unlock(&futex_list_lock);
-				ukplat_lcpu_restore_irqf(irqf);
-
-				uk_pr_debug("FUTEX_WAIT: Woke up because of timeout\n");
-				return -ETIMEDOUT;
-			}
-		}
-
-		uk_spin_unlock(&futex_list_lock);
-		ukplat_lcpu_restore_irqf(irqf);
-
-		return 0;
-	} else {
-		uk_pr_debug("FUTEX_WAIT: Condition =%"PRIu32" not met (uaddr: %p)\n",
-			    val, uaddr);
+		return -EAGAIN;
 	}
 
-	/* Futex word does not contain expected val */
-	return -EAGAIN;
+	/* Futex word _does_ contain expected val */
+	uk_pr_debug("FUTEX_WAIT: Condition met (*uaddr == %"PRIu32", uaddr: %p)\n",
+			val, uaddr);
+
+	/* Enqueue thread to wait list */
+	irqf = ukplat_lcpu_save_irqf();
+	uk_spin_lock(&futex_list_lock);
+	uk_list_add_tail(&f.list_node, &futex_list);
+	uk_spin_unlock(&futex_list_lock);
+	ukplat_lcpu_restore_irqf(irqf);
+
+	if (timeout) {
+		/* Block at most until `timeout` nanosecs */
+		uk_pr_debug("FUTEX_WAIT: Wait %"__PRIsnsec" nsec for wake-up\n",
+				(__snsec) (*timeout));
+		uk_thread_block_until(current, (__snsec) (*timeout));
+	} else {
+		/* Block indefinitely */
+		uk_pr_debug("FUTEX_WAIT: Wait indefinitely for wake-up\n");
+		uk_thread_block(current);
+	}
+	uk_sched_yield();
+
+	uk_pr_debug("FUTEX_WAIT: Woke up (uaddr: %p)\n", uaddr);
+	irqf = ukplat_lcpu_save_irqf();
+	uk_spin_lock(&futex_list_lock);
+
+	/* If the futex is still in the wait list, then it timed out */
+	uk_list_for_each_safe(itr, tmp, &futex_list) {
+		f_tmp = uk_list_entry(itr, struct uk_futex, list_node);
+
+		if (f_tmp->uaddr == uaddr && f_tmp->thread == current) {
+			/* Remove the thread from the futex list */
+			uk_list_del(&f_tmp->list_node);
+			uk_spin_unlock(&futex_list_lock);
+			ukplat_lcpu_restore_irqf(irqf);
+
+			uk_pr_debug("FUTEX_WAIT: Woke up because of timeout\n");
+			return -ETIMEDOUT;
+		}
+	}
+	uk_spin_unlock(&futex_list_lock);
+	ukplat_lcpu_restore_irqf(irqf);
+
+	return 0;
 }
 
 /**
