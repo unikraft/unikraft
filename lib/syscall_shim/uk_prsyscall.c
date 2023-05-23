@@ -1326,6 +1326,16 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		break;
 #endif /* HAVE_uk_syscall_bind */
 
+#ifdef HAVE_uk_syscall_getsockname
+	case SYS_getsockname:
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
+			    PT_FD,
+			    PT_STRUCT(sockaddr) | PT_OUT,
+			    PT_UDEC | PT_REF);
+		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
+		break;
+#endif /* HAVE_uk_syscall_getsockname */
+
 #ifdef HAVE_uk_syscall_sendto
 	case SYS_sendto:
 		do {
