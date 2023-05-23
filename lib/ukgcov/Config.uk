@@ -1,0 +1,40 @@
+menuconfig LIBUKGCOV
+	bool "ukgcov: Code coverage support"
+	# The dependencies below are required by GCC's `--coverage`
+    # parameter unconditionally to the output method we use.
+	select LIBVFSCORE
+	select LIBSYSCALL_SHIM
+	select LIBPOSIX_ENVIRON
+	select LIBUKMMAP
+	help
+		This library provides support for coverage analysis with gcov
+
+if LIBUKGCOV
+
+choice LIBUKGCOV_OUTPUT
+	prompt "Coverage data output"
+	default LIBUKGCOV_OUTPUT_SERIAL_HEXDUMP
+config LIBUKGCOV_OUTPUT_SERIAL_HEXDUMP
+	bool "Console"
+config LIBUKGCOV_OUTPUT_BINARY_FILE
+	bool "File"
+config LIBUKGCOV_OUTPUT_BINARY_MEMORY
+	bool "Memory"
+endchoice
+
+config LIBUKGCOV_OUTPUT_BINARY_FILENAME
+	depends on LIBUKGCOV_OUTPUT_BINARY_FILE
+	string "Filename for coverage output"
+
+config LIBUKGCOV_OUTPUT_BUFFER_SIZE
+	depends on LIBUKGCOV_OUTPUT_BINARY_MEMORY
+	int "Buffer size used to store the coverage information in memory"
+	default 102400
+	help
+	  Buffer size used to store the coverage information in memory
+	  that doubles every time the buffer is full. Adjust based on
+	  memory constraints or if you know the resulted file size
+	  in order to avoid unnecessary reallocations.
+	  The default value is 100 KiB.
+
+endif # LIBUKGCOV
