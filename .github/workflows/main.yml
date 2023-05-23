@@ -1,0 +1,40 @@
+name: libc CI/CD on PRs
+
+on:
+  pull_request:
+    branches:
+      - staging
+
+jobs:
+  lib-libc-test:
+    runs-on: ubuntu-22.04
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Run test script
+        run: |
+          bash ci/libc_tests/run_tests.sh > ci/libc_tests/test_results.txt
+
+      - name: Comment PR with test results
+        uses: actions/github-script@v4
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const results = fs.readFileSync('test_results.txt', 'utf8');
+            const context = github.context;
+
+            const comment = `
+            ## Test Results
+            \`\`\`
+            ${results}
+            \`\`\`
+            `;
+
+            github.issues.createComment({
+              ...context.repo,
+              issue_number: context.issue.number,
+              body: comment
+            });
