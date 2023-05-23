@@ -191,6 +191,11 @@ struct acpi_madt_gicc {
 } __packed;
 
 /* GIC Distributor (GICD) Structure */
+#define ACPI_MADT_GICD_VERSION_NONE				0x0
+#define ACPI_MADT_GICD_VERSION_1				0x1
+#define ACPI_MADT_GICD_VERSION_2				0x2
+#define ACPI_MADT_GICD_VERSION_3				0x3
+#define ACPI_MADT_GICD_VERSION_4				0x4
 struct acpi_madt_gicd {
 	struct acpi_subsdt_hdr hdr;
 	__u16 reserved;
