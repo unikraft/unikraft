@@ -474,6 +474,7 @@ enum param_type {
 #ifdef CONFIG_LIBPOSIX_SOCKET
 	PT_SOCKETAF,
 	PT_SOCKETTYPE,
+	PT_STRUCT(sockaddr),
 	PT_MSGFLAGS,
 #endif /* CONFIG_LIBPOSIX_SOCKET */
 	PT_CLONEFLAGS,
@@ -916,6 +917,10 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 	case PT_SOCKETTYPE:
 		param_sockettype(sb, fmtf, param);
 		break;
+	case PT_STRUCT(sockaddr):
+		PR_STRUCT(sb, fmtf, sockaddr, flags, param, 1, succ,
+			  PT_SOCKETAF, sa_family);
+		break;
 	case PT_MSGFLAGS:
 		param_msgflags(sb, fmtf, param);
 		break;
@@ -1316,7 +1321,7 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 #ifdef HAVE_uk_syscall_bind
 	case SYS_bind:
 		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
-			    PT_FD, PT_VADDR, PT_UDEC);
+			    PT_FD, PT_STRUCT(sockaddr), PT_UDEC);
 		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
 		break;
 #endif /* HAVE_uk_syscall_bind */
