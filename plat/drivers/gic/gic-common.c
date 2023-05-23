@@ -54,7 +54,7 @@ int _dtb_init_gic(const void *fdt, struct _gic_dev **dev)
 
 #ifdef CONFIG_LIBGICV3
 	/* GICv2 is not present, try GICv3 */
-	rc = gicv3_probe(fdt, dev);
+	rc = gicv3_probe(dev);
 	if (rc == 0)
 		return 0;
 #endif /* CONFIG_LIBGICV3 */
