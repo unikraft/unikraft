@@ -35,6 +35,11 @@
 
 #include <gic/gic.h>
 
+/* GICv2 GICD register map size page aligned up according to
+ * ARM Generic Interrupt Controller Architecture version 2.0 Issue B.b.
+ */
+#define GICD_V2_MEM_SZ					0x01000
+
 /*
  * Distributor registers. Unikraft only supports running on non-secure
  * so we just describe non-secure registers.

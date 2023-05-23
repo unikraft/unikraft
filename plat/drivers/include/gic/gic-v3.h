@@ -67,6 +67,11 @@
  */
 #define GICC_CTLR_EL1_EOImode_drop	(1U << 1)
 
+/* Default size according to ARM Generic Interrupt Controller Architecture
+ * Specification GIC Architecture version 3 and version 4 Issue H.
+ */
+#define GICD_V3_MEM_SZ			0x10000
+
 #define GICD_STATUSR			(0x010)
 #define GICD_SETSPI_NSR			(0x040)
 #define GICD_CLRSPI_NSR			(0x048)

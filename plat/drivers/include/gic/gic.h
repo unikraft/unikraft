@@ -166,4 +166,15 @@ int _dtb_init_gic(const void *fdt, struct _gic_dev **dev);
  */
 uint32_t gic_irq_translate(uint32_t type, uint32_t irq);
 
+/**
+ * Fetch data from an existing MADT's GICD table.
+ *
+ * @param _gic_dev The driver whose memory base and size to fill in
+ *
+ * @return 0 on success, < 0 otherwise
+ */
+#if defined(CONFIG_UKPLAT_ACPI)
+int acpi_get_gicd(struct _gic_dev *g);
+#endif /* CONFIG_UKPLAT_ACPI */
+
 #endif /* __PLAT_DRV_ARM_GIC_COMMON_H__ */

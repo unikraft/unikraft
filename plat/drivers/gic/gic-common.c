@@ -34,6 +34,7 @@
 #include <gic/gic.h>
 #include <gic/gic-v2.h>
 #include <gic/gic-v3.h>
+#include <uk/plat/common/acpi.h>
 
 /** Sanity check for GIC driver availability */
 #if !defined(CONFIG_LIBGICV2) && !defined(CONFIG_LIBGICV3)
@@ -78,3 +79,40 @@ uint32_t gic_irq_translate(uint32_t type, uint32_t irq)
 
 	return (uint32_t)-1;
 }
+
+#if defined(CONFIG_UKPLAT_ACPI)
+int acpi_get_gicd(struct _gic_dev *g)
+{
+	union {
+		struct acpi_madt_gicd *gicd;
+		struct acpi_subsdt_hdr *h;
+	} m;
+	struct acpi_madt *madt;
+	__sz off, len;
+
+	madt = acpi_get_madt();
+	UK_ASSERT(madt);
+
+	len = madt->hdr.tab_len - sizeof(*madt);
+	for (off = 0; off < len; off += m.h->len) {
+		m.h = (struct acpi_subsdt_hdr *)(madt->entries + off);
+
+		if (m.h->type != ACPI_MADT_GICD)
+			continue;
+
+		if (m.gicd->version == ACPI_MADT_GICD_VERSION_2)
+			g->dist_mem_size = GICD_V2_MEM_SZ;
+		else if (m.gicd->version == ACPI_MADT_GICD_VERSION_3)
+			g->dist_mem_size = GICD_V3_MEM_SZ;
+		else
+			return -ENOTSUP;
+
+		g->dist_mem_addr = m.gicd->paddr;
+
+		/* Only one GIC Distributor */
+		return 0;
+	}
+
+	return -ENOENT;
+}
+#endif /* CONFIG_UKPLAT_ACPI */
