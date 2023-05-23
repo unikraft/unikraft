@@ -143,15 +143,14 @@ struct _gic_dev {
 };
 
 /**
- * Initialize GIC driver from device tree
+ * Initialize GIC driver from device tree or ACPI
  *
- * @param [in] fdt Pointer to fdt structure
  * @param [out] dev receives pointer to GIC device driver on success, NULL
  *    otherwise
  *
  * @return 0 on success, a non-zero error code otherwise
  */
-int _dtb_init_gic(const void *fdt, struct _gic_dev **dev);
+int init_gic(struct _gic_dev **dev);
 
 /**
  * Translate a type-relative interrupt number to the corresponding absolute
