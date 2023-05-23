@@ -41,7 +41,7 @@
 #error At least one GIC driver should be selected!
 #endif
 
-int _dtb_init_gic(const void *fdt, struct _gic_dev **dev)
+int init_gic(struct _gic_dev **dev)
 {
 	int rc;
 

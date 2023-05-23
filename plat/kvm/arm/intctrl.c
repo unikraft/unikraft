@@ -42,13 +42,10 @@ struct _gic_dev *gic;
 
 void intctrl_init(void)
 {
-	void *dtb;
 	int rc;
 
-	dtb = (void *)ukplat_bootinfo_get()->dtb;
-
 	/* Initialize GIC from DTB */
-	rc = _dtb_init_gic(dtb, &gic);
+	rc = init_gic(&gic);
 	if (unlikely(rc))
 		goto EXIT_ERR;
 
