@@ -47,7 +47,7 @@ int _dtb_init_gic(const void *fdt, struct _gic_dev **dev)
 
 #ifdef CONFIG_LIBGICV2
 	/* First, try GICv2 */
-	rc = gicv2_probe(fdt, dev);
+	rc = gicv2_probe(dev);
 	if (rc == 0)
 		return 0;
 #endif /* CONFIG_LIBGICV2 */
