@@ -39,6 +39,10 @@
 #include <uk/asm.h>
 #include <uk/arch/limits.h>
 #include <uk/plat/lcpu.h>
+#ifdef CONFIG_UKPLAT_ACPI
+#include <uk/plat/common/acpi.h>
+#endif /* CONFIG_UKPLAT_ACPI */
+#include <uk/plat/common/bootinfo.h>
 #include <uk/plat/common/irq.h>
 #include <uk/plat/spinlock.h>
 #include <arm/cpu.h>
@@ -69,7 +73,7 @@ struct _gic_dev gicv2_drv = {
 #endif /* CONFIG_HAVE_SMP */
 };
 
-static const char * const gic_device_list[] = {
+static const char * const gic_device_list[] __maybe_unused = {
 	"arm,cortex-a15-gic",
 	NULL
 };
@@ -490,9 +494,8 @@ static int gicv2_initialize(void)
 	return 0;
 }
 
-static int gicv2_do_probe(const void *fdt)
+static void gicv2_set_ops(void)
 {
-	int fdt_gic, r;
 	struct _gic_operations drv_ops = {
 		.initialize        = gicv2_initialize,
 		.ack_irq           = gicv2_ack_irq,
@@ -509,6 +512,68 @@ static int gicv2_do_probe(const void *fdt)
 
 	/* Set driver functions */
 	gicv2_drv.ops = drv_ops;
+}
+
+#if defined(CONFIG_UKPLAT_ACPI)
+static int acpi_get_gicc(struct _gic_dev *g)
+{
+	union {
+		struct acpi_madt_gicc *gicc;
+		struct acpi_subsdt_hdr *h;
+	} m;
+	struct acpi_madt *madt;
+	__sz off, len;
+
+	madt = acpi_get_madt();
+	UK_ASSERT(madt);
+
+	/* In ACPI all GICCs' base address must be the same */
+	len = madt->hdr.tab_len - sizeof(*madt);
+	for (off = 0; off < len; off += m.h->len) {
+		m.h = (struct acpi_subsdt_hdr *)(madt->entries + off);
+
+		if (m.h->type != ACPI_MADT_GICC)
+			continue;
+
+		/* If GICv3/4 this field is 0 */
+		if (!m.gicc->paddr)
+			return -ENOTSUP;
+
+		g->cpuif_mem_addr = m.gicc->paddr;
+		g->cpuif_mem_size = GICC_MEM_SZ;
+
+		return 0;
+	}
+
+	return -ENOENT;
+}
+
+static int gicv2_do_probe(void)
+{
+	int rc;
+
+	rc = acpi_get_gicc(&gicv2_drv);
+	if (unlikely(rc < 0))
+		return rc;
+
+	rc = acpi_get_gicd(&gicv2_drv);
+	if (unlikely(rc < 0))
+		return rc;
+
+	if (unlikely(gicv2_drv.dist_mem_size != GICD_V2_MEM_SZ))
+		return -ENOTSUP;
+
+	return 0;
+}
+#else /* CONFIG_UKPLAT_ACPI */
+static int gicv2_do_probe(void)
+{
+	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
+	int fdt_gic, r;
+	void *fdt;
+
+	UK_ASSERT(bi);
+	fdt = (void *)bi->dtb;
 
 	/* Currently, we only support 1 GIC per system */
 	fdt_gic = fdt_node_offset_by_compatible_list(fdt, -1, gic_device_list);
@@ -530,30 +595,19 @@ static int gicv2_do_probe(const void *fdt)
 		return r;
 	}
 
-	uk_pr_info("Found GICv2 on:\n");
-	uk_pr_info("\tDistributor  : 0x%lx - 0x%lx\n",
-		   gicv2_drv.dist_mem_addr,
-		   gicv2_drv.dist_mem_addr + gicv2_drv.dist_mem_size - 1);
-	uk_pr_info("\tCPU interface: 0x%lx - 0x%lx\n",
-		   gicv2_drv.cpuif_mem_addr,
-		   gicv2_drv.cpuif_mem_addr + gicv2_drv.cpuif_mem_size - 1);
-
-	/* GICv2 is present */
-	gicv2_drv.is_present = 1;
-
 	return 0;
 }
+#endif /* !CONFIG_UKPLAT_ACPI */
 
 /**
- * Probe device tree for GICv2
+ * Probe device tree or ACPI for GICv2
  * NOTE: First time must not be called from multiple CPUs in parallel
  *
- * @param [in] fdt pointer to device tree
  * @param [out] dev receives pointer to GICv2 if available, NULL otherwise
  *
  * @return 0 if device is available, an FDT (FDT_ERR_*) error otherwise
  */
-int gicv2_probe(const void *fdt, struct _gic_dev **dev)
+int gicv2_probe(struct _gic_dev **dev)
 {
 	int rc;
 
@@ -572,11 +626,23 @@ int gicv2_probe(const void *fdt, struct _gic_dev **dev)
 
 	gicv2_drv.is_probed = 1;
 
-	rc = gicv2_do_probe(fdt);
+	rc = gicv2_do_probe();
 	if (rc) {
 		*dev = NULL;
 		return rc;
 	}
+
+	uk_pr_info("Found GICv2 on:\n");
+	uk_pr_info("\tDistributor  : 0x%lx - 0x%lx\n",
+		   gicv2_drv.dist_mem_addr,
+		   gicv2_drv.dist_mem_addr + gicv2_drv.dist_mem_size - 1);
+	uk_pr_info("\tCPU interface: 0x%lx - 0x%lx\n",
+		   gicv2_drv.cpuif_mem_addr,
+		   gicv2_drv.cpuif_mem_addr + gicv2_drv.cpuif_mem_size - 1);
+
+	/* GICv2 is present */
+	gicv2_drv.is_present = 1;
+	gicv2_set_ops();
 
 	*dev = &gicv2_drv;
 	return 0;
