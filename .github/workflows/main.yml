@@ -15,7 +15,7 @@ jobs:
 
       - name: Run test script
         run: |
-          bash ci/libc_tests/run_tests.sh > ci/libc_tests/test_results.txt
+          bash ci/libc_tests/run_tests.sh
 
       - name: Comment PR with test results
         uses: actions/github-script@v4
