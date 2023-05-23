@@ -1311,13 +1311,17 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		} while (0);
 		PR_SYSRET(sb, fmtf, PT_FD, rc);
 		break;
+#endif /* HAVE_uk_syscall_socket */
 
+#ifdef HAVE_uk_syscall_bind
 	case SYS_bind:
 		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
 			    PT_FD, PT_VADDR, PT_UDEC);
 		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
 		break;
+#endif /* HAVE_uk_syscall_bind */
 
+#ifdef HAVE_uk_syscall_sendto
 	case SYS_sendto:
 		do {
 			int fd = (int) va_arg(args, long);
@@ -1334,7 +1338,9 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		} while (0);
 		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
 		break;
+#endif /* HAVE_uk_syscall_sendto */
 
+#ifdef HAVE_uk_syscall_recvmsg
 	case SYS_recvmsg:
 		do {
 			int fd = (int) va_arg(args, long);
@@ -1349,8 +1355,7 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		} while (0);
 		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
 		break;
-
-#endif /* HAVE_uk_syscall_socket */
+#endif /* HAVE_uk_syscall_recvmsg */
 
 #ifdef HAVE_uk_syscall_clone
 	case SYS_clone:
