@@ -33,6 +33,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+/*
+ * We do not want to unmap anything.
+ */
+.section .bss
+.align	4
+.globl	bpt_unmap_mrd
+bpt_unmap_mrd:
+.space	64
+
 .section .text
 
 /* For now, although inaccurate, set the

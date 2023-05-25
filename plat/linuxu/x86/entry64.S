@@ -30,6 +30,14 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * We do not want to unmap anything.
+ */
+.section .bss
+.align	4
+.globl	bpt_unmap_mrd
+bpt_unmap_mrd:
+.space	64
 
 .section .text
 
