@@ -137,7 +137,9 @@ static void tss_init(__lcpuidx idx)
 }
 
 /* Declare the traps used only by this platform: */
-DECLARE_TRAP_EC(nmi,           "NMI",                  NULL)
+DECLARE_TRAP_EVENT(UKARCH_TRAP_NMI);
+
+DECLARE_TRAP_EC(nmi,           "NMI",                  UKARCH_TRAP_NMI)
 DECLARE_TRAP_EC(double_fault,  "double fault",         NULL)
 DECLARE_TRAP_EC(virt_error,    "virtualization error", NULL)
 
