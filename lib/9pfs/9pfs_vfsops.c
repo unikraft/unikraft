@@ -125,7 +125,7 @@ static int uk_9pfs_parse_options(struct uk_9pfs_mount_data *md,
 	 */
 	options = options_tok = strdup(data);
 
-	md->proto = UK_9P_PROTO_2000U;
+	md->proto = UK_9P_PROTO_2000L;
 	md->uname = strdup("");
 	md->aname = strdup("");
 
