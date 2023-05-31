@@ -3,3 +3,25 @@ $(eval $(call addlib_s,libuklibid,$(CONFIG_LIBUKLIBID)))
 ASINCLUDES-$(CONFIG_LIBUKLIBID)  += -I$(LIBUKLIBID_BASE)/include -I$(LIBUKLIBID_BUILD)/include
 CINCLUDES-$(CONFIG_LIBUKLIBID)   += -I$(LIBUKLIBID_BASE)/include -I$(LIBUKLIBID_BUILD)/include
 CXXINCLUDES-$(CONFIG_LIBUKLIBID) += -I$(LIBUKLIBID_BASE)/include -I$(LIBUKLIBID_BUILD)/include
+
+# Generates a list of library names. The list is sorted to ensure
+# reproducibility for the same sets of library names.
+$(LIBUKLIBID_BUILD)/libraries.in.new:
+	$(call build_cmd,GEN,libuklibid,$(notdir $@), \
+		echo $(foreach P,$(UK_PLATS) $(UK_PLATS-y),\
+		     $(foreach L,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y), \
+		     $(L) \
+		     )) \
+		     $(UK_LIBS) $(UK_LIBS-y) \
+		| tr ' ' '\n' | sort -V - > $@)
+
+.PHONY: $(LIBUKLIBID_BUILD)/libraries.in.new
+
+$(LIBUKLIBID_BUILD)/libraries.in: $(LIBUKLIBID_BUILD)/libraries.in.new
+	$(call build_cmd,CP,libuklibid,$(notdir $@), \
+		cmp -s $^ $@; if [ $$? -ne 0 ]; then cp $^ $@; fi)
+
+LIBUKLIBID_CLEAN += $(LIBUKLIBID_BUILD)/libraries.in.new
+LIBUKLIBID_CLEAN += $(LIBUKLIBID_BUILD)/libraries.in
+
+UK_PREPARE-$(CONFIG_LIBUKLIBID) += $(LIBUKLIBID_BUILD)/libraries.in.new
