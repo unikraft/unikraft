@@ -1,0 +1,3 @@
+config LIBUKLIBID
+	bool "uklibid: Library identifier"
+	default n
