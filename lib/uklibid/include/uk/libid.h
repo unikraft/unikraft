@@ -51,6 +51,25 @@ extern "C" {
 #define uk_libid_count() \
 	__UKLIBID_COUNT__
 
+/**
+ * Return the library name for a given identifier
+ *
+ * @param libid Library identifier
+ * @return Reference to a '\0'-terminated C-string that contains the library
+ *         name, a __NULL reference if the library identifier could not be
+ *         resolved
+ */
+const char *uk_libname(__u16 libid);
+
+/**
+ * Return the library name of the current library compilation
+ *
+ * @return Reference to a '\0'-terminated C-string that contains the library
+ *         name
+ */
+#define uk_libname_self() \
+	uk_libname(uk_libid_self())
+
 #ifdef __cplusplus
 }
 #endif
