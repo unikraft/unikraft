@@ -70,6 +70,17 @@ const char *uk_libname(__u16 libid);
 #define uk_libname_self() \
 	uk_libname(uk_libid_self())
 
+#if CONFIG_HAVE_LIBC || CONFIG_LIBNOLIBC
+/**
+ * Mapping of a library name to its unique library identifier
+ *
+ * @param libname Reference to `\0`-terminated C-string containing the name of
+ *                the library
+ * @return Identifier of the library, UKLIBID_NONE if the library was not found
+ */
+__u16 uk_libid(const char *libname);
+#endif /* CONFIG_HAVE_LIBC || CONFIG_LIBNOLIBC */
+
 #ifdef __cplusplus
 }
 #endif
