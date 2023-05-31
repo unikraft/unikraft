@@ -45,6 +45,7 @@
  */
 
 #include <stdio.h>
+#include <uk/arch/types.h>
 #include <uk/print.h>
 
 #ifdef __cplusplus
@@ -74,20 +75,20 @@ extern "C" {
 
 #if (defined UK_DEBUG) || CONFIG_LIBUKDEBUG_PRINTD
 /* Please use uk_asmdumpd() instead */
-void _uk_asmdumpd(const char *libname, const char *srcname,
+void _uk_asmdumpd(__u16 libid, const char *srcname,
 		  unsigned int srcline, const void *instr,
 		  unsigned int instr_count);
 
 #define uk_asmdumpd(instr, instr_count)					\
-	_uk_asmdumpd(__STR_LIBNAME__, __STR_BASENAME__,			\
+	_uk_asmdumpd(uk_libid_self(), __STR_BASENAME__,			\
 		     __LINE__, (instr), (instr_count))
 
-void _uk_asmndumpd(const char *libname, const char *srcname,
+void _uk_asmndumpd(__u16 libid, const char *srcname,
 		   unsigned int srcline, const void *instr,
 		   size_t len);
 
 #define uk_asmndumpd(instr, len)					\
-	_uk_asmndumpd(__STR_LIBNAME__, __STR_BASENAME__,		\
+	_uk_asmndumpd(uk_libid_self(), __STR_BASENAME__,		\
 		      __LINE__, (instr), (len))
 #else /* (defined UK_DEBUG) || CONFIG_LIBUKDEBUG_PRINTD */
 static inline void uk_asmdumpd(const void *instr __unused,
@@ -101,25 +102,25 @@ static inline void uk_asmndumpd(const void *instr __unused,
 
 #if CONFIG_LIBUKDEBUG_PRINTK
 /* Please use uk_asmdumpk() instead */
-void _uk_asmdumpk(int lvl, const char *libname, const char *srcname,
+void _uk_asmdumpk(int lvl, __u16 libid, const char *srcname,
 		 unsigned int srcline, const void *instr,
 		 unsigned int instr_count);
 
 #define uk_asmdumpk(lvl, instr, instr_count)				\
 	do {                                                            \
 		if ((lvl) <= KLVL_MAX)                                  \
-			_uk_asmdumpk((lvl), __STR_LIBNAME__, __STR_BASENAME__, \
+			_uk_asmdumpk((lvl), uk_libid_self(), __STR_BASENAME__, \
 				     __LINE__, (instr), (instr_count));	\
 	} while (0)
 
-void _uk_asmndumpk(int lvl, const char *libname, const char *srcname,
+void _uk_asmndumpk(int lvl, __u16 libid, const char *srcname,
 		   unsigned int srcline, const void *instr,
 		   size_t len);
 
 #define uk_asmndumpk(lvl, instr, len)					\
 	do {                                                            \
 		if ((lvl) <= KLVL_MAX)                                  \
-			_uk_asmdumpk((lvl), __STR_LIBNAME__, __STR_BASENAME__, \
+			_uk_asmdumpk((lvl), uk_libid_self(), __STR_BASENAME__, \
 				     __LINE__, (instr), (len));		\
 	} while (0)
 #else /* CONFIG_LIBUKDEBUG_PRINTK */

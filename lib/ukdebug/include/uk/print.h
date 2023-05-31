@@ -37,18 +37,13 @@
 #define __UKDEBUG_PRINT_H__
 
 #include <stdarg.h>
+#include <uk/libid.h>
 #include <uk/arch/lcpu.h>
 #include <uk/essentials.h>
 #include <uk/config.h>
 
 #ifdef __cplusplus
 extern "C" {
-#endif
-
-#ifdef __LIBNAME__
-#define __STR_LIBNAME__ STRINGIFY(__LIBNAME__)
-#else
-#define __STR_LIBNAME__ (NULL)
 #endif
 
 #ifdef __BASENAME__
@@ -64,9 +59,9 @@ extern "C" {
  * by other libraries with an own debug print switch
  * (e.g., hexdump, syscall_shim)
  */
-void _uk_vprintd(const char *libname, const char *srcname,
+void _uk_vprintd(__u16 libid, const char *srcname,
 		 unsigned int srcline, const char *fmt, va_list ap);
-void _uk_printd(const char *libname, const char *srcname,
+void _uk_printd(__u16 libid, const char *srcname,
 		unsigned int srcline, const char *fmt, ...) __printf(4, 5);
 
 #ifdef __IN_LIBUKDEBUG__
@@ -84,7 +79,7 @@ void _uk_printd(const char *libname, const char *srcname,
 #if defined UK_DEBUG || CONFIG_LIBUKDEBUG_PRINTD
 #define uk_vprintd(fmt, ap)						\
 	do {								\
-		_uk_vprintd(__STR_LIBNAME__, __STR_BASENAME__,		\
+		_uk_vprintd(uk_libid_self(), __STR_BASENAME__,		\
 			    __LINE__, (fmt), ap);			\
 	} while (0)
 
@@ -92,7 +87,7 @@ void _uk_printd(const char *libname, const char *srcname,
 	do {								\
 		static int __x;						\
 		if (unlikely(!__x)) {					\
-			_uk_vprintd(__STR_LIBNAME__, __STR_BASENAME__,	\
+			_uk_vprintd(uk_libid_self(), __STR_BASENAME__,	\
 				    __LINE__, (fmt), ap);		\
 			__x = 1;					\
 		}							\
@@ -100,7 +95,7 @@ void _uk_printd(const char *libname, const char *srcname,
 
 #define uk_printd(fmt, ...)						\
 	do {								\
-		_uk_printd(__STR_LIBNAME__, __STR_BASENAME__,		\
+		_uk_printd(uk_libid_self(), __STR_BASENAME__,		\
 			   __LINE__, (fmt), ##__VA_ARGS__);		\
 	} while (0)
 
@@ -108,7 +103,7 @@ void _uk_printd(const char *libname, const char *srcname,
 	do {								\
 		static int __x;						\
 		if (unlikely(!__x)) {					\
-			_uk_printd(__STR_LIBNAME__, __STR_BASENAME__,	\
+			_uk_printd(uk_libid_self(), __STR_BASENAME__,	\
 				   __LINE__, (fmt), ##__VA_ARGS__);	\
 			__x = 1;					\
 		}							\
@@ -155,15 +150,15 @@ static inline void uk_printd_once(const char *fmt __unused, ...)
  * they compile in the function calls only if the configured
  * debug level requires it
  */
-void _uk_vprintk(int lvl, const char *libname, const char *srcname,
+void _uk_vprintk(int lvl, __u16 libid, const char *srcname,
 		 unsigned int srcline, const char *fmt, va_list ap);
-void _uk_printk(int lvl, const char *libname, const char *srcname,
+void _uk_printk(int lvl, __u16 libid, const char *srcname,
 		unsigned int srcline, const char *fmt, ...) __printf(5, 6);
 
 #define uk_vprintk(lvl, fmt, ap)                                               \
 	do {                                                                   \
 		if ((lvl) <= KLVL_MAX)                                         \
-			_uk_vprintk((lvl), __STR_LIBNAME__, __STR_BASENAME__,  \
+			_uk_vprintk((lvl), uk_libid_self(), __STR_BASENAME__,  \
 				    __LINE__, (fmt), ap);                      \
 	} while (0)
 
@@ -172,7 +167,7 @@ void _uk_printk(int lvl, const char *libname, const char *srcname,
 		if ((lvl) <= KLVL_MAX) {                                       \
 			static int __x;                                        \
 			if (unlikely(!__x)) {                                  \
-				_uk_vprintk((lvl), __STR_LIBNAME__,            \
+				_uk_vprintk((lvl), uk_libid_self(),            \
 					    __STR_BASENAME__,                  \
 					    __LINE__, (fmt), ap);              \
 				__x = 1;                                       \
@@ -183,7 +178,7 @@ void _uk_printk(int lvl, const char *libname, const char *srcname,
 #define uk_printk(lvl, fmt, ...)                                               \
 	do {                                                                   \
 		if ((lvl) <= KLVL_MAX)                                         \
-			_uk_printk((lvl), __STR_LIBNAME__, __STR_BASENAME__,   \
+			_uk_printk((lvl), uk_libid_self(), __STR_BASENAME__,   \
 				   __LINE__, (fmt), ##__VA_ARGS__);            \
 	} while (0)
 
@@ -192,7 +187,7 @@ void _uk_printk(int lvl, const char *libname, const char *srcname,
 		if ((lvl) <= KLVL_MAX) {                                       \
 			static int __x;                                        \
 			if (unlikely(!__x)) {                                  \
-				_uk_printk((lvl), __STR_LIBNAME__,             \
+				_uk_printk((lvl), uk_libid_self(),             \
 					   __STR_BASENAME__,                   \
 					   __LINE__, (fmt), ##__VA_ARGS__);    \
 				__x = 1;                                       \

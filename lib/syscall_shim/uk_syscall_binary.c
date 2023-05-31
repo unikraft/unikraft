@@ -86,7 +86,7 @@ void ukplat_syscall_handler(struct __regs *r)
 	_uk_syscall_return_addr = r->rip;
 
 #if CONFIG_LIBSYSCALL_SHIM_DEBUG_HANDLER
-	_uk_printd(__STR_LIBNAME__, __STR_BASENAME__, __LINE__,
+	_uk_printd(uk_libid_self(), __STR_BASENAME__, __LINE__,
 			"Binary system call request \"%s\" (%lu) at ip:%p (arg0=0x%lx, arg1=0x%lx, ...)\n",
 		    uk_syscall_name(r->rsyscall), r->rsyscall,
 		    (void *) r->rip, r->rarg0, r->rarg1);

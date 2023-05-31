@@ -151,44 +151,44 @@ static int _asmndump(struct out_dev *o,
 #error No supported disassembler backend available.
 #endif /* CONFIG_LIBZYDIS */
 
-void _uk_asmdumpd(const char *libname, const char *srcname,
+void _uk_asmdumpd(__u16 libid, const char *srcname,
 		  unsigned int srcline, const void *instr,
 		  unsigned int instr_count)
 {
 	struct out_dev o;
 
-	out_dev_init_debug(&o, libname, srcname, srcline);
+	out_dev_init_debug(&o, libid, srcname, srcline);
 	_asmdump(&o, instr, instr_count);
 }
 
-void _uk_asmndumpd(const char *libname, const char *srcname,
+void _uk_asmndumpd(__u16 libid, const char *srcname,
 		   unsigned int srcline, const void *instr,
 		   size_t len)
 {
 	struct out_dev o;
 
-	out_dev_init_debug(&o, libname, srcname, srcline);
+	out_dev_init_debug(&o, libid, srcname, srcline);
 	_asmndump(&o, instr, len);
 }
 
 #if CONFIG_LIBUKDEBUG_PRINTK
-void _uk_asmdumpk(int lvl, const char *libname,
+void _uk_asmdumpk(int lvl, __u16 libid,
 		  const char *srcname, unsigned int srcline,
 		  const void *instr, unsigned int instr_count)
 {
 	struct out_dev o;
 
-	out_dev_init_kern(&o, lvl, libname, srcname, srcline);
+	out_dev_init_kern(&o, lvl, libid, srcname, srcline);
 	_asmdump(&o, instr, instr_count);
 }
 
-void _uk_asmndumpk(int lvl, const char *libname,
+void _uk_asmndumpk(int lvl, __u16 libid,
 		   const char *srcname, unsigned int srcline,
 		   const void *instr, size_t len)
 {
 	struct out_dev o;
 
-	out_dev_init_kern(&o, lvl, libname, srcname, srcline);
+	out_dev_init_kern(&o, lvl, libid, srcname, srcline);
 	_asmndump(&o, instr, len);
 }
 #endif /* CONFIG_LIBUKDEBUG_PRINTK */

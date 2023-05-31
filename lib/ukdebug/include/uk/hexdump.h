@@ -37,6 +37,7 @@
 #define __UKDEBUG_HEXDUMP_H__
 
 #include <stdio.h>
+#include <uk/arch/types.h>
 #include <uk/print.h>
 
 #ifdef __cplusplus
@@ -71,7 +72,7 @@ extern "C" {
 
 #if (defined UK_DEBUG) || CONFIG_LIBUKDEBUG_PRINTD
 /* Please use uk_hexdumpd() instead */
-void _uk_hexdumpd(const char *libname, const char *srcname,
+void _uk_hexdumpd(__u16 libid, const char *srcname,
 		  unsigned int srcline, const void *data, size_t len,
 		  size_t addr0, int flags, unsigned int grps_per_line,
 		  const char *line_prefix);
@@ -89,7 +90,7 @@ void _uk_hexdumpd(const char *libname, const char *srcname,
  * @return Returns the number of printed characters to output fp
  */
 #define uk_hexdumpd(data, len, flags, grps_per_line)			\
-	_uk_hexdumpd(__STR_LIBNAME__, __STR_BASENAME__,			\
+	_uk_hexdumpd(uk_libid_self(), __STR_BASENAME__,			\
 		     __LINE__, (data), (len),				\
 		     ((size_t)(data)), (flags),				\
 		     (grps_per_line), STRINGIFY(data) ": ")
@@ -102,7 +103,7 @@ static inline void uk_hexdumpd(const void *data __unused, size_t len __unused,
 
 #if CONFIG_LIBUKDEBUG_PRINTK
 /* Please use uk_hexdumpk() instead */
-void _uk_hexdumpk(int lvl, const char *libname, const char *srcname,
+void _uk_hexdumpk(int lvl, __u16 libid, const char *srcname,
 		  unsigned int srcline, const void *data, size_t len,
 		  size_t addr0, int flags, unsigned int grps_per_line,
 		  const char *line_prefix);
@@ -122,7 +123,7 @@ void _uk_hexdumpk(int lvl, const char *libname, const char *srcname,
 #define uk_hexdumpk(lvl, data, len, flags, grps_per_line)                      \
 	do {                                                                   \
 		if ((lvl) <= KLVL_MAX)                                         \
-			_uk_hexdumpk((lvl), __STR_LIBNAME__, __STR_BASENAME__, \
+			_uk_hexdumpk((lvl), uk_libid_self(), __STR_BASENAME__, \
 				     __LINE__, (data), (len),                  \
 				     ((size_t)(data)), (flags),                \
 				     (grps_per_line), STRINGIFY(data) ": ");   \
