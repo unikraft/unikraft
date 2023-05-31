@@ -31,6 +31,7 @@
 #include <virtio/virtio_blk.h>
 #include <uk/sglist.h>
 #include <uk/blkdev_driver.h>
+#include <uk/plat/lcpu.h>
 
 #define DRIVER_NAME		"virtio-blk"
 #define DEFAULT_SECTOR_SIZE	512
