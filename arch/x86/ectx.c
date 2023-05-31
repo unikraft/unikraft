@@ -131,6 +131,9 @@ void ukarch_ectx_sanitize(struct ukarch_ectx *state)
 		((__u64 *)state)[69] = 0;
 		((__u64 *)state)[70] = 0;
 		((__u64 *)state)[71] = 0;
+		break;
+	default: /* Nothing to be done in the general case. */
+		break;
 	}
 }
 
