@@ -118,7 +118,7 @@ struct uk_blkdev_queue;
  *
  * @param dev
  *   The Unikraft Block Device.
- * @param queue
+ * @param queue_id
  *   The queue on the Unikraft block device on which the event happened.
  * @param argp
  *   Extra argument that can be defined on callback registration.

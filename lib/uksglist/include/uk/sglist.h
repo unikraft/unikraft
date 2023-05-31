@@ -275,7 +275,7 @@ int uk_sglist_slice(struct uk_sglist *original, struct uk_sglist **slice,
  * The function create a scatter gather list from the netbuf
  * @param sg
  *	A reference to the scatter gather list.
- * @param m0
+ * @param netbuf
  *	A reference to the netbuf
  * @return
  *	0, on successful creation of the scatter gather list

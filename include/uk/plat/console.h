@@ -124,7 +124,7 @@ int ukplat_coutd(const char *buf, unsigned int len);
  * Reads characters from kernel console
  * Note that returned buf is not null terminated.
  * @param buf Target buffer
- * @param len Length of string buffer
+ * @param maxlen Length of string buffer
  * @return Number of read characters, errno on < 0
  */
 int ukplat_cink(char *buf, unsigned int maxlen);

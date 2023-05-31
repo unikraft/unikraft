@@ -87,7 +87,7 @@ typedef int (*posix_socket_driver_init_func_t)(struct posix_socket_driver *d);
 /**
  * Create a connection on a socket.
  *
- * @param driver The socket driver
+ * @param d The socket driver
  * @param family Specifies a communication family domain and thus driver
  * @param type Specifies communication semantics
  * @param protocol Specifies a particular protocol to be used with the socket

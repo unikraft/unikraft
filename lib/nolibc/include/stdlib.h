@@ -46,9 +46,9 @@ extern "C" {
  * Ignores `locale' stuff.  Assumes that the upper and lower case
  * alphabets and digits are each contiguous.
  *
- * @nptr:   The start of the string
- * @endptr: A pointer to the end of the parsed string will be placed here
- * @base:   The number base to use
+ * @param nptr The start of the string
+ * @param endptr A pointer to the end of the parsed string will be placed here
+ * @param base The number base to use
  */
 long strtol(const char *nptr, char **endptr, int base);
 unsigned long strtoul(const char *nptr, char **endptr, int base);
@@ -57,7 +57,7 @@ unsigned long long strtoull(const char *nptr, char **endptr, int base);
 
 /**
  * Convert a string to an integer
- * @s: The start of the string
+ * @param s The start of the string
  */
 int atoi(const char *s);
 long atol(const char *s);

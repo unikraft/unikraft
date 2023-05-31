@@ -305,7 +305,7 @@ struct uk_netbuf *uk_netbuf_alloc_buf(struct uk_alloc *a, size_t buflen,
  * is placed at the end of the given allocation.
  * @param mem
  *   Reference to user provided memory region
- * @param buflen
+ * @param size
  *   Size of the data that shall be allocated together with this netbuf
  * @param headroom
  *   Number of bytes reserved as headroom from the buffer area.
@@ -466,8 +466,6 @@ static inline uint32_t uk_netbuf_refcount_single_get(struct uk_netbuf *m)
  * allocation.
  * @param m
  *   head of uk_netbuf chain to release
- * @returns
- *   Reference to m
  */
 void uk_netbuf_free(struct uk_netbuf *m);
 
@@ -477,8 +475,6 @@ void uk_netbuf_free(struct uk_netbuf *m);
  * the memory is free'd according to its allocation.
  * @param m
  *   uk_netbuf to release
- * @returns
- *   Reference to m
  */
 void uk_netbuf_free_single(struct uk_netbuf *m);
 

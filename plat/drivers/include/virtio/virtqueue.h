@@ -152,7 +152,7 @@ int virtqueue_notify_enabled(struct virtqueue *vq);
  *
  * @param vq
  *	Reference to the virtqueue.
- * @param
+ * @param cookie
  *      Reference to a reference that will point to the cookie that was
  *      submitted with the dequeued descriptor after successful exit of this
  *      function.
@@ -204,9 +204,9 @@ int virtqueue_buffer_enqueue(struct virtqueue *vq, void *cookie,
  *	A reference to callback to the virtio-dev.
  * @param notify
  *	A reference to notification function to the host.
- * @param vdev:
+ * @param vdev
  *	A reference to the virtio device.
- * @param  a:
+ * @param  a
  *	A reference to the allocator.
  *
  * @return struct virtqueue *

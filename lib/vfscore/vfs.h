@@ -788,7 +788,7 @@ int vfs_close(struct vfscore_file *fp);
  *
  * @param fp
  *	Pointer to the vfscore_file structure
- * @param[in, out] uio
+ * @param[in,out] uio
  *	Pointer to the structure containing information about request
  *	and response
  * @param flags
@@ -808,7 +808,7 @@ int vfs_read(struct vfscore_file *fp, struct uio *uio, int flags);
  *
  * @param fp
  *	Pointer to the vfscore_file structure
- * @param[in, out] uio
+ * @param[in,out] uio
  *	Pointer to the structure containing information about request
  *	and response
  * @param flags

@@ -77,7 +77,7 @@ enum uk_blkreq_op {
  *
  * @param req
  *	The request object on which the event is triggered
- * @param cookie_callback
+ * @param cb_cookie
  *	Optional parameter set by user at request submit.
  */
 typedef void (*uk_blkreq_event_t)(struct uk_blkreq *req, void *cb_cookie);

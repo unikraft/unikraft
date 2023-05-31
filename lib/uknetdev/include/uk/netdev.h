@@ -183,7 +183,7 @@ const void *uk_netdev_einfo_get(struct uk_netdev *dev,
  *
  * @param dev
  *   The Unikraft Network Device in unconfigured state.
- * @param conf
+ * @param dev_conf
  *   The pointer to the configuration data to be used for the Unikraft
  *   network device.
  * @return
