@@ -213,11 +213,13 @@ static __noreturn void idle_thread_fn(void *argp)
 		wake_up_time = (volatile __nsec) c->idle_return_time;
 		now = ukplat_monotonic_clock();
 
-		if (wake_up_time > now) {
-			if (wake_up_time)
+		if (!wake_up_time || wake_up_time > now) {
+			if (wake_up_time) {
 				ukplat_lcpu_halt_to(wake_up_time);
-			else
+			} else {
 				ukplat_lcpu_halt_irq();
+				ukplat_lcpu_enable_irq();
+			}
 
 			/* handle pending events if any */
 			ukplat_lcpu_irqs_handle_pending();
