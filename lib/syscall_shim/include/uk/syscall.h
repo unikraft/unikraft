@@ -208,7 +208,7 @@ typedef long uk_syscall_arg_t;
 #define UK_S_ARG_FMT_LONGX(type, arg)  "(" STRINGIFY(type) ") 0x%lx"
 
 #define __UK_SYSCALL_PRINTD(x, rtype, fname, ...)			\
-	_uk_printd(__STR_LIBNAME__, __STR_BASENAME__, __LINE__,		\
+	_uk_printd(uk_libid_self(), __STR_BASENAME__, __LINE__,		\
 		   "(" STRINGIFY(rtype) ") " STRINGIFY(fname)		\
 		   "(" UK_ARG_FMT_MAPx(x, UK_S_ARG_FMT_LONGX, __VA_ARGS__) ")\n" \
 		   UK_ARG_EMAPx(x, UK_S_ARG_CAST_LONG, __VA_ARGS__) )

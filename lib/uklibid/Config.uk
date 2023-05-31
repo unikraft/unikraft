@@ -1,4 +1,10 @@
 config LIBUKLIBID
 	bool "uklibid: Library identifier"
 	default n
-	select LIBUKDEBUG
+	# FIXME: We actually depend on <uk/assert.h> but lib/ukdebug also
+	#        depends on us. If we specify the dependency here, it creates a
+	#        circular dependency that KConfig doesn't like. However, we
+	#        can currently assume that lib/ukdebug is always part of a
+	#        build, so we comment out the dependency here. Of course, this
+	#        is not accurate.
+	#select LIBUKDEBUG
