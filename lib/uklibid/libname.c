@@ -5,6 +5,10 @@
  */
 #include <uk/libid.h>
 #include <uk/arch/lcpu.h>
+#include <uk/assert.h>
+#if CONFIG_HAVE_LIBC || CONFIG_LIBNOLIBC
+#include <string.h>
+#endif /* CONFIG_HAVE_LIBC || CONFIG_LIBNOLIBC */
 
 extern const char *namemap[];
 
@@ -15,3 +19,20 @@ const char *uk_libname(__u16 libid)
 
 	return namemap[libid];
 }
+
+#if CONFIG_HAVE_LIBC || CONFIG_LIBNOLIBC
+__u16 uk_libid(const char *libname)
+{
+	__u16 libid;
+
+	UK_ASSERT(libname);
+
+	for (libid = 0; libid < uk_libid_count(); ++libid) {
+		if (strcmp(libname, namemap[libid]) == 0)
+			return libid;
+	}
+
+	/* no library with given name found */
+	return UKLIBID_NONE;
+}
+#endif /* CONFIG_HAVE_LIBC || CONFIG_LIBNOLIBC */
