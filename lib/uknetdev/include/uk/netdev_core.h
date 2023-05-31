@@ -238,7 +238,7 @@ enum uk_netdev_einfo_type {
  *
  * @param dev
  *   The Unikraft Network Device.
- * @param queue
+ * @param queue_id
  *   The queue on the Unikraft network device on which the event happened.
  * @param argp
  *   Extra argument that can be defined on callback registration.

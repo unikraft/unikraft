@@ -80,6 +80,8 @@ static inline void ukplat_tls_set(void *tls_area)
 	ukplat_tlsp_set(ukarch_tls_tlsp(tls_area));
 }
 
+typedef int (*ukplat_tlsp_exec_fn)(void *);
+
 /**
  * Executes a function with a different TLS pointer activated.
  * This wrapper function will apply a given TLS pointer before executing
@@ -99,8 +101,6 @@ static inline void ukplat_tls_set(void *tls_area)
  * @return
  *   The return value from `fn()`
  */
-typedef int (*ukplat_tlsp_exec_fn)(void *);
-
 static __noinline __maybe_unused int
 ukplat_tlsp_exec(__uptr tlsp, ukplat_tlsp_exec_fn fn, void *argp)
 {

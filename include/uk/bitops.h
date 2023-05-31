@@ -244,10 +244,10 @@ uk_find_next_zero_bit(const unsigned long *addr, unsigned long size,
 
 /**
  * uk_test_and_clear_bit - Atomically clear a bit and return its old value
- * @nr: Bit to clear
- * @addr: Address to count from
+ * @param nr Bit to clear
+ * @param addr Address to count from
  *
- * Note that @nr may be almost arbitrarily large; this function is not
+ * Note that nr may be almost arbitrarily large; this function is not
  * restricted to acting on a single-word quantity.
  */
 static inline int
@@ -264,10 +264,10 @@ uk_test_and_clear_bit(long nr, volatile unsigned long *addr)
 
 /**
  * __uk_test_and_clear_bit - Clear a bit and return its old value
- * @nr: Bit to clear
- * @addr: Address to count from
+ * @param nr Bit to clear
+ * @param addr Address to count from
  *
- * Note that @nr may be almost arbitrarily large; this function is not
+ * Note that nr may be almost arbitrarily large; this function is not
  * restricted to acting on a single-word quantity.
  *
  * This operation is not atomic and can be reordered. If two
@@ -288,10 +288,10 @@ __uk_test_and_clear_bit(long nr, volatile unsigned long *addr)
 
 /**
  * uk_test_and_set_bit - Atomically set a bit and return its old value
- * @nr: Bit to clear
- * @addr: Address to count from
+ * @param nr Bit to clear
+ * @param addr Address to count from
  *
- * Note that @nr may be almost arbitrarily large; this function is not
+ * Note that nr may be almost arbitrarily large; this function is not
  * restricted to acting on a single-word quantity.
  */
 static inline int
@@ -308,10 +308,10 @@ uk_test_and_set_bit(long nr, volatile unsigned long *addr)
 
 /**
  * __uk_test_and_set_bit - Set a bit and return its old value
- * @nr: Bit to clear
- * @addr: Address to count from
+ * @param nr Bit to clear
+ * @param addr Address to count from
  *
- * Note that @nr may be almost arbitrarily large; this function is not
+ * Note that nr may be almost arbitrarily large; this function is not
  * restricted to acting on a single-word quantity.
  *
  * This operation is not atomic and can be reordered. If two
