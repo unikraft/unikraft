@@ -70,7 +70,6 @@ void ukplat_syscall_handler(struct __regs *r)
 	UK_ASSERT(r);
 
 	/* Save extended register state */
-	ukarch_ectx_sanitize(ectx);
 	ukarch_ectx_store(ectx);
 
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS

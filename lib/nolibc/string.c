@@ -61,7 +61,6 @@
 #include <limits.h>
 #include <errno.h>
 #include <stdio.h>
-#include <ctype.h>
 
 void *memcpy(void *dst, const void *src, size_t len)
 {
@@ -110,9 +109,7 @@ void *memmove(void *dst, const void *src, size_t len)
 	uint8_t *d = dst;
 	const uint8_t *s = src;
 
-	if ((intptr_t)src == (intptr_t)dst) {
-		return dst;
-	} else if ((intptr_t)src > (intptr_t)dst) {
+	if (src > dst) {
 		for (; len > 0; --len)
 			*(d++) = *(s++);
 	} else {
@@ -299,23 +296,6 @@ char *strtok_r(char *restrict s, const char *restrict sep, char **restrict p)
 	else
 		*p = 0;
 	return s;
-}
-
-char *strsep(char **restrict s, const char *restrict sep)
-{
-	char *p, *str = *s;
-
-	if (!*s)
-		return NULL;
-
-	p = *s + strcspn(*s, sep);
-	if (*p)
-		*p++ = 0;
-	else
-		p = NULL;
-
-	*s = p;
-	return str;
 }
 
 char *strndup(const char *str, size_t len)
@@ -826,12 +806,6 @@ char *strerror(int errnum)
 	return strerror_r(errnum, buf, sizeof(buf));
 }
 
-char *strcat(char *restrict dest, const char *restrict src)
-{
-	strcpy(dest + strlen(dest), src);
-	return dest;
-}
-
 char *strncat(char *dest, const char *src, size_t n)
 {
 	char *a = dest;
@@ -847,26 +821,7 @@ char *strncat(char *dest, const char *src, size_t n)
 	return a;
 }
 
-int strcasecmp(const char *s1, const char *s2)
-{
-	/* The following code is taken from musl libc */
-	const unsigned char *l = (void *) s1, *r = (void *) s2;
-
-	for (; *l && *r && (*l == *r || tolower(*l) == tolower(*r)); l++, r++);
-	return tolower(*l) - tolower(*r);
-}
-
 int bcmp(const void *s1, const void *s2, size_t count)
 {
 	return memcmp(s1, s2, count);
-}
-
-void bcopy(const void *from, void *to, size_t len)
-{
-	memmove(to, from, len);
-}
-
-void bzero(void *buf, size_t len)
-{
-	memset(buf, 0, len);
 }

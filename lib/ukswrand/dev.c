@@ -32,7 +32,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 #include <uk/ctors.h>
 #include <uk/print.h>
 #include <uk/swrand.h>
@@ -45,8 +44,8 @@
 #define DEV_RANDOM_NAME "random"
 #define DEV_URANDOM_NAME "urandom"
 
-static int dev_random_read(struct device *dev __unused, struct uio *uio,
-			   int flags __unused)
+int dev_random_read(struct device *dev __unused, struct uio *uio,
+			int flags __unused)
 {
 	size_t count;
 	char *buf;
@@ -60,19 +59,21 @@ static int dev_random_read(struct device *dev __unused, struct uio *uio,
 	return 0;
 }
 
-static int dev_random_write(struct device *dev __unused,
-			    struct uio *uio __unused,
-			    int flags __unused)
+int dev_random_open(struct device *device __unused, int mode __unused)
 {
-	return EPERM;
+	return 0;
+}
+
+
+int dev_random_close(struct device *device __unused)
+{
+	return 0;
 }
 
 static struct devops random_devops = {
-	.open = dev_noop_open,
-	.close = dev_noop_close,
 	.read = dev_random_read,
-	.write = dev_random_write,
-	.ioctl = dev_noop_ioctl,
+	.open = dev_random_open,
+	.close = dev_random_close,
 };
 
 static struct driver drv_random = {
@@ -89,25 +90,25 @@ static struct driver drv_urandom = {
 
 static int devfs_register(void)
 {
-	int rc;
+	struct device *dev;
 
 	uk_pr_info("Register '%s' and '%s' to devfs\n",
 		   DEV_URANDOM_NAME, DEV_RANDOM_NAME);
 
 	/* register /dev/urandom */
-	rc = device_create(&drv_urandom, DEV_URANDOM_NAME, D_CHR, NULL);
-	if (unlikely(rc)) {
-		uk_pr_err("Failed to register '%s' to devfs: %d\n",
-			  DEV_URANDOM_NAME, rc);
-		return -rc;
+	dev = device_create(&drv_urandom, DEV_URANDOM_NAME, D_CHR);
+	if (dev == NULL) {
+		uk_pr_err("Failed to register '%s' to devfs\n",
+			  DEV_URANDOM_NAME);
+		return -1;
 	}
 
 	/* register /dev/random */
-	rc = device_create(&drv_random, DEV_RANDOM_NAME, D_CHR, NULL);
-	if (unlikely(rc)) {
-		uk_pr_err("Failed to register '%s' to devfs: %d\n",
-			  DEV_RANDOM_NAME, rc);
-		return -rc;
+	dev = device_create(&drv_random, DEV_RANDOM_NAME, D_CHR);
+	if (dev == NULL) {
+		uk_pr_err("Failed to register '%s' to devfs\n",
+			  DEV_RANDOM_NAME);
+		return -1;
 	}
 
 	return 0;

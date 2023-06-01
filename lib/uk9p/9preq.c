@@ -145,15 +145,8 @@ int uk_9preq_receive_cb(struct uk_9preq *req, uint32_t recv_size)
 	/* Check state and the existence of the header. */
 	if (UK_READ_ONCE(req->state) != UK_9PREQ_SENT)
 		return -EIO;
-
-	if (recv_size < UK_9P_HEADER_SIZE) {
-#ifdef CONFIG_LIBUK9P_ERRATUM_WSTAT_FSYNC_ZERO
-		if (req->xmit.type == UK_9P_TWSTAT && recv_size == 0)
-			recv_size = UK_9P_HEADER_SIZE;
-		else
-#endif /* CONFIG_LIBUK9P_ERRATUM_WSTAT_FSYNC_ZERO */
+	if (recv_size < UK_9P_HEADER_SIZE)
 		return -EIO;
-	}
 
 	/* Deserialize the header into request fields. */
 	req->recv.offset = 0;

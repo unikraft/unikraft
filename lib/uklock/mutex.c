@@ -8,10 +8,9 @@ struct uk_mutex_metrics _uk_mutex_metrics = { 0 };
 __spinlock              _uk_mutex_metrics_lock;
 #endif /* CONFIG_LIBUKLOCK_MUTEX_METRICS */
 
-void uk_mutex_init_config(struct uk_mutex *m, unsigned int flags)
+void uk_mutex_init(struct uk_mutex *m)
 {
 	m->lock_count = 0;
-	m->flags = flags;
 	m->owner = NULL;
 	uk_waitq_init(&m->wait);
 
@@ -50,3 +49,4 @@ void uk_mutex_get_metrics(struct uk_mutex_metrics *dst)
 	ukarch_spin_unlock(&_uk_mutex_metrics_lock);
 }
 #endif /* CONFIG_LIBUKLOCK_MUTEX_METRICS */
+

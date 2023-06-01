@@ -30,38 +30,49 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <uk/config.h>
 #include <stdlib.h>
 #include <string.h>
-
-#include <uk/config.h>
 #include <uk/ctors.h>
 #include <uk/print.h>
 #include <vfscore/uio.h>
 #include <devfs/device.h>
 
-static int dev_null_write(struct device *dev __unused, struct uio *uio,
-			  int flags __unused)
+
+int dev_null_write(struct device *dev __unused, struct uio *uio,
+		   int flags __unused)
 {
 	uio->uio_resid = 0;
 	return 0;
 }
 
+int dev_null_open(struct device *device __unused, int mode __unused)
+{
+	return 0;
+}
+
+
+int dev_null_close(struct device *device __unused)
+{
+	return 0;
+}
+
 #ifdef CONFIG_LIBDEVFS_DEV_NULL
+
 #define DEV_NULL_NAME "null"
 
-static int dev_null_read(struct device *dev __unused, struct uio *uio,
-			 int flags __unused)
+int dev_null_read(struct device *dev __unused, struct uio *uio,
+		  int flags __unused)
 {
 	uio->uio_resid = uio->uio_iov->iov_len;
 	return 0;
 }
 
 static struct devops null_devops = {
-	.open = dev_noop_open,
-	.close = dev_noop_close,
 	.read = dev_null_read,
 	.write = dev_null_write,
-	.ioctl = dev_noop_ioctl,
+	.open = dev_null_open,
+	.close = dev_null_close,
 };
 
 static struct driver drv_null = {
@@ -69,13 +80,14 @@ static struct driver drv_null = {
 	.devsz = 0,
 	.name = DEV_NULL_NAME
 };
-#endif /* CONFIG_LIBDEVFS_DEV_NULL */
+#endif
 
 #ifdef CONFIG_LIBDEVFS_DEV_ZERO
+
 #define DEV_ZERO_NAME "zero"
 
-static int dev_zero_read(struct device *dev __unused, struct uio *uio,
-			 int flags __unused)
+int dev_zero_read(struct device *dev __unused, struct uio *uio,
+		  int flags __unused)
 {
 	size_t count;
 	char *buf;
@@ -89,11 +101,10 @@ static int dev_zero_read(struct device *dev __unused, struct uio *uio,
 }
 
 static struct devops zero_devops = {
-	.open = dev_noop_open,
-	.close = dev_noop_close,
 	.read = dev_zero_read,
 	.write = dev_null_write,
-	.ioctl = dev_noop_ioctl,
+	.open = dev_null_open,
+	.close = dev_null_close,
 };
 
 static struct driver drv_zero = {
@@ -101,35 +112,33 @@ static struct driver drv_zero = {
 	.devsz = 0,
 	.name = DEV_ZERO_NAME
 };
-#endif /* CONFIG_LIBDEVFS_DEV_ZERO */
+#endif
 
 static int devfs_register_null(void)
 {
-	int rc;
+	struct device *dev;
 
 #ifdef CONFIG_LIBDEVFS_DEV_NULL
 	uk_pr_debug("Register '%s' to devfs\n", DEV_NULL_NAME);
 
 	/* register /dev/null */
-	rc = device_create(&drv_null, DEV_NULL_NAME, D_CHR, NULL);
-	if (unlikely(rc)) {
-		uk_pr_err("Failed to register '%s' to devfs: %d\n",
-			  DEV_NULL_NAME, rc);
-		return -rc;
+	dev = device_create(&drv_null, DEV_NULL_NAME, D_CHR);
+	if (dev == NULL) {
+		uk_pr_err("Failed to register '%s' to devfs\n", DEV_NULL_NAME);
+		return -1;
 	}
-#endif /* CONFIG_LIBDEVFS_DEV_NULL */
+#endif
 
 #ifdef CONFIG_LIBDEVFS_DEV_ZERO
 	uk_pr_debug("Register '%s' to devfs\n", DEV_ZERO_NAME);
 
 	/* register /dev/zero */
-	rc = device_create(&drv_zero, DEV_ZERO_NAME, D_CHR, NULL);
-	if (unlikely(rc)) {
-		uk_pr_err("Failed to register '%s' to devfs: %d\n",
-			  DEV_ZERO_NAME, rc);
-		return -rc;
+	dev = device_create(&drv_zero, DEV_ZERO_NAME, D_CHR);
+	if (dev == NULL) {
+		uk_pr_err("Failed to register '%s' to devfs\n", DEV_ZERO_NAME);
+		return -1;
 	}
-#endif /* CONFIG_LIBDEVFS_DEV_ZERO */
+#endif
 
 	return 0;
 }

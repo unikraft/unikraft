@@ -41,14 +41,13 @@
 #include <uk/assert.h>
 #include <uk/arch/limits.h>
 #include <uk/arch/lcpu.h>
-#include <uk/arch/paging.h>
 
 #if CONFIG_HAVE_MEMTAG
 #include <uk/arch/memtag.h>
 #endif
 
 #define size_to_num_pages(size) \
-	(PAGE_ALIGN_UP((unsigned long)(size)) / __PAGE_SIZE)
+	(ALIGN_UP((unsigned long)(size), __PAGE_SIZE) / __PAGE_SIZE)
 #define page_off(x) ((unsigned long)(x) & (__PAGE_SIZE - 1))
 
 struct uk_alloc *_uk_alloc_head;
@@ -109,7 +108,7 @@ static struct metadata_ifpages *uk_get_metadata(const void *ptr)
 	UK_ASSERT((__uptr) ptr >= __PAGE_SIZE +
 		  METADATA_IFPAGES_SIZE_POW2);
 
-	metadata = PAGE_ALIGN_DOWN((__uptr)ptr);
+	metadata = ALIGN_DOWN((__uptr) ptr, (__uptr) __PAGE_SIZE);
 	if (metadata == (__uptr) ptr) {
 		/* special case: the memory was page-aligned.
 		 * In this case the metadata lies at the start of the
@@ -213,7 +212,7 @@ void *uk_realloc_ifpages(struct uk_alloc *a, void *ptr, __sz size)
 	if (!ptr)
 		return uk_malloc_ifpages(a, size);
 
-	if (!size) {
+	if (ptr && !size) {
 		uk_free_ifpages(a, ptr);
 		return __NULL;
 	}
@@ -424,7 +423,7 @@ void *uk_realloc_ifmalloc(struct uk_alloc *a, void *ptr, __sz size)
 	if (!ptr)
 		return uk_malloc_ifmalloc(a, size);
 
-	if (!size) {
+	if (ptr && !size) {
 		uk_free_ifmalloc(a, ptr);
 		return __NULL;
 	}
@@ -530,7 +529,7 @@ void *uk_realloc_compat(struct uk_alloc *a, void *ptr, __sz size)
 	if (!ptr)
 		return uk_malloc(a, size);
 
-	if (!size) {
+	if (ptr && !size) {
 		uk_free(a, ptr);
 		return __NULL;
 	}

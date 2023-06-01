@@ -467,10 +467,6 @@ our $signature_tags = qr{(?xi:
 	Reviewed-by:|
 	Reported-by:|
 	Suggested-by:|
-	Approved-by:|
-	Co-authored-by:|
-	GitHub-Fixes:|
-	GitHub-Closes:|
 	To:|
 	Cc:
 )};
@@ -2465,8 +2461,7 @@ sub process {
 
 # Check signature styles
 		if (!$in_header_lines &&
-		    $line =~ /^(\s*)([a-z0-9_-]+by:|$signature_tags)(\s*)(.*)/i &&
-		    $line !~ /^GitHub\s*/i) {
+		    $line =~ /^(\s*)([a-z0-9_-]+by:|$signature_tags)(\s*)(.*)/i) {
 			my $space_before = $1;
 			my $sign_off = $2;
 			my $space_after = $3;

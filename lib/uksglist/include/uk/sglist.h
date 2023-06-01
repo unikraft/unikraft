@@ -108,7 +108,7 @@ static inline void uk_sglist_reset(struct uk_sglist *sg)
  *      - 0: The length was zero.
  *      - int: The number of segments
  */
-int uk_sglist_count(void *buf, size_t len) __nonnull;
+int uk_sglist_count(void *buf, size_t len);
 
 /**
  * Append the segments to describe a single kernel virtual address range to a
@@ -165,7 +165,7 @@ size_t uk_sglist_length(struct uk_sglist *sg);
  *	EFBIG: Insufficient space.
  *	0 : Successful joining of the list.
  */
-int uk_sglist_join(struct uk_sglist *first, struct uk_sglist *second) __nonnull;
+int uk_sglist_join(struct uk_sglist *first, struct uk_sglist *second);
 
 #ifdef CONFIG_LIBUKALLOC
 /**
@@ -241,7 +241,7 @@ struct uk_sglist *uk_sglist_clone(struct uk_sglist *sg,
  *	0: Successful split of the list.
  */
 int uk_sglist_split(struct uk_sglist *original, struct uk_sglist **head,
-				struct uk_alloc *a, size_t length) __nonnull;
+				struct uk_alloc *a, size_t length);
 
 /**
  * Generate a new scatter/gather list from a range of an existing
@@ -267,7 +267,7 @@ int uk_sglist_split(struct uk_sglist *original, struct uk_sglist **head,
  *	0: Successful in splicing the list.
  */
 int uk_sglist_slice(struct uk_sglist *original, struct uk_sglist **slice,
-			struct uk_alloc *a, size_t offset, size_t length) __nonnull;
+			struct uk_alloc *a, size_t offset, size_t length);
 #endif /* CONFIG_LIBUKALLOC */
 
 #ifdef CONFIG_LIBUKNETDEV
@@ -281,7 +281,7 @@ int uk_sglist_slice(struct uk_sglist *original, struct uk_sglist **slice,
  *	0, on successful creation of the scatter gather list
  *	-EINVAL, Invalid sg list.
  */
-int uk_sglist_append_netbuf(struct uk_sglist *sg, struct uk_netbuf *netbuf) __nonnull;
+int uk_sglist_append_netbuf(struct uk_sglist *sg, struct uk_netbuf *netbuf);
 #endif /* CONFIG_LIBUKNET */
 
 #ifdef __cplusplus
