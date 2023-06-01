@@ -12,4 +12,12 @@ if LIBNOLIBC
 			Assertions (`assert()` defined in `<assert.h>`) are mapped to `UK_ASSERT()`.
 			If selected, please note that libc assertions are also removed from the code
 			when assertions are disabled in libukdebug.
+
+	config LIBNOLIBC_SYSLOG
+		bool "Include syslog functions"
+		select LIBUKDEBUG
+		default n
+		help
+			Provide implementation of syslog/openlog/closelog functions which use the
+			ukdebug facility.
 endif

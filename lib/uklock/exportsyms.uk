@@ -1,5 +1,12 @@
 uk_semaphore_init
-uk_mutex_init
+uk_mutex_init_config
 uk_mutex_get_metrics
 _uk_mutex_metrics
 _uk_mutex_metrics_lock
+uk_rwlock_init_config
+uk_rwlock_rlock
+uk_rwlock_wlock
+uk_rwlock_runlock
+uk_rwlock_wunlock
+uk_rwlock_upgrade
+uk_rwlock_downgrade

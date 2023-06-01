@@ -40,17 +40,24 @@ printf
 fflush
 fputc
 putchar
+fputs
+puts
 
 # stdlib
+abort
+exit
 strtol
 strtoul
 strtoll
 strtoull
 atoi
+atol
 qsort
 
 # string
 memcpy
+bcopy
+bzero
 bcmp
 memset
 memchr
@@ -60,6 +67,8 @@ memcmp
 strnlen
 strlen
 strncpy
+strcat
+strcasecmp
 strcpy
 strchr
 strrchr
@@ -70,6 +79,7 @@ strcspn
 strspn
 strtok
 strtok_r
+strsep
 strndup
 strdup
 strlcpy
@@ -94,3 +104,15 @@ errno
 htons
 nthos
 h_errno
+
+# syslog
+openlog
+closelog
+syslog
+vsyslog
+
+# random
+random
+srandom
+initstate
+setstate

@@ -415,8 +415,27 @@ int atoi(const char *s)
 	return (int) atoll;
 }
 
+long atol(const char *s)
+{
+	long long atoll;
+
+	atoll = strtoll(s, NULL, 10);
+	atoll = (atoll > __L_MAX) ? __L_MAX : atoll;
+	atoll = (atoll < __L_MIN) ? __L_MIN : atoll;
+
+	return (long) atoll;
+}
+
 void abort(void)
 {
 	uk_pr_crit("Abnormal termination!\n");
 	ukplat_crash();
 }
+
+#ifndef CONFIG_LIBPOSIX_PROCESS
+void exit(int status)
+{
+	uk_pr_info("exit called with status %d, halting system\n", status);
+	ukplat_terminate(status);
+}
+#endif /* !CONFIG_LIBPOSIX_PROCESS */

@@ -10,7 +10,8 @@ LINUXU_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-T$(comma),\
 
 $(LINUXU_DEBUG_IMAGE): $(LINUXU_ALIBS) $(LINUXU_ALIBS-y) \
 		       $(LINUXU_OLIBS) $(LINUXU_OLIBS-y) \
-		       $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y)
+		       $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) \
+		       $(LINUXU_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y)
 	$(call build_cmd,LD,,$@,\
 	       $(LD) $(LDFLAGS) $(LDFLAGS-y) \
 		     $(LINUXU_LDFLAGS) $(LINUXU_LDFLAGS-y) \

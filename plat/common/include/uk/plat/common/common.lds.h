@@ -34,6 +34,16 @@
 
 #include <uk/arch/limits.h> /* for __PAGE_SIZE */
 
+#ifdef UK_USE_SECTION_SEGMENTS
+#define UK_SEGMENT_TLS :tls
+#define UK_SEGMENT_TLS_LOAD :tls_load
+#define UK_SEGMENT_DATA :data
+#else
+#define UK_SEGMENT_TLS
+#define UK_SEGMENT_TLS_LOAD
+#define UK_SEGMENT_DATA
+#endif
+
 /** Executable */
 #define PHDRS_PF_X 0x1
 /** Writeable */
@@ -134,7 +144,7 @@
 		*(.tdata)						\
 		*(.tdata.*)						\
 		*(.gnu.linkonce.td.*)					\
-	} :tls :tls_load						\
+	} UK_SEGMENT_TLS UK_SEGMENT_TLS_LOAD				\
 	_etdata = .;							\
 	.tbss :								\
 	{								\
@@ -160,7 +170,7 @@
 	{								\
 		*(.data)						\
 		*(.data.*)						\
-	} :data								\
+	} UK_SEGMENT_DATA						\
 	_edata = .;							\
 									\
 	/*								\

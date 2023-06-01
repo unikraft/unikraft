@@ -206,6 +206,15 @@ __sz ukarch_ectx_size(void);
 __sz ukarch_ectx_align(void);
 
 /**
+ * Perform the minimum necessary to ensure the memory at `state`
+ * is appropriate for passing to `ukarch_ectx_save()`.
+ *
+ * @param state
+ *   Reference to extended context
+ */
+void ukarch_ectx_sanitize(struct ukarch_ectx *state);
+
+/**
  * Initializes an extended context so that it can be loaded
  * into a logical CPU with `ukarch_ectx_load()`.
  *

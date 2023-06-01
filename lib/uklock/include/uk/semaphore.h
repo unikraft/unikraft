@@ -28,6 +28,7 @@
 #include <uk/config.h>
 
 #if CONFIG_LIBUKLOCK_SEMAPHORE
+#include <uk/spinlock.h>
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <uk/plat/lcpu.h>
@@ -45,6 +46,7 @@ extern "C" {
  * uses wait queues for threads
  */
 struct uk_semaphore {
+	struct uk_spinlock sl;
 	long count;
 	struct uk_waitq wait;
 };
@@ -59,16 +61,16 @@ static inline void uk_semaphore_down(struct uk_semaphore *s)
 
 	for (;;) {
 		uk_waitq_wait_event(&s->wait, s->count > 0);
-		irqf = ukplat_lcpu_save_irqf();
+		uk_spin_lock_irqsave(&(s->sl), irqf);
 		if (s->count > 0)
 			break;
-		ukplat_lcpu_restore_irqf(irqf);
+		uk_spin_unlock_irqrestore(&(s->sl), irqf);
 	}
 	--s->count;
 #ifdef UK_SEMAPHORE_DEBUG
 	uk_pr_debug("Decreased semaphore %p to %ld\n", s, s->count);
 #endif
-	ukplat_lcpu_restore_irqf(irqf);
+	uk_spin_unlock_irqrestore(&(s->sl), irqf);
 }
 
 static inline int uk_semaphore_down_try(struct uk_semaphore *s)
@@ -78,7 +80,7 @@ static inline int uk_semaphore_down_try(struct uk_semaphore *s)
 
 	UK_ASSERT(s);
 
-	irqf = ukplat_lcpu_save_irqf();
+	uk_spin_lock_irqsave(&(s->sl), irqf);
 	if (s->count > 0) {
 		ret = 1;
 		--s->count;
@@ -87,7 +89,7 @@ static inline int uk_semaphore_down_try(struct uk_semaphore *s)
 			    s, s->count);
 #endif
 	}
-	ukplat_lcpu_restore_irqf(irqf);
+	uk_spin_unlock_irqrestore(&(s->sl), irqf);
 	return ret;
 }
 
@@ -105,11 +107,11 @@ static inline __nsec uk_semaphore_down_to(struct uk_semaphore *s,
 
 	for (;;) {
 		uk_waitq_wait_event_deadline(&s->wait, s->count > 0, deadline);
-		irqf = ukplat_lcpu_save_irqf();
+		uk_spin_lock_irqsave(&(s->sl), irqf);
 		if (s->count > 0 || (deadline &&
 				     ukplat_monotonic_clock() >= deadline))
 			break;
-		ukplat_lcpu_restore_irqf(irqf);
+		uk_spin_unlock_irqrestore(&(s->sl), irqf);
 	}
 	if (s->count > 0) {
 		s->count--;
@@ -117,11 +119,11 @@ static inline __nsec uk_semaphore_down_to(struct uk_semaphore *s,
 		uk_pr_debug("Decreased semaphore %p to %ld\n",
 			    s, s->count);
 #endif
-		ukplat_lcpu_restore_irqf(irqf);
+		uk_spin_unlock_irqrestore(&(s->sl), irqf);
 		return ukplat_monotonic_clock() - then;
 	}
 
-	ukplat_lcpu_restore_irqf(irqf);
+	uk_spin_unlock_irqrestore(&(s->sl), irqf);
 #ifdef UK_SEMAPHORE_DEBUG
 	uk_pr_debug("Timed out while waiting for semaphore %p\n", s);
 #endif
@@ -134,14 +136,14 @@ static inline void uk_semaphore_up(struct uk_semaphore *s)
 
 	UK_ASSERT(s);
 
-	irqf = ukplat_lcpu_save_irqf();
+	uk_spin_lock_irqsave(&(s->sl), irqf);
 	++s->count;
 #ifdef UK_SEMAPHORE_DEBUG
 	uk_pr_debug("Increased semaphore %p to %ld\n",
 		    s, s->count);
 #endif
 	uk_waitq_wake_up(&s->wait);
-	ukplat_lcpu_restore_irqf(irqf);
+	uk_spin_unlock_irqrestore(&(s->sl), irqf);
 }
 
 #ifdef __cplusplus

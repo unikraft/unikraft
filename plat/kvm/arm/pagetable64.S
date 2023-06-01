@@ -70,7 +70,15 @@ ENTRY(start_mmu)
 	ldr x5, =tcr_ips_bits
 	ubfx x4, x3, #0, #4
 	ldrb w4, [x5, x4]
-
+	cmp x4, #52
+	b.lt setup_tcr_el1
+	/*
+	 * We currently do not provide 5-level page tables used in
+	 * implementing 52-bit virtual addresing with 4K granularity, so we
+	 * enforce the max VA to 48-bit for PARange >= 52.
+	 */
+	mov x4, #48
+setup_tcr_el1:
 	/* Setup TCR_EL1_TxSZ(64 - VIRT_BITS) for TCR_INIT_FLAGS */
 	mov x5, #64
 	sub x5, x5, x4

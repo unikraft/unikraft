@@ -31,12 +31,12 @@ uc = $(subst a,A,$(subst b,B,$(subst c,C,$(subst d,D,$(subst e,E,$(subst f,F,$(s
 
 # test if GCC is set as a compiler
 define have_gcc =
-$(if $(filter %gcc,$(CC)),y,n)
+$(if $(filter GCC,$(CC_NAME)),y,n)
 endef
 
 # test if CLANG is set as a compiler
 define have_clang =
-$(if $(filter %clang,$(CC)),y,n)
+$(if $(filter Clang,$(CC_NAME)),y,n)
 endef
 
 # test whether GCC version is greater than or equal to the minimum requirement
@@ -576,9 +576,10 @@ define buildrule_cxx =
 $(4): $(2) | preprocess
 	$(call build_cmd_fixdep,CXX,$(1),$(4),\
 		$(CXX) $$(COMPFLAGS) $$(COMPFLAGS-y) \
-		       $$(CXXINCLUDES) $$(CXXINCLUDES-y) \
-		       $$($(call vprefix_lib,$(1),CXXINCLUDES)) $$($(call vprefix_lib,$(1),CXXINCLUDES-y)) \
+		       $$($(call vprefix_lib,$(1),COMPFLAGS)) $$($(call vprefix_lib,$(1),COMPFLAGS-y)) \
 		       $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES)) $$($(call vprefix_src,$(1),$(2),$(3),INCLUDES-y)) \
+		       $$($(call vprefix_lib,$(1),CXXINCLUDES)) $$($(call vprefix_lib,$(1),CXXINCLUDES-y)) \
+		       $$(CXXINCLUDES) $$(CXXINCLUDES-y) \
 		       $$($(call vprefix_glb,$(3),ARCHFLAGS)) $$($(call vprefix_glb,$(3),ARCHFLAGS-y)) \
 		       $$(CXXFLAGS) $$(CXXFLAGS-y) $$(CXXFLAGS_EXTRA) \
 		       $$($(call vprefix_lib,$(1),CXXFLAGS)) $$($(call vprefix_lib,$(1),CXXFLAGS-y)) \
@@ -641,6 +642,7 @@ $(4): $(2) | preprocess
 		       $$(ASFLAGS) $$(ASFLAGS-y) $$(ASFLAGS_EXTRA) \
 		       $$($(call vprefix_lib,$(1),ASFLAGS)) $$($(call vprefix_lib,$(1),ASFLAGS-y)) \
 		       $$($(call vprefix_src,$(1),$(2),$(3),FLAGS)) $$($(call vprefix_src,$(1),$(2),$(3),FLAGS-y)) \
+		       -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) $(if $(3),-D__VARIANT__=$(3)) \
 		       $(5) \
 		       $(2) -o $(4) $(call depflags,$(4))
 	)

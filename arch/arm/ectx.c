@@ -60,6 +60,12 @@ __sz ukarch_ectx_align(void)
 	return ECTX_ALIGN;
 }
 
+void ukarch_ectx_sanitize(struct ukarch_ectx *state __maybe_unused)
+{
+	UK_ASSERT(state);
+	UK_ASSERT(IS_ALIGNED((__uptr) state, ECTX_ALIGN));
+}
+
 void ukarch_ectx_init(struct ukarch_ectx *state)
 {
 	UK_ASSERT(state);

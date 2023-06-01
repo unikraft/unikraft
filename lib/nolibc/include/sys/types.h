@@ -41,6 +41,9 @@
 extern "C" {
 #endif
 
+#ifdef _DEFAULT_SOURCE
+#define __NEED_BSD_TYPES
+#endif
 #define __NEED_size_t
 #define __NEED_ssize_t
 #define __NEED_off_t

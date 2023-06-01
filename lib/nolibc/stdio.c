@@ -511,3 +511,40 @@ int putchar(int c)
 {
 	return fputc(c, stdout);
 }
+
+static int
+fputs_internal(const char *restrict s, FILE *restrict stream, int newline)
+{
+	int ret;
+	size_t len;
+
+	len = strlen(s);
+
+	if (stream == stdout)
+		ret = ukplat_coutk(s, len);
+	else if (stream == stderr)
+		ret = ukplat_coutd(s, len);
+	else
+		return EOF;
+
+	/* If ukplat_cout{d,k} weren't able to write all characters, assume that
+	 * an error happened and there is no point in retrying.
+	 */
+	if ((size_t)ret != len)
+		return EOF;
+
+	if (newline)
+		return fputc('\n', stream);
+	else
+		return 1;
+}
+
+int fputs(const char *restrict s, FILE *restrict stream)
+{
+	return fputs_internal(s, stream, 0);
+}
+
+int puts(const char *s)
+{
+	return fputs_internal(s, stdout, 1);
+}

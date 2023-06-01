@@ -110,6 +110,30 @@ __sz ukarch_ectx_align(void)
 	return ectx_align;
 }
 
+void ukarch_ectx_sanitize(struct ukarch_ectx *state)
+{
+	UK_ASSERT(ectx_align); /* Do not call when not yet initialized */
+	UK_ASSERT(state);
+	UK_ASSERT(IS_ALIGNED((__uptr) state, ectx_align));
+
+	switch (ectx_method) {
+	case X86_SAVE_XSAVE:
+	case X86_SAVE_XSAVEOPT:
+		/* XSAVE* & XRSTOR rely on sane values in the XSAVE header
+		 * (64 bytes starting at offset 512 from the base address)
+		 * and will raise #GP on garbage data. We must zero them out.
+		 */
+		((__u64 *)state)[64] = 0;
+		((__u64 *)state)[65] = 0;
+		((__u64 *)state)[66] = 0;
+		((__u64 *)state)[67] = 0;
+		((__u64 *)state)[68] = 0;
+		((__u64 *)state)[69] = 0;
+		((__u64 *)state)[70] = 0;
+		((__u64 *)state)[71] = 0;
+	}
+}
+
 void ukarch_ectx_init(struct ukarch_ectx *state)
 {
 	UK_ASSERT(ectx_align); /* Do not call when not yet initialized */

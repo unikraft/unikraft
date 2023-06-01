@@ -624,12 +624,15 @@ DTC		:= dtc
 TIME		:= $(shell which time)
 LIFTOFF		:= liftoff -e -s
 override ARFLAGS:= rcs
-CC_VERSION	:= $(shell $(CC) --version | \
-		   sed -n -r 's/^.* ([0-9]*)\.([0-9]*)\.([0-9]*)[ ]*.*/\1.\2/p')
+
+CC_INFO := $(shell $(CONFIG_UK_BASE)/support/build/cc-version.sh $(CC))
+CC_NAME := $(word 1,$(CC_INFO))
+
 # Retrieve GCC major and minor number from CC_VERSION. They would be used
 # to select correct optimization parameters for target CPUs.
-CC_VER_MAJOR   := $(word 1,$(subst ., ,$(CC_VERSION)))
-CC_VER_MINOR   := $(word 2,$(subst ., ,$(CC_VERSION)))
+CC_VER_MAJOR   := $(word 2,$(subst ., ,$(CC_INFO)))
+CC_VER_MINOR   := $(word 3,$(subst ., ,$(CC_INFO)))
+CC_VERSION     := $(CC_VER_MAJOR).$(CC_VER_MINOR)
 
 ASFLAGS		+= -DCC_VERSION=$(CC_VERSION)
 CFLAGS		+= -DCC_VERSION=$(CC_VERSION)

@@ -490,7 +490,7 @@ static inline int uk_netdev_rx_one(struct uk_netdev *dev, uint16_t queue_id,
  * @param dev
  *   The Unikraft Network Device.
  * @param queue_id
- *   The index of the receive queue to receive from.
+ *   The index of the transmit queue to send to.
  *   The value must be in the range [0, nb_tx_queue - 1] previously supplied
  *   to uk_netdev_configure().
  * @param pkt

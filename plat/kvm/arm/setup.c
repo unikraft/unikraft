@@ -32,6 +32,7 @@
 #include <arm/arm64/cpu.h>
 #include <arm/smccc.h>
 #include <uk/arch/limits.h>
+#include <uk/arch/paging.h>
 
 #ifdef CONFIG_ARM64_FEAT_PAUTH
 #include <arm/arm64/pauth.h>
@@ -175,7 +176,7 @@ static void _init_dtb_mem(void)
 	_libkvmplat_cfg.bstack.start = _libkvmplat_cfg.bstack.end
 				       - _libkvmplat_cfg.bstack.len;
 
-	_libkvmplat_cfg.heap.start = ALIGN_DOWN((uintptr_t)__END, __PAGE_SIZE);
+	_libkvmplat_cfg.heap.start = PAGE_ALIGN_DOWN((uintptr_t)__END);
 	_libkvmplat_cfg.heap.end   = _libkvmplat_cfg.bstack.start;
 	_libkvmplat_cfg.heap.len   = _libkvmplat_cfg.heap.end
 				     - _libkvmplat_cfg.heap.start;
