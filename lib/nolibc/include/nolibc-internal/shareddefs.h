@@ -212,3 +212,11 @@ typedef unsigned short __sa_family_t;
 typedef __sa_family_t sa_family_t;
 #define __DEFINED_sa_family_t
 #endif
+
+#if defined(__NEED_BSD_TYPES) && !defined(__DEFINED_BSD_TYPES)
+typedef unsigned char u_char;
+typedef unsigned short u_short;
+typedef unsigned int u_int;
+typedef unsigned long u_long;
+#define __DEFINED_BSD_TYPES
+#endif

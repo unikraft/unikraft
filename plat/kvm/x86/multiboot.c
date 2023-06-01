@@ -22,12 +22,6 @@
 
 void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi);
 
-static inline int mrd_overlap(__paddr_t pstart, __paddr_t pend,
-			      const struct ukplat_memregion_desc *mrd)
-{
-	return ((pend > mrd->pbase) && (pstart < mrd->pbase + mrd->len));
-}
-
 static inline void mrd_insert(struct ukplat_bootinfo *bi,
 			      const struct ukplat_memregion_desc *mrd)
 {
@@ -50,12 +44,12 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 {
 	struct ukplat_bootinfo *bi;
 	struct ukplat_memregion_desc mrd = {0};
-	struct ukplat_memregion_desc *mrdp;
 	multiboot_memory_map_t *m;
 	multiboot_module_t *mods;
-	__sz offset;
+	__sz offset, cmdline_len;
 	__paddr_t start, end;
 	__u32 i;
+	int rc;
 
 	bi = ukplat_bootinfo_get();
 	if (unlikely(!bi))
@@ -64,15 +58,17 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 	/* Add the cmdline */
 	if (mi->flags & MULTIBOOT_INFO_CMDLINE) {
 		if (mi->cmdline) {
+			cmdline_len = strlen((const char *)(__uptr)mi->cmdline);
 			mrd.pbase = mi->cmdline;
 			mrd.vbase = mi->cmdline; /* 1:1 mapping */
-			mrd.len   = strlen((const char *)(__uptr)mi->cmdline);
+			mrd.len   = cmdline_len;
 			mrd.type  = UKPLAT_MEMRT_CMDLINE;
 			mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
 
 			mrd_insert(bi, &mrd);
 
 			bi->cmdline = mi->cmdline;
+			bi->cmdline_len = cmdline_len;
 		}
 	}
 
@@ -131,33 +127,20 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 			if (end <= start)
 				continue;
 
+			mrd.pbase = start;
+			mrd.vbase = start; /* 1:1 mapping */
+			mrd.len   = end - start;
+
 			if (m->type == MULTIBOOT_MEMORY_AVAILABLE) {
 				mrd.type  = UKPLAT_MEMRT_FREE;
 				mrd.flags = UKPLAT_MEMRF_READ |
 					    UKPLAT_MEMRF_WRITE;
 
-				for (i = 0; i < bi->mrds.count; i++) {
-					ukplat_memregion_get(i, &mrdp);
-					if (!mrd_overlap(start, end, mrdp))
-						continue;
-
-					if (!mrdp->type)
-						continue;
-
-					if (start < mrdp->pbase) {
-						mrd.pbase = start;
-						mrd.vbase = start; /* 1:1 map */
-						mrd.len   = mrdp->pbase - start;
-
-						if (mrd.len >= PAGE_SIZE)
-							mrd_insert(bi, &mrd);
-					}
-
-					start = mrdp->pbase + mrdp->len;
-				}
-
-				if (end - start < PAGE_SIZE)
-					continue;
+				rc = ukplat_memregion_list_insert_split_phys(
+					&bi->mrds, &mrd, __PAGE_SIZE);
+				if (unlikely(rc < 0))
+					multiboot_crash("Unable to add region",
+							rc);
 			} else {
 				mrd.type  = UKPLAT_MEMRT_RESERVED;
 				mrd.flags = UKPLAT_MEMRF_READ |
@@ -166,13 +149,8 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 				/* We assume that reserved regions cannot
 				 * overlap with loaded modules.
 				 */
+				mrd_insert(bi, &mrd);
 			}
-
-			mrd.pbase = start;
-			mrd.vbase = start; /* 1:1 mapping */
-			mrd.len   = end - start;
-
-			mrd_insert(bi, &mrd);
 		}
 	}
 

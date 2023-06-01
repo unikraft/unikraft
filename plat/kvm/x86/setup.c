@@ -11,6 +11,7 @@
 #include <uk/arch/limits.h>
 #include <uk/arch/types.h>
 #include <uk/arch/paging.h>
+#include <uk/asm/cfi.h>
 #include <uk/plat/console.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
@@ -194,7 +195,10 @@ static int paging_init(void)
 
 		rc = ukplat_page_map(&kernel_pt, vaddr, paddr,
 				     len >> PAGE_SHIFT, prot, 0);
-		if (unlikely(rc))
+		/* Unmappings are currently not performed on the low-mem.
+		 * Ignore any errors caused by already existing mappings.
+		 */
+		if (unlikely(rc && rc != -EEXIST))
 			return rc;
 	}
 
@@ -273,20 +277,35 @@ static __sz cmdline_len;
 
 static inline int cmdline_init(struct ukplat_bootinfo *bi)
 {
-	char *cmdl = (bi->cmdline) ? (char *)bi->cmdline : CONFIG_UK_NAME;
+	char *cmdl;
 
-	cmdline_len = strlen(cmdl) + 1;
+	if (bi->cmdline_len) {
+		cmdl = (char *)bi->cmdline;
+		cmdline_len = bi->cmdline_len;
+	} else {
+		cmdl = CONFIG_UK_NAME;
+		cmdline_len = sizeof(CONFIG_UK_NAME) - 1;
+	}
 
-	cmdline = bootmemory_palloc(cmdline_len, UKPLAT_MEMRT_CMDLINE);
+	cmdline = bootmemory_palloc(cmdline_len + 1, UKPLAT_MEMRT_CMDLINE);
 	if (unlikely(!cmdline))
 		return -ENOMEM;
 
-	strncpy(cmdline, cmdl, cmdline_len);
+	memcpy(cmdline, cmdl, cmdline_len);
+	cmdline[cmdline_len] = 0;
+
 	return 0;
 }
 
 static void __noreturn _ukplat_entry2(void)
 {
+	/* It's not possible to unwind past this function, because the stack
+	 * pointer was overwritten in lcpu_arch_jump_to. Therefore, mark the
+	 * previous instruction pointer as undefined, so that debuggers or
+	 * profilers stop unwinding here.
+	 */
+	ukarch_cfi_unwind_end();
+
 	ukplat_entry_argp(NULL, cmdline, cmdline_len);
 
 	ukplat_lcpu_halt();

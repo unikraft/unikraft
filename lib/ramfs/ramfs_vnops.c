@@ -117,7 +117,7 @@ ramfs_free_node(struct ramfs_node *np)
 }
 
 static struct ramfs_node *
-ramfs_add_node(struct ramfs_node *dnp, char *name, int type)
+ramfs_add_node(struct ramfs_node *dnp, const char *name, int type)
 {
 	struct ramfs_node *np, *prev;
 
@@ -175,7 +175,7 @@ ramfs_remove_node(struct ramfs_node *dnp, struct ramfs_node *np)
 }
 
 static int
-ramfs_rename_node(struct ramfs_node *np, char *name)
+ramfs_rename_node(struct ramfs_node *np, const char *name)
 {
 	size_t len;
 	char *tmp;
@@ -202,7 +202,7 @@ ramfs_rename_node(struct ramfs_node *np, char *name)
 }
 
 static int
-ramfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
+ramfs_lookup(struct vnode *dvp, const char *name, struct vnode **vpp)
 {
 	struct ramfs_node *np, *dnp;
 	struct vnode *vp;
@@ -253,7 +253,7 @@ ramfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
 }
 
 static int
-ramfs_mkdir(struct vnode *dvp, char *name, mode_t mode)
+ramfs_mkdir(struct vnode *dvp, const char *name, mode_t mode)
 {
 	struct ramfs_node *np;
 
@@ -273,7 +273,7 @@ ramfs_mkdir(struct vnode *dvp, char *name, mode_t mode)
 }
 
 static int
-ramfs_symlink(struct vnode *dvp, char *name, char *link)
+ramfs_symlink(struct vnode *dvp, const char *name, const char *link)
 {
 	struct ramfs_node *np;
 	size_t len;
@@ -319,14 +319,15 @@ ramfs_readlink(struct vnode *vp, struct uio *uio)
 
 /* Remove a directory */
 static int
-ramfs_rmdir(struct vnode *dvp, struct vnode *vp, char *name __unused)
+ramfs_rmdir(struct vnode *dvp, struct vnode *vp, const char *name __unused)
 {
 	return ramfs_remove_node(dvp->v_data, vp->v_data);
 }
 
 /* Remove a file */
 static int
-ramfs_remove(struct vnode *dvp, struct vnode *vp, char *name __maybe_unused)
+ramfs_remove(struct vnode *dvp, struct vnode *vp,
+	     const char *name __maybe_unused)
 {
 	uk_pr_debug("remove %s in %s\n", name,
 		 RAMFS_NODE(dvp)->rn_name);
@@ -377,7 +378,7 @@ ramfs_truncate(struct vnode *vp, off_t length)
  * Create empty file.
  */
 static int
-ramfs_create(struct vnode *dvp, char *name, mode_t mode)
+ramfs_create(struct vnode *dvp, const char *name, mode_t mode)
 {
 	struct ramfs_node *np;
 
@@ -493,8 +494,9 @@ ramfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 }
 
 static int
-ramfs_rename(struct vnode *dvp1, struct vnode *vp1, char *name1 __unused,
-			 struct vnode *dvp2, struct vnode *vp2, char *name2)
+ramfs_rename(struct vnode *dvp1, struct vnode *vp1, const char *name1 __unused,
+	     struct vnode *dvp2, struct vnode *vp2,
+	     const char *name2)
 {
 	struct ramfs_node *np, *old_np;
 	int error;

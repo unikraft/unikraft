@@ -78,7 +78,7 @@ namei_follow_link(struct dentry *dp, char *node, char *name, char *fp, size_t mo
 	}
 	link[sz] = 0;
 
-	p = fp + mountpoint_len + strlen(node);
+	p = fp + mountpoint_len + strlen(node) - 1;
 	c = strlen(node) - strlen(name) - 1;
 	node[c] = 0;
 

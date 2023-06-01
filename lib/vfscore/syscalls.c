@@ -839,19 +839,23 @@ sys_rename(char *src, char *dest)
 	vn_lock(dvp1);
 
 	dvp2 = ddp2->d_vnode;
-	vn_lock(dvp2);
+	if (dvp1 != dvp2) {
+		vn_lock(dvp2);
 
-	/* Source and destination directions should be writable) */
-	if ((error = vn_access(dvp1, VWRITE)) != 0)
-	    goto err3;
-	if ((error = vn_access(dvp2, VWRITE)) != 0)
-	    goto err3;
+		/* Source and destination must be on the same file system */
+		if (dvp1->v_mount != dvp2->v_mount) {
+			error = EXDEV;
+			goto err3;
+		}
 
-	/* The source and dest must be same file system */
-	if (dvp1->v_mount != dvp2->v_mount) {
-		error = EXDEV;
-		goto err3;
+		/* Destination directory must be writable */
+		if ((error = vn_access(dvp2, VWRITE)) != 0)
+			goto err3;
 	}
+
+	/* Source directory must be writable */
+	if ((error = vn_access(dvp1, VWRITE)) != 0)
+		goto err3;
 
 	error = VOP_RENAME(dvp1, vp1, sname, dvp2, vp2, dname);
 	if (error)
@@ -863,7 +867,8 @@ sys_rename(char *src, char *dest)
 		dentry_remove(dp2);
 
  err3:
-	vn_unlock(dvp2);
+	if (dvp2 != dvp1)
+		vn_unlock(dvp2);
 	vn_unlock(dvp1);
  err2:
 	if (vp2) {
@@ -881,63 +886,48 @@ sys_rename(char *src, char *dest)
 int
 sys_symlink(const char *oldpath, const char *newpath)
 {
-	struct task	*t = main_task;
-	int		error;
-	char		op[PATH_MAX];
-	char		np[PATH_MAX];
-	struct dentry	*newdp;
-	struct dentry	*newdirdp;
-	char		*name;
-
-	if (oldpath == NULL || newpath == NULL) {
-		return (EFAULT);
-	}
+	struct dentry *newdirdp = NULL;
+	struct dentry *newdp = NULL;
+	char np[PATH_MAX];
+	char *name;
+	int error;
 
 	DPRINTF(VFSDB_SYSCALL, ("sys_link: oldpath=%s newpath=%s\n",
 				oldpath, newpath));
 
-	newdp		= NULL;
-	newdirdp	= NULL;
+	error = task_conv(main_task, newpath, VWRITE, np);
+	if (unlikely(error))
+		goto out;
 
-	error = task_conv(t, newpath, VWRITE, np);
-	if (error != 0) {
-		return (error);
-	}
-
-	/* parent directory for new path must exist */
-	if ((error = lookup(np, &newdirdp, &name)) != 0)
+	/* parent directory for newpath must exist */
+	error = lookup(np, &newdirdp, &name);
+	if (unlikely(error))
 		goto out;
 
 	vn_lock(newdirdp->d_vnode);
 
 	/* newpath should not already exist */
-	if (namei_last_nofollow(np, newdirdp, &newdp) == 0) {
+	if (unlikely(namei_last_nofollow(np, newdirdp, &newdp) == 0)) {
 		drele(newdp);
 		error = EEXIST;
-		goto out;
+		goto out_unlock;
 	}
+
+	UK_ASSERT(!newdp);
 
 	/* check for write access at newpath */
-	if ((error = vn_access(newdirdp->d_vnode, VWRITE)) != 0) {
-		goto out;
-	}
+	error = vn_access(newdirdp->d_vnode, VWRITE);
+	if (unlikely(error))
+		goto out_unlock;
 
-	/* oldpath may not be const char * to VOP_SYMLINK - need to copy */
-	size_t tocopy;
-	tocopy = strlcpy(op, oldpath, PATH_MAX);
-	if (tocopy >= PATH_MAX - 1) {
-		error = ENAMETOOLONG;
-		goto out;
-	}
-	error = VOP_SYMLINK(newdirdp->d_vnode, name, op);
+	error = VOP_SYMLINK(newdirdp->d_vnode, name, oldpath);
+
+out_unlock:
+	vn_unlock(newdirdp->d_vnode);
+	drele(newdirdp);
 
 out:
-	if (newdirdp != NULL) {
-		vn_unlock(newdirdp->d_vnode);
-		drele(newdirdp);
-	}
-
-	return (error);
+	return error;
 }
 
 int
@@ -1372,125 +1362,137 @@ sys_utimes(char *path, const struct timeval *times, int flags)
 /*
  * Check the validity of members of a struct timespec
  */
-static int is_timespec_valid(const struct timespec *time)
+static int timespec_is_valid(const struct timespec *time)
 {
 	return (time->tv_sec >= 0) &&
-	   ((time->tv_nsec >= 0 && time->tv_nsec <= 999999999) ||
-	    time->tv_nsec == UTIME_NOW ||
-	    time->tv_nsec == UTIME_OMIT);
+	       ((time->tv_nsec >= 0 && time->tv_nsec <= 999999999) ||
+		time->tv_nsec == UTIME_NOW ||
+		time->tv_nsec == UTIME_OMIT);
 }
 
-void init_timespec(struct timespec *_times, const struct timespec *times)
+static void timespec_init(struct timespec *out, const struct timespec *in)
 {
-	if (times == NULL || times->tv_nsec == UTIME_NOW) {
-		clock_gettime(CLOCK_REALTIME, _times);
+	if (in == NULL || in->tv_nsec == UTIME_NOW) {
+		clock_gettime(CLOCK_REALTIME, out);
 	} else {
-		_times->tv_sec = times->tv_sec;
-		_times->tv_nsec = times->tv_nsec;
+		out->tv_sec = in->tv_sec;
+		out->tv_nsec = in->tv_nsec;
 	}
-	return;
 }
 
 int
-sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2], int flags)
+sys_utimensat(int dirfd, const char *pathname, const struct timespec times[2],
+	      int flags)
 {
 	int error;
 	char *ap;
 	struct timespec timespec_times[2];
 	extern struct task *main_task;
-	struct dentry *dp;
+	struct dentry *dp = NULL;
+	struct vfscore_file *fp = NULL;
+
+	if (times) {
+		/* Make the behavior compatible with Linux */
+		if (unlikely(times[0].tv_nsec == UTIME_OMIT &&
+			     times[1].tv_nsec == UTIME_OMIT))
+			return 0;
+
+		if (unlikely(!timespec_is_valid(&times[0]) ||
+			     !timespec_is_valid(&times[1])))
+			return EINVAL;
+
+		timespec_init(&timespec_times[0], times + 0);
+		timespec_init(&timespec_times[1], times + 1);
+	} else {
+		timespec_init(&timespec_times[0], NULL);
+		timespec_init(&timespec_times[1], NULL);
+	}
 
 	/* utimensat should return ENOENT when pathname is empty */
-	if(pathname && pathname[0] == 0)
+	if (unlikely(pathname && pathname[0] == 0))
 		return ENOENT;
 
-	if (flags && !(flags & AT_SYMLINK_NOFOLLOW))
+	/* Only the AT_SYMLINK_NOFOLLOW is allowed */
+	if (unlikely(flags & ~AT_SYMLINK_NOFOLLOW))
 		return EINVAL;
-
-	if (times && (!is_timespec_valid(&times[0]) || !is_timespec_valid(&times[1])))
-		return EINVAL;
-
-	init_timespec(&timespec_times[0], times ? times + 0 : NULL);
-	init_timespec(&timespec_times[1], times ? times + 1 : NULL);
 
 	if (pathname && pathname[0] == '/') {
 		ap = strdup(pathname);
-		if (!ap)
+		if (unlikely(!ap))
 			return ENOMEM;
 
 	} else if (dirfd == AT_FDCWD) {
-		if (!pathname)
+		if (unlikely(!pathname))
 			return EFAULT;
+
 		error = asprintf(&ap, "%s/%s", main_task->t_cwd, pathname);
-		if (error || !ap)
+		if (unlikely(error == -1))
 			return ENOMEM;
-
 	} else {
-		struct vfscore_file *fp;
-
 		fp = vfscore_get_file(dirfd);
-		if (!fp)
+		if (unlikely(!fp))
 			return EBADF;
 
-		if (!fp->f_dentry)
+		if (unlikely(!fp->f_dentry))
 			return EBADF;
 
-		if (!(fp->f_dentry->d_vnode->v_type & VDIR))
-			return ENOTDIR;
+		if (pathname) {
+			if (unlikely(!(fp->f_dentry->d_vnode->v_type & VDIR))) {
+				fdrop(fp);
+				return ENOTDIR;
+			}
 
-		if (pathname)
-			error = asprintf(&ap, "%s/%s/%s", fp->f_dentry->d_mount->m_path,
-					fp->f_dentry->d_path, pathname);
-		else
-			error = asprintf(&ap, "%s/%s", fp->f_dentry->d_mount->m_path,
-					fp->f_dentry->d_path);
-		if (error || !ap)
-			return ENOMEM;
-	}
+			error = asprintf(&ap, "%s/%s/%s",
+					 fp->f_dentry->d_mount->m_path,
+					 fp->f_dentry->d_path, pathname);
 
-	/* FIXME: Add support for AT_SYMLINK_NOFOLLOW */
+			fdrop(fp);
+			fp = NULL;
 
-	error = namei(ap, &dp);
-	free(ap);
-
-	if (error)
-		return error;
-
-	if (dp->d_mount->m_flags & MNT_RDONLY) {
-		error = EROFS;
-	} else {
-		if (vn_access(dp->d_vnode, VWRITE)) {
-			return EACCES;
+			if (unlikely(error == -1))
+				return ENOMEM;
+		} else {
+			/* On Linux, if pathname is NULL dirfd does not need to
+			 * be a directory. The change is applied to whatever
+			 * file dirfd refers to.
+			 */
+			dp = fp->f_dentry;
 		}
-		if (times &&
-			(times[0].tv_nsec != UTIME_NOW || times[1].tv_nsec != UTIME_NOW) &&
-			(times[0].tv_nsec != UTIME_OMIT || times[1].tv_nsec != UTIME_OMIT) &&
-			(!(dp->d_vnode->v_mode & ~VAPPEND)))
-			return EPERM;
-		error = vn_settimes(dp->d_vnode, timespec_times);
 	}
 
-	drele(dp);
+	if (!dp) {
+		UK_ASSERT(!fp);
+		UK_ASSERT(ap);
+
+		/* FIXME: Add support for AT_SYMLINK_NOFOLLOW */
+		error = namei(ap, &dp);
+		free(ap);
+
+		if (unlikely(error))
+			return error;
+
+		UK_ASSERT(dp);
+	}
+
+	error = vn_access(dp->d_vnode, VWRITE);
+	if (unlikely(error))
+		goto exit_rel;
+
+	error = vn_settimes(dp->d_vnode, timespec_times);
+
+exit_rel:
+	if (fp)
+		fdrop(fp);
+	else
+		drele(dp);
+
 	return error;
 }
 
 int
 sys_futimens(int fd, const struct timespec times[2])
 {
-	int error;
-	struct vfscore_file *fp;
-	char *pathname;
-
-	fp = vfscore_get_file(fd);
-	if (!fp)
-		return EBADF;
-
-	if (!fp->f_dentry)
-		return EBADF;
-
-	pathname = fp->f_dentry->d_path;
-	error = sys_utimensat(AT_FDCWD, pathname, times, 0);
-	return error;
+	return sys_utimensat(fd, NULL, times, 0);
 }
 
 int

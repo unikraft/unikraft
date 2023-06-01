@@ -48,18 +48,19 @@
 #include <stdio.h>
 #include <unistd.h>
 #include <errno.h>
-#include <uk/assert.h>
 #include <string.h>
 
 #include <vfscore/prex.h>
+#include <vfscore/uio.h>
 #include <uk/essentials.h>
 #include <uk/mutex.h>
+#include <uk/assert.h>
 
 #include <devfs/device.h>
 
 static struct uk_mutex devfs_lock = UK_MUTEX_INITIALIZER(devfs_lock);
 
-/* list head of the devices */
+/* List head of the devices */
 static struct device *device_list;
 
 /*
@@ -77,95 +78,75 @@ device_lookup(const char *name)
 	return NULL;
 }
 
-struct partition_table_entry {
-	uint8_t  bootable;
-	uint8_t  starting_head;
-	uint16_t starting_sector:6;
-	uint16_t starting_cylinder:10;
-	uint8_t  system_id;
-	uint8_t  ending_head;
-	uint16_t ending_sector:6;
-	uint16_t ending_cylinder:10;
-	uint32_t rela_sector;
-	uint32_t total_sectors;
-} __packed;
-
-
-void device_register(struct device *dev, const char *name, int flags)
-{
-	size_t len;
-	void *priv = NULL;
-
-	UK_ASSERT(dev->driver != NULL);
-
-	/* Check the length of name. */
-	len = strnlen(name, MAXDEVNAME);
-	if (len == 0 || len >= MAXDEVNAME)
-		return;
-
-	uk_mutex_lock(&devfs_lock);
-
-	/* Check if specified name is already used. */
-	if (device_lookup(name) != NULL)
-		UK_CRASH("duplicate device");
-
-	/*
-	 * Allocate a device and device private data.
-	 */
-	if (dev->driver->devsz != 0) {
-		if ((priv = malloc(dev->driver->devsz)) == NULL)
-			UK_CRASH("devsz");
-		memset(priv, 0, dev->driver->devsz);
-	}
-
-	strlcpy(dev->name, name, len + 1);
-	dev->flags = flags;
-	dev->active = 1;
-	dev->refcnt = 1;
-	dev->offset = 0;
-	dev->private_data = priv;
-	dev->next = device_list;
-	dev->max_io_size = UINT_MAX;
-	device_list = dev;
-
-	uk_mutex_unlock(&devfs_lock);
-}
-
-
 /*
  * device_create - create new device object.
  *
  * A device object is created by the device driver to provide
- * I/O services to applications.  Returns device ID on
- * success, or 0 on failure.
+ * I/O services to applications. Returns 0 on success, an errno
+ * number otherwise.
  */
-struct device *
-device_create(struct driver *drv, const char *name, int flags)
+int
+device_create(struct driver *drv, const char *name, int flags,
+	      struct device **devp)
 {
 	struct device *dev;
 	size_t len;
 
-	UK_ASSERT(drv != NULL);
+	UK_ASSERT(drv);
 
-	/* Check the length of name. */
+	UK_ASSERT(drv->devops->open);
+	UK_ASSERT(drv->devops->close);
+	UK_ASSERT(drv->devops->read);
+	UK_ASSERT(drv->devops->write);
+	UK_ASSERT(drv->devops->ioctl);
+
+	/* Check the length of the name */
 	len = strnlen(name, MAXDEVNAME);
-	if (len == 0 || len >= MAXDEVNAME)
-		return NULL;
+	if (unlikely(len == 0 || len >= MAXDEVNAME))
+		return EINVAL;
 
-	/*
-	 * Allocate a device structure.
-	 */
-	dev = malloc(sizeof(struct device));
-	if (!dev) {
-		uk_pr_err("Failed to allocate device memory, creation failed\n");
-		return NULL;
+	/* Allocate a device and device memory if needed */
+	dev = malloc(sizeof(*dev) + drv->devsz);
+	if (unlikely(!dev))
+		return ENOMEM;
+
+	/* Allocate device private data if needed */
+	if (drv->devsz != 0) {
+		dev->private_data = (void *)(dev + 1);
+		memset(dev->private_data, 0, drv->devsz);
+	} else {
+		dev->private_data = NULL;
 	}
 
+	memcpy(dev->name, name, len + 1);
 	dev->driver = drv;
-	device_register(dev, name, flags);
-	return dev;
-}
+	dev->flags = flags;
+	dev->active = 1;
+	dev->refcnt = 1;
 
+	/* Insert device into device list. This must be done while holding
+	 * the devfs lock. We optimize for success and reduce lock holder time
+	 * by doing the check for name collision only here, instead of keeping
+	 * the lock held the whole time.
+	 */
+	uk_mutex_lock(&devfs_lock);
+
+	if (unlikely(device_lookup(name) != NULL)) {
+		uk_mutex_unlock(&devfs_lock);
+		free(dev);
+
+		return EEXIST;
+	}
+
+	dev->next   = device_list;
+	device_list = dev;
+
+	uk_mutex_unlock(&devfs_lock);
+
+	if (devp)
+		*devp = dev;
+	return 0;
+}
 
 /*
  * Return true if specified device is valid.
@@ -425,14 +406,13 @@ device_info(struct devinfo *info)
 }
 
 int
-enodev(void)
-{
-	return ENODEV;
-}
-
-int
-nullop(void)
+devop_noop()
 {
 	return 0;
 }
 
+int
+devop_eperm()
+{
+	return EPERM;
+}

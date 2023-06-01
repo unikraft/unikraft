@@ -11,6 +11,8 @@ COMPFLAGS-$(call have_gcc)	+= -fno-tree-sra -fno-split-stack -nostdinc
 ifneq ($(HAVE_STACKPROTECTOR),y)
 COMPFLAGS    += -fno-stack-protector
 endif
+COMPFLAGS    += -fcf-protection=none
+
 COMPFLAGS    += -Wall -Wextra
 COMPFLAGS-$(call have_clang)	+= -Wdocumentation -Wdocumentation-pedantic
 
@@ -89,7 +91,7 @@ M4FLAGS      += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
 COMPFLAGS-$(call gcc_version_ge,6,1)	+= -fno-PIC
 LDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
 ifeq ($(call gcc_version_ge,10,0),y)
-COMPFLAGS-y += -fhosted -ffreestanding -fno-tree-loop-distribute-patterns
+COMPFLAGS-y += -fhosted -fno-tree-loop-distribute-patterns
 LIBLDFLAGS-$(CONFIG_OPTIMIZE_LTO) += -flinker-output=nolto-rel
 LDFLAGS-$(CONFIG_OPTIMIZE_LTO) += -flinker-output=nolto-rel
 endif

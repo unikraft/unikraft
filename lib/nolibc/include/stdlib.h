@@ -60,6 +60,7 @@ unsigned long long strtoull(const char *nptr, char **endptr, int base);
  * @s: The start of the string
  */
 int atoi(const char *s);
+long atol(const char *s);
 
 #if CONFIG_LIBUKALLOC
 /* Allocate size bytes of memory. Returns pointer to start of allocated memory,
@@ -116,12 +117,27 @@ static inline void *memalign(size_t align, size_t size)
 
 void abort(void) __noreturn;
 
+void exit(int status) __noreturn;
+
 void qsort(void *base, size_t nmemb, size_t size,
            int (*compar)(const void *, const void *));
+
+#if CONFIG_LIBPOSIX_ENVIRON
+int setenv(const char *name, const char *value, int overwrite);
+int unsetenv(const char *name);
+int clearenv(void);
+int putenv(char *string);
+char *getenv(const char *name);
+#endif /* CONFIG_LIBPOSIX_ENVIRON */
 
 #if CONFIG_LIBPOSIX_PROCESS
 int system(const char *command);
 #endif
+
+char *setstate(char *state);
+char *initstate(unsigned int seed, char *state, size_t size);
+void srandom(unsigned int seed);
+long random(void);
 
 #ifdef __cplusplus
 }

@@ -1,7 +1,11 @@
 ifeq (x86_64,$(CONFIG_UK_ARCH))
+ifeq ($(CONFIG_KVM_BOOT_PROTO_MULTIBOOT),y)
 KVM_LDFLAGS-y += -Wl,-m,elf_x86_64
 KVM_LDFLAGS-y += -Wl,--entry=_multiboot_entry
 KVM_STRIPFLAGS += --output-target elf32-i386
+else ifeq ($(CONFIG_KVM_BOOT_PROTO_LXBOOT),y)
+KVM_LDFLAGS-y += -Wl,--entry=_lxboot_entry
+endif
 else ifeq (arm64,$(CONFIG_UK_ARCH))
 KVM_LDFLAGS-y += -Wl,-m,aarch64elf
 KVM_LINK_LIBGCC_FLAG := -lgcc
@@ -11,7 +15,15 @@ KVM_BINFO_FLAGS := -a $(CONFIG_UK_ARCH)
 ##
 ## Link image
 ##
-KVM_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_kvm-$(CONFIG_UK_ARCH)
+ifeq ($(CONFIG_KVM_VMM_QEMU),y)
+KVM_VMM := qemu
+else ifeq ($(CONFIG_KVM_VMM_FIRECRACKER),y)
+KVM_VMM := fc
+else
+KVM_VMM := kvm
+endif
+
+KVM_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_$(KVM_VMM)-$(CONFIG_UK_ARCH)
 KVM_DEBUG_IMAGE := $(KVM_IMAGE).dbg
 
 KVM_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-dT$(comma),\
@@ -30,9 +42,11 @@ define build_bootinfo =
 endef
 
 $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
-		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y)
-	$(call build_cmd,LD,,$(KVM_IMAGE).o,\
-	       $(LD) -r $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
+		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) \
+		    $(KVM_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y) \
+		    $(UK_PLAT_KVM_DEF_LDS)
+	$(call build_cmd,LD,,$@,\
+	       $(LD) \
 			$(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
 			$(KVM_OLIBS) $(KVM_OLIBS-y) \
 			$(UK_OLIBS) $(UK_OLIBS-y) \
@@ -41,12 +55,9 @@ $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 			$(UK_ALIBS) $(UK_ALIBS-y) \
 			$(KVM_LINK_LIBGCC_FLAG) \
 			-Wl$(comma)--end-group \
-			-o $(KVM_IMAGE).o)
-	$(call build_cmd,LD,,$@,\
-	       $(LD) $(LDFLAGS) $(LDFLAGS-y) \
-		     $(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
-		     $(KVM_LD_SCRIPT_FLAGS) \
-		     $(KVM_IMAGE).o -o $@)
+			$(LDFLAGS) $(LDFLAGS-y) \
+			$(KVM_LD_SCRIPT_FLAGS) \
+			-o $@)
 	$(call build_bootinfo,$@)
 
 $(KVM_IMAGE): $(KVM_IMAGE).dbg
@@ -72,5 +83,4 @@ UK_IMAGES-$(CONFIG_OPTIMIZE_COMPRESS) += $(KVM_IMAGE).gz
 endif
 
 # ...for cleaning:
-LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_IMAGE).o)
 LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_DEBUG_IMAGE).bootinfo)

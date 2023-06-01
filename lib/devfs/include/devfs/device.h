@@ -30,25 +30,23 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _DEVICE_H
-#define _DEVICE_H
+#ifndef __DEVFS_DEVICE_H__
+#define __DEVFS_DEVICE_H__
 
 #include <sys/types.h>
 #include <uk/init.h>
 
-#include <vfscore/uio.h>
-
 #define MAXDEVNAME	12
 #define DO_RWMASK	0x3
 
-struct bio;
+struct uio;
 struct device;
 
 /*
  * Device information
  */
 struct devinfo {
-	unsigned long		cookie;		/* index cookie */
+	unsigned long	cookie;		/* index cookie */
 	struct device	*id;		/* device id */
 	int		flags;		/* device characteristics flags */
 	char		name[MAXDEVNAME]; /* device name */
@@ -62,13 +60,11 @@ struct devinfo {
 #define D_REM		0x00000004	/* removable device */
 #define D_TTY		0x00000010	/* tty device */
 
-typedef int (*devop_open_t)   (struct device *, int);
-typedef int (*devop_close_t)  (struct device *);
-typedef int (*devop_read_t)   (struct device *, struct uio *, int);
-typedef int (*devop_write_t)  (struct device *, struct uio *, int);
-typedef int (*devop_ioctl_t)  (struct device *, unsigned long, void *);
-typedef int (*devop_devctl_t) (struct device *, unsigned long, void *);
-typedef void (*devop_strategy_t)(struct bio *);
+typedef int (*devop_open_t)(struct device *, int);
+typedef int (*devop_close_t)(struct device *);
+typedef int (*devop_read_t)(struct device *, struct uio *, int);
+typedef int (*devop_write_t)(struct device *, struct uio *, int);
+typedef int (*devop_ioctl_t)(struct device *, unsigned long, void *);
 
 /*
  * Device operations
@@ -79,17 +75,11 @@ struct devops {
 	devop_read_t	read;
 	devop_write_t	write;
 	devop_ioctl_t	ioctl;
-	devop_devctl_t	devctl;
-	devop_strategy_t strategy;
 };
 
-
-#define	no_open		((devop_open_t)nullop)
-#define	no_close	((devop_close_t)nullop)
-#define	no_read		((devop_read_t)enodev)
-#define	no_write	((devop_write_t)enodev)
-#define	no_ioctl	((devop_ioctl_t)enodev)
-#define	no_devctl	((devop_devctl_t)nullop)
+#define	dev_noop_open	((devop_open_t)devop_noop)
+#define	dev_noop_close	((devop_close_t)devop_noop)
+#define dev_noop_ioctl	((devop_ioctl_t)devop_eperm)
 
 /*
  * Driver object
@@ -102,20 +92,6 @@ struct driver {
 };
 
 /*
- * flags for the driver.
- */
-
-typedef enum device_state {
-	DS_INACTIVE	    = 0x00,		/* driver is inactive */
-	DS_ALIVE	    = 0x01,		/* probe succeded */
-	DS_ACTIVE	    = 0x02,		/* intialized */
-	DS_DEBUG	    = 0x04,		/* debug */
-	DS_NOTPRESENT   = 0x08,     /* not probed or probe failed */
-	DS_ATTACHING    = 0x10,     /* currently attaching */
-	DS_ATTACHED     = 0x20,     /*attach method called */
-} device_state_t;
-
-/*
  * Device object
  */
 struct device {
@@ -125,70 +101,8 @@ struct device {
 	int		flags;		/* D_* flags defined above */
 	int		active;		/* device has not been destroyed */
 	int		refcnt;		/* reference count */
-	off_t		size;		/* device size */
-	off_t		offset; /* 0 for the main drive, if we have a
-				 *  partition, this is the start address
-				 */
-	size_t		max_io_size;
 	void		*private_data;	/* private storage */
-
-	void *softc;
-	void *ivars;
-	device_state_t state;
-	const char *desc;
-	int unit;
-	int irq;
-	int vector;
 };
-
-typedef struct device *device_t;
-
-static inline int
-device_set_unit(device_t dev, int unit)
-{
-	dev->unit = unit;
-	return 0;
-}
-
-static inline int
-device_get_unit(device_t dev)
-{
-	return dev->unit;
-}
-
-static inline const char *
-device_get_desc(device_t dev)
-{
-	return dev->desc;
-}
-
-static inline void
-device_set_desc(device_t dev, const char *desc)
-{
-	dev->desc = desc;
-}
-
-static inline void
-device_set_softc(device_t dev, void *softc)
-{
-	dev->softc = softc;
-}
-
-static inline void *
-device_get_softc(device_t dev)
-{
-	return dev->softc;
-}
-
-static inline void device_quiet(device_t dev __unused)
-{
-}
-
-static inline const char *
-devtoname(struct device *dev)
-{
-	return dev->name;
-}
 
 int device_open(const char *name, int mode, struct device **devp);
 int device_close(struct device *dev);
@@ -197,17 +111,12 @@ int device_write(struct device *dev, struct uio *uio, int ioflags);
 int device_ioctl(struct device *dev, unsigned long cmd, void *arg);
 int device_info(struct devinfo *info);
 
-int bdev_read(struct device *dev, struct uio *uio, int ioflags);
-int bdev_write(struct device *dev, struct uio *uio, int ioflags);
+int devop_noop();
+int devop_eperm();
 
-int	enodev(void);
-int	nullop(void);
-
-struct device *device_create(struct driver *drv, const char *name, int flags);
+int device_create(struct driver *drv, const char *name, int flags,
+		  struct device **devp);
 int device_destroy(struct device *dev);
-int device_destroy_locked(struct device *dev);
-void device_register(struct device *device, const char *name, int flags);
-void read_partition_table(struct device *device);
 
 /*
  * Ideally, any dev node registration should happen before we mount devfs.
@@ -217,4 +126,4 @@ void read_partition_table(struct device *device);
  */
 #define devfs_initcall(fn) uk_rootfs_initcall_prio(fn, 3)
 
-#endif /* !_DEVICE_H */
+#endif /* !__DEVFS_DEVICE_H__ */

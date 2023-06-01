@@ -1,0 +1,10 @@
+$(eval $(call addlib_s,libposix_environ,$(CONFIG_LIBPOSIX_ENVIRON)))
+# Register to uklibparam, sets "env" as parameter prefix (env.*)
+$(eval $(call uk_libparam_libprefix_set,libposix_environ,env))
+
+LIBPOSIX_ENVIRON_SRCS-y += $(LIBPOSIX_ENVIRON_BASE)/setenv.c
+LIBPOSIX_ENVIRON_SRCS-y += $(LIBPOSIX_ENVIRON_BASE)/unsetenv.c
+LIBPOSIX_ENVIRON_SRCS-y += $(LIBPOSIX_ENVIRON_BASE)/clearenv.c
+LIBPOSIX_ENVIRON_SRCS-y += $(LIBPOSIX_ENVIRON_BASE)/putenv.c
+LIBPOSIX_ENVIRON_SRCS-y += $(LIBPOSIX_ENVIRON_BASE)/getenv.c
+LIBPOSIX_ENVIRON_SRCS-y += $(LIBPOSIX_ENVIRON_BASE)/environ.c

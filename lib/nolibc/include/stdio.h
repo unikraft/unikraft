@@ -85,6 +85,8 @@ void psignal(int sig, const char *s);
 
 int fputc(int _c, FILE *fp);
 int putchar(int c);
+int fputs(const char *restrict s, FILE *restrict stream);
+int puts(const char *s);
 
 #if CONFIG_LIBVFSCORE
 int rename(const char *oldpath, const char *newpath);

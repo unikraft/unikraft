@@ -4,3 +4,6 @@ device_close
 device_read
 device_ioctl
 device_info
+
+devop_noop
+devop_eperm
