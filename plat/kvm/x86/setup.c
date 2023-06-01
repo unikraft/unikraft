@@ -299,7 +299,6 @@ void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi)
 
 	_libkvmplat_init_console();
 
-#ifndef CONFIG_LIBUKMINBOOT
 	/* Initialize trap vector table */
 	traps_table_init();
 
@@ -310,7 +309,6 @@ void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi)
 
 	/* Initialize IRQ controller */
 	intctrl_init();
-#endif
 
 	/* Initialize command line */
 	rc = cmdline_init(bi);
