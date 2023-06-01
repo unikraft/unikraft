@@ -28,13 +28,8 @@ struct ukplat_bootinfo {
 	/** Null-terminated boot protocol identifier */
 	char bootprotocol[16];
 
-	/** Address of the kernel command line. The string is not necessarily
-	 * null-terminated.
-	 */
+	/** Address of null-terminated kernel command line */
 	__u64 cmdline;
-
-	/** Size of the kernel command-line without the null terminator */
-	__u64 cmdline_len;
 
 	/**
 	 * List of memory regions. Must be the last member as the
@@ -43,7 +38,7 @@ struct ukplat_bootinfo {
 	struct ukplat_memregion_list mrds;
 } __packed __align(__SIZEOF_LONG__);
 
-UK_CTASSERT(sizeof(struct ukplat_bootinfo) == 64);
+UK_CTASSERT(sizeof(struct ukplat_bootinfo) == 56);
 
 #ifdef CONFIG_UKPLAT_MEMRNAME
 #if __SIZEOF_LONG__ == 8

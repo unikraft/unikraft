@@ -52,12 +52,9 @@ LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/asprintf.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/random.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/h_errno.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/getopt.c
-LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/random.c
 endif
 
 LIBNOLIBC_SRCS-$(CONFIG_LIBNOLIBC_SYSLOG) += $(LIBNOLIBC_BASE)/syslog.c
-
-LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/qsort.c
 
 # Localize internal symbols (starting with __*)
 LIBNOLIBC_OBJCFLAGS-y += -w -L __*

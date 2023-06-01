@@ -923,7 +923,7 @@ void uk_thread_release(struct uk_thread *t)
 		uk_free(a, t);
 }
 
-void uk_thread_block_until(struct uk_thread *thread, __snsec until)
+static void uk_thread_block_until(struct uk_thread *thread, __snsec until)
 {
 	unsigned long flags;
 

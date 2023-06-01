@@ -40,9 +40,8 @@
 #include <vfscore/prex.h>
 
 /**
- * Protocol version; the default version is `9P2000.L`,
- * it can be changed via the `CONFIG_LIBVFSCORE_ROOTOPTS`
- * config option.
+ * Protocol version; currently only the `9P2000.u`
+ * variant of the protocol is supported
  */
 enum uk_9pfs_proto {
 	/*

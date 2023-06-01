@@ -158,7 +158,7 @@ static int fdt_translate_one(const void *fdt, int parent, fdt32_t *addr,
 	if (!ranges)
 		return 1;
 	if (rlen == 0) {
-		offset = 0;
+		offset = fdt_reg_read_number(addr, na);
 		uk_pr_debug("empty ranges, 1:1 translation\n");
 		goto finish;
 	}
@@ -179,7 +179,7 @@ static int fdt_translate_one(const void *fdt, int parent, fdt32_t *addr,
 	memcpy(addr, ranges + na, 4 * pna);
 
 finish:
-	uk_pr_info("parent translation for:%p %x\n", addr, pna);
+	uk_pr_info("parent translation for:%p %x", addr, pna);
 
 	/* Translate it into parent bus space */
 	return fdt_default_translate(addr, offset, pna);
@@ -300,17 +300,14 @@ int fdt_get_address(const void *fdt, int nodeoffset, uint32_t index,
 int fdt_node_offset_by_compatible_list(const void *fdt, int startoffset,
 				  const char * const compatibles[])
 {
-	int idx, min_offset = INT_MAX, offset;
+	int idx, offset;
 
 	for (idx = 0; compatibles[idx] != NULL; idx++) {
 		offset = fdt_node_offset_by_compatible(fdt, startoffset,
 				  compatibles[idx]);
-		if (offset >= 0 && offset < min_offset)
-			min_offset = offset;
+		if (offset >= 0)
+			return offset;
 	}
-
-	if (min_offset != INT_MAX)
-		return min_offset;
 
 	return -FDT_ERR_NOTFOUND;
 }
@@ -318,22 +315,18 @@ int fdt_node_offset_by_compatible_list(const void *fdt, int startoffset,
 int fdt_node_offset_idx_by_compatible_list(const void *fdt, int startoffset,
 			  const char * const compatibles[], int *index)
 {
-	int idx, min_offset = INT_MAX, offset, compatible_idx;
+	int idx, offset;
 
 	for (idx = 0; compatibles[idx] != NULL; idx++) {
 		offset = fdt_node_offset_by_compatible(fdt, startoffset,
 				  compatibles[idx]);
-		if (offset >= 0 && offset < min_offset) {
-			min_offset = offset;
-			compatible_idx = idx;
+		if (offset >= 0) {
+			*index = idx;
+			return offset;
 		}
 	}
 
-	if (min_offset != INT_MAX) {
-		*index = compatible_idx;
-		return min_offset;
-	}
-
+	*index = idx;
 	return -FDT_ERR_NOTFOUND;
 }
 
