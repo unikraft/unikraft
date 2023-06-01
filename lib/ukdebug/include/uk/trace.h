@@ -173,7 +173,8 @@ static inline void __uk_trace_save_arg(char **pbuff,
 #define __UK_TRACE_REG(NR, regname, trace_name, fmt, ...)	\
 	UK_CTASSERT(sizeof(#trace_name) < 255);			\
 	UK_CTASSERT(sizeof(fmt) < 255);				\
-	__attribute((__section__(".uk_tracepoints_list")))	\
+	__attribute((__section__(				\
+		".uk_tracepoints_list,\"\",@note#")))		\
 	static struct {						\
 		uint32_t magic;					\
 		uint32_t size;					\

@@ -43,8 +43,11 @@
 #include <vfscore/mount.h>
 #include <vfscore/fs.h>
 #include <uk/errptr.h>
+#include <uk/init.h>
 #include <inttypes.h>
 #include <errno.h>
+#include <string.h>
+#include <stdlib.h>
 
 static struct mount posix_socket_mount;
 
@@ -342,3 +345,28 @@ static struct vfsops posix_socket_vfsops = {
 static struct mount posix_socket_mount = {
 	.m_op = &posix_socket_vfsops
 };
+
+static int posix_socket_mount_init(void)
+{
+	int ret;
+
+	posix_socket_mount.m_path = strdup("");
+	if (!posix_socket_mount.m_path) {
+		ret = -ENOMEM;
+		goto err_out;
+	}
+
+	posix_socket_mount.m_special = strdup("");
+	if (!posix_socket_mount.m_special) {
+		ret = -ENOMEM;
+		goto err_free_m_path;
+	}
+
+	return 0;
+
+err_free_m_path:
+	free(posix_socket_mount.m_path);
+err_out:
+	return ret;
+}
+uk_lib_initcall(posix_socket_mount_init);

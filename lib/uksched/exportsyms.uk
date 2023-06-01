@@ -31,6 +31,7 @@ uk_thread_create_fn1
 uk_thread_create_fn2
 uk_thread_set_exited
 uk_thread_release
+uk_thread_block_until
 uk_thread_block_timeout
 uk_thread_block
 uk_thread_wake

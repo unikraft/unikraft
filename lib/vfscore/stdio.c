@@ -206,11 +206,14 @@ static struct vnode stdio_vnode = {
 	.v_op = &stdio_vnops,
 	.v_lock = UK_MUTEX_INITIALIZER(stdio_vnode.v_lock),
 	.v_refcnt = 1,
+	.v_link = UK_LIST_HEAD_INIT(stdio_vnode.v_link),
+	.v_names = UK_LIST_HEAD_INIT(stdio_vnode.v_names),
 	.v_type = VCHR,
 };
 
 static struct dentry stdio_dentry = {
 	.d_vnode = &stdio_vnode,
+	.d_refcnt = 1,
 };
 
 static struct vfscore_file  stdio_file = {

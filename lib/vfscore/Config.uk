@@ -74,7 +74,7 @@ if LIBVFSCORE_AUTOMOUNT_ROOTFS
 	config LIBVFSCORE_ROOTDEV
 	string "Default root device"
 	depends on !LIBVFSCORE_ROOTFS_RAMFS && !LIBVFSCORE_ROOTFS_INITRD
-	default "rootfs" if LIBVFSCORE_ROOTFS_9PFS
+	default "fs0" if LIBVFSCORE_ROOTFS_9PFS
 	default ""
 	help
 		Device to mount the filesystem from (e.g., on 9PFS this

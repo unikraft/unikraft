@@ -27,6 +27,7 @@
 #define __UK_SCHED_WAIT_TYPES_H__
 
 #include <uk/list.h>
+#include <uk/plat/spinlock.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -38,10 +39,16 @@ struct uk_waitq_entry {
 	UK_STAILQ_ENTRY(struct uk_waitq_entry) thread_list;
 };
 
-/* TODO - lock required? */
-UK_STAILQ_HEAD(uk_waitq, struct uk_waitq_entry);
+struct uk_waitq {
+	__spinlock sl;
+	UK_STAILQ_HEAD(wait_list, struct uk_waitq_entry) wait_list;
+};
 
-#define __WAIT_QUEUE_INITIALIZER(name) UK_STAILQ_HEAD_INITIALIZER(name)
+#define __WAIT_QUEUE_INITIALIZER(name) \
+{ \
+	UKARCH_SPINLOCK_INITIALIZER(), \
+	UK_STAILQ_HEAD_INITIALIZER(name.wait_list) \
+}
 
 #define DEFINE_WAIT_QUEUE(name) \
 	struct uk_waitq name = __WAIT_QUEUE_INITIALIZER(name)

@@ -38,4 +38,11 @@ if LIBUKLOCK
 			Metrics related to mutex objects: current amount of (un)locked
 			objects, as well as number of successful/failed locking attempts
 			since startup.
+
+	config LIBUKLOCK_RWLOCK
+		bool "Reader-Writer lock"
+		select LIBUKSCHED
+		default y
+		help
+			Enable reader-writer based synchronization
 endif

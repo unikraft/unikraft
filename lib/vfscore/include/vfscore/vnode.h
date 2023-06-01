@@ -137,7 +137,6 @@ struct vattr {
 /*
  *  Modes.
  */
-#define VAPPEND 00010
 #define	VREAD	00004		/* read, write, execute permissions */
 #define	VWRITE	00002
 #define	VEXEC	00001
@@ -164,22 +163,22 @@ typedef	int (*vnop_seek_t)	(struct vnode *, struct vfscore_file *,
 typedef	int (*vnop_ioctl_t)	(struct vnode *, struct vfscore_file *, unsigned long, void *);
 typedef	int (*vnop_fsync_t)	(struct vnode *, struct vfscore_file *);
 typedef	int (*vnop_readdir_t)	(struct vnode *, struct vfscore_file *, struct dirent *);
-typedef	int (*vnop_lookup_t)	(struct vnode *, char *, struct vnode **);
-typedef	int (*vnop_create_t)	(struct vnode *, char *, mode_t);
-typedef	int (*vnop_remove_t)	(struct vnode *, struct vnode *, char *);
-typedef	int (*vnop_rename_t)	(struct vnode *, struct vnode *, char *,
-				 struct vnode *, struct vnode *, char *);
-typedef	int (*vnop_mkdir_t)	(struct vnode *, char *, mode_t);
-typedef	int (*vnop_rmdir_t)	(struct vnode *, struct vnode *, char *);
+typedef	int (*vnop_lookup_t)	(struct vnode *, const char *, struct vnode **);
+typedef	int (*vnop_create_t)	(struct vnode *, const char *, mode_t);
+typedef	int (*vnop_remove_t)	(struct vnode *, struct vnode *, const char *);
+typedef	int (*vnop_rename_t)	(struct vnode *, struct vnode *, const char *,
+				 struct vnode *, struct vnode *, const char *);
+typedef	int (*vnop_mkdir_t)	(struct vnode *, const char *, mode_t);
+typedef	int (*vnop_rmdir_t)	(struct vnode *, struct vnode *, const char *);
 typedef	int (*vnop_getattr_t)	(struct vnode *, struct vattr *);
 typedef	int (*vnop_setattr_t)	(struct vnode *, struct vattr *);
 typedef	int (*vnop_inactive_t)	(struct vnode *);
 typedef	int (*vnop_truncate_t)	(struct vnode *, off_t);
-typedef	int (*vnop_link_t)      (struct vnode *, struct vnode *, char *);
+typedef	int (*vnop_link_t)      (struct vnode *, struct vnode *, const char *);
 typedef int (*vnop_cache_t) (struct vnode *, struct vfscore_file *, struct uio *);
 typedef int (*vnop_fallocate_t) (struct vnode *, int, off_t, off_t);
 typedef int (*vnop_readlink_t)  (struct vnode *, struct uio *);
-typedef int (*vnop_symlink_t)   (struct vnode *, char *, char *);
+typedef int (*vnop_symlink_t)   (struct vnode *, const char *, const char *);
 typedef int (*vnop_poll_t)	(struct vnode *, unsigned int *,
 				 struct eventpoll_cb *);
 
