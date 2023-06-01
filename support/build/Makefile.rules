@@ -104,18 +104,23 @@ libname2olib = $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(1)))
 libname2preolib = $(addprefix $(BUILD_DIR)/,$(addsuffix .ld.o,$(1)))
 
 # converts a list of sources to paths pointing to their corresponding destination files
-# src2dst $1:libname,$2:source(s),$3:destsuffix,$4:variant(optional)
+# src2dst $1:libname,$2:source(s),$3:destsuffix,$4:variant(optional),$5:subbuild(optional)
 define src2dst =
+$(if $(5),\
 $(if $(4),\
-$(addprefix $(call sub_build_dir,$(1))/,$(addsuffix .$(4)$(3),$(basename $(notdir $(2))))),\
-$(addprefix $(call sub_build_dir,$(1))/,$(addsuffix $(3),$(basename $(notdir $(2)))))\
-)
+$(addprefix $(call sub_libbuild_dir,$(1),$(5))/,$(addsuffix .$(4)$(3),$(basename $(notdir $(2))))),\
+$(addprefix $(call sub_libbuild_dir,$(1),$(5))/,$(addsuffix $(3),$(basename $(notdir $(2)))))\
+),\
+$(if $(4),\
+$(addprefix $(call sub_build_dir,$(strip $(1)))/,$(addsuffix .$(4)$(3),$(basename $(notdir $(2))))),\
+$(addprefix $(call sub_build_dir,$(strip $(1)))/,$(addsuffix $(3),$(basename $(notdir $(2)))))\
+))
 endef
 
 # converts a list of sources to paths pointing to their corresponding object file
-# src2obj $1:libname,$2:source(s),$3:variant(optional)
+# src2obj $1:libname,$2:source(s),$3:variant(optional),$4:subbuild(optional)
 define src2obj =
-$(call src2dst,$(1),$(2),.o,$(3))
+$(call src2dst,$(1),$(2),.o,$(3),$(4))
 endef
 
 # converts a list of output file (object files or linker scripts) paths
@@ -124,23 +129,31 @@ endef
 out2dep = $(patsubst %.o,%.d,$(patsubst %.lds,%.lds.d,$(1)))
 
 # converts a list of sources (.S, .c, .cc, .cpp) to paths pointing to their corresponding dependency file
-# src2dep $1:libname,$2:source(s),$3:variant(optional)
-src2dep = $(call out2dep,$(call src2obj,$(1),$(2),$(3)))
+# src2dep $1:libname,$2:source(s),$3:variant(optional),$4:subbuild(optional)
+src2dep = $(call out2dep,$(call src2obj,$(1),$(2),$(3),$(4)))
 
 # converts paths of linker script sources (*.lds.S) to paths of corresponding
 # processed linker scripts (*.lds) within the library's build directory
-# src2lds $1:libname,$2:ldS(s),$3:variant(optional)
+# src2lds $1:libname,$2:ldS(s),$3:variant(optional),$4:subbuild(optional)
 define src2lds =
+$(if $(4),\
+$(if $(3),\
+$(addprefix $(call sub_libbuild_dir,$(1),$(4))/,$(addsuffix .$(3).lds,$(basename $(basename $(notdir $(2)))))),\
+$(addprefix $(call sub_libbuild_dir,$(1),$(4))/,$(addsuffix .lds,$(basename $(basename $(notdir $(2))))))\
+),\
 $(if $(3),\
 $(addprefix $(call sub_build_dir,$(1))/,$(addsuffix .$(3).lds,$(basename $(basename $(notdir $(2)))))),\
 $(addprefix $(call sub_build_dir,$(1))/,$(addsuffix .lds,$(basename $(basename $(notdir $(2))))))\
-)
+))
 endef
 
 # converts paths device tree source file to the device tree binary blob
-# dts2dtb $1:libname,$2:dts
+# dts2dtb $1:libname,$2:dts,$subbuild(optional)
 define dts2dtb =
+$(if $(3),\
+$(addprefix $(call sub_libbuild_dir,$(1),$(3))/,$(addsuffix .dtb,$(basename $(notdir $(2))))),
 $(addprefix $(call sub_build_dir,$(1))/,$(addsuffix .dtb,$(basename $(notdir $(2)))))
+)
 endef
 
 ################################################################################
@@ -842,11 +855,18 @@ endef
 #
 # buildrule_libobj $1:libname,$2:source,$3:variant(optional)
 define buildrule_libobj =
+$(eval subbuild=$($(call vprefix_src,$(1),$(2),$(3),SUBBUILD)))
+$(eval $(if $(subbuild),\
+$(call verbose_info,Creating: $(call sub_libbuild_dir,$(1),$(subbuild)))\
+$(call mk_sub_libbuild_dir,$(1),$(subbuild)))\
+)
+
 $(if $(filter %.lds.S,$(2)),\
-		$(eval target=$(call src2lds,$(1),$(2))),\
+		$(eval target=$(call src2lds,$(1),$(2),$(subbuild))),\
 	$(if $(filter %.dts,$(2)),\
-		$(eval target=$(call dts2dtb,$(1),$(2))),\
-		$(eval target=$(call src2obj,$(1),$(2),$(3)))))
+		$(eval target=$(call dts2dtb,$(1),$(2),$(subbuild))),\
+		$(eval target=$(call src2obj,$(1),$(2),$(3),$(subbuild)))))
+$(call verbose_info,Installing rule: $(2) -> $(target))
 $(eval $(call buildrule,$(1),$(2),$(3),$(target),))
 endef
 
@@ -859,20 +879,18 @@ endef
 #
 # preprule_libobj $1:libname,$2:source,$3:preptargetsuffix,$4:variant(optional)
 define preprule_libobj =
-$(eval $(call preprule,$(1),$(2),$(3),\
-  $($(call vprefix_src,$(1),$(2),PREPINCLUDES))\
-  $($(call vprefix_src,$(1),$(2),PREPINCLUDES-y))\
-  $($(call vprefix_src,$(1),$(2),PREPFLAGS))\
-  $($(call vprefix_src,$(1),$(2),PREPFLAGS-y))\
-  $(if $(4),\
-   $($(call vprefix_srcv,$(1),$(2),$(4),PREPINCLUDES))\
-   $($(call vprefix_srcv,$(1),$(2),$(4),PREPINCLUDES-y))\
-   $($(call vprefix_srcv,$(1),$(2),$(4),PREPFLAGS))\
-   $($(call vprefix_srcv,$(1),$(2),$(4),PREPFLAGS-y))\
-  ,)\
+$(eval subbuild=$($(call vprefix_src,$(1),$(2),$(4),SUBBUILD)))
+$(eval preptarget=$(call src2dst,$(1),$(2),$(3),$(4),$(subbuild)))
+
+$(call verbose_info,Installing prepare rule: $(2) -> $(preptarget))
+$(eval $(call preprule,$(1),$(2),$(preptarget),\
+	$($(call vprefix_src,$(1),$(2),$(4),PREPINCLUDES))\
+	$($(call vprefix_src,$(1),$(2),$(4),PREPINCLUDES-y))\
+	$($(call vprefix_src,$(1),$(2),$(4),PREPFLAGS))\
+	$($(call vprefix_src,$(1),$(2),$(4),PREPFLAGS-y))\
 ))
 
-$(eval $(call buildrule_libobj,$(1),$(3),$(4)))
+$(eval $(call buildrule_libobj,$(1),$(preptarget),$(4)))
 endef
 
 # Parses a pre-process definition (chains are not supported yet)
@@ -880,7 +898,7 @@ endef
 # buildrule_libobj_preproc $1:libname,$2:source_definition,$3:variant(optional)
 define buildrule_libobj_preproc =
 $(if $(wordlist 2,$(words $(subst >, ,$(2))),$(subst >, ,$(2))),\
-  $(eval $(call preprule_libobj,$(1),$(word 1,$(subst >, ,$(2))),$(call src2dst,$(1),$(word 1,$(subst >, ,$(2))),$(word 2,$(subst >, ,$(2))),$(3)),$(3))),\
+  $(eval $(call preprule_libobj,$(1),$(word 1,$(subst >, ,$(2))),$(word 2,$(subst >, ,$(2))),$(3))),\
  $(eval $(call buildrule_libobj,$(1),$(2),$(3)))\
 )
 endef
