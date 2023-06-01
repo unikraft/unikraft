@@ -85,8 +85,8 @@ endef
 # Creates a subfolder under the build output directory
 # mk_sub_build_dir $1:subfoldername
 define mk_sub_build_dir =
-$(if $(shell mkdir -p "$(BUILD_DIR)/$(1)" && cd "$(BUILD_DIR)/$(1)" >/dev/null && pwd),,\
-     $(error could not create directory "$(BUILD_DIR)/$(1)"))
+$(if $(shell mkdir -p "$(BUILD_DIR)/$(notdir $(1))" && cd "$(BUILD_DIR)/$(notdir $(1))" >/dev/null && pwd),,\
+     $(error could not create directory "$(BUILD_DIR)/$(notdir $(1))"))
 endef
 
 # Returns the fully-qualified path for a subfolder under the build output
@@ -228,7 +228,7 @@ define addlib =
 $(call mk_sub_build_dir,$(1))
 UK_LIBS += $(1)
 $(eval $(call uc,$(1))_BASE    := $(_IMPORT_BASE))
-$(eval $(call uc,$(1))_BUILD   := $(BUILD_DIR)/$(1))
+$(eval $(call uc,$(1))_BUILD   := $(call sub_build_dir,$(1)))
 $(eval $(call uc,$(1))_EXPORTS += $(wildcard $(_IMPORT_BASE)/exportsyms.uk))
 $(eval $(call uc,$(1))_LOCALS  += $(wildcard $(_IMPORT_BASE)/localsyms.uk))
 endef
@@ -246,7 +246,7 @@ $(call mk_sub_build_dir,$(2))
 $(eval $(call uc,$(2))_PLATS   += $(call uc,$(1)))
 $(eval $(call uc,$(1))_LIBS    += $(2))
 $(eval $(call uc,$(2))_BASE    := $(_IMPORT_BASE))
-$(eval $(call uc,$(2))_BUILD   := $(BUILD_DIR)/$(2))
+$(eval $(call uc,$(2))_BUILD   := $(call sub_build_dir,$(2)))
 $(eval $(call uc,$(2))_EXPORTS += $(wildcard $(_IMPORT_BASE)/exportsyms.uk))
 $(eval $(call uc,$(2))_LOCALS  += $(wildcard $(_IMPORT_BASE)/localsyms.uk))
 endef
@@ -259,11 +259,11 @@ endef
 # creates a sub build directory for a library
 # mk_sub_libbuild_dir $1:libname,$2:subdir
 define mk_sub_libbuild_dir =
-$(if $(shell mkdir -p "$(BUILD_DIR)/$(1)/$(2)" && cd "$(BUILD_DIR)/$(1)/$(2)" >/dev/null && pwd),,\
-     $(error could not create directory "$(BUILD_DIR)/$(1)/$(2)"))
+$(if $(shell mkdir -p "$(BUILD_DIR)/$(notdir $(1))/$(strip $(2))" && cd "$(BUILD_DIR)/$(notdir $(1))/$(strip $(2))" >/dev/null && pwd),,\
+     $(error could not create directory "$(BUILD_DIR)/$(notdir $(1))/$(strip $(2))"))
 endef
 
-sub_libbuild_dir = $(BUILD_DIR)/$(1)/$(2)
+sub_libbuild_dir = $(BUILD_DIR)/$(notdir $(1))/$(strip $(2))
 
 ################################################################################
 #
@@ -419,7 +419,7 @@ $(error $(2): missing extraction rule for archive type)\
 ))))
 UK_FETCH-y += $(BUILD_DIR)/$(1)/.origin \
 $(eval $(call vprefix_lib,$(1),ORIGIN) = $(BUILD_DIR)/$(1)/origin)
-$(call mk_sub_build_dir,$(1)/origin)
+$(call mk_sub_libbuild_dir,$(1),origin)
 
 .PRECIOUS: $(BUILD_DIR)/$(1)/origin
 
