@@ -1,7 +1,7 @@
 BEGIN {
 	print "/* Automatically generated file; DO NOT EDIT */"
 	print ""
-	print "static struct uk_store_entry *static_entries[2 * __UK_STORE_COUNT] = {"
+	print "static struct uk_store_entry *static_entries[] = {"
 }
 
 /[a-zA-Z0-9]+/{

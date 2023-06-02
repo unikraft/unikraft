@@ -41,6 +41,7 @@
 #include <uk/list.h>
 #include <uk/arch/atomic.h>
 #include <uk/alloc.h>
+#include <uk/libid.h>
 
 #endif /* CONFIG_LIBUKSTORE */
 
@@ -143,8 +144,6 @@ struct uk_store_entry {
 
 #if !CONFIG_LIBUKSTORE
 
-#define uk_store_libid(libname) (-1)
-
 /* Do not call directly */
 #define __UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set,	\
 				arg_cookie)				\
@@ -180,27 +179,6 @@ struct uk_store_entry {
 
 /* Library-specific information generated at compile-time */
 #include <uk/bits/store_libs.h>
-
-/* Do not call directly */
-#define _uk_store_libid(libname)	\
-	__UK_STORE_ ## libname
-
-/**
- * Returns the id of a given library.
- *
- * @param libname the library to search for (not a string, e.g. LIBVFSCORE)
- * @return the id
- */
-#define uk_store_libid(libname)	\
-	_uk_store_libid(libname)
-
-/**
- * Returns the id of the place it was called from.
- *
- * @return this libraries' id
- */
-#define uk_store_libid_self()	\
-	uk_store_libid(__LIBNAME__)
 
 /**
  * Checks if an entry is static
@@ -244,10 +222,10 @@ struct uk_store_entry {
 		e_type, e_get, e_set, cookie)
 
 const struct uk_store_entry *
-_uk_store_get_static_entry(unsigned int libid, const char *e_name);
+_uk_store_get_static_entry(__u16 libid, const char *e_name);
 
 static inline const struct uk_store_entry *
-_uk_store_get_entry(unsigned int libid, const char *f_name __unused,
+_uk_store_get_entry(__u16 libid, const char *f_name __unused,
 			const char *e_name)
 {
 	return _uk_store_get_static_entry(libid, e_name);
@@ -262,7 +240,7 @@ _uk_store_get_entry(unsigned int libid, const char *f_name __unused,
  * @return the found entry or NULL
  */
 #define uk_store_get_entry(libname, foldername, entryname)	\
-	_uk_store_get_entry(uk_store_libid(libname), foldername, entryname)
+	_uk_store_get_entry(uk_libid(libname), foldername, entryname)
 
 /**
  * Decreases the refcount. When it reaches 0, the memory is freed
