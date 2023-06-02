@@ -71,7 +71,7 @@ _uk_store_release_entry(const struct uk_store_entry *p_entry)
  * @return the found entry or NULL
  */
 const struct uk_store_entry *
-_uk_store_get_static_entry(unsigned int libid, const char *e_name)
+_uk_store_get_static_entry(__u16 libid, const char *e_name)
 {
 	struct uk_store_entry *entry = static_entries[2 * libid];
 	struct uk_store_entry *stop = static_entries[2 * libid + 1];
