@@ -149,7 +149,7 @@ void *uk_malloc_ifpages(struct uk_alloc *a, __sz size)
 #ifdef CONFIG_HAVE_MEMTAG
 	size = MEMTAG_ALIGN(size);
 #endif /* CONFIG_HAVE_MEMTAG */
-	__sz realsize = sizeof(*metadata) + size;
+	__sz realsize = METADATA_IFPAGES_SIZE_POW2 + size;
 
 	UK_ASSERT(a);
 	/* check for invalid size and overflow */
