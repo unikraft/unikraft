@@ -1,6 +1,16 @@
-config LIBUKALLOCBBUDDY
+menuconfig LIBUKALLOCBBUDDY
 	bool "ukallocbbuddy: Binary buddy page allocator"
 	default n
 	select LIBNOLIBC if !HAVE_LIBC
 	select LIBUKDEBUG
 	select LIBUKALLOC
+
+if LIBUKALLOCBBUDDY
+	config LIBUKALLOCBBUDDY_FREELIST_SANITY
+	bool "Debug: sanity check freelists"
+	default n
+	help
+		Run sanity checks on the free page lists on every malloc and free.
+		Adds significant overhead.
+
+endif
