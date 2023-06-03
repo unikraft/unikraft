@@ -1,0 +1,127 @@
+menuconfig PLAT_VMWARE
+       bool "VMware guest"
+       default n
+       depends on (ARCH_X86_64 || (ARCH_ARM_64 && !HAVE_SYSCALL))
+       select LIBUKDEBUG
+       select LIBUKALLOC
+       select LIBUKTIMECONV
+       select LIBNOLIBC if !HAVE_LIBC
+       select LIBFDT if ARCH_ARM_64
+       help
+                Create a Unikraft image that runs as a VMWware guest
+
+if (PLAT_VMWARE)
+
+menu "Console Options"
+
+config VMWARE_KERNEL_SERIAL_CONSOLE
+        bool "Serial console for the kernel prints"
+        default y
+        depends on (ARCH_X86_64 || ARCH_ARM_64)
+	select UART_PL011 if ARCH_ARM_64
+        help
+          Choose serial console for the kernel printing
+
+config VMWARE_KERNEL_VGA_CONSOLE
+        bool "VGA console for the kernel prints"
+        default y
+        depends on  ARCH_X86_64
+        help
+          Choose VGA console for the kernel printing
+
+config VMWARE_DEBUG_SERIAL_CONSOLE
+        bool "Serial console for the debug prints"
+        default y
+        depends on (ARCH_X86_64 || ARCH_ARM_64)
+        help
+          Choose serial console for the debug printing
+
+config VMWARE_DEBUG_VGA_CONSOLE
+        bool "VGA console for the debug prints"
+        default y
+        depends on ARCH_X86_64
+        help
+          Choose VGA console for the debug printing
+
+if (VMWARE_VMWARE_KERNEL_SERIAL_CONSOLE || VMWARE_DEBUG_SERIAL_CONSOLE)
+menu "Serial console configuration"
+	if ARCH_X86_64
+	choice
+		prompt "Baudrate"
+		default VMWARE_SERIAL_BAUD_115200
+
+		config VMWARE_SERIAL_BAUD_115200
+			bool "115200"
+
+		config VMWARE_SERIAL_BAUD_57600
+			bool "57600"
+
+		config VMWARE_SERIAL_BAUD_38400
+			bool "38400"
+
+		config VMWARE_SERIAL_BAUD_19200
+			bool "19200"
+	endchoice
+	endif
+
+	if ARCH_ARM_64
+	config EARLY_PRINT_PL011_UART_ADDR
+		hex "Early debug console pl011 serial address"
+		default 0x09000000
+		depends on (VMWARE_DEBUG_SERIAL_CONSOLE && ARCH_ARM_64)
+		help
+			Pl011 serial address used by early debug console.
+	endif
+endmenu
+endif
+
+endmenu
+
+config VMWARE_MAX_IRQ_HANDLER_ENTRIES
+       int "Maximum number of handlers per IRQ"
+       default 8
+       depends on (ARCH_X86_64 || ARCH_ARM_64)
+
+config VMWARE_PCI
+       bool "PCI Bus Driver"
+       default y
+       select LIBUKBUS
+       help
+                PCI bus driver for probing and operating PCI devices
+
+config RTC_PL031
+       bool "Arm platform RTC (PL031) driver"
+       default y if ARCH_ARM_64
+       depends on ARCH_ARM_64
+
+config LIBOFW
+       bool "Open Firmware library support"
+       default n
+       depends on ARCH_ARM_64
+       select LIBFDT
+
+config UKPLAT_ALLOW_GIC
+	bool
+	default y
+
+config VMXNET3
+      bool  "Vmxnet3 driver"
+      default y
+      depends on (ARCH_X86_64 || ARCH_ARM_64)
+      depends on LIBUKBUS
+      select LIBUKALLOC
+      select LIBUKSGLIST
+      help
+               Vmxnet3 driver for VMWare networking.
+
+config E1000
+      bool  "E1000 driver"
+      default y
+      depends on (ARCH_X86_64 || ARCH_ARM_64)
+      depends on LIBUKBUS
+      select LIBUKALLOC
+      select LIBUKSGLIST
+      help
+               E1000 driver for VMWare networking.
+
+endif

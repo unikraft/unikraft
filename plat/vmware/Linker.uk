@@ -1,0 +1,70 @@
+VMWARE_LDFLAGS-y += -Wl,-m,elf_x86_64
+VMWARE_LDFLAGS-y += -Wl,--entry=_multiboot_entry
+VMWARE_STRIPFLAGS += --output-target elf32-i386
+
+VMWARE_BINFO_FLAGS := -a $(CONFIG_UK_ARCH)
+
+##
+## Link image
+##
+VMWARE_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_vmware-$(CONFIG_UK_ARCH)
+VMWARE_DEBUG_IMAGE := $(VMWARE_IMAGE).dbg
+
+VMWARE_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-dT$(comma),\
+			 $(UK_PLAT_VMWARE_DEF_LDS))
+VMWARE_LD_SCRIPT_FLAGS += $(addprefix -Wl$(comma)-T$(comma),\
+			$(VMWARE_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y))
+
+ifeq ($(CONFIG_UKPLAT_MEMRNAME),y)
+VMWARE_BINFO_FLAGS += -n
+endif
+
+define build_bootinfo =
+	$(call build_cmd,UKBI,,$(1).bootinfo,\
+		$(SCRIPTS_DIR)/mkbootinfo.py $(1) $(1).bootinfo $(VMWARE_BINFO_FLAGS) && \
+		$(OBJCOPY) $(1) --update-section .uk_bootinfo=$(1).bootinfo)
+endef
+
+$(VMWARE_DEBUG_IMAGE): $(VMWARE_ALIBS) $(VMWARE_ALIBS-y) $(VMWARE_OLIBS) $(VMWARE_OLIBS-y) \
+		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) \
+		    $(VMWARE_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y) \
+		    $(UK_PLAT_VMWARE_DEF_LDS)
+	$(call build_cmd,LD,,$@,\
+	       $(LD) \
+			$(VMWARE_LDFLAGS) $(VMWARE_LDFLAGS-y) \
+			$(VMWARE_OLIBS) $(VMWARE_OLIBS-y) \
+			$(UK_OLIBS) $(UK_OLIBS-y) \
+			-Wl$(comma)--start-group \
+			$(VMWARE_ALIBS) $(VMWARE_ALIBS-y) \
+			$(UK_ALIBS) $(UK_ALIBS-y) \
+			$(VMWARE_LINK_LIBGCC_FLAG) \
+			-Wl$(comma)--end-group \
+			$(LDFLAGS) $(LDFLAGS-y) \
+			$(VMWARE_LD_SCRIPT_FLAGS) \
+			-o $@)
+	$(call build_bootinfo,$@)
+
+$(VMWARE_IMAGE): $(VMWARE_IMAGE).dbg
+	$(call build_cmd,SCSTRIP,,$@,\
+		$(STRIP) -s \
+			$(SECT_STRIP_FLAGS) $(SECT_STRIP_FLAGS-y) \
+			$(VMWARE_STRIPFLAGS) \
+			$< -o $@ 2>&1 | \
+			{ grep -v "Empty loadable segment detected" || true; })
+
+$(VMWARE_IMAGE).sym: $(VMWARE_DEBUG_IMAGE)
+	$(call build_cmd,NM,,$@, $(NM) -n $< > $@)
+
+$(VMWARE_IMAGE).gz: $(VMWARE_IMAGE)
+	$(call build_cmd,GZ,,$@, $(GZIP) -f -9 -c $< >$@)
+
+# register images to the build
+ifeq ($(CONFIG_PLAT_VMWARE),y)
+UK_DEBUG_IMAGES-y                     += $(VMWARE_DEBUG_IMAGE)
+UK_IMAGES-y                           += $(VMWARE_IMAGE)
+UK_IMAGES-$(CONFIG_OPTIMIZE_SYMFILE)  += $(VMWARE_IMAGE).sym
+UK_IMAGES-$(CONFIG_OPTIMIZE_COMPRESS) += $(VMWARE_IMAGE).gz
+endif
+
+# ...for cleaning:
+LIBVMWAREPLAT_CLEAN += $(call build_clean,$(VMWARE_DEBUG_IMAGE).bootinfo)
