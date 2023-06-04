@@ -72,6 +72,12 @@ static struct utsname utsname = {
 
 UK_SYSCALL_R_DEFINE(int, sysinfo, struct sysinfo *, info)
 {
+#ifdef CONFIG_HAVE_PAGING
+	struct uk_pagetable *pt;
+	__sz total_memory;
+	unsigned int mem_unit = 1;
+#endif /* CONFIG_HAVE_PAGING */
+
 	if (!info)
 		return -EFAULT;
 
@@ -79,9 +85,20 @@ UK_SYSCALL_R_DEFINE(int, sysinfo, struct sysinfo *, info)
 
 	info->procs = 1; /* number of processes */
 
-#if CONFIG_LIBUKALLOC
-	/* TODO: memory usage can be obtained from ukallloc */
-#endif
+#ifdef CONFIG_HAVE_PAGING
+	pt = ukplat_pt_get_active();
+
+	total_memory = pt->fa->total_memory;
+	while (total_memory > __UL_MAX) {
+		total_memory >>= 1;
+		mem_unit <<= 1;
+	}
+
+	info->totalram = (unsigned long) (pt->fa->total_memory / mem_unit);
+	info->freeram = (unsigned long) (pt->fa->free_memory / mem_unit);
+	info->mem_unit = mem_unit;
+#endif /* CONFIG_HAVE_PAGING */
+
 	return 0;
 }
 
