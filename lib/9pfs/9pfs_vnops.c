@@ -1012,7 +1012,7 @@ static int uk_9pfs_symlink(struct vnode *dvp, const char *op, const char *np)
 }
 
 #define uk_9pfs_seek		((vnop_seek_t)vfscore_vop_nullop)
-#define uk_9pfs_ioctl		((vnop_ioctl_t)vfscore_vop_einval)
+#define uk_9pfs_ioctl		((vnop_ioctl_t)vfscore_vop_nullop)
 #define uk_9pfs_cache		((vnop_cache_t)NULL)
 #define uk_9pfs_fallocate	((vnop_fallocate_t)vfscore_vop_nullop)
 #define uk_9pfs_poll		((vnop_poll_t)vfscore_vop_einval)
