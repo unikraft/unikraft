@@ -182,3 +182,17 @@ int gethostname(char *name, size_t len)
 
 	return 0;
 }
+
+UK_SYSCALL_R_DEFINE(int, getcpu, unsigned int *, cpu, unsigned int *, node,
+		    void *, tcache)
+{
+	/* tcache is ignored since Linux 2.6.24 */
+
+	if (cpu)
+		*cpu = 0;
+
+	if (node)
+		*node = 0;
+
+	return 0;
+}
