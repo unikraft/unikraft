@@ -76,6 +76,7 @@
 #define LVLC_RESET	""
 #define LVLC_TS		""
 #define LVLC_CALLER	""
+#define LVLC_THREAD	""
 #define LVLC_LIBNAME	""
 #define LVLC_SRCNAME	""
 #define LVLC_DEBUG	""
