@@ -395,8 +395,8 @@ static int uk_9pfs_create(struct vnode *dvp, const char *name, mode_t mode)
 	if (md->proto == UK_9P_PROTO_2000L) {
 		struct uk_9pfid *fid =
 		    uk_9p_walk(md->dev, UK_9PFS_VFID(dvp), NULL);
-		return -uk_9p_lcreate(md->dev, fid, name, O_WRONLY | O_TRUNC,
-				      mode, 0);
+		return -uk_9p_lcreate(md->dev, fid, name,
+				UK_9P_DOTL_WRONLY | UK_9P_DOTL_APPEND, mode, 0);
 
 	} else if (md->proto == UK_9P_PROTO_2000U) {
 		return uk_9pfs_create_generic(dvp, name, mode);

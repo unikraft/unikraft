@@ -205,6 +205,31 @@ enum uk_9p_type {
 #define UK_9P_SETATTR_MTIME_SET   0x00000100UL
 
 /**
+ * 9p2000.L open flags
+ *
+ * Source: https://lxr.missinglinkelectronics.com/qemu/hw/9pfs/9p.h#L368
+ */
+#define UK_9P_DOTL_RDONLY        00000000
+#define UK_9P_DOTL_WRONLY        00000001
+#define UK_9P_DOTL_RDWR          00000002
+#define UK_9P_DOTL_NOACCESS      00000003
+#define UK_9P_DOTL_CREATE        00000100
+#define UK_9P_DOTL_EXCL          00000200
+#define UK_9P_DOTL_NOCTTY        00000400
+#define UK_9P_DOTL_TRUNC         00001000
+#define UK_9P_DOTL_APPEND        00002000
+#define UK_9P_DOTL_NONBLOCK      00004000
+#define UK_9P_DOTL_DSYNC         00010000
+#define UK_9P_DOTL_FASYNC        00020000
+#define UK_9P_DOTL_DIRECT        00040000
+#define UK_9P_DOTL_LARGEFILE     00100000
+#define UK_9P_DOTL_DIRECTORY     00200000
+#define UK_9P_DOTL_NOFOLLOW      00400000
+#define UK_9P_DOTL_NOATIME       01000000
+#define UK_9P_DOTL_CLOEXEC       02000000
+#define UK_9P_DOTL_SYNC          04000000
+
+/**
  * 9P qid.
  *
  * Source: https://9fans.github.io/plan9port/man/man9/intro.html.
