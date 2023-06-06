@@ -126,6 +126,9 @@ struct uk_store_entry {
 		uk_store_set_charp_func_t charp;
 	} set;
 
+	/* Entry unique id */
+	__u64 id;
+
 	/* The entry name */
 	char *name;
 
@@ -142,30 +145,32 @@ struct uk_store_entry {
 #if !CONFIG_LIBUKSTORE
 
 /* Do not call directly */
-#define __UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set)	\
+#define __UK_STORE_STATIC_ENTRY(eid, entry, lib_str, e_type, e_get, e_set)\
 	static const struct uk_store_entry				\
 	__unused __uk_store_entries_list ## _ ## entry = {		\
-		.name = STRINGIFY(entry),				\
-		.type       = (UK_STORE_ENTRY_TYPE(e_type)),		\
+		.id             = eid,					\
+		.name           = STRINGIFY(entry),			\
+		.type           = (UK_STORE_ENTRY_TYPE(e_type)),	\
 		.get.e_type = (e_get),					\
 		.set.e_type = (e_set),					\
-		.flags      = UK_STORE_ENTRY_FLAG_STATIC		\
+		.flags          = UK_STORE_ENTRY_FLAG_STATIC		\
 	}
 
 /* Do not call directly */
-#define _UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set)	\
-	__UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set)
+#define _UK_STORE_STATIC_ENTRY(id, entry, lib_str, e_type, e_get, e_set)\
+	__UK_STORE_STATIC_ENTRY(id, entry, lib_str, e_type, e_get, e_set)
 
 /**
  * Adds an entry to the entry section of a library.
  *
+ * @param id entry id
  * @param entry the entry in the section
  * @param e_type type for the entry, e.g., s8, u16, charp
  * @param e_get getter pointer (optional, can be NULL)
  * @param e_set setter pointer (optional, can be NULL)
  */
-#define UK_STORE_STATIC_ENTRY(entry, e_type, e_get, e_set)	\
-	_UK_STORE_STATIC_ENTRY(entry, STRINGIFY(__LIBNAME__),	\
+#define UK_STORE_STATIC_ENTRY(id, entry, e_type, e_get, e_set)		\
+	_UK_STORE_STATIC_ENTRY(id, entry, STRINGIFY(__LIBNAME__),	\
 			       e_type, e_get, e_set)
 
 #else /* !CONFIG_LIBUKSTORE */
@@ -183,53 +188,52 @@ struct uk_store_entry {
 	((entry)->flags & UK_STORE_ENTRY_FLAG_STATIC)
 
 /* Do not call directly */
-#define __UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set)	\
+#define __UK_STORE_STATIC_ENTRY(eid, entry, lib_str, e_type, e_get, e_set)\
 	static const struct uk_store_entry				\
 	__used __section(".uk_store_lib_" lib_str) __align8		\
 	__uk_store_entries_list ## _ ## entry = {			\
-		.name = STRINGIFY(entry),				\
-		.type       = (UK_STORE_ENTRY_TYPE(e_type)),		\
+		.id		= eid,					\
+		.name           = STRINGIFY(entry),			\
+		.type           = (UK_STORE_ENTRY_TYPE(e_type)),	\
 		.get.e_type = (e_get),					\
 		.set.e_type = (e_set),					\
-		.flags      = UK_STORE_ENTRY_FLAG_STATIC		\
+		.flags          = UK_STORE_ENTRY_FLAG_STATIC		\
 	}
 
 /* Do not call directly */
-#define _UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set)	\
-	__UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set)
+#define _UK_STORE_STATIC_ENTRY(id, entry, lib_str, e_type, e_get, e_set)\
+	__UK_STORE_STATIC_ENTRY(id, entry, lib_str, e_type, e_get, e_set)
 
 /**
  * Adds an entry to the entry section of a library.
  *
+ * @param id entry id
  * @param entry the entry in the section
  * @param e_type type for the entry, e.g., s8, u16, charp
  * @param e_get getter pointer (optional, can be NULL)
  * @param e_set setter pointer (optional, can be NULL)
  */
-#define UK_STORE_STATIC_ENTRY(entry, e_type, e_get, e_set)	\
-	_UK_STORE_STATIC_ENTRY(entry, STRINGIFY(__LIBNAME__),	\
+#define UK_STORE_STATIC_ENTRY(id, entry, e_type, e_get, e_set)		\
+	_UK_STORE_STATIC_ENTRY(id, entry, STRINGIFY(__LIBNAME__),	\
 			       e_type, e_get, e_set)
 
 const struct uk_store_entry *
-_uk_store_get_static_entry(__u16 libid, const char *e_name);
-
-static inline const struct uk_store_entry *
-_uk_store_get_entry(__u16 libid, const char *f_name __unused,
-			const char *e_name)
-{
-	return _uk_store_get_static_entry(libid, e_name);
-}
+_uk_store_get_static_entry(__u16 library_id, __u64 entry_id);
 
 /**
- * Searches for an entry in a folder in a library. Increases the refcount.
+ * Searches for an entry in an object in a library. Increases the refcount.
  *
- * @param libname the name of the library to search in
- * @param foldername the name of the folder to search (NULL for static entries)
- * @param entryname the name of the entry to search for
+ * @param library_id the id of the library to search in
+ * @param object_id the id of the object to search (NULL for static entries)
+ * @param entry_id the id of the entry to search for
  * @return the found entry or NULL
  */
-#define uk_store_get_entry(libname, foldername, entryname)	\
-	_uk_store_get_entry(uk_libid(libname), foldername, entryname)
+static inline const struct uk_store_entry *
+uk_store_get_entry(__u16 library_id, __u64 object_id __unused,
+		   __u64 entry_id)
+{
+	return _uk_store_get_static_entry(library_id, entry_id);
+}
 
 /**
  * Decreases the refcount. When it reaches 0, the memory is freed

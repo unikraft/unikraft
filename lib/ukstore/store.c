@@ -63,21 +63,14 @@ _uk_store_release_entry(const struct uk_store_entry *p_entry)
 		return;
 }
 
-/**
- * Find a static entry and returns it.
- *
- * @param libid the id of the library to search in
- * @param e_name the name of the entry to search for
- * @return the found entry or NULL
- */
 const struct uk_store_entry *
-_uk_store_get_static_entry(__u16 libid, const char *e_name)
+_uk_store_get_static_entry(__u16 libid, __u64 entry_id)
 {
 	struct uk_store_entry *entry = static_entries[2 * libid];
 	struct uk_store_entry *stop = static_entries[2 * libid + 1];
 
 	for (; entry != stop; ++entry)
-		if (!strcmp(entry->name, e_name))
+		if (entry->id == entry_id)
 			return entry;
 
 	return NULL;
