@@ -92,13 +92,6 @@ struct fdt_phandle_args {
 #define IORESOURCE_DMA		0x00000800
 #define IORESOURCE_BUS		0x00001000
 
-
-int pci_generic_config_read(__u8 bus, __u8 devfn,
-			    int where, int size, void *val);
-
-int pci_generic_config_write(__u8 bus, __u8 devfn,
-			     int where, int size, __u32 val);
-
 extern struct pf_driver gen_pci_driver;
 
 #endif /* __UK_BUS_PCI_ECAM_H__ */
