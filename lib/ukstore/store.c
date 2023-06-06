@@ -105,64 +105,58 @@ _uk_store_get_static_entry(__u16 libid, const char *e_name)
  */
 
 /* Signed input, unsigned etype */
-#define SETCASE_DOWNCASTSU(entry, etype, ETYPE, var, eparam)		\
+#define SETCASE_DOWNCASTSU(entry, etype, ETYPE, var, eparam, cookie)	\
 	do {								\
 		case UK_STORE_ENTRY_TYPE(etype):			\
 		if (unlikely(var < 0 ||					\
 			var > (__ ## eparam) __ ## ETYPE ## _MAX))	\
 			return -ERANGE;					\
-		return (entry)->set.etype(entry->cookie,		\
-					(__ ## etype) var);		\
+		return (entry)->set.etype(cookie, (__ ## etype) var);	\
 	} while (0)
 
 /* Unsigned input, signed etype */
-#define SETCASE_DOWNCASTUS(entry, etype, ETYPE, var, eparam)	\
-	do {							\
-		case UK_STORE_ENTRY_TYPE(etype):		\
-		if (unlikely(var > __ ## ETYPE ## _MAX))	\
-			return -ERANGE;				\
-		return (entry)->set.etype(entry->cookie,	\
-					(__ ## etype) var);	\
+#define SETCASE_DOWNCASTUS(entry, etype, ETYPE, var, eparam, cookie)	\
+	do {								\
+		case UK_STORE_ENTRY_TYPE(etype):			\
+		if (unlikely(var > __ ## ETYPE ## _MAX))		\
+			return -ERANGE;					\
+		return (entry)->set.etype(cookie, (__ ## etype) var);	\
 	} while (0)
 
 /* Both signed */
-#define SETCASE_DOWNCASTSS(entry, etype, ETYPE, var, eparam)	\
-	do {							\
-		case UK_STORE_ENTRY_TYPE(etype):		\
-		if (unlikely(var < __ ## ETYPE ## _MIN ||	\
-				var > __ ## ETYPE ## _MAX))	\
-			return -ERANGE;				\
-		return (entry)->set.etype(entry->cookie,	\
-					(__ ## etype) var);	\
+#define SETCASE_DOWNCASTSS(entry, etype, ETYPE, var, eparam, cookie)	\
+	do {								\
+		case UK_STORE_ENTRY_TYPE(etype):			\
+		if (unlikely(var < __ ## ETYPE ## _MIN ||		\
+				var > __ ## ETYPE ## _MAX))		\
+			return -ERANGE;					\
+		return (entry)->set.etype(cookie, (__ ## etype) var);	\
 	} while (0)
 
 /* Both unsigned */
-#define SETCASE_DOWNCASTUU(entry, etype, ETYPE, var, eparam)	\
-	do {							\
-		case UK_STORE_ENTRY_TYPE(etype):		\
-		if (unlikely(var > __ ## ETYPE ## _MAX))	\
-			return -ERANGE;				\
-		return (entry)->set.etype(entry->cookie,	\
-					(__ ## etype) var);	\
+#define SETCASE_DOWNCASTUU(entry, etype, ETYPE, var, eparam, cookie)	\
+	do {								\
+		case UK_STORE_ENTRY_TYPE(etype):			\
+		if (unlikely(var > __ ## ETYPE ## _MAX))		\
+			return -ERANGE;					\
+		return (entry)->set.etype(cookie, (__ ## etype) var);	\
 	} while (0)
 
 /* Signed input, unsigned etype */
-#define SETCASE_UPCASTSU(entry, etype, ETYPE, var, eparam)	\
-	do {							\
-		case UK_STORE_ENTRY_TYPE(etype):		\
-		if (unlikely(var < 0))				\
-			return -ERANGE;				\
-		return (entry)->set.etype(entry->cookie,	\
-					(__ ## etype) var);	\
+#define SETCASE_UPCASTSU(entry, etype, ETYPE, var, eparam, cookie)	\
+	do {								\
+		case UK_STORE_ENTRY_TYPE(etype):			\
+		if (unlikely(var < 0))					\
+			return -ERANGE;					\
+		return (entry)->set.etype(cookie, (__ ## etype) var);	\
 	} while (0)
 
 /* All other cases */
-#define SETCASE_UPCAST(entry, etype, ETYPE, var, eparam)	\
-	do {							\
-		case UK_STORE_ENTRY_TYPE(etype):		\
-		;						\
-		return (entry)->set.etype(entry->cookie,	\
-					(__ ## etype) var);	\
+#define SETCASE_UPCAST(entry, etype, ETYPE, var, eparam, cookie)	\
+	do {								\
+		case UK_STORE_ENTRY_TYPE(etype):			\
+		;							\
+		return (entry)->set.etype(cookie, (__ ## etype) var);	\
 	} while (0)
 
 /**
@@ -177,27 +171,29 @@ _uk_store_get_static_entry(__u16 libid, const char *e_name)
 int
 _uk_store_set_u8(const struct uk_store_entry *e, __u8 val)
 {
+	void *cookie = NULL;
+
 	UK_ASSERT(e);
 	if (unlikely(e->set.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
-	SETCASE_DOWNCASTUS(e, s8, S8, val, u8);
-	SETCASE_UPCAST(e, u8, U8, val, u8);
-	SETCASE_UPCAST(e, u16, U16, val, u8);
-	SETCASE_UPCAST(e, s16, S16, val, u8);
-	SETCASE_UPCAST(e, u32, U32, val, u8);
-	SETCASE_UPCAST(e, s32, S32, val, u8);
-	SETCASE_UPCAST(e, u64, U64, val, u8);
-	SETCASE_UPCAST(e, s64, S64, val, u8);
-	SETCASE_UPCAST(e, uptr, PTR, val, u8);
+	SETCASE_DOWNCASTUS(e, s8, S8, val, u8, cookie);
+	SETCASE_UPCAST(e, u8, U8, val, u8, cookie);
+	SETCASE_UPCAST(e, u16, U16, val, u8, cookie);
+	SETCASE_UPCAST(e, s16, S16, val, u8, cookie);
+	SETCASE_UPCAST(e, u32, U32, val, u8, cookie);
+	SETCASE_UPCAST(e, s32, S32, val, u8, cookie);
+	SETCASE_UPCAST(e, u64, U64, val, u8, cookie);
+	SETCASE_UPCAST(e, s64, S64, val, u8, cookie);
+	SETCASE_UPCAST(e, uptr, PTR, val, u8, cookie);
 
 	case UK_STORE_ENTRY_TYPE(charp): {
 		int ret;
 		char to_set[_U8_STRLEN];
 
 		snprintf(to_set, _U8_STRLEN, "%" __PRIu8, val);
-		ret = e->set.charp(e->cookie, to_set);
+		ret = e->set.charp(cookie, to_set);
 		return ret;
 	}
 
@@ -210,27 +206,29 @@ _uk_store_set_u8(const struct uk_store_entry *e, __u8 val)
 int
 _uk_store_set_s8(const struct uk_store_entry *e, __s8 val)
 {
+	void *cookie = NULL;
+
 	UK_ASSERT(e);
 	if (unlikely(e->set.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
-	SETCASE_UPCAST(e, s8, S8, val, s8);
-	SETCASE_UPCASTSU(e, u8, U8, val, s8);
-	SETCASE_UPCAST(e, s16, S16, val, s8);
-	SETCASE_UPCASTSU(e, u16, U16, val, s8);
-	SETCASE_UPCAST(e, s32, S32, val, s8);
-	SETCASE_UPCASTSU(e, u32, U32, val, s8);
-	SETCASE_UPCAST(e, u64, U64, val, s8);
-	SETCASE_UPCASTSU(e, s64, S64, val, s8);
-	SETCASE_UPCASTSU(e, uptr, PTR, val, s8);
+	SETCASE_UPCAST(e, s8, S8, val, s8, cookie);
+	SETCASE_UPCASTSU(e, u8, U8, val, s8, cookie);
+	SETCASE_UPCAST(e, s16, S16, val, s8, cookie);
+	SETCASE_UPCASTSU(e, u16, U16, val, s8, cookie);
+	SETCASE_UPCAST(e, s32, S32, val, s8, cookie);
+	SETCASE_UPCASTSU(e, u32, U32, val, s8, cookie);
+	SETCASE_UPCAST(e, u64, U64, val, s8, cookie);
+	SETCASE_UPCASTSU(e, s64, S64, val, s8, cookie);
+	SETCASE_UPCASTSU(e, uptr, PTR, val, s8, cookie);
 
 	case UK_STORE_ENTRY_TYPE(charp): {
 		int ret;
 		char to_set[_S8_STRLEN];
 
 		snprintf(to_set, _S8_STRLEN, "%" __PRIs8, val);
-		ret = e->set.charp(e->cookie, to_set);
+		ret = e->set.charp(cookie, to_set);
 		return ret;
 	}
 
@@ -243,26 +241,28 @@ _uk_store_set_s8(const struct uk_store_entry *e, __s8 val)
 int
 _uk_store_set_u16(const struct uk_store_entry *e, __u16 val)
 {
+	void *cookie = NULL;
+
 	UK_ASSERT(e);
 	if (unlikely(e->set.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
-	SETCASE_DOWNCASTUS(e, s8, S8, val, u16);
-	SETCASE_DOWNCASTUU(e, u8, U8, val, u16);
-	SETCASE_DOWNCASTUS(e, s16, S16, val, u16);
-	SETCASE_UPCAST(e, u16, U16, val, u16);
-	SETCASE_UPCAST(e, s32, S32, val, u16);
-	SETCASE_UPCAST(e, u32, U32, val, u16);
-	SETCASE_UPCAST(e, u64, S64, val, u16);
-	SETCASE_UPCAST(e, uptr, PTR, val, u16);
+	SETCASE_DOWNCASTUS(e, s8, S8, val, u16, cookie);
+	SETCASE_DOWNCASTUU(e, u8, U8, val, u16, cookie);
+	SETCASE_DOWNCASTUS(e, s16, S16, val, u16, cookie);
+	SETCASE_UPCAST(e, u16, U16, val, u16, cookie);
+	SETCASE_UPCAST(e, s32, S32, val, u16, cookie);
+	SETCASE_UPCAST(e, u32, U32, val, u16, cookie);
+	SETCASE_UPCAST(e, u64, S64, val, u16, cookie);
+	SETCASE_UPCAST(e, uptr, PTR, val, u16, cookie);
 
 	case UK_STORE_ENTRY_TYPE(charp): {
 		int ret;
 		char to_set[_U16_STRLEN];
 
 		snprintf(to_set, _U16_STRLEN, "%" __PRIu16, val);
-		ret = e->set.charp(e->cookie, to_set);
+		ret = e->set.charp(cookie, to_set);
 		return ret;
 	}
 
@@ -275,27 +275,29 @@ _uk_store_set_u16(const struct uk_store_entry *e, __u16 val)
 int
 _uk_store_set_s16(const struct uk_store_entry *e, __s16 val)
 {
+	void *cookie = NULL;
+
 	UK_ASSERT(e);
 	if (unlikely(e->set.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
-	SETCASE_DOWNCASTSS(e, s8, S8, val, s16);
-	SETCASE_DOWNCASTSU(e, u8, U8, val, s16);
-	SETCASE_UPCAST(e, s16, S16, val, s16);
-	SETCASE_UPCASTSU(e, u16, U16, val, s16);
-	SETCASE_UPCAST(e, s32, S32, val, s16);
-	SETCASE_UPCASTSU(e, u32, U32, val, s16);
-	SETCASE_UPCAST(e, s64, S64, val, s16);
-	SETCASE_UPCASTSU(e, u64, U64, val, s16);
-	SETCASE_UPCASTSU(e, uptr, PTR, val, s16);
+	SETCASE_DOWNCASTSS(e, s8, S8, val, s16, cookie);
+	SETCASE_DOWNCASTSU(e, u8, U8, val, s16, cookie);
+	SETCASE_UPCAST(e, s16, S16, val, s16, cookie);
+	SETCASE_UPCASTSU(e, u16, U16, val, s16, cookie);
+	SETCASE_UPCAST(e, s32, S32, val, s16, cookie);
+	SETCASE_UPCASTSU(e, u32, U32, val, s16, cookie);
+	SETCASE_UPCAST(e, s64, S64, val, s16, cookie);
+	SETCASE_UPCASTSU(e, u64, U64, val, s16, cookie);
+	SETCASE_UPCASTSU(e, uptr, PTR, val, s16, cookie);
 
 	case UK_STORE_ENTRY_TYPE(charp): {
 		int ret;
 		char to_set[_S16_STRLEN];
 
 		snprintf(to_set, _S16_STRLEN, "%" __PRIs16, val);
-		ret = e->set.charp(e->cookie, to_set);
+		ret = e->set.charp(cookie, to_set);
 		return ret;
 	}
 
@@ -308,27 +310,29 @@ _uk_store_set_s16(const struct uk_store_entry *e, __s16 val)
 int
 _uk_store_set_u32(const struct uk_store_entry *e, __u32 val)
 {
+	void *cookie = NULL;
+
 	UK_ASSERT(e);
 	if (unlikely(e->set.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
-	SETCASE_DOWNCASTUS(e, s8, S8, val, u32);
-	SETCASE_DOWNCASTUU(e, u8, U8, val, u32);
-	SETCASE_DOWNCASTUS(e, s16, S16, val, u32);
-	SETCASE_DOWNCASTUU(e, u16, U16, val, u32);
-	SETCASE_DOWNCASTUS(e, s32, S32, val, u32);
-	SETCASE_UPCAST(e, u32, U32, val, u32);
-	SETCASE_UPCAST(e, s64, S64, val, u32);
-	SETCASE_UPCAST(e, u64, U64, val, u32);
-	SETCASE_UPCAST(e, uptr, UPTR, val, u32);
+	SETCASE_DOWNCASTUS(e, s8, S8, val, u32, cookie);
+	SETCASE_DOWNCASTUU(e, u8, U8, val, u32, cookie);
+	SETCASE_DOWNCASTUS(e, s16, S16, val, u32, cookie);
+	SETCASE_DOWNCASTUU(e, u16, U16, val, u32, cookie);
+	SETCASE_DOWNCASTUS(e, s32, S32, val, u32, cookie);
+	SETCASE_UPCAST(e, u32, U32, val, u32, cookie);
+	SETCASE_UPCAST(e, s64, S64, val, u32, cookie);
+	SETCASE_UPCAST(e, u64, U64, val, u32, cookie);
+	SETCASE_UPCAST(e, uptr, UPTR, val, u32, cookie);
 
 	case UK_STORE_ENTRY_TYPE(charp): {
 		int ret;
 		char to_set[_U32_STRLEN];
 
 		snprintf(to_set, _U32_STRLEN, "%" __PRIu32, val);
-		ret = e->set.charp(e->cookie, to_set);
+		ret = e->set.charp(cookie, to_set);
 		return ret;
 	}
 
@@ -341,27 +345,29 @@ _uk_store_set_u32(const struct uk_store_entry *e, __u32 val)
 int
 _uk_store_set_s32(const struct uk_store_entry *e, __s32 val)
 {
+	void *cookie = NULL;
+
 	UK_ASSERT(e);
 	if (unlikely(e->set.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
-	SETCASE_DOWNCASTSS(e, s8, S8, val, s32);
-	SETCASE_DOWNCASTSU(e, u8, U8, val, s32);
-	SETCASE_DOWNCASTSS(e, s16, S16, val, s32);
-	SETCASE_DOWNCASTSU(e, u16, U16, val, s32);
-	SETCASE_UPCAST(e, s32, S32, val, s32);
-	SETCASE_UPCASTSU(e, u32, S32, val, s32);
-	SETCASE_UPCAST(e, s64, S64, val, s32);
-	SETCASE_UPCASTSU(e, u64, U64, val, s32);
-	SETCASE_UPCASTSU(e, uptr, PTR, val, s32);
+	SETCASE_DOWNCASTSS(e, s8, S8, val, s32, cookie);
+	SETCASE_DOWNCASTSU(e, u8, U8, val, s32, cookie);
+	SETCASE_DOWNCASTSS(e, s16, S16, val, s32, cookie);
+	SETCASE_DOWNCASTSU(e, u16, U16, val, s32, cookie);
+	SETCASE_UPCAST(e, s32, S32, val, s32, cookie);
+	SETCASE_UPCASTSU(e, u32, S32, val, s32, cookie);
+	SETCASE_UPCAST(e, s64, S64, val, s32, cookie);
+	SETCASE_UPCASTSU(e, u64, U64, val, s32, cookie);
+	SETCASE_UPCASTSU(e, uptr, PTR, val, s32, cookie);
 
 	case UK_STORE_ENTRY_TYPE(charp): {
 		int ret;
 		char to_set[_S32_STRLEN];
 
 		snprintf(to_set, _S32_STRLEN, "%" __PRIs32, val);
-		ret = e->set.charp(e->cookie, to_set);
+		ret = e->set.charp(cookie, to_set);
 		return ret;
 	}
 
@@ -374,27 +380,29 @@ _uk_store_set_s32(const struct uk_store_entry *e, __s32 val)
 int
 _uk_store_set_u64(const struct uk_store_entry *e, __u64 val)
 {
+	void *cookie = NULL;
+
 	UK_ASSERT(e);
 	if (unlikely(e->set.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
-	SETCASE_DOWNCASTUS(e, s8, S8, val, u64);
-	SETCASE_DOWNCASTUU(e, u8, U8, val, u64);
-	SETCASE_DOWNCASTUS(e, s16, S16, val, u64);
-	SETCASE_DOWNCASTUU(e, u16, U16, val, u64);
-	SETCASE_DOWNCASTUS(e, s32, S32, val, u64);
-	SETCASE_DOWNCASTUU(e, u32, U32, val, u64);
-	SETCASE_DOWNCASTUS(e, s64, S64, val, u64);
-	SETCASE_UPCAST(e, u64, U64, val, u64);
-	SETCASE_UPCAST(e, uptr, PTR, val, u64);
+	SETCASE_DOWNCASTUS(e, s8, S8, val, u64, cookie);
+	SETCASE_DOWNCASTUU(e, u8, U8, val, u64, cookie);
+	SETCASE_DOWNCASTUS(e, s16, S16, val, u64, cookie);
+	SETCASE_DOWNCASTUU(e, u16, U16, val, u64, cookie);
+	SETCASE_DOWNCASTUS(e, s32, S32, val, u64, cookie);
+	SETCASE_DOWNCASTUU(e, u32, U32, val, u64, cookie);
+	SETCASE_DOWNCASTUS(e, s64, S64, val, u64, cookie);
+	SETCASE_UPCAST(e, u64, U64, val, u64, cookie);
+	SETCASE_UPCAST(e, uptr, PTR, val, u64, cookie);
 
 	case UK_STORE_ENTRY_TYPE(charp): {
 		int ret;
 		char to_set[_U64_STRLEN];
 
 		snprintf(to_set, _U64_STRLEN, "%" __PRIu64, val);
-		ret = e->set.charp(e->cookie, to_set);
+		ret = e->set.charp(cookie, to_set);
 		return ret;
 	}
 
@@ -407,27 +415,29 @@ _uk_store_set_u64(const struct uk_store_entry *e, __u64 val)
 int
 _uk_store_set_s64(const struct uk_store_entry *e, __s64 val)
 {
+	void *cookie = NULL;
+
 	UK_ASSERT(e);
 	if (unlikely(e->set.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
-	SETCASE_DOWNCASTSS(e, s8, S8, val, s64);
-	SETCASE_DOWNCASTSU(e, u8, U8, val, s64);
-	SETCASE_DOWNCASTSS(e, s16, S16, val, s64);
-	SETCASE_DOWNCASTSU(e, u16, U16, val, s64);
-	SETCASE_DOWNCASTSS(e, s32, S32, val, s64);
-	SETCASE_DOWNCASTSU(e, u32, S32, val, s64);
-	SETCASE_UPCAST(e, s64, S64, val, s64);
-	SETCASE_UPCASTSU(e, u64, U64, val, s64);
-	SETCASE_UPCASTSU(e, uptr, PTR, val, s64);
+	SETCASE_DOWNCASTSS(e, s8, S8, val, s64, cookie);
+	SETCASE_DOWNCASTSU(e, u8, U8, val, s64, cookie);
+	SETCASE_DOWNCASTSS(e, s16, S16, val, s64, cookie);
+	SETCASE_DOWNCASTSU(e, u16, U16, val, s64, cookie);
+	SETCASE_DOWNCASTSS(e, s32, S32, val, s64, cookie);
+	SETCASE_DOWNCASTSU(e, u32, S32, val, s64, cookie);
+	SETCASE_UPCAST(e, s64, S64, val, s64, cookie);
+	SETCASE_UPCASTSU(e, u64, U64, val, s64, cookie);
+	SETCASE_UPCASTSU(e, uptr, PTR, val, s64, cookie);
 
 	case UK_STORE_ENTRY_TYPE(charp): {
 		int ret;
 		char to_set[_S64_STRLEN];
 
 		snprintf(to_set, _S64_STRLEN, "%" __PRIs64, val);
-		ret = e->set.charp(e->cookie, to_set);
+		ret = e->set.charp(cookie, to_set);
 		return ret;
 	}
 
@@ -440,27 +450,29 @@ _uk_store_set_s64(const struct uk_store_entry *e, __s64 val)
 int
 _uk_store_set_uptr(const struct uk_store_entry *e, __uptr val)
 {
+	void *cookie = NULL;
+
 	UK_ASSERT(e);
 	if (unlikely(e->set.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
-	SETCASE_DOWNCASTUS(e, s8, S8, val, uptr);
-	SETCASE_DOWNCASTUU(e, u8, U8, val, uptr);
-	SETCASE_DOWNCASTUS(e, s16, S16, val, uptr);
-	SETCASE_DOWNCASTUU(e, u16, U16, val, uptr);
-	SETCASE_DOWNCASTUS(e, s32, S32, val, uptr);
-	SETCASE_DOWNCASTUU(e, u32, U32, val, uptr);
-	SETCASE_DOWNCASTUS(e, s64, S64, val, uptr);
-	SETCASE_UPCAST(e, u64, U64, val, uptr);
-	SETCASE_UPCAST(e, uptr, PTR, val, uptr);
+	SETCASE_DOWNCASTUS(e, s8, S8, val, uptr, cookie);
+	SETCASE_DOWNCASTUU(e, u8, U8, val, uptr, cookie);
+	SETCASE_DOWNCASTUS(e, s16, S16, val, uptr, cookie);
+	SETCASE_DOWNCASTUU(e, u16, U16, val, uptr, cookie);
+	SETCASE_DOWNCASTUS(e, s32, S32, val, uptr, cookie);
+	SETCASE_DOWNCASTUU(e, u32, U32, val, uptr, cookie);
+	SETCASE_DOWNCASTUS(e, s64, S64, val, uptr, cookie);
+	SETCASE_UPCAST(e, u64, U64, val, uptr, cookie);
+	SETCASE_UPCAST(e, uptr, PTR, val, uptr, cookie);
 
 	case UK_STORE_ENTRY_TYPE(charp): {
 		int ret;
 		char to_set[_UPTR_STRLEN];
 
 		snprintf(to_set, _UPTR_STRLEN, "0x%" __PRIx64, val);
-		ret = e->set.charp(e->cookie, to_set);
+		ret = e->set.charp(cookie, to_set);
 		return ret;
 	}
 
@@ -474,6 +486,7 @@ int
 _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 {
 	int ret;
+	void *cookie = NULL;
 
 	UK_ASSERT(e);
 	if (unlikely(e->set.u8 == NULL))
@@ -488,7 +501,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		if (ret < 0)
 			return ret;
 
-		return e->set.u8(e->cookie, to_set);
+		return e->set.u8(cookie, to_set);
 	}
 
 	case UK_STORE_ENTRY_TYPE(s8): {
@@ -498,7 +511,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		if (ret < 0)
 			return ret;
 
-		return e->set.s8(e->cookie, to_set);
+		return e->set.s8(cookie, to_set);
 	}
 
 	case UK_STORE_ENTRY_TYPE(u16): {
@@ -508,7 +521,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		if (ret < 0)
 			return ret;
 
-		return e->set.u16(e->cookie, to_set);
+		return e->set.u16(cookie, to_set);
 	}
 
 	case UK_STORE_ENTRY_TYPE(s16): {
@@ -518,7 +531,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		if (ret < 0)
 			return ret;
 
-		return e->set.s16(e->cookie, to_set);
+		return e->set.s16(cookie, to_set);
 	}
 
 	case UK_STORE_ENTRY_TYPE(u32): {
@@ -528,7 +541,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		if (ret < 0)
 			return ret;
 
-		return e->set.u32(e->cookie, to_set);
+		return e->set.u32(cookie, to_set);
 	}
 
 	case UK_STORE_ENTRY_TYPE(s32): {
@@ -538,7 +551,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		if (ret < 0)
 			return ret;
 
-		return e->set.s32(e->cookie, to_set);
+		return e->set.s32(cookie, to_set);
 	}
 
 	case UK_STORE_ENTRY_TYPE(u64): {
@@ -548,7 +561,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		if (ret < 0)
 			return ret;
 
-		return e->set.u64(e->cookie, to_set);
+		return e->set.u64(cookie, to_set);
 	}
 
 	case UK_STORE_ENTRY_TYPE(s64): {
@@ -558,7 +571,7 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		if (ret < 0)
 			return ret;
 
-		return e->set.s64(e->cookie, to_set);
+		return e->set.s64(cookie, to_set);
 	}
 
 	case UK_STORE_ENTRY_TYPE(uptr): {
@@ -572,11 +585,11 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 		if (ret < 0)
 			return ret;
 
-		return e->set.uptr(e->cookie, to_set);
+		return e->set.uptr(cookie, to_set);
 	}
 
 	case UK_STORE_ENTRY_TYPE(charp): {
-		ret = e->set.charp(e->cookie, val);
+		ret = e->set.charp(cookie, val);
 
 		return ret;
 	}
@@ -597,13 +610,12 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
  */
 
 /* Signed input, unsigned etype */
-#define GETCASE_DOWNCASTSU(entry, etype, PTYPE, var, eparam)		\
+#define GETCASE_DOWNCASTSU(entry, etype, PTYPE, var, eparam, cookie)	\
 	do {								\
 		case UK_STORE_ENTRY_TYPE(etype): {			\
 			__ ## etype val;				\
 									\
-			ret = (entry)->get.etype((entry)->cookie,	\
-						&val);			\
+			ret = (entry)->get.etype(cookie, &val);		\
 			if (ret < 0)					\
 				return ret;				\
 			if (unlikely(val < 0 ||				\
@@ -615,13 +627,12 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 	} while (0)
 
 /* Unsigned input, signed etype */
-#define GETCASE_DOWNCASTUS(entry, etype, PTYPE, var, eparam)		\
+#define GETCASE_DOWNCASTUS(entry, etype, PTYPE, var, eparam, cookie)	\
 	do {								\
 		case UK_STORE_ENTRY_TYPE(etype): {			\
 			__ ## etype val;				\
 									\
-			ret = (entry)->get.etype((entry)->cookie,	\
-						&val);			\
+			ret = (entry)->get.etype(cookie, &val);		\
 			if (ret < 0)					\
 				return ret;				\
 			if (unlikely(val > __ ## PTYPE ## _MAX))	\
@@ -632,13 +643,12 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 	} while (0)
 
 /* Both signed */
-#define GETCASE_DOWNCASTSS(entry, etype, PTYPE, var, eparam)		\
+#define GETCASE_DOWNCASTSS(entry, etype, PTYPE, var, eparam, cookie)	\
 	do {								\
 		case UK_STORE_ENTRY_TYPE(etype): {			\
 			__ ## etype val;				\
 									\
-			ret = (entry)->get.etype((entry)->cookie,	\
-						&val);			\
+			ret = (entry)->get.etype(cookie, &val);		\
 			if (ret < 0)					\
 				return ret;				\
 			if (unlikely(val < __ ## PTYPE ## _MIN		\
@@ -650,13 +660,12 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 	} while (0)
 
 /* Both unsigned */
-#define GETCASE_DOWNCASTUU(entry, etype, PTYPE, var, eparam)		\
+#define GETCASE_DOWNCASTUU(entry, etype, PTYPE, var, eparam, cookie)	\
 	do {								\
 		case UK_STORE_ENTRY_TYPE(etype): {			\
 			__ ## etype val;				\
 									\
-			ret = (entry)->get.etype((entry)->cookie,	\
-							&val);		\
+			ret = (entry)->get.etype(cookie, &val);		\
 			if (ret < 0)					\
 				return ret;				\
 			if (unlikely(val > __ ## PTYPE ## _MAX))	\
@@ -667,13 +676,12 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 	} while (0)
 
 /* All other cases */
-#define GETCASE_UPCAST(entry, etype, PTYPE, var, eparam)		\
+#define GETCASE_UPCAST(entry, etype, PTYPE, var, eparam, cookie)	\
 	do {								\
 		case UK_STORE_ENTRY_TYPE(etype): {			\
 			__ ## etype val;				\
 									\
-			ret = (entry)->get.etype((entry)->cookie,	\
-							&val);		\
+			ret = (entry)->get.etype(cookie, &val);		\
 			if (ret < 0)					\
 				return ret;				\
 			*(var)  = (__ ## eparam) val;			\
@@ -682,13 +690,12 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 	} while (0)
 
 /* Unsigned input, signed etype */
-#define GETCASE_UPCASTSU(entry, etype, PTYPE, var, eparam)		\
+#define GETCASE_UPCASTSU(entry, etype, PTYPE, var, eparam, cookie)	\
 	do {								\
 		case UK_STORE_ENTRY_TYPE(etype): {			\
 			__ ## etype val;				\
 									\
-			ret = (entry)->get.etype((entry)->cookie,	\
-						&val);			\
+			ret = (entry)->get.etype(cookie, &val);		\
 			if (ret < 0)					\
 				return ret;				\
 			if (unlikely(val < 0))				\
@@ -711,27 +718,28 @@ int
 _uk_store_get_u8(const struct uk_store_entry *e, __u8 *out)
 {
 	int ret;
+	void *cookie = NULL;
 
 	UK_ASSERT(e);
 	if (unlikely(e->get.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
-	GETCASE_UPCAST(e, u8, U8, out, u8);
-	GETCASE_UPCASTSU(e, s8, U8, out, u8);
-	GETCASE_DOWNCASTUU(e, u16, U8, out, u8);
-	GETCASE_DOWNCASTSU(e, s16, U8, out, u8);
-	GETCASE_DOWNCASTUU(e, u32, U8, out, u8);
-	GETCASE_DOWNCASTSU(e, s32, U8, out, u8);
-	GETCASE_DOWNCASTUU(e, u64, U8, out, u8);
-	GETCASE_DOWNCASTSU(e, s64, U8, out, u8);
-	GETCASE_DOWNCASTUU(e, uptr, U8, out, u8);
+	GETCASE_UPCAST(e, u8, U8, out, u8, cookie);
+	GETCASE_UPCASTSU(e, s8, U8, out, u8, cookie);
+	GETCASE_DOWNCASTUU(e, u16, U8, out, u8, cookie);
+	GETCASE_DOWNCASTSU(e, s16, U8, out, u8, cookie);
+	GETCASE_DOWNCASTUU(e, u32, U8, out, u8, cookie);
+	GETCASE_DOWNCASTSU(e, s32, U8, out, u8, cookie);
+	GETCASE_DOWNCASTUU(e, u64, U8, out, u8, cookie);
+	GETCASE_DOWNCASTSU(e, s64, U8, out, u8, cookie);
+	GETCASE_DOWNCASTUU(e, uptr, U8, out, u8, cookie);
 
 	case UK_STORE_ENTRY_TYPE(charp): {
 		char *val = NULL;
 		__s16 sscanf_ret;
 
-		ret = e->get.charp(e->cookie, &val);
+		ret = e->get.charp(cookie, &val);
 		if (ret < 0)
 			return ret;
 
@@ -751,27 +759,28 @@ int
 _uk_store_get_s8(const struct uk_store_entry *e, __s8 *out)
 {
 	int ret;
+	void *cookie = NULL;
 
 	UK_ASSERT(e);
 	if (unlikely(e->get.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
-	GETCASE_DOWNCASTUS(e, u8, S8, out, s8);
-	GETCASE_UPCAST(e, s8, S8, out, s8);
-	GETCASE_DOWNCASTUS(e, u16, S8, out, s8);
-	GETCASE_DOWNCASTSS(e, s16, S8, out, s8);
-	GETCASE_DOWNCASTUS(e, u32, S8, out, s8);
-	GETCASE_DOWNCASTSS(e, s32, S8, out, s8);
-	GETCASE_DOWNCASTUS(e, u64, S8, out, s8);
-	GETCASE_DOWNCASTSS(e, s64, S8, out, s8);
-	GETCASE_DOWNCASTUS(e, uptr, S8, out, s8);
+	GETCASE_DOWNCASTUS(e, u8, S8, out, s8, cookie);
+	GETCASE_UPCAST(e, s8, S8, out, s8, cookie);
+	GETCASE_DOWNCASTUS(e, u16, S8, out, s8, cookie);
+	GETCASE_DOWNCASTSS(e, s16, S8, out, s8, cookie);
+	GETCASE_DOWNCASTUS(e, u32, S8, out, s8, cookie);
+	GETCASE_DOWNCASTSS(e, s32, S8, out, s8, cookie);
+	GETCASE_DOWNCASTUS(e, u64, S8, out, s8, cookie);
+	GETCASE_DOWNCASTSS(e, s64, S8, out, s8, cookie);
+	GETCASE_DOWNCASTUS(e, uptr, S8, out, s8, cookie);
 
 	case UK_STORE_ENTRY_TYPE(charp): {
 		char *val = NULL;
 		__s16 sscanf_ret;
 
-		ret = e->get.charp(e->cookie, &val);
+		ret = e->get.charp(cookie, &val);
 		if (ret < 0)
 			return ret;
 
@@ -791,27 +800,28 @@ int
 _uk_store_get_u16(const struct uk_store_entry *e, __u16 *out)
 {
 	int ret;
+	void *cookie = NULL;
 
 	UK_ASSERT(e);
 	if (unlikely(e->get.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
-	GETCASE_UPCAST(e, u8, U16, out, u16);
-	GETCASE_UPCASTSU(e, s8, U16, out, u16);
-	GETCASE_UPCAST(e, u16, U16, out, u16);
-	GETCASE_UPCASTSU(e, s16, U16, out, u16);
-	GETCASE_DOWNCASTUU(e, u32, U16, out, u16);
-	GETCASE_DOWNCASTSU(e, s32, U16, out, u16);
-	GETCASE_DOWNCASTUU(e, u64, U16, out, u16);
-	GETCASE_DOWNCASTSU(e, s64, U16, out, u16);
-	GETCASE_DOWNCASTUU(e, uptr, U16, out, u16);
+	GETCASE_UPCAST(e, u8, U16, out, u16, cookie);
+	GETCASE_UPCASTSU(e, s8, U16, out, u16, cookie);
+	GETCASE_UPCAST(e, u16, U16, out, u16, cookie);
+	GETCASE_UPCASTSU(e, s16, U16, out, u16, cookie);
+	GETCASE_DOWNCASTUU(e, u32, U16, out, u16, cookie);
+	GETCASE_DOWNCASTSU(e, s32, U16, out, u16, cookie);
+	GETCASE_DOWNCASTUU(e, u64, U16, out, u16, cookie);
+	GETCASE_DOWNCASTSU(e, s64, U16, out, u16, cookie);
+	GETCASE_DOWNCASTUU(e, uptr, U16, out, u16, cookie);
 
 	case UK_STORE_ENTRY_TYPE(charp): {
 		char *val = NULL;
 		__s16 sscanf_ret;
 
-		ret = e->get.charp(e->cookie, &val);
+		ret = e->get.charp(cookie, &val);
 		if (ret < 0)
 			return ret;
 
@@ -831,27 +841,28 @@ int
 _uk_store_get_s16(const struct uk_store_entry *e, __s16 *out)
 {
 	int ret;
+	void *cookie = NULL;
 
 	UK_ASSERT(e);
 	if (unlikely(e->get.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
-	GETCASE_UPCAST(e, u8, S16, out, s16);
-	GETCASE_UPCAST(e, s8, S16, out, s16);
-	GETCASE_DOWNCASTUS(e, u16, S16, out, s16);
-	GETCASE_UPCAST(e, s16, S16, out, s16);
-	GETCASE_DOWNCASTUS(e, u32, S16, out, s16);
-	GETCASE_DOWNCASTSS(e, s32, S16, out, s16);
-	GETCASE_DOWNCASTUS(e, u64, S16, out, s16);
-	GETCASE_DOWNCASTSS(e, s64, S16, out, s16);
-	GETCASE_DOWNCASTUS(e, uptr, S16, out, s16);
+	GETCASE_UPCAST(e, u8, S16, out, s16, cookie);
+	GETCASE_UPCAST(e, s8, S16, out, s16, cookie);
+	GETCASE_DOWNCASTUS(e, u16, S16, out, s16, cookie);
+	GETCASE_UPCAST(e, s16, S16, out, s16, cookie);
+	GETCASE_DOWNCASTUS(e, u32, S16, out, s16, cookie);
+	GETCASE_DOWNCASTSS(e, s32, S16, out, s16, cookie);
+	GETCASE_DOWNCASTUS(e, u64, S16, out, s16, cookie);
+	GETCASE_DOWNCASTSS(e, s64, S16, out, s16, cookie);
+	GETCASE_DOWNCASTUS(e, uptr, S16, out, s16, cookie);
 
 	case UK_STORE_ENTRY_TYPE(charp): {
 		char *val = NULL;
 		__s16 sscanf_ret;
 
-		ret = e->get.charp(e->cookie, &val);
+		ret = e->get.charp(cookie, &val);
 		if (ret < 0)
 			return ret;
 
@@ -871,27 +882,28 @@ int
 _uk_store_get_u32(const struct uk_store_entry *e, __u32 *out)
 {
 	int ret;
+	void *cookie = NULL;
 
 	UK_ASSERT(e);
 	if (unlikely(e->get.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
-	GETCASE_UPCAST(e, u8, U32, out, u32);
-	GETCASE_UPCASTSU(e, s8, U32, out, u32);
-	GETCASE_UPCAST(e, u16, U32, out, u32);
-	GETCASE_UPCASTSU(e, s16, U32, out, u32);
-	GETCASE_UPCAST(e, u32, U32, out, u32);
-	GETCASE_UPCASTSU(e, s32, U32, out, u32);
-	GETCASE_DOWNCASTUU(e, u64, U32, out, u32);
-	GETCASE_DOWNCASTSU(e, s64, U32, out, u32);
-	GETCASE_DOWNCASTUU(e, uptr, U32, out, u32);
+	GETCASE_UPCAST(e, u8, U32, out, u32, cookie);
+	GETCASE_UPCASTSU(e, s8, U32, out, u32, cookie);
+	GETCASE_UPCAST(e, u16, U32, out, u32, cookie);
+	GETCASE_UPCASTSU(e, s16, U32, out, u32, cookie);
+	GETCASE_UPCAST(e, u32, U32, out, u32, cookie);
+	GETCASE_UPCASTSU(e, s32, U32, out, u32, cookie);
+	GETCASE_DOWNCASTUU(e, u64, U32, out, u32, cookie);
+	GETCASE_DOWNCASTSU(e, s64, U32, out, u32, cookie);
+	GETCASE_DOWNCASTUU(e, uptr, U32, out, u32, cookie);
 
 	case UK_STORE_ENTRY_TYPE(charp): {
 		char *val = NULL;
 		__s16 sscanf_ret;
 
-		ret = e->get.charp(e->cookie, &val);
+		ret = e->get.charp(cookie, &val);
 		if (ret < 0)
 			return ret;
 
@@ -911,27 +923,28 @@ int
 _uk_store_get_s32(const struct uk_store_entry *e, __s32 *out)
 {
 	int ret;
+	void *cookie = NULL;
 
 	UK_ASSERT(e);
 	if (unlikely(e->get.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
-	GETCASE_UPCAST(e, u8, S32, out, s32);
-	GETCASE_UPCAST(e, s8, S32, out, s32);
-	GETCASE_UPCAST(e, u16, S32, out, s32);
-	GETCASE_UPCAST(e, s16, S32, out, s32);
-	GETCASE_DOWNCASTUS(e, u32, S32, out, s32);
-	GETCASE_UPCAST(e, s32, S32, out, s32);
-	GETCASE_DOWNCASTUS(e, u64, S32, out, s32);
-	GETCASE_DOWNCASTSS(e, s64, S32, out, s32);
-	GETCASE_DOWNCASTUS(e, uptr, S32, out, s32);
+	GETCASE_UPCAST(e, u8, S32, out, s32, cookie);
+	GETCASE_UPCAST(e, s8, S32, out, s32, cookie);
+	GETCASE_UPCAST(e, u16, S32, out, s32, cookie);
+	GETCASE_UPCAST(e, s16, S32, out, s32, cookie);
+	GETCASE_DOWNCASTUS(e, u32, S32, out, s32, cookie);
+	GETCASE_UPCAST(e, s32, S32, out, s32, cookie);
+	GETCASE_DOWNCASTUS(e, u64, S32, out, s32, cookie);
+	GETCASE_DOWNCASTSS(e, s64, S32, out, s32, cookie);
+	GETCASE_DOWNCASTUS(e, uptr, S32, out, s32, cookie);
 
 	case UK_STORE_ENTRY_TYPE(charp): {
 		char *val = NULL;
 		__s16 sscanf_ret;
 
-		ret = e->get.charp(e->cookie, &val);
+		ret = e->get.charp(cookie, &val);
 		if (ret < 0)
 			return ret;
 
@@ -951,27 +964,28 @@ int
 _uk_store_get_u64(const struct uk_store_entry *e, __u64 *out)
 {
 	int ret;
+	void *cookie = NULL;
 
 	UK_ASSERT(e);
 	if (unlikely(e->get.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
-	GETCASE_UPCAST(e, u8, U64, out, u64);
-	GETCASE_UPCASTSU(e, s8, U64, out, u64);
-	GETCASE_UPCAST(e, u16, U64, out, u64);
-	GETCASE_UPCASTSU(e, s16, U64, out, u64);
-	GETCASE_UPCAST(e, u32, U64, out, u64);
-	GETCASE_UPCASTSU(e, s32, U64, out, u64);
-	GETCASE_UPCAST(e, u64, U64, out, u64);
-	GETCASE_UPCASTSU(e, s64, U64, out, u64);
-	GETCASE_UPCAST(e, uptr, U64, out, u64);
+	GETCASE_UPCAST(e, u8, U64, out, u64, cookie);
+	GETCASE_UPCASTSU(e, s8, U64, out, u64, cookie);
+	GETCASE_UPCAST(e, u16, U64, out, u64, cookie);
+	GETCASE_UPCASTSU(e, s16, U64, out, u64, cookie);
+	GETCASE_UPCAST(e, u32, U64, out, u64, cookie);
+	GETCASE_UPCASTSU(e, s32, U64, out, u64, cookie);
+	GETCASE_UPCAST(e, u64, U64, out, u64, cookie);
+	GETCASE_UPCASTSU(e, s64, U64, out, u64, cookie);
+	GETCASE_UPCAST(e, uptr, U64, out, u64, cookie);
 
 	case UK_STORE_ENTRY_TYPE(charp): {
 		char *val = NULL;
 		__s16 sscanf_ret;
 
-		ret = e->get.charp(e->cookie, &val);
+		ret = e->get.charp(cookie, &val);
 		if (ret < 0)
 			return ret;
 
@@ -991,27 +1005,28 @@ int
 _uk_store_get_s64(const struct uk_store_entry *e, __s64 *out)
 {
 	int ret;
+	void *cookie = NULL;
 
 	UK_ASSERT(e);
 	if (unlikely(e->get.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
-	GETCASE_UPCAST(e, u8, S64, out, s64);
-	GETCASE_UPCAST(e, s8, S64, out, s64);
-	GETCASE_UPCAST(e, u16, S64, out, s64);
-	GETCASE_UPCAST(e, s16, S64, out, s64);
-	GETCASE_UPCAST(e, u32, S64, out, s64);
-	GETCASE_UPCAST(e, s32, S64, out, s64);
-	GETCASE_DOWNCASTUS(e, u64, S64, out, s64);
-	GETCASE_UPCAST(e, s64, S64, out, s64);
-	GETCASE_DOWNCASTUS(e, uptr, S64, out, s64);
+	GETCASE_UPCAST(e, u8, S64, out, s64, cookie);
+	GETCASE_UPCAST(e, s8, S64, out, s64, cookie);
+	GETCASE_UPCAST(e, u16, S64, out, s64, cookie);
+	GETCASE_UPCAST(e, s16, S64, out, s64, cookie);
+	GETCASE_UPCAST(e, u32, S64, out, s64, cookie);
+	GETCASE_UPCAST(e, s32, S64, out, s64, cookie);
+	GETCASE_DOWNCASTUS(e, u64, S64, out, s64, cookie);
+	GETCASE_UPCAST(e, s64, S64, out, s64, cookie);
+	GETCASE_DOWNCASTUS(e, uptr, S64, out, s64, cookie);
 
 	case UK_STORE_ENTRY_TYPE(charp): {
 		char *val = NULL;
 		__s16 sscanf_ret;
 
-		ret = e->get.charp(e->cookie, &val);
+		ret = e->get.charp(cookie, &val);
 		if (ret < 0)
 			return ret;
 
@@ -1031,27 +1046,28 @@ int
 _uk_store_get_uptr(const struct uk_store_entry *e, __uptr *out)
 {
 	int ret;
+	void *cookie = NULL;
 
 	UK_ASSERT(e);
 	if (unlikely(e->get.u8 == NULL))
 		return -EIO;
 
 	switch (e->type) {
-	GETCASE_UPCAST(e, u8, PTR, out, uptr);
-	GETCASE_UPCASTSU(e, s8, PTR, out, uptr);
-	GETCASE_UPCAST(e, u16, PTR, out, uptr);
-	GETCASE_UPCASTSU(e, s16, PTR, out, uptr);
-	GETCASE_UPCAST(e, u32, PTR, out, uptr);
-	GETCASE_UPCASTSU(e, s32, PTR, out, uptr);
-	GETCASE_UPCAST(e, u64, PTR, out, uptr);
-	GETCASE_UPCASTSU(e, s64, PTR, out, uptr);
-	GETCASE_UPCAST(e, uptr, PTR, out, uptr);
+	GETCASE_UPCAST(e, u8, PTR, out, uptr, cookie);
+	GETCASE_UPCASTSU(e, s8, PTR, out, uptr, cookie);
+	GETCASE_UPCAST(e, u16, PTR, out, uptr, cookie);
+	GETCASE_UPCASTSU(e, s16, PTR, out, uptr, cookie);
+	GETCASE_UPCAST(e, u32, PTR, out, uptr, cookie);
+	GETCASE_UPCASTSU(e, s32, PTR, out, uptr, cookie);
+	GETCASE_UPCAST(e, u64, PTR, out, uptr, cookie);
+	GETCASE_UPCASTSU(e, s64, PTR, out, uptr, cookie);
+	GETCASE_UPCAST(e, uptr, PTR, out, uptr, cookie);
 
 	case UK_STORE_ENTRY_TYPE(charp): {
 		char *val = NULL;
 		__s16 sscanf_ret;
 
-		ret = e->get.charp(e->cookie, &val);
+		ret = e->get.charp(cookie, &val);
 		if (ret < 0)
 			return ret;
 
@@ -1075,6 +1091,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 {
 	int ret;
 	char *str;
+	void *cookie = NULL;
 
 	UK_ASSERT(e);
 	if (unlikely(e->get.u8 == NULL))
@@ -1088,7 +1105,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 		if (unlikely(!str))
 			return -ENOMEM;
 
-		ret = e->get.u8(e->cookie, &val);
+		ret = e->get.u8(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(str, _U8_STRLEN, "%" __PRIu8, val);
@@ -1103,7 +1120,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 		if (unlikely(!str))
 			return -ENOMEM;
 
-		ret = e->get.s8(e->cookie, &val);
+		ret = e->get.s8(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(str, _S8_STRLEN, "%" __PRIs8, val);
@@ -1118,7 +1135,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 		if (unlikely(!str))
 			return -ENOMEM;
 
-		ret = e->get.u16(e->cookie, &val);
+		ret = e->get.u16(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(str, _U16_STRLEN, "%" __PRIu16, val);
@@ -1133,7 +1150,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 		if (unlikely(!str))
 			return -ENOMEM;
 
-		ret = e->get.s16(e->cookie, &val);
+		ret = e->get.s16(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(str, _S16_STRLEN, "%" __PRIs16, val);
@@ -1148,7 +1165,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 		if (unlikely(!str))
 			return -ENOMEM;
 
-		ret = e->get.u32(e->cookie, &val);
+		ret = e->get.u32(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(str, _U32_STRLEN, "%" __PRIu32, val);
@@ -1163,7 +1180,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 		if (unlikely(!str))
 			return -ENOMEM;
 
-		ret = e->get.s32(e->cookie, &val);
+		ret = e->get.s32(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(str, _S32_STRLEN, "%" __PRIs32, val);
@@ -1178,7 +1195,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 		if (unlikely(!str))
 			return -ENOMEM;
 
-		ret = e->get.u64(e->cookie, &val);
+		ret = e->get.u64(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(str, _U64_STRLEN, "%" __PRIu64, val);
@@ -1193,7 +1210,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 		if (unlikely(!str))
 			return -ENOMEM;
 
-		ret = e->get.s64(e->cookie, &val);
+		ret = e->get.s64(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(str, _S64_STRLEN, "%" __PRIs64, val);
@@ -1208,7 +1225,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 		if (unlikely(!str))
 			return -ENOMEM;
 
-		ret = e->get.uptr(e->cookie, &val);
+		ret = e->get.uptr(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(str, _UPTR_STRLEN, "0x%" __PRIx64, val);
@@ -1219,7 +1236,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 	case UK_STORE_ENTRY_TYPE(charp): {
 		char *val = NULL;
 
-		ret = e->get.charp(e->cookie, &val);
+		ret = e->get.charp(cookie, &val);
 		if (ret < 0)
 			return ret;
 		*out  = val;
@@ -1236,6 +1253,7 @@ int
 uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 {
 	int ret;
+	void *cookie = NULL;
 
 	UK_ASSERT(e);
 	UK_ASSERT(out);
@@ -1246,7 +1264,7 @@ uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 	case UK_STORE_ENTRY_TYPE(u8): {
 		__u8 val;
 
-		ret = e->get.u8(e->cookie, &val);
+		ret = e->get.u8(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(out, maxlen, "%" __PRIu8, val);
@@ -1256,7 +1274,7 @@ uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 	case UK_STORE_ENTRY_TYPE(s8): {
 		__s8 val;
 
-		ret = e->get.s8(e->cookie, &val);
+		ret = e->get.s8(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(out, maxlen, "%" __PRIs8, val);
@@ -1266,7 +1284,7 @@ uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 	case UK_STORE_ENTRY_TYPE(u16): {
 		__u16 val;
 
-		ret = e->get.u16(e->cookie, &val);
+		ret = e->get.u16(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(out, maxlen, "%" __PRIu16, val);
@@ -1276,7 +1294,7 @@ uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 	case UK_STORE_ENTRY_TYPE(s16): {
 		__s16 val;
 
-		ret = e->get.s16(e->cookie, &val);
+		ret = e->get.s16(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(out, maxlen, "%" __PRIs16, val);
@@ -1286,7 +1304,7 @@ uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 	case UK_STORE_ENTRY_TYPE(u32): {
 		__u32 val;
 
-		ret = e->get.u32(e->cookie, &val);
+		ret = e->get.u32(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(out, maxlen, "%" __PRIu32, val);
@@ -1296,7 +1314,7 @@ uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 	case UK_STORE_ENTRY_TYPE(s32): {
 		__s32 val;
 
-		ret = e->get.s32(e->cookie, &val);
+		ret = e->get.s32(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(out, maxlen, "%" __PRIs32, val);
@@ -1306,7 +1324,7 @@ uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 	case UK_STORE_ENTRY_TYPE(u64): {
 		__u64 val;
 
-		ret = e->get.u64(e->cookie, &val);
+		ret = e->get.u64(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(out, maxlen, "%" __PRIu64, val);
@@ -1316,7 +1334,7 @@ uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 	case UK_STORE_ENTRY_TYPE(s64): {
 		__s64 val;
 
-		ret = e->get.s64(e->cookie, &val);
+		ret = e->get.s64(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(out, maxlen, "%" __PRIs64, val);
@@ -1326,7 +1344,7 @@ uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 	case UK_STORE_ENTRY_TYPE(uptr): {
 		__uptr val;
 
-		ret = e->get.uptr(e->cookie, &val);
+		ret = e->get.uptr(cookie, &val);
 		if (ret < 0)
 			return ret;
 		snprintf(out, maxlen, "0x%" __PRIx64, val);
@@ -1336,7 +1354,7 @@ uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 	case UK_STORE_ENTRY_TYPE(charp): {
 		char *val;
 
-		ret = e->get.charp(e->cookie, &val);
+		ret = e->get.charp(cookie, &val);
 		if (ret < 0)
 			return ret;
 		strncpy(out, val, maxlen);

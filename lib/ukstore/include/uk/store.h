@@ -134,9 +134,6 @@ struct uk_store_entry {
 
 	/* Entry getter/setter type */
 	enum uk_store_entry_type type;
-
-	/* Extra cookie that is handed over to getter and setter */
-	void *cookie;
 } __align8;
 
 /* Flags if an entry is static or dynamic */
@@ -145,22 +142,19 @@ struct uk_store_entry {
 #if !CONFIG_LIBUKSTORE
 
 /* Do not call directly */
-#define __UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set,	\
-				arg_cookie)				\
+#define __UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set)	\
 	static const struct uk_store_entry				\
 	__unused __uk_store_entries_list ## _ ## entry = {		\
 		.name = STRINGIFY(entry),				\
 		.type       = (UK_STORE_ENTRY_TYPE(e_type)),		\
 		.get.e_type = (e_get),					\
 		.set.e_type = (e_set),					\
-		.flags      = UK_STORE_ENTRY_FLAG_STATIC,		\
-		.cookie     = (arg_cookie)				\
+		.flags      = UK_STORE_ENTRY_FLAG_STATIC		\
 	}
 
 /* Do not call directly */
-#define _UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set,	\
-				cookie)					\
-	__UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set, cookie)
+#define _UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set)	\
+	__UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set)
 
 /**
  * Adds an entry to the entry section of a library.
@@ -169,11 +163,10 @@ struct uk_store_entry {
  * @param e_type type for the entry, e.g., s8, u16, charp
  * @param e_get getter pointer (optional, can be NULL)
  * @param e_set setter pointer (optional, can be NULL)
- * @param cookie a cookie for extra storage
  */
-#define UK_STORE_STATIC_ENTRY(entry, e_type, e_get, e_set, cookie)	\
-	_UK_STORE_STATIC_ENTRY(entry, STRINGIFY(__LIBNAME__),		\
-		e_type, e_get, e_set, cookie)
+#define UK_STORE_STATIC_ENTRY(entry, e_type, e_get, e_set)	\
+	_UK_STORE_STATIC_ENTRY(entry, STRINGIFY(__LIBNAME__),	\
+			       e_type, e_get, e_set)
 
 #else /* !CONFIG_LIBUKSTORE */
 
@@ -190,8 +183,7 @@ struct uk_store_entry {
 	((entry)->flags & UK_STORE_ENTRY_FLAG_STATIC)
 
 /* Do not call directly */
-#define __UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set,	\
-				arg_cookie)				\
+#define __UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set)	\
 	static const struct uk_store_entry				\
 	__used __section(".uk_store_lib_" lib_str) __align8		\
 	__uk_store_entries_list ## _ ## entry = {			\
@@ -199,14 +191,12 @@ struct uk_store_entry {
 		.type       = (UK_STORE_ENTRY_TYPE(e_type)),		\
 		.get.e_type = (e_get),					\
 		.set.e_type = (e_set),					\
-		.flags      = UK_STORE_ENTRY_FLAG_STATIC,		\
-		.cookie     = (arg_cookie)				\
+		.flags      = UK_STORE_ENTRY_FLAG_STATIC		\
 	}
 
 /* Do not call directly */
-#define _UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set,	\
-				cookie)	\
-	__UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set, cookie)
+#define _UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set)	\
+	__UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set)
 
 /**
  * Adds an entry to the entry section of a library.
@@ -215,11 +205,10 @@ struct uk_store_entry {
  * @param e_type type for the entry, e.g., s8, u16, charp
  * @param e_get getter pointer (optional, can be NULL)
  * @param e_set setter pointer (optional, can be NULL)
- * @param cookie a cookie for extra storage
  */
-#define UK_STORE_STATIC_ENTRY(entry, e_type, e_get, e_set, cookie)	\
-	_UK_STORE_STATIC_ENTRY(entry, STRINGIFY(__LIBNAME__),		\
-		e_type, e_get, e_set, cookie)
+#define UK_STORE_STATIC_ENTRY(entry, e_type, e_get, e_set)	\
+	_UK_STORE_STATIC_ENTRY(entry, STRINGIFY(__LIBNAME__),	\
+			       e_type, e_get, e_set)
 
 const struct uk_store_entry *
 _uk_store_get_static_entry(__u16 libid, const char *e_name);
