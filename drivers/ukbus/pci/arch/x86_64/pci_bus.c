@@ -65,6 +65,63 @@
 		*(ret) = (type) _conf_data;				\
 	} while (0)
 
+int pci_generic_config_read(__u8 bus, __u8 devfn,
+			    int where, int size, void *val)
+{
+	outl(PCI_CONFIG_ADDR, (PCI_ENABLE_BIT)		|
+			      (bus << PCI_BUS_SHIFT)	|
+			      (devfn << PCI_DEVICE_SHIFT)|
+			      (where & ~0x03));
+
+	switch (size) {
+	case 8:
+		*(__u8 *)val = inb(PCI_CONFIG_DATA + (where & 0x03));
+
+		break;
+	case 16:
+		*(__u16 *)val = inw(PCI_CONFIG_DATA + (where & 0x03));
+
+		break;
+	case 32:
+		*(__u16 *)val = inl(PCI_CONFIG_DATA + (where & 0x03));
+
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+int pci_generic_config_write(__u8 bus, __u8 devfn,
+			     int where, int size, __u32 val)
+
+{
+	outl(PCI_CONFIG_ADDR, (PCI_ENABLE_BIT)		|
+			      (bus << PCI_BUS_SHIFT)	|
+			      (devfn << PCI_DEVICE_SHIFT)|
+			      (where & ~0x03));
+
+	switch (size) {
+	case 8:
+		outb(PCI_CONFIG_DATA + (where & 0x03), val);
+
+		break;
+	case 16:
+		outw(PCI_CONFIG_DATA + (where & 0x03), val);
+
+		break;
+	case 32:
+		outl(PCI_CONFIG_DATA + (where & 0x03), val);
+
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static inline int pci_driver_add_device(struct pci_driver *drv,
 					struct pci_address *addr,
 					struct pci_device_id *devid)
