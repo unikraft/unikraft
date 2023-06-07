@@ -1,5 +1,5 @@
 ##
-## VMware platform registration
+## VMWARE platform registration
 ##
 $(eval $(call addplat_s,vmware,$(CONFIG_PLAT_VMWARE)))
 
@@ -8,8 +8,13 @@ $(eval $(call addplat_s,vmware,$(CONFIG_PLAT_VMWARE)))
 ##
 $(eval $(call addplatlib,vmware,libvmwareplat))
 $(eval $(call addplatlib_s,vmware,libvmwarepci,$(CONFIG_VMWARE_PCI)))
+$(eval $(call addplatlib_s,vmware,libvmwarepf,$(CONFIG_VMWARE_PF)))
+$(eval $(call addplatlib_s,vmware,libvmwarevirtio,$(CONFIG_VIRTIO_BUS)))
 $(eval $(call addplatlib_s,vmware,libvmwarevmxnet3,$(CONFIG_VMXNET3)))
 $(eval $(call addplatlib_s,vmware,libvmwaree1000,$(CONFIG_E1000)))
+$(eval $(call addplatlib_s,vmware,libvmwarevirtionet,$(CONFIG_VIRTIO_NET)))
+$(eval $(call addplatlib_s,vmware,libvmwarevirtioblk,$(CONFIG_VIRTIO_BLK)))
+$(eval $(call addplatlib_s,vmware,libvmwarevirtio9p,$(CONFIG_VIRTIO_9P)))
 $(eval $(call addplatlib_s,vmware,libvmwareofw,$(CONFIG_LIBOFW)))
 $(eval $(call addplatlib_s,vmware,libvmwaregic,$(CONFIG_LIBGIC)))
 $(eval $(call addplatlib_s,vmware,libvmwarepl031,$(CONFIG_RTC_PL031)))
@@ -23,14 +28,18 @@ LIBVMWAREPLAT_CINCLUDES-y         += -I$(LIBVMWAREPLAT_BASE)/include
 LIBVMWAREPLAT_CINCLUDES-y         += -I$(UK_PLAT_COMMON_BASE)/include
 LIBVMWAREPLAT_CINCLUDES-y         += -I$(UK_PLAT_DRIVERS_BASE)/include
 
-LIBVMWAREPLAT_ASFLAGS             += -DVMWAREPLAT
-LIBVMWAREPLAT_CFLAGS              += -DVMWAREPLAT
-LIBVMWAREPLAT_CXXFLAGS            += -DVMWAREPLAT
+LIBVMWAREPLAT_ASFLAGS             += -DVMWAREPLAT -DUK_USE_SECTION_SEGMENTS
+LIBVMWAREPLAT_CFLAGS              += -DVMWAREPLAT -DUK_USE_SECTION_SEGMENTS
+LIBVMWAREPLAT_CXXFLAGS            += -DVMWAREPLAT -DUK_USE_SECTION_SEGMENTS
 
 ##
 ## Default Linker script
 ifeq ($(CONFIG_ARCH_X86_64),y)
 UK_PLAT_VMWARE_DEF_LDS            := $(CONFIG_UK_BASE)/plat/vmware/x86/link64.lds.S
+else
+ifeq ($(CONFIG_ARCH_ARM_64),y)
+UK_PLAT_VMWARE_DEF_LDS            := $(CONFIG_UK_BASE)/plat/vmware/arm/link64.lds.S
+endif
 endif
 
 
@@ -73,6 +82,45 @@ ifeq ($(findstring y,$(CONFIG_VMWARE_KERNEL_SERIAL_CONSOLE) $(CONFIG_VMWARE_DEBU
 LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBVMWAREPLAT_BASE)/x86/serial_console.c
 endif
 
+##
+## Architecture library definitions for arm64
+##
+ifeq ($(findstring y,$(CONFIG_VMWARE_KERNEL_SERIAL_CONSOLE) $(CONFIG_VMWARE_DEBUG_SERIAL_CONSOLE)),y)
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_DRIVERS_BASE)/uart/pl011.c
+endif
+ifeq ($(CONFIG_PAGING),y)
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/paging.c|isr
+endif
+ifeq ($(CONFIG_ENFORCE_W_XOR_X),y)
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/w_xor_x.c|common
+endif
+ifeq ($(CONFIG_ARM64_FEAT_PAUTH),y)
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/pauth.c|common
+endif
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/cpu_native.c|common
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/cache64.S|common
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/smccc.c|common
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/smccc_invoke.S|common
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/time.c|common
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/generic_timer.c|common
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/lcpu.c|arm64_common
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/traps_arm64.c|isr
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/tls.c|common
+LIBVMWAREPLAT_SRCS-$(CONFIG_FPSIMD)      += $(UK_PLAT_COMMON_BASE)/arm/fp_arm64.c|isr
+ifeq ($(CONFIG_HAVE_SMP),y)
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/lcpu_start.S
+endif
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/bootinfo.c|common
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/bootinfo.lds.S|common
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBVMWAREPLAT_BASE)/arm/bpt64.S|arm
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBVMWAREPLAT_BASE)/arm/entry64.S|isr
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBVMWAREPLAT_BASE)/arm/exceptions.S|isr
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBVMWAREPLAT_BASE)/arm/pagetable64.S|isr
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBVMWAREPLAT_BASE)/arm/setup.c
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBVMWAREPLAT_BASE)/arm/lcpu.c
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBVMWAREPLAT_BASE)/arm/intctrl.c
+LIBVMWAREPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBVMWAREPLAT_BASE)/arm/memory.c
+
 LIBVMWAREPLAT_SRCS-y              += $(LIBVMWAREPLAT_BASE)/shutdown.c
 LIBVMWAREPLAT_SRCS-y              += $(LIBVMWAREPLAT_BASE)/irq.c
 LIBVMWAREPLAT_SRCS-y              += $(LIBVMWAREPLAT_BASE)/io.c
@@ -91,7 +139,48 @@ LIBVMWAREPCI_CINCLUDES-y   += -I$(UK_PLAT_DRIVERS_BASE)/include
 LIBVMWAREPCI_SRCS-y	+= $(UK_PLAT_COMMON_BASE)/pci_bus.c|common
 LIBVMWAREPCI_SRCS-$(CONFIG_ARCH_X86_64) += \
 				$(UK_PLAT_COMMON_BASE)/x86/pci_bus_x86.c|x86
+LIBVMWAREPCI_SRCS-$(CONFIG_ARCH_ARM_64) += \
+				$(UK_PLAT_COMMON_BASE)/arm/pci_bus_arm64.c|arm
+LIBVMWAREPCI_SRCS-$(CONFIG_ARCH_ARM_64) += \
+				$(UK_PLAT_COMMON_BASE)/pci_ecam.c|arm
 
+##
+## Platform bus library definitions
+##
+LIBVMWAREPF_ASINCLUDES-$(CONFIG_ARCH_ARM_64)  += -I$(UK_PLAT_COMMON_BASE)/include
+LIBVMWAREPF_CINCLUDES-$(CONFIG_ARCH_ARM_64)   += -I$(UK_PLAT_COMMON_BASE)/include
+LIBVMWAREPF_CINCLUDES-$(CONFIG_ARCH_ARM_64)   += -I$(LIBVMWAREPLAT_BASE)/include
+LIBVMWAREPF_CINCLUDES-$(CONFIG_ARCH_ARM_64)   += -I$(UK_PLAT_DRIVERS_BASE)/include
+LIBVMWAREPF_SRCS-$(CONFIG_VMWARE_PF) += $(UK_PLAT_COMMON_BASE)/platform_bus.c|common
+
+##
+## Virtio library definitions
+##
+LIBVMWAREVIRTIO_ASINCLUDES-y   += -I$(LIBVMWAREPLAT_BASE)/include
+LIBVMWAREVIRTIO_CINCLUDES-y    += -I$(LIBVMWAREPLAT_BASE)/include
+LIBVMWAREVIRTIO_ASINCLUDES-y   += -I$(UK_PLAT_COMMON_BASE)/include
+LIBVMWAREVIRTIO_CINCLUDES-y    += -I$(UK_PLAT_COMMON_BASE)/include
+LIBVMWAREVIRTIO_ASINCLUDES-y   += -I$(UK_PLAT_DRIVERS_BASE)/include
+LIBVMWAREVIRTIO_CINCLUDES-y    += -I$(UK_PLAT_DRIVERS_BASE)/include
+LIBVMWAREVIRTIO_SRCS-$(CONFIG_VIRTIO_BUS) +=\
+			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_bus.c
+LIBVMWAREVIRTIO_SRCS-$(CONFIG_VIRTIO_BUS) +=\
+			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_ring.c
+LIBVMWAREVIRTIO_SRCS-$(CONFIG_VIRTIO_PCI) +=\
+			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_pci.c
+LIBVMWAREVIRTIO_SRCS-$(CONFIG_ARCH_ARM_64)	+=\
+			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_mmio.c
+##
+## Virtio Net library definition
+##
+LIBVMWAREVIRTIONET_ASINCLUDES-y   += -I$(LIBVMWAREPLAT_BASE)/include
+LIBVMWAREVIRTIONET_CINCLUDES-y    += -I$(LIBVMWAREPLAT_BASE)/include
+LIBVMWAREVIRTIONET_ASINCLUDES-y   += -I$(UK_PLAT_COMMON_BASE)/include
+LIBVMWAREVIRTIONET_CINCLUDES-y    += -I$(UK_PLAT_COMMON_BASE)/include
+LIBVMWAREVIRTIONET_ASINCLUDES-y   += -I$(UK_PLAT_DRIVERS_BASE)/include
+LIBVMWAREVIRTIONET_CINCLUDES-y    += -I$(UK_PLAT_DRIVERS_BASE)/include
+LIBVMWAREVIRTIONET_SRCS-y +=\
+			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_net.c
 ##
 ## VMXNET3 library definition
 ##
@@ -130,6 +219,29 @@ LIBVMWAREE1000_SRCS-y +=\
 			$(UK_PLAT_DRIVERS_BASE)/e1000/em_rxtx.c
 LIBVMWAREE1000_SRCS-y +=\
 			$(UK_PLAT_DRIVERS_BASE)/e1000/em_ethdev.c
+##
+## Virtio BLK library definition
+##
+LIBVMWAREVIRTIOBLK_ASINCLUDES-y   += -I$(LIBVMWAREPLAT_BASE)/include
+LIBVMWAREVIRTIOBLK_CINCLUDES-y    += -I$(LIBVMWAREPLAT_BASE)/include
+LIBVMWAREVIRTIOBLK_ASINCLUDES-y   += -I$(UK_PLAT_COMMON_BASE)/include
+LIBVMWAREVIRTIOBLK_CINCLUDES-y    += -I$(UK_PLAT_COMMON_BASE)/include
+LIBVMWAREVIRTIOBLK_ASINCLUDES-y   += -I$(UK_PLAT_DRIVERS_BASE)/include
+LIBVMWAREVIRTIOBLK_CINCLUDES-y    += -I$(UK_PLAT_DRIVERS_BASE)/include
+LIBVMWAREVIRTIOBLK_SRCS-y +=\
+			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_blk.c
+
+##
+## Virtio 9P library definition
+##
+LIBVMWAREVIRTIO9P_ASINCLUDES-y   += -I$(LIBVMWAREPLAT_BASE)/include
+LIBVMWAREVIRTIO9P_CINCLUDES-y    += -I$(LIBVMWAREPLAT_BASE)/include
+LIBVMWAREVIRTIO9P_ASINCLUDES-y   += -I$(UK_PLAT_COMMON_BASE)/include
+LIBVMWAREVIRTIO9P_CINCLUDES-y    += -I$(UK_PLAT_COMMON_BASE)/include
+LIBVMWAREVIRTIO9P_ASINCLUDES-y   += -I$(UK_PLAT_DRIVERS_BASE)/include
+LIBVMWAREVIRTIO9P_CINCLUDES-y    += -I$(UK_PLAT_DRIVERS_BASE)/include
+LIBVMWAREVIRTIO9P_SRCS-y +=\
+			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_9p.c
 
 ##
 ## OFW library definitions

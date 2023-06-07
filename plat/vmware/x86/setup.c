@@ -52,17 +52,24 @@ static void *bootmemory_palloc(__sz size, int type)
 	int rc;
 
 	size = PAGE_ALIGN_UP(size);
+	uk_pr_info("Starting\n");
 	ukplat_memregion_foreach(&mrd, UKPLAT_MEMRT_FREE, 0, 0) {
+		uk_pr_info("iteration\n");
 		UK_ASSERT(mrd->pbase <= __U64_MAX - size);
+		uk_pr_info("Did not assert\n");
 		pstart = PAGE_ALIGN_UP(mrd->pbase);
 		pend   = pstart + size;
 
 		if (pend > PLATFORM_MAX_MEM_ADDR ||
-		    pend > mrd->pbase + mrd->len)
+		    pend > mrd->pbase + mrd->len) {
+			uk_pr_info("continuning\n");
 			continue;
+		}
 
+		uk_pr_info("Asserted?\n");
 		UK_ASSERT((mrd->flags & UKPLAT_MEMRF_PERMS) ==
 			  (UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE));
+		uk_pr_info("No\n");
 
 		ostart = mrd->pbase;
 		olen   = mrd->len;
@@ -88,12 +95,15 @@ static void *bootmemory_palloc(__sz size, int type)
 			/* Restore original region */
 			mrd->vbase = ostart;
 			mrd->len   = olen;
+			uk_pr_info("returning null\n");
 
 			return NULL;
 		}
 
+		uk_pr_info("returning pstart\n");
 		return (void *)pstart;
 	}
+	uk_pr_info("returning null2\n");
 
 	return NULL;
 }
