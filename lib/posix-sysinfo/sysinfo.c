@@ -120,6 +120,11 @@ long sysconf(int name)
 	if (name == _SC_PAGESIZE)
 		return __PAGE_SIZE;
 
+#ifdef CONFIG_LIBPOSIX_USER
+	if (name == _SC_GETPW_R_SIZE_MAX)
+		return -1;
+#endif /* CONFIG_LIBPOSIX_USER */
+
 #ifdef CONFIG_HAVE_PAGING
 	if (name == _SC_PHYS_PAGES) {
 		struct uk_pagetable *pt;
