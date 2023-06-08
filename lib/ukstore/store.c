@@ -29,12 +29,15 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-
 #include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <uk/arch/limits.h>
 #include <uk/arch/types.h>
+#include <uk/errptr.h>
+#include <uk/event.h>
+#include <uk/refcount.h>
+#include <uk/spinlock.h>
 #include <uk/store.h>
 
 #define _U8_STRLEN (3 + 1) /* 3 digits plus terminating '\0' */
@@ -47,34 +50,77 @@
 #define _S64_STRLEN (1 + _U64_STRLEN)
 #define _UPTR_STRLEN (2 + 16 + 1) /* 64bit in hex with leading `0x` prefix */
 
+#define UK_STORE_ENTRY_ISSTATIC(entry)				\
+	((entry)->flags & UK_STORE_ENTRY_FLAG_STATIC)
+
+#define OBJECT_ENTRY(e)						\
+	(__containerof(e, struct uk_store_object_entry, entry))
+
+#define OBJECT(e)						\
+	(OBJECT_ENTRY(e)->object)
+
+struct uk_store_object_entry {
+	struct uk_store_entry entry;
+	struct uk_store_object *object;
+	struct uk_list_head list_head;
+} __align8;
+
+/* The starting point of all dynamic objects for each library */
+static struct uk_list_head dynamic_heads[__UKLIBID_COUNT__] = { NULL, };
+static __spinlock dynamic_heads_lock = UK_SPINLOCK_INITIALIZER();
+
 #include <uk/bits/store_array.h>
 
-/**
- * Releases an entry (decreases the refcount and sets the reference to NULL)
- * If the refcount is 0 (it was also released by the creator), it is removed
- * from the list and memory is freed
- *
- * @param p_entry pointer to the entry to release
- */
-void
-_uk_store_release_entry(const struct uk_store_entry *p_entry)
-{
-	if (UK_STORE_ENTRY_ISSTATIC(p_entry))
-		return;
-}
+#define _UK_STORE_DYNAMIC_CREATE_TYPED(gen_type)			\
+	const struct uk_store_entry *					\
+	_uk_store_create_dynamic_entry_ ## gen_type(			\
+		struct uk_store_object *object,				\
+		__u64 entry_id,						\
+		const char *name,					\
+		uk_store_get_ ## gen_type ## _func_t get,		\
+		uk_store_set_ ## gen_type ## _func_t set)		\
+	{								\
+		struct uk_store_object_entry *new_object_entry;		\
+									\
+		UK_ASSERT(object || name || object->a);			\
+									\
+		new_object_entry = object->a->malloc(object->a,		\
+					sizeof(*new_object_entry));	\
+		if (!new_object_entry)					\
+			return ERR2PTR(ENOMEM);				\
+									\
+		new_object_entry->entry.name = object->a->malloc(	\
+			object->a, sizeof(*name) * (strlen(name) + 1));	\
+		if (!new_object_entry->entry.name) {			\
+			object->a->free(object->a, new_object_entry);	\
+			return ERR2PTR(ENOMEM);				\
+		}							\
+		strcpy(new_object_entry->entry.name, name);		\
+		new_object_entry->entry.id = entry_id;			\
+		new_object_entry->entry.type =				\
+				UK_STORE_ENTRY_TYPE(gen_type);		\
+		new_object_entry->entry.get.gen_type = get;		\
+		new_object_entry->entry.set.gen_type = set;		\
+		new_object_entry->entry.flags = 0;			\
+		new_object_entry->object = object;			\
+									\
+		uk_list_add(&(new_object_entry)->list_head,		\
+			    &(object)->entry_head);			\
+									\
+		return &new_object_entry->entry;			\
+	}
 
-const struct uk_store_entry *
-_uk_store_get_static_entry(__u16 libid, __u64 entry_id)
-{
-	struct uk_store_entry *entry = static_entries[2 * libid];
-	struct uk_store_entry *stop = static_entries[2 * libid + 1];
-
-	for (; entry != stop; ++entry)
-		if (entry->id == entry_id)
-			return entry;
-
-	return NULL;
-}
+/* Generate a function creator for each type */
+_UK_STORE_DYNAMIC_CREATE_TYPED(u8);
+_UK_STORE_DYNAMIC_CREATE_TYPED(s8);
+_UK_STORE_DYNAMIC_CREATE_TYPED(u16);
+_UK_STORE_DYNAMIC_CREATE_TYPED(s16);
+_UK_STORE_DYNAMIC_CREATE_TYPED(u32);
+_UK_STORE_DYNAMIC_CREATE_TYPED(s32);
+_UK_STORE_DYNAMIC_CREATE_TYPED(u64);
+_UK_STORE_DYNAMIC_CREATE_TYPED(s64);
+_UK_STORE_DYNAMIC_CREATE_TYPED(uptr);
+_UK_STORE_DYNAMIC_CREATE_TYPED(charp);
 
 /* Capital types used internally */
 #define S8  __do_not_expand__
@@ -86,6 +132,263 @@ _uk_store_get_static_entry(__u16 libid, __u64 entry_id)
 #define S64 __do_not_expand__
 #define U64 __do_not_expand__
 #define PTR __do_not_expand__
+
+static void free_entry(const struct uk_store_entry *entry)
+{
+	struct uk_alloc *a = OBJECT(entry)->a;
+
+	if (UK_STORE_ENTRY_ISSTATIC(entry))
+		return;
+
+	a->free(a, entry->name);
+	a->free(a, OBJECT_ENTRY(entry));
+}
+
+static void release_entry(const struct uk_store_entry *entry)
+{
+	struct uk_store_object_entry *obj_entry;
+
+	if (UK_STORE_ENTRY_ISSTATIC(entry))
+		return;
+
+	obj_entry = OBJECT_ENTRY(entry);
+
+	uk_list_del(&obj_entry->list_head);
+
+	free_entry(entry);
+}
+
+static void free_object(struct uk_store_object *object)
+{
+	struct uk_store_object_entry *iter, *sec;
+	const struct uk_store_entry *entry;
+
+	object->a->free(object->a, object->name);
+
+	uk_list_for_each_entry_safe(iter, sec,
+				&object->entry_head, list_head) {
+		uk_list_del(&iter->list_head);
+		iter->object = NULL;
+		entry = &iter->entry;
+		release_entry(entry);
+	}
+}
+
+static struct uk_store_object *get_obj_by_id(unsigned int lib_id, __u64 obj_id)
+{
+	struct uk_store_object *obj = NULL;
+
+	uk_list_for_each_entry(obj, &dynamic_heads[lib_id], object_head)
+		if (obj->id == obj_id)
+			break;
+
+	return obj;
+}
+
+struct uk_store_object *
+uk_store_obj_alloc(struct uk_alloc *a, __u64 id, const char *name,
+		   const struct uk_store_entry *entries[], void *cookie)
+{
+	struct uk_store_object *new_object;
+	const struct uk_store_entry *e;
+
+	UK_ASSERT(name);
+	UK_ASSERT(entries);
+
+	new_object = a->malloc(a, sizeof(*new_object));
+	if (!new_object)
+		return ERR2PTR(ENOMEM);
+
+	new_object->name = a->malloc(a, sizeof(*name) * (strlen(name) + 1));
+	if (!new_object->name) {
+		a->free(a, new_object);
+		return ERR2PTR(ENOMEM);
+	}
+
+	strcpy(new_object->name, name);
+
+	new_object->a = a;
+	new_object->id = id;
+	new_object->cookie = cookie;
+
+	uk_refcount_init(&new_object->refcount, 1);
+
+	UK_INIT_LIST_HEAD(&new_object->object_head);
+	UK_INIT_LIST_HEAD(&new_object->entry_head);
+
+	for (__sz i = 0; entries[i]; i++) {
+		e = entries[i];
+		switch (e->type) {
+		case UK_STORE_ENTRY_TYPE(s8):
+			_uk_store_create_dynamic_entry_s8(new_object,
+							  e->id,
+							  e->name,
+							  e->get.s8,
+							  e->set.s8);
+			break;
+		case UK_STORE_ENTRY_TYPE(u8):
+			_uk_store_create_dynamic_entry_u8(new_object,
+							  e->id,
+							  e->name,
+							  e->get.u8,
+							  e->set.u8);
+			break;
+		case UK_STORE_ENTRY_TYPE(s16):
+			_uk_store_create_dynamic_entry_s16(new_object,
+							   e->id,
+							   e->name,
+							   e->get.s16,
+							   e->set.s16);
+			break;
+		case UK_STORE_ENTRY_TYPE(u16):
+			_uk_store_create_dynamic_entry_u16(new_object,
+							   e->id,
+							   e->name,
+							   e->get.u16,
+							   e->set.u16);
+			break;
+		case UK_STORE_ENTRY_TYPE(s32):
+			_uk_store_create_dynamic_entry_s32(new_object,
+							   e->id,
+							   e->name,
+							   e->get.s32,
+							   e->set.s32);
+			break;
+		case UK_STORE_ENTRY_TYPE(u32):
+			_uk_store_create_dynamic_entry_u32(new_object,
+							   e->id,
+							   e->name,
+							   e->get.u32,
+							   e->set.u32);
+			break;
+		case UK_STORE_ENTRY_TYPE(s64):
+			_uk_store_create_dynamic_entry_s64(new_object,
+							   e->id,
+							   e->name,
+							   e->get.s64,
+							   e->set.s64);
+			break;
+		case UK_STORE_ENTRY_TYPE(u64):
+			_uk_store_create_dynamic_entry_u64(new_object,
+							   e->id,
+							   e->name,
+							   e->get.u64,
+							   e->set.u64);
+			break;
+
+		case UK_STORE_ENTRY_TYPE(uptr):
+			_uk_store_create_dynamic_entry_uptr(new_object,
+							    e->id,
+							    e->name,
+							    e->get.uptr,
+							    e->set.uptr);
+			break;
+		case UK_STORE_ENTRY_TYPE(charp):
+			_uk_store_create_dynamic_entry_charp(new_object,
+							     e->id,
+							     e->name,
+							     e->get.charp,
+							     e->set.charp);
+			break;
+		default:
+			return ERR2PTR(EINVAL);
+		};
+	}
+
+	return new_object;
+}
+
+int _uk_store_obj_add(__u16 library_id, struct uk_store_object *object)
+{
+	struct uk_store_event_data event_data;
+
+	UK_ASSERT(object);
+
+	if (!dynamic_heads[library_id].next)
+		UK_INIT_LIST_HEAD(&dynamic_heads[library_id]);
+
+	object->libid = library_id;
+	uk_list_add(&object->object_head, &dynamic_heads[library_id]);
+
+	/* Notify consumers */
+	event_data = (struct uk_store_event_data) {
+		.library_id = object->libid,
+		.object_id = object->id
+	};
+
+	uk_raise_event(UKSTORE_EVENT_CREATE_OBJECT, &event_data);
+
+	return 0;
+}
+
+struct uk_store_object *uk_store_obj_acquire(__u16 library_id, __u64 object_id)
+{
+	struct uk_store_object *obj = NULL;
+
+	if (!dynamic_heads[library_id].next)
+		return NULL;
+
+	uk_spin_lock(&dynamic_heads_lock);
+
+	obj = get_obj_by_id(library_id, object_id);
+	if (unlikely(!obj))
+		goto out;
+
+	uk_refcount_acquire(&obj->refcount);
+out:
+	uk_spin_unlock(&dynamic_heads_lock);
+
+	return obj;
+}
+
+void uk_store_obj_release(struct uk_store_object *object)
+{
+	int res;
+
+	UK_ASSERT(object);
+
+	if (!dynamic_heads[object->libid].next)
+		return;
+
+	uk_spin_lock(&dynamic_heads_lock);
+
+	res = uk_refcount_release_if_not_last(&object->refcount);
+	if (!res) {
+		uk_list_del(&(object->object_head));
+		free_object(object);
+	}
+	uk_spin_unlock(&dynamic_heads_lock);
+}
+
+const struct uk_store_entry *uk_store_static_entry_get(__u16 libid,
+						       __u64 entry_id)
+{
+	struct uk_store_entry *entry = static_entries[2 * libid];
+	struct uk_store_entry *stop = static_entries[2 * libid + 1];
+
+	for (; entry != stop; ++entry)
+		if (entry->id == entry_id)
+			return entry;
+
+	return NULL;
+}
+
+const struct uk_store_entry *
+uk_store_obj_entry_get(struct uk_store_object *object, __u64 entry_id)
+{
+	struct uk_store_object_entry *res = NULL;
+
+	UK_ASSERT(object);
+
+	uk_list_for_each_entry(res, &object->entry_head, list_head)
+		if (res->entry.id == entry_id)
+			break;
+
+	if (res)
+		return &res->entry;
+
+	return NULL;
+}
 
 /**
  * Case defines used internally for shortening code
@@ -170,6 +473,9 @@ _uk_store_set_u8(const struct uk_store_entry *e, __u8 val)
 	if (unlikely(e->set.u8 == NULL))
 		return -EIO;
 
+	if (!UK_STORE_ENTRY_ISSTATIC(e))
+		cookie = OBJECT(e)->cookie;
+
 	switch (e->type) {
 	SETCASE_DOWNCASTUS(e, s8, S8, val, u8, cookie);
 	SETCASE_UPCAST(e, u8, U8, val, u8, cookie);
@@ -204,6 +510,9 @@ _uk_store_set_s8(const struct uk_store_entry *e, __s8 val)
 	UK_ASSERT(e);
 	if (unlikely(e->set.u8 == NULL))
 		return -EIO;
+
+	if (!UK_STORE_ENTRY_ISSTATIC(e))
+		cookie = OBJECT(e)->cookie;
 
 	switch (e->type) {
 	SETCASE_UPCAST(e, s8, S8, val, s8, cookie);
@@ -240,6 +549,9 @@ _uk_store_set_u16(const struct uk_store_entry *e, __u16 val)
 	if (unlikely(e->set.u8 == NULL))
 		return -EIO;
 
+	if (!UK_STORE_ENTRY_ISSTATIC(e))
+		cookie = OBJECT(e)->cookie;
+
 	switch (e->type) {
 	SETCASE_DOWNCASTUS(e, s8, S8, val, u16, cookie);
 	SETCASE_DOWNCASTUU(e, u8, U8, val, u16, cookie);
@@ -273,6 +585,9 @@ _uk_store_set_s16(const struct uk_store_entry *e, __s16 val)
 	UK_ASSERT(e);
 	if (unlikely(e->set.u8 == NULL))
 		return -EIO;
+
+	if (!UK_STORE_ENTRY_ISSTATIC(e))
+		cookie = OBJECT(e)->cookie;
 
 	switch (e->type) {
 	SETCASE_DOWNCASTSS(e, s8, S8, val, s16, cookie);
@@ -309,6 +624,9 @@ _uk_store_set_u32(const struct uk_store_entry *e, __u32 val)
 	if (unlikely(e->set.u8 == NULL))
 		return -EIO;
 
+	if (!UK_STORE_ENTRY_ISSTATIC(e))
+		cookie = OBJECT(e)->cookie;
+
 	switch (e->type) {
 	SETCASE_DOWNCASTUS(e, s8, S8, val, u32, cookie);
 	SETCASE_DOWNCASTUU(e, u8, U8, val, u32, cookie);
@@ -343,6 +661,9 @@ _uk_store_set_s32(const struct uk_store_entry *e, __s32 val)
 	UK_ASSERT(e);
 	if (unlikely(e->set.u8 == NULL))
 		return -EIO;
+
+	if (!UK_STORE_ENTRY_ISSTATIC(e))
+		cookie = OBJECT(e)->cookie;
 
 	switch (e->type) {
 	SETCASE_DOWNCASTSS(e, s8, S8, val, s32, cookie);
@@ -379,6 +700,9 @@ _uk_store_set_u64(const struct uk_store_entry *e, __u64 val)
 	if (unlikely(e->set.u8 == NULL))
 		return -EIO;
 
+	if (!UK_STORE_ENTRY_ISSTATIC(e))
+		cookie = OBJECT(e)->cookie;
+
 	switch (e->type) {
 	SETCASE_DOWNCASTUS(e, s8, S8, val, u64, cookie);
 	SETCASE_DOWNCASTUU(e, u8, U8, val, u64, cookie);
@@ -414,6 +738,9 @@ _uk_store_set_s64(const struct uk_store_entry *e, __s64 val)
 	if (unlikely(e->set.u8 == NULL))
 		return -EIO;
 
+	if (!UK_STORE_ENTRY_ISSTATIC(e))
+		cookie = OBJECT(e)->cookie;
+
 	switch (e->type) {
 	SETCASE_DOWNCASTSS(e, s8, S8, val, s64, cookie);
 	SETCASE_DOWNCASTSU(e, u8, U8, val, s64, cookie);
@@ -448,6 +775,9 @@ _uk_store_set_uptr(const struct uk_store_entry *e, __uptr val)
 	UK_ASSERT(e);
 	if (unlikely(e->set.u8 == NULL))
 		return -EIO;
+
+	if (!UK_STORE_ENTRY_ISSTATIC(e))
+		cookie = OBJECT(e)->cookie;
 
 	switch (e->type) {
 	SETCASE_DOWNCASTUS(e, s8, S8, val, uptr, cookie);
@@ -485,6 +815,8 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val)
 	if (unlikely(e->set.u8 == NULL))
 		return -EIO;
 
+	if (!UK_STORE_ENTRY_ISSTATIC(e))
+		cookie = OBJECT(e)->cookie;
 
 	switch (e->type) {
 	case UK_STORE_ENTRY_TYPE(u8): {
@@ -717,6 +1049,9 @@ _uk_store_get_u8(const struct uk_store_entry *e, __u8 *out)
 	if (unlikely(e->get.u8 == NULL))
 		return -EIO;
 
+	if (!UK_STORE_ENTRY_ISSTATIC(e))
+		cookie = OBJECT(e)->cookie;
+
 	switch (e->type) {
 	GETCASE_UPCAST(e, u8, U8, out, u8, cookie);
 	GETCASE_UPCASTSU(e, s8, U8, out, u8, cookie);
@@ -757,6 +1092,9 @@ _uk_store_get_s8(const struct uk_store_entry *e, __s8 *out)
 	UK_ASSERT(e);
 	if (unlikely(e->get.u8 == NULL))
 		return -EIO;
+
+	if (!UK_STORE_ENTRY_ISSTATIC(e))
+		cookie = OBJECT(e)->cookie;
 
 	switch (e->type) {
 	GETCASE_DOWNCASTUS(e, u8, S8, out, s8, cookie);
@@ -799,6 +1137,9 @@ _uk_store_get_u16(const struct uk_store_entry *e, __u16 *out)
 	if (unlikely(e->get.u8 == NULL))
 		return -EIO;
 
+	if (!UK_STORE_ENTRY_ISSTATIC(e))
+		cookie = OBJECT(e)->cookie;
+
 	switch (e->type) {
 	GETCASE_UPCAST(e, u8, U16, out, u16, cookie);
 	GETCASE_UPCASTSU(e, s8, U16, out, u16, cookie);
@@ -839,6 +1180,9 @@ _uk_store_get_s16(const struct uk_store_entry *e, __s16 *out)
 	UK_ASSERT(e);
 	if (unlikely(e->get.u8 == NULL))
 		return -EIO;
+
+	if (!UK_STORE_ENTRY_ISSTATIC(e))
+		cookie = OBJECT(e)->cookie;
 
 	switch (e->type) {
 	GETCASE_UPCAST(e, u8, S16, out, s16, cookie);
@@ -881,6 +1225,9 @@ _uk_store_get_u32(const struct uk_store_entry *e, __u32 *out)
 	if (unlikely(e->get.u8 == NULL))
 		return -EIO;
 
+	if (!UK_STORE_ENTRY_ISSTATIC(e))
+		cookie = OBJECT(e)->cookie;
+
 	switch (e->type) {
 	GETCASE_UPCAST(e, u8, U32, out, u32, cookie);
 	GETCASE_UPCASTSU(e, s8, U32, out, u32, cookie);
@@ -921,6 +1268,9 @@ _uk_store_get_s32(const struct uk_store_entry *e, __s32 *out)
 	UK_ASSERT(e);
 	if (unlikely(e->get.u8 == NULL))
 		return -EIO;
+
+	if (!UK_STORE_ENTRY_ISSTATIC(e))
+		cookie = OBJECT(e)->cookie;
 
 	switch (e->type) {
 	GETCASE_UPCAST(e, u8, S32, out, s32, cookie);
@@ -963,6 +1313,9 @@ _uk_store_get_u64(const struct uk_store_entry *e, __u64 *out)
 	if (unlikely(e->get.u8 == NULL))
 		return -EIO;
 
+	if (!UK_STORE_ENTRY_ISSTATIC(e))
+		cookie = OBJECT(e)->cookie;
+
 	switch (e->type) {
 	GETCASE_UPCAST(e, u8, U64, out, u64, cookie);
 	GETCASE_UPCASTSU(e, s8, U64, out, u64, cookie);
@@ -1003,6 +1356,9 @@ _uk_store_get_s64(const struct uk_store_entry *e, __s64 *out)
 	UK_ASSERT(e);
 	if (unlikely(e->get.u8 == NULL))
 		return -EIO;
+
+	if (!UK_STORE_ENTRY_ISSTATIC(e))
+		cookie = OBJECT(e)->cookie;
 
 	switch (e->type) {
 	GETCASE_UPCAST(e, u8, S64, out, s64, cookie);
@@ -1045,6 +1401,9 @@ _uk_store_get_uptr(const struct uk_store_entry *e, __uptr *out)
 	if (unlikely(e->get.u8 == NULL))
 		return -EIO;
 
+	if (!UK_STORE_ENTRY_ISSTATIC(e))
+		cookie = OBJECT(e)->cookie;
+
 	switch (e->type) {
 	GETCASE_UPCAST(e, u8, PTR, out, uptr, cookie);
 	GETCASE_UPCASTSU(e, s8, PTR, out, uptr, cookie);
@@ -1085,16 +1444,24 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 	int ret;
 	char *str;
 	void *cookie = NULL;
+	struct uk_alloc *a = OBJECT(e)->a;
 
 	UK_ASSERT(e);
 	if (unlikely(e->get.u8 == NULL))
 		return -EIO;
 
+	if (!UK_STORE_ENTRY_ISSTATIC(e))
+		cookie = OBJECT(e)->cookie;
+
 	switch (e->type) {
 	case UK_STORE_ENTRY_TYPE(u8): {
 		__u8 val;
 
-		str = calloc(_U8_STRLEN, sizeof(char));
+		if (UK_STORE_ENTRY_ISSTATIC(e))
+			str = calloc(_U8_STRLEN, sizeof(char));
+		else
+			str = a->calloc(a, _U8_STRLEN, sizeof(char));
+
 		if (unlikely(!str))
 			return -ENOMEM;
 
@@ -1109,7 +1476,11 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 	case UK_STORE_ENTRY_TYPE(s8): {
 		__s8 val;
 
-		str = calloc(_S8_STRLEN, sizeof(char));
+		if (UK_STORE_ENTRY_ISSTATIC(e))
+			str = calloc(_S8_STRLEN, sizeof(char));
+		else
+			str = a->calloc(a, _S8_STRLEN, sizeof(char));
+
 		if (unlikely(!str))
 			return -ENOMEM;
 
@@ -1124,7 +1495,11 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 	case UK_STORE_ENTRY_TYPE(u16): {
 		__u16 val;
 
-		str = calloc(_U16_STRLEN, sizeof(char));
+		if (UK_STORE_ENTRY_ISSTATIC(e))
+			str = calloc(_U16_STRLEN, sizeof(char));
+		else
+			str = a->calloc(a, _U16_STRLEN, sizeof(char));
+
 		if (unlikely(!str))
 			return -ENOMEM;
 
@@ -1139,7 +1514,11 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 	case UK_STORE_ENTRY_TYPE(s16): {
 		__s16 val;
 
-		str = calloc(_S16_STRLEN, sizeof(char));
+		if (UK_STORE_ENTRY_ISSTATIC(e))
+			str = calloc(_S16_STRLEN, sizeof(char));
+		else
+			str = a->calloc(a, _S16_STRLEN, sizeof(char));
+
 		if (unlikely(!str))
 			return -ENOMEM;
 
@@ -1154,7 +1533,11 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 	case UK_STORE_ENTRY_TYPE(u32): {
 		__u32 val;
 
-		str = calloc(_U32_STRLEN, sizeof(char));
+		if (UK_STORE_ENTRY_ISSTATIC(e))
+			str = calloc(_U32_STRLEN, sizeof(char));
+		else
+			str = a->calloc(a, _U32_STRLEN, sizeof(char));
+
 		if (unlikely(!str))
 			return -ENOMEM;
 
@@ -1169,7 +1552,11 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 	case UK_STORE_ENTRY_TYPE(s32): {
 		__s32 val;
 
-		str = calloc(_S32_STRLEN, sizeof(char));
+		if (UK_STORE_ENTRY_ISSTATIC(e))
+			str = calloc(_S32_STRLEN, sizeof(char));
+		else
+			str = a->calloc(a, _S32_STRLEN, sizeof(char));
+
 		if (unlikely(!str))
 			return -ENOMEM;
 
@@ -1184,7 +1571,11 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 	case UK_STORE_ENTRY_TYPE(u64): {
 		__u64 val;
 
-		str = calloc(_U64_STRLEN, sizeof(char));
+		if (UK_STORE_ENTRY_ISSTATIC(e))
+			str = calloc(_U64_STRLEN, sizeof(char));
+		else
+			str = a->calloc(a, _U64_STRLEN, sizeof(char));
+
 		if (unlikely(!str))
 			return -ENOMEM;
 
@@ -1199,7 +1590,11 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 	case UK_STORE_ENTRY_TYPE(s64): {
 		__s64 val;
 
-		str = calloc(_S64_STRLEN, sizeof(char));
+		if (UK_STORE_ENTRY_ISSTATIC(e))
+			str = calloc(_S64_STRLEN, sizeof(char));
+		else
+			str = a->calloc(a, _S64_STRLEN, sizeof(char));
+
 		if (unlikely(!str))
 			return -ENOMEM;
 
@@ -1214,7 +1609,11 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 	case UK_STORE_ENTRY_TYPE(uptr): {
 		__uptr val;
 
-		str = calloc(_UPTR_STRLEN, sizeof(char));
+		if (UK_STORE_ENTRY_ISSTATIC(e))
+			str = calloc(_UPTR_STRLEN, sizeof(char));
+		else
+			str = a->calloc(a, _UPTR_STRLEN, sizeof(char));
+
 		if (unlikely(!str))
 			return -ENOMEM;
 
@@ -1243,7 +1642,7 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out)
 
 
 int
-uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
+_uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 {
 	int ret;
 	void *cookie = NULL;
@@ -1252,6 +1651,9 @@ uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 	UK_ASSERT(out);
 	if (unlikely(e->get.u8 == NULL))
 		return -EIO;
+
+	if (!UK_STORE_ENTRY_ISSTATIC(e))
+		cookie = OBJECT(e)->cookie;
 
 	switch (e->type) {
 	case UK_STORE_ENTRY_TYPE(u8): {
@@ -1359,3 +1761,6 @@ uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen)
 		return -EINVAL;
 	}
 }
+
+UK_EVENT(UKSTORE_EVENT_CREATE_OBJECT);
+UK_EVENT(UKSTORE_EVENT_RELEASE_OBJECT);
