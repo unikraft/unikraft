@@ -35,6 +35,7 @@
 
 #include <uk/arch/types.h>
 #include <uk/plat/tls.h>
+#include <uk/assert.h>
 
 #if defined(LINUXUPLAT) && defined(__X86_64__)
 #include <linuxu/x86/tls.h>
@@ -46,6 +47,11 @@
 #error "For thread-local storage support, add tls.h for current architecture."
 #endif
 
+#if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
+#include <uk/plat/tls.h>
+#include <uk/thread.h>
+#endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
+
 __uptr ukplat_tlsp_get(void)
 {
 	return (__uptr) get_tls_pointer();
@@ -55,3 +61,38 @@ void ukplat_tlsp_set(__uptr tlsp)
 {
 	set_tls_pointer(tlsp);
 }
+
+#if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
+
+extern __uk_tls __uptr _uk_syscall_ultlsp;
+
+__uptr ukplat_tlsp_enter(void)
+{
+	struct uk_thread *self = uk_thread_current();
+	__uptr orig_tlsp = ukplat_tlsp_get();
+
+	UK_ASSERT(self);
+	ukplat_tlsp_set(self->uktlsp);
+	_uk_syscall_ultlsp = orig_tlsp;
+	return orig_tlsp;
+}
+
+void ukplat_tlsp_exit(__uptr orig_tlsp)
+{
+	struct uk_thread *self = uk_thread_current();
+
+	UK_ASSERT(self);
+	uk_thread_uktls_var(self, _uk_syscall_ultlsp) = 0x0;
+
+	/* Restore original TLS only if it was _NOT_
+	 * changed by the system call handler
+	 */
+	if (likely(ukplat_tlsp_get() == self->uktlsp)) {
+		ukplat_tlsp_set(orig_tlsp);
+	} else {
+		uk_pr_debug("System call updated userland TLS pointer register to %p (before: %p)\n",
+			    (void *) orig_tlsp, (void *) ukplat_tlsp_get());
+	}
+}
+
+#endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
