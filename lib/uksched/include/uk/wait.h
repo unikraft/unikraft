@@ -102,7 +102,7 @@ do { \
 	unsigned long flags; \
 	int timedout = 0; \
 	DEFINE_WAIT(__wait); \
-	if (!(condition)) { \
+	if (unlikely(!(condition))) { \
 		__current = uk_thread_current(); \
 		for (;;) { \
 			/* protect the list */ \
