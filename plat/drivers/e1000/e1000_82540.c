@@ -67,7 +67,7 @@ static __s32 e1000_init_phy_params_82540(struct e1000_hw *hw)
 	struct e1000_phy_info *phy = &hw->phy;
 	__s32 ret_val;
 
-	// uk_pr_info("e1000_init_phy_params_82540\n");
+	debug_uk_pr_info("e1000_init_phy_params_82540\n");
 
 	phy->addr		= 1;
 	phy->autoneg_mask	= AUTONEG_ADVERTISE_SPEED_DEFAULT;
@@ -89,7 +89,7 @@ static __s32 e1000_init_phy_params_82540(struct e1000_hw *hw)
 
 	ret_val = e1000_get_phy_id(hw);
 	if (ret_val) {
-		// uk_pr_info("e1000_get_phy_id = %d\n", ret_val);
+		debug_uk_pr_info("e1000_get_phy_id = %d\n", ret_val);
 		return ret_val;
 	}
 
@@ -99,7 +99,7 @@ static __s32 e1000_init_phy_params_82540(struct e1000_hw *hw)
 		return ret_val;
 	}
 	
-	// uk_pr_info("e1000_init_phy_params_82540 returning -E1000_ERR_PHY\n");
+	debug_uk_pr_info("e1000_init_phy_params_82540 returning -E1000_ERR_PHY\n");
 	return -E1000_ERR_PHY;
 }
 
@@ -112,7 +112,7 @@ static __s32 e1000_init_nvm_params_82540(struct e1000_hw *hw)
 	struct e1000_nvm_info *nvm = &hw->nvm;
 	__u32 eecd;
 	
-	// uk_pr_info("e1000_init_nvm_params_82540\n");
+	debug_uk_pr_info("e1000_init_nvm_params_82540\n");
 	eecd = E1000_READ_REG(hw, E1000_EECD);
 
 	nvm->type = e1000_nvm_eeprom_microwire;
@@ -154,7 +154,7 @@ static __s32 e1000_init_mac_params_82540(struct e1000_hw *hw)
 	struct e1000_mac_info *mac = &hw->mac;
 	__s32 ret_val = E1000_SUCCESS;
 
-	// uk_pr_info("e1000_init_mac_params_82540\n");
+	debug_uk_pr_info("e1000_init_mac_params_82540\n");
 
 	/* Set media type */
 	hw->phy.media_type = e1000_media_type_copper;
@@ -232,7 +232,7 @@ out:
  **/
 void e1000_init_function_pointers_82540(struct e1000_hw *hw)
 {
-	// uk_pr_info("e1000_init_function_pointers_82540\n");
+	debug_uk_pr_info("e1000_init_function_pointers_82540\n");
 
 	hw->mac.ops.init_params = e1000_init_mac_params_82540;
 	hw->nvm.ops.init_params = e1000_init_nvm_params_82540;
@@ -250,9 +250,9 @@ static __s32 e1000_reset_hw_82540(struct e1000_hw *hw)
 	__u32 ctrl, manc;
 	__s32 ret_val = E1000_SUCCESS;
 
-	// uk_pr_info("e1000_reset_hw_82540\n");
+	debug_uk_pr_info("e1000_reset_hw_82540\n");
 
-	// DEBUGOUT("Masking off all interrupts\n");
+	uk_pr_debug("Masking off all interrupts\n");
 	E1000_WRITE_REG(hw, E1000_IMC, 0xFFFFFFFF);
 
 	E1000_WRITE_REG(hw, E1000_RCTL, 0);
@@ -267,7 +267,7 @@ static __s32 e1000_reset_hw_82540(struct e1000_hw *hw)
 
 	ctrl = E1000_READ_REG(hw, E1000_CTRL);
 
-	// DEBUGOUT("Issuing a global reset to 82540/82545/82546 MAC\n");
+	uk_pr_debug("Issuing a global reset to 82540/82545/82546 MAC\n");
 	E1000_WRITE_REG(hw, E1000_CTRL_DUP, ctrl | E1000_CTRL_RST);
 
 
@@ -298,17 +298,17 @@ static __s32 e1000_init_hw_82540(struct e1000_hw *hw)
 	__s32 ret_val;
 	__u16 i;
 
-	// uk_pr_info("e1000_init_hw_82540\n");
+	debug_uk_pr_info("e1000_init_hw_82540\n");
 
 	/* Initialize identification LED */
 	ret_val = mac->ops.id_led_init(hw);
 	if (ret_val) {
-		// DEBUGOUT("Error initializing identification LED\n");
+		uk_pr_debug("Error initializing identification LED\n");
 		/* This is not fatal and we should not stop init due to this */
 	}
 
 	/* Disabling VLAN filtering */
-	// DEBUGOUT("Initializing the IEEE VLAN\n");
+	uk_pr_debug("Initializing the IEEE VLAN\n");
 	if (mac->type < e1000_82545_rev_3)
 		E1000_WRITE_REG(hw, E1000_VET, 0);
 
@@ -316,7 +316,7 @@ static __s32 e1000_init_hw_82540(struct e1000_hw *hw)
 	e1000_init_rx_addrs_generic(hw, mac->rar_entry_count);
 
 	/* Zero out the Multicast HASH table */
-	// DEBUGOUT("Zeroing the MTA\n");
+	uk_pr_debug("Zeroing the MTA\n");
 	for (i = 0; i < mac->mta_reg_count; i++) {
 		E1000_WRITE_REG_ARRAY(hw, E1000_MTA, i, 0);
 		/*
@@ -367,7 +367,7 @@ static __s32 e1000_setup_copper_link_82540(struct e1000_hw *hw)
 	__s32 ret_val;
 	__u16 data;
 
-	// uk_pr_info("e1000_setup_copper_link_82540\n");
+	uk_pr_debug("e1000_setup_copper_link_82540\n");
 
 	ctrl = E1000_READ_REG(hw, E1000_CTRL);
 	ctrl |= E1000_CTRL_SLU;
@@ -413,7 +413,7 @@ static __s32 e1000_setup_fiber_serdes_link_82540(struct e1000_hw *hw)
 {
 	__s32 ret_val = E1000_SUCCESS;
 
-	// uk_pr_info("e1000_setup_fiber_serdes_link_82540\n");
+	uk_pr_debug("e1000_setup_fiber_serdes_link_82540\n");
 
 	if (hw->phy.media_type == e1000_media_type_internal_serdes) {
 		/*
@@ -447,7 +447,7 @@ static __s32 e1000_adjust_serdes_amplitude_82540(struct e1000_hw *hw)
 	__s32 ret_val;
 	__u16 nvm_data;
 
-	// uk_pr_info("e1000_adjust_serdes_amplitude_82540\n");
+	debug_uk_pr_info("e1000_adjust_serdes_amplitude_82540\n");
 
 	ret_val = hw->nvm.ops.read(hw, NVM_SERDES_AMPLITUDE, 1, &nvm_data);
 	if (ret_val)
@@ -478,56 +478,56 @@ static __s32 e1000_set_vco_speed_82540(struct e1000_hw *hw)
 	__u16 default_page = 0;
 	__u16 phy_data;
 
-	// uk_pr_info("e1000_set_vco_speed_82540\n");
+	debug_uk_pr_info("e1000_set_vco_speed_82540\n");
 
 	/* Set PHY register 30, page 5, bit 8 to 0 */
 
-	// uk_pr_info("e1000_set_vco_speed_82540 read_reg\n");
+	debug_uk_pr_info("e1000_set_vco_speed_82540 read_reg\n");
 	ret_val = hw->phy.ops.read_reg(hw, M88E1000_PHY_PAGE_SELECT,
 				       &default_page);
 	if (ret_val)
 		goto out;
 
-	// uk_pr_info("e1000_set_vco_speed_82540 write_reg\n");
+	debug_uk_pr_info("e1000_set_vco_speed_82540 write_reg\n");
 	ret_val = hw->phy.ops.write_reg(hw, M88E1000_PHY_PAGE_SELECT, 0x0005);
 	if (ret_val)
 		goto out;
 
-	// uk_pr_info("e1000_set_vco_speed_82540 read_reg\n");
+	debug_uk_pr_info("e1000_set_vco_speed_82540 read_reg\n");
 	ret_val = hw->phy.ops.read_reg(hw, M88E1000_PHY_GEN_CONTROL, &phy_data);
 	if (ret_val)
 		goto out;
 
 	phy_data &= ~M88E1000_PHY_VCO_REG_BIT8;
-	// uk_pr_info("e1000_set_vco_speed_82540 write_reg\n");
+	debug_uk_pr_info("e1000_set_vco_speed_82540 write_reg\n");
 	ret_val = hw->phy.ops.write_reg(hw, M88E1000_PHY_GEN_CONTROL, phy_data);
 	if (ret_val)
 		goto out;
 
 	/* Set PHY register 30, page 4, bit 11 to 1 */
 
-	// uk_pr_info("e1000_set_vco_speed_82540 write_reg\n");
+	debug_uk_pr_info("e1000_set_vco_speed_82540 write_reg\n");
 	ret_val = hw->phy.ops.write_reg(hw, M88E1000_PHY_PAGE_SELECT, 0x0004);
 	if (ret_val)
 		goto out;
 
-	// uk_pr_info("e1000_set_vco_speed_82540 read_reg\n");
+	debug_uk_pr_info("e1000_set_vco_speed_82540 read_reg\n");
 	ret_val = hw->phy.ops.read_reg(hw, M88E1000_PHY_GEN_CONTROL, &phy_data);
 	if (ret_val)
 		goto out;
 
 	phy_data |= M88E1000_PHY_VCO_REG_BIT11;
-	// uk_pr_info("e1000_set_vco_speed_82540 write_reg\n");
+	debug_uk_pr_info("e1000_set_vco_speed_82540 write_reg\n");
 	ret_val = hw->phy.ops.write_reg(hw, M88E1000_PHY_GEN_CONTROL, phy_data);
 	if (ret_val)
 		goto out;
 
-	// uk_pr_info("e1000_set_vco_speed_82540 write_reg\n");
+	debug_uk_pr_info("e1000_set_vco_speed_82540 write_reg\n");
 	ret_val = hw->phy.ops.write_reg(hw, M88E1000_PHY_PAGE_SELECT,
 					default_page);
 
 out:
-	// uk_pr_info("e1000_set_vco_speed_82540 out\n");
+	debug_uk_pr_info("e1000_set_vco_speed_82540 out\n");
 	return ret_val;
 }
 
@@ -545,7 +545,7 @@ static __s32 e1000_set_phy_mode_82540(struct e1000_hw *hw)
 	__s32 ret_val = E1000_SUCCESS;
 	__u16 nvm_data;
 
-	// uk_pr_info("e1000_set_phy_mode_82540\n");
+	debug_uk_pr_info("e1000_set_phy_mode_82540\n");
 
 	if (hw->mac.type != e1000_82545_rev_3)
 		goto out;
@@ -585,6 +585,8 @@ out:
  **/
 static void e1000_power_down_phy_copper_82540(struct e1000_hw *hw)
 {
+	debug_uk_pr_info("e1000_power_down_phy_copper_82540\n");
+
 	/* If the management interface is not enabled, then power down */
 	if (!(E1000_READ_REG(hw, E1000_MANC) & E1000_MANC_SMBUS_EN))
 		e1000_power_down_phy_copper(hw);
@@ -600,7 +602,7 @@ static void e1000_power_down_phy_copper_82540(struct e1000_hw *hw)
  **/
 static void e1000_clear_hw_cntrs_82540(struct e1000_hw *hw)
 {
-	// uk_pr_info("e1000_clear_hw_cntrs_82540\n");
+	debug_uk_pr_info("e1000_clear_hw_cntrs_82540\n");
 
 	e1000_clear_hw_cntrs_base_generic(hw);
 
@@ -648,7 +650,7 @@ __s32 e1000_read_mac_addr_82540(struct e1000_hw *hw)
 	__s32  ret_val = E1000_SUCCESS;
 	__u16 offset, nvm_data, i;
 
-	// uk_pr_info("e1000_read_mac_addr_82540\n");
+	debug_uk_pr_info("e1000_read_mac_addr_82540\n");
 
 	for (i = 0; i < ETH_ADDR_LEN; i += 2) {
 		offset = i >> 1;

@@ -423,7 +423,7 @@ STATIC __s32 e1000_ready_nvm_eeprom(struct e1000_hw *hw)
 		}
 
 		if (!timeout) {
-			// DEBUGOUT("SPI NVM Status error\n");
+			uk_pr_debug("SPI NVM Status error\n");
 			return -E1000_ERR_NVM;
 		}
 	}
@@ -455,7 +455,7 @@ __s32 e1000_read_nvm_spi(struct e1000_hw *hw, __u16 offset, __u16 words, __u16 *
 	 */
 	if ((offset >= nvm->word_size) || (words > (nvm->word_size - offset)) ||
 	    (words == 0)) {
-		// DEBUGOUT("nvm parameter(s) out of bounds\n");
+		uk_pr_debug("nvm parameter(s) out of bounds\n");
 		return -E1000_ERR_NVM;
 	}
 
@@ -515,7 +515,7 @@ __s32 e1000_read_nvm_microwire(struct e1000_hw *hw, __u16 offset, __u16 words,
 	 */
 	if ((offset >= nvm->word_size) || (words > (nvm->word_size - offset)) ||
 	    (words == 0)) {
-		// DEBUGOUT("nvm parameter(s) out of bounds\n");
+		uk_pr_debug("nvm parameter(s) out of bounds\n");
 		return -E1000_ERR_NVM;
 	}
 
@@ -568,7 +568,7 @@ __s32 e1000_read_nvm_eerd(struct e1000_hw *hw, __u16 offset, __u16 words, __u16 
 	 */
 	if ((offset >= nvm->word_size) || (words > (nvm->word_size - offset)) ||
 	    (words == 0)) {
-		// DEBUGOUT("nvm parameter(s) out of bounds\n");
+		uk_pr_debug("nvm parameter(s) out of bounds\n");
 		return -E1000_ERR_NVM;
 	}
 
@@ -616,7 +616,7 @@ __s32 e1000_write_nvm_spi(struct e1000_hw *hw, __u16 offset, __u16 words, __u16 
 	 */
 	if ((offset >= nvm->word_size) || (words > (nvm->word_size - offset)) ||
 	    (words == 0)) {
-		// DEBUGOUT("nvm parameter(s) out of bounds\n");
+		uk_pr_debug("nvm parameter(s) out of bounds\n");
 		return -E1000_ERR_NVM;
 	}
 
@@ -699,7 +699,7 @@ __s32 e1000_write_nvm_microwire(struct e1000_hw *hw, __u16 offset, __u16 words,
 	 */
 	if ((offset >= nvm->word_size) || (words > (nvm->word_size - offset)) ||
 	    (words == 0)) {
-		// DEBUGOUT("nvm parameter(s) out of bounds\n");
+		uk_pr_debug("nvm parameter(s) out of bounds\n");
 		return -E1000_ERR_NVM;
 	}
 
@@ -737,7 +737,7 @@ __s32 e1000_write_nvm_microwire(struct e1000_hw *hw, __u16 offset, __u16 words,
 		}
 
 		if (widx == 200) {
-			// DEBUGOUT("NVM Write did not complete\n");
+			uk_pr_debug("NVM Write did not complete\n");
 			ret_val = -E1000_ERR_NVM;
 			goto release;
 		}
@@ -779,19 +779,19 @@ __s32 e1000_read_pba_string_generic(struct e1000_hw *hw, __u8 *pba_num,
 	debug_uk_pr_info("e1000_read_pba_string_generic\n");
 
 	if (pba_num == NULL) {
-		// DEBUGOUT("PBA string buffer was null\n");
+		uk_pr_debug("PBA string buffer was null\n");
 		return -E1000_ERR_INVALID_ARGUMENT;
 	}
 
 	ret_val = hw->nvm.ops.read(hw, NVM_PBA_OFFSET_0, 1, &nvm_data);
 	if (ret_val) {
-		// DEBUGOUT("NVM Read Error\n");
+		uk_pr_debug("NVM Read Error\n");
 		return ret_val;
 	}
 
 	ret_val = hw->nvm.ops.read(hw, NVM_PBA_OFFSET_1, 1, &pba_ptr);
 	if (ret_val) {
-		// DEBUGOUT("NVM Read Error\n");
+		uk_pr_debug("NVM Read Error\n");
 		return ret_val;
 	}
 
@@ -800,11 +800,11 @@ __s32 e1000_read_pba_string_generic(struct e1000_hw *hw, __u8 *pba_num,
 	 * and we can decode it into an ascii string
 	 */
 	if (nvm_data != NVM_PBA_PTR_GUARD) {
-		// DEBUGOUT("NVM PBA number is not stored as string\n");
+		uk_pr_debug("NVM PBA number is not stored as string\n");
 
 		/* make sure callers buffer is big enough to store the PBA */
 		if (pba_num_size < E1000_PBANUM_LENGTH) {
-			// DEBUGOUT("PBA string buffer too small\n");
+			uk_pr_debug("PBA string buffer too small\n");
 			return E1000_ERR_NO_SPACE;
 		}
 
@@ -836,17 +836,17 @@ __s32 e1000_read_pba_string_generic(struct e1000_hw *hw, __u8 *pba_num,
 
 	ret_val = hw->nvm.ops.read(hw, pba_ptr, 1, &length);
 	if (ret_val) {
-		// DEBUGOUT("NVM Read Error\n");
+		uk_pr_debug("NVM Read Error\n");
 		return ret_val;
 	}
 
 	if (length == 0xFFFF || length == 0) {
-		// DEBUGOUT("NVM PBA number section invalid length\n");
+		uk_pr_debug("NVM PBA number section invalid length\n");
 		return -E1000_ERR_NVM_PBA_SECTION;
 	}
 	/* check if pba_num buffer is big enough */
 	if (pba_num_size < (((__u32)length * 2) - 1)) {
-		// DEBUGOUT("PBA string buffer too small\n");
+		uk_pr_debug("PBA string buffer too small\n");
 		return -E1000_ERR_NO_SPACE;
 	}
 
@@ -857,7 +857,7 @@ __s32 e1000_read_pba_string_generic(struct e1000_hw *hw, __u8 *pba_num,
 	for (offset = 0; offset < length; offset++) {
 		ret_val = hw->nvm.ops.read(hw, pba_ptr + offset, 1, &nvm_data);
 		if (ret_val) {
-			// DEBUGOUT("NVM Read Error\n");
+			uk_pr_debug("NVM Read Error\n");
 			return ret_val;
 		}
 		pba_num[offset * 2] = (__u8)(nvm_data >> 8);
@@ -886,19 +886,19 @@ __s32 e1000_read_pba_length_generic(struct e1000_hw *hw, __u32 *pba_num_size)
 	debug_uk_pr_info("e1000_read_pba_length_generic\n");
 
 	if (pba_num_size == NULL) {
-		// DEBUGOUT("PBA buffer size was null\n");
+		uk_pr_debug("PBA buffer size was null\n");
 		return -E1000_ERR_INVALID_ARGUMENT;
 	}
 
 	ret_val = hw->nvm.ops.read(hw, NVM_PBA_OFFSET_0, 1, &nvm_data);
 	if (ret_val) {
-		// DEBUGOUT("NVM Read Error\n");
+		uk_pr_debug("NVM Read Error\n");
 		return ret_val;
 	}
 
 	ret_val = hw->nvm.ops.read(hw, NVM_PBA_OFFSET_1, 1, &pba_ptr);
 	if (ret_val) {
-		// DEBUGOUT("NVM Read Error\n");
+		uk_pr_debug("NVM Read Error\n");
 		return ret_val;
 	}
 
@@ -910,12 +910,12 @@ __s32 e1000_read_pba_length_generic(struct e1000_hw *hw, __u32 *pba_num_size)
 
 	ret_val = hw->nvm.ops.read(hw, pba_ptr, 1, &length);
 	if (ret_val) {
-		// DEBUGOUT("NVM Read Error\n");
+		uk_pr_debug("NVM Read Error\n");
 		return ret_val;
 	}
 
 	if (length == 0xFFFF || length == 0) {
-		// DEBUGOUT("NVM PBA number section invalid length\n");
+		uk_pr_debug("NVM PBA number section invalid length\n");
 		return -E1000_ERR_NVM_PBA_SECTION;
 	}
 
@@ -944,17 +944,17 @@ __s32 e1000_read_pba_num_generic(struct e1000_hw *hw, __u32 *pba_num)
 
 	ret_val = hw->nvm.ops.read(hw, NVM_PBA_OFFSET_0, 1, &nvm_data);
 	if (ret_val) {
-		// DEBUGOUT("NVM Read Error\n");
+		uk_pr_debug("NVM Read Error\n");
 		return ret_val;
 	} else if (nvm_data == NVM_PBA_PTR_GUARD) {
-		// DEBUGOUT("NVM Not Supported\n");
+		uk_pr_debug("NVM Not Supported\n");
 		return -E1000_NOT_IMPLEMENTED;
 	}
 	*pba_num = (__u32)(nvm_data << 16);
 
 	ret_val = hw->nvm.ops.read(hw, NVM_PBA_OFFSET_1, 1, &nvm_data);
 	if (ret_val) {
-		// DEBUGOUT("NVM Read Error\n");
+		uk_pr_debug("NVM Read Error\n");
 		return ret_val;
 	}
 	*pba_num |= nvm_data;
@@ -1202,14 +1202,14 @@ __s32 e1000_validate_nvm_checksum_generic(struct e1000_hw *hw)
 	for (i = 0; i < (NVM_CHECKSUM_REG + 1); i++) {
 		ret_val = hw->nvm.ops.read(hw, i, 1, &nvm_data);
 		if (ret_val) {
-			// DEBUGOUT("NVM Read Error\n");
+			uk_pr_debug("NVM Read Error\n");
 			return ret_val;
 		}
 		checksum += nvm_data;
 	}
 
 	if (checksum != (__u16) NVM_SUM) {
-		// DEBUGOUT("NVM Checksum Invalid\n");
+		uk_pr_debug("NVM Checksum Invalid\n");
 		return -E1000_ERR_NVM;
 	}
 

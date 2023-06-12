@@ -302,7 +302,7 @@ __s32 e1000_read_phy_reg_mdic(struct e1000_hw *hw, __u32 offset, __u16 *data)
 	struct e1000_phy_info *phy = &hw->phy;
 	__u32 i, mdic = 0;
 
-	debug_uk_pr_info("e1000_read_phy_reg_mdic\n");
+	debug_uk_pr_info("e1000_read_phy_reg_mdic, offset = %d\n", offset);
 
 	if (offset > MAX_PHY_REG_ADDRESS) {
 		debug_uk_pr_info("PHY Address %d is out of range\n", offset);
@@ -653,7 +653,7 @@ __s32 e1000_read_phy_reg_m88(struct e1000_hw *hw, __u32 offset, __u16 *data)
 {
 	__s32 ret_val;
 
-	debug_uk_pr_info("e1000_read_phy_reg_m88\n");
+	debug_uk_pr_info("e1000_read_phy_reg_m88, offset = %d\n", offset);
 
 	if (!hw->phy.ops.acquire) {
 	    debug_uk_pr_info("e1000_read_phy_reg_m88 !phy.ops.acquire\n");
@@ -777,6 +777,7 @@ STATIC __s32 __e1000_read_phy_reg_igp(struct e1000_hw *hw, __u32 offset, __u16 *
  **/
 __s32 e1000_read_phy_reg_igp(struct e1000_hw *hw, __u32 offset, __u16 *data)
 {
+	debug_uk_pr_info("e1000_read_phy_reg_igp\n");
 	return __e1000_read_phy_reg_igp(hw, offset, data, false);
 }
 
@@ -791,6 +792,7 @@ __s32 e1000_read_phy_reg_igp(struct e1000_hw *hw, __u32 offset, __u16 *data)
  **/
 __s32 e1000_read_phy_reg_igp_locked(struct e1000_hw *hw, __u32 offset, __u16 *data)
 {
+	debug_uk_pr_info("e1000_read_phy_reg_igp_locked\n");
 	return __e1000_read_phy_reg_igp(hw, offset, data, true);
 }
 
@@ -845,6 +847,7 @@ STATIC __s32 __e1000_write_phy_reg_igp(struct e1000_hw *hw, __u32 offset, __u16 
  **/
 __s32 e1000_write_phy_reg_igp(struct e1000_hw *hw, __u32 offset, __u16 data)
 {
+	debug_uk_pr_info("e1000_write_phy_reg_igp\n");
 	return __e1000_write_phy_reg_igp(hw, offset, data, false);
 }
 
@@ -859,6 +862,7 @@ __s32 e1000_write_phy_reg_igp(struct e1000_hw *hw, __u32 offset, __u16 data)
  **/
 __s32 e1000_write_phy_reg_igp_locked(struct e1000_hw *hw, __u32 offset, __u16 data)
 {
+	debug_uk_pr_info("e1000_write_phy_reg_igp_locked\n");
 	return __e1000_write_phy_reg_igp(hw, offset, data, true);
 }
 
@@ -919,6 +923,7 @@ STATIC __s32 __e1000_read_kmrn_reg(struct e1000_hw *hw, __u32 offset, __u16 *dat
  **/
 __s32 e1000_read_kmrn_reg_generic(struct e1000_hw *hw, __u32 offset, __u16 *data)
 {
+	debug_uk_pr_info("e1000_read_kmrn_reg_generic\n");
 	return __e1000_read_kmrn_reg(hw, offset, data, false);
 }
 
@@ -934,6 +939,7 @@ __s32 e1000_read_kmrn_reg_generic(struct e1000_hw *hw, __u32 offset, __u16 *data
  **/
 __s32 e1000_read_kmrn_reg_locked(struct e1000_hw *hw, __u32 offset, __u16 *data)
 {
+	debug_uk_pr_info("e1000_read_kmrn_reg_locked\n");
 	return __e1000_read_kmrn_reg(hw, offset, data, true);
 }
 
@@ -990,6 +996,7 @@ STATIC __s32 __e1000_write_kmrn_reg(struct e1000_hw *hw, __u32 offset, __u16 dat
  **/
 __s32 e1000_write_kmrn_reg_generic(struct e1000_hw *hw, __u32 offset, __u16 data)
 {
+	debug_uk_pr_info("e1000_write_kmrn_reg_generic\n");
 	return __e1000_write_kmrn_reg(hw, offset, data, false);
 }
 
@@ -1004,6 +1011,7 @@ __s32 e1000_write_kmrn_reg_generic(struct e1000_hw *hw, __u32 offset, __u16 data
  **/
 __s32 e1000_write_kmrn_reg_locked(struct e1000_hw *hw, __u32 offset, __u16 data)
 {
+	debug_uk_pr_info("e1000_write_kmrn_reg_locked\n");
 	return __e1000_write_kmrn_reg(hw, offset, data, true);
 }
 
@@ -1017,6 +1025,8 @@ STATIC __s32 e1000_set_master_slave_mode(struct e1000_hw *hw)
 {
 	__s32 ret_val;
 	__u16 phy_data;
+
+	debug_uk_pr_info("e1000_set_master_slave_mode\n");
 
 	/* Resolve Master/Slave mode */
 	ret_val = hw->phy.ops.read_reg(hw, PHY_1000T_CTRL, &phy_data);
@@ -2998,6 +3008,7 @@ __s32 e1000_phy_init_script_igp3(struct e1000_hw *hw)
 enum e1000_phy_type e1000_get_phy_type_from_id(__u32 phy_id)
 {
 	enum e1000_phy_type phy_type = e1000_phy_unknown;
+	debug_uk_pr_info("e1000_get_phy_type_from_id\n");
 
 	switch (phy_id) {
 	case M88E1000_I_PHY_ID:
@@ -3068,6 +3079,7 @@ __s32 e1000_determine_phy_address(struct e1000_hw *hw)
 	__u32 i;
 	enum e1000_phy_type phy_type = e1000_phy_unknown;
 
+	debug_uk_pr_info("e1000_determine_phy_address\n");
 	hw->phy.id = phy_type;
 
 	for (phy_addr = 0; phy_addr < E1000_MAX_PHY_ADDR; phy_addr++) {
@@ -3102,6 +3114,7 @@ STATIC __u32 e1000_get_phy_addr_for_bm_page(__u32 page, __u32 reg)
 {
 	__u32 phy_addr = 2;
 
+	debug_uk_pr_info("e1000_get_phy_addr_for_bm_page\n");
 	if ((page >= 768) || (page == 0 && reg == 25) || (reg == 31))
 		phy_addr = 1;
 
@@ -3495,6 +3508,7 @@ void e1000_power_up_phy_copper(struct e1000_hw *hw)
 {
 	__u16 mii_reg = 0;
 
+	debug_uk_pr_info("e1000_power_up_phy_copper\n");
 	/* The PHY will retain its settings across a power down/up cycle */
 	hw->phy.ops.read_reg(hw, PHY_CONTROL, &mii_reg);
 	mii_reg &= ~MII_CR_POWER_DOWN;
@@ -3513,6 +3527,7 @@ void e1000_power_down_phy_copper(struct e1000_hw *hw)
 {
 	__u16 mii_reg = 0;
 
+	debug_uk_pr_info("e1000_power_down_phy_copper\n");
 	/* The PHY will retain its settings across a power down/up cycle */
 	hw->phy.ops.read_reg(hw, PHY_CONTROL, &mii_reg);
 	mii_reg |= MII_CR_POWER_DOWN;
@@ -3599,6 +3614,7 @@ out:
  **/
 __s32 e1000_read_phy_reg_hv(struct e1000_hw *hw, __u32 offset, __u16 *data)
 {
+	debug_uk_pr_info("e1000_read_phy_reg_hv\n");
 	return __e1000_read_phy_reg_hv(hw, offset, data, false, false);
 }
 
@@ -3613,6 +3629,7 @@ __s32 e1000_read_phy_reg_hv(struct e1000_hw *hw, __u32 offset, __u16 *data)
  **/
 __s32 e1000_read_phy_reg_hv_locked(struct e1000_hw *hw, __u32 offset, __u16 *data)
 {
+	debug_uk_pr_info("e1000_read_phy_reg_hv_locked\n");
 	return __e1000_read_phy_reg_hv(hw, offset, data, true, false);
 }
 
@@ -3627,6 +3644,7 @@ __s32 e1000_read_phy_reg_hv_locked(struct e1000_hw *hw, __u32 offset, __u16 *dat
  **/
 __s32 e1000_read_phy_reg_page_hv(struct e1000_hw *hw, __u32 offset, __u16 *data)
 {
+	debug_uk_pr_info("e1000_read_phy_reg_page_hv\n");
 	return __e1000_read_phy_reg_hv(hw, offset, data, true, true);
 }
 
@@ -3724,6 +3742,7 @@ out:
  **/
 __s32 e1000_write_phy_reg_hv(struct e1000_hw *hw, __u32 offset, __u16 data)
 {
+	debug_uk_pr_info("e1000_write_phy_reg_hv\n");
 	return __e1000_write_phy_reg_hv(hw, offset, data, false, false);
 }
 
@@ -3738,6 +3757,7 @@ __s32 e1000_write_phy_reg_hv(struct e1000_hw *hw, __u32 offset, __u16 data)
  **/
 __s32 e1000_write_phy_reg_hv_locked(struct e1000_hw *hw, __u32 offset, __u16 data)
 {
+	debug_uk_pr_info("e1000_write_phy_reg_hv_locked\n");
 	return __e1000_write_phy_reg_hv(hw, offset, data, true, false);
 }
 
@@ -3752,6 +3772,7 @@ __s32 e1000_write_phy_reg_hv_locked(struct e1000_hw *hw, __u32 offset, __u16 dat
  **/
 __s32 e1000_write_phy_reg_page_hv(struct e1000_hw *hw, __u32 offset, __u16 data)
 {
+	debug_uk_pr_info("e1000_write_phy_reg_page_hv\n");
 	return __e1000_write_phy_reg_hv(hw, offset, data, true, true);
 }
 
@@ -3763,6 +3784,7 @@ STATIC __u32 e1000_get_phy_addr_for_hv_page(__u32 page)
 {
 	__u32 phy_addr = 2;
 
+	debug_uk_pr_info("e1000_get_phy_addr_for_hv_page\n");
 	if (page >= HV_INTC_FC_PAGE_START)
 		phy_addr = 1;
 
@@ -4238,6 +4260,7 @@ bool e1000_is_mphy_ready(struct e1000_hw *hw)
 	__u32 mphy_ctrl = 0;
 	bool ready = false;
 
+	debug_uk_pr_info("e1000_is_mphy_ready\n");
 	while (retry_count < 2) {
 		mphy_ctrl = E1000_READ_REG(hw, E1000_MPHY_ADDR_CTRL);
 		if (mphy_ctrl & E1000_MPHY_BUSY) {

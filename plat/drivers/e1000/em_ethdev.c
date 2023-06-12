@@ -132,6 +132,7 @@ eth_em_dev_init(struct pci_device * pci_dev)
 	int rc = 0;
 	struct e1000_hw *hw = NULL;
 
+	debug_uk_pr_info("eth_em_dev_init\n");
     UK_ASSERT(pci_dev != NULL);
 
 	hw = uk_calloc(a, sizeof(*hw), 1);
@@ -241,6 +242,7 @@ em_hw_init(struct e1000_hw *hw)
 {
 	int diag;
 
+	debug_uk_pr_info("em_hw_init\n");
 	diag = hw->mac.ops.init_params(hw);
 	if (diag != 0) {
 		uk_pr_err("MAC Initialization Error\n");
@@ -331,7 +333,7 @@ eth_em_configure(__unused struct uk_netdev *dev, __unused const struct uk_netdev
 {
 	// struct e1000_hw *hw = to_e1000dev(dev);
 
-	uk_pr_info("eth_em_configure\n");
+	debug_uk_pr_info("eth_em_configure\n");
 	// struct e1000_interrupt *intr =
 	// 	E1000_DEV_PRIVATE_TO_INTR(dev->data->dev_private);
 
@@ -344,6 +346,8 @@ static void
 em_set_pba(struct e1000_hw *hw)
 {
 	uint32_t pba;
+
+	debug_uk_pr_info("em_set_pba\n");
 
 	/*
 	 * Packet Buffer Allocation (PBA)
@@ -361,6 +365,8 @@ static void
 eth_em_rxtx_control(struct uk_netdev *dev,
 		    bool enable)
 {
+	debug_uk_pr_info("eth_em_rxtx_control\n");
+
 	struct e1000_hw *hw =
 		to_e1000dev(dev);
 	uint32_t tctl, rctl;
@@ -384,7 +390,7 @@ eth_em_rxtx_control(struct uk_netdev *dev,
 static int
 eth_em_start(struct uk_netdev *dev)
 {
-	uk_pr_info("eth_em_start\n");
+	debug_uk_pr_info("eth_em_start\n");
 
 	struct e1000_hw *hw = to_e1000dev(dev);
 	// struct rte_pci_device *pci_dev = RTE_ETH_DEV_TO_PCI(dev);
@@ -516,6 +522,7 @@ eth_em_start(struct uk_netdev *dev)
 static void
 eth_em_stop(__unused struct uk_netdev *dev)
 {
+	debug_uk_pr_info("eth_em_stop\n");
 	// struct rte_eth_link link;
 	// struct e1000_hw *hw = to_e1000dev(dev);
 	// struct pci_device *pci_dev = hw->pdev;
@@ -569,7 +576,7 @@ em_get_rx_buffer_size(struct e1000_hw *hw)
 {
 	uint32_t rx_buf_size;
 
-	uk_pr_info("em_get_rx_buffer_size\n");
+	debug_uk_pr_info("em_get_rx_buffer_size\n");
 
 	rx_buf_size = ((E1000_READ_REG(hw, E1000_PBA) & UINT16_MAX) << 10);
 
@@ -684,6 +691,7 @@ eth_em_link_update(struct uk_netdev *dev, int wait_to_complete)
 	struct rte_eth_link link;
 	int link_check, count;
 
+	debug_uk_pr_info("eth_em_link_update\n");
 	link_check = 0;
 	hw->mac.get_link_status = 1;
 
@@ -752,6 +760,8 @@ static void
 em_hw_control_release(struct e1000_hw *hw)
 {
 	uint32_t ctrl_ext;
+
+	debug_uk_pr_info("em_hw_control_release\n");
 
 	/* Let firmware taken over control of h/w */
     ctrl_ext = E1000_READ_REG(hw, E1000_CTRL_EXT);
@@ -942,6 +952,7 @@ eth_em_promiscuous_get(__unused struct uk_netdev *dev) {
 static int
 eth_em_interrupt_handler(__unused void *param)
 {
+	debug_uk_pr_info("eth_em_interrupt_handler\n");
 	// struct e1000_hw *dev = (struct e1000_hw *)param;
 
 	// eth_em_interrupt_get_status(dev);
@@ -975,6 +986,8 @@ eth_em_default_mac_addr_get(struct uk_netdev *n)
 {
 	struct e1000_hw *d;
 
+	debug_uk_pr_info("eth_em_default_mac_addr_get\n");
+
 	UK_ASSERT(n);
 	d = to_e1000dev(n);
 
@@ -985,7 +998,7 @@ static int
 eth_em_default_mac_addr_set(__unused struct uk_netdev *dev,
 			    __unused const struct uk_hwaddr *hwaddr)
 {
-	uk_pr_info("eth_em_default_mac_addr_set\n");
+	debug_uk_pr_info("eth_em_default_mac_addr_set\n");
 	// TODO: uncomment
 	// eth_em_rar_clear(dev, 0);
 
@@ -996,7 +1009,7 @@ eth_em_default_mac_addr_set(__unused struct uk_netdev *dev,
 static uint16_t
 eth_em_mtu_get(__unused struct uk_netdev *dev)
 {
-	uk_pr_info("eth_em_mtu_get\n");
+	debug_uk_pr_info("eth_em_mtu_get\n");
 
 	 // TODO
 	return EM_TX_MAX_MTU_SEG;
@@ -1006,7 +1019,7 @@ eth_em_mtu_get(__unused struct uk_netdev *dev)
 static int
 eth_em_mtu_set(__unused struct uk_netdev *dev, __unused uint16_t mtu)
 {
-	uk_pr_info("eth_em_mtu_set\n");
+	debug_uk_pr_info("eth_em_mtu_set\n");
 	// TODO: uncomment
 	// struct uk_netdev_info dev_info;
 	// struct e1000_hw *hw;
@@ -1071,6 +1084,7 @@ static const struct pci_device_id e1000_pci_ids[] = {
 
 static int e1000_drv_init(struct uk_alloc *allocator)
 {
+	debug_uk_pr_info("e1000_drv_init\n");
 	/* driver initialization */
 	if (!allocator)
 		return -EINVAL;
