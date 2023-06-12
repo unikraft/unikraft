@@ -44,8 +44,8 @@ typedef int nf_paging_state_t;
 #endif /* !CONFIG_LIBUKVMEM */
 
 /* Must be a library global symbol so that the linker can resolve it */
-int nf_mf_handler(const struct nf_excpttab_entry *e,
-		  struct ukarch_trap_ctx *ctx)
+int __used nf_mf_handler(const struct nf_excpttab_entry *e,
+			 struct ukarch_trap_ctx *ctx)
 {
 	/* Just continue execution at the fault label */
 	nf_regs_ip(ctx->regs) = nf_excpttab_get_cont_ip(e);
