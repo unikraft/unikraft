@@ -18,7 +18,10 @@
 #include <vmxnet3/base/vmxnet3_defs.h>
 #include <vmxnet3/vmxnet3_ring.h>
 #include <vmxnet3/vmxnet3_ethdev.h>
+#define DRIVER_NAME           "vmxnet3"
 
+
+static const char *drv_name = DRIVER_NAME;
 
 #define	VMXNET3_TX_MAX_SEG	UINT8_MAX
 
@@ -29,19 +32,20 @@ static struct uk_alloc *a;
 
 static int vmxnet3_add_dev(struct pci_device *eth_dev);
 static int vmxnet3_drv_init(struct uk_alloc *allocator);
-static int eth_vmxnet3_dev_uninit(struct uk_netdev *eth_dev);
+// static int eth_vmxnet3_dev_uninit(struct uk_netdev *eth_dev);
 static int vmxnet3_dev_configure(struct uk_netdev *dev, const struct uk_netdev_conf *conf);
 static int vmxnet3_dev_start(struct uk_netdev *dev);
 static int vmxnet3_dev_stop(struct uk_netdev *dev);
-static int vmxnet3_dev_close(struct uk_netdev *dev);
+// static int vmxnet3_dev_close(struct uk_netdev *dev);
 static void vmxnet3_dev_set_rxmode(struct vmxnet3_hw *hw, uint32_t feature, int set);
 static int vmxnet3_dev_promiscuous_enable(struct uk_netdev *dev, unsigned mode);
-static int vmxnet3_dev_promiscuous_disable(struct uk_netdev *dev);
+// static int vmxnet3_dev_promiscuous_disable(struct uk_netdev *dev);
 static void vmxnet3_dev_info_get(struct uk_netdev *dev,
 				struct uk_netdev_info *dev_info);
 static int vmxnet3_dev_mtu_set(struct uk_netdev *dev, uint16_t mtu);
 static int vmxnet3_mac_addr_set(struct uk_netdev *dev,
 				 const struct uk_hwaddr *mac_addr);
+const struct uk_hwaddr * vmxnet3_mac_addr_get(struct uk_netdev *dev);
 static void vmxnet3_process_events(struct uk_netdev *dev);
 static int vmxnet3_dev_rx_queue_intr_enable(struct uk_netdev *dev,
 						struct uk_netdev_rx_queue *queue);
@@ -64,19 +68,24 @@ static const struct uk_netdev_ops vmxnet3_dev_ops = {
 	.rxq_intr_enable = vmxnet3_dev_rx_queue_intr_enable,
 	.rxq_intr_disable = vmxnet3_dev_rx_queue_intr_disable,
 	// .hwaddr_get recommended
+	.hwaddr_get = vmxnet3_mac_addr_get,
 	.hwaddr_set = vmxnet3_mac_addr_set,
-	// .mtu_get
-	.mtu_set = vmxnet3_dev_mtu_set,
-	// .promiscuous_get 
-	.promiscuous_set = vmxnet3_dev_promiscuous_enable,
+
+	.mtu_get = vmxnet3_mtu_get,
+	.mtu_set = vmxnet3_dev_mtu_set, // optional
+
+	.promiscuous_set = vmxnet3_dev_promiscuous_enable, // optional
 	// vmxnet3_dev_promiscuous_disable
-	.info_get = vmxnet3_dev_info_get,
-	// .txq_info_get
-	// .rxq_info_get
+	.promiscuous_get = vmxnet3_dev_promiscuous_get,
+
+	.info_get = vmxnet3_dev_info_get, // requiered
+	.txq_info_get = vmxnet3_txq_info_get, 
+	.rxq_info_get = vmxnet3_rxq_info_get,
 	// .einfo_get optional
+
 	.configure = vmxnet3_dev_configure,
-	// .txq_configure
-	// .rxq_configure
+	.txq_configure = vmxnet3_dev_tx_queue_setup,
+	.rxq_configure = vmxnet3_dev_rx_queue_setup,
 	.start = vmxnet3_dev_start,
 };
 
@@ -205,19 +214,22 @@ void adjust_pci_device(struct pci_device *pci __unused) {
  * It returns 0 on success.
  */
 static int
-vmxnet3_add_dev(struct pci_device * eth_dev)
+vmxnet3_add_dev(struct pci_device * pci_dev)
 {
-	struct vmxnet3_hw *hw = to_vmxnet3dev(eth_dev);
+	int rc;
+	struct vmxnet3_hw *hw = NULL;
+	// struct vmxnet3_hw *hw = to_vmxnet3dev(pci_dev);
 	uint32_t mac_hi, mac_lo, ver;
 
-	uk_pr_debug("vmxnet3_add_dev\n");
-	uk_pr_debug("vmxnet3_add_dev\n");
-	uk_pr_debug("vmxnet3_add_dev\n");
-	uk_pr_debug("vmxnet3_add_dev\n");
-	uk_pr_debug("vmxnet3_add_dev\n");
-	uk_pr_debug("vmxnet3_add_dev\n");
-	
+	uk_pr_info("vmxnet3_add_dev\n");
+    UK_ASSERT(pci_dev != NULL);
 
+	hw = uk_calloc(a, sizeof(*hw), 1);
+	hw->a = a;
+	if (!hw) {
+		uk_pr_err("Failed to allocate e1000 device\n");
+		return -ENOMEM;
+	}
 	hw->netdev.ops = &vmxnet3_dev_ops;
 	hw->netdev.rx_one = vmxnet3_recv_pkts;
 	hw->netdev.tx_one = vmxnet3_xmit_pkts;
@@ -229,27 +241,34 @@ vmxnet3_add_dev(struct pci_device * eth_dev)
 	hw->num_rx_queues = 1;
 	hw->num_tx_queues = 1;
 	hw->bufs_per_pkt = 1;
-	hw->hw_addr0 = eth_dev->base;
-	hw->hw_addr1 = eth_dev->irq;
+	// hw->hw_addr0 = pci_dev->base;
+	// hw->hw_addr1 = pci_dev->irq;
+	hw->hw_addr0 = pci_dev->bar0;
+	hw->hw_addr1 = pci_dev->bar1;
 	uk_pr_info("hw->hw_addr0 = %p, hw->hw_addr1 = %p\n", hw->hw_addr0, hw->hw_addr1);
-	uk_pr_info("eth_dev->base = %p, eth_dev->irq = %p\n", eth_dev->base, eth_dev->irq);
+	uk_pr_info("pci_dev->base = %p, pci_dev->irq = %p\n", pci_dev->base, pci_dev->irq);
 
+	rc = uk_netdev_drv_register(&hw->netdev, a, drv_name);
+	if (rc < 0) {
+		uk_pr_err("Failed to register virtio-net device with libuknet\n");
+		return 0;
+	}
 
-	// adjust_pci_device(eth_dev);
+	// adjust_pci_device(pci_dev);
 	// for (int i = 0; i < 20480; i++) {
-	// 	printf("%d: %x\n", i, *((char *) eth_dev->base + i));
+	// 	printf("%d: %x\n", i, *((char *) pci_dev->base + i));
 	// }
 
 	// 1st 00:0C:29:E9:74:B5
 	// 2nd 00:50:56:3A:1B:2E
 
-	for (int i = 0; i < 0x100000; i++) {
-		printf("%x: %x\n", i, vmxnet3_read_addr(i));
-	}
+	// for (int i = 0; i < 0x100000; i++) {
+	// 	printf("%x: %x\n", i, vmxnet3_read_addr(i));
+	// }
 
 	/* Check h/w version compatibility with driver. */
 	ver = VMXNET3_READ_BAR1_REG(hw, VMXNET3_REG_VRRS);
-	uk_pr_debug("Hardware version: %d\n", ver);
+	uk_pr_info("Hardware version: %d\n", ver);
 
 	if (ver & (1 << VMXNET3_REV_4)) {
 		VMXNET3_WRITE_BAR1_REG(hw, VMXNET3_REG_VRRS,
@@ -269,7 +288,6 @@ vmxnet3_add_dev(struct pci_device * eth_dev)
 		hw->version = VMXNET3_REV_1 + 1;
 	} else {
 		uk_pr_err("Incompatible hardware version: %d\n", ver);
-		// PMD_INIT_LOG(ERR, "Incompatible hardware version: %d", ver);
 		return -EIO;
 	}
 
@@ -292,25 +310,19 @@ vmxnet3_add_dev(struct pci_device * eth_dev)
 	mac_lo = VMXNET3_READ_BAR1_REG(hw, VMXNET3_REG_MACL);
 	mac_hi = VMXNET3_READ_BAR1_REG(hw, VMXNET3_REG_MACH);
 	uk_pr_info("mac_hi %08x\n", mac_hi);
-	// uk_pr_debug("mac_lo mac_hi: %08x %08x\n", mac_lo, mac_hi);
-	// uk_pr_debug("mac_lo mac_hi: %d %d\n", mac_lo, mac_hi);
-
-	// for (int i = -2048 * 32; i < 2048 * 32; i++) {
-	// 	int r = VMXNET3_READ_BAR0_REG(hw, i * 4);
-
-	// 	if (r != -1)
-	// 		uk_pr_debug("%d: %08x\n", i * 4, r);
-	// }
+	uk_pr_info("mac_hi %08x\n", mac_lo);
+	// uk_pr_info("mac_lo mac_hi: %08x %08x\n", mac_lo, mac_hi);
+	// uk_pr_info("mac_lo mac_hi: %d %d\n", mac_lo, mac_hi);
 
 	memcpy(hw->perm_addr, &mac_lo, 4);
 	memcpy(hw->perm_addr + 4, &mac_hi, 2);
 
 	/* Copy the permanent MAC address */
-	memcpy((struct uk_hwaddr *)hw->perm_addr,
-			&hw->hw_addr0,
-			UK_NETDEV_HWADDR_LEN * sizeof(uint8_t));
+	// memcpy((struct uk_hwaddr *)hw->perm_addr,
+	// 		&hw->hw_addr0,
+	// 		UK_NETDEV_HWADDR_LEN * sizeof(uint8_t));
 
-	uk_pr_debug("MAC Address: %hhX:%hhX:%hhX:%hhX:%hhX:%hhX\n",
+	uk_pr_info("MAC Address: %hhX:%hhX:%hhX:%hhX:%hhX:%hhX\n",
 		     hw->perm_addr[0], hw->perm_addr[1], hw->perm_addr[2],
 		     hw->perm_addr[3], hw->perm_addr[4], hw->perm_addr[5]);
 
@@ -325,8 +337,8 @@ vmxnet3_add_dev(struct pci_device * eth_dev)
 
 	hw->rxdata_desc_size = VMXNET3_VERSION_GE_3(hw) ?
 		VMXNET3_DEF_RXDATA_DESC_SIZE : 0;
-	// RTE_ASSERT((hw->rxdata_desc_size & ~VMXNET3_RXDATA_DESC_SIZE_MASK) ==
-		//    hw->rxdata_desc_size);
+	UK_ASSERT((hw->rxdata_desc_size & ~VMXNET3_RXDATA_DESC_SIZE_MASK) ==
+		   hw->rxdata_desc_size);
 
 	return 0;
 }
@@ -339,23 +351,11 @@ static int vmxnet3_drv_init(struct uk_alloc *allocator)
 	if (!allocator)
 		return -EINVAL;
 
-	uk_pr_debug("vmxnet3_drv_init\n");
-	uk_pr_debug("vmxnet3_drv_init\n");
-	uk_pr_debug("vmxnet3_drv_init\n");
-	uk_pr_debug("vmxnet3_drv_init\n");
-	uk_pr_debug("vmxnet3_drv_init\n");
-
+	uk_pr_info("vmxnet3_drv_init\n");
 
 	a = allocator;
 	return 0;
 }
-
-static struct pci_driver vmxnet3_pci_drv = {
-	.device_ids = pci_vmxnet3_ids,
-	.init = vmxnet3_drv_init,
-	.add_dev = vmxnet3_add_dev,
-};
-PCI_REGISTER_DRIVER(&vmxnet3_pci_drv);
 
 static void
 vmxnet3_alloc_intr_resources(struct uk_netdev *dev)
@@ -363,6 +363,8 @@ vmxnet3_alloc_intr_resources(struct uk_netdev *dev)
 	struct vmxnet3_hw *hw = to_vmxnet3dev(dev);
 	uint32_t cfg;
 	int nvec = 1; /* for link event */
+
+	uk_pr_info("vmxnet3_alloc_intr_resources\n");
 
 	/* intr settings */
 	VMXNET3_WRITE_BAR1_REG(hw, VMXNET3_REG_CMD,
@@ -388,7 +390,7 @@ msix_err:
 	/* the tx/rx queue interrupt will be disabled */
 	hw->intr.num_intrs = 2;
 	hw->intr.lsc_only = TRUE;
-	// PMD_INIT_LOG(INFO, "Enabled MSI-X with %d vectors", hw->intr.num_intrs);
+	uk_pr_err("Enabled MSI-X with %d vectors\n", hw->intr.num_intrs);
 }
 
 static int
@@ -399,26 +401,17 @@ vmxnet3_dev_configure(struct uk_netdev *dev,
 	struct vmxnet3_hw *hw = to_vmxnet3dev(dev);
 	size_t size;
 
-	uk_pr_debug("Configure vmxnet3\n");
-	uk_pr_debug("Configure vmxnet3\n");
-	uk_pr_debug("Configure vmxnet3\n");
-	uk_pr_debug("Configure vmxnet3\n");
-	uk_pr_debug("Configure vmxnet3\n");
-	uk_pr_debug("Configure vmxnet3\n");
-	uk_pr_debug("Configure vmxnet3\n");
-	uk_pr_debug("Configure vmxnet3\n");
-	uk_pr_debug("Configure vmxnet3\n");
-
+	uk_pr_info("Configure vmxnet3\n");
 
 
 	if (conf->nb_tx_queues > VMXNET3_MAX_TX_QUEUES ||
 	    conf->nb_rx_queues > VMXNET3_MAX_RX_QUEUES) {
-		// PMD_INIT_LOG(ERR, "ERROR: Number of queues not supported");
+		uk_pr_err("ERROR: Number of queues not supported\n");
 		return -EINVAL;
 	}
 
 	if (!is_power_of_2(conf->nb_rx_queues)) {
-		// PMD_INIT_LOG(ERR, "ERROR: Number of rx queues not power of 2");
+		uk_pr_err("ERROR: Number of rx queues not power of 2\n");
 		return -EINVAL;
 	}
 
@@ -435,10 +428,11 @@ vmxnet3_dev_configure(struct uk_netdev *dev,
 	 * Allocate a memzone for Vmxnet3_DriverShared - Vmxnet3_DSDevRead
 	 * on current socket
 	 */
-	mz = uk_calloc(a, 1, sizeof(struct Vmxnet3_DriverShared));
+	// mz = uk_calloc(a, 1, sizeof(struct Vmxnet3_DriverShared));
+	mz = uk_memalign(hw->a, 8, sizeof(struct Vmxnet3_DriverShared));
 
 	if (mz == NULL) {
-		// PMD_INIT_LOG(ERR, "ERROR: Creating shared zone");
+		uk_pr_err("ERROR: Creating shared zone\n");
 		return -ENOMEM;
 	}
 
@@ -455,12 +449,14 @@ vmxnet3_dev_configure(struct uk_netdev *dev,
 	 */
 	mz = uk_calloc(a, 1, size);
 	if (mz == NULL) {
-		// PMD_INIT_LOG(ERR, "ERROR: Creating queue descriptors zone");
+		uk_pr_err("ERROR: Creating queue descriptors zone\n");
 		return -ENOMEM;
 	}
 
-	hw->tqd_start = (Vmxnet3_TxQueueDesc *)mz;
-	hw->rqd_start = (Vmxnet3_RxQueueDesc *)(hw->tqd_start + hw->num_tx_queues);
+	// hw->tqd_start = (Vmxnet3_TxQueueDesc *)mz;
+	hw->tqd_start = uk_memalign(hw->a, VMXNET3_QUEUE_DESC_ALIGN, sizeof(struct Vmxnet3_TxQueueDesc));
+	// hw->rqd_start = (Vmxnet3_RxQueueDesc *)(hw->tqd_start + hw->num_tx_queues);
+	hw->rqd_start = uk_memalign(hw->a, VMXNET3_QUEUE_DESC_ALIGN, sizeof(struct Vmxnet3_RxQueueDesc));
 
 	hw->queueDescPA = mz;
 	hw->queue_desc_len = (uint16_t)size;
@@ -475,10 +471,11 @@ vmxnet3_write_mac(struct vmxnet3_hw *hw, const uint8_t *addr)
 {
 	uint32_t val;
 
-	// PMD_INIT_LOG(DEBUG,
-		    //  "Writing MAC Address : " RTE_ETHER_ADDR_PRT_FMT,
-		    //  addr[0], addr[1], addr[2],
-		    //  addr[3], addr[4], addr[5]);
+	uk_pr_info("vmxnet3_write_mac\n");
+
+	uk_pr_info("Writing MAC Address: %hhx:%hhx:%hhx:%hhx:%hhx:%hhx\n",
+		     addr[0], addr[1], addr[2],
+		     addr[3], addr[4], addr[5]);
 
 	memcpy(&val, addr, 4);
 	VMXNET3_WRITE_BAR1_REG(hw, VMXNET3_REG_MACL, val);
@@ -496,6 +493,8 @@ vmxnet3_setup_driver_shared(struct uk_netdev *dev)
 	Vmxnet3_DSDevRead *devRead = &shared->devRead;
 	uint32_t i;
 	int ret;
+
+	uk_pr_info("vmxnet3_setup_driver_shared\n");
 
 	shared->magic = VMXNET3_REV1_MAGIC;
 	devRead->misc.driverInfo.version = VMXNET3_DRIVER_VERSION_NUM;
@@ -576,6 +575,8 @@ vmxnet3_dev_setup_memreg(struct uk_netdev *dev)
 	uint8_t index[VMXNET3_MAX_RX_QUEUES + VMXNET3_MAX_TX_QUEUES];
 	uint32_t num, i, j, size;
 
+	uk_pr_info("vmxnet3_dev_setup_memreg\n");
+
 	if (hw->memRegsPA == 0) {
 		const void *mz;
 
@@ -585,7 +586,7 @@ vmxnet3_dev_setup_memreg(struct uk_netdev *dev)
 
 		mz = uk_calloc(a, 1, size);
 		if (mz == NULL) {
-			// PMD_INIT_LOG(ERR, "ERROR: Creating memRegs zone");
+			uk_pr_err("ERROR: Creating memRegs zone\n");
 			return -ENOMEM;
 		}
 		hw->memRegs = mz;
@@ -659,25 +660,16 @@ vmxnet3_dev_start(struct uk_netdev *dev)
 	int ret;
 	struct vmxnet3_hw *hw = to_vmxnet3dev(dev);
 
-	uk_pr_debug("Starting vmxnet3\n");
-	uk_pr_debug("Starting vmxnet3\n");
-	uk_pr_debug("Starting vmxnet3\n");
-	uk_pr_debug("Starting vmxnet3\n");
-	uk_pr_debug("Starting vmxnet3\n");
-	uk_pr_debug("Starting vmxnet3\n");
-	uk_pr_debug("Starting vmxnet3\n");
-	uk_pr_debug("Starting vmxnet3\n");
-	uk_pr_debug("Starting vmxnet3\n");
-	uk_pr_debug("Starting vmxnet3\n");
-	uk_pr_debug("Starting vmxnet3\n");
-
+	uk_pr_info("Starting vmxnet3\n");
 
 	hw->intr.num_intrs = 2;
 	hw->intr.lsc_only = TRUE;
 
 	ret = vmxnet3_setup_driver_shared(dev);
-	if (ret != VMXNET3_SUCCESS)
+	if (ret != VMXNET3_SUCCESS) {
+		uk_pr_err("vmxnet3_setup_driver_shared\n");
 		return ret;
+	}
 
 	/* Exchange shared data with device */
 	VMXNET3_WRITE_BAR1_REG(hw, VMXNET3_REG_DSAL,
@@ -686,11 +678,11 @@ vmxnet3_dev_start(struct uk_netdev *dev)
 			       VMXNET3_GET_ADDR_HI(hw->sharedPA));
 
 	/* Activate device by register write */
-	VMXNET3_WRITE_BAR1_REG(hw, VMXNET3_REG_CMD, VMXNET3_CMD_ACTIVATE_DEV);
-	ret = VMXNET3_READ_BAR1_REG(hw, VMXNET3_REG_CMD);
+	VMXNET3_WRITE_BAR0_REG(hw, VMXNET3_REG_CMD, VMXNET3_CMD_ACTIVATE_DEV); // was BAR1
+	ret = VMXNET3_READ_BAR0_REG(hw, VMXNET3_REG_CMD); // was BAR1
 
 	if (ret != 0) {
-		// PMD_INIT_LOG(ERR, "Device activation: UNSUCCESSFUL");
+		uk_pr_err("Device activation: UNSUCCESSFUL\n");
 		return -EINVAL;
 	}
 
@@ -701,11 +693,10 @@ vmxnet3_dev_start(struct uk_netdev *dev)
 				       VMXNET3_CMD_REGISTER_MEMREGS);
 		ret = VMXNET3_READ_BAR1_REG(hw, VMXNET3_REG_CMD);
 		if (ret != 0)
-			// PMD_INIT_LOG(DEBUG,
-				    //  "Failed in setup memory region cmd\n");
+			uk_pr_err("Failed in setup memory region cmd\n");
 		ret = 0;
 	} else {
-		// PMD_INIT_LOG(DEBUG, "Failed to setup memory region\n");
+		uk_pr_err("Failed to setup memory region\n");
 	}
 
 	/*
@@ -714,7 +705,7 @@ vmxnet3_dev_start(struct uk_netdev *dev)
 	 */
 	ret = vmxnet3_dev_rxtx_init(dev);
 	if (ret != VMXNET3_SUCCESS) {
-		// PMD_INIT_LOG(ERR, "Device queue init: UNSUCCESSFUL");
+		uk_pr_err("Device queue init: UNSUCCESSFUL\n");
 		return ret;
 	}
 
@@ -740,13 +731,14 @@ vmxnet3_dev_stop(struct uk_netdev *dev)
 	struct vmxnet3_hw *hw = to_vmxnet3dev(dev);
 	int ret;
 
+	uk_pr_info("vmxnet3_dev_stop\n");
 
 	if (hw->adapter_stopped == 1) {
-		// PMD_INIT_LOG(DEBUG, "Device already stopped.");
+		uk_pr_err("Device already stopped.\n");
 		return 0;
 	}
 
-	// PMD_INIT_LOG(DEBUG, "Disabled %d intr callbacks", ret);
+	uk_pr_err("Disabled %d intr callbacks\n", ret);
 
 	/* disable interrupts */
 	vmxnet3_disable_all_intrs(hw);
@@ -758,7 +750,7 @@ vmxnet3_dev_stop(struct uk_netdev *dev)
 
 	/* reset the device */
 	VMXNET3_WRITE_BAR1_REG(hw, VMXNET3_REG_CMD, VMXNET3_CMD_RESET_DEV);
-	// PMD_INIT_LOG(DEBUG, "Device reset.");
+	uk_pr_err("Device reset.\n");
 
 	vmxnet3_dev_clear_queues(dev);
 
@@ -774,6 +766,8 @@ vmxnet3_free_queues(struct uk_netdev *dev)
 	int i;
 	struct vmxnet3_hw *hw = to_vmxnet3dev(dev);
 
+	uk_pr_info("vmxnet3_free_queues\n");
+
 	for (i = 0; i < hw->num_rx_queues; i++)
 		vmxnet3_dev_rx_queue_release(dev, i);
 	hw->num_rx_queues = 0;
@@ -786,22 +780,26 @@ vmxnet3_free_queues(struct uk_netdev *dev)
 /*
  * Reset and stop device.
  */
-static int
-vmxnet3_dev_close(struct uk_netdev *dev)
-{
-	int ret;
+// static int
+// vmxnet3_dev_close(struct uk_netdev *dev)
+// {
+// 	int ret;
 
-	ret = vmxnet3_dev_stop(dev);
-	vmxnet3_free_queues(dev);
+// 	uk_pr_info("vmxnet3_free_queues\n");
 
-	return ret;
-}
+// 	ret = vmxnet3_dev_stop(dev);
+// 	vmxnet3_free_queues(dev);
+
+// 	return ret;
+// }
 
 static void
 vmxnet3_dev_info_get(struct uk_netdev *dev,
 		     struct uk_netdev_info *dev_info)
 {
 	struct vmxnet3_hw *hw = to_vmxnet3dev(dev);
+
+	uk_pr_info("vmxnet3_dev_info_get\n");
 
 	dev_info->max_rx_queues = VMXNET3_MAX_RX_QUEUES;
 	dev_info->max_tx_queues = VMXNET3_MAX_TX_QUEUES;
@@ -811,6 +809,7 @@ vmxnet3_dev_info_get(struct uk_netdev *dev,
 static int
 vmxnet3_dev_mtu_set(struct uk_netdev *dev, uint16_t mtu)
 {
+	uk_pr_info("vmxnet3_dev_mtu_set\n");
 	return 0;
 }
 
@@ -819,9 +818,24 @@ vmxnet3_mac_addr_set(struct uk_netdev *dev, const struct uk_hwaddr *mac_addr)
 {
 	struct vmxnet3_hw *hw = to_vmxnet3dev(dev);
 
+	uk_pr_info("vmxnet3_mac_addr_set\n");
+
 	memcpy(mac_addr, (struct uk_hwaddr *)(hw->perm_addr), UK_NETDEV_HWADDR_LEN * sizeof(uint8_t));
 	vmxnet3_write_mac(hw, mac_addr->addr_bytes);
 	return 0;
+}
+
+const struct uk_hwaddr *
+vmxnet3_mac_addr_get(struct uk_netdev *dev)
+{
+	struct vmxnet3_hw *hw;
+	
+	uk_pr_info("vmxnet3_mac_addr_get\n");
+	
+	hw = to_vmxnet3dev(dev);
+	UK_ASSERT(hw);
+
+	return &hw->perm_addr;
 }
 
 /* Updating rxmode through Vmxnet3_DriverShared structure in adapter */
@@ -830,6 +844,7 @@ vmxnet3_dev_set_rxmode(struct vmxnet3_hw *hw, uint32_t feature, int set)
 {
 	struct Vmxnet3_RxFilterConf *rxConf = &hw->shared->devRead.rxFilterConf;
 
+	uk_pr_info("vmxnet3_dev_set_rxmode\n");
 	if (set)
 		rxConf->rxMode = rxConf->rxMode | feature;
 	else
@@ -845,6 +860,8 @@ vmxnet3_dev_promiscuous_enable(struct uk_netdev *dev, unsigned mode)
 	struct vmxnet3_hw *hw = to_vmxnet3dev(dev);
 	uint32_t *vf_table = hw->shared->devRead.rxFilterConf.vfTable;
 
+	uk_pr_info("vmxnet3_dev_promiscuous_enable\n");
+
 	memset(vf_table, 0, VMXNET3_VFT_TABLE_SIZE);
 	vmxnet3_dev_set_rxmode(hw, VMXNET3_RXM_PROMISC, 1);
 
@@ -855,25 +872,29 @@ vmxnet3_dev_promiscuous_enable(struct uk_netdev *dev, unsigned mode)
 }
 
 /* Promiscuous supported only if Vmxnet3_DriverShared is initialized in adapter */
-static int
-vmxnet3_dev_promiscuous_disable(struct uk_netdev *dev)
-{
-	struct vmxnet3_hw *hw = to_vmxnet3dev(dev);
-	uint32_t *vf_table = hw->shared->devRead.rxFilterConf.vfTable;
+// static int
+// vmxnet3_dev_promiscuous_disable(struct uk_netdev *dev)
+// {
+// 	struct vmxnet3_hw *hw = to_vmxnet3dev(dev);
+// 	uint32_t *vf_table = hw->shared->devRead.rxFilterConf.vfTable;
 
-	memset(vf_table, 0xff, VMXNET3_VFT_TABLE_SIZE);
-	vmxnet3_dev_set_rxmode(hw, VMXNET3_RXM_PROMISC, 0);
-	VMXNET3_WRITE_BAR1_REG(hw, VMXNET3_REG_CMD,
-			       VMXNET3_CMD_UPDATE_VLAN_FILTERS);
+// 	uk_pr_info("vmxnet3_dev_promiscuous_disable\n");
 
-	return 0;
-}
+// 	memset(vf_table, 0xff, VMXNET3_VFT_TABLE_SIZE);
+// 	vmxnet3_dev_set_rxmode(hw, VMXNET3_RXM_PROMISC, 0);
+// 	VMXNET3_WRITE_BAR1_REG(hw, VMXNET3_REG_CMD,
+// 			       VMXNET3_CMD_UPDATE_VLAN_FILTERS);
+
+// 	return 0;
+// }
 
 static void
 vmxnet3_process_events(struct uk_netdev *dev)
 {
 	struct vmxnet3_hw *hw = to_vmxnet3dev(dev);
 	uint32_t events = hw->shared->ecr;
+
+	uk_pr_info("vmxnet3_process_events\n");
 
 	if (!events)
 		return;
@@ -885,33 +906,35 @@ vmxnet3_process_events(struct uk_netdev *dev)
 	VMXNET3_WRITE_BAR1_REG(hw, VMXNET3_REG_ECR, events);
 
 	// /* Check if there is an error on xmit/recv queues */
-	// if (events & (VMXNET3_ECR_TQERR | VMXNET3_ECR_RQERR)) {
-	// 	VMXNET3_WRITE_BAR1_REG(hw, VMXNET3_REG_CMD,
-	// 			       VMXNET3_CMD_GET_QUEUE_STATUS);
+	if (events & (VMXNET3_ECR_TQERR | VMXNET3_ECR_RQERR)) {
+		VMXNET3_WRITE_BAR1_REG(hw, VMXNET3_REG_CMD,
+				       VMXNET3_CMD_GET_QUEUE_STATUS);
 
-	// 	if (hw->tqd_start->status.stopped)
-	// 		PMD_DRV_LOG(ERR, "tq error 0x%x",
-	// 			    hw->tqd_start->status.error);
+		if (hw->tqd_start->status.stopped)
+			uk_pr_err("tq error 0x%x\n",
+				    hw->tqd_start->status.error);
 
-	// 	if (hw->rqd_start->status.stopped)
-	// 		PMD_DRV_LOG(ERR, "rq error 0x%x",
-	// 			     hw->rqd_start->status.error);
+		if (hw->rqd_start->status.stopped)
+			uk_pr_err("rq error 0x%x\n",
+				     hw->rqd_start->status.error);
 
-	// 	/* Reset the device */
-	// 	/* Have to reset the device */
-	// }
+		/* Reset the device */
+		/* Have to reset the device */
+	}
 
-	// if (events & VMXNET3_ECR_DIC)
-	// 	PMD_DRV_LOG(DEBUG, "Device implementation change event.");
+	if (events & VMXNET3_ECR_DIC)
+		uk_pr_info("Device implementation change event.\n");
 
-	// if (events & VMXNET3_ECR_DEBUG)
-	// 	PMD_DRV_LOG(DEBUG, "Debug event generated by device.");
+	if (events & VMXNET3_ECR_DEBUG)
+		uk_pr_info("Debug event generated by device.\n");
 }
 
 static int
 vmxnet3_dev_rx_queue_intr_enable(struct uk_netdev *dev, struct uk_netdev_rx_queue *queue)
 {
 	struct vmxnet3_hw *hw = to_vmxnet3dev(dev);
+
+	uk_pr_info("vmxnet3_dev_rx_queue_intr_enable\n");
 
 	vmxnet3_enable_intr(hw, queue->queue_id);
 
@@ -923,7 +946,43 @@ vmxnet3_dev_rx_queue_intr_disable(struct uk_netdev *dev, struct uk_netdev_rx_que
 {
 	struct vmxnet3_hw *hw = to_vmxnet3dev(dev);
 
+	uk_pr_info("vmxnet3_dev_rx_queue_intr_disable\n");
+
 	vmxnet3_disable_intr(hw, queue->queue_id);
 
 	return 0;
 }
+
+uint16_t vmxnet3_mtu_get(struct uk_netdev *dev)
+{
+	uk_pr_info("vmxnet3_mtu_get\n");
+	return VMXNET3_MAX_MTU;
+}
+
+unsigned vmxnet3_dev_promiscuous_get(struct uk_netdev *dev)
+{
+	uk_pr_info("vmxnet3_dev_promiscuous_get\n");
+	return 0;
+}
+
+int vmxnet3_txq_info_get(struct uk_netdev *dev,
+	uint16_t queue_id, struct uk_netdev_queue_info *queue_info)
+{
+	uk_pr_info("vmxnet3_txq_info_get\n");
+	return 0;
+}
+
+int vmxnet3_rxq_info_get(struct uk_netdev *dev,
+	uint16_t queue_id, struct uk_netdev_queue_info *queue_info)
+{
+	uk_pr_info("vmxnet3_rxq_info_get\n");
+	return 0;
+}
+
+
+static struct pci_driver vmxnet3_pci_drv = {
+	.device_ids = pci_vmxnet3_ids,
+	.init = vmxnet3_drv_init,
+	.add_dev = vmxnet3_add_dev,
+};
+PCI_REGISTER_DRIVER(&vmxnet3_pci_drv);

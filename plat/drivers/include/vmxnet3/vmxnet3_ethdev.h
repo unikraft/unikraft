@@ -63,12 +63,14 @@ struct vmxnet3_intr {
 };
 
 struct vmxnet3_hw {
-	uint8_t *hw_addr0;	/* BAR0: PT-Passthrough Regs    */
-	uint8_t *hw_addr1;	/* BAR1: VD-Virtual Dcoolevice Regs */
+	uint32_t *hw_addr0;	/* BAR0: PT-Passthrough Regs    */
+	uint32_t *hw_addr1;	/* BAR1: VD-Virtual Dcoolevice Regs */
 
+	struct pci_device *pdev;
 	struct uk_netdev netdev;
 	struct uk_hwaddr hw_addr;
 
+	struct uk_alloc *a;
 	/* BAR2: MSI-X Regs */
 	/* BAR3: Port IO    */
 	void *back;
@@ -132,24 +134,19 @@ struct vmxnet3_hw {
 static inline uint32_t
 vmxnet3_read_addr(volatile void *addr)
 {
-	__u16 io_addr;
+	uint32_t ret;
 
-	io_addr = (unsigned long) addr;
-	// return *((uint32_t *) addr);
-	return inl(io_addr);
+	ret = *(uint32_t *)(addr);
+	uk_pr_info("reading from %p = %ud\n", addr, ret);
+
+	return ret;
 }
 
 static inline void
-vmxnet3_write_addr(volatile void *reg, int value)
+vmxnet3_write_addr(volatile void *reg, uint32_t value)
 {
-	__u16 io_addr;
-	__u32 val;
-
-	io_addr = (unsigned long) reg;
-	val = (unsigned long) value;
-
-	*((uint32_t *) reg) = value;
-	// return outl(io_addr, val);
+	*(uint32_t *)(reg) = value;
+	uk_pr_info("writing %p = %d (%p)\n", reg, value, value);
 }
 
 #define VMXNET3_PCI_REG_WRITE(reg, value) vmxnet3_write_addr((reg), (value))
@@ -193,24 +190,37 @@ void vmxnet3_dev_tx_queue_release(struct uk_netdev *dev, uint16_t qid);
 
 int vmxnet3_v4_rss_configure(struct uk_netdev *dev);
 
-int  vmxnet3_dev_rx_queue_setup(struct uk_netdev *dev, uint16_t rx_queue_id,
-				uint16_t nb_rx_desc, unsigned int socket_id,
-				void *mb_pool);
-int  vmxnet3_dev_tx_queue_setup(struct uk_netdev *dev, uint16_t tx_queue_id,
+struct uk_netdev_rx_queue *
+vmxnet3_dev_rx_queue_setup(struct uk_netdev *dev, uint16_t queue_idx,
+			   uint16_t nb_desc, struct uk_netdev_rxqueue_conf *rx_conf);
+struct uk_netdev_tx_queue * vmxnet3_dev_tx_queue_setup(struct uk_netdev *dev, uint16_t tx_queue_id,
 				uint16_t nb_tx_desc, unsigned int socket_id);
 
 int vmxnet3_dev_rxtx_init(struct uk_netdev *dev);
 
 int vmxnet3_rss_configure(struct uk_netdev *dev);
 
-uint16_t vmxnet3_recv_pkts(struct uk_netdev *dev,
+int vmxnet3_recv_pkts(struct uk_netdev *dev,
 	struct uk_netdev_rx_queue *rx_queue,
 	struct uk_netbuf **pkt
 );
 // uint16_t vmxnet3_recv_pkts(void *rx_queue, void **rx_pkts,
 // 			   uint16_t nb_pkts);
-uint16_t vmxnet3_xmit_pkts(void *tx_queue, void **tx_pkts,
-			   uint16_t nb_pkts);
+// int vmxnet3_xmit_pkts(void *tx_queue, void **tx_pkts,
+// 			   uint16_t nb_pkts);
+int vmxnet3_xmit_pkts(__unused struct uk_netdev *dev,
+	struct uk_netdev_tx_queue *tx_queue,
+	struct uk_netbuf *pkt);
+			   
+uint16_t vmxnet3_mtu_get(struct uk_netdev *dev);
+
+unsigned vmxnet3_dev_promiscuous_get(struct uk_netdev *dev);
+
+int vmxnet3_txq_info_get(struct uk_netdev *dev,
+	uint16_t queue_id, struct uk_netdev_queue_info *queue_info);
+
+int vmxnet3_rxq_info_get(struct uk_netdev *dev,
+	uint16_t queue_id, struct uk_netdev_queue_info *queue_info);
 
 
 #endif /* _VMXNET3_ETHDEV_H_ */

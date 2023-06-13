@@ -46,6 +46,8 @@ typedef struct vmxnet3_cmd_ring {
 static inline void
 vmxnet3_cmd_ring_adv_next2fill(struct vmxnet3_cmd_ring *ring)
 {
+	uk_pr_info("vmxnet3_cmd_ring_adv_next2fill\n");
+
 	ring->next2fill++;
 	if (unlikely(ring->next2fill == ring->size)) {
 		ring->next2fill = 0;
@@ -62,6 +64,8 @@ vmxnet3_cmd_ring_adv_next2comp(struct vmxnet3_cmd_ring *ring)
 static inline uint32_t
 vmxnet3_cmd_ring_desc_avail(struct vmxnet3_cmd_ring *ring)
 {
+	uk_pr_info("vmxnet3_cmd_ring_desc_avail\n");
+
 	return (ring->next2comp > ring->next2fill ? 0 : ring->size) +
 		   ring->next2comp - ring->next2fill - 1;
 }
@@ -156,6 +160,7 @@ typedef struct uk_netdev_rx_queue {
 
 	/* User-provided receive buffer allocation function */
 	uk_netdev_alloc_rxpkts alloc_rxpkts;
+	void *alloc_rxpkts_argp;
 } vmxnet3_rx_queue;
 typedef struct uk_netdev_rx_queue vmxnet3_rx_queue_t;
 
