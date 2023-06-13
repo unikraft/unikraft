@@ -3,6 +3,9 @@ uk_mutex_init_config
 uk_mutex_get_metrics
 _uk_mutex_metrics
 _uk_mutex_metrics_lock
+_uk_mutex_lock_wait
+_uk_mutex_unlock_wait
+_uk_mutex_trylock_wait
 uk_rwlock_init_config
 uk_rwlock_rlock
 uk_rwlock_wlock
