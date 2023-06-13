@@ -12,6 +12,13 @@
 
 #include <vmxnet3/vmxnet3_ethdev.h>
 
+#define DEBUG 1
+#define debug_uk_pr_info(fmt, ...) \
+            do { \
+				if (DEBUG) \
+					uk_pr_info(fmt, ##__VA_ARGS__); \
+				} while (0)
+
 /* UPT feature to negotiate */
 #define VMXNET3_F_RXCSUM      0x0001
 #define VMXNET3_F_RSS         0x0002
@@ -146,7 +153,7 @@ static inline void
 vmxnet3_write_addr(volatile void *reg, uint32_t value)
 {
 	*(uint32_t *)(reg) = value;
-	uk_pr_info("writing %p = %d (%p)\n", reg, value, value);
+	// uk_pr_info("writing %p = %d (%x)\n", reg, value, value);
 }
 
 #define VMXNET3_PCI_REG_WRITE(reg, value) vmxnet3_write_addr((reg), (value))
@@ -194,7 +201,7 @@ struct uk_netdev_rx_queue *
 vmxnet3_dev_rx_queue_setup(struct uk_netdev *dev, uint16_t queue_idx,
 			   uint16_t nb_desc, struct uk_netdev_rxqueue_conf *rx_conf);
 struct uk_netdev_tx_queue * vmxnet3_dev_tx_queue_setup(struct uk_netdev *dev, uint16_t tx_queue_id,
-				uint16_t nb_tx_desc, unsigned int socket_id);
+				uint16_t nb_tx_desc, struct uk_netdev_txqueue_conf *tx_conf);
 
 int vmxnet3_dev_rxtx_init(struct uk_netdev *dev);
 

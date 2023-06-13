@@ -33,6 +33,7 @@ typedef struct vmxnet3_buf_info {
 } vmxnet3_buf_info_t;
 
 typedef struct vmxnet3_cmd_ring {
+	struct uk_alloc        *a;
 	vmxnet3_buf_info_t     *buf_info;
 	uint32_t               size;
 	uint32_t               next2fill;
@@ -46,7 +47,7 @@ typedef struct vmxnet3_cmd_ring {
 static inline void
 vmxnet3_cmd_ring_adv_next2fill(struct vmxnet3_cmd_ring *ring)
 {
-	uk_pr_info("vmxnet3_cmd_ring_adv_next2fill\n");
+	// uk_pr_info("vmxnet3_cmd_ring_adv_next2fill\n");
 
 	ring->next2fill++;
 	if (unlikely(ring->next2fill == ring->size)) {
@@ -64,7 +65,7 @@ vmxnet3_cmd_ring_adv_next2comp(struct vmxnet3_cmd_ring *ring)
 static inline uint32_t
 vmxnet3_cmd_ring_desc_avail(struct vmxnet3_cmd_ring *ring)
 {
-	uk_pr_info("vmxnet3_cmd_ring_desc_avail\n");
+	// uk_pr_info("vmxnet3_cmd_ring_desc_avail\n");
 
 	return (ring->next2comp > ring->next2fill ? 0 : ring->size) +
 		   ring->next2comp - ring->next2fill - 1;
@@ -77,6 +78,7 @@ vmxnet3_cmd_ring_desc_empty(struct vmxnet3_cmd_ring *ring)
 }
 
 typedef struct vmxnet3_comp_ring {
+	struct uk_alloc        *a;
 	uint32_t               size;
 	uint32_t               next2proc;
 	uint8_t                gen;
@@ -86,6 +88,7 @@ typedef struct vmxnet3_comp_ring {
 } vmxnet3_comp_ring_t;
 
 struct vmxnet3_data_ring {
+	struct uk_alloc           *a;
 	struct Vmxnet3_TxDataDesc *base;
 	uint32_t                  size;
 	uint64_t                  basePA;
@@ -112,6 +115,7 @@ struct vmxnet3_txq_stats {
 };
 
 typedef struct uk_netdev_tx_queue {
+	struct uk_alloc              *a;
 	struct vmxnet3_hw            *hw;
 	struct vmxnet3_cmd_ring      cmd_ring;
 	struct vmxnet3_comp_ring     comp_ring;
@@ -134,12 +138,14 @@ struct vmxnet3_rxq_stats {
 };
 
 struct vmxnet3_rx_data_ring {
+	struct uk_alloc             *a;
 	uint8_t  *base;
 	uint64_t basePA;
 	uint32_t size;
 };
 
 typedef struct uk_netdev_rx_queue {
+	struct uk_alloc             *a;
 	void                        *mp;
 	struct vmxnet3_hw           *hw;
 	struct vmxnet3_cmd_ring     cmd_ring[VMXNET3_RX_CMDRING_SIZE];
