@@ -30,6 +30,15 @@ if LIBUKLOCK
 		help
 			Enable mutex based synchornization
 
+	config LIBUKLOCK_MUTEX_ATOMIC
+		bool "Use atomic operations for mutex"
+		depends on LIBUKLOCK_MUTEX
+		default y
+		help
+			Use atomic operations for mutex implementation.
+			Disabling this can potentially improve the performance
+			of mutex if they are no used in an SMP environment.
+
 	config LIBUKLOCK_MUTEX_METRICS
 		bool "Metrics for mutex objects"
 		default n
