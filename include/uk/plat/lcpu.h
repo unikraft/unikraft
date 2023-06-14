@@ -86,9 +86,12 @@ void __noreturn ukplat_lcpu_halt(void);
  * Halts the current logical CPU. Execution is resumed when an interrupt/signal
  * arrives or the specified deadline expires
  *
+ * NOTE: This must be called with IRQ's disabled. On return, IRQ's are not
+ *        re-enabled.
+ *
  * @param until deadline in nanoseconds
  */
-void ukplat_lcpu_halt_to(__nsec until);
+void ukplat_lcpu_halt_irq_until(__nsec until);
 
 /**
  * Halts the current logical CPU. Execution is resumed when an interrupt/signal

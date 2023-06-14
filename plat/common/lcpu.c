@@ -187,13 +187,11 @@ void __noreturn ukplat_lcpu_halt(void)
 	lcpu_halt(lcpu_get_current(), 0);
 }
 
-void ukplat_lcpu_halt_to(__nsec until)
+void ukplat_lcpu_halt_irq_until(__nsec until)
 {
-	unsigned long flags;
+	UK_ASSERT(ukplat_lcpu_irqs_disabled());
 
-	flags = ukplat_lcpu_save_irqf();
 	time_block_until(until);
-	ukplat_lcpu_restore_irqf(flags);
 }
 
 __lcpuid ukplat_lcpu_id(void)
