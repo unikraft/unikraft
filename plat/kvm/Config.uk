@@ -171,6 +171,16 @@ config VIRTIO_9P
        select LIBUKSGLIST
        help
               Virtio 9P driver.
+
+config VIRTIO_VSOCK
+	bool "Virtio Vsock Device"
+	default y if LIBUKVSOCKDEV
+	default n
+	depends on LIBUKVSOCKDEV
+	select VIRTIO_BUS
+	select LIBUKGLIST
+	help
+		Virtual vsock driver.
 endmenu
 
 config RTC_PL031
