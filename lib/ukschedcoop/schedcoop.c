@@ -215,7 +215,7 @@ static __noreturn void idle_thread_fn(void *argp)
 
 		if (!wake_up_time || wake_up_time > now) {
 			if (wake_up_time) {
-				ukplat_lcpu_halt_to(wake_up_time);
+				ukplat_lcpu_halt_irq_until(wake_up_time);
 			} else {
 				ukplat_lcpu_halt_irq();
 				ukplat_lcpu_enable_irq();

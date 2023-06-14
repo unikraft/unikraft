@@ -56,9 +56,12 @@
 static void __spin_wait(__nsec nsec)
 {
 	__nsec until = ukplat_monotonic_clock() + nsec;
+	unsigned long flags;
 
+	flags = ukplat_lcpu_save_irqf();
 	while (until > ukplat_monotonic_clock())
-		ukplat_lcpu_halt_to(until);
+		ukplat_lcpu_halt_irq_until(until);
+	ukplat_lcpu_restore_irqf(flags);
 }
 #endif
 
