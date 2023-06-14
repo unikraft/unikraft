@@ -188,24 +188,33 @@ static __noreturn void idle_thread_fn(void *argp)
 {
 	struct schedcoop *c = (struct schedcoop *) argp;
 	__nsec now, wake_up_time;
+	unsigned long flags;
 
 	UK_ASSERT(c);
 
 	for (;;) {
+		flags = ukplat_lcpu_save_irqf();
+
 		/*
 		 * FIXME: We assume that `uk_sched_thread_gc()` is non-blocking
 		 *        because we implement a cooperative scheduler. However,
 		 *        this assumption may not be true depending on the
 		 *        destructor functions that are assigned to the threads
 		 *        and are called by `uk_sched_thred_gc()`.
+		 *	  Also check if in the meantime we got a runnable
+		 *	  thread.
 		 * NOTE:  This idle thread must be non-blocking so that the
 		 *        scheduler has always something to schedule.
 		 */
-		if (uk_sched_thread_gc(&c->sched) > 0) {
-			/* We collected successfully some garbage.
+		if (uk_sched_thread_gc(&c->sched) > 0 ||
+		    UK_TAILQ_FIRST(&c->run_queue)) {
+			/* We collected successfully some garbage or there is
+			 * a runnable thread in the queue.
 			 * Check if something else can be scheduled now.
 			 */
+			ukplat_lcpu_restore_irqf(flags);
 			schedcoop_schedule(&c->sched);
+
 			continue;
 		}
 
@@ -214,16 +223,16 @@ static __noreturn void idle_thread_fn(void *argp)
 		now = ukplat_monotonic_clock();
 
 		if (!wake_up_time || wake_up_time > now) {
-			if (wake_up_time) {
+			if (wake_up_time)
 				ukplat_lcpu_halt_irq_until(wake_up_time);
-			} else {
+			else
 				ukplat_lcpu_halt_irq();
-				ukplat_lcpu_enable_irq();
-			}
 
 			/* handle pending events if any */
 			ukplat_lcpu_irqs_handle_pending();
 		}
+
+		ukplat_lcpu_restore_irqf(flags);
 
 		/* try to schedule a thread that might now be available */
 		schedcoop_schedule(&c->sched);
