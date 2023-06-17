@@ -51,12 +51,14 @@
 #include <uk/page.h>
 
 #include <uk/spinlock.h>
+#include <uk/vmem.h>
 
 
 typedef struct chunk_head_st chunk_head_t;
 typedef struct chunk_tail_st chunk_tail_t;
 
 struct chunk_head_st {
+	int pallocated;
 	chunk_head_t *next;
 	chunk_head_t **pprev;
 	unsigned int level;
@@ -254,6 +256,38 @@ static inline unsigned long num_pages_to_order(unsigned long num_pages)
 	return ukarch_flsl(num_pages - 1) + 1;
 }
 
+static int assign_physical_memory(chunk_head_t *chunk, int order)
+{
+	int rc = 0;
+
+	rc = uk_vma_advise(uk_vas_get_active(),
+		(unsigned long)chunk + __PAGE_SIZE,
+		__PAGE_SIZE * ((1ULL << order) - 1), UK_VMA_ADV_WILLNEED, 0);
+	if (unlikely(rc))
+		/* Release any memory that has been allocated */
+		uk_vma_advise(uk_vas_get_active(),
+			(unsigned long)chunk + __PAGE_SIZE,
+			__PAGE_SIZE * ((1ULL << order) - 1),
+			UK_VMA_ADV_DONTNEED, 0);
+	else
+		chunk->pallocated  = 1;
+
+	return rc;
+}
+
+static int release_physical_memory(chunk_head_t *chunk, int order)
+{
+	int rc = 0;
+
+	rc = uk_vma_advise(uk_vas_get_active(),
+		(unsigned long)chunk + __PAGE_SIZE,
+		__PAGE_SIZE * ((1ULL << order) - 1), UK_VMA_ADV_DONTNEED, 0);
+	if (likely(!rc))
+		chunk->pallocated = 0;
+
+	return rc;
+}
+
 /*********************
  * BINARY BUDDY PAGE ALLOCATOR
  */
@@ -263,6 +297,7 @@ static void *bbuddy_palloc(struct uk_alloc *a, unsigned long num_pages)
 	size_t i;
 	chunk_head_t *alloc_ch, *spare_ch;
 	chunk_tail_t *spare_ct;
+	int rc;
 
 	UK_ASSERT(a != NULL);
 	b = (struct uk_bbpalloc *)&a->priv;
@@ -303,6 +338,13 @@ static void *bbuddy_palloc(struct uk_alloc *a, unsigned long num_pages)
 		/* Create new header for spare chunk. */
 		spare_ch->level = i;
 		spare_ct->level = i;
+		/* Inherit the physical allocation bit */
+		spare_ch->pallocated = alloc_ch->pallocated;
+
+		if (!alloc_ch->pallocated
+			&& i < CONFIG_UKLIBALLOCBUDDY_THRESHOLD) {
+			assign_physical_memory(alloc_ch, i);
+		}
 
 		uk_spin_lock(&b->level_locks[i]);
 		spare_ch->next = b->free_head[i];
@@ -314,6 +356,11 @@ static void *bbuddy_palloc(struct uk_alloc *a, unsigned long num_pages)
 		uk_spin_unlock(&b->level_locks[i]);
 	}
 
+	if (!alloc_ch->pallocated) {
+		rc = assign_physical_memory(alloc_ch, i);
+		if (unlikely(rc))
+			goto no_memory;
+	}
 
 	uk_alloc_stats_count_palloc(a, (void *) alloc_ch, num_pages);
 
@@ -332,7 +379,7 @@ no_memory:
 static void bbuddy_pfree(struct uk_alloc *a, void *obj, unsigned long num_pages)
 {
 	struct uk_bbpalloc *b;
-	chunk_head_t *freed_ch, *to_merge_ch;
+	chunk_head_t *freed_ch, *to_merge_ch, *old_freed_ch;
 	chunk_tail_t *freed_ct;
 	unsigned long mask;
 
@@ -350,7 +397,7 @@ static void bbuddy_pfree(struct uk_alloc *a, void *obj, unsigned long num_pages)
 	map_free(b, (uintptr_t)obj, 1UL << order);
 
 	/* Create free chunk */
-	freed_ch = (chunk_head_t *)obj;
+	freed_ch = old_freed_ch = (chunk_head_t *)obj;
 	freed_ct = (chunk_tail_t *)((char *)obj
 				    + (1UL << (order + __PAGE_SHIFT))) - 1;
 
@@ -378,13 +425,36 @@ static void bbuddy_pfree(struct uk_alloc *a, void *obj, unsigned long num_pages)
 			    (chunk_tail_t *)((char *)to_merge_ch + mask) - 1;
 		}
 
+		/* Release physical memory, if any */
+		if (order >= CONFIG_UKLIBALLOCBUDDY_THRESHOLD) {
+			if (old_freed_ch->pallocated)
+				release_physical_memory(old_freed_ch, order);
+			if (to_merge_ch->pallocated)
+				release_physical_memory(to_merge_ch, order);
+		} else {
+			if (old_freed_ch->pallocated
+				&& !to_merge_ch->pallocated)
+				release_physical_memory(old_freed_ch, order);
+			else if (!old_freed_ch->pallocated
+				&& to_merge_ch->pallocated)
+				release_physical_memory(to_merge_ch, order);
+		}
+
 		/* We are commited to merging, unlink the chunk */
 		*(to_merge_ch->pprev) = to_merge_ch->next;
 		to_merge_ch->next->pprev = to_merge_ch->pprev;
 
+		old_freed_ch = freed_ch;
+
 		uk_spin_unlock(&b->level_locks[order]);
 
 		order++;
+	}
+
+	/* Release an un-merged block that is over the threshold */
+	if (order >= CONFIG_UKLIBALLOCBUDDY_THRESHOLD) {
+		if (old_freed_ch->pallocated)
+			release_physical_memory(old_freed_ch, order);
 	}
 
 	/* Link the new chunk */
@@ -530,6 +600,7 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 		ct = (chunk_tail_t *)min - 1;
 		i -= __PAGE_SHIFT;
 		ch->level = i;
+		ch->pallocated = 0;
 
 		uk_spin_lock(&b->level_locks[i]);
 		ch->next = b->free_head[i];

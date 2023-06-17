@@ -5,3 +5,15 @@ menuconfig LIBUKALLOCBBUDDY
 	select LIBUKDEBUG
 	select LIBUKALLOC
 
+if LIBUKALLOCBBUDDY
+
+config UKLIBALLOCBUDDY_THRESHOLD
+	int "Maximum level for chunk physical allocation"
+	range 1 52
+	default 26
+	help
+		Maximum level of a chunk for which we allocate physical memory even
+		if the chunk will be split.
+
+endif
+
