@@ -60,13 +60,16 @@ __lcpuid lcpu_arch_id(void)
 
 int lcpu_arch_init(struct lcpu *this_lcpu)
 {
-#ifdef CONFIG_HAVE_SMP
 	int rc;
 
-	rc = apic_enable();
+	/*
+	 * Configure local APIC to receive interrupts from the PIC.
+	 * For SMP this also enables x2APIC mode and will fail with
+	 * ENOTSUP if that is not possible.
+	 */
+	rc = apic_enable(this_lcpu);
 	if (unlikely(rc))
 		return rc;
-#endif /* CONFIG_HAVE_SMP */
 
 	traps_lcpu_init(this_lcpu);
 
