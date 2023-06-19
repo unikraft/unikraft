@@ -135,6 +135,11 @@ lxboot_init_mem(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 			lxboot_crash(rc, "Unable to add ram mapping");
 
 	}
+
+	rc = ukplat_memregion_list_insert_legacy_hi_mem(&bi->mrds);
+	if (unlikely(rc < 0))
+		lxboot_crash(rc,
+			     "Failed to insert legacy high memory region\n");
 }
 
 void lxboot_entry(struct lcpu *lcpu, struct lxboot_params *bp)
