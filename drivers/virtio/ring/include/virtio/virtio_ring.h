@@ -157,7 +157,9 @@ struct vring {
  * versa. They are at the end for backwards compatibility.
  */
 #define vring_used_event(vr) ((vr)->avail->ring[(vr)->num])
-#define vring_avail_event(vr) (*(__virtio_le16 *)&(vr)->used->ring[(vr)->num])
+typedef __virtio_le16 __may_alias __virtio_le16_ma;
+#define vring_avail_event(vr) \
+	(*(__virtio_le16_ma *)&(vr)->used->ring[(vr)->num])
 
 static inline void vring_init(struct vring *vr, unsigned int num, uint8_t *p,
 			      unsigned long align)
