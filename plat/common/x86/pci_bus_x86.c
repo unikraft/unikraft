@@ -223,7 +223,8 @@ static void probe_bus(uint32_t bus)
 
 int arch_pci_probe(struct uk_alloc *pha)
 {
-	uint32_t config_addr, header_type; // function, vendor_id
+	uint32_t config_addr, header_type = 0; 
+	uint32_t function, vendor_id;
 
 	uk_pr_debug("Probe PCI\n");
 
@@ -233,27 +234,24 @@ int arch_pci_probe(struct uk_alloc *pha)
 	PCI_CONF_READ(uint32_t, &header_type,
 			config_addr, HEADER_TYPE);
 
-	for (int i = 0; i < 256; i++) {
-		probe_bus(i);
+	if ((header_type & PCI_HEADER_TYPE_MSB_MASK) == 0) {
+		/* Single PCI host controller */
+		probe_bus(0);
+	} else {
+		/* Multiple PCI host controllers */
+		for (function = 0; function < PCI_MAX_FUNCTIONS; function++) {
+			config_addr = (PCI_ENABLE_BIT) |
+					(function << PCI_FUNCTION_SHIFT);
+
+			PCI_CONF_READ(uint32_t, &vendor_id,
+					config_addr, VENDOR_ID);
+
+			if (vendor_id != PCI_INVALID_ID)
+				break;
+
+			probe_bus(function);
+		}
 	}
-	// if ((header_type & PCI_HEADER_TYPE_MSB_MASK) == 0) {
-	// 	/* Single PCI host controller */
-	// 	probe_bus(0);
-	// } else {
-	// 	/* Multiple PCI host controllers */
-	// 	for (function = 0; function < PCI_MAX_FUNCTIONS; function++) {
-	// 		config_addr = (PCI_ENABLE_BIT) |
-	// 				(function << PCI_FUNCTION_SHIFT);
-
-	// 		PCI_CONF_READ(uint32_t, &vendor_id,
-	// 				config_addr, VENDOR_ID);
-
-	// 		if (vendor_id != PCI_INVALID_ID)
-	// 			break;
-
-	// 		probe_bus(function);
-	// 	}
-	// }
 
 	return 0;
 }

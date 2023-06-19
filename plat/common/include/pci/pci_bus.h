@@ -214,8 +214,8 @@ static struct pci_bus_handler ph __unused;
 #define PCI_ENABLE_BIT              (1u << 31)
 
 #define PCI_CONF_CLASS_ID          (0x08)
-#define PCI_CONF_CLASS_ID_SHFT     (16)
-#define PCI_CONF_CLASS_ID_MASK     (0xFF00)
+#define PCI_CONF_CLASS_ID_SHFT     (24)
+#define PCI_CONF_CLASS_ID_MASK     (0xFF)
 
 #define PCI_CONF_VENDOR_ID          (0x00)
 #define PCI_CONF_VENDOR_ID_SHFT     (0)
@@ -238,13 +238,13 @@ static struct pci_bus_handler ph __unused;
 #define PCI_CONF_COMMAND_MASK         (0x0000FFFF)
 
 #define PCI_CONF_SECONDARY_BUS          (0x18)
-#define PCI_CONF_SECONDARY_BUS_SHFT     (0)
-#define PCI_CONF_SECONDARY_BUS_MASK     (0xFF00)
+#define PCI_CONF_SECONDARY_BUS_SHFT     (8)
+#define PCI_CONF_SECONDARY_BUS_MASK     (0xFF)
 
 #define PCI_HEADER_TYPE_MSB_MASK   (0x80)
-#define PCI_CONF_HEADER_TYPE       (0x00)
+#define PCI_CONF_HEADER_TYPE       (0x0C)
 #define PCI_CONF_HEADER_TYPE_SHFT  (16)
-#define PCI_CONF_HEADER_TYPE_MASK  (0xFF)
+#define PCI_CONF_HEADER_TYPE_MASK  (0x00FF)
 
 #define PCI_CONF_SUBSYS_ID          (0x2c)
 #define PCI_CONF_SUBSYS_ID_SHFT     (16)
