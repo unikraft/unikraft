@@ -170,11 +170,12 @@ static int probe_function(uint32_t bus, uint32_t device, uint32_t function)
 	PCI_CONF_READ(uint16_t, &devid.subsystem_vendor_id,
 			config_addr, SUBSYSVEN_ID);
 
-	uk_pr_info("PCI %02x:%02x.%02x (%04x %04x:%04x): ",
+	uk_pr_info("PCI %02x:%02x.%02x (%04x %04x %04x:%04x): ",
 		   (int) addr.bus,
 		   (int) addr.devid,
 		   (int) addr.function,
 		   (int) devid.class_id,
+		   (int) devid.sub_class_id,
 		   (int) devid.vendor_id,
 		   (int) devid.device_id);
 
@@ -190,6 +191,7 @@ static int probe_function(uint32_t bus, uint32_t device, uint32_t function)
 	if ((devid.class_id == 0x06) && (devid.sub_class_id == 0x04)) {
 		PCI_CONF_READ(uint32_t, &secondary_bus,
 				config_addr, SECONDARY_BUS);
+		uk_pr_info("PCI-to-PCI Bridge connecting with secondary bus %d\n", secondary_bus);
 		probe_bus(secondary_bus);
 	}
 
