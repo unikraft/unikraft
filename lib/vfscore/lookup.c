@@ -260,6 +260,36 @@ namei(const char *path, struct dentry **dpp)
 	return namei_resolve(path, dpp, NULL);
 }
 
+static int
+_namei_prep_path(const char *path, struct mount **mp, char *node, char **fname)
+{
+	if (path[0] != '/') {
+		return (ENOTDIR);
+	}
+
+	char *name = strrchr(path, '/');
+	if (name == NULL) {
+		return (ENOENT);
+	}
+	*fname = name + 1;
+
+	char *p;
+	int error = vfs_findroot(path, mp, &p);
+	if (error != 0) {
+		return (ENOTDIR);
+	}
+
+	strlcpy(node, "/", PATH_MAX);
+	strlcat(node, p, PATH_MAX);
+	// We want to treat things like /tmp/ the same as /tmp. Best way to do that
+	// is to ignore the last character, except when we're stating the root.
+	int l = strlen(node) - 1;
+	if (l && node[l] == '/') {
+		node[l] = '\0';
+	}
+	return 0;
+}
+
 /*
  * Convert last component in the path to pointer to dentry
  *
@@ -273,39 +303,14 @@ namei_last_nofollow(char *path, struct dentry *ddp, struct dentry **dpp)
 	char          *name;
 	int           error;
 	struct mount  *mp;
-	char          *p;
 	struct dentry *dp;
 	struct vnode  *dvp;
 	struct vnode  *vp;
 	char node[PATH_MAX];
 
-	dvp  = NULL;
-
-	if (path[0] != '/') {
-		return (ENOTDIR);
+	if ((error = _namei_prep_path(path, &mp, node, &name))) {
+		return error;
 	}
-
-	name = strrchr(path, '/');
-	if (name == NULL) {
-		return (ENOENT);
-	}
-	name++;
-
-	error = vfs_findroot(path, &mp, &p);
-	if (error != 0) {
-		return (ENOTDIR);
-	}
-
-	strlcpy(node, "/", PATH_MAX);
-	strlcat(node, p, PATH_MAX);
-
-	// We want to treat things like /tmp/ the same as /tmp. Best way to do that
-	// is to ignore the last character, except when we're stating the root.
-	int l = strlen(node) - 1;
-	if (l && node[l] == '/') {
-		node[l] = '\0';
-	}
-
 	dvp = ddp->d_vnode;
 	vn_lock(dvp);
 	dp = dentry_lookup(mp, node);
@@ -327,9 +332,51 @@ namei_last_nofollow(char *path, struct dentry *ddp, struct dentry **dpp)
 	*dpp  = dp;
 	error = 0;
 out:
-	if (dvp != NULL) {
-		vn_unlock(dvp);
+	vn_unlock(dvp);
+	return (error);
+}
+
+/*
+ * Same as namei_last_nofollow but does not lock ddp->d_vnode.
+ *
+ * @path: full path name
+ * @ddp : pointer to dentry of parent
+ * @dpp : dentry to be returned
+ */
+int
+namei_last_nofollow_locked(char *path, struct dentry *ddp, struct dentry **dpp)
+{
+	char          *name;
+	int           error;
+	struct mount  *mp;
+	struct dentry *dp;
+	struct vnode  *dvp;
+	struct vnode  *vp;
+	char node[PATH_MAX];
+
+	if ((error = _namei_prep_path(path, &mp, node, &name))) {
+		return error;
 	}
+	dvp = ddp->d_vnode;
+	dp = dentry_lookup(mp, node);
+	if (dp == NULL) {
+		error = VOP_LOOKUP(dvp, name, &vp);
+		if (error != 0) {
+			goto out;
+		}
+
+		dp = dentry_alloc(ddp, vp, node);
+		vput(vp);
+
+		if (dp == NULL) {
+			error = ENOMEM;
+			goto out;
+		}
+	}
+
+	*dpp  = dp;
+	error = 0;
+out:
 	return (error);
 }
 
