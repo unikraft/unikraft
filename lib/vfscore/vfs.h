@@ -700,6 +700,22 @@ int namei(const char *path, struct dentry **dpp);
 int namei_last_nofollow(char *path, struct dentry *ddp, struct dentry **dp);
 
 /**
+ * Same as namei_last_nofollow, to be called with the ddp->d_vnode lock held.
+ *
+ * @param path
+ *	The full path name
+ * @param ddp
+ *	Pointer to dentry of parent
+ * @param[out] dp
+ *	Dentry to be returned
+ * @return
+ *	- (0):  Completed successfully
+ *	- (<0): Negative value with error code
+ */
+int
+namei_last_nofollow_locked(char *path, struct dentry *ddp, struct dentry **dp);
+
+/**
  * Searches a pathname.
  * This routine returns a locked directory vnode and file name.
  *
