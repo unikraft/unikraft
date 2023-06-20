@@ -683,6 +683,14 @@ $(foreach E,$(EPLAT_DIR), \
 )
 $(eval $(call verbose_include,$(CONFIG_UK_BASE)/Makefile.uk)) # Unikraft base
 
+ifeq ($(call have_clang),y)
+$(call error_if_clang_version_lt,9,0)
+endif
+
+ifeq ($(call have_gcc),y)
+$(call error_if_gcc_version_lt,7,0)
+endif
+
 ifeq ($(call qstrip,$(UK_PLATS) $(UK_PLATS-y)),)
 $(warning You did not choose any target platform.)
 $(error Please choose at least one target platform in the configuration!)
