@@ -204,10 +204,10 @@ UK_LLSYSCALL_R_DEFINE(int, openat, int, dirfd, const char *, pathname,
 	strlcat(p, "/", PATH_MAX);
 	strlcat(p, pathname, PATH_MAX);
 
-	error = uk_syscall_r_open((long int)p, flags, mode);
-
 	vn_unlock(vp);
 	fdrop(fp);
+
+	error = uk_syscall_r_open((long int)p, flags, mode);
 
 	return error;
 }
@@ -1294,10 +1294,10 @@ UK_SYSCALL_R_DEFINE(int, mkdirat, int, dirfd,
 	strlcat(p, "/", PATH_MAX);
 	strlcat(p, pathname, PATH_MAX);
 
-	error = uk_syscall_r_mkdir((long) p, (long) mode);
-
 	vn_unlock(vp);
 	fdrop(fp);
+
+	error = uk_syscall_r_mkdir((long) p, (long) mode);
 
 	return error;
 }
@@ -1711,13 +1711,13 @@ static int __fxstatat_helper(int ver __unused, int dirfd, const char *pathname,
 	strlcat(p, "/", PATH_MAX);
 	strlcat(p, pathname, PATH_MAX);
 
+	vn_unlock(vp);
+	fdrop(fp);
+
 	if (flags & AT_SYMLINK_NOFOLLOW)
 		error = uk_syscall_r_lstat((long) p, (long) st);
 	else
 		error = uk_syscall_r_stat((long) p, (long) st);
-
-	vn_unlock(vp);
-	fdrop(fp);
 
 	return error;
 }
@@ -2201,10 +2201,10 @@ UK_SYSCALL_R_DEFINE(int, faccessat, int, dirfd, const char*, pathname, int, mode
 	strlcat(p, "/", PATH_MAX);
 	strlcat(p, pathname, PATH_MAX);
 
-	error = uk_syscall_r_access((long) p, (long) mode);
-
 	vn_unlock(vp);
 	fdrop(fp);
+
+	error = uk_syscall_r_access((long) p, (long) mode);
 
 	out_error:
 	return error;
