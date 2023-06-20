@@ -908,7 +908,7 @@ sys_symlink(const char *oldpath, const char *newpath)
 	vn_lock(newdirdp->d_vnode);
 
 	/* newpath should not already exist */
-	if (unlikely(namei_last_nofollow(np, newdirdp, &newdp) == 0)) {
+	if (unlikely(namei_last_nofollow_locked(np, newdirdp, &newdp) == 0)) {
 		drele(newdp);
 		error = EEXIST;
 		goto out_unlock;
