@@ -312,7 +312,7 @@ static void *bbuddy_palloc(struct uk_alloc *a, unsigned long num_pages)
 		if (!FREELIST_EMPTY(b->free_head[i]))
 			break;
 	}
-	if (i == FREELIST_SIZE)
+	if (i >= FREELIST_SIZE)
 		goto no_memory;
 
 	/* Unlink a chunk. */
