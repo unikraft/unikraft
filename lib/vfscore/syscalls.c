@@ -170,28 +170,31 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 			return error;
 
 		vp = dp->d_vnode;
+	}
 
-		if (flags & UK_FWRITE || flags & O_TRUNC) {
-			error = vn_access(vp, VWRITE);
-			if (error)
-				goto out_drele;
+	vn_lock(vp);
 
+	if (flags & UK_FWRITE || flags & O_TRUNC) {
+		error = vn_access(vp, VWRITE);
+		if (error)
+			goto out_unlock;
+
+		if (vp->v_type == VDIR) {
 			error = EISDIR;
-			if (vp->v_type == VDIR)
-				goto out_drele;
+			goto out_unlock;
 		}
-		if (flags & O_DIRECTORY) {
-			if (vp->v_type != VDIR) {
-				error = ENOTDIR;
-				goto out_drele;
-			}
+	}
+	if (flags & O_DIRECTORY) {
+		if (vp->v_type != VDIR) {
+			error = ENOTDIR;
+			goto out_unlock;
 		}
 	}
 
 	fp = calloc(sizeof(struct vfscore_file), 1);
 	if (!fp) {
 		error = ENOMEM;
-		goto out_drele;
+		goto out_unlock;
 	}
 
 	fhold(fp);
@@ -206,12 +209,11 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 	uk_mutex_init(&fp->f_lock);
 	UK_INIT_LIST_HEAD(&fp->f_ep);
 
-	vn_lock(vp);
-
 	if (flags & O_TRUNC) {
-		error = EINVAL;
-		if (!(flags & UK_FWRITE) || vp->v_type == VDIR)
+		if (!(flags & UK_FWRITE)) {
+			error = EINVAL;
 			goto out_fp_free_unlock;
+		}
 
 		error = VOP_TRUNCATE(vp, 0);
 		if (error)
@@ -229,6 +231,7 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 
 out_fp_free_unlock:
 	free(fp);
+out_unlock:
 	vn_unlock(vp);
 out_drele:
 	if (dp)
