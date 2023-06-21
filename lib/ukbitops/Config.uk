@@ -1,0 +1,5 @@
+menuconfig LIBUKBITOPS
+	bool "ukbitops: Bit operations"
+	default y
+	help
+		Support for common bit operations.

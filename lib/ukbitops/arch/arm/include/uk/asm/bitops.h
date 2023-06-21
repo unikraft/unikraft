@@ -33,7 +33,7 @@
  * SUCH DAMAGE.
  */
 
-#ifndef __UKARCH_ATOMIC_H__
+#ifndef __UKARCH_BITOPS_H__
 #error Do not include this header directly
 #endif
 
@@ -44,10 +44,7 @@
  * @return The index of the least significant 1-bit of x, or if x is zero,
  *   the result is undefined. ffs(1)=0, ffs(3)=0, ffs(0x80000000)=31
  */
-static inline unsigned int ukarch_ffs(unsigned int x)
-{
-	return __builtin_ffs(x) - 1;
-}
+#define uk_ffs(x) (__builtin_ffs(x) - 1)
 
 /**
  * Find last (highest) set bit in word.
@@ -56,10 +53,7 @@ static inline unsigned int ukarch_ffs(unsigned int x)
  * @return The index of the most significant 1-bit of x, or if x is zero,
  *   the result is undefined. fls(1)=0, fls(3)=1, fls(0x80000001)=31
  */
-static inline unsigned int ukarch_fls(unsigned int x)
-{
-	return sizeof(x) * 8 - __builtin_clz(x) - 1;
-}
+#define uk_fls(x) (sizeof(x) * 8 - __builtin_clz(x) - 1)
 
 /**
  * Find first (lowest) set bit in long word.
@@ -68,10 +62,7 @@ static inline unsigned int ukarch_fls(unsigned int x)
  * @return The index of the least significant 1-bit of x, or if x is zero,
  *    the result is undefined. ffs(1)=0, ffs(3)=0, ffs(0x80000000)=31
  */
-static inline unsigned int ukarch_ffsl(unsigned long x)
-{
-	return __builtin_ffsl(x) - 1;
-}
+#define uk_ffsl(x) (__builtin_ffsl(x) - 1)
 
 /**
  * Find last (highest) set bit in long word.
@@ -80,7 +71,4 @@ static inline unsigned int ukarch_ffsl(unsigned long x)
  * @return The index of the most significant 1-bit of x, or if x is zero,
  *   the result is undefined. fls(1)=0, fls(3)=1, fls(0x80000001)=31
  */
-static inline unsigned int ukarch_flsl(unsigned long x)
-{
-	return sizeof(x) * 8 - __builtin_clzl(x) - 1;
-}
+#define uk_flsl(x) (sizeof(x) * 8 - __builtin_clzl(x) - 1)

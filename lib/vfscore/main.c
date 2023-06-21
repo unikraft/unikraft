@@ -103,7 +103,7 @@ static inline int has_error(int error, int bytes)
 
 static inline mode_t apply_umask(mode_t mode)
 {
-	return mode & ~ukarch_load_n(&global_umask);
+	return mode & ~uk_load_n(&global_umask);
 }
 
 UK_TRACEPOINT(trace_vfs_open, "\"%s\" %#x 0%0o", const char*, int, mode_t);
@@ -2578,7 +2578,7 @@ LFS64(posix_fadvise);
 
 UK_SYSCALL_R_DEFINE(mode_t, umask, mode_t, newmask)
 {
-	return ukarch_exchange_n(&global_umask, newmask);
+	return uk_exchange_n(&global_umask, newmask);
 }
 
 int

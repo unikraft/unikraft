@@ -1,0 +1,5 @@
+menuconfig LIBUKATOMIC
+	bool "ukatomic: Atomic operations"
+	default y
+	help
+		Support for atomic operations.

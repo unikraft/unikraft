@@ -31,6 +31,10 @@
 #ifndef __UK_BITCOUNT_H__
 #define __UK_BITCOUNT_H__
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 #ifdef __POPCNT__
 #define	uk_bitcount64(x)	__builtin_popcountll((__u64)(x))
 #define	uk_bitcount32(x)	__builtin_popcountl((__u32)(x))
@@ -87,5 +91,9 @@ uk_bitcount64(__u64 _x)
 #define	uk_bitcount(x)	uk_bitcount32((unsigned int)(x))
 #endif
 #endif /* __POPCNT__ */
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif /* __UK_BITCOUNT_H__ */

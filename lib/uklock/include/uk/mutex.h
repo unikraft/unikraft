@@ -131,7 +131,7 @@ static inline void uk_mutex_lock(struct uk_mutex *m)
 		uk_waitq_wait_event(&m->wait, m->owner == NULL);
 
 		/* If there is no owner, we can acquire the lock */
-		if (ukarch_compare_exchange_sync(&m->owner, NULL, cur) == cur) {
+		if (uk_compare_exchange_sync(&m->owner, NULL, cur) == cur) {
 			UK_ASSERT(m->lock_count == 0);
 			m->lock_count = 1;
 			break;
@@ -172,7 +172,7 @@ static inline int uk_mutex_trylock(struct uk_mutex *m)
 	UK_ASSERT(m->owner != cur);
 
 	if (m->owner == NULL) {
-		if (ukarch_compare_exchange_sync(&m->owner, NULL, cur) == cur) {
+		if (uk_compare_exchange_sync(&m->owner, NULL, cur) == cur) {
 			UK_ASSERT(m->lock_count == 0);
 			m->lock_count = 1;
 

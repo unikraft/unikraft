@@ -39,7 +39,7 @@
 #include <uk/errptr.h>
 #include <uk/plat/common/cpu.h>
 #include <uk/sglist.h>
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
 #include <uk/plat/io.h>
 #include <virtio/virtio_ring.h>
 #include <virtio/virtqueue.h>

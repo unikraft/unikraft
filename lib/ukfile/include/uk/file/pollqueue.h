@@ -12,7 +12,7 @@
 #include <uk/config.h>
 
 #include <uk/assert.h>
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
 #include <uk/rwlock.h>
 #include <uk/plat/time.h>
 #include <uk/thread.h>
@@ -283,7 +283,7 @@ int _pollq_wait(struct uk_pollq *q, uk_pollevent req, __nsec deadline)
 	int timeout;
 
 	/* Mark request in waitmask */
-	(void)ukarch_or(&q->waitmask, req);
+	(void)uk_or(&q->waitmask, req);
 	/* Compete to register */
 
 	__current = uk_thread_current();
@@ -292,7 +292,7 @@ int _pollq_wait(struct uk_pollq *q, uk_pollevent req, __nsec deadline)
 		.thread = __current,
 		.mask = req,
 	};
-	tail = ukarch_exchange_n(&q->waitend, &tick.next);
+	tail = uk_exchange_n(&q->waitend, &tick.next);
 	/* tail is ours alone, safe to link in */
 	UK_ASSERT(!*tail); /* Should be a genuine list tail */
 	*tail = &tick;
@@ -408,8 +408,8 @@ void _pollq_register(struct uk_pollq *q, struct uk_poll_chain *tick)
 {
 	struct uk_poll_chain **tail;
 
-	(void)ukarch_or(&q->propmask, tick->mask);
-	tail = ukarch_exchange_n(&q->propend, &tick->next);
+	(void)uk_or(&q->propmask, tick->mask);
+	tail = uk_exchange_n(&q->propend, &tick->next);
 	UK_ASSERT(!*tail); /* Should be genuine list tail */
 	*tail = tick;
 }
@@ -466,7 +466,7 @@ void uk_pollq_reregister(struct uk_pollq *q, struct uk_poll_chain *tick,
 {
 	UK_ASSERT(tick->next == ntick->next);
 	uk_rwlock_rlock(&q->proplock);
-	ukarch_or(&q->propmask, ntick->mask);
+	uk_or(&q->propmask, ntick->mask);
 	*tick = *ntick;
 	uk_rwlock_runlock(&q->proplock);
 }

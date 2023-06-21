@@ -22,7 +22,7 @@
 #include <string.h>
 #endif
 #include <uk/arch/limits.h>
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
 #include <uk/plat/lcpu.h>
 #include <uk/semaphore.h>
 #include <common/gnttab.h>
@@ -140,7 +140,7 @@ static int gnttab_reset_flags(grant_ref_t gref)
 				   gref, flags);
 			return 0;
 		}
-	} while ((nflags = ukarch_compare_exchange_sync(pflags, flags, 0))
+	} while ((nflags = uk_compare_exchange_sync(pflags, flags, 0))
 			!= flags);
 
 	return 1;
@@ -191,7 +191,7 @@ unsigned long gnttab_end_transfer(grant_ref_t gref)
 
 	pflags = &gnttab.table[gref].flags;
 	while (!((flags = *pflags) & GTF_transfer_committed)) {
-		if (ukarch_compare_exchange_sync(pflags, flags, 0) == flags) {
+		if (uk_compare_exchange_sync(pflags, flags, 0) == flags) {
 			uk_pr_info("Release unused transfer grant.\n");
 			put_free_entry(gref);
 			return 0;

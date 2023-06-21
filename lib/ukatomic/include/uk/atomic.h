@@ -27,83 +27,81 @@
  * SUCH DAMAGE.
  */
 
-#ifndef __UKARCH_ATOMIC_H__
-#define __UKARCH_ATOMIC_H__
+#ifndef __UK_ATOMIC_H__
+#define __UK_ATOMIC_H__
 
 #include <uk/arch/lcpu.h>
 
 #ifdef __cplusplus
 extern "C" {
-#endif
-
-#include <uk/asm/atomic.h>
+#endif /* __cplusplus */
 
 /**
  * Perform an atomic load operation.
  */
-#define ukarch_load_n(src) \
+#define uk_load_n(src) \
 	__atomic_load_n(src, __ATOMIC_SEQ_CST)
 
 /**
  * Perform an atomic store operation.
  */
-#define ukarch_store_n(src, value) \
+#define uk_store_n(src, value) \
 	__atomic_store_n(src, value, __ATOMIC_SEQ_CST)
 
 /**
  * Perform an atomic fetch and add/sub operation.
  */
-#define ukarch_fetch_add(src, value) \
+#define uk_fetch_add(src, value) \
 	__atomic_fetch_add(src, value, __ATOMIC_SEQ_CST)
-#define ukarch_fetch_sub(src, value) \
+#define uk_fetch_sub(src, value) \
 	__atomic_fetch_sub(src, value, __ATOMIC_SEQ_CST)
 
 /**
  * Perform an atomic add/sub and fetch operation.
  */
-#define ukarch_add_fetch(src, value) \
+#define uk_add_fetch(src, value) \
 	__atomic_add_fetch(src, value, __ATOMIC_SEQ_CST)
-#define ukarch_sub_fetch(src, value) \
+#define uk_sub_fetch(src, value) \
 	__atomic_sub_fetch(src, value, __ATOMIC_SEQ_CST)
 
 /**
  * Perform an atomic increment/decrement operation and return the
  * previous value.
  */
-#define ukarch_inc(src) \
-	ukarch_fetch_add(src, 1)
-#define ukarch_dec(src) \
-	ukarch_fetch_sub(src, 1)
+#define uk_inc(src) \
+	uk_fetch_add(src, 1)
+#define uk_dec(src) \
+	uk_fetch_sub(src, 1)
 
 /**
  * Perform an atomic OR operation and return the previous value.
  */
-#define ukarch_or(src, val) \
+#define uk_or(src, val) \
 	__atomic_fetch_or(src, val, __ATOMIC_SEQ_CST)
 
 /**
  * Perform an atomic AND operation and return the previous value.
  */
-#define ukarch_and(src, val) \
+#define uk_and(src, val) \
 	__atomic_fetch_and(src, val, __ATOMIC_SEQ_CST)
 
 /**
  * Writes *src into *dst, and returns the previous contents of *dst.
  */
-#define ukarch_exchange(dst, src) \
+#define uk_exchange(dst, src) \
 	__atomic_exchange(dst, src, __ATOMIC_SEQ_CST)
 
 /**
  * Writes v into *dst, and returns the previous contents of *dst.
  */
-#define ukarch_exchange_n(dst, v) \
+#define uk_exchange_n(dst, v) \
 	__atomic_exchange_n(dst, v, __ATOMIC_SEQ_CST)
 
-#define ukarch_compare_exchange_n(dst, exp, des)  \
+#define uk_compare_exchange_n(dst, exp, des)  \
 	__atomic_compare_exchange_n(dst, exp, des, 0, \
 	                            __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
 
-#define ukarch_compare_exchange_sync(ptr, old, new)                            \
+#define uk_compare_exchange_sync(ptr, old, new)                            \
 	({                                                                     \
 		__typeof__(*ptr) stored = old;                                 \
 		__atomic_compare_exchange_n(                                   \
@@ -111,10 +109,6 @@ extern "C" {
 		    ? new                                                      \
 		    : old;                                                     \
 	})
-
-#ifdef __cplusplus
-}
-#endif
 
 #define	UK_ACCESS_ONCE(x)			(*(volatile __typeof(x) *)&(x))
 
@@ -133,4 +127,8 @@ extern "C" {
 	__var;				\
 })
 
-#endif /* __UKARCH_ATOMIC_H__ */
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
+
+#endif /* __UK_ATOMIC_H__ */

@@ -1,0 +1,4 @@
+$(eval $(call addlib_s,libukatomic,$(CONFIG_LIBUKATOMIC)))
+
+CINCLUDES-$(CONFIG_LIBUKATOMIC)	 		+= -I$(LIBUKATOMIC_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBUKATOMIC)		+= -I$(LIBUKATOMIC_BASE)/include

@@ -60,7 +60,7 @@ static ssize_t evfd_read(const struct uk_file *f,
 			next = 0;
 			ret = val;
 		}
-	} while (!ukarch_compare_exchange_n(n, &val, next));
+	} while (!uk_compare_exchange_n(n, &val, next));
 
 	if (!next)
 		uk_file_event_clear(f, UKFD_POLLIN);
@@ -94,7 +94,7 @@ static ssize_t evfd_write(const struct uk_file *f,
 	do {
 		if (add > UINT64_MAX - 1 - val)
 			return -EAGAIN;
-	} while (!ukarch_compare_exchange_n(n, &val, val + add));
+	} while (!uk_compare_exchange_n(n, &val, val + add));
 
 	if (val + add == UINT64_MAX - 1)
 		uk_file_event_clear(f, UKFD_POLLOUT);

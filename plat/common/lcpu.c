@@ -38,7 +38,7 @@
  */
 
 #include <uk/essentials.h>
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
 #if CONFIG_HAVE_SMP
 #include <uk/intctlr.h>
 #endif /* CONFIG_HAVE_SMP */
@@ -236,14 +236,14 @@ int lcpu_fn_enqueue(struct lcpu *lcpu, const struct ukplat_lcpu_func *fn)
 
 	UK_ASSERT(fn->fn);
 
-	old_fn = ukarch_load_n(&lcpu->fn.fn);
+	old_fn = uk_load_n(&lcpu->fn.fn);
 
 	/* Check if the slot is empty */
 	if (old_fn != NULL)
 		return -EAGAIN;
 
 	/* It is empty, try to store the function */
-	if (ukarch_compare_exchange_sync(&lcpu->fn.fn, old_fn,
+	if (uk_compare_exchange_sync(&lcpu->fn.fn, old_fn,
 					 fn->fn) != fn->fn)
 		return -EAGAIN;
 
@@ -291,7 +291,7 @@ static int lcpu_ipi_run_handler(void *args __unused)
 	 * state.
 	 */
 	UK_ASSERT(lcpu_state_is_busy(this_lcpu->state));
-	ukarch_dec(&this_lcpu->state);
+	uk_dec(&this_lcpu->state);
 
 	return 1;
 }
@@ -374,7 +374,7 @@ void __weak __noreturn lcpu_entry_default(struct lcpu *this_lcpu)
 		 * IDLE state. However, there can be functions queued already
 		 * so we have to use a decrement here.
 		 */
-		ukarch_dec(&this_lcpu->state);
+		uk_dec(&this_lcpu->state);
 
 		/* Enable IRQs. If there are functions queued we will
 		 * immediately jump to the IRQ handler.
@@ -420,7 +420,7 @@ int ukplat_lcpu_start(const __lcpuidx lcpuidx[], unsigned int *num, void *sp[],
 		}
 
 retry:
-		old = ukarch_load_n(&lcpu->state);
+		old = uk_load_n(&lcpu->state);
 
 		/* We ignore CPUs that are already started */
 		if (unlikely(old != LCPU_STATE_OFFLINE)) {
@@ -436,7 +436,7 @@ retry:
 		 * was faster, we will return to the state comparison and
 		 * report that the CPU is not offline.
 		 */
-		if (ukarch_compare_exchange_sync((int *)&lcpu->state, old,
+		if (uk_compare_exchange_sync((int *)&lcpu->state, old,
 						 new) != new)
 			goto retry;
 
@@ -501,7 +501,7 @@ static inline int lcpu_transition_safe(struct lcpu *lcpu, int incr)
 	 * the non-online state.
 	 */
 	do {
-		old = ukarch_load_n(&lcpu->state);
+		old = uk_load_n(&lcpu->state);
 
 		/* We must not change the state if the CPU is not online */
 		if (!lcpu_state_is_online(old))
@@ -512,7 +512,7 @@ static inline int lcpu_transition_safe(struct lcpu *lcpu, int incr)
 		new = old + incr;
 
 		UK_ASSERT(lcpu_state_is_online(new));
-	} while (ukarch_compare_exchange_sync((int *)&lcpu->state, old,
+	} while (uk_compare_exchange_sync((int *)&lcpu->state, old,
 					      new) != new);
 
 	return 1;

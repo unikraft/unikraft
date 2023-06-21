@@ -8,7 +8,7 @@
 
 #include <sys/ioctl.h>
 
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
 #include <uk/posix-fdio.h>
 #include <uk/print.h>
 
@@ -25,9 +25,9 @@ int uk_sys_ioctl(struct uk_ofile *of, int cmd, void *arg)
 		int val = *(int *)arg;
 
 		if (val)
-			ukarch_or(&of->mode, O_NONBLOCK);
+			uk_or(&of->mode, O_NONBLOCK);
 		else
-			ukarch_and(&of->mode, ~O_NONBLOCK);
+			uk_and(&of->mode, ~O_NONBLOCK);
 		return 0;
 	}
 
@@ -59,7 +59,7 @@ int uk_sys_fcntl(struct uk_ofile *of, int cmd, unsigned long arg)
 		do {
 			newmode = mode & ~_SETFL_MASK;
 			newmode |= arg & _SETFL_MASK;
-		} while (!ukarch_compare_exchange_n(&of->mode, &mode, newmode));
+		} while (!uk_compare_exchange_n(&of->mode, &mode, newmode));
 		return 0;
 	}
 	default:

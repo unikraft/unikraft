@@ -3,7 +3,7 @@
  * Licensed under the BSD-3-Clause License (the "License").
  * You may not use this file except in compliance with the License.
  */
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
 #if !__INTERRUPTSAFE__
 #include <uk/boot.h>
 #else /* __INTERRUPTSAFE__ */
@@ -37,7 +37,7 @@ int uk_boot_shutdown_req_isr(enum ukplat_gstate target)
 		return -EINVAL;
 	}
 
-	already_requested = ukarch_exchange_n(
+	already_requested = uk_exchange_n(
 					&shutdown_ctl.request.already_requested,
 					0x1);
 	if (already_requested) {

@@ -33,6 +33,10 @@
 #include <string.h>
 #include <uk/bitops.h>
 
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
+
 static inline void
 uk_bitmap_zero(unsigned long *addr, const unsigned int size)
 {
@@ -289,5 +293,9 @@ uk_bitmap_xor(unsigned long *dst, const unsigned long *src1,
 	for (i = 0; i != end; i++)
 		dst[i] = src1[i] ^ src2[i];
 }
+
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
 
 #endif					/* _LINUX_BITMAP_H_ */
