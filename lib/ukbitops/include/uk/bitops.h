@@ -1,43 +1,48 @@
 /* SPDX-License-Identifier: BSD-2-Clause */
-/*-
- * Copyright (c) 2010 Isilon Systems, Inc.
- * Copyright (c) 2010 iX Systems, Inc.
- * Copyright (c) 2010 Panasas, Inc.
- * Copyright (c) 2013-2017 Mellanox Technologies, Ltd.
- * All rights reserved.
+/*
+ * Port from Mini-OS: include/x86/os.h
+ */
+/*
+ * Copyright (c) 2009 Citrix Systems, Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
  * 1. Redistributions of source code must retain the above copyright
- *    notice unmodified, this list of conditions, and the following
- *    disclaimer.
+ *    notice, this list of conditions and the following disclaimer.
  * 2. Redistributions in binary form must reproduce the above copyright
  *    notice, this list of conditions and the following disclaimer in the
  *    documentation and/or other materials provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
- * IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
- * OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
- * NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
- * DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
- * THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
- * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
- * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- * $FreeBSD$
+ * THIS SOFTWARE IS PROVIDED BY AUTHOR AND CONTRIBUTORS ``AS IS'' AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+ * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+ * ARE DISCLAIMED.  IN NO EVENT SHALL AUTHOR OR CONTRIBUTORS BE LIABLE
+ * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+ * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+ * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+ * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+ * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+ * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+ * SUCH DAMAGE.
  */
-#ifndef	_LINUX_BITOPS_H_
-#define	_LINUX_BITOPS_H_
+
+#ifndef __UK_BITOPS_H__
+#define __UK_BITOPS_H__
+
+#define __UKARCH_BITOPS_H__
+#include <uk/asm/bitops.h>
 
 #include <sys/param.h>
 #include <errno.h>
 #include <uk/essentials.h>
 #include <uk/bitcount.h>
 #include <uk/arch/lcpu.h>
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif /* __cplusplus */
 
 #define	UK_BIT(nr)			(1UL << (nr))
 #define	UK_BIT_ULL(nr)		(1ULL << (nr))
@@ -86,7 +91,7 @@ static inline int uk_get_count_order(unsigned int count)
 {
 	int order;
 
-	order = ukarch_fls(count);
+	order = uk_fls(count);
 	if (count & (count - 1))
 		order++;
 	return order;
@@ -102,12 +107,12 @@ uk_find_first_bit(const unsigned long *addr, unsigned long size)
 		size -= UK_BITS_PER_LONG, bit += UK_BITS_PER_LONG, addr++) {
 		if (*addr == 0)
 			continue;
-		return (bit + ukarch_ffsl(*addr));
+		return (bit + uk_ffsl(*addr));
 	}
 	if (size) {
 		mask = (*addr) & UK_BITMAP_LAST_WORD_MASK(size);
 		if (mask)
-			bit += ukarch_ffsl(mask);
+			bit += uk_ffsl(mask);
 		else
 			bit += size;
 	}
@@ -124,12 +129,12 @@ uk_find_first_zero_bit(const unsigned long *addr, unsigned long size)
 		size -= UK_BITS_PER_LONG, bit += UK_BITS_PER_LONG, addr++) {
 		if (~(*addr) == 0)
 			continue;
-		return (bit + ukarch_ffsl(~(*addr)));
+		return (bit + uk_ffsl(~(*addr)));
 	}
 	if (size) {
 		mask = ~(*addr) & UK_BITMAP_LAST_WORD_MASK(size);
 		if (mask)
-			bit += ukarch_ffsl(mask);
+			bit += uk_ffsl(mask);
 		else
 			bit += size;
 	}
@@ -151,13 +156,13 @@ uk_find_last_bit(const unsigned long *addr, unsigned long size)
 	if (offs) {
 		mask = (*addr) & UK_BITMAP_LAST_WORD_MASK(offs);
 		if (mask)
-			return (bit + ukarch_flsl(mask));
+			return (bit + uk_flsl(mask));
 	}
 	while (pos--) {
 		addr--;
 		bit -= UK_BITS_PER_LONG;
 		if (*addr)
-			return (bit + ukarch_flsl(*addr));
+			return (bit + uk_flsl(*addr));
 	}
 	return (size);
 }
@@ -180,7 +185,7 @@ uk_find_next_bit(const unsigned long *addr, unsigned long size,
 	if (offs) {
 		mask = (*addr) & ~UK_BITMAP_LAST_WORD_MASK(offs);
 		if (mask)
-			return (bit + ukarch_ffsl(mask));
+			return (bit + uk_ffsl(mask));
 		if (size - bit <= UK_BITS_PER_LONG)
 			return (size);
 		bit += UK_BITS_PER_LONG;
@@ -190,12 +195,12 @@ uk_find_next_bit(const unsigned long *addr, unsigned long size,
 		size -= UK_BITS_PER_LONG, bit += UK_BITS_PER_LONG, addr++) {
 		if (*addr == 0)
 			continue;
-		return (bit + ukarch_ffsl(*addr));
+		return (bit + uk_ffsl(*addr));
 	}
 	if (size) {
 		mask = (*addr) & UK_BITMAP_LAST_WORD_MASK(size);
 		if (mask)
-			bit += ukarch_ffsl(mask);
+			bit += uk_ffsl(mask);
 		else
 			bit += size;
 	}
@@ -220,7 +225,7 @@ uk_find_next_zero_bit(const unsigned long *addr, unsigned long size,
 	if (offs) {
 		mask = ~(*addr) & ~UK_BITMAP_LAST_WORD_MASK(offs);
 		if (mask)
-			return (bit + ukarch_ffsl(mask));
+			return (bit + uk_ffsl(mask));
 		if (size - bit <= UK_BITS_PER_LONG)
 			return (size);
 		bit += UK_BITS_PER_LONG;
@@ -230,12 +235,12 @@ uk_find_next_zero_bit(const unsigned long *addr, unsigned long size,
 		size -= UK_BITS_PER_LONG, bit += UK_BITS_PER_LONG, addr++) {
 		if (~(*addr) == 0)
 			continue;
-		return (bit + ukarch_ffsl(~(*addr)));
+		return (bit + uk_ffsl(~(*addr)));
 	}
 	if (size) {
 		mask = ~(*addr) & UK_BITMAP_LAST_WORD_MASK(size);
 		if (mask)
-			bit += ukarch_ffsl(mask);
+			bit += uk_ffsl(mask);
 		else
 			bit += size;
 	}
@@ -431,4 +436,8 @@ uk_sign_extend64(__u64 value, int index)
 	return ((__s64)(value << shift) >> shift);
 }
 
-#endif	/* _LINUX_BITOPS_H_ */
+#ifdef __cplusplus
+}
+#endif /* __cplusplus */
+
+#endif /* __UK_BITOPS_H__ */

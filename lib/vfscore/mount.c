@@ -476,7 +476,7 @@ vfs_busy(struct mount *mp)
 	/* The m_count is not really checked anywhere
 	 * currently. Atomic is enough. But it could be that obtaining
 	 * mount_lock will be needed in the future */
-	ukarch_inc(&mp->m_count);
+	uk_inc(&mp->m_count);
 }
 
 
@@ -489,7 +489,7 @@ vfs_unbusy(struct mount *mp)
 	/* The m_count is not really checked anywhere
 	 * currently. Atomic is enough. But it could be that obtaining
 	 * mount_lock will be needed in the future */
-	ukarch_dec(&mp->m_count);
+	uk_dec(&mp->m_count);
 }
 
 int

@@ -374,21 +374,21 @@ void *unix_socket_accept4(posix_sock *file,
 		return ERR2PTR(-EAGAIN);
 	}
 	/* Reserve 1 accept entry */
-	while (!ukarch_compare_exchange_n(&data->listen.count,
+	while (!uk_compare_exchange_n(&data->listen.count,
 					  &prev, prev - 1));
 
 	/* New socket obj */
 	acc = unix_sock_alloc(d, data->type);
 	if (unlikely(!acc)) {
 		/* If ENOMEM, put number back in queue */
-		if (!ukarch_inc(&data->listen.count))
+		if (!uk_inc(&data->listen.count))
 			posix_sock_event_set(file, UKFD_POLLIN);
 		return ERR2PTR(-ENOMEM);
 	}
 
 	/* Grab entry from listen q (no errors past this point) */
 	i = data->listen.rhead;
-	while (!ukarch_compare_exchange_n(&data->listen.rhead,
+	while (!uk_compare_exchange_n(&data->listen.rhead,
 					  &i, (i + 1) % data->listen.size));
 	/* Fill in data in new socket */
 	acc->rpipe = data->listen.q[i].rpipe;

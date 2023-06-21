@@ -7,7 +7,7 @@
 #include <string.h>
 #include <fcntl.h>
 
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
 #include <uk/alloc.h>
 #include <uk/essentials.h>
 #include <uk/file/nops.h>
@@ -163,7 +163,7 @@ static ssize_t pipe_read(const struct uk_file *f,
 		/* If buffer will be empty after our read, clear POLLIN */
 		if (rend == d->whead)
 			uk_file_event_clear(f, UKFD_POLLIN);
-	} while (!ukarch_compare_exchange_n(&d->rhead, &ri, rend));
+	} while (!uk_compare_exchange_n(&d->rhead, &ri, rend));
 	/* Reserved `canread` bytes starting from ri */
 
 	/* If we're reading only part of a full buffer, reset POLLIN */
@@ -250,14 +250,14 @@ static void pipe_release(const struct uk_file *f, int what)
 	d = (struct pipe_node *)f->node;
 	if (what & UK_FILE_RELEASE_RES) {
 		/* Atomically set the HUP flag */
-		ukarch_or(&d->flags, PIPE_HUP);
+		uk_or(&d->flags, PIPE_HUP);
 		/* If was already set, we can free node */
 		/* Update w/ EPOLL(HUP|IN) for read & EPOLLERR for write */
 		uk_file_event_set(f, EPOLLHUP|EPOLLIN|EPOLLERR);
 	}
 	if (what & UK_FILE_RELEASE_OBJ) {
 		/* Atomically set the FIN flag */
-		if (ukarch_or(&d->flags, PIPE_FIN) & PIPE_FIN) {
+		if (uk_or(&d->flags, PIPE_FIN) & PIPE_FIN) {
 			/* If was already set, we free everything */
 			struct pipe_alloc *al = __containerof(f->state,
 							      struct pipe_alloc,

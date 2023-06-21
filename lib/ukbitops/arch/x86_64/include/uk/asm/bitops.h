@@ -26,7 +26,8 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#ifndef __UKARCH_ATOMIC_H__
+
+#ifndef __UKARCH_BITOPS_H__
 #error Do not include this header directly
 #endif
 
@@ -37,7 +38,7 @@
  * @return The index of the least significant 1-bit of x, or if x is zero,
  *   the result is undefined. ffs(1)=0, ffs(3)=0, ffs(0x80000000)=31
  */
-static inline unsigned int ukarch_ffs(unsigned int x)
+static inline unsigned int uk_ffs(unsigned int x)
 {
 	__asm__("bsfl %1,%0"
 		: "=r" (x)
@@ -52,7 +53,7 @@ static inline unsigned int ukarch_ffs(unsigned int x)
  * @return The index of the most significant 1-bit of x, or if x is zero,
  *   the result is undefined. fls(1)=0, fls(3)=1, fls(0x80000001)=31
  */
-static inline unsigned int ukarch_fls(unsigned int x)
+static inline unsigned int uk_fls(unsigned int x)
 {
 	__asm__("bsrl %1,%0"
 		: "=r" (x)
@@ -67,7 +68,7 @@ static inline unsigned int ukarch_fls(unsigned int x)
  * @return The index of the least significant 1-bit of x, or if x is zero,
  *    the result is undefined. ffs(1)=0, ffs(3)=0, ffs(0x80000000)=31
  */
-static inline unsigned int ukarch_ffsl(unsigned long x)
+static inline unsigned int uk_ffsl(unsigned long x)
 {
 	__asm__("bsfq %1,%0"
 		: "=r" (x)
@@ -82,7 +83,7 @@ static inline unsigned int ukarch_ffsl(unsigned long x)
  * @return The index of the most significant 1-bit of x, or if x is zero,
  *   the result is undefined. fls(1)=0, fls(3)=1, fls(0x80000001)=31
  */
-static inline unsigned int ukarch_flsl(unsigned long x)
+static inline unsigned int uk_flsl(unsigned long x)
 {
 	__asm__("bsrq %1,%0"
 		: "=r" (x)

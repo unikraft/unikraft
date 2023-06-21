@@ -47,7 +47,7 @@
 
 #include <linux/futex.h>
 #include <uk/syscall.h>
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
 #include <uk/thread.h>
 #include <uk/thread.h>
 #include <uk/list.h>
@@ -102,7 +102,7 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
 	struct uk_thread *current = uk_thread_current();
 	struct uk_futex f = {.uaddr = uaddr, .thread = current};
 
-	if (ukarch_load_n(uaddr) != val) {
+	if (uk_load_n(uaddr) != val) {
 		uk_pr_debug("FUTEX_WAIT: Condition not met (*uaddr != %"PRIu32", uaddr: %p)\n",
 			    val, uaddr);
 		return -EAGAIN;
@@ -231,7 +231,7 @@ static int futex_cmp_requeue(uint32_t *uaddr, uint32_t val, uint32_t val2,
 	int woken_uaddr1;
 	uint32_t waiters_uaddr2 = 0;
 
-	if (!((uint32_t)val3 == ukarch_load_n(uaddr)))
+	if (!((uint32_t)val3 == uk_load_n(uaddr)))
 		return -EAGAIN;
 
 	/* Wake up val waiters on uaddr */

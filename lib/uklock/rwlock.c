@@ -4,7 +4,7 @@
  * You may not use this file except in compliance with the License.
  */
 
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
 #include <uk/assert.h>
 #include <uk/rwlock.h>
 #include <uk/assert.h>

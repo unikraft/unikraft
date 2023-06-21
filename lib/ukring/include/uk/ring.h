@@ -38,7 +38,7 @@
 #include <uk/config.h>
 #include <uk/assert.h>
 #include <uk/plat/lcpu.h>
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
 #include <uk/essentials.h>
 #include <uk/preempt.h>
 
@@ -99,7 +99,7 @@ uk_ring_enqueue(struct uk_ring *br, void *buf)
 			}
 			continue;
 		}
-	} while (!ukarch_compare_exchange_sync((uint32_t *) &br->br_prod_head,
+	} while (!uk_compare_exchange_sync((uint32_t *) &br->br_prod_head,
 			prod_head, prod_next));
 
 #ifdef DEBUG_BUFRING
@@ -115,7 +115,7 @@ uk_ring_enqueue(struct uk_ring *br, void *buf)
 	 */
 	while (br->br_prod_tail != prod_head)
 		ukarch_spinwait();
-	ukarch_store_n(&br->br_prod_tail, prod_next);
+	uk_store_n(&br->br_prod_tail, prod_next);
 	critical_exit();
 	return 0;
 }
@@ -139,7 +139,7 @@ uk_ring_dequeue_mc(struct uk_ring *br)
 			critical_exit();
 			return NULL;
 		}
-	} while (!ukarch_compare_exchange_sync((uint32_t *) &br->br_cons_head,
+	} while (!uk_compare_exchange_sync((uint32_t *) &br->br_cons_head,
 			cons_head, cons_next));
 
 	buf = br->br_ring[cons_head];
@@ -154,7 +154,7 @@ uk_ring_dequeue_mc(struct uk_ring *br)
 	while (br->br_cons_tail != cons_head)
 		ukarch_spinwait();
 
-	ukarch_store_n(&br->br_cons_tail, cons_next);
+	uk_store_n(&br->br_cons_tail, cons_next);
 	critical_exit();
 
 	return buf;
@@ -200,11 +200,11 @@ uk_ring_dequeue_sc(struct uk_ring *br)
 	 * <1> Load (on core 1) from br->br_ring[cons_head] can be reordered (speculative readed) by CPU.
 	 */
 #if defined(CONFIG_ARCH_ARM_32) || defined(CONFIG_ARCH_ARM_64)
-	cons_head = ukarch_load_n(&br->br_cons_head);
+	cons_head = uk_load_n(&br->br_cons_head);
 #else
 	cons_head = br->br_cons_head;
 #endif
-	prod_tail = ukarch_load_n(&br->br_prod_tail);
+	prod_tail = uk_load_n(&br->br_prod_tail);
 
 	cons_next = (cons_head + 1) & br->br_cons_mask;
 #ifdef PREFETCH_DEFINED

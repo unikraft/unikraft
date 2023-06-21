@@ -11,7 +11,7 @@
 
 #include <string.h>
 
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
 #include <uk/assert.h>
 #include <uk/bitops.h>
 #include <uk/bitmap.h>
@@ -51,7 +51,7 @@ static inline int uk_bmap_reserve(const struct uk_bmap *bm, int idx)
 	if (!((idx >= 0) && IN_RANGE((size_t)idx, 0, bm->size)))
 		return -1;
 	mask = UK_BIT_MASK(idx);
-	v = ukarch_and(&bm->bitmap[UK_BIT_WORD(idx)], ~mask);
+	v = uk_and(&bm->bitmap[UK_BIT_WORD(idx)], ~mask);
 	return !(v & mask);
 }
 
@@ -69,7 +69,7 @@ static inline int uk_bmap_free(const struct uk_bmap *bm, int idx)
 	if (!((idx >= 0) && IN_RANGE((size_t)idx, 0, bm->size)))
 		return -1;
 	mask = UK_BIT_MASK(idx);
-	v = ukarch_or(&bm->bitmap[UK_BIT_WORD(idx)], mask);
+	v = uk_or(&bm->bitmap[UK_BIT_WORD(idx)], mask);
 	return !!(v & mask);
 }
 
@@ -171,7 +171,7 @@ int uk_fmap_put(const struct uk_fmap *m, const void *p, int min)
 	if (!_FMAP_INRANGE(m, pos))
 		return pos; /* Map full */
 
-	got = ukarch_exchange_n(&m->map[pos], (void *)p);
+	got = uk_exchange_n(&m->map[pos], (void *)p);
 	UK_ASSERT(got == NULL); /* There can't be stuff in there, abort */
 
 	return pos;
@@ -196,7 +196,7 @@ static inline void *uk_fmap_take(const struct uk_fmap *m, int idx)
 			return NULL; /* Already free */
 
 		/* At most one take thread gets the previous non-NULL value */
-		got = ukarch_exchange_n(&m->map[idx], NULL);
+		got = uk_exchange_n(&m->map[idx], NULL);
 		if (!got)
 			/* We lost the race with a (critical) take, retry */
 			uk_sched_yield();
@@ -226,7 +226,7 @@ void *uk_fmap_critical_take(const struct uk_fmap *m, int idx)
 	if (!_FMAP_INRANGE(m, idx))
 		return NULL;
 	do {
-		got = ukarch_exchange_n(&m->map[idx], NULL);
+		got = uk_exchange_n(&m->map[idx], NULL);
 		if (!got) {
 			if (uk_bmap_isfree(&m->bmap, idx))
 				/* idx is actually empty */
@@ -256,7 +256,7 @@ int uk_fmap_critical_put(const struct uk_fmap *m, int idx, const void *p)
 		return -1;
 
 	(void)uk_bmap_reserve(&m->bmap, idx);
-	got = ukarch_exchange_n(&m->map[idx], p);
+	got = uk_exchange_n(&m->map[idx], p);
 	UK_ASSERT(got == NULL);
 	return 0;
 }
@@ -294,7 +294,7 @@ int uk_fmap_xchg(const struct uk_fmap *m, int idx,
 			uk_sched_yield();
 		} else {
 			/* idx was free, we're basically a put now */
-			got = ukarch_exchange_n(&m->map[idx], p);
+			got = uk_exchange_n(&m->map[idx], p);
 			UK_ASSERT(got == NULL);
 			return 0;
 		}

@@ -6,7 +6,7 @@
 
 #include <errno.h>
 
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include <uk/file/nops.h>
@@ -102,7 +102,7 @@ static void epoll_event_callback(uk_pollevent set,
 			tick, struct epoll_entry, tick);
 		struct uk_pollq *upq = (struct uk_pollq *)tick->arg;
 
-		(void)ukarch_or(&ent->revents, set);
+		(void)uk_or(&ent->revents, set);
 		uk_pollq_set_n(upq, UKFD_POLLIN,
 			       IS_EDGEPOLL(ent) ? 1 : UK_POLLQ_NOTIFY_ALL);
 		if (IS_ONESHOT(ent))
@@ -133,7 +133,7 @@ static void vfs_poll_register(struct vfscore_file *vfd,
 		leg->revents = EPOLLERR;
 	} else {
 		uk_list_add_tail(&leg->f_link, &vfd->f_ep);
-		(void)ukarch_and(&leg->revents, leg->mask);
+		(void)uk_and(&leg->revents, leg->mask);
 		if (leg->revents)
 			uk_file_event_set(leg->epf, UKFD_POLLIN);
 	}
@@ -227,7 +227,7 @@ static int epoll_add(const struct uk_file *epf, struct epoll_entry **tail,
 	ev = uk_pollq_poll_register(&f->state->pollq, &ent->tick, 1);
 	if (ev) {
 		/* Need atomic OR since we're registered for updates */
-		(void)ukarch_or(&ent->revents, ev);
+		(void)uk_or(&ent->revents, ev);
 		uk_pollq_set_n(&epf->state->pollq, UKFD_POLLIN,
 			       edge ? 1 : UK_POLLQ_NOTIFY_ALL);
 	}
@@ -320,7 +320,7 @@ void eventpoll_signal(struct eventpoll_cb *ecb, unsigned int revents)
 
 	revents &= leg->mask;
 	if (revents) {
-		(void)ukarch_or(&leg->revents, revents);
+		(void)uk_or(&leg->revents, revents);
 		uk_file_event_set(leg->epf, UKFD_POLLIN);
 	}
 }
@@ -532,7 +532,7 @@ int uk_sys_epoll_pwait2(const struct uk_file *epf, struct epoll_event *events,
 #endif /* CONFIG_LIBVFSCORE */
 				revp = &p->revents;
 
-			revents = ukarch_exchange_n(revp, 0);
+			revents = uk_exchange_n(revp, 0);
 			if (revents) {
 				if (!IS_EDGEPOLL(p)) {
 					unsigned int mask;
@@ -552,7 +552,7 @@ int uk_sys_epoll_pwait2(const struct uk_file *epf, struct epoll_event *events,
 						continue;
 
 					lvlev = 1;
-					(void)ukarch_or(revp, revents);
+					(void)uk_or(revp, revents);
 				}
 
 				events[nout].events = revents;

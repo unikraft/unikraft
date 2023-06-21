@@ -45,7 +45,7 @@
 extern "C" {
 #endif
 
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
 
 typedef __sz __sector;
 #define __PRIsctr __PRIsz
@@ -133,7 +133,7 @@ static inline void uk_blkreq_init(struct uk_blkreq *req,
 	req->start_sector = start;
 	req->nb_sectors = nb_sectors;
 	req->aio_buf = aio_buf;
-	ukarch_store_n(&req->state.counter, UK_BLKREQ_UNFINISHED);
+	uk_store_n(&req->state.counter, UK_BLKREQ_UNFINISHED);
 	req->cb = cb;
 	req->cb_cookie = cb_cookie;
 }
@@ -145,7 +145,7 @@ static inline void uk_blkreq_init(struct uk_blkreq *req,
  *	uk_blkreq structure
  **/
 #define uk_blkreq_is_done(req) \
-		(ukarch_load_n(&(req)->state.counter) == UK_BLKREQ_FINISHED)
+		(uk_load_n(&(req)->state.counter) == UK_BLKREQ_FINISHED)
 
 #ifdef __cplusplus
 }
