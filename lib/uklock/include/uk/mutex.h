@@ -35,6 +35,7 @@
 #define __UK_MUTEX_H__
 
 #include <uk/config.h>
+#include <uk/preempt.h>
 
 #if CONFIG_LIBUKLOCK_MUTEX
 #include <uk/assert.h>
@@ -75,6 +76,7 @@ static inline int uk_mutex_is_recursive(const struct uk_mutex *m)
 #define _UK_MUTEX_CONTESTED	0x2
 #define _UK_MUTEX_STATE_MASK	(_UK_MUTEX_UNOWNED | _UK_MUTEX_CONTESTED)
 
+#if CONFIG_LIBUKLOCK_MUTEX_ATOMIC
 #define _uk_mutex_lock_fetch(m, v, tid)					\
 	__atomic_compare_exchange_n(&(m)->lock,				\
 		v, tid, 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)
@@ -82,6 +84,38 @@ static inline int uk_mutex_is_recursive(const struct uk_mutex *m)
 	__atomic_compare_exchange_n(&(m)->lock,				\
 		v, _UK_MUTEX_UNOWNED, 0,				\
 		__ATOMIC_RELEASE, __ATOMIC_RELAXED)
+#else
+#define _uk_mutex_lock_fetch(m, v, tid)					\
+	({								\
+		int _success;						\
+		uk_preempt_disable();					\
+		if ((m)->lock == *(v)) {				\
+			(m)->lock = tid;				\
+			_success = 1;					\
+		} else {						\
+			*(v) = (m)->lock;				\
+			_success = 0;					\
+		}							\
+		uk_preempt_enable();					\
+		_success;						\
+	})
+
+#define _uk_mutex_unlock_fetch(m, v)					\
+	({								\
+		int _success;						\
+		uk_preempt_disable();					\
+		if ((m)->lock == *(v)) {				\
+			(m)->lock = _UK_MUTEX_UNOWNED;			\
+			_success = 1;					\
+		} else {						\
+			*(v) = (m)->lock;				\
+			_success = 0;					\
+		}							\
+		uk_preempt_enable();					\
+		_success;						\
+	})
+
+#endif
 
 /*
  * Mutex statistics for ukstore.
