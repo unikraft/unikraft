@@ -209,6 +209,8 @@ eth_em_dev_init(struct pci_device * pci_dev)
 		return rc;
 	}
 
+
+
 	return 0;
 }
 
@@ -321,6 +323,14 @@ em_hw_init(struct e1000_hw *hw)
 			// "SOL/IDER session");
 	}
 	uk_pr_info("after e1000_check_reset_block\n");
+
+	uint32_t rctl = E1000_READ_REG(hw, E1000_RCTL);
+	uk_pr_info("promiscious mode before: rctl %d\n", rctl);
+	rctl |= (E1000_RCTL_UPE | E1000_RCTL_MPE);
+	E1000_WRITE_REG(hw, E1000_RCTL, rctl);
+	rctl = E1000_READ_REG(hw, E1000_RCTL);
+	uk_pr_info("promiscious mode after: rctl %d\n", rctl);
+
 	return 0;
 
 error:

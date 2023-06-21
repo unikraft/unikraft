@@ -36,7 +36,7 @@ POSSIBILITY OF SUCH DAMAGE.
 
 #include "e1000_hw.h"
 
-#define DEBUG 1
+#define DEBUG 0
 #define debug_uk_pr_info(fmt, ...) \
             do { \
 				if (DEBUG) \

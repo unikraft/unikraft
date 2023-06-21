@@ -294,10 +294,10 @@ em_xmit_cleanup(struct em_tx_queue *txq)
 	desc_to_clean_to = sw_ring[desc_to_clean_to].last_id;
 	if (! (txr[desc_to_clean_to].upper.fields.status & E1000_TXD_STAT_DD))
 	{
-		uk_pr_info(
-				"TX descriptor %4u is not done"
-				"(queue=%d)", desc_to_clean_to,
-				txq->queue_id);
+		// uk_pr_info(
+		// 		"TX descriptor %4u is not done"
+		// 		"(queue=%d)", desc_to_clean_to,
+		// 		txq->queue_id);
 		/* Failed to clean any descriptors, better luck next time */
 		return -(1);
 	}
@@ -310,7 +310,7 @@ em_xmit_cleanup(struct em_tx_queue *txq)
 		nb_tx_to_clean = (uint16_t)(desc_to_clean_to -
 						last_desc_cleaned);
 
-	uk_pr_info(
+	debug_uk_pr_info(
 			"Cleaning %4u TX descriptors: %4u to %4u "
 			"(queue=%d)", nb_tx_to_clean,
 			last_desc_cleaned, desc_to_clean_to,
@@ -422,11 +422,11 @@ int eth_em_xmit_pkts(__unused struct uk_netdev *dev,
 		 * nb_used better be less than or equal to txq->tx_rs_thresh
 		 */
 		while (unlikely (nb_used > txq->nb_tx_free)) {
-			uk_pr_info("Not enough free TX descriptors "
-					"nb_used=%4u nb_free=%4u "
-					"(queue=%d)\n",
-					nb_used, txq->nb_tx_free,
-					txq->queue_id);
+			// uk_pr_info("Not enough free TX descriptors "
+			// 		"nb_used=%4u nb_free=%4u "
+			// 		"(queue=%d)\n",
+			// 		nb_used, txq->nb_tx_free,
+			// 		txq->queue_id);
 
 			// TODO
 			if (em_xmit_cleanup(txq) != 0) {
@@ -506,9 +506,9 @@ int eth_em_xmit_pkts(__unused struct uk_netdev *dev,
 
 		/* Set RS bit only on threshold packets' last descriptor */
 		if (txq->nb_tx_used >= txq->tx_rs_thresh) {
-			uk_pr_info("Setting RS bit on TXD id=%4u "
-					"(queue=%d)\n",
-					tx_last, txq->queue_id);
+			// uk_pr_info("Setting RS bit on TXD id=%4u "
+			// 		"(queue=%d)\n",
+			// 		tx_last, txq->queue_id);
 
 			cmd_type_len |= E1000_TXD_CMD_RS;
 
@@ -697,8 +697,8 @@ eth_em_recv_pkts(__unused struct uk_netdev *dev, struct uk_netdev_rx_queue *rx_q
 		nmb = mbufs[0];
 		// nmb = uk_netbuf_alloc_buf(rxq->a, 2048, 128, 128, 0, NULL);
 		if (nmb == NULL) {
-			uk_pr_info("RX mbuf alloc failed queue_id=%u",
-				   (unsigned) rxq->queue_id);
+			// uk_pr_info("RX mbuf alloc failed queue_id=%u",
+			// 	   (unsigned) rxq->queue_id);
 			break;
 		}
 
@@ -868,6 +868,7 @@ eth_em_tx_queue_setup(struct uk_netdev *dev,
 	 * It must not exceed hardware maximum, and must be multiple
 	 * of E1000_ALIGN.
 	 */
+	nb_desc = 32;
 	if (nb_desc % EM_TXD_ALIGN != 0 ||
 			(nb_desc > E1000_MAX_RING_DESC) ||
 			(nb_desc < E1000_MIN_RING_DESC)) {
@@ -1035,6 +1036,7 @@ eth_em_rx_queue_setup(struct uk_netdev *dev,
 	 * It must not exceed hardware maximum, and must be multiple
 	 * of E1000_ALIGN.
 	 */
+	nb_desc = 32;
 	if (nb_desc % EM_RXD_ALIGN != 0 ||
 			(nb_desc > E1000_MAX_RING_DESC) ||
 			(nb_desc < E1000_MIN_RING_DESC)) {

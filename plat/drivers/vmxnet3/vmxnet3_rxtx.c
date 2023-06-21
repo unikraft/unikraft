@@ -524,7 +524,7 @@ vmxnet3_recv_pkts(struct uk_netdev *dev __unused,
 				  struct uk_netdev_rx_queue *rx_queue,
 				  struct uk_netbuf **pkt)
 {
-	uint32_t nb_rxd, idx;
+	uint32_t idx;
 	uint8_t ring_idx;
 	struct uk_netdev_rx_queue *rxq;
 	Vmxnet3_RxCompDesc *rcd;
@@ -537,7 +537,6 @@ vmxnet3_recv_pkts(struct uk_netdev *dev __unused,
 	debug_uk_pr_info("vmxnet3_recv_pkts\n");
 
 	ring_idx = 0;
-	nb_rxd = 0;
 	idx = 0;
 
 	rxq = rx_queue;
@@ -550,19 +549,18 @@ vmxnet3_recv_pkts(struct uk_netdev *dev __unused,
 		return 0;
 	}
 
-	debug_uk_pr_info("rcd->gen %d, rxq->comp_ring.gen = %d\n", rcd->gen, rxq->comp_ring.gen);
-	while (rcd->gen == rxq->comp_ring.gen) {
+	debug_uk_pr_info("initial rcd->gen %d, rxq->comp_ring.gen = %d\n", rcd->gen, rxq->comp_ring.gen);
+	if (rcd->gen == rxq->comp_ring.gen) {
 		struct uk_netbuf *newm = NULL;
 		int rc = 0;
 
-		// if (nb_rx >= nb_pkts)
-		// 	break;
+		ret_status |= UK_NETDEV_STATUS_SUCCESS;
 
-		// newm = rte_mbuf_raw_alloc(rxq->mp);
 		rc = rxq->alloc_rxpkts(rxq->alloc_rxpkts_argp, &newm, 1);
 		if (unlikely(rc == 0)) {
 			uk_pr_err("Error allocating mbuf\n");
-			break;
+			return UK_NETDEV_STATUS_MORE;
+			// break;
 		}
 
 		idx = rcd->rxdIdx;
@@ -591,8 +589,8 @@ vmxnet3_recv_pkts(struct uk_netdev *dev __unused,
 				uk_pr_err("Recv packet dropped due to frame err.\n");
 			}
 			uk_pr_err("Error in received packet rcd#:%d rxd:%d\n",
-				   (int)(rcd - (struct Vmxnet3_RxCompDesc *)
-					 rxq->comp_ring.base), rcd->rxdIdx);
+					(int)(rcd - (struct Vmxnet3_RxCompDesc *)
+						rxq->comp_ring.base), rcd->rxdIdx);
 			uk_netbuf_free(rxm);
 			if (rxq->start_seg) {
 				struct uk_netbuf *start = rxq->start_seg;
@@ -616,12 +614,12 @@ vmxnet3_recv_pkts(struct uk_netdev *dev __unused,
 		rxm->next = NULL;
 
 		/*
-		 * If this is the first buffer of the received packet,
-		 * set the pointer to the first mbuf of the packet
-		 * Otherwise, update the total length and the number of segments
-		 * of the current scattered packet, and update the pointer to
-		 * the last mbuf of the current packet.
-		 */
+			* If this is the first buffer of the received packet,
+			* set the pointer to the first mbuf of the packet
+			* Otherwise, update the total length and the number of segments
+			* of the current scattered packet, and update the pointer to
+			* the last mbuf of the current packet.
+			*/
 		if (rcd->sop) {
 			debug_uk_pr_info("rcd->sop set\n");
 			UK_ASSERT(rxd->btype == VMXNET3_RXD_BTYPE_HEAD);
@@ -631,7 +629,7 @@ vmxnet3_recv_pkts(struct uk_netdev *dev __unused,
 				UK_ASSERT(rcd->eop);
 
 				uk_pr_err("Rx buf was skipped. rxring[%d][%d])\n",
-					   ring_idx, idx);
+						ring_idx, idx);
 				uk_netbuf_free(rxm);
 				goto rcd_done;
 			}
@@ -672,7 +670,6 @@ vmxnet3_recv_pkts(struct uk_netdev *dev __unused,
 			// struct uk_netbuf *start = rxq->start_seg;
 
 			debug_uk_pr_info("rcd->eop set\n");
-			ret_status |= UK_NETDEV_STATUS_SUCCESS;
 			*pkt = rxq->start_seg;
 			// rx_pkts[nb_rx++] = start;
 
@@ -685,33 +682,24 @@ vmxnet3_recv_pkts(struct uk_netdev *dev __unused,
 			// debug_uk_pr_info("Buff->buf: %p\n", (*pkt)->buf);
 			// debug_uk_pr_info("Buff->buflen: %lu\n", (*pkt)->buflen);
 		}
-
 rcd_done:
 		rxq->cmd_ring[ring_idx].next2comp = idx;
 		VMXNET3_INC_RING_IDX_ONLY(rxq->cmd_ring[ring_idx].next2comp,
-					  rxq->cmd_ring[ring_idx].size);
+						rxq->cmd_ring[ring_idx].size);
 
 		/* It's time to renew descriptors */
 		vmxnet3_renew_desc(rxq, ring_idx, newm);
 		if (unlikely(rxq->shared->ctrl.updateRxProd)) {
 			debug_uk_pr_info("Unlikely rxq->shared->ctrl.updateRxProd\n");
 			VMXNET3_WRITE_BAR0_REG(hw, rxprod_reg[ring_idx] + (rxq->queue_id * VMXNET3_REG_ALIGN),
-					       rxq->cmd_ring[ring_idx].next2fill);
+							rxq->cmd_ring[ring_idx].next2fill);
 		}
 
 		/* Advance to the next descriptor in comp_ring */
 		vmxnet3_comp_ring_adv_next2proc(&rxq->comp_ring);
 
 		rcd = &rxq->comp_ring.base[rxq->comp_ring.next2proc].rcd;
-		nb_rxd++;
-		if (nb_rxd > rxq->cmd_ring[0].size) {
-			uk_pr_err("Used up quota of receiving packets,"
-				   " relinquish control.\n");
-			break;
-		}
-	}
-
-	if (unlikely(nb_rxd == 0)) {
+	} else {
 		debug_uk_pr_info("nb_rxd = 0\n");
 		uint32_t avail;
 		for (ring_idx = 0; ring_idx < VMXNET3_RX_CMDRING_SIZE; ring_idx++) {
@@ -775,7 +763,7 @@ vmxnet3_dev_tx_queue_setup(struct uk_netdev *dev,
 	data_ring->a = hw->a;
 
 	/* Tx vmxnet ring length should be between 512-4096 */
-	nb_desc = VMXNET3_DEF_TX_RING_SIZE;
+	nb_desc = VMXNET3_TX_RING_MAX_SIZE;
 	if (nb_desc < VMXNET3_DEF_TX_RING_SIZE) {
 		uk_pr_err("VMXNET3 Tx Ring Size Min: %u\n",
 			     VMXNET3_DEF_TX_RING_SIZE);
@@ -898,7 +886,7 @@ vmxnet3_dev_rx_queue_setup(struct uk_netdev *dev,
 	data_ring->a = hw->a;
 
 	/* Rx vmxnet rings length should be between 256-4096 */
-	nb_desc = VMXNET3_DEF_RX_RING_SIZE;
+	nb_desc = VMXNET3_RX_RING_MAX_SIZE;
 	if (nb_desc < VMXNET3_DEF_RX_RING_SIZE) {
 		uk_pr_err("VMXNET3 Rx Ring Size Min: 256\n");
 		// return -EINVAL;
