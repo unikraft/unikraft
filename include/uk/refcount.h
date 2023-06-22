@@ -37,7 +37,7 @@
 #include <uk/arch/types.h>
 #include <uk/arch/limits.h>
 #include <uk/arch/atomic.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/config.h>
 
 #ifdef CONFIG_LIBUKDEBUG
