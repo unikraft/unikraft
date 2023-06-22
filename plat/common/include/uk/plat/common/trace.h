@@ -32,7 +32,7 @@
 #ifndef __PLAT_CMN_TRACE_H__
 #define __PLAT_CMN_TRACE_H__
 
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 
 void dump_regs(struct __regs *regs);
 void dump_mem(unsigned long addr);
