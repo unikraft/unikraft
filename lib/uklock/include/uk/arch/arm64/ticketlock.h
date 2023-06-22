@@ -34,7 +34,7 @@
 extern "C" {
 #endif
 
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 
 #ifdef CONFIG_HAVE_SMP
 #include <uk/arch/atomic.h>
