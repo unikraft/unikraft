@@ -35,7 +35,7 @@
 #include <string.h>
 #include <linuxu/syscall.h>
 #include <uk/plat/console.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/assert.h>
 
 #include <linuxu/termios.h>
