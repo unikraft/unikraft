@@ -32,7 +32,7 @@
  *
  * $FreeBSD$
  */
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/arch/limits.h>
 #include <uk/asm.h>
 

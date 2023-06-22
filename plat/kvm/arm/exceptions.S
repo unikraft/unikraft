@@ -26,7 +26,7 @@
  * SUCH DAMAGE.
  *
  */
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/asm.h>
 
 .macro EXCHANGE_SP_WITH_X0
