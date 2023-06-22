@@ -48,7 +48,7 @@
 #else
 #error "Unsupported architecture"
 #endif
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/plat/lcpu.h>
 
 void do_hypervisor_callback(struct __regs *regs);
