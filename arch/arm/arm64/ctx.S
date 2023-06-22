@@ -33,7 +33,7 @@
  */
 
 #include <uk/arch/ctx.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 
 /*
  * NOTE: If we use the SP for single registers, we need to decrease the
