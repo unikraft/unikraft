@@ -37,7 +37,7 @@
 #include <uk/config.h>
 #include <uk/arch/types.h>
 #include <uk/arch/tls.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/essentials.h>
 #if CONFIG_LIBUKDEBUG
 #include <uk/assert.h>
