@@ -35,7 +35,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 #include <uk/arch/ctx.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/arch/types.h>
 #include <uk/ctors.h>
 #include <uk/essentials.h>
