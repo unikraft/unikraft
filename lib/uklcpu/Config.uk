@@ -1,0 +1,8 @@
+menuconfig LIBUKLCPU
+	bool "uklcpu - CPU code"
+	default y
+	help
+	  This option enables the LIBUKLCPU library.
+	  This library is required by other libraries and applications,
+	  and should be enabled by default. It provides functions to
+	  work with CPU registers and CPU features.`

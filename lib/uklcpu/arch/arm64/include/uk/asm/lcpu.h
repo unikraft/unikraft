@@ -362,7 +362,7 @@ static inline void ioreg_write64(const volatile uint64_t *address,
 	__asm__ __volatile__("str %0, [%1]" : : "rZ"(value), "r"(address));
 }
 
-static inline unsigned long ukarch_read_sp(void)
+static inline unsigned long uk_read_sp(void)
 {
 	unsigned long sp;
 
@@ -371,7 +371,7 @@ static inline unsigned long ukarch_read_sp(void)
 	return sp;
 }
 
-static inline void ukarch_spinwait(void)
+static inline void uk_spinwait(void)
 {
 	/* Intelligent busy wait not supported on arm64. */
 }

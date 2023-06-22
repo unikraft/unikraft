@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __UKARCH_LCPU_H__
-#define __UKARCH_LCPU_H__
+#ifndef __UK_LCPU_H__
+#define __UK_LCPU_H__
 
 #ifndef __ASSEMBLY__
 #include <uk/arch/types.h>
@@ -42,6 +42,7 @@
 extern "C" {
 #endif
 
+#define __UKARCH_LCPU_H__
 #include <uk/asm/lcpu.h>
 
 #ifndef __ASSEMBLY__
@@ -74,4 +75,4 @@ extern "C" {
 }
 #endif
 
-#endif /* __UKARCH_LCPU_H__ */
+#endif /* __UK_LCPU_H__ */
