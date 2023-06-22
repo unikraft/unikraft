@@ -37,7 +37,7 @@
 #define __UKDEBUG_PRINT_H__
 
 #include <stdarg.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/essentials.h>
 #include <uk/config.h>
 

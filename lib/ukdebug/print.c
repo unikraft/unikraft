@@ -44,7 +44,7 @@
 #include <uk/plat/time.h>
 #include <uk/print.h>
 #include <uk/errptr.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #if CONFIG_LIBUKDEBUG_PRINT_THREAD
 #include <uk/thread.h>
 #endif
