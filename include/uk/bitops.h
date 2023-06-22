@@ -36,7 +36,7 @@
 #include <errno.h>
 #include <uk/essentials.h>
 #include <uk/bitcount.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/arch/atomic.h>
 
 #define	UK_BIT(nr)			(1UL << (nr))
