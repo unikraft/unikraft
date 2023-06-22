@@ -31,7 +31,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <uk/alloc.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/arch/time.h>
 #include <uk/arch/ctx.h>
 #include <uk/plat/lcpu.h>
