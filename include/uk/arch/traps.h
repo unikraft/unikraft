@@ -34,7 +34,7 @@
 #define __UKARCH_TRAPS_H__
 
 #ifndef __ASSEMBLY__
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/event.h>
 #endif /* !__ASSEMBLY__ */
 
