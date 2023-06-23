@@ -43,14 +43,12 @@
 .space 4096
 lcpu_bootstack:
 
-/*
- * The registers used by _libkvmplat_start:
- * x0 - FDT pointer
- */
-
 .text
 ENTRY(_libkvmplat_entry)
-	ur_ldr  x25, _dtb
+
+#ifdef CONFIG_KVM_BOOT_PROTO_LXBOOT
+	mov x25, x0 /* preserve dtb addr */
+#endif
 
 #ifdef CONFIG_FPSIMD
 	/* Enable fp/simd support */
@@ -99,10 +97,13 @@ ENTRY(_libkvmplat_entry)
 	bl start_mmu
 
 	/* Load dtb address to x0 as a parameter */
+#if defined(CONFIG_KVM_BOOT_PROTO_LXBOOT)
+	mov x0, x25
+#elif defined(CONFIG_KVM_BOOT_PROTO_QEMU_VIRT)
 	ur_ldr  x0, _dtb
+#endif
 	bl ukplat_bootinfo_fdt_setup
 
 	bl ukplat_bootinfo_get
 	b _ukplat_entry
 END(_libkvmplat_entry)
-
