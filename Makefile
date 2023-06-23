@@ -646,6 +646,13 @@ CFLAGS		+= -DCC_VERSION=$(CC_VERSION)
 CXXFLAGS	+= -DCC_VERSION=$(CC_VERSION)
 GOCFLAGS	+= -DCC_VERSION=$(CC_VERSION)
 
+# Add user supplied flags as the last assignments
+ASFLAGS  += $(UK_ASFLAGS)
+CFLAGS   += $(UK_CFLAGS)
+CXXFLAGS += $(UK_CXXFLAGS)
+GOCFLAGS += $(UK_GOCFLAGS)
+LDFLAGS  += $(UK_LDFLAGS)
+
 # ensure $(BUILD_DIR)/kconfig, $(BUILD_DIR)/include and $(BUILD_DIR)/include/uk exists
 $(call mk_sub_build_dir,kconfig)
 $(call mk_sub_build_dir,include)
@@ -1099,6 +1106,13 @@ help:
 	@echo '                           (note: the name in the configuration file is not overwritten)'
 	@echo '  L=[PATH]:[PATH]:..     - colon-separated list of paths to external libraries'
 	@echo '  P=[PATH]:[PATH]:..     - colon-separated list of paths to external platforms'
+	@echo ''
+	@echo 'Environment variables:'
+	@echo '  UK_ASFLAGS             - explicit Unikraft-specific additions to the assembler flags (the ASFLAGS variable is ignored)'
+	@echo '  UK_CFLAGS              - explicit Unikraft-specific additions to the C compiler flags (the CFLAGS variable is ignored)'
+	@echo '  UK_CXXFLAGS            - explicit Unikraft-specific additions to the C++ compiler flags (the CXXFLAGS variable is ignored)'
+	@echo '  UK_GOCFLAGS            - explicit Unikraft-specific additions to the GO compiler flags (the GOCFLAGS variable is ignored)'
+	@echo '  UK_LDFLAGS             - explicit Unikraft-specific additions to the linker flags (the LDFLAGS variable is ignored)'
 	@echo ''
 	@echo 'Miscellaneous:'
 	@echo '  print-version          - print Unikraft version'
