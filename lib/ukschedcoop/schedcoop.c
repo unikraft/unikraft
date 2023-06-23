@@ -214,15 +214,17 @@ static __noreturn void idle_thread_fn(void *argp)
 		now = ukplat_monotonic_clock();
 
 		if (!wake_up_time || wake_up_time > now) {
-			if (wake_up_time) {
-				ukplat_lcpu_halt_to(wake_up_time);
-			} else {
-				ukplat_lcpu_halt_irq();
-				ukplat_lcpu_enable_irq();
-			}
+			ukplat_lcpu_disable_irq();
+			if (!UK_TAILQ_FIRST(&c->run_queue)) {
+				if (wake_up_time)
+					ukplat_lcpu_halt_to(wake_up_time);
+				else
+					ukplat_lcpu_halt_irq();
 
-			/* handle pending events if any */
-			ukplat_lcpu_irqs_handle_pending();
+				/* handle pending events if any */
+				ukplat_lcpu_irqs_handle_pending();
+			}
+			ukplat_lcpu_enable_irq();
 		}
 
 		/* try to schedule a thread that might now be available */
