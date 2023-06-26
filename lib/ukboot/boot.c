@@ -303,6 +303,7 @@ void ukplat_entry(int argc, char *argv[])
 	if (!tls)
 		UK_CRASH("Failed to allocate and initialize TLS\n");
 
+	memset(tls, 0, ukarch_tls_area_size());
 	/* Copy from TLS master template */
 	ukarch_tls_area_init(tls);
 	/* Activate TLS */
