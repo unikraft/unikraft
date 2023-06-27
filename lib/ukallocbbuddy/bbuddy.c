@@ -392,7 +392,7 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 	struct uk_bbpalloc *b;
 	struct uk_bbpalloc_memr *memr;
 	size_t memr_size;
-	unsigned long count, i;
+	unsigned long i;
 	chunk_head_t *ch;
 	chunk_tail_t *ct;
 	uintptr_t min, max, range;
@@ -458,7 +458,6 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 	/* free up the memory we've been given to play with */
 	map_free(b, min, memr->nr_pages);
 
-	count = 0;
 	while (range != 0) {
 		/*
 		 * Next chunk is limited by alignment of min, but also
@@ -483,7 +482,6 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 		ch->next->pprev = &ch->next;
 		b->free_head[i] = ch;
 		ct->level = i;
-		count++;
 	}
 
 	return 0;
