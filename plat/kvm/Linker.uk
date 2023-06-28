@@ -44,7 +44,7 @@ endef
 $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) \
 		    $(KVM_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y) \
-		    $(UK_PLAT_KVM_DEF_LDS)
+		    $(UK_PLAT_KVM_DEF_LDS) $(UK_LDEPS)
 	$(call build_cmd,LD,,$@,\
 	       $(LD) \
 			$(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
