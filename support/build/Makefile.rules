@@ -104,17 +104,41 @@ libname2olib = $(addprefix $(BUILD_DIR)/,$(addsuffix .o,$(1)))
 
 libname2preolib = $(addprefix $(BUILD_DIR)/,$(addsuffix .ld.o,$(1)))
 
+# check if $1 is a prefix of $2; expands to $2 if true
+isprefix = $(findstring $(1)$(subst $(1),,$(2)),$(2))
+
+# convert a full path to a source file into a relative path
+# result is relative to $(libname)_SRC, if defined and a prefix of $source
+# otherwise it is the filename of $source
+# srcrelpath $libname,$source
+define srcrelpath =
+$(eval _libsrc := $(if $($(call uc,$(1))__BUILDTREE),$($(call uc,$(1))_SRC)))\
+$(if $(and $(_libsrc),$(call isprefix,$(_libsrc),$(2))),\
+	$(2:$(_libsrc)/%=%),$(notdir $(2)))
+endef
+
+# convert a full path to a build target into a path relative to
+# the build dir of $libname if it is prefix of $target
+# otherwise return the filename of $target
+# targrelpath $libname,$target
+define targrelpath =
+$(eval _libbuild := $(if $($(call uc,$(1))__BUILDTREE),\
+	$(call sub_build_dir,$(1))))\
+$(if $(and $(_libbuild),$(call isprefix,$(_libbuild),$(2))),\
+	$(2:$(_libbuild)/%=%),$(notdir $(2)))
+endef
+
 # converts a list of sources to paths pointing to their corresponding destination files
 # src2dst $1:libname,$2:source(s),$3:destsuffix,$4:variant(optional),$5:subbuild(optional)
 define src2dst =
 $(if $(5),\
 $(if $(4),\
-$(addprefix $(call sub_libbuild_dir,$(1),$(5))/,$(addsuffix .$(4)$(3),$(basename $(notdir $(2))))),\
-$(addprefix $(call sub_libbuild_dir,$(1),$(5))/,$(addsuffix $(3),$(basename $(notdir $(2)))))\
+$(addprefix $(call sub_libbuild_dir,$(1),$(5))/,$(addsuffix .$(4)$(3),$(basename $(call srcrelpath,$(1),$(2))))),\
+$(addprefix $(call sub_libbuild_dir,$(1),$(5))/,$(addsuffix $(3),$(basename $(call srcrelpath,$(1),$(2)))))\
 ),\
 $(if $(4),\
-$(addprefix $(call sub_build_dir,$(strip $(1)))/,$(addsuffix .$(4)$(3),$(basename $(notdir $(2))))),\
-$(addprefix $(call sub_build_dir,$(strip $(1)))/,$(addsuffix $(3),$(basename $(notdir $(2)))))\
+$(addprefix $(call sub_build_dir,$(strip $(1)))/,$(addsuffix .$(4)$(3),$(basename $(call srcrelpath,$(1),$(2))))),\
+$(addprefix $(call sub_build_dir,$(strip $(1)))/,$(addsuffix $(3),$(basename $(call srcrelpath,$(1),$(2)))))\
 ))
 endef
 
@@ -139,12 +163,12 @@ src2dep = $(call out2dep,$(call src2obj,$(1),$(2),$(3),$(4)))
 define src2lds =
 $(if $(4),\
 $(if $(3),\
-$(addprefix $(call sub_libbuild_dir,$(1),$(4))/,$(addsuffix .$(3).lds,$(basename $(basename $(notdir $(2)))))),\
-$(addprefix $(call sub_libbuild_dir,$(1),$(4))/,$(addsuffix .lds,$(basename $(basename $(notdir $(2))))))\
+$(addprefix $(call sub_libbuild_dir,$(1),$(4))/,$(addsuffix .$(3).lds,$(basename $(basename $(call srcrelpath,$(1),$(2)))))),\
+$(addprefix $(call sub_libbuild_dir,$(1),$(4))/,$(addsuffix .lds,$(basename $(basename $(call srcrelpath,$(1),$(2))))))\
 ),\
 $(if $(3),\
-$(addprefix $(call sub_build_dir,$(1))/,$(addsuffix .$(3).lds,$(basename $(basename $(notdir $(2)))))),\
-$(addprefix $(call sub_build_dir,$(1))/,$(addsuffix .lds,$(basename $(basename $(notdir $(2))))))\
+$(addprefix $(call sub_build_dir,$(1))/,$(addsuffix .$(3).lds,$(basename $(basename $(call srcrelpath,$(1),$(2)))))),\
+$(addprefix $(call sub_build_dir,$(1))/,$(addsuffix .lds,$(basename $(basename $(call srcrelpath,$(1),$(2))))))\
 ))
 endef
 
@@ -152,8 +176,8 @@ endef
 # dts2dtb $1:libname,$2:dts,$subbuild(optional)
 define dts2dtb =
 $(if $(3),\
-$(addprefix $(call sub_libbuild_dir,$(1),$(3))/,$(addsuffix .dtb,$(basename $(notdir $(2))))),
-$(addprefix $(call sub_build_dir,$(1))/,$(addsuffix .dtb,$(basename $(notdir $(2)))))
+$(addprefix $(call sub_libbuild_dir,$(1),$(3))/,$(addsuffix .dtb,$(basename $(call srcrelpath,$(1),$(2))))),
+$(addprefix $(call sub_build_dir,$(1))/,$(addsuffix .dtb,$(basename $(call srcrelpath,$(1),$(2)))))
 )
 endef
 
@@ -300,7 +324,9 @@ endif
 # Writes to a file during deferred expansion
 #
 # write_file_deferred $1:filepath,$2:content
-write_file_deferred = $(if $(UK_DEFERRED_EXPANSION),$(file > $(1),$(2)),$$(file > $(1),$(2)))
+write_file_deferred = $(if $(UK_DEFERRED_EXPANSION),\
+	$(shell $(MKDIR) -p $(dir $(1)))$(file > $(1),$(2)),\
+	$$(shell $(MKDIR) -p $(dir $(1)))$$(file > $(1),$(2)))
 
 # Calls a command that creates an object
 #
@@ -308,18 +334,18 @@ write_file_deferred = $(if $(UK_DEFERRED_EXPANSION),$(file > $(1),$(2)),$$(file 
 ifeq ($(CONFIG_RECORD_BUILDTIME_TIME),y)
 define build_cmd =
 $(call write_file_deferred,$(addsuffix .cmd,$(3)),$(strip $(4)))\
-$(call verbose_cmd,$(1),$(if $(2),$(2)':' ,)$(notdir $(3)),$(TIME) $(TIMEFLAGS) -o $(addsuffix .time,$(3)) $(SHELL) $(addsuffix .cmd,$(3)))
+$(call verbose_cmd,$(1),$(if $(2),$(2)':' ,)$(strip $(call targrelpath,$(2),$(3))),$(TIME) $(TIMEFLAGS) -o $(addsuffix .time,$(3)) $(SHELL) $(addsuffix .cmd,$(3)))
 endef
 else
 ifeq ($(CONFIG_RECORD_BUILDTIME_LIFTOFF),y)
 define build_cmd =
 $(call write_file_deferred,$(addsuffix .cmd,$(3)),$(strip $(4)))\
-$(call verbose_cmd,$(1),$(if $(2),$(2)':' ,)$(notdir $(3)),$(LIFTOFF) $(LITFOFFFLAGS) -o $(addsuffix .liftoff,$(3)) -- $(SHELL) $(addsuffix .cmd,$(3)))
+$(call verbose_cmd,$(1),$(if $(2),$(2)':' ,)$(strip $(call targrelpath,$(2),$(3))),$(LIFTOFF) $(LITFOFFFLAGS) -o $(addsuffix .liftoff,$(3)) -- $(SHELL) $(addsuffix .cmd,$(3)))
 endef
 else
 define build_cmd =
 $(call write_file_deferred,$(addsuffix .cmd,$(3)),$(strip $(4)))\
-$(call verbose_cmd,$(1),$(if $(2),$(2)':' ,)$(notdir $(3)), $(SHELL) $(addsuffix .cmd,$(3)))
+$(call verbose_cmd,$(1),$(if $(2),$(2)':' ,)$(strip $(call targrelpath,$(2),$(3))), $(SHELL) $(addsuffix .cmd,$(3)))
 endef
 endif
 endif
