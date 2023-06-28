@@ -82,17 +82,18 @@ endef
 #
 ################################################################################
 
+# Returns the fully-qualified path for a subfolder under the build output
+# directory
+sub_build_dir = $(addprefix $(BUILD_DIR)/,$(if $($(call uc,$(1))__BUILDTREE),\
+	$(notdir $(1))/build,$(notdir $(1))))
+
 # Creates a subfolder under the build output directory
 # mk_sub_build_dir $1:subfoldername
 define mk_sub_build_dir =
-$(if $(shell $(MKDIR) -p "$(BUILD_DIR)/$(notdir $(1))" && cd "$(BUILD_DIR)/$(notdir $(1))" >/dev/null && pwd),,\
-     $(error could not create directory "$(BUILD_DIR)/$(notdir $(1))"))
+$(eval _d := $(call sub_build_dir,$(1)))\
+$(if $(shell $(MKDIR) -p "$(_d)" && cd "$(_d)" >/dev/null && pwd),,\
+     $(error could not create directory "$(_d)"))
 endef
-
-# Returns the fully-qualified path for a subfolder under the build output
-# directory
-# sub_build_dir $1:subfoldername
-sub_build_dir = $(addprefix $(BUILD_DIR)/,$(notdir $(1)))
 
 # Returns the file extension
 fileext = $(subst .,,$(suffix $(1)))
@@ -269,14 +270,15 @@ define addplatlib_s =
 $(if $(filter y,$(3)),$(call addplatlib,$(1),$(2)),)
 endef
 
+sub_libbuild_dir = $(call sub_build_dir,$(1))/$(strip $(2))
+
 # creates a sub build directory for a library
 # mk_sub_libbuild_dir $1:libname,$2:subdir
 define mk_sub_libbuild_dir =
-$(if $(shell $(MKDIR) -p "$(BUILD_DIR)/$(notdir $(1))/$(strip $(2))" && cd "$(BUILD_DIR)/$(notdir $(1))/$(strip $(2))" >/dev/null && pwd),,\
-     $(error could not create directory "$(BUILD_DIR)/$(notdir $(1))/$(strip $(2))"))
+$(eval _d := $(call sub_libbuild_dir,$(1),$(2)))\
+$(if $(shell $(MKDIR) -p "$(_d)" && cd "$(_d)" >/dev/null && pwd),,\
+     $(error could not create directory "$(_d)"))
 endef
-
-sub_libbuild_dir = $(BUILD_DIR)/$(notdir $(1))/$(strip $(2))
 
 ################################################################################
 #
@@ -432,7 +434,7 @@ $(error $(2): missing extraction rule for archive type)\
 ))))
 UK_FETCH-y += $(BUILD_DIR)/$(1)/.origin \
 $(eval $(call vprefix_lib,$(1),ORIGIN) = $(BUILD_DIR)/$(1)/origin)
-$(call mk_sub_libbuild_dir,$(1),origin)
+$(shell $(MKDIR) -p $(BUILD_DIR)/$(1)/origin)
 
 .PRECIOUS: $(BUILD_DIR)/$(1)/origin
 
