@@ -1113,6 +1113,7 @@ help:
 	@echo '  UK_CXXFLAGS            - explicit Unikraft-specific additions to the C++ compiler flags (the CXXFLAGS variable is ignored)'
 	@echo '  UK_GOCFLAGS            - explicit Unikraft-specific additions to the GO compiler flags (the GOCFLAGS variable is ignored)'
 	@echo '  UK_LDFLAGS             - explicit Unikraft-specific additions to the linker flags (the LDFLAGS variable is ignored)'
+	@echo '  UK_LDEPS               - explicit, space-seperated link-time file dependencies (changes to these files will trigger relinking on subsequent builds)'
 	@echo ''
 	@echo 'Miscellaneous:'
 	@echo '  print-version          - print Unikraft version'
