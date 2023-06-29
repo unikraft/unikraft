@@ -443,7 +443,7 @@ static int uk_9pfs_rmdir(struct vnode *dvp, struct vnode *vp,
 }
 
 static int uk_9pfs_readdir(struct vnode *vp, struct vfscore_file *fp,
-		struct dirent *dir)
+		struct dirent64 *dir)
 {
 	struct uk_9pfs_mount_data *md = UK_9PFS_MD(vp->v_mount);
 	struct uk_9pdev *dev = md->dev;

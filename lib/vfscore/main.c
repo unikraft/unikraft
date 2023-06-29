@@ -947,6 +947,10 @@ UK_TRACEPOINT(trace_vfs_readdir, "%d %#x", int, struct dirent*);
 UK_TRACEPOINT(trace_vfs_readdir_ret, "");
 UK_TRACEPOINT(trace_vfs_readdir_err, "%d", int);
 
+UK_TRACEPOINT(trace_vfs_readdir64, "%d %p", int, struct dirent64*);
+UK_TRACEPOINT(trace_vfs_readdir_ret64, "");
+UK_TRACEPOINT(trace_vfs_readdir_err64, "%d", int);
+
 struct __dirstream
 {
 	int fd;
@@ -1021,6 +1025,7 @@ int closedir(DIR *dir)
 	return 0;
 }
 
+#if CONFIG_LIBVFSCORE_NONLARGEFILE
 int scandir(const char *path, struct dirent ***res,
 	int (*sel)(const struct dirent *),
 	int (*cmp)(const struct dirent **, const struct dirent **))
@@ -1068,8 +1073,77 @@ int scandir(const char *path, struct dirent ***res,
 	*res = names;
 	return cnt;
 }
+#else /* !CONFIG_LIBVFSCORE_NONLARGEFILE */
+int scandir(const char *path, struct dirent ***res,
+	int (*sel)(const struct dirent *),
+	int (*cmp)(const struct dirent **, const struct dirent **))
+	__attribute__((alias("scandir64")));
+#endif /* !CONFIG_LIBVFSCORE_NONLARGEFILE */
 
-UK_TRACEPOINT(trace_vfs_getdents, "%d %#x %hu", int, struct dirent*, size_t);
+#ifdef scandir64
+#undef scandir64
+#endif
+int scandir64(const char *path, struct dirent64 ***res,
+	int (*sel)(const struct dirent64 *),
+	int (*cmp)(const struct dirent64 **, const struct dirent64 **))
+{
+	struct dirent64 *de, **names = 0, **tmp;
+	size_t cnt = 0, len = 0;
+	int old_errno = errno;
+	DIR *d;
+
+	d = opendir(path);
+	if (!d)
+		return -1;
+
+	de = readdir64(d);
+	while (de != NULL) {
+		if (sel && !sel(de))
+			continue;
+
+		if (cnt >= len) {
+			len = 2 * len + 1;
+			if (len > SIZE_MAX / sizeof(*names))
+				break;
+
+			tmp = realloc(names, len * sizeof(*names));
+			if (!tmp)
+				break;
+			names = tmp;
+		}
+
+		names[cnt] = malloc(de->d_reclen);
+		if (unlikely(!names[cnt]))
+			break;
+
+		memcpy(names[cnt++], de, de->d_reclen);
+
+		de = readdir64(d);
+	}
+
+	closedir(d);
+
+	if (unlikely(errno)) {
+		if (names) {
+			while (cnt-- > 0)
+				free(names[cnt]);
+			free(names);
+		}
+
+		return -1;
+	}
+	errno = old_errno;
+
+	if (cmp)
+		qsort(names, cnt, sizeof(*names),
+		      (int (*)(const void *, const void *))cmp);
+
+	*res = names;
+	return cnt;
+}
+
+#if CONFIG_LIBVFSCORE_NONLARGEFILE
+UK_TRACEPOINT(trace_vfs_getdents, "%d %p %hu", int, struct dirent*, size_t);
 UK_TRACEPOINT(trace_vfs_getdents_ret, "");
 UK_TRACEPOINT(trace_vfs_getdents_err, "%d", int);
 
@@ -1107,6 +1181,7 @@ UK_SYSCALL_R_DEFINE(int, getdents, int, fd, struct dirent*, dirp,
 
 	return (i * sizeof(struct dirent));
 }
+#endif /* CONFIG_LIBVFSCORE_NONLARGEFILE */
 
 UK_TRACEPOINT(trace_vfs_getdents64, "%d %p %hu", int, struct dirent64 *, size_t);
 UK_TRACEPOINT(trace_vfs_getdents64_ret, "");
@@ -1146,6 +1221,17 @@ UK_SYSCALL_R_DEFINE(int, getdents64, int, fd, struct dirent64 *, dirp,
 	return (i * sizeof(struct dirent64));
 }
 
+/**
+ * If we use an old libc version, that does not use the largefile syscalls as
+ * the default ones, we want to use proper Linux `dirent` and `dirent64`
+ * structures, in order to maintain compatibility.
+ * Since the filesystem `READDIR` vop uses `dirent64`, we will convert to
+ * a `dirent` structure within the `readdir_r` call.
+ *
+ * When this is not the case, we can simply use `#define dirent dirent64` and
+ * alias the `readdir*` functions to their `*64` equivalent.
+ */
+#if CONFIG_LIBVFSCORE_NONLARGEFILE
 struct dirent *readdir(DIR *dir)
 {
 	static __thread struct dirent entry;
@@ -1158,39 +1244,95 @@ struct dirent *readdir(DIR *dir)
 
 int readdir_r(DIR *dir, struct dirent *entry, struct dirent **result)
 {
-	int error;
+	/**
+	 * `sys_readdir()` will end up calling `VOP_READDIR`, which expects
+	 * a dirent64 structure instead of the `struct dirent` entry parameter.
+	 */
+	struct dirent64 entry64;
 	struct vfscore_file *fp;
+	int error;
 
-	trace_vfs_readdir(dir->fd, entry);
-	error = fget(dir->fd, &fp);
-	if (!error) {
-		error = sys_readdir(fp, entry);
-		fdrop(fp);
-		if (error) {
-			trace_vfs_readdir_err(error);
-		} else {
-			trace_vfs_readdir_ret();
-		}
-	}
+	*result = NULL;
+
 	// Our dirent has (like Linux) a d_reclen field, but a constant size.
 	entry->d_reclen = sizeof(*entry);
 
-	if (error) {
-		*result = NULL;
-	} else {
-		*result = entry;
-	}
-	return error == ENOENT ? 0 : error;
-}
+	trace_vfs_readdir(dir->fd, entry);
+	error = fget(dir->fd, &fp);
+	if (unlikely(error))
+		return error;
 
-// FIXME: in 64bit dirent64 and dirent are identical, so it's safe to alias
+	error = sys_readdir(fp, &entry64);
+	fdrop(fp);
+	if (unlikely(error)) {
+		trace_vfs_readdir_err(error);
+
+		return error == ENOENT ? 0 : error;
+	}
+
+	trace_vfs_readdir_ret();
+
+	entry->d_ino = entry64.d_ino;
+	entry->d_type = entry64.d_type;
+	entry->d_off = entry64.d_off;
+	memcpy(entry->d_name, entry64.d_name, sizeof(entry64.d_name));
+
+	*result = entry;
+
+	return 0;
+}
+#else /* !CONFIG_LIBVFSCORE_NONLARGEFILE */
+struct dirent *readdir(DIR *dir) __attribute__((alias("readdir64")));
+int readdir_r(DIR *dir, struct dirent *entry, struct dirent **result)
+	 __attribute__((alias("readdir64_r")));
+#endif /* !CONFIG_LIBVFSCORE_NONLARGEFILE */
+
+#ifdef readdir64_r
 #undef readdir64_r
+#endif
 int readdir64_r(DIR *dir, struct dirent64 *entry,
 		struct dirent64 **result)
-		__attribute__((alias("readdir_r")));
+{
+	struct vfscore_file *fp;
+	int error;
 
+	*result = NULL;
+
+	// Our dirent has (like Linux) a d_reclen field, but a constant size.
+	entry->d_reclen = sizeof(*entry);
+
+	trace_vfs_readdir64(dir->fd, entry);
+	error = fget(dir->fd, &fp);
+	if (unlikely(error))
+		return error;
+
+	error = sys_readdir(fp, entry);
+	fdrop(fp);
+	if (unlikely(error)) {
+		trace_vfs_readdir_err64(error);
+
+		return error == ENOENT ? 0 : error;
+	}
+
+	trace_vfs_readdir_ret64();
+
+	*result = entry;
+
+	return 0;
+}
+
+#ifdef readdir64
 #undef readdir64
-struct dirent *readdir64(DIR *dir) __attribute__((alias("readdir")));
+#endif
+struct dirent64 *readdir64(DIR *dir)
+{
+	static __thread struct dirent64 entry;
+	struct dirent64 *result;
+
+	errno = readdir64_r(dir, &entry, &result);
+
+	return result;
+}
 
 void rewinddir(DIR *dirp)
 {
