@@ -19,7 +19,11 @@ typedef struct __dirstream DIR;
 #define _DIRENT_HAVE_D_OFF
 #define _DIRENT_HAVE_D_TYPE
 
-struct dirent {
+/**
+ * The dirent and dirent64 structures must match the Linux system call ABI
+ * for binary compatibility.
+ */
+struct dirent64 {
 	ino_t d_ino;
 	off_t d_off;
 	unsigned short d_reclen;
@@ -27,13 +31,30 @@ struct dirent {
 	char d_name[256];
 };
 
+#if CONFIG_LIBVFSCORE_NONLARGEFILE
+struct dirent {
+	unsigned long d_ino;
+	unsigned long d_off;
+	unsigned short d_reclen;
+	char d_name[256];
+	unsigned char pad;
+	unsigned char d_type;
+};
+#else /* !CONFIG_LIBVFSCORE_NONLARGEFILE */
+#define dirent dirent64
+#endif /* !CONFIG_LIBVFSCORE_NONLARGEFILE */
+
 #define d_fileno d_ino
 
 int            closedir(DIR *);
 DIR           *fdopendir(int);
 DIR           *opendir(const char *);
+struct dirent64 *readdir64(DIR *dir);
+int            readdir64_r(DIR *__restrict, struct dirent64 *__restrict,
+		struct dirent64 **__restrict);
 struct dirent *readdir(DIR *);
 int            readdir_r(DIR *__restrict, struct dirent *__restrict, struct dirent **__restrict);
+
 void           rewinddir(DIR *);
 int            dirfd(DIR *);
 
@@ -57,18 +78,21 @@ long           telldir(DIR *);
 #define DT_WHT 14
 #define IFTODT(x) ((x)>>12 & 017)
 #define DTTOIF(x) ((x)<<12)
-int getdents(int, struct dirent *, size_t);
+int getdents(int fd, struct dirent *dirp, size_t count);
+int getdents64(int fd, struct dirent64 *dirp, size_t count);
 #endif
 
 #ifdef _GNU_SOURCE
-int versionsort(const struct dirent **, const struct dirent **);
+int versionsort(const struct dirent64 **, const struct dirent64 **);
 #endif
 
 #if defined(_LARGEFILE64_SOURCE) || defined(_GNU_SOURCE)
-#define dirent64 dirent
-#define readdir64 readdir
-#define readdir64_r readdir_r
-#define scandir64 scandir
+
+/**
+ * `alphasort()` and `versionsort()` are not provided in the Unikraft core,
+ * so we can just leave the largefile functions as aliases to the non largefile
+ * definitions
+ */
 #define alphasort64 alphasort
 #define versionsort64 versionsort
 #define off64_t off_t

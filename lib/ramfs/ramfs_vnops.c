@@ -539,7 +539,7 @@ ramfs_rename(struct vnode *dvp1, struct vnode *vp1, const char *name1 __unused,
  * @vp: vnode of the directory.
  */
 static int
-ramfs_readdir(struct vnode *vp, struct vfscore_file *fp, struct dirent *dir)
+ramfs_readdir(struct vnode *vp, struct vfscore_file *fp, struct dirent64 *dir)
 {
 	struct ramfs_node *np, *dnp;
 	int i;

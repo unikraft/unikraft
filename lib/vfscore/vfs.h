@@ -225,7 +225,7 @@ int sys_fsync(struct vfscore_file *fp);
  *	- (0):  Completed successfully
  *	- (<0): Negative value with error code
  */
-int sys_readdir(struct vfscore_file *fp, struct dirent *dirent);
+int sys_readdir(struct vfscore_file *fp, struct dirent64 *dirent);
 
 /**
  * Resets the location in the directory stream.

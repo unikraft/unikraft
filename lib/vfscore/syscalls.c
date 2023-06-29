@@ -468,7 +468,7 @@ check_dir_empty(char *path)
 {
 	int error;
 	struct vfscore_file *fp;
-	struct dirent dir;
+	struct dirent64 dir;
 
 	DPRINTF(VFSDB_SYSCALL, ("check_dir_empty\n"));
 
@@ -495,7 +495,7 @@ out_error:
 }
 
 int
-sys_readdir(struct vfscore_file *fp, struct dirent *dir)
+sys_readdir(struct vfscore_file *fp, struct dirent64 *dir)
 {
 	struct vnode *dvp;
 	int error;

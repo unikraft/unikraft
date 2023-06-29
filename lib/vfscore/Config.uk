@@ -15,6 +15,19 @@ config LIBVFSCORE_PIPE_SIZE_ORDER
 	help
 		The size of the internal buffer for anonymous pipes is 2^order.
 
+config LIBVFSCORE_NONLARGEFILE
+	bool "Non-largefile system calls"
+	default y if LIBSYSCALL_SHIM_HANDLER
+	default n
+	help
+		Add different dirent and dirent64 structure and their respective
+		syscalls (i.e. treat Linux non largefile legacy syscalls properly).
+		If this option is not set, the dirent structure will be aliased to
+		dirent64, and all other nonlargefile functions will be aliased to
+		their largefile variant (e.g. readdir = readdir64).
+		If lib/syscall_shim is enabled and this option is not selected, only
+		the 64-bit version of the system calls are registered.
+
 config LIBVFSCORE_AUTOMOUNT_ROOTFS
 bool "Automatically mount a root filesysytem (/)"
 default n

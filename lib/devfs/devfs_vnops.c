@@ -181,7 +181,8 @@ devfs_lookup(struct vnode *dvp, const char *name, struct vnode **vpp)
  * @vp: vnode of the directory.
  */
 static int
-devfs_readdir(struct vnode *vp __unused, struct vfscore_file *fp, struct dirent *dir)
+devfs_readdir(struct vnode *vp __unused, struct vfscore_file *fp,
+	      struct dirent64 *dir)
 {
 	struct devinfo info;
 	int error, i;
