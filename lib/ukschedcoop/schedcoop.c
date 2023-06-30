@@ -44,6 +44,7 @@ struct schedcoop {
 
 	struct uk_thread idle;
 	__nsec idle_return_time;
+	__nsec ts_prev_switch;
 };
 
 static inline struct schedcoop *uksched2schedcoop(struct uk_sched *s)
@@ -63,6 +64,7 @@ static void schedcoop_schedule(struct uk_sched *s)
 	if (unlikely(ukplat_lcpu_irqs_disabled()))
 		UK_CRASH("Must not call %s with IRQs disabled\n", __func__);
 
+	now = ukplat_monotonic_clock();
 	prev = uk_thread_current();
 	flags = ukplat_lcpu_save_irqf();
 
@@ -71,12 +73,18 @@ static void schedcoop_schedule(struct uk_sched *s)
 		UK_CRASH("Must not call %s from a callback\n", __func__);
 #endif
 
+	/* Update execution time of current thread */
+	/* WARNING: We assume here that scheduler `s` is only responsible for
+	 *          the current logical CPU. Otherwise, we would have to store
+	 *          the time of the last context switch per logical core.
+	 */
+	prev->exec_time += now - c->ts_prev_switch;
+	c->ts_prev_switch = now;
+
 	/* Examine all sleeping threads.
 	 * Wake up expired ones and find the time when the next timeout expires.
 	 */
-	now = ukplat_monotonic_clock();
 	min_wakeup_time = 0;
-
 	UK_TAILQ_FOREACH_SAFE(thread, &c->sleep_queue,
 			      queue, tmp) {
 		if (likely(thread->wakeup_time)) {
@@ -239,14 +247,21 @@ static __noreturn void idle_thread_fn(void *argp)
 	}
 }
 
-static int schedcoop_start(struct uk_sched *s __maybe_unused,
+static int schedcoop_start(struct uk_sched *s,
 			   struct uk_thread *main_thread __maybe_unused)
 {
+	struct schedcoop *c = uksched2schedcoop(s);
+
 	UK_ASSERT(main_thread);
 	UK_ASSERT(main_thread->sched == s);
 	UK_ASSERT(uk_thread_is_runnable(main_thread));
 	UK_ASSERT(!uk_thread_is_exited(main_thread));
 	UK_ASSERT(uk_thread_current() == main_thread);
+
+	/* Since we are now starting to schedule, we save the current timestamp
+	 * as the start time for the first time slice.
+	 */
+	c->ts_prev_switch = ukplat_monotonic_clock();
 
 	/* NOTE: We do not put `main_thread` into the thread list.
 	 *       Current running threads will be added as soon as
