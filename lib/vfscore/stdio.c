@@ -221,6 +221,7 @@ static struct vfscore_file  stdio_file = {
 	.f_flags = UK_FWRITE | UK_FREAD,
 	.f_dentry = &stdio_dentry,
 	.f_vfs_flags = UK_VFSCORE_NOPOS,
+	.f_lock = UK_MUTEX_INITIALIZER(stdio_file.f_lock),
 	/* reference count is 2 because close(0) is a valid
 	 * operation. However it is not properly handled in the
 	 * current implementation. */
