@@ -96,7 +96,7 @@ posix_socket_alloc_fd(struct posix_socket_driver *d, int type, void *sock_data)
 		goto ERR_MALLOC_FILE;
 	}
 
-	vfs_file = uk_calloc(d->allocator, 1, sizeof(*vfs_file));
+	vfs_file = calloc(1, sizeof(*vfs_file));
 	if (unlikely(!vfs_file)) {
 		ret = -ENOMEM;
 		goto ERR_MALLOC_VFS_FILE;
@@ -155,7 +155,7 @@ ERR_VFS_INSTALL:
 ERR_ALLOC_DENTRY:
 	vput(vfs_vnode);
 ERR_ALLOC_VNODE:
-	uk_free(d->allocator, vfs_file);
+	free(vfs_file);
 ERR_MALLOC_VFS_FILE:
 	uk_free(d->allocator, sock);
 ERR_MALLOC_FILE:
