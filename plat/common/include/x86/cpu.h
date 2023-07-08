@@ -97,6 +97,17 @@ static inline __u64 rdtsc(void)
 	return (h << 32) | l;
 }
 
+#ifdef __FSGSBASE__
+static inline __u64 rdfsbase(void)
+{
+	return __builtin_ia32_rdfsbase64();;
+}
+
+static inline void wrfsbase(__u64 fsbase)
+{
+	__builtin_ia32_wrfsbase64(fsbase);
+}
+#endif /* __FSGSBASE__ */
 
 /* accessing devices via port space */
 static inline __u8 inb(__u16 port)

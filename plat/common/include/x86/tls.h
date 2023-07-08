@@ -38,8 +38,18 @@
  *  #accessing-fs-gs-base-with-the-fsgsbase-instructions
  */
 
+#ifdef __FSGSBASE__
+
+#define get_tls_pointer() rdfsbase()
+
+#define set_tls_pointer(ptr) wrfsbase(ptr)
+
+#else /* !__FSGSBASE__ */
+
 #define get_tls_pointer() rdmsrl(X86_MSR_FS_BASE)
 
 #define set_tls_pointer(ptr) wrmsrl(X86_MSR_FS_BASE, ptr)
+
+#endif /* __FSGSBASE__ */
 
 #endif /* __PLAT_CMN_X86_TLS_H__ */
