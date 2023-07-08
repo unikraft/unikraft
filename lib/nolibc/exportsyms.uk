@@ -103,6 +103,8 @@ errno
 # network
 htons
 ntohs
+htonl
+ntohl
 h_errno
 
 # syslog
