@@ -103,7 +103,7 @@ errno
 
 # network
 htons
-nthos
+ntohs
 h_errno
 
 # syslog
