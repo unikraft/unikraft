@@ -22,8 +22,9 @@ free
 
 # sscanf
 vsscanf
-scanf
 sscanf
+scanf
+fscanf
 
 # stdio
 stdin
