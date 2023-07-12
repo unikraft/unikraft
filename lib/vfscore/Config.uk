@@ -100,5 +100,27 @@ if LIBVFSCORE_AUTOMOUNT_ROOTFS
 		filesystem.
 endif
 
+config LIBVFSCORE_FSTAB
+	bool "Automatically mount list of volumes from kernel arguments"
+	select LIBUKLIBPARAM
+	default n
+	help
+		These volumes are parsed from a command-line argument:
+		vfs.fstab=[
+			"<src_dev>:<mntpoint>:<fsdriver>[:<flags>:<opts>]"
+			"<src_dev>:<mntpoint>:<fsdriver>[:<flags>:<opts>]"
+			...
+		]
+		The list elements are to be separated by whitespaces.
+
+if LIBVFSCORE_FSTAB
+config LIBVFSCORE_FSTAB_SIZE
+	int "Maximum automounted volumes"
+	default 64
+	help
+		The maximum amount of automatically mounted volumes that are
+		passed through the vfs.fstab argument.
+endif
+
 endmenu
 endif
