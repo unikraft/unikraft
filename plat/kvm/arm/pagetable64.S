@@ -95,18 +95,6 @@ setup_tcr_el1:
 	/* save lr */
 	mov x22, x30
 
-        /*
-	 * Invalidate the D-Cache to avoid using invalid data that existed
-	 * in D-Cache. Invalidate ranges that may have been modified:
-	 * DATA, BSS, PAGETABLE and BOOTSTACK.
-	 */
-	ur_ldr  x0, _data
-	ur_ldr  x1, _end
-
-	add x1, x1, #__STACK_SIZE
-	sub x1, x1, x0
-	bl clean_and_invalidate_dcache_range
-
 	/* Setup SCTLR */
 	ldr x2, =SCTLR_SET_BITS
 	ldr x3, =SCTLR_CLEAR_BITS
