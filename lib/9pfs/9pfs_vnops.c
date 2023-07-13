@@ -35,6 +35,7 @@
 #include <fcntl.h>
 #include <dirent.h>
 #include <stdlib.h>
+#include <sys/ioctl.h>
 #include <uk/config.h>
 #include <uk/9p.h>
 #include <uk/errptr.h>
@@ -1011,8 +1012,18 @@ static int uk_9pfs_symlink(struct vnode *dvp, const char *op, const char *np)
 	return 0;
 }
 
+static int uk_9pfs_ioctl(struct vnode *dvp, struct vfscore_file *fp,
+			 unsigned long com, void *data)
+{
+	switch (com) {
+	case TIOCGWINSZ:
+		return ENOTTY;
+	default:
+		return 0;
+	}
+}
+
 #define uk_9pfs_seek		((vnop_seek_t)vfscore_vop_nullop)
-#define uk_9pfs_ioctl		((vnop_ioctl_t)vfscore_vop_nullop)
 #define uk_9pfs_cache		((vnop_cache_t)NULL)
 #define uk_9pfs_fallocate	((vnop_fallocate_t)vfscore_vop_nullop)
 #define uk_9pfs_poll		((vnop_poll_t)vfscore_vop_einval)
