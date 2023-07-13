@@ -48,9 +48,12 @@ void ukplat_lcpu_halt_irq(void)
 {
 	UK_ASSERT(ukplat_lcpu_irqs_disabled());
 
-	ukplat_lcpu_enable_irq();
+	/* Note: If priority masking is enabled
+	 * interrupts need to be unmasked in the GIC.
+	 *
+	 * See Linux `cpu_do_idle(void)` implementation
+	 */
 	halt();
-	ukplat_lcpu_disable_irq();
 }
 
 unsigned long ukplat_lcpu_save_irqf(void)
