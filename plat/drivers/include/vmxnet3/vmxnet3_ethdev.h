@@ -12,7 +12,7 @@
 
 #include <vmxnet3/vmxnet3_ethdev.h>
 
-#define DEBUG 1
+#define DEBUG 0
 #define debug_uk_pr_info(fmt, ...) \
             do { \
 				if (DEBUG) \
@@ -144,7 +144,7 @@ vmxnet3_read_addr(volatile void *addr)
 	uint32_t ret;
 
 	ret = *(uint32_t *)(addr);
-	uk_pr_info("reading from %p = %ud\n", addr, ret);
+	rmb();
 
 	return ret;
 }
@@ -153,7 +153,7 @@ static inline void
 vmxnet3_write_addr(volatile void *reg, uint32_t value)
 {
 	*(uint32_t *)(reg) = value;
-	// uk_pr_info("writing %p = %d (%x)\n", reg, value, value);
+	wmb();
 }
 
 #define VMXNET3_PCI_REG_WRITE(reg, value) vmxnet3_write_addr((reg), (value))

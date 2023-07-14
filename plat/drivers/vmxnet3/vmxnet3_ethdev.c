@@ -209,23 +209,6 @@ void adjust_pci_device(struct pci_device *pci __unused) {
 			| (pci->addr.devid << PCI_DEVICE_SHIFT);
 	PCI_CONF_READ(uint16_t, &cmd, config_addr, COMMAND);
 	debug_uk_pr_info("cmd: 0x%X\n", cmd);
-
-	// unsigned short new_command, pci_command;
-	// unsigned char pci_latency;
-
-	// PCI_CONF_READ(int, &pci_command, PCI_COMMAND, PCI_COMMAND);
-	// new_command = ( pci_command | PCI_COMMAND_MASTER |
-	// 		PCI_COMMAND_MEMORY | PCI_COMMAND_IO );
-	// if (pci_command != new_command) {
-	// 	PCI_CONF_WRITE(int, PCI_COMMAND, new_command);
-	// }
-
-	// pci_read_config_byte ( pci, PCI_LATENCY_TIMER, &pci_latency);
-	// if ( pci_latency < 32 ) {
-	// 	DBGC ( pci, PCI_FMT " latency timer is unreasonably low at "
-	// 	       "%d. Setting to 32.\n", PCI_ARGS ( pci ), pci_latency );
-	// 	pci_write_config_byte ( pci, PCI_LATENCY_TIMER, 32);
-	// }
 }
 
 /*
@@ -692,11 +675,9 @@ vmxnet3_dev_start(struct uk_netdev *dev)
 	/* Activate device by register write */
 	VMXNET3_WRITE_BAR1_REG(hw, VMXNET3_REG_CMD, VMXNET3_CMD_ACTIVATE_DEV); // was BAR1
 	ret = VMXNET3_READ_BAR1_REG(hw, VMXNET3_REG_CMD); // was BAR1
-
 	if (ret != 0) {
-		uk_pr_err("Device activation: UNSUCCESSFUL\n");
-		// TODO why? On app-httpserver it works even with the next line; on nginx it does not.
-		// return -EINVAL;
+		uk_pr_err("Device activation: UNSUCCESSFUL; ret = %x\n", ret);
+		return -EINVAL;
 	}
 
 	/* Setup memory region for rx buffers */

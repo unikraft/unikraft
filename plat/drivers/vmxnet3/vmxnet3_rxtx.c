@@ -510,7 +510,6 @@ vmxnet3_post_rx_bufs(struct uk_netdev_rx_queue *rxq, uint8_t ring_id)
 		return -err;
 	}
 	else {
-		uk_pr_err("Returning fine!\n");
 		return i;
 	}
 }
