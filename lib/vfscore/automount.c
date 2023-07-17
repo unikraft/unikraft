@@ -73,35 +73,6 @@ static inline int vfscore_mount_volume(struct vfscore_volume *vv)
 	return mount(vv->sdev, vv->path, vv->drv, vv->flags, vv->opts);
 }
 
-#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS
-
-static const char *rootfs   = CONFIG_LIBVFSCORE_ROOTFS;
-
-#ifndef CONFIG_LIBVFSCORE_ROOTDEV
-static const char *rootdev  = "";
-#else
-static const char *rootdev  = CONFIG_LIBVFSCORE_ROOTDEV;
-#endif
-
-#ifndef CONFIG_LIBVFSCORE_ROOTOPTS
-static const char *rootopts = "";
-#else
-static const char *rootopts = CONFIG_LIBVFSCORE_ROOTOPTS;
-#endif
-
-#ifndef CONFIG_LIBVFSCORE_ROOTFLAGS
-static __u64 rootflags;
-#else
-static __u64 rootflags      = (__u64) CONFIG_LIBVFSCORE_ROOTFLAGS;
-#endif
-
-UK_LIB_PARAM_STR(rootfs);
-UK_LIB_PARAM_STR(rootdev);
-UK_LIB_PARAM_STR(rootopts);
-UK_LIB_PARAM(rootflags, __u64);
-
-#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS */
-
 #ifdef CONFIG_LIBVFSCORE_FSTAB
 
 #define LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP			':'
@@ -229,11 +200,23 @@ static int vfscore_automount_rootfs(void)
 {
 	/* Convert to `struct vfscore_volume` */
 	struct vfscore_volume vv = {
-		.sdev = rootdev,
+#ifdef CONFIG_LIBVFSCORE_ROOTDEV
+		.sdev = CONFIG_LIBVFSCORE_ROOTDEV,
+#else
+		.sdev = "",
+#endif /* CONFIG_LIBVFSCORE_ROOTDEV */
 		.path = "/",
-		.drv = rootfs,
-		.flags = rootflags,
-		.opts = rootopts,
+		.drv = CONFIG_LIBVFSCORE_ROOTFS,
+#ifdef CONFIG_LIBVFSCORE_ROOTFLAGS
+		.flags = CONFIG_LIBVFSCORE_ROOTFLAGS,
+#else
+		.flags = 0,
+#endif /* CONFIG_LIBVFSCORE_ROOTFLAGS */
+#ifdef CONFIG_LIBVFSCORE_ROOTOPTS
+		.opts = CONFIG_LIBVFSCORE_ROOTOPTS,
+#else
+		.opts = "",
+#endif /* CONFIG_LIBVFSCORE_ROOTOPTS */
 	};
 	int rc;
 

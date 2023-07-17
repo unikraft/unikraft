@@ -18,12 +18,9 @@ config LIBVFSCORE_PIPE_SIZE_ORDER
 config LIBVFSCORE_AUTOMOUNT_ROOTFS
 bool "Automatically mount a root filesysytem (/)"
 default n
-imply LIBUKLIBPARAM
 help
-	Automatically mounts '/' during boot. If `libuklibparam` is
-	compiled in, the default root filesystem and mount options can
-	be changed with the following library parameters:
-	'vfs.rootfs', 'vfs.rootdev', 'vfs.rootflags', and 'vfs.rootopts'
+	Automatically mounts '/' during boot. The parameters are
+	compiled-in and cannot be changed at runtime.
 
 if LIBVFSCORE_AUTOMOUNT_ROOTFS
 	choice LIBVFSCORE_ROOTFS
