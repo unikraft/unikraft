@@ -271,10 +271,23 @@ $(eval $(call uc,$(1))_EXPORTS += $(wildcard $(IMPORT_BASE)/exportsyms.uk))
 $(eval $(call uc,$(1))_LOCALS  += $(wildcard $(IMPORT_BASE)/localsyms.uk))
 endef
 
+# addlib_tree $1:libname
+define addlib_tree =
+$(eval $(call uc,$(1))__BUILDTREE := y)
+$(call addlib,$(1))
+endef
+
 # addlib_s $1:libname,$2:switch
 define addlib_s =
 ifeq ($(2),y)
 $(call addlib,$(1))
+endif
+endef
+
+# addlib_tree_s $1:libname,$2:switch
+define addlib_tree_s =
+ifeq ($(2),y)
+$(call addlib_tree,$(1))
 endif
 endef
 
