@@ -39,10 +39,29 @@ define have_clang =
 $(if $(filter Clang,$(CC_NAME)),y,n)
 endef
 
-# test whether GCC version is greater than or equal to the minimum requirement
-# gcc_version_ge $gcc_major,$gcc_minor
+# test whether CC version is greater than or equal to the minimum requirement
+# cc_version_ge $cc_major,$cc_minor
+define cc_version_ge =
+$(shell if [ $(CC_VER_MAJOR) -gt $(1) ] || ([ $(CC_VER_MAJOR) -eq $(1) ] && [ $(CC_VER_MINOR) -ge $(2) ]) ; then echo -n y ; fi)
+endef
+# test whether CC version is less than the supplied version
+# cc_version_lt $cc_major,$cc_minor
+define cc_version_lt =
+$(shell if [ $(CC_VER_MAJOR) -lt $(1) ] || ([ $(CC_VER_MAJOR) -eq $(1) ] && [ $(CC_VER_MINOR) -lt $(2) ]) ; then echo -n y ; fi)
+endef
+
 define gcc_version_ge =
-$(shell if [ $(call have_gcc) = y ] ; then if [ $(CC_VER_MAJOR) -gt $(1) ] || ([ $(CC_VER_MAJOR) -eq $(1) ] && [ $(CC_VER_MINOR) -ge $(2) ]) ; then echo -n y ; fi ; fi)
+$(shell if [ $(call have_gcc) = y ] ; then echo -n "$(call cc_version_ge,$(1),$(2))" ; fi)
+endef
+define gcc_version_lt =
+$(shell if [ $(call have_gcc) = y ] ; then echo -n "$(call cc_version_lt,$(1),$(2))" ; fi)
+endef
+
+define clang_version_ge =
+$(shell if [ $(call have_clang) = y ] ; then echo -n "$(call cc_version_ge,$(1),$(2))" ; fi)
+endef
+define clang_version_lt =
+$(shell if [ $(call have_clang) = y ] ; then echo -n "$(call cc_version_gt,$(1),$(2))" ; fi)
 endef
 
 # print error and stop build when GCC version doesn't meet the minimum requirement
@@ -50,6 +69,11 @@ endef
 define error_if_gcc_version_lt =
 $(if $(call gcc_version_ge,$(1),$(2)),,\
      $(error Require GCC version >= $(1).$(2) found $(CC_VER_MAJOR).$(CC_VER_MINOR)))
+endef
+# error_if_clang_version_lt $clang_major,$clang_minor.
+define error_if_clang_version_lt =
+$(if $(call clang_version_ge,$(1),$(2)),,\
+     $(error Require Clang version >= $(1).$(2) found $(CC_VER_MAJOR).$(CC_VER_MINOR)))
 endef
 
 ################################################################################
