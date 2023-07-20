@@ -344,7 +344,7 @@ int virtqueue_buffer_enqueue(struct virtqueue *vq, void *cookie,
 			  total_desc);
 		return -EINVAL;
 	} else if (vrq->desc_avail < total_desc) {
-		uk_pr_err("Available descriptor:%"__PRIu16", Requested descriptor:%"__PRIu32"\n",
+		uk_pr_debug("Available descriptor:%"__PRIu16", Requested descriptor:%"__PRIu32"\n",
 			  vrq->desc_avail, total_desc);
 		return -ENOSPC;
 	}
