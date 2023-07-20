@@ -10,12 +10,12 @@ KVM_LDFLAGS-y += -Wl,--entry=uk_efi_entry64
 KVM_LDFLAGS-y += -Wl,-m,elf_x86_64
 endif
 else ifeq (arm64,$(CONFIG_UK_ARCH))
-ifeq ($(CONFIG_KVM_BOOT_QEMU_VIRT),y)
-KVM_LDFLAGS-y += -Wl,--entry=qemu_virt_entry
+ifeq ($(CONFIG_KVM_BOOT_EFI_STUB),y)
+KVM_LDFLAGS-y += -Wl,--entry=uk_efi_entry64
 KVM_LDFLAGS-y += -Wl,-m,aarch64elf
 KVM_LINK_LIBGCC_FLAG := -lgcc
-else ifeq ($(CONFIG_KVM_BOOT_EFI_STUB),y)
-KVM_LDFLAGS-y += -Wl,--entry=uk_efi_entry64
+else
+KVM_LDFLAGS-y += -Wl,--entry=qemu_virt_entry
 KVM_LDFLAGS-y += -Wl,-m,aarch64elf
 KVM_LINK_LIBGCC_FLAG := -lgcc
 endif
