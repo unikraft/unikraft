@@ -32,17 +32,16 @@
 #include <uk/arch/limits.h>
 #include <uk/plat/common/common.lds.h>
 
-/* QEMU-AArch64 virt platform's ram base address */
-#define RAM_BASE_ADDR 0x40000000
-
-/* Reserve first 1MB for DTB */
-#define DTB_RESERVED_SIZE 0x100000
+#include <kvm-arm64/image.h>
 
 OUTPUT_FORMAT("elf64-littleaarch64")
 OUTPUT_ARCH(aarch64)
 
 PHDRS
 {
+#ifdef CONFIG_KVM_BOOT_PROTO_LXBOOT
+	headers PT_LOAD;
+#endif /* CONFIG_KVM_BOOT_PROTO_LXBOOT */
 	text PT_LOAD FLAGS(PHDRS_PF_RX);
 	rodata PT_LOAD FLAGS(PHDRS_PF_R);
 	data PT_LOAD;
@@ -51,20 +50,23 @@ PHDRS
 	stack PT_GNU_STACK FLAGS(PHDRS_PF_RW);
 }
 
-/*
- * We use mmu to control each section's attribute, so the boundaries
- * of sections with different memory attributes must be 4KiB alignment.
- * For instance, the dtb section is readonly, but the text section
- * is readonly+exec. So the _text must start at a 4KiB alignment
- * address.
- */
 SECTIONS {
 	. = RAM_BASE_ADDR;
 
-	/* Place DTB binary at the beginning of the RAM */
-	_dtb = .;
 	_start_ram_addr = .;
+	_dtb = .;
 	. = . + DTB_RESERVED_SIZE;
+
+#ifdef CONFIG_KVM_BOOT_PROTO_LXBOOT
+	/* To maintain compatibility with QEMU we place
+	 * the linux header right before .text
+	 */
+	. = . - LINUX_ARM64_HDR_SIZE;
+
+	LINUX_ARM64_HDR_SYMBOLS
+
+	LINUX_ARM64_HDR_SECTION
+#endif /* CONFIG_KVM_BOOT_PROTO_LXBOOT */
 
 	_base_addr = .;		/* Symbol to represent the load base address */
 
@@ -121,12 +123,6 @@ SECTIONS {
 	TLS_SECTIONS
 
 	DATA_SECTIONS
-
-	/*
-	 * TODO
-	 * We can define the stack and page-table here, and free them once
-	 * the boot is done.
-	 */
 
 	_end = .;
 

@@ -222,6 +222,50 @@ static void fdt_bootinfo_cmdl_mrd(struct ukplat_bootinfo *bi, void *fdtp)
 	bi->cmdline_len = (__u64)cmdl_len;
 }
 
+/* Ideally the initrd nodes would use #address-cells, yet these nodes are not
+ * defined by the device-tree spec, and as such there is no formal requirement
+ * that they do so. In fact, QEMU virt uses a 32-bit address here, despite
+ * defining 2 address cells. To handle such cases, use the property length to
+ * determine the correct address.
+ */
+#define initrd_addr(val, len)                          \
+	(len == 4 ? fdt32_to_cpu(val) : fdt64_to_cpu(val))
+
+static void fdt_bootinfo_initrd_mrd(struct ukplat_bootinfo *bi, void *fdtp)
+{
+	struct ukplat_memregion_desc mrd = {0};
+	const __u64 *fdt_initrd_start;
+	const __u64 *fdt_initrd_end;
+	int start_len, end_len;
+	int nchosen;
+	int rc;
+
+	nchosen = fdt_path_offset(fdtp, "/chosen");
+	if (unlikely(!nchosen))
+		return;
+
+	fdt_initrd_start = fdt_getprop(fdtp, nchosen, "linux,initrd-start",
+				       &start_len);
+	if (unlikely(!fdt_initrd_start || start_len <= 0))
+		return;
+
+	fdt_initrd_end = fdt_getprop(fdtp, nchosen, "linux,initrd-end",
+				     &end_len);
+	if (unlikely(!fdt_initrd_end || end_len <= 0))
+		return;
+
+	mrd.vbase = initrd_addr(fdt_initrd_start[0], start_len);
+	mrd.pbase = initrd_addr(fdt_initrd_start[0], start_len);
+	mrd.len   = initrd_addr(fdt_initrd_end[0], end_len) -
+	initrd_addr(fdt_initrd_start[0], start_len);
+	mrd.type  = UKPLAT_MEMRT_INITRD;
+	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
+
+	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
+	if (unlikely(rc < 0))
+		ukplat_bootinfo_crash("Could not add initrd memory descriptor");
+}
+
 static void fdt_bootinfo_fdt_mrd(struct ukplat_bootinfo *bi, void *fdtp)
 {
 	struct ukplat_memregion_desc mrd = {0};
@@ -252,6 +296,8 @@ void ukplat_bootinfo_fdt_setup(void *fdtp)
 
 	fdt_bootinfo_fdt_mrd(bi, fdtp);
 	fdt_bootinfo_mem_mrd(bi, fdtp);
+
+	fdt_bootinfo_initrd_mrd(bi, fdtp);
 	ukplat_memregion_list_coalesce(&bi->mrds);
 	fdt_bootinfo_cmdl_mrd(bi, fdtp);
 
