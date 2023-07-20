@@ -26,8 +26,7 @@ config KVM_BOOT_PROTO_MULTIBOOT
 config KVM_BOOT_PROTO_LXBOOT
 	bool "Lxboot"
 	default y
-	depends on (!KVM_VMM_QEMU && KVM_VMM_FIRECRACKER && ARCH_X86_64) || \
-		   (KVM_VMM_QEMU && ARCH_ARM_64)
+	depends on KVM_VMM_FIRECRACKER || (KVM_VMM_QEMU && ARCH_ARM_64)
 	help
 		Linux 64-bit Boot Protocol
 
@@ -92,7 +91,7 @@ config KVM_VMM_QEMU
 config KVM_VMM_FIRECRACKER
 	bool "Firecracker"
 	select KVM_BOOT_PROTO_LXBOOT
-	depends on ARCH_X86_64
+	depends on ARCH_X86_64 || ARCH_ARM_64
 
 endchoice
 
