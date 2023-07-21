@@ -12,6 +12,7 @@
 #include <uk/config.h>
 #include <uk/ofile.h>
 
+#define UK_LIBPOSIX_FDTAB_PRIO				1
 #define UK_FD_MAX INT_MAX
 
 /**

@@ -380,7 +380,8 @@ static void term_posix_fdtab(const struct uk_term_ctx *tctx __unused)
 }
 
 /* Init fdtab as early as possible, to enable functions that rely on fds */
-uk_rootfs_initcall_prio(init_posix_fdtab, term_posix_fdtab, UK_PRIO_EARLIEST);
+uk_rootfs_initcall_prio(init_posix_fdtab, term_posix_fdtab,
+			UK_LIBPOSIX_FDTAB_PRIO);
 
 /* Internal Syscalls */
 
