@@ -35,6 +35,7 @@
 
 #include <sys/types.h>
 #include <uk/init.h>
+#include <uk/posix-fdtab.h>
 
 #define MAXDEVNAME	12
 #define DO_RWMASK	0x3
@@ -124,6 +125,7 @@ int device_destroy(struct device *dev);
  * To be on the safe side, we do the registration to devfs before both,
  * at priority '3'.
  */
-#define devfs_initcall(fn) uk_rootfs_initcall_prio(fn, 0x0, 3)
+#define devfs_initcall(fn)						\
+	uk_rootfs_initcall_prio(fn, 0x0, UK_PRIO_AFTER(UK_LIBPOSIX_FDTAB_PRIO))
 
 #endif /* !__DEVFS_DEVICE_H__ */

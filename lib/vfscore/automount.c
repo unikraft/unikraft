@@ -49,6 +49,8 @@
 #include <uk/libparam.h>
 #include <uk/plat/memory.h>
 #include <sys/stat.h>
+#include <vfscore/mount.h>
+#include <uk/posix-fdtab.h>
 
 #ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS
 #include <errno.h>
@@ -441,4 +443,21 @@ static int vfscore_automount(struct uk_init_ctx *ictx __unused)
 	return vfscore_automount_fstab_volumes();
 }
 
-uk_rootfs_initcall_prio(vfscore_automount, 0x0, 4);
+extern struct uk_list_head mount_list;
+
+static void vfscore_autoumount(const struct uk_term_ctx *tctx __unused)
+{
+	struct mount *mp;
+	int rc;
+
+	uk_list_for_each_entry_reverse(mp, &mount_list, mnt_list) {
+		/* For now, flags = 0 is enough. */
+		rc = VFS_UNMOUNT(mp, 0);
+		if (unlikely(rc))
+			uk_pr_err("Failed to unmount %s: error %d.\n",
+				  mp->m_path, rc);
+	}
+}
+
+uk_rootfs_initcall_prio(vfscore_automount, vfscore_autoumount,
+			UK_PRIO_BEFORE(UK_LIBPOSIX_FDTAB_PRIO));

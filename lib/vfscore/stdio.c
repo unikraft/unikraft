@@ -48,6 +48,7 @@
 #include <uk/init.h>
 
 #include <uk/posix-fdtab-legacy.h>
+#include <uk/posix-fdtab.h>
 
 /*
  * When the syscall_shim library is not part of the build, there is warning
@@ -257,4 +258,4 @@ static int init_stdio(struct uk_init_ctx *ictx __unused)
 	return 0;
 }
 
-uk_early_initcall(init_stdio, 0x0);
+uk_rootfs_initcall_prio(init_stdio, 0x0, UK_PRIO_AFTER(UK_LIBPOSIX_FDTAB_PRIO));
