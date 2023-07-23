@@ -31,8 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __UKPLAT_CONSOLE_H__
-#define __UKPLAT_CONSOLE_H__
+#ifndef __UK_CONSOLE_H__
+#define __UK_CONSOLE_H__
 
 #include <uk/essentials.h>
 
@@ -100,6 +100,17 @@ extern "C" {
 #define UK_ANSI_COLOR_CYAN		6
 #define UK_ANSI_COLOR_WHITE		7
 
+/* console operations */
+struct uk_console_ops {
+	int (*coutk)(const char *buf, unsigned int len);
+	int (*coutd)(const char *buf, unsigned int len);
+	int (*cink)(char *buf, unsigned int maxlen);
+#if CONFIG_ARCH_X86_64
+	void (*init)(void);
+#else /* !CONFIG_ARCH_X86_64 */
+	void (*init)(const void *dtb);
+#endif /* !CONFIG_ARCH_X86_64 */
+};
 
 /**
  * Outputs a string to kernel console
@@ -129,8 +140,22 @@ int ukplat_coutd(const char *buf, unsigned int len);
  */
 int ukplat_cink(char *buf, unsigned int maxlen);
 
+#if CONFIG_ARCH_X86_64
+/**
+ * Initializes console
+ */
+void uk_console_init(void);
+#else /* !CONFIG_ARCH_X86_64 */
+/**
+ * Initializes console
+ *
+ * @param dtb Pointer to device tree blob
+ */
+void uk_console_init(const void *dtb);
+#endif /* !CONFIG_ARCH_X86_64 */
+
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __UKPLAT_CONSOLE_H__ */
+#endif /* __UK_CONSOLE_H__ */

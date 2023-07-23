@@ -40,7 +40,7 @@
 #include <stdarg.h>
 
 #include <uk/essentials.h>
-#include <uk/plat/console.h>
+#include <uk/console.h>
 #include <uk/plat/time.h>
 #include <uk/print.h>
 #include <uk/errptr.h>
