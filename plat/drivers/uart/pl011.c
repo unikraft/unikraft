@@ -19,7 +19,7 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 #include <libfdt.h>
-#include <uk/plat/console.h>
+#include <uk/console.h>
 #include <uk/assert.h>
 #include <arm/cpu.h>
 
@@ -111,8 +111,6 @@ void pl011_console_init(const void *dtb)
 	const uint64_t *regs;
 	uint64_t reg_uart_bas;
 
-	uk_pr_info("Serial initializing\n");
-
 	offset = fdt_node_offset_by_compatible(dtb, -1, "arm,pl011");
 	if (offset < 0)
 		UK_CRASH("No console UART found!\n");
@@ -134,11 +132,6 @@ void pl011_console_init(const void *dtb)
 
 	init_pl011(reg_uart_bas);
 	uk_pr_info("PL011 UART initialized\n");
-}
-
-int ukplat_coutd(const char *str, uint32_t len)
-{
-	return ukplat_coutk(str, len);
 }
 
 static void pl011_write(char a)
@@ -181,14 +174,14 @@ static int pl011_getc(void)
 	return (int) (PL011_REG_READ(REG_UARTDR_OFFSET) & 0xff);
 }
 
-int ukplat_coutk(const char *buf, unsigned int len)
+int pl011_coutk(const char *buf, unsigned int len)
 {
 	for (unsigned int i = 0; i < len; i++)
 		pl011_putc(buf[i]);
 	return len;
 }
 
-int ukplat_cink(char *buf, unsigned int maxlen)
+int pl011_cink(char *buf, unsigned int maxlen)
 {
 	int ret;
 	unsigned int num = 0;
@@ -200,3 +193,10 @@ int ukplat_cink(char *buf, unsigned int maxlen)
 
 	return (int) num;
 }
+
+const struct uk_console_ops uk_console_pl011_ops = {
+	.coutd = pl011_coutk,
+	.coutk = pl011_coutk,
+	.cink = pl011_cink,
+	.init = pl011_console_init,
+};
