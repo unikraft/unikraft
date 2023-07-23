@@ -19,11 +19,11 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef __KVM_SERIAL_CONSOLE__
-#define __KVM_SERIAL_CONSOLE__
+#ifndef __COM_H__
+#define __COM_H__
 
 void _libkvmplat_init_serial_console(void);
 void _libkvmplat_serial_putc(char a);
 int  _libkvmplat_serial_getc(void);
 
-#endif /* __KVM_SERIAL_CONSOLE__ */
+#endif /* __COM_H__ */
