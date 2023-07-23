@@ -64,7 +64,7 @@ struct ukarch_pagetable {
 
 #define X86_PT_L0_SHIFT			12
 #define X86_PT_Lx_SHIFT(lvl)					\
-	(X86_PT_L0_SHIFT + (X86_PT_LEVEL_SHIFT * lvl))
+	(X86_PT_L0_SHIFT + (X86_PT_LEVEL_SHIFT * (lvl)))
 #define X86_PT_SHIFT_Lx(shift)					\
 	(((shift) - X86_PT_L0_SHIFT) / X86_PT_LEVEL_SHIFT)
 
@@ -158,8 +158,8 @@ static inline int ukarch_vaddr_range_isvalid(__vaddr_t start, __vaddr_t end)
 	(((__paddr_t)(pte) & X86_PTE_PADDR_MASK) & PAGE_MASK)
 
 #define PT_Lx_PTE_SET_PADDR(pte, lvl, paddr)			\
-	((pte & ~(X86_PTE_PADDR_MASK & PAGE_MASK)) |		\
-	 (__pte_t)(paddr & X86_PTE_PADDR_MASK))
+	(((pte) & ~(X86_PTE_PADDR_MASK & PAGE_MASK)) |		\
+	 (__pte_t)((paddr) & X86_PTE_PADDR_MASK))
 
 #define PT_Lx_PTE_INVALID(lvl)		0x0UL
 
@@ -181,12 +181,12 @@ static inline int ukarch_vaddr_range_isvalid(__vaddr_t start, __vaddr_t end)
 
 /* For lvl > PAGE_HUGE_LEVEL the X86_PTE_PSE bit must always be 0 (resv.) */
 #define PAGE_Lx_IS(pte, lvl)					\
-	((lvl == PAGE_LEVEL) || ((pte) & X86_PTE_PSE))
+	(((lvl) == PAGE_LEVEL) || ((pte) & X86_PTE_PSE))
 
 #define PT_Lx_PTE_PRESENT(pte, lvl)				\
 	((pte) & X86_PTE_PRESENT)
 #define PT_Lx_PTE_CLEAR_PRESENT(pte, lvl)			\
-	(pte & ~X86_PTE_PRESENT)
+	((pte) & ~X86_PTE_PRESENT)
 
 /* Page attributes */
 #define PAGE_ATTR_PROT_NONE		0x00 /* Page is not accessible */
