@@ -56,12 +56,14 @@
 #define FILE_TYPE_MASK    0170000
 #define DIRECTORY_BITS    040000
 #define FILE_BITS         0100000
+#define SYMLINK_BITS      0120000
 
 #define ALIGN_4(ptr)      ((void *)ALIGN_UP((uintptr_t)(ptr), 4))
 
 #define IS_FILE_OF_TYPE(mode, bits) (((mode) & (FILE_TYPE_MASK)) == (bits))
 #define IS_FILE(mode) IS_FILE_OF_TYPE((mode), (FILE_BITS))
 #define IS_DIR(mode) IS_FILE_OF_TYPE((mode), (DIRECTORY_BITS))
+#define IS_SYMLINK(mode) IS_FILE_OF_TYPE((mode), (SYMLINK_BITS))
 
 #define S8HEX_TO_U32(buf) ((uint32_t) snhex_to_int((buf), 8))
 #define GET_MODE(hdr)     ((mode_t) S8HEX_TO_U32((hdr)->mode))
@@ -292,6 +294,36 @@ read_section(struct cpio_header **header_ptr,
 			error = -UKCPIO_MKDIR_FAILED;
 			goto out;
 		}
+	} else if (IS_SYMLINK(header_mode)) {
+		uk_pr_info("Creating symlink %s\n", path_from_root);
+
+		data_location = (char *)ALIGN_4(
+				(char *)(header) + sizeof(struct cpio_header)
+				+ header_namesize);
+
+		if ((uintptr_t)data_location + header_filesize > last) {
+			uk_pr_err("%s: File exceeds archive bounds\n",
+				  path_from_root);
+			*header_ptr = NULL;
+			error = -UKCPIO_MALFORMED_INPUT;
+			goto out;
+		}
+
+		char target[header_filesize + 1];
+		memcpy(target, data_location, header_filesize);
+		target[header_filesize] = 0;
+
+		uk_pr_info("%s: Target is %s\n", path_from_root, target);
+		if (uk_syscall_r_symlink(target, path_from_root)) {
+			uk_pr_err("%s: Failed to create symlink: %s (%d)\n",
+				  path_from_root, strerror(errno), errno);
+			*header_ptr = NULL;
+			error = -UKCPIO_SYMLINK_FAILED;
+			goto out;
+		}
+	} else {
+		uk_pr_warn("File %s unknown mode %o\n",
+			   path_from_root, header_mode);
 	}
 
 	next_header = (struct cpio_header *)ALIGN_4(
