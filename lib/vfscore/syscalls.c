@@ -114,6 +114,7 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 	struct dentry *dp, *ddp;
 	struct vnode *vp;
 	char *filename;
+	char realpath[PATH_MAX];
 	int error;
 
 	DPRINTF(VFSDB_SYSCALL, ("sys_open: path=%s flags=%x mode=%x\n",
@@ -121,10 +122,10 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 
 	flags = vfscore_fflags(flags);
 	if (flags & O_CREAT) {
-		error = namei(path, &dp);
+		error = namei_resolve(path, &dp, realpath);
 		if (error == ENOENT) {
 			/* Create new struct vfscore_file. */
-			if ((error = lookup(path, &ddp, &filename)) != 0)
+			if ((error = lookup(realpath, &ddp, &filename)) != 0)
 				return error;
 
 			vn_lock(ddp->d_vnode);
