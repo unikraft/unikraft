@@ -92,6 +92,7 @@ ramfs_allocate_node(const char *name, int type, mode_t mode)
 	}
 	strlcpy(np->rn_name, name, np->rn_namelen + 1);
 	np->rn_type = type;
+	np->rn_ino = inode_count++;
 
 	mode &= 0777;
 	if (type == VDIR)
@@ -231,7 +232,7 @@ ramfs_lookup(struct vnode *dvp, const char *name, struct vnode **vpp)
 		uk_mutex_unlock(&ramfs_lock);
 		return ENOENT;
 	}
-	if (vfscore_vget(dvp->v_mount, inode_count++, &vp)) {
+	if (vfscore_vget(dvp->v_mount, np->rn_ino, &vp)) {
 		/* found in cache */
 		*vpp = vp;
 		uk_mutex_unlock(&ramfs_lock);
