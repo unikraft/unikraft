@@ -90,6 +90,9 @@ uk_syscall_r_link
 unlink
 uk_syscall_e_unlink
 uk_syscall_r_unlink
+unlinkat
+uk_syscall_e_unlinkat
+uk_syscall_r_unlinkat
 getcwd
 uk_syscall_e_getcwd
 uk_syscall_r_getcwd
