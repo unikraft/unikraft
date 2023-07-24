@@ -2560,21 +2560,16 @@ int lutimes(const char *pathname, const struct timeval *times)
 UK_SYSCALL_R_DEFINE(int, utime, const char *, pathname,
 		    const struct utimbuf *, t)
 {
-	struct timeval times[2];
-	times[0].tv_usec = 0;
-	times[1].tv_usec = 0;
-
-	if (!t) {
-		long int tsec = 0; /* FIXME: Use current time in seconds */
-		times[0].tv_sec = tsec;
-		times[1].tv_sec = tsec;
-	} else {
+	if (t) {
+		struct timeval times[2];
 		times[0].tv_sec = t->actime;
+		times[0].tv_usec = 0;
 		times[1].tv_sec = t->modtime;
+		times[1].tv_usec = 0;
+		return uk_syscall_r_utimes((long) pathname, (long) times);
+	} else {
+		return uk_syscall_r_utimes((long) pathname, (long) NULL);
 	}
-
-	return uk_syscall_r_utimes((long) pathname,
-				   (long) times);
 }
 
 UK_TRACEPOINT(trace_vfs_chmod, "\"%s\" 0%0o", const char*, mode_t);
