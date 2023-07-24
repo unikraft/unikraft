@@ -75,7 +75,7 @@ set_times_to_now(struct timespec *time1, struct timespec *time2,
 }
 
 struct ramfs_node *
-ramfs_allocate_node(const char *name, int type)
+ramfs_allocate_node(const char *name, int type, mode_t mode)
 {
 	struct ramfs_node *np;
 
@@ -93,12 +93,13 @@ ramfs_allocate_node(const char *name, int type)
 	strlcpy(np->rn_name, name, np->rn_namelen + 1);
 	np->rn_type = type;
 
+	mode &= 0777;
 	if (type == VDIR)
-		np->rn_mode = S_IFDIR|0777;
+		np->rn_mode = S_IFDIR|mode;
 	else if (type == VLNK)
 		np->rn_mode = S_IFLNK|0777;
 	else
-		np->rn_mode = S_IFREG|0777;
+		np->rn_mode = S_IFREG|mode;
 
 	set_times_to_now(&(np->rn_ctime), &(np->rn_atime), &(np->rn_mtime));
 	np->rn_owns_buf = true;
@@ -117,11 +118,11 @@ ramfs_free_node(struct ramfs_node *np)
 }
 
 static struct ramfs_node *
-ramfs_add_node(struct ramfs_node *dnp, const char *name, int type)
+ramfs_add_node(struct ramfs_node *dnp, const char *name, int type, mode_t mode)
 {
 	struct ramfs_node *np, *prev;
 
-	np = ramfs_allocate_node(name, type);
+	np = ramfs_allocate_node(name, type, mode);
 	if (np == NULL)
 		return NULL;
 
@@ -264,7 +265,7 @@ ramfs_mkdir(struct vnode *dvp, const char *name, mode_t mode)
 	if (!S_ISDIR(mode))
 		return EINVAL;
 
-	np = ramfs_add_node(dvp->v_data, name, VDIR);
+	np = ramfs_add_node(dvp->v_data, name, VDIR, mode);
 	if (np == NULL)
 		return ENOMEM;
 	np->rn_size = 0;
@@ -281,7 +282,7 @@ ramfs_symlink(struct vnode *dvp, const char *name, const char *link)
 	if (strlen(name) > NAME_MAX)
 		return ENAMETOOLONG;
 
-	np = ramfs_add_node(dvp->v_data, name, VLNK);
+	np = ramfs_add_node(dvp->v_data, name, VLNK, 0);
 
 	if (np == NULL)
 		return ENOMEM;
@@ -389,7 +390,7 @@ ramfs_create(struct vnode *dvp, const char *name, mode_t mode)
 	if (!S_ISREG(mode))
 		return EINVAL;
 
-	np = ramfs_add_node(dvp->v_data, name, VREG);
+	np = ramfs_add_node(dvp->v_data, name, VREG, mode);
 	if (np == NULL)
 		return ENOMEM;
 	return 0;
@@ -516,7 +517,8 @@ ramfs_rename(struct vnode *dvp1, struct vnode *vp1, const char *name1 __unused,
 	} else {
 		/* Create new file or directory */
 		old_np = vp1->v_data;
-		np = ramfs_add_node(dvp2->v_data, name2, old_np->rn_type);
+		np = ramfs_add_node(dvp2->v_data, name2,
+				    old_np->rn_type, old_np->rn_mode);
 		if (np == NULL)
 			return ENOMEM;
 
