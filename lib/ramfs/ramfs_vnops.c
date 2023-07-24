@@ -62,10 +62,9 @@ static void
 set_times_to_now(struct timespec *time1, struct timespec *time2,
 		 struct timespec *time3)
 {
-	struct timespec now = {0, 0};
+	struct timespec now;
 
-	/* TODO: implement the real clock_gettime */
-	/* clock_gettime(CLOCK_REALTIME, &now); */
+	clock_gettime(CLOCK_REALTIME, &now);
 	if (time1)
 		memcpy(time1, &now, sizeof(struct timespec));
 	if (time2)
