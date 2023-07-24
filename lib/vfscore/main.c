@@ -140,6 +140,7 @@ UK_LLSYSCALL_R_DEFINE(int, open, const char*, pathname, int, flags,
 	if (error)
 		goto out_error;
 
+	mode = apply_umask(mode);
 	error = sys_open(path, flags, mode, &fp);
 	if (error)
 		goto out_error;
@@ -167,7 +168,7 @@ int open(const char *pathname, int flags, ...)
 		va_list ap;
 
 		va_start(ap, flags);
-		mode = apply_umask(va_arg(ap, mode_t));
+		mode = va_arg(ap, mode_t);
 		va_end(ap);
 	}
 
@@ -221,7 +222,7 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 		va_list ap;
 
 		va_start(ap, flags);
-		mode = apply_umask(va_arg(ap, mode_t));
+		mode = va_arg(ap, mode_t);
 		va_end(ap);
 	}
 
