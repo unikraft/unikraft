@@ -685,6 +685,21 @@ int sec_vnode_permission(char *path);
 int namei(const char *path, struct dentry **dpp);
 
 /**
+ * Resolve a pathname into a pointer to a dentry and a realpath.
+ *
+ * @param path
+ *	The full path name
+ * @param[out] dpp
+ *	Dentry to be returned
+ * @param[out] realpath
+ *	if not NULL, return path after resolving all symlinks
+ * @return
+ *	- (0):  Completed successfully
+ *	- (<0): Negative value with error code
+ */
+int namei_resolve(const char *path, struct dentry **dpp, char *realpath);
+
+/**
  * Converts the last component in the path to a pointer to a dentry.
  *
  * @param path

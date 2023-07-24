@@ -96,13 +96,14 @@ namei_follow_link(struct dentry *dp, char *node, char *name, char *fp, size_t mo
 	return (0);
 }
 /*
- * Convert a pathname into a pointer to a dentry
+ * Resolve a pathname into a pointer to a dentry and a realpath.
  *
  * @path: full path name.
  * @dpp:  dentry to be returned.
+ * @realpath: if not NULL, return path after resolving all symlinks
  */
 int
-namei(const char *path, struct dentry **dpp)
+namei_resolve(const char *path, struct dentry **dpp, char *realpath)
 {
 	char *p;
 	char node[PATH_MAX];
@@ -122,6 +123,7 @@ namei(const char *path, struct dentry **dpp)
 	memset(fp, 0, PATH_MAX);
 	strlcpy(fp, path, PATH_MAX);
 
+	error = 0;
 	do {
 		need_continue = 0;
 		/*
@@ -129,7 +131,8 @@ namei(const char *path, struct dentry **dpp)
 		 * the local node in the file system.
 		 */
 		if (vfs_findroot(fp, &mp, &p)) {
-			return ENOTDIR;
+			error = ENOTDIR;
+			goto out;
 		}
 
 		size_t mountpoint_len = p - fp;
@@ -140,7 +143,7 @@ namei(const char *path, struct dentry **dpp)
 		if (dp) {
 			/* vnode is already active. */
 			*dpp = dp;
-			return 0;
+			goto out;
 		}
 		/*
 		 * Find target vnode, started from root directory.
@@ -189,7 +192,7 @@ namei(const char *path, struct dentry **dpp)
 				if (error) {
 					vn_unlock(dvp);
 					drele(ddp);
-					return error;
+					goto out;
 				}
 
 				dp = dentry_alloc(ddp, vp, node);
@@ -198,7 +201,8 @@ namei(const char *path, struct dentry **dpp)
 				if (!dp) {
 					vn_unlock(dvp);
 					drele(ddp);
-					return ENOMEM;
+					error = ENOMEM;
+					goto out;
 				}
 			}
 			vn_unlock(dvp);
@@ -209,7 +213,7 @@ namei(const char *path, struct dentry **dpp)
 				error = namei_follow_link(dp, node, name, fp, mountpoint_len);
 				if (error) {
 					drele(dp);
-					return (error);
+					goto out;
 				}
 
 				drele(dp);
@@ -223,7 +227,8 @@ namei(const char *path, struct dentry **dpp)
 				node[0] = 0;
 
 				if (++links_followed >= MAXSYMLINKS) {
-					return (ELOOP);
+					error = ELOOP;
+					goto out;
 				}
 				need_continue = 1;
 				break;
@@ -231,13 +236,28 @@ namei(const char *path, struct dentry **dpp)
 
 			if (*p == '/' && ddp->d_vnode->v_type != VDIR) {
 				drele(ddp);
-				return ENOTDIR;
+				error = ENOTDIR;
+				goto out;
 			}
 		}
 	} while (need_continue);
 
 	*dpp = dp;
-	return 0;
+out:
+	if (realpath)
+		strlcpy(realpath, fp, PATH_MAX);
+	return error;
+}
+/*
+ * Convert a pathname into a pointer to a dentry
+ *
+ * @path: full path name.
+ * @dpp:  dentry to be returned.
+ */
+int
+namei(const char *path, struct dentry **dpp)
+{
+	return namei_resolve(path, dpp, NULL);
 }
 
 /*
