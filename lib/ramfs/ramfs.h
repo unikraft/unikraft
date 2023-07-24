@@ -47,6 +47,8 @@ struct ramfs_node {
 	 * else NULL
 	 */
 	struct ramfs_node *rn_child;
+	/* Inode number of this node, should be unique and stable */
+	uint64_t rn_ino;
 	/*
 	 * Entry type: regular file - VREG, symbolic link - VLNK,
 	 * or directory - VDIR
