@@ -82,10 +82,12 @@ struct ramfs_node {
  * @param type
  *   The entry type (regular file - VREG, symbolic link - VLNK,
  *   or directory - VDIR)
+ * @param mode
+ *   The mode bits of the newly created node
  * @return
  *   Pointer to the new ramfs_node
  */
-struct ramfs_node *ramfs_allocate_node(const char *name, int type);
+struct ramfs_node *ramfs_allocate_node(const char *name, int type, mode_t mode);
 
 /**
  * Frees a ramfs node.
