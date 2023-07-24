@@ -1300,8 +1300,7 @@ sys_readlink(char *path, char *buf, size_t bufsize, ssize_t *size)
  */
 static int is_timeval_valid(const struct timeval *time)
 {
-	return (time->tv_sec >= 0) &&
-		   (time->tv_usec >= 0 && time->tv_usec < 1000000);
+	return (time->tv_usec >= 0 && time->tv_usec < 1000000);
 }
 
 /*
@@ -1368,8 +1367,7 @@ sys_utimes(char *path, const struct timeval *times, int flags)
  */
 static int timespec_is_valid(const struct timespec *time)
 {
-	return (time->tv_sec >= 0) &&
-	       ((time->tv_nsec >= 0 && time->tv_nsec <= 999999999) ||
+	return ((time->tv_nsec >= 0 && time->tv_nsec <= 999999999) ||
 		time->tv_nsec == UTIME_NOW ||
 		time->tv_nsec == UTIME_OMIT);
 }
