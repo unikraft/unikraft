@@ -40,7 +40,7 @@
 extern "C" {
 #endif
 
-#define CHAR_BITS    __C_BITS
+#define CHAR_BIT     __C_BITS
 #define CHAR_MIN      __C_MIN
 #define CHAR_MAX      __C_MAX
 #define UCHAR_MAX    __UC_MAX
