@@ -392,3 +392,28 @@ void uk_sched_dumpk_threads(int klvl, struct uk_sched *s)
 			  (t->flags & UK_THREADF_UKTLS)    ? 'T' : '-');
 	}
 }
+
+UK_SYSCALL_R_DEFINE(int, sched_getaffinity, int, pid, long, cpusetsize,
+						unsigned long*, mask)
+{
+	UK_WARN_STUBBED();
+	/* NOTE: Some applications use this to get the count of CPUs,
+	 *       and the result must be positive.
+	 *       So just return CPU0 to make them run.
+	 */
+	UK_ASSERT(cpusetsize > 0);
+	UK_ASSERT(mask);
+	memset(mask, 0, cpusetsize);
+
+	/* Set CPU0 */
+	*mask = 1UL << 0;
+
+	return cpusetsize;
+}
+
+UK_SYSCALL_R_DEFINE(int, sched_setaffinity, int, pid, long, cpusetsize,
+						unsigned long*, mask)
+{
+	UK_WARN_STUBBED();
+	return 0;
+}

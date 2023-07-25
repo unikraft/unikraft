@@ -39,3 +39,9 @@ __uk_sched_thread_current
 uk_syscall_e_sched_yield
 uk_syscall_r_sched_yield
 sched_yield
+uk_syscall_e_sched_getaffinity
+uk_syscall_r_sched_getaffinity
+sched_getaffinity
+uk_syscall_e_sched_setaffinity
+uk_syscall_r_sched_setaffinity
+sched_setaffinity
