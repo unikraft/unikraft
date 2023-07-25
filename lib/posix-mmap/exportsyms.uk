@@ -10,3 +10,9 @@ uk_syscall_r_mprotect
 madvise
 uk_syscall_e_madvise
 uk_syscall_r_madvise
+mlock
+uk_syscall_e_mlock
+uk_syscall_r_mlock
+msync
+uk_syscall_e_msync
+uk_syscall_r_msync

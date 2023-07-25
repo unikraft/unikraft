@@ -277,3 +277,17 @@ UK_SYSCALL_R_DEFINE(int, madvise, void *, addr, size_t, len, int, advice)
 
 	return 0;
 }
+
+UK_SYSCALL_R_DEFINE(int, msync, void*, addr, size_t, length, int, flags)
+{
+	/* Since writing mmap memory back to file is not supported,
+	 * this doesn't make sense.
+	 */
+	return 0;
+}
+
+UK_SYSCALL_R_DEFINE(int, mlock, const void*, addr, size_t, len)
+{
+	/* Since swap memory is not supported, this doesn't make sense */
+	return 0;
+}
