@@ -839,12 +839,20 @@ endif
 HOSTCFLAGS = $(CFLAGS_FOR_BUILD)
 export HOSTCFLAGS
 
-KCONFIG_TOOLS = conf mconf gconf nconf qconf fixdep
+ifeq ($(HOSTOSENV),Linux)
+KCONFIG_TOOLS = conf mconf gconf nconf qconf
 KCONFIG_TOOLS := $(addprefix $(KCONFIG_DIR)/,$(KCONFIG_TOOLS))
 
 $(KCONFIG_TOOLS):
 	$(call verbose_cmd,MKDIR,lxdialog,$(MKDIR) -p $(@D)/lxdialog)
 	$(call verbose_cmd,MAKE,$(notdir $(CONFIG)),$(MAKE) \
+	    --no-print-directory \
+	    CC="$(HOSTCC_NOCCACHE)" HOSTCC="$(HOSTCC_NOCCACHE)" \
+	    obj=$(@D) -C $(CONFIG) -f Makefile.br $(@))
+endif
+
+$(UK_FIXDEP):
+	$(call verbose_cmd,MAKE,$(notdir $(@)),$(MAKE) \
 	    --no-print-directory \
 	    CC="$(HOSTCC_NOCCACHE)" HOSTCC="$(HOSTCC_NOCCACHE)" \
 	    obj=$(@D) -C $(CONFIG) -f Makefile.br $(@))
@@ -887,34 +895,71 @@ $(error Use "make scriptconfig SCRIPT=<path to script> [SCRIPT_ARG=<argument>]")
 endif
 endif
 
-scriptconfig: $(KCONFIG_DIR)/fixdep
+scriptconfig:
 	$(Q)$(COMMON_CONFIG_ENV) $(kpython) $(SCRIPT) $(Kconfig) $(if $(SCRIPT_ARG),"$(SCRIPT_ARG)")
 
-iscriptconfig: $(KCONFIG_DIR)/fixdep
+iscriptconfig:
 	$(Q)$(COMMON_CONFIG_ENV) $(kpython) -i -c \
 	  "import kconfiglib; \
 	   kconf = kconfiglib.Kconfig('$(UK_CONFIG)'); \
 	   print('A Kconfig instance \'kconf\' for the architecture $(ARCH) has been created.')"
 
-kmenuconfig:$(KCONFIG_DIR)/fixdep
+kmenuconfig:
 	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/menuconfig.py \
 		$(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
-scriptsyncconfig: $(KCONFIG_DIR)/fixdep
+scriptsyncconfig:
 	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/genconfig.py \
 		--sync-deps=$(BUILD_DIR)/include/config \
 		--header-path=$(KCONFIG_AUTOHEADER) $(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
-guiconfig: $(KCONFIG_DIR)/fixdep
+guiconfig:
 	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/guiconfig.py $(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
-dumpvarsconfig:$(KCONFIG_DIR)/fixdep
+dumpvarsconfig:
 	$(Q)$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/examples/dumpvars.py $(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
+ifneq ($(HOSTOSENV),Linux)
+# Use libkconfiglib for non-Linux hosts
+# Compatibility wrappers:
+menuconfig: kmenuconfig
+nconfig: kmenuconfig
+gconfig: guiconfig
+xconfig: guiconfig
+
+config:
+	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/genconfig.py --header-path $(KCONFIG_AUTOHEADER) $(CONFIG_CONFIG_IN)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+
+allyesconfig:
+	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/allyesconfig.py $(CONFIG_CONFIG_IN)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+
+allnoconfig:
+	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/allnoconfig.py $(CONFIG_CONFIG_IN)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+
+defconfig:
+	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/defconfig.py --kconfig $(CONFIG_CONFIG_IN) $(DEFCONFIG)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+
+savedefconfig:
+	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/savedefconfig.py --kconfig $(CONFIG_CONFIG_IN) --out $(DEFCONFIG)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+
+oldconfig:
+	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/oldconfig.py $(CONFIG_CONFIG_IN)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+
+# Regenerate $(KCONFIG_AUTOHEADER) whenever $(UK_CONFIG) changed
+$(KCONFIG_AUTOHEADER): $(UK_CONFIG)
+	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/genconfig.py --header-path $(KCONFIG_AUTOHEADER) $(CONFIG_CONFIG_IN)
+else
+# Use traditional KConfig system on Linux
 xconfig: $(KCONFIG_DIR)/qconf
 	@$(COMMON_CONFIG_ENV) $< $(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
@@ -987,6 +1032,7 @@ savedefconfig: $(KCONFIG_DIR)/conf
 # Regenerate $(KCONFIG_AUTOHEADER) whenever $(UK_CONFIG) changed
 $(KCONFIG_AUTOHEADER): $(UK_CONFIG) $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) $(KCONFIG_DIR)/conf --syncconfig $(CONFIG_CONFIG_IN)
+endif
 
 
 # Misc stuff
@@ -1109,10 +1155,12 @@ help:
 	@echo '  xconfig                - interactive Qt-based configurator'
 	@echo '  gconfig                - interactive GTK-based configurator'
 	@echo '  oldconfig              - resolve any unresolved symbols in .config'
+ifeq ($(HOSTOSENV),Linux)
 	@echo '  syncconfig             - Same as oldconfig, but quietly, additionally update deps'
 	@echo '  scriptsyncconfig       - Same as oldconfig, but quietly, additionally update deps'
 	@echo '  olddefconfig           - Same as silentoldconfig but sets new symbols to their default value'
 	@echo '  randconfig             - New config with random answer to all options'
+endif
 	@echo '  defconfig              - New config with default answer to all options'
 	@echo '                             UK_DEFCONFIG, if set, is used as input'
 	@echo '  savedefconfig          - Save current config to UK_DEFCONFIG (minimal config)'
