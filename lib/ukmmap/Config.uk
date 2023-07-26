@@ -3,6 +3,7 @@ menuconfig LIBUKMMAP
 	default n
 	select LIBNOLIBC if !HAVE_LIBC
 	select LIBUKALLOC
+	depends on !LIBPOSIX_MMAP
 
 if LIBUKMMAP
 
