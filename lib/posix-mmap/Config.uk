@@ -2,7 +2,6 @@ menuconfig LIBPOSIX_MMAP
 	bool "posix-mmap: Memory mapping related functions"
 	default n
 	depends on LIBUKVMEM
-	depends on !LIBUKMMAP
 	help
 		This library implements memory mapping related functions such
 		as mmap() and munmap().
