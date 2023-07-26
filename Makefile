@@ -58,7 +58,11 @@ RUNNING_MAKE_VERSION := $(MAKE_VERSION)
 # Check for minimal make version (note: this check will break at make 10.x)
 MIN_MAKE_VERSION = 4.1
 ifneq ($(firstword $(sort $(RUNNING_MAKE_VERSION) $(MIN_MAKE_VERSION))),$(MIN_MAKE_VERSION))
+ifneq ($(HOSTOSENV),Darwin)
 $(error You have make '$(RUNNING_MAKE_VERSION)' installed. GNU make >= $(MIN_MAKE_VERSION) is required)
+else
+$(error We need GNU make >= $(MIN_MAKE_VERSION). It can be installed with 'brew install make'. Retry with: 'gmake $(MAKECMDGOALS)')
+endif
 endif
 
 # Strip quotes and then whitespaces
