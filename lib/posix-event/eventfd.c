@@ -343,7 +343,7 @@ static int do_eventfd(struct uk_alloc *a, unsigned int initval, int flags)
 		goto ERR_MALLOC_FILE;
 	}
 
-	vfs_file = uk_malloc(a, sizeof(struct vfscore_file));
+	vfs_file = malloc(sizeof(struct vfscore_file));
 	if (unlikely(!vfs_file)) {
 		ret = -ENOMEM;
 		goto ERR_MALLOC_VFS_FILE;
@@ -404,7 +404,7 @@ ERR_VFS_INSTALL:
 ERR_ALLOC_DENTRY:
 	vput(vfs_vnode);
 ERR_ALLOC_VNODE:
-	uk_free(a, vfs_file);
+	free(vfs_file);
 ERR_MALLOC_VFS_FILE:
 	uk_free(a, efd);
 ERR_MALLOC_FILE:
