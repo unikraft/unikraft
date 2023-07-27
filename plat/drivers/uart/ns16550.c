@@ -29,7 +29,7 @@
  */
 #include <libfdt.h>
 #include <uk/config.h>
-#include <uk/plat/console.h>
+#include <uk/console.h>
 #include <uk/assert.h>
 #include <arm/cpu.h>
 
@@ -87,11 +87,12 @@ static void init_ns16550(uint64_t base)
 		NS16550_REG_READ(NS16550_FCR_OFFSET) & ~(NS16550_FCR_FIFO_EN));
 }
 
-void ns16550_console_init(const void *dtb)
+static void ns16550_console_init(struct ukplat_bootinfo *bi)
 {
 	int offset, len, naddr, nsize;
 	const uint64_t *regs;
 	uint64_t reg_uart_base;
+	void *dtb = (void *)bi->dtb;
 
 	uk_pr_info("Serial initializing\n");
 
@@ -118,11 +119,6 @@ void ns16550_console_init(const void *dtb)
 	init_ns16550(reg_uart_base);
 
 	uk_pr_info("NS16550 UART initialized\n");
-}
-
-int ukplat_coutd(const char *str, unsigned int len)
-{
-	return ukplat_coutk(str, len);
 }
 
 static void _putc(char a)
@@ -173,14 +169,14 @@ static int ns16550_getc(void)
 	return (int)(NS16550_REG_READ(NS16550_RBR_OFFSET) & 0xff);
 }
 
-int ukplat_coutk(const char *buf, unsigned int len)
+static int ns16550_coutk(const char *buf, unsigned int len)
 {
 	for (unsigned int i = 0; i < len; i++)
 		ns16550_putc(buf[i]);
 	return len;
 }
 
-int ukplat_cink(char *buf, unsigned int maxlen)
+static int ns16550_cink(char *buf, unsigned int maxlen)
 {
 	int ret;
 	unsigned int num = 0;
@@ -192,3 +188,10 @@ int ukplat_cink(char *buf, unsigned int maxlen)
 
 	return (int) num;
 }
+
+struct uk_console_ops uk_console_ns16550_ops = {
+	.coutd = ns16550_coutk,
+	.coutk = ns16550_coutk,
+	.cink = ns16550_cink,
+	.init = ns16550_console_init,
+};
