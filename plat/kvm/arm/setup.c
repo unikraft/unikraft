@@ -27,7 +27,7 @@
 #include <uk/plat/common/acpi.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/common/lcpu.h>
-#include <uart/pl011.h>
+#include <uk/console.h>
 #ifdef CONFIG_RTC_PL031
 #include <rtc/pl031.h>
 #endif /* CONFIG_RTC_PL031 */
@@ -164,7 +164,7 @@ void __no_pauth _ukplat_entry(struct ukplat_bootinfo *bi)
 
 	fdt = (void *)bi->dtb;
 
-	pl011_console_init(fdt);
+	uk_console_init(bi);
 
 	rc = cmdline_init(bi);
 	if (unlikely(rc < 0))

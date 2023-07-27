@@ -12,11 +12,10 @@
 #include <uk/arch/types.h>
 #include <uk/arch/paging.h>
 #include <uk/asm/cfi.h>
-#include <uk/plat/console.h>
+#include <uk/console.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
 
-#include <kvm/console.h>
 #include <kvm/intctrl.h>
 
 #include <uk/plat/lcpu.h>
@@ -75,7 +74,7 @@ void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi)
 	int rc;
 	void *bstack;
 
-	_libkvmplat_init_console();
+	uk_console_init(bi);
 
 	/* Initialize trap vector table */
 	traps_table_init();

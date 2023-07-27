@@ -1,0 +1,7 @@
+menuconfig LIBUKCONSOLE
+	bool "ukconsole: Abstraction for serial console"
+	default y
+
+if LIBUKCONSOLE
+
+endif
