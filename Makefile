@@ -233,16 +233,18 @@ UK_FIXDEP             := $(KCONFIG_DIR)/fixdep
 KCONFIG_AUTOCONFIG    := $(KCONFIG_DIR)/auto.conf
 KCONFIG_TRISTATE      := $(KCONFIG_DIR)/tristate.config
 KCONFIG_AUTOHEADER    := $(KCONFIG_INCLUDES_DIR)/config.h
-KCONFIG_APP_DIR       := $(CONFIG_UK_APP)
 KCONFIG_LIB_IN        := $(KCONFIG_DIR)/libs.uk
-KCONFIG_DEF_PLATS     := $(shell find $(CONFIG_UK_PLAT)/* -maxdepth 0 \
-			   -type d \( -path $(CONFIG_UK_PLAT)/common -o \
-			   -path $(CONFIG_UK_PLAT)/drivers \
-			   \) -prune -o  -type d -print)
-KCONFIG_LIB_DIR       := $(shell find $(CONFIG_UK_LIB)/* -maxdepth 0 -type d) \
-			 $(CONFIG_UK_BASE)/lib $(ELIB_DIR)
-KCONFIG_PLAT_DIR      := $(KCONFIG_DEF_PLATS) $(EPLAT_DIR) $(CONFIG_UK_PLAT)
-KCONFIG_PLAT_IN       := $(KCONFIG_DIR)/plat.uk
+KCONFIG_LIB_BASE      := $(CONFIG_UK_BASE)/lib
+KCONFIG_ELIB_DIRS     := $(L)
+KCONFIG_PLAT_IN       := $(KCONFIG_DIR)/plats.uk
+KCONFIG_PLAT_BASE     := $(CONFIG_UK_BASE)/plat
+KCONFIG_EPLAT_DIRS    := $(E)
+KCONFIG_APP_IN        := $(KCONFIG_DIR)/app.uk
+ifneq ($(CONFIG_UK_BASE),$(CONFIG_UK_APP))
+KCONFIG_EAPP_DIR      := $(CONFIG_UK_APP)
+else
+KCONFIG_EAPP_DIR      :=
+endif
 
 # Makefile support scripts
 SCRIPTS_DIR := $(CONFIG_UK_BASE)/support/scripts
@@ -881,11 +883,14 @@ COMMON_CONFIG_ENV = \
 	UK_FULLVERSION="$(UK_FULLVERSION)" \
 	UK_CODENAME="$(UK_CODENAME)" \
 	UK_ARCH="$(CONFIG_UK_ARCH)" \
-	KCONFIG_APP_DIR="$(KCONFIG_APP_DIR)" \
-	KCONFIG_LIB_DIR="$(KCONFIG_LIB_DIR)" \
 	KCONFIG_LIB_IN="$(KCONFIG_LIB_IN)" \
-	KCONFIG_PLAT_DIR="$(KCONFIG_PLAT_DIR)" \
+	KCONFIG_LIB_BASE="$(KCONFIG_LIB_BASE)" \
+	KCONFIG_ELIB_DIRS="$(KCONFIG_ELIB_DIRS)" \
 	KCONFIG_PLAT_IN="$(KCONFIG_PLAT_IN)" \
+	KCONFIG_PLAT_BASE="$(KCONFIG_PLAT_BASE)" \
+	KCONFIG_EPLAT_DIRS="$(KCONFIG_EPLAT_DIRS)" \
+	KCONFIG_APP_IN="$(KCONFIG_APP_IN)" \
+	KCONFIG_EAPP_DIR="$(KCONFIG_EAPP_DIR)" \
 	UK_NAME="$(CONFIG_UK_NAME)"
 
 PHONY += scriptconfig scriptsyncconfig iscriptconfig kmenuconfig guiconfig \
