@@ -60,7 +60,7 @@
 #include <string.h>
 #include <stdarg.h>
 
-#include <uk/plat/console.h>
+#include <uk/console.h>
 
 /* 64 bits + 0-Byte at end */
 #define MAXNBUF 65
@@ -440,9 +440,9 @@ int vfprintf(FILE *fp, const char *fmt, va_list ap)
 	 * just send the buffer content to the kernel console
 	 */
 	if (fp == stdout)
-		ret = ukplat_coutk(buf, ret);
+		ret = uk_console_coutk(buf, ret);
 	else if (fp == stderr)
-		ret = ukplat_coutd(buf, ret);
+		ret = uk_console_coutd(buf, ret);
 	else
 		return 0;
 
@@ -490,9 +490,9 @@ int fputc(int _c, FILE *fp)
 	unsigned char c = _c;
 
 	if (fp == stdout)
-		ret = ukplat_coutk((char *)&c, 1);
+		ret = uk_console_coutk((char *)&c, 1);
 	else if (fp == stderr)
-		ret = ukplat_coutd((char *)&c, 1);
+		ret = uk_console_coutd((char *)&c, 1);
 
 	if (ret == 1)
 		return _c;
@@ -514,9 +514,9 @@ fputs_internal(const char *restrict s, FILE *restrict stream, int newline)
 	len = strlen(s);
 
 	if (stream == stdout)
-		ret = ukplat_coutk(s, len);
+		ret = uk_console_coutk(s, len);
 	else if (stream == stderr)
-		ret = ukplat_coutd(s, len);
+		ret = uk_console_coutd(s, len);
 	else
 		return EOF;
 
