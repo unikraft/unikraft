@@ -161,7 +161,7 @@
 #include <uk/init.h>
 #include <uk/print.h>
 #include <uk/ctors.h>
-#include <uk/plat/console.h>
+#include <uk/ansi.h>
 
 #include <stdio.h>
 #include <string.h>

@@ -56,7 +56,7 @@ static struct uk_test_stats testsuite_stats = {0};
 static struct uk_test_stats testcase_stats = {0};
 static struct uk_test_stats testassert_stats = {0};
 
-#include <uk/plat/console.h>
+#include <uk/ansi.h>
 
 #define UK_TEST_STATS_INIT_CLASS UK_INIT_CLASS_LATE
 #define UK_TEST_STATS_INIT_PRIO  9 /* As late as possible. */
