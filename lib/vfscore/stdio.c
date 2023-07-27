@@ -35,7 +35,7 @@
 
 #include <vfscore/file.h>
 #include <vfscore/fs.h>
-#include <uk/plat/console.h>
+#include <uk/console.h>
 #include <uk/syscall.h>
 #include <uk/essentials.h>
 #include <termios.h>
@@ -59,7 +59,7 @@ long uk_syscall_r_dup2(long oldfd, long newfd);
 
 static int __write_fn(void *dst __unused, void *src, size_t *cnt)
 {
-	int ret = ukplat_coutk(src, *cnt);
+	int ret = uk_console_coutk(src, *cnt);
 
 	if (ret < 0)
 		/* TODO: remove -1 when vfscore switches to negative
@@ -92,7 +92,7 @@ static int __read_fn(void *dst, void *src __unused, size_t *cnt)
 	count = *cnt;
 
 	do {
-		while ((bytes_read = ukplat_cink(buf,
+		while ((bytes_read = uk_console_cink(buf,
 			count - bytes_total)) <= 0)
 			;
 
@@ -105,13 +105,13 @@ static int __read_fn(void *dst, void *src __unused, size_t *cnt)
 			/* DELETE control character */
 			if (buf - 1 != dst) {
 				/* If this is not the first byte */
-				ukplat_coutk("\b \b", 3);
+				uk_console_coutk("\b \b", 3);
 				buf -= 1;
 				bytes_total -= 1;
 			}
 			buf -= 1;
 		} else {
-			ukplat_coutk(buf - bytes_read, bytes_read);
+			uk_console_coutk(buf - bytes_read, bytes_read);
 			bytes_total += bytes_read;
 		}
 
