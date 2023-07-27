@@ -1,25 +1,46 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright (c) 2018-2019, Ulf Magnusson
 # SPDX-License-Identifier: ISC
 
 """
-List all user-modifiable symbols that are not given a value in the configuration
-file. Usually, these are new symbols that have been added to the Kconfig files.
+Lists all user-modifiable symbols that are not given a value in the
+configuration file. Usually, these are new symbols that have been added to the
+Kconfig files.
 
 The default configuration filename is '.config'. A different filename can be
 passed in the KCONFIG_CONFIG environment variable.
 """
+from __future__ import print_function
+
+import argparse
 import sys
 
-from kconfiglib import standard_kconfig, BOOL, TRISTATE, INT, HEX, STRING, \
-                       TRI_TO_STR
+from kconfiglib import Kconfig, BOOL, TRISTATE, INT, HEX, STRING, TRI_TO_STR
 
 
 def main():
-    kconf = standard_kconfig()
+    parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        description=__doc__)
+
+    parser.add_argument(
+        "--show-help", "-l",
+        action="store_true",
+        help="Show any help texts as well")
+
+    parser.add_argument(
+        "kconfig",
+        metavar="KCONFIG",
+        nargs="?",
+        default="Kconfig",
+        help="Top-level Kconfig file (default: Kconfig)")
+
+    args = parser.parse_args()
+
+    kconf = Kconfig(args.kconfig, suppress_traceback=True)
     # Make it possible to filter this message out
-    sys.stderr.write(kconf.load_config() + "\n")
+    print(kconf.load_config(), file=sys.stderr)
 
     for sym in kconf.unique_defined_syms:
         # Only show symbols that can be toggled. Choice symbols are a special
@@ -40,7 +61,15 @@ def main():
             else:
                 s = sym.config_string
 
-            sys.stdout.write(s)
+            print(s, end="")
+            if args.show_help:
+                for node in sym.nodes:
+                    if node.help is not None:
+                        # Indent by two spaces. textwrap.indent() is not
+                        # available in Python 2 (it's 3.3+).
+                        print("\n".join("  " + line
+                                        for line in node.help.split("\n")))
+                        break
 
 
 if __name__ == "__main__":

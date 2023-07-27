@@ -1,10 +1,16 @@
 if UNDEFINED
 endif
 
-config SINGLE_DEF
+config ONE_DEF
     bool
 
-config MULTI_DEF
+config TWO_DEF
+    bool
+
+config TWO_DEF
+    bool
+
+config MANY_DEF
     bool
 
 # Throw in some line continuations too to make sure it doesn't mess up the line
@@ -34,9 +40,9 @@ config HELP_3
       bar
     bool
 config \
-MULTI_DEF
+MANY_DEF
 
-config MULTI_DEF
+config MANY_DEF
 
 endif
 endif
@@ -69,4 +75,4 @@ orsource "nonexistent*"
 grsource "nonexistent"
 grsource "nonexistent*"
 
-config MULTI_DEF
+config MANY_DEF

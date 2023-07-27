@@ -1,6 +1,33 @@
 .. contents:: Table of contents
    :backlinks: none
 
+News
+----
+
+Dependency loop with recent linux-next kernels
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+To fix issues with dependency loops on recent linux-next kernels, apply `this
+patch <https://www.spinics.net/lists/linux-kbuild/msg23455.html>`_. Hopefully,
+it will be in ``linux-next`` soon.
+
+``windows-curses`` is no longer automatically installed on Windows
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+Starting with Kconfiglib 13.0.0, the `windows-curses
+<https://github.com/zephyrproject-rtos/windows-curses>`__ package is no longer
+automatically installed on Windows, and needs to be installed manually for the
+terminal ``menuconfig`` to work.
+
+This fixes installation of Kconfiglib on MSYS2, which is not compatible with
+``windows-curses``. See `this issue
+<https://github.com/ulfalizer/Kconfiglib/issues/77>`__.
+
+The ``menuconfig`` now shows a hint re. installing ``windows-curses`` when the
+``curses`` module can't be imported on Windows.
+
+Sorry if this change caused problems!
+
 Overview
 --------
 
@@ -16,28 +43,33 @@ The entire library is contained in `kconfiglib.py
 bundled scripts are implemented on top of it. Implementing your own scripts
 should be relatively easy, if needed.
 
-Kconfiglib is used exclusively by e.g. the `Zephyr <https://www.zephyrproject.org/>`_ 
-and `ACRN <https://projectacrn.org/>`_ projects. It is also used for many small helper
+Kconfiglib is used exclusively by e.g. the `Zephyr
+<https://www.zephyrproject.org/>`__, `esp-idf
+<https://github.com/espressif/esp-idf>`__, and `ACRN
+<https://projectacrn.org/>`__ projects. It is also used for many small helper
 scripts in various projects.
 
 Since Kconfiglib is based around a library, it can be used e.g. to generate a
-`Kconfig cross-reference <https://docs.zephyrproject.org/latest/reference/kconfig/index.html>`_ (note: heavy page),
-using the same robust Kconfig parser used for other Kconfig tools, instead of brittle ad-hoc parsing. The documentation generation script can be found `here <https://github.com/zephyrproject-rtos/zephyr/blob/master/doc/scripts/genrest.py>`__.
+`Kconfig cross-reference
+<https://docs.zephyrproject.org/latest/reference/kconfig/index.html>`_, using
+the same robust Kconfig parser used for other Kconfig tools, instead of brittle
+ad-hoc parsing. The documentation generation script can be found `here
+<https://github.com/zephyrproject-rtos/zephyr/blob/master/doc/scripts/genrest.py>`__.
 
 Kconfiglib implements the recently added `Kconfig preprocessor
 <https://github.com/torvalds/linux/blob/master/Documentation/kbuild/kconfig-macro-language.rst>`__.
 For backwards compatibility, environment variables can be referenced both as
 ``$(FOO)`` (the new syntax) and as ``$FOO`` (the old syntax). The old syntax is
-deprecated, but will probably be supported for a long time, as its needed to
+deprecated, but will probably be supported for a long time, as it's needed to
 stay compatible with older Linux kernels. The major version will be increased
 if support is ever dropped. Using the old syntax with an undefined environment
 variable keeps the string as is.
 
-Note: See `this issue <https://github.com/ulfalizer/Kconfiglib/issues/47>`_ if you run into
-a "macro expanded to blank string" error with kernel 4.18+.
+Note: See `this issue <https://github.com/ulfalizer/Kconfiglib/issues/47>`__ if
+you run into a "macro expanded to blank string" error with kernel 4.18+.
 
 See `this page
-<https://docs.zephyrproject.org/latest/guides/kconfig/index.html>`__ for some
+<https://docs.zephyrproject.org/latest/guides/kconfig/tips.html>`__ for some
 Kconfig tips and best practices.
 
 Installation
@@ -97,11 +129,13 @@ Python 2 and Python 3. Previously, ``menuconfig.py`` only ran under Python 3
 that your ``PATH`` includes the directory where the executables end up. You can
 list the installed files with ``pip(3) show -f kconfiglib``.
 
-All releases have a corresponding tag in the git repository, e.g. ``v12.13.0``
+All releases have a corresponding tag in the git repository, e.g. ``v14.1.0``
 (the latest version).
 
-`Semantic versioning <http://semver.org/>`_ is used. There's been
-ten small changes (`1 <https://github.com/ulfalizer/Kconfiglib/commit/e8b4ecb6ff6ccc1c7be0818314fbccda2ef2b2ee>`_,
+`Semantic versioning <http://semver.org/>`_ is used. There's been ten small
+changes to the behavior of the API, a Windows packaging change, and a hashbang
+change to use ``python3``
+(`1 <https://github.com/ulfalizer/Kconfiglib/commit/e8b4ecb6ff6ccc1c7be0818314fbccda2ef2b2ee>`_,
 `2 <https://github.com/ulfalizer/Kconfiglib/commit/db633015a4d7b0ba1e882f665e191f350932b2af>`_,
 `3 <https://github.com/ulfalizer/Kconfiglib/commit/8983f7eb297dd614faf0beee3129559bc8ba338e>`_,
 `4 <https://github.com/ulfalizer/Kconfiglib/commit/cbf32e29a130d22bc734b7778e6304ac9df2a3e8>`_,
@@ -110,18 +144,20 @@ ten small changes (`1 <https://github.com/ulfalizer/Kconfiglib/commit/e8b4ecb6ff
 `7 <https://github.com/ulfalizer/Kconfiglib/commit/7a428aa415606820a44291f475248b08e3952c4b>`_,
 `8 <https://github.com/ulfalizer/Kconfiglib/commit/f247ddf618ad29718e5efd3e69f8baf75d4d347b>`_,
 `9 <https://github.com/ulfalizer/Kconfiglib/commit/4fed39d9271ceb68be4157ab3f96a45b94f77dc0>`_,
-`10 <https://github.com/ulfalizer/Kconfiglib/commit/55bc8c380869ea663092212e8fe388ad7abae596>`_)
-to the behavior of the API, which is why the major version is at 12 rather than
-2. I do major version bumps for all behavior changes, even tiny ones, and most of these were
-fixes for baby issues in the early days of the Kconfiglib 2 API.
+`10 <https://github.com/ulfalizer/Kconfiglib/commit/55bc8c380869ea663092212e8fe388ad7abae596>`_,
+`Windows packaging change <https://github.com/ulfalizer/Kconfiglib/commit/21b4c1e3b6e2867b9a0788d21a358f6b1f581d86>`_,
+`Python 3 hashbang change <https://github.com/ulfalizer/Kconfiglib/commit/9e0a8d29fa76adcb3f27bb2e20f16fefc2a8591e>`_),
+which is why the major version is at 14 rather than 2. I do major version bumps
+for all behavior changes, even tiny ones, and most of these were fixes for baby
+issues in the early days of the Kconfiglib 2 API.
 
 Manual installation
 ~~~~~~~~~~~~~~~~~~~
 
 Just drop ``kconfiglib.py`` and the scripts you want somewhere. There are no
-third-party dependencies (except for the `windows-curses
-<https://github.com/zephyrproject-rtos/windows-curses>`_ package on Windows,
-when running the terminal ``menuconfig`` implementation).
+third-party dependencies, but the terminal ``menuconfig`` won't work on Windows
+unless a package like `windows-curses
+<https://github.com/zephyrproject-rtos/windows-curses>`__ is installed.
 
 Installation for the Linux kernel
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -147,8 +183,10 @@ Getting started
 1. `Install <Installation_>`_ the library and the utilities.
 
 2. Write `Kconfig
-   <https://www.kernel.org/doc/Documentation/kbuild/kconfig-language.txt>`__
-   files that describe the available configuration options.
+   <https://github.com/torvalds/linux/blob/master/Documentation/kbuild/kconfig-language.rst>`__
+   files that describe the available configuration options. See `this page
+   <https://docs.zephyrproject.org/latest/guides/kconfig/tips.html>`__ for some
+   general Kconfig advice.
 
 3. Generate an initial configuration with e.g. ``menuconfig``/``guiconfig`` or
    ``alldefconfig``. The configuration is saved as ``.config`` by default.
@@ -187,9 +225,6 @@ Getting started
 
 Whenever ``.config`` is overwritten, the previous version of the file is saved
 to ``.config.old`` (or, more generally, to ``$KCONFIG_CONFIG.old``).
-
-For some general Kconfig advice, see `this page
-<https://docs.zephyrproject.org/latest/guides/kconfig/index.html>`__.
 
 Using ``.config`` files as Make input
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -251,12 +286,12 @@ For HTML output, add ``-w``:
 
 This will also work after installing Kconfiglib with ``pip(3)``.
 
-Documentation for the ``menuconfig`` and ``guiconfig`` interfaces can be viewed
-in the same way:
+Documentation for other modules can be viewed in the same way (though a plain
+``--help`` will work when they're run as executables):
 
 .. code:: sh
 
-    $ pydoc3 menuconfig/guiconfig
+    $ pydoc(3) menuconfig/guiconfig/...
 
 A good starting point for learning the library is to read the module docstring
 (which you could also just read directly at the beginning of `kconfiglib.py
@@ -293,7 +328,9 @@ Kconfiglib can do the following, among other things:
 - **Write C headers**
 
   The generated headers use the same format as ``include/generated/autoconf.h``
-  from the Linux kernel.
+  from the Linux kernel. Output for symbols appears in the order that they're
+  defined, unlike in the C tools (where the order depends on the hash table
+  implementation).
 
 - **Implement incremental builds**
 
@@ -370,7 +407,7 @@ The following Kconfig extensions are available:
   ``mainmenu`` statements, meaning ``option env`` symbols are redundant.
 
   This is the standard behavior with the new `Kconfig preprocessor
-  <https://github.com/torvalds/linux/blob/master/Documentation/kbuild/kconfig-macro-language.txt>`__,
+  <https://github.com/torvalds/linux/blob/master/Documentation/kbuild/kconfig-macro-language.rst>`__,
   which Kconfiglib implements.
 
   ``option env`` symbols are accepted but ignored, which leads the caveat that
@@ -498,9 +535,7 @@ Three configuration interfaces are currently available:
 
   There are no third-party dependencies on \*nix. On Windows,
   the ``curses`` modules is not available by default, but support
-  can be added by installing the ``windows-curses`` package (which is
-  installed automatically when Kconfiglib is installed via ``pip``
-  on Windows):
+  can be added by installing the ``windows-curses`` package:
   
   .. code-block:: shell
 

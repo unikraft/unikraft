@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright (c) 2019, Ulf Magnusson
 # SPDX-License-Identifier: ISC
@@ -34,7 +34,7 @@ def main():
     parser.add_argument(
         "--kconfig",
         default="Kconfig",
-        help="Base Kconfig file (default: Kconfig)")
+        help="Top-level Kconfig file (default: Kconfig)")
 
     parser.add_argument(
         "--no-check-exists",
@@ -59,7 +59,7 @@ def main():
 
     args = parser.parse_args()
 
-    kconf = kconfiglib.Kconfig(args.kconfig)
+    kconf = kconfiglib.Kconfig(args.kconfig, suppress_traceback=True)
     print(kconf.load_config())
 
     for arg in args.assignments:

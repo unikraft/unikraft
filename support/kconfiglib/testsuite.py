@@ -38,7 +38,6 @@
 import difflib
 import errno
 import os
-import platform
 import re
 import shutil
 import subprocess
@@ -47,10 +46,10 @@ import tempfile
 import textwrap
 
 from kconfiglib import Kconfig, Symbol, Choice, COMMENT, MENU, MenuNode, \
-                       BOOL, TRISTATE, HEX, STRING, \
+                       BOOL, TRISTATE, HEX, \
                        TRI_TO_STR, \
                        escape, unescape, \
-                       expr_str, expr_value, expr_items, split_expr, \
+                       expr_str, expr_items, split_expr, \
                        _ordered_unique, \
                        OR, AND, \
                        KconfigError
@@ -1073,32 +1072,51 @@ g
         # Has symbol with empty help text, so disable warnings
         c = Kconfig("tests/Klocation", warn=False)
 
-        verify_locations(c.syms["SINGLE_DEF"].nodes, "tests/Klocation:4")
+        verify_locations(c.syms["UNDEFINED"].nodes)
+        verify_equal(c.syms["UNDEFINED"].name_and_loc, "UNDEFINED (undefined)")
 
-        verify_locations(c.syms["MULTI_DEF"].nodes,
-          "tests/Klocation:7",
-          "tests/Klocation:37",
-          "tests/Klocation:39",
-          "tests/Klocation_sourced:3",
-          "tests/sub/Klocation_rsourced:2",
-          "tests/sub/Klocation_gsourced1:1",
-          "tests/sub/Klocation_gsourced2:1",
-          "tests/sub/Klocation_gsourced1:1",
-          "tests/sub/Klocation_gsourced2:1",
-          "tests/sub/Klocation_grsourced1:1",
-          "tests/sub/Klocation_grsourced2:1",
-          "tests/sub/Klocation_grsourced1:1",
-          "tests/sub/Klocation_grsourced2:1",
-          "tests/Klocation:72")
+        verify_locations(c.syms["ONE_DEF"].nodes, "tests/Klocation:4")
+        verify_equal(c.syms["ONE_DEF"].name_and_loc,
+                     "ONE_DEF (defined at tests/Klocation:4)")
 
-        verify_locations(c.named_choices["CHOICE"].nodes,
+        verify_locations(c.syms["TWO_DEF"].nodes,
+                         "tests/Klocation:7",
+                         "tests/Klocation:10")
+        verify_equal(c.syms["TWO_DEF"].name_and_loc,
+                     "TWO_DEF (defined at tests/Klocation:7, tests/Klocation:10)")
+
+        verify_locations(c.syms["MANY_DEF"].nodes,
+                         "tests/Klocation:13",
+                         "tests/Klocation:43",
+                         "tests/Klocation:45",
+                         "tests/Klocation_sourced:3",
+                         "tests/sub/Klocation_rsourced:2",
+                         "tests/sub/Klocation_gsourced1:1",
+                         "tests/sub/Klocation_gsourced2:1",
+                         "tests/sub/Klocation_gsourced1:1",
+                         "tests/sub/Klocation_gsourced2:1",
+                         "tests/sub/Klocation_grsourced1:1",
+                         "tests/sub/Klocation_grsourced2:1",
+                         "tests/sub/Klocation_grsourced1:1",
+                         "tests/sub/Klocation_grsourced2:1",
+                         "tests/Klocation:78")
+
+        verify_locations(c.named_choices["CHOICE_ONE_DEF"].nodes,
                          "tests/Klocation_sourced:5")
+        verify_equal(c.named_choices["CHOICE_ONE_DEF"].name_and_loc,
+                     "<choice CHOICE_ONE_DEF> (defined at tests/Klocation_sourced:5)")
+
+        verify_locations(c.named_choices["CHOICE_TWO_DEF"].nodes,
+                         "tests/Klocation_sourced:9",
+                         "tests/Klocation_sourced:13")
+        verify_equal(c.named_choices["CHOICE_TWO_DEF"].name_and_loc,
+                     "<choice CHOICE_TWO_DEF> (defined at tests/Klocation_sourced:9, tests/Klocation_sourced:13)")
 
         verify_locations([c.syms["MENU_HOOK"].nodes[0].next],
-                         "tests/Klocation_sourced:12")
+                         "tests/Klocation_sourced:20")
 
         verify_locations([c.syms["COMMENT_HOOK"].nodes[0].next],
-                         "tests/Klocation_sourced:18")
+                         "tests/Klocation_sourced:26")
 
         # Test Kconfig.kconfig_filenames
 
@@ -1181,25 +1199,27 @@ tests/Krecursive2:1
     verify_equal(
         [node.item.name for node in c.node_iter()
          if isinstance(node.item, Symbol)],
-        ["SINGLE_DEF", "MULTI_DEF", "HELP_1", "HELP_2", "HELP_3", "MULTI_DEF",
-         "MULTI_DEF", "MULTI_DEF", "MENU_HOOK", "COMMENT_HOOK"] + \
-        10*["MULTI_DEF"])
+        ["ONE_DEF", "TWO_DEF", "TWO_DEF", "MANY_DEF", "HELP_1", "HELP_2",
+         "HELP_3", "MANY_DEF", "MANY_DEF", "MANY_DEF", "MENU_HOOK",
+         "COMMENT_HOOK"] + 10*["MANY_DEF"])
 
     verify_equal(
         [node.item.name for node in c.node_iter(True)
          if isinstance(node.item, Symbol)],
-        ["SINGLE_DEF", "MULTI_DEF", "HELP_1", "HELP_2", "HELP_3", "MENU_HOOK",
-         "COMMENT_HOOK"])
+        ["ONE_DEF", "TWO_DEF", "MANY_DEF", "HELP_1", "HELP_2", "HELP_3",
+         "MENU_HOOK", "COMMENT_HOOK"])
 
     verify_equal(
         [node.prompt[0] for node in c.node_iter()
          if not isinstance(node.item, Symbol)],
-        ["choice", "menu", "comment"])
+        ["one-def choice", "two-def choice 1", "two-def choice 2",
+         "menu", "comment"])
 
     verify_equal(
         [node.prompt[0] for node in c.node_iter(True)
          if not isinstance(node.item, Symbol)],
-        ["choice", "menu", "comment"])
+        ["one-def choice", "two-def choice 1", "two-def choice 2",
+         "menu", "comment"])
 
 
     print("Testing MenuNode.include_path")
@@ -1906,12 +1926,12 @@ tests/Krecursive2:1
     c = Kconfig("Kconfiglib/tests/Kescape")
 
     # Test the default value
-    c.write_config(config_test_file + "_from_def", header="")
+    c.write_config(config_test_file + "_from_def")
     verify_file_contents(config_test_file + "_from_def",
                          r'''CONFIG_STRING="\"\\"''' "\n")
     # Write our own value
     c.syms["STRING"].set_value(r'''\"a'\\''')
-    c.write_config(config_test_file + "_from_user", header="")
+    c.write_config(config_test_file + "_from_user")
     verify_file_contents(config_test_file + "_from_user",
                          r'''CONFIG_STRING="\\\"a'\\\\"''' "\n")
 
@@ -1957,7 +1977,7 @@ tests/Krecursive2:1
 
     c = Kconfig("Kconfiglib/tests/Korder")
 
-    c.write_autoconf(config_test_file, header="")
+    c.write_autoconf(config_test_file)
     verify_file_contents(config_test_file, """
 #define CONFIG_O 0
 #define CONFIG_R 1
@@ -1976,7 +1996,7 @@ tests/Krecursive2:1
     c.syms["R2"].set_value("-1")
     c.syms["N"].set_value("-1")
     c.syms["G"].set_value("-1")
-    c.write_min_config(config_test_file, header="")
+    c.write_min_config(config_test_file)
     verify_file_contents(config_test_file, """
 CONFIG_O=-1
 CONFIG_R=-1
@@ -1985,6 +2005,44 @@ CONFIG_R2=-1
 CONFIG_N=-1
 CONFIG_G=-1
 """[1:])
+
+    # Test header strings in configuration files and headers
+
+    os.environ["KCONFIG_CONFIG_HEADER"] = "config header from env.\n"
+    os.environ["KCONFIG_AUTOHEADER_HEADER"] = "header header from env.\n"
+
+    c = Kconfig("Kconfiglib/tests/Kheader")
+    c.write_config(config_test_file, header="config header from param\n")
+    verify_file_contents(config_test_file, """\
+config header from param
+CONFIG_FOO=y
+""")
+    c.write_min_config(config_test_file, header="min. config header from param\n")
+    verify_file_contents(config_test_file, """\
+min. config header from param
+""")
+    c.write_config(config_test_file)
+    verify_file_contents(config_test_file, """\
+config header from env.
+CONFIG_FOO=y
+""")
+    c.write_min_config(config_test_file)
+    verify_file_contents(config_test_file, """\
+config header from env.
+""")
+    c.write_autoconf(config_test_file, header="header header from param\n")
+    verify_file_contents(config_test_file, """\
+header header from param
+#define CONFIG_FOO 1
+""")
+    c.write_autoconf(config_test_file)
+    verify_file_contents(config_test_file, """\
+header header from env.
+#define CONFIG_FOO 1
+""")
+
+    del os.environ["KCONFIG_CONFIG_HEADER"]
+    del os.environ["KCONFIG_AUTOHEADER_HEADER"]
 
 
     print("Testing Kconfig fetching and separation")
@@ -2478,8 +2536,8 @@ config J
     verify_variable("immediate", "foofoo", "foofoo", False)
 
     verify_variable("messy-fn-res",
-                    "$($(fn-indir)-unused-arg, a  b , c  d )",
-                    'surround-rev-quote " c  d " " a  b " surround-rev-quote ',
+                    "$($(fn-indir)-unused-arg, a  b (,) , c  d )",
+                    'surround-rev-quote " c  d " " a  b (,) " surround-rev-quote ',
                     True)
 
     verify_variable("special-chars-fn-res",
@@ -2516,7 +2574,7 @@ config PRINT_ME_TOO
 
     verify_repr(
         "messy-fn-res",
-        "<variable messy-fn-res, recursive, value '$($(fn-indir)-unused-arg, a  b , c  d )'>")
+        "<variable messy-fn-res, recursive, value '$($(fn-indir)-unused-arg, a  b (,) , c  d )'>")
 
     def verify_recursive(name):
         try:
@@ -2546,9 +2604,14 @@ config PRINT_ME_TOO
 
     verify_variable("shell-stderr-res", "", "", False)
 
+    verify_variable("parens-res",
+                    "pre-$(shell,echo '(a,$(b-char),(c,d),e)')-post",
+                    "pre-(a,b,(c,d),e)-post",
+                    True)
+
     verify_variable("location-res",
-                    "Kconfiglib/tests/Kpreprocess:125",
-                    "Kconfiglib/tests/Kpreprocess:125",
+                    "Kconfiglib/tests/Kpreprocess:129",
+                    "Kconfiglib/tests/Kpreprocess:129",
                     False)
 
     verify_variable("warning-res", "", "", False)
@@ -2568,7 +2631,7 @@ config PRINT_ME_TOO
     # Check that the expected warnings were generated
     verify_equal(c.warnings, [
         "Kconfiglib/tests/Kpreprocess:122: warning: 'echo message on stderr >&2' wrote to stderr: message on stderr",
-        "Kconfiglib/tests/Kpreprocess:130: warning: a warning"
+        "Kconfiglib/tests/Kpreprocess:134: warning: a warning"
     ])
 
 
@@ -2588,6 +2651,11 @@ config PRINT_ME_TOO
     verify_variable("one-or-more-one", "$(one-or-more,foo)", "foo + ", True)
     verify_variable("one-or-more-three", "$(one-or-more,foo,bar,baz)",
                     "foo + bar,baz", True)
+
+    verify_variable("location-1", "Kconfiglib/tests/Kuserfunctions:13",
+                    "Kconfiglib/tests/Kuserfunctions:13", False)
+    verify_variable("location-2", "Kconfiglib/tests/Kuserfunctions:14",
+                    "Kconfiglib/tests/Kuserfunctions:14", False)
 
     def verify_bad_argno(name):
         try:
@@ -3118,8 +3186,7 @@ def equal_configs():
         return False
     else:
         with f:
-            # [1:] strips the default header
-            our = f.readlines()[1:]
+            our = f.readlines()
 
     if their == our:
         return True
