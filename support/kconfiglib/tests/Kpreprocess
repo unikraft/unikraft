@@ -51,7 +51,7 @@ surround-rev-quote = $(0) $(rev-quote,$(1),$(2)) $(0)
 surround-rev-quote-unused-arg = $(surround-rev-quote,$(1),$(2)) $(3)
 # No value is passed for $(3), so it expands to nothing
 fn-indir = surround-rev-quote
-messy-fn-res = $($(fn-indir)-unused-arg, a  b , c  d )
+messy-fn-res = $($(fn-indir)-unused-arg, a  b (,) , c  d )
 
 # Special characters in function call
 comma = ,
@@ -120,6 +120,10 @@ shell-res = $(shell,false && echo foo bar || echo baz qaz)
 
 # Warns about output on stderr, expands to nothing
 shell-stderr-res := $(shell,echo message on stderr >&2)
+
+# Nested parens in macro call. Should give a single argument. Test it with
+# $(shell) to get a free argument number check.
+parens-res = pre-$(shell,echo '(a,$(b-char),(c,d),e)')-post
 
 # Expands to the current location
 location-res := $(filename):$(lineno)

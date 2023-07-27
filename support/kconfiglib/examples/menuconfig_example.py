@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Implements a simple configuration interface on top of Kconfiglib to
 # demonstrate concepts for building a menuconfig-like. Emulates how the
