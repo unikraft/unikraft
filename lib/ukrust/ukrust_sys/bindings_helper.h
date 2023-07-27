@@ -61,7 +61,7 @@
 #include <uk/argparse.h>
 #endif
 
-#include <uk/plat/console.h>
+#include <uk/console.h>
 #include <uk/arch/types.h>
 
 void *__ukrust_sys_malloc(__sz size);
