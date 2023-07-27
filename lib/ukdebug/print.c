@@ -40,7 +40,8 @@
 #include <stdarg.h>
 
 #include <uk/essentials.h>
-#include <uk/plat/console.h>
+#include <uk/ansi.h>
+#include <uk/console.h>
 #include <uk/plat/time.h>
 #include <uk/print.h>
 #include <uk/errptr.h>
@@ -102,14 +103,14 @@ struct _vprint_console {
 
 /* Console state for kernel output */
 #if CONFIG_LIBUKDEBUG_REDIR_PRINTD || CONFIG_LIBUKDEBUG_PRINTK
-static struct _vprint_console kern  = { .cout = ukplat_coutk,
+static struct _vprint_console kern  = { .cout = uk_console_coutk,
 					.newline = 1,
 					.prevlvl = INT_MIN };
 #endif
 
 /* Console state for debug output */
 #if !CONFIG_LIBUKDEBUG_REDIR_PRINTD
-static struct _vprint_console debug = { .cout = ukplat_coutd,
+static struct _vprint_console debug = { .cout = uk_console_coutd,
 					.newline = 1,
 					.prevlvl = INT_MIN };
 #endif
