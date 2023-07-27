@@ -427,9 +427,6 @@ if [ -z "$( which uuidgen )" ]; then
 	echo "Please install uuidgen" 1>&2
 	exit 2
 fi
-if [ ! -f "/usr/share/qemu/sgabios.bin" ]; then
-	echo "Could not find '/usr/share/qemu/sgabios.bin'. This script might not work properly." 1>&2
-fi
 mkdir -p "${TEMP}"
 if [ $? -ne 0 ]; then
 	echo "Error: Could not create ${TEMP}" 1>&2
@@ -763,10 +760,6 @@ case "$ARG_MACHINETYPE" in
 			QEMU_BASE_ARGS+=("-cpu")
 			QEMU_BASE_ARGS+=("qemu64,-vmx,-svm,+x2apic,+pdpe1gb")
 		fi
-
-		# BIOS also on serial
-		QEMU_ARGS+=("-device")
-		QEMU_ARGS+=("sga")
 		;;
 	"x86q35")
 		QEMU_BIN=${QEMU_BIN:-"$( which qemu-system-x86_64 )"}
@@ -784,10 +777,6 @@ case "$ARG_MACHINETYPE" in
 			QEMU_BASE_ARGS+=("-cpu")
 			QEMU_BASE_ARGS+=("qemu64,-vmx,-svm,+x2apic,+pdpe1gb")
 		fi
-
-		# BIOS also on serial
-		QEMU_ARGS+=("-device")
-		QEMU_ARGS+=("sga")
 		;;
 	*)
 		echo "Unsupported machine type (-t)"
