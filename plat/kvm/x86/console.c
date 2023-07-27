@@ -25,17 +25,17 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <uk/plat/console.h>
+#include <uk/console.h>
 #include <uk/config.h>
 #include <uk/essentials.h>
 #if (CONFIG_KVM_DEBUG_VGA_CONSOLE || CONFIG_KVM_KERNEL_VGA_CONSOLE)
 #include <kvm-x86/vga_console.h>
 #endif
 #if (CONFIG_KVM_DEBUG_SERIAL_CONSOLE || CONFIG_KVM_KERNEL_SERIAL_CONSOLE)
-#include <kvm-x86/serial_console.h>
+#include <uart/com.h>
 #endif
 
-void _libkvmplat_init_console(void)
+static void kvm_console_init(struct ukplat_bootinfo *bi __maybe_unused)
 {
 #if (CONFIG_KVM_DEBUG_VGA_CONSOLE || CONFIG_KVM_KERNEL_VGA_CONSOLE)
 	_libkvmplat_init_vga_console();
@@ -46,7 +46,7 @@ void _libkvmplat_init_console(void)
 
 }
 
-int ukplat_coutd(const char *buf __maybe_unused, unsigned int len)
+static int kvm_coutd(const char *buf __maybe_unused, unsigned int len)
 {
 	for (unsigned int i = 0; i < len; i++) {
 #if CONFIG_KVM_DEBUG_SERIAL_CONSOLE
@@ -60,7 +60,7 @@ int ukplat_coutd(const char *buf __maybe_unused, unsigned int len)
 }
 
 
-int ukplat_coutk(const char *buf __maybe_unused, unsigned int len)
+static int kvm_coutk(const char *buf __maybe_unused, unsigned int len)
 {
 	for (unsigned int i = 0; i < len; i++) {
 #if CONFIG_KVM_KERNEL_SERIAL_CONSOLE
@@ -73,7 +73,8 @@ int ukplat_coutk(const char *buf __maybe_unused, unsigned int len)
 	return len;
 }
 
-int ukplat_cink(char *buf __maybe_unused, unsigned int maxlen __maybe_unused)
+static int kvm_cink(char *buf __maybe_unused,
+		    unsigned int maxlen __maybe_unused)
 {
 	int ret __maybe_unused;
 	unsigned int num = 0;
@@ -87,3 +88,10 @@ int ukplat_cink(char *buf __maybe_unused, unsigned int maxlen __maybe_unused)
 #endif
 	return (int) num;
 }
+
+struct uk_console_ops uk_console_kvm_ops = {
+	.coutd = kvm_coutd,
+	.coutk = kvm_coutk,
+	.cink = kvm_cink,
+	.init = kvm_console_init,
+};
