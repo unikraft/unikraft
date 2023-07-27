@@ -35,7 +35,7 @@
  */
 
 #include <uk/config.h>
-#include <uk/plat/console.h>
+#include <uk/ansi.h>
 #include <stdio.h>
 
 /*
