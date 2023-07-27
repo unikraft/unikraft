@@ -44,7 +44,7 @@
 #include <uk/essentials.h>
 #include "arch/regmap_linuxabi.h"
 #if CONFIG_LIBSYSCALL_SHIM_STRACE
-#include <uk/plat/console.h> /* ukplat_coutk */
+#include <uk/console.h> /* uk_console_coutk */
 #endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
 
 void ukplat_syscall_handler(struct __regs *r)
@@ -105,10 +105,10 @@ void ukplat_syscall_handler(struct __regs *r)
 		     r->rarg3, r->rarg4, r->rarg5);
 	/*
 	 * FIXME:
-	 * We directly use `ukplat_coutk()` until lib/ukdebug printing
+	 * We directly use `uk_console_coutk()` until lib/ukdebug printing
 	 * allows us to generate shortened output (avoiding list of details).
 	 */
-	ukplat_coutk(prsyscallbuf, (__sz) prsyscalllen);
+	uk_console_coutk(prsyscallbuf, (__sz) prsyscalllen);
 #endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
 
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS

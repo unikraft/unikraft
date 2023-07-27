@@ -16,7 +16,7 @@
 #endif /* CONFIG_LIBPOSIX_SYSINFO */
 
 #include <uk/arch/types.h>
-#include <uk/plat/console.h> /* ANSI definitions */
+#include <uk/ansi.h> /* ANSI definitions */
 #include <uk/arch/limits.h>
 #include <uk/syscall.h>
 #include <uk/errptr.h>
