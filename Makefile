@@ -483,7 +483,7 @@ $(foreach _M,$(wildcard $(addsuffix Makefile.rules,\
 ################################################################################
 # Declare them before we depend on having .config
 properclean:
-	$(call verbose_cmd,RM,build/,$(RM) -r \
+	$(call verbose_cmd,RM,$(notdir $(BUILD_DIR)),$(RM) -r \
 		$(BUILD_DIR))
 
 distclean: properclean
