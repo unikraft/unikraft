@@ -1,6 +1,7 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2021 OpenSynergy GmbH
+ * Copyright (c) 2023, Xingjian Zhang <zhxj9823@qq.com>.
+ * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,12 +28,67 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef __PL011_H__
-#define __PL011_H__
 
-/**
- * Initialize the pl011 console driver
- */
-void pl011_console_init(void *dtb);
-
+#if CONFIG_ARCH_ARM64
+#include <libfdt.h>
 #endif
+#include <uk/console.h>
+#include <uk/print.h>
+#include <uk/assert.h>
+
+static struct uk_console_ops *uk_console_ops;
+
+int ukplat_coutk(const char *buf, unsigned int len)
+{
+	return uk_console_ops->coutk(buf, len);
+}
+
+int ukplat_coutd(const char *buf, unsigned int len)
+{
+	return uk_console_ops->coutd(buf, len);
+}
+
+int ukplat_cink(char *buf, unsigned int maxlen)
+{
+	return uk_console_ops->cink(buf, maxlen);
+}
+
+#if CONFIG_ARCH_X86_64
+extern const struct uk_console_ops uk_console_kvm_ops;
+
+void uk_console_init(void)
+{
+	uk_console_ops = &uk_console_kvm_ops;
+
+	/* Initialize the corresponding console */
+	uk_console_ops->init();
+
+	uk_pr_info("Console init finished\n");
+}
+#else  /* !CONFIG_ARCH_X86_64 */
+extern const struct uk_console_ops uk_console_pl011_ops;
+extern const struct uk_console_ops uk_console_ns16550_ops;
+
+void uk_console_init(const void *dtb)
+{
+	int offset;
+
+	/* find the device by name */
+	if (fdt_node_offset_by_compatible(dtb, -1, "arm,pl011") >= 0)
+		uk_console_ops = &uk_console_pl011_ops;
+
+	if ((offset = fdt_node_offset_by_compatible(dtb, -1, "ns16550")) >= 0
+	    && (offset = fdt_node_offset_by_compatible(dtb, -1, "ns16550a"))
+		   >= 0) {
+		uk_console_ops = &uk_console_ns16550_ops;
+	}
+
+	if (!uk_console_ops)
+		UK_CRASH("No console UART found!\n");
+
+	/* Initialize the corresponding console */
+	uk_console_ops->init(dtb);
+
+	uk_pr_info("Console init finished\n");
+}
+#endif /* !CONFIG_ARCH_X86_64 */

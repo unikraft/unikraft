@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: ISC */
-/* Copyright (c) 2015, IBM
- *           (c) 2017, NEC Europe Ltd.
- * Author(s): Dan Williams <djwillia@us.ibm.com>
- *            Simon Kuenzer <simon.kuenzer@neclab.eu>
+/*
+ * Authors: Dafna Hirschfeld <dafna3@gmail.com>
+ *
+ * Copyright (c) 2018 Dafna Hirschfeld <dafna3@gmail.com>
  *
  * Permission to use, copy, modify, and/or distribute this software
  * for any purpose with or without fee is hereby granted, provided
@@ -19,9 +19,11 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#ifndef __KVM_CONSOLE_H__
-#define __KVM_CONSOLE_H__
+#ifndef __COM_H__
+#define __COM_H__
 
-void _libkvmplat_init_console(void);
+void _libkvmplat_init_serial_console(void);
+void _libkvmplat_serial_putc(char a);
+int  _libkvmplat_serial_getc(void);
 
-#endif /* __KVM_CONSOLE_H__ */
+#endif /* __COM_H__ */

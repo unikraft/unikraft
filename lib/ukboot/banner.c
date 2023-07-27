@@ -35,7 +35,7 @@
  */
 
 #include <uk/config.h>
-#include <uk/plat/console.h>
+#include <uk/console.h>
 #include <stdio.h>
 
 /*

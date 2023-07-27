@@ -60,7 +60,7 @@
 #include <string.h>
 #include <stdarg.h>
 
-#include <uk/plat/console.h>
+#include <uk/console.h>
 
 /* 64 bits + 0-Byte at end */
 #define MAXNBUF 65

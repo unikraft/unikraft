@@ -21,7 +21,7 @@
 #include <uk/config.h>
 #include <libfdt.h>
 #include <uk/plat/common/sections.h>
-#include <uart/pl011.h>
+#include <uk/console.h>
 #ifdef CONFIG_RTC_PL031
 #include <rtc/pl031.h>
 #endif /* CONFIG_RTC_PL031 */
@@ -293,7 +293,7 @@ void __no_pauth _libkvmplat_start(void *dtb_pointer)
 
 	_init_dtb(dtb_pointer);
 
-	pl011_console_init(dtb_pointer);
+	uk_console_init(dtb_pointer);
 
 	uk_pr_info("Entering from KVM (arm64)...\n");
 

@@ -26,7 +26,7 @@
  */
 
 #include <uk/config.h>
-#include <kvm-x86/serial_console.h>
+#include <uart/com.h>
 #include <x86/cpu.h>
 
 #define COM1 0x3f8
