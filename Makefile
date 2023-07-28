@@ -645,6 +645,7 @@ TAR		:= tar
 UNZIP		:= unzip -qq -u
 GIT		:= git
 WGET		:= wget
+PYTHON          := python3
 SHA1SUM		:= sha1sum -b
 SHA256SUM	:= sha256sum -b
 SHA512SUM	:= sha512sum -b
@@ -891,8 +892,7 @@ COMMON_CONFIG_ENV = \
 PHONY += scriptconfig scriptsyncconfig iscriptconfig kmenuconfig guiconfig \
 		 dumpvarsconfig
 
-PYTHONCMD ?= python
-kpython := PYTHONPATH=$(UK_CONFIGLIB):$$PYTHONPATH $(PYTHONCMD)
+KPYTHON := PYTHONPATH=$(UK_CONFIGLIB):$$PYTHONPATH $(PYTHON)
 
 ifneq ($(filter scriptconfig,$(MAKECMDGOALS)),)
 ifndef SCRIPT
@@ -901,31 +901,31 @@ endif
 endif
 
 scriptconfig:
-	$(Q)$(COMMON_CONFIG_ENV) $(kpython) $(SCRIPT) $(Kconfig) $(if $(SCRIPT_ARG),"$(SCRIPT_ARG)")
+	$(Q)$(COMMON_CONFIG_ENV) $(KPYTHON) $(SCRIPT) $(Kconfig) $(if $(SCRIPT_ARG),"$(SCRIPT_ARG)")
 
 iscriptconfig:
-	$(Q)$(COMMON_CONFIG_ENV) $(kpython) -i -c \
+	$(Q)$(COMMON_CONFIG_ENV) $(KPYTHON) -i -c \
 	  "import kconfiglib; \
 	   kconf = kconfiglib.Kconfig('$(UK_CONFIG)'); \
 	   print('A Kconfig instance \'kconf\' for the architecture $(ARCH) has been created.')"
 
 kmenuconfig:
-	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/menuconfig.py \
+	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/menuconfig.py \
 		$(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 scriptsyncconfig:
-	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/genconfig.py \
+	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/genconfig.py \
 		--sync-deps=$(BUILD_DIR)/include/config \
 		--header-path=$(KCONFIG_AUTOHEADER) $(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 guiconfig:
-	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/guiconfig.py $(CONFIG_CONFIG_IN)
+	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/guiconfig.py $(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 dumpvarsconfig:
-	$(Q)$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/examples/dumpvars.py $(CONFIG_CONFIG_IN)
+	$(Q)$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/examples/dumpvars.py $(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 ifneq ($(HOSTOSENV),Linux)
@@ -937,32 +937,32 @@ gconfig: guiconfig
 xconfig: guiconfig
 
 config:
-	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/genconfig.py --header-path $(KCONFIG_AUTOHEADER) $(CONFIG_CONFIG_IN)
+	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/genconfig.py --header-path $(KCONFIG_AUTOHEADER) $(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 allyesconfig:
-	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/allyesconfig.py $(CONFIG_CONFIG_IN)
+	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/allyesconfig.py $(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 allnoconfig:
-	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/allnoconfig.py $(CONFIG_CONFIG_IN)
+	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/allnoconfig.py $(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 defconfig:
-	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/defconfig.py --kconfig $(CONFIG_CONFIG_IN) $(DEFCONFIG)
+	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/defconfig.py --kconfig $(CONFIG_CONFIG_IN) $(DEFCONFIG)
 	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 savedefconfig:
-	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/savedefconfig.py --kconfig $(CONFIG_CONFIG_IN) --out $(DEFCONFIG)
+	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/savedefconfig.py --kconfig $(CONFIG_CONFIG_IN) --out $(DEFCONFIG)
 	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 oldconfig:
-	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/oldconfig.py $(CONFIG_CONFIG_IN)
+	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/oldconfig.py $(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 # Regenerate $(KCONFIG_AUTOHEADER) whenever $(UK_CONFIG) changed
 $(KCONFIG_AUTOHEADER): $(UK_CONFIG)
-	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/genconfig.py --header-path $(KCONFIG_AUTOHEADER) $(CONFIG_CONFIG_IN)
+	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/genconfig.py --header-path $(KCONFIG_AUTOHEADER) $(CONFIG_CONFIG_IN)
 else
 # Use traditional KConfig system on Linux
 xconfig: $(KCONFIG_DIR)/qconf
