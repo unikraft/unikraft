@@ -40,6 +40,9 @@
 #include <uk/assert.h>
 #include <uk/refcount.h>
 #include <uk/alloc.h>
+#if CONFIG_LIBUKALLOCPOOL
+#include <uk/allocpool.h>
+#endif /* CONFIG_LIBUKALLOCPOOL */
 #include <uk/essentials.h>
 
 #ifdef __cplusplus
@@ -299,6 +302,81 @@ struct uk_netbuf *uk_netbuf_alloc_buf(struct uk_alloc *a, size_t buflen,
 				      size_t bufalign, uint16_t headroom,
 				      size_t privlen, uk_netbuf_dtor_t dtor);
 
+#if CONFIG_LIBUKALLOCPOOL
+/**
+ * Allocate and initialize netbuf with data buffer area, allocated
+ * from a memory pool. The size of the data buffer and alignment is
+ * retrieved from the pool.
+ * m->len is initialized with 0. Metadata (struct uknetbuf, priv)
+ * is placed at the end of the according allocation.
+ * @param p
+ *   Memory pool to be used for allocating `struct uk_netbuf` and the
+ *   corresponding buffer area (single allocation).
+ *   On uk_netbuf_free() and refcount == 0 the allocation is free'd
+ *   to this pool.
+ * @param headroom
+ *   Number of bytes reserved as headroom from the buffer area.
+ *   `headroom` has to be smaller or equal to the buffer length
+ *   (derived form pool settings).
+ *   Please note that `m->data` is aligned when `headroom` is 0.
+ *   In order to keep this property when a headroom is used,
+ *   it is recommended to align up the required headroom.
+ * @param privlen
+ *   Length for reserved memory to store private data. This memory is free'd
+ *   together with this netbuf. If privlen is 0, either no private data is
+ *   required or external meta data corresponds to this netbuf. m->priv can be
+ *   modified after the allocation.
+ * @param dtor
+ *   Destructor that is called when netbuf is free'd (optional)
+ * @returns
+ *   - (NULL): Allocation failed
+ *   - initialized uk_netbuf
+ */
+struct uk_netbuf *uk_netbuf_poolalloc_buf(struct uk_allocpool *p,
+					  uint16_t headroom,
+					  size_t privlen,
+					  uk_netbuf_dtor_t dtor);
+
+/**
+ * Batched allocation and initialization of netbufs with data buffer area,
+ * allocated from a memory pool. The size of the data buffer and alignment is
+ * retrieved from the pool.
+ * m->len is initialized with 0. Metadata (struct uknetbuf, priv)
+ * is placed at the end of the according allocation.
+ * @param p
+ *   Memory pool to be used for allocating netbufs and the
+ *   corresponding buffer area (single allocations).
+ *   On uk_netbuf_free() and refcount == 0 the allocation is free'd
+ *   to this pool.
+ * @param m
+ *   Pointer to array that will be filled with pointers of
+ *   allocated netbufs from the pool.
+ * @param headroom
+ *   Number of bytes reserved as headroom from the buffer area.
+ *   `headroom` has to be smaller or equal to the buffer length
+ *   (derived form pool settings).
+ *   Please note that `m->data` is aligned when `headroom` is 0.
+ *   In order to keep this property when a headroom is used,
+ *   it is recommended to align up the required headroom.
+ * @param count
+ *   Number of netbufs that should be allocated from the pool.
+ * @param privlen
+ *   Length for reserved memory to store private data. This memory is free'd
+ *   together with this netbuf. If privlen is 0, either no private data is
+ *   required or external meta data corresponds to this netbuf. m->priv can be
+ *   modified after the allocation.
+ * @param dtor
+ *   Destructor that is called when netbuf is free'd (optional)
+ * @returns
+ *   - (-ENOSPC) Pool objects are too small to store netbuf meta data
+ *   - (>= 0) Number of successfully allocated objects on the given array `m`.
+ */
+int uk_netbuf_poolalloc_buf_batch(struct uk_allocpool *p,
+				  struct uk_netbuf *m[],
+				  unsigned int count, uint16_t headroom,
+				  size_t privlen, uk_netbuf_dtor_t dtor);
+#endif /* CONFIG_LIBUKALLOCPOOL */
+
 /**
  * Initialize netbuf with data buffer on a user given allocated memory area
  * m->len is initialized with 0. Metadata (struct uknetbuf, priv)
@@ -477,6 +555,50 @@ void uk_netbuf_free(struct uk_netbuf *m);
  *   uk_netbuf to release
  */
 void uk_netbuf_free_single(struct uk_netbuf *m);
+
+/**
+ * Allocate a duplicate of a src netbuf. The data buffer area is copied
+ * into the new netbuf.
+ * Metadata (struct uknetbuf, priv) is placed at the end of the according
+ * allocation.
+ * @param a
+ *   Allocator to be used for allocating `struct uk_netbuf` and the
+ *   corresponding buffer area (single allocation).
+ *   On uk_netbuf_free() and refcount == 0 the allocation is free'd
+ *   to this allocator.
+ * @param buflen
+ *   Size of the buffer area
+ * @param bufalign
+ *   Alignment for the buffer area (`m->buf` will be aligned to it)
+ * @param headroom
+ *   Number of bytes reserved as headroom from the buffer area.
+ *   `headroom` has to be smaller or equal to `buflen`.
+ *   Please note that `m->data` is aligned when `headroom` is 0.
+ *   In order to keep this property when a headroom is used,
+ *   it is recommended to align up the required headroom.
+ * @param privlen
+ *   Length for reserved memory to store private data. This memory is free'd
+ *   together with this netbuf. If privlen is 0, either no private data is
+ *   required or external meta data corresponds to this netbuf. m->priv can be
+ *   modified after the allocation.
+ * @param dtor
+ *   Destructor that is called when netbuf is free'd (optional)
+ * @returns
+ *   - (NULL): Allocation failed
+ *   - initialized uk_netbuf
+ */
+struct uk_netbuf *uk_netbuf_dup_single(struct uk_alloc *a, size_t buflen,
+				       size_t bufalign, uint16_t headroom,
+				       size_t privlen, uk_netbuf_dtor_t dtor,
+				       const struct uk_netbuf *src);
+
+#if CONFIG_LIBUKALLOCPOOL
+struct uk_netbuf *uk_netbuf_pooldup_single(struct uk_allocpool *p,
+					   uint16_t headroom,
+					   size_t privlen,
+					   uk_netbuf_dtor_t dtor,
+					   const struct uk_netbuf *src);
+#endif /* CONFIG_LIBUKALLOCPOOL */
 
 /**
  * Calculates the current available headroom bytes of a netbuf

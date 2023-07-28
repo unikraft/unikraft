@@ -32,6 +32,7 @@
 #include <uk/netbuf.h>
 #include <uk/essentials.h>
 #include <uk/print.h>
+#include <string.h>
 
 /* Used to align netbuf's priv and data areas to `long long` data type */
 #define NETBUF_ADDR_ALIGNMENT (sizeof(long long))
@@ -129,6 +130,117 @@ struct uk_netbuf *uk_netbuf_alloc_buf(struct uk_alloc *a, size_t buflen,
 	return m;
 }
 
+#if CONFIG_LIBUKALLOCPOOL
+struct uk_netbuf *uk_netbuf_poolalloc_buf(struct uk_allocpool *p,
+					  uint16_t headroom,
+					  size_t privlen,
+					  uk_netbuf_dtor_t dtor)
+{
+	void *obj;
+	size_t obj_len;
+	size_t meta_len;
+	struct uk_alloc *a;
+	struct uk_netbuf *m;
+
+	UK_ASSERT(p);
+
+	/* uk_alloc interface used for free'ing */
+	a = uk_allocpool2ukalloc(p);
+
+	UK_ASSERT(a);
+
+	/* Place headroom and buf at the beginning of the allocation,
+	 * This is done in order to forward potential alignments of the
+	 * underlying allocation directly to the netbuf data area.
+	 * `m` (followed by `m->priv` if privlen > 0) will be placed at
+	 * the end of the given memory.
+	 * If the operation does not work, we
+	 */
+	obj_len = uk_allocpool_objlen(p);
+	meta_len = NETBUF_ADDR_ALIGN_UP(sizeof(*m) + privlen);
+	if (unlikely(meta_len > NETBUF_ADDR_ALIGN_DOWN(obj_len)))
+		return NULL; /* no space for meta data on pool objects */
+
+	obj = uk_allocpool_take(p);
+	if (unlikely(!obj))
+		return NULL;
+
+	m = (struct uk_netbuf *) (NETBUF_ADDR_ALIGN_DOWN((__uptr) obj
+							 + obj_len)
+				  - meta_len);
+	uk_netbuf_init_indir(m,
+			     obj,
+			     (size_t) ((__uptr) m - (__uptr) obj),
+			     headroom,
+			     privlen > 0 ? (void *) ((__uptr) m
+						     + sizeof(*m))
+			     : NULL,
+			     dtor);
+
+	/* Save reference to allocator and allocation
+	 * that is used for free'ing this uk_netbuf.
+	 */
+	m->_a = a;
+	m->_b = obj;
+
+	return m;
+}
+
+int uk_netbuf_poolalloc_buf_batch(struct uk_allocpool *p,
+				  struct uk_netbuf *m[], unsigned int count,
+				  uint16_t headroom,
+				  size_t privlen, uk_netbuf_dtor_t dtor)
+{
+	size_t meta_len = 0;
+	size_t obj_len;
+	struct uk_alloc *a;
+	void *obj[count];
+	unsigned int i;
+
+	UK_ASSERT(p);
+
+	/* uk_alloc interface used for free'ing */
+	a = uk_allocpool2ukalloc(p);
+
+	UK_ASSERT(a);
+
+	/* Place headroom and buf at the beginning of the allocation,
+	 * This is done in order to forward potential alignments of the
+	 * underlying allocation directly to the netbuf data area.
+	 * `m` (followed by `m->priv` if privlen > 0) will be placed at
+	 * the end of the given memory.
+	 * If the operation does not work, we
+	 */
+	obj_len = uk_allocpool_objlen(p);
+	meta_len = NETBUF_ADDR_ALIGN_UP(sizeof(struct uk_netbuf) + privlen);
+	if (unlikely(meta_len > NETBUF_ADDR_ALIGN_DOWN(obj_len)))
+		return -ENOSPC; /* no space for meta data on pool objects */
+
+	count = uk_allocpool_take_batch(p, obj, count);
+	for (i = 0; i < count; ++i) {
+		m[i] = (struct uk_netbuf *) (NETBUF_ADDR_ALIGN_DOWN((__uptr) obj[i]
+								    + obj_len)
+					     - meta_len);
+		uk_netbuf_init_indir(m[i],
+				     obj[i],
+				     (size_t) ((__uptr) m[i] - (__uptr) obj[i]),
+				     headroom,
+				     privlen > 0 ? (void *) ((__uptr) m[i]
+							     + sizeof(struct uk_netbuf))
+				     : NULL,
+				     dtor);
+
+		/* Save reference to allocator and allocation
+		 * that is used for free'ing this uk_netbuf.
+		 */
+		m[i]->_a = a;
+		m[i]->_b = obj[i];
+	}
+
+	return (int) count;
+}
+#endif /* CONFIG_LIBUKALLOCPOOL */
+
 struct uk_netbuf *uk_netbuf_prepare_buf(void *mem, size_t size,
 					uint16_t headroom,
 					size_t privlen, uk_netbuf_dtor_t dtor)
@@ -145,7 +257,7 @@ struct uk_netbuf *uk_netbuf_prepare_buf(void *mem, size_t size,
 	 * the end of the given memory.
 	 */
 	meta_len = NETBUF_ADDR_ALIGN_UP(sizeof(*m) + privlen);
-	if (meta_len > NETBUF_ADDR_ALIGN_DOWN((__uptr) mem + size))
+	if (meta_len > NETBUF_ADDR_ALIGN_DOWN(size))
 		return NULL;
 
 	m = (struct uk_netbuf *) (NETBUF_ADDR_ALIGN_DOWN((__uptr) mem + size)
@@ -263,3 +375,60 @@ void uk_netbuf_free(struct uk_netbuf *m)
 		m = n;
 	}
 }
+
+struct uk_netbuf *uk_netbuf_dup_single(struct uk_alloc *a, size_t buflen,
+				       size_t bufalign, uint16_t headroom,
+				       size_t privlen, uk_netbuf_dtor_t dtor,
+				       const struct uk_netbuf *src)
+{
+	struct uk_netbuf *nb;
+
+	UK_ASSERT(src);
+
+	if (unlikely((size_t) src->len + headroom > buflen))
+		return NULL; /* buffer would be too small to hold everything */
+
+	nb = uk_netbuf_alloc_buf(a, buflen, bufalign, headroom, privlen, dtor);
+	if (unlikely(!nb))
+		return NULL;
+
+	memcpy(nb->data, src->data, src->len);
+	nb->len = src->len;
+	nb->flags = src->flags;
+	nb->csum_start = src->csum_start;
+	nb->csum_offset = src->csum_offset;
+
+	return nb;
+}
+
+#if CONFIG_LIBUKALLOCPOOL
+struct uk_netbuf *uk_netbuf_pooldup_single(struct uk_allocpool *p,
+					   uint16_t headroom,
+					   size_t privlen,
+					   uk_netbuf_dtor_t dtor,
+					   const struct uk_netbuf *src)
+{
+	struct uk_netbuf *nb;
+
+	UK_ASSERT(src);
+
+	if (unlikely((size_t) src->len + headroom > (NETBUF_ADDR_ALIGN_DOWN(uk_allocpool_objlen(p))
+						     - NETBUF_ADDR_ALIGN_UP(sizeof(*nb) + privlen))))
+		return NULL; /* buffer would be too small to hold everything */
+
+	nb = uk_netbuf_poolalloc_buf(p, headroom, privlen, dtor);
+	if (unlikely(!nb))
+		return NULL;
+
+	/* double-check that target packet has really enough space to hold the source */
+	UK_ASSERT(uk_netbuf_tailroom(nb) >= src->len);
+
+	memcpy(nb->data, src->data, src->len);
+	nb->len = src->len;
+	nb->flags = src->flags;
+	nb->csum_start = src->csum_start;
+	nb->csum_offset = src->csum_offset;
+
+	return nb;
+}
+#endif /* CONFIG_LIBUKALLOCPOOL */
