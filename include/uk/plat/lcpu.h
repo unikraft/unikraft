@@ -96,6 +96,9 @@ void ukplat_lcpu_halt_irq_until(__nsec until);
 /**
  * Halts the current logical CPU. Execution is resumed when an interrupt/signal
  * arrives.
+ *
+ * NOTE: This must be called with IRQ's disabled. On return, IRQ's are not
+ *        re-enabled.
  */
 void ukplat_lcpu_halt_irq(void);
 
