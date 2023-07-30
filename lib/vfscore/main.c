@@ -1148,16 +1148,11 @@ UK_SYSCALL_R_DEFINE(int, getdents64, int, fd, struct dirent64 *, dirp,
 
 struct dirent *readdir(DIR *dir)
 {
-	static __thread struct dirent entry, *result;
-	int ret;
+	static __thread struct dirent entry;
+	struct dirent *result;
 
-	ret = readdir_r(dir, &entry, &result);
-	if (ret) {
-		errno = ret;
-		return NULL;
-	}
+	errno = readdir_r(dir, &entry, &result);
 
-	errno = 0;
 	return result;
 }
 
