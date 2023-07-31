@@ -1,7 +1,7 @@
 menuconfig PLAT_KVM
 	bool "KVM guest"
 	default n
-	depends on (ARCH_X86_64 || (ARCH_ARM_64 && !HAVE_SYSCALL))
+	depends on (ARCH_X86_64 || ARCH_ARM_64)
 	select LIBUKDEBUG
 	select LIBUKALLOC
 	select LIBUKTIMECONV
