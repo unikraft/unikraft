@@ -190,7 +190,9 @@ static int pf_probe(void)
 		ret = pf_driver_add_device(drv, dev);
 		if (ret < 0)
 			uk_free(pfh.a, dev);
+#ifdef CONFIG_ARCH_X86_64
 		return 0;
+#endif
 	} while (1);
 
 	return ret;
