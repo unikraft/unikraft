@@ -64,3 +64,5 @@ struct ukarch_trap_ctx {
 #define UKARCH_TRAP_MATH		trap_math
 
 #define UKARCH_TRAP_SECURITY		trap_security
+
+#define UKARCH_TRAP_SYSCALL		trap_syscall

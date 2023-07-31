@@ -25,8 +25,8 @@
 #define rret0		rax
 #define rret1		rdx
 
-#elif (defined __ARM64__)
-#define rip		x[15] /* TODO: Is this correct? */
+#elif (defined __ARM_64__)
+#define rip		elr_el1
 #define rsyscall	x[8]
 #define rarg0		x[0]
 #define rarg1		x[1]
