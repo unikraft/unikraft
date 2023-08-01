@@ -55,6 +55,10 @@
 #include <gic/gic-v2.h>
 #endif
 
+#if CONFIG_PAGING
+#include <uk/plat/paging.h>
+#endif /* CONFIG_PAGING */
+
 #if CONFIG_LIBUKMMIO
 #include <uk/mmio.h>
 #endif
@@ -467,6 +471,36 @@ error_exit:
 #endif
 }
 
+#ifdef CONFIG_PAGING
+static int virtio_mmio_map_device(struct virtio_mmio_device *vmdev)
+{
+	int rc;
+	struct uk_pagetable *pt;
+	unsigned long attr;
+
+	attr = PAGE_ATTR_PROT_RW;
+#ifdef CONFIG_ARCH_ARM_64
+	attr |= PAGE_ATTR_TYPE_DEVICE_nGnRnE;
+#endif /* CONFIG_ARCH_ARM_64 */
+
+	pt = ukplat_pt_get_active();
+
+	/* 1:1 */
+	rc = ukplat_page_map(pt, vmdev->base, vmdev->base, 1, attr, 0);
+	if (!rc)
+		goto out;
+
+	/* If already mapped, we assume that the mapping is part of the
+	 * boot pagetables. Make sure the attributes are correct.
+	 */
+	if (rc == -EEXIST)
+		rc = ukplat_page_set_attr(pt, vmdev->base, 1, attr, 0);
+
+out:
+	return rc;
+}
+#endif /* CONFIG_PAGING */
+
 static int virtio_mmio_add_dev(struct pf_device *pfdev)
 {
 	struct virtio_mmio_device *vm_dev;
@@ -492,6 +526,12 @@ static int virtio_mmio_add_dev(struct pf_device *pfdev)
 		rc = -EFAULT;
 		goto free_vmdev;
 	}
+
+#ifdef CONFIG_PAGING
+	rc = virtio_mmio_map_device(vm_dev);
+	if (unlikely(rc))
+		return rc;
+#endif /* CONFIG_PAGING */
 
 	magic = virtio_mem_cread32(vm_dev->base, VIRTIO_MMIO_MAGIC_VALUE);
 	if (magic != ('v' | 'i' << 8 | 'r' << 16 | 't' << 24)) {
