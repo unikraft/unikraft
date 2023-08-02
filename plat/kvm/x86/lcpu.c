@@ -32,6 +32,7 @@
  */
 
 #include <stdint.h>
+#include <uk/assert.h>
 #include <uk/plat/lcpu.h>
 #include <x86/irq.h>
 
