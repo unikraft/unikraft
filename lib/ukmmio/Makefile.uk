@@ -1,7 +1,7 @@
 $(eval $(call addlib_s,libukmmio,$(CONFIG_LIBUKMMIO)))
 
 # Register to uklibparam, sets "virtio_mmio" as parameter prefix (virtio_mmio.*)
-# $(eval $(call addlib_paramprefix,libukmmio,virtio_mmio))
+$(eval $(call addlib_paramprefix,libukmmio,virtio_mmio))
 
 CINCLUDES-y += -I$(LIBUKMMIO_BASE)/include
 

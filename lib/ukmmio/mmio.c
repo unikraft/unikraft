@@ -1,106 +1,87 @@
+#include <inttypes.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <uk/alloc.h>
 #include <uk/mmio.h>
 
-#define MAX_DEV_STR 255
-const char virtio_mmio_identifier[] = "virtio_mmio.device=";
+#include <uk/libparam.h>
+#include <uk/essentials.h>
 
-struct uk_alloc *a;
-struct uk_mmio_device_list uk_mmio_device_list =
-UK_TAILQ_HEAD_INITIALIZER(uk_mmio_device_list);
-int uk_mmio_device_count = 0;
+#define VIRTIO_MMIO_DEV_MAX	32 /* arbitrary */
+static char *uk_libparam_devices[VIRTIO_MMIO_DEV_MAX] = {0};
+
+UK_LIBPARAM_PARAM_ARR_ALIAS(device, uk_libparam_devices, charp,
+			    VIRTIO_MMIO_DEV_MAX, "virtio-mmio devices");
+
+/* Parse size string with suffix (eg "4K") into number */
+static char *parse_size(const char* size_str, size_t *sz)
+{
+	char *endptr;
+
+	*sz = strtoull(size_str, &endptr, 0);
+
+	switch(*endptr) {
+	case 'k':
+	case 'K':
+		*sz *= 1024;
+		++endptr;
+		break;
+	case 'm':
+	case 'M':
+		*sz *= 1024 * 1024;
+		++endptr;
+		break;
+	case 'g':
+	case 'G':
+		*sz *= 1024 * 1024 * 1024;
+		++endptr;
+		break;
+	default:
+		break;
+	}
+
+	return endptr;
+}
+
+/* virtio_mmio.base = <size>@<base>:<irq>[:<id>] */
+static struct uk_mmio_device *uk_mmio_parse_dev(char *str)
+{
+	struct uk_mmio_device *dev;
+	int chunks = 0;
+
+	dev = uk_calloc(uk_alloc_get_default(), 1, sizeof(*dev));
+	if (unlikely(!dev))
+		return NULL;
+
+	str = parse_size(str, &dev->size);
+	if (unlikely(!dev->size))
+		return NULL;
+
+	chunks = sscanf(str, "@%" PRIx64 ":%" PRIx32 ":%" PRIx32,
+			&dev->base_addr, &dev->irq, &dev->id);
+
+	if (unlikely(chunks < 2))
+		return NULL;
+
+	return dev;
+}
 
 unsigned int uk_mmio_dev_count(void)
 {
-	return (unsigned int) uk_mmio_device_count;
+	unsigned int count = 0;
+
+	while (((char **)uk_libparam_devices)[count++])
+		count++;
+
+	return count;
 }
 
-struct uk_mmio_device * uk_mmio_dev_get(unsigned int id)
+struct uk_mmio_device *uk_mmio_dev_get(unsigned int id)
 {
-	struct uk_mmio_device *dev;
+	if (id >= ARRAY_SIZE(uk_libparam_devices) || !uk_libparam_devices[id])
+		return NULL;
 
-	UK_TAILQ_FOREACH(dev, &uk_mmio_device_list, _list) {
-		if (dev->id == id)
-			return dev;
-	}
-
-	return NULL;
+	return uk_mmio_parse_dev(((char **)uk_libparam_devices)[id]);
 }
 
-__u64 get_token_until(char *str, char c, int base, char **pEnd)
-{
-	__u64 multiplier = 1;
-	char *p;
-
-	for (p = str; *p && *p != c; p++) {
-		if (*p == 'K') {
-			multiplier = 1024;
-			*p = ' ';
-		}
-	}
-	if (*p) {
-		*p = ' ';
-	}
-
-	return strtol(str, pEnd, base) * multiplier;
-}
-
-int uk_mmio_add_dev(char *device)
-{
-	__u64 size, base_addr;
-	unsigned long irq, plat_dev_id = 0;
-	char devStr[MAX_DEV_STR];
-	char *pEnd;
-	struct uk_mmio_device *dev;
-
-	if (!(a = uk_alloc_get_default())) {
-		uk_pr_err("No allocator\n");
-		return -1;
-	}
-
-	if (strncmp(device, virtio_mmio_identifier, sizeof(virtio_mmio_identifier) - 1)) {
-		uk_pr_err("Invalid mmio device cmdline argument\n");
-		return -1;
-	}
-
-	strcpy(devStr, device + sizeof(virtio_mmio_identifier) - 1);
-	
-	size = get_token_until(devStr, '@', 0, &pEnd);
-	if (!size) {
-		uk_pr_err("Couldn't parse mmio device size\n");
-		return -1;
-	}
-
-	base_addr = get_token_until(pEnd, ':', 0, &pEnd);
-	if (!base_addr) {
-		uk_pr_err("Couldn't parse mmio device base addr\n");
-		return -1;
-	}
-
-	irq = get_token_until(pEnd, ':', 10, &pEnd);
-	if (!irq) {
-		uk_pr_err("Couldn't parse mmio device base irq\n");
-		return -1;
-	}
-
-	if (*pEnd) {
-		plat_dev_id = get_token_until(pEnd, 0, 10, NULL);
-	}
-
-	dev = uk_calloc(a, 1, sizeof(*dev));
-	if (!dev) {
-		return -1;
-	}
-
-	dev->id = uk_mmio_device_count++;
-	dev->base_addr = base_addr;
-	dev->size = size;
-	dev->irq = irq;
-	dev->dev_id = plat_dev_id;
-	UK_TAILQ_INSERT_TAIL(&uk_mmio_device_list, dev, _list);
-
-	uk_pr_info("New mmio device at %#lx of size %#lx and irq %lu\n", base_addr, size, irq);
-	return 0;
-}
