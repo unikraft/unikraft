@@ -55,9 +55,9 @@ void ukplat_lcpu_disable_irq(void)
 
 void ukplat_lcpu_halt_irq(void)
 {
-	ukplat_lcpu_enable_irq();
+	UK_ASSERT(ukplat_lcpu_irqs_disabled());
+
 	halt();
-	ukplat_lcpu_disable_irq();
 }
 
 unsigned long ukplat_lcpu_save_irqf(void)
