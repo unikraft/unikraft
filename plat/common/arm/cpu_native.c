@@ -66,7 +66,7 @@ void reset(void)
 }
 
 /* Systems support PSCI >= 0.2 can do system off from PSCI */
-void system_off(void)
+void system_off(enum ukplat_gstate request __unused)
 {
 	struct smccc_args smccc_arguments = {0};
 
