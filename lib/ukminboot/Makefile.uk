@@ -1,0 +1,18 @@
+$(eval $(call addlib_s,libukminboot,$(CONFIG_LIBUKMINBOOT)))
+
+CINCLUDES-$(CONFIG_LIBUKMINBOOT)		+= -I$(LIBUKMINBOOT_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBUKMINBOOT)		+= -I$(LIBUKMINBOOT_BASE)/include
+
+LIBUKMINBOOT_SRCS-y += $(LIBUKMINBOOT_BASE)/boot.c
+
+# The main() is in the separate library to fool the LTO. Which is
+# trying to resolve the main() function call to whatever is available
+# during liking the library object file. And this will be the weak
+# main. So even if the proper main() is provided later, the weak one
+# will be called, because the decision is already made.
+#
+# This does not sound right, but LTO does not work well with
+# incremental linking (ld -r). This possibly will be fixed in gcc
+# v9. But we have to deal with it now.
+$(eval $(call addlib_s,libukboot_main,$(CONFIG_LIBUKMINBOOT)))
+LIBUKBOOT_MAIN_SRCS-y += $(LIBUKMINBOOT_BASE)/weak_main.c

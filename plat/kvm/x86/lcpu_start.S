@@ -52,6 +52,10 @@
 x86_start16_addr:
 	.quad	LOAD_ADDR16
 
+.globl boot_time
+boot_time:
+	.long	0
+
 /* The following section has to be copied to LOAD_ADDR16 (4KiB max!) at runtime
  * as 16-bit real mode entry point
  */
@@ -162,6 +166,12 @@ gdt64_ptr:
 .code32
 .section .text.boot.32
 ENTRY(lcpu_start32)
+	/* Get the current time-stamp (stores it in edx:eax) */
+	lfence
+	rdtsc
+	lfence
+	movl	%eax, boot_time
+
 	/* Enable physical address extension (PAE) */
 	movl	$CR4_BOOT32_SETTINGS, %eax
 	movl	%eax, %cr4

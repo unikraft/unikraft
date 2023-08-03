@@ -1,0 +1,28 @@
+menuconfig LIBUKMINBOOT
+	bool "minimal-ukboot: Minimal Unikraft bootstrapping (testing)"
+	depends on !LIBUKBOOT
+	select HAVE_BOOTENTRY
+	default y
+
+if LIBUKMINBOOT
+	config MYFILE_PATH
+		string "Path to the final image"
+	default "/home/dragos/Desktop/UnikraftBigFolder/unikraft/build/unikraft_kvm-x86_64"
+
+	config LIBUKMINBOOT_MAXNBARGS
+		int "Maximum number of arguments (max. size of argv)"
+	default 60
+
+	config LIBUKMINBOOT_PRINT
+		bool "Enable debug print"
+	default n
+
+	config LIBUKMINBOOT_OUTF
+		bool "Enable internal helper for text output redirection"
+	default n
+
+	config LIBUKMINBOOT_HEXDUMP
+		bool "Enable hexdump"
+	default n
+
+endif
