@@ -30,12 +30,12 @@
 static void cpu_halt(void) __noreturn;
 
 /* TODO: implement CPU reset */
-void ukplat_terminate(enum ukplat_gstate request __unused)
+void ukplat_terminate(enum ukplat_gstate request)
 {
 	uk_pr_info("Unikraft halted\n");
 
 	/* Try to make system off */
-	system_off();
+	system_off(request);
 
 	/*
 	 * If we got here, there is no way to initiate "shutdown" on virtio

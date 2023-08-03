@@ -38,7 +38,7 @@
 #include <string.h>
 
 void halt(void);
-void system_off(void);
+void system_off(enum ukplat_gstate request);
 
 static inline void cpuid(__u32 fn, __u32 subfn,
 			 __u32 *eax, __u32 *ebx,

@@ -35,6 +35,7 @@
 
 #include <inttypes.h>
 #include <uk/essentials.h>
+#include <uk/plat/bootstrap.h>
 #include <uk/alloc.h>
 #include <uk/assert.h>
 #include <arm/smccc.h>
@@ -57,7 +58,7 @@ extern smccc_conduit_fn_t smccc_psci_call;
 /* CPU native APIs */
 void halt(void);
 void reset(void);
-void system_off(void);
+void system_off(enum ukplat_gstate request);
 #ifdef CONFIG_HAVE_SMP
 int cpu_on(__lcpuid id, __paddr_t entry, void *arg);
 #endif /* CONFIG_HAVE_SMP */
