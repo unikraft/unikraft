@@ -213,6 +213,21 @@ static inline void do_uk_reloc(__paddr_t r_paddr __unused,
 			       __vaddr_t r_vaddr __unused) { }
 #endif /* !CONFIG_LIBUKRELOC */
 
+/* This relocates the UKPLAT_MEMRT_KERNEL memory region descriptors in the same
+ * manner do_uk_reloc does for the .uk_reloc ELF section.
+ *
+ * NOTE: THIS COULD CAUSE THE MEMORY REGION DESCRIPTORS LIST TO BECOME OUT OF
+ *       ORDER W.R.T. UKPLAT_MEMRT_KERNEL MEMORY REGION DESCRIPTORS. THIS SHOULD
+ *       BE FOLLOWED BY A CALL TO A COALESCING/SORTING METHOD.
+ *       ONLY USE THIS IF YOU KNOW WHAT YOU ARE DOING!
+ */
+#if CONFIG_LIBUKRELOC
+void do_uk_reloc_kmrds(__paddr_t r_paddr, __vaddr_t r_vaddr);
+#else  /* CONFIG_LIBUKRELOC */
+static inline void do_uk_reloc_kmrds(__paddr_t r_paddr __unused,
+				     __vaddr_t r_vaddr __unused) { }
+#endif /* !CONFIG_LIBUKRELOC */
+
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __UK_RELOC_H__ */

@@ -62,7 +62,6 @@ static inline struct uk_reloc_hdr *get_uk_reloc_hdr()
 
 void __used do_uk_reloc(__paddr_t r_paddr, __vaddr_t r_vaddr)
 {
-	struct ukplat_memregion_desc *mrdp;
 	unsigned long bkp_lt_baddr;
 	struct uk_reloc_hdr *ur_hdr;
 	struct uk_reloc *ur;
@@ -79,18 +78,8 @@ void __used do_uk_reloc(__paddr_t r_paddr, __vaddr_t r_vaddr)
 	if (r_vaddr == 0)
 		r_vaddr = (__vaddr_t)rt_baddr;
 
-	/* Since we may have been placed at a random physical address, adjust
-	 * the initial memory region descriptors added through mkbootinfo.py
-	 * since they contain the link-time addresses, relative to rt_baddr.
-	 * Do this before anything else, since `lt_baddr`'s relocation has
-	 * no been resolved yet and contains the link time address.
-	 */
-	ukplat_memregion_foreach(&mrdp, UKPLAT_MEMRT_KERNEL, 0, 0) {
-		mrdp->pbase -= (__paddr_t)lt_baddr;
-		mrdp->pbase += r_paddr;
-		mrdp->vbase -= (__vaddr_t)lt_baddr;
-		mrdp->vbase += r_vaddr;
-	}
+	/* Relocate UKPLAT_MEMRT_KERNEL memory region descriptors */
+	do_uk_reloc_kmrds(r_paddr, r_vaddr);
 
 	/* Back up the original link time base address. We are going to lose
 	 * it once we apply all relocations. Instead of impacting the runtime
@@ -113,4 +102,31 @@ void __used do_uk_reloc(__paddr_t r_paddr, __vaddr_t r_vaddr)
 	 * runtime base address.
 	 */
 	lt_baddr = bkp_lt_baddr;
+}
+
+/* NOTE:THIS COULD CAUSE THE MEMORY REGION DESCRIPTORS LIST TO BECOME OUT OF
+ *	ORDER W.R.T. UKPLAT_MEMRT_KERNEL MEMORY REGION DESCRIPTORS. THIS SHOULD
+ *	BE FOLLOWED BY A CALL TO A COALESCING/SORTING METHOD.
+ *	ONLY USE THIS IF YOU KNOW WHAT YOU ARE DOING!
+ */
+void do_uk_reloc_kmrds(__paddr_t r_paddr, __vaddr_t r_vaddr)
+{
+	struct ukplat_memregion_desc *mrdp;
+
+	rt_baddr = get_rt_addr(__BASE_ADDR);
+	if (r_paddr == 0)
+		r_paddr = (__paddr_t)rt_baddr;
+	if (r_vaddr == 0)
+		r_vaddr = (__vaddr_t)rt_baddr;
+
+	/* Since we may have been placed at a random physical address, adjust
+	 * the initial memory region descriptors added through mkbootinfo.py
+	 * since they contain the link-time addresses, relative to rt_baddr.
+	 */
+	ukplat_memregion_foreach(&mrdp, UKPLAT_MEMRT_KERNEL, 0, 0) {
+		mrdp->pbase -= (__paddr_t)lt_baddr;
+		mrdp->pbase += r_paddr;
+		mrdp->vbase -= (__vaddr_t)lt_baddr;
+		mrdp->vbase += r_vaddr;
+	}
 }
