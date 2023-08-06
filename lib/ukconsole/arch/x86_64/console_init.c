@@ -7,7 +7,7 @@
 #include <uk/console.h>
 #include <uk/print.h>
 
-extern struct uk_console_ops *uk_console_ops;
+struct uk_console_ops *uk_console_ops;
 extern struct uk_console_ops uk_console_kvm_ops;
 
 void uk_console_init(struct ukplat_bootinfo *bi)
