@@ -34,7 +34,7 @@
 #include <uk/config.h>
 #include <uk/plat/console.h>
 #include <string.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/essentials.h>
 #include <errno.h>
 

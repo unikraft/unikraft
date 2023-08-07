@@ -50,7 +50,7 @@ extern "C" {
 
 #else
 #include <uk/plat/bootstrap.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/essentials.h>
 #include <stdio.h>
 

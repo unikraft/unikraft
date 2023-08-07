@@ -34,7 +34,7 @@
 #define __UKPLAT_LCPU_H__
 
 #include <uk/arch/time.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/essentials.h>
 
 #ifdef __cplusplus

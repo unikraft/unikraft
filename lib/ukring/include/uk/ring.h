@@ -114,7 +114,7 @@ uk_ring_enqueue(struct uk_ring *br, void *buf)
 	 * to complete 
 	 */
 	while (br->br_prod_tail != prod_head)
-		ukarch_spinwait();
+		uk_spinwait();
 	ukarch_store_n(&br->br_prod_tail, prod_next);
 	critical_exit();
 	return 0;
@@ -152,7 +152,7 @@ uk_ring_dequeue_mc(struct uk_ring *br)
 	 * to complete
 	 */
 	while (br->br_cons_tail != cons_head)
-		ukarch_spinwait();
+		uk_spinwait();
 
 	ukarch_store_n(&br->br_cons_tail, cons_next);
 	critical_exit();

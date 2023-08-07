@@ -260,12 +260,12 @@ pgarch_init(void)
 	__u64 efer;
 
 	/* Check for availability of extended features */
-	ukarch_x86_cpuid(0x80000000, 0, &eax, &ebx, &ecx, &edx);
+	uk_x86_cpuid(0x80000000, 0, &eax, &ebx, &ecx, &edx);
 	if (eax < 0x80000008)
 		return -ENOTSUP;
 
 	/* Check for 1GiB page support. We assume 64-bit and NX support */
-	ukarch_x86_cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx);
+	uk_x86_cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx);
 
 	UK_ASSERT(edx & X86_CPUID81_LM);
 	UK_ASSERT(edx & X86_CPUID81_NX);
@@ -281,7 +281,7 @@ pgarch_init(void)
 	wrmsrl(X86_MSR_EFER, efer);
 
 #if PT_LEVELS == 5
-	ukarch_x86_cpuid(0x7, 0, &eax, &ebx, &ecx, &edx);
+	uk_x86_cpuid(0x7, 0, &eax, &ebx, &ecx, &edx);
 
 	if (unlikely(!(ecx & __X86_CPUID7_ECX_LA57))) {
 		uk_pr_crit("%s not supported.\n", "5-level paging");
@@ -290,7 +290,7 @@ pgarch_init(void)
 #endif /* PT_LEVELS == 5 */
 
 	/* Check for PAT support */
-	ukarch_x86_cpuid(0x1, 0, &eax, &ebx, &ecx, &edx);
+	uk_x86_cpuid(0x1, 0, &eax, &ebx, &ecx, &edx);
 	if (unlikely(!(edx & X86_CPUID1_EDX_PAT))) {
 		uk_pr_crit("Page table attributes are not supported.\n");
 		return -ENOTSUP;
@@ -298,7 +298,7 @@ pgarch_init(void)
 	/* Reset PAT to default value */
 	wrmsrl(X86_MSR_PAT, X86_PAT_DEFAULT);
 
-	ukarch_x86_cpuid(0x80000008, 0, &eax, &ebx, &ecx, &edx);
+	uk_x86_cpuid(0x80000008, 0, &eax, &ebx, &ecx, &edx);
 
 	max_addr_bit = (eax & X86_PG_VADDR_MASK) >> X86_PG_VADDR_SHIFT;
 	if (unlikely(max_addr_bit < X86_VADDR_BITS)) {

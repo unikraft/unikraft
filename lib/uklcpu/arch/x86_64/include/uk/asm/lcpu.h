@@ -117,7 +117,7 @@ struct __regs {
 #endif /* !__ASSEMBLY__ */
 
 #ifndef __ASSEMBLY__
-static inline unsigned long ukarch_read_sp(void)
+static inline unsigned long uk_read_sp(void)
 {
 	unsigned long sp;
 
@@ -125,7 +125,7 @@ static inline unsigned long ukarch_read_sp(void)
 	return sp;
 }
 
-static inline void ukarch_spinwait(void)
+static inline void uk_spinwait(void)
 {
 	__asm__ __volatile__("pause" : : : "memory");
 }
@@ -156,7 +156,7 @@ static inline void ukarch_spinwait(void)
 #define X86_CPUID3_SYSCALL      (1 << 11)
 
 #ifndef __ASSEMBLY__
-static inline void ukarch_x86_cpuid(__u32 fn, __u32 subfn,
+static inline void uk_x86_cpuid(__u32 fn, __u32 subfn,
 				    __u32 *eax, __u32 *ebx,
 				    __u32 *ecx, __u32 *edx)
 {

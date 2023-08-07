@@ -30,7 +30,7 @@
 #ifndef __UKARCH_ATOMIC_H__
 #define __UKARCH_ATOMIC_H__
 
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 
 #ifdef __cplusplus
 extern "C" {

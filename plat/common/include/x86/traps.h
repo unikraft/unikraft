@@ -34,7 +34,7 @@
 #ifndef __UKARCH_TRAPS_X86_64_H__
 #define __UKARCH_TRAPS_X86_64_H__
 
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/arch/traps.h>
 #include <uk/plat/common/lcpu.h>
 

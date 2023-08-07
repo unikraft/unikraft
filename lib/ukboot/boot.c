@@ -69,7 +69,7 @@
 #if CONFIG_LIBUKBOOT_INITSCHEDCOOP
 #include <uk/schedcoop.h>
 #endif /* CONFIG_LIBUKBOOT_INITSCHEDCOOP */
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/plat/bootstrap.h>
 #include <uk/plat/memory.h>
 #include <uk/plat/lcpu.h>

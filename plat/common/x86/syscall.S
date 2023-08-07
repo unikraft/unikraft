@@ -31,7 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/asm/cfi.h>
 
 #define ENTRY(X) .globl X ; X :

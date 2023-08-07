@@ -45,7 +45,7 @@
 #error "Unsupported architecture"
 #endif
 #include <xen/event_channel.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 
 
 typedef void (*evtchn_handler_t)(evtchn_port_t, struct __regs *, void *);

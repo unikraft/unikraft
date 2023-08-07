@@ -32,7 +32,7 @@
 #endif
 
 #include <errno.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 
 #define RDRAND_RETRY_LIMIT	10
 
@@ -40,11 +40,11 @@ static inline int ukarch_random_init(void)
 {
 	__u32 eax, ebx, ecx, edx;
 
-	ukarch_x86_cpuid(1, 0, &eax, &ebx, &ecx, &edx);
+	uk_x86_cpuid(1, 0, &eax, &ebx, &ecx, &edx);
 	if (unlikely(!(ecx & X86_CPUID1_ECX_RDRAND)))
 		return -ENOTSUP;
 
-	ukarch_x86_cpuid(7, 0, &eax, &ebx, &ecx, &edx);
+	uk_x86_cpuid(7, 0, &eax, &ebx, &ecx, &edx);
 	if (unlikely(!(ebx & X86_CPUID7_EBX_RDSEED)))
 		return -ENOTSUP;
 

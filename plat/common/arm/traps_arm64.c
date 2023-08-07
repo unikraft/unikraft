@@ -21,7 +21,7 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/arch/types.h>
 #include <arm/cpu.h>
 #include <arm/traps.h>

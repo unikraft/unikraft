@@ -37,7 +37,7 @@
 #include <stddef.h>
 #include <uk/plat/time.h>
 #include <string.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/plat/lcpu.h>
 
 /* There is no justification of the limit of 80 symbols. But there

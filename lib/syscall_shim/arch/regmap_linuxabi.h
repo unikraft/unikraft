@@ -1,6 +1,6 @@
 #ifndef _REGMAP_LINUXABI_H_
 
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 
 /*
  * Mappings of `struct __reg` register fields

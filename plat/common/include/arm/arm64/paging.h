@@ -38,7 +38,7 @@
 
 #include <arm/arm64/cpu.h>
 
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/arch/limits.h>
 #include <uk/essentials.h>
 #include <uk/plat/paging.h>

@@ -32,7 +32,7 @@
 #include <errno.h>
 #include <stddef.h>
 #include <uk/arch/memtag.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/arch/random.h>
 
 void *ukarch_memtag_region(void *ptr, __sz size)

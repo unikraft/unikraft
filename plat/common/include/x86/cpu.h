@@ -201,9 +201,9 @@ static inline void _init_syscall(void)
 	int have_syscall = 0;
 
 	/* Check for availability of extended features */
-	ukarch_x86_cpuid(0x80000000, 0, &eax, &ebx, &ecx, &edx);
+	uk_x86_cpuid(0x80000000, 0, &eax, &ebx, &ecx, &edx);
 	if (eax >= 0x80000001) {
-		ukarch_x86_cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx);
+		uk_x86_cpuid(0x80000001, 0, &eax, &ebx, &ecx, &edx);
 		have_syscall = (edx & X86_CPUID3_SYSCALL);
 	}
 

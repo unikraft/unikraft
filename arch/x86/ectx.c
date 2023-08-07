@@ -34,7 +34,7 @@
  */
 
 #include <uk/arch/ctx.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/arch/types.h>
 #include <uk/ctors.h>
 #include <uk/essentials.h>
@@ -64,9 +64,9 @@ static void _init_ectx_store(void)
 	 * contains "1" after this asm expression. See the "Warning" note at
 	 * https://gcc.gnu.org/onlinedocs/gcc/Extended-Asm.html#InputOperands
 	 */
-	ukarch_x86_cpuid(1, 0, &eax, &ebx, &ecx, &edx);
+	uk_x86_cpuid(1, 0, &eax, &ebx, &ecx, &edx);
 	if (ecx & X86_CPUID1_ECX_OSXSAVE) {
-		ukarch_x86_cpuid(0xd, 1, &eax, &ebx, &ecx, &edx);
+		uk_x86_cpuid(0xd, 1, &eax, &ebx, &ecx, &edx);
 		if (eax & X86_CPUIDD1_EAX_XSAVEOPT) {
 			ectx_method = X86_SAVE_XSAVEOPT;
 			uk_pr_debug("Load/store of extended CPU state: XSAVEOPT\n");
@@ -74,7 +74,7 @@ static void _init_ectx_store(void)
 			ectx_method = X86_SAVE_XSAVE;
 			uk_pr_debug("Load/store of extended CPU state: XSAVE\n");
 		}
-		ukarch_x86_cpuid(0xd, 0, &eax, &ebx, &ecx, &edx);
+		uk_x86_cpuid(0xd, 0, &eax, &ebx, &ecx, &edx);
 		ectx_size = ebx;
 		ectx_align = 64;
 	} else if (edx & X86_CPUID1_EDX_FXSR) {

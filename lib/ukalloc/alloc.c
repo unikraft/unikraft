@@ -40,7 +40,7 @@
 #include <uk/essentials.h>
 #include <uk/assert.h>
 #include <uk/arch/limits.h>
-#include <uk/arch/lcpu.h>
+#include <uk/lcpu.h>
 #include <uk/arch/paging.h>
 
 #if CONFIG_HAVE_MEMTAG
