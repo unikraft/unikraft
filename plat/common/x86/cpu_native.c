@@ -55,6 +55,13 @@ unsigned long read_cr2(void)
 /* This corresponds to an 85 (42 << 1 | 1) return value from QEMU */
 #define QEMU_ISA_DEBUG_EXIT_CRASH	42
 
+/* The port used by QEMU by default for the pvpanic device */
+#define QEMU_PVPANIC_EXIT_PORT		0x505
+/* This corresponds to a GUEST_PANICKED event for QEMU */
+#define QEMU_PVPANIC_GUEST_PANICKED	(1 << 0)
+/* This corresponds to a GUEST_CRASHLOADED event for QEMU */
+#define QEMU_PVPANIC_GUEST_CRASHLOADED	(1 << 1)
+
 /**
  * Trigger an exit() in QEMU with the code `value << 1 | 1`.
  * @param value the value used in the calculation of the exit code
@@ -79,9 +86,13 @@ void system_off(enum ukplat_gstate request __maybe_unused)
 	 * device.
 	 * Should be harmless if it is not present. This is used to enable
 	 * automated tests on virtio.
+	 * Also send a panic request to the pvpanic device.
+	 * Should be also harmless and helps with automated tests.
 	 */
-	if (request == UKPLAT_CRASH)
+	if (request == UKPLAT_CRASH) {
 		qemu_debug_exit(QEMU_ISA_DEBUG_EXIT_CRASH);
+		outb(QEMU_PVPANIC_EXIT_PORT, QEMU_PVPANIC_GUEST_PANICKED);
+	}
 #endif /* CONFIG_KVM_VMM_QEMU */
 
 	/*
