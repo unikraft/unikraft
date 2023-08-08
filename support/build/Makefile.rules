@@ -211,9 +211,9 @@ endef
 # For internally use only (Unikraft main makefile and internal libs Makefike.uk)
 # _import_library $1:path
 define _import_lib =
-_IMPORT_BASE := $(1)
+IMPORT_BASE := $(1)
 $(call verbose_include,$(1)/Makefile.uk)
-undefine _IMPORT_BASE
+undefine IMPORT_BASE
 endef
 # _import_linker $plat_name
 define _import_linker =
@@ -224,8 +224,8 @@ endef
 # addplat $1:platname
 define addplat =
 UK_PLATS += $(1)
-$(eval UK_PLAT_$(call uc,$(1))_BASE    := $(_IMPORT_BASE))
-$(eval UK_PLAT_$(call uc,$(1))_LINKER  := $(_IMPORT_BASE)/Linker.uk)
+$(eval UK_PLAT_$(call uc,$(1))_BASE    := $(IMPORT_BASE))
+$(eval UK_PLAT_$(call uc,$(1))_LINKER  := $(IMPORT_BASE)/Linker.uk)
 $(eval UK_PLAT_$(call uc,$(1))_DEF_LDS :=)
 endef
 
@@ -240,10 +240,10 @@ endef
 define addlib =
 $(call mk_sub_build_dir,$(1))
 UK_LIBS += $(1)
-$(eval $(call uc,$(1))_BASE    := $(_IMPORT_BASE))
+$(eval $(call uc,$(1))_BASE    := $(IMPORT_BASE))
 $(eval $(call uc,$(1))_BUILD   := $(call sub_build_dir,$(1)))
-$(eval $(call uc,$(1))_EXPORTS += $(wildcard $(_IMPORT_BASE)/exportsyms.uk))
-$(eval $(call uc,$(1))_LOCALS  += $(wildcard $(_IMPORT_BASE)/localsyms.uk))
+$(eval $(call uc,$(1))_EXPORTS += $(wildcard $(IMPORT_BASE)/exportsyms.uk))
+$(eval $(call uc,$(1))_LOCALS  += $(wildcard $(IMPORT_BASE)/localsyms.uk))
 endef
 
 # addlib_s $1:libname,$2:switch
@@ -258,10 +258,10 @@ define addplatlib =
 $(call mk_sub_build_dir,$(2))
 $(eval $(call uc,$(2))_PLATS   += $(call uc,$(1)))
 $(eval $(call uc,$(1))_LIBS    += $(2))
-$(eval $(call uc,$(2))_BASE    := $(_IMPORT_BASE))
+$(eval $(call uc,$(2))_BASE    := $(IMPORT_BASE))
 $(eval $(call uc,$(2))_BUILD   := $(call sub_build_dir,$(2)))
-$(eval $(call uc,$(2))_EXPORTS += $(wildcard $(_IMPORT_BASE)/exportsyms.uk))
-$(eval $(call uc,$(2))_LOCALS  += $(wildcard $(_IMPORT_BASE)/localsyms.uk))
+$(eval $(call uc,$(2))_EXPORTS += $(wildcard $(IMPORT_BASE)/exportsyms.uk))
+$(eval $(call uc,$(2))_LOCALS  += $(wildcard $(IMPORT_BASE)/localsyms.uk))
 endef
 
 # addplatlib_s $1:platname,$2:libname,$3:switch
