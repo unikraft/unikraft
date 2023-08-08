@@ -36,3 +36,8 @@ __u16 uk_libid(const char *libname)
 	return UKLIBID_NONE;
 }
 #endif /* CONFIG_HAVE_LIBC || CONFIG_LIBNOLIBC */
+
+__u16 uk_libid_count(void)
+{
+	return uk_libid_static_count();
+}

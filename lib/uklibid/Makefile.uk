@@ -13,6 +13,7 @@ $(LIBUKLIBID_BUILD)/libraries.in.new:
 		     $(L) \
 		     )) \
 		     $(UK_LIBS) $(UK_LIBS-y) \
+		     $(UK_LIBID_EXTRA) $(UK_LIBID_EXTRA-y) \
 		| tr ' ' '\n' | sort -V - > $@)
 
 .PHONY: $(LIBUKLIBID_BUILD)/libraries.in.new
@@ -29,6 +30,12 @@ LIBUKLIBID_LIBID_SUBBUILD = include/uk/bits
 LIBUKLIBID_LIBID_AWKINCLUDES-y += $(LIBUKLIBID_BUILD)/libraries.in
 LIBUKLIBID_SRCS-y += $(LIBUKLIBID_BASE)/namemap.awk>.c
 LIBUKLIBID_NAMEMAP_AWKINCLUDES-y += $(LIBUKLIBID_BUILD)/libraries.in
-LIBUKLIBID_SRCS-y += $(LIBUKLIBID_BASE)/libname.c
+LIBUKLIBID_SRCS-y += $(LIBUKLIBID_BASE)/selfids.awk>.c
+LIBUKLIBID_SELFIDS_AWKINCLUDES-y += $(LIBUKLIBID_BUILD)/libraries.in
+LIBUKLIBID_SRCS-y += $(LIBUKLIBID_BASE)/rtmap.c
+
+LIBUKLIBID_SRCS-y += $(LIBUKLIBID_BASE)/exportsyms.awk>.uk
+LIBUKLIBID_EXPORTSYMS_AWKINCLUDES-y += $(LIBUKLIBID_BUILD)/libraries.in
+LIBUKLIBID_EXPORTS-y += $(LIBUKLIBID_BUILD)/exportsyms.uk
 
 UK_PREPARE-$(CONFIG_LIBUKLIBID) += $(LIBUKLIBID_BUILD)/libraries.in.new
