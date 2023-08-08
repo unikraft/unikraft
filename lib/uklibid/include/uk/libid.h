@@ -34,22 +34,38 @@ extern "C" {
 #define uk_libid_self() \
 	UKLIBID_NONE
 #else /* __LIBNAME__ */
+#define __uk_libid_self_varname(l)		\
+	_uk_libid_self_ ## l
+#define _uk_libid_self_varname(self)		\
+	__uk_libid_self_varname(self)
+
 /**
- * Compile-time library identifier of current library compilation
+ * Library identifier of current library compilation
  *
  * @return Library identifier (__u16)
  */
-#define uk_libid_self() \
-	uk_libid_static(__LIBNAME__)
+extern const __u16 _uk_libid_self_varname(__LIBNAME__);
+
+#define uk_libid_self()				\
+	({ _uk_libid_self_varname(__LIBNAME__); })
 #endif /* __LIBNAME__ */
 
 /**
  * Return the number of libraries that are part of this build
+ * (resolved at compile time)
  *
  * @return Number of libraries
  */
-#define uk_libid_count() \
+#define uk_libid_static_count() \
 	__UKLIBID_COUNT__
+
+/**
+ * Return the number of libraries that are part of this build
+ * (resolved at runtime)
+ *
+ * @return Number of libraries
+ */
+__u16 uk_libid_count(void);
 
 /**
  * Return the library name for a given identifier
