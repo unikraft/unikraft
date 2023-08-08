@@ -716,6 +716,11 @@ endif
 
 # Generate build rules
 $(eval $(call verbose_include,$(CONFIG_UK_BASE)/support/build/Makefile.build))
+$(foreach _M,$(wildcard $(addsuffix Makefile.build,\
+	   $(CONFIG_UK_BASE)/lib/*/ $(CONFIG_UK_BASE)/plat/*/ \
+	   $(addsuffix /,$(ELIB_DIR)) $(APP_DIR)/)), \
+		$(eval $(call verbose_include,$(_M))) \
+)
 
 # Include source dependencies
 ifneq ($(call qstrip,$(UK_DEPS) $(UK_DEPS-y)),)
