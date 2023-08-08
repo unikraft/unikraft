@@ -746,6 +746,7 @@ endef
 
 # Aliases for pre-processed files (e.g., *.in)
 buildrule_in   = $(call buildrule_noop_,$(1),$(2))
+buildrule_uk   = $(call buildrule_noop_,$(1),$(2))
 
 # Aliases for C headers
 buildrule_h   = $(call buildrule_noop_,$(1),$(2))
