@@ -9,6 +9,19 @@ config LIBVFSCORE
 if LIBVFSCORE
 menu "vfscore: Configuration"
 
+config LIBVFSCORE_TEST
+    bool "Test vfscore"
+    default n
+
+if LIBVFSCORE_TEST
+
+config LIBVFSORE_TEST_UNLINK
+	bool "test: unlink()"
+	default n
+
+endif
+
+
 config LIBVFSCORE_PIPE_SIZE_ORDER
 	int "Pipe size order"
 	default 16
