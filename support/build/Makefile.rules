@@ -85,7 +85,7 @@ endef
 # Creates a subfolder under the build output directory
 # mk_sub_build_dir $1:subfoldername
 define mk_sub_build_dir =
-$(if $(shell mkdir -p "$(BUILD_DIR)/$(notdir $(1))" && cd "$(BUILD_DIR)/$(notdir $(1))" >/dev/null && pwd),,\
+$(if $(shell $(MKDIR) -p "$(BUILD_DIR)/$(notdir $(1))" && cd "$(BUILD_DIR)/$(notdir $(1))" >/dev/null && pwd),,\
      $(error could not create directory "$(BUILD_DIR)/$(notdir $(1))"))
 endef
 
@@ -272,7 +272,7 @@ endef
 # creates a sub build directory for a library
 # mk_sub_libbuild_dir $1:libname,$2:subdir
 define mk_sub_libbuild_dir =
-$(if $(shell mkdir -p "$(BUILD_DIR)/$(notdir $(1))/$(strip $(2))" && cd "$(BUILD_DIR)/$(notdir $(1))/$(strip $(2))" >/dev/null && pwd),,\
+$(if $(shell $(MKDIR) -p "$(BUILD_DIR)/$(notdir $(1))/$(strip $(2))" && cd "$(BUILD_DIR)/$(notdir $(1))/$(strip $(2))" >/dev/null && pwd),,\
      $(error could not create directory "$(BUILD_DIR)/$(notdir $(1))/$(strip $(2))"))
 endef
 
