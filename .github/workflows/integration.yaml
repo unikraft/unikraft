@@ -86,6 +86,8 @@ jobs:
               kconfig:
                 CONFIG_MUSL: "y"
                 CONFIG_LIBMUSL_COMPLEX: "y"
+            compiler-rt:
+              version: staging
           targets:
           - platform: ${{ matrix.plat }}
             architecture: ${{ matrix.arch }}
