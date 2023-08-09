@@ -214,11 +214,12 @@ CONFIG                := $(CONFIG_UK_BASE)/support/kconfig
 CONFIGLIB	      := $(CONFIG_UK_BASE)/support/kconfiglib
 UK_CONFIG_OUT         := $(BUILD_DIR)/config
 UK_GENERATED_INCLUDES := $(BUILD_DIR)/include
+KCONFIG_INCLUDES_DIR  := $(UK_GENERATED_INCLUDES)/uk/bits
 KCONFIG_DIR           := $(BUILD_DIR)/kconfig
 UK_FIXDEP             := $(KCONFIG_DIR)/fixdep
 KCONFIG_AUTOCONFIG    := $(KCONFIG_DIR)/auto.conf
 KCONFIG_TRISTATE      := $(KCONFIG_DIR)/tristate.config
-KCONFIG_AUTOHEADER    := $(UK_GENERATED_INCLUDES)/uk/_config.h
+KCONFIG_AUTOHEADER    := $(KCONFIG_INCLUDES_DIR)/config.h
 KCONFIG_APP_DIR       := $(CONFIG_UK_APP)
 KCONFIG_LIB_IN        := $(KCONFIG_DIR)/libs.uk
 KCONFIG_DEF_PLATS     := $(shell find $(CONFIG_UK_PLAT)/* -maxdepth 0 \
@@ -249,13 +250,15 @@ export DATE := $(shell date +%Y%m%d)
 
 # Makefile targets
 null_targets		:= print-version print-vars help
+nokconfig_targets       := properclean distclean $(null_targets)
 noconfig_targets	:= ukconfig menuconfig nconfig gconfig xconfig config \
 			   oldconfig randconfig \
 			   defconfig %_defconfig allyesconfig allnoconfig \
 			   silentoldconfig \
-			   release olddefconfig properclean distclean \
+			   release olddefconfig \
 			   scriptconfig iscriptconfig kmenuconfig guiconfig \
-			   dumpvarsconfig print-version help
+			   dumpvarsconfig \
+			   $(nokconfig_targets)
 
 # we want bash as shell
 SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
@@ -273,6 +276,19 @@ XARGS := xargs
 # kconfig uses CONFIG_SHELL
 CONFIG_SHELL := $(SHELL)
 export SHELL CONFIG_SHELL Q KBUILD_VERBOSE
+
+################################################################################
+# Create minimal necessary folder structure
+################################################################################
+# Create them before trying to include a .config
+ifeq ($(filter $(nokconfig_targets),$(MAKECMDGOALS)),)
+$(if $(shell $(MKDIR) -pv $(KCONFIG_DIR) && cd $(KCONFIG_DIR) >/dev/null && pwd),,\
+	$(error Could not create $(KCONFIG_DIR)))
+$(if $(shell $(MKDIR) -pv $(UK_GENERATED_INCLUDES) && cd $(KCONFIG_DIR) >/dev/null && pwd),,\
+	$(error Could not create $(UK_GENERATED_INCLUDES)))
+$(if $(shell $(MKDIR) -pv $(KCONFIG_INCLUDES_DIR) && cd $(KCONFIG_DIR) >/dev/null && pwd),,\
+	$(error Could not create $(KCONFIG_INCLUDES_DIR)))
+endif
 
 ################################################################################
 # .config
@@ -652,11 +668,6 @@ CFLAGS   += $(UK_CFLAGS)
 CXXFLAGS += $(UK_CXXFLAGS)
 GOCFLAGS += $(UK_GOCFLAGS)
 LDFLAGS  += $(UK_LDFLAGS)
-
-# ensure $(BUILD_DIR)/kconfig, $(BUILD_DIR)/include and $(BUILD_DIR)/include/uk exists
-$(call mk_sub_build_dir,kconfig)
-$(call mk_sub_build_dir,include)
-$(call mk_sub_build_dir,include/uk)
 
 ASINCLUDES            += -I$(UK_GENERATED_INCLUDES)
 CINCLUDES             += -I$(UK_GENERATED_INCLUDES)
