@@ -48,6 +48,7 @@ jobs:
               CONFIG_LIBUKTEST: "y"
               CONFIG_LIBUKTEST_ALL: "n"
               CONFIG_LIBUKTEST_TEST_MYSELF: "n"
+              CONFIG_LIBUKTEST_LOG_STATS: "y"
               CONFIG_LIBUKDEBUG_ANSI_COLOR: "y"
               CONFIG_LIBUKDEBUG_PRINTK_INFO: "y"
               CONFIG_LIBDEVFS: "y"
