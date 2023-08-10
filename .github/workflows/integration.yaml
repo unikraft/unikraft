@@ -49,6 +49,7 @@ jobs:
               CONFIG_LIBUKTEST_ALL: "n"
               CONFIG_LIBUKTEST_TEST_MYSELF: "n"
               CONFIG_LIBUKDEBUG_ANSI_COLOR: "y"
+              CONFIG_LIBUKDEBUG_PRINTK_INFO: "y"
               CONFIG_LIBDEVFS: "y"
               CONFIG_LIBDEVFS_DEV_STDOUT: "y"
               CONFIG_LIBDEVFS_DEV_NULL_ZERO: "y"
@@ -132,6 +133,7 @@ jobs:
               CONFIG_LIBUKTEST_ALL: "y"
               CONFIG_LIBUKTEST_TEST_MYSELF: "y"
               CONFIG_LIBUKDEBUG_ANSI_COLOR: "y"
+              CONFIG_LIBUKDEBUG_PRINTK_INFO: "y"
               CONFIG_LIBUKTEST_FAILFAST: "n"
               CONFIG_LIBUKTEST_LOG_STATS: "y"
           targets:
