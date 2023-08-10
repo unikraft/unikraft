@@ -17,3 +17,8 @@ endef
 define build_efi =
 	@$(SCRIPTS_DIR)/mkefi.py $(1)
 endef
+
+define build_linux =
+	$(call build_cmd,OBJCOPY,,$(1).bin, $(OBJCOPY) -O binary $(1))
+	$(call build_cmd,MKLINUX,,$(1).img, $(SCRIPTS_DIR)/mklinux.py $(1) $(2))
+endef
