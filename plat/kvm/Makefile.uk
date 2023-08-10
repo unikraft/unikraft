@@ -16,6 +16,7 @@ $(eval $(call addplatlib_s,kvm,libkvmvirtio9p,$(CONFIG_VIRTIO_9P)))
 $(eval $(call addplatlib_s,kvm,libkvmofw,$(CONFIG_LIBOFW)))
 $(eval $(call addplatlib_s,kvm,libkvmgic,$(CONFIG_LIBGIC)))
 $(eval $(call addplatlib_s,kvm,libkvmpl031,$(CONFIG_RTC_PL031)))
+$(eval $(call addplatlib_s,kvm,libkvmballoon,$(CONFIG_VIRTIO_BALLOON)))
 
 ##
 ## Platform library definitions
@@ -243,3 +244,13 @@ LIBKVMPL031_CINCLUDES-y		+= -I$(UK_PLAT_DRIVERS_BASE)/include
 
 LIBKVMPL031_SRCS-y		+= $(UK_PLAT_DRIVERS_BASE)/rtc/pl031.c
 LIBKVMPL031_SRCS-y		+= $(UK_PLAT_DRIVERS_BASE)/rtc/rtc.c
+
+##
+## BALLOON library definitions
+##
+LIBKVMBALLOON_CINCLUDES-y += -I$(LIBKVMPLAT_BASE)/include
+LIBKVMBALLOON_CINCLUDES-y += -I$(UK_PLAT_DRIVERS_BASE)/include
+LIBKVMBALLOON_CINCLUDES-y += -I$(UK_PLAT_COMMON_BASE)/include
+
+LIBKVMBALLOON_SRCS-y += $(UK_PLAT_DRIVERS_BASE)/balloon/balloon_drv.c
+LIBKVMBALLOON_SRCS-y += $(LIBKVMPLAT_BASE)/balloon.c
