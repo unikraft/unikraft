@@ -162,8 +162,8 @@ static int vm_get(struct virtio_dev *vdev, __u16 offset,
 		memcpy(buf + sizeof(l), &l, sizeof(l));
 		break;
 	default:
-		uk_pr_err("Not supported length(%d) for io read\n", len);
-		UK_BUG();
+		_virtio_cread_bytes(base, offset, buf, len, 1);
+		uk_pr_warn("Unaligned io read: %d bytes\n", len);
 	}
 
 	return len;
@@ -207,8 +207,8 @@ static int vm_set(struct virtio_dev *vdev, __u16 offset,
 		virtio_cwrite32(base, offset + sizeof(l), l);
 		break;
 	default:
-		uk_pr_err("Not supported length(%d) for io write\n", len);
-		UK_BUG();
+		_virtio_cwrite_bytes(base, offset, buf, len, 1);
+		uk_pr_warn("Unaligned io write: %d bytes\n", len);
 	}
 
 	return 0;

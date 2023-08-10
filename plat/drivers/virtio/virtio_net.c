@@ -934,6 +934,7 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n)
 	 * reconsider providing generic read/write function for all these
 	 * virtio device in a separate header file which could be reused across
 	 * different virtio devices.
+	 * Currently, unaligned read is supported in the underlying function.
 	 */
 	virtio_config_get(vndev->vdev,
 				   __offsetof(struct virtio_net_config, mac),
