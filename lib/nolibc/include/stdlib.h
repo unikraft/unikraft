@@ -63,58 +63,15 @@ int atoi(const char *s);
 long atol(const char *s);
 
 #if CONFIG_LIBUKALLOC
-/* Allocate size bytes of memory. Returns pointer to start of allocated memory,
- * or NULL on failure.
- */
-static inline void *malloc(size_t size)
-{
-	return uk_malloc(uk_alloc_get_default(), size);
-}
 
-/* Release memory previously allocated by malloc(). ptr must be a pointer
- * previously returned by malloc(), otherwise undefined behavior will occur.
- */
-static inline void free(void *ptr)
-{
-	return uk_free(uk_alloc_get_default(), ptr);
-}
+void *malloc(size_t size);
+void free(void *ptr);
+void *calloc(size_t nmemb, size_t size);
+void *realloc(void *ptr, size_t size);
+int posix_memalign(void **memptr, size_t align, size_t size);
+void *memalign(size_t align, size_t size);
 
-/* Allocate memory for an array of nmemb elements of size bytes. Returns
- * pointer to start of allocated memory, or NULL on failure.
- */
-static inline void *calloc(size_t nmemb, size_t size)
-{
-	return uk_calloc(uk_alloc_get_default(), nmemb, size);
-}
-
-/* Change the size of the memory block pointed to by ptr to size bytes.
- * Returns a pointer to the resized memory area. If the area pointed to was
- * moved, a free(ptr) is done.
- */
-static inline void *realloc(void *ptr, size_t size)
-{
-	return uk_realloc(uk_alloc_get_default(), ptr, size);
-}
-
-/* Allocate size bytes of memory, aligned to align bytes, and return the
- * pointer to that area in *memptr. Returns 0 on success, and a non-zero error
- * value on failure.
- */
-static inline int posix_memalign(void **memptr, size_t align, size_t size)
-{
-	return uk_posix_memalign(uk_alloc_get_default(),
-				 memptr, align, size);
-}
-
-/* Allocate size bytes of memory, aligned to align bytes. Returns pointer to
- * start of allocated memory, or NULL on failure.
- */
-static inline void *memalign(size_t align, size_t size)
-{
-	return uk_memalign(uk_alloc_get_default(), align, size);
-}
 #endif /* CONFIG_LIBUKALLOC */
-
 void abort(void) __noreturn;
 
 void exit(int status) __noreturn;
