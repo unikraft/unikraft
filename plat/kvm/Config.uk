@@ -15,7 +15,7 @@ menuconfig PLAT_KVM
 if (PLAT_KVM)
 
 choice
-	prompt "Booting environment"
+	prompt "Boot protocol"
 
 config KVM_BOOT_PROTO_MULTIBOOT
 	bool "Multiboot"
@@ -43,6 +43,8 @@ config KVM_BOOT_EFI_STUB
 	help
 		Make Unikraft bootable by UEFI firmware
 
+comment "Hint: EFI stub depends on OPTIMIZE_PIE"
+	depends on !OPTIMIZE_PIE && !KVM_VMM_FIRECRACKER
 endchoice
 
 if KVM_BOOT_EFI_STUB
