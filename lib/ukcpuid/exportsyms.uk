@@ -1,0 +1,3 @@
+is_xsave_available
+init_cpuid
+get_cpuid_info
