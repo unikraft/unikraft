@@ -59,10 +59,6 @@ void ukplat_terminate(enum ukplat_gstate request)
 	uk_pr_info("Unikraft halted\n");
 
 	switch (request) {
-	case UKPLAT_HALT:
-		cpu_halt();
-
-		break;
 	case UKPLAT_RESTART:
 		uk_efi_rs_reset_system(UK_EFI_RESET_COLD);
 
