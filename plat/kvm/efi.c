@@ -23,6 +23,10 @@ static __u8 uk_efi_mat_present;
 #define UK_EFI_ABS_FNAME(f)					"\\EFI\\BOOT\\"f
 #define UK_EFI_SURPLUS_MEM_DESC_COUNT				10
 
+#define EFI_STUB_CMDLINE_FNAME	CONFIG_KVM_BOOT_PROTO_EFI_STUB_CMDLINE_FNAME
+#define EFI_STUB_INITRD_FNAME	CONFIG_KVM_BOOT_PROTO_EFI_STUB_INITRD_FNAME
+#define EFI_STUB_DTB_FNAME	CONFIG_KVM_BOOT_PROTO_EFI_STUB_DTB_FNAME
+
 void uk_efi_jmp_to_kern(void) __noreturn;
 
 /* Overlysimplified conversion from ASCII to UTF-16 */
@@ -70,7 +74,7 @@ static void _uk_efi_crash(void)
 				sizeof(reset_data), (void *)reset_data);
 }
 
-#ifdef CONFIG_KVM_BOOT_EFI_STUB_DEBUG
+#ifdef CONFIG_KVM_BOOT_PROTO_EFI_STUB_DEBUG
 #define UK_EFI_MAX_CRASH_STR_LEN				256
 /* UEFI for proper \n, we must also use CRLF */
 #define uk_efi_crash(str)						\
@@ -444,7 +448,8 @@ static void uk_efi_setup_bootinfo_cmdl(struct ukplat_bootinfo *bi)
 	/* We can either have the command line provided by the user when this
 	 * very specific instance of the image was launched, in which case this
 	 * one takes priority, or we can have it provided through
-	 * CONFIG_KVM_BOOT_EFI_STUB_CMDLINE_PATH as a path on the same device.
+	 * CONFIG_KVM_BOOT_PROTO_EFI_STUB_CMDLINE_PATH as a path on the same
+	 * device.
 	 */
 	if (uk_img_hndl->load_options && uk_img_hndl->load_options_size) {
 		len = (uk_img_hndl->load_options_size >> 1) + 1;
@@ -460,9 +465,9 @@ static void uk_efi_setup_bootinfo_cmdl(struct ukplat_bootinfo *bi)
 		if (unlikely(len == __SZ_MAX))
 			uk_efi_crash("Conversion from UTF-16 to ASCII of cmdl "
 				     "overflowed. This shouldn't be possible\n");
-	} else if (sizeof(CONFIG_KVM_BOOT_EFI_STUB_CMDLINE_FNAME) > 1) {
+	} else if (sizeof(EFI_STUB_CMDLINE_FNAME) > 1) {
 		uk_efi_read_file(uk_img_hndl->device_handle,
-				 UK_EFI_ABS_FNAME(CONFIG_KVM_BOOT_EFI_STUB_CMDLINE_FNAME),
+				 UK_EFI_ABS_FNAME(EFI_STUB_CMDLINE_FNAME),
 				 (char **)&cmdl, &len);
 	}
 
@@ -490,13 +495,13 @@ static void uk_efi_setup_bootinfo_initrd(struct ukplat_bootinfo *bi)
 	__sz len;
 	int rc;
 
-	if (sizeof(CONFIG_KVM_BOOT_EFI_STUB_INITRD_FNAME) <= 1)
+	if (sizeof(EFI_STUB_INITRD_FNAME) <= 1)
 		return;
 
 	uk_img_hndl = uk_efi_get_uk_img_hndl();
 
 	uk_efi_read_file(uk_img_hndl->device_handle,
-			 UK_EFI_ABS_FNAME(CONFIG_KVM_BOOT_EFI_STUB_INITRD_FNAME),
+			 UK_EFI_ABS_FNAME(EFI_STUB_INITRD_FNAME),
 			 (char **)&initrd, &len);
 
 	mrd.pbase = (__paddr_t)initrd;
@@ -517,13 +522,13 @@ static void uk_efi_setup_bootinfo_dtb(struct ukplat_bootinfo *bi)
 	__sz len;
 	int rc;
 
-	if (sizeof(CONFIG_KVM_BOOT_EFI_STUB_DTB_FNAME) <= 1)
+	if (sizeof(EFI_STUB_DTB_FNAME) <= 1)
 		return;
 
 	uk_img_hndl = uk_efi_get_uk_img_hndl();
 
 	uk_efi_read_file(uk_img_hndl->device_handle,
-			 UK_EFI_ABS_FNAME(CONFIG_KVM_BOOT_EFI_STUB_DTB_FNAME),
+			 UK_EFI_ABS_FNAME(EFI_STUB_DTB_FNAME),
 			 (char **)&dtb, &len);
 
 	mrd.pbase = (__paddr_t)dtb;
@@ -572,7 +577,7 @@ static void uk_efi_exit_bs(void)
  */
 static void uk_efi_reset_attack_mitigation_enable(void)
 {
-#ifdef CONFIG_KVM_BOOT_EFI_STUB_RST_ATK_MITIGATION
+#ifdef CONFIG_KVM_BOOT_PROTO_EFI_STUB_RST_ATK_MITIGATION
 	/* The UTF-16 encoding of the "MemoryOverwriteRequestControl" string */
 	char var_name[] = "M\0e\0m\0o\0r\0y\0O\0v\0e\0r\0w\0r\0i\0t\0e\0R\0e"
 			  "\0q\0u\0e\0s\0t\0C\0o\0n\0t\0r\0o\0l\0";
