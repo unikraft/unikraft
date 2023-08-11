@@ -14,6 +14,7 @@ extern void *x86_start16_end[];
 #define X86_START16_SIZE						\
 	((__uptr)x86_start16_end - (__uptr)x86_start16_begin)
 
+#if CONFIG_LIBUKRELOC
 #define START16_UKRELOC_MOV_SYM(sym, sz)				\
 	sym##_uk_reloc_imm##sz##_start16
 
@@ -36,5 +37,6 @@ extern void *x86_start16_end[];
 	UKRELOC_ENTRY(START16_UKRELOC_##type##_OFF(sym, sz),		\
 		       (void *)sym - (void *)x86_start16_begin,		\
 		       sz, UKRELOC_FLAGS_PHYS_REL)
+#endif /* CONFIG_LIBUKRELOC */
 
 #endif  /* __START16_HELPERS_H__ */
