@@ -100,10 +100,14 @@ config OPTIMIZE_LTO
 		Unikraft binaries.
 
 config OPTIMIZE_PIE
-	bool "Build the Unikernel as a static PIE"
+	bool "Static-PIE - Position-independent binary"
 	select LIBUKRELOC
+	default n
 	help
-		Build the Unikernel as a static PIE.
+		Creates a position independent binary. Such a Unikernel binary does
+		not have to be placed at a fixed location in the virtual address
+		space by a loader. Some loaders even assume that kernel entrance is
+		relocatable (e.g., EFI).
 
 choice
 	prompt "Debug information level"
