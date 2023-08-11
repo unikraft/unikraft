@@ -51,9 +51,7 @@
 #include <string.h>
 #include <errno.h>
 
-#if CONFIG_LIBUKRELOC
 #include "start16_helpers.h"
-#endif /* CONFIG_LIBUKRELOC */
 
 __lcpuid lcpu_arch_id(void)
 {
