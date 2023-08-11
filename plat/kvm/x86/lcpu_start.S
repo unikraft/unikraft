@@ -172,8 +172,64 @@ ENTRY(lcpu_start32)
 	movl	$X86_MSR_EFER, %ecx
 	wrmsr
 
+	/* Request basic CPU features and APIC ID
+	 * TODO: This APIC ID is limited to 256. Better get from leaf 0x1f
+	 */
+	movl	$1, %eax
+	cpuid
+	shrl	$24, %ebx
+
+#if CONFIG_UKPLAT_LCPU_IDISIDX
+	/* Use APIC_ID * LCPU_SIZE for indexing the cpu structure */
+	movl    $LCPU_SIZE, %eax
+	imul    %ebx, %eax
+
+	/* Compute pointer into CPU struct array and store it in EDX
+	 */
+	movl    $lcpus, %edx
+	add     %eax, %edx
+#else
+	/* Iterate the lcpu structure until we find a matching cpu id.
+	 * Store pointer to EDX.
+	 */
+	movl	$0, %ecx
+next_lcpu:
+	movl	$lcpus, %edx
+	movl	$LCPU_SIZE, %eax
+
+	/* Compute index to lcpu array */
+	imul	%ecx, %eax
+	add	%eax, %edx
+
+	/* Check match */
+	mov	LCPU_ID_OFFSET(%edx), %ebp
+	cmp	%ebp, %ebx
+	jz	check_args
+
+	/* Next lcpu */
+	inc	%ecx
+	movl	$CONFIG_UKPLAT_LCPU_MAXCOUNT, %edx
+	cmp	%ecx, %edx
+	jne	next_lcpu
+
+	/* No match */
+	jmp	fail32
+#endif /* CONFIG_UKPLAT_LCPU_IDISIDX */
+
+	/* Check if we have startup arguments supplied */
+check_args:
+	test	%edi, %edi
+	jz	no_args32
+
 	/* Set boot page table and enable paging */
 	movl	$x86_bpt_pml4, %eax
+	jmp	enable_paging
+
+no_args32:
+	/* Get pml4 from lcpu struct */
+	mov	LCPU_BPT_OFFSET(%edx), %eax
+
+enable_paging:
 	movl	%eax, %cr3
 
 	movl	$CR0_BOOT32_SETTINGS, %eax
@@ -196,6 +252,15 @@ jump_to64:
 
 	leaq	lcpu_start64, %rcx
 	jmp	*%rcx
+
+fail32:
+	movl	$LCPU_STATE_HALTED, LCPU_STATE_OFFSET(%edx)
+
+fail_loop32:
+	cli
+1:
+	hlt
+	jmp	1b
 END(lcpu_start32)
 
 /*
@@ -220,36 +285,20 @@ END(lcpu_start32)
 ENTRY(lcpu_start64)
 	/* Save the startup args pointer */
 	movq	%rdi, %r8
-
-	/* Request basic CPU features and APIC ID
-	 * TODO: This APIC ID is limited to 256. Better get from leaf 0x1f
-	 */
-	movl	$1, %eax
-	cpuid
-	shrl	$24, %ebx
-
-	/* Use APIC_ID * LCPU_SIZE for indexing the cpu structure */
-	movl	$LCPU_SIZE, %eax
-	imul	%ebx, %eax
-
-	/* Compute pointer into CPU struct array and store it in RBP
-	 * We do not use the frame pointer, yet
-	 */
-	leaq	lcpus(%rip), %rbp
-	addq	%rax, %rbp
+	movq	%rdx, %r9
 
 	/* Put CPU into init state */
-	movl	$LCPU_STATE_INIT, LCPU_STATE_OFFSET(%rbp)
+	movl	$LCPU_STATE_INIT, LCPU_STATE_OFFSET(%r9)
 
 	/* Enable FPU and SSE */
 	LCPU_ENABLE_FPU_SSE
 
 #if (__AVX__ || CONFIG_HAVE_X86PKU)
 	/* Enable XSAVE feature */
-	LCPU_ENABLE_XSAVE fail
+	LCPU_ENABLE_XSAVE fail64
 #if __AVX__
 	/* Enable AVX */
-	LCPU_ENABLE_AVX fail
+	LCPU_ENABLE_AVX fail64
 #endif /* __AVX__ */
 #endif /* __AVX__ || CONFIG_HAVE_X86PKU */
 
@@ -279,8 +328,8 @@ no_pku:
 
 no_args:
 	/* Load the stack pointer and the entry address from the CPU struct */
-	movq	LCPU_ENTRY_OFFSET(%rbp), %rax
-	movq	LCPU_STACKP_OFFSET(%rbp), %rsp
+	movq	LCPU_ENTRY_OFFSET(%r9), %rax
+	movq	LCPU_STACKP_OFFSET(%r9), %rsp
 
 jump_to_entry:
 	/* According to System V AMD64 the stack pointer must be aligned to
@@ -292,7 +341,7 @@ jump_to_entry:
 	andq	$~0xf, %rsp
 	subq	$0x8, %rsp
 
-	movq	%rbp, %rdi
+	movq	%r9, %rdi
 #if !__OMIT_FRAMEPOINTER__
 	/* Reset frame pointer */
 	xorq	%rbp, %rbp
@@ -303,10 +352,10 @@ jump_to_entry:
 	 */
 	jmp	*%rax
 
-fail:
-	movl	$LCPU_STATE_HALTED, LCPU_STATE_OFFSET(%rbp)
+fail64:
+	movl	$LCPU_STATE_HALTED, LCPU_STATE_OFFSET(%r9)
 
-fail_loop:
+fail_loop64:
 	cli
 1:
 	hlt
