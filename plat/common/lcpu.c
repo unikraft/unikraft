@@ -402,8 +402,9 @@ void __weak __noreturn lcpu_entry_default(struct lcpu *this_lcpu)
 	}
 }
 
-int ukplat_lcpu_start(const __lcpuidx lcpuidx[], unsigned int *num, void *sp[],
-		      const ukplat_lcpu_entry_t entry[], unsigned long flags)
+int ukplat_lcpu_start(const __lcpuidx lcpuidx[], unsigned int *num, void *pt_base[],
+		      void *sp[], const ukplat_lcpu_entry_t entry[],
+		      unsigned long flags)
 {
 	__lcpuid this_cpu_id = ukplat_lcpu_id();
 	struct lcpu *lcpu;
@@ -462,6 +463,7 @@ retry:
 		lcpu->s_args.entry = (entry && entry[argi]) ?
 			entry[argi] : lcpu_entry_default;
 		lcpu->s_args.stackp = sp[argi];
+		lcpu->s_args.bpt = pt_base[argi];
 
 		/* Ensure that the startup arguments have been written back
 		 * before issuing the startup call
