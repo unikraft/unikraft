@@ -190,4 +190,24 @@ config UKPLAT_ALLOW_GIC
 	bool
 	default y
 
+config VMXNET3
+      bool  "Vmxnet3 driver"
+      default y
+      depends on (ARCH_X86_64 || ARCH_ARM_64)
+      depends on LIBUKBUS
+      select LIBUKALLOC
+      select LIBUKSGLIST
+      help
+               Vmxnet3 driver for VMWare networking.
+
+config E1000
+      bool  "E1000 driver"
+      default y
+      depends on (ARCH_X86_64 || ARCH_ARM_64)
+      depends on LIBUKBUS
+      select LIBUKALLOC
+      select LIBUKSGLIST
+      help
+               E1000 driver for VMWare networking.
+
 endif

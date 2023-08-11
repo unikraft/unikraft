@@ -96,6 +96,21 @@ static inline int pci_driver_add_device(struct pci_driver *drv,
 			| (addr->devid << PCI_DEVICE_SHIFT);
 	PCI_CONF_READ(uint16_t, &dev->base, config_addr, IOBAR);
 	PCI_CONF_READ(uint8_t, &dev->irq, config_addr, IRQ);
+	uk_pr_info("dev->base: 0x%08X\n", dev->base);
+
+	PCI_CONF_READ(uint32_t, &dev->bar0, config_addr, BAR0);
+	uk_pr_info("bar0: 0x%08X\n", dev->bar0);
+	PCI_CONF_READ(uint32_t, &dev->bar1, config_addr, BAR1);
+	uk_pr_info("bar1: 0x%08X\n", dev->bar1);
+	PCI_CONF_READ(uint32_t, &dev->bar2, config_addr, BAR2);
+	uk_pr_info("bar2: 0x%08X\n", dev->bar2);
+	PCI_CONF_READ(uint32_t, &dev->bar3, config_addr, BAR3);
+	uk_pr_info("bar3: 0x%08X\n", dev->bar3);
+	PCI_CONF_READ(uint32_t, &dev->bar4, config_addr, BAR4);
+	uk_pr_info("bar4: 0x%08X\n", dev->bar4);
+	PCI_CONF_READ(uint32_t, &dev->bar5, config_addr, BAR5);
+	uk_pr_info("bar5: 0x%08X\n", dev->bar5);
+
 
 	ret = drv->add_dev(dev);
 	if (ret < 0) {
@@ -155,11 +170,12 @@ static int probe_function(uint32_t bus, uint32_t device, uint32_t function)
 	PCI_CONF_READ(uint16_t, &devid.subsystem_vendor_id,
 			config_addr, SUBSYSVEN_ID);
 
-	uk_pr_info("PCI %02x:%02x.%02x (%04x %04x:%04x): ",
+	uk_pr_info("PCI %02x:%02x.%02x (%04x %04x %04x:%04x): ",
 		   (int) addr.bus,
 		   (int) addr.devid,
 		   (int) addr.function,
 		   (int) devid.class_id,
+		   (int) devid.sub_class_id,
 		   (int) devid.vendor_id,
 		   (int) devid.device_id);
 
@@ -175,6 +191,7 @@ static int probe_function(uint32_t bus, uint32_t device, uint32_t function)
 	if ((devid.class_id == 0x06) && (devid.sub_class_id == 0x04)) {
 		PCI_CONF_READ(uint32_t, &secondary_bus,
 				config_addr, SECONDARY_BUS);
+		uk_pr_info("PCI-to-PCI Bridge connecting with secondary bus %d\n", secondary_bus);
 		probe_bus(secondary_bus);
 	}
 
@@ -208,7 +225,8 @@ static void probe_bus(uint32_t bus)
 
 int arch_pci_probe(struct uk_alloc *pha)
 {
-	uint32_t config_addr, function, header_type, vendor_id;
+	uint32_t config_addr, header_type = 0; 
+	uint32_t function, vendor_id;
 
 	uk_pr_debug("Probe PCI\n");
 

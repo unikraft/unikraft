@@ -154,6 +154,13 @@ struct pci_device {
 	struct pci_driver     *drv;
 	enum pci_device_state state;
 
+	uint32_t bar0;
+	uint32_t bar1;
+	uint32_t bar2;
+	uint32_t bar3;
+	uint32_t bar4;
+	uint32_t bar5;
+
 	unsigned long base;
 	unsigned long irq;
 };
@@ -207,8 +214,8 @@ static struct pci_bus_handler ph __unused;
 #define PCI_ENABLE_BIT              (1u << 31)
 
 #define PCI_CONF_CLASS_ID          (0x08)
-#define PCI_CONF_CLASS_ID_SHFT     (16)
-#define PCI_CONF_CLASS_ID_MASK     (0xFF00)
+#define PCI_CONF_CLASS_ID_SHFT     (24)
+#define PCI_CONF_CLASS_ID_MASK     (0xFF)
 
 #define PCI_CONF_VENDOR_ID          (0x00)
 #define PCI_CONF_VENDOR_ID_SHFT     (0)
@@ -226,14 +233,18 @@ static struct pci_bus_handler ph __unused;
 #define PCI_CONF_SUBCLASS_ID_SHFT     (16)
 #define PCI_CONF_SUBCLASS_ID_MASK     (0x00FF)
 
+#define PCI_CONF_COMMAND              (0x04)
+#define PCI_CONF_COMMAND_SHFT         (0)
+#define PCI_CONF_COMMAND_MASK         (0x0000FFFF)
+
 #define PCI_CONF_SECONDARY_BUS          (0x18)
-#define PCI_CONF_SECONDARY_BUS_SHFT     (0)
-#define PCI_CONF_SECONDARY_BUS_MASK     (0xFF00)
+#define PCI_CONF_SECONDARY_BUS_SHFT     (8)
+#define PCI_CONF_SECONDARY_BUS_MASK     (0xFF)
 
 #define PCI_HEADER_TYPE_MSB_MASK   (0x80)
-#define PCI_CONF_HEADER_TYPE       (0x00)
+#define PCI_CONF_HEADER_TYPE       (0x0C)
 #define PCI_CONF_HEADER_TYPE_SHFT  (16)
-#define PCI_CONF_HEADER_TYPE_MASK  (0xFF)
+#define PCI_CONF_HEADER_TYPE_MASK  (0x00FF)
 
 #define PCI_CONF_SUBSYS_ID          (0x2c)
 #define PCI_CONF_SUBSYS_ID_SHFT     (16)
@@ -246,6 +257,30 @@ static struct pci_bus_handler ph __unused;
 #define PCI_CONF_IOBAR              (0x10)
 #define PCI_CONF_IOBAR_SHFT         (0x0)
 #define PCI_CONF_IOBAR_MASK         (~0x3)
+
+#define PCI_CONF_BAR0              (0x10)
+#define PCI_CONF_BAR0_SHFT         (0x0)
+#define PCI_CONF_BAR0_MASK         (0xFFFFFFFF)
+
+#define PCI_CONF_BAR1              (0x14)
+#define PCI_CONF_BAR1_SHFT         (0x0)
+#define PCI_CONF_BAR1_MASK         (0xFFFFFFFF)
+
+#define PCI_CONF_BAR2              (0x18)
+#define PCI_CONF_BAR2_SHFT         (0x0)
+#define PCI_CONF_BAR2_MASK         (0xFFFFFFFF)
+
+#define PCI_CONF_BAR3              (0x1c)
+#define PCI_CONF_BAR3_SHFT         (0x0)
+#define PCI_CONF_BAR3_MASK         (0xFFFFFFFF)
+
+#define PCI_CONF_BAR4              (0x20)
+#define PCI_CONF_BAR4_SHFT         (0x0)
+#define PCI_CONF_BAR4_MASK         (0xFFFFFFFF)
+
+#define PCI_CONF_BAR5              (0x24)
+#define PCI_CONF_BAR5_SHFT         (0x0)
+#define PCI_CONF_BAR5_MASK         (0xFFFFFFFF)
 
 #define PCI_BASE_ADDRESS_0	0x10	/* 32 bits */
 #define PCI_BASE_ADDRESS_1	0x14	/* 32 bits */
