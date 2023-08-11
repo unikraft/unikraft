@@ -31,7 +31,7 @@
 
 static void cpu_halt(void) __noreturn;
 
-#ifdef CONFIG_KVM_BOOT_EFI_STUB
+#ifdef CONFIG_KVM_BOOT_PROTO_EFI_STUB
 static void uk_efi_rs_reset_system(enum uk_efi_reset_type reset_type)
 {
 	const char reset_data[] = "UK EFI SYSTEM RESET";

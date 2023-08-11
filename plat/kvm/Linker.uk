@@ -5,7 +5,7 @@ KVM_LDFLAGS-y += -Wl,--entry=_multiboot_entry
 ELF64_TO_32 = y
 else ifeq ($(CONFIG_KVM_BOOT_PROTO_LXBOOT),y)
 KVM_LDFLAGS-y += -Wl,--entry=_lxboot_entry
-else ifeq ($(CONFIG_KVM_BOOT_EFI_STUB),y)
+else ifeq ($(CONFIG_KVM_BOOT_PROTO_EFI_STUB),y)
 KVM_LDFLAGS-y += -Wl,--entry=uk_efi_entry64
 KVM_LDFLAGS-y += -Wl,-m,elf_x86_64
 endif
@@ -14,7 +14,7 @@ ifeq ($(CONFIG_KVM_BOOT_PROTOCOL_QEMU_VIRT),y)
 KVM_LDFLAGS-y += -Wl,--entry=_libkvmplat_entry
 KVM_LDFLAGS-y += -Wl,-m,aarch64elf
 KVM_LINK_LIBGCC_FLAG := -lgcc
-else ifeq ($(CONFIG_KVM_BOOT_EFI_STUB),y)
+else ifeq ($(CONFIG_KVM_BOOT_PROTO_EFI_STUB),y)
 KVM_LDFLAGS-y += -Wl,--entry=uk_efi_entry64
 KVM_LDFLAGS-y += -Wl,-m,aarch64elf
 KVM_LINK_LIBGCC_FLAG := -lgcc
@@ -74,7 +74,7 @@ $(KVM_IMAGE): $(KVM_IMAGE).dbg
 ifeq ($(ELF64_TO_32),y)
 	$(call build_elf64_to_32,$@)
 endif
-ifeq ($(CONFIG_KVM_BOOT_EFI_STUB),y)
+ifeq ($(CONFIG_KVM_BOOT_PROTO_EFI_STUB),y)
 	$(call build_efi,$@)
 endif
 
