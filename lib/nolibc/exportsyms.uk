@@ -100,6 +100,7 @@ _nolibc_ctype
 
 # errno
 errno
+__errno_location
 
 # network
 htons
