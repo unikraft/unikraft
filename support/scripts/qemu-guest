@@ -778,8 +778,17 @@ case "$ARG_MACHINETYPE" in
 	"x86pc")
 		QEMU_BIN=${QEMU_BIN:-"$( which qemu-system-x86_64 )"}
 
+		# WORKAROUND: Unikraft currently only supports QEMUs PC model until 7.0
+		# See: https://github.com/unikraft/unikraft/issues/1040
+		"${QEMU_BIN}" -M \? | grep -qe '^pc-i440fx-7\.0[[:space:]]\?'
+		if [ $? -eq 0 ]; then
+			QEMU_X86MACH="pc-i440fx-7.0"
+		else
+			QEMU_X86MACH="pc"
+		fi
+
 		QEMU_BASE_ARGS+=("-machine")
-		QEMU_BASE_ARGS+=("pc,accel=${QEMU_ACCEL}")
+		QEMU_BASE_ARGS+=("${QEMU_X86MACH},accel=${QEMU_ACCEL}")
 
 		if [ $OPT_HWACCEL -eq 0 ]; then
 			QEMU_BASE_ARGS+=("-cpu")
