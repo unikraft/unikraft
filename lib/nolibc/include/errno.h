@@ -190,4 +190,6 @@ extern int errno;
 }
 #endif
 
+int *__errno_location(void);
+
 #endif /* __ERRNO_H__ */
