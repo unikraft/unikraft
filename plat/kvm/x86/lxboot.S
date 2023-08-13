@@ -35,6 +35,23 @@ ENTRY(_lxboot_entry)
 	cmpl	$LXBOOT_HDR_HEADER_MAGIC, LXBOOT_HDR_HEADER_OFFSET(%rsi)
 	jne	no_lxboot
 
+#if CONFIG_LIBUKRELOC
+	/* We are going to taint the early lcpu_bootstack but we do not care.
+	 * Since it's a stack, it does not need to not be tainted anyway.
+	 */
+	leaq	lcpu_bootstack(%rip), %rsp
+	/* Make sure it is aligned */
+	andq	$~0xf, %rsp
+	pushq	%rsi
+	xorl	%esi, %esi
+	xorl	%edi, %edi
+	call	do_uk_reloc
+	popq	%rsi
+	/* We do not restore the previous %rsp. At this time it does not seem to
+	 * be needed.
+	 */
+#endif /* CONFIG_LIBUKRELOC */
+
 	/* startup args for boot CPU */
 	leaq	lcpu_boot_startup_args(%rip), %rdi
 	leaq	lxboot_entry(%rip), %rax
@@ -44,7 +61,6 @@ ENTRY(_lxboot_entry)
 
 	leaq	x86_bpt_pml4(%rip), %rax
 	movq	%rax, %cr3
-
 	jmp	lcpu_start64
 
 no_lxboot:
