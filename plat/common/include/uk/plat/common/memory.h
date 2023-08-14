@@ -114,28 +114,49 @@ ukplat_memregion_list_insert(struct ukplat_memregion_list *list,
 }
 
 #if defined(__X86_64__)
-#define	X86_HI_MEM_START		0xA0000
-#define X86_HI_MEM_LEN			0x60000
+#define	X86_HI_MEM_START		0xA0000UL
+#define X86_HI_MEM_LEN			0x40000UL
+
+#define X86_BIOS_ROM_START		0xE0000UL
+#define X86_BIOS_ROM_LEN		0x20000UL
 
 static inline int
 ukplat_memregion_list_insert_legacy_hi_mem(struct ukplat_memregion_list *list)
 {
-	struct ukplat_memregion_desc mrd = {0};
+	int rc;
 
 	/* Note that we are mapping it as writable as well to cope with the
 	 * potential existence of the VGA framebuffer/SMM shadow memory.
-	 * This is fine, as writes to the mapped BIOS ROM in non-SMM are
-	 * ignored by the MCH once the BIOS gets towards the end of POST
-	 * by writing PCI config cycles to Programmable Attribute Map
-	 * registers mapped as a PCI device.
 	 */
-	mrd.vbase = (__vaddr_t)X86_HI_MEM_START;
-	mrd.pbase = (__paddr_t)X86_HI_MEM_START;
-	mrd.len = X86_HI_MEM_LEN;
-	mrd.type = UKPLAT_MEMRT_RESERVED;
-	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE | UKPLAT_MEMRF_MAP;
+	rc = ukplat_memregion_list_insert(list,
+			&(struct ukplat_memregion_desc){
+				.vbase = X86_HI_MEM_START,
+				.pbase = X86_HI_MEM_START,
+				.len   = X86_HI_MEM_LEN,
+				.type  = UKPLAT_MEMRT_RESERVED,
+				.flags = UKPLAT_MEMRF_READ  |
+					 UKPLAT_MEMRF_WRITE |
+					 UKPLAT_MEMRF_MAP,
+			});
+	if (unlikely(rc < 0))
+		return rc;
 
-	return ukplat_memregion_list_insert(list, &mrd);
+	/* Keep compatibility with other possible reports of reserved memory
+	 * regions of this area and mark the BIOS System Memory as read-only.
+	 */
+	rc = ukplat_memregion_list_insert(list,
+			&(struct ukplat_memregion_desc){
+				.vbase = X86_BIOS_ROM_START,
+				.pbase = X86_BIOS_ROM_START,
+				.len   = X86_BIOS_ROM_LEN,
+				.type  = UKPLAT_MEMRT_RESERVED,
+				.flags = UKPLAT_MEMRF_READ  |
+					 UKPLAT_MEMRF_MAP,
+			});
+	if (unlikely(rc < 0))
+		return rc;
+
+	return 0;
 }
 
 #if defined(CONFIG_HAVE_SMP)
