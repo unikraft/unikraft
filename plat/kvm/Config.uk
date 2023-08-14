@@ -178,6 +178,20 @@ config EARLY_UART_NS16550_BASE
 	depends on EARLY_UART_NS16550
 	help
 		NS16550 serial address used by early debug console.
+
+config UART_NS16550_REG_SHIFT
+	int "NS16550 serial register shift"
+	depends on UART_NS16550
+	default 0
+	help
+		NS16550 serial register shift.
+
+config UART_NS16550_REG_WIDTH
+	int "NS165500 serial register width"
+	depends on UART_NS16550
+	default 1
+	help
+		NS16550 serial register width.
 endmenu
 endif
 

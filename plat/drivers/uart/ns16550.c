@@ -43,8 +43,6 @@
 #define NS16550_LSR_OFFSET	0x05U
 #define NS16550_MSR_OFFSET	0x06U
 
-#define NS16550_REG_SHIFT	0x02U
-
 #define NS16550_LCR_DLAB	0x80U
 #define NS16550_IIR_NO_INT	0x01U
 #define NS16550_FCR_FIFO_EN	0x01U
@@ -59,7 +57,7 @@
  * use ns16550_uart_initialized as an extra variable to check
  * whether the UART has been initialized.
  */
-#if defined(CONFIG_EARLY_UART_NS16550) && defined(CONFIG_EARLY_UART_NS16550_BASE)
+#if defined(CONFIG_EARLY_UART_NS16550)
 static uint8_t ns16550_uart_initialized = 1;
 static uint64_t ns16550_uart_base = CONFIG_EARLY_UART_NS16550_BASE;
 #else
@@ -67,11 +65,53 @@ static uint8_t ns16550_uart_initialized;
 static uint64_t ns16550_uart_base;
 #endif
 
+/* The register shift. Default is 0 (device-tree spec v0.4 Sect. 4.2.2) */
+static uint32_t ns16550_reg_shift = CONFIG_UART_NS16550_REG_SHIFT;
+
+/* The register width. Default is 1 (8-bit register width) */
+static uint32_t ns16550_reg_width = CONFIG_UART_NS16550_REG_WIDTH;
+
 /* Macros to access ns16550 registers with base address and reg shift */
-#define NS16550_REG(r)			((uint16_t *)(ns16550_uart_base + \
-					(r << NS16550_REG_SHIFT)))
-#define NS16550_REG_READ(r)		ioreg_read16(NS16550_REG(r))
-#define NS16550_REG_WRITE(r, v)	ioreg_write16(NS16550_REG(r), v)
+#define NS16550_REG(r) (ns16550_uart_base + (r << ns16550_reg_shift))
+
+static uint32_t ns16550_reg_read(uint32_t reg)
+{
+	uint32_t ret;
+
+	switch (ns16550_reg_width) {
+	case 1:
+		ret = ioreg_read8((uint8_t *)NS16550_REG(reg)) & 0xff;
+		break;
+	case 2:
+		ret = ioreg_read16((uint16_t *)NS16550_REG(reg)) & 0xffff;
+		break;
+	case 4:
+		ret = ioreg_read32((uint32_t *)NS16550_REG(reg));
+		break;
+	default:
+		UK_CRASH("Invalid register width: %d\n", ns16550_reg_width);
+	}
+	return ret;
+}
+
+static void ns16550_reg_write(uint32_t reg, uint32_t value)
+{
+	switch (ns16550_reg_width) {
+	case 1:
+		ioreg_write8((uint8_t *)NS16550_REG(reg),
+			     (uint8_t)(value & 0xff));
+		break;
+	case 2:
+		ioreg_write16((uint16_t *)NS16550_REG(reg),
+			      (uint16_t)(value & 0xffff));
+		break;
+	case 4:
+		ioreg_write32((uint32_t *)NS16550_REG(reg), value);
+		break;
+	default:
+		UK_CRASH("Invalid register width: %d\n", ns16550_reg_width);
+	}
+}
 
 static void init_ns16550(uint64_t base)
 {
@@ -79,12 +119,12 @@ static void init_ns16550(uint64_t base)
 	ns16550_uart_initialized = 1;
 
 	/* Disable all interrupts */
-	NS16550_REG_WRITE(NS16550_IER_OFFSET,
-		NS16550_REG_READ(NS16550_FCR_OFFSET) & ~(NS16550_IIR_NO_INT));
+	ns16550_reg_write(NS16550_IER_OFFSET,
+		ns16550_reg_read(NS16550_FCR_OFFSET) & ~(NS16550_IIR_NO_INT));
 
 	/* Disable FIFOs */
-	NS16550_REG_WRITE(NS16550_FCR_OFFSET,
-		NS16550_REG_READ(NS16550_FCR_OFFSET) & ~(NS16550_FCR_FIFO_EN));
+	ns16550_reg_write(NS16550_FCR_OFFSET,
+		ns16550_reg_read(NS16550_FCR_OFFSET) & ~(NS16550_FCR_FIFO_EN));
 }
 
 void ns16550_console_init(const void *dtb)
@@ -115,6 +155,14 @@ void ns16550_console_init(const void *dtb)
 	reg_uart_base = fdt64_to_cpu(regs[0]);
 	uk_pr_info("Found NS16550 UART on: 0x%lx\n", reg_uart_base);
 
+	regs = fdt_getprop(dtb, offset, "reg-shift", &len);
+	if (regs != NULL)
+		ns16550_reg_shift = fdt32_to_cpu(regs[0]);
+
+	regs = fdt_getprop(dtb, offset, "reg-io-width", &len);
+	if (regs != NULL)
+		ns16550_reg_width = fdt32_to_cpu(regs[0]);
+
 	init_ns16550(reg_uart_base);
 
 	uk_pr_info("NS16550 UART initialized\n");
@@ -128,14 +176,14 @@ int ukplat_coutd(const char *str, unsigned int len)
 static void _putc(char a)
 {
 	/* Wait until TX FIFO becomes empty */
-	while (!(NS16550_REG_READ(NS16550_LSR_OFFSET) & NS16550_LSR_TX_EMPTY))
+	while (!(ns16550_reg_read(NS16550_LSR_OFFSET) & NS16550_LSR_TX_EMPTY))
 		;
 
 	/* Reset DLAB and write to THR */
-	NS16550_REG_WRITE(NS16550_LCR_OFFSET,
-			  NS16550_REG_READ(NS16550_LCR_OFFSET) &
+	ns16550_reg_write(NS16550_LCR_OFFSET,
+			  ns16550_reg_read(NS16550_LCR_OFFSET) &
 			  ~(NS16550_LCR_DLAB));
-	NS16550_REG_WRITE(NS16550_THR_OFFSET, a & 0xff);
+	ns16550_reg_write(NS16550_THR_OFFSET, a & 0xff);
 }
 
 static void ns16550_putc(char a)
@@ -163,14 +211,14 @@ static int ns16550_getc(void)
 		return -1;
 
 	/* If RX FIFO is empty, return -1 immediately */
-	if (!(NS16550_REG_READ(NS16550_LSR_OFFSET) & NS16550_LSR_RX_EMPTY))
+	if (!(ns16550_reg_read(NS16550_LSR_OFFSET) & NS16550_LSR_RX_EMPTY))
 		return -1;
 
 	/* Reset DLAB and read from RBR */
-	NS16550_REG_WRITE(NS16550_LCR_OFFSET,
-			  NS16550_REG_READ(NS16550_LCR_OFFSET) &
+	ns16550_reg_write(NS16550_LCR_OFFSET,
+			  ns16550_reg_read(NS16550_LCR_OFFSET) &
 			  ~(NS16550_LCR_DLAB));
-	return (int)(NS16550_REG_READ(NS16550_RBR_OFFSET) & 0xff);
+	return (int)(ns16550_reg_read(NS16550_RBR_OFFSET) & 0xff);
 }
 
 int ukplat_coutk(const char *buf, unsigned int len)
