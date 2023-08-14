@@ -335,10 +335,14 @@ static void uk_efi_setup_bootinfo_mrds(struct ukplat_bootinfo *bi)
 			uk_efi_crash("Failed to insert mrd\n");
 	}
 
-	ukplat_memregion_list_coalesce(&bi->mrds);
+	rc = ukplat_memregion_list_coalesce(&bi->mrds);
+	if (unlikely(rc))
+		uk_efi_crash("Failed to coalesce memory regions\n");
 
 #if defined(__X86_64__)
-	ukplat_memregion_alloc_sipi_vect();
+	rc = ukplat_memregion_alloc_sipi_vect();
+	if (unlikely(rc))
+		uk_efi_crash("Failed to insert SIPI vector region\n");
 #endif
 }
 
