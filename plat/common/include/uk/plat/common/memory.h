@@ -115,7 +115,7 @@ ukplat_memregion_list_insert(struct ukplat_memregion_list *list,
 
 #if defined(__X86_64__)
 #define	X86_HI_MEM_START		0xA0000
-#define X86_HI_MEM_LEN			0x50000
+#define X86_HI_MEM_LEN			0x60000
 
 static inline int
 ukplat_memregion_list_insert_legacy_hi_mem(struct ukplat_memregion_list *list)
