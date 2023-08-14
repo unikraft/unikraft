@@ -79,8 +79,9 @@ ENTRY(_libkvmplat_entry)
 	isb
 
 	/* Set the boot stack */
-	ur_ldr x26, lcpu_bootstack
-	mov sp, x26
+	ur_ldr	x26, lcpu_bootstack
+	and	x26, x26, ~(__STACK_ALIGN_SIZE - 1)
+	mov	sp, x26
 
 	/* Set the context id */
 	msr contextidr_el1, xzr
