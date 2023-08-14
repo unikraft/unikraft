@@ -137,7 +137,7 @@
 	}
 
 #define TLS_SECTIONS							\
-	. = ALIGN(0x20);						\
+	. = ALIGN(__PAGE_SIZE);						\
 	_tls_start = .;							\
 	.tdata :							\
 	{								\
