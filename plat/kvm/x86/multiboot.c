@@ -50,6 +50,7 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 	__sz offset, cmdline_len;
 	__paddr_t start, end;
 	__u32 i;
+	int rc;
 
 	bi = ukplat_bootinfo_get();
 	if (unlikely(!bi))
@@ -62,7 +63,9 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 	do_uk_reloc_kmrds(0, 0);
 
 	/* Ensure that the memory map contains the legacy high mem area */
-	ukplat_memregion_list_insert_legacy_hi_mem(&bi->mrds);
+	rc = ukplat_memregion_list_insert_legacy_hi_mem(&bi->mrds);
+	if (unlikely(rc))
+		multiboot_crash("Could not insert legacy memory region", rc);
 
 	/* Add the cmdline */
 	if (mi->flags & MULTIBOOT_INFO_CMDLINE) {
@@ -153,9 +156,13 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 		}
 	}
 
-	ukplat_memregion_list_coalesce(&bi->mrds);
+	rc = ukplat_memregion_list_coalesce(&bi->mrds);
+	if (unlikely(rc))
+		multiboot_crash("Could not coalesce memory regions", rc);
 
-	ukplat_memregion_alloc_sipi_vect();
+	rc = ukplat_memregion_alloc_sipi_vect();
+	if (unlikely(rc))
+		multiboot_crash("Could not insert SIPI vector region", rc);
 
 	_ukplat_entry(lcpu, bi);
 }
