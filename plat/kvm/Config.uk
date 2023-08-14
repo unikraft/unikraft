@@ -16,6 +16,7 @@ if (PLAT_KVM)
 
 choice
 	prompt "Boot protocol"
+	default KVM_BOOT_PROTO_LXBOOT
 
 config KVM_BOOT_PROTO_MULTIBOOT
 	bool "Multiboot"
@@ -25,7 +26,6 @@ config KVM_BOOT_PROTO_MULTIBOOT
 
 config KVM_BOOT_PROTO_LXBOOT
 	bool "Lxboot"
-	default y
 	depends on KVM_VMM_FIRECRACKER || (KVM_VMM_QEMU && ARCH_ARM_64)
 	help
 		Linux 64-bit Boot Protocol
