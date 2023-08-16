@@ -46,6 +46,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <utime.h>
 
 /*
  * Currently only supports BSD new-style cpio archive format.
@@ -170,6 +171,7 @@ int uk_syscall_r_open(const char *, int, mode_t);
 int uk_syscall_r_close(int);
 ssize_t uk_syscall_r_write(int, const void *, size_t);
 int uk_syscall_r_chmod(const char *, mode_t);
+int uk_syscall_r_utime(const char *, const struct utimbuf *);
 int uk_syscall_r_mkdir(const char *, mode_t);
 int uk_syscall_r_symlink(const char *, const char *);
 
@@ -197,10 +199,12 @@ read_section(struct cpio_header **header_ptr,
 	mode_t header_mode;
 	uint32_t header_filesize;
 	uint32_t header_namesize;
+	uint32_t header_mtime;
 	char *data_location;
 	uint32_t bytes_to_write;
 	int bytes_written;
 	struct cpio_header *next_header;
+	struct utimbuf times;
 
 	if (strcmp(filename(*header_ptr), "TRAILER!!!") == 0) {
 		*header_ptr = NULL;
@@ -228,6 +232,7 @@ read_section(struct cpio_header **header_ptr,
 	header_mode = GET_MODE(header);
 	header_filesize = S8HEX_TO_U32(header->filesize);
 	header_namesize = S8HEX_TO_U32(header->namesize);
+	header_mtime = S8HEX_TO_U32(header->mtime);
 
 	if ((uintptr_t)header + sizeof(struct cpio_header) > last) {
 		*header_ptr = NULL;
@@ -283,6 +288,12 @@ read_section(struct cpio_header **header_ptr,
 					      header_mode & 0777)))
 			uk_pr_warn("%s: Failed to chmod: %s (%d)\n",
 				   path_from_root, strerror(-err), -err);
+
+		times.actime = header_mtime;
+		times.modtime = header_mtime;
+		if ((err = uk_syscall_r_utime(path_from_root, &times)))
+			uk_pr_warn("%s: Failed to set modification time: %s (%d)",
+			           path_from_root, strerror(-err), -err);
 
 		if ((err = uk_syscall_r_close(fd))) {
 			uk_pr_err("%s: Failed to close file: %s (%d)\n",
