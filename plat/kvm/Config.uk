@@ -5,6 +5,7 @@ menuconfig PLAT_KVM
 	select LIBUKDEBUG
 	select LIBUKALLOC
 	select LIBUKTIMECONV
+	select LIBUKATOMIC
 	select LIBNOLIBC if !HAVE_LIBC
 	select LIBUKBITOPS if ARCH_X86_64
 	select HAVE_FDT if ARCH_ARM_64

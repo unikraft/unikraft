@@ -59,6 +59,7 @@
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <uk/bitops.h>
+#include <uk/atomic.h>
 
 #define TIMER_CNTR           0x40
 #define TIMER_MODE           0x43
@@ -104,6 +105,11 @@ static __u64 tsc_base;
 
 /* Multiplier for converting TSC ticks to nsecs. (0.32) fixed point. */
 static __u32 tsc_mult;
+
+/* Shift for TSC tick to nanosecond conversions. This ensures that the tsc_mult
+ * multiplication won't overflow
+ */
+static __s8 tsc_shift;
 
 /*
  * Multiplier for converting nsecs to PIT ticks. (1.32) fixed point.
@@ -205,6 +211,11 @@ __u64 tscclock_monotonic(void)
 	 */
 	tsc_now = rdtsc();
 	tsc_delta = tsc_now - tsc_base;
+	if (tsc_shift >= 0)
+		tsc_delta <<= tsc_shift;
+	else
+		tsc_delta >>= -tsc_shift;
+
 	if (tsc_delta >= UINT64_MAX / 2)
 		tsc_delta = 1;
 	time_base += mul64_32(tsc_delta, tsc_mult);
@@ -213,18 +224,89 @@ __u64 tscclock_monotonic(void)
 	return time_base;
 }
 
-/*
- * Calibrate TSC and initialise TSC clock.
+/* Ensure there is no accidental padding in the following structures */
+#pragma GCC diagnostic push
+#pragma GCC diagnostic error "-Wpadded"
+struct pvclock_vcpu_time_info {
+	__u32	version;
+	__u32	pad0;
+	__u64	tsc_timestamp;
+	__u64	system_time;
+	__u32	tsc_to_system_mul;
+	__s8	tsc_shift;
+	__u8	flags;
+	__u8	pad[2];
+};
+
+struct pvclock_wall_clock {
+	__u32   version;
+	__u32   sec;
+	__u32   nsec;
+};
+#pragma GCC diagnostic pop
+
+static struct {
+	unsigned int system_clock_msr;
+	struct pvclock_vcpu_time_info system_clock;
+	unsigned int wall_clock_msr;
+	struct pvclock_wall_clock wall_clock;
+} pvclock_state;
+
+#define X86_KVM_CPUID_HYPERVISOR		0x40000000
+#define X86_KVM_CPUID_FEATURES			0x40000001
+
+#define X86_KVM_FEATURE_CLOCKSOURCE		(0 << 1)
+#define X86_KVM_FEATURE_CLOCKSOURCE2		(3 << 1)
+
+#define KVM_PVCLOCK_LEGACY_WALL_CLOCK_MSR	0x11
+#define KVM_PVCLOCK_LEGACY_SYS_CLOCK_MSR	0x12
+#define KVM_PVCLOCK_WALL_CLOCK_MSR		0x4b564d00
+#define KVM_PVCLOCK_SYS_CLOCK_MSR		0x4b564d01
+
+/**
+ * Initialize the TSC values from a set of pvclock MSRs.
+ * Documentation of these MSRs can ben found at:
+ *  https://www.kernel.org/doc/html/v5.9/virt/kvm/msr.html
  */
-int tscclock_init(void)
+static void pvclock_init(unsigned int systemclock_msr,
+			 unsigned int wallclock_msr)
+{
+	__u32 version;
+
+	/* Give KVM the address of our pvclock structure and trigger an update.
+	 */
+	wrmsrl(systemclock_msr, (__u64)&pvclock_state.system_clock | 0x1);
+	wrmsrl(wallclock_msr, (__u64)&pvclock_state.wall_clock);
+
+	/* Attempt to fetch a consistent set of values (as in the version did
+	 * not change)
+	 */
+	do {
+		version = uk_load_n(&pvclock_state.system_clock.version);
+
+		time_base = pvclock_state.system_clock.system_time;
+		tsc_base = pvclock_state.system_clock.tsc_timestamp;
+		tsc_mult = pvclock_state.system_clock.tsc_to_system_mul;
+		tsc_shift = pvclock_state.system_clock.tsc_shift;
+	} while (version != uk_load_n(&pvclock_state.system_clock.version) ||
+		 (version & 1));
+
+	do {
+		version = uk_load_n(&pvclock_state.wall_clock.version);
+		rtc_epochoffset =
+		    ukarch_time_sec_to_nsec(pvclock_state.wall_clock.sec)
+		    + pvclock_state.wall_clock.nsec;
+	} while (version != uk_load_n(&pvclock_state.wall_clock.version) ||
+		 (version & 1));
+
+	pvclock_state.system_clock_msr = systemclock_msr;
+	pvclock_state.wall_clock_msr = wallclock_msr;
+}
+
+void tscclock_pit_init(void)
 {
 	__u64 tsc_freq = 0, rtc_boot;
 	__u32 eax, ebx, ecx, edx;
-
-	/* Initialise i8254 timer channel 0 to mode 2 at CONFIG_HZ frequency */
-	outb(TIMER_MODE, TIMER_SEL0 | TIMER_RATEGEN | TIMER_16BIT);
-	outb(TIMER_CNTR, (TIMER_HZ / CONFIG_HZ) & 0xff);
-	outb(TIMER_CNTR, (TIMER_HZ / CONFIG_HZ) >> 8);
 
 	/*
 	 * Read RTC "time at boot". This must be done just before tsc_base is
@@ -287,6 +369,43 @@ int tscclock_init(void)
 	 * time at boot.
 	 */
 	rtc_epochoffset = rtc_boot - time_base;
+}
+
+/*
+ * Calibrate TSC and initialise TSC clock.
+ */
+int tscclock_init(void)
+{
+	__u32 eax, ebx, ecx, edx;
+
+	/* Initialise i8254 timer channel 0 to mode 2 at CONFIG_HZ frequency */
+	outb(TIMER_MODE, TIMER_SEL0 | TIMER_RATEGEN | TIMER_16BIT);
+	outb(TIMER_CNTR, (TIMER_HZ / CONFIG_HZ) & 0xff);
+	outb(TIMER_CNTR, (TIMER_HZ / CONFIG_HZ) >> 8);
+
+	/* First try to fetch all timing information from the pvclock */
+	cpuid(X86_KVM_CPUID_HYPERVISOR, 0,
+	      &eax, &ebx, &ecx, &edx);
+	/* The values in the registers correspond to "KVMKVMKVM" */
+	if (ebx == 0x4b4d564b && ecx == 0x564b4d56 && edx == 0x4d) {
+		cpuid(X86_KVM_CPUID_FEATURES, 0,
+		      &eax, &ebx, &ecx, &edx);
+		if (eax & X86_KVM_FEATURE_CLOCKSOURCE2) {
+			uk_pr_debug("Using modern pvclock to init clock\n");
+			pvclock_init(KVM_PVCLOCK_SYS_CLOCK_MSR,
+				     KVM_PVCLOCK_WALL_CLOCK_MSR);
+		} else if (eax & X86_KVM_FEATURE_CLOCKSOURCE2) {
+			uk_pr_debug("Using legacy pvclock to init clock\n");
+			pvclock_init(KVM_PVCLOCK_LEGACY_SYS_CLOCK_MSR,
+				     KVM_PVCLOCK_LEGACY_WALL_CLOCK_MSR);
+		} else {
+			uk_pr_debug("KVM does not provide a pvclock\n");
+		}
+	}
+
+	/* If that fails, use legacy devices */
+	if (!tsc_mult)
+		tscclock_pit_init();
 
 	/*
 	 * Initialise i8254 timer channel 0 to mode 4 (one shot).
