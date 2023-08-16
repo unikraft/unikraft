@@ -33,6 +33,7 @@
 #ifndef __UKPLAT_COMMON_PF_BUS_H__
 #define __UKPLAT_COMMON_PF_BUS_H__
 
+#include <stdint.h>
 #include <uk/bus.h>
 #include <uk/alloc.h>
 
