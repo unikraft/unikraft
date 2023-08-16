@@ -35,7 +35,6 @@
 
 #include <string.h>
 #include <stdint.h>
-#include <inttypes.h>
 #include <limits.h>
 
 #include <uk/assert.h>
@@ -81,7 +80,7 @@ struct cpio_header {
 };
 
 static int
-valid_magic(struct cpio_header *header)
+valid_magic(const struct cpio_header *header)
 {
 	return memcmp(header->magic, UKCPIO_MAGIC_NEWC, 6) == 0
 		|| memcmp(header->magic, UKCPIO_MAGIC_CRC, 6) == 0;
@@ -130,6 +129,8 @@ snhex_to_int(const char *buf, size_t count)
 	(char *)ALIGN_4((char *)(header) + sizeof(struct cpio_header) + fnlen)
 #define CPIO_NEXT(header, fnlen, fsize) \
 	(struct cpio_header *)ALIGN_4(CPIO_DATA(header, fnlen) + fsize)
+#define CPIO_ISLAST(header) \
+	(strcmp(CPIO_FILENAME(header), "TRAILER!!!") == 0)
 
 /**
  * Create absolute path with prefix.
@@ -179,183 +180,178 @@ int uk_syscall_r_utime(const char *, const struct utimbuf *);
 int uk_syscall_r_mkdir(const char *, mode_t);
 int uk_syscall_r_symlink(const char *, const char *);
 
+static enum ukcpio_error
+extract_file(const char *path, const char *contents, size_t len,
+             mode_t mode, uint32_t mtime)
+{
+	int ret = UKCPIO_SUCCESS;
+	int fd;
+	int err;
+	struct utimbuf times = {mtime, mtime};
+
+	uk_pr_info("Extracting %s (%zu bytes)\n", path, len);
+
+	fd = uk_syscall_r_open(path, O_CREAT|O_RDWR, 0);
+	if (fd < 0) {
+		uk_pr_err("%s: Failed to create file: %s (%d)\n",
+		          path, strerror(-fd), -fd);
+		ret = -UKCPIO_FILE_CREATE_FAILED;
+		goto out;
+	}
+
+	while (len) {
+		ssize_t written = uk_syscall_r_write(fd, contents, len);
+		if (written < 0) {
+			err = written;
+			uk_pr_err("%s: Failed to load content: %s (%d)\n",
+			          path, strerror(-err), -err);
+			ret = -UKCPIO_FILE_WRITE_FAILED;
+			goto close_out;
+		}
+		UK_ASSERT(len >= (size_t)written);
+		contents += written;
+		len -= written;
+	}
+
+	if ((err = uk_syscall_r_chmod(path, mode)))
+		uk_pr_warn("%s: Failed to chmod: %s (%d)\n",
+			   path, strerror(-err), -err);
+
+	if ((err = uk_syscall_r_utime(path, &times)))
+		uk_pr_warn("%s: Failed to set modification time: %s (%d)",
+		           path, strerror(-err), -err);
+
+close_out:
+	if ((err = uk_syscall_r_close(fd))) {
+		uk_pr_err("%s: Failed to close file: %s (%d)\n",
+		          path, strerror(-err), -err);
+		if (!ret)
+			ret = -UKCPIO_FILE_CLOSE_FAILED;
+	}
+out:
+	return ret;
+}
+
+static enum ukcpio_error
+extract_dir(const char *path, mode_t mode)
+{
+	int r;
+
+	uk_pr_info("Creating directory %s\n", path);
+	if ((r = uk_syscall_r_mkdir(path, mode))) {
+		uk_pr_err("%s: Failed to create directory: %s (%d)\n",
+		          path, strerror(-r), -r);
+		return -UKCPIO_MKDIR_FAILED;
+	}
+	return UKCPIO_SUCCESS;
+}
+
+static enum ukcpio_error
+extract_symlink(const char *path, const char *contents, size_t len)
+{
+	int r;
+	char target[len + 1];
+
+	uk_pr_info("Creating symlink %s\n", path);
+	/* NUL not guaranteed at the end of contents; need to copy */
+	memcpy(target, contents, len);
+	target[len] = 0;
+
+	uk_pr_info("%s: Target is %s\n", path, target);
+	if ((r = uk_syscall_r_symlink(target, path))) {
+		uk_pr_err("%s: Failed to create symlink: %s (%d)\n",
+		          path, strerror(-r), -r);
+		return -UKCPIO_SYMLINK_FAILED;
+	}
+	return UKCPIO_SUCCESS;
+}
+
 /**
- * Reads the section to the dest from a given a CPIO header.
+ * Extracts a CPIO section to the dest directory.
  *
- * @param header_ptr
- *  Pointer to the CPIO header.
+ * @param headerp
+ *  Pointer to the CPIO header, on success gets advanced to next section.
  * @param dest
- *  Destination path to extract the current header.
- * @param last
- *  The size of the CPIO section.
+ *  Destination path to extract the current header to.
+ * @param eof
+ *  Pointer to the first byte after end of file.
  * @return
  *  Returns 0 on success or one of ukcpio_error enum.
  */
 static enum ukcpio_error
-read_section(struct cpio_header **header_ptr,
-				const char *dest, uintptr_t last)
+process_section(const struct cpio_header **headerp,
+                const char *dest, const char *eof)
 {
-	enum ukcpio_error error = UKCPIO_SUCCESS;
-	int fd;
-	int err;
-	struct cpio_header *header;
-	char path_from_root[PATH_MAX];
-	mode_t header_mode;
-	uint32_t header_filesize;
-	uint32_t header_namesize;
-	uint32_t header_mtime;
-	char *data_location;
-	uint32_t bytes_to_write;
-	int bytes_written;
-	struct utimbuf times;
+	const struct cpio_header *header = *headerp;
 
-	if (strcmp(CPIO_FILENAME(*header_ptr), "TRAILER!!!") == 0) {
-		*header_ptr = NULL;
-		return UKCPIO_SUCCESS;
+	if ((char *)header >= eof || CPIO_FILENAME(header) > eof) {
+		uk_pr_err("Truncated CPIO header at %p", header);
+		return -UKCPIO_INVALID_HEADER;
 	}
-
-	if (!valid_magic(*header_ptr)) {
-		uk_pr_err("Unsupported or invalid magic number in CPIO header at %p\n",
-			  *header_ptr);
-		*header_ptr = NULL;
+	if (!valid_magic(header)) {
+		uk_pr_err("Bad magic number in CPIO header at %p\n", header);
 		return -UKCPIO_INVALID_HEADER;
 	}
 
-	if ((uintptr_t)*header_ptr + sizeof(struct cpio_header) > last) {
-		*header_ptr = NULL;
-		error = -UKCPIO_MALFORMED_INPUT;
-		goto out;
-	}
-
-	UK_ASSERT(dest);
-
-	header = *header_ptr;
-
-	header_mode = CPIO_U32FIELD(header->mode);
-	header_filesize = CPIO_U32FIELD(header->filesize);
-	header_namesize = CPIO_U32FIELD(header->namesize);
-	header_mtime = CPIO_U32FIELD(header->mtime);
-	data_location = CPIO_DATA(header, header_namesize);
-
-	if ((uintptr_t)data_location + header_filesize > last) {
-		uk_pr_err("File exceeds archive bounds: %s\n",
-			  CPIO_FILENAME(header));
-		*header_ptr = NULL;
-		error = -UKCPIO_MALFORMED_INPUT;
-		goto out;
-	}
-
-	if (absolute_path(path_from_root, dest, CPIO_FILENAME(header))) {
-		uk_pr_err("Resulting path too long: %s\n",
-			  CPIO_FILENAME(header));
-		*header_ptr = NULL;
-		error = -UKCPIO_MALFORMED_INPUT;
-		goto out;
-	}
-
-	if (IS_FILE(header_mode)) {
-		uk_pr_info("Extracting %s (%"PRIu32" bytes)\n",
-			   path_from_root, header_filesize);
-		fd = uk_syscall_r_open(path_from_root, O_CREAT|O_RDWR, 0);
-
-		if (fd < 0) {
-			uk_pr_err("%s: Failed to create file\n",
-				  path_from_root);
-			*header_ptr = NULL;
-			error = -UKCPIO_FILE_CREATE_FAILED;
-			goto out;
-		}
-
-		bytes_to_write = header_filesize;
-		bytes_written = 0;
-
-		while (bytes_to_write > 0) {
-			bytes_written = uk_syscall_r_write(fd,
-				data_location + bytes_written,
-				bytes_to_write);
-			if (bytes_written < 0) {
-				uk_pr_err("%s: Failed to load content: %s (%d)\n",
-					  path_from_root,
-					  strerror(-bytes_written),
-					  -bytes_written);
-				*header_ptr = NULL;
-				error = -UKCPIO_FILE_WRITE_FAILED;
-				goto out;
-			}
-			bytes_to_write -= bytes_written;
-		}
-
-		if ((err = uk_syscall_r_chmod(path_from_root,
-					      header_mode & 0777)))
-			uk_pr_warn("%s: Failed to chmod: %s (%d)\n",
-				   path_from_root, strerror(-err), -err);
-
-		times.actime = header_mtime;
-		times.modtime = header_mtime;
-		if ((err = uk_syscall_r_utime(path_from_root, &times)))
-			uk_pr_warn("%s: Failed to set modification time: %s (%d)",
-			           path_from_root, strerror(-err), -err);
-
-		if ((err = uk_syscall_r_close(fd))) {
-			uk_pr_err("%s: Failed to close file: %s (%d)\n",
-				  path_from_root, strerror(-err), -err);
-			*header_ptr = NULL;
-			error = -UKCPIO_FILE_CLOSE_FAILED;
-			goto out;
-		}
-	} else if (IS_DIR(header_mode)) {
-		uk_pr_info("Creating directory %s\n", path_from_root);
-		if (strcmp(".", CPIO_FILENAME(header)) != 0 &&
-		    (err = uk_syscall_r_mkdir(path_from_root,
-		                              header_mode & 0777)))
-		{
-			uk_pr_err("%s: Failed to create directory: %s (%d)\n",
-				  path_from_root, strerror(-err), -err);
-			*header_ptr = NULL;
-			error = -UKCPIO_MKDIR_FAILED;
-			goto out;
-		}
-	} else if (IS_SYMLINK(header_mode)) {
-		uk_pr_info("Creating symlink %s\n", path_from_root);
-
-		char target[header_filesize + 1];
-		memcpy(target, data_location, header_filesize);
-		target[header_filesize] = 0;
-
-		uk_pr_info("%s: Target is %s\n", path_from_root, target);
-		if ((err = uk_syscall_r_symlink(target, path_from_root))) {
-			uk_pr_err("%s: Failed to create symlink: %s (%d)\n",
-				  path_from_root, strerror(-err), -err);
-			*header_ptr = NULL;
-			error = -UKCPIO_SYMLINK_FAILED;
-			goto out;
-		}
+	if (CPIO_ISLAST(header)) {
+		*headerp = NULL;
+		return UKCPIO_SUCCESS;
 	} else {
-		uk_pr_warn("File %s unknown mode %o\n",
-			   path_from_root, header_mode);
+		uint32_t mode = CPIO_U32FIELD(header->mode);
+		uint32_t filesize = CPIO_U32FIELD(header->filesize);
+		uint32_t namesize = CPIO_U32FIELD(header->namesize);
+		uint32_t mtime = CPIO_U32FIELD(header->mtime);
+		const char *fname = CPIO_FILENAME(header);
+		const char *data = CPIO_DATA(header, namesize);
+
+		if (fname + namesize > eof) {
+			uk_pr_err("File name exceeds archive bounds at %p\n",
+			          header);
+			return -UKCPIO_MALFORMED_INPUT;
+		}
+		if (data + filesize > eof) {
+			uk_pr_err("File exceeds archive bounds: %s\n", fname);
+			return -UKCPIO_MALFORMED_INPUT;
+		}
+
+		UK_ASSERT(dest);
+		char fullpath[PATH_MAX];
+
+		if (absolute_path(fullpath, dest, fname)) {
+			uk_pr_err("Resulting path too long: %s\n", fname);
+			return -UKCPIO_MALFORMED_INPUT;
+		}
+
+		enum ukcpio_error err = UKCPIO_SUCCESS;
+
+		/* Skip "." as dest is already there */
+		if (IS_DIR(mode) && strcmp(".", fname)) {
+			err = extract_dir(fullpath, mode & 0777);
+		} else if (IS_FILE(mode)) {
+			err = extract_file(fullpath, data, filesize,
+			                   mode & 0777, mtime);
+		} else if (IS_SYMLINK(mode)) {
+			err = extract_symlink(fullpath, data, filesize);
+		} else {
+			uk_pr_warn("File %s unknown mode %o\n", fullpath, mode);
+		}
+
+		*headerp = CPIO_NEXT(header, namesize, filesize);
+		return err;
 	}
-
-	*header_ptr = CPIO_NEXT(header, header_namesize, header_filesize);
-
-out:
-	return error;
 }
 
 enum ukcpio_error
 ukcpio_extract(const char *dest, void *buf, size_t buflen)
 {
 	enum ukcpio_error error = UKCPIO_SUCCESS;
-	struct cpio_header *header = (struct cpio_header *)(buf);
-	struct cpio_header **header_ptr = &header;
-	uintptr_t end = (uintptr_t)header;
+	const struct cpio_header *header = (struct cpio_header *)(buf);
 
 	if (dest == NULL)
 		return -UKCPIO_NODEST;
 
-	while ((error == UKCPIO_SUCCESS) && header) {
-		error = read_section(header_ptr, dest, end + buflen);
-		header = *header_ptr;
-	}
+	while (header && error == UKCPIO_SUCCESS)
+		error = process_section(&header, dest, (char *)header + buflen);
 
 	return error;
 }
