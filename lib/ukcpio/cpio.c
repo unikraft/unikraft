@@ -58,17 +58,10 @@
 #define FILE_BITS         0100000
 #define SYMLINK_BITS      0120000
 
-#define ALIGN_4(ptr)      ((void *)ALIGN_UP((uintptr_t)(ptr), 4))
-
 #define IS_FILE_OF_TYPE(mode, bits) (((mode) & (FILE_TYPE_MASK)) == (bits))
 #define IS_FILE(mode) IS_FILE_OF_TYPE((mode), (FILE_BITS))
 #define IS_DIR(mode) IS_FILE_OF_TYPE((mode), (DIRECTORY_BITS))
 #define IS_SYMLINK(mode) IS_FILE_OF_TYPE((mode), (SYMLINK_BITS))
-
-#define S8HEX_TO_U32(buf) ((uint32_t) snhex_to_int((buf), 8))
-#define GET_MODE(hdr)     ((mode_t) S8HEX_TO_U32((hdr)->mode))
-
-#define filename(header) ((const char *)header + sizeof(struct cpio_header))
 
 struct cpio_header {
 	char magic[6];
@@ -126,6 +119,17 @@ snhex_to_int(const char *buf, size_t count)
 	}
 	return val;
 }
+
+#define ALIGN_4(ptr)      ((void *)ALIGN_UP((uintptr_t)(ptr), 4))
+
+#define CPIO_U32FIELD(buf) \
+	((uint32_t) snhex_to_int((buf), 8))
+#define CPIO_FILENAME(header) \
+	((char *)header + sizeof(struct cpio_header))
+#define CPIO_DATA(header, fnlen) \
+	(char *)ALIGN_4((char *)(header) + sizeof(struct cpio_header) + fnlen)
+#define CPIO_NEXT(header, fnlen, fsize) \
+	(struct cpio_header *)ALIGN_4(CPIO_DATA(header, fnlen) + fsize)
 
 /**
  * Create absolute path with prefix.
@@ -203,10 +207,9 @@ read_section(struct cpio_header **header_ptr,
 	char *data_location;
 	uint32_t bytes_to_write;
 	int bytes_written;
-	struct cpio_header *next_header;
 	struct utimbuf times;
 
-	if (strcmp(filename(*header_ptr), "TRAILER!!!") == 0) {
+	if (strcmp(CPIO_FILENAME(*header_ptr), "TRAILER!!!") == 0) {
 		*header_ptr = NULL;
 		return UKCPIO_SUCCESS;
 	}
@@ -218,23 +221,33 @@ read_section(struct cpio_header **header_ptr,
 		return -UKCPIO_INVALID_HEADER;
 	}
 
-	UK_ASSERT(dest);
-
-	header = *header_ptr;
-
-	if (absolute_path(path_from_root, dest, filename(header))) {
-		uk_pr_err("Resulting path too long: %s\n", filename(header));
+	if ((uintptr_t)*header_ptr + sizeof(struct cpio_header) > last) {
 		*header_ptr = NULL;
 		error = -UKCPIO_MALFORMED_INPUT;
 		goto out;
 	}
 
-	header_mode = GET_MODE(header);
-	header_filesize = S8HEX_TO_U32(header->filesize);
-	header_namesize = S8HEX_TO_U32(header->namesize);
-	header_mtime = S8HEX_TO_U32(header->mtime);
+	UK_ASSERT(dest);
 
-	if ((uintptr_t)header + sizeof(struct cpio_header) > last) {
+	header = *header_ptr;
+
+	header_mode = CPIO_U32FIELD(header->mode);
+	header_filesize = CPIO_U32FIELD(header->filesize);
+	header_namesize = CPIO_U32FIELD(header->namesize);
+	header_mtime = CPIO_U32FIELD(header->mtime);
+	data_location = CPIO_DATA(header, header_namesize);
+
+	if ((uintptr_t)data_location + header_filesize > last) {
+		uk_pr_err("File exceeds archive bounds: %s\n",
+			  CPIO_FILENAME(header));
+		*header_ptr = NULL;
+		error = -UKCPIO_MALFORMED_INPUT;
+		goto out;
+	}
+
+	if (absolute_path(path_from_root, dest, CPIO_FILENAME(header))) {
+		uk_pr_err("Resulting path too long: %s\n",
+			  CPIO_FILENAME(header));
 		*header_ptr = NULL;
 		error = -UKCPIO_MALFORMED_INPUT;
 		goto out;
@@ -250,18 +263,6 @@ read_section(struct cpio_header **header_ptr,
 				  path_from_root);
 			*header_ptr = NULL;
 			error = -UKCPIO_FILE_CREATE_FAILED;
-			goto out;
-		}
-
-		data_location = (char *)ALIGN_4(
-				(char *)(header) + sizeof(struct cpio_header)
-				+ header_namesize);
-
-		if ((uintptr_t)data_location + header_filesize > last) {
-			uk_pr_err("%s: File exceeds archive bounds\n",
-				  path_from_root);
-			*header_ptr = NULL;
-			error = -UKCPIO_MALFORMED_INPUT;
 			goto out;
 		}
 
@@ -304,7 +305,7 @@ read_section(struct cpio_header **header_ptr,
 		}
 	} else if (IS_DIR(header_mode)) {
 		uk_pr_info("Creating directory %s\n", path_from_root);
-		if (strcmp(".", filename(header)) != 0 &&
+		if (strcmp(".", CPIO_FILENAME(header)) != 0 &&
 		    (err = uk_syscall_r_mkdir(path_from_root,
 		                              header_mode & 0777)))
 		{
@@ -316,18 +317,6 @@ read_section(struct cpio_header **header_ptr,
 		}
 	} else if (IS_SYMLINK(header_mode)) {
 		uk_pr_info("Creating symlink %s\n", path_from_root);
-
-		data_location = (char *)ALIGN_4(
-				(char *)(header) + sizeof(struct cpio_header)
-				+ header_namesize);
-
-		if ((uintptr_t)data_location + header_filesize > last) {
-			uk_pr_err("%s: File exceeds archive bounds\n",
-				  path_from_root);
-			*header_ptr = NULL;
-			error = -UKCPIO_MALFORMED_INPUT;
-			goto out;
-		}
 
 		char target[header_filesize + 1];
 		memcpy(target, data_location, header_filesize);
@@ -346,15 +335,7 @@ read_section(struct cpio_header **header_ptr,
 			   path_from_root, header_mode);
 	}
 
-	next_header = (struct cpio_header *)ALIGN_4(
-		(char *)header + sizeof(struct cpio_header) + header_namesize
-	);
-
-	next_header = (struct cpio_header *)ALIGN_4(
-		(char *)next_header + header_filesize
-	);
-
-	*header_ptr = next_header;
+	*header_ptr = CPIO_NEXT(header, header_namesize, header_filesize);
 
 out:
 	return error;
