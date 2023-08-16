@@ -25,7 +25,7 @@ void __noreturn uk_efi_jmp_to_kern(void)
 	ukplat_lcpu_disable_irq();
 
 	/* Invalidate the image from the data cache */
-	clean_and_invalidate_dcache_range(__BASE_ADDR, __END);
+	clean_and_invalidate_dcache_range(__BASE_ADDR, __END - __BASE_ADDR);
 
 	SYSREG_WRITE64(sctlr_el1, SCTLR_SET_BITS);
 	SYSREG_WRITE64(contextidr_el1, 0);

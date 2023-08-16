@@ -83,6 +83,7 @@ ENTRY(_libkvmplat_entry)
 
 	ur_ldr	x0, _start_ram_addr
 	ur_ldr	x1, _end
+	sub	x1, x1, x0
 	bl	clean_and_invalidate_dcache_range
 
 	/* Disable the MMU and D-Cache. */
@@ -97,6 +98,7 @@ ENTRY(_libkvmplat_entry)
 0:
 	ur_ldr	x0, _start_ram_addr
 	ur_ldr	x1, _end
+	sub	x1, x1, x0
 	bl	invalidate_dcache_range
 #endif /* CONFIG_LIBUKRELOC */
 1:
