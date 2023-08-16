@@ -33,10 +33,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdlib.h>
 #include <string.h>
 #include <stdint.h>
 #include <inttypes.h>
+#include <limits.h>
 
 #include <uk/assert.h>
 #include <uk/print.h>
@@ -136,14 +136,13 @@ snhex_to_int(const char *buf, size_t count)
  * @return
  *  Returns the absolute path with prefix.
  */
-static char *
-absolute_path(const char *prefix, const char *path)
+static int
+absolute_path(char *abs_path, const char *prefix, const char *path)
 {
 	int add_slash;
 	size_t prefix_len;
 	size_t path_len;
 	size_t abs_path_len;
-	char *abs_path;
 
 	UK_ASSERT(prefix);
 	UK_ASSERT(path);
@@ -154,10 +153,8 @@ absolute_path(const char *prefix, const char *path)
 	add_slash = prefix[prefix_len - 1] == '/' ? 0 : 1;
 	abs_path_len = prefix_len + add_slash + path_len + 1;
 
-	abs_path = malloc(abs_path_len);
-
-	if (abs_path == NULL)
-		return NULL;
+	if (abs_path_len > PATH_MAX)
+		return -1;
 
 	memcpy(abs_path, prefix, prefix_len);
 	if (add_slash)
@@ -165,7 +162,7 @@ absolute_path(const char *prefix, const char *path)
 	memcpy(&abs_path[prefix_len + add_slash], path, path_len);
 
 	abs_path[abs_path_len - 1] = '\0';
-	return abs_path;
+	return 0;
 }
 
 /* Raw filesystem syscalls; not provided by headers */
@@ -196,7 +193,7 @@ read_section(struct cpio_header **header_ptr,
 	int fd;
 	int err;
 	struct cpio_header *header;
-	char *path_from_root;
+	char path_from_root[PATH_MAX];
 	mode_t header_mode;
 	uint32_t header_filesize;
 	uint32_t header_namesize;
@@ -220,12 +217,11 @@ read_section(struct cpio_header **header_ptr,
 	UK_ASSERT(dest);
 
 	header = *header_ptr;
-	path_from_root = absolute_path(dest, filename(header));
 
-	if (path_from_root == NULL) {
-		uk_pr_err("Out of memory\n");
+	if (absolute_path(path_from_root, dest, filename(header))) {
+		uk_pr_err("Resulting path too long: %s\n", filename(header));
 		*header_ptr = NULL;
-		error = -UKCPIO_NOMEM;
+		error = -UKCPIO_MALFORMED_INPUT;
 		goto out;
 	}
 
@@ -350,7 +346,6 @@ read_section(struct cpio_header **header_ptr,
 	*header_ptr = next_header;
 
 out:
-	free(path_from_root);
 	return error;
 }
 
