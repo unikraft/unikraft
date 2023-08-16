@@ -3,6 +3,7 @@
  * Authors: Robert Hrusecky <roberth@cs.utexas.edu>
  *          Omar Jamil <omarj2898@gmail.com>
  *          Sachin Beldona <sachinbeldona@utexas.edu>
+ *          Andrei Tatar <andrei@unikraft.io>
  *
  * Copyright (c) 2017, The University of Texas at Austin. All rights reserved.
  *
@@ -33,11 +34,9 @@
  */
 
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 #include <stdint.h>
 #include <inttypes.h>
-#include <errno.h>
 
 #include <uk/assert.h>
 #include <uk/print.h>
@@ -169,6 +168,14 @@ absolute_path(const char *prefix, const char *path)
 	return abs_path;
 }
 
+/* Raw filesystem syscalls; not provided by headers */
+int uk_syscall_r_open(const char *, int, mode_t);
+int uk_syscall_r_close(int);
+ssize_t uk_syscall_r_write(int, const void *, size_t);
+int uk_syscall_r_chmod(const char *, mode_t);
+int uk_syscall_r_mkdir(const char *, mode_t);
+int uk_syscall_r_symlink(const char *, const char *);
+
 /**
  * Reads the section to the dest from a given a CPIO header.
  *
@@ -187,6 +194,7 @@ read_section(struct cpio_header **header_ptr,
 {
 	enum ukcpio_error error = UKCPIO_SUCCESS;
 	int fd;
+	int err;
 	struct cpio_header *header;
 	char *path_from_root;
 	mode_t header_mode;
@@ -234,7 +242,7 @@ read_section(struct cpio_header **header_ptr,
 	if (IS_FILE(header_mode)) {
 		uk_pr_info("Extracting %s (%"PRIu32" bytes)\n",
 			   path_from_root, header_filesize);
-		fd = open(path_from_root, O_CREAT | O_RDWR);
+		fd = uk_syscall_r_open(path_from_root, O_CREAT|O_RDWR, 0);
 
 		if (fd < 0) {
 			uk_pr_err("%s: Failed to create file\n",
@@ -260,12 +268,14 @@ read_section(struct cpio_header **header_ptr,
 		bytes_written = 0;
 
 		while (bytes_to_write > 0) {
-			bytes_written = write(fd, data_location + bytes_written,
-					      bytes_to_write);
+			bytes_written = uk_syscall_r_write(fd,
+				data_location + bytes_written,
+				bytes_to_write);
 			if (bytes_written < 0) {
 				uk_pr_err("%s: Failed to load content: %s (%d)\n",
-					  path_from_root, strerror(errno),
-					  errno);
+					  path_from_root,
+					  strerror(-bytes_written),
+					  -bytes_written);
 				*header_ptr = NULL;
 				error = -UKCPIO_FILE_WRITE_FAILED;
 				goto out;
@@ -273,23 +283,26 @@ read_section(struct cpio_header **header_ptr,
 			bytes_to_write -= bytes_written;
 		}
 
-		if (chmod(path_from_root, header_mode & 0777) < 0)
+		if ((err = uk_syscall_r_chmod(path_from_root,
+					      header_mode & 0777)))
 			uk_pr_warn("%s: Failed to chmod: %s (%d)\n",
-				   path_from_root, strerror(errno), errno);
+				   path_from_root, strerror(-err), -err);
 
-		if (close(fd) < 0) {
+		if ((err = uk_syscall_r_close(fd))) {
 			uk_pr_err("%s: Failed to close file: %s (%d)\n",
-				  path_from_root, strerror(errno), errno);
+				  path_from_root, strerror(-err), -err);
 			*header_ptr = NULL;
 			error = -UKCPIO_FILE_CLOSE_FAILED;
 			goto out;
 		}
 	} else if (IS_DIR(header_mode)) {
 		uk_pr_info("Creating directory %s\n", path_from_root);
-		if (strcmp(".", filename(header)) != 0
-			&& mkdir(path_from_root, header_mode & 0777) < 0) {
+		if (strcmp(".", filename(header)) != 0 &&
+		    (err = uk_syscall_r_mkdir(path_from_root,
+		                              header_mode & 0777)))
+		{
 			uk_pr_err("%s: Failed to create directory: %s (%d)\n",
-				   path_from_root, strerror(errno), errno);
+				  path_from_root, strerror(-err), -err);
 			*header_ptr = NULL;
 			error = -UKCPIO_MKDIR_FAILED;
 			goto out;
@@ -314,9 +327,9 @@ read_section(struct cpio_header **header_ptr,
 		target[header_filesize] = 0;
 
 		uk_pr_info("%s: Target is %s\n", path_from_root, target);
-		if (uk_syscall_r_symlink(target, path_from_root)) {
+		if ((err = uk_syscall_r_symlink(target, path_from_root))) {
 			uk_pr_err("%s: Failed to create symlink: %s (%d)\n",
-				  path_from_root, strerror(errno), errno);
+				  path_from_root, strerror(-err), -err);
 			*header_ptr = NULL;
 			error = -UKCPIO_SYMLINK_FAILED;
 			goto out;
