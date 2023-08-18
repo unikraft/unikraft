@@ -7,6 +7,16 @@
 #include <uk/arch/paging.h>
 #include <uk/plat/common/bootinfo.h>
 
+extern struct ukplat_memregion_desc bpt_unmap_mrd;
+static uk_efi_paddr_t uk_efi_alloc_max_paddr;
+
+/* We must ensure backwards compatibility with !CONFIG_HAVE_PAGING */
+#if CONFIG_HAVE_PAGING
+static enum uk_efi_alloc_type uk_efi_alloc_type = UK_EFI_ALLOCATE_ANY_PAGES;
+#else  /* !CONFIG_HAVE_PAGING */
+static enum uk_efi_alloc_type uk_efi_alloc_type = UK_EFI_ALLOCATE_MAX_ADDRESS;
+#endif /* !CONFIG_HAVE_PAGING */
+
 static struct uk_efi_runtime_services *uk_efi_rs;
 static struct uk_efi_boot_services *uk_efi_bs;
 static struct uk_efi_sys_tbl *uk_efi_st;
@@ -104,6 +114,8 @@ static void uk_efi_init_vars(uk_efi_hndl_t self_hndl,
 	uk_efi_bs = sys_tbl->boot_services;
 	uk_efi_rs = sys_tbl->runtime_services;
 	uk_efi_sh = self_hndl;
+
+	uk_efi_alloc_max_paddr = bpt_unmap_mrd.pbase + bpt_unmap_mrd.len;
 }
 
 /* Convert an EFI Memory Descriptor to a ukplat_memregion_desc */
@@ -208,8 +220,11 @@ static void uk_efi_get_mmap(struct uk_efi_mem_desc **map, uk_efi_uintn_t *map_sz
 
 	/* Make sure the actual allocated buffer is bigger */
 	*map_sz += *desc_sz * UK_EFI_SURPLUS_MEM_DESC_COUNT;
-	status = uk_efi_bs->allocate_pool(UK_EFI_LOADER_DATA, *map_sz,
-					  (void **)map);
+	*map = (struct uk_efi_mem_desc *)uk_efi_alloc_max_paddr;
+	status = uk_efi_bs->allocate_pages(uk_efi_alloc_type,
+					   UK_EFI_LOADER_DATA,
+					   DIV_ROUND_UP(*map_sz, PAGE_SIZE),
+					   (uk_efi_paddr_t *)map);
 	if (unlikely(status != UK_EFI_SUCCESS))
 		uk_efi_crash("Failed to allocate memory for map\n");
 
@@ -419,9 +434,11 @@ static void uk_efi_read_file(uk_efi_hndl_t dev_h, const char *file_name,
 		uk_efi_crash("Failed to get file_info\n");
 
 	*len = file_info->file_size;
-	status = uk_efi_bs->allocate_pool(UK_EFI_LOADER_DATA,
-					  PAGE_ALIGN_UP(*len + 1),
-					  (void **)buf);
+	*buf = (char *)uk_efi_alloc_max_paddr;
+	status = uk_efi_bs->allocate_pages(uk_efi_alloc_type,
+					   UK_EFI_LOADER_DATA,
+					   DIV_ROUND_UP(*len, PAGE_SIZE),
+					   (uk_efi_paddr_t *)buf);
 	if (unlikely(status != UK_EFI_SUCCESS))
 		uk_efi_crash("Failed to allocate memory for file contents\n");
 
@@ -456,9 +473,11 @@ static void uk_efi_setup_bootinfo_cmdl(struct ukplat_bootinfo *bi)
 	if (uk_img_hndl->load_options && uk_img_hndl->load_options_size) {
 		len = (uk_img_hndl->load_options_size >> 1) + 1;
 
-		status = uk_efi_bs->allocate_pool(UK_EFI_LOADER_DATA,
-						  PAGE_ALIGN_UP(len),
-						  (void **)&cmdl);
+		cmdl = (char *)uk_efi_alloc_max_paddr;
+		status = uk_efi_bs->allocate_pages(uk_efi_alloc_type,
+						   UK_EFI_LOADER_DATA,
+						   DIV_ROUND_UP(len, PAGE_SIZE),
+						   (uk_efi_paddr_t *)&cmdl);
 		if (unlikely(status != UK_EFI_SUCCESS))
 			uk_efi_crash("Failed to allocate memory for cmdl\n");
 
