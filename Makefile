@@ -222,6 +222,7 @@ endif
 
 CONFIG_UK_PLAT        := $(CONFIG_UK_BASE)/plat/
 CONFIG_UK_LIB         := $(CONFIG_UK_BASE)/lib/
+CONFIG_UK_DRIV        := $(CONFIG_UK_BASE)/drivers/
 CONFIG_CONFIG_IN      := $(CONFIG_UK_BASE)/Config.uk
 CONFIG                := $(CONFIG_UK_BASE)/support/kconfig
 CONFIGLIB	      := $(CONFIG_UK_BASE)/support/kconfiglib
@@ -233,13 +234,11 @@ UK_FIXDEP             := $(KCONFIG_DIR)/fixdep
 KCONFIG_AUTOCONFIG    := $(KCONFIG_DIR)/auto.conf
 KCONFIG_TRISTATE      := $(KCONFIG_DIR)/tristate.config
 KCONFIG_AUTOHEADER    := $(KCONFIG_INCLUDES_DIR)/config.h
-KCONFIG_LIB_IN        := $(KCONFIG_DIR)/libs.uk
 KCONFIG_LIB_BASE      := $(CONFIG_UK_BASE)/lib
 KCONFIG_ELIB_DIRS     := $(L)
-KCONFIG_PLAT_IN       := $(KCONFIG_DIR)/plats.uk
 KCONFIG_PLAT_BASE     := $(CONFIG_UK_BASE)/plat
 KCONFIG_EPLAT_DIRS    := $(E)
-KCONFIG_APP_IN        := $(KCONFIG_DIR)/app.uk
+KCONFIG_DRIV_BASE     := $(CONFIG_UK_BASE)/drivers
 ifneq ($(CONFIG_UK_BASE),$(CONFIG_UK_APP))
 KCONFIG_EAPP_DIR      := $(CONFIG_UK_APP)
 else
@@ -474,6 +473,7 @@ include $(CONFIG_UK_BASE)/support/build/Makefile.rules
 $(foreach _M,$(wildcard $(addsuffix Makefile.rules,\
 	   $(CONFIG_UK_BASE)/arch/ $(CONFIG_UK_BASE)/arch/*/ \
 	   $(CONFIG_UK_BASE)/plat/*/ $(CONFIG_UK_BASE)/lib/*/ \
+	   $(CONFIG_UK_BASE)/drivers/*/ $(CONFIG_UK_BASE)/drivers/*/*/ \
 	   $(addsuffix /,$(ELIB_DIR)) $(APP_DIR)/)), \
 		$(eval $(call verbose_include,$(_M))) \
 )
@@ -706,6 +706,8 @@ $(foreach E,$(ELIB_DIR), \
 )
 # architecture library
 $(eval $(call _import_lib,$(CONFIG_UK_BASE)/arch/$(UK_FAMILY)))
+# drivers
+$(eval $(call verbose_include,$(CONFIG_UK_BASE)/drivers/Makefile.uk))
 # internal platform libraries
 $(eval $(call verbose_include,$(CONFIG_UK_BASE)/plat/Makefile.uk))
 # external platform libraries
@@ -884,13 +886,12 @@ COMMON_CONFIG_ENV = \
 	UK_FULLVERSION="$(UK_FULLVERSION)" \
 	UK_CODENAME="$(UK_CODENAME)" \
 	UK_ARCH="$(CONFIG_UK_ARCH)" \
-	KCONFIG_LIB_IN="$(KCONFIG_LIB_IN)" \
+	KCONFIG_DIR="$(KCONFIG_DIR)" \
 	KCONFIG_LIB_BASE="$(KCONFIG_LIB_BASE)" \
 	KCONFIG_ELIB_DIRS="$(KCONFIG_ELIB_DIRS)" \
-	KCONFIG_PLAT_IN="$(KCONFIG_PLAT_IN)" \
 	KCONFIG_PLAT_BASE="$(KCONFIG_PLAT_BASE)" \
 	KCONFIG_EPLAT_DIRS="$(KCONFIG_EPLAT_DIRS)" \
-	KCONFIG_APP_IN="$(KCONFIG_APP_IN)" \
+	KCONFIG_DRIV_BASE="$(KCONFIG_DRIV_BASE)" \
 	KCONFIG_EAPP_DIR="$(KCONFIG_EAPP_DIR)" \
 	UK_NAME="$(CONFIG_UK_NAME)"
 
