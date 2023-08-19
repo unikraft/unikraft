@@ -65,16 +65,18 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags)
 {
 	struct ukplat_memregion_desc *mrd, alloc_mrd = {0};
 	__vaddr_t unmap_start, unmap_end;
+	__sz unmap_len, desired_sz;
 	struct ukplat_bootinfo *bi;
 	__paddr_t pstart, pend;
 	__paddr_t ostart, olen;
-	__sz unmap_len;
 	int rc;
 
 	unmap_start = ALIGN_DOWN(bpt_unmap_mrd.vbase, __PAGE_SIZE);
 	unmap_end = unmap_start + ALIGN_DOWN(bpt_unmap_mrd.len, __PAGE_SIZE);
 	unmap_len = unmap_end - unmap_start;
 
+	/* Preserve desired size */
+	desired_sz = size;
 	size = ALIGN_UP(size, __PAGE_SIZE);
 	ukplat_memregion_foreach(&mrd, UKPLAT_MEMRT_FREE, 0, 0) {
 		UK_ASSERT(mrd->pbase <= __U64_MAX - size);
@@ -106,7 +108,7 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags)
 		if (olen - (pstart - ostart) == size) {
 			mrd->pbase = pstart;
 			mrd->vbase = pstart;
-			mrd->len = pend - pstart;
+			mrd->len = desired_sz;
 			mrd->type = type;
 			mrd->flags = flags;
 
@@ -122,7 +124,7 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags)
 		/* Insert allocated region */
 		alloc_mrd.vbase = pstart;
 		alloc_mrd.pbase = pstart;
-		alloc_mrd.len   = size;
+		alloc_mrd.len   = desired_sz;
 		alloc_mrd.type  = type;
 		alloc_mrd.flags = flags | UKPLAT_MEMRF_MAP;
 
