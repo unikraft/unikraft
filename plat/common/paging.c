@@ -1453,22 +1453,22 @@ int ukplat_paging_init(void)
 	 */
 	rc = -ENOMEM; /* In case there is no region */
 	ukplat_memregion_foreach(&mrd, UKPLAT_MEMRT_FREE, 0, 0) {
-		paddr  = PAGE_ALIGN_UP(mrd->pbase);
-		len    = PAGE_ALIGN_DOWN(mrd->len - (paddr - mrd->pbase));
+		UK_ASSERT(mrd->vbase == mrd->pbase);
+		UK_ASSERT(!(mrd->pbase & ~PAGE_MASK));
+		UK_ASSERT(mrd->len);
+		UK_ASSERT(!(mrd->len & ~PAGE_MASK));
 
 		/* Not mapped */
 		mrd->vbase = __U64_MAX;
 		mrd->flags &= ~UKPLAT_MEMRF_PERMS;
 
-		if (unlikely(len == 0))
-			continue;
-
 		if (!kernel_pt.fa) {
-			rc = ukplat_pt_init(&kernel_pt, paddr, len);
+			rc = ukplat_pt_init(&kernel_pt, mrd->pbase, mrd->len);
 			if (unlikely(rc))
 				kernel_pt.fa = NULL;
 		} else {
-			rc = ukplat_pt_add_mem(&kernel_pt, paddr, len);
+			rc = ukplat_pt_add_mem(&kernel_pt, mrd->pbase,
+					       mrd->len);
 		}
 
 		/* We do not fail if we cannot add this memory region to the
@@ -1477,8 +1477,13 @@ int ukplat_paging_init(void)
 		 */
 		if (unlikely(rc && rc != -ENOMEM))
 			uk_pr_err("Cannot add %12lx-%12lx to paging: %d\n",
-				  paddr, paddr + len, rc);
+				  mrd->pbase, mrd->pbase + mrd->len, rc);
 	}
+
+	/* The frame allocator should've only had page-aligned memory regions
+	 * added to it. Make sure nothing happened in the meantime.
+	 */
+	UK_ASSERT(!(kernel_pt.fa->free_memory & ~PAGE_MASK));
 
 	if (unlikely(!kernel_pt.fa))
 		return rc;
