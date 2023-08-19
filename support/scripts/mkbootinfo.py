@@ -123,6 +123,8 @@ def main():
 
             # Align size up to page size
             size = (int(phdr[1], base=16) + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1)
+            if size == 0:
+                continue
 
             assert nsecs < cap
             nsecs += 1

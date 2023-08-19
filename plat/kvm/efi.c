@@ -480,7 +480,7 @@ static void uk_efi_setup_bootinfo_cmdl(struct ukplat_bootinfo *bi)
 
 	mrd.pbase = (__paddr_t)cmdl;
 	mrd.vbase = (__vaddr_t)cmdl;
-	mrd.len = PAGE_ALIGN_UP(len);
+	mrd.len = len;
 	mrd.type = UKPLAT_MEMRT_CMDLINE;
 	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
 	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
@@ -510,7 +510,7 @@ static void uk_efi_setup_bootinfo_initrd(struct ukplat_bootinfo *bi)
 
 	mrd.pbase = (__paddr_t)initrd;
 	mrd.vbase = (__vaddr_t)initrd;
-	mrd.len = PAGE_ALIGN_UP(len);
+	mrd.len = len;
 	mrd.type = UKPLAT_MEMRT_INITRD;
 	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
 	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
@@ -537,7 +537,7 @@ static void uk_efi_setup_bootinfo_dtb(struct ukplat_bootinfo *bi)
 
 	mrd.pbase = (__paddr_t)dtb;
 	mrd.vbase = (__vaddr_t)dtb;
-	mrd.len = PAGE_ALIGN_UP(len);
+	mrd.len = len;
 	mrd.type = UKPLAT_MEMRT_DEVICETREE;
 	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
 	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
