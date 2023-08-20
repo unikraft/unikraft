@@ -47,6 +47,10 @@
 
 #include <errno.h>
 
+#if CONFIG_LIBUKRSI
+#include <uk/rsi.h>
+#endif /* CONFIG_LIBUKRSI */
+
 /* The implementation for arm64 supports a 48-bit virtual address space
  * with 4KiB translation granule, as defined by VMSAv8.
  *
@@ -118,6 +122,15 @@ pgarch_pte_create(__paddr_t paddr, unsigned long attr, unsigned int level,
 	if (!(attr & PAGE_ATTR_PROT_EXEC))
 		pte |= PTE_ATTR_XN;
 
+#if CONFIG_LIBUKRSI
+	if (attr & PAGE_ATTR_RME_UNPROTECTED)
+		pte |= PTE_RME_UNPROTECTED_BIT;
+	else
+		pte &= (~PTE_RME_UNPROTECTED_BIT);
+#else /* !CONFIG_LIBUKRSI */
+	UK_ASSERT(!(attr & PAGE_ATTR_RME_UNPROTECTED));
+#endif /* !CONFIG_LIBUKRSI */
+
 	switch (attr & (PAGE_ATTR_SHAREABLE_MASK <<
 		PAGE_ATTR_SHAREABLE_SHIFT)) {
 	case PAGE_ATTR_SHAREABLE_IS:
@@ -181,6 +194,11 @@ pgarch_attr_from_pte(__pte_t pte, unsigned int level __unused)
 
 	if (!(pte & PTE_ATTR_PXN))
 		attr |= PAGE_ATTR_PROT_EXEC;
+
+#if CONFIG_LIBUKRSI
+	if (pte & PTE_RME_UNPROTECTED_BIT)
+		attr |= PAGE_ATTR_RME_UNPROTECTED;
+#endif /* !CONFIG_LIBUKRSI */
 
 	switch (pte & PTE_ATTR_SH_MASK) {
 	case (PTE_ATTR_SH(PTE_ATTR_SH_NS)):
