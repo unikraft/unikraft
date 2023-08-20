@@ -6,6 +6,7 @@
 
 UK_DRIV_BASE := $(CONFIG_UK_BASE)/drivers
 
+$(eval $(call _import_lib,$(UK_DRIV_BASE)/arm-cca))
 $(eval $(call _import_lib,$(UK_DRIV_BASE)/ukbus))
 $(eval $(call _import_lib,$(UK_DRIV_BASE)/ukintctlr))
 $(eval $(call _import_lib,$(UK_DRIV_BASE)/virtio))

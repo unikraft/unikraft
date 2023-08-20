@@ -1,0 +1,13 @@
+$(eval $(call addlib_s,libukrsi,$(CONFIG_LIBUKRSI)))
+
+CINCLUDES-$(CONFIG_LIBUKRSI)   += -I$(LIBUKRSI_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBUKRSI) += -I$(LIBUKRSI_BASE)/include
+
+LIBUKRSI_CINCLUDES-y += -I$(LIBUKRSI_BASE)/include
+LIBUKRSI_CINCLUDES-y += -I$(LIBKVMPLAT_BASE)/include
+
+LIBUKRSI_SRCS-y += $(LIBUKRSI_BASE)/rsi.c
+
+ifneq ($(filter y,$(CONFIG_LIBUKRSI_TEST) $(CONFIG_LIBUKTEST_ALL)),)
+LIBUKRSI_SRCS-y += $(LIBUKRSI_BASE)/tests/test_rsi.c
+endif

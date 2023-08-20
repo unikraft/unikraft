@@ -1,13 +1,15 @@
+if ARM64_FEAT_RME
+menu "Arm CCA"
+source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-arm-cca.uk' -r '$(KCONFIG_DRIV_BASE)/arm-cca' -l '$(KCONFIG_DRIV_BASE)/arm-cca')"
+endmenu
+endif
+
 menu "Bus drivers"
-
 source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-bus.uk' -r '$(KCONFIG_DRIV_BASE)/ukbus' -l '$(KCONFIG_DRIV_BASE)/ukbus')"
-
 endmenu
 
 menu "Interrupt controller"
-
 source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-intctlr.uk' -r '$(KCONFIG_DRIV_BASE)/ukintctlr' -l '$(KCONFIG_DRIV_BASE)/ukintctlr')"
-
 endmenu
 
 menu "Virtio"

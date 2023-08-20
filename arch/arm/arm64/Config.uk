@@ -157,7 +157,7 @@ config ARM64_FEAT_PAUTH
 	  rely on memory corruption, such as stack smashing and
 	  ROP.
 
-	config ARM64_FEAT_BTI
+config ARM64_FEAT_BTI
 	bool "Armv8.5 Branch Target Identification"
 	help
 		BTI protects against JOP-like attacks by placing and
@@ -209,6 +209,15 @@ config ARM64_FEAT_RNG
 	  processor. The architecture specifies that this is implemented
 	  by a Deterministic Random Bit Generator (DRBG) that is seeded
 	  from a TRNG.
+endmenu
+
+menu "Armv9-A Extensions"
+	depends on MCPU_ARM64_NONE
+
+config ARM64_FEAT_RME
+	bool "Armv9 Realm Management Extension"
+	help
+	  Enable the support for Confidential Computing Architecture.
 endmenu
 
 config ARM64_ERRATUM_858921
