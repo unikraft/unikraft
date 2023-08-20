@@ -38,6 +38,11 @@
 #include <uk/asm/limits.h>
 #include <uk/alloc.h>
 
+#if CONFIG_LIBUKRSI
+#include <uk/rsi.h>
+#include <kvm-arm64/image.h>
+#endif /* CONFIG_LIBUKRSI */
+
 extern struct ukplat_memregion_desc bpt_unmap_mrd;
 
 static struct uk_alloc *plat_allocator;
@@ -362,6 +367,8 @@ int ukplat_memregion_get(int i, struct ukplat_memregion_desc **mrd)
 static int ukplat_memregion_list_insert_unmaps(struct ukplat_bootinfo *bi)
 {
 	__vaddr_t unmap_start, unmap_end;
+	struct ukplat_memregion_desc *mrdm, *mrdu;
+	int i, j;
 	int rc;
 
 	if (!bpt_unmap_mrd.len)
@@ -387,15 +394,75 @@ static int ukplat_memregion_list_insert_unmaps(struct ukplat_bootinfo *bi)
 		return rc;
 
 	/* Before Kernel image */
-	return ukplat_memregion_list_insert(&bi->mrds,
-			&(struct ukplat_memregion_desc){
-				.vbase = unmap_start,
-				.pbase = 0,
-				.len   = ALIGN_DOWN(__BASE_ADDR, __PAGE_SIZE) -
-					 unmap_start,
-				.type  = 0,
-				.flags = UKPLAT_MEMRF_UNMAP,
-			});
+	rc = ukplat_memregion_list_insert(
+	    &bi->mrds,
+	    &(struct ukplat_memregion_desc){
+		.vbase = unmap_start,
+		.pbase = 0,
+		.len = ALIGN_DOWN(__BASE_ADDR, __PAGE_SIZE) - unmap_start,
+		.type = 0,
+		.flags = UKPLAT_MEMRF_UNMAP,
+	    });
+	if (unlikely(rc < 0))
+		return rc;
+
+	/* exclude the realm region */
+	for (i = 0; i < (int)bi->mrds.count; i++) {
+		mrdm = &bi->mrds.mrds[i];
+
+		if (mrdm->type != UKPLAT_MEMRT_REALM)
+			continue;
+
+		for (j = 0; j < (int)bi->mrds.count; j++) {
+			mrdu = &bi->mrds.mrds[j];
+
+			if (!(mrdu->flags & UKPLAT_MEMRF_UNMAP))
+				continue;
+
+			if (RANGE_CONTAIN(mrdu->vbase, mrdu->len, mrdm->vbase,
+					  mrdm->len)) {
+				/* prevent the region from being mapped later */
+				mrdm->flags &= ~UKPLAT_MEMRF_MAP;
+
+				ukplat_memregion_list_insert_at_idx(
+				    &bi->mrds,
+				    &(struct ukplat_memregion_desc){
+					.vbase = mrdm->pbase + mrdm->len,
+					.pbase = mrdm->pbase + mrdm->len,
+					.len   = mrdu->vbase + mrdu->len
+					       - mrdm->vbase - mrdm->len,
+					.type = mrdu->type,
+					.flags = mrdu->flags
+					}, i + 1);
+
+				mrdu->len = mrdm->vbase - mrdu->vbase;
+
+				/* Remove dropped regions */
+				if (mrdu->len == 0)
+					ukplat_memregion_list_delete(&bi->mrds,
+								     j);
+				break;
+			}
+		}
+	}
+	return 0;
+}
+
+static int ukplat_memregion_list_delete_unmaps(struct ukplat_bootinfo *bi)
+{
+	struct ukplat_memregion_desc *mrd;
+	int i = 0;
+
+	while (i < (int)bi->mrds.count) {
+		mrd = &bi->mrds.mrds[i];
+		if (!(mrd->flags & UKPLAT_MEMRF_UNMAP)) {
+			i++;
+			continue;
+		}
+		ukplat_memregion_list_delete(&bi->mrds, i);
+	}
+
+	return 0;
 }
 
 int ukplat_mem_init(void)
@@ -413,13 +480,18 @@ int ukplat_mem_init(void)
 	if (unlikely(rc < 0))
 		return rc;
 
-	/* Remove the two memory regions inserted by
-	 * ukplat_memregion_list_insert_unmaps(). Due to their `pbase` nature
-	 * and us never adding regions starting from zero-page, they are
-	 * guaranteed to be the first in the list
+	/* Remove the memory regions inserted by
+	 * ukplat_memregion_list_insert_unmaps().
 	 */
-	ukplat_memregion_list_delete(&bi->mrds, 0);
-	ukplat_memregion_list_delete(&bi->mrds, 0);
+	rc = ukplat_memregion_list_delete_unmaps(bi);
+	if (unlikely(rc < 0))
+		return rc;
+
+#if CONFIG_LIBUKRSI
+	rc = uk_rsi_init_device(DEVICE_BASE_ADDR, DEVICE_LENGTH);
+	if (unlikely(rc))
+		UK_CRASH("Failed to set up device memory region\n");
+#endif /* CONFIG_LIBUKRSI */
 
 	return 0;
 }
