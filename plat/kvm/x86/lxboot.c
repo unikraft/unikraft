@@ -41,7 +41,7 @@ lxboot_init_cmdline(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 
 	mrd.pbase = cmdline_addr;
 	mrd.vbase = cmdline_addr;
-	mrd.len   = PAGE_ALIGN_UP(cmdline_size);
+	mrd.len   = cmdline_size;
 	mrd.type  = UKPLAT_MEMRT_CMDLINE;
 	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
 #ifdef CONFIG_UKPLAT_MEMRNAME
@@ -79,7 +79,7 @@ lxboot_init_initrd(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 	mrd.flags = UKPLAT_MEMRF_MAP | UKPLAT_MEMRF_READ;
 	mrd.vbase = initrd_addr;
 	mrd.pbase = initrd_addr;
-	mrd.len   = PAGE_ALIGN_UP(initrd_size);
+	mrd.len   = initrd_size;
 #ifdef CONFIG_UKPLAT_MEMRNAME
 	memcpy(mrd.name, "initrd", sizeof("initrd"));
 #endif /* CONFIG_UKPLAT_MEMRNAME */
@@ -105,9 +105,6 @@ lxboot_init_mem(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 		 * not handle address zero well.
 		 */
 		start = MAX(entry->addr, PAGE_SIZE);
-		/* Also make sure to not insert unaligned memory regions */
-		start = PAGE_ALIGN_UP(start);
-
 		end = entry->addr + entry->size;
 
 		if (end <= start)
