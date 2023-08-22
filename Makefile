@@ -83,14 +83,15 @@ export CDPATH :=
 
 # To put more focus on warnings, be less verbose as default
 # Use 'make V=1' to see the full commands
+# Set KBUILD_VERBOSE and Q to quiet mode
+KBUILD_VERBOSE := 0
+Q := @
+
 ifeq ("$(origin V)", "command line")
   BUILD_VERBOSE = $(V)
 endif
 ifndef BUILD_VERBOSE
   BUILD_VERBOSE = 0
-  # Set KBUILD_VERBOSE and Q to quiet mode
-  KBUILD_VERBOSE := 0
-  Q := @
 endif
 
 ifneq ($(BUILD_VERBOSE),0)
