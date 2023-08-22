@@ -40,8 +40,8 @@
 #include <uk/plat/irq.h>
 #include <uk/bus.h>
 #include <uk/bitops.h>
+#include <uk/ofw/fdt.h>
 #include <libfdt.h>
-#include <ofw/fdt.h>
 #include <uk/plat/common/bootinfo.h>
 
 #include <platform_bus.h>

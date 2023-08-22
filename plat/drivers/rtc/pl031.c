@@ -34,9 +34,9 @@
 #include <string.h>
 #include <uk/essentials.h>
 #include <libfdt.h>
-#include <ofw/fdt.h>
 #include <gic/gic-v2.h>
-#include <ofw/gic_fdt.h>
+#include <uk/ofw/fdt.h>
+#include <uk/ofw/gic_fdt.h>
 #include <uk/print.h>
 #include <arm/cpu.h>
 #include <rtc/rtc.h>

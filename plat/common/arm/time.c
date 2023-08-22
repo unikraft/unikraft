@@ -31,7 +31,7 @@
  */
 #include <stdlib.h>
 #include <libfdt.h>
-#include <ofw/fdt.h>
+#include <uk/ofw/fdt.h>
 #include <uk/assert.h>
 #include <uk/plat/time.h>
 #include <uk/plat/lcpu.h>
@@ -40,7 +40,7 @@
 #include <uk/plat/common/cpu.h>
 #include <uk/plat/common/sections.h>
 #include <uk/plat/common/bootinfo.h>
-#include <ofw/gic_fdt.h>
+#include <uk/ofw/gic_fdt.h>
 #include <uk/plat/common/irq.h>
 #include <gic/gic.h>
 #include <arm/time.h>

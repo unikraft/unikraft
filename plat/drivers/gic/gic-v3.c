@@ -50,10 +50,10 @@
 #include <uk/plat/common/bootinfo.h>
 #include <uk/plat/common/irq.h>
 #include <uk/plat/spinlock.h>
+#include <uk/ofw/fdt.h>
 #include <arm/cpu.h>
 #include <gic/gic.h>
 #include <gic/gic-v3.h>
-#include <ofw/fdt.h>
 
 #define GIC_RDIST_REG(gdev, r)					\
 	((void *)(gdev.rdist_mem_addr + (r) +			\

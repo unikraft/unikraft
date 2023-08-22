@@ -34,11 +34,11 @@
 #include <uk/plat/common/acpi.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/io.h>
+#include <uk/ofw/fdt.h>
 #include <arm/smccc.h>
 #include <arm/arm64/cpu.h>
 #include <gic/gic.h>
 #include <libfdt.h>
-#include <ofw/fdt.h>
 
 #define CPU_ID_MASK 0xff00ffffffUL
 

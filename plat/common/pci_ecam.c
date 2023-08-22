@@ -39,7 +39,7 @@
 #include <uk/plat/common/cpu.h>
 #include <uk/plat/common/bootinfo.h>
 #include <libfdt_env.h>
-#include <ofw/fdt.h>
+#include <uk/ofw/fdt.h>
 #include <libfdt.h>
 
 static struct uk_alloc *a;
