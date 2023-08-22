@@ -212,11 +212,11 @@ static struct pci_bus_handler ph __unused;
 
 #define PCI_CONF_VENDOR_ID          (0x00)
 #define PCI_CONF_VENDOR_ID_SHFT     (0)
-#define PCI_CONF_VENDOR_ID_MASK     (0x0000FFFF)
+#define PCI_CONF_VENDOR_ID_MASK     (0xFFFF)
 
 #define PCI_CONF_DEVICE_ID          (0x00)
 #define PCI_CONF_DEVICE_ID_SHFT     (16)
-#define PCI_CONF_DEVICE_ID_MASK     (0x0000FFFF)
+#define PCI_CONF_DEVICE_ID_MASK     (0xFFFF)
 
 #define PCI_CONF_SUBSYSVEN_ID          (0x2c)
 #define PCI_CONF_SUBSYSVEN_ID_SHFT     (0)
@@ -224,7 +224,7 @@ static struct pci_bus_handler ph __unused;
 
 #define PCI_CONF_SUBCLASS_ID          (0x08)
 #define PCI_CONF_SUBCLASS_ID_SHFT     (16)
-#define PCI_CONF_SUBCLASS_ID_MASK     (0x00FF)
+#define PCI_CONF_SUBCLASS_ID_MASK     (0xFF)
 
 #define PCI_CONF_COMMAND              (0x04)
 #define PCI_CONF_COMMAND_SHFT         (0)
@@ -244,11 +244,11 @@ static struct pci_bus_handler ph __unused;
 #define PCI_CONF_SUBSYS_ID_MASK     (0xFFFF)
 
 #define PCI_CONF_IRQ                (0X3C)
-#define PCI_CONF_IRQ_SHFT           (0x0)
+#define PCI_CONF_IRQ_SHFT           (0)
 #define PCI_CONF_IRQ_MASK           (0XFF)
 
 #define PCI_CONF_IOBAR              (0x10)
-#define PCI_CONF_IOBAR_SHFT         (0x0)
+#define PCI_CONF_IOBAR_SHFT         (0)
 #define PCI_CONF_IOBAR_MASK         (~0x3)
 
 #define PCI_CONF_BAR0              (0x10)
