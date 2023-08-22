@@ -240,6 +240,7 @@ config VIRTIO_PCI
 
 config VIRTIO_MMIO
        bool "Virtio MMIO device support"
+       default y if ((VIRTIO_NET || VIRTIO_9P || VIRTIO_BLK) && KVM_VMM_FIRECRACKER)
        default n
        depends on KVM_PF
        select VIRTIO_BUS
