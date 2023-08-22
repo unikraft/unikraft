@@ -9,6 +9,7 @@ menuconfig PLAT_KVM
        select LIBFDT if ARCH_ARM_64
        select ELF64_TO_32 if ARCH_X86_64
        select LIBUKRELOC if OPTIMIZE_PIE
+       select LIBUKOFW if ARCH_ARM_64
        help
                 Create a Unikraft image that runs as a KVM guest
 
@@ -276,12 +277,6 @@ config RTC_PL031
        bool "Arm platform RTC (PL031) driver"
        default y if ARCH_ARM_64
        depends on ARCH_ARM_64
-
-config LIBOFW
-       bool "Open Firmware library support"
-       default n
-       depends on ARCH_ARM_64
-       select LIBFDT
 
 config UKPLAT_ALLOW_GIC
 	bool

@@ -13,7 +13,6 @@ $(eval $(call addplatlib_s,kvm,libkvmvirtio,$(CONFIG_VIRTIO_BUS)))
 $(eval $(call addplatlib_s,kvm,libkvmvirtionet,$(CONFIG_VIRTIO_NET)))
 $(eval $(call addplatlib_s,kvm,libkvmvirtioblk,$(CONFIG_VIRTIO_BLK)))
 $(eval $(call addplatlib_s,kvm,libkvmvirtio9p,$(CONFIG_VIRTIO_9P)))
-$(eval $(call addplatlib_s,kvm,libkvmofw,$(CONFIG_LIBOFW)))
 $(eval $(call addplatlib_s,kvm,libkvmgic,$(CONFIG_LIBGIC)))
 $(eval $(call addplatlib_s,kvm,libkvmpl031,$(CONFIG_RTC_PL031)))
 
@@ -219,16 +218,6 @@ LIBKVMVIRTIO9P_ASINCLUDES-y   += -I$(UK_PLAT_DRIVERS_BASE)/include
 LIBKVMVIRTIO9P_CINCLUDES-y    += -I$(UK_PLAT_DRIVERS_BASE)/include
 LIBKVMVIRTIO9P_SRCS-y +=\
 			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_9p.c
-
-##
-## OFW library definitions
-##
-LIBKVMOFW_CINCLUDES-y         += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMOFW_CINCLUDES-y         += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMOFW_CINCLUDES-y         += -I$(UK_PLAT_DRIVERS_BASE)/include
-
-LIBKVMOFW_SRCS-y                += $(UK_PLAT_DRIVERS_BASE)/ofw/fdt.c
-LIBKVMOFW_SRCS-$(CONFIG_LIBGIC) += $(UK_PLAT_DRIVERS_BASE)/ofw/gic_fdt.c
 
 ##
 ## GIC library definitions

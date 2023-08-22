@@ -45,9 +45,9 @@
 #include <uk/plat/common/bootinfo.h>
 #include <uk/plat/common/irq.h>
 #include <uk/plat/spinlock.h>
+#include <uk/ofw/fdt.h>
 #include <arm/cpu.h>
 #include <gic/gic-v2.h>
-#include <ofw/fdt.h>
 
 /* Max CPU interface for GICv2 */
 #define GIC_MAX_CPUIF		8
