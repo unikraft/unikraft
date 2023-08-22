@@ -54,7 +54,7 @@
  */
 
 #if !CONFIG_LIBSYSCALL_SHIM
-long uk_syscall_r_dup2(long oldfd, long newfd);
+long uk_syscall_r_dup3(long oldfd, long newfd, long flags);
 #endif /* !CONFIG_LIBSYSCALL_SHIM */
 
 static int __write_fn(void *dst __unused, void *src, size_t *cnt)
@@ -240,13 +240,13 @@ int init_stdio(void)
 	}
 	vfscore_install_fd(0, &stdio_file);
 
-	fd = uk_syscall_r_dup2(0, 1);
+	fd = uk_syscall_r_dup3(0, 1, 0);
 	if (fd != 1) {
 		uk_pr_crit("failed to dup to stdout (fd=1)\n");
 		return (fd < 0) ? fd : -EBADF;
 	}
 
-	fd = uk_syscall_r_dup2(0, 2);
+	fd = uk_syscall_r_dup3(0, 2, 0);
 	if (fd != 2) {
 		uk_pr_crit("failed to dup to stderr (fd=2)\n");
 		return (fd < 0) ? fd : -EBADF;
