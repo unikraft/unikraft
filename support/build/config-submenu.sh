@@ -89,7 +89,7 @@ if [ ! -z "$ARG_OUT" ]; then
 	printf '# Auto generated file. DO NOT EDIT\n' >&7
 else
 	# duplicate stdout to fd:7
-	exec >&7
+	exec 7>&1
 fi
 
 #
