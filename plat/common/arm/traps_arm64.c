@@ -27,7 +27,7 @@
 #include <arm/traps.h>
 #include <uk/print.h>
 #include <uk/assert.h>
-#include <gic/gic.h>
+#include <uk/intctlr/gic.h>
 
 #ifdef CONFIG_ARM64_FEAT_MTE
 #include <arm/arm64/mte.h>

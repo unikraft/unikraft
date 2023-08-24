@@ -41,8 +41,8 @@
 #include <uk/plat/common/sections.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/ofw/gic_fdt.h>
+#include <uk/intctlr/gic.h>
 #include <uk/plat/common/irq.h>
-#include <gic/gic.h>
 #include <arm/time.h>
 
 static const char * const arch_timer_list[] = {

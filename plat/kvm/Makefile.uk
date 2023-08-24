@@ -13,7 +13,6 @@ $(eval $(call addplatlib_s,kvm,libkvmvirtio,$(CONFIG_VIRTIO_BUS)))
 $(eval $(call addplatlib_s,kvm,libkvmvirtionet,$(CONFIG_VIRTIO_NET)))
 $(eval $(call addplatlib_s,kvm,libkvmvirtioblk,$(CONFIG_VIRTIO_BLK)))
 $(eval $(call addplatlib_s,kvm,libkvmvirtio9p,$(CONFIG_VIRTIO_9P)))
-$(eval $(call addplatlib_s,kvm,libkvmgic,$(CONFIG_LIBGIC)))
 $(eval $(call addplatlib_s,kvm,libkvmpl031,$(CONFIG_RTC_PL031)))
 
 ##
@@ -71,7 +70,6 @@ LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/setup.c
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/console.c
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/lcpu.c
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/lcpu_start.S
-LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/intctrl.c
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/tscclock.c
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/time.c
 ifeq ($(findstring y,$(CONFIG_KVM_KERNEL_VGA_CONSOLE) $(CONFIG_KVM_DEBUG_VGA_CONSOLE)),y)
@@ -124,7 +122,6 @@ LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/exceptions.S|isr
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/pagetable64.S|isr
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/setup.c
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/lcpu.c
-LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/intctrl.c
 
 LIBKVMPLAT_SRCS-y                          += $(LIBKVMPLAT_BASE)/shutdown.c
 LIBKVMPLAT_SRCS-y                          += $(LIBKVMPLAT_BASE)/memory.c
@@ -218,22 +215,6 @@ LIBKVMVIRTIO9P_ASINCLUDES-y   += -I$(UK_PLAT_DRIVERS_BASE)/include
 LIBKVMVIRTIO9P_CINCLUDES-y    += -I$(UK_PLAT_DRIVERS_BASE)/include
 LIBKVMVIRTIO9P_SRCS-y +=\
 			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_9p.c
-
-##
-## GIC library definitions
-##
-ifeq ($(findstring y,$(CONFIG_LIBGIC)),y)
-LIBKVMGIC_CINCLUDES-y         += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMGIC_CINCLUDES-y         += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMGIC_CINCLUDES-y         += -I$(UK_PLAT_DRIVERS_BASE)/include
-LIBKVMGIC_SRCS-y += $(UK_PLAT_DRIVERS_BASE)/gic/gic-common.c
-ifeq ($(findstring y,$(CONFIG_LIBGICV2)),y)
-LIBKVMGIC_SRCS-y += $(UK_PLAT_DRIVERS_BASE)/gic/gic-v2.c
-endif
-ifeq ($(findstring y,$(CONFIG_LIBGICV3)),y)
-LIBKVMGIC_SRCS-y += $(UK_PLAT_DRIVERS_BASE)/gic/gic-v3.c
-endif
-endif
 
 ##
 ## RTC-PL031 library definitions

@@ -15,9 +15,9 @@
 #include <uk/plat/console.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
+#include <uk/intctlr.h>
 
 #include <kvm/console.h>
-#include <kvm/intctrl.h>
 
 #include <uk/plat/lcpu.h>
 #include <uk/plat/common/lcpu.h>

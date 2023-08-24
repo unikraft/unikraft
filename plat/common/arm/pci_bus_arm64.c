@@ -56,7 +56,7 @@
 #include <pci/pci_bus.h>
 #include <pci/pci_ecam.h>
 #include <libfdt_env.h>
-#include <gic/gic-v2.h>
+#include <uk/intctlr/gic.h>
 
 #define DEVFN(dev, fn)   ((dev << PCI_FN_BIT_NBR) | fn)
 #define SIZE_PER_PCI_DEV 0x20	/* legacy pci device size, no msi */
