@@ -1,0 +1,3 @@
+config LIBUKINTCTLR
+    bool "ukintctlr: Interrupt Controller API"
+    default n
