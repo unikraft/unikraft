@@ -37,7 +37,7 @@
 #include <uk/ofw/fdt.h>
 #include <arm/smccc.h>
 #include <arm/arm64/cpu.h>
-#include <gic/gic.h>
+#include <uk/intctlr/gic.h>
 #include <libfdt.h>
 
 #define CPU_ID_MASK 0xff00ffffffUL

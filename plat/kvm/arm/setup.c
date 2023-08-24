@@ -32,7 +32,7 @@
 #include <rtc/pl031.h>
 #endif /* CONFIG_RTC_PL031 */
 #include <uk/assert.h>
-#include <kvm/intctrl.h>
+#include <uk/intctlr.h>
 #include <arm/cpu.h>
 #include <arm/arm64/cpu.h>
 #include <arm/smccc.h>

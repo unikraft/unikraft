@@ -129,19 +129,3 @@ config FPSIMD
 	depends on ARCH_ARM_64
 	help
 		Enable support FPU usage in application
-
-menuconfig LIBGIC
-	bool "Arm GIC (generic interrupt controller) support"
-	select LIBOFW
-	default y if ARCH_ARM_64
-	depends on ARCH_ARM_64
-	depends on UKPLAT_ALLOW_GIC
-if LIBGIC
-config LIBGICV2
-	bool "Version 2"
-	default y
-
-config LIBGICV3
-	bool "Version 3"
-	default y
-endif

@@ -49,7 +49,7 @@
 #include <virtio/virtio_bus.h>
 #include <virtio/virtqueue.h>
 #include <virtio/virtio_mmio.h>
-#include <gic/gic-v2.h>
+#include <uk/intctlr/gic.h>
 
 /*
  * The alignment to use between consumer and producer parts of vring.

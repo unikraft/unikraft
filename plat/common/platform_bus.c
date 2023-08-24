@@ -36,8 +36,8 @@
 #include <uk/plat/common/cpu.h>
 #include <platform_bus.h>
 #include <libfdt.h>
-#include <gic/gic-v2.h>
 #include <uk/ofw/fdt.h>
+#include <uk/intctlr/gic.h>
 #include <uk/plat/common/bootinfo.h>
 
 static void *dtb;
