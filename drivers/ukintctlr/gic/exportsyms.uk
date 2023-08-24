@@ -1,0 +1,5 @@
+init_gic
+gic_irq_translate
+acpi_get_gicd
+gicv3_probe
+gicv2_probe
