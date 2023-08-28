@@ -44,7 +44,7 @@
 #include <libfdt.h>
 #include <uk/plat/common/bootinfo.h>
 
-#include <platform_bus.h>
+#include <uk/bus/platform.h>
 #include <virtio/virtio_config.h>
 #include <virtio/virtio_bus.h>
 #include <virtio/virtqueue.h>

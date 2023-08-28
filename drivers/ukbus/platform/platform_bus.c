@@ -34,7 +34,7 @@
 #include <uk/print.h>
 #include <uk/plat/memory.h>
 #include <uk/plat/common/cpu.h>
-#include <platform_bus.h>
+#include <uk/bus/platform.h>
 #include <libfdt.h>
 #include <uk/ofw/fdt.h>
 #include <uk/intctlr/gic.h>
