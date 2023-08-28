@@ -36,7 +36,7 @@
 #include <uk/arch/types.h>
 #include <uk/list.h>
 #include <uk/bus/pci.h>
-#include <platform_bus.h>
+#include <uk/bus/platform.h>
 #include <libfdt.h>
 
 struct fdt_phandle_args;

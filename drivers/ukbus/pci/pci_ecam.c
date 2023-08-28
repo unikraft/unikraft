@@ -31,7 +31,7 @@
  */
 
 #include <stdbool.h>
-#include <platform_bus.h>
+#include <uk/bus/platform.h>
 #include <uk/list.h>
 #include <uk/alloc.h>
 #include <uk/print.h>
