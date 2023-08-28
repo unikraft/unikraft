@@ -11,6 +11,7 @@ menuconfig PLAT_KVM
        select LIBUKRELOC if OPTIMIZE_PIE
        select LIBUKOFW if ARCH_ARM_64
        imply LIBUKBUS_PCI if LIBUKBUS
+       imply LIBUKBUS_PLATFORM if (LIBUKBUS && ARCH_ARM_64)
        select LIBUKINTCTLR if ARCH_X86_64
        help
                 Create a Unikraft image that runs as a KVM guest
