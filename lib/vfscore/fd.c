@@ -188,13 +188,13 @@ int fdalloc(struct vfscore_file *fp, int *newfd)
 {
 	int fd, ret = 0;
 
-	fhold(fp);
-
 	fd = vfscore_alloc_fd();
 	if (fd < 0) {
 		ret = fd;
 		goto exit;
 	}
+
+	fhold(fp);
 
 	ret = vfscore_install_fd(fd, fp);
 	if (ret)
