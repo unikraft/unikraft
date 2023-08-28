@@ -151,7 +151,7 @@ static void vfscore_fstab_fetch_volume_args(char *v, struct vfscore_volume *vv)
 }
 #endif /* CONFIG_LIBVFSCORE_FSTAB */
 
-#ifdef CONFIG_LIBUKCPIO
+#if CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS
 static int vfscore_mount_initrd_volume(struct vfscore_volume *vv)
 {
 	struct ukplat_memregion_desc *initrd;
@@ -187,13 +187,7 @@ static int vfscore_mount_initrd_volume(struct vfscore_volume *vv)
 
 	return 0;
 }
-
-#else /* CONFIG_LIBUKCPIO */
-static int vfscore_mount_initrd_volume(struct vfscore_volume *vv __unused)
-{
-	return -1;
-}
-#endif /* !CONFIG_LIBUKCPIO */
+#endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
 
 #ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS
 static int vfscore_automount_rootfs(void)
@@ -230,10 +224,10 @@ static int vfscore_automount_rootfs(void)
 	if (!vv.drv || vv.drv[0] == '\0')
 		return 0;
 
-#if CONFIG_LIBVFSCORE_ROOTFS_INITRD
+#if CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS
 	if (!strncmp(vv.drv, "initrd", sizeof("initrd") - 1))
 		return vfscore_mount_initrd_volume(&vv);
-#endif /* CONFIG_LIBVFSCORE_ROOTFS_INITRD */
+#endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
 
 	rc = vfscore_mount_volume(&vv);
 	if (unlikely(rc))
@@ -258,10 +252,14 @@ static int vfscore_automount_fstab_volumes(void)
 	for (i = 0; i < CONFIG_LIBVFSCORE_FSTAB_SIZE && vfscore_fstab[i]; i++) {
 		vfscore_fstab_fetch_volume_args(vfscore_fstab[i], &vv);
 
-		if (!strncmp(vv.drv, "initrd", sizeof("initrd") - 1))
+#if CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS
+		if (!strncmp(vv.drv, "initrd", sizeof("initrd") - 1)) {
 			rc = vfscore_mount_initrd_volume(&vv);
-		else
+		} else
+#endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
+		{
 			rc = vfscore_mount_volume(&vv);
+		}
 		if (unlikely(rc)) {
 			uk_pr_err("Failed to mount %s: error %d\n", vv.sdev,
 				  rc);
