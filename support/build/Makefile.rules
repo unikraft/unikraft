@@ -586,7 +586,7 @@ endef
 # buildrule_* $1:libname,$2:source,$3:variant,$4:target,$5:extraflags
 
 define buildrule_S_ =
-$(4): $(2) | preprocess
+$(4): $(2)
 	$(call build_cmd_fixdep,AS,$(1),$(4),\
 		$(AS)  $$(COMPFLAGS) $$(COMPFLAGS-y) \
 		       $$($(call vprefix_lib,$(1),COMPFLAGS)) $$($(call vprefix_lib,$(1),COMPFLAGS-y)) \
@@ -613,7 +613,7 @@ endef
 buildrule_sx = $(call buildrule_S_,$(1),$(2),$(3),$(4))
 
 define buildrule_s =
-$(4): $(2) | preprocess
+$(4): $(2)
 	$(call build_cmd,AS,$(1),$(4),\
 		$(AS)  $$(COMPFLAGS) $$(COMPFLAGS-y) \
 		       $$($(call vprefix_lib,$(1),COMPFLAGS)) $$($(call vprefix_lib,$(1),COMPFLAGS-y)) \
@@ -638,7 +638,7 @@ $(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(4)) $(call out2d
 endef
 
 define buildrule_c =
-$(4): $(2) | preprocess
+$(4): $(2)
 	$(call build_cmd_fixdep,CC,$(1),$(4),\
 		$(CC)  $$(COMPFLAGS) $$(COMPFLAGS-y) \
 		       $$($(call vprefix_lib,$(1),COMPFLAGS)) $$($(call vprefix_lib,$(1),COMPFLAGS-y)) \
@@ -663,7 +663,7 @@ $(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(4)) $(call out2d
 endef
 
 define buildrule_cxx =
-$(4): $(2) | preprocess
+$(4): $(2)
 	$(call build_cmd_fixdep,CXX,$(1),$(4),\
 		$(CXX) $$(COMPFLAGS) $$(COMPFLAGS-y) \
 		       $$($(call vprefix_lib,$(1),COMPFLAGS)) $$($(call vprefix_lib,$(1),COMPFLAGS-y)) \
@@ -697,7 +697,7 @@ buildrule_c$(plus)$(plus) = $(call buildrule_cxx,$(1),$(2),$(3),$(4))
 
 # NOTE: We are not using most of the flags such as COMPFLAGS due to incompatibilities between rustc and GCC.
 define buildrule_rs =
-$(4): $(2) | preprocess
+$(4): $(2)
 	$(call build_cmd,RUSTC,$(1),$(4),\
 		$(RUSTC) $$(RUSTCFLAGS) $$(RUSTCFLAGS-y) $$(RUSTCFLAGS_EXTRA) \
 			$$($(call vprefix_lib,$(1),RUSTCFLAGS)) $$($(call vprefix_lib,$(1),RUSTCFLAGS-y)) \
@@ -722,7 +722,7 @@ $(eval EXTRA_LD_SCRIPT-y += $(1))
 endef
 
 define buildrule_S_lds =
-$(4): $(2) | preprocess
+$(4): $(2)
 	$(call build_cmd_fixdep,LDS,$(1),$(4),\
 		$(AS)  -E -P -x assembler-with-cpp $$(COMPFLAGS) $$(COMPFLAGS-y) \
 		       $$(ASINCLUDES) $$(ASINCLUDES-y) \
@@ -775,7 +775,7 @@ $(if $(strip $($(call uc,$(1))_PLATS)),\
 endef
 
 define buildrule_dts =
-$(4) : $(2) | preprocess
+$(4): $(2)
 	$(call build_cmd,DTC,$(1),$(4),\
 	       $(DTC) -I dts -O dtb -o $$(@) $$(<)\
 	)
@@ -817,6 +817,9 @@ $(if $(filter buildrule_$(call fileext,$(strip $(2))),$(.VARIABLES)),,\
 $(error buildrule_$(call fileext,$(strip $(2))) is not defined: Failed to install rule for $(2)))
 
 $(call buildrule_$(call fileext,$(strip $(2))),$(strip $(1)),$(strip $(2)),$(strip $(3)),$(strip $(4)),$(strip $(5)))
+
+# Default buildrule_* dependencies
+$(4): | preprocess
 endef
 
 #################################################
