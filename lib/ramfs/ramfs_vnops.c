@@ -55,6 +55,12 @@
 #include <fcntl.h>
 #include <vfscore/fs.h>
 
+/* 16 bits are enough for file mode as defined by POSIX, the rest we can use */
+#define RAMFS_MODEMASK 0xffff
+#define RAMFS_DELMODE 0x10000
+#define RAMFS_IS_DELETED(np) ((np)->rn_mode & RAMFS_DELMODE)
+#define RAMFS_MARK_DELETED(np) (np)->rn_mode |= RAMFS_DELMODE
+
 static struct uk_mutex ramfs_lock = UK_MUTEX_INITIALIZER(ramfs_lock);
 static uint64_t inode_count = 1; /* inode 0 is reserved to root */
 
@@ -167,7 +173,8 @@ ramfs_remove_node(struct ramfs_node *dnp, struct ramfs_node *np)
 		}
 		prev->rn_next = np->rn_next;
 	}
-	ramfs_free_node(np);
+	/* Mark node as deleted */
+	RAMFS_MARK_DELETED(np);
 
 	set_times_to_now(&(dnp->rn_mtime), &(dnp->rn_ctime), NULL);
 
@@ -608,7 +615,7 @@ ramfs_getattr(struct vnode *vnode, struct vattr *attr)
 	memcpy(&(attr->va_ctime), &(np->rn_ctime), sizeof(struct timespec));
 	memcpy(&(attr->va_mtime), &(np->rn_mtime), sizeof(struct timespec));
 
-	attr->va_mode = np->rn_mode;
+	attr->va_mode = np->rn_mode & RAMFS_MODEMASK;
 
 	return 0;
 }
@@ -634,8 +641,17 @@ ramfs_setattr(struct vnode *vnode, struct vattr *attr)
 	}
 
 	if (attr->va_mask & AT_MODE)
-		np->rn_mode = attr->va_mode;
+		np->rn_mode = attr->va_mode & RAMFS_MODEMASK;
 
+	return 0;
+}
+
+static int
+ramfs_inactive(struct vnode *vp)
+{
+	struct ramfs_node *np = RAMFS_NODE(vp);
+	if (np && RAMFS_IS_DELETED(np))
+		ramfs_free_node(vp->v_data);
 	return 0;
 }
 
@@ -644,7 +660,6 @@ ramfs_setattr(struct vnode *vnode, struct vattr *attr)
 #define ramfs_seek      ((vnop_seek_t)vfscore_vop_nullop)
 #define ramfs_ioctl     ((vnop_ioctl_t)vfscore_vop_einval)
 #define ramfs_fsync     ((vnop_fsync_t)vfscore_vop_nullop)
-#define ramfs_inactive  ((vnop_inactive_t)vfscore_vop_nullop)
 #define ramfs_link      ((vnop_link_t)vfscore_vop_eperm)
 #define ramfs_fallocate ((vnop_fallocate_t)vfscore_vop_nullop)
 #define ramfs_poll      ((vnop_poll_t)vfscore_vop_einval)
