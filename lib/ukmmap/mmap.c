@@ -78,13 +78,13 @@ UK_SYSCALL_DEFINE(void*, mmap, void*, addr, size_t, len, int, prot,
 	 * Otherwise return 0 (unimplemented mmap)
 	 */
 	if (fildes != -1 || off)
-		return 0;
+		return MAP_FAILED;
 	if (!(prot & (PROT_READ|PROT_WRITE)) && (prot != 0))
-		return 0;
+		return MAP_FAILED;
 	if (!(flags & (MAP_ANON|MAP_PRIVATE)) &&
 			!(flags & (MAP_FIXED|MAP_ANON|MAP_PRIVATE)) &&
 			!(flags & (MAP_NORESERVE|MAP_ANON|MAP_PRIVATE)))
-		return 0;
+		return MAP_FAILED;
 
 	while (tmp) {
 		if (addr) {
@@ -98,14 +98,14 @@ UK_SYSCALL_DEFINE(void*, mmap, void*, addr, size_t, len, int, prot,
 	void *mem = uk_memalign(uk_alloc_get_default(), __PAGE_SIZE, len);
 	if (!mem) {
 		errno = ENOMEM;
-		return (void *) -1;
+		return MAP_FAILED;
 	}
 
 	new = uk_malloc(uk_alloc_get_default(), sizeof(struct mmap_addr));
 	if (!new) {
 		uk_free(uk_alloc_get_default(), mem);
 		errno = ENOMEM;
-		return (void *) -1;
+		return MAP_FAILED;
 	}
 
 	/* The caller expects the memory to be zeroed */
