@@ -35,11 +35,12 @@
 #define __LIBPOSIX_USER_H__
 
 #include <uk/assert.h>
+#include <uk/config.h>
 
-#define UK_DEFAULT_UID		0
-#define UK_DEFAULT_GID		0
-#define UK_DEFAULT_USER		"root"
-#define UK_DEFAULT_GROUP	"root"
+#define UK_DEFAULT_UID		CONFIG_LIBPOSIX_USER_UID
+#define UK_DEFAULT_GID		CONFIG_LIBPOSIX_USER_GID
+#define UK_DEFAULT_USER		CONFIG_LIBPOSIX_USER_USERNAME
+#define UK_DEFAULT_GROUP	CONFIG_LIBPOSIX_USER_GROUPNAME
 #define UK_DEFAULT_PASS		""
 
 void pu_init_passwds(void);

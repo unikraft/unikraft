@@ -1,3 +1,23 @@
-config LIBPOSIX_USER
+menuconfig LIBPOSIX_USER
 	bool "posix-user: User-related functions"
 	default n
+
+if LIBPOSIX_USER
+
+config LIBPOSIX_USER_UID
+	int "User ID (uid)"
+	default 0
+
+config LIBPOSIX_USER_GID
+	int "Group ID (gid)"
+	default 0
+
+config LIBPOSIX_USER_USERNAME
+	string "User Name"
+	default "root"
+
+config LIBPOSIX_USER_GROUPNAME
+	string "Group Name"
+	default "root"
+
+endif
