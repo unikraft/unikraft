@@ -1,4 +1,4 @@
-config LIBVFSCORE
+menuconfig LIBVFSCORE
 	bool "vfscore: VFS Core Interface"
 	default n
 	select LIBNOLIBC if !HAVE_LIBC
@@ -7,8 +7,6 @@ config LIBVFSCORE
 	select LIBPOSIX_TIME
 
 if LIBVFSCORE
-menu "vfscore: Configuration"
-
 config LIBVFSCORE_PIPE_SIZE_ORDER
 	int "Pipe size order"
 	default 16
@@ -132,5 +130,4 @@ config LIBVFSCORE_FSTAB_SIZE
 		passed through the vfs.fstab argument.
 endif
 
-endmenu
 endif
