@@ -95,14 +95,16 @@ static int arch_pci_driver_add_device(struct pci_driver *drv,
 	dev->irq = irq;
 	uk_pr_info("pci dev base(0x%lx) irq(%ld)\n", dev->base, dev->irq);
 
-	if (drv->add_dev)
+	if (drv->add_dev) {
 		ret = drv->add_dev(dev); //virtio pci
-	if (ret < 0) {
-		uk_pr_err("PCI %02x:%02x.%02x: Failed to initialize device driver\n",
-			  (int) addr->bus,
-			  (int) addr->devid,
-			  (int) addr->function);
-		uk_free(pha, dev);
+		if (unlikely(ret < 0)) {
+			uk_pr_err("PCI %02x:%02x.%02x: Failed to initialize device driver\n",
+				  (int) addr->bus,
+				  (int) addr->devid,
+				  (int) addr->function);
+			uk_free(pha, dev);
+			return ret;
+		}
 	}
 
 	return 0;
