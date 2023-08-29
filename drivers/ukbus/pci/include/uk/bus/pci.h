@@ -61,14 +61,18 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __UKPLAT_COMMON_PCI_BUS_H__
-#define __UKPLAT_COMMON_PCI_BUS_H__
+#ifndef __UK_BUS_PCI_H__
+#define __UK_BUS_PCI_H__
 
 #include <stdint.h>
 #include <stddef.h>
 #include <uk/bus.h>
 #include <uk/alloc.h>
 #include <uk/ctors.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  * A structure describing an ID for a PCI driver. Each driver provides a
@@ -297,4 +301,8 @@ static struct pci_bus_handler ph __unused;
 
 struct pci_driver *pci_find_driver(struct pci_device_id *id);
 
-#endif /* __UKPLAT_COMMON_PCI_BUS_H__ */
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __UK_BUS_PCI_H__ */
