@@ -30,9 +30,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-
-#ifndef _PCI_ECAM_H
-#define _PCI_ECAM_H
+#ifndef __UK_BUS_PCI_ECAM_H__
+#define __UK_BUS_PCI_ECAM_H__
 
 #include <uk/arch/types.h>
 #include <uk/list.h>
@@ -101,4 +100,5 @@ int pci_generic_config_write(__u8 bus, __u8 devfn,
 			     int where, int size, __u32 val);
 
 extern struct pf_driver gen_pci_driver;
-#endif
+
+#endif /* __UK_BUS_PCI_ECAM_H__ */
