@@ -31,7 +31,6 @@
  */
 
 #include <stdbool.h>
-#include <pci/pci_ecam.h>
 #include <platform_bus.h>
 #include <uk/list.h>
 #include <uk/alloc.h>
@@ -41,6 +40,8 @@
 #include <libfdt_env.h>
 #include <uk/ofw/fdt.h>
 #include <libfdt.h>
+
+#include "pci_ecam.h"
 
 static struct uk_alloc *a;
 static struct pci_ecam_ops pci_generic_ecam_ops;
