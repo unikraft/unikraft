@@ -30,11 +30,15 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __UKPLAT_COMMON_PF_BUS_H__
-#define __UKPLAT_COMMON_PF_BUS_H__
+#ifndef __UK_BUS_PLATFORM_H__
+#define __UK_BUS_PLATFORM_H__
 
 #include <uk/bus.h>
 #include <uk/alloc.h>
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  * A structure describing an ID for a Platform driver. Each driver provides a
@@ -111,4 +115,8 @@ UK_TAILQ_HEAD(pf_device_list, struct pf_device);
 /* Do not use this function directly: */
 void _pf_register_driver(struct pf_driver *drv);
 
-#endif /* __UKPLAT_COMMON_PF_BUS_H__ */
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __UK_BUS_PLATFORM_H__*/
