@@ -7,7 +7,6 @@ $(eval $(call addplat_s,kvm,$(CONFIG_PLAT_KVM)))
 ## KVM platform library registration
 ##
 $(eval $(call addplatlib,kvm,libkvmplat))
-$(eval $(call addplatlib_s,kvm,libkvmpf,$(CONFIG_KVM_PF)))
 $(eval $(call addplatlib_s,kvm,libkvmvirtio,$(CONFIG_VIRTIO_BUS)))
 $(eval $(call addplatlib_s,kvm,libkvmvirtionet,$(CONFIG_VIRTIO_NET)))
 $(eval $(call addplatlib_s,kvm,libkvmvirtioblk,$(CONFIG_VIRTIO_BLK)))
@@ -137,15 +136,6 @@ endif
 LIBKVMPLAT_SRCS-y		 += $(UK_PLAT_COMMON_BASE)/bootinfo.c|common
 LIBKVMPLAT_SRCS-$(CONFIG_LIBFDT) += $(UK_PLAT_COMMON_BASE)/bootinfo_fdt.c|common
 LIBKVMPLAT_SRCS-y		 += $(UK_PLAT_COMMON_BASE)/bootinfo.lds.S|common
-
-##
-## Platform bus library definitions
-##
-LIBKVMPF_ASINCLUDES-$(CONFIG_ARCH_ARM_64)  += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMPF_CINCLUDES-$(CONFIG_ARCH_ARM_64)   += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMPF_CINCLUDES-$(CONFIG_ARCH_ARM_64)   += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMPF_CINCLUDES-$(CONFIG_ARCH_ARM_64)   += -I$(UK_PLAT_DRIVERS_BASE)/include
-LIBKVMPF_SRCS-$(CONFIG_KVM_PF) += $(UK_PLAT_COMMON_BASE)/platform_bus.c|common
 
 ##
 ## Virtio library definitions

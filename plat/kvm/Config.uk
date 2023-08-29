@@ -207,14 +207,6 @@ config KVM_MAX_IRQ_HANDLER_ENTRIES
        default 8
        depends on (ARCH_X86_64 || ARCH_ARM_64)
 
-config KVM_PF
-       bool "Platform Bus Driver"
-       default y
-       depends on (ARCH_ARM_64)
-       select LIBUKBUS
-       help
-               Platform bus driver for probing and operating platform devices
-
 config VIRTIO_BUS
       bool  "Virtio bus driver"
       default y

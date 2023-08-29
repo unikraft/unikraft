@@ -1,0 +1,8 @@
+config LIBUKBUS_PLATFORM
+	bool "Platform bus"
+	depends on ARCH_ARM_64
+	depends on LIBUKBUS
+	select LIBUKOFW
+	select LIBUKINTCTLR_GIC if ARCH_ARM_64
+	help
+		Platform bus for non-auto-discoverable devices
