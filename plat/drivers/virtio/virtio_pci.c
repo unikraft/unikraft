@@ -37,7 +37,7 @@
 #include <uk/print.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/irq.h>
-#include <pci/pci_bus.h>
+#include <uk/bus/pci.h>
 #include <virtio/virtio_config.h>
 #include <virtio/virtio_bus.h>
 #include <virtio/virtqueue.h>

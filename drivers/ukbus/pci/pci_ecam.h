@@ -36,7 +36,7 @@
 
 #include <uk/arch/types.h>
 #include <uk/list.h>
-#include <pci/pci_bus.h>
+#include <uk/bus/pci.h>
 #include <platform_bus.h>
 #include <libfdt.h>
 

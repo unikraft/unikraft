@@ -54,7 +54,7 @@
 #include <string.h>
 #include <uk/print.h>
 #include <uk/plat/common/cpu.h>
-#include <pci/pci_bus.h>
+#include <uk/bus/pci.h>
 
 #define PCI_CONF_READ(type, ret, a, s)					\
 	do {								\
