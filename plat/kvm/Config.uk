@@ -230,7 +230,7 @@ config VIRTIO_PCI
        bool "Virtio PCI device support"
        default y if (VIRTIO_NET || VIRTIO_9P || VIRTIO_BLK)
        default n
-       depends on KVM_PCI
+       depends on LIBUKBUS_PCI
        select VIRTIO_BUS
        help
                Support virtio devices on PCI bus
