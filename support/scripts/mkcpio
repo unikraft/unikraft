@@ -1,5 +1,11 @@
 #!/usr/bin/env bash
-CPIOTOOL="$( which bsdcpio )"
+OSENV=$( uname )
+CPIOTOOL=
+if [ "$OSENV" = "Linux" ]; then
+	CPIOTOOL="$( which bsdcpio )"
+else
+	CPIOTOOL="$( which cpio )"
+fi
 
 usage()
 {
