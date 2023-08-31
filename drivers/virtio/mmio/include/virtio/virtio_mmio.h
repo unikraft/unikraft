@@ -34,6 +34,8 @@
 #ifndef __VIRTIO_MMIO_H__
 #define __VIRTIO_MMIO_H__
 
+#include <uk/bus/platform.h>
+
 /*
  * Control registers
  */
@@ -139,5 +141,8 @@
  */
 #define VIRTIO_MMIO_INT_VRING		(1 << 0)
 #define VIRTIO_MMIO_INT_CONFIG		(1 << 1)
+
+/* Register a new device */
+int virtio_mmio_add_dev(struct pf_device *pfdev);
 
 #endif /* __VIRTIO_MMIO_H__ */

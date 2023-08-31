@@ -453,6 +453,7 @@ static int virtio_mmio_probe_fdt(struct pf_device *pfdev)
 
 	uk_pr_info("virtio mmio probe base(0x%lx) irq(%ld)\n",
 				pfdev->base, pfdev->irq);
+
 	return 0;
 }
 #endif /* CONFIG_LIBVIRTIO_MMIO_FDT */
@@ -468,13 +469,22 @@ static int virtio_mmio_probe(struct pf_device __maybe_unused *pfdev)
 	return rc;
 }
 
-static int virtio_mmio_add_dev(struct pf_device *pfdev)
+int virtio_mmio_add_dev(struct pf_device *pfdev)
 {
 	struct virtio_mmio_device *vm_dev;
 	unsigned int magic;
 	int rc;
 
 	UK_ASSERT(pfdev != NULL);
+
+#if CONFIG_PAGING
+	pfdev->base = uk_bus_pf_devmap(pfdev->base, pfdev->size);
+	if (unlikely(PTRISERR(pfdev->base))) {
+		uk_pr_err("Could not map the device (%d)\n",
+			  PTR2ERR(pfdev->base));
+		return PTR2ERR(pfdev->base);
+	}
+#endif /* CONFIG_PAGING */
 
 	vm_dev = uk_malloc(a, sizeof(*vm_dev));
 	if (!vm_dev) {
