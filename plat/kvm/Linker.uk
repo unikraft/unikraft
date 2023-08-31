@@ -75,7 +75,7 @@ $(KVM_IMAGE): $(KVM_IMAGE).dbg
 				true; })
 	$(call build_bootinfo,$@)
 ifeq ($(ELF64_TO_32),y)
-	$(call build_elf64_to_32,$@)
+	$(call build_multiboot,$@)
 endif
 ifeq ($(CONFIG_KVM_BOOT_PROTO_EFI_STUB),y)
 	$(call build_efi,$@)
