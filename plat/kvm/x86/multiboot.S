@@ -40,17 +40,6 @@
 
 #include <kvm-x86/multiboot.h>
 
-#define MULTIBOOT_FLAGS \
-	(MULTIBOOT_PAGE_ALIGN | MULTIBOOT_MEMORY_INFO)
-
-.section .data.boot
-
-.align 4
-multiboot_header:
-	.long MULTIBOOT_HEADER_MAGIC
-	.long MULTIBOOT_FLAGS
-	.long -(MULTIBOOT_HEADER_MAGIC+MULTIBOOT_FLAGS) /* checksum */
-
 /**
  * Stack and entry function to use during CPU initialization
  */

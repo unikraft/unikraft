@@ -30,6 +30,13 @@ ELF64_PHDR_LEN = 56
 ELF32_SHDR_LEN = 40
 ELF64_SHDR_LEN = 64
 
+MULTIBOOT_HEADER_MAGIC = 0x1BADB002
+MULTIBOOT_PAGE_ALIGN = 0x00000001
+MULTIBOOT_MEMORY_INFO = 0x00000002
+MULTIBOOT_SEARCH = 8192
+# our Multiboot header is of size 12 (Magic(4) + Flags(4) + Checksum(4))
+MULTIBOOT_HEADER_END_OFF = ELF32_EHDR_LEN + 12
+
 class Elf64_to_32:
     arch32 = 'i386'
     endian = '<'
@@ -78,13 +85,15 @@ class Elf64_to_32:
             for _ in range(self.e_shnum):
                 self.elf64_shdrs.append(f.read(ehdr64_e_shentsize))
 
-    # We use this function to adjust offsets w.r.t. the prepended ELF32 header
-    # and the Program Headers.
+    # We use this function to adjust offsets w.r.t. the prepended ELF32 header,
+    # the Multiboot header and the Program headers.
     def prpnd_off(self, barray):
         sz = len(barray)
         old_off = int.from_bytes(barray, self.endian)
 
-        new_off = ELF32_EHDR_LEN + ELF32_PHDR_LEN * self.e_phnum + old_off
+        new_off = (MULTIBOOT_HEADER_END_OFF +
+                   ELF32_PHDR_LEN * self.e_phnum +
+                   old_off)
         if sz < (new_off.bit_length() + 7) // 8:
             raise Exception("New size exceeds initial byte-length.")
 
@@ -95,14 +104,22 @@ class Elf64_to_32:
         elf32_em = ELF_MACHINE[self.arch32]
 
         # The offset to the equivalent ELF32 Program/Sections Headers are at
-        # the end of the ELF32 Header and the end of the file respectively,
+        # the end of the Multiboot Header and the end of the file respectively,
         # so that we do not mess up the Multiboot header, which must exist
         # in the first 8192 bytes. Although the specification does not enforce
         # this, GRUB, for whatever reason, wants the Program Headers to also be
         # be placed in the first 8192 bytes (see commit 9a5c1ad).
-        elf32_phoff = ELF32_EHDR_LEN.to_bytes(4, self.endian)
-        elf32_shoff = (ELF32_EHDR_LEN + self.file_sz +
-                       ELF32_PHDR_LEN * self.e_phnum).to_bytes(4, self.endian)
+        # Therefore the final image will have, in this order:
+        # ELF32 header
+        # ALIGN(4)
+        # Multiboot header
+        # ELF32 Program headers
+        # Original ELF64 binary
+        # ELF32 Section headers (these are too many so place them at the end)
+        elf32_phoff = MULTIBOOT_HEADER_END_OFF.to_bytes(4, self.endian)
+        elf32_shoff = (MULTIBOOT_HEADER_END_OFF +
+                       ELF32_PHDR_LEN * self.e_phnum +
+                       self.file_sz).to_bytes(4, self.endian)
 
         elf32_ehdr[0:16] = ELF_MAGIC[self.arch32]
         elf32_ehdr[16:18] = self.elf64_ehdr[16:18]                  # e_type
@@ -158,6 +175,15 @@ class Elf64_to_32:
 
         return [elf64_to_32_shdr(p) for p in self.elf64_shdrs]
 
+def get_multiboot_hdr():
+    mb_magic = MULTIBOOT_HEADER_MAGIC
+    mb_flags = MULTIBOOT_PAGE_ALIGN | MULTIBOOT_MEMORY_INFO
+    mb_checksum = -(mb_magic + mb_flags)
+
+    return (mb_magic.to_bytes(4, 'little') +
+		    mb_flags.to_bytes(4, 'little') +
+		    mb_checksum.to_bytes(4, 'little', signed=True))
+
 def main():
     parser = argparse.ArgumentParser(
         description='Appends the equivalent ELF32 Headers to an ELF64 Binary.')
@@ -169,6 +195,7 @@ def main():
     elf32_ehdr = elf64.get_elf32_ehdr()
     elf32_phdrs = elf64.get_elf32_phdrs()
     elf32_shdrs = elf64.get_elf32_shdrs()
+    mb_hdr = get_multiboot_hdr()
 
     with open(opt.elf64, 'r+b') as elf32:
         # Save previous ELF64
@@ -179,6 +206,14 @@ def main():
 
         # Write equivalent ELF32 header
         elf32.write(elf32_ehdr)
+
+        # Append the Multiboot header
+        # NOTE: Multiboot header must be 4-byte aligned - luckily that is the
+        # case with the size of the ELF32 header (40 bytes)
+        if elf32.tell() & 0b11:
+            raise Exception("ELF32 header is not a multiple of 4 bytes in size")
+
+        elf32.write(mb_hdr)
 
         # Write the ELF32 equivalent Program Headers after the ELF32 header
         for p in elf32_phdrs:
