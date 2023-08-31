@@ -1,5 +1,5 @@
-define build_elf64_to_32 =
-	@$(SCRIPTS_DIR)/elf64_to_32.py $(1)
+define build_multiboot =
+	@$(SCRIPTS_DIR)/multiboot.py $(1)
 endef
 
 BINFO_FLAGS := -a $(CONFIG_UK_ARCH)
