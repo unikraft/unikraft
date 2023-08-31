@@ -11,3 +11,8 @@ LIBVIRTIO_MMIO_CINCLUDES-y  += -I$(UK_DRIV_LIBVIRTIO_BASE)/include
 LIBVIRTIO_MMIO_CINCLUDES-y  += -I$(UK_PLAT_COMMON_BASE)/include
 
 LIBVIRTIO_MMIO_SRCS-y += $(LIBVIRTIO_MMIO_BASE)/virtio_mmio.c
+LIBVIRTIO_MMIO_SRCS-y += $(LIBVIRTIO_MMIO_BASE)/virtio_mmio_cmdl.c
+
+ifeq ($(CONFIG_VIRTIO_MMIO_LINUX_COMPAT_CMDLINE),y)
+$(eval $(call addlib_paramprefix,libvirtio_mmio,virtio_mmio))
+endif
