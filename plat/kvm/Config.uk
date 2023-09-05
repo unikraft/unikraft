@@ -136,7 +136,7 @@ config KVM_KERNEL_SERIAL_CONSOLE
         help
           Choose serial console for the kernel printing
 
-if (KVM_KVM_KERNEL_SERIAL_CONSOLE || KVM_DEBUG_SERIAL_CONSOLE)
+if (KVM_KERNEL_SERIAL_CONSOLE || KVM_DEBUG_SERIAL_CONSOLE)
 
 choice
 	prompt "Serial console driver"
