@@ -92,6 +92,7 @@ struct pf_device {
 
 	int fdt_offset;	/* The start offset of fdt node for device */
 	uint64_t base;
+	size_t size;
 	unsigned long irq;
 };
 UK_TAILQ_HEAD(pf_device_list, struct pf_device);
