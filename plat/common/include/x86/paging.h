@@ -273,7 +273,7 @@ static __paddr_t x86_pg_maxphysaddr;
 int ukarch_paddr_range_isvalid(__paddr_t start, __paddr_t end)
 {
 	UK_ASSERT(start <= end);
-	return (X86_PG_VALID_PADDR(start) && X86_PG_VALID_PADDR(end));
+	return (X86_PG_VALID_PADDR(start) && X86_PG_VALID_PADDR(end - 1));
 }
 
 static inline int
