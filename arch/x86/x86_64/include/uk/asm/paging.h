@@ -118,7 +118,12 @@ struct ukarch_pagetable {
 #endif
 
 #define X86_PTE_PADDR_BITS		52
+
+#ifdef CONFIG_HAVE_MEM_ENCRYPT
+#define X86_PTE_PADDR_MASK		(((1UL << X86_PTE_PADDR_BITS) - 1) &  ~X86_PTE_ENCRYPT )
+#else
 #define X86_PTE_PADDR_MASK		((1UL << X86_PTE_PADDR_BITS) - 1)
+#endif /* CONFIG_HAVE_MEM_ENCRYPT */
 
 #ifndef __ASSEMBLY__
 /* In canonical form bit 47 is replicated into the bits [48..63]. We compute
@@ -164,6 +169,10 @@ static inline int ukarch_vaddr_range_isvalid(__vaddr_t start, __vaddr_t end)
 #define PT_Lx_PTE_INVALID(lvl)		0x0UL
 
 /* Note: Some flags only apply to page PTEs, not page table PTEs */
+#ifdef CONFIG_LIBUKSEV
+#define X86_PTE_ENCRYPT			(1UL << CONFIG_LIBUKSEV_PTE_MEM_ENCRYPT_BIT)
+#endif
+
 #define X86_PTE_PRESENT			0x001UL
 #define X86_PTE_RW			0x002UL
 #define X86_PTE_US			0x004UL
@@ -194,6 +203,7 @@ static inline int ukarch_vaddr_range_isvalid(__vaddr_t start, __vaddr_t end)
 #define PAGE_ATTR_PROT_WRITE		0x02 /* Page is writeable */
 #define PAGE_ATTR_PROT_EXEC		0x04 /* Page is executable */
 #define PAGE_ATTR_WRITECOMBINE		0x08 /* Page allows write-combining */
+#define PAGE_ATTR_ENCRYPT		0x10 /* Page is encrypted by hardware */
 
 /* Page fault error code bits */
 #define X86_PF_EC_P			0x0001UL /* 0=non-present, 1=prot */
