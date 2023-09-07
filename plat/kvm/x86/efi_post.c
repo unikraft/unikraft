@@ -5,6 +5,9 @@
  */
 #include <kvm/efi.h>
 #include <uk/arch/paging.h>
+#ifdef CONFIG_LIBUKSEV
+#include <uk/sev.h>
+#endif /* CONFIG_LIBUKSEV */
 #include <uk/plat/common/bootinfo.h>
 #include <uk/plat/lcpu.h>
 #include <x86/apic_defs.h>
@@ -81,7 +84,19 @@ void __noreturn uk_efi_jmp_to_kern()
 	uk_efi_boot_startup_args.bootstack = uk_efi_bootstack + __PAGE_SIZE;
 
 	ukplat_lcpu_disable_irq();
+
+#ifdef CONFIG_LIBUKSEV
+	int rc;
+	rc = uk_sev_mem_encrypt_init();
+	if (unlikely(rc))
+		UK_CRASH("Failed initializing memory encryption\n");
+
+#ifndef CONFIG_X86_AMD64_SEV_ES
+	/* On SEV-ES, writing writing into CR3 will trigger a #VC exception, so
+	 * this must be delayed until *after* the trap table is setup */
 	ukarch_pt_write_base((__paddr_t)&x86_bpt_pml4);
+#endif
+#endif
 	unmask_8259_pic();
 	lapic_timer_disable();
 	pic_8259_elcr2_level_irq10_11();
