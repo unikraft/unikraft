@@ -19,3 +19,19 @@ endef
 define aarch64_no_reserved_tcb_overlap =
 	$(eval LIBCONTEXT_CFLAGS-y+=-DCONFIG_AARCH64_NO_TCB_OVERLAP=1)
 endef
+
+# Converts an architecture string to the corresponding name of a configuration
+# variable
+# WARNING: This function might need to get modified as sson as we introduce
+#          another (external) architecture. This is is only necessary if the
+#          following assumption will note be valid:
+#          This function intents that for any future architecture the
+#          configuration name of matches with its name string, like we we have
+#          with x86: For example, the architecture string is called "x86_64" and
+#          its configuration name just contains this string in capital letters:
+#          `CONFIG_ARCH_X86_64`
+# Usage:
+#  $(call ukarch_str2cfg,"<architecture name>")
+define ukarch_str2cfg =
+$(addprefix CONFIG_ARCH_,$(call uc,$(subst arm,ARM_32,$(subst arm64,ARM_64,$(1)))))
+endef
