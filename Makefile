@@ -969,6 +969,10 @@ defconfig:
 
 savedefconfig:
 	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/savedefconfig.py --kconfig $(CONFIG_CONFIG_IN) --out $(DEFCONFIG)
+ifeq ($(HOSTARCH),$(CONFIG_UK_ARCH))
+	@# Make sure arch is stored in the file even if arch matches between host and config
+	@echo "$(call ukarch_str2cfg,$(CONFIG_UK_ARCH))=y" >> $(DEFCONFIG)
+endif
 
 oldconfig:
 	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/oldconfig.py $(CONFIG_CONFIG_IN)
@@ -1043,6 +1047,11 @@ savedefconfig: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) $< \
 		--savedefconfig=$(if $(DEFCONFIG),$(DEFCONFIG),$(CONFIG_DIR)/defconfig) \
 		$(CONFIG_CONFIG_IN)
+ifeq ($(HOSTARCH),$(CONFIG_UK_ARCH))
+	@# Make sure arch is stored in the file even if arch matches between host and config
+	@echo "$(call ukarch_str2cfg,$(CONFIG_UK_ARCH))=y" >> \
+		$(if $(DEFCONFIG),$(DEFCONFIG),$(CONFIG_DIR)/defconfig)
+endif
 
 .PHONY: defconfig savedefconfig silentoldconfig
 
