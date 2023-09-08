@@ -770,7 +770,7 @@ $(foreach _D,$(UK_DEPS) $(UK_DEPS-y),\
 endif
 
 # include Makefile for platform linking (`Linker.uk`)
-$(foreach plat,$(UK_PLATS),$(eval $(call _import_linker,$(plat))))
+$(foreach plat,$(UK_PLATS),$(eval $(call import_linker,$(plat))))
 
 .PHONY: prepare preprocess image libs objs clean
 
