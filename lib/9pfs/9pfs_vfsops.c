@@ -118,16 +118,17 @@ static int uk_9pfs_parse_options(struct uk_9pfs_mount_data *md,
 		goto err;
 	}
 
+	md->proto = UK_9P_PROTO_2000L;
+	md->uname = strdup("");
+	md->aname = strdup("");
+
 	/*
 	 * musl/nolibc strtok_r resets saveptr at the end, so we need to feed
 	 * the option string only once; otherwise strtok_r would loop over the
 	 * options string forever
 	 */
-	options = options_tok = strdup(data);
-
-	md->proto = UK_9P_PROTO_2000L;
-	md->uname = strdup("");
-	md->aname = strdup("");
+	if (data)
+		options = options_tok = strdup(data);
 
 	while ((option = strtok_r(options_tok, ",", &options_save))) {
 		options_tok = NULL;
