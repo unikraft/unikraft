@@ -960,7 +960,6 @@ defconfig:
 
 savedefconfig:
 	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/savedefconfig.py --kconfig $(CONFIG_CONFIG_IN) --out $(DEFCONFIG)
-	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 oldconfig:
 	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/oldconfig.py $(CONFIG_CONFIG_IN)
@@ -1035,8 +1034,6 @@ savedefconfig: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) $< \
 		--savedefconfig=$(if $(DEFCONFIG),$(DEFCONFIG),$(CONFIG_DIR)/defconfig) \
 		$(CONFIG_CONFIG_IN)
-	@$(SED) '/UK_DEFCONFIG=/d' $(if $(DEFCONFIG),$(DEFCONFIG),$(CONFIG_DIR)/defconfig)
-	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 .PHONY: defconfig savedefconfig silentoldconfig
 
