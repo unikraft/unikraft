@@ -882,13 +882,12 @@ DEFCONFIG = $(call qstrip,$(UK_DEFCONFIG))
 # We don't want to fully expand UK_DEFCONFIG here, so Kconfig will
 # recognize that if it's still at its default $(CONFIG_DIR)/defconfig
 COMMON_CONFIG_ENV = \
-	CC=$(CC)\
 	CONFIG_="CONFIG_" \
 	KCONFIG_CONFIG="$(UK_CONFIG)" \
 	KCONFIG_AUTOCONFIG="$(KCONFIG_AUTOCONFIG)" \
 	KCONFIG_AUTOHEADER="$(KCONFIG_AUTOHEADER)" \
 	KCONFIG_TRISTATE="$(KCONFIG_TRISTATE)" \
-	HOST_GCC_VERSION="$(HOSTCC_VERSION)" \
+	HOST_ARCH="$(HOSTARCH)" \
 	BUILD_DIR="$(BUILD_DIR)" \
 	UK_BASE="$(CONFIG_UK_BASE)" \
 	UK_APP="$(CONFIG_UK_APP)" \

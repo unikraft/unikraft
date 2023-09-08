@@ -1,7 +1,7 @@
 choice
 	prompt "Architecture"
-	default ARCH_ARM_32 if ($(shell,$(CC) -dumpmachine | cut -d '-' -f1) = "arm")
-	default ARCH_ARM_64 if ($(shell,$(CC) -dumpmachine | cut -d '-' -f1) = "arm64")
+	default ARCH_ARM_32 if HOST_ARCH = "arm"
+	default ARCH_ARM_64 if HOST_ARCH = "arm64"
 	default ARCH_X86_64
 	help
 	  Select the target CPU architecture.
