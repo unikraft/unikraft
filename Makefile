@@ -704,7 +704,7 @@ GOCINCLUDES           += -I$(UK_GENERATED_INCLUDES)
 ################################################################################
 # external application
 ifneq ($(CONFIG_UK_BASE),$(CONFIG_UK_APP))
-$(eval $(call _import_lib,$(CONFIG_UK_APP)));
+$(eval $(call import_lib,$(CONFIG_UK_APP)));
 endif
 
 # internal libraries
@@ -712,10 +712,10 @@ $(eval $(call verbose_include,$(CONFIG_UK_BASE)/lib/Makefile.uk))
 
 # external libraries
 $(foreach E,$(ELIB_DIR), \
-	$(eval $(call _import_lib,$(E))); \
+	$(eval $(call import_lib,$(E))); \
 )
 # architecture library
-$(eval $(call _import_lib,$(CONFIG_UK_BASE)/arch/$(UK_FAMILY)))
+$(eval $(call import_lib,$(CONFIG_UK_BASE)/arch/$(UK_FAMILY)))
 # drivers
 $(eval $(call verbose_include,$(CONFIG_UK_BASE)/drivers/Makefile.uk))
 # internal platform libraries
@@ -724,7 +724,7 @@ $(eval $(call verbose_include,$(CONFIG_UK_BASE)/plat/Makefile.uk))
 # NOTE: We include them after internal platform libs so that also base variables
 #       provided with /plat/Makefile.uk are populated
 $(foreach E,$(EPLAT_DIR), \
-	$(eval $(call _import_lib,$(E))); \
+	$(eval $(call import_lib,$(E))); \
 )
 $(eval $(call verbose_include,$(CONFIG_UK_BASE)/Makefile.uk)) # Unikraft base
 
