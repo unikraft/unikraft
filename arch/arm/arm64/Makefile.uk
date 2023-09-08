@@ -14,6 +14,9 @@ ARCHFLAGS-$(call gcc_version_ge,9,4) += -mno-outline-atomics
 ISR_ARCHFLAGS += -D__ARM_64__ -mgeneral-regs-only
 ISR_ARCHFLAGS-$(call gcc_version_ge,9,4) += -mno-outline-atomics
 
+ARCHFLAGS-$(call have_clang)     += --target=aarch64-none-elf
+ISR_ARCHFLAGS-$(call have_clang) += --target=aarch64-none-elf
+
 CINCLUDES   += -I$(CONFIG_UK_BASE)/arch/arm/arm64/include
 ASINCLUDES  += -I$(CONFIG_UK_BASE)/arch/arm/arm64/include
 CXXINCLUDES += -I$(CONFIG_UK_BASE)/arch/arm/arm64/include
