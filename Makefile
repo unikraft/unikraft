@@ -675,13 +675,6 @@ CC_VER_MAJOR   := $(word 2,$(subst ., ,$(CC_INFO)))
 CC_VER_MINOR   := $(word 3,$(subst ., ,$(CC_INFO)))
 CC_VERSION     := $(CC_VER_MAJOR).$(CC_VER_MINOR)
 
-ifeq ($(call have_clang),y)
-ifeq ("$(ARCH)", "arm64")
-ARCHFLAGS             += --target=aarch64-none-elf
-ISR_ARCHFLAGS         += --target=aarch64-none-elf
-endif
-endif
-
 ASFLAGS		+= -DCC_VERSION=$(CC_VERSION)
 CFLAGS		+= -DCC_VERSION=$(CC_VERSION)
 CXXFLAGS	+= -DCC_VERSION=$(CC_VERSION)
