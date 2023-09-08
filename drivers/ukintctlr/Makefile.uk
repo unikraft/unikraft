@@ -6,5 +6,5 @@
 
 UK_DRIV_INTCTLR_BASE := $(UK_DRIV_BASE)/ukintctlr
 
-$(eval $(call _import_lib,$(UK_DRIV_INTCTLR_BASE)/xpic))
-$(eval $(call _import_lib,$(UK_DRIV_INTCTLR_BASE)/gic))
+$(eval $(call import_lib,$(UK_DRIV_INTCTLR_BASE)/xpic))
+$(eval $(call import_lib,$(UK_DRIV_INTCTLR_BASE)/gic))
