@@ -246,8 +246,8 @@ IMPORT_BASE := $(1)
 $(call verbose_include,$(1)/Makefile.uk)
 undefine IMPORT_BASE
 endef
-# _import_linker $plat_name
-define _import_linker =
+# import_linker $plat_name
+define import_linker =
 $(call verbose_include,$(UK_PLAT_$(call uc,$(1))_LINKER))
 endef
 
