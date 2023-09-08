@@ -240,8 +240,8 @@ endef
 
 # Import a library
 # For internally use only (Unikraft main makefile and internal libs Makefike.uk)
-# _import_library $1:path
-define _import_lib =
+# import_lib $1:path
+define import_lib =
 IMPORT_BASE := $(1)
 $(call verbose_include,$(1)/Makefile.uk)
 undefine IMPORT_BASE
