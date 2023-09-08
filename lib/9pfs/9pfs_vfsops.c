@@ -106,7 +106,7 @@ static int uk_9pfs_parse_option(struct uk_9pfs_mount_data *md,
 }
 
 static int uk_9pfs_parse_options(struct uk_9pfs_mount_data *md,
-		const void *data __unused)
+				 const void *data __unused)
 {
 	int rc = 0;
 	char *options = NULL, *options_tok = NULL, *options_save = NULL;
