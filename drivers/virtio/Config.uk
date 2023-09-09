@@ -1,0 +1,3 @@
+config VIRTIO_DEVICE
+	bool
+	default y if (LIBVIRTIO_9P || LIBVIRTIO_BLK || LIBVIRTIO_NET)
