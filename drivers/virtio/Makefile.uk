@@ -5,3 +5,5 @@
 ################################################################################
 
 UK_DRIV_LIBVIRTIO_BASE := $(UK_DRIV_BASE)/virtio
+
+$(eval $(call _import_lib,$(UK_DRIV_LIBVIRTIO_BASE)/ring))
