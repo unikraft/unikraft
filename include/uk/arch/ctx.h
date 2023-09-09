@@ -93,7 +93,7 @@ static inline void ukarch_ctx_init_bare(struct ukarch_ctx *ctx,
 	/* NOTE: We are not checking if SP is given or if SP is aligned because
 	 *       execution does not have to start with a function entry.
 	 */
-	(*ctx) = (struct ukarch_ctx){ .sp = sp, .ip = ip };
+	(*ctx) = (struct ukarch_ctx){ .ip = ip, .sp = sp };
 }
 
 /**
