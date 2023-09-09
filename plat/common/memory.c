@@ -164,6 +164,7 @@ static inline int get_mrd_prio(struct ukplat_memregion_desc *const m)
 	case UKPLAT_MEMRT_KERNEL:
 		return 1;
 	case UKPLAT_MEMRT_RESERVED:
+	case UKPLAT_MEMRT_REALM:
 		return 2;
 	default:
 		return -1;
