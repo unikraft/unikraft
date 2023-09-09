@@ -1,0 +1,9 @@
+config LIBVIRTIO_BUS
+	bool "Virtio ukbus driver"
+	depends on VIRTIO_DEVICE
+	select LIBUKBUS
+	select LIBUKALLOC
+	select LIBUKSGLIST
+	select LIBVIRTIO_RING
+	imply LIBVIRTIO_PCI if HAVE_PCI
+	imply LIBVIRTIO_MMIO if HAVE_MMIO
