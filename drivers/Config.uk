@@ -9,3 +9,9 @@ menu "Interrupt controller"
 source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-intctlr.uk' -r '$(KCONFIG_DRIV_BASE)/ukintctlr' -l '$(KCONFIG_DRIV_BASE)/ukintctlr')"
 
 endmenu
+
+menu "Virtio"
+
+source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-virtio.uk' -r '$(KCONFIG_DRIV_BASE)/virtio' -l '$(KCONFIG_DRIV_BASE)/virtio')"
+
+endmenu
