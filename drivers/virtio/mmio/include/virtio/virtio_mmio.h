@@ -30,8 +30,9 @@
  * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
  * SUCH DAMAGE.
  */
-#ifndef _LINUX_VIRTIO_MMIO_H
-#define _LINUX_VIRTIO_MMIO_H
+
+#ifndef __VIRTIO_MMIO_H__
+#define __VIRTIO_MMIO_H__
 
 /*
  * Control registers
@@ -139,4 +140,4 @@
 #define VIRTIO_MMIO_INT_VRING		(1 << 0)
 #define VIRTIO_MMIO_INT_CONFIG		(1 << 1)
 
-#endif
+#endif /* __VIRTIO_MMIO_H__ */

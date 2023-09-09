@@ -30,8 +30,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __PLAT_DRV_VIRTIO_H
-#define __PLAT_DRV_VIRTIO_H
+#ifndef __VIRTIO_BUS_H__
+#define __VIRTIO_BUS_H__
 
 #include <uk/config.h>
 #include <errno.h>
@@ -373,4 +373,4 @@ static inline void virtio_dev_drv_up(struct virtio_dev *vdev)
 }
 #endif /* __cplusplus */
 
-#endif /* __PLAT_DRV_VIRTIO_H */
+#endif /* __VIRTIO_BUS_H__ */

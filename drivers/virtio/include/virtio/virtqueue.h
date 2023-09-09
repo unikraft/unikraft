@@ -30,8 +30,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __PLAT_DRV_VIRTQUEUE_H__
-#define __PLAT_DRV_VIRTQUEUE_H__
+#ifndef __VIRTQUEUE_H__
+#define __VIRTQUEUE_H__
 
 #include <uk/config.h>
 #include <uk/list.h>
@@ -291,4 +291,4 @@ static inline void virtqueue_host_notify(struct virtqueue *vq)
 }
 #endif /* __cplusplus */
 
-#endif /* __PLAT_DRV_VIRTQUEUE_H__ */
+#endif /* __VIRTQUEUE_H__ */

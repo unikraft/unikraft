@@ -30,8 +30,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __PLAT_DRV_VIRTIO_CONFIG_H
-#define __PLAT_DRV_VIRTIO_CONFIG_H
+#ifndef __VIRTIO_CONFIG_H__
+#define __VIRTIO_CONFIG_H__
 
 #include <uk/arch/types.h>
 #include <uk/plat/common/cpu.h>
@@ -315,4 +315,4 @@ static inline void virtio_cwrite32(const void *addr, const __u8 offset,
 }
 #endif /* __cplusplus __ */
 
-#endif /* __PLAT_DRV_VIRTIO_CONFIG_H */
+#endif /* __VIRTIO_CONFIG_H__ */
