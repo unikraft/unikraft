@@ -37,8 +37,8 @@
  * Commit id: ecda85e70277
  */
 
-#ifndef __PLAT_DRV_VIRTIO_RING_H__
-#define __PLAT_DRV_VIRTIO_RING_H__
+#ifndef __VIRTIO_RING_H__
+#define __VIRTIO_RING_H__
 
 #include <uk/arch/limits.h>
 #include <virtio/virtio_types.h>
@@ -193,4 +193,4 @@ static inline int vring_need_event(__u16 event_idx, __u16 new_idx,
 }
 #endif /* __cplusplus __ */
 
-#endif /* __PLAT_DRV_VIRTIO_RING_H__ */
+#endif /* __VIRTIO_RING_H__ */

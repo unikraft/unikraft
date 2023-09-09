@@ -30,8 +30,10 @@
  *
  * commit-id: faa9b39f0e9d
  */
-#ifndef __PLAT_DRV_VIRTIO_NET_H
-#define __PLAT_DRV_VIRTIO_NET_H
+
+#ifndef __VIRTIO_NET_H__
+#define __VIRTIO_NET_H__
+
 #include <uk/config.h>
 #include <uk/arch/types.h>
 
@@ -255,4 +257,4 @@ struct virtio_net_ctrl_mq {
 #define VIRTIO_NET_CTRL_GUEST_OFFLOADS   5
 #define VIRTIO_NET_CTRL_GUEST_OFFLOADS_SET        0
 
-#endif /* __PLAT_CMN_VIRTIO_NET_H */
+#endif /* __VIRTIO_NET_H__ */

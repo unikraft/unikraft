@@ -34,8 +34,9 @@
  *
  * Commit-id:dbaf0624ffa5
  */
-#ifndef __PLAT_DRV_VIRTIO_IDS_H
-#define __PLAT_DRV_VIRTIO_IDS_H
+
+#ifndef __VIRTIO_IDS_H__
+#define __VIRTIO_IDS_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -61,4 +62,4 @@ extern "C" {
 }
 #endif /* __cplusplus __ */
 
-#endif /* __PLAT_DRV_VIRTIO_IDS_H */
+#endif /* __VIRTIO_IDS_H__ */

@@ -27,8 +27,8 @@
  * Commit-id: 6e0e12133aa7
  */
 
-#ifndef __PLAT_DRV_VIRTIO_PCI_H__
-#define __PLAT_DRV_VIRTIO_PCI_H__
+#ifndef __VIRTIO_PCI_H__
+#define __VIRTIO_PCI_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -71,4 +71,4 @@ extern "C" {
 }
 #endif /* __cplusplus __ */
 
-#endif /* __PLAT_DRV_VIRTIO_PCI_H__ */
+#endif /* __VIRTIO_PCI_H__ */

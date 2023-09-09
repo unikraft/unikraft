@@ -37,8 +37,9 @@
  *
  * Commit-id: 9efeccacd3a4
  */
-#ifndef __PLAT_DRV_VIRTIO_TYPES_H
-#define __PLAT_DRV_VIRTIO_TYPES_H
+
+#ifndef __VIRTIO_TYPES_H__
+#define __VIRTIO_TYPES_H__
 
 #include <uk/arch/types.h>
 
@@ -59,4 +60,4 @@ typedef __u64 __virtio_le64;
 }
 #endif /* __cplusplus  */
 
-#endif /* __PLAT_DRV_VIRTIO_TYPES_H */
+#endif /* __VIRTIO_TYPES_H__ */

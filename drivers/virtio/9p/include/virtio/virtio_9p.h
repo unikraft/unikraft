@@ -30,8 +30,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __PLAT_DRV_VIRTIO_9P_H
-#define __PLAT_DRV_VIRTIO_9P_H
+#ifndef __VIRTIO_9P_H__
+#define __VIRTIO_9P_H__
+
 #include <uk/config.h>
 #include <uk/arch/types.h>
 
@@ -48,4 +49,4 @@ struct virtio_9p_config {
 	__u8 tag[0];
 } __packed;
 
-#endif /* __PLAT_DRV_VIRTIO_9P_H */
+#endif /* __VIRTIO_9P_H__ */

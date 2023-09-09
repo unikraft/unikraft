@@ -32,8 +32,10 @@
  *
  * commit-id: 8005803a2
  */
-#ifndef __PLAT_DRV_VIRTIO_BLK_H
-#define __PLAT_DRV_VIRTIO_BLK_H
+
+#ifndef __VIRTIO_BLK_H__
+#define __VIRTIO_BLK_H__
+
 #include <virtio/virtio_ids.h>
 #include <virtio/virtio_config.h>
 #include <virtio/virtio_types.h>
@@ -209,4 +211,4 @@ struct virtio_scsi_inhdr {
 #define VIRTIO_BLK_S_OK		0
 #define VIRTIO_BLK_S_IOERR	1
 
-#endif /* __PLAT_DRV_VIRTIO_BLK_H */
+#endif /* __VIRTIO_BLK_H__ */
