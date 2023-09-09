@@ -1,0 +1,11 @@
+config HAVE_MMIO
+	bool
+
+config LIBVIRTIO_MMIO
+	bool "Virtio MMIO transport"
+	depends on ARCH_ARM_64
+	depends on VIRTIO_DEVICE
+	select LIBUKOFW
+	select LIBUKINTCTLR_GIC
+	help
+		Virtio MMIO transport.
