@@ -7,10 +7,6 @@ $(eval $(call addplat_s,kvm,$(CONFIG_PLAT_KVM)))
 ## KVM platform library registration
 ##
 $(eval $(call addplatlib,kvm,libkvmplat))
-$(eval $(call addplatlib_s,kvm,libkvmvirtio,$(CONFIG_VIRTIO_BUS)))
-$(eval $(call addplatlib_s,kvm,libkvmvirtionet,$(CONFIG_VIRTIO_NET)))
-$(eval $(call addplatlib_s,kvm,libkvmvirtioblk,$(CONFIG_VIRTIO_BLK)))
-$(eval $(call addplatlib_s,kvm,libkvmvirtio9p,$(CONFIG_VIRTIO_9P)))
 $(eval $(call addplatlib_s,kvm,libkvmpl031,$(CONFIG_RTC_PL031)))
 
 ##
@@ -136,58 +132,6 @@ endif
 LIBKVMPLAT_SRCS-y		 += $(UK_PLAT_COMMON_BASE)/bootinfo.c|common
 LIBKVMPLAT_SRCS-$(CONFIG_LIBFDT) += $(UK_PLAT_COMMON_BASE)/bootinfo_fdt.c|common
 LIBKVMPLAT_SRCS-y		 += $(UK_PLAT_COMMON_BASE)/bootinfo.lds.S|common
-
-##
-## Virtio library definitions
-##
-LIBKVMVIRTIO_ASINCLUDES-y   += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMVIRTIO_CINCLUDES-y    += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMVIRTIO_ASINCLUDES-y   += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMVIRTIO_CINCLUDES-y    += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMVIRTIO_ASINCLUDES-y   += -I$(UK_PLAT_DRIVERS_BASE)/include
-LIBKVMVIRTIO_CINCLUDES-y    += -I$(UK_PLAT_DRIVERS_BASE)/include
-LIBKVMVIRTIO_SRCS-$(CONFIG_VIRTIO_BUS) +=\
-			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_bus.c
-LIBKVMVIRTIO_SRCS-$(CONFIG_VIRTIO_BUS) +=\
-			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_ring.c
-LIBKVMVIRTIO_SRCS-$(CONFIG_VIRTIO_PCI) +=\
-			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_pci.c
-LIBKVMVIRTIO_SRCS-$(CONFIG_ARCH_ARM_64)	+=\
-			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_mmio.c
-##
-## Virtio Net library definition
-##
-LIBKVMVIRTIONET_ASINCLUDES-y   += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMVIRTIONET_CINCLUDES-y    += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMVIRTIONET_ASINCLUDES-y   += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMVIRTIONET_CINCLUDES-y    += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMVIRTIONET_ASINCLUDES-y   += -I$(UK_PLAT_DRIVERS_BASE)/include
-LIBKVMVIRTIONET_CINCLUDES-y    += -I$(UK_PLAT_DRIVERS_BASE)/include
-LIBKVMVIRTIONET_SRCS-y +=\
-			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_net.c
-##
-## Virtio BLK library definition
-##
-LIBKVMVIRTIOBLK_ASINCLUDES-y   += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMVIRTIOBLK_CINCLUDES-y    += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMVIRTIOBLK_ASINCLUDES-y   += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMVIRTIOBLK_CINCLUDES-y    += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMVIRTIOBLK_ASINCLUDES-y   += -I$(UK_PLAT_DRIVERS_BASE)/include
-LIBKVMVIRTIOBLK_CINCLUDES-y    += -I$(UK_PLAT_DRIVERS_BASE)/include
-LIBKVMVIRTIOBLK_SRCS-y +=\
-			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_blk.c
-
-##
-## Virtio 9P library definition
-##
-LIBKVMVIRTIO9P_ASINCLUDES-y   += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMVIRTIO9P_CINCLUDES-y    += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMVIRTIO9P_ASINCLUDES-y   += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMVIRTIO9P_CINCLUDES-y    += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMVIRTIO9P_ASINCLUDES-y   += -I$(UK_PLAT_DRIVERS_BASE)/include
-LIBKVMVIRTIO9P_CINCLUDES-y    += -I$(UK_PLAT_DRIVERS_BASE)/include
-LIBKVMVIRTIO9P_SRCS-y +=\
-			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_9p.c
 
 ##
 ## RTC-PL031 library definitions

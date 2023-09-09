@@ -1,20 +1,22 @@
 menuconfig PLAT_KVM
-       bool "KVM guest"
-       default n
-       depends on (ARCH_X86_64 || (ARCH_ARM_64 && !HAVE_SYSCALL))
-       select LIBUKDEBUG
-       select LIBUKALLOC
-       select LIBUKTIMECONV
-       select LIBNOLIBC if !HAVE_LIBC
-       select LIBFDT if ARCH_ARM_64
-       select ELF64_TO_32 if ARCH_X86_64
-       select LIBUKRELOC if OPTIMIZE_PIE
-       select LIBUKOFW if ARCH_ARM_64
-       imply LIBUKBUS_PCI if LIBUKBUS
-       imply LIBUKBUS_PLATFORM if (LIBUKBUS && ARCH_ARM_64)
-       select LIBUKINTCTLR if ARCH_X86_64
-       help
-                Create a Unikraft image that runs as a KVM guest
+	bool "KVM guest"
+	default n
+	depends on (ARCH_X86_64 || (ARCH_ARM_64 && !HAVE_SYSCALL))
+	select LIBUKDEBUG
+	select LIBUKALLOC
+	select LIBUKTIMECONV
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBFDT if ARCH_ARM_64
+	select ELF64_TO_32 if ARCH_X86_64
+	select LIBUKRELOC if OPTIMIZE_PIE
+	select LIBUKOFW if ARCH_ARM_64
+	select LIBUKINTCTLR if ARCH_X86_64
+	imply LIBUKBUS_PLATFORM if ARCH_ARM_64
+	imply LIBVIRTIO_9P if LIBUK9P
+	imply LIBVIRTIO_NET if LIBUKNETDEV
+	imply LIBVIRTIO_BLK if LIBUKBLKDEV
+	help
+		Create a Unikraft image that runs as a KVM guest
 
 if (PLAT_KVM)
 
@@ -92,10 +94,13 @@ choice
 config KVM_VMM_QEMU
 	bool "QEMU"
 	imply LIBUKINTCTLR_GICV2
+	select HAVE_PCI
+	select HAVE_MMIO
 
 config KVM_VMM_FIRECRACKER
 	bool "Firecracker"
 	select KVM_BOOT_PROTO_LXBOOT
+	select HAVE_MMIO
 	imply LIBUKINTCTLR_GICV3
 	depends on ARCH_X86_64 || ARCH_ARM_64
 
@@ -207,60 +212,6 @@ config KVM_MAX_IRQ_HANDLER_ENTRIES
        int "Maximum number of handlers per IRQ"
        default 8
        depends on (ARCH_X86_64 || ARCH_ARM_64)
-
-config VIRTIO_BUS
-      bool  "Virtio bus driver"
-      default y
-      depends on (ARCH_X86_64 || ARCH_ARM_64)
-      depends on LIBUKBUS
-      select LIBUKALLOC
-      select LIBUKSGLIST
-      help
-               Virtio bus driver for probing and operating virtio device and
-               transport layer.
-
-menu "Virtio"
-config VIRTIO_PCI
-       bool "Virtio PCI device support"
-       default y if (VIRTIO_NET || VIRTIO_9P || VIRTIO_BLK)
-       default n
-       depends on LIBUKBUS_PCI
-       select VIRTIO_BUS
-       help
-               Support virtio devices on PCI bus
-
-config VIRTIO_NET
-       bool "Virtio Net device"
-       default y if LIBUKNETDEV
-       default n
-       depends on LIBUKNETDEV
-       imply VIRTIO_PCI if ARCH_X86_64
-       select VIRTIO
-       select LIBUKSGLIST
-       help
-              Virtual network driver.
-
-config VIRTIO_BLK
-	bool "Virtio Block Device"
-	default y if LIBUKBLKDEV
-	default n
-	depends on LIBUKBLKDEV
-	select VIRTIO_BUS
-	select LIBUKGLIST
-	help
-		Virtual block driver.
-
-config VIRTIO_9P
-       bool "Virtio 9P device"
-       default y if LIBUK9P
-       default n
-       depends on LIBUK9P
-       imply VIRTIO_PCI if ARCH_X86_64
-       select VIRTIO_BUS
-       select LIBUKSGLIST
-       help
-              Virtio 9P driver.
-endmenu
 
 config RTC_PL031
        bool "Arm platform RTC (PL031) driver"
