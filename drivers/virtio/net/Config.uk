@@ -1,0 +1,7 @@
+config LIBVIRTIO_NET
+	bool "Virtio Net device"
+	depends on LIBUKNETDEV
+	select LIBVIRTIO_BUS
+	select LIBUKSGLIST
+	help
+		Virtual network driver.
