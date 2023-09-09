@@ -1,0 +1,7 @@
+config LIBVIRTIO_BLK
+	bool "Virtio Block device"
+	depends on LIBUKBLKDEV
+	select LIBVIRTIO_BUS
+	select LIBUKSGLIST
+	help
+		Virtual block driver.
