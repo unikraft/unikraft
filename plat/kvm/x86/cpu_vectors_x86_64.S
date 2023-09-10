@@ -26,6 +26,7 @@
 
 #include <x86/traps.h>
 #include <uk/asm/cfi.h>
+#include <uk/intctlr.h>
 
 #define ENTRY(X)     .global X ; .type X, @function ; X:
 
@@ -143,7 +144,7 @@ ENTRY(cpu_irq_\irqno)
 
 	movq %rsp, %rdi
 	movq $\irqno, %rsi
-	call _ukplat_irq_handle
+	call uk_intctlr_xpic_handle_irq
 
 	addq $__REGS_PAD_SIZE, %rsp         /* we have some padding */
 	.cfi_adjust_cfa_offset -__REGS_PAD_SIZE

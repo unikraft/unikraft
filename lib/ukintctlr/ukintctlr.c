@@ -125,7 +125,7 @@ void uk_intctlr_irq_handle(struct __regs *regs, unsigned int irq)
 		/* Skip all normal handlers if an event handler handled the
 		 * event
 		 */
-		goto exit_ack;
+		goto exit;
 	}
 
 	for (i = 0; i < MAX_HANDLERS_PER_IRQ; i++) {
@@ -146,7 +146,7 @@ void uk_intctlr_irq_handle(struct __regs *regs, unsigned int irq)
 			__uk_test_and_set_bit(0, &sched_have_pending_events);
 
 		if (h->func(h->arg) == 1)
-			goto exit_ack;
+			goto exit;
 	}
 	/*
 	 * Acknowledge interrupts even in the case when there was no handler for
@@ -156,11 +156,10 @@ void uk_intctlr_irq_handle(struct __regs *regs, unsigned int irq)
 	 */
 	trace_uk_intctlr_unhandled_irq(irq);
 
-exit_ack:
+exit:
 #if CONFIG_LIBUKINTCTLR_ISR_ECTX_ASSERTIONS
 	ukarch_ectx_assert_equal(ectx);
 #endif /* CONFIG_LIBUKINTCTLR_ISR_ECTX_ASSERTIONS */
-	intctrl_ack_irq(irq);
 
 	return;
 }
