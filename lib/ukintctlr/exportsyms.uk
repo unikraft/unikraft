@@ -3,7 +3,6 @@ intctrl_clear_irq
 intctrl_mask_irq
 intctrl_ack_irq
 intctrl_send_ipi
-gic
 uk_intctlr
 uk_intctlr_init
 uk_intctlr_irq_configure
