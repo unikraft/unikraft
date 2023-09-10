@@ -32,8 +32,8 @@
 
 #include <stdint.h>
 #include <uk/config.h>
+#include <uk/intctlr.h>
 #include <uk/plat/spinlock.h>
-#include <uk/plat/common/irq.h>
 
 /* Shared Peripheral Interrupt (SPI) definitions */
 #define GIC_SPI_TYPE 0
@@ -86,13 +86,12 @@ struct _gic_operations {
 	/** Disable IRQ */
 	void (*disable_irq)(uint32_t irq);
 	/** Set IRQ trigger type */
-	void (*set_irq_type)(uint32_t irq, enum uk_irq_trigger trigger);
+	void (*set_irq_trigger)(uint32_t irq,
+				enum uk_intctlr_irq_trigger trigger);
 	/** Set priority for IRQ */
 	void (*set_irq_prio)(uint32_t irq, uint8_t priority);
 	/** Set IRQ affinity (or "target" for GICv2) */
 	void (*set_irq_affinity)(uint32_t irq, uint32_t affinity);
-	/** Translate to absolute IRQ according to type e.g. PPI SPI SGI */
-	uint32_t (*irq_translate)(uint32_t type, uint32_t irq);
 	/** Handle IRQ */
 	void (*handle_irq)(struct __regs *regs);
 	/** Send a SGI to the specifiec core */
@@ -141,29 +140,6 @@ struct _gic_dev {
 	/** Driver operations */
 	struct _gic_operations ops;
 };
-
-/**
- * Initialize GIC driver from device tree or ACPI
- *
- * @param [out] dev receives pointer to GIC device driver on success, NULL
- *    otherwise
- *
- * @return 0 on success, a non-zero error code otherwise
- */
-int init_gic(struct _gic_dev **dev);
-
-/**
- * Translate a type-relative interrupt number to the corresponding absolute
- * interrupt number. For example, first SPI (irq=0, type=GIC_SPI_TYPE) will
- * return 32.
- *
- * @param type interrupt type (i.e., GIC_SPI_TYPE or GIC_PPI_TYPE)
- * @param irq type-relative interrupt number
- *
- * @return absolute interrupt number or (uint32_t)-1 if the interrupt number
- *    cannot be translated
- */
-uint32_t gic_irq_translate(uint32_t type, uint32_t irq);
 
 /**
  * Fetch data from an existing MADT's GICD table.
