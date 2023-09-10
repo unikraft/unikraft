@@ -31,6 +31,7 @@
 #include <errno.h>
 #include <uk/config.h>
 #include <uk/assert.h>
+#include <uk/intctlr.h>
 #include <uk/intctlr/gic.h>
 #include <uk/intctlr/gic-v2.h>
 #include <uk/intctlr/gic-v3.h>
@@ -40,45 +41,6 @@
 #if !defined(CONFIG_LIBUKINTCTLR_GICV2) && !defined(CONFIG_LIBUKINTCTLR_GICV3)
 #error At least one GIC driver should be selected!
 #endif
-
-int init_gic(struct _gic_dev **dev)
-{
-	int rc;
-
-#ifdef CONFIG_LIBUKINTCTLR_GICV2
-	/* First, try GICv2 */
-	rc = gicv2_probe(dev);
-	if (rc == 0)
-		return 0;
-#endif /* LIBUKINTCTLR_GICV2 */
-
-#ifdef CONFIG_LIBUKINTCTLR_GICV3
-	/* GICv2 is not present, try GICv3 */
-	rc = gicv3_probe(dev);
-	if (rc == 0)
-		return 0;
-#endif /* LIBUKINTCTLR_GICV3 */
-
-	*dev = NULL;
-	return rc;
-}
-
-uint32_t gic_irq_translate(uint32_t type, uint32_t irq)
-{
-	UK_ASSERT(type == GIC_SPI_TYPE || type == GIC_PPI_TYPE);
-
-	switch (type) {
-	case GIC_SPI_TYPE:
-		UK_ASSERT((irq + GIC_SPI_BASE) < GIC_MAX_IRQ);
-		return irq + GIC_SPI_BASE;
-
-	case GIC_PPI_TYPE:
-		UK_ASSERT((irq + GIC_PPI_BASE) < GIC_SPI_BASE);
-		return irq + GIC_PPI_BASE;
-	}
-
-	return (uint32_t)-1;
-}
 
 #if defined(CONFIG_UKPLAT_ACPI)
 int acpi_get_gicd(struct _gic_dev *g)
