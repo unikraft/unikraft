@@ -1,5 +1,3 @@
-init_gic
-gic_irq_translate
+uk_intctlr_probe
 acpi_get_gicd
-gicv3_probe
-gicv2_probe
+gic

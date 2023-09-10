@@ -43,9 +43,9 @@
 #include <uk/plat/common/acpi.h>
 #endif /* CONFIG_UKPLAT_ACPI */
 #include <uk/plat/common/bootinfo.h>
-#include <uk/plat/common/irq.h>
 #include <uk/plat/spinlock.h>
 #include <arm/cpu.h>
+#include <uk/intctlr.h>
 #include <uk/intctlr/gic-v2.h>
 #include <uk/ofw/fdt.h>
 
@@ -320,15 +320,16 @@ static void gicv2_disable_dist(void)
  * Config trigger type for an interrupt
  *
  * @param irq interrupt number [GIC_PPI_BASE..GIC_MAX_IRQ-1]
- * @param trigger trigger type (UK_IRQ_TRIGGER_*)
+ * @param trigger trigger type (UK_INTCTLR_IRQ_TRIGGER_*)
  */
-static void gicv2_set_irq_type(uint32_t irq, enum uk_irq_trigger trigger)
+static
+void gicv2_set_irq_trigger(uint32_t irq, enum uk_intctlr_irq_trigger trigger)
 {
 	uint32_t val, mask, oldmask;
 
 	UK_ASSERT(irq >= GIC_PPI_BASE && irq < GIC_MAX_IRQ);
-	UK_ASSERT(trigger == UK_IRQ_TRIGGER_EDGE ||
-		  trigger == UK_IRQ_TRIGGER_LEVEL);
+	UK_ASSERT(trigger == UK_INTCTLR_IRQ_TRIGGER_EDGE ||
+		  trigger == UK_INTCTLR_IRQ_TRIGGER_LEVEL);
 
 	dist_lock(gicv2_drv);
 
@@ -336,10 +337,10 @@ static void gicv2_set_irq_type(uint32_t irq, enum uk_irq_trigger trigger)
 	mask = oldmask = (val >> ((irq % GICD_I_PER_ICFGRn) * 2)) &
 			GICD_ICFGR_MASK;
 
-	if (trigger == UK_IRQ_TRIGGER_LEVEL) {
+	if (trigger == UK_INTCTLR_IRQ_TRIGGER_LEVEL) {
 		mask &= ~GICD_ICFGR_TRIG_MASK;
 		mask |= GICD_ICFGR_TRIG_LVL;
-	} else if (trigger == UK_IRQ_TRIGGER_EDGE) {
+	} else if (trigger == UK_INTCTLR_IRQ_TRIGGER_EDGE) {
 		mask &= ~GICD_ICFGR_TRIG_MASK;
 		mask |= GICD_ICFGR_TRIG_EDGE;
 	}
@@ -376,9 +377,8 @@ static void gicv2_handle_irq(struct __regs *regs)
 		isb();
 
 		if (irq < GIC_MAX_IRQ) {
-			_ukplat_irq_handle(regs, (unsigned long)irq);
+			uk_intctlr_irq_handle(regs, irq);
 			gicv2_eoi_irq(stat);
-
 			continue;
 		}
 
@@ -502,10 +502,9 @@ static void gicv2_set_ops(void)
 		.eoi_irq           = gicv2_eoi_irq,
 		.enable_irq        = gicv2_enable_irq,
 		.disable_irq       = gicv2_disable_irq,
-		.set_irq_type      = gicv2_set_irq_type,
+		.set_irq_trigger   = gicv2_set_irq_trigger,
 		.set_irq_prio      = gicv2_set_irq_prio,
 		.set_irq_affinity  = gicv2_set_irq_target,
-		.irq_translate     = gic_irq_translate,
 		.handle_irq        = gicv2_handle_irq,
 		.gic_sgi_gen       = gicv2_sgi_gen_to_cpu,
 	};
