@@ -296,7 +296,7 @@ static int virtio_9p_vq_alloc(struct virtio_9p_device *d)
 	int rc = 0;
 	__u16 qdesc_size;
 
-	vq_avail = virtio_find_vqs(d->vdev, 1, &qdesc_size);
+	vq_avail = virtio_find_vq(d->vdev, 0, &qdesc_size);
 	if (unlikely(vq_avail != 1)) {
 		uk_pr_err(DRIVER_NAME": Expected: %d queues, found %d\n",
 			  1, vq_avail);

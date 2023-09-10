@@ -108,7 +108,7 @@ static struct virtio_config_ops vpci_legacy_ops = {
 	.features_set = vpci_legacy_pci_features_set,
 	.status_get   = vpci_legacy_pci_status_get,
 	.status_set   = vpci_legacy_pci_status_set,
-	.vqs_find     = vpci_legacy_pci_vq_find,
+	.vq_find      = vpci_legacy_pci_vq_find,
 	.vq_setup     = vpci_legacy_vq_setup,
 	.vq_release   = vpci_legacy_vq_release,
 };
@@ -212,35 +212,26 @@ static void vpci_legacy_vq_release(struct virtio_dev *vdev,
 	virtqueue_destroy(vq, a);
 }
 
-static int vpci_legacy_pci_vq_find(struct virtio_dev *vdev, __u16 num_vqs,
+/* TODO: change documentation if available */
+static int vpci_legacy_pci_vq_find(struct virtio_dev *vdev, __u16 vq_id,
 				   __u16 *qdesc_size)
 {
 	struct virtio_pci_dev *vpdev = NULL;
-	int vq_cnt = 0, i = 0, rc = 0;
 
 	UK_ASSERT(vdev);
 	vpdev = to_virtiopcidev(vdev);
 
-	/* Registering the interrupt for the queue */
-	rc = ukplat_irq_register(vpdev->pdev->irq, virtio_pci_handle, vpdev);
-	if (rc != 0) {
-		uk_pr_err("Failed to register the interrupt\n");
-		return rc;
+	virtio_cwrite16((void *) (unsigned long)vpdev->pci_base_addr,
+			VIRTIO_PCI_QUEUE_SEL, vq_id);
+	*qdesc_size = virtio_cread16(
+			(void *) (unsigned long)vpdev->pci_base_addr,
+			VIRTIO_PCI_QUEUE_SIZE);
+	if (unlikely(!*qdesc_size)) {
+		uk_pr_err("Virtqueue %d not available\n", vq_id);
+		return 0;
 	}
 
-	for (i = 0; i < num_vqs; i++) {
-		virtio_cwrite16((void *) (unsigned long)vpdev->pci_base_addr,
-				VIRTIO_PCI_QUEUE_SEL, i);
-		qdesc_size[i] = virtio_cread16(
-				(void *) (unsigned long)vpdev->pci_base_addr,
-				VIRTIO_PCI_QUEUE_SIZE);
-		if (unlikely(!qdesc_size[i])) {
-			uk_pr_err("Virtqueue %d not available\n", i);
-			continue;
-		}
-		vq_cnt++;
-	}
-	return vq_cnt;
+	return 1;
 }
 
 static int vpci_legacy_pci_config_set(struct virtio_dev *vdev, __u16 offset,
@@ -423,6 +414,17 @@ static int virtio_pci_add_dev(struct pci_device *pci_dev)
 	rc = virtio_bus_register_device(&vpci_dev->vdev);
 	if (rc != 0) {
 		uk_pr_err("Failed to register the virtio device: %d\n", rc);
+		goto free_pci_dev;
+	}
+
+	/* Registering the interrupt for the queue
+	 * The early registration of the interrupt handler does not harm us,
+	 * the interrupt handler enumerates vqs list, which is empty at the
+	 * start, hence returns safely in case where queue setup is still pending.
+	 */
+	rc = ukplat_irq_register(pci_dev->irq, virtio_pci_handle, &vpci_dev->vdev);
+	if (rc != 0) {
+		uk_pr_err("Failed to register the interrupt\n");
 		goto free_pci_dev;
 	}
 

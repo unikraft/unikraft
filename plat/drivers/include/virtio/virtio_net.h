@@ -80,6 +80,9 @@
 #define VIRTIO_NET_S_LINK_UP	1	/* Link is up */
 #define VIRTIO_NET_S_ANNOUNCE	2	/* Announcement is needed */
 
+/* Control queue hardware id: 2 * N */
+#define VIRTIO_NET_CTRLQ_ID(vndev) (2 * vndev->max_vqueue_pairs)
+
 struct virtio_net_config {
 	/* The config defining mac address (if VIRTIO_NET_F_MAC) */
 	__u8 mac[UK_NETDEV_HWADDR_LEN];
