@@ -22,6 +22,20 @@
  */
 /* Taken from solo5 platform_intr.c */
 
+#include <uk/asm/arch.h>
+#include <uk/essentials.h>
+#include <uk/intctlr.h>
+#include <x86/cpu.h>
+
+static void pic_mask_irq(unsigned int irq);
+static void pic_clear_irq(unsigned int irq);
+
+static struct uk_intctlr_driver_ops pic_ops = {
+	.fdt_xlat = __NULL,
+	.mask_irq = pic_mask_irq,
+	.unmask_irq = pic_clear_irq,
+};
+
 /*
  * arguments:
  * offset1 - vector offset for master PIC vectors on the master become
@@ -55,12 +69,16 @@ static void PIC_remap(int offset1, int offset2)
 	outb(PIC2_DATA, a2);
 }
 
-void intctrl_init(void)
+int pic_init(struct uk_intctlr_driver_ops **ops)
 {
 	PIC_remap(32, 40);
+
+	*ops = &pic_ops;
+
+	return 0;
 }
 
-void intctrl_ack_irq(unsigned int irq)
+void pic_ack_irq(unsigned int irq)
 {
 	if (!IRQ_ON_MASTER(irq))
 		outb(PIC2_COMMAND, PIC_EOI);
@@ -68,7 +86,7 @@ void intctrl_ack_irq(unsigned int irq)
 	outb(PIC1_COMMAND, PIC_EOI);
 }
 
-void intctrl_mask_irq(unsigned int irq)
+static void pic_mask_irq(unsigned int irq)
 {
 	__u16 port;
 
@@ -76,10 +94,11 @@ void intctrl_mask_irq(unsigned int irq)
 	outb(port, inb(port) | (1 << IRQ_OFFSET(irq)));
 }
 
-void intctrl_clear_irq(unsigned int irq)
+static void pic_clear_irq(unsigned int irq)
 {
 	__u16 port;
 
 	port = IRQ_PORT(irq);
 	outb(port, inb(port) & ~(1 << IRQ_OFFSET(irq)));
 }
+
