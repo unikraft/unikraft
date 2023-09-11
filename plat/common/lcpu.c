@@ -52,7 +52,7 @@
 
 #ifdef CONFIG_ARCH_X86_64
 /* TODO: Remove when we have unified IRQ handling */
-#include <x86/apic.h>
+#include <uk/intctlr/apic.h>
 #endif /* CONFIG_ARCH_X86_64 */
 
 /**
