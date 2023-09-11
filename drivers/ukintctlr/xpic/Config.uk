@@ -1,1 +1,5 @@
+config LIBUKINTCTLR_XPIC
+	bool "Intel PIC"
+	depends on ARCH_X86_64
+	select LIBUKINTCTLR
 
