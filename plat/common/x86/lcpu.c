@@ -38,7 +38,7 @@
 #include <uk/assert.h>
 #include <uk/print.h>
 #include <x86/irq.h>
-#include <x86/apic.h>
+#include <uk/intctlr/apic.h>
 #include <x86/cpu.h>
 #include <x86/traps.h>
 #include <x86/delay.h>

@@ -40,7 +40,7 @@
 #include <uk/assert.h>
 #include <uk/arch/limits.h>
 #include <x86/cpu.h>
-#include <x86/apic_defs.h>
+#include <uk/asm/arch.h>
 
 #include <errno.h>
 

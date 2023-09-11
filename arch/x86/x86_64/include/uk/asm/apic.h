@@ -34,8 +34,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __PLAT_CMN_X86_APIC_DEFS_H__
-#define __PLAT_CMN_X86_APIC_DEFS_H__
+#ifndef __UK_ARCH_APIC_H__
+#define __UK_ARCH_APIC_H__
 
 /* APIC MSR registers */
 #define APIC_MSR_BASE			0x01b
@@ -108,4 +108,4 @@
 #define APIC_ICR_DSTSH_ALL_INCL_SELF	(2 << 18)
 #define APIC_ICR_DSTSH_ALL_EXCL_SELF	(3 << 18)
 
-#endif /* __PLAT_CMN_X86_APIC_DEFS_H__ */
+#endif /* __UK_ARCH_APIC_H__ */
