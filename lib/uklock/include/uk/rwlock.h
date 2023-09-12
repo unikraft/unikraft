@@ -90,24 +90,6 @@ void uk_rwlock_runlock(struct uk_rwlock *rwl);
  */
 void uk_rwlock_wunlock(struct uk_rwlock *rwl);
 
-/**
- * Upgrade the given read lock to a write lock
- *
- * @param rwl
- *   Reader-writer lock to upgrade. The current thread must hold the lock
- *   for reading
- */
-void uk_rwlock_upgrade(struct uk_rwlock *rwl);
-
-/**
- * Downgrade the given write lock to a read lock
- *
- * @param rwl
- *   Reader-writer lock to downgrade. The current thread must hold the lock
- *   for writing
- */
-void uk_rwlock_downgrade(struct uk_rwlock *rwl);
-
 
 #ifdef __cplusplus
 }
