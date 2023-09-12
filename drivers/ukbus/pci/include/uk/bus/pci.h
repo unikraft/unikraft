@@ -65,6 +65,7 @@
 #define __UK_BUS_PCI_H__
 
 #include <stddef.h>
+#include <stdint.h>
 #include <uk/arch/types.h>
 #include <uk/bus.h>
 #include <uk/alloc.h>
