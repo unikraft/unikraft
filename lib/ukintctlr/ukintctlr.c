@@ -99,6 +99,44 @@ int uk_intctlr_irq_register(unsigned int irq,
 	return 0;
 }
 
+int uk_intctlr_irq_unregister(unsigned int irq,
+			      uk_intctlr_irq_handler_func_t func)
+{
+	struct irq_handler *h = NULL;
+	unsigned long flags;
+	int count;
+	int i;
+
+	UK_ASSERT(func);
+	UK_ASSERT(irq <= MAX_IRQ);
+
+	flags = ukplat_lcpu_save_irqf();
+
+	count = MAX_HANDLERS_PER_IRQ;
+	for (i = 0; i < count; i++) {
+recheck:
+		if (irq_handlers[irq][i].func == func) {
+			h = &irq_handlers[irq][i];
+			h->func = NULL;
+			h->arg = NULL;
+
+			/* Copy all following handlers forward */
+			memmove(h, h + 1, sizeof(*h) * (count - i - 1));
+			goto recheck;
+		}
+	}
+
+	ukplat_lcpu_restore_irqf(flags);
+
+	/* If `h` is set, then there was at least one instance found */
+	if (unlikely(!h)) {
+		uk_pr_crit("Invalid irq handler %p for irq %u ", func, irq);
+		return -ENOENT;
+	}
+
+	return 0;
+}
+
 /*
  * TODO: This is a temporary solution used to identify non TSC clock
  * interrupts in order to stop waiting for interrupts with deadline.

@@ -4,4 +4,5 @@ uk_intctlr_irq_configure
 uk_intctlr_irq_fdt_xlat
 uk_intctlr_irq_handle
 uk_intctlr_irq_register
+uk_intctlr_irq_unregister
 uk_intctlr_register
