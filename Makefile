@@ -858,6 +858,7 @@ $(KCONFIG_TOOLS):
 	$(call verbose_cmd,MAKE,$(notdir $(CONFIG)),$(MAKE) \
 	    --no-print-directory \
 	    CC="$(HOSTCC_NOCCACHE)" HOSTCC="$(HOSTCC_NOCCACHE)" \
+	    YACC="$(YACC)" LEX="$(LEX)" \
 	    obj=$(@D) -C $(CONFIG) -f Makefile.br $(@))
 endif
 
