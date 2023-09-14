@@ -189,10 +189,6 @@ int pl031_init_rtc(void *dtb)
 	}
 
 	pl031_irq = gic_irq_translate(irq_type, hwirq);
-	if (unlikely(pl031_irq < 0 || pl031_irq >= __MAX_IRQ)) {
-		uk_pr_err("Failed to translate RTC IRQ\n");
-		return -EINVAL;
-	}
 	uk_pr_info("RTC IRQ is: %d\n", pl031_irq);
 
 	if (pl031_get_status() == PL031_STATUS_DISABLED)

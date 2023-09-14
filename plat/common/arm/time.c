@@ -138,9 +138,6 @@ void ukplat_time_init(void)
 		UK_CRASH("Failed to find IRQ number from DTB\n");
 
 	irq = gic_irq_translate(irq_type, hwirq);
-	if (irq < 0 || irq >= __MAX_IRQ)
-		UK_CRASH("Failed to translate IRQ number, type=%u, hwirq=%u\n",
-			irq_type, hwirq);
 
 	rc = ukplat_irq_register(irq, generic_timer_irq_handler, NULL);
 	if (rc < 0)

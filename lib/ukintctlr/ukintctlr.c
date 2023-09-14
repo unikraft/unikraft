@@ -30,6 +30,7 @@
 #include <uk/plat/lcpu.h>
 #include <uk/plat/time.h>
 #include <uk/intctlr.h>
+#include <uk/intctlr/limits.h>
 #include <uk/assert.h>
 #include <uk/event.h>
 #include <uk/trace.h>
@@ -40,6 +41,11 @@
 #include <uk/arch/ctx.h>
 #endif /* CONFIG_LIBUKINTCTLR_ISR_ECTX_ASSERTIONS */
 
+#ifndef UK_INTCTLR_MAX_IRQ
+#error "Incomplete definition of uk_intctlr driver limits"
+#endif
+
+#define MAX_IRQ				UK_INTCTLR_MAX_IRQ
 #define MAX_HANDLERS_PER_IRQ		CONFIG_LIBUKINTCTLR_MAX_HANDLERS_PER_IRQ
 
 struct uk_intctlr_desc *uk_intctlr;
@@ -55,11 +61,12 @@ struct irq_handler {
 	void *arg;
 };
 
-static struct irq_handler irq_handlers[__MAX_IRQ][MAX_HANDLERS_PER_IRQ];
+static struct irq_handler irq_handlers[MAX_IRQ][MAX_HANDLERS_PER_IRQ];
 
 static inline struct irq_handler *allocate_handler(unsigned long irq)
 {
-	UK_ASSERT(irq < __MAX_IRQ);
+	UK_ASSERT(irq <= MAX_IRQ);
+
 	for (int i = 0; i < MAX_HANDLERS_PER_IRQ; i++)
 		if (irq_handlers[irq][i].func == NULL)
 			return &irq_handlers[irq][i];
@@ -73,8 +80,7 @@ int uk_intctlr_irq_register(unsigned int irq,
 	unsigned long flags;
 
 	UK_ASSERT(func);
-	if (irq >= __MAX_IRQ)
-		return -EINVAL;
+	UK_ASSERT(irq <= MAX_IRQ);
 
 	flags = ukplat_lcpu_save_irqf();
 	h = allocate_handler(irq);
@@ -114,7 +120,7 @@ void uk_intctlr_irq_handle(struct __regs *regs, unsigned int irq)
 	ukarch_ectx_init(ectx);
 #endif /* CONFIG_LIBUKINTCTLR_ISR_ECTX_ASSERTIONS */
 
-	UK_ASSERT(irq < __MAX_IRQ);
+	UK_ASSERT(irq <= MAX_IRQ);
 
 	ctx.regs = regs;
 	ctx.irq = irq;
