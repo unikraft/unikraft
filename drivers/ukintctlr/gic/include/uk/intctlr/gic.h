@@ -43,13 +43,6 @@
 #define GIC_PPI_TYPE 1
 #define GIC_PPI_BASE 16
 
-/**
- * Max supported interrupt number for GIC
- * Interrupts 1020-1023 are reserved for special purposes, with 1023 being the
- * spurious interrupt
- */
-#define GIC_MAX_IRQ  __MAX_IRQ
-
 /** Distributor register address */
 #define GIC_DIST_REG(gdev, r) ((void *)(gdev.dist_mem_addr + (r)))
 
