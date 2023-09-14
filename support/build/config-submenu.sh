@@ -138,6 +138,6 @@ esac
 
 # close FD:7 and print filename
 if [ ! -z "$ARG_OUT" ]; then
-	printf '%s\n' "$( "${CMD_READLINK}" -f $ARG_OUT )"
+	printf '%s\n' "$( "${CMD_READLINK}" -f "${ARG_OUT}" )"
 	exec 7>&-
 fi
