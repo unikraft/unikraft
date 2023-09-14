@@ -47,10 +47,13 @@
 #include <arm/cpu.h>
 #include <uk/intctlr.h>
 #include <uk/intctlr/gic-v2.h>
+#include <uk/intctlr/limits.h>
 #include <uk/ofw/fdt.h>
 
 /* Max CPU interface for GICv2 */
 #define GIC_MAX_CPUIF		8
+
+#define GIC_MAX_IRQ		UK_INTCTLR_MAX_IRQ
 
 #define GIC_CPU_REG(gdev, r)	((void *)(gdev.cpuif_mem_addr + (r)))
 
@@ -237,13 +240,13 @@ void gicv2_sgi_gen_to_self(uint32_t sgintid)
 /**
  * Set target CPU for an interrupt
  *
- * @param irq interrupt number [GIC_SPI_BASE..GIC_MAX_IRQ-1]
+ * @param irq interrupt number [GIC_SPI_BASE..GIC_MAX_IRQ]
  * @param targetlist an 8-bit bitmap with 1 bit per CPU 0-7. A `1` bit
  *    indicates that the SGI should be forwarded to the respective CPU
  */
 static void gicv2_set_irq_target(uint32_t irq, uint32_t targetlist)
 {
-	UK_ASSERT(irq >= GIC_SPI_BASE && irq < GIC_MAX_IRQ);
+	UK_ASSERT(irq >= GIC_SPI_BASE && irq <= GIC_MAX_IRQ);
 	UK_ASSERT(targetlist <= __U8_MAX);
 
 	dist_lock(gicv2_drv);
@@ -254,7 +257,7 @@ static void gicv2_set_irq_target(uint32_t irq, uint32_t targetlist)
 /**
  * Set priority for an interrupt
  *
- * @param irq interrupt number [0..GIC_MAX_IRQ-1]
+ * @param irq interrupt number [0..GIC_MAX_IRQ]
  * @param priority priority [0..255]. The GIC implementation may not support
  *    all levels. For example, if only 128 levels are supported every two levels
  *    (e.g., 0 and 1) map to the same effective value. Lower values correspond
@@ -262,7 +265,7 @@ static void gicv2_set_irq_target(uint32_t irq, uint32_t targetlist)
  */
 static void gicv2_set_irq_prio(uint32_t irq, uint8_t priority)
 {
-	UK_ASSERT(irq < GIC_MAX_IRQ);
+	UK_ASSERT(irq <= GIC_MAX_IRQ);
 
 	dist_lock(gicv2_drv);
 	write_gicd8(GICD_IPRIORITYR(irq), priority);
@@ -272,11 +275,11 @@ static void gicv2_set_irq_prio(uint32_t irq, uint8_t priority)
 /**
  * Enable an interrupt
  *
- * @param irq interrupt number [0..GIC_MAX_IRQ-1]
+ * @param irq interrupt number [0..GIC_MAX_IRQ]
  */
 static void gicv2_enable_irq(uint32_t irq)
 {
-	UK_ASSERT(irq < GIC_MAX_IRQ);
+	UK_ASSERT(irq <= GIC_MAX_IRQ);
 
 	dist_lock(gicv2_drv);
 	write_gicd32(GICD_ISENABLER(irq), UK_BIT(irq % GICD_I_PER_ISENABLERn));
@@ -286,11 +289,11 @@ static void gicv2_enable_irq(uint32_t irq)
 /**
  * Disable an interrupt
  *
- * @param irq interrupt number [0..GIC_MAX_IRQ-1]
+ * @param irq interrupt number [0..GIC_MAX_IRQ]
  */
 static void gicv2_disable_irq(uint32_t irq)
 {
-	UK_ASSERT(irq < GIC_MAX_IRQ);
+	UK_ASSERT(irq <= GIC_MAX_IRQ);
 
 	dist_lock(gicv2_drv);
 	write_gicd32(GICD_ICENABLER(irq), UK_BIT(irq % GICD_I_PER_ICENABLERn));
@@ -319,7 +322,7 @@ static void gicv2_disable_dist(void)
 /**
  * Config trigger type for an interrupt
  *
- * @param irq interrupt number [GIC_PPI_BASE..GIC_MAX_IRQ-1]
+ * @param irq interrupt number [GIC_PPI_BASE..GIC_MAX_IRQ]
  * @param trigger trigger type (UK_INTCTLR_IRQ_TRIGGER_*)
  */
 static
@@ -327,7 +330,7 @@ void gicv2_set_irq_trigger(uint32_t irq, enum uk_intctlr_irq_trigger trigger)
 {
 	uint32_t val, mask, oldmask;
 
-	UK_ASSERT(irq >= GIC_PPI_BASE && irq < GIC_MAX_IRQ);
+	UK_ASSERT(irq >= GIC_PPI_BASE && irq <= GIC_MAX_IRQ);
 	UK_ASSERT(trigger == UK_INTCTLR_IRQ_TRIGGER_EDGE ||
 		  trigger == UK_INTCTLR_IRQ_TRIGGER_LEVEL);
 
@@ -376,7 +379,7 @@ static void gicv2_handle_irq(struct __regs *regs)
 		/* Ensure interrupt processing starts only after ACK */
 		isb();
 
-		if (irq < GIC_MAX_IRQ) {
+		if (irq <= GIC_MAX_IRQ) {
 			uk_intctlr_irq_handle(regs, irq);
 			gicv2_eoi_irq(stat);
 			continue;
@@ -408,7 +411,7 @@ static void gicv2_init_dist(void)
 	/* Get the maximum number of interrupts that the GIC supports */
 	irq_number = GICD_TYPER_LINE_NUM(val);
 	if (irq_number > GIC_MAX_IRQ)
-		irq_number = GIC_MAX_IRQ;
+		irq_number = GIC_MAX_IRQ + 1;
 	uk_pr_info("GICv2 Max interrupt lines:%d\n", irq_number);
 
 	/* Set all SPI's interrupt target to all CPUs */

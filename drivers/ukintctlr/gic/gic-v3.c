@@ -53,7 +53,10 @@
 #include <uk/intctlr.h>
 #include <uk/intctlr/gic.h>
 #include <uk/intctlr/gic-v3.h>
+#include <uk/intctlr/limits.h>
 #include <uk/ofw/fdt.h>
+
+#define GIC_MAX_IRQ	UK_INTCTLR_MAX_IRQ
 
 #define GIC_RDIST_REG(gdev, r)					\
 	((void *)(gdev.rdist_mem_addr + (r) +			\
@@ -192,11 +195,11 @@ static void gicv3_eoi_irq(uint32_t irq)
 /**
  * Enable an interrupt
  *
- * @param irq interrupt number [0..GIC_MAX_IRQ-1]
+ * @param irq interrupt number [0..GIC_MAX_IRQ]
  */
 static void gicv3_enable_irq(uint32_t irq)
 {
-	UK_ASSERT(irq < GIC_MAX_IRQ);
+	UK_ASSERT(irq <= GIC_MAX_IRQ);
 
 	dist_lock(gicv3_drv);
 
@@ -274,11 +277,11 @@ static void gicv3_sgi_gen(uint8_t sgintid, uint32_t cpuid)
 /**
  * Disable an interrupt
  *
- * @param irq interrupt number [0..GIC_MAX_IRQ-1]
+ * @param irq interrupt number [0..GIC_MAX_IRQ]
  */
 static void gicv3_disable_irq(uint32_t irq)
 {
-	UK_ASSERT(irq < GIC_MAX_IRQ);
+	UK_ASSERT(irq <= GIC_MAX_IRQ);
 
 	dist_lock(gicv3_drv);
 
@@ -295,13 +298,13 @@ static void gicv3_disable_irq(uint32_t irq)
 /**
  * Set interrupt affinity
  *
- * @param irq interrupt number [GIC_SPI_BASE..GIC_MAX_IRQ-1]
+ * @param irq interrupt number [GIC_SPI_BASE..GIC_MAX_IRQ]
  * @param affinity target CPU affinity in 32 bits format
  * (AFF3|AFF2|AFF1|AFF0), as returned by get_cpu_affinity()
  */
 static void gicv3_set_irq_affinity(uint32_t irq, uint32_t affinity)
 {
-	UK_ASSERT(irq >= GIC_SPI_BASE && irq < GIC_MAX_IRQ);
+	UK_ASSERT(irq >= GIC_SPI_BASE && irq <= GIC_MAX_IRQ);
 
 	dist_lock(gicv3_drv);
 	write_gicd64(GICD_IROUTER(irq), GIC_AFF_TO_ROUTER(affinity, 0));
@@ -311,7 +314,7 @@ static void gicv3_set_irq_affinity(uint32_t irq, uint32_t affinity)
 /**
  * Set priority for an interrupt
  *
- * @param irq interrupt number [0..GIC_MAX_IRQ-1]
+ * @param irq interrupt number [0..GIC_MAX_IRQ]
  * @param priority priority [0..255]. The GIC implementation may not support
  *    all levels. For example, if only 128 levels are supported every two levels
  *    (e.g., 0 and 1) map to the same effective value. Lower values correspond
@@ -332,7 +335,7 @@ static void gicv3_set_irq_prio(uint32_t irq, uint8_t priority)
 /**
  * Configure trigger type for an interrupt
  *
- * @param irq interrupt number [GIC_PPI_BASE..GIC_MAX_IRQ-1]
+ * @param irq interrupt number [GIC_PPI_BASE..GIC_MAX_IRQ]
  * @param trigger trigger type (UK_INTCTLR_IRQ_TRIGGER_*)
  */
 static
@@ -340,7 +343,7 @@ void gicv3_set_irq_trigger(uint32_t irq, enum uk_intctlr_irq_trigger trigger)
 {
 	uint32_t val, mask, oldmask;
 
-	UK_ASSERT(irq >= GIC_PPI_BASE && irq < GIC_MAX_IRQ);
+	UK_ASSERT(irq >= GIC_PPI_BASE && irq <= GIC_MAX_IRQ);
 	UK_ASSERT(trigger == UK_INTCTLR_IRQ_TRIGGER_EDGE ||
 		  trigger == UK_INTCTLR_IRQ_TRIGGER_LEVEL);
 
@@ -461,7 +464,7 @@ static void gicv3_init_dist(void)
 	val = read_gicd32(GICD_TYPER);
 	irq_number = GICD_TYPER_LINE_NUM(val);
 	if (irq_number > GIC_MAX_IRQ)
-		irq_number = GIC_MAX_IRQ;
+		irq_number = GIC_MAX_IRQ + 1;
 	uk_pr_info("GICv3 Max interrupt lines: %d\n", irq_number);
 
 	/* Check for LPI support */
@@ -522,10 +525,9 @@ static void gicv3_handle_irq(struct __regs *regs)
 		/* Ensure interrupt processing starts only after ACK */
 		isb();
 
-		if (irq < GIC_MAX_IRQ) {
+		if (irq <= GIC_MAX_IRQ) {
 			uk_intctlr_irq_handle(regs, irq);
 			gicv3_eoi_irq(stat);
-
 			continue;
 		}
 
