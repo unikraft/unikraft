@@ -73,7 +73,6 @@
 #include <uk/plat/bootstrap.h>
 #include <uk/plat/memory.h>
 #include <uk/plat/lcpu.h>
-#include <uk/plat/irq.h>
 #include <uk/plat/time.h>
 #include <uk/essentials.h>
 #include <uk/print.h>
@@ -90,6 +89,10 @@
 #include <uk/arch/tls.h>
 #include <uk/plat/tls.h>
 #include "banner.h"
+
+#if CONFIG_LIBUKINTCTLR
+#include <uk/intctlr.h>
+#endif /* CONFIG_LIBUKINTCTLR */
 
 int main(int argc, char *argv[]) __weak;
 
@@ -315,12 +318,12 @@ void ukplat_entry(int argc, char *argv[])
 	ukplat_tlsp_set(ukarch_tls_tlsp(tls));
 #endif /* !CONFIG_LIBUKBOOT_NOALLOC */
 
-#if CONFIG_LIBUKALLOC
-	uk_pr_info("Initialize IRQ subsystem...\n");
-	rc = ukplat_irq_init(a);
-	if (unlikely(rc != 0))
-		UK_CRASH("Could not initialize the platform IRQ subsystem\n");
-#endif
+#if CONFIG_LIBUKINTCTLR
+	uk_pr_info("Initialize the IRQ subsystem...\n");
+	rc = uk_intctlr_init(a);
+	if (unlikely(rc))
+		UK_CRASH("Could not initialize the IRQ subsystem\n");
+#endif /* CONFIG_LIBUKINTCTLR */
 
 	/* On most platforms the timer depend on an initialized IRQ subsystem */
 	uk_pr_info("Initialize platform time...\n");
