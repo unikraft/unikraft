@@ -29,8 +29,6 @@
 #include <uk/alloc.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/time.h>
-#include <uk/plat/irq.h>
-#include <uk/plat/common/irq.h>
 #include <uk/intctlr.h>
 #include <uk/assert.h>
 #include <uk/event.h>
@@ -38,34 +36,38 @@
 #include <uk/print.h>
 #include <errno.h>
 #include <uk/bitops.h>
-#ifdef CONFIG_UKPLAT_ISR_ECTX_ASSERTIONS
+#if CONFIG_LIBUKINTCTLR_ISR_ECTX_ASSERTIONS
 #include <uk/arch/ctx.h>
-#endif
+#endif /* CONFIG_LIBUKINTCTLR_ISR_ECTX_ASSERTIONS */
 
-UK_EVENT(UKPLAT_EVENT_IRQ);
+#define MAX_HANDLERS_PER_IRQ		CONFIG_LIBUKINTCTLR_MAX_HANDLERS_PER_IRQ
 
-UK_TRACEPOINT(trace_plat_kvm_unhandled_irq, "Unhandled irq=%lu\n",
+struct uk_intctlr_desc *uk_intctlr;
+
+UK_EVENT(UK_INTCTLR_EVENT_IRQ);
+
+UK_TRACEPOINT(trace_uk_intctlr_unhandled_irq, "Unhandled irq=%lu\n",
 	      unsigned long);
 
 /* IRQ handlers declarations */
 struct irq_handler {
-	irq_handler_func_t func;
+	uk_intctlr_irq_handler_func_t func;
 	void *arg;
 };
 
-static struct irq_handler irq_handlers[__MAX_IRQ]
-				[CONFIG_KVM_MAX_IRQ_HANDLER_ENTRIES];
+static struct irq_handler irq_handlers[__MAX_IRQ][MAX_HANDLERS_PER_IRQ];
 
 static inline struct irq_handler *allocate_handler(unsigned long irq)
 {
 	UK_ASSERT(irq < __MAX_IRQ);
-	for (int i = 0; i < CONFIG_KVM_MAX_IRQ_HANDLER_ENTRIES; i++)
+	for (int i = 0; i < MAX_HANDLERS_PER_IRQ; i++)
 		if (irq_handlers[irq][i].func == NULL)
 			return &irq_handlers[irq][i];
 	return NULL;
 }
 
-int ukplat_irq_register(unsigned long irq, irq_handler_func_t func, void *arg)
+int uk_intctlr_irq_register(unsigned int irq,
+			    uk_intctlr_irq_handler_func_t func, void *arg)
 {
 	struct irq_handler *h;
 	unsigned long flags;
@@ -86,7 +88,8 @@ int ukplat_irq_register(unsigned long irq, irq_handler_func_t func, void *arg)
 
 	ukplat_lcpu_restore_irqf(flags);
 
-	intctrl_clear_irq(irq);
+	uk_intctlr->ops->unmask_irq(irq);
+
 	return 0;
 }
 
@@ -96,26 +99,26 @@ int ukplat_irq_register(unsigned long irq, irq_handler_func_t func, void *arg)
  */
 extern unsigned long sched_have_pending_events;
 
-void _ukplat_irq_handle(struct __regs *regs, unsigned long irq)
+void uk_intctlr_irq_handle(struct __regs *regs, unsigned int irq)
 {
 	struct irq_handler *h;
 	int i;
 	int rc;
-	struct ukplat_event_irq_data ctx;
-#ifdef CONFIG_UKPLAT_ISR_ECTX_ASSERTIONS
+	struct uk_intctlr_event_irq_data ctx;
+#if CONFIG_LIBUKINTCTLR_ISR_ECTX_ASSERTIONS
 	__sz ectx_align = ukarch_ectx_align();
 	__u8 ectxbuf[ukarch_ectx_size() + ectx_align];
 	struct ukarch_ectx *ectx = (struct ukarch_ectx *)
 		ALIGN_UP((__uptr) ectxbuf, ectx_align);
 
 	ukarch_ectx_init(ectx);
-#endif
+#endif /* CONFIG_LIBUKINTCTLR_ISR_ECTX_ASSERTIONS */
 
 	UK_ASSERT(irq < __MAX_IRQ);
 
 	ctx.regs = regs;
 	ctx.irq = irq;
-	rc = uk_raise_event(UKPLAT_EVENT_IRQ, &ctx);
+	rc = uk_raise_event(UK_INTCTLR_EVENT_IRQ, &ctx);
 	if (unlikely(rc < 0))
 		UK_CRASH("IRQ event handler returned error: %d\n", rc);
 	if (rc == UK_EVENT_HANDLED) {
@@ -125,7 +128,7 @@ void _ukplat_irq_handle(struct __regs *regs, unsigned long irq)
 		goto exit_ack;
 	}
 
-	for (i = 0; i < CONFIG_KVM_MAX_IRQ_HANDLER_ENTRIES; i++) {
+	for (i = 0; i < MAX_HANDLERS_PER_IRQ; i++) {
 		if (irq_handlers[irq][i].func == NULL)
 			break;
 		h = &irq_handlers[irq][i];
@@ -151,19 +154,68 @@ void _ukplat_irq_handle(struct __regs *regs, unsigned long irq)
 	 * devices, and (2) to minimize impact on drivers that share one
 	 * interrupt line that would then stay disabled.
 	 */
-	trace_plat_kvm_unhandled_irq(irq);
+	trace_uk_intctlr_unhandled_irq(irq);
 
 exit_ack:
-#ifdef CONFIG_UKPLAT_ISR_ECTX_ASSERTIONS
+#if CONFIG_LIBUKINTCTLR_ISR_ECTX_ASSERTIONS
 	ukarch_ectx_assert_equal(ectx);
-#endif
+#endif /* CONFIG_LIBUKINTCTLR_ISR_ECTX_ASSERTIONS */
 	intctrl_ack_irq(irq);
+
+	return;
 }
 
-int ukplat_irq_init(struct uk_alloc *a __unused)
+void uk_intctlr_irq_mask(unsigned int irq)
 {
+	UK_ASSERT(uk_intctlr && uk_intctlr->ops);
+
+	return uk_intctlr->ops->mask_irq(irq);
+}
+
+void uk_intctlr_irq_unmask(unsigned int irq)
+{
+	UK_ASSERT(uk_intctlr && uk_intctlr->ops);
+
+	return uk_intctlr->ops->unmask_irq(irq);
+}
+
+int uk_intctlr_irq_configure(struct uk_intctlr_irq *irq)
+{
+	UK_ASSERT(uk_intctlr && uk_intctlr->ops);
+	UK_ASSERT(irq);
+
+	return uk_intctlr->ops->configure_irq(irq);
+}
+
+int uk_intctlr_irq_fdt_xlat(const void *fdt, int nodeoffset, __u32 index,
+			    struct uk_intctlr_irq *irq)
+{
+	UK_ASSERT(uk_intctlr && uk_intctlr->ops);
+	UK_ASSERT(fdt);
+	UK_ASSERT(irq);
+
+	/* We're using an assertion here instead of returning -ENOTSUP
+	 * because the implementation returns libfdt error codes.
+	 */
+	UK_ASSERT(uk_intctlr->ops->fdt_xlat);
+
+	return uk_intctlr->ops->fdt_xlat(fdt, nodeoffset, index, irq);
+}
+
+int uk_intctlr_init(struct uk_alloc *a __unused)
+{
+	UK_ASSERT(uk_intctlr);
 	UK_ASSERT(ukplat_lcpu_irqs_disabled());
 
 	/* Nothing for now */
+	return 0;
+}
+
+int uk_intctlr_register(struct uk_intctlr_desc *intctlr)
+{
+	UK_ASSERT(intctlr);
+
+	uk_intctlr = intctlr;
+
 	return 0;
 }

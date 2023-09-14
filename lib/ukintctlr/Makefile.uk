@@ -8,6 +8,8 @@ ASINCLUDES-$(CONFIG_LIBUKINTCTLR)  += -I$(CONFIG_UK_BASE)/plat/common/include
 CINCLUDES-$(CONFIG_LIBUKINTCTLR)   += -I$(CONFIG_UK_BASE)/plat/common/include
 CXXINCLUDES-$(CONFIG_LIBUKINTCTLR) += -I$(CONFIG_UK_BASE)/plat/common/include
 
+LIBUKINTCTLR_SRCS-y += $(LIBUKINTCTLR_BASE)/ukintctlr.c
+
 ifeq ($(CONFIG_ARCH_X86_64),y)
 LIBUKINTCTLR_SRCS-y += $(LIBUKINTCTLR_BASE)/arch/x86/intctlr.c
 endif
