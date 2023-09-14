@@ -1,5 +1,9 @@
+config HAVE_INTCTLR
+	bool
+
 config LIBUKINTCTLR
 	bool "ukintctlr: Interrupt Controller API"
+	depends on HAVE_INTCTLR
 
 if LIBUKINTCTLR
 
