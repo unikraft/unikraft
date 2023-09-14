@@ -50,11 +50,6 @@
 #include <limits.h>
 #include <errno.h>
 
-#ifdef CONFIG_ARCH_X86_64
-/* TODO: Remove when we have unified IRQ handling */
-#include <uk/intctlr/apic.h>
-#endif /* CONFIG_ARCH_X86_64 */
-
 /**
  * Array of LCPUs, one for every CPU in the system.
  *
@@ -296,21 +291,11 @@ static int lcpu_ipi_run_handler(void *args __unused)
 	UK_ASSERT(lcpu_state_is_busy(this_lcpu->state));
 	ukarch_dec(&this_lcpu->state);
 
-#ifdef CONFIG_ARCH_X86_64
-	/* TODO: Remove when we have unified IRQ handling */
-	apic_ack_interrupt();
-#endif /* CONFIG_ARCH_X86_64 */
-
 	return 1;
 }
 
 static int lcpu_ipi_wakeup_handler(void *args __unused)
 {
-#ifdef CONFIG_ARCH_X86_64
-	/* TODO: Remove when we have unified IRQ handling */
-	apic_ack_interrupt();
-#endif /* CONFIG_ARCH_X86_64 */
-
 	/* Nothing to do */
 	return 1;
 }
