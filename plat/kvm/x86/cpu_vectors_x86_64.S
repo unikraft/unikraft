@@ -27,6 +27,9 @@
 #include <x86/traps.h>
 #include <uk/asm/cfi.h>
 #include <uk/intctlr.h>
+#include <kvm-x86/traps.h>
+
+.altmacro
 
 #define ENTRY(X)     .global X ; .type X, @function ; X:
 
@@ -176,19 +179,9 @@ TRAP_ENTRY machine_check,    0
 TRAP_ENTRY simd_error,       0
 TRAP_ENTRY virt_error,       0
 
-IRQ_ENTRY 0
-IRQ_ENTRY 1
-IRQ_ENTRY 2
-IRQ_ENTRY 3
-IRQ_ENTRY 4
-IRQ_ENTRY 5
-IRQ_ENTRY 6
-IRQ_ENTRY 7
-IRQ_ENTRY 8
-IRQ_ENTRY 9
-IRQ_ENTRY 10
-IRQ_ENTRY 11
-IRQ_ENTRY 12
-IRQ_ENTRY 13
-IRQ_ENTRY 14
-IRQ_ENTRY 15
+.set irqno, 0
+.rept IDT_NUM_ENTRIES-32
+IRQ_ENTRY %irqno
+.set irqno, irqno + 1
+.endr
+.noaltmacro
