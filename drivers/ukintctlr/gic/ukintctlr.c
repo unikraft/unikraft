@@ -6,6 +6,7 @@
 #include <uk/config.h>
 #include <uk/assert.h>
 #include <uk/intctlr.h>
+#include <uk/intctlr/limits.h>
 #include <uk/intctlr/gic-v2.h>
 #include <uk/intctlr/gic-v3.h>
 
@@ -46,7 +47,7 @@ static int fdt_xlat(const void *fdt, int nodeoffset, __u32 index,
 
 	switch (type) {
 	case GIC_SPI_TYPE:
-		UK_ASSERT((irq_num + GIC_SPI_BASE) <= UK_INTCTLR_GIC_MAX_IRQ);
+		UK_ASSERT((irq_num + GIC_SPI_BASE) <= UK_INTCTLR_MAX_IRQ);
 		irq->id = irq_num + GIC_SPI_BASE;
 		break;
 	case GIC_PPI_TYPE:
