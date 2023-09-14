@@ -309,7 +309,7 @@ static int pipe_write(struct vnode *vnode,
 
 	if (!pipe_file->r_refcount) {
 		/* TODO before returning the error, send a SIGPIPE signal */
-		return -EPIPE;
+		return EPIPE;
 	}
 
 	uk_mutex_lock(&pipe_buf->wrlock);
@@ -447,8 +447,7 @@ static int pipe_seek(struct vnode *vnode __unused,
 			struct vfscore_file *vfscore_file __unused,
 			off_t off1 __unused, off_t off2 __unused)
 {
-	errno = ESPIPE;
-	return -1;
+	return ESPIPE;
 }
 
 static int pipe_ioctl(struct vnode *vnode,
@@ -468,7 +467,7 @@ static int pipe_ioctl(struct vnode *vnode,
 		/* sys_ioctl() already sets f_flags, no need to do anything */
 		return 0;
 	default:
-		return -EINVAL;
+		return EINVAL;
 	}
 }
 
@@ -698,6 +697,9 @@ ERR_EXIT:
 UK_SYSCALL_R_DEFINE(int, pipe2, int*, pipefd, int, flags)
 {
 	int rc;
+
+	if (flags & O_DIRECT)
+		return -EINVAL;
 
 	rc = uk_syscall_r_pipe((long) pipefd);
 	if (rc)
