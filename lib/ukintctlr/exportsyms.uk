@@ -4,3 +4,10 @@ intctrl_mask_irq
 intctrl_ack_irq
 intctrl_send_ipi
 gic
+uk_intctlr
+uk_intctlr_init
+uk_intctlr_irq_configure
+uk_intctlr_irq_fdt_xlat
+uk_intctlr_irq_handle
+uk_intctlr_irq_register
+uk_intctlr_register
