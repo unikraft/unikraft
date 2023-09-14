@@ -23,6 +23,10 @@
 #include <uk/assert.h>
 #include <arm/cpu.h>
 
+#if CONFIG_LIBUKRSI
+#include <uk/rsi.h>
+#endif /* CONFIG_LIBUKRSI */
+
 /* PL011 UART registers and masks*/
 /* Data register */
 #define REG_UARTDR_OFFSET	0x00
@@ -70,18 +74,37 @@
  * use pl011_uart_initialized as an extra variable to check
  * whether the UART has been initialized.
  */
-#if defined(CONFIG_EARLY_PRINT_PL011_UART_ADDR)
-static uint8_t pl011_uart_initialized = 1;
-static uint64_t pl011_uart_bas = CONFIG_EARLY_PRINT_PL011_UART_ADDR;
-#else
+#if !defined(CONFIG_EARLY_PRINT_PL011_UART_ADDR) || CONFIG_LIBUKRSI
 static uint8_t pl011_uart_initialized;
 static uint64_t pl011_uart_bas;
+#else
+static uint8_t pl011_uart_initialized = 1;
+static uint64_t pl011_uart_bas = CONFIG_EARLY_PRINT_PL011_UART_ADDR;
 #endif
 
 /* Macros to access PL011 Registers with base address */
 #define PL011_REG(r)		((uint16_t *)(pl011_uart_bas + (r)))
 #define PL011_REG_READ(r)	ioreg_read16(PL011_REG(r))
 #define PL011_REG_WRITE(r, v)	ioreg_write16(PL011_REG(r), v)
+
+static uint8_t initialized(void)
+{
+#if defined(CONFIG_EARLY_PRINT_PL011_UART_ADDR) && CONFIG_LIBUKRSI
+	__u64 new_base;
+	int rc;
+
+	if (unlikely(!pl011_uart_initialized)) {
+		rc = uk_rsi_set_early_unprotected(
+		    CONFIG_EARLY_PRINT_PL011_UART_ADDR,
+		    __PAGE_SIZE, &new_base);
+		if (!rc) {
+			pl011_uart_initialized = 1;
+			pl011_uart_bas = new_base;
+		}
+	}
+#endif
+	return pl011_uart_initialized;
+}
 
 static void init_pl011(uint64_t bas)
 {
@@ -144,10 +167,9 @@ int ukplat_coutd(const char *str, uint32_t len)
 static void pl011_write(char a)
 {
 	/*
-	 * Avoid using the UART before base address initialized,
-	 * or CONFIG_EARLY_PRINT_PL011_UART is not enabled.
+	 * Avoid using the UART before base address initialized.
 	 */
-	if (!pl011_uart_initialized)
+	if (!initialized())
 		return;
 
 	/* Wait until TX FIFO becomes empty */
@@ -168,10 +190,9 @@ static void pl011_putc(char a)
 static int pl011_getc(void)
 {
 	/*
-	 * Avoid using the UART before base address initialized,
-	 * or CONFIG_EARLY_PRINT_PL011_UART is not enabled.
+	 * Avoid using the UART before base address initialized.
 	 */
-	if (!pl011_uart_initialized)
+	if (!initialized())
 		return -1;
 
 	/* If RX FIFO is empty, return -1 immediately */
