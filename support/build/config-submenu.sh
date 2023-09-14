@@ -22,16 +22,19 @@ usage()
 	echo "  -t [TEXT]                  Generates a submenu with TEXT as title"
 	echo "  -l [PATH]                  Library directory"
 	echo "  -c [PATH:PATH:...]         Colon separated list of library directories"
+	echo "  -e [PATH:PATH:...]         Colon separated list of library paths that"
+	echo "                             shall be skipped/excluded"
 	echo "  -r [PATH]                  Search for library directories in subfolders"
 	echo "  -o [PATH]                  Write to output file instead of STDOUT"
 }
 
 ARG_OUT=
 ARG_PATHS=()
+ARG_EXCLUDES=()
 ARG_TITLE=
 OPT_MODE="concat"
 OPT_QUIET=1
-while getopts :hqt:l:r:c:o: OPT; do
+while getopts :hqt:l:r:c:e:o: OPT; do
 	case ${OPT} in
 	h)
 		usage
@@ -58,7 +61,16 @@ while getopts :hqt:l:r:c:o: OPT; do
 		IFS=':'
 		for P in ${OPTARG}; do
 			IFS=$IFS_ORIG
-			ARG_PATHS+=("${P}")
+			[ ! -z "${P}" ] && ARG_PATHS+=("${P}")
+			IFS=$IFS_NL
+		done
+		IFS=$IFS_ORIG
+		;;
+	e)
+		IFS=':'
+		for S in ${OPTARG}; do
+		        IFS=$IFS_ORIG
+			[ ! -z "${S}" ] && ARG_EXCLUDES+=("${S}")
 			IFS=$IFS_NL
 		done
 		IFS=$IFS_ORIG
@@ -99,6 +111,39 @@ else
 fi
 
 #
+# GENERATE LIST OF FINAL LIBRARY PATHS
+#
+LIBS=()
+for ARG_PATH in "${ARG_PATHS[@]}" "$@"; do
+	# Remove trailing slashes
+	ARG_PATH="${ARG_PATH%/}"
+
+	# Does Config.uk exist?
+	CONFIG_UK="${ARG_PATH}/Config.uk"
+	if [ ! -f "${CONFIG_UK}" ]; then
+		if [ $OPT_QUIET -ne 0 ]; then
+			echo "Could not find \"Config.uk\" under \"${ARG_PATH}\". Skipping..." 1>&2
+		fi
+		continue
+	fi
+
+	DONT_INCLUDE=1
+	for ARG_EXCLUDE in "${ARG_EXCLUDES[@]}"; do
+		if [ "${ARG_PATH}" = "${ARG_EXCLUDE}" ]; then
+			if [ $OPT_QUIET -ne 0 ]; then
+			        echo "Skipping excluded \"${ARG_PATH}\"..." 1>&2
+			fi
+			echo "# Skipped excluded \"${ARG_PATH}\"" >&7
+			DONT_INCLUDE=0
+			break
+		fi
+	done
+	[ ${DONT_INCLUDE} -eq 0 ] && continue
+
+	LIBS+=("${ARG_PATH}")
+done
+
+#
 # HEADER
 #
 case "${OPT_MODE}" in
@@ -112,16 +157,8 @@ esac
 #
 # BODY
 #
-for ARG_PATH in "${ARG_PATHS[@]}" "$@"; do
-	CONFIG_UK="${ARG_PATH}/Config.uk"
-
-	if [ ! -f "${CONFIG_UK}" ]; then
-		if [ $OPT_QUIET -ne 0 ]; then
-			echo "Could not find \"Config.uk\" under \"${ARG_PATH}\". Skipping..." 1>&2
-		fi
-		continue;
-	fi
-
+for L in "${LIBS[@]}"; do
+	CONFIG_UK="${L}/Config.uk"
 	printf "source \"%s\"\n" "$( "${CMD_READLINK}" -f "${CONFIG_UK}" )" >&7
 done
 
