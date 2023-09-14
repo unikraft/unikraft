@@ -27,6 +27,7 @@
 
 #include <stdlib.h>
 #include <uk/alloc.h>
+#include <uk/bitmap.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/time.h>
 #include <uk/intctlr.h>
@@ -41,12 +42,19 @@
 #include <uk/arch/ctx.h>
 #endif /* CONFIG_LIBUKINTCTLR_ISR_ECTX_ASSERTIONS */
 
-#ifndef UK_INTCTLR_MAX_IRQ
+#if !defined(UK_INTCTLR_MAX_IRQ) ||					\
+	!defined(UK_INTCTLR_ALLOCABLE_IRQ_COUNT) ||			\
+	!defined(UK_INTCTLR_FIRST_ALLOCABLE_IRQ) ||			\
+	!defined(UK_INTCTLR_LAST_ALLOCABLE_IRQ)
 #error "Incomplete definition of uk_intctlr driver limits"
 #endif
 
 #define MAX_IRQ				UK_INTCTLR_MAX_IRQ
 #define MAX_HANDLERS_PER_IRQ		CONFIG_LIBUKINTCTLR_MAX_HANDLERS_PER_IRQ
+
+#define ALLOCABLE_IRQ_COUNT		UK_INTCTLR_ALLOCABLE_IRQ_COUNT
+#define FIRST_ALLOCABLE_IRQ		UK_INTCTLR_FIRST_ALLOCABLE_IRQ
+#define LAST_ALLOCABLE_IRQ		UK_INTCTLR_LAST_ALLOCABLE_IRQ
 
 struct uk_intctlr_desc *uk_intctlr;
 
@@ -54,6 +62,8 @@ UK_EVENT(UK_INTCTLR_EVENT_IRQ);
 
 UK_TRACEPOINT(trace_uk_intctlr_unhandled_irq, "Unhandled irq=%lu\n",
 	      unsigned long);
+
+static unsigned long irqs_allocated[UK_BITS_TO_LONGS(ALLOCABLE_IRQ_COUNT)];
 
 /* IRQ handlers declarations */
 struct irq_handler {
@@ -243,6 +253,45 @@ int uk_intctlr_irq_fdt_xlat(const void *fdt, int nodeoffset, __u32 index,
 	UK_ASSERT(uk_intctlr->ops->fdt_xlat);
 
 	return uk_intctlr->ops->fdt_xlat(fdt, nodeoffset, index, irq);
+}
+
+int uk_intctlr_irq_alloc(unsigned int *irqs, __sz count)
+{
+	unsigned long start, idx;
+
+	UK_ASSERT(irqs);
+
+	start = uk_bitmap_find_next_zero_area(irqs_allocated,
+					      ALLOCABLE_IRQ_COUNT, 0,
+					      count, 0);
+	if (start == ALLOCABLE_IRQ_COUNT)
+		return -ENOSPC;
+
+	uk_bitmap_set(irqs_allocated, start, count);
+	for (idx = start; idx < (start + count); idx++) {
+		*irqs = idx + FIRST_ALLOCABLE_IRQ;
+		irqs++;
+	}
+
+	return 0;
+}
+
+int uk_intctlr_irq_free(unsigned int *irqs, __sz count)
+{
+	int rc = 0;
+
+	UK_ASSERT(irqs);
+
+	for (__sz i = 0; i < count; i++) {
+		UK_ASSERT(irqs[i] >= FIRST_ALLOCABLE_IRQ &&
+			  irqs[i] <= LAST_ALLOCABLE_IRQ);
+
+		rc = uk_test_and_clear_bit(irqs[i] - FIRST_ALLOCABLE_IRQ,
+					   irqs_allocated);
+		UK_ASSERT(rc);
+	}
+
+	return !rc;
 }
 
 int uk_intctlr_init(struct uk_alloc *a __unused)
