@@ -14,7 +14,6 @@ export "C" {
 #ifndef __ASSEMBLY__
 
 #include <uk/alloc.h>
-#include <uk/asm/irq.h>
 #include <uk/essentials.h>
 #include <uk/plat/lcpu.h>
 
