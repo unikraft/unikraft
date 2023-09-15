@@ -40,8 +40,6 @@
 #include <uk/intctlr.h>
 #include <uk/bus.h>
 #include <uk/bitops.h>
-#include <uk/ofw/fdt.h>
-#include <libfdt.h>
 #include <uk/plat/common/bootinfo.h>
 
 #include <uk/bus/platform.h>
@@ -49,7 +47,11 @@
 #include <virtio/virtio_bus.h>
 #include <virtio/virtqueue.h>
 #include <virtio/virtio_mmio.h>
-#include <uk/intctlr/gic.h>
+
+#if CONFIG_LIBVIRTIO_MMIO_FDT
+#include <uk/ofw/fdt.h>
+#include <libfdt.h>
+#endif /* CONFIG_LIBVIRTIO_MMIO_FDT */
 
 /*
  * The alignment to use between consumer and producer parts of vring.
@@ -417,7 +419,8 @@ static struct virtio_config_ops virtio_mmio_config_ops = {
 	.vq_setup	= vm_setup_vq,
 };
 
-static int virtio_mmio_probe(struct pf_device *pfdev)
+#if CONFIG_LIBVIRTIO_MMIO_FDT
+static int virtio_mmio_probe_fdt(struct pf_device *pfdev)
 {
 	int rc;
 	const fdt32_t *prop;
@@ -451,6 +454,18 @@ static int virtio_mmio_probe(struct pf_device *pfdev)
 	uk_pr_info("virtio mmio probe base(0x%lx) irq(%ld)\n",
 				pfdev->base, pfdev->irq);
 	return 0;
+}
+#endif /* CONFIG_LIBVIRTIO_MMIO_FDT */
+
+static int virtio_mmio_probe(struct pf_device __maybe_unused *pfdev)
+{
+	int rc = -ENODEV;
+
+#if CONFIG_LIBVIRTIO_MMIO_FDT
+	rc = virtio_mmio_probe_fdt(pfdev);
+#endif /* CONFIG_LIBVIRTIO_MMIO_FDT */
+
+	return rc;
 }
 
 static int virtio_mmio_add_dev(struct pf_device *pfdev)
@@ -565,8 +580,10 @@ static struct pf_driver virtio_mmio_drv = {
 };
 
 static const struct device_match_table virtio_mmio_match_table[] = {
+#if CONFIG_LIBVIRTIO_MMIO_FDT
 	{ .compatible = "virtio,mmio",
 	  .id = &virtio_mmio_ids },
+#endif /* CONFIG_LIBVIRTIO_MMIO_FDT */
 	{NULL}
 };
 
