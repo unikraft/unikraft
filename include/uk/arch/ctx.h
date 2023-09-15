@@ -174,6 +174,14 @@ void ukarch_ctx_init_entry2(struct ukarch_ctx *ctx,
 	})
 
 /**
+ * Similar to `ukarch_rctx_stackpush()` but without alignment.
+ */
+#define ukarch_rctx_stackpush_packed(ctx, value)			\
+	({								\
+		(ctx)->sp = ukarch_rstack_push_packed((ctx)->sp, (value)); \
+	})
+
+/**
  * Switch the current logical CPU to context `load`. The current context
  * is stored to `store`. The standard register set is saved to `store`'s
  * stack and will be restored when the context will be loaded again.
