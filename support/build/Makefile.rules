@@ -76,6 +76,12 @@ $(if $(call clang_version_ge,$(1),$(2)),,\
      $(error Require Clang version >= $(1).$(2) found $(CC_VER_MAJOR).$(CC_VER_MINOR)))
 endef
 
+# Roughly measure lines of code in a built (debug) ELF
+# measure_loc $path
+define measure_loc =
+$(shell $(OBJDUMP) -dl "$(1)" | grep '^/' | grep -v '^/[/*]' | $(SED) -e 's/ [(]discriminator .*[)]//g' | sort -u | wc -l)
+endef
+
 ################################################################################
 #
 # Paths and Filenames

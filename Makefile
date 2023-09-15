@@ -842,7 +842,7 @@ clean-libs clean:
 
 endif
 
-.PHONY: print-vars print-libs print-objs print-srcs help outputmakefile list-defconfigs
+.PHONY: print-vars print-libs print-objs print-srcs print-loc help outputmakefile list-defconfigs
 
 # Configuration
 # ---------------------------------------------------------------------------
@@ -1048,6 +1048,11 @@ endif
 
 # Misc stuff
 # ---------------------------------------------------------------------------
+print-loc: images
+	@$(info [LoC stats])
+	@$(foreach I,$(UK_DEBUG_IMAGES) $(UK_DEBUG_IMAGES-y),\
+		$(info $(shell basename $(I) .dbg) has $(call measure_loc,$(I)) lines of code))
+
 print-vars:
 	@$(foreach V, \
 		$(sort $(if $(VARS),$(filter $(VARS),$(.VARIABLES)),$(.VARIABLES))), \
@@ -1204,6 +1209,7 @@ endif
 	@echo '  print-objs             - print object file names enabled for build'
 	@echo '  print-srcs             - print source file names enabled for build'
 	@echo '  print-vars             - prints all the variables currently defined in Makefile'
+	@echo '  print-loc              - print Lines-of-Code statistics for built unikernel image(s)'
 	@echo ''
 
 endif #umask
