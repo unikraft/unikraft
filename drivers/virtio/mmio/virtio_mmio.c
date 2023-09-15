@@ -37,7 +37,7 @@
 #include <uk/alloc.h>
 #include <uk/print.h>
 #include <uk/plat/lcpu.h>
-#include <uk/plat/irq.h>
+#include <uk/intctlr.h>
 #include <uk/bus.h>
 #include <uk/bitops.h>
 #include <uk/ofw/fdt.h>
@@ -373,7 +373,7 @@ static int vm_find_vqs(struct virtio_dev *vdev, __u16 num_vqs, __u16 *qdesc_size
 	int i, err;
 	int vq_cnt = 0;
 
-	err = ukplat_irq_register(irq, vm_interrupt, vm_dev);
+	err = uk_intctlr_irq_register(irq, vm_interrupt, vm_dev);
 	if (err)
 		return err;
 
@@ -419,45 +419,38 @@ static struct virtio_config_ops virtio_mmio_config_ops = {
 
 static int virtio_mmio_probe(struct pf_device *pfdev)
 {
+	int rc;
 	const fdt32_t *prop;
-	int type, hwirq, prop_len;
-	int fdt_vm = pfdev->fdt_offset;
-	__u64 reg_base;
-	__u64 reg_size;
+	int prop_len, offs;
+	__u64 reg_base, reg_size;
 	void *dtb;
+	struct uk_intctlr_irq irq;
 
 	dtb = (void *)ukplat_bootinfo_get()->dtb;
-	if (fdt_vm == -FDT_ERR_NOTFOUND) {
-		uk_pr_info("device not found in fdt\n");
-		goto error_exit;
-	} else {
-		prop = fdt_getprop(dtb, fdt_vm, "interrupts", &prop_len);
-		if (!prop) {
-			uk_pr_err("irq of device not found in fdt\n");
-			goto error_exit;
-		}
+	offs = pfdev->fdt_offset;
 
-		type = fdt32_to_cpu(prop[0]);
-		hwirq = fdt32_to_cpu(prop[1]);
+	if (unlikely(offs < 0))
+		return -EINVAL;
 
-		prop = fdt_getprop(dtb, fdt_vm, "reg", &prop_len);
-		if (!prop) {
-			uk_pr_err("reg of device not found in fdt\n");
-			goto error_exit;
-		}
+	rc = uk_intctlr_irq_fdt_xlat(dtb, offs, 0, &irq);
+	if (unlikely(rc < 0))
+		return -EINVAL;
 
-		/* only care about base addr, ignore the size */
-		fdt_get_address(dtb, fdt_vm, 0, &reg_base, &reg_size);
-	}
+	uk_intctlr_irq_configure(&irq);
+
+	prop = fdt_getprop(dtb, offs, "reg", &prop_len);
+	if (unlikely(!prop))
+		return -EINVAL;
+
+	/* only care about base addr, ignore the size */
+	fdt_get_address(dtb, offs, 0, &reg_base, &reg_size);
 
 	pfdev->base = reg_base;
-	pfdev->irq = gic_irq_translate(type, hwirq);
+	pfdev->irq = irq.id;
+
 	uk_pr_info("virtio mmio probe base(0x%lx) irq(%ld)\n",
 				pfdev->base, pfdev->irq);
 	return 0;
-
-error_exit:
-	return -EFAULT;
 }
 
 static int virtio_mmio_add_dev(struct pf_device *pfdev)
