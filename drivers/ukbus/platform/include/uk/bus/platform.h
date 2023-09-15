@@ -33,6 +33,7 @@
 #ifndef __UK_BUS_PLATFORM_H__
 #define __UK_BUS_PLATFORM_H__
 
+#include <stdint.h>
 #include <uk/bus.h>
 #include <uk/alloc.h>
 
