@@ -1,6 +1,6 @@
-config LIBUKLIBID
+menuconfig LIBUKLIBID
 	bool "uklibid: Library identifier"
-	default n
+	default y
 	# FIXME: We actually depend on <uk/assert.h> but lib/ukdebug also
 	#        depends on us. If we specify the dependency here, it creates a
 	#        circular dependency that KConfig doesn't like. However, we
@@ -8,3 +8,64 @@ config LIBUKLIBID
 	#        build, so we comment out the dependency here. Of course, this
 	#        is not accurate.
 	#select LIBUKDEBUG
+
+if LIBUKLIBID
+config LIBUKLIBID_INFO
+	bool "Embedded library metadata"
+	default y
+
+	if LIBUKLIBID_INFO
+	menu "Global metadata"
+		config LIBUKLIBID_INFO_UKFULLVERSION
+			bool "Full unikraft version"
+			default y
+			help
+				If enabled, the full Unikraft version including
+				Git SHA is embedded. Otherwise, only the short
+				Unikraft version is stored.
+
+		config LIBUKLIBID_INFO_UKCODENAME
+			bool "Unikraft codename"
+			help
+				If enabled, the Unikraft release codename is
+				stored as part of the global metadata
+				information.
+
+		config LIBUKLIBID_INFO_COMPILER
+			bool "Compiler (CC) information"
+			help
+				Enables storing the C compiler ($(CC)) that was
+				used for during compilation for the unikernel
+				image.
+	endmenu
+
+	menu "Per library metadata"
+		config LIBUKLIBID_INFO_LIB_UKVERSION
+			bool "Unikraft version"
+			help
+				If enabled, the Unikraft version is included
+				to each library.
+
+		config LIBUKLIBID_INFO_LIB_UKFULLVERSION
+			bool "Full version"
+			depends on LIBUKLIBID_INFO_LIB_UKVERSION
+			help
+				Instead of the short Unikraft version, the full
+				Unikraft version including Git SHA is embedded
+				to each library.
+
+		config LIBUKLIBID_INFO_LIB_UKCODENAME
+			bool "Unikraft codename"
+			help
+				If enabled, the Unikraft release codename is
+				stored as part of each library metadata
+				information.
+
+		config LIBUKLIBID_INFO_LIB_COMPILER
+			bool "Compiler (CC) information"
+			default y
+			help
+				Enables storing the C compiler ($(CC)) that was
+				used for each library.
+	endmenu
+endif
