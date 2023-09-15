@@ -40,7 +40,6 @@
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include <uk/9pdev_core.h>
-#include <uk/plat/irq.h>
 
 #ifdef __cplusplus
 extern "C" {

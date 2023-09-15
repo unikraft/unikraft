@@ -36,7 +36,7 @@
 #include <uk/alloc.h>
 #include <uk/print.h>
 #include <uk/plat/lcpu.h>
-#include <uk/plat/irq.h>
+#include <uk/intctlr.h>
 #include <uk/bus/pci.h>
 #include <virtio/virtio_config.h>
 #include <virtio/virtio_bus.h>
@@ -220,7 +220,8 @@ static int vpci_legacy_pci_vq_find(struct virtio_dev *vdev, __u16 num_vqs,
 	vpdev = to_virtiopcidev(vdev);
 
 	/* Registering the interrupt for the queue */
-	rc = ukplat_irq_register(vpdev->pdev->irq, virtio_pci_handle, vpdev);
+	rc = uk_intctlr_irq_register(vpdev->pdev->irq, virtio_pci_handle,
+				     vpdev);
 	if (rc != 0) {
 		uk_pr_err("Failed to register the interrupt\n");
 		return rc;
