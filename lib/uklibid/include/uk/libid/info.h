@@ -86,6 +86,21 @@ struct uk_libid_info_hdr {
 	struct uk_libid_info_rec recs[];
 } __packed __align(1);
 
+extern const struct uk_libid_info_hdr uk_libinfo_start[];
+extern const struct uk_libid_info_hdr uk_libinfo_end;
+
+#define uk_libinfo_hdr_foreach(hdr_itr)					       \
+	for ((hdr_itr) = (const struct uk_libid_info_hdr *)uk_libinfo_start;   \
+	     (hdr_itr) < &(uk_libinfo_end);				       \
+	     (hdr_itr) = (const struct uk_libid_info_hdr *)((__uptr)(hdr_itr)  \
+							    + (hdr_itr)->len))
+
+#define uk_libinfo_rec_foreach(hdr, rec_itr)				       \
+	for ((rec_itr) = (const struct uk_libid_info_rec *) &hdr->recs[0];     \
+	     (__uptr)(rec_itr) < ((__uptr)hdr + hdr->len);		       \
+	     (rec_itr) = (const struct uk_libid_info_rec *)((__uptr)(rec_itr)  \
+							    + (rec_itr)->len))
+
 #ifdef __cplusplus
 }
 #endif
