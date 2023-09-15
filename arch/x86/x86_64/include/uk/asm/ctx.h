@@ -39,6 +39,9 @@
 		__sp__;					\
 	})
 
+#define ukarch_rstack_push_packed(sp, value)		\
+	ukarch_rstack_push(sp, value)
+
 #define UKARCH_SP_ALIGN		(1 << 4)
 #define UKARCH_SP_ALIGN_MASK	(UKARCH_SP_ALIGN - 1)
 

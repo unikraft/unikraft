@@ -56,6 +56,14 @@
 		__sp__;					\
 	})
 
+#define ukarch_rstack_push_packed(sp, value)		\
+	({						\
+		unsigned long __sp__ = (sp);		\
+		__sp__ -= sizeof(value);		\
+		*((typeof(value) *) __sp__) = (value);	\
+		__sp__;					\
+	})
+
 #define ukarch_gen_sp(base, len)					\
 	({								\
 		unsigned long __sp__ = (unsigned long) (base)		\
