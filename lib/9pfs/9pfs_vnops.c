@@ -1016,10 +1016,23 @@ static int uk_9pfs_ioctl(struct vnode *dvp, struct vfscore_file *fp,
 			 unsigned long com, void *data)
 {
 	switch (com) {
-	case TIOCGWINSZ:
-		return ENOTTY;
-	default:
+	/**
+	 * HACK: In binary compatibility mode, Ruby tries to set O_ASYNC,
+	 * which Unikraft does not yet support. If the `ioctl` call returns
+	 * an error, Ruby stops working, even if it does not depend on the
+	 * O_ASYNC being properly set.
+	 *
+	 * Until proper support, just return 0 in case an `FIONBIO` ioctl
+	 * request is done, and ENOTSUP for all other cases.
+	 *
+	 * Setting `ioctl` to a nullop will not work, since it is used by
+	 * interpreted languages (e.g. python3) to check if it should start
+	 * the interpretor or just read a file.
+	 */
+	case FIONBIO:
 		return 0;
+	default:
+		return ENOTSUP;
 	}
 }
 
