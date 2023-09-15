@@ -68,4 +68,9 @@ config LIBUKLIBID_INFO
 				Enables storing the C compiler ($(CC)) that was
 				used for each library.
 	endmenu
+
+	config LIBUKLIBID_INFO_BOOTDUMP
+		bool "Print library summary early during boot"
+		depends on LIBUKLIBID_INFO
+		default n
 endif
