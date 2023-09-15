@@ -30,17 +30,28 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <stdint.h>
 #include <string.h>
 #include <uk/print.h>
 #include <uk/plat/memory.h>
 #include <uk/plat/common/cpu.h>
 #include <uk/bus/platform.h>
-#include <libfdt.h>
-#include <uk/ofw/fdt.h>
-#include <uk/intctlr/gic.h>
 #include <uk/plat/common/bootinfo.h>
 
+#if CONFIG_LIBUKBUS_PLATFORM_FDT
+#include <libfdt.h>
+#include <uk/ofw/fdt.h>
+
 static void *dtb;
+
+static const char *pf_device_compatible_list[] = {
+	"virtio,mmio",
+	"pci-host-ecam-generic",
+	NULL
+};
+#endif /* CONFIG_LIBUKBUS_PLATFORM_FDT */
+
+static struct pf_bus_handler pfh;
 
 struct pf_bus_handler {
 	struct uk_bus b;
@@ -48,13 +59,6 @@ struct pf_bus_handler {
 	struct pf_driver_list drv_list;  /**< List of platform drivers */
 	int drv_list_initialized;
 	struct pf_device_list dev_list;  /**< List of platform devices */
-};
-static struct pf_bus_handler pfh;
-
-static const char *pf_device_compatible_list[] = {
-	"virtio,mmio",
-	"pci-host-ecam-generic",
-	NULL
 };
 
 static inline int pf_device_id_match(const struct pf_device_id *id0,
@@ -131,7 +135,8 @@ static inline int pf_driver_probe_device(struct pf_driver *drv,
 	return 0;
 }
 
-static int pf_probe(void)
+#if CONFIG_LIBUKBUS_PLATFORM_FDT
+static int pf_probe_fdt(void)
 {
 	struct pf_driver *drv;
 	int idx = 0;
@@ -184,7 +189,18 @@ static int pf_probe(void)
 
 	return ret;
 }
+#endif /* CONFIG_LIBUKBUS_PLATFORM_FDT */
 
+static int pf_probe(void)
+{
+	int rc = -ENODEV;
+
+#if CONFIG_LIBUKBUS_PLATFORM_FDT
+	rc = pf_probe_fdt();
+#endif /* CONFIG_LIBUKBUS_PLATFORM_FDT */
+
+	return rc;
+}
 
 static int pf_init(struct uk_alloc *a)
 {
@@ -225,11 +241,11 @@ void _pf_register_driver(struct pf_driver *drv)
 	UK_TAILQ_INSERT_TAIL(&pfh.drv_list, drv, next);
 }
 
-
 /* Register this bus driver to libukbus:
  */
 static struct pf_bus_handler pfh = {
 	.b.init = pf_init,
 	.b.probe = pf_probe
 };
+
 UK_BUS_REGISTER_PRIORITY(&pfh.b, 1);
