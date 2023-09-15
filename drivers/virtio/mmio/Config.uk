@@ -3,9 +3,16 @@ config HAVE_MMIO
 
 config LIBVIRTIO_MMIO
 	bool "Virtio MMIO transport"
-	depends on ARCH_ARM_64
+	depends on HAVE_MMIO
 	depends on VIRTIO_DEVICE
-	select LIBUKOFW
-	select LIBUKINTCTLR_GIC
+	select LIBUKBUS_PLATFORM
 	help
 		Virtio MMIO transport.
+
+if LIBVIRTIO_MMIO
+
+config LIBVIRTIO_MMIO_FDT
+	bool
+	default y if (LIBFDT && LIBUKOFW)
+
+endif
