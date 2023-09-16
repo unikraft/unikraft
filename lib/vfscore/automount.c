@@ -151,6 +151,9 @@ static void vfscore_fstab_fetch_volume_args(char *v, struct vfscore_volume *vv)
 }
 #endif /* CONFIG_LIBVFSCORE_FSTAB */
 
+#if (CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS && \
+	CONFIG_LIBVFSCORE_ROOTFS_INITRD) || \
+	CONFIG_LIBVFSCORE_FSTAB
 #ifdef CONFIG_LIBUKCPIO
 static int vfscore_mount_initrd_volume(struct vfscore_volume *vv)
 {
@@ -194,6 +197,7 @@ static int vfscore_mount_initrd_volume(struct vfscore_volume *vv __unused)
 	return -1;
 }
 #endif /* !CONFIG_LIBUKCPIO */
+#endif /* CONFIG_... */
 
 #ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS
 static int vfscore_automount_rootfs(void)
