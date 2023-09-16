@@ -31,7 +31,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define _BSD_SOURCE
+#define _GNU_SOURCE
 
 #include <vfscore/file.h>
 #include <vfscore/fs.h>

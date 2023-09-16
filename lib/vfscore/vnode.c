@@ -33,7 +33,7 @@
 /*
  * vfs_vnode.c - vnode service
  */
-#define _BSD_SOURCE
+#define _GNU_SOURCE
 
 #include <limits.h>
 #include <unistd.h>

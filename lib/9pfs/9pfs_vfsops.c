@@ -30,7 +30,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define _BSD_SOURCE
+#define _GNU_SOURCE
 
 #include <uk/config.h>
 #include <uk/errptr.h>
