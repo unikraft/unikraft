@@ -33,6 +33,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _GNU_SOURCE
+
 #include <uk/alloc.h>
 #include <uk/assert.h>
 #include <uk/print.h>

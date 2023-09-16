@@ -34,7 +34,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#define _BSD_SOURCE
+#define _GNU_SOURCE
 
 #include <uk/socket_driver.h>
 #include <uk/socket_vnops.h>
