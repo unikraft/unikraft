@@ -175,13 +175,13 @@ CONFIG_DIR := $(dir $(C))
 # EPLAT_DIR (list of external platform libraries)
 # Retrieved from P variable from the command line (paths separated by colon)
 ifeq ("$(origin P)", "command line")
-$(foreach E,$(subst :, ,$(P)), \
-$(if $(filter /%,$(E)),,$(error Path to external platform "$(E)" (P) is not absolute));\
-$(if $(wildcard $(E)), \
-	$(eval EPLAT_DIR += $(E)) \
-, $(if $(wildcard $(CONFIG_UK_BASE)/$(E)),\
-	$(eval EPLAT_DIR += $(CONFIG_UK_BASE)/$(E)), \
-	$(error Cannot find platform library: $(E)) \
+$(foreach ITR,$(subst :, ,$(P)), \
+$(if $(filter /%,$(ITR)),,$(error Path to external platform "$(ITR)" (P) is not absolute));\
+$(if $(wildcard $(ITR)), \
+	$(eval EPLAT_DIR += $(ITR)) \
+, $(if $(wildcard $(CONFIG_UK_BASE)/$(ITR)),\
+	$(eval EPLAT_DIR += $(CONFIG_UK_BASE)/$(ITR)), \
+	$(error Cannot find platform library: $(ITR)) \
    ) \
 ) \
 )
@@ -192,13 +192,13 @@ EPLAT_DIR := $(realpath $(patsubst %/,%,$(patsubst %.,%,$(EPLAT_DIR))))
 # Retrieved from L variable from the command line (paths separated by colon)
 ifeq ("$(origin L)", "command line")
 # library path exists?
-$(foreach E,$(subst :, ,$(L)), \
-$(if $(filter /%,$(E)),,$(error Path to external library "$(E)" (L) is not absolute));\
-$(if $(wildcard $(E)), \
-	$(eval ELIB_DIR += $(E)) \
-, $(if $(wildcard $(CONFIG_UK_BASE)/$(E)),\
-	$(eval ELIB_DIR += $(CONFIG_UK_BASE)/$(E)), \
-	$(error Cannot find library: $(E)) \
+$(foreach ITR,$(subst :, ,$(L)), \
+$(if $(filter /%,$(ITR)),,$(error Path to external library "$(ITR)" (L) is not absolute));\
+$(if $(wildcard $(ITR)), \
+	$(eval ELIB_DIR += $(ITR)) \
+, $(if $(wildcard $(CONFIG_UK_BASE)/$(ITR)),\
+	$(eval ELIB_DIR += $(CONFIG_UK_BASE)/$(ITR)), \
+	$(error Cannot find library: $(ITR)) \
    )\
 ) \
 )
@@ -706,8 +706,8 @@ endif
 $(eval $(call verbose_include,$(CONFIG_UK_BASE)/lib/Makefile.uk))
 
 # external libraries
-$(foreach E,$(ELIB_DIR), \
-	$(eval $(call import_lib,$(E))); \
+$(foreach ITR,$(ELIB_DIR), \
+	$(eval $(call import_lib,$(ITR))); \
 )
 # architecture library
 $(eval $(call import_lib,$(CONFIG_UK_BASE)/arch/$(UK_FAMILY)))
@@ -718,8 +718,8 @@ $(eval $(call verbose_include,$(CONFIG_UK_BASE)/plat/Makefile.uk))
 # external platform libraries
 # NOTE: We include them after internal platform libs so that also base variables
 #       provided with /plat/Makefile.uk are populated
-$(foreach E,$(EPLAT_DIR), \
-	$(eval $(call import_lib,$(E))); \
+$(foreach ITR,$(EPLAT_DIR), \
+	$(eval $(call import_lib,$(ITR))); \
 )
 $(eval $(call verbose_include,$(CONFIG_UK_BASE)/Makefile.uk)) # Unikraft base
 
