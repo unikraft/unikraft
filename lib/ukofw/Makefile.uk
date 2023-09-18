@@ -5,4 +5,3 @@ CINCLUDES-$(CONFIG_LIBUKOFW)   += -I$(LIBUKOFW_BASE)/include
 CXXINCLUDES-$(CONFIG_LIBUKOFW) += -I$(LIBUKOFW_BASE)/include
 
 LIBUKOFW_SRCS-y                += $(LIBUKOFW_BASE)/fdt.c
-LIBUKOFW_SRCS-y                += $(LIBUKOFW_BASE)/gic_fdt.c
