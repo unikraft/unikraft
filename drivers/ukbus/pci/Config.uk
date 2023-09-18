@@ -10,5 +10,6 @@ config LIBUKBUS_PCI
 		PCI bus driver for probing and operating PCI devices
 
 config LIBUKBUS_PCI_ECAM
-	default y if (LIBUKBUS_PCI && LIBUKBUS_PLATFORM)
+	select LIBUKBUS_PLATFORM
+	default y if (LIBUKBUS_PCI && LIBFDT && LIBUKOFW)
 	bool
