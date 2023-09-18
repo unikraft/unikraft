@@ -41,19 +41,19 @@ menu "Architecture Selection"
 endmenu
 
 menu "Platform Configuration"
-	source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/plats.uk' -r '$(KCONFIG_PLAT_BASE)' -l '$(KCONFIG_PLAT_BASE)' -c '$(KCONFIG_EPLAT_DIRS)')"
+	source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/plats.uk' -r '$(KCONFIG_PLAT_BASE)' -l '$(KCONFIG_PLAT_BASE)' -c '$(KCONFIG_EPLAT_DIRS)' -e '$(KCONFIG_EXCLUDEDIRS)')"
 endmenu
 
 menu "Device Drivers"
-	source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers.uk' -r '$(KCONFIG_DRIV_BASE)' -l '$(KCONFIG_DRIV_BASE)')"
+	source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers.uk' -r '$(KCONFIG_DRIV_BASE)' -l '$(KCONFIG_DRIV_BASE)' -e '$(KCONFIG_EXCLUDEDIRS)')"
 endmenu
 
 menu "Library Configuration"
-	source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/libs.uk' -r '$(KCONFIG_LIB_BASE)' -l '$(KCONFIG_LIB_BASE)' -c '$(KCONFIG_ELIB_DIRS)')"
+	source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/libs.uk' -r '$(KCONFIG_LIB_BASE)' -l '$(KCONFIG_LIB_BASE)' -c '$(KCONFIG_ELIB_DIRS)' -e '$(KCONFIG_EXCLUDEDIRS)')"
 endmenu
 
 if !NO_APP
-	source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/app.uk' -t "Application Options" -l '$(KCONFIG_EAPP_DIR)')"
+	source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/app.uk' -t "Application Options" -l '$(KCONFIG_EAPP_DIR)' -e '$(KCONFIG_EXCLUDEDIRS)')"
 endif
 
 menu "Build Options"
