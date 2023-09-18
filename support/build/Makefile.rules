@@ -241,11 +241,19 @@ endef
 # Import a library
 # For internally use only (Unikraft main makefile and internal libs Makefike.uk)
 # import_lib $1:path
-define import_lib =
+define do_import_lib =
 IMPORT_BASE := $(1)
 $(call verbose_include,$(1)/Makefile.uk)
 undefine IMPORT_BASE
 endef
+
+define import_lib =
+$(eval IMPORT_IS_FILTERED:=n)
+$(foreach ITR,$(IMPORT_EXCLUDEDIRS),$(if $(filter $(ITR),$(1)),$(eval IMPORT_IS_EXCLUDED:=y),))
+$(if $(filter $(IMPORT_IS_EXCLUDED),y),$(call verbose_info,Skip including $(1): Excluded from build (E)),$(call do_import_lib,$(1)))
+$(eval undefine IMPORT_IS_EXCLUDED)
+endef
+
 # import_linker $plat_name
 define import_linker =
 $(call verbose_include,$(UK_PLAT_$(call uc,$(1))_LINKER))
