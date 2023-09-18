@@ -192,18 +192,35 @@ ifeq ("$(origin L)", "command line")
 $(foreach ITR,$(subst :, ,$(L)), \
 $(if $(filter /%,$(ITR)),,$(error Path to external library "$(ITR)" (L) is not absolute));\
 $(if $(wildcard $(ITR)), \
-$(eval ELIB_DIR += $(ITR)), \
+$(eval ELIB_DIR += $(realpath $(patsubst %/,%,$(patsubst %.,%,$(ITR))))), \
 $(error Cannot find library: $(ITR)) \
 ) \
 )
 endif
 ELIB_DIR := $(realpath $(patsubst %/,%,$(patsubst %.,%,$(ELIB_DIR))))
 
+# IMPORT_EXCLUDEDIRS (list of (library) paths to exclude)
+# Retrieved from E variable from the command line
+# (paths are separated by colon)
+KCONFIG_EXCLUDEDIRS:=
+IMPORT_EXCLUDEDIRS:=
+ifeq ("$(origin E)", "command line")
+$(foreach ITR,$(subst :, ,$(E)), \
+$(if $(filter /%,$(ITR)),,$(error Path to library to exclude "$(ITR)" (E) is not absolute));\
+$(if $(wildcard $(ITR)), \
+$(eval IMPORT_EXCLUDEDIRS += $(realpath $(patsubst %/,%,$(patsubst %.,%,$(ITR))))) \
+$(eval KCONFIG_EXCLUDEDIRS = $(KCONFIG_EXCLUDEDIRS)$(colon)$(realpath $(patsubst %/,%,$(patsubst %.,%,$(ITR))))), \
+$(error Cannot find library for exclusion: $(ITR)) \
+) \
+)
+endif
+
 $(call verbose_info,* Unikraft base:      $(CONFIG_UK_BASE))
 $(call verbose_info,* Configuration:      $(UK_CONFIG))
 $(call verbose_info,* Application base:   $(CONFIG_UK_APP))
 $(call verbose_info,* External platforms: [ $(EPLAT_DIR) ])
 $(call verbose_info,* External libraries: [ $(ELIB_DIR) ])
+$(call verbose_info,* Import excludes:    [ $(IMPORT_EXCLUDEDIRS) ])
 $(call verbose_info,* Build output:       $(BUILD_DIR))
 
 build_dir_make  := 0
@@ -892,6 +909,7 @@ COMMON_CONFIG_ENV = \
 	KCONFIG_EPLAT_DIRS="$(KCONFIG_EPLAT_DIRS)" \
 	KCONFIG_DRIV_BASE="$(KCONFIG_DRIV_BASE)" \
 	KCONFIG_EAPP_DIR="$(KCONFIG_EAPP_DIR)" \
+	KCONFIG_EXCLUDEDIRS="$(KCONFIG_EXCLUDEDIRS)" \
 	UK_NAME="$(CONFIG_UK_NAME)"
 
 PHONY += scriptconfig scriptsyncconfig iscriptconfig kmenuconfig guiconfig \
@@ -1203,6 +1221,11 @@ endif
 	@echo '                           (note: the name in the configuration file is not overwritten)'
 	@echo '  L=[PATH]:[PATH]:..     - colon-separated list of paths to external libraries'
 	@echo '  P=[PATH]:[PATH]:..     - colon-separated list of paths to external platforms'
+	@echo '  E=[PATH]:[PATH]:..     - colon-separated list of paths to libraries that shall be skipped/excluded'
+	@echo '                           (note: `E=` acts as a global exclusion mask, which means that the mask'
+	@echo '                            is applied to every internal and external import of libraries, platforms,'
+	@echo '                            and applications. For example, an external library (via `L=`) will also be'
+	@echo '                            skipped if its path was specified with `E=` at the same time.)'
 	@echo ''
 	@echo 'Environment variables:'
 	@echo '  UK_ASFLAGS             - explicit Unikraft-specific additions to the assembler flags (the ASFLAGS variable is ignored)'
