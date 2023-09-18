@@ -186,7 +186,9 @@ int arch_pci_probe(struct uk_alloc *pha)
 			fdtaddr[1] = fdtaddr[2] = cpu_to_fdt32(0);
 
 			gen_pci_irq_parse(fdtaddr, &out_irq);
-			irq = gic_irq_translate(0, out_irq.args[1]);
+
+			/* Translate IRQ number */
+			irq = GIC_SPI_BASE + out_irq.args[1];
 
 			arch_pci_driver_add_device(drv, &addr, &devid, irq, base, pha);
 		}
