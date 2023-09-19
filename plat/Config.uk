@@ -39,7 +39,7 @@ config UKPLAT_LCPU_MAXCOUNT
 config HAVE_SMP
 	bool
 	default y if UKPLAT_LCPU_MAXCOUNT > 1
-	default n
+	select LIBUKINTCTLR_APIC if (ARCH_X86_64 && UKPLAT_LCPU_MAXCOUNT > 1)
 	select UKPLAT_ACPI if ARCH_X86_64
 
 menu "Multiprocessor Configuration"

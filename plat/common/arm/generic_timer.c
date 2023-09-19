@@ -33,12 +33,8 @@
 #include <uk/assert.h>
 #include <uk/plat/time.h>
 #include <uk/plat/lcpu.h>
-#include <uk/plat/irq.h>
 #include <uk/bitops.h>
 #include <uk/plat/common/cpu.h>
-#include <uk/ofw/gic_fdt.h>
-#include <uk/plat/common/irq.h>
-#include <uk/intctlr/gic.h>
 #include <arm/time.h>
 
 static uint64_t boot_ticks;
