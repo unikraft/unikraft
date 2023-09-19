@@ -38,6 +38,7 @@
 #include <getopt.h>
 #include <stdlib.h>
 #include <linuxu/console.h>
+#include <linuxu/irq.h>
 #include <linuxu/syscall.h>
 #include <uk/plat/console.h>
 #include <uk/plat/bootstrap.h>
@@ -161,6 +162,8 @@ void _liblinuxuplat_entry(int argc, char *argv[])
 	__linuxu_plat_heap_init();
 
 	__linuxu_plat_initrd_init();
+
+	ukplat_irq_init();
 
 	/*
 	 * Enter Unikraft

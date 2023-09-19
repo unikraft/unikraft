@@ -33,10 +33,10 @@
 #include <uk/alloc.h>
 #include <errno.h>
 #include <uk/plat/lcpu.h>
-#include <uk/plat/irq.h>
 #include <uk/assert.h>
 #include <uk/print.h>
 #include <uk/event.h>
+#include <linuxu/irq.h>
 #include <linuxu/syscall.h>
 #include <linuxu/signal.h>
 #if defined(__X86_32__) || defined(__x86_64__)
@@ -47,22 +47,10 @@
 #error "Unsupported architecture"
 #endif
 
-#define __MAX_IRQ 16
 #define HANDLER_RESERVED ((void *) 0x1)
 
 UK_EVENT(UKPLAT_EVENT_IRQ);
 
-/* IRQ handlers declarations */
-struct irq_handler {
-	/* func() special values:
-	 *   NULL: free,
-	 *   HANDLER_RESERVED: reserved
-	 */
-	irq_handler_func_t func;
-	void *arg;
-
-	struct uk_sigaction oldaction;
-};
 
 static struct irq_handler irq_handlers[__MAX_IRQ]
 				[CONFIG_LINUXU_MAX_IRQ_HANDLER_ENTRIES];
@@ -241,7 +229,7 @@ err:
 	return -rc;
 }
 
-int ukplat_irq_init(struct uk_alloc *a __unused)
+int ukplat_irq_init(void)
 {
 	UK_ASSERT(ukplat_lcpu_irqs_disabled());
 	k_sigemptyset(&handled_signals_set);
