@@ -208,11 +208,6 @@ endif
 
 endmenu
 
-config KVM_MAX_IRQ_HANDLER_ENTRIES
-       int "Maximum number of handlers per IRQ"
-       default 8
-       depends on (ARCH_X86_64 || ARCH_ARM_64)
-
 config RTC_PL031
        bool "Arm platform RTC (PL031) driver"
        default y if ARCH_ARM_64
