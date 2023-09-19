@@ -38,7 +38,6 @@
 #include <common/events.h>
 #include <xen/xen.h>
 #include <uk/print.h>
-#include <uk/plat/irq.h>
 #include <uk/event.h>
 #include <uk/assert.h>
 #include <uk/bitops.h>
@@ -53,6 +52,11 @@ typedef struct _ev_action_t {
 	void *data;
 	uint32_t count;
 } ev_action_t;
+
+struct uk_event_irq_data {
+	struct __regs *regs;
+	unsigned long irq;
+};
 
 static ev_action_t ev_actions[NR_EVS];
 static void default_handler(evtchn_port_t port, struct __regs *regs,
@@ -90,7 +94,7 @@ int do_event(evtchn_port_t port, struct __regs *regs)
 {
 	ev_action_t *action;
 	int rc;
-	struct ukplat_event_irq_data ctx;
+	struct uk_event_irq_data ctx;
 
 	clear_evtchn(port);
 
