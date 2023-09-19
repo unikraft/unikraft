@@ -200,10 +200,6 @@ void __no_pauth _ukplat_entry(struct ukplat_bootinfo *bi)
 		UK_CRASH("Could not initialize MTE (%d)\n", rc);
 #endif /* CONFIG_HAVE_MEMTAG */
 
-#ifdef CONFIG_RTC_PL031
-	/* Initialize RTC */
-	pl031_init_rtc(fdt);
-#endif /* CONFIG_RTC_PL031 */
 
 #if defined(CONFIG_UKPLAT_ACPI)
 	rc = acpi_init();
@@ -212,7 +208,9 @@ void __no_pauth _ukplat_entry(struct ukplat_bootinfo *bi)
 #endif /* CONFIG_UKPLAT_ACPI */
 
 	/* Initialize interrupt controller */
-	intctrl_init();
+	rc = uk_intctlr_probe();
+	if (unlikely(rc))
+		UK_CRASH("Could not initialize the IRQ controller: %d\n", rc);
 
 	/* Initialize logical boot CPU */
 	rc = lcpu_init(lcpu_get_bsp());
@@ -230,6 +228,11 @@ void __no_pauth _ukplat_entry(struct ukplat_bootinfo *bi)
 	rc = get_psci_method(bi);
 	if (unlikely(rc < 0))
 		UK_CRASH("Failed to get PSCI method: %d.\n", rc);
+
+#if CONFIG_RTC_PL031
+	/* Initialize RTC */
+	pl031_init_rtc(fdt);
+#endif /* CONFIG_RTC_PL031 */
 
 	/*
 	 * Switch away from the bootstrap stack as early as possible.

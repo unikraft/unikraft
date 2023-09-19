@@ -40,7 +40,7 @@
 
 #include <stdlib.h>
 #include <uk/plat/time.h>
-#include <uk/plat/irq.h>
+#include <uk/intctlr.h>
 #include <kvm/tscclock.h>
 #include <uk/assert.h>
 
@@ -71,7 +71,7 @@ void ukplat_time_init(void)
 {
 	int rc;
 
-	rc = ukplat_irq_register(0, timer_handler, NULL);
+	rc = uk_intctlr_irq_register(0, timer_handler, NULL);
 	if (rc < 0)
 		UK_CRASH("Failed to register timer interrupt handler\n");
 

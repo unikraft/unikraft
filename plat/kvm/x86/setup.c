@@ -86,7 +86,9 @@ void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi)
 		UK_CRASH("Bootstrap processor init failed: %d\n", rc);
 
 	/* Initialize IRQ controller */
-	intctrl_init();
+	rc = uk_intctlr_probe();
+	if (unlikely(rc))
+		UK_CRASH("Interrupt controller init failed: %d\n", rc);
 
 	/* Initialize command line */
 	rc = cmdline_init(bi);
