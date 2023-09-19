@@ -27,7 +27,7 @@ config LIBVFSCORE_NONLARGEFILE
 		the 64-bit version of the system calls are registered.
 
 config LIBVFSCORE_AUTOMOUNT_ROOTFS
-bool "Automatically mount a root filesysytem (/)"
+bool "Automatically mount a root filesystem (/)"
 default n
 help
 	Automatically mounts '/' during boot. The parameters are
