@@ -35,14 +35,11 @@
 #include <uk/assert.h>
 #include <uk/plat/time.h>
 #include <uk/plat/lcpu.h>
-#include <uk/plat/irq.h>
 #include <uk/bitops.h>
 #include <uk/plat/common/cpu.h>
 #include <uk/plat/common/sections.h>
 #include <uk/plat/common/bootinfo.h>
-#include <uk/ofw/gic_fdt.h>
-#include <uk/intctlr/gic.h>
-#include <uk/plat/common/irq.h>
+#include <uk/intctlr.h>
 #include <arm/time.h>
 
 static const char * const arch_timer_list[] = {
@@ -110,9 +107,8 @@ __nsec ukplat_time_get_ticks(void)
 /* must be called before interrupts are enabled */
 void ukplat_time_init(void)
 {
-	int rc, irq, fdt_timer;
-	uint32_t irq_type, hwirq;
-	uint32_t trigger_type;
+	int rc, offs;
+	struct uk_intctlr_irq irq;
 
 	dtb = (void *)ukplat_bootinfo_get()->dtb;
 
@@ -123,27 +119,25 @@ void ukplat_time_init(void)
 	generic_timer_update_boot_ticks();
 
 	/* Currently, we only support 1 timer per system */
-	fdt_timer = fdt_node_offset_by_compatible_list(dtb, -1,
-						       arch_timer_list);
-	if (fdt_timer < 0)
-		UK_CRASH("Could not find arch timer!\n");
+	offs = fdt_node_offset_by_compatible_list(dtb, -1, arch_timer_list);
+	if (unlikely(offs < 0))
+		UK_CRASH("Could not find arch timer (%d)\n", offs);
 
-	rc = generic_timer_init(fdt_timer);
-	if (rc < 0)
-		UK_CRASH("Failed to initialize platform time\n");
+	rc = generic_timer_init(offs);
+	if (unlikely(rc < 0))
+		UK_CRASH("Failed to initialize platform time (%d)\n", rc);
 
-	rc = gic_get_irq_from_dtb(dtb, fdt_timer, 2, &irq_type, &hwirq,
-				  &trigger_type);
-	if (rc < 0)
-		UK_CRASH("Failed to find IRQ number from DTB\n");
+	rc = uk_intctlr_irq_fdt_xlat(dtb, offs, 2, &irq);
+	if (unlikely(rc < 0))
+		UK_CRASH("Could not get IRQ from dtb (%d)\n", rc);
 
-	irq = gic_irq_translate(irq_type, hwirq);
+	uk_intctlr_irq_configure(&irq);
 
-	rc = ukplat_irq_register(irq, generic_timer_irq_handler, NULL);
-	if (rc < 0)
+	rc = uk_intctlr_irq_register(irq.id, generic_timer_irq_handler, NULL);
+	if (unlikely(rc < 0))
 		UK_CRASH("Failed to register timer interrupt handler\n");
-	else
-		timer_irq = irq;
+
+	timer_irq = irq.id;
 
 	/*
 	 * Mask IRQ before scheduler start working. Otherwise we will get

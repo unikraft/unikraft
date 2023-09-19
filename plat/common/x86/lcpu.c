@@ -38,7 +38,6 @@
 #include <uk/assert.h>
 #include <uk/print.h>
 #include <x86/irq.h>
-#include <uk/intctlr/apic.h>
 #include <x86/cpu.h>
 #include <x86/traps.h>
 #include <x86/delay.h>
@@ -50,6 +49,10 @@
 
 #include <string.h>
 #include <errno.h>
+
+#if CONFIG_LIBUKINTCTLR_APIC
+#include <uk/intctlr/apic.h>
+#endif /* CONFIG_LIBUKINTCTLR_APIC */
 
 #include "start16_helpers.h"
 

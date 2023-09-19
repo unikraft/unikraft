@@ -35,13 +35,11 @@
 #include <uk/essentials.h>
 #include <libfdt.h>
 #include <uk/ofw/fdt.h>
-#include <uk/ofw/gic_fdt.h>
-#include <uk/intctlr/gic.h>
+#include <uk/intctlr.h>
 #include <uk/print.h>
 #include <arm/cpu.h>
 #include <rtc/rtc.h>
 #include <rtc/pl031.h>
-#include <uk/plat/common/irq.h>
 
 static __u64 pl031_base_addr;
 static int pl031_irq;
@@ -155,41 +153,37 @@ void pl031_clear_intr(void)
 
 int pl031_register_alarm_handler(int (*handler)(void *))
 {
-	return ukplat_irq_register(pl031_irq, handler, NULL);
+	return uk_intctlr_irq_register(pl031_irq, handler, NULL);
 }
 
 int pl031_init_rtc(void *dtb)
 {
 	__u64 size;
-	__u32 irq_type, hwirq, trigger_type;
-	int fdt_rtc, rc;
+	int offs, rc;
+	struct uk_intctlr_irq irq;
 
 	uk_pr_info("Probing RTC...\n");
 
-	/* Search for RTC device by compatible property name. */
-	fdt_rtc = fdt_node_offset_by_compatible(dtb, -1, PL031_COMPATIBLE);
-	if (unlikely(fdt_rtc < 0)) {
-		uk_pr_err("Could not find RTC device, fdt_rtc is %d\n",
-			  fdt_rtc);
+	offs = fdt_node_offset_by_compatible(dtb, -1, PL031_COMPATIBLE);
+	if (unlikely(offs < 0)) {
+		uk_pr_err("Could not find RTC node (%d)\n", offs);
 		return -EINVAL;
 	}
 
-	rc = fdt_get_address(dtb, fdt_rtc, 0, &pl031_base_addr, &size);
+	rc = fdt_get_address(dtb, offs, 0, &pl031_base_addr, &size);
 	if (unlikely(rc < 0)) {
 		uk_pr_err("Could not get RTC address\n");
 		return -EINVAL;
 	}
 	uk_pr_info("Found RTC at: 0x%lx\n", pl031_base_addr);
 
-	rc = gic_get_irq_from_dtb(dtb, fdt_rtc, 0, &irq_type, &hwirq,
-				  &trigger_type);
-	if (unlikely(rc < 0)) {
-		uk_pr_err("Failed to find RTC IRQ from DTB\n");
-		return -EINVAL;
-	}
+	rc = uk_intctlr_irq_fdt_xlat(dtb, offs, 0, &irq);
+	if (unlikely(rc))
+		return rc;
 
-	pl031_irq = gic_irq_translate(irq_type, hwirq);
-	uk_pr_info("RTC IRQ is: %d\n", pl031_irq);
+	uk_intctlr_irq_configure(&irq);
+
+	pl031_irq = irq.id;
 
 	if (pl031_get_status() == PL031_STATUS_DISABLED)
 		pl031_enable();
