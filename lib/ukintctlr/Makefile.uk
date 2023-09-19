@@ -15,3 +15,5 @@ endif
 ifeq ($(filter $(CONFIG_ARCH_ARM_64) $(CONFIG_ARCH_ARM_32),y), y)
 LIBUKINTCTLR_SRCS-y += $(LIBUKINTCTLR_BASE)/arch/arm/intctlr.c
 endif
+
+LIBUKINTCTLR_SRCS-y += $(LIBUKINTCTLR_BASE)/ukintctlr.c

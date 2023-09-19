@@ -119,7 +119,6 @@ LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/lcpu.c
 
 LIBKVMPLAT_SRCS-y                          += $(LIBKVMPLAT_BASE)/shutdown.c
 LIBKVMPLAT_SRCS-y                          += $(LIBKVMPLAT_BASE)/memory.c
-LIBKVMPLAT_SRCS-y                          += $(LIBKVMPLAT_BASE)/irq.c
 LIBKVMPLAT_SRCS-y                          += $(LIBKVMPLAT_BASE)/io.c
 LIBKVMPLAT_SRCS-y                          += $(UK_PLAT_COMMON_BASE)/lcpu.c|common
 LIBKVMPLAT_SRCS-y                          += $(UK_PLAT_COMMON_BASE)/memory.c|common

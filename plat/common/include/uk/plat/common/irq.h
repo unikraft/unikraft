@@ -33,8 +33,13 @@
 #ifndef __PLAT_CMN_IRQ_H__
 #define __PLAT_CMN_IRQ_H__
 
-#include <uk/plat/irq.h>
-
+/* Saving /restoring CPU IRQ flags and enabling / disabling IRQs on the
+ * CPU were previously part of the ukplat_irq API. These are not managed
+ * by the interrupt controller, so they need to be part of the lcpu
+ * low-level API. As some platforms may have their own implementation of
+ * these (linuxu, xen) keep them on a separate header.
+ * TODO: Remove this comment after migrating lcpu into drivers.
+ */
 #if defined(__X86_64__)
 #include <x86/irq.h>
 #elif defined(__ARM_64__)
@@ -42,30 +47,5 @@
 #else
 #error "Add irq.h for current architecture."
 #endif
-
-/* define IRQ trigger types */
-enum uk_irq_trigger {
-	UK_IRQ_TRIGGER_NONE = 0,
-	UK_IRQ_TRIGGER_EDGE = 1,
-	UK_IRQ_TRIGGER_LEVEL = 2,
-	UK_IRQ_TRIGGER_MAX
-};
-
-/* define IRQ trigger polarities */
-enum uk_irq_polarity {
-	UK_IRQ_POLARITY_NONE = 0,
-	UK_IRQ_POLARITY_HIGH = 1,
-	UK_IRQ_POLARITY_LOW = 2,
-	UK_IRQ_POLARITY_MAX
-};
-
-/**
- * Calls the registered IRQ handlers for the given IRQ vector. This will
- * acknowledge the IRQ.
- *
- * @param regs the registers of the interrupted code
- * @param irq IRQ vector
- */
-void _ukplat_irq_handle(struct __regs *regs, unsigned long irq);
 
 #endif /* __PLAT_CMN_IRQ_H__ */

@@ -68,11 +68,6 @@ config UKPLAT_LCPU_WAKEUP_IRQ
 
 endmenu
 
-config UKPLAT_ISR_ECTX_ASSERTIONS
-	bool "Check for unmodified ECTX in interrupt handlers"
-	default n
-	depends on (ARCH_X86_64 && PLAT_KVM)
-
 menuconfig PAGING
 	bool "Virtual memory API"
 	default n
