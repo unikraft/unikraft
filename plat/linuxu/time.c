@@ -33,8 +33,8 @@
 
 #include <string.h>
 #include <uk/plat/time.h>
-#include <uk/plat/irq.h>
 #include <uk/assert.h>
+#include <linuxu/irq.h>
 #include <linuxu/syscall.h>
 #include <linuxu/time.h>
 
