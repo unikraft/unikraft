@@ -345,7 +345,12 @@ static inline void virtio_vqueue_release(struct virtio_dev *vdev,
 
 static inline void virtio_dev_drv_up(struct virtio_dev *vdev)
 {
-	virtio_dev_status_update(vdev, VIRTIO_CONFIG_STATUS_DRIVER_OK);
+	__u8 status = VIRTIO_CONFIG_STATUS_ACK |
+		      VIRTIO_CONFIG_STATUS_DRIVER |
+		      VIRTIO_CONFIG_STATUS_FEATURES_OK |
+		      VIRTIO_CONFIG_STATUS_DRIVER_OK;
+
+	virtio_dev_status_update(vdev, status);
 }
 
 #define VIRTIO_BUS_REGISTER_DRIVER(b)	\
