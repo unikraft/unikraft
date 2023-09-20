@@ -445,10 +445,10 @@ static int virtio_mmio_probe_fdt(struct pf_device *pfdev)
 	if (unlikely(!prop))
 		return -EINVAL;
 
-	/* only care about base addr, ignore the size */
 	fdt_get_address(dtb, offs, 0, &reg_base, &reg_size);
 
 	pfdev->base = reg_base;
+	pfdev->size = reg_size;
 	pfdev->irq = irq.id;
 
 	uk_pr_info("virtio mmio probe base(0x%lx) irq(%ld)\n",
