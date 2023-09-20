@@ -1015,7 +1015,6 @@ static int uk_9pfs_symlink(struct vnode *dvp, const char *op, const char *np)
 static int uk_9pfs_ioctl(struct vnode *dvp, struct vfscore_file *fp,
 			 unsigned long com, void *data)
 {
-	switch (com) {
 	/**
 	 * HACK: In binary compatibility mode, Ruby tries to set O_ASYNC,
 	 * which Unikraft does not yet support. If the `ioctl` call returns
@@ -1028,12 +1027,15 @@ static int uk_9pfs_ioctl(struct vnode *dvp, struct vfscore_file *fp,
 	 * Setting `ioctl` to a nullop will not work, since it is used by
 	 * interpreted languages (e.g. python3) to check if it should start
 	 * the interpretor or just read a file.
+	 *
+	 * For every `ioctl` request related to a terminal, return ENOTTY.
 	 */
-	case FIONBIO:
+	if (com == FIONBIO)
 		return 0;
-	default:
-		return ENOTSUP;
-	}
+	if (IOCTL_CMD_ISTYPE(com, IOCTL_CMD_TYPE_TTY))
+		return ENOTTY;
+
+	return ENOTSUP;
 }
 
 #define uk_9pfs_seek		((vnop_seek_t)vfscore_vop_nullop)
