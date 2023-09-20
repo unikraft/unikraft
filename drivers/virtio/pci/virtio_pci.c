@@ -79,8 +79,7 @@ static int vpci_legacy_pci_config_set(struct virtio_dev *vdev, __u16 offset,
 static int vpci_legacy_pci_config_get(struct virtio_dev *vdev, __u16 offset,
 				      void *buf, __u32 len, __u8 type_len);
 static __u64 vpci_legacy_pci_features_get(struct virtio_dev *vdev);
-static void vpci_legacy_pci_features_set(struct virtio_dev *vdev,
-					 __u64 features);
+static void vpci_legacy_pci_features_set(struct virtio_dev *vdev);
 static int vpci_legacy_pci_vq_find(struct virtio_dev *vdev, __u16 num_vq,
 				   __u16 *qdesc_size);
 static void vpci_legacy_pci_status_set(struct virtio_dev *vdev, __u8 status);
@@ -353,17 +352,19 @@ static __u64 vpci_legacy_pci_features_get(struct virtio_dev *vdev)
 	return features;
 }
 
-static void vpci_legacy_pci_features_set(struct virtio_dev *vdev,
-					 __u64 features)
+static void vpci_legacy_pci_features_set(struct virtio_dev *vdev)
 {
 	struct virtio_pci_dev *vpdev = NULL;
 
 	UK_ASSERT(vdev);
+
 	vpdev = to_virtiopcidev(vdev);
+
 	/* Mask out features not supported by the virtqueue driver */
-	features = virtqueue_feature_negotiate(features);
+	vdev->features = virtqueue_feature_negotiate(vdev->features);
+
 	virtio_cwrite32((void *) (unsigned long)vpdev->pci_base_addr,
-			VIRTIO_PCI_GUEST_FEATURES, (__u32)features);
+			VIRTIO_PCI_GUEST_FEATURES, (__u32)vdev->features);
 }
 
 static int virtio_pci_legacy_add_dev(struct pci_device *pci_dev,

@@ -100,28 +100,31 @@ static __u64 vm_get_features(struct virtio_dev *vdev)
 	return features;
 }
 
-static void vm_set_features(struct virtio_dev *vdev,
-					 __u64 features)
+static void vm_set_features(struct virtio_dev *vdev)
 {
-	struct virtio_mmio_device *vm_dev = to_virtio_mmio_device(vdev);
+	struct virtio_mmio_device *vm_dev;
+
+	UK_ASSERT(vdev);
+
+	vm_dev = to_virtio_mmio_device(vdev);
 
 	/* Give virtio_ring a chance to accept features. */
-	virtqueue_feature_negotiate(features);
+	vdev->features = virtqueue_feature_negotiate(vdev->features);
 
 	/* Make sure there are no mixed devices */
 	if (vm_dev->version == 2 &&
-		!uk_test_bit(VIRTIO_F_VERSION_1, &vdev->features)) {
-		uk_pr_err("New virtio-mmio devices (version 2) must provide VIRTIO_F_VERSION_1 feature!\n");
+	    !uk_test_bit(VIRTIO_F_VERSION_1, &vdev->features)) {
+		uk_pr_err("Modern virtio devices must set VIRTIO_F_VERSION_1\n");
 		return;
 	}
 
 	virtio_cwrite32(vm_dev->base, VIRTIO_MMIO_DRIVER_FEATURES_SEL, 1);
 	virtio_cwrite32(vm_dev->base, VIRTIO_MMIO_DRIVER_FEATURES,
-						(__u32)(vdev->features >> 32));
+			(__u32)(vdev->features >> 32));
 
 	virtio_cwrite32(vm_dev->base, VIRTIO_MMIO_DRIVER_FEATURES_SEL, 0);
 	virtio_cwrite32(vm_dev->base, VIRTIO_MMIO_DRIVER_FEATURES,
-						(__u32)vdev->features);
+			(__u32)vdev->features);
 }
 
 static int vm_get(struct virtio_dev *vdev, __u16 offset,
