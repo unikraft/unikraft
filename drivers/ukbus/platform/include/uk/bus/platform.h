@@ -97,6 +97,19 @@ struct pf_device {
 };
 UK_TAILQ_HEAD(pf_device_list, struct pf_device);
 
+#if CONFIG_PAGING
+/**
+ * (Re)map device memory
+ *
+ * Maps a region with attributes suitable for device memory access.
+ * If the region is already mapped, it will be remapped unconditionally.
+ *
+ * @param base Base address of the region to map.
+ * @param size Region size. Must be page-aligned.
+ * @return virtual address
+ */
+__vaddr_t uk_bus_pf_devmap(__u64 base, __sz size);
+#endif /* CONFIG_PAGING */
 
 #define PF_REGISTER_DRIVER(b)                  \
 	_PF_REGISTER_DRIVER(__LIBNAME__, b)
