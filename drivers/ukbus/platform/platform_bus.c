@@ -38,6 +38,11 @@
 #include <uk/bus/platform.h>
 #include <uk/plat/common/bootinfo.h>
 
+#if CONFIG_PAGING
+#include <uk/errptr.h>
+#include <uk/plat/paging.h>
+#endif /* CONFIG_PAGING */
+
 #if CONFIG_LIBUKBUS_PLATFORM_FDT
 #include <libfdt.h>
 #include <uk/ofw/fdt.h>
@@ -229,6 +234,45 @@ static int pf_init(struct uk_alloc *a)
 	}
 	return 0;
 }
+
+#if CONFIG_PAGING
+__vaddr_t uk_bus_pf_devmap(__paddr_t base, __sz size)
+{
+	struct uk_pagetable *pt;
+	__vaddr_t vaddr, paddr;
+	unsigned long attr;
+	unsigned long pages;
+	int rc;
+
+	attr = PAGE_ATTR_PROT_RW;
+#ifdef CONFIG_ARCH_ARM_64
+	attr |= PAGE_ATTR_TYPE_DEVICE_nGnRnE;
+#endif /* CONFIG_ARCH_ARM_64 */
+
+	pages = ALIGN_UP(size, __PAGE_SIZE) >> PAGE_SHIFT;
+
+	pt = ukplat_pt_get_active();
+
+	paddr = ALIGN_DOWN(base, __PAGE_SIZE);
+	vaddr = ALIGN_DOWN(base, __PAGE_SIZE);
+
+	/* We can't use uk_vma_map_dma here as the vmem API is initialized
+	 * way too late for the interrupt controller which is required for
+	 * bringing up secondary cores.
+	 */
+	rc = ukplat_page_map(pt, vaddr, paddr, pages, attr, 0);
+	if (!rc)
+		goto out;
+
+	if (rc == -EEXIST)
+		rc = ukplat_page_set_attr(pt, vaddr, pages, attr, 0);
+
+	if (unlikely(rc))
+		return (__vaddr_t)ERR2PTR(rc);
+out:
+	return (__vaddr_t)base;
+}
+#endif /* CONFIG_PAGING */
 
 void _pf_register_driver(struct pf_driver *drv)
 {
