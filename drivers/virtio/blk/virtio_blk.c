@@ -874,7 +874,7 @@ static int virtio_blkdev_feature_negotiate(struct virtio_blk_device *vbdev)
 	 * Mask out features supported by both driver and device.
 	 */
 	vbdev->vdev->features &= host_features;
-	virtio_feature_set(vbdev->vdev, vbdev->vdev->features);
+	virtio_feature_set(vbdev->vdev);
 
 exit:
 	return rc;

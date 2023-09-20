@@ -101,7 +101,7 @@ struct virtio_config_ops {
 	/** Get the feature */
 	__u64 (*features_get)(struct virtio_dev *vdev);
 	/** Set the feature */
-	void (*features_set)(struct virtio_dev *vdev, __u64 features);
+	void (*features_set)(struct virtio_dev *vdev);
 	/** Get and Set Status */
 	__u8 (*status_get)(struct virtio_dev *vdev);
 	void (*status_set)(struct virtio_dev *vdev, __u8 status);
@@ -222,17 +222,15 @@ static inline __u64 virtio_feature_get(struct virtio_dev *vdev)
 
 /**
  * The function to set the negotiated features.
- * @param vdev
- *	Reference to the virtio device.
- * @param feature
- *	A bit map of the feature negotiated.
+ *
+ * @param vdev Reference to the virtio device.
  */
-static inline void virtio_feature_set(struct virtio_dev *vdev, __u32 feature)
+static inline void virtio_feature_set(struct virtio_dev *vdev)
 {
 	UK_ASSERT(vdev);
 
 	if (likely(vdev->cops->features_set))
-		vdev->cops->features_set(vdev, feature);
+		vdev->cops->features_set(vdev);
 }
 
 /**

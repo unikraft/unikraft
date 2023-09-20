@@ -942,7 +942,7 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n)
 	 * Announce our enabled driver features back to the backend device
 	 */
 	vndev->vdev->features = drv_features;
-	virtio_feature_set(vndev->vdev, vndev->vdev->features);
+	virtio_feature_set(vndev->vdev);
 
 	/**
 	 * According to Virtio specification, section 2.3.1. Config fields
