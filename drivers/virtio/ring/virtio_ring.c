@@ -233,10 +233,9 @@ __u64 virtqueue_feature_negotiate(__u64 feature_set)
 {
 	__u64 feature = (1ULL << VIRTIO_TRANSPORT_F_START) - 1;
 
-	/**
-	 * Currently out vring driver does not support any ring feature. We will
-	 * add support to transport feature in the future.
-	 */
+	/* Allow version 1 flag */
+	feature |= 1ULL << VIRTIO_F_VERSION_1;
+
 	feature &= feature_set;
 	return feature;
 }
