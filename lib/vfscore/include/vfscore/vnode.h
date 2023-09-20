@@ -43,6 +43,15 @@
 #include <vfscore/uio.h>
 #include <vfscore/dentry.h>
 
+#define IOCTL_CMD_TYPE_SHIFT		(8)
+#define IOCTL_CMD_TYPE_MASK		(0xFF << IOCTL_CMD_TYPE_SHIFT)
+#define IOCTL_CMD_TYPE_TTY		('T')
+
+#define IOCTL_CMD_ISTYPE(cmd, type)			\
+		((cmd & (IOCTL_CMD_TYPE_MASK)) ==	\
+		 (((type) << IOCTL_CMD_TYPE_SHIFT) &	\
+		  IOCTL_CMD_TYPE_MASK))
+
 struct vfsops;
 struct vnops;
 struct vnode;
