@@ -371,7 +371,8 @@ static int virtio_9p_feature_negotiate(struct virtio_9p_device *d)
 	d->tag[tag_len] = '\0';
 
 	d->vdev->features &= host_features;
-	virtio_feature_set(d->vdev, d->vdev->features);
+	virtio_feature_set(d->vdev);
+
 	return 0;
 
 free_mem:
