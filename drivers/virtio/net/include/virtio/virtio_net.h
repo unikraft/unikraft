@@ -74,6 +74,9 @@
 #define VIRTIO_NET_F_CTRL_MAC_ADDR 23	/* Set MAC address */
 
 #define VIRTIO_NET_F_SPEED_DUPLEX 63	/* Device set linkspeed and duplex */
+#define VIRTIO_NET_F_HASH_REPORT  57	/* Device can provide per-packet hash
+					 * value
+					 */
 
 #ifndef VIRTIO_NET_NO_LEGACY
 #define VIRTIO_NET_F_GSO	6	/* Host handles pkts w/ any GSO type */
@@ -124,18 +127,15 @@ struct virtio_net_hdr {
 #define VIRTIO_NET_HDR_GSO_ECN      0x80    /* TCP has ECN set */
 	/* See VIRTIO_NET_HDR_GSO_* */
 	__u8 gso_type;
-	__virtio_le16 hdr_len;	/* Ethernet + IP + tcp/udp hdrs */
-	__virtio_le16 gso_size;	/* Bytes to append to hdr_len per frame */
-	__virtio_le16 csum_start; /* Position to start checksumming from */
+	__virtio_le16 hdr_len;     /* Ethernet + IP + tcp/udp hdrs */
+	__virtio_le16 gso_size;    /* Bytes to append to hdr_len per frame */
+	__virtio_le16 csum_start;  /* Position to start checksumming from */
 	__virtio_le16 csum_offset; /* Offset after that to place checksum */
-};
-
-/* This is the version of the header to use when the MRG_RXBUF
- * feature has been negotiated.
- */
-struct virtio_net_hdr_mrg_rxbuf {
-	struct virtio_net_hdr hdr;
-	__virtio_le16 num_buffers;	/* Number of merged rx buffers */
+	/* Modern virtio */
+	__virtio_le16 num_buffers; /* Number of descriptors in the rx packet */
+	__virtio_le32 hash_value;  /* VIRTIO_NET_F_HASH_REPORT */
+	__virtio_le16 hash_report; /* VIRTIO_NET_F_HASH_REPORT */
+	__virtio_le16 padding_reserved; /* VIRTIO_NET_F_HASH_REPORT */
 };
 
 /*
