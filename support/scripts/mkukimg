@@ -1,4 +1,8 @@
 #!/usr/bin/env bash
+if [ $( uname ) != "Linux" ]; then
+	echo "This command can only be run on Linux" 1>&2
+	exit 1
+fi
 
 # help menu
 usage()
