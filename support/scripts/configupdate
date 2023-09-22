@@ -2,9 +2,15 @@
 UK_CONFIG="${1:-${UK_BASE}/.config}"
 UK_CONFIG_OLD="${2:-${UK_BASE}/.config.old}"
 
+if [ $( uname ) = "Darwin" ]; then
+	CMD_GREP=ggrep
+else
+	CMD_GREP=grep
+fi
+
 _subconfig()
 {
-	grep -e "^#\?[[:space:]]*$1.*$" "$2" | sort
+	"${CMD_GREP}" -e "^#\?[[:space:]]*$1.*$" "$2" | sort
 }
 
 _comparesym()

@@ -1,6 +1,14 @@
 #!/bin/bash
-_SELF=$( readlink -f "$0" )
-_SELF_BASE=$( dirname "${_SELF}" )
+if [ $( uname ) = "Darwin" ]; then
+	CMD_READLINK=greadlink
+	CMD_DIRNAME=gdirname
+else
+	CMD_READLINK=readlink
+	CMD_DIRNAME=dirname
+fi
+
+_SELF=$( "${CMD_READLINK}" -f "$0" )
+_SELF_BASE=$( "${CMD_DIRNAME}" "${_SELF}" )
 
 if [ -z "${_SELF}" ]; then
 	echo "Failed to detect fully qualified path of '$0'" 1>&2
