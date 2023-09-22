@@ -48,7 +48,7 @@ $(XEN_IMAGE): $(XEN_DEBUG_IMAGE)
 		$(STRIP) -s \
 			$(SECT_STRIP_FLAGS) $(SECT_STRIP_FLAGS-y) \
 			$< -o $@ 2>&1 | \
-		        { grep -Ev \
+		        { $(GREP) -Ev \
 				"Empty loadable segment detected|section.*lma.*adjusted to.*" || \
 				true; })
 	$(call build_bootinfo,$@)

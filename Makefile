@@ -637,6 +637,11 @@ AWK		:= awk
 else
 AWK		:= gawk --lint
 endif
+ifeq ($(HOSTOSENV),Darwin)
+GREP		:= ggrep
+else
+GREP		:= grep
+endif
 YACC		:= bison
 LEX     	:= flex
 PATCH		:= patch

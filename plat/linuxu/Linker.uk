@@ -29,7 +29,7 @@ $(LINUXU_IMAGE): $(LINUXU_IMAGE).dbg
 		$(STRIP) -s \
 			$(SECT_STRIP_FLAGS) $(SECT_STRIP_FLAGS-y) \
 			$< -o $@ 2>&1 | \
-			{ grep -v "Empty loadable segment detected" || true; })
+			{ $(GREP) -v "Empty loadable segment detected" || true; })
 	$(call build_bootinfo,$@)
 
 $(LINUXU_IMAGE).sym: $(LINUXU_DEBUG_IMAGE)
