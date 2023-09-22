@@ -639,8 +639,12 @@ AWK		:= gawk --lint
 endif
 ifeq ($(HOSTOSENV),Darwin)
 GREP		:= ggrep
+READLINK	:= greadlink
+DIRNAME		:= gdirname
 else
 GREP		:= grep
+READLINK	:= readlink
+DIRNAME		:= dirname
 endif
 YACC		:= bison
 LEX     	:= flex
