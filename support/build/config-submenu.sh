@@ -6,6 +6,12 @@
 IFS_ORIG=$IFS
 IFS_NL=$'\n'
 
+if [ $( uname ) = "Darwin" ]; then
+	CMD_READLINK=greadlink
+else
+	CMD_READLINK=readlink
+fi
+
 usage()
 {
 	echo "Usage: $0 [OPTION]... [LIBRARY PATH]..."
@@ -116,7 +122,7 @@ for ARG_PATH in "${ARG_PATHS[@]}" "$@"; do
 		continue;
 	fi
 
-	printf "source \"%s\"\n" "$( readlink -f "${CONFIG_UK}" )" >&7
+	printf "source \"%s\"\n" "$( "${CMD_READLINK}" -f "${CONFIG_UK}" )" >&7
 done
 
 #
@@ -132,6 +138,6 @@ esac
 
 # close FD:7 and print filename
 if [ ! -z "$ARG_OUT" ]; then
-	printf '%s\n' "$( readlink -f $ARG_OUT )"
+	printf '%s\n' "$( "${CMD_READLINK}" -f $ARG_OUT )"
 	exec 7>&-
 fi
