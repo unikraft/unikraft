@@ -118,7 +118,8 @@ static int do_arch_mp_init(void *arg __unused)
 		m.h = (struct acpi_subsdt_hdr *)(madt->entries + off);
 
 		if (m.h->type != ACPI_MADT_GICC ||
-		    !(m.gicc->flags & ACPI_MADT_GICC_FLAGS_EN))
+		    (!(m.gicc->flags & ACPI_MADT_GICC_FLAGS_EN) &&
+		     !(m.gicc->flags & ACPI_MADT_GICC_FLAGS_ON_CAP)))
 			continue;
 
 		cpu_id = m.gicc->mpidr & CPU_ID_MASK;
