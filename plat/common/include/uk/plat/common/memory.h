@@ -90,6 +90,9 @@ ukplat_memregion_list_insert(struct ukplat_memregion_list *list,
 	struct ukplat_memregion_desc *p;
 	__u32 i;
 
+	if (unlikely(!mrd->len))
+		return -EINVAL;
+
 	if (unlikely(list->count == list->capacity))
 		return -ENOMEM;
 
@@ -206,6 +209,9 @@ ukplat_memregion_list_insert_at_idx(struct ukplat_memregion_list *list,
 {
 	struct ukplat_memregion_desc *p;
 
+	if (unlikely(!mrd->len))
+		return -EINVAL;
+
 	if (unlikely(list->count == list->capacity))
 		return -ENOMEM;
 
@@ -246,6 +252,9 @@ ukplat_memregion_list_insert_split_phys(struct ukplat_memregion_list *list,
 	__vaddr_t voffset;
 	int i;
 	int rc;
+
+	if (unlikely(!mrd->len))
+		return -EINVAL;
 
 	voffset = mrd->vbase - mrd->pbase;
 	pstart = mrd->pbase;
