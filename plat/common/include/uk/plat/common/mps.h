@@ -202,4 +202,10 @@ struct uk_mps_busovr {
 
 UK_CTASSERT(sizeof(struct uk_mps_busovr) == 8);
 
+int uk_mps_init(void);
+
+struct uk_mps_mpfp *uk_mps_get_mpfp(void);
+
+struct uk_mps_mpc *uk_mps_get_mpc(void);
+
 #endif /* __PLAT_CMN_MPS_H__ */
