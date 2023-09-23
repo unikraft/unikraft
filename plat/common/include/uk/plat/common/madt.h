@@ -170,6 +170,7 @@ struct acpi_madt_x2apic_nmi {
 #define ACPI_MADT_GICC_FLAGS_EN					0x01
 #define ACPI_MADT_GICC_FLAGS_PERF_IRQ_MODE			0x02
 #define ACPI_MADT_GICC_FLAGS_VGIC_IRQ_MODE			0x04
+#define ACPI_MADT_GICC_FLAGS_ON_CAP				0x08
 struct acpi_madt_gicc {
 	struct acpi_subsdt_hdr hdr;
 	__u16 reserved;
