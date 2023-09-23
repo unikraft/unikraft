@@ -52,6 +52,7 @@ extern "C" {
 #define UKPLAT_MEMRT_CMDLINE		0x0010	/* Command line */
 #define UKPLAT_MEMRT_DEVICETREE		0x0020	/* Device tree */
 #define UKPLAT_MEMRT_STACK		0x0040	/* Thread stack */
+#define UKPLAT_MEMRT_LBIOS		0x0080	/* Legacy BIOS SYS ROM, EBDA */
 
 /* Memory region flags */
 #define UKPLAT_MEMRF_ALL		0xffff

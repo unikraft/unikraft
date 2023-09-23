@@ -90,6 +90,9 @@ void ukplat_bootinfo_print(void)
 		case UKPLAT_MEMRT_DEVICETREE:
 			type = "dtb ";
 			break;
+		case UKPLAT_MEMRT_LBIOS:
+			type = "lbios ";
+			break;
 		case UKPLAT_MEMRT_STACK:
 			type = "stck";
 			break;
