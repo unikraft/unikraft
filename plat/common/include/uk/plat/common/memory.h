@@ -117,16 +117,69 @@ ukplat_memregion_list_insert(struct ukplat_memregion_list *list,
 }
 
 #if defined(__X86_64__)
+/* For EISA or MCA systems, the EBDA real-mode segmented pointer can be found
+ * in the two-byte location 40:0Eh, right after the BIOS IVT.
+ */
+#define X86_EBDA_PTR			((0x40UL << 4) + 0x0EUL)
+#define X86_EBDA_LEN			0x400UL
+static inline unsigned long get_ebda_addr(void)
+{
+	__u16 *ebda_ptr = (__u16 *)X86_EBDA_PTR;
+
+	return (*ebda_ptr << 4);
+}
+
 #define	X86_HI_MEM_START		0xA0000UL
 #define X86_HI_MEM_LEN			0x40000UL
 
 #define X86_BIOS_ROM_START		0xE0000UL
 #define X86_BIOS_ROM_LEN		0x20000UL
 
+/* WARNING! DO NOT CALL THIS FUNCTION AFTER PAGING INITIALIZATION! THIS RELIES
+ * ON THE VERY FIRST PAGE (0 - 4KB) BEING MAPPED! ONLY CALL IF YOU KNOW WHAT YOU
+ * YOU ARE DOING!
+ */
 static inline int
 ukplat_memregion_list_insert_legacy_hi_mem(struct ukplat_memregion_list *list)
 {
+	unsigned long ebda_addr;
 	int rc;
+
+	/* According to ACPI spec for IA-PC systems, RSDP can be in:
+	 * 1. the first 1KiB of EBDA
+	 * 2. BIOS read-only memory space between 0xE0000 and 0xFFFFF
+	 *
+	 * According to MP spec for PC-AT systems, MP Floating Pointer Structure
+	 * can be found in:
+	 * 1. the first 1KiB of EBDA
+	 * 2. if EBDA segment is not defined, the last 1KiB of PC-AT base ram:
+	 * e.g., 639K-640K for systems with 640 KB of base memory or 511K-512K
+	 * for systems with 512 KB of base memory (WE DO NOT TARGET THE LATTER)
+	 * 3. BIOS read-only memory space between 0xE0000 and 0xFFFFF
+	 */
+
+	/* Check for EBDA explicit segmented pointer */
+	ebda_addr = get_ebda_addr();
+
+	/* If we do not have an EBDA pointer or it is invalid (beyond DOS
+	 * compatible RAM), then resort to default: the last 1KB of DOS
+	 * compatible RAM.
+	 */
+	if (!ebda_addr || ebda_addr > X86_HI_MEM_START - X86_EBDA_LEN)
+		ebda_addr = X86_HI_MEM_START - X86_EBDA_LEN;
+
+	/* Now insert EBDA memregion */
+	rc = ukplat_memregion_list_insert(list,
+			&(struct ukplat_memregion_desc){
+				.vbase = ebda_addr,
+				.pbase = ebda_addr,
+				.len   = X86_EBDA_LEN,
+				.type  = UKPLAT_MEMRT_RESERVED,
+				.flags = UKPLAT_MEMRF_READ  |
+					 UKPLAT_MEMRF_MAP,
+			});
+	if (unlikely(rc < 0))
+		return rc;
 
 	/* Note that we are mapping it as writable as well to cope with the
 	 * potential existence of the VGA framebuffer/SMM shadow memory.
