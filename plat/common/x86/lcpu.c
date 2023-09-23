@@ -42,7 +42,12 @@
 #include <x86/cpu.h>
 #include <x86/traps.h>
 #include <x86/delay.h>
+
+#if CONFIG_UKPLAT_ACPI
 #include <uk/plat/common/acpi.h>
+#else /* !CONFIG_UKPLAT_ACPI */
+#include <uk/plat/common/mps.h>
+#endif /* !CONFIG_UKPLAT_ACPI */
 
 #include <uk/plat/lcpu.h>
 #include <uk/plat/common/lcpu.h>
@@ -160,6 +165,7 @@ static void start16_reloc_mp_init(void)
 			    (__u64)lcpu_start32 - (__u64)x86_start16_addr, 4);
 }
 
+#if CONFIG_UKPLAT_ACPI
 int lcpu_arch_mp_init(void *arg __unused)
 {
 	__lcpuid bsp_cpu_id = lcpu_get(0)->id;
@@ -235,6 +241,80 @@ int lcpu_arch_mp_init(void *arg __unused)
 
 	return 0;
 }
+#else /* !CONFIG_UKPLAT_ACPI */
+int lcpu_arch_mp_init(void *arg __unused)
+{
+	__lcpuid bsp_cpu_id = lcpu_get(0)->id;
+	int bsp_found __maybe_unused = 0;
+	struct uk_mps_mpc *mpc;
+	struct uk_mps_cpu *cpu;
+	struct lcpu *lcpu;
+	__lcpuid cpu_id;
+	void *mpc_end;
+
+	uk_pr_info("Bootstrapping processor has the ID %ld\n", bsp_cpu_id);
+
+	mpc = uk_mps_get_mpc();
+
+	/* If MPC is 0, then we are dealing with one of the default MP PC-AT
+	 * configurations. Either way, have 2 physical, no hyperthreading,
+	 * cores, numbered 0 and 1.
+	 */
+	if (!mpc) {
+		lcpu = lcpu_alloc(!bsp_cpu_id);
+		if (unlikely(!lcpu)) {
+			/* If we cannot allocate another LCPU, we probably have
+			 * reached the maximum number of supported CPUs. So
+			 * just stop here.
+			 */
+			uk_pr_warn("Maximum number of cores exceeded.\n");
+			return 0;
+		}
+	}
+
+	mpc_end = (__u8 *)mpc + mpc->tbl_len;
+	for (cpu = (struct uk_mps_cpu *)((__u8 *)mpc + sizeof(*mpc));
+	     cpu && (void *)cpu < mpc_end;
+	     uk_mps_next_mpc_entry((void **)&cpu)) {
+		if (cpu->type != UK_MPS_MPC_TYPE_CPU ||
+		    !(cpu->cpu_flags & UK_MPS_CPU_FLAGS_EN))
+			continue;
+
+		cpu_id = (__lcpuid)cpu->lapic_id;
+
+		if (bsp_cpu_id == cpu_id &&
+		    cpu->cpu_flags & UK_MPS_CPU_FLAGS_BP) {
+			UK_ASSERT(!bsp_found);
+
+			bsp_found = 1;
+			continue;
+		}
+
+		lcpu = lcpu_alloc(cpu_id);
+		if (unlikely(!lcpu)) {
+			/* If we cannot allocate another LCPU, we probably have
+			 * reached the maximum number of supported CPUs. So
+			 * just stop here.
+			 */
+			uk_pr_warn("Maximum number of cores exceeded.\n");
+			return 0;
+		}
+	}
+	UK_ASSERT(bsp_found);
+
+	/* Copy AP startup code to target address in first 1MiB */
+	UK_ASSERT(x86_start16_addr < 0x100000);
+	memcpy((void *)x86_start16_addr, &x86_start16_begin, X86_START16_SIZE);
+
+	start16_reloc_mp_init();
+
+	uk_pr_debug("Copied AP 16-bit boot code to 0x%"__PRIvaddr"\n",
+		    x86_start16_addr);
+
+	return 0;
+}
+#endif /* !CONFIG_UKPLAT_ACPI */
+
 
 int lcpu_arch_start(struct lcpu *lcpu, unsigned long flags __unused)
 {

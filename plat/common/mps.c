@@ -70,3 +70,42 @@ struct uk_mps_mpc *uk_mps_get_mpc(void)
 {
 	return mpc;
 }
+
+void uk_mps_next_mpc_entry(void **entryp)
+{
+	__u8 **entry = (__u8 **)entryp;
+
+	UK_ASSERT(entryp);
+
+	if (!mpc)
+		*entry = NULL;
+
+	switch (**entry) {
+	case UK_MPS_MPC_TYPE_CPU:
+		*entry += sizeof(struct uk_mps_cpu);
+		break;
+	case UK_MPS_MPC_TYPE_BUS:
+		*entry += sizeof(struct uk_mps_bus);
+		break;
+	case UK_MPS_MPC_TYPE_IOAPIC:
+		*entry += sizeof(struct uk_mps_ioapic);
+		break;
+	case UK_MPS_MPC_TYPE_INTSRC:
+		*entry += sizeof(struct uk_mps_intsrc);
+		break;
+	case UK_MPS_MPC_TYPE_LINTSRC:
+		*entry += sizeof(struct uk_mps_lintsrc);
+		break;
+	case UK_MPS_XMPC_TYPE_SYSMEM:
+		*entry += sizeof(struct uk_mps_sysmem);
+		break;
+	case UK_MPS_XMPC_TYPE_BUSLINK:
+		*entry += sizeof(struct uk_mps_buslink);
+		break;
+	case UK_MPS_XMPC_TYPE_BUSOVR:
+		*entry += sizeof(struct uk_mps_busovr);
+		break;
+	default:
+		*entry = NULL;
+	}
+}

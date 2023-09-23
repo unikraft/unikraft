@@ -208,4 +208,6 @@ struct uk_mps_mpfp *uk_mps_get_mpfp(void);
 
 struct uk_mps_mpc *uk_mps_get_mpc(void);
 
+void uk_mps_next_mpc_entry(void **entryp);
+
 #endif /* __PLAT_CMN_MPS_H__ */

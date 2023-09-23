@@ -125,6 +125,9 @@ LIBKVMPLAT_SRCS-y                          += $(UK_PLAT_COMMON_BASE)/lcpu.c|comm
 LIBKVMPLAT_SRCS-y                          += $(UK_PLAT_COMMON_BASE)/memory.c|common
 LIBKVMPLAT_SRCS-y                          += $(UK_PLAT_KVM_DEF_LDS)
 LIBKVMPLAT_SRCS-$(CONFIG_UKPLAT_ACPI)      += $(UK_PLAT_COMMON_BASE)/acpi.c|common
+ifneq ($(CONFIG_UKPLAT_ACPI),y)
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64)      += $(UK_PLAT_COMMON_BASE)/mps.c|common
+endif
 ifeq ($(CONFIG_KVM_BOOT_PROTO_EFI_STUB),y)
 LIBKVMPLAT_SRCS-y                          += $(LIBKVMPLAT_BASE)/efi.c|common
 endif
