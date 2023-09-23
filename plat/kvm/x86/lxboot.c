@@ -158,6 +158,10 @@ void lxboot_entry(struct lcpu *lcpu, struct lxboot_params *bp)
 	if (unlikely(rc))
 		lxboot_crash(rc, "Could not coalesce memory regions");
 
+	rc = ukplat_memregion_alloc_sipi_vect();
+	if (unlikely(rc))
+		lxboot_crash(rc, "Could not insert SIPI vector region");
+
 	memcpy(bi->bootprotocol, "lxboot", sizeof("lxboot"));
 
 	_ukplat_entry(lcpu, bi);
