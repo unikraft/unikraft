@@ -230,7 +230,7 @@ int arch_pci_probe(struct uk_alloc *pha)
 			PCI_CONF_READ(uint32_t, &vendor_id,
 					config_addr, VENDOR_ID);
 
-			if (vendor_id != PCI_INVALID_ID)
+			if (vendor_id == PCI_INVALID_ID)
 				break;
 
 			probe_bus(function);
