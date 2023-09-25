@@ -144,7 +144,7 @@ static int vm_get(struct virtio_dev *vdev, __u16 offset,
 
 		for (i = 0; i < len; i++)
 			ptr[i] = virtio_mmio_cread8(base, offset + i);
-		return len;
+		return 0;
 	}
 
 	switch (len) {
@@ -171,7 +171,7 @@ static int vm_get(struct virtio_dev *vdev, __u16 offset,
 		uk_pr_warn("Unaligned io read: %d bytes\n", len);
 	}
 
-	return len;
+	return 0;
 }
 
 static int vm_set(struct virtio_dev *vdev, __u16 offset,
