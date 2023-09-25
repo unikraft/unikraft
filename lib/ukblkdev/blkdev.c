@@ -419,12 +419,11 @@ struct uk_blkdev_sync_io_request {
 	struct uk_semaphore s;
 };
 
-static void __sync_io_callback(struct uk_blkreq *req,
-		void *cookie_callback)
+static void __sync_io_callback(struct uk_blkreq *req __unused,
+			       void *cookie_callback)
 {
 	struct uk_blkdev_sync_io_request *sync_io_req;
 
-	UK_ASSERT(req);
 	UK_ASSERT(cookie_callback);
 
 	sync_io_req = (struct uk_blkdev_sync_io_request *)cookie_callback;
