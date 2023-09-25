@@ -386,7 +386,7 @@ static int virtio_blkdev_queue_dequeue(struct uk_blkdev_queue *queue,
 	ret = virtqueue_buffer_dequeue(queue->vq, (void **) &response_req,
 			&len);
 	if (ret < 0) {
-		uk_pr_info("No data available in the queue\n");
+		uk_pr_debug("No data available in the queue\n");
 		return 0;
 	}
 
