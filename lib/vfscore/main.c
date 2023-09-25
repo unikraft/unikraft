@@ -289,8 +289,8 @@ UK_TRACEPOINT(trace_vfs_mknod, "\"%s\" 0%0o %#x", const char*, mode_t, dev_t);
 UK_TRACEPOINT(trace_vfs_mknod_ret, "");
 UK_TRACEPOINT(trace_vfs_mknod_err, "%d", int);
 
-static int __xmknod_helper(int ver, const char *pathname,
-		mode_t mode, dev_t *dev __unused)
+static int __xmknod_helper(int ver __maybe_unused, const char *pathname,
+			   mode_t mode, dev_t *dev __maybe_unused)
 {
 	UK_ASSERT(ver == 0); // On x86-64 Linux, _MKNOD_VER_LINUX is 0.
 	struct task *t = main_task;
