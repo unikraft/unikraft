@@ -47,6 +47,7 @@ extern "C" {
 #define VIRTIO_CONFIG_STATUS_ACK		0x1  /* device is virtio */
 #define VIRTIO_CONFIG_STATUS_DRIVER		0x2  /* driver found */
 #define VIRTIO_CONFIG_STATUS_DRIVER_OK		0x4  /* init complete */
+#define VIRTIO_CONFIG_STATUS_FEATURES_OK	0x8  /* feat negot complete */
 #define VIRTIO_CONFIG_STATUS_NEEDS_RESET	0x40 /* device needs reset */
 #define VIRTIO_CONFIG_STATUS_FAIL		0x80 /* device failure */
 
