@@ -34,30 +34,31 @@
 #define __VIRTIO_CONFIG_H__
 
 #include <uk/arch/types.h>
+#include <uk/config.h>
 #include <uk/plat/common/cpu.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus __ */
 
-#define MAX_TRY_COUNT    (10)
+#define MAX_TRY_COUNT				10
 
-#define VIRTIO_CONFIG_STATUS_RESET         0x0  /* Reset the device */
-#define VIRTIO_CONFIG_STATUS_ACK           0x1  /* recognize device as virtio */
-#define VIRTIO_CONFIG_STATUS_DRIVER        0x2  /* driver for the device found*/
-#define VIRTIO_CONFIG_STATUS_DRIVER_OK     0x4  /* initialization is complete */
-#define VIRTIO_CONFIG_STATUS_NEEDS_RESET   0x40 /* device needs reset */
-#define VIRTIO_CONFIG_STATUS_FAIL          0x80 /* device something's wrong*/
+#define VIRTIO_CONFIG_STATUS_RESET		0x0  /* device reset */
+#define VIRTIO_CONFIG_STATUS_ACK		0x1  /* device is virtio */
+#define VIRTIO_CONFIG_STATUS_DRIVER		0x2  /* driver found */
+#define VIRTIO_CONFIG_STATUS_DRIVER_OK		0x4  /* init complete */
+#define VIRTIO_CONFIG_STATUS_NEEDS_RESET	0x40 /* device needs reset */
+#define VIRTIO_CONFIG_STATUS_FAIL		0x80 /* device failure */
 
-#define VIRTIO_TRANSPORT_F_START    28
-#define VIRTIO_TRANSPORT_F_END      32
+#define VIRTIO_TRANSPORT_F_START		28
+#define VIRTIO_TRANSPORT_F_END			32
 
 /* v1.0 compliant. */
-#define VIRTIO_F_VERSION_1		32
+#define VIRTIO_F_VERSION_1			32
 
-#ifdef __X86_64__
-static inline void _virtio_cwrite_bytes(const void *addr, const __u8 offset,
-					const void *buf, int len, int type_len)
+#if CONFIG_ARCH_X86_64
+static inline void virtio_cwrite_bytes(const void *addr, const __u8 offset,
+				       const void *buf, int len, int type_len)
 {
 	int i = 0;
 	__u16 io_addr;
@@ -82,8 +83,8 @@ static inline void _virtio_cwrite_bytes(const void *addr, const __u8 offset,
 	}
 }
 
-static inline void _virtio_cread_bytes(const void *addr, const __u8 offset,
-				       void *buf, int len, int type_len)
+static inline void virtio_cread_bytes(const void *addr, const __u8 offset,
+				      void *buf, int len, int type_len)
 {
 	int i = 0;
 	__u16 io_addr;
@@ -110,14 +111,14 @@ static inline void _virtio_cread_bytes(const void *addr, const __u8 offset,
 		}
 	}
 }
-#else  /* __X86_64__ */
+#else  /* !CONFIG_ARCH_X86_64 */
 
 /* IO barriers */
 #define __iormb()		rmb()
 #define __iowmb()		wmb()
 
-static inline void _virtio_cwrite_bytes(const void *addr, const __u8 offset,
-					const void *buf, int len, int type_len)
+static inline void virtio_cwrite_bytes(const void *addr, const __u8 offset,
+				       const void *buf, int len, int type_len)
 {
 	int i = 0;
 	void *io_addr;
@@ -143,8 +144,8 @@ static inline void _virtio_cwrite_bytes(const void *addr, const __u8 offset,
 	}
 }
 
-static inline void _virtio_cread_bytes(const void *addr, const __u8 offset,
-				       void *buf, int len, int type_len)
+static inline void virtio_cread_bytes(const void *addr, const __u8 offset,
+				      void *buf, int len, int type_len)
 {
 	int i = 0;
 	void *io_addr;
@@ -170,7 +171,7 @@ static inline void _virtio_cread_bytes(const void *addr, const __u8 offset,
 	}
 }
 
-#endif /* __X86_64__ */
+#endif  /* !CONFIG_ARCH_X86_64 */
 
 /**
  * Read the virtio device configuration of specified length.
@@ -194,8 +195,8 @@ static inline int virtio_cread_bytes_many(const void *addr, const __u8 offset,
 
 	do {
 		check = len;
-		_virtio_cread_bytes(addr, offset, &old_buf[0], len, 1);
-		_virtio_cread_bytes(addr, offset, buf, len, 1);
+		virtio_cread_bytes(addr, offset, &old_buf[0], len, 1);
+		virtio_cread_bytes(addr, offset, buf, len, 1);
 
 		for (i = 0; i < len; i++) {
 			if (unlikely(buf[i] != old_buf[i])) {
@@ -223,7 +224,7 @@ static inline __u8 virtio_cread8(const void *addr, const __u8 offset)
 {
 	__u8 buf = 0;
 
-	_virtio_cread_bytes(addr, offset, &buf, sizeof(buf), sizeof(buf));
+	virtio_cread_bytes(addr, offset, &buf, sizeof(buf), sizeof(buf));
 	return buf;
 }
 
@@ -241,7 +242,7 @@ static inline __u16 virtio_cread16(const void *addr, const __u8 offset)
 {
 	__u16 buf = 0;
 
-	_virtio_cread_bytes(addr, offset, &buf, sizeof(buf), sizeof(buf));
+	virtio_cread_bytes(addr, offset, &buf, sizeof(buf), sizeof(buf));
 	return buf;
 }
 
@@ -259,7 +260,7 @@ static inline __u32 virtio_cread32(const void *addr, const __u8 offset)
 {
 	__u32 buf = 0;
 
-	_virtio_cread_bytes(addr, offset, &buf, sizeof(buf), sizeof(buf));
+	virtio_cread_bytes(addr, offset, &buf, sizeof(buf), sizeof(buf));
 	return buf;
 }
 
@@ -276,7 +277,7 @@ static inline __u32 virtio_cread32(const void *addr, const __u8 offset)
 static inline void virtio_cwrite8(const void *addr, const __u8 offset,
 				  const __u8 data)
 {
-	_virtio_cwrite_bytes(addr, offset, &data, sizeof(data), sizeof(data));
+	virtio_cwrite_bytes(addr, offset, &data, sizeof(data), sizeof(data));
 }
 
 /**
@@ -292,7 +293,7 @@ static inline void virtio_cwrite8(const void *addr, const __u8 offset,
 static inline void virtio_cwrite16(const void *addr, const __u8 offset,
 				   const __u16 data)
 {
-	_virtio_cwrite_bytes(addr, offset, &data, sizeof(data), sizeof(data));
+	virtio_cwrite_bytes(addr, offset, &data, sizeof(data), sizeof(data));
 }
 
 /**
@@ -308,7 +309,7 @@ static inline void virtio_cwrite16(const void *addr, const __u8 offset,
 static inline void virtio_cwrite32(const void *addr, const __u8 offset,
 				   const __u32 data)
 {
-	_virtio_cwrite_bytes(addr, offset, &data, sizeof(data), sizeof(data));
+	virtio_cwrite_bytes(addr, offset, &data, sizeof(data), sizeof(data));
 }
 
 #ifdef __cplusplus
