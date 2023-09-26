@@ -111,11 +111,71 @@ static inline void virtio_cread_bytes(const void *addr, const __u8 offset,
 		}
 	}
 }
+
+static inline
+void virtio_mmio_cwrite_bytes(const void *addr, const __u8 offset,
+			      const void *buf, int len, int type_len)
+{
+	int i = 0;
+	__u64 io_addr;
+	int count;
+
+	count  = len / type_len;
+	for (i = 0; i < count; i++) {
+		io_addr = ((unsigned long)addr) + offset + (i * type_len);
+		switch (type_len) {
+		case 1:
+			writeb((__u8 *)io_addr, ((__u8 *)buf)[i * type_len]);
+			break;
+		case 2:
+			writew((__u16 *)io_addr, ((__u16 *)buf)[i * type_len]);
+			break;
+		case 4:
+			writel((__u32 *)io_addr, ((__u32 *)buf)[i * type_len]);
+			break;
+		default:
+			UK_CRASH("Unsupported virtio write operation\n");
+		}
+	}
+}
+
+static inline
+void virtio_mmio_cread_bytes(const void *addr, const __u8 offset,
+			     void *buf, int len, int type_len)
+{
+	int i = 0;
+	__u64 io_addr;
+	int count;
+
+	count = len / type_len;
+	for (i = 0; i < count; i++) {
+		io_addr = ((unsigned long)addr) + offset + (i * type_len);
+		switch (type_len) {
+		case 1:
+			((__u8 *)buf)[i * type_len] = readb((__u8 *)io_addr);
+			break;
+		case 2:
+			((__u16 *)buf)[i * type_len] = readw((__u16 *)io_addr);
+			break;
+		case 4:
+			((__u32 *)buf)[i * type_len] = readl((__u32 *)io_addr);
+			break;
+		case 8:
+			((__u64  *)buf)[i * type_len] = readq((__u64  *)io_addr);
+			break;
+		default:
+			UK_CRASH("Unsupported virtio read operation\n");
+		}
+	}
+}
 #else  /* !CONFIG_ARCH_X86_64 */
 
 /* IO barriers */
 #define __iormb()		rmb()
 #define __iowmb()		wmb()
+
+#define virtio_mmio_cwrite_bytes	virtio_cwrite_bytes
+#define virtio_mmio_cread_bytes		virtio_cread_bytes
 
 static inline void virtio_cwrite_bytes(const void *addr, const __u8 offset,
 				       const void *buf, int len, int type_len)
@@ -189,7 +249,7 @@ static inline int virtio_cread_bytes_many(const void *addr, const __u8 offset,
 					  __u8 *buf, __u32 len)
 {
 	__u8 old_buf[len];
-	int check = -1;
+	int check;
 	int cnt = 0;
 	__u32 i = 0;
 
@@ -310,6 +370,114 @@ static inline void virtio_cwrite32(const void *addr, const __u8 offset,
 				   const __u32 data)
 {
 	virtio_cwrite_bytes(addr, offset, &data, sizeof(data), sizeof(data));
+}
+
+/**
+ * Read an 8-bit item from the device's config space
+ *
+ * @param addr
+ *   The base address of the device.
+ * @param offset
+ *   The offset with the device address space.
+ * @return __u8
+ *   Returns the value configuration register.
+ */
+static inline __u8 virtio_mmio_cread8(const void *addr, const __u8 offset)
+{
+	__u8 buf = 0;
+
+	virtio_mmio_cread_bytes(addr, offset, &buf, sizeof(buf), sizeof(buf));
+
+	return buf;
+}
+
+/**
+ * Read a 16-bit item from the device's config space
+ *
+ * @param addr
+ *   The base address of the device.
+ * @param offset
+ *   The offset with the device address space.
+ * @return __u16
+ *   Returns the value configuration register.
+ */
+static inline __u16 virtio_mmio_cread16(const void *addr, const __u8 offset)
+{
+	__u16 buf = 0;
+
+	virtio_mmio_cread_bytes(addr, offset, &buf, sizeof(buf), sizeof(buf));
+
+	return buf;
+}
+
+/**
+ * Read a 32-bit item from the device's config space
+ *
+ * @param addr
+ *   The base address of the device.
+ * @param offset
+ *   The offset with the device address space.
+ * @return __u32
+ *   Returns the value configuration register.
+ */
+static inline __u32 virtio_mmio_cread32(const void *addr, const __u8 offset)
+{
+	__u32 buf = 0;
+
+	virtio_mmio_cread_bytes(addr, offset, &buf, sizeof(buf), sizeof(buf));
+
+	return buf;
+}
+
+/**
+ * Write an 8-bit item from the device's config space
+ *
+ * @param addr
+ *   The base address of the device.
+ * @param offset
+ *   The offset with the device address space.
+ * @param data
+ *   The value to write to the configuration.
+ */
+static inline void virtio_mmio_cwrite8(const void *addr, const __u8 offset,
+				       const __u8 data)
+{
+	virtio_mmio_cwrite_bytes(addr, offset, &data, sizeof(data),
+				 sizeof(data));
+}
+
+/**
+ * Write a 16-bit item from the device's config space
+ *
+ * @param addr
+ *   The base address of the device.
+ * @param offset
+ *   The offset with the device address space.
+ * @param data
+ *   The value to write to the configuration.
+ */
+static inline void virtio_mmio_cwrite16(const void *addr, const __u8 offset,
+					const __u16 data)
+{
+	virtio_mmio_cwrite_bytes(addr, offset, &data, sizeof(data),
+				 sizeof(data));
+}
+
+/**
+ * Write a 32-bit item from the device's config space
+ *
+ * @param addr
+ *   The base address of the device.
+ * @param offset
+ *   The offset with the device address space.
+ * @param data
+ *   The value to write to the configuration.
+ */
+static inline void virtio_mmio_cwrite32(const void *addr, const __u8 offset,
+					const __u32 data)
+{
+	virtio_mmio_cwrite_bytes(addr, offset, &data, sizeof(data),
+				 sizeof(data));
 }
 
 #ifdef __cplusplus
