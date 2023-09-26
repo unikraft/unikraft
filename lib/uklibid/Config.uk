@@ -37,6 +37,13 @@ config LIBUKLIBID_INFO
 				Enables storing the C compiler ($(CC)) that was
 				used for during compilation for the unikernel
 				image.
+
+		config LIBUKLIBID_INFO_UKCONFIGGZ
+			bool "Embed gzipped configuration (.config)"
+			help
+				If enabled, the current configuration `.config`
+				of the build is gzipped and embedded to the
+				global metadata infomration space.
 	endmenu
 
 	menu "Per library metadata"
