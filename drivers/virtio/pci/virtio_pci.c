@@ -250,8 +250,8 @@ static int vpci_legacy_pci_config_set(struct virtio_dev *vdev, __u16 offset,
 	UK_ASSERT(vdev);
 	vpdev = to_virtiopcidev(vdev);
 
-	_virtio_cwrite_bytes((void *)(unsigned long)vpdev->pci_base_addr,
-			     VIRTIO_PCI_CONFIG_OFF + offset, buf, len, 1);
+	virtio_cwrite_bytes((void *)(unsigned long)vpdev->pci_base_addr,
+			    VIRTIO_PCI_CONFIG_OFF + offset, buf, len, 1);
 
 	return 0;
 }
@@ -267,7 +267,7 @@ static int vpci_legacy_pci_config_get(struct virtio_dev *vdev, __u16 offset,
 
 	/* Reading an entity less than 4 bytes are atomic */
 	if (type_len == len && type_len <= 4) {
-		_virtio_cread_bytes(
+		virtio_cread_bytes(
 				(void *) (unsigned long)vpdev->pci_base_addr,
 				VIRTIO_PCI_CONFIG_OFF + offset, buf, len,
 				type_len);
