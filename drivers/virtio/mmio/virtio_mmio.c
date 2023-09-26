@@ -168,7 +168,7 @@ static int vm_get(struct virtio_dev *vdev, __u16 offset,
 		break;
 	default:
 		virtio_mmio_cread_bytes(base, offset, buf, len, 1);
-		uk_pr_warn("Unaligned mmio read: %d bytes\n", len);
+		uk_pr_warn("Unaligned io read: %d bytes\n", len);
 	}
 
 	return len;
@@ -213,7 +213,7 @@ static int vm_set(struct virtio_dev *vdev, __u16 offset,
 		break;
 	default:
 		virtio_mmio_cwrite_bytes(base, offset, buf, len, 1);
-		uk_pr_warn("Unaligned mmio write: %d bytes\n", len);
+		uk_pr_warn("Unaligned io write: %d bytes\n", len);
 	}
 
 	return 0;
