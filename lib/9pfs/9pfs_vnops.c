@@ -1012,8 +1012,10 @@ static int uk_9pfs_symlink(struct vnode *dvp, const char *op, const char *np)
 	return 0;
 }
 
-static int uk_9pfs_ioctl(struct vnode *dvp, struct vfscore_file *fp,
-			 unsigned long com, void *data)
+static int uk_9pfs_ioctl(struct vnode *dvp __unused,
+			 struct vfscore_file *fp __unused,
+			 unsigned long com,
+			 void *data __unused)
 {
 	/**
 	 * HACK: In binary compatibility mode, Ruby tries to set O_ASYNC,
