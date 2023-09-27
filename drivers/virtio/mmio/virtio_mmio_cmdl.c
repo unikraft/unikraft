@@ -31,19 +31,17 @@ static char *parse_size(const char *size_str, size_t *sz)
 	*sz = strtoull(size_str, &endptr, 0);
 
 	switch (*endptr) {
+	case 'g':
+	case 'G':
+		*sz *= 1024;
+		__fallthrough;
+	case 'm':
+	case 'M':
+		*sz *= 1024;
+		__fallthrough;
 	case 'k':
 	case 'K':
 		*sz *= 1024;
-		++endptr;
-		break;
-	case 'm':
-	case 'M':
-		*sz *= 1024 * 1024;
-		++endptr;
-		break;
-	case 'g':
-	case 'G':
-		*sz *= 1024 * 1024 * 1024;
 		++endptr;
 		break;
 	default:
