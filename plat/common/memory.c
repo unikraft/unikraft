@@ -180,6 +180,8 @@ static inline int get_mrd_prio(struct ukplat_memregion_desc *const m)
  * contains the right memory region of higher priority, then split the left one
  * in two, by adjusting the current left one and inserting a new memory region
  * descriptor.
+ * The start of the left memory region in the list is always less
+ * or equal to the start of the right memory region in the list.
  */
 static inline void overlapping_mrd_fixup(struct ukplat_memregion_list *list,
 					 struct ukplat_memregion_desc *const ml,
@@ -217,22 +219,27 @@ static inline void overlapping_mrd_fixup(struct ukplat_memregion_list *list,
 		 * a new one if the left region is larger than the right region.
 		 */
 		} else {
+			__sz len = ml->pbase + ml->len - mr->pbase - mr->len;
+
 			if (RANGE_CONTAIN(ml->pbase, ml->len,
-					  mr->pbase, mr->len))
-				/* Ignore insertion failure as there is nothing
-				 * we can do about it and it is not worth caring
-				 * about.
+					  mr->pbase, mr->len && len))
+				/* len here is basically ml_end - mr_end. Thus,
+				 * len == 0 can happen only if mr is at the end
+				 * of the ml and we therefore ignore the rest.
+				 * If we ended up here then mr is actually
+				 * somewhere in the middle of ml and we are
+				 * inserting the mrd between mr_end and ml_end
 				 */
 				ukplat_memregion_list_insert_at_idx(list,
 					&(struct ukplat_memregion_desc){
 						.vbase = mr->pbase + mr->len,
 						.pbase = mr->pbase + mr->len,
-						.len   = ml->pbase + ml->len -
-							 mr->pbase - mr->len,
+						.len   = len,
 						.type  = ml->type,
 						.flags = ml->flags
 					}, ridx + 1);
 
+			/* Drop the fraction of ml that overlaps with mr */
 			ml->len = mr->pbase - ml->pbase;
 		}
 	}
@@ -279,6 +286,8 @@ static void ukplat_memregion_restore_mrd(struct ukplat_memregion_desc *mrd,
 /* Quick function to do potentially necessary swapping of two adjacent memory
  * region descriptors. Here just to modularize code because
  * ukplat_memregion_list_coalesce was quite large already.
+ * Guarantees the start of the left memory region in the list is always less
+ * or equal to the start of the right memory region in the list.
  */
 static void ukplat_memregion_swap_if_unordered(struct ukplat_memregion_list *l,
 					       __u32 l_idx, __u32 r_idx)
