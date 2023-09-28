@@ -46,6 +46,10 @@
 #include <uk/arch/memtag.h>
 #endif /* CONFIG_HAVE_MEMTAG */
 
+#if CONFIG_LIBUKRSI
+#include <uk/rsi.h>
+#endif /* CONFIG_LIBUKRSI */
+
 smccc_conduit_fn_t smccc_psci_call;
 
 #ifdef CONFIG_UKPLAT_ACPI
@@ -163,7 +167,16 @@ void __no_pauth _ukplat_entry(struct ukplat_bootinfo *bi)
 
 	fdt = (void *)bi->dtb;
 
+	/* With ukrsi, console init is deferred after paging initialization,
+	 * when the device region is properly setup.
+	 */
+#if CONFIG_LIBUKRSI
+	rc = uk_rsi_init_memory();
+	if (unlikely(rc))
+		UK_CRASH("Could not initialize memory for CCA\n");
+#else /* !CONFIG_LIBUKRSI */
 	kvm_console_init(fdt);
+#endif /* CONFIG_LIBUKRSI */
 
 	rc = cmdline_init(bi);
 	if (unlikely(rc < 0))
@@ -183,6 +196,10 @@ void __no_pauth _ukplat_entry(struct ukplat_bootinfo *bi)
 	rc = ukplat_mem_init();
 	if (unlikely(rc))
 		UK_CRASH("Could not initialize paging (%d)\n", rc);
+
+#if CONFIG_LIBUKRSI
+	kvm_console_init(fdt);
+#endif /* CONFIG_LIBUKRSI */
 
 #if defined(CONFIG_ENFORCE_W_XOR_X) && defined(CONFIG_PAGING)
 	enforce_w_xor_x();

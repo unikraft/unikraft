@@ -33,6 +33,10 @@
 #include <uk/assert.h>
 #include <arm/cpu.h>
 
+#if CONFIG_LIBUKRSI
+#include <uk/rsi.h>
+#endif /* CONFIG_LIBUKRSI */
+
 #define NS16550_THR_OFFSET	0x00U
 #define NS16550_RBR_OFFSET	0x00U
 #define NS16550_IER_OFFSET	0x01U
@@ -57,12 +61,12 @@
  * use ns16550_uart_initialized as an extra variable to check
  * whether the UART has been initialized.
  */
-#if defined(CONFIG_EARLY_UART_NS16550)
-static uint8_t ns16550_uart_initialized = 1;
-static uint64_t ns16550_uart_base = CONFIG_EARLY_UART_NS16550_BASE;
-#else
+#if !CONFIG_EARLY_UART_NS16550 || CONFIG_LIBUKRSI
 static uint8_t ns16550_uart_initialized;
 static uint64_t ns16550_uart_base;
+#else
+static uint8_t ns16550_uart_initialized = 1;
+static uint64_t ns16550_uart_base = CONFIG_EARLY_UART_NS16550_BASE;
 #endif
 
 /* The register shift. Default is 0 (device-tree spec v0.4 Sect. 4.2.2) */
@@ -73,6 +77,25 @@ static uint32_t ns16550_reg_width = CONFIG_UART_NS16550_REG_WIDTH;
 
 /* Macros to access ns16550 registers with base address and reg shift */
 #define NS16550_REG(r) (ns16550_uart_base + (r << ns16550_reg_shift))
+
+static uint8_t initialized(void)
+{
+#if CONFIG_LIBUKRSI && CONFIG_EARLY_UART_NS16550
+	__u64 new_base;
+	int rc;
+
+	if (unlikely(!ns16550_uart_initialized)) {
+		rc = uk_rsi_set_early_unprotected(
+		    CONFIG_EARLY_UART_NS16550_BASE, __PAGE_SIZE,
+		    &new_base);
+		if (!rc) {
+			ns16550_uart_initialized = 1;
+			ns16550_uart_base = new_base;
+		}
+	}
+#endif
+	return ns16550_uart_initialized;
+}
 
 static uint32_t ns16550_reg_read(uint32_t reg)
 {
@@ -189,10 +212,9 @@ static void _putc(char a)
 static void ns16550_putc(char a)
 {
 	/*
-	 * Avoid using the UART before base address initialized, or
-	 * if CONFIG_EARLY_UART_NS16550 is not enabled.
+	 * Avoid using the UART before base address initialized.
 	 */
-	if (!ns16550_uart_initialized)
+	if (!initialized())
 		return;
 
 	if (a == '\n')
@@ -204,10 +226,9 @@ static void ns16550_putc(char a)
 static int ns16550_getc(void)
 {
 	/*
-	 * Avoid using the UART before base address initialized, or
-	 * if CONFIG_EARLY_UART_NS16550 is not enabled.
+	 * Avoid using the UART before base address initialized.
 	 */
-	if (!ns16550_uart_initialized)
+	if (!initialized())
 		return -1;
 
 	/* If RX FIFO is empty, return -1 immediately */

@@ -93,6 +93,9 @@ void ukplat_bootinfo_print(void)
 		case UKPLAT_MEMRT_STACK:
 			type = "stck";
 			break;
+		case UKPLAT_MEMRT_REALM:
+			type = "realm";
+			break;
 		default:
 			type = "";
 			break;

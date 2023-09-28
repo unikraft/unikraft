@@ -36,7 +36,11 @@
 #include <uk/config.h>
 #include <uk/reloc.h>
 
+#if CONFIG_LIBUKRSI
+#define BOOTSTACK_SIZE	16384
+#else /* !CONFIG_LIBUKRSI */
 #define BOOTSTACK_SIZE	4096
+#endif /* CONFIG_LIBUKRSI */
 
 /* Prefer using in-image stack, to avoid conflicts when unmapping is done by
  * paging_init (it invalidates our stack)
@@ -127,6 +131,10 @@ ENTRY(_libkvmplat_entry)
 
 	/* Enable the mmu */
 	bl start_mmu
+
+#if CONFIG_LIBUKRSI
+	bl uk_rsi_init
+#endif /* CONFIG_LIBUKRSI */
 
 	/* Load dtb address to x0 as a parameter */
 #if defined(CONFIG_KVM_BOOT_PROTO_LXBOOT)
