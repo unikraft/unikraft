@@ -981,7 +981,9 @@ $(call libname2preolib,$(1)): $$($(call vprefix_lib,$(1),OBJS)) \
 			      $$($(call vprefix_lib,$(1),LDS)) \
 			      $$($(call vprefix_lib,$(1),LDS-y)) \
 			      $$($(call vprefix_lib,$(1),DTB)) \
-			      $$($(call vprefix_lib,$(1),DTB-y))
+			      $$($(call vprefix_lib,$(1),DTB-y)) \
+			      $$($(call vprefix_lib,$(1),LDEPS)) \
+			      $$($(call vprefix_lib,$(1),LDEPS-y))
 	$(call build_cmd,LD,,$(call libname2preolib,$(1)),\
 		$(LD) $$(LIBLDFLAGS) $$(LIBLDFLAGS-y) \
 		      $$($(call vprefix_lib,$(1),LDFLAGS)) \
