@@ -104,7 +104,7 @@ void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
 	__builtin_unreachable();
 }
 
-#ifdef CONFIG_HAVE_SMP
+#if CONFIG_HAVE_SMP
 IMPORT_START16_SYM(gdt32_ptr, 2, MOV);
 IMPORT_START16_SYM(gdt32, 4, DATA);
 IMPORT_START16_SYM(lcpu_start16, 2, MOV);
@@ -115,36 +115,54 @@ IMPORT_START16_SYM(lcpu_start32, 4, MOV);
  * corresponding boot code somewhere in the first 1 MiB. We copy the trampoline
  * code to the target address during MP initialization.
  */
-#if CONFIG_LIBUKRELOC
+#define START16_RELOC_ENTRY(sym, sz, type)				\
+	{								\
+		.r_mem_off = START16_##type##_OFF(sym, sz),		\
+		.r_addr = (void *)(sym) - (void *)x86_start16_begin,	\
+		.r_sz = (sz),						\
+	}
+
+static void apply_start16_reloc(__u64 baddr, __u64 r_mem_off,
+				__u64 r_addr, __u32 r_sz)
+{
+	switch (r_sz) {
+	case 2:
+		*(__u16 *)((__u8 *)baddr + r_mem_off) = (__u16)(baddr + r_addr);
+		break;
+	case 4:
+		*(__u32 *)((__u8 *)baddr + r_mem_off) = (__u32)(baddr + r_addr);
+		break;
+	}
+}
+
 static void start16_reloc_mp_init(void)
 {
-	size_t i;
-	struct uk_reloc x86_start16_relocs[] = {
-		START16_UKRELOC_ENTRY(lcpu_start16, 2, MOV),
-		START16_UKRELOC_ENTRY(gdt32, 4, DATA),
-		START16_UKRELOC_ENTRY(gdt32_ptr, 2, MOV),
-		START16_UKRELOC_ENTRY(jump_to32, 2, MOV),
+	struct {
+		__u64 r_mem_off;
+		__u64 r_addr;
+		__u32 r_sz;
+	} x86_start16_relocs[] = {
+		START16_RELOC_ENTRY(lcpu_start16, 2, MOV),
+		START16_RELOC_ENTRY(gdt32_ptr, 2, MOV),
+		START16_RELOC_ENTRY(gdt32, 4, DATA),
+		START16_RELOC_ENTRY(jump_to32, 2, MOV),
+		START16_RELOC_ENTRY(lcpu_start32, 4, MOV),
 	};
+	__sz i;
 
 	for (i = 0; i < ARRAY_SIZE(x86_start16_relocs); i++)
-		apply_uk_reloc(&x86_start16_relocs[i],
-			      (__u64)x86_start16_addr +
-			      x86_start16_relocs[i].r_addr,
-			      (void *)x86_start16_addr);
+		apply_start16_reloc((__u64)x86_start16_addr,
+				    x86_start16_relocs[i].r_mem_off,
+				    x86_start16_relocs[i].r_addr,
+				    x86_start16_relocs[i].r_sz);
 
 	/* Unlike the other entries, lcpu_start32 must stay the same
-	 * as it is not part of the start16 section
+	 * as it is not part of the start16 section.
 	 */
-	apply_uk_reloc(&(struct uk_reloc)UKRELOC_ENTRY(
-				START16_MOV_OFF(lcpu_start32, 4),
-				(__u64)lcpu_start32, 4,
-				UKRELOC_FLAGS_PHYS_REL),
-		       (__u64)lcpu_start32,
-		       (void *)x86_start16_addr);
+	apply_start16_reloc((__u64)x86_start16_addr,
+			    START16_MOV_OFF(lcpu_start32, 4),
+			    (__u64)lcpu_start32 - (__u64)x86_start16_addr, 4);
 }
-#else  /* CONFIG_LIBUKRELOC */
-static void start16_reloc_mp_init(void) { }
-#endif /* !CONFIG_LIBUKRELOC */
 
 int lcpu_arch_mp_init(void *arg __unused)
 {
