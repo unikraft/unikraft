@@ -778,9 +778,8 @@ fetch: $(UK_FETCH) $(UK_FETCH-y)
 
 # Copy current configuration in order to detect changes
 $(UK_CONFIG_OUT): $(UK_CONFIG)
-	$(call verbose_cmd,CP,config,$(CP) \
-		$(UK_CONFIG) \
-		$(UK_CONFIG_OUT))
+	$(call verbose_cmd,CP,config, \
+		cmp -s $^ $@; if [ $$? -ne 0 ]; then cp $^ $@; fi)
 
 prepare: $(KCONFIG_AUTOHEADER) $(UK_CONFIG_OUT) $(UK_PREPARE) $(UK_PREPARE-y)
 prepare: $(UK_FIXDEP) | fetch
@@ -983,8 +982,10 @@ oldconfig:
 	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 # Regenerate $(KCONFIG_AUTOHEADER) whenever $(UK_CONFIG) changed
-$(KCONFIG_AUTOHEADER): $(UK_CONFIG)
-	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/genconfig.py --header-path $(KCONFIG_AUTOHEADER) $(CONFIG_CONFIG_IN)
+$(KCONFIG_AUTOHEADER): $(UK_CONFIG_OUT)
+	$(call verbose_cmd,GEN,config.h, \
+		$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/genconfig.py \
+			--header-path $(KCONFIG_AUTOHEADER) $(CONFIG_CONFIG_IN))
 else
 # Use traditional KConfig system on Linux
 xconfig: $(KCONFIG_DIR)/qconf
@@ -1062,8 +1063,10 @@ endif
 .PHONY: defconfig savedefconfig silentoldconfig
 
 # Regenerate $(KCONFIG_AUTOHEADER) whenever $(UK_CONFIG) changed
-$(KCONFIG_AUTOHEADER): $(UK_CONFIG) $(KCONFIG_DIR)/conf
-	@$(COMMON_CONFIG_ENV) $(KCONFIG_DIR)/conf --syncconfig $(CONFIG_CONFIG_IN)
+$(KCONFIG_AUTOHEADER): $(UK_CONFIG_OUT) $(KCONFIG_DIR)/conf
+	$(call verbose_cmd,GEN,config.h, \
+		$(COMMON_CONFIG_ENV) $(KCONFIG_DIR)/conf \
+			--syncconfig $(CONFIG_CONFIG_IN))
 endif
 
 
