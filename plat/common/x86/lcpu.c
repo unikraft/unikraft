@@ -105,18 +105,18 @@ void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
 }
 
 #ifdef CONFIG_HAVE_SMP
+IMPORT_START16_SYM(gdt32_ptr, 2, MOV);
+IMPORT_START16_SYM(gdt32, 4, DATA);
+IMPORT_START16_SYM(lcpu_start16, 2, MOV);
+IMPORT_START16_SYM(jump_to32, 2, MOV);
+IMPORT_START16_SYM(lcpu_start32, 4, MOV);
+
 /* Secondary cores start in 16-bit real-mode and we have to provide the
  * corresponding boot code somewhere in the first 1 MiB. We copy the trampoline
  * code to the target address during MP initialization.
  */
 #if CONFIG_LIBUKRELOC
-IMPORT_START16_UKRELOC_SYM(gdt32_ptr, 2, MOV);
-IMPORT_START16_UKRELOC_SYM(gdt32, 4, DATA);
-IMPORT_START16_UKRELOC_SYM(lcpu_start16, 2, MOV);
-IMPORT_START16_UKRELOC_SYM(jump_to32, 2, MOV);
-IMPORT_START16_UKRELOC_SYM(lcpu_start32, 4, MOV);
-
-static void uk_reloc_mp_init(void)
+static void start16_reloc_mp_init(void)
 {
 	size_t i;
 	struct uk_reloc x86_start16_relocs[] = {
@@ -136,14 +136,14 @@ static void uk_reloc_mp_init(void)
 	 * as it is not part of the start16 section
 	 */
 	apply_uk_reloc(&(struct uk_reloc)UKRELOC_ENTRY(
-				START16_UKRELOC_MOV_OFF(lcpu_start32, 4),
+				START16_MOV_OFF(lcpu_start32, 4),
 				(__u64)lcpu_start32, 4,
 				UKRELOC_FLAGS_PHYS_REL),
 		       (__u64)lcpu_start32,
 		       (void *)x86_start16_addr);
 }
 #else  /* CONFIG_LIBUKRELOC */
-static void uk_reloc_mp_init(void) { }
+static void start16_reloc_mp_init(void) { }
 #endif /* !CONFIG_LIBUKRELOC */
 
 int lcpu_arch_mp_init(void *arg __unused)
@@ -214,7 +214,7 @@ int lcpu_arch_mp_init(void *arg __unused)
 	UK_ASSERT(x86_start16_addr < 0x100000);
 	memcpy((void *)x86_start16_addr, &x86_start16_begin, X86_START16_SIZE);
 
-	uk_reloc_mp_init();
+	start16_reloc_mp_init();
 
 	uk_pr_debug("Copied AP 16-bit boot code to 0x%"__PRIvaddr"\n",
 		    x86_start16_addr);

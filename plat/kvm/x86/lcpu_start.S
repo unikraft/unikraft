@@ -53,25 +53,26 @@
 x86_start16_addr:
 	.quad	START16_PLACEHOLDER
 
-/* Implement dedicate ur_* macro's whose only use-case is this file to cope with
- * the existence of 16-bit code. This is so it does not interfere with the other
- * uses of the ur_* macro's. For example, we not want symbols for these to
- * occupy unnecessary space in .uk_reloc.
+/* Implement dedicated start16 macro's whose only use-case is this file to cope
+ * with the existence of 16-bit code. This is so it does not interfere with the
+ * other uses of the ur_* macro's.
+ * For example, we do not want symbols for these to occupy unnecessary space in
+ * .uk_reloc.
  *
  * NOTE:IF ADDING/REMOVING RELOCATIONS FROM HERE, THEN ADD/REMOVE
- *	CORRESPONDENT SYMBOL TO `lcpu.c` (see IMPORT_START16_UKRELOC_SYM
+ *	CORRESPONDENT SYMBOL TO `lcpu.c` (see IMPORT_START16_SYM
  *	start16_helpers.h macros being used on start16 symbols)
  */
-.macro ur_mov_start16	sym:req, reg:req, bytes:req
+.macro mov_start16	sym:req, reg:req, bytes:req
 	mov	$START16_PLACEHOLDER, \reg
-.globl	\sym\()_uk_reloc_imm\bytes\()_start16
-.set	\sym\()_uk_reloc_imm\bytes\()_start16, (. - \bytes)
+.globl	\sym\()_imm\bytes\()_start16
+.set	\sym\()_imm\bytes\()_start16, (. - \bytes)
 	nop
 .endm
 
-.macro ur_data_start16	type:req, sym:req, bytes:req
-.globl	\sym\()_uk_reloc_data\bytes\()_start16
-.set	\sym\()_uk_reloc_data\bytes\()_start16, .
+.macro data_start16	type:req, sym:req, bytes:req
+.globl	\sym\()_data\bytes\()_start16
+.set	\sym\()_data\bytes\()_start16, .
 	.\type	START16_PLACEHOLDER
 .endm
 
@@ -94,7 +95,7 @@ ENTRY(lcpu_start16_ap)
 	xorl	%edi, %edi
 	xorl	%esi, %esi
 
-	ur_mov_start16	lcpu_start16, %ax, 2
+	mov_start16	lcpu_start16, %ax, 2
 	/* On start-up a core's %cs is set depending on the value of the vector
 	 * inside the SIPI message, so make sure we are jumping to the
 	 * proper address w.r.t. segmentation.
@@ -123,7 +124,7 @@ gdt32_null:
 .globl gdt32_ptr
 gdt32_ptr:
 	.word	(gdt32_end - gdt32 - 1)	/* size - 1	*/
-	ur_data_start16	long, gdt32, 4	/* GDT address	*/
+	data_start16	long, gdt32, 4	/* GDT address	*/
 gdt32_cs:
 	.quad	GDT_DESC_CODE32_VAL	/* 32-bit CS	*/
 gdt32_ds:
@@ -143,7 +144,7 @@ ENTRY(lcpu_start16)
 	movl	%eax, %cr0
 
 	/* Load 32-bit GDT and jump into 32-bit code segment */
-	ur_mov_start16	gdt32_ptr, %ax, 2
+	mov_start16	gdt32_ptr, %ax, 2
 	lgdt	(%eax)
 
 	/* ljmp encoding has 5 opcodes, thus 40 bits, which in our case
@@ -161,7 +162,7 @@ ENTRY(lcpu_start16)
 	 * address corresponds to the very next instruction in memory
 	 * after our ljmp.
 	 */
-	ur_mov_start16	jump_to32, %ax, 2
+	mov_start16	jump_to32, %ax, 2
 	movw	%ax, -4(%eax)
 	ljmp	$(gdt32_cs - gdt32), $START16_PLACEHOLDER
 
@@ -178,7 +179,7 @@ jump_to32:
 	movl	%eax, %fs
 	movl	%eax, %gs
 
-	ur_mov_start16	lcpu_start32, %eax, 4
+	mov_start16	lcpu_start32, %eax, 4
 
 	jmp	*%eax
 END(lcpu_start16)

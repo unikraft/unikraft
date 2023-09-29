@@ -14,27 +14,27 @@ extern void *x86_start16_end[];
 #define X86_START16_SIZE						\
 	((__uptr)x86_start16_end - (__uptr)x86_start16_begin)
 
-#if CONFIG_LIBUKRELOC
-#define START16_UKRELOC_MOV_SYM(sym, sz)				\
-	sym##_uk_reloc_imm##sz##_start16
+#define START16_MOV_SYM(sym, sz)					\
+	sym##_imm##sz##_start16
 
-#define START16_UKRELOC_DATA_SYM(sym, sz)				\
-	sym##_uk_reloc_data##sz##_start16
+#define START16_DATA_SYM(sym, sz)					\
+	sym##_data##sz##_start16
 
-#define IMPORT_START16_UKRELOC_SYM(sym, sz, type)			\
+#define IMPORT_START16_SYM(sym, sz, type)				\
 	extern void *sym[];						\
-	extern void *START16_UKRELOC_##type##_SYM(sym, sz)[]
+	extern void *START16_##type##_SYM(sym, sz)[]
 
-#define START16_UKRELOC_MOV_OFF(sym, sz)				\
-	((void *)START16_UKRELOC_MOV_SYM(sym, sz) -			\
+#define START16_MOV_OFF(sym, sz)					\
+	((void *)START16_MOV_SYM(sym, sz) -				\
 	(void *)x86_start16_begin)
 
-#define START16_UKRELOC_DATA_OFF(sym, sz)				\
-	((void *)START16_UKRELOC_DATA_SYM(sym, sz) -			\
+#define START16_DATA_OFF(sym, sz)					\
+	((void *)START16_DATA_SYM(sym, sz) -				\
 	(void *)x86_start16_begin)
 
+#if CONFIG_LIBUKRELOC
 #define START16_UKRELOC_ENTRY(sym, sz, type)				\
-	UKRELOC_ENTRY(START16_UKRELOC_##type##_OFF(sym, sz),		\
+	UKRELOC_ENTRY(START16_##type##_OFF(sym, sz),			\
 		       (void *)sym - (void *)x86_start16_begin,		\
 		       sz, UKRELOC_FLAGS_PHYS_REL)
 #endif /* CONFIG_LIBUKRELOC */
