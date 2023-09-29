@@ -974,6 +974,7 @@ ifeq ($(HOSTARCH),$(CONFIG_UK_ARCH))
 	@# Make sure arch is stored in the file even if arch matches between host and config
 	@echo "$(call ukarch_str2cfg,$(CONFIG_UK_ARCH))=y" >> $(DEFCONFIG)
 endif
+	@echo "CONFIG_UK_NAME=\"$(CONFIG_UK_NAME)\"" >> $(DEFCONFIG)
 
 oldconfig:
 	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/oldconfig.py $(CONFIG_CONFIG_IN)
@@ -1053,6 +1054,8 @@ ifeq ($(HOSTARCH),$(CONFIG_UK_ARCH))
 	@echo "$(call ukarch_str2cfg,$(CONFIG_UK_ARCH))=y" >> \
 		$(if $(DEFCONFIG),$(DEFCONFIG),$(CONFIG_DIR)/defconfig)
 endif
+	@echo "CONFIG_UK_NAME=\"$(CONFIG_UK_NAME)\"" >> \
+		$(if $(DEFCONFIG),$(DEFCONFIG),$(CONFIG_DIR)/defconfig)
 
 .PHONY: defconfig savedefconfig silentoldconfig
 
