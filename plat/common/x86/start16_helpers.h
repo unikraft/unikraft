@@ -32,11 +32,4 @@ extern void *x86_start16_end[];
 	((void *)START16_DATA_SYM(sym, sz) -				\
 	(void *)x86_start16_begin)
 
-#if CONFIG_LIBUKRELOC
-#define START16_UKRELOC_ENTRY(sym, sz, type)				\
-	UKRELOC_ENTRY(START16_##type##_OFF(sym, sz),			\
-		       (void *)sym - (void *)x86_start16_begin,		\
-		       sz, UKRELOC_FLAGS_PHYS_REL)
-#endif /* CONFIG_LIBUKRELOC */
-
 #endif  /* __START16_HELPERS_H__ */
