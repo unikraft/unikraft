@@ -885,6 +885,9 @@ $(if $(filter preprule_$(call fileext,$(strip $(2))),$(.VARIABLES)),,\
 $(error preprule_$(call fileext,$(strip $(2))) is not defined: Failed to install rule for $(2)))
 
 $(call preprule_$(call fileext,$(strip $(2))),$(strip $(1)),$(strip $(2)),$(strip $(3)),$(strip $(4)),$(strip $(5)))
+
+# default preprule dependencies
+$(strip $(3)): $(strip $(2))
 endef
 
 
