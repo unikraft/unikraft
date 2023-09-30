@@ -819,7 +819,12 @@ $(error buildrule_$(call fileext,$(strip $(2))) is not defined: Failed to instal
 $(call buildrule_$(call fileext,$(strip $(2))),$(strip $(1)),$(strip $(2)),$(strip $(3)),$(strip $(4)),$(strip $(5)))
 
 # Default buildrule_* dependencies
-$(4): $(call qstrip,$($(call vprefix_src,$(1),$(2),$(3),CDEPS)) $($(call vprefix_src,$(1),$(2),$(3),CDEPS-y))) | preprocess
+# FIXME: We add $(KCONFIG_AUTOHEADER) in order to forcefully retrigger compiling
+#        whenever there is a config change. This is a workaround until we can
+#        handle changes that affect the compile command lines properly.
+$(4): $(call qstrip,$($(call vprefix_src,$(1),$(2),$(3),CDEPS)) \
+      $($(call vprefix_src,$(1),$(2),$(3),CDEPS-y))) $(KCONFIG_AUTOHEADER) \
+      | preprocess
 endef
 
 #################################################
@@ -886,8 +891,11 @@ $(error preprule_$(call fileext,$(strip $(2))) is not defined: Failed to install
 
 $(call preprule_$(call fileext,$(strip $(2))),$(strip $(1)),$(strip $(2)),$(strip $(3)),$(strip $(4)),$(strip $(5)))
 
-# default preprule dependencies
-$(strip $(3)): $(strip $(2))
+# Default preprule dependencies
+# FIXME: We add $(KCONFIG_AUTOHEADER) in order to forcefully retrigger compiling
+#        whenever there is a config change. This is a workaround until we can
+#        handle changes that affect the compile command lines properly.
+$(strip $(3)): $(strip $(2)) $(KCONFIG_AUTOHEADER)
 endef
 
 
