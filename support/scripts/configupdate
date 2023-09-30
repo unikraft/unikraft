@@ -31,18 +31,12 @@ NL=$'\n'
 # Change of architecture?
 _comparesym "CONFIG_ARCH_" "${UK_CONFIG}" "${UK_CONFIG_OLD}" || UPDATES+="*** - CPU architecture changed${NL}"
 
-# Change of CPU options?
-_comparesym "CONFIG_MARCH_" "${UK_CONFIG}" "${UK_CONFIG_OLD}" || UPDATES+="*** - CPU optimization changed${NL}"
-
-# Change of optimizations?
-_comparesym "CONFIG_OPTIMIZE_" "${UK_CONFIG}" "${UK_CONFIG_OLD}" || UPDATES+="*** - Code optimization changed${NL}"
-
 if [ ! -z "$UPDATES" ]; then
 	echo "*** The following configuration changes were detected:"
 	echo -n "${UPDATES}"
-	echo "*** Execute 'make clean' before executing 'make'."
-	echo "*** This is to ensure that the new setting is applied"
-	echo "*** to every compilation unit."
+	echo "*** We highly recommend to execute 'make properclean' before"
+	echo "*** calling 'make'. This is to ensure that the new setting"
+	echo "*** is also considered by the fetch and prepare targets."
 	echo ""
 fi
 exit 0
