@@ -56,6 +56,8 @@ extern "C" {
 	} while (0)
 #endif /* CONFIG_LIBUKDEBUG */
 
+#define UK_REFCOUNT_INITIALIZER(val) ((__atomic){ .counter = (val) })
+
 /**
  * Initialize the atomic reference.
  *
