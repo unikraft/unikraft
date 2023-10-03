@@ -7,7 +7,11 @@
 #include <string.h>
 #include <x86/cpu.h>
 #include <x86/traps.h>
+#if CONFIG_UKPLAT_ACPI
 #include <uk/plat/common/acpi.h>
+#else /* !CONFIG_UKPLAT_ACPI */
+#include <uk/plat/common/mps.h>
+#endif /* !CONFIG_UKPLAT_ACPI */
 #include <uk/arch/limits.h>
 #include <uk/arch/types.h>
 #include <uk/arch/paging.h>
@@ -111,8 +115,12 @@ void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi)
 	/* Print boot information */
 	ukplat_bootinfo_print();
 
-#if defined(CONFIG_HAVE_SMP) && defined(CONFIG_UKPLAT_ACPI)
+#if CONFIG_HAVE_SMP
+#if CONFIG_UKPLAT_ACPI
 	rc = acpi_init();
+#else /* !CONFIG_UKPLAT_ACPI */
+	rc = uk_mps_init();
+#endif /* !CONFIG_UKPLAT_ACPI */
 	if (likely(rc == 0)) {
 		rc = lcpu_mp_init(CONFIG_UKPLAT_LCPU_RUN_IRQ,
 				  CONFIG_UKPLAT_LCPU_WAKEUP_IRQ,
@@ -120,7 +128,7 @@ void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi)
 		if (unlikely(rc))
 			uk_pr_err("SMP init failed: %d\n", rc);
 	} else {
-		uk_pr_err("ACPI init failed: %d\n", rc);
+		uk_pr_err("ACPI/MPS init failed: %d\n", rc);
 	}
 #endif /* CONFIG_HAVE_SMP && CONFIG_UKPLAT_ACPI */
 

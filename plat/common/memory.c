@@ -65,16 +65,18 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags)
 {
 	struct ukplat_memregion_desc *mrd, alloc_mrd = {0};
 	__vaddr_t unmap_start, unmap_end;
+	__sz unmap_len, desired_sz;
 	struct ukplat_bootinfo *bi;
 	__paddr_t pstart, pend;
 	__paddr_t ostart, olen;
-	__sz unmap_len;
 	int rc;
 
 	unmap_start = ALIGN_DOWN(bpt_unmap_mrd.vbase, __PAGE_SIZE);
 	unmap_end = unmap_start + ALIGN_DOWN(bpt_unmap_mrd.len, __PAGE_SIZE);
 	unmap_len = unmap_end - unmap_start;
 
+	/* Preserve desired size */
+	desired_sz = size;
 	size = ALIGN_UP(size, __PAGE_SIZE);
 	ukplat_memregion_foreach(&mrd, UKPLAT_MEMRT_FREE, 0, 0) {
 		UK_ASSERT(mrd->pbase <= __U64_MAX - size);
@@ -106,7 +108,7 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags)
 		if (olen - (pstart - ostart) == size) {
 			mrd->pbase = pstart;
 			mrd->vbase = pstart;
-			mrd->len = pend - pstart;
+			mrd->len = desired_sz;
 			mrd->type = type;
 			mrd->flags = flags;
 
@@ -122,7 +124,7 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags)
 		/* Insert allocated region */
 		alloc_mrd.vbase = pstart;
 		alloc_mrd.pbase = pstart;
-		alloc_mrd.len   = size;
+		alloc_mrd.len   = desired_sz;
 		alloc_mrd.type  = type;
 		alloc_mrd.flags = flags | UKPLAT_MEMRF_MAP;
 
@@ -152,19 +154,23 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags)
  * - the others are all allocated for Unikraft so they will have the same
  * priority
  */
+#define MRD_PRIO_FREE			0
+#define MRD_PRIO_KRNL_RSRC		1
+#define MRD_PRIO_RSVD			2
 static inline int get_mrd_prio(struct ukplat_memregion_desc *const m)
 {
 	switch (m->type) {
 	case UKPLAT_MEMRT_FREE:
-		return 0;
+		return MRD_PRIO_FREE;
 	case UKPLAT_MEMRT_INITRD:
 	case UKPLAT_MEMRT_CMDLINE:
 	case UKPLAT_MEMRT_STACK:
 	case UKPLAT_MEMRT_DEVICETREE:
 	case UKPLAT_MEMRT_KERNEL:
-		return 1;
+		return MRD_PRIO_KRNL_RSRC;
+	case UKPLAT_MEMRT_LBIOS:
 	case UKPLAT_MEMRT_RESERVED:
-		return 2;
+		return MRD_PRIO_RSVD;
 	default:
 		return -1;
 	}
@@ -212,66 +218,167 @@ static inline void overlapping_mrd_fixup(struct ukplat_memregion_list *list,
 		 * a new one if the left region is larger than the right region.
 		 */
 		} else {
+			/* len here is basically ml_end - mr_end. Thus,
+			 * len == 0 can happen only if:
+			 * - mr is at the end of the ml
+			 * - mr == ml, as mr can't be at the beginning
+			 * since ukplat_memregion_swap_if_unordered()
+			 * would have assigned mr as the actual ml.
+			 */
+			__sz len = ml->pbase + ml->len - mr->pbase - mr->len;
+
 			if (RANGE_CONTAIN(ml->pbase, ml->len,
-					  mr->pbase, mr->len))
-				/* Ignore insertion failure as there is nothing
-				 * we can do about it and it is not worth caring
-				 * about.
+					  mr->pbase, mr->len) && len) {
+
+				/* If we ended up here then mr is actually
+				 * somewhere in the middle of ml and we are
+				 * inserting the mrd between mr_end and ml_end
 				 */
 				ukplat_memregion_list_insert_at_idx(list,
 					&(struct ukplat_memregion_desc){
 						.vbase = mr->pbase + mr->len,
 						.pbase = mr->pbase + mr->len,
-						.len   = ml->pbase + ml->len -
-							 mr->pbase - mr->len,
+						.len   = len,
 						.type  = ml->type,
 						.flags = ml->flags
 					}, ridx + 1);
+			}
 
+			/* You may think that this could be 0 if mr is at the
+			 * beginning of ml, however this is not the case
+			 * because ukplat_memregion_swap_if_unordered()
+			 * guarantees that if ml_base == mr_base then mr
+			 * will be the one of higher length. And if that
+			 * would be the case, this would have been caught by
+			 * the
+			 * RANGE_CONTAIN(mr->pbase, mr->len, ml->pbase, ml->len)
+			 * if statement a few lines above.
+			 * Thus, this here can either:
+			 * - be 0 if ml is the same as mr
+			 * - be different from 0 if the two regions simply have
+			 * an overlapping fraction, in which case we drop the
+			 * overlapping region on ml's side, as it's of lower
+			 * priority.
+			 */
 			ml->len = mr->pbase - ml->pbase;
 		}
+	}
+}
+
+/* During coalescing of two memory region descriptors, we first call this
+ * function which would overwrite the physical and length of a given memory
+ * region descriptor with its equivalent page-aligned physical base and length
+ * if the end address of the memory region would have also been page-aligned.
+ * The coalesce function then, at the end, calls ukplat_memregion_restore_mrd
+ * to undo this.
+ */
+static void ukplat_memregion_align_mrd(struct ukplat_memregion_desc *mrd,
+				       __paddr_t *opbase, __sz *olen)
+{
+	__sz pend;
+
+	/* Store the **original** physical base and length */
+	*opbase = mrd->pbase;
+	*olen = mrd->len;
+
+	/* Compute the page-aligned end address of the region */
+	pend = ALIGN_UP(mrd->pbase + mrd->len, __PAGE_SIZE);
+
+	/* Overwrite original pbase with its page-aligned value */
+	mrd->pbase = ALIGN_DOWN(mrd->pbase, __PAGE_SIZE);
+
+	/* Overwrite original len with the supposed size of end-to-end
+	 * page-aligned memory region.
+	 */
+	mrd->len = pend - mrd->pbase;
+}
+
+/* Called at the end of ukplat_memregion_list_coalesce to undo what
+ * ukplat_memregion_align_mrd has done.
+ */
+static void ukplat_memregion_restore_mrd(struct ukplat_memregion_desc *mrd,
+					 __paddr_t opbase, __sz olen)
+{
+	mrd->len = olen;
+	mrd->pbase = opbase;
+}
+
+/* Quick function to do potentially necessary swapping of two adjacent memory
+ * region descriptors. Here just to modularize code because
+ * ukplat_memregion_list_coalesce was quite large already.
+ */
+static void ukplat_memregion_swap_if_unordered(struct ukplat_memregion_list *l,
+					       __u32 l_idx, __u32 r_idx)
+{
+	struct ukplat_memregion_desc tmp, *m;
+
+	m = l->mrds;
+	if (m[l_idx].pbase > m[r_idx].pbase ||
+	    (m[l_idx].pbase == m[r_idx].pbase &&
+	     m[l_idx].pbase + m[l_idx].len > m[r_idx].pbase + m[r_idx].len)) {
+		tmp = m[l_idx];
+		m[l_idx] = m[r_idx];
+		m[r_idx] = tmp;
 	}
 }
 
 int ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 {
 	struct ukplat_memregion_desc *m, *ml, *mr;
+	__paddr_t ml_opbase, mr_opbase;
+	__sz ml_olen, mr_olen;
 	int ml_prio, mr_prio;
+	__u8 del; /* lets us know if a deletion happened */
 	__u32 i;
 
 	i = 0;
 	m = list->mrds;
 	while (i + 1 < list->count) {
-		/* Make sure first that they are ordered. If not, swap them */
-		if (m[i].pbase > m[i + 1].pbase ||
-		    (m[i].pbase == m[i + 1].pbase &&
-		     m[i].pbase + m[i].len > m[i + 1].pbase + m[i + 1].len)) {
-			struct ukplat_memregion_desc tmp;
+		del = 0;
 
-			tmp = m[i];
-			m[i] = m[i + 1];
-			m[i + 1] = tmp;
-		}
+		/* Make sure first that they are ordered. If not, swap them */
+		ukplat_memregion_swap_if_unordered(list, i, i + 1);
+
 		ml = &m[i];
 		mr = &m[i + 1];
-		ml_prio = get_mrd_prio(ml);
-		mr_prio = get_mrd_prio(mr);
 
-		/* If they overlap */
-		if (RANGE_OVERLAP(ml->pbase,  ml->len, mr->pbase, mr->len)) {
+		ml_prio = get_mrd_prio(ml);
+		if (unlikely(ml_prio < 0))
+			return -EINVAL;
+
+		mr_prio = get_mrd_prio(mr);
+		if (unlikely(mr_prio < 0))
+			return -EINVAL;
+
+		ukplat_memregion_align_mrd(ml, &ml_opbase, &ml_olen);
+		ukplat_memregion_align_mrd(mr, &mr_opbase, &mr_olen);
+
+		if (RANGE_OVERLAP(ml->pbase, ml->len, mr->pbase, mr->len)) {
 			/* If they are not of the same priority */
 			if (ml_prio != mr_prio) {
+				/* At least one of the overlapping regions must
+				 * be a free one. Otherwise, something wrong
+				 * happened.
+				 */
+				if (unlikely(!(mr_prio == MRD_PRIO_FREE ||
+					       ml_prio == MRD_PRIO_FREE)))
+					return -EINVAL;
+
 				overlapping_mrd_fixup(list, ml, mr, ml_prio,
 						      mr_prio, i, i + 1);
 
 				/* Remove dropped regions */
-				if (ml->len == 0)
+				del = 1;
+				if (ml->len == 0) {
 					ukplat_memregion_list_delete(list, i);
-				else if (mr->len == 0)
+
+				} else if (mr->len == 0) {
 					ukplat_memregion_list_delete(list,
 								     i + 1);
-				else
+				} else {
 					i++;
+					del = 0;  /* No deletions */
+				}
 
 			} else if (ml->flags != mr->flags) {
 				return -EINVAL;
@@ -287,8 +394,9 @@ int ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 				if (RANGE_CONTAIN(mr->pbase, mr->len,
 						  ml->pbase, ml->len)) {
 					ukplat_memregion_list_delete(list, i);
+					del = 1;
 
-					continue;
+					goto restore_mrds;
 
 				/* If the right region is contained within the
 				 * left region, drop it
@@ -297,8 +405,9 @@ int ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 							 mr->pbase, mr->len)) {
 					ukplat_memregion_list_delete(list,
 								     i + 1);
+					del = 1;
 
-					continue;
+					goto restore_mrds;
 				}
 
 				/* If they are not contained within each other,
@@ -315,6 +424,7 @@ int ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 				 * the previous region.
 				 */
 				ukplat_memregion_list_delete(list, i + 1);
+				del = 1;
 			}
 
 		/* If they do not overlap but they are contiguous and have the
@@ -324,10 +434,43 @@ int ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 			   ml_prio == mr_prio && ml->flags == mr->flags) {
 			ml->len += mr->len;
 			ukplat_memregion_list_delete(list, i + 1);
+			del = 1;
 		} else {
 			i++;
 		}
+
+restore_mrds:
+		if (!del) {
+			/* We assume only MRD_PRIO_FREE can be dropped. We want
+			 * to maintain !MRD_PRIO_FREE start addresses and
+			 * length so that the kernel may use them (e.g. initrd
+			 * start address).
+			 */
+			if (ml_prio != MRD_PRIO_FREE)
+				ukplat_memregion_restore_mrd(ml, ml_opbase,
+							     ml_olen);
+
+			/* This here can only happen if two adjacent
+			 * !MRD_PRIO_FREE regions are resolved without a
+			 * deletion. Preserve mr's original data as well.
+			 */
+			if (mr_prio != MRD_PRIO_FREE)
+				ukplat_memregion_restore_mrd(mr, mr_opbase,
+							     mr_olen);
+		}
+
+		/* Update ml's vbase, since it might not be equal to pbase
+		 * anymore. Whether we deleted ml or mr it does not matter,
+		 * as ml is now equal to the remaining one, because
+		 * ukplat_memregion_list_delete() removes by `memmove()`ing.
+		 */
+		ml->vbase = ml->pbase;
 	}
+
+	/* Make sure the last memory region always ends up being updated when
+	 * we exit this function
+	 */
+	m[i].vbase = m[i].pbase;
 
 	return 0;
 }

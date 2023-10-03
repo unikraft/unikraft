@@ -42,7 +42,12 @@
 #include <x86/cpu.h>
 #include <x86/traps.h>
 #include <x86/delay.h>
+
+#if CONFIG_UKPLAT_ACPI
 #include <uk/plat/common/acpi.h>
+#else /* !CONFIG_UKPLAT_ACPI */
+#include <uk/plat/common/mps.h>
+#endif /* !CONFIG_UKPLAT_ACPI */
 
 #include <uk/plat/lcpu.h>
 #include <uk/plat/common/lcpu.h>
@@ -104,48 +109,63 @@ void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
 	__builtin_unreachable();
 }
 
-#ifdef CONFIG_HAVE_SMP
-/* Secondary cores start in 16-bit real-mode and we have to provide the
- * corresponding boot code somewhere in the first 1 MiB. We copy the trampoline
- * code to the target address during MP initialization.
- */
-#if CONFIG_LIBUKRELOC
-IMPORT_START16_UKRELOC_SYM(gdt32_ptr, 2, MOV);
-IMPORT_START16_UKRELOC_SYM(gdt32, 4, DATA);
-IMPORT_START16_UKRELOC_SYM(lcpu_start16, 2, MOV);
-IMPORT_START16_UKRELOC_SYM(jump_to32, 2, MOV);
-IMPORT_START16_UKRELOC_SYM(lcpu_start32, 4, MOV);
+#if CONFIG_HAVE_SMP
+IMPORT_START16_SYM(gdt32_ptr, 2, MOV);
+IMPORT_START16_SYM(gdt32, 4, DATA);
+IMPORT_START16_SYM(lcpu_start16, 2, MOV);
+IMPORT_START16_SYM(jump_to32, 2, MOV);
+IMPORT_START16_SYM(lcpu_start32, 4, MOV);
 
-static void uk_reloc_mp_init(void)
+#define START16_RELOC_ENTRY(sym, sz, type)				\
+	{								\
+		.r_mem_off = START16_##type##_OFF(sym, sz),		\
+		.r_addr = (void *)(sym) - (void *)x86_start16_begin,	\
+		.r_sz = (sz),						\
+	}
+
+static void apply_start16_reloc(__u64 baddr, __u64 r_mem_off,
+				__u64 r_addr, __u32 r_sz)
 {
-	size_t i;
-	struct uk_reloc x86_start16_relocs[] = {
-		START16_UKRELOC_ENTRY(lcpu_start16, 2, MOV),
-		START16_UKRELOC_ENTRY(gdt32, 4, DATA),
-		START16_UKRELOC_ENTRY(gdt32_ptr, 2, MOV),
-		START16_UKRELOC_ENTRY(jump_to32, 2, MOV),
+	switch (r_sz) {
+	case 2:
+		*(__u16 *)((__u8 *)baddr + r_mem_off) = (__u16)(baddr + r_addr);
+		break;
+	case 4:
+		*(__u32 *)((__u8 *)baddr + r_mem_off) = (__u32)(baddr + r_addr);
+		break;
+	}
+}
+
+static void start16_reloc_mp_init(void)
+{
+	struct {
+		__u64 r_mem_off;
+		__u64 r_addr;
+		__u32 r_sz;
+	} x86_start16_relocs[] = {
+		START16_RELOC_ENTRY(lcpu_start16, 2, MOV),
+		START16_RELOC_ENTRY(gdt32_ptr, 2, MOV),
+		START16_RELOC_ENTRY(gdt32, 4, DATA),
+		START16_RELOC_ENTRY(jump_to32, 2, MOV),
+		START16_RELOC_ENTRY(lcpu_start32, 4, MOV),
 	};
+	__sz i;
 
 	for (i = 0; i < ARRAY_SIZE(x86_start16_relocs); i++)
-		apply_uk_reloc(&x86_start16_relocs[i],
-			      (__u64)x86_start16_addr +
-			      x86_start16_relocs[i].r_addr,
-			      (void *)x86_start16_addr);
+		apply_start16_reloc((__u64)x86_start16_addr,
+				    x86_start16_relocs[i].r_mem_off,
+				    x86_start16_relocs[i].r_addr,
+				    x86_start16_relocs[i].r_sz);
 
 	/* Unlike the other entries, lcpu_start32 must stay the same
 	 * as it is not part of the start16 section
 	 */
-	apply_uk_reloc(&(struct uk_reloc)UKRELOC_ENTRY(
-				START16_UKRELOC_MOV_OFF(lcpu_start32, 4),
-				(__u64)lcpu_start32, 4,
-				UKRELOC_FLAGS_PHYS_REL),
-		       (__u64)lcpu_start32,
-		       (void *)x86_start16_addr);
+	apply_start16_reloc((__u64)x86_start16_addr,
+			    START16_MOV_OFF(lcpu_start32, 4),
+			    (__u64)lcpu_start32 - (__u64)x86_start16_addr, 4);
 }
-#else  /* CONFIG_LIBUKRELOC */
-static void uk_reloc_mp_init(void) { }
-#endif /* !CONFIG_LIBUKRELOC */
 
+#if CONFIG_UKPLAT_ACPI
 int lcpu_arch_mp_init(void *arg __unused)
 {
 	__lcpuid bsp_cpu_id = lcpu_get(0)->id;
@@ -214,13 +234,87 @@ int lcpu_arch_mp_init(void *arg __unused)
 	UK_ASSERT(x86_start16_addr < 0x100000);
 	memcpy((void *)x86_start16_addr, &x86_start16_begin, X86_START16_SIZE);
 
-	uk_reloc_mp_init();
+	start16_reloc_mp_init();
 
 	uk_pr_debug("Copied AP 16-bit boot code to 0x%"__PRIvaddr"\n",
 		    x86_start16_addr);
 
 	return 0;
 }
+#else /* !CONFIG_UKPLAT_ACPI */
+int lcpu_arch_mp_init(void *arg __unused)
+{
+	__lcpuid bsp_cpu_id = lcpu_get(0)->id;
+	int bsp_found __maybe_unused = 0;
+	struct uk_mps_mpc *mpc;
+	struct uk_mps_cpu *cpu;
+	struct lcpu *lcpu;
+	__lcpuid cpu_id;
+	void *mpc_end;
+
+	uk_pr_info("Bootstrapping processor has the ID %ld\n", bsp_cpu_id);
+
+	mpc = uk_mps_get_mpc();
+
+	/* If MPC is 0, then we are dealing with one of the default MP PC-AT
+	 * configurations. Either way, have 2 physical, no hyperthreading,
+	 * cores, numbered 0 and 1.
+	 */
+	if (!mpc) {
+		lcpu = lcpu_alloc(!bsp_cpu_id);
+		if (unlikely(!lcpu)) {
+			/* If we cannot allocate another LCPU, we probably have
+			 * reached the maximum number of supported CPUs. So
+			 * just stop here.
+			 */
+			uk_pr_warn("Maximum number of cores exceeded.\n");
+			return 0;
+		}
+	}
+
+	mpc_end = (__u8 *)mpc + mpc->tbl_len;
+	for (cpu = (struct uk_mps_cpu *)((__u8 *)mpc + sizeof(*mpc));
+	     cpu && (void *)cpu < mpc_end;
+	     uk_mps_next_mpc_entry((void **)&cpu)) {
+		if (cpu->type != UK_MPS_MPC_TYPE_CPU ||
+		    !(cpu->cpu_flags & UK_MPS_CPU_FLAGS_EN))
+			continue;
+
+		cpu_id = (__lcpuid)cpu->lapic_id;
+
+		if (bsp_cpu_id == cpu_id &&
+		    cpu->cpu_flags & UK_MPS_CPU_FLAGS_BP) {
+			UK_ASSERT(!bsp_found);
+
+			bsp_found = 1;
+			continue;
+		}
+
+		lcpu = lcpu_alloc(cpu_id);
+		if (unlikely(!lcpu)) {
+			/* If we cannot allocate another LCPU, we probably have
+			 * reached the maximum number of supported CPUs. So
+			 * just stop here.
+			 */
+			uk_pr_warn("Maximum number of cores exceeded.\n");
+			return 0;
+		}
+	}
+	UK_ASSERT(bsp_found);
+
+	/* Copy AP startup code to target address in first 1MiB */
+	UK_ASSERT(x86_start16_addr < 0x100000);
+	memcpy((void *)x86_start16_addr, &x86_start16_begin, X86_START16_SIZE);
+
+	start16_reloc_mp_init();
+
+	uk_pr_debug("Copied AP 16-bit boot code to 0x%"__PRIvaddr"\n",
+		    x86_start16_addr);
+
+	return 0;
+}
+#endif /* !CONFIG_UKPLAT_ACPI */
+
 
 int lcpu_arch_start(struct lcpu *lcpu, unsigned long flags __unused)
 {
