@@ -244,7 +244,7 @@ pgarch_kunmap(struct uk_pagetable *pt __unused, __vaddr_t vaddr __unused,
 
 static __paddr_t x86_pg_maxphysaddr;
 
-#define X86_PG_VALID_PADDR(paddr)	((paddr) < x86_pg_maxphysaddr)
+#define X86_PG_VALID_PADDR(paddr)	((paddr) <= x86_pg_maxphysaddr)
 
 int ukarch_paddr_range_isvalid(__paddr_t start, __paddr_t end)
 {
@@ -308,7 +308,7 @@ pgarch_init(void)
 	}
 
 	max_addr_bit = (eax & X86_PG_PADDR_MASK) >> X86_PG_PADDR_SHIFT;
-	x86_pg_maxphysaddr = (1UL << max_addr_bit);
+	x86_pg_maxphysaddr = (1UL << max_addr_bit) - 1;
 
 	return 0;
 }
