@@ -59,6 +59,8 @@
 #include <string.h>
 #include "snprintf.h"
 
+#include <uk/essentials.h>
+
 /* 64 bits + 0-Byte at end */
 #define MAXNBUF 65
 
@@ -173,7 +175,7 @@ reswitch:
 				padc = '0';
 				goto reswitch;
 			}
-		/* fallthrough */
+			__fallthrough;
 		case '1':
 		case '2':
 		case '3':
