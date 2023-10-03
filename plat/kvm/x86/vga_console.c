@@ -33,6 +33,8 @@
 #include <x86/irq.h>
 #include <kvm-x86/vga_console.h>
 
+#include <uk/essentials.h>
+
 /* Hardware text mode color constants. */
 enum vga_color {
 	VGA_COLOR_BLACK = 0,
@@ -195,7 +197,7 @@ void _libkvmplat_vga_putc(char c)
 		break;
 	case '\n':
 		NEWLINE();
-		/* fall through */
+		__fallthrough;
 	case '\r':
 		column = 0;
 		break;
