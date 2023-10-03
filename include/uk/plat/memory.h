@@ -156,12 +156,63 @@ ukplat_memregion_find_next(int i, __u32 type, __u32 flags, __u32 fmask,
 	int rc;
 
 	do {
+                uk_pr_info("Got i: %d\n", i);
 		rc = ukplat_memregion_get(++i, &desc);
 		if (rc < 0)
 			return -1;
 
 		stype  = desc->type & type;
 		sflags = desc->flags & fmask;
+	} while ((type && !stype) || (sflags != flags));
+
+	*mrd = desc;
+	return i;
+}
+
+/**
+ * Searches for the previous memory region before i that fulfills the given search
+ * criteria.
+ *
+ * @param i
+ *   Memory region number to start searching. Use ukplat_memregion_count to start 
+ *   from the end
+ * @param type
+ *   The set of memory region types to look for. Can be UKPLAT_MEMRT_ANY or a
+ *   combination of specific types (UKPLAT_MEMRT_*). If 0 is specified, the
+ *   type is ignored.
+ * @param flags
+ *   Find only memory regions that have the specified flags set
+ * @param fmask
+ *   Only consider the flags provided in this mask when searching for a region
+ * @param[out] mrd
+ *   Pointer to a memory region descriptor that will be updated on success
+ *
+ * @return
+ *   On success the function returns the previous region before i that has any of
+ *   the specified types and fulfills the given flags. A value < 0 is returned
+ *   if no more region could be found that fulfills the search criteria. In
+ *   that case mrd is not changed.
+ */
+static inline int
+ukplat_memregion_find_prev(int i, __u32 type, __u32 flags, __u32 fmask,
+                            struct ukplat_memregion_desc **mrd)
+{
+	struct ukplat_memregion_desc *desc;
+	__u32 stype, sflags;
+	int rc;
+        
+        uk_pr_info("Got i: %d\n", i);
+
+	do {
+		rc = ukplat_memregion_get(i--, &desc);
+		if (rc < 0)
+			return -1;
+
+		stype  = desc->type & type;
+		sflags = desc->flags & fmask;
+
+                uk_pr_info("type: %d -> stype: %d, flags: %d -> sflags -> %d\n", type, stype, flags, sflags);
+
 	} while ((type && !stype) || (sflags != flags));
 
 	*mrd = desc;
@@ -189,6 +240,15 @@ ukplat_memregion_find_next(int i, __u32 type, __u32 flags, __u32 fmask,
 	     __ukplat_memregion_foreach_i				\
 		     = ukplat_memregion_find_next(__ukplat_memregion_foreach_i,\
 						  type, flags, fmask, mrd))
+
+#define ukplat_memregion_foreach_inv(mrd, type, flags, fmask)           \
+        for (int __ukplat_memregion_foreach_i				\
+                     = ukplat_memregion_find_prev(ukplat_memregion_count()-1,\
+                                                  type, flags, fmask, mrd);\
+             __ukplat_memregion_foreach_i > 0;                         \
+             __ukplat_memregion_foreach_i                               \
+                     = ukplat_memregion_find_prev(__ukplat_memregion_foreach_i,\
+                                                  type, flags, fmask, mrd))
 
 /**
  * Searches for the first initrd module.

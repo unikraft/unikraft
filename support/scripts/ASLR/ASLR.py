@@ -268,6 +268,8 @@ def print_back(openFile,output,table,debug,dedu):
 			sys.exit()
 	#clears the file and save headers
 	openFile.seek(0)
+	# header = openFile.read().split("SECTIONS\n{\n")
+	openFile.seek(0)
 	header = openFile.read().split("SECTIONS\n{\n")
 	openFile.seek(0)
 	
@@ -276,7 +278,8 @@ def print_back(openFile,output,table,debug,dedu):
 	previous = ""
 	if debug:
 		#Doesn't set ENTRY in debug mode otherwise causes double import
-		writeFile.write("SECTIONS\n{\n")
+		# writeFile.write("SECTIONS\n{\n")
+		writeFile.write(header[0]+"SECTIONS\n{\n")
 	else :
 		writeFile.write(header[0]+"SECTIONS\n{\n")
 	
@@ -349,6 +352,7 @@ if __name__ == '__main__':
 
 	params , _ = parser.parse_known_args(sys.argv[1:])
 
+	# params.baseAddr = "100000"
 	if params.setup != "./":
 		openFile = open(params.setup,"r+")
 		if(openFile == None):
@@ -358,6 +362,16 @@ if __name__ == '__main__':
 		openFile.close()
 	
 	elif params.baseAddr != '-1':
+		# with open(params.path, "rb") as f_src:
+		# 	with open(params.output, "wb") as f_dest:
+		# 		while True:
+		# 			# Read data from source file in chunks
+		# 			data = f_src.read(1024)
+		# 			if not data:
+		# 				break
+		# 			# Write data to destination file
+		# 			f_dest.write(data)
+		# sys.exit()
 		openFile = open(params.path,"r+")
 		if(openFile == None):
 			print("[ASLR] {Error} Couldn't open the file, path may be wrong.")

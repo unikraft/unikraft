@@ -87,6 +87,9 @@
 #include <uk/sp.h>
 #endif
 #include <uk/arch/paging.h>
+#ifdef CONFIG_RUNTIME_ASLR
+#include <uk/swrand.h>
+#endif
 #include <uk/arch/tls.h>
 #include <uk/plat/tls.h>
 #if CONFIG_LIBUKBOOT_MAINTHREAD
@@ -126,7 +129,39 @@ static struct uk_alloc *heap_init()
 	struct ukplat_memregion_desc *md;
 #endif /* !CONFIG_LIBUKBOOT_HEAP_BASE */
 
-#ifdef CONFIG_LIBUKBOOT_HEAP_BASE
+#ifdef CONFIG_RUNTIME_ASLR
+	ukplat_memregion_foreach_inv(&md, UKPLAT_MEMRT_FREE, 0, 0) {
+		uk_pr_debug("Trying %p-%p 0x%02x %s\n",
+			    (void *)md->vbase, (void *)(md->vbase + md->len),
+			    md->flags,
+#if CONFIG_UKPLAT_MEMRNAME
+			    md->name
+#else /* CONFIG_UKPLAT_MEMRNAME */
+			    ""
+#endif /* !CONFIG_UKPLAT_MEMRNAME */
+			    );
+
+		/* Generate a random starting point for the */
+		__paddr_t pstart, pend;
+		unsigned long ASLR_offset;
+		unsigned long len;
+
+		/* Randomize only half of the len to ensure that there is enough space left for the heap */
+		ASLR_offset = uk_swrand_randr() % (md->len / 2);
+
+		pstart = md->vbase + ASLR_offset;
+		len = md->len - ASLR_offset;
+
+		uk_pr_info("Remained with: %p:\n", pstart);
+
+		if (!a)
+			a = uk_alloc_init((void *)pstart, len);
+		else
+			uk_alloc_addmem(a, (void *)pstart, len);
+
+		break;
+	}
+#elif CONFIG_LIBUKBOOT_HEAP_BASE
 	UK_ASSERT(pt);
 
 	/* Paging is enabled. The available physical memory has already been
@@ -315,6 +350,7 @@ void ukplat_entry(int argc, char *argv[])
 	uk_pr_info("Initialize memory allocator...\n");
 
 	a = heap_init();
+
 	if (unlikely(!a))
 		UK_CRASH("Failed to initialize memory allocator\n");
 	else {
@@ -329,6 +365,13 @@ void ukplat_entry(int argc, char *argv[])
 			  ukarch_tls_area_size());
 	if (!tls)
 		UK_CRASH("Failed to allocate and initialize TLS\n");
+
+
+	uk_pr_info("******************************************************************************************************************************\n");
+	ukplat_bootinfo_print();
+	uk_pr_info("Heat address?: %p\n", a);
+	uk_pr_info("Heat address?: %p\n", &a);
+	uk_pr_info("******************************************************************************************************************************\n");
 
 	/* Copy from TLS master template */
 	ukarch_tls_area_init(tls);

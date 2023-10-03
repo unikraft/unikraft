@@ -79,7 +79,7 @@ $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 	$(call build_cmd,ASLR,,ASLR,\
 		$(SCRIPTS_DIR)/ASLR/ASLR.py \
 			$(ASLR_args))
-
+			
 	$(call build_cmd,LD,,$(KVM_IMAGE).ld.o,\
 	       $(LD) -r $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
 			$(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
@@ -91,7 +91,7 @@ $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 			$(KVM_LINK_LIBGCC_FLAG) \
 			-Wl$(comma)--end-group \
 			-o $(KVM_IMAGE).ld.o)
-			
+
 	$(call build_cmd,OBJCOPY,,$(KVM_IMAGE).o,\
 		$(OBJCOPY) -w -G kvmos_* -G _libkvmplat_entry \
 			$(KVM_IMAGE).ld.o $(KVM_IMAGE).o)
@@ -100,12 +100,14 @@ $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 		cp $(SCRIPTS_DIR)/ASLR/relink_ELF.sh ./../; \
 		cp $(SCRIPTS_DIR)/ASLR/string_script.py ./../)
 	
+
 	$(call build_cmd,LD,,$@,\
 	       $(LD) $(LDFLAGS) $(LDFLAGS-y) \
 		     $(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
 		     $(KVM_LD_SCRIPT_FLAGS_ASLR)\
 		     -L$(BUILD_DIR) \
 		     -o $@)
+	$(call build_bootinfo,$@)
 else
 $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) \
