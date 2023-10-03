@@ -102,6 +102,9 @@ extern "C" {
 #ifndef __may_alias
 #define __may_alias            __attribute__((may_alias))
 #endif
+#ifndef __fallthrough
+#define __fallthrough          __attribute__((fallthrough))
+#endif
 
 #ifndef __alias
 #define __alias(old, new) \
