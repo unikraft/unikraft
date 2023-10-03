@@ -60,6 +60,7 @@
 #include <string.h>
 #include <stdarg.h>
 
+#include <uk/essentials.h>
 #include <uk/plat/console.h>
 
 /* 64 bits + 0-Byte at end */
@@ -183,7 +184,7 @@ reswitch:
 				padc = '0';
 				goto reswitch;
 			}
-		/* fallthrough */
+			__fallthrough;
 		case '1':
 		case '2':
 		case '3':
