@@ -255,7 +255,110 @@ typedef struct {
 	__u32 counter;
 } __atomic;
 
-#endif /* !__ASSEMBLY__ */
+#else /* __ASSEMBLY__ */
+
+#if (defined __C_IS_8)
+#define __s8 char
+#define __u8 char
+#define __HAVE_INT8__
+#undef __C_IS_8
+#endif
+
+#if (defined __S_IS_16)
+#define __s16 short
+#define __u16 short
+#define __HAVE_INT16__
+#undef __S_IS_16
+#endif
+
+#if (defined __I_IS_16)
+#ifndef __HAVE_INT16__
+#define __s16 int
+#define __u16 int
+#define __HAVE_INT16__
+#endif
+#undef __I_IS_16
+#elif (defined __I_IS_32)
+#ifndef __HAVE_INT32__
+#define __s32 int
+#define __u32 int
+#define __HAVE_INT32__
+#endif
+#undef __I_IS_32
+#elif (defined __I_IS_64)
+#ifndef __HAVE_INT64__
+#define __s64 int
+#define __u64 int
+#define __HAVE_INT64__
+#endif
+#undef __I_IS_64
+#endif
+
+#if (defined __L_IS_32)
+#ifndef __HAVE_INT32__
+#define __s32 long
+#define __u32 long
+#define __HAVE_INT32__
+#endif
+#undef __L_IS_32
+#elif (defined __L_IS_64)
+#ifndef __HAVE_INT64__
+#define __s64 long
+#define __u64 long
+#define __HAVE_INT64__
+#endif
+#undef __L_IS_64
+#endif
+
+/*
+ * NOTE: According to GAS, .quad expression always maps
+ *       to an 8-byte (64 bit) integer.
+ */
+#ifndef __HAVE_INT64__
+#define __s64 quad
+#define __u64 quad
+#define __HAVE_INT64__
+#endif
+#if (defined __LL_IS_32)
+#undef __LL_IS_32
+#endif
+#if (defined __LL_IS_64)
+#undef __LL_IS_64
+#endif
+
+#if (defined __PTR_IS_16)
+#define __sptr __s16
+#define __uptr __u16
+#define __HAVE_PTR__
+#elif (defined __PTR_IS_32)
+#define __sptr __s32
+#define __uptr __u32
+#define __HAVE_PTR__
+#elif (defined __PTR_IS_64)
+#define __sptr __s64
+#define __uptr __u64
+#define __HAVE_PTR__
+#endif
+
+#ifdef __HAVE_PTR__
+#define __sz  __uptr
+#define __ssz __sptr
+#define __off __sptr
+#define __vaddr_t __uptr
+#endif
+
+#if (defined __PADDR_IS_16)
+typedef __paddr_t __u16
+#define __HAVE_PADDR__
+#elif (defined __PADDR_IS_32)
+#define __paddr_t __u32
+#define __HAVE_PADDR__
+#elif (defined __PADDR_IS_64)
+#define __paddr_t __u64
+#define __HAVE_PADDR__
+#endif
+
+#endif /* __ASSEMBLY__ */
 
 #ifdef	__cplusplus
 }
