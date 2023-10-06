@@ -304,7 +304,7 @@ static void ukplat_memregion_swap_if_unordered(struct ukplat_memregion_list *l,
 	}
 }
 
-int ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
+void ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 {
 	struct ukplat_memregion_desc *m, *ml, *mr;
 	__paddr_t ml_opbase, mr_opbase;
@@ -312,6 +312,10 @@ int ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 	int ml_prio, mr_prio;
 	__u8 del; /* lets us know if a deletion happened */
 	__u32 i;
+
+	UK_ASSERT(list);
+
+	uk_pr_debug("Coalescing memory region list.\n");
 
 	i = 0;
 	m = list->mrds;
@@ -324,13 +328,20 @@ int ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 		ml = &m[i];
 		mr = &m[i + 1];
 
+		uk_pr_debug("Currently coalescing the following memory "
+			    "regions:\n");
+		ukplat_memregion_print_desc(ml);
+		ukplat_memregion_print_desc(mr);
+
+		UK_ASSERT(ml->pbase <= mr->pbase);
+
 		ml_prio = get_mrd_prio(ml);
-		if (unlikely(ml_prio < 0))
-			return -EINVAL;
+		uk_pr_debug("Priority of left memory region: %d\n", ml_prio);
+		UK_ASSERT(ml_prio >= 0);
 
 		mr_prio = get_mrd_prio(mr);
-		if (unlikely(mr_prio < 0))
-			return -EINVAL;
+		uk_pr_debug("Priority of right memory region: %d\n", mr_prio);
+		UK_ASSERT(mr_prio >= 0);
 
 		ukplat_memregion_align_mrd(ml, &ml_opbase, &ml_olen);
 		ukplat_memregion_align_mrd(mr, &mr_opbase, &mr_olen);
@@ -338,13 +349,15 @@ int ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 		if (RANGE_OVERLAP(ml->pbase, ml->len, mr->pbase, mr->len)) {
 			/* If they are not of the same priority */
 			if (ml_prio != mr_prio) {
+				uk_pr_debug("mrd's of different priority "
+					    "overlap!\n");
+
 				/* At least one of the overlapping regions must
 				 * be a free one. Otherwise, something wrong
 				 * happened.
 				 */
-				if (unlikely(!(mr_prio == MRD_PRIO_FREE ||
-					       ml_prio == MRD_PRIO_FREE)))
-					return -EINVAL;
+				UK_ASSERT(mr_prio == MRD_PRIO_FREE ||
+					  ml_prio == MRD_PRIO_FREE);
 
 				overlapping_mrd_fixup(list, ml, mr, ml_prio,
 						      mr_prio, i, i + 1);
@@ -352,9 +365,11 @@ int ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 				/* Remove dropped regions */
 				del = 1;
 				if (ml->len == 0) {
+					uk_pr_debug("Deleting left mrd!\n");
 					ukplat_memregion_list_delete(list, i);
 
 				} else if (mr->len == 0) {
+					uk_pr_debug("Deleting right mrd!\n");
 					ukplat_memregion_list_delete(list,
 								     i + 1);
 				} else {
@@ -362,19 +377,22 @@ int ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 					del = 0;  /* No deletions */
 				}
 
-			} else if (ml->flags != mr->flags) {
-				return -EINVAL;
-
-			/* If they have the same priority and same flags, merge
-			 * them. If they are contained within each other, drop
-			 * the contained one.
+			/* If they have the same priority, merge them. If they
+			 * are contained within each other, drop the contained
+			 * one.
 			 */
 			} else {
+				/* We do not allow overlaps of same priority
+				 * and of different flags.
+				 */
+				UK_ASSERT(ml->flags == mr->flags);
+
 				/* If the left region is contained within the
 				 * right region, drop it
 				 */
 				if (RANGE_CONTAIN(mr->pbase, mr->len,
 						  ml->pbase, ml->len)) {
+					uk_pr_debug("Deleting left mrd!\n");
 					ukplat_memregion_list_delete(list, i);
 					del = 1;
 
@@ -385,12 +403,15 @@ int ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 				 */
 				} else if (RANGE_CONTAIN(ml->pbase, ml->len,
 							 mr->pbase, mr->len)) {
+					uk_pr_debug("Deleting right mrd!\n");
 					ukplat_memregion_list_delete(list,
 								     i + 1);
 					del = 1;
 
 					goto restore_mrds;
 				}
+
+				uk_pr_debug("Merging two overlapping mrd's.\n");
 
 				/* If they are not contained within each other,
 				 * merge them.
@@ -414,10 +435,12 @@ int ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 		 */
 		} else if (ml->pbase + ml->len == mr->pbase &&
 			   ml_prio == mr_prio && ml->flags == mr->flags) {
+			uk_pr_debug("Merging two contiguous mrd's.\n");
 			ml->len += mr->len;
 			ukplat_memregion_list_delete(list, i + 1);
 			del = 1;
 		} else {
+			uk_pr_debug("No adjustment for these mrd's.\n");
 			i++;
 		}
 
@@ -453,8 +476,6 @@ restore_mrds:
 	 * we exit this function
 	 */
 	m[i].vbase = m[i].pbase;
-
-	return 0;
 }
 
 int ukplat_memregion_count(void)
