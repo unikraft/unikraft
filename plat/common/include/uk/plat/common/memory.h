@@ -382,11 +382,8 @@ ukplat_memregion_print_desc(struct ukplat_memregion_desc *mrd __unused) { }
  *
  * @param list
  *   The list whose memory region descriptors to coalesce.
- *
- * @return
- *   0 on success, < 0 otherwise.
  */
-int ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list);
+void ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list);
 
 /**
  * Initializes the platform memory mappings which require an allocator. This

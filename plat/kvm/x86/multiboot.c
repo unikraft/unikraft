@@ -156,9 +156,7 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 		}
 	}
 
-	rc = ukplat_memregion_list_coalesce(&bi->mrds);
-	if (unlikely(rc))
-		multiboot_crash("Could not coalesce memory regions", rc);
+	ukplat_memregion_list_coalesce(&bi->mrds);
 
 	rc = ukplat_memregion_alloc_sipi_vect();
 	if (unlikely(rc))

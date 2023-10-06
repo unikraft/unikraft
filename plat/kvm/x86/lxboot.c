@@ -154,9 +154,7 @@ void lxboot_entry(struct lcpu *lcpu, struct lxboot_params *bp)
 	lxboot_init_cmdline(bi, bp);
 	lxboot_init_initrd(bi, bp);
 	lxboot_init_mem(bi, bp);
-	rc = ukplat_memregion_list_coalesce(&bi->mrds);
-	if (unlikely(rc))
-		lxboot_crash(rc, "Could not coalesce memory regions");
+	ukplat_memregion_list_coalesce(&bi->mrds);
 
 	memcpy(bi->bootprotocol, "lxboot", sizeof("lxboot"));
 

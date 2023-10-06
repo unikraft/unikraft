@@ -192,7 +192,9 @@ static int _init_mem(struct ukplat_bootinfo *const bi)
 			return rc;
 	}
 
-	return ukplat_memregion_list_coalesce(&bi->mrds);
+	ukplat_memregion_list_coalesce(&bi->mrds);
+
+	return 0;
 }
 
 static char *cmdline;
