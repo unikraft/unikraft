@@ -328,6 +328,55 @@ ukplat_memregion_list_delete(struct ukplat_memregion_list *list, __u32 idx)
 	list->count--;
 }
 
+#if CONFIG_LIBUKDEBUG_PRINTD
+static inline void
+ukplat_memregion_print_desc(struct ukplat_memregion_desc *mrd)
+{
+	const char *type;
+
+	switch (mrd->type) {
+	case UKPLAT_MEMRT_RESERVED:
+		type = "rsvd";
+		break;
+	case UKPLAT_MEMRT_KERNEL:
+		type = "krnl";
+		break;
+	case UKPLAT_MEMRT_INITRD:
+		type = "ramd";
+		break;
+	case UKPLAT_MEMRT_CMDLINE:
+		type = "cmdl";
+		break;
+	case UKPLAT_MEMRT_DEVICETREE:
+		type = "dtb ";
+		break;
+	case UKPLAT_MEMRT_STACK:
+		type = "stck";
+		break;
+	default:
+		type = "";
+		break;
+	}
+
+	uk_pr_debug(" %012lx-%012lx %012lx %c%c%c %016lx %s %s\n",
+		   mrd->pbase, mrd->pbase + mrd->len, mrd->len,
+		   (mrd->flags & UKPLAT_MEMRF_READ) ? 'r' : '-',
+		   (mrd->flags & UKPLAT_MEMRF_WRITE) ? 'w' : '-',
+		   (mrd->flags & UKPLAT_MEMRF_EXECUTE) ? 'x' : '-',
+		   mrd->vbase,
+		   type,
+#if CONFIG_UKPLAT_MEMRNAME
+		   mrd->name
+#else /* !CONFIG_UKPLAT_MEMRNAME */
+		   ""
+#endif /* !CONFIG_UKPLAT_MEMRNAME */
+		   );
+}
+#else  /* !CONFIG_LIBUKDEBUG_PRINTD */
+static inline void
+ukplat_memregion_print_desc(struct ukplat_memregion_desc *mrd __unused) { }
+#endif /* !CONFIG_LIBUKDEBUG_PRINTD */
+
 /**
  * Coalesces the memory regions of a given memory region descriptor list.
  *
