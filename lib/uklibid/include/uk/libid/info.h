@@ -62,7 +62,12 @@
 #define UKLI_REC_COMPILEDATE      0x000C /* C-string */
 #define UKLI_REC_COMPILEDBY       0x000D /* C-string */
 #define UKLI_REC_COMPILEDBYASSOC  0x000E /* C-string */
-#define UKLI_REC_COMPILEOPTS      0x000F /* __u32 flags */
+#define UKLI_REC_COMPILEOPTS      0x000F /* __u32 flags, see UKLI_REC_CO_* */
+
+/* Flags for UKLI_REC_COMPILEOPTS */
+#define UKLI_REC_CO_PIE           (0x01 << 0) /* position independent */
+#define UKLI_REC_CO_DCE           (0x01 << 1) /* dead code elimination */
+#define UKLI_REC_CO_LTO           (0x01 << 2) /* link-time optimizations */
 
 #if !__ASSEMBLY__
 #ifdef __cplusplus

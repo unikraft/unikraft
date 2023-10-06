@@ -77,6 +77,25 @@ class UKLibraryInfoRecord:
 				self._tname = "COMPILEDBYASSOC"
 				self._tdesc = "Compiled by (association)"
 				self._data  = self._data_decode(data, 'ascii')
+			case 0x000F:
+				self._tname = "COMPILEOPTS"
+				self._tdesc = "Compile options"
+				flags = int.from_bytes(data, byteorder)
+				decflags = []
+
+				# Decode UKLI_REC_CO_* flags
+				if self._flag_isset(flags, 0):
+					flags = self._flag_unset(flags, 0)
+					decflags.append("PIE")
+				if self._flag_isset(flags, 1):
+					flags = self._flag_unset(flags, 1)
+					decflags.append("DCE")
+				if self._flag_isset(flags, 2):
+					flags = self._flag_unset(flags, 2)
+					decflags.append("LTO")
+				if flags != 0x0:
+					decflags.append("UNKNOWN-0x{:01x}".format(flags))
+				self._data  = (False, ", ".join(decflags))
 			case _:
 				self._tname = int(type)
 				self._tdesc = "Unknown record"
@@ -88,6 +107,12 @@ class UKLibraryInfoRecord:
 		except:
 			# decoding failed, treat as raw data
 			return (True, data)
+
+	def _flag_isset(self, flags, flagpos):
+		return flags & (0x1 << flagpos)
+
+	def _flag_unset(self, flags, flagpos):
+		return flags ^ (0x1 << flagpos)
 
 	def type(self):
 		return self._tnum
