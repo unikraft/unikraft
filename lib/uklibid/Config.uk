@@ -76,6 +76,46 @@ config LIBUKLIBID_INFO
 				used for each library.
 	endmenu
 
+	menuconfig LIBUKLIBID_INFO_COMPILEDBY
+		bool "Compiled by"
+		help
+			Name of the person/entity that did the compilation.
+			This information is added to each library and to the
+			global metadata information of a unikernel.
+
+	if LIBUKLIBID_INFO_COMPILEDBY
+		config LIBUKLIBID_INFO_COMPILEDBY_HOST
+			bool "Auto-detect name (user@hostname)"
+			default y
+			help
+				Automatically retrieves "Compiled by"
+				information by detecting the user
+				and the host (user@hostname).
+
+		config LIBUKLIBID_INFO_COMPILEDBY_CUSTOM_TEXT
+			string "Custom name"
+			depends on !LIBUKLIBID_INFO_COMPILEDBY_HOST
+			help
+				This option can be used to set a custom name
+				that is set as "Compiled by" information.
+
+		# Invisible option that enables auto-detecting user from host
+		config LIBUKLIBID_INFO_COMPILEDBY_CUSTOM
+			bool
+			default y if LIBUKLIBID_INFO_COMPILEDBY_CUSTOM_TEXT != ""
+
+		config LIBUKLIBID_INFO_COMPILEDBYASSOC_TEXT
+			string "Association"
+			help
+				Additional "Compiled by" field for setting an
+				association.
+
+		config LIBUKLIBID_INFO_COMPILEDBYASSOC
+			bool
+			default y if LIBUKLIBID_INFO_COMPILEDBYASSOC_TEXT != ""
+		endif
+	endif
+
 	config LIBUKLIBID_INFO_BOOTDUMP
 		bool "Print library summary early during boot"
 		depends on LIBUKLIBID_INFO
