@@ -436,6 +436,7 @@ static struct pci_bus_handler ph __unused;
 #define PCI_MAX_LAT		0x3f	/* 8 bits */
 
 /* PCI capabilities */
+#define PCI_CAP_VENDOR		0x9	/* Vendor-specific Capabilities*/
 #define PCI_CAP_MSIX		0x11
 
 struct pci_driver *pci_find_driver(struct pci_device_id *id);
