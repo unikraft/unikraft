@@ -314,6 +314,7 @@ static struct pci_bus_handler ph __unused;
 #define PCI_FUNCTION_SHIFT          (8)
 #define PCI_ENABLE_BIT              (1u << 31)
 
+#define PCI_MAX_BARS                (6)
 /* Offsets, masks and shifts for reading different registers inside a PCI
  * configuration space header.
  */

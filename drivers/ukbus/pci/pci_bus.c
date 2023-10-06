@@ -175,7 +175,7 @@ static int pci_get_bar(struct pci_device *dev, uint8_t idx, __paddr_t *bar_out,
 
 	UK_ASSERT(dev);
 	UK_ASSERT(bar_out);
-	UK_ASSERT(idx < 6);
+	UK_ASSERT(idx < PCI_MAX_BARS);
 
 	cfg = dev->config_addr;
 	offset = PCI_BASE_ADDRESS_0 + idx * 4;
@@ -211,7 +211,7 @@ static int pci_set_bar(struct pci_device *dev, uint8_t idx, __paddr_t value)
 	uint32_t cfg, offset, bar_low;
 
 	UK_ASSERT(dev);
-	UK_ASSERT(idx < 6);
+	UK_ASSERT(idx < PCI_MAX_BARS);
 
 	cfg = dev->config_addr;
 	offset = PCI_BASE_ADDRESS_0 + idx * 4;
@@ -249,7 +249,7 @@ static int pci_bar_phys_region(struct pci_device *pci_dev, uint32_t idx,
 	UK_ASSERT(pci_dev);
 	UK_ASSERT(addr_out);
 	UK_ASSERT(size_out);
-	UK_ASSERT(idx < 6);
+	UK_ASSERT(idx < PCI_MAX_BARS);
 
 	rc = pci_get_bar(pci_dev, idx, &saved_value, &is_64bit);
 	if (rc)
