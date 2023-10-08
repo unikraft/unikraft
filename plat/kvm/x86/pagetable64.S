@@ -131,13 +131,20 @@ bpt_unmap_mrd:
  * systems supporting 1GB pages.
  *
  * 0x0000000000000000 - 0x00000000ffffffff Mapping of first 4GB
+ * However, the first page is inaccessible.
  *
  * If paging is enabled:
  * 0xffffff8000000000 - 0xffffffffffffffff Mapping of first 512GB (for PTs)
  */
 .align 0x1000
+x86_bpt_pt0_0_0: /* 4K pages */
+	pte_zero 0x0000000000000000, 0x001
+	pte_fill 0x0000000000001000, 0x1ff, PT_LVL, PTE_RW
+
+.align 0x1000
 x86_bpt_pd0_0: /* 2M pages */
-	pte_fill 0x0000000000000000, 0x200, PD_LVL, PTE_RW
+	pte x86_bpt_pt0_0_0, PTE_RW
+	pte_fill 0x0000000000200000, 0x1ff, PD_LVL, PTE_RW
 
 x86_bpt_pd0_1: /* 2M pages */
 	pte_fill 0x0000000040000000, 0x200, PD_LVL, PTE_RW
