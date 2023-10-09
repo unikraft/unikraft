@@ -265,10 +265,8 @@ endif
 null_targets		:= print-version print-vars help
 nokconfig_targets       := properclean distclean $(null_targets)
 noconfig_targets	:= ukconfig menuconfig nconfig gconfig xconfig config \
-			   oldconfig randconfig \
-			   defconfig %_defconfig allyesconfig allnoconfig \
-			   silentoldconfig \
-			   release olddefconfig \
+			   oldconfig defconfig olddefconfig savedefconfig \
+			   randconfig allyesconfig allnoconfig \
 			   scriptconfig iscriptconfig kmenuconfig guiconfig \
 			   dumpvarsconfig \
 			   $(nokconfig_targets)
@@ -853,7 +851,7 @@ clean-libs clean:
 
 endif
 
-.PHONY: print-vars print-libs print-objs print-srcs print-loc help outputmakefile list-defconfigs
+.PHONY: print-vars print-libs print-objs print-srcs print-loc help
 
 # Configuration
 # ---------------------------------------------------------------------------
@@ -953,10 +951,6 @@ nconfig: kmenuconfig
 gconfig: guiconfig
 xconfig: guiconfig
 
-config:
-	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/genconfig.py --header-path $(KCONFIG_AUTOHEADER) $(CONFIG_CONFIG_IN)
-	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
-
 allyesconfig:
 	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/allyesconfig.py $(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
@@ -1004,10 +998,6 @@ nconfig: $(KCONFIG_DIR)/nconf
 	@$(COMMON_CONFIG_ENV) $< $(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
-config: $(KCONFIG_DIR)/conf
-	@$(COMMON_CONFIG_ENV) $< $(CONFIG_CONFIG_IN)
-	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
-
 # For the config targets that automatically select options, we pass
 # SKIP_LEGACY=y to disable the legacy options. However, in that case
 # no values are set for the legacy options so a subsequent oldconfig
@@ -1043,11 +1033,6 @@ defconfig: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) $< --defconfig$(if $(DEFCONFIG),=$(DEFCONFIG)) $(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
-# Override the UK_DEFCONFIG from COMMON_CONFIG_ENV with the new defconfig
-%_defconfig: $(KCONFIG_DIR)/conf $(A)/configs/%_defconfig
-	@$(COMMON_CONFIG_ENV) UK_DEFCONFIG=$(A)/configs/$@ \
-		$< --defconfig=$(A)/configs/$@ $(CONFIG_CONFIG_IN)
-
 savedefconfig: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) $< \
 		--savedefconfig=$(if $(DEFCONFIG),$(DEFCONFIG),$(CONFIG_DIR)/defconfig) \
@@ -1060,7 +1045,7 @@ endif
 	@echo "CONFIG_UK_NAME=\"$(CONFIG_UK_NAME)\"" >> \
 		$(if $(DEFCONFIG),$(DEFCONFIG),$(CONFIG_DIR)/defconfig)
 
-.PHONY: defconfig savedefconfig silentoldconfig
+.PHONY: defconfig savedefconfig
 
 # Regenerate $(KCONFIG_AUTOHEADER) whenever $(UK_CONFIG) changed
 $(KCONFIG_AUTOHEADER): $(UK_CONFIG_OUT) $(KCONFIG_DIR)/conf
@@ -1198,7 +1183,7 @@ help:
 ifeq ($(HOSTOSENV),Linux)
 	@echo '  syncconfig             - Same as oldconfig, but quietly, additionally update deps'
 	@echo '  scriptsyncconfig       - Same as oldconfig, but quietly, additionally update deps'
-	@echo '  olddefconfig           - Same as silentoldconfig but sets new symbols to their default value'
+	@echo '  olddefconfig           - Same as defconfig but sets new symbols to their default value'
 	@echo '  randconfig             - New config with random answer to all options'
 endif
 	@echo '  defconfig              - New config with default answer to all options'
