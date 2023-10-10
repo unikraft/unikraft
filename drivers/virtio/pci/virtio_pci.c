@@ -91,7 +91,7 @@ static struct virtqueue *vpci_legacy_vq_setup(struct virtio_dev *vdev,
 					      struct uk_alloc *a);
 static void vpci_legacy_vq_release(struct virtio_dev *vdev,
 		struct virtqueue *vq, struct uk_alloc *a);
-static int virtio_pci_handle(void *arg);
+static int virtio_legacy_pci_handle(void *arg);
 static int vpci_legacy_notify(struct virtio_dev *vdev, __u16 queue_id);
 static int virtio_pci_legacy_add_dev(struct pci_device *pci_dev,
 				     struct virtio_pci_dev *vpci_dev);
@@ -124,7 +124,7 @@ static int vpci_legacy_notify(struct virtio_dev *vdev, __u16 queue_id)
 	return 0;
 }
 
-static int virtio_pci_handle(void *arg)
+static int virtio_legacy_pci_handle(void *arg)
 {
 	struct virtio_pci_dev *d = (struct virtio_pci_dev *) arg;
 	uint8_t isr_status;
@@ -220,8 +220,8 @@ static int vpci_legacy_pci_vq_find(struct virtio_dev *vdev, __u16 num_vqs,
 	vpdev = to_virtiopcidev(vdev);
 
 	/* Registering the interrupt for the queue */
-	rc = uk_intctlr_irq_register(vpdev->pdev->irq, virtio_pci_handle,
-				     vpdev);
+	rc = ukplat_irq_register(vpdev->pdev->irq, virtio_legacy_pci_handle,
+				 vpdev);
 	if (rc != 0) {
 		uk_pr_err("Failed to register the interrupt\n");
 		return rc;
