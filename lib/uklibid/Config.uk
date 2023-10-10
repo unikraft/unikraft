@@ -38,6 +38,13 @@ config LIBUKLIBID_INFO
 				used for during compilation for the unikernel
 				image.
 
+		config LIBUKLIBID_INFO_COMPILEDATE
+			bool "Compile date"
+			default y
+			help
+				This option stores the compile date and time for
+				the unikernel image.
+
 		config LIBUKLIBID_INFO_UKCONFIGGZ
 			bool "Embed gzipped configuration (.config)"
 			help
@@ -74,6 +81,12 @@ config LIBUKLIBID_INFO
 			help
 				Enables storing the C compiler ($(CC)) that was
 				used for each library.
+
+		config LIBUKLIBID_INFO_LIB_COMPILEDATE
+			bool "Compile date"
+			help
+				This option stores the compile date and time for
+				each library.
 	endmenu
 
 	menuconfig LIBUKLIBID_INFO_COMPILEDBY
