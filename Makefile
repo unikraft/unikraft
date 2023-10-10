@@ -440,6 +440,7 @@ HOSTOBJCOPY	:= $(shell which $(HOSTOBJCOPY) || type -p $(HOSTOBJCOPY) || echo ob
 HOSTRANLIB	:= $(shell which $(HOSTRANLIB) || type -p $(HOSTRANLIB) || echo ranlib)
 HOSTCC_VERSION	:= $(shell $(HOSTCC_NOCCACHE) --version | \
 		   $(SED) -n -r 's/^.* ([0-9]*)\.([0-9]*)\.([0-9]*)[ ]*.*/\1 \2/p')
+HOSTUTC		:= $(shell date -u)
 HOSTNAME	:= $(shell hostname -s)
 HOSTUSER	:= $(shell whoami)
 
