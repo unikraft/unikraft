@@ -372,8 +372,6 @@ static int virtio_pci_legacy_add_dev(struct pci_device *pci_dev,
 {
 	/* Check the valid range of the virtio legacy device */
 	if (pci_dev->id.device_id < 0x1000 || pci_dev->id.device_id > 0x103f) {
-		uk_pr_err("Invalid Virtio Devices %04x\n",
-			  pci_dev->id.device_id);
 		return -EINVAL;
 	}
 
@@ -393,6 +391,178 @@ static int virtio_pci_legacy_add_dev(struct pci_device *pci_dev,
 }
 
 
+
+static int virtio_pci_find_cfg_cap(struct pci_device *pci_dev, uint8_t cfg_type,
+				   uint8_t *cap)
+{
+	uint8_t type, curr_cap, type_offset;
+
+	if (arch_pci_find_cap(pci_dev, PCI_CAP_VENDOR, &curr_cap) != 0)
+		return -1;
+
+	PCI_CONF_READ_OFFSET(uint8_t, &type, pci_dev->config_addr,
+			     __offsetof(struct virtio_pci_cap, cfg_type), 0,
+			     UINT8_MAX);
+
+	/* Iterate through the capabilities to find the matching type */
+	while (type != cfg_type) {
+		if (arch_pci_find_next_cap(pci_dev, PCI_CAP_VENDOR, curr_cap,
+					   &curr_cap)
+		    == 0) {
+			type_offset =
+			    curr_cap
+			    + __offsetof(struct virtio_pci_cap, cfg_type);
+			PCI_CONF_READ_OFFSET(uint8_t, &type,
+					     pci_dev->config_addr, type_offset,
+					     0, UINT8_MAX);
+
+			/* TODO: Check if BAR is a reserved one */
+		} else {
+			return -1;
+		}
+	}
+
+	*cap = curr_cap;
+	return 0;
+}
+
+static int virtio_pci_map_cap(struct pci_device *pci_dev,
+			      struct virtio_pci_dev *vpci_dev, uint8_t cap,
+			      int attr, void **mapped_addr)
+{
+	uint8_t bar_idx;
+	__sz offset, length;
+	int rc;
+	struct pci_bar_memory *mapped_bar;
+
+	UK_ASSERT(mapped_addr);
+
+	PCI_CONF_READ_OFFSET(uint8_t, &bar_idx, pci_dev->config_addr,
+			     cap + __offsetof(struct virtio_pci_cap, bar), 0,
+			     UINT8_MAX);
+	PCI_CONF_READ_OFFSET(uint32_t, &length, pci_dev->config_addr,
+			     cap + __offsetof(struct virtio_pci_cap, length), 0,
+			     UINT32_MAX);
+	PCI_CONF_READ_OFFSET(uint32_t, &offset, pci_dev->config_addr,
+			     cap + __offsetof(struct virtio_pci_cap, offset), 0,
+			     UINT32_MAX);
+
+	UK_ASSERT(bar_idx < PCI_MAX_BARS);
+
+	mapped_bar = &vpci_dev->mapped_bar[bar_idx];
+
+	if (mapped_bar->start == __NULL) {
+		rc = pci_map_bar(pci_dev, bar_idx, attr,
+				 mapped_bar);
+		if (unlikely(rc)) {
+			uk_pr_err("Cannot map BAR %d, rc= %d\n", bar_idx, rc);
+			return -1;
+		}
+	}
+
+	UK_ASSERT(mapped_bar->start + mapped_bar->size
+		  >= mapped_bar->start + offset + length);
+	*mapped_addr = mapped_bar->start + offset;
+
+	uk_pr_debug("Mapped cap %d to BAR %d at %#" PRIx64 "\n", cap, bar_idx,
+		    (unsigned long)*mapped_addr);
+
+	return 0;
+}
+
+static int virtio_pci_modern_add_dev(struct pci_device *pci_dev,
+				     struct virtio_pci_dev *vpci_dev)
+{
+	uint8_t found_cap;
+	int rc;
+	void *mapped_addr;
+
+	/* Check the valid range of the virtio modern device */
+	if (pci_dev->id.device_id < VIRTIO_PCI_MODERN_DEVICEID_START
+	    || pci_dev->id.device_id > 0x107f) {
+		return -EINVAL;
+	}
+
+	/* Setting the configuration operation */
+	vpci_dev->vdev.cops = &vpci_modern_ops;
+
+	uk_pr_info("Added virtio-pci device %04x\n", pci_dev->id.device_id);
+	uk_pr_info("Added virtio-pci subsystem_device_id %04x\n",
+		   pci_dev->id.subsystem_device_id);
+
+	/* Mapping the virtio device identifier for modern device. */
+	vpci_dev->vdev.id.virtio_device_id =
+	    pci_dev->id.device_id - VIRTIO_PCI_MODERN_DEVICEID_START;
+
+	/* Mapping the VirtIO PCI capabilities for modern device. */
+	if (!virtio_pci_find_cfg_cap(pci_dev, VIRTIO_PCI_CAP_COMMON_CFG,
+				     &found_cap)) {
+		rc = virtio_pci_map_cap(pci_dev, vpci_dev, found_cap,
+					PAGE_ATTR_PROT_RW, &mapped_addr);
+		if (unlikely(rc))
+			return rc;
+		vpci_dev->common_cfg = mapped_addr;
+	} else {
+		uk_pr_err("Cannot find %s\n",
+			  "Common Configuration Capability");
+		goto exit_unmap_bar;
+	}
+
+	if (!virtio_pci_find_cfg_cap(pci_dev, VIRTIO_PCI_CAP_ISR, &found_cap)) {
+		rc = virtio_pci_map_cap(pci_dev, vpci_dev, found_cap,
+					PAGE_ATTR_PROT_RW, &mapped_addr);
+		if (unlikely(rc))
+			return rc;
+
+		vpci_dev->pci_isr_addr = (__u64)mapped_addr;
+	} else {
+		uk_pr_err("Cannot find %s\n", "ISR Configuration Capability");
+		goto exit_unmap_bar;
+	}
+
+	if (!virtio_pci_find_cfg_cap(pci_dev, VIRTIO_PCI_CAP_NOTIFY_CFG,
+				     &found_cap)) {
+		uint32_t offset = __offsetof(struct virtio_pci_notify_cap,
+					     notify_off_multiplier);
+
+		/* Get offset multiplier from configuration space */
+		PCI_CONF_READ_OFFSET(uint32_t, &vpci_dev->notify_off_mul,
+				     pci_dev->config_addr, found_cap + offset,
+				     0, UINT32_MAX);
+
+		rc = virtio_pci_map_cap(pci_dev, vpci_dev, found_cap,
+					PAGE_ATTR_PROT_RW, &mapped_addr);
+		if (unlikely(rc))
+			return rc;
+
+		vpci_dev->notify = mapped_addr;
+	} else {
+		uk_pr_err("Cannot find %s\n",
+			  "Notification Configuration Capability");
+		goto exit_unmap_bar;
+	}
+
+	/* Defice Configuration is optional. */
+	if (!virtio_pci_find_cfg_cap(pci_dev, VIRTIO_PCI_CAP_DEVICE_CFG,
+				     &found_cap)) {
+		rc = virtio_pci_map_cap(pci_dev, vpci_dev, found_cap,
+					PAGE_ATTR_PROT_RW, &mapped_addr);
+		if (unlikely(rc))
+			return -1;
+		vpci_dev->device_cfg = mapped_addr;
+	}
+
+	return 0;
+
+exit_unmap_bar:
+	for (int i = 0; i < PCI_MAX_BARS; i++) {
+		if (vpci_dev->mapped_bar[i].start == __NULL)
+			continue;
+		pci_unmap_bar(pci_dev, i, &vpci_dev->mapped_bar[i]);
+	}
+	return -EINVAL;
+}
+
 static int virtio_pci_add_dev(struct pci_device *pci_dev)
 {
 	struct virtio_pci_dev *vpci_dev = NULL;
@@ -411,14 +581,17 @@ static int virtio_pci_add_dev(struct pci_device *pci_dev)
 	vpci_dev->pci_base_addr = pci_dev->base;
 
 	/**
-	 * Probing for the legacy virtio device. We separate the legacy probing
-	 * with the possibility of supporting the modern PCI device in the
-	 * future.
+	 * Probing for the legacy virtio device first. If fail, probe for modern
+	 * virtio device
 	 */
 	rc = virtio_pci_legacy_add_dev(pci_dev, vpci_dev);
 	if (rc != 0) {
-		uk_pr_err("Failed to probe (legacy) pci device: %d\n", rc);
-		goto free_pci_dev;
+		rc = virtio_pci_modern_add_dev(pci_dev, vpci_dev);
+		if (unlikely(rc)) {
+			uk_pr_err("Failed to probe Virtio Device %04x: %d\n",
+				  pci_dev->id.device_id, rc);
+			goto free_pci_dev;
+		}
 	}
 
 	rc = virtio_bus_register_device(&vpci_dev->vdev);
