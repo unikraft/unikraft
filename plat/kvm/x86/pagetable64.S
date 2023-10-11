@@ -36,7 +36,13 @@
 #include <uk/reloc.h>
 
 #define PTE_RO		X86_PTE_PRESENT
+
+#ifdef CONFIG_LIBUKSEV
+#define PTE_RW		(X86_PTE_PRESENT | X86_PTE_RW | X86_PTE_ENCRYPT)
+#define PTE_RW_SHARED		(X86_PTE_PRESENT | X86_PTE_RW)
+#else
 #define PTE_RW		(X86_PTE_PRESENT | X86_PTE_RW)
+#endif  /* CONFIG_LIBUKSEV */
 
 #define PT_LVL		0
 #define PD_LVL		1

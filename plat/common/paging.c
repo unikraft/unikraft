@@ -1433,6 +1433,10 @@ static inline unsigned long bootinfo_to_page_attr(__u16 flags)
 	if (flags & UKPLAT_MEMRF_EXECUTE)
 		prot |= PAGE_ATTR_PROT_EXEC;
 
+#ifdef CONFIG_LIBUKSEV
+	prot |= PAGE_ATTR_ENCRYPT;
+#endif
+
 	return prot;
 }
 
