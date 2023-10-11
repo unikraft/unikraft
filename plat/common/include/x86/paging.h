@@ -246,7 +246,11 @@ static __paddr_t x86_pg_maxphysaddr;
 
 #define X86_PG_VALID_PADDR(paddr)	((paddr) <= x86_pg_maxphysaddr)
 
+int ukarch_paddr_isvalid(__paddr_t addr)
 {
+	return X86_PG_VALID_PADDR(addr);
+}
+
 int ukarch_paddr_range_isvalid(__paddr_t start, __sz len)
 {
 	__paddr_t end = start + len - 1;
