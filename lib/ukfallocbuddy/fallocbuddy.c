@@ -495,7 +495,7 @@ static struct bfa_zone *bfa_zone_init(void *buffer, __paddr_t start, __sz len,
 	UK_ASSERT(BFA_Lx_ALIGNED(start, 0));
 	UK_ASSERT(start <= __PADDR_MAX - len);
 #ifdef CONFIG_PAGING
-	UK_ASSERT(ukarch_paddr_range_isvalid(start, start + len));
+	UK_ASSERT(ukarch_paddr_range_isvalid(start, len));
 #endif /* CONFIG_PAGING */
 	zn->start = start;
 	zn->end = start + len;
@@ -1366,7 +1366,7 @@ static int bfa_do_free(struct buddy_framealloc *bfa, __paddr_t paddr, __sz len)
 	UK_ASSERT(BFA_Lx_ALIGNED(len, 0));
 	UK_ASSERT(paddr <= (__PADDR_MAX - len));
 #ifdef CONFIG_PAGING
-	UK_ASSERT(ukarch_paddr_range_isvalid(paddr, paddr + len));
+	UK_ASSERT(ukarch_paddr_range_isvalid(paddr, len));
 #endif /* CONFIG_PAGING */
 
 	/* The memory area might cross multiple buddies and zones */
@@ -1440,7 +1440,7 @@ static int bfa_do_addmem(struct buddy_framealloc *bfa, void *metadata,
 	UK_ASSERT(BFA_Lx_ALIGNED(len, 0));
 	UK_ASSERT(paddr <= (__PADDR_MAX - len));
 #ifdef CONFIG_PAGING
-	UK_ASSERT(ukarch_paddr_range_isvalid(paddr, paddr + len));
+	UK_ASSERT(ukarch_paddr_range_isvalid(paddr, len));
 #endif /* CONFIG_PAGING */
 
 	zone = bfa_zone_init(metadata, paddr, len, dm_off);

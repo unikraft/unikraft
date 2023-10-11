@@ -246,8 +246,11 @@ static __paddr_t x86_pg_maxphysaddr;
 
 #define X86_PG_VALID_PADDR(paddr)	((paddr) <= x86_pg_maxphysaddr)
 
-int ukarch_paddr_range_isvalid(__paddr_t start, __paddr_t end)
 {
+int ukarch_paddr_range_isvalid(__paddr_t start, __sz len)
+{
+	__paddr_t end = start + len - 1;
+
 	UK_ASSERT(start <= end);
 	return (X86_PG_VALID_PADDR(start) && X86_PG_VALID_PADDR(end));
 }
@@ -323,7 +326,7 @@ pgarch_pt_add_mem(struct uk_pagetable *pt, __paddr_t start, __sz len)
 	int rc;
 
 	UK_ASSERT(start <= __PADDR_MAX - len);
-	UK_ASSERT(ukarch_paddr_range_isvalid(start, start + len));
+	UK_ASSERT(ukarch_paddr_range_isvalid(start, len));
 
 	/* Reserve space for the metadata at the beginning of the area. Note
 	 * that the metadata area will be a bit too large because we eat away

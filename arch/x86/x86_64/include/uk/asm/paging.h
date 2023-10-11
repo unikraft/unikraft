@@ -128,8 +128,11 @@ struct ukarch_pagetable {
 	((__vaddr_t)(((__ssz)(vaddr) << (64 - X86_VADDR_BITS)) >>	\
 		(64 - X86_VADDR_BITS)))
 
-static inline int ukarch_vaddr_range_isvalid(__vaddr_t start, __vaddr_t end)
 {
+static inline int ukarch_vaddr_range_isvalid(__vaddr_t start, __sz len)
+{
+	__vaddr_t end = start + len - 1;
+
 #ifdef CONFIG_LIBUKDEBUG
 	UK_ASSERT(start <= end);
 #endif /* CONFIG_LIBUKDEBUG */
