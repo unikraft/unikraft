@@ -362,7 +362,7 @@ int pci_map_bar(struct pci_device *dev, __u8 idx, int attr,
 	__paddr_t bar_phys;
 	__vaddr_t bar_virt;
 	__sz bar_size;
-	__sz bar_pages;
+	__sz __maybe_unused bar_pages;
 	int rc;
 #ifdef CONFIG_PAGING
 	struct uk_pagetable *pt;
@@ -374,8 +374,14 @@ int pci_map_bar(struct pci_device *dev, __u8 idx, int attr,
 	rc = pci_bar_phys_region(dev, idx, &bar_phys, &bar_size);
 	if (rc)
 		return rc;
-	bar_pages = DIV_ROUND_UP(bar_size, __PAGE_SIZE);
 
+	uk_pr_debug("BAR%d physical memory region: [%#" PRIx64 "-%#" PRIx64
+		    ")\n",
+		    idx, bar_phys, bar_phys + bar_size);
+
+	/* Map base address memory */
+#ifdef CONFIG_PAGING
+	bar_pages = DIV_ROUND_UP(bar_size, __PAGE_SIZE);
 	rc = phys_alloc(&bar_phys, bar_pages);
 	if (rc < 0)
 		return rc;
@@ -384,9 +390,6 @@ int pci_map_bar(struct pci_device *dev, __u8 idx, int attr,
 		if (rc)
 			return rc;
 	}
-
-	/* Map base address memory */
-#ifdef CONFIG_PAGING
 	/* TODO: Allocate virtual address space range */
 	bar_virt = bar_phys;
 
@@ -403,7 +406,8 @@ int pci_map_bar(struct pci_device *dev, __u8 idx, int attr,
 	bar_virt = bar_phys;
 #endif
 
-	uk_pr_debug("Mapped PCI BAR%d to addresses [%#" PRIx64 "-%#" PRIx64 ")\n",
+	uk_pr_debug("Mapped PCI BAR%d to addresses [%#" PRIx64 "-%#" PRIx64
+		    ")\n",
 		    idx, bar_virt, bar_virt + bar_size);
 	mem->start = (void *)bar_virt;
 	mem->size = bar_size;
