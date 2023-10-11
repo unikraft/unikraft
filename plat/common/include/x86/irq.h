@@ -90,6 +90,15 @@ static inline int irqs_disabled(void)
 #define local_irq_enable()       __sti()
 #define local_irq_enable_halt()  __sti_hlt()
 
+#define __FIRST_ALLOCABLE_IRQ	16
+#ifdef CONFIG_KVM_X86_FULL_IDT
+#define __LAST_ALLOCABLE_IRQ	223
+#define __MAX_IRQ	(256-32)
+#else
+#define __LAST_ALLOCABLE_IRQ	16
 #define __MAX_IRQ	16
+#endif
+#define __ALLOCABLE_IRQ_COUNT	(__LAST_ALLOCABLE_IRQ - __FIRST_ALLOCABLE_IRQ)
+
 
 #endif /* __PLAT_CMN_X86_IRQ_H__ */

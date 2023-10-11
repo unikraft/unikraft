@@ -9,6 +9,14 @@ config LIBUKBUS_PCI
 	help
 		PCI bus driver for probing and operating PCI devices
 
+config LIBUKBUS_PCI_MSIX
+	bool "MSI-X interrupt support"
+	default n
+	depends on LIBUKBUS_PCI
+	select KVM_X86_FULL_IDT if (ARCH_X86_64)
+	help
+		Enable support for MSI-X interrupts of PCI devices
+
 config LIBUKBUS_PCI_ECAM
 	default y if (LIBUKBUS_PCI && LIBUKBUS_PLATFORM)
 	bool
