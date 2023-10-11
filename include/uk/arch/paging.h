@@ -375,8 +375,13 @@ int PAGE_Lx_IS(__pte_t pte, unsigned int lvl);
  */
 int ukarch_vaddr_range_isvalid(__vaddr_t start, __sz len);
 
-#define ukarch_vaddr_isvalid(vaddr)				\
-	ukarch_vaddr_range_isvalid(vaddr, vaddr)
+/**
+ * Tests if a virtual address is valid on the current architecture.
+ *
+ * @param addr the virtual address to test
+ * @return a non-zero value if the address is supported
+ */
+int ukarch_vaddr_isvalid(__vaddr_t addr);
 
 /**
  * Tests if a certain range of physical addresses is valid on the current
@@ -390,8 +395,13 @@ int ukarch_vaddr_range_isvalid(__vaddr_t start, __sz len);
  */
 int ukarch_paddr_range_isvalid(__paddr_t start, __sz len);
 
-#define ukarch_paddr_isvalid(paddr)				\
-	ukarch_paddr_range_isvalid(paddr, paddr)
+/**
+ * Tests if a physical address is valid on the current architecture.
+ *
+ * @param addr the physical address to test
+ * @return a non-zero value if the address is supported
+ */
+int ukarch_paddr_isvalid(__paddr_t addr);
 
 /**
  * Reads a page table entry from the given page table.

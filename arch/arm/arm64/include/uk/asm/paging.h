@@ -202,7 +202,11 @@ static inline __paddr_t PT_Lx_PTE_SET_PADDR(__pte_t pte, unsigned int lvl,
 	return pte | paddr;
 }
 
+static inline int ukarch_paddr_isvalid(__paddr_t addr)
 {
+	return ARM64_PADDR_VALID(addr);
+}
+
 static inline int ukarch_paddr_range_isvalid(__paddr_t start, __sz len)
 {
 	__paddr_t end = start + len - 1;
@@ -212,6 +216,11 @@ static inline int ukarch_paddr_range_isvalid(__paddr_t start, __sz len)
 #endif /* CONFIG_LIBUKDEBUG */
 
 	return (ARM64_PADDR_VALID(end)) && (ARM64_PADDR_VALID(start));
+}
+
+static inline int ukarch_vaddr_isvalid(__vaddr_t addr)
+{
+	return ARM64_VADDR_VALID(addr);
 }
 
 static inline int ukarch_vaddr_range_isvalid(__vaddr_t start, __sz len)
