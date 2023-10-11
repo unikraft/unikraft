@@ -215,7 +215,7 @@ static int vmem_vma_find_range(struct uk_vas *vas, __vaddr_t *vaddr, __sz *len,
 	UK_ASSERT(vend > vstart);
 	UK_ASSERT(vstart >= vma_start->start && vstart < vma_start->end);
 	UK_ASSERT(vend > vma_end->start && vend <= vma_end->end);
-	UK_ASSERT(ukarch_vaddr_range_isvalid(vstart, vend));
+	UK_ASSERT(ukarch_vaddr_range_isvalid(vstart, vl));
 
 	*vaddr = vstart;
 	*len   = vend - vstart;
@@ -662,7 +662,7 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 
 	UK_ASSERT(PAGE_Lx_ALIGNED(va, algn_lvl));
 	UK_ASSERT(va <= __VADDR_MAX - len);
-	UK_ASSERT(ukarch_vaddr_range_isvalid(va, va + len));
+	UK_ASSERT(ukarch_vaddr_range_isvalid(va, len));
 
 	/* Create a new VMA for the requested range. */
 	if (ops->new) {
