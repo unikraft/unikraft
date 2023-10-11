@@ -118,6 +118,9 @@ static struct uk_alloc *heap_init()
 #endif /* CONFIG_LIBUKVMEM */
 	int rc;
 	int pg_attr = PAGE_ATTR_PROT_RW;
+#ifdef CONFIG_HAVE_MEM_ENCRYPT
+	pg_attr |= PAGE_ATTR_ENCRYPT;
+#endif
 #else /* CONFIG_LIBUKBOOT_HEAP_BASE */
 	struct ukplat_memregion_desc *md;
 #endif /* !CONFIG_LIBUKBOOT_HEAP_BASE */
@@ -145,9 +148,6 @@ static struct uk_alloc *heap_init()
 	 * mappings and then create the VMA on top. Afterwards, we add the
 	 * remainder of the VMA to the allocator.
 	 */
-#ifdef CONFIG_HAVE_MEM_ENCRYPT
-	pg_attr |= PAGE_ATTR_ENCRYPT;
-#endif
 
 	rc = ukplat_page_map(pt, heap_base, __PADDR_ANY,
 			     HEAP_INITIAL_PAGES, pg_attr, 0);
