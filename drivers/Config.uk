@@ -1,3 +1,11 @@
+if X86_AMD64_FEAT_SEV
+menu "AMD SEV"
+
+source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-amd-sev.uk' -r '$(KCONFIG_DRIV_BASE)/amd-sev' -l '$(KCONFIG_DRIV_BASE)/amd-sev' -e '$(KCONFIG_EXCLUDEDIRS)')"
+
+endmenu
+endif
+
 menu "Bus drivers"
 
 source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-bus.uk' -r '$(KCONFIG_DRIV_BASE)/ukbus' -l '$(KCONFIG_DRIV_BASE)/ukbus' -e '$(KCONFIG_EXCLUDEDIRS)')"
