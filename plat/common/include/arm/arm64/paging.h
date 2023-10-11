@@ -346,7 +346,7 @@ pgarch_pt_add_mem(struct uk_pagetable *pt, __paddr_t start, __sz len)
 	int rc;
 
 	UK_ASSERT(start <= __PADDR_MAX - len);
-	UK_ASSERT(ukarch_paddr_range_isvalid(start, start + len));
+	UK_ASSERT(ukarch_paddr_range_isvalid(start, len));
 
 	/* Reserve space for the metadata at the beginning of the area. Note
 	 * that the metadata area will be a bit too large because we eat away

@@ -267,7 +267,7 @@ int ukplat_pt_init(struct uk_pagetable *pt, __paddr_t start, __sz len)
 	}
 
 	UK_ASSERT(start <= __PADDR_MAX - len);
-	UK_ASSERT(ukarch_paddr_range_isvalid(start, start + len));
+	UK_ASSERT(ukarch_paddr_range_isvalid(start, len));
 
 	/* Initialize the frame allocator and any architecture-dependent parts
 	 * of the new page table
@@ -307,7 +307,7 @@ int ukplat_pt_add_mem(struct uk_pagetable *pt, __paddr_t start, __sz len)
 		return 0;
 
 	UK_ASSERT(start <= __PADDR_MAX - len);
-	UK_ASSERT(ukarch_paddr_range_isvalid(start, start + len));
+	UK_ASSERT(ukarch_paddr_range_isvalid(start, len));
 
 	return pgarch_pt_add_mem(pt, start, len);
 }
@@ -533,12 +533,12 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 	UK_ASSERT(PAGE_Lx_ALIGNED(len, to_lvl));
 	UK_ASSERT(PAGE_Lx_ALIGNED(vaddr, to_lvl));
 	UK_ASSERT(vaddr <= __VADDR_MAX - len);
-	UK_ASSERT(ukarch_vaddr_range_isvalid(vaddr, vaddr + len));
+	UK_ASSERT(ukarch_vaddr_range_isvalid(vaddr, len));
 
 	if (paddr != __PADDR_ANY) {
 		UK_ASSERT(PAGE_Lx_ALIGNED(paddr, to_lvl));
 		UK_ASSERT(paddr <= __PADDR_MAX - len);
-		UK_ASSERT(ukarch_paddr_range_isvalid(paddr, paddr + len));
+		UK_ASSERT(ukarch_paddr_range_isvalid(paddr, len));
 
 		alloc_pmem = 0;
 	} else
@@ -956,7 +956,7 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 		UK_ASSERT(PAGE_Lx_ALIGNED(len, to_lvl));
 		UK_ASSERT(PAGE_Lx_ALIGNED(vaddr, to_lvl));
 		UK_ASSERT(vaddr <= __VADDR_MAX - len);
-		UK_ASSERT(ukarch_vaddr_range_isvalid(vaddr, vaddr + len));
+		UK_ASSERT(ukarch_vaddr_range_isvalid(vaddr, len));
 
 		pte_idx = PT_Lx_IDX(vaddr, lvl);
 		page_size = PAGE_Lx_SIZE(lvl);
@@ -1237,7 +1237,7 @@ static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 		UK_ASSERT(PAGE_Lx_ALIGNED(len, to_lvl));
 		UK_ASSERT(PAGE_Lx_ALIGNED(vaddr, to_lvl));
 		UK_ASSERT(vaddr <= __VADDR_MAX - len);
-		UK_ASSERT(ukarch_vaddr_range_isvalid(vaddr, vaddr + len));
+		UK_ASSERT(ukarch_vaddr_range_isvalid(vaddr, len));
 
 		pte_idx = PT_Lx_IDX(vaddr, lvl);
 		page_size = PAGE_Lx_SIZE(lvl);
