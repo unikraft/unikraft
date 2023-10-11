@@ -33,7 +33,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "uk/plat/io.h"
 #include <uk/config.h>
+
+#ifdef CONFIG_LIBUKSEV
+#include <uk/sev.h>
+#include <uk/asm/sev-ghcb.h>
+#endif
 
 #include <stddef.h>
 #include <stdio.h>
@@ -111,6 +117,7 @@ static struct uk_alloc *heap_init()
 	__vaddr_t vaddr;
 #endif /* CONFIG_LIBUKVMEM */
 	int rc;
+	int pg_attr = PAGE_ATTR_PROT_RW;
 #else /* CONFIG_LIBUKBOOT_HEAP_BASE */
 	struct ukplat_memregion_desc *md;
 #endif /* !CONFIG_LIBUKBOOT_HEAP_BASE */
@@ -138,8 +145,13 @@ static struct uk_alloc *heap_init()
 	 * mappings and then create the VMA on top. Afterwards, we add the
 	 * remainder of the VMA to the allocator.
 	 */
+#ifdef CONFIG_HAVE_MEM_ENCRYPT
+	pg_attr |= PAGE_ATTR_ENCRYPT;
+#endif
+
 	rc = ukplat_page_map(pt, heap_base, __PADDR_ANY,
-			     HEAP_INITIAL_PAGES, PAGE_ATTR_PROT_RW, 0);
+			     HEAP_INITIAL_PAGES, pg_attr, 0);
+
 	if (unlikely(rc))
 		return NULL;
 
@@ -161,7 +173,7 @@ static struct uk_alloc *heap_init()
 	vaddr = heap_base;
 	rc = uk_vma_map_anon(&kernel_vas, &vaddr,
 			     (alloc_pages + HEAP_INITIAL_PAGES) << PAGE_SHIFT,
-			     PAGE_ATTR_PROT_RW, UK_VMA_MAP_UNINITIALIZED,
+			     pg_attr, UK_VMA_MAP_UNINITIALIZED,
 			     "heap");
 	if (unlikely(rc))
 		return NULL;
@@ -174,8 +186,8 @@ static struct uk_alloc *heap_init()
 	free_pages  = pt->fa->free_memory >> PAGE_SHIFT;
 	alloc_pages = free_pages - PT_PAGES(free_pages);
 
-	rc = ukplat_page_map(pt, heap_base, __PADDR_ANY,
-			     alloc_pages, PAGE_ATTR_PROT_RW, 0);
+	rc = ukplat_page_map(pt, heap_base, __PADDR_ANY, alloc_pages,
+			     pg_attr, 0);
 	if (unlikely(rc))
 		return NULL;
 
