@@ -96,4 +96,29 @@ config X86_64_HAVE_RANDOM
 	help
 	  Enable processor-generated randomness. This uses the RDRAND / RDSEED
 	  instructions provided by Intel's DRNG technology.
+
+config X86_64_HAVE_MEM_ENCRYPT
+	bool "Memory Encryption"
+	select HAVE_MEM_ENCRYPT
+	help
+		Enable processor support for page table-based memory encryption. Currently available on AMD CPUs.
+
+menu "AMD Secure Encrypted Virtualization"
+config X86_AMD64_FEAT_SEV
+	bool "Enable support for AMD SEV"
+	select X86_64_HAVE_MEM_ENCRYPT
+
+config X86_AMD64_FEAT_SEV_ES
+	bool "Enable support for SEV-ES"
+	select X86_AMD64_FEAT_SEV
+
+config X86_AMD64_FEAT_SEV_SNP
+	bool "Enable support for SEV-SNP"
+	select X86_AMD64_FEAT_SEV
+	select X86_AMD64_FEAT_SEV_ES
+
+
 endmenu
+endmenu
+
+
