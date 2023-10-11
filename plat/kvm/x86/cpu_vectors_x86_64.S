@@ -185,3 +185,8 @@ IRQ_ENTRY %irqno
 .set irqno, irqno + 1
 .endr
 .noaltmacro
+
+#ifdef CONFIG_LIBUKSEV
+TRAP_ENTRY vmm_comm_exception_no_ghcb 1;
+TRAP_ENTRY vmm_comm_exception 1;
+#endif

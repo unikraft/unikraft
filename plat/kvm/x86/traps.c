@@ -33,6 +33,9 @@
 #include <x86/desc.h>
 #include <kvm-x86/traps.h>
 
+#ifdef CONFIG_LIBUKSEV
+#include <uk/sev.h>
+#endif
 /*
  * CPUs should get dedicated IRQ and exception stacks. We use the interrupt
  * stack table (IST) feature for switching to the stack. This means when an
@@ -209,6 +212,11 @@ void traps_table_init(void)
 	FILL_TRAP_GATE(machine_check,	3); /* runs on IST3 (cpu_crit_stack) */
 	FILL_TRAP_GATE(simd_error,	2);
 	FILL_TRAP_GATE(virt_error,	2);
+
+#ifdef CONFIG_LIBUKSEV
+	/* Temporary #VC trap handler until GHCB is setup */
+	idt_fillgate(TRAP_vmm_comm_exception, &ASM_TRAP_SYM(vmm_comm_exception_no_ghcb), 3);
+#endif
 
 	/*
 	 * Load IRQ vectors. All IRQs run on IST1 (cpu_intr_stack).
@@ -444,6 +452,15 @@ void traps_table_init(void)
 
 	idtptr.limit = sizeof(cpu_idt) - 1;
 	idtptr.base = (__u64) &cpu_idt;
+}
+
+
+void traps_table_ghcb_vc_handler_init(void)
+{
+#ifdef CONFIG_LIBUKSEV
+	idt_fillgate(TRAP_vmm_comm_exception, &ASM_TRAP_SYM(vmm_comm_exception), 3);
+	idt_init();
+#endif
 }
 
 void traps_lcpu_init(struct lcpu *this_lcpu)
