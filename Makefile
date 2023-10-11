@@ -261,8 +261,6 @@ else
 export UK_FULLVERSION := $(UK_VERSION).$(UK_SUBVERSION)$(shell cd $(CONFIG_UK_BASE); $(SCRIPTS_DIR)/gitsha1)
 endif
 
-export DATE := $(shell date +%Y%m%d)
-
 # Makefile targets
 null_targets		:= print-version print-vars help
 nokconfig_targets       := properclean distclean $(null_targets)
