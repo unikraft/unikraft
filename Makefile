@@ -178,11 +178,8 @@ ifeq ("$(origin P)", "command line")
 $(foreach ITR,$(subst :, ,$(P)), \
 $(if $(filter /%,$(ITR)),,$(error Path to external platform "$(ITR)" (P) is not absolute));\
 $(if $(wildcard $(ITR)), \
-	$(eval EPLAT_DIR += $(ITR)) \
-, $(if $(wildcard $(CONFIG_UK_BASE)/$(ITR)),\
-	$(eval EPLAT_DIR += $(CONFIG_UK_BASE)/$(ITR)), \
-	$(error Cannot find platform library: $(ITR)) \
-   ) \
+$(eval EPLAT_DIR += $(realpath $(patsubst %/,%,$(patsubst %.,%,$(ITR))))), \
+$(error Cannot find platform library: $(ITR)) \
 ) \
 )
 endif
@@ -195,11 +192,8 @@ ifeq ("$(origin L)", "command line")
 $(foreach ITR,$(subst :, ,$(L)), \
 $(if $(filter /%,$(ITR)),,$(error Path to external library "$(ITR)" (L) is not absolute));\
 $(if $(wildcard $(ITR)), \
-	$(eval ELIB_DIR += $(ITR)) \
-, $(if $(wildcard $(CONFIG_UK_BASE)/$(ITR)),\
-	$(eval ELIB_DIR += $(CONFIG_UK_BASE)/$(ITR)), \
-	$(error Cannot find library: $(ITR)) \
-   )\
+$(eval ELIB_DIR += $(ITR)), \
+$(error Cannot find library: $(ITR)) \
 ) \
 )
 endif
