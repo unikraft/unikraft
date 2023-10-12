@@ -222,7 +222,7 @@ void trap_el1_irq(struct __regs *regs)
 	gic->ops.handle_irq(regs);
 }
 
-#ifdef CONFIG_LIBSYSCALL_SHIM
+#ifdef CONFIG_LIBSYSCALL_SHIM_HANDLER
 
 extern void ukplat_syscall_handler(struct __regs *r);
 
@@ -236,4 +236,4 @@ static int arm64_syscall_adapter(void *data)
 
 UK_EVENT_HANDLER(UKARCH_TRAP_SYSCALL, arm64_syscall_adapter);
 
-#endif /* CONFIG_LIBSYSCALL_SHIM */
+#endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER */
