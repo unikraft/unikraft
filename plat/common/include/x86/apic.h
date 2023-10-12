@@ -39,35 +39,58 @@
 
 #include <uk/assert.h>
 #include <uk/arch/limits.h>
+#include <uk/plat/common/lcpu.h>
 #include <x86/cpu.h>
 #include <x86/apic_defs.h>
 
 #include <errno.h>
 
-static inline int x2apic_enable(void)
+static inline int apic_enable(struct lcpu *this_lcpu)
 {
 	__u32 eax, ebx, ecx, edx;
+	__u32 x2apic_support;
 
 	/* Check for x2APIC support */
 	cpuid(1, 0, &eax, &ebx, &ecx, &edx);
-	if (!(ecx & X86_CPUID1_ECX_x2APIC))
-		return -ENOTSUP;
+	x2apic_support = ecx & X86_CPUID1_ECX_x2APIC;
 
-	/* Check if APIC is active */
+	/*
+	 * We expect to be started in xAPIC mode. This means firmware has not
+	 * irreversibly disabled the APIC and not yet enabled x2APIC mode.
+	 */
 	rdmsr(APIC_MSR_BASE, &eax, &edx);
-	if (!(eax & APIC_BASE_EN))
+	UK_BUGON(!(eax & APIC_BASE_EN));
+	if (x2apic_support)
+		UK_BUGON(eax & APIC_BASE_EXTD);
+
+	/* Set APIC software enable flag */
+	eax = ioreg_read32(APIC_MMIO_SVR);
+	eax |= APIC_SVR_EN;
+	ioreg_write32(APIC_MMIO_SVR, eax);
+
+	/*
+	 * Enable "virtual wire mode" to receive PIC interrupts on the BSP.
+	 * Local interrupts are masked after reset and will remain masked on
+	 * AP cores.
+	 */
+	if (lcpu_is_bsp(this_lcpu)) {
+		eax =  APIC_LVT_DELIVERY_MODE_EXTINT;
+		ioreg_write32(APIC_MMIO_LINT0, eax);
+
+		eax = APIC_LVT_DELIVERY_MODE_NMI;
+		ioreg_write32(APIC_MMIO_LINT1, eax);
+	}
+
+#ifdef CONFIG_HAVE_SMP
+	/* We currently need x2APIC mode for SMP boot */
+	if (!x2apic_support)
 		return -ENOTSUP;
 
 	/* Switch to x2APIC mode */
+	rdmsr(APIC_MSR_BASE, &eax, &edx);
 	eax |= APIC_BASE_EXTD;
 	wrmsr(APIC_MSR_BASE, eax, edx);
-
-	/* Set APIC software enable flag if necessary */
-	rdmsr(APIC_MSR_SVR, &eax, &edx);
-	if ((eax & APIC_SVR_EN) == 0) {
-		eax |= APIC_SVR_EN;
-		wrmsr(APIC_MSR_SVR, eax, edx);
-	}
+#endif
 
 	/*
 	 * TODO: Configure spurious interrupt vector number
@@ -148,8 +171,6 @@ static inline void x2apic_ack_interrupt(void)
 	wrmsr(APIC_MSR_EOI, 0, 0);
 }
 
-/* We only support x2APIC at the moment */
-#define apic_enable		x2apic_enable
 #define apic_send_ipi		x2apic_send_ipi
 #define apic_send_nmi		x2apic_send_nmi
 #define apic_send_sipi		x2apic_send_sipi

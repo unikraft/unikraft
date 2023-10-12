@@ -114,9 +114,75 @@ struct __regs {
 #ifndef nop
 #define nop()   __asm__ __volatile__ ("nop" : : : "memory")
 #endif
-#endif /* !__ASSEMBLY__ */
 
-#ifndef __ASSEMBLY__
+static inline __u8 ioreg_read8(const volatile __u8 *address)
+{
+	__u8 value;
+
+	__asm__ __volatile__("movb %1, %0"
+		: "=q" (value) : "m" (*address) : "memory");
+
+	return value;
+}
+
+static inline __u16 ioreg_read16(const volatile __u16 *address)
+{
+	__u16 value;
+
+	__asm__ __volatile__("movw %1, %0"
+		: "=r" (value) : "m" (*address) : "memory");
+
+	return value;
+}
+
+static inline __u32 ioreg_read32(const volatile __u32 *address)
+{
+	__u32 value;
+
+	__asm__ __volatile__("movl %1, %0"
+		: "=r" (value) : "m" (*address) : "memory");
+
+	return value;
+}
+
+static inline __u64 ioreg_read64(const volatile __u64 *address)
+{
+	__u64 value;
+
+	__asm__ __volatile__("movq %1, %0"
+		: "=r" (value) : "m" (*address) : "memory");
+
+	return value;
+}
+
+static inline void ioreg_write8(const volatile __u8 *address,
+				__u8 value)
+{
+	__asm__ __volatile__("movb %0, %1"
+		: : "q" (value), "m" (*address) : "memory");
+}
+
+static inline void ioreg_write16(const volatile __u16 *address,
+				 __u16 value)
+{
+	__asm__ __volatile__("movw %0, %1"
+		: : "r" (value), "m" (*address) : "memory");
+}
+
+static inline void ioreg_write32(const volatile __u32 *address,
+				 __u32 value)
+{
+	__asm__ __volatile__("movl %0, %1"
+		: : "r" (value), "m" (*address) : "memory");
+}
+
+static inline void ioreg_write64(const volatile __u64 *address,
+				 __u64 value)
+{
+	__asm__ __volatile__("movq %0, %1"
+		: : "r" (value), "m" (*address) : "memory");
+}
+
 static inline unsigned long ukarch_read_sp(void)
 {
 	unsigned long sp;

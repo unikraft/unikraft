@@ -40,6 +40,11 @@
 /* APIC MSR registers */
 #define APIC_MSR_BASE			0x01b
 
+/* The following MMIO registers are only accessible in xAPIC mode */
+#define APIC_MMIO_SVR			((void *)0xfee000f0)
+#define APIC_MMIO_LINT0			((void *)0xfee00350)
+#define APIC_MMIO_LINT1			((void *)0xfee00360)
+
 /* The following MSRs are only accessible in x2APIC mode */
 #define APIC_MSR_ID			0x802
 #define APIC_MSR_VER			0x803
@@ -76,6 +81,15 @@
 #define APIC_SVR_EN			(1 << 8)
 #define APIC_SVR_VECTOR_MASK		0x00000000000000ffUL
 #define APIC_SVR_EOI_BROADCAST		(1 << 12)
+
+/* APIC local vector table registers (LVT) */
+#define APIC_LVT_DELIVERY_MODE_FIXED	0x0000
+#define APIC_LVT_DELIVERY_MODE_SMI	0x0200
+#define APIC_LVT_DELIVERY_MODE_NMI	0x0400
+#define APIC_LVT_DELIVERY_MODE_INIT	0x0500
+#define APIC_LVT_DELIVERY_MODE_EXTINT	0x0700
+
+#define APIC_LVT_TRIGGER_MODE_LEVEL	0x8000
 
 /* APIC error status registers (ESR) */
 #define APIC_ESR_SEND_CHECKSUM		(1 << 0) /* only Pentium and P6 */
