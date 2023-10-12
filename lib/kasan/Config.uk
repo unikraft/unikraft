@@ -1,0 +1,19 @@
+menuconfig LIBKASAN
+	bool "kasan: Kernel Address Sanitizer"
+	depends on ARCH_X86_64
+	depends on PLAT_KVM
+	depends on !LIBUKBOOT_NOALLOC
+	select LIBUKVMEM
+	default n
+	help
+		Experimental. Only works for the heap. Uses
+		1 MB of heap.
+
+if LIBKASAN
+
+config LIBKASAN_GLOBAL
+	bool "Global Kernel Address Sanitizer"
+	default n
+	help
+		Enable Kernel Address Sanitizer globally.
+endif

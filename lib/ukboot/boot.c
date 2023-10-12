@@ -89,6 +89,9 @@
 #include <uk/arch/paging.h>
 #include <uk/arch/tls.h>
 #include <uk/plat/tls.h>
+#ifdef CONFIG_LIBKASAN
+#include <uk/kasan.h>
+#endif
 #include "banner.h"
 
 int main(int argc, char *argv[]) __weak;
@@ -167,6 +170,21 @@ static struct uk_alloc *heap_init()
 			     (alloc_pages - HEAP_INITIAL_PAGES) << PAGE_SHIFT);
 	if (unlikely(rc))
 		return NULL;
+
+
+#ifdef CONFIG_LIBKASAN
+	vaddr = __VADDR_ANY;
+	/* Create the mapping for the shadow memory. Initial size is 1/8 of the
+	 * heap.
+	 */
+	rc = uk_vma_map_anon(&kernel_vas, &vaddr,
+			     KASAN_MD_SHADOW_SIZE,
+			     PAGE_ATTR_PROT_RW, UK_VMA_MAP_UNINITIALIZED,
+			     "shadow_mem");
+
+	init_kasan(vaddr);
+#endif
+
 #else /* CONFIG_LIBUKVMEM */
 	free_pages  = pt->fa->free_memory >> PAGE_SHIFT;
 	alloc_pages = free_pages - PT_PAGES(free_pages);

@@ -42,6 +42,9 @@
 #include <uk/arch/limits.h>
 #include <uk/arch/lcpu.h>
 #include <uk/arch/paging.h>
+#ifdef CONFIG_LIBKASAN
+#include <uk/kasan.h>
+#endif
 
 #if CONFIG_HAVE_MEMTAG
 #include <uk/arch/memtag.h>
@@ -149,7 +152,12 @@ void *uk_malloc_ifpages(struct uk_alloc *a, __sz size)
 #ifdef CONFIG_HAVE_MEMTAG
 	size = MEMTAG_ALIGN(size);
 #endif /* CONFIG_HAVE_MEMTAG */
-	__sz realsize = METADATA_IFPAGES_SIZE_POW2 + size;
+
+#ifdef CONFIG_LIBKASAN
+	__sz realsize = sizeof(*metadata) + size + KASAN_KMALLOC_REDZONE_SIZE;
+#else
+	__sz realsize = sizeof(*metadata) + size;
+#endif
 
 	UK_ASSERT(a);
 	/* check for invalid size and overflow */
@@ -166,6 +174,12 @@ void *uk_malloc_ifpages(struct uk_alloc *a, __sz size)
 	metadata->size = size;
 	metadata->num_pages = num_pages;
 	metadata->base = (void *) intptr;
+
+#ifdef CONFIG_LIBKASAN
+	kasan_mark((void *)(intptr + sizeof(*metadata)),
+		size, metadata->num_pages * __PAGE_SIZE - sizeof(*metadata),
+		KASAN_CODE_KMALLOC_OVERFLOW);
+#endif
 
 #ifdef CONFIG_HAVE_MEMTAG
 	return ukarch_memtag_region(
@@ -197,6 +211,13 @@ void uk_free_ifpages(struct uk_alloc *a, void *ptr)
 
 	UK_ASSERT(metadata->base != __NULL);
 	UK_ASSERT(metadata->num_pages != 0);
+
+#ifdef CONFIG_LIBKASAN
+	kasan_mark_invalid(metadata->base + sizeof(*metadata),
+		metadata->num_pages * 4096 - sizeof(*metadata),
+		KASAN_CODE_KMALLOC_FREED);
+#endif
+
 	uk_pfree(a, metadata->base, metadata->num_pages);
 
 #ifdef CONFIG_HAVE_MEMTAG
