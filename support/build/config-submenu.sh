@@ -48,12 +48,13 @@ while getopts :hqt:l:r:c:e:o: OPT; do
 		OPT_MODE="menu"
 		;;
 	l)
-		ARG_PATHS+=("${OPTARG}")
+		ARG_PATHS+=("${OPTARG%/}")
 		;;
 	r)
 		if [ ! -z "${OPTARG}" ]; then
-			for P in "${OPTARG}/"*; do
-				[ -d "${P}" ] && ARG_PATHS+=("${P}")
+			OPTARG="${OPTARG%/}"
+			for P in "${OPTARG}"/*; do
+				[ -d "${P}" ] && ARG_PATHS+=("${P%/}")
 			done
 		fi
 		;;
@@ -61,7 +62,7 @@ while getopts :hqt:l:r:c:e:o: OPT; do
 		IFS=':'
 		for P in ${OPTARG}; do
 			IFS=$IFS_ORIG
-			[ ! -z "${P}" ] && ARG_PATHS+=("${P}")
+			[ ! -z "${P}" ] && ARG_PATHS+=("${P%/}")
 			IFS=$IFS_NL
 		done
 		IFS=$IFS_ORIG
@@ -70,7 +71,7 @@ while getopts :hqt:l:r:c:e:o: OPT; do
 		IFS=':'
 		for S in ${OPTARG}; do
 		        IFS=$IFS_ORIG
-			[ ! -z "${S}" ] && ARG_EXCLUDES+=("${S}")
+			[ ! -z "${S}" ] && ARG_EXCLUDES+=("${S%/}")
 			IFS=$IFS_NL
 		done
 		IFS=$IFS_ORIG
@@ -115,8 +116,7 @@ fi
 #
 LIBS=()
 for ARG_PATH in "${ARG_PATHS[@]}" "$@"; do
-	# Remove trailing slashes
-	ARG_PATH="${ARG_PATH%/}"
+	ARG_PATH="${ARG_PATH}"
 
 	# Does Config.uk exist?
 	CONFIG_UK="${ARG_PATH}/Config.uk"
