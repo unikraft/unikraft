@@ -1,0 +1,33 @@
+name: shellcheck
+
+on:
+  push:
+    branches: [staging, stable]
+    paths:
+      - 'support/scripts/**'
+      - '.github/workflows/shellcheck.yaml'
+
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [staging]
+    paths:
+      - 'support/scripts/**'
+      - '.github/workflows/shellcheck.yaml'
+
+permissions: {}
+
+jobs:
+  shellcheck:
+    name: Shellcheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Run ShellCheck
+        uses: ludeeus/action-shellcheck@master
+        env:
+          SHELLCHECK_OPTS: -s bash
+        with:
+          severity: warning
+          scandir: support/scripts
+          format: tty
