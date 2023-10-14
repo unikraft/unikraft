@@ -143,7 +143,7 @@ x86_bpt_pt0_0_0: /* 4K pages */
 
 .align 0x1000
 x86_bpt_pd0_0: /* 2M pages */
-	pte x86_bpt_pt0_0_0, PTE_RW
+	ur_pte x86_bpt_pt0_0_0, PTE_RW
 	pte_fill 0x0000000000200000, 0x1ff, PD_LVL, PTE_RW
 
 x86_bpt_pd0_1: /* 2M pages */
