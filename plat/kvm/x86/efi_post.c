@@ -7,7 +7,6 @@
 #include <uk/arch/paging.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/plat/lcpu.h>
-#include <x86/apic_defs.h>
 #include <x86/cpu.h>
 
 /* Slave Controller Edge/Level Triggered Register */
@@ -17,6 +16,11 @@
 
 /* Initial Count Register (for Timer) */
 #define LAPIC_TMICT					0xFEE00380
+
+/* APIC MSR Register */
+/* TODO: This should be removed once our APIC driver is able to handle LAPIC */
+#define LAPIC_MSR_BASE					0x01B
+#define LAPIC_BASE_EN					(1 << 11)
 
 /* Master/Slave PIC Data Registers */
 #define PIC1_DATA					0x21
@@ -51,8 +55,8 @@ static inline void lapic_timer_disable(void)
 	__u32 eax, edx;
 
 	/* Check if APIC is active */
-	rdmsr(APIC_MSR_BASE, &eax, &edx);
-	if (unlikely(!(eax & APIC_BASE_EN)))
+	rdmsr(LAPIC_MSR_BASE, &eax, &edx);
+	if (unlikely(!(eax & LAPIC_BASE_EN)))
 		return;
 
 	/* Zero-ing out this register disables the LAPIC Timer */
