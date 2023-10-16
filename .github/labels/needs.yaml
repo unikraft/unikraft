@@ -1,0 +1,12 @@
+labels:
+  - name: needs/documentation
+    description: Issue or PR needs additional documentation
+    color: "#d4c5f9"
+
+  - name: needs/rebase
+    description: Indicates a PR cannot be merged because it has merge conflicts with HEAD
+    color: "#2e20c1"
+    apply_when:
+      - needs_rebase
+    remove_when:
+      - no_rebase
