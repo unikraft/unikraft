@@ -1,0 +1,228 @@
+labels:
+  - name: lib/9pfs
+    description: Issues and PRs which affect the 9p filesystem
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/9pfs/**
+
+  - name: lib/devfs
+    description: Issues and PRs which affect the devfs file system
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/devfs/**
+
+  - name: lib/fdt
+    description: Issues and PRs which affect Flat Device Tree manipulation
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/fdt/**
+
+  - name: lib/isrlib
+    description: Issues and PRs which affect interrupt-safe standard routines
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/isrlib/**
+
+  - name: lib/nolibc
+    description: Issues and PRs which affect the nolibc subset
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/nolibc/**
+
+  - name: lib/posix-libdl
+    description: Issues and PRs which affect POSIX libdl library
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/posix-libdl/**
+
+  - name: lib/posix-process
+    description: Issues and PRs which affect POSIX process-related functions
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/posix-process/**
+
+  - name: lib/posix-sysinfo
+    description: Issues and PRs which affect information about system parameters
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/posix-sysinfo/**
+
+  - name: lib/posix-user
+    description: Issues and PRs which affect POSIX user-related functions
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/posix-user/**
+
+  - name: lib/ramfs
+    description: Issues and PRs which affect the simple RAM file system
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/ramfs/**
+
+  - name: lib/syscall_shim
+    description: Issues and PRs which affect the syscall shim layer
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/syscall_shim/**
+
+  - name: lib/ubsan
+    description: Issues and PRs which affect Undefined Behavior Sanitization
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/ubsan/**
+
+  - name: lib/uk9p
+    description: Issues and PRs which affect the 9p client
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/uk9p/**
+
+  - name: lib/ukalloc
+    description: Issues and PRs which affect the binary buddy page allocator
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/ukalloc/**
+
+  - name: lib/ukallocbbuddy
+    description: Issues and PRs which affect the abstraction for memory allocators
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/ukallocbbuddy/**
+
+  - name: lib/ukallocpool
+    description: Issues and PRs which affect the memory pool allocator
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/ukallocpool/**
+
+  - name: lib/ukallocregion
+    description: Issues and PRs which affect the region-based allocator
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/ukallocregion/**
+
+  - name: lib/ukargparse
+    description: Issues and PRs which affect the simple argument parser
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/ukargparse/**
+
+  - name: lib/ukblkdev
+    description: Issues and PRs which affect the block driver interface
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/ukblkdev/**
+
+  - name: lib/ukboot
+    description: Issues and PRs which affect the Unikraft bootstrapping code
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/ukboot/**
+
+  - name: lib/ukbus
+    description: Issues and PRs which affect the abstraction for device buses
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/ukbus/**
+
+  - name: lib/ukcpio
+    description: Issues and PRs which affect CPIO archive extraction
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/ukcpio/**
+
+  - name: lib/ukdebug
+    description: Issues and PRs which affect debugging and tracing
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/ukdebug/**
+
+  - name: lib/uklibparam
+    description: Issues and PRs which affect the library arguments parser
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/uklibparam/**
+
+  - name: lib/uklock
+    description: Issues and PRs which affect multi-task synchronization primitives
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/uklock/**
+
+  - name: lib/ukmmap
+    description: Issues and PRs which affect mmap system call
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/ukmmap/**
+
+  - name: lib/ukmpi
+    description: Issues and PRs which affect the Message Passing Interface
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/ukmpi/**
+
+  - name: lib/uknetdev
+    description: Issues and PRs which affect the network driver interface
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/uknetdev/**
+
+  - name: lib/ukring
+    description: Issues and PRs which affect the ring buffer interface
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/ukring/**
+
+  - name: lib/uksched
+    description: Issues and PRs which affect the abstraction for schedulers
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/uksched/**
+
+  - name: lib/ukschedcoop
+    description: Issues and PRs which affect the cooperative Round-Robin scheduler
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/ukschedcoop/**
+
+  - name: lib/uksglist
+    description: Issues and PRs which affect the Scatter Gather List
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/uksglist/**
+
+  - name: lib/uksignal
+    description: Issues and PRs which affect Unikraft signals
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/uksignal/**
+
+  - name: lib/uksp
+    description: Issues and PRs which affect the stack protector
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/uksp/**
+
+  - name: lib/ukswrand
+    description: Issues and PRs which affect the software random number generator
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/ukswrand/**
+
+  - name: lib/uktime
+    description: Issues and PRs which affect time functions
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/uktime/**
+
+  - name: lib/uktimeconv
+    description: Issues and PRs which affect time conversion functions
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/uktimeconv/**
+
+  - name: lib/vfscore
+    description: Issues and PRs which affect VFS Core interface
+    color: "#fbca04"
+    apply_on_pr_match_paths:
+      - lib/vfscore/**

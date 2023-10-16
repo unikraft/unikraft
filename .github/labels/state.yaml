@@ -1,0 +1,28 @@
+labels:
+  - name: state/accepted
+    description: Issue or PR has been accepted
+    color: "#BBFD97"
+
+  - name: state/action-required
+    description: Issue or PR requires external change to occur before proceeding
+    color: "#006b75"
+
+  - name: state/changes-requested
+    description: Issue or PR requires a change to proceed
+    color: "#FA7505"
+
+  - name: state/deferred
+    description: Issue or PR has been deferred
+    color: "#763F27"
+
+  - name: state/not-applicable
+    description: Issue or PR is not applicable
+    color: "#52544A"
+
+  - name: state/rejected
+    description: Sadly this issue or PR cannot be accepted
+    color: "#E93303"
+
+  - name: state/superceded
+    description: Issue or PR is no longer applicable
+    color: "#5024E8"

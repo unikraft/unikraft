@@ -1,0 +1,25 @@
+labels:
+  - name: arch/arm
+    description: Issues and PRs related to ARM architecture
+    color: "#1d76db"
+    apply_on_pr_match_paths:
+      - arch/arm/**
+      - plat/common/arm/**
+      - plat/common/include/arm/**
+
+  - name: arch/arm64
+    description: Issues and PRs related to ARM 64-bit architecture
+    color: "#1d76db"
+    apply_on_pr_match_paths:
+      - arch/arm/arm64/**
+      - plat/common/arm/*64.S
+      - plat/common/arm/*64.c
+      - plat/common/include/arm/arm64/**
+
+  - name: arch/x86_64
+    description: Issues and PRs related to Intel x86_64 architecture
+    color: "#c5def5"
+    apply_on_pr_match_paths:
+      - arch/x86/**
+      - plat/common/x86/**
+      - plat/common/include/x86/**
