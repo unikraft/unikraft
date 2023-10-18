@@ -653,9 +653,13 @@ void __uk_efi_api __noreturn uk_efi_main(uk_efi_hndl_t self_hndl,
 {
 	uk_efi_init_vars(self_hndl, sys_tbl);
 	uk_efi_cls();
-	uk_efi_setup_bootinfo();
 	uk_efi_reset_attack_mitigation_enable();
 	uk_efi_exit_bs();
+
+	/* uk_efi_setup_bootinfo must be called last, since it will exit Boot
+	 * Service after obtaining EFI memory map
+	 */
+	uk_efi_setup_bootinfo();
 
 	/* Jump to arch specific post-EFI entry */
 	uk_efi_jmp_to_kern();
