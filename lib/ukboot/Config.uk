@@ -144,4 +144,24 @@ if LIBUKBOOT
 		bool "None"
 
 	endchoice
+
+	config LIBUKBOOT_MAINTHREAD
+	bool "Run application main in own thread"
+	depends on !LIBUKBOOT_NOSCHED && !LIBUKBOOT_NOALLOC
+	select LIBUKLOCK
+	select LIBUKLOCK_SEMAPHORE
+	help
+		Instead of executing main() in the "init" context, a "main"
+		thread is created for executing the application code.
+		This enables proceeding with a system shutdown before the
+		application's main function returned.
+
+	config LIBUKBOOT_MAINTHREAD_NOHALT
+	bool "Do not initiate a shutdown when application main returned"
+	depends on LIBUKBOOT_MAINTHREAD
+	help
+		This setting disables automatically shutting down whenever
+		the application main function returned or when the main thread
+		terminated. The system performs a shutdown only on explicit
+		requests.
 endif

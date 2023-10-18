@@ -39,6 +39,7 @@
 #include <stdio.h>
 #include <errno.h>
 
+#include <uk/boot.h>
 #ifdef CONFIG_HAVE_PAGING
 #include <uk/plat/paging.h>
 #include <uk/falloc.h>
@@ -88,6 +89,10 @@
 #include <uk/arch/paging.h>
 #include <uk/arch/tls.h>
 #include <uk/plat/tls.h>
+#if CONFIG_LIBUKBOOT_MAINTHREAD
+#include "shutdown_req.h"
+#endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
+#include <uk/errptr.h>
 #include "banner.h"
 
 #if CONFIG_LIBUKINTCTLR
@@ -95,6 +100,12 @@
 #endif /* CONFIG_LIBUKINTCTLR */
 
 int main(int argc, char *argv[]) __weak;
+static inline int do_main(int argc, char *argv[]);
+
+#if CONFIG_LIBUKBOOT_MAINTHREAD
+static __noreturn void main_thread(void *, void *);
+static void main_thread_dtor(struct uk_thread *m);
+#endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
 
 #if defined(CONFIG_LIBUKBOOT_HEAP_BASE) && defined(CONFIG_LIBUKVMEM)
 static struct uk_vas kernel_vas;
@@ -240,9 +251,6 @@ extern char **environ;
 /* defined in <uk/plat.h> */
 void ukplat_entry(int argc, char *argv[])
 {
-#if CONFIG_LIBPOSIX_ENVIRON
-	char **envp;
-#endif /* CONFIG_LIBPOSIX_ENVIRON */
 	struct uk_init_ctx ictx = { 0 };
 	/* NOTE: Default target is crash for failed initialization (inittab) */
 	struct uk_term_ctx tctx = { .target = UKPLAT_CRASH };
@@ -256,9 +264,16 @@ void ukplat_entry(int argc, char *argv[])
 #if CONFIG_LIBUKSCHED
 	struct uk_sched *s = NULL;
 #endif
+#if CONFIG_LIBUKBOOT_MAINTHREAD
+	struct uk_thread *m;
+#endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
 	uk_ctor_func_t *ctorfn;
 	struct uk_inittab_entry *init_entry;
-	int i;
+
+#if CONFIG_LIBUKBOOT_MAINTHREAD
+	/* Initialize shutdown control structure */
+	uk_boot_shutdown_ctl_init();
+#endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
 
 	uk_pr_info("Unikraft constructor table at %p - %p\n",
 		   &uk_ctortab_start[0], &uk_ctortab_end);
@@ -376,59 +391,25 @@ void ukplat_entry(int argc, char *argv[])
 	print_banner(stdout);
 	fflush(stdout);
 
-	/*
-	 * Application
-	 *
-	 * We are calling the application constructors right before calling
-	 * the application's main(). All of our Unikraft systems, VFS,
-	 * networking stack is initialized at this point. This way we closely
-	 * mimic what a regular user application (e.g., BSD, Linux) would expect
-	 * from its OS being initialized.
-	 */
-	uk_pr_info("Pre-init table at %p - %p\n",
-		   &__preinit_array_start[0], &__preinit_array_end);
-	uk_ctortab_foreach(ctorfn,
-			   __preinit_array_start, __preinit_array_end) {
-		if (!*ctorfn)
-			continue;
-
-		uk_pr_debug("Call pre-init constructor: %p()...\n", *ctorfn);
-		(*ctorfn)();
-	}
-
-	uk_pr_info("Constructor table at %p - %p\n",
-		   &__init_array_start[0], &__init_array_end);
-	uk_ctortab_foreach(ctorfn, __init_array_start, __init_array_end) {
-		if (!*ctorfn)
-			continue;
-
-		uk_pr_debug("Call constructor: %p(%d, %p)...\n", *ctorfn,
-			    ictx.cmdline.argc, ictx.cmdline.argv);
-		(*ctorfn)(ictx.cmdline.argc, ictx.cmdline.argv);
-	}
-
-#if CONFIG_LIBPOSIX_ENVIRON
-	envp = environ;
-	if (envp) {
-		uk_pr_info("Environment variables:\n");
-		while (*envp) {
-			uk_pr_info("\t%s\n", *envp);
-			envp++;
-		}
-	}
-#endif /* CONFIG_LIBPOSIX_ENVIRON */
-
-	uk_pr_info("Calling main(%d, [", ictx.cmdline.argc);
-	for (i = 0; i < ictx.cmdline.argc; ++i) {
-		uk_pr_info("'%s'", ictx.cmdline.argv[i]);
-		if ((i + 1) < ictx.cmdline.argc)
-			uk_pr_info(", ");
-	}
-	uk_pr_info("])\n");
-
-	rc = main(ictx.cmdline.argc, ictx.cmdline.argv);
-	uk_pr_info("main returned %d\n", rc);
+#if !CONFIG_LIBUKBOOT_MAINTHREAD
+	do_main(ictx.cmdline.argc, ictx.cmdline.argv);
 	tctx.target = UKPLAT_HALT;
+
+#else /* CONFIG_LIBUKBOOT_MAINTHREAD */
+	m = uk_sched_thread_create_fn2(s, main_thread,
+				       (void *)((long)argc), (void *)argv,
+				       0x0 /* default stack size */,
+				       false, false,
+				       "main", NULL,
+				       main_thread_dtor);
+	if (unlikely(!m || PTRISERR(m))) {
+		uk_pr_err("Failed to launch application's main()\n");
+		goto exit;
+	}
+
+	/* Block execution of "init" until we receive the first request */
+	tctx.target = uk_boot_shutdown_barrier();
+#endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
 
 exit:
 	uk_pr_info("Halting system (%d)\n", tctx.target);
@@ -453,3 +434,102 @@ exit:
 
 	ukplat_terminate(tctx.target); /* does not return */
 }
+
+static inline int do_main(int argc, char *argv[])
+{
+	uk_ctor_func_t *ctorfn;
+#if CONFIG_LIBPOSIX_ENVIRON
+	char **envp;
+#endif /* CONFIG_LIBPOSIX_ENVIRON */
+	int ret;
+	int i;
+
+	/*
+	 * Application
+	 *
+	 * We are calling the application constructors right before calling
+	 * the application's main(). All of our Unikraft systems, VFS,
+	 * networking stack are initialized at this point. This way we closely
+	 * mimic what a regular user application (e.g., BSD, Linux) would expect
+	 * from its OS being initialized.
+	 */
+	uk_pr_info("Pre-init table at %p - %p\n",
+		   &__preinit_array_start[0], &__preinit_array_end);
+	uk_ctortab_foreach(ctorfn,
+			   __preinit_array_start, __preinit_array_end) {
+		if (!*ctorfn)
+			continue;
+
+		uk_pr_debug("Call pre-init constructor: %p()...\n", *ctorfn);
+		(*ctorfn)();
+	}
+
+	uk_pr_info("Constructor table at %p - %p\n",
+		   &__init_array_start[0], &__init_array_end);
+	uk_ctortab_foreach(ctorfn, __init_array_start, __init_array_end) {
+		if (!*ctorfn)
+			continue;
+
+		uk_pr_debug("Call constructor: %p(%d, %p)...\n", *ctorfn,
+			    argc, argv);
+		(*ctorfn)(argc, argv);
+	}
+
+#if CONFIG_LIBUKDEBUG_PRINTK_INFO
+#if CONFIG_LIBPOSIX_ENVIRON
+	envp = environ;
+	if (envp) {
+		uk_pr_info("Environment variables:\n");
+		while (*envp) {
+			uk_pr_info("\t%s\n", *envp);
+			envp++;
+		}
+	}
+#endif /* CONFIG_LIBPOSIX_ENVIRON */
+
+	uk_pr_info("Calling main(%d, [", argc);
+	for (i = 0; i < argc; ++i) {
+		uk_pr_info("'%s'", argv[i]);
+		if ((i + 1) < argc)
+			uk_pr_info(", ");
+	}
+	uk_pr_info("])\n");
+#endif /* CONFIG_LIBUKDEBUG_PRINTK_INFO */
+
+	ret = main(argc, argv);
+	uk_pr_info("main returned %d\n", ret);
+	return ret;
+}
+
+#if CONFIG_LIBUKBOOT_MAINTHREAD
+static __noreturn void main_thread(void *a_argc, void *a_argv)
+{
+	int argc = (int)((__uptr)a_argc);
+	char **argv = (char **)a_argv;
+
+	do_main(argc, argv);
+#if !CONFIG_LIBUKBOOT_MAINTHREAD_NOHALT
+	/* NOTE: The scheduler's garbage collector would also initiate a
+	 *       shutdown request via `main_thread_dtor()`.
+	 *       But because of an unknown delay before the GC is called
+	 *       we already request a shutdown here in order to go down
+	 *       as earlier as possible.
+	 */
+	uk_boot_shutdown_req(UKPLAT_HALT);
+#endif /* !LIBUKBOOT_MAINTHREAD_NOHALT */
+	/* Terminate "main" thread */
+	uk_thread_exit();
+}
+
+static void main_thread_dtor(struct uk_thread *m __unused)
+{
+#if !CONFIG_LIBUKBOOT_MAINTHREAD_NOHALT
+	/* NOTE: Here, we request a shutdown as soon as "main" exits.
+	 *       It covers also the cases where the "main" thread just exits
+	 *       without returning to the caller of `main()` (for example
+	 *       via `uk_thread_exit()`).
+	 */
+	uk_boot_shutdown_req(UKPLAT_HALT);
+#endif /* !LIBUKBOOT_MAINTHREAD_NOHALT */
+}
+#endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
