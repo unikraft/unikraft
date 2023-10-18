@@ -27,7 +27,6 @@ static struct uk_efi_boot_services *uk_efi_bs;
 static struct uk_efi_sys_tbl *uk_efi_st;
 static uk_efi_hndl_t uk_efi_sh;
 
-static uk_efi_uintn_t uk_efi_map_key;
 static __u8 uk_efi_mat_present;
 
 /* As per UEFI specification, the call to the GetMemoryMap routine following
@@ -217,11 +216,27 @@ static int uk_efi_md_to_bi_mrd(struct uk_efi_mem_desc *const md,
 	return 0;
 }
 
-static void uk_efi_get_mmap(struct uk_efi_mem_desc **map, uk_efi_uintn_t *map_sz,
-			    uk_efi_uintn_t *desc_sz)
+static void uk_efi_get_mmap_and_exit_bs(struct uk_efi_mem_desc **map,
+					uk_efi_uintn_t *map_sz,
+					uk_efi_uintn_t *desc_sz)
 {
+	uk_efi_uintn_t map_key;
 	uk_efi_status_t status;
+	__u8 retries = 0;
 	__u32 desc_ver;
+
+uk_efi_get_mmap_retry:
+	if (retries) {
+		if (unlikely(retries > 1))
+			UK_EFI_CRASH("Failed to exit Boot Services second time\n");
+
+		/* Free the memory map previously allocated */
+		status = uk_efi_bs->free_pages((uk_efi_paddr_t)*map,
+					       DIV_ROUND_UP(*map_sz,
+							    PAGE_SIZE));
+		if (unlikely(status != UK_EFI_SUCCESS))
+			UK_EFI_CRASH("Failed to free previous memory map\n");
+	}
 
 	/* As the UEFI Spec says:
 	 * If the MemoryMap buffer is too small, the EFI_BUFFER_TOO_SMALL
@@ -234,7 +249,7 @@ static void uk_efi_get_mmap(struct uk_efi_mem_desc **map, uk_efi_uintn_t *map_sz
 	 */
 	*map_sz = 0;  /* force EFI_BUFFER_TOO_SMALL */
 	*map = NULL;
-	status = uk_efi_bs->get_memory_map(map_sz, *map, &uk_efi_map_key,
+	status = uk_efi_bs->get_memory_map(map_sz, *map, &map_key,
 					   desc_sz, &desc_ver);
 	if (unlikely(status != UK_EFI_BUFFER_TOO_SMALL))
 		UK_EFI_CRASH("Failed to call initial dummy get_memory_map\n");
@@ -250,10 +265,21 @@ static void uk_efi_get_mmap(struct uk_efi_mem_desc **map, uk_efi_uintn_t *map_sz
 		UK_EFI_CRASH("Failed to allocate memory for map\n");
 
 	/* Now we call it for real */
-	status = uk_efi_bs->get_memory_map(map_sz, *map, &uk_efi_map_key,
+	status = uk_efi_bs->get_memory_map(map_sz, *map, &map_key,
 					   desc_sz, &desc_ver);
 	if (unlikely(status != UK_EFI_SUCCESS))
 		UK_EFI_CRASH("Failed to get memory map\n");
+
+	/* We now exit Boot Services since we no longer need it. */
+	/* In case of exit failure, we obtain the memory map again, since the
+	 * memory map may have been changed.
+	 */
+	status = uk_efi_bs->exit_boot_services(uk_efi_sh, map_key);
+	if (unlikely(status != UK_EFI_SUCCESS)) {
+		retries++;
+		uk_efi_pr_debug("ExitBootServices failed, retrying GetMemoryMap\n");
+		goto uk_efi_get_mmap_retry;
+	}
 }
 
 /* Runtime Services memory regions in the Memory Attribute Table have a higher
@@ -357,8 +383,11 @@ static void uk_efi_setup_bootinfo_mrds(struct ukplat_bootinfo *bi)
 	if (unlikely(status != UK_EFI_SUCCESS))
 		UK_EFI_CRASH("Failed to free rt_mrds\n");
 
-	/* Get memory map through GetMemoryMap */
-	uk_efi_get_mmap(&map_start, &map_sz, &desc_sz);
+	/* Get memory map through GetMemoryMap and also exit Boot service.
+	 * NOTE: after exiting, EFI printing provided by BS is not available
+	 * anymore, so UK_CRASH should be used instead.
+	 */
+	uk_efi_get_mmap_and_exit_bs(&map_start, &map_sz, &desc_sz);
 
 	map_end = (struct uk_efi_mem_desc *)((__u8 *)map_start + map_sz);
 	for (md = map_start; md < map_end;
@@ -368,7 +397,7 @@ static void uk_efi_setup_bootinfo_mrds(struct ukplat_bootinfo *bi)
 
 		rc = ukplat_memregion_list_insert(&bi->mrds,  &mrd);
 		if (unlikely(rc < 0))
-			UK_EFI_CRASH("Failed to insert mrd\n");
+			UK_CRASH("Failed to insert mrd\n");
 	}
 
 	ukplat_memregion_list_coalesce(&bi->mrds);
@@ -376,7 +405,7 @@ static void uk_efi_setup_bootinfo_mrds(struct ukplat_bootinfo *bi)
 #if defined(__X86_64__)
 	rc = ukplat_memregion_alloc_sipi_vect();
 	if (unlikely(rc))
-		UK_EFI_CRASH("Failed to insert SIPI vector region\n");
+		UK_CRASH("Failed to insert SIPI vector region\n");
 #endif
 }
 
@@ -605,15 +634,6 @@ static void uk_efi_setup_bootinfo(void)
 	bi->efi_st = (__u64)uk_efi_st;
 }
 
-static void uk_efi_exit_bs(void)
-{
-	uk_efi_status_t status;
-
-	status = uk_efi_bs->exit_boot_services(uk_efi_sh, uk_efi_map_key);
-	if (unlikely(status != UK_EFI_SUCCESS))
-		uk_efi_crash("Failed to to exit Boot Services\n");
-}
-
 /* Sect 4. of TCG Platform Reset Attack Mitigation Specification Version 1.10
  * Rev. 17
  */
@@ -655,7 +675,6 @@ void __uk_efi_api __noreturn uk_efi_main(uk_efi_hndl_t self_hndl,
 	uk_efi_init_vars(self_hndl, sys_tbl);
 	uk_efi_cls();
 	uk_efi_reset_attack_mitigation_enable();
-	uk_efi_exit_bs();
 
 	/* uk_efi_setup_bootinfo must be called last, since it will exit Boot
 	 * Service after obtaining EFI memory map
