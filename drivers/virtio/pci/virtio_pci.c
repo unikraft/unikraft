@@ -220,7 +220,7 @@ static int vpci_legacy_pci_vq_find(struct virtio_dev *vdev, __u16 num_vqs,
 	vpdev = to_virtiopcidev(vdev);
 
 	/* Registering the interrupt for the queue */
-	rc = ukplat_irq_register(vpdev->pdev->irq, virtio_legacy_pci_handle,
+	rc = uk_intctlr_irq_register(vpdev->pdev->irq, virtio_legacy_pci_handle,
 				 vpdev);
 	if (rc != 0) {
 		uk_pr_err("Failed to register the interrupt\n");
