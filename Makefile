@@ -1141,6 +1141,8 @@ export sub_make_exec:=1
 $(BUILD_DIR)/Makefile:
 	$(call verbose_cmd,LN,$(notdir $@),$(HOSTLN) -sf $(CONFIG_UK_BASE)/Makefile $@)
 
+.PHONY: $(BUILD_DIR)/Makefile
+
 $(filter-out _all $(BUILD_DIR)/Makefile sub-make distclean properclean help $(lastword $(MAKEFILE_LIST)), \
   $(MAKECMDGOALS)) all: sub-make
 	@:
