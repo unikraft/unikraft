@@ -117,28 +117,122 @@ ukplat_memregion_list_insert(struct ukplat_memregion_list *list,
 }
 
 #if defined(__X86_64__)
-#define	X86_HI_MEM_START		0xA0000UL
-#define X86_HI_MEM_LEN			0x40000UL
+/* For EISA or MCA systems, the EBDA real-mode segmented pointer can be found
+ * in the two-byte location 40:0Eh, right after the BIOS IVT.
+ */
+#define X86_EBDA_PTR			((0x40UL << 4) + 0x0EUL)
+#define X86_EBDA_LEN			0x400UL
+static inline unsigned long get_ebda_addr(void)
+{
+	__u16 *ebda_ptr = (__u16 *)X86_EBDA_PTR;
 
-#define X86_BIOS_ROM_START		0xE0000UL
-#define X86_BIOS_ROM_LEN		0x20000UL
+	return (*ebda_ptr << 4);
+}
 
+#define X86_HI_MEM_START		0xA0000UL
+#define X86_DISPLAY_BUF_START		0xA0000UL
+#define X86_DISPLAY_BUF_LEN		0x20000UL
+
+#define X86_BIOS_XROM_START		0xC0000UL
+#define X86_BIOS_XROM_LEN		0x20000UL
+
+#define X86_BIOS_SYSROM_START		0xE0000UL
+#define X86_BIOS_SYSROM_LEN		0x20000UL
+
+/* WARNING! DO NOT CALL THIS FUNCTION AFTER PAGING INITIALIZATION! THIS RELIES
+ * ON THE VERY FIRST PAGE (0 - 4KB) BEING MAPPED! ONLY CALL IF YOU KNOW WHAT YOU
+ * YOU ARE DOING!
+ *
+ * Expected memory map for the first 1MiB w.r.t. PC-AT systems compatiblity
+ * 0x00000 – 0x9FFFF 640KB Main memory, DOS compatible. May contain the
+ *		     following memory subregions that we will not need after
+ *		     boot. If the EBDA is defined here, then 1KB starting
+ *		     at that address shall be treated as a reserved region
+ *	0x00000 - 0x003FF Legacy BIOS IVT, segmented pointers to software
+ *			  interrupt routines defined in the ROM BIOS
+ *	0x0040E - 0x0040F Optional EBDA segmented pointer (part of BDA's
+ *			  structure that occupies 40:00 -> 40:101 range)
+ *	0x9FC00 - 0xA0000 Default 1KB of EBDA if not defined in previous region
+ * 0xA0000 – 0xBFFFF 128KB Display buffer for video adapters and possible SMM
+ *		     Shadow Memory
+ * 0xC0000 – 0xDFFFF 128KB ROM BIOS for add-on cards (PCI XROMBARs)
+ * 0xE0000 – 0xFFFFF 128KB System ROM BIOS
+ */
 static inline int
 ukplat_memregion_list_insert_legacy_hi_mem(struct ukplat_memregion_list *list)
 {
+	unsigned long ebda_addr;
 	int rc;
+
+	/* According to ACPI spec for IA-PC systems, RSDP can be in:
+	 * 1. the first 1KiB of EBDA
+	 * 2. BIOS read-only memory space between 0xE0000 and 0xFFFFF
+	 *
+	 * According to MP spec for PC-AT systems, MP Floating Pointer Structure
+	 * can be found in:
+	 * 1. the first 1KiB of EBDA
+	 * 2. if EBDA segment is not defined, the last 1KiB of PC-AT base ram:
+	 * e.g., 639K-640K for systems with 640 KB of base memory or 511K-512K
+	 * for systems with 512 KB of base memory (WE DO NOT TARGET THE LATTER)
+	 * 3. BIOS read-only memory space between 0xE0000 and 0xFFFFF
+	 */
+
+	/* Check for EBDA explicit segmented pointer */
+	ebda_addr = get_ebda_addr();
+
+	/* If we do not have an EBDA pointer or it is invalid (beyond DOS
+	 * compatible RAM), then resort to default: the last 1KB of DOS
+	 * compatible RAM.
+	 */
+	if (!ebda_addr || ebda_addr > X86_HI_MEM_START - X86_EBDA_LEN)
+		ebda_addr = X86_HI_MEM_START - X86_EBDA_LEN;
+
+	/* Now insert EBDA memregion */
+	rc = ukplat_memregion_list_insert(list,
+			&(struct ukplat_memregion_desc){
+				.vbase = ebda_addr,
+				.pbase = ebda_addr,
+				.len   = X86_EBDA_LEN,
+				.type  = UKPLAT_MEMRT_LBIOS,
+				.flags = UKPLAT_MEMRF_READ  |
+					 UKPLAT_MEMRF_MAP,
+			});
+	if (unlikely(rc < 0))
+		return rc;
 
 	/* Note that we are mapping it as writable as well to cope with the
 	 * potential existence of the VGA framebuffer/SMM shadow memory.
 	 */
 	rc = ukplat_memregion_list_insert(list,
 			&(struct ukplat_memregion_desc){
-				.vbase = X86_HI_MEM_START,
-				.pbase = X86_HI_MEM_START,
-				.len   = X86_HI_MEM_LEN,
+				.vbase = X86_DISPLAY_BUF_START,
+				.pbase = X86_DISPLAY_BUF_START,
+				.len   = X86_DISPLAY_BUF_LEN,
 				.type  = UKPLAT_MEMRT_RESERVED,
 				.flags = UKPLAT_MEMRF_READ  |
 					 UKPLAT_MEMRF_WRITE |
+					 UKPLAT_MEMRF_MAP,
+			});
+	if (unlikely(rc < 0))
+		return rc;
+
+	/* Note that we are assigning UKPLAT_MEMRT_RESERVED to BIOS PCI ROM,
+	 * instead of UKPLAT_MEMRT_LBIOS, as this is not needed at boot time,
+	 * and it's rather more related to the XROM of add-on cards than BIOS
+	 * itself. We usually have here the routines used by real-mode
+	 * bootloaders invoked through the BIOS IVT. Although this may not be
+	 * necessary anymore, we cannot assign UKPLAT_MEMRT_FREE either since
+	 * some BIOSes do set this as a RO segment in the corresponding chipset
+	 * registers, leaving this potentially unusable. Thus, just treat it
+	 * as a memory hole.
+	 */
+	rc = ukplat_memregion_list_insert(list,
+			&(struct ukplat_memregion_desc){
+				.vbase = X86_BIOS_XROM_START,
+				.pbase = X86_BIOS_XROM_START,
+				.len   = X86_BIOS_XROM_LEN,
+				.type  = UKPLAT_MEMRT_RESERVED,
+				.flags = UKPLAT_MEMRF_READ  |
 					 UKPLAT_MEMRF_MAP,
 			});
 	if (unlikely(rc < 0))
@@ -149,10 +243,10 @@ ukplat_memregion_list_insert_legacy_hi_mem(struct ukplat_memregion_list *list)
 	 */
 	rc = ukplat_memregion_list_insert(list,
 			&(struct ukplat_memregion_desc){
-				.vbase = X86_BIOS_ROM_START,
-				.pbase = X86_BIOS_ROM_START,
-				.len   = X86_BIOS_ROM_LEN,
-				.type  = UKPLAT_MEMRT_RESERVED,
+				.vbase = X86_BIOS_SYSROM_START,
+				.pbase = X86_BIOS_SYSROM_START,
+				.len   = X86_BIOS_SYSROM_LEN,
+				.type  = UKPLAT_MEMRT_LBIOS,
 				.flags = UKPLAT_MEMRF_READ  |
 					 UKPLAT_MEMRF_MAP,
 			});

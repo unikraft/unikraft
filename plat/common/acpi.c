@@ -41,8 +41,6 @@
 #include <uk/plat/common/bootinfo.h>
 
 #define RSDP10_LEN		20
-#define BIOS_ROM_START		0xE0000UL
-#define BIOS_ROM_END		0xFFFFFUL
 #define BIOS_ROM_STEP		16
 
 static struct acpi_madt *acpi_madt;
@@ -181,14 +179,21 @@ static struct acpi_rsdp *acpi_get_efi_st_rsdp(void)
 #if defined(__X86_64__)
 static struct acpi_rsdp *acpi_get_bios_rom_rsdp(void)
 {
-	__paddr_t ptr;
+	struct ukplat_memregion_desc *mrdp;
+	__paddr_t ptr, start, end;
 
-	for (ptr = BIOS_ROM_START; ptr < BIOS_ROM_END; ptr += BIOS_ROM_STEP)
-		if (!memcmp((void *)ptr, RSDP_SIG, sizeof(RSDP_SIG) - 1)) {
-			uk_pr_debug("ACPI RSDP present at %lx\n", ptr);
+	ukplat_memregion_foreach(&mrdp, UKPLAT_MEMRT_LBIOS, 0, 0) {
+		start = mrdp->pbase;
+		end = mrdp->pbase + mrdp->len;
 
-			return (struct acpi_rsdp *)ptr;
-		}
+		for (ptr = start; ptr < end; ptr += BIOS_ROM_STEP)
+			if (!memcmp((void *)ptr, RSDP_SIG,
+			    sizeof(RSDP_SIG) - 1)) {
+				uk_pr_debug("ACPI RSDP present at %lx\n", ptr);
+
+				return (struct acpi_rsdp *)ptr;
+			}
+	}
 
 	return NULL;
 }
