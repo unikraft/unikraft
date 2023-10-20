@@ -143,9 +143,8 @@ start_uk_reloc32:
 	/* Skip UKRELOC_SIGNATURE and go to uk_reloc entries */
 	addl	$4, %ebx
 .foreach_uk_reloc32:
-	xorl	%ecx, %ecx
 	/* Store r_sz in %ecx */
-	movb	16(%ebx), %cl
+	movl	16(%ebx), %ecx
 	/* Check whether we reached sentinel or not */
 	test	%ecx, %ecx
 	jz	.finish_uk_reloc32
