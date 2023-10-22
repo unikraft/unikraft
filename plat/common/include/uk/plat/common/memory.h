@@ -140,8 +140,7 @@ ukplat_memregion_list_insert_legacy_hi_mem(struct ukplat_memregion_list *list)
 				.pg_count = PAGE_COUNT(X86_HI_MEM_LEN),
 				.type  = UKPLAT_MEMRT_RESERVED,
 				.flags = UKPLAT_MEMRF_READ  |
-					 UKPLAT_MEMRF_WRITE |
-					 UKPLAT_MEMRF_MAP,
+					 UKPLAT_MEMRF_WRITE,
 			});
 	if (unlikely(rc < 0))
 		return rc;
@@ -157,8 +156,7 @@ ukplat_memregion_list_insert_legacy_hi_mem(struct ukplat_memregion_list *list)
 				.len   = X86_BIOS_ROM_LEN,
 				.pg_count = PAGE_COUNT(X86_BIOS_ROM_LEN),
 				.type  = UKPLAT_MEMRT_RESERVED,
-				.flags = UKPLAT_MEMRF_READ  |
-					 UKPLAT_MEMRF_MAP,
+				.flags = UKPLAT_MEMRF_READ,
 			});
 	if (unlikely(rc < 0))
 		return rc;
@@ -181,8 +179,7 @@ ukplat_memregion_alloc_sipi_vect(void)
 	x86_start16_addr = (__uptr)ukplat_memregion_alloc(len,
 							  UKPLAT_MEMRT_RESERVED,
 							  UKPLAT_MEMRF_READ  |
-							  UKPLAT_MEMRF_WRITE |
-							  UKPLAT_MEMRF_MAP);
+							  UKPLAT_MEMRF_WRITE);
 	if (unlikely(!x86_start16_addr || x86_start16_addr >= X86_HI_MEM_START))
 		return -ENOMEM;
 
