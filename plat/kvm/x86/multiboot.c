@@ -71,6 +71,7 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 	if (mi->flags & MULTIBOOT_INFO_CMDLINE) {
 		if (mi->cmdline) {
 			cmdline_len = strlen((const char *)(__uptr)mi->cmdline);
+
 			/* 1:1 mapping */
 			mrd.pbase = PAGE_ALIGN_DOWN(mi->cmdline);
 			mrd.vbase = mrd.pbase;
@@ -78,7 +79,7 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 			mrd.len = cmdline_len;
 			mrd.pg_count = PAGE_COUNT(mrd.pg_off + cmdline_len);
 			mrd.type = UKPLAT_MEMRT_CMDLINE;
-			mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
+			mrd.flags = UKPLAT_MEMRF_READ;
 
 			mrd_insert(bi, &mrd);
 
@@ -108,7 +109,7 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 			mrd.len = mods[i].mod_end - mods[i].mod_start;
 			mrd.pg_count = PAGE_COUNT(mrd.pg_off + mrd.len);
 			mrd.type  = UKPLAT_MEMRT_INITRD;
-			mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
+			mrd.flags = UKPLAT_MEMRF_READ;
 
 #ifdef CONFIG_UKPLAT_MEMRNAME
 			strncpy(mrd.name, (char *)(__uptr)mods[i].cmdline,
@@ -156,8 +157,7 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 				mrd.len = PAGE_ALIGN_UP(mrd.len + mrd.pg_off);
 			} else {
 				mrd.type  = UKPLAT_MEMRT_RESERVED;
-				mrd.flags = UKPLAT_MEMRF_READ |
-					    UKPLAT_MEMRF_MAP;
+				mrd.flags = UKPLAT_MEMRF_READ;
 
 				/* We assume that reserved regions cannot
 				 * overlap with loaded modules.

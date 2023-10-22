@@ -45,7 +45,7 @@ lxboot_init_cmdline(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 	mrd.len = cmdline_size;
 	mrd.pg_count = PAGE_COUNT(mrd.pg_off + mrd.len);
 	mrd.type = UKPLAT_MEMRT_CMDLINE;
-	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
+	mrd.flags = UKPLAT_MEMRF_READ;
 #ifdef CONFIG_UKPLAT_MEMRNAME
 	memcpy(mrd.name, "cmdline", sizeof("cmdline"));
 #endif /* CONFIG_UKPLAT_MEMRNAME */
@@ -83,7 +83,7 @@ lxboot_init_initrd(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 	mrd.len = initrd_size;
 	mrd.type = UKPLAT_MEMRT_INITRD;
 	mrd.pg_count = PAGE_COUNT(mrd.pg_off + initrd_size);
-	mrd.flags = UKPLAT_MEMRF_MAP | UKPLAT_MEMRF_READ;
+	mrd.flags = UKPLAT_MEMRF_READ;
 #ifdef CONFIG_UKPLAT_MEMRNAME
 	memcpy(mrd.name, "initrd", sizeof("initrd"));
 #endif /* CONFIG_UKPLAT_MEMRNAME */
@@ -130,7 +130,7 @@ lxboot_init_mem(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 			mrd.len = PAGE_ALIGN_UP(mrd.len);
 		} else {
 			mrd.type = UKPLAT_MEMRT_RESERVED;
-			mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
+			mrd.flags = UKPLAT_MEMRF_READ;
 
 			/* We assume that reserved regions cannot
 			 * overlap with loaded modules.
