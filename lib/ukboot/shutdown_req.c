@@ -9,6 +9,7 @@
 #else /* __INTERRUPTSAFE__ */
 #include <uk/isr/boot.h>
 #include <uk/isr/semaphore.h>
+#include <uk/event.h>
 #endif /* __INTERRUPTSAFE__ */
 #include "shutdown_req.h"
 
@@ -54,3 +55,18 @@ int uk_boot_shutdown_req_isr(enum ukplat_gstate target)
 #endif /* __INTERRUPTSAFE__ */
 	return 0;
 }
+
+#if __INTERRUPTSAFE__ && CONFIG_LIBUKBOOT_SHUTDOWNREQ_HANDLER
+static int shutdown_req_handler(void *data)
+{
+	enum ukplat_gstate request = (enum ukplat_gstate)data;
+	int rc;
+
+	rc = uk_boot_shutdown_req_isr(request);
+	if (unlikely(rc < 0))
+		return UK_EVENT_NOT_HANDLED;
+	return UK_EVENT_HANDLED_CONT;
+}
+UK_EVENT_HANDLER(UKPLAT_SHUTDOWN_EVENT, shutdown_req_handler);
+
+#endif /* CONFIG_LIBUKBOOT_SHUTDOWNREQ_HANDLER && __INTERRUPTSAFE__ */

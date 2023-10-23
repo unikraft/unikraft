@@ -164,4 +164,12 @@ if LIBUKBOOT
 		the application main function returned or when the main thread
 		terminated. The system performs a shutdown only on explicit
 		requests.
+
+	config LIBUKBOOT_SHUTDOWNREQ_HANDLER
+	bool "Register shutdown request handler"
+	depends on LIBUKBOOT_MAINTHREAD
+	help
+		This setting enables the init thread to initiate a shutdown
+		if it is requested by a driver on the shutdown_req event queue
+		(e.g., ACPI power button event).
 endif
