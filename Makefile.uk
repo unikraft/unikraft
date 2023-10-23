@@ -19,10 +19,13 @@ COMPFLAGS-$(call have_clang)	+= -Wdocumentation -Wdocumentation-pedantic
 
 ASFLAGS      += -D__ASSEMBLY__
 
+GDCFLAGS     += -nostdlib -nophoboslib
+
 ASINCLUDES   += -I$(CONFIG_UK_BASE)/include
 CINCLUDES    += -I$(CONFIG_UK_BASE)/include
 CXXINCLUDES  += -I$(CONFIG_UK_BASE)/include
 GOCINCLUDES  += -I$(CONFIG_UK_BASE)/include
+GDCINCLUDES  += -I$(CONFIG_UK_BASE)/include
 
 RUSTCFLAGS-y	+= --emit=obj --crate-type=rlib --edition=2018 \
 		-Cpanic=abort -Cembed-bitcode=n \

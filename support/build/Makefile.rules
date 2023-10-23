@@ -721,6 +721,52 @@ $(eval $(call vprefix_lib,$(1),OBJS-y) += $(4))
 $(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(4)) $(call out2dep,$(4)))
 endef
 
+define buildrule_dmd =
+$(4): $(2) | prepare
+	$(call build_cmd,DMD,$(1),$(4),\
+		$(DMD) $(DMDINCLUDES) $(DMDINCLUDES-y) \
+			$($(call vprefix_lib,$(1),DMDINCLUDES)) $($(call vprefix_lib,$(1),DMDINCLUDES-y)) \
+			$(DMDFLAGS) $(DMDFLAGS-y) $($(call vprefix_lib,$(1),DMDFLAGS)) \
+			$($(call vprefix_lib,$(1),DMDFLAGS-y)) \
+			$(2) -c -od=$(dir $(4))
+	)
+
+UK_SRCS-y += $(2)
+UK_DEPS-y += $(call out2dep,$(4))
+UK_OBJS-y += $(4)
+$(eval $(call vprefix_lib,$(1),OBJS-y) += $(4))
+$(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(4)) $(call out2dep,$(4)))
+endef
+
+define buildrule_gdc =
+$(4): $(2) | prepare
+	$(call build_cmd,GDC,$(1),$(4),\
+		$(GDC) $(GDCINCLUDES) $(GDCINCLUDES-y) \
+			$($(call vprefix_lib,$(1),GDCINCLUDES)) $($(call vprefix_lib,$(1),GDCINCLUDES-y)) \
+			$(GDCFLAGS) $(GDCFLAGS-y) $(DBGFLAGS) $(DBGFLAGS-y) \
+			$($(call vprefix_lib,$(1),GDCFLAGS)) $($(call vprefix_lib,$(1),GDCFLAGS-y)) \
+			$(5) -D__LIBNAME__=$(1) -D__BASENAME__=$(notdir $(2)) \
+			-c $(2) -o $(4) $(depflags)
+	)
+
+UK_SRCS-y += $(2)
+UK_DEPS-y += $(call out2dep,$(4))
+UK_OBJS-y += $(4)
+$(eval $(call vprefix_lib,$(1),OBJS-y) += $(4))
+$(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(4)) $(call out2dep,$(4)))
+endef
+
+ifeq ($(D_COMPILER),dmd)
+    define buildrule_d =
+        $(buildrule_dmd)
+    endef
+else
+    define buildrule_d =
+        $(buildrule_gdc)
+    endef
+endif
+
+
 define add_lds_to_plat =
 $(eval $(call uc,$(2))_LD_SCRIPT-y += $(1))
 endef
