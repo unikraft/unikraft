@@ -78,6 +78,53 @@ struct vfscore_volume {
 #endif /* CONFIG_LIBVFSCORE_FSTAB */
 };
 
+#if CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS
+static int do_mount_initrd(const void *initrd, size_t len, const char *path)
+{
+	int rc;
+
+	UK_ASSERT(path);
+
+	rc = mount("", path, "ramfs", 0x0, NULL);
+	if (unlikely(rc)) {
+		uk_pr_crit("Failed to mount ramfs to \"%s\": %d\n",
+			   path, errno);
+		return -1;
+	}
+
+	uk_pr_info("Extracting initrd @ %p (%"__PRIsz" bytes) to %s...\n",
+		   (void *)initrd, len, path);
+	rc = ukcpio_extract(path, (void *)initrd, len);
+	if (unlikely(rc)) {
+		uk_pr_crit("Failed to extract cpio archive to %s: %d\n",
+			   path, rc);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int vfscore_mount_initrd_volume(struct vfscore_volume *vv)
+{
+	struct ukplat_memregion_desc *initrd;
+	int rc;
+
+	UK_ASSERT(vv);
+	UK_ASSERT(vv->path);
+
+	/* TODO: Support multiple Initial RAM Disks */
+	rc = ukplat_memregion_find_initrd0(&initrd);
+	if (unlikely(rc < 0)) {
+		uk_pr_crit("Could not find an initrd!\n");
+
+		return -1;
+	}
+
+	return do_mount_initrd((void *)initrd->vbase, initrd->len,
+			       vv->path);
+}
+#endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
+
 #if CONFIG_LIBVFSCORE_FSTAB
 /* Handle `mkmp` Unikraft Mount Option */
 static int vfscore_volume_process_ukopts_do_mkmp(char *path)
@@ -178,11 +225,20 @@ static int vfscore_volume_process_ukopts(struct vfscore_volume *vv)
 
 static inline int vfscore_mount_volume(struct vfscore_volume *vv)
 {
+	UK_ASSERT(vv);
+
 #if CONFIG_LIBVFSCORE_FSTAB
 	vfscore_volume_process_ukopts(vv);
 #endif /* CONFIG_LIBVFSCORE_FSTAB */
 
-	return mount(vv->sdev, vv->path, vv->drv, vv->flags, vv->opts);
+#if CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS
+	if (!strncmp(vv->drv, "initrd", sizeof("initrd") - 1)) {
+		return vfscore_mount_initrd_volume(vv);
+	} else
+#endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
+	{
+		return mount(vv->sdev, vv->path, vv->drv, vv->flags, vv->opts);
+	}
 }
 
 #ifdef CONFIG_LIBVFSCORE_FSTAB
@@ -282,34 +338,6 @@ static void vfscore_fstab_fetch_volume_args(char *v, struct vfscore_volume *vv)
 }
 #endif /* CONFIG_LIBVFSCORE_FSTAB */
 
-#if CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS
-static int do_mount_initrd(const void *initrd, size_t len, const char *path)
-{
-	int rc;
-
-	UK_ASSERT(initrd);
-	UK_ASSERT(path);
-
-	rc = mount("", path, "ramfs", 0x0, NULL);
-	if (unlikely(rc)) {
-		uk_pr_crit("Failed to mount ramfs to \"%s\": %d\n",
-			   path, errno);
-		return -1;
-	}
-
-	uk_pr_info("Extracting initrd @ %p (%"__PRIsz" bytes) to %s...\n",
-		   (void *)initrd, len, path);
-	rc = ukcpio_extract(path, (void *)initrd, len);
-	if (unlikely(rc)) {
-		uk_pr_crit("Failed to extract cpio archive to %s: %d\n",
-			   path, rc);
-		return -1;
-	}
-
-	return 0;
-}
-#endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
-
 #if CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS
 #if CONFIG_LIBVFSCORE_ROOTFS_EINITRD
 extern const char vfscore_einitrd_start[];
@@ -328,27 +356,6 @@ static int vfscore_automount_rootfs(void)
 }
 
 #else /* !CONFIG_LIBVFSCORE_ROOTFS_EINITRD */
-#if CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS
-static int vfscore_mount_initrd_volume(struct vfscore_volume *vv)
-{
-	struct ukplat_memregion_desc *initrd;
-	int rc;
-
-	UK_ASSERT(vv);
-
-	/* TODO: Support multiple Initial RAM Disks */
-	rc = ukplat_memregion_find_initrd0(&initrd);
-	if (unlikely(rc < 0)) {
-		uk_pr_crit("Could not find an initrd!\n");
-
-		return -1;
-	}
-
-	return do_mount_initrd((void *)initrd->vbase, initrd->len,
-			       vv->path);
-}
-#endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
-
 static int vfscore_automount_rootfs(void)
 {
 	/* Convert to `struct vfscore_volume` */
@@ -383,11 +390,6 @@ static int vfscore_automount_rootfs(void)
 	if (!vv.drv || vv.drv[0] == '\0')
 		return 0;
 
-#if CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS
-	if (!strncmp(vv.drv, "initrd", sizeof("initrd") - 1))
-		return vfscore_mount_initrd_volume(&vv);
-#endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
-
 	rc = vfscore_mount_volume(&vv);
 	if (unlikely(rc))
 		uk_pr_crit("Failed to mount %s (%s) at /: %d\n", vv.sdev,
@@ -412,14 +414,7 @@ static int vfscore_automount_fstab_volumes(void)
 	for (i = 0; i < CONFIG_LIBVFSCORE_FSTAB_SIZE && vfscore_fstab[i]; i++) {
 		vfscore_fstab_fetch_volume_args(vfscore_fstab[i], &vv);
 
-#if CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS
-		if (!strncmp(vv.drv, "initrd", sizeof("initrd") - 1)) {
-			rc = vfscore_mount_initrd_volume(&vv);
-		} else
-#endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
-		{
-			rc = vfscore_mount_volume(&vv);
-		}
+		rc = vfscore_mount_volume(&vv);
 		if (unlikely(rc)) {
 			uk_pr_err("Failed to mount %s: error %d\n", vv.sdev,
 				  rc);
