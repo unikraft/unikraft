@@ -243,8 +243,8 @@ int lcpu_fn_enqueue(struct lcpu *lcpu, const struct ukplat_lcpu_func *fn)
 		return -EAGAIN;
 
 	/* It is empty, try to store the function */
-	if (ukarch_compare_exchange_sync(&lcpu->fn.fn, old_fn,
-					 fn->fn) != fn->fn)
+	if (!__atomic_compare_exchange_sync(&lcpu->fn.fn, &old_fn, fn->fn, 0,
+					    __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST))
 		return -EAGAIN;
 
 	/* We have acquired the slot! Also store the user argument.
@@ -419,9 +419,8 @@ int ukplat_lcpu_start(const __lcpuidx lcpuidx[], unsigned int *num, void *sp[],
 			continue;
 		}
 
-retry:
 		old = ukarch_load_n(&lcpu->state);
-
+	retry:
 		/* We ignore CPUs that are already started */
 		if (unlikely(old != LCPU_STATE_OFFLINE)) {
 			uk_pr_warn("Failed to start CPU 0x%lx: not offline\n",
@@ -436,8 +435,9 @@ retry:
 		 * was faster, we will return to the state comparison and
 		 * report that the CPU is not offline.
 		 */
-		if (ukarch_compare_exchange_sync((int *)&lcpu->state, old,
-						 new) != new)
+		if (!__atomic_compare_exchange_n((int *)&lcpu->state, &old, new,
+						 0, __ATOMIC_SEQ_CST,
+						 __ATOMIC_RELAXED))
 			goto retry;
 
 		UK_ASSERT(lcpu->state == LCPU_STATE_INIT);
@@ -500,8 +500,8 @@ static inline int lcpu_transition_safe(struct lcpu *lcpu, int incr)
 	 * just atomically in-/decrement the state. Otherwise, we might corrupt
 	 * the non-online state.
 	 */
+	old = ukarch_load_n(&lcpu->state);
 	do {
-		old = ukarch_load_n(&lcpu->state);
 
 		/* We must not change the state if the CPU is not online */
 		if (!lcpu_state_is_online(old))
@@ -512,8 +512,7 @@ static inline int lcpu_transition_safe(struct lcpu *lcpu, int incr)
 		new = old + incr;
 
 		UK_ASSERT(lcpu_state_is_online(new));
-	} while (ukarch_compare_exchange_sync((int *)&lcpu->state, old,
-					      new) != new);
+	} while (!__atomic_compare_exchange_n((int *)&lcpu->state, &old, new, 0, __ATOMIC_SEQ_CST, __ATOMIC_RELAXED));
 
 	return 1;
 }

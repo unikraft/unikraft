@@ -93,15 +93,6 @@ extern "C" {
 #define ukarch_exchange_n(dst, v) \
 	__atomic_exchange_n(dst, v, __ATOMIC_SEQ_CST)
 
-#define ukarch_compare_exchange_sync(ptr, old, new)                            \
-	({                                                                     \
-		__typeof__(*ptr) stored = old;                                 \
-		__atomic_compare_exchange_n(                                   \
-		    ptr, &stored, new, 0, __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)  \
-		    ? new                                                      \
-		    : old;                                                     \
-	})
-
 #ifdef __cplusplus
 }
 #endif
