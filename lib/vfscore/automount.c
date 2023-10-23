@@ -48,12 +48,12 @@
 #include <uk/init.h>
 #include <uk/libparam.h>
 #include <uk/plat/memory.h>
+#include <sys/stat.h>
 
 #ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS
 #include <errno.h>
 #include <uk/config.h>
 #include <uk/arch/types.h>
-#include <sys/stat.h>
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS */
 
 #if CONFIG_LIBVFSCORE_FSTAB
@@ -65,7 +65,7 @@ struct vfscore_volume {
 	/* Volume source device */
 	const char *sdev;
 	/* Mount point absolute path */
-	const char *path;
+	char *path;
 	/* Corresponding filesystem driver name */
 	const char *drv;
 	/* Mount flags */
@@ -79,12 +79,69 @@ struct vfscore_volume {
 };
 
 #if CONFIG_LIBVFSCORE_FSTAB
+/* Handle `mkmp` Unikraft Mount Option */
+static int vfscore_volume_process_ukopts_do_mkmp(char *path)
+{
+	char *pos, *prev_pos;
+	int rc;
+
+	UK_ASSERT(path);
+	UK_ASSERT(path[0] == '/');
+
+	pos = path;
+	do {
+		prev_pos = pos;
+		pos = strchr(pos + 1, '/');
+
+		if (pos) {
+			if (pos[0] == '\0')
+				break;
+
+			/* Zero out the next '/' */
+			*pos = '\0';
+		}
+
+		/* Do not allow `/./` or `/../` in the path. Also do not allow
+		 * overwriting .. or . files
+		 */
+		if (unlikely(prev_pos[1] == '.' &&
+			     /* /../ and /.. */
+			     ((prev_pos[2] == '.' &&
+			       (prev_pos[3] == '/' || prev_pos[3] == '\0')) ||
+				/* OR /./ and /. */
+			      (prev_pos[2] == '/' || prev_pos[2] == '\0')
+			     ))) {
+			uk_pr_err("'.' or '..' are not supported in mount paths.\n");
+			return -EINVAL;
+		}
+
+		/* mkdir() with S_IRWXU */
+		rc = mkdir(path, 0700);
+		if (rc && errno != EEXIST)
+			return -errno;
+
+		/* Restore current '/' */
+		if (pos)
+			*pos = '/';
+
+		/* Handle paths with multiple `/` */
+		while (pos && pos[1] == '/')
+			pos++;
+	} while (pos);
+
+	return 0;
+}
+
 /**
  * vv->ukopts must follow the pattern below, each option separated by
  * the character defined through LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP (e.g. with
  * LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP = ','):
  *	[<ukopt1>,<ukopt2>,<ukopt3>,...,<ukoptN>]
  *
+ * Currently implemented, Unikraft Mount options:
+ * - mkmp	Make mount point. Ensures that the specified mount point
+ *		exists. If it does not exist in the current vfs, the directory
+ *		structure is created.
  */
 static int vfscore_volume_process_ukopts(struct vfscore_volume *vv)
 {
@@ -92,6 +149,7 @@ static int vfscore_volume_process_ukopts(struct vfscore_volume *vv)
 	int rc;
 
 	UK_ASSERT(vv);
+	UK_ASSERT(vv->path);
 
 	o_curr = vv->ukopts;
 	while (o_curr) {
@@ -99,6 +157,16 @@ static int vfscore_volume_process_ukopts(struct vfscore_volume *vv)
 		if (o_next) {
 			*o_next = '\0';
 			o_next++;
+		}
+
+		/* First check is so we do not run `mkmp` on `/` */
+		if (!strcmp(o_curr, "mkmp") && vv->path[1] != '\0') {
+			rc = vfscore_volume_process_ukopts_do_mkmp(vv->path);
+			if (unlikely(rc)) {
+				uk_pr_err("Failed to process ukopt (mkmp): "
+					  "%d\n", rc);
+				return rc;
+			}
 		}
 
 		o_curr = o_next;
@@ -217,6 +285,7 @@ static int do_mount_initrd(const void *initrd, size_t len, const char *path)
 {
 	int rc;
 
+	UK_ASSERT(initrd);
 	UK_ASSERT(path);
 
 	rc = mount("", path, "ramfs", 0x0, NULL);
