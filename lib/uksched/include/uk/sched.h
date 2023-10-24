@@ -84,6 +84,7 @@ struct uk_sched {
 	uk_sched_thread_remove_func_t   thread_remove;
 	uk_sched_thread_blocked_func_t  thread_blocked;
 	uk_sched_thread_woken_func_t    thread_woken;
+	uk_sched_thread_woken_func_t    thread_woken_isr;
 	uk_sched_idle_thread_func_t     idle_thread;
 
 	uk_sched_start_t sched_start;

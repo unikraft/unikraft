@@ -55,15 +55,17 @@ int uk_sched_register(struct uk_sched *s);
 #define uk_sched_init(s, start_func, yield_func, \
 		thread_add_func, thread_remove_func, \
 		thread_blocked_func, thread_woken_func, \
-		idle_thread_func, def_allocator) \
+		thread_woken_isr_func, idle_thread_func, \
+		def_allocator) \
 	do { \
-		(s)->sched_start     = start_func; \
-		(s)->yield           = yield_func; \
-		(s)->thread_add      = thread_add_func; \
-		(s)->thread_remove   = thread_remove_func; \
-		(s)->thread_blocked  = thread_blocked_func; \
-		(s)->thread_woken    = thread_woken_func; \
-		(s)->idle_thread     = idle_thread_func; \
+		(s)->sched_start      = start_func; \
+		(s)->yield            = yield_func; \
+		(s)->thread_add       = thread_add_func; \
+		(s)->thread_remove    = thread_remove_func; \
+		(s)->thread_blocked   = thread_blocked_func; \
+		(s)->thread_woken     = thread_woken_func; \
+		(s)->thread_woken_isr = thread_woken_isr_func; \
+		(s)->idle_thread      = idle_thread_func; \
 		uk_sched_register((s)); \
 		\
 		(s)->a = (def_allocator); \
