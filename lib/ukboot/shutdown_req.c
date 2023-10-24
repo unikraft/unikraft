@@ -4,12 +4,23 @@
  * You may not use this file except in compliance with the License.
  */
 #include <uk/arch/atomic.h>
+#if !__INTERRUPTSAFE__
 #include <uk/boot.h>
+#else /* __INTERRUPTSAFE__ */
+#include <uk/isr/boot.h>
+#include <uk/isr/semaphore.h>
+#endif /* __INTERRUPTSAFE__ */
 #include "shutdown_req.h"
 
+#if !__INTERRUPTSAFE__
 struct uk_boot_shutdown_ctl shutdown_ctl;
+#endif /* !__INTERRUPTSAFE__ */
 
+#if !__INTERRUPTSAFE__
 int uk_boot_shutdown_req(enum ukplat_gstate target)
+#else /* __INTERRUPTSAFE__ */
+int uk_boot_shutdown_req_isr(enum ukplat_gstate target)
+#endif /* __INTERRUPTSAFE__ */
 {
 	unsigned long already_requested;
 
@@ -36,6 +47,10 @@ int uk_boot_shutdown_req(enum ukplat_gstate target)
 	/* The first request sets the shutdown target and unblocks "init" */
 	uk_pr_info("Shutdown requested (%d)\n", target);
 	shutdown_ctl.request.target = target;
+#if !__INTERRUPTSAFE__
 	uk_semaphore_up(&shutdown_ctl.barrier);
+#else /* __INTERRUPTSAFE__ */
+	uk_semaphore_up_isr(&shutdown_ctl.barrier);
+#endif /* __INTERRUPTSAFE__ */
 	return 0;
 }

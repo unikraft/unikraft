@@ -9,6 +9,7 @@ ifneq ($(CONFIG_LIBUKBOOT_BANNER_NONE),y)
 LIBUKBOOT_SRCS-y += $(LIBUKBOOT_BASE)/banner.c
 endif
 LIBUKBOOT_SRCS-$(CONFIG_LIBUKBOOT_MAINTHREAD) += $(LIBUKBOOT_BASE)/shutdown_req.c
+LIBUKBOOT_SRCS-$(CONFIG_LIBUKBOOT_MAINTHREAD) += $(LIBUKBOOT_BASE)/shutdown_req.c|isr
 
 # The main() is in the separate library to fool the LTO. Which is
 # trying to resolve the main() function call to whatever is available
