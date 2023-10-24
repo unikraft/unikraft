@@ -36,23 +36,7 @@
 #include <uk/sched_impl.h>
 #include <uk/schedcoop.h>
 #include <uk/essentials.h>
-
-struct schedcoop {
-	struct uk_sched sched;
-	struct uk_thread_list run_queue;
-	struct uk_thread_list sleep_queue;
-
-	struct uk_thread idle;
-	__nsec idle_return_time;
-	__nsec ts_prev_switch;
-};
-
-static inline struct schedcoop *uksched2schedcoop(struct uk_sched *s)
-{
-	UK_ASSERT(s);
-
-	return __containerof(s, struct schedcoop, sched);
-}
+#include "schedcoop.h"
 
 static void schedcoop_schedule(struct uk_sched *s)
 {
@@ -176,20 +160,6 @@ static void schedcoop_thread_blocked(struct uk_sched *s, struct uk_thread *t)
 		UK_TAILQ_REMOVE(&c->run_queue, t, queue);
 	if (t->wakeup_time > 0)
 		UK_TAILQ_INSERT_TAIL(&c->sleep_queue, t, queue);
-}
-
-static void schedcoop_thread_woken(struct uk_sched *s, struct uk_thread *t)
-{
-	struct schedcoop *c = uksched2schedcoop(s);
-
-	UK_ASSERT(ukplat_lcpu_irqs_disabled());
-
-	if (t->wakeup_time > 0)
-		UK_TAILQ_REMOVE(&c->sleep_queue, t, queue);
-	if (uk_thread_is_queueable(t) && uk_thread_is_runnable(t)) {
-		UK_TAILQ_INSERT_TAIL(&c->run_queue, t, queue);
-		uk_thread_clear_queueable(t);
-	}
 }
 
 static __noreturn void idle_thread_fn(void *argp)
@@ -318,8 +288,8 @@ struct uk_sched *uk_schedcoop_create(struct uk_alloc *a)
 			schedcoop_thread_add,
 			schedcoop_thread_remove,
 			schedcoop_thread_blocked,
-			schedcoop_thread_woken,
-			NULL, /* currently unsupported */
+			schedcoop_thread_woken_isr,
+			schedcoop_thread_woken_isr,
 			schedcoop_idle_thread,
 			a);
 
