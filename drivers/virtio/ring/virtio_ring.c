@@ -33,6 +33,11 @@
  * Inspired from the FreeBSD.
  * Commit-id: a89e7a10d501
  */
+
+#if CONFIG_LIBUKSEV
+#include <uk/sev.h>
+#endif
+
 #include <uk/config.h>
 #include <string.h>
 #include <uk/print.h>
@@ -452,6 +457,11 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 	struct uk_pagetable *pt = ukplat_pt_get_active();
 	__paddr_t paddr = __PADDR_ANY;
 	__vaddr_t vaddr = __VADDR_ANY;
+	int attr = PAGE_ATTR_PROT_RW;
+
+#if CONFIG_LIBUKSEV
+	attr |= PAGE_ATTR_ENCRYPT;
+#endif /* CONFIG_LIBUKSEV */
 
 	ring_size = PAGE_ALIGN_UP(ring_size);
 
@@ -459,9 +469,8 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 	if (unlikely(rc))
 		goto err_freevq;
 
-	rc = uk_vma_map_dma(uk_vas_get_active(), &vaddr, ring_size,
-			    PAGE_ATTR_PROT_RW, UK_VMA_MAP_POPULATE,
-			    "virtqueue", paddr);
+	rc = uk_vma_map_dma(uk_vas_get_active(), &vaddr, ring_size, attr,
+			    UK_VMA_MAP_POPULATE, "virtqueue", paddr);
 	if (unlikely(rc))
 		goto err_freevq;
 
@@ -473,6 +482,11 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 		goto err_freevq;
 	}
 #endif /* !CONFIG_LIBUKVMEM */
+#if CONFIG_LIBUKSEV
+	uk_sev_set_memory_shared(vaddr,
+				 ring_size >> PAGE_SHIFT);
+
+#endif
 	memset(vrq->vring_mem, 0, ring_size);
 	virtqueue_vring_init(vrq, nr_descs, align);
 
