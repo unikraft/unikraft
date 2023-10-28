@@ -52,17 +52,17 @@ struct ukplat_bootinfo {
 
 UK_CTASSERT(sizeof(struct ukplat_bootinfo) == 80);
 
-#ifdef CONFIG_UKPLAT_MEMRNAME
+#if CONFIG_UKPLAT_MEMRNAME
 #if __SIZEOF_LONG__ == 8
-UK_CTASSERT(sizeof(struct ukplat_memregion_desc) == 64);
-#else /* __SIZEOF_LONG__ == 8 */
-UK_CTASSERT(sizeof(struct ukplat_memregion_desc) == 52);
+UK_CTASSERT(sizeof(struct ukplat_memregion_desc) == 80);
+#else /* __SIZEOF_LONG__ != 8 */
+UK_CTASSERT(sizeof(struct ukplat_memregion_desc) == 60);
 #endif /* __SIZEOF_LONG__ != 8 */
-#else /* CONFIG_UKPLAT_MEMRNAME */
+#else /* !CONFIG_UKPLAT_MEMRNAME */
 #if __SIZEOF_LONG__ == 8
-UK_CTASSERT(sizeof(struct ukplat_memregion_desc) == 32);
-#else /* __SIZEOF_LONG__ == 8 */
-UK_CTASSERT(sizeof(struct ukplat_memregion_desc) == 16);
+UK_CTASSERT(sizeof(struct ukplat_memregion_desc) == 48);
+#else /* __SIZEOF_LONG__ != 8 */
+UK_CTASSERT(sizeof(struct ukplat_memregion_desc) == 24);
 #endif /* __SIZEOF_LONG__ != 8 */
 #endif /* !CONFIG_UKPLAT_MEMRNAME */
 
