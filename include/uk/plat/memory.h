@@ -81,12 +81,16 @@ extern "C" {
  * Descriptor of a memory region
  */
 struct ukplat_memregion_desc {
-	/** Physical base address */
+	/** Physical page-aligned base address of the region */
 	__paddr_t pbase;
-	/** Virtual base address */
+	/** Virtual page-aligned base address of the region */
 	__vaddr_t vbase;
-	/** Length in bytes */
+	/** Offset where the resource starts in the region's first page */
+	__off pg_off;
+	/** Length in bytes of the resource inside this region */
 	__sz len;
+	/** Number of pages the end-to-end aligned region occupies */
+	__sz pg_count;
 	/** Memory region type (see UKPLAT_MEMRT_*) */
 	__u16 type;
 	/** Memory region flags (see UKPLAT_MEMRF_*) */

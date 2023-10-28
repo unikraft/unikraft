@@ -133,9 +133,11 @@ ukplat_memregion_list_insert_legacy_hi_mem(struct ukplat_memregion_list *list)
 	 */
 	rc = ukplat_memregion_list_insert(list,
 			&(struct ukplat_memregion_desc){
-				.vbase = X86_HI_MEM_START,
 				.pbase = X86_HI_MEM_START,
+				.vbase = X86_HI_MEM_START,
+				.pg_off = 0,
 				.len   = X86_HI_MEM_LEN,
+				.pg_count = PAGE_COUNT(X86_HI_MEM_LEN),
 				.type  = UKPLAT_MEMRT_RESERVED,
 				.flags = UKPLAT_MEMRF_READ  |
 					 UKPLAT_MEMRF_WRITE |
@@ -149,9 +151,11 @@ ukplat_memregion_list_insert_legacy_hi_mem(struct ukplat_memregion_list *list)
 	 */
 	rc = ukplat_memregion_list_insert(list,
 			&(struct ukplat_memregion_desc){
-				.vbase = X86_BIOS_ROM_START,
 				.pbase = X86_BIOS_ROM_START,
+				.vbase = X86_BIOS_ROM_START,
+				.pg_off = 0,
 				.len   = X86_BIOS_ROM_LEN,
+				.pg_count = PAGE_COUNT(X86_BIOS_ROM_LEN),
 				.type  = UKPLAT_MEMRT_RESERVED,
 				.flags = UKPLAT_MEMRF_READ  |
 					 UKPLAT_MEMRF_MAP,
@@ -358,17 +362,19 @@ ukplat_memregion_print_desc(struct ukplat_memregion_desc *mrd)
 		break;
 	}
 
-	uk_pr_debug(" %012lx-%012lx %012lx %c%c%c %016lx %s %s\n",
-		   mrd->pbase, mrd->pbase + mrd->len, mrd->len,
-		   (mrd->flags & UKPLAT_MEMRF_READ) ? 'r' : '-',
-		   (mrd->flags & UKPLAT_MEMRF_WRITE) ? 'w' : '-',
-		   (mrd->flags & UKPLAT_MEMRF_EXECUTE) ? 'x' : '-',
-		   mrd->vbase,
-		   type,
+	uk_pr_debug(" %012lx-%012lx %012lx-%012lx %c%c%c %016lx %s %s\n",
+		    mrd->pbase, mrd->pbase + mrd->pg_count * PAGE_SIZE,
+		    mrd->pbase + mrd->pg_off,
+		    mrd->pbase + mrd->pg_off + mrd->len,
+		    (mrd->flags & UKPLAT_MEMRF_READ) ? 'r' : '-',
+		    (mrd->flags & UKPLAT_MEMRF_WRITE) ? 'w' : '-',
+		    (mrd->flags & UKPLAT_MEMRF_EXECUTE) ? 'x' : '-',
+		    mrd->vbase,
+		    type,
 #if CONFIG_UKPLAT_MEMRNAME
-		   mrd->name
+		    mrd->name
 #else /* !CONFIG_UKPLAT_MEMRNAME */
-		   ""
+		    ""
 #endif /* !CONFIG_UKPLAT_MEMRNAME */
 		   );
 }

@@ -108,7 +108,9 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags)
 		if (olen - (pstart - ostart) == size) {
 			mrd->pbase = pstart;
 			mrd->vbase = pstart;
+			mrd->pg_off = 0;
 			mrd->len = desired_sz;
+			mrd->pg_count = PAGE_COUNT(desired_sz);
 			mrd->type = type;
 			mrd->flags = flags;
 
@@ -116,16 +118,19 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags)
 		}
 
 		/* Adjust free region */
-		mrd->len  -= pend - mrd->pbase;
+		mrd->len -= pend - mrd->pbase;
+		mrd->pg_count = PAGE_COUNT(mrd->len);
 		mrd->pbase = pend;
 
 		mrd->vbase = (__vaddr_t)mrd->pbase;
 
 		/* Insert allocated region */
-		alloc_mrd.vbase = pstart;
 		alloc_mrd.pbase = pstart;
-		alloc_mrd.len   = desired_sz;
-		alloc_mrd.type  = type;
+		alloc_mrd.vbase = pstart;
+		alloc_mrd.pg_off = 0;
+		alloc_mrd.len = desired_sz;
+		alloc_mrd.pg_count = PAGE_COUNT(desired_sz);
+		alloc_mrd.type = type;
 		alloc_mrd.flags = flags | UKPLAT_MEMRF_MAP;
 
 		bi = ukplat_bootinfo_get();
@@ -194,35 +199,54 @@ static inline void overlapping_mrd_fixup(struct ukplat_memregion_list *list,
 		/* If the right region is contained within the left region,
 		 * drop it entirely
 		 */
-		if (RANGE_CONTAIN(ml->pbase, ml->len, mr->pbase, mr->len)) {
+		/* This can only happen if mr is a free mrd or if it has
+		 * the same type as ml
+		 */
+		UK_ASSERT(mr->type == UKPLAT_MEMRT_FREE ||
+			  mr->type == ml->type);
+
+		if (RANGE_CONTAIN(ml->pbase, ml->pg_count * PAGE_SIZE,
+				  mr->pbase, mr->pg_count * PAGE_SIZE)) {
 			mr->len = 0;
+			mr->pg_count = 0;
 
 		/* If the right region has a part of itself in the left region,
 		 * drop that part of the right region only
 		 */
 		} else {
 			mr->len -= ml->pbase + ml->len - mr->pbase;
-			mr->pbase = ml->pbase + ml->len;
+			mr->pg_count = PAGE_COUNT(mr->len);
+			mr->pbase = ml->pbase + ml->pg_count * PAGE_SIZE;
 			mr->vbase = mr->pbase;
 		}
 
 	/* If left memory region is of lower priority */
 	} else {
+		/* This can only happen if ml is a free mrd or if it has the
+		 * same type as mr
+		 */
+		UK_ASSERT(ml->type == UKPLAT_MEMRT_FREE ||
+			  ml->type == mr->type);
+
 		/* If the left memory region is contained within the right
 		 * region, drop it entirely
 		 */
-		if (RANGE_CONTAIN(mr->pbase, mr->len, ml->pbase, ml->len)) {
+		if (RANGE_CONTAIN(mr->pbase, mr->pg_count * PAGE_SIZE,
+				  ml->pbase, ml->pg_count * PAGE_SIZE)) {
 			ml->len = 0;
+			ml->pg_count = 0;
 
 		/* If the left region has a part of itself in the right region,
 		 * drop that part of the left region only and split by creating
 		 * a new one if the left region is larger than the right region.
 		 */
 		} else {
-			__sz len = ml->pbase + ml->len - mr->pbase - mr->len;
+			__sz len = ml->pbase + ml->pg_count * PAGE_SIZE -
+				   mr->pbase - mr->pg_count * PAGE_SIZE;
+			__uptr base = PAGE_ALIGN_UP(mr->pbase + mr->len);
 
-			if (RANGE_CONTAIN(ml->pbase, ml->len,
-					  mr->pbase, mr->len && len))
+			if (RANGE_CONTAIN(ml->pbase, ml->pg_count * PAGE_SIZE,
+					  mr->pbase, mr->pg_count * PAGE_SIZE))
 				/* len here is basically ml_end - mr_end. Thus,
 				 * len == 0 can happen only if mr is at the end
 				 * of the ml and we therefore ignore the rest.
@@ -232,55 +256,21 @@ static inline void overlapping_mrd_fixup(struct ukplat_memregion_list *list,
 				 */
 				ukplat_memregion_list_insert_at_idx(list,
 					&(struct ukplat_memregion_desc){
-						.vbase = mr->pbase + mr->len,
-						.pbase = mr->pbase + mr->len,
-						.len   = len,
-						.type  = ml->type,
+						.pbase = base,
+						.vbase = base,
+						.pg_off = 0,
+						.len = len,
+						.pg_count = PAGE_COUNT(len),
+						.type = UKPLAT_MEMRT_FREE,
 						.flags = ml->flags
 					}, ridx + 1);
 
 			/* Drop the fraction of ml that overlaps with mr */
-			ml->len = mr->pbase - ml->pbase;
+			ml->len = (mr->pbase + mr->pg_off) -
+				  (ml->pbase + ml->pg_off);
+			ml->pg_count = PAGE_COUNT(ml->pg_off + ml->len);
 		}
 	}
-}
-
-/* During coalescing of two memory region descriptors, we first call this
- * function which would overwrite the physical and length of a given memory
- * region descriptor with its equivalent page-aligned physical base and length
- * if the end address of the memory region would have also been page-aligned.
- * The coalesce function then, at the end, calls ukplat_memregion_restore_mrd
- * to undo this.
- */
-static void ukplat_memregion_align_mrd(struct ukplat_memregion_desc *mrd,
-				       __paddr_t *opbase, __sz *olen)
-{
-	__sz pend;
-
-	/* Store the **original** physical base and length */
-	*opbase = mrd->pbase;
-	*olen = mrd->len;
-
-	/* Compute the page-aligned end address of the region */
-	pend = ALIGN_UP(mrd->pbase + mrd->len, __PAGE_SIZE);
-
-	/* Overwrite original pbase with its page-aligned value */
-	mrd->pbase = ALIGN_DOWN(mrd->pbase, __PAGE_SIZE);
-
-	/* Overwrite original len with the supposed size of end-to-end
-	 * page-aligned memory region.
-	 */
-	mrd->len = pend - mrd->pbase;
-}
-
-/* Called at the end of ukplat_memregion_list_coalesce to undo what
- * ukplat_memregion_align_mrd has done.
- */
-static void ukplat_memregion_restore_mrd(struct ukplat_memregion_desc *mrd,
-					 __paddr_t opbase, __sz olen)
-{
-	mrd->len = olen;
-	mrd->pbase = opbase;
 }
 
 /* Quick function to do potentially necessary swapping of two adjacent memory
@@ -307,10 +297,7 @@ static void ukplat_memregion_swap_if_unordered(struct ukplat_memregion_list *l,
 void ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 {
 	struct ukplat_memregion_desc *m, *ml, *mr;
-	__paddr_t ml_opbase, mr_opbase;
-	__sz ml_olen, mr_olen;
 	int ml_prio, mr_prio;
-	__u8 del; /* lets us know if a deletion happened */
 	__u32 i;
 
 	UK_ASSERT(list);
@@ -320,8 +307,6 @@ void ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 	i = 0;
 	m = list->mrds;
 	while (i + 1 < list->count) {
-		del = 0;
-
 		/* Make sure first that they are ordered. If not, swap them */
 		ukplat_memregion_swap_if_unordered(list, i, i + 1);
 
@@ -343,10 +328,8 @@ void ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 		uk_pr_debug("Priority of right memory region: %d\n", mr_prio);
 		UK_ASSERT(mr_prio >= 0);
 
-		ukplat_memregion_align_mrd(ml, &ml_opbase, &ml_olen);
-		ukplat_memregion_align_mrd(mr, &mr_opbase, &mr_olen);
-
-		if (RANGE_OVERLAP(ml->pbase, ml->len, mr->pbase, mr->len)) {
+		if (RANGE_OVERLAP(ml->pbase, ml->pg_count * PAGE_SIZE,
+				  mr->pbase, mr->pg_count * PAGE_SIZE)) {
 			/* If they are not of the same priority */
 			if (ml_prio != mr_prio) {
 				uk_pr_debug("mrd's of different priority "
@@ -363,7 +346,6 @@ void ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 						      mr_prio, i, i + 1);
 
 				/* Remove dropped regions */
-				del = 1;
 				if (ml->len == 0) {
 					uk_pr_debug("Deleting left mrd!\n");
 					ukplat_memregion_list_delete(list, i);
@@ -374,44 +356,62 @@ void ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 								     i + 1);
 				} else {
 					i++;
-					del = 0;  /* No deletions */
 				}
 
 			/* If they have the same priority, merge them. If they
 			 * are contained within each other, drop the contained
-			 * one.
+			 * one. Do not allow merging of kernel resources, as
+			 * their resource page offset into the region is
+			 * important!
 			 */
 			} else {
+				/* Kernel regions must never overlap! */
+				UK_ASSERT(ml_prio != MRD_PRIO_KRNL_RSRC);
+				UK_ASSERT(mr_prio != MRD_PRIO_KRNL_RSRC);
+
 				/* We do not allow overlaps of same priority
 				 * and of different flags.
 				 */
 				UK_ASSERT(ml->flags == mr->flags);
 
+				/* We do not allow overlaps of memory regions
+				 * whose resource page offset into their region
+				 * is not equal to 0. Regions don't that meet
+				 * this condition are hand-inserted by us and
+				 * should not overlap.
+				 */
+				UK_ASSERT(!ml->pg_off);
+				UK_ASSERT(!mr->pg_off);
+				UK_ASSERT(PAGE_ALIGNED(ml->pbase));
+				UK_ASSERT(PAGE_ALIGNED(mr->pbase));
+
 				/* If the left region is contained within the
 				 * right region, drop it
 				 */
-				if (RANGE_CONTAIN(mr->pbase, mr->len,
-						  ml->pbase, ml->len)) {
+				if (RANGE_CONTAIN(mr->pbase,
+						  mr->pg_count * PAGE_SIZE,
+						  ml->pbase,
+						  ml->pg_count * PAGE_SIZE)) {
 					uk_pr_debug("Deleting left mrd!\n");
 					ukplat_memregion_list_delete(list, i);
-					del = 1;
-
-					goto restore_mrds;
+					continue;
 
 				/* If the right region is contained within the
 				 * left region, drop it
 				 */
-				} else if (RANGE_CONTAIN(ml->pbase, ml->len,
-							 mr->pbase, mr->len)) {
+				} else if (RANGE_CONTAIN(ml->pbase,
+							 ml->pg_count *
+							 PAGE_SIZE,
+							 mr->pbase,
+							 mr->pg_count *
+							 PAGE_SIZE)) {
 					uk_pr_debug("Deleting right mrd!\n");
 					ukplat_memregion_list_delete(list,
 								     i + 1);
-					del = 1;
-
-					goto restore_mrds;
+					continue;
 				}
 
-				uk_pr_debug("Merging two overlapping mrd's.\n");
+				uk_pr_debug("Merging two overlapping mrds.\n");
 
 				/* If they are not contained within each other,
 				 * merge them.
@@ -422,60 +422,41 @@ void ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 				 * overlapping region
 				 */
 				ml->len -= ml->pbase + ml->len - mr->pbase;
+				ml->pg_count = PAGE_COUNT(ml->pg_off + ml->len);
 
 				/* Delete the memory region we just merged into
 				 * the previous region.
 				 */
 				ukplat_memregion_list_delete(list, i + 1);
-				del = 1;
 			}
 
 		/* If they do not overlap but they are contiguous and have the
-		 * same flags and priority.
+		 * same flags and priority. Do not merge Kernel type memregions,
+		 * as we have to preserve pg_off's and len's.
 		 */
 		} else if (ml->pbase + ml->len == mr->pbase &&
-			   ml_prio == mr_prio && ml->flags == mr->flags) {
+			   ml_prio == mr_prio && ml->flags == mr->flags &&
+			   ml_prio != MRD_PRIO_KRNL_RSRC) {
+			/* We do not allow overlaps of memory regions
+			 * whose resource page offset into their region
+			 * is not equal to 0. Regions don't that meet
+			 * this condition are hand-inserted by us and
+			 * should not overlap.
+			 */
+			UK_ASSERT(!ml->pg_off);
+			UK_ASSERT(!mr->pg_off);
+			UK_ASSERT(PAGE_ALIGNED(ml->pbase));
+			UK_ASSERT(PAGE_ALIGNED(mr->pbase));
+
 			uk_pr_debug("Merging two contiguous mrd's.\n");
 			ml->len += mr->len;
+			ml->pg_count = PAGE_COUNT(ml->len);
 			ukplat_memregion_list_delete(list, i + 1);
-			del = 1;
 		} else {
 			uk_pr_debug("No adjustment for these mrd's.\n");
 			i++;
 		}
-
-restore_mrds:
-		if (!del) {
-			/* We assume only MRD_PRIO_FREE can be dropped. We want
-			 * to maintain !MRD_PRIO_FREE start addresses and
-			 * length so that the kernel may use them (e.g. initrd
-			 * start address).
-			 */
-			if (ml_prio != MRD_PRIO_FREE)
-				ukplat_memregion_restore_mrd(ml, ml_opbase,
-							     ml_olen);
-
-			/* This here can only happen if two adjacent
-			 * !MRD_PRIO_FREE regions are resolved without a
-			 * deletion. Preserve mr's original data as well.
-			 */
-			if (mr_prio != MRD_PRIO_FREE)
-				ukplat_memregion_restore_mrd(mr, mr_opbase,
-							     mr_olen);
-		}
-
-		/* Update ml's vbase, since it might not be equal to pbase
-		 * anymore. Whether we deleted ml or mr it does not matter,
-		 * as ml is now equal to the remaining one, because
-		 * ukplat_memregion_list_delete() removes by `memmove()`ing.
-		 */
-		ml->vbase = ml->pbase;
 	}
-
-	/* Make sure the last memory region always ends up being updated when
-	 * we exit this function
-	 */
-	m[i].vbase = m[i].pbase;
 }
 
 int ukplat_memregion_count(void)
@@ -521,10 +502,14 @@ static int ukplat_memregion_list_insert_unmaps(struct ukplat_bootinfo *bi)
 	/* After Kernel image */
 	rc = ukplat_memregion_list_insert(&bi->mrds,
 			&(struct ukplat_memregion_desc){
-				.vbase = ALIGN_UP(__END, __PAGE_SIZE),
 				.pbase = 0,
+				.vbase = ALIGN_UP(__END, __PAGE_SIZE),
+				.pg_off = 0,
 				.len   = unmap_end -
 					 ALIGN_UP(__END, __PAGE_SIZE),
+				.pg_count = PAGE_COUNT(unmap_end -
+						       ALIGN_UP(__END,
+								__PAGE_SIZE)),
 				.type  = 0,
 				.flags = UKPLAT_MEMRF_UNMAP,
 			});
@@ -534,10 +519,14 @@ static int ukplat_memregion_list_insert_unmaps(struct ukplat_bootinfo *bi)
 	/* Before Kernel image */
 	return ukplat_memregion_list_insert(&bi->mrds,
 			&(struct ukplat_memregion_desc){
-				.vbase = unmap_start,
 				.pbase = 0,
+				.vbase = unmap_start,
+				.pg_off = 0,
 				.len   = ALIGN_DOWN(__BASE_ADDR, __PAGE_SIZE) -
 					 unmap_start,
+				.pg_count = PAGE_COUNT(ALIGN_DOWN(__BASE_ADDR,
+								  __PAGE_SIZE) -
+						       unmap_start),
 				.type  = 0,
 				.flags = UKPLAT_MEMRF_UNMAP,
 			});
@@ -593,11 +582,13 @@ int ukplat_mem_init(void)
 			/* Region overlaps with unmapped area */
 			uk_pr_info("Memory %012lx-%012lx outside mapped area\n",
 				   unmap_end,
-				   mrdp->vbase + mrdp->len);
+				   mrdp->vbase + mrdp->pg_count * PAGE_SIZE);
 
-			if (mrdp->type == UKPLAT_MEMRT_FREE)
+			if (mrdp->type == UKPLAT_MEMRT_FREE) {
 				mrdp->len -= (mrdp->vbase + mrdp->len) -
 					     unmap_end;
+				mrdp->pg_count = PAGE_COUNT(mrdp->len);
+			}
 
 			/* Since regions are non-overlapping and ordered, we
 			 * can stop here, as the next region would be fully

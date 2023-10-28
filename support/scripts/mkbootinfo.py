@@ -29,6 +29,7 @@ UKPLAT_BOOTINFO_MAGIC = 0xB007B0B0  # Boot Bobo
 UKPLAT_BOOTINFO_VERSION = 0x01
 
 PAGE_SIZE = 4096
+PAGE_SHIFT = 12
 
 
 def main():
@@ -129,18 +130,23 @@ def main():
 
             # We have 1:1 mapping
             vbase = pbase
+            # Offset in the first page is equal to the start of the first page
+            pg_off = 0
 
             # Align size up to page size
             size = (int(phdr[1], base=16) + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1)
             if size == 0:
                 continue
+            pg_count = size >> PAGE_SHIFT
 
             assert nsecs < cap
             nsecs += 1
 
             secobj.write(pbase.to_bytes(8, endianness))  # pbase
             secobj.write(vbase.to_bytes(8, endianness))  # vbase
+            secobj.write(pg_off.to_bytes(8, endianness))  # pg_off
             secobj.write(size.to_bytes(8, endianness))  # len
+            secobj.write(pg_count.to_bytes(8, endianness))  # pg_count
             secobj.write(UKPLAT_MEMRT_KERNEL.to_bytes(2, endianness))  # type
             secobj.write(flags.to_bytes(2, endianness))  # flags
             secobj.write(name)  # name or padding

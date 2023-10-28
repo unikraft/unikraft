@@ -52,14 +52,16 @@ static void fdt_bootinfo_mem_mrd(struct ukplat_bootinfo *bi, void *fdtp)
 		ukplat_bootinfo_crash("Image outside of RAM");
 
 	/* Check that we are not placed at the top of the memory region */
-	mrd.len   = __BASE_ADDR - mem_base;
+	mrd.len = __BASE_ADDR - mem_base;
 	if (!mrd.len)
 		goto end_mrd;
 
-	mrd.vbase = (__vaddr_t)mem_base;
-	mrd.pbase = (__paddr_t)mem_base;
+	mrd.pbase = (__paddr_t)PAGE_ALIGN_DOWN(mem_base);
+	mrd.vbase = (__vaddr_t)PAGE_ALIGN_DOWN(mem_base);
+	mrd.pg_off = mem_base - mrd.pbase;
 	mrd.type  = UKPLAT_MEMRT_FREE;
 	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE;
+	mrd.pg_count = PAGE_COUNT(mrd.pg_off + mrd.len);
 
 	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
 	if (unlikely(rc < 0))
@@ -71,10 +73,12 @@ end_mrd:
 	if (!mrd.len)
 		return;
 
-	mrd.vbase = (__vaddr_t)__END;
-	mrd.pbase = (__paddr_t)__END;
+	mrd.pbase = (__paddr_t)PAGE_ALIGN_DOWN(__END);
+	mrd.vbase = (__vaddr_t)PAGE_ALIGN_DOWN(__END);
+	mrd.pg_off = __END - mrd.pbase;
 	mrd.type  = UKPLAT_MEMRT_FREE;
 	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE;
+	mrd.pg_count = PAGE_COUNT(mrd.pg_off + mrd.len);
 
 	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
 	if (unlikely(rc < 0))
@@ -130,6 +134,7 @@ static void fdt_bootinfo_initrd_mrd(struct ukplat_bootinfo *bi, void *fdtp)
 	const __u64 *fdt_initrd_start;
 	const __u64 *fdt_initrd_end;
 	int start_len, end_len;
+	__u64 initrd_base;
 	int nchosen;
 	int rc;
 
@@ -147,10 +152,12 @@ static void fdt_bootinfo_initrd_mrd(struct ukplat_bootinfo *bi, void *fdtp)
 	if (unlikely(!fdt_initrd_end || end_len <= 0))
 		return;
 
-	mrd.vbase = initrd_addr(fdt_initrd_start[0], start_len);
-	mrd.pbase = initrd_addr(fdt_initrd_start[0], start_len);
-	mrd.len = initrd_addr(fdt_initrd_end[0], end_len) -
-		  initrd_addr(fdt_initrd_start[0], start_len);
+	initrd_base = initrd_addr(fdt_initrd_start[0], start_len);
+	mrd.pbase = PAGE_ALIGN_DOWN(initrd_base);
+	mrd.vbase = mrd.pbase;
+	mrd.pg_off = initrd_base - mrd.pbase;
+	mrd.len = initrd_addr(fdt_initrd_end[0], end_len) - initrd_base;
+	mrd.pg_count = PAGE_COUNT(mrd.pg_off + mrd.len);
 	mrd.type = UKPLAT_MEMRT_INITRD;
 	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
 
@@ -164,10 +171,12 @@ static void fdt_bootinfo_fdt_mrd(struct ukplat_bootinfo *bi, void *fdtp)
 	struct ukplat_memregion_desc mrd = {0};
 	int rc;
 
-	mrd.vbase = (__vaddr_t)fdtp;
-	mrd.pbase = (__paddr_t)fdtp;
-	mrd.len   = fdt_totalsize(fdtp);
-	mrd.type  = UKPLAT_MEMRT_DEVICETREE;
+	mrd.pbase = (__paddr_t)PAGE_ALIGN_DOWN((__uptr)fdtp);
+	mrd.vbase = (__vaddr_t)PAGE_ALIGN_DOWN((__uptr)fdtp);
+	mrd.pg_off = (__u64)fdtp - mrd.pbase;
+	mrd.len = fdt_totalsize(fdtp);
+	mrd.pg_count = PAGE_COUNT(mrd.pg_off + mrd.len);
+	mrd.type = UKPLAT_MEMRT_DEVICETREE;
 	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
 
 	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);

@@ -24,6 +24,7 @@
 bpt_unmap_mrd:
 	.quad	0x0000000040000000		/* 1 GiB */
 	.quad	0x0000000040000000		/* 1 GiB */
+	.quad	0x0000000000000000		/* Page-aligned */
 	/* QEMU-VIRT's legacy RAM max is 255 GiB, but it can also depend on the
 	 * settings, see QEMU upstream commit:
 	 * 50a17297e2f0c ("hw/arm/virt: Bump the 255GB initial RAM limit").
@@ -31,6 +32,7 @@ bpt_unmap_mrd:
 	 * high memory.
 	 */
 	.quad	(255 - 1) * 0x0000000040000000
+	.quad	(255 - 1) * 0x0000000000040000  /* Page count */
 	.short	0x0000000000000000
 	.short	0x0000000000000010		/* UKPLAT_MEMRF_UNMAP */
 	.space	36
