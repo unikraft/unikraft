@@ -71,10 +71,13 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 	if (mi->flags & MULTIBOOT_INFO_CMDLINE) {
 		if (mi->cmdline) {
 			cmdline_len = strlen((const char *)(__uptr)mi->cmdline);
-			mrd.pbase = mi->cmdline;
-			mrd.vbase = mi->cmdline; /* 1:1 mapping */
-			mrd.len   = cmdline_len;
-			mrd.type  = UKPLAT_MEMRT_CMDLINE;
+			/* 1:1 mapping */
+			mrd.pbase = PAGE_ALIGN_DOWN(mi->cmdline);
+			mrd.vbase = mrd.pbase;
+			mrd.pg_off = mi->cmdline - mrd.pbase;
+			mrd.len = cmdline_len;
+			mrd.pg_count = PAGE_COUNT(mrd.pg_off + cmdline_len);
+			mrd.type = UKPLAT_MEMRT_CMDLINE;
 			mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
 
 			mrd_insert(bi, &mrd);
@@ -99,9 +102,11 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 	if (mi->flags & MULTIBOOT_INFO_MODS) {
 		mods = (multiboot_module_t *)(__uptr)mi->mods_addr;
 		for (i = 0; i < mi->mods_count; i++) {
-			mrd.pbase = mods[i].mod_start;
-			mrd.vbase = mods[i].mod_start; /* 1:1 mapping */
-			mrd.len   = mods[i].mod_end - mods[i].mod_start;
+			mrd.pbase = PAGE_ALIGN_DOWN(mods[i].mod_start);
+			mrd.vbase = mrd.pbase; /* 1:1 mapping */
+			mrd.pg_off = mods[i].mod_start - mrd.pbase;
+			mrd.len = mods[i].mod_end - mods[i].mod_start;
+			mrd.pg_count = PAGE_COUNT(mrd.pg_off + mrd.len);
 			mrd.type  = UKPLAT_MEMRT_INITRD;
 			mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
 
@@ -134,14 +139,21 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 			if (unlikely(end <= start || end - start < PAGE_SIZE))
 				continue;
 
-			mrd.pbase = start;
-			mrd.vbase = start; /* 1:1 mapping */
-			mrd.len   = end - start;
+			mrd.pbase = PAGE_ALIGN_DOWN(start);
+			mrd.vbase = mrd.pbase; /* 1:1 mapping */
+			mrd.pg_off = start - mrd.pbase;
+			mrd.len = end - start;
+			mrd.pg_count = PAGE_COUNT(mrd.pg_off + mrd.len);
 
 			if (m->type == MULTIBOOT_MEMORY_AVAILABLE) {
 				mrd.type  = UKPLAT_MEMRT_FREE;
 				mrd.flags = UKPLAT_MEMRF_READ |
 					    UKPLAT_MEMRF_WRITE;
+
+				/* Free memory regions have
+				 * mrd.len == mrd.pg_count * PAGE_SIZE
+				 */
+				mrd.len = PAGE_ALIGN_UP(mrd.len + mrd.pg_off);
 			} else {
 				mrd.type  = UKPLAT_MEMRT_RESERVED;
 				mrd.flags = UKPLAT_MEMRF_READ |

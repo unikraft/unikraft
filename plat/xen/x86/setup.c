@@ -140,10 +140,12 @@ static int _init_mem(struct ukplat_bootinfo *const bi)
 	/* Fill out mrd array */
 	/* heap */
 	mrd = (struct ukplat_memregion_desc) {
-		.vbase = (__vaddr_t)to_virt(start_pfn << PAGE_SHIFT),
 		.pbase = start_pfn << PAGE_SHIFT,
-		.len   = (max_pfn - start_pfn) << PAGE_SHIFT,
-		.type  = UKPLAT_MEMRT_FREE,
+		.vbase = (__vaddr_t)to_virt(start_pfn << PAGE_SHIFT),
+		.pg_off = 0,
+		.len = (max_pfn - start_pfn) << PAGE_SHIFT,
+		.pg_count = max_pfn - start_pfn,
+		.type = UKPLAT_MEMRT_FREE,
 		.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE |
 			 UKPLAT_MEMRF_MAP,
 	};
@@ -155,9 +157,11 @@ static int _init_mem(struct ukplat_bootinfo *const bi)
 		return rc;
 
 	mrd = (struct ukplat_memregion_desc) {
-		.vbase = VIRT_DEMAND_AREA,
 		.pbase = __PADDR_MAX,
+		.vbase = VIRT_DEMAND_AREA,
+		.pg_off = 0,
 		.len   = DEMAND_MAP_PAGES * PAGE_SIZE,
+		.pg_count = DEMAND_MAP_PAGES,
 		.type  = UKPLAT_MEMRT_RESERVED,
 		.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP,
 	};
@@ -173,14 +177,14 @@ static int _init_mem(struct ukplat_bootinfo *const bi)
 	/* initrd */
 	mrd = (struct ukplat_memregion_desc){0};
 	if (HYPERVISOR_start_info->mod_len) {
-		if (HYPERVISOR_start_info->flags & SIF_MOD_START_PFN) {
-			mrd.pbase = HYPERVISOR_start_info->mod_start;
+		mrd.pbase = PAGE_ALIGN_DOWN(HYPERVISOR_start_info->mod_start);
+		if (HYPERVISOR_start_info->flags & SIF_MOD_START_PFN)
 			mrd.vbase = (__vaddr_t)to_virt(mrd.pbase);
-		} else {
-			mrd.pbase = HYPERVISOR_start_info->mod_start;
+		else
 			mrd.vbase = mrd.pbase;
-		}
+		mrd.pg_off = HYPERVISOR_start_info->mod_start - mrd.pbase;
 		mrd.len = (size_t)HYPERVISOR_start_info->mod_len;
+		mrd.pg_count = PAGE_COUNT(mrd.len + mrd.pg_off);
 		mrd.type = UKPLAT_MEMRT_INITRD;
 		mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE |
 			    UKPLAT_MEMRF_MAP;

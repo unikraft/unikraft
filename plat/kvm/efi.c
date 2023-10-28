@@ -213,6 +213,10 @@ static int uk_efi_md_to_bi_mrd(struct uk_efi_mem_desc *const md,
 	mrd->vbase = start;
 	mrd->len = end - start;
 
+	/* All UEFI memory regions are page-aligned */
+	mrd->pg_off = 0;
+	mrd->pg_count = md->number_of_pages;
+
 	return 0;
 }
 
@@ -338,6 +342,8 @@ static void uk_efi_rt_md_to_bi_mrds(struct ukplat_memregion_desc **rt_mrds,
 		rt_mrd = *rt_mrds + i;
 		rt_mrd->pbase = mat_md->physical_start;
 		rt_mrd->len = mat_md->number_of_pages * UK_EFI_PAGE_SIZE;
+		rt_mrd->pg_off = 0;
+		rt_mrd->pg_count = mat_md->number_of_pages;
 		rt_mrd->vbase = rt_mrd->pbase;
 		rt_mrd->type = UKPLAT_MEMRT_RESERVED;
 		rt_mrd->flags = UKPLAT_MEMRF_MAP;
@@ -547,7 +553,9 @@ static void uk_efi_setup_bootinfo_cmdl(struct ukplat_bootinfo *bi)
 
 	mrd.pbase = (__paddr_t)cmdl;
 	mrd.vbase = (__vaddr_t)cmdl;
+	mrd.pg_off = 0;
 	mrd.len = len;
+	mrd.pg_count = PAGE_COUNT(len);
 	mrd.type = UKPLAT_MEMRT_CMDLINE;
 	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
 	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
@@ -577,7 +585,9 @@ static void uk_efi_setup_bootinfo_initrd(struct ukplat_bootinfo *bi)
 
 	mrd.pbase = (__paddr_t)initrd;
 	mrd.vbase = (__vaddr_t)initrd;
+	mrd.pg_off = 0;
 	mrd.len = len;
+	mrd.pg_count = PAGE_COUNT(len);
 	mrd.type = UKPLAT_MEMRT_INITRD;
 	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
 	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
@@ -604,7 +614,9 @@ static void uk_efi_setup_bootinfo_dtb(struct ukplat_bootinfo *bi)
 
 	mrd.pbase = (__paddr_t)dtb;
 	mrd.vbase = (__vaddr_t)dtb;
+	mrd.pg_off = 0;
 	mrd.len = len;
+	mrd.pg_count = PAGE_COUNT(len);
 	mrd.type = UKPLAT_MEMRT_DEVICETREE;
 	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
 	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);

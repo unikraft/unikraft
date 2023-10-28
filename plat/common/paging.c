@@ -1442,9 +1442,6 @@ int ukplat_paging_init(void)
 {
 	struct ukplat_memregion_desc *mrd;
 	unsigned long prot;
-	__vaddr_t vaddr;
-	__paddr_t paddr;
-	__sz len;
 	int rc;
 
 	/* Initialize the frame allocator with the free physical memory
@@ -1456,19 +1453,19 @@ int ukplat_paging_init(void)
 		UK_ASSERT(mrd->vbase == mrd->pbase);
 		UK_ASSERT(!(mrd->pbase & ~PAGE_MASK));
 		UK_ASSERT(mrd->len);
-		UK_ASSERT(!(mrd->len & ~PAGE_MASK));
 
 		/* Not mapped */
 		mrd->vbase = __U64_MAX;
 		mrd->flags &= ~UKPLAT_MEMRF_PERMS;
 
 		if (!kernel_pt.fa) {
-			rc = ukplat_pt_init(&kernel_pt, mrd->pbase, mrd->len);
+			rc = ukplat_pt_init(&kernel_pt, mrd->pbase,
+					    mrd->pg_count * PAGE_SIZE);
 			if (unlikely(rc))
 				kernel_pt.fa = NULL;
 		} else {
 			rc = ukplat_pt_add_mem(&kernel_pt, mrd->pbase,
-					       mrd->len);
+					       mrd->pg_count * PAGE_SIZE);
 		}
 
 		/* We do not fail if we cannot add this memory region to the
@@ -1491,13 +1488,19 @@ int ukplat_paging_init(void)
 	/* Perform unmappings */
 	ukplat_memregion_foreach(&mrd, 0, UKPLAT_MEMRF_UNMAP,
 				 UKPLAT_MEMRF_UNMAP) {
+		/* Ensure unmap memory region descriptors' correctness */
+		/* Must be non-empty and aligned end-to-end */
+		UK_ASSERT(mrd->len);
+		UK_ASSERT(mrd->pg_count * PAGE_SIZE == mrd->len);
+		UK_ASSERT(PAGE_ALIGNED(mrd->vbase));
+		UK_ASSERT(!mrd->pg_off);
+		/* Physical base address must be 0 */
+		UK_ASSERT(!mrd->pbase);
+		/* Virtual base address must be a valid value */
 		UK_ASSERT(mrd->vbase != __U64_MAX);
 
-		vaddr = PAGE_ALIGN_DOWN(mrd->vbase);
-		len   = PAGE_ALIGN_UP(mrd->len + (mrd->vbase - vaddr));
-
-		rc = ukplat_page_unmap(&kernel_pt, vaddr,
-				       len >> PAGE_SHIFT,
+		rc = ukplat_page_unmap(&kernel_pt, mrd->vbase,
+				       mrd->pg_count,
 				       PAGE_FLAG_KEEP_FRAMES);
 		if (unlikely(rc))
 			return rc;
@@ -1506,22 +1509,19 @@ int ukplat_paging_init(void)
 	/* Perform mappings */
 	ukplat_memregion_foreach(&mrd, 0, UKPLAT_MEMRF_MAP,
 				 UKPLAT_MEMRF_MAP) {
+		UK_ASSERT(!(mrd->vbase & ~PAGE_MASK));
 		UK_ASSERT(mrd->vbase != __U64_MAX);
-
-		vaddr = PAGE_ALIGN_DOWN(mrd->vbase);
-		paddr = PAGE_ALIGN_DOWN(mrd->pbase);
-		len   = PAGE_ALIGN_UP(mrd->len + (mrd->vbase - vaddr));
 
 #if defined(CONFIG_ARCH_ARM_64)
 		if (!RANGE_CONTAIN(bpt_unmap_mrd.pbase, bpt_unmap_mrd.len,
-				   paddr, len))
+				   mrd->pbase, mrd->pg_count * PAGE_SIZE))
 			continue;
 #endif
 
 		prot  = bootinfo_to_page_attr(mrd->flags);
 
-		rc = ukplat_page_map(&kernel_pt, vaddr, paddr,
-				     len >> PAGE_SHIFT, prot, 0);
+		rc = ukplat_page_map(&kernel_pt, mrd->vbase, mrd->pbase,
+				     mrd->pg_count, prot, 0);
 		if (unlikely(rc))
 			return rc;
 	}
