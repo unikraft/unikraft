@@ -1450,9 +1450,7 @@ int ukplat_paging_init(void)
 	 */
 	rc = -ENOMEM; /* In case there is no region */
 	ukplat_memregion_foreach(&mrd, UKPLAT_MEMRT_FREE, 0, 0) {
-		UK_ASSERT(mrd->vbase == mrd->pbase);
-		UK_ASSERT(!(mrd->pbase & ~PAGE_MASK));
-		UK_ASSERT(mrd->len);
+		UK_ASSERT_VALID_FREE_MRD(mrd);
 
 		/* Not mapped */
 		mrd->vbase = __U64_MAX;
@@ -1488,6 +1486,15 @@ int ukplat_paging_init(void)
 	/* Perform unmappings */
 	ukplat_memregion_foreach(&mrd, 0, UKPLAT_MEMRF_UNMAP,
 				 UKPLAT_MEMRF_UNMAP) {
+		/* Ensure unmap memory region descriptors correctness */
+		/* Must be non-empty and aligned end-to-end */
+		UK_ASSERT(mrd->len);
+		UK_ASSERT(mrd->pg_count * PAGE_SIZE == mrd->len);
+		UK_ASSERT(!(mrd->vbase & ~PAGE_MASK));
+		UK_ASSERT(!mrd->pg_off);
+		/* Physical base address must be 0 */
+		UK_ASSERT(!mrd->pbase);
+		/* Virtual base address must be a valid value */
 		UK_ASSERT(mrd->vbase != __U64_MAX);
 
 		rc = ukplat_page_unmap(&kernel_pt, mrd->vbase,
@@ -1500,8 +1507,9 @@ int ukplat_paging_init(void)
 	/* Perform mappings */
 	ukplat_memregion_foreach(&mrd, 0, UKPLAT_MEMRF_MAP,
 				 UKPLAT_MEMRF_MAP) {
-		UK_ASSERT(!(mrd->vbase & ~PAGE_MASK));
-		UK_ASSERT(mrd->vbase != __U64_MAX);
+		UK_ASSERT_VALID_MRD(mrd);
+		/* Do not allow mapping of free memory regions */
+		UK_ASSERT(mrd->type != UKPLAT_MEMRT_FREE);
 
 #if defined(CONFIG_ARCH_ARM_64)
 		if (!RANGE_CONTAIN(bpt_unmap_mrd.pbase, bpt_unmap_mrd.len,
