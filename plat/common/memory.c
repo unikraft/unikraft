@@ -79,9 +79,11 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags)
 	desired_sz = size;
 	size = ALIGN_UP(size, __PAGE_SIZE);
 	ukplat_memregion_foreach(&mrd, UKPLAT_MEMRT_FREE, 0, 0) {
+		UK_ASSERT_VALID_FREE_MRD(mrd);
 		UK_ASSERT(mrd->pbase <= __U64_MAX - size);
+
 		pstart = ALIGN_UP(mrd->pbase, __PAGE_SIZE);
-		pend   = pstart + size;
+		pend = pstart + size;
 
 		if (unmap_len &&
 		    (!RANGE_CONTAIN(unmap_start, unmap_len, pstart, size) ||
@@ -93,7 +95,7 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags)
 			return NULL;
 
 		ostart = mrd->pbase;
-		olen   = mrd->len;
+		olen = mrd->len;
 
 		/* Check whether we are allocating from an in-image memory hole
 		 * or not. If no, then it is not already mapped.
@@ -318,7 +320,8 @@ void ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 		ukplat_memregion_print_desc(ml);
 		ukplat_memregion_print_desc(mr);
 
-		UK_ASSERT(ml->pbase <= mr->pbase);
+		UK_ASSERT_VALID_MRD(ml);
+		UK_ASSERT_VALID_MRD(mr);
 
 		ml_prio = get_mrd_prio(ml);
 		uk_pr_debug("Priority of left memory region: %d\n", ml_prio);
@@ -571,6 +574,8 @@ int ukplat_mem_init(void)
 			       __PAGE_SIZE);
 	for (i = (int)bi->mrds.count - 1; i >= 0; i--) {
 		ukplat_memregion_get(i, &mrdp);
+		UK_ASSERT_VALID_MRD(mrdp);
+
 		if (mrdp->vbase >= unmap_end) {
 			/* Region is outside the mapped area */
 			uk_pr_info("Memory %012lx-%012lx outside mapped area\n",

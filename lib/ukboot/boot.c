@@ -86,7 +86,6 @@
 #ifdef CONFIG_LIBUKSP
 #include <uk/sp.h>
 #endif
-#include <uk/arch/paging.h>
 #include <uk/arch/tls.h>
 #include <uk/plat/tls.h>
 #if CONFIG_LIBUKBOOT_MAINTHREAD
@@ -205,10 +204,7 @@ static struct uk_alloc *heap_init()
 	 * add every subsequent region to it.
 	 */
 	ukplat_memregion_foreach(&md, UKPLAT_MEMRT_FREE, 0, 0) {
-		UK_ASSERT(md->vbase == md->pbase);
-		UK_ASSERT(!(md->pbase & ~PAGE_MASK));
-		UK_ASSERT(md->len);
-		UK_ASSERT(!(md->len & ~PAGE_MASK));
+		UK_ASSERT_VALID_FREE_MRD(md);
 
 		uk_pr_debug("Trying %p-%p 0x%02x %s\n",
 			    (void *)md->vbase, (void *)(md->vbase + md->len),

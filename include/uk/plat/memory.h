@@ -37,6 +37,9 @@
 #include <uk/essentials.h>
 #include <uk/arch/types.h>
 #include <uk/alloc.h>
+#include <uk/arch/paging.h>
+#include <uk/arch/types.h>
+#include <uk/essentials.h>
 #include <uk/config.h>
 #include <uk/arch/ctx.h>
 #include <uk/arch/paging.h>
@@ -100,6 +103,124 @@ struct ukplat_memregion_desc {
 	char name[36];
 #endif /* CONFIG_UKPLAT_MEMRNAME */
 } __packed __align(__SIZEOF_LONG__);
+
+/** UK_ASSERT_VALID_MRD_TYPE(mrd) macro
+ *
+ * Ensure a given memory region descriptor has one of the following defined
+ * types only:
+ *	UKPLAT_MEMRT_FREE		Uninitialized memory
+ *	UKPLAT_MEMRT_RESERVED		In use by platform
+ *	UKPLAT_MEMRT_KERNEL		Kernel binary segment
+ *	UKPLAT_MEMRT_INITRD		Initramdisk
+ *	UKPLAT_MEMRT_CMDLINE		Command line
+ *	UKPLAT_MEMRT_DEVICETREE		Device tree
+ *	UKPLAT_MEMRT_STACK		Thread stack
+ * @param mrd pointer to the memory region descriptor whose type to validate
+ */
+#define UK_ASSERT_VALID_MRD_TYPE(mrd)					\
+	do {								\
+		switch ((mrd)->type) {					\
+		case UKPLAT_MEMRT_FREE:					\
+			__fallthrough;					\
+		case UKPLAT_MEMRT_RESERVED:				\
+			__fallthrough;					\
+		case UKPLAT_MEMRT_KERNEL:				\
+			__fallthrough;					\
+		case UKPLAT_MEMRT_INITRD:				\
+			__fallthrough;					\
+		case UKPLAT_MEMRT_CMDLINE:				\
+			__fallthrough;					\
+		case UKPLAT_MEMRT_DEVICETREE:				\
+			__fallthrough;					\
+		case UKPLAT_MEMRT_STACK:				\
+			break;						\
+		default:						\
+			UK_CRASH("Invalid mrd type: %hu\n",		\
+				 (mrd)->type);				\
+		}							\
+	} while (0)
+
+/** UK_ASSERT_VALID_MRD_FLAGS(mrd) macro
+ *
+ * Ensure a given memory region descriptor has one of the following defined
+ * flags only:
+ *	UKPLAT_MEMRF_READ		Region is readable
+ *	UKPLAT_MEMRF_WRITE		Region is writable
+ *	UKPLAT_MEMRF_EXECUTE		Region is executable
+ *	UKPLAT_MEMRF_UNMAP		Must be unmapped at boot
+ *	UKPLAT_MEMRF_MAP		Must be mapped at boot
+ *
+ * @param mrd pointer to the memory region descriptor whose type to validate
+ */
+#define UK_ASSERT_VALID_MRD_FLAGS(mrd)					\
+	do {								\
+		__u16 flags_all = UKPLAT_MEMRF_READ    |		\
+				  UKPLAT_MEMRF_WRITE   |		\
+				  UKPLAT_MEMRF_EXECUTE |		\
+				  UKPLAT_MEMRF_UNMAP   |		\
+				  UKPLAT_MEMRF_MAP;			\
+									\
+		UK_ASSERT(((mrd)->flags & flags_all) == (mrd)->flags);	\
+	} while (0)
+
+/** UK_ASSERT_VALID_MRD(mrd) macro
+ *
+ * Ensure memory region descriptor general correctness:
+ * - must be of only one valid type as per UK_ASSERT_VALID_MRD_TYPE
+ * - must only have valid flags as per UK_ASSERT_VALID_MRD_FLAGS
+ * - memory region is not empty or of length 0
+ * - virtual/physical base addresses are page-aligned
+ * - resource in-page offset must be in the range [0, PAGE_SIZE)
+ *
+ * @param mrd pointer to the free memory region descriptor to validate
+ */
+#define UK_ASSERT_VALID_MRD(mrd)					\
+	do {								\
+		UK_ASSERT_VALID_MRD_TYPE((mrd));			\
+		UK_ASSERT_VALID_MRD_FLAGS((mrd));			\
+		UK_ASSERT(PAGE_ALIGNED((mrd)->vbase));			\
+		UK_ASSERT(PAGE_ALIGNED((mrd)->pbase));			\
+		UK_ASSERT((mrd)->pg_off >= 0 &&				\
+			  (mrd)->pg_off < (__off)PAGE_SIZE);		\
+	} while (0)
+
+/** UK_ASSERT_VALID_FREE_MRD(mrd) macro
+ *
+ * Ensure free memory region descriptor particular correctness:
+ * - must meet the criteria of a general valid memory region descriptor
+ * - virtual/physical base addresses are equal
+ * - region is aligned end-to-end, therefore length is multiple of
+ * PAGE_SIZE times region's page count and the resource's
+ * in-page offset must be 0
+ *
+ * @param mrd pointer to the free memory region descriptor to validate
+ */
+#define UK_ASSERT_VALID_FREE_MRD(mrd)					\
+	do {								\
+		UK_ASSERT_VALID_MRD((mrd));				\
+		UK_ASSERT((mrd)->type == UKPLAT_MEMRT_FREE);		\
+		UK_ASSERT((mrd)->vbase == (mrd)->pbase);		\
+		UK_ASSERT((mrd)->pg_count * PAGE_SIZE == (mrd)->len);	\
+		UK_ASSERT(!(mrd)->pg_off);				\
+	} while (0)
+
+/** UK_ASSERT_VALID_KERNEL_MRD(mrd) macro
+ *
+ * Ensure kernel memory region descriptor particular correctness:
+ * - must meet the criteria of a general valid memory region descriptor
+ * - region is aligned end-to-end, therefore length is multiple of
+ * PAGE_SIZE times region's page count and the resource's
+ * in-page offset must be 0
+ *
+ * @param mrd pointer to the kernel memory region descriptor to validate
+ */
+#define UK_ASSERT_VALID_KERNEL_MRD(mrd)					\
+	do {								\
+		UK_ASSERT_VALID_MRD((mrd));				\
+		UK_ASSERT((mrd)->type == UKPLAT_MEMRT_KERNEL);		\
+		UK_ASSERT((mrd)->pg_count * PAGE_SIZE == (mrd)->len);	\
+		UK_ASSERT(!(mrd)->pg_off);				\
+	} while (0)
 
 /**
  * Check whether the memory region descriptor overlaps with [pstart, pend) in
