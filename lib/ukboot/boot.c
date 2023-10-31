@@ -399,6 +399,7 @@ void ukplat_entry(int argc, char *argv[])
 	m = uk_sched_thread_create_fn2(s, main_thread,
 				       (void *)((long)argc), (void *)argv,
 				       0x0 /* default stack size */,
+				       0x0 /* default auxiliary stack size */,
 				       false, false,
 				       "main", NULL,
 				       main_thread_dtor);
