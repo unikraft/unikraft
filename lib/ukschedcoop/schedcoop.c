@@ -302,6 +302,7 @@ struct uk_sched *uk_schedcoop_create(struct uk_alloc *a)
 	rc = uk_thread_init_fn1(&c->idle,
 				idle_thread_fn, (void *) c,
 				a, STACK_SIZE,
+				a, 0,  /* Default auxiliary stack size */
 				a, false,
 				NULL,
 				"idle",

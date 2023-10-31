@@ -94,6 +94,7 @@ struct uk_sched {
 	struct uk_thread_list exited_threads;
 	struct uk_alloc *a;       /**< default allocator for struct uk_thread */
 	struct uk_alloc *a_stack; /**< default allocator for stacks */
+	struct uk_alloc *a_auxstack; /**< default allocator for aux stacks */
 	struct uk_alloc *a_uktls; /**< default allocator for TLS+ectx */
 	struct uk_sched *next;
 };
@@ -177,6 +178,9 @@ int uk_sched_start(struct uk_sched *sched);
  * @param stack_len
  *   Size of the thread stack. If set to 0, a default stack size is used
  *   for the stack allocation.
+ * @param auxstack_len
+ *   Size of the thread auxiliary stack. If set to 0, a default stack size is
+ *   used for the stack allocation.
  * @param no_uktls
  *   If set, no memory is allocated for a TLS. Functions must not use
  *   any TLS variables.
@@ -198,6 +202,7 @@ int uk_sched_start(struct uk_sched *sched);
 struct uk_thread *uk_sched_thread_create_fn0(struct uk_sched *s,
 					     uk_thread_fn0_t fn0,
 					     size_t stack_len,
+					     size_t auxstack_len,
 					     bool no_uktls,
 					     bool no_ectx,
 					     const char *name,
@@ -212,6 +217,7 @@ struct uk_thread *uk_sched_thread_create_fn1(struct uk_sched *s,
 					     uk_thread_fn1_t fn1,
 					     void *argp,
 					     size_t stack_len,
+					     size_t auxstack_len,
 					     bool no_uktls,
 					     bool no_ectx,
 					     const char *name,
@@ -226,6 +232,7 @@ struct uk_thread *uk_sched_thread_create_fn2(struct uk_sched *s,
 					     uk_thread_fn2_t fn2,
 					     void *argp0, void *argp1,
 					     size_t stack_len,
+					     size_t auxstack_len,
 					     bool no_uktls,
 					     bool no_ectx,
 					     const char *name,
@@ -235,7 +242,7 @@ struct uk_thread *uk_sched_thread_create_fn2(struct uk_sched *s,
 /* Shortcut for creating a thread with default settings */
 #define uk_sched_thread_create(s, fn1, argp, name)		\
 	uk_sched_thread_create_fn1((s), (fn1), (void *) (argp),	\
-				   0x0, false, false,		\
+				   0x0, 0x0, false, false,	\
 				   (name), NULL, NULL)
 
 #define uk_sched_foreach_thread(sched, itr)				\
