@@ -70,6 +70,7 @@ int uk_sched_register(struct uk_sched *s);
 		\
 		(s)->a = (def_allocator); \
 		(s)->a_stack = (def_allocator); \
+		(s)->a_auxstack = (def_allocator); \
 		(s)->a_uktls = (def_allocator); \
 		UK_TAILQ_INIT(&(s)->thread_list); \
 		UK_TAILQ_INIT(&(s)->exited_threads); \

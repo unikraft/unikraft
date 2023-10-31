@@ -59,6 +59,7 @@ struct uk_thread {
 	struct ukarch_ectx *ectx;	/**< Extended context (FPU, VPU, ...) */
 	uintptr_t           tlsp;	/**< Current active TLS pointer */
 	__uptr            uktlsp;	/**< Unikraft TLS pointer */
+	__uptr		   auxsp;	/**< Unikraft Auxiliary Stack Pointer */
 
 	UK_TAILQ_ENTRY(struct uk_thread) queue;
 	uint32_t flags;
@@ -71,6 +72,8 @@ struct uk_thread {
 		struct uk_alloc *stack_a;
 		void            *uktls;
 		struct uk_alloc *uktls_a;
+		void            *auxstack;
+		struct uk_alloc *auxstack_a;
 	} _mem;				/**< Associated allocs (internal!) */
 	uk_thread_gc_t _gc_fn;		/**< Extra gc function (internal!) */
 	void *_gc_argp;			/**< Argument for gc fn (internal!) */
@@ -197,6 +200,8 @@ void uk_thread_set_exited(struct uk_thread *t);
  *   UK_THREADF_RUNNABLE is set.
  * @param sp
  *   Stack pointer
+ * @param auxsp
+ *   Auxiliary stack pointer
  * @param tlsp
  *   Architecture pointer to TLS. If set to NULL, the thread cannot
  *   access thread-local variables.
@@ -222,6 +227,7 @@ void uk_thread_set_exited(struct uk_thread *t);
 int uk_thread_init_bare(struct uk_thread *t,
 			uintptr_t ip,
 			uintptr_t sp,
+			uintptr_t auxsp,
 			uintptr_t tlsp,
 			bool is_uktls,
 			struct ukarch_ectx *ectx,
@@ -243,6 +249,8 @@ int uk_thread_init_bare(struct uk_thread *t,
  *   Thread entry function (required)
  * @param sp
  *   Architecture stack pointer (stack is required)
+ * @param auxsp
+ *   Auxiliary stack pointer
  * @param tlsp
  *   Architecture pointer to TLS. If set to NULL, the thread cannot
  *   access thread-local variables.
@@ -268,6 +276,7 @@ int uk_thread_init_bare(struct uk_thread *t,
 int uk_thread_init_bare_fn0(struct uk_thread *t,
 			    uk_thread_fn0_t fn,
 			    uintptr_t sp,
+			    uintptr_t auxsp,
 			    uintptr_t tlsp,
 			    bool is_uktls,
 			    struct ukarch_ectx *ectx,
@@ -283,6 +292,7 @@ int uk_thread_init_bare_fn1(struct uk_thread *t,
 			    uk_thread_fn1_t fn,
 			    void *argp,
 			    uintptr_t sp,
+			    uintptr_t auxsp,
 			    uintptr_t tlsp,
 			    bool is_uktls,
 			    struct ukarch_ectx *ectx,
@@ -298,6 +308,7 @@ int uk_thread_init_bare_fn2(struct uk_thread *t,
 			    uk_thread_fn2_t fn,
 			    void *argp0, void *argp1,
 			    uintptr_t sp,
+			    uintptr_t auxsp,
 			    uintptr_t tlsp,
 			    bool is_uktls,
 			    struct ukarch_ectx *ectx,
@@ -319,6 +330,11 @@ int uk_thread_init_bare_fn2(struct uk_thread *t,
  * @param stack_len
  *   Size of the thread stack. If set to 0, a default stack size is used
  *   for the allocation.
+ * @param a_auxstack
+ *   Reference to an allocator for allocating an auxiliary stack
+ * @param auxstack_len
+ *   Size of the thread auxiliary stack. If set to 0, a default stack size is
+ *   used for the allocation.
  * @param a_uktls
  *   Reference to an allocator for allocating (Unikraft) thread local storage.
  *   In case `custom_ectx` is not set, space for extended CPU context state
@@ -348,6 +364,8 @@ int uk_thread_init_fn0(struct uk_thread *t,
 		       uk_thread_fn0_t fn,
 		       struct uk_alloc *a_stack,
 		       size_t stack_len,
+		       struct uk_alloc *a_auxstack,
+		       size_t auxstack_len,
 		       struct uk_alloc *a_uktls,
 		       bool custom_ectx,
 		       struct ukarch_ectx *ectx,
@@ -364,6 +382,8 @@ int uk_thread_init_fn1(struct uk_thread *t,
 		       void *argp,
 		       struct uk_alloc *a_stack,
 		       size_t stack_len,
+		       struct uk_alloc *a_auxstack,
+		       size_t auxstack_len,
 		       struct uk_alloc *a_uktls,
 		       bool custom_ectx,
 		       struct ukarch_ectx *ectx,
@@ -380,6 +400,8 @@ int uk_thread_init_fn2(struct uk_thread *t,
 		       void *argp0, void *argp1,
 		       struct uk_alloc *a_stack,
 		       size_t stack_len,
+		       struct uk_alloc *a_auxstack,
+		       size_t auxstack_len,
 		       struct uk_alloc *a_uktls,
 		       bool custom_ectx,
 		       struct ukarch_ectx *ectx,
@@ -398,6 +420,8 @@ int uk_thread_init_fn2(struct uk_thread *t,
  *   `UK_THREADF_RUNNABLE` is set.
  * @param sp
  *   Stack pointer
+ * @param auxsp
+ *   Auxiliary stack pointer
  * @param tlsp
  *   Architecture pointer to TLS. If set to NULL, the thread cannot
  *   access thread-local variables
@@ -422,6 +446,7 @@ int uk_thread_init_fn2(struct uk_thread *t,
 struct uk_thread *uk_thread_create_bare(struct uk_alloc *a,
 					uintptr_t ip,
 					uintptr_t sp,
+					uintptr_t auxsp,
 					uintptr_t tlsp,
 					bool is_uktls,
 					bool no_ectx,
@@ -443,6 +468,11 @@ struct uk_thread *uk_thread_create_bare(struct uk_alloc *a,
  * @param stack_len
  *   Size of the thread stack. If set to 0, a default stack size is used
  *   for the stack allocation.
+ * @param a_auxstack
+ *   Reference to an allocator for allocating an auxiliary stack
+ * @param auxstack_len
+ *   Size of the thread auxiliary stack. If set to 0, a default stack size is
+ *   used for the allocation.
  * @param a_uktls
  *   Reference to an allocator for allocating (Unikraft) thread local storage.
  *   If `NULL` is passed, a thread without TLS is allocated.
@@ -464,6 +494,8 @@ struct uk_thread *uk_thread_create_bare(struct uk_alloc *a,
 struct uk_thread *uk_thread_create_container(struct uk_alloc *a,
 					     struct uk_alloc *a_stack,
 					     size_t stack_len,
+					     struct uk_alloc *a_auxstack,
+					     size_t auxstack_len,
 					     struct uk_alloc *a_uktls,
 					     bool no_ectx,
 					     const char *name,
@@ -481,6 +513,8 @@ struct uk_thread *uk_thread_create_container(struct uk_alloc *a,
  *   Reference t o an allocator (required)
  * @param sp
  *   Stack pointer
+ * @param auxsp
+ *   Auxiliary stack pointer
  * @param tlsp
  *   Architecture pointer to TLS. If set to NULL, the thread cannot
  *   access thread-local variables
@@ -504,6 +538,7 @@ struct uk_thread *uk_thread_create_container(struct uk_alloc *a,
  */
 struct uk_thread *uk_thread_create_container2(struct uk_alloc *a,
 					      uintptr_t sp,
+					      uintptr_t auxsp,
 					      uintptr_t tlsp,
 					      bool is_uktls,
 					      bool no_ectx,
@@ -537,6 +572,11 @@ void uk_thread_container_init_fn2(struct uk_thread *t, uk_thread_fn2_t fn,
  * @param stack_len
  *   Size of the thread stack. If set to 0, a default stack size is used
  *   for the stack allocation.
+ * @param a_auxstack
+ *   Reference to an allocator for allocating an auxiliary stack
+ * @param auxstack_len
+ *   Size of the thread auxiliary stack. If set to 0, a default stack size is
+ *   used for the allocation.
  * @param a_uktls
  *   Reference to an allocator for allocating (Unikraft) thread local storage.
  *   If `NULL` is passed, a thread without TLS is allocated.
@@ -559,6 +599,8 @@ struct uk_thread *uk_thread_create_fn0(struct uk_alloc *a,
 				       uk_thread_fn0_t fn,
 				       struct uk_alloc *a_stack,
 				       size_t stack_len,
+				       struct uk_alloc *a_auxstack,
+				       size_t auxstack_len,
 				       struct uk_alloc *a_uktls,
 				       bool no_ectx,
 				       const char *name,
@@ -573,6 +615,8 @@ struct uk_thread *uk_thread_create_fn1(struct uk_alloc *a,
 				       uk_thread_fn1_t fn, void *argp,
 				       struct uk_alloc *a_stack,
 				       size_t stack_len,
+				       struct uk_alloc *a_auxstack,
+				       size_t auxstack_len,
 				       struct uk_alloc *a_uktls,
 				       bool no_ectx,
 				       const char *name,
@@ -588,6 +632,8 @@ struct uk_thread *uk_thread_create_fn2(struct uk_alloc *a,
 				       void *argp0, void *argp1,
 				       struct uk_alloc *a_stack,
 				       size_t stack_len,
+				       struct uk_alloc *a_auxstack,
+				       size_t auxstack_len,
 				       struct uk_alloc *a_uktls,
 				       bool no_ectx,
 				       const char *name,
