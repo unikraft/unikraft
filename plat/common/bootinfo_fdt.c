@@ -90,7 +90,7 @@ static void fdt_bootinfo_cmdl_mrd(struct ukplat_bootinfo *bi, void *fdtp)
 	char *cmdl;
 
 	nchosen = fdt_path_offset(fdtp, "/chosen");
-	if (unlikely(!nchosen))
+	if (unlikely(nchosen < 0))
 		return;
 
 	fdt_cmdl = fdt_getprop(fdtp, nchosen, "bootargs", &fdt_cmdl_len);
@@ -134,7 +134,7 @@ static void fdt_bootinfo_initrd_mrd(struct ukplat_bootinfo *bi, void *fdtp)
 	int rc;
 
 	nchosen = fdt_path_offset(fdtp, "/chosen");
-	if (unlikely(!nchosen))
+	if (unlikely(nchosen < 0))
 		return;
 
 	fdt_initrd_start = fdt_getprop(fdtp, nchosen, "linux,initrd-start",
