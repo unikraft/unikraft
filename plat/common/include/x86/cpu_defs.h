@@ -88,7 +88,9 @@
 /*
  * Model-specific register addresses
  */
+/* FS and GS Registers in 64-bit Mode */
 #define X86_MSR_FS_BASE         0xc0000100
+#define X86_MSR_GS_BASE         0xc0000101
 /* extended feature register */
 #define X86_MSR_EFER		0xc0000080
 /* legacy mode SYSCALL target */
