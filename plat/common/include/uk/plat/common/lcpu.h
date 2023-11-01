@@ -97,7 +97,8 @@ UK_CTASSERT(sizeof(struct lcpu_sargs) == LCPU_SARGS_SIZE);
 #define LCPU_ENTRY_OFFSET		(LCPU_ID_OFFSET    + 0x08)
 #define LCPU_STACKP_OFFSET		(LCPU_ENTRY_OFFSET + 0x08)
 #define LCPU_ERR_OFFSET			(LCPU_ENTRY_OFFSET + 0x00)
-#define LCPU_ARCH_OFFSET		(LCPU_ENTRY_OFFSET + 0x10)
+#define LCPU_AUXSP_OFFSET		(LCPU_ENTRY_OFFSET + 0x10)
+#define LCPU_ARCH_OFFSET		(LCPU_ENTRY_OFFSET + 0x18)
 
 #ifdef CONFIG_HAVE_SMP
 #define LCPU_FUNC_SIZE			0x10
@@ -136,6 +137,9 @@ struct __align(CACHE_LINE_SIZE) lcpu {
 		int error_code;
 	};
 
+	/* Auxiliary stack pointer of the thread currently executing on LCPU */
+	__uptr auxsp;
+
 	/* Architecture-dependent part */
 	struct lcpu_arch arch;
 };
@@ -150,6 +154,7 @@ UK_CTASSERT(__offsetof(struct lcpu, id)            == LCPU_ID_OFFSET);
 UK_CTASSERT(__offsetof(struct lcpu, s_args.entry)  == LCPU_ENTRY_OFFSET);
 UK_CTASSERT(__offsetof(struct lcpu, s_args.stackp) == LCPU_STACKP_OFFSET);
 UK_CTASSERT(__offsetof(struct lcpu, error_code)    == LCPU_ERR_OFFSET);
+UK_CTASSERT(__offsetof(struct lcpu, auxsp)         == LCPU_AUXSP_OFFSET);
 UK_CTASSERT(__offsetof(struct lcpu, arch)          == LCPU_ARCH_OFFSET);
 
 UK_CTASSERT(sizeof(struct lcpu) == LCPU_SIZE);
