@@ -132,6 +132,20 @@ struct lcpu *lcpu_get_current(void)
 	return lcpu_get(ukplat_lcpu_idx());
 }
 
+__uptr ukplat_lcpu_get_auxsp(void)
+{
+	UK_ASSERT(IS_LCPU_PTR(lcpu_get_current()));
+
+	return rdgsbase64(LCPU_AUXSP_OFFSET);
+}
+
+void ukplat_lcpu_set_auxsp(__uptr auxsp)
+{
+	UK_ASSERT(IS_LCPU_PTR(lcpu_get_current()));
+
+	wrgsbase64(auxsp, LCPU_AUXSP_OFFSET);
+}
+
 #if CONFIG_HAVE_SMP
 IMPORT_START16_SYM(gdt32_ptr, 2, MOV);
 IMPORT_START16_SYM(gdt32, 4, DATA);
