@@ -100,6 +100,25 @@
 	/* Store old SP previously saved into x0 */
 	str     x0, [sp, #-16]
 
+	/* Is this trap a system call? */
+	mrs	x0, esr_el1
+	and	x0, x0, #ESR_EC_MASK
+	orr	x0, xzr, x0, lsr #ESR_EC_SHIFT
+	cmp	x0, #ESR_EL1_EC_SVC64
+	bne	0f
+
+	/* If we are in a system call trap then switch to auxiliary stack
+	 * from the current lcpu pointer
+	 */
+	mrs	x0, tpidr_el1
+	ldr	x0, [x0, #LCPU_AUXSP_OFFSET]
+
+	/* We now have in SP the trap stack and in x0 the auxiliary stack */
+	EXCHANGE_SP_WITH_X0  /* Switch them */
+	/* Restore old SP we stored before system call check */
+	ldr	x0, [x0, #-16]
+	str	x0, [sp, #-16]  /* Store old SP in auxiliary stack */
+0:
 	/* Restore x0 */
 	mrs     x0, tpidrro_el0
 
