@@ -7,6 +7,24 @@
 #include <uk/thread.h>
 #include <uk/syscall.h>
 
+void ukarch_sysregs_switch_uk(struct ukarch_sysregs *sysregs)
+{
+	UK_ASSERT(sysregs);
+
+#if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
+	ukarch_sysregs_switch_uk_tls(sysregs);
+#endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
+}
+
+void ukarch_sysregs_switch_ul(struct ukarch_sysregs *sysregs)
+{
+	UK_ASSERT(sysregs);
+
+#if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
+	ukarch_sysregs_switch_ul_tls(sysregs);
+#endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
+}
+
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
 __uptr ukarch_sysregs_get_tlsp(struct ukarch_sysregs *sysregs)
 {
