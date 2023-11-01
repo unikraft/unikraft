@@ -7,7 +7,41 @@
 #include <uk/assert.h>
 #include <uk/plat/common/cpu.h>
 #include <uk/thread.h>
+#include <x86/gsbase.h>
 #include <uk/syscall.h>
+
+void ukarch_sysregs_switch_uk(struct ukarch_sysregs *sysregs)
+{
+	UK_ASSERT(sysregs);
+	UK_ASSERT(lcpu_get_current());
+
+	/* This can only be called from Unikraft ctx in bincompat mode.
+	 * Therefore, X86_MSR_GS_BASE holds the current `struct lcpu` and
+	 * X86_MSR_KERNEL_GS_BASE contains the app-saved gs_base.
+	 */
+	sysregs->gs_base = rdkgsbase();
+
+#if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
+	ukarch_sysregs_switch_uk_tls(sysregs);
+#endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
+}
+
+void ukarch_sysregs_switch_ul(struct ukarch_sysregs *sysregs)
+{
+	UK_ASSERT(sysregs);
+	UK_ASSERT(lcpu_get_current());
+
+#if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
+	ukarch_sysregs_switch_ul_tls(sysregs);
+#endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
+
+	/* This can only be called from Unikraft ctx in bincompat mode.
+	 * Therefore, X86_MSR_GS_BASE holds the current `struct lcpu` and
+	 * X86_MSR_KERNEL_GS_BASE contains the app-saved gs_base.
+	 */
+	wrgsbase((__uptr)lcpu_get_current());
+	wrkgsbase(sysregs->gs_base);
+}
 
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
 __uptr ukarch_sysregs_get_tlsp(struct ukarch_sysregs *sysregs)
