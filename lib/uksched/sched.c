@@ -232,6 +232,9 @@ int uk_sched_start(struct uk_sched *s)
 	/* Set main_thread as current scheduled thread */
 	ukplat_per_lcpu_current(__uk_sched_thread_current) = main_thread;
 
+	/* Set current LCPU's Kernel Stack pointer */
+	ukplat_lcpu_set_auxsp(main_thread->auxsp);
+
 	/* Add main to the scheduler's thread list */
 	UK_TAILQ_INSERT_TAIL(&s->thread_list, main_thread, thread_list);
 
