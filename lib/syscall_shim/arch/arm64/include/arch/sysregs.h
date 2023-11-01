@@ -33,4 +33,8 @@ void ukarch_sysregs_switch_uk_tls(struct ukarch_sysregs *sysregs);
 void ukarch_sysregs_switch_ul_tls(struct ukarch_sysregs *sysregs);
 #endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
 
+void ukarch_sysregs_switch_uk(struct ukarch_sysregs *sysregs);
+
+void ukarch_sysregs_switch_ul(struct ukarch_sysregs *sysregs);
+
 #endif /* !__ASSEMBLY__ */
