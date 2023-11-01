@@ -118,6 +118,16 @@ __lcpuidx ukplat_lcpu_idx(void);
  */
 __lcpuid ukplat_lcpu_id(void);
 
+/**
+ * Returns the auxiliary stack pointer of the current logical CPU
+ */
+__uptr ukplat_lcpu_get_auxsp(void);
+
+/**
+ * Sets the auxiliary stack pointer of the current logical cpu
+ */
+void ukplat_lcpu_set_auxsp(__uptr auxsp);
+
 #ifdef CONFIG_HAVE_SMP
 
 struct ukplat_lcpu_func {
@@ -231,9 +241,12 @@ int ukplat_lcpu_run(const __lcpuidx lcpuidx[], unsigned int *num,
 int ukplat_lcpu_wakeup(const __lcpuidx lcpuidx[], unsigned int *num);
 
 #else /* CONFIG_HAVE_SMP */
-#define ukplat_lcpu_count()	(1)
+#define ukplat_lcpu_count()		(1)
 #if !CONFIG_PLAT_KVM
-#define ukplat_lcpu_idx()	(0)
+#define ukplat_lcpu_idx()		(0)
+#define ukplat_lcpu_idx()		(0)
+#define ukplat_lcpu_set_auxsp(...)
+#define ukplat_lcpu_get_auxsp()
 #endif /* !CONFIG_PLAT_KVM */
 #endif /* CONFIG_HAVE_SMP */
 

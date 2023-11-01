@@ -135,6 +135,20 @@ struct lcpu *lcpu_get_current(void)
 	return this_lcpu;
 }
 
+__uptr ukplat_lcpu_get_auxsp(void)
+{
+	UK_ASSERT(IS_LCPU_PTR(lcpu_get_current()));
+
+	return lcpu_get_current()->auxsp;
+}
+
+void ukplat_lcpu_set_auxsp(__uptr auxsp)
+{
+	UK_ASSERT(IS_LCPU_PTR(lcpu_get_current()));
+
+	lcpu_get_current()->auxsp = auxsp;
+}
+
 #ifdef CONFIG_HAVE_SMP
 #ifdef CONFIG_UKPLAT_ACPI
 static __paddr_t lcpu_start_paddr;
