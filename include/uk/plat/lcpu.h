@@ -108,6 +108,16 @@ typedef void __noreturn (*ukplat_lcpu_entry_t)();
 typedef __u32 __lcpuidx;	/* Sequential index of logical CPU */
 typedef __u64 __lcpuid;		/* Physical ID of logical CPU */
 
+/**
+ * Returns the auxiliary stack pointer of the current logical CPU
+ */
+__uptr ukplat_lcpu_get_auxsp(void);
+
+/**
+ * Sets the auxiliary stack pointer of the current logical cpu
+ */
+void ukplat_lcpu_set_auxsp(__uptr auxsp);
+
 #ifdef CONFIG_HAVE_SMP
 
 struct ukplat_lcpu_func {

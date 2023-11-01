@@ -196,6 +196,20 @@ void ukplat_lcpu_halt_irq_until(__nsec until)
 	time_block_until(until);
 }
 
+__uptr ukplat_lcpu_get_auxsp(void)
+{
+	UK_ASSERT(IS_LCPU_PTR(lcpu_get_current()));
+
+	return lcpu_get_current()->auxsp;
+}
+
+void ukplat_lcpu_set_auxsp(__uptr auxsp)
+{
+	UK_ASSERT(IS_LCPU_PTR(lcpu_get_current()));
+
+	lcpu_get_current()->auxsp = auxsp;
+}
+
 #ifdef CONFIG_HAVE_SMP
 __lcpuid ukplat_lcpu_id(void)
 {
