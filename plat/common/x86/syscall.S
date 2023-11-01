@@ -33,12 +33,71 @@
 
 #include <uk/arch/lcpu.h>
 #include <uk/asm/cfi.h>
+#include <uk/plat/common/lcpu.h>
 
 ENTRY(_ukplat_syscall)
 	.cfi_startproc simple
 	.cfi_def_cfa rsp, 0
 	.cfi_register rip, rcx
 	cli
+
+	/* Switch to Unikraft's gs_base, which contains pointer to the current
+	 * LCPU's `struct lcpu`.
+	 */
+	swapgs
+
+	/* We can now use the scratch register %r11 (SYSv ABI) to temporarily
+	 * store the current stack pointer and switch to the auxiliary stack
+	 * of the current thread, which is also stored in `struct lcpu`'s
+	 * `auxsp` field.
+	 * We thus achieve a complete switch to another stack while preserving
+	 * the context of the application.
+	 */
+	/* Temporarily store current stack pointer in scratch register */
+	movq	%rsp, %r11
+
+	/* Switch to the auxiliary stack so that we do not contaminate the
+	 * application's stack, as this could either be too small and result
+	 * in corrupted memory or we could unwantedly modify variables stored
+	 * in the Red Zone.
+	 */
+	movq	%gs:LCPU_AUXSP_OFFSET, %rsp
+	/* Describing the rsp relative to GS would make it necessary to emit
+	 * raw CFI. Instead of doing so, mark rsp as undefined temporarily
+	 */
+	.cfi_undefined rsp
+
+	/* Store application's stack pointer at the top of current thread's
+	 * auxiliary stack. We have to do this because we obviously can't
+	 * rely on the scratch register being maintained between thread switches
+	 */
+	pushq_reg_cfi r11
+	.cfi_rel_offset rsp, 0
+
+	/* We are now in a state where the stack looks like this:
+	 *	--------------- <-- auxsp (i.e. lcpu_get_current()->auxsp,
+	 *	| app's saved |	           i.e. uk_thread_current()->auxsp)
+	 *	|     %rsp    |
+	 *	--------------- <-- (auxsp - 8) i.e. (**current %rsp**)
+	 *	|             |
+	 *	|             |
+	 *            ...
+	 *	|             |
+	 *	--------------- <-- (auxsp -
+	 *			     (PAGE_SIZE *
+	 *			      (1 << CONFIG_UKPLAT_AUXSP_PAGE_ORDER)))
+	 *	  END OF AUXSP
+	 */
+
+	/* Make a final alignment so that we preserve syscall semantics where
+	 * register pushes on the stack are happening on an initially 16-byte
+	 * aligned stack.
+	 * Therefore, all in-syscall context operations, buffer and function
+	 * frames must fit into (auxsp size - 16) bytes.
+	 */
+	subq	$8, %rsp
+	.cfi_adjust_cfa_offset 8
+
 	/*
 	 * Push arguments in the order of 'struct __regs' to the stack.
 	 * We are going to handover a refernce to this stack area as
@@ -117,6 +176,21 @@ ENTRY(_ukplat_syscall)
 	/* orig_rax and exception frame */
 	addq $(6 * 8), %rsp
 	.cfi_adjust_cfa_offset -(6 * 8)
+
+	/* Undo alignment done after storing application %rsp */
+	addq	$8, %rsp
+	.cfi_adjust_cfa_offset -8
+
+	/* We are now back in the state where the stack was looking like the
+	 * diagram above. Restore application %rsp!
+	 */
+	movq	8(%rsp), %rsp
+	.cfi_restore rsp
+	.cfi_def_cfa rsp, 0
+
+	/* Restore application's gs_base register */
+	swapgs
+
 	sti
 
 	/*
