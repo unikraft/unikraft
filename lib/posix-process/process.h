@@ -41,6 +41,21 @@
 
 #define TIDMAP_SIZE (CONFIG_LIBPOSIX_PROCESS_MAX_PID + 1)
 
+/* Notice: The RUNNING state is not necessarily in sync with the state
+ * of the underlying uk_thread (may be blocked by the scheduler).
+ * On the other hand, the BLOCKED state implies that the underlying
+ * uk_thread is also blocked. Use RUNNING only as a means to check
+ * whether a posix-thread is neither terminated or blocked.
+ */
+enum posix_thread_state {
+	POSIX_THREAD_RUNNING,
+	POSIX_THREAD_BLOCKED_VFORK,  /* waiting for child to call execve */
+	POSIX_THREAD_BLOCKED_WAIT,   /* waiting for process state change */
+	POSIX_THREAD_BLOCKED_SIGNAL, /* waiting for signal */
+	POSIX_THREAD_EXITED,         /* terminated normally */
+	POSIX_THREAD_KILLED,         /* terminated by signal */
+};
+
 struct posix_process {
 	pid_t pid;
 	struct posix_process *parent;
@@ -58,6 +73,7 @@ struct posix_thread {
 	struct uk_list_head thread_list_entry;
 	struct uk_thread *thread;
 	struct uk_alloc *_a;
+	enum posix_thread_state state;
 
 	/* TODO: Mutex */
 };
