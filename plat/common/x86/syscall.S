@@ -31,7 +31,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <kvm-x86/traps.h>
 #include <uk/arch/lcpu.h>
+#include <uk/asm.h>
 #include <uk/asm/cfi.h>
 #include <uk/plat/common/lcpu.h>
 
@@ -67,6 +69,8 @@ ENTRY(_ukplat_syscall)
 	 */
 	.cfi_undefined rsp
 
+	pushq_cfi	$(GDT_DESC_OFFSET(GDT_DESC_DATA))
+
 	/* Store application's stack pointer at the top of current thread's
 	 * auxiliary stack. We have to do this because we obviously can't
 	 * rely on the scratch register being maintained between thread switches
@@ -77,8 +81,11 @@ ENTRY(_ukplat_syscall)
 	/* We are now in a state where the stack looks like this:
 	 *	--------------- <-- auxsp (i.e. lcpu_get_current()->auxsp,
 	 *	| app's saved |	           i.e. uk_thread_current()->auxsp)
+	 *	|     %ss     |
+	 *	---------------
+	 *	| app's saved |
 	 *	|     %rsp    |
-	 *	--------------- <-- (auxsp - 8) i.e. (**current %rsp**)
+	 *	--------------- <-- (auxsp - 16) i.e. (**current %rsp**)
 	 *	|             |
 	 *	|             |
 	 *            ...
@@ -89,25 +96,18 @@ ENTRY(_ukplat_syscall)
 	 *	  END OF AUXSP
 	 */
 
-	/* Make a final alignment so that we preserve syscall semantics where
-	 * register pushes on the stack are happening on an initially 16-byte
-	 * aligned stack.
-	 * Therefore, all in-syscall context operations, buffer and function
-	 * frames must fit into (auxsp size - 16) bytes.
-	 */
-	subq	$8, %rsp
-	.cfi_adjust_cfa_offset 8
-
 	/*
 	 * Push arguments in the order of 'struct __regs' to the stack.
 	 * We are going to handover a refernce to this stack area as
 	 * `struct __regs *` argument to the system call handler.
 	 */
-	pushq_cfi $0		/* exception frame filled with zeros */
-	pushq_cfi $0		/* (rip, cs, eflags, rsp, ss)        */
-	pushq_cfi $0		/*                                   */
-	pushq_cfi $0		/*                                   */
-	pushq_cfi $0		/*                                   */
+	/* We now have %ss and %rsp on the frame, finish classic trap frame */
+	pushfq			/* eflags */
+	.cfi_adjust_cfa_offset 8
+
+	pushq_cfi	$(GDT_DESC_OFFSET(GDT_DESC_CODE))	/* cs */
+	pushq_reg_cfi rcx	/* rcx contains the next rip on syscall exit */
+
 	pushq_reg_cfi rax	/* orig_rax */
 	pushq_reg_cfi rdi
 	pushq_reg_cfi rsi
@@ -173,18 +173,8 @@ ENTRY(_ukplat_syscall)
 	popq_reg_cfi rdx
 	popq_reg_cfi rsi
 	popq_reg_cfi rdi
-	/* orig_rax and exception frame */
-	addq $(6 * 8), %rsp
-	.cfi_adjust_cfa_offset -(6 * 8)
 
-	/* Undo alignment done after storing application %rsp */
-	addq	$8, %rsp
-	.cfi_adjust_cfa_offset -8
-
-	/* We are now back in the state where the stack was looking like the
-	 * diagram above. Restore application %rsp!
-	 */
-	movq	8(%rsp), %rsp
+	movq	32(%rsp), %rsp
 	.cfi_restore rsp
 	.cfi_def_cfa rsp, 0
 
