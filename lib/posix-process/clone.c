@@ -38,6 +38,7 @@
 #include <string.h>
 #include <sys/prctl.h>
 #include <sys/resource.h>
+#include <uk/arch/ctx.h>
 #include <uk/process.h>
 #include <uk/print.h>
 #include <uk/syscall.h>
@@ -320,11 +321,11 @@ static void _clone_child_gc(struct uk_thread *t)
  *       to zero.
  */
 static int _clone(struct clone_args *cl_args, size_t cl_args_len,
-		  __uptr return_addr)
+		  struct uk_syscall_ctx *usc)
 {
+	struct uk_thread *child = NULL;
 	struct uk_thread *t;
 	struct uk_sched *s;
-	struct uk_thread *child = NULL;
 	__u64 flags;
 	int ret;
 
@@ -336,7 +337,6 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 	/* Parent must have ECTX and a Unikraft TLS */
 	UK_ASSERT((t->flags & UK_THREADF_ECTX)
 		  && (t->flags & UK_THREADF_UKTLS));
-	UK_ASSERT(return_addr);
 
 	if (!cl_args || cl_args_len < CL_ARGS_REQUIRED_LEN) {
 		uk_pr_debug("No or invalid clone arguments given\n");
@@ -376,20 +376,20 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 	if (flags & CLONE_IO)			uk_pr_debug(" IO");
 	uk_pr_debug(" ]\n");
 	if (flags & CLONE_PIDFD)
-		uk_pr_debug(" pidfd: %d\n", (int) cl_args->pidfd);
+		uk_pr_debug(" pidfd: %d\n", (int)cl_args->pidfd);
 	if (flags & CLONE_PARENT_SETTID)
-		uk_pr_debug(" parent_tid: %p\n", (void *) cl_args->parent_tid);
+		uk_pr_debug(" parent_tid: %p\n", (void *)cl_args->parent_tid);
 	if (flags & (CLONE_CHILD_CLEARTID | CLONE_CHILD_SETTID))
-		uk_pr_debug(" child_tid: %p\n", (void *) cl_args->child_tid);
-	uk_pr_debug(" stack: %p\n", (void *) cl_args->stack);
-	uk_pr_debug(" tls: %p\n", (void *) cl_args->tls);
-	uk_pr_debug(" <return>: %p\n", (void *) return_addr);
+		uk_pr_debug(" child_tid: %p\n", (void *)cl_args->child_tid);
+	uk_pr_debug(" stack: %p\n", (void *)cl_args->stack);
+	uk_pr_debug(" tls: %p\n", (void *)cl_args->tls);
+	uk_pr_debug(" <return>: %p\n", (void *)usc->regs.rip);
 	uk_pr_debug(")\n");
 #endif /* UK_DEBUG */
 
 	if ((flags & CLONE_SETTLS)
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
-	    && (uk_syscall_ultlsp() == 0x0)
+	    && (ukarch_sysregs_get_tlsp(&usc->sysregs) == 0x0)
 #endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
 	) {
 		/* The caller already created a TLS for the child (for instance
@@ -415,7 +415,7 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 		 * places TLS variables and uses them effectively as TCB.
 		 */
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
-		if (uk_syscall_ultlsp() != 0x0) {
+		if (ukarch_sysregs_get_tlsp(&usc->sysregs) != 0x0) {
 			uk_pr_debug("Allocating an Unikraft TLS for the new child, parent called from context with custom TLS\n");
 		} else
 #endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
@@ -464,15 +464,8 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 		    t, t->name ? child->name : "<unnamed>",
 		    child, child->name ? child->name : "<unnamed>", ret);
 
-	/*
-	 * Child starts at return address, sets given stack and given TLS.
-	 * Register clearing has the effect that it looks like `clone`
-	 * returns `0` in the child.
-	 */
-	ukarch_ctx_init(&child->ctx,
-			(__uptr) cl_args->stack,
-			false,
-			return_addr);
+	clone_setup_child_ctx(usc, child, (__uptr)cl_args->stack);
+
 	uk_thread_set_runnable(child);
 
 	/* We will return the child's thread ID in the parent */
@@ -490,19 +483,19 @@ err_out:
 }
 
 #if CONFIG_ARCH_X86_64
-UK_LLSYSCALL_R_DEFINE(int, clone,
-		      unsigned long, flags,
-		      void *, sp,
-		      int *, parent_tid,
-		      int *, child_tid,
-		      unsigned long, tlsp)
+UK_LLSYSCALL_R_U_DEFINE(int, clone,
+			unsigned long, flags,
+			void *, sp,
+			int *, parent_tid,
+			int *, child_tid,
+			unsigned long, tlsp)
 #else /* !CONFIG_ARCH_X86_64 */
-UK_LLSYSCALL_R_DEFINE(int, clone,
-		      unsigned long, flags,
-		      void *, sp,
-		      int *, parent_tid,
-		      unsigned long, tlsp,
-		      int *, child_tid)
+UK_LLSYSCALL_R_U_DEFINE(int, clone,
+			unsigned long, flags,
+			void *, sp,
+			int *, parent_tid,
+			unsigned long, tlsp,
+			int *, child_tid)
 #endif /* !CONFIG_ARCH_X86_64 */
 {
 	/* Translate */
@@ -516,7 +509,7 @@ UK_LLSYSCALL_R_DEFINE(int, clone,
 		.tls         = (__u64) tlsp
 	};
 
-	return _clone(&cl_args, sizeof(cl_args), uk_syscall_return_addr());
+	return _clone(&cl_args, sizeof(cl_args), usc);
 }
 
 #if UK_LIBC_SYSCALLS
