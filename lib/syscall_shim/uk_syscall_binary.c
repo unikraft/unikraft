@@ -51,7 +51,7 @@ void ukplat_syscall_handler(struct __regs *r)
 {
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
 	struct uk_thread *self;
-	__uptr orig_tlsp;
+	__uptr ultlsp;
 #endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
 	/* Place backup of extended register state on stack */
 	__sz ectx_align = ukarch_ectx_align();
@@ -75,11 +75,11 @@ void ukplat_syscall_handler(struct __regs *r)
 
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
 	/* Activate Unikraft TLS */
-	orig_tlsp = ukplat_tlsp_get();
+	ultlsp = ukplat_tlsp_get();
 	self = uk_thread_current();
 	UK_ASSERT(self);
 	ukplat_tlsp_set(self->uktlsp);
-	_uk_syscall_ultlsp = orig_tlsp;
+	_uk_syscall_ultlsp = ultlsp;
 #endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
 
 	/* uk_syscall6_r() will clear _uk_syscall_return_addr on return */
@@ -112,17 +112,20 @@ void ukplat_syscall_handler(struct __regs *r)
 #endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
 
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
-	uk_thread_uktls_var(self, _uk_syscall_ultlsp) = 0x0;
-
 	/* Restore original TLS only if it was _NOT_
 	 * changed by the system call handler
 	 */
-	if (likely(ukplat_tlsp_get() == self->uktlsp)) {
-		ukplat_tlsp_set(orig_tlsp);
-	} else {
+#if CONFIG_LIBUKDEBUG_PRINTD
+	if (_uk_syscall_ultlsp != ultlsp) {
 		uk_pr_debug("System call updated userland TLS pointer register to %p (before: %p)\n",
-			    (void *) orig_tlsp, (void *) ukplat_tlsp_get());
+			    (void *)ultlsp, (void *)ukplat_tlsp_get());
 	}
+#endif
+
+	ultlsp = _uk_syscall_ultlsp;
+	uk_thread_uktls_var(self, _uk_syscall_ultlsp) = 0x0;
+
+	ukplat_tlsp_set(ultlsp);
 #endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
 
 	/* Restore extended register state */
