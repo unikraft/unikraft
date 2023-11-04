@@ -79,5 +79,7 @@ uk_posix_process_kill
 clone
 uk_syscall_r_clone
 uk_syscall_e_clone
+uk_syscall_r_u_clone
+uk_syscall_e_u_clone
 uk_syscall_r_clone3
 uk_syscall_e_clone3
