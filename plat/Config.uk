@@ -115,3 +115,7 @@ config FPSIMD
 	depends on ARCH_ARM_64
 	help
 		Enable support FPU usage in application
+
+config UKPLAT_AUXSP_PAGE_ORDER
+	int "Maximum size allocated for the auxiliary stack"
+	default 4
