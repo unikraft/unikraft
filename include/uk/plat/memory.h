@@ -33,10 +33,15 @@
 #ifndef __UKPLAT_MEMORY_H__
 #define __UKPLAT_MEMORY_H__
 
+#include <stddef.h>
 #include <uk/essentials.h>
 #include <uk/arch/types.h>
 #include <uk/alloc.h>
 #include <uk/config.h>
+#include <uk/arch/ctx.h>
+#if CONFIG_LIBUKVMEM
+#include <uk/vmem.h>
+#endif /* CONFIG_LIBUKVMEM */
 
 #ifdef __cplusplus
 extern "C" {
@@ -251,6 +256,61 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags);
  *   0 on success, not 0 otherwise.
  */
 int ukplat_mem_init(void);
+
+/* Allocates and returns an auxiliary stack that can be used in emergency cases
+ * such as when switching system call stacks. The size is that given by
+ * CONFIG_AUXSP_SIZE.
+ *
+ * @param a
+ *   The allocator to use for the auxiliary stack
+ * @param vas
+ *   The virtual address space to use for the mapping of the auxiliary stack.
+ *   This should be used in conjunction with CONFIG_LIBUKVMEM to ensure that
+ *   accesses to the auxiliary stack do not generate page faults in more
+ *   fragile system states.
+ * @param auxsp_len
+ *   The custom length of the auxiliary stack. If 0, then
+ *   CONFIG_UKPLAT_AUXSP_SIZE is used instead as the default length.
+ *
+ * @return
+ *   Pointer to the allocated auxiliary stack
+ */
+static inline __uptr ukplat_auxsp_alloc(struct uk_alloc *a,
+#if CONFIG_LIBUKVMEM
+					struct uk_vas __maybe_unused *vas,
+#endif /* CONFIG_LIBUKVMEM */
+					__sz auxsp_len)
+{
+	void *auxsp = NULL;
+
+	if (!auxsp_len)
+		auxsp_len = ALIGN_UP(CONFIG_UKPLAT_AUXSP_SIZE, UKARCH_SP_ALIGN);
+
+	auxsp = uk_memalign(a, UKARCH_SP_ALIGN, auxsp_len);
+	if (unlikely(!auxsp)) {
+		uk_pr_err("Failed to allocate auxiliary stack\n");
+		return 0;
+	}
+
+#if CONFIG_LIBUKVMEM
+	__uptr auxsp_base = PAGE_ALIGN_DOWN((__uptr)auxsp);
+	int rc;
+
+	/* Ensure the buffer is backed by physical memory */
+	rc = uk_vma_advise(vas,
+			   auxsp_base,
+			   PAGE_ALIGN_UP((__uptr)auxsp + auxsp_len -
+					 auxsp_base),
+			   UK_VMA_ADV_WILLNEED,
+			   UK_VMA_FLAG_UNINITIALIZED);
+	if (unlikely(rc)) {
+		uk_pr_err("Failed to prematurely map auxiliary stack\n");
+		return 0;
+	}
+#endif /* CONFIG_LIBUKVMEM */
+
+	return (__uptr)ukarch_gen_sp(auxsp, auxsp_len);
+}
 
 #ifdef __cplusplus
 }
