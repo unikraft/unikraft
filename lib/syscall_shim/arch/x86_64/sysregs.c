@@ -26,4 +26,27 @@ void ukarch_sysregs_set_tlsp(struct ukarch_sysregs *sysregs, __uptr tlsp)
 
 	sysregs->fs_base = tlsp;
 }
+
+void ukarch_sysregs_switch_uk_tls(struct ukarch_sysregs *sysregs)
+{
+	struct uk_thread *t = uk_thread_current();
+
+	UK_ASSERT(sysregs);
+	UK_ASSERT(t);
+
+	sysregs->fs_base = ukplat_tlsp_get();
+	ukplat_tlsp_set(t->uktlsp);
+	t->tlsp = t->uktlsp;
+}
+
+void ukarch_sysregs_switch_ul_tls(struct ukarch_sysregs *sysregs)
+{
+	struct uk_thread *t = uk_thread_current();
+
+	UK_ASSERT(sysregs);
+	UK_ASSERT(t);
+
+	ukplat_tlsp_set(sysregs->fs_base);
+	t->tlsp = sysregs->fs_base;
+}
 #endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
