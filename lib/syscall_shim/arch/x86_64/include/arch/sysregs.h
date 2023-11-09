@@ -31,6 +31,10 @@ UK_CTASSERT(sizeof(struct ukarch_sysregs) == UKARCH_SYSREGS_SIZE);
 __uptr ukarch_sysregs_get_tlsp(struct ukarch_sysregs *sysregs);
 
 void ukarch_sysregs_set_tlsp(struct ukarch_sysregs *sysregs, __uptr tlsp);
+
+void ukarch_sysregs_switch_uk_tls(struct ukarch_sysregs *sysregs);
+
+void ukarch_sysregs_switch_ul_tls(struct ukarch_sysregs *sysregs);
 #endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
 
 #endif /* !__ASSEMBLY__ */
