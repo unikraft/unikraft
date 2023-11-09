@@ -90,6 +90,10 @@
 #include <uk/plat/tls.h>
 #include "banner.h"
 
+#if CONFIG_LIBUKBOOT_NOSCHED
+#include <uk/plat/common/lcpu.h>
+#endif /* CONFIG_LIBUKBOOT_NOSCHED */
+
 #if CONFIG_LIBUKINTCTLR
 #include <uk/intctlr.h>
 #endif /* CONFIG_LIBUKINTCTLR */
@@ -252,7 +256,7 @@ void ukplat_entry(int argc, char *argv[])
 #endif
 #if CONFIG_LIBUKSCHED
 	struct uk_sched *s = NULL;
-#endif
+#endif /* CONFIG_LIBUKSCHED */
 	uk_ctor_func_t *ctorfn;
 	uk_init_func_t *initfn;
 	int i;
@@ -337,7 +341,15 @@ void ukplat_entry(int argc, char *argv[])
 	if (unlikely(!s))
 		UK_CRASH("Failed to initialize scheduling\n");
 	uk_sched_start(s);
-#endif /* !CONFIG_LIBUKBOOT_NOSCHED */
+#else /* CONFIG_LIBUKBOOT_NOSCHED */
+	struct lcpu *bsp_lcpu = lcpu_get_current();
+	UK_ASSERT(bsp_lcpu);
+	bsp_lcpu->auxsp = ukplat_auxsp_alloc(a,
+#if defined(CONFIG_LIBUKBOOT_HEAP_BASE) && defined(CONFIG_LIBUKVMEM)
+					     &kernel_vas,
+#endif /* !CONFIG_LIBUKBOOT_HEAP_BASE && CONFIG_LIBUKVMEM */
+					     0);  /* Default auxsp size */
+#endif /* CONFIG_LIBUKBOOT_NOSCHED */
 
 	/* Enable interrupts before starting the application */
 	ukplat_lcpu_enable_irq();
