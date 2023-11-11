@@ -35,6 +35,31 @@
 #ifndef __UK_SYSCALL_H__
 #define __UK_SYSCALL_H__
 
+#include <uk/arch/ctx.h>
+#include <arch/sysregs.h>
+
+/* We must make sure that ECTX is aligned, so we make use of some padding,
+ * whose size is equal to what we need to add to UKARCH_ECTX_SIZE
+ * to make it aligned with UKARCH_ECTX_ALIGN
+ */
+#define UK_SYSCALL_CTX_PAD_SIZE				\
+	(ALIGN_UP(UKARCH_ECTX_SIZE,		\
+		 UKARCH_ECTX_ALIGN) -		\
+	 UKARCH_ECTX_SIZE)
+/* If we make sure that the in-memory structure's end address is aligned to
+ * the ECTX alignment, then subtracting from that end address a value that is
+ * also a multiple of that alignment, guarantees that the resulted address
+ * is also ECTX aligned.
+ */
+#define UK_SYSCALL_CTX_END_ALIGN			\
+	UKARCH_ECTX_ALIGN
+#define UK_SYSCALL_CTX_SIZE				\
+	(UK_SYSCALL_CTX_PAD_SIZE +				\
+	 UKARCH_ECTX_SIZE +			\
+	 UKARCH_SYSREGS_SIZE +				\
+	 __REGS_SIZEOF)
+
+#if !__ASSEMBLY__
 #include <uk/config.h>
 #include <uk/essentials.h>
 #include <uk/errptr.h>
@@ -46,6 +71,17 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+struct uk_syscall_ctx {
+	struct __regs regs;
+	struct ukarch_sysregs sysregs;
+	__u8 ectx[UKARCH_ECTX_SIZE];
+	__u8 pad[UK_SYSCALL_CTX_PAD_SIZE];
+};
+
+UK_CTASSERT(sizeof(struct uk_syscall_ctx) == UK_SYSCALL_CTX_SIZE);
+UK_CTASSERT(IS_ALIGNED(UK_SYSCALL_CTX_PAD_SIZE + UKARCH_ECTX_SIZE,
+		       UKARCH_ECTX_ALIGN));
 
 /*
  * Whenever the hidden Config.uk option LIBSYSCALL_SHIM_NOWRAPPER
@@ -595,5 +631,6 @@ int uk_vsnprsyscall(char *buf, __sz maxlen, int fmtf, long syscall_num,
 #ifdef __cplusplus
 }
 #endif
+#endif /* !__ASSEMBLY__ */
 
 #endif /* __UK_SYSCALL_H__ */
