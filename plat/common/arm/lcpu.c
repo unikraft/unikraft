@@ -86,6 +86,8 @@ __lcpuid lcpu_arch_id(void)
 void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
 {
 	__asm__ __volatile__ (
+		"mov	x29, xzr\n" /* reset frame pointer */
+		"mov	x30, xzr\n" /* reset link register */
 		"mov	sp, %0\n" /* set the sp  */
 		"br	%1\n"     /* branch to the entry function */
 		:
