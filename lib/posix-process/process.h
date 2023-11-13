@@ -89,6 +89,8 @@ struct posix_thread {
 
 extern struct posix_process *pid_process[TIDMAP_SIZE];
 
+extern __uk_tls struct posix_thread *pthread_self;
+
 #define uk_pprocess_foreach(_p)						\
 	for (int _j = 1, _i = 0; _i != ARRAY_SIZE(pid_process);		\
 		_j = !_j, _i++)						\
@@ -98,6 +100,12 @@ extern struct posix_process *pid_process[TIDMAP_SIZE];
 #define uk_pprocess_foreach_pthread(_proc, _pthread, _pthreadn)		\
 	uk_list_for_each_entry_safe((_pthread), (_pthreadn),		\
 				    &(_proc)->threads, thread_list_entry)
+
+#define uk_pthread_current()						\
+	uk_thread_uktls_var(uk_thread_current(), pthread_self)
+
+#define uk_pprocess_current()						\
+	uk_pthread_current()->process
 
 #if CONFIG_LIBPOSIX_PROCESS_PIDS
 struct posix_process *pid2pprocess(pid_t pid);

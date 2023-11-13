@@ -70,7 +70,7 @@ struct posix_process *pid_process[TIDMAP_SIZE];
 /**
  * Thread-local posix_thread reference
  */
-static __uk_tls struct posix_thread *pthread_self = NULL;
+__uk_tls struct posix_thread *pthread_self = NULL;
 
 /**
  * Helpers to find and reserve a `pid_t`
