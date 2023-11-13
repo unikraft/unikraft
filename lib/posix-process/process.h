@@ -74,6 +74,9 @@ for (int _j = 1, _i = 0; _i != ARRAY_SIZE(pid_process);			\
 	uk_list_for_each_entry_safe(_pthread, _pthreadn,		\
 				    &(_proc)->threads, thread_list_entry)
 
+#define uk_gettid()	ukthread2tid(uk_thread_current())
+#define uk_getpid()	ukthread2pid(uk_thread_current())
+
 #if CONFIG_LIBPOSIX_PROCESS_PIDS
 struct posix_process *pid2pprocess(pid_t pid);
 struct uk_thread *tid2ukthread(pid_t tid);
