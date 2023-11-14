@@ -465,6 +465,7 @@ enum param_type {
 	PT_FD, /* File descriptor number */
 	PT_DIRFD, /* File descriptor number of directory */
 	PT_PID, /* PID number */
+	PT_ATFLAGS,
 	PT_OFLAGS,
 	PT_OKFLAGS,
 	PT_PROTFLAGS,
@@ -517,6 +518,18 @@ static inline void param_fd(struct uk_streambuf *sb, int fmtf, int fd)
 	PR_PARAM(sb, fmtf, "fd", "%d", fd);
 
 	/* TODO: Print file constructor/path (socket/file) as comment */
+}
+
+static inline void param_atflags(struct uk_streambuf *sb, int fmtf, long val)
+{
+	__sz orig_seek = uk_streambuf_seek(sb);
+	int atflags = (int) val;
+
+	PR_FLAG(sb, fmtf, orig_seek, AT_, SYMLINK_FOLLOW,   atflags);
+	PR_FLAG(sb, fmtf, orig_seek, AT_, SYMLINK_NOFOLLOW, atflags);
+	PR_FLAG(sb, fmtf, orig_seek, AT_, REMOVEDIR,        atflags);
+	PR_FLAG(sb, fmtf, orig_seek, AT_, EACCESS,          atflags);
+	PR_FLAG_END(sb, fmtf, orig_seek, atflags);
 }
 
 static inline void param_pid(struct uk_streambuf *sb, int fmtf, int pid)
@@ -887,6 +900,9 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 		break;
 	case PT_PID:
 		param_pid(sb, fmtf, param);
+		break;
+	case PT_ATFLAGS:
+		param_atflags(sb, fmtf, param);
 		break;
 	case PT_OFLAGS:
 		param_oflags(sb, fmtf, param);
