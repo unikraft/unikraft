@@ -1355,6 +1355,25 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		break;
 #endif /* HAVE_uk_syscall_sendto */
 
+#ifdef HAVE_uk_syscall_recv
+	case SYS_recv:
+		do {
+			int fd = (int) va_arg(args, long);
+			void *buf  = (void *) va_arg(args, long);
+			__sz len   = (__sz)   va_arg(args, long);
+			int flags  = (int))   va_arg(args, long);
+
+			PR_SYSCALL(sb, fmtf, syscall_num, rc >= 0,
+				   PT_FD, fd,
+				   PT_BUFP(((rc >= 0) ? (__sz) rc : len))
+				   | PT_OUT, buf,
+				   PT_UDEC, len,
+				   PT_MSGFLAGS, flags);
+			PR_SYSRET(sb, fmtf, PT_UDEC, rc);
+		} while (0);
+		break;
+#endif /* HAVE_uk_syscall_recv */
+
 #ifdef HAVE_uk_syscall_recvmsg
 	case SYS_recvmsg:
 		do {
@@ -1371,6 +1390,30 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
 		break;
 #endif /* HAVE_uk_syscall_recvmsg */
+
+#ifdef HAVE_uk_syscall_recvfrom
+	case SYS_recvfrom:
+		do {
+			int fd = (int) va_arg(args, long);
+			void *buf  = (void *) va_arg(args, long);
+			__sz len   = (__sz)   va_arg(args, long);
+			int flags  = (int)    va_arg(args, long);
+			struct sockaddr *src_addr = (struct sockaddr *)
+						    va_arg(args, long);
+			socklen_t *addrlen = (socklen_t *) va_arg(args, long);
+
+			PR_SYSCALL(sb, fmtf, syscall_num, rc >= 0,
+				   PT_FD, fd,
+				   PT_BUFP(((rc >= 0) ? (__sz) rc : len))
+				   | PT_OUT, buf,
+				   PT_UDEC, len,
+				   PT_MSGFLAGS, flags,
+				   PT_STRUCT(sockaddr) | PT_OUT, src_addr,
+				   PT_UDEC | PT_REF | PT_OUT, addrlen);
+			PR_SYSRET(sb, fmtf, PT_UDEC, rc);
+		} while (0);
+		break;
+#endif /* HAVE_uk_syscall_recvfrom */
 
 #ifdef HAVE_uk_syscall_clone
 	case SYS_clone:
