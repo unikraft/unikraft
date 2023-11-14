@@ -1222,6 +1222,22 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		break;
 #endif /* HAVE_uk_syscall_fstatfs */
 
+#ifdef HAVE_uk_syscall_rename
+	case SYS_rename:
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
+			    PT_PATH, PT_PATH);
+		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
+		break;
+#endif /* HAVE_uk_syscall_rename */
+
+#ifdef HAVE_uk_syscall_renameat
+	case SYS_renameat:
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
+			    PT_DIRFD, PT_PATH, PT_DIRFD, PT_PATH);
+		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
+		break;
+#endif /* HAVE_uk_syscall_renameat */
+
 #ifdef HAVE_uk_syscall_close
 	case SYS_close:
 		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0, PT_FD);
