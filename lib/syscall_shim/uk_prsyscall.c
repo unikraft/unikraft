@@ -121,35 +121,86 @@
 	} while (0)
 
 /* Helper macros for expanding code depending on variadic arguments */
-#define __VARG_EXPAND_IDX77 0
-#define __VARG_EXPAND_IDX76 1
-#define __VARG_EXPAND_IDX75 2
-#define __VARG_EXPAND_IDX74 3
-#define __VARG_EXPAND_IDX73 4
-#define __VARG_EXPAND_IDX72 5
-#define __VARG_EXPAND_IDX71 6
-#define __VARG_EXPAND_IDX66 0
-#define __VARG_EXPAND_IDX65 1
-#define __VARG_EXPAND_IDX64 2
-#define __VARG_EXPAND_IDX63 3
-#define __VARG_EXPAND_IDX62 4
-#define __VARG_EXPAND_IDX61 5
-#define __VARG_EXPAND_IDX55 0
-#define __VARG_EXPAND_IDX54 1
-#define __VARG_EXPAND_IDX53 2
-#define __VARG_EXPAND_IDX52 3
-#define __VARG_EXPAND_IDX51 4
-#define __VARG_EXPAND_IDX44 0
-#define __VARG_EXPAND_IDX43 1
-#define __VARG_EXPAND_IDX42 2
-#define __VARG_EXPAND_IDX41 3
-#define __VARG_EXPAND_IDX33 0
-#define __VARG_EXPAND_IDX32 1
-#define __VARG_EXPAND_IDX31 2
-#define __VARG_EXPAND_IDX22 0
-#define __VARG_EXPAND_IDX21 1
-#define __VARG_EXPAND_IDX11 0
-#define __VARG_EXPAND_IDX(x, y) UK_CONCAT(UK_CONCAT(__VARG_EXPAND_IDX, x), y)
+#define __VARG_EXPAND_IDX12_12 0
+#define __VARG_EXPAND_IDX12_11 1
+#define __VARG_EXPAND_IDX12_10 2
+#define __VARG_EXPAND_IDX12_9  3
+#define __VARG_EXPAND_IDX12_8  4
+#define __VARG_EXPAND_IDX12_7  5
+#define __VARG_EXPAND_IDX12_6  6
+#define __VARG_EXPAND_IDX12_5  7
+#define __VARG_EXPAND_IDX12_4  8
+#define __VARG_EXPAND_IDX12_3  9
+#define __VARG_EXPAND_IDX12_2  10
+#define __VARG_EXPAND_IDX12_1  11
+#define __VARG_EXPAND_IDX11_11 0
+#define __VARG_EXPAND_IDX11_10 1
+#define __VARG_EXPAND_IDX11_9  2
+#define __VARG_EXPAND_IDX11_8  3
+#define __VARG_EXPAND_IDX11_7  4
+#define __VARG_EXPAND_IDX11_6  5
+#define __VARG_EXPAND_IDX11_5  6
+#define __VARG_EXPAND_IDX11_4  7
+#define __VARG_EXPAND_IDX11_3  8
+#define __VARG_EXPAND_IDX11_2  9
+#define __VARG_EXPAND_IDX11_1 10
+#define __VARG_EXPAND_IDX10_10 0
+#define __VARG_EXPAND_IDX10_9  1
+#define __VARG_EXPAND_IDX10_8  2
+#define __VARG_EXPAND_IDX10_7  3
+#define __VARG_EXPAND_IDX10_6  4
+#define __VARG_EXPAND_IDX10_5  5
+#define __VARG_EXPAND_IDX10_4  6
+#define __VARG_EXPAND_IDX10_3  7
+#define __VARG_EXPAND_IDX10_2  8
+#define __VARG_EXPAND_IDX10_1  9
+#define __VARG_EXPAND_IDX9_9 0
+#define __VARG_EXPAND_IDX9_8 1
+#define __VARG_EXPAND_IDX9_7 2
+#define __VARG_EXPAND_IDX9_6 3
+#define __VARG_EXPAND_IDX9_5 4
+#define __VARG_EXPAND_IDX9_4 5
+#define __VARG_EXPAND_IDX9_3 6
+#define __VARG_EXPAND_IDX9_2 7
+#define __VARG_EXPAND_IDX9_1 8
+#define __VARG_EXPAND_IDX8_8 0
+#define __VARG_EXPAND_IDX8_7 1
+#define __VARG_EXPAND_IDX8_6 2
+#define __VARG_EXPAND_IDX8_5 3
+#define __VARG_EXPAND_IDX8_4 4
+#define __VARG_EXPAND_IDX8_3 5
+#define __VARG_EXPAND_IDX8_2 6
+#define __VARG_EXPAND_IDX8_1 7
+#define __VARG_EXPAND_IDX7_7 0
+#define __VARG_EXPAND_IDX7_6 1
+#define __VARG_EXPAND_IDX7_5 2
+#define __VARG_EXPAND_IDX7_4 3
+#define __VARG_EXPAND_IDX7_3 4
+#define __VARG_EXPAND_IDX7_2 5
+#define __VARG_EXPAND_IDX7_1 6
+#define __VARG_EXPAND_IDX6_6 0
+#define __VARG_EXPAND_IDX6_5 1
+#define __VARG_EXPAND_IDX6_4 2
+#define __VARG_EXPAND_IDX6_3 3
+#define __VARG_EXPAND_IDX6_2 4
+#define __VARG_EXPAND_IDX6_1 5
+#define __VARG_EXPAND_IDX5_5 0
+#define __VARG_EXPAND_IDX5_4 1
+#define __VARG_EXPAND_IDX5_3 2
+#define __VARG_EXPAND_IDX5_2 3
+#define __VARG_EXPAND_IDX5_1 4
+#define __VARG_EXPAND_IDX4_4 0
+#define __VARG_EXPAND_IDX4_3 1
+#define __VARG_EXPAND_IDX4_2 2
+#define __VARG_EXPAND_IDX4_1 3
+#define __VARG_EXPAND_IDX3_3 0
+#define __VARG_EXPAND_IDX3_2 1
+#define __VARG_EXPAND_IDX3_1 2
+#define __VARG_EXPAND_IDX2_2 0
+#define __VARG_EXPAND_IDX2_1 1
+#define __VARG_EXPAND_IDX1_1 0
+#define __VARG_EXPAND_IDX(x, y) \
+	UK_CONCAT(UK_CONCAT(__VARG_EXPAND_IDX, x), UK_CONCAT(_, y))
 
 #define __VARG_EXPAND0(x, ...)
 #define __VARG_EXPAND1(x, m, earg, succ, type)				\
@@ -172,6 +223,21 @@
 #define __VARG_EXPAND7(x, m, earg, succ, type, ...)			\
 	m(__VARG_EXPAND_IDX(x, 7), earg, succ, type)			\
 	__VARG_EXPAND6(x, m, earg, succ, __VA_ARGS__)
+#define __VARG_EXPAND8(x, m, earg, succ, type, ...)			\
+	m(__VARG_EXPAND_IDX(x, 8), earg, succ, type)			\
+	__VARG_EXPAND7(x, m, earg, succ, __VA_ARGS__)
+#define __VARG_EXPAND9(x, m, earg, succ, type, ...)			\
+	m(__VARG_EXPAND_IDX(x, 9), earg, succ, type)			\
+	__VARG_EXPAND8(x, m, earg, succ, __VA_ARGS__)
+#define __VARG_EXPAND10(x, m, earg, succ, type, ...)			\
+	m(__VARG_EXPAND_IDX(x, 10), earg, succ, type)			\
+	__VARG_EXPAND9(x, m, earg, succ, __VA_ARGS__)
+#define __VARG_EXPAND11(x, m, earg, succ, type, ...)			\
+	m(__VARG_EXPAND_IDX(x, 11), earg, succ, type)			\
+	__VARG_EXPAND10(x, m, earg, succ, __VA_ARGS__)
+#define __VARG_EXPAND12(x, m, earg, succ, type, ...)			\
+	m(__VARG_EXPAND_IDX(x, 12), earg, succ, type)			\
+	__VARG_EXPAND11(x, m, earg, succ, __VA_ARGS__)
 #define __VARG_EXPANDx(nr_args, ...)					\
 	UK_CONCAT(__VARG_EXPAND, nr_args)(nr_args, __VA_ARGS__)
 #define _VARG_EXPAND(...) __VARG_EXPANDx(__VA_ARGS__)
@@ -179,35 +245,86 @@
 	_VARG_EXPAND(UK_NARGS(__VA_ARGS__), m, earg, succ, __VA_ARGS__)
 
 /* Like VARG_EXPAND() but takes two variadic arguments per expansion step  */
-#define __VARG2_EXPAND_IDX1414 0
-#define __VARG2_EXPAND_IDX1412 1
-#define __VARG2_EXPAND_IDX1410 2
-#define __VARG2_EXPAND_IDX148  3
-#define __VARG2_EXPAND_IDX146  4
-#define __VARG2_EXPAND_IDX144  5
-#define __VARG2_EXPAND_IDX142  6
-#define __VARG2_EXPAND_IDX1212 0
-#define __VARG2_EXPAND_IDX1210 1
-#define __VARG2_EXPAND_IDX128  2
-#define __VARG2_EXPAND_IDX126  3
-#define __VARG2_EXPAND_IDX124  4
-#define __VARG2_EXPAND_IDX122  5
-#define __VARG2_EXPAND_IDX1010 0
-#define __VARG2_EXPAND_IDX108  1
-#define __VARG2_EXPAND_IDX106  2
-#define __VARG2_EXPAND_IDX104  3
-#define __VARG2_EXPAND_IDX102  4
-#define __VARG2_EXPAND_IDX88   0
-#define __VARG2_EXPAND_IDX86   1
-#define __VARG2_EXPAND_IDX84   2
-#define __VARG2_EXPAND_IDX82   3
-#define __VARG2_EXPAND_IDX66   0
-#define __VARG2_EXPAND_IDX64   1
-#define __VARG2_EXPAND_IDX62   2
-#define __VARG2_EXPAND_IDX44   0
-#define __VARG2_EXPAND_IDX42   1
-#define __VARG2_EXPAND_IDX22   0
-#define __VARG2_EXPAND_IDX(x, y) UK_CONCAT(UK_CONCAT(__VARG2_EXPAND_IDX, x), y)
+#define __VARG2_EXPAND_IDX24_24 0
+#define __VARG2_EXPAND_IDX24_22 1
+#define __VARG2_EXPAND_IDX24_20 2
+#define __VARG2_EXPAND_IDX24_18 3
+#define __VARG2_EXPAND_IDX24_16 4
+#define __VARG2_EXPAND_IDX24_14 5
+#define __VARG2_EXPAND_IDX24_12 6
+#define __VARG2_EXPAND_IDX24_10 7
+#define __VARG2_EXPAND_IDX24_8  8
+#define __VARG2_EXPAND_IDX24_6  9
+#define __VARG2_EXPAND_IDX24_4  10
+#define __VARG2_EXPAND_IDX24_2  11
+#define __VARG2_EXPAND_IDX22_22 0
+#define __VARG2_EXPAND_IDX22_20 1
+#define __VARG2_EXPAND_IDX22_18 2
+#define __VARG2_EXPAND_IDX22_16 3
+#define __VARG2_EXPAND_IDX22_14 4
+#define __VARG2_EXPAND_IDX22_12 5
+#define __VARG2_EXPAND_IDX22_10 6
+#define __VARG2_EXPAND_IDX22_8  7
+#define __VARG2_EXPAND_IDX22_6  8
+#define __VARG2_EXPAND_IDX22_4  9
+#define __VARG2_EXPAND_IDX22_2  10
+#define __VARG2_EXPAND_IDX20_20 0
+#define __VARG2_EXPAND_IDX20_18 1
+#define __VARG2_EXPAND_IDX20_16 2
+#define __VARG2_EXPAND_IDX20_14 3
+#define __VARG2_EXPAND_IDX20_12 4
+#define __VARG2_EXPAND_IDX20_10 5
+#define __VARG2_EXPAND_IDX20_8  6
+#define __VARG2_EXPAND_IDX20_6  7
+#define __VARG2_EXPAND_IDX20_4  8
+#define __VARG2_EXPAND_IDX20_2  9
+#define __VARG2_EXPAND_IDX18_18 0
+#define __VARG2_EXPAND_IDX18_16 1
+#define __VARG2_EXPAND_IDX18_14 2
+#define __VARG2_EXPAND_IDX18_12 3
+#define __VARG2_EXPAND_IDX18_10 4
+#define __VARG2_EXPAND_IDX18_8  5
+#define __VARG2_EXPAND_IDX18_6  6
+#define __VARG2_EXPAND_IDX18_4  7
+#define __VARG2_EXPAND_IDX18_2  8
+#define __VARG2_EXPAND_IDX16_16 0
+#define __VARG2_EXPAND_IDX16_14 1
+#define __VARG2_EXPAND_IDX16_12 2
+#define __VARG2_EXPAND_IDX16_10 3
+#define __VARG2_EXPAND_IDX16_8  4
+#define __VARG2_EXPAND_IDX16_6  5
+#define __VARG2_EXPAND_IDX16_4  6
+#define __VARG2_EXPAND_IDX16_2  7
+#define __VARG2_EXPAND_IDX14_14 0
+#define __VARG2_EXPAND_IDX14_12 1
+#define __VARG2_EXPAND_IDX14_10 2
+#define __VARG2_EXPAND_IDX14_8  3
+#define __VARG2_EXPAND_IDX14_6  4
+#define __VARG2_EXPAND_IDX14_4  5
+#define __VARG2_EXPAND_IDX14_2  6
+#define __VARG2_EXPAND_IDX12_12 0
+#define __VARG2_EXPAND_IDX12_10 1
+#define __VARG2_EXPAND_IDX12_8  2
+#define __VARG2_EXPAND_IDX12_6  3
+#define __VARG2_EXPAND_IDX12_4  4
+#define __VARG2_EXPAND_IDX12_2  5
+#define __VARG2_EXPAND_IDX10_10 0
+#define __VARG2_EXPAND_IDX10_8  1
+#define __VARG2_EXPAND_IDX10_6  2
+#define __VARG2_EXPAND_IDX10_4  3
+#define __VARG2_EXPAND_IDX10_2  4
+#define __VARG2_EXPAND_IDX8_8   0
+#define __VARG2_EXPAND_IDX8_6   1
+#define __VARG2_EXPAND_IDX8_4   2
+#define __VARG2_EXPAND_IDX8_2   3
+#define __VARG2_EXPAND_IDX6_6   0
+#define __VARG2_EXPAND_IDX6_4   1
+#define __VARG2_EXPAND_IDX6_2   2
+#define __VARG2_EXPAND_IDX4_4   0
+#define __VARG2_EXPAND_IDX4_2   1
+#define __VARG2_EXPAND_IDX2_2   0
+#define __VARG2_EXPAND_IDX(x, y) \
+	UK_CONCAT(UK_CONCAT(__VARG2_EXPAND_IDX, x), UK_CONCAT(_, y))
 
 #define  __VARG2_EXPAND0(x, ...)
 #define  __VARG2_EXPAND2(x, m, earg, succ, type, param)			\
@@ -230,6 +347,21 @@
 #define __VARG2_EXPAND14(x, m, earg, succ, type, param, ...)		\
 	m(__VARG2_EXPAND_IDX(x, 14), earg, succ, type, param)		\
 	__VARG2_EXPAND12(x, m, earg, succ, __VA_ARGS__)
+#define __VARG2_EXPAND16(x, m, earg, succ, type, param, ...)		\
+	m(__VARG2_EXPAND_IDX(x, 16), earg, succ, type, param)		\
+	__VARG2_EXPAND14(x, m, earg, succ, __VA_ARGS__)
+#define __VARG2_EXPAND18(x, m, earg, succ, type, param, ...)		\
+	m(__VARG2_EXPAND_IDX(x, 18), earg, succ, type, param)		\
+	__VARG2_EXPAND16(x, m, earg, succ, __VA_ARGS__)
+#define __VARG2_EXPAND20(x, m, earg, succ, type, param, ...)		\
+	m(__VARG2_EXPAND_IDX(x, 20), earg, succ, type, param)		\
+	__VARG2_EXPAND18(x, m, earg, succ, __VA_ARGS__)
+#define __VARG2_EXPAND22(x, m, earg, succ, type, param, ...)		\
+	m(__VARG2_EXPAND_IDX(x, 22), earg, succ, type, param)		\
+	__VARG2_EXPAND20(x, m, earg, succ, __VA_ARGS__)
+#define __VARG2_EXPAND24(x, m, earg, succ, type, param, ...)		\
+	m(__VARG2_EXPAND_IDX(x, 24), earg, succ, type, param)		\
+	__VARG2_EXPAND22(x, m, earg, succ, __VA_ARGS__)
 #define __VARG2_EXPANDx(nr_args, ...)					\
 	UK_CONCAT(__VARG2_EXPAND, nr_args)(nr_args, __VA_ARGS__)
 #define _VARG2_EXPAND(...) __VARG2_EXPANDx(__VA_ARGS__)
