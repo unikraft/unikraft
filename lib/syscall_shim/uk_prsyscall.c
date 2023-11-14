@@ -1607,6 +1607,14 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		break;
 #endif /* HAVE_uk_syscall_access */
 
+#ifdef HAVE_uk_syscall_faccessat
+	case SYS_faccessat:
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
+			    PT_DIRFD, PT_PATH, PT_OKFLAGS, PT_ATFLAGS);
+		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
+		break;
+#endif /* HAVE_uk_syscall_faccessat */
+
 #ifdef HAVE_uk_syscall_uname
 	case SYS_uname:
 		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
