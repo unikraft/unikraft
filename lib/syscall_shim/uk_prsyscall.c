@@ -1238,6 +1238,22 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		break;
 #endif /* HAVE_uk_syscall_renameat */
 
+#ifdef HAVE_uk_syscall_mkdir
+	case SYS_mkdir:
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
+			    PT_PATH, PT_OCTAL);
+		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
+		break;
+#endif /* HAVE_uk_syscall_mkdir */
+
+#ifdef HAVE_uk_syscall_mkdirat
+	case SYS_mkdirat:
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
+			    PT_DIRFD, PT_PATH, PT_OCTAL);
+		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
+		break;
+#endif /* HAVE_uk_syscall_mkdirat */
+
 #ifdef HAVE_uk_syscall_close
 	case SYS_close:
 		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0, PT_FD);
