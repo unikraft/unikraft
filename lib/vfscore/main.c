@@ -1447,60 +1447,34 @@ UK_TRACEPOINT(trace_vfs_unlink, "\"%s\"", const char*);
 UK_TRACEPOINT(trace_vfs_unlink_ret, "");
 UK_TRACEPOINT(trace_vfs_unlink_err, "%d", int);
 
-UK_SYSCALL_R_DEFINE(int, unlink, const char*, pathname)
+UK_SYSCALL_R_DEFINE(int, unlinkat, int, dirfd, const char*, pathname,
+		    int, flags)
 {
-	trace_vfs_unlink(pathname);
 	struct task *t = main_task;
 	char path[PATH_MAX];
 	int error;
 
-	error = ENOENT;
-	if (pathname == NULL)
-		goto out_errno;
-	if ((error = task_conv(t, pathname, VWRITE, path)) != 0)
-		goto out_errno;
+	trace_vfs_unlink(pathname);
 
-	error = sys_unlink(path);
-	if (error)
-		goto out_errno;
-	trace_vfs_unlink_ret();
-	return 0;
-out_errno:
-	trace_vfs_unlink_err(error);
-	return -error;
-}
-
-UK_SYSCALL_R_DEFINE(int, unlinkat, int, dirfd, const char*, pathname, int, flags)
-{
-	if (pathname[0] == '/' || dirfd == AT_FDCWD) {
-		if (flags & AT_REMOVEDIR)
-			return uk_syscall_do_rmdir((long)pathname);
-		else
-			return uk_syscall_do_unlink((long)pathname);
-	}
-
-	struct vfscore_file *fp;
-	int error = fget(dirfd, &fp);
-	if (error)
-		return -error;
-
-	struct vnode *vp = fp->f_dentry->d_vnode;
-	vn_lock(vp);
-
-	char p[PATH_MAX];
-	/* build absolute path */
-	strlcpy(p, fp->f_dentry->d_mount->m_path, PATH_MAX);
-	strlcat(p, fp->f_dentry->d_path, PATH_MAX);
-	strlcat(p, "/", PATH_MAX);
-	strlcat(p, pathname, PATH_MAX);
-
-	vn_unlock(vp);
-	fdrop(fp);
+	if ((error = taskat_conv(t, dirfd, pathname, path)) != 0)
+		goto out_error;
 
 	if (flags & AT_REMOVEDIR)
-		return uk_syscall_do_rmdir((long)p);
+		error = sys_rmdir(path);
 	else
-		return uk_syscall_do_unlink((long)p);
+		error = sys_unlink(path);
+	if (error)
+		goto out_error;
+	trace_vfs_unlink_ret();
+	return 0;
+out_error:
+	trace_vfs_unlink_err(error);
+	return error < 0 ? error : -error;
+}
+
+UK_SYSCALL_R_DEFINE(int, unlink, const char*, pathname)
+{
+	return uk_syscall_do_unlinkat(AT_FDCWD, (long)pathname, 0x0);
 }
 
 UK_TRACEPOINT(trace_vfs_stat, "\"%s\" %#x", const char*, struct stat*);
