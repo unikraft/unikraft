@@ -11,6 +11,7 @@
 #include <fcntl.h>
 
 #include <sys/stat.h>
+#include <sys/statfs.h>
 #ifdef CONFIG_LIBPOSIX_SYSINFO
 #include <sys/utsname.h>
 #endif /* CONFIG_LIBPOSIX_SYSINFO */
@@ -481,6 +482,7 @@ enum param_type {
 	PT_CLONEFLAGS,
 	PT_STRUCT(timespec),
 	PT_STRUCT(stat),
+	PT_STRUCT(statfs),
 #ifdef CONFIG_LIBPOSIX_SYSINFO
 	PT_STRUCT(utsname),
 #endif /* CONFIG_LIBPOSIX_SYSINFO */
@@ -956,6 +958,20 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 			  PT_UDEC, st_size,
 			  PT_OCTAL, st_mode);
 		break;
+	case PT_STRUCT(statfs):
+		PR_STRUCT(sb, fmtf, statfs, flags, param, 0, succ,
+			  PT_HEX,  f_type,
+			  PT_UDEC, f_bsize,
+			  PT_UDEC, f_blocks,
+			  PT_UDEC, f_bfree,
+			  PT_UDEC, f_bavail,
+			  PT_UDEC, f_files,
+			  PT_UDEC, f_ffree,
+			  PT_HEX,  f_fsid,
+			  PT_UDEC, f_namelen,
+			  PT_UDEC, f_frsize,
+			  PT_HEX,  f_flags);
+		break;
 #ifdef CONFIG_LIBPOSIX_SYSINFO
 	case PT_STRUCT(utsname):
 		PR_STRUCT(sb, fmtf, utsname, flags, param, 1, succ,
@@ -1180,6 +1196,22 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
 		break;
 #endif /* HAVE_uk_syscall_fstat */
+
+#ifdef HAVE_uk_syscall_statfs
+	case SYS_statfs:
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
+			    PT_PATH, PT_STRUCT(statfs) | PT_OUT);
+		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
+		break;
+#endif /* HAVE_uk_syscall_statfs */
+
+#ifdef HAVE_uk_syscall_fstatfs
+	case SYS_fstatfs:
+		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc == 0,
+			    PT_FD, PT_STRUCT(statfs) | PT_OUT);
+		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
+		break;
+#endif /* HAVE_uk_syscall_fstatfs */
 
 #ifdef HAVE_uk_syscall_close
 	case SYS_close:
