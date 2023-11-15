@@ -40,6 +40,7 @@
 #include <fcntl.h>
 #include <sys/statfs.h>
 #include <sys/time.h>
+#include <vfscore/file.h>
 
 /*
  * Tunable parameters
@@ -535,6 +536,26 @@ int	sys_chmod(const char *path, mode_t mode);
 int task_conv(struct task *t, const char *path, int mode, char *full);
 
 /**
+ * Converts to full path from the cwd of a task or dirfd and path.
+ *
+ * @param t
+ *	Pointer to task containing the cwd
+ * @param dirfd
+ *	File descriptor of directory to be used as instead of the task's cwd.
+ *	If dirfd == AT_FDCWD, the task's cwd (parameter `t`) is used.
+ * @param path
+ *	The target path
+ * @param mode
+ *	Unused parameter
+ * @param[out] full
+ *	Full path to be returned
+ * @return
+ *	- (0):  Completed successfully
+ *	- (<0): Negative value with error code
+ */
+int taskat_conv(struct task *t, int dirfd, const char *path, char *full);
+
+/**
  * Converts to full path from the wd of task and cpath.
  *
  * @param wd
@@ -547,7 +568,7 @@ int task_conv(struct task *t, const char *path, int mode, char *full);
  *	- (0):  Completed successfully
  *	- (<0): Negative value with error code
  */
-int path_conv(char *wd, const char *cpath, char *full);
+int path_conv(const char *wd, const char *cpath, char *full);
 
 /**
  * This function is not implemented or used at this point.

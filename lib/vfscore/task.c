@@ -53,7 +53,7 @@
  * @full: full path to be returned
  */
 int
-path_conv(char *wd, const char *cpath, char *full)
+path_conv(const char *wd, const char *cpath, char *full)
 {
 	char path[PATH_MAX];
 	char *src, *tgt, *p, *end;
@@ -141,6 +141,62 @@ task_conv(struct task *t, const char *cpath, int acc __unused, char *full)
 
 	/* Check if the client task has required permission */
 	return (0); //sec_file_permission(t->t_taskid, full, acc);
+}
+
+/*
+ * Converts to full path from the cwd of a task or dirfd and path.
+ * @t:    task structure
+ * @dirfd: file descriptor of open directory to be used as cwd
+ * @path: target path
+ * @full: full path to be returned
+ */
+int
+taskat_conv(struct task *t, int dirfd, const char *path, char *full)
+{
+	struct vfscore_file *dirfp;
+	struct vnode *dirvp;
+	int error;
+
+	UK_ASSERT(full);
+
+	if (unlikely(!path)) {
+		error = -EINVAL;
+		goto out_error;
+	}
+
+	if (path[0] == '/') {
+		error = path_conv("", path, full);
+	} else if (dirfd == AT_FDCWD) {
+		error = path_conv(t->t_cwd, path, full);
+	} else {
+		char wdpath[PATH_MAX];
+		size_t len;
+
+		error = fget(dirfd, &dirfp);
+		if (error)
+			goto out_error;
+
+		dirvp = dirfp->f_dentry->d_vnode;
+		vn_lock(dirvp);
+
+		/* get working directory */
+		strlcpy(wdpath, dirfp->f_dentry->d_mount->m_path, PATH_MAX);
+		len = strlcat(wdpath, dirfp->f_dentry->d_path, PATH_MAX);
+		/* check for truncation */
+		if (len < PATH_MAX)
+			error = path_conv(wdpath, path, full);
+		else
+			error = -ENAMETOOLONG;
+
+		vn_unlock(dirvp);
+		fdrop(dirfp);
+	}
+	if (error)
+		goto out_error;
+
+	return 0;
+out_error:
+	return error;
 }
 
 /*
