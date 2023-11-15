@@ -64,8 +64,9 @@
 #ifndef __UK_BUS_PCI_H__
 #define __UK_BUS_PCI_H__
 
-#include <stdint.h>
 #include <stddef.h>
+#include <stdint.h>
+#include <uk/arch/types.h>
 #include <uk/bus.h>
 #include <uk/alloc.h>
 #include <uk/ctors.h>
@@ -151,6 +152,16 @@ enum pci_device_state {
 	PCI_DEVICE_STATE_RUNNING
 };
 
+/**
+ * @brief Description of a mapped BAR.
+ */
+struct pci_bar_memory {
+	/**< Start address of memory region */
+	void *start;
+	/**< Size of the memory region */
+	size_t size;
+};
+
 struct pci_device {
 	struct uk_list_head list;
 	struct pci_device_id  id;
@@ -160,8 +171,101 @@ struct pci_device {
 
 	unsigned long base;
 	unsigned long irq;
+	/* Memory address of the device configuration space */
+	uint32_t config_addr;
 };
 
+int arch_pci_find_cap(struct pci_device *pci_dev, uint16_t vndr_id,
+		      uint8_t *cap_offset);
+int arch_pci_find_next_cap(struct pci_device *pci_dev, uint16_t vndr_id,
+			   uint8_t curr_cap_offset,
+			   uint8_t *next_cap_offset);
+
+/**
+ * @brief read a register in the configuration space header, located at @p a.
+ * Reads a register, identified by @p s, and writes its contents into the @ret.
+ * Type determines, how much of the data should be returned
+ *
+ * @param a configuration space header address
+ * @param s macro suffix for the register-specific offset, mask and shift
+ * @param[out] ret return variable
+ * @param type return type
+ *
+ */
+#define PCI_CONF_READ_HEADER(type, ret, a, s)					\
+	do {								\
+		uint32_t _conf_data;					\
+		outl(PCI_CONFIG_ADDR, (a) | PCI_CONF_##s);		\
+		_conf_data = ((inl(PCI_CONFIG_DATA) >> PCI_CONF_##s##_SHFT) \
+			      & PCI_CONF_##s##_MASK);			\
+		*(ret) = (type) _conf_data;				\
+	} while (0)
+
+/**
+ * @brief Same as PCI_CONF_READ but allows for register offset, shift and mask
+ * values to be set on runtime, instead of by a macro.
+ *
+ * @param a configuration space header address
+ * @param[out] ret return variable
+ * @param type return type
+ * @param offset offset in bytes, from the beginning of the configuration space.
+ * 		 Configuration space is 256 bytes large.
+ */
+#define PCI_CONF_READ_OFFSET(type, ret, a, offset, shift, mask)					\
+	do {								\
+		uint32_t _conf_data;					\
+		outl(PCI_CONFIG_ADDR, (a) | (offset));		\
+		_conf_data = ((inl(PCI_CONFIG_DATA) >> (shift)) \
+			      & (mask));			\
+		*(ret) = (type) _conf_data;				\
+	} while (0)
+
+/**
+ * @brief write a register in the configuration space header, located at @p a.
+ * Writes a register, identified by @p s.
+ *
+ * @param a configuration space header address
+ * @param s macro suffix for the register-specific offset, mask and shift
+ * @param value the value to write
+ * @param type register type
+ *
+ */
+#define PCI_CONF_WRITE_HEADER(type, a, s, value)				\
+	do {									\
+		uint32_t _conf_data;						\
+		outl(PCI_CONFIG_ADDR, (a) | PCI_CONF_##s);			\
+		_conf_data = inl(PCI_CONFIG_DATA);				\
+										\
+                _conf_data &= ~(PCI_CONF_##s##_MASK << PCI_CONF_##s##_SHFT);	\
+                _conf_data |=							\
+		    ((value) & PCI_CONF_##s##_MASK) << PCI_CONF_##s##_SHFT;	\
+		outl(PCI_CONFIG_ADDR, (a) | PCI_CONF_##s);			\
+		outl(PCI_CONFIG_DATA, _conf_data);				\
+	} while (0)
+
+/**
+ * @brief Same as PCI_CONF_WRITE_HEADER but allows for register offset, shift
+ * and mask values to be set on runtime, instead of by a macro.
+ *
+ * @param a configuration space header address
+ * @param offset the offset of the register in the configuration space
+ * @param shift the bit position of the value
+ * @param mask the mask used to select the bits after the shift
+ * @param value the value to write
+ * @param type register type
+ */
+#define PCI_CONF_WRITE_OFFSET(type, a, offset, shift, mask, value)		\
+	do {									\
+		uint32_t _conf_data;						\
+		outl(PCI_CONFIG_ADDR, (a) | (offset));				\
+		_conf_data = inl(PCI_CONFIG_DATA);				\
+										\
+                _conf_data &= ~((mask) << (shift));				\
+                _conf_data |=							\
+		    ((value) & (mask)) << (shift);				\
+		outl(PCI_CONFIG_ADDR, (a) | (offset));				\
+		outl(PCI_CONFIG_DATA, _conf_data);				\
+	} while (0)
 
 #define PCI_REGISTER_DRIVER(b)                  \
 	_PCI_REGISTER_DRIVER(__LIBNAME__, b)
@@ -210,6 +314,16 @@ static struct pci_bus_handler ph __unused;
 #define PCI_FUNCTION_SHIFT          (8)
 #define PCI_ENABLE_BIT              (1u << 31)
 
+#define PCI_MAX_BARS                (6)
+/* Offsets, masks and shifts for reading different registers inside a PCI
+ * configuration space header.
+ */
+#define PCI_CONF_STATUS            (0x04)
+#define PCI_CONF_STATUS_SHFT       (16)
+#define PCI_CONF_STATUS_MASK       (0x0000FFFF)
+
+#define PCI_CONF_CAP_STATUS_BIT (0x10) /* set if PCI capabilites are enabled */
+
 #define PCI_CONF_CLASS_ID          (0x08)
 #define PCI_CONF_CLASS_ID_SHFT     (16)
 #define PCI_CONF_CLASS_ID_MASK     (0xFF00)
@@ -234,10 +348,16 @@ static struct pci_bus_handler ph __unused;
 #define PCI_CONF_SECONDARY_BUS_SHFT     (0)
 #define PCI_CONF_SECONDARY_BUS_MASK     (0xFF00)
 
-#define PCI_HEADER_TYPE_MSB_MASK   (0x80)
-#define PCI_CONF_HEADER_TYPE       (0x00)
-#define PCI_CONF_HEADER_TYPE_SHFT  (16)
-#define PCI_CONF_HEADER_TYPE_MASK  (0xFF)
+#define PCI_HEADER_TYPE_MSB_MASK	(0x80)
+#define PCI_CONF_HEADER_TYPE		(0x0C)
+#define PCI_CONF_HEADER_TYPE_SHFT	(16)
+#define PCI_CONF_HEADER_TYPE_MASK	(0xFF)
+/*Bit 7 identifies a multi-function device*/
+#define PCI_CONF_HEADER_TYPE_HEADER_TYPE_MASK (0x7F)
+#define PCI_CONF_HEADER_TYPE_STANDARD	(0x0)
+#define PCI_CONF_HEADER_TYPE_PCI_TO_PCI	(0x1)
+#define PCI_CONF_HEADER_TYPE_CARDBUS_BRIDGE (0x2)
+#define PCI_CONF_CARDBUS_BRIDGE_CAP_LIST_PTR (0x14)
 
 #define PCI_CONF_SUBSYS_ID          (0x2c)
 #define PCI_CONF_SUBSYS_ID_SHFT     (16)
@@ -246,6 +366,14 @@ static struct pci_bus_handler ph __unused;
 #define PCI_CONF_IRQ                (0X3C)
 #define PCI_CONF_IRQ_SHFT           (0x0)
 #define PCI_CONF_IRQ_MASK           (0XFF)
+
+#define PCI_CONF_CAP_POINTER (0x34)
+#define PCI_CONF_CAP_POINTER_SHFT (0x0)
+/**
+ * The bottom two bits are reserved and should be masked before
+ * the Pointer is used to access the Configuration Space.
+ */
+#define PCI_CONF_CAP_POINTER_MASK (0xFC)
 
 #define PCI_CONF_IOBAR              (0x10)
 #define PCI_CONF_IOBAR_SHFT         (0x0)
@@ -279,6 +407,14 @@ static struct pci_bus_handler ph __unused;
 #define PCI_CONFIG_SECONDARY_BUS   0x19
 #define PCI_CAPABILITIES_PTR   0x34
 
+/* Offsets inside a capability register */
+#define PCI_CAP_VENDOR_ID_SHIFT	0
+#define PCI_CAP_VENDOR_ID_MASK	0x000000FF
+#define PCI_CAP_NEXT_SHIFT	8
+#define PCI_CAP_NEXT_MASK	0x000000FC /*last two bits are reserved*/
+
+#define PCI_HEADER_END      0xFF
+
 #define PCI_COMMAND		0x04	/* 16 bits */
 #define  PCI_COMMAND_IO		0x1	/* Enable response in I/O space */
 #define  PCI_COMMAND_MEMORY	0x2	/* Enable response in Memory space */
@@ -299,7 +435,39 @@ static struct pci_bus_handler ph __unused;
 #define PCI_MIN_GNT		0x3e	/* 8 bits */
 #define PCI_MAX_LAT		0x3f	/* 8 bits */
 
+/* PCI capabilities */
+#define PCI_CAP_VENDOR		0x9	/* Vendor-specific Capabilities*/
+#define PCI_CAP_MSIX		0x11
+
 struct pci_driver *pci_find_driver(struct pci_device_id *id);
+
+int pci_generic_config_read(__u8 bus, __u8 devfn,
+			    int where, int size, void *val);
+
+int pci_generic_config_write(__u8 bus, __u8 devfn,
+			     int where, int size, __u32 val);
+/**
+ * @brief Create a memory mapping for a memory BAR
+ * @param dev the device to act on
+ * @param idx the index of the BAR register
+ * @param mem[out] description of the mapped memory
+ * @param flags the page attributes to use for mapping the memory. See the
+ * 		PAGE_ATTR_PROT_* constants.
+ * @return 0 if the memory was mapped successfully, a non-zero value if an error
+ *   occurred.
+ */
+int pci_map_bar(struct pci_device *dev, __u8 idx, int attr,
+		struct pci_bar_memory *mem);
+
+/**
+ * @brief Unmap a previously mapped memory BAR
+ * @param dev the device to act on
+ * @param idx the index of the BAR register
+ * @param mem[in] description of the mapped memory
+ * @return 0 if the memory was unmapped successfully, a non-zero value if an
+ *   error occurred.
+ */
+int pci_unmap_bar(struct pci_device *dev, __u8 idx, struct pci_bar_memory *mem);
 
 #ifdef __cplusplus
 }
