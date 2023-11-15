@@ -79,7 +79,8 @@ static int uk_posix_clone_files(const struct clone_args *cl_args,
 				struct uk_thread *child __unused,
 				struct uk_thread *parent __unused)
 {
-	if (unlikely(!(cl_args->flags & CLONE_FILES))) {
+	if (unlikely(!(cl_args->flags & CLONE_FILES) &&
+		     !(cl_args->flags & CLONE_VM))) {
 		uk_pr_warn("CLONE_FILES not set");
 		return -ENOTSUP;
 	}

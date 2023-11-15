@@ -1237,7 +1237,8 @@ static int uk_posix_clone_fs(const struct clone_args *cl_args,
 			     struct uk_thread *child __unused,
 			     struct uk_thread *parent __unused)
 {
-	if (unlikely(!(cl_args->flags & CLONE_FS))) {
+	if (unlikely(!(cl_args->flags & CLONE_FS) &&
+		     !(cl_args->flags & CLONE_VM))) {
 		uk_pr_warn("Separate filesystem information for children are not supported (CLONE_FS absent)\n");
 		return -ENOTSUP;
 	}
