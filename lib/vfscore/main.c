@@ -106,37 +106,24 @@ static inline mode_t apply_umask(mode_t mode)
 	return mode & ~uk_load_n(&global_umask);
 }
 
-UK_TRACEPOINT(trace_vfs_open, "\"%s\" %#x 0%0o", const char*, int, mode_t);
-UK_TRACEPOINT(trace_vfs_open_ret, "%d", int);
-UK_TRACEPOINT(trace_vfs_open_err, "%d", int);
+UK_TRACEPOINT(trace_vfs_openat, "%d \"%s\" %#x 0%0o",
+	      int, const char*, int, mode_t);
+UK_TRACEPOINT(trace_vfs_openat_ret, "%d", int);
+UK_TRACEPOINT(trace_vfs_openat_err, "%d", int);
 
 struct task *main_task;	/* we only have a single process */
 
-UK_LLSYSCALL_R_DEFINE(int, open, const char*, pathname, int, flags,
-		      mode_t, mode)
+UK_LLSYSCALL_R_DEFINE(int, openat, int, dirfd, const char *, pathname,
+		      int, flags, int, mode)
 {
-	trace_vfs_open(pathname, flags, mode);
-
 	struct task *t = main_task;
-	char path[PATH_MAX];
 	struct vfscore_file *fp;
+	char path[PATH_MAX];
 	int fd, error;
-	int acc;
 
-	acc = 0;
-	switch (flags & O_ACCMODE) {
-	case O_RDONLY:
-		acc = VREAD;
-		break;
-	case O_WRONLY:
-		acc = VWRITE;
-		break;
-	case O_RDWR:
-		acc = VREAD | VWRITE;
-		break;
-	}
+	trace_vfs_openat(dirfd, pathname, flags, mode);
 
-	error = task_conv(t, pathname, acc, path);
+	error = taskat_conv(t, dirfd, pathname, path);
 	if (error)
 		goto out_error;
 
@@ -149,68 +136,15 @@ UK_LLSYSCALL_R_DEFINE(int, open, const char*, pathname, int, flags,
 	if (error)
 		goto out_fput;
 	fdrop(fp);
-	trace_vfs_open_ret(fd);
+
+	trace_vfs_openat_ret(fd);
 	return fd;
 
-	out_fput:
+out_fput:
 	fdrop(fp);
-	out_error:
-	trace_vfs_open_err(error);
+out_error:
+	trace_vfs_openat_err(error);
 	return -error;
-}
-
-#if UK_LIBC_SYSCALLS
-int open(const char *pathname, int flags, ...)
-{
-	mode_t mode = 0;
-
-	if (flags & O_CREAT) {
-		va_list ap;
-
-		va_start(ap, flags);
-		mode = va_arg(ap, mode_t);
-		va_end(ap);
-	}
-
-	return uk_syscall_e_open((long int)pathname, flags, mode);
-}
-
-#ifdef open64
-#undef open64
-#endif
-
-LFS64(open);
-#endif /* UK_LIBC_SYSCALLS */
-
-UK_LLSYSCALL_R_DEFINE(int, openat, int, dirfd, const char *, pathname,
-		      int, flags, int, mode)
-{
-	if (pathname[0] == '/' || dirfd == AT_FDCWD) {
-		return uk_syscall_do_open((long int)pathname, flags, mode);
-	}
-
-	struct vfscore_file *fp;
-	int error = fget(dirfd, &fp);
-	if (error)
-		return -error;
-
-	struct vnode *vp = fp->f_dentry->d_vnode;
-	vn_lock(vp);
-
-	char p[PATH_MAX];
-
-	/* build absolute path */
-	strlcpy(p, fp->f_dentry->d_mount->m_path, PATH_MAX);
-	strlcat(p, fp->f_dentry->d_path, PATH_MAX);
-	strlcat(p, "/", PATH_MAX);
-	strlcat(p, pathname, PATH_MAX);
-
-	vn_unlock(vp);
-	fdrop(fp);
-
-	error = uk_syscall_do_open((long int)p, flags, mode);
-
-	return error;
 }
 
 #if UK_LIBC_SYSCALLS
@@ -226,7 +160,7 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 		va_end(ap);
 	}
 
-	return uk_syscall_e_openat(dirfd, (long) pathname, flags, mode);
+	return uk_syscall_e_openat(dirfd, (long)pathname, flags, mode);
 }
 
 #ifdef openat64
@@ -234,6 +168,36 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 #endif
 
 LFS64(openat);
+#endif /* UK_LIBC_SYSCALLS */
+
+UK_LLSYSCALL_R_DEFINE(int, open, const char*, pathname, int, flags,
+		      mode_t, mode)
+{
+	return uk_syscall_r_openat(AT_FDCWD, (long)pathname, (long)flags,
+				   (long)mode);
+}
+
+#if UK_LIBC_SYSCALLS
+int open(const char *pathname, int flags, ...)
+{
+	mode_t mode = 0;
+
+	if (flags & O_CREAT) {
+		va_list ap;
+
+		va_start(ap, flags);
+		mode = va_arg(ap, mode_t);
+		va_end(ap);
+	}
+
+	return uk_syscall_do_open((long)pathname, flags, mode);
+}
+
+#ifdef open64
+#undef open64
+#endif
+
+LFS64(open);
 #endif /* UK_LIBC_SYSCALLS */
 
 UK_SYSCALL_R_DEFINE(int, creat, const char*, pathname, mode_t, mode)
