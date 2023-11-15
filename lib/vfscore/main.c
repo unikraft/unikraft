@@ -1098,7 +1098,8 @@ UK_TRACEPOINT(trace_vfs_mkdir, "\"%s\" 0%0o", const char*, mode_t);
 UK_TRACEPOINT(trace_vfs_mkdir_ret, "");
 UK_TRACEPOINT(trace_vfs_mkdir_err, "%d", int);
 
-UK_SYSCALL_R_DEFINE(int, mkdir, const char*, pathname, mode_t, mode)
+UK_SYSCALL_R_DEFINE(int, mkdirat, int, dirfd,
+		    const char*, pathname, mode_t, mode)
 {
 	struct task *t = main_task;
 	char path[PATH_MAX];
@@ -1107,7 +1108,7 @@ UK_SYSCALL_R_DEFINE(int, mkdir, const char*, pathname, mode_t, mode)
 	mode = apply_umask(mode);
 
 	trace_vfs_mkdir(pathname, mode);
-	if ((error = task_conv(t, pathname, VWRITE, path)) != 0)
+	if ((error = taskat_conv(t, dirfd, pathname, path)) != 0)
 		goto out_errno;
 
 	error = sys_mkdir(path, mode);
@@ -1120,36 +1121,10 @@ out_errno:
 	return -error;
 }
 
-UK_SYSCALL_R_DEFINE(int, mkdirat, int, dirfd,
-		    const char*, pathname, mode_t, mode)
+UK_SYSCALL_R_DEFINE(int, mkdir, const char*, pathname, mode_t, mode)
 {
-	struct vfscore_file *fp;
-	struct vnode *vp;
-	char p[PATH_MAX];
-	int error;
-
-	if (pathname[0] == '/' || dirfd == AT_FDCWD)
-		return uk_syscall_do_mkdir((long) pathname, (long) mode);
-
-	error = fget(dirfd, &fp);
-	if (error)
-		return error;
-
-	vp = fp->f_dentry->d_vnode;
-	vn_lock(vp);
-
-	/* build absolute path */
-	strlcpy(p, fp->f_dentry->d_mount->m_path, PATH_MAX);
-	strlcat(p, fp->f_dentry->d_path, PATH_MAX);
-	strlcat(p, "/", PATH_MAX);
-	strlcat(p, pathname, PATH_MAX);
-
-	vn_unlock(vp);
-	fdrop(fp);
-
-	error = uk_syscall_do_mkdir((long) p, (long) mode);
-
-	return error;
+	return uk_syscall_do_mkdirat((long)AT_FDCWD, (long)pathname,
+				     (long)mode);
 }
 
 UK_TRACEPOINT(trace_vfs_rmdir, "\"%s\"", const char*);
