@@ -1373,6 +1373,24 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		break;
 #endif /* HAVE_uk_syscall_socketpair */
 
+#ifdef HAVE_uk_syscall_setsockopt
+	case SYS_setsockopt:
+		do {
+			int fd = (int) va_arg(args, long);
+			int level = (int) va_arg(args, long);
+			int optname = (int) va_arg(args, long);
+			char *optval = (char *) va_arg(args, long);
+			int optlen = (int) va_arg(args, long);
+
+			PR_SYSCALL(sb, fmtf, syscall_num, rc == 0,
+				   PT_FD, fd, PT_UDEC, level,
+				   PT_UDEC, optname, PT_BUFP(optlen), optval,
+				   PT_UDEC, optlen);
+		} while (0);
+		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
+		break;
+#endif /* HAVE_uk_syscall_setsockopt */
+
 #ifdef HAVE_uk_syscall_sendto
 	case SYS_sendto:
 		do {
