@@ -50,35 +50,38 @@ unsafe impl GlobalAlloc for UkAlloc {
 #[global_allocator]
 static ALLOCATOR: UkAlloc = UkAlloc;
 
-#[no_mangle]
-pub fn __rust_alloc(size: usize, _align: usize) -> *mut u8 {
-    unsafe { bindings::__ukrust_sys_malloc(size as u64) as *mut u8 }
-}
+// #[no_mangle]
+// pub extern "Rust" fn __rust_alloc(size: usize, _align: usize) -> *mut u8 {
+//     unsafe { bindings::__ukrust_sys_malloc(size as u64) as *mut u8 }
+// }
+
+// #[no_mangle]
+// pub extern "Rust" fn __rust_dealloc(ptr: *mut u8, _size: usize, _align: usize) {
+//     unsafe { bindings::__ukrust_sys_free(ptr as *mut c_types::c_void); }
+// }
+
+// #[no_mangle]
+// pub extern "Rust" fn __rust_realloc(ptr: *mut u8, _old_size: usize, _align: usize, new_size: usize) -> *mut u8 {
+//     unsafe {
+//         bindings::__ukrust_sys_realloc(
+//             ptr as *mut c_types::c_void,
+//             new_size as u64,
+//         ) as *mut u8
+//     }
+// }
+
+// #[no_mangle]
+// pub extern "Rust" fn __rust_alloc_zeroed(size: usize, _align: usize) -> *mut u8 {
+//     unsafe { bindings::__ukrust_sys_calloc(0, size as u64) as *mut u8 }
+// }
 
 #[no_mangle]
-pub fn __rust_dealloc(ptr: *mut u8, _size: usize, _align: usize) {
-    unsafe { bindings::__ukrust_sys_free(ptr as *mut c_types::c_void); }
-}
-
-#[no_mangle]
-pub fn __rust_realloc(ptr: *mut u8, _old_size: usize, _align: usize, new_size: usize) -> *mut u8 {
-    unsafe {
-        bindings::__ukrust_sys_realloc(
-            ptr as *mut c_types::c_void,
-            new_size as u64,
-        ) as *mut u8
-    }
-}
-
-#[no_mangle]
-pub fn __rust_alloc_zeroed(size: usize, _align: usize) -> *mut u8 {
-    unsafe { bindings::__ukrust_sys_calloc(0, size as u64) as *mut u8 }
-}
-
-#[no_mangle]
-pub fn __rust_alloc_error_handler(_size: usize, _align: usize) -> ! {
+pub extern "Rust" fn __rust_alloc_error_handler(_size: usize, _align: usize) -> ! {
     panic!("Alloc error handler");
 }
 
 #[no_mangle]
 static __rust_alloc_error_handler_should_panic: u8 = 1;
+
+#[no_mangle]
+static __rust_no_alloc_shim_is_unstable: u8 = 0;
