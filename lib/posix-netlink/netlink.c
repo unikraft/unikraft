@@ -295,6 +295,18 @@ static int nl_sockopt(const posix_sock *s __unused,
 	return 0;
 }
 
+static int nl_ioctl(const posix_sock *s __unused,
+		    int request __unused,
+		    void *argp __unused)
+{
+	return -ENOTSUP;
+}
+
+static void nl_poll(const posix_sock *s __unused)
+{
+	UK_WARN_STUBBED();
+}
+
 static const struct posix_socket_ops netlink_vops = {
 	.create		= nl_create,
 	.close		= nl_close,
@@ -304,6 +316,8 @@ static const struct posix_socket_ops netlink_vops = {
 	.recvmsg	= nl_recvmsg,
 	.recvfrom	= nl_recvfrom,
 	.setsockopt	= nl_sockopt,
+	.ioctl		= nl_ioctl,
+	.poll		= nl_poll,
 };
 
 POSIX_SOCKET_FAMILY_REGISTER(AF_NETLINK, &netlink_vops);
