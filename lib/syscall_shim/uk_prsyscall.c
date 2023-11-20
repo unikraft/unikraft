@@ -1410,6 +1410,39 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		break;
 #endif /* HAVE_uk_syscall_sendto */
 
+#ifdef HAVE_uk_syscall_sendmsg
+	case SYS_sendmsg:
+		do {
+			int fd = (int) va_arg(args, long);
+			struct msghdr *msg = (struct msghdr *)
+					     va_arg(args, long);
+			int flags = (int) va_arg(args, long);
+
+			PR_SYSCALL(sb, fmtf, syscall_num, rc == 0,
+				   PT_FD, fd, PT_HEX, msg,
+				   PT_MSGFLAGS, flags);
+		} while (0);
+		PR_SYSRET(sb, fmtf, PT_UDEC, rc);
+		break;
+#endif /* HAVE_uk_syscall_sendmsg */
+
+#ifdef HAVE_uk_syscall_sendmmsg
+	case SYS_sendmmsg:
+		do {
+			int fd = (int) va_arg(args, long);
+			struct mmsghdr *msgvec = (struct mmsghdr *)
+						 va_arg(args, long);
+			int veclen = (int) va_arg(args, long);
+			int flags = (int) va_arg(args, long);
+
+			PR_SYSCALL(sb, fmtf, syscall_num, rc == 0,
+				   PT_FD, fd, PT_HEX, msgvec, PT_UDEC, veclen,
+				   PT_MSGFLAGS, flags);
+		} while (0);
+		PR_SYSRET(sb, fmtf, PT_UDEC, rc);
+		break;
+#endif /* HAVE_uk_syscall_sendmmsg */
+
 #ifdef HAVE_uk_syscall_recv
 	case SYS_recv:
 		do {
