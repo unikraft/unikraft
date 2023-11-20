@@ -1401,7 +1401,7 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 			void *dst_addr = (void *) va_arg(args, long);
 			long dst_len = (long) va_arg(args, long);
 
-			PR_SYSCALL(sb, fmtf, syscall_num, rc = 0,
+			PR_SYSCALL(sb, fmtf, syscall_num, rc == 0,
 				   PT_FD, fd, PT_BUFP(len), buf,
 				   PT_UDEC, len, PT_MSGFLAGS, flags,
 				   PT_VADDR, dst_addr, PT_UDEC, dst_len);
