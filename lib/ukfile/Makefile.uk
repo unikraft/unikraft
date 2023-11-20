@@ -1,0 +1,7 @@
+$(eval $(call addlib_s,libukfile,$(CONFIG_LIBUKFILE)))
+
+CINCLUDES-$(CONFIG_LIBUKFILE)     += -I$(LIBUKFILE_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBUKFILE)   += -I$(LIBUKFILE_BASE)/include
+
+LIBUKFILE_SRCS-y += $(LIBUKFILE_BASE)/pollqueue.c
+LIBUKFILE_SRCS-y += $(LIBUKFILE_BASE)/file-nops.c
