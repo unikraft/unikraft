@@ -1344,6 +1344,35 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		break;
 #endif /* HAVE_uk_syscall_getsockname */
 
+#ifdef HAVE_uk_syscall_socketpair
+	case SYS_socketpair:
+		do {
+			int domain = (int) va_arg(args, long);
+			int type = (int) va_arg(args, long);
+			int protocol = (int) va_arg(args, long);
+			int *fds = (int *) va_arg(args, long);
+
+			if (rc == 0) {
+				PR_SYSCALL(sb, fmtf, syscall_num,
+					   rc == 0,
+					   PT_SOCKETAF, domain,
+					   PT_SOCKETTYPE, type,
+					   PT_UDEC, protocol,
+					   PT_FD | PT_OUT, fds[0],
+					   PT_FD | PT_OUT, fds[1]);
+			} else {
+				PR_SYSCALL(sb, fmtf, syscall_num,
+					   rc == 0,
+					   PT_SOCKETAF, domain,
+					   PT_SOCKETTYPE, type,
+					   PT_UDEC, protocol,
+					   PT_HEX, fds);
+			}
+		} while (0);
+		PR_SYSRET(sb, fmtf, PT_STATUS, rc);
+		break;
+#endif /* HAVE_uk_syscall_socketpair */
+
 #ifdef HAVE_uk_syscall_sendto
 	case SYS_sendto:
 		do {
