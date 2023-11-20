@@ -43,9 +43,33 @@
 #define UK_DEFAULT_GROUP	CONFIG_LIBPOSIX_USER_GROUPNAME
 #define UK_DEFAULT_PASS		""
 
+/**
+ * Initializes the `passwds` list and inserts in it the first entry.
+ * This entry contains the default values defined above, such that
+ * name => `UK_DEFAULT_USER`, passwd => `UK_DEFAULT_PASS`,
+ * uid => `UK_DEFAULT_UID`, gid => `UK_DEFAULT_GID`,
+ * gecos => `UK_DEFAULT_USER`, dir = "/", shell = "".
+ */
 void pu_init_passwds(void);
+/**
+ * Initializes the `groups` list and inserts in it the first entry.
+ * This entry contains the default values defined above, such that
+ * name => `UK_DEFAULT_GROUP`, passwd => `UK_DEFAULT_PASS`,
+ * uid => `UK_DEFAULT_GID`, mem => `{ `UK_DEFAULT_USER` }`.
+ */
 void pu_init_groups(void);
 
+/**
+ * Copies `src` string at the end of the `dest` string,
+ * also adding `\0` at the end.
+ *
+ * @param src
+ *   Source string
+ * @param dest
+ *	 Destination string
+ * @return
+ *   Destination string, containing the source string at the end.
+ */
 static inline char *pu_cpystr(char *src, char *dest)
 {
 	UK_ASSERT(src);
