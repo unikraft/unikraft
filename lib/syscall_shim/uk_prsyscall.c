@@ -502,8 +502,10 @@ enum param_type {
 /*
  * Individual parameter type formats
  */
-static inline void param_dirfd(struct uk_streambuf *sb, int fmtf, int dirfd)
+static inline void param_dirfd(struct uk_streambuf *sb, int fmtf, long val)
 {
+	int dirfd = (int) val;
+
 	if (dirfd == -100) {
 		uk_streambuf_shcc(sb, fmtf, MACRO);
 		uk_streambuf_strcpy(sb, "AT_FDCWD");
@@ -515,8 +517,10 @@ static inline void param_dirfd(struct uk_streambuf *sb, int fmtf, int dirfd)
 	}
 }
 
-static inline void param_fd(struct uk_streambuf *sb, int fmtf, int fd)
+static inline void param_fd(struct uk_streambuf *sb, int fmtf, long val)
 {
+	int fd = (int) val;
+
 	PR_PARAM(sb, fmtf, "fd", "%d", fd);
 
 	/* TODO: Print file constructor/path (socket/file) as comment */
@@ -534,16 +538,19 @@ static inline void param_atflags(struct uk_streambuf *sb, int fmtf, long val)
 	PR_FLAG_END(sb, fmtf, orig_seek, atflags);
 }
 
-static inline void param_pid(struct uk_streambuf *sb, int fmtf, int pid)
+static inline void param_pid(struct uk_streambuf *sb, int fmtf, long val)
 {
+	int pid = (int) val;
+
 	PR_PARAM(sb, fmtf, "pid", "%d", pid);
 
 	/* TODO: PID of corresponding process group as comment */
 }
 
-static inline void param_oflags(struct uk_streambuf *sb, int fmtf, int oflags)
+static inline void param_oflags(struct uk_streambuf *sb, int fmtf, long val)
 {
 	__sz orig_seek = uk_streambuf_seek(sb);
+	int oflags = (int) val;
 
 	uk_streambuf_shcc(sb, fmtf, FLAGS);
 	uk_streambuf_strcpy(sb, "O_RDONLY");
@@ -569,9 +576,10 @@ static inline void param_oflags(struct uk_streambuf *sb, int fmtf, int oflags)
 	PR_FLAG_END(sb, fmtf, orig_seek, oflags);
 }
 
-static inline void param_okflag(struct uk_streambuf *sb, int fmtf, int okflags)
+static inline void param_okflag(struct uk_streambuf *sb, int fmtf, long val)
 {
 	__sz orig_seek = uk_streambuf_seek(sb);
+	int okflags = (int) val;
 
 	if (okflags == 0) {
 		uk_streambuf_shcc(sb, fmtf, FLAGS);
@@ -588,10 +596,10 @@ static inline void param_okflag(struct uk_streambuf *sb, int fmtf, int okflags)
 #if CONFIG_LIBPOSIX_MMAP || CONFIG_LIBUKMMAP
 #include <sys/mman.h>
 
-static inline void param_protflags(struct uk_streambuf *sb, int fmtf,
-				   int protflags)
+static inline void param_protflags(struct uk_streambuf *sb, int fmtf, long val)
 {
 	__sz orig_seek = uk_streambuf_seek(sb);
+	int protflags = (int) val;
 
 	if (protflags == 0) {
 		uk_streambuf_shcc(sb, fmtf, FLAGS);
@@ -605,10 +613,10 @@ static inline void param_protflags(struct uk_streambuf *sb, int fmtf,
 	PR_FLAG_END(sb, fmtf, orig_seek, protflags);
 }
 
-static inline void param_mapflags(struct uk_streambuf *sb, int fmtf,
-				  int mapflags)
+static inline void param_mapflags(struct uk_streambuf *sb, int fmtf, long val)
 {
 	__sz orig_seek = uk_streambuf_seek(sb);
+	int mapflags = (int) val;
 
 	if (mapflags == 0) {
 		uk_streambuf_shcc(sb, fmtf, FLAGS);
@@ -636,13 +644,11 @@ static inline void param_mapflags(struct uk_streambuf *sb, int fmtf,
 #if CONFIG_LIBPOSIX_FUTEX
 #include <linux/futex.h>
 
-static inline void param_futexop(struct uk_streambuf *sb, int fmtf, int op)
+static inline void param_futexop(struct uk_streambuf *sb, int fmtf, long val)
 {
 	__sz orig_seek = uk_streambuf_seek(sb);
-	int flags;
-
-	flags = op & ~(FUTEX_CMD_MASK);
-	op &= FUTEX_CMD_MASK;
+	int flags = (int)(val & ~(long)FUTEX_CMD_MASK);
+	int op    = (int)(val & (long)FUTEX_CMD_MASK);
 
 	switch (op) {
 		PR_TYPE(sb, fmtf, FUTEX_, WAIT);
@@ -672,8 +678,10 @@ static inline void param_futexop(struct uk_streambuf *sb, int fmtf, int op)
 
 #include <time.h>
 
-static inline void param_clockid(struct uk_streambuf *sb, int fmtf, int clockid)
+static inline void param_clockid(struct uk_streambuf *sb, int fmtf, long val)
 {
+	int clockid = (int)val;
+
 	switch (clockid) {
 		PR_TYPE(sb, fmtf, CLOCK_, REALTIME);
 		PR_TYPE(sb, fmtf, CLOCK_, MONOTONIC);
@@ -686,8 +694,10 @@ static inline void param_clockid(struct uk_streambuf *sb, int fmtf, int clockid)
 #if CONFIG_LIBPOSIX_SOCKET
 #include <sys/socket.h>
 
-static inline void param_socketaf(struct uk_streambuf *sb, int fmtf, int domain)
+static inline void param_socketaf(struct uk_streambuf *sb, int fmtf, long val)
 {
+	int domain = (int)val;
+
 	switch (domain) {
 		PR_TYPE(sb, fmtf, AF_, UNIX); /* LOCAL, FILE */
 		PR_TYPE(sb, fmtf, AF_, INET);
@@ -697,9 +707,10 @@ static inline void param_socketaf(struct uk_streambuf *sb, int fmtf, int domain)
 	}
 }
 
-static inline void param_sockettype(struct uk_streambuf *sb, int fmtf, int type)
+static inline void param_sockettype(struct uk_streambuf *sb, int fmtf, long val)
 {
 	__sz orig_seek = uk_streambuf_seek(sb);
+	int type = (int)val;
 
 	PR_FLAG(sb, fmtf, orig_seek, SOCK_, NONBLOCK, type);
 	PR_FLAG(sb, fmtf, orig_seek, SOCK_, CLOEXEC, type);
@@ -715,9 +726,10 @@ static inline void param_sockettype(struct uk_streambuf *sb, int fmtf, int type)
 	}
 }
 
-static inline void param_msgflags(struct uk_streambuf *sb, int fmtf, int flags)
+static inline void param_msgflags(struct uk_streambuf *sb, int fmtf, long val)
 {
 	__sz orig_seek = uk_streambuf_seek(sb);
+	int flags = (int)val;
 
 	PR_FLAG(sb, fmtf, orig_seek, MSG_, CONFIRM, flags);
 	PR_FLAG(sb, fmtf, orig_seek, MSG_, DONTROUTE, flags);
@@ -734,9 +746,10 @@ static inline void param_msgflags(struct uk_streambuf *sb, int fmtf, int flags)
 #include <uk/process.h>
 
 static inline void param_cloneflags(struct uk_streambuf *sb, int fmtf,
-				    int flags)
+				    long val)
 {
 	__sz orig_seek = uk_streambuf_seek(sb);
+	int flags = (int)val;
 
 	PR_FLAG(sb, fmtf, orig_seek, CLONE_, NEWTIME,        flags);
 	PR_FLAG(sb, fmtf, orig_seek, CLONE_, VM,             flags);
@@ -814,7 +827,7 @@ static void pr_param(struct uk_streambuf *sb, int fmtf,
 	switch (type) {
 	case PT_BOOL:
 		uk_streambuf_shcc(sb, fmtf, VALUE);
-		if (param)
+		if ((bool) param)
 			uk_streambuf_strcpy(sb, "true");
 		else
 			uk_streambuf_strcpy(sb, "false");
