@@ -43,6 +43,8 @@
 #include <uk/config.h>
 #include <uk/init.h>
 
+#include <uk/posix-fdtab-legacy.h>
+
 #include <inttypes.h>
 #include <stdlib.h>
 #include <errno.h>
@@ -116,13 +118,6 @@ static int do_epoll_create(struct uk_alloc *a, int flags)
 	if (unlikely(flags & ~EPOLL_CLOEXEC))
 		return -EINVAL;
 
-	/* Reserve a file descriptor number */
-	vfs_fd = vfscore_alloc_fd();
-	if (unlikely(vfs_fd < 0)) {
-		ret = -ENFILE;
-		goto ERR_EXIT;
-	}
-
 	/* Allocate file, vfs_file, and vnode */
 	ep = uk_malloc(a, sizeof(struct eventpoll));
 	if (unlikely(!ep)) {
@@ -155,7 +150,6 @@ static int do_epoll_create(struct uk_alloc *a, int flags)
 	}
 
 	/* Initialize data structures */
-	vfs_file->fd = vfs_fd;
 	vfs_file->f_flags = 0;
 	vfs_file->f_count = 1;
 	vfs_file->f_data = ep;
@@ -171,9 +165,11 @@ static int do_epoll_create(struct uk_alloc *a, int flags)
 	eventpoll_init(ep, a);
 
 	/* Store within the vfs structure */
-	ret = vfscore_install_fd(vfs_fd, vfs_file);
-	if (unlikely(ret))
+	vfs_fd = uk_fdtab_legacy_open(vfs_file);
+	if (unlikely(vfs_fd < 0)) {
+		ret = vfs_fd;
 		goto ERR_VFS_INSTALL;
+	}
 
 	/* Only the dentry should hold a reference; release ours */
 	vput(vfs_vnode);
@@ -189,8 +185,6 @@ ERR_ALLOC_VNODE:
 ERR_MALLOC_VFS_FILE:
 	uk_free(a, ep);
 ERR_MALLOC_FILE:
-	vfscore_put_fd(vfs_fd);
-ERR_EXIT:
 	UK_ASSERT(ret < 0);
 	return ret;
 }
@@ -219,13 +213,13 @@ static int do_epoll_ctl(int epfd, int op, int fd, struct epoll_event *event)
 	struct eventpoll *ep;
 	int ret;
 
-	epf = vfscore_get_file(epfd);
+	epf = uk_fdtab_legacy_get(epfd);
 	if (unlikely(!epf)) {
 		ret = -EBADF;
 		goto EXIT;
 	}
 
-	fp = vfscore_get_file(fd);
+	fp = uk_fdtab_legacy_get(fd);
 	if (unlikely(!fp)) {
 		ret = -EBADF;
 		goto ERR_PUT_EPF;
@@ -290,7 +284,7 @@ static int do_epoll_pwait(int epfd, struct epoll_event *events, int maxevents,
 	struct eventpoll *ep;
 	int ret;
 
-	epf = vfscore_get_file(epfd);
+	epf = uk_fdtab_legacy_get(epfd);
 	if (unlikely(!epf)) {
 		ret = -EBADF;
 		goto EXIT;

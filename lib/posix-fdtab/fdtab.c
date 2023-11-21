@@ -11,6 +11,7 @@
 #include <uk/assert.h>
 #include <uk/config.h>
 #include <uk/init.h>
+#include <uk/syscall.h>
 
 #include <uk/posix-fdtab.h>
 
@@ -456,4 +457,26 @@ int uk_sys_dup_min(int oldfd, int min, int flags)
 int uk_sys_dup(int oldfd)
 {
 	return uk_sys_dup_min(oldfd, 0, 0);
+}
+
+/* Userspace Syscalls */
+
+UK_SYSCALL_R_DEFINE(int, close, int, fd)
+{
+	return uk_sys_close(fd);
+}
+
+UK_SYSCALL_R_DEFINE(int, dup, int, oldfd)
+{
+	return uk_sys_dup(oldfd);
+}
+
+UK_SYSCALL_R_DEFINE(int, dup2, int, oldfd, int, newfd)
+{
+	return uk_sys_dup2(oldfd, newfd);
+}
+
+UK_SYSCALL_R_DEFINE(int, dup3, int, oldfd, int, newfd, int, flags)
+{
+	return uk_sys_dup3(oldfd, newfd, flags);
 }

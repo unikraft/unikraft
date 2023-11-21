@@ -49,6 +49,8 @@
 #include <uk/syscall.h>
 #include <uk/init.h>
 
+#include <uk/posix-fdtab-legacy.h>
+
 /* We use the default size in Linux kernel */
 #define PIPE_MAX_SIZE	(1 << CONFIG_LIBVFSCORE_PIPE_SIZE_ORDER)
 
@@ -590,13 +592,6 @@ static int pipe_fd_alloc(struct pipe_file *pipe_file, int flags)
 	struct dentry *p_dentry;
 	struct vnode *p_vnode;
 
-	/* Reserve file descriptor number */
-	vfs_fd = vfscore_alloc_fd();
-	if (vfs_fd < 0) {
-		ret = -ENFILE;
-		goto ERR_EXIT;
-	}
-
 	/* Allocate file, dentry, and vnode */
 	vfs_file = calloc(1, sizeof(*vfs_file));
 	if (!vfs_file) {
@@ -621,9 +616,8 @@ static int pipe_fd_alloc(struct pipe_file *pipe_file, int flags)
 	}
 
 	/* Fill out necessary fields. */
-	vfs_file->fd = vfs_fd;
 	vfs_file->f_flags = flags;
-	vfs_file->f_count = 1;
+	vfs_file->f_count = 0;
 	vfs_file->f_data = pipe_file;
 	vfs_file->f_dentry = p_dentry;
 	vfs_file->f_vfs_flags = UK_VFSCORE_NOPOS;
@@ -635,9 +629,11 @@ static int pipe_fd_alloc(struct pipe_file *pipe_file, int flags)
 	p_vnode->v_type = VFIFO;
 
 	/* Assign the file descriptors to the corresponding vfs_file. */
-	ret = vfscore_install_fd(vfs_fd, vfs_file);
-	if (ret)
+	vfs_fd = uk_fdtab_legacy_open(vfs_file);
+	if (vfs_fd < 0) {
+		ret = vfs_fd;
 		goto ERR_VFS_INSTALL;
+	}
 
 	/* Only the dentry should hold a reference; release ours */
 	vrele(p_vnode);
@@ -651,8 +647,6 @@ ERR_ALLOC_DENTRY:
 ERR_ALLOC_VNODE:
 	free(vfs_file);
 ERR_MALLOC_VFS_FILE:
-	vfscore_put_fd(vfs_fd);
-ERR_EXIT:
 	UK_ASSERT(ret < 0);
 	return ret;
 }
@@ -685,7 +679,7 @@ UK_SYSCALL_R_DEFINE(int, pipe, int*, pipefd)
 	return ret;
 
 ERR_W_FD:
-	vfscore_put_fd(r_fd);
+	uk_syscall_r_close(r_fd);
 ERR_VFS_INSTALL:
 	pipe_file_free(pipe_file);
 ERR_EXIT:
