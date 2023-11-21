@@ -63,6 +63,33 @@ int uk_fdtab_getflags(int fd);
  */
 void uk_fdtab_cloexec(void);
 
+#if CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM
+/*
+ * TODO: This shim interface exists to support cohabitation with vfscore until
+ * its eventual removal. Unless you are implementing a vfscore shim interface,
+ * and know what you are doing, please do not use this API.
+ */
+union uk_shim_file {
+	struct uk_ofile *ofile;
+	struct vfscore_file *vfile;
+};
+
+/**
+ * Get the open file description associated with descriptor `fd`, shimming
+ * between vfscore_file and uk_ofile, writing the value in `*out`.
+ *
+ * @return
+ *   UK_SHIM_OFILE, if successful and `*out` is a uk_ofile
+ *   UK_SHIM_LEGACY, if successful and `*out` is a vfscore_file
+ *   < 0, if `fd` is not mapped
+ */
+int uk_fdtab_shim_get(int fd, union uk_shim_file *out);
+
+#define UK_SHIM_OFILE  0
+#define UK_SHIM_LEGACY 1
+
+#endif /* CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM */
+
 /* Internal syscalls */
 int uk_sys_close(int fd);
 int uk_sys_dup(int oldfd);
