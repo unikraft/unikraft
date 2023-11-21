@@ -16,6 +16,9 @@
 
 #include "fmap.h"
 
+#if CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM
+#include <uk/posix-fdtab-legacy.h>
+#endif /* CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM */
 
 #define UK_FDTAB_SIZE CONFIG_LIBPOSIX_FDTAB_MAXFDS
 UK_CTASSERT(UK_FDTAB_SIZE <= UK_FD_MAX);
@@ -66,11 +69,19 @@ struct fdval {
 
 #define UK_FDTAB_CLOEXEC 1
 
+#if CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM
+#define UK_FDTAB_VFSCORE 2
+#define _MAX_FLAG 2
+#else /* !CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM */
 #define _MAX_FLAG 1
+#endif /* !CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM */
 
 #define _FLAG_MASK (((uintptr_t)_MAX_FLAG << 1) - 1)
 
 UK_CTASSERT(__alignof__(struct uk_ofile) > _MAX_FLAG);
+#if CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM
+UK_CTASSERT(__alignof__(struct vfscore_file) > _MAX_FLAG);
+#endif /* CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM */
 
 static inline const void *fdtab_encode(const void *f, int flags)
 {
@@ -114,8 +125,29 @@ static inline void ofile_rel(struct uk_fdtab *tab, struct uk_ofile *of)
 	}
 }
 
+#if CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM
+
+static inline void file_acq(void *p, int flags)
+{
+	if (flags & UK_FDTAB_VFSCORE)
+		fhold((struct vfscore_file *)p);
+	else
+		ofile_acq((struct uk_ofile *)p);
+}
+static inline void file_rel(struct uk_fdtab *tab, void *p, int flags)
+{
+	if (flags & UK_FDTAB_VFSCORE)
+		fdrop((struct vfscore_file *)p);
+	else
+		ofile_rel(tab, (struct uk_ofile *)p);
+}
+
+#else /* !CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM */
+
 #define file_acq(p, f) ofile_acq((struct uk_ofile *)(p))
 #define file_rel(t, p, f) ofile_rel((t), (struct uk_ofile *)(p))
+
+#endif /* !CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM */
 
 /* Ops */
 
@@ -196,6 +228,79 @@ int uk_fdtab_getflags(int fd)
 	return ret;
 }
 
+#if CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM
+int uk_fdtab_legacy_open(struct vfscore_file *vf)
+{
+	struct uk_fdtab *tab = _active_tab();
+	const void *entry;
+	int fd;
+
+	fhold(vf);
+	entry = fdtab_encode(vf, UK_FDTAB_VFSCORE);
+	fd = _fmap_put(&tab->fmap, entry, 0);
+	if (fd >= UK_FDTAB_SIZE)
+		goto err_out;
+	vf->fd = fd;
+	return fd;
+err_out:
+	fdrop(vf);
+	return -ENFILE;
+}
+
+struct vfscore_file *uk_fdtab_legacy_get(int fd)
+{
+	struct uk_fdtab *tab = _active_tab();
+	struct uk_fmap *fmap = &tab->fmap;
+	struct vfscore_file *vf = NULL;
+	void *p = uk_fmap_critical_take(fmap, fd);
+
+	if (p) {
+		struct fdval v = fdtab_decode(p);
+
+		if (v.flags & UK_FDTAB_VFSCORE) {
+			vf = (struct vfscore_file *)v.p;
+			fhold(vf);
+		}
+		uk_fmap_critical_put(fmap, fd, p);
+	}
+	return vf;
+}
+
+int uk_fdtab_shim_get(uk_fd fd, union uk_shim_file *out)
+{
+	struct uk_fdtab *tab;
+	struct uk_fmap *fmap;
+	void *p;
+
+	if (fd < 0)
+		return -1;
+
+	tab = _active_tab();
+	fmap = &tab->fmap;
+
+	p = uk_fmap_critical_take(fmap, fd);
+	if (p) {
+		struct fdval v = fdtab_decode(p);
+
+		if (v.flags & UK_FDTAB_VFSCORE) {
+			struct vfscore_file *vf = (struct vfscore_file *)v.p;
+
+			fhold(vf);
+			uk_fmap_critical_put(fmap, fd, p);
+			out->vfile = vf;
+			return UK_SHIM_LEGACY;
+		} else {
+			struct uk_ofile *of = (struct uk_ofile *)v.p;
+
+			ofile_acq(of);
+			uk_fmap_critical_put(fmap, fd, p);
+			out->ofile = of;
+			return UK_SHIM_OFILE;
+		}
+	}
+	return -1;
+}
+#endif /* CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM */
 
 static struct fdval _fdtab_get(struct uk_fdtab *tab, int fd)
 {
@@ -220,6 +325,13 @@ struct uk_ofile *uk_fdtab_get(int fd)
 	struct uk_fdtab *tab = _active_tab();
 	struct fdval v = _fdtab_get(tab, fd);
 
+#if CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM
+	/* Report legacy files as not present if called through new API */
+	if (v.p && v.flags & UK_FDTAB_VFSCORE) {
+		file_rel(tab, v.p, v.flags);
+		return NULL;
+	}
+#endif /* CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM */
 	return (struct uk_ofile *)v.p;
 }
 
