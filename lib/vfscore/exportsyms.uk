@@ -26,8 +26,6 @@ write
 uk_syscall_e_write
 uk_syscall_r_write
 close
-uk_syscall_e_close
-uk_syscall_r_close
 read
 uk_syscall_e_read
 uk_syscall_r_read

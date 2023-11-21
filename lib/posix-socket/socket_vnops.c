@@ -49,6 +49,8 @@
 #include <string.h>
 #include <stdlib.h>
 
+#include <uk/posix-fdtab-legacy.h>
+
 static struct mount posix_socket_mount;
 
 static uint64_t s_inode;
@@ -58,7 +60,7 @@ posix_socket_file_get(int sock_fd)
 {
 	struct vfscore_file *fos;
 
-	fos = vfscore_get_file(sock_fd);
+	fos = uk_fdtab_legacy_get(sock_fd);
 	if (unlikely(!fos))
 		return ERR2PTR(-ENOENT);
 
@@ -81,13 +83,6 @@ posix_socket_alloc_fd(struct posix_socket_driver *d, int type, void *sock_data)
 	struct vfscore_file *vfs_file;
 	struct dentry *vfs_dentry;
 	struct vnode *vfs_vnode;
-
-	/* Reserve file descriptor number */
-	vfs_fd = vfscore_alloc_fd();
-	if (unlikely(vfs_fd < 0)) {
-		ret = -ENFILE;
-		goto ERR_EXIT;
-	}
 
 	/* Allocate file, vfs_file, and vnode */
 	sock = uk_calloc(d->allocator, 1, sizeof(*sock));
@@ -118,7 +113,6 @@ posix_socket_alloc_fd(struct posix_socket_driver *d, int type, void *sock_data)
 	}
 
 	/* Put things together, and fill out necessary fields */
-	vfs_file->fd = vfs_fd;
 	vfs_file->f_flags = UK_FWRITE | UK_FREAD;
 	vfs_file->f_count = 1;
 	vfs_file->f_data = sock;
@@ -137,9 +131,11 @@ posix_socket_alloc_fd(struct posix_socket_driver *d, int type, void *sock_data)
 	sock->type = type;
 
 	/* Store within the vfs structure */
-	ret = vfscore_install_fd(vfs_fd, vfs_file);
-	if (unlikely(ret))
+	vfs_fd = uk_fdtab_legacy_open(vfs_file);
+	if (unlikely(vfs_fd < 0)) {
+		ret = vfs_fd;
 		goto ERR_VFS_INSTALL;
+	}
 
 	/* Only the dentry should hold a reference; release ours */
 	vput(vfs_vnode);
@@ -159,8 +155,6 @@ ERR_ALLOC_VNODE:
 ERR_MALLOC_VFS_FILE:
 	uk_free(d->allocator, sock);
 ERR_MALLOC_FILE:
-	vfscore_put_fd(vfs_fd);
-ERR_EXIT:
 	UK_ASSERT(ret < 0);
 	return ret;
 }

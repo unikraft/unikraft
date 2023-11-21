@@ -47,6 +47,8 @@
 #include <uk/config.h>
 #include <uk/init.h>
 
+#include <uk/posix-fdtab-legacy.h>
+
 #include <sys/eventfd.h>
 #include <sys/ioctl.h>
 #include <inttypes.h>
@@ -350,13 +352,6 @@ static int do_eventfd(struct uk_alloc *a, unsigned int initval, int flags)
 	if (unlikely(flags & ~(EFD_CLOEXEC | EFD_SEMAPHORE | EFD_NONBLOCK)))
 		return -EINVAL;
 
-	/* Reserve a file descriptor number */
-	vfs_fd = vfscore_alloc_fd();
-	if (unlikely(vfs_fd < 0)) {
-		ret = -ENFILE;
-		goto ERR_EXIT;
-	}
-
 	/* Allocate file, vfs_file, and vnode */
 	efd = uk_malloc(a, sizeof(struct eventfd));
 	if (unlikely(!efd)) {
@@ -388,7 +383,6 @@ static int do_eventfd(struct uk_alloc *a, unsigned int initval, int flags)
 	}
 
 	/* Initialize data structures */
-	vfs_file->fd = vfs_fd;
 	vfs_file->f_flags = UK_FREAD | UK_FWRITE;
 	vfs_file->f_count = 1;
 	vfs_file->f_data = efd;
@@ -405,9 +399,11 @@ static int do_eventfd(struct uk_alloc *a, unsigned int initval, int flags)
 	eventfd_init(efd, initval, flags);
 
 	/* Store within the vfs structure */
-	ret = vfscore_install_fd(vfs_fd, vfs_file);
-	if (unlikely(ret))
+	vfs_fd = uk_fdtab_legacy_open(vfs_file);
+	if (unlikely(vfs_fd < 0)) {
+		ret = vfs_fd;
 		goto ERR_VFS_INSTALL;
+	}
 
 	/* Only the dentry should hold a reference; release ours */
 	vput(vfs_vnode);
@@ -431,8 +427,6 @@ ERR_ALLOC_VNODE:
 ERR_MALLOC_VFS_FILE:
 	uk_free(a, efd);
 ERR_MALLOC_FILE:
-	vfscore_put_fd(vfs_fd);
-ERR_EXIT:
 	UK_ASSERT(ret < 0);
 	return ret;
 }
