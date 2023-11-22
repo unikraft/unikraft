@@ -312,6 +312,7 @@ EXIT:
 	return ret;
 }
 
+#if !CONFIG_LIBPOSIX_POLL
 void eventpoll_notify_close(struct vfscore_file *fp)
 {
 	struct eventpoll_fd *efd;
@@ -348,6 +349,7 @@ void eventpoll_notify_close(struct vfscore_file *fp)
 			uk_free(ep->a, efd);
 	}
 }
+#endif
 
 int eventpoll_wait(struct eventpoll *ep, struct epoll_event *events,
 		   int maxevents, const __nsec *timeout)
@@ -432,6 +434,7 @@ int eventpoll_wait(struct eventpoll *ep, struct epoll_event *events,
 	return n;
 }
 
+#if !CONFIG_LIBPOSIX_POLL
 void eventpoll_signal(struct eventpoll_cb *ecb, unsigned int revents)
 {
 	struct eventpoll *ep;
@@ -459,3 +462,4 @@ void eventpoll_signal(struct eventpoll_cb *ecb, unsigned int revents)
 
 	uk_mutex_unlock(&ep->fd_lock);
 }
+#endif
