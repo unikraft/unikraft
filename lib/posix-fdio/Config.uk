@@ -1,0 +1,3 @@
+config LIBPOSIX_FDIO
+	bool "posix-fdio: File I/O and control"
+	select LIBUKFILE
