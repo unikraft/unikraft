@@ -44,4 +44,15 @@ ssize_t uk_sys_pwritev2(struct uk_ofile *of, const struct iovec *iov,
 
 off_t uk_sys_lseek(struct uk_ofile *of, off_t offset, int whence);
 
+/* Metadata */
+
+int uk_sys_fstat(struct uk_ofile *of, struct stat *statbuf);
+
+int uk_sys_fstatx(struct uk_ofile *of, unsigned int mask,
+		  struct uk_statx *statxbuf);
+
+int uk_sys_fchmod(struct uk_ofile *of, mode_t mode);
+
+int uk_sys_fchown(struct uk_ofile *of, uid_t owner, gid_t group);
+
 #endif /* __UK_POSIX_FDIO_H__ */
