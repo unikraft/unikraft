@@ -55,4 +55,22 @@ int uk_sys_fchmod(struct uk_ofile *of, mode_t mode);
 
 int uk_sys_fchown(struct uk_ofile *of, uid_t owner, gid_t group);
 
+/* Control */
+
+int uk_sys_ioctl(struct uk_ofile *of, int cmd, void *arg);
+
+int uk_sys_fcntl(struct uk_ofile *of, int cmd, unsigned long arg);
+
+int uk_sys_flock(struct uk_ofile *of, int cmd);
+
+int uk_sys_fsync(struct uk_ofile *of);
+
+int uk_sys_fdatasync(struct uk_ofile *of);
+
+int uk_sys_ftruncate(struct uk_ofile *of, off_t len);
+
+int uk_sys_fallocate(struct uk_ofile *of, int mode, off_t offset, off_t len);
+
+int uk_sys_fadvise(struct uk_ofile *of, off_t offset, off_t len, int advice);
+
 #endif /* __UK_POSIX_FDIO_H__ */
