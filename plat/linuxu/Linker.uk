@@ -3,7 +3,11 @@ LINUXU_LDFLAGS-y += -Wl,-e,_liblinuxuplat_start
 ##
 ## Link image
 ##
+ifneq ($(UK_IMAGE_NAME_OVERWRITE),)
+LINUXU_IMAGE := $(BUILD_DIR)/$(UK_IMAGE_NAME_OVERWRITE)
+else
 LINUXU_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_linuxu-$(CONFIG_UK_ARCH)
+endif
 LINUXU_DEBUG_IMAGE := $(LINUXU_IMAGE).dbg
 LINUXU_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-T$(comma),\
 			    $(LINUXU_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y))
