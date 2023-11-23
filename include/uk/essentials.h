@@ -105,6 +105,12 @@ extern "C" {
 #ifndef __fallthrough
 #define __fallthrough          __attribute__((fallthrough))
 #endif
+/* NOTE: naked attribute is not yet defined for AArch64 and would generate a
+ * warning.
+ */
+#ifndef __naked
+#define __naked                __attribute__((naked))
+#endif
 
 #ifndef __alias
 #define __alias(old, new) \
