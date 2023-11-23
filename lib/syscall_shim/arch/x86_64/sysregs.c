@@ -84,3 +84,20 @@ void ukarch_sysregs_switch_ul_tls(struct ukarch_sysregs *sysregs)
 	t->tlsp = sysregs->fs_base;
 }
 #endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
+
+__uptr ukarch_sysregs_get_gs_base(struct ukarch_sysregs *sysregs)
+{
+	UK_ASSERT(sysregs);
+
+	return sysregs->gs_base;
+}
+
+void ukarch_sysregs_set_gs_base(struct ukarch_sysregs *sysregs, __uptr gs_base)
+{
+	UK_ASSERT(sysregs);
+
+	uk_pr_debug("System call updated userland GS_BASE pointer register to %p (before: %p)\n",
+		    (void *)sysregs->gs_base, (void *)gs_base);
+
+	sysregs->gs_base = gs_base;
+}

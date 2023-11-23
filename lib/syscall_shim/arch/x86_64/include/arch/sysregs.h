@@ -41,4 +41,8 @@ void ukarch_sysregs_switch_uk(struct ukarch_sysregs *sysregs);
 
 void ukarch_sysregs_switch_ul(struct ukarch_sysregs *sysregs);
 
+__uptr ukarch_sysregs_get_gs_base(struct ukarch_sysregs *sysregs);
+
+void ukarch_sysregs_set_gs_base(struct ukarch_sysregs *sysregs, __uptr gs_base);
+
 #endif /* !__ASSEMBLY__ */
