@@ -32,3 +32,12 @@ config HAVE_SYSCALL
 config HAVE_X86PKU
 	bool
 	default n
+
+##
+# Compatibility entries for legacy libraries
+##
+
+config LIBPOSIX_EVENT
+	bool
+	select LIBPOSIX_POLL
+	select LIBPOSIX_EVENTFD

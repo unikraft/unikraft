@@ -15,6 +15,7 @@
 #include <uk/posix-fdtab.h>
 #include <uk/posix-poll.h>
 #include <uk/timeutil.h>
+#include <uk/syscall.h>
 
 #include <vfscore/file.h>
 #include <vfscore/vnode.h>
@@ -527,4 +528,79 @@ int uk_sys_epoll_pwait2(const struct uk_file *epf, struct epoll_event *events,
 	}
 	/* Timeout */
 	return 0;
+}
+
+/* Userspace Syscalls */
+
+UK_SYSCALL_R_DEFINE(int, epoll_create, int, size)
+{
+	if (unlikely(size <= 0))
+		return -EINVAL;
+	return uk_sys_epoll_create(0);
+}
+
+UK_SYSCALL_R_DEFINE(int, epoll_create1, int, flags)
+{
+	return uk_sys_epoll_create(flags);
+}
+
+UK_SYSCALL_R_DEFINE(int, epoll_ctl, int, epfd, int, op, int, fd,
+		    struct epoll_event *, event)
+{
+	int r;
+	struct uk_ofile *of = uk_fdtab_get(epfd);
+
+	if (unlikely(!of))
+		return -EBADF;
+	r = uk_sys_epoll_ctl(of->file, op, fd, event);
+	uk_fdtab_ret(of);
+	return r;
+}
+
+UK_SYSCALL_R_DEFINE(int, epoll_pwait2, int, epfd, struct epoll_event *, events,
+		    int, maxevents, struct timespec *, timeout,
+		    const sigset_t *, sigmask, size_t, sigsetsize)
+{
+	int r;
+	struct uk_ofile *of = uk_fdtab_get(epfd);
+
+	if (unlikely(!of))
+		return -EBADF;
+	r = uk_sys_epoll_pwait2(of->file, events, maxevents,
+				timeout, sigmask, sigsetsize);
+	uk_fdtab_ret(of);
+	return r;
+}
+
+#ifdef epoll_pwait
+#undef epoll_pwait
+#endif
+
+UK_LLSYSCALL_R_DEFINE(int, epoll_pwait, int, epfd, struct epoll_event *, events,
+		      int, maxevents, int, timeout,
+		      const sigset_t *, sigmask, size_t, sigsetsize)
+{
+	int r;
+	struct uk_ofile *of = uk_fdtab_get(epfd);
+
+	if (unlikely(!of))
+		return -EBADF;
+	r = uk_sys_epoll_pwait(of->file, events, maxevents,
+			       timeout, sigmask, sigsetsize);
+	uk_fdtab_ret(of);
+	return r;
+}
+
+UK_SYSCALL_R_DEFINE(int, epoll_wait, int, epfd, struct epoll_event *, events,
+		    int, maxevents, int, timeout)
+{
+	int r;
+	struct uk_ofile *of = uk_fdtab_get(epfd);
+
+	if (unlikely(!of))
+		return -EBADF;
+	r = uk_sys_epoll_pwait(of->file, events, maxevents,
+			       timeout, NULL, 0);
+	uk_fdtab_ret(of);
+	return r;
 }

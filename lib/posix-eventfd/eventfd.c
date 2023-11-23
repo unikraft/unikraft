@@ -11,6 +11,7 @@
 #include <uk/file/nops.h>
 #include <uk/posix-eventfd.h>
 #include <uk/posix-fd.h>
+#include <uk/syscall.h>
 
 
 static const char EVENTFD_VOLID[] = "eventfd_vol";
@@ -168,4 +169,15 @@ int uk_sys_eventfd(unsigned int count, int flags)
 	ret = uk_fdtab_open(evf, mode);
 	uk_file_release(evf);
 	return ret;
+}
+
+
+UK_LLSYSCALL_R_DEFINE(int, eventfd, unsigned int, count)
+{
+	return uk_sys_eventfd(count, 0);
+}
+
+UK_SYSCALL_R_DEFINE(int, eventfd2, unsigned int, count, int, flags)
+{
+	return uk_sys_eventfd(count, flags);
 }
