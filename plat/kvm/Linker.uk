@@ -35,7 +35,11 @@ else
 KVM_VMM := kvm
 endif
 
+ifneq ($(UK_IMAGE_NAME_OVERWRITE),)
+KVM_IMAGE := $(BUILD_DIR)/$(UK_IMAGE_NAME_OVERWRITE)
+else
 KVM_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_$(KVM_VMM)-$(CONFIG_UK_ARCH)
+endif
 KVM_DEBUG_IMAGE := $(KVM_IMAGE).dbg
 
 KVM_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-dT$(comma),\
