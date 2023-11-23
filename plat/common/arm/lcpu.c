@@ -90,6 +90,8 @@ int lcpu_arch_init(struct lcpu *this_lcpu)
 			return ret;
 	}
 
+	SYSREG_WRITE64(tpidr_el1, (__uptr)this_lcpu);
+
 	return ret;
 }
 
