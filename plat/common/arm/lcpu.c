@@ -30,6 +30,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#include <uk/arch/lcpu.h>
+#include <uk/arch/ctx.h>
+#include <uk/plat/config.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/plat/common/acpi.h>
 #include <uk/plat/lcpu.h>
@@ -42,6 +45,20 @@
 #include <libfdt.h>
 
 #define CPU_ID_MASK 0xff00ffffffUL
+
+/*
+ *       STACK_SIZE               STACK_SIZE
+ * <---------------------><--------------------->
+ * |============================================|
+ * |                     |                      |
+ * |       trap stack    |        IRQ stack     |
+ * |                     |                      |
+ * |=============================================
+ *                       ^
+ *                     SP_EL0
+ */
+static __align(UKARCH_SP_ALIGN)
+UKPLAT_PER_LCPU_ARRAY_DEFINE(__u8, lcpu_irqntrap_sp, STACK_SIZE * 2);
 
 __lcpuid lcpu_arch_id(void)
 {
@@ -80,6 +97,7 @@ extern struct _gic_dev *gic;
 
 int lcpu_arch_init(struct lcpu *this_lcpu)
 {
+	__uptr irqntrap_sp;
 	int ret = 0;
 
 	/* Initialize the interrupt controller for non-bsp cores */
@@ -90,6 +108,10 @@ int lcpu_arch_init(struct lcpu *this_lcpu)
 	}
 
 	SYSREG_WRITE64(tpidr_el1, (__uptr)this_lcpu);
+
+	irqntrap_sp = (__uptr)&ukplat_per_lcpu_array_current(lcpu_irqntrap_sp,
+							     STACK_SIZE / 2);
+	SYSREG_WRITE64(sp_el0, irqntrap_sp);
 
 	return ret;
 }
