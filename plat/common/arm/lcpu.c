@@ -38,6 +38,7 @@
 #include <arm/smccc.h>
 #include <arm/arm64/cpu.h>
 #include <uk/intctlr/gic.h>
+#include <uk/plat/config.h>
 #include <libfdt.h>
 
 #define CPU_ID_MASK 0xff00ffffffUL
@@ -65,7 +66,6 @@ void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
 	__builtin_unreachable();
 }
 
-#ifdef CONFIG_HAVE_SMP
 /**
  * The number of cells for the size field should be 0 in cpu nodes.
  * The number of cells in the address field is set by default to 2 in cpu
@@ -76,7 +76,6 @@ void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
 #define FDT_ADDR_CELLS_DEFAULT 2
 
 void lcpu_start(struct lcpu *cpu);
-static __paddr_t lcpu_start_paddr;
 extern struct _gic_dev *gic;
 
 int lcpu_arch_init(struct lcpu *this_lcpu)
@@ -95,7 +94,29 @@ int lcpu_arch_init(struct lcpu *this_lcpu)
 	return ret;
 }
 
+__lcpuidx ukplat_lcpu_idx(void)
+{
+	return lcpu_get_current()->idx;
+}
+
+__lcpuid ukplat_lcpu_id(void)
+{
+	return lcpu_arch_id();
+}
+
+struct lcpu *lcpu_get_current(void)
+{
+	struct lcpu *this_lcpu = (struct lcpu *)SYSREG_READ64(tpidr_el1);
+
+	UK_ASSERT(IS_LCPU_PTR(this_lcpu));
+
+	return this_lcpu;
+}
+
+#ifdef CONFIG_HAVE_SMP
 #ifdef CONFIG_UKPLAT_ACPI
+static __paddr_t lcpu_start_paddr;
+
 static int do_arch_mp_init(void *arg __unused)
 {
 	__lcpuid bsp_cpu_id = lcpu_get(0)->id;
