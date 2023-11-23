@@ -308,6 +308,9 @@ ENTRY(lcpu_start64)
 
 	/* Compute pointer into CPU struct array and store it in RBP
 	 * We do not use the frame pointer, yet
+	 * TODO: We are leaking implementation details. `lcpus` is defined
+	 * with `UKPLAT_PER_LCPU_DEFINE`. Find a way to properly access
+	 * this `lcpus` here.
 	 */
 	leaq	lcpus(%rip), %rbp
 	addq	%rax, %rbp
