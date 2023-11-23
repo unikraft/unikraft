@@ -13,6 +13,7 @@
 #include <uk/file/nops.h>
 #include <uk/posix-fd.h>
 #include <uk/posix-pipe.h>
+#include <uk/syscall.h>
 
 
 #define PIPE_SIZE (1L << CONFIG_LIBPOSIX_PIPE_SIZE_ORDER)
@@ -353,4 +354,16 @@ err_free:
 	uk_file_release(pipes[0]);
 	uk_file_release(pipes[1]);
 	return r;
+}
+
+/* Syscalls */
+
+UK_SYSCALL_R_DEFINE(int, pipe, int *, pipefd)
+{
+	return uk_sys_pipe(pipefd, 0);
+}
+
+UK_SYSCALL_R_DEFINE(int, pipe2, int *, pipefd, int, flags)
+{
+	return uk_sys_pipe(pipefd, flags);
 }
