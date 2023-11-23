@@ -9,6 +9,7 @@
 #include <uk/essentials.h>
 #include <uk/posix-poll.h>
 #include <uk/timeutil.h>
+#include <uk/syscall.h>
 
 /* For performance we copy between epoll and poll events with no conversion. */
 /* This assumes them to be equal, which we ensure with these asserts */
@@ -118,4 +119,22 @@ int uk_sys_ppoll(struct pollfd *fds, nfds_t nfds,
 out:
 	uk_file_release(ef);
 	return ret;
+}
+
+/* Userspace syscalls */
+
+UK_SYSCALL_R_DEFINE(int, ppoll, struct pollfd *, fds, nfds_t, nfds,
+		    const struct timespec *, timeout,
+		    const sigset_t *, sigmask, size_t, sigsetsize)
+{
+	return uk_sys_ppoll(fds, nfds, timeout, sigmask, sigsetsize);
+}
+
+UK_SYSCALL_R_DEFINE(int, poll, struct pollfd *, fds, nfds_t, nfds, int, timeout)
+{
+	return uk_sys_ppoll(
+		fds, nfds,
+		(timeout < 0) ? NULL : &uk_time_spec_from_msec(timeout),
+		NULL, 0
+	);
 }

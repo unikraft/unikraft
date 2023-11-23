@@ -8,6 +8,7 @@
 #include <uk/posix-fd.h>
 #include <uk/posix-poll.h>
 #include <uk/timeutil.h>
+#include <uk/syscall.h>
 
 /* HACK: Because we need to support both vfscore and uk_file, we need to defer
  * to epoll(), which can handle both. Once vfscore shim is no longer needed, we
@@ -107,4 +108,36 @@ int uk_sys_pselect(int nfds, fd_set *restrict readfds,
 
 	uk_file_release(ef);
 	return ret;
+}
+
+/* Userspace syscalls */
+
+UK_SYSCALL_R_DEFINE(int, pselect6, int, nfds,
+		    fd_set *restrict, readfds,
+		    fd_set *restrict, writefds,
+		    fd_set *restrict, exceptfds,
+		    struct timespec *restrict, timeout,
+		    const struct uk_ksigset *, sigset)
+{
+	return uk_sys_pselect(nfds, readfds, writefds, exceptfds,
+			      timeout, sigset);
+}
+
+UK_SYSCALL_R_DEFINE(int, select, int, nfds,
+		    fd_set *restrict, readfds,
+		    fd_set *restrict, writefds,
+		    fd_set *restrict, exceptfds,
+		    struct timeval *restrict, timeout)
+{
+	if (timeout) {
+		struct timespec ts = uk_time_spec_from_val(timeout);
+		int r = uk_sys_pselect(nfds, readfds, writefds, exceptfds, &ts,
+				       NULL);
+
+		*timeout = uk_time_val_from_spec(&ts);
+		return r;
+	} else {
+		return uk_sys_pselect(nfds, readfds, writefds, exceptfds, NULL,
+				      NULL);
+	}
 }
