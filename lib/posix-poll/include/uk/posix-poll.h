@@ -18,6 +18,21 @@
 #include <uk/timeutil.h>
 
 
+/* select */
+
+/* Taken from pselect(2) manpage */
+struct uk_ksigset {
+	const sigset_t *ss;
+	size_t ss_len;
+};
+
+int uk_sys_pselect(int nfds, fd_set *restrict readfds,
+		   fd_set *restrict writefds,
+		   fd_set *restrict exceptfds,
+		   struct timespec *restrict timeout,
+		   const struct uk_ksigset *sigset);
+
+
 /* poll */
 
 int uk_sys_ppoll(struct pollfd *fds, nfds_t nfds,
