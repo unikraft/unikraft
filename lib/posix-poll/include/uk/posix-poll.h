@@ -18,6 +18,13 @@
 #include <uk/timeutil.h>
 
 
+/* poll */
+
+int uk_sys_ppoll(struct pollfd *fds, nfds_t nfds,
+		 const struct timespec *timeout,
+		 const sigset_t *sigmask, size_t sigsetsize);
+
+
 /* epoll */
 
 struct uk_file *uk_epollfile_create(void);
