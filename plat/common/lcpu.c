@@ -59,7 +59,7 @@
  * for non-present CPUs and does not force us to configure the maximum number
  * of CPUs beforehand.
  */
-struct lcpu lcpus[CONFIG_UKPLAT_LCPU_MAXCOUNT];
+UKPLAT_PER_LCPU_DEFINE(struct lcpu, lcpus);
 
 #ifdef CONFIG_HAVE_SMP
 /**
