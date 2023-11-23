@@ -170,16 +170,14 @@ unsigned char tcr_ips_bits[] = {32, 36, 40, 42, 44, 48, 52};
 /*
  * Stack size to save general purpose registers and essential system
  * registers. 8 * (30 + lr + elr_el1 + spsr_el1 + esr_el1) = 272.
- * From exceptions come from EL0, we have to save sp_el0. So the
- * TRAP_STACK_SIZE should be 272 + 8 = 280. But we enable the stack
- * alignment check, we will force align the stack for EL1 exceptions,
- * so we add a sp to save original stack pointer: 280 + 8 = 288
+ * We enable the stack alignment check, we will force align the stack for
+ * EL1 exceptions, so we add a sp to save original stack pointer: 272 + 8 = 280
+ * and then a padding of 8 bytes: 280 + 8 = 288 (288 % 16 == 0).
  *
  * TODO: We'd better to calculate this size automatically later.
  */
 #define __TRAP_STACK_SIZE	288
 #define __SP_OFFSET		272
-#define __SP_EL0_OFFSET		280
 
 /*
  * In thread context switch, we will save the callee-saved registers
@@ -216,8 +214,8 @@ struct __regs {
 	/* Stack Pointer */
 	uint64_t sp;
 
-	/* Stack Pointer from el0 */
-	uint64_t sp_el0;
+	/* Padding to make sure this structure is 16-byte aligned */
+	__u8 pad[8];
 };
 
 /*

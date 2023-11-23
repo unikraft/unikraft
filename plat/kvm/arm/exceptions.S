@@ -66,13 +66,8 @@
 	EXCHANGE_SP_WITH_X0
 .endm
 
-.macro ENTER_TRAP, el
+.macro SAVE_REGS
 	sub sp, sp, #__TRAP_STACK_SIZE
-
-.if	\el != 0
-	/* Force align the stack, and save SP to __SP_OFFSET */
-	ALIGN_STACK
-.endif
 
 	/* Save general purpose registers */
 	stp x0, x1, [sp, #16 * 0]
@@ -99,16 +94,9 @@
 	mrs x22, spsr_el1
 	mrs x23, esr_el1
 	stp x22, x23, [sp, #16 * 16]
-
-.if \el == 0
-	/* Save stack pointer for lower level exception */
-	mrs x18, sp_el0
-	str x18, [sp, #__SP_EL0_OFFSET]
-.endif
-
 .endm
 
-.macro LEAVE_TRAP, el
+.macro RESTORE_REGS
 	/* Mask IRQ to make sure restore would not be interrupted by IRQ */
 	msr daifset, #2
 
@@ -138,14 +126,6 @@
 	ldp x2, x3, [sp, #16 * 1]
 	ldp x0, x1, [sp, #16 * 0]
 
-.if \el == 0
-	/* Restore stack pointer for exception from EL0 */
-	ldr x18, [sp, #__SP_EL0_OFFSET]
-	msr sp_el0, x18
-
-	/* Restore x18, x19 */
-	ldp x18, x19, [sp, #16 * 9]
-.else
 	/* Restore stack pointer for exception from EL1 */
 	ldr x18, [sp, #__SP_OFFSET]
 	mov x19, sp
@@ -153,7 +133,7 @@
 
 	/* Restore x18, x19 */
 	ldp x18, x19, [x19, #16 * 9]
-.endif
+
 	add sp, sp, #__TRAP_STACK_SIZE
 
 	eret
@@ -166,19 +146,19 @@
  */
 .align 6
 el1_sync:
-	ENTER_TRAP 1
+	SAVE_REGS
 	mov x0, sp
 	mrs x1, far_el1
 	bl trap_el1_sync
-	LEAVE_TRAP 1
+	RESTORE_REGS
 
 .align 6
 el1_irq:
-	ENTER_TRAP 1
+	SAVE_REGS
 	msr daifclr, #(8 | 4 | 1)
 	mov x0, sp
 	bl trap_el1_irq
-	LEAVE_TRAP 1
+	RESTORE_REGS
 
 /* Bad Abort numbers */
 #define BAD_SYNC  0
@@ -189,7 +169,7 @@ el1_irq:
 #define el_invalid(name, reason, el)	\
 .align 6;				\
 name##_invalid:				\
-	ENTER_TRAP  el;			\
+	SAVE_REGS;			\
 	mov x0, sp;			\
 	mov x1, el;			\
 	mov x2, #(reason);		\
