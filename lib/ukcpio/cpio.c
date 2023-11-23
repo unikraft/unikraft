@@ -36,6 +36,7 @@
 #include <string.h>
 #include <stdint.h>
 #include <limits.h>
+#include <errno.h>
 
 #include <uk/assert.h>
 #include <uk/print.h>
@@ -141,6 +142,7 @@ int uk_syscall_r_chmod(const char *, mode_t);
 int uk_syscall_r_utime(const char *, const struct utimbuf *);
 int uk_syscall_r_mkdir(const char *, mode_t);
 int uk_syscall_r_symlink(const char *, const char *);
+int uk_syscall_r_stat(const char *, struct stat *);
 
 static enum ukcpio_error
 extract_file(const char *path, const char *contents, size_t len,
@@ -153,7 +155,7 @@ extract_file(const char *path, const char *contents, size_t len,
 
 	uk_pr_info("Extracting %s (%zu bytes)\n", path, len);
 
-	fd = uk_syscall_r_open(path, O_CREAT|O_RDWR, 0);
+	fd = uk_syscall_r_open(path, O_CREAT | O_WRONLY | O_TRUNC, 0);
 	if (fd < 0) {
 		uk_pr_err("%s: Failed to create file: %s (%d)\n",
 			  path, strerror(-fd), -fd);
@@ -201,12 +203,35 @@ extract_dir(const char *path, mode_t mode)
 	int r;
 
 	uk_pr_info("Creating directory %s\n", path);
-	if ((r = uk_syscall_r_mkdir(path, mode))) {
-		uk_pr_err("%s: Failed to create directory: %s (%d)\n",
-			  path, strerror(-r), -r);
-		return -UKCPIO_MKDIR_FAILED;
+	r = uk_syscall_r_mkdir(path, mode);
+	if (r == -EEXIST) {
+		struct stat pstat;
+
+		r = uk_syscall_r_stat(path, &pstat);
+		if (r < 0) {
+			r = -EEXIST;
+			goto err_out;
+		}
+		if (!S_ISDIR(pstat.st_mode)) {
+			r = -EEXIST;
+			goto err_out;
+		}
+
+		/* Directory already exists, set mode only */
+		r = uk_syscall_r_chmod(path, mode);
+		if (r < 0) {
+			uk_pr_warn("%s: Failed to chmod: %s (%d)\n",
+				   path, strerror(-r), -r);
+		}
+	} else if (r < 0) {
+		goto err_out;
 	}
 	return UKCPIO_SUCCESS;
+
+err_out:
+	uk_pr_err("%s: Failed to create directory: %s (%d)\n",
+		  path, strerror(-r), -r);
+	return -UKCPIO_MKDIR_FAILED;
 }
 
 static enum ukcpio_error
