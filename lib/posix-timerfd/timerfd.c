@@ -17,6 +17,7 @@
 #include <uk/mutex.h>
 #include <uk/sched.h>
 #include <uk/timeutil.h>
+#include <uk/syscall.h>
 
 
 static const char TIMERFD_VOLID[] = "timerfd_vol";
@@ -329,4 +330,46 @@ int uk_sys_timerfd_gettime(const struct uk_file *f,
 	curr_value->it_interval = set.it_interval;
 	curr_value->it_value = uk_time_spec_from_nsec(st.next);
 	return 0;
+}
+
+/* Syscalls */
+
+UK_SYSCALL_R_DEFINE(int, timerfd_create, int, id, int, flags)
+{
+	return uk_sys_timerfd_create(id, flags);
+}
+
+UK_SYSCALL_R_DEFINE(int, timerfd_settime, int, fd, int, flags,
+		    const struct itimerspec *, new_value,
+		    struct itimerspec *, old_value)
+{
+	int r;
+	struct uk_ofile *of;
+
+	if (unlikely(!new_value))
+		return -EFAULT;
+
+	of = uk_fdtab_get(fd);
+	if (unlikely(!of))
+		return -EBADF;
+	r = uk_sys_timerfd_settime(of->file, flags, new_value, old_value);
+	uk_fdtab_ret(of);
+	return r;
+}
+
+UK_SYSCALL_R_DEFINE(int, timerfd_gettime, int, fd,
+		    struct itimerspec *, curr_value)
+{
+	int r;
+	struct uk_ofile *of;
+
+	if (unlikely(!curr_value))
+		return -EFAULT;
+
+	of = uk_fdtab_get(fd);
+	if (unlikely(!of))
+		return -EBADF;
+	r = uk_sys_timerfd_gettime(of->file, curr_value);
+	uk_fdtab_ret(of);
+	return r;
 }
