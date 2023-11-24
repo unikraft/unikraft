@@ -52,10 +52,10 @@ extern "C" {
  * It is intended that the handler modifies the register(s) state
  * according to the implemented ABI.
  *
- * @param r Referenced to saved registers. After the call, the
- *          the struct will be restored for the caller as state.
+ * @param usc Referenced to saved registers. After the call, the
+ *	      the struct will be restored for the caller as state.
  */
-void ukplat_syscall_handler(struct __regs *r);
+void ukplat_syscall_handler(struct uk_syscall_ctx *usc);
 #endif /* CONFIG_HAVE_SYSCALL */
 
 #ifdef __cplusplus
