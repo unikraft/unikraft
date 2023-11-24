@@ -60,6 +60,7 @@
 #define LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP			':'
 #define LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP			','
 #endif /* CONFIG_LIBVFSCORE_FSTAB */
+#define LIBVFSCORE_INITRD_OPT_EXTRACT				"extract"
 
 struct vfscore_volume {
 	/* Volume source device */
@@ -79,17 +80,26 @@ struct vfscore_volume {
 };
 
 #if CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS
-static int do_mount_initrd(const void *initrd, size_t len, const char *path)
+static int do_mount_initrd(const void *initrd, size_t len, const char *path,
+			   unsigned long flags, const char *opts)
 {
 	int rc;
 
 	UK_ASSERT(path);
 
-	rc = mount("", path, "ramfs", 0x0, NULL);
-	if (unlikely(rc)) {
-		uk_pr_crit("Failed to mount ramfs to \"%s\": %d\n",
-			   path, errno);
-		return -1;
+	/* 'extract' is an (e)initrd-specific mount option that allows
+	 * extracting an archive to an existing filesystem. If this option
+	 * is chosen, no other mount option is accepted.
+	 */
+	if (!opts || (strcmp(opts, LIBVFSCORE_INITRD_OPT_EXTRACT) != 0)) {
+		/* mount a ramfs volume as base only in non-'extract' mode */
+		uk_pr_info("Mounting 'ramfs' to %s...\n", path);
+		rc = mount("", path, "ramfs", flags, opts);
+		if (unlikely(rc)) {
+			uk_pr_crit("Failed to mount ramfs to \"%s\": %d\n",
+				   path, errno);
+			return -1;
+		}
 	}
 
 	uk_pr_info("Extracting initrd @ %p (%"__PRIsz" bytes) to %s...\n",
@@ -121,7 +131,7 @@ static int vfscore_mount_initrd_volume(struct vfscore_volume *vv)
 	}
 
 	return do_mount_initrd((void *)initrd->vbase, initrd->len,
-			       vv->path);
+			       vv->path, vv->flags, vv->opts);
 }
 #endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
 
@@ -247,7 +257,7 @@ static char *vfscore_fstab[CONFIG_LIBVFSCORE_FSTAB_SIZE];
 
 UK_LIBPARAM_PARAM_ARR_ALIAS(fstab, &vfscore_fstab, charp,
 			    CONFIG_LIBVFSCORE_FSTAB_SIZE,
-			    "VFSCore Filesystem Table");
+			"Automount table: dev:path:fs[:flags[:opts[:ukopts]]]");
 
 /**
  * Expected command-line argument format:
@@ -350,7 +360,7 @@ static int vfscore_automount_rootfs(void)
 	len    = (size_t)((uintptr_t)&vfscore_einitrd_end
 			  - (uintptr_t)vfscore_einitrd_start);
 
-	return do_mount_initrd(initrd, len, "/");
+	return do_mount_initrd(initrd, len, "/", 0x0, NULL);
 }
 
 #else /* !CONFIG_LIBVFSCORE_ROOTFS_EINITRD */
