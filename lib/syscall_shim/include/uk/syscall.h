@@ -550,18 +550,6 @@ const char *uk_syscall_name(long nr);
  */
 const char *uk_syscall_name_p(long nr);
 
-/**
- * Returns the according raw system call handler as function pointer for the
- * given system call number. If the system call handler is not available,
- * NULL is returned.
- * @param nr
- *  System call number of current architecture
- * @return
- *  - Function pointer to raw system call handler
- *  - (NULL): if system call handler is not provided
- */
-long (*uk_syscall_r_fn(long nr))(void);
-
 /*
  * Format flags for system call print functions `uk_snprsyscall()`  and
  * `uk_vsnprsyscall()`
