@@ -34,6 +34,7 @@
 #include <uk/asm.h>
 #include <uk/asm/arch.h>
 #include <uk/config.h>
+#include <uk/essentials.h>
 
 #define CACHE_LINE_SIZE		64
 
@@ -166,7 +167,6 @@ static __attribute__((unused))
 unsigned char tcr_ips_bits[] = {32, 36, 40, 42, 44, 48, 52};
 #endif
 
-#ifdef __ASSEMBLY__
 /*
  * Stack size to save general purpose registers and essential system
  * registers. 8 * (30 + lr + elr_el1 + spsr_el1 + esr_el1) = 272.
@@ -189,7 +189,7 @@ unsigned char tcr_ips_bits[] = {32, 36, 40, 42, 44, 48, 52};
  */
 #define __CALLEE_SAVED_SIZE    96
 
-#else
+#if !__ASSEMBLY__
 
 #include <stdint.h>
 
@@ -376,4 +376,4 @@ static inline void ukarch_spinwait(void)
 	/* Intelligent busy wait not supported on arm64. */
 }
 
-#endif /* __ASSEMBLY__ */
+#endif /* !__ASSEMBLY__ */
