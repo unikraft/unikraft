@@ -657,6 +657,7 @@ long uk_syscall6(long nr, long arg1, long arg2, long arg3,
 /* Raw system call, returns negative codes on errors */
 long uk_syscall_r(long nr, ...);
 long uk_vsyscall_r(long nr, va_list arg);
+long uk_syscall6_r_u(struct uk_syscall_ctx *usc);
 long uk_syscall6_r(long nr, long arg1, long arg2, long arg3,
 		   long arg4, long arg5, long arg6);
 
