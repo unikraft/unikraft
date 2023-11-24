@@ -11,7 +11,6 @@ BEGIN {
 	printf "long arg%d __maybe_unused)\n{\n", max_args
 	print "\tlong ret;\n"
 
-	print "\t__UK_SYSCALL_RETADDR_ENTRY();"
 	print "\tswitch (nr) {"
 }
 
@@ -38,7 +37,6 @@ END {
 	printf "\t\terrno = -ENOSYS;\n"
 	printf "\t\tret = -1;\n"
 	printf "\t}\n"
-	printf "\t__UK_SYSCALL_RETADDR_CLEAR();\n"
 	printf "\treturn ret;\n"
 	printf "}\n"
 	printf "\n"
