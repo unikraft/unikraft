@@ -92,6 +92,8 @@ struct __regs {
 	unsigned long ss;
 /* top of stack page */
 };
+
+UK_CTASSERT(sizeof(struct __regs) == __REGS_SIZEOF);
 #endif /* !__ASSEMBLY__ */
 
 /* sanity check */
