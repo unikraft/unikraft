@@ -70,10 +70,7 @@ void ukplat_syscall_handler(struct uk_syscall_ctx *usc)
 		    usc->regs.rarg1);
 #endif /* CONFIG_LIBSYSCALL_SHIM_DEBUG_HANDLER */
 
-	usc->regs->rret0 = uk_syscall6_r(usc->regs->rsyscall,
-					 usc->regs->rarg0, usc->regs->rarg1,
-					 usc->regs->rarg2, usc->regs->rarg3,
-					 usc->regs->rarg4, usc->regs->rarg5);
+	usc->regs.rret0 = uk_syscall6_r_u(usc);
 
 #if CONFIG_LIBSYSCALL_SHIM_STRACE
 	prsyscalllen = uk_snprsyscall(prsyscallbuf, ARRAY_SIZE(prsyscallbuf),
