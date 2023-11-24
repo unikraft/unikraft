@@ -36,6 +36,7 @@
 #include <uk/asm.h>
 #include <uk/asm/cfi.h>
 #include <uk/plat/common/lcpu.h>
+#include <uk/syscall.h>
 
 ENTRY(_ukplat_syscall)
 	.cfi_startproc simple
@@ -68,6 +69,16 @@ ENTRY(_ukplat_syscall)
 	 * raw CFI. Instead of doing so, mark rsp as undefined temporarily
 	 */
 	.cfi_undefined rsp
+
+	/* NOTE: We should normally align the stack before doing this
+	 * subtraction because we must ensure that the `ectx` field
+	 * is aligned to the corresponding ECTX alignment.
+	 * However, this is guaranteed to already be the case for the
+	 * auxiliary stack because it is allocated with this exact alignment
+	 * in mind.
+	 */
+	subq	$(UK_SYSCALL_CTX_SIZE - __REGS_SIZEOF), %rsp
+	.cfi_adjust_cfa_offset (UK_SYSCALL_CTX_SIZE - __REGS_SIZEOF)
 
 	pushq_cfi	$(GDT_DESC_OFFSET(GDT_DESC_DATA))
 
