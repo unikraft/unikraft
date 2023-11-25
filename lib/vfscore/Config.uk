@@ -147,6 +147,17 @@ config LIBVFSCORE_FSTAB_SIZE
 	help
 		The maximum amount of automatically mounted volumes that are
 		passed through the vfs.fstab argument.
+
+config LIBVFSCORE_INITRD_EXTRACT_WORKAROUND
+	bool "Workaround: InitRD-Root-Extract"
+	depends on !LIBVFSCORE_AUTOMOUNT_ROOTFS
+	depends on LIBUKCPIO
+	depends on LIBRAMFS
+	help
+		This option activates a workaround in the event that an "initrd"
+		with "extract" was specified as the root file system via the
+		fstab feature. In such a case, a "ramfs" volume is mounted
+		before extraction.
 endif
 
 endif

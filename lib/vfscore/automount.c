@@ -423,6 +423,28 @@ static int vfscore_automount_fstab_volumes(void)
 	for (i = 0; i < CONFIG_LIBVFSCORE_FSTAB_SIZE && vfscore_fstab[i]; i++) {
 		vfscore_fstab_fetch_volume_args(vfscore_fstab[i], &vv);
 
+#if CONFIG_LIBVFSCORE_INITRD_EXTRACT_WORKAROUND && \
+    !CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS
+		/* WORKAROUND: In case the image was built without predefined
+		 *             rootfs and we are asked to `extract` an initrd
+		 *             to `/` as first filesystem, we mount an empty
+		 *             ramfs as base.
+		 */
+		if (i == 0 &&
+		    vv.drv &&
+		    strcmp("initrd", vv.drv) == 0 &&
+		    vv.opts &&
+		    strcmp(LIBVFSCORE_INITRD_OPT_EXTRACT, vv.opts) == 0 &&
+		    vv.path && vv.path[0] == '/' && vv.path[1] == '\0') {
+			/* Removing the "extract" option will cause mounting
+			 * an empty ramfs volume for `/`.
+			 */
+			vv.opts = NULL;
+		}
+#endif /* CONFIG_LIBVFSCORE_INITRD_EXTRACT_WORKAROUND &&
+	* !CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS
+	*/
+
 		rc = vfscore_mount_volume(&vv);
 		if (unlikely(rc)) {
 			uk_pr_err("Failed to mount %s: error %d\n", vv.sdev,
