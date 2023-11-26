@@ -40,6 +40,7 @@
 #include <uk/essentials.h>
 #include <uk/assert.h>
 #include <uk/print.h>
+#include <uk/hexdump.h>
 #include <string.h> /* memset */
 
 enum x86_save_method {
@@ -110,6 +111,33 @@ __sz ukarch_ectx_align(void)
 	return ectx_align;
 }
 
+void ukarch_ectx_sanitize(struct ukarch_ectx *state)
+{
+	UK_ASSERT(ectx_align); /* Do not call when not yet initialized */
+	UK_ASSERT(state);
+	UK_ASSERT(IS_ALIGNED((__uptr) state, ectx_align));
+
+	switch (ectx_method) {
+	case X86_SAVE_XSAVE:
+	case X86_SAVE_XSAVEOPT:
+		/* XSAVE* & XRSTOR rely on sane values in the XSAVE header
+		 * (64 bytes starting at offset 512 from the base address)
+		 * and will raise #GP on garbage data. We must zero them out.
+		 */
+		((__u64 *)state)[64] = 0;
+		((__u64 *)state)[65] = 0;
+		((__u64 *)state)[66] = 0;
+		((__u64 *)state)[67] = 0;
+		((__u64 *)state)[68] = 0;
+		((__u64 *)state)[69] = 0;
+		((__u64 *)state)[70] = 0;
+		((__u64 *)state)[71] = 0;
+		break;
+	default: /* Nothing to be done in the general case. */
+		break;
+	}
+}
+
 void ukarch_ectx_init(struct ukarch_ectx *state)
 {
 	UK_ASSERT(ectx_align); /* Do not call when not yet initialized */
@@ -173,3 +201,30 @@ void ukarch_ectx_load(struct ukarch_ectx *state)
 		break;
 	}
 }
+
+#ifdef CONFIG_ARCH_X86_64
+void ukarch_ectx_assert_equal(struct ukarch_ectx *state)
+{
+	__u8 ectxbuf[ectx_size + ectx_align];
+	struct ukarch_ectx *current;
+
+	/* Store the current state */
+	current = (struct ukarch_ectx *)ALIGN_UP((__uptr)ectxbuf, ectx_align);
+	ukarch_ectx_init(current);
+
+	if (memcmp(current, state, ectx_size) != 0) {
+		uk_pr_crit("Modified ECTX detected!\n");
+		uk_pr_crit("Current:\n");
+		uk_hexdumpk(KLVL_CRIT, current, ectx_size,
+			    UK_HXDF_ADDR | UK_HXDF_GRPQWORD | UK_HXDF_COMPRESS,
+			    2);
+
+		uk_pr_crit("Expected:\n");
+		uk_hexdumpk(KLVL_CRIT, state, ectx_size,
+			    UK_HXDF_ADDR | UK_HXDF_GRPQWORD | UK_HXDF_COMPRESS,
+			    2);
+
+		UK_CRASH("Modified ECTX\n");
+	}
+}
+#endif

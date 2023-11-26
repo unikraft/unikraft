@@ -66,6 +66,8 @@ struct chunk_tail_st {
 /* Linked lists of free chunks of different powers-of-two in size. */
 #define FREELIST_SIZE ((sizeof(void *) << 3) - __PAGE_SHIFT)
 #define FREELIST_EMPTY(_l) ((_l)->next == NULL)
+#define FREELIST_ALIGNED(ptr, lvl) \
+	!((uintptr_t)(ptr) & ((1ULL << ((lvl) + __PAGE_SHIFT)) - 1))
 
 /* keep a bitmap for each memory region separately */
 struct uk_bbpalloc_memr {
@@ -82,6 +84,62 @@ struct uk_bbpalloc {
 	chunk_head_t free_tail[FREELIST_SIZE];
 	struct uk_bbpalloc_memr *memr_head;
 };
+
+#if CONFIG_LIBUKALLOCBBUDDY_FREELIST_SANITY
+/* Provide sanity checking of freelists, walking their length and checking
+ * for consistency. Useful when suspecting memory corruption.
+ */
+
+#include <uk/arch/paging.h>
+#define _FREESAN_NONCANON(x) ((x) && (~(uintptr_t)(x)))
+#define _FREESAN_BAD_CHUNKPTR(x) \
+	(((uintptr_t)x & (sizeof(void *) - 1)) || \
+	_FREESAN_NONCANON((uintptr_t)(x) >> PAGE_Lx_SHIFT(PT_LEVELS - 1)))
+
+#define _FREESAN_LOCFMT "\t@ %p (free_head[%zu](%p) + %zu): "
+
+#define _FREESAN_HEAD(head) \
+do { \
+	size_t off = 0; \
+	for (chunk_head_t *c = head; c; c = c->next, off++) { \
+		if (c->next != NULL && c->level != i) { \
+			uk_pr_err("Bad page level" _FREESAN_LOCFMT \
+			          "got %u, expected %zu\n", \
+			          c, i, head, off, c->level, i); \
+		} \
+		if (_FREESAN_BAD_CHUNKPTR(c->pprev)) { \
+			uk_pr_err("Bad pprev pointer" _FREESAN_LOCFMT "%p\n", \
+			          c, i, head, off, c->pprev); \
+		} else if (*c->pprev != c) { \
+			uk_pr_err("Bad backward link" _FREESAN_LOCFMT \
+			          "got %p, expected %p\n", \
+			          c, i, head, off, *c->pprev, c); \
+		} \
+		if (_FREESAN_BAD_CHUNKPTR(c->next)) { \
+			uk_pr_err("Bad next pointer" _FREESAN_LOCFMT "%p\n", \
+			          c, i, head, off, c->next); \
+			break; \
+		} else if (!FREELIST_ALIGNED(c->next, i) && \
+		           c->next->next != NULL) { \
+			uk_pr_err("Unaligned next page" _FREESAN_LOCFMT \
+			          "%p not aligned to %zx boundary\n", \
+			          c, i, head, off, c->next, \
+			          (size_t)1 << (__PAGE_SHIFT + i)); \
+		} \
+	} \
+} while (0)
+
+#define freelist_sanitycheck(free_head) \
+for (size_t i = 0; i < FREELIST_SIZE; i++) { \
+	UK_ASSERT((free_head)[i] != NULL); \
+	_FREESAN_HEAD((free_head)[i]); \
+}
+
+#else /* !CONFIG_LIBUKALLOCBBUDDY_FREELIST_SANITY */
+
+#define freelist_sanitycheck(x) do {} while (0)
+
+#endif /* CONFIG_LIBUKALLOCBBUDDY_FREELIST_SANITY */
 
 /*********************
  * ALLOCATION BITMAP
@@ -245,6 +303,8 @@ static void *bbuddy_palloc(struct uk_alloc *a, unsigned long num_pages)
 	UK_ASSERT(a != NULL);
 	b = (struct uk_bbpalloc *)&a->priv;
 
+	freelist_sanitycheck(b->free_head);
+
 	size_t order = (size_t)num_pages_to_order(num_pages);
 
 	/* Find smallest order which can satisfy the request. */
@@ -252,7 +312,7 @@ static void *bbuddy_palloc(struct uk_alloc *a, unsigned long num_pages)
 		if (!FREELIST_EMPTY(b->free_head[i]))
 			break;
 	}
-	if (i == FREELIST_SIZE)
+	if (i >= FREELIST_SIZE)
 		goto no_memory;
 
 	/* Unlink a chunk. */
@@ -279,9 +339,11 @@ static void *bbuddy_palloc(struct uk_alloc *a, unsigned long num_pages)
 		spare_ch->next->pprev = &spare_ch->next;
 		b->free_head[i] = spare_ch;
 	}
+	UK_ASSERT(FREELIST_ALIGNED(alloc_ch, order));
 	map_alloc(b, (uintptr_t)alloc_ch, 1UL << order);
 
 	uk_alloc_stats_count_palloc(a, (void *) alloc_ch, num_pages);
+	freelist_sanitycheck(b->free_head);
 	return ((void *)alloc_ch);
 
 no_memory:
@@ -304,6 +366,8 @@ static void bbuddy_pfree(struct uk_alloc *a, void *obj, unsigned long num_pages)
 
 	uk_alloc_stats_count_pfree(a, obj, num_pages);
 	b = (struct uk_bbpalloc *)&a->priv;
+
+	freelist_sanitycheck(b->free_head);
 
 	size_t order = (size_t)num_pages_to_order(num_pages);
 
@@ -355,6 +419,8 @@ static void bbuddy_pfree(struct uk_alloc *a, void *obj, unsigned long num_pages)
 
 	freed_ch->next->pprev = &freed_ch->next;
 	b->free_head[order] = freed_ch;
+
+	freelist_sanitycheck(b->free_head);
 }
 
 static long bbuddy_pmaxalloc(struct uk_alloc *a)
@@ -392,7 +458,7 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 	struct uk_bbpalloc *b;
 	struct uk_bbpalloc_memr *memr;
 	size_t memr_size;
-	unsigned long count, i;
+	unsigned long i;
 	chunk_head_t *ch;
 	chunk_tail_t *ct;
 	uintptr_t min, max, range;
@@ -400,6 +466,8 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 	UK_ASSERT(a != NULL);
 	UK_ASSERT(base != NULL);
 	b = (struct uk_bbpalloc *)&a->priv;
+
+	freelist_sanitycheck(b->free_head);
 
 	min = round_pgup((uintptr_t)base);
 	max = round_pgdown((uintptr_t)base + (uintptr_t)len);
@@ -458,7 +526,6 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 	/* free up the memory we've been given to play with */
 	map_free(b, min, memr->nr_pages);
 
-	count = 0;
 	while (range != 0) {
 		/*
 		 * Next chunk is limited by alignment of min, but also
@@ -483,8 +550,9 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 		ch->next->pprev = &ch->next;
 		b->free_head[i] = ch;
 		ct->level = i;
-		count++;
 	}
+
+	freelist_sanitycheck(b->free_head);
 
 	return 0;
 }

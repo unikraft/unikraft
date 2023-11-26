@@ -85,6 +85,27 @@ struct ukplat_memregion_desc {
 } __packed __align(__SIZEOF_LONG__);
 
 /**
+ * Check whether the memory region descriptor overlaps with [pstart, pend) in
+ * the physical address space.
+ *
+ * @param mrd
+ *   Pointer to the memory region descriptor to check against
+ * @param pstart
+ *   Start of the physical memory region
+ * @param pend
+ *   End of the physical memory region
+ * @return
+ *   Zero if the two specified regions have no overlap, a non-zero value
+ *   otherwise
+ */
+static inline int
+ukplat_memregion_desc_overlap(const struct ukplat_memregion_desc *mrd,
+			      __paddr_t pstart, __paddr_t pend)
+{
+	return RANGE_OVERLAP(mrd->pbase, mrd->len, pstart, pend - pstart);
+}
+
+/**
  * Returns the number of available memory regions
  */
 int ukplat_memregion_count(void);
@@ -197,6 +218,39 @@ int ukplat_memallocator_set(struct uk_alloc *a);
  * Returns the platform memory allocator
  */
 struct uk_alloc *ukplat_memallocator_get(void);
+
+/**
+ * Allocates page-aligned memory by taking it away from the free physical
+ * memory. Only memory up to the platform's static page table mapped
+ * maximum address is used so that it is accessible.
+ * Note, the memory cannot be released!
+ *
+ * @param size
+ *   The size to allocate. Will be rounded up to next multiple of page size.
+ * @param type
+ *   Memory region type to use for the allocated memory. Can be 0.
+ * @param flags
+ *   Flags of the allocated memory region.
+ *
+ * @return
+ *   A pointer to the allocated memory on success, NULL otherwise.
+ */
+void *ukplat_memregion_alloc(__sz size, int type, __u16 flags);
+
+/**
+ * Initializes the memory mapping based on the platform or architecture defined
+ * unmapping memory region descriptor (named `bpt_unmap_mrd`). Based on this
+ * descriptor, the function surrounds the kernel image with the unmappings,
+ * adding an unmapping region before and after the kernel. Therefore,
+ * `bpt_unmap_mrd`'s range must contain the kernel image range.
+ *
+ * @param bi
+ *   Pointer to the image's `struct ukplat_bootinfo` structure.
+ *
+ * @return
+ *   0 on success, not 0 otherwise.
+ */
+int ukplat_mem_init(void);
 
 #ifdef __cplusplus
 }

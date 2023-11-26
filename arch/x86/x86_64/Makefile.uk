@@ -15,6 +15,8 @@ ISR_ARCHFLAGS += -mno-80387 -mno-mmx -mno-sse -mno-avx
 ISR_ARCHFLAGS-$(call have_gcc)	+= -mno-fp-ret-in-387
 ISR_ARCHFLAGS-$(call gcc_version_ge,7,1) += -mgeneral-regs-only
 
+ARCHFLAGS-$(CONFIG_MARCH_X86_64_NATIVE)         += -march=native
+ISR_ARCHFLAGS-$(CONFIG_MARCH_X86_64_NATIVE)     += -march=native
 ARCHFLAGS-$(CONFIG_MARCH_X86_64_GENERIC)        += -mtune=generic
 ISR_ARCHFLAGS-$(CONFIG_MARCH_X86_64_GENERIC)    += -mtune=generic
 ARCHFLAGS-$(CONFIG_MARCH_X86_64_NOCONA)         += -march=nocona

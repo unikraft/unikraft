@@ -34,6 +34,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _GNU_SOURCE
+
 #include <sys/types.h>
 #include <uk/socket.h>
 #include <uk/errptr.h>

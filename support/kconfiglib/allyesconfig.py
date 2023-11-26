@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright (c) 2018-2019, Ulf Magnusson
 # SPDX-License-Identifier: ISC
@@ -11,13 +11,13 @@ in the KCONFIG_CONFIG environment variable.
 
 Usage for the Linux kernel:
 
-  $ make [ARCH=<arch>] scriptconfig SCRIPT=Kconfiglib/examples/allmodconfig.py
+  $ make [ARCH=<arch>] scriptconfig SCRIPT=Kconfiglib/allyesconfig.py
 """
 import kconfiglib
 
 
 def main():
-    kconf = kconfiglib.standard_kconfig()
+    kconf = kconfiglib.standard_kconfig(__doc__)
 
     # See allnoconfig.py
     kconf.warn = False
@@ -47,7 +47,7 @@ def main():
 
     kconf.warn = True
 
-    kconfiglib.load_allconfig(kconf, "allyes.config")
+    kconf.load_allconfig("allyes.config")
 
     print(kconf.write_config())
 

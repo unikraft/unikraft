@@ -34,6 +34,7 @@
 
 #include <sys/statvfs.h>
 #include <sys/stat.h>
+#include <sys/ioctl.h>
 #include <limits.h>
 #include <string.h>
 #include <stdlib.h>
@@ -105,7 +106,7 @@ static inline mode_t apply_umask(mode_t mode)
 	return mode & ~ukarch_load_n(&global_umask);
 }
 
-UK_TRACEPOINT(trace_vfs_open, "\"%s\" 0x%x 0%0o", const char*, int, mode_t);
+UK_TRACEPOINT(trace_vfs_open, "\"%s\" %#x 0%0o", const char*, int, mode_t);
 UK_TRACEPOINT(trace_vfs_open_ret, "%d", int);
 UK_TRACEPOINT(trace_vfs_open_err, "%d", int);
 
@@ -139,6 +140,7 @@ UK_LLSYSCALL_R_DEFINE(int, open, const char*, pathname, int, flags,
 	if (error)
 		goto out_error;
 
+	mode = apply_umask(mode);
 	error = sys_open(path, flags, mode, &fp);
 	if (error)
 		goto out_error;
@@ -166,7 +168,7 @@ int open(const char *pathname, int flags, ...)
 		va_list ap;
 
 		va_start(ap, flags);
-		mode = apply_umask(va_arg(ap, mode_t));
+		mode = va_arg(ap, mode_t);
 		va_end(ap);
 	}
 
@@ -203,10 +205,10 @@ UK_LLSYSCALL_R_DEFINE(int, openat, int, dirfd, const char *, pathname,
 	strlcat(p, "/", PATH_MAX);
 	strlcat(p, pathname, PATH_MAX);
 
-	error = uk_syscall_r_open((long int)p, flags, mode);
-
 	vn_unlock(vp);
 	fdrop(fp);
+
+	error = uk_syscall_r_open((long int)p, flags, mode);
 
 	return error;
 }
@@ -220,7 +222,7 @@ int openat(int dirfd, const char *pathname, int flags, ...)
 		va_list ap;
 
 		va_start(ap, flags);
-		mode = apply_umask(va_arg(ap, mode_t));
+		mode = va_arg(ap, mode_t);
 		va_end(ap);
 	}
 
@@ -283,12 +285,12 @@ UK_SYSCALL_R_DEFINE(int, close, int, fd)
 	return -error;
 }
 
-UK_TRACEPOINT(trace_vfs_mknod, "\"%s\" 0%0o 0x%x", const char*, mode_t, dev_t);
+UK_TRACEPOINT(trace_vfs_mknod, "\"%s\" 0%0o %#x", const char*, mode_t, dev_t);
 UK_TRACEPOINT(trace_vfs_mknod_ret, "");
 UK_TRACEPOINT(trace_vfs_mknod_err, "%d", int);
 
-static int __xmknod_helper(int ver, const char *pathname,
-		mode_t mode, dev_t *dev __unused)
+static int __xmknod_helper(int ver __maybe_unused, const char *pathname,
+			   mode_t mode, dev_t *dev __maybe_unused)
 {
 	UK_ASSERT(ver == 0); // On x86-64 Linux, _MKNOD_VER_LINUX is 0.
 	struct task *t = main_task;
@@ -324,8 +326,8 @@ UK_SYSCALL_R_DEFINE(int, mknod, const char*, pathname, mode_t, mode, dev_t, dev)
 	return __xmknod_helper(0, pathname, mode, &dev);
 }
 
-UK_TRACEPOINT(trace_vfs_lseek, "%d 0x%x %d", int, off_t, int);
-UK_TRACEPOINT(trace_vfs_lseek_ret, "0x%x", off_t);
+UK_TRACEPOINT(trace_vfs_lseek, "%d %#x %d", int, off_t, int);
+UK_TRACEPOINT(trace_vfs_lseek_ret, "%#x", off_t);
 UK_TRACEPOINT(trace_vfs_lseek_err, "%d", int);
 
 UK_SYSCALL_R_DEFINE(off_t, lseek, int, fd, off_t, offset, int, whence)
@@ -384,9 +386,9 @@ out_error:
 	return -error;
 }
 
-UK_TRACEPOINT(trace_vfs_preadv, "%d %p 0x%x 0x%x", int, const struct iovec*,
+UK_TRACEPOINT(trace_vfs_preadv, "%d %#x %d %#x", int, const struct iovec*,
 	      int, off_t);
-UK_TRACEPOINT(trace_vfs_preadv_ret, "0x%x", ssize_t);
+UK_TRACEPOINT(trace_vfs_preadv_ret, "%#x", ssize_t);
 UK_TRACEPOINT(trace_vfs_preadv_err, "%d", int);
 
 UK_SYSCALL_R_DEFINE(ssize_t, preadv, int, fd, const struct iovec*, iov,
@@ -441,8 +443,8 @@ out_error:
 
 LFS64(preadv);
 
-UK_TRACEPOINT(trace_vfs_pread, "%d %p 0x%x 0x%x", int, void*, size_t, off_t);
-UK_TRACEPOINT(trace_vfs_pread_ret, "0x%x", ssize_t);
+UK_TRACEPOINT(trace_vfs_pread, "%d %#x %#x %#x", int, void*, size_t, off_t);
+UK_TRACEPOINT(trace_vfs_pread_ret, "%#x", ssize_t);
 UK_TRACEPOINT(trace_vfs_pread_err, "%d", int);
 
 /*
@@ -484,9 +486,9 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset)
 LFS64(pread);
 #endif /* UK_LIBC_SYSCALLS */
 
-UK_TRACEPOINT(trace_vfs_readv, "%d %p 0x%x", int, const struct iovec*,
+UK_TRACEPOINT(trace_vfs_readv, "%d %#x %#x", int, const struct iovec*,
 	      int);
-UK_TRACEPOINT(trace_vfs_readv_ret, "0x%x", ssize_t);
+UK_TRACEPOINT(trace_vfs_readv_ret, "%#x", ssize_t);
 UK_TRACEPOINT(trace_vfs_readv_err, "%d", int);
 
 UK_SYSCALL_R_DEFINE(ssize_t, readv,
@@ -530,8 +532,8 @@ out_error:
 	return error;
 }
 
-UK_TRACEPOINT(trace_vfs_read, "%d %p %d", int, void *, int);
-UK_TRACEPOINT(trace_vfs_read_ret, "0x%x", ssize_t);
+UK_TRACEPOINT(trace_vfs_read, "%d %#x %d", int, void *, int);
+UK_TRACEPOINT(trace_vfs_read_ret, "%#x", ssize_t);
 UK_TRACEPOINT(trace_vfs_read_err, "%d", int);
 
 UK_SYSCALL_R_DEFINE(ssize_t, read, int, fd, void *, buf, size_t, count)
@@ -577,9 +579,9 @@ out_error:
 	return -error;
 }
 
-UK_TRACEPOINT(trace_vfs_pwritev, "%d %p 0x%x 0x%x", int, const struct iovec*,
+UK_TRACEPOINT(trace_vfs_pwritev, "%d %#x %#x %#x", int, const struct iovec*,
 	      int, off_t);
-UK_TRACEPOINT(trace_vfs_pwritev_ret, "0x%x", ssize_t);
+UK_TRACEPOINT(trace_vfs_pwritev_ret, "%#x", ssize_t);
 UK_TRACEPOINT(trace_vfs_pwritev_err, "%d", int);
 
 UK_SYSCALL_R_DEFINE(ssize_t, pwritev, int, fd, const struct iovec*, iov,
@@ -634,9 +636,9 @@ out_error:
 
 LFS64(pwritev);
 
-UK_TRACEPOINT(trace_vfs_pwrite, "%d %p 0x%x 0x%x", int, const void*, size_t,
+UK_TRACEPOINT(trace_vfs_pwrite, "%d %#x %#x %#x", int, const void*, size_t,
 	      off_t);
-UK_TRACEPOINT(trace_vfs_pwrite_ret, "0x%x", ssize_t);
+UK_TRACEPOINT(trace_vfs_pwrite_ret, "%#x", ssize_t);
 UK_TRACEPOINT(trace_vfs_pwrite_err, "%d", int);
 
 /*
@@ -678,9 +680,8 @@ ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset)
 LFS64(pwrite);
 #endif /* UK_LIBC_SYSCALLS */
 
-UK_TRACEPOINT(trace_vfs_writev, "%d %p 0x%x 0x%x", int, const struct iovec*,
-	      int);
-UK_TRACEPOINT(trace_vfs_writev_ret, "0x%x", ssize_t);
+UK_TRACEPOINT(trace_vfs_writev, "%d %#x %d", int, const struct iovec*, int);
+UK_TRACEPOINT(trace_vfs_writev_ret, "%#x", ssize_t);
 UK_TRACEPOINT(trace_vfs_writev_err, "%d", int);
 
 UK_SYSCALL_R_DEFINE(ssize_t, writev,
@@ -724,9 +725,8 @@ out_error:
 	return error;
 }
 
-UK_TRACEPOINT(trace_vfs_write, "%d %p 0x%x 0x%x", int, const void *,
-	      size_t);
-UK_TRACEPOINT(trace_vfs_write_ret, "0x%x", ssize_t);
+UK_TRACEPOINT(trace_vfs_write, "%d %#x %#x", int, const void *, size_t);
+UK_TRACEPOINT(trace_vfs_write_ret, "%#x", ssize_t);
 UK_TRACEPOINT(trace_vfs_write_err, "%d", int);
 
 UK_SYSCALL_R_DEFINE(ssize_t, write, int, fd, const void *, buf, size_t, count)
@@ -748,7 +748,7 @@ UK_SYSCALL_R_DEFINE(ssize_t, write, int, fd, const void *, buf, size_t, count)
 	return bytes;
 }
 
-UK_TRACEPOINT(trace_vfs_ioctl, "%d 0x%x", int, unsigned long);
+UK_TRACEPOINT(trace_vfs_ioctl, "%d %#x", int, unsigned long);
 UK_TRACEPOINT(trace_vfs_ioctl_ret, "");
 UK_TRACEPOINT(trace_vfs_ioctl_err, "%d", int);
 
@@ -827,7 +827,7 @@ UK_SYSCALL_R_DEFINE(int, fdatasync, int, fd)
 	return fsync(fd);
 }
 
-UK_TRACEPOINT(trace_vfs_fstat, "%d %p", int, struct stat*);
+UK_TRACEPOINT(trace_vfs_fstat, "%d %#x", int, struct stat*);
 UK_TRACEPOINT(trace_vfs_fstat_ret, "");
 UK_TRACEPOINT(trace_vfs_fstat_err, "%d", int);
 
@@ -943,9 +943,13 @@ UK_SYSCALL_R_DEFINE(int, flock, int, fd, int, operation)
 	return -error;
 }
 
-UK_TRACEPOINT(trace_vfs_readdir, "%d %p", int, struct dirent*);
+UK_TRACEPOINT(trace_vfs_readdir, "%d %#x", int, struct dirent*);
 UK_TRACEPOINT(trace_vfs_readdir_ret, "");
 UK_TRACEPOINT(trace_vfs_readdir_err, "%d", int);
+
+UK_TRACEPOINT(trace_vfs_readdir64, "%d %p", int, struct dirent64*);
+UK_TRACEPOINT(trace_vfs_readdir_ret64, "");
+UK_TRACEPOINT(trace_vfs_readdir_err64, "%d", int);
 
 struct __dirstream
 {
@@ -1021,6 +1025,7 @@ int closedir(DIR *dir)
 	return 0;
 }
 
+#if CONFIG_LIBVFSCORE_NONLARGEFILE
 int scandir(const char *path, struct dirent ***res,
 	int (*sel)(const struct dirent *),
 	int (*cmp)(const struct dirent **, const struct dirent **))
@@ -1054,10 +1059,11 @@ int scandir(const char *path, struct dirent ***res,
 	closedir(d);
 
 	if (errno) {
-		if (names)
+		if (names) {
 			while (cnt-->0)
 				free(names[cnt]);
-		free(names);
+			free(names);
+		}
 		return -1;
 	}
 	errno = old_errno;
@@ -1067,7 +1073,76 @@ int scandir(const char *path, struct dirent ***res,
 	*res = names;
 	return cnt;
 }
+#else /* !CONFIG_LIBVFSCORE_NONLARGEFILE */
+int scandir(const char *path, struct dirent ***res,
+	int (*sel)(const struct dirent *),
+	int (*cmp)(const struct dirent **, const struct dirent **))
+	__attribute__((alias("scandir64")));
+#endif /* !CONFIG_LIBVFSCORE_NONLARGEFILE */
 
+#ifdef scandir64
+#undef scandir64
+#endif
+int scandir64(const char *path, struct dirent64 ***res,
+	int (*sel)(const struct dirent64 *),
+	int (*cmp)(const struct dirent64 **, const struct dirent64 **))
+{
+	struct dirent64 *de, **names = 0, **tmp;
+	size_t cnt = 0, len = 0;
+	int old_errno = errno;
+	DIR *d;
+
+	d = opendir(path);
+	if (!d)
+		return -1;
+
+	de = readdir64(d);
+	while (de != NULL) {
+		if (sel && !sel(de))
+			continue;
+
+		if (cnt >= len) {
+			len = 2 * len + 1;
+			if (len > SIZE_MAX / sizeof(*names))
+				break;
+
+			tmp = realloc(names, len * sizeof(*names));
+			if (!tmp)
+				break;
+			names = tmp;
+		}
+
+		names[cnt] = malloc(de->d_reclen);
+		if (unlikely(!names[cnt]))
+			break;
+
+		memcpy(names[cnt++], de, de->d_reclen);
+
+		de = readdir64(d);
+	}
+
+	closedir(d);
+
+	if (unlikely(errno)) {
+		if (names) {
+			while (cnt-- > 0)
+				free(names[cnt]);
+			free(names);
+		}
+
+		return -1;
+	}
+	errno = old_errno;
+
+	if (cmp)
+		qsort(names, cnt, sizeof(*names),
+		      (int (*)(const void *, const void *))cmp);
+
+	*res = names;
+	return cnt;
+}
+
+#if CONFIG_LIBVFSCORE_NONLARGEFILE
 UK_TRACEPOINT(trace_vfs_getdents, "%d %p %hu", int, struct dirent*, size_t);
 UK_TRACEPOINT(trace_vfs_getdents_ret, "");
 UK_TRACEPOINT(trace_vfs_getdents_err, "%d", int);
@@ -1106,6 +1181,7 @@ UK_SYSCALL_R_DEFINE(int, getdents, int, fd, struct dirent*, dirp,
 
 	return (i * sizeof(struct dirent));
 }
+#endif /* CONFIG_LIBVFSCORE_NONLARGEFILE */
 
 UK_TRACEPOINT(trace_vfs_getdents64, "%d %p %hu", int, struct dirent64 *, size_t);
 UK_TRACEPOINT(trace_vfs_getdents64_ret, "");
@@ -1145,56 +1221,118 @@ UK_SYSCALL_R_DEFINE(int, getdents64, int, fd, struct dirent64 *, dirp,
 	return (i * sizeof(struct dirent64));
 }
 
+/**
+ * If we use an old libc version, that does not use the largefile syscalls as
+ * the default ones, we want to use proper Linux `dirent` and `dirent64`
+ * structures, in order to maintain compatibility.
+ * Since the filesystem `READDIR` vop uses `dirent64`, we will convert to
+ * a `dirent` structure within the `readdir_r` call.
+ *
+ * When this is not the case, we can simply use `#define dirent dirent64` and
+ * alias the `readdir*` functions to their `*64` equivalent.
+ */
+#if CONFIG_LIBVFSCORE_NONLARGEFILE
 struct dirent *readdir(DIR *dir)
 {
-	static __thread struct dirent entry, *result;
-	int ret;
+	static __thread struct dirent entry;
+	struct dirent *result;
 
-	ret = readdir_r(dir, &entry, &result);
-	if (ret) {
-		errno = ret;
-		return NULL;
-	}
+	errno = readdir_r(dir, &entry, &result);
 
-	errno = 0;
 	return result;
 }
 
 int readdir_r(DIR *dir, struct dirent *entry, struct dirent **result)
 {
-	int error;
+	/**
+	 * `sys_readdir()` will end up calling `VOP_READDIR`, which expects
+	 * a dirent64 structure instead of the `struct dirent` entry parameter.
+	 */
+	struct dirent64 entry64;
 	struct vfscore_file *fp;
+	int error;
 
-	trace_vfs_readdir(dir->fd, entry);
-	error = fget(dir->fd, &fp);
-	if (!error) {
-		error = sys_readdir(fp, entry);
-		fdrop(fp);
-		if (error) {
-			trace_vfs_readdir_err(error);
-		} else {
-			trace_vfs_readdir_ret();
-		}
-	}
+	*result = NULL;
+
 	// Our dirent has (like Linux) a d_reclen field, but a constant size.
 	entry->d_reclen = sizeof(*entry);
 
-	if (error) {
-		*result = NULL;
-	} else {
-		*result = entry;
-	}
-	return error == ENOENT ? 0 : error;
-}
+	trace_vfs_readdir(dir->fd, entry);
+	error = fget(dir->fd, &fp);
+	if (unlikely(error))
+		return error;
 
-// FIXME: in 64bit dirent64 and dirent are identical, so it's safe to alias
+	error = sys_readdir(fp, &entry64);
+	fdrop(fp);
+	if (unlikely(error)) {
+		trace_vfs_readdir_err(error);
+
+		return error == ENOENT ? 0 : error;
+	}
+
+	trace_vfs_readdir_ret();
+
+	entry->d_ino = entry64.d_ino;
+	entry->d_type = entry64.d_type;
+	entry->d_off = entry64.d_off;
+	memcpy(entry->d_name, entry64.d_name, sizeof(entry64.d_name));
+
+	*result = entry;
+
+	return 0;
+}
+#else /* !CONFIG_LIBVFSCORE_NONLARGEFILE */
+struct dirent *readdir(DIR *dir) __attribute__((alias("readdir64")));
+int readdir_r(DIR *dir, struct dirent *entry, struct dirent **result)
+	 __attribute__((alias("readdir64_r")));
+#endif /* !CONFIG_LIBVFSCORE_NONLARGEFILE */
+
+#ifdef readdir64_r
 #undef readdir64_r
+#endif
 int readdir64_r(DIR *dir, struct dirent64 *entry,
 		struct dirent64 **result)
-		__attribute__((alias("readdir_r")));
+{
+	struct vfscore_file *fp;
+	int error;
 
+	*result = NULL;
+
+	// Our dirent has (like Linux) a d_reclen field, but a constant size.
+	entry->d_reclen = sizeof(*entry);
+
+	trace_vfs_readdir64(dir->fd, entry);
+	error = fget(dir->fd, &fp);
+	if (unlikely(error))
+		return error;
+
+	error = sys_readdir(fp, entry);
+	fdrop(fp);
+	if (unlikely(error)) {
+		trace_vfs_readdir_err64(error);
+
+		return error == ENOENT ? 0 : error;
+	}
+
+	trace_vfs_readdir_ret64();
+
+	*result = entry;
+
+	return 0;
+}
+
+#ifdef readdir64
 #undef readdir64
-struct dirent *readdir64(DIR *dir) __attribute__((alias("readdir")));
+#endif
+struct dirent64 *readdir64(DIR *dir)
+{
+	static __thread struct dirent64 entry;
+	struct dirent64 *result;
+
+	errno = readdir64_r(dir, &entry, &result);
+
+	return result;
+}
 
 void rewinddir(DIR *dirp)
 {
@@ -1292,10 +1430,10 @@ UK_SYSCALL_R_DEFINE(int, mkdirat, int, dirfd,
 	strlcat(p, "/", PATH_MAX);
 	strlcat(p, pathname, PATH_MAX);
 
-	error = uk_syscall_r_mkdir((long) p, (long) mode);
-
 	vn_unlock(vp);
 	fdrop(fp);
+
+	error = uk_syscall_r_mkdir((long) p, (long) mode);
 
 	return error;
 }
@@ -1576,7 +1714,40 @@ out_errno:
 	return -error;
 }
 
-UK_TRACEPOINT(trace_vfs_stat, "\"%s\" %p", const char*, struct stat*);
+UK_SYSCALL_R_DEFINE(int, unlinkat, int, dirfd, const char*, pathname, int, flags)
+{
+	if (pathname[0] == '/' || dirfd == AT_FDCWD) {
+		if (flags & AT_REMOVEDIR)
+			return uk_syscall_r_rmdir((long)pathname);
+		else
+			return uk_syscall_r_unlink((long)pathname);
+	}
+
+	struct vfscore_file *fp;
+	int error = fget(dirfd, &fp);
+	if (error)
+		return -error;
+
+	struct vnode *vp = fp->f_dentry->d_vnode;
+	vn_lock(vp);
+
+	char p[PATH_MAX];
+	/* build absolute path */
+	strlcpy(p, fp->f_dentry->d_mount->m_path, PATH_MAX);
+	strlcat(p, fp->f_dentry->d_path, PATH_MAX);
+	strlcat(p, "/", PATH_MAX);
+	strlcat(p, pathname, PATH_MAX);
+
+	vn_unlock(vp);
+	fdrop(fp);
+
+	if (flags & AT_REMOVEDIR)
+		return uk_syscall_r_rmdir((long)p);
+	else
+		return uk_syscall_r_unlink((long)p);
+}
+
+UK_TRACEPOINT(trace_vfs_stat, "\"%s\" %#x", const char*, struct stat*);
 UK_TRACEPOINT(trace_vfs_stat_ret, "");
 UK_TRACEPOINT(trace_vfs_stat_err, "%d", int);
 
@@ -1631,7 +1802,7 @@ UK_SYSCALL_R_DEFINE(int, stat, const char*, pathname, struct stat*, st)
 
 LFS64(stat);
 
-UK_TRACEPOINT(trace_vfs_lstat, "pathname=%s, stat=%p", const char*,
+UK_TRACEPOINT(trace_vfs_lstat, "pathname=%s, stat=%#x", const char*,
 	      struct stat*);
 UK_TRACEPOINT(trace_vfs_lstat_ret, "");
 UK_TRACEPOINT(trace_vfs_lstat_err, "errno=%d", int);
@@ -1709,13 +1880,13 @@ static int __fxstatat_helper(int ver __unused, int dirfd, const char *pathname,
 	strlcat(p, "/", PATH_MAX);
 	strlcat(p, pathname, PATH_MAX);
 
+	vn_unlock(vp);
+	fdrop(fp);
+
 	if (flags & AT_SYMLINK_NOFOLLOW)
 		error = uk_syscall_r_lstat((long) p, (long) st);
 	else
 		error = uk_syscall_r_stat((long) p, (long) st);
-
-	vn_unlock(vp);
-	fdrop(fp);
 
 	return error;
 }
@@ -1726,7 +1897,7 @@ static int __fxstatat_helper(int ver __unused, int dirfd, const char *pathname,
 
 LFS64(lstat);
 
-UK_TRACEPOINT(trace_vfs_statfs, "\"%s\" %p", const char*, struct statfs*);
+UK_TRACEPOINT(trace_vfs_statfs, "\"%s\" %#x", const char*, struct statfs*);
 UK_TRACEPOINT(trace_vfs_statfs_ret, "");
 UK_TRACEPOINT(trace_vfs_statfs_err, "%d", int);
 
@@ -1763,7 +1934,7 @@ UK_SYSCALL_R_DEFINE(int, statfs, const char*, pathname, struct statfs*, buf)
 
 LFS64(statfs);
 
-UK_TRACEPOINT(trace_vfs_fstatfs, "\"%s\" %p", int, struct statfs*);
+UK_TRACEPOINT(trace_vfs_fstatfs, "\"%s\" %#x", int, struct statfs*);
 UK_TRACEPOINT(trace_vfs_fstatfs_ret, "");
 UK_TRACEPOINT(trace_vfs_fstatfs_err, "%d", int);
 
@@ -1853,7 +2024,7 @@ LFS64(fstatvfs);
 #endif /* UK_LIBC_SYSCALLS */
 
 
-UK_TRACEPOINT(trace_vfs_getcwd, "%p %d", char*, size_t);
+UK_TRACEPOINT(trace_vfs_getcwd, "%#x %d", char*, size_t);
 UK_TRACEPOINT(trace_vfs_getcwd_ret, "\"%s\"", const char*);
 UK_TRACEPOINT(trace_vfs_getcwd_err, "%d", int);
 
@@ -1928,7 +2099,7 @@ UK_SYSCALL_R_DEFINE(int, dup, int, oldfd)
 	return error;
 }
 
-UK_TRACEPOINT(trace_vfs_dup3, "%d %d 0x%x", int, int, int);
+UK_TRACEPOINT(trace_vfs_dup3, "%d %d %#x", int, int, int);
 UK_TRACEPOINT(trace_vfs_dup3_ret, "%d", int);
 UK_TRACEPOINT(trace_vfs_dup3_err, "%d", int);
 /*
@@ -1936,7 +2107,7 @@ UK_TRACEPOINT(trace_vfs_dup3_err, "%d", int);
  */
 UK_SYSCALL_R_DEFINE(int, dup3, int, oldfd, int, newfd, int, flags)
 {
-	struct vfscore_file *fp, *fp_new;
+	struct vfscore_file *fp;
 	int error;
 
 	trace_vfs_dup3(oldfd, newfd, flags);
@@ -1958,39 +2129,42 @@ UK_SYSCALL_R_DEFINE(int, dup3, int, oldfd, int, newfd, int, flags)
 	if (error)
 		goto out_error;
 
-	error = fget(newfd, &fp_new);
-	if (error == 0) {
-		/* if newfd is open, then close it */
-		error = close(newfd);
-		if (error)
-			goto out_error;
-	}
+	/* BUG: The close and reserve operation must be atomic */
+	error = uk_syscall_r_close(newfd);
+	if (error && error != -EBADF)
+		goto out_error_drop;
 
 	error = vfscore_reserve_fd(newfd);
 	if (error)
-		goto out_error;
+		goto out_error_drop;
 
 	error = vfscore_install_fd(newfd, fp);
-	if (error) {
-		fdrop(fp);
-		goto out_error;
-	}
+	if (error)
+		goto out_error_drop;
 
-	fdrop(fp);
 	trace_vfs_dup3_ret(newfd);
 	return newfd;
 
-	out_error:
+out_error_drop:
+	fdrop(fp);
+out_error:
 	trace_vfs_dup3_err(error);
-	if(error > 0)
-		return -error;
-	return error;
+	return (error > 0) ? -error : error;
 }
 
 UK_SYSCALL_R_DEFINE(int, dup2, int, oldfd, int, newfd)
 {
-	if (oldfd == newfd)
+	struct vfscore_file *fp;
+	int error;
+
+	if (unlikely(oldfd == newfd)) {
+		error = fget(oldfd, &fp);
+		if (unlikely(error))
+			return -error;
+
+		fdrop(fp);
 		return newfd;
+	}
 
 	return uk_syscall_r_dup3(oldfd, newfd, 0);
 }
@@ -2000,7 +2174,7 @@ UK_SYSCALL_R_DEFINE(int, dup2, int, oldfd, int, newfd)
  */
 #define SETFL (O_APPEND | O_ASYNC | O_DIRECT | O_NOATIME | O_NONBLOCK)
 
-UK_TRACEPOINT(trace_vfs_fcntl, "%d %d 0x%x", int, int, int);
+UK_TRACEPOINT(trace_vfs_fcntl, "%d %d %#x", int, int, int);
 UK_TRACEPOINT(trace_vfs_fcntl_ret, "\"%s\"", int);
 UK_TRACEPOINT(trace_vfs_fcntl_err, "%d", int);
 
@@ -2008,9 +2182,7 @@ UK_LLSYSCALL_R_DEFINE(int, fcntl, int, fd, unsigned int, cmd, int, arg)
 {
 	struct vfscore_file *fp;
 	int ret = 0, error;
-#if defined(FIONBIO) && defined(FIOASYNC)
-	int tmp;
-#endif
+	int tmp, oldf;
 
 	trace_vfs_fcntl(fd, cmd, arg);
 	error = fget(fd, &fp);
@@ -2047,17 +2219,44 @@ UK_LLSYSCALL_R_DEFINE(int, fcntl, int, fd, unsigned int, cmd, int, arg)
 		break;
 	case F_SETFL:
 		FD_LOCK(fp);
-		fp->f_flags = vfscore_fflags((vfscore_oflags(fp->f_flags) & ~SETFL) |
-				(arg & SETFL));
-		FD_UNLOCK(fp);
+		oldf = fp->f_flags;
+		tmp  = vfscore_oflags(fp->f_flags) & ~SETFL;
+		fp->f_flags = vfscore_fflags(tmp | (arg & SETFL));
 
-#if defined(FIONBIO) && defined(FIOASYNC)
-		/* Sync nonblocking/async state with file flags */
+		/* Sync nonblocking/async state with file flags
+		 * To make sure that the actual state of the underlying file
+		 * is in sync with the configured flag, we need to perform the
+		 * ioctl while holding the lock. This is not optimal since we
+		 * hold the lock for the duration of potentially expensive
+		 * operations. It would be better to just set the flag here and
+		 * make sure that all components directly consume this flag
+		 * instead of synching it to other places.
+		 */
 		tmp = fp->f_flags & FNONBLOCK;
-		vfs_ioctl(fp, FIONBIO, &tmp);
+		if ((tmp ^ oldf) & FNONBLOCK) {
+			error = vfs_ioctl(fp, FIONBIO, &tmp);
+			if (unlikely(error)) {
+				fp->f_flags = oldf;
+				FD_UNLOCK(fp);
+				break;
+			}
+		}
+
 		tmp = fp->f_flags & FASYNC;
-		vfs_ioctl(fp, FIOASYNC, &tmp);
-#endif
+		if ((tmp ^ oldf) & FASYNC) {
+			error = vfs_ioctl(fp, FIOASYNC, &tmp);
+			if (unlikely(error)) {
+				tmp = oldf & FNONBLOCK;
+				if ((tmp ^ fp->f_flags) & FNONBLOCK)
+					(void)vfs_ioctl(fp, FIONBIO, &tmp);
+
+				fp->f_flags = oldf;
+				FD_UNLOCK(fp);
+				break;
+			}
+		}
+
+		FD_UNLOCK(fp);
 		break;
 	case F_DUPFD_CLOEXEC:
 		error = fdalloc(fp, &ret);
@@ -2078,7 +2277,7 @@ UK_LLSYSCALL_R_DEFINE(int, fcntl, int, fd, unsigned int, cmd, int, arg)
 		uk_pr_warn_once("fcntl(F_SETOWN) stubbed\n");
 		break;
 	default:
-		uk_pr_err("unsupported fcntl cmd 0x%x\n", cmd);
+		uk_pr_err("unsupported fcntl cmd %#x\n", cmd);
 		error = EINVAL;
 	}
 
@@ -2171,10 +2370,10 @@ UK_SYSCALL_R_DEFINE(int, faccessat, int, dirfd, const char*, pathname, int, mode
 	strlcat(p, "/", PATH_MAX);
 	strlcat(p, pathname, PATH_MAX);
 
-	error = uk_syscall_r_access((long) p, (long) mode);
-
 	vn_unlock(vp);
 	fdrop(fp);
+
+	error = uk_syscall_r_access((long) p, (long) mode);
 
 	out_error:
 	return error;
@@ -2215,7 +2414,7 @@ int isatty(int fd)
 }
 #endif
 
-UK_TRACEPOINT(trace_vfs_truncate, "\"%s\" 0x%x", const char*, off_t);
+UK_TRACEPOINT(trace_vfs_truncate, "\"%s\" %#x", const char*, off_t);
 UK_TRACEPOINT(trace_vfs_truncate_ret, "");
 UK_TRACEPOINT(trace_vfs_truncate_err, "%d", int);
 
@@ -2251,7 +2450,7 @@ UK_SYSCALL_R_DEFINE(int, truncate, const char*, pathname, off_t, length)
 
 LFS64(truncate);
 
-UK_TRACEPOINT(trace_vfs_ftruncate, "%d 0x%x", int, off_t);
+UK_TRACEPOINT(trace_vfs_ftruncate, "%d %#x", int, off_t);
 UK_TRACEPOINT(trace_vfs_ftruncate_ret, "");
 UK_TRACEPOINT(trace_vfs_ftruncate_err, "%d", int);
 
@@ -2314,7 +2513,7 @@ UK_SYSCALL_DEFINE(ssize_t, readlink, const char *, pathname, char *, buf, size_t
 	return -1;
 }
 
-UK_TRACEPOINT(trace_vfs_fallocate, "%d %d 0x%x 0x%x", int, int, loff_t, loff_t);
+UK_TRACEPOINT(trace_vfs_fallocate, "%d %d %#x %#x", int, int, loff_t, loff_t);
 UK_TRACEPOINT(trace_vfs_fallocate_ret, "");
 UK_TRACEPOINT(trace_vfs_fallocate_err, "%d", int);
 
@@ -2351,7 +2550,7 @@ UK_TRACEPOINT(trace_vfs_utimes, "\"%s\"", const char*);
 UK_TRACEPOINT(trace_vfs_utimes_ret, "");
 UK_TRACEPOINT(trace_vfs_utimes_err, "%d", int);
 
-int futimes(int fd, const struct timeval *times)
+int futimes(int fd, const struct timeval times[2])
 {
     return futimesat(fd, NULL, times);
 }
@@ -2489,7 +2688,7 @@ UK_SYSCALL_R_DEFINE(int, utimes, const char*, pathname,
 	return do_utimes(pathname, times, 0);
 }
 
-int lutimes(const char *pathname, const struct timeval *times)
+int lutimes(const char *pathname, const struct timeval times[2])
 {
 	return do_utimes(pathname, times, AT_SYMLINK_NOFOLLOW);
 }
@@ -2497,21 +2696,16 @@ int lutimes(const char *pathname, const struct timeval *times)
 UK_SYSCALL_R_DEFINE(int, utime, const char *, pathname,
 		    const struct utimbuf *, t)
 {
-	struct timeval times[2];
-	times[0].tv_usec = 0;
-	times[1].tv_usec = 0;
-
-	if (!t) {
-		long int tsec = 0; /* FIXME: Use current time in seconds */
-		times[0].tv_sec = tsec;
-		times[1].tv_sec = tsec;
-	} else {
+	if (t) {
+		struct timeval times[2];
 		times[0].tv_sec = t->actime;
+		times[0].tv_usec = 0;
 		times[1].tv_sec = t->modtime;
+		times[1].tv_usec = 0;
+		return uk_syscall_r_utimes((long) pathname, (long) times);
+	} else {
+		return uk_syscall_r_utimes((long) pathname, (long) NULL);
 	}
-
-	return uk_syscall_r_utimes((long) pathname,
-				   (long) times);
 }
 
 UK_TRACEPOINT(trace_vfs_chmod, "\"%s\" 0%0o", const char*, mode_t);

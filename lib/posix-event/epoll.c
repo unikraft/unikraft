@@ -30,6 +30,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _GNU_SOURCE
+
 #include <vfscore/eventpoll.h>
 #include <vfscore/fs.h>
 #include <vfscore/file.h>
@@ -39,10 +41,13 @@
 #include <uk/alloc.h>
 #include <uk/syscall.h>
 #include <uk/config.h>
+#include <uk/init.h>
 
 #include <inttypes.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <string.h>
+#include <stdlib.h>
 
 static uint64_t e_inode;
 
@@ -125,7 +130,7 @@ static int do_epoll_create(struct uk_alloc *a, int flags)
 		goto ERR_MALLOC_FILE;
 	}
 
-	vfs_file = uk_malloc(a, sizeof(struct vfscore_file));
+	vfs_file = malloc(sizeof(struct vfscore_file));
 	if (unlikely(!vfs_file)) {
 		ret = -ENOMEM;
 		goto ERR_MALLOC_VFS_FILE;
@@ -180,7 +185,7 @@ ERR_VFS_INSTALL:
 ERR_ALLOC_DENTRY:
 	vput(vfs_vnode);
 ERR_ALLOC_VNODE:
-	uk_free(a, vfs_file);
+	free(vfs_file);
 ERR_MALLOC_VFS_FILE:
 	uk_free(a, ep);
 ERR_MALLOC_FILE:
@@ -369,3 +374,28 @@ int epoll_pwait(int epfd, struct epoll_event *events, int maxevents,
 	return ret;
 }
 #endif /* UK_LIBC_SYSCALLS */
+
+static int epoll_mount_init(void)
+{
+	int ret;
+
+	epoll_mount.m_path = strdup("");
+	if (!epoll_mount.m_path) {
+		ret = -ENOMEM;
+		goto err_out;
+	}
+
+	epoll_mount.m_special = strdup("");
+	if (!epoll_mount.m_special) {
+		ret = -ENOMEM;
+		goto err_free_m_path;
+	}
+
+	return 0;
+
+err_free_m_path:
+	free(epoll_mount.m_path);
+err_out:
+	return ret;
+}
+uk_lib_initcall(epoll_mount_init);

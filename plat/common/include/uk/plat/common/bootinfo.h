@@ -9,6 +9,7 @@
 
 #include <uk/arch/types.h>
 #include <uk/arch/limits.h>
+#include <uk/plat/memory.h>
 #include <uk/plat/common/memory.h>
 
 /** Unikraft boot info */
@@ -28,8 +29,19 @@ struct ukplat_bootinfo {
 	/** Null-terminated boot protocol identifier */
 	char bootprotocol[16];
 
-	/** Address of null-terminated kernel command line */
+	/** Address of the kernel command line. The string is not necessarily
+	 * null-terminated.
+	 */
 	__u64 cmdline;
+
+	/** Size of the kernel command-line without the null terminator */
+	__u64 cmdline_len;
+
+	/** Address of the devicetree blob */
+	__u64 dtb;
+
+	/** Address of UEFI System Table */
+	__u64 efi_st;
 
 	/**
 	 * List of memory regions. Must be the last member as the
@@ -38,7 +50,7 @@ struct ukplat_bootinfo {
 	struct ukplat_memregion_list mrds;
 } __packed __align(__SIZEOF_LONG__);
 
-UK_CTASSERT(sizeof(struct ukplat_bootinfo) == 56);
+UK_CTASSERT(sizeof(struct ukplat_bootinfo) == 80);
 
 #ifdef CONFIG_UKPLAT_MEMRNAME
 #if __SIZEOF_LONG__ == 8
@@ -76,5 +88,10 @@ void ukplat_bootinfo_set(struct ukplat_bootinfo *bi);
  * Prints the boot information to the kernel console using informational level
  */
 void ukplat_bootinfo_print(void);
+
+/**
+ * Given the pointer to the FDT, sets up the bootinfo structure based on it.
+ */
+void ukplat_bootinfo_fdt_setup(void *fdtp);
 
 #endif /* __PLAT_CMN_BOOTINFO_H__ */

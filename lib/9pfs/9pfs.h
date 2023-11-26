@@ -39,63 +39,152 @@
 
 #include <vfscore/prex.h>
 
-/*
- * Currently supports only the 9P2000.u variant of the protocol.
+/**
+ * Protocol version; the default version is `9P2000.L`,
+ * it can be changed via the `CONFIG_LIBVFSCORE_ROOTOPTS`
+ * config option.
  */
 enum uk_9pfs_proto {
+	/*
+	 * Extensions and minor adjustments are added to
+	 * the basic protocol for Unix systems
+	 */
 	UK_9P_PROTO_2000U,
+	/*
+	 * Extensions and minor adjustments are added to
+	 * the basic protocol for Linux systems
+	 */
 	UK_9P_PROTO_2000L,
+	/*
+	 * The number of existent protocols;
+	 * in this case, two (`UK_9P_PROTO_2000U` and `UK_9P_PROTO_2000L`)
+	 */
 	UK_9P_PROTO_MAX
 };
 
+/**
+ * An entry containing the necessary data for mounting the filesystem
+ */
 struct uk_9pfs_mount_data {
-	/* 9P device. */
+	/* 9P device, used to interact with a `virtio` device;
+	 * the initialization for this field is done in
+	 * `uk_9p_dev_connect()`
+	 */
 	struct uk_9pdev		*dev;
-	/* Wanted transport. */
+	/* Wanted transport */
 	struct uk_9pdev_trans	*trans;
-	/* Protocol version used. */
+	/* Protocol version used */
 	enum uk_9pfs_proto	proto;
-	/* Username to attempt to mount as on the remote server. */
+	/* User name to attempt to mount as on the remote server */
 	char			*uname;
-	/* File tree to access when offered multiple exported filesystems. */
+	/*
+	 * File system name to access when the server is
+	 * offering several exported file systems.
+	 */
 	char			*aname;
 };
 
+/**
+ * An entry containing the necessary data
+ */
 struct uk_9pfs_file_data {
-	/* Fid associated with the 9pfs file. */
+	/* File id of the 9pfs file */
 	struct uk_9pfid        *fid;
 	/*
 	 * Buffer for persisting results from a 9P read operation across
-	 * readdir() calls.
+	 * `readdir()` calls
 	 */
 	char                   *readdir_buf;
 	/*
-	 * Offset within the buffer where the stat of the next child can
-	 * be found.
+	 * Offset within the buffer where the `uk_9p_stat`
+	 * stat structure of the next child can be found
 	 */
 	int                    readdir_off;
-	/* Total size of the data in the readdir buf. */
+	/* Total size of the data in the `readdir` buf */
 	int                    readdir_sz;
 };
 
+/**
+ * A filesystem entry node for 9pfs
+ */
 struct uk_9pfs_node_data {
-	/* Fid associated with the vfs node. */
+	/* File id of the vfs node */
 	struct uk_9pfid        *fid;
-	/* Number of files opened from the vfs node. */
+	/* Number of files opened from the vfs node */
 	int                    nb_open_files;
-	/* Is a 9P remove call required when nb_open_files reaches 0? */
+	/* Is a 9P remove call required when `nb_open_files` reaches 0? */
 	bool                   removed;
 };
 
+/**
+ * Allocates a new `uk_9pfs_node_data` entry and associates it with a `vnode`.
+ *
+ * @param vp
+ *   Pointer to the `vnode` which will contain the `uk_9pfs_node_data` entry
+ * @param fid
+ *   File id of the vfs node
+ * @return
+ *   0 on success, -ENOMEM for memory allocation error
+ */
 int uk_9pfs_allocate_vnode_data(struct vnode *vp, struct uk_9pfid *fid);
+
+/**
+ * Frees a new `uk_9pfs_node_data` entry and removes it from the `vnode`.
+ *
+ * @param vp
+ *   Pointer to the `vnode` which contains the `uk_9pfs_node_data`
+ *   that will be freed
+ */
 void uk_9pfs_free_vnode_data(struct vnode *vp);
 
-/* Default readdir buffer size. */
+/**
+ * Default `readdir` buffer size.
+ */
 #define UK_9PFS_READDIR_BUFSZ	8192
 
+/**
+ * Converts a `vfscore_file` into a `uk_9pfs_file_data`.
+ *
+ * @param file
+ *   Virtual file (abstraction offered by `vfscore`)
+ *   holding a reference to a `uk_9pfs_file_data`
+ * @return
+ *   Pointer to the corresponding `uk_9pfs_file_data`
+ */
 #define UK_9PFS_FD(file) ((struct uk_9pfs_file_data *) (file)->f_data)
+
+/**
+ * Converts a `vnode` into a `uk_9pfs_node_data`.
+ *
+ * @param vnode
+ *   Virtual node (abstraction offered by `vfscore`)
+ *   holding a reference to a `uk_9pfs_node_data`
+ * @return
+ *   Pointer to the corresponding `uk_9pfs_node_data`
+ */
 #define UK_9PFS_ND(vnode) ((struct uk_9pfs_node_data *) (vnode)->v_data)
+
+/**
+ * Returns the file id of a `vnode`.
+ *
+ * @param vnode
+ *   Virtual node (abstraction offered by `vfscore`)
+ *   holding a reference to a `uk_9pfs_node_data`, which
+ *   contains the file id.
+ * @return
+ *   File id of the vnode
+ */
 #define UK_9PFS_VFID(vnode) (UK_9PFS_ND(vnode)->fid)
+
+/**
+ * Converts a mount into `uk_9pfs_mount_data`.
+ *
+ * @param mount
+ *   Mount data (abstraction offered by `vfscore`)
+ *   holding a reference to a `uk_9pfs_mount_data`
+ * @return
+ *   Pointer to the corresponding `uk_9pfs_mount_data`
+ */
 #define UK_9PFS_MD(mount) ((struct uk_9pfs_mount_data *) (mount)->m_data)
 
 #endif /* __UK_9PFS__ */

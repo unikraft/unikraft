@@ -7,14 +7,6 @@ $(eval $(call addplat_s,kvm,$(CONFIG_PLAT_KVM)))
 ## KVM platform library registration
 ##
 $(eval $(call addplatlib,kvm,libkvmplat))
-$(eval $(call addplatlib_s,kvm,libkvmpci,$(CONFIG_KVM_PCI)))
-$(eval $(call addplatlib_s,kvm,libkvmpf,$(CONFIG_KVM_PF)))
-$(eval $(call addplatlib_s,kvm,libkvmvirtio,$(CONFIG_VIRTIO_BUS)))
-$(eval $(call addplatlib_s,kvm,libkvmvirtionet,$(CONFIG_VIRTIO_NET)))
-$(eval $(call addplatlib_s,kvm,libkvmvirtioblk,$(CONFIG_VIRTIO_BLK)))
-$(eval $(call addplatlib_s,kvm,libkvmvirtio9p,$(CONFIG_VIRTIO_9P)))
-$(eval $(call addplatlib_s,kvm,libkvmofw,$(CONFIG_LIBOFW)))
-$(eval $(call addplatlib_s,kvm,libkvmgic,$(CONFIG_LIBGIC)))
 $(eval $(call addplatlib_s,kvm,libkvmpl031,$(CONFIG_RTC_PL031)))
 
 ##
@@ -26,9 +18,9 @@ LIBKVMPLAT_CINCLUDES-y         += -I$(LIBKVMPLAT_BASE)/include
 LIBKVMPLAT_CINCLUDES-y         += -I$(UK_PLAT_COMMON_BASE)/include
 LIBKVMPLAT_CINCLUDES-y         += -I$(UK_PLAT_DRIVERS_BASE)/include
 
-LIBKVMPLAT_ASFLAGS             += -DKVMPLAT
-LIBKVMPLAT_CFLAGS              += -DKVMPLAT
-LIBKVMPLAT_CXXFLAGS            += -DKVMPLAT
+LIBKVMPLAT_ASFLAGS             += -DKVMPLAT -DUK_USE_SECTION_SEGMENTS
+LIBKVMPLAT_CFLAGS              += -DKVMPLAT -DUK_USE_SECTION_SEGMENTS
+LIBKVMPLAT_CXXFLAGS            += -DKVMPLAT -DUK_USE_SECTION_SEGMENTS
 
 ##
 ## Default Linker script
@@ -55,13 +47,16 @@ LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/tls.c|common
 ifeq ($(CONFIG_HAVE_SYSCALL),y)
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/syscall.S|common
 endif
-ifeq ($(CONFIG_HAVE_SMP),y)
-LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/acpi.c|common
-endif
-LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/bootinfo.c|common
-LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/bootinfo.lds.S|common
+ifeq ($(CONFIG_KVM_BOOT_PROTO_MULTIBOOT),y)
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/multiboot.S|x86
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/multiboot.c
+else ifeq ($(CONFIG_KVM_BOOT_PROTO_LXBOOT),y)
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/lxboot.S|x86
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/lxboot.c
+else ifeq ($(CONFIG_KVM_BOOT_PROTO_EFI_STUB),y)
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/efi_entry64.S|x86
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/efi_post.c
+endif
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/pagetable64.S
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/traps.c
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/cpu_vectors_x86_64.S
@@ -69,10 +64,8 @@ LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/setup.c
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/console.c
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/lcpu.c
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/lcpu_start.S
-LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/intctrl.c
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/tscclock.c
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/time.c
-LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/memory.c
 ifeq ($(findstring y,$(CONFIG_KVM_KERNEL_VGA_CONSOLE) $(CONFIG_KVM_DEBUG_VGA_CONSOLE)),y)
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBKVMPLAT_BASE)/x86/vga_console.c
 endif
@@ -83,9 +76,8 @@ endif
 ##
 ## Architecture library definitions for arm64
 ##
-ifeq ($(findstring y,$(CONFIG_KVM_KERNEL_SERIAL_CONSOLE) $(CONFIG_KVM_DEBUG_SERIAL_CONSOLE)),y)
-LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_DRIVERS_BASE)/uart/pl011.c
-endif
+LIBKVMPLAT_SRCS-$(CONFIG_UART_NS16550) += $(UK_PLAT_DRIVERS_BASE)/uart/ns16550.c
+LIBKVMPLAT_SRCS-$(CONFIG_UART_PL011)   += $(UK_PLAT_DRIVERS_BASE)/uart/pl011.c
 ifeq ($(CONFIG_PAGING),y)
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/paging.c|isr
 endif
@@ -108,126 +100,37 @@ LIBKVMPLAT_SRCS-$(CONFIG_FPSIMD)      += $(UK_PLAT_COMMON_BASE)/arm/fp_arm64.c|i
 ifeq ($(CONFIG_HAVE_SMP),y)
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/lcpu_start.S
 endif
-LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/bootinfo.c|common
-LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/bootinfo.lds.S|common
-LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/bpt64.S|arm
+ifeq ($(CONFIG_KVM_VMM_QEMU),y)
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/qemu_bpt64.S|arm
+endif
+ifeq ($(CONFIG_KVM_VMM_FIRECRACKER),y)
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/firecracker_bpt64.S|arm
+endif
+ifeq ($(CONFIG_KVM_BOOT_PROTO_EFI_STUB),y)
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/efi_post.c
+LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/efi_entry64.S|arm
+else
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/entry64.S|isr
+endif
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/exceptions.S|isr
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/pagetable64.S|isr
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/setup.c
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/lcpu.c
-LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/intctrl.c
-LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBKVMPLAT_BASE)/arm/memory.c
 
-LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/shutdown.c
-LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/irq.c
-LIBKVMPLAT_SRCS-y              += $(LIBKVMPLAT_BASE)/io.c
-LIBKVMPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/lcpu.c|common
-LIBKVMPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/memory.c|common
-LIBKVMPLAT_SRCS-y              += $(UK_PLAT_KVM_DEF_LDS)
-
-##
-## PCI library definitions
-##
-LIBKVMPCI_ASINCLUDES-y  += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMPCI_ASINCLUDES-y  += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMPCI_CINCLUDES-y   += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMPCI_CINCLUDES-y   += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMPCI_CINCLUDES-y   += -I$(UK_PLAT_DRIVERS_BASE)/include
-LIBKVMPCI_SRCS-y	+= $(UK_PLAT_COMMON_BASE)/pci_bus.c|common
-LIBKVMPCI_SRCS-$(CONFIG_ARCH_X86_64) += \
-				$(UK_PLAT_COMMON_BASE)/x86/pci_bus_x86.c|x86
-LIBKVMPCI_SRCS-$(CONFIG_ARCH_ARM_64) += \
-				$(UK_PLAT_COMMON_BASE)/arm/pci_bus_arm64.c|arm
-LIBKVMPCI_SRCS-$(CONFIG_ARCH_ARM_64) += \
-				$(UK_PLAT_COMMON_BASE)/pci_ecam.c|arm
-
-##
-## Platform bus library definitions
-##
-LIBKVMPF_ASINCLUDES-$(CONFIG_ARCH_ARM_64)  += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMPF_CINCLUDES-$(CONFIG_ARCH_ARM_64)   += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMPF_CINCLUDES-$(CONFIG_ARCH_ARM_64)   += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMPF_CINCLUDES-$(CONFIG_ARCH_ARM_64)   += -I$(UK_PLAT_DRIVERS_BASE)/include
-LIBKVMPF_SRCS-$(CONFIG_KVM_PF) += $(UK_PLAT_COMMON_BASE)/platform_bus.c|common
-
-##
-## Virtio library definitions
-##
-LIBKVMVIRTIO_ASINCLUDES-y   += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMVIRTIO_CINCLUDES-y    += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMVIRTIO_ASINCLUDES-y   += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMVIRTIO_CINCLUDES-y    += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMVIRTIO_ASINCLUDES-y   += -I$(UK_PLAT_DRIVERS_BASE)/include
-LIBKVMVIRTIO_CINCLUDES-y    += -I$(UK_PLAT_DRIVERS_BASE)/include
-LIBKVMVIRTIO_SRCS-$(CONFIG_VIRTIO_BUS) +=\
-			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_bus.c
-LIBKVMVIRTIO_SRCS-$(CONFIG_VIRTIO_BUS) +=\
-			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_ring.c
-LIBKVMVIRTIO_SRCS-$(CONFIG_VIRTIO_PCI) +=\
-			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_pci.c
-LIBKVMVIRTIO_SRCS-$(CONFIG_ARCH_ARM_64)	+=\
-			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_mmio.c
-##
-## Virtio Net library definition
-##
-LIBKVMVIRTIONET_ASINCLUDES-y   += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMVIRTIONET_CINCLUDES-y    += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMVIRTIONET_ASINCLUDES-y   += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMVIRTIONET_CINCLUDES-y    += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMVIRTIONET_ASINCLUDES-y   += -I$(UK_PLAT_DRIVERS_BASE)/include
-LIBKVMVIRTIONET_CINCLUDES-y    += -I$(UK_PLAT_DRIVERS_BASE)/include
-LIBKVMVIRTIONET_SRCS-y +=\
-			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_net.c
-##
-## Virtio BLK library definition
-##
-LIBKVMVIRTIOBLK_ASINCLUDES-y   += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMVIRTIOBLK_CINCLUDES-y    += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMVIRTIOBLK_ASINCLUDES-y   += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMVIRTIOBLK_CINCLUDES-y    += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMVIRTIOBLK_ASINCLUDES-y   += -I$(UK_PLAT_DRIVERS_BASE)/include
-LIBKVMVIRTIOBLK_CINCLUDES-y    += -I$(UK_PLAT_DRIVERS_BASE)/include
-LIBKVMVIRTIOBLK_SRCS-y +=\
-			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_blk.c
-
-##
-## Virtio 9P library definition
-##
-LIBKVMVIRTIO9P_ASINCLUDES-y   += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMVIRTIO9P_CINCLUDES-y    += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMVIRTIO9P_ASINCLUDES-y   += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMVIRTIO9P_CINCLUDES-y    += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMVIRTIO9P_ASINCLUDES-y   += -I$(UK_PLAT_DRIVERS_BASE)/include
-LIBKVMVIRTIO9P_CINCLUDES-y    += -I$(UK_PLAT_DRIVERS_BASE)/include
-LIBKVMVIRTIO9P_SRCS-y +=\
-			$(UK_PLAT_DRIVERS_BASE)/virtio/virtio_9p.c
-
-##
-## OFW library definitions
-##
-LIBKVMOFW_CINCLUDES-y         += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMOFW_CINCLUDES-y         += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMOFW_CINCLUDES-y         += -I$(UK_PLAT_DRIVERS_BASE)/include
-
-LIBKVMOFW_SRCS-y                += $(UK_PLAT_DRIVERS_BASE)/ofw/fdt.c
-LIBKVMOFW_SRCS-$(CONFIG_LIBGIC) += $(UK_PLAT_DRIVERS_BASE)/ofw/gic_fdt.c
-
-##
-## GIC library definitions
-##
-ifeq ($(findstring y,$(CONFIG_LIBGIC)),y)
-LIBKVMGIC_CINCLUDES-y         += -I$(LIBKVMPLAT_BASE)/include
-LIBKVMGIC_CINCLUDES-y         += -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMGIC_CINCLUDES-y         += -I$(UK_PLAT_DRIVERS_BASE)/include
-LIBKVMGIC_SRCS-y += $(UK_PLAT_DRIVERS_BASE)/gic/gic-common.c
-ifeq ($(findstring y,$(CONFIG_LIBGICV2)),y)
-LIBKVMGIC_SRCS-y += $(UK_PLAT_DRIVERS_BASE)/gic/gic-v2.c
+LIBKVMPLAT_SRCS-y                          += $(LIBKVMPLAT_BASE)/shutdown.c
+LIBKVMPLAT_SRCS-y                          += $(LIBKVMPLAT_BASE)/memory.c
+LIBKVMPLAT_SRCS-y                          += $(LIBKVMPLAT_BASE)/io.c
+LIBKVMPLAT_SRCS-y                          += $(UK_PLAT_COMMON_BASE)/lcpu.c|common
+LIBKVMPLAT_SRCS-y                          += $(UK_PLAT_COMMON_BASE)/memory.c|common
+LIBKVMPLAT_SRCS-y                          += $(UK_PLAT_KVM_DEF_LDS)
+LIBKVMPLAT_SRCS-$(CONFIG_UKPLAT_ACPI)      += $(UK_PLAT_COMMON_BASE)/acpi.c|common
+ifeq ($(CONFIG_KVM_BOOT_PROTO_EFI_STUB),y)
+LIBKVMPLAT_SRCS-y                          += $(LIBKVMPLAT_BASE)/efi.c|common
 endif
-ifeq ($(findstring y,$(CONFIG_LIBGICV3)),y)
-LIBKVMGIC_SRCS-y += $(UK_PLAT_DRIVERS_BASE)/gic/gic-v3.c
-endif
-endif
+
+LIBKVMPLAT_SRCS-y		 += $(UK_PLAT_COMMON_BASE)/bootinfo.c|common
+LIBKVMPLAT_SRCS-$(CONFIG_LIBFDT) += $(UK_PLAT_COMMON_BASE)/bootinfo_fdt.c|common
+LIBKVMPLAT_SRCS-y		 += $(UK_PLAT_COMMON_BASE)/bootinfo.lds.S|common
 
 ##
 ## RTC-PL031 library definitions

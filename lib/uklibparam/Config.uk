@@ -1,5 +1,10 @@
 config LIBUKLIBPARAM
-       bool "uklibparam: Library arguments"
-       default n
-       select LIBUKDEBUG
-       select LIBNOLIBC if !HAVE_LIBC
+	bool "uklibparam: Library arguments"
+	default n
+	select LIBUKDEBUG
+	select LIBNOLIBC if !HAVE_LIBC
+	help
+		Parser for library arguments. Such arguments can be set with the
+		kernel command line at boot time and overwrites default values
+		(e.g., network interface IP addresses). A help summary with a
+		list of available arguments is printed with: "help --".

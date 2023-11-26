@@ -31,10 +31,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _GNU_SOURCE
+
 #include <uk/config.h>
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <vfscore/file.h>
 #include <vfscore/fs.h>
 #include <vfscore/mount.h>
@@ -44,6 +47,7 @@
 #include <uk/syscall.h>
 #include <sys/ioctl.h>
 #include <uk/syscall.h>
+#include <uk/init.h>
 
 /* We use the default size in Linux kernel */
 #define PIPE_MAX_SIZE	(1 << CONFIG_LIBVFSCORE_PIPE_SIZE_ORDER)
@@ -305,7 +309,7 @@ static int pipe_write(struct vnode *vnode,
 
 	if (!pipe_file->r_refcount) {
 		/* TODO before returning the error, send a SIGPIPE signal */
-		return -EPIPE;
+		return EPIPE;
 	}
 
 	uk_mutex_lock(&pipe_buf->wrlock);
@@ -443,8 +447,7 @@ static int pipe_seek(struct vnode *vnode __unused,
 			struct vfscore_file *vfscore_file __unused,
 			off_t off1 __unused, off_t off2 __unused)
 {
-	errno = ESPIPE;
-	return -1;
+	return ESPIPE;
 }
 
 static int pipe_ioctl(struct vnode *vnode,
@@ -460,8 +463,11 @@ static int pipe_ioctl(struct vnode *vnode,
 		*((int *) data) = pipe_buf_get_available(pipe_buf);
 		uk_mutex_unlock(&pipe_buf->rdlock);
 		return 0;
+	case FIONBIO:
+		/* sys_ioctl() already sets f_flags, no need to do anything */
+		return 0;
 	default:
-		return -EINVAL;
+		return EINVAL;
 	}
 }
 
@@ -692,6 +698,9 @@ UK_SYSCALL_R_DEFINE(int, pipe2, int*, pipefd, int, flags)
 {
 	int rc;
 
+	if (flags & O_DIRECT)
+		return -EINVAL;
+
 	rc = uk_syscall_r_pipe((long) pipefd);
 	if (rc)
 		return rc;
@@ -716,3 +725,28 @@ int mkfifo(const char *path __unused, mode_t mode __unused)
 	return -1;
 }
 #endif /* UK_LIBC_SYSCALLS */
+
+static int pipe_mount_init(void)
+{
+	int ret;
+
+	p_mount.m_path = strdup("");
+	if (!p_mount.m_path) {
+		ret = -ENOMEM;
+		goto err_out;
+	}
+
+	p_mount.m_special = strdup("");
+	if (!p_mount.m_special) {
+		ret = -ENOMEM;
+		goto err_free_m_path;
+	}
+
+	return 0;
+
+err_free_m_path:
+	free(p_mount.m_path);
+err_out:
+	return ret;
+}
+uk_lib_initcall(pipe_mount_init);

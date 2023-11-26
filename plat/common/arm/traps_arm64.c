@@ -27,7 +27,7 @@
 #include <arm/traps.h>
 #include <uk/print.h>
 #include <uk/assert.h>
-#include <gic/gic.h>
+#include <uk/intctlr/gic.h>
 
 #ifdef CONFIG_ARM64_FEAT_MTE
 #include <arm/arm64/mte.h>
@@ -50,6 +50,7 @@ enum aarch64_trap {
 	AARCH64_TRAP_BUS_ERROR,
 	AARCH64_TRAP_MATH,
 	AARCH64_TRAP_SECURITY,
+	AARCH64_TRAP_SYSCALL,
 
 	AARCH64_TRAP_MAX
 };
@@ -99,6 +100,7 @@ DECLARE_TRAP_EVENT(UKARCH_TRAP_PAGE_FAULT);
 DECLARE_TRAP_EVENT(UKARCH_TRAP_BUS_ERROR);
 DECLARE_TRAP_EVENT(UKARCH_TRAP_MATH);
 DECLARE_TRAP_EVENT(UKARCH_TRAP_SECURITY);
+DECLARE_TRAP_EVENT(UKARCH_TRAP_SYSCALL);
 
 static const struct {
 	struct uk_event *event;
@@ -109,7 +111,8 @@ static const struct {
 	{ UK_EVENT_PTR(UKARCH_TRAP_PAGE_FAULT), "page fault"     },
 	{ UK_EVENT_PTR(UKARCH_TRAP_BUS_ERROR),  "bus error"      },
 	{ UK_EVENT_PTR(UKARCH_TRAP_MATH),       "floating point" },
-	{ UK_EVENT_PTR(UKARCH_TRAP_SECURITY),   "security"       }
+	{ UK_EVENT_PTR(UKARCH_TRAP_SECURITY),   "security"       },
+	{ UK_EVENT_PTR(UKARCH_TRAP_SYSCALL),    "system call"    }
 };
 
 static enum aarch64_trap esr_to_trap(__u64 esr)
@@ -118,6 +121,9 @@ static enum aarch64_trap esr_to_trap(__u64 esr)
 
 	/* We expect Unikraft to run in EL1. So do not catch traps from EL0. */
 	switch (ESR_EC_FROM(esr)) {
+	case ESR_EL1_EC_SVC64:
+		return AARCH64_TRAP_SYSCALL;
+
 	case ESR_EL1_EC_MMU_IABRT_EL1:
 	case ESR_EL1_EC_MMU_DABRT_EL1:
 		fsc = ESR_ISS_ABRT_FSC_FROM(ESR_ISS_FROM(esr));
@@ -215,3 +221,19 @@ void trap_el1_irq(struct __regs *regs)
 
 	gic->ops.handle_irq(regs);
 }
+
+#ifdef CONFIG_LIBSYSCALL_SHIM_HANDLER
+
+extern void ukplat_syscall_handler(struct __regs *r);
+
+static int arm64_syscall_adapter(void *data)
+{
+	struct ukarch_trap_ctx *ctx = (struct ukarch_trap_ctx *)data;
+
+	ukplat_syscall_handler(ctx->regs);
+	return 1; /* Success */
+}
+
+UK_EVENT_HANDLER(UKARCH_TRAP_SYSCALL, arm64_syscall_adapter);
+
+#endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER */

@@ -1,0 +1,15 @@
+################################################################################
+#
+# Driver registrations
+#
+################################################################################
+
+UK_DRIV_LIBVIRTIO_BASE := $(UK_DRIV_BASE)/virtio
+
+$(eval $(call import_lib,$(UK_DRIV_LIBVIRTIO_BASE)/9p))
+$(eval $(call import_lib,$(UK_DRIV_LIBVIRTIO_BASE)/blk))
+$(eval $(call import_lib,$(UK_DRIV_LIBVIRTIO_BASE)/bus))
+$(eval $(call import_lib,$(UK_DRIV_LIBVIRTIO_BASE)/mmio))
+$(eval $(call import_lib,$(UK_DRIV_LIBVIRTIO_BASE)/net))
+$(eval $(call import_lib,$(UK_DRIV_LIBVIRTIO_BASE)/pci))
+$(eval $(call import_lib,$(UK_DRIV_LIBVIRTIO_BASE)/ring))

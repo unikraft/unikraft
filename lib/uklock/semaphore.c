@@ -5,6 +5,7 @@
 
 void uk_semaphore_init(struct uk_semaphore *s, long count)
 {
+	uk_spin_init(&(s->sl));
 	s->count = count;
 	uk_waitq_init(&s->wait);
 

@@ -30,6 +30,8 @@
 #include <uk/config.h>
 #include <xen/xen.h>
 #include <xen/elfnote.h>
+#include <uk/asm.h>
+#include <uk/reloc.h>
 
 #define ELFNOTE(name, type, desc)           \
     .pushsection .note.name               ; \
@@ -42,8 +44,6 @@
 3:desc                  /* desc   */      ; \
 4:.align 4                                ; \
     .popsection
-
-#define ENTRY(X) .globl X ; X :
 
 #ifdef CONFIG_PARAVIRT
 ELFNOTE(Xen, XEN_ELFNOTE_GUEST_OS, .asciz "Unikraft")
@@ -59,6 +59,18 @@ _libxenplat_start:
 
 #endif
 	cld
+
+	/* esi contains pointer to start_info page
+	 * Temporarily store it on the default scratch stack given by Xen */
+	pushq %rsi
+
+	/* Zero-out the first two arguments  of do_uk_reloc.
+	 * do_uk_reloc can detect the base load address on its own in 64-bit */
+	xorq %rsi, %rsi
+	xorq %rdi, %rdi
+	call do_uk_reloc
+	popq %rsi
+
 	movq stack_start(%rip),%rsp
 	andq $STACK_MASK_TOP, %rsp
 	movq %rsi, %r8 /* esi contains pointer to start_info page */
@@ -76,7 +88,9 @@ _libxenplat_start:
 #if __SSE__
 	orl $(X86_CR4_OSFXSR | X86_CR4_OSXMMEXCPT), %edi
 	movq %rdi, %cr4
-	ldmxcsr (mxcsr_ptr)
+
+	leaq mxcsr_ptr(%rip),%r9
+	ldmxcsr (%r9d)
 #endif /* __SSE__ */
 #if (__AVX__ || CONFIG_HAVE_X86PKU)
 	/* Check capabilities subject to availability as indicated by cpuid.
@@ -155,7 +169,7 @@ hypercall_page:
         .fill __PAGE_SIZE,1,0
 
 
-#define XEN_GET_VCPU_INFO(reg)	movq HYPERVISOR_shared_info,reg
+#define XEN_GET_VCPU_INFO(reg)	movq HYPERVISOR_shared_info(%rip),reg
 #define XEN_LOCKED_BLOCK_EVENTS(reg)	movb $1,evtchn_upcall_mask(reg)
 #define XEN_LOCKED_UNBLOCK_EVENTS(reg)	movb $0,evtchn_upcall_mask(reg)
 #define XEN_TEST_PENDING(reg)	testb $0xFF,evtchn_upcall_pending(reg)
@@ -286,9 +300,11 @@ hypervisor_callback2:
 
 	/* check against event re-entrant */
 	movq __REGS_OFFSETOF_RIP(%rsp),%rax
-	cmpq $scrit,%rax
+	leaq scrit(%rip),%r9
+	cmpq %r9,%rax
 	jb 11f
-	cmpq $ecrit,%rax
+	leaq ecrit(%rip),%r9
+	cmpq %r9,%rax
 	jb  critical_region_fixup
 
 11:	movq %gs:8,%rax
@@ -352,7 +368,8 @@ critical_region_fixup:
 	# plus 0xb0, because the second interrupt might align the stack frame.
 	movq __REGS_OFFSETOF_RSP(%rsp),%rdi   # edi points at end of dst region
 
-	cmpq $restore_end,%rax
+	leaq restore_end(%rip),%r9
+	cmpq %r9,%rax
 	jae  13f
 
 	# If interrupted rip is before restore_end
@@ -403,3 +420,12 @@ TRAP_ENTRY alignment_check,     1
 /* no Machine Check */
 TRAP_ENTRY simd_error,          0
 /* no Virtualization Exception */
+
+/*
+ * We do not want to unmap anything.
+ */
+.section .bss
+.align	4
+.globl	bpt_unmap_mrd
+bpt_unmap_mrd:
+.space	64

@@ -48,7 +48,7 @@ extern "C" {
  * already, otherwise a platform library will call ukplat_entry_argp() to let
  * the arguments parsed from a string buffer
  * @param argc Number of arguments
- * @param args Array to '\0'-terminated arguments
+ * @param argv Array to '\0'-terminated arguments
  */
 void ukplat_entry(int argc, char *argv[]) __noreturn;
 

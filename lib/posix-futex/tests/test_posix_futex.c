@@ -109,7 +109,7 @@ static int futex(uint32_t *uaddr, int futex_op, uint32_t val,
  * Wait for the futex value to be equal to the iteration number and then
  * increment a variable.
  */
-static void waiter_func(void *arg)
+static __noreturn void waiter_func(void *arg)
 {
 	uint32_t i;
 	struct test_args *args = (struct test_args *)arg;
@@ -122,16 +122,17 @@ static void waiter_func(void *arg)
 				NULL, 0);
 
 		if (rets[i])
-			return;
+			break;
 
 		var_to_change_vals[i] = ++(*args->var_to_change);
 	}
+	uk_sched_thread_exit();
 }
 
 /**
  * Increment the variable and wake up the waiter threads.
  */
-static void waker_func(void *arg)
+static __noreturn void waker_func(void *arg)
 {
 	uint32_t i;
 	struct test_args *args = (struct test_args *)arg;
@@ -146,12 +147,13 @@ static void waker_func(void *arg)
 				NULL, NULL, 0);
 		uk_sched_yield();
 	}
+	uk_sched_thread_exit();
 }
 
 /**
  * Wake up nr_wake threads and requeue nr_requeue threads.
  */
-static void requeuer_func(void *arg)
+static __noreturn void requeuer_func(void *arg)
 {
 	uint32_t i;
 	struct test_args *args = (struct test_args *)arg;
@@ -165,6 +167,18 @@ static void requeuer_func(void *arg)
 				args->requeue_futex_val, args->val);
 		uk_sched_yield();
 	}
+	uk_sched_thread_exit();
+}
+
+/**
+ * TODO: replace this with pthread_join
+ *
+ * this is sufficient for now
+ */
+static void wait_thread(struct uk_thread *t)
+{
+	while (!uk_thread_is_exited(t))
+		uk_sched_yield();
 }
 
 UK_TESTCASE(posix_futex_testsuite, test_wait_different_value)
@@ -226,12 +240,14 @@ UK_TESTCASE(posix_futex_testsuite, test_one_waiter_one_waker)
 		};
 
 	/* Create the two threads */
-	threads[1] = uk_thread_create("Waiter", waiter_func, args + 1);
-	threads[0] = uk_thread_create("Waker", waker_func, args + 0);
+	threads[1] = uk_sched_thread_create(uk_sched_current(),
+			waiter_func, args + 1, "Waiter");
+	threads[0] = uk_sched_thread_create(uk_sched_current(),
+			waker_func, args + 0, "Waker");
 
 	/* Wait for the threads to finish */
 	for (i = 0; i < num_threads; ++i)
-		uk_thread_wait(threads[i]);
+		wait_thread(threads[i]);
 
 	CHECK_ITERATIONS(rets, var_to_change_vals, num_iterations, num_threads,
 			 var_to_change, 1, true);
@@ -263,13 +279,16 @@ UK_TESTCASE(posix_futex_testsuite, test_two_waiters_one_waker)
 		};
 
 	/* Create the two threads */
-	threads[1] = uk_thread_create("Waiter 1", waiter_func, args + 1);
-	threads[2] = uk_thread_create("Waiter 2", waiter_func, args + 2);
-	threads[0] = uk_thread_create("Waker", waker_func, args + 0);
+	threads[1] = uk_sched_thread_create(uk_sched_current(),
+			waiter_func, args + 1, "Waiter 1");
+	threads[2] = uk_sched_thread_create(uk_sched_current(),
+			waiter_func, args + 2, "Waiter 2");
+	threads[0] = uk_sched_thread_create(uk_sched_current(),
+			waker_func, args + 0, "Waker");
 
 	/* Wait for the threads to finish */
 	for (i = 0; i < num_threads; ++i)
-		uk_thread_wait(threads[i]);
+		wait_thread(threads[i]);
 
 	CHECK_ITERATIONS(rets, var_to_change_vals, num_iterations, num_threads,
 			 var_to_change, 2, false);
@@ -332,13 +351,16 @@ UK_TESTCASE(posix_futex_testsuite, test_cmp_requeue_two_waiters_no_requeue)
 	args[2].nr_wake = nr_wake;
 
 	/* Create the two threads */
-	threads[0] = uk_thread_create("Waiter 1", waiter_func, args + 0);
-	threads[1] = uk_thread_create("Waiter 2", waiter_func, args + 1);
-	threads[2] = uk_thread_create("Requeuer", requeuer_func, args + 2);
+	threads[0] = uk_sched_thread_create(uk_sched_current(),
+			waiter_func, args + 0, "Waiter 1");
+	threads[1] = uk_sched_thread_create(uk_sched_current(),
+			waiter_func, args + 1, "Waiter 2");
+	threads[2] = uk_sched_thread_create(uk_sched_current(),
+			requeuer_func, args + 2, "Requeuer");
 
 	/* Wait for the threads to finish */
 	for (i = 0; i < num_threads; ++i)
-		uk_thread_wait(threads[i]);
+		wait_thread(threads[i]);
 
 	/* Requeuer should have woken up one waiter and requeued no thread */
 	UK_TEST_EXPECT_SNUM_EQ(rets[2][0], 1);
@@ -390,21 +412,25 @@ UK_TESTCASE(posix_futex_testsuite, test_cmp_requeue_two_waiters_one_waker)
 	args[3].futex_val = &requeue_futex_val;
 	args[3].nr_wake = nr_wake;
 
-	threads[0] = uk_thread_create("Waiter 1", waiter_func, args + 0);
-	threads[1] = uk_thread_create("Waiter 2", waiter_func, args + 1);
-	threads[2] = uk_thread_create("Requeuer", requeuer_func, args + 2);
+	threads[0] = uk_sched_thread_create(uk_sched_current(),
+			waiter_func, args + 0, "Waiter 1");
+	threads[1] = uk_sched_thread_create(uk_sched_current(),
+			waiter_func, args + 1, "Waiter 2");
+	threads[2] = uk_sched_thread_create(uk_sched_current(),
+			requeuer_func, args + 2, "Requeuer");
 
-	uk_thread_wait(threads[2]);
+	wait_thread(threads[2]);
 
 	/* Requeuer should have woken up one waiter and requeued the other */
 	UK_TEST_EXPECT_SNUM_EQ(rets[2][0], 2);
 
-	threads[3] = uk_thread_create("Waker", waker_func, args + 3);
+	threads[3] = uk_sched_thread_create(uk_sched_current(),
+			waker_func, args + 3, "Waker");
 
 	/* Wait for the threads to finish */
 	for (i = 0; i < num_threads; ++i)
 		if (i != 2)
-			uk_thread_wait(threads[i]);
+			wait_thread(threads[i]);
 
 	/* Waiters 1 and 2 should have been woken */
 	UK_TEST_EXPECT_SNUM_EQ(rets[0][0], 0);

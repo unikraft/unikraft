@@ -56,4 +56,5 @@ END {
 	printf "\tva_end(ap);\n"
 	printf "\treturn ret;\n"
 	printf "}\n"
+	printf "long syscall() __attribute__ ((weak, alias (\"uk_syscall\")));\n"
 }

@@ -225,6 +225,8 @@ struct uk_vma_ops {
 	 *   The length of the virtual memory area in bytes
 	 * @param data
 	 *   Pointer to VMA-type specific data supplied to the map function
+	 * @param attr
+	 *   Page attributes for the pages in the memory area
 	 * @param[in,out] flags
 	 *   The flags supplied to the map function. The handler may
 	 *   set/unset the following flags (besides VMA-type specific ones):
@@ -237,7 +239,8 @@ struct uk_vma_ops {
 	 *   0 on success, a negative errno error otherwise
 	 */
 	int (*new)(struct uk_vas *vas, __vaddr_t vaddr, __sz len, void *data,
-		   unsigned long *flags, struct uk_vma **vma);
+		   unsigned long attr, unsigned long *flags,
+		   struct uk_vma **vma);
 
 	/**
 	 * Frees any references that this VMA might hold. The memory for the

@@ -56,9 +56,12 @@
 static void __spin_wait(__nsec nsec)
 {
 	__nsec until = ukplat_monotonic_clock() + nsec;
+	unsigned long flags;
 
+	flags = ukplat_lcpu_save_irqf();
 	while (until > ukplat_monotonic_clock())
-		ukplat_lcpu_halt_to(until);
+		ukplat_lcpu_halt_irq_until(until);
+	ukplat_lcpu_restore_irqf(flags);
 }
 #endif
 
@@ -203,6 +206,16 @@ out_error:
 UK_SYSCALL_R_DEFINE(int, clock_settime, clockid_t, clk_id,
 		    const struct timespec *, tp)
 {
+	UK_WARN_STUBBED();
+	return 0;
+}
+
+UK_SYSCALL_R_DEFINE(int, clock_nanosleep, clockid_t, clockid, int, flags,
+		    const struct timespec *, request, struct timespec *, remain)
+{
+	if ((clockid == CLOCK_REALTIME) && !(flags & TIMER_ABSTIME))
+		return uk_syscall_r_nanosleep((long) request, (long) remain);
+
 	UK_WARN_STUBBED();
 	return 0;
 }

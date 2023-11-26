@@ -68,7 +68,7 @@ extern int vfs_debug;
  *	Format string, followed by a variable-length list of arguments,
  *	similar to arguments passed to printf().
  */
-#define DPRINTF(_m, X)	do {if (vfs_debug & (_m)) uk_pr_debug X} while (0)
+#define DPRINTF(_m, X)	do { if (vfs_debug & (_m)) uk_pr_debug X; } while (0)
 #else
 #define DPRINTF(_m, X)
 #endif
@@ -225,7 +225,7 @@ int sys_fsync(struct vfscore_file *fp);
  *	- (0):  Completed successfully
  *	- (<0): Negative value with error code
  */
-int sys_readdir(struct vfscore_file *fp, struct dirent *dirent);
+int sys_readdir(struct vfscore_file *fp, struct dirent64 *dirent);
 
 /**
  * Resets the location in the directory stream.
@@ -685,6 +685,21 @@ int sec_vnode_permission(char *path);
 int namei(const char *path, struct dentry **dpp);
 
 /**
+ * Resolve a pathname into a pointer to a dentry and a realpath.
+ *
+ * @param path
+ *	The full path name
+ * @param[out] dpp
+ *	Dentry to be returned
+ * @param[out] realpath
+ *	if not NULL, return path after resolving all symlinks
+ * @return
+ *	- (0):  Completed successfully
+ *	- (<0): Negative value with error code
+ */
+int namei_resolve(const char *path, struct dentry **dpp, char *realpath);
+
+/**
  * Converts the last component in the path to a pointer to a dentry.
  *
  * @param path
@@ -698,6 +713,22 @@ int namei(const char *path, struct dentry **dpp);
  *	- (<0): Negative value with error code
  */
 int namei_last_nofollow(char *path, struct dentry *ddp, struct dentry **dp);
+
+/**
+ * Same as namei_last_nofollow, to be called with the ddp->d_vnode lock held.
+ *
+ * @param path
+ *	The full path name
+ * @param ddp
+ *	Pointer to dentry of parent
+ * @param[out] dp
+ *	Dentry to be returned
+ * @return
+ *	- (0):  Completed successfully
+ *	- (<0): Negative value with error code
+ */
+int
+namei_last_nofollow_locked(char *path, struct dentry *ddp, struct dentry **dp);
 
 /**
  * Searches a pathname.
@@ -788,7 +819,7 @@ int vfs_close(struct vfscore_file *fp);
  *
  * @param fp
  *	Pointer to the vfscore_file structure
- * @param[in, out] uio
+ * @param[in,out] uio
  *	Pointer to the structure containing information about request
  *	and response
  * @param flags
@@ -808,7 +839,7 @@ int vfs_read(struct vfscore_file *fp, struct uio *uio, int flags);
  *
  * @param fp
  *	Pointer to the vfscore_file structure
- * @param[in, out] uio
+ * @param[in,out] uio
  *	Pointer to the structure containing information about request
  *	and response
  * @param flags

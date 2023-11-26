@@ -1,0 +1,120 @@
+menuconfig LIBPOSIX_ENVIRON
+	bool "posix-environ: Environment variables"
+	default n
+	select LIBNOLIBC if !HAVE_LIBC
+
+if LIBPOSIX_ENVIRON
+	menu "Compiled-in environment variables"
+		config LIBPOSIX_ENVIRON_ENVP0
+		string ""
+		default "PATH=/bin"
+
+		# invisible boolean that marks not empty entries
+		config LIBPOSIX_ENVIRON_ENVP0_NOTEMPTY
+		bool
+		default y if LIBPOSIX_ENVIRON_ENVP0 != ""
+
+		config LIBPOSIX_ENVIRON_ENVP1
+		string ""
+		config LIBPOSIX_ENVIRON_ENVP1_NOTEMPTY
+		bool
+		default y if LIBPOSIX_ENVIRON_ENVP1 != ""
+
+		config LIBPOSIX_ENVIRON_ENVP2
+		string ""
+		config LIBPOSIX_ENVIRON_ENVP2_NOTEMPTY
+		bool
+		default y if LIBPOSIX_ENVIRON_ENVP2 != ""
+
+		config LIBPOSIX_ENVIRON_ENVP3
+		string ""
+		config LIBPOSIX_ENVIRON_ENVP3_NOTEMPTY
+		bool
+		default y if LIBPOSIX_ENVIRON_ENVP3 != ""
+
+		config LIBPOSIX_ENVIRON_ENVP4
+		string ""
+		config LIBPOSIX_ENVIRON_ENVP4_NOTEMPTY
+		bool
+		default y if LIBPOSIX_ENVIRON_ENVP4 != ""
+
+		config LIBPOSIX_ENVIRON_ENVP5
+		string ""
+		config LIBPOSIX_ENVIRON_ENVP5_NOTEMPTY
+		bool
+		default y if LIBPOSIX_ENVIRON_ENVP5 != ""
+
+		config LIBPOSIX_ENVIRON_ENVP6
+		string ""
+		config LIBPOSIX_ENVIRON_ENVP6_NOTEMPTY
+		bool
+		default y if LIBPOSIX_ENVIRON_ENVP6 != ""
+
+		config LIBPOSIX_ENVIRON_ENVP7
+		string ""
+		config LIBPOSIX_ENVIRON_ENVP7_NOTEMPTY
+		bool
+		default y if LIBPOSIX_ENVIRON_ENVP7 != ""
+
+		config LIBPOSIX_ENVIRON_ENVP8
+		string ""
+		config LIBPOSIX_ENVIRON_ENVP8_NOTEMPTY
+		bool
+		default y if LIBPOSIX_ENVIRON_ENVP8 != ""
+
+		config LIBPOSIX_ENVIRON_ENVP9
+		string ""
+		config LIBPOSIX_ENVIRON_ENVP9_NOTEMPTY
+		bool
+		default y if LIBPOSIX_ENVIRON_ENVP9 != ""
+
+		config LIBPOSIX_ENVIRON_ENVP10
+		string ""
+		config LIBPOSIX_ENVIRON_ENVP10_NOTEMPTY
+		bool
+		default y if LIBPOSIX_ENVIRON_ENVP10 != ""
+
+		config LIBPOSIX_ENVIRON_ENVP11
+		string ""
+		config LIBPOSIX_ENVIRON_ENVP11_NOTEMPTY
+		bool
+		default y if LIBPOSIX_ENVIRON_ENVP11 != ""
+
+		config LIBPOSIX_ENVIRON_ENVP12
+		string ""
+		config LIBPOSIX_ENVIRON_ENVP12_NOTEMPTY
+		bool
+		default y if LIBPOSIX_ENVIRON_ENVP12 != ""
+
+		config LIBPOSIX_ENVIRON_ENVP13
+		string ""
+		config LIBPOSIX_ENVIRON_ENVP13_NOTEMPTY
+		bool
+		default y if LIBPOSIX_ENVIRON_ENVP13 != ""
+
+		config LIBPOSIX_ENVIRON_ENVP14
+		string ""
+		config LIBPOSIX_ENVIRON_ENVP14_NOTEMPTY
+		bool
+		default y if LIBPOSIX_ENVIRON_ENVP14 != ""
+
+		config LIBPOSIX_ENVIRON_ENVP15
+		string ""
+		config LIBPOSIX_ENVIRON_ENVP15_NOTEMPTY
+		bool
+		default y if LIBPOSIX_ENVIRON_ENVP15 != ""
+	endmenu
+
+	config LIBPOSIX_ENVIRON_LIBPARAM
+	bool "Parse kernel command line arguments"
+	default n
+	select LIBUKLIBPARAM
+
+	config LIBPOSIX_ENVIRON_LIBPARAM_MAXCOUNT
+	int "Additional reserved entries for vars from command line"
+	default 8
+	depends on LIBPOSIX_ENVIRON_LIBPARAM
+	help
+		This number defines the maximum number of variables that
+		can be handed over with the kernel command line.
+endif

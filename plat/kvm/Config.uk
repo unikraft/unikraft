@@ -1,26 +1,115 @@
 menuconfig PLAT_KVM
-       bool "KVM guest"
-       default n
-       depends on (ARCH_X86_64 || (ARCH_ARM_64 && !HAVE_SYSCALL))
-       select LIBUKDEBUG
-       select LIBUKALLOC
-       select LIBUKTIMECONV
-       select LIBNOLIBC if !HAVE_LIBC
-       select LIBFDT if ARCH_ARM_64
-       help
-                Create a Unikraft image that runs as a KVM guest
+	bool "KVM guest"
+	default n
+	depends on (ARCH_X86_64 || ARCH_ARM_64)
+	select LIBUKDEBUG
+	select LIBUKALLOC
+	select LIBUKTIMECONV
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBFDT if ARCH_ARM_64
+	select ELF64_TO_32 if ARCH_X86_64
+	select LIBUKRELOC if OPTIMIZE_PIE
+	select LIBUKOFW if ARCH_ARM_64
+	select HAVE_INTCTLR
+	select HAVE_APIC if ARCH_X86_64
+	select LIBUKINTCTLR_XPIC if ARCH_X86_64
+	imply LIBUKBUS_PLATFORM if ARCH_ARM_64
+	imply LIBVIRTIO_9P if LIBUK9P
+	imply LIBVIRTIO_NET if LIBUKNETDEV
+	imply LIBVIRTIO_BLK if LIBUKBLKDEV
+	help
+		Create a Unikraft image that runs as a KVM guest
 
 if (PLAT_KVM)
 
-menu "Console Options"
+choice
+	prompt "Boot protocol"
+	default KVM_BOOT_PROTO_LXBOOT
 
-config KVM_KERNEL_SERIAL_CONSOLE
-        bool "Serial console for the kernel prints"
-        default y
-        depends on (ARCH_X86_64 || ARCH_ARM_64)
-	select UART_PL011 if ARCH_ARM_64
-        help
-          Choose serial console for the kernel printing
+config KVM_BOOT_PROTO_MULTIBOOT
+	bool "Multiboot"
+	depends on KVM_VMM_QEMU && !KVM_VMM_FIRECRACKER && ARCH_X86_64
+	help
+		Multiboot Boot Protocol Version 1
+
+config KVM_BOOT_PROTO_LXBOOT
+	bool "Lxboot"
+	depends on KVM_VMM_FIRECRACKER || (KVM_VMM_QEMU && ARCH_ARM_64)
+	help
+		Linux 64-bit Boot Protocol
+
+config KVM_BOOT_PROTO_QEMU_VIRT
+	bool "QEMU virt"
+	depends on KVM_VMM_QEMU && !KVM_VMM_FIRECRACKER && ARCH_ARM_64
+	help
+		Default QEMU virt environment
+
+config KVM_BOOT_PROTO_EFI_STUB
+	bool "EFI stub"
+	depends on KVM_VMM_QEMU && !KVM_VMM_FIRECRACKER
+	depends on OPTIMIZE_PIE
+	select UKPLAT_ACPI
+	help
+		Make Unikraft bootable by UEFI firmware
+
+comment "Hint: EFI stub depends on OPTIMIZE_PIE"
+	depends on !OPTIMIZE_PIE && !KVM_VMM_FIRECRACKER
+endchoice
+
+if KVM_BOOT_PROTO_EFI_STUB
+
+config KVM_BOOT_PROTO_EFI_STUB_DEBUG
+	bool "Enable EFI stub crash messages"
+	default n
+
+config KVM_BOOT_PROTO_EFI_STUB_CMDLINE_FNAME
+	string "Name of the command line arguments file"
+	default "$(UK_NAME).cmdl"
+
+config KVM_BOOT_PROTO_EFI_STUB_INITRD_FNAME
+	string "Name of the initial RAM disk file"
+	default "$(UK_NAME).initrd"
+
+config KVM_BOOT_PROTO_EFI_STUB_DTB_FNAME
+	string "Name of the Devicetree Blob file"
+	default "$(UK_NAME).dtb"
+
+config KVM_BOOT_PROTO_EFI_STUB_RST_ATK_MITIGATION
+	bool "TCG Reset Attack Mitigation"
+	default n
+	help
+		Enable Trusted Computing Group's Reset Attack Mitigation.
+		Whenever a machine shuts down or reboots, due to lack of
+		electric charge, the contents of RAM may dissipate after a short
+		amount of time. However this may be enough for an attacker to
+		quickly boot again into a custom program and dump memory
+		contents. Thus, by using this, the OS instructs POST BIOS to
+		overwrite memory contents before continuing to boot into the
+		rest of the BIOS code.
+
+endif
+
+choice
+	prompt "Virtual Machine Monitor"
+	default KVM_VMM_QEMU
+
+config KVM_VMM_QEMU
+	bool "QEMU"
+	imply LIBUKINTCTLR_GICV2 if ARCH_ARM_64
+	select HAVE_PCI
+	select HAVE_MMIO
+
+config KVM_VMM_FIRECRACKER
+	bool "Firecracker"
+	select KVM_BOOT_PROTO_LXBOOT
+	select HAVE_MMIO
+	select VIRTIO_MMIO_LINUX_COMPAT_CMDLINE
+	imply LIBUKINTCTLR_GICV3 if ARCH_ARM_64
+	depends on ARCH_X86_64 || ARCH_ARM_64
+
+endchoice
+
+menu "Console Options"
 
 config KVM_KERNEL_VGA_CONSOLE
         bool "VGA console for the kernel prints"
@@ -43,128 +132,88 @@ config KVM_DEBUG_VGA_CONSOLE
         help
           Choose VGA console for the debug printing
 
-if (KVM_KVM_KERNEL_SERIAL_CONSOLE || KVM_DEBUG_SERIAL_CONSOLE)
+config KVM_KERNEL_SERIAL_CONSOLE
+        bool "Serial console for the kernel prints"
+        default y
+        depends on (ARCH_X86_64 || ARCH_ARM_64)
+        help
+          Choose serial console for the kernel printing
+
+if (KVM_KERNEL_SERIAL_CONSOLE || KVM_DEBUG_SERIAL_CONSOLE)
+
+choice
+	prompt "Serial console driver"
+	depends on ARCH_ARM_64
+	default UART_PL011 if KVM_VMM_QEMU
+	default UART_NS16550 if KVM_VMM_FIRECRACKER
+
+config UART_PL011
+	bool "PrimeCell UART (PL011)"
+
+config UART_NS16550
+	bool "8250 / NS16550"
+endchoice
+
 menu "Serial console configuration"
-	if ARCH_X86_64
-	choice
-		prompt "Baudrate"
-		default KVM_SERIAL_BAUD_115200
+if ARCH_X86_64
+choice
+	prompt "Baudrate"
+	default KVM_SERIAL_BAUD_115200
 
-		config KVM_SERIAL_BAUD_115200
-			bool "115200"
+	config KVM_SERIAL_BAUD_115200
+		bool "115200"
 
-		config KVM_SERIAL_BAUD_57600
-			bool "57600"
+	config KVM_SERIAL_BAUD_57600
+		bool "57600"
 
-		config KVM_SERIAL_BAUD_38400
-			bool "38400"
+	config KVM_SERIAL_BAUD_38400
+		bool "38400"
 
-		config KVM_SERIAL_BAUD_19200
-			bool "19200"
-	endchoice
-	endif
+	config KVM_SERIAL_BAUD_19200
+		bool "19200"
+endchoice
+endif
 
-	if ARCH_ARM_64
-	config EARLY_PRINT_PL011_UART_ADDR
-		hex "Early debug console pl011 serial address"
-		default 0x09000000
-		depends on (KVM_DEBUG_SERIAL_CONSOLE && ARCH_ARM_64)
-		help
-			Pl011 serial address used by early debug console.
-	endif
+config EARLY_PRINT_PL011_UART_ADDR
+	hex "Early debug console pl011 serial address"
+	depends on UART_PL011
+	default 0x09000000
+	depends on (KVM_DEBUG_SERIAL_CONSOLE && ARCH_ARM_64)
+	help
+		Pl011 serial address used by early debug console.
+
+config EARLY_UART_NS16550
+	bool "Early console"
+	depends on UART_NS16550
+	default n
+
+config EARLY_UART_NS16550_BASE
+	hex "Early debug console ns16550 serial address"
+	depends on EARLY_UART_NS16550
+	help
+		NS16550 serial address used by early debug console.
+
+config UART_NS16550_REG_SHIFT
+	int "NS16550 serial register shift"
+	depends on UART_NS16550
+	default 0
+	help
+		NS16550 serial register shift.
+
+config UART_NS16550_REG_WIDTH
+	int "NS165500 serial register width"
+	depends on UART_NS16550
+	default 1
+	help
+		NS16550 serial register width.
 endmenu
 endif
 
-endmenu
-
-config KVM_MAX_IRQ_HANDLER_ENTRIES
-       int "Maximum number of handlers per IRQ"
-       default 8
-       depends on (ARCH_X86_64 || ARCH_ARM_64)
-
-config KVM_PCI
-       bool "PCI Bus Driver"
-       default y
-       depends on (ARCH_X86_64 || ARCH_ARM_64)
-       select LIBUKBUS
-       help
-                PCI bus driver for probing and operating PCI devices
-
-config KVM_PF
-       bool "Platform Bus Driver"
-       default y
-       depends on (ARCH_ARM_64)
-       select LIBUKBUS
-       help
-               Platform bus driver for probing and operating platform devices
-
-config VIRTIO_BUS
-      bool  "Virtio bus driver"
-      default y
-      depends on (ARCH_X86_64 || ARCH_ARM_64)
-      depends on LIBUKBUS
-      select LIBUKALLOC
-      select LIBUKSGLIST
-      help
-               Virtio bus driver for probing and operating virtio device and
-               transport layer.
-
-menu "Virtio"
-config VIRTIO_PCI
-       bool "Virtio PCI device support"
-       default y if (VIRTIO_NET || VIRTIO_9P || VIRTIO_BLK)
-       default n
-       depends on KVM_PCI
-       select VIRTIO_BUS
-       help
-               Support virtio devices on PCI bus
-
-config VIRTIO_NET
-       bool "Virtio Net device"
-       default y if LIBUKNETDEV
-       default n
-       depends on LIBUKNETDEV
-       imply VIRTIO_PCI if ARCH_X86_64
-       select VIRTIO
-       select LIBUKSGLIST
-       help
-              Virtual network driver.
-
-config VIRTIO_BLK
-	bool "Virtio Block Device"
-	default y if LIBUKBLKDEV
-	default n
-	depends on LIBUKBLKDEV
-	select VIRTIO_BUS
-	select LIBUKGLIST
-	help
-		Virtual block driver.
-
-config VIRTIO_9P
-       bool "Virtio 9P device"
-       default y if LIBUK9P
-       default n
-       depends on LIBUK9P
-       imply VIRTIO_PCI if ARCH_X86_64
-       select VIRTIO_BUS
-       select LIBUKSGLIST
-       help
-              Virtio 9P driver.
 endmenu
 
 config RTC_PL031
        bool "Arm platform RTC (PL031) driver"
        default y if ARCH_ARM_64
        depends on ARCH_ARM_64
-
-config LIBOFW
-       bool "Open Firmware library support"
-       default n
-       depends on ARCH_ARM_64
-       select LIBFDT
-
-config UKPLAT_ALLOW_GIC
-	bool
-	default y
 
 endif

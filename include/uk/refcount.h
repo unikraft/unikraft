@@ -59,9 +59,9 @@ extern "C" {
 /**
  * Initialize the atomic reference.
  *
- * @param ref:
+ * @param ref
  *	A reference to the atomic data structure.
- * @param value:
+ * @param value
  *	A value to initialize.
  */
 static inline void uk_refcount_init(__atomic *ref, __u32 value)
@@ -73,7 +73,7 @@ static inline void uk_refcount_init(__atomic *ref, __u32 value)
 
 /**
  * Increment the reference counter.
- * @param refs
+ * @param ref
  *	Reference to the atomic counter.
  */
 static inline void uk_refcount_acquire(__atomic *ref)
@@ -85,7 +85,7 @@ static inline void uk_refcount_acquire(__atomic *ref)
 
 /**
  * Decrement the reference counter.
- * @param refs
+ * @param ref
  *	Reference to the atomic counter.
  * @return
  *	0: there are more active reference
@@ -117,7 +117,7 @@ static inline int uk_refcount_release(__atomic *ref)
 
 /**
  * Increment the reference counter if it was already in use.
- * @param refs
+ * @param ref
  *	Reference to the atomic counter.
  * @return
  *	0: Failed to acquire the counter.
@@ -141,7 +141,7 @@ static inline int uk_refcount_acquire_if_not_zero(__atomic *ref)
 
 /**
  * refcount_read - get a refcount's value
- * @r: the refcount
+ * @param ref the refcount
  *
  * Return: the refcount's value
  */
@@ -155,7 +155,7 @@ static inline __u32 uk_refcount_read(const __atomic *ref)
 
 /**
  * Decrement the reference counter if there are multiple users of the counter.
- * @param refs
+ * @param ref
  *	Reference to the atomic counter.
  * @return
  *	0: Failed to acquire the counter.

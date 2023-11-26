@@ -33,6 +33,7 @@
 
 #include <uk/config.h>
 #include <uk/arch/paging.h>
+#include <uk/reloc.h>
 
 #define PTE_RO		X86_PTE_PRESENT
 #define PTE_RW		(X86_PTE_PRESENT | X86_PTE_RW)
@@ -111,6 +112,16 @@
 	.fill \pages, 0x8, 0
 .endm
 
+.align 4
+.global bpt_unmap_mrd
+bpt_unmap_mrd:
+	.quad	0x0000000000000000		/* 0 GiB */
+	.quad	0x0000000000000000		/* 0 GiB */
+	.quad	0x0000000100000000		/* 4 GiB */
+	.short	0x0000000000000000
+	.short	0x0000000000000010		/* UKPLAT_MEMRF_UNMAP */
+	.fill	36, 1, 0
+
 /* x86-64 Boot Page Table
  *
  * We map the first 4GB using max 2MB pages to keep compatibility for systems
@@ -120,30 +131,19 @@
  * systems supporting 1GB pages.
  *
  * 0x0000000000000000 - 0x00000000ffffffff Mapping of first 4GB
- *
- * However, the first 1M is inaccessible, except for:
- * 0x0000000000008000 - 0x0000000000008fff 16-bit entry code (read+write)
- * 0x0000000000009000 - 0x0000000000009fff Multiboot info @ 0x09500 (read-only)
- * 0x00000000000b8000 - 0x00000000000bffff VGA buffer (read+write)
- * 0x00000000000e0000 - 0x00000000000fffff BIOS memory (read-only)
+ * However, the first page is inaccessible.
  *
  * If paging is enabled:
  * 0xffffff8000000000 - 0xffffffffffffffff Mapping of first 512GB (for PTs)
  */
 .align 0x1000
 x86_bpt_pt0_0_0: /* 4K pages */
-	pte_zero 0x0000000000000000, 0x008
-	pte_fill 0x0000000000008000, 0x001, PT_LVL, PTE_RW
-	pte_fill 0x0000000000009000, 0x008, PT_LVL, PTE_RO
-	pte_zero 0x0000000000010000, 0x0a7
-	pte_fill 0x00000000000b8000, 0x008, PT_LVL, PTE_RW
-	pte_zero 0x00000000000c0000, 0x020
-	pte_fill 0x00000000000e0000, 0x020, PT_LVL, PTE_RO
-	pte_fill 0x0000000000100000, 0x100, PT_LVL, PTE_RW
+	pte_zero 0x0000000000000000, 0x001
+	pte_fill 0x0000000000001000, 0x1ff, PT_LVL, PTE_RW
 
 .align 0x1000
 x86_bpt_pd0_0: /* 2M pages */
-	pte	 x86_bpt_pt0_0_0, PTE_RW
+	ur_pte x86_bpt_pt0_0_0, PTE_RW
 	pte_fill 0x0000000000200000, 0x1ff, PD_LVL, PTE_RW
 
 x86_bpt_pd0_1: /* 2M pages */
@@ -157,10 +157,10 @@ x86_bpt_pd0_3: /* 2M pages */
 
 .align 0x1000
 x86_bpt_pdpt0: /* 1G pages */
-	pte	 x86_bpt_pd0_0, PTE_RW
-	pte	 x86_bpt_pd0_1, PTE_RW
-	pte	 x86_bpt_pd0_2, PTE_RW
-	pte	 x86_bpt_pd0_3, PTE_RW
+	ur_pte	x86_bpt_pd0_0, PTE_RW
+	ur_pte	x86_bpt_pd0_1, PTE_RW
+	ur_pte	x86_bpt_pd0_2, PTE_RW
+	ur_pte	x86_bpt_pd0_3, PTE_RW
 	pte_zero , 0x1fc
 
 /* Page table for 512 GiB direct-mapped physical memory */
@@ -173,10 +173,10 @@ x86_bpt_pdpt511: /* 1G pages */
 .align 0x1000
 .global x86_bpt_pml4
 x86_bpt_pml4:
-	pte	 x86_bpt_pdpt0  , PTE_RW
+	ur_pte	x86_bpt_pdpt0, PTE_RW
 	pte_zero , 0x1fe
 #ifdef CONFIG_PAGING
-	pte	 x86_bpt_pdpt511, PTE_RW
+	ur_pte	x86_bpt_pdpt511, PTE_RW
 #else
 	pte_zero , 0x001
 #endif /* CONFIG_PAGING */

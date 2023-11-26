@@ -30,8 +30,25 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/*
+ * We do not want to unmap anything.
+ */
+.section .bss
+.align	4
+.globl	bpt_unmap_mrd
+bpt_unmap_mrd:
+.space	64
 
 .section .text
+
+/* For now, although inaccurate, set the
+ * _base_addr symbol to _liblinuxuplat_start, since that is where most images
+ * happen to begin anyway. We do not use it in linuxu anyway, so we do not care.
+ * We only do this so that references to this symbol do not generate build
+ * errors, although it is not used.
+ */
+.globl	_base_addr
+.set	_base_addr, _liblinuxuplat_start
 
 .global _liblinuxuplat_start
 _liblinuxuplat_start:

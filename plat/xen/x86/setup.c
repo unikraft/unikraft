@@ -74,6 +74,7 @@
 #include <uk/plat/config.h>
 #include <uk/plat/console.h>
 #include <uk/plat/bootstrap.h>
+#include <uk/plat/common/bootinfo.h>
 #include <x86/cpu.h>
 #include <x86/traps.h>
 
@@ -91,8 +92,6 @@
 #include <xen/arch-x86/cpuid.h>
 #include <xen/arch-x86/hvm/start_info.h>
 
-static char cmdline[MAX_GUEST_CMDLINE];
-
 start_info_t *HYPERVISOR_start_info;
 shared_info_t *HYPERVISOR_shared_info;
 
@@ -101,13 +100,6 @@ shared_info_t *HYPERVISOR_shared_info;
  * in head.S.
  */
 char _libxenplat_bootstack[2*__STACK_SIZE];
-
-/*
- * Memory region description
- */
-#define UKPLAT_MEMRD_MAX_ENTRIES 3
-unsigned int _libxenplat_mrd_num;
-struct ukplat_memregion_desc _libxenplat_mrd[UKPLAT_MEMRD_MAX_ENTRIES];
 
 static inline void _init_traps(void)
 {
@@ -127,9 +119,11 @@ static inline void _init_shared_info(void)
 	HYPERVISOR_shared_info = (shared_info_t *)_libxenplat_shared_info;
 }
 
-static inline void _init_mem(void)
+static int _init_mem(struct ukplat_bootinfo *const bi)
 {
 	unsigned long start_pfn, max_pfn;
+	struct ukplat_memregion_desc mrd;
+	int rc;
 
 	_init_mem_prepare(&start_pfn, &max_pfn);
 
@@ -145,59 +139,119 @@ static inline void _init_mem(void)
 
 	/* Fill out mrd array */
 	/* heap */
-	_libxenplat_mrd[0].pbase = start_pfn << PAGE_SHIFT;
-	_libxenplat_mrd[0].vbase = (__vaddr_t)to_virt(_libxenplat_mrd[0].pbase);
-	_libxenplat_mrd[0].len   = (max_pfn - start_pfn) << PAGE_SHIFT;
-	_libxenplat_mrd[0].type  = UKPLAT_MEMRT_FREE;
-	_libxenplat_mrd[0].flags = 0;
+	mrd = (struct ukplat_memregion_desc) {
+		.vbase = (__vaddr_t)to_virt(start_pfn << PAGE_SHIFT),
+		.pbase = start_pfn << PAGE_SHIFT,
+		.len   = (max_pfn - start_pfn) << PAGE_SHIFT,
+		.type  = UKPLAT_MEMRT_FREE,
+		.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE |
+			 UKPLAT_MEMRF_MAP,
+	};
 #if CONFIG_UKPLAT_MEMRNAME
-	strncpy(_libxenplat_mrd[0].name, "heap",
-		sizeof(_libxenplat_mrd[0].name) - 1);
+	strncpy(mrd.name, "heap", sizeof(mrd.name) - 1);
 #endif
+	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
+	if (unlikely(rc < 0))
+		return rc;
 
-	/* demand area */
-	_libxenplat_mrd[1].pbase = __PADDR_MAX;
-	_libxenplat_mrd[1].vbase = VIRT_DEMAND_AREA;
-	_libxenplat_mrd[1].len   = DEMAND_MAP_PAGES * PAGE_SIZE;
-	_libxenplat_mrd[1].type  = UKPLAT_MEMRT_RESERVED;
-	_libxenplat_mrd[1].flags = 0;
+	mrd = (struct ukplat_memregion_desc) {
+		.vbase = VIRT_DEMAND_AREA,
+		.pbase = __PADDR_MAX,
+		.len   = DEMAND_MAP_PAGES * PAGE_SIZE,
+		.type  = UKPLAT_MEMRT_RESERVED,
+		.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP,
+	};
 #if CONFIG_UKPLAT_MEMRNAME
-	strncpy(_libxenplat_mrd[1].name, "demand",
-		sizeof(_libxenplat_mrd[1].name) - 1);
+	strncpy(mrd.name, "demand", sizeof(mrd.name) - 1);
 #endif
-	_init_mem_demand_area((unsigned long) _libxenplat_mrd[1].vbase,
-			DEMAND_MAP_PAGES);
+	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
+	if (unlikely(rc < 0))
+		return rc;
 
-	_libxenplat_mrd_num = 2;
+	_init_mem_demand_area((unsigned long)mrd.vbase, DEMAND_MAP_PAGES);
 
 	/* initrd */
+	mrd = (struct ukplat_memregion_desc){0};
 	if (HYPERVISOR_start_info->mod_len) {
 		if (HYPERVISOR_start_info->flags & SIF_MOD_START_PFN) {
-			_libxenplat_mrd[2].pbase =
-				HYPERVISOR_start_info->mod_start;
-			_libxenplat_mrd[2].vbase =
-				(__vaddr_t)to_virt(_libxenplat_mrd[2].pbase);
+			mrd.pbase = HYPERVISOR_start_info->mod_start;
+			mrd.vbase = (__vaddr_t)to_virt(mrd.pbase);
 		} else {
-			_libxenplat_mrd[2].pbase =
-				HYPERVISOR_start_info->mod_start;
-			_libxenplat_mrd[2].vbase =
-				_libxenplat_mrd[2].pbase;
+			mrd.pbase = HYPERVISOR_start_info->mod_start;
+			mrd.vbase = mrd.pbase;
 		}
-		_libxenplat_mrd[2].len   =
-			(size_t) HYPERVISOR_start_info->mod_len;
-		_libxenplat_mrd[2].type  = UKPLAT_MEMRT_INITRD;
-		_libxenplat_mrd[2].flags = (UKPLAT_MEMRF_WRITE
-					    | UKPLAT_MEMRF_MAP);
+		mrd.len = (size_t)HYPERVISOR_start_info->mod_len;
+		mrd.type = UKPLAT_MEMRT_INITRD;
+		mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE |
+			    UKPLAT_MEMRF_MAP;
 #if CONFIG_UKPLAT_MEMRNAME
-		strncpy(_libxenplat_mrd[2].name, "initrd",
-			sizeof(_libxenplat_mrd[2].name) - 1);
+		strncpy(mrd.name, "initrd", sizeof(mrd.name) - 1);
 #endif
-		_libxenplat_mrd_num++;
+		rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
+		if (unlikely(rc < 0))
+			return rc;
 	}
+
+	ukplat_memregion_list_coalesce(&bi->mrds);
+
+	return 0;
+}
+
+static char *cmdline;
+static __sz cmdline_len;
+
+static void _libxenplat_x86bootinfo_setup_cmdl(struct ukplat_bootinfo *bi)
+{
+	cmdline_len = strlen((char *)HYPERVISOR_start_info->cmd_line);
+	if (!cmdline_len)
+		cmdline_len = sizeof(CONFIG_UK_NAME) - 1;
+
+	cmdline = ukplat_memregion_alloc(cmdline_len, UKPLAT_MEMRT_CMDLINE,
+					 UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP);
+	if (unlikely(!cmdline))
+		UK_CRASH("Could not allocate command-line memory");
+
+	strncpy(cmdline, (const char *)HYPERVISOR_start_info->cmd_line,
+		cmdline_len);
+	cmdline[cmdline_len] = '\0';
+
+	bi->cmdline = (__u64)cmdline;
+	bi->cmdline_len = cmdline_len;
+
+	/* Tag this scratch cmdline as a kernel resource, to distinguish it
+	 * from the original cmdline obtained above
+	 */
+	cmdline = ukplat_memregion_alloc(cmdline_len, UKPLAT_MEMRT_KERNEL,
+					 UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP);
+	if (unlikely(!cmdline))
+		UK_CRASH("Could not allocate scratch command-line memory");
+
+	strncpy(cmdline, (const char *)HYPERVISOR_start_info->cmd_line,
+		cmdline_len);
+	cmdline[cmdline_len] = '\0';
+}
+
+static void _libxenplat_x86bootinfo_setup(void)
+{
+	const char bl[] = "Xen";
+	const char bp[] = "PVH";
+	struct ukplat_bootinfo *bi;
+
+	bi = ukplat_bootinfo_get();
+	if (unlikely(!bi))
+		UK_CRASH("Failed to get bootinfo\n");
+
+	memcpy(bi->bootloader, bl, sizeof(bl));
+
+	memcpy(bi->bootprotocol, bp, sizeof(bp));
+
+	if (_init_mem(bi) < 0)
+		UK_CRASH("Failed to initialize memory\n");
+
+	_libxenplat_x86bootinfo_setup_cmdl(bi);
 }
 
 void _libxenplat_x86entry(void *start_info) __noreturn;
-
 void _libxenplat_x86entry(void *start_info)
 {
 	_init_traps();
@@ -208,9 +262,6 @@ void _libxenplat_x86entry(void *start_info)
 
 	_init_shared_info(); /* remaps shared info */
 
-	strncpy(cmdline, (char *)HYPERVISOR_start_info->cmd_line,
-		MAX_GUEST_CMDLINE);
-
 	/* Set up events. */
 	init_events();
 
@@ -218,13 +269,13 @@ void _libxenplat_x86entry(void *start_info)
 	uk_pr_info("   shared_info: %p\n", HYPERVISOR_shared_info);
 	uk_pr_info("hypercall_page: %p\n", hypercall_page);
 
-	_init_mem();
-
 	init_console();
+
+	_libxenplat_x86bootinfo_setup();
 
 #if CONFIG_HAVE_X86PKU
 	_check_ospke();
 #endif /* CONFIG_HAVE_X86PKU */
 
-	ukplat_entry_argp(CONFIG_UK_NAME, cmdline, MAX_GUEST_CMDLINE);
+	ukplat_entry_argp(CONFIG_UK_NAME, cmdline, cmdline_len);
 }

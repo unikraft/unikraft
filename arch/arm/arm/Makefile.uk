@@ -10,81 +10,76 @@ CXXINCLUDES += -I$(CONFIG_UK_BASE)/arch/arm/arm/include
 # Disable FPU for trap/exception/interrupt handlers
 ISR_ARCHFLAGS += -mfpu=none
 
-# Set GCC flags for MARCH_ARM32_GENERICV7. GCC supports -mtune=generic-armv7-a from 4.7
+# Set GCC flags for MARCH_ARM32_GENERICV7.
 ifeq ($(CONFIG_MARCH_ARM32_GENERICV7),y)
-$(call error_if_gcc_version_lt,4,7)
-ARCHFLAGS-$(call gcc_version_ge,4,7)     += -march=armv7-a -mtune=generic-armv7-a
-ISR_ARCHFLAGS-$(call gcc_version_ge,4,7) += -march=armv7-a -mtune=generic-armv7-a
+ifeq ($(call have_clang),y)
+$(error Generic Cortex A7 CPU model only supported with GCC)
+endif
+ARCHFLAGS     += -march=armv7-a -mtune=generic-armv7-a
+ISR_ARCHFLAGS += -march=armv7-a -mtune=generic-armv7-a
 endif
 
-# Set GCC flags for MARCH_ARM32_CORTEXA5. GCC supports -mcpu=cortex-a5 from 4.5
+# Set flags for MARCH_ARM32_CORTEXA5.
 ifeq ($(CONFIG_MARCH_ARM32_CORTEXA5),y)
-$(call error_if_gcc_version_lt,4,5)
-ARCHFLAGS-$(call gcc_version_ge,4,5)     += -mcpu=cortex-a5 -mtune=cortex-a5
-ISR_ARCHFLAGS-$(call gcc_version_ge,4,5) += -mcpu=cortex-a5 -mtune=cortex-a5
+ARCHFLAGS     += -mcpu=cortex-a5 -mtune=cortex-a5
+ISR_ARCHFLAGS += -mcpu=cortex-a5 -mtune=cortex-a5
 endif
 
-# Set GCC flags for MARCH_ARM32_CORTEXA7. GCC supports -mcpu=cortex-a7 from 4.7
+# Set flags for MARCH_ARM32_CORTEXA7.
 ifeq ($(CONFIG_MARCH_ARM32_CORTEXA7),y)
-$(call error_if_gcc_version_lt,4,7)
-ARCHFLAGS-$(call gcc_version_ge,4,7)     += -mcpu=cortex-a7 -mtune=cortex-a7
-ISR_ARCHFLAGS-$(call gcc_version_ge,4,7) += -mcpu=cortex-a7 -mtune=cortex-a7
+ARCHFLAGS     += -mcpu=cortex-a7 -mtune=cortex-a7
+ISR_ARCHFLAGS += -mcpu=cortex-a7 -mtune=cortex-a7
 endif
 
-# Set GCC flags for MARCH_ARM32_CORTEXA8. GCC supports -mcpu=cortex-a8 from 4.3
+# Set flags for MARCH_ARM32_CORTEXA8.
 ifeq ($(CONFIG_MARCH_ARM32_CORTEXA8),y)
-$(call error_if_gcc_version_lt,4,3)
-ARCHFLAGS-$(call gcc_version_ge,4,3)     += -mcpu=cortex-a8 -mtune=cortex-a8
-ISR_ARCHFLAGS-$(call gcc_version_ge,4,3) += -mcpu=cortex-a8 -mtune=cortex-a8
+ARCHFLAGS     += -mcpu=cortex-a8 -mtune=cortex-a8
+ISR_ARCHFLAGS += -mcpu=cortex-a8 -mtune=cortex-a8
 endif
 
-# Set GCC flags for MARCH_ARM32_CORTEXA9. GCC supports -mcpu=cortex-a9 from 4.4
+# Set flags for MARCH_ARM32_CORTEXA9.
 ifeq ($(CONFIG_MARCH_ARM32_CORTEXA9),y)
-$(call error_if_gcc_version_lt,4,4)
-ARCHFLAGS-$(call gcc_version_ge,4,4)     += -mcpu=cortex-a9 -mtune=cortex-a9
-ISR_ARCHFLAGS-$(call gcc_version_ge,4,4) += -mcpu=cortex-a9 -mtune=cortex-a9
+ARCHFLAGS     += -mcpu=cortex-a9 -mtune=cortex-a9
+ISR_ARCHFLAGS += -mcpu=cortex-a9 -mtune=cortex-a9
 endif
 
-# Set GCC flags for MARCH_ARM32_CORTEXA12. GCC supports -mcpu=cortex-a12 from 4.9
+# Set flags for MARCH_ARM32_CORTEXA12.
 ifeq ($(CONFIG_MARCH_ARM32_CORTEXA12),y)
-$(call error_if_gcc_version_lt,4,9)
-ARCHFLAGS-$(call gcc_version_ge,4,9)     += -mcpu=cortex-a12 -mtune=cortex-a12
-ISR_ARCHFLAGS-$(call gcc_version_ge,4,9) += -mcpu=cortex-a12 -mtune=cortex-a12
+ARCHFLAGS     += -mcpu=cortex-a12 -mtune=cortex-a12
+ISR_ARCHFLAGS += -mcpu=cortex-a12 -mtune=cortex-a12
 endif
 
-# Set GCC flags for MARCH_ARM32_CORTEXA15. GCC supports -mcpu=cortex-a15 from 4.6
+# Set flags for MARCH_ARM32_CORTEXA15.
 ifeq ($(CONFIG_MARCH_ARM32_CORTEXA15),y)
-$(call error_if_gcc_version_lt,4,6)
-ARCHFLAGS-$(call gcc_version_ge,4,6)     += -mcpu=cortex-a15 -mtune=cortex-a15
-ISR_ARCHFLAGS-$(call gcc_version_ge,4,6) += -mcpu=cortex-a15 -mtune=cortex-a15
+ARCHFLAGS     += -mcpu=cortex-a15 -mtune=cortex-a15
+ISR_ARCHFLAGS += -mcpu=cortex-a15 -mtune=cortex-a15
 endif
 
-# Set GCC flags for MARCH_ARM32_CORTEXA17. GCC supports -mcpu=cortex-a17 from 6.1
+# Set flags for MARCH_ARM32_CORTEXA17.
 ifeq ($(CONFIG_MARCH_ARM32_CORTEXA17),y)
-$(call error_if_gcc_version_lt,6,1)
-ARCHFLAGS-$(call gcc_version_ge,6,1)     += -mcpu=cortex-a17 -mtune=cortex-a17
-ISR_ARCHFLAGS-$(call gcc_version_ge,6,1) += -mcpu=cortex-a17 -mtune=cortex-a17
+ARCHFLAGS     += -mcpu=cortex-a17 -mtune=cortex-a17
+ISR_ARCHFLAGS += -mcpu=cortex-a17 -mtune=cortex-a17
 endif
 
-# Set GCC flags for MARCH_ARM32_CORTEXA32. GCC supports -mcpu=cortex-a32 from 6.1
+# Set flags for MARCH_ARM32_CORTEXA32.
 ifeq ($(CONFIG_MARCH_ARM32_CORTEXA32),y)
-$(call error_if_gcc_version_lt,6,1)
-ARCHFLAGS-$(call gcc_version_ge,6,1)     += -mcpu=cortex-a32 -mtune=cortex-a32
-ISR_ARCHFLAGS-$(call gcc_version_ge,6,1) += -mcpu=cortex-a32 -mtune=cortex-a32
+ARCHFLAGS     += -mcpu=cortex-a32 -mtune=cortex-a32
+ISR_ARCHFLAGS += -mcpu=cortex-a32 -mtune=cortex-a32
 endif
 
-# Set GCC flags for MARCH_ARM32_CORTEXA35. GCC supports -mcpu=cortex-a35 from 6.1
+# Set flags for MARCH_ARM32_CORTEXA35.
 ifeq ($(CONFIG_MARCH_ARM32_CORTEXA35),y)
-$(call error_if_gcc_version_lt,6,1)
-ARCHFLAGS-$(call gcc_version_ge,6,1)     += -mcpu=cortex-a35 -mtune=cortex-a35
-ISR_ARCHFLAGS-$(call gcc_version_ge,6,1) += -mcpu=cortex-a35 -mtune=cortex-a35
+ARCHFLAGS     += -mcpu=cortex-a35 -mtune=cortex-a35
+ISR_ARCHFLAGS += -mcpu=cortex-a35 -mtune=cortex-a35
 endif
 
-# Set GCC flags for MARCH_ARM32_A20NEON. GCC supports -mcpu=cortex-a7 from 4.7
+# Set GCC flags for MARCH_ARM32_A20NEON.
 ifeq ($(CONFIG_MARCH_ARM32_A20NEON),y)
-$(call error_if_gcc_version_lt,4,7)
-ARCHFLAGS-$(call gcc_version_ge,4,7)     += -mcpu=cortex-a7 -mtune=cortex-a7 -mfpu=vfpv4-d16 -mfpu=neon-vfpv4 -funsafe-math-optimizations
-ISR_ARCHFLAGS-$(call gcc_version_ge,4,7) += -mcpu=cortex-a7 -mtune=cortex-a7 -funsafe-math-optimizations
+ifeq ($(call have_clang),y)
+$(error Cortex AllWinner A20 CPU model only supported with GCC)
+endif
+ARCHFLAGS     += -mcpu=cortex-a7 -mtune=cortex-a7 -mfpu=vfpv4-d16 -mfpu=neon-vfpv4 -funsafe-math-optimizations
+ISR_ARCHFLAGS += -mcpu=cortex-a7 -mtune=cortex-a7 -funsafe-math-optimizations
 endif
 
 $(eval $(call addlib,libarmmath))

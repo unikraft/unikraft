@@ -269,7 +269,7 @@ static int is_ignored_file(const char *s, int len)
 {
 	return str_ends_with(s, len, "include/generated/autoconf.h") ||
 	       str_ends_with(s, len, "include/generated/autoksyms.h") ||
-	       str_ends_with(s, len, "build/include/uk/_config.h") ||
+	       str_ends_with(s, len, "build/include/uk/bits/config.h") ||
 	       str_ends_with(s, len, ".ver");
 }
 

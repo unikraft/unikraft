@@ -1,0 +1,13 @@
+config LIBUKINTCTLR_GIC
+	select LIBUKINTCTLR
+	bool
+
+config LIBUKINTCTLR_GICV2
+	bool "Arm Generic Interrupt Controller (GICv2)"
+	depends on (HAVE_INTCTLR && ARCH_ARM_64)
+	select LIBUKINTCTLR_GIC
+
+config LIBUKINTCTLR_GICV3
+	bool "Arm Generic Interrupt Controller (GICv3)"
+	depends on (HAVE_INTCTLR && ARCH_ARM_64)
+	select LIBUKINTCTLR_GIC

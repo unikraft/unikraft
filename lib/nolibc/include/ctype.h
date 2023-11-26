@@ -65,6 +65,8 @@ extern const unsigned char _nolibc_ctype[];
 #define isascii(c)	(((unsigned char)(c)) <= 0x7f)
 #define toascii(c)	((int)(((unsigned char)(c)) & 0x7f))
 
+#define isblank(c)	((c) == ' ' || (c) == '\t')
+
 static inline int tolower(int c)
 {
 	if (isupper(c))

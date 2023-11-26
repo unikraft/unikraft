@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright (c) 2018-2019, Ulf Magnusson
 # SPDX-License-Identifier: ISC
@@ -11,16 +11,16 @@ in the KCONFIG_CONFIG environment variable.
 
 Usage for the Linux kernel:
 
-  $ make [ARCH=<arch>] scriptconfig SCRIPT=Kconfiglib/examples/allmodconfig.py
-
-See the examples/allnoconfig_walk.py example script for another way to
-implement this script.
+  $ make [ARCH=<arch>] scriptconfig SCRIPT=Kconfiglib/allnoconfig.py
 """
+
+# See examples/allnoconfig_walk.py for another way to implement this script
+
 import kconfiglib
 
 
 def main():
-    kconf = kconfiglib.standard_kconfig()
+    kconf = kconfiglib.standard_kconfig(__doc__)
 
     # Avoid warnings that would otherwise get printed by Kconfiglib for the
     # following:
@@ -36,7 +36,7 @@ def main():
         sym.set_value(2 if sym.is_allnoconfig_y else 0)
     kconf.warn = True
 
-    kconfiglib.load_allconfig(kconf, "allno.config")
+    kconf.load_allconfig("allno.config")
 
     print(kconf.write_config())
 

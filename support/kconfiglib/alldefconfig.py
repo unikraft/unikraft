@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright (c) 2018-2019, Ulf Magnusson
 # SPDX-License-Identifier: ISC
@@ -18,8 +18,8 @@ import kconfiglib
 
 
 def main():
-    kconf = kconfiglib.standard_kconfig()
-    kconfiglib.load_allconfig(kconf, "alldef.config")
+    kconf = kconfiglib.standard_kconfig(__doc__)
+    kconf.load_allconfig("alldef.config")
     print(kconf.write_config())
 
 

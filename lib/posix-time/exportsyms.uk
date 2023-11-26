@@ -7,6 +7,9 @@ uk_syscall_r_clock_gettime
 clock_settime
 uk_syscall_e_clock_settime
 uk_syscall_r_clock_settime
+clock_nanosleep
+uk_syscall_e_clock_nanosleep
+uk_syscall_r_clock_nanosleep
 gettimeofday
 uk_syscall_e_gettimeofday
 uk_syscall_r_gettimeofday

@@ -1,9 +1,10 @@
 #!/bin/bash
 #
-# Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+# Authors: Simon Kuenzer <simon@unikraft.io>
 #
 # Copyright (c) 2019, NEC Laboratories Europe GmbH,
 #                     NEC Corporation All rights reserved.
+# Copyright (c) 2022, Unikraft GmbH
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions
@@ -30,6 +31,7 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
+OSENV=$( uname )
 
 die()
 {
@@ -356,15 +358,16 @@ _netdev_hwaddr()
 ##
 ## ARE WE ROOT?
 ##
-if [ $( id -u ) != 0 ]; then
-	if [ -x $( which sudo ) ]; then
-		echo "Trying to get root privileges..." 1>&2
-		exec sudo "$0" "$@"
-		exit 2
+if [ "$OSENV" = "Linux" ]; then
+	if [ $( id -u ) != 0 ]; then
+		if [ -x $( which sudo ) ]; then
+			echo "Trying to get root privileges..." 1>&2
+			exec sudo "$0" "$@"
+			exit 2
+		fi
+		echo "Please run as root" 1>&2
+		exit 1
 	fi
-
-	echo "Please run as root" 1>&2
-	exit 1
 fi
 
 ##
@@ -373,10 +376,16 @@ fi
 QEMU_BASE_ARGS=()
 QEMU_ARGS=()
 QEMU_PID=
+TEMP="/tmp/$( basename "$0" )-$$"
+if [ "$OSENV" = "Linux" ]; then
 SOCK_MONITOR="/run/$( basename "$0" )-$$_monitor.socket"
 SOCK_SERIAL="/run/$( basename "$0" )-$$_serial.socket"
 PIDFILE="/run/$( basename "$0" )-$$_qemu.pid"
-TEMP="/tmp/$( basename "$0" )-$$"
+else
+SOCK_MONITOR="${TEMP}/monitor.socket"
+SOCK_SERIAL="${TEMP}/serial.socket"
+PIDFILE="${TEMP}/qemu.pid"
+fi
 
 ARG_MACHINETYPE="x86pc"
 ARG_MEM=64
@@ -426,9 +435,6 @@ if [ -z "$( which uuidgen )" ]; then
 	echo "Please install uuidgen" 1>&2
 	exit 2
 fi
-if [ ! -f "/usr/share/qemu/sgabios.bin" ]; then
-	echo "Could not find '/usr/share/qemu/sgabios.bin'. This script might not work properly." 1>&2
-fi
 mkdir -p "${TEMP}"
 if [ $? -ne 0 ]; then
 	echo "Error: Could not create ${TEMP}" 1>&2
@@ -464,7 +470,7 @@ trap sighandler_abort SIGTERM
 usage()
 {
 	echo "Usage: $0 [OPTION]... [-- [EXTRA QEMU ARGS]...]"
-	echo "Runs a QEMU-based virtual guest. As default, the guest will use KVM extensions and has"
+	echo "Runs a QEMU-based virtual guest. As default, the guest will use hardware acceleration and has"
 	echo "no video device attached but one serial (ttyS0). This device is redirected"
 	echo "to stdio. QEMU's monitor will listen on another UNIX socket."
 	echo ""
@@ -482,19 +488,21 @@ usage()
 	echo "  -p [CPULIST]               Pin vCPUs to CPULIST (default off)"
 	echo "                             Note: QEMU threads are not pinned. In order to pin those as well,"
 	echo "                             use numactl or taskset to run this script"
-	echo "  -W                         Disable KVM acceleration of CPU (enables TCG)"
+	echo "  -W                         Disable hardware acceleration of CPU (enables TCG)"
 	echo "  -m [MB]                    Assign MB memory to the guest (default ${ARG_MEM})"
 	echo "  -v [PORT]                  Attach a video device that is accessible with VNC on port PORT (e.g., 5901)"
 	echo "  -n                         Attach a NAT-ed virtio-NIC to the guest"
 	echo "                             Note: No bridge is required on the host"
 	echo "  -N [PORT]                  Same as -n but forwards host port PORT"
 	echo "                             to the guest's SSH port (22)"
+	if [ "$OSENV" = "Linux" ]; then
 	echo "  -b [BRIDGE]                Attach a virtio-NIC to the existing Linux"
 	echo "                             bridge BRIDGE"
 	echo "  -V [IFACE]                 Assign host device IFACE directly as virtio-NIC to the guest"
 	echo "  -f [PCI-ID]                Directly assign PCI device PCI-ID (format: 0000:00:00.0)"
 	echo "                             Note: The PCI device will be unbind from the host"
 	echo "  -G [IOMMUGRP-ID]           Directly assign all PCI device of IOMMU group IOMMUGRP-ID"
+	fi
 	echo "  -d [IMAGE/DEVICE]          Attach a virtio storage device based on a raw IMAGE/DEVICE"
 	echo "  -q [IMAGE]                 Attach a virtio storage device based on a qcow2 IMAGE"
 	echo "  -I [ISO/DEVICE]            Attach a virtual IDE CD drive based on a ISO/DEVICE"
@@ -520,7 +528,14 @@ usage()
 	echo "  $0 -c 2 -m 2048 -b virbr0 -b virbr1 -q root.qcow2 -d /dev/sdb -d /dev/sdc"
 }
 
-while getopts :hnN:b:V:f:G:d:q:S:I:e:k:i:a:c:m:v:lrs:p:HxCDG:g:PT:WQ:M:t: OPT; do
+SHORTOPTS=
+if [ "$OSENV" = "Linux" ]; then
+	SHORTOPTS=":hnN:b:V:f:G:d:q:S:I:e:k:i:a:c:m:v:lrs:p:HxCDG:g:PT:WQ:M:t:"
+else
+	SHORTOPTS=":hnN:d:q:S:I:e:k:i:a:c:m:v:lrs:p:HxCDG:g:PT:WQ:M:t:"
+fi
+
+while getopts "$SHORTOPTS" OPT; do
         case ${OPT} in
 	v)
 		OPT_VIDEOVNC=0
@@ -736,57 +751,66 @@ if [ $OPT_BACKGROUND -ne 0 ]; then
 	fi
 fi
 
+QEMU_ACCEL=tcg
+if [ $OPT_HWACCEL -eq 0 ]; then
+	if [ $OSENV = Linux ]; then
+		QEMU_ACCEL=kvm
+		QEMU_BASE_ARGS+=("-enable-kvm")
+	elif [ $OSENV = Darwin ]; then
+		QEMU_ACCEL=hvf
+	fi
+fi
 case "$ARG_MACHINETYPE" in
 	"arm64v")
 		QEMU_BIN=${QEMU_BIN:-"$( which qemu-system-aarch64 )"}
 
 		QEMU_BASE_ARGS+=("-machine")
-		QEMU_BASE_ARGS+=("virt")
+		QEMU_BASE_ARGS+=("virt,accel=${QEMU_ACCEL}")
 
-		QEMU_BASE_ARGS+=("-cpu")
-		QEMU_BASE_ARGS+=("cortex-a53")
+		if [ $OPT_HWACCEL -eq 0 ]; then
+			QEMU_BASE_ARGS+=("-cpu")
+			QEMU_BASE_ARGS+=("host")
+		else
+			QEMU_BASE_ARGS+=("-cpu")
+			QEMU_BASE_ARGS+=("cortex-a53")
+		fi
 		;;
 	"x86pc")
 		QEMU_BIN=${QEMU_BIN:-"$( which qemu-system-x86_64 )"}
 
-		if [ $OPT_HWACCEL -eq 0 ]; then
-			QEMU_BASE_ARGS+=("-machine")
-			QEMU_BASE_ARGS+=("pc,accel=kvm")
+		# WORKAROUND: Unikraft currently only supports QEMUs PC model until 7.0
+		# See: https://github.com/unikraft/unikraft/issues/1040
+		"${QEMU_BIN}" -M \? | grep -qe '^pc-i440fx-7\.0[[:space:]]\?'
+		if [ $? -eq 0 ]; then
+			QEMU_X86MACH="pc-i440fx-7.0"
+		else
+			QEMU_X86MACH="pc"
+		fi
 
+		QEMU_BASE_ARGS+=("-machine")
+		QEMU_BASE_ARGS+=("${QEMU_X86MACH},accel=${QEMU_ACCEL}")
+
+		if [ $OPT_HWACCEL -eq 0 ]; then
 			QEMU_BASE_ARGS+=("-cpu")
 			QEMU_BASE_ARGS+=("host,+x2apic,-pmu")
 		else
-			QEMU_BASE_ARGS+=("-machine")
-			QEMU_BASE_ARGS+=("pc")
-
 			QEMU_BASE_ARGS+=("-cpu")
-			QEMU_BASE_ARGS+=("qemu64,-vmx,-svm,+pdpe1gb")
+			QEMU_BASE_ARGS+=("qemu64,-vmx,-svm,+x2apic,+pdpe1gb")
 		fi
-
-		# BIOS also on serial
-		QEMU_ARGS+=("-device")
-		QEMU_ARGS+=("sga")
 		;;
 	"x86q35")
 		QEMU_BIN=${QEMU_BIN:-"$( which qemu-system-x86_64 )"}
 
-		if [ $OPT_HWACCEL -eq 0 ]; then
-			QEMU_BASE_ARGS+=("-machine")
-			QEMU_BASE_ARGS+=("q35,accel=kvm")
+		QEMU_BASE_ARGS+=("-machine")
+		QEMU_BASE_ARGS+=("q35,accel=${QEMU_ACCEL}")
 
+		if [ $OPT_HWACCEL -eq 0 ]; then
 			QEMU_BASE_ARGS+=("-cpu")
 			QEMU_BASE_ARGS+=("host,+x2apic,-pmu")
 		else
-			QEMU_BASE_ARGS+=("-machine")
-			QEMU_BASE_ARGS+=("q35")
-
 			QEMU_BASE_ARGS+=("-cpu")
-			QEMU_BASE_ARGS+=("qemu64,-vmx,-svm")
+			QEMU_BASE_ARGS+=("qemu64,-vmx,-svm,+x2apic,+pdpe1gb")
 		fi
-
-		# BIOS also on serial
-		QEMU_ARGS+=("-device")
-		QEMU_ARGS+=("sga")
 		;;
 	*)
 		echo "Unsupported machine type (-t)"
@@ -916,10 +940,6 @@ QEMU_BASE_ARGS+=("-monitor")
 QEMU_BASE_ARGS+=("unix:${SOCK_MONITOR},server,nowait")
 
 QEMU_BASE_ARGS+=("-S")
-
-if [ $OPT_HWACCEL -eq 0 ]; then
-	QEMU_BASE_ARGS+=("-enable-kvm")
-fi
 
 if [ $OPT_TRACE -eq 0 ]; then
 	QEMU_BASE_ARGS+=("-d")

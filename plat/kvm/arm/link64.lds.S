@@ -32,15 +32,10 @@
 #include <uk/arch/limits.h>
 #include <uk/plat/common/common.lds.h>
 
-/* QEMU-AArch64 virt platform's ram base address */
-#define RAM_BASE_ADDR 0x40000000
-
-/* Reserve first 1MB for DTB */
-#define DTB_RESERVED_SIZE 0x100000
+#include <kvm-arm64/image.h>
 
 OUTPUT_FORMAT("elf64-littleaarch64")
 OUTPUT_ARCH(aarch64)
-ENTRY(_libkvmplat_entry)
 
 PHDRS
 {
@@ -66,6 +61,8 @@ SECTIONS {
 	_dtb = .;
 	_start_ram_addr = .;
 	. = . + DTB_RESERVED_SIZE;
+
+	_base_addr = .;		/* Symbol to represent the load base address */
 
 	/* Code */
 	_text = .;
@@ -131,5 +128,5 @@ SECTIONS {
 	.comment       0 : { *(.comment) }
 	DEBUG_SYMBOLS
 
-	/DISCARD/ : { *(.note.gnu.build-id) }
+	DISCARDS
 }

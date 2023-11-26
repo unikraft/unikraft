@@ -9,7 +9,7 @@ import subprocess
 import re
 import os
 
-SECINFO_EXP = r'^\s+\d+\s+.uk_bootinfo\s+([0-9,a-f]+)'
+SECINFO_EXP = r'^\s*\d+\s+\.uk_bootinfo\s+([0-9,a-f]+)'
 PHDRS_EXP = r'^\s+LOAD.+vaddr\s(0x[0-9,a-f]+).+\n.+memsz\s(0x[0-9,a-f]+)\sflags\s([rwx|-]{3})$'
 
 # Memory region types (see include/uk/plat/memory.h)
@@ -23,7 +23,7 @@ UKPLAT_MEMRF_EXECUTE    = 0x0004   # Region is executable
 UKPLAT_MEMR_NAME_LEN    = 36
 
 # Boot info structure (see include/uk/plat/common/bootinfo.h)
-UKPLAT_BOOTINFO_SIZE    = 56
+UKPLAT_BOOTINFO_SIZE    = 80
 
 UKPLAT_BOOTINFO_MAGIC   = 0xB007B0B0 # Boot Bobo
 UKPLAT_BOOTINFO_VERSION = 0x01
@@ -64,7 +64,7 @@ def main():
     # to create a binary blob that has exactly this size so we can replace it
     # in the binary.
     out = subprocess.check_output(["objdump", "-h", opt.kernel])
-    match = re.findall(SECINFO_EXP, out.decode('ASCII'), re.MULTILINE)
+    match = re.findall(SECINFO_EXP, out.decode('utf-8'), re.MULTILINE)
 
     if len(match) != 1:
         raise Exception(".uk_bootinfo section not found")
@@ -73,7 +73,10 @@ def main():
 
     # Retrieve info about ELF segments in unikernel
     out = subprocess.check_output(["objdump", "-p", opt.kernel])
-    phdrs = re.findall(PHDRS_EXP, out.decode('ASCII'), re.MULTILINE)
+    phdrs = re.findall(PHDRS_EXP, out.decode('utf-8'), re.MULTILINE)
+
+    # Make sure they are sorted by their addresses
+    phdrs = sorted(phdrs, key=lambda x: x[0])
 
     # The boot info is a struct ukplat_bootinfo
     # (see plat/common/include/uk/plat/common/bootinfo.h) followed by a list of
@@ -91,6 +94,9 @@ def main():
         secobj.write(b'\0' * 16) # bootloader
         secobj.write(b'\0' * 16) # bootprotocol
         secobj.write(b'\0' * 8) # cmdline
+        secobj.write(b'\0' * 8) # cmdline_len
+        secobj.write(b'\0' * 8) # dtb
+        secobj.write(b'\0' * 8) # efi_st
         secobj.write(cap.to_bytes(4, endianness)) # mrds.capacity
         secobj.write(b'\0' * 4) # mrds.count
 
@@ -117,6 +123,8 @@ def main():
 
             # Align size up to page size
             size = (int(phdr[1], base=16) + (PAGE_SIZE - 1)) & ~(PAGE_SIZE - 1)
+            if size == 0:
+                continue
 
             assert nsecs < cap
             nsecs += 1

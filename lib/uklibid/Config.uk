@@ -1,0 +1,136 @@
+menuconfig LIBUKLIBID
+	bool "uklibid: Library identifier"
+	default y
+	# FIXME: We actually depend on <uk/assert.h> but lib/ukdebug also
+	#        depends on us. If we specify the dependency here, it creates a
+	#        circular dependency that KConfig doesn't like. However, we
+	#        can currently assume that lib/ukdebug is always part of a
+	#        build, so we comment out the dependency here. Of course, this
+	#        is not accurate.
+	#select LIBUKDEBUG
+
+if LIBUKLIBID
+config LIBUKLIBID_INFO
+	bool "Embedded library metadata"
+	default y
+
+	if LIBUKLIBID_INFO
+	menu "Global metadata"
+		config LIBUKLIBID_INFO_UKFULLVERSION
+			bool "Full unikraft version"
+			default y
+			help
+				If enabled, the full Unikraft version including
+				Git SHA is embedded. Otherwise, only the short
+				Unikraft version is stored.
+
+		config LIBUKLIBID_INFO_UKCODENAME
+			bool "Unikraft codename"
+			help
+				If enabled, the Unikraft release codename is
+				stored as part of the global metadata
+				information.
+
+		config LIBUKLIBID_INFO_COMPILER
+			bool "Compiler (CC) information"
+			help
+				Enables storing the C compiler ($(CC)) that was
+				used for during compilation for the unikernel
+				image.
+
+		config LIBUKLIBID_INFO_COMPILEDATE
+			bool "Compile date"
+			default y
+			help
+				This option stores the compile date and time for
+				the unikernel image.
+
+		config LIBUKLIBID_INFO_UKCONFIGGZ
+			bool "Embed gzipped configuration (.config)"
+			help
+				If enabled, the current configuration `.config`
+				of the build is gzipped and embedded to the
+				global metadata infomration space.
+	endmenu
+
+	menu "Per library metadata"
+		config LIBUKLIBID_INFO_LIB_UKVERSION
+			bool "Unikraft version"
+			help
+				If enabled, the Unikraft version is included
+				to each library.
+
+		config LIBUKLIBID_INFO_LIB_UKFULLVERSION
+			bool "Full version"
+			depends on LIBUKLIBID_INFO_LIB_UKVERSION
+			help
+				Instead of the short Unikraft version, the full
+				Unikraft version including Git SHA is embedded
+				to each library.
+
+		config LIBUKLIBID_INFO_LIB_UKCODENAME
+			bool "Unikraft codename"
+			help
+				If enabled, the Unikraft release codename is
+				stored as part of each library metadata
+				information.
+
+		config LIBUKLIBID_INFO_LIB_COMPILER
+			bool "Compiler (CC) information"
+			default y
+			help
+				Enables storing the C compiler ($(CC)) that was
+				used for each library.
+
+		config LIBUKLIBID_INFO_LIB_COMPILEDATE
+			bool "Compile date"
+			help
+				This option stores the compile date and time for
+				each library.
+	endmenu
+
+	menuconfig LIBUKLIBID_INFO_COMPILEDBY
+		bool "Compiled by"
+		help
+			Name of the person/entity that did the compilation.
+			This information is added to each library and to the
+			global metadata information of a unikernel.
+
+	if LIBUKLIBID_INFO_COMPILEDBY
+		config LIBUKLIBID_INFO_COMPILEDBY_HOST
+			bool "Auto-detect name (user@hostname)"
+			default y
+			help
+				Automatically retrieves "Compiled by"
+				information by detecting the user
+				and the host (user@hostname).
+
+		config LIBUKLIBID_INFO_COMPILEDBY_CUSTOM_TEXT
+			string "Custom name"
+			depends on !LIBUKLIBID_INFO_COMPILEDBY_HOST
+			help
+				This option can be used to set a custom name
+				that is set as "Compiled by" information.
+
+		# Invisible option that enables auto-detecting user from host
+		config LIBUKLIBID_INFO_COMPILEDBY_CUSTOM
+			bool
+			default y if LIBUKLIBID_INFO_COMPILEDBY_CUSTOM_TEXT != ""
+
+		config LIBUKLIBID_INFO_COMPILEDBYASSOC_TEXT
+			string "Association"
+			help
+				Additional "Compiled by" field for setting an
+				association.
+
+		config LIBUKLIBID_INFO_COMPILEDBYASSOC
+			bool
+			default y if LIBUKLIBID_INFO_COMPILEDBYASSOC_TEXT != ""
+		endif
+	endif
+
+	config LIBUKLIBID_INFO_BOOTDUMP
+		bool "Print library summary early during boot"
+		depends on LIBUKLIBID_INFO
+		default n
+endif

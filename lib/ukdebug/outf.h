@@ -39,6 +39,7 @@
 #include <uk/config.h>
 #include <inttypes.h>
 #include <stdio.h>
+#include <uk/libid.h>
 
 enum out_dev_type {
 	OUTDEV_FILE = 0,
@@ -56,7 +57,7 @@ struct out_dev {
 		/* OUTDEV_KERN, OUTDEV_DEBUG */
 		struct {
 			int lvl; /* OUTDEV_KERN only */
-			const char *libname;
+			__u16 libid;
 			const char *srcname;
 			unsigned int srcline;
 		} uk_pr;
@@ -93,20 +94,20 @@ int outf(struct out_dev *dev, const char *fmt, ...);
 	} while (0)
 
 #if CONFIG_LIBUKDEBUG_PRINTK
-#define out_dev_init_kern(dev, lvl, libname, srcname, srcline)	\
+#define out_dev_init_kern(dev, lvl, libid, srcname, srcline)	\
 	do {							\
 		(dev)->type          = OUTDEV_KERN;		\
 		(dev)->uk_pr.lvl     = (lvl);			\
-		(dev)->uk_pr.libname = (libname);		\
+		(dev)->uk_pr.libid   = (libid);			\
 		(dev)->uk_pr.srcname = (srcname);		\
 		(dev)->uk_pr.srcline = (srcline);		\
 	} while (0)
 #endif
 
-#define out_dev_init_debug(dev, libname, srcname, srcline)	\
+#define out_dev_init_debug(dev, libid, srcname, srcline)	\
 	do {							\
 		(dev)->type          = OUTDEV_DEBUG;		\
-		(dev)->uk_pr.libname = (libname);		\
+		(dev)->uk_pr.libid   = (libid);			\
 		(dev)->uk_pr.srcname = (srcname);		\
 		(dev)->uk_pr.srcline = (srcline);		\
 	} while (0)

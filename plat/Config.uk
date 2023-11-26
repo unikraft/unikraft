@@ -5,6 +5,32 @@ config UKPLAT_MEMRNAME
 	help
 		Enable name field in memory region descriptors
 
+config UKPLAT_MEMREGION_MAX_COUNT
+	int "Maximum amount of Bootinfo Memory Region Descriptors"
+	default 128
+	help
+		The number of memory region descriptors depends on the platform. Some
+		may have less than 100, while others may have 100's of memory region
+		descriptors. In order to cope with this, the user is able to configure
+		the amount of statically allocated space in the image made available
+		for storing memory region descriptors' metadata.
+
+if ARCH_X86_64 || (KVM_BOOT_PROTO_EFI_STUB && ARCH_ARM_64)
+
+config UKPLAT_ACPI
+	bool "Enable parsing of ACPI structures"
+	default n
+
+if UKPLAT_ACPI
+
+config UKPLAT_ACPI_CHECKSUM
+	bool "Verify ACPI structures' checksum"
+	default n
+
+endif
+
+endif
+
 config UKPLAT_LCPU_MAXCOUNT
 	int "Maximum number of supported logical CPUs"
 	range 1 256
@@ -13,7 +39,8 @@ config UKPLAT_LCPU_MAXCOUNT
 config HAVE_SMP
 	bool
 	default y if UKPLAT_LCPU_MAXCOUNT > 1
-	default n
+	select LIBUKINTCTLR_APIC if (ARCH_X86_64 && UKPLAT_LCPU_MAXCOUNT > 1)
+	select UKPLAT_ACPI if ARCH_X86_64
 
 menu "Multiprocessor Configuration"
 	depends on HAVE_SMP
@@ -97,19 +124,3 @@ config FPSIMD
 	depends on ARCH_ARM_64
 	help
 		Enable support FPU usage in application
-
-menuconfig LIBGIC
-	bool "Arm GIC (generic interrupt controller) support"
-	select LIBOFW
-	default y if ARCH_ARM_64
-	depends on ARCH_ARM_64
-	depends on UKPLAT_ALLOW_GIC
-if LIBGIC
-config LIBGICV2
-	bool "Version 2"
-	default y
-
-config LIBGICV3
-	bool "Version 3"
-	default y
-endif

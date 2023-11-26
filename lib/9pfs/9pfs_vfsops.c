@@ -30,6 +30,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _GNU_SOURCE
+
 #include <uk/config.h>
 #include <uk/errptr.h>
 #include <uk/9p.h>
@@ -104,7 +106,7 @@ static int uk_9pfs_parse_option(struct uk_9pfs_mount_data *md,
 }
 
 static int uk_9pfs_parse_options(struct uk_9pfs_mount_data *md,
-		const void *data __unused)
+				 const void *data __unused)
 {
 	int rc = 0;
 	char *options = NULL, *options_tok = NULL, *options_save = NULL;
@@ -116,16 +118,17 @@ static int uk_9pfs_parse_options(struct uk_9pfs_mount_data *md,
 		goto err;
 	}
 
+	md->proto = UK_9P_PROTO_2000L;
+	md->uname = strdup("");
+	md->aname = strdup("");
+
 	/*
 	 * musl/nolibc strtok_r resets saveptr at the end, so we need to feed
 	 * the option string only once; otherwise strtok_r would loop over the
 	 * options string forever
 	 */
-	options = options_tok = strdup(data);
-
-	md->proto = UK_9P_PROTO_2000U;
-	md->uname = strdup("");
-	md->aname = strdup("");
+	if (data)
+		options = options_tok = strdup(data);
 
 	while ((option = strtok_r(options_tok, ",", &options_save))) {
 		options_tok = NULL;

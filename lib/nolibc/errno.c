@@ -32,9 +32,15 @@
  */
 
 #include <errno.h>
+#include <stddef.h>
 
 #if CONFIG_HAVE_SCHED
 __thread int errno;
 #else
 int errno;
 #endif /* !CONFIG_HAVE_SCHED */
+
+int *__errno_location(void)
+{
+	return &errno;
+}

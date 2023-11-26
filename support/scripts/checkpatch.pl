@@ -467,6 +467,10 @@ our $signature_tags = qr{(?xi:
 	Reviewed-by:|
 	Reported-by:|
 	Suggested-by:|
+	Approved-by:|
+	Co-authored-by:|
+	GitHub-Fixes:|
+	GitHub-Closes:|
 	To:|
 	Cc:
 )};
@@ -2461,7 +2465,8 @@ sub process {
 
 # Check signature styles
 		if (!$in_header_lines &&
-		    $line =~ /^(\s*)([a-z0-9_-]+by:|$signature_tags)(\s*)(.*)/i) {
+		    $line =~ /^(\s*)([a-z0-9_-]+by:|$signature_tags)(\s*)(.*)/i &&
+		    $line !~ /^GitHub\s*/i) {
 			my $space_before = $1;
 			my $sign_off = $2;
 			my $space_after = $3;
@@ -2541,6 +2546,25 @@ sub process {
 		    $line =~ /^Subject:[^:]+$/i) {
 			ERROR("UNIKRAFT_SUBJECT_FORMAT",
 			     "Patch subject line does not follow Unikraft scheme: '[Selector]/[Component]: [Short message]'\n" . $herecurr);
+		}
+
+# Check that the first line in the commit message has less than
+# 70 characters to comply with Github UI. This helps
+# avoid commit message subjects placed at the beginning
+# to overflow into the second line when viewing through
+# the Github UI.
+		if ($in_header_lines &&
+		    $line =~ /^Subject:.*$/i) {
+			my $commit_subject_line0 = $1 if
+				$lines[$linenr - 1] =~ /^Subject: \[.*\] (.*)$/;
+			my $commit_subject_line1 = $lines[$linenr];
+			my $commit_subject = $commit_subject_line0 .
+					     $commit_subject_line1;
+			if (length($commit_subject) > 70) {
+				WARN("COMMIT_SUBJECT_LONG_LINE",
+				     "Possible unwrapped commit subject (prefer a maximum 70 chars)\n" . $commit_subject);
+				$commit_log_long_line = 1;
+			}
 		}
 
 # Check for old stable address

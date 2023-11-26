@@ -241,6 +241,7 @@ static void _uk_thread_struct_init(struct uk_thread *t,
 	t->name = name;
 	t->priv = priv;
 	t->dtor = dtor;
+	t->exec_time = 0;
 
 	if (tlsp && is_uktls) {
 		t->flags |= UK_THREADF_UKTLS;
@@ -923,7 +924,7 @@ void uk_thread_release(struct uk_thread *t)
 		uk_free(a, t);
 }
 
-static void uk_thread_block_until(struct uk_thread *thread, __snsec until)
+void uk_thread_block_until(struct uk_thread *thread, __snsec until)
 {
 	unsigned long flags;
 

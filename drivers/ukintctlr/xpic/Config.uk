@@ -1,0 +1,13 @@
+config HAVE_APIC
+	bool
+
+config LIBUKINTCTLR_XPIC
+	bool "Intel PIC"
+	depends on ARCH_X86_64
+	select LIBUKINTCTLR
+
+config LIBUKINTCTLR_APIC
+	bool "Intel APIC"
+	depends on HAVE_APIC
+	select LIBUKINTCTLR_PIC
+	depends on ARCH_X86_64

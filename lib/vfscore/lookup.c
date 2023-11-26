@@ -30,7 +30,7 @@
  * SUCH DAMAGE.
  */
 
-#define _BSD_SOURCE
+#define _GNU_SOURCE
 
 #include <unistd.h>
 #include <string.h>
@@ -78,7 +78,7 @@ namei_follow_link(struct dentry *dp, char *node, char *name, char *fp, size_t mo
 	}
 	link[sz] = 0;
 
-	p = fp + mountpoint_len + strlen(node);
+	p = fp + mountpoint_len + strlen(node) - 1;
 	c = strlen(node) - strlen(name) - 1;
 	node[c] = 0;
 
@@ -96,13 +96,14 @@ namei_follow_link(struct dentry *dp, char *node, char *name, char *fp, size_t mo
 	return (0);
 }
 /*
- * Convert a pathname into a pointer to a dentry
+ * Resolve a pathname into a pointer to a dentry and a realpath.
  *
  * @path: full path name.
  * @dpp:  dentry to be returned.
+ * @realpath: if not NULL, return path after resolving all symlinks
  */
 int
-namei(const char *path, struct dentry **dpp)
+namei_resolve(const char *path, struct dentry **dpp, char *realpath)
 {
 	char *p;
 	char node[PATH_MAX];
@@ -118,8 +119,11 @@ namei(const char *path, struct dentry **dpp)
 	DPRINTF(VFSDB_VNODE, ("namei: path=%s\n", path));
 
 	links_followed = 0;
+
+	memset(fp, 0, PATH_MAX);
 	strlcpy(fp, path, PATH_MAX);
 
+	error = 0;
 	do {
 		need_continue = 0;
 		/*
@@ -127,16 +131,19 @@ namei(const char *path, struct dentry **dpp)
 		 * the local node in the file system.
 		 */
 		if (vfs_findroot(fp, &mp, &p)) {
-			return ENOTDIR;
+			error = ENOTDIR;
+			goto out;
 		}
-		int mountpoint_len = p - fp - 1;
+
+		size_t mountpoint_len = p - fp;
+
 		strlcpy(node, "/", sizeof(node));
 		strlcat(node, p, sizeof(node));
 		dp = dentry_lookup(mp, node);
 		if (dp) {
 			/* vnode is already active. */
 			*dpp = dp;
-			return 0;
+			goto out;
 		}
 		/*
 		 * Find target vnode, started from root directory.
@@ -185,7 +192,7 @@ namei(const char *path, struct dentry **dpp)
 				if (error) {
 					vn_unlock(dvp);
 					drele(ddp);
-					return error;
+					goto out;
 				}
 
 				dp = dentry_alloc(ddp, vp, node);
@@ -194,7 +201,8 @@ namei(const char *path, struct dentry **dpp)
 				if (!dp) {
 					vn_unlock(dvp);
 					drele(ddp);
-					return ENOMEM;
+					error = ENOMEM;
+					goto out;
 				}
 			}
 			vn_unlock(dvp);
@@ -205,7 +213,7 @@ namei(const char *path, struct dentry **dpp)
 				error = namei_follow_link(dp, node, name, fp, mountpoint_len);
 				if (error) {
 					drele(dp);
-					return (error);
+					goto out;
 				}
 
 				drele(dp);
@@ -219,7 +227,8 @@ namei(const char *path, struct dentry **dpp)
 				node[0] = 0;
 
 				if (++links_followed >= MAXSYMLINKS) {
-					return (ELOOP);
+					error = ELOOP;
+					goto out;
 				}
 				need_continue = 1;
 				break;
@@ -227,12 +236,57 @@ namei(const char *path, struct dentry **dpp)
 
 			if (*p == '/' && ddp->d_vnode->v_type != VDIR) {
 				drele(ddp);
-				return ENOTDIR;
+				error = ENOTDIR;
+				goto out;
 			}
 		}
 	} while (need_continue);
 
 	*dpp = dp;
+out:
+	if (realpath)
+		strlcpy(realpath, fp, PATH_MAX);
+	return error;
+}
+/*
+ * Convert a pathname into a pointer to a dentry
+ *
+ * @path: full path name.
+ * @dpp:  dentry to be returned.
+ */
+int
+namei(const char *path, struct dentry **dpp)
+{
+	return namei_resolve(path, dpp, NULL);
+}
+
+static int
+_namei_prep_path(const char *path, struct mount **mp, char *node, char **fname)
+{
+	if (path[0] != '/') {
+		return (ENOTDIR);
+	}
+
+	char *name = strrchr(path, '/');
+	if (name == NULL) {
+		return (ENOENT);
+	}
+	*fname = name + 1;
+
+	char *p;
+	int error = vfs_findroot(path, mp, &p);
+	if (error != 0) {
+		return (ENOTDIR);
+	}
+
+	strlcpy(node, "/", PATH_MAX);
+	strlcat(node, p, PATH_MAX);
+	// We want to treat things like /tmp/ the same as /tmp. Best way to do that
+	// is to ignore the last character, except when we're stating the root.
+	int l = strlen(node) - 1;
+	if (l && node[l] == '/') {
+		node[l] = '\0';
+	}
 	return 0;
 }
 
@@ -249,39 +303,14 @@ namei_last_nofollow(char *path, struct dentry *ddp, struct dentry **dpp)
 	char          *name;
 	int           error;
 	struct mount  *mp;
-	char          *p;
 	struct dentry *dp;
 	struct vnode  *dvp;
 	struct vnode  *vp;
 	char node[PATH_MAX];
 
-	dvp  = NULL;
-
-	if (path[0] != '/') {
-		return (ENOTDIR);
+	if ((error = _namei_prep_path(path, &mp, node, &name))) {
+		return error;
 	}
-
-	name = strrchr(path, '/');
-	if (name == NULL) {
-		return (ENOENT);
-	}
-	name++;
-
-	error = vfs_findroot(path, &mp, &p);
-	if (error != 0) {
-		return (ENOTDIR);
-	}
-
-	strlcpy(node, "/", PATH_MAX);
-	strlcat(node, p, PATH_MAX);
-
-	// We want to treat things like /tmp/ the same as /tmp. Best way to do that
-	// is to ignore the last character, except when we're stating the root.
-	int l = strlen(node) - 1;
-	if (l && node[l] == '/') {
-		node[l] = '\0';
-	}
-
 	dvp = ddp->d_vnode;
 	vn_lock(dvp);
 	dp = dentry_lookup(mp, node);
@@ -303,9 +332,51 @@ namei_last_nofollow(char *path, struct dentry *ddp, struct dentry **dpp)
 	*dpp  = dp;
 	error = 0;
 out:
-	if (dvp != NULL) {
-		vn_unlock(dvp);
+	vn_unlock(dvp);
+	return (error);
+}
+
+/*
+ * Same as namei_last_nofollow but does not lock ddp->d_vnode.
+ *
+ * @path: full path name
+ * @ddp : pointer to dentry of parent
+ * @dpp : dentry to be returned
+ */
+int
+namei_last_nofollow_locked(char *path, struct dentry *ddp, struct dentry **dpp)
+{
+	char          *name;
+	int           error;
+	struct mount  *mp;
+	struct dentry *dp;
+	struct vnode  *dvp;
+	struct vnode  *vp;
+	char node[PATH_MAX];
+
+	if ((error = _namei_prep_path(path, &mp, node, &name))) {
+		return error;
 	}
+	dvp = ddp->d_vnode;
+	dp = dentry_lookup(mp, node);
+	if (dp == NULL) {
+		error = VOP_LOOKUP(dvp, name, &vp);
+		if (error != 0) {
+			goto out;
+		}
+
+		dp = dentry_alloc(ddp, vp, node);
+		vput(vp);
+
+		if (dp == NULL) {
+			error = ENOMEM;
+			goto out;
+		}
+	}
+
+	*dpp  = dp;
+	error = 0;
+out:
 	return (error);
 }
 

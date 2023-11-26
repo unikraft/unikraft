@@ -1,0 +1,40 @@
+config HAVE_MMIO
+	bool
+
+menuconfig LIBVIRTIO_MMIO
+	bool "Virtio MMIO transport"
+	depends on HAVE_MMIO
+	depends on VIRTIO_DEVICE
+	select LIBUKBUS_PLATFORM
+	help
+		Virtio MMIO transport.
+
+if LIBVIRTIO_MMIO
+
+config LIBVIRTIO_MMIO_FDT
+	bool
+	default y if (LIBFDT && LIBUKOFW)
+
+config VIRTIO_MMIO_MAX_DEV_CMDLINE
+	int "Max command-line devices"
+	default 4
+	help
+		Maximum number of virtio-mmio devices that can be passed via the
+		command line.
+
+config VIRTIO_MMIO_LINUX_COMPAT_CMDLINE
+	bool "Linux compatible command line"
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKLIBPARAM
+	help
+		Accept MMIO devices using the linux command line parameter
+		format, ie:
+
+		virtio_mmio.device = <size>@<base>:<irq>[:<id>]
+
+		If this option is not enabled, use the default libukparam
+		format for this library, ie:
+
+		libvirtio_mmio.device = <size>@<base>:<irq>[:<id>]
+
+endif

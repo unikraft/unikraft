@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # This script functions similarly to scripts/kconfig/merge_config.sh from the
 # kernel tree, merging multiple configurations fragments to produce a complete
@@ -79,7 +79,7 @@ from kconfiglib import Kconfig, BOOL, TRISTATE, TRI_TO_STR
 if len(sys.argv) < 4:
     sys.exit("usage: merge_config.py Kconfig merged_config config1 [config2 ...]")
 
-kconf = Kconfig(sys.argv[1])
+kconf = Kconfig(sys.argv[1], suppress_traceback=True)
 
 # Enable warnings for assignments to undefined symbols
 kconf.warn_assign_undef = True
@@ -104,18 +104,6 @@ print(kconf.write_config(sys.argv[2]))
 
 # Print warnings for symbols whose actual value doesn't match the assigned
 # value
-
-def name_and_loc(sym):
-    # Helper for printing symbol names and Kconfig file location(s) in warnings
-
-    if not sym.nodes:
-        return sym.name + " (undefined)"
-
-    return "{} (defined at {})".format(
-        sym.name,
-        ", ".join("{}:{}".format(node.filename, node.linenr)
-                  for node in sym.nodes))
-
 for sym in kconf.defined_syms:
     # Was the symbol assigned to?
     if sym.user_value is not None:
@@ -129,5 +117,5 @@ for sym in kconf.defined_syms:
         if user_value != sym.str_value:
             print("warning: {} was assigned the value '{}' but got the "
                   "value '{}' -- check dependencies".format(
-                      name_and_loc(sym), user_value, sym.str_value),
+                      sym.name_and_loc, user_value, sym.str_value),
                   file=sys.stderr)

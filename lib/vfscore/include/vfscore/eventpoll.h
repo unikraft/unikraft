@@ -199,7 +199,7 @@ static inline void eventpoll_init(struct eventpoll *ep, struct uk_alloc *a)
  * files. After calling this function it is safe to release the memory of the
  * eventpoll object.
  *
- * @param eventpoll the eventpoll to finalize
+ * @param ep the eventpoll to finalize
  */
 void eventpoll_fini(struct eventpoll *ep);
 

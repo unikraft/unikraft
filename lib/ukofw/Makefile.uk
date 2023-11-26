@@ -1,0 +1,7 @@
+$(eval $(call addlib_s,libukofw,$(CONFIG_LIBUKOFW)))
+
+ASINCLUDES-$(CONFIG_LIBUKOFW)  += -I$(LIBUKOFW_BASE)/include
+CINCLUDES-$(CONFIG_LIBUKOFW)   += -I$(LIBUKOFW_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBUKOFW) += -I$(LIBUKOFW_BASE)/include
+
+LIBUKOFW_SRCS-y                += $(LIBUKOFW_BASE)/fdt.c

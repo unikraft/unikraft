@@ -55,6 +55,12 @@
 #include <fcntl.h>
 #include <vfscore/fs.h>
 
+/* 16 bits are enough for file mode as defined by POSIX, the rest we can use */
+#define RAMFS_MODEMASK 0xffff
+#define RAMFS_DELMODE 0x10000
+#define RAMFS_IS_DELETED(np) ((np)->rn_mode & RAMFS_DELMODE)
+#define RAMFS_MARK_DELETED(np) (np)->rn_mode |= RAMFS_DELMODE
+
 static struct uk_mutex ramfs_lock = UK_MUTEX_INITIALIZER(ramfs_lock);
 static uint64_t inode_count = 1; /* inode 0 is reserved to root */
 
@@ -62,10 +68,9 @@ static void
 set_times_to_now(struct timespec *time1, struct timespec *time2,
 		 struct timespec *time3)
 {
-	struct timespec now = {0, 0};
+	struct timespec now;
 
-	/* TODO: implement the real clock_gettime */
-	/* clock_gettime(CLOCK_REALTIME, &now); */
+	clock_gettime(CLOCK_REALTIME, &now);
 	if (time1)
 		memcpy(time1, &now, sizeof(struct timespec));
 	if (time2)
@@ -75,7 +80,7 @@ set_times_to_now(struct timespec *time1, struct timespec *time2,
 }
 
 struct ramfs_node *
-ramfs_allocate_node(const char *name, int type)
+ramfs_allocate_node(const char *name, int type, mode_t mode)
 {
 	struct ramfs_node *np;
 
@@ -92,13 +97,15 @@ ramfs_allocate_node(const char *name, int type)
 	}
 	strlcpy(np->rn_name, name, np->rn_namelen + 1);
 	np->rn_type = type;
+	np->rn_ino = inode_count++;
 
+	mode &= 0777;
 	if (type == VDIR)
-		np->rn_mode = S_IFDIR|0777;
+		np->rn_mode = S_IFDIR|mode;
 	else if (type == VLNK)
 		np->rn_mode = S_IFLNK|0777;
 	else
-		np->rn_mode = S_IFREG|0777;
+		np->rn_mode = S_IFREG|mode;
 
 	set_times_to_now(&(np->rn_ctime), &(np->rn_atime), &(np->rn_mtime));
 	np->rn_owns_buf = true;
@@ -117,11 +124,11 @@ ramfs_free_node(struct ramfs_node *np)
 }
 
 static struct ramfs_node *
-ramfs_add_node(struct ramfs_node *dnp, char *name, int type)
+ramfs_add_node(struct ramfs_node *dnp, const char *name, int type, mode_t mode)
 {
 	struct ramfs_node *np, *prev;
 
-	np = ramfs_allocate_node(name, type);
+	np = ramfs_allocate_node(name, type, mode);
 	if (np == NULL)
 		return NULL;
 
@@ -166,7 +173,8 @@ ramfs_remove_node(struct ramfs_node *dnp, struct ramfs_node *np)
 		}
 		prev->rn_next = np->rn_next;
 	}
-	ramfs_free_node(np);
+	/* Mark node as deleted */
+	RAMFS_MARK_DELETED(np);
 
 	set_times_to_now(&(dnp->rn_mtime), &(dnp->rn_ctime), NULL);
 
@@ -175,7 +183,7 @@ ramfs_remove_node(struct ramfs_node *dnp, struct ramfs_node *np)
 }
 
 static int
-ramfs_rename_node(struct ramfs_node *np, char *name)
+ramfs_rename_node(struct ramfs_node *np, const char *name)
 {
 	size_t len;
 	char *tmp;
@@ -202,7 +210,7 @@ ramfs_rename_node(struct ramfs_node *np, char *name)
 }
 
 static int
-ramfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
+ramfs_lookup(struct vnode *dvp, const char *name, struct vnode **vpp)
 {
 	struct ramfs_node *np, *dnp;
 	struct vnode *vp;
@@ -230,7 +238,7 @@ ramfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
 		uk_mutex_unlock(&ramfs_lock);
 		return ENOENT;
 	}
-	if (vfscore_vget(dvp->v_mount, inode_count++, &vp)) {
+	if (vfscore_vget(dvp->v_mount, np->rn_ino, &vp)) {
 		/* found in cache */
 		*vpp = vp;
 		uk_mutex_unlock(&ramfs_lock);
@@ -253,7 +261,7 @@ ramfs_lookup(struct vnode *dvp, char *name, struct vnode **vpp)
 }
 
 static int
-ramfs_mkdir(struct vnode *dvp, char *name, mode_t mode)
+ramfs_mkdir(struct vnode *dvp, const char *name, mode_t mode)
 {
 	struct ramfs_node *np;
 
@@ -264,7 +272,7 @@ ramfs_mkdir(struct vnode *dvp, char *name, mode_t mode)
 	if (!S_ISDIR(mode))
 		return EINVAL;
 
-	np = ramfs_add_node(dvp->v_data, name, VDIR);
+	np = ramfs_add_node(dvp->v_data, name, VDIR, mode);
 	if (np == NULL)
 		return ENOMEM;
 	np->rn_size = 0;
@@ -273,7 +281,7 @@ ramfs_mkdir(struct vnode *dvp, char *name, mode_t mode)
 }
 
 static int
-ramfs_symlink(struct vnode *dvp, char *name, char *link)
+ramfs_symlink(struct vnode *dvp, const char *name, const char *link)
 {
 	struct ramfs_node *np;
 	size_t len;
@@ -281,7 +289,7 @@ ramfs_symlink(struct vnode *dvp, char *name, char *link)
 	if (strlen(name) > NAME_MAX)
 		return ENAMETOOLONG;
 
-	np = ramfs_add_node(dvp->v_data, name, VLNK);
+	np = ramfs_add_node(dvp->v_data, name, VLNK, 0);
 
 	if (np == NULL)
 		return ENOMEM;
@@ -319,14 +327,15 @@ ramfs_readlink(struct vnode *vp, struct uio *uio)
 
 /* Remove a directory */
 static int
-ramfs_rmdir(struct vnode *dvp, struct vnode *vp, char *name __unused)
+ramfs_rmdir(struct vnode *dvp, struct vnode *vp, const char *name __unused)
 {
 	return ramfs_remove_node(dvp->v_data, vp->v_data);
 }
 
 /* Remove a file */
 static int
-ramfs_remove(struct vnode *dvp, struct vnode *vp, char *name __maybe_unused)
+ramfs_remove(struct vnode *dvp, struct vnode *vp,
+	     const char *name __maybe_unused)
 {
 	uk_pr_debug("remove %s in %s\n", name,
 		 RAMFS_NODE(dvp)->rn_name);
@@ -377,7 +386,7 @@ ramfs_truncate(struct vnode *vp, off_t length)
  * Create empty file.
  */
 static int
-ramfs_create(struct vnode *dvp, char *name, mode_t mode)
+ramfs_create(struct vnode *dvp, const char *name, mode_t mode)
 {
 	struct ramfs_node *np;
 
@@ -388,7 +397,7 @@ ramfs_create(struct vnode *dvp, char *name, mode_t mode)
 	if (!S_ISREG(mode))
 		return EINVAL;
 
-	np = ramfs_add_node(dvp->v_data, name, VREG);
+	np = ramfs_add_node(dvp->v_data, name, VREG, mode);
 	if (np == NULL)
 		return ENOMEM;
 	return 0;
@@ -493,8 +502,9 @@ ramfs_write(struct vnode *vp, struct uio *uio, int ioflag)
 }
 
 static int
-ramfs_rename(struct vnode *dvp1, struct vnode *vp1, char *name1 __unused,
-			 struct vnode *dvp2, struct vnode *vp2, char *name2)
+ramfs_rename(struct vnode *dvp1, struct vnode *vp1, const char *name1 __unused,
+	     struct vnode *dvp2, struct vnode *vp2,
+	     const char *name2)
 {
 	struct ramfs_node *np, *old_np;
 	int error;
@@ -514,7 +524,8 @@ ramfs_rename(struct vnode *dvp1, struct vnode *vp1, char *name1 __unused,
 	} else {
 		/* Create new file or directory */
 		old_np = vp1->v_data;
-		np = ramfs_add_node(dvp2->v_data, name2, old_np->rn_type);
+		np = ramfs_add_node(dvp2->v_data, name2,
+				    old_np->rn_type, old_np->rn_mode);
 		if (np == NULL)
 			return ENOMEM;
 
@@ -535,7 +546,7 @@ ramfs_rename(struct vnode *dvp1, struct vnode *vp1, char *name1 __unused,
  * @vp: vnode of the directory.
  */
 static int
-ramfs_readdir(struct vnode *vp, struct vfscore_file *fp, struct dirent *dir)
+ramfs_readdir(struct vnode *vp, struct vfscore_file *fp, struct dirent64 *dir)
 {
 	struct ramfs_node *np, *dnp;
 	int i;
@@ -604,7 +615,7 @@ ramfs_getattr(struct vnode *vnode, struct vattr *attr)
 	memcpy(&(attr->va_ctime), &(np->rn_ctime), sizeof(struct timespec));
 	memcpy(&(attr->va_mtime), &(np->rn_mtime), sizeof(struct timespec));
 
-	attr->va_mode = np->rn_mode;
+	attr->va_mode = np->rn_mode & RAMFS_MODEMASK;
 
 	return 0;
 }
@@ -630,8 +641,17 @@ ramfs_setattr(struct vnode *vnode, struct vattr *attr)
 	}
 
 	if (attr->va_mask & AT_MODE)
-		np->rn_mode = attr->va_mode;
+		np->rn_mode = attr->va_mode & RAMFS_MODEMASK;
 
+	return 0;
+}
+
+static int
+ramfs_inactive(struct vnode *vp)
+{
+	struct ramfs_node *np = RAMFS_NODE(vp);
+	if (np && RAMFS_IS_DELETED(np))
+		ramfs_free_node(vp->v_data);
 	return 0;
 }
 
@@ -640,7 +660,6 @@ ramfs_setattr(struct vnode *vnode, struct vattr *attr)
 #define ramfs_seek      ((vnop_seek_t)vfscore_vop_nullop)
 #define ramfs_ioctl     ((vnop_ioctl_t)vfscore_vop_einval)
 #define ramfs_fsync     ((vnop_fsync_t)vfscore_vop_nullop)
-#define ramfs_inactive  ((vnop_inactive_t)vfscore_vop_nullop)
 #define ramfs_link      ((vnop_link_t)vfscore_vop_eperm)
 #define ramfs_fallocate ((vnop_fallocate_t)vfscore_vop_nullop)
 #define ramfs_poll      ((vnop_poll_t)vfscore_vop_einval)

@@ -17,7 +17,7 @@ Please mark items appropriately:
 
  - [ ] Read the [contribution guidelines](https://unikraft.org/docs/contributing/) regarding submitting new changes to the project;
  - [ ] Tested your changes against relevant architectures and platforms;
- - [ ] Ran the [`checkpatch.pl`](https://github.com/unikraft/unikraft/blob/staging/support/scripts/checkpatch.pl) on your commit series before opening this PR;
+ - [ ] Ran the [`checkpatch.uk`](https://github.com/unikraft/unikraft/blob/staging/support/scripts/checkpatch.uk) on your commit series before opening this PR;
  - [ ] Updated relevant documentation.
 
 

@@ -1,8 +1,10 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Sharan Santhanam <sharan.santhanam@neclab.eu>
+ *          Simon Kuenzer <simon@unikraft.io>
  *
  * Copyright (c) 2019, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2023, Unikraft GmbH. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -45,407 +47,290 @@ extern C {
 #endif /* __cplusplus */
 #endif /* !__ASSEMBLY__ */
 
-/**
- * Variable name prefix/suffix
+/* We need to define an own version here in order to avoid (indirect) header
+ * dependencies in our linker script `libparam.lds.S`. These headers are likely
+ * not prepared or available in the scope of linker scripts.
  */
-#define UK_LIBPARAM_SECTION	uk_lib_arg
-/**
- * Library: section suffix for the name and the
- * parameter.
- */
-#define LIB_PARAM_SUFFIX	__lib_param
-#define LIB_NAME_SUFFIX		__lib_str
-/**
- * Library variable names for the name and the
- * parameter.
- */
-#define LIB_PARAMVAR_PREFIX	_lib_param_
-#define LIB_NAMEVAR_PREFIX	_lib_name_
-/**
- * Parameter within a library: section suffix for the name and the
- * parameter.
- */
-#define PARAM_SECTION_SUFFIX	__param_arg
-#define PARAM_NAME_SUFFIX	__param_str
-/**
- * Parameter within a library: variable name prefix for the name and the
- * parameter.
- */
-#define PARAM_PARAMVAR_PREFIX	_param_param_
-#define PARAM_NAMEVAR_PREFIX	_param_name_
+#define _UK_LIBPARAM_CONCAT(a, b) a ## b
+#define UK_LIBPARAM_CONCAT(a, b) _UK_LIBPARAM_CONCAT(a, b)
 
-#define __STRINGCONCAT(x, y)	x ## y
+/* Fallback to default library prefix if not set by compiler flag */
+#ifndef UK_LIBPARAM_LIBPREFIX
+#define UK_LIBPARAM_LIBPREFIX __LIBNAME__
+#endif /* !UK_LIBPARAM_PREFIX */
 
-/**
- * Create a section name.
- * @param libname
- *	The library name
- * @param section
- *	The section suffix for the library
+/*
+ * Name (prefixes) used for a per-library section that stores all references
+ * to parameters (struct uk_libparam_param) available for one library. This
+ * section is basically compiled into an array of pointers.
+ * A library parameter descriptor (struct uk_libparam_desc) is referencing to
+ * the section's base address for iteration.
  */
-#define _LIB_PARAM_SECTION_NAME(libname, section_name)		\
-				__STRINGCONCAT(libname, section_name)
+#define UK_LIBPARAM_PARAMSECTION_NAMEPREFIX   uk_libparam_params_
+#define UK_LIBPARAM_PARAM_NAMEPREFIX          __uk_libparam_param_
 
-/**
- * Macros to denote the start / stop of a section.
- */
-#define _SECTION_START(name)	__STRINGCONCAT(__start_, name)
-#define _SECTION_STOP(name)	__STRINGCONCAT(__stop_, name)
-
-/**
- * Make sure there is a dummy implementation for the UK_PARAM family of
- * functions.
- */
-#ifndef CONFIG_LIBUKLIBPARAM
-/**
- * Declare a library param.
- * @param name
- *	The name of the library param.
- * @param type
- *	The type of the param.
- */
-#define UK_LIB_PARAM(name, type)
-
-/**
- * Declare a string library param. This is a dummy implementation.
- * @param name
- *	The name of the parameter.
- */
-#define UK_LIB_PARAM_STR(name)
-
-/**
- * Declare an array of primitive.
- * @param name
- *	The name of the parameter.
- * @param type
- *	The type of the parameter.
- */
-#define UK_LIB_PARAM_ARR(name, type)
-
-#else /* !CONFIG_LIBUKLIBPARAM */
-/**
- * Each parameter is bit-mapped as follows:
- * ---------------------------------------
- * | sign | copy | size of the parameter |
- * ---------------------------------------
- * 7     6      5                       0
- */
-/**
- * Sign bit: Shift & Mask
- */
-#define PARAM_SIGN_SHIFT	(7)
-#define PARAM_SIGN_MASK		(0x1)
-/**
- * Shallow copy: Shift & Mask
- */
-#define PARAM_SCOPY_SHIFT	(6)
-#define PARAM_SCOPY_MASK	(0x1)
-/**
- * Size of the param: Shift & Mask
- */
-#define PARAM_SIZE_SHIFT	(0x0)
-#define PARAM_SIZE_MASK         (0x3F)
+#define UK_LIBPARAM_PARAMSECTION_NAME       \
+	UK_LIBPARAM_CONCAT(UK_LIBPARAM_PARAMSECTION_NAMEPREFIX, __LIBNAME__)
+#define UK_LIBPARAM_PARAMSECTION_STARTSYM   \
+	UK_LIBPARAM_CONCAT(UK_LIBPARAM_PARAMSECTION_NAME, _start)
+#define UK_LIBPARAM_PARAMSECTION_ENDSYM     \
+	UK_LIBPARAM_CONCAT(UK_LIBPARAM_PARAMSECTION_NAME, _end)
 
 #ifndef __ASSEMBLY__
-/**
- * Get the parameter type.
- * @param sign
- *	The sign of the data type.
- * @param scopy
- *	Flag to indicate shallow copy.
- *	1 - shallow copy.
- *	0 - data copy.
- * @param size
- *	The size of the parameter.
+#ifdef CONFIG_LIBUKLIBPARAM
+/* The following symbols are provided by the per-library linker script.
+ * They define the start and the end of the library parameters reference array
  */
-#define PARAM_TYPE(sign, scopy, size)				\
-		(						\
-			((((__u8) (sign & PARAM_SIGN_MASK)) <<	\
-				  PARAM_SIGN_SHIFT) |		\
-			(((__u8) (scopy & PARAM_SCOPY_MASK)) <<	\
-				  PARAM_SCOPY_SHIFT) |		\
-			(((__u8) (size & PARAM_SIZE_MASK)) <<	\
-				  PARAM_SIZE_SHIFT))		\
-		)
+extern struct uk_libparam_param * const UK_LIBPARAM_PARAMSECTION_STARTSYM[];
+extern struct uk_libparam_param * const UK_LIBPARAM_PARAMSECTION_ENDSYM;
 
-/**
- * Support data types as parameters
+/*
+ * Library parameter data types
  */
-#define _LIB_PARAM___s8		PARAM_TYPE(1, 0, sizeof(__s8))
-#define _LIB_PARAM_char		_LIB_PARAM___s8
-#define _LIB_PARAM___u8		PARAM_TYPE(0, 0, sizeof(__u8))
-#define _LIB_PARAM___s16	PARAM_TYPE(1, 0, sizeof(__s16))
-#define _LIB_PARAM___u16	PARAM_TYPE(0, 0, sizeof(__u16))
-#define _LIB_PARAM___s32	PARAM_TYPE(1, 0, sizeof(__s32))
-#define _LIB_PARAM_int		_LIB_PARAM___s32
-#define _LIB_PARAM___u32	PARAM_TYPE(0, 0, sizeof(__u32))
-#define _LIB_PARAM___s64	PARAM_TYPE(1, 0, sizeof(__s64))
-#define _LIB_PARAM___u64	PARAM_TYPE(0, 0, sizeof(__u64))
-#define _LIB_PARAM___uptr	PARAM_TYPE(0, 1, sizeof(__uptr))
-#define _LIB_PARAM_charp	_LIB_PARAM___uptr
-
-struct uk_param {
-	/* The name of the param */
-	const char *name;
-	/* Type information for the param */
-	const __u8 param_type;
-	/* Type information for the variable size param */
-	const __u8 param_size;
-	/* Define a reference to location of the parameter */
-	__uptr addr;
+enum  uk_libparam_param_type {
+	_UK_LIBPARAM_PARAM_TYPE___undef = 0,
+	_UK_LIBPARAM_PARAM_TYPE_bool,
+	_UK_LIBPARAM_PARAM_TYPE___s8,
+#define _UK_LIBPARAM_PARAM_TYPE_char _UK_LIBPARAM_PARAM_TYPE___s8
+	_UK_LIBPARAM_PARAM_TYPE___u8,
+#define _UK_LIBPARAM_PARAM_TYPE_uchar _UK_LIBPARAM_PARAM_TYPE___u8
+	_UK_LIBPARAM_PARAM_TYPE___s16,
+	_UK_LIBPARAM_PARAM_TYPE___u16,
+	_UK_LIBPARAM_PARAM_TYPE___s32,
+#define _UK_LIBPARAM_PARAM_TYPE_int _UK_LIBPARAM_PARAM_TYPE___s32
+	_UK_LIBPARAM_PARAM_TYPE___u32,
+#define _UK_LIBPARAM_PARAM_TYPE_uint _UK_LIBPARAM_PARAM_TYPE___u32
+	_UK_LIBPARAM_PARAM_TYPE___s64,
+	_UK_LIBPARAM_PARAM_TYPE___u64,
+	_UK_LIBPARAM_PARAM_TYPE___uptr,
+	_UK_LIBPARAM_PARAM_TYPE_charp
 };
 
-struct uk_lib_section {
-	/* Library name */
-	const char *lib_name;
-	/* Section header of the uk_param args */
-	struct uk_param *sec_addr_start;
-	/* Length of the section */
-	__u32	len;
-	/* Next section entry */
+/*
+ * Library parameter descriptor
+ */
+struct uk_libparam_param {
+	const char * const name;
+	const char * const desc;
+	const enum uk_libparam_param_type type;
+	/* Number of elements (>1 means we have an array of the given type) */
+	const __sz count;
+	/* Reference to corresponding variable */
+	void * const addr;
+
+	/* Internally used by parser for array parameters */
+	__sz __widx;
+};
+
+/*
+ * Library descriptor
+ */
+struct uk_libparam_libdesc {
+	/* Library prefix */
+	const char *prefix;
+	/* Section header of parameter reference array */
+	struct uk_libparam_param **params;
+	/* Number of parameters */
+	__sz params_len;
+	/* Next libdesc entry */
 	struct uk_list_head next;
 };
 
-/**
- * Parse through the kernel parameter
- * @param progname
- *	The application name
- * @param argc
- *	The number of arguments
- * @param argv
- *	Reference to the command line arguments
- * @return
- *	On success, return the number of argument parsed.
- *	On Failure, return the error code.
+/* -------------------------------------------------------------------------- */
+/* Library registration                                                       */
+
+/* The following code declares a library descriptor as soon as this header
+ * is included: This makes an explicit registration to libuklibparam
+ * unnecessary.
+ * FIXME: This allows using of library parameters only in one source file of a
+ *        library. A solution could be to create a file in uklibparam that
+ *        declares an array of structs, one struct per library. Ideally the
+ *        fields are filled out at compile/link time. This can be done as soon
+ *        as a library is available that can export the list of included
+ *        libraries of a build.
+ * NOTE: Double declaration within one source file is avoided by the header's
+ *       include guards.
  */
-int uk_libparam_parse(const char *progname, int argc, char **argv);
+#define UK_LIBPARAM_LIBDESC \
+	UK_LIBPARAM_CONCAT(UK_LIBPARAM_PARAMSECTION_NAME, _libdesc)
+#define UK_LIBPARAM_LIBDESC_CTOR \
+	UK_LIBPARAM_CONCAT(UK_LIBPARAM_PARAMSECTION_NAME, _ctor)
 
-/**
- * Register the library containing kernel parameter.
- *
- * @param lib_sec
- *	A reference to the uk_lib_section.
- */
-void _uk_libparam_lib_add(struct uk_lib_section *lib_sec);
+static struct uk_libparam_libdesc UK_LIBPARAM_LIBDESC = {
+	.prefix = STRINGIFY(UK_LIBPARAM_LIBPREFIX)
 
-/**
- * Add a variable to a specific section.
- * @param section_name
- *	The name of the section.
- * @param align_type
- *	The alignment requirements for the variable definitions.
- */
-#define _LIB_PARAM_SECTION_ADD(section_name, align_type)		\
-				__attribute__ ((used,			\
-						section(		\
-					__STRINGIFY(section_name)),	\
-					aligned(sizeof(align_type))	\
-					     ))
-/**
- * Create a constructor name.
- * @param libname
- *	The library name.
- * @param suffix
- *	The suffix appended to the library name.
- */
-#define _LIB_UK_CONSTRUCT_NAME(libname, suffix)			\
-	       __STRINGCONCAT(libname, suffix)
+	/* Rest of fields are initialized with 0 automatically */
+};
 
-/**
- * Create a variable name
- * @param prefix
- *	The prefix to the variable name.
- * @param name
- *	The name of the variable
- */
-#define _LIB_VARNAME_SET(prefix, name)				\
-			 __STRINGCONCAT(prefix, name)
+void _uk_libparam_libsec_register(struct uk_libparam_libdesc *ld);
 
-/**
- * Import the section header.
- * @param libname
- *	The library name.
- * @param section_suffix
- *	The suffix string for the section name
- */
-#define UK_LIB_IMPORT_SECTION_PARAMS(libname, section_suffix)		\
-	extern char *_SECTION_START(					\
-			_LIB_PARAM_SECTION_NAME(libname,		\
-						section_suffix));	\
-	extern char *_SECTION_STOP(					\
-			_LIB_PARAM_SECTION_NAME(libname,		\
-						section_suffix))	\
+static void UK_LIBPARAM_LIBDESC_CTOR(void)
+{
+	UK_LIBPARAM_LIBDESC.params_len =
+		(__sz)((__uptr) &UK_LIBPARAM_PARAMSECTION_ENDSYM -
+		       (__uptr) UK_LIBPARAM_PARAMSECTION_STARTSYM) /
+		      sizeof(void *);
 
-/**
- * Create a library name variable and uk_lib_section for each library.
- * @param libname
- *	The library name.
- */
-#define UK_LIB_SECTION_CREATE(section, libname)				\
-	static const char						\
-		_LIB_VARNAME_SET(LIB_NAMEVAR_PREFIX, libname)[] =	\
-						__STRINGIFY(libname);	\
-	static _LIB_PARAM_SECTION_ADD(					\
-				      _LIB_PARAM_SECTION_NAME(section,	\
-						LIB_PARAM_SUFFIX),	\
-						void *)			\
-		struct uk_lib_section					\
-			_LIB_VARNAME_SET(LIB_PARAMVAR_PREFIX, libname) = \
-			{ .lib_name = __NULL,				\
-			  .sec_addr_start = __NULL, .len = 0		\
-			}
-
-#define UK_LIB_CTOR_PRIO	1
-
-#define UK_LIB_CONSTRUCTOR_SETUP(prio, name)				\
-	UK_CTOR_PRIO(name, prio)
-
-/**
- * Create a constructor to initialize the parameters in the library.
- */
-#define UK_LIB_CONSTRUCTOR_CREATE(libname)				\
-	static void _LIB_UK_CONSTRUCT_NAME(libname, process_arg)(void)	\
-	{								\
-		int len = (__uptr) &_SECTION_STOP(			\
-				_LIB_PARAM_SECTION_NAME(		\
-					libname, PARAM_SECTION_SUFFIX)	\
-					) -				\
-			  (__uptr) &_SECTION_START(			\
-				_LIB_PARAM_SECTION_NAME(		\
-					libname, PARAM_SECTION_SUFFIX)	\
-					 );				\
-		if (len > 0) {						\
-			_LIB_VARNAME_SET(LIB_PARAMVAR_PREFIX, libname).	\
-					sec_addr_start =		\
-						(struct uk_param *)	\
-						ALIGN_UP((__uptr)	\
-						&_SECTION_START(	\
-						_LIB_PARAM_SECTION_NAME(\
-						libname,		\
-						PARAM_SECTION_SUFFIX)),	\
-						sizeof(void *));	\
-			_LIB_VARNAME_SET(LIB_PARAMVAR_PREFIX, libname).	\
-						len =	len;		\
-			_LIB_VARNAME_SET(LIB_PARAMVAR_PREFIX, libname).	\
-					 lib_name =		\
-						&_LIB_VARNAME_SET(	\
-						LIB_NAMEVAR_PREFIX,	\
-						libname)[0];		\
-			_uk_libparam_lib_add(&_LIB_VARNAME_SET(		\
-						LIB_PARAMVAR_PREFIX,	\
-						libname)		\
-					    );				\
-		}							\
-	}								\
-
-#define UK_LIB_CONSTRUCTOR_INIT(libname)				\
-		UK_LIB_IMPORT_SECTION_PARAMS(libname,			\
-					     PARAM_SECTION_SUFFIX);	\
-		UK_LIB_SECTION_CREATE(UK_LIBPARAM_SECTION, libname);	\
-		UK_LIB_CONSTRUCTOR_CREATE(libname)			\
-		UK_LIB_CONSTRUCTOR_SETUP(UK_LIB_CTOR_PRIO,		\
-			_LIB_UK_CONSTRUCT_NAME(libname, process_arg))
-
-
-/**
- * Create a constructor to fill in the parameter.
- */
-#ifdef UK_LIBPARAM_PREFIX
-	UK_LIB_CONSTRUCTOR_INIT(UK_LIBPARAM_PREFIX);
-#endif /* UK_LIBPARAM_PREFIX */
-
-/**
- * Create the fully qualified name of a parameter.
- *
- * @param libname
- *	The name of the library
- * @param name
- *	The name of the parameter
- */
-#define _LIB_PARAM_STRING(libname, name)			\
-			libname.name
-
-/**
- * Initialize the parameter string in a variable. The name of the
- * parameter is stored in a separate linker section.
- *
- * @param name
- *	The name of the variable
- * @param value
- *	The string representation of the parameter.
- */
-#define _LIB_PARAM_NAME_SET(name, value)				\
-	static const							\
-	char _LIB_VARNAME_SET(PARAM_NAMEVAR_PREFIX, name)[] =		\
-						__STRINGIFY(value)
-
-
-/**
- * Initialize the parameter structure.
- *
- * @param param_name
- *	The name of the parameter
- * @param type
- *	The type of the parameter
- * @param cnt
- *	The number of the elements of that type.
- */
-#define _LIB_UK_PARAM_SET(param_name, type, cnt)			\
-	static const							\
-	_LIB_PARAM_SECTION_ADD(						\
-				_LIB_PARAM_SECTION_NAME(		\
-						UK_LIBPARAM_PREFIX,	\
-						PARAM_SECTION_SUFFIX),	\
-						void *			\
-				)					\
-	struct uk_param _LIB_VARNAME_SET(PARAM_SECTION_SUFFIX,		\
-					 param_name) = {		\
-		.name = _LIB_VARNAME_SET(PARAM_NAMEVAR_PREFIX,		\
-					  param_name),			\
-		.param_type = _LIB_PARAM_##type,			\
-		.param_size = cnt,					\
-		.addr       = (__uptr) &param_name,			\
+	if (UK_LIBPARAM_LIBDESC.params_len > 0) {
+		UK_LIBPARAM_LIBDESC.params = (struct uk_libparam_param **)
+					     UK_LIBPARAM_PARAMSECTION_STARTSYM;
+		_uk_libparam_libsec_register(&UK_LIBPARAM_LIBDESC);
 	}
+}
+UK_CTOR_PRIO(UK_LIBPARAM_LIBDESC_CTOR, 0);
+
+/* -------------------------------------------------------------------------- */
+/* Parameter registration                                                     */
+
+#define __UK_LIBPARAM_PARAM_NAME(varname)				\
+	UK_LIBPARAM_CONCAT(UK_LIBPARAM_PARAM_NAMEPREFIX, varname)
+
+#define __UK_LIBPARAM_PARAM_DEFINE(arg_var, arg_addr, arg_type, arg_count, \
+				   arg_desc)				\
+	static struct uk_libparam_param __UK_LIBPARAM_PARAM_NAME(arg_var) = { \
+		.name  = STRINGIFY(arg_var),				\
+		.desc  = arg_desc,					\
+		.type  = _UK_LIBPARAM_PARAM_TYPE_##arg_type,		\
+		.count = arg_count,					\
+		.addr  = arg_addr					\
+	};								\
+									\
+	static __section("." STRINGIFY(UK_LIBPARAM_PARAMSECTION_NAME))	\
+	       __used struct uk_libparam_param * const			\
+	       UK_LIBPARAM_CONCAT(__UK_LIBPARAM_PARAM_NAME(arg_var), _ptr) = \
+		&__UK_LIBPARAM_PARAM_NAME(arg_var)
+
+#define _UK_LIBPARAM_PARAM_DEFINE(name, var, type, count, desc) \
+	__UK_LIBPARAM_PARAM_DEFINE(name, var, type, count, desc)
+
+/* -------------------------------------------------------------------------- */
+/* Parser                                                                     */
+
+/*
+ * Flag bits for defining parsing behavior
+ */
+/* Scan only, do not parse and set values */
+#define UK_LIBPARAM_F_SCAN   0x1
+/* Don't skip on unknown arguments, exit with a parsing error */
+#define UK_LIBPARAM_F_STRICT 0x2
+/* Print usage when 'help' is found as parameter and return with -EINTR */
+#define UK_LIBPARAM_F_USAGE  0x4
 
 /**
- * Declare a library param.
- * @param name
- *	The name of the library param.
+ * Parse given parameter list. The parsing mode can be defined with flags
+ * (see: `UK_LIBPARAM_F_*`). Parsing will stop if the end of the argument list
+ * is reached or if the stop sequence `---` is detected.
+ * NOTE: The parser is designed to be alloc-free, errno-free, and TLS-free so
+ *       that it can be used in early boot code. Because of this, please note
+ *       that registered parameters that expect a C string will be filled with
+ *       a reference to the according argv object. argv must not be free'd
+ *       after the parser was called (except scan mode).
+ *
+ * @param argc
+ *      The number of arguments
+ * @param argv
+ *      Reference to the command line arguments
+ *      NOTE: In strict mode, program name (typically `argv[0]`) should not be
+ *            handed over because the parser tries to parse `argv[0]` as well.
+ * @param flags
+ *      UK_LIBPARAM_F_* to influence the behavior
+ * @return
+ *      On success, the argument index is return where the parser stopped.
+ *      A negative errno code is returned (<0) on failure.
+ */
+int uk_libparam_parse(int argc, char **argv, int flags);
+
+#else /* !CONFIG_LIBUKLIBPARAM */
+
+/* Removes library parameter instrumentation if the library is unselected
+ * WARNING: Do not use directly.
+ */
+#define _UK_LIBPARAM_PARAM_DEFINE(name, var, type, count, desc)
+
+#endif /* !CONFIG_LIBUKLIBPARAM */
+
+/*
+ * Register a single parameter
+ *
+ * @param var
+ *      Variable to export as library parameter
  * @param type
- *	The type of the param.
+ *      Data type: bool, char, uchar, int, uint, charp, __s8, __u8, __s16,
+ *                 __u16, __s32, __u32, __s64, __u64, __uptr
+ * @param desc
+ *      C string with parameter description. Optional, can be __NULL.
  */
-#define UK_LIB_PARAM(name, type)					\
-	_LIB_PARAM_NAME_SET(name, _LIB_PARAM_STRING(UK_LIBPARAM_PREFIX,	\
-						    name));		\
-	_LIB_UK_PARAM_SET(name, type, 1)
+#define UK_LIBPARAM_PARAM(var, type, desc) \
+	_UK_LIBPARAM_PARAM_DEFINE(var, &var, type, 1, desc)
 
-/**
- * Declare an array of primitive.
+/*
+ * Register a single parameter with a custom name
+ *
  * @param name
- *	The name of the parameter.
+ *      Name used for library parameter
+ * @param addr
+ *      Reference to variable/memory address of parameter
  * @param type
- *	The type of the parameter.
+ *      Data type: bool, char, uchar, int, uint, charp, __s8, __u8, __s16,
+ *                 __u16, __s32, __u32, __s64, __u64, __uptr
+ * @param desc
+ *      C string with parameter description. Optional, can be __NULL.
  */
-#define UK_LIB_PARAM_ARR(name, type)					\
-	_LIB_PARAM_NAME_SET(name, _LIB_PARAM_STRING(UK_LIBPARAM_PREFIX,	\
-						    name));		\
-	_LIB_UK_PARAM_SET(name, type, sizeof(name)/sizeof(type))	\
+#define UK_LIBPARAM_PARAM_ALIAS(name, addr, type, desc)		\
+	_UK_LIBPARAM_PARAM_DEFINE(name, (addr), type, 1, desc)
 
-/**
- * Declare a string library param.
+/*
+ * Register a parameter array
+ *
+ * @param var
+ *      Array to export as library parameter
+ * @param type
+ *      Data type of array elements: bool, char, uchar, int, uint, charp, __s8,
+ *                                   __u8, __s16, __u16, __s32, __u32, __s64,
+ *                                   __u64, __uptr
+ * @param count
+ *      Number of elements in the array that can be filled (<= array size)
+ * @param desc
+ *      C string with parameter description. Optional, can be __NULL.
+ */
+#define UK_LIBPARAM_PARAM_ARR(var, type, count, desc) \
+	_UK_LIBPARAM_PARAM_DEFINE(var, &var, type, (count), desc)
+
+/*
+ * Register a parameter array with a custom name
+ *
  * @param name
- *	The name of the parameter.
+ *      Name used for library parameter
+ * @param addr
+ *      Reference to first array element/memory address of parameter
+ * @param type
+ *      Data type of array elements: bool, char, uchar, int, uint, charp, __s8,
+ *                                   __u8, __s16, __u16, __s32, __u32, __s64,
+ *                                   __u64, __uptr
+ * @param count
+ *      Number of elements in the array that can be filled (<= array size)
+ * @param desc
+ *      C string with parameter description. Optional, can be __NULL.
  */
-#define UK_LIB_PARAM_STR(name)						\
-	UK_LIB_PARAM(name, __uptr)
+#define UK_LIBPARAM_PARAM_ARR_ALIAS(name, addr, type, count, desc)	\
+	_UK_LIBPARAM_PARAM_DEFINE(name, (addr), type, (count), desc)
 
-#endif /* !__ASSEMBLY__ */
-#endif /* CONFIG_LIBUKLIBPARAM */
+/* Deprecated registration macros */
+/* WARNING: These interfaces are here for backwards compatibility and will be
+ *          removed in the near future.
+ */
+#define UK_LIB_PARAM(var, type) \
+	_UK_LIBPARAM_PARAM_DEFINE(var, &var, type, 1, __NULL)
+#define UK_LIB_PARAM_STR(var) \
+	UK_LIB_PARAM(var, charp)
 
-#ifndef __ASSEMBLY__
+#define UK_LIB_PARAM_ARR(var, type) \
+	_UK_LIBPARAM_PARAM_DEFINE(var, &var, type, ARRAY_SIZE(var), __NULL)
+#define UK_LIB_PARAM_ARR_STR(var) \
+	UK_LIB_PARAM_ARR(var, charp)
+
+#endif /* !__ASSEMBLY */
 #ifdef __cplusplus
 }
 #endif /* __cplusplus */
-#endif /* !__ASSEMBLY */
-
 #endif /* __UK_LIBPARAM_H */

@@ -171,7 +171,7 @@ int uk_blkdev_configure(struct uk_blkdev *dev,
  *   The index of the queue to set up.
  *   The value must be in the range [0, nb_queue - 1] previously supplied
  *   to uk_blkdev_configure().
- * @param queue_info
+ * @param q_info
  *   A pointer to a structure of type *uk_blkdev_queue_info* to be filled out.
  * @return
  *   - (0): Success, queue_info is filled out.
@@ -226,7 +226,7 @@ int uk_blkdev_start(struct uk_blkdev *dev);
  * like nb_of_sectors, sector_size etc
  * The device state has to be UK_BLKDEV_RUNNING.
  *
- * @param dev
+ * @param blkdev
  *	The Unikraft Block Device.
  *
  * @return

@@ -14,6 +14,9 @@ ARCHFLAGS-$(call gcc_version_ge,9,4) += -mno-outline-atomics
 ISR_ARCHFLAGS += -D__ARM_64__ -mgeneral-regs-only
 ISR_ARCHFLAGS-$(call gcc_version_ge,9,4) += -mno-outline-atomics
 
+ARCHFLAGS-$(call have_clang)     += --target=aarch64-none-elf
+ISR_ARCHFLAGS-$(call have_clang) += --target=aarch64-none-elf
+
 CINCLUDES   += -I$(CONFIG_UK_BASE)/arch/arm/arm64/include
 ASINCLUDES  += -I$(CONFIG_UK_BASE)/arch/arm/arm64/include
 CXXINCLUDES += -I$(CONFIG_UK_BASE)/arch/arm/arm64/include
@@ -67,205 +70,246 @@ ARCHFLAGS-y += -mbranch-protection=$(BRANCH_PROTECTION)
 ISR_ARCHFLAGS-y += -mbranch-protection=$(BRANCH_PROTECTION)
 endif
 
-# GCC support -mcpu=native for arm64 from 6.0
 ifeq ($(CONFIG_MCPU_ARM64_NATIVE),y)
-$(call error_if_gcc_version_lt,6,0)
-ARCHFLAGS-$(call gcc_version_ge,6,0)     += -mcpu=native
-ISR_ARCHFLAGS-$(call gcc_version_ge,6,0) += -mcpu=native
+ARCHFLAGS     += -mcpu=native
+ISR_ARCHFLAGS += -mcpu=native
 endif
 
-# GCC support -mcpu=generic for arm64 from 4.8
 ifeq ($(CONFIG_MCPU_ARM64_GENERIC),y)
-$(call error_if_gcc_version_lt,4,8)
-ARCHFLAGS-$(call gcc_version_ge,4,8)     += -mcpu=generic -mtune=generic
-ISR_ARCHFLAGS-$(call gcc_version_ge,4,8) += -mcpu=generic -mtune=generic
+ARCHFLAGS     += -mcpu=generic -mtune=generic
+ISR_ARCHFLAGS += -mcpu=generic -mtune=generic
 endif
 
-# GCC support -mcpu=cortex-a53 for arm64 from 4.9
 ifeq ($(CONFIG_MCPU_ARM64_CORTEX_A53),y)
-$(call error_if_gcc_version_lt,4,9)
-ARCHFLAGS-$(call gcc_version_ge,4,9)     += -mcpu=cortex-a53 -mtune=cortex-a53
-ISR_ARCHFLAGS-$(call gcc_version_ge,4,9) += -mcpu=cortex-a53 -mtune=cortex-a53
+ARCHFLAGS     += -mcpu=cortex-a53 -mtune=cortex-a53
+ISR_ARCHFLAGS += -mcpu=cortex-a53 -mtune=cortex-a53
 endif
 
 # For erratum 835769
 ifeq ($(CONFIG_ARM64_ERRATUM_835769),y)
-$(call error_if_gcc_version_lt,4,9)
-ARCHFLAGS-$(call gcc_version_ge,4,9)     += -mfix-cortex-a53-835769
-ISR_ARCHFLAGS-$(call gcc_version_ge,4,9) += -mfix-cortex-a53-835769
+ARCHFLAGS     += -mfix-cortex-a53-835769
+ISR_ARCHFLAGS += -mfix-cortex-a53-835769
 endif
 
 # For erratum 843419
 ifeq ($(CONFIG_ARM64_ERRATUM_843419),y)
-$(call error_if_gcc_version_lt,4,9)
-ARCHFLAGS-$(call gcc_version_ge,4,9)     += -mfix-cortex-a53-843419
-ISR_ARCHFLAGS-$(call gcc_version_ge,4,9) += -mfix-cortex-a53-843419
+ifeq ($(call have_clang),y)
+$(error The workaround for erratum 843419 is only supported with GCC)
+endif
+ARCHFLAGS     += -mfix-cortex-a53-843419
+ISR_ARCHFLAGS += -mfix-cortex-a53-843419
 endif
 
-# GCC support -mcpu=cortex-a57 for arm64 from 4.9
 ifeq ($(CONFIG_MCPU_ARM64_CORTEX_A57),y)
-$(call error_if_gcc_version_lt,4,9)
-ARCHFLAGS-$(call gcc_version_ge,4,9)     += -mcpu=cortex-a57 -mtune=cortex-a57
-ISR_ARCHFLAGS-$(call gcc_version_ge,4,9) += -mcpu=cortex-a57 -mtune=cortex-a57
+ARCHFLAGS     += -mcpu=cortex-a57 -mtune=cortex-a57
+ISR_ARCHFLAGS += -mcpu=cortex-a57 -mtune=cortex-a57
 endif
 
-# GCC support -mcpu=cortex-a57.cortex-a53 for arm64 from 4.9
 ifeq ($(CONFIG_MCPU_ARM64_CORTEX_A57_A53),y)
-$(call error_if_gcc_version_lt,4,9)
-ARCHFLAGS-$(call gcc_version_ge,4,9)     += -mcpu=cortex-a57.cortex-a53
-ARCHFLAGS-$(call gcc_version_ge,4,9)     += -mtune=cortex-a57.cortex-a53
-ISR_ARCHFLAGS-$(call gcc_version_ge,4,9) += -mcpu=cortex-a57.cortex-a53
-ISR_ARCHFLAGS-$(call gcc_version_ge,4,9) += -mtune=cortex-a57.cortex-a53
+ifeq ($(call have_clang),y)
+$(error Cortex A57-A53 CPU model is only supported with GCC)
+endif
+ARCHFLAGS     += -mcpu=cortex-a57.cortex-a53
+ARCHFLAGS     += -mtune=cortex-a57.cortex-a53
+ISR_ARCHFLAGS += -mcpu=cortex-a57.cortex-a53
+ISR_ARCHFLAGS += -mtune=cortex-a57.cortex-a53
 endif
 
-# GCC support -mcpu=cortex-a72 for arm64 from 5.0
 ifeq ($(CONFIG_MCPU_ARM64_CORTEX_A72),y)
-$(call error_if_gcc_version_lt,5,0)
-ARCHFLAGS-$(call gcc_version_ge,5,0)     += -mcpu=cortex-a72 -mtune=cortex-a72
-ISR_ARCHFLAGS-$(call gcc_version_ge,5,0) += -mcpu=cortex-a72 -mtune=cortex-a72
+ARCHFLAGS     += -mcpu=cortex-a72 -mtune=cortex-a72
+ISR_ARCHFLAGS += -mcpu=cortex-a72 -mtune=cortex-a72
 endif
 
-# GCC support -mcpu=cortex-a72.cortex-a53 for arm64 from 5.0
 ifeq ($(CONFIG_MCPU_ARM64_CORTEX_A72_A53),y)
-$(call error_if_gcc_version_lt,5,0)
-ARCHFLAGS-$(call gcc_version_ge,5,0)     += -mcpu=cortex-a72.cortex-a53
-ARCHFLAGS-$(call gcc_version_ge,5,0)     += -mtune=cortex-a72.cortex-a53
-ISR_ARCHFLAGS-$(call gcc_version_ge,5,0) += -mcpu=cortex-a72.cortex-a53
-ISR_ARCHFLAGS-$(call gcc_version_ge,5,0) += -mtune=cortex-a72.cortex-a53
+ifeq ($(call have_clang),y)
+$(error Cortex A72-A53 CPU model is only supported with GCC)
+endif
+ARCHFLAGS     += -mcpu=cortex-a72.cortex-a53
+ARCHFLAGS     += -mtune=cortex-a72.cortex-a53
+ISR_ARCHFLAGS += -mcpu=cortex-a72.cortex-a53
+ISR_ARCHFLAGS += -mtune=cortex-a72.cortex-a53
 endif
 
-# GCC support -mcpu=cortex-a35 for arm64 from 6.0
 ifeq ($(CONFIG_MCPU_ARM64_CORTEX_A35),y)
-$(call error_if_gcc_version_lt,6,0)
-ARCHFLAGS-$(call gcc_version_ge,6,0)     += -mcpu=cortex-a35 -mtune=cortex-a35
-ISR_ARCHFLAGS-$(call gcc_version_ge,6,0) += -mcpu=cortex-a35 -mtune=cortex-a35
+ARCHFLAGS     += -mcpu=cortex-a35 -mtune=cortex-a35
+ISR_ARCHFLAGS += -mcpu=cortex-a35 -mtune=cortex-a35
 endif
 
-# GCC support -mcpu=cortex-a73 for arm64 from 7.0
 ifeq ($(CONFIG_MCPU_ARM64_CORTEX_A73),y)
-$(call error_if_gcc_version_lt,7,0)
-ARCHFLAGS-$(call gcc_version_ge,7,0)     += -mcpu=cortex-a73 -mtune=cortex-a73
-ISR_ARCHFLAGS-$(call gcc_version_ge,7,0) += -mcpu=cortex-a73 -mtune=cortex-a73
+ARCHFLAGS     += -mcpu=cortex-a73 -mtune=cortex-a73
+ISR_ARCHFLAGS += -mcpu=cortex-a73 -mtune=cortex-a73
 endif
 
-# GCC support -mcpu=cortex-a73.cortex-a35 for arm64 from 7.0
 ifeq ($(CONFIG_MCPU_ARM64_CORTEX_A73_A35),y)
-$(call error_if_gcc_version_lt,7,0)
-ARCHFLAGS-$(call gcc_version_ge,7,0)     += -mcpu=cortex-a73.cortex-a35
-ARCHFLAGS-$(call gcc_version_ge,7,0)     += -mtune=cortex-a73.cortex-a35
-ISR_ARCHFLAGS-$(call gcc_version_ge,7,0) += -mcpu=cortex-a73.cortex-a35
-ISR_ARCHFLAGS-$(call gcc_version_ge,7,0) += -mtune=cortex-a73.cortex-a35
+ifeq ($(call have_clang),y)
+$(error Cortex A73-A35 CPU model is only supported with GCC)
+endif
+ARCHFLAGS     += -mcpu=cortex-a73.cortex-a35
+ARCHFLAGS     += -mtune=cortex-a73.cortex-a35
+ISR_ARCHFLAGS += -mcpu=cortex-a73.cortex-a35
+ISR_ARCHFLAGS += -mtune=cortex-a73.cortex-a35
 endif
 
-# GCC support -mcpu=cortex-a73.cortex-a53 for arm64 from 7.0
 ifeq ($(CONFIG_MCPU_ARM64_CORTEX_A73_A53),y)
-$(call error_if_gcc_version_lt,7,0)
-ARCHFLAGS-$(call gcc_version_ge,7,0)     += -mcpu=cortex-a73.cortex-a53
-ARCHFLAGS-$(call gcc_version_ge,7,0)     += -mtune=cortex-a73.cortex-a53
-ISR_ARCHFLAGS-$(call gcc_version_ge,7,0) += -mcpu=cortex-a73.cortex-a53
-ISR_ARCHFLAGS-$(call gcc_version_ge,7,0) += -mtune=cortex-a73.cortex-a53
+ifeq ($(call have_clang),y)
+$(error Cortex A73-A53 CPU model is only supported with GCC)
+endif
+ARCHFLAGS     += -mcpu=cortex-a73.cortex-a53
+ARCHFLAGS     += -mtune=cortex-a73.cortex-a53
+ISR_ARCHFLAGS += -mcpu=cortex-a73.cortex-a53
+ISR_ARCHFLAGS += -mtune=cortex-a73.cortex-a53
 endif
 
-# GCC support -mcpu=cortex-a55 for arm64 from 8.0
+# GCC supports -mcpu=cortex-a55 for arm64 from 8.0
+# Clang supports it from 9.0, the minimum required version
 ifeq ($(CONFIG_MCPU_ARM64_CORTEX_A55),y)
+ifeq ($(call have_gcc),y)
 $(call error_if_gcc_version_lt,8,0)
-ARCHFLAGS-$(call gcc_version_ge,8,0)     += -mcpu=cortex-a55 -mtune=cortex-a55
-ISR_ARCHFLAGS-$(call gcc_version_ge,8,0) += -mcpu=cortex-a55 -mtune=cortex-a55
+endif
+ARCHFLAGS     += -mcpu=cortex-a55 -mtune=cortex-a55
+ISR_ARCHFLAGS += -mcpu=cortex-a55 -mtune=cortex-a55
 endif
 
 # GCC support -mcpu=cortex-a75 for arm64 from 8.0
+# Clang supports it from 9.0, the minimum required version
 ifeq ($(CONFIG_MCPU_ARM64_CORTEX_A75),y)
+ifeq ($(call have_gcc),y)
 $(call error_if_gcc_version_lt,8,0)
-ARCHFLAGS-$(call gcc_version_ge,8,0)     += -mcpu=cortex-a75 -mtune=cortex-a75
-ISR_ARCHFLAGS-$(call gcc_version_ge,8,0) += -mcpu=cortex-a75 -mtune=cortex-a75
+endif
+ARCHFLAGS     += -mcpu=cortex-a75 -mtune=cortex-a75
+ISR_ARCHFLAGS += -mcpu=cortex-a75 -mtune=cortex-a75
 endif
 
 # GCC support -mcpu=cortex-a75.cortex-a55 for arm64 from 8.0
 ifeq ($(CONFIG_MCPU_ARM64_CORTEX_A75_A55),y)
 $(call error_if_gcc_version_lt,8,0)
-ARCHFLAGS-$(call gcc_version_ge,8,0)     += -mcpu=cortex-a75.cortex-a55
-ARCHFLAGS-$(call gcc_version_ge,8,0)     += -mtune=cortex-a75.cortex-a55
-ISR_ARCHFLAGS-$(call gcc_version_ge,8,0) += -mcpu=cortex-a75.cortex-a55
-ISR_ARCHFLAGS-$(call gcc_version_ge,8,0) += -mtune=cortex-a75.cortex-a55
+ARCHFLAGS     += -mcpu=cortex-a75.cortex-a55
+ARCHFLAGS     += -mtune=cortex-a75.cortex-a55
+ISR_ARCHFLAGS += -mcpu=cortex-a75.cortex-a55
+ISR_ARCHFLAGS += -mtune=cortex-a75.cortex-a55
 endif
 
 # GCC support -mcpu=cortex-a76 for arm64 from 9.1
+# Clang supports it from 9.0, the minimum required version
 ifeq ($(CONFIG_MCPU_ARM64_CORTEX_A76),y)
+ifeq ($(call have_gcc),y)
 $(call error_if_gcc_version_lt,9,1)
-ARCHFLAGS-$(call gcc_version_ge,9,1)     += -mcpu=cortex-a76 -mtune=cortex-a76
-ISR_ARCHFLAGS-$(call gcc_version_ge,9,1) += -mcpu=cortex-a76 -mtune=cortex-a76
+endif
+ARCHFLAGS     += -mcpu=cortex-a76 -mtune=cortex-a76
+ISR_ARCHFLAGS += -mcpu=cortex-a76 -mtune=cortex-a76
 endif
 
 # GCC support -mcpu=cortex-a76.cortex-a55 for arm64 from 9.1
 ifeq ($(CONFIG_MCPU_ARM64_CORTEX_A76_A55),y)
 $(call error_if_gcc_version_lt,9,1)
-ARCHFLAGS-$(call gcc_version_ge,9,1)     += -mcpu=cortex-a76.cortex-a55
-ARCHFLAGS-$(call gcc_version_ge,9,1)     += -mtune=cortex-a76.cortex-a55
-ISR_ARCHFLAGS-$(call gcc_version_ge,9,1) += -mcpu=cortex-a76.cortex-a55
-ISR_ARCHFLAGS-$(call gcc_version_ge,9,1) += -mtune=cortex-a76.cortex-a55
+ARCHFLAGS     += -mcpu=cortex-a76.cortex-a55
+ARCHFLAGS     += -mtune=cortex-a76.cortex-a55
+ISR_ARCHFLAGS += -mcpu=cortex-a76.cortex-a55
+ISR_ARCHFLAGS += -mtune=cortex-a76.cortex-a55
 endif
 
-# GCC support -mcpu=neoverse-n1 for arm64 from 9.1
+# GCC supports -mcpu=neoverse-n1 for arm64 from 9.1
+# Clang supports -mcpu=neoverse-n1 for arm64 from 10.0
 ifeq ($(CONFIG_MCPU_ARM64_NEOVERSE_N1),y)
+ifeq ($(call have_gcc),y)
 $(call error_if_gcc_version_lt,9,1)
-ARCHFLAGS-$(call gcc_version_ge,9,1)     += -mcpu=neoverse-n1 -mtune=neoverse-n1
-ISR_ARCHFLAGS-$(call gcc_version_ge,9,1) += -mcpu=neoverse-n1 -mtune=neoverse-n1
+else
+$(call error_if_clang_version_lt,10,0)
+endif
+ARCHFLAGS     += -mcpu=neoverse-n1 -mtune=neoverse-n1
+ISR_ARCHFLAGS += -mcpu=neoverse-n1 -mtune=neoverse-n1
 endif
 
-# GCC support -mcpu=neoverse-e1 for arm64 from 9.1
+# GCC supports -mcpu=neoverse-e1 for arm64 from 9.1
+# Clang supports -mcpu=neoverse-e1 for arm64 from 10.0
 ifeq ($(CONFIG_MCPU_ARM64_NEOVERSE_E1),y)
+ifeq ($(call have_gcc),y)
 $(call error_if_gcc_version_lt,9,1)
-ARCHFLAGS-$(call gcc_version_ge,9,1)     += -mcpu=neoverse-e1 -mtune=neoverse-e1
-ISR_ARCHFLAGS-$(call gcc_version_ge,9,1) += -mcpu=neoverse-e1 -mtune=neoverse-e1
+else
+$(call error_if_clang_version_lt,10,0)
+endif
+ARCHFLAGS     += -mcpu=neoverse-e1 -mtune=neoverse-e1
+ISR_ARCHFLAGS += -mcpu=neoverse-e1 -mtune=neoverse-e1
 endif
 
-# GCC support -mcpu=cortex-a34 for arm64 from 10.1
+# GCC supports -mcpu=cortex-a34 for arm64 from 10.1
+# Clang supports -mcpu=cortex-a34 for arm64 from 11.0
 ifeq ($(CONFIG_MCPU_ARM64_CORTEX_A34),y)
+ifeq ($(call have_gcc),y)
 $(call error_if_gcc_version_lt,10,1)
-ARCHFLAGS-$(call gcc_version_ge,10,1)     += -mcpu=cortex-a34 -mtune=cortex-a34
-ISR_ARCHFLAGS-$(call gcc_version_ge,10,1) += -mcpu=cortex-a34 -mtune=cortex-a34
+else
+$(call error_if_clang_version_lt,11,0)
+endif
+ARCHFLAGS     += -mcpu=cortex-a34 -mtune=cortex-a34
+ISR_ARCHFLAGS += -mcpu=cortex-a34 -mtune=cortex-a34
 endif
 
-# GCC support -mcpu=cortex-a65 for arm64 from 10.1
+# GCC supports -mcpu=cortex-a65 for arm64 from 10.1
+# Clang supports -mcpu=cortex-a65 for arm64 from 10.0
 ifeq ($(CONFIG_MCPU_ARM64_CORTEX_A65),y)
+ifeq ($(call have_gcc),y)
 $(call error_if_gcc_version_lt,10,1)
-ARCHFLAGS-$(call gcc_version_ge,10,1)     += -mcpu=cortex-a65 -mtune=cortex-a65
-ISR_ARCHFLAGS-$(call gcc_version_ge,10,1) += -mcpu=cortex-a65 -mtune=cortex-a65
+else
+$(call error_if_clang_version_lt,10,0)
+endif
+ARCHFLAGS     += -mcpu=cortex-a65 -mtune=cortex-a65
+ISR_ARCHFLAGS += -mcpu=cortex-a65 -mtune=cortex-a65
 endif
 
-# GCC support -mcpu=cortex-a65ae for arm64 from 10.1
+# GCC supports -mcpu=cortex-a65ae for arm64 from 10.1
+# Clang supports -mcpu=cortex-a65ae for arm64 from 10.0
 ifeq ($(CONFIG_MCPU_ARM64_CORTEX_A65AE),y)
+ifeq ($(call have_gcc),y)
 $(call error_if_gcc_version_lt,10,1)
-ARCHFLAGS-$(call gcc_version_ge,10,1)     += -mcpu=cortex-a65ae -mtune=cortex-a65ae
-ISR_ARCHFLAGS-$(call gcc_version_ge,10,1) += -mcpu=cortex-a65ae -mtune=cortex-a65ae
+else
+$(call error_if_clang_version_lt,10,0)
+endif
+ARCHFLAGS     += -mcpu=cortex-a65ae -mtune=cortex-a65ae
+ISR_ARCHFLAGS += -mcpu=cortex-a65ae -mtune=cortex-a65ae
 endif
 
-# GCC support -mcpu=cortex-a76ae for arm64 from 10.1
+# GCC supports -mcpu=cortex-a76ae for arm64 from 10.1
+# Clang supports it from 9.0, the minimum required version
 ifeq ($(CONFIG_MCPU_ARM64_CORTEX_A76AE),y)
+ifeq ($(call have_gcc),y)
 $(call error_if_gcc_version_lt,10,1)
-ARCHFLAGS-$(call gcc_version_ge,10,1)     += -mcpu=cortex-a76ae -mtune=cortex-a76ae
-ISR_ARCHFLAGS-$(call gcc_version_ge,10,1) += -mcpu=cortex-a76ae -mtune=cortex-a76ae
+endif
+ARCHFLAGS     += -mcpu=cortex-a76ae -mtune=cortex-a76ae
+ISR_ARCHFLAGS += -mcpu=cortex-a76ae -mtune=cortex-a76ae
 endif
 
-# GCC support -mcpu=cortex-a77 for arm64 from 10.1
+# GCC supports -mcpu=cortex-a77 for arm64 from 10.1
+# Clang supports -mcpu=cortex-a77 for arm64 from 11.0
 ifeq ($(CONFIG_MCPU_ARM64_CORTEX_A77),y)
+ifeq ($(call have_gcc),y)
 $(call error_if_gcc_version_lt,10,1)
-ARCHFLAGS-$(call gcc_version_ge,10,1)     += -mcpu=cortex-a77 -mtune=cortex-a77
-ISR_ARCHFLAGS-$(call gcc_version_ge,10,1) += -mcpu=cortex-a77 -mtune=cortex-a77
+else
+$(call error_if_clang_version_lt,11,0)
+endif
+ARCHFLAGS     += -mcpu=cortex-a77 -mtune=cortex-a77
+ISR_ARCHFLAGS += -mcpu=cortex-a77 -mtune=cortex-a77
 endif
 
-# GCC support -mcpu=neoverse-n2 for arm64 from 10.1
+# GCC supports -mcpu=neoverse-n2 for arm64 from 10.1
 ifeq ($(CONFIG_MCPU_ARM64_NEOVERSE_N2),y)
+ifeq ($(call have_gcc),y)
 $(call error_if_gcc_version_lt,10,1)
-ARCHFLAGS-$(call gcc_version_ge,10,1)     += -mcpu=neoverse-n2 -mtune=neoverse-n2
-ISR_ARCHFLAGS-$(call gcc_version_ge,10,1) += -mcpu=neoverse-n2 -mtune=neoverse-n2
+else
+$(call error_if_clang_version_lt,12,0)
+endif
+ARCHFLAGS     += -mcpu=neoverse-n2 -mtune=neoverse-n2
+ISR_ARCHFLAGS += -mcpu=neoverse-n2 -mtune=neoverse-n2
 endif
 
 # GCC support -mcpu=neoverse-v1 for arm64 from 10.1
 ifeq ($(CONFIG_MCPU_ARM64_NEOVERSE_V1),y)
+ifeq ($(call have_gcc),y)
 $(call error_if_gcc_version_lt,10,1)
-ARCHFLAGS-$(call gcc_version_ge,10,1)     += -mcpu=neoverse-v1 -mtune=neoverse-v1
-ISR_ARCHFLAGS-$(call gcc_version_ge,10,1) += -mcpu=neoverse-v1 -mtune=neoverse-v1
+else
+$(call error_if_clang_version_lt,12,0)
+endif
+ARCHFLAGS     += -mcpu=neoverse-v1 -mtune=neoverse-v1
+ISR_ARCHFLAGS += -mcpu=neoverse-v1 -mtune=neoverse-v1
 endif
 
 $(eval $(call addlib,libarm64arch))

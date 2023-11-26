@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright (c) 2018-2019, Ulf Magnusson
 # SPDX-License-Identifier: ISC
@@ -44,7 +44,7 @@ def _main():
     # visible symbols.
     global conf_changed
 
-    kconf = standard_kconfig()
+    kconf = standard_kconfig(__doc__)
     print(kconf.load_config())
 
     while True:

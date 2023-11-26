@@ -34,6 +34,16 @@
 
 #include <uk/arch/limits.h> /* for __PAGE_SIZE */
 
+#ifdef UK_USE_SECTION_SEGMENTS
+#define UK_SEGMENT_TLS :tls
+#define UK_SEGMENT_TLS_LOAD :tls_load
+#define UK_SEGMENT_DATA :data
+#else
+#define UK_SEGMENT_TLS
+#define UK_SEGMENT_TLS_LOAD
+#define UK_SEGMENT_DATA
+#endif
+
 /** Executable */
 #define PHDRS_PF_X 0x1
 /** Writeable */
@@ -82,18 +92,25 @@
 	__eh_frame_start = .;						\
 	.eh_frame :							\
 	{								\
-		*(.eh_frame)						\
-		*(.eh_frame.*)						\
+		KEEP(*(.eh_frame))					\
+		KEEP(*(.eh_frame.*))					\
 	}								\
 	__eh_frame_end = .;						\
 									\
 	__eh_frame_hdr_start = .;					\
 	.eh_frame_hdr :							\
 	{								\
-		*(.eh_frame_hdr)					\
-		*(.eh_frame_hdr.*)					\
+		KEEP(*(.eh_frame_hdr))					\
+		KEEP(*(.eh_frame_hdr.*))				\
 	}								\
-	__eh_frame_hdr_end = .;
+	__eh_frame_hdr_end = .;						\
+	__gcc_except_table_start = .;					\
+	.gcc_except_table :						\
+	{								\
+		*(.gcc_except_table)					\
+		*(.gcc_except_table.*)					\
+	}								\
+	__gcc_except_table_end = .;
 
 #define CTORTAB_SECTION							\
 	. = ALIGN(__PAGE_SIZE);						\
@@ -120,14 +137,14 @@
 	}
 
 #define TLS_SECTIONS							\
-	. = ALIGN(0x20);						\
+	. = ALIGN(__PAGE_SIZE);						\
 	_tls_start = .;							\
 	.tdata :							\
 	{								\
 		*(.tdata)						\
 		*(.tdata.*)						\
 		*(.gnu.linkonce.td.*)					\
-	} :tls :tls_load						\
+	} UK_SEGMENT_TLS UK_SEGMENT_TLS_LOAD				\
 	_etdata = .;							\
 	.tbss :								\
 	{								\
@@ -153,7 +170,7 @@
 	{								\
 		*(.data)						\
 		*(.data.*)						\
-	} :data								\
+	} UK_SEGMENT_DATA						\
 	_edata = .;							\
 									\
 	/*								\
@@ -170,6 +187,12 @@
 		*(.bss.*)						\
 		*(COMMON)						\
 		. = ALIGN(__PAGE_SIZE);					\
+	}
+
+#define DISCARDS							\
+	/DISCARD/ :							\
+	{								\
+		*(.note.gnu.build-id)					\
 	}
 
 #endif /* __UK_COMMON_LDS_H */

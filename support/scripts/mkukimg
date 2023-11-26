@@ -1,0 +1,267 @@
+#!/usr/bin/env bash
+if [ $( uname ) != "Linux" ]; then
+	echo "This command can only be run on Linux" 1>&2
+	exit 1
+fi
+
+# help menu
+usage()
+{
+	echo "Usage: $0 [options]"
+	echo "Creates bootable images from Unikraft kernel images."
+	echo ""
+	echo "  -h                         Display help and exit"
+	echo "  -f                         Output format: iso, disk (ukefi only)"
+	echo "  -k                         Path to the Unikraft kernel image"
+	echo "  -c                         Kernel command-line parameters file (optional)"
+	echo "  -i                         Path to initrd cpio file (optional)"
+	echo "  -b                         Bootloader: grub (GRUB), ukefi (Unikraft EFI stub)"
+	echo "  -a                         Architecture: X64 (x86_64), AA64 (Aarch64)"
+	echo "  -d                         Path to Devicetree Blob (optional, for ukefi only!)"
+	echo "  -o                         Path to output file"
+	exit 1
+}
+
+# default options
+OPTFORMAT="iso"
+OPTCMDLINE=""
+OPTOUTPUT=
+OPTARCH=
+OPTDTB=
+
+# cleanup
+BUILDDIR=
+sighandler_exit()
+{
+	if [ -n "${BUILDDIR}" ] && [ -d "${BUILDDIR}" ]; then
+		rm -rf "${BUILDDIR}"
+	fi
+}
+
+mkgrubiso()
+{
+	# configure grub
+	mkdir -p "${BUILDDIR}/boot/grub"
+
+	if [ -n "${OPTINITRD}" ]; then
+		GRUB_CFG_INITRD="module /boot/${OPTINITRDNAME}"
+		cp "${OPTINITRD}" "${BUILDDIR}/boot/${OPTINITRDNAME}" || exit 1
+	fi
+	cp "${OPTKERNELIMG}" "${BUILDDIR}/boot/" || exit 1
+
+	MBCMDL=
+	if [ -n "${OPTCMDLINE}" ]; then
+		MBCMDL=$(tr '\n' ' ' < "${OPTCMDLINE}")
+	fi
+
+	cat >"${BUILDDIR}/boot/grub/grub.cfg" <<EOF
+set default=0
+set timeout=0
+
+menuentry "${OPTKERNELNAME}" {
+	multiboot /boot/${OPTKERNELNAME} /${OPTKERNELNAME} ${MBCMDL}
+	${GRUB_CFG_INITRD}
+	boot
+}
+EOF
+
+	# build grub image
+	GRUB_INSTALL_MSGS=$( grub-mkrescue -o "${OPTOUTPUT}" --install-modules="multiboot" --fonts="" --themes="" --locales="" "${BUILDDIR}/" 2>&1 )
+	if [ ${?} != 0 ]; then
+		printf '%s\n' "${GRUB_INSTALL_MSGS}" 1>&2
+		exit 1
+	fi
+}
+
+# Helper function for mkukefi{iso,disk}
+# Given a directory, creates an EFI System Partition layout
+mkukefiesp()
+{
+	ESP=${1}
+	if [ -z "${ESP}" ]; then
+		echo "mkukefiesp() must receive the directory where the ESP is mounted"
+		exit 1
+	fi
+
+	sudo mkdir -p "${ESP}"/EFI/BOOT/
+
+	if [ -n "${OPTINITRD}" ]; then
+		sudo cp "${OPTINITRD}" "${ESP}/EFI/BOOT/"
+	fi
+
+	if [ -n "${OPTCMDLINE}" ]; then
+		sudo cp "${OPTCMDLINE}" "${ESP}/EFI/BOOT/"
+	fi
+
+	if [ -n "${OPTDTB}" ]; then
+		sudo cp "${OPTDTB}" "${ESP}/EFI/BOOT/"
+	fi
+
+	sudo cp "${OPTKERNELIMG}" "${ESP}/EFI/BOOT/BOOT${OPTARCH}.EFI"
+}
+
+mkukefiiso()
+{
+	# create initial empty image we will format as FAT32
+	# ESP must be at least 100MB
+	dd if=/dev/zero of="${BUILDDIR}/fs.img" bs=1M count=100
+
+	mkfs.vfat -F 32 "${BUILDDIR}/fs.img"
+
+	LOOPDEV=$(sudo losetup --find --show "${BUILDDIR}/fs.img")
+	mkdir "${BUILDDIR}/mnt"
+	sudo mount "${LOOPDEV}" "${BUILDDIR}/mnt"
+
+	mkukefiesp "${BUILDDIR}/mnt"
+
+	sudo umount "${BUILDDIR}/mnt"
+	sudo losetup -d "${LOOPDEV}"
+
+	mkdir "${BUILDDIR}/iso_dir"
+	cp "${BUILDDIR}/fs.img" "${BUILDDIR}/iso_dir"
+	echo "${OPTOUTPUT}"
+	xorriso -as mkisofs -R -f -e fs.img -no-emul-boot -o "${OPTOUTPUT}" "${BUILDDIR}/iso_dir"
+}
+
+mkukefidisk()
+{
+	# create initial empty image we will format as GPT
+	# ESP must be at least 100MB and must be FAT12/16/32, but leave some
+	# room for the GPT and the backup GPT as well as the PMBR (5MB is enough)
+	dd if=/dev/zero of="${OPTOUTPUT}" bs=1M count=105
+
+	# Create the partition table
+	#	g\n	Create new GPT
+	#	n\n	Create new partition
+	#	1\n	Select partition number as 1
+	#	\n	Default first sector
+	#	\n	Default last sector
+	#	t\n	Change type of partition (default partition 1)
+	#	1\n	Mark partition 1 as EFI System Partition
+	#	w\n	Write the changes to the disk image
+	echo -e	"								\
+		g\n								\
+		n\n								\
+		1\n								\
+		\n								\
+		\n								\
+		t\n								\
+		1\n								\
+		w\n								\
+		" | fdisk -W always "${OPTOUTPUT}"	# Wipe filesystem, RAID	\
+							# and partition-table signatures
+
+	LOOPDEV=$(sudo losetup --find --show "${OPTOUTPUT}")
+	sudo partprobe "${LOOPDEV}"
+	sudo mkfs.vfat -F 32 "${LOOPDEV}p1"
+
+	mkdir "${BUILDDIR}/mnt"
+	sudo mount "${LOOPDEV}p1" "${BUILDDIR}/mnt"	# We only have one partition
+
+	mkukefiesp "${BUILDDIR}/mnt"
+
+	sudo umount "${BUILDDIR}/mnt"
+	sudo losetup -d "${LOOPDEV}"
+}
+
+# process options
+while getopts "hk:c:i:f:a:b:d:o:" OPT; do
+	case "${OPT}" in
+		h)
+			usage
+			;;
+		f)
+			OPTFORMAT="${OPTARG}"
+			;;
+		k)
+			OPTKERNELIMG="${OPTARG}"
+			;;
+		c)
+			OPTCMDLINE="${OPTARG}"
+			;;
+		i)
+			OPTINITRD="${OPTARG}"
+			;;
+		b)
+			OPTBOOTLOADER="${OPTARG}"
+			;;
+		a)
+			OPTARCH="${OPTARG}"
+			;;
+		d)
+			OPTDTB="${OPTARG}"
+			;;
+		o)
+			OPTOUTPUT="${OPTARG}"
+			;;
+		*)
+			usage
+			;;
+	esac
+done
+shift $((OPTIND-1))
+
+# validate arguments
+if [[ -z "${OPTKERNELIMG}" ]]; then
+	echo "Missing path to kernel image ('-k')" 1>&2
+	usage
+fi
+if [[ -z "${OPTOUTPUT}" ]]; then
+	echo "Missing path to output image" 1>&2
+	usage
+fi
+if [ ! -f "${OPTKERNELIMG}" ]; then
+	echo "${OPTKERNELIMG} does not exist or is not a file" 1>&2
+	exit 1
+fi
+if [ -n "${OPTINITRD}" ] && [ ! -f "${OPTINITRD}" ]; then
+	echo "${OPTINITRD} does not exist or is not a file" 1>&2
+	exit 1
+fi
+if [ "${OPTARCH}" != "AA64" ] && [ "${OPTARCH}" != "X64" ]; then
+	echo "Invalid architecture" 1>&2
+	usage
+fi
+
+# Register exit handler and create BUILDDIR
+trap sighandler_exit exit
+BUILDDIR="$( mktemp -d )"
+if [ ${?} -ne 0 ] || [ -z "${BUILDDIR}" ] || [ ! -d "${BUILDDIR}" ]; then
+	echo "Failed to create temporary directory" 1>&2
+	exit 1
+fi
+
+OPTKERNELNAME="${OPTKERNELIMG##*/}"
+OPTINITRDNAME="${OPTINITRD##*/}"
+
+case "${OPTFORMAT}" in
+	iso)
+		case "${OPTBOOTLOADER}" in
+		grub)
+			mkgrubiso
+			;;
+		ukefi)
+			mkukefiiso
+			;;
+		*)
+			echo -e "\"${OPTBOOTLOADER}\" not a supported bootloader for ISO images." 1>&2
+			usage
+			;;
+		esac
+		;;
+	disk)
+		case "${OPTBOOTLOADER}" in
+		ukefi)
+			mkukefidisk
+			;;
+		*)
+			echo -e "\"${OPTBOOTLOADER}\" not a supported bootloader for DISK images." 1>&2
+			usage
+			;;
+		esac
+		;;
+	*)
+		echo -e "\"${OPTFORMAT}\" not a supported format." 1>&2
+		usage
+		;;
+esac

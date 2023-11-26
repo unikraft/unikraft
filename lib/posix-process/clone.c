@@ -528,14 +528,6 @@ int clone(int (*fn)(void *) __unused, void *sp __unused,
 }
 #endif /* UK_LIBC_SYSCALLS */
 
-/* NOTE: There are currently no libc wrapper for clone3 */
-UK_LLSYSCALL_R_DEFINE(long, clone3,
-		      struct clone_args *, cl_args,
-		      size_t, cl_args_len)
-{
-	return _clone(cl_args, cl_args_len, uk_syscall_return_addr());
-}
-
 /*
  * Checks that the CLONE_VM is set so that we make sure that
  * the address space is shared. Unikraft does currently not support

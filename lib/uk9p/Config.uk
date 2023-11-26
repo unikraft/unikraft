@@ -1,6 +1,19 @@
-config LIBUK9P
+menuconfig LIBUK9P
 	bool "uk9p: 9p client"
 	default n
 	select LIBUKALLOC
 	select LIBNOLIBC if !HAVE_LIBC
 	select LIBUKDEBUG
+
+if LIBUK9P
+
+config LIBUK9P_ERRATUM_WSTAT_FSYNC_ZERO
+	bool "Workaround for WSTAT bug in QEMU"
+	depends on KVM_VMM_QEMU
+	default y
+	help
+		QEMU has a bug where a successful call of WSTAT to perform
+		an fsync will lead to a zero-sized response. This option
+		enables a workaround where the length of the response is fixed.
+
+endif

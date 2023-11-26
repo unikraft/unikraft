@@ -26,16 +26,49 @@
 #include <uk/plat/common/irq.h>
 #include <uk/print.h>
 #include <uk/plat/bootstrap.h>
+#include <kvm/efi.h>
+#include <uk/plat/common/bootinfo.h>
 
 static void cpu_halt(void) __noreturn;
 
-/* TODO: implement CPU reset */
-void ukplat_terminate(enum ukplat_gstate request __unused)
+#ifdef CONFIG_KVM_BOOT_PROTO_EFI_STUB
+static void uk_efi_rs_reset_system(enum uk_efi_reset_type reset_type)
+{
+	const char reset_data[] = "UK EFI SYSTEM RESET";
+	struct uk_efi_runtime_services *rs;
+	struct ukplat_bootinfo *bi;
+
+	bi = ukplat_bootinfo_get();
+	if (unlikely(!bi || !bi->efi_st))
+		return;
+
+	rs = ((struct uk_efi_sys_tbl *)bi->efi_st)->runtime_services;
+	if (unlikely(!rs))
+		return;
+
+	rs->reset_system(reset_type, UK_EFI_SUCCESS,
+			 sizeof(reset_data), (void *)reset_data);
+}
+#else
+static void uk_efi_rs_reset_system(enum uk_efi_reset_type reset_type __unused)
+{ }
+#endif
+
+void ukplat_terminate(enum ukplat_gstate request)
 {
 	uk_pr_info("Unikraft halted\n");
 
+	switch (request) {
+	case UKPLAT_RESTART:
+		uk_efi_rs_reset_system(UK_EFI_RESET_COLD);
+
+		break;
+	default:
+		uk_efi_rs_reset_system(UK_EFI_RESET_SHUTDOWN);
+	}
+
 	/* Try to make system off */
-	system_off();
+	system_off(request);
 
 	/*
 	 * If we got here, there is no way to initiate "shutdown" on virtio

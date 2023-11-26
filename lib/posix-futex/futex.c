@@ -43,6 +43,7 @@
 #include <stdio.h>
 #include <errno.h>
 #include <time.h>
+#include <inttypes.h>
 
 #include <linux/futex.h>
 #include <uk/syscall.h>
@@ -52,13 +53,14 @@
 #include <uk/list.h>
 #if CONFIG_LIBPOSIX_PROCESS_CLONE
 #include <uk/process.h>
-#endif
+#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 #include <uk/sched.h>
 #include <uk/list.h>
 #include <uk/assert.h>
 #include <uk/print.h>
 #include <uk/spinlock.h>
 #include <uk/plat/lcpu.h>
+#include <uk/plat/time.h>
 
 /** @struct uk_futex
  *  @brief Futex structure.
@@ -82,18 +84,17 @@ static uk_spinlock futex_list_lock = UK_SPINLOCK_INITIALIZER();
  * expected one. If the futex was not removed from the list when the thread was
  * unblocked, then it means that it timed out.
  *
- * @param uaddr	The futex userspace address
- * @param val	The expected value
- * @param tm	Timespec structure which contains the timeout for which the
- *		thread will blocked. If it is null, the thread will wait
- *		indefinitely.
+ * @param uaddr		The futex userspace address
+ * @param val		The expected value
+ * @param timeout	The deadline until the function will block at most.
+ * 			If it is NULL, the thread will wait indefinitely.
  *
  * @return
  *	0: uaddr contains val and the thread finished waiting;
  *	<1: -EAGAIN (uaddr does not contain val) or -ETIMEDOUT (the futex timed
  *       out)
  */
-static int futex_wait(uint32_t *uaddr, uint32_t val, const struct timespec *tm)
+static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
 {
 	unsigned long irqf;
 	struct uk_list_head *itr, *tmp;
@@ -101,50 +102,57 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const struct timespec *tm)
 	struct uk_thread *current = uk_thread_current();
 	struct uk_futex f = {.uaddr = uaddr, .thread = current};
 
-	if (ukarch_load_n(uaddr) == val) {
-		irqf = ukplat_lcpu_save_irqf();
-		uk_spin_lock(&futex_list_lock);
-
-		/* Enqueue thread to wait list */
-		uk_list_add_tail(&f.list_node, &futex_list);
-
-		uk_spin_unlock(&futex_list_lock);
-		ukplat_lcpu_restore_irqf(irqf);
-
-		if (tm)
-			/* Block for at most timeout nanosecs */
-			uk_thread_block_timeout(current, tm->tv_nsec);
-		else
-			/* Block indefinitely */
-			uk_thread_block(current);
-
-		uk_sched_yield();
-
-		irqf = ukplat_lcpu_save_irqf();
-		uk_spin_lock(&futex_list_lock);
-
-		/* If the futex is still in the wait list, then it timed out */
-		uk_list_for_each_safe(itr, tmp, &futex_list) {
-			f_tmp = uk_list_entry(itr, struct uk_futex, list_node);
-
-			if (f_tmp->uaddr == uaddr && f_tmp->thread == current) {
-				/* Remove the thread from the futex list */
-				uk_list_del(&f_tmp->list_node);
-				uk_spin_unlock(&futex_list_lock);
-				ukplat_lcpu_restore_irqf(irqf);
-
-				return -ETIMEDOUT;
-			}
-		}
-
-		uk_spin_unlock(&futex_list_lock);
-		ukplat_lcpu_restore_irqf(irqf);
-
-		return 0;
+	if (ukarch_load_n(uaddr) != val) {
+		uk_pr_debug("FUTEX_WAIT: Condition not met (*uaddr != %"PRIu32", uaddr: %p)\n",
+			    val, uaddr);
+		return -EAGAIN;
 	}
 
-	/* Futex word does not contain expected val */
-	return -EAGAIN;
+	/* Futex word _does_ contain expected val */
+	uk_pr_debug("FUTEX_WAIT: Condition met (*uaddr == %"PRIu32", uaddr: %p)\n",
+			val, uaddr);
+
+	/* Enqueue thread to wait list */
+	irqf = ukplat_lcpu_save_irqf();
+	uk_spin_lock(&futex_list_lock);
+	uk_list_add_tail(&f.list_node, &futex_list);
+	uk_spin_unlock(&futex_list_lock);
+	ukplat_lcpu_restore_irqf(irqf);
+
+	if (timeout) {
+		/* Block at most until `timeout` nanosecs */
+		uk_pr_debug("FUTEX_WAIT: Wait %"__PRIsnsec" nsec for wake-up\n",
+				(__snsec) (*timeout));
+		uk_thread_block_until(current, (__snsec) (*timeout));
+	} else {
+		/* Block indefinitely */
+		uk_pr_debug("FUTEX_WAIT: Wait indefinitely for wake-up\n");
+		uk_thread_block(current);
+	}
+	uk_sched_yield();
+
+	uk_pr_debug("FUTEX_WAIT: Woke up (uaddr: %p)\n", uaddr);
+	irqf = ukplat_lcpu_save_irqf();
+	uk_spin_lock(&futex_list_lock);
+
+	/* If the futex is still in the wait list, then it timed out */
+	uk_list_for_each_safe(itr, tmp, &futex_list) {
+		f_tmp = uk_list_entry(itr, struct uk_futex, list_node);
+
+		if (f_tmp->uaddr == uaddr && f_tmp->thread == current) {
+			/* Remove the thread from the futex list */
+			uk_list_del(&f_tmp->list_node);
+			uk_spin_unlock(&futex_list_lock);
+			ukplat_lcpu_restore_irqf(irqf);
+
+			uk_pr_debug("FUTEX_WAIT: Woke up because of timeout\n");
+			return -ETIMEDOUT;
+		}
+	}
+	uk_spin_unlock(&futex_list_lock);
+	ukplat_lcpu_restore_irqf(irqf);
+
+	return 0;
 }
 
 /**
@@ -276,13 +284,51 @@ UK_LLSYSCALL_R_DEFINE(int, futex, uint32_t *, uaddr, int, futex_op,
 		      uint32_t, val, const struct timespec *, timeout,
 		      uint32_t *, uaddr2, uint32_t, val3)
 {
-	switch (futex_op) {
+	__nsec timeout_ns;
+ 	int cmd = futex_op & FUTEX_CMD_MASK;
+
+	/* Reject invalid combinations of the realtime clock flag */
+	if (futex_op & FUTEX_CLOCK_REALTIME && !(
+		cmd == FUTEX_WAIT ||
+		cmd == FUTEX_WAIT_BITSET ||
+		cmd == FUTEX_LOCK_PI2 ||
+		cmd == FUTEX_WAIT_REQUEUE_PI))
+		return -ENOSYS;
+
+	/*
+	 * N.B. CLOCK_(MONOTONIC|REALTIME|...) are at the moment all the same in
+	 * Unikraft. Therefore, we can just use CLOCK_MONOTONIC for timeouts in
+	 * the following code.
+	 */
+	switch (cmd) {
 	case FUTEX_WAIT:
-	case FUTEX_WAIT_PRIVATE:
-		return futex_wait(uaddr, val, timeout);
+		/*
+		 * `timeout` is relative to "now" (whenever that is). To
+		 * simplify the implementation regarding overflows, we will only
+		 * honor the nanosecond part of the timespec.
+		 */
+		if (timeout)
+			timeout_ns = ukplat_monotonic_clock() +
+				     ukarch_time_sec_to_nsec(timeout->tv_sec) +
+				     timeout->tv_nsec;
+		return futex_wait(uaddr, val, timeout ? &timeout_ns : NULL);
+
+	case FUTEX_WAIT_BITSET:
+		/*
+		 * Special case implementation for cases where the val3/mask has
+		 * all bits set. Some applications do this to use the absolute
+		 * timeout mode. We return ENOSYS for all non-supported calls.
+		 */
+		if (val3 != UINT32_MAX)
+			return -ENOSYS;
+
+		if (timeout)
+			timeout_ns = ukarch_time_sec_to_nsec(timeout->tv_sec)
+				     + timeout->tv_nsec;
+
+		return futex_wait(uaddr, val, timeout ? &timeout_ns : NULL);
 
 	case FUTEX_WAKE:
-	case FUTEX_WAKE_PRIVATE:
 		return futex_wake(uaddr, val);
 
 	case FUTEX_FD:

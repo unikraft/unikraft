@@ -32,6 +32,7 @@
  */
 
 #include <stdint.h>
+#include <uk/assert.h>
 #include <uk/plat/lcpu.h>
 #include <x86/irq.h>
 
@@ -47,6 +48,8 @@ void ukplat_lcpu_disable_irq(void)
 
 void ukplat_lcpu_halt_irq(void)
 {
+	UK_ASSERT(ukplat_lcpu_irqs_disabled());
+
 	/*
 	 * We have to be careful when enabling interrupts before entering a
 	 * halt state. If we want to wait for an interrupt (e.g., a timer)

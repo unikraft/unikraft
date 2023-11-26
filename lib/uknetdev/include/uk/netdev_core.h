@@ -47,6 +47,10 @@
 #include <uk/sched.h>
 #include <uk/semaphore.h>
 #endif
+#ifdef CONFIG_LIBUKNETDEV_STATS
+#include <uk/arch/spinlock.h>
+#endif /* CONFIG_LIBUKNETDEV_STATS */
+
 
 /**
  * Unikraft network API common declarations.
@@ -138,13 +142,19 @@ struct uk_hwaddr {
 #define UK_NETDEV_F_PARTIAL_CSUM_BIT	2
 #define UK_NETDEV_F_PARTIAL_CSUM	(1UL << UK_NETDEV_F_PARTIAL_CSUM_BIT)
 
+/* Indicates that the network device supports sending netbufs with the
+ * UK_NETBUF_F_GSO_TCPV4 bit set. */
+#define UK_NETDEV_F_TSO4_BIT		3
+#define UK_NETDEV_F_TSO4		(1UL << UK_NETDEV_F_TSO4_BIT)
+
 #define uk_netdev_rxintr_supported(feature)	\
 	(feature & (UK_NETDEV_F_RXQ_INTR))
 #define uk_netdev_txintr_supported(feature)	\
 	(feature & (UK_NETDEV_F_TXQ_INTR))
 #define uk_netdev_partial_csum_supported(feature)	\
 	(feature & (UK_NETDEV_F_PARTIAL_CSUM))
-
+#define uk_netdev_tso4_supported(feature) \
+	(feature & (UK_NETDEV_F_TSO4))
 /**
  * A structure used to describe network device capabilities.
  */
@@ -238,7 +248,7 @@ enum uk_netdev_einfo_type {
  *
  * @param dev
  *   The Unikraft Network Device.
- * @param queue
+ * @param queue_id
  *   The queue on the Unikraft network device on which the event happened.
  * @param argp
  *   Extra argument that can be defined on callback registration.
@@ -455,6 +465,40 @@ struct uk_netdev_einfo {
 	const char *ipv4_addr;
 	const char *ipv4_net_mask;
 	const char *ipv4_gw_addr;
+	const char *ipv4_dns0_addr;
+};
+
+struct uk_netdev_tx_stats {
+	/** The total number of bytes of data transmitted by the interface */
+	size_t bytes;
+
+	/** The total number of packets of data transmitted by the interface */
+	size_t packets;
+
+	/** The total number of transmit errors detected by the device driver */
+	size_t errors;
+
+	/** The number of FIFO buffer errors */
+	size_t fifo;
+};
+
+struct uk_netdev_rx_stats {
+	/** The total number of bytes of data received by the interface */
+	size_t bytes;
+
+	/** The total number of packets of data received by the interface */
+	size_t packets;
+
+	/** The total number of receive errors detected by the device driver */
+	size_t errors;
+
+	/** The number of FIFO buffer errors */
+	size_t fifo;
+};
+
+struct uk_netdev_stats {
+	struct uk_netdev_tx_stats tx_m;
+	struct uk_netdev_rx_stats rx_m;
 };
 
 /**
@@ -491,6 +535,12 @@ struct uk_netdev {
 #if (CONFIG_UK_NETDEV_SCRATCH_SIZE > 0)
 	char scratch_pad[CONFIG_UK_NETDEV_SCRATCH_SIZE];
 #endif /* CONFIG_UK_NETDEV_SCRATCH_SIZE */
+
+#ifdef CONFIG_LIBUKNETDEV_STATS
+	/* TODO: Per-queue stats to reduce contention */
+	struct uk_netdev_stats _stats;
+	__spinlock _stats_lock;
+#endif /* CONFIG_LIBUKNETDEV_STATS */
 };
 
 #ifdef __cplusplus

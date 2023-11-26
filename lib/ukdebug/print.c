@@ -76,6 +76,7 @@
 #define LVLC_RESET	""
 #define LVLC_TS		""
 #define LVLC_CALLER	""
+#define LVLC_THREAD	""
 #define LVLC_LIBNAME	""
 #define LVLC_SRCNAME	""
 #define LVLC_DEBUG	""
@@ -167,7 +168,7 @@ static void _print_caller(struct _vprint_console *cons, __uptr ra, __uptr fa)
 #endif /* CONFIG_LIBUKDEBUG_PRINT_CALLER */
 
 static void _vprint(struct _vprint_console *cons,
-		    int lvl, const char *libname,
+		    int lvl, __u16 libid,
 #if CONFIG_LIBUKDEBUG_PRINT_SRCNAME
 		    const char *srcname,
 		    unsigned int srcline,
@@ -183,6 +184,7 @@ static void _vprint(struct _vprint_console *cons,
 	const char *msghdr = NULL;
 	const char *lptr = NULL;
 	const char *nlptr = NULL;
+	const char *libname = uk_libname(libid);
 
 	/*
 	 * Note: We reset the console colors earlier in order to exclude
@@ -310,37 +312,37 @@ static void _vprint(struct _vprint_console *cons,
 #define _VPRINT_ARGS_CALLER()
 #endif /* CONFIG_LIBUKDEBUG_PRINT_CALLER */
 
-void _uk_vprintd(const char *libname, const char *srcname __maybe_unused,
+void _uk_vprintd(__u16 libid, const char *srcname __maybe_unused,
 		 unsigned int srcline __maybe_unused, const char *fmt,
 		 va_list ap)
 {
 
 #if CONFIG_LIBUKDEBUG_REDIR_PRINTD
-	_vprint(&kern,  KLVL_DEBUG, libname,
+	_vprint(&kern,  KLVL_DEBUG, libid,
 		_VPRINT_ARGS_SRCNAME(srcname, srcline)
 		_VPRINT_ARGS_CALLER()
 		fmt, ap);
 #else
-	_vprint(&debug, KLVL_DEBUG, libname,
+	_vprint(&debug, KLVL_DEBUG, libid,
 		_VPRINT_ARGS_SRCNAME(srcname, srcline)
 		_VPRINT_ARGS_CALLER()
 		fmt, ap);
 #endif /* !CONFIG_LIBUKDEBUG_REDIR_PRINTD */
 }
 
-void _uk_printd(const char *libname, const char *srcname __maybe_unused,
+void _uk_printd(__u16 libid, const char *srcname __maybe_unused,
 		unsigned int srcline __maybe_unused, const char *fmt, ...)
 {
 	va_list ap;
 
 	va_start(ap, fmt);
 #if CONFIG_LIBUKDEBUG_REDIR_PRINTD
-	_vprint(&kern,  KLVL_DEBUG, libname,
+	_vprint(&kern,  KLVL_DEBUG, libid,
 		_VPRINT_ARGS_SRCNAME(srcname, srcline)
 		_VPRINT_ARGS_CALLER()
 		fmt, ap);
 #else
-	_vprint(&debug, KLVL_DEBUG, libname,
+	_vprint(&debug, KLVL_DEBUG, libid,
 		_VPRINT_ARGS_SRCNAME(srcname, srcline)
 		_VPRINT_ARGS_CALLER()
 		fmt, ap);
@@ -355,25 +357,25 @@ void _uk_printd(const char *libname, const char *srcname __maybe_unused,
  *  enabled.
  */
 #if CONFIG_LIBUKDEBUG_PRINTK
-void _uk_vprintk(int lvl, const char *libname,
+void _uk_vprintk(int lvl, __u16 libid,
 		 const char *srcname __maybe_unused,
 		 unsigned int srcline __maybe_unused,
 		 const char *fmt, va_list ap)
 {
 #if CONFIG_LIBUKDEBUG_REDIR_PRINTK
-	_vprint(&debug, lvl, libname,
+	_vprint(&debug, lvl, libid,
 		_VPRINT_ARGS_SRCNAME(srcname, srcline)
 		_VPRINT_ARGS_CALLER()
 		fmt, ap);
 #else
-	_vprint(&kern,  lvl, libname,
+	_vprint(&kern,  lvl, libid,
 		_VPRINT_ARGS_SRCNAME(srcname, srcline)
 		_VPRINT_ARGS_CALLER()
 		fmt, ap);
 #endif /* !CONFIG_LIBUKDEBUG_REDIR_PRINTK */
 }
 
-void _uk_printk(int lvl, const char *libname,
+void _uk_printk(int lvl, __u16 libid,
 		const char *srcname __maybe_unused,
 		unsigned int srcline __maybe_unused,
 		const char *fmt, ...)
@@ -382,12 +384,12 @@ void _uk_printk(int lvl, const char *libname,
 
 	va_start(ap, fmt);
 #if CONFIG_LIBUKDEBUG_REDIR_PRINTK
-	_vprint(&debug, lvl, libname,
+	_vprint(&debug, lvl, libid,
 		_VPRINT_ARGS_SRCNAME(srcname, srcline)
 		_VPRINT_ARGS_CALLER()
 		fmt, ap);
 #else
-	_vprint(&kern,  lvl, libname,
+	_vprint(&kern,  lvl, libid,
 		_VPRINT_ARGS_SRCNAME(srcname, srcline)
 		_VPRINT_ARGS_CALLER()
 		fmt, ap);

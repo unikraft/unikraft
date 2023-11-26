@@ -34,6 +34,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _GNU_SOURCE
+
 #include <uk/socket_driver.h>
 #include <uk/socket_vnops.h>
 #include <uk/socket.h>
@@ -41,8 +43,11 @@
 #include <vfscore/mount.h>
 #include <vfscore/fs.h>
 #include <uk/errptr.h>
+#include <uk/init.h>
 #include <inttypes.h>
 #include <errno.h>
+#include <string.h>
+#include <stdlib.h>
 
 static struct mount posix_socket_mount;
 
@@ -91,7 +96,7 @@ posix_socket_alloc_fd(struct posix_socket_driver *d, int type, void *sock_data)
 		goto ERR_MALLOC_FILE;
 	}
 
-	vfs_file = uk_calloc(d->allocator, 1, sizeof(*vfs_file));
+	vfs_file = calloc(1, sizeof(*vfs_file));
 	if (unlikely(!vfs_file)) {
 		ret = -ENOMEM;
 		goto ERR_MALLOC_VFS_FILE;
@@ -150,7 +155,7 @@ ERR_VFS_INSTALL:
 ERR_ALLOC_DENTRY:
 	vput(vfs_vnode);
 ERR_ALLOC_VNODE:
-	uk_free(d->allocator, vfs_file);
+	free(vfs_file);
 ERR_MALLOC_VFS_FILE:
 	uk_free(d->allocator, sock);
 ERR_MALLOC_FILE:
@@ -340,3 +345,28 @@ static struct vfsops posix_socket_vfsops = {
 static struct mount posix_socket_mount = {
 	.m_op = &posix_socket_vfsops
 };
+
+static int posix_socket_mount_init(void)
+{
+	int ret;
+
+	posix_socket_mount.m_path = strdup("");
+	if (!posix_socket_mount.m_path) {
+		ret = -ENOMEM;
+		goto err_out;
+	}
+
+	posix_socket_mount.m_special = strdup("");
+	if (!posix_socket_mount.m_special) {
+		ret = -ENOMEM;
+		goto err_free_m_path;
+	}
+
+	return 0;
+
+err_free_m_path:
+	free(posix_socket_mount.m_path);
+err_out:
+	return ret;
+}
+uk_lib_initcall(posix_socket_mount_init);

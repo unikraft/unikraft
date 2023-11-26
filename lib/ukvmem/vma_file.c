@@ -32,8 +32,8 @@ static __vaddr_t vma_op_file_get_base(struct uk_vas *vas __unused,
 #endif /* CONFIG_LIBUKVMEM_FILE_BASE */
 
 int vma_op_file_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
-		    __sz len __unused, void *data, unsigned long *flags,
-		    struct uk_vma **vma)
+		    __sz len __unused, void *data, unsigned long attr,
+		    unsigned long *flags, struct uk_vma **vma)
 {
 	struct uk_vma_file_args *args = (struct uk_vma_file_args *)data;
 	struct uk_vma_file *vma_file;
@@ -43,8 +43,14 @@ int vma_op_file_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
 	UK_ASSERT(args->offset >= 0);
 	UK_ASSERT(PAGE_ALIGNED(args->offset));
 
-	/* Shared mappings are not supported */
-	if (*flags & UK_VMA_FILE_SHARED)
+	/* Writable shared mappings are not supported.
+	 * Read-only shared mappings are partially supported.
+	 *
+	 * We treat read-only shared mappings as private. Note that any writes
+	 * to the underlying file while the mapping is established will not be
+	 * reflected in memory.
+	 */
+	if ((*flags & UK_VMA_FILE_SHARED) && (attr & PAGE_ATTR_PROT_WRITE))
 		return -ENOTSUP;
 
 	/* Since we cannot do ISR-safe file accesses in the fault handler,
@@ -211,6 +217,16 @@ static int vma_op_file_merge(struct uk_vma *vma, struct uk_vma *next)
 	return 0;
 }
 
+static int vma_op_file_set_attr(struct uk_vma *vma, unsigned long attr)
+{
+	/* Writable shared mappings are not supported. */
+	if ((vma->flags & UK_VMA_FILE_SHARED) && (attr & PAGE_ATTR_PROT_WRITE))
+		return -EPERM;
+
+	/* Default handler */
+	return vma_op_set_attr(vma, attr);
+}
+
 /* We only support private mappings. Changes are not carried through to the
  * underlying file. So we can just use the default unmap handler that unmaps
  * the memory and forgets about it. Private file mappings can also change their
@@ -229,6 +245,6 @@ const struct uk_vma_ops uk_vma_file_ops = {
 	.unmap		= vma_op_unmap,		/* default */
 	.split		= vma_op_file_split,
 	.merge		= vma_op_file_merge,
-	.set_attr	= vma_op_set_attr,	/* default */
+	.set_attr	= vma_op_file_set_attr,
 	.advise		= vma_op_advise,	/* default */
 };

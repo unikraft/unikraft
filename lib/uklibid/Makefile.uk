@@ -1,0 +1,61 @@
+$(eval $(call addlib_s,libuklibid,$(CONFIG_LIBUKLIBID)))
+
+ASINCLUDES-$(CONFIG_LIBUKLIBID)  += -I$(LIBUKLIBID_BASE)/include -I$(LIBUKLIBID_BUILD)/include
+CINCLUDES-$(CONFIG_LIBUKLIBID)   += -I$(LIBUKLIBID_BASE)/include -I$(LIBUKLIBID_BUILD)/include
+CXXINCLUDES-$(CONFIG_LIBUKLIBID) += -I$(LIBUKLIBID_BASE)/include -I$(LIBUKLIBID_BUILD)/include
+
+# Generates a list of library names. The list is sorted to ensure
+# reproducibility for the same sets of library names.
+$(LIBUKLIBID_BUILD)/libraries.in.new:
+	$(call build_cmd,GEN,libuklibid,$(notdir $@), \
+		echo $(foreach P,$(UK_PLATS) $(UK_PLATS-y),\
+		     $(foreach L,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y), \
+		     $(L) \
+		     )) \
+		     $(UK_LIBS) $(UK_LIBS-y) \
+		     $(UK_LIBID_EXTRA) $(UK_LIBID_EXTRA-y) \
+		| tr ' ' '\n' | sort -V - > $@)
+
+.PHONY: $(LIBUKLIBID_BUILD)/libraries.in.new
+
+$(LIBUKLIBID_BUILD)/libraries.in: $(LIBUKLIBID_BUILD)/libraries.in.new
+	$(call build_cmd,CP,libuklibid,$(notdir $@), \
+		cmp -s $^ $@; if [ $$? -ne 0 ]; then cp $^ $@; fi)
+
+LIBUKLIBID_CLEAN += $(LIBUKLIBID_BUILD)/libraries.in.new
+LIBUKLIBID_CLEAN += $(LIBUKLIBID_BUILD)/libraries.in
+
+LIBUKLIBID_SRCS-y += $(LIBUKLIBID_BASE)/libid.awk>.h
+LIBUKLIBID_LIBID_SUBBUILD = include/uk/bits
+LIBUKLIBID_LIBID_AWKINCLUDES-y += $(LIBUKLIBID_BUILD)/libraries.in
+LIBUKLIBID_SRCS-y += $(LIBUKLIBID_BASE)/namemap.awk>.c
+LIBUKLIBID_NAMEMAP_AWKINCLUDES-y += $(LIBUKLIBID_BUILD)/libraries.in
+LIBUKLIBID_SRCS-y += $(LIBUKLIBID_BASE)/selfids.awk>.c
+LIBUKLIBID_SELFIDS_AWKINCLUDES-y += $(LIBUKLIBID_BUILD)/libraries.in
+LIBUKLIBID_SRCS-y += $(LIBUKLIBID_BASE)/rtmap.c
+
+LIBUKLIBID_SRCS-y += $(LIBUKLIBID_BASE)/exportsyms.awk>.uk
+LIBUKLIBID_EXPORTSYMS_AWKINCLUDES-y += $(LIBUKLIBID_BUILD)/libraries.in
+LIBUKLIBID_EXPORTS-y += $(LIBUKLIBID_BUILD)/exportsyms.uk
+
+LIBUKLIBID_SRCS-$(CONFIG_LIBUKLIBID_INFO_BOOTDUMP) += $(LIBUKLIBID_BASE)/infodump.c
+EACHOLIB_SRCS-$(CONFIG_LIBUKLIBID_INFO) += $(LIBUKLIBID_BASE)/libinfo.S|libuklibid
+ifeq ($(CONFIG_LIBUKLIBID_INFO),y)
+ASFLAGS-y += -D__LIBUKLIBID_COMPILER__="$(CC_INFO)"
+# NOTE: We hand-over $(HOSTUTC) instead of using __DATE__ and __TIME__ in order
+#       to ensure recompilation of `libinfo.S` due to changed compile flags
+ASFLAGS-$(CONFIG_LIBUKLIBID_INFO_LIB_COMPILEDATE) += -D__LIBUKLIBID_UTCDATE__="$(HOSTUTC)"
+ASFLAGS-$(CONFIG_LIBUKLIBID_INFO_COMPILEDBY_HOST) += -D__LIBUKLIBID_COMPILEDBY_HOST__="$(HOSTUSER)@$(HOSTNAME)"
+endif # CONFIG_LIBUKLIBID_INFO
+LIBUKLIBID_SRCS-$(CONFIG_LIBUKLIBID_INFO) +=  $(LIBUKLIBID_BASE)/infosec.ld
+LIBUKLIBID_SRCS-$(CONFIG_LIBUKLIBID_INFO) += $(LIBUKLIBID_BASE)/libinfo.S|global
+LIBUKLIBID_LIBINFO_GLOBAL_FLAGS-y += -D__GLOBALINFO__
+LIBUKLIBID_LIBINFO_GLOBAL_FLAGS-$(CONFIG_LIBUKLIBID_INFO_COMPILEDATE) += -DUK_UTCDATE="$(HOSTUTC)"
+LIBUKLIBID_LIBINFO_GLOBAL_CDEPS-$(CONFIG_LIBUKLIBID_INFO_UKCONFIGGZ) += $(LIBUKLIBID_BUILD)/config.gz
+LIBUKLIBID_LIBINFO_GLOBAL_FLAGS-$(CONFIG_LIBUKLIBID_INFO_UKCONFIGGZ) += -DUK_CONFIGGZINC="$(LIBUKLIBID_BUILD)/config.gz"
+
+$(LIBUKLIBID_BUILD)/config.gz: $(UK_CONFIG_OUT)
+	$(call build_cmd,GZ,libuklibid,$@, \
+		$(GZIP) -f -9 -c $< >$@)
+
+UK_PREPARE-$(CONFIG_LIBUKLIBID) += $(LIBUKLIBID_BUILD)/libraries.in.new

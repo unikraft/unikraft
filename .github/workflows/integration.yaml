@@ -1,0 +1,191 @@
+name: integration
+
+on:
+  push:
+    branches: [staging, stable]
+
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [staging]
+
+jobs:
+  libc-test:
+    name: libc-test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - plat: qemu
+          arch: x86_64
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - name: Fetch helloworld
+      uses: actions/checkout@v3
+      with:
+        repository: unikraft/app-helloworld
+        fetch-depth: 1
+        path: _helloworld
+
+    - name: Build and run libc-test via uktest
+      uses: unikraft/kraftkit@staging
+      with:
+        loglevel: debug
+        workdir: _helloworld
+        plat: ${{ matrix.plat }}
+        arch: ${{ matrix.arch }}
+        execute: true
+        kraftfile: |
+          specification: '0.5'
+          name: helloworld
+          unikraft:
+            source: ../
+            kconfig:
+              CONFIG_LIBUKTEST: "y"
+              CONFIG_LIBUKTEST_ALL: "n"
+              CONFIG_LIBUKTEST_TEST_MYSELF: "n"
+              CONFIG_LIBUKTEST_LOG_STATS: "y"
+              CONFIG_LIBUKDEBUG_ANSI_COLOR: "y"
+              CONFIG_LIBUKDEBUG_PRINTK_INFO: "y"
+              CONFIG_LIBDEVFS: "y"
+              CONFIG_LIBDEVFS_DEV_STDOUT: "y"
+              CONFIG_LIBDEVFS_DEV_NULL_ZERO: "y"
+              CONFIG_LIBDEVFS_DEV_ZERO: "y"
+              CONFIG_STACK_SIZE_PAGE_ORDER: 4
+          libraries:
+            libc-test:
+              version: staging
+              kconfig:
+                CONFIG_LIBLIBCTEST: "y"
+                CONFIG_LIBLIBCTEST_STRING_TESTS: "y"
+                CONFIG_LIBLIBCTEST_PTHREAD_TESTS: "y"
+                CONFIG_LIBLIBCTEST_CONVERSION_TESTS: "y"
+                CONFIG_LIBLIBCTEST_REGEX_TESTS: "y"
+                CONFIG_LIBLIBCTEST_FILE_FOLDER_TESTS: "y"
+                CONFIG_LIBLIBCTEST_TIME_TESTS: "y"
+                CONFIG_LIBLIBCTEST_NETWORK_TESTS: "y"
+                CONFIG_LIBLIBCTEST_SORT_TESTS: "y"
+                CONFIG_LIBLIBCTEST_STRUCTURE_SEARCH_TESTS: "y"
+                CONFIG_LIBLIBCTEST_SEMAPHORE_TESTS: "y"
+                CONFIG_LIBLIBCTEST_RANDOM_TESTS: "y"
+                CONFIG_LIBLIBCTEST_CRYPT_TESTS: "y"
+                CONFIG_LIBLIBCTEST_ENV_TESTS: "y"
+                CONFIG_LIBLIBCTEST_MALLOC_TESTS: "y"
+                CONFIG_LIBLIBCTEST_TGMATH_TESTS: "y"
+                CONFIG_LIBLIBCTEST_ICONV_TESTS: "y"
+                CONFIG_LIBLIBCTEST_UDIV_TESTS: "y"
+                CONFIG_LIBLIBCTEST_MBFUNC_TESTS: "y"
+                CONFIG_LIBLIBCTEST_SETJMP_TESTS: "y"
+                CONFIG_LIBLIBCTEST_FPCLASSIFY_TESTS: "y"
+                CONFIG_LIBLIBCTEST_POSIX_SPAWN_TESTS: "y"
+                CONFIG_LIBLIBCTEST_ACCESS_TESTS: "y"
+            musl:
+              version: staging
+              kconfig:
+                CONFIG_MUSL: "y"
+                CONFIG_LIBMUSL_COMPLEX: "y"
+            compiler-rt:
+              version: staging
+          targets:
+          - platform: ${{ matrix.plat }}
+            architecture: ${{ matrix.arch }}
+
+  self-test:
+    name: self-test
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - plat: qemu
+          arch: x86_64
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - name: Fetch helloworld
+      uses: actions/checkout@v3
+      with:
+        repository: unikraft/app-helloworld
+        fetch-depth: 1
+        path: _helloworld
+
+    - name: Build and run all internal tests via uktest
+      uses: unikraft/kraftkit@staging
+      with:
+        loglevel: debug
+        workdir: _helloworld
+        plat: ${{ matrix.plat }}
+        arch: ${{ matrix.arch }}
+        execute: true
+        kraftfile: |
+          specification: '0.5'
+          name: helloworld
+          unikraft:
+            source: ../
+            kconfig:
+              CONFIG_LIBUKTEST: "y"
+              CONFIG_LIBUKTEST_ALL: "y"
+              CONFIG_LIBUKTEST_TEST_MYSELF: "y"
+              CONFIG_LIBUKDEBUG_ANSI_COLOR: "y"
+              CONFIG_LIBUKDEBUG_PRINTK_INFO: "y"
+              CONFIG_LIBUKTEST_FAILFAST: "n"
+              CONFIG_LIBUKTEST_LOG_STATS: "y"
+          targets:
+          - platform: ${{ matrix.plat }}
+            architecture: ${{ matrix.arch }}
+
+  helloworld:
+    name: helloworld
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+        - plat: qemu
+          arch: x86_64
+        - plat: qemu
+          arch: arm64
+        - plat: xen
+          arch: x86_64
+        - plat: fc
+          arch: x86_64
+        - plat: linuxu
+          arch: x86_64
+        - plat: linuxu
+          arch: arm64
+
+    steps:
+    - uses: actions/checkout@v3
+      with:
+        submodules: recursive
+
+    - name: Fetch helloworld
+      uses: actions/checkout@v3
+      with:
+        repository: unikraft/app-helloworld
+        fetch-depth: 1
+        path: _helloworld
+
+    - name: Build helloworld
+      uses: unikraft/kraftkit@staging
+      with:
+        loglevel: debug
+        workdir: _helloworld
+        execute: false
+        plat: ${{ matrix.plat }}
+        arch: ${{ matrix.arch }}
+        kraftfile: |
+          specification: '0.5'
+          name: helloworld
+          unikraft:
+            source: ../
+          targets:
+          - platform: ${{ matrix.plat }}
+            architecture: ${{ matrix.arch }}

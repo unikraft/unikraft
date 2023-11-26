@@ -1,0 +1,7 @@
+config LIBVIRTIO_9P
+	bool "Virtio 9P device"
+	depends on LIBUK9P
+	select LIBVIRTIO_BUS
+	select LIBUKSGLIST
+	help
+		Virtio 9P driver.

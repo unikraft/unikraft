@@ -132,7 +132,8 @@ ENTRY(ukarch_ctx_switch)
 	 * Record the restore point for switch out thread to restore
 	 * its callee-saved registers in next switch to time.
 	 */
-	ldr x30, =restore_point
+	adrp x30, restore_point
+	add x30, x30, :lo12:restore_point
 
 	/* Save sp and restore point to previous context */
 	mov x2, sp

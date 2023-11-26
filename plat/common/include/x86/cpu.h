@@ -38,7 +38,7 @@
 #include <string.h>
 
 void halt(void);
-void system_off(void);
+void system_off(enum ukplat_gstate request);
 
 static inline void cpuid(__u32 fn, __u32 subfn,
 			 __u32 *eax, __u32 *ebx,
@@ -97,6 +97,58 @@ static inline __u64 rdtsc(void)
 	return (h << 32) | l;
 }
 
+/* accessing devices via memory */
+static inline __u8 readb(__u8 *addr)
+{
+	__u8 v;
+
+	__asm__ __volatile__("movb %1, %0" : "=q"(v) : "m"(*addr));
+	return v;
+}
+
+static inline __u16 readw(__u16 *addr)
+{
+	__u16 v;
+
+	__asm__ __volatile__("movw %1, %0" : "=r"(v) : "m"(*addr));
+	return v;
+}
+
+static inline __u32 readl(__u32 *addr)
+{
+	__u32 v;
+
+	__asm__ __volatile__("movl %1, %0" : "=r"(v) : "m"(*addr));
+	return v;
+}
+
+static inline __u64 readq(__u64 *addr)
+{
+	__u64 v;
+
+	__asm__ __volatile__("movq %1, %0" : "=r"(v) : "m"(*addr));
+	return v;
+}
+
+static inline void writeb(__u8 *addr, __u8 v)
+{
+	__asm__ __volatile__("movb %0, %1" : : "q"(v), "m"(*addr));
+}
+
+static inline void writew(__u16 *addr, __u16 v)
+{
+	__asm__ __volatile__("movw %0, %1" : : "r"(v), "m"(*addr));
+}
+
+static inline void writel(__u32 *addr, __u32 v)
+{
+	__asm__ __volatile__("movl %0, %1" : : "r"(v), "m"(*addr));
+}
+
+static inline void writeq(__u64 *addr, __u64 v)
+{
+	__asm__ __volatile__("movq %0, %1" : : "r"(v), "m"(*addr));
+}
 
 /* accessing devices via port space */
 static inline __u8 inb(__u16 port)

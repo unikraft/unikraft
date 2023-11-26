@@ -99,6 +99,8 @@
 #define X86_MSR_CSTAR		0xc0000083
 /* EFLAGS mask for syscall */
 #define X86_MSR_SYSCALL_MASK	0xc0000084
+/* page attribute table configuration */
+#define X86_MSR_PAT		0x277
 
 /* MSR EFER bits */
 #define X86_EFER_SCE		(1 << 0)

@@ -93,7 +93,7 @@ static inline void ukarch_ctx_init_bare(struct ukarch_ctx *ctx,
 	/* NOTE: We are not checking if SP is given or if SP is aligned because
 	 *       execution does not have to start with a function entry.
 	 */
-	(*ctx) = (struct ukarch_ctx){ .sp = sp, .ip = ip };
+	(*ctx) = (struct ukarch_ctx){ .ip = ip, .sp = sp };
 }
 
 /**
@@ -174,6 +174,14 @@ void ukarch_ctx_init_entry2(struct ukarch_ctx *ctx,
 	})
 
 /**
+ * Similar to `ukarch_rctx_stackpush()` but without alignment.
+ */
+#define ukarch_rctx_stackpush_packed(ctx, value)			\
+	({								\
+		(ctx)->sp = ukarch_rstack_push_packed((ctx)->sp, (value)); \
+	})
+
+/**
  * Switch the current logical CPU to context `load`. The current context
  * is stored to `store`. The standard register set is saved to `store`'s
  * stack and will be restored when the context will be loaded again.
@@ -206,6 +214,15 @@ __sz ukarch_ectx_size(void);
 __sz ukarch_ectx_align(void);
 
 /**
+ * Perform the minimum necessary to ensure the memory at `state`
+ * is appropriate for passing to `ukarch_ectx_save()`.
+ *
+ * @param state
+ *   Reference to extended context
+ */
+void ukarch_ectx_sanitize(struct ukarch_ectx *state);
+
+/**
  * Initializes an extended context so that it can be loaded
  * into a logical CPU with `ukarch_ectx_load()`.
  *
@@ -230,6 +247,17 @@ void ukarch_ectx_store(struct ukarch_ectx *state);
  *   Reference to extended context to restore
  */
 void ukarch_ectx_load(struct ukarch_ectx *state);
+
+#ifdef CONFIG_ARCH_X86_64
+/**
+ * Compare the given extended context with the state of the currently executing
+ * CPU. If the state is different, crash the kernel.
+ *
+ * @param state
+ *   Reference to extended context to compare to
+ */
+void ukarch_ectx_assert_equal(struct ukarch_ectx *state);
+#endif
 
 #endif /* !__ASSEMBLY__ */
 #endif /* __UKARCH_CTX_H__ */

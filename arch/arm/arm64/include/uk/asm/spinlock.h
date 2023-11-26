@@ -58,7 +58,7 @@ static inline void ukarch_spin_lock(struct __spinlock *lock)
 		"1:	wfe\n"			/* wait for event */
 		"2:	ldaxr	%w0, [%1]\n"	/* exclusive load lock value */
 		"	cbnz	%w0, 1b\n"	/* check if already locked */
-		"	stxr	%w0, %2, [%1]\n"/* try to lock it */
+		"	stxr	%w0, %w2, [%1]\n"/* try to lock it */
 		"	cbnz	%w0, 2b\n"	/* jump to l2 if we failed */
 		: "=&r" (r)
 		: "r" (&lock->lock), "r" (locked));
@@ -80,7 +80,7 @@ static inline int ukarch_spin_trylock(struct __spinlock *lock)
 	__asm__ __volatile__(
 		"	ldaxr	%w0, [%1]\n"	/* exclusive load lock value */
 		"	cbnz	%w0, 1f\n"	/* bail out if locked */
-		"	stxr	%w0, %2, [%1]\n"/* try to lock it */
+		"	stxr	%w0, %w2, [%1]\n"/* try to lock it */
 		"1:\n"
 		: "=&r" (r)
 		: "r" (&lock->lock), "r" (locked));

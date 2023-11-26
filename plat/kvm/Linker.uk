@@ -1,17 +1,45 @@
 ifeq (x86_64,$(CONFIG_UK_ARCH))
+ifeq ($(CONFIG_KVM_BOOT_PROTO_MULTIBOOT),y)
 KVM_LDFLAGS-y += -Wl,-m,elf_x86_64
 KVM_LDFLAGS-y += -Wl,--entry=_multiboot_entry
-KVM_STRIPFLAGS += --output-target elf32-i386
+ELF64_TO_32 = y
+else ifeq ($(CONFIG_KVM_BOOT_PROTO_LXBOOT),y)
+KVM_LDFLAGS-y += -Wl,--entry=_lxboot_entry
+else ifeq ($(CONFIG_KVM_BOOT_PROTO_EFI_STUB),y)
+KVM_LDFLAGS-y += -Wl,--entry=uk_efi_entry64
+KVM_LDFLAGS-y += -Wl,-m,elf_x86_64
+endif
 else ifeq (arm64,$(CONFIG_UK_ARCH))
+ifeq ($(CONFIG_KVM_BOOT_PROTO_LXBOOT),y)
+LINUX_HDR_ARM64 := y
+endif
+ifeq ($(CONFIG_KVM_BOOT_PROTO_EFI_STUB),y)
+KVM_LDFLAGS-y += -Wl,--entry=uk_efi_entry64
+KVM_LDFLAGS-y += -Wl,-m,aarch64elf
+KVM_LINK_LIBGCC_FLAG := -lgcc
+else
+KVM_LDFLAGS-y += -Wl,--entry=_libkvmplat_entry
 KVM_LDFLAGS-y += -Wl,-m,aarch64elf
 KVM_LINK_LIBGCC_FLAG := -lgcc
 endif
-KVM_BINFO_FLAGS := -a $(CONFIG_UK_ARCH)
+endif
 
 ##
 ## Link image
 ##
-KVM_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_kvm-$(CONFIG_UK_ARCH)
+ifeq ($(CONFIG_KVM_VMM_QEMU),y)
+KVM_VMM := qemu
+else ifeq ($(CONFIG_KVM_VMM_FIRECRACKER),y)
+KVM_VMM := fc
+else
+KVM_VMM := kvm
+endif
+
+ifneq ($(UK_IMAGE_NAME_OVERWRITE),)
+KVM_IMAGE := $(BUILD_DIR)/$(UK_IMAGE_NAME_OVERWRITE)
+else
+KVM_IMAGE := $(BUILD_DIR)/$(CONFIG_UK_NAME)_$(KVM_VMM)-$(CONFIG_UK_ARCH)
+endif
 KVM_DEBUG_IMAGE := $(KVM_IMAGE).dbg
 
 KVM_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-dT$(comma),\
@@ -19,20 +47,12 @@ KVM_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-dT$(comma),\
 KVM_LD_SCRIPT_FLAGS += $(addprefix -Wl$(comma)-T$(comma),\
 			$(KVM_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y))
 
-ifeq ($(CONFIG_UKPLAT_MEMRNAME),y)
-KVM_BINFO_FLAGS += -n
-endif
-
-define build_bootinfo =
-	$(call build_cmd,UKBI,,$(1).bootinfo,\
-		$(SCRIPTS_DIR)/mkbootinfo.py $(1) $(1).bootinfo $(KVM_BINFO_FLAGS) && \
-		$(OBJCOPY) $(1) --update-section .uk_bootinfo=$(1).bootinfo)
-endef
-
 $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
-		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y)
-	$(call build_cmd,LD,,$(KVM_IMAGE).o,\
-	       $(LD) -r $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
+		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) \
+		    $(KVM_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y) \
+		    $(UK_PLAT_KVM_DEF_LDS) $(UK_LDEPS)
+	$(call build_cmd,LD,,$@,\
+	       $(LD) \
 			$(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
 			$(KVM_OLIBS) $(KVM_OLIBS-y) \
 			$(UK_OLIBS) $(UK_OLIBS-y) \
@@ -41,13 +61,12 @@ $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 			$(UK_ALIBS) $(UK_ALIBS-y) \
 			$(KVM_LINK_LIBGCC_FLAG) \
 			-Wl$(comma)--end-group \
-			-o $(KVM_IMAGE).o)
-	$(call build_cmd,LD,,$@,\
-	       $(LD) $(LDFLAGS) $(LDFLAGS-y) \
-		     $(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
-		     $(KVM_LD_SCRIPT_FLAGS) \
-		     $(KVM_IMAGE).o -o $@)
-	$(call build_bootinfo,$@)
+			$(LDFLAGS) $(LDFLAGS-y) \
+			$(KVM_LD_SCRIPT_FLAGS) \
+			-o $@)
+ifeq ($(CONFIG_OPTIMIZE_PIE),y)
+	$(call build_uk_reloc,$@)
+endif
 
 $(KVM_IMAGE): $(KVM_IMAGE).dbg
 	$(call build_cmd,SCSTRIP,,$@,\
@@ -55,7 +74,19 @@ $(KVM_IMAGE): $(KVM_IMAGE).dbg
 			$(SECT_STRIP_FLAGS) $(SECT_STRIP_FLAGS-y) \
 			$(KVM_STRIPFLAGS) \
 			$< -o $@ 2>&1 | \
-			{ grep -v "Empty loadable segment detected" || true; })
+			{ $(GREP) -Ev \
+				"Empty loadable segment detected|section.*lma.*adjusted to.*" || \
+				true; })
+	$(call build_bootinfo,$@)
+ifeq ($(ELF64_TO_32),y)
+	$(call build_multiboot,$@)
+endif
+ifeq ($(CONFIG_KVM_BOOT_PROTO_EFI_STUB),y)
+	$(call build_efi,$@)
+endif
+ifeq ($(LINUX_HDR_ARM64),y)
+	$(call build_linux,$@,$<)
+endif
 
 $(KVM_IMAGE).sym: $(KVM_DEBUG_IMAGE)
 	$(call build_cmd,NM,,$@, $(NM) -n $< > $@)
@@ -72,5 +103,4 @@ UK_IMAGES-$(CONFIG_OPTIMIZE_COMPRESS) += $(KVM_IMAGE).gz
 endif
 
 # ...for cleaning:
-LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_IMAGE).o)
 LIBKVMPLAT_CLEAN += $(call build_clean,$(KVM_DEBUG_IMAGE).bootinfo)

@@ -15,3 +15,5 @@ LIBUKSCHED_THREAD_FLAGS-$(call gcc_version_ge,8,0) += -Wno-cast-function-type
 LIBUKSCHED_SRCS-y += $(LIBUKSCHED_BASE)/extra.ld
 
 UK_PROVIDED_SYSCALLS-$(CONFIG_LIBUKSCHED) += sched_yield-0
+UK_PROVIDED_SYSCALLS-$(CONFIG_LIBUKSCHED) += sched_getaffinity-3
+UK_PROVIDED_SYSCALLS-$(CONFIG_LIBUKSCHED) += sched_setaffinity-3

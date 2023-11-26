@@ -34,19 +34,21 @@
 
 #include <errno.h>
 #include <string.h>
+#include <stddef.h>
 #include <uk/alloc_impl.h>
 #include <uk/config.h>
 #include <uk/essentials.h>
 #include <uk/assert.h>
 #include <uk/arch/limits.h>
 #include <uk/arch/lcpu.h>
+#include <uk/arch/paging.h>
 
 #if CONFIG_HAVE_MEMTAG
 #include <uk/arch/memtag.h>
 #endif
 
 #define size_to_num_pages(size) \
-	(ALIGN_UP((unsigned long)(size), __PAGE_SIZE) / __PAGE_SIZE)
+	(PAGE_ALIGN_UP((unsigned long)(size)) / __PAGE_SIZE)
 #define page_off(x) ((unsigned long)(x) & (__PAGE_SIZE - 1))
 
 struct uk_alloc *_uk_alloc_head;
@@ -89,6 +91,11 @@ struct metadata_ifpages {
 #define METADATA_IFPAGES_SIZE_POW2 32
 UK_CTASSERT(!(sizeof(struct metadata_ifpages) > METADATA_IFPAGES_SIZE_POW2));
 
+/* The METADATA_IFPAGES_SIZE_POW2 size must not break any alignments */
+UK_CTASSERT(
+	METADATA_IFPAGES_SIZE_POW2 % __alignof__(max_align_t) == 0
+);
+
 static struct metadata_ifpages *uk_get_metadata(const void *ptr)
 {
 	__uptr metadata;
@@ -100,9 +107,9 @@ static struct metadata_ifpages *uk_get_metadata(const void *ptr)
 	 * we need space to store metadata.
 	 */
 	UK_ASSERT((__uptr) ptr >= __PAGE_SIZE +
-		  sizeof(struct metadata_ifpages));
+		  METADATA_IFPAGES_SIZE_POW2);
 
-	metadata = ALIGN_DOWN((__uptr) ptr, (__uptr) __PAGE_SIZE);
+	metadata = PAGE_ALIGN_DOWN((__uptr)ptr);
 	if (metadata == (__uptr) ptr) {
 		/* special case: the memory was page-aligned.
 		 * In this case the metadata lies at the start of the
@@ -142,7 +149,7 @@ void *uk_malloc_ifpages(struct uk_alloc *a, __sz size)
 #ifdef CONFIG_HAVE_MEMTAG
 	size = MEMTAG_ALIGN(size);
 #endif /* CONFIG_HAVE_MEMTAG */
-	__sz realsize = sizeof(*metadata) + size;
+	__sz realsize = METADATA_IFPAGES_SIZE_POW2 + size;
 
 	UK_ASSERT(a);
 	/* check for invalid size and overflow */
@@ -161,9 +168,12 @@ void *uk_malloc_ifpages(struct uk_alloc *a, __sz size)
 	metadata->base = (void *) intptr;
 
 #ifdef CONFIG_HAVE_MEMTAG
-	return ukarch_memtag_region((void *)(intptr + sizeof(*metadata)), size);
+	return ukarch_memtag_region(
+		(void *)(intptr + METADATA_IFPAGES_SIZE_POW2),
+		size
+	);
 #else
-	return (void *)(intptr + sizeof(*metadata));
+	return (void *)(intptr + METADATA_IFPAGES_SIZE_POW2);
 #endif /* CONFIG_HAVE_MEMTAG */
 }
 
@@ -203,7 +213,7 @@ void *uk_realloc_ifpages(struct uk_alloc *a, void *ptr, __sz size)
 	if (!ptr)
 		return uk_malloc_ifpages(a, size);
 
-	if (ptr && !size) {
+	if (!size) {
 		uk_free_ifpages(a, ptr);
 		return __NULL;
 	}
@@ -414,7 +424,7 @@ void *uk_realloc_ifmalloc(struct uk_alloc *a, void *ptr, __sz size)
 	if (!ptr)
 		return uk_malloc_ifmalloc(a, size);
 
-	if (ptr && !size) {
+	if (!size) {
 		uk_free_ifmalloc(a, ptr);
 		return __NULL;
 	}
@@ -520,7 +530,7 @@ void *uk_realloc_compat(struct uk_alloc *a, void *ptr, __sz size)
 	if (!ptr)
 		return uk_malloc(a, size);
 
-	if (ptr && !size) {
+	if (!size) {
 		uk_free(a, ptr);
 		return __NULL;
 	}

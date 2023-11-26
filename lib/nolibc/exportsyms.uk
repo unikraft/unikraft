@@ -22,8 +22,9 @@ free
 
 # sscanf
 vsscanf
-scanf
 sscanf
+scanf
+fscanf
 
 # stdio
 stdin
@@ -40,17 +41,24 @@ printf
 fflush
 fputc
 putchar
+fputs
+puts
 
 # stdlib
+abort
+exit
 strtol
 strtoul
 strtoll
 strtoull
 atoi
+atol
 qsort
 
 # string
 memcpy
+bcopy
+bzero
 bcmp
 memset
 memchr
@@ -60,6 +68,8 @@ memcmp
 strnlen
 strlen
 strncpy
+strcat
+strcasecmp
 strcpy
 strchr
 strrchr
@@ -70,6 +80,7 @@ strcspn
 strspn
 strtok
 strtok_r
+strsep
 strndup
 strdup
 strlcpy
@@ -89,8 +100,23 @@ _nolibc_ctype
 
 # errno
 errno
+__errno_location
 
 # network
 htons
-nthos
+ntohs
+htonl
+ntohl
 h_errno
+
+# syslog
+openlog
+closelog
+syslog
+vsyslog
+
+# random
+random
+srandom
+initstate
+setstate

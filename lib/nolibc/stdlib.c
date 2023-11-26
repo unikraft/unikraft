@@ -61,6 +61,60 @@
 
 #define __DECONST(type, var) ((type)(uintptr_t)(const void *)(var))
 
+
+#if CONFIG_LIBUKALLOC
+/* Allocate size bytes of memory. Returns pointer to start of allocated memory,
+ * or NULL on failure.
+ */
+void *malloc(size_t size)
+{
+	return uk_malloc(uk_alloc_get_default(), size);
+}
+
+/* Release memory previously allocated by malloc(). ptr must be a pointer
+ * previously returned by malloc(), otherwise undefined behavior will occur.
+ */
+void free(void *ptr)
+{
+	return uk_free(uk_alloc_get_default(), ptr);
+}
+
+/* Allocate memory for an array of nmemb elements of size bytes. Returns
+ * pointer to start of allocated memory, or NULL on failure.
+ */
+void *calloc(size_t nmemb, size_t size)
+{
+	return uk_calloc(uk_alloc_get_default(), nmemb, size);
+}
+
+/* Change the size of the memory block pointed to by ptr to size bytes.
+ * Returns a pointer to the resized memory area. If the area pointed to was
+ * moved, a free(ptr) is done. If the call fails, the memory remains unchanged
+ */
+void *realloc(void *ptr, size_t size)
+{
+	return uk_realloc(uk_alloc_get_default(), ptr, size);
+}
+
+/* Allocate size bytes of memory, aligned to align bytes, and return the
+ * pointer to that area in *memptr. Returns 0 on success, and a non-zero error
+ * value on failure.
+ */
+int posix_memalign(void **memptr, size_t align, size_t size)
+{
+	return uk_posix_memalign(uk_alloc_get_default(),
+				 memptr, align, size);
+}
+
+/* Allocate size bytes of memory, aligned to align bytes. Returns pointer to
+ * start of allocated memory, or NULL on failure.
+ */
+void *memalign(size_t align, size_t size)
+{
+	return uk_memalign(uk_alloc_get_default(), align, size);
+}
+#endif /* CONFIG_LIBUKALLOC */
+
 /*
  * Convert a string to an unsigned long integer.
  *
@@ -415,8 +469,27 @@ int atoi(const char *s)
 	return (int) atoll;
 }
 
+long atol(const char *s)
+{
+	long long atoll;
+
+	atoll = strtoll(s, NULL, 10);
+	atoll = (atoll > __L_MAX) ? __L_MAX : atoll;
+	atoll = (atoll < __L_MIN) ? __L_MIN : atoll;
+
+	return (long) atoll;
+}
+
 void abort(void)
 {
 	uk_pr_crit("Abnormal termination!\n");
 	ukplat_crash();
 }
+
+#ifndef CONFIG_LIBPOSIX_PROCESS
+void exit(int status)
+{
+	uk_pr_info("exit called with status %d, halting system\n", status);
+	ukplat_terminate(status);
+}
+#endif /* !CONFIG_LIBPOSIX_PROCESS */

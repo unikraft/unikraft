@@ -3,6 +3,7 @@
  * Authors: Robert Hrusecky <roberth@cs.utexas.edu>
  *          Omar Jamil <omarj2898@gmail.com>
  *          Sachin Beldona <sachinbeldona@utexas.edu>
+ *          Andrei Tatar <andrei@unikraft.io>
  *
  * Copyright (c) 2017, The University of Texas at Austin. All rights reserved.
  *
@@ -32,12 +33,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 #include <stdint.h>
 #include <inttypes.h>
-#include <errno.h>
+#include <limits.h>
 
 #include <uk/assert.h>
 #include <uk/print.h>
@@ -47,6 +46,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
+#include <utime.h>
 
 /*
  * Currently only supports BSD new-style cpio archive format.
@@ -56,12 +56,14 @@
 #define FILE_TYPE_MASK    0170000
 #define DIRECTORY_BITS    040000
 #define FILE_BITS         0100000
+#define SYMLINK_BITS      0120000
 
 #define ALIGN_4(ptr)      ((void *)ALIGN_UP((uintptr_t)(ptr), 4))
 
 #define IS_FILE_OF_TYPE(mode, bits) (((mode) & (FILE_TYPE_MASK)) == (bits))
 #define IS_FILE(mode) IS_FILE_OF_TYPE((mode), (FILE_BITS))
 #define IS_DIR(mode) IS_FILE_OF_TYPE((mode), (DIRECTORY_BITS))
+#define IS_SYMLINK(mode) IS_FILE_OF_TYPE((mode), (SYMLINK_BITS))
 
 #define S8HEX_TO_U32(buf) ((uint32_t) snhex_to_int((buf), 8))
 #define GET_MODE(hdr)     ((mode_t) S8HEX_TO_U32((hdr)->mode))
@@ -135,14 +137,13 @@ snhex_to_int(const char *buf, size_t count)
  * @return
  *  Returns the absolute path with prefix.
  */
-static char *
-absolute_path(const char *prefix, const char *path)
+static int
+absolute_path(char *abs_path, const char *prefix, const char *path)
 {
 	int add_slash;
 	size_t prefix_len;
 	size_t path_len;
 	size_t abs_path_len;
-	char *abs_path;
 
 	UK_ASSERT(prefix);
 	UK_ASSERT(path);
@@ -153,10 +154,8 @@ absolute_path(const char *prefix, const char *path)
 	add_slash = prefix[prefix_len - 1] == '/' ? 0 : 1;
 	abs_path_len = prefix_len + add_slash + path_len + 1;
 
-	abs_path = malloc(abs_path_len);
-
-	if (abs_path == NULL)
-		return NULL;
+	if (abs_path_len > PATH_MAX)
+		return -1;
 
 	memcpy(abs_path, prefix, prefix_len);
 	if (add_slash)
@@ -164,8 +163,17 @@ absolute_path(const char *prefix, const char *path)
 	memcpy(&abs_path[prefix_len + add_slash], path, path_len);
 
 	abs_path[abs_path_len - 1] = '\0';
-	return abs_path;
+	return 0;
 }
+
+/* Raw filesystem syscalls; not provided by headers */
+int uk_syscall_r_open(const char *, int, mode_t);
+int uk_syscall_r_close(int);
+ssize_t uk_syscall_r_write(int, const void *, size_t);
+int uk_syscall_r_chmod(const char *, mode_t);
+int uk_syscall_r_utime(const char *, const struct utimbuf *);
+int uk_syscall_r_mkdir(const char *, mode_t);
+int uk_syscall_r_symlink(const char *, const char *);
 
 /**
  * Reads the section to the dest from a given a CPIO header.
@@ -185,15 +193,18 @@ read_section(struct cpio_header **header_ptr,
 {
 	enum ukcpio_error error = UKCPIO_SUCCESS;
 	int fd;
+	int err;
 	struct cpio_header *header;
-	char *path_from_root;
+	char path_from_root[PATH_MAX];
 	mode_t header_mode;
 	uint32_t header_filesize;
 	uint32_t header_namesize;
+	uint32_t header_mtime;
 	char *data_location;
 	uint32_t bytes_to_write;
 	int bytes_written;
 	struct cpio_header *next_header;
+	struct utimbuf times;
 
 	if (strcmp(filename(*header_ptr), "TRAILER!!!") == 0) {
 		*header_ptr = NULL;
@@ -210,18 +221,18 @@ read_section(struct cpio_header **header_ptr,
 	UK_ASSERT(dest);
 
 	header = *header_ptr;
-	path_from_root = absolute_path(dest, filename(header));
 
-	if (path_from_root == NULL) {
-		uk_pr_err("Out of memory\n");
+	if (absolute_path(path_from_root, dest, filename(header))) {
+		uk_pr_err("Resulting path too long: %s\n", filename(header));
 		*header_ptr = NULL;
-		error = -UKCPIO_NOMEM;
+		error = -UKCPIO_MALFORMED_INPUT;
 		goto out;
 	}
 
 	header_mode = GET_MODE(header);
 	header_filesize = S8HEX_TO_U32(header->filesize);
 	header_namesize = S8HEX_TO_U32(header->namesize);
+	header_mtime = S8HEX_TO_U32(header->mtime);
 
 	if ((uintptr_t)header + sizeof(struct cpio_header) > last) {
 		*header_ptr = NULL;
@@ -232,7 +243,7 @@ read_section(struct cpio_header **header_ptr,
 	if (IS_FILE(header_mode)) {
 		uk_pr_info("Extracting %s (%"PRIu32" bytes)\n",
 			   path_from_root, header_filesize);
-		fd = open(path_from_root, O_CREAT | O_RDWR);
+		fd = uk_syscall_r_open(path_from_root, O_CREAT|O_RDWR, 0);
 
 		if (fd < 0) {
 			uk_pr_err("%s: Failed to create file\n",
@@ -258,12 +269,14 @@ read_section(struct cpio_header **header_ptr,
 		bytes_written = 0;
 
 		while (bytes_to_write > 0) {
-			bytes_written = write(fd, data_location + bytes_written,
-					      bytes_to_write);
+			bytes_written = uk_syscall_r_write(fd,
+				data_location + bytes_written,
+				bytes_to_write);
 			if (bytes_written < 0) {
 				uk_pr_err("%s: Failed to load content: %s (%d)\n",
-					  path_from_root, strerror(errno),
-					  errno);
+					  path_from_root,
+					  strerror(-bytes_written),
+					  -bytes_written);
 				*header_ptr = NULL;
 				error = -UKCPIO_FILE_WRITE_FAILED;
 				goto out;
@@ -271,27 +284,66 @@ read_section(struct cpio_header **header_ptr,
 			bytes_to_write -= bytes_written;
 		}
 
-		if (chmod(path_from_root, header_mode & 0777) < 0)
+		if ((err = uk_syscall_r_chmod(path_from_root,
+					      header_mode & 0777)))
 			uk_pr_warn("%s: Failed to chmod: %s (%d)\n",
-				   path_from_root, strerror(errno), errno);
+				   path_from_root, strerror(-err), -err);
 
-		if (close(fd) < 0) {
+		times.actime = header_mtime;
+		times.modtime = header_mtime;
+		if ((err = uk_syscall_r_utime(path_from_root, &times)))
+			uk_pr_warn("%s: Failed to set modification time: %s (%d)",
+			           path_from_root, strerror(-err), -err);
+
+		if ((err = uk_syscall_r_close(fd))) {
 			uk_pr_err("%s: Failed to close file: %s (%d)\n",
-				  path_from_root, strerror(errno), errno);
+				  path_from_root, strerror(-err), -err);
 			*header_ptr = NULL;
 			error = -UKCPIO_FILE_CLOSE_FAILED;
 			goto out;
 		}
 	} else if (IS_DIR(header_mode)) {
 		uk_pr_info("Creating directory %s\n", path_from_root);
-		if (strcmp(".", filename(header)) != 0
-			&& mkdir(path_from_root, header_mode & 0777) < 0) {
+		if (strcmp(".", filename(header)) != 0 &&
+		    (err = uk_syscall_r_mkdir(path_from_root,
+		                              header_mode & 0777)))
+		{
 			uk_pr_err("%s: Failed to create directory: %s (%d)\n",
-				   path_from_root, strerror(errno), errno);
+				  path_from_root, strerror(-err), -err);
 			*header_ptr = NULL;
 			error = -UKCPIO_MKDIR_FAILED;
 			goto out;
 		}
+	} else if (IS_SYMLINK(header_mode)) {
+		uk_pr_info("Creating symlink %s\n", path_from_root);
+
+		data_location = (char *)ALIGN_4(
+				(char *)(header) + sizeof(struct cpio_header)
+				+ header_namesize);
+
+		if ((uintptr_t)data_location + header_filesize > last) {
+			uk_pr_err("%s: File exceeds archive bounds\n",
+				  path_from_root);
+			*header_ptr = NULL;
+			error = -UKCPIO_MALFORMED_INPUT;
+			goto out;
+		}
+
+		char target[header_filesize + 1];
+		memcpy(target, data_location, header_filesize);
+		target[header_filesize] = 0;
+
+		uk_pr_info("%s: Target is %s\n", path_from_root, target);
+		if ((err = uk_syscall_r_symlink(target, path_from_root))) {
+			uk_pr_err("%s: Failed to create symlink: %s (%d)\n",
+				  path_from_root, strerror(-err), -err);
+			*header_ptr = NULL;
+			error = -UKCPIO_SYMLINK_FAILED;
+			goto out;
+		}
+	} else {
+		uk_pr_warn("File %s unknown mode %o\n",
+			   path_from_root, header_mode);
 	}
 
 	next_header = (struct cpio_header *)ALIGN_4(
@@ -305,7 +357,6 @@ read_section(struct cpio_header **header_ptr,
 	*header_ptr = next_header;
 
 out:
-	free(path_from_root);
 	return error;
 }
 

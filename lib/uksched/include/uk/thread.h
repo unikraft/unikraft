@@ -34,6 +34,7 @@
 #include <uk/arch/lcpu.h>
 #include <uk/arch/time.h>
 #include <uk/arch/ctx.h>
+#include <uk/plat/lcpu.h>
 #include <uk/plat/tls.h>
 #include <uk/wait_types.h>
 #include <uk/list.h>
@@ -77,6 +78,7 @@ struct uk_thread {
 	uk_thread_dtor_t dtor;		/**< User provided destructor */
 	void *priv;			/**< Private field, free for use */
 
+	__nsec exec_time;		/**< Time the thread was scheduled */
 	const char *name;		/**< Reference to thread name */
 	UK_TAILQ_ENTRY(struct uk_thread) thread_list;
 };
@@ -89,12 +91,12 @@ UK_TAILQ_HEAD(uk_thread_list, struct uk_thread);
 	uk_sched_thread_exit()
 
 /* managed by sched.c */
-extern struct uk_thread *__uk_sched_thread_current;
+extern UKPLAT_PER_LCPU_DEFINE(struct uk_thread *, __uk_sched_thread_current);
 
 static inline
 struct uk_thread *uk_thread_current(void)
 {
-	return __uk_sched_thread_current;
+	return ukplat_per_lcpu_current(__uk_sched_thread_current);
 }
 
 /*
@@ -112,7 +114,7 @@ struct uk_thread *uk_thread_current(void)
  *           |     v    v       |
  *           |    BLOCKED [--]  |
  *           |  /  |            |
- *            \|   | block()    | wake()
+ *            \|   | wake()     | block()
  *             \   |            |
  *             |\  |            |
  *             | v v            |
@@ -593,6 +595,7 @@ struct uk_thread *uk_thread_create_fn2(struct uk_alloc *a,
 				       uk_thread_dtor_t dtor);
 
 void uk_thread_release(struct uk_thread *t);
+void uk_thread_block_until(struct uk_thread *thread, __snsec until);
 void uk_thread_block_timeout(struct uk_thread *thread, __nsec nsec);
 void uk_thread_block(struct uk_thread *thread);
 void uk_thread_wake(struct uk_thread *thread);

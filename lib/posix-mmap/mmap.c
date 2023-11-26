@@ -85,7 +85,8 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 	}
 
 	if (flags & MAP_ANONYMOUS) {
-		if ((flags & MAP_SHARED) || (flags & MAP_SHARED_VALIDATE)) {
+		if ((flags & MAP_SHARED) ||
+		    (flags & MAP_SHARED_VALIDATE) == MAP_SHARED_VALIDATE) {
 			/* MAP_SHARED(_VALIDATE): Note, we ignore it for
 			 * anonymous memory since we only have a single
 			 * process. There is no one to share the mapping with.
@@ -122,7 +123,8 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 		vops  = &uk_vma_anon_ops;
 	} else {
 #ifdef CONFIG_LIBVFSCORE
-		if ((flags & MAP_SHARED) || (flags & MAP_SHARED_VALIDATE))
+		if ((flags & MAP_SHARED) ||
+		    (flags & MAP_SHARED_VALIDATE) == MAP_SHARED_VALIDATE)
 			vflags |= UK_VMA_FILE_SHARED;
 		else if (unlikely(!(flags & MAP_PRIVATE)))
 			return -EINVAL;
@@ -184,6 +186,7 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 		vaddr = __VADDR_ANY;
 	} while (1);
 
+	*addr = (void *)vaddr;
 	return rc;
 }
 
@@ -194,7 +197,7 @@ UK_SYSCALL_DEFINE(void *, mmap, void *, addr, size_t, len, int, prot,
 
 	rc = do_mmap(&addr, len, prot, flags, fd, offset);
 	if (unlikely(rc)) {
-		errno = rc;
+		errno = -rc;
 		return MAP_FAILED;
 	}
 
@@ -272,5 +275,19 @@ UK_SYSCALL_R_DEFINE(int, madvise, void *, addr, size_t, len, int, advice)
 		return rc;
 	}
 
+	return 0;
+}
+
+UK_SYSCALL_R_DEFINE(int, msync, void*, addr, size_t, length, int, flags)
+{
+	/* Since writing mmap memory back to file is not supported,
+	 * this doesn't make sense.
+	 */
+	return 0;
+}
+
+UK_SYSCALL_R_DEFINE(int, mlock, const void*, addr, size_t, len)
+{
+	/* Since swap memory is not supported, this doesn't make sense */
 	return 0;
 }

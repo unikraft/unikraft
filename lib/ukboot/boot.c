@@ -73,7 +73,6 @@
 #include <uk/plat/bootstrap.h>
 #include <uk/plat/memory.h>
 #include <uk/plat/lcpu.h>
-#include <uk/plat/irq.h>
 #include <uk/plat/time.h>
 #include <uk/essentials.h>
 #include <uk/print.h>
@@ -86,6 +85,7 @@
 #ifdef CONFIG_LIBUKSP
 #include <uk/sp.h>
 #endif
+#include <uk/arch/paging.h>
 #include <uk/arch/tls.h>
 #include <uk/plat/tls.h>
 #include "banner.h"
@@ -95,6 +95,10 @@
 #include <uk/store.h>
 #endif /* CONFIG_LIBPROCFS_CMDLINE */
 
+
+#if CONFIG_LIBUKINTCTLR
+#include <uk/intctlr.h>
+#endif /* CONFIG_LIBUKINTCTLR */
 
 int main(int argc, char *argv[]) __weak;
 
@@ -192,6 +196,11 @@ static struct uk_alloc *heap_init()
 	 * add every subsequent region to it.
 	 */
 	ukplat_memregion_foreach(&md, UKPLAT_MEMRT_FREE, 0, 0) {
+		UK_ASSERT(md->vbase == md->pbase);
+		UK_ASSERT(!(md->pbase & ~PAGE_MASK));
+		UK_ASSERT(md->len);
+		UK_ASSERT(!(md->len & ~PAGE_MASK));
+
 		uk_pr_debug("Trying %p-%p 0x%02x %s\n",
 			    (void *)md->vbase, (void *)(md->vbase + md->len),
 			    md->flags,
@@ -230,10 +239,16 @@ void ukplat_entry_argp(char *arg0, char *argb, __sz argb_len)
 	ukplat_entry(argc, argv);
 }
 
+#if CONFIG_LIBPOSIX_ENVIRON
+extern char **environ;
+#endif /* CONFIG_LIBPOSIX_ENVIRON */
+
 /* defined in <uk/plat.h> */
 void ukplat_entry(int argc, char *argv[])
 {
-	int kern_args = 0;
+#if CONFIG_LIBPOSIX_ENVIRON
+	char **envp;
+#endif /* CONFIG_LIBPOSIX_ENVIRON */
 	int rc = 0;
 #if CONFIG_LIBUKALLOC
 	struct uk_alloc *a = NULL;
@@ -257,12 +272,30 @@ void ukplat_entry(int argc, char *argv[])
 	}
 
 #ifdef CONFIG_LIBUKLIBPARAM
-	rc = (argc > 1) ? uk_libparam_parse(argv[0], argc - 1, &argv[1]) : 0;
-	if (unlikely(rc < 0))
-		uk_pr_crit("Failed to parse the kernel argument\n");
-	else {
-		kern_args = rc;
-		uk_pr_info("Found %d library args\n", kern_args);
+	/*
+	 * First, we scan if we can find the stop sequence in the kernel
+	 * cmdline. If not, we assume that there are no uklibparam arguments in
+	 * the command line.
+	 * NOTE: argv[0] contains the kernel/program name that we need to
+	 *       hide from the parser.
+	 */
+	rc = uk_libparam_parse(argc - 1, &argv[1], UK_LIBPARAM_F_SCAN);
+	if (rc > 0 && rc < (argc - 1)) {
+		/* In this case, we did successfully scan for uklibparam
+		 * arguments and stop sequence is at rc < (argc - 1).
+		 */
+		/* Run a second pass for parsing */
+		rc = uk_libparam_parse(argc - 1, &argv[1], UK_LIBPARAM_F_USAGE);
+		if (rc < 0) /* go down on errors (including USAGE) */
+			ukplat_halt();
+
+		/* Drop uklibparam parameters from argv but keep argv[0].
+		 * We are going to replace the stop sequence with argv[0].
+		 */
+		rc += 1; /* include argv[0]; we use rc as idx to stop seq */
+		argc -= rc;
+		argv[rc] = argv[0];
+		argv = &argv[rc];
 	}
 #endif /* CONFIG_LIBUKLIBPARAM */
 
@@ -291,12 +324,12 @@ void ukplat_entry(int argc, char *argv[])
 	ukplat_tlsp_set(ukarch_tls_tlsp(tls));
 #endif /* !CONFIG_LIBUKBOOT_NOALLOC */
 
-#if CONFIG_LIBUKALLOC
-	uk_pr_info("Initialize IRQ subsystem...\n");
-	rc = ukplat_irq_init(a);
-	if (unlikely(rc != 0))
-		UK_CRASH("Could not initialize the platform IRQ subsystem\n");
-#endif
+#if CONFIG_LIBUKINTCTLR
+	uk_pr_info("Initialize the IRQ subsystem...\n");
+	rc = uk_intctlr_init(a);
+	if (unlikely(rc))
+		UK_CRASH("Could not initialize the IRQ subsystem\n");
+#endif /* CONFIG_LIBUKINTCTLR */
 
 	/* On most platforms the timer depend on an initialized IRQ subsystem */
 	uk_pr_info("Initialize platform time...\n");
@@ -311,9 +344,6 @@ void ukplat_entry(int argc, char *argv[])
 		UK_CRASH("Failed to initialize scheduling\n");
 	uk_sched_start(s);
 #endif /* !CONFIG_LIBUKBOOT_NOSCHED */
-
-	argc -= kern_args;
-	argv = &argv[kern_args];
 
 	/* Enable interrupts before starting the application */
 	ukplat_lcpu_enable_irq();
@@ -371,6 +401,17 @@ void ukplat_entry(int argc, char *argv[])
 		uk_pr_debug("Call constructor: %p()...\n", *ctorfn);
 		(*ctorfn)();
 	}
+
+#if CONFIG_LIBPOSIX_ENVIRON
+	envp = environ;
+	if (envp) {
+		uk_pr_info("Environment variables:\n");
+		while (*envp) {
+			uk_pr_info("\t%s\n", *envp);
+			envp++;
+		}
+	}
+#endif /* CONFIG_LIBPOSIX_ENVIRON */
 
 	uk_pr_info("Calling main(%d, [", argc);
 	for (i = 0; i < argc; ++i) {

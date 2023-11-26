@@ -28,7 +28,7 @@ if LIBSYSCALL_SHIM
 	config LIBSYSCALL_SHIM_HANDLER
 		bool "Binary system call handler (Linux ABI)"
 		default n
-		depends on ARCH_X86_64
+		depends on (ARCH_X86_64 || ARCH_ARM_64)
 		select HAVE_SYSCALL
 		help
 			Enables a system call handler for binary system call
@@ -75,6 +75,10 @@ if LIBSYSCALL_SHIM
 			bool "Use ANSI-colored syntax highlighting"
 			default n
 			default y if LIBUKDEBUG_ANSI_COLOR
+
+			config LIBSYSCALL_SHIM_STRACE_PRINT_TYPE
+			bool "Print type name"
+			default y
 		endif
 
 		config LIBSYSCALL_SHIM_DEBUG

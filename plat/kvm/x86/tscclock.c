@@ -292,6 +292,8 @@ int tscclock_init(void)
 	 * Initialise i8254 timer channel 0 to mode 4 (one shot).
 	 */
 	outb(TIMER_MODE, TIMER_SEL0 | TIMER_ONESHOT | TIMER_16BIT);
+	outb(TIMER_CNTR, 0);
+	outb(TIMER_CNTR, 0);
 
 	return 0;
 }

@@ -20,6 +20,15 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 #
 
+HOSTOSENV := $(shell uname)
+
+# Set initial and basic tools that we need to operate
+ifeq ($(HOSTOSENV),Darwin)
+SED := gsed
+else
+SED := sed
+endif
+
 # Trick for always running with a fixed umask
 UMASK = 0022
 ifneq ($(shell umask),$(UMASK))
@@ -49,7 +58,11 @@ RUNNING_MAKE_VERSION := $(MAKE_VERSION)
 # Check for minimal make version (note: this check will break at make 10.x)
 MIN_MAKE_VERSION = 4.1
 ifneq ($(firstword $(sort $(RUNNING_MAKE_VERSION) $(MIN_MAKE_VERSION))),$(MIN_MAKE_VERSION))
+ifneq ($(HOSTOSENV),Darwin)
 $(error You have make '$(RUNNING_MAKE_VERSION)' installed. GNU make >= $(MIN_MAKE_VERSION) is required)
+else
+$(error We need GNU make >= $(MIN_MAKE_VERSION). It can be installed with 'brew install make'. Retry with: 'gmake $(MAKECMDGOALS)')
+endif
 endif
 
 # Strip quotes and then whitespaces
@@ -70,14 +83,15 @@ export CDPATH :=
 
 # To put more focus on warnings, be less verbose as default
 # Use 'make V=1' to see the full commands
+# Set KBUILD_VERBOSE and Q to quiet mode
+KBUILD_VERBOSE := 0
+Q := @
+
 ifeq ("$(origin V)", "command line")
   BUILD_VERBOSE = $(V)
 endif
 ifndef BUILD_VERBOSE
   BUILD_VERBOSE = 0
-  # Set KBUILD_VERBOSE and Q to quiet mode
-  KBUILD_VERBOSE := 0
-  Q := @
 endif
 
 ifneq ($(BUILD_VERBOSE),0)
@@ -155,18 +169,17 @@ override C := $(realpath $(dir $(C)))/$(notdir $(C))
 endif
 UK_CONFIG  := $(C)
 CONFIG_DIR := $(dir $(C))
+# As UK_CONFIG could be different files, always assume it has a newer version
+.PHONY: $(UK_CONFIG)
 
 # EPLAT_DIR (list of external platform libraries)
 # Retrieved from P variable from the command line (paths separated by colon)
 ifeq ("$(origin P)", "command line")
-$(foreach E,$(subst :, ,$(P)), \
-$(if $(filter /%,$(E)),,$(error Path to external platform "$(E)" (P) is not absolute));\
-$(if $(wildcard $(E)), \
-	$(eval EPLAT_DIR += $(E)) \
-, $(if $(wildcard $(CONFIG_UK_BASE)/$(E)),\
-	$(eval EPLAT_DIR += $(CONFIG_UK_BASE)/$(E)), \
-	$(error Cannot find platform library: $(E)) \
-   ) \
+$(foreach ITR,$(subst :, ,$(P)), \
+$(if $(filter /%,$(ITR)),,$(error Path to external platform "$(ITR)" (P) is not absolute));\
+$(if $(wildcard $(ITR)), \
+$(eval EPLAT_DIR += $(realpath $(patsubst %/,%,$(patsubst %.,%,$(ITR))))), \
+$(error Cannot find platform library: $(ITR)) \
 ) \
 )
 endif
@@ -176,24 +189,38 @@ EPLAT_DIR := $(realpath $(patsubst %/,%,$(patsubst %.,%,$(EPLAT_DIR))))
 # Retrieved from L variable from the command line (paths separated by colon)
 ifeq ("$(origin L)", "command line")
 # library path exists?
-$(foreach E,$(subst :, ,$(L)), \
-$(if $(filter /%,$(E)),,$(error Path to external library "$(E)" (L) is not absolute));\
-$(if $(wildcard $(E)), \
-	$(eval ELIB_DIR += $(E)) \
-, $(if $(wildcard $(CONFIG_UK_BASE)/$(E)),\
-	$(eval ELIB_DIR += $(CONFIG_UK_BASE)/$(E)), \
-	$(error Cannot find library: $(E)) \
-   )\
+$(foreach ITR,$(subst :, ,$(L)), \
+$(if $(filter /%,$(ITR)),,$(error Path to external library "$(ITR)" (L) is not absolute));\
+$(if $(wildcard $(ITR)), \
+$(eval ELIB_DIR += $(realpath $(patsubst %/,%,$(patsubst %.,%,$(ITR))))), \
+$(error Cannot find library: $(ITR)) \
 ) \
 )
 endif
 ELIB_DIR := $(realpath $(patsubst %/,%,$(patsubst %.,%,$(ELIB_DIR))))
+
+# IMPORT_EXCLUDEDIRS (list of (library) paths to exclude)
+# Retrieved from E variable from the command line
+# (paths are separated by colon)
+KCONFIG_EXCLUDEDIRS:=
+IMPORT_EXCLUDEDIRS:=
+ifeq ("$(origin E)", "command line")
+$(foreach ITR,$(subst :, ,$(E)), \
+$(if $(filter /%,$(ITR)),,$(error Path to library to exclude "$(ITR)" (E) is not absolute));\
+$(if $(wildcard $(ITR)), \
+$(eval IMPORT_EXCLUDEDIRS += $(realpath $(patsubst %/,%,$(patsubst %.,%,$(ITR))))) \
+$(eval KCONFIG_EXCLUDEDIRS = $(KCONFIG_EXCLUDEDIRS)$(colon)$(realpath $(patsubst %/,%,$(patsubst %.,%,$(ITR))))), \
+$(error Cannot find library for exclusion: $(ITR)) \
+) \
+)
+endif
 
 $(call verbose_info,* Unikraft base:      $(CONFIG_UK_BASE))
 $(call verbose_info,* Configuration:      $(UK_CONFIG))
 $(call verbose_info,* Application base:   $(CONFIG_UK_APP))
 $(call verbose_info,* External platforms: [ $(EPLAT_DIR) ])
 $(call verbose_info,* External libraries: [ $(ELIB_DIR) ])
+$(call verbose_info,* Import excludes:    [ $(IMPORT_EXCLUDEDIRS) ])
 $(call verbose_info,* Build output:       $(BUILD_DIR))
 
 build_dir_make  := 0
@@ -207,26 +234,28 @@ endif
 
 CONFIG_UK_PLAT        := $(CONFIG_UK_BASE)/plat/
 CONFIG_UK_LIB         := $(CONFIG_UK_BASE)/lib/
+CONFIG_UK_DRIV        := $(CONFIG_UK_BASE)/drivers/
 CONFIG_CONFIG_IN      := $(CONFIG_UK_BASE)/Config.uk
 CONFIG                := $(CONFIG_UK_BASE)/support/kconfig
 CONFIGLIB	      := $(CONFIG_UK_BASE)/support/kconfiglib
 UK_CONFIG_OUT         := $(BUILD_DIR)/config
 UK_GENERATED_INCLUDES := $(BUILD_DIR)/include
+KCONFIG_INCLUDES_DIR  := $(UK_GENERATED_INCLUDES)/uk/bits
 KCONFIG_DIR           := $(BUILD_DIR)/kconfig
 UK_FIXDEP             := $(KCONFIG_DIR)/fixdep
 KCONFIG_AUTOCONFIG    := $(KCONFIG_DIR)/auto.conf
 KCONFIG_TRISTATE      := $(KCONFIG_DIR)/tristate.config
-KCONFIG_AUTOHEADER    := $(UK_GENERATED_INCLUDES)/uk/_config.h
-KCONFIG_APP_DIR       := $(CONFIG_UK_APP)
-KCONFIG_LIB_IN        := $(KCONFIG_DIR)/libs.uk
-KCONFIG_DEF_PLATS     := $(shell find $(CONFIG_UK_PLAT)/* -maxdepth 0 \
-			   -type d \( -path $(CONFIG_UK_PLAT)/common -o \
-			   -path $(CONFIG_UK_PLAT)/drivers \
-			   \) -prune -o  -type d -print)
-KCONFIG_LIB_DIR       := $(shell find $(CONFIG_UK_LIB)/* -maxdepth 0 -type d) \
-			 $(CONFIG_UK_BASE)/lib $(ELIB_DIR)
-KCONFIG_PLAT_DIR      := $(KCONFIG_DEF_PLATS) $(EPLAT_DIR) $(CONFIG_UK_PLAT)
-KCONFIG_PLAT_IN       := $(KCONFIG_DIR)/plat.uk
+KCONFIG_AUTOHEADER    := $(KCONFIG_INCLUDES_DIR)/config.h
+KCONFIG_LIB_BASE      := $(CONFIG_UK_BASE)/lib
+KCONFIG_ELIB_DIRS     := $(L)
+KCONFIG_PLAT_BASE     := $(CONFIG_UK_BASE)/plat
+KCONFIG_EPLAT_DIRS    := $(P)
+KCONFIG_DRIV_BASE     := $(CONFIG_UK_BASE)/drivers
+ifneq ($(CONFIG_UK_BASE),$(CONFIG_UK_APP))
+KCONFIG_EAPP_DIR      := $(CONFIG_UK_APP)
+else
+KCONFIG_EAPP_DIR      :=
+endif
 
 # Makefile support scripts
 SCRIPTS_DIR := $(CONFIG_UK_BASE)/support/scripts
@@ -243,17 +272,15 @@ else
 export UK_FULLVERSION := $(UK_VERSION).$(UK_SUBVERSION)$(shell cd $(CONFIG_UK_BASE); $(SCRIPTS_DIR)/gitsha1)
 endif
 
-export DATE := $(shell date +%Y%m%d)
-
 # Makefile targets
 null_targets		:= print-version print-vars help
+nokconfig_targets       := properclean distclean $(null_targets)
 noconfig_targets	:= ukconfig menuconfig nconfig gconfig xconfig config \
-			   oldconfig randconfig \
-			   defconfig %_defconfig allyesconfig allnoconfig \
-			   silentoldconfig \
-			   release olddefconfig properclean distclean \
+			   oldconfig defconfig olddefconfig savedefconfig \
+			   randconfig allyesconfig allnoconfig \
 			   scriptconfig iscriptconfig kmenuconfig guiconfig \
-			   dumpvarsconfig print-version help
+			   dumpvarsconfig \
+			   $(nokconfig_targets)
 
 # we want bash as shell
 SHELL := $(shell if [ -x "$$BASH" ]; then echo $$BASH; \
@@ -271,6 +298,19 @@ XARGS := xargs
 # kconfig uses CONFIG_SHELL
 CONFIG_SHELL := $(SHELL)
 export SHELL CONFIG_SHELL Q KBUILD_VERBOSE
+
+################################################################################
+# Create minimal necessary folder structure
+################################################################################
+# Create them before trying to include a .config
+ifeq ($(filter $(nokconfig_targets),$(MAKECMDGOALS)),)
+$(if $(shell $(MKDIR) -pv $(KCONFIG_DIR) && cd $(KCONFIG_DIR) >/dev/null && pwd),,\
+	$(error Could not create $(KCONFIG_DIR)))
+$(if $(shell $(MKDIR) -pv $(UK_GENERATED_INCLUDES) && cd $(KCONFIG_DIR) >/dev/null && pwd),,\
+	$(error Could not create $(UK_GENERATED_INCLUDES)))
+$(if $(shell $(MKDIR) -pv $(KCONFIG_INCLUDES_DIR) && cd $(KCONFIG_DIR) >/dev/null && pwd),,\
+	$(error Could not create $(KCONFIG_INCLUDES_DIR)))
+endif
 
 ################################################################################
 # .config
@@ -356,6 +396,20 @@ else
 CONFIG_UK_NAME ?= $(notdir $(APP_DIR))
 endif
 
+# Option to overwrite file name of generated images by supported platforms. The
+# target platform has to support this feature.  When unset or unsupported by the
+# platform, the default semantic of the target platform (typically
+# `$(UK_NAME)_$(PLAT)_$(ARCH)`) will be used.
+#
+# NOTE: Please note that multi-platform builds do not work anymore when this
+#       option is used.  The reason is that the build system will generate the
+#       same file by each selected platform.  Make won't be able to proceed
+#       building.
+# NOTE: This feature is currently used by kraftkit.
+ifneq ($(call qstrip,$(UK_IMAGE_NAME_OVERWRITE)),)
+UK_IMAGE_NAME_OVERWRITE := $(call qstrip,$(UK_IMAGE_NAME_OVERWRITE))
+endif
+
 # remove quotes from CONFIG_UK_NAME
 CONFIG_UK_NAME := $(call qstrip,$(CONFIG_UK_NAME))
 export CONFIG_UK_NAME
@@ -406,7 +460,11 @@ HOSTNM		:= $(shell which $(HOSTNM) || type -p $(HOSTNM) || echo nm)
 HOSTOBJCOPY	:= $(shell which $(HOSTOBJCOPY) || type -p $(HOSTOBJCOPY) || echo objcopy)
 HOSTRANLIB	:= $(shell which $(HOSTRANLIB) || type -p $(HOSTRANLIB) || echo ranlib)
 HOSTCC_VERSION	:= $(shell $(HOSTCC_NOCCACHE) --version | \
-		   sed -n -r 's/^.* ([0-9]*)\.([0-9]*)\.([0-9]*)[ ]*.*/\1 \2/p')
+		   $(SED) -n -r 's/^.* ([0-9]*)\.([0-9]*)\.([0-9]*)[ ]*.*/\1 \2/p')
+# UTC time in ISO 8601 format:
+HOSTUTC		:= $(shell date -Iseconds -u)
+HOSTNAME	:= $(shell hostname -s)
+HOSTUSER	:= $(shell whoami)
 
 # For gcc >= 5.x, we only need the major version.
 ifneq ($(firstword $(HOSTCC_VERSION)),4)
@@ -416,7 +474,7 @@ endif
 # Determine the userland we are running on.
 #
 export HOSTARCH := $(shell LC_ALL=C $(HOSTCC_NOCCACHE) -v 2>&1 | \
-		   sed -e '/^Target: \([^-]*\).*/!d' \
+		   $(SED) -e '/^Target: \([^-]*\).*/!d' \
 		       -e 's//\1/' \
 		       -e 's/i.86/x86/' \
 		       -e 's/sun4u/sparc64/' \
@@ -441,6 +499,7 @@ include $(CONFIG_UK_BASE)/support/build/Makefile.rules
 $(foreach _M,$(wildcard $(addsuffix Makefile.rules,\
 	   $(CONFIG_UK_BASE)/arch/ $(CONFIG_UK_BASE)/arch/*/ \
 	   $(CONFIG_UK_BASE)/plat/*/ $(CONFIG_UK_BASE)/lib/*/ \
+	   $(CONFIG_UK_BASE)/drivers/*/ $(CONFIG_UK_BASE)/drivers/*/*/ \
 	   $(addsuffix /,$(ELIB_DIR)) $(APP_DIR)/)), \
 		$(eval $(call verbose_include,$(_M))) \
 )
@@ -450,7 +509,7 @@ $(foreach _M,$(wildcard $(addsuffix Makefile.rules,\
 ################################################################################
 # Declare them before we depend on having .config
 properclean:
-	$(call verbose_cmd,RM,build/,$(RM) -r \
+	$(call verbose_cmd,RM,$(notdir $(BUILD_DIR)),$(RM) -r \
 		$(BUILD_DIR))
 
 distclean: properclean
@@ -470,7 +529,7 @@ ifeq ($(CONFIG_UK_ARCH),)
 # Set target archicture as set in environment
 ifneq ($(ARCH),)
 export CONFIG_UK_ARCH	?= $(shell echo "$(call qstrip,$(ARCH))" | \
-		   sed -e "s/-.*//" \
+		   $(SED) -e "s/-.*//" \
 		       -e 's//\1/' \
 		       -e 's/i.86/x86/' \
 		       -e 's/sun4u/sparc64/' \
@@ -484,7 +543,7 @@ export CONFIG_UK_ARCH	?= $(shell echo "$(call qstrip,$(ARCH))" | \
 else
 # Nothing set, use detected host architecture
 export CONFIG_UK_ARCH	?= $(shell echo "$(HOSTARCH)" | \
-		   sed -e "s/-.*//" \
+		   $(SED) -e "s/-.*//" \
 		       -e 's//\1/' \
 		       -e 's/i.86/x86/' \
 		       -e 's/sun4u/sparc64/' \
@@ -501,7 +560,7 @@ override ARCH := $(CONFIG_UK_ARCH)
 export CONFIG_UK_ARCH ARCH
 
 export UK_FAMILY ?= $(shell echo "$(CONFIG_UK_ARCH)" | \
-		   sed -e "s/-.*//" \
+		   $(SED) -e "s/-.*//" \
 		       -e 's//\1/' \
 		       -e 's/x86.*/x86/' \
 		       -e 's/sparc64/sparc/' \
@@ -580,7 +639,7 @@ LD		:= $(CONFIG_CROSS_COMPILE)$(CONFIG_COMPILER)
 CC		:= $(CONFIG_CROSS_COMPILE)$(CONFIG_COMPILER)
 CPP		:= $(CC)
 CXX		:= $(CPP)
-GOC		:= $(CONFIG_CROSS_COMPILE)gccgo-7
+GOC		:= $(CONFIG_CROSS_COMPILE)gccgo
 # We use rustc because the gcc frontend is experimental and missing features such
 # as borrowing checking
 ifneq ("$(origin LLVM_TARGET_ARCH)","undefined")
@@ -598,8 +657,21 @@ OBJDUMP		:= $(CONFIG_CROSS_COMPILE)objdump
 M4		:= m4
 AR		:= ar
 CAT		:= cat
-SED		:= sed
+# Prefer using GNU AWK because of provided error messages on script errors
+ifeq (, $(shell which gawk))
 AWK		:= awk
+else
+AWK		:= gawk --lint
+endif
+ifeq ($(HOSTOSENV),Darwin)
+GREP		:= ggrep
+READLINK	:= greadlink
+DIRNAME		:= gdirname
+else
+GREP		:= grep
+READLINK	:= readlink
+DIRNAME		:= dirname
+endif
 YACC		:= bison
 LEX     	:= flex
 PATCH		:= patch
@@ -608,6 +680,7 @@ TAR		:= tar
 UNZIP		:= unzip -qq -u
 GIT		:= git
 WGET		:= wget
+PYTHON          := python3
 SHA1SUM		:= sha1sum -b
 SHA256SUM	:= sha256sum -b
 SHA512SUM	:= sha512sum -b
@@ -617,22 +690,27 @@ DTC		:= dtc
 TIME		:= $(shell which time)
 LIFTOFF		:= liftoff -e -s
 override ARFLAGS:= rcs
-CC_VERSION	:= $(shell $(CC) --version | \
-		   sed -n -r 's/^.* ([0-9]*)\.([0-9]*)\.([0-9]*)[ ]*.*/\1.\2/p')
+
+CC_INFO := $(shell $(CONFIG_UK_BASE)/support/build/cc-version.sh $(CC))
+CC_NAME := $(word 1,$(CC_INFO))
+
 # Retrieve GCC major and minor number from CC_VERSION. They would be used
 # to select correct optimization parameters for target CPUs.
-CC_VER_MAJOR   := $(word 1,$(subst ., ,$(CC_VERSION)))
-CC_VER_MINOR   := $(word 2,$(subst ., ,$(CC_VERSION)))
+CC_VER_MAJOR   := $(word 2,$(subst ., ,$(CC_INFO)))
+CC_VER_MINOR   := $(word 3,$(subst ., ,$(CC_INFO)))
+CC_VERSION     := $(CC_VER_MAJOR).$(CC_VER_MINOR)
 
 ASFLAGS		+= -DCC_VERSION=$(CC_VERSION)
 CFLAGS		+= -DCC_VERSION=$(CC_VERSION)
 CXXFLAGS	+= -DCC_VERSION=$(CC_VERSION)
 GOCFLAGS	+= -DCC_VERSION=$(CC_VERSION)
 
-# ensure $(BUILD_DIR)/kconfig, $(BUILD_DIR)/include and $(BUILD_DIR)/include/uk exists
-$(call mk_sub_build_dir,kconfig)
-$(call mk_sub_build_dir,include)
-$(call mk_sub_build_dir,include/uk)
+# Add user supplied flags as the last assignments
+ASFLAGS  += $(UK_ASFLAGS)
+CFLAGS   += $(UK_CFLAGS)
+CXXFLAGS += $(UK_CXXFLAGS)
+GOCFLAGS += $(UK_GOCFLAGS)
+LDFLAGS  += $(UK_LDFLAGS)
 
 ASINCLUDES            += -I$(UK_GENERATED_INCLUDES)
 CINCLUDES             += -I$(UK_GENERATED_INCLUDES)
@@ -644,27 +722,37 @@ GOCINCLUDES           += -I$(UK_GENERATED_INCLUDES)
 ################################################################################
 # external application
 ifneq ($(CONFIG_UK_BASE),$(CONFIG_UK_APP))
-$(eval $(call _import_lib,$(CONFIG_UK_APP)));
+$(eval $(call import_lib,$(CONFIG_UK_APP)));
 endif
 
 # internal libraries
 $(eval $(call verbose_include,$(CONFIG_UK_BASE)/lib/Makefile.uk))
 
 # external libraries
-$(foreach E,$(ELIB_DIR), \
-	$(eval $(call _import_lib,$(E))); \
+$(foreach ITR,$(ELIB_DIR), \
+	$(eval $(call import_lib,$(ITR))); \
 )
 # architecture library
-$(eval $(call _import_lib,$(CONFIG_UK_BASE)/arch/$(UK_FAMILY)))
+$(eval $(call import_lib,$(CONFIG_UK_BASE)/arch/$(UK_FAMILY)))
+# drivers
+$(eval $(call verbose_include,$(CONFIG_UK_BASE)/drivers/Makefile.uk))
 # internal platform libraries
 $(eval $(call verbose_include,$(CONFIG_UK_BASE)/plat/Makefile.uk))
 # external platform libraries
 # NOTE: We include them after internal platform libs so that also base variables
 #       provided with /plat/Makefile.uk are populated
-$(foreach E,$(EPLAT_DIR), \
-	$(eval $(call _import_lib,$(E))); \
+$(foreach ITR,$(EPLAT_DIR), \
+	$(eval $(call import_lib,$(ITR))); \
 )
 $(eval $(call verbose_include,$(CONFIG_UK_BASE)/Makefile.uk)) # Unikraft base
+
+ifeq ($(call have_clang),y)
+$(call error_if_clang_version_lt,9,0)
+endif
+
+ifeq ($(call have_gcc),y)
+$(call error_if_gcc_version_lt,7,0)
+endif
 
 ifeq ($(call qstrip,$(UK_PLATS) $(UK_PLATS-y)),)
 $(warning You did not choose any target platform.)
@@ -684,6 +772,11 @@ endif
 
 # Generate build rules
 $(eval $(call verbose_include,$(CONFIG_UK_BASE)/support/build/Makefile.build))
+$(foreach _M,$(wildcard $(addsuffix Makefile.build,\
+	   $(CONFIG_UK_BASE)/lib/*/ $(CONFIG_UK_BASE)/plat/*/ \
+	   $(addsuffix /,$(ELIB_DIR)) $(APP_DIR)/)), \
+		$(eval $(call verbose_include,$(_M))) \
+)
 
 # Include source dependencies
 ifneq ($(call qstrip,$(UK_DEPS) $(UK_DEPS-y)),)
@@ -693,7 +786,7 @@ $(foreach _D,$(UK_DEPS) $(UK_DEPS-y),\
 endif
 
 # include Makefile for platform linking (`Linker.uk`)
-$(foreach plat,$(UK_PLATS),$(eval $(call _import_linker,$(plat))))
+$(foreach plat,$(UK_PLATS),$(eval $(call import_linker,$(plat))))
 
 .PHONY: prepare preprocess image libs objs clean
 
@@ -701,9 +794,8 @@ fetch: $(UK_FETCH) $(UK_FETCH-y)
 
 # Copy current configuration in order to detect changes
 $(UK_CONFIG_OUT): $(UK_CONFIG)
-	$(call verbose_cmd,CP,config,$(CP) \
-		$(UK_CONFIG) \
-		$(UK_CONFIG_OUT))
+	$(call verbose_cmd,CP,config, \
+		cmp -s $^ $@; if [ $$? -ne 0 ]; then cp $^ $@; fi)
 
 prepare: $(KCONFIG_AUTOHEADER) $(UK_CONFIG_OUT) $(UK_PREPARE) $(UK_PREPARE-y)
 prepare: $(UK_FIXDEP) | fetch
@@ -777,19 +869,28 @@ clean-libs clean:
 
 endif
 
-.PHONY: print-vars print-libs print-objs print-srcs help outputmakefile list-defconfigs
+.PHONY: print-vars print-libs print-objs print-srcs print-loc help
 
 # Configuration
 # ---------------------------------------------------------------------------
 HOSTCFLAGS = $(CFLAGS_FOR_BUILD)
 export HOSTCFLAGS
 
-KCONFIG_TOOLS = conf mconf gconf nconf qconf fixdep
+ifeq ($(HOSTOSENV),Linux)
+KCONFIG_TOOLS = conf mconf gconf nconf qconf
 KCONFIG_TOOLS := $(addprefix $(KCONFIG_DIR)/,$(KCONFIG_TOOLS))
 
 $(KCONFIG_TOOLS):
 	$(call verbose_cmd,MKDIR,lxdialog,$(MKDIR) -p $(@D)/lxdialog)
 	$(call verbose_cmd,MAKE,$(notdir $(CONFIG)),$(MAKE) \
+	    --no-print-directory \
+	    CC="$(HOSTCC_NOCCACHE)" HOSTCC="$(HOSTCC_NOCCACHE)" \
+	    YACC="$(YACC)" LEX="$(LEX)" \
+	    obj=$(@D) -C $(CONFIG) -f Makefile.br $(@))
+endif
+
+$(UK_FIXDEP):
+	$(call verbose_cmd,MAKE,$(notdir $(@)),$(MAKE) \
 	    --no-print-directory \
 	    CC="$(HOSTCC_NOCCACHE)" HOSTCC="$(HOSTCC_NOCCACHE)" \
 	    obj=$(@D) -C $(CONFIG) -f Makefile.br $(@))
@@ -799,13 +900,12 @@ DEFCONFIG = $(call qstrip,$(UK_DEFCONFIG))
 # We don't want to fully expand UK_DEFCONFIG here, so Kconfig will
 # recognize that if it's still at its default $(CONFIG_DIR)/defconfig
 COMMON_CONFIG_ENV = \
-	CC=$(CC)\
 	CONFIG_="CONFIG_" \
 	KCONFIG_CONFIG="$(UK_CONFIG)" \
 	KCONFIG_AUTOCONFIG="$(KCONFIG_AUTOCONFIG)" \
 	KCONFIG_AUTOHEADER="$(KCONFIG_AUTOHEADER)" \
 	KCONFIG_TRISTATE="$(KCONFIG_TRISTATE)" \
-	HOST_GCC_VERSION="$(HOSTCC_VERSION)" \
+	HOST_ARCH="$(HOSTARCH)" \
 	BUILD_DIR="$(BUILD_DIR)" \
 	UK_BASE="$(CONFIG_UK_BASE)" \
 	UK_APP="$(CONFIG_UK_APP)" \
@@ -813,18 +913,20 @@ COMMON_CONFIG_ENV = \
 	UK_FULLVERSION="$(UK_FULLVERSION)" \
 	UK_CODENAME="$(UK_CODENAME)" \
 	UK_ARCH="$(CONFIG_UK_ARCH)" \
-	KCONFIG_APP_DIR="$(KCONFIG_APP_DIR)" \
-	KCONFIG_LIB_DIR="$(KCONFIG_LIB_DIR)" \
-	KCONFIG_LIB_IN="$(KCONFIG_LIB_IN)" \
-	KCONFIG_PLAT_DIR="$(KCONFIG_PLAT_DIR)" \
-	KCONFIG_PLAT_IN="$(KCONFIG_PLAT_IN)" \
+	KCONFIG_DIR="$(KCONFIG_DIR)" \
+	KCONFIG_LIB_BASE="$(KCONFIG_LIB_BASE)" \
+	KCONFIG_ELIB_DIRS="$(KCONFIG_ELIB_DIRS)" \
+	KCONFIG_PLAT_BASE="$(KCONFIG_PLAT_BASE)" \
+	KCONFIG_EPLAT_DIRS="$(KCONFIG_EPLAT_DIRS)" \
+	KCONFIG_DRIV_BASE="$(KCONFIG_DRIV_BASE)" \
+	KCONFIG_EAPP_DIR="$(KCONFIG_EAPP_DIR)" \
+	KCONFIG_EXCLUDEDIRS="$(KCONFIG_EXCLUDEDIRS)" \
 	UK_NAME="$(CONFIG_UK_NAME)"
 
 PHONY += scriptconfig scriptsyncconfig iscriptconfig kmenuconfig guiconfig \
 		 dumpvarsconfig
 
-PYTHONCMD ?= python
-kpython := PYTHONPATH=$(UK_CONFIGLIB):$$PYTHONPATH $(PYTHONCMD)
+KPYTHON := PYTHONPATH=$(UK_CONFIGLIB):$$PYTHONPATH $(PYTHON)
 
 ifneq ($(filter scriptconfig,$(MAKECMDGOALS)),)
 ifndef SCRIPT
@@ -832,34 +934,73 @@ $(error Use "make scriptconfig SCRIPT=<path to script> [SCRIPT_ARG=<argument>]")
 endif
 endif
 
-scriptconfig: $(KCONFIG_DIR)/fixdep
-	$(Q)$(COMMON_CONFIG_ENV) $(kpython) $(SCRIPT) $(Kconfig) $(if $(SCRIPT_ARG),"$(SCRIPT_ARG)")
+scriptconfig:
+	$(Q)$(COMMON_CONFIG_ENV) $(KPYTHON) $(SCRIPT) $(Kconfig) $(if $(SCRIPT_ARG),"$(SCRIPT_ARG)")
 
-iscriptconfig: $(KCONFIG_DIR)/fixdep
-	$(Q)$(COMMON_CONFIG_ENV) $(kpython) -i -c \
+iscriptconfig:
+	$(Q)$(COMMON_CONFIG_ENV) $(KPYTHON) -i -c \
 	  "import kconfiglib; \
 	   kconf = kconfiglib.Kconfig('$(UK_CONFIG)'); \
 	   print('A Kconfig instance \'kconf\' for the architecture $(ARCH) has been created.')"
 
-kmenuconfig:$(KCONFIG_DIR)/fixdep
-	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/menuconfig.py \
+kmenuconfig:
+	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/menuconfig.py \
 		$(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
-scriptsyncconfig: $(KCONFIG_DIR)/fixdep
-	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/genconfig.py \
+scriptsyncconfig:
+	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/genconfig.py \
 		--sync-deps=$(BUILD_DIR)/include/config \
 		--header-path=$(KCONFIG_AUTOHEADER) $(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
-guiconfig: $(KCONFIG_DIR)/fixdep
-	@$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/guiconfig.py $(CONFIG_CONFIG_IN)
+guiconfig:
+	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/guiconfig.py $(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
-dumpvarsconfig:$(KCONFIG_DIR)/fixdep
-	$(Q)$(COMMON_CONFIG_ENV) $(kpython) $(CONFIGLIB)/examples/dumpvars.py $(CONFIG_CONFIG_IN)
+dumpvarsconfig:
+	$(Q)$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/examples/dumpvars.py $(CONFIG_CONFIG_IN)
 	@$(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
+ifneq ($(HOSTOSENV),Linux)
+# Use libkconfiglib for non-Linux hosts
+# Compatibility wrappers:
+menuconfig: kmenuconfig
+nconfig: kmenuconfig
+gconfig: guiconfig
+xconfig: guiconfig
+
+allyesconfig:
+	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/allyesconfig.py $(CONFIG_CONFIG_IN)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+
+allnoconfig:
+	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/allnoconfig.py $(CONFIG_CONFIG_IN)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+
+defconfig:
+	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/defconfig.py --kconfig $(CONFIG_CONFIG_IN) $(DEFCONFIG)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+
+savedefconfig:
+	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/savedefconfig.py --kconfig $(CONFIG_CONFIG_IN) --out $(DEFCONFIG)
+ifeq ($(HOSTARCH),$(CONFIG_UK_ARCH))
+	@# Make sure arch is stored in the file even if arch matches between host and config
+	@echo "$(call ukarch_str2cfg,$(CONFIG_UK_ARCH))=y" >> $(DEFCONFIG)
+endif
+	@echo "CONFIG_UK_NAME=\"$(CONFIG_UK_NAME)\"" >> $(DEFCONFIG)
+
+oldconfig:
+	@$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/oldconfig.py $(CONFIG_CONFIG_IN)
+	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+
+# Regenerate $(KCONFIG_AUTOHEADER) whenever $(UK_CONFIG) changed
+$(KCONFIG_AUTOHEADER): $(UK_CONFIG_OUT)
+	$(call verbose_cmd,GEN,config.h, \
+		$(COMMON_CONFIG_ENV) $(KPYTHON) $(CONFIGLIB)/genconfig.py \
+			--header-path $(KCONFIG_AUTOHEADER) $(CONFIG_CONFIG_IN))
+else
+# Use traditional KConfig system on Linux
 xconfig: $(KCONFIG_DIR)/qconf
 	@$(COMMON_CONFIG_ENV) $< $(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
@@ -873,10 +1014,6 @@ menuconfig: $(KCONFIG_DIR)/mconf
 	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
 nconfig: $(KCONFIG_DIR)/nconf
-	@$(COMMON_CONFIG_ENV) $< $(CONFIG_CONFIG_IN)
-	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
-
-config: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) $< $(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
@@ -915,27 +1052,35 @@ defconfig: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) $< --defconfig$(if $(DEFCONFIG),=$(DEFCONFIG)) $(CONFIG_CONFIG_IN)
 	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
 
-# Override the UK_DEFCONFIG from COMMON_CONFIG_ENV with the new defconfig
-%_defconfig: $(KCONFIG_DIR)/conf $(A)/configs/%_defconfig
-	@$(COMMON_CONFIG_ENV) UK_DEFCONFIG=$(A)/configs/$@ \
-		$< --defconfig=$(A)/configs/$@ $(CONFIG_CONFIG_IN)
-
 savedefconfig: $(KCONFIG_DIR)/conf
 	@$(COMMON_CONFIG_ENV) $< \
 		--savedefconfig=$(if $(DEFCONFIG),$(DEFCONFIG),$(CONFIG_DIR)/defconfig) \
 		$(CONFIG_CONFIG_IN)
-	@$(SED) '/UK_DEFCONFIG=/d' $(if $(DEFCONFIG),$(DEFCONFIG),$(CONFIG_DIR)/defconfig)
-	@$(COMMON_CONFIG_ENV) $(SCRIPTS_DIR)/configupdate $(UK_CONFIG) $(UK_CONFIG_OUT)
+ifeq ($(HOSTARCH),$(CONFIG_UK_ARCH))
+	@# Make sure arch is stored in the file even if arch matches between host and config
+	@echo "$(call ukarch_str2cfg,$(CONFIG_UK_ARCH))=y" >> \
+		$(if $(DEFCONFIG),$(DEFCONFIG),$(CONFIG_DIR)/defconfig)
+endif
+	@echo "CONFIG_UK_NAME=\"$(CONFIG_UK_NAME)\"" >> \
+		$(if $(DEFCONFIG),$(DEFCONFIG),$(CONFIG_DIR)/defconfig)
 
-.PHONY: defconfig savedefconfig silentoldconfig
+.PHONY: defconfig savedefconfig
 
 # Regenerate $(KCONFIG_AUTOHEADER) whenever $(UK_CONFIG) changed
-$(KCONFIG_AUTOHEADER): $(UK_CONFIG) $(KCONFIG_DIR)/conf
-	@$(COMMON_CONFIG_ENV) $(KCONFIG_DIR)/conf --syncconfig $(CONFIG_CONFIG_IN)
+$(KCONFIG_AUTOHEADER): $(UK_CONFIG_OUT) $(KCONFIG_DIR)/conf
+	$(call verbose_cmd,GEN,config.h, \
+		$(COMMON_CONFIG_ENV) $(KCONFIG_DIR)/conf \
+			--syncconfig $(CONFIG_CONFIG_IN))
+endif
 
 
 # Misc stuff
 # ---------------------------------------------------------------------------
+print-loc: images
+	@$(info [LoC stats])
+	@$(foreach I,$(UK_DEBUG_IMAGES) $(UK_DEBUG_IMAGES-y),\
+		$(info $(shell basename $(I) .dbg) has $(call measure_loc,$(I)) lines of code))
+
 print-vars:
 	@$(foreach V, \
 		$(sort $(if $(VARS),$(filter $(VARS),$(.VARIABLES)),$(.VARIABLES))), \
@@ -1015,6 +1160,8 @@ export sub_make_exec:=1
 $(BUILD_DIR)/Makefile:
 	$(call verbose_cmd,LN,$(notdir $@),$(HOSTLN) -sf $(CONFIG_UK_BASE)/Makefile $@)
 
+.PHONY: $(BUILD_DIR)/Makefile
+
 $(filter-out _all $(BUILD_DIR)/Makefile sub-make distclean properclean help $(lastword $(MAKEFILE_LIST)), \
   $(MAKECMDGOALS)) all: sub-make
 	@:
@@ -1054,10 +1201,12 @@ help:
 	@echo '  xconfig                - interactive Qt-based configurator'
 	@echo '  gconfig                - interactive GTK-based configurator'
 	@echo '  oldconfig              - resolve any unresolved symbols in .config'
+ifeq ($(HOSTOSENV),Linux)
 	@echo '  syncconfig             - Same as oldconfig, but quietly, additionally update deps'
 	@echo '  scriptsyncconfig       - Same as oldconfig, but quietly, additionally update deps'
-	@echo '  olddefconfig           - Same as silentoldconfig but sets new symbols to their default value'
+	@echo '  olddefconfig           - Same as defconfig but sets new symbols to their default value'
 	@echo '  randconfig             - New config with random answer to all options'
+endif
 	@echo '  defconfig              - New config with default answer to all options'
 	@echo '                             UK_DEFCONFIG, if set, is used as input'
 	@echo '  savedefconfig          - Save current config to UK_DEFCONFIG (minimal config)'
@@ -1074,6 +1223,19 @@ help:
 	@echo '                           (note: the name in the configuration file is not overwritten)'
 	@echo '  L=[PATH]:[PATH]:..     - colon-separated list of paths to external libraries'
 	@echo '  P=[PATH]:[PATH]:..     - colon-separated list of paths to external platforms'
+	@echo '  E=[PATH]:[PATH]:..     - colon-separated list of paths to libraries that shall be skipped/excluded'
+	@echo '                           (note: `E=` acts as a global exclusion mask, which means that the mask'
+	@echo '                            is applied to every internal and external import of libraries, platforms,'
+	@echo '                            and applications. For example, an external library (via `L=`) will also be'
+	@echo '                            skipped if its path was specified with `E=` at the same time.)'
+	@echo ''
+	@echo 'Environment variables:'
+	@echo '  UK_ASFLAGS             - explicit Unikraft-specific additions to the assembler flags (the ASFLAGS variable is ignored)'
+	@echo '  UK_CFLAGS              - explicit Unikraft-specific additions to the C compiler flags (the CFLAGS variable is ignored)'
+	@echo '  UK_CXXFLAGS            - explicit Unikraft-specific additions to the C++ compiler flags (the CXXFLAGS variable is ignored)'
+	@echo '  UK_GOCFLAGS            - explicit Unikraft-specific additions to the GO compiler flags (the GOCFLAGS variable is ignored)'
+	@echo '  UK_LDFLAGS             - explicit Unikraft-specific additions to the linker flags (the LDFLAGS variable is ignored)'
+	@echo '  UK_LDEPS               - explicit, space-seperated link-time file dependencies (changes to these files will trigger relinking on subsequent builds)'
 	@echo ''
 	@echo 'Miscellaneous:'
 	@echo '  print-version          - print Unikraft version'
@@ -1082,6 +1244,7 @@ help:
 	@echo '  print-objs             - print object file names enabled for build'
 	@echo '  print-srcs             - print source file names enabled for build'
 	@echo '  print-vars             - prints all the variables currently defined in Makefile'
+	@echo '  print-loc              - print Lines-of-Code statistics for built unikernel image(s)'
 	@echo ''
 
 endif #umask

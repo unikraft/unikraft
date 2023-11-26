@@ -537,7 +537,7 @@ extern struct shared_info _libxenplat_shared_info;
 void _init_mem_set_readonly(void *text, void *etext)
 {
     unsigned long start_address =
-        ((unsigned long) text + PAGE_SIZE - 1) & PAGE_MASK;
+        PAGE_ALIGN((unsigned long)text);
     unsigned long end_address = (unsigned long) etext;
     pgentry_t *tab = pt_base, page;
     unsigned long mfn;
@@ -651,9 +651,13 @@ void _arch_init_p2m(struct uk_alloc *a)
 		UK_CRASH("Error: Too many pfns.\n");
 
 	l3_list = uk_palloc(a, 1);
+	if (l3_list == NULL)
+		UK_CRASH("Error: Cannot allocate l3_list.\n");
 	for (pfn = 0; pfn < max_pfn; pfn += P2M_ENTRIES) {
 		if (!(pfn % (P2M_ENTRIES * P2M_ENTRIES))) {
 			l2_list = uk_palloc(a, 1);
+			if (l2_list == NULL)
+				UK_CRASH("Error: Cannot allocate l2_list.\n");
 			l3_list[L3_P2M_IDX(pfn)] = virt_to_mfn(l2_list);
 			l2_list_pages[L3_P2M_IDX(pfn)] = l2_list;
 		}

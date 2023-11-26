@@ -72,6 +72,12 @@ static struct utsname utsname = {
 
 UK_SYSCALL_R_DEFINE(int, sysinfo, struct sysinfo *, info)
 {
+#ifdef CONFIG_HAVE_PAGING
+	struct uk_pagetable *pt;
+	__sz total_memory;
+	unsigned int mem_unit = 1;
+#endif /* CONFIG_HAVE_PAGING */
+
 	if (!info)
 		return -EFAULT;
 
@@ -79,9 +85,20 @@ UK_SYSCALL_R_DEFINE(int, sysinfo, struct sysinfo *, info)
 
 	info->procs = 1; /* number of processes */
 
-#if CONFIG_LIBUKALLOC
-	/* TODO: memory usage can be obtained from ukallloc */
-#endif
+#ifdef CONFIG_HAVE_PAGING
+	pt = ukplat_pt_get_active();
+
+	total_memory = pt->fa->total_memory;
+	while (total_memory > __UL_MAX) {
+		total_memory >>= 1;
+		mem_unit <<= 1;
+	}
+
+	info->totalram = (unsigned long) (pt->fa->total_memory / mem_unit);
+	info->freeram = (unsigned long) (pt->fa->free_memory / mem_unit);
+	info->mem_unit = mem_unit;
+#endif /* CONFIG_HAVE_PAGING */
+
 	return 0;
 }
 
@@ -102,6 +119,11 @@ long sysconf(int name)
 
 	if (name == _SC_PAGESIZE)
 		return __PAGE_SIZE;
+
+#ifdef CONFIG_LIBPOSIX_USER
+	if (name == _SC_GETPW_R_SIZE_MAX)
+		return -1;
+#endif /* CONFIG_LIBPOSIX_USER */
 
 #ifdef CONFIG_HAVE_PAGING
 	if (name == _SC_PHYS_PAGES) {
@@ -179,6 +201,20 @@ int gethostname(char *name, size_t len)
 	}
 
 	strncpy(name, buf.nodename, len);
+
+	return 0;
+}
+
+UK_SYSCALL_R_DEFINE(int, getcpu, unsigned int *, cpu, unsigned int *, node,
+		    void *, tcache)
+{
+	/* tcache is ignored since Linux 2.6.24 */
+
+	if (cpu)
+		*cpu = 0;
+
+	if (node)
+		*node = 0;
 
 	return 0;
 }

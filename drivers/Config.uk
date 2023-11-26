@@ -1,0 +1,17 @@
+menu "Bus drivers"
+
+source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-bus.uk' -r '$(KCONFIG_DRIV_BASE)/ukbus' -l '$(KCONFIG_DRIV_BASE)/ukbus' -e '$(KCONFIG_EXCLUDEDIRS)')"
+
+endmenu
+
+menu "Interrupt controller"
+
+source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-intctlr.uk' -r '$(KCONFIG_DRIV_BASE)/ukintctlr' -l '$(KCONFIG_DRIV_BASE)/ukintctlr' -e '$(KCONFIG_EXCLUDEDIRS)')"
+
+endmenu
+
+menu "Virtio"
+
+source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-virtio.uk' -r '$(KCONFIG_DRIV_BASE)/virtio' -l '$(KCONFIG_DRIV_BASE)/virtio' -e '$(KCONFIG_EXCLUDEDIRS)')"
+
+endmenu

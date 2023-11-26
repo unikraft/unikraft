@@ -56,6 +56,7 @@ struct ukarch_trap_ctx {
  */
 #define UKARCH_TRAP_INVALID_OP		trap_invalid_op
 #define UKARCH_TRAP_DEBUG		trap_debug
+#define UKARCH_TRAP_NMI			trap_nmi
 
 #define UKARCH_TRAP_PAGE_FAULT		trap_page_fault
 #define UKARCH_TRAP_BUS_ERROR		trap_bus_error

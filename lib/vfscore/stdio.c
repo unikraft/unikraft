@@ -31,6 +31,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _GNU_SOURCE
+
 #include <vfscore/file.h>
 #include <vfscore/fs.h>
 #include <uk/plat/console.h>
@@ -52,7 +54,7 @@
  */
 
 #if !CONFIG_LIBSYSCALL_SHIM
-long uk_syscall_r_dup2(long oldfd, long newfd);
+long uk_syscall_r_dup3(long oldfd, long newfd, long flags);
 #endif /* !CONFIG_LIBSYSCALL_SHIM */
 
 static int __write_fn(void *dst __unused, void *src, size_t *cnt)
@@ -204,11 +206,14 @@ static struct vnode stdio_vnode = {
 	.v_op = &stdio_vnops,
 	.v_lock = UK_MUTEX_INITIALIZER(stdio_vnode.v_lock),
 	.v_refcnt = 1,
+	.v_link = UK_LIST_HEAD_INIT(stdio_vnode.v_link),
+	.v_names = UK_LIST_HEAD_INIT(stdio_vnode.v_names),
 	.v_type = VCHR,
 };
 
 static struct dentry stdio_dentry = {
 	.d_vnode = &stdio_vnode,
+	.d_refcnt = 1,
 };
 
 static struct vfscore_file  stdio_file = {
@@ -216,6 +221,7 @@ static struct vfscore_file  stdio_file = {
 	.f_flags = UK_FWRITE | UK_FREAD,
 	.f_dentry = &stdio_dentry,
 	.f_vfs_flags = UK_VFSCORE_NOPOS,
+	.f_lock = UK_MUTEX_INITIALIZER(stdio_file.f_lock),
 	/* reference count is 2 because close(0) is a valid
 	 * operation. However it is not properly handled in the
 	 * current implementation. */
@@ -234,13 +240,13 @@ int init_stdio(void)
 	}
 	vfscore_install_fd(0, &stdio_file);
 
-	fd = uk_syscall_r_dup2(0, 1);
+	fd = uk_syscall_r_dup3(0, 1, 0);
 	if (fd != 1) {
 		uk_pr_crit("failed to dup to stdout (fd=1)\n");
 		return (fd < 0) ? fd : -EBADF;
 	}
 
-	fd = uk_syscall_r_dup2(0, 2);
+	fd = uk_syscall_r_dup3(0, 2, 0);
 	if (fd != 2) {
 		uk_pr_crit("failed to dup to stderr (fd=2)\n");
 		return (fd < 0) ? fd : -EBADF;

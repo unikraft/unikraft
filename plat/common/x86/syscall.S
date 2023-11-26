@@ -32,39 +32,46 @@
  */
 
 #include <uk/arch/lcpu.h>
+#include <uk/asm/cfi.h>
 
 #define ENTRY(X) .globl X ; X :
 
 ENTRY(_ukplat_syscall)
+	.cfi_startproc simple
+	.cfi_def_cfa rsp, 0
+	.cfi_register rip, rcx
 	cli
 	/*
 	 * Push arguments in the order of 'struct __regs' to the stack.
 	 * We are going to handover a refernce to this stack area as
 	 * `struct __regs *` argument to the system call handler.
 	 */
-	pushq $0	/* exception frame filled with zeros */
-	pushq $0	/* (rip, cs, eflags, rsp, ss)        */
-	pushq $0	/*                                   */
-	pushq $0	/*                                   */
-	pushq $0	/*                                   */
-	pushq %rax 	/* orig_rax */
-	pushq %rdi
-	pushq %rsi
-	pushq %rdx
-	pushq %rcx
-	pushq %rax
-	pushq %r8
-	pushq %r9
-	pushq %r10
-	pushq %r11
-	pushq %rbx
-	pushq %rbp
-	pushq %r12
-	pushq %r13
-	pushq %r14
-	pushq %r15
+	pushq_cfi $0		/* exception frame filled with zeros */
+	pushq_cfi $0		/* (rip, cs, eflags, rsp, ss)        */
+	pushq_cfi $0		/*                                   */
+	pushq_cfi $0		/*                                   */
+	pushq_cfi $0		/*                                   */
+	pushq_reg_cfi rax	/* orig_rax */
+	pushq_reg_cfi rdi
+	pushq_reg_cfi rsi
+	pushq_reg_cfi rdx
+	pushq_reg_cfi rcx
+	.cfi_rel_offset rip, 0
+	pushq_reg_cfi rax
+	pushq_reg_cfi r8
+	pushq_reg_cfi r9
+	pushq_reg_cfi r10
+	pushq_reg_cfi r11
+	pushq_reg_cfi rbx
+	pushq_reg_cfi rbp
+	pushq_reg_cfi r12
+	pushq_reg_cfi r13
+	pushq_reg_cfi r14
+	pushq_reg_cfi r15
+
 	/* padding */
 	subq  $(__REGS_PAD_SIZE), %rsp
+	.cfi_adjust_cfa_offset __REGS_PAD_SIZE
 	sti
 
 	/*
@@ -81,32 +88,37 @@ ENTRY(_ukplat_syscall)
 	 */
 	movq %rsp, %rbp
 	and $~15, %rsp
+	.cfi_def_cfa_register rbp
 
 	call ukplat_syscall_handler
 
 	/* Restore original stack pointer */
 	movq %rbp, %rsp
+	.cfi_def_cfa_register rsp
 
 	cli
 	/* Load the updated state back to registers */
 	addq $(__REGS_PAD_SIZE), %rsp
-	popq %r15
-	popq %r14
-	popq %r13
-	popq %r12
-	popq %rbp
-	popq %rbx
-	popq %r11
-	popq %r10
-	popq %r9
-	popq %r8
-	popq %rax
-	popq %rcx
-	popq %rdx
-	popq %rsi
-	popq %rdi
+	.cfi_adjust_cfa_offset -__REGS_PAD_SIZE
+	popq_reg_cfi r15
+	popq_reg_cfi r14
+	popq_reg_cfi r13
+	popq_reg_cfi r12
+	popq_reg_cfi rbp
+	popq_reg_cfi rbx
+	popq_reg_cfi r11
+	popq_reg_cfi r10
+	popq_reg_cfi r9
+	popq_reg_cfi r8
+	popq_reg_cfi rax
+	popq_reg_cfi rcx
+	.cfi_register rip, rcx
+	popq_reg_cfi rdx
+	popq_reg_cfi rsi
+	popq_reg_cfi rdi
 	/* orig_rax and exception frame */
 	addq $(6 * 8), %rsp
+	.cfi_adjust_cfa_offset -(6 * 8)
 	sti
 
 	/*
@@ -118,3 +130,4 @@ ENTRY(_ukplat_syscall)
 	 *     Conference on Virtual Execution Environments (VEE 2019))
 	 */
 	jmp *%rcx
+	.cfi_endproc

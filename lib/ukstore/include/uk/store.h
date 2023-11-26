@@ -29,23 +29,24 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-
 #ifndef __UK_STORE_H__
 #define __UK_STORE_H__
 
 #if CONFIG_LIBUKSTORE
 
 #include <string.h>
+#include <uk/alloc.h>
 #include <uk/config.h>
 #include <uk/assert.h>
-#include <uk/list.h>
 #include <uk/arch/atomic.h>
-#include <uk/alloc.h>
+#include <uk/libid.h>
 
 #endif /* CONFIG_LIBUKSTORE */
 
+#include <uk/arch/limits.h>
 #include <uk/arch/types.h>
 #include <uk/essentials.h>
+#include <uk/list.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -125,6 +126,9 @@ struct uk_store_entry {
 		uk_store_set_charp_func_t charp;
 	} set;
 
+	/* Entry unique id */
+	__u64 id;
+
 	/* The entry name */
 	char *name;
 
@@ -133,9 +137,6 @@ struct uk_store_entry {
 
 	/* Entry getter/setter type */
 	enum uk_store_entry_type type;
-
-	/* Extra cookie that is handed over to getter and setter */
-	void *cookie;
 } __align8;
 
 /* Flags if an entry is static or dynamic */
@@ -143,160 +144,201 @@ struct uk_store_entry {
 
 #if !CONFIG_LIBUKSTORE
 
-#define uk_store_libid(libname) (-1)
-
 /* Do not call directly */
-#define __UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set,	\
-				arg_cookie)				\
+#define __UK_STORE_STATIC_ENTRY(eid, entry, lib_str, e_type, e_get, e_set)\
 	static const struct uk_store_entry				\
 	__unused __uk_store_entries_list ## _ ## entry = {		\
-		.name = STRINGIFY(entry),				\
-		.type       = (UK_STORE_ENTRY_TYPE(e_type)),		\
-		.get.e_type = (e_get),					\
-		.set.e_type = (e_set),					\
-		.flags      = UK_STORE_ENTRY_FLAG_STATIC,		\
-		.cookie     = (arg_cookie)				\
+		.id             = eid,					\
+		.name           = STRINGIFY(entry),			\
+		.type           = (UK_STORE_ENTRY_TYPE(e_type)),	\
+		.get.e_type     = (e_get),				\
+		.set.e_type     = (e_set),				\
+		.flags          = UK_STORE_ENTRY_FLAG_STATIC		\
 	}
 
 /* Do not call directly */
-#define _UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set,	\
-				cookie)					\
-	__UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set, cookie)
+#define _UK_STORE_STATIC_ENTRY(id, entry, lib_str, e_type, e_get, e_set)\
+	__UK_STORE_STATIC_ENTRY(id, entry, lib_str, e_type, e_get, e_set)
 
 /**
  * Adds an entry to the entry section of a library.
  *
+ * @param id entry id
  * @param entry the entry in the section
  * @param e_type type for the entry, e.g., s8, u16, charp
  * @param e_get getter pointer (optional, can be NULL)
  * @param e_set setter pointer (optional, can be NULL)
- * @param cookie a cookie for extra storage
  */
-#define UK_STORE_STATIC_ENTRY(entry, e_type, e_get, e_set, cookie)	\
-	_UK_STORE_STATIC_ENTRY(entry, STRINGIFY(__LIBNAME__),		\
-		e_type, e_get, e_set, cookie)
+#define UK_STORE_STATIC_ENTRY(id, entry, e_type, e_get, e_set)		\
+	_UK_STORE_STATIC_ENTRY(id, entry, STRINGIFY(__LIBNAME__),	\
+			       e_type, e_get, e_set)
 
-#else /* !CONFIG_LIBUKSTORE */
+#else /* CONFIG_LIBUKSTORE */
 
 /* Library-specific information generated at compile-time */
 #include <uk/bits/store_libs.h>
 
+struct uk_store_object {
+	/* List for the dynamic objects only */
+	struct uk_list_head object_head;
+
+	/* List for the entries in the object */
+	struct uk_list_head entry_head;
+
+	/* Allocator to be used in allocations */
+	struct uk_alloc *a;
+
+	/* Parent library id */
+	__u16 libid;
+
+	/* Object unique id */
+	__u64 id;
+
+	/* The object name */
+	char *name;
+
+	/* The object's refcount */
+	__atomic refcount;
+
+	/* User data */
+	void *cookie;
+} __align8;
+
+/**
+ * Payload to pass to uk_store events.
+ */
+struct uk_store_event_data {
+	__u16 library_id;
+	__u64 object_id;
+};
 /* Do not call directly */
-#define _uk_store_libid(libname)	\
-	__UK_STORE_ ## libname
-
-/**
- * Returns the id of a given library.
- *
- * @param libname the library to search for (not a string, e.g. LIBVFSCORE)
- * @return the id
- */
-#define uk_store_libid(libname)	\
-	_uk_store_libid(libname)
-
-/**
- * Returns the id of the place it was called from.
- *
- * @return this libraries' id
- */
-#define uk_store_libid_self()	\
-	uk_store_libid(__LIBNAME__)
-
-/**
- * Checks if an entry is static
- *
- * @param entry the entry to check
- * @return the condition result
- */
-#define UK_STORE_ENTRY_ISSTATIC(entry)	\
-	((entry)->flags & UK_STORE_ENTRY_FLAG_STATIC)
-
-/* Do not call directly */
-#define __UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set,	\
-				arg_cookie)				\
+#define __UK_STORE_STATIC_ENTRY(eid, entry, lib_str, e_type, e_get, e_set)\
 	static const struct uk_store_entry				\
 	__used __section(".uk_store_lib_" lib_str) __align8		\
 	__uk_store_entries_list ## _ ## entry = {			\
-		.name = STRINGIFY(entry),				\
-		.type       = (UK_STORE_ENTRY_TYPE(e_type)),		\
-		.get.e_type = (e_get),					\
-		.set.e_type = (e_set),					\
-		.flags      = UK_STORE_ENTRY_FLAG_STATIC,		\
-		.cookie     = (arg_cookie)				\
+		.id		= eid,					\
+		.name           = STRINGIFY(entry),			\
+		.type           = (UK_STORE_ENTRY_TYPE(e_type)),	\
+		.get.e_type     = (e_get),				\
+		.set.e_type     = (e_set),				\
+		.flags          = UK_STORE_ENTRY_FLAG_STATIC		\
 	}
 
 /* Do not call directly */
-#define _UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set,	\
-				cookie)	\
-	__UK_STORE_STATIC_ENTRY(entry, lib_str, e_type, e_get, e_set, cookie)
+#define _UK_STORE_STATIC_ENTRY(id, entry, lib_str, e_type, e_get, e_set)\
+	__UK_STORE_STATIC_ENTRY(id, entry, lib_str, e_type, e_get, e_set)
+
+
+/**
+ * Helper to create entry array elements for uk_store_create_object()
+ *
+ * @_id   entry id
+ * @_name entry name (without quotes)
+ * @_type entry type, e.g s8, u16, charp
+ * @get   getter function
+ * @set   setter function
+ */
+#define UK_STORE_ENTRY(_id, _name, _type, _get, _set)		\
+(								\
+	&(struct uk_store_entry) {				\
+		.id = _id,					\
+		.name = STRINGIFY(_name),			\
+		.type = UK_STORE_ENTRY_TYPE(_type),		\
+		.get._type = _get,				\
+		.set._type = _set,				\
+	}							\
+)
 
 /**
  * Adds an entry to the entry section of a library.
  *
+ * @param id entry id
  * @param entry the entry in the section
  * @param e_type type for the entry, e.g., s8, u16, charp
  * @param e_get getter pointer (optional, can be NULL)
  * @param e_set setter pointer (optional, can be NULL)
- * @param cookie a cookie for extra storage
  */
-#define UK_STORE_STATIC_ENTRY(entry, e_type, e_get, e_set, cookie)	\
-	_UK_STORE_STATIC_ENTRY(entry, STRINGIFY(__LIBNAME__),		\
-		e_type, e_get, e_set, cookie)
-
-const struct uk_store_entry *
-_uk_store_get_static_entry(unsigned int libid, const char *e_name);
-
-static inline const struct uk_store_entry *
-_uk_store_get_entry(unsigned int libid, const char *f_name __unused,
-			const char *e_name)
-{
-	return _uk_store_get_static_entry(libid, e_name);
-}
+#define UK_STORE_STATIC_ENTRY(id, entry, e_type, e_get, e_set)		\
+	_UK_STORE_STATIC_ENTRY(id, entry, STRINGIFY(__LIBNAME__),	\
+			       e_type, e_get, e_set)
 
 /**
- * Searches for an entry in a folder in a library. Increases the refcount.
+ * Creates an object
  *
- * @param libname the name of the library to search in
- * @param foldername the name of the folder to search (NULL for static entries)
- * @param entryname the name of the entry to search for
- * @return the found entry or NULL
+ * Allocates memory and initializes a new uk_store object.
+ *
+ * @param a       allocator instance to allocate this object from
+ * @param id      the id of the new object
+ * @param name    the name of the new object
+ * @param entries NULL terminated array of struct uk_store_entry describing
+ *                the entries of this object. These can be defined with the
+ *                UK_STORE_ENTRY helper. You should define the superset of
+ *                entries, including ones disabled by default. At runtime,
+ *                disabled entries are indicated by the return code of
+ *                get_value()
+ * @param cookie  caller defined data. This is passed to the getter function
+ * @return        pointer to the allocated object, errptr otherwise
  */
-#define uk_store_get_entry(libname, foldername, entryname)	\
-	_uk_store_get_entry(uk_store_libid(libname), foldername, entryname)
+struct uk_store_object *
+uk_store_obj_alloc(struct uk_alloc *a, __u64 id, const char *name,
+		   const struct uk_store_entry *entries[], void *cookie);
 
 /**
- * Decreases the refcount. When it reaches 0, the memory is freed
+ * Associates an object to the caller library
  *
  * Guard this with `#if CONFIG_LIBUKSTORE`
  *
- * @param entry the entry to release
+ * @param object     the object to add to the caller library
+ * @return           0 on success and < 0 on failure
  */
-#define uk_store_release_entry(entry)	\
-	_uk_store_release_entry((entry))
-
-void
-_uk_store_release_entry(const struct uk_store_entry *entry);
+#define uk_store_obj_add(obj)					\
+	_uk_store_obj_add(uk_libid_self(), (obj))
 
 int
-_uk_store_get_u8(const struct uk_store_entry *e, __u8 *out);
-int
-_uk_store_get_s8(const struct uk_store_entry *e, __s8 *out);
-int
-_uk_store_get_u16(const struct uk_store_entry *e, __u16 *out);
-int
-_uk_store_get_s16(const struct uk_store_entry *e, __s16 *out);
-int
-_uk_store_get_u32(const struct uk_store_entry *e, __u32 *out);
-int
-_uk_store_get_s32(const struct uk_store_entry *e, __s32 *out);
-int
-_uk_store_get_u64(const struct uk_store_entry *e, __u64 *out);
-int
-_uk_store_get_s64(const struct uk_store_entry *e, __s64 *out);
-int
-_uk_store_get_uptr(const struct uk_store_entry *e, __uptr *out);
-int
-_uk_store_get_charp(const struct uk_store_entry *e, char **out);
+_uk_store_obj_add(__u16 library_id, struct uk_store_object *object);
+
+/**
+ * Acquires an object
+ *
+ * Increments the object's refcount and returns the object.
+ * Evern call must be paired with a call to uk_store_release_object()
+ * to decrement the refcount.
+ *
+ * @param library_id owner library id as returned by uklibid
+ * @param object_id  object id
+ * @return           pointer to object
+ */
+struct uk_store_object *
+uk_store_obj_acquire(__u16 library_id, __u64 object_id);
+
+/**
+ * Releases an object
+ *
+ * Decrements the object's refcount.
+ *
+ * @param object  object to release
+ */
+void uk_store_obj_release(struct uk_store_object *object);
+
+/**
+ * Looks up a static entry of a library.
+ *
+ * @param libid    owner library
+ * @param entry_id the id of the entry to look up
+ * @return the matched entry or NULL
+ */
+const struct uk_store_entry *
+uk_store_static_entry_get(__u16 library_id, __u64 entry_id);
+
+/**
+ * Looks up an entry in an object of a library.
+ *
+ * @param object   target object
+ * @param entry_id the id of the entry to look up
+ * @return the matched entry or NULL
+ */
+const struct uk_store_entry *
+uk_store_obj_entry_get(struct uk_store_object *object_id, __u64 entry_id);
 
 /**
  * Calls the getter to get it's value.
@@ -310,39 +352,17 @@ _uk_store_get_charp(const struct uk_store_entry *e, char **out);
 #define uk_store_get_value(entry, outtype, out)	\
 	_uk_store_get_ ## outtype((entry), (out))
 
-/**
- * Calls the ncharp getter to get it's value.
- * The caller must provide a buffer with enough space to store the result.
- * The max length of the result is given by maxlen.
- *
- * @param e the entry to call the getter from
- * @param out space to store the result of the call
- * @param maxlen the maximum length of the result
- * @return 0 or error on fail
- */
-int
-uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen);
-
-int
-_uk_store_set_u8(const struct uk_store_entry *e, __u8 val);
-int
-_uk_store_set_s8(const struct uk_store_entry *e, __s8 val);
-int
-_uk_store_set_u16(const struct uk_store_entry *e, __u16 val);
-int
-_uk_store_set_s16(const struct uk_store_entry *e, __s16 val);
-int
-_uk_store_set_u32(const struct uk_store_entry *e, __u32 val);
-int
-_uk_store_set_s32(const struct uk_store_entry *e, __s32 val);
-int
-_uk_store_set_u64(const struct uk_store_entry *e, __u64 val);
-int
-_uk_store_set_s64(const struct uk_store_entry *e, __s64 val);
-int
-_uk_store_set_uptr(const struct uk_store_entry *e, __uptr val);
-int
-_uk_store_set_charp(const struct uk_store_entry *e, const char *val);
+int _uk_store_get_u8(const struct uk_store_entry *e, __u8 *out);
+int _uk_store_get_s8(const struct uk_store_entry *e, __s8 *out);
+int _uk_store_get_u16(const struct uk_store_entry *e, __u16 *out);
+int _uk_store_get_s16(const struct uk_store_entry *e, __s16 *out);
+int _uk_store_get_u32(const struct uk_store_entry *e, __u32 *out);
+int _uk_store_get_s32(const struct uk_store_entry *e, __s32 *out);
+int _uk_store_get_u64(const struct uk_store_entry *e, __u64 *out);
+int _uk_store_get_s64(const struct uk_store_entry *e, __s64 *out);
+int _uk_store_get_uptr(const struct uk_store_entry *e, __uptr *out);
+int _uk_store_get_charp(const struct uk_store_entry *e, char **out);
+int _uk_store_get_ncharp(const struct uk_store_entry *e, char *out, __sz maxlen);
 
 /**
  * Calls the setter to set a new value.
@@ -355,6 +375,17 @@ _uk_store_set_charp(const struct uk_store_entry *e, const char *val);
  */
 #define uk_store_set_value(entry, intype, in)	\
 	_uk_store_set_ ## intype((entry), (in))
+
+int _uk_store_set_u8(const struct uk_store_entry *e, __u8 val);
+int _uk_store_set_s8(const struct uk_store_entry *e, __s8 val);
+int _uk_store_set_u16(const struct uk_store_entry *e, __u16 val);
+int _uk_store_set_s16(const struct uk_store_entry *e, __s16 val);
+int _uk_store_set_u32(const struct uk_store_entry *e, __u32 val);
+int _uk_store_set_s32(const struct uk_store_entry *e, __s32 val);
+int _uk_store_set_u64(const struct uk_store_entry *e, __u64 val);
+int _uk_store_set_s64(const struct uk_store_entry *e, __s64 val);
+int _uk_store_set_uptr(const struct uk_store_entry *e, __uptr val);
+int _uk_store_set_charp(const struct uk_store_entry *e, const char *val);
 
 #endif /* CONFIG_LIBUKSTORE */
 

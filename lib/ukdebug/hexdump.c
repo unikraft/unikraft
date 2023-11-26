@@ -241,26 +241,26 @@ int uk_hexdumpf(FILE *fp, const void *data, size_t len, size_t addr0, int flags,
 	return _hxd(&o, data, len, addr0, flags, grps_per_line, line_prefix);
 }
 
-void _uk_hexdumpd(const char *libname, const char *srcname,
+void _uk_hexdumpd(__u16 libid, const char *srcname,
 		  unsigned int srcline, const void *data, size_t len,
 		  size_t addr0, int flags, unsigned int grps_per_line,
 		  const char *line_prefix)
 {
 	struct out_dev o;
 
-	out_dev_init_debug(&o, libname, srcname, srcline);
+	out_dev_init_debug(&o, libid, srcname, srcline);
 	_hxd(&o, data, len, addr0, flags, grps_per_line, line_prefix);
 }
 
 #if CONFIG_LIBUKDEBUG_PRINTK
-void _uk_hexdumpk(int lvl, const char *libname, const char *srcname,
+void _uk_hexdumpk(int lvl, __u16 libid, const char *srcname,
 		  unsigned int srcline, const void *data, size_t len,
 		  size_t addr0, int flags, unsigned int grps_per_line,
 		  const char *line_prefix)
 {
 	struct out_dev o;
 
-	out_dev_init_kern(&o, lvl, libname, srcname, srcline);
+	out_dev_init_kern(&o, lvl, libid, srcname, srcline);
 	_hxd(&o, data, len, addr0, flags, grps_per_line, line_prefix);
 }
 #endif

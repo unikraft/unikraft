@@ -77,6 +77,10 @@ if LIBUKBOOT
 	int "Maximum number of arguments (max. size of argv)"
 	default 60
 
+	config LIBUKBOOT_DISABLE_WEAK_MAIN
+	bool
+	default n
+
 	choice LIBUKBOOT_INITALLOC
 	prompt "Initialize memory allocator"
 	default LIBUKBOOT_INITBBUDDY
@@ -123,9 +127,7 @@ if LIBUKBOOT
 	default 0x400000000
 	depends on HAVE_PAGING
 	depends on !LIBUKBOOT_NOALLOC
-	# TODO: This is temporary until all platforms/archs supporting paging
-	# have switched to not initialize the heap in the platform.
-	depends on (ARCH_X86_64 && PLAT_KVM)
+	depends on PLAT_KVM
 
 	choice LIBUKBOOT_INITSCHED
 	prompt "Initialize scheduler"

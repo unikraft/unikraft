@@ -49,6 +49,9 @@ SECTIONS
 	_boot_stack_end	= 0x404000;
 	_page_dir	= 0x404000;	/* 16 KB translation table */
 	.		= 0x408000;
+
+	_base_addr = .;		/* Symbol to represent the load base address */
+
 	_text = .;			/* Text and read-only data */
 	.text : {
 		*(.text.zimageboot)	/* zImage boot header & code
@@ -122,5 +125,5 @@ SECTIONS
 
 	DEBUG_SYMBOLS
 
-	/DISCARD/ : { *(.note.gnu.build-id) }
+	DISCARDS
 }

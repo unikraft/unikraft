@@ -222,7 +222,7 @@ UK_SYSCALL_R_DEFINE(int, mount, const char*, dev, const char*, dir,
 	/*
 	 * Create VFS mount entry.
 	 */
-	mp = malloc(sizeof(struct mount));
+	mp = calloc(1, sizeof(struct mount));
 	if (!mp) {
 		error = ENOMEM;
 		goto err1;
@@ -232,8 +232,16 @@ UK_SYSCALL_R_DEFINE(int, mount, const char*, dev, const char*, dir,
 	mp->m_flags = flags;
 	mp->m_dev = device;
 	mp->m_data = NULL;
-	strlcpy(mp->m_path, dir, sizeof(mp->m_path));
-	strlcpy(mp->m_special, dev, sizeof(mp->m_special));
+	mp->m_path = strndup(dir, PATH_MAX - 1);
+	if (!mp->m_path) {
+		error = ENOMEM;
+		goto err_free_mp;
+	}
+	mp->m_special = strndup(dev, PATH_MAX - 1);
+	if (!mp->m_special) {
+		error = ENOMEM;
+		goto err_free_m_path;
+	}
 
 	/*
 	 * Get vnode to be covered in the upper file system.
@@ -245,7 +253,7 @@ UK_SYSCALL_R_DEFINE(int, mount, const char*, dev, const char*, dir,
 		if ((error = namei(dir, &dp_covered)) != 0) {
 
 			error = ENOENT;
-			goto err2;
+			goto err_free_m_special;
 		}
 		if (dp_covered->d_vnode->v_type != VDIR) {
 			error = ENOTDIR;
@@ -296,7 +304,11 @@ UK_SYSCALL_R_DEFINE(int, mount, const char*, dev, const char*, dir,
  err3:
 	if (dp_covered)
 		drele(dp_covered);
- err2:
+ err_free_m_special:
+	free(mp->m_special);
+ err_free_m_path:
+	free(mp->m_path);
+ err_free_mp:
 	free(mp);
  err1:
 	if (device)
@@ -363,6 +375,8 @@ found:
 
 	if (mp->m_dev)
 		device_close(mp->m_dev);
+	free(mp->m_special);
+	free(mp->m_path);
 	free(mp);
  out:
 	uk_mutex_unlock(&mount_lock);

@@ -5,12 +5,15 @@
 ################################################################################
 
 COMPFLAGS    += -nostdlib
-COMPFLAGS    += -U __linux__ -U __FreeBSD__ -U __sun__
-COMPFLAGS-$(call have_gcc)	+= -fno-tree-sra -fno-split-stack -nostdinc
+COMPFLAGS    += -U __linux__ -U __FreeBSD__ -U __sun__ -nostdinc
+COMPFLAGS-$(call have_gcc)	+= -fno-tree-sra -fno-split-stack
 
 ifneq ($(HAVE_STACKPROTECTOR),y)
 COMPFLAGS    += -fno-stack-protector
 endif
+COMPFLAGS-$(call gcc_version_ge,8,0)	+= -fcf-protection=none
+COMPFLAGS-$(call have_clang)	+= -fcf-protection=none
+
 COMPFLAGS    += -Wall -Wextra
 COMPFLAGS-$(call have_clang)	+= -Wdocumentation -Wdocumentation-pedantic
 
@@ -86,15 +89,35 @@ M4FLAGS      += -DUK_VERSION=$(UK_VERSION).$(UK_SUBVERSION)
 # If GCC supports "-no-pie" flag, we will add this flag to link flags to
 # override "pie" option, because some distributions will set
 # "--enable-default-pie" by default.
+ifeq ($(CONFIG_OPTIMIZE_PIE),y)
+ifeq ($(call have_gcc),y)
+$(call error_if_gcc_version_lt,7,0)
+endif
+COMPFLAGS-$(call gcc_version_ge,7,0)	+= -fPIE
+LDFLAGS-$(call gcc_version_ge,7,0)	+= -static-pie
+LDFLAGS-$(call gcc_version_ge,7,0)	+= -Wl,--no-dynamic-linker
+LDFLAGS-$(call gcc_version_ge,7,0)	+= -z notext -z norelro
+COMPFLAGS-$(call have_clang)	+= -fPIE
+LDFLAGS-$(call have_clang)	+= -static-pie
+LDFLAGS-$(call have_clang)	+= -Wl,--no-dynamic-linker
+LDFLAGS-$(call have_clang)	+= -z notext -z norelro
+SECT_STRIP_FLAGS-$(CONFIG_OPTIMIZE_PIE) += -R .dynamic
+SECT_STRIP_FLAGS-$(CONFIG_OPTIMIZE_PIE) += -R .dynsym
+SECT_STRIP_FLAGS-$(CONFIG_OPTIMIZE_PIE) += -R .dynstr
+SECT_STRIP_FLAGS-$(CONFIG_OPTIMIZE_PIE) += -R .rela.dyn
+else
 COMPFLAGS-$(call gcc_version_ge,6,1)	+= -fno-PIC
 LDFLAGS-$(call gcc_version_ge,6,1)	+= -no-pie
+COMPFLAGS-$(call have_clang)	+= -fno-PIC
+LDFLAGS-$(call have_clang)	+= -no-pie
+endif
+
 ifeq ($(call gcc_version_ge,10,0),y)
-COMPFLAGS-y += -fhosted -ffreestanding -fno-tree-loop-distribute-patterns
+COMPFLAGS-y += -fno-tree-loop-distribute-patterns
 LIBLDFLAGS-$(CONFIG_OPTIMIZE_LTO) += -flinker-output=nolto-rel
 LDFLAGS-$(CONFIG_OPTIMIZE_LTO) += -flinker-output=nolto-rel
 endif
 
 ASFLAGS-$(call have_clang)     += -mllvm -asm-macro-max-nesting-depth=1000
-COMPFLAGS-$(call have_clang)	+= -fno-builtin -fno-PIC
-LDFLAGS-$(call have_clang)	+= -no-pie
+COMPFLAGS-$(call have_clang)	+= -fno-builtin
 

@@ -46,6 +46,8 @@
 #include <uk/assert.h>
 #include <uk/print.h>
 #include <uk/plat/paging.h>
+#include <uk/plat/common/sections.h>
+#include <uk/plat/common/bootinfo.h>
 #include <uk/falloc.h>
 
 #define __PLAT_CMN_ARCH_PAGING_H__
@@ -86,6 +88,7 @@ static unsigned int pg_page_largest_level = PAGE_LEVEL;
  * need a way to derive the struct pagetable pointer from the configured
  * HW page table base pointer.
  */
+static struct uk_pagetable kernel_pt;
 static struct uk_pagetable *pg_active_pt;
 
 struct uk_pagetable *ukplat_pt_get_active(void)
@@ -264,7 +267,7 @@ int ukplat_pt_init(struct uk_pagetable *pt, __paddr_t start, __sz len)
 	}
 
 	UK_ASSERT(start <= __PADDR_MAX - len);
-	UK_ASSERT(ukarch_paddr_range_isvalid(start, start + len));
+	UK_ASSERT(ukarch_paddr_range_isvalid(start, len));
 
 	/* Initialize the frame allocator and any architecture-dependent parts
 	 * of the new page table
@@ -304,7 +307,7 @@ int ukplat_pt_add_mem(struct uk_pagetable *pt, __paddr_t start, __sz len)
 		return 0;
 
 	UK_ASSERT(start <= __PADDR_MAX - len);
-	UK_ASSERT(ukarch_paddr_range_isvalid(start, start + len));
+	UK_ASSERT(ukarch_paddr_range_isvalid(start, len));
 
 	return pgarch_pt_add_mem(pt, start, len);
 }
@@ -530,12 +533,12 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 	UK_ASSERT(PAGE_Lx_ALIGNED(len, to_lvl));
 	UK_ASSERT(PAGE_Lx_ALIGNED(vaddr, to_lvl));
 	UK_ASSERT(vaddr <= __VADDR_MAX - len);
-	UK_ASSERT(ukarch_vaddr_range_isvalid(vaddr, vaddr + len));
+	UK_ASSERT(ukarch_vaddr_range_isvalid(vaddr, len));
 
 	if (paddr != __PADDR_ANY) {
 		UK_ASSERT(PAGE_Lx_ALIGNED(paddr, to_lvl));
 		UK_ASSERT(paddr <= __PADDR_MAX - len);
-		UK_ASSERT(ukarch_paddr_range_isvalid(paddr, paddr + len));
+		UK_ASSERT(ukarch_paddr_range_isvalid(paddr, len));
 
 		alloc_pmem = 0;
 	} else
@@ -738,7 +741,7 @@ TOO_BIG:
 			pt->nr_lx_pages[lvl]++;
 #endif /* CONFIG_PAGING_STATS */
 
-		if (PT_Lx_PTE_PRESENT(orig_pte, lvl))
+		if (PT_Lx_PTE_PRESENT(orig_pte, lvl) && pt == pg_active_pt)
 			ukarch_tlb_flush_entry(vaddr);
 
 NEXT_PTE:
@@ -953,7 +956,7 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 		UK_ASSERT(PAGE_Lx_ALIGNED(len, to_lvl));
 		UK_ASSERT(PAGE_Lx_ALIGNED(vaddr, to_lvl));
 		UK_ASSERT(vaddr <= __VADDR_MAX - len);
-		UK_ASSERT(ukarch_vaddr_range_isvalid(vaddr, vaddr + len));
+		UK_ASSERT(ukarch_vaddr_range_isvalid(vaddr, len));
 
 		pte_idx = PT_Lx_IDX(vaddr, lvl);
 		page_size = PAGE_Lx_SIZE(lvl);
@@ -1039,7 +1042,7 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			if (unlikely(rc))
 				return rc;
 
-			if (vaddr != __VADDR_ANY)
+			if (vaddr != __VADDR_ANY && pt == pg_active_pt)
 				ukarch_tlb_flush_entry(vaddr);
 
 #ifdef CONFIG_PAGING_STATS
@@ -1149,7 +1152,7 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			if (unlikely(rc))
 				return rc;
 
-			if (vaddr != __VADDR_ANY)
+			if (vaddr != __VADDR_ANY && pt == pg_active_pt)
 				ukarch_tlb_flush_entry(vaddr);
 
 			pg_pt_free(pt, pt_vaddr_cache[plvl], plvl);
@@ -1173,7 +1176,7 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 
 	} while (1);
 
-	if (vaddr == __VADDR_ANY)
+	if (vaddr == __VADDR_ANY && pt == pg_active_pt)
 		ukarch_tlb_flush();
 
 	return 0;
@@ -1234,7 +1237,7 @@ static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 		UK_ASSERT(PAGE_Lx_ALIGNED(len, to_lvl));
 		UK_ASSERT(PAGE_Lx_ALIGNED(vaddr, to_lvl));
 		UK_ASSERT(vaddr <= __VADDR_MAX - len);
-		UK_ASSERT(ukarch_vaddr_range_isvalid(vaddr, vaddr + len));
+		UK_ASSERT(ukarch_vaddr_range_isvalid(vaddr, len));
 
 		pte_idx = PT_Lx_IDX(vaddr, lvl);
 		page_size = PAGE_Lx_SIZE(lvl);
@@ -1311,7 +1314,7 @@ static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			if (unlikely(rc))
 				return rc;
 
-			if (vaddr != __VADDR_ANY)
+			if (vaddr != __VADDR_ANY && pt == pg_active_pt)
 				ukarch_tlb_flush_entry(vaddr);
 		}
 
@@ -1351,7 +1354,7 @@ static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 
 	} while (1);
 
-	if (vaddr == __VADDR_ANY)
+	if (vaddr == __VADDR_ANY && pt == pg_active_pt)
 		ukarch_tlb_flush();
 
 	return 0;
@@ -1417,4 +1420,116 @@ void ukplat_page_kunmap(struct uk_pagetable *pt, __vaddr_t vaddr,
 	len = pages * PAGE_Lx_SIZE(level);
 
 	pgarch_kunmap(pt, vaddr, len);
+}
+
+static inline unsigned long bootinfo_to_page_attr(__u16 flags)
+{
+	unsigned long prot = 0;
+
+	if (flags & UKPLAT_MEMRF_READ)
+		prot |= PAGE_ATTR_PROT_READ;
+	if (flags & UKPLAT_MEMRF_WRITE)
+		prot |= PAGE_ATTR_PROT_WRITE;
+	if (flags & UKPLAT_MEMRF_EXECUTE)
+		prot |= PAGE_ATTR_PROT_EXEC;
+
+	return prot;
+}
+
+extern struct ukplat_memregion_desc bpt_unmap_mrd;
+
+int ukplat_paging_init(void)
+{
+	struct ukplat_memregion_desc *mrd;
+	unsigned long prot;
+	__vaddr_t vaddr;
+	__paddr_t paddr;
+	__sz len;
+	int rc;
+
+	/* Initialize the frame allocator with the free physical memory
+	 * regions supplied via the boot info. The new page table uses the
+	 * one currently active.
+	 */
+	rc = -ENOMEM; /* In case there is no region */
+	ukplat_memregion_foreach(&mrd, UKPLAT_MEMRT_FREE, 0, 0) {
+		UK_ASSERT(mrd->vbase == mrd->pbase);
+		UK_ASSERT(!(mrd->pbase & ~PAGE_MASK));
+		UK_ASSERT(mrd->len);
+		UK_ASSERT(!(mrd->len & ~PAGE_MASK));
+
+		/* Not mapped */
+		mrd->vbase = __U64_MAX;
+		mrd->flags &= ~UKPLAT_MEMRF_PERMS;
+
+		if (!kernel_pt.fa) {
+			rc = ukplat_pt_init(&kernel_pt, mrd->pbase, mrd->len);
+			if (unlikely(rc))
+				kernel_pt.fa = NULL;
+		} else {
+			rc = ukplat_pt_add_mem(&kernel_pt, mrd->pbase,
+					       mrd->len);
+		}
+
+		/* We do not fail if we cannot add this memory region to the
+		 * frame allocator. If the range is too small to hold the
+		 * metadata, this is expected. Just ignore this error.
+		 */
+		if (unlikely(rc && rc != -ENOMEM))
+			uk_pr_err("Cannot add %12lx-%12lx to paging: %d\n",
+				  mrd->pbase, mrd->pbase + mrd->len, rc);
+	}
+
+	/* The frame allocator should've only had page-aligned memory regions
+	 * added to it. Make sure nothing happened in the meantime.
+	 */
+	UK_ASSERT(!(kernel_pt.fa->free_memory & ~PAGE_MASK));
+
+	if (unlikely(!kernel_pt.fa))
+		return rc;
+
+	/* Perform unmappings */
+	ukplat_memregion_foreach(&mrd, 0, UKPLAT_MEMRF_UNMAP,
+				 UKPLAT_MEMRF_UNMAP) {
+		UK_ASSERT(mrd->vbase != __U64_MAX);
+
+		vaddr = PAGE_ALIGN_DOWN(mrd->vbase);
+		len   = PAGE_ALIGN_UP(mrd->len + (mrd->vbase - vaddr));
+
+		rc = ukplat_page_unmap(&kernel_pt, vaddr,
+				       len >> PAGE_SHIFT,
+				       PAGE_FLAG_KEEP_FRAMES);
+		if (unlikely(rc))
+			return rc;
+	}
+
+	/* Perform mappings */
+	ukplat_memregion_foreach(&mrd, 0, UKPLAT_MEMRF_MAP,
+				 UKPLAT_MEMRF_MAP) {
+		UK_ASSERT(mrd->vbase != __U64_MAX);
+
+		vaddr = PAGE_ALIGN_DOWN(mrd->vbase);
+		paddr = PAGE_ALIGN_DOWN(mrd->pbase);
+		len   = PAGE_ALIGN_UP(mrd->len + (mrd->vbase - vaddr));
+
+#if defined(CONFIG_ARCH_ARM_64)
+		if (!RANGE_CONTAIN(bpt_unmap_mrd.pbase, bpt_unmap_mrd.len,
+				   paddr, len))
+			continue;
+#endif
+
+		prot  = bootinfo_to_page_attr(mrd->flags);
+
+		rc = ukplat_page_map(&kernel_pt, vaddr, paddr,
+				     len >> PAGE_SHIFT, prot, 0);
+		if (unlikely(rc))
+			return rc;
+	}
+
+	/* Activate page table */
+	rc = ukplat_pt_set_active(&kernel_pt);
+	if (unlikely(rc))
+		return rc;
+
+	return 0;
 }

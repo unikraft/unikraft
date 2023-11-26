@@ -9,9 +9,13 @@ menuconfig LIBPOSIX_FUTEX
 		Linux-compatible futex calls
 
 if LIBPOSIX_FUTEX
+config LIBPOSIX_FUTEX_DEBUG
+	bool "Enable debug messages"
+	default n
 
 config LIBPOSIX_FUTEX_TEST
 	bool "Enable tests"
 	default n
 	select LIBUKTEST
+	select LIBSYSCALL_SHIM
 endif

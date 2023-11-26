@@ -44,6 +44,7 @@ struct schedcoop {
 
 	struct uk_thread idle;
 	__nsec idle_return_time;
+	__nsec ts_prev_switch;
 };
 
 static inline struct schedcoop *uksched2schedcoop(struct uk_sched *s)
@@ -63,6 +64,7 @@ static void schedcoop_schedule(struct uk_sched *s)
 	if (unlikely(ukplat_lcpu_irqs_disabled()))
 		UK_CRASH("Must not call %s with IRQs disabled\n", __func__);
 
+	now = ukplat_monotonic_clock();
 	prev = uk_thread_current();
 	flags = ukplat_lcpu_save_irqf();
 
@@ -71,12 +73,18 @@ static void schedcoop_schedule(struct uk_sched *s)
 		UK_CRASH("Must not call %s from a callback\n", __func__);
 #endif
 
+	/* Update execution time of current thread */
+	/* WARNING: We assume here that scheduler `s` is only responsible for
+	 *          the current logical CPU. Otherwise, we would have to store
+	 *          the time of the last context switch per logical core.
+	 */
+	prev->exec_time += now - c->ts_prev_switch;
+	c->ts_prev_switch = now;
+
 	/* Examine all sleeping threads.
 	 * Wake up expired ones and find the time when the next timeout expires.
 	 */
-	now = ukplat_monotonic_clock();
 	min_wakeup_time = 0;
-
 	UK_TAILQ_FOREACH_SAFE(thread, &c->sleep_queue,
 			      queue, tmp) {
 		if (likely(thread->wakeup_time)) {
@@ -188,24 +196,33 @@ static __noreturn void idle_thread_fn(void *argp)
 {
 	struct schedcoop *c = (struct schedcoop *) argp;
 	__nsec now, wake_up_time;
+	unsigned long flags;
 
 	UK_ASSERT(c);
 
 	for (;;) {
+		flags = ukplat_lcpu_save_irqf();
+
 		/*
 		 * FIXME: We assume that `uk_sched_thread_gc()` is non-blocking
 		 *        because we implement a cooperative scheduler. However,
 		 *        this assumption may not be true depending on the
 		 *        destructor functions that are assigned to the threads
 		 *        and are called by `uk_sched_thred_gc()`.
+		 *	  Also check if in the meantime we got a runnable
+		 *	  thread.
 		 * NOTE:  This idle thread must be non-blocking so that the
 		 *        scheduler has always something to schedule.
 		 */
-		if (uk_sched_thread_gc(&c->sched) > 0) {
-			/* We collected successfully some garbage.
+		if (uk_sched_thread_gc(&c->sched) > 0 ||
+		    UK_TAILQ_FIRST(&c->run_queue)) {
+			/* We collected successfully some garbage or there is
+			 * a runnable thread in the queue.
 			 * Check if something else can be scheduled now.
 			 */
+			ukplat_lcpu_restore_irqf(flags);
 			schedcoop_schedule(&c->sched);
+
 			continue;
 		}
 
@@ -213,9 +230,9 @@ static __noreturn void idle_thread_fn(void *argp)
 		wake_up_time = (volatile __nsec) c->idle_return_time;
 		now = ukplat_monotonic_clock();
 
-		if (wake_up_time > now) {
+		if (!wake_up_time || wake_up_time > now) {
 			if (wake_up_time)
-				ukplat_lcpu_halt_to(wake_up_time);
+				ukplat_lcpu_halt_irq_until(wake_up_time);
 			else
 				ukplat_lcpu_halt_irq();
 
@@ -223,19 +240,28 @@ static __noreturn void idle_thread_fn(void *argp)
 			ukplat_lcpu_irqs_handle_pending();
 		}
 
+		ukplat_lcpu_restore_irqf(flags);
+
 		/* try to schedule a thread that might now be available */
 		schedcoop_schedule(&c->sched);
 	}
 }
 
-static int schedcoop_start(struct uk_sched *s __maybe_unused,
+static int schedcoop_start(struct uk_sched *s,
 			   struct uk_thread *main_thread __maybe_unused)
 {
+	struct schedcoop *c = uksched2schedcoop(s);
+
 	UK_ASSERT(main_thread);
 	UK_ASSERT(main_thread->sched == s);
 	UK_ASSERT(uk_thread_is_runnable(main_thread));
 	UK_ASSERT(!uk_thread_is_exited(main_thread));
 	UK_ASSERT(uk_thread_current() == main_thread);
+
+	/* Since we are now starting to schedule, we save the current timestamp
+	 * as the start time for the first time slice.
+	 */
+	c->ts_prev_switch = ukplat_monotonic_clock();
 
 	/* NOTE: We do not put `main_thread` into the thread list.
 	 *       Current running threads will be added as soon as
@@ -245,6 +271,18 @@ static int schedcoop_start(struct uk_sched *s __maybe_unused,
 	ukplat_lcpu_enable_irq();
 
 	return 0;
+}
+
+static const struct uk_thread *schedcoop_idle_thread(struct uk_sched *s,
+						     unsigned int proc_id)
+{
+	struct schedcoop *c = uksched2schedcoop(s);
+
+	/* NOTE: We only support one processing LCPU (for now) */
+	if (proc_id > 0)
+		return NULL;
+
+	return &(c->idle);
 }
 
 struct uk_sched *uk_schedcoop_create(struct uk_alloc *a)
@@ -281,6 +319,7 @@ struct uk_sched *uk_schedcoop_create(struct uk_alloc *a)
 			schedcoop_thread_remove,
 			schedcoop_thread_blocked,
 			schedcoop_thread_woken,
+			schedcoop_idle_thread,
 			a);
 
 	/* Add idle thread to the scheduler's thread list */

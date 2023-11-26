@@ -1,9 +1,10 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ * Authors: Simon Kuenzer <simon@unikraft.io>
  *
  *
  * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2023, Unikraft GmbH. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -47,6 +48,7 @@ int uk_argnparse(char *argb, __sz maxlen, char *argv[], int maxcount)
 {
 	int argc = 0;
 	int prev_wspace = 1;
+	int prev_escape = 0;
 	char in_quote = '\0';
 	__sz i;
 
@@ -66,7 +68,7 @@ int uk_argnparse(char *argb, __sz maxlen, char *argv[], int maxcount)
 		case '\n':
 		case '\t':
 		case '\v':
-			if (!in_quote) {
+			if (!in_quote && !prev_escape) {
 				argb[i] = '\0';
 				prev_wspace = 1;
 				break;
@@ -76,6 +78,18 @@ int uk_argnparse(char *argb, __sz maxlen, char *argv[], int maxcount)
 		/* quotes */
 		case '\'':
 		case '"':
+			if (prev_escape) {
+				if (!in_quote) {
+					/* escaping removes special meaning */
+					goto regularchar;
+				} else if (argb[i] == '"') {
+					/* \" -> " */
+					left_shift(argb, i - 1, maxlen + 1);
+					--i;
+					prev_escape = 0;
+					goto regularchar;
+				}
+			}
 			if (!in_quote) {
 				in_quote = argb[i];
 				left_shift(argb, i, maxlen);
@@ -96,6 +110,27 @@ int uk_argnparse(char *argb, __sz maxlen, char *argv[], int maxcount)
 			if (prev_wspace) {
 				argv[argc++] = &argb[i];
 				prev_wspace = 0;
+				prev_escape = 0;
+			}
+
+			/* escape character handling */
+			if (argb[i] == '\\' && in_quote != '\'') {
+				if (prev_escape) {
+					/* double escape: \\ -> \ */
+					left_shift(argb, i, maxlen);
+					--i;
+					prev_escape = 0;
+				} else {
+					prev_escape = 1;
+				}
+			} else if (prev_escape) {
+				/* any character after escape symbol */
+				if (!in_quote) {
+					/* remove escape symbol */
+					left_shift(argb, i - 1, maxlen + 1);
+					--i;
+				}
+				prev_escape = 0;
 			}
 			break;
 		}

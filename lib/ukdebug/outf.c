@@ -64,13 +64,13 @@ int outf(struct out_dev *dev, const char *fmt, ...)
 		}
 		break;
 	case OUTDEV_DEBUG:
-		_uk_vprintd(dev->uk_pr.libname,
+		_uk_vprintd(dev->uk_pr.libid,
 			    dev->uk_pr.srcname, dev->uk_pr.srcline,
 			    fmt, ap);
 		break;
 #if CONFIG_LIBUKDEBUG_PRINTK
 	case OUTDEV_KERN:
-		_uk_vprintk(dev->uk_pr.lvl, dev->uk_pr.libname,
+		_uk_vprintk(dev->uk_pr.lvl, dev->uk_pr.libid,
 			    dev->uk_pr.srcname, dev->uk_pr.srcline,
 			    fmt, ap);
 		break;

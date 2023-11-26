@@ -38,10 +38,14 @@
 #include <uk/arch/limits.h>
 #include <uk/essentials.h>
 #include <uk/plat/paging.h>
+#include <uk/plat/common/cpu.h>
 #include <uk/fallocbuddy.h>
 #include <uk/print.h>
 
 #include <errno.h>
+
+#include "cpu_defs.h"
+#include "cpu.h"
 
 /* We do not support 32-bit virtual address spaces as they do not provide
  * enough space for the direct mapping of page tables. In this case, we would
@@ -98,13 +102,15 @@ pgarch_pte_create(__paddr_t paddr, unsigned long attr, unsigned int level,
 	if (!(attr & PAGE_ATTR_PROT_EXEC))
 		pte |= X86_PTE_NX;
 
+	if (attr & PAGE_ATTR_WRITECOMBINE) {
+		pte |= X86_PTE_PCD;
+		pte |= X86_PTE_PWT;
+	}
+
 	/* Take all other bits from template */
 	pte |= template & (X86_PTE_US |
-			   X86_PTE_PWT |
-			   X86_PTE_PCD |
 			   X86_PTE_ACCESSED |
 			   X86_PTE_DIRTY |
-			   X86_PTE_PAT(level) |
 			   X86_PTE_GLOBAL |
 			   X86_PTE_USER1_MASK |
 			   X86_PTE_USER2_MASK |
@@ -117,13 +123,18 @@ static inline __pte_t
 pgarch_pte_change_attr(__pte_t pte, unsigned long new_attr,
 		       unsigned int level __unused)
 {
-	pte &= ~(X86_PTE_RW | X86_PTE_NX);
+	pte &= ~(X86_PTE_RW | X86_PTE_NX | X86_PTE_PCD | X86_PTE_PWT);
 
 	if (new_attr & PAGE_ATTR_PROT_WRITE)
 		pte |= X86_PTE_RW;
 
 	if (!(new_attr & PAGE_ATTR_PROT_EXEC))
 		pte |= X86_PTE_NX;
+
+	if (new_attr & PAGE_ATTR_WRITECOMBINE) {
+		pte |= X86_PTE_PCD;
+		pte |= X86_PTE_PWT;
+	}
 
 	return pte;
 }
@@ -138,6 +149,9 @@ pgarch_attr_from_pte(__pte_t pte, unsigned int level __unused)
 
 	if (!(pte & X86_PTE_NX))
 		attr |= PAGE_ATTR_PROT_EXEC;
+
+	if ((pte & X86_PTE_PWT) && (pte & X86_PTE_PCD))
+		attr |= PAGE_ATTR_WRITECOMBINE;
 
 	return attr;
 }
@@ -168,13 +182,16 @@ pgarch_pt_pte_create(struct uk_pagetable *pt __unused, __paddr_t pt_paddr,
 	 */
 	pt_pte |= (X86_PTE_PRESENT | X86_PTE_RW);
 
+	/* Do not use the PWT/PCD bits for the PT PTEs. We only use them for
+	 * page PTEs
+	 */
+	pt_pte &= ~(X86_PTE_PWT | X86_PTE_PCD);
+
 	/* Take all other bits from template. We also keep the flags that are
 	 * ignored by the architecture. The caller might have stored custom
 	 * data in these fields
 	 */
 	pt_pte |= template & (X86_PTE_US |
-			      X86_PTE_PWT |
-			      X86_PTE_PCD |
 			      X86_PTE_ACCESSED |
 			      X86_PTE_DIRTY | /* ignored */
 			      X86_PTE_GLOBAL | /* ignored */
@@ -227,10 +244,17 @@ pgarch_kunmap(struct uk_pagetable *pt __unused, __vaddr_t vaddr __unused,
 
 static __paddr_t x86_pg_maxphysaddr;
 
-#define X86_PG_VALID_PADDR(paddr)	((paddr) < x86_pg_maxphysaddr)
+#define X86_PG_VALID_PADDR(paddr)	((paddr) <= x86_pg_maxphysaddr)
 
-int ukarch_paddr_range_isvalid(__paddr_t start, __paddr_t end)
+int ukarch_paddr_isvalid(__paddr_t addr)
 {
+	return X86_PG_VALID_PADDR(addr);
+}
+
+int ukarch_paddr_range_isvalid(__paddr_t start, __sz len)
+{
+	__paddr_t end = start + len - 1;
+
 	UK_ASSERT(start <= end);
 	return (X86_PG_VALID_PADDR(start) && X86_PG_VALID_PADDR(end));
 }
@@ -240,6 +264,7 @@ pgarch_init(void)
 {
 	__u32 eax, ebx, ecx, edx;
 	__u32 max_addr_bit;
+	__u64 efer;
 
 	/* Check for availability of extended features */
 	ukarch_x86_cpuid(0x80000000, 0, &eax, &ebx, &ecx, &edx);
@@ -257,6 +282,11 @@ pgarch_init(void)
 		return -ENOTSUP;
 	}
 
+	/* Enable the NX bit */
+	efer = rdmsrl(X86_MSR_EFER);
+	efer |= X86_EFER_NXE;
+	wrmsrl(X86_MSR_EFER, efer);
+
 #if PT_LEVELS == 5
 	ukarch_x86_cpuid(0x7, 0, &eax, &ebx, &ecx, &edx);
 
@@ -265,6 +295,15 @@ pgarch_init(void)
 		return -ENOTSUP;
 	}
 #endif /* PT_LEVELS == 5 */
+
+	/* Check for PAT support */
+	ukarch_x86_cpuid(0x1, 0, &eax, &ebx, &ecx, &edx);
+	if (unlikely(!(edx & X86_CPUID1_EDX_PAT))) {
+		uk_pr_crit("Page table attributes are not supported.\n");
+		return -ENOTSUP;
+	}
+	/* Reset PAT to default value */
+	wrmsrl(X86_MSR_PAT, X86_PAT_DEFAULT);
 
 	ukarch_x86_cpuid(0x80000008, 0, &eax, &ebx, &ecx, &edx);
 
@@ -276,7 +315,7 @@ pgarch_init(void)
 	}
 
 	max_addr_bit = (eax & X86_PG_PADDR_MASK) >> X86_PG_PADDR_SHIFT;
-	x86_pg_maxphysaddr = (1UL << max_addr_bit);
+	x86_pg_maxphysaddr = (1UL << max_addr_bit) - 1;
 
 	return 0;
 }
@@ -291,7 +330,7 @@ pgarch_pt_add_mem(struct uk_pagetable *pt, __paddr_t start, __sz len)
 	int rc;
 
 	UK_ASSERT(start <= __PADDR_MAX - len);
-	UK_ASSERT(ukarch_paddr_range_isvalid(start, start + len));
+	UK_ASSERT(ukarch_paddr_range_isvalid(start, len));
 
 	/* Reserve space for the metadata at the beginning of the area. Note
 	 * that the metadata area will be a bit too large because we eat away

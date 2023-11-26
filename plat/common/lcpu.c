@@ -39,8 +39,10 @@
 
 #include <uk/essentials.h>
 #include <uk/arch/atomic.h>
+#if CONFIG_HAVE_SMP
+#include <uk/intctlr.h>
+#endif /* CONFIG_HAVE_SMP */
 #include <uk/plat/lcpu.h>
-#include <uk/plat/irq.h>
 #include <uk/plat/time.h>
 #include <uk/plat/common/cpu.h>
 #include <uk/plat/common/lcpu.h>
@@ -49,11 +51,6 @@
 
 #include <limits.h>
 #include <errno.h>
-
-#ifdef CONFIG_ARCH_X86_64
-/* TODO: Remove when we have unified IRQ handling */
-#include <x86/apic.h>
-#endif /* CONFIG_ARCH_X86_64 */
 
 /**
  * Array of LCPUs, one for every CPU in the system.
@@ -187,13 +184,11 @@ void __noreturn ukplat_lcpu_halt(void)
 	lcpu_halt(lcpu_get_current(), 0);
 }
 
-void ukplat_lcpu_halt_to(__nsec until)
+void ukplat_lcpu_halt_irq_until(__nsec until)
 {
-	unsigned long flags;
+	UK_ASSERT(ukplat_lcpu_irqs_disabled());
 
-	flags = ukplat_lcpu_save_irqf();
 	time_block_until(until);
-	ukplat_lcpu_restore_irqf(flags);
 }
 
 __lcpuid ukplat_lcpu_id(void)
@@ -298,21 +293,11 @@ static int lcpu_ipi_run_handler(void *args __unused)
 	UK_ASSERT(lcpu_state_is_busy(this_lcpu->state));
 	ukarch_dec(&this_lcpu->state);
 
-#ifdef CONFIG_ARCH_X86_64
-	/* TODO: Remove when we have unified IRQ handling */
-	apic_ack_interrupt();
-#endif /* CONFIG_ARCH_X86_64 */
-
 	return 1;
 }
 
 static int lcpu_ipi_wakeup_handler(void *args __unused)
 {
-#ifdef CONFIG_ARCH_X86_64
-	/* TODO: Remove when we have unified IRQ handling */
-	apic_ack_interrupt();
-#endif /* CONFIG_ARCH_X86_64 */
-
 	/* Nothing to do */
 	return 1;
 }
@@ -346,14 +331,14 @@ int lcpu_mp_init(unsigned long run_irq, unsigned long wakeup_irq, void *arg)
 		return rc;
 
 	/* Register the lcpu_run and lcpu_wakeup interrupt handlers */
-	rc = ukplat_irq_register(run_irq, lcpu_ipi_run_handler, NULL);
+	rc = uk_intctlr_irq_register(run_irq, lcpu_ipi_run_handler, NULL);
 	if (unlikely(rc)) {
 		uk_pr_crit("Could not register handler for IPI IRQ %ld\n",
 			   run_irq);
 		return rc;
 	}
 
-	rc = ukplat_irq_register(wakeup_irq, lcpu_ipi_wakeup_handler, NULL);
+	rc = uk_intctlr_irq_register(wakeup_irq, lcpu_ipi_wakeup_handler, NULL);
 	if (unlikely(rc)) {
 		uk_pr_crit("Could not register handler for wakeup IRQ %ld\n",
 			   wakeup_irq);

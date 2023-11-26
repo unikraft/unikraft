@@ -1,0 +1,6 @@
+define build_uk_reloc =
+	$(call build_cmd,UKRELOC,,$(1).uk_reloc.bin,\
+		$(SCRIPTS_DIR)/mkukreloc.py $(1) && \
+		$(OBJCOPY) --update-section .uk_reloc=$(1).uk_reloc.bin $(1) 2>&1 | \
+		{ $(GREP) -v "section.*lma.*adjusted to.*" || true; })
+endef

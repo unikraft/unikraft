@@ -39,31 +39,48 @@ extern "C" {
 #include <uk/asm/atomic.h>
 
 /**
- * Perform a atomic load operation.
+ * Perform an atomic load operation.
  */
 #define ukarch_load_n(src) \
 	__atomic_load_n(src, __ATOMIC_SEQ_CST)
 
 /**
- * Perform a atomic store operation.
+ * Perform an atomic store operation.
  */
 #define ukarch_store_n(src, value) \
 	__atomic_store_n(src, value, __ATOMIC_SEQ_CST)
 
 /**
- * Perform a atomic fetch and add operation.
+ * Perform an atomic fetch and add/sub operation.
  */
 #define ukarch_fetch_add(src, value) \
 	__atomic_fetch_add(src, value, __ATOMIC_SEQ_CST)
+#define ukarch_fetch_sub(src, value) \
+	__atomic_fetch_sub(src, value, __ATOMIC_SEQ_CST)
 
 /**
- * Perform a atomic increment/decrement operation and return the
+ * Perform an atomic add/sub and fetch operation.
+ */
+#define ukarch_add_fetch(src, value) \
+	__atomic_add_fetch(src, value, __ATOMIC_SEQ_CST)
+#define ukarch_sub_fetch(src, value) \
+	__atomic_sub_fetch(src, value, __ATOMIC_SEQ_CST)
+
+/**
+ * Perform an atomic increment/decrement operation and return the
  * previous value.
  */
 #define ukarch_inc(src) \
 	ukarch_fetch_add(src, 1)
 #define ukarch_dec(src) \
-	__atomic_fetch_sub(src, 1, __ATOMIC_SEQ_CST)
+	ukarch_fetch_sub(src, 1)
+
+/**
+ * Perform an atomic OR operation and return the previous value.
+ */
+#define ukarch_or(src, val) \
+	__atomic_or_fetch(src, val, __ATOMIC_SEQ_CST)
+
 /**
  * Writes *src into *dst, and returns the previous contents of *dst.
  */

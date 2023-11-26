@@ -1,15 +1,21 @@
-# add_paramprefix $name $libname
-define _add_paramprefix =
-$(eval $(call uc,$(2))_CFLAGS += -DUK_LIBPARAM_PREFIX=$(1))
-$(eval $(call uc,$(2))_CXXFLAGS += -DUK_LIBPARAM_PREFIX=$(1))
-$(eval $(call uc,$(2))_ASFLAGS += -DUK_LIBPARAM_PREFIX=$(1))
-$(eval $(call uc,$(2))_SRCS-$(CONFIG_LIBUKLIBPARAM) += $$(LIBUKLIBPARAM_BASE)/libparam.lds.S)
+define _uk_libparam_libprefix_set =
+$(eval $(call uc,$(2))_CFLAGS += -DUK_LIBPARAM_LIBPREFIX=$(1))
+$(eval $(call uc,$(2))_CXXFLAGS += -DUK_LIBPARAM_LIBPREFIX=$(1))
+$(eval $(call uc,$(2))_ASFLAGS += -DUK_LIBPARAM_LIBPREFIX=$(1))
 endef
 
-# addlib_paramprefix $libname,$paramname(optional)
-define addlib_paramprefix =
+# Set an alternative library prefix for library parameters
+# uk_libparam_prefix_set 1:library_name, 2:new_prefix
+define uk_libparam_libprefix_set =
 $(if $(2),\
 $(eval name := $(2)),\
 $(eval name := $(1)))
-$(eval $(call _add_paramprefix,$(name),$(1),$(call uc,$(1))))
+$(eval $(call _uk_libparam_libprefix_set,$(name),$(1),$(call uc,$(1))))
+endef
+
+# Deprecated registration function
+# WARNING: This interface is here for backwards compatibility and will be
+#          removed in the near future.
+define addlib_paramprefix =
+$(call uk_libparam_libprefix_set,$(1),$(2))
 endef

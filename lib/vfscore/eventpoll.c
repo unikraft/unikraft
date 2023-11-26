@@ -30,6 +30,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _GNU_SOURCE
+
 #include <vfscore/eventpoll.h>
 #include <vfscore/file.h>
 #include <vfscore/dentry.h>

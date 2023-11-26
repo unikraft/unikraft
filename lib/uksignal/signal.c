@@ -46,39 +46,56 @@
 #endif
 #include <sys/types.h>
 #include "sigset.h"
+#include "ksigaction.h"
+
+UK_SYSCALL_R_DEFINE(int, sigaltstack, const stack_t *, ss,
+		    stack_t *, old_ss)
+{
+	return 0;
+}
 
 UK_SYSCALL_R_DEFINE(int, rt_sigaction, int, signum,
-		    const struct sigaction *__unused, act,
-		    struct sigaction *, oldact,
+		    const struct k_sigaction *__unused, act,
+		    struct k_sigaction *, oldact,
 		    size_t __unused, sigsetsize)
 {
 	if (unlikely(signum == SIGKILL || signum == SIGSTOP))
 		return -EINVAL;
 
 	if (oldact)
-		*oldact = (struct sigaction){0};
+		*oldact = (struct k_sigaction){0};
 
 	return 0;
 }
 
 #if UK_LIBC_SYSCALLS
-int sigaction(int signum, const struct sigaction *act, struct sigaction *oldact)
+int sigaction(int signum, const struct sigaction __unused *act,
+              struct sigaction *oldact)
 {
-	return rt_sigaction(signum, act, oldact, sizeof(sigset_t));
+	/* Not actually an implementation of sigaction.
+	 * Do minimal argument matching for the stub syscall. */
+	int r;
+	struct k_sigaction kold;
+	r = rt_sigaction(signum, NULL, oldact ? &kold : NULL, sizeof(sigset_t));
+	if (oldact && !r) {
+		oldact->sa_handler = kold.handler;
+		oldact->sa_flags = kold.flags;
+	}
+	return r;
 }
 
 sighandler_t signal(int signum, sighandler_t handler)
 {
-	struct sigaction old;
-	struct sigaction act = {
-		.sa_handler = handler,
-		.sa_flags = SA_RESTART, /* BSD signal semantics */
+	struct k_sigaction old;
+	struct k_sigaction act = {
+		.handler = handler,
+		.flags = SA_RESTART, /* BSD signal semantics */
 	};
 
 	if (unlikely(rt_sigaction(signum, &act, &old, sizeof(sigset_t)) < 0))
 		return SIG_ERR;
 
-	return (old.sa_flags & SA_SIGINFO) ? NULL : old.sa_handler;
+	return (old.flags & SA_SIGINFO) ? NULL : old.handler;
 }
 #endif /* UK_LIBC_SYSCALLS */
 

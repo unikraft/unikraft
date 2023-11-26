@@ -1,0 +1,9 @@
+config LIBUKBUS_PLATFORM
+	bool "Platform bus"
+	select LIBUKBUS
+	help
+		Platform bus for non-auto-discoverable devices
+
+config LIBUKBUS_PLATFORM_FDT
+	bool
+	default y if (LIBUKOFW && LIBFDT)

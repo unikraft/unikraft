@@ -30,6 +30,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#define _GNU_SOURCE
+
 #include <vfscore/eventpoll.h>
 #include <vfscore/fs.h>
 #include <vfscore/file.h>
@@ -43,10 +45,14 @@
 #include <uk/mutex.h>
 #include <uk/list.h>
 #include <uk/config.h>
+#include <uk/init.h>
 
 #include <sys/eventfd.h>
+#include <sys/ioctl.h>
 #include <inttypes.h>
 #include <errno.h>
+#include <string.h>
+#include <stdlib.h>
 
 struct eventfd {
 	/** Current value of this eventfd */
@@ -171,6 +177,9 @@ static int eventfd_vfscore_read(struct vnode *vnode,
 
 	uk_mutex_unlock(&efd->lock);
 
+	buf->uio_resid = 0;
+	buf->uio_offset = sizeof(uint64_t);
+
 	return 0;
 }
 
@@ -284,6 +293,24 @@ static int eventfd_vfscore_poll(struct vnode *vnode, unsigned int *revents,
 	return 0;
 }
 
+static int eventfd_vfscore_ioctl(struct vnode *vnode __unused,
+				 struct vfscore_file *fp __unused,
+				 unsigned long request, void *buf __unused)
+{
+
+	switch (request) {
+	case FIONBIO:
+		/* eventfd operations look for O_NONBLOCK flag. We only need to
+		 * confirm here that we support O_NONBLOCK. Setting O_NONBLOCK
+		 * is implemented with an `ioctl` call with the FIONBIO flag).
+		 */
+		return 0;
+	default:
+		break;
+	}
+	return EINVAL;
+}
+
 /* vnode operations */
 #define eventfd_vfscore_inactive ((vnop_inactive_t) vfscore_vop_einval)
 
@@ -292,7 +319,8 @@ static struct vnops eventfd_vnops = {
 	.vop_inactive = eventfd_vfscore_inactive,
 	.vop_read = eventfd_vfscore_read,
 	.vop_write = eventfd_vfscore_write,
-	.vop_poll = eventfd_vfscore_poll
+	.vop_poll = eventfd_vfscore_poll,
+	.vop_ioctl = eventfd_vfscore_ioctl
 };
 
 /* file system operations */
@@ -308,6 +336,9 @@ static struct mount eventfd_mount = {
 	.m_op = &eventfd_vfsops
 };
 
+/* Prototype of fcntl system call is needed when lib/syscall_shim is off */
+long uk_syscall_r_fcntl(long, long, long);
+
 static int do_eventfd(struct uk_alloc *a, unsigned int initval, int flags)
 {
 	int vfs_fd, ret;
@@ -316,7 +347,7 @@ static int do_eventfd(struct uk_alloc *a, unsigned int initval, int flags)
 	struct dentry *vfs_dentry;
 	struct vnode *vfs_vnode;
 
-	if (unlikely(flags & ~(EFD_CLOEXEC | EFD_SEMAPHORE)))
+	if (unlikely(flags & ~(EFD_CLOEXEC | EFD_SEMAPHORE | EFD_NONBLOCK)))
 		return -EINVAL;
 
 	/* Reserve a file descriptor number */
@@ -333,7 +364,7 @@ static int do_eventfd(struct uk_alloc *a, unsigned int initval, int flags)
 		goto ERR_MALLOC_FILE;
 	}
 
-	vfs_file = uk_malloc(a, sizeof(struct vfscore_file));
+	vfs_file = malloc(sizeof(struct vfscore_file));
 	if (unlikely(!vfs_file)) {
 		ret = -ENOMEM;
 		goto ERR_MALLOC_VFS_FILE;
@@ -381,6 +412,14 @@ static int do_eventfd(struct uk_alloc *a, unsigned int initval, int flags)
 	/* Only the dentry should hold a reference; release ours */
 	vput(vfs_vnode);
 
+	if (flags & EFD_NONBLOCK) {
+		ret = uk_syscall_r_fcntl(vfs_fd, F_SETFL, O_NONBLOCK);
+		/* Setting the O_NONBLOCK here must not fail.
+		 * According to `man` pages, `F_SETFL` returns zero on success.
+		 */
+		UK_ASSERT(ret == 0);
+	}
+
 	return vfs_fd;
 
 ERR_VFS_INSTALL:
@@ -388,7 +427,7 @@ ERR_VFS_INSTALL:
 ERR_ALLOC_DENTRY:
 	vput(vfs_vnode);
 ERR_ALLOC_VNODE:
-	uk_free(a, vfs_file);
+	free(vfs_file);
 ERR_MALLOC_VFS_FILE:
 	uk_free(a, efd);
 ERR_MALLOC_FILE:
@@ -425,3 +464,28 @@ int eventfd(unsigned int initval, int flags)
 	return ret;
 }
 #endif /* UK_LIBC_SYSCALLS */
+
+static int eventfd_mount_init(void)
+{
+	int ret;
+
+	eventfd_mount.m_path = strdup("");
+	if (!eventfd_mount.m_path) {
+		ret = -ENOMEM;
+		goto err_out;
+	}
+
+	eventfd_mount.m_special = strdup("");
+	if (!eventfd_mount.m_special) {
+		ret = -ENOMEM;
+		goto err_free_m_path;
+	}
+
+	return 0;
+
+err_free_m_path:
+	free(eventfd_mount.m_path);
+err_out:
+	return ret;
+}
+uk_lib_initcall(eventfd_mount_init);

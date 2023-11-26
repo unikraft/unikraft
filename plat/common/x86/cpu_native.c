@@ -46,8 +46,55 @@ unsigned long read_cr2(void)
 	return cr2;
 }
 
-void system_off(void)
+#ifdef CONFIG_KVM_VMM_QEMU
+
+/* The port used by QEMU by default for the isa-debug-exit device */
+#define QEMU_ISA_DEBUG_EXIT_PORT	0x501
+/* This corresponds to an 83 (41 << 1 | 1) return value from QEMU */
+#define QEMU_ISA_DEBUG_EXIT_NO_CRASH	41
+/* This corresponds to an 85 (42 << 1 | 1) return value from QEMU */
+#define QEMU_ISA_DEBUG_EXIT_CRASH	42
+
+/* The port used by QEMU by default for the pvpanic device */
+#define QEMU_PVPANIC_EXIT_PORT		0x505
+/* This corresponds to a GUEST_PANICKED event for QEMU */
+#define QEMU_PVPANIC_GUEST_PANICKED	(1 << 0)
+/* This corresponds to a GUEST_CRASHLOADED event for QEMU */
+#define QEMU_PVPANIC_GUEST_CRASHLOADED	(1 << 1)
+
+/**
+ * Trigger an exit() in QEMU with the code `value << 1 | 1`.
+ * @param value the value used in the calculation of the exit code
+ */
+static void qemu_debug_exit(int value)
 {
+	outw(QEMU_ISA_DEBUG_EXIT_PORT, value);
+}
+#endif /* CONFIG_KVM_VMM_QEMU */
+
+void system_off(enum ukplat_gstate request __maybe_unused)
+{
+#ifdef CONFIG_KVM_VMM_FIRECRACKER
+	/* Trigger the reset line via the PS/2 controller. On firecracker
+	 * this will shutdown the VM.
+	 */
+	outb(0x64, 0xFE);
+#endif /* CONFIG_KVM_VMM_FIRECRACKER */
+
+#ifdef CONFIG_KVM_VMM_QEMU
+	/* If we are crashing, then try to exit QEMU with the isa-debug-exit
+	 * device.
+	 * Should be harmless if it is not present. This is used to enable
+	 * automated tests on virtio.
+	 * Also send a panic request to the pvpanic device.
+	 * Should be also harmless and helps with automated tests.
+	 */
+	if (request == UKPLAT_CRASH) {
+		qemu_debug_exit(QEMU_ISA_DEBUG_EXIT_CRASH);
+		outb(QEMU_PVPANIC_EXIT_PORT, QEMU_PVPANIC_GUEST_PANICKED);
+	}
+#endif /* CONFIG_KVM_VMM_QEMU */
+
 	/*
 	 * Perform an ACPI shutdown by writing (SLP_TYPa | SLP_EN) to PM1a_CNT.
 	 * Generally speaking, we'd have to jump through a lot of hoops to
@@ -57,11 +104,11 @@ void system_off(void)
 	 */
 	outw(0x604, 0x2000);
 
+#ifdef CONFIG_KVM_VMM_QEMU
 	/*
 	 * If that didn't work for whatever reason, try poking the QEMU
-	 * "isa-debug-exit" device to "shutdown". Should be harmless if it is
-	 * not present. This is used to enable automated tests on virtio.  Note
-	 * that the actual QEMU exit() status will be 83 ('S', 41 << 1 | 1).
+	 * "isa-debug-exit" device to "shutdown".
 	 */
-	outw(0x501, 41);
+	qemu_debug_exit(QEMU_ISA_DEBUG_EXIT_NO_CRASH);
+#endif /* CONFIG_KVM_VMM_QEMU */
 }

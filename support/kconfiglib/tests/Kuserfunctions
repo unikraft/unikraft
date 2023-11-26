@@ -9,3 +9,6 @@ one-two  = $(one,foo bar,baz)
 one-or-more-zero  = $(one-or-more)
 one-or-more-one   = $(one-or-more,foo)
 one-or-more-three = $(one-or-more,foo,bar,baz)
+
+location-1 := $(location)
+location-2 := $(location)

@@ -86,13 +86,19 @@ void __noreturn ukplat_lcpu_halt(void);
  * Halts the current logical CPU. Execution is resumed when an interrupt/signal
  * arrives or the specified deadline expires
  *
+ * NOTE: This must be called with IRQ's disabled. On return, IRQ's are not
+ *        re-enabled.
+ *
  * @param until deadline in nanoseconds
  */
-void ukplat_lcpu_halt_to(__nsec until);
+void ukplat_lcpu_halt_irq_until(__nsec until);
 
 /**
  * Halts the current logical CPU. Execution is resumed when an interrupt/signal
  * arrives.
+ *
+ * NOTE: This must be called with IRQ's disabled. On return, IRQ's are not
+ *        re-enabled.
  */
 void ukplat_lcpu_halt_irq(void);
 
@@ -228,6 +234,22 @@ int ukplat_lcpu_wakeup(const __lcpuidx lcpuidx[], unsigned int *num);
 #define ukplat_lcpu_idx()	(0)
 #define ukplat_lcpu_count()	(1)
 #endif /* CONFIG_HAVE_SMP */
+
+/* Per-LCPU variable definition */
+
+#define UKPLAT_PER_LCPU_DEFINE(var_type, var_name) \
+	var_type var_name[CONFIG_UKPLAT_LCPU_MAXCOUNT]
+#define ukplat_per_lcpu(var_name, lcpu_idx) \
+	var_name[lcpu_idx]
+#define ukplat_per_lcpu_current(var_name) \
+	ukplat_per_lcpu(var_name, ukplat_lcpu_idx())
+
+#define UKPLAT_PER_LCPU_ARRAY_DEFINE(var_type, var_name, size) \
+	var_type var_name[CONFIG_UKPLAT_LCPU_MAXCOUNT][size]
+#define ukplat_per_lcpu_array(var_name, lcpu_idx, idx) \
+	var_name[lcpu_idx][idx]
+#define ukplat_per_lcpu_array_current(var_name, idx) \
+	ukplat_per_lcpu_array(var_name, ukplat_lcpu_idx(), idx)
 
 #ifdef __cplusplus
 }

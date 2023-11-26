@@ -4,3 +4,7 @@ LIBUKMMAP_SRCS-y += $(LIBUKMMAP_BASE)/mmap.c
 
 UK_PROVIDED_SYSCALLS-$(CONFIG_LIBUKMMAP) += mmap-6 munmap-2 madvise-3
 UK_PROVIDED_SYSCALLS-$(CONFIG_LIBUKMMAP) += mremap-5 mprotect-3
+
+ifneq ($(filter y,$(CONFIG_LIBUKMMAP_TEST) $(CONFIG_LIBUKTEST_ALL)),)
+LIBUKMMAP_SRCS-y += $(LIBUKMMAP_BASE)/tests/test_mmap.c
+endif

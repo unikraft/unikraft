@@ -53,10 +53,13 @@ extern "C" {
 #define _SC_OPEN_MAX          4
 #define _SC_PAGE_SIZE        30
 #define _SC_PAGESIZE         _SC_PAGE_SIZE
+#define _SC_GETPW_R_SIZE_MAX 70
 #define _SC_PHYS_PAGES       85
 #define _SC_AVPHYS_PAGES     86
 #define _SC_NPROCESSORS_CONF 83
 #define _SC_NPROCESSORS_ONLN 84
+
+long sysconf(int);
 #endif
 
 #include <nolibc-internal/shareddefs.h>
@@ -83,7 +86,9 @@ int execve(const char *filename, char *const argv[],
 #if CONFIG_LIBVFSCORE
 int close(int fd);
 ssize_t write(int fd, const void *buf, size_t count);
+ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset);
 ssize_t read(int fd, void *buf, size_t count);
+ssize_t pread(int fd, void *buf, size_t count, off_t offset);
 void sync(void);
 int fsync(int fd);
 int dup(int oldfd);

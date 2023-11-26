@@ -1,0 +1,15 @@
+config HAVE_PCI
+	bool
+
+config LIBUKBUS_PCI
+	bool "PCI bus"
+	depends on HAVE_PCI
+	depends on (ARCH_X86_64 || ARCH_ARM_64)
+	select LIBUKBUS
+	help
+		PCI bus driver for probing and operating PCI devices
+
+config LIBUKBUS_PCI_ECAM
+	select LIBUKBUS_PLATFORM
+	default y if (LIBUKBUS_PCI && LIBFDT && LIBUKOFW)
+	bool

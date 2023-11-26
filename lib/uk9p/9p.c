@@ -146,7 +146,7 @@ struct uk_9pfid *uk_9p_attach(struct uk_9pdev *dev, uint32_t afid,
 	req = request_create(dev, UK_9P_TATTACH);
 	if (PTRISERR(req)) {
 		uk_9pdev_fid_release(fid);
-		return (void *)req;
+		return (struct uk_9pfid *)req;
 	}
 
 	uk_pr_debug("TATTACH fid %u afid %u uname %s aname %s n_uname %u\n",
@@ -812,7 +812,7 @@ struct uk_9pfid *uk_9p_symlink(struct uk_9pdev *dev, struct uk_9pfid *sfid,
 	req = request_create(dev, UK_9P_TSYMLINK);
 	if (PTRISERR(req)) {
 		uk_9pdev_fid_release(fid);
-		return (void *)req;
+		return (struct uk_9pfid *)req;
 	}
 
 	uk_pr_debug("TSYMLINK fid %u\n", sfid->fid);

@@ -5,11 +5,15 @@ endif
 ##
 ## Link image
 ##
-ifeq (arm,$(CONFIG_UK_ARCH))
+ifneq ($(UK_IMAGE_NAME_OVERWRITE),)
+XEN_RAW_IMAGE   := $(BUILD_DIR)/$(UK_IMAGE_NAME_OVERWRITE)
+else
 XEN_RAW_IMAGE   := $(BUILD_DIR)/$(CONFIG_UK_NAME)_xen-$(CONFIG_UK_ARCH)
+endif
+ifeq (arm,$(CONFIG_UK_ARCH))
 XEN_IMAGE       := $(XEN_RAW_IMAGE).elf
 else
-XEN_IMAGE       := $(BUILD_DIR)/$(CONFIG_UK_NAME)_xen-$(CONFIG_UK_ARCH)
+XEN_IMAGE       := $(XEN_RAW_IMAGE)
 endif
 XEN_DEBUG_IMAGE := $(XEN_IMAGE).dbg
 
@@ -19,7 +23,9 @@ XEN_LD_SCRIPT_FLAGS += $(addprefix -Wl$(comma)-T$(comma),\
 			 $(XEN_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y))
 
 $(XEN_DEBUG_IMAGE): $(XEN_ALIBS) $(XEN_ALIBS-y) $(XEN_OLIBS) $(XEN_OLIBS-y) \
-		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y)
+		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) \
+		    $(XEN_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y) \
+		    $(UK_PLAT_XEN_DEF_LDS) $(UK_LDEPS)
 	$(call build_cmd,LD,,$(XEN_IMAGE).ld.o,\
 	       $(LD) -r $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
 			$(XEN_LDFLAGS) $(XEN_LDFLAGS-y) \
@@ -37,13 +43,19 @@ $(XEN_DEBUG_IMAGE): $(XEN_ALIBS) $(XEN_ALIBS-y) $(XEN_OLIBS) $(XEN_OLIBS-y) \
 	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(XEN_LDFLAGS) $(XEN_LDFLAGS-y) \
 		     $(XEN_LD_SCRIPT_FLAGS) \
 		     $(XEN_IMAGE).o -o $@)
+ifeq ($(CONFIG_OPTIMIZE_PIE),y)
+	$(call build_uk_reloc,$@)
+endif
 
 $(XEN_IMAGE): $(XEN_DEBUG_IMAGE)
 	$(call build_cmd,SCSTRIP,,$@,\
 		$(STRIP) -s \
 			$(SECT_STRIP_FLAGS) $(SECT_STRIP_FLAGS-y) \
 			$< -o $@ 2>&1 | \
-			{ grep -v "Empty loadable segment detected" || true; })
+		        { $(GREP) -Ev \
+				"Empty loadable segment detected|section.*lma.*adjusted to.*" || \
+				true; })
+	$(call build_bootinfo,$@)
 
 ifeq (arm,$(CONFIG_UK_ARCH))
 $(XEN_RAW_IMAGE): $(XEN_IMAGE)

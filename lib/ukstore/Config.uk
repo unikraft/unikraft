@@ -2,4 +2,6 @@ config LIBUKSTORE
 	bool "ukstore: Run-time configuring and monitoring"
 	select LIBNOLIBC if !HAVE_LIBC
 	select LIBUKDEBUG
+	select LIBUKLIBID
+	select LIBUKLOCK
 	default n

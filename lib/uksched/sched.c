@@ -36,6 +36,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <uk/plat/config.h>
+#include <uk/plat/time.h>
 #include <uk/alloc.h>
 #include <uk/plat/lcpu.h>
 #include <uk/sched.h>
@@ -43,8 +44,7 @@
 
 struct uk_sched *uk_sched_head;
 
-/* FIXME: Define per CPU (CPU-local variable declaration needed) */
-struct uk_thread *__uk_sched_thread_current;
+UKPLAT_PER_LCPU_DEFINE(struct uk_thread *, __uk_sched_thread_current);
 
 int uk_sched_register(struct uk_sched *s)
 {
@@ -220,7 +220,7 @@ int uk_sched_start(struct uk_sched *s)
 	uk_thread_set_runnable(main_thread);
 
 	/* Set main_thread as current scheduled thread */
-	__uk_sched_thread_current = main_thread;
+	ukplat_per_lcpu_current(__uk_sched_thread_current) = main_thread;
 
 	/* Add main to the scheduler's thread list */
 	UK_TAILQ_INSERT_TAIL(&s->thread_list, main_thread, thread_list);
@@ -235,7 +235,7 @@ int uk_sched_start(struct uk_sched *s)
 	return 0;
 
 err_unset_thread_current:
-	__uk_sched_thread_current = NULL;
+	ukplat_per_lcpu_current(__uk_sched_thread_current) = NULL;
 	uk_thread_release(main_thread);
 err_out:
 	return ret;
@@ -381,15 +381,51 @@ void uk_sched_dumpk_threads(int klvl, struct uk_sched *s)
 {
 	struct uk_thread *t, *tmp;
 
+	if (uk_sched_current() == s) {
+		/* Let the scheduler update the thread execution time
+		 * of the current thread with a forced context switch.
+		 */
+		uk_sched_yield();
+	}
+
+	uk_printk(klvl, "sched %p:\n", s);
 	uk_sched_foreach_thread_safe(s, t, tmp) {
 		uk_printk(klvl,
-			  "sched %p: thread %p (%s), ctx: %p, flags: %c%c%c%c\n",
-			  s,
+			  " + thread %p (%s), ctx: %p, "
+			  "execution time: %"__PRInsec".%06"__PRInsec"s, "
+			  "flags: %c%c%c%c\n",
 			  t, t->name ? t->name : "<unnamed>",
 			  &t->ctx,
+			  ukarch_time_nsec_to_sec(t->exec_time),
+			  ukarch_time_nsec_to_usec(t->exec_time) % 1000000,
 			  (t->flags & UK_THREADF_RUNNABLE) ? 'R' : '-',
 			  (t->flags & UK_THREADF_EXITED)   ? 'D' : '-',
 			  (t->flags & UK_THREADF_ECTX)     ? 'E' : '-',
 			  (t->flags & UK_THREADF_UKTLS)    ? 'T' : '-');
 	}
+}
+
+UK_SYSCALL_R_DEFINE(int, sched_getaffinity, int, pid, long, cpusetsize,
+						unsigned long*, mask)
+{
+	UK_WARN_STUBBED();
+	/* NOTE: Some applications use this to get the count of CPUs,
+	 *       and the result must be positive.
+	 *       So just return CPU0 to make them run.
+	 */
+	UK_ASSERT(cpusetsize > 0);
+	UK_ASSERT(mask);
+	memset(mask, 0, cpusetsize);
+
+	/* Set CPU0 */
+	*mask = 1UL << 0;
+
+	return cpusetsize;
+}
+
+UK_SYSCALL_R_DEFINE(int, sched_setaffinity, int, pid, long, cpusetsize,
+						unsigned long*, mask)
+{
+	UK_WARN_STUBBED();
+	return 0;
 }

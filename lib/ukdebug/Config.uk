@@ -1,6 +1,7 @@
 menuconfig LIBUKDEBUG
 	bool "ukdebug: Debugging and tracing"
 	depends on (HAVE_LIBC || LIBNOLIBC)
+	select LIBUKLIBID
 	default y
 
 if LIBUKDEBUG

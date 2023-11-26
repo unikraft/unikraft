@@ -78,6 +78,9 @@ int  printf(const char *fmt, ...)                           __printf(1, 2);
 int vsscanf(const char *str, const char *fmt, va_list ap);
 int  sscanf(const char *str, const char *fmt, ...)          __scanf(2, 3);
 
+int scanf(const char *fmt, ...)                             __scanf(1, 2);
+int fscanf(FILE *fp, const char *fmt, ...)                  __scanf(2, 3);
+
 int vasprintf(char **str, const char *fmt, va_list ap);
 int  asprintf(char **str, const char *fmt, ...)             __printf(2, 3);
 
@@ -85,6 +88,8 @@ void psignal(int sig, const char *s);
 
 int fputc(int _c, FILE *fp);
 int putchar(int c);
+int fputs(const char *restrict s, FILE *restrict stream);
+int puts(const char *s);
 
 #if CONFIG_LIBVFSCORE
 int rename(const char *oldpath, const char *newpath);

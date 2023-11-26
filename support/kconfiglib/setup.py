@@ -7,7 +7,7 @@ import setuptools
 setuptools.setup(
     name="kconfiglib",
     # MAJOR.MINOR.PATCH, per http://semver.org
-    version="12.13.0",
+    version="14.1.0",
     description="A flexible Python Kconfig implementation",
 
     # Make sure that README.rst decodes on Python 3 in environments that use
@@ -61,12 +61,8 @@ setuptools.setup(
         )
     },
 
-    # The terminal menuconfig implementation uses the standard Python 'curses'
-    # module. The windows-curses package makes it available on Windows. See
-    # https://github.com/zephyrproject-rtos/windows-curses.
-    install_requires=(
-        'windows-curses; sys_platform == "win32"',
-    ),
+    # Note: windows-curses is not automatically installed on Windows anymore,
+    # because it made Kconfiglib impossible to install on MSYS2 with pip
 
     # Needs support for unnumbered {} in format() and argparse
     python_requires=">=2.7,!=3.0.*,!=3.1.*",

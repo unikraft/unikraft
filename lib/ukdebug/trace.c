@@ -54,7 +54,8 @@ char *uk_trace_buffer_writep = uk_trace_buffer;
  *     $ readelf -p .uk_trace_keyvals <your_image.gdb>
  */
 #define TRACE_DEFINE_KEY(key, val)			\
-	__attribute((__section__(".uk_trace_keyvals")))	\
+	__attribute((__section__(			\
+		".uk_trace_keyvals,\"\",@note#")))	\
 	static const char key[] __used =		\
 		#key " = " #val
 

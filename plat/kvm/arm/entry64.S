@@ -34,17 +34,23 @@
 #include <uk/asm.h>
 #include <uk/plat/common/sections.h>
 #include <uk/config.h>
+#include <uk/reloc.h>
 
-/*
- * The registers used by _libkvmplat_start:
- * x0 - FDT pointer
+#define BOOTSTACK_SIZE	4096
+
+/* Prefer using in-image stack, to avoid conflicts when unmapping is done by
+ * paging_init (it invalidates our stack)
  */
+.section .bss
+.space BOOTSTACK_SIZE
+lcpu_bootstack:
 
 .text
 ENTRY(_libkvmplat_entry)
 
-	ldr x25, =_dtb
-	ldr x26, =_end
+#ifdef CONFIG_KVM_BOOT_PROTO_LXBOOT
+	mov x25, x0 /* preserve dtb addr */
+#endif
 
 #ifdef CONFIG_FPSIMD
 	/* Enable fp/simd support */
@@ -53,43 +59,83 @@ ENTRY(_libkvmplat_entry)
 	isb
 #endif /* CONFIG_FPSIMD */
 
-	/*
-	 * We will disable MMU and cache before the pagetables are ready.
-	 * This means we will change memory with cache disabled, so we need to
-	 * invalidate the cache to ensure there is no stale data in it.
-	 * But we don't know the size of the RAM either. And it would be
-	 * expensive to invalidate the whole cache. In this case, just
-	 * just need to invalidate what we are going to use:
-	 * DTB, TEXT, DATA, BSS, and bootstack.
+	/* If we boot via the linux boot protocol we expect that the MMU is
+	 * disabled and the cache for the region of the image is clean.
+	 * If we find that the MMU is enabled, we consider the cache state
+	 * unpredicatable. In that case we clean-invalidate the cache for
+	 * the entire image and disable the MMU.
+	 *
+	 * Notice: A clean cache would suffice as long as we invalidate any
+	 *         memory we touch while the MMU is disabled. But since PIE
+	 *         can write anywhere we also invalidate the entire image.
 	 */
-	ldr x0, = _start_ram_addr;
-	add x27, x26, #__STACK_SIZE
-	sub x1, x27, x25
-	bl clean_and_invalidate_dcache_range
+	mrs	x19, sctlr_el1
+	and	x19, x19, #SCTLR_EL1_M_BIT
+#if CONFIG_LIBUKRELOC
+	/* If PIE is enabled and the MMU is disabled we proceed to
+	 * invalidate the entire image region anyway, as libukreloc
+	 * right now does not invalidate the individual lines it touches.
+	 */
+	cbz	x19, 0f
+#else /* !CONFIG_LIBUKRELOC */
+	cbz	x19, 1f
+#endif /* !CONFIG_LIBUKRELOC */
+
+	ur_ldr	x0, _start_ram_addr
+	ur_ldr	x1, _end
+	sub	x1, x1, x0
+	bl	clean_and_invalidate_dcache_range
 
 	/* Disable the MMU and D-Cache. */
-	dsb sy
-	mrs x2, sctlr_el1
-	mov x3, #SCTLR_EL1_M_BIT|SCTLR_EL1_C_BIT
-	bic x2, x2, x3
-	msr sctlr_el1, x2
+	dsb	sy
+	mrs	x2, sctlr_el1
+	mov	x3, #SCTLR_EL1_M_BIT|SCTLR_EL1_C_BIT
+	bic	x2, x2, x3
+	msr	sctlr_el1, x2
 	isb
-
-	/* Set the boot stack */
-	mov sp, x27
+#if CONFIG_LIBUKRELOC
+	b	1f
+0:
+	ur_ldr	x0, _start_ram_addr
+	ur_ldr	x1, _end
+	sub	x1, x1, x0
+	bl	invalidate_dcache_range
+#endif /* CONFIG_LIBUKRELOC */
+1:
+	/* Set the boot stack.Invalidate the corresponding cache lines to
+	 * avoid stale cache contents shadowing our changes once the MMU
+	 * and D-cache are enabled.
+	 */
+	ur_ldr	x26, lcpu_bootstack
+	and	x26, x26, ~(__STACK_ALIGN_SIZE - 1)
+	mov	sp, x26
+	mov	x0, x26
+	mov	x1, #BOOTSTACK_SIZE
+	dmb	sy
+	bl	invalidate_dcache_range
 
 	/* Set the context id */
 	msr contextidr_el1, xzr
 
+	mov     x0, xzr
+	mov     x1, xzr
+	bl      do_uk_reloc
+
 	/* Setup exception vector table address before enable MMU */
-	ldr x29, =vector_table
+	ur_ldr  x29, vector_table
 	msr VBAR_EL1, x29
 
 	/* Enable the mmu */
 	bl start_mmu
 
 	/* Load dtb address to x0 as a parameter */
-	ldr x0, =_dtb
-	b _libkvmplat_start
-END(_libkvmplat_entry)
+#if defined(CONFIG_KVM_BOOT_PROTO_LXBOOT)
+	mov x0, x25
+#elif defined(CONFIG_KVM_BOOT_PROTO_QEMU_VIRT)
+	ur_ldr  x0, _dtb
+#endif
+	bl ukplat_bootinfo_fdt_setup
 
+	bl ukplat_bootinfo_get
+	b _ukplat_entry
+END(_libkvmplat_entry)

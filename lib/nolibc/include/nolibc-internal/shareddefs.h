@@ -79,6 +79,15 @@ typedef unsigned gid_t;
 #define __DEFINED_gid_t
 #endif
 
+#if defined(__NEED_max_align_t) && !defined(__DEFINED_max_align_t)
+typedef struct {
+	long long __longlongf;
+
+	long double __longdoublef;
+} max_align_t;
+#define __DEFINED_max_align_t
+#endif
+
 #if defined(__NEED_useconds_t) && !defined(__DEFINED_useconds_t)
 typedef unsigned useconds_t;
 #define __DEFINED_useconds_t
@@ -105,7 +114,7 @@ typedef __u64 ino_t;
 #endif
 
 #if defined(__NEED_nlink_t) && !defined(__DEFINED_nlink_t)
-typedef __u32 nlink_t;
+typedef __u64 nlink_t;
 #define __DEFINED_nlink_t
 #endif
 
@@ -202,4 +211,12 @@ typedef long clock_t;
 typedef unsigned short __sa_family_t;
 typedef __sa_family_t sa_family_t;
 #define __DEFINED_sa_family_t
+#endif
+
+#if defined(__NEED_BSD_TYPES) && !defined(__DEFINED_BSD_TYPES)
+typedef unsigned char u_char;
+typedef unsigned short u_short;
+typedef unsigned int u_int;
+typedef unsigned long u_long;
+#define __DEFINED_BSD_TYPES
 #endif

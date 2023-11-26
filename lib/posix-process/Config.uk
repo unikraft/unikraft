@@ -12,8 +12,8 @@ if LIBPOSIX_PROCESS
 if LIBPOSIX_PROCESS_PIDS
 		config LIBPOSIX_PROCESS_MAX_PID
 		int "Largest PID"
-		range 1 32768
-		default 32
+		range 1 32767
+		default 31
 
 		config LIBPOSIX_PROCESS_INIT_PIDS
 		bool "Assign PID during boot"

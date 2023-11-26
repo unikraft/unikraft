@@ -1,0 +1,10 @@
+################################################################################
+#
+# Driver registrations
+#
+################################################################################
+
+UK_DRIV_BUS_BASE := $(UK_DRIV_BASE)/ukbus
+
+$(eval $(call import_lib,$(UK_DRIV_BUS_BASE)/pci))
+$(eval $(call import_lib,$(UK_DRIV_BUS_BASE)/platform))

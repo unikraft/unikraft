@@ -4,8 +4,7 @@ menuconfig LIBUKVMEM
 	select LIBUKDEBUG
 	select LIBUKALLOC
 	select LIBISRLIB
-	# ARM architecture is not yet compatible
-	depends on ARCH_X86_64
+	select PAGING
 	help
 		This library implements virtual address management by
 		providing methods for working with virtual address space

@@ -34,6 +34,6 @@
 #ifndef __UK_CONFIG_H__
 #define __UK_CONFIG_H__
 
-#include <uk/_config.h>
+#include <uk/bits/config.h>
 
 #endif /* __UK_CONFIG_H__ */

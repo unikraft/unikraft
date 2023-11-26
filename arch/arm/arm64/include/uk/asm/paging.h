@@ -104,6 +104,10 @@ struct ukarch_pagetable {
 #define PAGE_ATTR_SHAREABLE_IS		(1 << PAGE_ATTR_SHAREABLE_SHIFT)
 #define PAGE_ATTR_SHAREABLE_OS		(2 << PAGE_ATTR_SHAREABLE_SHIFT)
 
+/* Page fault error code bits */
+#define ARM64_PF_ESR_WnR		0x0000040UL
+#define ARM64_PF_ESR_ISV		0x1000000UL
+
 #define ARM64_PADDR_BITS		48
 #define ARM64_VADDR_BITS		48
 
@@ -173,8 +177,40 @@ static inline __paddr_t PT_Lx_PTE_PADDR(__pte_t pte, unsigned int lvl)
 	return paddr;
 }
 
-static inline int ukarch_paddr_range_isvalid(__paddr_t start, __paddr_t end)
+static inline __paddr_t PT_Lx_PTE_SET_PADDR(__pte_t pte, unsigned int lvl,
+					     __paddr_t paddr)
 {
+	static __u64 pte_lx_map_paddr_mask[] = {
+		PTE_L0_PAGE_PADDR_MASK,
+		PTE_L1_BLOCK_PADDR_MASK,
+		PTE_L2_BLOCK_PADDR_MASK
+	};
+
+	if (PAGE_Lx_IS(pte, lvl)) {
+#ifdef CONFIG_LIBUKDEBUG
+		UK_ASSERT(lvl <= PT_MAP_LEVEL_MAX);
+#endif /* CONFIG_LIBUKDEBUG */
+		paddr &= pte_lx_map_paddr_mask[lvl];
+		pte &= ~pte_lx_map_paddr_mask[lvl];
+	} else {
+#ifdef CONFIG_LIBUKDEBUG
+		UK_ASSERT(lvl > PAGE_LEVEL && lvl < PT_LEVELS);
+#endif /* CONFIG_LIBUKDEBUG */
+		paddr &= PTE_Lx_TABLE_PADDR_MASK;
+		pte &= ~PTE_Lx_TABLE_PADDR_MASK;
+	}
+	return pte | paddr;
+}
+
+static inline int ukarch_paddr_isvalid(__paddr_t addr)
+{
+	return ARM64_PADDR_VALID(addr);
+}
+
+static inline int ukarch_paddr_range_isvalid(__paddr_t start, __sz len)
+{
+	__paddr_t end = start + len - 1;
+
 #ifdef CONFIG_LIBUKDEBUG
 	UK_ASSERT(start <= end);
 #endif /* CONFIG_LIBUKDEBUG */
@@ -182,8 +218,15 @@ static inline int ukarch_paddr_range_isvalid(__paddr_t start, __paddr_t end)
 	return (ARM64_PADDR_VALID(end)) && (ARM64_PADDR_VALID(start));
 }
 
-static inline int ukarch_vaddr_range_isvalid(__vaddr_t start, __vaddr_t end)
+static inline int ukarch_vaddr_isvalid(__vaddr_t addr)
 {
+	return ARM64_VADDR_VALID(addr);
+}
+
+static inline int ukarch_vaddr_range_isvalid(__vaddr_t start, __sz len)
+{
+	__vaddr_t end = start + len - 1;
+
 #ifdef CONFIG_LIBUKDEBUG
 	UK_ASSERT(start <= end);
 #endif /* CONFIG_LIBUKDEBUG */

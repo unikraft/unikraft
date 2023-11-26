@@ -39,6 +39,10 @@
 #include <uk/print.h>
 #include <uk/libparam.h>
 
+#if CONFIG_LIBUKNETDEV_STATS
+#include "stats.h"
+#endif /* CONFIG_LIBUKNETDEV_STATS */
+
 struct uk_netdev_list uk_netdev_list =
 	UK_TAILQ_HEAD_INITIALIZER(uk_netdev_list);
 static uint16_t netdev_count;
@@ -50,10 +54,12 @@ static uint16_t netdev_count;
 static char *ipv4_addr;
 static char *ipv4_subnet_mask;
 static char *ipv4_gw_addr;
+static char *ipv4_dns0_addr;
 
 UK_LIB_PARAM_STR(ipv4_addr);
 UK_LIB_PARAM_STR(ipv4_subnet_mask);
 UK_LIB_PARAM_STR(ipv4_gw_addr);
+UK_LIB_PARAM_STR(ipv4_dns0_addr);
 
 static const char *_parse_ipv4_addr(void)
 {
@@ -94,6 +100,19 @@ static const char *_parse_ipv4_gw_addr(void)
 	return NULL;
 }
 
+static const char *_parse_ipv4_dns0_addr(void)
+{
+	/** Remember the reference to the dns server for successive calls */
+	static char *dns0;
+
+	if (dns0)
+		return strtok_r(NULL, " ", &dns0);
+	else if (ipv4_dns0_addr)
+		return strtok_r(ipv4_dns0_addr, " ", &dns0);
+
+	return NULL;
+}
+
 static struct uk_netdev_data *_alloc_data(struct uk_alloc *a,
 					  uint16_t netdev_id,
 					  const char *drv_name)
@@ -128,6 +147,7 @@ static struct uk_netdev_einfo *_alloc_einfo(struct uk_alloc *a)
 	_einfo->ipv4_addr = _parse_ipv4_addr();
 	_einfo->ipv4_net_mask = _parse_ipv4_net_mask();
 	_einfo->ipv4_gw_addr = _parse_ipv4_gw_addr();
+	_einfo->ipv4_dns0_addr = _parse_ipv4_dns0_addr();
 
 	return _einfo;
 }
@@ -260,7 +280,7 @@ static const void *_netdev_einfo_get(struct uk_netdev *dev,
 	switch (einfo) {
 	case UK_NETDEV_IPV4_ADDR_STR:
 		if (dev->_einfo->ipv4_addr)
-			uk_pr_debug("ip_addr: %s\n", dev->_einfo->ipv4_addr);
+			uk_pr_debug("ip: %s\n", dev->_einfo->ipv4_addr);
 		return dev->_einfo->ipv4_addr;
 	case UK_NETDEV_IPV4_MASK_STR:
 		if (dev->_einfo->ipv4_net_mask)
@@ -268,8 +288,12 @@ static const void *_netdev_einfo_get(struct uk_netdev *dev,
 		return dev->_einfo->ipv4_net_mask;
 	case UK_NETDEV_IPV4_GW_STR:
 		if (dev->_einfo->ipv4_gw_addr)
-			uk_pr_debug("Gateway: %s\n", dev->_einfo->ipv4_gw_addr);
+			uk_pr_debug("gateway: %s\n", dev->_einfo->ipv4_gw_addr);
 		return dev->_einfo->ipv4_gw_addr;
+	case UK_NETDEV_IPV4_DNS0_STR:
+		if (dev->_einfo->ipv4_dns0_addr)
+			uk_pr_debug("dns: %s\n", dev->_einfo->ipv4_dns0_addr);
+		return dev->_einfo->ipv4_dns0_addr;
 	default:
 		uk_pr_warn("Option %d not yet supported\n", einfo);
 	}
@@ -344,6 +368,15 @@ int uk_netdev_configure(struct uk_netdev *dev,
 		uk_pr_info("netdev%"PRIu16": Configured interface\n",
 			   dev->_data->id);
 		dev->_data->state = UK_NETDEV_CONFIGURED;
+
+#ifdef CONFIG_LIBUKNETDEV_STATS
+	ret = uk_netdev_stats_init(dev);
+	if (unlikely(ret)) {
+		uk_pr_err("Could not initialize netdev stats\n");
+		return ret;
+	}
+#endif /* CONFIG_LIBUKNETDEV_STATS */
+
 	} else {
 		uk_pr_err("netdev%"PRIu16": Failed to configure interface: %d\n",
 			  dev->_data->id, ret);

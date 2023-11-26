@@ -55,7 +55,7 @@ int uk_sched_register(struct uk_sched *s);
 #define uk_sched_init(s, start_func, yield_func, \
 		thread_add_func, thread_remove_func, \
 		thread_blocked_func, thread_woken_func, \
-		def_allocator) \
+		idle_thread_func, def_allocator) \
 	do { \
 		(s)->sched_start     = start_func; \
 		(s)->yield           = yield_func; \
@@ -63,6 +63,7 @@ int uk_sched_register(struct uk_sched *s);
 		(s)->thread_remove   = thread_remove_func; \
 		(s)->thread_blocked  = thread_blocked_func; \
 		(s)->thread_woken    = thread_woken_func; \
+		(s)->idle_thread     = idle_thread_func; \
 		uk_sched_register((s)); \
 		\
 		(s)->a = (def_allocator); \
@@ -84,11 +85,14 @@ unsigned int uk_sched_thread_gc(struct uk_sched *sched);
 static inline
 void uk_sched_thread_switch(struct uk_thread *next)
 {
-	struct uk_thread *prev = __uk_sched_thread_current;
+	struct uk_thread *prev;
+
+	prev = ukplat_per_lcpu_current(__uk_sched_thread_current);
 
 	UK_ASSERT(prev);
 
-	__uk_sched_thread_current = next;
+	ukplat_per_lcpu_current(__uk_sched_thread_current) = next;
+
 	prev->tlsp = ukplat_tlsp_get();
 	if (prev->ectx)
 		ukarch_ectx_store(prev->ectx);

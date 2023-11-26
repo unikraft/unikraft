@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright (c) 2018-2019, Ulf Magnusson
 # SPDX-License-Identifier: ISC
@@ -20,6 +20,17 @@ might save work depending on your build setup.
 
 By default, the configuration is generated from '.config'. A different
 configuration file can be passed in the KCONFIG_CONFIG environment variable.
+
+A custom header string can be inserted at the beginning of generated
+configuration and header files by setting the KCONFIG_CONFIG_HEADER and
+KCONFIG_AUTOHEADER_HEADER environment variables, respectively (this also works
+for other scripts). The string is not automatically made a comment (this is by
+design, to allow anything to be added), and no trailing newline is added, so
+add '/* */', '#', and newlines as appropriate.
+
+See https://www.gnu.org/software/make/manual/make.html#Multi_002dLine for a
+handy way to define multi-line variables in makefiles, for use with custom
+headers. Remember to export the variable to the environment.
 """
 import argparse
 import os
@@ -28,7 +39,6 @@ import sys
 import kconfiglib
 
 
-DEFAULT_HEADER_PATH = "config.h"
 DEFAULT_SYNC_DEPS_PATH = "deps/"
 
 
@@ -40,9 +50,11 @@ def main():
     parser.add_argument(
         "--header-path",
         metavar="HEADER_FILE",
-        default=DEFAULT_HEADER_PATH,
-        help="Path for the generated header file (default: {})"
-             .format(DEFAULT_HEADER_PATH))
+        help="""
+Path to write the generated header file to. If not specified, the path in the
+environment variable KCONFIG_AUTOHEADER is used if it is set, and 'config.h'
+otherwise.
+""")
 
     parser.add_argument(
         "--config-out",
@@ -88,8 +100,8 @@ only supported for backwards compatibility).
 """)
 
     parser.add_argument(
-        "kconfig_filename",
-        metavar="KCONFIG_FILENAME",
+        "kconfig",
+        metavar="KCONFIG",
         nargs="?",
         default="Kconfig",
         help="Top-level Kconfig file (default: Kconfig)")
@@ -97,10 +109,20 @@ only supported for backwards compatibility).
     args = parser.parse_args()
 
 
-    kconf = kconfiglib.Kconfig(args.kconfig_filename)
+    kconf = kconfiglib.Kconfig(args.kconfig, suppress_traceback=True)
     kconf.load_config()
 
-    kconf.write_autoconf(args.header_path)
+    if args.header_path is None:
+        if "KCONFIG_AUTOHEADER" in os.environ:
+            kconf.write_autoconf()
+        else:
+            # Kconfiglib defaults to include/generated/autoconf.h to be
+            # compatible with the C tools. 'config.h' is used here instead for
+            # backwards compatibility. It's probably a saner default for tools
+            # as well.
+            kconf.write_autoconf("config.h")
+    else:
+        kconf.write_autoconf(args.header_path)
 
     if args.config_out is not None:
         kconf.write_config(args.config_out, save_old=False)

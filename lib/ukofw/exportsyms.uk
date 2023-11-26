@@ -1,0 +1,11 @@
+fdt_reg_read_number
+fdt_getprop_u32_by_offset
+fdt_find_irq_parent_offset
+fdt_interrupt_cells
+fdt_get_address
+fdt_get_interrupt
+gic_get_irq_from_dtb
+fdt_node_offset_by_compatible_list
+fdt_node_offset_idx_by_compatible_list
+fdt_prop_read_bool
+fdt_translate_address_by_ranges

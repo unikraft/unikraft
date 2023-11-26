@@ -239,7 +239,7 @@ int tcsetpgrp(int fd __unused, pid_t pgrp)
 #endif /* UK_LIBC_SYSCALLS */
 
 #if UK_LIBC_SYSCALLS
-pid_t tcgetpgrp(int fd)
+pid_t tcgetpgrp(int fd __unused)
 {
 	/* We have a single "process group" */
 	return UNIKRAFT_PGID;
@@ -247,7 +247,7 @@ pid_t tcgetpgrp(int fd)
 #endif /* UK_LIBC_SYSCALLS */
 
 #if UK_LIBC_SYSCALLS
-int nice(int inc)
+int nice(int inc __unused)
 {
 	/* We don't support priority updates at the moment */
 	errno = EPERM;
@@ -405,7 +405,7 @@ UK_SYSCALL_R_DEFINE(int, getrusage, int, who,
 }
 
 #if UK_LIBC_SYSCALLS
-int prlimit(pid_t pid, int resource, const struct rlimit *new_limit,
+int prlimit(pid_t pid __unused, int resource, const struct rlimit *new_limit,
 	    struct rlimit *old_limit)
 {
 	return uk_syscall_e_prlimit64(0, (long) resource,

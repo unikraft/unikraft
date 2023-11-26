@@ -33,6 +33,8 @@
 #include <x86/irq.h>
 #include <kvm-x86/vga_console.h>
 
+#include <uk/essentials.h>
+
 /* Hardware text mode color constants. */
 enum vga_color {
 	VGA_COLOR_BLACK = 0,
@@ -66,11 +68,12 @@ static inline uint16_t vga_entry(unsigned char uc, uint8_t color)
 #define TAB_ALIGNMENT 8
 #define VGA_WIDTH     80
 #define VGA_HEIGHT    25
+#define VGA_FB_BASE   0xb8000
 
 static size_t terminal_row;
 static size_t terminal_column;
 static uint8_t terminal_color;
-static uint16_t *terminal_buffer;
+static uint16_t *const terminal_buffer = (uint16_t *)VGA_FB_BASE;
 static uint16_t areg;   /* VGA address register */
 static uint16_t dreg;   /* VGA data register */
 
@@ -117,7 +120,6 @@ void _libkvmplat_init_vga_console(void)
 	outb(dreg, 0x0f);
 	local_irq_restore(irq_flags);
 
-	terminal_buffer = (uint16_t *) 0xb8000;
 	clear_terminal();
 }
 
@@ -195,7 +197,7 @@ void _libkvmplat_vga_putc(char c)
 		break;
 	case '\n':
 		NEWLINE();
-		/* fall through */
+		__fallthrough;
 	case '\r':
 		column = 0;
 		break;

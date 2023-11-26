@@ -1,4 +1,4 @@
-config LIBVFSCORE
+menuconfig LIBVFSCORE
 	bool "vfscore: VFS Core Interface"
 	default n
 	select LIBNOLIBC if !HAVE_LIBC
@@ -7,23 +7,31 @@ config LIBVFSCORE
 	select LIBPOSIX_TIME
 
 if LIBVFSCORE
-menu "vfscore: Configuration"
-
 config LIBVFSCORE_PIPE_SIZE_ORDER
 	int "Pipe size order"
 	default 16
 	help
 		The size of the internal buffer for anonymous pipes is 2^order.
 
+config LIBVFSCORE_NONLARGEFILE
+	bool "Non-largefile system calls"
+	default y if LIBSYSCALL_SHIM_HANDLER
+	default n
+	help
+		Add different dirent and dirent64 structure and their respective
+		syscalls (i.e. treat Linux non largefile legacy syscalls properly).
+		If this option is not set, the dirent structure will be aliased to
+		dirent64, and all other nonlargefile functions will be aliased to
+		their largefile variant (e.g. readdir = readdir64).
+		If lib/syscall_shim is enabled and this option is not selected, only
+		the 64-bit version of the system calls are registered.
+
 config LIBVFSCORE_AUTOMOUNT_ROOTFS
-bool "Automatically mount a root filesysytem (/)"
+bool "Automatically mount a root filesystem (/)"
 default n
-imply LIBUKLIBPARAM
 help
-	Automatically mounts '/' during boot. If `libuklibparam` is
-	compiled in, the default root filesystem and mount options can
-	be changed with the following library parameters:
-	'vfs.rootfs', 'vfs.rootdev', 'vfs.rootflags', and 'vfs.rootopts'
+	Automatically mounts '/' during boot. The parameters are
+	compiled-in and cannot be changed at runtime.
 
 if LIBVFSCORE_AUTOMOUNT_ROOTFS
 	choice LIBVFSCORE_ROOTFS
@@ -42,6 +50,13 @@ if LIBVFSCORE_AUTOMOUNT_ROOTFS
 		bool "InitRD"
 		select LIBRAMFS
 		select LIBUKCPIO
+
+		config LIBVFSCORE_ROOTFS_EINITRD
+		bool "Embedded InitRD"
+		select LIBRAMFS
+		select LIBUKCPIO
+		help
+			Embeds a CPIO initrd into the unikernel image.
 
 		config LIBVFSCORE_ROOTFS_CUSTOM
 		bool "Custom argument"
@@ -67,38 +82,66 @@ if LIBVFSCORE_AUTOMOUNT_ROOTFS
 	default "ramfs" if LIBVFSCORE_ROOTFS_RAMFS
 	default "9pfs" if LIBVFSCORE_ROOTFS_9PFS
 	default "initrd" if LIBVFSCORE_ROOTFS_INITRD
+	default "einitrd" if LIBVFSCORE_ROOTFS_EINITRD
 	default LIBVFSCORE_ROOTFS_CUSTOM_ARG if LIBVFSCORE_ROOTFS_CUSTOM
 	default ""
 
-	# The root device option is hidden for RamFS and 9PFS
-	config LIBVFSCORE_ROOTDEV
-	string "Default root device"
-	depends on !LIBVFSCORE_ROOTFS_RAMFS && !LIBVFSCORE_ROOTFS_INITRD
-	default "rootfs" if LIBVFSCORE_ROOTFS_9PFS
-	default ""
-	help
-		Device to mount the filesystem from (e.g., on 9PFS this
-		is the name of the shared filesystem). Depending on the
-		selected filesystem, this option may not be required.
+	# The following options are hidden to RamFS, initrd, and einitrd
+	if !LIBVFSCORE_ROOTFS_RAMFS && !LIBVFSCORE_ROOTFS_INITRD && !LIBVFSCORE_ROOTFS_EINITRD
+		config LIBVFSCORE_ROOTDEV
+		string "Default root device"
+		default "fs0" if LIBVFSCORE_ROOTFS_9PFS
+		default ""
+		help
+			Device to mount the filesystem from (e.g., on 9PFS this
+			is the name of the shared filesystem). Depending on the
+			selected filesystem, this option may not be required.
 
-	# The root flags is hidden for RamFS
-	config LIBVFSCORE_ROOTFLAGS
-	hex "Default root mount flags"
-	depends on !LIBVFSCORE_ROOTFS_RAMFS && !LIBVFSCORE_ROOTFS_INITRD
-	default 0x0
-	help
-		Mount flags.
+		config LIBVFSCORE_ROOTFLAGS
+		hex "Default root mount flags"
+		default 0x0
+		help
+			Mount flags.
 
-	# The root options are hidden for RamFS
-	config LIBVFSCORE_ROOTOPTS
-	string "Default root mount options"
-	depends on !LIBVFSCORE_ROOTFS_RAMFS && !LIBVFSCORE_ROOTFS_INITRD
-	default ""
-	help
-		Usually a comma-separated list of additional mount
-		options that are directly interpreted by the target
-		filesystem.
+		config LIBVFSCORE_ROOTOPTS
+		string "Default root mount options"
+		default ""
+		help
+			Usually a comma-separated list of additional mount
+			options that are directly interpreted by the target
+			filesystem.
+	endif
+
+	if LIBVFSCORE_ROOTFS_EINITRD
+		config LIBVFSCORE_ROOTFS_EINITRD_PATH
+		string "Path to initrd (fully qualified)"
+		default "$(UK_APP)/initrd.cpio"
+		help
+			Path of a CPIO initrd image to be embedded in the unikernel
+			image and mounted under '/'.
+	endif
 endif
 
-endmenu
+config LIBVFSCORE_FSTAB
+	bool "Automatically mount list of volumes from kernel arguments"
+	select LIBUKLIBPARAM
+	default n
+	help
+		These volumes are parsed from a command-line argument:
+		vfs.fstab=[
+			"<src_dev>:<mntpoint>:<fsdriver>[:<flags>:<opts>]"
+			"<src_dev>:<mntpoint>:<fsdriver>[:<flags>:<opts>]"
+			...
+		]
+		The list elements are to be separated by whitespaces.
+
+if LIBVFSCORE_FSTAB
+config LIBVFSCORE_FSTAB_SIZE
+	int "Maximum automounted volumes"
+	default 64
+	help
+		The maximum amount of automatically mounted volumes that are
+		passed through the vfs.fstab argument.
+endif
+
 endif

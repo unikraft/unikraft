@@ -64,7 +64,7 @@ struct ukarch_pagetable {
 
 #define X86_PT_L0_SHIFT			12
 #define X86_PT_Lx_SHIFT(lvl)					\
-	(X86_PT_L0_SHIFT + (X86_PT_LEVEL_SHIFT * lvl))
+	(X86_PT_L0_SHIFT + (X86_PT_LEVEL_SHIFT * (lvl)))
 #define X86_PT_SHIFT_Lx(shift)					\
 	(((shift) - X86_PT_L0_SHIFT) / X86_PT_LEVEL_SHIFT)
 
@@ -128,8 +128,15 @@ struct ukarch_pagetable {
 	((__vaddr_t)(((__ssz)(vaddr) << (64 - X86_VADDR_BITS)) >>	\
 		(64 - X86_VADDR_BITS)))
 
-static inline int ukarch_vaddr_range_isvalid(__vaddr_t start, __vaddr_t end)
+static inline int ukarch_vaddr_isvalid(__vaddr_t addr)
 {
+	return X86_VADDR_CANONICALIZE(addr) == addr;
+}
+
+static inline int ukarch_vaddr_range_isvalid(__vaddr_t start, __sz len)
+{
+	__vaddr_t end = start + len - 1;
+
 #ifdef CONFIG_LIBUKDEBUG
 	UK_ASSERT(start <= end);
 #endif /* CONFIG_LIBUKDEBUG */
@@ -158,8 +165,8 @@ static inline int ukarch_vaddr_range_isvalid(__vaddr_t start, __vaddr_t end)
 	(((__paddr_t)(pte) & X86_PTE_PADDR_MASK) & PAGE_MASK)
 
 #define PT_Lx_PTE_SET_PADDR(pte, lvl, paddr)			\
-	((pte & ~(X86_PTE_PADDR_MASK & PAGE_MASK)) |		\
-	 (__pte_t)(paddr & X86_PTE_PADDR_MASK))
+	(((pte) & ~(X86_PTE_PADDR_MASK & PAGE_MASK)) |		\
+	 (__pte_t)((paddr) & X86_PTE_PADDR_MASK))
 
 #define PT_Lx_PTE_INVALID(lvl)		0x0UL
 
@@ -181,18 +188,19 @@ static inline int ukarch_vaddr_range_isvalid(__vaddr_t start, __vaddr_t end)
 
 /* For lvl > PAGE_HUGE_LEVEL the X86_PTE_PSE bit must always be 0 (resv.) */
 #define PAGE_Lx_IS(pte, lvl)					\
-	((lvl == PAGE_LEVEL) || ((pte) & X86_PTE_PSE))
+	(((lvl) == PAGE_LEVEL) || ((pte) & X86_PTE_PSE))
 
 #define PT_Lx_PTE_PRESENT(pte, lvl)				\
 	((pte) & X86_PTE_PRESENT)
 #define PT_Lx_PTE_CLEAR_PRESENT(pte, lvl)			\
-	(pte & ~X86_PTE_PRESENT)
+	((pte) & ~X86_PTE_PRESENT)
 
 /* Page attributes */
 #define PAGE_ATTR_PROT_NONE		0x00 /* Page is not accessible */
 #define PAGE_ATTR_PROT_READ		0x01 /* Page is readable */
 #define PAGE_ATTR_PROT_WRITE		0x02 /* Page is writeable */
 #define PAGE_ATTR_PROT_EXEC		0x04 /* Page is executable */
+#define PAGE_ATTR_WRITECOMBINE		0x08 /* Page allows write-combining */
 
 /* Page fault error code bits */
 #define X86_PF_EC_P			0x0001UL /* 0=non-present, 1=prot */
@@ -204,6 +212,27 @@ static inline int ukarch_vaddr_range_isvalid(__vaddr_t start, __vaddr_t end)
 #define X86_PF_EC_SS			0x0040UL /* shadow stack access */
 #define X86_PF_EC_SGX			0x8000UL /* SGX access control viol. */
 #define X86_PF_EC_HLAT			0x0080UL /* no translation using HLAT */
+
+/* Page attribute table (PAT) */
+#define X86_PAT_UC			0x00 /* Uncacheable (UC)*/
+#define X86_PAT_WC			0x01 /* Write combining (WC) */
+#define X86_PAT_WT			0x04 /* Write through (WT) */
+#define X86_PAT_WP			0x05 /* Write protected (WP) */
+#define X86_PAT_WB			0x06 /* Write back (WB) */
+#define X86_PAT_UCM			0x07 /* Uncached (UC-) */
+
+#define X86_PAT_ENTRY(i, val)		((unsigned long)(val) << ((i) * 8UL))
+
+/* Default PAT value (see SDM Vol 3, 11.12.4 Programming the PAT) */
+#define X86_PAT_DEFAULT						\
+	(X86_PAT_ENTRY(0, X86_PAT_WB) |				\
+	 X86_PAT_ENTRY(1, X86_PAT_WT) |				\
+	 X86_PAT_ENTRY(2, X86_PAT_UCM) |			\
+	 X86_PAT_ENTRY(3, X86_PAT_UC) |				\
+	 X86_PAT_ENTRY(4, X86_PAT_WB) |				\
+	 X86_PAT_ENTRY(5, X86_PAT_WT) |				\
+	 X86_PAT_ENTRY(6, X86_PAT_UCM) |			\
+	 X86_PAT_ENTRY(7, X86_PAT_UC))
 
 #ifndef CONFIG_PARAVIRT
 #ifndef __ASSEMBLY__

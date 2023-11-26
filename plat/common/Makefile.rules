@@ -1,0 +1,24 @@
+define build_multiboot =
+	@$(SCRIPTS_DIR)/multiboot.py $(1)
+endef
+
+BINFO_FLAGS := -a $(CONFIG_UK_ARCH)
+
+ifeq ($(CONFIG_UKPLAT_MEMRNAME),y)
+BINFO_FLAGS += -n
+endif
+
+define build_bootinfo =
+	$(call build_cmd,UKBI,,$(1).bootinfo,\
+		$(SCRIPTS_DIR)/mkbootinfo.py $(1) $(1).bootinfo $(BINFO_FLAGS) && \
+		$(OBJCOPY) $(1) --update-section .uk_bootinfo=$(1).bootinfo)
+endef
+
+define build_efi =
+	@$(SCRIPTS_DIR)/mkefi.py $(1)
+endef
+
+define build_linux =
+	$(call build_cmd,OBJCOPY,,$(1).bin, $(OBJCOPY) -O binary $(1))
+	$(call build_cmd,MKLINUX,,$(1).img, $(SCRIPTS_DIR)/mklinux.py $(1) $(2))
+endef

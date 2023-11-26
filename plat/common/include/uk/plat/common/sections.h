@@ -43,6 +43,11 @@
 /* _dtb: start of device tree */
 extern char _dtb[];
 
+/* _base_addr: this is the base address of the unikernel image. It is set at
+ * link time. It is used to compute other addresses, as reference to this.
+ */
+extern char _base_addr[];
+
 /* [_text, _etext]: contains .text.* sections */
 extern char _text[], _etext[];
 
@@ -66,6 +71,9 @@ extern char _tls_start[], _tls_end[];
 /* _etdata: denotes end of .tdata (and start of .tbss */
 extern char _etdata[];
 
+/* [_uk_reloc_start, _uk_reloc_end]: contains *(.ukeloc) */
+extern char _uk_reloc_start[], _uk_reloc_end[];
+
 /* __bss_start: start of BSS sections */
 extern char __bss_start[];
 
@@ -75,6 +83,7 @@ extern char _end[];
 #define __uk_image_symbol(addr)    ((unsigned long)(addr))
 
 #define __DTB                   __uk_image_symbol(_dtb)
+#define __BASE_ADDR             __uk_image_symbol(_base_addr)
 #define __TEXT                  __uk_image_symbol(_text)
 #define __ETEXT                 __uk_image_symbol(_etext)
 #define __EH_FRAME_START        __uk_image_symbol(__eh_frame_start)
@@ -87,6 +96,8 @@ extern char _end[];
 #define __EDATA                 __uk_image_symbol(_edata)
 #define __CTORS                 __uk_image_symbol(_ctors)
 #define __ECTORS                __uk_image_symbol(_ectors)
+#define __UKRELOC_START         __uk_image_symbol(_uk_reloc_start)
+#define __UKRELOC_END           __uk_image_symbol(_uk_reloc_end)
 #define __BSS_START             __uk_image_symbol(__bss_start)
 #define __END                   __uk_image_symbol(_end)
 
