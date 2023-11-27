@@ -1,9 +1,8 @@
 menuconfig LIBPOSIX_SOCKET
 	bool "posix-socket: Abstraction for communication sockets"
-	default n
 	select LIBUKDEBUG
 	select LIBUKALLOC
-	select LIBVFSCORE
+	select LIBUKFILE
 	help
 		This microlibrary allows other microlibraries to register a
 		socket family number, such as AF_INET, for their socket
@@ -19,6 +18,5 @@ if LIBPOSIX_SOCKET
 
 config LIBPOSIX_SOCKET_PRINT_ERRORS
 	bool "Print error messages"
-	default n
 
 endif

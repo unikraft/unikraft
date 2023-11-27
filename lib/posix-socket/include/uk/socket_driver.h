@@ -2,10 +2,13 @@
 /*
  * Authors: Alexander Jung <alexander.jung@neclab.eu>
  *          Marc Rittinghaus <marc.rittinghaus@kit.edu>
+ *          Andrei Tatar <andrei@unikraft.io>
  *
  * Copyright (c) 2020, NEC Laboratories Europe GmbH, NEC Corporation.
  *                     All rights reserved.
  * Copyright (c) 2022, Karlsruhe Institute of Technology (KIT).
+ *                     All rights reserved.
+ * Copyright (c) 2023, Unikraft GmbH and The Unikraft Authors.
  *                     All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -46,15 +49,16 @@ extern "C" {
 #include <uk/alloc.h>
 #include <uk/socket.h>
 #include <uk/errptr.h>
+#include <uk/file.h>
+#include <uk/posix-fd.h>
 
 #include <sys/socket.h>
 #include <sys/uio.h>
 #include <errno.h>
 
 struct posix_socket_ops;
-struct posix_socket_file;
 
-struct eventpoll_cb;
+#define SOCK_FLAGS (SOCK_NONBLOCK|SOCK_CLOEXEC)
 
 /**
  * The POSIX socket driver defines the operations to be used for the
@@ -72,6 +76,87 @@ struct __align(8) posix_socket_driver {
 	/** Private data for this socket driver */
 	void *private;
 };
+
+/* Driver API */
+
+/**
+ * Abstract type for socket objects for the driver API.
+ * Drivers receive a reference of this type and can use it to call the
+ * utility functions listed below on the socket file.
+ */
+typedef const struct uk_file posix_sock;
+
+/* Driver utils */
+
+/**
+ * Get the socket node from a posix socket.
+ */
+static inline
+struct posix_socket_node *posix_sock_get_node(posix_sock *sock)
+{
+	struct posix_socket_node *n;
+
+	UK_ASSERT(sock);
+	n = (struct posix_socket_node *)sock->node;
+	UK_ASSERT(n);
+	return n;
+}
+
+/**
+ * Get the driver-specific socket data from a posix socket.
+ */
+static inline
+void *posix_sock_get_data(posix_sock *sock)
+{
+	return posix_sock_get_node(sock)->sock_data;
+}
+
+/**
+ * Replace the driver-specific socket data pointer.
+ */
+static inline
+void posix_sock_set_data(posix_sock *sock, void *data)
+{
+	posix_sock_get_node(sock)->sock_data = data;
+}
+
+/**
+ * Get the driver of a posix socket object.
+ */
+static inline
+struct posix_socket_driver *posix_sock_get_driver(posix_sock *sock)
+{
+	return posix_sock_get_node(sock)->driver;
+}
+
+/**
+ * Clear event flags from posix socket object.
+ */
+static inline
+void posix_sock_event_clear(posix_sock *sock, unsigned int events)
+{
+	uk_file_event_clear(sock, events);
+}
+
+/**
+ * Set event flags on posix socket object.
+ */
+static inline
+void posix_sock_event_set(posix_sock *sock, unsigned int events)
+{
+	uk_file_event_set(sock, events);
+}
+
+/**
+ * Clear and set the event flags on posix socket object to a specified value.
+ */
+static inline
+void posix_sock_event_assign(posix_sock *sock, unsigned int events)
+{
+	uk_file_event_assign(sock, events);
+}
+
+/* Socket operations */
 
 /**
  * The initialization function called for this socket family. It's here that
@@ -111,7 +196,7 @@ typedef void *(*posix_socket_create_func_t)(struct posix_socket_driver *d,
  * @return NULL or a valid pointer to driver-specific data on success,
  *    ERR2PTR(-errno) otherwise
  */
-typedef void *(*posix_socket_accept4_func_t)(struct posix_socket_file *sock,
+typedef void *(*posix_socket_accept4_func_t)(posix_sock *sock,
 		struct sockaddr *restrict addr, socklen_t *restrict addr_len,
 		int flags);
 
@@ -125,7 +210,7 @@ typedef void *(*posix_socket_accept4_func_t)(struct posix_socket_file *sock,
  *
  * @return 0 on success, -errno otherwise
  */
-typedef int (*posix_socket_bind_func_t)(struct posix_socket_file *sock,
+typedef int (*posix_socket_bind_func_t)(posix_sock *sock,
 		const struct sockaddr *addr, socklen_t addr_len);
 
 /**
@@ -136,8 +221,7 @@ typedef int (*posix_socket_bind_func_t)(struct posix_socket_file *sock,
  *
  * @return 0 on success, -errno otherwise
  */
-typedef int (*posix_socket_shutdown_func_t)(struct posix_socket_file *sock,
-		int how);
+typedef int (*posix_socket_shutdown_func_t)(posix_sock *sock, int how);
 
 /**
  * Get name of connected peer socket.
@@ -149,7 +233,7 @@ typedef int (*posix_socket_shutdown_func_t)(struct posix_socket_file *sock,
  *
  * @return 0 on success, -errno otherwise
  */
-typedef int (*posix_socket_getpeername_func_t)(struct posix_socket_file *sock,
+typedef int (*posix_socket_getpeername_func_t)(posix_sock *sock,
 		struct sockaddr *restrict addr, socklen_t *restrict addr_len);
 
 /**
@@ -162,7 +246,7 @@ typedef int (*posix_socket_getpeername_func_t)(struct posix_socket_file *sock,
  *
  * @return 0 on success, -errno otherwise
  */
-typedef int (*posix_socket_getsockname_func_t)(struct posix_socket_file *sock,
+typedef int (*posix_socket_getsockname_func_t)(posix_sock *sock,
 		struct sockaddr *restrict addr, socklen_t *restrict addr_len);
 
 /**
@@ -177,7 +261,7 @@ typedef int (*posix_socket_getsockname_func_t)(struct posix_socket_file *sock,
  *
  * @return 0 on success, -errno otherwise
  */
-typedef int (*posix_socket_getsockopt_func_t)(struct posix_socket_file *sock,
+typedef int (*posix_socket_getsockopt_func_t)(posix_sock *sock,
 		int level, int optname, void *restrict optval,
 		socklen_t *restrict optlen);
 
@@ -193,7 +277,7 @@ typedef int (*posix_socket_getsockopt_func_t)(struct posix_socket_file *sock,
  *
  * @return 0 on success, -errno otherwise
  */
-typedef int (*posix_socket_setsockopt_func_t)(struct posix_socket_file *sock,
+typedef int (*posix_socket_setsockopt_func_t)(posix_sock *sock,
 		int level, int optname, const void *optval, socklen_t optlen);
 
 /**
@@ -206,7 +290,7 @@ typedef int (*posix_socket_setsockopt_func_t)(struct posix_socket_file *sock,
  *
  * @return 0 on success, -errno otherwise
  */
-typedef int (*posix_socket_connect_func_t)(struct posix_socket_file *sock,
+typedef int (*posix_socket_connect_func_t)(posix_sock *sock,
 		const struct sockaddr *addr, socklen_t addr_len);
 
 /**
@@ -218,7 +302,7 @@ typedef int (*posix_socket_connect_func_t)(struct posix_socket_file *sock,
  *
  * @return 0 on success, -errno otherwise
  */
-typedef int (*posix_socket_listen_func_t)(struct posix_socket_file *sock,
+typedef int (*posix_socket_listen_func_t)(posix_sock *sock,
 		int backlog);
 
 /**
@@ -233,7 +317,7 @@ typedef int (*posix_socket_listen_func_t)(struct posix_socket_file *sock,
  *
  * @return The number of bytes read on success, -errno otherwise
  */
-typedef ssize_t (*posix_socket_recvfrom_func_t)(struct posix_socket_file *sock,
+typedef ssize_t (*posix_socket_recvfrom_func_t)(posix_sock *sock,
 		void *restrict buf, size_t len, int flags,
 		struct sockaddr *from, socklen_t *restrict fromlen);
 
@@ -247,7 +331,7 @@ typedef ssize_t (*posix_socket_recvfrom_func_t)(struct posix_socket_file *sock,
  *
  * @return The number of bytes read on success, -errno otherwise
  */
-typedef ssize_t (*posix_socket_recvmsg_func_t)(struct posix_socket_file *sock,
+typedef ssize_t (*posix_socket_recvmsg_func_t)(posix_sock *sock,
 		struct msghdr *msg, int flags);
 
 /**
@@ -260,7 +344,7 @@ typedef ssize_t (*posix_socket_recvmsg_func_t)(struct posix_socket_file *sock,
  *
  * @return The number of bytes sent on success, -errno otherwise
  */
-typedef ssize_t (*posix_socket_sendmsg_func_t)(struct posix_socket_file *sock,
+typedef ssize_t (*posix_socket_sendmsg_func_t)(posix_sock *sock,
 		const struct msghdr *msg, int flags);
 
 /**
@@ -275,7 +359,7 @@ typedef ssize_t (*posix_socket_sendmsg_func_t)(struct posix_socket_file *sock,
  *
  * @return The number of bytes sent on success, -errno otherwise
  */
-typedef ssize_t (*posix_socket_sendto_func_t)(struct posix_socket_file *sock,
+typedef ssize_t (*posix_socket_sendto_func_t)(posix_sock *sock,
 		const void *buf, size_t len, int flags,
 		const struct sockaddr *dest_addr, socklen_t addrlen);
 
@@ -304,7 +388,7 @@ typedef int (*posix_socket_socketpair_func_t)(struct posix_socket_driver *d,
  *
  * @return The number of bytes written on success, -errno otherwise
  */
-typedef ssize_t (*posix_socket_write_func_t)(struct posix_socket_file *sock,
+typedef ssize_t (*posix_socket_write_func_t)(posix_sock *sock,
 		const struct iovec *iov, int iovcnt);
 
 /**
@@ -317,7 +401,7 @@ typedef ssize_t (*posix_socket_write_func_t)(struct posix_socket_file *sock,
  *
  * @return The number of bytes read on success, -errno otherwise
  */
-typedef ssize_t (*posix_socket_read_func_t)(struct posix_socket_file *sock,
+typedef ssize_t (*posix_socket_read_func_t)(posix_sock *sock,
 		const struct iovec *iov, int iovcnt);
 
 /**
@@ -327,7 +411,7 @@ typedef ssize_t (*posix_socket_read_func_t)(struct posix_socket_file *sock,
  *
  * @return 0 on success, -errno otherwise
  */
-typedef int (*posix_socket_close_func_t)(struct posix_socket_file *sock);
+typedef int (*posix_socket_close_func_t)(posix_sock *sock);
 
 /**
  * Manipulate the socket.
@@ -338,25 +422,19 @@ typedef int (*posix_socket_close_func_t)(struct posix_socket_file *sock);
  *
  * @return 0 on success, -errno otherwise
  */
-typedef int (*posix_socket_ioctl_func_t)(struct posix_socket_file *sock,
+typedef int (*posix_socket_ioctl_func_t)(posix_sock *sock,
 		int request, void *argp);
 
 /**
- * Poll the socket. The driver is expected to register with the eventpoll and
- * signal new incoming events via eventpoll_signal as soon as they occur.
+ * Poll the socket, updating `sock` with the currently set events.
+ * This is guaranteed to be called exactly once on initialization,
+ * allowing the driver to set up any data structures required by callbacks.
+ * The driver from that point responsible for updating the events on every
+ * operation using the `posix_socket_event_*` functions.
  *
  * @param sock Reference to the socket
- * @param revents Pointer to an unsigned integer which receives the mask of
- *    events that are active for the socket (e.g., EPOLLIN)
- * @param ecb Reference to the eventpoll control block. It can be used to
- *    configure a cleanup function that should be called when the eventpoll
- *    is destroyed and further calls of eventpoll_signal by the driver are no
- *    longer desired
- *
- * @return 0 on success, -errno otherwise
  */
-typedef int (*posix_socket_poll_func_t)(struct posix_socket_file *sock,
-		unsigned int *revents, struct eventpoll_cb *ecb);
+typedef void (*posix_socket_poll_func_t)(posix_sock *sock);
 
 /**
  * A structure containing the functions exported by a Unikraft socket driver
@@ -364,7 +442,7 @@ typedef int (*posix_socket_poll_func_t)(struct posix_socket_file *sock,
 struct posix_socket_ops {
 	/* The initialization function on socket registration. */
 	posix_socket_driver_init_func_t	init;
-	/* POSIX interface */
+	/* POSIX socket interface */
 	posix_socket_create_func_t	create;
 	posix_socket_accept4_func_t	accept4;
 	posix_socket_bind_func_t	bind;
@@ -380,7 +458,7 @@ struct posix_socket_ops {
 	posix_socket_sendmsg_func_t	sendmsg;
 	posix_socket_sendto_func_t	sendto;
 	posix_socket_socketpair_func_t	socketpair;
-	/* vfscore ops */
+	/* file ops */
 	posix_socket_write_func_t	write;
 	posix_socket_read_func_t	read;
 	posix_socket_close_func_t	close;
@@ -399,140 +477,136 @@ posix_socket_create(struct posix_socket_driver *d, int family, int type,
 }
 
 static inline void *
-posix_socket_accept4(struct posix_socket_file *sock,
+posix_socket_accept4(posix_sock *sock,
 		     struct sockaddr *restrict addr,
 		     socklen_t *restrict addr_len, int flags)
 {
-	UK_ASSERT(sock);
-	UK_ASSERT(sock->driver->ops->accept4);
+	struct posix_socket_driver *d = posix_sock_get_driver(sock);
 
-	return sock->driver->ops->accept4(sock, addr, addr_len, flags);
+	UK_ASSERT(d->ops->accept4);
+	return d->ops->accept4(sock, addr, addr_len, flags);
 }
 
 static inline int
-posix_socket_bind(struct posix_socket_file *sock,
+posix_socket_bind(posix_sock *sock,
 		  const struct sockaddr *addr, socklen_t addr_len)
 {
-	UK_ASSERT(sock);
-	UK_ASSERT(sock->driver->ops->bind);
+	struct posix_socket_driver *d = posix_sock_get_driver(sock);
 
-	return sock->driver->ops->bind(sock, addr, addr_len);
+	UK_ASSERT(d->ops->bind);
+	return d->ops->bind(sock, addr, addr_len);
 }
 
 static inline int
-posix_socket_shutdown(struct posix_socket_file *sock, int how)
+posix_socket_shutdown(posix_sock *sock, int how)
 {
-	UK_ASSERT(sock);
-	UK_ASSERT(sock->driver->ops->shutdown);
+	struct posix_socket_driver *d = posix_sock_get_driver(sock);
 
-	return sock->driver->ops->shutdown(sock, how);
+	UK_ASSERT(d->ops->shutdown);
+	return d->ops->shutdown(sock, how);
 }
 
 static inline int
-posix_socket_getpeername(struct posix_socket_file *sock,
+posix_socket_getpeername(posix_sock *sock,
 			 struct sockaddr *restrict addr,
 			 socklen_t *restrict addr_len)
 {
-	UK_ASSERT(sock);
-	UK_ASSERT(sock->driver->ops->getpeername);
+	struct posix_socket_driver *d = posix_sock_get_driver(sock);
 
-	return sock->driver->ops->getpeername(sock, addr, addr_len);
+	UK_ASSERT(d->ops->getpeername);
+	return d->ops->getpeername(sock, addr, addr_len);
 }
 
 static inline int
-posix_socket_getsockname(struct posix_socket_file *sock,
+posix_socket_getsockname(posix_sock *sock,
 			 struct sockaddr *restrict addr,
 			 socklen_t *restrict addr_len)
 {
-	UK_ASSERT(sock);
-	UK_ASSERT(sock->driver->ops->getsockname);
+	struct posix_socket_driver *d = posix_sock_get_driver(sock);
 
-	return sock->driver->ops->getsockname(sock, addr, addr_len);
+	UK_ASSERT(d->ops->getsockname);
+	return d->ops->getsockname(sock, addr, addr_len);
 }
 
 static inline int
-posix_socket_getsockopt(struct posix_socket_file *sock, int level, int optname,
+posix_socket_getsockopt(posix_sock *sock, int level, int optname,
 			void *restrict optval, socklen_t *restrict optlen)
 {
-	UK_ASSERT(sock);
-	UK_ASSERT(sock->driver->ops->getsockopt);
+	struct posix_socket_driver *d = posix_sock_get_driver(sock);
 
-	return sock->driver->ops->getsockopt(sock, level, optname,
-					     optval, optlen);
+	UK_ASSERT(d->ops->getsockopt);
+	return d->ops->getsockopt(sock, level, optname, optval, optlen);
 }
 
 static inline int
-posix_socket_setsockopt(struct posix_socket_file *sock, int level, int optname,
+posix_socket_setsockopt(posix_sock *sock, int level, int optname,
 			const void *optval, socklen_t optlen)
 {
-	UK_ASSERT(sock);
-	UK_ASSERT(sock->driver->ops->setsockopt);
+	struct posix_socket_driver *d = posix_sock_get_driver(sock);
 
-	return sock->driver->ops->setsockopt(sock, level, optname,
-					     optval, optlen);
+	UK_ASSERT(d->ops->setsockopt);
+	return d->ops->setsockopt(sock, level, optname, optval, optlen);
 }
 
 static inline int
-posix_socket_connect(struct posix_socket_file *sock,
+posix_socket_connect(posix_sock *sock,
 		     const struct sockaddr *addr, socklen_t addr_len)
 {
-	UK_ASSERT(sock);
-	UK_ASSERT(sock->driver->ops->connect);
+	struct posix_socket_driver *d = posix_sock_get_driver(sock);
 
-	return sock->driver->ops->connect(sock, addr, addr_len);
+	UK_ASSERT(d->ops->connect);
+	return d->ops->connect(sock, addr, addr_len);
 }
 
 static inline int
-posix_socket_listen(struct posix_socket_file *sock, int backlog)
+posix_socket_listen(posix_sock *sock, int backlog)
 {
-	UK_ASSERT(sock);
-	UK_ASSERT(sock->driver->ops->listen);
+	struct posix_socket_driver *d = posix_sock_get_driver(sock);
 
-	return sock->driver->ops->listen(sock, backlog);
+	UK_ASSERT(d->ops->listen);
+	return d->ops->listen(sock, backlog);
 }
 
 static inline ssize_t
-posix_socket_recvfrom(struct posix_socket_file *sock, void *restrict buf,
+posix_socket_recvfrom(posix_sock *sock, void *restrict buf,
 		      size_t len, int flags, struct sockaddr *from,
 		      socklen_t *fromlen)
 {
-	UK_ASSERT(sock);
-	UK_ASSERT(sock->driver->ops->recvfrom);
+	struct posix_socket_driver *d = posix_sock_get_driver(sock);
 
-	return sock->driver->ops->recvfrom(sock, buf, len, flags,
-					   from, fromlen);
+	UK_ASSERT(d->ops->recvfrom);
+	return d->ops->recvfrom(sock, buf, len, flags, from, fromlen);
 }
 
 static inline ssize_t
-posix_socket_recvmsg(struct posix_socket_file *sock, struct msghdr *msg,
+posix_socket_recvmsg(posix_sock *sock, struct msghdr *msg,
 		     int flags)
 {
-	UK_ASSERT(sock);
-	UK_ASSERT(sock->driver->ops->recvmsg);
+	struct posix_socket_driver *d = posix_sock_get_driver(sock);
 
-	return sock->driver->ops->recvmsg(sock, msg, flags);
+	UK_ASSERT(d->ops->recvmsg);
+	return d->ops->recvmsg(sock, msg, flags);
 }
 
 static inline ssize_t
-posix_socket_sendmsg(struct posix_socket_file *sock,
+posix_socket_sendmsg(posix_sock *sock,
 		     const struct msghdr *msg, int flags)
 {
-	UK_ASSERT(sock);
-	UK_ASSERT(sock->driver->ops->sendmsg);
+	struct posix_socket_driver *d = posix_sock_get_driver(sock);
 
-	return sock->driver->ops->sendmsg(sock, msg, flags);
+	UK_ASSERT(d->ops->sendmsg);
+	return d->ops->sendmsg(sock, msg, flags);
 }
 
 static inline ssize_t
-posix_socket_sendto(struct posix_socket_file *sock, const void *buf,
+posix_socket_sendto(posix_sock *sock, const void *buf,
 		    size_t len, int flags, const struct sockaddr *dest_addr,
 		    socklen_t addrlen)
 {
-	UK_ASSERT(sock);
-	UK_ASSERT(sock->driver->ops->sendto);
+	struct posix_socket_driver *d = posix_sock_get_driver(sock);
 
-	return sock->driver->ops->sendto(sock, buf, len, flags,
-					 dest_addr, addrlen);
+	UK_ASSERT(d->ops->sendto);
+	return d->ops->sendto(sock, buf, len, flags, dest_addr, addrlen);
 }
 
 static inline int
@@ -541,56 +615,54 @@ posix_socket_socketpair(struct posix_socket_driver *d, int family, int type,
 {
 	UK_ASSERT(d);
 	UK_ASSERT(d->ops->socketpair);
-
 	return d->ops->socketpair(d, family, type, protocol, usockvec);
 }
 
 static inline ssize_t
-posix_socket_write(struct posix_socket_file *sock, const struct iovec *iov,
+posix_socket_write(posix_sock *sock, const struct iovec *iov,
 		   int iovcnt)
 {
-	UK_ASSERT(sock);
-	UK_ASSERT(sock->driver->ops->write);
+	struct posix_socket_driver *d = posix_sock_get_driver(sock);
 
-	return sock->driver->ops->write(sock, iov, iovcnt);
+	UK_ASSERT(d->ops->write);
+	return d->ops->write(sock, iov, iovcnt);
 }
 
 static inline ssize_t
-posix_socket_read(struct posix_socket_file *sock, const struct iovec *iov,
+posix_socket_read(posix_sock *sock, const struct iovec *iov,
 		  int iovcnt)
 {
-	UK_ASSERT(sock);
-	UK_ASSERT(sock->driver->ops->read);
+	struct posix_socket_driver *d = posix_sock_get_driver(sock);
 
-	return sock->driver->ops->read(sock, iov, iovcnt);
+	UK_ASSERT(d->ops->read);
+	return d->ops->read(sock, iov, iovcnt);
 }
 
 static inline int
-posix_socket_close(struct posix_socket_file *sock)
+posix_socket_close(posix_sock *sock)
 {
-	UK_ASSERT(sock);
-	UK_ASSERT(sock->driver->ops->close);
+	struct posix_socket_driver *d = posix_sock_get_driver(sock);
 
-	return sock->driver->ops->close(sock);
+	UK_ASSERT(d->ops->close);
+	return d->ops->close(sock);
 }
 
 static inline int
-posix_socket_ioctl(struct posix_socket_file *sock, int request, void *argp)
+posix_socket_ioctl(posix_sock *sock, int request, void *argp)
 {
-	UK_ASSERT(sock);
-	UK_ASSERT(sock->driver->ops->ioctl);
+	struct posix_socket_driver *d = posix_sock_get_driver(sock);
 
-	return sock->driver->ops->ioctl(sock, request, argp);
+	UK_ASSERT(d->ops->ioctl);
+	return d->ops->ioctl(sock, request, argp);
 }
 
-static inline int
-posix_socket_poll(struct posix_socket_file *sock, unsigned int *revents,
-		  struct eventpoll_cb *ecb)
+static inline void
+posix_socket_poll(posix_sock *sock)
 {
-	UK_ASSERT(sock);
-	UK_ASSERT(sock->driver->ops->poll);
+	struct posix_socket_driver *d = posix_sock_get_driver(sock);
 
-	return sock->driver->ops->poll(sock, revents, ecb);
+	UK_ASSERT(d->ops->poll);
+	d->ops->poll(sock);
 }
 
 /**
