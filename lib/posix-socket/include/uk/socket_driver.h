@@ -379,6 +379,15 @@ typedef int (*posix_socket_socketpair_func_t)(struct posix_socket_driver *d,
 		int family, int type, int protocol, void *sockvec[2]);
 
 /**
+ * Optional post-socketpair callback with fully-initialized socket files.
+ *
+ * @param d The socket driver
+ * @param sockvec A length 2 vector of the newly initialized socket files.
+ */
+typedef void (*posix_socket_socketpair_post_func_t)(
+	struct posix_socket_driver *d, posix_sock *sockvec[2]);
+
+/**
  * Write to a socket file descriptor.
  *
  * @param sock Reference to the socket
@@ -458,6 +467,7 @@ struct posix_socket_ops {
 	posix_socket_sendmsg_func_t	sendmsg;
 	posix_socket_sendto_func_t	sendto;
 	posix_socket_socketpair_func_t	socketpair;
+	posix_socket_socketpair_post_func_t	socketpair_post;
 	/* file ops */
 	posix_socket_write_func_t	write;
 	posix_socket_read_func_t	read;
@@ -616,6 +626,16 @@ posix_socket_socketpair(struct posix_socket_driver *d, int family, int type,
 	UK_ASSERT(d);
 	UK_ASSERT(d->ops->socketpair);
 	return d->ops->socketpair(d, family, type, protocol, usockvec);
+}
+
+static inline void
+posix_socket_socketpair_post(struct posix_socket_driver *d,
+			     posix_sock *sockvec[2])
+{
+	UK_ASSERT(d);
+
+	if (d->ops->socketpair_post)
+		d->ops->socketpair_post(d, sockvec);
 }
 
 static inline ssize_t
