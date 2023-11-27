@@ -2,14 +2,14 @@
 
 `posix-sysinfo` is an internal library of Unikraft that provides a similar interface to the Linux system information related syscalls (`sysinfo`, `uname`, etc.).
 
-The `struct sysinfo` and `struct utsname` structures follow the Linux conventions.
-The Unikraft `sysinfo` library will not fill all the items in the `struct sysinfo` structure, some of them will be set to 0 (such as `uptime`, `loads`, `*swap`, `*high`).
+The [`struct sysinfo`](https://github.com/unikraft/unikraft/blob/staging/lib/posix-sysinfo/include/sys/sysinfo.h#L36) and [`struct utsname`](https://github.com/unikraft/unikraft/blob/staging/lib/posix-sysinfo/include/sys/utsname.h#L43) structures follow the Linux conventions.
+The Unikraft `sysinfo` library will not fill all the items in the `struct sysinfo` structure, some of them will be set to 0 (such as `uptime`, `loads`, `*swap`, `*high`), as support for them is not yet implemented.
 For memory-related fields to be populated (`*ram`, `mem_unit`), the `Virtual memory API` config option must be selected from the `Platform Configuration -> Platform Interface Options` configuration screen.
 
 ## Configuring applications to use `posix-sysinfo`
 
 You can select `posix-sysinfo` under the `Library Configuration` screen of the `make menuconfig` command.
-After that, you can use the functions eposed by the internal library just like you would for a Linux system,
+After that, you can use the functions exposed by the internal library just like you would do for a Linux system,
 
 An example of a simple application that uses the `posix-sysinfo` library is the following:
 
@@ -18,7 +18,7 @@ An example of a simple application that uses the `posix-sysinfo` library is the 
 #include <sys/sysinfo.h>
 #include <sys/utsname.h>
 
-int main(int argc, char *argv[])
+int main(void)
 {
         struct sysinfo info;
         struct utsname utsn;
