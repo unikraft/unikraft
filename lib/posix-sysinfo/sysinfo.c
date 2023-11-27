@@ -51,6 +51,16 @@
 #include <vfscore/file.h>
 #endif
 
+/**
+ * The Unikraft `struct utsname` structure.
+ *
+ * * `sysname` is set to "Unikraft".
+ * * `nodename` is set to "unikraft".
+ * * `release` is set to * `5-{Unikraft Release Codename}` for glibc
+ *   compatibility (see the comments below).
+ * * `version` is set to the Unikraft full version.
+ * * `machine` is set to the current architecture.
+ */
 static struct utsname utsname = {
 	.sysname	= "Unikraft",
 	.nodename	= "unikraft",
