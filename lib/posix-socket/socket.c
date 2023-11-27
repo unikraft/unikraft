@@ -856,6 +856,7 @@ int uk_socketpair_create(int family, int type, int protocol,
 	_socket_init(al[1], d, sock_data[1]);
 	sv[0] = &al[0]->f;
 	sv[1] = &al[1]->f;
+	posix_socket_socketpair_post(d, sv);
 	return 0;
 
 err_free:
