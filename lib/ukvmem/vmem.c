@@ -665,7 +665,15 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 
 	UK_ASSERT(PAGE_Lx_ALIGNED(va, algn_lvl));
 	UK_ASSERT(va <= __VADDR_MAX - len);
-	UK_ASSERT(ukarch_vaddr_range_isvalid(va, len));
+
+	/* Applications can request invalid memory ranges in mmap. In case the
+	 * address is not valid, then ENOMEM is the specfied error code.
+	 * This should only happen rarely in practice, for example when JS
+	 * engines (mozjs) do weird stuff to figure out the available address
+	 * bits.
+	 */
+	if (unlikely(!ukarch_vaddr_range_isvalid(va, len)))
+		return -ENOMEM;
 
 	/* Create a new VMA for the requested range. */
 	if (ops->new) {
