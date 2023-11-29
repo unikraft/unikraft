@@ -31,26 +31,77 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <kvm-x86/traps.h>
 #include <uk/arch/lcpu.h>
+#include <uk/asm.h>
 #include <uk/asm/cfi.h>
-
-#define ENTRY(X) .globl X ; X :
+#include <uk/plat/common/lcpu.h>
 
 ENTRY(_ukplat_syscall)
 	.cfi_startproc simple
 	.cfi_def_cfa rsp, 0
 	.cfi_register rip, rcx
 	cli
+
+	/* Switch to Unikraft's gs_base, which contains pointer to the current
+	 * LCPU's `struct lcpu`.
+	 */
+	swapgs
+
+	/* We can now use the scratch register %r11 (SYSv ABI) to temporarily
+	 * store the current stack pointer and switch to the auxiliary stack
+	 * of the current thread, which is also stored in `struct lcpu`'s
+	 * `auxsp` field.
+	 * We thus achieve a complete switch to another stack while preserving
+	 * the context of the application.
+	 */
+	/* Temporarily store current stack pointer in scratch register */
+	movq	%rsp, %r11
+
+	/* Switch to the auxiliary stack so that we do not contaminate the
+	 * application's stack, as this could either be too small and result
+	 * in corrupted memory or we could modify unwanted variables stored
+	 * in the Red Zone.
+	 */
+	movq	%gs:LCPU_AUXSP_OFFSET, %rsp
+
+	pushq_cfi	$(GDT_DESC_OFFSET(GDT_DESC_DATA))
+
+	/* Store application's stack pointer at the top of current thread's
+	 * auxiliary stack. We have to do this because we obviously can't
+	 * rely on the scratch register being maintained between thread switches
+	 */
+	pushq_reg_cfi r11
+	.cfi_rel_offset rsp, 0
+
+	/* We are now in a state where the stack looks like this:
+	 *	--------------- <-- auxsp (i.e. lcpu_get_current()->auxsp OR
+	 *	| app's saved |	           uk_thread_current()->auxsp)
+	 *	|     %ss     |
+	 *	---------------
+	 *	| app's saved |
+	 *	|     %rsp    |
+	 *	--------------- <-- (auxsp - 16) OR (**current %rsp**)
+	 *	|             |
+	 *	|             |
+	 *            ...
+	 *	|             |
+	 *	--------------- <-- (auxsp - CONFIG_UKPLAT_AUXSP_SIZE)
+	 *	  END OF AUXSP
+	 */
+
 	/*
 	 * Push arguments in the order of 'struct __regs' to the stack.
 	 * We are going to handover a refernce to this stack area as
 	 * `struct __regs *` argument to the system call handler.
 	 */
-	pushq_cfi $0		/* exception frame filled with zeros */
-	pushq_cfi $0		/* (rip, cs, eflags, rsp, ss)        */
-	pushq_cfi $0		/*                                   */
-	pushq_cfi $0		/*                                   */
-	pushq_cfi $0		/*                                   */
+	/* We now have %ss and %rsp on the frame, finish classic trap frame */
+	pushfq			/* eflags */
+	.cfi_adjust_cfa_offset 8
+
+	pushq_cfi	$(GDT_DESC_OFFSET(GDT_DESC_CODE))	/* cs */
+	pushq_reg_cfi rcx	/* rcx contains the next rip on syscall exit */
+
 	pushq_reg_cfi rax	/* orig_rax */
 	pushq_reg_cfi rdi
 	pushq_reg_cfi rsi
@@ -116,9 +167,12 @@ ENTRY(_ukplat_syscall)
 	popq_reg_cfi rdx
 	popq_reg_cfi rsi
 	popq_reg_cfi rdi
-	/* orig_rax and exception frame */
-	addq $(6 * 8), %rsp
-	.cfi_adjust_cfa_offset -(6 * 8)
+
+	movq	32(%rsp), %rsp
+
+	/* Restore application's gs_base register */
+	swapgs
+
 	sti
 
 	/*

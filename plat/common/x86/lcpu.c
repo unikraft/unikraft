@@ -39,6 +39,7 @@
 #include <uk/print.h>
 #include <x86/irq.h>
 #include <x86/cpu.h>
+#include <x86/gsbase.h>
 #include <x86/traps.h>
 #include <x86/delay.h>
 #include <uk/plat/common/acpi.h>
@@ -76,6 +77,9 @@ int lcpu_arch_init(struct lcpu *this_lcpu)
 
 	traps_lcpu_init(this_lcpu);
 
+	wrkgsbase((__uptr)this_lcpu);
+	wrgsbase((__uptr)this_lcpu);
+
 	return 0;
 }
 
@@ -105,6 +109,41 @@ void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
 
 	/* just make the compiler happy about returning function */
 	__builtin_unreachable();
+}
+
+__lcpuidx ukplat_lcpu_idx(void)
+{
+	UK_ASSERT(IS_LCPU_PTR(rdgsbase()));
+
+	return rdgsbase32(LCPU_IDX_OFFSET);
+}
+
+__lcpuid ukplat_lcpu_id(void)
+{
+	UK_ASSERT(IS_LCPU_PTR(rdgsbase()));
+
+	return rdgsbase64(LCPU_ID_OFFSET);
+}
+
+struct lcpu *lcpu_get_current(void)
+{
+	UK_ASSERT(IS_LCPU_PTR(rdgsbase()));
+
+	return lcpu_get(ukplat_lcpu_idx());
+}
+
+__uptr ukplat_lcpu_get_auxsp(void)
+{
+	UK_ASSERT(IS_LCPU_PTR(lcpu_get_current()));
+
+	return rdgsbase64(LCPU_AUXSP_OFFSET);
+}
+
+void ukplat_lcpu_set_auxsp(__uptr auxsp)
+{
+	UK_ASSERT(IS_LCPU_PTR(lcpu_get_current()));
+
+	wrgsbase64(auxsp, LCPU_AUXSP_OFFSET);
 }
 
 #if CONFIG_HAVE_SMP

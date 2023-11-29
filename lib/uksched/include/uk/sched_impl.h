@@ -68,6 +68,7 @@ int uk_sched_register(struct uk_sched *s);
 		\
 		(s)->a = (def_allocator); \
 		(s)->a_stack = (def_allocator); \
+		(s)->a_auxstack = (def_allocator); \
 		(s)->a_uktls = (def_allocator); \
 		UK_TAILQ_INIT(&(s)->thread_list); \
 		UK_TAILQ_INIT(&(s)->exited_threads); \
@@ -104,6 +105,8 @@ void uk_sched_thread_switch(struct uk_thread *next)
 	ukplat_tlsp_set(next->tlsp);
 	if (next->ectx)
 		ukarch_ectx_load(next->ectx);
+
+	ukplat_lcpu_set_auxsp(next->auxsp);
 
 	ukarch_ctx_switch(&prev->ctx, &next->ctx);
 }

@@ -66,6 +66,7 @@ int uk_sched_register(struct uk_sched *s)
 struct uk_thread *uk_sched_thread_create_fn0(struct uk_sched *s,
 					     uk_thread_fn0_t fn0,
 					     size_t stack_len,
+					     size_t auxstack_len,
 					     bool no_uktls,
 					     bool no_ectx,
 					     const char *name,
@@ -77,6 +78,7 @@ struct uk_thread *uk_sched_thread_create_fn0(struct uk_sched *s,
 
 	UK_ASSERT(s);
 	UK_ASSERT(s->a_stack);
+	UK_ASSERT(s->a_auxstack);
 
 	if (!no_uktls && !s->a_uktls)
 		goto err_out;
@@ -84,6 +86,7 @@ struct uk_thread *uk_sched_thread_create_fn0(struct uk_sched *s,
 	t = uk_thread_create_fn0(s->a,
 				 fn0,
 				 s->a_stack, stack_len,
+				 s->a_auxstack, auxstack_len,
 				 no_uktls ? NULL : s->a_uktls,
 				 no_ectx,
 				 name,
@@ -108,6 +111,7 @@ struct uk_thread *uk_sched_thread_create_fn1(struct uk_sched *s,
 					     uk_thread_fn1_t fn1,
 					     void *argp,
 					     size_t stack_len,
+					     size_t auxstack_len,
 					     bool no_uktls,
 					     bool no_ectx,
 					     const char *name,
@@ -119,6 +123,7 @@ struct uk_thread *uk_sched_thread_create_fn1(struct uk_sched *s,
 
 	UK_ASSERT(s);
 	UK_ASSERT(s->a_stack);
+	UK_ASSERT(s->a_auxstack);
 
 	if (!no_uktls && !s->a_uktls)
 		goto err_out;
@@ -126,6 +131,7 @@ struct uk_thread *uk_sched_thread_create_fn1(struct uk_sched *s,
 	t = uk_thread_create_fn1(s->a,
 				 fn1, argp,
 				 s->a_stack, stack_len,
+				 s->a_auxstack, auxstack_len,
 				 no_uktls ? NULL : s->a_uktls,
 				 no_ectx,
 				 name,
@@ -150,6 +156,7 @@ struct uk_thread *uk_sched_thread_create_fn2(struct uk_sched *s,
 					     uk_thread_fn2_t fn2,
 					     void *argp0, void *argp1,
 					     size_t stack_len,
+					     size_t auxstack_len,
 					     bool no_uktls,
 					     bool no_ectx,
 					     const char *name,
@@ -161,6 +168,7 @@ struct uk_thread *uk_sched_thread_create_fn2(struct uk_sched *s,
 
 	UK_ASSERT(s);
 	UK_ASSERT(s->a_stack);
+	UK_ASSERT(s->a_auxstack);
 
 	if (!no_uktls && !s->a_uktls)
 		goto err_out;
@@ -168,6 +176,7 @@ struct uk_thread *uk_sched_thread_create_fn2(struct uk_sched *s,
 	t = uk_thread_create_fn2(s->a,
 				 fn2, argp0, argp1,
 				 s->a_stack, stack_len,
+				 s->a_auxstack, auxstack_len,
 				 no_uktls ? NULL : s->a_uktls,
 				 no_ectx,
 				 name,
@@ -205,7 +214,8 @@ int uk_sched_start(struct uk_sched *s)
 	 */
 	tlsp = ukplat_tlsp_get();
 	main_thread = uk_thread_create_bare(s->a,
-					    0x0, 0x0, tlsp, !(!tlsp), false,
+					    0x0, 0x0, 0x0,
+					    tlsp, !(!tlsp), false,
 					    "init", NULL, NULL);
 	if (!main_thread) {
 		ret = -ENOMEM;
@@ -221,6 +231,9 @@ int uk_sched_start(struct uk_sched *s)
 
 	/* Set main_thread as current scheduled thread */
 	ukplat_per_lcpu_current(__uk_sched_thread_current) = main_thread;
+
+	/* Set current LCPU's Kernel Stack pointer */
+	ukplat_lcpu_set_auxsp(main_thread->auxsp);
 
 	/* Add main to the scheduler's thread list */
 	UK_TAILQ_INSERT_TAIL(&s->thread_list, main_thread, thread_list);

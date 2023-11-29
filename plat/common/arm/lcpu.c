@@ -30,6 +30,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#include <uk/arch/lcpu.h>
+#include <uk/arch/ctx.h>
+#include <uk/plat/config.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/plat/common/acpi.h>
 #include <uk/plat/lcpu.h>
@@ -38,9 +41,24 @@
 #include <arm/smccc.h>
 #include <arm/arm64/cpu.h>
 #include <uk/intctlr/gic.h>
+#include <uk/plat/config.h>
 #include <libfdt.h>
 
 #define CPU_ID_MASK 0xff00ffffffUL
+
+/*
+ *       STACK_SIZE               STACK_SIZE
+ * <---------------------><--------------------->
+ * |============================================|
+ * |                     |                      |
+ * |       trap stack    |        IRQ stack     |
+ * |                     |                      |
+ * |=============================================
+ *                       ^
+ *                     SP_EL0
+ */
+static __align(UKARCH_SP_ALIGN)
+UKPLAT_PER_LCPU_ARRAY_DEFINE(__u8, lcpu_irqntrap_sp, STACK_SIZE * 2);
 
 __lcpuid lcpu_arch_id(void)
 {
@@ -67,7 +85,6 @@ void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
 	__builtin_unreachable();
 }
 
-#ifdef CONFIG_HAVE_SMP
 /**
  * The number of cells for the size field should be 0 in cpu nodes.
  * The number of cells in the address field is set by default to 2 in cpu
@@ -78,11 +95,11 @@ void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
 #define FDT_ADDR_CELLS_DEFAULT 2
 
 void lcpu_start(struct lcpu *cpu);
-static __paddr_t lcpu_start_paddr;
 extern struct _gic_dev *gic;
 
 int lcpu_arch_init(struct lcpu *this_lcpu)
 {
+	__uptr irqntrap_sp;
 	int ret = 0;
 
 	/* Initialize the interrupt controller for non-bsp cores */
@@ -92,10 +109,52 @@ int lcpu_arch_init(struct lcpu *this_lcpu)
 			return ret;
 	}
 
+	SYSREG_WRITE64(tpidr_el1, (__uptr)this_lcpu);
+
+	irqntrap_sp = (__uptr)&ukplat_per_lcpu_array_current(lcpu_irqntrap_sp,
+							     STACK_SIZE / 2);
+	SYSREG_WRITE64(sp_el0, irqntrap_sp);
+
 	return ret;
 }
 
+__lcpuidx ukplat_lcpu_idx(void)
+{
+	return lcpu_get_current()->idx;
+}
+
+__lcpuid ukplat_lcpu_id(void)
+{
+	return lcpu_arch_id();
+}
+
+struct lcpu *lcpu_get_current(void)
+{
+	struct lcpu *this_lcpu = (struct lcpu *)SYSREG_READ64(tpidr_el1);
+
+	UK_ASSERT(IS_LCPU_PTR(this_lcpu));
+
+	return this_lcpu;
+}
+
+__uptr ukplat_lcpu_get_auxsp(void)
+{
+	UK_ASSERT(IS_LCPU_PTR(lcpu_get_current()));
+
+	return lcpu_get_current()->auxsp;
+}
+
+void ukplat_lcpu_set_auxsp(__uptr auxsp)
+{
+	UK_ASSERT(IS_LCPU_PTR(lcpu_get_current()));
+
+	lcpu_get_current()->auxsp = auxsp;
+}
+
+#ifdef CONFIG_HAVE_SMP
 #ifdef CONFIG_UKPLAT_ACPI
+static __paddr_t lcpu_start_paddr;
+
 static int do_arch_mp_init(void *arg __unused)
 {
 	__lcpuid bsp_cpu_id = lcpu_get(0)->id;
