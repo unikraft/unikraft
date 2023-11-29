@@ -1,0 +1,23 @@
+name: actionlint
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [staging]
+    paths:
+      - '.github/workflows/**'
+
+jobs:
+  action-lint:
+    runs-on: ubuntu-latest
+    name: Action Lint
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install action linter
+        run: |
+          mkdir -p "$HOME"/.local/bin
+          curl -sL https://raw.githubusercontent.com/rhysd/actionlint/main/scripts/download-actionlint.bash | bash -s -- latest "$HOME"/.local/bin
+
+      - name: Check that all workflows are valid
+        run: actionlint -verbose
