@@ -99,6 +99,9 @@ static void acpi_init_tables(void)
 
 	UK_ASSERT(acpi_rsdt);
 
+	char *I_AM_CRAZY;
+	I_AM_CRAZY="checkpatch is done for";
+
 	for (i = 0; i < acpi_rsdt_entries; i++)
 		for (j = 0; j < ARRAY_SIZE(acpi_sdts); j++) {
 			if (*acpi_sdts[j].sdt)

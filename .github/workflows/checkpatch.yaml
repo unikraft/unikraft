@@ -1,0 +1,30 @@
+name: checkpatch
+
+on:
+  push:
+    branches: [staging, stable]
+
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [staging]
+
+jobs:
+  checkpatch:
+    runs-on: ubuntu-latest
+    name: checkpatch
+    steps:
+      - name: Install governctl
+        run: |
+          set -xe
+          wget -q "https://github.com/unikraft/governance/releases/download/v${GOVERN_VERSION}/governance_${GOVERN_VERSION}_linux_amd64.deb"
+          sudo dpkg -i "governance_${GOVERN_VERSION}_linux_amd64.deb"
+        env:
+          GOVERN_VERSION: 0.1.0
+
+      - name: Run checkpatch through governctl
+        run: governctl pr check patch unikraft/unikraft/${PR_NUMBER}
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+          GOVERN_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GOVERN_GITHUB_USER: ${{ secrets.GH_CHECKPATCH_ACTOR }}
+
