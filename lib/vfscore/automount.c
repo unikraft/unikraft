@@ -48,35 +48,200 @@
 #include <uk/init.h>
 #include <uk/libparam.h>
 #include <uk/plat/memory.h>
+#include <sys/stat.h>
 
 #ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS
 #include <errno.h>
 #include <uk/config.h>
 #include <uk/arch/types.h>
-#include <sys/stat.h>
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS */
+
+#if CONFIG_LIBVFSCORE_FSTAB
+#define LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP			':'
+#define LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP			','
+#endif /* CONFIG_LIBVFSCORE_FSTAB */
 
 struct vfscore_volume {
 	/* Volume source device */
 	const char *sdev;
 	/* Mount point absolute path */
-	const char *path;
+	char *path;
 	/* Corresponding filesystem driver name */
 	const char *drv;
 	/* Mount flags */
 	unsigned long flags;
 	/* Mount options */
 	const char *opts;
+#if CONFIG_LIBVFSCORE_FSTAB
+	/* Unikraft Mount options, see vfscore_mount_volume() */
+	char *ukopts;
+#endif /* CONFIG_LIBVFSCORE_FSTAB */
 };
+
+#if CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS
+static int do_mount_initrd(const void *initrd, size_t len, const char *path)
+{
+	int rc;
+
+	UK_ASSERT(path);
+
+	rc = mount("", path, "ramfs", 0x0, NULL);
+	if (unlikely(rc)) {
+		uk_pr_crit("Failed to mount ramfs to \"%s\": %d\n",
+			   path, errno);
+		return -1;
+	}
+
+	uk_pr_info("Extracting initrd @ %p (%"__PRIsz" bytes) to %s...\n",
+		   (void *)initrd, len, path);
+	rc = ukcpio_extract(path, (void *)initrd, len);
+	if (unlikely(rc)) {
+		uk_pr_crit("Failed to extract cpio archive to %s: %d\n",
+			   path, rc);
+		return -1;
+	}
+
+	return 0;
+}
+
+static int vfscore_mount_initrd_volume(struct vfscore_volume *vv)
+{
+	struct ukplat_memregion_desc *initrd;
+	int rc;
+
+	UK_ASSERT(vv);
+	UK_ASSERT(vv->path);
+
+	/* TODO: Support multiple Initial RAM Disks */
+	rc = ukplat_memregion_find_initrd0(&initrd);
+	if (unlikely(rc < 0)) {
+		uk_pr_crit("Could not find an initrd!\n");
+
+		return -1;
+	}
+
+	return do_mount_initrd((void *)initrd->vbase, initrd->len,
+			       vv->path);
+}
+#endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
+
+#if CONFIG_LIBVFSCORE_FSTAB
+/* Handle `mkmp` Unikraft Mount Option */
+static int vfscore_volume_process_ukopts_do_mkmp(char *path)
+{
+	char *pos, *prev_pos;
+	int rc;
+
+	UK_ASSERT(path);
+	UK_ASSERT(path[0] == '/');
+
+	pos = path;
+	do {
+		prev_pos = pos;
+		pos = strchr(pos + 1, '/');
+
+		if (pos) {
+			if (pos[0] == '\0')
+				break;
+
+			/* Zero out the next '/' */
+			*pos = '\0';
+		}
+
+		/* Do not allow `/./` or `/../` in the path. Also do not allow
+		 * overwriting .. or . files
+		 */
+		if (unlikely(prev_pos[1] == '.' &&
+			     /* /../ and /.. */
+			     ((prev_pos[2] == '.' &&
+			       (prev_pos[3] == '/' || prev_pos[3] == '\0')) ||
+				/* OR /./ and /. */
+			      (prev_pos[2] == '/' || prev_pos[2] == '\0')
+			     )))
+			uk_pr_err("Do not allow `/./` or `/../` in the path. "
+				  "Also do not allow overwriting .. or . "
+				  "files\n");
+
+		/* mkdir() with S_IRWXU */
+		rc = mkdir(path, 0700);
+		if (rc && errno != EEXIST)
+			return rc;
+
+		/* Restore current '/' */
+		if (pos)
+			*pos = '/';
+
+		/* Handle paths with multiple `/` */
+		while (pos && pos[1] == '/')
+			pos++;
+	} while (pos);
+
+	return 0;
+}
+
+/**
+ * vv->ukopts must follow the pattern below, each option separated by
+ * the character defined through LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP (e.g. with
+ * LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP = ','):
+ *	[<ukopt1>,<ukopt2>,<ukopt3>,...,<ukoptN>]
+ *
+ * Currently implemented, Unikraft Mount options:
+ * - mkmp	Make mount point. Ensures that the specified mount point
+ *		exists. If it does not exist in the current vfs, the directory
+ *		structure is created.
+ */
+static int vfscore_volume_process_ukopts(struct vfscore_volume *vv)
+{
+	char *o_curr, *o_next;
+	int rc;
+
+	UK_ASSERT(vv);
+	UK_ASSERT(vv->path);
+
+	o_curr = vv->ukopts;
+	while (o_curr) {
+		o_next = strchr(o_curr, LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP);
+		if (o_next) {
+			*o_next = '\0';
+			o_next++;
+		}
+
+		/* First check is so we do not run `mkmp` on `/` */
+		if (!strcmp(o_curr, "mkmp") && vv->path[1] != '\0') {
+			rc = vfscore_volume_process_ukopts_do_mkmp(vv->path);
+			if (unlikely(rc)) {
+				uk_pr_err("Failed to process ukopt (mkmp): "
+					  "%d\n", rc);
+				return rc;
+			}
+		}
+
+		o_curr = o_next;
+	}
+
+	return 0;
+}
+#endif /* CONFIG_LIBVFSCORE_FSTAB */
 
 static inline int vfscore_mount_volume(struct vfscore_volume *vv)
 {
-	return mount(vv->sdev, vv->path, vv->drv, vv->flags, vv->opts);
+	UK_ASSERT(vv);
+
+#if CONFIG_LIBVFSCORE_FSTAB
+	vfscore_volume_process_ukopts(vv);
+#endif /* CONFIG_LIBVFSCORE_FSTAB */
+
+#if CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS
+	if (!strncmp(vv->drv, "initrd", sizeof("initrd") - 1)) {
+		return vfscore_mount_initrd_volume(vv);
+	} else
+#endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
+	{
+		return mount(vv->sdev, vv->path, vv->drv, vv->flags, vv->opts);
+	}
 }
 
 #ifdef CONFIG_LIBVFSCORE_FSTAB
-
-#define LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP			':'
 
 static char *vfscore_fstab[CONFIG_LIBVFSCORE_FSTAB_SIZE];
 
@@ -87,12 +252,12 @@ UK_LIBPARAM_PARAM_ARR_ALIAS(fstab, &vfscore_fstab, charp,
 /**
  * Expected command-line argument format:
  *	vfs.fstab=[
- *		"<src_dev>:<mntpoint>:<fsdriver>[:<flags>:<opts>]"
- *		"<src_dev>:<mntpoint>:<fsdriver>[:<flags>:<opts>]"
+ *		"<src_dev>:<mntpoint>:<fsdriver>[:<flags>:<opts>:<ukopts>]"
+ *		"<src_dev>:<mntpoint>:<fsdriver>[:<flags>:<opts>:<ukopts>]"
  *		...
  *	]
  * These list elements are expected to be separated by whitespaces.
- * Mount options and flags are optional.
+ * Mount options, flags and Unikraft mount options are optional.
  */
 static char *vfscore_fstab_next_volume_arg(char **pos)
 {
@@ -133,13 +298,22 @@ static void vfscore_fstab_fetch_volume_args(char *v, struct vfscore_volume *vv)
 	vv->path = vfscore_fstab_next_volume_arg(&pos);
 	UK_ASSERT(vv->path);
 
+	if (unlikely(vv->path[0] != '/')) {
+		uk_pr_err("Invalid absolute path provided. Please have your "
+			  "mount point path be absolute.\n");
+		vv->sdev = NULL;
+		vv->path = NULL;
+		vv->drv = NULL;
+		vv->opts = NULL;
+		vv->ukopts = NULL;
+		vv->flags = 0;
+		return;
+	}
+
 	vv->drv = vfscore_fstab_next_volume_arg(&pos);
 	UK_ASSERT(vv->drv);
 
-	if (!pos)
-		return;
-
-	/* Allow empty flags: "<src_dev>:<mntpoint>:<fsdriver>::<opts>" */
+	/* Allow empty flags: "<src_dev>:<mntpoint>:<fsdriver>::<opts>:" */
 	flags = vfscore_fstab_next_volume_arg(&pos);
 	if (flags && flags[0] != '\0')
 		vv->flags = strtol(flags, NULL, 0);
@@ -149,35 +323,20 @@ static void vfscore_fstab_fetch_volume_args(char *v, struct vfscore_volume *vv)
 	vv->opts = vfscore_fstab_next_volume_arg(&pos);
 	if (vv->opts && vv->opts[0] == '\0')
 		vv->opts = NULL;
+
+	vv->ukopts = vfscore_fstab_next_volume_arg(&pos);
+	if (vv->ukopts && vv->ukopts[0] == '\0')
+		vv->ukopts = NULL;
+
+	uk_pr_info("Fetched VFSCore Volume args: %s:%s:%s:%lx:%s:%s\n",
+		   vv->sdev == NULL ? "none" : vv->sdev,
+		   vv->path == NULL ? "none" : vv->path,
+		   vv->drv == NULL ? "none" : vv->drv,
+		   vv->flags,
+		   vv->opts == NULL ? "none" : vv->opts,
+		   vv->ukopts == NULL ? "none" : vv->ukopts);
 }
 #endif /* CONFIG_LIBVFSCORE_FSTAB */
-
-#if CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS
-static int do_mount_initrd(const void *initrd, size_t len, const char *path)
-{
-	int rc;
-
-	UK_ASSERT(path);
-
-	rc = mount("", path, "ramfs", 0x0, NULL);
-	if (unlikely(rc)) {
-		uk_pr_crit("Failed to mount ramfs to \"%s\": %d\n",
-			   path, errno);
-		return -1;
-	}
-
-	uk_pr_info("Extracting initrd @ %p (%"__PRIsz" bytes) to %s...\n",
-		   (void *)initrd, len, path);
-	rc = ukcpio_extract(path, (void *)initrd, len);
-	if (unlikely(rc)) {
-		uk_pr_crit("Failed to extract cpio archive to %s: %d\n",
-			   path, rc);
-		return -1;
-	}
-
-	return 0;
-}
-#endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
 
 #if CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS
 #if CONFIG_LIBVFSCORE_ROOTFS_EINITRD
@@ -197,27 +356,6 @@ static int vfscore_automount_rootfs(void)
 }
 
 #else /* !CONFIG_LIBVFSCORE_ROOTFS_EINITRD */
-#if CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS
-static int vfscore_mount_initrd_volume(struct vfscore_volume *vv)
-{
-	struct ukplat_memregion_desc *initrd;
-	int rc;
-
-	UK_ASSERT(vv);
-
-	/* TODO: Support multiple Initial RAM Disks */
-	rc = ukplat_memregion_find_initrd0(&initrd);
-	if (unlikely(rc < 0)) {
-		uk_pr_crit("Could not find an initrd!\n");
-
-		return -1;
-	}
-
-	return do_mount_initrd((void *)initrd->vbase, initrd->len,
-			       vv->path);
-}
-#endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
-
 static int vfscore_automount_rootfs(void)
 {
 	/* Convert to `struct vfscore_volume` */
@@ -252,11 +390,6 @@ static int vfscore_automount_rootfs(void)
 	if (!vv.drv || vv.drv[0] == '\0')
 		return 0;
 
-#if CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS
-	if (!strncmp(vv.drv, "initrd", sizeof("initrd") - 1))
-		return vfscore_mount_initrd_volume(&vv);
-#endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
-
 	rc = vfscore_mount_volume(&vv);
 	if (unlikely(rc))
 		uk_pr_crit("Failed to mount %s (%s) at /: %d\n", vv.sdev,
@@ -281,14 +414,7 @@ static int vfscore_automount_fstab_volumes(void)
 	for (i = 0; i < CONFIG_LIBVFSCORE_FSTAB_SIZE && vfscore_fstab[i]; i++) {
 		vfscore_fstab_fetch_volume_args(vfscore_fstab[i], &vv);
 
-#if CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS
-		if (!strncmp(vv.drv, "initrd", sizeof("initrd") - 1)) {
-			rc = vfscore_mount_initrd_volume(&vv);
-		} else
-#endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
-		{
-			rc = vfscore_mount_volume(&vv);
-		}
+		rc = vfscore_mount_volume(&vv);
 		if (unlikely(rc)) {
 			uk_pr_err("Failed to mount %s: error %d\n", vv.sdev,
 				  rc);
