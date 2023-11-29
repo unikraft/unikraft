@@ -39,7 +39,6 @@ endif
 ifeq ($(CONFIG_PAGING),y)
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/paging.c|isr
 endif
-LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/trace.c|common
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/traps.c|isr
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/cpu_native.c|common
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/lcpu.c|x86_common
@@ -122,6 +121,7 @@ LIBKVMPLAT_SRCS-y                          += $(LIBKVMPLAT_BASE)/memory.c
 LIBKVMPLAT_SRCS-y                          += $(LIBKVMPLAT_BASE)/io.c
 LIBKVMPLAT_SRCS-y                          += $(UK_PLAT_COMMON_BASE)/lcpu.c|common
 LIBKVMPLAT_SRCS-y                          += $(UK_PLAT_COMMON_BASE)/memory.c|common
+LIBKVMPLAT_SRCS-y                          += $(UK_PLAT_COMMON_BASE)/crash.c|common
 LIBKVMPLAT_SRCS-y                          += $(UK_PLAT_KVM_DEF_LDS)
 LIBKVMPLAT_SRCS-$(CONFIG_UKPLAT_ACPI)      += $(UK_PLAT_COMMON_BASE)/acpi.c|common
 ifeq ($(CONFIG_KVM_BOOT_PROTO_EFI_STUB),y)

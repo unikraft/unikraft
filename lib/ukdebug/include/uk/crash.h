@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
+ * Author(s): Marc Rittinghaus <marc.rittinghaus@kit.edu>
  *
- * Copyright (c) 2018, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2021, Karlsruhe Institute of Technology. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -29,16 +29,36 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef __PLAT_CMN_TRACE_H__
-#define __PLAT_CMN_TRACE_H__
 
+#ifndef __UKDEBUG_CRASH_H__
+#define __UKDEBUG_CRASH_H__
+
+#include <uk/plat/bootstrap.h>
 #include <uk/arch/lcpu.h>
+#include <uk/essentials.h>
 
-void dump_regs(struct __regs *regs);
-void dump_mem(unsigned long addr);
-#if !__OMIT_FRAMEPOINTER__
-void stack_walk(void);
-void stack_walk_for_frame(unsigned long frame_base);
-#endif /* !__OMIT_FRAMEPOINTER__ */
+#ifdef __cplusplus
+extern "C" {
+#endif
 
-#endif /* __PLAT_CMN_TRACE_H__ */
+struct uk_event_crash_parameter {
+	/** Optional register state at the crash location */
+	struct __regs *regs;
+	/** Optional explicit crash description */
+	struct uk_crash_description *descr;
+};
+
+/**
+ * Event for crashes. Will receive a uk_event_crash_parameter as data argument.
+ */
+#define UK_EVENT_CRASH uk_event_crash
+
+/* Use the UK_CRASH*() and UK_ASSERT() macros instead */
+void
+_uk_crash(struct __regs *regs, struct uk_crash_description *descr) __noreturn;
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif /* __UKDEBUG_CRASH_H__ */
