@@ -485,15 +485,17 @@ int unix_socket_getsockname(posix_sock *file,
 }
 
 static
-int unix_socket_getsockopt(posix_sock *file, int level, int optname,
-			   void *restrict optval, socklen_t *restrict optlen)
+int unix_socket_getsockopt(posix_sock *file __unused, int level __unused,
+			   int optname __unused, void *restrict optval __unused,
+			   socklen_t *restrict optlen __unused)
 {
 	return -ENOSYS;
 }
 
 static
-int unix_socket_setsockopt(posix_sock *file, int level, int optname,
-			   const void *optval, socklen_t optlen)
+int unix_socket_setsockopt(posix_sock *file __unused, int level __unused,
+			   int optname __unused, const void *optval __unused,
+			   socklen_t optlen __unused)
 {
 	return -ENOSYS;
 }
@@ -915,7 +917,8 @@ int unix_socket_close(posix_sock *file)
 }
 
 static
-int unix_socket_ioctl(posix_sock *file, int request, void *argp)
+int unix_socket_ioctl(posix_sock *file __unused, int request __unused,
+		      void *argp __unused)
 {
 	return -ENOSYS;
 }
