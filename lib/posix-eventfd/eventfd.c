@@ -11,6 +11,7 @@
 #include <uk/file/nops.h>
 #include <uk/posix-eventfd.h>
 #include <uk/posix-fd.h>
+#include <uk/posix-fdtab.h>
 #include <uk/syscall.h>
 
 
