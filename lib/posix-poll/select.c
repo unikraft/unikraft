@@ -52,9 +52,14 @@ int uk_sys_pselect(int nfds, fd_set *restrict readfds,
 	ret = 0;
 	monitored = 0;
 	for (int fd = 0; fd < nfds; fd++) {
-		int r = FD_ISSET(fd, readfds) ? SELECT_READ : 0;
-		int w = FD_ISSET(fd, writefds) ? SELECT_WRITE : 0;
-		int x = FD_ISSET(fd, exceptfds) ? SELECT_EXCEPT : 0;
+		int r = 0, w = 0, x = 0;
+
+		if (readfds)
+			r = FD_ISSET(fd, readfds) ? SELECT_READ : 0;
+		if (writefds)
+			w = FD_ISSET(fd, writefds) ? SELECT_WRITE : 0;
+		if (exceptfds)
+			x = FD_ISSET(fd, exceptfds) ? SELECT_EXCEPT : 0;
 
 		if (r|w|x) {
 			struct epoll_event ev = {
@@ -91,17 +96,20 @@ int uk_sys_pselect(int nfds, fd_set *restrict readfds,
 
 			*timeout = uk_time_spec_from_nsec(left > 0 ? left : 0);
 		}
-		FD_ZERO(readfds);
-		FD_ZERO(writefds);
-		FD_ZERO(exceptfds);
+		if (readfds)
+			FD_ZERO(readfds);
+		if (writefds)
+			FD_ZERO(writefds);
+		if (exceptfds)
+			FD_ZERO(exceptfds);
 		for (int i = 0; i < ret; i++) {
 			int fd = ev[i].data.fd;
 
-			if (ev[i].events & SELECT_READ)
+			if (readfds && ev[i].events & SELECT_READ)
 				FD_SET(fd, readfds);
-			if (ev[i].events & SELECT_WRITE)
+			if (writefds && ev[i].events & SELECT_WRITE)
 				FD_SET(fd, writefds);
-			if (ev[i].events & SELECT_EXCEPT)
+			if (exceptfds && ev[i].events & SELECT_EXCEPT)
 				FD_SET(fd, exceptfds);
 		}
 	}
