@@ -731,7 +731,7 @@ ssize_t unix_socket_sendmsg(posix_sock *file,
 	const struct uk_file *wpipe;
 	ssize_t ret;
 
-	if (unlikely(flags)) {
+	if (unlikely(flags & ~MSG_NOSIGNAL)) {
 		uk_pr_warn("Unsupported send flags: %x\n", flags);
 		return -ENOSYS;
 	}
