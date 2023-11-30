@@ -101,6 +101,10 @@ extern __spinlock              _uk_mutex_metrics_lock;
 #define	UK_MUTEX_INITIALIZER(name)				\
 	{ 0, 0, NULL, __WAIT_QUEUE_INITIALIZER((name).wait) }
 
+#define	UK_MUTEX_INITIALIZER_RECURSIVE(name)			\
+	{ _UK_MUTEX_UNOWNED, 0, UK_MUTEX_CONFIG_RECURSE,	\
+	__WAIT_QUEUE_INITIALIZER((name).wait) }
+
 void uk_mutex_init_config(struct uk_mutex *m, unsigned int flags);
 void uk_mutex_get_metrics(struct uk_mutex_metrics *dst);
 
