@@ -68,7 +68,7 @@ int uk_sys_fcntl(struct uk_ofile *of, int cmd, unsigned long arg)
 	}
 }
 
-int uk_sys_flock(struct uk_ofile *of, int cmd)
+int uk_sys_flock(struct uk_ofile *of __unused, int cmd __unused)
 {
 	uk_pr_warn_once("STUB: flock\n");
 	return -ENOSYS;
