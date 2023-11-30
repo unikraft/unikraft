@@ -202,7 +202,7 @@ vfscore_vget(struct mount *mp, uint64_t ino, struct vnode **vpp)
 	vp->v_mount = mp;
 	vp->v_refcnt = 1;
 	vp->v_op = mp->m_op->vfs_vnops;
-	uk_mutex_init(&vp->v_lock);
+	uk_mutex_init_config(&vp->v_lock, UK_MUTEX_CONFIG_RECURSE);
 	/*
 	 * Request to allocate fs specific data for vnode.
 	 */
