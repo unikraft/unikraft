@@ -6,7 +6,6 @@ menuconfig LIBDEVFS
 if LIBDEVFS
 	config LIBDEVFS_AUTOMOUNT
 	bool "Mount /dev during boot"
-	depends on LIBVFSCORE_AUTOMOUNT_ROOTFS
 	default n
 
 	# hidden
