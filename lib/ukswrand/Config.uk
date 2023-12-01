@@ -42,7 +42,7 @@ config LIBUKSWRAND_INITIALSEED_CONSTANT
 config LIBUKSWRAND_DEVFS
 	bool "Register random and urandom device to devfs"
 	select LIBDEVFS
-	select LIBVFSCORE
+	depends on LIBVFSCORE
 	default n
 
 endif
