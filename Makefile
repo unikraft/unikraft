@@ -774,7 +774,7 @@ endif
 # include Makefile for platform linking (`Linker.uk`)
 $(foreach plat,$(UK_PLATS),$(eval $(call import_linker,$(plat))))
 
-.PHONY: prepare preprocess image libs objs clean
+.PHONY: prepare preprocess headers_install image libs objs clean
 
 fetch: $(UK_FETCH) $(UK_FETCH-y)
 
@@ -787,6 +787,25 @@ prepare: $(KCONFIG_AUTOHEADER) $(UK_CONFIG_OUT) $(UK_PREPARE) $(UK_PREPARE-y)
 prepare: $(UK_FIXDEP) | fetch
 
 preprocess: $(UK_PREPROCESS) $(UK_PREPROCESS-y) | prepare
+
+headers_install: preprocess
+	@mkdir -p $(INSTALL_HDR_PATH)/include/uk; \
+	mkdir -p $(INSTALL_HDR_PATH)/include/uk/nolibc; \
+	for hdr_dir in $$(echo $(HDR_DIRS) | tr ' ' '\n' | sort -u); do \
+	  if [ ! -d "$$hdr_dir" ]; then \
+	    continue; \
+	  fi; \
+	  for hdr_dir2 in $$hdr_dir/*; do \
+	    bname=$$(basename $$hdr_dir2); \
+	    if [ "$$bname" == uk ]; then \
+	      cp -r $$hdr_dir2 $(INSTALL_HDR_PATH)/include/; \
+	    elif [ -n "$$(echo $$hdr_dir2 | grep nolibc)" ]; then \
+	      cp -r $$hdr_dir2 $(INSTALL_HDR_PATH)/include/uk/nolibc; \
+	    else \
+	      cp -r $$hdr_dir2 $(INSTALL_HDR_PATH)/include/uk/; \
+	    fi; \
+	  done; \
+	done
 
 objs: $(UK_OBJS) $(UK_OBJS-y)
 
@@ -1156,6 +1175,10 @@ sub-make: $(BUILD_DIR)/Makefile
 	$(Q)$(MAKE) --no-print-directory CONFIG_UK_BASE=$(CONFIG_UK_BASE) -C $(BUILD_DIR) -f $(BUILD_DIR)/Makefile $(MAKECMDGOALS)
 
 endif
+
+INCLUDES = $(ASINCLUDES) $(ASINCLUDES-y) $(CINCLUDES) $(CINCLUDES-y) $(CXXINCLUDES) $(CXXINCLUDES-y) $(GOCINCLUDES) $(GOCINCLUDES-y)
+HDR_DIRS = $(patsubst -I%,%,$(INCLUDES))
+INSTALL_HDR_PATH ?= /usr/local
 
 help:
 	@echo 'Cleaning:'
