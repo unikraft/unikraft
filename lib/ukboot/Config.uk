@@ -127,7 +127,6 @@ if LIBUKBOOT
 	default 0x400000000
 	depends on HAVE_PAGING
 	depends on !LIBUKBOOT_NOALLOC
-	depends on PLAT_KVM
 
 	choice LIBUKBOOT_INITSCHED
 	prompt "Initialize scheduler"
