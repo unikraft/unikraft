@@ -50,6 +50,8 @@ struct uk_waitq {
 	UK_STAILQ_HEAD_INITIALIZER(name.wait_list) \
 }
 
+#define UK_WAIT_QUEUE_INITIALIZER(name) __WAIT_QUEUE_INITIALIZER(name)
+
 #define DEFINE_WAIT_QUEUE(name) \
 	struct uk_waitq name = __WAIT_QUEUE_INITIALIZER(name)
 
