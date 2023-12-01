@@ -79,7 +79,13 @@ extern "C" {
  * Perform an atomic OR operation and return the previous value.
  */
 #define ukarch_or(src, val) \
-	__atomic_or_fetch(src, val, __ATOMIC_SEQ_CST)
+	__atomic_fetch_or(src, val, __ATOMIC_SEQ_CST)
+
+/**
+ * Perform an atomic AND operation and return the previous value.
+ */
+#define ukarch_and(src, val) \
+	__atomic_fetch_and(src, val, __ATOMIC_SEQ_CST)
 
 /**
  * Writes *src into *dst, and returns the previous contents of *dst.
