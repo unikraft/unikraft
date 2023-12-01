@@ -36,6 +36,11 @@
 
 #include <uk/essentials.h>
 
+
+#if CONFIG_LIBVFSCORE
+#include <vfscore/file.h>
+#endif
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -43,10 +48,8 @@ extern "C" {
 #define __NEED_NULL
 #define __NEED_size_t
 #define __NEED_ssize_t
+#define __NEED_FILE
 #include <nolibc-internal/shareddefs.h>
-
-struct _nolibc_fd;
-typedef struct _nolibc_fd FILE;
 
 extern FILE *stdin;
 extern FILE *stdout;
@@ -92,8 +95,17 @@ int fputs(const char *restrict s, FILE *restrict stream);
 int puts(const char *s);
 
 #if CONFIG_LIBVFSCORE
+void clearerr(FILE *stream);
 int rename(const char *oldpath, const char *newpath);
-#endif
+int feof(FILE *stream);
+int ferror(FILE *stream);
+int fseek(FILE *stream, long offset, int whence);
+int fclose(FILE *stream);
+FILE *fopen(const char *pathname, const char *mode);
+FILE *fdopen(int fd, const char *mode);
+size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream);
+size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream);
+#endif /* CONFIG_LIBVFSCORE */
 
 #ifdef __STDIO_H_DEFINED_va_list
 #undef va_list
