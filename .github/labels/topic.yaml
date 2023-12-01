@@ -1,0 +1,60 @@
+labels:
+  - name: topic/booting
+    description: Issue or PR pertaining to the boot process
+    color: "#c5def5"
+
+  - name: topic/build
+    description: Issue or PR pertaining to the build system
+    color: "#c5def5"
+
+  - name: topic/ci
+    description: Issue or PR pertaining to CI/CD
+    color: "#c5def5"
+
+  - name: topic/concurrency
+    description: Issue or PR pertaining to concurrency
+    color: "#c5def5"
+
+  - name: topic/irq
+    description: Issue or PR pertaining to IRQs
+    color: "#c5def5"
+
+  - name: topic/metrics
+    description: Issue or PR pertaining to metrics
+    color: "#c5def5"
+
+  - name: topic/mm
+    description: Issue or PR pertaining to memory management
+    color: "#c5def5"
+
+  - name: topic/mpk
+    description: Issue or PR pertaining to Memory Protection Keys (MPKs)
+    color: "#c5def5"
+
+  - name: topic/posix
+    description: Issue or PR pertaining to POSIX
+    color: "#c5def5"
+
+  - name: topic/primitive
+    description: Issue or PR pertaining to Unikraft primitives
+    color: "#c5def5"
+
+  - name: topic/scheduling
+    description: Issue or PR pertaining to scheduling
+    color: "#c5def5"
+
+  - name: topic/smp
+    description: Issue or PR pertaining to SMP
+    color: "#c5def5"
+
+  - name: topic/syscall
+    description: Issue or PR pertaining to syscalls
+    color: "#c5def5"
+
+  - name: topic/threading
+    description: Issue or PR pertaining to threading
+    color: "#c5def5"
+
+  - name: topic/tls
+    description: Issue or PR pertaining to Thread Local Storage (TLS)
+    color: "#c5def5"
