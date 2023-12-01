@@ -398,6 +398,20 @@ else
 CONFIG_UK_NAME ?= $(notdir $(APP_DIR))
 endif
 
+# Option to overwrite file name of generated images by supported platforms. The
+# target platform has to support this feature.  When unset or unsupported by the
+# platform, the default semantic of the target platform (typically
+# `$(UK_NAME)_$(PLAT)_$(ARCH)`) will be used.
+#
+# NOTE: Please note that multi-platform builds do not work anymore when this
+#       option is used.  The reason is that the build system will generate the
+#       same file by each selected platform.  Make won't be able to proceed
+#       building.
+# NOTE: This feature is currently used by kraftkit.
+ifneq ($(call qstrip,$(UK_IMAGE_NAME_OVERWRITE)),)
+UK_IMAGE_NAME_OVERWRITE := $(call qstrip,$(UK_IMAGE_NAME_OVERWRITE))
+endif
+
 # remove quotes from CONFIG_UK_NAME
 CONFIG_UK_NAME := $(call qstrip,$(CONFIG_UK_NAME))
 export CONFIG_UK_NAME
