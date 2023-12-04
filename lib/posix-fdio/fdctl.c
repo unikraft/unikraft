@@ -58,7 +58,7 @@ int uk_sys_fcntl(struct uk_ofile *of, int cmd, unsigned long arg)
 
 		do {
 			newmode = mode & ~_SETFL_MASK;
-			newmode |= *((unsigned int *)arg) & _SETFL_MASK;
+			newmode |= arg & _SETFL_MASK;
 		} while (!ukarch_compare_exchange_n(&of->mode, &mode, newmode));
 		return 0;
 	}
