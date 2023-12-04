@@ -529,6 +529,10 @@ ramfs_rename(struct vnode *dvp1, struct vnode *vp1, const char *name1 __unused,
 		if (np == NULL)
 			return ENOMEM;
 
+		/* Copy children structure */
+		np->rn_child = old_np->rn_child;
+		old_np->rn_child = NULL;
+
 		if (old_np->rn_buf) {
 			/* Copy file data */
 			np->rn_buf = old_np->rn_buf;
