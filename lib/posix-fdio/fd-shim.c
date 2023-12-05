@@ -7,7 +7,9 @@
 /* Userspace shim syscalls that delegate to either posix-fdio or vfscore */
 
 #include <uk/posix-fdio.h>
+#if CONFIG_LIBVFSCORE
 #include <vfscore/syscalls.h>
+#endif /* CONFIG_LIBVFSCORE */
 #include <uk/posix-fdtab.h>
 #include <uk/syscall.h>
 
@@ -25,12 +27,14 @@ UK_SYSCALL_R_DEFINE(ssize_t, preadv2, int, fd, const struct iovec *, iov,
 		r = uk_sys_preadv2(sf.ofile, iov, iovcnt, offset, flags);
 		uk_fdtab_ret(sf.ofile);
 		break;
+#if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
 		if (flags)
 			r = -EINVAL;
 		else
 			r = vfscore_preadv(sf.vfile, iov, iovcnt, offset);
 		break;
+#endif /* CONFIG_LIBVFSCORE */
 	default:
 		r = -EBADF;
 	}
@@ -48,9 +52,11 @@ UK_SYSCALL_R_DEFINE(ssize_t, preadv, int, fd, const struct iovec *, iov,
 		r = uk_sys_preadv(sf.ofile, iov, iovcnt, offset);
 		uk_fdtab_ret(sf.ofile);
 		break;
+#if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
 		r = vfscore_preadv(sf.vfile, iov, iovcnt, offset);
 		break;
+#endif /* CONFIG_LIBVFSCORE */
 	default:
 		r = -EBADF;
 	}
@@ -78,9 +84,11 @@ UK_LLSYSCALL_R_DEFINE(ssize_t, pread64, int, fd,
 		r = uk_sys_pread(sf.ofile, buf, count, offset);
 		uk_fdtab_ret(sf.ofile);
 		break;
+#if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
 		r = vfscore_pread64(sf.vfile, buf, count, offset);
 		break;
+#endif /* CONFIG_LIBVFSCORE */
 	default:
 		r = -EBADF;
 	}
@@ -98,9 +106,11 @@ UK_SYSCALL_R_DEFINE(ssize_t, readv, int, fd,
 		r = uk_sys_readv(sf.ofile, iov, iovcnt);
 		uk_fdtab_ret(sf.ofile);
 		break;
+#if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
 		r = vfscore_readv(sf.vfile, iov, iovcnt);
 		break;
+#endif /* CONFIG_LIBVFSCORE */
 	default:
 		r = -EBADF;
 	}
@@ -118,9 +128,11 @@ UK_SYSCALL_R_DEFINE(ssize_t, read, int, fd,
 		r = uk_sys_read(sf.ofile, buf, count);
 		uk_fdtab_ret(sf.ofile);
 		break;
+#if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
 		r = vfscore_read(sf.vfile, buf, count);
 		break;
+#endif /* CONFIG_LIBVFSCORE */
 	default:
 		r = -EBADF;
 	}
@@ -138,12 +150,14 @@ UK_SYSCALL_R_DEFINE(ssize_t, pwritev2, int, fd, const struct iovec*, iov,
 		r = uk_sys_pwritev2(sf.ofile, iov, iovcnt, offset, flags);
 		uk_fdtab_ret(sf.ofile);
 		break;
+#if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
 		if (flags)
 			r = -EINVAL;
 		else
 			r = vfscore_pwritev(sf.vfile, iov, iovcnt, offset);
 		break;
+#endif /* CONFIG_LIBVFSCORE */
 	default:
 		r = -EBADF;
 	}
@@ -161,9 +175,11 @@ UK_SYSCALL_R_DEFINE(ssize_t, pwritev, int, fd, const struct iovec*, iov,
 		r = uk_sys_pwritev(sf.ofile, iov, iovcnt, offset);
 		uk_fdtab_ret(sf.ofile);
 		break;
+#if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
 		r = vfscore_pwritev(sf.vfile, iov, iovcnt, offset);
 		break;
+#endif /* CONFIG_LIBVFSCORE */
 	default:
 		r = -EBADF;
 	}
@@ -186,9 +202,11 @@ UK_LLSYSCALL_R_DEFINE(ssize_t, pwrite64, int, fd,
 		r = uk_sys_pwrite(sf.ofile, buf, count, offset);
 		uk_fdtab_ret(sf.ofile);
 		break;
+#if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
 		r = vfscore_pwrite64(sf.vfile, buf, count, offset);
 		break;
+#endif /* CONFIG_LIBVFSCORE */
 	default:
 		r = -EBADF;
 	}
@@ -206,9 +224,11 @@ UK_SYSCALL_R_DEFINE(ssize_t, writev, int, fd, const struct iovec *, iov,
 		r = uk_sys_writev(sf.ofile, iov, iovcnt);
 		uk_fdtab_ret(sf.ofile);
 		break;
+#if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
 		r = vfscore_writev(sf.vfile, iov, iovcnt);
 		break;
+#endif /* CONFIG_LIBVFSCORE */
 	default:
 		r = -EBADF;
 	}
@@ -225,9 +245,11 @@ UK_SYSCALL_R_DEFINE(ssize_t, write, int, fd, const void *, buf, size_t, count)
 		r = uk_sys_write(sf.ofile, buf, count);
 		uk_fdtab_ret(sf.ofile);
 		break;
+#if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
 		r = vfscore_write(sf.vfile, buf, count);
 		break;
+#endif /* CONFIG_LIBVFSCORE */
 	default:
 		r = -EBADF;
 	}
@@ -244,6 +266,7 @@ UK_SYSCALL_R_DEFINE(off_t, lseek, int, fd, off_t, offset, int, whence)
 		r = uk_sys_lseek(sf.ofile, offset, whence);
 		uk_fdtab_ret(sf.ofile);
 		break;
+#if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
 	{
 		/* vfscore_lseek returns positive error codes */
@@ -256,6 +279,7 @@ UK_SYSCALL_R_DEFINE(off_t, lseek, int, fd, off_t, offset, int, whence)
 		fdrop(sf.vfile);
 		break;
 	}
+#endif /* CONFIG_LIBVFSCORE */
 	default:
 		r = -EBADF;
 	}
@@ -274,11 +298,13 @@ UK_SYSCALL_R_DEFINE(int, fstat, int, fd, struct stat *, statbuf)
 		r = uk_sys_fstat(sf.ofile, statbuf);
 		uk_fdtab_ret(sf.ofile);
 		break;
+#if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
 		/* vfscore_fstat returns positive error codes */
 		r = -vfscore_fstat(sf.vfile, statbuf);
 		fdrop(sf.vfile);
 		break;
+#endif /* CONFIG_LIBVFSCORE */
 	default:
 		r = -EBADF;
 	}
@@ -312,10 +338,12 @@ UK_LLSYSCALL_R_DEFINE(int, fcntl, int, fd,
 			r = uk_sys_fcntl(sf.ofile, cmd, arg);
 			uk_fdtab_ret(sf.ofile);
 			break;
+#if CONFIG_LIBVFSCORE
 		case UK_SHIM_LEGACY:
 			r = vfscore_fcntl(sf.vfile, cmd, arg);
 			fdrop(sf.vfile);
 			break;
+#endif /* CONFIG_LIBVFSCORE */
 		default:
 			r = -EBADF;
 		}
@@ -334,11 +362,13 @@ UK_LLSYSCALL_R_DEFINE(int, ioctl, int, fd, unsigned int, request, void *, arg)
 		r = uk_sys_ioctl(sf.ofile, request, arg);
 		uk_fdtab_ret(sf.ofile);
 		break;
+#if CONFIG_LIBVFSCORE
 	case UK_SHIM_LEGACY:
 		/* vfscore_ioctl returns positive error codes */
 		r = -vfscore_ioctl(sf.vfile, request, arg);
 		fdrop(sf.vfile);
 		break;
+#endif /* CONFIG_LIBVFSCORE */
 	default:
 		r = -EBADF;
 	}
