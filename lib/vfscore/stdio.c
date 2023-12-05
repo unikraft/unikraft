@@ -45,6 +45,7 @@
 #include <vfscore/vnode.h>
 #include <vfscore/mount.h>
 #include <errno.h>
+#include <uk/init.h>
 
 #include <uk/posix-fdtab-legacy.h>
 
@@ -231,7 +232,7 @@ static struct vfscore_file  stdio_file = {
 	.f_ep = UK_LIST_HEAD_INIT(stdio_file.f_ep)
 };
 
-int init_stdio(void)
+static int init_stdio(void)
 {
 	int fd;
 
@@ -255,3 +256,5 @@ int init_stdio(void)
 
 	return 0;
 }
+
+uk_early_initcall(init_stdio);
