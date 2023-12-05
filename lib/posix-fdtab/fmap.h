@@ -48,7 +48,7 @@ static inline int uk_bmap_reserve(const struct uk_bmap *bm, int idx)
 	unsigned long mask;
 	unsigned long v;
 
-	if (!IN_RANGE(idx, 0, bm->size))
+	if (!((idx >= 0) && IN_RANGE((size_t)idx, 0, bm->size)))
 		return -1;
 	mask = UK_BIT_MASK(idx);
 	v = ukarch_and(&bm->bitmap[UK_BIT_WORD(idx)], ~mask);
@@ -66,7 +66,7 @@ static inline int uk_bmap_free(const struct uk_bmap *bm, int idx)
 	unsigned long mask;
 	unsigned long v;
 
-	if (!IN_RANGE(idx, 0, bm->size))
+	if (!((idx >= 0) && IN_RANGE((size_t)idx, 0, bm->size)))
 		return -1;
 	mask = UK_BIT_MASK(idx);
 	v = ukarch_or(&bm->bitmap[UK_BIT_WORD(idx)], mask);
@@ -75,7 +75,7 @@ static inline int uk_bmap_free(const struct uk_bmap *bm, int idx)
 
 static inline int uk_bmap_isfree(const struct uk_bmap *bm, int idx)
 {
-	if (!IN_RANGE(idx, 0, bm->size))
+	if (!((idx >= 0) && IN_RANGE((size_t)idx, 0, bm->size)))
 		return -1;
 	return uk_test_bit(idx, bm->bitmap);
 }
@@ -88,7 +88,7 @@ static inline int uk_bmap_isfree(const struct uk_bmap *bm, int idx)
  */
 static inline int uk_bmap_request(const struct uk_bmap *bm, int min)
 {
-	int pos;
+	size_t pos;
 
 	do {
 		/* Seems safe to cast away volatility, revisit if problem */
@@ -113,7 +113,7 @@ struct uk_fmap {
 #define UK_FMAP_SZ(s) ((s) * sizeof(void *))
 
 
-#define _FMAP_INRANGE(m, i) IN_RANGE(i, 0, (m)->bmap.size)
+#define _FMAP_INRANGE(m, i) ((i >= 0) && IN_RANGE((size_t)i, 0, (m)->bmap.size))
 
 /**
  * Initialize the memory for a uk_fmap.
