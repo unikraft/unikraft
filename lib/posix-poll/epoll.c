@@ -17,10 +17,11 @@
 #include <uk/timeutil.h>
 #include <uk/syscall.h>
 
+#if CONFIG_LIBVFSCORE
 #include <vfscore/file.h>
 #include <vfscore/vnode.h>
 #include <vfscore/eventpoll.h>
-
+#endif /* CONFIG_LIBVFSCORE */
 
 static const char EPOLL_VOLID[] = "epoll_vol";
 
@@ -30,7 +31,7 @@ static const char EPOLL_VOLID[] = "epoll_vol";
 
 #define events2mask(ev) (((ev) & EPOLL_EVENTS) | UKFD_POLL_ALWAYS)
 
-
+#if CONFIG_LIBVFSCORE
 struct epoll_legacy {
 	struct eventpoll_cb ecb;
 	const struct uk_file *epf;
@@ -38,14 +39,19 @@ struct epoll_legacy {
 	unsigned int revents;
 	struct uk_list_head f_link;
 };
+#endif /* CONFIG_LIBVFSCORE */
 
 struct epoll_entry {
 	struct epoll_entry *next;
+#if CONFIG_LIBVFSCORE
 	int legacy;
+#endif /* CONFIG_LIBVFSCORE */
 	int fd;
 	union {
 		const struct uk_file *f;
+#if CONFIG_LIBVFSCORE
 		struct vfscore_file *vf;
+#endif /* CONFIG_LIBVFSCORE */
 	};
 	struct epoll_event event;
 	union {
@@ -53,7 +59,9 @@ struct epoll_entry {
 			struct uk_poll_chain tick;
 			uk_pollevent revents;
 		};
+#if CONFIG_LIBVFSCORE
 		struct epoll_legacy legacy_cb;
+#endif /* CONFIG_LIBVFSCORE */
 	};
 };
 #define IS_EDGEPOLL(ent) (!!((ent)->event.events & EPOLLET))
@@ -71,11 +79,14 @@ struct epoll_alloc {
 
 static void epoll_unregister_entry(struct epoll_entry *ent)
 {
+#if CONFIG_LIBVFSCORE
 	if (ent->legacy) {
 		if (ent->legacy_cb.ecb.unregister)
 			ent->legacy_cb.ecb.unregister(&ent->legacy_cb.ecb);
 		uk_list_del(&ent->legacy_cb.f_link);
-	} else {
+	} else
+#endif /* CONFIG_LIBVFSCORE */
+	{
 		uk_pollq_unregister(&ent->f->state->pollq, &ent->tick);
 		uk_file_release_weak(ent->f);
 	}
@@ -100,7 +111,7 @@ static void epoll_event_callback(uk_pollevent set,
 }
 
 
-
+#if CONFIG_LIBVFSCORE
 /* vfscore shim helpers */
 
 static int vfs_poll(struct vfscore_file *vfd, unsigned int *revents,
@@ -127,6 +138,7 @@ static void vfs_poll_register(struct vfscore_file *vfd,
 			uk_file_event_set(leg->epf, UKFD_POLLIN);
 	}
 }
+#endif /* CONFIG_LIBVFSCORE */
 
 /* File ops */
 
@@ -182,7 +194,9 @@ static int epoll_add(const struct uk_file *epf, int fd, const struct uk_file *f,
 	uk_file_acquire_weak(f);
 	*ent = (struct epoll_entry){
 		.next = NULL,
+#if CONFIG_LIBVFSCORE
 		.legacy = 0,
+#endif /* CONFIG_LIBVFSCORE */
 		.fd = fd,
 		.f = f,
 		.event = *event,
@@ -204,6 +218,7 @@ out:
 	return ret;
 }
 
+#if CONFIG_LIBVFSCORE
 static int epoll_add_legacy(const struct uk_file *epf, int fd,
 			    struct vfscore_file *vf,
 			    const struct epoll_event *event)
@@ -249,12 +264,15 @@ static int epoll_add_legacy(const struct uk_file *epf, int fd,
 out:
 	return ret;
 }
+#endif /* CONFIG_LIBVFSCORE */
 
 static void entry_mod(struct epoll_entry *ent, const struct epoll_event *event)
 {
 	struct uk_poll_chain ntick;
 
+#if CONFIG_LIBVFSCORE
 	UK_ASSERT(!ent->legacy);
+#endif /* CONFIG_LIBVFSCORE */
 	ntick = ent->tick;
 	ntick.mask = events2mask(event->events);
 
@@ -264,6 +282,7 @@ static void entry_mod(struct epoll_entry *ent, const struct epoll_event *event)
 	ent->revents = 0;
 }
 
+#if CONFIG_LIBVFSCORE
 static void entry_mod_legacy(struct epoll_entry *ent,
 			     const struct epoll_event *event)
 {
@@ -273,6 +292,7 @@ static void entry_mod_legacy(struct epoll_entry *ent,
 	ent->event = *event;
 	vfs_poll_register(ent->vf, &ent->legacy_cb);
 }
+#endif /* CONFIG_LIBVFSCORE */
 
 static int epoll_mod(const struct uk_file *epf, int fd,
 		     const struct epoll_event *event)
@@ -284,9 +304,11 @@ static int epoll_mod(const struct uk_file *epf, int fd,
 		struct epoll_entry *ent = *p;
 
 		if (ent->fd == fd) {
+#if CONFIG_LIBVFSCORE
 			if (ent->legacy)
 				entry_mod_legacy(ent, event);
 			else
+#endif /* CONFIG_LIBVFSCORE */
 				entry_mod(ent, event);
 			ret = 0;
 			break;
@@ -317,6 +339,7 @@ static int epoll_del(const struct uk_file *epf, int fd)
 	return ret;
 }
 
+#if CONFIG_LIBVFSCORE
 /* vfscore shim callbacks */
 
 /* Called by vfscore drivers to signal events to epoll */
@@ -348,6 +371,7 @@ void eventpoll_notify_close(struct vfscore_file *fp)
 		epoll_del(leg->epf, ent->fd);
 	}
 }
+#endif /* CONFIG_LIBVFSCORE */
 
 /* File creation */
 
@@ -405,22 +429,28 @@ int uk_sys_epoll_ctl(const struct uk_file *epf, int op, int fd,
 {
 	int ret;
 	union uk_shim_file sf;
+#if CONFIG_LIBVFSCORE
 	int legacy;
+#endif /* CONFIG_LIBVFSCORE */
 
 	if (unlikely(epf->vol != EPOLL_VOLID))
 		return -EINVAL;
 
+#if CONFIG_LIBVFSCORE
 	legacy = uk_fdtab_shim_get(fd, &sf);
 	if (unlikely(legacy < 0))
 		return -EBADF;
 	legacy = legacy == UK_SHIM_LEGACY;
+#endif /* CONFIG_LIBVFSCORE */
 
 	uk_file_wlock(epf);
 	switch (op) {
 	case EPOLL_CTL_ADD:
+#if CONFIG_LIBVFSCORE
 		if (legacy)
 			ret = epoll_add_legacy(epf, fd, sf.vfile, event);
 		else
+#endif /* CONFIG_LIBVFSCORE */
 			ret = epoll_add(epf, fd, sf.ofile->file, event);
 		break;
 	case EPOLL_CTL_MOD:
@@ -434,9 +464,11 @@ int uk_sys_epoll_ctl(const struct uk_file *epf, int op, int fd,
 	}
 	uk_file_wunlock(epf);
 
+#if CONFIG_LIBVFSCORE
 	if (legacy)
 		fdrop(sf.vfile);
 	else
+#endif /* CONFIG_LIBVFSCORE */
 		uk_fdtab_ret(sf.ofile);
 
 	return ret;
@@ -486,9 +518,11 @@ int uk_sys_epoll_pwait2(const struct uk_file *epf, struct epoll_event *events,
 			unsigned int revents;
 			unsigned int *revp;
 
+#if CONFIG_LIBVFSCORE
 			if (p->legacy)
 				revp = &p->legacy_cb.revents;
 			else
+#endif /* CONFIG_LIBVFSCORE */
 				revp = &p->revents;
 
 			revents = ukarch_exchange_n(revp, 0);
@@ -497,11 +531,14 @@ int uk_sys_epoll_pwait2(const struct uk_file *epf, struct epoll_event *events,
 					unsigned int mask;
 
 					mask = events2mask(p->event.events);
+#if CONFIG_LIBVFSCORE
 					if (p->legacy) {
 						vfs_poll(p->vf, &revents,
 							 &p->legacy_cb.ecb);
 						revents &= mask;
-					} else {
+					} else
+#endif /* CONFIG_LIBVFSCORE */
+					{
 						revents = uk_file_poll_immediate(p->f, mask);
 					}
 					if (!revents)
