@@ -39,15 +39,11 @@
 #include <vfscore/file.h>
 #include <uk/plat/lcpu.h>
 #include <errno.h>
-#include <uk/init.h>
 #if CONFIG_LIBPOSIX_PROCESS_CLONE
 #include <uk/process.h>
 #endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 
 #include <uk/posix-fdtab-legacy.h>
-
-int init_stdio(void);
-
 
 struct vfscore_file *vfscore_get_file(int fd)
 {
@@ -76,14 +72,6 @@ int fdalloc(struct vfscore_file *fp, int *newfd)
 	*newfd = r;
 	return 0;
 }
-
-
-static int fdtable_init(void)
-{
-	return init_stdio();
-}
-
-uk_early_initcall(fdtable_init);
 
 #if CONFIG_LIBPOSIX_PROCESS_CLONE
 static int uk_posix_clone_files(const struct clone_args *cl_args,
