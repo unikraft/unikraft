@@ -9,10 +9,15 @@
 #ifndef __UK_POSIX_FDTAB_LEGACY_H__
 #define __UK_POSIX_FDTAB_LEGACY_H__
 
+#include <uk/config.h>
+
+#if CONFIG_LIBVFSCORE
+
 #include <vfscore/file.h>
 
 int uk_fdtab_legacy_open(struct vfscore_file *vf);
 
 struct vfscore_file *uk_fdtab_legacy_get(int fd);
 
+#endif /* CONFIG_LIBVFSCORE */
 #endif /* __UK_POSIX_FDTAB_LEGACY_H__ */
