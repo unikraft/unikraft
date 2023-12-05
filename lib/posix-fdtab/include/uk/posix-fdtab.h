@@ -71,7 +71,9 @@ void uk_fdtab_cloexec(void);
  */
 union uk_shim_file {
 	struct uk_ofile *ofile;
+#if CONFIG_LIBVFSCORE
 	struct vfscore_file *vfile;
+#endif /* CONFIG_LIBVFSCORE */
 };
 
 /**
