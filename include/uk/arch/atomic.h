@@ -79,7 +79,13 @@ extern "C" {
  * Perform an atomic OR operation and return the previous value.
  */
 #define ukarch_or(src, val) \
-	__atomic_or_fetch(src, val, __ATOMIC_SEQ_CST)
+	__atomic_fetch_or(src, val, __ATOMIC_SEQ_CST)
+
+/**
+ * Perform an atomic AND operation and return the previous value.
+ */
+#define ukarch_and(src, val) \
+	__atomic_fetch_and(src, val, __ATOMIC_SEQ_CST)
 
 /**
  * Writes *src into *dst, and returns the previous contents of *dst.
@@ -92,6 +98,10 @@ extern "C" {
  */
 #define ukarch_exchange_n(dst, v) \
 	__atomic_exchange_n(dst, v, __ATOMIC_SEQ_CST)
+
+#define ukarch_compare_exchange_n(dst, exp, des)  \
+	__atomic_compare_exchange_n(dst, exp, des, 0, \
+	                            __ATOMIC_SEQ_CST, __ATOMIC_SEQ_CST)
 
 #define ukarch_compare_exchange_sync(ptr, old, new)                            \
 	({                                                                     \

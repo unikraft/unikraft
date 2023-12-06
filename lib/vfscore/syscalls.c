@@ -347,7 +347,7 @@ sys_write(struct vfscore_file *fp, const struct iovec *iov, size_t niov,
 }
 
 int
-sys_lseek(struct vfscore_file *fp, off_t off, int type, off_t *origin)
+vfscore_lseek(struct vfscore_file *fp, off_t off, int type, off_t *origin)
 {
 	struct vnode *vp;
 
@@ -383,7 +383,7 @@ sys_lseek(struct vfscore_file *fp, off_t off, int type, off_t *origin)
 }
 
 int
-sys_ioctl(struct vfscore_file *fp, unsigned long request, void *buf)
+vfscore_ioctl(struct vfscore_file *fp, unsigned long request, void *buf)
 {
 	int error = 0;
 	int oldf;
@@ -449,7 +449,7 @@ sys_fsync(struct vfscore_file *fp)
 }
 
 int
-sys_fstat(struct vfscore_file *fp, struct stat *st)
+vfscore_fstat(struct vfscore_file *fp, struct stat *st)
 {
 	int error = 0;
 

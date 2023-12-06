@@ -5,11 +5,15 @@ endif
 ##
 ## Link image
 ##
-ifeq (arm,$(CONFIG_UK_ARCH))
+ifneq ($(UK_IMAGE_NAME_OVERWRITE),)
+XEN_RAW_IMAGE   := $(BUILD_DIR)/$(UK_IMAGE_NAME_OVERWRITE)
+else
 XEN_RAW_IMAGE   := $(BUILD_DIR)/$(CONFIG_UK_NAME)_xen-$(CONFIG_UK_ARCH)
+endif
+ifeq (arm,$(CONFIG_UK_ARCH))
 XEN_IMAGE       := $(XEN_RAW_IMAGE).elf
 else
-XEN_IMAGE       := $(BUILD_DIR)/$(CONFIG_UK_NAME)_xen-$(CONFIG_UK_ARCH)
+XEN_IMAGE       := $(XEN_RAW_IMAGE)
 endif
 XEN_DEBUG_IMAGE := $(XEN_IMAGE).dbg
 

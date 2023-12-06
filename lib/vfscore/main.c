@@ -248,42 +248,6 @@ UK_SYSCALL_DEFINE(int, creat, const char*, pathname, mode_t, mode)
 
 LFS64(creat);
 
-UK_TRACEPOINT(trace_vfs_close, "%d", int);
-UK_TRACEPOINT(trace_vfs_close_ret, "");
-UK_TRACEPOINT(trace_vfs_close_err, "%d", int);
-
-int fdclose(int fd)
-{
-	struct vfscore_file *fp;
-	int error;
-
-	fp = vfscore_get_file(fd);
-	if (!fp)
-		return EBADF;
-
-	error = vfscore_put_fd(fd);
-	if (!error)
-		fdrop(fp);
-
-	return error;
-}
-
-UK_SYSCALL_R_DEFINE(int, close, int, fd)
-{
-	int error;
-
-	trace_vfs_close(fd);
-	error = fdclose(fd);
-	if (error)
-		goto out_error;
-
-	trace_vfs_close_ret();
-	return 0;
-
-	out_error:
-	trace_vfs_close_err(error);
-	return -error;
-}
 
 UK_TRACEPOINT(trace_vfs_mknod, "\"%s\" 0%0o %#x", const char*, mode_t, dev_t);
 UK_TRACEPOINT(trace_vfs_mknod_ret, "");
@@ -326,40 +290,6 @@ UK_SYSCALL_R_DEFINE(int, mknod, const char*, pathname, mode_t, mode, dev_t, dev)
 	return __xmknod_helper(0, pathname, mode, &dev);
 }
 
-UK_TRACEPOINT(trace_vfs_lseek, "%d %#x %d", int, off_t, int);
-UK_TRACEPOINT(trace_vfs_lseek_ret, "%#x", off_t);
-UK_TRACEPOINT(trace_vfs_lseek_err, "%d", int);
-
-UK_SYSCALL_R_DEFINE(off_t, lseek, int, fd, off_t, offset, int, whence)
-{
-	struct vfscore_file *fp;
-	off_t org;
-	int error;
-
-	trace_vfs_lseek(fd, offset, whence);
-	error = fget(fd, &fp);
-	if (error)
-		goto out_error;
-
-	error = sys_lseek(fp, offset, whence, &org);
-	fdrop(fp);
-
-	if (error)
-		goto out_error;
-	trace_vfs_lseek_ret(org);
-	return org;
-
-	out_error:
-	trace_vfs_lseek_err(error);
-	return -error;
-}
-
-#ifdef lseek64
-#undef lseek64
-#endif
-
-LFS64(lseek);
-
 /**
  * Return:
  * = 0, Success and the nr of bytes read is returned in bytes parameter.
@@ -386,24 +316,18 @@ out_error:
 	return -error;
 }
 
-UK_TRACEPOINT(trace_vfs_preadv, "%d %#x %d %#x", int, const struct iovec*,
+UK_TRACEPOINT(trace_vfs_preadv, "%p %#x %d %#x", void *, const struct iovec*,
 	      int, off_t);
 UK_TRACEPOINT(trace_vfs_preadv_ret, "%#x", ssize_t);
 UK_TRACEPOINT(trace_vfs_preadv_err, "%d", int);
 
-UK_SYSCALL_R_DEFINE(ssize_t, preadv, int, fd, const struct iovec*, iov,
-	int, iovcnt, off_t, offset)
+ssize_t vfscore_preadv(struct vfscore_file *fp, const struct iovec *iov,
+		       int iovcnt, off_t offset)
 {
-	struct vfscore_file *fp;
 	ssize_t bytes;
 	int error;
 
-	trace_vfs_preadv(fd, iov, iovcnt, offset);
-	error = fget(fd, &fp);
-	if (error) {
-		error = -error;
-		goto out_error;
-	}
+	trace_vfs_preadv(fp, iov, iovcnt, offset);
 
 	/* Check if the file is indeed seekable. */
 	if (fp->f_vfs_flags & UK_VFSCORE_NOPOS) {
@@ -441,9 +365,7 @@ out_error:
 #undef preadv64
 #endif
 
-LFS64(preadv);
-
-UK_TRACEPOINT(trace_vfs_pread, "%d %#x %#x %#x", int, void*, size_t, off_t);
+UK_TRACEPOINT(trace_vfs_pread, "%p %#x %#x %#x", void *, void*, size_t, off_t);
 UK_TRACEPOINT(trace_vfs_pread_ret, "%#x", ssize_t);
 UK_TRACEPOINT(trace_vfs_pread_err, "%d", int);
 
@@ -457,18 +379,17 @@ UK_TRACEPOINT(trace_vfs_pread_err, "%d", int);
 #undef pread64
 #endif
 
-UK_LLSYSCALL_R_DEFINE(ssize_t, pread64, int, fd,
-		      void *, buf, size_t, count, off_t, offset)
+ssize_t vfscore_pread64(struct vfscore_file *fp,
+			void *buf, size_t count, off_t offset)
 {
-	trace_vfs_pread(fd, buf, count, offset);
+	trace_vfs_pread(fp, buf, count, offset);
 	struct iovec iov = {
 			.iov_base	= buf,
 			.iov_len	= count,
 	};
 	ssize_t bytes;
 
-	bytes = uk_syscall_r_preadv((long) fd, (long) &iov,
-				    1, (long) offset);
+	bytes = vfscore_preadv(fp, &iov, 1, offset);
 	if (bytes < 0)
 		trace_vfs_pread_err(bytes);
 	else
@@ -486,24 +407,18 @@ ssize_t pread(int fd, void *buf, size_t count, off_t offset)
 LFS64(pread);
 #endif /* UK_LIBC_SYSCALLS */
 
-UK_TRACEPOINT(trace_vfs_readv, "%d %#x %#x", int, const struct iovec*,
+UK_TRACEPOINT(trace_vfs_readv, "%p %#x %#x", void *, const struct iovec*,
 	      int);
 UK_TRACEPOINT(trace_vfs_readv_ret, "%#x", ssize_t);
 UK_TRACEPOINT(trace_vfs_readv_err, "%d", int);
 
-UK_SYSCALL_R_DEFINE(ssize_t, readv,
-		  int, fd, const struct iovec *, iov, int, iovcnt)
+ssize_t vfscore_readv(struct vfscore_file *fp,
+		      const struct iovec *iov, int iovcnt)
 {
-	struct vfscore_file *fp;
 	ssize_t bytes;
 	int error;
 
-	trace_vfs_readv(fd, iov, iovcnt);
-	error = fget(fd, &fp);
-	if (error) {
-		error = -error;
-		goto out_error;
-	}
+	trace_vfs_readv(fp, iov, iovcnt);
 
 	/* Check if the file has not already been read and that is
 	 * not a character device.
@@ -532,11 +447,11 @@ out_error:
 	return error;
 }
 
-UK_TRACEPOINT(trace_vfs_read, "%d %#x %d", int, void *, int);
+UK_TRACEPOINT(trace_vfs_read, "%p %#x %d", void *, void *, int);
 UK_TRACEPOINT(trace_vfs_read_ret, "%#x", ssize_t);
 UK_TRACEPOINT(trace_vfs_read_err, "%d", int);
 
-UK_SYSCALL_R_DEFINE(ssize_t, read, int, fd, void *, buf, size_t, count)
+ssize_t vfscore_read(struct vfscore_file *fp, void *buf, size_t count)
 {
 	ssize_t bytes;
 
@@ -547,9 +462,9 @@ UK_SYSCALL_R_DEFINE(ssize_t, read, int, fd, void *, buf, size_t, count)
 			.iov_len	= count,
 	};
 
-	trace_vfs_read(fd, buf, count);
+	trace_vfs_read(fp, buf, count);
 
-	bytes = uk_syscall_r_readv((long) fd, (long) &iov, 1);
+	bytes = vfscore_readv(fp, &iov, 1);
 	if (bytes < 0)
 		trace_vfs_read_err(bytes);
 	else
@@ -579,24 +494,18 @@ out_error:
 	return -error;
 }
 
-UK_TRACEPOINT(trace_vfs_pwritev, "%d %#x %#x %#x", int, const struct iovec*,
+UK_TRACEPOINT(trace_vfs_pwritev, "%p %#x %#x %#x", void *, const struct iovec*,
 	      int, off_t);
 UK_TRACEPOINT(trace_vfs_pwritev_ret, "%#x", ssize_t);
 UK_TRACEPOINT(trace_vfs_pwritev_err, "%d", int);
 
-UK_SYSCALL_R_DEFINE(ssize_t, pwritev, int, fd, const struct iovec*, iov,
-			int, iovcnt, off_t, offset)
+ssize_t vfscore_pwritev(struct vfscore_file *fp, const struct iovec *iov,
+			int iovcnt, off_t offset)
 {
-	struct vfscore_file *fp;
 	ssize_t bytes;
 	int error;
 
-	trace_vfs_pwritev(fd, iov, iovcnt, offset);
-	error = fget(fd, &fp);
-	if (error) {
-		error = -error;
-		goto out_error;
-	}
+	trace_vfs_pwritev(fp, iov, iovcnt, offset);
 
 	/* Check if the file is indeed seekable. */
 	if (fp->f_vfs_flags & UK_VFSCORE_NOPOS) {
@@ -634,9 +543,7 @@ out_error:
 #undef pwritev64
 #endif
 
-LFS64(pwritev);
-
-UK_TRACEPOINT(trace_vfs_pwrite, "%d %#x %#x %#x", int, const void*, size_t,
+UK_TRACEPOINT(trace_vfs_pwrite, "%p %#x %#x %#x", void *, const void*, size_t,
 	      off_t);
 UK_TRACEPOINT(trace_vfs_pwrite_ret, "%#x", ssize_t);
 UK_TRACEPOINT(trace_vfs_pwrite_err, "%d", int);
@@ -651,18 +558,17 @@ UK_TRACEPOINT(trace_vfs_pwrite_err, "%d", int);
 #undef pwrite64
 #endif
 
-UK_LLSYSCALL_R_DEFINE(ssize_t, pwrite64, int, fd,
-		      const void *, buf, size_t, count, off_t, offset)
+ssize_t vfscore_pwrite64(struct vfscore_file *fp, const void *buf,
+			 size_t count, off_t offset)
 {
-	trace_vfs_pwrite(fd, buf, count, offset);
+	trace_vfs_pwrite(fp, buf, count, offset);
 	struct iovec iov = {
 			.iov_base	= (void *)buf,
 			.iov_len	= count,
 	};
 	ssize_t bytes;
 
-	bytes = uk_syscall_r_pwritev((long) fd, (long) &iov,
-				     1, (long) offset);
+	bytes = vfscore_pwritev(fp, &iov, 1, offset);
 	if (bytes < 0)
 		trace_vfs_pwrite_err(bytes);
 	else
@@ -680,23 +586,17 @@ ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset)
 LFS64(pwrite);
 #endif /* UK_LIBC_SYSCALLS */
 
-UK_TRACEPOINT(trace_vfs_writev, "%d %#x %d", int, const struct iovec*, int);
+UK_TRACEPOINT(trace_vfs_writev, "%p %#x %d", void *, const struct iovec*, int);
 UK_TRACEPOINT(trace_vfs_writev_ret, "%#x", ssize_t);
 UK_TRACEPOINT(trace_vfs_writev_err, "%d", int);
 
-UK_SYSCALL_R_DEFINE(ssize_t, writev,
-		  int, fd, const struct iovec *, vec, int, vlen)
+ssize_t vfscore_writev(struct vfscore_file *fp,
+		       const struct iovec *vec, int vlen)
 {
-	struct vfscore_file *fp;
 	ssize_t bytes;
 	int error;
 
-	trace_vfs_writev(fd, vec, vlen);
-	error = fget(fd, &fp);
-	if (error) {
-		error = -error;
-		goto out_error;
-	}
+	trace_vfs_writev(fp, vec, vlen);
 
 	/* Check if the file has not already been written to and
 	 * that it is not a character device.
@@ -725,11 +625,11 @@ out_error:
 	return error;
 }
 
-UK_TRACEPOINT(trace_vfs_write, "%d %#x %#x", int, const void *, size_t);
+UK_TRACEPOINT(trace_vfs_write, "%p %#x %#x", void *, const void *, size_t);
 UK_TRACEPOINT(trace_vfs_write_ret, "%#x", ssize_t);
 UK_TRACEPOINT(trace_vfs_write_err, "%d", int);
 
-UK_SYSCALL_R_DEFINE(ssize_t, write, int, fd, const void *, buf, size_t, count)
+ssize_t vfscore_write(struct vfscore_file *fp, const void *buf, size_t count)
 {
 	ssize_t bytes;
 
@@ -739,45 +639,13 @@ UK_SYSCALL_R_DEFINE(ssize_t, write, int, fd, const void *, buf, size_t, count)
 			.iov_base	= (void *)buf,
 			.iov_len	= count,
 	};
-	trace_vfs_write(fd, buf, count);
-	bytes = uk_syscall_r_writev((long) fd, (long) &iov, 1);
+	trace_vfs_write(fp, buf, count);
+	bytes = vfscore_writev(fp, &iov, 1);
 	if (bytes < 0)
 		trace_vfs_write_err(errno);
 	else
 		trace_vfs_write_ret(bytes);
 	return bytes;
-}
-
-UK_TRACEPOINT(trace_vfs_ioctl, "%d %#x", int, unsigned long);
-UK_TRACEPOINT(trace_vfs_ioctl_ret, "");
-UK_TRACEPOINT(trace_vfs_ioctl_err, "%d", int);
-
-UK_LLSYSCALL_R_DEFINE(int, ioctl, int, fd, unsigned long int, request,
-		void*, arg)
-{
-	struct vfscore_file *fp;
-	int error;
-
-	trace_vfs_ioctl(fd, request);
-	/* glibc ABI provides a variadic prototype for ioctl so we need to agree
-	 * with it, since we now include sys/ioctl.h
-	 * read the first argument and pass it to sys_ioctl() */
-
-	error = fget(fd, &fp);
-	if (error)
-		goto out_errno;
-
-	error = sys_ioctl(fp, request, arg);
-	fdrop(fp);
-
-	if (error)
-		goto out_errno;
-	trace_vfs_ioctl_ret();
-	return 0;
-
-out_errno:
-	trace_vfs_ioctl_err(error);
-	return -error;
 }
 
 #if UK_LIBC_SYSCALLS
@@ -826,58 +694,6 @@ UK_SYSCALL_R_DEFINE(int, fdatasync, int, fd)
 	// TODO: See if we can do less than fsync().
 	return fsync(fd);
 }
-
-UK_TRACEPOINT(trace_vfs_fstat, "%d %#x", int, struct stat*);
-UK_TRACEPOINT(trace_vfs_fstat_ret, "");
-UK_TRACEPOINT(trace_vfs_fstat_err, "%d", int);
-
-static int __fxstat_helper(int ver __unused, int fd, struct stat *st)
-{
-	struct vfscore_file *fp;
-	int error;
-
-	trace_vfs_fstat(fd, st);
-
-	error = fget(fd, &fp);
-	if (error)
-		goto out_errno;
-
-	error = sys_fstat(fp, st);
-	fdrop(fp);
-
-	if (error)
-		goto out_errno;
-	trace_vfs_fstat_ret();
-	return 0;
-
-	out_errno:
-	trace_vfs_fstat_err(error);
-	errno = error;
-	return -1;
-}
-
-#if UK_LIBC_SYSCALLS
-int __fxstat(int ver __unused, int fd, struct stat *st)
-{
-	return __fxstat_helper(ver, fd, st);
-}
-#ifdef __fxstat64
-#undef __fxstat64
-#endif
-
-LFS64(__fxstat);
-#endif /* UK_LIBC_SYSCALLS */
-
-UK_SYSCALL_DEFINE(int, fstat, int, fd, struct stat *, st)
-{
-	return __fxstat_helper(1, fd, st);
-}
-
-#ifdef fstat64
-#undef fstat64
-#endif
-
-LFS64(fstat);
 
 static int __fxstatat_helper(int ver __unused, int dirfd, const char *pathname,
 		struct stat *st, int flags);
@@ -1856,6 +1672,8 @@ UK_SYSCALL_R_DEFINE(int, lstat, const char*, pathname, struct stat*, st)
 static int __fxstatat_helper(int ver __unused, int dirfd, const char *pathname,
 		struct stat *st, int flags)
 {
+	if (!pathname || !st)
+		return -EFAULT;
 	if (pathname[0] == '/' || dirfd == AT_FDCWD) {
 		return uk_syscall_r_stat((long) pathname, (long) st);
 	}
@@ -2064,130 +1882,22 @@ out_error:
 	return ERR2PTR(-error);
 }
 
-UK_TRACEPOINT(trace_vfs_dup, "%d", int);
-UK_TRACEPOINT(trace_vfs_dup_ret, "\"%s\"", int);
-UK_TRACEPOINT(trace_vfs_dup_err, "%d", int);
-/*
- * Duplicate a file descriptor
- */
-UK_SYSCALL_R_DEFINE(int, dup, int, oldfd)
-{
-	struct vfscore_file *fp;
-	int newfd;
-	int error;
-
-	trace_vfs_dup(oldfd);
-	error = fget(oldfd, &fp);
-	if (error)
-		goto out_error;
-
-	error = fdalloc(fp, &newfd);
-	if (error)
-		goto out_fdrop;
-
-	fdrop(fp);
-	trace_vfs_dup_ret(newfd);
-	return newfd;
-
-	out_fdrop:
-	fdrop(fp);
-
-	out_error:
-	trace_vfs_dup_err(error);
-	if (error > 0)
-		return -error;
-	return error;
-}
-
-UK_TRACEPOINT(trace_vfs_dup3, "%d %d %#x", int, int, int);
-UK_TRACEPOINT(trace_vfs_dup3_ret, "%d", int);
-UK_TRACEPOINT(trace_vfs_dup3_err, "%d", int);
-/*
- * Duplicate a file descriptor to a particular value.
- */
-UK_SYSCALL_R_DEFINE(int, dup3, int, oldfd, int, newfd, int, flags)
-{
-	struct vfscore_file *fp;
-	int error;
-
-	trace_vfs_dup3(oldfd, newfd, flags);
-	/*
-	 * Don't allow any argument but O_CLOEXEC.  But we even ignore
-	 * that as we don't support exec() and thus don't care.
-	 */
-	if ((flags & ~O_CLOEXEC) != 0) {
-		error = EINVAL;
-		goto out_error;
-	}
-
-	if (oldfd == newfd) {
-		error = EINVAL;
-		goto out_error;
-	}
-
-	error = fget(oldfd, &fp);
-	if (error)
-		goto out_error;
-
-	/* BUG: The close and reserve operation must be atomic */
-	error = uk_syscall_r_close(newfd);
-	if (error && error != -EBADF)
-		goto out_error_drop;
-
-	error = vfscore_reserve_fd(newfd);
-	if (error)
-		goto out_error_drop;
-
-	error = vfscore_install_fd(newfd, fp);
-	if (error)
-		goto out_error_drop;
-
-	trace_vfs_dup3_ret(newfd);
-	return newfd;
-
-out_error_drop:
-	fdrop(fp);
-out_error:
-	trace_vfs_dup3_err(error);
-	return (error > 0) ? -error : error;
-}
-
-UK_SYSCALL_R_DEFINE(int, dup2, int, oldfd, int, newfd)
-{
-	struct vfscore_file *fp;
-	int error;
-
-	if (unlikely(oldfd == newfd)) {
-		error = fget(oldfd, &fp);
-		if (unlikely(error))
-			return -error;
-
-		fdrop(fp);
-		return newfd;
-	}
-
-	return uk_syscall_r_dup3(oldfd, newfd, 0);
-}
 
 /*
  * The file control system call.
  */
 #define SETFL (O_APPEND | O_ASYNC | O_DIRECT | O_NOATIME | O_NONBLOCK)
 
-UK_TRACEPOINT(trace_vfs_fcntl, "%d %d %#x", int, int, int);
+UK_TRACEPOINT(trace_vfs_fcntl, "%p %d %#x", void *, int, int);
 UK_TRACEPOINT(trace_vfs_fcntl_ret, "\"%s\"", int);
 UK_TRACEPOINT(trace_vfs_fcntl_err, "%d", int);
 
-UK_LLSYSCALL_R_DEFINE(int, fcntl, int, fd, unsigned int, cmd, int, arg)
+int vfscore_fcntl(struct vfscore_file *fp, unsigned int cmd, int arg)
 {
-	struct vfscore_file *fp;
-	int ret = 0, error;
+	int ret = 0, error = 0;
 	int tmp, oldf;
 
-	trace_vfs_fcntl(fd, cmd, arg);
-	error = fget(fd, &fp);
-	if (error)
-		goto out_errno;
+	trace_vfs_fcntl(fp, cmd, arg);
 
 	// An important note about our handling of FD_CLOEXEC / O_CLOEXEC:
 	// close-on-exec shouldn't have been a file flag (fp->f_flags) - it is a
@@ -2197,11 +1907,6 @@ UK_LLSYSCALL_R_DEFINE(int, fcntl, int, fd, unsigned int, cmd, int, arg)
 	// There is little practical difference, though, because this flag is
 	// ignored in OSv anyway, as it doesn't support exec().
 	switch (cmd) {
-	case F_DUPFD:
-		error = fdalloc(fp, &ret);
-		if (error)
-			goto out_errno;
-		break;
 	case F_GETFD:
 		ret = (fp->f_flags & O_CLOEXEC) ? FD_CLOEXEC : 0;
 		break;
@@ -2258,12 +1963,6 @@ UK_LLSYSCALL_R_DEFINE(int, fcntl, int, fd, unsigned int, cmd, int, arg)
 
 		FD_UNLOCK(fp);
 		break;
-	case F_DUPFD_CLOEXEC:
-		error = fdalloc(fp, &ret);
-		if (error)
-			goto out_errno;
-		fp->f_flags |= O_CLOEXEC;
-		break;
 	case F_SETLK:
 		uk_pr_warn_once("fcntl(F_SETLK) stubbed\n");
 		break;
@@ -2281,7 +1980,6 @@ UK_LLSYSCALL_R_DEFINE(int, fcntl, int, fd, unsigned int, cmd, int, arg)
 		error = EINVAL;
 	}
 
-	fdrop(fp);
 	if (error)
 		goto out_errno;
 	trace_vfs_fcntl_ret(ret);

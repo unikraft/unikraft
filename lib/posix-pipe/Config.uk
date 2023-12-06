@@ -1,0 +1,12 @@
+menuconfig LIBPOSIX_PIPE
+	bool "posix-pipe: Support for pipes"
+	select LIBPOSIX_FDIO
+
+if LIBPOSIX_PIPE
+	config LIBPOSIX_PIPE_SIZE_ORDER
+	int "Size order of pipe buffer"
+	default 16
+	help
+		Pipe buffer size will be 2^(order) bytes.
+
+endif

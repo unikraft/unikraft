@@ -149,17 +149,14 @@ UK_SYSCALL_R_DEFINE(int, clock_getres, clockid_t, clk_id,
 {
 	int error;
 
-	if (!tp) {
-		error = EFAULT;
-		goto out_error;
-	}
-
 	switch (clk_id) {
 	case CLOCK_MONOTONIC:
 	case CLOCK_MONOTONIC_COARSE:
 	case CLOCK_REALTIME:
-		tp->tv_sec = 0;
-		tp->tv_nsec = UKPLAT_TIME_TICK_NSEC;
+		if (tp) {
+			tp->tv_sec = 0;
+			tp->tv_nsec = UKPLAT_TIME_TICK_NSEC;
+		}
 		break;
 	default:
 		error = EINVAL;

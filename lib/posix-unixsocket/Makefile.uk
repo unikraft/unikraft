@@ -1,0 +1,4 @@
+$(eval $(call addlib_s,libposix_unixsocket,$(CONFIG_LIBPOSIX_UNIXSOCKET)))
+
+LIBPOSIX_UNIXSOCKET_SRCS-y += $(LIBPOSIX_UNIXSOCKET_BASE)/unixsock.c
+LIBPOSIX_UNIXSOCKET_SRCS-y += $(LIBPOSIX_UNIXSOCKET_BASE)/unixsock-bind.c

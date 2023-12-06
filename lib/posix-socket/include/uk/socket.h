@@ -2,10 +2,13 @@
 /*
  * Authors: Alexander Jung <alexander.jung@neclab.eu>
  *          Marc Rittinghaus <marc.rittinghaus@kit.edu>
+ *          Andrei Tatar <andrei@unikraft.io>
  *
  * Copyright (c) 2020, NEC Laboratories Europe GmbH, NEC Corporation.
  *                     All rights reserved.
  * Copyright (c) 2022, Karlsruhe Institute of Technology (KIT).
+ *                     All rights reserved.
+ * Copyright (c) 2023, Unikraft GmbH and The Unikraft Authors.
  *                     All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -37,16 +40,11 @@
 #ifndef __UK_SOCKET__
 #define __UK_SOCKET__
 
-struct vfscore_file;
 struct posix_socket_driver;
 
-struct posix_socket_file {
+struct posix_socket_node {
 	/** The fd or data used internally by the socket implementation */
 	void *sock_data;
-	/** Socket type */
-	int type;
-	/** Internal reference to the vfscore_file */
-	struct vfscore_file *vfs_file;
 	/** The driver to use for this socket */
 	struct posix_socket_driver *driver;
 };
@@ -59,6 +57,5 @@ struct posix_socket_file {
 #endif /* !CONFIG_LIBPOSIX_SOCKET_PRINT_ERRORS */
 
 #include <uk/socket_driver.h>
-#include <uk/socket_vnops.h>
 
 #endif /* __UK_SOCKET__ */

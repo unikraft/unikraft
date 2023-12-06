@@ -1,0 +1,8 @@
+config LIBPOSIX_POLL
+	bool "posix-poll: Support for file polling"
+	select LIBPOSIX_FDIO
+	select LIBPOSIX_FDTAB
+	select LIBUKTIMECONV
+	select LIBUKFILE_CHAINUPDATE
+	select LIBVFSCORE
+	select LIBNOLIBC if !HAVE_LIBC

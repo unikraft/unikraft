@@ -46,6 +46,8 @@
 #include <vfscore/mount.h>
 #include <errno.h>
 
+#include <uk/posix-fdtab-legacy.h>
+
 /*
  * When the syscall_shim library is not part of the build, there is warning
  * of implicit declaration of uk_syscall_r_dup2.
@@ -233,12 +235,11 @@ int init_stdio(void)
 {
 	int fd;
 
-	fd = vfscore_alloc_fd();
+	fd = uk_fdtab_legacy_open(&stdio_file);
 	if (fd != 0) {
-		uk_pr_crit("failed to allocate fd for stdin (fd=0)\n");
+		uk_pr_crit("failed to allocate fd for stdin (fd=%d)\n", fd);
 		return (fd < 0) ? fd : -EBADF;
 	}
-	vfscore_install_fd(0, &stdio_file);
 
 	fd = uk_syscall_r_dup3(0, 1, 0);
 	if (fd != 1) {
