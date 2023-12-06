@@ -46,72 +46,7 @@
 struct uk_netdev_list uk_netdev_list =
 	UK_TAILQ_HEAD_INITIALIZER(uk_netdev_list);
 static uint16_t netdev_count;
-/**
- * TODO: Define Network argument format when multiple driver device need to
- * coexist. For example like:
- * Driver Name:IP Address:Net Mask
- */
-static char *ipv4_addr;
-static char *ipv4_subnet_mask;
-static char *ipv4_gw_addr;
-static char *ipv4_dns0_addr;
 
-UK_LIB_PARAM_STR(ipv4_addr);
-UK_LIB_PARAM_STR(ipv4_subnet_mask);
-UK_LIB_PARAM_STR(ipv4_gw_addr);
-UK_LIB_PARAM_STR(ipv4_dns0_addr);
-
-static const char *_parse_ipv4_addr(void)
-{
-	/** Remember the reference to the ip address for successive calls*/
-	static char *ip_addr;
-
-	if (ip_addr)
-		return strtok_r(NULL, " ", &ip_addr);
-	else if (ipv4_addr)
-		return strtok_r(ipv4_addr, " ", &ip_addr);
-
-	return NULL;
-}
-
-static const char *_parse_ipv4_net_mask(void)
-{
-	/** Remember the reference to the netmask for successive calls*/
-	static char *net_mask;
-
-	if (net_mask)
-		return strtok_r(NULL, " ", &net_mask);
-	else if (ipv4_subnet_mask)
-		return strtok_r(ipv4_subnet_mask, " ", &net_mask);
-
-	return NULL;
-}
-
-static const char *_parse_ipv4_gw_addr(void)
-{
-	/** Remember the reference to the gateway address for successive calls*/
-	static char *gw;
-
-	if (gw)
-		return strtok_r(NULL, " ", &gw);
-	else if (ipv4_gw_addr)
-		return strtok_r(ipv4_gw_addr, " ", &gw);
-
-	return NULL;
-}
-
-static const char *_parse_ipv4_dns0_addr(void)
-{
-	/** Remember the reference to the dns server for successive calls */
-	static char *dns0;
-
-	if (dns0)
-		return strtok_r(NULL, " ", &dns0);
-	else if (ipv4_dns0_addr)
-		return strtok_r(ipv4_dns0_addr, " ", &dns0);
-
-	return NULL;
-}
 
 static struct uk_netdev_data *_alloc_data(struct uk_alloc *a,
 					  uint16_t netdev_id,
@@ -134,23 +69,6 @@ static struct uk_netdev_data *_alloc_data(struct uk_alloc *a,
 	return data;
 }
 
-static struct uk_netdev_einfo *_alloc_einfo(struct uk_alloc *a)
-{
-	struct uk_netdev_einfo *_einfo = NULL;
-
-	_einfo = uk_zalloc(a, sizeof(*_einfo));
-	if (!_einfo) {
-		uk_pr_warn("Failed to allocate memory for netdev config\n");
-		return ERR2PTR(-ENOMEM);
-	}
-
-	_einfo->ipv4_addr = _parse_ipv4_addr();
-	_einfo->ipv4_net_mask = _parse_ipv4_net_mask();
-	_einfo->ipv4_gw_addr = _parse_ipv4_gw_addr();
-	_einfo->ipv4_dns0_addr = _parse_ipv4_dns0_addr();
-
-	return _einfo;
-}
 
 int uk_netdev_drv_register(struct uk_netdev *dev, struct uk_alloc *a,
 			   const char *drv_name)
@@ -175,15 +93,10 @@ int uk_netdev_drv_register(struct uk_netdev *dev, struct uk_alloc *a,
 	UK_ASSERT(dev->rx_one);
 	UK_ASSERT(dev->tx_one);
 
-	dev->_data = _alloc_data(a, netdev_count,  drv_name);
+	dev->_data = _alloc_data(a, netdev_count, drv_name);
 	if (!dev->_data)
 		return -ENOMEM;
 
-	if (ipv4_addr || ipv4_subnet_mask || ipv4_gw_addr) {
-		dev->_einfo = _alloc_einfo(a);
-		if (PTRISERR(dev->_einfo))
-			return PTR2ERR(dev->_einfo);
-	}
 
 	UK_TAILQ_INSERT_TAIL(&uk_netdev_list, dev, _list);
 	uk_pr_info("Registered netdev%"PRIu16": %p (%s)\n",
@@ -274,32 +187,6 @@ void uk_netdev_info_get(struct uk_netdev *dev,
 				      dev_info->max_tx_queues);
 }
 
-static const void *_netdev_einfo_get(struct uk_netdev *dev,
-				enum uk_netdev_einfo_type einfo)
-{
-	switch (einfo) {
-	case UK_NETDEV_IPV4_ADDR_STR:
-		if (dev->_einfo->ipv4_addr)
-			uk_pr_debug("ip: %s\n", dev->_einfo->ipv4_addr);
-		return dev->_einfo->ipv4_addr;
-	case UK_NETDEV_IPV4_MASK_STR:
-		if (dev->_einfo->ipv4_net_mask)
-			uk_pr_debug("netmask: %s\n", dev->_einfo->ipv4_net_mask);
-		return dev->_einfo->ipv4_net_mask;
-	case UK_NETDEV_IPV4_GW_STR:
-		if (dev->_einfo->ipv4_gw_addr)
-			uk_pr_debug("gateway: %s\n", dev->_einfo->ipv4_gw_addr);
-		return dev->_einfo->ipv4_gw_addr;
-	case UK_NETDEV_IPV4_DNS0_STR:
-		if (dev->_einfo->ipv4_dns0_addr)
-			uk_pr_debug("dns: %s\n", dev->_einfo->ipv4_dns0_addr);
-		return dev->_einfo->ipv4_dns0_addr;
-	default:
-		uk_pr_warn("Option %d not yet supported\n", einfo);
-	}
-	return NULL;
-}
-
 const void *uk_netdev_einfo_get(struct uk_netdev *dev,
 				enum uk_netdev_einfo_type einfo)
 {
@@ -307,9 +194,7 @@ const void *uk_netdev_einfo_get(struct uk_netdev *dev,
 	UK_ASSERT(dev->ops);
 	UK_ASSERT(dev->_data->state >= UK_NETDEV_UNCONFIGURED);
 
-	if (dev->_einfo)
-		return _netdev_einfo_get(dev, einfo);
-	else if (dev->ops->einfo_get)
+	if (dev->ops->einfo_get)
 		return dev->ops->einfo_get(dev, einfo);
 	return NULL;
 }

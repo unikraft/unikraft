@@ -461,12 +461,6 @@ struct uk_netdev_data {
 	const char           *drv_name;
 };
 
-struct uk_netdev_einfo {
-	const char *ipv4_addr;
-	const char *ipv4_net_mask;
-	const char *ipv4_gw_addr;
-	const char *ipv4_dns0_addr;
-};
 
 struct uk_netdev_tx_stats {
 	/** The total number of bytes of data transmitted by the interface */
@@ -529,8 +523,6 @@ struct uk_netdev {
 
 	UK_TAILQ_ENTRY(struct uk_netdev) _list;
 
-	/** Netdevice address configuration */
-	struct uk_netdev_einfo *_einfo;
 
 #if (CONFIG_UK_NETDEV_SCRATCH_SIZE > 0)
 	char scratch_pad[CONFIG_UK_NETDEV_SCRATCH_SIZE];
