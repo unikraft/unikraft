@@ -780,11 +780,11 @@ static const void *netfront_einfo_get(struct uk_netdev *n,
 
 	nfdev = to_netfront_dev(n);
 	switch (einfo_type) {
-	case UK_NETDEV_IPV4_ADDR_STR:
+	case UK_NETDEV_IPV4_ADDR:
 		return nfdev->econf.ipv4addr;
-	case UK_NETDEV_IPV4_MASK_STR:
+	case UK_NETDEV_IPV4_MASK:
 		return nfdev->econf.ipv4mask;
-	case UK_NETDEV_IPV4_GW_STR:
+	case UK_NETDEV_IPV4_GW:
 		return nfdev->econf.ipv4gw;
 	default:
 		break;

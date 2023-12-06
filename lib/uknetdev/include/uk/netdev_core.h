@@ -219,28 +219,22 @@ enum uk_netdev_state {
  * This list is extensible in the future without needing the drivers to adopt
  * any or all of the data types.
  *
- * The extra information can available in one of the following formats:
- * - *_NINT16: Network-order raw int (4 bytes)
- * - *_STR: Null-terminated string
+ * Each of the extra information field is available as Null-terminated string
  */
 enum uk_netdev_einfo_type {
-	/* IPv4 address and mask */
-	UK_NETDEV_IPV4_ADDR_NINT16,
-	UK_NETDEV_IPV4_ADDR_STR,
-	UK_NETDEV_IPV4_MASK_NINT16,
-	UK_NETDEV_IPV4_MASK_STR,
+	/* IPv4 */
+	UK_NETDEV_IPV4_ADDR,
+	UK_NETDEV_IPV4_MASK,
+	UK_NETDEV_IPV4_CIDR,	/* IPv4 address in CIDR notation
+				 * (if set, addr/mask fields are NULL)
+				 */
+	UK_NETDEV_IPV4_GW,	/* IPv4 gateway */
+	UK_NETDEV_IPV4_DNS0,	/* Primary DNS (IPv4 address) */
+	UK_NETDEV_IPV4_DNS1,	/* Secondary DNS (IPv4 address) */
+	UK_NETDEV_IPV4_HOSTNAME,/* Hostname for IPv4 address */
+	UK_NETDEV_IPV4_DOMAIN,	/* Domain/Search suffix for IPv4 address */
 
-	/* IPv4 gateway */
-	UK_NETDEV_IPV4_GW_NINT16,
-	UK_NETDEV_IPV4_GW_STR,
-
-	/* IPv4 Primary DNS */
-	UK_NETDEV_IPV4_DNS0_NINT16,
-	UK_NETDEV_IPV4_DNS0_STR,
-
-	/* IPv4 Secondary DNS */
-	UK_NETDEV_IPV4_DNS1_NINT16,
-	UK_NETDEV_IPV4_DNS1_STR,
+	/* TODO: IPv6 */
 };
 
 /**
@@ -311,7 +305,7 @@ typedef void (*uk_netdev_info_get_t)(struct uk_netdev *dev,
 				     struct uk_netdev_info *dev_info);
 
 /** Driver callback type to read any extra configuration. */
-typedef const void *(*uk_netdev_einfo_get_t)(struct uk_netdev *dev,
+typedef const char *(*uk_netdev_einfo_get_t)(struct uk_netdev *dev,
 					     enum uk_netdev_einfo_type econf);
 
 /** Driver callback type to configure a network device. */

@@ -187,15 +187,28 @@ void uk_netdev_info_get(struct uk_netdev *dev,
 				      dev_info->max_tx_queues);
 }
 
-const void *uk_netdev_einfo_get(struct uk_netdev *dev,
+const char *uk_netdev_einfo_get(struct uk_netdev *dev,
 				enum uk_netdev_einfo_type einfo)
 {
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->ops);
 	UK_ASSERT(dev->_data->state >= UK_NETDEV_UNCONFIGURED);
 
-	if (dev->ops->einfo_get)
+	if (dev->ops->einfo_get) {
+		switch (einfo) {
+		case UK_NETDEV_IPV4_ADDR:
+			if (dev->ops->einfo_get(dev, UK_NETDEV_IPV4_CIDR))
+				return NULL; /* IPv4 CIDR exists */
+			break;
+		case UK_NETDEV_IPV4_MASK:
+			if (dev->ops->einfo_get(dev, UK_NETDEV_IPV4_CIDR))
+				return NULL; /* IPv4 CIDR exists */
+			break;
+		default:
+			break;
+		}
 		return dev->ops->einfo_get(dev, einfo);
+	}
 	return NULL;
 }
 
