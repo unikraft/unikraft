@@ -47,6 +47,25 @@ struct uk_netdev_list uk_netdev_list =
 	UK_TAILQ_HEAD_INITIALIZER(uk_netdev_list);
 static uint16_t netdev_count;
 
+#if CONFIG_LIBUKNETDEV_EINFO_LIBPARAM
+static char *ipv4_conf[CONFIG_LIBUKNETDEV_EINFO_LIBPARAM_MAXCOUNT];
+
+UK_LIBPARAM_PARAM_ARR_ALIAS(ip, ipv4_conf, charp,
+			    CONFIG_LIBUKNETDEV_EINFO_LIBPARAM_MAXCOUNT,
+			 "IPv4 einfo: cidr[:gw[:dns0[:dns1[:hostname[:domain]]]]]");
+
+struct uk_netdev_einfo_overwrites {
+	struct {
+		const char *cidr;
+		const char *gw;
+		const char *dns0;
+		const char *dns1;
+		const char *hostname;
+		const char *domain;
+	} ip4;
+	/* TODO: ip6 */
+};
+#endif /* CONFIG_LIBUKNETDEV_EINFO_LIBPARAM */
 
 static struct uk_netdev_data *_alloc_data(struct uk_alloc *a,
 					  uint16_t netdev_id,
@@ -69,6 +88,94 @@ static struct uk_netdev_data *_alloc_data(struct uk_alloc *a,
 	return data;
 }
 
+#if CONFIG_LIBUKNETDEV_EINFO_LIBPARAM
+static char *pick_arg(char **argptr, int separator)
+{
+	char *nsep;
+	char *arg;
+
+	UK_ASSERT(argptr);
+
+	if (!*argptr || (*argptr)[0] == '\0') {
+		/* We likely got called after we already
+		 * returned the last available argument
+		 */
+		*argptr = NULL;
+		return NULL;
+	}
+
+	arg = *argptr;
+	nsep = strchr(*argptr, separator);
+	if (!nsep) {
+		/* No next separator, we hit the last argument */
+		*argptr = NULL;
+		goto exit;
+	}
+
+	/* Split C string by overwriting the separator */
+	nsep[0] = '\0';
+	/* Move argptr to next argument */
+	*argptr = nsep + 1;
+
+exit:
+	/* Return NULL for empty arguments */
+	if (*arg == '\0')
+		return NULL;
+	return arg;
+}
+
+static struct uk_netdev_einfo_overwrites *_alloc_einfo(struct uk_alloc *a,
+						       uint16_t netdev_id)
+{
+	struct uk_netdev_einfo_overwrites *_einfo = NULL;
+
+	if (netdev_id >= CONFIG_LIBUKNETDEV_EINFO_LIBPARAM_MAXCOUNT)
+		return NULL;
+	_einfo = uk_zalloc(a, sizeof(*_einfo));
+	if (!_einfo) {
+		uk_pr_warn("Failed to allocate memory for netdev einfo\n");
+		return ERR2PTR(-ENOMEM);
+	}
+
+	/*
+	 * Parse IPv4 parameters
+	 * NOTE: `pick_arg` automatically returns NULL if an arguments is
+	 *       empty or does not exists.
+	 */
+	_einfo->ip4.cidr     = pick_arg(&ipv4_conf[netdev_id], ':');
+	_einfo->ip4.gw       = pick_arg(&ipv4_conf[netdev_id], ':');
+	_einfo->ip4.dns0     = pick_arg(&ipv4_conf[netdev_id], ':');
+	_einfo->ip4.dns1     = pick_arg(&ipv4_conf[netdev_id], ':');
+	_einfo->ip4.hostname = pick_arg(&ipv4_conf[netdev_id], ':');
+	_einfo->ip4.domain   = pick_arg(&ipv4_conf[netdev_id], ':');
+	/*
+	 * NOTE: We do not throw an error if additional arguments are handed
+	 *       over (after domain). This will keep this parsing code
+	 *       future-proof.
+	 */
+
+	if (_einfo->ip4.cidr)
+		uk_pr_debug("netdev%d: Overwrite einfo ip4.cidr: \"%s\"\n",
+			    netdev_id, _einfo->ip4.cidr);
+	if (_einfo->ip4.gw)
+		uk_pr_debug("netdev%d: Overwrite einfo ip4.gw: \"%s\"\n",
+			    netdev_id, _einfo->ip4.gw);
+	if (_einfo->ip4.dns0)
+		uk_pr_debug("netdev%d: Overwrite einfo ip4.dns0: \"%s\"\n",
+			    netdev_id, _einfo->ip4.dns0);
+	if (_einfo->ip4.dns1)
+		uk_pr_debug("netdev%d: Overwrite einfo ip4.dns1: \"%s\"\n",
+			    netdev_id, _einfo->ip4.dns1);
+	if (_einfo->ip4.hostname)
+		uk_pr_debug("netdev%d: Overwrite einfo ip4.host: \"%s\"\n",
+			    netdev_id, _einfo->ip4.hostname);
+	if (_einfo->ip4.domain)
+		uk_pr_debug("netdev%d: Overwrite einfo ip4.domain: \"%s\"\n",
+			    netdev_id, _einfo->ip4.domain);
+
+	return _einfo;
+}
+#endif /* CONFIG_LIBUKNETDEV_EINFO_LIBPARAM */
 
 int uk_netdev_drv_register(struct uk_netdev *dev, struct uk_alloc *a,
 			   const char *drv_name)
@@ -97,6 +204,13 @@ int uk_netdev_drv_register(struct uk_netdev *dev, struct uk_alloc *a,
 	if (!dev->_data)
 		return -ENOMEM;
 
+#if CONFIG_LIBUKNETDEV_EINFO_LIBPARAM
+	dev->_einfo = _alloc_einfo(a, netdev_count);
+	if (PTRISERR(dev->_einfo)) {
+		uk_free(a, dev->_data);
+		return PTR2ERR(dev->_einfo);
+	}
+#endif /* CONFIG_LIBUKNETDEV_EINFO_LIBPARAM */
 
 	UK_TAILQ_INSERT_TAIL(&uk_netdev_list, dev, _list);
 	uk_pr_info("Registered netdev%"PRIu16": %p (%s)\n",
@@ -193,6 +307,51 @@ const char *uk_netdev_einfo_get(struct uk_netdev *dev,
 	UK_ASSERT(dev);
 	UK_ASSERT(dev->ops);
 	UK_ASSERT(dev->_data->state >= UK_NETDEV_UNCONFIGURED);
+
+#if CONFIG_LIBUKNETDEV_EINFO_LIBPARAM
+	if (dev->_einfo) {
+		switch (einfo) {
+		case UK_NETDEV_IPV4_ADDR:
+			if (dev->_einfo->ip4.cidr ||
+			    (dev->ops->einfo_get &&
+			     dev->ops->einfo_get(dev, UK_NETDEV_IPV4_CIDR)))
+				return NULL; /* CIDR (overwrite) exists */
+			break;
+		case UK_NETDEV_IPV4_MASK:
+			if (dev->_einfo->ip4.cidr ||
+			    (dev->ops->einfo_get &&
+			     dev->ops->einfo_get(dev, UK_NETDEV_IPV4_CIDR)))
+				return NULL; /* CIDR (overwrite) exists */
+			break;
+		case UK_NETDEV_IPV4_CIDR:
+			if (dev->_einfo->ip4.cidr)
+				return dev->_einfo->ip4.cidr;
+			break;
+		case UK_NETDEV_IPV4_GW:
+			if (dev->_einfo->ip4.gw)
+				return dev->_einfo->ip4.gw;
+			break;
+		case UK_NETDEV_IPV4_DNS0:
+			if (dev->_einfo->ip4.dns0)
+				return dev->_einfo->ip4.dns0;
+			break;
+		case UK_NETDEV_IPV4_DNS1:
+			if (dev->_einfo->ip4.dns1)
+				return dev->_einfo->ip4.dns1;
+			break;
+		case UK_NETDEV_IPV4_HOSTNAME:
+			if (dev->_einfo->ip4.hostname)
+				return dev->_einfo->ip4.hostname;
+			break;
+		case UK_NETDEV_IPV4_DOMAIN:
+			if (dev->_einfo->ip4.domain)
+				return dev->_einfo->ip4.domain;
+			break;
+		default:
+			break;
+		}
+	}
+#endif /* CONFIG_LIBUKNETDEV_EINFO_LIBPARAM */
 
 	if (dev->ops->einfo_get) {
 		switch (einfo) {
