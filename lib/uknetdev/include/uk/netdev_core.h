@@ -455,6 +455,9 @@ struct uk_netdev_data {
 	const char           *drv_name;
 };
 
+#if CONFIG_LIBUKNETDEV_EINFO_LIBPARAM
+struct uk_netdev_einfo_overwrites;
+#endif /* CONFIG_LIBUKNETDEV_EINFO_LIBPARAM */
 
 struct uk_netdev_tx_stats {
 	/** The total number of bytes of data transmitted by the interface */
@@ -517,6 +520,10 @@ struct uk_netdev {
 
 	UK_TAILQ_ENTRY(struct uk_netdev) _list;
 
+#if CONFIG_LIBUKNETDEV_EINFO_LIBPARAM
+	/** Netdevice einfo overwrites by kernel parameters */
+	struct uk_netdev_einfo_overwrites *_einfo;
+#endif /* CONFIG_LIBUKNETDEV_EINFO_LIBPARAM */
 
 #if (CONFIG_UK_NETDEV_SCRATCH_SIZE > 0)
 	char scratch_pad[CONFIG_UK_NETDEV_SCRATCH_SIZE];

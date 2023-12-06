@@ -31,6 +31,24 @@ config LIBUKNETDEV_DISPATCHERTHREADS
 		allocated for each configured receive queue.
 		libuksched is required for this option.
 
+config LIBUKNETDEV_EINFO_LIBPARAM
+	bool "Netdev einfo with kernel parameters"
+	select LIBUKLIBPARAM
+	help
+		Extended information field are used to pass IPv4 addresses
+		and network settings to network stacks. This option enables to
+		overwrite the values that are provided by underlying drivers
+		with the `netdev.ip` kernel parameter.
+
+config LIBUKNETDEV_EINFO_LIBPARAM_MAXCOUNT
+	int "Maximum number of configurable netdevs"
+	depends on LIBUKNETDEV_EINFO_LIBPARAM
+	range 1 512
+	default 4
+	help
+		This number defines an upper limit of netdev devices that can
+		be configured via the kernel command line.
+
 config LIBUKNETDEV_STATS
 	bool "Collect network statistics"
 	default n
