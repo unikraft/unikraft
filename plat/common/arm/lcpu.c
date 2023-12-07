@@ -65,7 +65,6 @@ void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
 	__builtin_unreachable();
 }
 
-#ifdef CONFIG_HAVE_SMP
 /**
  * The number of cells for the size field should be 0 in cpu nodes.
  * The number of cells in the address field is set by default to 2 in cpu
@@ -76,7 +75,6 @@ void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
 #define FDT_ADDR_CELLS_DEFAULT 2
 
 void lcpu_start(struct lcpu *cpu);
-static __paddr_t lcpu_start_paddr;
 extern struct _gic_dev *gic;
 
 int lcpu_arch_init(struct lcpu *this_lcpu)
@@ -93,6 +91,18 @@ int lcpu_arch_init(struct lcpu *this_lcpu)
 	SYSREG_WRITE64(tpidr_el1, (__uptr)this_lcpu);
 
 	return ret;
+}
+
+#ifdef CONFIG_HAVE_SMP
+static __paddr_t lcpu_start_paddr;
+
+__lcpuidx lcpu_arch_idx(void)
+{
+	struct lcpu *this_lcpu = SYSREG_READ64(tpidr_el1);
+
+	UK_ASSERT(IS_LCPU_PTR(this_lcpu));
+
+	return this_lcpu->idx;
 }
 
 #ifdef CONFIG_UKPLAT_ACPI
