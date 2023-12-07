@@ -62,6 +62,12 @@ struct lcpu_arch { };
 #endif /* !__ASSEMBLY__ */
 #endif /* !LCPU_ARCH_SIZE */
 
+#define IS_LCPU_PTR(ptr)                                               \
+	(IN_RANGE((__uptr)(ptr),                                        \
+		  (__uptr)lcpu_get(0),                                  \
+		  (__uptr)CONFIG_UKPLAT_LCPU_MAXCOUNT *                 \
+		  sizeof(struct lcpu)))
+
 /*
  * LCPU Startup Arguments
  */
@@ -334,6 +340,14 @@ int lcpu_fn_enqueue(struct lcpu *lcpu, const struct ukplat_lcpu_func *fn);
  * functions.
  */
 __lcpuid lcpu_arch_id(void);
+
+/**
+ * Return the index of the CPU executing this function. Needs to have had the
+ * architecture of the CPU already initialized. This method is meant to make
+ * use of architectural defined registers initialized during CPU architecture
+ * initialization to yield faster execution.
+ */
+__lcpuidx lcpu_arch_idx(void);
 
 /**
  * Initialize the architectural part of the LCPU. The function is
