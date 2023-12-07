@@ -49,6 +49,11 @@
 #define UKARCH_ECTX_SIZE			832 /* Max possible size */
 #define UKARCH_ECTX_ALIGN			64 /* Max needed alignment */
 
+#define UKARCH_SP_ALIGN		(1 << 4)
+#define UKARCH_SP_ALIGN_MASK	(UKARCH_SP_ALIGN - 1)
+
+#if !__ASSEMBLY__
+
 #define ukarch_rstack_push(sp, value)			\
 	({						\
 		unsigned long __sp__ = (sp);		\
@@ -60,9 +65,6 @@
 #define ukarch_rstack_push_packed(sp, value)		\
 	ukarch_rstack_push(sp, value)
 
-#define UKARCH_SP_ALIGN		(1 << 4)
-#define UKARCH_SP_ALIGN_MASK	(UKARCH_SP_ALIGN - 1)
-
 #define ukarch_gen_sp(base, len)					\
 	({								\
 		unsigned long __sp__ = (unsigned long) (base)		\
@@ -70,3 +72,4 @@
 		__sp__ &= ~((unsigned long) UKARCH_SP_ALIGN_MASK);	\
 		__sp__;							\
 	})
+#endif /* !__ASSEMBLY__ */
