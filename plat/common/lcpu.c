@@ -202,38 +202,10 @@ __lcpuid ukplat_lcpu_id(void)
 }
 
 #ifdef CONFIG_HAVE_SMP
-#ifdef CONFIG_UKPLAT_LCPU_IDISIDX
-/* For many VMMs the CPU ID is simply a sequentially increasing number with
- * the BSP always at index 0. This is essentially the definition of __lcpuidx
- * so in this case, we can simply use the ID as IDX.
- */
 __lcpuidx ukplat_lcpu_idx(void)
 {
-	__lcpuidx this_cpu_idx = (__lcpuidx) ukplat_lcpu_id();
-
-	UK_ASSERT(this_cpu_idx < lcpu_count);
-	UK_ASSERT(lcpus[this_cpu_idx].idx == this_cpu_idx);
-	return this_cpu_idx;
+	return lcpu_arch_idx();
 }
-#else /* CONFIG_UKPLAT_LCPU_IDISIDX */
-__lcpuidx ukplat_lcpu_idx(void)
-{
-	__lcpuid this_cpu_id  = ukplat_lcpu_id();
-	__u32 i, this_cpu_idx = (__u32) (-1);
-
-	/** TODO: Until we have a better way just do a linear search */
-	for (i = 0; i < lcpu_count; i++)
-		if (lcpus[i].id == this_cpu_id) {
-			UK_ASSERT(lcpus[i].idx == (__lcpuidx) i);
-			this_cpu_idx = i;
-			break;
-		}
-
-	UK_ASSERT(this_cpu_idx != (__u32) (-1));
-
-	return (__lcpuidx) this_cpu_idx;
-}
-#endif /* CONFIG_UKPLAT_LCPU_IDISIDX */
 
 int lcpu_fn_enqueue(struct lcpu *lcpu, const struct ukplat_lcpu_func *fn)
 {
