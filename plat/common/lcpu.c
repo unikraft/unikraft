@@ -196,12 +196,12 @@ void ukplat_lcpu_halt_irq_until(__nsec until)
 	time_block_until(until);
 }
 
+#ifdef CONFIG_HAVE_SMP
 __lcpuid ukplat_lcpu_id(void)
 {
-	return lcpu_arch_id();
+	return lcpu_get_current()->id;
 }
 
-#ifdef CONFIG_HAVE_SMP
 __lcpuidx ukplat_lcpu_idx(void)
 {
 	return lcpu_arch_idx();
