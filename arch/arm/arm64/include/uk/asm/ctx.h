@@ -43,6 +43,8 @@
 #define UKARCH_SP_ALIGN		16
 #define UKARCH_SP_ALIGN_MASK	(UKARCH_SP_ALIGN - 1)
 
+#if !__ASSEMBLY__
+
 /*
  * NOTE: Since we use the SP for single registers, we need to add some padding.
  * https://community.arm.com/arm-community-blogs/b/
@@ -75,3 +77,5 @@
 		__sp__ &= ~((unsigned long) UKARCH_SP_ALIGN_MASK);	\
 		__sp__;							\
 	})
+
+#endif /* !__ASSEMBLY__ */
