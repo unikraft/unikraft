@@ -31,6 +31,24 @@
 #error Do not include this header directly
 #endif
 
+/**
+ * Legacy FP State - 160 bytes
+ * Legacy SSE State - 352 bytes
+ * XSAVE Header Data - 64 bytes (needs sanitization)
+ * YMM_H State (AVX) - 256 bytes
+ * MPX_BNDREGS - 64 bytes X !We do not enable/use!
+ * MPX_BNDCSR - 64 bytes X !We do not enable/use!
+ * AVX-512 KMASK - 64 bytes X !We do not enable/use!
+ * AVX-512 ZMM_H - 512 bytes X !We do not enable/use!
+ * AVX-512 ZMM - 1024 bytes X !We do not enable/use!
+ *
+ * Total for now: 160 + 352 + 64 + 256 = 832 bytes!
+ *
+ * NOTE: Increase as we support more of the above!
+ */
+#define UKARCH_ECTX_SIZE			832 /* Max possible size */
+#define UKARCH_ECTX_ALIGN			64 /* Max needed alignment */
+
 #define ukarch_rstack_push(sp, value)			\
 	({						\
 		unsigned long __sp__ = (sp);		\
