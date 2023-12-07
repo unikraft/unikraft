@@ -100,6 +100,11 @@ __lcpuid __weak lcpu_arch_id(void)
 	return 0;
 }
 
+__lcpuidx __weak lcpu_arch_idx(void)
+{
+	return 0;
+}
+
 int __weak lcpu_arch_init(struct lcpu *this_lcpu __unused)
 {
 	return 0;
