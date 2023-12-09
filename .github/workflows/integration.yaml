@@ -3,10 +3,12 @@ name: integration
 on:
   push:
     branches: [staging, stable]
+    paths-ignore: ['*.md']
 
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [staging]
+    paths-ignore: ['*.md']
 
 jobs:
   libc-test:
