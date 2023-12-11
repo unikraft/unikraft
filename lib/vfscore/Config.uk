@@ -12,12 +12,6 @@ menuconfig LIBVFSCORE
 	select LIBPOSIX_PIPE
 
 if LIBVFSCORE
-config LIBVFSCORE_PIPE_SIZE_ORDER
-	int "Pipe size order"
-	default 16
-	help
-		The size of the internal buffer for anonymous pipes is 2^order.
-
 config LIBVFSCORE_NONLARGEFILE
 	bool "Non-largefile system calls"
 	default y if LIBSYSCALL_SHIM_HANDLER
