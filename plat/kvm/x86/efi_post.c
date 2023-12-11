@@ -3,8 +3,12 @@
  * Licensed under the BSD-3-Clause License (the "License").
  * You may not use this file except in compliance with the License.
  */
+#include "x86/desc.h"
 #include <kvm/efi.h>
 #include <uk/arch/paging.h>
+#ifdef CONFIG_LIBUKSEV
+#include <uk/sev.h>
+#endif /* CONFIG_LIBUKSEV */
 #include <uk/plat/common/bootinfo.h>
 #include <uk/plat/lcpu.h>
 #include <x86/cpu.h>
@@ -74,6 +78,8 @@ static inline void pic_8259_elcr2_level_irq10_11(void)
 	outb(PIC2_ELCR2, PIC2_ELCR2_IRQ11_ECL | PIC2_ELCR2_IRQ10_ECL);
 }
 
+
+
 void __noreturn uk_efi_jmp_to_kern()
 {
 	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
@@ -84,10 +90,35 @@ void __noreturn uk_efi_jmp_to_kern()
 	uk_efi_boot_startup_args.entry_fn = &_ukplat_entry;
 	uk_efi_boot_startup_args.bootstack = uk_efi_bootstack + __PAGE_SIZE;
 
+	/* For SEV-ES machines, we rely on UEFI's registered #VC handler  to
+	 * handle these I/O in these operation*/
 	ukplat_lcpu_disable_irq();
-	ukarch_pt_write_base((__paddr_t)&x86_bpt_pml4);
 	unmask_8259_pic();
 	lapic_timer_disable();
 	pic_8259_elcr2_level_irq10_11();
+
+#ifdef CONFIG_LIBUKSEV
+
+	int rc;
+	rc = uk_sev_cpu_features_check();
+	if (unlikely(rc))
+		UK_CRASH("Crashing\n");
+
+	rc = uk_sev_mem_encrypt_init();
+	if (unlikely(rc))
+		UK_CRASH("Failed initializing memory encryption\n");
+
+
+#ifdef CONFIG_X86_AMD64_FEAT_SEV_ES
+	/* We are about to invalidates the GHCB and the #VS handler setup by
+	 * UEFI */
+
+	/* Setup an VC handler to handle CPUID calls. This handler uses the GHCB
+	* MSR protocol, so GHCB is not needed yet. */
+	uk_sev_early_vc_handler_init();
+#endif /* CONFIG_X86_AMD64_FEAT_SEV_ES */
+#endif /* CONFIG_LIBUKSEV */
+
+	ukarch_pt_write_base((__paddr_t)&x86_bpt_pml4);
 	lcpu_start64(&uk_efi_boot_startup_args, bi);
 }

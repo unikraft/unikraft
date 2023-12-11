@@ -1,0 +1,19 @@
+menuconfig LIBUKSEV
+	bool "uksev: Secure Encrypted Virtualization library"
+	select HAVE_MEM_ENCRYPT
+	select HAVE_PAGING
+	select LIB_ZYDIS
+	depends on X86_AMD64_FEAT_SEV
+	help
+		Secure Encrypted Virtualization support.
+
+if LIBUKSEV
+
+config LIBUKSEV_PTE_MEM_ENCRYPT_BIT
+	int "Bit location in the PTE indicating memory encryption"
+	default 47
+
+config LIBUKSEV_TEST
+	bool "Enable tests"
+	select LIBUKTEST
+endif

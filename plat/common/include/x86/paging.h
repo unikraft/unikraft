@@ -107,6 +107,12 @@ pgarch_pte_create(__paddr_t paddr, unsigned long attr, unsigned int level,
 		pte |= X86_PTE_PWT;
 	}
 
+#ifdef CONFIG_HAVE_MEM_ENCRYPT
+	if (attr & PAGE_ATTR_ENCRYPT) {
+		pte |= X86_PTE_ENCRYPT;
+	}
+#endif
+
 	/* Take all other bits from template */
 	pte |= template & (X86_PTE_US |
 			   X86_PTE_ACCESSED |
@@ -136,6 +142,12 @@ pgarch_pte_change_attr(__pte_t pte, unsigned long new_attr,
 		pte |= X86_PTE_PWT;
 	}
 
+#ifdef CONFIG_HAVE_MEM_ENCRYPT
+	if (new_attr & PAGE_ATTR_ENCRYPT) {
+		pte |= X86_PTE_ENCRYPT;
+	}
+#endif
+
 	return pte;
 }
 
@@ -152,6 +164,11 @@ pgarch_attr_from_pte(__pte_t pte, unsigned int level __unused)
 
 	if ((pte & X86_PTE_PWT) && (pte & X86_PTE_PCD))
 		attr |= PAGE_ATTR_WRITECOMBINE;
+
+#ifdef CONFIG_HAVE_MEM_ENCRYPT
+	if (pte & X86_PTE_ENCRYPT)
+		attr |= PAGE_ATTR_ENCRYPT;
+#endif
 
 	return attr;
 }
@@ -181,6 +198,12 @@ pgarch_pt_pte_create(struct uk_pagetable *pt __unused, __paddr_t pt_paddr,
 	 * protections in the PTEs mapping pages only
 	 */
 	pt_pte |= (X86_PTE_PRESENT | X86_PTE_RW);
+
+
+#ifdef CONFIG_LIBUKSEV
+	/* In SEV, page table pages should always be encrypted */
+	pt_pte |= X86_PTE_ENCRYPT;
+#endif /* CONFIG_LIBUKSEV */
 
 	/* Do not use the PWT/PCD bits for the PT PTEs. We only use them for
 	 * page PTEs

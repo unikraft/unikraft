@@ -78,6 +78,12 @@ DECLARE_TRAP_EC(machine_check,   "machine check",        NULL)
 DECLARE_TRAP   (simd_error,      "SIMD coprocessor",     UKARCH_TRAP_MATH)
 DECLARE_TRAP_EC(security_error,  "control protection",   UKARCH_TRAP_SECURITY)
 
+#ifdef CONFIG_X86_AMD64_FEAT_SEV_ES
+DECLARE_TRAP_EVENT(UKARCH_TRAP_VC);
+DECLARE_TRAP_EC(vmm_comm_exception,  "VMM communication exception",   UKARCH_TRAP_VC)
+#endif
+
+
 void do_unhandled_trap(int trapnr, char *str, struct __regs *regs,
 		unsigned long error_code)
 {

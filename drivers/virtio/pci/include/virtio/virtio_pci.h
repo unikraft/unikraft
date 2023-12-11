@@ -30,6 +30,7 @@
 #ifndef __VIRTIO_PCI_H__
 #define __VIRTIO_PCI_H__
 
+#include <virtio/virtio_types.h>
 #ifdef __cplusplus
 extern "C" {
 #endif /* __cplusplus __ */
@@ -66,6 +67,128 @@ extern "C" {
 /* TODO Revisit when adding MSI support. */
 #define VIRTIO_PCI_CONFIG_OFF           20
 #define VIRTIO_PCI_VRING_ALIGN          4096
+
+
+/* Types of capabilities for virtio configuration */
+#define VIRTIO_PCI_CAP_COMMON_CFG	1
+#define VIRTIO_PCI_CAP_NOTIFY_CFG	2
+#define VIRTIO_PCI_CAP_ISR		3
+#define VIRTIO_PCI_CAP_DEVICE_CFG	4
+#define VIRTIO_PCI_CAP_PCI_CFG		5
+#define VIRTIO_PCI_CAP_SHARED_MEM_CFG	8
+
+
+struct virtio_pci_cap {
+	__u8 cap_vndr;
+	__u8 cap_next;
+	__u8 cap_len;
+	__u8 cfg_type;
+	__u8 bar;
+	__u8 padding[3];
+	__virtio_le32 offset;
+	__virtio_le32 length;
+};
+
+struct virtio_pci_notify_cap {
+	struct virtio_pci_cap cap;
+	__virtio_le32 notify_off_multiplier;
+};
+
+struct virtio_pci_common_cfg {
+	/* About the whole device. */
+	__virtio_le32 host_feature_select;
+	__virtio_le32 host_feature;
+	__virtio_le32 guest_feature_select;
+	__virtio_le32 guest_feature;
+	__virtio_le16 msix_config;
+	__virtio_le16 num_queues;
+	__u8 device_status;
+	__u8 config_generation;
+
+	/* About a specific virtqueue. */
+	__virtio_le16 queue_select;
+	__virtio_le16 queue_size;
+	__virtio_le16 queue_msix_vector;
+	__virtio_le16 queue_enable;
+	__virtio_le16 queue_notify_off;
+	__virtio_le32 queue_desc_lo;
+	__virtio_le32 queue_desc_hi;
+	__virtio_le32 queue_driver_lo;
+	__virtio_le32 queue_driver_hi;
+	__virtio_le32 queue_device_lo;
+	__virtio_le32 queue_device_hi;
+};
+
+/* Offsets calculation for consistency with virtio_mmio.h */
+/* Device (host) features set selector - Write Only */
+#define VIRTIO_PCI_CFG_DEVICE_FEATURES                                         \
+	__offsetof(struct virtio_pci_common_cfg, host_feature)
+
+/*
+ * Bitmask of the features supported by the device (host)
+ * (32 bits per set) - Read Only
+ */
+#define VIRTIO_PCI_CFG_DEVICE_FEATURES_SEL                                     \
+	__offsetof(struct virtio_pci_common_cfg, host_feature_select)
+
+/*
+ * Bitmask of features activated by the driver (guest)
+ * (32 bits per set) - Write Only
+ */
+#define VIRTIO_PCI_CFG_DRIVER_FEATURES                                         \
+	__offsetof(struct virtio_pci_common_cfg, guest_feature)
+
+/* Activated features set selector - Write Only */
+#define VIRTIO_PCI_CFG_DRIVER_FEATURES_SEL                                     \
+	__offsetof(struct virtio_pci_common_cfg, guest_feature_select)
+
+/* Maximum number of queues - Read Only */
+#define VIRTIO_PCI_CFG_NUM_QUEUES                                              \
+	__offsetof(struct virtio_pci_common_cfg, num_queues)
+
+/* Device status - Read Write */
+#define VIRTIO_PCI_CFG_DEVICE_STATUS                                           \
+	__offsetof(struct virtio_pci_common_cfg, device_status)
+
+/* Configuration atomicity value */
+#define VIRTIO_PCI_CFG_CONFIG_GENERATION                                       \
+	__offsetof(struct virtio_pci_common_cfg, config_generation)
+
+/* Queue selector - Write Only */
+#define VIRTIO_PCI_CFG_QUEUE_SEL                                               \
+	__offsetof(struct virtio_pci_common_cfg, queue_select)
+
+/* Maximum size of the currently selected queue - Read Only */
+#define VIRTIO_PCI_CFG_QUEUE_SIZE                                              \
+	__offsetof(struct virtio_pci_common_cfg, queue_size)
+
+/* Ready bit for the currently selected queue - Read Write */
+#define VIRTIO_PCI_CFG_QUEUE_READY                                             \
+	__offsetof(struct virtio_pci_common_cfg, queue_enable)
+
+/* Offset from the notification structure where this virtqueue is located - Read
+ * Only
+ */
+#define VIRTIO_PCI_CFG_QUEUE_NOTIFY_OFF                                        \
+	__offsetof(struct virtio_pci_common_cfg, queue_notify_off)
+
+/* Selected queue's Descriptor Table address, 64 bits in two halves */
+#define VIRTIO_PCI_CFG_QUEUE_DESC_LOW                                          \
+	__offsetof(struct virtio_pci_common_cfg, queue_desc_lo)
+#define VIRTIO_PCI_CFG_QUEUE_DESC_HIGH                                         \
+	__offsetof(struct virtio_pci_common_cfg, queue_desc_hi)
+
+/* Selected queue's Available Ring address, 64 bits in two halves */
+#define VIRTIO_PCI_CFG_QUEUE_AVAIL_LOW                                         \
+	__offsetof(struct virtio_pci_common_cfg, queue_driver_lo)
+#define VIRTIO_PCI_CFG_QUEUE_AVAIL_HIGH                                        \
+	__offsetof(struct virtio_pci_common_cfg, queue_driver_hi)
+
+/* Selected queue's Used Ring address, 64 bits in two halves */
+#define VIRTIO_PCI_CFG_QUEUE_USED_LOW                                          \
+	__offsetof(struct virtio_pci_common_cfg, queue_device_lo)
+#define VIRTIO_PCI_CFG_QUEUE_USED_HIGH                                         \
+	__offsetof(struct virtio_pci_common_cfg, queue_device_hi)
 
 #ifdef __cplusplus
 }

@@ -4,6 +4,7 @@
  * You may not use this file except in compliance with the License.
  */
 
+
 #include <string.h>
 #include <x86/cpu.h>
 #include <x86/traps.h>
@@ -23,6 +24,10 @@
 #include <uk/plat/common/lcpu.h>
 #include <uk/plat/common/sections.h>
 #include <uk/plat/common/bootinfo.h>
+
+#ifdef CONFIG_LIBUKSEV
+#include <uk/sev.h>
+#endif
 
 static char *cmdline;
 static __sz cmdline_len;
@@ -75,7 +80,10 @@ void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi)
 	int rc;
 	void *bstack;
 
+#ifndef CONFIG_LIBUKSEV
+	/* SEV-ES: I/O operations are delayed until after GHCB is setup */
 	_libkvmplat_init_console();
+#endif /* !CONFIG_LIBUKSEV */
 
 	/* Initialize trap vector table */
 	traps_table_init();
@@ -85,10 +93,13 @@ void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi)
 	if (unlikely(rc))
 		UK_CRASH("Bootstrap processor init failed: %d\n", rc);
 
+
+#ifndef CONFIG_LIBUKSEV
 	/* Initialize IRQ controller */
 	rc = uk_intctlr_probe();
 	if (unlikely(rc))
 		UK_CRASH("Interrupt controller init failed: %d\n", rc);
+#endif /* !CONFIG_LIBUKSEV */
 
 	/* Initialize command line */
 	rc = cmdline_init(bi);
@@ -109,6 +120,37 @@ void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi)
 	rc = ukplat_mem_init();
 	if (unlikely(rc))
 		UK_CRASH("Mem init failed: %d\n", rc);
+
+#ifdef CONFIG_LIBUKSEV
+	/* Setting up the GHCB requires that we have the page table set up */
+	rc = uk_sev_setup_ghcb();
+	if (unlikely(rc))
+		UK_CRASH("GHCB setup failed: %d\n", rc);
+
+
+
+	/* Setting up APIC requires MSR access */
+	/* Initialize IRQ controller */
+	rc = uk_intctlr_probe();
+	if (unlikely(rc))
+		UK_CRASH("Interrupt controller init failed: %d\n", rc);
+
+#ifdef CONFIG_HAVE_SMP
+	rc = apic_enable();
+	if (unlikely(rc))
+		UK_CRASH("Cannot enable APIC: %d\n", rc);
+#endif /* CONFIG_HAVE_SMP */
+
+	/* Now the #VC handler is properly setup, we call the delayed operations
+	 */
+	_libkvmplat_init_console();
+
+	/* Initialize IRQ controller */
+	rc = uk_intctlr_probe();
+	if (unlikely(rc))
+		UK_CRASH("Interrupt controller init failed: %d\n", rc);
+
+#endif /* CONFIG_LIBUKSEV */
 
 	/* Print boot information */
 	ukplat_bootinfo_print();

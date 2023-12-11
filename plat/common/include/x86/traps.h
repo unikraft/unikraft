@@ -59,6 +59,10 @@
 #define TRAP_virt_error          20
 #define TRAP_security_error      21
 
+#ifdef CONFIG_LIBUKSEV
+#define TRAP_vmm_comm_exception	 29
+#endif
+
 #define ASM_TRAP_SYM(trapname)   asm_trap_##trapname
 
 #ifndef __ASSEMBLY__
@@ -90,6 +94,11 @@ DECLARE_ASM_TRAP(machine_check);
 DECLARE_ASM_TRAP(simd_error);
 DECLARE_ASM_TRAP(virt_error);
 DECLARE_ASM_TRAP(security_error);
+
+#ifdef CONFIG_LIBUKSEV
+DECLARE_ASM_TRAP(vmm_comm_exception);
+DECLARE_ASM_TRAP(vmm_comm_exception_no_ghcb);
+#endif
 
 void do_unhandled_trap(int trapnr, char *str, struct __regs *regs,
 		unsigned long error_code);
@@ -129,6 +138,13 @@ void do_##name(struct __regs *regs, unsigned long error_code)		\
 }
 
 void traps_table_init(void);
+
+#ifdef CONFIG_LIBUKSEV
+/* Called after the GHCB is setup to use the #VC handler that communicate with
+ * hypervisor through GHCB */
+void traps_table_ghcb_vc_handler_init(void);
+#endif
+
 void traps_lcpu_init(struct lcpu *current);
 #endif /* !__ASSEMBLY__ */
 

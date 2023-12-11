@@ -48,6 +48,9 @@
 #if CONFIG_LIBUKDEBUG_PRINT_THREAD
 #include <uk/thread.h>
 #endif
+#ifdef CONFIG_LIBUKSEV
+#include <uk/sev.h>
+#endif
 
 #if CONFIG_LIBUKDEBUG_ANSI_COLOR
 #define LVLC_RESET	UK_ANSI_MOD_RESET
@@ -186,6 +189,15 @@ static void _vprint(struct _vprint_console *cons,
 	const char *nlptr = NULL;
 	const char *libname = uk_libname(libid);
 
+
+#ifdef CONFIG_LIBUKSEV
+	/* Debug printing is unavailable until the handler for I/O is properly
+	* set up. However, it is often called at many stages. Checking if ghcb
+	* is setup here and return early to prevent possible errors. */
+	if (!uk_sev_ghcb_initialized()) {
+		return;
+	}
+#endif /* CONFIG_LIBUKSEV */
 	/*
 	 * Note: We reset the console colors earlier in order to exclude
 	 *       background colors for trailing white spaces.
