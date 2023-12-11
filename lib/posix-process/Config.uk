@@ -28,4 +28,13 @@ endif
 	config LIBPOSIX_PROCESS_DEBUG
 	bool "Enable debug messages"
 	default n
+
+	config LIBPOSIX_PROCESS_TEST
+	bool "Enable tests"
+	default n
+	select LIBUKTEST
+	select LIBSYSCALL_SHIM
+	select LIBSYSCALL_SHIM_HANDLER
+	select LIBSYSCALL_SHIM_HANDLER_ULTLS
+	select LIBPOSIX_TIME
 endif

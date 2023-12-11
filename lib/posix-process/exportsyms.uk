@@ -81,3 +81,7 @@ uk_syscall_r_clone
 uk_syscall_e_clone
 uk_syscall_r_clone3
 uk_syscall_e_clone3
+# PLEASE NOTE THIS IS NOT A REAL FORK. IT IS USED FOR TESTING IF THE USERLAND
+# TLS POINTER IS CORRECTLY RESTORED AFTER FORK.
+uk_syscall_r_fork
+uk_syscall_e_fork
