@@ -441,7 +441,12 @@ int uk_sys_epoll_ctl(const struct uk_file *epf, int op, int fd,
 	if (unlikely(legacy < 0))
 		return -EBADF;
 	legacy = legacy == UK_SHIM_LEGACY;
-#endif /* CONFIG_LIBVFSCORE */
+#else /* !CONFIG_LIBVFSCORE */
+	ret = uk_fdtab_shim_get(fd, &sf);
+	if (unlikely(ret < 0))
+		return -EBADF;
+	UK_ASSERT(ret == UK_SHIM_OFILE);
+#endif /* !CONFIG_LIBVFSCORE */
 
 	uk_file_wlock(epf);
 	switch (op) {
