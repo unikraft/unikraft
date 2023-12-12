@@ -39,6 +39,8 @@
 #define _GNU_SOURCE
 
 #include <sys/types.h>
+#include <sys/stat.h>
+
 #include <uk/socket.h>
 #include <uk/file.h>
 #include <uk/file/nops.h>
@@ -163,10 +165,33 @@ socket_ctl(const struct uk_file *sock, int fam, int req,
 	}
 }
 
+#define SOCKET_STATX_MASK \
+	(UK_STATX_TYPE|UK_STATX_MODE|UK_STATX_NLINK|UK_STATX_INO|UK_STATX_SIZE)
+
+static int
+socket_getstat(const struct uk_file *sock,
+	       unsigned int mask __unused, struct uk_statx *arg)
+{
+	/* Since all information is immediately available, ignore mask arg */
+	arg->stx_mask = SOCKET_STATX_MASK;
+	arg->stx_mode = S_IFSOCK|0777;
+	arg->stx_nlink = 1;
+	arg->stx_ino = (uintptr_t)sock; /* Must be unique per-socket */
+	arg->stx_size = 0;
+
+	/* Following fields are always filled in, not in stx_mask */
+	arg->stx_dev_major = 0;
+	arg->stx_dev_minor = 8; /* Same value Linux returns for sockets */
+	arg->stx_rdev_major = 0;
+	arg->stx_rdev_minor = 0;
+	arg->stx_blksize = 0x1000;
+	return 0;
+}
+
 static const struct uk_file_ops socket_file_ops = {
 	.read = socket_read,
 	.write = socket_write,
-	.getstat = uk_file_nop_getstat,
+	.getstat = socket_getstat,
 	.setstat = uk_file_nop_setstat,
 	.ctl = socket_ctl
 };
