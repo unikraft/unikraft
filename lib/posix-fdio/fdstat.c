@@ -60,21 +60,12 @@ void statx_cpyout(struct stat *s, const struct uk_statx *sx)
 int uk_sys_fstatx(struct uk_ofile *of, unsigned int mask,
 		  struct uk_statx *statxbuf)
 {
-	int ret;
-	int iolock;
-
 	if (unlikely(!statxbuf))
 		return -EFAULT;
 	if (unlikely(mask & UK_STATX__RESERVED))
 		return -EINVAL;
 
-	iolock = _SHOULD_LOCK(of->mode);
-	if (iolock)
-		uk_file_rlock(of->file);
-	ret = uk_file_getstat(of->file, mask, statxbuf);
-	if (iolock)
-		uk_file_runlock(of->file);
-	return ret;
+	return uk_file_getstat(of->file, mask, statxbuf);
 }
 
 int uk_sys_fstat(struct uk_ofile *of, struct stat *statbuf)
