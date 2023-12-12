@@ -6,6 +6,8 @@
 
 /* Internal syscalls for manipulating file metadata */
 
+#include <string.h>
+
 #include <uk/posix-fdio.h>
 
 #include "fdio-impl.h"
@@ -28,6 +30,7 @@ void statx_cpyout(struct stat *s, const struct uk_statx *sx)
 {
 	unsigned int mask = sx->stx_mask;
 
+	memset(s, 0, sizeof(*s));
 	s->st_dev = nums2dev(sx->stx_dev_major, sx->stx_dev_minor);
 	s->st_rdev = nums2dev(sx->stx_rdev_major, sx->stx_rdev_minor);
 	s->st_blksize = sx->stx_blksize;
