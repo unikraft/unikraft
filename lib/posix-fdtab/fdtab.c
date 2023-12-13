@@ -52,9 +52,6 @@ static int init_posix_fdtab(struct uk_init_ctx *ictx __unused)
 	return 0;
 }
 
-/* Init fdtab as early as possible, to enable functions that rely on fds */
-uk_early_initcall_prio(init_posix_fdtab, 0x0, UK_PRIO_EARLIEST);
-
 /* TODO: Adapt when multiple processes are supported */
 static inline struct uk_fdtab *_active_tab(void)
 {
@@ -351,7 +348,7 @@ void uk_fdtab_ret(struct uk_ofile *of)
 	ofile_rel(_active_tab(), of);
 }
 
-void uk_fdtab_cloexec(void)
+static void fdtab_cleanup(int all)
 {
 	struct uk_fdtab *tab = _active_tab();
 	struct uk_fmap *fmap = &tab->fmap;
@@ -362,7 +359,7 @@ void uk_fdtab_cloexec(void)
 		if (p) {
 			struct fdval v = fdtab_decode(p);
 
-			if (v.flags & UK_FDTAB_CLOEXEC) {
+			if (all || (v.flags & UK_FDTAB_CLOEXEC)) {
 				void *pp = uk_fmap_take(fmap, i);
 
 				UK_ASSERT(p == pp);
@@ -371,6 +368,19 @@ void uk_fdtab_cloexec(void)
 		}
 	}
 }
+
+void uk_fdtab_cloexec(void)
+{
+	fdtab_cleanup(0);
+}
+
+static void term_posix_fdtab(const struct uk_term_ctx *tctx __unused)
+{
+	fdtab_cleanup(1);
+}
+
+/* Init fdtab as early as possible, to enable functions that rely on fds */
+uk_rootfs_initcall_prio(init_posix_fdtab, term_posix_fdtab, UK_PRIO_EARLIEST);
 
 /* Internal Syscalls */
 
