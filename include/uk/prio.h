@@ -38,7 +38,7 @@ extern "C" {
 #endif
 
 /**
- * Computes the priority level that has one lower priority than
+ * Computes the priority level that has one lower/higher priority than
  * the given priority level. This macro can be used to state
  * initialization dependencies. It is intended to be used for
  * declaring macro constants.
@@ -48,7 +48,7 @@ extern "C" {
  * @param x
  *  Given Unikraft priority level
  * @return
- *  Priority level that has one priority less than x
+ *  Priority level that has one priority less/more than x
  */
 #define __UK_PRIO_AFTER_0 1
 #define __UK_PRIO_AFTER_1 2
@@ -62,6 +62,19 @@ extern "C" {
 #define __UK_PRIO_AFTER_9 __UK_PRIO_OUT_OF_BOUNDS
 #define __UK_PRIO_AFTER(x) __UK_PRIO_AFTER_##x
 #define UK_PRIO_AFTER(x)   __UK_PRIO_AFTER(x)
+
+#define __UK_PRIO_BEFORE_0 __UK_PRIO_OUT_OF_BOUNDS
+#define __UK_PRIO_BEFORE_1 0
+#define __UK_PRIO_BEFORE_2 1
+#define __UK_PRIO_BEFORE_3 2
+#define __UK_PRIO_BEFORE_4 3
+#define __UK_PRIO_BEFORE_5 4
+#define __UK_PRIO_BEFORE_6 5
+#define __UK_PRIO_BEFORE_7 6
+#define __UK_PRIO_BEFORE_8 7
+#define __UK_PRIO_BEFORE_9 8
+#define __UK_PRIO_BEFORE(x) __UK_PRIO_BEFORE_##x
+#define UK_PRIO_BEFORE(x)   __UK_PRIO_BEFORE(x)
 
 #define UK_PRIO_EARLIEST 0
 #define UK_PRIO_LATEST   9
