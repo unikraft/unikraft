@@ -1892,7 +1892,7 @@ UK_TRACEPOINT(trace_vfs_fcntl, "%p %d %#x", void *, int, int);
 UK_TRACEPOINT(trace_vfs_fcntl_ret, "\"%s\"", int);
 UK_TRACEPOINT(trace_vfs_fcntl_err, "%d", int);
 
-int vfscore_fcntl(struct vfscore_file *fp, unsigned int cmd, int arg)
+int vfscore_fcntl(struct vfscore_file *fp, unsigned int cmd, unsigned long arg)
 {
 	int ret = 0, error = 0;
 	int tmp, oldf;
