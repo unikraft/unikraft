@@ -29,11 +29,12 @@
  */
 #include <stdint.h>
 #include <x86/cpu.h>
+#include <uk/arch/ctx.h>
 #include <uk/plat/config.h>
 #include <uk/essentials.h>
 
 #if defined(__x86_64__)
-char irqstack[STACK_SIZE] __align(STACK_SIZE);
+char irqstack[STACK_SIZE] __align(UKARCH_SP_ALIGN);
 
 static struct pda {
 	int irqcount;       /* offset 0 (used in x86_64.S) */
