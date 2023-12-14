@@ -1,9 +1,6 @@
 name: checkpatch
 
 on:
-  push:
-    branches: [staging, stable]
-
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [staging]
