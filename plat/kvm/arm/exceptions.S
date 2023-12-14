@@ -78,7 +78,7 @@
 	msr     tpidrro_el0, x0
 
 	/* Fetch middle of `lcpu_irqntrap_sp`:
-	 *       STACK_SIZE               STACK_SIZE
+	 *  CPU_EXCEPT_STACK_SIZE  CPU_EXCEPT_STACK_SIZE
 	 * <---------------------><--------------------->
 	 * |============================================|
 	 * |                     |                      |
@@ -95,7 +95,7 @@
 
 .if \is_irq != 0
 	/* If we are an IRQ, use the IRQ stack instead. */
-	add     sp, sp, #STACK_SIZE
+	add     sp, sp, #CPU_EXCEPT_STACK_SIZE
 .endif
 
 	/* Store old SP previously saved into x0 */

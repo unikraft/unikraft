@@ -46,7 +46,7 @@
 #define CPU_ID_MASK 0xff00ffffffUL
 
 /*
- *       STACK_SIZE               STACK_SIZE
+ *  CPU_EXCEPT_STACK_SIZE  CPU_EXCEPT_STACK_SIZE
  * <---------------------><--------------------->
  * |============================================|
  * |                     |                      |
@@ -62,7 +62,7 @@
  * check at the interrupt vector entry whether we are coming from an exception
  * (i.e. keep using the exception stack) or not (switch to the exception stack).
  * This may be correct but it is a costlier operation than simply adding
- * STACK_SIZE, especially on an IRQ handler path.
+ * CPU_EXCEPT_STACK_SIZE, especially on an IRQ handler path.
  *
  * Why can one stack not corrupt the other/Why is trap stack before IRQ stack?
  * During a trap IRQs are disabled. So only the trap stack could potentially
@@ -71,7 +71,7 @@
  *
  */
 static __align(UKARCH_SP_ALIGN)
-UKPLAT_PER_LCPU_ARRAY_DEFINE(__u8, lcpu_irqntrap_sp, STACK_SIZE * 2);
+UKPLAT_PER_LCPU_ARRAY_DEFINE(__u8, lcpu_irqntrap_sp, CPU_EXCEPT_STACK_SIZE * 2);
 
 __lcpuid lcpu_arch_id(void)
 {
@@ -123,7 +123,7 @@ int lcpu_arch_init(struct lcpu *this_lcpu)
 	SYSREG_WRITE64(tpidr_el1, (__uptr)this_lcpu);
 
 	irqntrap_sp = (__uptr)&ukplat_per_lcpu_array_current(lcpu_irqntrap_sp,
-							     STACK_SIZE);
+							CPU_EXCEPT_STACK_SIZE);
 	SYSREG_WRITE64(sp_el0, irqntrap_sp);
 
 	return ret;

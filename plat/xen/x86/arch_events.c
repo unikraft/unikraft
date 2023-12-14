@@ -34,7 +34,7 @@
 #include <uk/essentials.h>
 
 #if defined(__x86_64__)
-char irqstack[STACK_SIZE] __align(UKARCH_SP_ALIGN);
+char irqstack[CPU_EXCEPT_STACK_SIZE] __align(UKARCH_SP_ALIGN);
 
 static struct pda {
 	int irqcount;       /* offset 0 (used in x86_64.S) */
