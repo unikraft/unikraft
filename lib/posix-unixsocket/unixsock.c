@@ -308,16 +308,18 @@ int unix_socket_socketpair(struct posix_socket_driver *d,
 	if (unlikely(ret))
 		goto err_release;
 
-	uk_file_acquire(pipes[0][1]);
-	uk_file_acquire(pipes[1][1]);
 	dat[0]->rpipe = pipes[0][0];
-	dat[0]->bpipe = pipes[0][1];
 	dat[1]->wpipe = pipes[0][1];
 	dat[1]->rpipe = pipes[1][0];
-	dat[1]->bpipe = pipes[1][1];
 	dat[0]->wpipe = pipes[1][1];
 	dat[0]->flags |= UNIXSOCK_CONN;
 	dat[1]->flags |= UNIXSOCK_CONN;
+	if (type == SOCK_DGRAM) {
+		uk_file_acquire(pipes[0][1]);
+		uk_file_acquire(pipes[1][1]);
+		dat[0]->bpipe = pipes[0][1];
+		dat[1]->bpipe = pipes[1][1];
+	}
 
 	sockvec[0] = dat[0];
 	sockvec[1] = dat[1];
