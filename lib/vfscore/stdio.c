@@ -258,4 +258,4 @@ static int init_stdio(struct uk_init_ctx *ictx __unused)
 	return 0;
 }
 
-uk_rootfs_initcall_prio(init_stdio, 0x0, UK_PRIO_AFTER(UK_LIBPOSIX_FDTAB_PRIO));
+uk_rootfs_initcall_prio(init_stdio, 0x0, UK_PRIO_LATEST);

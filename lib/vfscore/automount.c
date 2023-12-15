@@ -50,7 +50,6 @@
 #include <uk/plat/memory.h>
 #include <sys/stat.h>
 #include <vfscore/mount.h>
-#include <uk/posix-fdtab.h>
 
 #ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS
 #include <errno.h>
@@ -459,5 +458,4 @@ static void vfscore_autoumount(const struct uk_term_ctx *tctx __unused)
 	}
 }
 
-uk_rootfs_initcall_prio(vfscore_automount, vfscore_autoumount,
-			UK_PRIO_BEFORE(UK_LIBPOSIX_FDTAB_PRIO));
+uk_rootfs_initcall_prio(vfscore_automount, vfscore_autoumount, 4);
