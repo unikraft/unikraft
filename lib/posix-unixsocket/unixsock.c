@@ -845,7 +845,7 @@ ssize_t unix_socket_write(posix_sock *file,
 }
 
 static
-int unix_socket_shutdown(posix_sock *file, int how)
+int unix_sock_shutdown(posix_sock *file, int how, int notify)
 {
 	struct unix_sock_data *data = posix_sock_get_data(file);
 
@@ -863,18 +863,28 @@ int unix_socket_shutdown(posix_sock *file, int how)
 		}
 		uk_file_release(data->wpipe);
 		data->wpipe = NULL;
-		/* Signal events; reuse pipe callback */
-		unix_sock_wdown(EPOLLERR, UK_POLL_CHAINOP_SET, &data->werr);
+		if (notify)
+			/* Signal events; reuse pipe callback */
+			unix_sock_wdown(EPOLLERR, UK_POLL_CHAINOP_SET,
+					&data->werr);
 	}
 	if ((how == SHUT_RD || how == SHUT_RDWR) && data->rpipe) {
 		uk_pollq_unregister(&data->rpipe->state->pollq, &data->rio);
 		uk_pollq_unregister(&data->rpipe->state->pollq, &data->rerr);
 		uk_file_release(data->rpipe);
 		data->rpipe = NULL;
-		/* Signal events; reuse pipe callback */
-		unix_sock_rdown(EPOLLHUP, UK_POLL_CHAINOP_SET, &data->rerr);
+		if (notify)
+			/* Signal events; reuse pipe callback */
+			unix_sock_rdown(EPOLLHUP, UK_POLL_CHAINOP_SET,
+					&data->rerr);
 	}
 	return 0;
+}
+
+static
+int unix_socket_shutdown(posix_sock *file, int how)
+{
+	return unix_sock_shutdown(file, how, 1);
 }
 
 static
@@ -885,7 +895,7 @@ int unix_socket_close(posix_sock *file)
 	struct unix_sock_data *data = posix_sock_get_data(file);
 
 	uk_file_wlock(file);
-	r = unix_socket_shutdown(file, SHUT_RDWR);
+	r = unix_sock_shutdown(file, SHUT_RDWR, 0);
 	posix_sock_set_data(file, NULL);
 	uk_file_wunlock(file);
 
