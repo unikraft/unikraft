@@ -1,0 +1,32 @@
+name: merge
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  merge:
+    if: github.event.review.state == 'approved'
+    runs-on: ubuntu-latest
+    name: merge
+    steps:
+      - name: Install governctl
+        run: |
+          set -xe
+          wget -q "https://github.com/unikraft/governance/releases/download/v${GOVERN_VERSION}/governance_${GOVERN_VERSION}_linux_amd64.deb"
+          sudo dpkg -i "governance_${GOVERN_VERSION}_linux_amd64.deb"
+        env:
+          GOVERN_VERSION: 0.1.8
+
+      - name: Run the merge through governctl
+        run: governctl pr merge --approve-states ${GOVERN_APPROVE_STATES} --review-states ${GOVERN_REVIEW_STATES} --base staging --push unikraft/unikraft/${PR_NUMBER}
+        env:
+          PR_NUMBER: ${{ github.event.number }}
+          GOVERN_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GOVERN_GITHUB_USER: ${{ secrets.GH_CHECKPATCH_ACTOR }}
+          GOVERN_NO_RENDER: true
+          GOVERN_LOG_LEVEL: warn
+          GOVERN_NO_CONFLICTS: true
+          GOVERN_REVIEW_STATES: approved
+          GOVERN_APPROVE_STATES: approved
+
