@@ -374,14 +374,16 @@ void uk_fdtab_cloexec(void)
 	fdtab_cleanup(0);
 }
 
+/* Cleanup all leftover open fds */
 static void term_posix_fdtab(const struct uk_term_ctx *tctx __unused)
 {
 	fdtab_cleanup(1);
 }
 
 /* Init fdtab as early as possible, to enable functions that rely on fds */
-uk_rootfs_initcall_prio(init_posix_fdtab, term_posix_fdtab,
-			UK_LIBPOSIX_FDTAB_PRIO);
+uk_lib_initcall_prio(init_posix_fdtab, 0x0, UK_PRIO_EARLIEST);
+/* Place fd cleanup to run latest before any rootfs terminators */
+uk_rootfs_initcall_prio(0x0, term_posix_fdtab, UK_PRIO_LATEST);
 
 /* Internal Syscalls */
 
