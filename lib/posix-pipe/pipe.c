@@ -252,8 +252,8 @@ static void pipe_release(const struct uk_file *f, int what)
 		/* Atomically set the HUP flag */
 		ukarch_or(&d->flags, PIPE_HUP);
 		/* If was already set, we can free node */
-		/* Update state w/ EPOLLHUP for read & EPOLLERR for write */
-		uk_file_event_set(f, EPOLLHUP|EPOLLERR);
+		/* Update w/ EPOLL(HUP|IN) for read & EPOLLERR for write */
+		uk_file_event_set(f, EPOLLHUP|EPOLLIN|EPOLLERR);
 	}
 	if (what & UK_FILE_RELEASE_OBJ) {
 		/* Atomically set the FIN flag */
