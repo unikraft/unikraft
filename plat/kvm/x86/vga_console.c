@@ -55,14 +55,14 @@ enum vga_color {
 	VGA_COLOR_WHITE = 15,
 };
 
-static inline uint8_t vga_entry_color(enum vga_color fg, enum vga_color bg)
+static inline __u8 vga_entry_color(enum vga_color fg, enum vga_color bg)
 {
 	return fg | bg << 4;
 }
 
-static inline uint16_t vga_entry(unsigned char uc, uint8_t color)
+static inline __u16 vga_entry(unsigned char uc, __u8 color)
 {
-	return (uint16_t) uc | (uint16_t) color << 8;
+	return (__u16) uc | (__u16) color << 8;
 }
 
 #define TAB_ALIGNMENT 8
@@ -70,18 +70,18 @@ static inline uint16_t vga_entry(unsigned char uc, uint8_t color)
 #define VGA_HEIGHT    25
 #define VGA_FB_BASE   0xb8000
 
-static size_t terminal_row;
-static size_t terminal_column;
-static uint8_t terminal_color;
-static uint16_t *const terminal_buffer = (uint16_t *)VGA_FB_BASE;
-static uint16_t areg;   /* VGA address register */
-static uint16_t dreg;   /* VGA data register */
+static __sz terminal_row;
+static __sz terminal_column;
+static __u8 terminal_color;
+static __u16 *const terminal_buffer = (__u16 *)VGA_FB_BASE;
+static __u16 areg;   /* VGA address register */
+static __u16 dreg;   /* VGA data register */
 
 static void clear_terminal(void)
 {
-	for (size_t y = 0; y < VGA_HEIGHT; y++) {
-		for (size_t x = 0; x < VGA_WIDTH; x++) {
-			const size_t index = y * VGA_WIDTH + x;
+	for (__sz y = 0; y < VGA_HEIGHT; y++) {
+		for (__sz x = 0; x < VGA_WIDTH; x++) {
+			const __sz index = y * VGA_WIDTH + x;
 
 			terminal_buffer[index] = vga_entry(' ', terminal_color);
 		}
@@ -123,15 +123,15 @@ void _libkvmplat_init_vga_console(void)
 	clear_terminal();
 }
 
-static void terminal_putentryat(char c, uint8_t color, size_t x, size_t y)
+static void terminal_putentryat(char c, __u8 color, __sz x, __sz y)
 {
-	const size_t index = y * VGA_WIDTH + x;
+	const __sz index = y * VGA_WIDTH + x;
 
 	terminal_buffer[index] = vga_entry(c, color);
 }
 static void vga_scroll(void)
 {
-	size_t i;
+	__sz i;
 
 	for (i = 1; i < VGA_HEIGHT; i++) {
 		memcpy(terminal_buffer + ((i - 1) * VGA_WIDTH),
@@ -145,7 +145,7 @@ static void vga_scroll(void)
 static void vga_update_cursor(void)
 {
 	unsigned long irq_flags;
-	uint8_t old;
+	__u8 old;
 
 	local_irq_save(irq_flags);
 	old = inb(areg);
@@ -168,8 +168,8 @@ void _libkvmplat_vga_putc(char c)
 	} while (0)
 
 	unsigned long irq_flags;
-	size_t row;
-	size_t column;
+	__sz row;
+	__sz column;
 
 	/* Make a consistent copy of the global state variables (row, column).
 	 * This way, we can work on them consistently in this function and
