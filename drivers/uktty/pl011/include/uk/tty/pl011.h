@@ -27,12 +27,20 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef __PL011_H__
-#define __PL011_H__
+#ifndef __UK_TTY_PL011_H__
+#define __UK_TTY_PL011_H__
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /**
  * Initialize the pl011 console driver
  */
 void pl011_console_init(void *dtb);
 
+#ifdef __cplusplus
+}
 #endif
+
+#endif /* __UK_TTY_PL011_H__ */

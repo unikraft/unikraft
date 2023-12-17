@@ -7,9 +7,9 @@
 #include <uart/ns16550.h>
 #endif /* CONFIG UART_NS16550 */
 
-#if CONFIG_UART_PL011
-#include <uart/pl011.h>
-#endif /* CONFIG_UART_PL011 */
+#if CONFIG_LIBUKTTY_PL011
+#include <uk/tty/pl011.h>
+#endif /* CONFIG_LIBUKTTY_PL011 */
 
 static inline void kvm_console_init(void *fdt)
 {
@@ -17,7 +17,7 @@ static inline void kvm_console_init(void *fdt)
 	ns16550_console_init(fdt);
 #endif /* CONFIG UART_NS16550 */
 
-#if CONFIG_UART_PL011
+#if CONFIG_LIBUKTTY_PL011
 	pl011_console_init(fdt);
-#endif /* CONFIG_UART_PL011 */
+#endif /* CONFIG_LIBUKTTY_PL011 */
 }
