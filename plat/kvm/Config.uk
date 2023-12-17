@@ -92,6 +92,7 @@ choice
 
 config KVM_VMM_QEMU
 	bool "QEMU"
+	imply LIBUKTTY_PL011 if ARCH_ARM_64
 	imply LIBUKINTCTLR_GICV2 if ARCH_ARM_64
 	select HAVE_PCI
 	select HAVE_MMIO
@@ -138,18 +139,9 @@ config KVM_KERNEL_SERIAL_CONSOLE
 
 if (KVM_KERNEL_SERIAL_CONSOLE || KVM_DEBUG_SERIAL_CONSOLE)
 
-choice
-	prompt "Serial console driver"
-	depends on ARCH_ARM_64
-	default UART_PL011 if KVM_VMM_QEMU
-	default UART_NS16550 if KVM_VMM_FIRECRACKER
-
-config UART_PL011
-	bool "PrimeCell UART (PL011)"
-
 config UART_NS16550
 	bool "8250 / NS16550"
-endchoice
+	depends on ARCH_ARM_64
 
 menu "Serial console configuration"
 if ARCH_X86_64
@@ -170,14 +162,6 @@ choice
 		bool "19200"
 endchoice
 endif
-
-config EARLY_PRINT_PL011_UART_ADDR
-	hex "Early debug console pl011 serial address"
-	depends on UART_PL011
-	default 0x09000000
-	depends on (KVM_DEBUG_SERIAL_CONSOLE && ARCH_ARM_64)
-	help
-		Pl011 serial address used by early debug console.
 
 config EARLY_UART_NS16550
 	bool "Early console"

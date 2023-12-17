@@ -5,3 +5,5 @@
 ################################################################################
 
 UK_DRIV_TTY_BASE := $(UK_DRIV_BASE)/uktty
+
+$(eval $(call import_lib,$(UK_DRIV_TTY_BASE)/pl011))
