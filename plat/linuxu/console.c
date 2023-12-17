@@ -101,7 +101,7 @@ void _liblinuxuplat_fini_console(void)
 
 int ukplat_coutd(const char *str, unsigned int len)
 {
-	ssize_t ret = 0;
+	__ssz ret = 0;
 
 	ret = sys_write(STDDEBUG, str, len);
 	return (int) ret;
@@ -109,7 +109,7 @@ int ukplat_coutd(const char *str, unsigned int len)
 
 int ukplat_coutk(const char *str, unsigned int len)
 {
-	ssize_t ret = 0;
+	__ssz ret = 0;
 
 	ret = sys_write(STDOUT, str, len);
 	return (int) ret;
@@ -117,7 +117,7 @@ int ukplat_coutk(const char *str, unsigned int len)
 
 int ukplat_cink(char *str, unsigned int maxlen)
 {
-	ssize_t ret = 0;
+	__ssz ret = 0;
 
 	ret = sys_read(STDIN, str, maxlen);
 	return (int) ret;

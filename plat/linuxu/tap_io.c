@@ -109,9 +109,9 @@ int tap_netif_create(void)
 	return sys_socket(AF_INET, SOCK_DGRAM, 0);
 }
 
-ssize_t tap_read(int fd, void *buf, size_t count)
+__ssz tap_read(int fd, void *buf, __sz count)
 {
-	ssize_t rc = -EINTR;
+	__ssz rc = -EINTR;
 
 	while (rc == -EINTR)
 		rc = sys_read(fd, buf, count);
@@ -125,10 +125,10 @@ ssize_t tap_read(int fd, void *buf, size_t count)
 	return rc;
 }
 
-ssize_t tap_write(int fd, const void *buf, size_t count)
+__ssz tap_write(int fd, const void *buf, __sz count)
 {
-	ssize_t rc = -EINTR;
-	size_t written = 0;
+	__ssz rc = -EINTR;
+	__sz written = 0;
 
 	while (count > 0) {
 		rc = sys_write(fd, buf + written, count);
@@ -151,7 +151,7 @@ ssize_t tap_write(int fd, const void *buf, size_t count)
 		count -= rc;
 		written += rc;
 	}
-	return (ssize_t)written;
+	return (__ssz)written;
 }
 
 int tap_close(int fd)
