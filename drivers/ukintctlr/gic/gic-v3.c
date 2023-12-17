@@ -63,8 +63,8 @@
 	lcpu_get_current()->idx * GICR_STRIDE))
 
 #define GIC_AFF_TO_ROUTER(aff, mode)				\
-	((((uint64_t)(aff) << 8) & MPIDR_AFF3_MASK) | ((aff) & 0xffffff) | \
-	 ((uint64_t)(mode) << 31))
+	((((__u64)(aff) << 8) & MPIDR_AFF3_MASK) | ((aff) & 0xffffff) | \
+	 ((__u64)(mode) << 31))
 
 #ifdef CONFIG_HAVE_SMP
 __spinlock gicv3_dist_lock;
@@ -91,37 +91,37 @@ static const char * const gic_device_list[] __maybe_unused = {
 };
 
 /* Inline functions to access GICD & GICR registers */
-static inline void write_gicd8(uint64_t offset, uint8_t val)
+static inline void write_gicd8(__u64 offset, __u8 val)
 {
 	ioreg_write8(GIC_DIST_REG(gicv3_drv, offset), val);
 }
 
-static inline void write_gicrd8(uint64_t offset, uint8_t val)
+static inline void write_gicrd8(__u64 offset, __u8 val)
 {
 	ioreg_write8(GIC_RDIST_REG(gicv3_drv, offset), val);
 }
 
-static inline void write_gicd32(uint64_t offset, uint32_t val)
+static inline void write_gicd32(__u64 offset, __u32 val)
 {
 	ioreg_write32(GIC_DIST_REG(gicv3_drv, offset), val);
 }
 
-static inline void write_gicd64(uint64_t offset, uint64_t val)
+static inline void write_gicd64(__u64 offset, __u64 val)
 {
 	ioreg_write64(GIC_DIST_REG(gicv3_drv, offset), val);
 }
 
-static inline uint32_t read_gicd32(uint64_t offset)
+static inline __u32 read_gicd32(__u64 offset)
 {
 	return ioreg_read32(GIC_DIST_REG(gicv3_drv, offset));
 }
 
-static inline void write_gicrd32(uint64_t offset, uint32_t val)
+static inline void write_gicrd32(__u64 offset, __u32 val)
 {
 	ioreg_write32(GIC_RDIST_REG(gicv3_drv, offset), val);
 }
 
-static inline uint32_t read_gicrd32(uint64_t offset)
+static inline __u32 read_gicrd32(__u64 offset)
 {
 	return ioreg_read32(GIC_RDIST_REG(gicv3_drv, offset));
 }
@@ -131,9 +131,9 @@ static inline uint32_t read_gicrd32(uint64_t offset)
  *
  * @param offset Memory address of distributor or redistributor
  */
-static void wait_for_rwp(uint64_t offset)
+static void wait_for_rwp(__u64 offset)
 {
-	uint32_t val;
+	__u32 val;
 
 	do {
 		val = ioreg_read32((void *)(offset + GICD_CTLR));
@@ -144,19 +144,19 @@ static void wait_for_rwp(uint64_t offset)
 /**
  * Get affinity value for the calling CPU
  *
- * @return uint32_t (AFF3|AFF2|AFF1|AFF0)
+ * @return __u32 (AFF3|AFF2|AFF1|AFF0)
  */
-static uint32_t get_cpu_affinity(void)
+static __u32 get_cpu_affinity(void)
 {
-	uint64_t aff;
-	uint64_t mpidr = SYSREG_READ64(MPIDR_EL1);
+	__u64 aff;
+	__u64 mpidr = SYSREG_READ64(MPIDR_EL1);
 
 	aff = ((mpidr & MPIDR_AFF3_MASK) >> 8) |
 		(mpidr & MPIDR_AFF2_MASK) |
 		(mpidr & MPIDR_AFF1_MASK) |
 		(mpidr & MPIDR_AFF0_MASK);
 
-	return (uint32_t)aff;
+	return (__u32)aff;
 }
 #endif /* CONFIG_HAVE_SMP */
 
@@ -165,9 +165,9 @@ static uint32_t get_cpu_affinity(void)
  *
  * @return the ID of the signaled interrupt
  */
-static uint32_t gicv3_ack_irq(void)
+static __u32 gicv3_ack_irq(void)
 {
-	uint32_t irq;
+	__u32 irq;
 
 	irq = SYSREG_READ32(ICC_IAR1_EL1);
 	dsb(sy);
@@ -181,7 +181,7 @@ static uint32_t gicv3_ack_irq(void)
  * @param irq the ID of the interrupt to complete. Must be from a corresponding
  *    call to gicv3_ack_irq()
  */
-static void gicv3_eoi_irq(uint32_t irq)
+static void gicv3_eoi_irq(__u32 irq)
 {
 	/* Lower the priority */
 	SYSREG_WRITE32(ICC_EOIR1_EL1, irq);
@@ -197,7 +197,7 @@ static void gicv3_eoi_irq(uint32_t irq)
  *
  * @param irq interrupt number [0..GIC_MAX_IRQ]
  */
-static void gicv3_enable_irq(uint32_t irq)
+static void gicv3_enable_irq(__u32 irq)
 {
 	UK_ASSERT(irq <= GIC_MAX_IRQ);
 
@@ -208,8 +208,8 @@ static void gicv3_enable_irq(uint32_t irq)
 	 * of the core calling this function
 	 */
 	if (irq >= GIC_SPI_BASE) {
-		uint64_t aff = (uint64_t)get_cpu_affinity();
-		uint64_t irouter_val = GIC_AFF_TO_ROUTER(aff, 0);
+		__u64 aff = (__u64)get_cpu_affinity();
+		__u64 irouter_val = GIC_AFF_TO_ROUTER(aff, 0);
 
 		write_gicd64(GICD_IROUTER(irq), irouter_val);
 		uk_pr_debug("IRQ %d routed to 0x%lx (REG: 0x%lx)\n",
@@ -233,13 +233,13 @@ static void gicv3_enable_irq(uint32_t irq)
  * @sgintid the software generated interrupt id
  * @cpuid the id of the targeted cpu
  */
-static void gicv3_sgi_gen(uint8_t sgintid, uint32_t cpuid)
+static void gicv3_sgi_gen(__u8 sgintid, __u32 cpuid)
 {
-	uint64_t sgi_register = 0, control_register_rss, type_register_rss;
-	uint64_t range_selector = 0, extended_cpuid;
-	uint32_t aff0;
+	__u64 sgi_register = 0, control_register_rss, type_register_rss;
+	__u64 range_selector = 0, extended_cpuid;
+	__u32 aff0;
 
-	extended_cpuid = (uint64_t) cpuid;
+	extended_cpuid = (__u64) cpuid;
 
 	/* Only INTID 0-15 allocated to sgi */
 	UK_ASSERT(sgintid <= GICD_SGI_MAX_INITID);
@@ -279,7 +279,7 @@ static void gicv3_sgi_gen(uint8_t sgintid, uint32_t cpuid)
  *
  * @param irq interrupt number [0..GIC_MAX_IRQ]
  */
-static void gicv3_disable_irq(uint32_t irq)
+static void gicv3_disable_irq(__u32 irq)
 {
 	UK_ASSERT(irq <= GIC_MAX_IRQ);
 
@@ -302,7 +302,7 @@ static void gicv3_disable_irq(uint32_t irq)
  * @param affinity target CPU affinity in 32 bits format
  * (AFF3|AFF2|AFF1|AFF0), as returned by get_cpu_affinity()
  */
-static void gicv3_set_irq_affinity(uint32_t irq, uint32_t affinity)
+static void gicv3_set_irq_affinity(__u32 irq, __u32 affinity)
 {
 	UK_ASSERT(irq >= GIC_SPI_BASE && irq <= GIC_MAX_IRQ);
 
@@ -320,7 +320,7 @@ static void gicv3_set_irq_affinity(uint32_t irq, uint32_t affinity)
  *    (e.g., 0 and 1) map to the same effective value. Lower values correspond
  *    to higher priority
  */
-static void gicv3_set_irq_prio(uint32_t irq, uint8_t priority)
+static void gicv3_set_irq_prio(__u32 irq, __u8 priority)
 {
 	dist_lock(gicv3_drv);
 
@@ -339,9 +339,9 @@ static void gicv3_set_irq_prio(uint32_t irq, uint8_t priority)
  * @param trigger trigger type (UK_INTCTLR_IRQ_TRIGGER_*)
  */
 static
-void gicv3_set_irq_trigger(uint32_t irq, enum uk_intctlr_irq_trigger trigger)
+void gicv3_set_irq_trigger(__u32 irq, enum uk_intctlr_irq_trigger trigger)
 {
-	uint32_t val, mask, oldmask;
+	__u32 val, mask, oldmask;
 
 	UK_ASSERT(irq >= GIC_PPI_BASE && irq <= GIC_MAX_IRQ);
 	UK_ASSERT(trigger == UK_INTCTLR_IRQ_TRIGGER_EDGE ||
@@ -397,7 +397,7 @@ static void gicv3_disable_dist(void)
 /** Enable the redistributor */
 static void gicv3_init_redist(void)
 {
-	uint32_t i, val;
+	__u32 i, val;
 
 	/* Wake up CPU redistributor */
 	val  = read_gicrd32(GICR_WAKER);
@@ -454,8 +454,8 @@ static void gicv3_init_redist(void)
 /** Initialize the distributor */
 static void gicv3_init_dist(void)
 {
-	uint32_t val, irq_number;
-	uint32_t i;
+	__u32 val, irq_number;
+	__u32 i;
 
 	/* Disable the distributor */
 	gicv3_disable_dist();
@@ -477,8 +477,8 @@ static void gicv3_init_dist(void)
 
 #ifdef CONFIG_HAVE_SMP
 	/* Route all global SPIs to this CPU */
-	uint64_t aff = (uint64_t)get_cpu_affinity();
-	uint64_t irouter_val = GIC_AFF_TO_ROUTER(aff, 0);
+	__u64 aff = (__u64)get_cpu_affinity();
+	__u64 irouter_val = GIC_AFF_TO_ROUTER(aff, 0);
 
 	for (i = GIC_SPI_BASE; i < irq_number; i++)
 		write_gicd64(GICD_IROUTER(i), irouter_val);
@@ -509,7 +509,7 @@ static void gicv3_init_dist(void)
 
 static void gicv3_handle_irq(struct __regs *regs)
 {
-	uint32_t stat, irq;
+	__u32 stat, irq;
 
 	do {
 		stat = gicv3_ack_irq();

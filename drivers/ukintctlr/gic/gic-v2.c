@@ -82,27 +82,27 @@ static const char * const gic_device_list[] __maybe_unused = {
 };
 
 /* Inline functions to access GICC & GICD registers */
-static inline void write_gicd8(uint64_t offset, uint8_t val)
+static inline void write_gicd8(__u64 offset, __u8 val)
 {
 	ioreg_write8(GIC_DIST_REG(gicv2_drv, offset), val);
 }
 
-static inline void write_gicd32(uint64_t offset, uint32_t val)
+static inline void write_gicd32(__u64 offset, __u32 val)
 {
 	ioreg_write32(GIC_DIST_REG(gicv2_drv, offset), val);
 }
 
-static inline uint32_t read_gicd32(uint64_t offset)
+static inline __u32 read_gicd32(__u64 offset)
 {
 	return ioreg_read32(GIC_DIST_REG(gicv2_drv, offset));
 }
 
-static inline void write_gicc32(uint64_t offset, uint32_t val)
+static inline void write_gicc32(__u64 offset, __u32 val)
 {
 	ioreg_write32(GIC_CPU_REG(gicv2_drv, offset), val);
 }
 
-static inline uint32_t read_gicc32(uint64_t offset)
+static inline __u32 read_gicc32(__u64 offset)
 {
 	return ioreg_read32(GIC_CPU_REG(gicv2_drv, offset));
 }
@@ -124,7 +124,7 @@ static void gicv2_enable_cpuif(void)
  *    may not support all levels. For example, if only 128 levels are supported
  *    every two levels (e.g., 0 and 1) map to the same effective value
  */
-static void gicv2_set_threshold_priority(uint32_t priority)
+static void gicv2_set_threshold_priority(__u32 priority)
 {
 	/* GICC_PMR allocate 1 byte for each IRQ */
 	UK_ASSERT(priority <= GICC_PMR_PRIO_MAX);
@@ -137,7 +137,7 @@ static void gicv2_set_threshold_priority(uint32_t priority)
  * @return the ID of the signaled interrupt in bits [0..9] and for SGIs in
  *    a multiprocessor system the originating CPU's ID in bits [10..12]
  */
-static uint32_t gicv2_ack_irq(void)
+static __u32 gicv2_ack_irq(void)
 {
 	return read_gicc32(GICC_IAR);
 }
@@ -153,7 +153,7 @@ static uint32_t gicv2_ack_irq(void)
  *    the ID of the CPU that requested the interrupt in bits [10..12]. Must
  *    correspond to the last value read with ack_irq()
  */
-static void gicv2_eoi_irq(uint32_t eoir)
+static void gicv2_eoi_irq(__u32 eoir)
 {
 	write_gicc32(GICC_EOIR, eoir);
 }
@@ -168,10 +168,10 @@ static void gicv2_eoi_irq(uint32_t eoir)
  * @param targetlist an 8-bit bitmap with 1 bit per CPU 0-7. A `1` bit
  *    indicates that the SGI should be forwarded to the respective CPU
  */
-static void gicv2_sgi_gen(uint32_t sgintid, enum sgi_filter targetfilter,
-			  uint8_t targetlist)
+static void gicv2_sgi_gen(__u32 sgintid, enum sgi_filter targetfilter,
+			  __u8 targetlist)
 {
-	uint32_t val;
+	__u32 val;
 
 	UK_ASSERT(sgintid <= GICD_SGI_MAX_INITID);
 	UK_ASSERT(targetfilter < GICD_SGI_FILTER_MAX);
@@ -198,7 +198,7 @@ static void gicv2_sgi_gen(uint32_t sgintid, enum sgi_filter targetfilter,
  * @param targetlist an 8-bit bitmap with 1 bit per CPU 0-7. A `1` bit
  *    indicates that the SGI should be forwarded to the respective CPU
  */
-void gicv2_sgi_gen_to_list(uint32_t sgintid, uint8_t targetlist)
+void gicv2_sgi_gen_to_list(__u32 sgintid, __u8 targetlist)
 {
 	unsigned long irqf;
 
@@ -210,16 +210,16 @@ void gicv2_sgi_gen_to_list(uint32_t sgintid, uint8_t targetlist)
 /**
  * Forward the SGI to the CPU specified by cpuid.
  */
-static void gicv2_sgi_gen_to_cpu(uint8_t sgintid, uint32_t cpuid)
+static void gicv2_sgi_gen_to_cpu(__u8 sgintid, __u32 cpuid)
 {
-	gicv2_sgi_gen_to_list((uint32_t) sgintid, (uint8_t) (1 << (cpuid % 8)));
+	gicv2_sgi_gen_to_list((__u32) sgintid, (__u8) (1 << (cpuid % 8)));
 }
 
 /**
  * Forward the SGI to all CPU interfaces except the one of the processor that
  * requested the interrupt.
  */
-void gicv2_sgi_gen_to_others(uint32_t sgintid)
+void gicv2_sgi_gen_to_others(__u32 sgintid)
 {
 	unsigned long irqf;
 
@@ -232,7 +232,7 @@ void gicv2_sgi_gen_to_others(uint32_t sgintid)
  * Forward the SGI only to the CPU interface of the processor that requested
  * the interrupt.
  */
-void gicv2_sgi_gen_to_self(uint32_t sgintid)
+void gicv2_sgi_gen_to_self(__u32 sgintid)
 {
 	gicv2_sgi_gen(sgintid, GICD_SGI_FILTER_TO_SELF, 0);
 }
@@ -244,13 +244,13 @@ void gicv2_sgi_gen_to_self(uint32_t sgintid)
  * @param targetlist an 8-bit bitmap with 1 bit per CPU 0-7. A `1` bit
  *    indicates that the SGI should be forwarded to the respective CPU
  */
-static void gicv2_set_irq_target(uint32_t irq, uint32_t targetlist)
+static void gicv2_set_irq_target(__u32 irq, __u32 targetlist)
 {
 	UK_ASSERT(irq >= GIC_SPI_BASE && irq <= GIC_MAX_IRQ);
 	UK_ASSERT(targetlist <= __U8_MAX);
 
 	dist_lock(gicv2_drv);
-	write_gicd8(GICD_ITARGETSR(irq), (uint8_t)targetlist);
+	write_gicd8(GICD_ITARGETSR(irq), (__u8)targetlist);
 	dist_unlock(gicv2_drv);
 }
 
@@ -263,7 +263,7 @@ static void gicv2_set_irq_target(uint32_t irq, uint32_t targetlist)
  *    (e.g., 0 and 1) map to the same effective value. Lower values correspond
  *    to higher priority
  */
-static void gicv2_set_irq_prio(uint32_t irq, uint8_t priority)
+static void gicv2_set_irq_prio(__u32 irq, __u8 priority)
 {
 	UK_ASSERT(irq <= GIC_MAX_IRQ);
 
@@ -277,7 +277,7 @@ static void gicv2_set_irq_prio(uint32_t irq, uint8_t priority)
  *
  * @param irq interrupt number [0..GIC_MAX_IRQ]
  */
-static void gicv2_enable_irq(uint32_t irq)
+static void gicv2_enable_irq(__u32 irq)
 {
 	UK_ASSERT(irq <= GIC_MAX_IRQ);
 
@@ -291,7 +291,7 @@ static void gicv2_enable_irq(uint32_t irq)
  *
  * @param irq interrupt number [0..GIC_MAX_IRQ]
  */
-static void gicv2_disable_irq(uint32_t irq)
+static void gicv2_disable_irq(__u32 irq)
 {
 	UK_ASSERT(irq <= GIC_MAX_IRQ);
 
@@ -326,9 +326,9 @@ static void gicv2_disable_dist(void)
  * @param trigger trigger type (UK_INTCTLR_IRQ_TRIGGER_*)
  */
 static
-void gicv2_set_irq_trigger(uint32_t irq, enum uk_intctlr_irq_trigger trigger)
+void gicv2_set_irq_trigger(__u32 irq, enum uk_intctlr_irq_trigger trigger)
 {
-	uint32_t val, mask, oldmask;
+	__u32 val, mask, oldmask;
 
 	UK_ASSERT(irq >= GIC_PPI_BASE && irq <= GIC_MAX_IRQ);
 	UK_ASSERT(trigger == UK_INTCTLR_IRQ_TRIGGER_EDGE ||
@@ -363,7 +363,7 @@ EXIT_UNLOCK:
 
 static void gicv2_handle_irq(struct __regs *regs)
 {
-	uint32_t stat, irq;
+	__u32 stat, irq;
 
 	do {
 		stat = gicv2_ack_irq();
@@ -395,8 +395,8 @@ static void gicv2_handle_irq(struct __regs *regs)
 
 static void gicv2_init_dist(void)
 {
-	uint32_t val, cpuif_number, irq_number;
-	uint32_t i;
+	__u32 val, cpuif_number, irq_number;
+	__u32 i;
 
 	/* Turn off distributor */
 	gicv2_disable_dist();
@@ -440,7 +440,7 @@ static void gicv2_init_dist(void)
 
 static void gicv2_init_cpuif(void)
 {
-	uint32_t i;
+	__u32 i;
 
 	/* Set priority threshold to the lowest to make all IRQs visible to
 	 * the CPU interface. Note: Higher priority corresponds to a lower
