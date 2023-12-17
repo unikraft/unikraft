@@ -127,7 +127,7 @@ static int vpci_legacy_notify(struct virtio_dev *vdev, __u16 queue_id)
 static int virtio_pci_handle(void *arg)
 {
 	struct virtio_pci_dev *d = (struct virtio_pci_dev *) arg;
-	uint8_t isr_status;
+	__u8 isr_status;
 	struct virtqueue *vq;
 	int rc = 0;
 
