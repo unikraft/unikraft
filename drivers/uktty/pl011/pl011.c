@@ -90,7 +90,7 @@ static void init_pl011(__u64 bas)
 
 	/* Mask all interrupts */
 	PL011_REG_WRITE(REG_UARTIMSC_OFFSET,
-		PL011_REG_READ(REG_UARTIMSC_OFFSET) & 0xf800);
+			PL011_REG_READ(REG_UARTIMSC_OFFSET) & 0xf800);
 
 	/* Clear all interrupts */
 	PL011_REG_WRITE(REG_UARTICR_OFFSET, 0x07ff);
@@ -100,7 +100,8 @@ static void init_pl011(__u64 bas)
 
 	/* Select 8-bits data transmit and receive */
 	PL011_REG_WRITE(REG_UARTLCR_H_OFFSET,
-		(PL011_REG_READ(REG_UARTLCR_H_OFFSET) & 0xff00) | LCR_H_WLEN8);
+			(PL011_REG_READ(REG_UARTLCR_H_OFFSET) & 0xff00) |
+			 LCR_H_WLEN8);
 
 	/* Just enable UART and data transmit/receive */
 	PL011_REG_WRITE(REG_UARTCR_OFFSET, CR_TXE | CR_UARTEN);
@@ -179,7 +180,7 @@ static int pl011_getc(void)
 	if (PL011_REG_READ(REG_UARTFR_OFFSET) & FR_RXFE)
 		return -1;
 
-	return (int) (PL011_REG_READ(REG_UARTDR_OFFSET) & 0xff);
+	return (int)(PL011_REG_READ(REG_UARTDR_OFFSET) & 0xff);
 }
 
 int ukplat_coutk(const char *buf, unsigned int len)
@@ -195,9 +196,9 @@ int ukplat_cink(char *buf, unsigned int maxlen)
 	unsigned int num = 0;
 
 	while (num < maxlen && (ret = pl011_getc()) >= 0) {
-		*(buf++) = (char) ret;
+		*(buf++) = (char)ret;
 		num++;
 	}
 
-	return (int) num;
+	return (int)num;
 }
