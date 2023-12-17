@@ -102,6 +102,7 @@ config KVM_VMM_FIRECRACKER
 	select KVM_BOOT_PROTO_LXBOOT
 	select HAVE_MMIO
 	select VIRTIO_MMIO_LINUX_COMPAT_CMDLINE
+	imply LIBUKTTY_NS16550 if ARCH_ARM_64
 	imply LIBUKINTCTLR_GICV3 if ARCH_ARM_64
 	depends on ARCH_X86_64 || ARCH_ARM_64
 
@@ -139,12 +140,8 @@ config KVM_KERNEL_SERIAL_CONSOLE
 
 if (KVM_KERNEL_SERIAL_CONSOLE || KVM_DEBUG_SERIAL_CONSOLE)
 
-config UART_NS16550
-	bool "8250 / NS16550"
-	depends on ARCH_ARM_64
-
-menu "Serial console configuration"
 if ARCH_X86_64
+menu "Serial console configuration"
 choice
 	prompt "Baudrate"
 	default KVM_SERIAL_BAUD_115200
@@ -161,33 +158,9 @@ choice
 	config KVM_SERIAL_BAUD_19200
 		bool "19200"
 endchoice
+endmenu
 endif
 
-config EARLY_UART_NS16550
-	bool "Early console"
-	depends on UART_NS16550
-	default n
-
-config EARLY_UART_NS16550_BASE
-	hex "Early debug console ns16550 serial address"
-	depends on EARLY_UART_NS16550
-	help
-		NS16550 serial address used by early debug console.
-
-config UART_NS16550_REG_SHIFT
-	int "NS16550 serial register shift"
-	depends on UART_NS16550
-	default 0
-	help
-		NS16550 serial register shift.
-
-config UART_NS16550_REG_WIDTH
-	int "NS165500 serial register width"
-	depends on UART_NS16550
-	default 1
-	help
-		NS16550 serial register width.
-endmenu
 endif
 
 endmenu

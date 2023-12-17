@@ -31,7 +31,6 @@
 #include <uk/config.h>
 #include <uk/plat/console.h>
 #include <uk/assert.h>
-#include <arm/cpu.h>
 
 #define NS16550_THR_OFFSET	0x00U
 #define NS16550_RBR_OFFSET	0x00U
@@ -57,19 +56,19 @@
  * use ns16550_uart_initialized as an extra variable to check
  * whether the UART has been initialized.
  */
-#if defined(CONFIG_EARLY_UART_NS16550)
+#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE
 static uint8_t ns16550_uart_initialized = 1;
-static uint64_t ns16550_uart_base = CONFIG_EARLY_UART_NS16550_BASE;
-#else
+static uint64_t ns16550_uart_base = CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE;
+#else /* !CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE */
 static uint8_t ns16550_uart_initialized;
 static uint64_t ns16550_uart_base;
-#endif
+#endif /* !CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE */
 
 /* The register shift. Default is 0 (device-tree spec v0.4 Sect. 4.2.2) */
-static uint32_t ns16550_reg_shift = CONFIG_UART_NS16550_REG_SHIFT;
+static uint32_t ns16550_reg_shift = CONFIG_LIBUKTTY_NS16550_REG_SHIFT;
 
 /* The register width. Default is 1 (8-bit register width) */
-static uint32_t ns16550_reg_width = CONFIG_UART_NS16550_REG_WIDTH;
+static uint32_t ns16550_reg_width = CONFIG_LIBUKTTY_NS16550_REG_WIDTH;
 
 /* Macros to access ns16550 registers with base address and reg shift */
 #define NS16550_REG(r) (ns16550_uart_base + (r << ns16550_reg_shift))
@@ -190,7 +189,7 @@ static void ns16550_putc(char a)
 {
 	/*
 	 * Avoid using the UART before base address initialized, or
-	 * if CONFIG_EARLY_UART_NS16550 is not enabled.
+	 * if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE is not enabled.
 	 */
 	if (!ns16550_uart_initialized)
 		return;
@@ -205,7 +204,7 @@ static int ns16550_getc(void)
 {
 	/*
 	 * Avoid using the UART before base address initialized, or
-	 * if CONFIG_EARLY_UART_NS16550 is not enabled.
+	 * if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE is not enabled.
 	 */
 	if (!ns16550_uart_initialized)
 		return -1;
