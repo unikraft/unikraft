@@ -128,7 +128,7 @@ void pl011_console_init(const void *dtb)
 		UK_CRASH("Could not find proper size cells!\n");
 
 	regs = fdt_getprop(dtb, offset, "reg", &len);
-	if (regs == NULL || (len < (int)sizeof(fdt32_t) * (naddr + nsize)))
+	if (!regs || (len < (int)sizeof(fdt32_t) * (naddr + nsize)))
 		UK_CRASH("Bad 'reg' property: %p %d\n", regs, len);
 
 	reg_uart_bas = fdt64_to_cpu(regs[0]);
