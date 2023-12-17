@@ -54,7 +54,7 @@ extern "C" {
 #define UK_MAX_VIRTIO_MMIO_DEVICE (0x2)
 
 struct pf_device_id {
-	uint16_t device_id;
+	__u16 device_id;
 };
 
 struct device_match_table {
@@ -91,8 +91,8 @@ struct pf_device {
 	enum pf_device_state state;
 
 	int fdt_offset;	/* The start offset of fdt node for device */
-	uint64_t base;
-	size_t size;
+	__u64 base;
+	__sz size;
 	unsigned long irq;
 };
 UK_TAILQ_HEAD(pf_device_list, struct pf_device);
