@@ -135,7 +135,9 @@ void pl011_console_init(const void *dtb)
 	uk_pr_info("Found PL011 UART on: 0x%lx\n", reg_uart_bas);
 
 	init_pl011(reg_uart_bas);
+
 	uk_pr_info("PL011 UART initialized\n");
+	pl011_uart_initialized = 1;
 }
 
 int ukplat_coutd(const char *str, __u32 len)
