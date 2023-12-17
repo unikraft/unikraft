@@ -13,7 +13,7 @@ on:
 jobs:
   libc-test:
     name: libc-test
-    runs-on: ubuntu-latest
+    runs-on: [upb, qemu, X64, run-qemu]
     strategy:
       fail-fast: false
       matrix:
@@ -98,7 +98,7 @@ jobs:
 
   self-test:
     name: self-test
-    runs-on: ubuntu-latest
+    runs-on: [upb, qemu, X64, run-qemu]
     strategy:
       fail-fast: false
       matrix:
@@ -145,7 +145,7 @@ jobs:
 
   helloworld:
     name: helloworld
-    runs-on: ubuntu-latest
+    runs-on: [upb, X64, build-any]
     strategy:
       fail-fast: false
       matrix:
