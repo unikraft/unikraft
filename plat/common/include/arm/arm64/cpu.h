@@ -71,12 +71,12 @@ struct fpsimd_state {
 	__u32		fpcr;
 };
 
-extern void fpsimd_save_state(uintptr_t ptr);
-extern void fpsimd_restore_state(uintptr_t ptr);
+extern void fpsimd_save_state(__uptr ptr);
+extern void fpsimd_restore_state(__uptr ptr);
 
 static inline void save_extregs(void *ectx)
 {
-	fpsimd_save_state((uintptr_t) ectx);
+	fpsimd_save_state((__uptr) ectx);
 
 	/* make sure sysreg writing takes effects */
 	isb();
@@ -84,7 +84,7 @@ static inline void save_extregs(void *ectx)
 
 static inline void restore_extregs(void *ectx)
 {
-	fpsimd_restore_state((uintptr_t) ectx);
+	fpsimd_restore_state((__uptr) ectx);
 
 	/* make sure sysreg writing takes effects */
 	isb();

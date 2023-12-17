@@ -48,7 +48,7 @@ static const char * const arch_timer_list[] = {
 	NULL
 };
 
-static uint32_t timer_irq;
+static __u32 timer_irq;
 static void *dtb;
 
 void generic_timer_mask_irq(void)
@@ -67,10 +67,10 @@ void generic_timer_unmask_irq(void)
 	isb();
 }
 
-uint32_t generic_timer_get_frequency(int fdt_timer)
+__u32 generic_timer_get_frequency(int fdt_timer)
 {
 	int len;
-	const uint64_t *fdt_freq;
+	const __u64 *fdt_freq;
 
 	/*
 	* On a few platforms the frequency is not configured correctly
@@ -149,7 +149,7 @@ void ukplat_time_init(void)
 	generic_timer_enable();
 }
 
-uint32_t ukplat_time_get_irq(void)
+__u32 ukplat_time_get_irq(void)
 {
 	return timer_irq;
 }

@@ -37,23 +37,23 @@
 #include <uk/plat/common/cpu.h>
 #include <arm/time.h>
 
-static uint64_t boot_ticks;
-static uint32_t counter_freq;
+static __u64 boot_ticks;
+static __u32 counter_freq;
 
 /* Shift factor for converting ticks to ns */
-static uint8_t counter_shift_to_ns;
+static __u8 counter_shift_to_ns;
 
 /* Shift factor for converting ns to ticks */
-static uint8_t counter_shift_to_tick;
+static __u8 counter_shift_to_tick;
 
 /* Multiplier for converting counter ticks to nsecs */
-static uint32_t ns_per_tick;
+static __u32 ns_per_tick;
 
 /* Multiplier for converting nsecs to counter ticks */
-static uint32_t tick_per_ns;
+static __u32 tick_per_ns;
 
 /* Total (absolute) number of nanoseconds per tick */
-static uint64_t tot_ns_per_tick;
+static __u64 tot_ns_per_tick;
 
 /*
  * The maximum time range in seconds which can be converted by multiplier
@@ -64,12 +64,12 @@ static uint64_t tot_ns_per_tick;
  */
 #define __MAX_CONVERT_SECS	(3600UL)
 #define __MAX_CONVERT_NS	(3600UL*NSEC_PER_SEC)
-static uint64_t max_convert_ticks;
+static __u64 max_convert_ticks;
 
 /* How many nanoseconds per second */
 #define NSEC_PER_SEC ukarch_time_sec_to_nsec(1)
 
-static inline uint64_t ticks_to_ns(uint64_t ticks)
+static inline __u64 ticks_to_ns(__u64 ticks)
 {
 	if (ticks > max_convert_ticks) {
 		/* We have reached the maximum number of ticks to convert using
@@ -81,7 +81,7 @@ static inline uint64_t ticks_to_ns(uint64_t ticks)
 	}
 }
 
-static inline uint64_t ns_to_ticks(uint64_t ns)
+static inline __u64 ns_to_ticks(__u64 ns)
 {
 	if (ns > __MAX_CONVERT_NS) {
 		/* We have reached the maximum number of ns to convert using the
@@ -96,17 +96,17 @@ static inline uint64_t ns_to_ticks(uint64_t ns)
 /*
  * Calculate multiplier/shift factors for scaled math.
  */
-static void calculate_mult_shift(uint32_t *mult, uint8_t *shift,
-		uint64_t from, uint64_t to)
+static void calculate_mult_shift(__u32 *mult, __u8 *shift,
+		__u64 from, __u64 to)
 {
-	uint64_t tmp;
-	uint32_t sft, sftacc = 32;
+	__u64 tmp;
+	__u32 sft, sftacc = 32;
 
 	/*
 	 * Calculate the shift factor which is limiting the conversion
 	 * range:
 	 */
-	tmp = ((uint64_t)__MAX_CONVERT_SECS * from) >> 32;
+	tmp = ((__u64)__MAX_CONVERT_SECS * from) >> 32;
 	while (tmp) {
 		tmp >>= 1;
 		sftacc--;
@@ -117,13 +117,13 @@ static void calculate_mult_shift(uint32_t *mult, uint8_t *shift,
 	 * Calculate shift factor (S) and scaling multiplier (M).
 	 *
 	 * (S) needs to be the largest shift factor (<= max_shift) where
-	 * the result of the M calculation below fits into uint32_t
+	 * the result of the M calculation below fits into __u32
 	 * without truncation.
 	 *
 	 * multiplier = (target << shift) / source
 	 */
 	for (sft = 32; sft > 0; sft--) {
-		tmp = (uint64_t) to << sft;
+		tmp = (__u64) to << sft;
 
 		/* Ensuring we round to nearest when calculating the
 		 * multiplier
@@ -153,7 +153,7 @@ static inline void generic_timer_disable(void)
 	isb();
 }
 
-static inline void generic_timer_update_compare(uint64_t new_val)
+static inline void generic_timer_update_compare(__u64 new_val)
 {
 	set_el0(cntv_cval, new_val);
 
@@ -171,16 +171,16 @@ static inline void generic_timer_update_compare(uint64_t new_val)
  * the two read values. If bit[32] is different, keep the first value,
  * otherwise keep the second value.
  */
-uint64_t generic_timer_get_ticks(void)
+__u64 generic_timer_get_ticks(void)
 {
-	uint64_t val_1st, val_2nd;
+	__u64 val_1st, val_2nd;
 
 	val_1st = get_el0(cntvct);
 	val_2nd = get_el0(cntvct);
 	return (((val_1st ^ val_2nd) >> 32) & 1) ? val_1st : val_2nd;
 }
 #else
-uint64_t generic_timer_get_ticks(void)
+__u64 generic_timer_get_ticks(void)
 {
 	return get_el0(cntvct);
 }
@@ -203,12 +203,12 @@ static inline __nsec generic_timer_monotonic(void)
 /*
  * Return epoch offset (wall time offset to monotonic clock start).
  */
-static inline uint64_t generic_timer_epochoffset(void)
+static inline __u64 generic_timer_epochoffset(void)
 {
 	return 0;
 }
 
-static inline __nsec generic_timer_monotonic_ticks(uint64_t *ticks)
+static inline __nsec generic_timer_monotonic_ticks(__u64 *ticks)
 {
 	*ticks = generic_timer_get_ticks();
 	return ticks_to_ns(*ticks - boot_ticks);
@@ -225,9 +225,9 @@ static inline __nsec generic_timer_monotonic_ticks(uint64_t *ticks)
  * kind of mutex_lock. It will simply halt the cpu, not allowing any
  * other thread to execute.
  */
-void generic_timer_cpu_block_until(uint64_t until_ns)
+void generic_timer_cpu_block_until(__u64 until_ns)
 {
-	uint64_t now_ns, now_ticks, until_ticks;
+	__u64 now_ns, now_ticks, until_ticks;
 
 	UK_ASSERT(ukplat_lcpu_irqs_disabled());
 
