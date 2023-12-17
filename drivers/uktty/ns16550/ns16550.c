@@ -150,18 +150,18 @@ void ns16550_console_init(const void *dtb)
 		UK_CRASH("Could not find proper size cells!\n");
 
 	regs = fdt_getprop(dtb, offset, "reg", &len);
-	if (regs == NULL || (len < (int)sizeof(fdt32_t) * (naddr + nsize)))
+	if (!regs || (len < (int)sizeof(fdt32_t) * (naddr + nsize)))
 		UK_CRASH("Bad 'reg' property: %p %d\n", regs, len);
 
 	reg_uart_base = fdt64_to_cpu(regs[0]);
 	uk_pr_info("Found NS16550 UART on: 0x%lx\n", reg_uart_base);
 
 	regs = fdt_getprop(dtb, offset, "reg-shift", &len);
-	if (regs != NULL)
+	if (regs)
 		ns16550_reg_shift = fdt32_to_cpu(regs[0]);
 
 	regs = fdt_getprop(dtb, offset, "reg-io-width", &len);
-	if (regs != NULL)
+	if (regs)
 		ns16550_reg_width = fdt32_to_cpu(regs[0]);
 
 	init_ns16550(reg_uart_base);
