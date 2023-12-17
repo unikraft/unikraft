@@ -62,7 +62,7 @@
 	(((~0ULL) >> (UK_BITS_PER_LONG_LONG - (h) - 1)) & ((~0ULL) << (l)))
 #define BITS_PER_BYTE  8
 
-#define	uk_hweight8(x)	uk_bitcount((uint8_t)(x))
+#define	uk_hweight8(x)	uk_bitcount((__u8)(x))
 #define	uk_hweight16(x)	uk_bitcount16(x)
 #define	uk_hweight32(x)	uk_bitcount32(x)
 #define	uk_hweight64(x)	uk_bitcount64(x)

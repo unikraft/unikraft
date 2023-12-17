@@ -43,7 +43,7 @@ extern "C" {
 
 void ukplat_time_init(void);
 void ukplat_time_fini(void);
-uint32_t ukplat_time_get_irq(void);
+__u32 ukplat_time_get_irq(void);
 
 __nsec ukplat_time_get_ticks(void);
 __nsec ukplat_monotonic_clock(void);
