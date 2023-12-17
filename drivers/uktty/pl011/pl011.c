@@ -19,6 +19,7 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 #include <libfdt.h>
+#include <uk/bitops.h>
 #include <uk/plat/console.h>
 #include <uk/assert.h>
 
@@ -32,8 +33,8 @@
 
 /* Flag register */
 #define REG_UARTFR_OFFSET	0x18
-#define FR_TXFF			(1 << 5)    /* Transmit FIFO/reg full */
-#define FR_RXFE			(1 << 4)    /* Receive FIFO/reg empty */
+#define FR_TXFF			UK_BIT(5)    /* Transmit FIFO/reg full */
+#define FR_RXFE			UK_BIT(4)    /* Receive FIFO/reg empty */
 
 /* Integer baud rate register */
 #define REG_UARTIBRD_OFFSET	0x24
@@ -46,9 +47,9 @@
 
 /* Control register */
 #define REG_UARTCR_OFFSET	0x30
-#define CR_RXE			(1 << 9)    /* Receive enable */
-#define CR_TXE			(1 << 8)    /* Transmit enable */
-#define CR_UARTEN		(1 << 0)    /* UART enable */
+#define CR_RXE			UK_BIT(9)    /* Receive enable */
+#define CR_TXE			UK_BIT(8)    /* Transmit enable */
+#define CR_UARTEN		UK_BIT(0)    /* UART enable */
 
 /* Interrupt FIFO level select register */
 #define REG_UARTIFLS_OFFSET	0x34
