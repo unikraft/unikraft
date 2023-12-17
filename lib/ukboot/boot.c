@@ -442,7 +442,6 @@ static inline int do_main(int argc, char *argv[])
 	char **envp;
 #endif /* CONFIG_LIBPOSIX_ENVIRON */
 	int ret;
-	int i;
 
 	/*
 	 * Application
@@ -488,7 +487,7 @@ static inline int do_main(int argc, char *argv[])
 #endif /* CONFIG_LIBPOSIX_ENVIRON */
 
 	uk_pr_info("Calling main(%d, [", argc);
-	for (i = 0; i < argc; ++i) {
+	for (int i = 0; i < argc; ++i) {
 		uk_pr_info("'%s'", argv[i]);
 		if ((i + 1) < argc)
 			uk_pr_info(", ");
