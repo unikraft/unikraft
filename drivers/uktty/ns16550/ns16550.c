@@ -119,11 +119,13 @@ static void init_ns16550(__u64 base)
 
 	/* Disable all interrupts */
 	ns16550_reg_write(NS16550_IER_OFFSET,
-		ns16550_reg_read(NS16550_FCR_OFFSET) & ~(NS16550_IIR_NO_INT));
+			  ns16550_reg_read(NS16550_FCR_OFFSET) &
+					 ~(NS16550_IIR_NO_INT));
 
 	/* Disable FIFOs */
 	ns16550_reg_write(NS16550_FCR_OFFSET,
-		ns16550_reg_read(NS16550_FCR_OFFSET) & ~(NS16550_FCR_FIFO_EN));
+			  ns16550_reg_read(NS16550_FCR_OFFSET) &
+					 ~(NS16550_FCR_FIFO_EN));
 }
 
 void ns16550_console_init(const void *dtb)
@@ -233,9 +235,9 @@ int ukplat_cink(char *buf, unsigned int maxlen)
 	unsigned int num = 0;
 
 	while (num < maxlen && (ret = ns16550_getc()) >= 0) {
-		*(buf++) = (char) ret;
+		*(buf++) = (char)ret;
 		num++;
 	}
 
-	return (int) num;
+	return (int)num;
 }
