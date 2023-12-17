@@ -1,0 +1,29 @@
+menuconfig LIBUKTTY_NS16550
+	bool "NS16550 / 8250"
+	default n
+	depends on ARCH_ARM_64
+
+if LIBUKTTY_NS16550
+menuconfig LIBUKTTY_NS16550_EARLY_CONSOLE
+	bool "Early console"
+	default n
+
+if LIBUKTTY_NS16550_EARLY_CONSOLE
+config LIBUKTTY_EARLY_PRINT_NS16550_CONSOLE_BASE
+	hex "Early console address"
+endif
+
+config LIBUKTTY_NS16550_REG_SHIFT
+	int "NS16550 serial register shift"
+	depends on LIBUKTTY_NS16550
+	default 0
+	help
+		NS16550 serial register shift.
+
+config LIBUKTTY_NS16550_REG_WIDTH
+	int "NS165500 serial register width"
+	depends on LIBUKTTY_NS16550
+	default 1
+	help
+		NS16550 serial register width.
+endif

@@ -27,12 +27,12 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef __NS16550_H__
-#define __NS16550_H__
+#ifndef __UK_TTY_NS16550_H__
+#define __UK_TTY_NS16550_H__
 
 /**
  * Initialize the ns16550 console driver
  */
 void ns16550_console_init(void *dtb);
 
-#endif
+#endif /* __UK_TTY_NS16550_H__ */
