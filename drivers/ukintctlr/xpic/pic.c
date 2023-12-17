@@ -22,7 +22,7 @@
  */
 /* Taken from solo5 platform_intr.c */
 
-#include <uk/asm/arch.h>
+#include <uk/arch/lcpu.h>
 #include <uk/essentials.h>
 #include <uk/intctlr.h>
 #include <x86/cpu.h>

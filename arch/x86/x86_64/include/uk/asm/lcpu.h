@@ -32,6 +32,8 @@
 #error Do not include this header directly
 #endif
 
+#include <uk/asm/arch.h>
+
 #define CACHE_LINE_SIZE	64
 
 #define __REGS_OFFSETOF_PAD       0
