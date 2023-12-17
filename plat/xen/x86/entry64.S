@@ -25,7 +25,7 @@
 
 #include <uk/arch/types.h>
 #include <uk/arch/limits.h>
-#include <x86/cpu_defs.h>
+#include <uk/arch/lcpu.h>
 #include <x86/traps.h>
 #include <uk/config.h>
 #include <xen/xen.h>
