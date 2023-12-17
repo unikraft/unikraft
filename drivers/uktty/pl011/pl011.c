@@ -69,20 +69,21 @@
  * use pl011_uart_initialized as an extra variable to check
  * whether the UART has been initialized.
  */
+
 #if defined(CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE)
-static uint8_t pl011_uart_initialized = 1;
-static uint64_t pl011_uart_bas = CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE;
+static __u8 pl011_uart_initialized = 1;
+static __u64 pl011_uart_bas = CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE;
 #else /* !CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE */
-static uint8_t pl011_uart_initialized;
-static uint64_t pl011_uart_bas;
+static __u8 pl011_uart_initialized;
+static __u64 pl011_uart_bas;
 #endif /* !CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE */
 
 /* Macros to access PL011 Registers with base address */
-#define PL011_REG(r)		((uint16_t *)(pl011_uart_bas + (r)))
+#define PL011_REG(r)		((__u16 *)(pl011_uart_bas + (r)))
 #define PL011_REG_READ(r)	ioreg_read16(PL011_REG(r))
 #define PL011_REG_WRITE(r, v)	ioreg_write16(PL011_REG(r), v)
 
-static void init_pl011(uint64_t bas)
+static void init_pl011(__u64 bas)
 {
 	pl011_uart_bas = bas;
 
@@ -107,8 +108,8 @@ static void init_pl011(uint64_t bas)
 void pl011_console_init(const void *dtb)
 {
 	int offset, len, naddr, nsize;
-	const uint64_t *regs;
-	uint64_t reg_uart_bas;
+	const __u64 *regs;
+	__u64 reg_uart_bas;
 
 	uk_pr_info("Serial initializing\n");
 
@@ -135,7 +136,7 @@ void pl011_console_init(const void *dtb)
 	uk_pr_info("PL011 UART initialized\n");
 }
 
-int ukplat_coutd(const char *str, uint32_t len)
+int ukplat_coutd(const char *str, __u32 len)
 {
 	return ukplat_coutk(str, len);
 }
