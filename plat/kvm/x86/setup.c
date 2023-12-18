@@ -47,50 +47,6 @@
  * @return
  *   A pointer to the allocated memory on success, NULL otherwise
  */
-
-// static inline void _init_mem(struct uk_bootinfo *bi)
-// {
-// #ifdef CONFIG_RUNTIME_ASLR
-// 	int ASLR_offset;
-// 	int divisor = 1;
-// 	/*
-// 	 * Since we can't modify __STACK_SIZE which is a macro, we place first the 
-// 	 * stack and then the heap. 
-// 	 */
-// 	ASLR_offset = uk_swrand_randr() % (bi->max_addr/4);
-// 	_libkvmplat_cfg.bstack.end = ALIGN_UP(bi->max_addr - ASLR_offset, __PAGE_SIZE);
-// 	_libkvmplat_cfg.bstack.start   = _libkvmplat_cfg.bstack.end-__STACK_SIZE;
-// 	_libkvmplat_cfg.bstack.len   = __STACK_SIZE;
-	
-// 	uk_pr_info(" ASLR - Stack : s: %p e: %p\n",_libkvmplat_cfg.bstack.start,
-// 	_libkvmplat_cfg.bstack.end);
-	
-// 	do{
-// 	ASLR_offset = uk_swrand_randr() % (bi->max_addr/(4*divisor));
-// 	_libkvmplat_cfg.heap.start = ALIGN_UP((uintptr_t) __END+ASLR_offset, __PAGE_SIZE);
-// 	divisor++;
-// 	}
-// 	while(_libkvmplat_cfg.heap.start >= _libkvmplat_cfg.bstack.start);
-
-// 	_libkvmplat_cfg.heap.end = (uintptr_t) _libkvmplat_cfg.bstack.start;
-// 	_libkvmplat_cfg.heap.len   = _libkvmplat_cfg.heap.end
-// 				     - _libkvmplat_cfg.heap.start;
-// 	uk_pr_info(" ASLR - Heap : s: %p e: %p len: %p\n",_libkvmplat_cfg.heap.start,
-// 	_libkvmplat_cfg.heap.end,_libkvmplat_cfg.heap.len );
-				 
-	
-	
-// #else
-// 	_libkvmplat_cfg.heap.start = ALIGN_UP((uintptr_t)__END, __PAGE_SIZE);
-// 	_libkvmplat_cfg.heap.end = (uintptr_t)bi->max_addr - __STACK_SIZE;
-// 	_libkvmplat_cfg.heap.len =
-// 	    _libkvmplat_cfg.heap.end - _libkvmplat_cfg.heap.start;
-// 	_libkvmplat_cfg.bstack.start = _libkvmplat_cfg.heap.end;
-// 	_libkvmplat_cfg.bstack.end = bi->max_addr;
-// 	_libkvmplat_cfg.bstack.len = __STACK_SIZE;
-// #endif
-// }
-
 static void *bootmemory_palloc(__sz size, int type)
 {
 	struct ukplat_memregion_desc *mrd;
@@ -173,14 +129,7 @@ static void *stackmemory_aslr_palloc(__sz size) {
 		old_mrd.type  = UKPLAT_MEMRT_FREE;
 		old_mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE | UKPLAT_MEMRF_MAP;
 
-		// TODO:
-		// 3. Check if the this approach "%" is fine
-		// 4. How can I see the start of the heap address?
 		ASLR_offset = uk_swrand_randr() % (mrd->len - size);
-		uk_pr_info("ASLR_offset: %x\n", ASLR_offset);
-		uk_pr_info("pbase: %x\n", mrd->pbase);
-		uk_pr_info("stack start: %x\n", PAGE_ALIGN_UP(mrd->pbase + ASLR_offset));
-		uk_pr_info("pend: %x\n", PAGE_ALIGN_UP(mrd->pbase + ASLR_offset + size));
 		pstart = PAGE_ALIGN_UP(mrd->pbase + ASLR_offset);
 		pend = PAGE_ALIGN_UP(pstart + size);
 
@@ -190,7 +139,7 @@ static void *stackmemory_aslr_palloc(__sz size) {
 		/* Delete the old memory region to make space for the three new regions (before stack, stack, after stack) */
 		ukplat_memregion_list_delete(&ukplat_bootinfo_get()->mrds, __ukplat_memregion_foreach_i);
 
-		// Insert the free region before the stack start address
+		/* Insert the free region before the stack start address */
 		rc_b = ukplat_memregion_list_insert(&ukplat_bootinfo_get()->mrds,
 			&(struct ukplat_memregion_desc){
 				.vbase = PAGE_ALIGN_UP(tmp_pstart),
@@ -233,7 +182,7 @@ static void *stackmemory_aslr_palloc(__sz size) {
 		tmp_len  = tmp_pstart + tmp_len - pend;
 		tmp_pstart = pend;
 
-		// Insert the free region after the stack start address
+		/* Insert the free region after the stack start address */
 		rc_a = ukplat_memregion_list_insert(&ukplat_bootinfo_get()->mrds,
 			&(struct ukplat_memregion_desc){
 				.vbase = PAGE_ALIGN_UP(tmp_pstart),
@@ -261,177 +210,6 @@ static void *stackmemory_aslr_palloc(__sz size) {
 	return NULL;
 }
 #endif
-
-#ifdef CONFIG_HAVE_PAGING
-/* Initial page table struct used for paging API to absorb statically defined
- * startup page table.
- */
-static struct uk_pagetable kernel_pt;
-
-static inline unsigned long bootinfo_to_page_attr(__u16 flags)
-{
-	unsigned long prot = 0;
-
-	if (flags & UKPLAT_MEMRF_READ)
-		prot |= PAGE_ATTR_PROT_READ;
-	if (flags & UKPLAT_MEMRF_WRITE)
-		prot |= PAGE_ATTR_PROT_WRITE;
-	if (flags & UKPLAT_MEMRF_EXECUTE)
-		prot |= PAGE_ATTR_PROT_EXEC;
-
-	return prot;
-}
-
-static int paging_init(void)
-{
-	struct ukplat_memregion_desc *mrd;
-	__sz len;
-	__vaddr_t vaddr;
-	__paddr_t paddr;
-	unsigned long prot;
-	int rc;
-
-	/* Initialize the frame allocator with the free physical memory
-	 * regions supplied via the boot info. The new page table uses the
-	 * one currently active.
-	 */
-	rc = -ENOMEM; /* In case there is no region */
-	ukplat_memregion_foreach(&mrd, UKPLAT_MEMRT_FREE, 0, 0) {
-		paddr  = PAGE_ALIGN_UP(mrd->pbase);
-		len    = PAGE_ALIGN_DOWN(mrd->len - (paddr - mrd->pbase));
-
-		/* Not mapped */
-		mrd->vbase = __U64_MAX;
-		mrd->flags &= ~UKPLAT_MEMRF_PERMS;
-
-		if (unlikely(len == 0))
-			continue;
-
-		if (!kernel_pt.fa) {
-			rc = ukplat_pt_init(&kernel_pt, paddr, len);
-			if (unlikely(rc))
-				kernel_pt.fa = NULL;
-		} else {
-			rc = ukplat_pt_add_mem(&kernel_pt, paddr, len);
-		}
-
-		/* We do not fail if we cannot add this memory region to the
-		 * frame allocator. If the range is too small to hold the
-		 * metadata, this is expected. Just ignore this error.
-		 */
-		if (unlikely(rc && rc != -ENOMEM))
-			uk_pr_err("Cannot add %12lx-%12lx to paging: %d\n",
-				  paddr, paddr + len, rc);
-	}
-
-	if (unlikely(!kernel_pt.fa))
-		return rc;
-
-	/* Activate page table */
-	rc = ukplat_pt_set_active(&kernel_pt);
-	if (unlikely(rc))
-		return rc;
-
-	/* Perform unmappings */
-	ukplat_memregion_foreach(&mrd, 0, UKPLAT_MEMRF_UNMAP,
-				 UKPLAT_MEMRF_UNMAP) {
-		UK_ASSERT(mrd->vbase != __U64_MAX);
-
-		vaddr = PAGE_ALIGN_DOWN(mrd->vbase);
-		len   = PAGE_ALIGN_UP(mrd->len + (mrd->vbase - vaddr));
-
-		rc = ukplat_page_unmap(&kernel_pt, vaddr,
-				       len >> PAGE_SHIFT,
-				       PAGE_FLAG_KEEP_FRAMES);
-		if (unlikely(rc))
-			return rc;
-	}
-
-	/* Perform mappings */
-	ukplat_memregion_foreach(&mrd, 0, UKPLAT_MEMRF_MAP,
-				 UKPLAT_MEMRF_MAP) {
-		UK_ASSERT(mrd->vbase != __U64_MAX);
-
-		vaddr = PAGE_ALIGN_DOWN(mrd->vbase);
-		paddr = PAGE_ALIGN_DOWN(mrd->pbase);
-		len   = PAGE_ALIGN_UP(mrd->len + (mrd->vbase - vaddr));
-		prot  = bootinfo_to_page_attr(mrd->flags);
-
-		rc = ukplat_page_map(&kernel_pt, vaddr, paddr,
-				     len >> PAGE_SHIFT, prot, 0);
-		if (unlikely(rc))
-			return rc;
-	}
-
-	return 0;
-}
-
-static int mem_init(struct ukplat_bootinfo *bi)
-{
-	int rc;
-
-	/* TODO: Until we generate the boot page table at compile time, we
-	 * manually add an untyped unmap region to the boot info to force an
-	 * unmapping of the 1:1 mapping after the kernel image before mapping
-	 * only the necessary parts.
-	 */
-	rc = ukplat_memregion_list_insert(&bi->mrds,
-		&(struct ukplat_memregion_desc){
-			.vbase = PAGE_ALIGN_UP(__END),
-			.pbase = 0,
-			.len   = PLATFORM_MAX_MEM_ADDR - PAGE_ALIGN_UP(__END),
-			.type  = 0,
-			.flags = UKPLAT_MEMRF_UNMAP,
-		});
-	if (unlikely(rc < 0))
-		return rc;
-
-	return paging_init();
-}
-#else /* CONFIG_HAVE_PAGING */
-static int mem_init(struct ukplat_bootinfo *bi)
-{
-	struct ukplat_memregion_desc *mrdp;
-	int i;
-
-	/* The static boot page table maps only the first 4 GiB. Remove all
-	 * free memory regions above this limit so we won't use them for the
-	 * heap. Start from the tail as the memory list is ordered by address.
-	 * We can stop at the first area that is completely in the mapped area.
-	 */
-	for (i = (int)bi->mrds.count - 1; i >= 0; i--) {
-		ukplat_memregion_get(i, &mrdp);
-		if (mrdp->vbase >= PLATFORM_MAX_MEM_ADDR) {
-			/* Region is outside the mapped area */
-			uk_pr_info("Memory %012lx-%012lx outside mapped area\n",
-				   mrdp->vbase, mrdp->vbase + mrdp->len);
-
-			if (mrdp->type == UKPLAT_MEMRT_FREE)
-				ukplat_memregion_list_delete(&bi->mrds, i);
-		} else if (mrdp->vbase + mrdp->len > PLATFORM_MAX_MEM_ADDR) {
-			/* Region overlaps with unmapped area */
-			uk_pr_info("Memory %012lx-%012lx outside mapped area\n",
-				   PLATFORM_MAX_MEM_ADDR,
-				   mrdp->vbase + mrdp->len);
-
-			if (mrdp->type == UKPLAT_MEMRT_FREE)
-				mrdp->len -= (mrdp->vbase + mrdp->len) -
-						PLATFORM_MAX_MEM_ADDR;
-
-			/* Since regions are non-overlapping and ordered, we
-			 * can stop here, as the next region would be fully
-			 * mapped anyways
-			 */
-			break;
-		} else {
-			/* Region is fully mapped */
-			break;
-		}
-	}
-
-	return 0;
-}
-#endif /* !CONFIG_HAVE_PAGING */
 
 static char *cmdline;
 static __sz cmdline_len;

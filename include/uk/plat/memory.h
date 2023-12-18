@@ -156,7 +156,6 @@ ukplat_memregion_find_next(int i, __u32 type, __u32 flags, __u32 fmask,
 	int rc;
 
 	do {
-                uk_pr_info("Got i: %d\n", i);
 		rc = ukplat_memregion_get(++i, &desc);
 		if (rc < 0)
 			return -1;
@@ -200,8 +199,6 @@ ukplat_memregion_find_prev(int i, __u32 type, __u32 flags, __u32 fmask,
 	struct ukplat_memregion_desc *desc;
 	__u32 stype, sflags;
 	int rc;
-        
-        uk_pr_info("Got i: %d\n", i);
 
 	do {
 		rc = ukplat_memregion_get(i--, &desc);
@@ -210,9 +207,6 @@ ukplat_memregion_find_prev(int i, __u32 type, __u32 flags, __u32 fmask,
 
 		stype  = desc->type & type;
 		sflags = desc->flags & fmask;
-
-                uk_pr_info("type: %d -> stype: %d, flags: %d -> sflags -> %d\n", type, stype, flags, sflags);
-
 	} while ((type && !stype) || (sflags != flags));
 
 	*mrd = desc;

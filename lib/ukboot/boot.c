@@ -152,8 +152,6 @@ static struct uk_alloc *heap_init()
 		pstart = md->vbase + ASLR_offset;
 		len = md->len - ASLR_offset;
 
-		uk_pr_info("Remained with: %p:\n", pstart);
-
 		if (!a)
 			a = uk_alloc_init((void *)pstart, len);
 		else
@@ -350,7 +348,6 @@ void ukplat_entry(int argc, char *argv[])
 	uk_pr_info("Initialize memory allocator...\n");
 
 	a = heap_init();
-
 	if (unlikely(!a))
 		UK_CRASH("Failed to initialize memory allocator\n");
 	else {
@@ -365,13 +362,6 @@ void ukplat_entry(int argc, char *argv[])
 			  ukarch_tls_area_size());
 	if (!tls)
 		UK_CRASH("Failed to allocate and initialize TLS\n");
-
-
-	uk_pr_info("******************************************************************************************************************************\n");
-	ukplat_bootinfo_print();
-	uk_pr_info("Heat address?: %p\n", a);
-	uk_pr_info("Heat address?: %p\n", &a);
-	uk_pr_info("******************************************************************************************************************************\n");
 
 	/* Copy from TLS master template */
 	ukarch_tls_area_init(tls);
