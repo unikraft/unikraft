@@ -51,16 +51,6 @@ KVM_LD_SCRIPT_FLAGS_ASLR := $(addprefix -Wl$(comma)-dT$(comma),\
 KVM_LD_SCRIPT_FLAGS_ASLR += $(addprefix -Wl$(comma)-T$(comma),\
 			$(KVM_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y))
 
-ifeq ($(CONFIG_UKPLAT_MEMRNAME),y)
-KVM_BINFO_FLAGS += -n
-endif
-
-define build_bootinfo =
-	$(call build_cmd,UKBI,,$(1).bootinfo,\
-		$(SCRIPTS_DIR)/mkbootinfo.py $(1) $(1).bootinfo $(KVM_BINFO_FLAGS) && \
-		$(OBJCOPY) $(1) --update-section .uk_bootinfo=$(1).bootinfo)
-endef
-
 ASLR_LIBS += $(foreach P,$(UK_PLATS) $(UK_PLATS-y),\
 		$(if $(call qstrip,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y)),\
 		$(foreach L,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y), \
@@ -93,7 +83,7 @@ $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 			-o $(KVM_IMAGE).ld.o)
 
 	$(call build_cmd,OBJCOPY,,$(KVM_IMAGE).o,\
-		$(OBJCOPY) -w -G kvmos_* -G _libkvmplat_entry \
+		$(OBJCOPY) -w \
 			$(KVM_IMAGE).ld.o $(KVM_IMAGE).o)
 	
 	$(call build_cmd,COPY,,ASLR_scripts,\
@@ -123,13 +113,13 @@ $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 			$(UK_ALIBS) $(UK_ALIBS-y) \
 			$(KVM_LINK_LIBGCC_FLAG) \
 			-Wl$(comma)--end-group \
-			-o $(KVM_IMAGE).o)
-	$(call build_cmd,LD,,$@,\
-	       $(LD) $(LDFLAGS) $(LDFLAGS-y) \
-		     $(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
-		     $(KVM_LD_SCRIPT_FLAGS) \
-		     $(KVM_IMAGE).o -o $@)
-	$(call build_bootinfo,$@)
+			$(LDFLAGS) $(LDFLAGS-y) \
+			$(KVM_LD_SCRIPT_FLAGS) \
+			-o $@)
+endif
+
+ifeq ($(CONFIG_OPTIMIZE_PIE),y)
+	$(call build_uk_reloc,$@)
 endif
 
 $(KVM_IMAGE): $(KVM_IMAGE).dbg

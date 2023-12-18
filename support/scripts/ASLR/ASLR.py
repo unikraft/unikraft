@@ -24,18 +24,8 @@ from random import SystemRandom
 from utils import extract_conf,extract_libs
 import argparse
 import re
-
-def print_sym_table(table):
-	"""
-	In : Takes a table of symbols
-	Prints what the table contains in a format . | . | . \n or . | . \n depending
-	on the col count.
-	"""
-	for element in table:
-		if len(element) == 3:
-			print( element[0] + " | " + element[1]+ " | " + str(element[2]))
-		else:
-			print( element[0] + " | " + element[1])
+import random
+import copy
 
 #Takes 2 string and returns the longest prefix/suffix between them
 def alike(s1,s2):
@@ -71,101 +61,21 @@ def alike(s1,s2):
 	else :
 		return lettersSuf
 
-def region_handler(table,sysRand,libList,debug,baseAddr):
+def library_region(sysRand,libListOrigin,debug):
 	"""
-	In : Takes a table of symbols from the linker file, a random engine, 
-	the list of libraries contained in the executable, a debug boolean and a baseAddress.
-	Returns regionTable which is a table recreating regions based on memory pointers set in the linker script.
-	Those pointers are matched based on their names : i.e foo_start = . ; ..... foo_end  = . ; are matched together
-	"""
-	tableLen = len(table)
-	regionTable = []
-	textRegion = None
-	#For now randomizes current address (. = 0x....) and swap the regions (not subregions)
-	for i in range(tableLen): 
-		maxCompatIndex = 0
-		maxCompat = 0
-		compat = 0
-		atEnd = False
-		tableSize = len(regionTable)
-		if table[i][0] == "assign":
-			for j in range(i+1,tableLen):
-			
-				#Qemu expects text to be the first region
-				#and bss the last one, so we don't swap them
-				#Breaks a second time not to take the ending pointer 
-				#for another region
-				if table[j][0] == "bss " or table[j-2][0] == "bss ":
-					break
-				if table[j][0] != "assign":
-					continue
-
-				compat = alike(table[i][1],table[j][1]) / (j-i)
-				if compat > maxCompat:
-					maxCompat = compat
-					maxCompatIndex = j
-					
-			#Checks if the elements that starts the region closes already another one
-			for j in range(tableSize):
-				if regionTable[tableSize-1-j][1] == i or i < regionTable[tableSize-1-j][1]:
-					atEnd = True
-					break
-			if (tableSize == 0 or not atEnd) and i <= maxCompatIndex:
-				#Modifies the lib position
-				if table[i][1] == ' _text ' :
-					table[i+1] = library_region(table[i+1],sysRand,libList,debug)
-				
-				#Tries to drag pre-configured memory layout with it
-				if i-1 >= 0 and table[i-1][0] == "curAdd" and table[i-1][1].startswith('ALIGN'):
-					regionTable.append([i-1,maxCompatIndex])
-				else:
-					regionTable.append([i,maxCompatIndex])
-		
-		#Randomizes static addresses
-		elif(table[i][0] == "curAdd" and not table[i][1].startswith('ALIGN')):
-			#Replaces the starting address
-			if i == 0:
-				table[i][1] = '0x'+baseAddr
-			else:
-				table[i][1] = '0x'+''.join('{:02X}'.format(int(table[i][1],16)+(sysRand.randint(0,65536))))
-	
-	return regionTable, table
-
-def library_region(textRegion,sysRand,libListOrigin,debug):
-	"""
-	In : textRegion is a string of the whole text segment, a random engine, the list of libraries contained in the executable and a debug boolean.
-	Returns a modified version of the textregion with padding and shuffled micro libs.
+	In : A random engine, the list of libraries contained in the executable and a debug boolean.
+	Returns a randomized version of the libListOrigin with padding and shuffled micro libs.
 	"""
 	libList = libListOrigin.copy()
-	if debug == 'True':
-		index = textRegion[1].find("*(.text)")
+	newRegions = ""
+	while len(libList) != 0:
 		padding = '. = . + 0x'+''.join('{:02X}'.format(sysRand.randint(0,65536)))+";\n"
-		modfiedRegion = textRegion[1][0:index] +"}"
-		nextLib = libList.pop(0)
-		modfiedRegion += "  .text."+nextLib+" . :{ "+nextLib+".o (.text);}\n"
-		while len(libList) != 0:
-			padding = '. = . + 0x'+''.join('{:02X}'.format(sysRand.randint(0,65536)))+";\n"
-			nextLib = sysRand.choice(libList)
-			libList.remove(nextLib)
-			modfiedRegion += "  .text."+nextLib+" . :{ "
-			modfiedRegion += padding+"  "
-			modfiedRegion += nextLib+".o (.text);}\n"
-		
-		textRegion[1] = modfiedRegion
-		return textRegion
-	else:
-		index = textRegion[1].find("*(.text)")
-		padding = '. = . + 0x'+''.join('{:02X}'.format(sysRand.randint(0,65536)))+";\n"
-		modfiedRegion = textRegion[1][0:index]
-		while len(libList) != 0:
-			padding = '. = . + 0x'+''.join('{:02X}'.format(sysRand.randint(0,65536)))+";\n"
-			nextLib = sysRand.choice(libList)
-			libList.remove(nextLib)
-			modfiedRegion += "  " + padding
-			modfiedRegion += nextLib+".o (.text);\n"
-		
-		textRegion[1] = modfiedRegion+textRegion[1][index-2:]
-		return textRegion
+		nextLib = sysRand.choice(libList)
+		libList.remove(nextLib)
+		newRegions += "  " + padding
+		newRegions += nextLib+".o (.text);\n"
+
+	return newRegions
 
 def main(openFile,output,debug,libList,baseAddr,dedu):
 	
@@ -173,81 +83,81 @@ def main(openFile,output,debug,libList,baseAddr,dedu):
 	table = analyzer.analyze()
 	regionTable = []
 	sysRand = SystemRandom()
-	if debug == 'True':
-		print_sym_table(table)
 	
-	regionTable, table = region_handler(table,sysRand,libList,debug,baseAddr)
+	# Randomize the library list inside the .text region
+	for i, line in enumerate(table):
+		if ".text" in line:
+			newLibs = library_region(sysRand, libList, debug)
+			table[i] = table[i].replace("*(.text)", newLibs + "*(.text)")
+			break
+
 	#Swap memory regions
-	table = swap_regions(table,regionTable,sysRand)
-		
+	table = swap_regions(table)
+
+	# Change the base address in the table
+	table[0] = baseAddr
+
 	print_back(openFile,output,table,debug,dedu)
 	
 	return 0
 
-def swap_regions(table,regionTable,sysRand):
+def swap_regions(table):
 	"""
-	In : Takes a table of symbols from the linker file, the table of the linker's memory segments and a random engine.
-	Return a swapped version of the linker script's segment according to some rules specified by Qemu.
+	In : Takes a table of symbols from the linker file, and randomizez the order of the regions and segments.
+	Return a swapped version of the linker script's regions and segments.
 	"""
-	regionCopy = regionTable.copy()
-	iterations = len(regionCopy)
-	regionTableIndex = 0
-	maxInter = len(table)
-	newTable = []
-	index = 0
-	#Set text,uk_*tab as first regions in order to avoid errors.
-	toDel = []
-	added = False
-	setRoData = False
 
-	for ind in regionCopy :
-		if table[ind[1]][1] == " uk_inittab_end " or \
-		table[ind[1]][1] == " _etext " or \
-		table[ind[1]][1] == " uk_ctortab_end ":
-			toDel.append(ind)
-	
-	if len(toDel) == 0:
-		print("[ASLR] {Error} Missing important memory regions : _text, uk_inittab_start, uk_ctortab_start",file=sys.stderr)
-		sys.exit()
-	
-	#if there's only one element there's no point swapping it.
-	if iterations > 0:
-		while index < maxInter:
-		
-			if len(toDel) != 0 and index == toDel[0][0] and added:
-				index = toDel[0][1]
-				toDel.pop(0)
-			elif regionTableIndex < iterations and index == regionTable[regionTableIndex][0]:
-				#Set text,uk_*tab as first regions in order toclear avoid errors.
-				if regionTableIndex == 0 and added != True:
-					for el in toDel:
-						newTable += table[el[0]:el[1]+1]
-						regionCopy.remove(el)
-						regionTable.remove(el)
-						added = True
-						iterations -= 1
-					continue
+	for index in range(1,3):
+		region_index = []
+		indices_dict = {}
+		for i, item in enumerate(table):
+			if isinstance(item, list):
+				if item[1] == index:
+					region_index.append(i)
+			if len(item) == 3:
+				key = tuple(item[2]) if isinstance(item[2], list) else item[2]
+				if key not in indices_dict:
+					indices_dict[key] = [i]
 				else:
-					#Takes an element at random without replacement
-					tmpRegion = None
-					while tmpRegion == None or (table[tmpRegion[1]][1] == ' _edata ' and not setRoData):
-						tmpRegion = sysRand.choice(regionCopy)
+					indices_dict[key].append(i)
 
-					if table[tmpRegion[1]][1] == " _erodata ":
-						setRoData = True
-					#Makes the right jump in the table
-					index = regionTable[regionTableIndex][1]
-					#Append the region to the newtable
-					newTable += table[tmpRegion[0]:tmpRegion[1]+1]
-					regionCopy.remove(tmpRegion)
-					regionTableIndex += 1
-			#If it's a singleton
-			else :
-				newTable.append(table[index])
+		if indices_dict != {}:
+			for key, value in indices_dict.items():
+				tmp_shuffle = copy.deepcopy(value)
+				random.shuffle(tmp_shuffle)
 
-			index += 1
-		return newTable
+				tmp_table = copy.deepcopy(table)
+				for i, item in enumerate(value):
+					tmp_table[value[i]] = table[tmp_shuffle[i]]
+				table = tmp_table
+		else:
+			tmp_shuffle = copy.deepcopy(region_index)
+			random.shuffle(tmp_shuffle)
+
+			tmp_table = copy.deepcopy(table)
+			for i, item in enumerate(region_index):
+				tmp_table[region_index[i]] = table[tmp_shuffle[i]]
+		table = tmp_table
+
 	return table
+
+def randomize_phdrs(file_content):
+    # Use regular expression to find lines between '{' and '}'
+    pattern = re.compile(r'{(.*?)}', re.DOTALL)
+
+    def randomize(match):
+        # Split the lines inside the braces
+        lines = match.group(1).strip().split('\n')
+        # Randomize the order of lines
+        random.shuffle(lines)
+        # Join the lines back together
+        return '{\n' + '\n'.join(lines) + '\n}'
+
+    # Apply the randomize function to each match
+    result = pattern.sub(randomize, file_content, count=1)
+
+    return result
+
 
 def print_back(openFile,output,table,debug,dedu):
 	"""
@@ -273,40 +183,17 @@ def print_back(openFile,output,table,debug,dedu):
 	header = openFile.read().split("SECTIONS\n{\n")
 	openFile.seek(0)
 	
+	new_phdrs = randomize_phdrs(header[0])
 	
 	#Writes back
-	previous = ""
-	if debug:
-		#Doesn't set ENTRY in debug mode otherwise causes double import
-		# writeFile.write("SECTIONS\n{\n")
-		writeFile.write(header[0]+"SECTIONS\n{\n")
-	else :
-		writeFile.write(header[0]+"SECTIONS\n{\n")
-	
+	writeFile.write(new_phdrs+"SECTIONS\n{\n")
+
 	for element in table:
-		
-		if element[0] == "curAdd":
-			#Avoid having ALIGN cascade
-			if not (previous.startswith('ALIGN') and element[1].startswith('ALIGN')):
-				writeFile.write(". = "+element[1]+";\n")
-		elif element[0] == "assign":
-			if len(element) == 3:
-				writeFile.write(element[1]+"= ."+element[2]+";\n")
-			else:
-				writeFile.write(element[1]+"= .;\n")
-			if element[1] == " _etext " and deduFile:
-				conf = extract_conf(deduFile)
-				addr = conf.pop(0)[0]
-				fill = 0
-				for lib in conf:
-					fill += int(lib[1],16)
-				writeFile.write(". = ALIGN(0x1000);\n.ind "+addr+" : {FILL(0X90);. = . + "+hex(fill)+";BYTE(0X90)}\n")
+		if isinstance(element, list):
+			writeFile.write(element[0] + "\n")
 		else:
-			writeFile.write("."+element[0]+":"+element[1]+"\n")
-		previous = element[1]
-		
-		
-	writeFile.write("}")
+			writeFile.write(element + "\n")
+
 	writeFile.close()
 	return 0
 
@@ -352,7 +239,10 @@ if __name__ == '__main__':
 
 	params , _ = parser.parse_known_args(sys.argv[1:])
 
-	# params.baseAddr = "100000"
+
+	if params.baseAddr == "":
+		params.baseAddr = '. = 0x' + ''.join('{:02X}'.format(SystemRandom().randint(1048576,1048576*4))) + ";"
+
 	if params.setup != "./":
 		openFile = open(params.setup,"r+")
 		if(openFile == None):
@@ -360,18 +250,7 @@ if __name__ == '__main__':
 			sys.exit()
 		handleSetup(openFile,params.baseAddr)
 		openFile.close()
-	
 	elif params.baseAddr != '-1':
-		# with open(params.path, "rb") as f_src:
-		# 	with open(params.output, "wb") as f_dest:
-		# 		while True:
-		# 			# Read data from source file in chunks
-		# 			data = f_src.read(1024)
-		# 			if not data:
-		# 				break
-		# 			# Write data to destination file
-		# 			f_dest.write(data)
-		# sys.exit()
 		openFile = open(params.path,"r+")
 		if(openFile == None):
 			print("[ASLR] {Error} Couldn't open the file, path may be wrong.")
