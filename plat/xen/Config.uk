@@ -7,6 +7,7 @@ menuconfig PLAT_XEN
        imply XEN_PV_BUILD_P2M
        select LIBUKDEBUG
        select LIBNOLIBC if !HAVE_LIBC
+       select HAVE_FDT if ARCH_ARM32
        select LIBFDT if ARCH_ARM_32
        select XEN_DBGEMERGENCY if ARCH_ARM_32
        select LIBUKRELOC if OPTIMIZE_PIE
