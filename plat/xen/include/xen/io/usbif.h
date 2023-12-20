@@ -177,37 +177,37 @@ enum usb_spec_version {
  */
 struct usbif_request_segment {
 	grant_ref_t gref;
-	uint16_t offset;
-	uint16_t length;
+	__u16 offset;
+	__u16 length;
 };
 
 struct usbif_urb_request {
-	uint16_t id; /* request id */
-	uint16_t nr_buffer_segs; /* number of urb->transfer_buffer segments */
+	__u16 id; /* request id */
+	__u16 nr_buffer_segs; /* number of urb->transfer_buffer segments */
 
 	/* basic urb parameter */
-	uint32_t pipe;
-	uint16_t transfer_flags;
+	__u32 pipe;
+	__u16 transfer_flags;
 #define USBIF_SHORT_NOT_OK	0x0001
-	uint16_t buffer_length;
+	__u16 buffer_length;
 	union {
-		uint8_t ctrl[8]; /* setup_packet (Ctrl) */
+		__u8 ctrl[8]; /* setup_packet (Ctrl) */
 
 		struct {
-			uint16_t interval; /* maximum (1024*8) in usb core */
-			uint16_t start_frame; /* start frame */
-			uint16_t number_of_packets; /* number of ISO packet */
-			uint16_t nr_frame_desc_segs; /* number of iso_frame_desc segments */
+			__u16 interval; /* maximum (1024*8) in usb core */
+			__u16 start_frame; /* start frame */
+			__u16 number_of_packets; /* number of ISO packet */
+			__u16 nr_frame_desc_segs; /* number of iso_frame_desc segments */
 		} isoc;
 
 		struct {
-			uint16_t interval; /* maximum (1024*8) in usb core */
-			uint16_t pad[3];
+			__u16 interval; /* maximum (1024*8) in usb core */
+			__u16 pad[3];
 		} intr;
 
 		struct {
-			uint16_t unlink_id; /* unlink request id */
-			uint16_t pad[3];
+			__u16 unlink_id; /* unlink request id */
+			__u16 pad[3];
 		} unlink;
 
 	} u;
@@ -218,11 +218,11 @@ struct usbif_urb_request {
 typedef struct usbif_urb_request usbif_urb_request_t;
 
 struct usbif_urb_response {
-	uint16_t id; /* request id */
-	uint16_t start_frame;  /* start frame (ISO) */
-	int32_t status; /* status (non-ISO) */
-	int32_t actual_length; /* actual transfer length */
-	int32_t error_count; /* number of ISO errors */
+	__u16 id; /* request id */
+	__u16 start_frame;  /* start frame (ISO) */
+	__s32 status; /* status (non-ISO) */
+	__s32 actual_length; /* actual transfer length */
+	__s32 error_count; /* number of ISO errors */
 };
 typedef struct usbif_urb_response usbif_urb_response_t;
 
@@ -233,14 +233,14 @@ DEFINE_RING_TYPES(usbif_urb, struct usbif_urb_request, struct usbif_urb_response
  * RING for notifying connect/disconnect events to frontend
  */
 struct usbif_conn_request {
-	uint16_t id;
+	__u16 id;
 };
 typedef struct usbif_conn_request usbif_conn_request_t;
 
 struct usbif_conn_response {
-	uint16_t id; /* request id */
-	uint8_t portnum; /* port number */
-	uint8_t speed; /* usb_device_speed */
+	__u16 id; /* request id */
+	__u8 portnum; /* port number */
+	__u8 speed; /* usb_device_speed */
 #define USBIF_SPEED_NONE	0
 #define USBIF_SPEED_LOW		1
 #define USBIF_SPEED_FULL	2

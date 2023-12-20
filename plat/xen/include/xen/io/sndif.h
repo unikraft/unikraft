@@ -160,22 +160,22 @@
  *-------------------------------- Addressing ---------------------------------
  *
  * dom-id
- *      Values:         <uint16_t>
+ *      Values:         <__u16>
  *
  *      Domain identifier.
  *
  * dev-id
- *      Values:         <uint16_t>
+ *      Values:         <__u16>
  *
  *      Device identifier.
  *
  * pcm-dev-idx
- *      Values:         <uint8_t>
+ *      Values:         <__u8>
  *
  *      Zero based contigous index of the PCM device.
  *
  * stream-idx
- *      Values:         <uint8_t>
+ *      Values:         <__u8>
  *
  *      Zero based contigous index of the stream of the PCM device.
  *
@@ -206,19 +206,19 @@
  * range.
  *
  * channels-min
- *      Values:         <uint8_t>
+ *      Values:         <__u8>
  *
  *      The minimum amount of channels that is supported, [1; channels-max].
  *      Optional, if not set or omitted a value of 1 is used.
  *
  * channels-max
- *      Values:         <uint8_t>
+ *      Values:         <__u8>
  *
  *      The maximum amount of channels that is supported.
  *      Must be at least <channels-min>.
  *
  * sample-rates
- *      Values:         <list of uint32_t>
+ *      Values:         <list of __u32>
  *
  *      List of supported sample rates separated by XENSND_LIST_SEPARATOR.
  *      Sample rates are expressed as a list of decimal values w/o any
@@ -231,7 +231,7 @@
  *      Items must not exceed XENSND_SAMPLE_FORMAT_MAX_LEN length.
  *
  * buffer-size
- *      Values:         <uint32_t>
+ *      Values:         <__u32>
  *
  *      The maximum size in octets of the buffer to allocate per stream.
  *
@@ -263,7 +263,7 @@
  *      defined under the same device.
  *
  * unique-id
- *      Values:         <uint32_t>
+ *      Values:         <__u32>
  *
  *      After stream initialization it is assigned a unique ID (within the front
  *      driver), so every stream of the frontend can be identified by the
@@ -274,13 +274,13 @@
  *-------------------- Stream Request Transport Parameters --------------------
  *
  * event-channel
- *      Values:         <uint32_t>
+ *      Values:         <__u32>
  *
  *      The identifier of the Xen event channel used to signal activity
  *      in the ring buffer.
  *
  * ring-ref
- *      Values:         <uint32_t>
+ *      Values:         <__u32>
  *
  *      The Xen grant reference granting permission for the backend to map
  *      a sole page in a single page sized ring buffer.
@@ -534,14 +534,14 @@
  * +----------------+----------------+----------------+----------------+
  * |                             reserved                              | 8
  * +----------------+----------------+----------------+----------------+
- *   id - uint16_t, private guest value, echoed in response
- *   operation - uint8_t, operation code, XENSND_OP_???
+ *   id - __u16, private guest value, echoed in response
+ *   operation - __u8, operation code, XENSND_OP_???
  *
  * For all packets which use offset and length:
- *   offset - uint32_t, read or write data offset within the shared buffer,
+ *   offset - __u32, read or write data offset within the shared buffer,
  *     passed with XENSND_OP_OPEN request, octets,
  *     [0; XENSND_OP_OPEN.buffer_sz - 1].
- *   length - uint32_t, read or write data length, octets
+ *   length - __u32, read or write data length, octets
  *
  * Request open - open a PCM stream for playback or capture:
  *
@@ -566,11 +566,11 @@
  * |                             reserved                              | 32
  * +----------------+----------------+----------------+----------------+
  *
- * pcm_rate - uint32_t, stream data rate, Hz
- * pcm_format - uint8_t, XENSND_PCM_FORMAT_XXX value
- * pcm_channels - uint8_t, number of channels of this stream,
+ * pcm_rate - __u32, stream data rate, Hz
+ * pcm_format - __u8, XENSND_PCM_FORMAT_XXX value
+ * pcm_channels - __u8, number of channels of this stream,
  *   [channels-min; channels-max]
- * buffer_sz - uint32_t, buffer size to be allocated, octets
+ * buffer_sz - __u32, buffer size to be allocated, octets
  * gref_directory - grant_ref_t, a reference to the first shared page
  *   describing shared buffer references. At least one page exists. If shared
  *   buffer size  (buffer_sz) exceeds what can be addressed by this single page,
@@ -579,11 +579,11 @@
  */
 
 struct xensnd_open_req {
-    uint32_t pcm_rate;
-    uint8_t pcm_format;
-    uint8_t pcm_channels;
-    uint16_t reserved;
-    uint32_t buffer_sz;
+    __u32 pcm_rate;
+    __u8 pcm_format;
+    __u8 pcm_channels;
+    __u16 reserved;
+    __u32 buffer_sz;
     grant_ref_t gref_directory;
 };
 
@@ -657,8 +657,8 @@ struct xensnd_page_directory {
  */
 
 struct xensnd_rw_req {
-    uint32_t offset;
-    uint32_t length;
+    __u32 offset;
+    __u32 length;
 };
 
 /*
@@ -697,7 +697,7 @@ struct xensnd_rw_req {
  * +----------------+----------------+----------------+----------------+
  *
  * N = XENSND_OP_OPEN.pcm_channels
- * i - uint8_t, index of a channel
+ * i - __u8, index of a channel
  * channel[i] - sint32_t, volume of i-th channel
  * Volume is expressed as a signed value in steps of 0.001 dB,
  * while 0 being 0 dB.
@@ -736,8 +736,8 @@ struct xensnd_rw_req {
  * +----------------+----------------+----------------+----------------+
  *
  * N = XENSND_OP_OPEN.pcm_channels
- * i - uint8_t, index of a channel
- * channel[i] - uint8_t, non-zero if i-th channel needs to be muted/unmuted
+ * i - __u8, index of a channel
+ * channel[i] - __u8, non-zero if i-th channel needs to be muted/unmuted
  *
  *------------------------------------ N.B. -----------------------------------
  *
@@ -764,28 +764,28 @@ struct xensnd_rw_req {
  * |                             reserved                              | 32
  * +----------------+----------------+----------------+----------------+
  *
- * id - uint16_t, copied from the request
- * operation - uint8_t, XENSND_OP_* - copied from request
- * status - int32_t, response status, zero on success and -XEN_EXX on failure
+ * id - __u16, copied from the request
+ * operation - __u8, XENSND_OP_* - copied from request
+ * status - __s32, response status, zero on success and -XEN_EXX on failure
  */
 
 struct xensnd_req {
-    uint16_t id;
-    uint8_t operation;
-    uint8_t reserved[5];
+    __u16 id;
+    __u8 operation;
+    __u8 reserved[5];
     union {
         struct xensnd_open_req open;
         struct xensnd_rw_req rw;
-        uint8_t reserved[24];
+        __u8 reserved[24];
     } op;
 };
 
 struct xensnd_resp {
-    uint16_t id;
-    uint8_t operation;
-    uint8_t reserved;
-    int32_t status;
-    uint8_t reserved1[24];
+    __u16 id;
+    __u8 operation;
+    __u8 reserved;
+    __s32 status;
+    __u8 reserved1[24];
 };
 
 DEFINE_RING_TYPES(xen_sndif, struct xensnd_req, struct xensnd_resp);

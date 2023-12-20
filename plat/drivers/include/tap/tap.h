@@ -45,7 +45,7 @@ int tap_close(int fd);
 int tap_dev_configure(int fd, __u32 feature_flags, void *arg);
 int tap_netif_configure(int fd, __u32 request, void *arg);
 int tap_netif_create(void);
-__ssz tap_read(int fd, void *buf, size_t count);
-__ssz tap_write(int fd, const void *buf, size_t count);
+__ssz tap_read(int fd, void *buf, __sz count);
+__ssz tap_write(int fd, const void *buf, __sz count);
 
 #endif /* __PLAT_DRV_TAP_H */

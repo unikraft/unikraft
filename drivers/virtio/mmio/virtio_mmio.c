@@ -61,8 +61,8 @@
 
 static struct uk_alloc *a;
 struct virtio_mmio_device_id {
-	uint16_t device_id;
-	uint32_t vendor;
+	__u16 device_id;
+	__u32 vendor;
 };
 
 struct virtio_mmio_device {

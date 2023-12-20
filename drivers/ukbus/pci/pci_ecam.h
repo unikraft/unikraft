@@ -73,7 +73,7 @@ struct pci_config_window {
 struct fdt_phandle_args {
 	int np;
 	int args_count;
-	uint32_t args[16];
+	__u32 args[16];
 };
 
 /*

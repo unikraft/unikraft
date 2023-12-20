@@ -57,17 +57,17 @@ static inline int sys_close(int fd)
 			     (long) (fd));
 }
 
-static inline ssize_t sys_read(int fd, const char *buf, size_t len)
+static inline __ssz sys_read(int fd, const char *buf, __sz len)
 {
-	return (ssize_t) syscall3(__SC_READ,
+	return (__ssz) syscall3(__SC_READ,
 				  (long) (fd),
 				  (long) (buf),
 				  (long) (len));
 }
 
-static inline ssize_t sys_write(int fd, const char *buf, size_t len)
+static inline __ssz sys_write(int fd, const char *buf, __sz len)
 {
-	return (ssize_t) syscall3(__SC_WRITE,
+	return (__ssz) syscall3(__SC_WRITE,
 				  (long) (fd),
 				  (long) (buf),
 				  (long) (len));
@@ -157,7 +157,7 @@ static inline int sys_open(const char *pathname, int flags, ...)
 #endif /* AF_INET */
 static inline int sys_socket(int domain, int type, int protocol)
 {
-	return (ssize_t) syscall3(__SC_SOCKET,
+	return (__ssz) syscall3(__SC_SOCKET,
 				  (long) domain,
 				  (long) type,
 				  (long) protocol);
@@ -186,7 +186,7 @@ static inline int sys_clock_gettime(k_clockid_t clk_id, struct k_timespec *tp)
 #define PROT_READ     (0x1)
 #define PROT_WRITE    (0x2)
 #define PROT_EXEC     (0x4)
-static inline void *sys_mmap(void *addr, size_t len, int prot, int flags,
+static inline void *sys_mmap(void *addr, __sz len, int prot, int flags,
 		int fd, off_t offset)
 {
 	return (void *) syscall6(__SC_MMAP,

@@ -58,35 +58,35 @@
  * whether the UART has been initialized.
  */
 #if defined(CONFIG_EARLY_UART_NS16550)
-static uint8_t ns16550_uart_initialized = 1;
-static uint64_t ns16550_uart_base = CONFIG_EARLY_UART_NS16550_BASE;
+static __u8 ns16550_uart_initialized = 1;
+static __u64 ns16550_uart_base = CONFIG_EARLY_UART_NS16550_BASE;
 #else
-static uint8_t ns16550_uart_initialized;
-static uint64_t ns16550_uart_base;
+static __u8 ns16550_uart_initialized;
+static __u64 ns16550_uart_base;
 #endif
 
 /* The register shift. Default is 0 (device-tree spec v0.4 Sect. 4.2.2) */
-static uint32_t ns16550_reg_shift = CONFIG_UART_NS16550_REG_SHIFT;
+static __u32 ns16550_reg_shift = CONFIG_UART_NS16550_REG_SHIFT;
 
 /* The register width. Default is 1 (8-bit register width) */
-static uint32_t ns16550_reg_width = CONFIG_UART_NS16550_REG_WIDTH;
+static __u32 ns16550_reg_width = CONFIG_UART_NS16550_REG_WIDTH;
 
 /* Macros to access ns16550 registers with base address and reg shift */
 #define NS16550_REG(r) (ns16550_uart_base + (r << ns16550_reg_shift))
 
-static uint32_t ns16550_reg_read(uint32_t reg)
+static __u32 ns16550_reg_read(__u32 reg)
 {
-	uint32_t ret;
+	__u32 ret;
 
 	switch (ns16550_reg_width) {
 	case 1:
-		ret = ioreg_read8((uint8_t *)NS16550_REG(reg)) & 0xff;
+		ret = ioreg_read8((__u8 *)NS16550_REG(reg)) & 0xff;
 		break;
 	case 2:
-		ret = ioreg_read16((uint16_t *)NS16550_REG(reg)) & 0xffff;
+		ret = ioreg_read16((__u16 *)NS16550_REG(reg)) & 0xffff;
 		break;
 	case 4:
-		ret = ioreg_read32((uint32_t *)NS16550_REG(reg));
+		ret = ioreg_read32((__u32 *)NS16550_REG(reg));
 		break;
 	default:
 		UK_CRASH("Invalid register width: %d\n", ns16550_reg_width);
@@ -94,26 +94,26 @@ static uint32_t ns16550_reg_read(uint32_t reg)
 	return ret;
 }
 
-static void ns16550_reg_write(uint32_t reg, uint32_t value)
+static void ns16550_reg_write(__u32 reg, __u32 value)
 {
 	switch (ns16550_reg_width) {
 	case 1:
-		ioreg_write8((uint8_t *)NS16550_REG(reg),
-			     (uint8_t)(value & 0xff));
+		ioreg_write8((__u8 *)NS16550_REG(reg),
+			     (__u8)(value & 0xff));
 		break;
 	case 2:
-		ioreg_write16((uint16_t *)NS16550_REG(reg),
-			      (uint16_t)(value & 0xffff));
+		ioreg_write16((__u16 *)NS16550_REG(reg),
+			      (__u16)(value & 0xffff));
 		break;
 	case 4:
-		ioreg_write32((uint32_t *)NS16550_REG(reg), value);
+		ioreg_write32((__u32 *)NS16550_REG(reg), value);
 		break;
 	default:
 		UK_CRASH("Invalid register width: %d\n", ns16550_reg_width);
 	}
 }
 
-static void init_ns16550(uint64_t base)
+static void init_ns16550(__u64 base)
 {
 	ns16550_uart_base = base;
 	ns16550_uart_initialized = 1;
@@ -130,8 +130,8 @@ static void init_ns16550(uint64_t base)
 void ns16550_console_init(const void *dtb)
 {
 	int offset, len, naddr, nsize;
-	const uint64_t *regs;
-	uint64_t reg_uart_base;
+	const __u64 *regs;
+	__u64 reg_uart_base;
 
 	uk_pr_info("Serial initializing\n");
 

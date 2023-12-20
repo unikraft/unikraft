@@ -26,22 +26,22 @@
 #include "../xen.h"
 
 struct vcpu_hvm_x86_32 {
-    uint32_t eax;
-    uint32_t ecx;
-    uint32_t edx;
-    uint32_t ebx;
-    uint32_t esp;
-    uint32_t ebp;
-    uint32_t esi;
-    uint32_t edi;
-    uint32_t eip;
-    uint32_t eflags;
+    __u32 eax;
+    __u32 ecx;
+    __u32 edx;
+    __u32 ebx;
+    __u32 esp;
+    __u32 ebp;
+    __u32 esi;
+    __u32 edi;
+    __u32 eip;
+    __u32 eflags;
 
-    uint32_t cr0;
-    uint32_t cr3;
-    uint32_t cr4;
+    __u32 cr0;
+    __u32 cr3;
+    __u32 cr4;
 
-    uint32_t pad1;
+    __u32 pad1;
 
     /*
      * EFER should only be used to set the NXE bit (if required)
@@ -49,25 +49,25 @@ struct vcpu_hvm_x86_32 {
      * to set the LME/LMA bits in order to start the vCPU in
      * compatibility mode.
      */
-    uint64_t efer;
+    __u64 efer;
 
-    uint32_t cs_base;
-    uint32_t ds_base;
-    uint32_t ss_base;
-    uint32_t es_base;
-    uint32_t tr_base;
-    uint32_t cs_limit;
-    uint32_t ds_limit;
-    uint32_t ss_limit;
-    uint32_t es_limit;
-    uint32_t tr_limit;
-    uint16_t cs_ar;
-    uint16_t ds_ar;
-    uint16_t ss_ar;
-    uint16_t es_ar;
-    uint16_t tr_ar;
+    __u32 cs_base;
+    __u32 ds_base;
+    __u32 ss_base;
+    __u32 es_base;
+    __u32 tr_base;
+    __u32 cs_limit;
+    __u32 ds_limit;
+    __u32 ss_limit;
+    __u32 es_limit;
+    __u32 tr_limit;
+    __u16 cs_ar;
+    __u16 ds_ar;
+    __u16 ss_ar;
+    __u16 es_ar;
+    __u16 tr_ar;
 
-    uint16_t pad2[3];
+    __u16 pad2[3];
 };
 
 /*
@@ -89,21 +89,21 @@ struct vcpu_hvm_x86_32 {
  */
 
 struct vcpu_hvm_x86_64 {
-    uint64_t rax;
-    uint64_t rcx;
-    uint64_t rdx;
-    uint64_t rbx;
-    uint64_t rsp;
-    uint64_t rbp;
-    uint64_t rsi;
-    uint64_t rdi;
-    uint64_t rip;
-    uint64_t rflags;
+    __u64 rax;
+    __u64 rcx;
+    __u64 rdx;
+    __u64 rbx;
+    __u64 rsp;
+    __u64 rbp;
+    __u64 rsi;
+    __u64 rdi;
+    __u64 rip;
+    __u64 rflags;
 
-    uint64_t cr0;
-    uint64_t cr3;
-    uint64_t cr4;
-    uint64_t efer;
+    __u64 cr0;
+    __u64 cr3;
+    __u64 cr4;
+    __u64 efer;
 
     /*
      * Using VCPU_HVM_MODE_64B implies that the vCPU is launched
@@ -118,9 +118,9 @@ struct vcpu_hvm_x86_64 {
 struct vcpu_hvm_context {
 #define VCPU_HVM_MODE_32B 0  /* 32bit fields of the structure will be used. */
 #define VCPU_HVM_MODE_64B 1  /* 64bit fields of the structure will be used. */
-    uint32_t mode;
+    __u32 mode;
 
-    uint32_t pad;
+    __u32 pad;
 
     /* CPU registers. */
     union {

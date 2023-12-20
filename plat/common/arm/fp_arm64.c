@@ -20,7 +20,7 @@
  */
 #include <uk/plat/common/cpu.h>
 
-void fpsimd_save_state(uintptr_t ptr)
+void fpsimd_save_state(__uptr ptr)
 {
 	__u32 fpcr, fpsr;
 
@@ -49,7 +49,7 @@ void fpsimd_save_state(uintptr_t ptr)
 	((struct fpsimd_state *)ptr)->fpsr = fpsr;
 }
 
-void fpsimd_restore_state(uintptr_t ptr)
+void fpsimd_restore_state(__uptr ptr)
 {
 	__u32 fpcr, fpsr;
 

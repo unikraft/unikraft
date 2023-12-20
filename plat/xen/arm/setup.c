@@ -53,7 +53,7 @@ void *HYPERVISOR_dtb;
 /*
  * Physical address offset
  */
-uint32_t _libxenplat_paddr_offset;
+__u32 _libxenplat_paddr_offset;
 
 /*
  * Memory region description
@@ -78,7 +78,7 @@ static inline void _init_dtb(void *dtb_pointer)
 	HYPERVISOR_dtb = dtb_pointer;
 }
 
-static inline void _dtb_get_cmdline(char *cmdline, size_t maxlen)
+static inline void _dtb_get_cmdline(char *cmdline, __sz maxlen)
 {
 	int fdtchosen, len;
 	const char *fdtcmdline;
@@ -103,16 +103,16 @@ enocmdl:
 	strcpy(cmdline, CONFIG_UK_NAME);
 }
 
-static inline void _dtb_init_mem(uint32_t physical_offset)
+static inline void _dtb_init_mem(__u32 physical_offset)
 {
 	int memory;
 	int prop_len = 0;
-	const uint64_t *regs;
-	uintptr_t end;
-	uint64_t mem_base;
-	uint64_t mem_size;
-	uint64_t heap_len;
-	size_t fdt_size;
+	const __u64 *regs;
+	__uptr end;
+	__u64 mem_base;
+	__u64 mem_size;
+	__u64 heap_len;
+	__sz fdt_size;
 	void *new_dtb;
 	paddr_t start_pfn_p;
 	paddr_t max_pfn_p;
@@ -142,7 +142,7 @@ static inline void _dtb_init_mem(uint32_t physical_offset)
 	if (regs == NULL && prop_len < 16)
 		UK_CRASH("Bad 'reg' property: %p %d\n", regs, prop_len);
 
-	end = (uintptr_t) __END;
+	end = (__uptr) __END;
 	mem_base = fdt64_to_cpu(regs[0]);
 	mem_size = fdt64_to_cpu(regs[1]);
 	if (to_virt(mem_base) > (void *)__TEXT)
@@ -191,9 +191,9 @@ static inline void _dtb_init_mem(uint32_t physical_offset)
 }
 
 void _libxenplat_armentry(void *dtb_pointer,
-			  uint32_t physical_offset) __noreturn;
+			  __u32 physical_offset) __noreturn;
 
-void _libxenplat_armentry(void *dtb_pointer, uint32_t physical_offset)
+void _libxenplat_armentry(void *dtb_pointer, __u32 physical_offset)
 {
 	uk_pr_info("Entering from Xen (arm)...\n");
 

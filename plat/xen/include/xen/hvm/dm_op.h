@@ -31,7 +31,7 @@
 #include "../event_channel.h"
 
 #ifndef uint64_aligned_t
-#define uint64_aligned_t uint64_t
+#define uint64_aligned_t __u64
 #endif
 
 /*
@@ -53,7 +53,7 @@
  * PCI config space ranges which they explicitly register.
  */
 
-typedef uint16_t ioservid_t;
+typedef __u16 ioservid_t;
 
 /*
  * XEN_DMOP_create_ioreq_server: Instantiate a new IOREQ Server for a
@@ -69,8 +69,8 @@ typedef uint16_t ioservid_t;
 
 struct xen_dm_op_create_ioreq_server {
     /* IN - should server handle buffered ioreqs */
-    uint8_t handle_bufioreq;
-    uint8_t pad[3];
+    __u8 handle_bufioreq;
+    __u8 pad[3];
     /* OUT - server id */
     ioservid_t id;
 };
@@ -95,7 +95,7 @@ struct xen_dm_op_create_ioreq_server {
 struct xen_dm_op_get_ioreq_server_info {
     /* IN - server id */
     ioservid_t id;
-    uint16_t pad;
+    __u16 pad;
     /* OUT - buffered ioreq port */
     evtchn_port_t bufioreq_port;
     /* OUT - sync ioreq gfn */
@@ -129,9 +129,9 @@ struct xen_dm_op_get_ioreq_server_info {
 struct xen_dm_op_ioreq_server_range {
     /* IN - server id */
     ioservid_t id;
-    uint16_t pad;
+    __u16 pad;
     /* IN - type of range */
-    uint32_t type;
+    __u32 type;
 # define XEN_DMOP_IO_RANGE_PORT   0 /* I/O port range */
 # define XEN_DMOP_IO_RANGE_MEMORY 1 /* MMIO range */
 # define XEN_DMOP_IO_RANGE_PCI    2 /* PCI segment/bus/dev/func range */
@@ -160,8 +160,8 @@ struct xen_dm_op_set_ioreq_server_state {
     /* IN - server id */
     ioservid_t id;
     /* IN - enabled? */
-    uint8_t enabled;
-    uint8_t pad;
+    __u8 enabled;
+    __u8 pad;
 };
 
 /*
@@ -174,7 +174,7 @@ struct xen_dm_op_set_ioreq_server_state {
 struct xen_dm_op_destroy_ioreq_server {
     /* IN - server id */
     ioservid_t id;
-    uint16_t pad;
+    __u16 pad;
 };
 
 /*
@@ -188,8 +188,8 @@ struct xen_dm_op_destroy_ioreq_server {
 
 struct xen_dm_op_track_dirty_vram {
     /* IN - number of pages to be tracked */
-    uint32_t nr;
-    uint32_t pad;
+    __u32 nr;
+    __u32 pad;
     /* IN - first pfn to track */
     uint64_aligned_t first_pfn;
 };
@@ -202,10 +202,10 @@ struct xen_dm_op_track_dirty_vram {
 
 struct xen_dm_op_set_pci_intx_level {
     /* IN - PCI INTx identification (domain:bus:device:intx) */
-    uint16_t domain;
-    uint8_t bus, device, intx;
+    __u16 domain;
+    __u8 bus, device, intx;
     /* IN - Level: 0 -> deasserted, 1 -> asserted */
-    uint8_t  level;
+    __u8  level;
 };
 
 /*
@@ -216,9 +216,9 @@ struct xen_dm_op_set_pci_intx_level {
 
 struct xen_dm_op_set_isa_irq_level {
     /* IN - ISA IRQ (0-15) */
-    uint8_t  isa_irq;
+    __u8  isa_irq;
     /* IN - Level: 0 -> deasserted, 1 -> asserted */
-    uint8_t  level;
+    __u8  level;
 };
 
 /*
@@ -228,9 +228,9 @@ struct xen_dm_op_set_isa_irq_level {
 
 struct xen_dm_op_set_pci_link_route {
     /* PCI INTx line (0-3) */
-    uint8_t  link;
+    __u8  link;
     /* ISA IRQ (1-15) or 0 -> disable link */
-    uint8_t  isa_irq;
+    __u8  isa_irq;
 };
 
 /*
@@ -251,15 +251,15 @@ struct xen_dm_op_modified_memory {
      * IN - Number of extents to be processed
      * OUT -returns n+1 for failing extent
      */
-    uint32_t nr_extents;
+    __u32 nr_extents;
     /* IN/OUT - Must be set to 0 */
-    uint32_t opaque;
+    __u32 opaque;
 };
 
 struct xen_dm_op_modified_memory_extent {
     /* IN - number of contiguous pages modified */
-    uint32_t nr;
-    uint32_t pad;
+    __u32 nr;
+    __u32 pad;
     /* IN - first pfn modified */
     uint64_aligned_t first_pfn;
 };
@@ -277,10 +277,10 @@ struct xen_dm_op_modified_memory_extent {
 
 struct xen_dm_op_set_mem_type {
     /* IN - number of contiguous pages */
-    uint32_t nr;
+    __u32 nr;
     /* IN - new hvmmem_type_t of region */
-    uint16_t mem_type;
-    uint16_t pad;
+    __u16 mem_type;
+    __u16 pad;
     /* IN - first pfn in region */
     uint64_aligned_t first_pfn;
 };
@@ -296,11 +296,11 @@ struct xen_dm_op_set_mem_type {
 
 struct xen_dm_op_inject_event {
     /* IN - index of vCPU */
-    uint32_t vcpuid;
+    __u32 vcpuid;
     /* IN - interrupt vector */
-    uint8_t vector;
+    __u8 vector;
     /* IN - event type (DMOP_EVENT_* ) */
-    uint8_t type;
+    __u8 type;
 /* NB. This enumeration precisely matches hvm.h:X86_EVENTTYPE_* */
 # define XEN_DMOP_EVENT_ext_int    0 /* external interrupt */
 # define XEN_DMOP_EVENT_nmi        2 /* nmi */
@@ -309,11 +309,11 @@ struct xen_dm_op_inject_event {
 # define XEN_DMOP_EVENT_pri_sw_exc 5 /* ICEBP (F1) */
 # define XEN_DMOP_EVENT_sw_exc     6 /* INT3 (CC), INTO (CE) */
     /* IN - instruction length */
-    uint8_t insn_len;
-    uint8_t pad0;
+    __u8 insn_len;
+    __u8 pad0;
     /* IN - error code (or ~0 to skip) */
-    uint32_t error_code;
-    uint32_t pad1;
+    __u32 error_code;
+    __u32 pad1;
     /* IN - CR2 for page faults */
     uint64_aligned_t cr2;
 };
@@ -325,8 +325,8 @@ struct xen_dm_op_inject_event {
 
 struct xen_dm_op_inject_msi {
     /* IN - MSI data (lower 32 bits) */
-    uint32_t data;
-    uint32_t pad;
+    __u32 data;
+    __u32 pad;
     /* IN - MSI address (0xfeexxxxx) */
     uint64_aligned_t addr;
 };
@@ -345,15 +345,15 @@ struct xen_dm_op_inject_msi {
 
 struct xen_dm_op_map_mem_type_to_ioreq_server {
     ioservid_t id;      /* IN - ioreq server id */
-    uint16_t type;      /* IN - memory type */
-    uint32_t flags;     /* IN - types of accesses to be forwarded to the
+    __u16 type;      /* IN - memory type */
+    __u32 flags;     /* IN - types of accesses to be forwarded to the
                            ioreq server. flags with 0 means to unmap the
                            ioreq server */
 
 #define XEN_DMOP_IOREQ_MEM_ACCESS_READ (1u << 0)
 #define XEN_DMOP_IOREQ_MEM_ACCESS_WRITE (1u << 1)
 
-    uint64_t opaque;    /* IN/OUT - only used for hypercall continuation,
+    __u64 opaque;    /* IN/OUT - only used for hypercall continuation,
                            has to be set to zero by the caller */
 };
 
@@ -364,13 +364,13 @@ struct xen_dm_op_map_mem_type_to_ioreq_server {
 #define XEN_DMOP_remote_shutdown 16
 
 struct xen_dm_op_remote_shutdown {
-    uint32_t reason;       /* SHUTDOWN_* => enum sched_shutdown_reason */
+    __u32 reason;       /* SHUTDOWN_* => enum sched_shutdown_reason */
                            /* (Other reason values are not blocked) */
 };
 
 struct xen_dm_op {
-    uint32_t op;
-    uint32_t pad;
+    __u32 op;
+    __u32 pad;
     union {
         struct xen_dm_op_create_ioreq_server create_ioreq_server;
         struct xen_dm_op_get_ioreq_server_info get_ioreq_server_info;

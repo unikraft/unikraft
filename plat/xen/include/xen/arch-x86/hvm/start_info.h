@@ -76,23 +76,23 @@
  * represent the layout described there using C types.
  */
 struct hvm_start_info {
-    uint32_t magic;             /* Contains the magic value 0x336ec578       */
+    __u32 magic;             /* Contains the magic value 0x336ec578       */
                                 /* ("xEn3" with the 0x80 bit of the "E" set).*/
-    uint32_t version;           /* Version of this structure.                */
-    uint32_t flags;             /* SIF_xxx flags.                            */
-    uint32_t nr_modules;        /* Number of modules passed to the kernel.   */
-    uint64_t modlist_paddr;     /* Physical address of an array of           */
+    __u32 version;           /* Version of this structure.                */
+    __u32 flags;             /* SIF_xxx flags.                            */
+    __u32 nr_modules;        /* Number of modules passed to the kernel.   */
+    __u64 modlist_paddr;     /* Physical address of an array of           */
                                 /* hvm_modlist_entry.                        */
-    uint64_t cmdline_paddr;     /* Physical address of the command line.     */
-    uint64_t rsdp_paddr;        /* Physical address of the RSDP ACPI data    */
+    __u64 cmdline_paddr;     /* Physical address of the command line.     */
+    __u64 rsdp_paddr;        /* Physical address of the RSDP ACPI data    */
                                 /* structure.                                */
 };
 
 struct hvm_modlist_entry {
-    uint64_t paddr;             /* Physical address of the module.           */
-    uint64_t size;              /* Size of the module in bytes.              */
-    uint64_t cmdline_paddr;     /* Physical address of the command line.     */
-    uint64_t reserved;
+    __u64 paddr;             /* Physical address of the module.           */
+    __u64 size;              /* Size of the module in bytes.              */
+    __u64 cmdline_paddr;     /* Physical address of the command line.     */
+    __u64 reserved;
 };
 
 #endif /* __XEN_PUBLIC_ARCH_X86_HVM_START_INFO_H__ */

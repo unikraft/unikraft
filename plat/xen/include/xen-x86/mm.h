@@ -160,7 +160,7 @@ typedef unsigned long pgentry_t;
 
 #define PFN_UP(x)	(((x) + PAGE_SIZE-1) >> L1_PAGETABLE_SHIFT)
 #define PFN_DOWN(x)	((x) >> L1_PAGETABLE_SHIFT)
-#define PFN_PHYS(x)	((uint64_t)(x) << L1_PAGETABLE_SHIFT)
+#define PFN_PHYS(x)	((__u64)(x) << L1_PAGETABLE_SHIFT)
 #define PHYS_PFN(x)	((x) >> L1_PAGETABLE_SHIFT)
 
 /* to align the pointer to the (next) page boundary */

@@ -95,7 +95,7 @@ struct blkfront_request {
 	/* List with maximum number of blkfront_grefs for a request. */
 	struct blkfront_gref *gref[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 	/* Number of segments. */
-	uint16_t nb_segments;
+	__u16 nb_segments;
 	/* Queue in which the request will be stored */
 	struct uk_blkdev_queue *queue;
 };
@@ -113,7 +113,7 @@ struct uk_blkdev_queue {
 	/* Allocator for this queue. */
 	struct uk_alloc *a;
 	/* The libukblkdev queue identifier */
-	uint16_t queue_id;
+	__u16 queue_id;
 	/* The flag to interrupt on the queue */
 	int intr_enabled;
 	/* Reference to the Blkfront Device */
@@ -143,7 +143,7 @@ struct blkfront_dev {
 	 */
 	int flush;
 	/* Number of configured queues used for requests */
-	uint16_t nb_queues;
+	__u16 nb_queues;
 	/* Vector of queues used for communication with backend */
 	struct uk_blkdev_queue *queues;
 	/* The blkdev identifier */

@@ -202,7 +202,7 @@ static inline void virtqueue_detach_desc(struct virtqueue_vring *vrq,
 int virtqueue_notify_enabled(struct virtqueue *vq)
 {
 	struct virtqueue_vring *vrq;
-	uint16_t old, new;
+	__u16 old, new;
 
 	UK_ASSERT(vq);
 	vrq = to_virtqueue_vring(vq);
@@ -429,7 +429,7 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 	struct virtqueue_vring *vrq;
 	struct virtqueue *vq;
 	int rc;
-	size_t ring_size = 0;
+	__sz ring_size = 0;
 
 	UK_ASSERT(a);
 

@@ -160,7 +160,7 @@ int netfront_xb_init(struct netfront_dev *nfdev, struct uk_alloc *a)
 
 	p = mac_str;
 	for (int i = 0; i < UK_NETDEV_HWADDR_LEN; i++) {
-		nfdev->hw_addr.addr_bytes[i] = (uint8_t) strtoul(p, &p, 16);
+		nfdev->hw_addr.addr_bytes[i] = (__u8) strtoul(p, &p, 16);
 		p++;
 	}
 	free(mac_str);
@@ -182,7 +182,7 @@ int netfront_xb_init(struct netfront_dev *nfdev, struct uk_alloc *a)
 	int_str = xs_read(XBT_NIL, xendev->otherend,
 		"multi-queue-max-queues");
 	if (!PTRISERR(int_str)) {
-		nfdev->max_queue_pairs = (uint16_t) strtoul(int_str, NULL, 10);
+		nfdev->max_queue_pairs = (__u16) strtoul(int_str, NULL, 10);
 		free(int_str);
 	}
 
@@ -223,7 +223,7 @@ void netfront_xb_fini(struct netfront_dev *nfdev, struct uk_alloc *a)
 	}
 }
 
-static int xs_write_queue(struct netfront_dev *nfdev, uint16_t queue_id,
+static int xs_write_queue(struct netfront_dev *nfdev, __u16 queue_id,
 		xenbus_transaction_t xbt, int write_hierarchical)
 {
 	struct xenbus_device *xendev = nfdev->xendev;
@@ -275,7 +275,7 @@ out:
 	return rc;
 }
 
-static void xs_delete_queue(struct netfront_dev *nfdev, uint16_t queue_id,
+static void xs_delete_queue(struct netfront_dev *nfdev, __u16 queue_id,
 		xenbus_transaction_t xbt, int write_hierarchical)
 {
 	struct xenbus_device *xendev = nfdev->xendev;

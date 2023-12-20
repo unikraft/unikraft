@@ -149,8 +149,8 @@ struct xenbus_handler {
 };
 
 /* Helper functions for Xenbus related allocations */
-void *uk_xb_malloc(size_t size);
-void *uk_xb_calloc(size_t nmemb, size_t size);
+void *uk_xb_malloc(__sz size);
+void *uk_xb_calloc(__sz nmemb, __sz size);
 void  uk_xb_free(void *ptr);
 
 #endif /* __XENBUS_H__ */

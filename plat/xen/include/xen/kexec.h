@@ -174,11 +174,11 @@ typedef struct xen_kexec_range {
 typedef struct xen_kexec_segment {
     union {
         XEN_GUEST_HANDLE(const_void) h;
-        uint64_t _pad;
+        __u64 _pad;
     } buf;
-    uint64_t buf_size;
-    uint64_t dest_maddr;
-    uint64_t dest_size;
+    __u64 buf_size;
+    __u64 dest_maddr;
+    __u64 dest_size;
 } xen_kexec_segment_t;
 DEFINE_XEN_GUEST_HANDLE(xen_kexec_segment_t);
 
@@ -204,15 +204,15 @@ DEFINE_XEN_GUEST_HANDLE(xen_kexec_segment_t);
 
 #define KEXEC_CMD_kexec_load 4
 typedef struct xen_kexec_load {
-    uint8_t  type;        /* One of KEXEC_TYPE_* */
-    uint8_t  _pad;
-    uint16_t arch;        /* ELF machine type (EM_*). */
-    uint32_t nr_segments;
+    __u8  type;        /* One of KEXEC_TYPE_* */
+    __u8  _pad;
+    __u16 arch;        /* ELF machine type (EM_*). */
+    __u32 nr_segments;
     union {
         XEN_GUEST_HANDLE(xen_kexec_segment_t) h;
-        uint64_t _pad;
+        __u64 _pad;
     } segments;
-    uint64_t entry_maddr; /* image entry point machine address. */
+    __u64 entry_maddr; /* image entry point machine address. */
 } xen_kexec_load_t;
 DEFINE_XEN_GUEST_HANDLE(xen_kexec_load_t);
 
@@ -223,7 +223,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_kexec_load_t);
  */
 #define KEXEC_CMD_kexec_unload 5
 typedef struct xen_kexec_unload {
-    uint8_t type;
+    __u8 type;
 } xen_kexec_unload_t;
 DEFINE_XEN_GUEST_HANDLE(xen_kexec_unload_t);
 
@@ -237,7 +237,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_kexec_unload_t);
  */
 #define KEXEC_CMD_kexec_status 6
 typedef struct xen_kexec_status {
-    uint8_t type;
+    __u8 type;
 } xen_kexec_status_t;
 DEFINE_XEN_GUEST_HANDLE(xen_kexec_status_t);
 

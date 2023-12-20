@@ -57,14 +57,14 @@
 struct xen_pmu_params {
     /* IN/OUT parameters */
     struct {
-        uint32_t maj;
-        uint32_t min;
+        __u32 maj;
+        __u32 min;
     } version;
-    uint64_t val;
+    __u64 val;
 
     /* IN parameters */
-    uint32_t vcpu;
-    uint32_t pad;
+    __u32 vcpu;
+    __u32 pad;
 };
 typedef struct xen_pmu_params xen_pmu_params_t;
 DEFINE_XEN_GUEST_HANDLE(xen_pmu_params_t);
@@ -109,13 +109,13 @@ DEFINE_XEN_GUEST_HANDLE(xen_pmu_params_t);
  */
 struct xen_pmu_data {
     /* Interrupted VCPU */
-    uint32_t vcpu_id;
+    __u32 vcpu_id;
 
     /*
      * Physical processor on which the interrupt occurred. On non-privileged
      * guests set to vcpu_id;
      */
-    uint32_t pcpu_id;
+    __u32 pcpu_id;
 
     /*
      * Domain that was interrupted. On non-privileged guests set to DOMID_SELF.
@@ -124,7 +124,7 @@ struct xen_pmu_data {
      */
     domid_t  domain_id;
 
-    uint8_t pad[6];
+    __u8 pad[6];
 
     /* Architecture-specific information */
     struct xen_pmu_arch pmu;

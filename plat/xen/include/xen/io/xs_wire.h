@@ -96,10 +96,10 @@ __attribute__((unused))
 
 struct xsd_sockmsg
 {
-    uint32_t type;  /* XS_??? */
-    uint32_t req_id;/* Request identifier, echoed in daemon's response.  */
-    uint32_t tx_id; /* Transaction id (0 if not related to a transaction). */
-    uint32_t len;   /* Length of data following this. */
+    __u32 type;  /* XS_??? */
+    __u32 req_id;/* Request identifier, echoed in daemon's response.  */
+    __u32 tx_id; /* Transaction id (0 if not related to a transaction). */
+    __u32 len;   /* Length of data following this. */
 
     /* Generally followed by nul-terminated string(s). */
 };
@@ -115,15 +115,15 @@ enum xs_watch_type
  *
  * Inter-domain shared memory communications. */
 #define XENSTORE_RING_SIZE 1024
-typedef uint32_t XENSTORE_RING_IDX;
+typedef __u32 XENSTORE_RING_IDX;
 #define MASK_XENSTORE_IDX(idx) ((idx) & (XENSTORE_RING_SIZE-1))
 struct xenstore_domain_interface {
     char req[XENSTORE_RING_SIZE]; /* Requests to xenstore daemon. */
     char rsp[XENSTORE_RING_SIZE]; /* Replies and async watch events. */
     XENSTORE_RING_IDX req_cons, req_prod;
     XENSTORE_RING_IDX rsp_cons, rsp_prod;
-    uint32_t server_features; /* Bitmap of features supported by the server */
-    uint32_t connection;
+    __u32 server_features; /* Bitmap of features supported by the server */
+    __u32 connection;
 };
 
 /* Violating this is very bad.  See docs/misc/xenstore.txt. */

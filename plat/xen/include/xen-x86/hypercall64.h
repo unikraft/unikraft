@@ -201,7 +201,7 @@ HYPERVISOR_shutdown(
 
 static inline long
 HYPERVISOR_set_timer_op(
-	uint64_t timeout)
+	__u64 timeout)
 {
 	return _hypercall1(long, set_timer_op, timeout);
 }

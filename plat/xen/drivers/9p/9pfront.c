@@ -59,9 +59,9 @@ static UK_LIST_HEAD(p9front_device_list);
 static __spinlock p9front_device_list_lock;
 
 struct p9front_header {
-	uint32_t size;
-	uint8_t type;
-	uint16_t tag;
+	__u32 size;
+	__u8 type;
+	__u16 tag;
 } __packed;
 
 static void p9front_recv(struct p9front_dev_ring *ring);
@@ -89,7 +89,7 @@ static void p9front_recv(struct p9front_dev_ring *ring)
 	int ring_size, rc;
 	struct p9front_header hdr;
 	struct uk_9preq *req;
-	uint32_t buf_cnt, zc_buf_cnt;
+	__u32 buf_cnt, zc_buf_cnt;
 
 	ring_size = XEN_FLEX_RING_SIZE(p9fdev->ring_order);
 

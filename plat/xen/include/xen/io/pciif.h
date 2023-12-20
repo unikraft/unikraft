@@ -64,29 +64,29 @@
 #define SH_INFO_MAX_VEC     128
 
 struct xen_msix_entry {
-    uint16_t vector;
-    uint16_t entry;
+    __u16 vector;
+    __u16 entry;
 };
 struct xen_pci_op {
     /* IN: what action to perform: XEN_PCI_OP_* */
-    uint32_t cmd;
+    __u32 cmd;
 
     /* OUT: will contain an error number (if any) from errno.h */
-    int32_t err;
+    __s32 err;
 
     /* IN: which device to touch */
-    uint32_t domain; /* PCI Domain/Segment */
-    uint32_t bus;
-    uint32_t devfn;
+    __u32 domain; /* PCI Domain/Segment */
+    __u32 bus;
+    __u32 devfn;
 
     /* IN: which configuration registers to touch */
-    int32_t offset;
-    int32_t size;
+    __s32 offset;
+    __s32 size;
 
     /* IN/OUT: Contains the result after a READ or the value to WRITE */
-    uint32_t value;
+    __u32 value;
     /* IN: Contains extra infor for this operation */
-    uint32_t info;
+    __u32 info;
     /*IN:  param for msi-x */
     struct xen_msix_entry msix_entries[SH_INFO_MAX_VEC];
 };
@@ -96,18 +96,18 @@ struct xen_pcie_aer_op
 {
 
     /* IN: what action to perform: XEN_PCI_OP_* */
-    uint32_t cmd;
+    __u32 cmd;
     /*IN/OUT: return aer_op result or carry error_detected state as input*/
-    int32_t err;
+    __s32 err;
 
     /* IN: which device to touch */
-    uint32_t domain; /* PCI Domain/Segment*/
-    uint32_t bus;
-    uint32_t devfn;
+    __u32 domain; /* PCI Domain/Segment*/
+    __u32 bus;
+    __u32 devfn;
 };
 struct xen_pci_sharedinfo {
     /* flags - XEN_PCIF_* */
-    uint32_t flags;
+    __u32 flags;
     struct xen_pci_op op;
     struct xen_pcie_aer_op aer_op;
 };

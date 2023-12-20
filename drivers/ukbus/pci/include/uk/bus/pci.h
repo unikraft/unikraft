@@ -81,17 +81,17 @@ extern "C" {
  */
 struct pci_device_id {
 	/**< Class ID or PCI_CLASS_ANY_ID. */
-	uint32_t class_id;
+	__u32 class_id;
 	/**< Sub class ID or PCI_CLASS_ANY_ID. */
-	uint32_t sub_class_id;
+	__u32 sub_class_id;
 	/**< Vendor ID or PCI_ANY_ID. */
-	uint16_t vendor_id;
+	__u16 vendor_id;
 	/**< Device ID or PCI_ANY_ID. */
-	uint16_t device_id;
+	__u16 device_id;
 	/**< Subsystem vendor ID or PCI_ANY_ID. */
-	uint16_t subsystem_vendor_id;
+	__u16 subsystem_vendor_id;
 	/**< Subsystem device ID or PCI_ANY_ID. */
-	uint16_t subsystem_device_id;
+	__u16 subsystem_device_id;
 };
 
 /** Any PCI device identifier (vendor, device, ...) */
@@ -124,13 +124,13 @@ struct pci_device_id {
  */
 struct pci_address {
 	/**< Device domain */
-	uint32_t domain;
+	__u32 domain;
 	/**< Device bus */
-	uint8_t bus;
+	__u8 bus;
 	/**< Device ID */
-	uint8_t devid;
+	__u8 devid;
 	/**< Device function. */
-	uint8_t function;
+	__u8 function;
 };
 
 struct pci_device;

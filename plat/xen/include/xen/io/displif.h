@@ -155,17 +155,17 @@
  *-------------------------------- Addressing ---------------------------------
  *
  * dom-id
- *      Values:         <uint16_t>
+ *      Values:         <__u16>
  *
  *      Domain identifier.
  *
  * dev-id
- *      Values:         <uint16_t>
+ *      Values:         <__u16>
  *
  *      Device identifier.
  *
  * conn-idx
- *      Values:         <uint8_t>
+ *      Values:         <__u8>
  *
  *      Zero based contigous index of the connector.
  *      /local/domain/<dom-id>/device/vdispl/<dev-id>/<conn-idx>/...
@@ -190,7 +190,7 @@
  *----------------------------- Connector settings ----------------------------
  *
  * resolution
- *      Values:         <width, uint32_t>x<height, uint32_t>
+ *      Values:         <width, __u32>x<height, __u32>
  *
  *      Width and height of the connector in pixels separated by
  *      XENDISPL_RESOLUTION_SEPARATOR. This defines visible area of the
@@ -203,13 +203,13 @@
  * set up per connector.
  *
  * req-event-channel
- *      Values:         <uint32_t>
+ *      Values:         <__u32>
  *
  *      The identifier of the Xen connector's control event channel
  *      used to signal activity in the ring buffer.
  *
  * req-ring-ref
- *      Values:         <uint32_t>
+ *      Values:         <__u32>
  *
  *      The Xen grant reference granting permission for the backend to map
  *      a sole page of connector's control ring buffer.
@@ -220,13 +220,13 @@
  * to frontend, set up per connector.
  *
  * evt-event-channel
- *      Values:         <uint32_t>
+ *      Values:         <__u32>
  *
  *      The identifier of the Xen connector's event channel
  *      used to signal activity in the ring buffer.
  *
  * evt-ring-ref
- *      Values:         <uint32_t>
+ *      Values:         <__u32>
  *
  *      The Xen grant reference granting permission for the backend to map
  *      a sole page of connector's event ring buffer.
@@ -398,9 +398,9 @@
  * Framebuffer's cookie of value 0 is treated as invalid.
  *
  * For all request/response/event packets that use cookies:
- *   dbuf_cookie - uint64_t, unique to guest domain value used by the backend
+ *   dbuf_cookie - __u64, unique to guest domain value used by the backend
  *     to map remote display buffer to its local one
- *   fb_cookie - uint64_t, unique to guest domain value used by the backend
+ *   fb_cookie - __u64, unique to guest domain value used by the backend
  *     to map remote framebuffer to its local one
  *
  *---------------------------------- Requests ---------------------------------
@@ -417,8 +417,8 @@
  * +----------------+----------------+----------------+----------------+
  * |                             reserved                              | 8
  * +----------------+----------------+----------------+----------------+
- *   id - uint16_t, private guest value, echoed in response
- *   operation - uint8_t, operation code, XENDISPL_OP_???
+ *   id - __u16, private guest value, echoed in response
+ *   operation - __u8, operation code, XENDISPL_OP_???
  *
  * Request dbuf creation - request creation of a display buffer.
  *         0                1                 2               3        octet
@@ -463,11 +463,11 @@
  * than the connector's resolution. Depth/pixel format of the individual
  * buffers can differ as well.
  *
- * width - uint32_t, width in pixels
- * height - uint32_t, height in pixels
- * bpp - uint32_t, bits per pixel
- * buffer_sz - uint32_t, buffer size to be allocated, octets
- * flags - uint32_t, flags of the operation
+ * width - __u32, width in pixels
+ * height - __u32, height in pixels
+ * bpp - __u32, bits per pixel
+ * buffer_sz - __u32, buffer size to be allocated, octets
+ * flags - __u32, flags of the operation
  *   o XENDISPL_DBUF_FLG_REQ_ALLOC - if set, then backend is requested
  *     to allocate the buffer with the parameters provided in this request.
  *     Page directory is handled as follows:
@@ -491,12 +491,12 @@
 #define XENDISPL_DBUF_FLG_REQ_ALLOC       (1 << 0)
 
 struct xendispl_dbuf_create_req {
-    uint64_t dbuf_cookie;
-    uint32_t width;
-    uint32_t height;
-    uint32_t bpp;
-    uint32_t buffer_sz;
-    uint32_t flags;
+    __u64 dbuf_cookie;
+    __u32 width;
+    __u32 height;
+    __u32 bpp;
+    __u32 buffer_sz;
+    __u32 flags;
     grant_ref_t gref_directory;
 };
 
@@ -560,7 +560,7 @@ struct xendispl_page_directory {
  */
 
 struct xendispl_dbuf_destroy_req {
-    uint64_t dbuf_cookie;
+    __u64 dbuf_cookie;
 };
 
 /*
@@ -603,17 +603,17 @@ struct xendispl_dbuf_destroy_req {
  * an error. fb_cookie can be re-used after destroying the corresponding
  * frame buffer.
  *
- * width - uint32_t, width in pixels
- * height - uint32_t, height in pixels
- * pixel_format - uint32_t, pixel format of the framebuffer, FOURCC code
+ * width - __u32, width in pixels
+ * height - __u32, height in pixels
+ * pixel_format - __u32, pixel format of the framebuffer, FOURCC code
  */
 
 struct xendispl_fb_attach_req {
-    uint64_t dbuf_cookie;
-    uint64_t fb_cookie;
-    uint32_t width;
-    uint32_t height;
-    uint32_t pixel_format;
+    __u64 dbuf_cookie;
+    __u64 fb_cookie;
+    __u32 width;
+    __u32 height;
+    __u32 pixel_format;
 };
 
 /*
@@ -642,7 +642,7 @@ struct xendispl_fb_attach_req {
  */
 
 struct xendispl_fb_detach_req {
-    uint64_t fb_cookie;
+    __u64 fb_cookie;
 };
 
 /*
@@ -682,20 +682,20 @@ struct xendispl_fb_detach_req {
  * x, y, width and height are bound by the connector's resolution and must not
  * exceed it.
  *
- * x - uint32_t, starting position in pixels by X axis
- * y - uint32_t, starting position in pixels by Y axis
- * width - uint32_t, width in pixels
- * height - uint32_t, height in pixels
- * bpp - uint32_t, bits per pixel
+ * x - __u32, starting position in pixels by X axis
+ * y - __u32, starting position in pixels by Y axis
+ * width - __u32, width in pixels
+ * height - __u32, height in pixels
+ * bpp - __u32, bits per pixel
  */
 
 struct xendispl_set_config_req {
-    uint64_t fb_cookie;
-    uint32_t x;
-    uint32_t y;
-    uint32_t width;
-    uint32_t height;
-    uint32_t bpp;
+    __u64 fb_cookie;
+    __u32 x;
+    __u32 y;
+    __u32 width;
+    __u32 height;
+    __u32 bpp;
 };
 
 /*
@@ -720,7 +720,7 @@ struct xendispl_set_config_req {
  */
 
 struct xendispl_page_flip_req {
-    uint64_t fb_cookie;
+    __u64 fb_cookie;
 };
 
 /*
@@ -742,8 +742,8 @@ struct xendispl_page_flip_req {
  * |                             reserved                              | 64
  * +----------------+----------------+----------------+----------------+
  *
- * id - uint16_t, private guest value, echoed from request
- * status - int32_t, response status, zero on success and -XEN_EXX on failure
+ * id - __u16, private guest value, echoed from request
+ * status - __s32, response status, zero on success and -XEN_EXX on failure
  *
  *----------------------------------- Events ----------------------------------
  *
@@ -758,8 +758,8 @@ struct xendispl_page_flip_req {
  * |                             reserved                              | 8
  * +----------------+----------------+----------------+----------------+
  *
- * id - uint16_t, event id, may be used by front
- * type - uint8_t, type of the event
+ * id - __u16, event id, may be used by front
+ * type - __u8, type of the event
  *
  *
  * Page flip complete event - event from back to front on page flip completed:
@@ -782,13 +782,13 @@ struct xendispl_page_flip_req {
  */
 
 struct xendispl_pg_flip_evt {
-    uint64_t fb_cookie;
+    __u64 fb_cookie;
 };
 
 struct xendispl_req {
-    uint16_t id;
-    uint8_t operation;
-    uint8_t reserved[5];
+    __u16 id;
+    __u8 operation;
+    __u8 reserved[5];
     union {
         struct xendispl_dbuf_create_req dbuf_create;
         struct xendispl_dbuf_destroy_req dbuf_destroy;
@@ -796,25 +796,25 @@ struct xendispl_req {
         struct xendispl_fb_detach_req fb_detach;
         struct xendispl_set_config_req set_config;
         struct xendispl_page_flip_req pg_flip;
-        uint8_t reserved[56];
+        __u8 reserved[56];
     } op;
 };
 
 struct xendispl_resp {
-    uint16_t id;
-    uint8_t operation;
-    uint8_t reserved;
-    int32_t status;
-    uint8_t reserved1[56];
+    __u16 id;
+    __u8 operation;
+    __u8 reserved;
+    __s32 status;
+    __u8 reserved1[56];
 };
 
 struct xendispl_evt {
-    uint16_t id;
-    uint8_t type;
-    uint8_t reserved[5];
+    __u16 id;
+    __u8 type;
+    __u8 reserved[5];
     union {
         struct xendispl_pg_flip_evt pg_flip;
-        uint8_t reserved[56];
+        __u8 reserved[56];
     } op;
 };
 
@@ -837,9 +837,9 @@ DEFINE_RING_TYPES(xen_displif, struct xendispl_req, struct xendispl_resp);
  */
 
 struct xendispl_event_page {
-    uint32_t in_cons;
-    uint32_t in_prod;
-    uint8_t reserved[56];
+    __u32 in_cons;
+    __u32 in_prod;
+    __u8 reserved[56];
 };
 
 #define XENDISPL_EVENT_PAGE_SIZE 4096

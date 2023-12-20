@@ -52,12 +52,12 @@ struct uk_netdev_tx_queue {
 	/* The netfront device */
 	struct netfront_dev *netfront_dev;
 	/* The libuknet queue identifier */
-	uint16_t lqueue_id;
+	__u16 lqueue_id;
 	/* True if initialized */
 	bool initialized;
 
 	/* Shared ring size */
-	uint16_t ring_size;
+	__u16 ring_size;
 	/* Shared ring */
 	netif_tx_front_ring_t ring;
 	/* Shared ring grant ref */
@@ -66,7 +66,7 @@ struct uk_netdev_tx_queue {
 	evtchn_port_t evtchn;
 
 	/* Free list of transmitting request IDs */
-	uint16_t freelist[NET_TX_RING_SIZE + 1];
+	__u16 freelist[NET_TX_RING_SIZE + 1];
 	/* Ring of inflight netbufs */
 	struct uk_netbuf *nbuf[NET_TX_RING_SIZE];
 	/* Grants for transmit buffers */
@@ -82,12 +82,12 @@ struct uk_netdev_rx_queue {
 	/* The netfront device */
 	struct netfront_dev *netfront_dev;
 	/* The libuknet queue identifier */
-	uint16_t lqueue_id;
+	__u16 lqueue_id;
 	/* True if initialized */
 	bool initialized;
 
 	/* Shared ring size */
-	uint16_t ring_size;
+	__u16 ring_size;
 	/* Shared ring */
 	netif_rx_front_ring_t ring;
 	/* Shared ring grant ref */
@@ -96,7 +96,7 @@ struct uk_netdev_rx_queue {
 	evtchn_port_t evtchn;
 
 	/* The flag to interrupt on the transmit queue */
-	uint8_t intr_enabled;
+	__u8 intr_enabled;
 
 	/* User-provided receive buffer allocation function */
 	uk_netdev_alloc_rxpkts alloc_rxpkts;
@@ -121,12 +121,12 @@ struct netfront_dev {
 	struct uk_netdev netdev;
 
 	/* List of the Rx/Tx queues */
-	uint16_t txqs_num;
-	uint16_t rxqs_num;
+	__u16 txqs_num;
+	__u16 rxqs_num;
 	struct uk_netdev_tx_queue *txqs;
 	struct uk_netdev_rx_queue *rxqs;
 	/* Maximum number of queue pairs */
-	uint16_t  max_queue_pairs;
+	__u16  max_queue_pairs;
 	/* True if using split event channels */
 	bool split_evtchn;
 
@@ -134,13 +134,13 @@ struct netfront_dev {
 	struct xs_econf econf;
 
 	/* The netdevice identifier */
-	uint16_t uid;
+	__u16 uid;
 	/* The mtu */
-	uint16_t mtu;
+	__u16 mtu;
 	/* The hw address of the netdevice */
 	struct uk_hwaddr hw_addr;
 	/* RX promiscuous mode. */
-	uint8_t promisc : 1;
+	__u8 promisc : 1;
 };
 
 #endif /* __NETFRONT_H__ */

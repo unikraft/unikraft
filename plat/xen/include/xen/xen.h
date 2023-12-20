@@ -49,7 +49,7 @@ __DEFINE_XEN_GUEST_HANDLE(ulong, unsigned long);
 #endif
 DEFINE_XEN_GUEST_HANDLE(void);
 
-DEFINE_XEN_GUEST_HANDLE(uint64_t);
+DEFINE_XEN_GUEST_HANDLE(__u64);
 DEFINE_XEN_GUEST_HANDLE(xen_pfn_t);
 DEFINE_XEN_GUEST_HANDLE(xen_ulong_t);
 
@@ -580,15 +580,15 @@ DEFINE_XEN_GUEST_HANDLE(mmuext_op_t);
 
 #ifndef __ASSEMBLY__
 
-typedef uint16_t domid_t;
+typedef __u16 domid_t;
 
 /*
  * Send an array of these to HYPERVISOR_mmu_update().
  * NB. The fields are natural pointer/address size for this architecture.
  */
 struct mmu_update {
-    uint64_t ptr;       /* Machine address of PTE. */
-    uint64_t val;       /* New contents of PTE.    */
+    __u64 ptr;       /* Machine address of PTE. */
+    __u64 val;       /* New contents of PTE.    */
 };
 typedef struct mmu_update mmu_update_t;
 DEFINE_XEN_GUEST_HANDLE(mmu_update_t);
@@ -596,7 +596,7 @@ DEFINE_XEN_GUEST_HANDLE(mmu_update_t);
 /*
  * ` enum neg_errnoval
  * ` HYPERVISOR_multicall(multicall_entry_t call_list[],
- * `                      uint32_t nr_calls);
+ * `                      __u32 nr_calls);
  *
  * NB. The fields are logically the natural register size for this
  * architecture. In cases where xen_ulong_t is larger than this then
@@ -627,10 +627,10 @@ struct vcpu_time_info {
      * The correct way to interact with the version number is similar to
      * Linux's seqlock: see the implementations of read_seqbegin/read_seqretry.
      */
-    uint32_t version;
-    uint32_t pad0;
-    uint64_t tsc_timestamp;   /* TSC at last update of time vals.  */
-    uint64_t system_time;     /* Time, in nanosecs, since boot.    */
+    __u32 version;
+    __u32 pad0;
+    __u64 tsc_timestamp;   /* TSC at last update of time vals.  */
+    __u64 system_time;     /* Time, in nanosecs, since boot.    */
     /*
      * Current system time:
      *   system_time +
@@ -638,13 +638,13 @@ struct vcpu_time_info {
      * CPU frequency (Hz):
      *   ((10^9 << 32) / tsc_to_system_mul) >> tsc_shift
      */
-    uint32_t tsc_to_system_mul;
-    int8_t   tsc_shift;
+    __u32 tsc_to_system_mul;
+    __s8   tsc_shift;
 #if __XEN_INTERFACE_VERSION__ > 0x040600
-    uint8_t  flags;
-    uint8_t  pad1[2];
+    __u8  flags;
+    __u8  pad1[2];
 #else
-    int8_t   pad1[3];
+    __s8   pad1[3];
 #endif
 }; /* 32 bytes */
 typedef struct vcpu_time_info vcpu_time_info_t;
@@ -678,11 +678,11 @@ struct vcpu_info {
      * an upcall activation. The mask is cleared when the VCPU requests
      * to block: this avoids wakeup-waiting races.
      */
-    uint8_t evtchn_upcall_pending;
+    __u8 evtchn_upcall_pending;
 #ifdef XEN_HAVE_PV_UPCALL_MASK
-    uint8_t evtchn_upcall_mask;
+    __u8 evtchn_upcall_mask;
 #else /* XEN_HAVE_PV_UPCALL_MASK */
-    uint8_t pad0;
+    __u8 pad0;
 #endif /* XEN_HAVE_PV_UPCALL_MASK */
     xen_ulong_t evtchn_pending_sel;
     struct arch_vcpu_info arch;
@@ -742,11 +742,11 @@ struct shared_info {
      * Wallclock time: updated only by control software. Guests should base
      * their gettimeofday() syscall on this wallclock-base value.
      */
-    uint32_t wc_version;      /* Version counter: see vcpu_time_info_t. */
-    uint32_t wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
-    uint32_t wc_nsec;         /* Nsecs 00:00:00 UTC, Jan 1, 1970.  */
+    __u32 wc_version;      /* Version counter: see vcpu_time_info_t. */
+    __u32 wc_sec;          /* Secs  00:00:00 UTC, Jan 1, 1970.  */
+    __u32 wc_nsec;         /* Nsecs 00:00:00 UTC, Jan 1, 1970.  */
 #if !defined(__i386__)
-    uint32_t wc_sec_hi;
+    __u32 wc_sec_hi;
 # define xen_wc_sec_hi wc_sec_hi
 #elif !defined(__XEN__) && !defined(__XEN_TOOLS__)
 # define xen_wc_sec_hi arch.wc_sec_hi
@@ -802,17 +802,17 @@ struct start_info {
     char magic[32];             /* "xen-<version>-<platform>".            */
     unsigned long nr_pages;     /* Total pages allocated to this domain.  */
     unsigned long shared_info;  /* MACHINE address of shared info struct. */
-    uint32_t flags;             /* SIF_xxx flags.                         */
+    __u32 flags;             /* SIF_xxx flags.                         */
     xen_pfn_t store_mfn;        /* MACHINE page number of shared page.    */
-    uint32_t store_evtchn;      /* Event channel for store communication. */
+    __u32 store_evtchn;      /* Event channel for store communication. */
     union {
         struct {
             xen_pfn_t mfn;      /* MACHINE page number of console page.   */
-            uint32_t  evtchn;   /* Event channel for console page.        */
+            __u32  evtchn;   /* Event channel for console page.        */
         } domU;
         struct {
-            uint32_t info_off;  /* Offset of console_info struct.         */
-            uint32_t info_size; /* Size of console_info struct from start.*/
+            __u32 info_off;  /* Offset of console_info struct.         */
+            __u32 info_size; /* Size of console_info struct from start.*/
         } dom0;
     } console;
     /* THE FOLLOWING ARE ONLY FILLED IN ON INITIAL BOOT (NOT RESUME).     */
@@ -824,7 +824,7 @@ struct start_info {
                                 /*  SIF_MOD_START_PFN set in flags).      */
     unsigned long mod_len;      /* Size (bytes) of pre-loaded module.     */
 #define MAX_GUEST_CMDLINE 1024
-    int8_t cmd_line[MAX_GUEST_CMDLINE];
+    __s8 cmd_line[MAX_GUEST_CMDLINE];
     /* The pfn range here covers both page table and p->m table frames.   */
     unsigned long first_p2m_pfn;/* 1st pfn forming initial P->M table.    */
     unsigned long nr_p2m_frames;/* # of pfns forming initial P->M table.  */
@@ -864,13 +864,13 @@ typedef struct start_info start_info_t;
 struct xen_multiboot_mod_list
 {
     /* Address of first byte of the module */
-    uint32_t mod_start;
+    __u32 mod_start;
     /* Address of last byte of the module (inclusive) */
-    uint32_t mod_end;
+    __u32 mod_end;
     /* Address of zero-terminated command line */
-    uint32_t cmdline;
+    __u32 cmdline;
     /* Unused, must be zero */
-    uint32_t pad;
+    __u32 pad;
 };
 /*
  * `incontents 200 startofday_dom0_console Dom0_console
@@ -881,7 +881,7 @@ struct xen_multiboot_mod_list
  * have a working VGA/VESA console.
  */
 typedef struct dom0_vga_console_info {
-    uint8_t video_type; /* DOM0_VGA_CONSOLE_??? */
+    __u8 video_type; /* DOM0_VGA_CONSOLE_??? */
 #define XEN_VGATYPE_TEXT_MODE_3 0x03
 #define XEN_VGATYPE_VESA_LFB    0x23
 #define XEN_VGATYPE_EFI_LFB     0x70
@@ -889,33 +889,33 @@ typedef struct dom0_vga_console_info {
     union {
         struct {
             /* Font height, in pixels. */
-            uint16_t font_height;
+            __u16 font_height;
             /* Cursor location (column, row). */
-            uint16_t cursor_x, cursor_y;
+            __u16 cursor_x, cursor_y;
             /* Number of rows and columns (dimensions in characters). */
-            uint16_t rows, columns;
+            __u16 rows, columns;
         } text_mode_3;
 
         struct {
             /* Width and height, in pixels. */
-            uint16_t width, height;
+            __u16 width, height;
             /* Bytes per scan line. */
-            uint16_t bytes_per_line;
+            __u16 bytes_per_line;
             /* Bits per pixel. */
-            uint16_t bits_per_pixel;
+            __u16 bits_per_pixel;
             /* LFB physical address, and size (in units of 64kB). */
-            uint32_t lfb_base;
-            uint32_t lfb_size;
+            __u32 lfb_base;
+            __u32 lfb_size;
             /* RGB mask offsets and sizes, as defined by VBE 1.2+ */
-            uint8_t  red_pos, red_size;
-            uint8_t  green_pos, green_size;
-            uint8_t  blue_pos, blue_size;
-            uint8_t  rsvd_pos, rsvd_size;
+            __u8  red_pos, red_size;
+            __u8  green_pos, green_size;
+            __u8  blue_pos, blue_size;
+            __u8  rsvd_pos, rsvd_size;
 #if __XEN_INTERFACE_VERSION__ >= 0x00030206
             /* VESA capabilities (offset 0xa, VESA command 0x4f00). */
-            uint32_t gbl_caps;
+            __u32 gbl_caps;
             /* Mode attributes (offset 0x0, VESA command 0x4f01). */
-            uint16_t mode_attrs;
+            __u16 mode_attrs;
 #endif
         } vesa_lfb;
     } u;
@@ -923,15 +923,15 @@ typedef struct dom0_vga_console_info {
 #define xen_vga_console_info dom0_vga_console_info
 #define xen_vga_console_info_t dom0_vga_console_info_t
 
-typedef uint8_t xen_domain_handle_t[16];
+typedef __u8 xen_domain_handle_t[16];
 
-__DEFINE_XEN_GUEST_HANDLE(uint8,  uint8_t);
-__DEFINE_XEN_GUEST_HANDLE(uint16, uint16_t);
-__DEFINE_XEN_GUEST_HANDLE(uint32, uint32_t);
-__DEFINE_XEN_GUEST_HANDLE(uint64, uint64_t);
+__DEFINE_XEN_GUEST_HANDLE(uint8,  __u8);
+__DEFINE_XEN_GUEST_HANDLE(uint16, __u16);
+__DEFINE_XEN_GUEST_HANDLE(uint32, __u32);
+__DEFINE_XEN_GUEST_HANDLE(uint64, __u64);
 
 typedef struct {
-    uint8_t a[16];
+    __u8 a[16];
 } xen_uuid_t;
 
 /*
@@ -967,10 +967,10 @@ typedef struct {
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 
 #ifndef int64_aligned_t
-#define int64_aligned_t int64_t
+#define int64_aligned_t __s64
 #endif
 #ifndef uint64_aligned_t
-#define uint64_aligned_t uint64_t
+#define uint64_aligned_t __u64
 #endif
 #ifndef XEN_GUEST_HANDLE_64
 #define XEN_GUEST_HANDLE_64(name) XEN_GUEST_HANDLE(name)
@@ -979,7 +979,7 @@ typedef struct {
 #ifndef __ASSEMBLY__
 struct xenctl_bitmap {
     XEN_GUEST_HANDLE_64(uint8) bitmap;
-    uint32_t nr_bits;
+    __u32 nr_bits;
 };
 #endif
 

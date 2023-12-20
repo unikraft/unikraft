@@ -61,20 +61,20 @@
 #define dom0_platform_quirk   xenpf_platform_quirk
 #define dom0_platform_quirk_t xenpf_platform_quirk_t
 
-typedef uint64_t cpumap_t;
+typedef __u64 cpumap_t;
 
 /* Unsupported legacy operation -- defined for API compatibility. */
 #define DOM0_MSR                 15
 struct dom0_msr {
     /* IN variables. */
-    uint32_t write;
+    __u32 write;
     cpumap_t cpu_mask;
-    uint32_t msr;
-    uint32_t in1;
-    uint32_t in2;
+    __u32 msr;
+    __u32 in1;
+    __u32 in2;
     /* OUT variables. */
-    uint32_t out1;
-    uint32_t out2;
+    __u32 out1;
+    __u32 out2;
 };
 typedef struct dom0_msr dom0_msr_t;
 DEFINE_XEN_GUEST_HANDLE(dom0_msr_t);
@@ -82,16 +82,16 @@ DEFINE_XEN_GUEST_HANDLE(dom0_msr_t);
 /* Unsupported legacy operation -- defined for API compatibility. */
 #define DOM0_PHYSICAL_MEMORY_MAP 40
 struct dom0_memory_map_entry {
-    uint64_t start, end;
-    uint32_t flags; /* reserved */
-    uint8_t  is_ram;
+    __u64 start, end;
+    __u32 flags; /* reserved */
+    __u8  is_ram;
 };
 typedef struct dom0_memory_map_entry dom0_memory_map_entry_t;
 DEFINE_XEN_GUEST_HANDLE(dom0_memory_map_entry_t);
 
 struct dom0_op {
-    uint32_t cmd;
-    uint32_t interface_version; /* DOM0_INTERFACE_VERSION */
+    __u32 cmd;
+    __u32 interface_version; /* DOM0_INTERFACE_VERSION */
     union {
         struct dom0_msr               msr;
         struct dom0_settime           settime;
@@ -101,7 +101,7 @@ struct dom0_op {
         struct dom0_microcode         microcode;
         struct dom0_platform_quirk    platform_quirk;
         struct dom0_memory_map_entry  physical_memory_map;
-        uint8_t                       pad[128];
+        __u8                       pad[128];
     } u;
 };
 typedef struct dom0_op dom0_op_t;

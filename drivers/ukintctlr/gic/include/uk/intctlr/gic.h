@@ -71,24 +71,24 @@ struct _gic_operations {
 	/** Initialize GIC controller */
 	int (*initialize)(void);
 	/** Acknowledging IRQ */
-	uint32_t (*ack_irq)(void);
+	__u32 (*ack_irq)(void);
 	/** Finish interrupt handling */
-	void (*eoi_irq)(uint32_t irq);
+	void (*eoi_irq)(__u32 irq);
 	/** Enable IRQ */
-	void (*enable_irq)(uint32_t irq);
+	void (*enable_irq)(__u32 irq);
 	/** Disable IRQ */
-	void (*disable_irq)(uint32_t irq);
+	void (*disable_irq)(__u32 irq);
 	/** Set IRQ trigger type */
-	void (*set_irq_trigger)(uint32_t irq,
+	void (*set_irq_trigger)(__u32 irq,
 				enum uk_intctlr_irq_trigger trigger);
 	/** Set priority for IRQ */
-	void (*set_irq_prio)(uint32_t irq, uint8_t priority);
+	void (*set_irq_prio)(__u32 irq, __u8 priority);
 	/** Set IRQ affinity (or "target" for GICv2) */
-	void (*set_irq_affinity)(uint32_t irq, uint32_t affinity);
+	void (*set_irq_affinity)(__u32 irq, __u32 affinity);
 	/** Handle IRQ */
 	void (*handle_irq)(struct __regs *regs);
 	/** Send a SGI to the specifiec core */
-	void (*gic_sgi_gen)(uint8_t sgintid, uint32_t cpuid);
+	void (*gic_sgi_gen)(__u8 sgintid, __u32 cpuid);
 };
 
 /** GIC controller structure */
@@ -96,24 +96,24 @@ struct _gic_dev {
 	/** GIC hardware version */
 	GIC_HW_VER version;
 	/** Indicates if GIC is present */
-	uint8_t is_present;
+	__u8 is_present;
 	/** Probe status */
-	uint8_t is_probed;
+	__u8 is_probed;
 	/** GIC status */
-	uint8_t is_initialized;
+	__u8 is_initialized;
 	/** Distributor base address */
-	uint64_t dist_mem_addr;
+	__u64 dist_mem_addr;
 	/** Distributor memory size */
-	uint64_t dist_mem_size;
+	__u64 dist_mem_size;
 	union {
 		/**
 		 * CPU Interface base address. This field is used only by
 		 * GICv2 driver since in versions above the CPU interface
 		 * is accessed through system registers (not memory mapped)
 		 */
-		uint64_t cpuif_mem_addr;
+		__u64 cpuif_mem_addr;
 		/** Redistributor's base address (GICv3) */
-		uint64_t rdist_mem_addr;
+		__u64 rdist_mem_addr;
 	};
 	union {
 		/**
@@ -121,9 +121,9 @@ struct _gic_dev {
 		 * GICv2 driver since in versions above the CPU interface
 		 * is accessed through system registers (not memory mapped)
 		 */
-		uint64_t cpuif_mem_size;
+		__u64 cpuif_mem_size;
 		/** Redistributor's memory size (GICv3) */
-		uint64_t rdist_mem_size;
+		__u64 rdist_mem_size;
 	};
 #ifdef CONFIG_HAVE_SMP
 	/** Pointer to the lock for distributor access */

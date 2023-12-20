@@ -240,7 +240,7 @@ struct xen_add_to_physmap {
     domid_t domid;
 
     /* Number of pages to go through for gmfn_range */
-    uint16_t    size;
+    __u16    size;
 
     unsigned int space; /* => enum phys_map_space */
 
@@ -261,17 +261,17 @@ struct xen_add_to_physmap_batch {
     /* IN */
     /* Which domain to change the mapping for. */
     domid_t domid;
-    uint16_t space; /* => enum phys_map_space */
+    __u16 space; /* => enum phys_map_space */
 
     /* Number of pages to go through */
-    uint16_t size;
+    __u16 size;
 
 #if __XEN_INTERFACE_VERSION__ < 0x00040700
     domid_t foreign_domid; /* IFF gmfn_foreign. Should be 0 for other spaces. */
 #else
     union xen_add_to_physmap_batch_extra {
         domid_t foreign_domid; /* gmfn_foreign */
-        uint16_t res0;  /* All the other spaces. Should be 0 */
+        __u16 res0;  /* All the other spaces. Should be 0 */
     } u;
 #endif
 
@@ -364,11 +364,11 @@ DEFINE_XEN_GUEST_HANDLE(xen_foreign_memory_map_t);
 #define XENMEM_get_pod_target       17
 struct xen_pod_target {
     /* IN */
-    uint64_t target_pages;
+    __u64 target_pages;
     /* OUT */
-    uint64_t tot_pages;
-    uint64_t pod_cache_pages;
-    uint64_t pod_entries;
+    __u64 tot_pages;
+    __u64 pod_cache_pages;
+    __u64 pod_entries;
     /* IN */
     domid_t domid;
 };
@@ -377,7 +377,7 @@ typedef struct xen_pod_target xen_pod_target_t;
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 
 #ifndef uint64_aligned_t
-#define uint64_aligned_t uint64_t
+#define uint64_aligned_t __u64
 #endif
 
 /*
@@ -393,7 +393,7 @@ typedef struct xen_pod_target xen_pod_target_t;
 #define XENMEM_paging_op_prep               2
 
 struct xen_mem_paging_op {
-    uint8_t     op;         /* XENMEM_paging_op_* */
+    __u8     op;         /* XENMEM_paging_op_* */
     domid_t     domain;
 
     /* PAGING_PREP IN: buffer to immediately fill page in */
@@ -442,16 +442,16 @@ typedef enum {
 
 struct xen_mem_access_op {
     /* XENMEM_access_op_* */
-    uint8_t op;
+    __u8 op;
     /* xenmem_access_t */
-    uint8_t access;
+    __u8 access;
     domid_t domid;
     /*
      * Number of pages for set op (or size of pfn_list for
      * XENMEM_access_op_set_access_multi)
      * Ignored on setting default access and other ops
      */
-    uint32_t nr;
+    __u32 nr;
     /*
      * First pfn for set op
      * pfn for get op
@@ -500,14 +500,14 @@ DEFINE_XEN_GUEST_HANDLE(xen_mem_access_op_t);
     ((field) & (~XENMEM_SHARING_OP_FIELD_IS_GREF_FLAG))
 
 struct xen_mem_sharing_op {
-    uint8_t     op;     /* XENMEM_sharing_op_* */
+    __u8     op;     /* XENMEM_sharing_op_* */
     domid_t     domain;
 
     union {
         struct mem_sharing_op_nominate {  /* OP_NOMINATE_xxx           */
             union {
                 uint64_aligned_t gfn;     /* IN: gfn to nominate       */
-                uint32_t      grant_ref;  /* IN: grant ref to nominate */
+                __u32      grant_ref;  /* IN: grant ref to nominate */
             } u;
             uint64_aligned_t  handle;     /* OUT: the handle           */
         } nominate;
@@ -523,13 +523,13 @@ struct xen_mem_sharing_op {
             uint64_aligned_t last_gfn;       /* IN: the last gfn */
             uint64_aligned_t opaque;         /* Must be set to 0 */
             domid_t client_domain;           /* IN: the client domain id */
-            uint16_t _pad[3];                /* Must be set to 0 */
+            __u16 _pad[3];                /* Must be set to 0 */
         } range;
         struct mem_sharing_op_debug {     /* OP_DEBUG_xxx */
             union {
                 uint64_aligned_t gfn;      /* IN: gfn to debug          */
                 uint64_aligned_t mfn;      /* IN: mfn to debug          */
-                uint32_t gref;     /* IN: gref to debug         */
+                __u32 gref;     /* IN: gref to debug         */
             } u;
         } debug;
     } u;
@@ -581,7 +581,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_reserved_device_memory_t);
 struct xen_reserved_device_memory_map {
 #define XENMEM_RDM_ALL 1 /* Request all regions (ignore dev union). */
     /* IN */
-    uint32_t flags;
+    __u32 flags;
     /*
      * IN/OUT
      *
@@ -609,7 +609,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_reserved_device_memory_map_t);
 
 /* vNUMA node memory ranges */
 struct xen_vmemrange {
-    uint64_t start, end;
+    __u64 start, end;
     unsigned int flags;
     unsigned int nid;
 };
@@ -628,7 +628,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_vmemrange_t);
 struct xen_vnuma_topology_info {
     /* IN */
     domid_t domid;
-    uint16_t pad;
+    __u16 pad;
     /* IN/OUT */
     unsigned int nr_vnodes;
     unsigned int nr_vcpus;
@@ -636,15 +636,15 @@ struct xen_vnuma_topology_info {
     /* OUT */
     union {
         XEN_GUEST_HANDLE(uint) h;
-        uint64_t pad;
+        __u64 pad;
     } vdistance;
     union {
         XEN_GUEST_HANDLE(uint) h;
-        uint64_t pad;
+        __u64 pad;
     } vcpu_to_vnode;
     union {
         XEN_GUEST_HANDLE(xen_vmemrange_t) h;
-        uint64_t pad;
+        __u64 pad;
     } vmemrange;
 };
 typedef struct xen_vnuma_topology_info xen_vnuma_topology_info_t;

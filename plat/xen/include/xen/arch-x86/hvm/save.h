@@ -34,11 +34,11 @@
 #define HVM_FILE_VERSION 0x00000001
 
 struct hvm_save_header {
-    uint32_t magic;             /* Must be HVM_FILE_MAGIC */
-    uint32_t version;           /* File format version */
-    uint64_t changeset;         /* Version of Xen that saved this file */
-    uint32_t cpuid;             /* CPUID[0x01][%eax] on the saving machine */
-    uint32_t gtsc_khz;        /* Guest's TSC frequency in kHz */
+    __u32 magic;             /* Must be HVM_FILE_MAGIC */
+    __u32 version;           /* File format version */
+    __u64 changeset;         /* Version of Xen that saved this file */
+    __u32 cpuid;             /* CPUID[0x01][%eax] on the saving machine */
+    __u32 gtsc_khz;        /* Guest's TSC frequency in kHz */
 };
 
 DECLARE_HVM_SAVE_TYPE(HEADER, 1, struct hvm_save_header);
@@ -53,229 +53,229 @@ DECLARE_HVM_SAVE_TYPE(HEADER, 1, struct hvm_save_header);
  */
 
 struct hvm_hw_cpu {
-    uint8_t  fpu_regs[512];
+    __u8  fpu_regs[512];
 
-    uint64_t rax;
-    uint64_t rbx;
-    uint64_t rcx;
-    uint64_t rdx;
-    uint64_t rbp;
-    uint64_t rsi;
-    uint64_t rdi;
-    uint64_t rsp;
-    uint64_t r8;
-    uint64_t r9;
-    uint64_t r10;
-    uint64_t r11;
-    uint64_t r12;
-    uint64_t r13;
-    uint64_t r14;
-    uint64_t r15;
+    __u64 rax;
+    __u64 rbx;
+    __u64 rcx;
+    __u64 rdx;
+    __u64 rbp;
+    __u64 rsi;
+    __u64 rdi;
+    __u64 rsp;
+    __u64 r8;
+    __u64 r9;
+    __u64 r10;
+    __u64 r11;
+    __u64 r12;
+    __u64 r13;
+    __u64 r14;
+    __u64 r15;
 
-    uint64_t rip;
-    uint64_t rflags;
+    __u64 rip;
+    __u64 rflags;
 
-    uint64_t cr0;
-    uint64_t cr2;
-    uint64_t cr3;
-    uint64_t cr4;
+    __u64 cr0;
+    __u64 cr2;
+    __u64 cr3;
+    __u64 cr4;
 
-    uint64_t dr0;
-    uint64_t dr1;
-    uint64_t dr2;
-    uint64_t dr3;
-    uint64_t dr6;
-    uint64_t dr7;    
+    __u64 dr0;
+    __u64 dr1;
+    __u64 dr2;
+    __u64 dr3;
+    __u64 dr6;
+    __u64 dr7;    
 
-    uint32_t cs_sel;
-    uint32_t ds_sel;
-    uint32_t es_sel;
-    uint32_t fs_sel;
-    uint32_t gs_sel;
-    uint32_t ss_sel;
-    uint32_t tr_sel;
-    uint32_t ldtr_sel;
+    __u32 cs_sel;
+    __u32 ds_sel;
+    __u32 es_sel;
+    __u32 fs_sel;
+    __u32 gs_sel;
+    __u32 ss_sel;
+    __u32 tr_sel;
+    __u32 ldtr_sel;
 
-    uint32_t cs_limit;
-    uint32_t ds_limit;
-    uint32_t es_limit;
-    uint32_t fs_limit;
-    uint32_t gs_limit;
-    uint32_t ss_limit;
-    uint32_t tr_limit;
-    uint32_t ldtr_limit;
-    uint32_t idtr_limit;
-    uint32_t gdtr_limit;
+    __u32 cs_limit;
+    __u32 ds_limit;
+    __u32 es_limit;
+    __u32 fs_limit;
+    __u32 gs_limit;
+    __u32 ss_limit;
+    __u32 tr_limit;
+    __u32 ldtr_limit;
+    __u32 idtr_limit;
+    __u32 gdtr_limit;
 
-    uint64_t cs_base;
-    uint64_t ds_base;
-    uint64_t es_base;
-    uint64_t fs_base;
-    uint64_t gs_base;
-    uint64_t ss_base;
-    uint64_t tr_base;
-    uint64_t ldtr_base;
-    uint64_t idtr_base;
-    uint64_t gdtr_base;
+    __u64 cs_base;
+    __u64 ds_base;
+    __u64 es_base;
+    __u64 fs_base;
+    __u64 gs_base;
+    __u64 ss_base;
+    __u64 tr_base;
+    __u64 ldtr_base;
+    __u64 idtr_base;
+    __u64 gdtr_base;
 
-    uint32_t cs_arbytes;
-    uint32_t ds_arbytes;
-    uint32_t es_arbytes;
-    uint32_t fs_arbytes;
-    uint32_t gs_arbytes;
-    uint32_t ss_arbytes;
-    uint32_t tr_arbytes;
-    uint32_t ldtr_arbytes;
+    __u32 cs_arbytes;
+    __u32 ds_arbytes;
+    __u32 es_arbytes;
+    __u32 fs_arbytes;
+    __u32 gs_arbytes;
+    __u32 ss_arbytes;
+    __u32 tr_arbytes;
+    __u32 ldtr_arbytes;
 
-    uint64_t sysenter_cs;
-    uint64_t sysenter_esp;
-    uint64_t sysenter_eip;
+    __u64 sysenter_cs;
+    __u64 sysenter_esp;
+    __u64 sysenter_eip;
 
     /* msr for em64t */
-    uint64_t shadow_gs;
+    __u64 shadow_gs;
 
     /* msr content saved/restored. */
-    uint64_t msr_flags; /* Obsolete, ignored. */
-    uint64_t msr_lstar;
-    uint64_t msr_star;
-    uint64_t msr_cstar;
-    uint64_t msr_syscall_mask;
-    uint64_t msr_efer;
-    uint64_t msr_tsc_aux;
+    __u64 msr_flags; /* Obsolete, ignored. */
+    __u64 msr_lstar;
+    __u64 msr_star;
+    __u64 msr_cstar;
+    __u64 msr_syscall_mask;
+    __u64 msr_efer;
+    __u64 msr_tsc_aux;
 
     /* guest's idea of what rdtsc() would return */
-    uint64_t tsc;
+    __u64 tsc;
 
     /* pending event, if any */
     union {
-        uint32_t pending_event;
+        __u32 pending_event;
         struct {
-            uint8_t  pending_vector:8;
-            uint8_t  pending_type:3;
-            uint8_t  pending_error_valid:1;
-            uint32_t pending_reserved:19;
-            uint8_t  pending_valid:1;
+            __u8  pending_vector:8;
+            __u8  pending_type:3;
+            __u8  pending_error_valid:1;
+            __u32 pending_reserved:19;
+            __u8  pending_valid:1;
         };
     };
     /* error code for pending event */
-    uint32_t error_code;
+    __u32 error_code;
 
 #define _XEN_X86_FPU_INITIALISED        0
 #define XEN_X86_FPU_INITIALISED         (1U<<_XEN_X86_FPU_INITIALISED)
-    uint32_t flags;
-    uint32_t pad0;
+    __u32 flags;
+    __u32 pad0;
 };
 
 struct hvm_hw_cpu_compat {
-    uint8_t  fpu_regs[512];
+    __u8  fpu_regs[512];
 
-    uint64_t rax;
-    uint64_t rbx;
-    uint64_t rcx;
-    uint64_t rdx;
-    uint64_t rbp;
-    uint64_t rsi;
-    uint64_t rdi;
-    uint64_t rsp;
-    uint64_t r8;
-    uint64_t r9;
-    uint64_t r10;
-    uint64_t r11;
-    uint64_t r12;
-    uint64_t r13;
-    uint64_t r14;
-    uint64_t r15;
+    __u64 rax;
+    __u64 rbx;
+    __u64 rcx;
+    __u64 rdx;
+    __u64 rbp;
+    __u64 rsi;
+    __u64 rdi;
+    __u64 rsp;
+    __u64 r8;
+    __u64 r9;
+    __u64 r10;
+    __u64 r11;
+    __u64 r12;
+    __u64 r13;
+    __u64 r14;
+    __u64 r15;
 
-    uint64_t rip;
-    uint64_t rflags;
+    __u64 rip;
+    __u64 rflags;
 
-    uint64_t cr0;
-    uint64_t cr2;
-    uint64_t cr3;
-    uint64_t cr4;
+    __u64 cr0;
+    __u64 cr2;
+    __u64 cr3;
+    __u64 cr4;
 
-    uint64_t dr0;
-    uint64_t dr1;
-    uint64_t dr2;
-    uint64_t dr3;
-    uint64_t dr6;
-    uint64_t dr7;    
+    __u64 dr0;
+    __u64 dr1;
+    __u64 dr2;
+    __u64 dr3;
+    __u64 dr6;
+    __u64 dr7;    
 
-    uint32_t cs_sel;
-    uint32_t ds_sel;
-    uint32_t es_sel;
-    uint32_t fs_sel;
-    uint32_t gs_sel;
-    uint32_t ss_sel;
-    uint32_t tr_sel;
-    uint32_t ldtr_sel;
+    __u32 cs_sel;
+    __u32 ds_sel;
+    __u32 es_sel;
+    __u32 fs_sel;
+    __u32 gs_sel;
+    __u32 ss_sel;
+    __u32 tr_sel;
+    __u32 ldtr_sel;
 
-    uint32_t cs_limit;
-    uint32_t ds_limit;
-    uint32_t es_limit;
-    uint32_t fs_limit;
-    uint32_t gs_limit;
-    uint32_t ss_limit;
-    uint32_t tr_limit;
-    uint32_t ldtr_limit;
-    uint32_t idtr_limit;
-    uint32_t gdtr_limit;
+    __u32 cs_limit;
+    __u32 ds_limit;
+    __u32 es_limit;
+    __u32 fs_limit;
+    __u32 gs_limit;
+    __u32 ss_limit;
+    __u32 tr_limit;
+    __u32 ldtr_limit;
+    __u32 idtr_limit;
+    __u32 gdtr_limit;
 
-    uint64_t cs_base;
-    uint64_t ds_base;
-    uint64_t es_base;
-    uint64_t fs_base;
-    uint64_t gs_base;
-    uint64_t ss_base;
-    uint64_t tr_base;
-    uint64_t ldtr_base;
-    uint64_t idtr_base;
-    uint64_t gdtr_base;
+    __u64 cs_base;
+    __u64 ds_base;
+    __u64 es_base;
+    __u64 fs_base;
+    __u64 gs_base;
+    __u64 ss_base;
+    __u64 tr_base;
+    __u64 ldtr_base;
+    __u64 idtr_base;
+    __u64 gdtr_base;
 
-    uint32_t cs_arbytes;
-    uint32_t ds_arbytes;
-    uint32_t es_arbytes;
-    uint32_t fs_arbytes;
-    uint32_t gs_arbytes;
-    uint32_t ss_arbytes;
-    uint32_t tr_arbytes;
-    uint32_t ldtr_arbytes;
+    __u32 cs_arbytes;
+    __u32 ds_arbytes;
+    __u32 es_arbytes;
+    __u32 fs_arbytes;
+    __u32 gs_arbytes;
+    __u32 ss_arbytes;
+    __u32 tr_arbytes;
+    __u32 ldtr_arbytes;
 
-    uint64_t sysenter_cs;
-    uint64_t sysenter_esp;
-    uint64_t sysenter_eip;
+    __u64 sysenter_cs;
+    __u64 sysenter_esp;
+    __u64 sysenter_eip;
 
     /* msr for em64t */
-    uint64_t shadow_gs;
+    __u64 shadow_gs;
 
     /* msr content saved/restored. */
-    uint64_t msr_flags; /* Obsolete, ignored. */
-    uint64_t msr_lstar;
-    uint64_t msr_star;
-    uint64_t msr_cstar;
-    uint64_t msr_syscall_mask;
-    uint64_t msr_efer;
-    /*uint64_t msr_tsc_aux; COMPAT */
+    __u64 msr_flags; /* Obsolete, ignored. */
+    __u64 msr_lstar;
+    __u64 msr_star;
+    __u64 msr_cstar;
+    __u64 msr_syscall_mask;
+    __u64 msr_efer;
+    /*__u64 msr_tsc_aux; COMPAT */
 
     /* guest's idea of what rdtsc() would return */
-    uint64_t tsc;
+    __u64 tsc;
 
     /* pending event, if any */
     union {
-        uint32_t pending_event;
+        __u32 pending_event;
         struct {
-            uint8_t  pending_vector:8;
-            uint8_t  pending_type:3;
-            uint8_t  pending_error_valid:1;
-            uint32_t pending_reserved:19;
-            uint8_t  pending_valid:1;
+            __u8  pending_vector:8;
+            __u8  pending_type:3;
+            __u8  pending_error_valid:1;
+            __u32 pending_reserved:19;
+            __u8  pending_valid:1;
         };
     };
     /* error code for pending event */
-    uint32_t error_code;
+    __u32 error_code;
 };
 
-static inline int _hvm_hw_fix_cpu(void *h, uint32_t size) {
+static inline int _hvm_hw_fix_cpu(void *h, __u32 size) {
 
     union hvm_hw_cpu_union {
         struct hvm_hw_cpu nat;
@@ -308,12 +308,12 @@ DECLARE_HVM_SAVE_TYPE_COMPAT(CPU, 2, struct hvm_hw_cpu, \
 
 struct hvm_hw_vpic {
     /* IR line bitmasks. */
-    uint8_t irr;
-    uint8_t imr;
-    uint8_t isr;
+    __u8 irr;
+    __u8 imr;
+    __u8 isr;
 
     /* Line IRx maps to IRQ irq_base+x */
-    uint8_t irq_base;
+    __u8 irq_base;
 
     /*
      * Where are we in ICW2-4 initialisation (0 means no init in progress)?
@@ -321,37 +321,37 @@ struct hvm_hw_vpic {
      * Bit 2: ICW1.IC4  (1 == ICW4 included in init sequence)
      * Bit 3: ICW1.SNGL (0 == ICW3 included in init sequence)
      */
-    uint8_t init_state:4;
+    __u8 init_state:4;
 
     /* IR line with highest priority. */
-    uint8_t priority_add:4;
+    __u8 priority_add:4;
 
     /* Reads from A=0 obtain ISR or IRR? */
-    uint8_t readsel_isr:1;
+    __u8 readsel_isr:1;
 
     /* Reads perform a polling read? */
-    uint8_t poll:1;
+    __u8 poll:1;
 
     /* Automatically clear IRQs from the ISR during INTA? */
-    uint8_t auto_eoi:1;
+    __u8 auto_eoi:1;
 
     /* Automatically rotate IRQ priorities during AEOI? */
-    uint8_t rotate_on_auto_eoi:1;
+    __u8 rotate_on_auto_eoi:1;
 
     /* Exclude slave inputs when considering in-service IRQs? */
-    uint8_t special_fully_nested_mode:1;
+    __u8 special_fully_nested_mode:1;
 
     /* Special mask mode excludes masked IRs from AEOI and priority checks. */
-    uint8_t special_mask_mode:1;
+    __u8 special_mask_mode:1;
 
     /* Is this a master PIC or slave PIC? (NB. This is not programmable.) */
-    uint8_t is_master:1;
+    __u8 is_master:1;
 
     /* Edge/trigger selection. */
-    uint8_t elcr;
+    __u8 elcr;
 
     /* Virtual INT output. */
-    uint8_t int_output;
+    __u8 int_output;
 };
 
 DECLARE_HVM_SAVE_TYPE(PIC, 3, struct hvm_hw_vpic);
@@ -363,19 +363,19 @@ DECLARE_HVM_SAVE_TYPE(PIC, 3, struct hvm_hw_vpic);
 
 union vioapic_redir_entry
 {
-    uint64_t bits;
+    __u64 bits;
     struct {
-        uint8_t vector;
-        uint8_t delivery_mode:3;
-        uint8_t dest_mode:1;
-        uint8_t delivery_status:1;
-        uint8_t polarity:1;
-        uint8_t remote_irr:1;
-        uint8_t trig_mode:1;
-        uint8_t mask:1;
-        uint8_t reserve:7;
-        uint8_t reserved[4];
-        uint8_t dest_id;
+        __u8 vector;
+        __u8 delivery_mode:3;
+        __u8 dest_mode:1;
+        __u8 delivery_status:1;
+        __u8 polarity:1;
+        __u8 remote_irr:1;
+        __u8 trig_mode:1;
+        __u8 mask:1;
+        __u8 reserve:7;
+        __u8 reserved[4];
+        __u8 dest_id;
     } fields;
 };
 
@@ -383,9 +383,9 @@ union vioapic_redir_entry
 
 #define XEN_HVM_VIOAPIC(name, cnt)                      \
     struct name {                                       \
-        uint64_t base_address;                          \
-        uint32_t ioregsel;                              \
-        uint32_t id;                                    \
+        __u64 base_address;                          \
+        __u32 ioregsel;                              \
+        __u32 id;                                    \
         union vioapic_redir_entry redirtbl[cnt];        \
     }
 
@@ -405,16 +405,16 @@ DECLARE_HVM_SAVE_TYPE(IOAPIC, 4, struct hvm_hw_vioapic);
  */
 
 struct hvm_hw_lapic {
-    uint64_t             apic_base_msr;
-    uint32_t             disabled; /* VLAPIC_xx_DISABLED */
-    uint32_t             timer_divisor;
-    uint64_t             tdt_msr;
+    __u64             apic_base_msr;
+    __u32             disabled; /* VLAPIC_xx_DISABLED */
+    __u32             timer_divisor;
+    __u64             tdt_msr;
 };
 
 DECLARE_HVM_SAVE_TYPE(LAPIC, 5, struct hvm_hw_lapic);
 
 struct hvm_hw_lapic_regs {
-    uint8_t data[1024];
+    __u8 data[1024];
 };
 
 DECLARE_HVM_SAVE_TYPE(LAPIC_REGS, 6, struct hvm_hw_lapic_regs);
@@ -431,7 +431,7 @@ struct hvm_hw_pci_irqs {
      */
     union {
         unsigned long i[16 / sizeof (unsigned long)]; /* DECLARE_BITMAP(i, 32*4); */
-        uint64_t pad[2];
+        __u64 pad[2];
     };
 };
 
@@ -444,7 +444,7 @@ struct hvm_hw_isa_irqs {
      */
     union {
         unsigned long i[1];  /* DECLARE_BITMAP(i, 16); */
-        uint64_t pad[1];
+        __u64 pad[1];
     };
 };
 
@@ -457,8 +457,8 @@ struct hvm_hw_pci_link {
      * the traditional 'barber's pole' mapping ((device + INTx#) & 3).
      * The router provides a programmable mapping from each link to a GSI.
      */
-    uint8_t route[4];
-    uint8_t pad0[4];
+    __u8 route[4];
+    __u8 pad0[4];
 };
 
 DECLARE_HVM_SAVE_TYPE(PCI_LINK, 9, struct hvm_hw_pci_link);
@@ -469,21 +469,21 @@ DECLARE_HVM_SAVE_TYPE(PCI_LINK, 9, struct hvm_hw_pci_link);
 
 struct hvm_hw_pit {
     struct hvm_hw_pit_channel {
-        uint32_t count; /* can be 65536 */
-        uint16_t latched_count;
-        uint8_t count_latched;
-        uint8_t status_latched;
-        uint8_t status;
-        uint8_t read_state;
-        uint8_t write_state;
-        uint8_t write_latch;
-        uint8_t rw_mode;
-        uint8_t mode;
-        uint8_t bcd; /* not supported */
-        uint8_t gate; /* timer start */
+        __u32 count; /* can be 65536 */
+        __u16 latched_count;
+        __u8 count_latched;
+        __u8 status_latched;
+        __u8 status;
+        __u8 read_state;
+        __u8 write_state;
+        __u8 write_latch;
+        __u8 rw_mode;
+        __u8 mode;
+        __u8 bcd; /* not supported */
+        __u8 gate; /* timer start */
     } channels[3];  /* 3 x 16 bytes */
-    uint32_t speaker_data_on;
-    uint32_t pad0;
+    __u32 speaker_data_on;
+    __u32 pad0;
 };
 
 DECLARE_HVM_SAVE_TYPE(PIT, 10, struct hvm_hw_pit);
@@ -496,10 +496,10 @@ DECLARE_HVM_SAVE_TYPE(PIT, 10, struct hvm_hw_pit);
 #define RTC_CMOS_SIZE 14
 struct hvm_hw_rtc {
     /* CMOS bytes */
-    uint8_t cmos_data[RTC_CMOS_SIZE];
+    __u8 cmos_data[RTC_CMOS_SIZE];
     /* Index register for 2-part operations */
-    uint8_t cmos_index;
-    uint8_t pad0;
+    __u8 cmos_index;
+    __u8 pad0;
 };
 
 DECLARE_HVM_SAVE_TYPE(RTC, 11, struct hvm_hw_rtc);
@@ -512,24 +512,24 @@ DECLARE_HVM_SAVE_TYPE(RTC, 11, struct hvm_hw_rtc);
 #define HPET_TIMER_NUM     3    /* 3 timers supported now */
 struct hvm_hw_hpet {
     /* Memory-mapped, software visible registers */
-    uint64_t capability;        /* capabilities */
-    uint64_t res0;              /* reserved */
-    uint64_t config;            /* configuration */
-    uint64_t res1;              /* reserved */
-    uint64_t isr;               /* interrupt status reg */
-    uint64_t res2[25];          /* reserved */
-    uint64_t mc64;              /* main counter */
-    uint64_t res3;              /* reserved */
+    __u64 capability;        /* capabilities */
+    __u64 res0;              /* reserved */
+    __u64 config;            /* configuration */
+    __u64 res1;              /* reserved */
+    __u64 isr;               /* interrupt status reg */
+    __u64 res2[25];          /* reserved */
+    __u64 mc64;              /* main counter */
+    __u64 res3;              /* reserved */
     struct {                    /* timers */
-        uint64_t config;        /* configuration/cap */
-        uint64_t cmp;           /* comparator */
-        uint64_t fsb;           /* FSB route, not supported now */
-        uint64_t res4;          /* reserved */
+        __u64 config;        /* configuration/cap */
+        __u64 cmp;           /* comparator */
+        __u64 fsb;           /* FSB route, not supported now */
+        __u64 res4;          /* reserved */
     } timers[HPET_TIMER_NUM];
-    uint64_t res5[4*(24-HPET_TIMER_NUM)];  /* reserved, up to 0x3ff */
+    __u64 res5[4*(24-HPET_TIMER_NUM)];  /* reserved, up to 0x3ff */
 
     /* Hidden register state */
-    uint64_t period[HPET_TIMER_NUM]; /* Last value written to comparator */
+    __u64 period[HPET_TIMER_NUM]; /* Last value written to comparator */
 };
 
 DECLARE_HVM_SAVE_TYPE(HPET, 12, struct hvm_hw_hpet);
@@ -540,9 +540,9 @@ DECLARE_HVM_SAVE_TYPE(HPET, 12, struct hvm_hw_hpet);
  */
 
 struct hvm_hw_pmtimer {
-    uint32_t tmr_val;   /* PM_TMR_BLK.TMR_VAL: 32bit free-running counter */
-    uint16_t pm1a_sts;  /* PM1a_EVT_BLK.PM1a_STS: status register */
-    uint16_t pm1a_en;   /* PM1a_EVT_BLK.PM1a_EN: enable register */
+    __u32 tmr_val;   /* PM_TMR_BLK.TMR_VAL: 32bit free-running counter */
+    __u16 pm1a_sts;  /* PM1a_EVT_BLK.PM1a_STS: status register */
+    __u16 pm1a_en;   /* PM1a_EVT_BLK.PM1a_EN: enable register */
 };
 
 DECLARE_HVM_SAVE_TYPE(PMTIMER, 13, struct hvm_hw_pmtimer);
@@ -554,12 +554,12 @@ DECLARE_HVM_SAVE_TYPE(PMTIMER, 13, struct hvm_hw_pmtimer);
 struct hvm_hw_mtrr {
 #define MTRR_VCNT 8
 #define NUM_FIXED_MSR 11
-    uint64_t msr_pat_cr;
+    __u64 msr_pat_cr;
     /* mtrr physbase & physmask msr pair*/
-    uint64_t msr_mtrr_var[MTRR_VCNT*2];
-    uint64_t msr_mtrr_fixed[NUM_FIXED_MSR];
-    uint64_t msr_mtrr_cap;
-    uint64_t msr_mtrr_def_type;
+    __u64 msr_mtrr_var[MTRR_VCNT*2];
+    __u64 msr_mtrr_fixed[NUM_FIXED_MSR];
+    __u64 msr_mtrr_cap;
+    __u64 msr_mtrr_def_type;
 };
 
 DECLARE_HVM_SAVE_TYPE(MTRR, 14, struct hvm_hw_mtrr);
@@ -569,16 +569,16 @@ DECLARE_HVM_SAVE_TYPE(MTRR, 14, struct hvm_hw_mtrr);
  */
 
 struct hvm_hw_cpu_xsave {
-    uint64_t xfeature_mask;        /* Ignored */
-    uint64_t xcr0;                 /* Updated by XSETBV */
-    uint64_t xcr0_accum;           /* Updated by XSETBV */
+    __u64 xfeature_mask;        /* Ignored */
+    __u64 xcr0;                 /* Updated by XSETBV */
+    __u64 xcr0_accum;           /* Updated by XSETBV */
     struct {
         struct { char x[512]; } fpu_sse;
 
         struct hvm_hw_cpu_xsave_hdr {
-            uint64_t xstate_bv;         /* Updated by XRSTOR */
-            uint64_t xcomp_bv;          /* Updated by XRSTOR{C,S} */
-            uint64_t reserved[6];
+            __u64 xstate_bv;         /* Updated by XRSTOR */
+            __u64 xcomp_bv;          /* Updated by XRSTOR{C,S} */
+            __u64 reserved[6];
         } xsave_hdr;                    /* The 64-byte header */
     } save_area;
 };
@@ -590,44 +590,44 @@ struct hvm_hw_cpu_xsave {
  */
 
 struct hvm_viridian_domain_context {
-    uint64_t hypercall_gpa;
-    uint64_t guest_os_id;
-    uint64_t time_ref_count;
-    uint64_t reference_tsc;
+    __u64 hypercall_gpa;
+    __u64 guest_os_id;
+    __u64 time_ref_count;
+    __u64 reference_tsc;
 };
 
 DECLARE_HVM_SAVE_TYPE(VIRIDIAN_DOMAIN, 15, struct hvm_viridian_domain_context);
 
 struct hvm_viridian_vcpu_context {
-    uint64_t vp_assist_msr;
-    uint8_t  vp_assist_vector;
-    uint8_t  _pad[7];
+    __u64 vp_assist_msr;
+    __u8  vp_assist_vector;
+    __u8  _pad[7];
 };
 
 DECLARE_HVM_SAVE_TYPE(VIRIDIAN_VCPU, 17, struct hvm_viridian_vcpu_context);
 
 struct hvm_vmce_vcpu {
-    uint64_t caps;
-    uint64_t mci_ctl2_bank0;
-    uint64_t mci_ctl2_bank1;
-    uint64_t mcg_ext_ctl;
+    __u64 caps;
+    __u64 mci_ctl2_bank0;
+    __u64 mci_ctl2_bank1;
+    __u64 mcg_ext_ctl;
 };
 
 DECLARE_HVM_SAVE_TYPE(VMCE_VCPU, 18, struct hvm_vmce_vcpu);
 
 struct hvm_tsc_adjust {
-    uint64_t tsc_adjust;
+    __u64 tsc_adjust;
 };
 
 DECLARE_HVM_SAVE_TYPE(TSC_ADJUST, 19, struct hvm_tsc_adjust);
 
 
 struct hvm_msr {
-    uint32_t count;
+    __u32 count;
     struct hvm_one_msr {
-        uint32_t index;
-        uint32_t _rsvd;
-        uint64_t val;
+        __u32 index;
+        __u32 _rsvd;
+        __u64 val;
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
     } msr[];
 #elif defined(__GNUC__)

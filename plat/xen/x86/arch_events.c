@@ -46,7 +46,7 @@ void arch_init_events(void)
 #if defined(__x86_64__)
 	asm volatile("movl %0,%%fs ; movl %0,%%gs" :: "r" (0));
 	/* 0xc0000101 is MSR_GS_BASE */
-	wrmsrl(0xc0000101, (uint64_t) &cpu0_pda);
+	wrmsrl(0xc0000101, (__u64) &cpu0_pda);
 	cpu0_pda.irqcount = -1;
 	cpu0_pda.irqstackptr =
 			(void *) ((unsigned long) irqstack + STACK_SIZE);

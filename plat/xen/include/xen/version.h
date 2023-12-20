@@ -68,7 +68,7 @@ typedef struct xen_platform_parameters xen_platform_parameters_t;
 #define XENVER_get_features 6
 struct xen_feature_info {
     unsigned int submap_idx;    /* IN: which 32-bit submap to return */
-    uint32_t     submap;        /* OUT: 32-bit submap */
+    __u32     submap;        /* OUT: 32-bit submap */
 };
 typedef struct xen_feature_info xen_feature_info_t;
 
@@ -94,7 +94,7 @@ typedef char xen_commandline_t[1024];
  */
 #define XENVER_build_id 10
 struct xen_build_id {
-        uint32_t        len; /* IN: size of buf[]. */
+        __u32        len; /* IN: size of buf[]. */
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
         unsigned char   buf[];
 #elif defined(__GNUC__)

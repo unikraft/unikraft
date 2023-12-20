@@ -100,11 +100,11 @@ int pci_generic_config_read(__u8 bus, __u8 devfn,
 	}
 
 	if (size == 1)
-		*(uint8_t *)val = ioreg_read8(addr);
+		*(__u8 *)val = ioreg_read8(addr);
 	else if (size == 2)
-		*(uint16_t *)val = ioreg_read16(addr);
+		*(__u16 *)val = ioreg_read16(addr);
 	else if (size == 4)
-		*(uint32_t *)val = ioreg_read32(addr);
+		*(__u32 *)val = ioreg_read32(addr);
 	else
 		uk_pr_err("not support size pci config read\n");
 

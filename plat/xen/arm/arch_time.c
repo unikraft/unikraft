@@ -36,8 +36,8 @@
  * Time functions
  *************************************************************************/
 
-static uint64_t cntvct_at_init;
-static uint32_t counter_freq;
+static __u64 cntvct_at_init;
+static __u32 counter_freq;
 /*
  * System Time
  * 64 bit value containing the nanoseconds elapsed since boot time.
@@ -46,46 +46,46 @@ static uint32_t counter_freq;
  * The other macros are for convenience to approximate short intervals
  * of real time into system time
  */
-typedef int64_t s_time_t;
+typedef __s64 s_time_t;
 
 #define SECONDS(_s)   (((s_time_t)(_s))  * 1000000000UL)
 
 /* Compute with 96 bit intermediate result: (a*b)/c */
-uint64_t muldiv64(uint64_t a, uint32_t b, uint32_t c)
+__u64 muldiv64(__u64 a, __u32 b, __u32 c)
 {
 	union {
-		uint64_t ll;
+		__u64 ll;
 		struct {
-			uint32_t low, high;
+			__u32 low, high;
 		} l;
 	} u, res;
-	uint64_t rl, rh;
+	__u64 rl, rh;
 
 	u.ll = a;
-	rl = (uint64_t)u.l.low * (uint64_t)b;
-	rh = (uint64_t)u.l.high * (uint64_t)b;
+	rl = (__u64)u.l.low * (__u64)b;
+	rh = (__u64)u.l.high * (__u64)b;
 	rh += (rl >> 32);
 	res.l.high = rh / c;
 	res.l.low = (((rh % c) << 32) + (rl & 0xffffffff)) / c;
 	return res.ll;
 }
 
-static inline s_time_t ticks_to_ns(uint64_t ticks)
+static inline s_time_t ticks_to_ns(__u64 ticks)
 {
 	return muldiv64(ticks, SECONDS(1), counter_freq);
 }
 
-static inline uint64_t ns_to_ticks(s_time_t ns)
+static inline __u64 ns_to_ticks(s_time_t ns)
 {
 	return muldiv64(ns, counter_freq, SECONDS(1));
 }
 
-static inline uint64_t read_virtual_count(void)
+static inline __u64 read_virtual_count(void)
 {
-	uint32_t c_lo, c_hi;
+	__u32 c_lo, c_hi;
 
 	__asm__ __volatile__("mrrc p15, 1, %0, %1, c14":"=r"(c_lo), "=r"(c_hi));
-	return (((uint64_t) c_hi) << 32) + c_lo;
+	return (((__u64) c_hi) << 32) + c_lo;
 }
 
 /* monotonic_clock(): returns # of nanoseconds passed since time_init()
@@ -104,13 +104,13 @@ __nsec ukplat_wall_clock(void)
 }
 
 /* Set the timer and mask. */
-void write_timer_ctl(uint32_t value)
+void write_timer_ctl(__u32 value)
 {
 	__asm__ __volatile__("mcr p15, 0, %0, c14, c3, 1\n"
 			     "isb"::"r"(value));
 }
 
-void set_vtimer_compare(uint64_t value)
+void set_vtimer_compare(__u64 value)
 {
 	uk_pr_debug("New CompareValue : %llx\n", value);
 
@@ -129,7 +129,7 @@ void unset_vtimer_compare(void)
 
 void block_domain(__snsec until)
 {
-	uint64_t until_count = ns_to_ticks(until) + cntvct_at_init;
+	__u64 until_count = ns_to_ticks(until) + cntvct_at_init;
 
 	UK_ASSERT(irqs_disabled());
 	if (read_virtual_count() < until_count) {
