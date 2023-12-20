@@ -62,9 +62,9 @@
 
 /* Xenoprof performance events (not Xen events) */
 struct event_log {
-    uint64_t eip;
-    uint8_t mode;
-    uint8_t event;
+    __u64 eip;
+    __u8 mode;
+    __u8 event;
 };
 
 /* PC value that indicates a special code */
@@ -74,14 +74,14 @@ struct event_log {
 
 /* Xenoprof buffer shared between Xen and domain - 1 per VCPU */
 struct xenoprof_buf {
-    uint32_t event_head;
-    uint32_t event_tail;
-    uint32_t event_size;
-    uint32_t vcpu_id;
-    uint64_t xen_samples;
-    uint64_t kernel_samples;
-    uint64_t user_samples;
-    uint64_t lost_samples;
+    __u32 event_head;
+    __u32 event_tail;
+    __u32 event_size;
+    __u32 vcpu_id;
+    __u64 xen_samples;
+    __u64 kernel_samples;
+    __u64 user_samples;
+    __u64 lost_samples;
     struct event_log event_log[1];
 };
 #ifndef __XEN__
@@ -90,51 +90,51 @@ DEFINE_XEN_GUEST_HANDLE(xenoprof_buf_t);
 #endif
 
 struct xenoprof_init {
-    int32_t  num_events;
-    int32_t  is_primary;
+    __s32  num_events;
+    __s32  is_primary;
     char cpu_type[XENOPROF_CPU_TYPE_SIZE];
 };
 typedef struct xenoprof_init xenoprof_init_t;
 DEFINE_XEN_GUEST_HANDLE(xenoprof_init_t);
 
 struct xenoprof_get_buffer {
-    int32_t  max_samples;
-    int32_t  nbuf;
-    int32_t  bufsize;
-    uint64_t buf_gmaddr;
+    __s32  max_samples;
+    __s32  nbuf;
+    __s32  bufsize;
+    __u64 buf_gmaddr;
 };
 typedef struct xenoprof_get_buffer xenoprof_get_buffer_t;
 DEFINE_XEN_GUEST_HANDLE(xenoprof_get_buffer_t);
 
 struct xenoprof_counter {
-    uint32_t ind;
-    uint64_t count;
-    uint32_t enabled;
-    uint32_t event;
-    uint32_t hypervisor;
-    uint32_t kernel;
-    uint32_t user;
-    uint64_t unit_mask;
+    __u32 ind;
+    __u64 count;
+    __u32 enabled;
+    __u32 event;
+    __u32 hypervisor;
+    __u32 kernel;
+    __u32 user;
+    __u64 unit_mask;
 };
 typedef struct xenoprof_counter xenoprof_counter_t;
 DEFINE_XEN_GUEST_HANDLE(xenoprof_counter_t);
 
 typedef struct xenoprof_passive {
-    uint16_t domain_id;
-    int32_t  max_samples;
-    int32_t  nbuf;
-    int32_t  bufsize;
-    uint64_t buf_gmaddr;
+    __u16 domain_id;
+    __s32  max_samples;
+    __s32  nbuf;
+    __s32  bufsize;
+    __u64 buf_gmaddr;
 } xenoprof_passive_t;
 DEFINE_XEN_GUEST_HANDLE(xenoprof_passive_t);
 
 struct xenoprof_ibs_counter {
-    uint64_t op_enabled;
-    uint64_t fetch_enabled;
-    uint64_t max_cnt_fetch;
-    uint64_t max_cnt_op;
-    uint64_t rand_en;
-    uint64_t dispatched_ops;
+    __u64 op_enabled;
+    __u64 fetch_enabled;
+    __u64 max_cnt_fetch;
+    __u64 max_cnt_op;
+    __u64 rand_en;
+    __u64 dispatched_ops;
 };
 typedef struct xenoprof_ibs_counter xenoprof_ibs_counter_t;
 DEFINE_XEN_GUEST_HANDLE(xenoprof_ibs_counter_t);

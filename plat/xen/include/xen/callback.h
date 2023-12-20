@@ -82,8 +82,8 @@
  */
 #define CALLBACKOP_register                0
 struct callback_register {
-    uint16_t type;
-    uint16_t flags;
+    __u16 type;
+    __u16 flags;
     xen_callback_t address;
 };
 typedef struct callback_register callback_register_t;
@@ -97,8 +97,8 @@ DEFINE_XEN_GUEST_HANDLE(callback_register_t);
  */
 #define CALLBACKOP_unregister              1
 struct callback_unregister {
-    uint16_t type;
-    uint16_t _unused;
+    __u16 type;
+    __u16 _unused;
 };
 typedef struct callback_unregister callback_unregister_t;
 DEFINE_XEN_GUEST_HANDLE(callback_unregister_t);

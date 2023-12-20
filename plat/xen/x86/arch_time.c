@@ -50,17 +50,17 @@
 
 /* These are peridically updated in shared_info, and then copied here. */
 struct shadow_time_info {
-	uint64_t tsc_timestamp;     /* TSC at last update of time vals.  */
-	uint64_t system_timestamp;  /* Time, in nanosecs, since boot.    */
-	uint32_t tsc_to_nsec_mul;
-	uint32_t tsc_to_usec_mul;
+	__u64 tsc_timestamp;     /* TSC at last update of time vals.  */
+	__u64 system_timestamp;  /* Time, in nanosecs, since boot.    */
+	__u32 tsc_to_nsec_mul;
+	__u32 tsc_to_usec_mul;
 	int tsc_shift;
-	uint32_t version;
+	__u32 version;
 };
 
 static struct timespec shadow_ts;
 
-static uint32_t shadow_ts_version;
+static __u32 shadow_ts_version;
 
 static struct shadow_time_info shadow;
 
@@ -96,9 +96,9 @@ static inline int wc_values_up_to_date(void)
  * Scale a 64-bit delta by scaling and multiplying by a 32-bit fraction,
  * yielding a 64-bit result.
  */
-static inline uint64_t scale_delta(uint64_t delta, uint32_t mul_frac, int shift)
+static inline __u64 scale_delta(__u64 delta, __u32 mul_frac, int shift)
 {
-	uint64_t product;
+	__u64 product;
 
 	if (shift < 0)
 		delta >>= -shift;
@@ -107,7 +107,7 @@ static inline uint64_t scale_delta(uint64_t delta, uint32_t mul_frac, int shift)
 
 	__asm__(
 		"mul %%rdx ; shrd $32,%%rdx,%%rax"
-		: "=a" (product) : "0" (delta), "d" ((uint64_t)mul_frac)
+		: "=a" (product) : "0" (delta), "d" ((__u64)mul_frac)
 	);
 
 	return product;
@@ -116,7 +116,7 @@ static inline uint64_t scale_delta(uint64_t delta, uint32_t mul_frac, int shift)
 
 static unsigned long get_nsec_offset(void)
 {
-	uint64_t now, delta;
+	__u64 now, delta;
 
 	now = rdtsc();
 	delta = now - shadow.tsc_timestamp;
@@ -151,8 +151,8 @@ static void get_time_values_from_xen(void)
  */
 __nsec ukplat_monotonic_clock(void)
 {
-	uint64_t time;
-	uint32_t local_time_version;
+	__u64 time;
+	__u32 local_time_version;
 
 	do {
 		local_time_version = shadow.version;

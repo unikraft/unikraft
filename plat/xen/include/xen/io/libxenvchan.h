@@ -51,7 +51,7 @@
 #include <sys/types.h>
 
 struct ring_shared {
-	uint32_t cons, prod;
+	__u32 cons, prod;
 };
 
 #define VCHAN_NOTIFY_WRITE 0x1
@@ -75,27 +75,27 @@ struct vchan_interface {
 	 * These should remain constant once the page is shared.
 	 * Only one of the two orders can be 10 (or 11).
 	 */
-	uint16_t left_order, right_order;
+	__u16 left_order, right_order;
 	/**
 	 * Shutdown detection:
 	 *  0: client (or server) has exited
 	 *  1: client (or server) is connected
 	 *  2: client has not yet connected
 	 */
-	uint8_t cli_live, srv_live;
+	__u8 cli_live, srv_live;
 	/**
 	 * Notification bits:
 	 *  VCHAN_NOTIFY_WRITE: send notify when data is written
 	 *  VCHAN_NOTIFY_READ: send notify when data is read (consumed)
 	 * cli_notify is used for the client to inform the server of its action
 	 */
-	uint8_t cli_notify, srv_notify;
+	__u8 cli_notify, srv_notify;
 	/**
 	 * Grant list: ordering is left, right. Must not extend into actual ring
 	 * or grow beyond the end of the initial shared page.
 	 * These should remain constant once the page is shared, to allow
 	 * for possible remapping by a client that restarts.
 	 */
-	uint32_t grants[0];
+	__u32 grants[0];
 };
 

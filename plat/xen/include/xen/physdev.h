@@ -39,7 +39,7 @@
 #define PHYSDEVOP_eoi                   12
 struct physdev_eoi {
     /* IN */
-    uint32_t irq;
+    __u32 irq;
 };
 typedef struct physdev_eoi physdev_eoi_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_eoi_t);
@@ -74,9 +74,9 @@ DEFINE_XEN_GUEST_HANDLE(physdev_pirq_eoi_gmfn_t);
 #define PHYSDEVOP_irq_status_query       5
 struct physdev_irq_status_query {
     /* IN */
-    uint32_t irq;
+    __u32 irq;
     /* OUT */
-    uint32_t flags; /* XENIRQSTAT_* */
+    __u32 flags; /* XENIRQSTAT_* */
 };
 typedef struct physdev_irq_status_query physdev_irq_status_query_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_irq_status_query_t);
@@ -96,7 +96,7 @@ DEFINE_XEN_GUEST_HANDLE(physdev_irq_status_query_t);
 #define PHYSDEVOP_set_iopl               6
 struct physdev_set_iopl {
     /* IN */
-    uint32_t iopl;
+    __u32 iopl;
 };
 typedef struct physdev_set_iopl physdev_set_iopl_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_set_iopl_t);
@@ -109,11 +109,11 @@ DEFINE_XEN_GUEST_HANDLE(physdev_set_iopl_t);
 struct physdev_set_iobitmap {
     /* IN */
 #if __XEN_INTERFACE_VERSION__ >= 0x00030205
-    XEN_GUEST_HANDLE(uint8) bitmap;
+    XEN_GUEST_HANDLE(__u8) bitmap;
 #else
-    uint8_t *bitmap;
+    __u8 *bitmap;
 #endif
-    uint32_t nr_ports;
+    __u32 nr_ports;
 };
 typedef struct physdev_set_iobitmap physdev_set_iobitmap_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_set_iobitmap_t);
@@ -127,9 +127,9 @@ DEFINE_XEN_GUEST_HANDLE(physdev_set_iobitmap_t);
 struct physdev_apic {
     /* IN */
     unsigned long apic_physbase;
-    uint32_t reg;
+    __u32 reg;
     /* IN or OUT */
-    uint32_t value;
+    __u32 value;
 };
 typedef struct physdev_apic physdev_apic_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_apic_t);
@@ -142,9 +142,9 @@ DEFINE_XEN_GUEST_HANDLE(physdev_apic_t);
 #define PHYSDEVOP_free_irq_vector       11
 struct physdev_irq {
     /* IN */
-    uint32_t irq;
+    __u32 irq;
     /* IN or OUT */
-    uint32_t vector;
+    __u32 vector;
 };
 typedef struct physdev_irq physdev_irq_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_irq_t);
@@ -171,7 +171,7 @@ struct physdev_map_pirq {
     /* IN (also OUT for ..._MULTI_MSI) */
     int entry_nr;
     /* IN */
-    uint64_t table_base;
+    __u64 table_base;
 };
 typedef struct physdev_map_pirq physdev_map_pirq_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_map_pirq_t);
@@ -190,8 +190,8 @@ DEFINE_XEN_GUEST_HANDLE(physdev_unmap_pirq_t);
 #define PHYSDEVOP_manage_pci_remove      16
 struct physdev_manage_pci {
     /* IN */
-    uint8_t bus;
-    uint8_t devfn;
+    __u8 bus;
+    __u8 devfn;
 }; 
 
 typedef struct physdev_manage_pci physdev_manage_pci_t;
@@ -200,8 +200,8 @@ DEFINE_XEN_GUEST_HANDLE(physdev_manage_pci_t);
 #define PHYSDEVOP_restore_msi            19
 struct physdev_restore_msi {
     /* IN */
-    uint8_t bus;
-    uint8_t devfn;
+    __u8 bus;
+    __u8 devfn;
 };
 typedef struct physdev_restore_msi physdev_restore_msi_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_restore_msi_t);
@@ -209,13 +209,13 @@ DEFINE_XEN_GUEST_HANDLE(physdev_restore_msi_t);
 #define PHYSDEVOP_manage_pci_add_ext     20
 struct physdev_manage_pci_ext {
     /* IN */
-    uint8_t bus;
-    uint8_t devfn;
+    __u8 bus;
+    __u8 devfn;
     unsigned is_extfn;
     unsigned is_virtfn;
     struct {
-        uint8_t bus;
-        uint8_t devfn;
+        __u8 bus;
+        __u8 devfn;
     } physfn;
 };
 
@@ -227,7 +227,7 @@ DEFINE_XEN_GUEST_HANDLE(physdev_manage_pci_ext_t);
  * hypercall since 0x00030202.
  */
 struct physdev_op {
-    uint32_t cmd;
+    __u32 cmd;
     union {
         struct physdev_irq_status_query      irq_status_query;
         struct physdev_set_iopl              set_iopl;
@@ -243,9 +243,9 @@ DEFINE_XEN_GUEST_HANDLE(physdev_op_t);
 struct physdev_setup_gsi {
     int gsi;
     /* IN */
-    uint8_t triggering;
+    __u8 triggering;
     /* IN */
-    uint8_t polarity;
+    __u8 polarity;
     /* IN */
 };
 
@@ -261,7 +261,7 @@ struct physdev_get_free_pirq {
     /* IN */ 
     int type;
     /* OUT */
-    uint32_t pirq;
+    __u32 pirq;
 };
 
 typedef struct physdev_get_free_pirq physdev_get_free_pirq_t;
@@ -271,11 +271,11 @@ DEFINE_XEN_GUEST_HANDLE(physdev_get_free_pirq_t);
 
 #define PHYSDEVOP_pci_mmcfg_reserved    24
 struct physdev_pci_mmcfg_reserved {
-    uint64_t address;
-    uint16_t segment;
-    uint8_t start_bus;
-    uint8_t end_bus;
-    uint32_t flags;
+    __u64 address;
+    __u16 segment;
+    __u8 start_bus;
+    __u8 end_bus;
+    __u32 flags;
 };
 typedef struct physdev_pci_mmcfg_reserved physdev_pci_mmcfg_reserved_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_pci_mmcfg_reserved_t);
@@ -287,13 +287,13 @@ DEFINE_XEN_GUEST_HANDLE(physdev_pci_mmcfg_reserved_t);
 #define PHYSDEVOP_pci_device_add        25
 struct physdev_pci_device_add {
     /* IN */
-    uint16_t seg;
-    uint8_t bus;
-    uint8_t devfn;
-    uint32_t flags;
+    __u16 seg;
+    __u8 bus;
+    __u8 devfn;
+    __u32 flags;
     struct {
-        uint8_t bus;
-        uint8_t devfn;
+        __u8 bus;
+        __u8 devfn;
     } physfn;
     /*
      * Optional parameters array.
@@ -301,9 +301,9 @@ struct physdev_pci_device_add {
      * XEN_PCI_DEV_PXM is set)
      */
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
-    uint32_t optarr[];
+    __u32 optarr[];
 #elif defined(__GNUC__)
-    uint32_t optarr[0];
+    __u32 optarr[0];
 #endif
 };
 typedef struct physdev_pci_device_add physdev_pci_device_add_t;
@@ -319,9 +319,9 @@ DEFINE_XEN_GUEST_HANDLE(physdev_pci_device_add_t);
 #define PHYSDEVOP_release_msix          31
 struct physdev_pci_device {
     /* IN */
-    uint16_t seg;
-    uint8_t bus;
-    uint8_t devfn;
+    __u16 seg;
+    __u8 bus;
+    __u8 devfn;
 };
 typedef struct physdev_pci_device physdev_pci_device_t;
 DEFINE_XEN_GUEST_HANDLE(physdev_pci_device_t);
@@ -335,8 +335,8 @@ DEFINE_XEN_GUEST_HANDLE(physdev_pci_device_t);
 #define PHYSDEVOP_dbgp_op               29
 struct physdev_dbgp_op {
     /* IN */
-    uint8_t op;
-    uint8_t bus;
+    __u8 op;
+    __u8 bus;
     union {
         struct physdev_pci_device pci;
     } u;

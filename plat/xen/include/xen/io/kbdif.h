@@ -215,7 +215,7 @@
  * +-----------------+
  * |       type      |
  * +-----------------+
- * type - uint8_t, event code, XENKBD_TYPE_???
+ * type - __u8, event code, XENKBD_TYPE_???
  *
  *
  * Pointer relative movement event
@@ -236,17 +236,17 @@
  * |                             reserved                              | 40
  * +----------------+----------------+----------------+----------------+
  *
- * rel_x - int32_t, relative X motion
- * rel_y - int32_t, relative Y motion
- * rel_z - int32_t, relative Z motion (wheel)
+ * rel_x - __s32, relative X motion
+ * rel_y - __s32, relative Y motion
+ * rel_z - __s32, relative Z motion (wheel)
  */
 
 struct xenkbd_motion
 {
-    uint8_t type;
-    int32_t rel_x;
-    int32_t rel_y;
-    int32_t rel_z;
+    __u8 type;
+    __s32 rel_x;
+    __s32 rel_y;
+    __s32 rel_z;
 };
 
 /*
@@ -264,15 +264,15 @@ struct xenkbd_motion
  * |                             reserved                              | 40
  * +----------------+----------------+----------------+----------------+
  *
- * pressed - uint8_t, 1 if pressed; 0 otherwise
- * keycode - uint32_t, KEY_* from linux/input.h
+ * pressed - __u8, 1 if pressed; 0 otherwise
+ * keycode - __u32, KEY_* from linux/input.h
  */
 
 struct xenkbd_key
 {
-    uint8_t type;
-    uint8_t pressed;
-    uint32_t keycode;
+    __u8 type;
+    __u8 pressed;
+    __u32 keycode;
 };
 
 /*
@@ -294,17 +294,17 @@ struct xenkbd_key
  * |                             reserved                              | 40
  * +----------------+----------------+----------------+----------------+
  *
- * abs_x - int32_t, absolute X position (in FB pixels)
- * abs_y - int32_t, absolute Y position (in FB pixels)
- * rel_z - int32_t, relative Z motion (wheel)
+ * abs_x - __s32, absolute X position (in FB pixels)
+ * abs_y - __s32, absolute Y position (in FB pixels)
+ * rel_z - __s32, relative Z motion (wheel)
  */
 
 struct xenkbd_position
 {
-    uint8_t type;
-    int32_t abs_x;
-    int32_t abs_y;
-    int32_t rel_z;
+    __u8 type;
+    __s32 abs_x;
+    __s32 abs_y;
+    __s32 rel_z;
 };
 
 /*
@@ -358,8 +358,8 @@ struct xenkbd_position
  * |                             reserved                              | 40
  * +----------------+----------------+----------------+----------------+
  *
- * abs_x - int32_t, absolute X position, in pixels
- * abs_y - int32_t, absolute Y position, in pixels
+ * abs_x - __s32, absolute X position, in pixels
+ * abs_y - __s32, absolute Y position, in pixels
  *
  * Multi-touch contact release event
  *         0                1                 2               3        octet
@@ -391,8 +391,8 @@ struct xenkbd_position
  * |                             reserved                              | 40
  * +----------------+----------------+----------------+----------------+
  *
- * abs_x - int32_t, absolute X position, in pixels,
- * abs_y - int32_t, absolute Y position, in pixels,
+ * abs_x - __s32, absolute X position, in pixels,
+ * abs_y - __s32, absolute Y position, in pixels,
  *
  * Multi-touch input synchronization event - shows end of a set of events
  * which logically belong together.
@@ -450,24 +450,24 @@ struct xenkbd_position
  * |                             reserved                              | 40
  * +----------------+----------------+----------------+----------------+
  *
- * orientation - int16_t, clockwise angle of the major axis
+ * orientation - __s16, clockwise angle of the major axis
  */
 
 struct xenkbd_mtouch {
-    uint8_t type;            /* XENKBD_TYPE_MTOUCH */
-    uint8_t event_type;      /* XENKBD_MT_EV_??? */
-    uint8_t contact_id;
-    uint8_t reserved[5];     /* reserved for the future use */
+    __u8 type;            /* XENKBD_TYPE_MTOUCH */
+    __u8 event_type;      /* XENKBD_MT_EV_??? */
+    __u8 contact_id;
+    __u8 reserved[5];     /* reserved for the future use */
     union {
         struct {
-            int32_t abs_x;   /* absolute X position, pixels */
-            int32_t abs_y;   /* absolute Y position, pixels */
+            __s32 abs_x;   /* absolute X position, pixels */
+            __s32 abs_y;   /* absolute Y position, pixels */
         } pos;
         struct {
-            uint32_t major;  /* length of the major axis, pixels */
-            uint32_t minor;  /* length of the minor axis, pixels */
+            __u32 major;  /* length of the major axis, pixels */
+            __u32 minor;  /* length of the minor axis, pixels */
         } shape;
-        int16_t orientation; /* clockwise angle of the major axis */
+        __s16 orientation; /* clockwise angle of the major axis */
     } u;
 };
 
@@ -475,7 +475,7 @@ struct xenkbd_mtouch {
 
 union xenkbd_in_event
 {
-    uint8_t type;
+    __u8 type;
     struct xenkbd_motion motion;
     struct xenkbd_key key;
     struct xenkbd_position pos;
@@ -498,14 +498,14 @@ union xenkbd_in_event
  * +-----------------+
  * |       type      |
  * +-----------------+
- * type - uint8_t, event code
+ * type - __u8, event code
  */
 
 #define XENKBD_OUT_EVENT_SIZE 40
 
 union xenkbd_out_event
 {
-    uint8_t type;
+    __u8 type;
     char pad[XENKBD_OUT_EVENT_SIZE];
 };
 
@@ -533,8 +533,8 @@ union xenkbd_out_event
 
 struct xenkbd_page
 {
-    uint32_t in_cons, in_prod;
-    uint32_t out_cons, out_prod;
+    __u32 in_cons, in_prod;
+    __u32 out_cons, out_prod;
 };
 
 #endif /* __XEN_PUBLIC_IO_KBDIF_H__ */

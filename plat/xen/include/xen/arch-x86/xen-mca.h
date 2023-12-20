@@ -109,8 +109,8 @@
 #define MC_TYPE_RECOVERY        3
 
 struct mcinfo_common {
-    uint16_t type;      /* structure type */
-    uint16_t size;      /* size of this struct in bytes */
+    __u16 type;      /* structure type */
+    __u16 size;      /* size of this struct in bytes */
 };
 
 
@@ -126,35 +126,35 @@ struct mcinfo_global {
     struct mcinfo_common common;
 
     /* running domain at the time in error (most likely the impacted one) */
-    uint16_t mc_domid;
-    uint16_t mc_vcpuid; /* virtual cpu scheduled for mc_domid */
-    uint32_t mc_socketid; /* physical socket of the physical core */
-    uint16_t mc_coreid; /* physical impacted core */
-    uint16_t mc_core_threadid; /* core thread of physical core */
-    uint32_t mc_apicid;
-    uint32_t mc_flags;
-    uint64_t mc_gstatus; /* global status */
+    __u16 mc_domid;
+    __u16 mc_vcpuid; /* virtual cpu scheduled for mc_domid */
+    __u32 mc_socketid; /* physical socket of the physical core */
+    __u16 mc_coreid; /* physical impacted core */
+    __u16 mc_core_threadid; /* core thread of physical core */
+    __u32 mc_apicid;
+    __u32 mc_flags;
+    __u64 mc_gstatus; /* global status */
 };
 
 /* contains bank local x86 mc information */
 struct mcinfo_bank {
     struct mcinfo_common common;
 
-    uint16_t mc_bank; /* bank nr */
-    uint16_t mc_domid; /* Usecase 5: domain referenced by mc_addr on dom0
+    __u16 mc_bank; /* bank nr */
+    __u16 mc_domid; /* Usecase 5: domain referenced by mc_addr on dom0
                         * and if mc_addr is valid. Never valid on DomU. */
-    uint64_t mc_status; /* bank status */
-    uint64_t mc_addr;   /* bank address, only valid
+    __u64 mc_status; /* bank status */
+    __u64 mc_addr;   /* bank address, only valid
                          * if addr bit is set in mc_status */
-    uint64_t mc_misc;
-    uint64_t mc_ctrl2;
-    uint64_t mc_tsc;
+    __u64 mc_misc;
+    __u64 mc_ctrl2;
+    __u64 mc_tsc;
 };
 
 
 struct mcinfo_msr {
-    uint64_t reg;   /* MSR */
-    uint64_t value; /* MSR value */
+    __u64 reg;   /* MSR */
+    __u64 value; /* MSR value */
 };
 
 /* contains mc information from other
@@ -166,7 +166,7 @@ struct mcinfo_extended {
      * If you need more, then use this structure
      * multiple times. */
 
-    uint32_t mc_msrs; /* Number of msr with valid values. */
+    __u32 mc_msrs; /* Number of msr with valid values. */
     /*
      * Currently Intel extended MSR (32/64) include all gp registers
      * and E(R)FLAGS, E(R)IP, E(R)MISC, up to 11/19 of them might be
@@ -205,29 +205,29 @@ struct mcinfo_extended {
 struct page_offline_action
 {
     /* Params for passing the offlined page number to DOM0 */
-    uint64_t mfn;
-    uint64_t status;
+    __u64 mfn;
+    __u64 status;
 };
 
 struct cpu_offline_action
 {
     /* Params for passing the identity of the offlined CPU to DOM0 */
-    uint32_t mc_socketid;
-    uint16_t mc_coreid;
-    uint16_t mc_core_threadid;
+    __u32 mc_socketid;
+    __u16 mc_coreid;
+    __u16 mc_core_threadid;
 };
 
 #define MAX_UNION_SIZE 16
 struct mcinfo_recovery
 {
     struct mcinfo_common common;
-    uint16_t mc_bank; /* bank nr */
-    uint8_t action_flags;
-    uint8_t action_types;
+    __u16 mc_bank; /* bank nr */
+    __u8 action_flags;
+    __u8 action_types;
     union {
         struct page_offline_action page_retire;
         struct cpu_offline_action cpu_offline;
-        uint8_t pad[MAX_UNION_SIZE];
+        __u8 pad[MAX_UNION_SIZE];
     } action_info;
 };
 
@@ -238,9 +238,9 @@ struct mcinfo_recovery
 #define MCINFO_FLAGS_UNCOMPLETE 0x1
 struct mc_info {
     /* Number of mcinfo_* entries in mi_data */
-    uint32_t mi_nentries;
-    uint32_t flags;
-    uint64_t mi_data[(MCINFO_MAXSIZE - 1) / 8];
+    __u32 mi_nentries;
+    __u32 flags;
+    __u64 mi_data[(MCINFO_MAXSIZE - 1) / 8];
 };
 typedef struct mc_info mc_info_t;
 DEFINE_XEN_GUEST_HANDLE(mc_info_t);
@@ -257,26 +257,26 @@ DEFINE_XEN_GUEST_HANDLE(mc_info_t);
 #define MC_CAPS_AMD_ECX	6	/* cpuid level 0x80000001 (%ecx) */
 
 struct mcinfo_logical_cpu {
-    uint32_t mc_cpunr;
-    uint32_t mc_chipid;
-    uint16_t mc_coreid;
-    uint16_t mc_threadid;
-    uint32_t mc_apicid;
-    uint32_t mc_clusterid;
-    uint32_t mc_ncores;
-    uint32_t mc_ncores_active;
-    uint32_t mc_nthreads;
-    int32_t mc_cpuid_level;
-    uint32_t mc_family;
-    uint32_t mc_vendor;
-    uint32_t mc_model;
-    uint32_t mc_step;
+    __u32 mc_cpunr;
+    __u32 mc_chipid;
+    __u16 mc_coreid;
+    __u16 mc_threadid;
+    __u32 mc_apicid;
+    __u32 mc_clusterid;
+    __u32 mc_ncores;
+    __u32 mc_ncores_active;
+    __u32 mc_nthreads;
+    __s32 mc_cpuid_level;
+    __u32 mc_family;
+    __u32 mc_vendor;
+    __u32 mc_model;
+    __u32 mc_step;
     char mc_vendorid[16];
     char mc_brandid[64];
-    uint32_t mc_cpu_caps[MC_NCAPS];
-    uint32_t mc_cache_size;
-    uint32_t mc_cache_alignment;
-    int32_t mc_nmsrvals;
+    __u32 mc_cpu_caps[MC_NCAPS];
+    __u32 mc_cache_size;
+    __u32 mc_cache_alignment;
+    __s32 mc_nmsrvals;
     struct mcinfo_msr mc_msrvalues[__MC_MSR_ARRAYSIZE];
 };
 typedef struct mcinfo_logical_cpu xen_mc_logical_cpu_t;
@@ -290,7 +290,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_mc_logical_cpu_t);
  * to include this header in assembly files (*.S).
  */
 /* Prototype:
- *    uint32_t x86_mcinfo_nentries(struct mc_info *mi);
+ *    __u32 x86_mcinfo_nentries(struct mc_info *mi);
  */
 #define x86_mcinfo_nentries(_mi)    \
     (_mi)->mi_nentries
@@ -303,14 +303,14 @@ DEFINE_XEN_GUEST_HANDLE(xen_mc_logical_cpu_t);
  *    struct mcinfo_common *x86_mcinfo_next(struct mcinfo_common *mic);
  */
 #define x86_mcinfo_next(_mic)       \
-    ((struct mcinfo_common *)((uint8_t *)(_mic) + (_mic)->size))
+    ((struct mcinfo_common *)((__u8 *)(_mic) + (_mic)->size))
 
 /* Prototype:
- *    void x86_mcinfo_lookup(void *ret, struct mc_info *mi, uint16_t type);
+ *    void x86_mcinfo_lookup(void *ret, struct mc_info *mi, __u16 type);
  */
 #define x86_mcinfo_lookup(_ret, _mi, _type)    \
     do {                                                        \
-        uint32_t found, i;                                      \
+        __u32 found, i;                                      \
         struct mcinfo_common *_mic;                             \
                                                                 \
         found = 0;                                              \
@@ -345,12 +345,12 @@ DEFINE_XEN_GUEST_HANDLE(xen_mc_logical_cpu_t);
 #define XEN_MC_fetch            1
 struct xen_mc_fetch {
     /* IN/OUT variables. */
-    uint32_t flags;	/* IN: XEN_MC_NONURGENT, XEN_MC_URGENT,
+    __u32 flags;	/* IN: XEN_MC_NONURGENT, XEN_MC_URGENT,
                            XEN_MC_ACK if ack'ing an earlier fetch */
                        /* OUT: XEN_MC_OK, XEN_MC_FETCHFAILED,
                           XEN_MC_NODATA, XEN_MC_NOMATCH */
-    uint32_t _pad0;
-    uint64_t fetch_id;	/* OUT: id for ack, IN: id we are ack'ing */
+    __u32 _pad0;
+    __u64 fetch_id;	/* OUT: id for ack, IN: id we are ack'ing */
 
     /* OUT variables. */
     XEN_GUEST_HANDLE(mc_info_t) data;
@@ -365,12 +365,12 @@ DEFINE_XEN_GUEST_HANDLE(xen_mc_fetch_t);
 #define XEN_MC_notifydomain     2
 struct xen_mc_notifydomain {
     /* IN variables. */
-    uint16_t mc_domid;    /* The unprivileged domain to notify. */
-    uint16_t mc_vcpuid;   /* The vcpu in mc_domid to notify.
+    __u16 mc_domid;    /* The unprivileged domain to notify. */
+    __u16 mc_vcpuid;   /* The vcpu in mc_domid to notify.
                            * Usually echo'd value from the fetch hypercall. */
 
     /* IN/OUT variables. */
-    uint32_t flags;
+    __u32 flags;
 
 /* IN: XEN_MC_CORRECTABLE, XEN_MC_TRAP */
 /* OUT: XEN_MC_OK, XEN_MC_CANNOTHANDLE, XEN_MC_NOTDELIVERED, XEN_MC_NOMATCH */
@@ -381,8 +381,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_mc_notifydomain_t);
 #define XEN_MC_physcpuinfo 3
 struct xen_mc_physcpuinfo {
     /* IN/OUT */
-    uint32_t ncpus;
-    uint32_t _pad0;
+    __u32 ncpus;
+    __u32 _pad0;
     /* OUT */
     XEN_GUEST_HANDLE(xen_mc_logical_cpu_t) info;
 };
@@ -391,12 +391,12 @@ struct xen_mc_physcpuinfo {
 #define MC_MSRINJ_MAXMSRS       8
 struct xen_mc_msrinject {
     /* IN */
-    uint32_t mcinj_cpunr;           /* target processor id */
-    uint32_t mcinj_flags;           /* see MC_MSRINJ_F_* below */
-    uint32_t mcinj_count;           /* 0 .. count-1 in array are valid */
+    __u32 mcinj_cpunr;           /* target processor id */
+    __u32 mcinj_flags;           /* see MC_MSRINJ_F_* below */
+    __u32 mcinj_count;           /* 0 .. count-1 in array are valid */
     domid_t  mcinj_domid;           /* valid only if MC_MSRINJ_F_GPADDR is
                                        present in mcinj_flags */
-    uint16_t _pad0;
+    __u16 _pad0;
     struct mcinfo_msr mcinj_msr[MC_MSRINJ_MAXMSRS];
 };
 
@@ -419,14 +419,14 @@ struct xen_mc_mceinject {
 #define XEN_MC_INJECT_CPU_BROADCAST 0x8
 
 struct xen_mc_inject_v2 {
-    uint32_t flags;
+    __u32 flags;
     struct xenctl_bitmap cpumap;
 };
 #endif
 
 struct xen_mc {
-    uint32_t cmd;
-    uint32_t interface_version; /* XEN_MCA_INTERFACE_VERSION */
+    __u32 cmd;
+    __u32 interface_version; /* XEN_MCA_INTERFACE_VERSION */
     union {
         struct xen_mc_fetch        mc_fetch;
         struct xen_mc_notifydomain mc_notifydomain;

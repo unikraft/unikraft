@@ -180,7 +180,7 @@ static int _init_mem(struct ukplat_bootinfo *const bi)
 			mrd.pbase = HYPERVISOR_start_info->mod_start;
 			mrd.vbase = mrd.pbase;
 		}
-		mrd.len = (size_t)HYPERVISOR_start_info->mod_len;
+		mrd.len = (__sz)HYPERVISOR_start_info->mod_len;
 		mrd.type = UKPLAT_MEMRT_INITRD;
 		mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE |
 			    UKPLAT_MEMRF_MAP;

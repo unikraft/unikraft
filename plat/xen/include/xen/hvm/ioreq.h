@@ -50,19 +50,19 @@
  * SEGMENT |BUS   |DEV   |FN    |OFFSET
  */
 struct ioreq {
-    uint64_t addr;          /* physical address */
-    uint64_t data;          /* data (or paddr of data) */
-    uint32_t count;         /* for rep prefixes */
-    uint32_t size;          /* size in bytes */
-    uint32_t vp_eport;      /* evtchn for notifications to/from device model */
-    uint16_t _pad0;
-    uint8_t state:4;
-    uint8_t data_is_ptr:1;  /* if 1, data above is the guest paddr 
+    __u64 addr;          /* physical address */
+    __u64 data;          /* data (or paddr of data) */
+    __u32 count;         /* for rep prefixes */
+    __u32 size;          /* size in bytes */
+    __u32 vp_eport;      /* evtchn for notifications to/from device model */
+    __u16 _pad0;
+    __u8 state:4;
+    __u8 data_is_ptr:1;  /* if 1, data above is the guest paddr 
                              * of the real data to use. */
-    uint8_t dir:1;          /* 1=read, 0=write */
-    uint8_t df:1;
-    uint8_t _pad1:1;
-    uint8_t type;           /* I/O type */
+    __u8 dir:1;          /* 1=read, 0=write */
+    __u8 df:1;
+    __u8 _pad1:1;
+    __u8 type;           /* I/O type */
 };
 typedef struct ioreq ioreq_t;
 
@@ -72,12 +72,12 @@ struct shared_iopage {
 typedef struct shared_iopage shared_iopage_t;
 
 struct buf_ioreq {
-    uint8_t  type;   /* I/O type                    */
-    uint8_t  pad:1;
-    uint8_t  dir:1;  /* 1=read, 0=write             */
-    uint8_t  size:2; /* 0=>1, 1=>2, 2=>4, 3=>8. If 8, use two buf_ioreqs */
-    uint32_t addr:20;/* physical address            */
-    uint32_t data;   /* data                        */
+    __u8  type;   /* I/O type                    */
+    __u8  pad:1;
+    __u8  dir:1;  /* 1=read, 0=write             */
+    __u8  size:2; /* 0=>1, 1=>2, 2=>4, 3=>8. If 8, use two buf_ioreqs */
+    __u32 addr:20;/* physical address            */
+    __u32 data;   /* data                        */
 };
 typedef struct buf_ioreq buf_ioreq_t;
 
@@ -87,11 +87,11 @@ struct buffered_iopage {
     union bufioreq_pointers {
         struct {
 #endif
-            uint32_t read_pointer;
-            uint32_t write_pointer;
+            __u32 read_pointer;
+            __u32 write_pointer;
 #ifdef __XEN__
         };
-        uint64_t full;
+        __u64 full;
     } ptrs;
 #endif
     buf_ioreq_t buf_ioreq[IOREQ_BUFFER_SLOT_NUM];

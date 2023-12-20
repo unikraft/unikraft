@@ -61,20 +61,20 @@
 static struct uk_alloc *drv_allocator;
 
 
-static uint16_t xennet_rxidx(RING_IDX idx)
+static __u16 xennet_rxidx(RING_IDX idx)
 {
-	return (uint16_t) (idx & (NET_RX_RING_SIZE - 1));
+	return (__u16) (idx & (NET_RX_RING_SIZE - 1));
 }
 
-static void add_id_to_freelist(uint16_t id, uint16_t *freelist)
+static void add_id_to_freelist(__u16 id, __u16 *freelist)
 {
 	freelist[id + 1] = freelist[0];
 	freelist[0]  = id;
 }
 
-static uint16_t get_id_from_freelist(uint16_t *freelist)
+static __u16 get_id_from_freelist(__u16 *freelist)
 {
-	uint16_t id;
+	__u16 id;
 
 	id = freelist[0];
 	freelist[0] = freelist[id + 1];
@@ -85,7 +85,7 @@ static int network_tx_buf_gc(struct uk_netdev_tx_queue *txq)
 {
 	RING_IDX prod, cons;
 	netif_tx_response_t *tx_rsp;
-	uint16_t id;
+	__u16 id;
 	int count = 0;
 
 	prod = txq->ring.sring->rsp_prod;
@@ -123,7 +123,7 @@ static int netfront_xmit(struct uk_netdev *n,
 {
 	struct netfront_dev *nfdev;
 	unsigned long flags;
-	uint16_t id;
+	__u16 id;
 	RING_IDX req_prod;
 	netif_tx_request_t *tx_req;
 	bool more_to_do;
@@ -175,8 +175,8 @@ static int netfront_xmit(struct uk_netdev *n,
 	/* remember netbuf reference for free'ing it later */
 	txq->nbuf[id] = pkt;
 	tx_req->gref = txq->gref[id];
-	tx_req->offset = (uint16_t) uk_netbuf_headroom(pkt);
-	tx_req->size = (uint16_t) pkt->len;
+	tx_req->offset = (__u16) uk_netbuf_headroom(pkt);
+	tx_req->size = (__u16) pkt->len;
 	tx_req->flags  = (pkt->flags & UK_NETBUF_F_PARTIAL_CSUM)
 			 ? NETTXF_csum_blank : 0x0;
 	tx_req->flags |= (pkt->flags & UK_NETBUF_F_DATA_VALID)
@@ -208,7 +208,7 @@ static int netfront_rxq_enqueue(struct uk_netdev_rx_queue *rxq,
 		struct uk_netbuf *netbuf)
 {
 	RING_IDX req_prod;
-	uint16_t id;
+	__u16 id;
 	netif_rx_request_t *rx_req;
 	struct netfront_dev *nfdev;
 	int notify;
@@ -261,7 +261,7 @@ static int netfront_rxq_dequeue(struct uk_netdev_rx_queue *rxq,
 {
 	RING_IDX prod, cons;
 	netif_rx_response_t *rx_rsp;
-	uint16_t len, id;
+	__u16 len, id;
 	struct uk_netbuf *buf = NULL;
 	int count = 0;
 
@@ -290,7 +290,7 @@ static int netfront_rxq_dequeue(struct uk_netdev_rx_queue *rxq,
 		uk_pr_err("rxq %p: Receive error %d!\n", rxq, rx_rsp->status);
 		buf->len = 0;
 	} else {
-		len = (uint16_t) rx_rsp->status;
+		len = (__u16) rx_rsp->status;
 		if (len > UK_ETH_FRAME_MAXLEN)
 			len = UK_ETH_FRAME_MAXLEN;
 
@@ -317,15 +317,15 @@ out:
 	return count;
 }
 
-static int netfront_rx_fillup(struct uk_netdev_rx_queue *rxq, uint16_t nb_desc)
+static int netfront_rx_fillup(struct uk_netdev_rx_queue *rxq, __u16 nb_desc)
 {
 	struct uk_netbuf *netbuf[nb_desc];
 	int rc, status = 0;
-	uint16_t cnt;
+	__u16 cnt;
 
 	cnt = rxq->alloc_rxpkts(rxq->alloc_rxpkts_argp, netbuf, nb_desc);
 
-	for (uint16_t i = 0; i < cnt; i++) {
+	for (__u16 i = 0; i < cnt; i++) {
 		rc = netfront_rxq_enqueue(rxq, netbuf[i]);
 		if (unlikely(rc < 0)) {
 			uk_pr_err("Failed to add a buffer to rx queue %p: %d\n",
@@ -335,7 +335,7 @@ static int netfront_rx_fillup(struct uk_netdev_rx_queue *rxq, uint16_t nb_desc)
 			 * Release netbufs that we are not going
 			 * to use anymore
 			 */
-			for (uint16_t j = i; j < cnt; j++)
+			for (__u16 j = i; j < cnt; j++)
 				uk_netbuf_free(netbuf[j]);
 
 			status |= UK_NETDEV_STATUS_UNDERRUN;
@@ -426,8 +426,8 @@ static int netfront_recv(struct uk_netdev *n __unused,
 }
 
 static struct uk_netdev_tx_queue *netfront_txq_setup(struct uk_netdev *n,
-		uint16_t queue_id,
-		uint16_t nb_desc __unused,
+		__u16 queue_id,
+		__u16 nb_desc __unused,
 		struct uk_netdev_txqueue_conf *conf)
 {
 	int rc;
@@ -478,7 +478,7 @@ static struct uk_netdev_tx_queue *netfront_txq_setup(struct uk_netdev *n,
 	mask_evtchn(txq->evtchn);
 
 	/* Initialize list of request ids */
-	for (uint16_t i = 0; i < NET_TX_RING_SIZE; i++) {
+	for (__u16 i = 0; i < NET_TX_RING_SIZE; i++) {
 		add_id_to_freelist(i, txq->freelist);
 		txq->gref[i] = GRANT_INVALID_REF;
 		txq->netbuf[i] = NULL;
@@ -504,8 +504,8 @@ static void netfront_rxq_handler(evtchn_port_t port __unused,
 }
 
 static struct uk_netdev_rx_queue *netfront_rxq_setup(struct uk_netdev *n,
-		uint16_t queue_id,
-		uint16_t nb_desc __unused,
+		__u16 queue_id,
+		__u16 nb_desc __unused,
 		struct uk_netdev_rxqueue_conf *conf)
 {
 	int rc;
@@ -565,7 +565,7 @@ static struct uk_netdev_rx_queue *netfront_rxq_setup(struct uk_netdev *n,
 	rxq->alloc_rxpkts = conf->alloc_rxpkts;
 	rxq->alloc_rxpkts_argp = conf->alloc_rxpkts_argp;
 
-	for (uint16_t i = 0; i < NET_RX_RING_SIZE; i++)
+	for (__u16 i = 0; i < NET_RX_RING_SIZE; i++)
 		rxq->gref[i] = GRANT_INVALID_REF;
 
 	/* Allocate receive buffers for this queue */
@@ -662,7 +662,7 @@ static int netfront_rx_intr_disable(struct uk_netdev *n __unused,
 }
 
 static int netfront_txq_info_get(struct uk_netdev *n,
-		uint16_t queue_id,
+		__u16 queue_id,
 		struct uk_netdev_queue_info *qinfo)
 {
 	struct netfront_dev *nfdev;
@@ -689,7 +689,7 @@ exit:
 }
 
 static int netfront_rxq_info_get(struct uk_netdev *n,
-		uint16_t queue_id,
+		__u16 queue_id,
 		struct uk_netdev_queue_info *qinfo)
 {
 	struct netfront_dev *nfdev;
@@ -803,7 +803,7 @@ static const struct uk_hwaddr *netfront_mac_get(struct uk_netdev *n)
 	return &nfdev->hw_addr;
 }
 
-static uint16_t netfront_mtu_get(struct uk_netdev *n)
+static __u16 netfront_mtu_get(struct uk_netdev *n)
 {
 	struct netfront_dev *nfdev;
 

@@ -47,9 +47,9 @@
  * Each entry is preceded by a descriptor giving its type and length
  */
 struct hvm_save_descriptor {
-    uint16_t typecode;          /* Used to demux the various types below */
-    uint16_t instance;          /* Further demux within a type */
-    uint32_t length;            /* In bytes, *not* including this descriptor */
+    __u16 typecode;          /* Used to demux the various types below */
+    __u16 instance;          /* Further demux within a type */
+    __u32 length;            /* In bytes, *not* including this descriptor */
 };
 
 
@@ -63,14 +63,14 @@ struct hvm_save_descriptor {
 
 #ifdef __XEN__
 # define DECLARE_HVM_SAVE_TYPE_COMPAT(_x, _code, _type, _ctype, _fix)     \
-    static inline int __HVM_SAVE_FIX_COMPAT_##_x(void *h, uint32_t size)  \
+    static inline int __HVM_SAVE_FIX_COMPAT_##_x(void *h, __u32 size)  \
         { return _fix(h, size); }                                         \
     struct __HVM_SAVE_TYPE_##_x { _type t; char c[_code]; char cpt[2];};  \
     struct __HVM_SAVE_TYPE_COMPAT_##_x { _ctype t; }                   
 
 # include <xen/lib.h> /* BUG() */
 # define DECLARE_HVM_SAVE_TYPE(_x, _code, _type)                         \
-    static inline int __HVM_SAVE_FIX_COMPAT_##_x(void *h, uint32_t size) \
+    static inline int __HVM_SAVE_FIX_COMPAT_##_x(void *h, __u32 size) \
         { BUG(); return -1; }                                            \
     struct __HVM_SAVE_TYPE_##_x { _type t; char c[_code]; char cpt[1];}; \
     struct __HVM_SAVE_TYPE_COMPAT_##_x { _type t; }                   

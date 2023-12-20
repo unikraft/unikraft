@@ -58,8 +58,8 @@
 
 #if defined(__i386__)
 # ifdef __XEN__
-__DeFiNe__ __DECL_REG_LO8(which) uint32_t e ## which ## x
-__DeFiNe__ __DECL_REG_LO16(name) union { uint32_t e ## name; }
+__DeFiNe__ __DECL_REG_LO8(which) __u32 e ## which ## x
+__DeFiNe__ __DECL_REG_LO16(name) union { __u32 e ## name; }
 # endif
 #include "xen-x86_32.h"
 # ifdef __XEN__
@@ -148,15 +148,15 @@ typedef unsigned long xen_ulong_t;
 #define TI_SET_DPL(_ti,_dpl) ((_ti)->flags |= (_dpl))
 #define TI_SET_IF(_ti,_if)   ((_ti)->flags |= ((!!(_if))<<2))
 struct trap_info {
-    uint8_t       vector;  /* exception vector                              */
-    uint8_t       flags;   /* 0-3: privilege level; 4: clear event enable?  */
-    uint16_t      cs;      /* code selector                                 */
+    __u8       vector;  /* exception vector                              */
+    __u8       flags;   /* 0-3: privilege level; 4: clear event enable?  */
+    __u16      cs;      /* code selector                                 */
     unsigned long address; /* code offset                                   */
 };
 typedef struct trap_info trap_info_t;
 DEFINE_XEN_GUEST_HANDLE(trap_info_t);
 
-typedef uint64_t tsc_timestamp_t; /* RDTSC timestamp */
+typedef __u64 tsc_timestamp_t; /* RDTSC timestamp */
 
 /*
  * The following is all CPU context. Note that the fpu_ctxt block is filled
@@ -216,9 +216,9 @@ struct vcpu_guest_context {
     unsigned long vm_assist;                /* VMASST_TYPE_* bitmap */
 #ifdef __x86_64__
     /* Segment base addresses. */
-    uint64_t      fs_base;
-    uint64_t      gs_base_kernel;
-    uint64_t      gs_base_user;
+    __u64      fs_base;
+    __u64      gs_base_kernel;
+    __u64      gs_base_user;
 #endif
 };
 typedef struct vcpu_guest_context vcpu_guest_context_t;
@@ -262,7 +262,7 @@ struct arch_shared_info {
     unsigned long p2m_generation;  /* generation count of p2m mapping */
 #ifdef __i386__
     /* There's no room for this field in the generic structure. */
-    uint32_t wc_sec_hi;
+    __u32 wc_sec_hi;
 #endif
 };
 typedef struct arch_shared_info arch_shared_info_t;
@@ -299,7 +299,7 @@ struct xen_arch_domainconfig {
                                      XEN_X86_EMU_IOAPIC | XEN_X86_EMU_PIC |  \
                                      XEN_X86_EMU_VGA | XEN_X86_EMU_IOMMU |   \
                                      XEN_X86_EMU_PIT | XEN_X86_EMU_USE_PIRQ)
-    uint32_t emulation_flags;
+    __u32 emulation_flags;
 };
 
 /* Location of online VCPU bitmap. */

@@ -284,14 +284,14 @@
  * does not already provide an implementation.
  */
 #ifdef XEN_NETIF_DEFINE_TOEPLITZ
-static uint32_t xen_netif_toeplitz_hash(const uint8_t *key,
+static __u32 xen_netif_toeplitz_hash(const __u8 *key,
                                         unsigned int keylen,
-                                        const uint8_t *buf,
+                                        const __u8 *buf,
                                         unsigned int buflen)
 {
     unsigned int keyi, bufi;
-    uint64_t prefix = 0;
-    uint64_t hash = 0;
+    __u64 prefix = 0;
+    __u64 hash = 0;
 
     /* Pre-load prefix with the first 8 bytes of the key */
     for (keyi = 0; keyi < 8; keyi++) {
@@ -300,7 +300,7 @@ static uint32_t xen_netif_toeplitz_hash(const uint8_t *key,
     }
 
     for (bufi = 0; bufi < buflen; bufi++) {
-        uint8_t byte = buf[bufi];
+        __u8 byte = buf[bufi];
         unsigned int bit;
 
         for (bit = 0; bit < 8; bit++) {
@@ -342,8 +342,8 @@ static uint32_t xen_netif_toeplitz_hash(const uint8_t *key,
  */
 
 struct xen_netif_ctrl_request {
-    uint16_t id;
-    uint16_t type;
+    __u16 id;
+    __u16 type;
 
 #define XEN_NETIF_CTRL_TYPE_INVALID               0
 #define XEN_NETIF_CTRL_TYPE_GET_HASH_FLAGS        1
@@ -357,7 +357,7 @@ struct xen_netif_ctrl_request {
 #define XEN_NETIF_CTRL_TYPE_ADD_GREF_MAPPING      9
 #define XEN_NETIF_CTRL_TYPE_DEL_GREF_MAPPING     10
 
-    uint32_t data[3];
+    __u32 data[3];
 };
 
 /*
@@ -381,16 +381,16 @@ struct xen_netif_ctrl_request {
  */
 
 struct xen_netif_ctrl_response {
-    uint16_t id;
-    uint16_t type;
-    uint32_t status;
+    __u16 id;
+    __u16 type;
+    __u32 status;
 
 #define XEN_NETIF_CTRL_STATUS_SUCCESS           0
 #define XEN_NETIF_CTRL_STATUS_NOT_SUPPORTED     1
 #define XEN_NETIF_CTRL_STATUS_INVALID_PARAMETER 2
 #define XEN_NETIF_CTRL_STATUS_BUFFER_OVERFLOW   3
 
-    uint32_t data;
+    __u32 data;
 };
 
 /*
@@ -423,12 +423,12 @@ struct xen_netif_ctrl_response {
 
 struct xen_netif_gref {
        grant_ref_t ref;
-       uint16_t flags;
+       __u16 flags;
 
 #define _XEN_NETIF_CTRLF_GREF_readonly    0
 #define XEN_NETIF_CTRLF_GREF_readonly    (1U<<_XEN_NETIF_CTRLF_GREF_readonly)
 
-       uint16_t status;
+       __u16 status;
 };
 
 /*
@@ -958,10 +958,10 @@ DEFINE_RING_TYPES(xen_netif_ctrl,
 #define XEN_NETIF_MAX_TX_SIZE 0xFFFF
 struct netif_tx_request {
     grant_ref_t gref;
-    uint16_t offset;
-    uint16_t flags;
-    uint16_t id;
-    uint16_t size;
+    __u16 offset;
+    __u16 flags;
+    __u16 id;
+    __u16 size;
 };
 typedef struct netif_tx_request netif_tx_request_t;
 
@@ -987,37 +987,37 @@ typedef struct netif_tx_request netif_tx_request_t;
  * netif_rx_response_t for compatibility.
  */
 struct netif_extra_info {
-    uint8_t type;
-    uint8_t flags;
+    __u8 type;
+    __u8 flags;
     union {
         struct {
-            uint16_t size;
-            uint8_t type;
-            uint8_t pad;
-            uint16_t features;
+            __u16 size;
+            __u8 type;
+            __u8 pad;
+            __u16 features;
         } gso;
         struct {
-            uint8_t addr[6];
+            __u8 addr[6];
         } mcast;
         struct {
-            uint8_t type;
-            uint8_t algorithm;
-            uint8_t value[4];
+            __u8 type;
+            __u8 algorithm;
+            __u8 value[4];
         } hash;
-        uint16_t pad[3];
+        __u16 pad[3];
     } u;
 };
 typedef struct netif_extra_info netif_extra_info_t;
 
 struct netif_tx_response {
-    uint16_t id;
-    int16_t  status;
+    __u16 id;
+    __s16  status;
 };
 typedef struct netif_tx_response netif_tx_response_t;
 
 struct netif_rx_request {
-    uint16_t    id;        /* Echoed in response message.        */
-    uint16_t    pad;
+    __u16    id;        /* Echoed in response message.        */
+    __u16    pad;
     grant_ref_t gref;
 };
 typedef struct netif_rx_request netif_rx_request_t;
@@ -1043,10 +1043,10 @@ typedef struct netif_rx_request netif_rx_request_t;
 #define  NETRXF_gso_prefix     (1U<<_NETRXF_gso_prefix)
 
 struct netif_rx_response {
-    uint16_t id;
-    uint16_t offset;
-    uint16_t flags;
-    int16_t  status;
+    __u16 id;
+    __u16 offset;
+    __u16 flags;
+    __s16  status;
 };
 typedef struct netif_rx_response netif_rx_response_t;
 

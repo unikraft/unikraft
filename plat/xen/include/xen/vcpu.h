@@ -82,7 +82,7 @@ struct vcpu_runstate_info {
     /* VCPU's current state (RUNSTATE_*). */
     int      state;
     /* When was current state entered (system time, ns)? */
-    uint64_t state_entry_time;
+    __u64 state_entry_time;
     /*
      * Update indicator set in state_entry_time:
      * When activated via VMASST_TYPE_runstate_update_flag, set during
@@ -93,7 +93,7 @@ struct vcpu_runstate_info {
      * Time spent in each RUNSTATE_* (ns). The sum of these times is
      * guaranteed not to drift from system time.
      */
-    uint64_t time[4];
+    __u64 time[4];
 };
 typedef struct vcpu_runstate_info vcpu_runstate_info_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_runstate_info_t);
@@ -134,7 +134,7 @@ struct vcpu_register_runstate_memory_area {
     union {
         XEN_GUEST_HANDLE(vcpu_runstate_info_t) h;
         struct vcpu_runstate_info *v;
-        uint64_t p;
+        __u64 p;
     } addr;
 };
 typedef struct vcpu_register_runstate_memory_area vcpu_register_runstate_memory_area_t;
@@ -148,7 +148,7 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_register_runstate_memory_area_t);
 #define VCPUOP_set_periodic_timer    6 /* arg == vcpu_set_periodic_timer_t */
 #define VCPUOP_stop_periodic_timer   7 /* arg == NULL */
 struct vcpu_set_periodic_timer {
-    uint64_t period_ns;
+    __u64 period_ns;
 };
 typedef struct vcpu_set_periodic_timer vcpu_set_periodic_timer_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_set_periodic_timer_t);
@@ -160,8 +160,8 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_set_periodic_timer_t);
 #define VCPUOP_set_singleshot_timer  8 /* arg == vcpu_set_singleshot_timer_t */
 #define VCPUOP_stop_singleshot_timer 9 /* arg == NULL */
 struct vcpu_set_singleshot_timer {
-    uint64_t timeout_abs_ns;   /* Absolute system time value in nanoseconds. */
-    uint32_t flags;            /* VCPU_SSHOTTMR_??? */
+    __u64 timeout_abs_ns;   /* Absolute system time value in nanoseconds. */
+    __u32 flags;            /* VCPU_SSHOTTMR_??? */
 };
 typedef struct vcpu_set_singleshot_timer vcpu_set_singleshot_timer_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_set_singleshot_timer_t);
@@ -182,9 +182,9 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_set_singleshot_timer_t);
  */
 #define VCPUOP_register_vcpu_info   10  /* arg == vcpu_register_vcpu_info_t */
 struct vcpu_register_vcpu_info {
-    uint64_t mfn;    /* mfn of page to place vcpu_info */
-    uint32_t offset; /* offset within page */
-    uint32_t rsvd;   /* unused */
+    __u64 mfn;    /* mfn of page to place vcpu_info */
+    __u32 offset; /* offset within page */
+    __u32 rsvd;   /* unused */
 };
 typedef struct vcpu_register_vcpu_info vcpu_register_vcpu_info_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_register_vcpu_info_t);
@@ -200,12 +200,12 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_register_vcpu_info_t);
  */
 #define VCPUOP_get_physid           12 /* arg == vcpu_get_physid_t */
 struct vcpu_get_physid {
-    uint64_t phys_id;
+    __u64 phys_id;
 };
 typedef struct vcpu_get_physid vcpu_get_physid_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_get_physid_t);
-#define xen_vcpu_physid_to_x86_apicid(physid) ((uint32_t)(physid))
-#define xen_vcpu_physid_to_x86_acpiid(physid) ((uint32_t)((physid) >> 32))
+#define xen_vcpu_physid_to_x86_apicid(physid) ((__u32)(physid))
+#define xen_vcpu_physid_to_x86_acpiid(physid) ((__u32)((physid) >> 32))
 
 /* 
  * Register a memory location to get a secondary copy of the vcpu time
@@ -229,7 +229,7 @@ struct vcpu_register_time_memory_area {
     union {
         XEN_GUEST_HANDLE(vcpu_time_info_t) h;
         struct vcpu_time_info *v;
-        uint64_t p;
+        __u64 p;
     } addr;
 };
 typedef struct vcpu_register_time_memory_area vcpu_register_time_memory_area_t;

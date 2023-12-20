@@ -68,7 +68,7 @@ static struct uk_alloc *drv_allocator;
 static int blkfront_request_set_grefs(struct blkfront_request *blkfront_req)
 {
 	struct blkfront_gref *ref_elem;
-	uint16_t nb_segments;
+	__u16 nb_segments;
 	int grefi = 0, grefj;
 	int err = 0;
 
@@ -132,9 +132,9 @@ err:
  **/
 static void blkfront_request_reset_grefs(struct blkfront_request *req)
 {
-	uint16_t gref_id = 0;
+	__u16 gref_id = 0;
 	struct blkfront_gref *gref_elem;
-	uint16_t nb_segments;
+	__u16 nb_segments;
 	int rc;
 #if CONFIG_XEN_BLKFRONT_GREFPOOL
 	struct uk_blkdev_queue *queue;
@@ -179,12 +179,12 @@ static void blkfront_request_reset_grefs(struct blkfront_request *req)
 static void blkfront_request_map_grefs(struct blkif_request *ring_req,
 		domid_t otherend_id)
 {
-	uint16_t gref_index;
+	__u16 gref_index;
 	struct blkfront_request *blkfront_req;
 	struct uk_blkreq *req;
-	uint16_t nb_segments;
-	uintptr_t data;
-	uintptr_t start_sector;
+	__u16 nb_segments;
+	__uptr data;
+	__uptr start_sector;
 	struct blkfront_gref *ref_elem;
 #if CONFIG_XEN_BLKFRONT_GREFPOOL
 	int rc;
@@ -194,7 +194,7 @@ static void blkfront_request_map_grefs(struct blkif_request *ring_req,
 
 	blkfront_req = (struct blkfront_request *)ring_req->id;
 	req = blkfront_req->req;
-	start_sector = round_pgdown((uintptr_t)req->aio_buf);
+	start_sector = round_pgdown((__uptr)req->aio_buf);
 	nb_segments = blkfront_req->nb_segments;
 
 	for (gref_index = 0; gref_index < nb_segments; ++gref_index) {
@@ -219,18 +219,18 @@ static void blkfront_request_map_grefs(struct blkif_request *ring_req,
 static void blkif_request_init(struct blkif_request *ring_req,
 		__sector sector_size)
 {
-	uintptr_t start_sector, end_sector;
-	uint16_t nb_segments;
+	__uptr start_sector, end_sector;
+	__u16 nb_segments;
 	struct blkfront_request *blkfront_req;
 	struct uk_blkreq *req;
-	uintptr_t start_data, end_data;
-	uint16_t seg;
+	__uptr start_data, end_data;
+	__u16 seg;
 
 	UK_ASSERT(ring_req);
 	blkfront_req = (struct blkfront_request *)ring_req->id;
 	req = blkfront_req->req;
-	start_data = (uintptr_t)req->aio_buf;
-	end_data = (uintptr_t)req->aio_buf + req->nb_sectors * sector_size;
+	start_data = (__uptr)req->aio_buf;
+	end_data = (__uptr)req->aio_buf + req->nb_sectors * sector_size;
 
 	/* Can't io non-sector-aligned buffer */
 	UK_ASSERT(!(start_data & (sector_size - 1)));
@@ -355,7 +355,7 @@ static int blkfront_queue_enqueue(struct uk_blkdev_queue *queue,
 	ring = &queue->ring;
 	ring_idx = ring->req_prod_pvt;
 	ring_req = RING_GET_REQUEST(ring, ring_idx);
-	ring_req->id = (uintptr_t) blkfront_req;
+	ring_req->id = (__uptr) blkfront_req;
 	ring_req->handle = dev->handle;
 
 	if (req->operation == UK_BLKREQ_READ ||
@@ -453,7 +453,7 @@ static int blkfront_queue_dequeue(struct uk_blkdev_queue *queue,
 	struct uk_blkreq *req_from_q = NULL;
 	struct blkfront_request *blkfront_req;
 	struct blkif_front_ring *ring;
-	uint8_t status;
+	__u8 status;
 	int rc = 0;
 
 	UK_ASSERT(queue);
@@ -662,8 +662,8 @@ static void blkfront_handler(evtchn_port_t port __unused,
 }
 
 static struct uk_blkdev_queue *blkfront_queue_setup(struct uk_blkdev *blkdev,
-		uint16_t queue_id,
-		uint16_t nb_desc __unused,
+		__u16 queue_id,
+		__u16 nb_desc __unused,
 		const struct uk_blkdev_queue_conf *queue_conf)
 {
 	struct blkfront_dev *dev;
@@ -766,7 +766,7 @@ static int blkfront_queue_intr_disable(struct uk_blkdev *blkdev,
 }
 
 static int blkfront_queue_get_info(struct uk_blkdev *blkdev,
-		uint16_t queue_id,
+		__u16 queue_id,
 		struct uk_blkdev_queue_info *qinfo)
 {
 	struct blkfront_dev *dev;
@@ -837,7 +837,7 @@ static int blkfront_start(struct uk_blkdev *blkdev)
 static int blkfront_stop(struct uk_blkdev *blkdev)
 {
 	struct blkfront_dev *dev;
-	uint16_t q_id;
+	__u16 q_id;
 	int err;
 
 	UK_ASSERT(blkdev != NULL);

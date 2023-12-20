@@ -39,8 +39,8 @@
 struct tpmif_tx_request {
     unsigned long addr;   /* Machine address of packet.   */
     grant_ref_t ref;      /* grant table access reference */
-    uint16_t unused;
-    uint16_t size;        /* Packet size in bytes.        */
+    __u16 unused;
+    __u16 size;        /* Packet size in bytes.        */
 };
 typedef struct tpmif_tx_request tpmif_tx_request_t;
 
@@ -48,7 +48,7 @@ typedef struct tpmif_tx_request tpmif_tx_request_t;
  * The TPMIF_TX_RING_SIZE defines the number of pages the
  * front-end and backend can exchange (= size of array).
  */
-typedef uint32_t TPMIF_RING_IDX;
+typedef __u32 TPMIF_RING_IDX;
 
 #define TPMIF_TX_RING_SIZE 1
 
@@ -119,14 +119,14 @@ enum tpmif_state {
  * the TPM_CAP_PROP_INPUT_BUFFER property from the TPM.
  */
 struct tpmif_shared_page {
-    uint32_t length;         /* request/response length in bytes */
+    __u32 length;         /* request/response length in bytes */
 
-    uint8_t state;           /* enum tpmif_state */
-    uint8_t locality;        /* for the current request */
-    uint8_t pad;             /* should be zero */
+    __u8 state;           /* enum tpmif_state */
+    __u8 locality;        /* for the current request */
+    __u8 pad;             /* should be zero */
 
-    uint8_t nr_extra_pages;  /* extra pages for long packets; may be zero */
-    uint32_t extra_pages[0]; /* grant IDs; length is actually nr_extra_pages */
+    __u8 nr_extra_pages;  /* extra pages for long packets; may be zero */
+    __u32 extra_pages[0]; /* grant IDs; length is actually nr_extra_pages */
 };
 typedef struct tpmif_shared_page tpmif_shared_page_t;
 

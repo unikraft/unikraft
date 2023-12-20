@@ -103,7 +103,7 @@
 #include <xen/io/ring.h>
 
 static struct xencons_interface *console_ring;
-static uint32_t console_evtchn;
+static __u32 console_evtchn;
 static int console_ready;
 
 #ifdef CONFIG_PARAVIRT

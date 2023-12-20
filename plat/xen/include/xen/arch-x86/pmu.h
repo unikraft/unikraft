@@ -31,14 +31,14 @@ struct xen_pmu_amd_ctxt {
      * Offsets to counter and control MSRs (relative to xen_pmu_arch.c.amd).
      * For PV(H) guests these fields are RO.
      */
-    uint32_t counters;
-    uint32_t ctrls;
+    __u32 counters;
+    __u32 ctrls;
 
     /* Counter MSRs */
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
-    uint64_t regs[];
+    __u64 regs[];
 #elif defined(__GNUC__)
-    uint64_t regs[0];
+    __u64 regs[0];
 #endif
 };
 typedef struct xen_pmu_amd_ctxt xen_pmu_amd_ctxt_t;
@@ -46,8 +46,8 @@ DEFINE_XEN_GUEST_HANDLE(xen_pmu_amd_ctxt_t);
 
 /* Intel PMU registers and structures */
 struct xen_pmu_cntr_pair {
-    uint64_t counter;
-    uint64_t control;
+    __u64 counter;
+    __u64 control;
 };
 typedef struct xen_pmu_cntr_pair xen_pmu_cntr_pair_t;
 DEFINE_XEN_GUEST_HANDLE(xen_pmu_cntr_pair_t);
@@ -58,23 +58,23 @@ struct xen_pmu_intel_ctxt {
     * xen_pmu_arch.c.intel).
     * For PV(H) guests these fields are RO.
     */
-    uint32_t fixed_counters;
-    uint32_t arch_counters;
+    __u32 fixed_counters;
+    __u32 arch_counters;
 
     /* PMU registers */
-    uint64_t global_ctrl;
-    uint64_t global_ovf_ctrl;
-    uint64_t global_status;
-    uint64_t fixed_ctrl;
-    uint64_t ds_area;
-    uint64_t pebs_enable;
-    uint64_t debugctl;
+    __u64 global_ctrl;
+    __u64 global_ovf_ctrl;
+    __u64 global_status;
+    __u64 fixed_ctrl;
+    __u64 ds_area;
+    __u64 pebs_enable;
+    __u64 debugctl;
 
     /* Fixed and architectural counter MSRs */
 #if defined(__STDC_VERSION__) && __STDC_VERSION__ >= 199901L
-    uint64_t regs[];
+    __u64 regs[];
 #elif defined(__GNUC__)
-    uint64_t regs[0];
+    __u64 regs[0];
 #endif
 };
 typedef struct xen_pmu_intel_ctxt xen_pmu_intel_ctxt_t;
@@ -82,13 +82,13 @@ DEFINE_XEN_GUEST_HANDLE(xen_pmu_intel_ctxt_t);
 
 /* Sampled domain's registers */
 struct xen_pmu_regs {
-    uint64_t ip;
-    uint64_t sp;
-    uint64_t flags;
-    uint16_t cs;
-    uint16_t ss;
-    uint8_t cpl;
-    uint8_t pad[3];
+    __u64 ip;
+    __u64 sp;
+    __u64 flags;
+    __u16 cs;
+    __u16 ss;
+    __u8 cpl;
+    __u8 pad[3];
 };
 typedef struct xen_pmu_regs xen_pmu_regs_t;
 DEFINE_XEN_GUEST_HANDLE(xen_pmu_regs_t);
@@ -116,11 +116,11 @@ struct xen_pmu_arch {
         struct xen_pmu_regs regs;
         /* Padding for adding new registers to xen_pmu_regs in the future */
 #define XENPMU_REGS_PAD_SZ  64
-        uint8_t pad[XENPMU_REGS_PAD_SZ];
+        __u8 pad[XENPMU_REGS_PAD_SZ];
     } r;
 
     /* WO for hypervisor, RO for guest */
-    uint64_t pmu_flags;
+    __u64 pmu_flags;
 
     /*
      * APIC LVTPC register.
@@ -129,8 +129,8 @@ struct xen_pmu_arch {
      * during XENPMU_flush or XENPMU_lvtpc_set.
      */
     union {
-        uint32_t lapic_lvtpc;
-        uint64_t pad;
+        __u32 lapic_lvtpc;
+        __u64 pad;
     } l;
 
     /*
@@ -148,7 +148,7 @@ struct xen_pmu_arch {
          * that are specified by offsets)
          */
 #define XENPMU_CTXT_PAD_SZ  128
-        uint8_t pad[XENPMU_CTXT_PAD_SZ];
+        __u8 pad[XENPMU_CTXT_PAD_SZ];
     } c;
 };
 typedef struct xen_pmu_arch xen_pmu_arch_t;

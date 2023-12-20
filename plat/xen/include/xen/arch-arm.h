@@ -165,8 +165,8 @@
 
 #define XEN_HYPERCALL_TAG   0XEA1
 
-#define  int64_aligned_t  int64_t __attribute__((aligned(8)))
-#define uint64_aligned_t uint64_t __attribute__((aligned(8)))
+#define  int64_aligned_t  __s64 __attribute__((aligned(8)))
+#define uint64_aligned_t __u64 __attribute__((aligned(8)))
 
 #ifndef __ASSEMBLY__
 #define ___DEFINE_XEN_GUEST_HANDLE(name, type)                  \
@@ -200,12 +200,12 @@
 #if defined(__GNUC__) && !defined(__STRICT_ANSI__)
 /* Anonymous union includes both 32- and 64-bit names (e.g., r0/x0). */
 # define __DECL_REG(n64, n32) union {          \
-        uint64_t n64;                          \
-        uint32_t n32;                          \
+        __u64 n64;                          \
+        __u32 n32;                          \
     }
 #else
 /* Non-gcc sources must always use the proper 64-bit name (e.g., x0). */
-#define __DECL_REG(n64, n32) uint64_t n64
+#define __DECL_REG(n64, n32) __u64 n64
 #endif
 
 struct vcpu_guest_core_regs
@@ -253,45 +253,45 @@ struct vcpu_guest_core_regs
 
     /* Return address and mode */
     __DECL_REG(pc64,         pc32);             /* ELR_EL2 */
-    uint32_t cpsr;                              /* SPSR_EL2 */
+    __u32 cpsr;                              /* SPSR_EL2 */
 
     union {
-        uint32_t spsr_el1;       /* AArch64 */
-        uint32_t spsr_svc;       /* AArch32 */
+        __u32 spsr_el1;       /* AArch64 */
+        __u32 spsr_svc;       /* AArch32 */
     };
 
     /* AArch32 guests only */
-    uint32_t spsr_fiq, spsr_irq, spsr_und, spsr_abt;
+    __u32 spsr_fiq, spsr_irq, spsr_und, spsr_abt;
 
     /* AArch64 guests only */
-    uint64_t sp_el0;
-    uint64_t sp_el1, elr_el1;
+    __u64 sp_el0;
+    __u64 sp_el1, elr_el1;
 };
 typedef struct vcpu_guest_core_regs vcpu_guest_core_regs_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_guest_core_regs_t);
 
 #undef __DECL_REG
 
-typedef uint64_t xen_pfn_t;
+typedef __u64 xen_pfn_t;
 #define PRI_xen_pfn PRIx64
 
 /* Maximum number of virtual CPUs in legacy multi-processor guests. */
 /* Only one. All other VCPUS must use VCPUOP_register_vcpu_info */
 #define XEN_LEGACY_MAX_VCPUS 1
 
-typedef uint64_t xen_ulong_t;
+typedef __u64 xen_ulong_t;
 #define PRI_xen_ulong PRIx64
 
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 struct vcpu_guest_context {
 #define _VGCF_online                   0
 #define VGCF_online                    (1<<_VGCF_online)
-    uint32_t flags;                         /* VGCF_* */
+    __u32 flags;                         /* VGCF_* */
 
     struct vcpu_guest_core_regs user_regs;  /* Core CPU registers */
 
-    uint32_t sctlr;
-    uint64_t ttbcr, ttbr0, ttbr1;
+    __u32 sctlr;
+    __u64 ttbcr, ttbr0, ttbr1;
 };
 typedef struct vcpu_guest_context vcpu_guest_context_t;
 DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
@@ -305,9 +305,9 @@ DEFINE_XEN_GUEST_HANDLE(vcpu_guest_context_t);
 #define XEN_DOMCTL_CONFIG_GIC_V3        2
 struct xen_arch_domainconfig {
     /* IN/OUT */
-    uint8_t gic_version;
+    __u8 gic_version;
     /* IN */
-    uint32_t nr_spis;
+    __u32 nr_spis;
     /*
      * OUT
      * Based on the property clock-frequency in the DT timer node.
@@ -321,7 +321,7 @@ struct xen_arch_domainconfig {
      * > 0 => Value of the property
      *
      */
-    uint32_t clock_frequency;
+    __u32 clock_frequency;
 };
 #endif /* __XEN__ || __XEN_TOOLS__ */
 
@@ -332,7 +332,7 @@ typedef struct arch_vcpu_info arch_vcpu_info_t;
 struct arch_shared_info {
 };
 typedef struct arch_shared_info arch_shared_info_t;
-typedef uint64_t xen_callback_t;
+typedef __u64 xen_callback_t;
 
 #endif
 
@@ -435,7 +435,7 @@ typedef uint64_t xen_callback_t;
 #define GUEST_RAM_BASE    GUEST_RAM0_BASE /* Lowest RAM address */
 /* Largest amount of actual RAM, not including holes */
 #define GUEST_RAM_MAX     (GUEST_RAM0_SIZE + GUEST_RAM1_SIZE)
-/* Suitable for e.g. const uint64_t ramfoo[] = GUEST_RAM_BANK_FOOS; */
+/* Suitable for e.g. const __u64 ramfoo[] = GUEST_RAM_BANK_FOOS; */
 #define GUEST_RAM_BANK_BASES   { GUEST_RAM0_BASE, GUEST_RAM1_BASE }
 #define GUEST_RAM_BANK_SIZES   { GUEST_RAM0_SIZE, GUEST_RAM1_SIZE }
 
@@ -460,7 +460,7 @@ typedef uint64_t xen_callback_t;
 
 #ifndef __ASSEMBLY__
 /* Stub definition of PMU structure */
-typedef struct xen_pmu_arch { uint8_t dummy; } xen_pmu_arch_t;
+typedef struct xen_pmu_arch { __u8 dummy; } xen_pmu_arch_t;
 #endif
 
 #endif /*  __XEN_PUBLIC_ARCH_ARM_H__ */

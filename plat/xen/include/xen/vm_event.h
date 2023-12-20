@@ -162,39 +162,39 @@
  * so as to not fill the vm_event ring buffer too quickly.
  */
 struct vm_event_regs_x86 {
-    uint64_t rax;
-    uint64_t rcx;
-    uint64_t rdx;
-    uint64_t rbx;
-    uint64_t rsp;
-    uint64_t rbp;
-    uint64_t rsi;
-    uint64_t rdi;
-    uint64_t r8;
-    uint64_t r9;
-    uint64_t r10;
-    uint64_t r11;
-    uint64_t r12;
-    uint64_t r13;
-    uint64_t r14;
-    uint64_t r15;
-    uint64_t rflags;
-    uint64_t dr7;
-    uint64_t rip;
-    uint64_t cr0;
-    uint64_t cr2;
-    uint64_t cr3;
-    uint64_t cr4;
-    uint64_t sysenter_cs;
-    uint64_t sysenter_esp;
-    uint64_t sysenter_eip;
-    uint64_t msr_efer;
-    uint64_t msr_star;
-    uint64_t msr_lstar;
-    uint64_t fs_base;
-    uint64_t gs_base;
-    uint32_t cs_arbytes;
-    uint32_t _pad;
+    __u64 rax;
+    __u64 rcx;
+    __u64 rdx;
+    __u64 rbx;
+    __u64 rsp;
+    __u64 rbp;
+    __u64 rsi;
+    __u64 rdi;
+    __u64 r8;
+    __u64 r9;
+    __u64 r10;
+    __u64 r11;
+    __u64 r12;
+    __u64 r13;
+    __u64 r14;
+    __u64 r15;
+    __u64 rflags;
+    __u64 dr7;
+    __u64 rip;
+    __u64 cr0;
+    __u64 cr2;
+    __u64 cr3;
+    __u64 cr4;
+    __u64 sysenter_cs;
+    __u64 sysenter_esp;
+    __u64 sysenter_eip;
+    __u64 msr_efer;
+    __u64 msr_star;
+    __u64 msr_lstar;
+    __u64 fs_base;
+    __u64 gs_base;
+    __u32 cs_arbytes;
+    __u32 _pad;
 };
 
 /*
@@ -202,12 +202,12 @@ struct vm_event_regs_x86 {
  * VM_EVENT_FLAG_SET_REGISTERS flag.
  */
 struct vm_event_regs_arm {
-    uint64_t ttbr0;
-    uint64_t ttbr1;
-    uint64_t ttbcr;
-    uint64_t pc;
-    uint32_t cpsr;
-    uint32_t _pad;
+    __u64 ttbr0;
+    __u64 ttbr1;
+    __u64 ttbcr;
+    __u64 pc;
+    __u32 cpsr;
+    __u32 _pad;
 };
 
 /*
@@ -233,34 +233,34 @@ struct vm_event_regs_arm {
 #define MEM_ACCESS_FAULT_IN_GPT     (1 << 5)
 
 struct vm_event_mem_access {
-    uint64_t gfn;
-    uint64_t offset;
-    uint64_t gla;   /* if flags has MEM_ACCESS_GLA_VALID set */
-    uint32_t flags; /* MEM_ACCESS_* */
-    uint32_t _pad;
+    __u64 gfn;
+    __u64 offset;
+    __u64 gla;   /* if flags has MEM_ACCESS_GLA_VALID set */
+    __u32 flags; /* MEM_ACCESS_* */
+    __u32 _pad;
 };
 
 struct vm_event_write_ctrlreg {
-    uint32_t index;
-    uint32_t _pad;
-    uint64_t new_value;
-    uint64_t old_value;
+    __u32 index;
+    __u32 _pad;
+    __u64 new_value;
+    __u64 old_value;
 };
 
 struct vm_event_singlestep {
-    uint64_t gfn;
+    __u64 gfn;
 };
 
 struct vm_event_debug {
-    uint64_t gfn;
-    uint32_t insn_length;
-    uint8_t type;        /* HVMOP_TRAP_* */
-    uint8_t _pad[3];
+    __u64 gfn;
+    __u32 insn_length;
+    __u8 type;        /* HVMOP_TRAP_* */
+    __u8 _pad[3];
 };
 
 struct vm_event_mov_to_msr {
-    uint64_t msr;
-    uint64_t value;
+    __u64 msr;
+    __u64 value;
 };
 
 #define VM_EVENT_DESC_IDTR           1
@@ -271,67 +271,67 @@ struct vm_event_mov_to_msr {
 struct vm_event_desc_access {
     union {
         struct {
-            uint32_t instr_info;         /* VMX: VMCS Instruction-Information */
-            uint32_t _pad1;
-            uint64_t exit_qualification; /* VMX: VMCS Exit Qualification */
+            __u32 instr_info;         /* VMX: VMCS Instruction-Information */
+            __u32 _pad1;
+            __u64 exit_qualification; /* VMX: VMCS Exit Qualification */
         } vmx;
         struct {
-            uint64_t exitinfo;           /* SVM: VMCB EXITINFO */
-            uint64_t _pad2;
+            __u64 exitinfo;           /* SVM: VMCB EXITINFO */
+            __u64 _pad2;
         } svm;
     } arch;
-    uint8_t descriptor;                  /* VM_EVENT_DESC_* */
-    uint8_t is_write;
-    uint8_t _pad[6];
+    __u8 descriptor;                  /* VM_EVENT_DESC_* */
+    __u8 is_write;
+    __u8 _pad[6];
 };
 
 struct vm_event_cpuid {
-    uint32_t insn_length;
-    uint32_t leaf;
-    uint32_t subleaf;
-    uint32_t _pad;
+    __u32 insn_length;
+    __u32 leaf;
+    __u32 subleaf;
+    __u32 _pad;
 };
 
 struct vm_event_interrupt_x86 {
-    uint32_t vector;
-    uint32_t type;
-    uint32_t error_code;
-    uint32_t _pad;
-    uint64_t cr2;
+    __u32 vector;
+    __u32 type;
+    __u32 error_code;
+    __u32 _pad;
+    __u64 cr2;
 };
 
 #define MEM_PAGING_DROP_PAGE       (1 << 0)
 #define MEM_PAGING_EVICT_FAIL      (1 << 1)
 
 struct vm_event_paging {
-    uint64_t gfn;
-    uint32_t p2mt;
-    uint32_t flags;
+    __u64 gfn;
+    __u32 p2mt;
+    __u32 flags;
 };
 
 struct vm_event_sharing {
-    uint64_t gfn;
-    uint32_t p2mt;
-    uint32_t _pad;
+    __u64 gfn;
+    __u32 p2mt;
+    __u32 _pad;
 };
 
 struct vm_event_emul_read_data {
-    uint32_t size;
+    __u32 size;
     /* The struct is used in a union with vm_event_regs_x86. */
-    uint8_t  data[sizeof(struct vm_event_regs_x86) - sizeof(uint32_t)];
+    __u8  data[sizeof(struct vm_event_regs_x86) - sizeof(__u32)];
 };
 
 struct vm_event_emul_insn_data {
-    uint8_t data[16]; /* Has to be completely filled */
+    __u8 data[16]; /* Has to be completely filled */
 };
 
 typedef struct vm_event_st {
-    uint32_t version;   /* VM_EVENT_INTERFACE_VERSION */
-    uint32_t flags;     /* VM_EVENT_FLAG_* */
-    uint32_t reason;    /* VM_EVENT_REASON_* */
-    uint32_t vcpu_id;
-    uint16_t altp2m_idx; /* may be used during request and response */
-    uint16_t _pad[3];
+    __u32 version;   /* VM_EVENT_INTERFACE_VERSION */
+    __u32 flags;     /* VM_EVENT_FLAG_* */
+    __u32 reason;    /* VM_EVENT_REASON_* */
+    __u32 vcpu_id;
+    __u16 altp2m_idx; /* may be used during request and response */
+    __u16 _pad[3];
 
     union {
         struct vm_event_paging                mem_paging;

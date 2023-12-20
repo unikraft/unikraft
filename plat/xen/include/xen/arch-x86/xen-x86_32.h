@@ -98,11 +98,11 @@
         __guest_handle_64_ ## name
 #undef set_xen_guest_handle_raw
 #define set_xen_guest_handle_raw(hnd, val)                  \
-    do { if ( sizeof(hnd) == 8 ) *(uint64_t *)&(hnd) = 0;   \
+    do { if ( sizeof(hnd) == 8 ) *(__u64 *)&(hnd) = 0;   \
          (hnd).p = val;                                     \
     } while ( 0 )
-#define  int64_aligned_t  int64_t __attribute__((aligned(8)))
-#define uint64_aligned_t uint64_t __attribute__((aligned(8)))
+#define  int64_aligned_t  __s64 __attribute__((aligned(8)))
+#define uint64_aligned_t __u64 __attribute__((aligned(8)))
 #define __XEN_GUEST_HANDLE_64(name) __guest_handle_64_ ## name
 #define XEN_GUEST_HANDLE_64(name) __XEN_GUEST_HANDLE_64(name)
 #endif
@@ -114,21 +114,21 @@
 #elif defined(__XEN__) || defined(__XEN_TOOLS__)
 /* Anonymous unions include all permissible names (e.g., al/ah/ax/eax). */
 #define __DECL_REG_LO8(which) union { \
-    uint32_t e ## which ## x; \
-    uint16_t which ## x; \
+    __u32 e ## which ## x; \
+    __u16 which ## x; \
     struct { \
-        uint8_t which ## l; \
-        uint8_t which ## h; \
+        __u8 which ## l; \
+        __u8 which ## h; \
     }; \
 }
 #define __DECL_REG_LO16(name) union { \
-    uint32_t e ## name, _e ## name; \
-    uint16_t name; \
+    __u32 e ## name, _e ## name; \
+    __u16 name; \
 }
 #else
 /* Other sources must always use the proper 32-bit name (e.g., eax). */
-#define __DECL_REG_LO8(which) uint32_t e ## which ## x
-#define __DECL_REG_LO16(name) uint32_t e ## name
+#define __DECL_REG_LO8(which) __u32 e ## which ## x
+#define __DECL_REG_LO16(name) __u32 e ## name
 #endif
 
 struct cpu_user_regs {
@@ -139,19 +139,19 @@ struct cpu_user_regs {
     __DECL_REG_LO16(di);
     __DECL_REG_LO16(bp);
     __DECL_REG_LO8(a);
-    uint16_t error_code;    /* private */
-    uint16_t entry_vector;  /* private */
+    __u16 error_code;    /* private */
+    __u16 entry_vector;  /* private */
     __DECL_REG_LO16(ip);
-    uint16_t cs;
-    uint8_t  saved_upcall_mask;
-    uint8_t  _pad0;
+    __u16 cs;
+    __u8  saved_upcall_mask;
+    __u8  _pad0;
     __DECL_REG_LO16(flags); /* eflags.IF == !saved_upcall_mask */
     __DECL_REG_LO16(sp);
-    uint16_t ss, _pad1;
-    uint16_t es, _pad2;
-    uint16_t ds, _pad3;
-    uint16_t fs, _pad4;
-    uint16_t gs, _pad5;
+    __u16 ss, _pad1;
+    __u16 es, _pad2;
+    __u16 ds, _pad3;
+    __u16 fs, _pad4;
+    __u16 gs, _pad5;
 };
 typedef struct cpu_user_regs cpu_user_regs_t;
 DEFINE_XEN_GUEST_HANDLE(cpu_user_regs_t);

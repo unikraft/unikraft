@@ -197,7 +197,7 @@ HYPERVISOR_shutdown(
 
 static inline long
 HYPERVISOR_set_timer_op(
-	uint64_t timeout)
+	__u64 timeout)
 {
 	unsigned long timeout_hi = (unsigned long)(timeout>>32);
 	unsigned long timeout_lo = (unsigned long)timeout;
@@ -221,7 +221,7 @@ HYPERVISOR_get_debugreg(
 
 static inline int
 HYPERVISOR_update_descriptor(
-	uint64_t ma, uint64_t desc)
+	__u64 ma, __u64 desc)
 {
 	return _hypercall4(int, update_descriptor, ma, ma>>32, desc, desc>>32);
 }

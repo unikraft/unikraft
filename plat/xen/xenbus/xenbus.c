@@ -52,13 +52,13 @@ static struct xenbus_handler xbh;
 
 
 /* Helper functions for Xenbus related allocations */
-void *uk_xb_malloc(size_t size)
+void *uk_xb_malloc(__sz size)
 {
 	UK_ASSERT(xbh.a != NULL);
 	return uk_malloc(xbh.a, size);
 }
 
-void *uk_xb_calloc(size_t nmemb, size_t size)
+void *uk_xb_calloc(__sz nmemb, __sz size)
 {
 	UK_ASSERT(xbh.a != NULL);
 	return uk_calloc(xbh.a, nmemb, size);

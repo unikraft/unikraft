@@ -44,14 +44,14 @@
 
 struct hvm_info_table {
     char        signature[8]; /* "HVM INFO" */
-    uint32_t    length;
-    uint8_t     checksum;
+    __u32    length;
+    __u8     checksum;
 
     /* Should firmware build APIC descriptors (APIC MADT / MP BIOS)? */
-    uint8_t     apic_mode;
+    __u8     apic_mode;
 
     /* How many CPUs does this domain have? */
-    uint32_t    nr_vcpus;
+    __u32    nr_vcpus;
 
     /*
      * MEMORY MAP provided by HVM domain builder.
@@ -63,20 +63,20 @@ struct hvm_info_table {
      *  0x0 to page_to_phys(low_mem_pgend)-1:
      *    RAM below 4GB (except for VGA hole 0xA0000-0xBFFFF)
      */
-    uint32_t    low_mem_pgend;
+    __u32    low_mem_pgend;
     /*
      *  page_to_phys(reserved_mem_pgstart) to 0xFFFFFFFF:
      *    Reserved for special memory mappings
      */
-    uint32_t    reserved_mem_pgstart;
+    __u32    reserved_mem_pgstart;
     /*
      *  0x100000000 to page_to_phys(high_mem_pgend)-1:
      *    RAM above 4GB
      */
-    uint32_t    high_mem_pgend;
+    __u32    high_mem_pgend;
 
     /* Bitmap of which CPUs are online at boot time. */
-    uint8_t     vcpu_online[(HVM_MAX_VCPUS + 7)/8];
+    __u8     vcpu_online[(HVM_MAX_VCPUS + 7)/8];
 };
 
 #endif /* __XEN_PUBLIC_HVM_HVM_INFO_TABLE_H__ */

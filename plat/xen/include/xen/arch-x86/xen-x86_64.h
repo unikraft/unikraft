@@ -126,54 +126,54 @@
 
 struct iret_context {
     /* Top of stack (%rsp at point of hypercall). */
-    uint64_t rax, r11, rcx, flags, rip, cs, rflags, rsp, ss;
+    __u64 rax, r11, rcx, flags, rip, cs, rflags, rsp, ss;
     /* Bottom of iret stack frame. */
 };
 
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 /* Anonymous unions include all permissible names (e.g., al/ah/ax/eax/rax). */
 #define __DECL_REG_LOHI(which) union { \
-    uint64_t r ## which ## x; \
-    uint32_t e ## which ## x; \
-    uint16_t which ## x; \
+    __u64 r ## which ## x; \
+    __u32 e ## which ## x; \
+    __u16 which ## x; \
     struct { \
-        uint8_t which ## l; \
-        uint8_t which ## h; \
+        z which ## l; \
+        __u8 which ## h; \
     }; \
 }
 #define __DECL_REG_LO8(name) union { \
-    uint64_t r ## name; \
-    uint32_t e ## name; \
-    uint16_t name; \
-    uint8_t name ## l; \
+    __u64 r ## name; \
+    __u32 e ## name; \
+    __u16 name; \
+    __u8 name ## l; \
 }
 #define __DECL_REG_LO16(name) union { \
-    uint64_t r ## name; \
-    uint32_t e ## name; \
-    uint16_t name; \
+    __u64 r ## name; \
+    __u32 e ## name; \
+    __u16 name; \
 }
 #define __DECL_REG_HI(num) union { \
-    uint64_t r ## num; \
-    uint32_t r ## num ## d; \
-    uint16_t r ## num ## w; \
-    uint8_t r ## num ## b; \
+    __u64 r ## num; \
+    __u32 r ## num ## d; \
+    __u16 r ## num ## w; \
+    __u8 r ## num ## b; \
 }
 #elif defined(__GNUC__) && !defined(__STRICT_ANSI__)
 /* Anonymous union includes both 32- and 64-bit names (e.g., eax/rax). */
 #define __DECL_REG(name) union { \
-    uint64_t r ## name, e ## name; \
-    uint32_t _e ## name; \
+    __u64 r ## name, e ## name; \
+    __u32 _e ## name; \
 }
 #else
 /* Non-gcc sources must always use the proper 64-bit name (e.g., rax). */
-#define __DECL_REG(name) uint64_t r ## name
+#define __DECL_REG(name) __u64 r ## name
 #endif
 
 #ifndef __DECL_REG_LOHI
 #define __DECL_REG_LOHI(name) __DECL_REG(name ## x)
 #define __DECL_REG_LO8        __DECL_REG
 #define __DECL_REG_LO16       __DECL_REG
-#define __DECL_REG_HI(num)    uint64_t r ## num
+#define __DECL_REG_HI(num)    __u64 r ## num
 #endif
 
 struct cpu_user_regs {
@@ -192,19 +192,19 @@ struct cpu_user_regs {
     __DECL_REG_LOHI(d);
     __DECL_REG_LO8(si);
     __DECL_REG_LO8(di);
-    uint32_t error_code;    /* private */
-    uint32_t entry_vector;  /* private */
+    __u32 error_code;    /* private */
+    __u32 entry_vector;  /* private */
     __DECL_REG_LO16(ip);
-    uint16_t cs, _pad0[1];
-    uint8_t  saved_upcall_mask;
-    uint8_t  _pad1[3];
+    __u16 cs, _pad0[1];
+    __u8  saved_upcall_mask;
+    __u8  _pad1[3];
     __DECL_REG_LO16(flags); /* rflags.IF == !saved_upcall_mask */
     __DECL_REG_LO8(sp);
-    uint16_t ss, _pad2[3];
-    uint16_t es, _pad3[3];
-    uint16_t ds, _pad4[3];
-    uint16_t fs, _pad5[3]; /* Non-nul => takes precedence over fs_base.      */
-    uint16_t gs, _pad6[3]; /* Non-nul => takes precedence over gs_base_user. */
+    __u16 ss, _pad2[3];
+    __u16 es, _pad3[3];
+    __u16 ds, _pad4[3];
+    __u16 fs, _pad5[3]; /* Non-nul => takes precedence over fs_base.      */
+    __u16 gs, _pad6[3]; /* Non-nul => takes precedence over gs_base_user. */
 };
 typedef struct cpu_user_regs cpu_user_regs_t;
 DEFINE_XEN_GUEST_HANDLE(cpu_user_regs_t);

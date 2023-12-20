@@ -49,46 +49,46 @@ struct fsif_open_request {
 };
 
 struct fsif_close_request {
-    uint32_t fd;
+    __u32 fd;
 };
 
 struct fsif_read_request {
-    uint32_t fd;
-    int32_t pad;
-    uint64_t len;
-    uint64_t offset;
+    __u32 fd;
+    __s32 pad;
+    __u64 len;
+    __u64 offset;
     grant_ref_t grefs[1];  /* Variable length */
 };
 
 struct fsif_write_request {
-    uint32_t fd;
-    int32_t pad;
-    uint64_t len;
-    uint64_t offset;
+    __u32 fd;
+    __s32 pad;
+    __u64 len;
+    __u64 offset;
     grant_ref_t grefs[1];  /* Variable length */
 };
 
 struct fsif_stat_request {
-    uint32_t fd;
+    __u32 fd;
 };
 
 /* This structure is a copy of some fields from stat structure, returned
  * via the ring. */
 struct fsif_stat_response {
-    int32_t  stat_mode;
-    uint32_t stat_uid;
-    uint32_t stat_gid;
-    int32_t  stat_ret;
-    int64_t  stat_size;
-    int64_t  stat_atime;
-    int64_t  stat_mtime;
-    int64_t  stat_ctime;
+    __s32  stat_mode;
+    __u32 stat_uid;
+    __u32 stat_gid;
+    __s32  stat_ret;
+    __s64  stat_size;
+    __s64  stat_atime;
+    __s64  stat_mtime;
+    __s64  stat_ctime;
 };
 
 struct fsif_truncate_request {
-    uint32_t fd;
-    int32_t pad;
-    int64_t length;
+    __u32 fd;
+    __s32 pad;
+    __s64 length;
 };
 
 struct fsif_remove_request {
@@ -96,21 +96,21 @@ struct fsif_remove_request {
 };
 
 struct fsif_rename_request {
-    uint16_t old_name_offset;
-    uint16_t new_name_offset;
+    __u16 old_name_offset;
+    __u16 new_name_offset;
     grant_ref_t gref;
 };
 
 struct fsif_create_request {
-    int8_t directory;
-    int8_t pad;
-    int16_t pad2;
-    int32_t mode;
+    __s8 directory;
+    __s8 pad;
+    __s16 pad2;
+    __s32 mode;
     grant_ref_t gref;
 };
 
 struct fsif_list_request {
-    uint32_t offset;
+    __u32 offset;
     grant_ref_t gref;
 };
 
@@ -124,8 +124,8 @@ struct fsif_list_request {
 #define HAS_MORE_FLAG   (1ULL << HAS_MORE_SHIFT)
 
 struct fsif_chmod_request {
-    uint32_t fd;
-    int32_t mode;
+    __u32 fd;
+    __s32 mode;
 };
 
 struct fsif_space_request {
@@ -133,16 +133,16 @@ struct fsif_space_request {
 };
 
 struct fsif_sync_request {
-    uint32_t fd;
+    __u32 fd;
 };
 
 
 /* FS operation request */
 struct fsif_request {
-    uint8_t type;                 /* Type of the request                  */
-    uint8_t pad;
-    uint16_t id;                  /* Request ID, copied to the response   */
-    uint32_t pad2;
+    __u8 type;                 /* Type of the request                  */
+    __u8 pad;
+    __u16 id;                  /* Request ID, copied to the response   */
+    __u32 pad2;
     union {
         struct fsif_open_request     fopen;
         struct fsif_close_request    fclose;
@@ -163,11 +163,11 @@ typedef struct fsif_request fsif_request_t;
 
 /* FS operation response */
 struct fsif_response {
-    uint16_t id;
-    uint16_t pad1;
-    uint32_t pad2;
+    __u16 id;
+    __u16 pad1;
+    __u32 pad2;
     union {
-        uint64_t ret_val;
+        __u64 ret_val;
         struct fsif_stat_response fstat;
     } u;
 };

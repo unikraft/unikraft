@@ -44,19 +44,19 @@
 /* XEN_SYSCTL_readconsole */
 struct xen_sysctl_readconsole {
     /* IN: Non-zero -> clear after reading. */
-    uint8_t clear;
+    __u8 clear;
     /* IN: Non-zero -> start index specified by @index field. */
-    uint8_t incremental;
-    uint8_t pad0, pad1;
+    __u8 incremental;
+    __u8 pad0, pad1;
     /*
      * IN:  Start index for consuming from ring buffer (if @incremental);
      * OUT: End index after consuming from ring buffer.
      */
-    uint32_t index; 
+    __u32 index; 
     /* IN: Virtual address to write console data. */
     XEN_GUEST_HANDLE_64(char) buffer;
     /* IN: Size of buffer; OUT: Bytes written to buffer. */
-    uint32_t count;
+    __u32 count;
 };
 
 /* Get trace buffers machine base address */
@@ -69,13 +69,13 @@ struct xen_sysctl_tbuf_op {
 #define XEN_SYSCTL_TBUFOP_set_size     3
 #define XEN_SYSCTL_TBUFOP_enable       4
 #define XEN_SYSCTL_TBUFOP_disable      5
-    uint32_t cmd;
+    __u32 cmd;
     /* IN/OUT variables */
     struct xenctl_bitmap cpu_mask;
-    uint32_t             evt_mask;
+    __u32             evt_mask;
     /* OUT variables */
     uint64_aligned_t buffer_mfn;
-    uint32_t size;  /* Also an IN variable! */
+    __u32 size;  /* Also an IN variable! */
 };
 
 /*
@@ -89,20 +89,20 @@ struct xen_sysctl_tbuf_op {
 #define _XEN_SYSCTL_PHYSCAP_hvm_directio 1
 #define XEN_SYSCTL_PHYSCAP_hvm_directio  (1u<<_XEN_SYSCTL_PHYSCAP_hvm_directio)
 struct xen_sysctl_physinfo {
-    uint32_t threads_per_core;
-    uint32_t cores_per_socket;
-    uint32_t nr_cpus;     /* # CPUs currently online */
-    uint32_t max_cpu_id;  /* Largest possible CPU ID on this host */
-    uint32_t nr_nodes;    /* # nodes currently online */
-    uint32_t max_node_id; /* Largest possible node ID on this host */
-    uint32_t cpu_khz;
-    uint32_t capabilities;/* XEN_SYSCTL_PHYSCAP_??? */
+    __u32 threads_per_core;
+    __u32 cores_per_socket;
+    __u32 nr_cpus;     /* # CPUs currently online */
+    __u32 max_cpu_id;  /* Largest possible CPU ID on this host */
+    __u32 nr_nodes;    /* # nodes currently online */
+    __u32 max_node_id; /* Largest possible node ID on this host */
+    __u32 cpu_khz;
+    __u32 capabilities;/* XEN_SYSCTL_PHYSCAP_??? */
     uint64_aligned_t total_pages;
     uint64_aligned_t free_pages;
     uint64_aligned_t scrub_pages;
     uint64_aligned_t outstanding_pages;
     uint64_aligned_t max_mfn; /* Largest possible MFN on this host */
-    uint32_t hw_cap[8];
+    __u32 hw_cap[8];
 };
 
 /*
@@ -111,7 +111,7 @@ struct xen_sysctl_physinfo {
 /* XEN_SYSCTL_sched_id */
 struct xen_sysctl_sched_id {
     /* OUT variable */
-    uint32_t sched_id;
+    __u32 sched_id;
 };
 
 /* Interface for controlling Xen software performance counters. */
@@ -121,19 +121,19 @@ struct xen_sysctl_sched_id {
 #define XEN_SYSCTL_PERFCOP_query 2   /* Get perfctr information. */
 struct xen_sysctl_perfc_desc {
     char         name[80];             /* name of perf counter */
-    uint32_t     nr_vals;              /* number of values for this counter */
+    __u32     nr_vals;              /* number of values for this counter */
 };
 typedef struct xen_sysctl_perfc_desc xen_sysctl_perfc_desc_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_perfc_desc_t);
-typedef uint32_t xen_sysctl_perfc_val_t;
+typedef __u32 xen_sysctl_perfc_val_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_perfc_val_t);
 
 struct xen_sysctl_perfc_op {
     /* IN variables. */
-    uint32_t       cmd;                /*  XEN_SYSCTL_PERFCOP_??? */
+    __u32       cmd;                /*  XEN_SYSCTL_PERFCOP_??? */
     /* OUT variables. */
-    uint32_t       nr_counters;       /*  number of counters description  */
-    uint32_t       nr_vals;           /*  number of values  */
+    __u32       nr_counters;       /*  number of counters description  */
+    __u32       nr_vals;           /*  number of values  */
     /* counter information (or NULL) */
     XEN_GUEST_HANDLE_64(xen_sysctl_perfc_desc_t) desc;
     /* counter values (or NULL) */
@@ -144,10 +144,10 @@ struct xen_sysctl_perfc_op {
 struct xen_sysctl_getdomaininfolist {
     /* IN variables. */
     domid_t               first_domain;
-    uint32_t              max_domains;
+    __u32              max_domains;
     XEN_GUEST_HANDLE_64(xen_domctl_getdomaininfo_t) buffer;
     /* OUT variables. */
-    uint32_t              num_domains;
+    __u32              num_domains;
 };
 
 /* Inject debug keys into Xen. */
@@ -155,7 +155,7 @@ struct xen_sysctl_getdomaininfolist {
 struct xen_sysctl_debug_keys {
     /* IN variables. */
     XEN_GUEST_HANDLE_64(char) keys;
-    uint32_t nr_keys;
+    __u32 nr_keys;
 };
 
 /* Get physical CPU information. */
@@ -167,18 +167,18 @@ typedef struct xen_sysctl_cpuinfo xen_sysctl_cpuinfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cpuinfo_t); 
 struct xen_sysctl_getcpuinfo {
     /* IN variables. */
-    uint32_t max_cpus;
+    __u32 max_cpus;
     XEN_GUEST_HANDLE_64(xen_sysctl_cpuinfo_t) info;
     /* OUT variables. */
-    uint32_t nr_cpus;
+    __u32 nr_cpus;
 }; 
 
 /* XEN_SYSCTL_availheap */
 struct xen_sysctl_availheap {
     /* IN variables. */
-    uint32_t min_bitwidth;  /* Smallest address width (zero if don't care). */
-    uint32_t max_bitwidth;  /* Largest address width (zero if don't care). */
-    int32_t  node;          /* NUMA node of interest (-1 for all nodes). */
+    __u32 min_bitwidth;  /* Smallest address width (zero if don't care). */
+    __u32 max_bitwidth;  /* Largest address width (zero if don't care). */
+    __s32  node;          /* NUMA node of interest (-1 for all nodes). */
     /* OUT variables. */
     uint64_aligned_t avail_bytes;/* Bytes available in the specified region. */
 };
@@ -193,22 +193,22 @@ typedef struct pm_px_val pm_px_val_t;
 DEFINE_XEN_GUEST_HANDLE(pm_px_val_t);
 
 struct pm_px_stat {
-    uint8_t total;        /* total Px states */
-    uint8_t usable;       /* usable Px states */
-    uint8_t last;         /* last Px state */
-    uint8_t cur;          /* current Px state */
+    __u8 total;        /* total Px states */
+    __u8 usable;       /* usable Px states */
+    __u8 last;         /* last Px state */
+    __u8 cur;          /* current Px state */
     XEN_GUEST_HANDLE_64(uint64) trans_pt;   /* Px transition table */
     XEN_GUEST_HANDLE_64(pm_px_val_t) pt;
 };
 
 struct pm_cx_stat {
-    uint32_t nr;    /* entry nr in triggers & residencies, including C0 */
-    uint32_t last;  /* last Cx state */
+    __u32 nr;    /* entry nr in triggers & residencies, including C0 */
+    __u32 last;  /* last Cx state */
     uint64_aligned_t idle_time;                 /* idle time from boot */
     XEN_GUEST_HANDLE_64(uint64) triggers;    /* Cx trigger counts */
     XEN_GUEST_HANDLE_64(uint64) residencies; /* Cx residencies */
-    uint32_t nr_pc;                          /* entry nr in pc[] */
-    uint32_t nr_cc;                          /* entry nr in cc[] */
+    __u32 nr_pc;                          /* entry nr in pc[] */
+    __u32 nr_cc;                          /* entry nr in cc[] */
     /*
      * These two arrays may (and generally will) have unused slots; slots not
      * having a corresponding hardware register will not be written by the
@@ -230,8 +230,8 @@ struct xen_sysctl_get_pmstat {
 #define PMSTAT_get_max_cx    (PMSTAT_CX | 0x1)
 #define PMSTAT_get_cxstat    (PMSTAT_CX | 0x2)
 #define PMSTAT_reset_cxstat  (PMSTAT_CX | 0x3)
-    uint32_t type;
-    uint32_t cpuid;
+    __u32 type;
+    __u32 cpuid;
     union {
         struct pm_px_stat getpx;
         struct pm_cx_stat getcx;
@@ -242,10 +242,10 @@ struct xen_sysctl_get_pmstat {
 /* XEN_SYSCTL_cpu_hotplug */
 struct xen_sysctl_cpu_hotplug {
     /* IN variables */
-    uint32_t cpu;   /* Physical cpu. */
+    __u32 cpu;   /* Physical cpu. */
 #define XEN_SYSCTL_CPU_HOTPLUG_ONLINE  0
 #define XEN_SYSCTL_CPU_HOTPLUG_OFFLINE 1
-    uint32_t op;    /* hotplug opcode */
+    __u32 op;    /* hotplug opcode */
 };
 
 /*
@@ -254,15 +254,15 @@ struct xen_sysctl_cpu_hotplug {
  */
 /* XEN_SYSCTL_pm_op */
 struct xen_userspace {
-    uint32_t scaling_setspeed;
+    __u32 scaling_setspeed;
 };
 
 struct xen_ondemand {
-    uint32_t sampling_rate_max;
-    uint32_t sampling_rate_min;
+    __u32 sampling_rate_max;
+    __u32 sampling_rate_min;
 
-    uint32_t sampling_rate;
-    uint32_t up_threshold;
+    __u32 sampling_rate;
+    __u32 up_threshold;
 };
 
 /* 
@@ -272,9 +272,9 @@ struct xen_ondemand {
 #define CPUFREQ_NAME_LEN 16
 struct xen_get_cpufreq_para {
     /* IN/OUT variable */
-    uint32_t cpu_num;
-    uint32_t freq_num;
-    uint32_t gov_num;
+    __u32 cpu_num;
+    __u32 freq_num;
+    __u32 gov_num;
 
     /* for all governors */
     /* OUT variable */
@@ -283,14 +283,14 @@ struct xen_get_cpufreq_para {
     XEN_GUEST_HANDLE_64(char)   scaling_available_governors;
     char scaling_driver[CPUFREQ_NAME_LEN];
 
-    uint32_t cpuinfo_cur_freq;
-    uint32_t cpuinfo_max_freq;
-    uint32_t cpuinfo_min_freq;
-    uint32_t scaling_cur_freq;
+    __u32 cpuinfo_cur_freq;
+    __u32 cpuinfo_max_freq;
+    __u32 cpuinfo_min_freq;
+    __u32 scaling_cur_freq;
 
     char scaling_governor[CPUFREQ_NAME_LEN];
-    uint32_t scaling_max_freq;
-    uint32_t scaling_min_freq;
+    __u32 scaling_max_freq;
+    __u32 scaling_min_freq;
 
     /* for specific governor */
     union {
@@ -298,7 +298,7 @@ struct xen_get_cpufreq_para {
         struct  xen_ondemand ondemand;
     } u;
 
-    int32_t turbo_enabled;
+    __s32 turbo_enabled;
 };
 
 struct xen_set_cpufreq_gov {
@@ -312,8 +312,8 @@ struct xen_set_cpufreq_para {
     #define SAMPLING_RATE              4
     #define UP_THRESHOLD               5
 
-    uint32_t ctrl_type;
-    uint32_t ctrl_value;
+    __u32 ctrl_type;
+    __u32 ctrl_value;
 };
 
 struct xen_sysctl_pm_op {
@@ -341,18 +341,18 @@ struct xen_sysctl_pm_op {
     #define XEN_SYSCTL_pm_op_enable_turbo               0x26
     #define XEN_SYSCTL_pm_op_disable_turbo              0x27
 
-    uint32_t cmd;
-    uint32_t cpuid;
+    __u32 cmd;
+    __u32 cpuid;
     union {
         struct xen_get_cpufreq_para get_para;
         struct xen_set_cpufreq_gov  set_gov;
         struct xen_set_cpufreq_para set_para;
         uint64_aligned_t get_avgfreq;
-        uint32_t                    set_sched_opt_smt;
-        uint32_t                    get_max_cstate;
-        uint32_t                    set_max_cstate;
-        uint32_t                    get_vcpu_migration_delay;
-        uint32_t                    set_vcpu_migration_delay;
+        __u32                    set_sched_opt_smt;
+        __u32                    get_max_cstate;
+        __u32                    set_max_cstate;
+        __u32                    get_vcpu_migration_delay;
+        __u32                    set_vcpu_migration_delay;
     } u;
 };
 
@@ -362,9 +362,9 @@ struct xen_sysctl_page_offline_op {
 #define sysctl_page_offline     1
 #define sysctl_page_online      2
 #define sysctl_query_page_offline  3
-    uint32_t cmd;
-    uint32_t start;
-    uint32_t end;
+    __u32 cmd;
+    __u32 start;
+    __u32 end;
     /* OUT: result of page offline request */
     /*
      * bit 0~15: result flags
@@ -415,8 +415,8 @@ struct xen_sysctl_page_offline_op {
 #define LOCKPROF_TYPE_N           2   /* number of types */
 struct xen_sysctl_lockprof_data {
     char     name[40];     /* lock name (may include up to 2 %d specifiers) */
-    int32_t  type;         /* LOCKPROF_TYPE_??? */
-    int32_t  idx;          /* index (e.g. domain id) */
+    __s32  type;         /* LOCKPROF_TYPE_??? */
+    __s32  idx;          /* index (e.g. domain id) */
     uint64_aligned_t lock_cnt;     /* # of locking succeeded */
     uint64_aligned_t block_cnt;    /* # of wait for lock */
     uint64_aligned_t lock_time;    /* nsecs lock held */
@@ -426,10 +426,10 @@ typedef struct xen_sysctl_lockprof_data xen_sysctl_lockprof_data_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_lockprof_data_t);
 struct xen_sysctl_lockprof_op {
     /* IN variables. */
-    uint32_t       cmd;               /* XEN_SYSCTL_LOCKPROF_??? */
-    uint32_t       max_elem;          /* size of output buffer */
+    __u32       cmd;               /* XEN_SYSCTL_LOCKPROF_??? */
+    __u32       max_elem;          /* size of output buffer */
     /* OUT variables (query only). */
-    uint32_t       nr_elem;           /* number of elements available */
+    __u32       nr_elem;           /* number of elements available */
     uint64_aligned_t time;            /* nsecs of profile measurement */
     /* profile information (or NULL) */
     XEN_GUEST_HANDLE_64(xen_sysctl_lockprof_data_t) data;
@@ -441,9 +441,9 @@ struct xen_sysctl_lockprof_op {
 #define XEN_INVALID_NODE_ID     (~0U)
 
 struct xen_sysctl_cputopo {
-    uint32_t core;
-    uint32_t socket;
-    uint32_t node;
+    __u32 core;
+    __u32 socket;
+    __u32 node;
 };
 typedef struct xen_sysctl_cputopo xen_sysctl_cputopo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cputopo_t);
@@ -461,7 +461,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_cputopo_t);
  *    may be less than the input value.
  */
 struct xen_sysctl_cputopoinfo {
-    uint32_t num_cpus;
+    __u32 num_cpus;
     XEN_GUEST_HANDLE_64(xen_sysctl_cputopo_t) cputopo;
 };
 
@@ -470,8 +470,8 @@ struct xen_sysctl_cputopoinfo {
 #define XEN_INVALID_NODE_DIST  (~0U)
 
 struct xen_sysctl_meminfo {
-    uint64_t memsize;
-    uint64_t memfree;
+    __u64 memsize;
+    __u64 memfree;
 };
 typedef struct xen_sysctl_meminfo xen_sysctl_meminfo_t;
 DEFINE_XEN_GUEST_HANDLE(xen_sysctl_meminfo_t);
@@ -493,7 +493,7 @@ DEFINE_XEN_GUEST_HANDLE(xen_sysctl_meminfo_t);
  */
 
 struct xen_sysctl_numainfo {
-    uint32_t num_nodes;
+    __u32 num_nodes;
 
     XEN_GUEST_HANDLE_64(xen_sysctl_meminfo_t) meminfo;
 
@@ -515,12 +515,12 @@ struct xen_sysctl_numainfo {
 #define XEN_SYSCTL_CPUPOOL_OP_FREEINFO              7  /* F */
 #define XEN_SYSCTL_CPUPOOL_PAR_ANY     0xFFFFFFFF
 struct xen_sysctl_cpupool_op {
-    uint32_t op;          /* IN */
-    uint32_t cpupool_id;  /* IN: CDIARM OUT: CI */
-    uint32_t sched_id;    /* IN: C      OUT: I  */
-    uint32_t domid;       /* IN: M              */
-    uint32_t cpu;         /* IN: AR             */
-    uint32_t n_dom;       /*            OUT: I  */
+    __u32 op;          /* IN */
+    __u32 cpupool_id;  /* IN: CDIARM OUT: CI */
+    __u32 sched_id;    /* IN: C      OUT: I  */
+    __u32 domid;       /* IN: M              */
+    __u32 cpu;         /* IN: AR             */
+    __u32 n_dom;       /*            OUT: I  */
     struct xenctl_bitmap cpumap; /*     OUT: IF */
 };
 
@@ -571,7 +571,7 @@ struct xen_sysctl_arinc653_schedule {
     uint64_aligned_t     major_frame;
     /* num_sched_entries holds how many of the entries in the
      * sched_entries[] array are valid. */
-    uint8_t     num_sched_entries;
+    __u8     num_sched_entries;
     /* The sched_entries array holds the actual schedule entries. */
     struct {
         /* dom_handle must match a domain's UUID */
@@ -612,9 +612,9 @@ struct xen_sysctl_credit2_schedule {
 #define XEN_SYSCTL_SCHEDOP_putinfo 0
 #define XEN_SYSCTL_SCHEDOP_getinfo 1
 struct xen_sysctl_scheduler_op {
-    uint32_t cpupool_id; /* Cpupool whose scheduler is to be targetted. */
-    uint32_t sched_id;   /* XEN_SCHEDULER_* (domctl.h) */
-    uint32_t cmd;        /* XEN_SYSCTL_SCHEDOP_* */
+    __u32 cpupool_id; /* Cpupool whose scheduler is to be targetted. */
+    __u32 sched_id;   /* XEN_SCHEDULER_* (domctl.h) */
+    __u32 cmd;        /* XEN_SYSCTL_SCHEDOP_* */
     union {
         struct xen_sysctl_sched_arinc653 {
             XEN_GUEST_HANDLE_64(xen_sysctl_arinc653_schedule_t) schedule;
@@ -631,13 +631,13 @@ struct xen_sysctl_scheduler_op {
  *
  * That is, one magic number followed by 0 or more record.
  *
- * The magic number is stored as an uint32_t field.
+ * The magic number is stored as an __u32 field.
  *
  * The record is packed and variable in length. It has the form:
  *
  *  filename: a NULL terminated path name extracted from gcov, used to
  *            create the name of gcda file.
- *  size:     a uint32_t field indicating the size of the payload, the
+ *  size:     a __u32 field indicating the size of the payload, the
  *            unit is byte.
  *  payload:  the actual payload, length is `size' bytes.
  *
@@ -651,8 +651,8 @@ struct xen_sysctl_scheduler_op {
 #define XEN_SYSCTL_GCOV_reset    2 /* Reset all counters */
 
 struct xen_sysctl_gcov_op {
-    uint32_t cmd;
-    uint32_t size; /* IN/OUT: size of the buffer  */
+    __u32 cmd;
+    __u32 size; /* IN/OUT: size of the buffer  */
     XEN_GUEST_HANDLE_64(char) buffer; /* OUT */
 };
 
@@ -663,13 +663,13 @@ struct xen_sysctl_gcov_op {
 #define XEN_SYSCTL_PSR_CMT_enabled                   3
 #define XEN_SYSCTL_PSR_CMT_get_l3_event_mask         4
 struct xen_sysctl_psr_cmt_op {
-    uint32_t cmd;       /* IN: XEN_SYSCTL_PSR_CMT_* */
-    uint32_t flags;     /* padding variable, may be extended for future use */
+    __u32 cmd;       /* IN: XEN_SYSCTL_PSR_CMT_* */
+    __u32 flags;     /* padding variable, may be extended for future use */
     union {
-        uint64_t data;  /* OUT */
+        __u64 data;  /* OUT */
         struct {
-            uint32_t cpu;   /* IN */
-            uint32_t rsvd;
+            __u32 cpu;   /* IN */
+            __u32 rsvd;
         } l3_cache;
     } u;
 };
@@ -681,7 +681,7 @@ struct xen_sysctl_pcitopoinfo {
      * IN: Number of elements in 'pcitopo' and 'nodes' arrays.
      * OUT: Number of processed elements of those arrays.
      */
-    uint32_t num_devs;
+    __u32 num_devs;
 
     /* IN: list of devices for which node IDs are requested. */
     XEN_GUEST_HANDLE_64(physdev_pci_device_t) devs;
@@ -699,14 +699,14 @@ struct xen_sysctl_pcitopoinfo {
 #define XEN_SYSCTL_PSR_CAT_get_l3_info               0
 #define XEN_SYSCTL_PSR_CAT_get_l2_info               1
 struct xen_sysctl_psr_cat_op {
-    uint32_t cmd;       /* IN: XEN_SYSCTL_PSR_CAT_* */
-    uint32_t target;    /* IN */
+    __u32 cmd;       /* IN: XEN_SYSCTL_PSR_CAT_* */
+    __u32 target;    /* IN */
     union {
         struct {
-            uint32_t cbm_len;   /* OUT: CBM length */
-            uint32_t cos_max;   /* OUT: Maximum COS */
+            __u32 cbm_len;   /* OUT: CBM length */
+            __u32 cos_max;   /* OUT: Maximum COS */
 #define XEN_SYSCTL_PSR_CAT_L3_CDP       (1u << 0)
-            uint32_t flags;     /* OUT: CAT flags */
+            __u32 flags;     /* OUT: CAT flags */
         } cat_info;
     } u;
 };
@@ -738,8 +738,8 @@ struct xen_sysctl_psr_cat_op {
  * page tackled on.
  */
 struct tmem_handle {
-    uint32_t pool_id;
-    uint32_t index;
+    __u32 pool_id;
+    __u32 index;
     xen_tmem_oid_t oid;
 };
 
@@ -748,19 +748,19 @@ struct tmem_handle {
  * xen_tmem_op with this structure, which is mostly used during migration.
  */
 struct xen_tmem_client {
-    uint32_t version;   /* If mismatched we will get XEN_EOPNOTSUPP. */
-    uint32_t maxpools;  /* If greater than what hypervisor supports, will get
+    __u32 version;   /* If mismatched we will get XEN_EOPNOTSUPP. */
+    __u32 maxpools;  /* If greater than what hypervisor supports, will get
                            XEN_ERANGE. */
-    uint32_t nr_pools;  /* Current amount of pools. Ignored on SET*/
+    __u32 nr_pools;  /* Current amount of pools. Ignored on SET*/
     union {             /* See TMEM_CLIENT_[COMPRESS,FROZEN] */
-        uint32_t raw;
+        __u32 raw;
         struct {
-            uint8_t frozen:1,
+            __u8 frozen:1,
                     compress:1,
                     migrating:1;
         } u;
     } flags;
-    uint32_t weight;
+    __u32 weight;
 };
 typedef struct xen_tmem_client xen_tmem_client_t;
 DEFINE_XEN_GUEST_HANDLE(xen_tmem_client_t);
@@ -777,9 +777,9 @@ DEFINE_XEN_GUEST_HANDLE(xen_tmem_client_t);
  */
 struct xen_tmem_pool_info {
     union {
-        uint32_t raw;
+        __u32 raw;
         struct {
-            uint32_t persist:1,    /* See TMEM_POOL_PERSIST. */
+            __u32 persist:1,    /* See TMEM_POOL_PERSIST. */
                      shared:1,     /* See TMEM_POOL_SHARED. */
                      auth:1,       /* See TMEM_POOL_AUTH. */
                      rsv1:1,
@@ -788,22 +788,22 @@ struct xen_tmem_pool_info {
                      version:8;    /* TMEM_POOL_VERSION_[SHIFT,MASK]. */
         } u;
     } flags;
-    uint32_t id;                  /* Less than tmem_client.maxpools. */
-    uint64_t n_pages;             /* Zero on XEN_SYSCTL_TMEM_OP_SET_[AUTH|POOLS]. */
+    __u32 id;                  /* Less than tmem_client.maxpools. */
+    __u64 n_pages;             /* Zero on XEN_SYSCTL_TMEM_OP_SET_[AUTH|POOLS]. */
     uint64_aligned_t uuid[2];
 };
 typedef struct xen_tmem_pool_info xen_tmem_pool_info_t;
 DEFINE_XEN_GUEST_HANDLE(xen_tmem_pool_info_t);
 
 struct xen_sysctl_tmem_op {
-    uint32_t cmd;       /* IN: XEN_SYSCTL_TMEM_OP_* . */
-    int32_t pool_id;    /* IN: 0 by default unless _SAVE_*, RESTORE_* .*/
-    uint32_t cli_id;    /* IN: client id, 0 for XEN_SYSCTL_TMEM_QUERY_FREEABLE_MB
+    __u32 cmd;       /* IN: XEN_SYSCTL_TMEM_OP_* . */
+    __s32 pool_id;    /* IN: 0 by default unless _SAVE_*, RESTORE_* .*/
+    __u32 cli_id;    /* IN: client id, 0 for XEN_SYSCTL_TMEM_QUERY_FREEABLE_MB
                            for all others can be the domain id or
                            XEN_SYSCTL_TMEM_OP_ALL_CLIENTS for all. */
-    uint32_t len;       /* IN: length of 'buf'. If not applicable to use 0. */
-    uint32_t arg;       /* IN: If not applicable to command use 0. */
-    uint32_t pad;       /* Padding so structure is the same under 32 and 64. */
+    __u32 len;       /* IN: length of 'buf'. If not applicable to use 0. */
+    __u32 arg;       /* IN: If not applicable to command use 0. */
+    __u32 pad;       /* Padding so structure is the same under 32 and 64. */
     xen_tmem_oid_t oid; /* IN: If not applicable to command use 0s. */
     union {
         XEN_GUEST_HANDLE_64(char) buf; /* IN/OUT: Buffer to save/restore */
@@ -831,7 +831,7 @@ struct xen_sysctl_cpu_levelling_caps {
 #define XEN_SYSCTL_CPU_LEVELCAP_thermal_ecx (1ul <<  6) /* 0x00000006.ecx    */
 #define XEN_SYSCTL_CPU_LEVELCAP_l7s0_eax    (1ul <<  7) /* 0x00000007:0.eax  */
 #define XEN_SYSCTL_CPU_LEVELCAP_l7s0_ebx    (1ul <<  8) /* 0x00000007:0.ebx  */
-    uint32_t caps;
+    __u32 caps;
 };
 
 /*
@@ -848,8 +848,8 @@ struct xen_sysctl_cpu_featureset {
 #define XEN_SYSCTL_cpu_featureset_host     1
 #define XEN_SYSCTL_cpu_featureset_pv       2
 #define XEN_SYSCTL_cpu_featureset_hvm      3
-    uint32_t index;       /* IN: Which featureset to query? */
-    uint32_t nr_features; /* IN/OUT: Number of entries in/written to
+    __u32 index;       /* IN: Which featureset to query? */
+    __u32 nr_features; /* IN/OUT: Number of entries in/written to
                            * 'features', or the maximum number of features if
                            * the guest handle is NULL.  NB. All featuresets
                            * come from the same numberspace, so have the same
@@ -890,10 +890,10 @@ struct livepatch_func {
     const char *name;       /* Name of function to be patched. */
     void *new_addr;
     void *old_addr;
-    uint32_t new_size;
-    uint32_t old_size;
-    uint8_t version;        /* MUST be LIVEPATCH_PAYLOAD_VERSION. */
-    uint8_t opaque[31];
+    __u32 new_size;
+    __u32 old_size;
+    __u8 version;        /* MUST be LIVEPATCH_PAYLOAD_VERSION. */
+    __u8 opaque[31];
 };
 typedef struct livepatch_func livepatch_func_t;
 #endif
@@ -907,9 +907,9 @@ typedef struct livepatch_func livepatch_func_t;
 #define XEN_LIVEPATCH_NAME_SIZE 128
 struct xen_livepatch_name {
     XEN_GUEST_HANDLE_64(char) name;         /* IN: pointer to name. */
-    uint16_t size;                          /* IN: size of name. May be upto
+    __u16 size;                          /* IN: size of name. May be upto
                                                XEN_LIVEPATCH_NAME_SIZE. */
-    uint16_t pad[3];                        /* IN: MUST be zero. */
+    __u16 pad[3];                        /* IN: MUST be zero. */
 };
 
 /*
@@ -930,7 +930,7 @@ struct xen_livepatch_name {
 #define XEN_SYSCTL_LIVEPATCH_UPLOAD 0
 struct xen_sysctl_livepatch_upload {
     struct xen_livepatch_name name;         /* IN, name of the patch. */
-    uint64_t size;                          /* IN, size of the ELF file. */
+    __u64 size;                          /* IN, size of the ELF file. */
     XEN_GUEST_HANDLE_64(uint8) payload;     /* IN, the ELF file. */
 };
 
@@ -947,8 +947,8 @@ struct xen_sysctl_livepatch_upload {
 struct xen_livepatch_status {
 #define LIVEPATCH_STATE_CHECKED      1
 #define LIVEPATCH_STATE_APPLIED      2
-    uint32_t state;                /* OUT: LIVEPATCH_STATE_*. */
-    int32_t rc;                    /* OUT: 0 if no error, otherwise -XEN_EXX. */
+    __u32 state;                /* OUT: LIVEPATCH_STATE_*. */
+    __s32 rc;                    /* OUT: 0 if no error, otherwise -XEN_EXX. */
 };
 typedef struct xen_livepatch_status xen_livepatch_status_t;
 DEFINE_XEN_GUEST_HANDLE(xen_livepatch_status_t);
@@ -981,15 +981,15 @@ struct xen_sysctl_livepatch_get {
  */
 #define XEN_SYSCTL_LIVEPATCH_LIST 2
 struct xen_sysctl_livepatch_list {
-    uint32_t version;                       /* OUT: Hypervisor stamps value.
+    __u32 version;                       /* OUT: Hypervisor stamps value.
                                                If varies between calls, we are
                                              * getting stale data. */
-    uint32_t idx;                           /* IN: Index into hypervisor list. */
-    uint32_t nr;                            /* IN: How many status, name, and len
+    __u32 idx;                           /* IN: Index into hypervisor list. */
+    __u32 nr;                            /* IN: How many status, name, and len
                                                should fill out. Can be zero to get
                                                amount of payloads and version.
                                                OUT: How many payloads left. */
-    uint32_t pad;                           /* IN: Must be zero. */
+    __u32 pad;                           /* IN: Must be zero. */
     XEN_GUEST_HANDLE_64(xen_livepatch_status_t) status;  /* OUT. Must have enough
                                                space allocate for nr of them. */
     XEN_GUEST_HANDLE_64(char) name;         /* OUT: Array of names. Each member
@@ -1011,16 +1011,16 @@ struct xen_sysctl_livepatch_action {
 #define LIVEPATCH_ACTION_REVERT       2
 #define LIVEPATCH_ACTION_APPLY        3
 #define LIVEPATCH_ACTION_REPLACE      4
-    uint32_t cmd;                           /* IN: LIVEPATCH_ACTION_*. */
-    uint32_t timeout;                       /* IN: If zero then uses */
+    __u32 cmd;                           /* IN: LIVEPATCH_ACTION_*. */
+    __u32 timeout;                       /* IN: If zero then uses */
                                             /* hypervisor default. */
                                             /* Or upper bound of time (ns) */
                                             /* for operation to take. */
 };
 
 struct xen_sysctl_livepatch_op {
-    uint32_t cmd;                           /* IN: XEN_SYSCTL_LIVEPATCH_*. */
-    uint32_t pad;                           /* IN: Always zero. */
+    __u32 cmd;                           /* IN: XEN_SYSCTL_LIVEPATCH_*. */
+    __u32 pad;                           /* IN: Always zero. */
     union {
         struct xen_sysctl_livepatch_upload upload;
         struct xen_sysctl_livepatch_list list;
@@ -1041,12 +1041,12 @@ struct xen_sysctl_livepatch_op {
 
 struct xen_sysctl_set_parameter {
     XEN_GUEST_HANDLE_64(char) params;       /* IN: pointer to parameters. */
-    uint16_t size;                          /* IN: size of parameters. */
-    uint16_t pad[3];                        /* IN: MUST be zero. */
+    __u16 size;                          /* IN: size of parameters. */
+    __u16 pad[3];                        /* IN: MUST be zero. */
 };
 
 struct xen_sysctl {
-    uint32_t cmd;
+    __u32 cmd;
 #define XEN_SYSCTL_readconsole                    1
 #define XEN_SYSCTL_tbuf_op                        2
 #define XEN_SYSCTL_physinfo                       3
@@ -1074,7 +1074,7 @@ struct xen_sysctl {
 #define XEN_SYSCTL_get_cpu_featureset            26
 #define XEN_SYSCTL_livepatch_op                  27
 #define XEN_SYSCTL_set_parameter                 28
-    uint32_t interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
+    __u32 interface_version; /* XEN_SYSCTL_INTERFACE_VERSION */
     union {
         struct xen_sysctl_readconsole       readconsole;
         struct xen_sysctl_tbuf_op           tbuf_op;
@@ -1103,7 +1103,7 @@ struct xen_sysctl {
         struct xen_sysctl_cpu_featureset    cpu_featureset;
         struct xen_sysctl_livepatch_op      livepatch;
         struct xen_sysctl_set_parameter     set_parameter;
-        uint8_t                             pad[128];
+        __u8                             pad[128];
     } u;
 };
 typedef struct xen_sysctl xen_sysctl_t;

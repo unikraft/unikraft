@@ -226,7 +226,7 @@ static int blkfront_xb_get_capabilities(struct blkfront_dev *blkdev)
  * include queue-<queue-id>.
  **/
 static int blkfront_xb_write_ring_info(struct blkfront_dev *dev,
-		uint16_t queue_id,
+		__u16 queue_id,
 		xenbus_transaction_t xbt)
 {
 	struct xenbus_device *xendev;
@@ -295,7 +295,7 @@ out:
 
 /* Delete ring entry */
 static int blkfront_xb_delete_ring_info(struct blkfront_dev *dev,
-		uint16_t queue_id)
+		__u16 queue_id)
 {
 	struct xenbus_device *xendev;
 	char *node_ring_ref = NULL;
@@ -364,7 +364,7 @@ again:
 	if (err)
 		goto abort_transaction;
 
-	for (uint16_t queue_id = 0; queue_id < dev->nb_queues; ++queue_id) {
+	for (__u16 queue_id = 0; queue_id < dev->nb_queues; ++queue_id) {
 		err = blkfront_xb_write_ring_info(dev, queue_id, xbt);
 		if (err) {
 			uk_pr_err("Failed to write queue%"PRIu16" to xs: %d\n",
@@ -394,7 +394,7 @@ static int blkfront_xb_delete_rings_info(struct blkfront_dev *dev)
 
 	UK_ASSERT(dev != NULL);
 
-	for (uint16_t queue_id = 0; queue_id < dev->nb_queues; ++queue_id) {
+	for (__u16 queue_id = 0; queue_id < dev->nb_queues; ++queue_id) {
 		err = blkfront_xb_delete_ring_info(dev, queue_id);
 		if (err) {
 			uk_pr_err("Failed to delete ring_info for q-%"

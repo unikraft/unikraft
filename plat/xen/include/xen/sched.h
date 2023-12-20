@@ -141,7 +141,7 @@ DEFINE_XEN_GUEST_HANDLE(sched_shutdown_t);
 struct sched_poll {
     XEN_GUEST_HANDLE(evtchn_port_t) ports;
     unsigned int nr_ports;
-    uint64_t timeout;
+    __u64 timeout;
 };
 typedef struct sched_poll sched_poll_t;
 DEFINE_XEN_GUEST_HANDLE(sched_poll_t);
@@ -154,14 +154,14 @@ typedef struct sched_remote_shutdown sched_remote_shutdown_t;
 DEFINE_XEN_GUEST_HANDLE(sched_remote_shutdown_t);
 
 struct sched_watchdog {
-    uint32_t id;                /* watchdog ID */
-    uint32_t timeout;           /* timeout */
+    __u32 id;                /* watchdog ID */
+    __u32 timeout;           /* timeout */
 };
 typedef struct sched_watchdog sched_watchdog_t;
 DEFINE_XEN_GUEST_HANDLE(sched_watchdog_t);
 
 struct sched_pin_override {
-    int32_t pcpu;
+    __s32 pcpu;
 };
 typedef struct sched_pin_override sched_pin_override_t;
 DEFINE_XEN_GUEST_HANDLE(sched_pin_override_t);

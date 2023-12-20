@@ -74,7 +74,7 @@
 #define EEMPTY                  1001
 
 struct xen_tmem_oid {
-    uint64_t oid[3];
+    __u64 oid[3];
 };
 typedef struct xen_tmem_oid xen_tmem_oid_t;
 DEFINE_XEN_GUEST_HANDLE(xen_tmem_oid_t);
@@ -85,24 +85,24 @@ typedef xen_pfn_t tmem_cli_mfn_t;
 #endif
 typedef XEN_GUEST_HANDLE(char) tmem_cli_va_t;
 struct tmem_op {
-    uint32_t cmd;
-    int32_t pool_id;
+    __u32 cmd;
+    __s32 pool_id;
     union {
         struct {
-            uint64_t uuid[2];
-            uint32_t flags;
-            uint32_t arg1;
+            __u64 uuid[2];
+            __u32 flags;
+            __u32 arg1;
         } creat; /* for cmd == TMEM_NEW_POOL. */
         struct {
 #if __XEN_INTERFACE_VERSION__ < 0x00040600
-            uint64_t oid[3];
+            __u64 oid[3];
 #else
             xen_tmem_oid_t oid;
 #endif
-            uint32_t index;
-            uint32_t tmem_offset;
-            uint32_t pfn_offset;
-            uint32_t len;
+            __u32 index;
+            __u32 tmem_offset;
+            __u32 pfn_offset;
+            __u32 len;
             xen_pfn_t cmfn; /* client machine page frame */
         } gen; /* for all other cmd ("generic") */
     } u;

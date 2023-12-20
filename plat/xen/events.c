@@ -50,7 +50,7 @@ UK_EVENT(UKPLAT_EVENT_IRQ);
 typedef struct _ev_action_t {
 	evtchn_handler_t handler;
 	void *data;
-	uint32_t count;
+	__u32 count;
 } ev_action_t;
 
 struct uk_event_irq_data {
@@ -66,7 +66,7 @@ static unsigned long bound_ports[NR_EVS/(8*sizeof(unsigned long))];
 
 void unbind_all_ports(void)
 {
-	uint32_t i;
+	__u32 i;
 	int cpu = 0;
 	shared_info_t *s = HYPERVISOR_shared_info;
 	vcpu_info_t   *vcpu_info = &s->vcpu_info[cpu];
@@ -158,7 +158,7 @@ void unbind_evtchn(evtchn_port_t port)
 
 }
 
-evtchn_port_t bind_virq(uint32_t virq, evtchn_handler_t handler, void *data)
+evtchn_port_t bind_virq(__u32 virq, evtchn_handler_t handler, void *data)
 {
 	evtchn_bind_virq_t op;
 	int rc;
@@ -177,7 +177,7 @@ evtchn_port_t bind_virq(uint32_t virq, evtchn_handler_t handler, void *data)
 	return op.port;
 }
 
-evtchn_port_t bind_pirq(uint32_t pirq, int will_share,
+evtchn_port_t bind_pirq(__u32 pirq, int will_share,
 			evtchn_handler_t handler, void *data)
 {
 	evtchn_bind_pirq_t op;
@@ -290,7 +290,7 @@ int evtchn_bind_interdomain(domid_t pal, evtchn_port_t remote_port,
 int evtchn_get_peercontext(evtchn_port_t local_port, char *ctx, int size)
 {
 	int rc;
-	uint32_t sid;
+	__u32 sid;
 	struct xen_flask_op op;
 
 	op.cmd = FLASK_GET_PEER_SID;

@@ -44,9 +44,9 @@
  */
 
 #ifndef blkif_vdev_t
-#define blkif_vdev_t   uint16_t
+#define blkif_vdev_t   __u16
 #endif
-#define blkif_sector_t uint64_t
+#define blkif_sector_t __u64
 
 /*
  * Feature and Parameter Negotiation
@@ -193,7 +193,7 @@
  *----------------------- Request Transport Parameters ------------------------
  *
  * max-ring-page-order
- *      Values:         <uint32_t>
+ *      Values:         <__u32>
  *      Default Value:  0
  *      Notes:          1, 3
  *
@@ -202,7 +202,7 @@
  *      etc.).
  *
  * max-ring-pages
- *      Values:         <uint32_t>
+ *      Values:         <__u32>
  *      Default Value:  1
  *      Notes:          DEPRECATED, 2, 3
  *
@@ -221,7 +221,7 @@
  *      actually supports it.
  *
  * discard-alignment
- *      Values:         <uint32_t>
+ *      Values:         <__u32>
  *      Default Value:  0
  *      Notes:          4, 5
  *
@@ -229,7 +229,7 @@
  *      to the first, addressable, discard extent on the underlying device.
  *
  * discard-granularity
- *      Values:         <uint32_t>
+ *      Values:         <__u32>
  *      Default Value:  <"sector-size">
  *      Notes:          4
  *
@@ -245,24 +245,24 @@
  *      requests with the BLKIF_DISCARD_SECURE flag set.
  *
  * info
- *      Values:         <uint32_t> (bitmap)
+ *      Values:         <__u32> (bitmap)
  *
  *      A collection of bit flags describing attributes of the backing
  *      device.  The VDISK_* macros define the meaning of each bit
  *      location.
  *
  * sector-size
- *      Values:         <uint32_t>
+ *      Values:         <__u32>
  *
  *      The logical sector size, in bytes, of the backend device.
  *
  * physical-sector-size
- *      Values:         <uint32_t>
+ *      Values:         <__u32>
  *
  *      The physical sector size, in bytes, of the backend device.
  *
  * sectors
- *      Values:         <uint64_t>
+ *      Values:         <__u64>
  *
  *      The size of the backend device, expressed in units of its logical
  *      sector size ("sector-size").
@@ -274,20 +274,20 @@
  *----------------------- Request Transport Parameters -----------------------
  *
  * event-channel
- *      Values:         <uint32_t>
+ *      Values:         <__u32>
  *
  *      The identifier of the Xen event channel used to signal activity
  *      in the ring buffer.
  *
  * ring-ref
- *      Values:         <uint32_t>
+ *      Values:         <__u32>
  *      Notes:          6
  *
  *      The Xen grant reference granting permission for the backend to map
  *      the sole page in a single page sized ring buffer.
  *
  * ring-ref%u
- *      Values:         <uint32_t>
+ *      Values:         <__u32>
  *      Notes:          6
  *
  *      For a frontend providing a multi-page ring, a "number of ring pages"
@@ -303,7 +303,7 @@
  *      response structures.
  *
  * ring-page-order
- *      Values:         <uint32_t>
+ *      Values:         <__u32>
  *      Default Value:  0
  *      Maximum Value:  MAX(ffs(max-ring-pages) - 1, max-ring-page-order)
  *      Notes:          1, 3
@@ -313,7 +313,7 @@
  *      etc.).
  *
  * num-ring-pages
- *      Values:         <uint32_t>
+ *      Values:         <__u32>
  *      Default Value:  1
  *      Maximum Value:  MAX(max-ring-pages,(0x1 << max-ring-page-order))
  *      Notes:          DEPRECATED, 2, 3
@@ -348,7 +348,7 @@
  *      Values:         "disk", "cdrom", "floppy", etc.
  *
  * virtual-device
- *      Values:         <uint32_t>
+ *      Values:         <__u32>
  *
  *      A value indicating the physical device to virtualize within the
  *      frontend's domain.  (e.g. "The first ATA disk", "The third SCSI
@@ -618,17 +618,17 @@ struct blkif_request_segment {
     grant_ref_t gref;        /* reference to I/O buffer frame        */
     /* @first_sect: first sector in frame to transfer (inclusive).   */
     /* @last_sect: last sector in frame to transfer (inclusive).     */
-    uint8_t     first_sect, last_sect;
+    __u8     first_sect, last_sect;
 };
 
 /*
  * Starting ring element for any I/O request.
  */
 struct blkif_request {
-    uint8_t        operation;    /* BLKIF_OP_???                         */
-    uint8_t        nr_segments;  /* number of segments                   */
+    __u8        operation;    /* BLKIF_OP_???                         */
+    __u8        nr_segments;  /* number of segments                   */
     blkif_vdev_t   handle;       /* only for read/write requests         */
-    uint64_t       id;           /* private guest value, echoed in resp  */
+    __u64       id;           /* private guest value, echoed in resp  */
     blkif_sector_t sector_number;/* start sector idx on disk (r/w only)  */
     struct blkif_request_segment seg[BLKIF_MAX_SEGMENTS_PER_REQUEST];
 };
@@ -639,34 +639,34 @@ typedef struct blkif_request blkif_request_t;
  * sizeof(struct blkif_request_discard) <= sizeof(struct blkif_request)
  */
 struct blkif_request_discard {
-    uint8_t        operation;    /* BLKIF_OP_DISCARD                     */
-    uint8_t        flag;         /* BLKIF_DISCARD_SECURE or zero         */
+    __u8        operation;    /* BLKIF_OP_DISCARD                     */
+    __u8        flag;         /* BLKIF_DISCARD_SECURE or zero         */
 #define BLKIF_DISCARD_SECURE (1<<0)  /* ignored if discard-secure=0      */
     blkif_vdev_t   handle;       /* same as for read/write requests      */
-    uint64_t       id;           /* private guest value, echoed in resp  */
+    __u64       id;           /* private guest value, echoed in resp  */
     blkif_sector_t sector_number;/* start sector idx on disk             */
-    uint64_t       nr_sectors;   /* number of contiguous sectors to discard*/
+    __u64       nr_sectors;   /* number of contiguous sectors to discard*/
 };
 typedef struct blkif_request_discard blkif_request_discard_t;
 
 struct blkif_request_indirect {
-    uint8_t        operation;    /* BLKIF_OP_INDIRECT                    */
-    uint8_t        indirect_op;  /* BLKIF_OP_{READ/WRITE}                */
-    uint16_t       nr_segments;  /* number of segments                   */
-    uint64_t       id;           /* private guest value, echoed in resp  */
+    __u8        operation;    /* BLKIF_OP_INDIRECT                    */
+    __u8        indirect_op;  /* BLKIF_OP_{READ/WRITE}                */
+    __u16       nr_segments;  /* number of segments                   */
+    __u64       id;           /* private guest value, echoed in resp  */
     blkif_sector_t sector_number;/* start sector idx on disk (r/w only)  */
     blkif_vdev_t   handle;       /* same as for read/write requests      */
     grant_ref_t    indirect_grefs[BLKIF_MAX_INDIRECT_PAGES_PER_REQUEST];
 #ifdef __i386__
-    uint64_t       pad;          /* Make it 64 byte aligned on i386      */
+    __u64       pad;          /* Make it 64 byte aligned on i386      */
 #endif
 };
 typedef struct blkif_request_indirect blkif_request_indirect_t;
 
 struct blkif_response {
-    uint64_t        id;              /* copied from request */
-    uint8_t         operation;       /* copied from request */
-    int16_t         status;          /* BLKIF_RSP_???       */
+    __u64        id;              /* copied from request */
+    __u8         operation;       /* copied from request */
+    __s16         status;          /* BLKIF_RSP_???       */
 };
 typedef struct blkif_response blkif_response_t;
 

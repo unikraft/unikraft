@@ -30,12 +30,12 @@
 /*
  * When #include'ing this header, you need to provide the following
  * declaration upfront:
- * - standard integers types (uint8_t, uint16_t, etc)
+ * - standard integers types (__u8, __u16, etc)
  * They are provided by stdint.h of the standard headers.
  *
  * In addition, if you intend to use the FLEX macros, you also need to
  * provide the following, before invoking the FLEX macros:
- * - size_t
+ * - __sz
  * - memcpy
  * - grant_ref_t
  * These declarations are provided by string.h of the standard headers,
@@ -120,14 +120,14 @@ struct __name##_sring {                                                 \
     RING_IDX rsp_prod, rsp_event;                                       \
     union {                                                             \
         struct {                                                        \
-            uint8_t smartpoll_active;                                   \
+            __u8 smartpoll_active;                                   \
         } netif;                                                        \
         struct {                                                        \
-            uint8_t msg;                                                \
+            __u8 msg;                                                \
         } tapif_user;                                                   \
-        uint8_t pvt_pad[4];                                             \
+        __u8 pvt_pad[4];                                             \
     } pvt;                                                              \
-    uint8_t __pad[44];                                                  \
+    __u8 __pad[44];                                                  \
     union __name##_sring_entry ring[1]; /* variable-length */           \
 };                                                                      \
                                                                         \
@@ -395,7 +395,7 @@ static inline unsigned char *name##_get_ring_ptr(unsigned char *buf,          \
                                                                               \
 static inline void name##_read_packet(void *opaque,                           \
                                       const unsigned char *buf,               \
-                                      size_t size,                            \
+                                      __sz size,                            \
                                       RING_IDX masked_prod,                   \
                                       RING_IDX *masked_cons,                  \
                                       RING_IDX ring_size)                     \
@@ -413,7 +413,7 @@ static inline void name##_read_packet(void *opaque,                           \
                                                                               \
 static inline void name##_write_packet(unsigned char *buf,                    \
                                        const void *opaque,                    \
-                                       size_t size,                           \
+                                       __sz size,                           \
                                        RING_IDX *masked_prod,                 \
                                        RING_IDX masked_cons,                  \
                                        RING_IDX ring_size)                    \
@@ -460,11 +460,11 @@ struct name##_data {                                                          \
 struct name##_data_intf {                                                     \
     RING_IDX in_cons, in_prod;                                                \
                                                                               \
-    uint8_t pad1[56];                                                         \
+    __u8 pad1[56];                                                         \
                                                                               \
     RING_IDX out_cons, out_prod;                                              \
                                                                               \
-    uint8_t pad2[56];                                                         \
+    __u8 pad2[56];                                                         \
                                                                               \
     RING_IDX ring_order;                                                      \
     grant_ref_t ref[];                                                        \

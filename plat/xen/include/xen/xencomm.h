@@ -33,9 +33,9 @@
 #define XENCOMM_INVALID (~0UL)
 
 struct xencomm_desc {
-    uint32_t magic;
-    uint32_t nr_addrs; /* the number of entries in address[] */
-    uint64_t address[0];
+    __u32 magic;
+    __u32 nr_addrs; /* the number of entries in address[] */
+    __u64 address[0];
 };
 
 #endif /* _XEN_XENCOMM_H_ */
