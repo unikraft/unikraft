@@ -1,10 +1,38 @@
 menuconfig LIBPOSIX_TTY
 	bool "posix-tty: Support for stdin/out/err"
-	select LIBUKFILE
+	select LIBPOSIX_FDTAB
+	select LIBPOSIX_FDIO
 
 if LIBPOSIX_TTY
 
 	config LIBPOSIX_TTY_SERIAL
 	bool "Provide file driver for the serial console"
+
+	choice LIBPOSIX_TTY_STDIN
+	prompt "stdin:"
+
+		config LIBPOSIX_TTY_STDIN_NULL
+		bool "NULL file: immediately return EOF"
+
+		config LIBPOSIX_TTY_STDIN_VOID
+		bool "Void file: wait for input forever"
+
+		config LIBPOSIX_TTY_STDIN_SERIAL
+		bool "Serial: platform-specific serial input"
+		select LIBPOSIX_TTY_SERIAL
+
+	endchoice
+
+	choice LIBPOSIX_TTY_STDOUT
+	prompt "stdout/err:"
+
+		config LIBPOSIX_TTY_STDOUT_SERIAL
+		bool "Serial: platform-specific serial output"
+		select LIBPOSIX_TTY_SERIAL
+
+		config LIBPOSIX_TTY_STDOUT_NULL
+		bool "NULL file: discard output"
+
+	endchoice
 
 endif
