@@ -134,13 +134,17 @@ static inline void uk_file_state_wunlock(struct uk_file_state *st)
  * The former can only be used in (static) variable initializations, while the
  * latter is meant for assigning to variables or as anonymous data structures.
  */
-#define UK_FILE_STATE_INITIALIZER(name) { \
+#define UK_FILE_STATE_EVENTS_INITIALIZER(name, ev) { \
 	.iolock = UK_RWLOCK_INITIALIZER((name).iolock, 0), \
-	.pollq = UK_POLLQ_INITIALIZER((name).pollq) \
+	.pollq = UK_POLLQ_EVENTS_INITIALIZER((name).pollq, (ev)) \
 }
-#define UK_FILE_STATE_INIT_VALUE(name) \
-	((struct uk_file_state)UK_FILE_STATE_INITIALIZER(name))
+#define UK_FILE_STATE_EVENTS_INIT_VALUE(name, ev) \
+	((struct uk_file_state)UK_FILE_STATE_EVENTS_INITIALIZER((name), (ev)))
 
+#define UK_FILE_STATE_INITIALIZER(name) \
+	UK_FILE_STATE_EVENTS_INITIALIZER((name), 0)
+#define UK_FILE_STATE_INIT_VALUE(name) \
+	UK_FILE_STATE_EVENTS_INIT_VALUE((name), 0)
 
 static inline
 uk_pollevent uk_file_state_event_clear(struct uk_file_state *st,
