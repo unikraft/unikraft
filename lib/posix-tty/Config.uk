@@ -1,0 +1,10 @@
+menuconfig LIBPOSIX_TTY
+	bool "posix-tty: Support for stdin/out/err"
+	select LIBUKFILE
+
+if LIBPOSIX_TTY
+
+	config LIBPOSIX_TTY_SERIAL
+	bool "Provide file driver for the serial console"
+
+endif
