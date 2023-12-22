@@ -52,5 +52,36 @@ struct uk_socket_event {
 	socklen_t raddr_len;
 };
 
+/**
+ * Registers a socket event receiver function
+ *
+ * @param family
+ *   The socket family (e.g., AF_INET) to receive events for. Can be set
+ *   to AF_UNSPEC to receive any socket event of any address family.
+ * @param recfn
+ *   Event receiver function, must have the following singature:
+ *   `void recvfn(const struct uk_socket_event *)`
+ */
+#define __UK_SOCKET_EVENT_RECEIVER(afamily, arecvfn)			\
+	static int __uk_event ## arecvfn(void *data)			\
+	{								\
+		const struct uk_socket_event *e =			\
+			(const struct uk_socket_event *) data;		\
+									\
+		if (afamily && (afamily != e->family))			\
+			return UK_EVENT_HANDLED_CONT;			\
+									\
+		arecvfn(e);						\
+		return UK_EVENT_HANDLED_CONT;				\
+	}								\
+									\
+	UK_EVENT_HANDLER(UK_POSIX_SOCKET_EVENT, __uk_event ## arecvfn)
+
+#define _UK_SOCKET_EVENT_RECEIVER(family, recvfn) \
+	__UK_SOCKET_EVENT_RECEIVER(family, recvfn)
+
+#define UK_SOCKET_EVENT_RECEIVER(family, recvfn) \
+	_UK_SOCKET_EVENT_RECEIVER(family, recvfn)
+
 #endif /* CONFIG_LIBPOSIX_SOCKET_EVENTS */
 #endif /* __UK_POSIX_SOCKET_EVENT_H__ */

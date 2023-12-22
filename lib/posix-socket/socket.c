@@ -50,7 +50,10 @@
 #include <uk/print.h>
 #include <uk/trace.h>
 #include <uk/syscall.h>
+#include <uk/essentials.h>
 #include <errno.h>
+
+#include "events.h"
 
 
 static const char POSIX_SOCKET_VOLID[] = "posix_socket_vol";
@@ -65,6 +68,9 @@ struct socket_alloc {
 	uk_file_refcnt fref;
 	struct uk_file_state fstate;
 	struct posix_socket_node node;
+#if CONFIG_LIBPOSIX_SOCKET_EVENTS
+	struct uk_socket_event_data evd;
+#endif /* CONFIG_LIBPOSIX_SOCKET_EVENTS */
 };
 
 
@@ -206,6 +212,11 @@ static void socket_release(const struct uk_file *sock, int what)
 		struct socket_alloc *al = __containerof(sock,
 							struct socket_alloc, f);
 
+		/* Raise only a UK_SOCKET_EVENT_CLOSE event if we ever raised an
+		 * event on this socket already
+		 */
+		if (uk_socket_event_has_raised(&al->evd))
+			uk_socket_event_raise(&al->evd, UK_SOCKET_EVENT_CLOSE);
 		uk_free(al->node.driver->allocator, al);
 	}
 }
@@ -253,6 +264,7 @@ struct uk_file *uk_socket_create(int family, int type, int protocol)
 	}
 
 	_socket_init(al, d, sock_data);
+	uk_socket_evd_init(&al->evd, family, type, protocol);
 	return &al->f;
 }
 
@@ -304,6 +316,7 @@ int uk_sys_accept(const struct uk_file *sock, int blocking,
 	int fd;
 	void *new_data;
 	struct socket_alloc *al;
+	struct socket_alloc *al_listener __maybe_unused;
 	unsigned int mode = SOCKET_MODE;
 	struct posix_socket_node *n = (struct posix_socket_node *)sock->node;
 
@@ -327,6 +340,10 @@ int uk_sys_accept(const struct uk_file *sock, int blocking,
 
 	_socket_init(al, n->driver, new_data);
 
+	al_listener = __containerof(sock, struct socket_alloc, f);
+	uk_socket_evd_init_from(&al->evd, &al_listener->evd);
+	uk_socket_evd_laddr_set_from(&al->evd, &al_listener->evd);
+	uk_socket_evd_raddr_set(&al->evd, addr, *addr_len);
 
 	if (flags & SOCK_NONBLOCK)
 		mode |= O_NONBLOCK;
@@ -334,6 +351,8 @@ int uk_sys_accept(const struct uk_file *sock, int blocking,
 		mode |= O_CLOEXEC;
 	fd = uk_fdtab_open(&al->f, mode);
 	uk_file_release(&al->f);
+	if (fd > 0)
+		uk_socket_event_raise(&al->evd, UK_SOCKET_EVENT_ACCEPT);
 	return fd;
 }
 
@@ -412,10 +431,15 @@ UK_SYSCALL_R_DEFINE(int, bind, int, sock, const struct sockaddr *, addr,
 	uk_fdtab_ret(of);
 
 out:
-	if (ret)
+	if (ret) {
 		trace_posix_socket_bind_err(ret);
-	else
+	} else {
+		struct socket_alloc *al __maybe_unused;
+
+		al = __containerof(of->file, struct socket_alloc, f);
+		uk_socket_evd_laddr_set(&al->evd, addr, addr_len);
 		trace_posix_socket_bind_ret(ret);
+	}
 
 	return ret;
 }
@@ -629,10 +653,16 @@ UK_SYSCALL_R_DEFINE(int, connect, int, sock, const struct sockaddr *, addr,
 	uk_fdtab_ret(of);
 
 out:
-	if (ret && ret != -EINPROGRESS)
+	if (ret && ret != -EINPROGRESS) {
 		trace_posix_socket_connect_err(ret);
-	else
+	} else {
+		struct socket_alloc *al __maybe_unused;
+
+		al = __containerof(of->file, struct socket_alloc, f);
+		uk_socket_evd_raddr_set(&al->evd, addr, addr_len);
+		uk_socket_event_raise(&al->evd, UK_SOCKET_EVENT_CONNECT);
 		trace_posix_socket_connect_ret(ret);
+	}
 	return ret;
 }
 
@@ -659,10 +689,15 @@ UK_SYSCALL_R_DEFINE(int, listen, int, sock, int, backlog)
 	uk_fdtab_ret(of);
 
 out:
-	if (ret)
+	if (ret) {
 		trace_posix_socket_listen_err(ret);
-	else
+	} else {
+		struct socket_alloc *al __maybe_unused;
+
+		al = __containerof(of->file, struct socket_alloc, f);
+		uk_socket_event_raise(&al->evd, UK_SOCKET_EVENT_LISTEN);
 		trace_posix_socket_listen_ret(ret);
+	}
 	return ret;
 }
 
@@ -878,10 +913,18 @@ int uk_socketpair_create(int family, int type, int protocol,
 		goto err_free;
 
 	_socket_init(al[0], d, sock_data[0]);
+	uk_socket_evd_init(&al[0]->evd, family, type, protocol);
 	_socket_init(al[1], d, sock_data[1]);
+	uk_socket_evd_init(&al[1]->evd, family, type, protocol);
 	sv[0] = &al[0]->f;
 	sv[1] = &al[1]->f;
 	posix_socket_socketpair_post(d, sv);
+	/* NOTE: If we fail later in `uk_sys_socketpair()`, release calls
+	 *       during error cleanup will cause raising `UK_SOCKET_EVENT_CLOSE`
+	 *       events immediately.
+	 */
+	uk_socket_event_raise(&al[0]->evd, UK_SOCKET_EVENT_CONNECT);
+	uk_socket_event_raise(&al[1]->evd, UK_SOCKET_EVENT_CONNECT);
 	return 0;
 
 err_free:

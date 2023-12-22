@@ -19,4 +19,14 @@ if LIBPOSIX_SOCKET
 config LIBPOSIX_SOCKET_PRINT_ERRORS
 	bool "Print error messages"
 
+config LIBPOSIX_SOCKET_EVENTS
+	bool "Socket events"
+	help
+		With socket events connection states and endpoints can be tracked
+		independently of the target address family. This happens in the
+		following situtations:
+		- LISTEN: The host listens for incoming connections
+		- ACCEPT: An incoming connection request is accepted
+		- CONNECT: A connection to a remote endpoint is established
+		- CLOSE: A connection or listener is closed
 endif
