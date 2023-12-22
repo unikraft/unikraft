@@ -6,6 +6,9 @@
 
 /* Userspace shim syscalls that delegate to either posix-fdio or vfscore */
 
+#include <fcntl.h>
+#include <sys/ioctl.h>
+
 #include <uk/posix-fdio.h>
 #if CONFIG_LIBVFSCORE
 #include <vfscore/syscalls.h>
@@ -358,20 +361,27 @@ UK_LLSYSCALL_R_DEFINE(int, ioctl, int, fd, unsigned int, request, void *, arg)
 	int r;
 	union uk_shim_file sf;
 
-	switch (uk_fdtab_shim_get(fd, &sf)) {
-	case UK_SHIM_OFILE:
-		r = uk_sys_ioctl(sf.ofile, request, arg);
-		uk_fdtab_ret(sf.ofile);
-		break;
-#if CONFIG_LIBVFSCORE
-	case UK_SHIM_LEGACY:
-		/* vfscore_ioctl returns positive error codes */
-		r = -vfscore_ioctl(sf.vfile, request, arg);
-		fdrop(sf.vfile);
-		break;
-#endif /* CONFIG_LIBVFSCORE */
+	switch (request) {
+	case FIOCLEX:
+		return uk_fdtab_setflags(fd, O_CLOEXEC);
+	case FIONCLEX:
+		return uk_fdtab_setflags(fd, 0);
 	default:
-		r = -EBADF;
+		switch (uk_fdtab_shim_get(fd, &sf)) {
+		case UK_SHIM_OFILE:
+			r = uk_sys_ioctl(sf.ofile, request, arg);
+			uk_fdtab_ret(sf.ofile);
+			break;
+#if CONFIG_LIBVFSCORE
+		case UK_SHIM_LEGACY:
+			/* vfscore_ioctl returns positive error codes */
+			r = -vfscore_ioctl(sf.vfile, request, arg);
+			fdrop(sf.vfile);
+			break;
+#endif /* CONFIG_LIBVFSCORE */
+		default:
+			r = -EBADF;
+		}
 	}
 	return r;
 }
