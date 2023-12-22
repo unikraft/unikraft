@@ -287,11 +287,10 @@ int uk_pipefile_create(struct uk_file *pipes[2], int flags)
 		return -ENOMEM;
 
 	al->alloc = a;
-	al->node = (struct pipe_node){
-		.flags = 0,
-		.rhead = 0,
-		.whead = 0,
-	};
+	al->node.flags = 0;
+	al->node.rhead = 0;
+	al->node.whead = 0;
+	memset(al->node.buf, 0, sizeof(al->node.buf));
 	al->fstate = UK_FILE_STATE_INITIALIZER(al->fstate);
 	al->rref = UK_FILE_REFCNT_INITIALIZER;
 	al->wref = UK_FILE_REFCNT_INITIALIZER;
