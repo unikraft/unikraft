@@ -116,19 +116,19 @@ void pl011_console_init(const void *dtb)
 	uk_pr_info("Serial initializing\n");
 
 	offset = fdt_node_offset_by_compatible(dtb, -1, "arm,pl011");
-	if (offset < 0)
+	if (unlikely(offset < 0))
 		UK_CRASH("No console UART found!\n");
 
 	naddr = fdt_address_cells(dtb, offset);
-	if (naddr < 0 || naddr >= FDT_MAX_NCELLS)
+	if (unlikely(naddr < 0 || naddr >= FDT_MAX_NCELLS))
 		UK_CRASH("Could not find proper address cells!\n");
 
 	nsize = fdt_size_cells(dtb, offset);
-	if (nsize < 0 || nsize >= FDT_MAX_NCELLS)
+	if (unlikely(nsize < 0 || nsize >= FDT_MAX_NCELLS))
 		UK_CRASH("Could not find proper size cells!\n");
 
 	regs = fdt_getprop(dtb, offset, "reg", &len);
-	if (!regs || (len < (int)sizeof(fdt32_t) * (naddr + nsize)))
+	if (unlikely(!regs || (len < (int)sizeof(fdt32_t) * (naddr + nsize))))
 		UK_CRASH("Bad 'reg' property: %p %d\n", regs, len);
 
 	reg_uart_bas = fdt64_to_cpu(regs[0]);
