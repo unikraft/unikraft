@@ -112,11 +112,8 @@ static void ns16550_reg_write(__u32 reg, __u32 value)
 	}
 }
 
-static void init_ns16550(__u64 base)
+static int init_ns16550(void)
 {
-	ns16550_uart_base = base;
-	ns16550_uart_initialized = 1;
-
 	/* Disable all interrupts */
 	ns16550_reg_write(NS16550_IER_OFFSET,
 			  ns16550_reg_read(NS16550_FCR_OFFSET) &
@@ -126,35 +123,49 @@ static void init_ns16550(__u64 base)
 	ns16550_reg_write(NS16550_FCR_OFFSET,
 			  ns16550_reg_read(NS16550_FCR_OFFSET) &
 					 ~(NS16550_FCR_FIFO_EN));
+	return 0;
 }
 
-void ns16550_console_init(const void *dtb)
+int ns16550_console_init(void *dtb)
 {
 	int offset, len, naddr, nsize;
 	const __u64 *regs;
-	__u64 reg_uart_base;
+	__u64 reg_base;
+	__u64 reg_size;
+	int rc;
 
-	uk_pr_info("Serial initializing\n");
+	UK_ASSERT(dtb);
+
+	uk_pr_debug("Probing ns16550\n");
 
 	if (unlikely((offset = fdt_node_offset_by_compatible(dtb, -1, "ns16550")) < 0 &&
 		     (offset = fdt_node_offset_by_compatible(dtb, -1, "ns16550a")) < 0)) {
-		UK_CRASH("No console UART found!\n");
+		uk_pr_err("ns16550 not found in fdt\n");
+		return -ENODEV;
 	}
 
 	naddr = fdt_address_cells(dtb, offset);
-	if (unlikely(naddr < 0 || naddr >= FDT_MAX_NCELLS))
-		UK_CRASH("Could not find proper address cells!\n");
+	if (unlikely(naddr < 0 || naddr >= FDT_MAX_NCELLS)) {
+		uk_pr_err("Invalid address-cells\n");
+		return -EINVAL;
+	}
 
 	nsize = fdt_size_cells(dtb, offset);
-	if (unlikely(nsize < 0 || nsize >= FDT_MAX_NCELLS))
-		UK_CRASH("Could not find proper size cells!\n");
+	if (unlikely(nsize < 0 || nsize >= FDT_MAX_NCELLS)) {
+		uk_pr_err("Invalid size-cells\n");
+		return -EINVAL;
+	}
 
 	regs = fdt_getprop(dtb, offset, "reg", &len);
-	if (unlikely(!regs || (len < (int)sizeof(fdt32_t) * (naddr + nsize))))
-		UK_CRASH("Bad 'reg' property: %p %d\n", regs, len);
+	if (unlikely(!regs || (len < (int)sizeof(fdt32_t) * (naddr + nsize)))) {
+		uk_pr_err("Invalid 'reg' property: %p %d\n", regs, len);
+		return -EINVAL;
+	}
 
-	reg_uart_base = fdt64_to_cpu(regs[0]);
-	uk_pr_info("Found NS16550 UART on: 0x%lx\n", reg_uart_base);
+	reg_base = fdt64_to_cpu(regs[0]);
+	reg_size = ALIGN_UP(fdt64_to_cpu(regs[1]), __PAGE_SIZE);
+
+	ns16550_uart_base = reg_base;
 
 	regs = fdt_getprop(dtb, offset, "reg-shift", &len);
 	if (regs)
@@ -164,14 +175,18 @@ void ns16550_console_init(const void *dtb)
 	if (regs)
 		ns16550_reg_width = fdt32_to_cpu(regs[0]);
 
-	init_ns16550(reg_uart_base);
+	uk_pr_debug("ns16550 @ 0x%lx - 0x%lx\n", reg_base, reg_base + reg_size);
 
-	uk_pr_info("NS16550 UART initialized\n");
-}
+	rc = init_ns16550();
+	if (unlikely(rc)) {
+		uk_pr_err("Could not initialize ns16550\n");
+		return rc;
+	}
 
-int ukplat_coutd(const char *str, unsigned int len)
-{
-	return ukplat_coutk(str, len);
+	ns16550_uart_initialized = 1;
+	uk_pr_info("tty: ns16550\n");
+
+	return 0;
 }
 
 static void _putc(char a)
@@ -227,6 +242,11 @@ int ukplat_coutk(const char *buf, unsigned int len)
 	for (unsigned int i = 0; i < len; i++)
 		ns16550_putc(buf[i]);
 	return len;
+}
+
+int ukplat_coutd(const char *str, unsigned int len)
+{
+	return ukplat_coutk(str, len);
 }
 
 int ukplat_cink(char *buf, unsigned int maxlen)
