@@ -37,7 +37,7 @@ extern "C" {
 /**
  * Initialize the pl011 console driver
  */
-void pl011_console_init(void *dtb);
+int pl011_console_init(void *dtb);
 
 #ifdef __cplusplus
 }
