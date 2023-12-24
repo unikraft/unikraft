@@ -1,4 +1,5 @@
 $(eval $(call addplatlib_s,kvm,libuktty_ns16550,$(CONFIG_LIBUKTTY_NS16550)))
 
 CINCLUDES-y             += -I$(LIBUKTTY_NS16550_BASE)/include
+
 LIBUKTTY_NS16550_SRCS-y += $(LIBUKTTY_NS16550_BASE)/ns16550.c
