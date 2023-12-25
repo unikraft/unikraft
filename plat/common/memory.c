@@ -160,6 +160,7 @@ static inline int get_mrd_prio(struct ukplat_memregion_desc *const m)
 	case UKPLAT_MEMRT_CMDLINE:
 	case UKPLAT_MEMRT_STACK:
 	case UKPLAT_MEMRT_DEVICETREE:
+	case UKPLAT_MEMRT_DEVICE:
 	case UKPLAT_MEMRT_KERNEL:
 		return MRD_PRIO_KRNL_RSRC;
 	case UKPLAT_MEMRT_RESERVED:

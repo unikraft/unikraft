@@ -354,6 +354,9 @@ ukplat_memregion_print_desc(struct ukplat_memregion_desc *mrd)
 	case UKPLAT_MEMRT_STACK:
 		type = "stck";
 		break;
+	case UKPLAT_MEMRT_DEVICE:
+		type = "device";
+		break;
 	default:
 		type = "";
 		break;
