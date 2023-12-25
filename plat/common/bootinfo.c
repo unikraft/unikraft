@@ -93,6 +93,9 @@ void ukplat_bootinfo_print(void)
 		case UKPLAT_MEMRT_STACK:
 			type = "stck";
 			break;
+		case UKPLAT_MEMRT_DEVICE:
+			type = "device ";
+			break;
 		default:
 			type = "";
 			break;
