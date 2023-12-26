@@ -5,4 +5,7 @@ CINCLUDES-y += -I$(LIBUKTTY_NS16550_BASE)/include
 # TODO Remove as soon as plat dependencies go away
 LIBUKTTY_NS16550_CINCLUDES-y += -I$(UK_PLAT_COMMON_BASE)/include
 
+# FIXME Remove as soon as bootinfo is moved out of plat/
+LIBUKTTY_NS16550_CINCLUDES-y += -I$(UK_PLAT_COMMON_BASE)/include
+
 LIBUKTTY_NS16550_SRCS-y += $(LIBUKTTY_NS16550_BASE)/ns16550.c
