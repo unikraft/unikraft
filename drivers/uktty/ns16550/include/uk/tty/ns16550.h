@@ -30,4 +30,11 @@
 #ifndef __UK_TTY_NS16550_H__
 #define __UK_TTY_NS16550_H__
 
+/**
+ * Early driver init
+ *
+ * @return zero on success, negative value on error
+ */
+int ns16550_early_init(void);
+
 #endif /* __UK_TTY_NS16550_H__ */

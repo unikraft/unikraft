@@ -38,6 +38,10 @@
 #include <uk/errptr.h>
 #endif /* CONFIG_PAGING */
 
+#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
+#include <uk/plat/common/bootinfo.h>
+#endif /* CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
+
 #define NS16550_THR_OFFSET	0x00U
 #define NS16550_RBR_OFFSET	0x00U
 #define NS16550_IER_OFFSET	0x01U
@@ -62,13 +66,8 @@
  * use ns16550_uart_initialized as an extra variable to check
  * whether the UART has been initialized.
  */
-#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE
-static __u8 ns16550_uart_initialized = 1;
-static __u64 ns16550_uart_base = CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE;
-#else /* !CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE */
 static __u8 ns16550_uart_initialized;
 static __u64 ns16550_uart_base;
-#endif /* !CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE */
 
 /* The register shift. Default is 0 (device-tree spec v0.4 Sect. 4.2.2) */
 static __u32 ns16550_reg_shift = CONFIG_LIBUKTTY_NS16550_REG_SHIFT;
@@ -129,6 +128,38 @@ static int init_ns16550(void)
 	ns16550_reg_write(NS16550_FCR_OFFSET,
 			  ns16550_reg_read(NS16550_FCR_OFFSET) &
 					 ~(NS16550_FCR_FIFO_EN));
+	return 0;
+}
+
+int ns16550_early_init(void)
+{
+#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
+	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
+	struct ukplat_memregion_desc mrd = {0};
+	int rc;
+
+	UK_ASSERT(bi);
+
+	ns16550_uart_base = CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE;
+
+	/* From this point we can print */
+	ns16550_uart_initialized = 1;
+
+	mrd.pbase = ns16550_uart_base;
+	mrd.vbase = ns16550_uart_base;
+	mrd.pg_off = 0;
+	mrd.pg_count = 1;
+	mrd.len = 0x1000;
+	mrd.type = UKPLAT_MEMRT_DEVICE;
+	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE;
+
+	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
+	if (unlikely(rc < 0)) {
+		uk_pr_err("Could not insert mrd (%d)\n", rc);
+		return rc;
+	}
+#endif /* !CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
+
 	return 0;
 }
 
