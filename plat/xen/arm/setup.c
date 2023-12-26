@@ -183,7 +183,7 @@ static inline void _dtb_init_mem(uint32_t physical_offset)
 	_libxenplat_mrd[1].vbase = _libxenplat_mrd[1].pbase;
 	_libxenplat_mrd[1].len   = fdt_size;
 	_libxenplat_mrd[1].type  = UKPLAT_MEMRT_DEVICETREE;
-	_libxenplat_mrd[1].flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
+	_libxenplat_mrd[1].flags = UKPLAT_MEMRF_READ;
 #if CONFIG_UKPLAT_MEMRNAME
 	strncpy(_libxenplat_mrd[1].name, "dtb",
 		sizeof(_libxenplat_mrd[1].name) - 1);
