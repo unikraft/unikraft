@@ -54,8 +54,15 @@ void uk_netbuf_init_indir(struct uk_netbuf *m,
 	UK_ASSERT(headroom <= buflen);
 
 #if CONFIG_LIBUKSEV
-	uk_sev_set_memory_shared(buf, buflen >> PAGE_SHIFT);
+	int rc;
+	rc = uk_sev_set_memory_shared(
+	    (__vaddr_t)buf,
+	    PAGE_ALIGN_UP((unsigned long)buflen) >> PAGE_SHIFT);
+	if (unlikely(rc)) {
+		UK_CRASH("Cannot set memory private: %d\n", rc);
+	}
 #endif
+
 	/* Reset pbuf, non-listed fields are automatically set to 0 */
 	*m = (struct uk_netbuf) {
 		.buf    = buf,
@@ -259,8 +266,10 @@ void uk_netbuf_free_single(struct uk_netbuf *m)
 			uk_free(a, b);
 
 #if CONFIG_LIBUKSEV
-		UK_ASSERT(PAGE_ALIGNED(m->buflen));
-		uk_sev_set_memory_private(m->buf, m->buflen >> PAGE_SHIFT);
+		int rc = uk_sev_set_memory_private(m->buf, PAGE_ALIGN_UP(m->buflen)
+						      >> PAGE_SHIFT);
+		if (unlikely(rc))
+			UK_CRASH("Cannot set memory private: %d\n", rc);
 #endif
 	} else {
 		uk_pr_debug("Not freeing netbuf %p (next: %p): refcount greater than 1",
