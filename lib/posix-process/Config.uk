@@ -1,40 +1,39 @@
 menuconfig LIBPOSIX_PROCESS
 	bool "posix-process: Process-related functions"
-	default n
 	select LIBNOLIBC if !HAVE_LIBC
 
 if LIBPOSIX_PROCESS
-	menuconfig LIBPOSIX_PROCESS_PIDS
-		bool "Process and thread IDs"
-		default n
-		select LIBUKSCHED
+
+menuconfig LIBPOSIX_PROCESS_PIDS
+	bool "Process and thread IDs"
+	select LIBUKSCHED
 
 if LIBPOSIX_PROCESS_PIDS
-		config LIBPOSIX_PROCESS_MAX_PID
-		int "Largest PID"
-		range 1 32767
-		default 31
 
-		config LIBPOSIX_PROCESS_INIT_PIDS
-		bool "Assign PID during boot"
-		default n
+config LIBPOSIX_PROCESS_MAX_PID
+	int "Largest PID"
+	range 1 32767
+	default 31
+
+config LIBPOSIX_PROCESS_INIT_PIDS
+	bool "Assign PID during boot"
+
 endif
 
-	config LIBPOSIX_PROCESS_CLONE
+config LIBPOSIX_PROCESS_CLONE
 	bool "Clone system call"
-	default n
 	select LIBPOSIX_PROCESS_PIDS
 
-	config LIBPOSIX_PROCESS_CLONE_PREFER_CHILD
-	bool "Prefer scheduling of child"
-	depends on LIBPOSIX_PROCESS_CLONE
-	help
-		If enabled, clone will context switch away from the clone
-		caller. This is necessary for some applications that assume that
-		the new thread does progress while the clone caller is not
-		context switching.
+config LIBPOSIX_PROCESS_CLONE_PREFER_CHILD
+bool "Prefer scheduling of child"
+depends on LIBPOSIX_PROCESS_CLONE
+help
+	If enabled, clone will context switch away from the clone
+	caller. This is necessary for some applications that assume that
+	the new thread does progress while the clone caller is not
+	context switching.
 
-	config LIBPOSIX_PROCESS_DEBUG
+config LIBPOSIX_PROCESS_DEBUG
 	bool "Enable debug messages"
-	default n
+
 endif
