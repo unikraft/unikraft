@@ -23,6 +23,13 @@ endif
 menuconfig LIBPOSIX_PROCESS_SIGNAL
 	bool "POSIX signals"
 
+if LIBPOSIX_PROCESS_SIGNAL
+
+config LIBPOSIX_PROCESS_SIGNAL_SIGPROCMASK
+	bool "rt_sigprocmask() syscall"
+	default y
+endif
+
 config LIBPOSIX_PROCESS_CLONE
 	bool "Clone system call"
 	select LIBPOSIX_PROCESS_PIDS
