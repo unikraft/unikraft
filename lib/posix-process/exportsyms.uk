@@ -83,3 +83,6 @@ uk_syscall_r_u_clone
 uk_syscall_e_u_clone
 uk_syscall_r_clone3
 uk_syscall_e_clone3
+rt_sigprocmask
+uk_syscall_r_rt_sigprocmask
+uk_syscall_e_rt_sigprocmask
