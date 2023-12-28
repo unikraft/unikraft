@@ -1,8 +1,0 @@
-menuconfig LIBUKSIGNAL
-	bool "uksignal: Unikraft signals"
-	default n
-	select LIBNOLIBC if !HAVE_LIBC
-	select LIBUKDEBUG
-	select LIBUKALLOC
-	select LIBUKSCHED
-	select LIBPOSIX_PROCESS
