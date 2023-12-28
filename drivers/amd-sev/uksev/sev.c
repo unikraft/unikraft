@@ -4,6 +4,8 @@
  * You may not use this file except in compliance with the License.
  */
 
+#define UK_DEBUG
+
 #include "uk/asm/sev.h"
 #include "kvm-x86/serial_console.h"
 #include "uk/arch/lcpu.h"
@@ -125,6 +127,7 @@ static inline int uk_sev_ghcb_cpuid(__u32 fn, __unused __u32 sub_fn, __u32 *eax,
 /*
  * Emulation of serial print, so that #VC is not triggered.
  */
+// #define SERIAL_PRINTF 1
 static void uk_sev_serial_printf(struct ghcb *ghcb, const char* fmt, ...){
 #if SERIAL_PRINTF
 	if (!ghcb_initialized)
