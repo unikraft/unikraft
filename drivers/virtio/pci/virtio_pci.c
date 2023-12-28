@@ -30,6 +30,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "uk/sev.h"
 #include <stdint.h>
 #include <uk/bitops.h>
 #include <uk/config.h>
@@ -843,18 +844,28 @@ static int virtio_pci_map_cap(struct pci_device *pci_dev,
 
 	mapped_bar = &vpci_dev->mapped_bar[bar_idx];
 
-	if (mapped_bar->start == __NULL) {
+	if (!mapped_bar->start) {
 		rc = pci_map_bar(pci_dev, bar_idx, attr,
 				 mapped_bar);
 		if (unlikely(rc)) {
 			uk_pr_err("Cannot map BAR %d, rc= %d\n", bar_idx, rc);
 			return -1;
 		}
+#if CONFIG_LIBUKSEV
+		/* Why we don't need those page as shared??? */
+		// uk_sev_set_memory_shared(
+		//     (__vaddr_t)PAGE_ALIGN_UP((unsigned long)mapped_bar->start),
+		//     mapped_bar->size << PAGE_SHIFT);
+#endif
 	}
+
+
 
 	UK_ASSERT(mapped_bar->start + mapped_bar->size
 		  >= mapped_bar->start + offset + length);
 	*mapped_addr = mapped_bar->start + offset;
+
+
 
 	uk_pr_debug("Mapped cap %d to BAR %d at %#" PRIx64 "\n", cap, bar_idx,
 		    (unsigned long)*mapped_addr);
@@ -948,7 +959,7 @@ static int virtio_pci_modern_add_dev(struct pci_device *pci_dev,
 
 exit_unmap_bar:
 	for (int i = 0; i < PCI_MAX_BARS; i++) {
-		if (vpci_dev->mapped_bar[i].start == __NULL)
+		if (!vpci_dev->mapped_bar[i].start)
 			continue;
 		pci_unmap_bar(pci_dev, i, &vpci_dev->mapped_bar[i]);
 	}
@@ -962,7 +973,7 @@ static int virtio_pci_add_dev(struct pci_device *pci_dev)
 
 	UK_ASSERT(pci_dev != NULL);
 
-	vpci_dev = uk_malloc(a, sizeof(*vpci_dev));
+	vpci_dev = uk_calloc(a, 1, sizeof(*vpci_dev));
 	if (!vpci_dev) {
 		uk_pr_err("Failed to allocate virtio-pci device\n");
 		return -ENOMEM;
