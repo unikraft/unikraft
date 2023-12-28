@@ -536,6 +536,7 @@ static int vpci_modern_notify(struct virtio_dev *vdev, __u16 queue_id)
 	vpdev = to_virtiopcidev(vdev);
 	UK_ASSERT(vpdev->notify);
 
+	// uk_pr_info("virtio-pci device %p: Notifying queue %d\n", vdev, queue_id);
 	/* We don't support extra notification data yet */
 	if (uk_test_bit(VIRTIO_F_NOTIFICATION_DATA, &vdev->features))
 		return -1;
@@ -550,8 +551,8 @@ static int vpci_modern_notify(struct virtio_dev *vdev, __u16 queue_id)
 
 	notify_off = vpdev->notify_off_mul * notify_off;
 
-	virtio_mmio_cwrite16((void *)(unsigned long)vpdev->notify,
-			notify_off, queue_id);
+	virtio_mmio_cwrite16((void *)(unsigned long)vpdev->notify, notify_off,
+			     queue_id);
 
 	return 0;
 }
@@ -563,6 +564,7 @@ static int virtio_modern_pci_handle(void *arg)
 	struct virtqueue *vq;
 	int rc = 0;
 
+	// uk_pr_info("virtio-pci device %p: Handling interrupt\n", d);
 	UK_ASSERT(arg);
 
 	/* Reading the isr status is used to acknowledge the interrupt */
@@ -571,7 +573,8 @@ static int virtio_modern_pci_handle(void *arg)
 
 	if (isr_status & VIRTIO_PCI_ISR_CONFIG) {
 		/* We don't support configuration interrupt on the device */
-		uk_pr_warn("Unsupported config change interrupt received on virtio-pci device %p\n",
+		uk_pr_warn("Unsupported config change interrupt received on "
+			   "virtio-pci device %p\n",
 			   d);
 	}
 
@@ -597,6 +600,7 @@ static struct virtqueue *vpci_modern_vq_setup(struct virtio_dev *vdev,
 
 	UK_ASSERT(vdev != NULL);
 
+	// uk_pr_info("Setting up virtqueue %d\n", queue_id);
 	vpdev = to_virtiopcidev(vdev);
 	vq = virtqueue_create(queue_id, num_desc, VIRTIO_PCI_VRING_ALIGN,
 			      callback, vpci_modern_notify, vdev, a);
@@ -608,11 +612,11 @@ static struct virtqueue *vpci_modern_vq_setup(struct virtio_dev *vdev,
 
 	/* Select the queue of interest */
 	virtio_mmio_cwrite16((void *)(unsigned long)vpdev->common_cfg,
-			VIRTIO_PCI_CFG_QUEUE_SEL, queue_id);
+			     VIRTIO_PCI_CFG_QUEUE_SEL, queue_id);
 
 	/* Set the queue size */
 	virtio_mmio_cwrite16((void *)(unsigned long)vpdev->common_cfg,
-			VIRTIO_PCI_CFG_QUEUE_SIZE, num_desc);
+			     VIRTIO_PCI_CFG_QUEUE_SIZE, num_desc);
 
 	/* Set the addresses of the descriptor, available and used rings */
 	addr = virtqueue_physaddr(vq);
@@ -639,12 +643,11 @@ static struct virtqueue *vpci_modern_vq_setup(struct virtio_dev *vdev,
 	flags = ukplat_lcpu_save_irqf();
 	UK_TAILQ_INSERT_TAIL(&vpdev->vdev.vqs, vq, next);
 	ukplat_lcpu_restore_irqf(flags);
+	// uk_pr_info("Done\n");
 
 err_exit:
 	return vq;
 }
-
-
 
 static int vpci_modern_pci_vq_find(struct virtio_dev *vdev, __u16 num_vqs,
 				   __u16 *qdesc_size)
@@ -679,15 +682,16 @@ static int vpci_modern_pci_vq_find(struct virtio_dev *vdev, __u16 num_vqs,
 	return vq_cnt;
 }
 
-
-
 static void vpci_modern_pci_dev_reset(struct virtio_dev *vdev)
 {
 	__u8 status;
 	struct virtio_pci_dev *vpdev = NULL;
+	// uk_pr_info("Resetting device\n");
 
 	vpdev = to_virtiopcidev(vdev);
 	UK_ASSERT(vdev);
+
+	uk_pr_debug("MMIO\n");
 
 	/**
 	 * Resetting the device.
@@ -702,11 +706,13 @@ static void vpci_modern_pci_dev_reset(struct virtio_dev *vdev)
 	 * NOTE! Spec (4.1.4.3.2)
 	 * Need to check if we have to wait for the reset to happen.
 	 */
+	uk_pr_debug("Waiting for device reset\n");
 	do {
-		status = vpci_modern_pci_status_get(vdev);
+		status = virtio_mmio_cread8(vpdev->common_cfg,
+					    VIRTIO_PCI_CFG_DEVICE_STATUS);
 	} while (status != VIRTIO_CONFIG_STATUS_RESET);
+	uk_pr_debug("Device reseted\n");
 }
-
 
 static __u64 vpci_modern_pci_features_get(struct virtio_dev *vdev)
 {
@@ -729,6 +735,8 @@ static __u64 vpci_modern_pci_features_get(struct virtio_dev *vdev)
 	features |= virtio_mmio_cread32(vpdev->common_cfg,
 					VIRTIO_PCI_CFG_DEVICE_FEATURES);
 
+	// uk_pr_info("Feature: 0x%" __PRIx64 "\n", features);
+	/* uk_sev_terminate(0, 5); */
 	return features;
 }
 
@@ -753,8 +761,6 @@ static void vpci_modern_pci_features_set(struct virtio_dev *vdev)
 	virtio_mmio_cwrite32(vpdev->common_cfg, VIRTIO_PCI_CFG_DRIVER_FEATURES,
 			     (__u32)vdev->features);
 }
-
-
 
 static void vpci_modern_pci_status_set(struct virtio_dev *vdev, __u8 status)
 {
@@ -783,7 +789,6 @@ static __u8 vpci_modern_pci_status_get(struct virtio_dev *vdev)
 	return virtio_mmio_cread8(vpdev->common_cfg,
 				  VIRTIO_PCI_CFG_DEVICE_STATUS);
 }
-
 
 static int virtio_pci_find_cfg_cap(struct pci_device *pci_dev, uint8_t cfg_type,
 				   uint8_t *cap)
@@ -851,13 +856,15 @@ static int virtio_pci_map_cap(struct pci_device *pci_dev,
 			uk_pr_err("Cannot map BAR %d, rc= %d\n", bar_idx, rc);
 			return -1;
 		}
-#if CONFIG_LIBUKSEV
-		/* Why we don't need those page as shared??? */
-		// uk_sev_set_memory_shared(
-		//     (__vaddr_t)PAGE_ALIGN_UP((unsigned long)mapped_bar->start),
-		//     mapped_bar->size << PAGE_SHIFT);
+
+#ifdef CONFIG_LIBUKSEV
+		/* uk_sev_set_memory_shared((__vaddr_t)mapped_bar->start, */
+		/* 			 mapped_bar->size / __PAGE_SIZE); */
 #endif
 	}
+	uk_pr_info("start: %#" PRIx64 ",size: %lx, offset: %lx, length: %lx\n",
+		   (unsigned long)mapped_bar->start, mapped_bar->size, offset,
+		   length);
 
 
 
@@ -888,6 +895,10 @@ static int virtio_pci_modern_add_dev(struct pci_device *pci_dev,
 
 	/* Setting the configuration operation */
 	vpci_dev->vdev.cops = &vpci_modern_ops;
+
+	for (int i = 0; i < PCI_MAX_BARS; i++) {
+		vpci_dev->mapped_bar[i].start = __NULL;
+	}
 
 	uk_pr_info("Added virtio-pci device %04x\n", pci_dev->id.device_id);
 	uk_pr_info("Added virtio-pci subsystem_device_id %04x\n",
@@ -955,6 +966,7 @@ static int virtio_pci_modern_add_dev(struct pci_device *pci_dev,
 		vpci_dev->device_cfg = mapped_addr;
 	}
 
+	uk_pr_debug("Mapped all cap\n");
 	return 0;
 
 exit_unmap_bar:
@@ -997,6 +1009,7 @@ static int virtio_pci_add_dev(struct pci_device *pci_dev)
 		}
 	}
 
+	uk_pr_debug("Registering\n");
 	rc = virtio_bus_register_device(&vpci_dev->vdev);
 	if (rc != 0) {
 		uk_pr_err("Failed to register the virtio device: %d\n", rc);
@@ -1022,14 +1035,12 @@ static int virtio_pci_drv_init(struct uk_alloc *drv_allocator)
 }
 
 static const struct pci_device_id virtio_pci_ids[] = {
-	{PCI_DEVICE_ID(VENDOR_QUMRANET_VIRTIO, PCI_ANY_ID)},
-	/* End of Driver List */
-	{PCI_ANY_DEVICE_ID},
+    {PCI_DEVICE_ID(VENDOR_QUMRANET_VIRTIO, PCI_ANY_ID)},
+    /* End of Driver List */
+    {PCI_ANY_DEVICE_ID},
 };
 
-static struct pci_driver virtio_pci_drv = {
-	.device_ids = virtio_pci_ids,
-	.init = virtio_pci_drv_init,
-	.add_dev = virtio_pci_add_dev
-};
+static struct pci_driver virtio_pci_drv = {.device_ids = virtio_pci_ids,
+					   .init = virtio_pci_drv_init,
+					   .add_dev = virtio_pci_add_dev};
 PCI_REGISTER_DRIVER(&virtio_pci_drv);
