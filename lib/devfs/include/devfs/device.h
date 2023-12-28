@@ -126,6 +126,6 @@ int device_destroy(struct device *dev);
  * at priority '3'.
  */
 #define devfs_initcall(fn)						\
-	uk_rootfs_initcall_prio(fn, 0x0, UK_PRIO_AFTER(UK_LIBPOSIX_FDTAB_PRIO))
+	uk_rootfs_initcall_prio(fn, 0x0, UK_PRIO_AFTER(UK_LIBPOSIX_FDTAB_INIT_PRIO))
 
 #endif /* !__DEVFS_DEVICE_H__ */

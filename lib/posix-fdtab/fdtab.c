@@ -381,7 +381,7 @@ static void term_posix_fdtab(const struct uk_term_ctx *tctx __unused)
 }
 
 /* Init fdtab as early as possible, to enable functions that rely on fds */
-uk_lib_initcall_prio(init_posix_fdtab, 0x0, UK_PRIO_EARLIEST);
+uk_lib_initcall_prio(init_posix_fdtab, 0x0, UK_LIBPOSIX_FDTAB_INIT_PRIO);
 /* Place fd cleanup to run latest before any rootfs terminators */
 uk_rootfs_initcall_prio(0x0, term_posix_fdtab, UK_PRIO_LATEST);
 
