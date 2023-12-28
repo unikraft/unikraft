@@ -20,6 +20,9 @@ config LIBPOSIX_PROCESS_INIT_PIDS
 
 endif
 
+menuconfig LIBPOSIX_PROCESS_SIGNAL
+	bool "POSIX signals"
+
 config LIBPOSIX_PROCESS_CLONE
 	bool "Clone system call"
 	select LIBPOSIX_PROCESS_PIDS
