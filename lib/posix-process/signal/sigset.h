@@ -34,8 +34,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  *
  */
-#ifndef __UK_SIGSET_H__
-#define __UK_SIGSET_H__
+#ifndef __UK_PROCESS_SIGSET_H__
+#define __UK_PROCESS_SIGSET_H__
 
 #ifdef __cplusplus
 extern "C" {
@@ -62,4 +62,4 @@ extern "C" {
 }
 #endif
 
-#endif /* __UK_SIGSET_H__ */
+#endif /* __UK_PROCESS_SIGSET_H__ */
