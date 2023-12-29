@@ -28,6 +28,11 @@ if LIBPOSIX_PROCESS_SIGNAL
 config LIBPOSIX_PROCESS_SIGNAL_SIGPROCMASK
 	bool "rt_sigprocmask() syscall"
 	default y
+
+config LIBPOSIX_PROCESS_SIGNAL_SIGACTION
+	bool "rt_sigaction() syscall"
+	default y
+
 endif
 
 config LIBPOSIX_PROCESS_CLONE
