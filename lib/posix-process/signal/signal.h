@@ -10,6 +10,7 @@
 #include <limits.h>
 #include <signal.h>
 
+#include <arch/signal.h>
 #include <uk/alloc.h>
 #include <uk/list.h>
 #include <uk/process.h>
