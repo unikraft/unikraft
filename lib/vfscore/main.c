@@ -2248,7 +2248,7 @@ UK_TRACEPOINT(trace_vfs_utimes, "\"%s\"", const char*);
 UK_TRACEPOINT(trace_vfs_utimes_ret, "");
 UK_TRACEPOINT(trace_vfs_utimes_err, "%d", int);
 
-int futimes(int fd, const struct timeval times[2])
+int futimes(int fd, const struct timeval *times)
 {
     return futimesat(fd, NULL, times);
 }
@@ -2386,7 +2386,7 @@ UK_SYSCALL_R_DEFINE(int, utimes, const char*, pathname,
 	return do_utimes(pathname, times, 0);
 }
 
-int lutimes(const char *pathname, const struct timeval times[2])
+int lutimes(const char *pathname, const struct timeval *times)
 {
 	return do_utimes(pathname, times, AT_SYMLINK_NOFOLLOW);
 }
