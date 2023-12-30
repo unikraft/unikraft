@@ -360,9 +360,7 @@ static void fdtab_cleanup(int all)
 			struct fdval v = fdtab_decode(p);
 
 			if (all || (v.flags & UK_FDTAB_CLOEXEC)) {
-				void *pp = uk_fmap_take(fmap, i);
-
-				UK_ASSERT(p == pp);
+				UK_ASSERT(p == uk_fmap_take(fmap, i));
 				file_rel(tab, v.p, v.flags);
 			}
 		}
