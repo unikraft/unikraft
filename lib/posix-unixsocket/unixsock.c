@@ -158,8 +158,9 @@ out:
 
 
 static
-void unix_sock_rdown(uk_pollevent ev,
-		     enum uk_poll_chain_op op, struct uk_poll_chain *tick)
+void unix_sock_rdown(uk_pollevent ev __maybe_unused,
+		     enum uk_poll_chain_op op __maybe_unused,
+		     struct uk_poll_chain *tick)
 {
 	struct unix_sock_data *d;
 	struct uk_pollq *sockq;
@@ -177,8 +178,9 @@ void unix_sock_rdown(uk_pollevent ev,
 }
 
 static
-void unix_sock_wdown(uk_pollevent ev,
-		     enum uk_poll_chain_op op, struct uk_poll_chain *tick)
+void unix_sock_wdown(uk_pollevent ev __maybe_unused,
+		     enum uk_poll_chain_op op __maybe_unused,
+		     struct uk_poll_chain *tick)
 {
 	struct unix_sock_data *d;
 	struct uk_pollq *sockq;
