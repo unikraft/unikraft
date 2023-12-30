@@ -251,7 +251,7 @@ static int virtio_9p_recv(struct virtqueue *vq, void *priv)
 		 * which are trying to enqueue to the same vq.
 		 */
 		ukarch_spin_lock(&dev->spinlock);
-		rc = virtqueue_buffer_dequeue(dev->vq, (void **)&req, &len);
+		rc = virtqueue_buffer_dequeue(vq, (void **)&req, &len);
 		ukarch_spin_unlock(&dev->spinlock);
 		if (rc < 0)
 			break;
