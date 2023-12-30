@@ -164,7 +164,7 @@ static inline void *uk_fmap_lookup(const struct uk_fmap *m, int idx)
 static inline
 int uk_fmap_put(const struct uk_fmap *m, const void *p, int min)
 {
-	void *got;
+	void *got __maybe_unused;
 	int pos;
 
 	pos = uk_bmap_request(&m->bmap, min);
@@ -250,7 +250,7 @@ void *uk_fmap_critical_take(const struct uk_fmap *m, int idx)
 static inline
 int uk_fmap_critical_put(const struct uk_fmap *m, int idx, const void *p)
 {
-	void *got;
+	void *got __maybe_unused;
 
 	if (!_FMAP_INRANGE(m, idx))
 		return -1;
