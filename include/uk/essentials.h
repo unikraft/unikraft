@@ -39,6 +39,7 @@
 #include <uk/config.h>
 
 #if CONFIG_LIBNEWLIBC
+#ifndef __ASSEMBLY__
 /*
  * Needed for __used, __unused, __packed, __section,
  *   __nonnull, __offsetof, __containerof
@@ -48,6 +49,7 @@
 #include <sys/param.h>
 /* Needed for MIN, MAX */
 #include <inttypes.h>
+#endif /* !__ASSEMBLY__ */
 #endif
 
 #ifdef __cplusplus

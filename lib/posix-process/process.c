@@ -92,7 +92,7 @@ static unsigned long tid_map[UK_BITS_TO_LONGS(TIDMAP_SIZE)] = { [0] = 0x01UL };
 /**
  * Thread-local posix_thread reference
  */
-static __uk_tls struct posix_thread *pthread_self = NULL;
+static __uk_tls struct posix_thread *pthread_myself = NULL;
 
 /**
  * Helpers to find and reserve a `pid_t`
@@ -217,13 +217,13 @@ int uk_posix_process_create(struct uk_alloc *a,
 	struct posix_process *orig_pprocess;
 	int ret;
 
-	/* Retrieve a reference to the `pthread_self` pointer on the remote TLS:
+	/* Retrieve a reference to the `pthread_myself` pointer on the remote TLS:
 	 * Allows us changing the pointer value.
 	 */
-	pthread = &uk_thread_uktls_var(thread, pthread_self);
+	pthread = &uk_thread_uktls_var(thread, pthread_myself);
 
 	if (parent)
-		parent_pthread = uk_thread_uktls_var(parent, pthread_self);
+		parent_pthread = uk_thread_uktls_var(parent, pthread_myself);
 	if (parent_pthread) {
 		 /* if we have a parent pthread,
 		  *  it must have a surrounding pprocess
@@ -328,7 +328,7 @@ static void pprocess_release(struct posix_process *pprocess)
 
 static void pprocess_kill(struct posix_process *pprocess)
 {
-	struct posix_thread *pthread, *pthreadn, *pthread_self = NULL;
+	struct posix_thread *pthread, *pthreadn, *pthread_myself = NULL;
 
 	/* Kill all remaining threads of the process */
 	uk_list_for_each_entry_safe(pthread, pthreadn,
@@ -342,7 +342,7 @@ static void pprocess_kill(struct posix_process *pprocess)
 			 * function is executed anymore as soon as the
 			 * thread killed itself.
 			 */
-			pthread_self = pthread;
+			pthread_myself = pthread;
 			continue;
 		}
 		if (uk_thread_is_exited(pthread->thread)) {
@@ -364,9 +364,9 @@ static void pprocess_kill(struct posix_process *pprocess)
 		uk_sched_thread_terminate(pthread->thread);
 	}
 
-	if (pthread_self) {
+	if (pthread_myself) {
 		uk_pr_debug("Terminating PID %d: Self-killing TID %d...\n",
-			    pprocess->pid, pthread_self->tid);
+			    pprocess->pid, pthread_myself->tid);
 		uk_sched_thread_terminate(uk_thread_current());
 
 		/* NOTE: Nothing will be executed from here on */
@@ -378,7 +378,7 @@ void uk_posix_process_kill(struct uk_thread *thread)
 	struct posix_thread  **pthread;
 	struct posix_process *pprocess;
 
-	pthread = &uk_thread_uktls_var(thread, pthread_self);
+	pthread = &uk_thread_uktls_var(thread, pthread_myself);
 
 	UK_ASSERT(*pthread);
 	UK_ASSERT((*pthread)->process);
@@ -408,14 +408,14 @@ static int posix_thread_init(struct uk_thread *child, struct uk_thread *parent)
 
 	if (parent) {
 		parent_pthread = uk_thread_uktls_var(parent,
-						     pthread_self);
+						     pthread_myself);
 	}
 	if (!parent_pthread) {
 		/* parent has no posix thread, do not setup one for the child */
 		uk_pr_debug("thread %p (%s): Parent %p (%s) without process context, skipping...\n",
 			    child, child->name, parent,
 			    parent ? parent->name : "<n/a>");
-		pthread_self = NULL;
+		pthread_myself = NULL;
 		return 0;
 	}
 
@@ -426,7 +426,7 @@ static int posix_thread_init(struct uk_thread *child, struct uk_thread *parent)
 	if (PTRISERR(pthread))
 		return PTR2ERR(pthread);
 
-	pthread_self = pthread;
+	pthread_myself = pthread;
 
 	uk_pr_debug("thread %p (%s): New thread with TID: %d (PID: %d)\n",
 		    child, child->name, (int) pthread->tid,
@@ -439,18 +439,18 @@ static void posix_thread_fini(struct uk_thread *child)
 {
 	struct posix_process *pprocess;
 
-	if (!pthread_self)
+	if (!pthread_myself)
 		return; /* no posix thread was assigned */
 
-	pprocess = pthread_self->process;
+	pprocess = pthread_myself->process;
 
 	UK_ASSERT(pprocess);
 
 	uk_pr_debug("thread %p (%s): Releasing thread with TID: %d (PID: %d)\n",
-		    child, child->name, (int) pthread_self->tid,
+		    child, child->name, (int) pthread_myself->tid,
 		    (int) pprocess->pid);
-	pprocess_release_pthread(pthread_self);
-	pthread_self = NULL;
+	pprocess_release_pthread(pthread_myself);
+	pthread_myself = NULL;
 
 	/* Release process if it became empty of threads */
 	if (uk_list_empty(&pprocess->threads))
@@ -492,7 +492,7 @@ pid_t ukthread2tid(struct uk_thread *thread)
 {
 	struct posix_thread *pthread;
 
-	pthread = uk_thread_uktls_var(thread, pthread_self);
+	pthread = uk_thread_uktls_var(thread, pthread_myself);
 	if (!pthread)
 		return -ENOTSUP;
 
@@ -503,7 +503,7 @@ pid_t ukthread2pid(struct uk_thread *thread)
 {
 	struct posix_thread *pthread;
 
-	pthread = uk_thread_uktls_var(thread, pthread_self);
+	pthread = uk_thread_uktls_var(thread, pthread_myself);
 	if (!pthread)
 		return -ENOTSUP;
 
@@ -514,35 +514,35 @@ pid_t ukthread2pid(struct uk_thread *thread)
 
 UK_SYSCALL_R_DEFINE(pid_t, getpid)
 {
-	if (!pthread_self)
+	if (!pthread_myself)
 		return -ENOTSUP;
 
-	UK_ASSERT(pthread_self->process);
-	return pthread_self->process->pid;
+	UK_ASSERT(pthread_myself->process);
+	return pthread_myself->process->pid;
 }
 
 UK_SYSCALL_R_DEFINE(pid_t, gettid)
 {
-	if (!pthread_self)
+	if (!pthread_myself)
 		return -ENOTSUP;
 
-	return pthread_self->tid;
+	return pthread_myself->tid;
 }
 
 /* PID of parent process  */
 UK_SYSCALL_R_DEFINE(pid_t, getppid)
 {
-	if (!pthread_self)
+	if (!pthread_myself)
 		return -ENOTSUP;
 
-	UK_ASSERT(pthread_self->process);
+	UK_ASSERT(pthread_myself->process);
 
-	if (!pthread_self->process->parent) {
+	if (!pthread_myself->process->parent) {
 		 /* no parent, return 0 */
 		return 0;
 	}
 
-	return pthread_self->process->parent->pid;
+	return pthread_myself->process->parent->pid;
 }
 
  /* NOTE: The man pages of _exit(2) say:

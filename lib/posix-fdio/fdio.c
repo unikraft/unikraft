@@ -6,6 +6,7 @@
 
 /* Internal syscalls for file I/O */
 
+#include <stdio.h>
 #include <poll.h>
 
 #include <uk/posix-fdio.h>
