@@ -155,6 +155,7 @@ struct uk_signal_queue {
 struct uk_signal_pdesc {
 	__sz queued_count;
 	__sz queued_max;
+	stack_t altstack;
 	struct uk_signal_queue sigqueue;
 	/* We use dynamically allocated memory for sigaction as passing
 	 * CLONE_SIGHAND to clone() requires that the parent and the child

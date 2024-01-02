@@ -214,6 +214,8 @@ int pprocess_signal_pdesc_init(struct posix_process *process)
 	pprocess_signal_foreach(signum)
 		pprocess_signal_sigaction_clear(KERN_SIGACTION(process, signum));
 
+	pd->altstack.ss_flags = SS_DISABLE;
+
 	return 0;
 }
 
