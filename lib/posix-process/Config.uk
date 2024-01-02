@@ -22,8 +22,13 @@ endif
 
 menuconfig LIBPOSIX_PROCESS_SIGNAL
 	bool "POSIX signals"
+	select LIBUKLOCK
 
 if LIBPOSIX_PROCESS_SIGNAL
+
+config LIBPOSIX_PROCESS_SIGNAL_SIGALTSTACK
+	bool "sigaltstack() syscall"
+	default y
 
 config LIBPOSIX_PROCESS_SIGNAL_SIGPROCMASK
 	bool "rt_sigprocmask() syscall"
