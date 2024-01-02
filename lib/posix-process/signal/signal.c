@@ -4,6 +4,7 @@
  * You may not use this file except in compliance with the License.
  */
 
+#include <uk/mutex.h>
 #include <uk/process.h>
 #include <uk/semaphore.h>
 
@@ -229,6 +230,9 @@ int pprocess_signal_pdesc_init(struct posix_process *process)
 	}
 	for (__sz i = 0; i < SIG_ARRAY_COUNT; i++)
 		pprocess_signal_sigaction_clear(&pd->sigaction[i]);
+
+	uk_mutex_init(&pd->lock);
+	pd->altstack.ss_flags = SS_DISABLE;
 
 	return 0;
 }

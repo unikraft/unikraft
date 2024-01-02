@@ -13,6 +13,7 @@
 #include <arch/signal.h>
 #include <uk/alloc.h>
 #include <uk/list.h>
+#include <uk/mutex.h>
 #include <uk/process.h>
 #include <uk/semaphore.h>
 
@@ -128,6 +129,7 @@ struct uk_signal_queue {
 struct uk_signal_pdesc {
 	__sz queued_count;
 	__sz queued_max;
+	stack_t altstack;
 	struct uk_signal_queue sigqueue;
 	struct uk_sigaction *sigaction;
 	struct uk_mutex lock;

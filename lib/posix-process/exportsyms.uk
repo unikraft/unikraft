@@ -89,3 +89,6 @@ uk_syscall_e_rt_sigaction
 rt_sigprocmask
 uk_syscall_r_rt_sigprocmask
 uk_syscall_e_rt_sigprocmask
+sigaltstack
+uk_syscall_r_sigaltstack
+uk_syscall_e_sigaltstack
