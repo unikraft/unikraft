@@ -113,3 +113,4 @@ uk_syscall_e_tgkill
 tkill
 uk_syscall_r_tkill
 uk_syscall_e_tkill
+uk_signal_deliver
