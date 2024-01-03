@@ -30,6 +30,10 @@ config LIBPOSIX_PROCESS_SIGNAL_SIGALTSTACK
 	bool "sigaltstack() syscall"
 	default y
 
+config LIBPOSIX_PROCESS_SIGNAL_SIGPENDING
+	bool "rt_sigpending() syscall"
+	default y
+
 config LIBPOSIX_PROCESS_SIGNAL_SIGPROCMASK
 	bool "rt_sigprocmask() syscall"
 	default y
