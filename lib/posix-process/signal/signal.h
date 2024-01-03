@@ -261,6 +261,40 @@ int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo);
 /* Signal a process */
 int pprocess_signal_send(struct posix_process *proc, int signum,
 			 siginfo_t *siginfo);
+
+/* Jump to signal handler
+ *
+ * Trampoline to jump from unikraft to userspace context.
+ *
+ * @param signum signal number
+ * @param si     data to pass as the 2nd parameter to the handler
+ *               if SA_SIGINFO is set, or NULL
+ * @param ctx    user context to pass as the 3rd parameter to
+ *               the handler if SA_SIGINFO is set, or NULL
+ * @param sp     the user stack pointer address to switch to
+ *               before calling the handler
+ */
+void pprocess_signal_arch_jmp_handler(struct ukarch_execenv *execenv,
+				      int signum, siginfo_t *si,
+				      ucontext_t *ctx,
+				      void *handler, void *sp);
+
+/* Populate POSIX u_context from ukarch_execenv */
+void pprocess_signal_arch_set_ucontext(struct ukarch_execenv *execenv,
+				       ucontext_t *ucontext);
+
+/* Populate ukarch_execenv from POSIX u_context */
+void pprocess_signal_arch_get_ucontext(ucontext_t *ucontext,
+				       struct ukarch_execenv *execenv);
+
+/* Checks whether a signal can be delivered to a given thread, depending
+ * on the thread's mask, whether the process chooses to ingores this signal,
+ * or whether the process uses a default disposition of ignore.
+ *
+ * Does NOT check permissions.
+ */
+bool pprocess_signal_is_deliverable(struct posix_thread *pthread, int signum);
+
 #endif /* CONFIG_LIBPOSIX_PROCESS_PIDS */
 
 #endif /* __UK_PROCESS_SIGNAL_H__ */
