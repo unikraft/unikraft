@@ -134,29 +134,34 @@ struct uk_pollq {
 	struct uk_rwlock waitlock; /* Wait list lock */
 };
 
+/*
+ * We define initializers separate from an initial values.
+ * The former can only be used in (static) variable initializations, while the
+ * latter is meant for assigning to variables or as anonymous data structures.
+ */
 #if CONFIG_LIBUKFILE_CHAINUPDATE
-#define UK_POLLQ_INITIALIZER(q) \
-	((struct uk_pollq){ \
-		.wait = NULL, \
-		.waitend = &(q).wait, \
-		.prop = NULL, \
-		.propend = &(q).prop, \
-		.events = 0, \
-		.waitmask = 0, \
-		.propmask = 0, \
-		.proplock = UK_RWLOCK_INITIALIZER((q).proplock, 0), \
-		.waitlock = UK_RWLOCK_INITIALIZER((q).waitlock, 0), \
-	})
+#define UK_POLLQ_INITIALIZER(q) { \
+	.wait = NULL, \
+	.waitend = &(q).wait, \
+	.prop = NULL, \
+	.propend = &(q).prop, \
+	.events = 0, \
+	.waitmask = 0, \
+	.propmask = 0, \
+	.proplock = UK_RWLOCK_INITIALIZER((q).proplock, 0), \
+	.waitlock = UK_RWLOCK_INITIALIZER((q).waitlock, 0), \
+}
 #else /* !CONFIG_LIBUKFILE_CHAINUPDATE */
-#define UK_POLLQ_INITIALIZER(q) \
-	((struct uk_pollq){ \
-		.wait = NULL, \
-		.waitend = &(q).wait, \
-		.events = 0, \
-		.waitmask = 0, \
-		.waitlock = UK_RWLOCK_INITIALIZER((q).waitlock, 0), \
-	})
+#define UK_POLLQ_INITIALIZER(q) { \
+	.wait = NULL, \
+	.waitend = &(q).wait, \
+	.events = 0, \
+	.waitmask = 0, \
+	.waitlock = UK_RWLOCK_INITIALIZER((q).waitlock, 0), \
+}
 #endif /* !CONFIG_LIBUKFILE_CHAINUPDATE */
+
+#define UK_POLLQ_INIT_VALUE(q) ((struct uk_pollq)UK_POLLQ_INITIALIZER(q))
 
 /**
  * Initialize the fields of `q` to a valid empty state.
