@@ -39,8 +39,33 @@
 #include <uk/thread.h>
 #endif /* CONFIG_LIBPOSIX_PROCESS_PIDS */
 
+#define TIDMAP_SIZE (CONFIG_LIBPOSIX_PROCESS_MAX_PID + 1)
+
+struct posix_process {
+	pid_t pid;
+	struct posix_process *parent;
+	struct uk_list_head children; /* child processes */
+	struct uk_list_head child_list_entry;
+	struct uk_list_head threads;
+	struct uk_alloc *_a;
+
+	/* TODO: Mutex */
+};
+
+struct posix_thread {
+	pid_t tid;
+	struct posix_process *process;
+	struct uk_list_head thread_list_entry;
+	struct uk_thread *thread;
+	struct uk_alloc *_a;
+
+	/* TODO: Mutex */
+};
+
 #if CONFIG_LIBPOSIX_PROCESS_PIDS
 struct uk_thread *tid2ukthread(pid_t tid);
+struct posix_thread *tid2pthread(pid_t tid);
+struct posix_process *tid2pprocess(pid_t tid);
 pid_t ukthread2tid(struct uk_thread *thread);
 pid_t ukthread2pid(struct uk_thread *thread);
 #endif /* CONFIG_LIBPOSIX_PROCESS_PIDS */

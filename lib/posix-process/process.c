@@ -40,8 +40,6 @@
 #include <uk/config.h>
 #include <uk/syscall.h>
 
-#define TIDMAP_SIZE (CONFIG_LIBPOSIX_PROCESS_MAX_PID + 1)
-
 #if CONFIG_LIBPOSIX_PROCESS_PIDS
 #include <uk/bitmap.h>
 #include <uk/list.h>
@@ -56,30 +54,6 @@
 #endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 
 #include "process.h"
-
-/**
- * Internal structures
- */
-struct posix_process {
-	pid_t pid;
-	struct posix_process *parent;
-	struct uk_list_head children; /* child processes */
-	struct uk_list_head child_list_entry;
-	struct uk_list_head threads;
-	struct uk_alloc *_a;
-
-	/* TODO: Mutex */
-};
-
-struct posix_thread {
-	pid_t tid;
-	struct posix_process *process;
-	struct uk_list_head thread_list_entry;
-	struct uk_thread *thread;
-	struct uk_alloc *_a;
-
-	/* TODO: Mutex */
-};
 
 /**
  * System global lists
@@ -461,14 +435,14 @@ static void posix_thread_fini(struct uk_thread *child)
 
 UK_THREAD_INIT_PRIO(posix_thread_init, posix_thread_fini, UK_PRIO_EARLIEST);
 
-static inline struct posix_thread *tid2pthread(pid_t tid)
+struct posix_thread *tid2pthread(pid_t tid)
 {
 	if ((__sz)tid >= ARRAY_SIZE(tid_thread) || tid < 0)
 		return NULL;
 	return tid_thread[tid];
 }
 
-static inline struct posix_process *tid2pprocess(pid_t tid)
+struct posix_process *tid2pprocess(pid_t tid)
 {
 	struct posix_thread *pthread;
 
