@@ -63,6 +63,9 @@
 static struct posix_thread *tid_thread[TIDMAP_SIZE];
 static unsigned long tid_map[UK_BITS_TO_LONGS(TIDMAP_SIZE)] = { [0] = 0x01UL };
 
+/* Process Table */
+struct posix_process *pid_process[TIDMAP_SIZE];
+
 /**
  * Thread-local posix_thread reference
  */
@@ -254,6 +257,14 @@ int uk_posix_process_create(struct uk_alloc *a,
 				 &parent_pprocess->children);
 	}
 
+	/* Add to process table */
+	if ((unsigned long)pprocess->pid >= ARRAY_SIZE(pid_process)) {
+		uk_pr_err("Process limit reached, could not create new process\n");
+		ret = -EAGAIN;
+		goto err_free_pprocess;
+	}
+	pid_process[pprocess->pid] = pprocess;
+
 	uk_pr_debug("Process PID %d created (parent PID: %d)\n",
 		    (int) pprocess->pid,
 		    (int) ((pprocess->parent) ? pprocess->parent->pid : 0));
@@ -294,6 +305,8 @@ static void pprocess_release(struct posix_process *pprocess)
 				    pchild->pid);
 		}
 	}
+
+	pid_process[pprocess->pid] = NULL;
 
 	uk_pr_debug("Process PID %d released\n",
 		    pprocess->pid);
@@ -432,6 +445,13 @@ static void posix_thread_fini(struct uk_thread *child)
 }
 
 UK_THREAD_INIT_PRIO(posix_thread_init, posix_thread_fini, UK_PRIO_EARLIEST);
+
+struct posix_process *pid2pprocess(pid_t pid)
+{
+	UK_ASSERT((size_t)pid < ARRAY_SIZE(pid_process));
+
+	return pid_process[pid];
+}
 
 struct posix_thread *tid2pthread(pid_t tid)
 {
