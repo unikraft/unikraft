@@ -56,7 +56,13 @@ extern "C" {
 	} while (0)
 #endif /* CONFIG_LIBUKDEBUG */
 
-#define UK_REFCOUNT_INITIALIZER(val) ((__atomic){ .counter = (val) })
+/*
+ * We define initializers separate from an initial values.
+ * The former can only be used in (static) variable initializations, while the
+ * latter is meant for assigning to variables or as anonymous data structures.
+ */
+#define UK_REFCOUNT_INITIALIZER(val) { .counter = (val) }
+#define UK_REFCOUNT_INIT_VALUE(val) ((__atomic)UK_REFCOUNT_INITIALIZER(val))
 
 /**
  * Initialize the atomic reference.

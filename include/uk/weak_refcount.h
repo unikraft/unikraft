@@ -17,10 +17,17 @@ struct uk_swrefcount {
 	__atomic strong; /* Number of strong references; <= .refcount */
 };
 
-#define UK_SWREFCOUNT_INITIALIZER(r, s) ((struct uk_swrefcount){ \
+/*
+ * We define initializers separate from an initial values.
+ * The former can only be used in (static) variable initializations, while the
+ * latter is meant for assigning to variables or as anonymous data structures.
+ */
+#define UK_SWREFCOUNT_INITIALIZER(r, s) { \
 	.refcount = UK_REFCOUNT_INITIALIZER((r)), \
 	.strong = UK_REFCOUNT_INITIALIZER((s)), \
-})
+}
+#define UK_SWREFCOUNT_INIT_VALUE(r, s) \
+	((struct uk_swrefcount)UK_SWREFCOUNT_INITIALIZER((r), (s)))
 
 /**
  * Initialize refcount with `ref` references, of which `strong` are strong.
