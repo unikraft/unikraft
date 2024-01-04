@@ -224,7 +224,7 @@ struct uk_file *uk_timerfile_create(clockid_t id)
 		.clkid = id,
 		.upthread = NULL
 	};
-	al->fstate = UK_FILE_STATE_INITIALIZER(al->fstate);
+	al->fstate = UK_FILE_STATE_INIT_VALUE(al->fstate);
 	al->frefcnt = UK_FILE_REFCNT_INIT_VALUE;
 	al->f = (struct uk_file){
 		.vol = TIMERFD_VOLID,

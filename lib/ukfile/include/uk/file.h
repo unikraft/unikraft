@@ -104,10 +104,18 @@ struct uk_file_state {
 	/* TODO */
 };
 
-#define UK_FILE_STATE_INITIALIZER(name) ((struct uk_file_state){ \
+/*
+ * We define initializers separate from an initial values.
+ * The former can only be used in (static) variable initializations, while the
+ * latter is meant for assigning to variables or as anonymous data structures.
+ */
+#define UK_FILE_STATE_INITIALIZER(name) { \
 	.iolock = UK_RWLOCK_INITIALIZER((name).iolock, 0), \
 	.pollq = UK_POLLQ_INITIALIZER((name).pollq) \
-})
+}
+#define UK_FILE_STATE_INIT_VALUE(name) \
+	((struct uk_file_state)UK_FILE_STATE_INITIALIZER(name))
+
 
 /*
  * Reference count type used by uk_file.
@@ -132,6 +140,7 @@ struct uk_file {
 };
 
 /* Files always get created with one strong reference held */
+/* See above comment for file state on initializers vs initial values */
 #define UK_FILE_REFCNT_INITIALIZER UK_SWREFCOUNT_INITIALIZER(1, 1)
 #define UK_FILE_REFCNT_INIT_VALUE UK_SWREFCOUNT_INIT_VALUE(1, 1)
 

@@ -229,7 +229,7 @@ static void _socket_init(struct socket_alloc *al,
 		.sock_data = sock_data,
 		.driver = d
 	};
-	al->fstate = UK_FILE_STATE_INITIALIZER(al->fstate);
+	al->fstate = UK_FILE_STATE_INIT_VALUE(al->fstate);
 	al->fref = UK_FILE_REFCNT_INIT_VALUE;
 	al->f = (struct uk_file){
 		.vol = POSIX_SOCKET_VOLID,
