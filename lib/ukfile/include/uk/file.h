@@ -133,6 +133,7 @@ struct uk_file {
 
 /* Files always get created with one strong reference held */
 #define UK_FILE_REFCNT_INITIALIZER UK_SWREFCOUNT_INITIALIZER(1, 1)
+#define UK_FILE_REFCNT_INIT_VALUE UK_SWREFCOUNT_INIT_VALUE(1, 1)
 
 /* Operations inlines */
 static inline
