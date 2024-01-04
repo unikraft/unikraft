@@ -62,7 +62,20 @@ struct posix_thread {
 	/* TODO: Mutex */
 };
 
+extern struct posix_process *pid_process[TIDMAP_SIZE];
+
+#define uk_process_foreach(_p)						\
+	for (int _j = 1, _i = 0; _i != ARRAY_SIZE(pid_process);		\
+		_j = !_j, _i++)						\
+			for (_p = pid_process[_i]; _j; _j = !_j)	\
+				if (_p)
+
+#define uk_process_foreach_pthread(_proc, _pthread, _pthreadn)		\
+	uk_list_for_each_entry_safe(_pthread, _pthreadn,		\
+				    &(_proc)->threads, thread_list_entry)
+
 #if CONFIG_LIBPOSIX_PROCESS_PIDS
+struct posix_process *pid2pprocess(pid_t pid);
 struct uk_thread *tid2ukthread(pid_t tid);
 struct posix_thread *tid2pthread(pid_t tid);
 struct posix_process *tid2pprocess(pid_t tid);
