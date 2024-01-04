@@ -90,23 +90,29 @@ struct uk_poll_chain {
 	};
 };
 
+/* See comment for main queue below on initializers vs initial values */
+
 /* Initializer for a chain ticket that propagates events to another queue */
-#define UK_POLL_CHAIN_UPDATE(msk, to, ev) ((struct uk_poll_chain){ \
+#define UK_POLL_CHAIN_UPDATE_INITIALZER(msk, to, ev) { \
 	.next = NULL, \
 	.mask = (msk), \
 	.type = UK_POLL_CHAINTYPE_UPDATE, \
 	.queue = (to), \
 	.set = (ev) \
-})
+}
+#define UK_POLL_CHAIN_UPDATE(msk, to, ev) ((struct uk_poll_chain) \
+	UK_POLL_CHAIN_UPDATE_INITIALZER((msk), (to), (ev)))
 
 /* Initializer for a chain ticket that calls a custom callback */
-#define UK_POLL_CHAIN_CALLBACK(msk, cb, dat) ((struct uk_poll_chain){ \
+#define UK_POLL_CHAIN_CALLBACK_INITIALIZER(msk, cb, dat) { \
 	.next = NULL, \
 	.mask = (msk), \
 	.type = UK_POLL_CHAINTYPE_CALLBACK, \
 	.callback = (cb), \
 	.arg = (dat) \
-})
+}
+#define UK_POLL_CHAIN_CALLBACK(msk, cb, dat) ((struct uk_poll_chain) \
+	UK_POLL_CHAIN_CALLBACK_INITIALIZER((msk), (cb), (dat)))
 
 #endif /* CONFIG_LIBUKFILE_CHAINUPDATE */
 

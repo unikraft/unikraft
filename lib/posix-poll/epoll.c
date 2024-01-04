@@ -215,9 +215,11 @@ static int epoll_add(const struct uk_file *epf, struct epoll_entry **tail,
 		.fd = fd,
 		.f = f,
 		.event = *event,
-		.tick = UK_POLL_CHAIN_CALLBACK(events2mask(event->events),
-					       epoll_event_callback,
-					       &epf->state->pollq),
+		.tick = UK_POLL_CHAIN_CALLBACK_INITIALIZER(
+			events2mask(event->events),
+			epoll_event_callback,
+			&epf->state->pollq
+		),
 		.revents = 0
 	};
 	*tail = ent;
