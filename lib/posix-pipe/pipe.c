@@ -291,7 +291,7 @@ int uk_pipefile_create(struct uk_file *pipes[2], int flags)
 	al->node.rhead = 0;
 	al->node.whead = 0;
 	memset(al->node.buf, 0, sizeof(al->node.buf));
-	al->fstate = UK_FILE_STATE_INITIALIZER(al->fstate);
+	al->fstate = UK_FILE_STATE_INIT_VALUE(al->fstate);
 	al->rref = UK_FILE_REFCNT_INIT_VALUE;
 	al->wref = UK_FILE_REFCNT_INIT_VALUE;
 	al->rf = (struct uk_file){
