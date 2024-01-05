@@ -171,7 +171,11 @@ char *strncpy_isr(char *dst, const char *src, size_t len)
 
 char *strcpy_isr(char *dst, const char *src)
 {
-	return strncpy_isr(dst, src, SIZE_MAX);
+	char *save = dst;
+
+	for (; (*dst = *src) != '\0'; ++src, ++dst)
+		;
+	return save;
 }
 
 int strncmp_isr(const char *str1, const char *str2, size_t len)
