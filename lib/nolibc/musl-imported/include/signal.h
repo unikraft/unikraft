@@ -25,7 +25,7 @@ extern "C" {
 #define __NEED_clock_t
 #define __NEED_sigset_t
 
-#include <bits/alltypes.h>
+#include <nolibc-internal/shareddefs.h>
 
 #define SIG_BLOCK     0
 #define SIG_UNBLOCK   1
@@ -204,11 +204,8 @@ struct sigevent {
 #define SIGEV_THREAD 2
 #define SIGEV_THREAD_ID 4
 
-int __libc_current_sigrtmin(void);
-int __libc_current_sigrtmax(void);
-
-#define SIGRTMIN  (__libc_current_sigrtmin())
-#define SIGRTMAX  (__libc_current_sigrtmax())
+#define SIGRTMIN  35
+#define SIGRTMAX  (_NSIG - 1)
 
 int kill(pid_t, int);
 
