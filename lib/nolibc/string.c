@@ -171,7 +171,11 @@ char *strncpy(char *dst, const char *src, size_t len)
 
 char *strcpy(char *dst, const char *src)
 {
-	return strncpy(dst, src, SIZE_MAX);
+	char *save = dst;
+
+	for (; (*dst = *src) != '\0'; ++src, ++dst)
+		;
+	return save;
 }
 
 int strncmp(const char *str1, const char *str2, size_t len)
