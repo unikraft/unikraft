@@ -42,6 +42,25 @@ config LIBPOSIX_PROCESS_SIGNAL_SIGACTION
 	bool "rt_sigaction() syscall"
 	default y
 
+config LIBPOSIX_PROCESS_SIGNAL_RTSIGQUEUEINFO
+	bool "rt_sigqueueinfo() syscall"
+	default y
+
+config LIBPOSIX_PROCESS_SIGNAL_RTTGSIGQUEUEINFO
+	bool "rt_tgsigqueueinfo() syscall"
+	default y
+
+config LIBPOSIX_PROCESS_SIGNAL_KILL
+	bool "kill() syscall"
+	default y
+
+config LIBPOSIX_PROCESS_SIGNAL_TGKILL
+	bool "tgkill() syscall"
+	default y
+
+config LIBPOSIX_PROCESS_SIGNAL_TKILL
+	bool "tkill() syscall"
+	default y
 endif
 
 config LIBPOSIX_PROCESS_CLONE
