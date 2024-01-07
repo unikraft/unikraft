@@ -24,6 +24,7 @@ config LIBPOSIX_PROCESS_SIGNAL
 	bool "POSIX signals (EXPERIMENTAL)"
 	select LIBPOSIX_PROCESS_PIDS
 	select LIBSYSCALL_SHIM
+	select LIBUKLOCK
 
 config LIBPOSIX_PROCESS_CLONE
 	bool "clone() system call"

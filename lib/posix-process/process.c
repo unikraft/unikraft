@@ -54,6 +54,10 @@
 #include <uk/process.h>
 #endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+#include "signal/signal.h"
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+
 #include "process.h"
 
 /**
@@ -147,10 +151,34 @@ static struct posix_thread *pprocess_create_pthread(
 	pthread->process = pprocess;
 	pthread->tid = tid;
 	pthread->thread = th;
-	uk_list_add_tail(&pthread->thread_list_entry, &pprocess->threads);
+
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+	err = pprocess_signal_tdesc_alloc(pthread);
+	if (unlikely(err)) {
+		uk_pr_err("Could not allocate signal descriptor\n");
+		/* Handle rollback manually to avoid adding more
+		 * signal conditionals.
+		 */
+		uk_free(a, pthread);
+		goto err_free_tid;
+	}
+	err = pprocess_signal_tdesc_init(pthread);
+	if (unlikely(err)) {
+		uk_pr_err("Could not initialize signal descriptor\n");
+		/* Handle rollback manually to avoid adding more
+		 * signal conditionals.
+		 */
+		pprocess_signal_tdesc_free(pthread);
+		uk_free(a, pthread);
+		goto err_free_tid;
+	}
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
 	/* Store reference to pthread with TID */
 	tid_thread[tid] = pthread;
+
+	/* Add to parent's list of threads */
+	uk_list_add_tail(&pthread->thread_list_entry, &pprocess->threads);
 
 	uk_pr_debug("Process PID %d: New thread TID %d\n",
 		    (int) pprocess->pid, (int) pthread->tid);
@@ -170,6 +198,10 @@ static void pprocess_release_pthread(struct posix_thread *pthread)
 {
 	UK_ASSERT(pthread);
 	UK_ASSERT(pthread->_a);
+
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+	pprocess_signal_tdesc_free(pthread);
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
 	/* remove from process' thread list */
 	uk_list_del_init(&pthread->thread_list_entry);
@@ -223,6 +255,23 @@ int uk_posix_process_create(struct uk_alloc *a,
 	UK_INIT_LIST_HEAD(&pprocess->threads);
 	UK_INIT_LIST_HEAD(&pprocess->children);
 
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+	ret = pprocess_signal_pdesc_alloc(pprocess);
+	if (unlikely(ret)) {
+		uk_pr_err("Could not allocate signal descriptor\n");
+		/* Free manually as we can jump to err_free_pprocess
+		 * after this allocation is successful.
+		 */
+		uk_free(a, pprocess);
+		goto err_out;
+	}
+	ret = pprocess_signal_pdesc_init(pprocess);
+	if (unlikely(ret)) {
+		uk_pr_err("Could not initialize signal descriptor\n");
+		goto err_free_pprocess;
+	}
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+
 	/* Check if we have a pthread structure already for this thread
 	 * or if we need to allocate one
 	 */
@@ -249,12 +298,21 @@ int uk_posix_process_create(struct uk_alloc *a,
 		uk_list_add_tail(&(*pthread)->thread_list_entry,
 				 &pprocess->threads);
 
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+		/* Reset signal state of this thread */
+		ret = pprocess_signal_tdesc_init(*pthread);
+		if (unlikely(ret)) {
+			uk_pr_err("Could not initialize signal descriptor\n");
+			goto err_free_pprocess;
+		}
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+
 		/* Release original process if it became empty of threads */
 		if (uk_list_empty(&orig_pprocess->threads))
 			pprocess_release(orig_pprocess);
 	}
 
-	/* Add to process table */
+	/* Add to process table. No failure past this point. */
 	if (unlikely((unsigned long)pprocess->pid >= ARRAY_SIZE(pid_process))) {
 		uk_pr_err("Process limit reached, could not create new process\n");
 		ret = -EAGAIN;
@@ -276,6 +334,9 @@ int uk_posix_process_create(struct uk_alloc *a,
 	return 0;
 
 err_free_pprocess:
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+	pprocess_signal_pdesc_free(pprocess);
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 	uk_free(a, pprocess);
 err_out:
 	return ret;
@@ -310,6 +371,10 @@ static void pprocess_release(struct posix_process *pprocess)
 				    pchild->pid);
 		}
 	}
+
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+	pprocess_signal_pdesc_free(pprocess);
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
 	pid_process[pprocess->pid] = NULL;
 
