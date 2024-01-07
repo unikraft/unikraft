@@ -205,4 +205,14 @@ void pprocess_signal_clear_pending(struct posix_process *proc, int signum);
 /* Get next pending signal of a given thread */
 struct uk_signal *pprocess_signal_next_pending_t(struct posix_thread *pthread);
 
+/* Signal a process (abstraction for kill / sigqueueinfo) */
+int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo);
+
+/* Signal a thread (abstraction for kill / sigqueueinfo) */
+int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo);
+
+/* Signal a process */
+int pprocess_signal_send(struct posix_process *proc, int signum,
+			 siginfo_t *siginfo);
+
 #endif /* __UK_SIGNAL_H__ */
