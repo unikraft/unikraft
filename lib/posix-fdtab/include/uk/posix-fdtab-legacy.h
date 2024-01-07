@@ -15,8 +15,26 @@
 
 #include <vfscore/file.h>
 
+/**
+ * Opens a vfscore_file structure and assigns it a new file descriptor number.
+ *
+ * @param vf
+ *   Pointer to vfscore_file structure that contains information about the
+ *   file, such as its file descriptor
+ * @return
+ *   = 0, success
+ *   < 0, failure
+ */
 int uk_fdtab_legacy_open(struct vfscore_file *vf);
 
+/**
+ * Returns the vfscore_file structure with the given file descriptor number.
+ *
+ * @param fd
+ *   File descriptor number for which to search
+ * @return
+ *   Pointer to vfscore_file structure that has that file descriptor number
+ */
 struct vfscore_file *uk_fdtab_legacy_get(int fd);
 
 #endif /* CONFIG_LIBVFSCORE */

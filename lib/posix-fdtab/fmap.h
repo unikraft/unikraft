@@ -19,18 +19,33 @@
 #include <uk/thread.h>
 
 /**
- * Lock-free bitmap, with ones representing a free index.
+ * An entry containing the necessary data for defining the bitmap that will
+ * tell us if a file descriptor is used or not.
  */
 struct uk_bmap {
+	/* Lock-free bitmap, with ones representing a free index */
 	volatile unsigned long *bitmap;
+	/* Size of the bitmap */
 	size_t size;
 };
 
+/**
+ * Gets the size of the bitmap in bytes.
+ *
+ * @param s
+ *   Number of elements in the bitmap
+ * @return
+ *   Size of the bitmap in bytes
+ */
 #define UK_BMAP_SZ(s) (UK_BITS_TO_LONGS(s) * sizeof(unsigned long))
 
 
 /**
- * Initialize the bitmap; must not be called concurrently with other functions.
+ * Initializes the bitmap (fills it with ones);
+ * must not be called concurrently with other functions.
+ *
+ * @param bm
+ *   Bitmap to be initialized
  */
 static inline void uk_bmap_init(const struct uk_bmap *bm)
 {
@@ -38,8 +53,12 @@ static inline void uk_bmap_init(const struct uk_bmap *bm)
 }
 
 /**
- * Mark `idx` as used, and return whether we were the ones to do so.
+ * Marks `idx` as used, and returns whether we were the ones to do so.
  *
+ * @param bm
+ *   Bitmap in which to mark
+ * @param idx
+ *   Index to mark as used
  * @return
  *   0 if we marked `idx` as used, non-zero otherwise
  */
@@ -56,8 +75,12 @@ static inline int uk_bmap_reserve(const struct uk_bmap *bm, int idx)
 }
 
 /**
- * Mark `idx` as free, and return whether we were the ones to do so.
+ * Marks `idx` as free, and returns whether we were the ones to do so.
  *
+ * @param bm
+ *   Bitmap in which to mark
+ * @param idx
+ *   Index to mark as free
  * @return
  *   0 if we freed `idx`, non-zero if it was already free or out of range
  */
@@ -73,6 +96,16 @@ static inline int uk_bmap_free(const struct uk_bmap *bm, int idx)
 	return !!(v & mask);
 }
 
+/**
+ * Checks if `idx` is free or not.
+ *
+ * @param bm
+ *   Bitmap in which to check
+ * @param idx
+ *   Index to check
+ * @return
+ *   0 if `idx` is free, non-zero if it is not
+ */
 static inline int uk_bmap_isfree(const struct uk_bmap *bm, int idx)
 {
 	if (!((idx >= 0) && IN_RANGE((size_t)idx, 0, bm->size)))
@@ -81,8 +114,12 @@ static inline int uk_bmap_isfree(const struct uk_bmap *bm, int idx)
 }
 
 /**
- * Allocate and return the smallest free index larger than `min`.
+ * Allocates and returns the smallest free index larger than `min`.
  *
+ * @param bm
+ *   Bitmap in which to search for the next free index
+ * @param min
+ *   Start value from which we search the next free index
  * @return
  *   The allocated index or `>= bm->size` if map full.
  */
@@ -103,22 +140,52 @@ static inline int uk_bmap_request(const struct uk_bmap *bm, int min)
 }
 
 /**
- * Mapping of integers to pointers.
+ * An entry defining the mapping between the bitmap (which tells us whether a
+ * file descriptor is free) and the map of pointers that contain references to
+ * the file descriptor structures.
  */
 struct uk_fmap {
+	/**
+	 * Bitmap that gives us information about
+	 * which file descriptors are free
+	 */
 	struct uk_bmap bmap;
+	/**
+	 * Map of pointers containing references to the
+	 * file descriptor structures
+	 */
 	void *volatile *map;
 };
 
+/**
+ * Gets the size of the map in bytes.
+ *
+ * @param s
+ *   Number of elements in the map
+ * @return
+ *   Size of the map in bytes
+ */
 #define UK_FMAP_SZ(s) ((s) * sizeof(void *))
 
-
+/**
+ * Checks if the index given is in the range of the map's indices.
+ *
+ * @param m
+ *   fmap that gives us the maximum value that the index can have
+ * @param i
+ *   Index that we check if it is in range from 0 to size of the bitmap
+ * @return
+ *   0 if the index is not in the range, 1 otherwise
+ */
 #define _FMAP_INRANGE(m, i) ((i >= 0) && IN_RANGE((size_t)i, 0, (m)->bmap.size))
 
 /**
- * Initialize the memory for a uk_fmap.
+ * Initializes the memory for a uk_fmap.
  *
  * The `size` field must be correctly set and the map buffers allocated.
+ *
+ * @param m
+ *   fmap to be initialized
  */
 static inline void uk_fmap_init(const struct uk_fmap *m)
 {
@@ -127,13 +194,17 @@ static inline void uk_fmap_init(const struct uk_fmap *m)
 }
 
 /**
- * Lookup the entry at `idx`.
+ * Looks up and returns the entry at `idx`.
  *
  * WARNING: Use of this function is vulnerable to use-after-free race conditions
  * for entry objects whose lifetime depends on their membership in this data
  * structure (e.g., refcounting on put, take, and after lookups).
  * For that case please use the `uk_fmap_critical_*` functions.
  *
+ * @param m
+ *   fmap in which to search
+ * @param idx
+ *   Index from which to return the entry
  * @return
  *   The entry at `idx`, or NULL if out of range.
  */
@@ -156,8 +227,14 @@ static inline void *uk_fmap_lookup(const struct uk_fmap *m, int idx)
 }
 
 /**
- * Put an entry in the map and return its index.
+ * Puts a new entry in the map and returns its index.
  *
+ * @param m
+ *   fmap in which to put the entry
+ * @param p
+ *   New entry to put in the map
+ * @param min
+ *   Start value from which we search the next free index
  * @return
  *   newly allocated index, or out of range if map full
  */
@@ -178,8 +255,12 @@ int uk_fmap_put(const struct uk_fmap *m, const void *p, int min)
 }
 
 /**
- * Take the entry at `idx` out of the map and return it.
+ * Takes the entry at `idx` out of the map and returns it.
  *
+ * @param m
+ *   fmap from which to take the entry
+ * @param idx
+ *   Index of the entry
  * @return
  *   Previous entry, or NULL if empty or out of range
  */
@@ -209,12 +290,16 @@ static inline void *uk_fmap_take(const struct uk_fmap *m, int idx)
 }
 
 /**
- * Take out an entry, without marking its `idx` as free.
+ * Takes out an entry, without marking its `idx` as free.
  *
  * Calling this function is akin to taking a lock on `idx` which should be
  * released as soon as practical by a matching call to `uk_fmap_critical_put`.
  * Take care to not block inbetween these two calls.
  *
+ * @param m
+ *   fmap from which to take the entry
+ * @param idx
+ *   Index of the entry
  * @return
  *   The entry at `idx`, or NULL if not present or out of range.
  */
@@ -239,11 +324,17 @@ void *uk_fmap_critical_take(const struct uk_fmap *m, int idx)
 }
 
 /**
- * Place an entry at `idx`, following a call to `uk_fmap_critical_take`.
+ * Places an entry at `idx`, following a call to `uk_fmap_critical_take`.
  *
  * Calling on an `idx` without a matching call to `uk_fmap_critical_take`
  * is undefined. The value of `p` need not match the value previously taken out.
  *
+ * @param m
+ *   fmap in which to place the entry
+ * @param idx
+ *   Index where to place the entry
+ * @param p
+ *	 Entry to be placed in fmap
  * @return
  *   0 on success, non-zero if `idx` out of range
  */
@@ -262,10 +353,19 @@ int uk_fmap_critical_put(const struct uk_fmap *m, int idx, const void *p)
 }
 
 /**
- * Atomically exhange the entry at `idx` with `p`, returning previous in `prev`.
+ * Atomically exhanges the entry at `idx` with `p`,
+ * returning previous in `prev`.
  *
  * If `idx` is free, it is marked as used and `*prev` is set to NULL.
  *
+ * @param m
+ *   fmap in which to exchange the entries
+ * @param idx
+ *   Index where we want to exchange the entries
+ * @param p
+ *	 Entry to be exchanged with
+ * @param prev
+ *   Previous entry that has now been exchanged
  * @return
  *   0 on success, non-zero if `idx` out of range
  */
