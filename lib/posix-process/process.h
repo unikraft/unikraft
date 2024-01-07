@@ -57,6 +57,9 @@ struct posix_process {
 	struct uk_list_head child_list_entry;
 	struct uk_list_head threads;
 	struct uk_alloc *_a;
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+	struct uk_signal_pdesc *signal;
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
 	/* TODO: Mutex */
 };
@@ -68,6 +71,9 @@ struct posix_thread {
 	struct uk_thread *thread;
 	struct uk_alloc *_a;
 	enum posix_thread_state state;
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+	struct uk_signal_tdesc *signal;
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
 	/* TODO: Mutex */
 };
