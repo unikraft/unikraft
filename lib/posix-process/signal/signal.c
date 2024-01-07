@@ -10,7 +10,17 @@
 
 #include "process.h"
 #include "sigset.h"
+#include "siginfo.h"
 #include "signal.h"
+
+/* Check permissions to signal target process.
+ *
+ * For a process to be permitted to send a signal to another
+ * process, its real / effective uid must match the target's
+ * real / saved set-user-id. We don't support these, so we
+ * deliver to every process.
+ */
+#define signal_check_perm(_target_process) true
 
 /* Enqueue signal for a thread or a process
  *
@@ -157,6 +167,144 @@ int pprocess_signal_sigaction_new(struct uk_alloc *alloc, struct uk_signal_pdesc
 
 	pd->sigaction->alloc = alloc;
 	uk_refcount_init(&pd->sigaction->refcnt, 1);
+
+	return 0;
+}
+
+int pprocess_signal_send(struct posix_process *proc, int signum,
+			 siginfo_t *siginfo)
+{
+	struct uk_signal *sig;
+	int rc;
+
+	sig = uk_signal_alloc(proc->_a);
+	if (unlikely(!sig)) {
+		uk_pr_err("Could not allocate signal\n");
+		return -EAGAIN;
+	}
+
+	if (siginfo)
+		set_siginfo_sigqueue(signum, &sig->siginfo, siginfo);
+	else
+		set_siginfo_kill(signum, &sig->siginfo);
+
+	rc = pprocess_signal_enqueue(proc, NULL, sig);
+	if (unlikely(rc)) {
+		/* issue a warning as this may be temporary */
+		uk_pr_warn("Could not queue signal\n");
+		uk_signal_free(proc->_a, sig);
+		return -EAGAIN;
+	}
+
+	return 0;
+}
+
+int pprocess_signal_process_do(pid_t pid, int signum, siginfo_t *siginfo)
+{
+	struct posix_process *pproc = NULL;
+	struct posix_thread *thread, *threadn;
+	int rc;
+
+	if (unlikely(signum != 0 && !IS_VALID(signum)))
+		return -EINVAL;
+
+	if (unlikely(signum == SIGSTOP || signum == SIGCONT)) {
+		uk_pr_warn("Process stop / resume not supported. Ignoring\n");
+		return 0;
+	}
+
+	/* pid == 0 -> Send the signal to every process in the process group
+	 *             of the calling process.
+	 * pid < -1 -> Send the signal to every process in the process group
+	 *             with ID equal to -pid.
+	 */
+	if (!pid || pid < -1) {
+		uk_pr_warn("pgroups not supported, delivering to every process\n");
+		pid = -1;
+	}
+
+	/* pid == -1 -> Send the signal to every process for which the
+	 *              calling process has permissions to signal.
+	 */
+	if (pid == -1) {
+		uk_pprocess_foreach(pproc) {
+			if (!signal_check_perm(pproc))
+				continue;
+
+			if (IS_IGNORED(pproc, signum))
+				continue;
+
+			rc = pprocess_signal_send(pproc, signum, siginfo);
+			if (unlikely(rc))
+				return rc;
+		}
+		return 0;
+	}
+
+	/* Default: Send to process with pid */
+	pproc = pid2pprocess(pid);
+	if (unlikely(!pproc))
+		return -ESRCH;
+
+	if (unlikely(signal_check_perm(pproc) == false))
+		return -EPERM;
+
+	/* If signum == 0 do only pid exist & permissions check */
+	if (!signum)
+		return 0;
+
+	/* If this signal is currently ignored, don't even try */
+	if (IS_IGNORED(pproc, signum))
+		return 0;
+
+	rc = pprocess_signal_send(pproc, signum, siginfo);
+	if (unlikely(rc))
+		return rc;
+
+	/* Wake up any threads that may be paused */
+	uk_pprocess_foreach_pthread(pproc, thread, threadn) {
+		if (thread->state == POSIX_THREAD_BLOCKED_SIGNAL)
+			uk_semaphore_up(&thread->signal->deliver_semaphore);
+	}
+
+	return 0;
+}
+
+int pprocess_signal_thread_do(int tid, int signum, siginfo_t *siginfo)
+{
+	struct posix_thread *pthread;
+	struct posix_process *pproc;
+	struct uk_signal *sig;
+	int rc;
+
+	pthread = tid2pthread(tid);
+	if (unlikely(!pthread))
+		return -EINVAL;
+
+	pproc = tid2pprocess(tid);
+	UK_ASSERT(pproc);
+
+	sig = uk_signal_alloc(pthread->_a);
+	if (unlikely(!sig)) {
+		uk_pr_err("Could not allocate signal\n");
+		return -EAGAIN;
+	}
+
+	if (siginfo)
+		set_siginfo_sigqueue(signum, &sig->siginfo, siginfo);
+	else
+		set_siginfo_kill(signum, &sig->siginfo);
+
+	rc = pprocess_signal_enqueue(pproc, pthread, sig);
+	if (unlikely(rc)) {
+		/* issue a warning as this may be temporary */
+		uk_pr_warn("Could not queue signal\n");
+		uk_signal_free(pthread->_a, sig);
+		return rc;
+	}
+
+	if (pthread->state == POSIX_THREAD_BLOCKED_SIGNAL)
+		uk_semaphore_up(&pthread->signal->deliver_semaphore);
 
 	return 0;
 }
