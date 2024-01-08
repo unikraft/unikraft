@@ -32,32 +32,34 @@
 
 import gdb
 import pickle
-import os, sys
-import tempfile, shutil
+import os
+import sys
+import tempfile
+import shutil
+import uk_trace.parse as parse
 
 scripts_dir = os.path.dirname(os.path.realpath(__file__))
 sys.path.append(scripts_dir)
 
-import uk_trace.parse as parse
-
-type_char = gdb.lookup_type('char')
-type_void = gdb.lookup_type('void')
+type_char = gdb.lookup_type("char")
+type_void = gdb.lookup_type("void")
 
 PTR_SIZE = type_void.pointer().sizeof
+
 
 def get_trace_buffer():
     inf = gdb.selected_inferior()
 
     try:
-        trace_buff = gdb.parse_and_eval('uk_trace_buffer')
-        trace_buff_size = trace_buff.type.sizeof
+        trace_buff = gdb.parse_and_eval("uk_trace_buffer")
+        # trace_buff_size = trace_buff.type.sizeof
         trace_buff_addr = int(trace_buff.address)
-        trace_buff_writep = int(gdb.parse_and_eval('uk_trace_buffer_writep'))
+        trace_buff_writep = int(gdb.parse_and_eval("uk_trace_buffer_writep"))
     except gdb.error:
         gdb.write("Error getting the trace buffer. Is tracing enabled?\n")
         raise gdb.error
 
-    if (trace_buff_writep == 0):
+    if trace_buff_writep == 0:
         # This can happen as effect of compile optimization if none of
         # tracepoints were called
         used = 0
@@ -65,6 +67,7 @@ def get_trace_buffer():
         used = trace_buff_writep - trace_buff_addr
 
     return bytes(inf.read_memory(trace_buff_addr, used))
+
 
 def save_traces(out):
     elf = gdb.current_progspace().filename
@@ -86,39 +89,48 @@ def save_traces(out):
     pickler.dump(parse.get_tp_sections(elf))
     pickler.dump(get_trace_buffer())
 
+
 class uk(gdb.Command):
     def __init__(self):
-        gdb.Command.__init__(self, 'uk',
-                             gdb.COMMAND_USER, gdb.COMPLETE_COMMAND, True)
+        gdb.Command.__init__(self, "uk", gdb.COMMAND_USER, gdb.COMPLETE_COMMAND, True)
+
 
 class uk_trace(gdb.Command):
     def __init__(self):
-        gdb.Command.__init__(self, 'uk trace',
-                             gdb.COMMAND_USER, gdb.COMPLETE_COMMAND, True)
+        gdb.Command.__init__(
+            self, "uk trace", gdb.COMMAND_USER, gdb.COMPLETE_COMMAND, True
+        )
+
     def invoke(self, arg, from_tty):
         elf = gdb.current_progspace().filename
-        samples = parse.sample_parser(parse.get_keyvals(elf),
-                                      parse.get_tp_sections(elf),
-                                      get_trace_buffer(), PTR_SIZE)
+        samples = parse.sample_parser(
+            parse.get_keyvals(elf),
+            parse.get_tp_sections(elf),
+            get_trace_buffer(),
+            PTR_SIZE,
+        )
         for sample in samples:
             print(sample)
 
 
 class uk_trace_save(gdb.Command):
     def __init__(self):
-        gdb.Command.__init__(self, 'uk trace save',
-                             gdb.COMMAND_USER, gdb.COMPLETE_COMMAND)
+        gdb.Command.__init__(
+            self, "uk trace save", gdb.COMMAND_USER, gdb.COMPLETE_COMMAND
+        )
+
     def invoke(self, arg, from_tty):
         if not arg:
-            gdb.write('Missing argument. Usage: uk trace save <filename>\n')
+            gdb.write("Missing argument. Usage: uk trace save <filename>\n")
             return
 
-        gdb.write('Saving traces to %s ...\n' % arg)
+        gdb.write("Saving traces to %s ...\n" % arg)
 
         with tempfile.NamedTemporaryFile() as out:
             save_traces(out)
             out.flush()
             shutil.copyfile(out.name, arg)
+
 
 uk()
 uk_trace()
