@@ -2,10 +2,10 @@
 UK_CONFIG="${1:-${UK_BASE}/.config}"
 UK_CONFIG_OLD="${2:-${UK_BASE}/.config.old}"
 
-if [ $( uname ) = "Darwin" ]; then
-	CMD_GREP=ggrep
+if [ "$(uname)" = "Darwin" ]; then
+	CMD_GREP="ggrep"
 else
-	CMD_GREP=grep
+	CMD_GREP="grep"
 fi
 
 _subconfig()
@@ -15,8 +15,10 @@ _subconfig()
 
 _comparesym()
 {
-	local _SUBCONFIG=$( _subconfig "${1}" "${2}" )
-	local _SUBCONFIG_OLD=$( _subconfig "${1}" "${3}" )
+	local _SUBCONFIG=
+	local _SUBCONFIG_OLD=
+	_SUBCONFIG=$(_subconfig "${1}" "${2}")
+	_SUBCONFIG_OLD=$(_subconfig "${1}" "${3}")
 	[ "$_SUBCONFIG" == "$_SUBCONFIG_OLD" ] || return 1
 
 	return 0
@@ -25,13 +27,13 @@ _comparesym()
 UPDATES=
 NL=$'\n'
 
-[ -z "${UK_CONFIG}" -o ! -e "${UK_CONFIG}" ] && exit 0
-[ -z "${UK_CONFIG_OLD}" -o ! -e "${UK_CONFIG_OLD}" ] && exit 0
+[ -z "${UK_CONFIG}" ] || [ ! -e "${UK_CONFIG}" ] && exit 0
+[ -z "${UK_CONFIG_OLD}" ] || [ ! -e "${UK_CONFIG_OLD}" ] && exit 0
 
 # Change of architecture?
 _comparesym "CONFIG_ARCH_" "${UK_CONFIG}" "${UK_CONFIG_OLD}" || UPDATES+="*** - CPU architecture changed${NL}"
 
-if [ ! -z "$UPDATES" ]; then
+if [ -n "$UPDATES" ]; then
 	echo "*** The following configuration changes were detected:"
 	echo -n "${UPDATES}"
 	echo "*** We highly recommend to execute 'make properclean' before"
