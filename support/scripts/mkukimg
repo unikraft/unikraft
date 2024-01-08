@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-if [ $( uname ) != "Linux" ]; then
+if [ "$(uname)" != "Linux" ]; then
 	echo "This command can only be run on Linux" 1>&2
 	exit 1
 fi
@@ -54,7 +54,7 @@ mkgrubiso()
 		MBCMDL=$(tr '\n' ' ' < "${OPTCMDLINE}")
 	fi
 
-	cat >"${BUILDDIR}/boot/grub/grub.cfg" <<EOF
+	cat > "${BUILDDIR}/boot/grub/grub.cfg" << EOF
 set default=0
 set timeout=0
 
@@ -66,7 +66,7 @@ menuentry "${OPTKERNELNAME}" {
 EOF
 
 	# build grub image
-	GRUB_INSTALL_MSGS=$( grub-mkrescue -o "${OPTOUTPUT}" --install-modules="multiboot" --fonts="" --themes="" --locales="" "${BUILDDIR}/" 2>&1 )
+	GRUB_INSTALL_MSGS=$(grub-mkrescue -o "${OPTOUTPUT}" --install-modules="multiboot" --fonts="" --themes="" --locales="" "${BUILDDIR}/" 2>&1)
 	if [ ${?} != 0 ]; then
 		printf '%s\n' "${GRUB_INSTALL_MSGS}" 1>&2
 		exit 1
@@ -139,7 +139,7 @@ mkukefidisk()
 	#	t\n	Change type of partition (default partition 1)
 	#	1\n	Mark partition 1 as EFI System Partition
 	#	w\n	Write the changes to the disk image
-	echo -e	"								\
+	echo -e "								\
 		g\n								\
 		n\n								\
 		1\n								\
@@ -148,15 +148,15 @@ mkukefidisk()
 		t\n								\
 		1\n								\
 		w\n								\
-		" | fdisk -W always "${OPTOUTPUT}"	# Wipe filesystem, RAID	\
-							# and partition-table signatures
+		" | fdisk -W always "${OPTOUTPUT}" # Wipe filesystem, RAID	\
+	# and partition-table signatures
 
 	LOOPDEV=$(sudo losetup --find --show "${OPTOUTPUT}")
 	sudo partprobe "${LOOPDEV}"
 	sudo mkfs.vfat -F 32 "${LOOPDEV}p1"
 
 	mkdir "${BUILDDIR}/mnt"
-	sudo mount "${LOOPDEV}p1" "${BUILDDIR}/mnt"	# We only have one partition
+	sudo mount "${LOOPDEV}p1" "${BUILDDIR}/mnt" # We only have one partition
 
 	mkukefiesp "${BUILDDIR}/mnt"
 
@@ -167,39 +167,39 @@ mkukefidisk()
 # process options
 while getopts "hk:c:i:f:a:b:d:o:" OPT; do
 	case "${OPT}" in
-		h)
-			usage
-			;;
-		f)
-			OPTFORMAT="${OPTARG}"
-			;;
-		k)
-			OPTKERNELIMG="${OPTARG}"
-			;;
-		c)
-			OPTCMDLINE="${OPTARG}"
-			;;
-		i)
-			OPTINITRD="${OPTARG}"
-			;;
-		b)
-			OPTBOOTLOADER="${OPTARG}"
-			;;
-		a)
-			OPTARCH="${OPTARG}"
-			;;
-		d)
-			OPTDTB="${OPTARG}"
-			;;
-		o)
-			OPTOUTPUT="${OPTARG}"
-			;;
-		*)
-			usage
-			;;
+	h)
+		usage
+		;;
+	f)
+		OPTFORMAT="${OPTARG}"
+		;;
+	k)
+		OPTKERNELIMG="${OPTARG}"
+		;;
+	c)
+		OPTCMDLINE="${OPTARG}"
+		;;
+	i)
+		OPTINITRD="${OPTARG}"
+		;;
+	b)
+		OPTBOOTLOADER="${OPTARG}"
+		;;
+	a)
+		OPTARCH="${OPTARG}"
+		;;
+	d)
+		OPTDTB="${OPTARG}"
+		;;
+	o)
+		OPTOUTPUT="${OPTARG}"
+		;;
+	*)
+		usage
+		;;
 	esac
 done
-shift $((OPTIND-1))
+shift $((OPTIND - 1))
 
 # validate arguments
 if [[ -z "${OPTKERNELIMG}" ]]; then
@@ -225,7 +225,7 @@ fi
 
 # Register exit handler and create BUILDDIR
 trap sighandler_exit exit
-BUILDDIR="$( mktemp -d )"
+BUILDDIR="$(mktemp -d)"
 if [ ${?} -ne 0 ] || [ -z "${BUILDDIR}" ] || [ ! -d "${BUILDDIR}" ]; then
 	echo "Failed to create temporary directory" 1>&2
 	exit 1
@@ -235,33 +235,33 @@ OPTKERNELNAME="${OPTKERNELIMG##*/}"
 OPTINITRDNAME="${OPTINITRD##*/}"
 
 case "${OPTFORMAT}" in
-	iso)
-		case "${OPTBOOTLOADER}" in
-		grub)
-			mkgrubiso
-			;;
-		ukefi)
-			mkukefiiso
-			;;
-		*)
-			echo -e "\"${OPTBOOTLOADER}\" not a supported bootloader for ISO images." 1>&2
-			usage
-			;;
-		esac
+iso)
+	case "${OPTBOOTLOADER}" in
+	grub)
+		mkgrubiso
 		;;
-	disk)
-		case "${OPTBOOTLOADER}" in
-		ukefi)
-			mkukefidisk
-			;;
-		*)
-			echo -e "\"${OPTBOOTLOADER}\" not a supported bootloader for DISK images." 1>&2
-			usage
-			;;
-		esac
+	ukefi)
+		mkukefiiso
 		;;
 	*)
-		echo -e "\"${OPTFORMAT}\" not a supported format." 1>&2
+		echo -e "\"${OPTBOOTLOADER}\" not a supported bootloader for ISO images." 1>&2
 		usage
 		;;
+	esac
+	;;
+disk)
+	case "${OPTBOOTLOADER}" in
+	ukefi)
+		mkukefidisk
+		;;
+	*)
+		echo -e "\"${OPTBOOTLOADER}\" not a supported bootloader for DISK images." 1>&2
+		usage
+		;;
+	esac
+	;;
+*)
+	echo -e "\"${OPTFORMAT}\" not a supported format." 1>&2
+	usage
+	;;
 esac
