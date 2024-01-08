@@ -24,12 +24,13 @@ if [ -z "$GCOV" ]; then
 	exit 1
 fi
 
-SCRIPT_DIR=$(realpath $(dirname "$0"))
+SCRIPT_DIR=$(dirname "$0")
+SCRIPT_DIR=$(realpath "$SCRIPT_DIR")
 PARSE_SCRIPT=$(realpath "$SCRIPT_DIR"/gcov_serial_parse.py)
 RESULT_DIRECTORY=$(realpath "$2")
 OUTPUT_FILE=$(realpath "$4")
 BUILD_DIR=$(realpath "$5")
-OBJ_DIR="$RESULT_DIRECTORY"/$objs/
+export OBJ_DIR="$RESULT_DIRECTORY"/objs/
 
 mkdir -p "$RESULT_DIRECTORY"
 cd "$RESULT_DIRECTORY"
@@ -44,10 +45,10 @@ rm -rf objs/*
 rm -rf results/*
 
 find "$BUILD_DIR" -type d -name objs \
-	 -prune -o -name \*.gcno -exec cp {} objs/ \;
+	-prune -o -name \*.gcno -exec cp {} objs/ \;
 
-lcov --gcov-tool "$CROSS_COMPILE"gcov --capture --initial \
-     --directory objs -o "$RESULT_DIRECTORY"/results/baseline.info 2>/dev/null
+lcov --gcov-tool "$CROSS_COMPILE"gcov --capture --initial --directory objs \
+	-o "$RESULT_DIRECTORY"/results/baseline.info 2> /dev/null
 
 if [[ $3 == "-c" ]]; then
 	"$PARSE_SCRIPT" --filename "$OUTPUT_FILE" --output "$CONVERTED_FILE"
@@ -57,7 +58,7 @@ else
 fi
 
 find "$BUILD_DIR" -type d -name objs \
-	 -prune -o -name \*.gcda -exec cp {} objs/ \;
+	-prune -o -name \*.gcda -exec cp {} objs/ \;
 
 echo
 
@@ -65,7 +66,7 @@ cd "$RESULT_DIRECTORY"
 
 # Capture converage info from this run
 lcov --gcov-tool gcov --capture --directory objs \
-	 --ignore-errors gcov,source -o results/uk.info
+	--ignore-errors gcov,source -o results/uk.info
 
 # # Combine baseline and coverage info from this run
 lcov -a results/baseline.info -a results/uk.info -o results/run.info
