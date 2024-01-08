@@ -170,8 +170,7 @@ int xenbus_switch_state(xenbus_transaction_t xbt,
 		}
 
 		/* check if state is already set */
-		err = xs_read_integer(xbt, xendev->nodename,
-			(int *) &crnt_state);
+		err = xs_read_integer(xbt, state_path, (int *)&crnt_state);
 		if (err || crnt_state == state)
 			goto exit;
 
