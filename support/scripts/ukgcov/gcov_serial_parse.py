@@ -10,17 +10,30 @@ import argparse
 GCOV_BEGIN = "GCOV_DUMP_INFO_SERIAL:"
 GCOV_END = "GCOV_DUMP_INFO_SERIAL_END"
 
+
 def parse_args():
     parser = argparse.ArgumentParser()
 
-    parser.add_argument("--filename", required=True, type=str, help="The path of the console output file")
-    parser.add_argument("--output", required=True, type=str, help="The path of the desired output file")
+    parser.add_argument(
+        "--filename",
+        required=True,
+        type=str,
+        help="The path of the console output file",
+    )
+    parser.add_argument(
+        "--output",
+        required=True,
+        type=str,
+        help="The path of the desired output file",
+    )
     args = parser.parse_args()
 
     return args
 
+
 def can_decode(x):
-    return x.isdigit() or (x >= 'a' and x <= 'f')
+    return x.isdigit() or (x >= "a" and x <= "f")
+
 
 def main():
     args = parse_args()
@@ -41,7 +54,7 @@ def main():
                 end_line = i - 1
                 break
 
-        if (start_line > end_line):
+        if start_line > end_line:
             print("Error: start line > end line")
             sys.exit(1)
 
@@ -51,16 +64,19 @@ def main():
             c = 0
             for line in lines[start_line:end_line]:
                 for i, x in enumerate(line):
-                    if x == '\n':
+                    if x == "\n":
                         continue
                     if can_decode(x):
                         if first:
                             c = int(x, 16)  # Decode the first hex digit
                         else:
-                            g.write(bytes([c + 16 * int(x, 16)]))  # Decode the second hex digit and combine with the first
+                            g.write(
+                                bytes([c + 16 * int(x, 16)])
+                            )  # Decode the second hex digit and combine with the first
                         first = not first
                     else:
                         first = True
+
 
 if __name__ == "__main__":
     main()
