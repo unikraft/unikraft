@@ -23,6 +23,7 @@ jobs:
       - name: black
         uses: psf/black@stable
         with:
+          options: "--check --diff --line-length 80"
           src: support/scripts
 
       - name: ruff
