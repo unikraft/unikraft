@@ -35,26 +35,25 @@
 # e.g., 2,4-7,0,1,2-3 -> 2 4 5 6 7 0 1 2 3
 _expand_num_list()
 {
-	local -a ARG=(${1//,/ })
-	for R in ${ARG[@]}; do
+	local -a ARG=("${1//,/ }")
+	for R in "${ARG[@]}"; do
 		if [[ $R =~ ^[[:digit:]]+$ ]]; then
 			echo "$R"
 		elif [[ $R =~ ^[[:digit:]]+-[[:digit:]]+$ ]]; then
-			local -a SEQ=(${R//-/ })
-			seq ${SEQ[0]} ${SEQ[1]}
-		elif [ ! -z "$R" ]; then
+			local -a SEQ=("${R//-/ }")
+			seq "${SEQ[0]}" "${SEQ[1]}"
+		elif [ -n "$R" ]; then
 			echo "Warning: unrecognized range specification: '$R'" 1>&2
 		fi
 	done
 }
 
 # Detects CPUs that are not assigned to any domain yet
-# If no CPU is free, -1 is returned
+# If no CPU is free, 1 is returned
 detect_freecpus()
 {
-	local NUM_CPUS=$( "$XL_BIN" info | grep -e '^nr_cpus[[:space:]]*:' | awk '{ print $3 }' )
-	#local USED_CPUS=$( "$XL_BIN" vcpu-list | grep '^.\+[[:space:]]\+[[:digit:]]\+[[:space:]]\+[[:digit:]]\+[[:space:]]\+' | awk '{ print $3 }' )
-	local CPU_AFFINITY=$( "$XL_BIN" vcpu-list | grep '^.\+[[:space:]]\+[[:digit:]]\+[[:space:]]\+[[:digit:]]\+[[:space:]]\+[[:space:]]\+...[[:space:]]\+[[:digit:]]\+\(\.[[:digit:]]\+\|\)[[:space:]]\+.*$' | awk '{ print $7 }' )
+	local NUM_CPUS=
+	local CPU_AFFINITY=
 	local CPU_BITMAP=()
 	local I=
 	local A=
@@ -63,37 +62,41 @@ detect_freecpus()
 	local RET=()
 	local NUM_USED=
 
+	NUM_CPUS=$("$XL_BIN" info | grep -e '^nr_cpus[[:space:]]*:' | awk '{ print $3 }')
+	#USED_CPUS=$( "$XL_BIN" vcpu-list | grep '^.\+[[:space:]]\+[[:digit:]]\+[[:space:]]\+[[:digit:]]\+[[:space:]]\+' | awk '{ print $3 }' )
+	CPU_AFFINITY=$("$XL_BIN" vcpu-list | grep '^.\+[[:space:]]\+[[:digit:]]\+[[:space:]]\+[[:digit:]]\+[[:space:]]\+[[:space:]]\+...[[:space:]]\+[[:digit:]]\+\(\.[[:digit:]]\+\|\)[[:space:]]\+.*$' | awk '{ print $7 }')
+
 	[ -z "$NUM_CPUS" ] && die "Failed to detect the number of available CPUs"
 
 	# clear bitmap~ish
-	for (( I=0; I<NUM_CPUS; I++ )); do
-	        CPU_BITMAP[$I]=0
+	for ((I = 0; I < NUM_CPUS; I++)); do
+		CPU_BITMAP[$I]=0
 	done
 
 	# set bits
 	for A in $CPU_AFFINITY; do
 		if [ "$A" = "all" ]; then
-			return -1 # nothing is free
+			return 1 # nothing is free
 		fi
 
-		CL=$( _expand_num_list "$A" )
+		CL=$(_expand_num_list "$A")
 		for C in $CL; do
-		        CPU_BITMAP[$C]=1
+			CPU_BITMAP[$C]=1
 		done
 	done
 
 	# list free
 	local NUM_USED=0
-	for (( I=0; I<NUM_CPUS; I++ )); do
-	        if [ "${CPU_BITMAP[$I]}" = 0 ]; then
+	for ((I = 0; I < NUM_CPUS; I++)); do
+		if [ "${CPU_BITMAP[$I]}" = 0 ]; then
 			RET+=("$I")
 		else
-			(( NUM_USED++ ))
-	        fi
+			((NUM_USED++))
+		fi
 	done
 
-	if [ $NUM_USED = $NUM_CPUS ]; then
-		return -1 # nothing is free
+	if [ "$NUM_USED" = "$NUM_CPUS" ]; then
+		return 1 # nothing is free
 	fi
 
 	# some are free:
@@ -106,40 +109,42 @@ diskid2xvd()
 	local ID=$1
 	local _arr=('a' 'b' 'c' 'd' 'e' 'f' 'g' 'h' 'i' 'j' 'k' 'l' 'm' 'n' 'o' 'p' 'q' 'r' 's' 't' 'u' 'v' 'w' 'x' 'y' 'z')
 
-	while [ $ID -gt 26 ]; do
-		ID=$(( ID - 26 ))
+	while [ "$ID" -gt 26 ]; do
+		ID=$((ID - 26))
 	done
 	echo "xvd${_arr[$ID]}"
 }
 
 cpu2pool()
 {
-    local pool=$( "$XL_BIN" cpupool-list -c | grep -e "\([[:space:]]\|[[:digit:]],\)${1}\(\,[[:digit:]].*\|\)$" | head -n1 | awk '{ print $1 }' )
+	local pool=
 
-    if [ -z "$pool" ]; then
-	    return 1
-    fi
-    printf '%s' "${pool}"
-    return 0
+	pool=$("$XL_BIN" cpupool-list -c | grep -e "\([[:space:]]\|[[:digit:]],\)${1}\(\,[[:digit:]].*\|\)$" | head -n1 | awk '{ print $1 }')
+
+	if [ -z "$pool" ]; then
+		return 1
+	fi
+	printf '%s' "${pool}"
+	return 0
 }
 
 # 24bit base for mac addresses
-_NETDEV_HWADDR_BASE=$(( (($RANDOM % 256) * 65536) + (($RANDOM % 256) * 256) + ($RANDOM % 256) ))
+_NETDEV_HWADDR_BASE=$((((RANDOM % 256) * 65536) + ((RANDOM % 256) * 256) + (RANDOM % 256)))
 
 _netdev_hwaddr()
 {
-    local NICID=${1:-0}
-    local HWADDR=$(( ${_NETDEV_HWADDR_BASE} + ${NICID} ))
+	local NICID=${1:-0}
+	local HWADDR=$((_NETDEV_HWADDR_BASE + NICID))
 
-    printf '00:16:3e:%02x:%02x:%02x' \
-	   $(( ($HWADDR / 65536) % 256 )) \
-	   $(( ($HWADDR / 256)   % 256 )) \
-	   $((  $HWADDR          % 256 ))
+	printf '00:16:3e:%02x:%02x:%02x' \
+		$(((HWADDR / 65536) % 256)) \
+		$(((HWADDR / 256) % 256)) \
+		$((HWADDR % 256))
 }
 
 attach_natvif()
 {
-	cat > "${TEMP}/vif-nat" <<EOF
+	cat > "${TEMP}/vif-nat" << EOF
 #!/bin/bash
 dir=\$(dirname "\$0")
 . "\$dir/xen-hotplug-common.sh"
@@ -180,21 +185,22 @@ EOF
 	# copy script dependencies
 	cp "${XEN_SCRIPT_DIR}/xen-network-common.sh" "${TEMP}/" || die "Failed to copy ${XEN_SCRIPT_DIR}/xen-network-common.sh"
 	cp "${XEN_SCRIPT_DIR}/xen-hotplug-common.sh" "${TEMP}/" || die "Failed to copy ${XEN_SCRIPT_DIR}/xen-hotplug-common.sh"
-	cp "${XEN_SCRIPT_DIR}/xen-script-common.sh" "${TEMP}/"  || die "Failed to copy ${XEN_SCRIPT_DIR}/xen-script-common.sh"
-	cp "${XEN_SCRIPT_DIR}/hotplugpath.sh" "${TEMP}/"        || die "Failed to copy ${XEN_SCRIPT_DIR}/hotplugpath.sh"
-	cp "${XEN_SCRIPT_DIR}/logging.sh" "${TEMP}/"            || die "Failed to copy ${XEN_SCRIPT_DIR}/logging.sh"
-	cp "${XEN_SCRIPT_DIR}/locking.sh" "${TEMP}/"            || die "Failed to copy ${XEN_SCRIPT_DIR}/locking.sh"
+	cp "${XEN_SCRIPT_DIR}/xen-script-common.sh" "${TEMP}/" || die "Failed to copy ${XEN_SCRIPT_DIR}/xen-script-common.sh"
+	cp "${XEN_SCRIPT_DIR}/hotplugpath.sh" "${TEMP}/" || die "Failed to copy ${XEN_SCRIPT_DIR}/hotplugpath.sh"
+	cp "${XEN_SCRIPT_DIR}/logging.sh" "${TEMP}/" || die "Failed to copy ${XEN_SCRIPT_DIR}/logging.sh"
+	cp "${XEN_SCRIPT_DIR}/locking.sh" "${TEMP}/" || die "Failed to copy ${XEN_SCRIPT_DIR}/locking.sh"
 
-	VIFS_CFG+="'bridge=null,mac=$( _netdev_hwaddr ${NICID} ),script=${TEMP}/vif-nat', "
+	NETDEV_HWADDR=$(_netdev_hwaddr "${NICID}")
+	VIFS_CFG+="'bridge=null,mac=${NETDEV_HWADDR},script=${TEMP}/vif-nat', "
 	HAS_NATVIF=0
-	(( NICID++ ))
+	((NICID++))
 }
 
 ##
 ## ARE WE ROOT?
 ##
-if [ $( id -u ) != 0 ]; then
-	if [ -x $( which sudo ) ]; then
+if [ "$(id -u)" != 0 ]; then
+	if [ -x "$(which sudo)" ]; then
 		echo "Trying to get root privileges..." 1>&2
 		exec sudo "$0" "$@"
 		exit 2
@@ -208,21 +214,20 @@ fi
 ## MAIN
 ##
 NL=$'\n'
-XL_BIN=${XL_BIN:-"$( which xl )"}
-GDBSX_BIN=${GDBSX_BIN:-"$( which gdbsx)"}
+XL_BIN=${XL_BIN:-"$(which xl)"}
+GDBSX_BIN=${GDBSX_BIN:-"$(which gdbsx)"}
 XEN_SCRIPT_DIR=${XEN_SCRIPT_DIR:-"/etc/xen/scripts"}
-TEMP="/tmp/$( basename "$0" )-$$"
+TEMP="/tmp/$(basename "$0")-$$"
 
 ARG_MEM=64
 ARG_CORES=1
 #ARG_SOCKETS=1
 #ARG_SMT=1
-ARG_GUESTNAME="$( uuidgen 2>/dev/null )"
+ARG_GUESTNAME="$(uuidgen 2> /dev/null)"
 ARG_KERNEL=
 ARG_INITRD=
 ARG_VCPUPIN=
 ARG_APPEND=
-ARG_APPEND_EXTRA=
 ARG_GDBPORT=8888
 
 OPT_BACKGROUND=1
@@ -234,11 +239,9 @@ OPT_DRYRUN=1
 OPT_GDBPORT=1
 OPT_PAUSED=1
 
-DOMAIN_CFG=
 VIFS_CFG=
 DISKS_CFG=
-NAT_NET=172.62.$(( $$ % 255 ))
-NAT_BRNAME='xnatbr-$(( $$ % 255 ))'
+NAT_NET=172.62.$(($$ % 255))
 
 HAS_NATVIF=1
 
@@ -249,7 +252,7 @@ if [ ! -d "$XEN_SCRIPT_DIR" ]; then
 	echo "Error: XEN_SCRIPT_DIR=\"${XEN_SCRIPT_DIR}\" does not exists" 1>&2
 	exit 2
 fi
-if [ -z "$( which uuidgen )" ]; then
+if [ -z "$(which uuidgen)" ]; then
 	echo "Please install uuidgen" 1>&2
 	exit 2
 fi
@@ -258,7 +261,7 @@ if [ $? -ne 0 ]; then
 	echo "Error: Could not create ${TEMP}" 1>&2
 	exit 2
 fi
-trap "rm -rf \"${TEMP}\"" exit
+trap rm -rf "${TEMP}" exit
 
 usage()
 {
@@ -305,29 +308,31 @@ usage()
 }
 
 while getopts :h:nb:o:d:k:i:a:c:m:p:xDG:g:P OPT; do
-    case ${OPT} in
+	case ${OPT} in
 	n)
-		if [ "$HAS_NATVIF" -ne 0 -a "$NICID" -ne 0 ]; then
+		if [ "$HAS_NATVIF" -ne 0 ] && [ "$NICID" -ne 0 ]; then
 			echo "A NAT-ed NIC needs to be the first NIC and can only be added once (-n)" 1>&2
 			return 1
 		fi
 		attach_natvif
 		;;
 	b)
-		VIFS_CFG+="'bridge=${OPTARG},mac=$( _netdev_hwaddr ${NICID} ),script=vif-bridge', "
-		(( NICID++ ))
+		NETDEV_HWADDR=$(_netdev_hwaddr "${NICID}")
+		VIFS_CFG+="'bridge=${OPTARG},mac=$NETDEV_HWADDR,script=vif-bridge', "
+		((NICID++))
 		;;
 	o)
-		VIFS_CFG+="'bridge=${OPTARG},mac=$( _netdev_hwaddr ${NICID} ),script=vif-openvswitch', "
-		(( NICID++ ))
+		NETDEV_HWADDR=$(_netdev_hwaddr "${NICID}")
+		VIFS_CFG+="'bridge=${OPTARG},mac=$NETDEV_HWADDR,script=vif-openvswitch', "
+		((NICID++))
 		;;
 	d)
 		if [ -b "$OPTARG" ]; then
-			DISKS_CFG+="'phy:${OPTARG},$( diskid2xvd $DISKID ),rw', "
+			DISKS_CFG+="'phy:${OPTARG},$(diskid2xvd $DISKID),rw', "
 		else
-			DISKS_CFG+="'raw:${OPTARG},$( diskid2xvd $DISKID ),rw', "
+			DISKS_CFG+="'raw:${OPTARG},$(diskid2xvd $DISKID),rw', "
 		fi
-		(( DISKID++ ))
+		((DISKID++))
 		;;
 	c)
 		ARG_CORES=${OPTARG}
@@ -348,29 +353,29 @@ while getopts :h:nb:o:d:k:i:a:c:m:p:xDG:g:P OPT; do
 		OPT_APPEND=0
 		;;
 	p)
-		if [ "${OPTARG}" = "allfree" -o "${OPTARG}" = "firstfree" -o "${OPTARG}" = "first2free" \
-		     -o "${OPTARG}" = "free" -o "${OPTARG}" = "1free" -o "${OPTARG}" = "2free" ]; then
-			FREE_CPUS=$( detect_freecpus )
-			if [ $? -ne 0 -o -z "${FREE_CPUS}" ]; then
+		if [ "${OPTARG}" = "allfree" ] || [ "${OPTARG}" = "firstfree" ] || [ "${OPTARG}" = "first2free" ] ||
+			[ "${OPTARG}" = "free" ] || [ "${OPTARG}" = "1free" ] || [ "${OPTARG}" = "2free" ]; then
+			FREE_CPUS=$(detect_freecpus)
+			if [ $? -ne 0 ] || [ -z "${FREE_CPUS}" ]; then
 				echo "Could not find a single free CPU, all in use? (-p)" 1>&2
 				exit 1
 			fi
-			if [ "${OPTARG}" = "firstfree" -o "${OPTARG}" = "1free" ]; then
+			if [ "${OPTARG}" = "firstfree" ] || [ "${OPTARG}" = "1free" ]; then
 				C=
 				for C in $FREE_CPUS; do
 					ARG_VCPUPIN="$C"
 					break
 				done
-			elif [ "${OPTARG}" = "first2free" -o "${OPTARG}" = "2free" ]; then
+			elif [ "${OPTARG}" = "first2free" ] || [ "${OPTARG}" = "2free" ]; then
 				C=
 				I=0
 				for C in $FREE_CPUS; do
 					ARG_VCPUPIN+=" $C"
-					(( I++ ))
-					if [ $I -eq 2 ]; then break; fi
+					((I++))
+					if [ "$I" -eq 2 ]; then break; fi
 				done
 
-				if [ $I -ne 2 ]; then
+				if [ "$I" -ne 2 ]; then
 					echo "Not enough free CPUs found (-p)" 1>&2
 					exit 1
 				fi
@@ -378,8 +383,8 @@ while getopts :h:nb:o:d:k:i:a:c:m:p:xDG:g:P OPT; do
 				ARG_VCPUPIN="$FREE_CPUS"
 			fi
 		else
-			ARG_VCPUPIN=$( _expand_num_list "${OPTARG}" )
-			if [ $? -ne 0 -o -z "${ARG_VCPUPIN}" ]; then
+			ARG_VCPUPIN=$(_expand_num_list "${OPTARG}")
+			if [ $? -ne 0 ] || [ -z "${ARG_VCPUPIN}" ]; then
 				echo "Could not parse CPU list (-p)" 1>&2
 				exit 1
 			fi
@@ -413,24 +418,24 @@ while getopts :h:nb:o:d:k:i:a:c:m:p:xDG:g:P OPT; do
 		;;
 	esac
 done
-shift $(( OPTIND - 1 ))
+shift $((OPTIND - 1))
 
-[ -z "$XL_BIN" -o ! -x "$XL_BIN" ] && die "xl not found (XL_BIN)"
-[ -z "$XEN_SCRIPT_DIR" -o ! -d "$XEN_SCRIPT_DIR" ] && die "Xen script directory not found (XEN_SCRIPT_DIR)"
+[ -z "$XL_BIN" ] || [ ! -x "$XL_BIN" ] && die "xl not found (XL_BIN)"
+[ -z "$XEN_SCRIPT_DIR" ] || [ ! -d "$XEN_SCRIPT_DIR" ] && die "Xen script directory not found (XEN_SCRIPT_DIR)"
 if [ ${OPT_GDBPORT} -eq 0 ]; then
-	[ -z "${GDBSX_BIN}" -o !-x "${GDBSX_BIN}" ] && die "gdbsx not found (GDBSX_BIN)"
+	[ -z "${GDBSX_BIN}" ] || [ ! -x "${GDBSX_BIN}" ] && die "gdbsx not found (GDBSX_BIN)"
 fi
 
-if [ $OPT_INITRD -eq 0 -a $OPT_KERNEL -ne 0 ]; then
+if [ $OPT_INITRD -eq 0 ] && [ $OPT_KERNEL -ne 0 ]; then
 	echo "An init-ramdisk requires a kernel (-k option missing)" 1>&2
 	exit 1
 fi
-if [ $OPT_APPEND -eq 0 -a $OPT_KERNEL -ne 0 ]; then
+if [ $OPT_APPEND -eq 0 ] && [ $OPT_KERNEL -ne 0 ]; then
 	echo "Kernel arguments require a kernel (-k option missing)" 1>&2
 	exit 1
 fi
 
-if [ $OPT_KERNEL -eq 0 -a $OPT_APPEND -ne 0 ]; then
+if [ $OPT_KERNEL -eq 0 ] && [ $OPT_APPEND -ne 0 ]; then
 	# default append
 	ARG_APPEND="console=hvc0"
 	if [ $HAS_NATVIF -eq 0 ]; then
@@ -451,19 +456,19 @@ if [ ${OPT_VCPUPIN} -eq 0 ]; then
 	TMP=
 	F=0
 	for P in $ARG_VCPUPIN; do
-	    if [ $F -ne 0 ]; then
-		    TMP+=","
-	    else
-		    # record first CPU to detect cpu pool later
-		    P_FIRST="${P}"
-	    fi
-	    TMP+="${P}"
-	    F=1
+		if [ $F -ne 0 ]; then
+			TMP+=","
+		else
+			# record first CPU to detect cpu pool later
+			P_FIRST="${P}"
+		fi
+		TMP+="${P}"
+		F=1
 	done
 	DOM_CFG+="cpus          = '${TMP}'${NL}"
 
 	# try to detect CPU pool of pinning (Note: only a single CPU pool per guest is supported)
-	P_POOL="$( cpu2pool "${P_FIRST}" )"
+	P_POOL="$(cpu2pool "${P_FIRST}")"
 	if [ $? -eq 0 ]; then
 		DOM_CFG+="pool          = '${P_POOL}'${NL}"
 	fi
@@ -517,8 +522,8 @@ XL_RET=$?
 if [ $XL_RET -ne 0 ]; then
 	exit $XL_RET
 fi
-GUESTID=$( ${XL_BIN} list | grep "${ARG_GUESTNAME}" 2>/dev/null | awk '{print $2}' )
-if [ $? -ne 0 -o -z "$GUESTID" ]; then
+GUESTID=$(${XL_BIN} list | grep "${ARG_GUESTNAME}" 2> /dev/null | awk '{print $2}')
+if [ $? -ne 0 ] || [ -z "$GUESTID" ]; then
 	printf 'Failed to retrieve guest ID\n' 1>&2
 	${XL_BIN} destroy "${ARG_GUESTNAME}"
 	exit 1
@@ -535,7 +540,7 @@ printf '   Domain ID:             %s\n' "${GUESTID}"
 printf '   SMP configuration:     %s\n' "sockets=1,cores=${ARG_CORES},threads=1"
 printf '   Memory:                %d MB\n' "${ARG_MEM}"
 if [ ${OPT_VCPUPIN} -eq 0 ]; then
-	printf '   vCPU pin set:          %s\n' "$( echo "${ARG_VCPUPIN}" | tr '\n' ' ' )"
+	printf '   vCPU pin set:          %s\n' "$(echo "${ARG_VCPUPIN}" | tr '\n' ' ')"
 fi
 if [ ${OPT_KERNEL} -eq 0 ]; then
 	printf '   Kernel:                %s\n' "${ARG_KERNEL}"
@@ -550,10 +555,10 @@ if [ ${OPT_GDBPORT} -eq 0 ]; then
 	printf '   GDB server:            %s\n' "${ARG_GDBPORT}"
 fi
 printf '\n'
-if [ ${OPT_GDBPORT} -eq 0 -a ${OPT_KERNEL} -eq 0 ]; then
+if [ ${OPT_GDBPORT} -eq 0 ] && [ ${OPT_KERNEL} -eq 0 ]; then
 	printf '   Hint:    Use '"\'"'gdb --eval-command="target remote :%s" %s'"\'"' to connect to the GDB server\n' "${ARG_GDBPORT}" "${ARG_KERNEL}"
 fi
-if [ ${NICID} -eq 0 ]; then
+if [ "${NICID}" -eq 0 ]; then
 	printf '   Warning: No networking for guest!\n'
 fi
 if [ ${OPT_BACKGROUND} -ne 0 ]; then
