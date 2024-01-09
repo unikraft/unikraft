@@ -34,6 +34,8 @@ jobs:
         env:
           GOVERN_GITHUB_TOKEN: ${{ secrets.GH_MERGE_PAT }}
           GOVERN_GITHUB_USER: ${{ secrets.GH_MERGE_ACTOR }}
+          GOVERN_COMMITTER_EMAIL: ${{ secrets.GOVERN_COMMITTER_EMAIL }}
+          GOVERN_COMMITTER_NAME: ${{ secrets.GOVERN_COMMITTER_NAME }}
           GOVERN_NO_RENDER: true
           GOVERN_LOG_LEVEL: warn
           GOVERN_NO_CONFLICTS: true
