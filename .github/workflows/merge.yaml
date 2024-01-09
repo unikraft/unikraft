@@ -6,11 +6,11 @@ on:
 
 permissions:
   contents: read
-  pull-requests: read
+  pull-requests: write
 
 jobs:
   merge:
-    if: ${{ github.event.label.name == 'merged' }}
+    if: ${{ github.event.label.name == 'merge' }}
     runs-on: ubuntu-latest
     name: merge
     steps:
