@@ -55,4 +55,10 @@ labels:
     description: Issues and PRs which affect support code
     color: "#bfd4f2"
     apply_on_pr_match_paths:
-      - suuport/**
+      - support/**
+
+  - name: area/workflows
+    description: Issue or PR relates to GitHub action workflows
+    color: "#fef2c0"
+    apply_on_pr_match_paths:
+      - .github/workflows/**
