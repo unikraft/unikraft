@@ -21,7 +21,8 @@ jobs:
       - name: Run checkpatch through governctl
         run: governctl pr check patch --ignore "${GOVERN_IGNORES}" "unikraft/unikraft/${PR_NUMBER}"
         env:
-          GOVERN_GITHUB_TOKEN: ${{ secrets.GH_MERGE_PAT }}
+          PR_NUMBER: ${{ github.event.number }}
+          GOVERN_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GOVERN_GITHUB_USER: ${{ secrets.GH_CHECKPATCH_ACTOR }}
           GOVERN_NO_RENDER: true
           GOVERN_LOG_LEVEL: warn
