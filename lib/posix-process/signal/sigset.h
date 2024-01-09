@@ -37,26 +37,22 @@
 #ifndef __UK_SIGSET_H__
 #define __UK_SIGSET_H__
 
+#include <signal.h>
+
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-/* TODO: do we have gnu statement expression?  */
-/* internal use */
-#if !HAVE_LIBC
-
-#define uk_sigemptyset(ptr)	(*(ptr) = 0)
-#define uk_sigfillset(ptr)  (*(ptr) = ~((__sigset_t) 0))
-#define uk_sigaddset(ptr, signo) (*(ptr) |= (1UL << ((signo) - 1)))
-#define uk_sigdelset(ptr, signo) (*(ptr) &= ~(1UL << ((signo) - 1)))
-#define uk_sigcopyset(ptr1, ptr2) (*(ptr1) = *(ptr2))
-#define uk_sigandset(ptr1, ptr2)  (*(ptr1) &= *(ptr2))
-#define uk_sigorset(ptr1, ptr2)	  (*(ptr1) |= *(ptr2))
-#define uk_sigreverseset(ptr)	  (*(ptr) = ~(*(ptr)))
-#define uk_sigismember(ptr, signo) (*(ptr) & (1UL << ((signo) - 1)))
-#define uk_sigisempty(ptr) (*(ptr) == 0)
-
-#endif
+#define uk_sigemptyset(_ptr)		(*(_ptr) = 0)
+#define uk_sigfillset(_ptr)		(*(_ptr) = ~((__sigset_t)0))
+#define uk_sigaddset(_ptr, _signo)	(*(_ptr) |= (1UL << ((_signo) - 1)))
+#define uk_sigdelset(_ptr, _signo)	(*(_ptr) &= ~(1UL << ((_signo) - 1)))
+#define uk_sigcopyset(_ptr1, _ptr2)	(*(_ptr1) = *(_ptr2))
+#define uk_sigandset(_ptr1, _ptr2)	(*(_ptr1) &= *(_ptr2))
+#define uk_sigorset(_ptr1, _ptr2)	(*(_ptr1) |= *(_ptr2))
+#define uk_sigreverseset(_ptr)		(*(_ptr) = ~(*(_ptr)))
+#define uk_sigismember(_ptr, _signo)	(*(_ptr) & (1UL << ((_signo) - 1)))
+#define uk_sigisempty(_ptr)		(*(_ptr) == 0)
 
 #ifdef __cplusplus
 }
