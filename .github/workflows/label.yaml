@@ -16,7 +16,7 @@ jobs:
           wget -q "https://github.com/unikraft/governance/releases/download/v${GOVERN_VERSION}/governance_${GOVERN_VERSION}_linux_amd64.deb"
           sudo dpkg -i "governance_${GOVERN_VERSION}_linux_amd64.deb"
         env:
-          GOVERN_VERSION: 0.1.8
+          GOVERN_VERSION: 0.1.9
 
       - name: Label PR
         run: governctl pr sync labels "unikraft/unikraft/${PR_NUMBER}" --labels-dir .github/labels
