@@ -1,9 +1,8 @@
 name: governctl
 
 on:
-  pull_request:
+  pull_request_target:
     types: [opened, synchronize, reopened]
-    branches: [staging]
 
 permissions:
   contents: read
@@ -14,6 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     name: label
     steps:
+      - name: Get Pull Request Number
+        run: echo "PR_NUMBER=$(echo ${{ github.event.number }} | sed 's/\//\\\//g')" >> "$GITHUB_ENV"
+        shell: bash
+
       - name: Install governctl
         run: |
           set -xe
@@ -25,7 +28,6 @@ jobs:
       - name: Label PR
         run: governctl pr sync labels "unikraft/unikraft/${PR_NUMBER}" --labels-dir .github/labels
         env:
-          PR_NUMBER: ${{ github.event.number }}
           GOVERN_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GOVERN_GITHUB_USER: ${{ secrets.GH_CHECKPATCH_ACTOR }}
           GOVERN_NO_RENDER: true
