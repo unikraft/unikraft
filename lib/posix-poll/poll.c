@@ -62,7 +62,7 @@ int uk_sys_ppoll(struct pollfd *fds, nfds_t nfds,
 		struct pollfd *p = &fds[i];
 		int r = 0;
 
-		if (p->fd > 0) {
+		if (p->fd >= 0) {
 			struct epoll_event ev = {
 				.events = p->events,
 				.data.fd = p->fd
