@@ -227,6 +227,7 @@ static int _init_mem(struct ukplat_bootinfo *const bi, paddr_t physical_offset)
 	void *new_dtb;
 	paddr_t start_pfn_p;
 	paddr_t max_pfn_p;
+	__vaddr_t vaddr;
 	struct ukplat_memregion_desc mrd;
 
 	/* init physical address offset gathered by entry32.S */
@@ -248,16 +249,23 @@ static int _init_mem(struct ukplat_bootinfo *const bi, paddr_t physical_offset)
 
 	max_pfn_p = to_phys(new_dtb) >> __PAGE_SHIFT;
 
-	/* Fill out mrd array
+	/*
+	 * Fill out mrd array
 	 */
+	/*
+	 * We set .pbase = .vbase in heap mrd structure because of the way
+	 * ukplat_memregion_list_coalesce work behaviour.
+	 * It does ml->vbase = ml->pbase at the end of undating each region,
+	 * so we can't use pbase to store physical address
+	 */
+	vaddr = (__vaddr_t)to_virt(start_pfn_p << PAGE_SHIFT);
 	/* heap */
 	mrd = (struct ukplat_memregion_desc){
-		.vbase = (__vaddr_t)to_virt(start_pfn_p << PAGE_SHIFT),
-		.pbase = start_pfn_p << PAGE_SHIFT,
-		.len = (max_pfn_p - start_pfn_p) << PAGE_SHIFT,
-		.type = UKPLAT_MEMRT_FREE,
-		.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE |
-			UKPLAT_MEMRF_MAP,
+	    .vbase = vaddr,
+	    .pbase = (__paddr_t)vaddr,
+	    .len = (max_pfn_p - start_pfn_p) << PAGE_SHIFT,
+	    .type = UKPLAT_MEMRT_FREE,
+	    .flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE | UKPLAT_MEMRF_MAP,
 	};
 #if CONFIG_UKPLAT_MEMRNAME
 	memcpy(mrd.name, "heap", sizeof(mrd.name) - 1);
