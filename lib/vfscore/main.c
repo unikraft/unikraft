@@ -1967,7 +1967,20 @@ int vfscore_fcntl(struct vfscore_file *fp, unsigned int cmd, unsigned long arg)
 		uk_pr_warn_once("fcntl(F_SETLK) stubbed\n");
 		break;
 	case F_GETLK:
-		uk_pr_warn_once("fcntl(F_GETLK) stubbed\n");
+		uk_pr_warn_once("fcntl(F_GETLK) stubbed. Always unlocked\n");
+
+		struct flock *flk = (struct flock *)arg;
+
+		if (unlikely(!flk)) {
+			error = EFAULT;
+			goto out_errno;
+		}
+
+		/* For now, stubbing as always unlocked seems to be fine. We
+		 * are, after all, a unikernel.
+		 */
+		flk->l_type = F_UNLCK;
+
 		break;
 	case F_SETLKW:
 		uk_pr_warn_once("fcntl(F_SETLKW) stubbed\n");
