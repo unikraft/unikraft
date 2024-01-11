@@ -129,11 +129,10 @@
 	str	x0, [sp, #__SP_OFFSET]  /* Store old SP in auxiliary stack */
 	b	1f
 0:
-	/* Restore x0 */
-	mrs     x0, tpidrro_el0
-
 	sub	sp, sp, #__TRAP_STACK_SIZE
 1:
+	/* Restore x0 */
+	mrs     x0, tpidrro_el0
 
 	/* Save general purpose registers */
 	stp	x0, x1, [sp, #16 * 0]
