@@ -71,22 +71,28 @@ int uk_sys_ppoll(struct pollfd *fds, nfds_t nfds,
 			r = uk_sys_epoll_ctl(ef, EPOLL_CTL_ADD, p->fd, &ev);
 			monitored++;
 		}
-		if (unlikely(r))
-			switch (r) {
-			case -EBADF:
-				p->revents = POLLNVAL;
-				ret++;
-				break;
-			case -EEXIST:
-				uk_pr_warn("Duplicate fd in poll: %d\n", p->fd);
-				ret = -ENOSYS;
-				goto out;
-			default:
-				ret = r;
-				goto out;
-			}
-		else
+		switch (r) {
+		case 0:
 			p->revents = 0;
+			break;
+		case -EBADF:
+			p->revents = POLLNVAL;
+			ret++;
+			break;
+		case -EPERM:
+			/* Files without epoll support always return in|out */
+			p->revents = (POLLIN|POLLOUT) & p->events;
+			if (p->revents)
+				ret++;
+			break;
+		case -EEXIST:
+			uk_pr_warn("Duplicate fd in poll: %d\n", p->fd);
+			ret = -ENOSYS;
+			goto out;
+		default:
+			ret = r;
+			goto out;
+		}
 	}
 	if (!monitored)
 		monitored = 1; /* Need at least 1 return entry */
