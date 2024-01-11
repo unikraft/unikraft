@@ -34,6 +34,7 @@ LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/ctype.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/stdlib.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/string.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/string/strsignal.c
+LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/string/strstr.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/signal/psignal.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/time/__month_to_secs.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/time/__secs_to_tm.c
