@@ -123,20 +123,18 @@ static int vfs_poll(struct vfscore_file *vfd, unsigned int *revents,
 	return VOP_POLL(vnode, revents, ecb);
 }
 
-static void vfs_poll_register(struct vfscore_file *vfd,
-			      struct epoll_legacy *leg)
+static int vfs_poll_register(struct vfscore_file *vfd, struct epoll_legacy *leg)
 {
-	int ret;
+	int ret = vfs_poll(vfd, &leg->revents, &leg->ecb);
 
-	ret = vfs_poll(vfd, &leg->revents, &leg->ecb);
-	if (unlikely(ret)) {
-		leg->revents = EPOLLERR;
-	} else {
-		uk_list_add_tail(&leg->f_link, &vfd->f_ep);
-		(void)uk_and(&leg->revents, leg->mask);
-		if (leg->revents)
-			uk_file_event_set(leg->epf, UKFD_POLLIN);
-	}
+	if (unlikely(ret))
+		return -ret; /* vfscore uses positive errnos */
+
+	uk_list_add_tail(&leg->f_link, &vfd->f_ep);
+	(void)uk_and(&leg->revents, leg->mask);
+	if (leg->revents)
+		uk_file_event_set(leg->epf, UKFD_POLLIN);
+	return 0;
 }
 #endif /* CONFIG_LIBVFSCORE */
 
@@ -242,6 +240,7 @@ static int epoll_add_legacy(const struct uk_file *epf,
 {
 	struct epoll_alloc *al = __containerof(epf, struct epoll_alloc, f);
 	struct epoll_entry *ent;
+	int r;
 
 	/* New entry */
 	ent = uk_malloc(al->alloc, sizeof(*ent));
@@ -263,10 +262,17 @@ static int epoll_add_legacy(const struct uk_file *epf,
 	};
 	UK_INIT_LIST_HEAD(&ent->legacy_cb.ecb.cb_link);
 	UK_INIT_LIST_HEAD(&ent->legacy_cb.f_link);
-	*tail = ent;
 	/* Poll, register & update if needed */
-	vfs_poll_register(vf, &ent->legacy_cb);
+	r = vfs_poll_register(vf, &ent->legacy_cb);
+	if (unlikely(r)) {
+		uk_free(al->alloc, ent);
+		if (r == -EINVAL)
+			return -EPERM;
+		else
+			return r;
+	}
 
+	*tail = ent;
 	return 0;
 }
 #endif /* CONFIG_LIBVFSCORE */
