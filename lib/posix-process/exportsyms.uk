@@ -127,3 +127,4 @@ tkill
 uk_syscall_r_tkill
 uk_syscall_e_tkill
 uk_signal_deliver
+uk_posix_process_wait

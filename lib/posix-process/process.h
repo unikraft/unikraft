@@ -33,11 +33,14 @@
 #ifndef __PROCESS_H_INTERNAL__
 #define __PROCESS_H_INTERNAL__
 
-#include <uk/config.h>
 #include <sys/types.h>
+#include <uk/config.h>
+#include <uk/semaphore.h>
 #if CONFIG_LIBPOSIX_PROCESS_PIDS
 #include <uk/thread.h>
 #endif /* CONFIG_LIBPOSIX_PROCESS_PIDS */
+
+#define UK_PID_WAIT_ANY		-1
 
 #define TIDMAP_SIZE (CONFIG_LIBPOSIX_PROCESS_MAX_PID + 1)
 
@@ -60,6 +63,9 @@ struct posix_process {
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	struct uk_signal_pdesc *signal;
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+	struct uk_semaphore wait_semaphore;
+	bool terminated;
+	int exit_status;
 
 	/* TODO: Mutex */
 };
@@ -74,6 +80,7 @@ struct posix_thread {
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	struct uk_signal_tdesc *signal;
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+	pid_t wait_pid;
 
 	/* TODO: Mutex */
 };
@@ -85,6 +92,10 @@ for (int _j = 1, _i = 0; _i != ARRAY_SIZE(pid_process);			\
 	_j = !_j, _i++)							\
 		for (_p = pid_process[_i]; _j; _j = !_j)		\
 			if (_p)						\
+
+#define uk_process_foreach_child(_pparent, _p)				\
+uk_process_foreach(_p)							\
+		if ((_p)->parent == (_pparent))				\
 
 #define uk_process_foreach_pthread(_proc, _pthread, _pthreadn)		\
 	uk_list_for_each_entry_safe(_pthread, _pthreadn,		\

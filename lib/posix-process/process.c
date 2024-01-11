@@ -254,6 +254,9 @@ int uk_posix_process_create(struct uk_alloc *a,
 	}
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
+	/* Initialize semaphore for wait() */
+	uk_semaphore_init(&pprocess->wait_semaphore, 0);
+
 	/* Check if we have a pthread structure already for this thread
 	 * or if we need to allocate one
 	 */
@@ -404,6 +407,46 @@ static void pprocess_kill(struct posix_process *pprocess)
 		uk_sched_thread_terminate(uk_thread_current());
 
 		/* NOTE: Nothing will be executed from here on */
+	}
+}
+
+void uk_posix_process_kill_siblings(struct uk_thread *thread)
+{
+	struct posix_thread *pthread, *pthreadn;
+	struct posix_thread *this_thread;
+	struct posix_process *pprocess;
+	pid_t this_tid;
+
+	this_tid = ukthread2tid(thread);
+	this_thread = tid2pthread(this_tid);
+
+	pprocess = this_thread->process;
+	UK_ASSERT(pprocess);
+
+	/* Kill all remaining threads of the process */
+	uk_list_for_each_entry_safe(pthread, pthreadn,
+				    &pprocess->threads, thread_list_entry) {
+		if (pthread->tid == this_tid)
+			continue;
+
+		if (uk_thread_is_exited(pthread->thread)) {
+			/* Thread already exited, might wait for getting
+			 * garbage collected.
+			 */
+			continue;
+		}
+
+		uk_pr_debug("Terminating siblings of tid: %d (pid: %d): Killing TID %d: thread %p (%s)...\n",
+			    this_thread->tid, pprocess->pid,
+			    pthread->tid, pthread->thread,
+			    pthread->thread->name);
+
+		/* Terminating the thread will lead to calling
+		 * `posix_thread_fini()` which will clean-up the related
+		 * pthread resources and pprocess resources on the last
+		 * thread
+		 */
+		uk_sched_thread_terminate(pthread->thread);
 	}
 }
 

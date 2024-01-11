@@ -36,4 +36,31 @@ static inline void set_siginfo_sigqueue(int signum, siginfo_t *si,
 	si->si_value = si_usr->si_value;
 }
 
+static inline void set_siginfo_wait(struct posix_thread *thread, siginfo_t *si)
+{
+	struct posix_process *proc;
+
+	UK_ASSERT(si);
+	UK_ASSERT(thread);
+	UK_ASSERT(thread->process);
+
+	proc = thread->process;
+
+	si->si_pid = proc->pid;
+	si->si_uid = 0;
+	si->si_signo = SIGCHLD;
+	switch (thread->state) {
+	case POSIX_THREAD_EXITED:
+		si->si_status = CLD_EXITED;
+		si->si_code = proc->exit_status;
+		break;
+	case POSIX_THREAD_KILLED:
+		si->si_status = CLD_KILLED;
+		si->si_code = proc->exit_status;
+		break;
+	default:
+		uk_pr_warn("CLD_STOPPED, CLD_CONTINUED, CLD_TRAPPED, CLD_DUMPED stubbed");
+	}
+}
+
 #endif /* __UK_SIGNAL_SIGINFO_H__ */
