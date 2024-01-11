@@ -61,7 +61,6 @@
 #define LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP			':'
 #define LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP			','
 #endif /* CONFIG_LIBVFSCORE_FSTAB */
-#define LIBVFSCORE_INITRD_OPT_EXTRACT				"extract"
 
 struct vfscore_volume {
 	/* Volume source device */
@@ -88,19 +87,12 @@ static int do_mount_initrd(const void *initrd, size_t len, const char *path,
 
 	UK_ASSERT(path);
 
-	/* 'extract' is an (e)initrd-specific mount option that allows
-	 * extracting an archive to an existing filesystem. If this option
-	 * is chosen, no other mount option is accepted.
-	 */
-	if (!opts || (strcmp(opts, LIBVFSCORE_INITRD_OPT_EXTRACT) != 0)) {
-		/* mount a ramfs volume as base only in non-'extract' mode */
-		uk_pr_info("Mounting 'ramfs' to %s...\n", path);
-		rc = mount("", path, "ramfs", flags, opts);
-		if (unlikely(rc)) {
-			uk_pr_crit("Failed to mount ramfs to \"%s\": %d\n",
-				   path, errno);
-			return -1;
-		}
+	uk_pr_info("Mounting 'ramfs' to %s...\n", path);
+	rc = mount("", path, "ramfs", flags, opts);
+	if (unlikely(rc)) {
+		uk_pr_crit("Failed to mount ramfs to \"%s\": %d\n",
+			   path, errno);
+		return -1;
 	}
 
 	uk_pr_info("Extracting initrd @ %p (%"__PRIsz" bytes) to %s...\n",
@@ -422,28 +414,6 @@ static int vfscore_automount_fstab_volumes(void)
 
 	for (i = 0; i < CONFIG_LIBVFSCORE_FSTAB_SIZE && vfscore_fstab[i]; i++) {
 		vfscore_fstab_fetch_volume_args(vfscore_fstab[i], &vv);
-
-#if CONFIG_LIBVFSCORE_INITRD_EXTRACT_WORKAROUND && \
-    !CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS
-		/* WORKAROUND: In case the image was built without predefined
-		 *             rootfs and we are asked to `extract` an initrd
-		 *             to `/` as first filesystem, we mount an empty
-		 *             ramfs as base.
-		 */
-		if (i == 0 &&
-		    vv.drv &&
-		    strcmp("initrd", vv.drv) == 0 &&
-		    vv.opts &&
-		    strcmp(LIBVFSCORE_INITRD_OPT_EXTRACT, vv.opts) == 0 &&
-		    vv.path && vv.path[0] == '/' && vv.path[1] == '\0') {
-			/* Removing the "extract" option will cause mounting
-			 * an empty ramfs volume for `/`.
-			 */
-			vv.opts = NULL;
-		}
-#endif /* CONFIG_LIBVFSCORE_INITRD_EXTRACT_WORKAROUND &&
-	* !CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS
-	*/
 
 		rc = vfscore_mount_volume(&vv);
 		if (unlikely(rc)) {
