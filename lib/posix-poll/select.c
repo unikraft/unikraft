@@ -21,6 +21,18 @@
 
 /* Internal syscalls */
 
+static inline void zero_fdsets(fd_set *restrict readfds,
+			       fd_set *restrict writefds,
+			       fd_set *restrict exceptfds)
+{
+	if (readfds)
+		FD_ZERO(readfds);
+	if (writefds)
+		FD_ZERO(writefds);
+	if (exceptfds)
+		FD_ZERO(exceptfds);
+}
+
 int uk_sys_pselect(int nfds, fd_set *restrict readfds,
 		   fd_set *restrict writefds,
 		   fd_set *restrict exceptfds,
@@ -30,6 +42,9 @@ int uk_sys_pselect(int nfds, fd_set *restrict readfds,
 	const struct uk_file *ef;
 	int ret;
 	int monitored;
+	int immediate;
+	fd_set imm_rd;
+	fd_set imm_wr;
 
 	if (unlikely(nfds < 0))
 		return -EINVAL;
@@ -51,6 +66,9 @@ int uk_sys_pselect(int nfds, fd_set *restrict readfds,
 	/* Walk fds, add to epoll */
 	ret = 0;
 	monitored = 0;
+	immediate = 0;
+	FD_ZERO(&imm_rd);
+	FD_ZERO(&imm_wr);
 	for (int fd = 0; fd < nfds; fd++) {
 		int r = 0, w = 0, x = 0;
 
@@ -68,13 +86,39 @@ int uk_sys_pselect(int nfds, fd_set *restrict readfds,
 			};
 
 			ret = uk_sys_epoll_ctl(ef, EPOLL_CTL_ADD, fd, &ev);
-			if (unlikely(ret))
+			if (ret == -EPERM) {
+				/* Files without epoll support return rd|wr */
+				if (r|w)
+					immediate = fd + 1;
+				if (r)
+					FD_SET(fd, &imm_rd);
+				if (w)
+					FD_SET(fd, &imm_wr);
+				ret = 0;
+			} else if (unlikely(ret)) {
 				break;
+			}
 			monitored++;
 		}
 	}
 	if (!monitored)
 		monitored = 1;
+
+	if (immediate) {
+		ret = 0;
+		zero_fdsets(readfds, writefds, exceptfds);
+
+		for (int i = 0; i < immediate; i++) {
+			if (FD_ISSET(i, &imm_rd)) {
+				FD_SET(i, readfds);
+				ret++;
+			}
+			if (FD_ISSET(i, &imm_wr)) {
+				FD_SET(i, writefds);
+				ret++;
+			}
+		}
+	}
 
 	if (!ret) {
 		struct epoll_event ev[monitored];
@@ -96,12 +140,7 @@ int uk_sys_pselect(int nfds, fd_set *restrict readfds,
 
 			*timeout = uk_time_spec_from_nsec(left > 0 ? left : 0);
 		}
-		if (readfds)
-			FD_ZERO(readfds);
-		if (writefds)
-			FD_ZERO(writefds);
-		if (exceptfds)
-			FD_ZERO(exceptfds);
+		zero_fdsets(readfds, writefds, exceptfds);
 		for (int i = 0; i < ret; i++) {
 			int fd = ev[i].data.fd;
 
