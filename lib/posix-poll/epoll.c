@@ -434,7 +434,9 @@ int uk_sys_epoll_ctl(const struct uk_file *epf, int op, int fd,
 
 	switch (op) {
 	case EPOLL_CTL_ADD:
-		if (unlikely(*entp))
+		if (unlikely(!event))
+			ret = -EFAULT;
+		else if (unlikely(*entp))
 			ret = -EEXIST;
 		else
 #if CONFIG_LIBVFSCORE
@@ -448,7 +450,9 @@ int uk_sys_epoll_ctl(const struct uk_file *epf, int op, int fd,
 		break;
 
 	case EPOLL_CTL_MOD:
-		if (unlikely(!*entp))
+		if (unlikely(!event))
+			ret = -EFAULT;
+		else if (unlikely(!*entp))
 			ret = -ENOENT;
 		else
 #if CONFIG_LIBVFSCORE
