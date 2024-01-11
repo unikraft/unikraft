@@ -47,3 +47,4 @@ kill
 pause
 sigaltstack
 tgkill
+uk_posix_process_wait

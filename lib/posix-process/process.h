@@ -33,7 +33,6 @@
 #ifndef __PROCESS_H_INTERNAL__
 #define __PROCESS_H_INTERNAL__
 
-#include <uk/config.h>
 #include <sys/types.h>
 
 #if CONFIG_LIBPOSIX_PROCESS_CLONE
@@ -41,9 +40,14 @@
 #include <uk/arch/ctx.h>
 #endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 
+#include <uk/config.h>
+#include <uk/semaphore.h>
+
 #if CONFIG_LIBPOSIX_PROCESS_PIDS
 #include <uk/thread.h>
 #endif /* CONFIG_LIBPOSIX_PROCESS_PIDS */
+
+#define UK_PID_WAIT_ANY		-1
 
 #define TIDMAP_SIZE (CONFIG_LIBPOSIX_PROCESS_MAX_PID + 1)
 
@@ -72,6 +76,9 @@ struct posix_process {
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	struct uk_signal_pdesc *signal;
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+	struct uk_semaphore wait_semaphore;
+	bool terminated;
+	int exit_status;
 
 	/* TODO: Mutex */
 };
@@ -87,6 +94,7 @@ struct posix_thread {
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	struct uk_signal_tdesc *signal;
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+	pid_t wait_pid;
 
 	/* TODO: Mutex */
 };
@@ -104,6 +112,10 @@ extern __uk_tls struct posix_thread *pthread_self;
 #define uk_pprocess_foreach_pthread(_proc, _pthread, _pthreadn)		\
 	uk_list_for_each_entry_safe((_pthread), (_pthreadn),		\
 				    &(_proc)->threads, thread_list_entry)
+
+#define uk_pprocess_foreach_child(_pparent, _p)				\
+	uk_pprocess_foreach(_p)						\
+		if ((_p)->parent == (_pparent))				\
 
 #define uk_pthread_current()						\
 	uk_thread_uktls_var(uk_thread_current(), pthread_self)
