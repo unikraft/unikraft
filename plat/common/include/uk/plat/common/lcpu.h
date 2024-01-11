@@ -97,6 +97,10 @@ UK_CTASSERT(sizeof(struct lcpu_sargs) == LCPU_SARGS_SIZE);
 #define LCPU_ENTRY_OFFSET		(LCPU_ID_OFFSET    + 0x08)
 #define LCPU_STACKP_OFFSET		(LCPU_ENTRY_OFFSET + 0x08)
 #define LCPU_ERR_OFFSET			(LCPU_ENTRY_OFFSET + 0x00)
+/* TODO: See comment from syscall_prologue.h architecture specific files */
+#ifdef LCPU_AUXSP_OFFSET
+#undef LCPU_AUXSP_OFFSET
+#endif /* LCPU_AUXSP_OFFSET */
 #define LCPU_AUXSP_OFFSET		(LCPU_ENTRY_OFFSET + 0x10)
 #define LCPU_ARCH_OFFSET		(LCPU_ENTRY_OFFSET + 0x18)
 
