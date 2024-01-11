@@ -341,9 +341,11 @@ int uk_sys_accept(const struct uk_file *sock, int blocking,
 	_socket_init(al, n->driver, new_data);
 
 	al_listener = __containerof(sock, struct socket_alloc, f);
+#if CONFIG_LIBPOSIX_SOCKET_EVENTS
 	uk_socket_evd_init_from(&al->evd, &al_listener->evd);
 	uk_socket_evd_laddr_set_from(&al->evd, &al_listener->evd);
-	uk_socket_evd_raddr_set(&al->evd, addr, *addr_len);
+	uk_socket_evd_raddr_set(&al->evd, addr, (addr_len ? *addr_len : 0));
+#endif /* CONFIG_LIBPOSIX_SOCKET_EVENTS */
 
 	if (flags & SOCK_NONBLOCK)
 		mode |= O_NONBLOCK;
