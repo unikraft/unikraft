@@ -47,6 +47,8 @@
 #include <uk/thread.h>
 #endif /* CONFIG_LIBPOSIX_PROCESS_PIDS */
 
+#define UK_PID_INIT		1
+
 #define UK_PID_WAIT_ANY		-1
 
 #define TIDMAP_SIZE (CONFIG_LIBPOSIX_PROCESS_MAX_PID + 1)
@@ -77,6 +79,7 @@ struct posix_process {
 	struct uk_signal_pdesc *signal;
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 	struct uk_semaphore wait_semaphore;
+	struct uk_semaphore exit_semaphore;
 	bool terminated;
 	int exit_status;
 
@@ -138,5 +141,27 @@ void pprocess_kill_siblings(struct uk_thread *thread);
 int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
 	     struct ukarch_execenv *execenv);
 #endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
+
+/**
+ * Terminate a process
+ *
+ * Sends the process and thread status, kills the terminating thread's
+ * siblings, reparents children, and sends SIGCHLD to the parent.
+ *
+ * At this point the process is in zombie state and should be reaped
+ * by a syscall of the wait family or uk_posix_process_wait().
+ *
+ * @param pthread     The thread that terminates the process.
+ * @param state	      The new process state. Must be either
+ *                    POSIX_THREAD_STATE_EXITED if called by exit(), or
+ *                    POSIX_THREAD_KILLED if called by SIG_KILL / SIG_CORE.
+ * @param exit_status If called on behalf of the current thread, does not
+ *                    return. If called for a thread other than the current
+ *                    thread, it returns the exit code if called by exit(),
+ *                    or the signal number that caused the termination if
+ *                    called via SIG_KILL / SIG_CORE.
+ */
+void pprocess_exit(struct uk_thread *thread, enum posix_thread_state state,
+		   int exit_status);
 
 #endif /* __PROCESS_H_INTERNAL__ */
