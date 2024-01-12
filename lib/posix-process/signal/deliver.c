@@ -7,16 +7,23 @@
 #include <uk/essentials.h>
 #include <uk/process.h>
 
+#include "process.h"
 #include "sigset.h"
 #include "signal.h"
 #include "siginfo.h"
 
 static void uk_sigact_term(int __unused sig)
 {
+	struct posix_thread *pthread;
 	pid_t tid = uk_gettid();
 
-	uk_pr_warn("tid %d terminated by signal\n", tid);
-	uk_posix_process_kill(tid2ukthread(uk_gettid()));
+	pthread = tid2pthread(tid);
+
+	uk_pr_warn("tid: %d (pid: %d) terminated by signal\n",
+		   tid, pthread->process->pid);
+
+	pprocess_exit(pthread->thread, POSIX_THREAD_KILLED, sig);
+	UK_BUG(); /* noreturn */
 }
 
 static void uk_sigact_ign(int __unused sig)
@@ -348,7 +355,7 @@ void uk_signal_deliver(struct uk_syscall_ctx *usc)
 	if (IS_PENDING(pproc->signal->sigqueue, SIGKILL)) {
 		uk_pr_info("SIGKILL tid %d\n", tid);
 		uk_sigact_term(SIGKILL);
-		return;
+		UK_BUG(); /* noreturn */
 	}
 
 	/* SIGSTOP / SIGCONT should have been already ignored by rt_sigaction */
