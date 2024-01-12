@@ -9,14 +9,22 @@
 #include <uk/process.h>
 #include <uk/syscall.h>
 
+#include "process.h"
 #include "sigset.h"
 #include "signal.h"
 #include "siginfo.h"
 
 static void uk_sigact_term(int __unused sig)
 {
-	uk_pr_warn("tid %d terminated by signal\n", uk_sys_gettid());
-	uk_posix_process_kill(uk_thread_current());
+	struct posix_thread *pthread;
+
+	pthread = uk_pthread_current();
+
+	uk_pr_warn("tid: %d (pid: %d) terminated by signal\n",
+		   uk_sys_gettid(), pthread->process->pid);
+
+	pprocess_exit(pthread->thread, POSIX_THREAD_KILLED, sig);
+	UK_BUG(); /* noreturn */
 }
 
 static void uk_sigact_ign(int __unused sig)
