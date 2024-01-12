@@ -49,9 +49,7 @@
 #include <uk/init.h>
 #include <uk/errptr.h>
 #include <uk/essentials.h>
-#if CONFIG_LIBPOSIX_PROCESS_CLONE
 #include <uk/process.h>
-#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 #include "signal/signal.h"
@@ -176,6 +174,23 @@ err_out:
 	return ERR2PTR(err);
 }
 
+static void pprocess_remove_from_parent(struct posix_process *pprocess)
+{
+	struct posix_process *pchild, *pchildn;
+
+	if (pprocess->pid == UK_PID_INIT)
+		return;
+
+	uk_list_for_each_entry_safe(pchild, pchildn,
+				    &pprocess->parent->children,
+				    child_list_entry) {
+		if (pchild->pid == pprocess->pid) {
+			uk_list_del(&pchild->child_list_entry);
+			break;
+		}
+	}
+}
+
 /* Free thread that is part of a process
  * NOTE: The process is not free'd here when its thread list
  *       becomes empty.
@@ -256,6 +271,7 @@ int uk_posix_process_create(struct uk_alloc *a,
 
 	/* Initialize semaphore for wait() */
 	uk_semaphore_init(&pprocess->wait_semaphore, 0);
+	uk_semaphore_init(&pprocess->exit_semaphore, 0);
 
 	/* Check if we have a pthread structure already for this thread
 	 * or if we need to allocate one
@@ -322,35 +338,14 @@ err_out:
 	return ret;
 }
 
-/* Releases pprocess memory and re-links its child to the parent
+/* Releases pprocess memory.
  * NOTE: All related threads must be removed already from this pprocess
  */
 static void pprocess_release(struct posix_process *pprocess)
 {
-	struct posix_process *pchild, *pchildn;
-
 	UK_ASSERT(uk_list_empty(&pprocess->threads));
 
-	uk_list_for_each_entry_safe(pchild, pchildn,
-				    &pprocess->children,
-				    child_list_entry) {
-		/* check for violation of the tree structure */
-		UK_ASSERT(pchild != pprocess);
-
-		uk_list_del(&pchild->child_list_entry);
-		if (pprocess->parent) {
-			pchild->parent = pprocess->parent;
-			uk_list_add(&pchild->child_list_entry,
-				    &pprocess->parent->children);
-			uk_pr_debug("Process PID %d re-assigned to parent PID %d\n",
-				    pchild->pid, pprocess->parent->pid);
-		} else {
-			/* There is no parent, disconnect */
-			pchild->parent = NULL;
-			uk_pr_debug("Process PID %d loses its parent\n",
-				    pchild->pid);
-		}
-	}
+	pprocess_remove_from_parent(pprocess);
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	pprocess_signal_pdesc_free(pprocess);
@@ -629,6 +624,95 @@ UK_SYSCALL_R_DEFINE(pid_t, getppid)
 	return pthread_self->process->parent->pid;
 }
 
+void pprocess_exit(struct uk_thread *thread, enum posix_thread_state state,
+		   int exit_status)
+{
+	struct posix_thread *ptchild, *ptchildn;
+	struct posix_process *pchild, *pchildn;
+	struct posix_process *parent_process;
+	struct posix_process *pprocess_init;
+	struct posix_thread *pthread;
+	int ret;
+
+	UK_ASSERT(state == POSIX_THREAD_EXITED ||
+		  state == POSIX_THREAD_KILLED);
+
+	pprocess_init = pid2pprocess(UK_PID_INIT);
+	UK_ASSERT(pprocess_init);
+
+	pthread = uk_thread_uktls_var(thread, pthread_self);
+	UK_ASSERT(pthread);
+	UK_ASSERT(!pthread->process->terminated);
+
+	parent_process = pthread->process->parent;
+
+	/* Update process status */
+	if (state == POSIX_THREAD_EXITED) {
+		pthread->state = POSIX_THREAD_EXITED;
+		pthread->process->exit_status = exit_status & 0xff;
+	} else { /* POSIX_THREAD_KILLED */
+		pthread->state = POSIX_THREAD_KILLED;
+		pthread->process->exit_status = exit_status;
+	}
+	pthread->process->terminated = true;
+
+	pprocess_remove_from_parent(pthread->process);
+
+	uk_posix_process_kill_siblings(pthread->thread);
+
+	/* Reparent child processes to init */
+	uk_list_for_each_entry_safe(pchild, pchildn,
+				    &pthread->process->children,
+				    child_list_entry) {
+		uk_list_del(&pchild->child_list_entry);
+		pchild->parent = pprocess_init;
+		uk_list_add(&pchild->child_list_entry,
+			    &pprocess_init->children);
+		uk_pr_debug("pid %d reparented to init\n", pchild->pid);
+	}
+
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+	ret = pprocess_signal_send(parent_process, SIGCHLD, NULL);
+	if (unlikely(ret))
+		UK_CRASH("Could not signal parent\n");
+
+	/* If the parent has set the disposition of SIGCHLD to SIG_IGN,
+	 * or has set SA_NOCLDWAIT, then terminate the child right away.
+	 */
+	if (parent_process->signal->sigaction[SIGCHLD].ks_handler == SIG_IGN ||
+	    parent_process->signal->sigaction[SIGCHLD].ks_flags & SA_NOCLDWAIT) {
+		uk_pr_err("Parent ignores SIGHLD, terminating\n");
+		pprocess_kill(pthread->process);
+	}
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+
+	/* If the parent is waiting, write the status and notify the
+	 * parent that the process is terminated. We will let wait()
+	 * reap the child so that it can obtain its exit_status first.
+	 *
+	 * Finally, if the parent is not waiting, and the parent did not
+	 * set the disposition of SIGCHLD to SIG_IGN or set SA_NOCLDWAIT,
+	 * this process becomes a zombie. Keep the process struct so that
+	 * the parent can retrieve basic info later via waitpid().
+	 */
+	uk_process_foreach_pthread(parent_process, ptchild, ptchildn) {
+		if (ptchild->state == POSIX_THREAD_BLOCKED_SIGNAL ||
+		    (ptchild->state == POSIX_THREAD_BLOCKED_WAIT &&
+		     (ptchild->wait_pid == uk_getpid() ||
+		      ptchild->wait_pid == UK_PID_WAIT_ANY))) {
+			uk_semaphore_up(&parent_process->wait_semaphore);
+			break;
+		}
+	}
+
+	uk_semaphore_up(&pthread->process->exit_semaphore);
+
+	/* This process is now a zombie. Remove from the scheduler */
+	uk_thread_block(pthread->thread);
+	if (pthread->thread == uk_thread_current())
+		uk_sched_yield();
+}
+
  /* NOTE: The man pages of _exit(2) say:
   *       "In glibc up to version 2.3, the _exit() wrapper function invoked
   *        the kernel system call of the same name.  Since glibc 2.3, the
@@ -641,14 +725,29 @@ UK_SYSCALL_R_DEFINE(pid_t, getppid)
   */
 UK_LLSYSCALL_R_DEFINE(int, exit, int, status)
 {
-	uk_sched_thread_exit(); /* won't return */
+	struct posix_thread *this_pthread;
+	struct uk_thread *this_thread;
+
+	this_thread = uk_thread_current();
+	this_pthread = uk_thread_uktls_var(this_thread, pthread_self);
+
+	UK_ASSERT(this_pthread);
+	UK_ASSERT(this_pthread->process);
+
+	if (uk_list_is_singular(&this_pthread->process->threads)) {
+		pprocess_exit(this_thread, POSIX_THREAD_EXITED, status);
+		/* noreturn when called by current process */
+		UK_BUG();
+	}
+
+	uk_sched_thread_exit(); /* noreturn */
 	UK_CRASH("sys_exit() unexpectedly returned\n");
 	return -EFAULT;
 }
 
 UK_LLSYSCALL_R_DEFINE(int, exit_group, int, status)
 {
-	uk_posix_process_kill(uk_thread_current()); /* won't return */
+	pprocess_exit(uk_thread_current(), POSIX_THREAD_EXITED, status);
 	UK_CRASH("sys_exit_group() unexpectedly returned\n");
 	return -EFAULT;
 }
