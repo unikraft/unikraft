@@ -62,6 +62,10 @@
 #define LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP			','
 #endif /* CONFIG_LIBVFSCORE_FSTAB */
 
+#define LIBVFSCORE_EXTRACT_DRV					"extract"
+#define LIBVFSCORE_EXTRACT_DEV_INITRD0				"initrd0"
+#define LIBVFSCORE_EXTRACT_DEV_EMBEDDED				"embedded"
+
 struct vfscore_volume {
 	/* Volume source device */
 	const char *sdev;
@@ -80,51 +84,59 @@ struct vfscore_volume {
 };
 
 #if CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS
-static int do_mount_initrd(const void *initrd, size_t len, const char *path,
-			   unsigned long flags, const char *opts)
+#if CONFIG_LIBVFSCORE_ROOTFS_EINITRD
+extern const char vfscore_einitrd_start[];
+extern const char vfscore_einitrd_end;
+#endif /* CONFIG_LIBVFSCORE_ROOTFS_EINITRD */
+
+static int vfscore_extract_volume(const struct vfscore_volume *vv)
 {
-	int rc;
-
-	UK_ASSERT(path);
-
-	uk_pr_info("Mounting 'ramfs' to %s...\n", path);
-	rc = mount("", path, "ramfs", flags, opts);
-	if (unlikely(rc)) {
-		uk_pr_crit("Failed to mount ramfs to \"%s\": %d\n",
-			   path, errno);
-		return -1;
-	}
-
-	uk_pr_info("Extracting initrd @ %p (%"__PRIsz" bytes) to %s...\n",
-		   (void *)initrd, len, path);
-	rc = ukcpio_extract(path, (void *)initrd, len);
-	if (unlikely(rc)) {
-		uk_pr_crit("Failed to extract cpio archive to %s: %d\n",
-			   path, rc);
-		return -1;
-	}
-
-	return 0;
-}
-
-static int vfscore_mount_initrd_volume(struct vfscore_volume *vv)
-{
-	struct ukplat_memregion_desc *initrd;
+	const void *vbase = NULL;
+	size_t vlen = 0;
 	int rc;
 
 	UK_ASSERT(vv);
 	UK_ASSERT(vv->path);
 
+	/* Detect which initrd to use */
 	/* TODO: Support multiple Initial RAM Disks */
-	rc = ukplat_memregion_find_initrd0(&initrd);
-	if (unlikely(rc < 0)) {
-		uk_pr_crit("Could not find an initrd!\n");
+	if (!strcmp(vv->sdev, LIBVFSCORE_EXTRACT_DEV_INITRD0)) {
+		struct ukplat_memregion_desc *initrd;
 
-		return -1;
+		rc = ukplat_memregion_find_initrd0(&initrd);
+		if (unlikely(rc < 0 || initrd->len == 0)) {
+			uk_pr_crit("Could not find an initrd!\n");
+			return -1;
+		}
+
+		vbase = (void *)initrd->vbase;
+		vlen = initrd->len;
+	}
+#if CONFIG_LIBVFSCORE_ROOTFS_EINITRD
+	else if (!strcmp(vv->sdev, LIBVFSCORE_EXTRACT_DEV_EMBEDDED)) {
+		vbase = (const void *)vfscore_einitrd_start;
+		vlen  = (size_t)((uintptr_t)&vfscore_einitrd_end
+				 - (uintptr_t)vfscore_einitrd_start);
+	}
+#endif /* CONFIG_LIBVFSCORE_ROOTFS_EINITRD*/
+	else {
+		uk_pr_crit("\"%s\" is an invalid or unsupported initrd source!\n",
+			   vv->sdev);
+		return -EINVAL;
 	}
 
-	return do_mount_initrd((void *)initrd->vbase, initrd->len,
-			       vv->path, vv->flags, vv->opts);
+	if (unlikely(vlen == 0))
+		uk_pr_warn("Initrd \"%s\" seems to be empty.\n", vv->sdev);
+
+	uk_pr_info("Extracting initrd @ %p (%"__PRIsz" bytes) to %s...\n",
+		   vbase, vlen, vv->path);
+	rc = ukcpio_extract(vv->path, vbase, vlen);
+	if (unlikely(rc)) {
+		uk_pr_crit("Failed to extract cpio archive to %s: %d\n",
+			   vv->path, rc);
+		return -EIO;
+	}
+	return 0;
 }
 #endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
 
@@ -235,8 +247,8 @@ static inline int vfscore_mount_volume(struct vfscore_volume *vv)
 #endif /* CONFIG_LIBVFSCORE_FSTAB */
 
 #if CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS
-	if (!strcmp(vv->drv, "initrd")) {
-		return vfscore_mount_initrd_volume(vv);
+	if (!strcmp(vv->drv, LIBVFSCORE_EXTRACT_DRV)) {
+		return vfscore_extract_volume(vv);
 	} else
 #endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
 	{
@@ -340,23 +352,6 @@ static void vfscore_fstab_fetch_volume_args(char *v, struct vfscore_volume *vv)
 #endif /* CONFIG_LIBVFSCORE_FSTAB */
 
 #if CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS
-#if CONFIG_LIBVFSCORE_ROOTFS_EINITRD
-extern const char vfscore_einitrd_start[];
-extern const char vfscore_einitrd_end;
-
-static int vfscore_automount_rootfs(void)
-{
-	const void *initrd;
-	size_t len;
-
-	initrd = (const void *)vfscore_einitrd_start;
-	len    = (size_t)((uintptr_t)&vfscore_einitrd_end
-			  - (uintptr_t)vfscore_einitrd_start);
-
-	return do_mount_initrd(initrd, len, "/", 0x0, NULL);
-}
-
-#else /* !CONFIG_LIBVFSCORE_ROOTFS_EINITRD */
 static int vfscore_automount_rootfs(void)
 {
 	/* Convert to `struct vfscore_volume` */
@@ -367,7 +362,13 @@ static int vfscore_automount_rootfs(void)
 		.sdev = "",
 #endif /* CONFIG_LIBVFSCORE_ROOTDEV */
 		.path = "/",
+#if CONFIG_LIBVFSCORE_ROOTFS_INITRD || CONFIG_LIBVFSCORE_ROOTFS_EINITRD
+		.drv = "ramfs",
+#elif defined CONFIG_LIBVFSCORE_ROOTFS
 		.drv = CONFIG_LIBVFSCORE_ROOTFS,
+#else
+		.drv = "",
+#endif
 #ifdef CONFIG_LIBVFSCORE_ROOTFLAGS
 		.flags = CONFIG_LIBVFSCORE_ROOTFLAGS,
 #else
@@ -379,6 +380,22 @@ static int vfscore_automount_rootfs(void)
 		.opts = "",
 #endif /* CONFIG_LIBVFSCORE_ROOTOPTS */
 	};
+
+#if CONFIG_LIBVFSCORE_ROOTFS_INITRD || CONFIG_LIBVFSCORE_ROOTFS_EINITRD
+	struct vfscore_volume vv2 = {
+#if CONFIG_LIBVFSCORE_ROOTFS_INITRD
+		.sdev = LIBVFSCORE_EXTRACT_DEV_INITRD0,
+#elif CONFIG_LIBVFSCORE_ROOTFS_EINITRD
+		.sdev = LIBVFSCORE_EXTRACT_DEV_EMBEDDED,
+#else
+		.sdev = "",
+#endif
+		.path = "/",
+		.drv = LIBVFSCORE_EXTRACT_DRV,
+,		.flags = 0,
+		.opts = "",
+	};
+#if /* CONFIG_LIBVFSCORE_ROOTFS_INITRD || CONFIG_LIBVFSCORE_ROOTFS_EINITRD */
 	int rc;
 
 	/*
@@ -392,14 +409,24 @@ static int vfscore_automount_rootfs(void)
 		return 0;
 
 	rc = vfscore_mount_volume(&vv);
-	if (unlikely(rc))
+	if (unlikely(rc)) {
 		uk_pr_crit("Failed to mount %s (%s) at /: %d\n", vv.sdev,
 			   vv.drv, rc);
+		return rc;
+	}
+
+#if CONFIG_LIBVFSCORE_ROOTFS_INITRD || CONFIG_LIBVFSCORE_ROOTFS_EINITRD
+	rc = vfscore_mount_volume(&vv2);
+	if (unlikely(rc)) {
+		uk_pr_crit("Failed to extract %s (%s) to /: %d\n", vv2.sdev,
+			   vv2.drv, rc);
+		return rc;
+	}
+#endif /* CONFIG_LIBVFSCORE_ROOTFS_INITRD || CONFIG_LIBVFSCORE_ROOTFS_EINITRD */
 
 	return rc;
 }
-#endif /* !CONFIG_LIBVFSCORE_ROOTFS_EINITRD */
-#else /* CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS */
+#else /* !CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS */
 static int vfscore_automount_rootfs(void)
 {
 	return 0;
