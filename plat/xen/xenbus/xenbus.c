@@ -178,7 +178,7 @@ out:
 static int xenbus_probe(void)
 {
 	char **devtypes;
-	int err = 0;
+	int err, saved_err = 0;
 
 	uk_pr_info("Probe Xenbus\n");
 
@@ -191,16 +191,19 @@ static int xenbus_probe(void)
 	}
 
 	for (int i = 0; devtypes[i] != NULL; i++) {
-		/* Probe only if no previous error */
-		if (err == 0)
-			err = xenbus_probe_device_type(devtypes[i]);
+		err = xenbus_probe_device_type(devtypes[i]);
+		if (err) {
+			uk_pr_err("Error probing device %s: %d\n", devtypes[i],
+				  err);
+			saved_err = err;
+		}
 	}
 
 out:
 	if (!PTRISERR(devtypes))
 		free(devtypes);
 
-	return err;
+	return saved_err;
 }
 
 static int xenbus_init(struct uk_alloc *a)
