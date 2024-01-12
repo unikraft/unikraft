@@ -9,6 +9,7 @@
 #include <uk/process.h>
 #include <uk/syscall.h>
 
+#include "process.h"
 #include "sigset.h"
 #include "signal.h"
 #include "siginfo.h"
@@ -20,8 +21,15 @@ void pprocess_signal_call_handler_with_stack(int signum, siginfo_t *si,
 
 static void uk_sigact_term(int __unused sig)
 {
-	uk_pr_warn("tid %d terminated by signal\n", uk_sys_gettid());
-	pprocess_kill(uk_pprocess_current());
+	struct posix_process *pprocess;
+
+	pprocess = uk_pprocess_current();
+	UK_ASSERT(pprocess);
+
+	uk_pr_info("pid: %d terminated by signal\n", pprocess->pid);
+
+	pprocess_exit(pprocess, POSIX_PROCESS_KILLED, sig);
+	uk_sched_thread_exit(); /* noreturn */
 }
 
 static void uk_sigact_ign(int __unused sig)
