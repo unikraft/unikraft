@@ -332,7 +332,7 @@ process_section(const struct cpio_header **headerp, char *fullpath,
 }
 
 enum ukcpio_error
-ukcpio_extract(const char *dest, void *buf, size_t buflen)
+ukcpio_extract(const char *dest, const void *buf, size_t buflen)
 {
 	enum ukcpio_error error = UKCPIO_SUCCESS;
 	const struct cpio_header *header = (struct cpio_header *)(buf);
