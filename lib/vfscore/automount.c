@@ -2,7 +2,7 @@
 /*
  * VFS Automatic Mounts
  *
- * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ * Authors: Simon Kuenzer <simon@unikraft.io>
  *          Robert Hrusecky <roberth@cs.utexas.edu>
  *          Omar Jamil <omarj2898@gmail.com>
  *          Sachin Beldona <sachinbeldona@utexas.edu>
@@ -10,7 +10,7 @@
  *
  * Copyright (c) 2019, NEC Laboratories Europe GmbH, NEC Corporation.
  *                     All rights reserved.
- * Copyright (c) 2023, Unikraft GmbH. All rights reserved.
+ * Copyright (c) 2023-2024, Unikraft GmbH. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -50,17 +50,12 @@
 #include <uk/plat/memory.h>
 #include <sys/stat.h>
 #include <vfscore/mount.h>
-
-#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS
 #include <errno.h>
 #include <uk/config.h>
 #include <uk/arch/types.h>
-#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS */
 
-#if CONFIG_LIBVFSCORE_FSTAB
 #define LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP			':'
 #define LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP			','
-#endif /* CONFIG_LIBVFSCORE_FSTAB */
 
 #define LIBVFSCORE_EXTRACT_DRV					"extract"
 #define LIBVFSCORE_EXTRACT_DEV_INITRD0				"initrd0"
@@ -77,17 +72,266 @@ struct vfscore_volume {
 	unsigned long flags;
 	/* Mount options */
 	const char *opts;
-#if CONFIG_LIBVFSCORE_FSTAB
-	/* Unikraft Mount options, see vfscore_mount_volume() */
-	char *ukopts;
-#endif /* CONFIG_LIBVFSCORE_FSTAB */
+	/* Unikraft mount options, see vfscore_mount_volume() */
+	const char *ukopts;
 };
 
-#if CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS
-#if CONFIG_LIBVFSCORE_ROOTFS_EINITRD
+/*
+ * Compiled-in file system table: `fstab_ci`
+ */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI0
+const struct vfscore_volume __fstab_ci0 = {
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_DEV_ARG
+	.sdev = CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_DEV_ARG,
+#else
+	.sdev = "",
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_DEV_ARG */
+	.path = CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_MP_ARG,
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_DRIVER_ARG
+	.drv = CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_DRIVER_ARG,
+#else
+	.drv = "",
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_DRIVER_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_FLAGS_ARG
+	.flags = CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_FLAGS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_FLAGS_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_OPTS_ARG
+	.opts = CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_OPTS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_OPTS_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_UKOPTS_ARG
+	.ukopts = CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_UKOPTS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_OPTS_ARG */
+};
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI0 */
+
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI1
+const struct vfscore_volume __fstab_ci1 = {
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_DEV_ARG
+	.sdev = CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_DEV_ARG,
+#else
+	.sdev = "",
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_DEV_ARG */
+	.path = CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_MP_ARG,
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_DRIVER_ARG
+	.drv = CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_DRIVER_ARG,
+#else
+	.drv = "",
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_DRIVER_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_FLAGS_ARG
+	.flags = CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_FLAGS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_FLAGS_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_OPTS_ARG
+	.opts = CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_OPTS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_OPTS_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_UKOPTS_ARG
+	.ukopts = CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_UKOPTS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_OPTS_ARG */
+};
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI1 */
+
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI2
+const struct vfscore_volume __fstab_ci2 = {
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_DEV_ARG
+	.sdev = CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_DEV_ARG,
+#else
+	.sdev = "",
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_DEV_ARG */
+	.path = CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_MP_ARG,
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_DRIVER_ARG
+	.drv = CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_DRIVER_ARG,
+#else
+	.drv = "",
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_DRIVER_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_FLAGS_ARG
+	.flags = CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_FLAGS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_FLAGS_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_OPTS_ARG
+	.opts = CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_OPTS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_OPTS_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_UKOPTS_ARG
+	.ukopts = CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_UKOPTS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_OPTS_ARG */
+};
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI2 */
+
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI3
+const struct vfscore_volume __fstab_ci3 = {
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_DEV_ARG
+	.sdev = CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_DEV_ARG,
+#else
+	.sdev = "",
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_DEV_ARG */
+	.path = CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_MP_ARG,
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_DRIVER_ARG
+	.drv = CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_DRIVER_ARG,
+#else
+	.drv = "",
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_DRIVER_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_FLAGS_ARG
+	.flags = CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_FLAGS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_FLAGS_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_OPTS_ARG
+	.opts = CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_OPTS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_OPTS_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_UKOPTS_ARG
+	.ukopts = CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_UKOPTS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_OPTS_ARG */
+};
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI3 */
+
+static const struct vfscore_volume *fstab_ci[] = {
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI0
+	&__fstab_ci0,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI0 */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI1
+	&__fstab_ci1,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI1 */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI2
+	&__fstab_ci2,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI2 */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI3
+	&__fstab_ci3,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI3 */
+	NULL
+};
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI */
+
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_UP
+/*
+ * Compiled-in fall-back file system table: `fstab_fb`
+ */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_FB
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_FB0
+const struct vfscore_volume __fstab_fb0 = {
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_DEV_ARG
+	.sdev = CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_DEV_ARG,
+#else
+	.sdev = "",
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_DEV_ARG */
+	.path = CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_MP_ARG,
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_DRIVER_ARG
+	.drv = CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_DRIVER_ARG,
+#else
+	.drv = "",
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_DRIVER_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_FLAGS_ARG
+	.flags = CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_FLAGS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_FLAGS_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_OPTS_ARG
+	.opts = CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_OPTS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_OPTS_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_UKOPTS_ARG
+	.ukopts = CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_UKOPTS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_OPTS_ARG */
+};
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB0 */
+
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_FB1
+const struct vfscore_volume __fstab_fb1 = {
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_DEV_ARG
+	.sdev = CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_DEV_ARG,
+#else
+	.sdev = "",
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_DEV_ARG */
+	.path = CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_MP_ARG,
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_DRIVER_ARG
+	.drv = CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_DRIVER_ARG,
+#else
+	.drv = "",
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_DRIVER_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_FLAGS_ARG
+	.flags = CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_FLAGS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_FLAGS_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_OPTS_ARG
+	.opts = CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_OPTS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_OPTS_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_UKOPTS_ARG
+	.ukopts = CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_UKOPTS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_OPTS_ARG */
+};
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB1 */
+
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_FB2
+const struct vfscore_volume __fstab_fb2 = {
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_DEV_ARG
+	.sdev = CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_DEV_ARG,
+#else
+	.sdev = "",
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_DEV_ARG */
+	.path = CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_MP_ARG,
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_DRIVER_ARG
+	.drv = CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_DRIVER_ARG,
+#else
+	.drv = "",
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_DRIVER_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_FLAGS_ARG
+	.flags = CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_FLAGS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_FLAGS_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_OPTS_ARG
+	.opts = CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_OPTS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_OPTS_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_UKOPTS_ARG
+	.ukopts = CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_UKOPTS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_OPTS_ARG */
+};
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB2 */
+
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_FB3
+const struct vfscore_volume __fstab_fb3 = {
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_DEV_ARG
+	.sdev = CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_DEV_ARG,
+#else
+	.sdev = "",
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_DEV_ARG */
+	.path = CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_MP_ARG,
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_DRIVER_ARG
+	.drv = CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_DRIVER_ARG,
+#else
+	.drv = "",
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_DRIVER_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_FLAGS_ARG
+	.flags = CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_FLAGS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_FLAGS_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_OPTS_ARG
+	.opts = CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_OPTS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_OPTS_ARG */
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_UKOPTS_ARG
+	.ukopts = CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_UKOPTS_ARG,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_OPTS_ARG */
+};
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB3 */
+
+static const struct vfscore_volume *fstab_fb[] = {
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_FB0
+	&__fstab_fb0,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB0 */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_FB1
+	&__fstab_fb1,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB1 */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_FB2
+	&__fstab_fb2,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB2 */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_FB3
+	&__fstab_fb3,
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB3 */
+	NULL
+};
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB */
+
+static char *fstab_up[CONFIG_LIBVFSCORE_AUTOMOUNT_UP_SIZE] = { NULL };
+
+UK_LIBPARAM_PARAM_ARR_ALIAS(fstab, &fstab_up, charp,
+			    CONFIG_LIBVFSCORE_AUTOMOUNT_UP_SIZE,
+			"Automount table: dev:path:fs[:flags[:opts[:ukopts]]]");
+
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_UP */
+
+#if CONFIG_LIBUKCPIO
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_EINITRD
 extern const char vfscore_einitrd_start[];
 extern const char vfscore_einitrd_end;
-#endif /* CONFIG_LIBVFSCORE_ROOTFS_EINITRD */
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_EINITRD */
 
 static int vfscore_extract_volume(const struct vfscore_volume *vv)
 {
@@ -112,13 +356,13 @@ static int vfscore_extract_volume(const struct vfscore_volume *vv)
 		vbase = (void *)initrd->vbase;
 		vlen = initrd->len;
 	}
-#if CONFIG_LIBVFSCORE_ROOTFS_EINITRD
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_EINITRD
 	else if (!strcmp(vv->sdev, LIBVFSCORE_EXTRACT_DEV_EMBEDDED)) {
 		vbase = (const void *)vfscore_einitrd_start;
 		vlen  = (size_t)((uintptr_t)&vfscore_einitrd_end
 				 - (uintptr_t)vfscore_einitrd_start);
 	}
-#endif /* CONFIG_LIBVFSCORE_ROOTFS_EINITRD*/
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_EINITRD */
 	else {
 		uk_pr_crit("\"%s\" is an invalid or unsupported initrd source!\n",
 			   vv->sdev);
@@ -128,8 +372,8 @@ static int vfscore_extract_volume(const struct vfscore_volume *vv)
 	if (unlikely(vlen == 0))
 		uk_pr_warn("Initrd \"%s\" seems to be empty.\n", vv->sdev);
 
-	uk_pr_info("Extracting initrd @ %p (%"__PRIsz" bytes) to %s...\n",
-		   vbase, vlen, vv->path);
+	uk_pr_info("Extracting initrd @ %p (%"__PRIsz" bytes, source: \"%s\") to %s...\n",
+		   vbase, vlen, vv->sdev, vv->path);
 	rc = ukcpio_extract(vv->path, vbase, vlen);
 	if (unlikely(rc)) {
 		uk_pr_crit("Failed to extract cpio archive to %s: %d\n",
@@ -138,9 +382,8 @@ static int vfscore_extract_volume(const struct vfscore_volume *vv)
 	}
 	return 0;
 }
-#endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
+#endif /* CONFIG_LIBUKCPIO */
 
-#if CONFIG_LIBVFSCORE_FSTAB
 /* Handle `mkmp` Unikraft Mount Option */
 static int vfscore_ukopt_mkmp(char *path)
 {
@@ -237,7 +480,6 @@ static int vfscore_volume_process_ukopts(const struct vfscore_volume *vv)
 
 	return 0;
 }
-#endif /* CONFIG_LIBVFSCORE_FSTAB */
 
 static inline int vfscore_mount_volume(const struct vfscore_volume *vv)
 {
@@ -258,22 +500,15 @@ static inline int vfscore_mount_volume(const struct vfscore_volume *vv)
 			return rc;
 	}
 
-#if CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS
+#if CONFIG_LIBUKCPIO
 	if (!strcmp(vv->drv, LIBVFSCORE_EXTRACT_DRV)) {
 		return vfscore_extract_volume(vv);
 	}
-#endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
+#endif /* CONFIG_LIBUKCPIO */
 	return mount(vv->sdev, vv->path, vv->drv, vv->flags, vv->opts);
 }
 
-#ifdef CONFIG_LIBVFSCORE_FSTAB
-
-static char *vfscore_fstab[CONFIG_LIBVFSCORE_FSTAB_SIZE];
-
-UK_LIBPARAM_PARAM_ARR_ALIAS(fstab, &vfscore_fstab, charp,
-			    CONFIG_LIBVFSCORE_FSTAB_SIZE,
-			"Automount table: dev:path:fs[:flags[:opts[:ukopts]]]");
-
+#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_UP
 /**
  * Expected command-line argument format:
  *	vfs.fstab=[
@@ -365,129 +600,57 @@ static int vfscore_parse_volume(char *v, struct vfscore_volume *vv)
 		    vv->ukopts == NULL ? "" : vv->ukopts);
 	return 0;
 }
-#endif /* CONFIG_LIBVFSCORE_FSTAB */
 
-#if CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS
-static int vfscore_automount_rootfs(void)
+static int vfscore_automount_volumes_up(void)
 {
-	/* Convert to `struct vfscore_volume` */
-	struct vfscore_volume vv = {
-#ifdef CONFIG_LIBVFSCORE_ROOTDEV
-		.sdev = CONFIG_LIBVFSCORE_ROOTDEV,
-#else
-		.sdev = "",
-#endif /* CONFIG_LIBVFSCORE_ROOTDEV */
-		.path = "/",
-#if CONFIG_LIBVFSCORE_ROOTFS_INITRD || CONFIG_LIBVFSCORE_ROOTFS_EINITRD
-		.drv = "ramfs",
-#elif defined CONFIG_LIBVFSCORE_ROOTFS
-		.drv = CONFIG_LIBVFSCORE_ROOTFS,
-#else
-		.drv = "",
-#endif
-#ifdef CONFIG_LIBVFSCORE_ROOTFLAGS
-		.flags = CONFIG_LIBVFSCORE_ROOTFLAGS,
-#else
-		.flags = 0,
-#endif /* CONFIG_LIBVFSCORE_ROOTFLAGS */
-#ifdef CONFIG_LIBVFSCORE_ROOTOPTS
-		.opts = CONFIG_LIBVFSCORE_ROOTOPTS,
-#else
-		.opts = "",
-#endif /* CONFIG_LIBVFSCORE_ROOTOPTS */
-	};
-
-#if CONFIG_LIBVFSCORE_ROOTFS_INITRD || CONFIG_LIBVFSCORE_ROOTFS_EINITRD
-	struct vfscore_volume vv2 = {
-#if CONFIG_LIBVFSCORE_ROOTFS_INITRD
-		.sdev = LIBVFSCORE_EXTRACT_DEV_INITRD0,
-#elif CONFIG_LIBVFSCORE_ROOTFS_EINITRD
-		.sdev = LIBVFSCORE_EXTRACT_DEV_EMBEDDED,
-#else
-		.sdev = "",
-#endif
-		.path = "/",
-		.drv = LIBVFSCORE_EXTRACT_DRV,
-,		.flags = 0,
-		.opts = "",
-	};
-#if /* CONFIG_LIBVFSCORE_ROOTFS_INITRD || CONFIG_LIBVFSCORE_ROOTFS_EINITRD */
+	int mounted = 0;
 	int rc;
 
-	/*
-	 * Initialization of the root filesystem '/'
-	 * NOTE: Any additional sub mount points (like '/dev' with devfs)
-	 * have to be mounted later.
-	 *
-	 * Silently return 0, as user might not have configured implicit rootfs.
-	 */
-	if (!vv.drv || vv.drv[0] == '\0')
-		return 0;
+	for (unsigned long i = 0; i < ARRAY_SIZE(fstab_up); ++i) {
+		struct vfscore_volume vv;
 
-	rc = vfscore_mount_volume(&vv);
-	if (unlikely(rc)) {
-		uk_pr_crit("Failed to mount %s (%s) at /: %d\n", vv.sdev,
-			   vv.drv, rc);
-		return rc;
-	}
+		if (!fstab_up[i])
+			continue;
 
-#if CONFIG_LIBVFSCORE_ROOTFS_INITRD || CONFIG_LIBVFSCORE_ROOTFS_EINITRD
-	rc = vfscore_mount_volume(&vv2);
-	if (unlikely(rc)) {
-		uk_pr_crit("Failed to extract %s (%s) to /: %d\n", vv2.sdev,
-			   vv2.drv, rc);
-		return rc;
-	}
-#endif /* CONFIG_LIBVFSCORE_ROOTFS_INITRD || CONFIG_LIBVFSCORE_ROOTFS_EINITRD */
-
-	return rc;
-}
-#else /* !CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS */
-static int vfscore_automount_rootfs(void)
-{
-	return 0;
-}
-#endif /* !CONFIG_LIBVFSCORE_AUTOMOUNT_ROOTFS */
-
-#ifdef CONFIG_LIBVFSCORE_FSTAB
-static int vfscore_automount_fstab_volumes(void)
-{
-	struct vfscore_volume vv;
-	int rc, i;
-
-	for (i = 0; i < CONFIG_LIBVFSCORE_FSTAB_SIZE && vfscore_fstab[i]; i++) {
-		vfscore_parse_volume(vfscore_fstab[i], &vv);
-		if (unlikely(rc))
+		rc = vfscore_parse_volume(fstab_up[i], &vv);
+		if (unlikely(rc < 0))
 			return rc;
 
 		rc = vfscore_mount_volume(&vv);
-		if (unlikely(rc)) {
-			uk_pr_err("Failed to mount %s: error %d\n", vv.sdev,
-				  rc);
-
+		if (unlikely(rc < 0))
 			return rc;
-		}
+
+		mounted++;
 	}
 
-	return 0;
+	return mounted;
 }
-#else /* CONFIG_LIBVFSCORE_FSTAB */
-static int vfscore_automount_fstab_volumes(void)
-{
-	return 0;
-}
-#endif /* !CONFIG_LIBVFSCORE_FSTAB */
+#endif /* !CONFIG_LIBVFSCORE_AUTOMOUNT_UP */
 
-static int vfscore_automount(struct uk_init_ctx *ictx __unused)
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI || CONFIG_LIBVFSCORE_AUTOMOUNT_FB
+static int vfscore_automount_volumes(const struct vfscore_volume *vvs[],
+				     int count)
 {
+	int mounted = 0;
 	int rc;
 
-	rc = vfscore_automount_rootfs();
-	if (unlikely(rc < 0))
-		return rc;
+	UK_ASSERT(vvs);
 
-	return vfscore_automount_fstab_volumes();
+	for (int i = 0; i < count; ++i) {
+		if (!vvs[i])
+			continue;
+
+		rc = vfscore_mount_volume(vvs[i]);
+		if (unlikely(rc < 0))
+			return rc;
+
+		mounted++;
+	}
+
+	return mounted;
 }
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI || CONFIG_LIBVFSCORE_AUTOMOUNT_FB */
+
 
 extern struct uk_list_head mount_list;
 
@@ -496,6 +659,7 @@ static void vfscore_autoumount(const struct uk_term_ctx *tctx __unused)
 	struct mount *mp;
 	int rc;
 
+	uk_pr_debug("Unmounting filesystems...\n");
 	uk_list_for_each_entry_reverse(mp, &mount_list, mnt_list) {
 		/* For now, flags = 0 is enough. */
 		rc = VFS_UNMOUNT(mp, 0);
@@ -503,6 +667,50 @@ static void vfscore_autoumount(const struct uk_term_ctx *tctx __unused)
 			uk_pr_err("Failed to unmount %s: error %d.\n",
 				  mp->m_path, rc);
 	}
+}
+
+static int vfscore_automount(struct uk_init_ctx *ictx __unused)
+{
+	int rc;
+	int count __maybe_unused = 0;
+
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI
+	uk_pr_debug("Mounting volumes from compiled-in table (%lu entries)...\n",
+		    ARRAY_SIZE(fstab_ci) - 1);
+	rc = vfscore_automount_volumes(fstab_ci, ARRAY_SIZE(fstab_ci));
+	if (unlikely(rc < 0))
+		goto err_umount;
+	count = rc;
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI */
+
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_UP
+	uk_pr_debug("Mounting volumes from user-provided table...\n");
+	rc = vfscore_automount_volumes_up();
+	if (unlikely(rc < 0))
+		goto err_umount;
+	count += rc;
+	if (rc == 0)
+		uk_pr_debug(" Note: Table is empty.\n");
+
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_FB
+	if (rc == 0) {
+		uk_pr_debug("Mounting volumes from fallback table (%lu entries)...\n",
+			    ARRAY_SIZE(fstab_fb) - 1);
+		rc = vfscore_automount_volumes(fstab_fb, ARRAY_SIZE(fstab_fb));
+		if (unlikely(rc < 0))
+			goto err_umount;
+		count += rc;
+	}
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB */
+
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_UP */
+
+	uk_pr_debug("%d volumes mounted in total.\n", count);
+	return 0;
+
+err_umount: __maybe_unused
+	vfscore_autoumount(NULL);
+	return rc;
 }
 
 uk_rootfs_initcall_prio(vfscore_automount, vfscore_autoumount, 4);
