@@ -142,7 +142,7 @@ static int vfscore_extract_volume(const struct vfscore_volume *vv)
 
 #if CONFIG_LIBVFSCORE_FSTAB
 /* Handle `mkmp` Unikraft Mount Option */
-static int vfscore_volume_process_ukopts_do_mkmp(char *path)
+static int vfscore_ukopt_mkmp(char *path)
 {
 	char *pos, *prev_pos;
 	int rc;
@@ -205,15 +205,16 @@ static int vfscore_volume_process_ukopts_do_mkmp(char *path)
  *		exists. If it does not exist in the current vfs, the directory
  *		structure is created.
  */
-static int vfscore_volume_process_ukopts(struct vfscore_volume *vv)
+static int vfscore_volume_process_ukopts(const struct vfscore_volume *vv)
 {
-	char *o_curr, *o_next;
+	const char *o_curr;
+	char *o_next;
 	int rc;
 
 	UK_ASSERT(vv);
 	UK_ASSERT(vv->path);
 
-	o_curr = vv->ukopts;
+	o_curr = (const char *) vv->ukopts;
 	while (o_curr) {
 		o_next = strchr(o_curr, LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP);
 		if (o_next) {
@@ -223,10 +224,10 @@ static int vfscore_volume_process_ukopts(struct vfscore_volume *vv)
 
 		/* First check is so we do not run `mkmp` on `/` */
 		if (!strcmp(o_curr, "mkmp") && vv->path[1] != '\0') {
-			rc = vfscore_volume_process_ukopts_do_mkmp(vv->path);
+			rc = vfscore_ukopt_mkmp(vv->path);
 			if (unlikely(rc)) {
-				uk_pr_err("Failed to process ukopt (mkmp): "
-					  "%d\n", rc);
+				uk_pr_err("Failed to process ukopt \"mkmp\": %d\n",
+					  rc);
 				return rc;
 			}
 		}
@@ -238,22 +239,31 @@ static int vfscore_volume_process_ukopts(struct vfscore_volume *vv)
 }
 #endif /* CONFIG_LIBVFSCORE_FSTAB */
 
-static inline int vfscore_mount_volume(struct vfscore_volume *vv)
+static inline int vfscore_mount_volume(const struct vfscore_volume *vv)
 {
-	UK_ASSERT(vv);
+	int rc;
 
-#if CONFIG_LIBVFSCORE_FSTAB
-	vfscore_volume_process_ukopts(vv);
-#endif /* CONFIG_LIBVFSCORE_FSTAB */
+	UK_ASSERT(vv);
+	UK_ASSERT(vv->sdev);
+	UK_ASSERT(vv->path);
+
+	uk_pr_debug("vfs.fstab: Mounting: %s:%s:%s:%lo:%s:%s...\n",
+		    vv->sdev[0] == '\0' ? "none" : vv->sdev,
+		    vv->path, vv->drv, vv->flags,
+		    vv->opts == NULL ? "" : vv->opts,
+		    vv->ukopts == NULL ? "" : vv->ukopts);
+	if (vv->ukopts) {
+		rc = vfscore_volume_process_ukopts(vv);
+		if (unlikely(rc < 0))
+			return rc;
+	}
 
 #if CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS
 	if (!strcmp(vv->drv, LIBVFSCORE_EXTRACT_DRV)) {
 		return vfscore_extract_volume(vv);
-	} else
-#endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
-	{
-		return mount(vv->sdev, vv->path, vv->drv, vv->flags, vv->opts);
 	}
+#endif /* CONFIG_LIBUKCPIO && CONFIG_LIBRAMFS */
+	return mount(vv->sdev, vv->path, vv->drv, vv->flags, vv->opts);
 }
 
 #ifdef CONFIG_LIBVFSCORE_FSTAB
@@ -274,80 +284,86 @@ UK_LIBPARAM_PARAM_ARR_ALIAS(fstab, &vfscore_fstab, charp,
  * These list elements are expected to be separated by whitespaces.
  * Mount options, flags and Unikraft mount options are optional.
  */
-static char *vfscore_fstab_next_volume_arg(char **pos)
+static char *next_volume_arg(char **argptr)
 {
-	char *ipos;
+	char *nsep;
+	char *arg;
 
-	UK_ASSERT(pos);
+	UK_ASSERT(argptr);
 
-	if (!*pos)
+	if (!*argptr || (*argptr)[0] == '\0') {
+		/* We likely got called again after we already
+		 * returned the last argument
+		 */
+		*argptr = NULL;
 		return NULL;
-
-	ipos = *pos;
-	*pos = strchr(ipos, LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP);
-
-	if (*pos && **pos != '\0') {
-		**pos = '\0';
-		(*pos)++;
-	} else {
-		*pos = NULL;
 	}
 
-	return ipos;
+	arg = *argptr;
+	nsep = strchr(*argptr, LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP);
+	if (!nsep) {
+		/* No next separator, we hit the last argument */
+		*argptr = NULL;
+		goto out;
+	}
+
+	/* Split C string by overwriting the separator */
+	nsep[0] = '\0';
+	/* Move argptr to next argument */
+	*argptr = nsep + 1;
+
+out:
+	/* Return NULL for empty arguments */
+	if (*arg == '\0')
+		return NULL;
+	return arg;
 }
 
-static void vfscore_fstab_fetch_volume_args(char *v, struct vfscore_volume *vv)
+static int vfscore_parse_volume(char *v, struct vfscore_volume *vv)
 {
-	const char *flags;
+	const char *strflags;
 	char *pos;
 
 	UK_ASSERT(v);
 	UK_ASSERT(vv);
 
 	pos = v;
+	vv->sdev   = next_volume_arg(&pos);
+	vv->path   = next_volume_arg(&pos);
+	vv->drv    = next_volume_arg(&pos);
+	strflags   = next_volume_arg(&pos);
+	vv->opts   = next_volume_arg(&pos);
+	vv->ukopts = next_volume_arg(&pos);
 
-	/* sdev, path and drv are mandatory */
-	vv->sdev = vfscore_fstab_next_volume_arg(&pos);
-	UK_ASSERT(vv->sdev);
-
-	vv->path = vfscore_fstab_next_volume_arg(&pos);
-	UK_ASSERT(vv->path);
-	if (unlikely(vv->path[0] != '/')) {
-		uk_pr_err("Mountpoint \"%s\" is not absolute\n", vv->path);
-		vv->sdev = NULL;
-		vv->path = NULL;
-		vv->drv = NULL;
-		vv->opts = NULL;
-		vv->ukopts = NULL;
-		vv->flags = 0;
-		return;
+	/* path and drv are mandatory */
+	if (unlikely(!vv->path || !vv->drv)) {
+		uk_pr_err("vfs.fstab: Incomplete entry: Require mountpoint and filesystem driver\n");
+		return -EINVAL;
 	}
 
-	vv->drv = vfscore_fstab_next_volume_arg(&pos);
-	UK_ASSERT(vv->drv);
+	/* Fill source device with empty string if missing */
+	if (!vv->sdev)
+		vv->sdev = "";
 
-	/* Allow empty flags: "<src_dev>:<mntpoint>:<fsdriver>::<opts>:" */
-	flags = vfscore_fstab_next_volume_arg(&pos);
-	if (flags && flags[0] != '\0')
-		vv->flags = strtol(flags, NULL, 0);
+	/* Check that given path is absolute */
+	if (unlikely(vv->path[0] != '/')) {
+		uk_pr_err("vfs.fstab: Mountpoint \"%s\" is not absolute\n",
+			  vv->path);
+		return -EINVAL;
+	}
+
+	/* Parse flags */
+	if (strflags && strflags[0] != '\0')
+		vv->flags = strtol(strflags, NULL, 0);
 	else
 		vv->flags = 0;
 
-	vv->opts = vfscore_fstab_next_volume_arg(&pos);
-	if (vv->opts && vv->opts[0] == '\0')
-		vv->opts = NULL;
-
-	vv->ukopts = vfscore_fstab_next_volume_arg(&pos);
-	if (vv->ukopts && vv->ukopts[0] == '\0')
-		vv->ukopts = NULL;
-
-	uk_pr_info("Fetched VFSCore Volume args: %s:%s:%s:%lx:%s:%s\n",
-		   vv->sdev == NULL ? "none" : vv->sdev,
-		   vv->path == NULL ? "none" : vv->path,
-		   vv->drv == NULL ? "none" : vv->drv,
-		   vv->flags,
-		   vv->opts == NULL ? "none" : vv->opts,
-		   vv->ukopts == NULL ? "none" : vv->ukopts);
+	uk_pr_debug("vfs.fstab: Parsed: %s:%s:%s:%lx:%s:%s\n",
+		    vv->sdev[0] == '\0' ? "none" : vv->sdev,
+		    vv->path, vv->drv, vv->flags,
+		    vv->opts == NULL ? "" : vv->opts,
+		    vv->ukopts == NULL ? "" : vv->ukopts);
+	return 0;
 }
 #endif /* CONFIG_LIBVFSCORE_FSTAB */
 
@@ -440,7 +456,9 @@ static int vfscore_automount_fstab_volumes(void)
 	int rc, i;
 
 	for (i = 0; i < CONFIG_LIBVFSCORE_FSTAB_SIZE && vfscore_fstab[i]; i++) {
-		vfscore_fstab_fetch_volume_args(vfscore_fstab[i], &vv);
+		vfscore_parse_volume(vfscore_fstab[i], &vv);
+		if (unlikely(rc))
+			return rc;
 
 		rc = vfscore_mount_volume(&vv);
 		if (unlikely(rc)) {
