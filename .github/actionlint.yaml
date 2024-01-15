@@ -1,0 +1,8 @@
+self-hosted-runner:
+  labels:
+    - upb
+    - qemu
+    - xen
+    - run-qemu
+    - build-any
+config-variables: null
