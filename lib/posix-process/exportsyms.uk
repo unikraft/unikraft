@@ -86,6 +86,9 @@ uk_syscall_e_clone3
 kill
 uk_syscall_r_kill
 uk_syscall_e_kill
+pause
+uk_syscall_r_pause
+uk_syscall_e_pause
 rt_sigaction
 uk_syscall_r_rt_sigaction
 uk_syscall_e_rt_sigaction
