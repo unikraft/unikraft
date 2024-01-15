@@ -29,6 +29,17 @@
 OUTPUT_FORMAT("elf64-littleaarch64")
 OUTPUT_ARCH(aarch64)
 ENTRY(_libxenplat_zimageboot)
+
+PHDRS
+{
+	text PT_LOAD FLAGS(PHDRS_PF_RX);
+	rodata PT_LOAD FLAGS(PHDRS_PF_R);
+	data PT_LOAD;
+	tls PT_TLS;
+	tls_load PT_LOAD;
+	stack PT_GNU_STACK FLAGS(PHDRS_PF_RW);
+}
+
 SECTIONS
 {
   . = 0xffffffc000000000;
@@ -40,11 +51,17 @@ SECTIONS
     *(.text.zimageboot)
 	*(.text)
 	*(.gnu.warning)
-  }
+  } : text = 0x9090
 
   _etext = .;			/* End of text section */
 
   . = ALIGN(__PAGE_SIZE);
+
+  _rodata = .;
+  .rodata : { *(.rodata) *(.rodata.*) } :rodata
+  . = ALIGN(4096);
+  _erodata = .;
+
   EXCEPTION_SECTIONS
 
   CTORTAB_SECTION
@@ -52,11 +69,6 @@ SECTIONS
   INITTAB_SECTION
 
   EVENTTAB_SECTION
-
-  _rodata = .;
-  .rodata : { *(.rodata) *(.rodata.*) }
-  . = ALIGN(4096);
-  _erodata = .;
 
   . = ALIGN(0x8);
   _ctors = .;
