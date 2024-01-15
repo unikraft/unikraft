@@ -1,7 +1,5 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Costin Lupu <costin.lupu@cs.pub.ro>
- *
  * Copyright (c) 2019, University Politehnica of Bucharest. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -30,20 +28,60 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef _SYS_RANDOM_H
-#define _SYS_RANDOM_H
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include <string.h>
+#include <uk/swrand.h>
+#include <arch/random.h>
+#include <uk/swrand.h>
+#include <uk/config.h>
+#include <uk/print.h>
+#include <uk/init.h>
 
-#include <sys/types.h>
+__u32 uk_swrandr_gen_seed32(void)
+{
+	__u32 val;
+	int ret;
 
-#define GRND_NONBLOCK     0x01
-#define GRND_RANDOM       0x02
+	ret = ukarch_random_seed_u32(&val);
+	if (unlikely(ret))
+		UK_CRASH("Could not generate random seed\n");
 
-ssize_t getrandom(void *buf, size_t buflen, unsigned int flags);
-
-#ifdef __cplusplus
+	return val;
 }
-#endif
-#endif
+
+ssize_t uk_swrand_fill_buffer(void *buf, size_t buflen)
+{
+	size_t step, chunk_size, i;
+	__u32 rd;
+
+	step = sizeof(__u32);
+	chunk_size = buflen % step;
+
+	for (i = 0; i < buflen - chunk_size; i += step)
+		*(__u32 *)((char *) buf + i) = uk_swrand_randr();
+
+	/* fill the remaining bytes of the buffer */
+	if (chunk_size > 0) {
+		rd = uk_swrand_randr();
+		memcpy(buf + i, &rd, chunk_size);
+	}
+
+	return buflen;
+}
+
+static int _uk_swrand_init(struct uk_init_ctx *ictx __unused)
+{
+	unsigned int seedc = 10;
+	__u32 seedv[10];
+	unsigned int i;
+
+	uk_pr_info("Initialize random number generator...\n");
+
+	for (i = 0; i < seedc; i++)
+		seedv[i] = uk_chacha_gen_seed32();
+
+	uk_swrand_init_r(&uk_swrand_def, seedc, seedv);
+
+	return seedc;
+}
+
+uk_early_initcall(_uk_swrand_init, 0x0);

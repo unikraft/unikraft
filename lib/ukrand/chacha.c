@@ -109,7 +109,7 @@ static inline void _uk_iv_setup(struct uk_swrand *r, __u32 iv[2])
 }
 
 static inline __u32 _infvec_val(unsigned int c, const __u32 v[],
-		unsigned int pos)
+				unsigned int pos)
 {
 	if (c == 0)
 		return 0x0;
@@ -117,7 +117,7 @@ static inline __u32 _infvec_val(unsigned int c, const __u32 v[],
 }
 
 void uk_swrand_init_r(struct uk_swrand *r, unsigned int seedc,
-		const __u32 seedv[])
+		      const __u32 seedv[])
 {
 	__u32 i;
 

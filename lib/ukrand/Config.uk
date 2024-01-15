@@ -1,0 +1,22 @@
+menuconfig LIBUKRAND
+	bool "ukrand: Random number generation"
+	depends on HAVE_RANDOM
+
+if LIBUKRAND
+
+choice
+	prompt "RNG Source"
+	default LIBUKRAND_CHACHA
+
+config LIBUKRAND_CHACHA
+	bool "ChaCha20"
+	help
+	  ChaCha20 is a fast CSPRNG based on Salsa20
+endchoice
+
+config LIBUKRAND_DEVFS
+	bool "Register random and urandom device to devfs"
+	depends on LIBUKRAND_CHACHA
+	select LIBDEVFS
+	select LIBVFSCORE
+endif
