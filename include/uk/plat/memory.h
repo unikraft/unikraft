@@ -312,7 +312,7 @@ static inline __uptr ukplat_auxsp_alloc(struct uk_alloc __maybe_unused *a,
 	rc = uk_vma_map_stack(vas,
 			      &auxsp,
 			      auxsp_len,
-			      UK_VMA_MAP_POPULATE,
+			      UK_VMA_MAP_POPULATE | UK_VMA_MAP_UNINITIALIZED,
 			      NULL,
 			      0);
 	if (unlikely(rc)) {
