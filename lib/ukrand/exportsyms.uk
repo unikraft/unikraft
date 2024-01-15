@@ -1,8 +1,7 @@
 getrandom
 uk_syscall_e_getrandom
 uk_syscall_r_getrandom
-uk_swrand_def
-uk_swrand_init_r
-uk_swrand_randr_r
-uk_swrandr_gen_seed32
-uk_swrand_fill_buffer
+uk_chacha_randr_u32
+uk_chacha_randr_u64
+uk_chacha_init_r
+uk_chacha_randr_r

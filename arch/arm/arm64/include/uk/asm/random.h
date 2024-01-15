@@ -33,6 +33,8 @@
 
 #ifdef CONFIG_ARM64_FEAT_RNG
 
+#include <uk/arch/lcpu.h>
+
 static inline int ukarch_random_init(void)
 {
 	__u64 reg;

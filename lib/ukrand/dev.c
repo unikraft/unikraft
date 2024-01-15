@@ -35,7 +35,7 @@
 #include <errno.h>
 #include <uk/ctors.h>
 #include <uk/print.h>
-#include <uk/swrand.h>
+#include <uk/random.h>
 #include <uk/assert.h>
 #include <uk/config.h>
 #include <uk/essentials.h>
@@ -54,7 +54,7 @@ static int dev_random_read(struct device *dev __unused, struct uio *uio,
 	buf = uio->uio_iov->iov_base;
 	count = uio->uio_iov->iov_len;
 
-	uk_swrand_fill_buffer(buf, count);
+	uk_chacha_fill_buffer(buf, count);
 
 	uio->uio_resid = 0;
 	return 0;

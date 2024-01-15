@@ -33,12 +33,12 @@
 #include <string.h>
 #include <sys/random.h>
 #include <uk/essentials.h>
-#include <uk/swrand.h>
+#include <uk/random.h>
 #include <uk/syscall.h>
 
 UK_SYSCALL_R_DEFINE(ssize_t, getrandom,
 		    void *, buf, size_t, buflen,
 		    unsigned int, flags)
 {
-	return uk_swrand_fill_buffer(buf, buflen);
+	return uk_chacha_fill_buffer(buf, buflen);
 }
