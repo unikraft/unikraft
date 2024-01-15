@@ -9,142 +9,143 @@ menuconfig LIBUKBOOT
 	# FIXME: binary buddy allocator is hard-coded for now
 
 if LIBUKBOOT
-	choice LIBUKBOOT_BANNER
+choice LIBUKBOOT_BANNER
 	prompt "Unikraft banner"
 	default LIBUKBOOT_BANNER_POWEREDBY
-		config LIBUKBOOT_BANNER_NONE
-		bool "None"
 
-		config LIBUKBOOT_BANNER_MINIMAL
-		bool "One liner"
+config LIBUKBOOT_BANNER_NONE
+	bool "None"
 
-		config LIBUKBOOT_BANNER_CLASSIC
-		bool "Classic banner"
+config LIBUKBOOT_BANNER_MINIMAL
+	bool "One liner"
 
-		config LIBUKBOOT_BANNER_POWEREDBY
-		bool "Powered by Unikraft"
+config LIBUKBOOT_BANNER_CLASSIC
+	bool "Classic banner"
 
-		config LIBUKBOOT_BANNER_POWEREDBY_ANSI
-		bool "Powered by Unikraft (blue, ANSI)"
-		help
-		  Please make sure that your console display supports
-		  ANSI colors
+config LIBUKBOOT_BANNER_POWEREDBY
+	bool "Powered by Unikraft"
 
-		config LIBUKBOOT_BANNER_POWEREDBY_ANSI2
-		bool "Powered by Unikraft (gray, ANSI)"
-		help
-		  Please make sure that your console display supports
-		  ANSI colors
+config LIBUKBOOT_BANNER_POWEREDBY_ANSI
+	bool "Powered by Unikraft (blue, ANSI)"
+	help
+	  Please make sure that your console display supports
+	  ANSI colors
 
-		config LIBUKBOOT_BANNER_POWEREDBY_EA
-		bool "Powered by Unikraft (ASCII)"
-		help
-		  Please make sure that your console display supports
-		  extended ASCII characters
+config LIBUKBOOT_BANNER_POWEREDBY_ANSI2
+	bool "Powered by Unikraft (gray, ANSI)"
+	help
+	  Please make sure that your console display supports
+	  ANSI colors
 
-		config LIBUKBOOT_BANNER_POWEREDBY_EAANSI
-		bool "Powered by Unikraft (ASCII, blue, ANSI)"
-		help
-		  Please make sure that your console display supports
-		  extended ASCII characters and ANSI colors
+config LIBUKBOOT_BANNER_POWEREDBY_EA
+	bool "Powered by Unikraft (ASCII)"
+	help
+	  Please make sure that your console display supports
+	  extended ASCII characters
 
-		config LIBUKBOOT_BANNER_POWEREDBY_EAANSI2
-		bool "Powered by Unikraft (ASCII, gray, ANSI)"
-		help
-		  Please make sure that your console display supports
-		  extended ASCII characters and ANSI colors
+config LIBUKBOOT_BANNER_POWEREDBY_EAANSI
+	bool "Powered by Unikraft (ASCII, blue, ANSI)"
+	help
+	  Please make sure that your console display supports
+	  extended ASCII characters and ANSI colors
 
-		config LIBUKBOOT_BANNER_POWEREDBY_U8
-		bool "Powered by Unikraft (UTF-8)"
-		help
-		  Please make sure that your console display supports
-		  UTF-8
+config LIBUKBOOT_BANNER_POWEREDBY_EAANSI2
+	bool "Powered by Unikraft (ASCII, gray, ANSI)"
+	help
+	  Please make sure that your console display supports
+	  extended ASCII characters and ANSI colors
 
-		config LIBUKBOOT_BANNER_POWEREDBY_U8ANSI
-		bool "Powered by Unikraft (UTF-8, blue, ANSI)"
-		help
-		  Please make sure that your console display supports
-		  UTF-8 and ANSI colors
+config LIBUKBOOT_BANNER_POWEREDBY_U8
+	bool "Powered by Unikraft (UTF-8)"
+	help
+	  Please make sure that your console display supports
+	  UTF-8
 
-		config LIBUKBOOT_BANNER_POWEREDBY_U8ANSI2
-		bool "Powered by Unikraft (UTF-8, gray, ANSI)"
-		help
-		  Please make sure that your console display supports
-		  UTF-8 and ANSI colors
-	endchoice
+config LIBUKBOOT_BANNER_POWEREDBY_U8ANSI
+	bool "Powered by Unikraft (UTF-8, blue, ANSI)"
+	help
+	  Please make sure that your console display supports
+	  UTF-8 and ANSI colors
 
-	config LIBUKBOOT_MAXNBARGS
+config LIBUKBOOT_BANNER_POWEREDBY_U8ANSI2
+	bool "Powered by Unikraft (UTF-8, gray, ANSI)"
+	help
+	  Please make sure that your console display supports
+	  UTF-8 and ANSI colors
+endchoice
+
+config LIBUKBOOT_MAXNBARGS
 	int "Maximum number of arguments (max. size of argv)"
 	default 60
 
-	config LIBUKBOOT_DISABLE_WEAK_MAIN
+config LIBUKBOOT_DISABLE_WEAK_MAIN
 	bool
 	default n
 
-	choice LIBUKBOOT_INITALLOC
+choice LIBUKBOOT_INITALLOC
 	prompt "Initialize memory allocator"
 	default LIBUKBOOT_INITBBUDDY
 
-		config LIBUKBOOT_INITBBUDDY
-		bool "Binary buddy allocator"
-		select LIBUKALLOCBBUDDY
+config LIBUKBOOT_INITBBUDDY
+	bool "Binary buddy allocator"
+	select LIBUKALLOCBBUDDY
 
-		config LIBUKBOOT_INITREGION
-		bool "Region allocator"
-		select LIBUKALLOCREGION
-		help
-		  Satisfy allocation as fast as possible. No support for free().
-		  Refer to help in ukallocregion for more information.
+config LIBUKBOOT_INITREGION
+	bool "Region allocator"
+	select LIBUKALLOCREGION
+	help
+	  Satisfy allocation as fast as possible. No support for free().
+	  Refer to help in ukallocregion for more information.
 
-		config LIBUKBOOT_INITMIMALLOC
-		bool "Mimalloc"
-		depends on LIBMIMALLOC_INCLUDED
-		select LIBMIMALLOC
+config LIBUKBOOT_INITMIMALLOC
+	bool "Mimalloc"
+	depends on LIBMIMALLOC_INCLUDED
+	select LIBMIMALLOC
 
-		config LIBUKBOOT_INITTINYALLOC
-		bool "tinyalloc"
-		depends on LIBTINYALLOC_INCLUDED
-		select LIBTINYALLOC
-		help
-		  Minimalist allocator implementation, meant for use in systems
-		  with unmanaged linear memory such as WebAssembly or embedded
-		  systems. tinyalloc is highly configurable and offers high
-		  performance and reasonable memory usage when used and
-		  configured appropriately.
+config LIBUKBOOT_INITTINYALLOC
+	bool "tinyalloc"
+	depends on LIBTINYALLOC_INCLUDED
+	select LIBTINYALLOC
+	help
+	  Minimalist allocator implementation, meant for use in systems
+	  with unmanaged linear memory such as WebAssembly or embedded
+	  systems. tinyalloc is highly configurable and offers high
+	  performance and reasonable memory usage when used and
+	  configured appropriately.
 
-		config LIBUKBOOT_INITTLSF
-		bool "TLSF"
-		depends on LIBTLSF_INCLUDED
-		select LIBTLSF
+config LIBUKBOOT_INITTLSF
+	bool "TLSF"
+	depends on LIBTLSF_INCLUDED
+	select LIBTLSF
 
-		config LIBUKBOOT_NOALLOC
-		bool "None"
+config LIBUKBOOT_NOALLOC
+	bool "None"
 
-	endchoice
+endchoice
 
-	config LIBUKBOOT_HEAP_BASE
+config LIBUKBOOT_HEAP_BASE
 	hex "Heap base address"
 	default 0x400000000
 	depends on HAVE_PAGING
 	depends on !LIBUKBOOT_NOALLOC
 
-	choice LIBUKBOOT_INITSCHED
+choice LIBUKBOOT_INITSCHED
 	prompt "Initialize scheduler"
 	default LIBUKBOOT_INITSCHEDCOOP
 	depends on !LIBUKBOOT_NOALLOC
 
-		config LIBUKBOOT_INITSCHEDCOOP
-		bool "Cooperative scheduler"
-		select LIBUKSCHEDCOOP
-		help
-		  Initialize ukschedcoop as cooperative scheduler on the boot CPU.
+config LIBUKBOOT_INITSCHEDCOOP
+	bool "Cooperative scheduler"
+	select LIBUKSCHEDCOOP
+	help
+	  Initialize ukschedcoop as cooperative scheduler on the boot CPU.
 
-		config LIBUKBOOT_NOSCHED
-		bool "None"
+config LIBUKBOOT_NOSCHED
+	bool "None"
 
-	endchoice
+endchoice
 
-	config LIBUKBOOT_MAINTHREAD
+config LIBUKBOOT_MAINTHREAD
 	bool "Run application main in own thread"
 	depends on !LIBUKBOOT_NOSCHED && !LIBUKBOOT_NOALLOC
 	select LIBUKLOCK
@@ -155,7 +156,7 @@ if LIBUKBOOT
 		This enables proceeding with a system shutdown before the
 		application's main function returned.
 
-	config LIBUKBOOT_MAINTHREAD_NOHALT
+config LIBUKBOOT_MAINTHREAD_NOHALT
 	bool "Do not initiate a shutdown when application main returned"
 	depends on LIBUKBOOT_MAINTHREAD
 	help
@@ -164,7 +165,7 @@ if LIBUKBOOT
 		terminated. The system performs a shutdown only on explicit
 		requests.
 
-	config LIBUKBOOT_SHUTDOWNREQ_HANDLER
+config LIBUKBOOT_SHUTDOWNREQ_HANDLER
 	bool "Register shutdown request handler"
 	depends on LIBUKBOOT_MAINTHREAD
 	help
