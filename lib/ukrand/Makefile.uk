@@ -3,8 +3,9 @@ $(eval $(call addlib_s,libukrand,$(CONFIG_LIBUKRAND)))
 CINCLUDES-$(CONFIG_LIBUKRAND)	                += -I$(LIBUKRAND_BASE)/include
 CXXINCLUDES-$(CONFIG_LIBUKRAND)                 += -I$(LIBUKRAND_BASE)/include
 
-LIBUKRAND_SRCS-$(CONFIG_LIBUKRAND_CHACHA)       += $(LIBUKRAND_BASE)/getrandom.c
+LIBUKRAND_SRCS-y                                += $(LIBUKRAND_BASE)/random.c
+LIBUKRAND_SRCS-y                                += $(LIBUKRAND_BASE)/getrandom.c
 LIBUKRAND_SRCS-$(CONFIG_LIBUKRAND_CHACHA)       += $(LIBUKRAND_BASE)/chacha.c
 LIBUKRAND_SRCS-$(CONFIG_LIBUKRAND_DEVFS)        += $(LIBUKRAND_BASE)/dev.c
 
-UK_PROVIDED_SYSCALLS-$(CONFIG_LIBUKRAND_CHACHA) += getrandom-3
+UK_PROVIDED_SYSCALLS-$(CONFIG_LIBUKRAND)        += getrandom-3

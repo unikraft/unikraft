@@ -217,24 +217,4 @@ __u64 uk_chacha_randr_u64(void)
 	return ret;
 }
 
-__ssz uk_chacha_fill_buffer(void *buf, __sz buflen)
-{
-	__sz step, chunk_size, i;
-	__u32 rd;
-
-	step = sizeof(__u32);
-	chunk_size = buflen % step;
-
-	for (i = 0; i < buflen - chunk_size; i += step)
-		*(__u32 *)((char *)buf + i) = uk_chacha_randr_u32();
-
-	/* fill the remaining bytes of the buffer */
-	if (chunk_size > 0) {
-		rd = uk_chacha_randr_u32();
-		memcpy(buf + i, &rd, chunk_size);
-	}
-
-	return buflen;
-}
-
 uk_early_initcall(uk_chacha_init, 0x0);

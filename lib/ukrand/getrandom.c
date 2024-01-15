@@ -40,5 +40,5 @@ UK_SYSCALL_R_DEFINE(ssize_t, getrandom,
 		    void *, buf, size_t, buflen,
 		    unsigned int, flags)
 {
-	return uk_chacha_fill_buffer(buf, buflen);
+	return uk_random_fill_buffer(buf, buflen);
 }

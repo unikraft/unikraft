@@ -20,9 +20,14 @@ extern "C" {
 
 __u32 uk_chacha_randr_u32(void);
 __u64 uk_chacha_randr_u64(void);
-__ssz uk_chacha_fill_buffer(void *buf, __sz buflen);
 
 #endif /* CONFIG_LIBUKRAND_CHACHA */
+
+int uk_random_u32(__u32 *val);
+int uk_random_u64(__u64 *val);
+int uk_random_seed_u32(__u32 *val);
+int uk_random_seed_u64(__u64 *val);
+__ssz uk_random_fill_buffer(void *buf, __sz buflen);
 
 #ifdef __cplusplus
 }
