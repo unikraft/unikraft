@@ -43,6 +43,7 @@ uk_posix_process_kill
 clone
 vfork
 kill
+pause
 sigaltstack
 sigprocmask
 tgkill
