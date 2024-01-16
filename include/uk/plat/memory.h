@@ -258,6 +258,7 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags);
  */
 int ukplat_mem_init(void);
 
+#if CONFIG_LIBUKALLOC
 /* Allocates and returns an auxiliary stack that can be used in emergency cases
  * such as when switching system call stacks. The size is that given by
  * (1 << CONFIG_AUXSP_PAGE_ORDER) * PAGE_SIZE.
@@ -337,6 +338,7 @@ static inline __uptr ukplat_auxsp_alloc(struct uk_alloc __maybe_unused *a,
 	 */
 	return (__uptr)ukarch_gen_sp((__uptr)auxsp, auxsp_len);
 }
+#endif /* CONFIG_LIBUKALLOC */
 
 #ifdef __cplusplus
 }
