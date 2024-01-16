@@ -245,12 +245,18 @@ static void _uk_thread_struct_init(struct uk_thread *t,
 	t->dtor = dtor;
 	t->exec_time = 0;
 
-	if (!auxsp)
-		auxsp = ukplat_auxsp_alloc(uk_alloc_get_default(),
+	if (!auxsp) {
+		void *auxstack = ukplat_auxstack_alloc(uk_alloc_get_default(),
 #if CONFIG_LIBUKVMEM
-					   uk_vas_get_active(),
+						       uk_vas_get_active(),
 #endif /* CONFIG_LIBUKVMEM */
-					   0);  /* Default auxsp size */
+						       0);
+
+		t->_mem.auxstack = auxstack;
+		t->_mem.auxstack_a = uk_alloc_get_default();
+
+		auxsp = ukarch_gen_sp(auxstack, ukplat_auxstack_len_default());
+	}
 
 	t->auxsp = auxsp;
 
@@ -384,10 +390,11 @@ static int _uk_thread_struct_init_alloc(struct uk_thread *t,
 					void *priv,
 					uk_thread_dtor_t dtor)
 {
-	void *stack = NULL;
-	void *tls = NULL;
 	void *auxstack = 0x0;
-	uintptr_t tlsp = 0x0;
+	void *stack = NULL;
+	__uptr tlsp = 0x0;
+	__uptr auxsp = 0;
+	void *tls = NULL;
 	int rc;
 
 	if (a_stack && stack_len) {
@@ -399,15 +406,17 @@ static int _uk_thread_struct_init_alloc(struct uk_thread *t,
 	}
 
 	if (a_auxstack && auxstack_len) {
-		auxstack = (void *)ukplat_auxsp_alloc(a_auxstack,
+		auxstack = (void *)ukplat_auxstack_alloc(a_auxstack,
 #if CONFIG_LIBUKVMEM
-						      uk_vas_get_active(),
+							 uk_vas_get_active(),
 #endif /* CONFIG_LIBUKVMEM */
-						      auxstack_len);
+							 auxstack_len);
 		if (unlikely(!auxstack)) {
 			rc = -ENOMEM;
 			goto err_free_stack;
 		}
+
+		auxsp = ukarch_gen_sp(auxstack, auxstack_len);
 	}
 
 	if (a_uktls) {
@@ -441,7 +450,9 @@ static int _uk_thread_struct_init_alloc(struct uk_thread *t,
 		tlsp = ukarch_tls_tlsp(tls);
 	}
 
-	_uk_thread_struct_init(t, (__uptr)auxstack, tlsp, !(!tlsp), ectx,
+	_uk_thread_struct_init(t,
+			       auxsp,
+			       tlsp, !(!tlsp), ectx,
 			       name, priv,
 			       dtor);
 
@@ -715,8 +726,7 @@ struct uk_thread *uk_thread_create_container(struct uk_alloc *a,
 
 	stack_len = (!!stack_len) ? stack_len : STACK_SIZE;
 	auxstack_len = (!!auxstack_len) ? auxstack_len :
-					((1 << CONFIG_UKPLAT_AUXSP_PAGE_ORDER) *
-					 PAGE_SIZE);
+					  ukplat_auxstack_len_default();
 
 	if (_uk_thread_struct_init_alloc(t,
 					 a_stack, stack_len,

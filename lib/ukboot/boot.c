@@ -361,12 +361,17 @@ void ukplat_entry(int argc, char *argv[])
 	uk_sched_start(s);
 #else /* CONFIG_LIBUKBOOT_NOSCHED */
 	struct lcpu *bsp_lcpu = lcpu_get_current();
+	void *auxstack;
+
 	UK_ASSERT(bsp_lcpu);
-	bsp_lcpu->auxsp = ukplat_auxsp_alloc(a,
+
+	auxstack = ukplat_auxstack_alloc(a,
 #if defined(CONFIG_LIBUKBOOT_HEAP_BASE) && defined(CONFIG_LIBUKVMEM)
-					     &kernel_vas,
+					 &kernel_vas,
 #endif /* !CONFIG_LIBUKBOOT_HEAP_BASE && CONFIG_LIBUKVMEM */
-					     0);  /* Default auxsp size */
+					 0);  /* Default auxstack size */
+	bsp_lcpu->auxsp = ukarch_gen_sp(auxstack,
+					ukplat_auxstack_len_default());
 #endif /* CONFIG_LIBUKBOOT_NOSCHED */
 
 	ictx.cmdline.argc = argc;

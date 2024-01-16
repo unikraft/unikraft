@@ -103,7 +103,7 @@ ENTRY(_ukplat_syscall)
 	 *	|             |
 	 *	--------------- <-- (auxsp -
 	 *			     (PAGE_SIZE *
-	 *			      (1 << CONFIG_UKPLAT_AUXSP_PAGE_ORDER)))
+	 *			      (1 << CONFIG_AUXSTACK_SIZE_PAGE_ORDER)))
 	 *	  END OF AUXSP
 	 */
 

@@ -259,9 +259,16 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags);
 int ukplat_mem_init(void);
 
 #if CONFIG_LIBUKALLOC
+static inline __sz ukplat_auxstack_len_default(void)
+{
+	return ALIGN_UP(PAGE_SIZE *
+			(1 << CONFIG_AUXSTACK_SIZE_PAGE_ORDER),
+			UKARCH_ECTX_ALIGN);
+}
+
 /* Allocates and returns an auxiliary stack that can be used in emergency cases
  * such as when switching system call stacks. The size is that given by
- * (1 << CONFIG_AUXSP_PAGE_ORDER) * PAGE_SIZE.
+ * (1 << CONFIG_AUXSTACK_SIZE_PAGE_ORDER) * PAGE_SIZE.
  *
  * @param a
  *   The allocator to use for the auxiliary stack
@@ -270,20 +277,21 @@ int ukplat_mem_init(void);
  *   This should be used in conjunction with CONFIG_LIBUKVMEM to ensure that
  *   accesses to the auxiliary stack do not generate page faults in more
  *   fragile system states.
- * @param auxsp_len
+ * @param auxstack_len
  *   The custom length of the auxiliary stack. If 0, then
- *   CONFIG_UKPLAT_AUXSP_PAGE_ORDER is used instead as the default length.
+ *   CONFIG_AUXSTACK_SIZE_PAGE_ORDER is used instead as the default
+ *   length.
  *
  * @return
  *   Pointer to the allocated auxiliary stack
  */
-static inline __uptr ukplat_auxsp_alloc(struct uk_alloc __maybe_unused *a,
+static inline void *ukplat_auxstack_alloc(struct uk_alloc __maybe_unused *a,
 #if CONFIG_LIBUKVMEM
-					struct uk_vas __maybe_unused *vas,
+					  struct uk_vas __maybe_unused *vas,
 #endif /* CONFIG_LIBUKVMEM */
-					__sz auxsp_len)
+					  __sz auxstack_len)
 {
-	__vaddr_t auxsp;
+	void *auxstack;
 
 	/**
 	 * Why does the auxiliary stack have to be end-to-end aligned to ECTX
@@ -297,22 +305,19 @@ static inline __uptr ukplat_auxsp_alloc(struct uk_alloc __maybe_unused *a,
 	 * alignment as well because when we add to it the auxiliary stack
 	 * length the resulted stack pointer should on its own be ECTX aligned.
 	 */
-	if (!auxsp_len)
-		auxsp_len = ALIGN_UP(PAGE_SIZE *
-				     (1 << CONFIG_UKPLAT_AUXSP_PAGE_ORDER),
-				     UKARCH_ECTX_ALIGN);
+	if (!auxstack_len)
+		auxstack_len = ukplat_auxstack_len_default();
 
 #if CONFIG_LIBUKVMEM
+	__vaddr_t auxstack_vaddr = __VADDR_ANY;
 	int rc;
 
-	/* Have the whole stack always backed by physical memory */
-	auxsp = __VADDR_ANY;
 	/* Allocation through uk_vma_map_stack() will result in a page-aligned
 	 * address which is more than enough to be ECTX aligned.
 	 */
 	rc = uk_vma_map_stack(vas,
-			      &auxsp,
-			      auxsp_len,
+			      &auxstack_vaddr,
+			      auxstack_len,
 			      UK_VMA_MAP_POPULATE | UK_VMA_MAP_UNINITIALIZED,
 			      NULL,
 			      0);
@@ -320,23 +325,25 @@ static inline __uptr ukplat_auxsp_alloc(struct uk_alloc __maybe_unused *a,
 		uk_pr_err("Failed to map auxiliary stack\n");
 		return 0;
 	}
+
+	auxstack = (void *)auxstack_vaddr;
+
 #else /* !CONFIG_LIBUKVMEM */
 	/* Again, make sure that allocation resulted start address is ECTX
 	 * aligned.
 	 */
-	auxsp = (__vaddr_t)uk_memalign(a, UKARCH_ECTX_ALIGN,
-				       auxsp_len);
-	if (unlikely(!auxsp)) {
+	auxstack = uk_memalign(a, UKARCH_ECTX_ALIGN, auxstack_len);
+	if (unlikely(!auxstack)) {
 		uk_pr_err("Failed to allocate auxiliary stack\n");
 		return 0;
 	}
 #endif /* !CONFIG_LIBUKVMEM */
 
-	/* If auxsp resulted from the previous allocations is ECTX aligned
-	 * and auxsp_len is ECTX aligned, then the function call below will
+	/* If auxstack resulted from the previous allocations is ECTX aligned
+	 * and auxstack_len is ECTX aligned, then the function call below will
 	 * result in an ECTX aligned stack pointer.
 	 */
-	return (__uptr)ukarch_gen_sp((__uptr)auxsp, auxsp_len);
+	return auxstack;
 }
 #endif /* CONFIG_LIBUKALLOC */
 
