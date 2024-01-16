@@ -21,3 +21,9 @@ menu "Xen"
 source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-xen.uk' -r '$(KCONFIG_DRIV_BASE)/xen' -l '$(KCONFIG_DRIV_BASE)/xen' -e '$(KCONFIG_EXCLUDEDIRS)')"
 
 endmenu
+
+menu "PS/2 controller"
+
+source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-ukps2.uk' -r '$(KCONFIG_DRIV_BASE)/ukps2' -l '$(KCONFIG_DRIV_BASE)/ukps2' -e '$(KCONFIG_EXCLUDEDIRS)')"
+
+endmenu

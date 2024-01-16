@@ -4,6 +4,8 @@ menuconfig LIBUKBOOT
 	select LIBUKDEBUG
 	select LIBUKARGPARSE
 	select HAVE_BOOTENTRY
+	imply LIBUKBOOT_MAINTHREAD if HAVE_SHUTDOWN_DISPATCHER
+	imply LIBUKBOOT_SHUTDOWNREQ_HANDLER if HAVE_SHUTDOWN_DISPATCHER
 	default y
 
 	# FIXME: binary buddy allocator is hard-coded for now
@@ -168,6 +170,7 @@ config LIBUKBOOT_MAINTHREAD_NOHALT
 config LIBUKBOOT_SHUTDOWNREQ_HANDLER
 	bool "Register shutdown request handler"
 	depends on LIBUKBOOT_MAINTHREAD
+	depends on HAVE_SHUTDOWN_DISPATCHER
 	help
 		This setting enables the init thread to initiate a shutdown
 		if it is requested by a driver on the shutdown_req event queue
