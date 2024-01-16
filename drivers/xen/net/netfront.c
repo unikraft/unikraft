@@ -48,7 +48,7 @@
 #else
 #error "Unsupported architecture"
 #endif
-#include <xenbus/xenbus.h>
+#include <uk/xenbus/xenbus.h>
 #include <uk/essentials.h>
 #include "netfront.h"
 #include "netfront_xb.h"

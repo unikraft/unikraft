@@ -37,8 +37,8 @@
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include <uk/errptr.h>
-#include <xenbus/xs.h>
-#include <xenbus/client.h>
+#include <uk/xenbus/xs.h>
+#include <uk/xenbus/client.h>
 
 #include "9pfront_xb.h"
 
@@ -288,7 +288,7 @@ static int be_watch_stop(struct xenbus_device *xendev)
 		if (rc) \
 			goto out; \
 		while (!rc && (state_cond)) \
-			rc = xenbus_wait_for_state_change(be_state_path, \
+			rc = uk_xenbus_wait_for_state_change(be_state_path, \
 				&be_state, xendev->otherend_watch); \
 		if (rc) \
 			goto out; \
@@ -311,12 +311,12 @@ static int p9front_xb_wait_be_connect(struct p9front_dev *p9fdev)
 
 	if (be_state != XenbusStateConnected) {
 		uk_pr_err("Backend not available, state=%s\n",
-				xenbus_state_to_str(be_state));
+				uk_xenbus_state_to_str(be_state));
 		be_watch_stop(xendev);
 		goto out;
 	}
 
-	rc = xenbus_switch_state(XBT_NIL, xendev, XenbusStateConnected);
+	rc = uk_xenbus_switch_state(XBT_NIL, xendev, XenbusStateConnected);
 	if (rc)
 		goto out;
 
@@ -344,7 +344,7 @@ again:
 	if (rc)
 		goto abort_transaction;
 
-	rc = xenbus_switch_state(xbt, xendev, XenbusStateInitialised);
+	rc = uk_xenbus_switch_state(xbt, xendev, XenbusStateInitialised);
 	if (rc)
 		goto abort_transaction;
 

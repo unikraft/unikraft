@@ -37,8 +37,8 @@
 #include <uk/errptr.h>
 #include <uk/print.h>
 #include <uk/assert.h>
-#include <xenbus/xs.h>
-#include <xenbus/client.h>
+#include <uk/xenbus/xs.h>
+#include <uk/xenbus/client.h>
 #include "netfront_xb.h"
 
 
@@ -393,7 +393,7 @@ again:
 	if (rc)
 		goto abort_transaction;
 
-	rc = xenbus_switch_state(xbt, xendev, XenbusStateConnected);
+	rc = uk_xenbus_switch_state(xbt, xendev, XenbusStateConnected);
 	if (rc)
 		goto abort_transaction;
 
@@ -425,7 +425,7 @@ int netfront_xb_disconnect(struct netfront_dev *nfdev)
 
 	uk_pr_debug("Close network: backend at %s\n", xendev->otherend);
 
-	rc = xenbus_switch_state(XBT_NIL, xendev, XenbusStateClosing);
+	rc = uk_xenbus_switch_state(XBT_NIL, xendev, XenbusStateClosing);
 	if (rc)
 		goto out;
 
@@ -464,7 +464,7 @@ static int be_watch_stop(struct xenbus_device *xendev)
 		if (rc) \
 			goto out; \
 		while (!rc && (state_cond)) \
-			rc = xenbus_wait_for_state_change(be_state_path, \
+			rc = uk_xenbus_wait_for_state_change(be_state_path, \
 				&be_state, xendev->otherend_watch); \
 		if (rc) \
 			goto out; \
@@ -487,7 +487,7 @@ static int netfront_xb_wait_be_connect(struct netfront_dev *nfdev)
 
 	if (be_state != XenbusStateConnected) {
 		uk_pr_err("Backend not available, state=%s\n",
-				xenbus_state_to_str(be_state));
+				uk_xenbus_state_to_str(be_state));
 		be_watch_stop(xendev);
 	}
 
@@ -506,13 +506,13 @@ static int netfront_xb_wait_be_disconnect(struct netfront_dev *nfdev)
 
 	WAIT_BE_STATE_CHANGE_WHILE_COND(be_state < XenbusStateClosing);
 
-	rc = xenbus_switch_state(XBT_NIL, xendev, XenbusStateClosed);
+	rc = uk_xenbus_switch_state(XBT_NIL, xendev, XenbusStateClosed);
 	if (rc)
 		goto out;
 
 	WAIT_BE_STATE_CHANGE_WHILE_COND(be_state < XenbusStateClosed);
 
-	rc = xenbus_switch_state(XBT_NIL, xendev, XenbusStateInitialising);
+	rc = uk_xenbus_switch_state(XBT_NIL, xendev, XenbusStateInitialising);
 	if (rc)
 		goto out;
 

@@ -40,7 +40,7 @@
 #ifndef __XS_H__
 #define __XS_H__
 
-#include <xenbus/xenbus.h>
+#include <uk/xenbus/xenbus.h>
 
 
 /*
