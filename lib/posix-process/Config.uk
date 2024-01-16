@@ -42,6 +42,10 @@ config LIBPOSIX_PROCESS_SIGNAL_SIGPROCMASK
 	bool "rt_sigprocmask() syscall"
 	default y
 
+config LIBPOSIX_PROCESS_SIGNAL_SIGSUSPEND
+	bool "rt_sigsuspend() syscall"
+	default y
+
 config LIBPOSIX_PROCESS_SIGNAL_SIGACTION
 	bool "rt_sigaction() syscall"
 	default y

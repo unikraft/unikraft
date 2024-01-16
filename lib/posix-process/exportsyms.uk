@@ -98,6 +98,9 @@ uk_syscall_e_rt_sigprocmask
 rt_sigprocmask
 uk_syscall_r_rt_sigprocmask
 uk_syscall_e_rt_sigprocmask
+sigsuspend
+uk_syscall_r_rt_sigsuspend
+uk_syscall_e_rt_sigsuspend
 rt_sigqueueinfo
 uk_syscall_r_rt_sigqueueinfo
 uk_syscall_e_rt_sigqueueinfo
