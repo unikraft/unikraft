@@ -7,6 +7,7 @@
 /* Pseudo-files: files with constant input and discarding output */
 
 #include <string.h>
+#include <sys/stat.h>
 
 #include <uk/assert.h>
 #include <uk/file.h>
@@ -67,10 +68,35 @@ static ssize_t null_write(const struct uk_file *f __unused,
 	return total;
 }
 
+#define PSEUDO_STATX_MASK \
+	(UK_STATX_TYPE|UK_STATX_MODE|UK_STATX_NLINK|UK_STATX_INO|UK_STATX_SIZE)
+
+static int pseudo_getstat(const struct uk_file *f,
+			  unsigned int mask __unused, struct uk_statx *arg)
+{
+	UK_ASSERT(f->vol == NULL_VOLID || f->vol == VOID_VOLID ||
+		  f->vol == ZERO_VOLID);
+
+	/* Since all information is immediately available, ignore mask arg */
+	arg->stx_mask = PSEUDO_STATX_MASK;
+	arg->stx_mode = S_IFCHR|0666;
+	arg->stx_nlink = 1;
+	arg->stx_ino = 1;
+	arg->stx_size = 0;
+
+	/* Following fields are always filled in, not in stx_mask */
+	arg->stx_dev_major = 0;
+	arg->stx_dev_minor = 5; /* Same value Linux returns for /dev/null */
+	arg->stx_rdev_major = 0;
+	arg->stx_rdev_minor = 0;
+	arg->stx_blksize = 0x1000;
+	return 0;
+}
+
 static const struct uk_file_ops null_ops = {
 	.read = null_read,
 	.write = null_write,
-	.getstat = uk_file_nop_getstat,
+	.getstat = pseudo_getstat,
 	.setstat = uk_file_nop_setstat,
 	.ctl = uk_file_nop_ctl,
 };
@@ -78,7 +104,7 @@ static const struct uk_file_ops null_ops = {
 static const struct uk_file_ops void_ops = {
 	.read = void_read,
 	.write = null_write,
-	.getstat = uk_file_nop_getstat,
+	.getstat = pseudo_getstat,
 	.setstat = uk_file_nop_setstat,
 	.ctl = uk_file_nop_ctl,
 };
@@ -86,7 +112,7 @@ static const struct uk_file_ops void_ops = {
 static const struct uk_file_ops zero_ops = {
 	.read = zero_read,
 	.write = null_write,
-	.getstat = uk_file_nop_getstat,
+	.getstat = pseudo_getstat,
 	.setstat = uk_file_nop_setstat,
 	.ctl = uk_file_nop_ctl,
 };
