@@ -398,8 +398,12 @@ static int _uk_thread_struct_init_alloc(struct uk_thread *t,
 	int rc;
 
 	if (a_stack && stack_len) {
-		stack = uk_memalign(a_stack, UKARCH_SP_ALIGN, stack_len);
-		if (!stack) {
+		stack = ukplat_stack_alloc(a_stack,
+#if CONFIG_LIBUKVMEM
+					   uk_vas_get_active(),
+#endif /* CONFIG_LIBUKVMEM */
+					   stack_len);
+		if (unlikely(!stack)) {
 			rc = -ENOMEM;
 			goto err_out;
 		}
