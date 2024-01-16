@@ -36,10 +36,10 @@ static int vmem_arch_pagefault(void *data)
 
 	rc = vmem_pagefault(vaddr, faulttype, ctx->regs);
 	if (unlikely(rc < 0)) {
-		uk_pr_debug("Cannot handle %s page fault at 0x%"__PRIvaddr
-			    " (ec: 0x%x): %d\n",
-			    faultstr[faulttype & UK_VMA_FAULT_ACCESSTYPE],
-			    vaddr, ctx->error_code, rc);
+		uk_pr_crit("Cannot handle %s page fault at 0x%"__PRIvaddr
+			   " (ec: 0x%x): %d\n",
+			   faultstr[faulttype & UK_VMA_FAULT_ACCESSTYPE],
+			   vaddr, ctx->error_code, rc);
 
 		return UK_EVENT_NOT_HANDLED;
 	}
