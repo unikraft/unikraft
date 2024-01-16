@@ -29,34 +29,51 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+/* Internal API for Xenstore watches */
 
-#ifndef __XS_COMMS_H__
-#define __XS_COMMS_H__
+#ifndef __XS_WATCH_H__
+#define __XS_WATCH_H__
 
-#include <xen/io/xs_wire.h>
-#include <xenbus/xenbus.h>
+#include <uk/xenbus/xenbus.h>
 
-int  xs_comms_init(void);
-void xs_comms_fini(void);
+/* Xenstore watch info */
+struct xs_watch_info {
+	/**< Watched Xenstore path */
+	char *path;
+	/**< Watch identification token */
+	char *token;
+};
 
-struct xs_iovec {
-	void *data;
-	unsigned int len;
+/* Xenstore watch */
+struct xs_watch {
+	struct xenbus_watch base;
+	struct xs_watch_info xs;
 };
 
 /*
- * Sends a message to Xenstore and blocks waiting for a reply.
- * The reply is malloc'ed and should be freed by the caller.
+ * Create a Xenstore watch associated with a path.
  *
- * @param msg_type Xenstore message type
- * @param xbt Xenbus transaction id
- * @param req_iovecs Array of request strings buffers
- * @param req_iovecs_num Request strings buffers number
- * @param rep_iovec Incoming reply string buffer (optional)
+ * @param path Xenstore path
+ * @return On success, returns a malloc'd Xenstore watch. On error, returns
+ * a negative error number which should be checked using PTRISERR.
+ */
+struct xs_watch *xs_watch_create(const char *path);
+
+/*
+ * Destroy a previously created Xenstore watch.
+ *
+ * @param watch Xenstore watch
  * @return 0 on success, a negative errno value on error.
  */
-int xs_msg_reply(enum xsd_sockmsg_type msg_type, xenbus_transaction_t xbt,
-	const struct xs_iovec *req_iovecs, int req_iovecs_num,
-	struct xs_iovec *rep_iovec);
+int xs_watch_destroy(struct xs_watch *watch);
 
-#endif /* __XS_COMMS_H__ */
+/*
+ * Returns the Xenstore watch associated with path and token.
+ *
+ * @param path Watched path
+ * @param token Watch token
+ * @return On success returns the found watch. On error, returns NULL.
+ */
+struct xs_watch *xs_watch_find(const char *path, const char *token);
+
+#endif /* __XS_WATCH_H__ */

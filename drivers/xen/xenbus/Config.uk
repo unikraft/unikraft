@@ -1,0 +1,10 @@
+config LIBXEN_XENBUS
+	bool "Xenbus/XenStore driver"
+	default y if XEN_PV
+	depends on PLAT_XEN
+	select LIBUKALLOC
+	select LIBUKSCHED
+	select LIBUKBUS
+	help
+		Registers Xenbus as bus driver to libukbus and provides a
+		XenStore communication API for Xen drivers

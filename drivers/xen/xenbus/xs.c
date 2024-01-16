@@ -45,7 +45,7 @@
 #include <stdarg.h>
 #include <uk/errptr.h>
 #include <xen/io/xs_wire.h>
-#include <xenbus/xs.h>
+#include <uk/xenbus/xs.h>
 #include "xs_watch.h"
 #include "xs_comms.h"
 

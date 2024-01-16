@@ -9,10 +9,7 @@ $(eval $(call addplat_s,xen,$(CONFIG_PLAT_XEN)))
 ## Xen platform library registration
 ##
 $(eval $(call addplatlib,xen,libxenplat))
-$(eval $(call addplatlib_s,xen,libxenbus,$(CONFIG_XEN_XENBUS)))
-$(eval $(call addplatlib_s,xen,libxennetfront,$(CONFIG_XEN_NETFRONT)))
-$(eval $(call addplatlib_s,xen,libxenblkfront,$(CONFIG_XEN_BLKFRONT)))
-$(eval $(call addplatlib_s,xen,libxen9pfront,$(CONFIG_XEN_9PFRONT)))
+$(eval $(call addplatlib_s,xen,libxenpvcalls,$(CONFIG_XEN_PVCALLS)))
 
 ##
 ## Xen platform compilation settings
@@ -118,47 +115,4 @@ ifeq ($(CONFIG_XEN_GNTTAB),y)
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/gnttab.c
 LIBXENPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBXENPLAT_BASE)/x86/gnttab.c|x86
 LIBXENPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBXENPLAT_BASE)/arm/gnttab.c|arm64
-endif
-
-ifeq ($(CONFIG_XEN_XENBUS),y)
-LIBXENBUS_EXPORTS               = $(LIBXENPLAT_BASE)/xenbus/exportsyms.uk
-LIBXENBUS_ASFLAGS-y            += $(LIBXENPLAT_ASFLAGS-y)
-LIBXENBUS_ASINCLUDES-y         += $(LIBXENPLAT_ASINCLUDES-y)
-LIBXENBUS_CFLAGS-y             += $(LIBXENPLAT_CFLAGS-y)
-LIBXENBUS_CINCLUDES-y          += $(LIBXENPLAT_CINCLUDES-y)
-LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/xenbus.c
-LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/client.c
-LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/xs_comms.c
-LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/xs_watch.c
-LIBXENBUS_SRCS-y               += $(LIBXENPLAT_BASE)/xenbus/xs.c
-endif
-
-ifeq ($(CONFIG_XEN_NETFRONT),y)
-LIBXENNETFRONT_EXPORTS          = $(LIBXENPLAT_BASE)/drivers/net/exportsyms.uk
-LIBXENNETFRONT_ASFLAGS-y       += $(LIBXENPLAT_ASFLAGS-y)
-LIBXENNETFRONT_ASINCLUDES-y    += $(LIBXENPLAT_ASINCLUDES-y)
-LIBXENNETFRONT_CFLAGS-y        += $(LIBXENPLAT_CFLAGS-y)
-LIBXENNETFRONT_CINCLUDES-y     += $(LIBXENPLAT_CINCLUDES-y)
-LIBXENNETFRONT_SRCS-y          += $(LIBXENPLAT_BASE)/drivers/net/netfront.c
-LIBXENNETFRONT_SRCS-y          += $(LIBXENPLAT_BASE)/drivers/net/netfront_xs.c
-endif
-
-ifeq ($(CONFIG_XEN_BLKFRONT),y)
-LIBXENBLKFRONT_EXPORTS           = $(LIBXENPLAT_BASE)/drivers/blk/exportsyms.uk
-LIBXENBLKFRONT_ASFLAGS-y        += $(LIBXENPLAT_ASFLAGS-y)
-LIBXENBLKFRONT_ASINCLUDES-y     += $(LIBXENPLAT_ASINCLUDES-y)
-LIBXENBLKFRONT_CFLAGS-y         += $(LIBXENPLAT_CFLAGS-y)
-LIBXENBLKFRONT_CINCLUDES-y      += $(LIBXENPLAT_CINCLUDES-y)
-LIBXENBLKFRONT_SRCS-y           += $(LIBXENPLAT_BASE)/drivers/blk/blkfront.c
-LIBXENBLKFRONT_SRCS-y           += $(LIBXENPLAT_BASE)/drivers/blk/blkfront_xs.c
-endif
-
-ifeq ($(CONFIG_XEN_9PFRONT),y)
-LIBXEN9PFRONT_EXPORTS           = $(LIBXENPLAT_BASE)/drivers/9p/exportsyms.uk
-LIBXEN9PFRONT_ASFLAGS-y        += $(LIBXENPLAT_ASFLAGS-y)
-LIBXEN9PFRONT_ASINCLUDES-y     += $(LIBXENPLAT_ASINCLUDES-y)
-LIBXEN9PFRONT_CFLAGS-y         += $(LIBXENPLAT_CFLAGS-y)
-LIBXEN9PFRONT_CINCLUDES-y      += $(LIBXENPLAT_CINCLUDES-y)
-LIBXEN9PFRONT_SRCS-y           += $(LIBXENPLAT_BASE)/drivers/9p/9pfront.c
-LIBXEN9PFRONT_SRCS-y           += $(LIBXENPLAT_BASE)/drivers/9p/9pfront_xs.c
 endif

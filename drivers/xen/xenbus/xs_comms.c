@@ -55,7 +55,7 @@
 #else
 #error "Unsupported architecture"
 #endif
-#include <xenbus/client.h>
+#include <uk/xenbus/client.h>
 #include "xs_comms.h"
 #include "xs_watch.h"
 
@@ -477,7 +477,7 @@ static void process_watch_event(char *watch_msg)
 	free(watch_msg);
 
 	if (watch)
-		xenbus_watch_notify_event(&watch->base);
+		uk_xenbus_watch_notify_event(&watch->base);
 	else
 		uk_pr_err("Invalid watch event.");
 }

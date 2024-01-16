@@ -42,8 +42,8 @@
 #include <string.h>
 #include <uk/errptr.h>
 #include <uk/wait.h>
-#include <xenbus/xs.h>
-#include <xenbus/client.h>
+#include <uk/xenbus/xs.h>
+#include <uk/xenbus/client.h>
 
 
 #define XENBUS_STATE_ENTRY(name) \
@@ -61,7 +61,7 @@ static const char *const xb_state_tbl[] = {
 	XENBUS_STATE_ENTRY(Reconfigured),
 };
 
-const char *xenbus_state_to_str(XenbusState state)
+const char *uk_xenbus_state_to_str(XenbusState state)
 {
 	return (state < ARRAY_SIZE(xb_state_tbl)) ?
 		xb_state_tbl[state] : "INVALID";
@@ -77,13 +77,13 @@ static const char *const xb_devtype_tbl[] = {
 	XENBUS_DEVTYPE_ENTRY(9pfs),
 };
 
-const char *xenbus_devtype_to_str(enum xenbus_dev_type devtype)
+const char *uk_xenbus_devtype_to_str(enum xenbus_dev_type devtype)
 {
 	return (devtype < ARRAY_SIZE(xb_devtype_tbl)) ?
 		xb_devtype_tbl[devtype] : "INVALID";
 }
 
-enum xenbus_dev_type xenbus_str_to_devtype(const char *devtypestr)
+enum xenbus_dev_type uk_xenbus_str_to_devtype(const char *devtypestr)
 {
 	for (int i = 0; i < (int) ARRAY_SIZE(xb_devtype_tbl); i++) {
 		if (!strcmp(xb_devtype_tbl[i], devtypestr))
@@ -97,7 +97,7 @@ enum xenbus_dev_type xenbus_str_to_devtype(const char *devtypestr)
  * Watches
  */
 
-int xenbus_watch_wait_event(struct xenbus_watch *watch)
+int uk_xenbus_watch_wait_event(struct xenbus_watch *watch)
 {
 	if (watch == NULL)
 		return -EINVAL;
@@ -120,7 +120,7 @@ int xenbus_watch_wait_event(struct xenbus_watch *watch)
 	return 0;
 }
 
-int xenbus_watch_notify_event(struct xenbus_watch *watch)
+int uk_xenbus_watch_notify_event(struct xenbus_watch *watch)
 {
 	if (watch == NULL)
 		return -EINVAL;
@@ -133,7 +133,7 @@ int xenbus_watch_notify_event(struct xenbus_watch *watch)
 	return 0;
 }
 
-XenbusState xenbus_read_driver_state(const char *path)
+XenbusState uk_xenbus_read_driver_state(const char *path)
 {
 	char state_path[strlen(path) + sizeof("/state")];
 	XenbusState state = XenbusStateUnknown;
@@ -144,7 +144,7 @@ XenbusState xenbus_read_driver_state(const char *path)
 	return state;
 }
 
-int xenbus_switch_state(xenbus_transaction_t xbt,
+int uk_xenbus_switch_state(xenbus_transaction_t xbt,
 	struct xenbus_device *xendev, XenbusState state)
 {
 	char state_path[strlen(xendev->nodename) + sizeof("/state")];
@@ -192,12 +192,12 @@ exit:
 
 	if (err)
 		uk_pr_err("Error switching state to %s: %d\n",
-			xenbus_state_to_str(state), err);
+			uk_xenbus_state_to_str(state), err);
 
 	return err;
 }
 
-int xenbus_wait_for_state_change(const char *path, XenbusState *state,
+int uk_xenbus_wait_for_state_change(const char *path, XenbusState *state,
 	struct xenbus_watch *watch)
 {
 	XenbusState crnt_state;
@@ -228,7 +228,7 @@ int xenbus_wait_for_state_change(const char *path, XenbusState *state,
 			break;
 		}
 
-		xenbus_watch_wait_event(watch);
+		uk_xenbus_watch_wait_event(watch);
 	}
 
 out:

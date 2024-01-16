@@ -37,7 +37,7 @@
 #ifndef __XENBUS_CLIENT_H__
 #define __XENBUS_CLIENT_H__
 
-#include <xenbus/xenbus.h>
+#include <uk/xenbus/xenbus.h>
 
 /*
  * Returns the name of the state for tracing/debugging purposes.
@@ -45,7 +45,7 @@
  * @param state The Xenbus state
  * @return A string representing the state name
  */
-const char *xenbus_state_to_str(XenbusState state);
+const char *uk_xenbus_state_to_str(XenbusState state);
 
 /*
  * Converts a device type value to name
@@ -53,7 +53,7 @@ const char *xenbus_state_to_str(XenbusState state);
  * @param devtype The Xenbus device type
  * @return A string representing the device type name
  */
-const char *xenbus_devtype_to_str(enum xenbus_dev_type devtype);
+const char *uk_xenbus_devtype_to_str(enum xenbus_dev_type devtype);
 
 /*
  * Converts a device type name to value
@@ -61,8 +61,7 @@ const char *xenbus_devtype_to_str(enum xenbus_dev_type devtype);
  * @param devtypestr The Xenbus device type name
  * @return The Xenbus device type
  */
-enum xenbus_dev_type xenbus_str_to_devtype(const char *devtypestr);
-
+enum xenbus_dev_type uk_xenbus_str_to_devtype(const char *devtypestr);
 
 /*
  * Watches
@@ -74,7 +73,7 @@ enum xenbus_dev_type xenbus_str_to_devtype(const char *devtypestr);
  * @param watch Xenbus watch
  * @return 0 on success, a negative errno value on error.
  */
-int xenbus_watch_wait_event(struct xenbus_watch *watch);
+int uk_xenbus_watch_wait_event(struct xenbus_watch *watch);
 
 /*
  * Notifies a client driver waiting for watch events.
@@ -82,7 +81,7 @@ int xenbus_watch_wait_event(struct xenbus_watch *watch);
  * @param watch Xenbus watch
  * @return 0 on success, a negative errno value on error.
  */
-int xenbus_watch_notify_event(struct xenbus_watch *watch);
+int uk_xenbus_watch_notify_event(struct xenbus_watch *watch);
 
 /*
  * Driver states
@@ -94,7 +93,7 @@ int xenbus_watch_notify_event(struct xenbus_watch *watch);
  * @param path Xenstore path
  * @return The Xenbus driver state
  */
-XenbusState xenbus_read_driver_state(const char *path);
+XenbusState uk_xenbus_read_driver_state(const char *path);
 
 /*
  * Changes the state of a Xen PV driver
@@ -104,7 +103,7 @@ XenbusState xenbus_read_driver_state(const char *path);
  * @param state The new Xenbus state
  * @return 0 on success, a negative errno value on error.
  */
-int xenbus_switch_state(xenbus_transaction_t xbt,
+int uk_xenbus_switch_state(xenbus_transaction_t xbt,
 	struct xenbus_device *xendev, XenbusState state);
 
 /*
@@ -117,7 +116,7 @@ int xenbus_switch_state(xenbus_transaction_t xbt,
  * will be created.
  * @return 0 on success, a negative errno value on error.
  */
-int xenbus_wait_for_state_change(const char *path, XenbusState *state,
+int uk_xenbus_wait_for_state_change(const char *path, XenbusState *state,
 	struct xenbus_watch *watch);
 
 #endif /* __XENBUS_CLIENT_H__ */

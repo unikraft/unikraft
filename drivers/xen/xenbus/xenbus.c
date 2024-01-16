@@ -41,9 +41,9 @@
 #include <uk/print.h>
 #include <uk/errptr.h>
 #include <uk/assert.h>
-#include <xenbus/xenbus.h>
-#include <xenbus/xs.h>
-#include <xenbus/client.h>
+#include <uk/xenbus/xenbus.h>
+#include <uk/xenbus/xs.h>
+#include <uk/xenbus/client.h>
 #include "xs_comms.h"
 
 #define XS_DEV_PATH "device"
@@ -97,11 +97,11 @@ static int xenbus_probe_device(struct xenbus_driver *drv,
 
 	/* device/type/name */
 	err = asprintf(&nodename, "%s/%s/%s",
-		XS_DEV_PATH, xenbus_devtype_to_str(type), name);
+		XS_DEV_PATH, uk_xenbus_devtype_to_str(type), name);
 	if (err < 0)
 		goto out;
 
-	state = xenbus_read_driver_state(nodename);
+	state = uk_xenbus_read_driver_state(nodename);
 	if (state != XenbusStateInitialising)
 		return 0;
 
@@ -140,7 +140,7 @@ static int xenbus_probe_device_type(const char *devtype_str)
 	char **devices = NULL;
 	int err = 0;
 
-	devtype = xenbus_str_to_devtype(devtype_str);
+	devtype = uk_xenbus_str_to_devtype(devtype_str);
 	if (!devtype) {
 		uk_pr_warn("Unsupported device type: %s\n", devtype_str);
 		goto out;

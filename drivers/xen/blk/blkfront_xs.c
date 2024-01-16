@@ -39,8 +39,8 @@
 #include <uk/errptr.h>
 #include <uk/print.h>
 #include <uk/assert.h>
-#include <xenbus/client.h>
-#include <xenbus/xs.h>
+#include <uk/xenbus/client.h>
+#include <uk/xenbus/xs.h>
 #if defined(__aarch64__)
 #include <xen-arm/mm.h>
 #endif
@@ -417,7 +417,7 @@ static int blkfront_xb_delete_rings_info(struct blkfront_dev *dev)
 		if (err) \
 			goto out; \
 		while (!err && (state_cond)) \
-			err = xenbus_wait_for_state_change(back_state_path, \
+			err = uk_xenbus_wait_for_state_change(back_state_path, \
 				&back_state, \
 				xendev->otherend_watch); \
 		if (err) \
@@ -443,7 +443,7 @@ static int blkfront_xb_wait_be_connect(struct blkfront_dev *blkdev)
 	WAIT_BE_STATE_CHANGE_WHILE_COND(back_state < XenbusStateConnected);
 	if (back_state != XenbusStateConnected) {
 		uk_pr_err("Backend not available, state=%s\n",
-				xenbus_state_to_str(back_state));
+				uk_xenbus_state_to_str(back_state));
 		err = -1;
 		goto out;
 	}
@@ -470,14 +470,14 @@ static int blkfront_xb_wait_be_disconnect(struct blkfront_dev *blkdev)
 	}
 
 	WAIT_BE_STATE_CHANGE_WHILE_COND(back_state < XenbusStateClosing);
-	err = xenbus_switch_state(XBT_NIL, xendev, XenbusStateClosed);
+	err = uk_xenbus_switch_state(XBT_NIL, xendev, XenbusStateClosed);
 	if (err) {
 		uk_pr_err("Failed to switch state to Closed: %d\n", err);
 		goto out;
 	}
 
 	WAIT_BE_STATE_CHANGE_WHILE_COND(back_state < XenbusStateClosed);
-	err = xenbus_switch_state(XBT_NIL, xendev, XenbusStateInitialising);
+	err = uk_xenbus_switch_state(XBT_NIL, xendev, XenbusStateInitialising);
 	if (err) {
 		uk_pr_err("Failed to switch state to Initialising: %d\n", err);
 		goto out;
@@ -506,7 +506,7 @@ int blkfront_xb_connect(struct blkfront_dev *blkdev)
 		return err;
 	}
 
-	err = xenbus_switch_state(XBT_NIL, xendev, XenbusStateConnected);
+	err = uk_xenbus_switch_state(XBT_NIL, xendev, XenbusStateConnected);
 	if (err) {
 		uk_pr_err("Failed to switch state to XenbusStateConnected: %d.\n",
 				err);
@@ -542,7 +542,7 @@ int blkfront_xb_disconnect(struct blkfront_dev *blkdev)
 	uk_pr_info("Disconnect blkfront: backend at %s\n",
 			xendev->otherend);
 
-	err = xenbus_switch_state(XBT_NIL, xendev, XenbusStateClosing);
+	err = uk_xenbus_switch_state(XBT_NIL, xendev, XenbusStateClosing);
 	if (err) {
 		uk_pr_err("Failed to switch state to Closing: %d\n", err);
 		goto out;

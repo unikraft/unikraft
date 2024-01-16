@@ -1,0 +1,24 @@
+menuconfig LIBXEN_9PFRONT
+	bool "Xenbus 9pfront Driver"
+	select LIBXEN_XENBUS
+	depends on PLAT_XEN
+	depends on LIBUK9P
+	help
+		Driver for 9pfs devices
+
+config LIBXEN_9PFRONT_NB_RINGS
+	int "Xen 9P ring number"
+	default 2
+	depends on LIBXEN_9PFRONT
+	help
+		Number of rings to allocate.
+		Will be clamped to the maximum value allowed by the backend.
+
+config LIBXEN_9PFRONT_RING_ORDER
+	int "Xen 9P ring order"
+	default 6
+	depends on LIBXEN_9PFRONT
+	help
+		Ring order for xen 9P devices. Orders of 0, 1, 2, ..., 9 will
+		create rings of size 4K, 8K, 16K, ..., 2M respectively.
+		Will be clamped to the maximum value allowed by the backend.
