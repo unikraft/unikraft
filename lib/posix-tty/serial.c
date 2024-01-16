@@ -6,6 +6,7 @@
 
 #include <termios.h>
 #include <sys/ioctl.h>
+#include <sys/stat.h>
 
 #include <uk/assert.h>
 #include <uk/file.h>
@@ -124,10 +125,35 @@ static int serial_ctl(const struct uk_file *f, int fam, int req, uintptr_t arg1,
 	}
 }
 
+#define SERIAL_STATX_MASK \
+	(UK_STATX_TYPE|UK_STATX_MODE|UK_STATX_NLINK|UK_STATX_INO|UK_STATX_SIZE)
+
+static int serial_getstat(const struct uk_file *f,
+			  unsigned int mask __unused, struct uk_statx *arg)
+{
+	UK_ASSERT(f->vol == SERIAL_VOLID);
+
+	/* Since all information is immediately available, ignore mask arg */
+	arg->stx_mask = SERIAL_STATX_MASK;
+	arg->stx_mode = S_IFCHR|0666;
+	arg->stx_nlink = 1;
+	arg->stx_ino = 1;
+	arg->stx_size = 0;
+
+	/* Following fields are always filled in, not in stx_mask */
+	arg->stx_dev_major = 0;
+	arg->stx_dev_minor = 5; /* Same value Linux returns for tty */
+	arg->stx_rdev_major = 0;
+	arg->stx_rdev_minor = 0;
+	arg->stx_blksize = 0x1000;
+	return 0;
+}
+
+
 static const struct uk_file_ops serial_ops = {
 	.read = serial_read,
 	.write = serial_write,
-	.getstat = uk_file_nop_getstat,
+	.getstat = serial_getstat,
 	.setstat = uk_file_nop_setstat,
 	.ctl = serial_ctl,
 };
