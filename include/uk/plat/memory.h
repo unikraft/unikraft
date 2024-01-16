@@ -345,6 +345,71 @@ static inline void *ukplat_auxstack_alloc(struct uk_alloc __maybe_unused *a,
 	 */
 	return auxstack;
 }
+
+/* Allocates and returns a stack.
+ * The size is that given by (1 << CONFIG_STACK_SIZE_PAGE_ORDER) * PAGE_SIZE.
+ *
+ * NOTE: Must be used after paging initialization has finished.
+ *
+ * @param a
+ *   The allocator to use for the stack
+ * @param vas
+ *   The virtual address space to use for the mapping of the stack.
+ *   This should be used in conjunction with CONFIG_LIBUKVMEM to ensure that
+ *   accesses to the  stack do not generate page faults in more
+ *   fragile system states.
+ * @param stack_len
+ *   The custom length of the stack. If 0, then
+ *   CONFIG_STACK_SIZE_PAGE_ORDER is used instead as the default length.
+ *
+ * @return
+ *   Pointer to the allocated stack
+ */
+static inline void *ukplat_stack_alloc(struct uk_alloc __maybe_unused *a,
+#if CONFIG_LIBUKVMEM
+					struct uk_vas __maybe_unused *vas,
+#endif /* CONFIG_LIBUKVMEM */
+					__sz stack_len)
+{
+	void *stack;
+
+	UK_ASSERT(!(stack_len & UKARCH_SP_ALIGN_MASK));
+
+	if (!stack_len)
+		stack_len = __STACK_SIZE;
+
+#if CONFIG_LIBUKVMEM
+	__vaddr_t stack_vaddr = __VADDR_ANY;
+	int rc;
+
+	/* Allocation through uk_vma_map_stack() will result in a page-aligned
+	 * address which is more than enough to be UKARCH_SP_ALIGN aligned.
+	 */
+	rc = uk_vma_map_stack(vas,
+			      &stack_vaddr,
+			      stack_len,
+			      UK_VMA_MAP_UNINITIALIZED,
+			      NULL,
+			      0);
+	if (unlikely(rc)) {
+		uk_pr_err("Failed to map stack\n");
+		return 0;
+	}
+
+	stack = (void *)stack_vaddr;
+#else /* !CONFIG_LIBUKVMEM */
+	/* Again, make sure that allocation resulted start address is
+	 * UKARCH_SP_ALIGN aligned.
+	 */
+	stack = (__vaddr_t)uk_memalign(a, UKARCH_SP_ALIGN, stack_len);
+	if (unlikely(!stack)) {
+		uk_pr_err("Failed to allocate stack\n");
+		return 0;
+	}
+#endif /* !CONFIG_LIBUKVMEM */
+
+	return stack;
+}
 #endif /* CONFIG_LIBUKALLOC */
 
 #ifdef __cplusplus
