@@ -51,9 +51,15 @@ static int vma_op_stack_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
 	 * faults, we ignore the request to fault in the page. For actual
 	 * accesses we fail.
 	 */
-	if (fault->vbase == guard_page_vaddr(vma))
-		return (fault->type & UK_VMA_FAULT_SOFT) ?
-			   UKPLAT_PAGE_MAPX_ESKIP : -EFAULT;
+	if (fault->vbase == guard_page_vaddr(vma)) {
+		if (likely(fault->type & UK_VMA_FAULT_SOFT))
+			   return UKPLAT_PAGE_MAPX_ESKIP;
+
+		uk_pr_crit("Guard page for stack VMA 0x%lx - 0x%lx hit!\n",
+			   vma->start, vma->end);
+
+		return -EFAULT;
+	}
 
 	rc = pt->fa->falloc(pt->fa, &paddr, 1, 0);
 	if (unlikely(rc))
