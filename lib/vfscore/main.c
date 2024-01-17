@@ -1842,44 +1842,40 @@ LFS64(fstatvfs);
 #endif /* UK_LIBC_SYSCALLS */
 
 
-UK_TRACEPOINT(trace_vfs_getcwd, "%#x %d", char*, size_t);
-UK_TRACEPOINT(trace_vfs_getcwd_ret, "\"%s\"", const char*);
+UK_TRACEPOINT(trace_vfs_getcwd, "%#x %zu", char*, size_t);
+UK_TRACEPOINT(trace_vfs_getcwd_ret, "%zd", ssize_t);
 UK_TRACEPOINT(trace_vfs_getcwd_err, "%d", int);
 
-UK_SYSCALL_R_DEFINE(char*, getcwd, char*, path, size_t, size)
+UK_SYSCALL_R_DEFINE(ssize_t, getcwd, char*, path, size_t, size)
 {
 	trace_vfs_getcwd(path, size);
 	struct task *t = main_task;
-	size_t len = strlen(t->t_cwd) + 1;
+	size_t len;
 	int error;
+
+	if (!path) {
+		error = EFAULT;
+		goto out_error;
+	}
+	if (!size) {
+		error = EINVAL;
+		goto out_error;
+	}
+
+	len = strlen(t->t_cwd) + 1;
 
 	if (size < len) {
 		error = ERANGE;
 		goto out_error;
 	}
 
-	if (!path) {
-		if (!size)
-			size = len;
-		path = (char*)malloc(size);
-		if (!path) {
-			error = ENOMEM;
-			goto out_error;
-		}
-	} else {
-		if (!size) {
-			error = EINVAL;
-			goto out_error;
-		}
-	}
-
 	memcpy(path, t->t_cwd, len);
-	trace_vfs_getcwd_ret(path);
-	return path;
+	trace_vfs_getcwd_ret(len);
+	return len;
 
 out_error:
 	trace_vfs_getcwd_err(error);
-	return ERR2PTR(-error);
+	return -error;
 }
 
 
