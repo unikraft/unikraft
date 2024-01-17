@@ -143,9 +143,10 @@ struct uk_thread *uk_thread_current(void)
  */
 
 #define UK_THREADF_ECTX       (0x001)	/**< Extended context available */
-#define UK_THREADF_UKTLS      (0x002)	/**< Unikraft allocated TLS */
-#define UK_THREADF_RUNNABLE   (0x004)
-#define UK_THREADF_EXITED     (0x008)
+#define UK_THREADF_AUXSP      (0x002)	/**< Thread has auxiliary stack */
+#define UK_THREADF_UKTLS      (0x004)	/**< Unikraft allocated TLS */
+#define UK_THREADF_RUNNABLE   (0x008)
+#define UK_THREADF_EXITED     (0x010)
 /*
  *  A flag used for marking that a thread could potentially
  *  be added to the run queue. A thread marked as such must
@@ -153,7 +154,7 @@ struct uk_thread *uk_thread_current(void)
  *  out from the CPU during a context switch), nor be already
  *  present in the run queue.
  */
-#define UK_THREADF_QUEUEABLE  (0x010)
+#define UK_THREADF_QUEUEABLE  (0x020)
 
 #define uk_thread_is_exited(t)   ((t)->flags & UK_THREADF_EXITED)
 #define uk_thread_is_runnable(t) (!uk_thread_is_exited(t) \
@@ -709,8 +710,10 @@ struct uk_thread_inittab_entry {
 };
 
 #define UK_THREAD_INITF_ECTX  (UK_THREADF_ECTX)
+#define UK_THREAD_INITF_AUXSP (UK_THREADF_AUXSP)
 #define UK_THREAD_INITF_UKTLS (UK_THREADF_UKTLS)
-#define UK_THREAD_INITF_ALL   (UK_THREAD_INITF_ECTX | UK_THREAD_INITF_UKTLS)
+#define UK_THREAD_INITF_ALL   (UK_THREAD_INITF_ECTX | UK_THREAD_INITF_AUXSP | \
+			       UK_THREAD_INITF_UKTLS)
 
 #define __UK_THREAD_INITTAB_ENTRY(init_fn, term_fn, prio, arg_flags)	\
 	static const struct uk_thread_inittab_entry			\

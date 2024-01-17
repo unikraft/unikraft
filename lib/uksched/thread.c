@@ -188,14 +188,18 @@ static int _uk_thread_call_termtab(struct uk_thread *child)
 		if (unlikely(!itr->term))
 			continue;
 		if (unlikely((itr->flags & child->flags) != itr->flags)) {
-			uk_pr_debug("uk_thread %p (%s) term cb: Skip %p() due to feature mismatch: %c%c required (has %c%c)\n",
+			uk_pr_debug("uk_thread %p (%s) term cb: Skip %p() due to feature mismatch: %c%c%c required (has %c%c%c)\n",
 				    child, child->name
 				     ? child->name : "<unnamed>",
 				    *itr->term,
+				    (itr->flags & UK_THREAD_INITF_AUXSP)
+				     ? 'A' : '-',
 				    (itr->flags & UK_THREAD_INITF_ECTX)
 				     ? 'E' : '-',
 				    (itr->flags & UK_THREAD_INITF_UKTLS)
 				     ? 'T' : '-',
+				    (child->flags & UK_THREADF_AUXSP)
+				     ? 'A' : '-',
 				    (child->flags & UK_THREADF_ECTX)
 				     ? 'E' : '-',
 				    (child->flags & UK_THREADF_UKTLS)
@@ -245,9 +249,10 @@ static void _uk_thread_struct_init(struct uk_thread *t,
 	t->dtor = dtor;
 	t->exec_time = 0;
 
-
-	t->auxsp = auxsp;
-
+	if (auxsp) {
+		t->flags |= UK_THREADF_AUXSP;
+		t->auxsp = auxsp;
+	}
 	if (tlsp && is_uktls) {
 		t->flags |= UK_THREADF_UKTLS;
 		t->uktlsp = tlsp;
