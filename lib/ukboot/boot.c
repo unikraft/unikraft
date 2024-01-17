@@ -273,6 +273,10 @@ void ukplat_entry(int argc, char *argv[])
 #endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
 	uk_ctor_func_t *ctorfn;
 	struct uk_inittab_entry *init_entry;
+#if CONFIG_LIBUKBOOT_NOSCHED
+	struct lcpu *bsp_lcpu;
+	void *auxstack;
+#endif /* !CONFIG_LIBUKBOOT_NOSCHED */
 
 #if CONFIG_LIBUKBOOT_MAINTHREAD
 	/* Initialize shutdown control structure */
@@ -360,13 +364,16 @@ void ukplat_entry(int argc, char *argv[])
 		UK_CRASH("Failed to initialize scheduling\n");
 	uk_sched_start(s);
 #else /* CONFIG_LIBUKBOOT_NOSCHED */
-	struct lcpu *bsp_lcpu = lcpu_get_current();
+	bsp_lcpu = lcpu_get_current();
+
 	UK_ASSERT(bsp_lcpu);
-	bsp_lcpu->auxsp = ukplat_auxsp_alloc(a,
-#if defined(CONFIG_LIBUKBOOT_HEAP_BASE) && defined(CONFIG_LIBUKVMEM)
-					     &kernel_vas,
-#endif /* !CONFIG_LIBUKBOOT_HEAP_BASE && CONFIG_LIBUKVMEM */
-					     0);  /* Default auxsp size */
+
+	auxstack = uk_memalign(uk_alloc_get_default(),
+			       UKPLAT_AUXSP_ALIGN, UKPLAT_AUXSP_LEN);
+	if (unlikely(!auxstack))
+		uk_pr_err("Failed to allocate the auxiliary stack\n");
+
+	bsp_lcpu->auxsp = ukarch_gen_sp(auxstack, auxstack_len);
 #endif /* CONFIG_LIBUKBOOT_NOSCHED */
 
 	ictx.cmdline.argc = argc;
