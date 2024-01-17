@@ -1,8 +1,6 @@
 name: Commits Formatting Check
 
 on:
-  push:
-    branches: [staging, stable]
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [staging]
