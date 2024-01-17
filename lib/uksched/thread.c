@@ -245,12 +245,6 @@ static void _uk_thread_struct_init(struct uk_thread *t,
 	t->dtor = dtor;
 	t->exec_time = 0;
 
-	if (!auxsp)
-		auxsp = ukplat_auxsp_alloc(uk_alloc_get_default(),
-#if CONFIG_LIBUKVMEM
-					   uk_vas_get_active(),
-#endif /* CONFIG_LIBUKVMEM */
-					   0);  /* Default auxsp size */
 
 	t->auxsp = auxsp;
 
@@ -385,28 +379,37 @@ static int _uk_thread_struct_init_alloc(struct uk_thread *t,
 					uk_thread_dtor_t dtor)
 {
 	void *stack = NULL;
+	void *auxstack = NULL;
 	void *tls = NULL;
-	void *auxstack = 0x0;
 	uintptr_t tlsp = 0x0;
 	int rc;
+
+	if (a_auxstack && auxstack_len) {
+		auxstack = uk_memalign(a_auxstack, UKPLAT_AUXSP_ALIGN,
+				       auxstack_len);
+		if (!auxstack) {
+			rc = -ENOMEM;
+			goto err_out;
+		}
+
+#if CONFIG_LIBUKVMEM
+		rc = uk_vma_advise(uk_vas_get_active(),
+				   PAGE_ALIGN_DOWN((__vaddr_t)auxstack),
+				   PAGE_ALIGN_UP((__vaddr_t)auxstack +
+					  auxstack_len -
+					  PAGE_ALIGN_DOWN((__vaddr_t)auxstack)),
+				   UK_VMA_ADV_WILLNEED,
+				   UK_VMA_FLAG_UNINITIALIZED);
+		if (unlikely(rc))
+			goto err_out;
+#endif /* CONFIG_LIBUKVMEM */
+	}
 
 	if (a_stack && stack_len) {
 		stack = uk_memalign(a_stack, UKARCH_SP_ALIGN, stack_len);
 		if (!stack) {
 			rc = -ENOMEM;
-			goto err_out;
-		}
-	}
-
-	if (a_auxstack && auxstack_len) {
-		auxstack = (void *)ukplat_auxsp_alloc(a_auxstack,
-#if CONFIG_LIBUKVMEM
-						      uk_vas_get_active(),
-#endif /* CONFIG_LIBUKVMEM */
-						      auxstack_len);
-		if (unlikely(!auxstack)) {
-			rc = -ENOMEM;
-			goto err_free_stack;
+			goto err_free_auxstack;
 		}
 	}
 
@@ -441,7 +444,9 @@ static int _uk_thread_struct_init_alloc(struct uk_thread *t,
 		tlsp = ukarch_tls_tlsp(tls);
 	}
 
-	_uk_thread_struct_init(t, (__uptr)auxstack, tlsp, !(!tlsp), ectx,
+	_uk_thread_struct_init(t,
+			       ukarch_gen_sp(auxstack, auxstack_len),
+			       tlsp, !(!tlsp), ectx,
 			       name, priv,
 			       dtor);
 
@@ -480,6 +485,9 @@ err_free_tls:
 err_free_stack:
 	if (stack)
 		uk_free(a_stack, stack);
+err_free_auxstack:
+	if (auxstack)
+		uk_free(a_auxstack, auxstack);
 err_out:
 	return rc;
 }
@@ -714,9 +722,7 @@ struct uk_thread *uk_thread_create_container(struct uk_alloc *a,
 						       ukarch_ectx_align());
 
 	stack_len = (!!stack_len) ? stack_len : STACK_SIZE;
-	auxstack_len = (!!auxstack_len) ? auxstack_len :
-					((1 << CONFIG_UKPLAT_AUXSP_PAGE_ORDER) *
-					 PAGE_SIZE);
+	auxstack_len = (!!auxstack_len) ? auxstack_len : UKPLAT_AUXSP_LEN;
 
 	if (_uk_thread_struct_init_alloc(t,
 					 a_stack, stack_len,

@@ -70,6 +70,13 @@ extern "C" {
 #define UKPLAT_MEMRF_UNMAP		0x0010	/* Must be unmapped at boot */
 #define UKPLAT_MEMRF_MAP		0x0020	/* Must be mapped at boot */
 
+#define UKPLAT_AUXSP_ALIGN					\
+	UKARCH_ECTX_ALIGN
+#define UKPLAT_AUXSP_LEN					\
+	ALIGN_UP((PAGE_SIZE *					\
+		  (1 << CONFIG_UKPLAT_AUXSP_PAGE_ORDER)),	\
+		  UKPLAT_AUXSP_ALIGN)
+
 /**
  * Descriptor of a memory region
  */
@@ -297,9 +304,7 @@ static inline __uptr ukplat_auxsp_alloc(struct uk_alloc __maybe_unused *a,
 	 * length the resulted stack pointer should on its own be ECTX aligned.
 	 */
 	if (!auxsp_len)
-		auxsp_len = ALIGN_UP(PAGE_SIZE *
-				     (1 << CONFIG_UKPLAT_AUXSP_PAGE_ORDER),
-				     UKARCH_ECTX_ALIGN);
+		auxsp_len = UKPLAT_AUXSP_LEN;
 
 #if CONFIG_LIBUKVMEM
 	int rc;
