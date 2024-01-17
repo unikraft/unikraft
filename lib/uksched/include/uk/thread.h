@@ -471,6 +471,7 @@ struct uk_thread *uk_thread_create_bare(struct uk_alloc *a,
  *   for the stack allocation.
  * @param a_auxstack
  *   Reference to an allocator for allocating an auxiliary stack
+ *   Set to `NULL` to continue without an auxiliary stack (not recommended).
  * @param auxstack_len
  *   Size of the thread auxiliary stack. If set to 0, a default stack size is
  *   used for the allocation.
@@ -514,8 +515,12 @@ struct uk_thread *uk_thread_create_container(struct uk_alloc *a,
  *   Reference t o an allocator (required)
  * @param sp
  *   Stack pointer
- * @param auxsp
- *   Auxiliary stack pointer
+ * @param a_auxstack
+ *   Reference to an allocator for allocating an auxiliary stack
+ *   Set to `NULL` to continue without an auxiliary stack (not recommended).
+ * @param auxstack_len
+ *   Size of the thread auxiliary stack. If set to 0, a default stack size is
+ *   used for the allocation.
  * @param tlsp
  *   Architecture pointer to TLS. If set to NULL, the thread cannot
  *   access thread-local variables
@@ -539,7 +544,8 @@ struct uk_thread *uk_thread_create_container(struct uk_alloc *a,
  */
 struct uk_thread *uk_thread_create_container2(struct uk_alloc *a,
 					      uintptr_t sp,
-					      uintptr_t auxsp,
+					      struct uk_alloc *a_auxstack,
+					      size_t auxstack_len,
 					      uintptr_t tlsp,
 					      bool is_uktls,
 					      bool no_ectx,

@@ -763,11 +763,13 @@ err_out:
 
 /** Allocates `struct uk_thread` along with ectx (if requested), take stack
  *  and TLS from caller but do not initialize the architecture context with
- *  an entry function (set to NULL)
+ *  an entry function (set to NULL). A new auxiliary stack is allocated if
+ *  an allocator was given.
  */
 struct uk_thread *uk_thread_create_container2(struct uk_alloc *a,
 					      uintptr_t sp,
-					      uintptr_t auxsp,
+					      struct uk_alloc *a_auxstack,
+					      size_t auxstack_len,
 					      uintptr_t tlsp,
 					      bool is_uktls,
 					      bool no_ectx,
@@ -778,6 +780,8 @@ struct uk_thread *uk_thread_create_container2(struct uk_alloc *a,
 	struct uk_thread *t;
 	size_t t_size;
 	struct ukarch_ectx *ectx = NULL;
+	void *auxstack;
+	__uptr auxsp = 0x0;
 	int ret;
 
 	/* NOTE: We place space for extended context after
@@ -797,9 +801,36 @@ struct uk_thread *uk_thread_create_container2(struct uk_alloc *a,
 						       + sizeof(*t),
 						       ukarch_ectx_align());
 
+	/* Allocate auxiliary stack */
+	auxstack_len = (!!auxstack_len) ? auxstack_len : UKPLAT_AUXSP_LEN;
+	if (a_auxstack && auxstack_len) {
+		auxstack = uk_memalign(a_auxstack, UKPLAT_AUXSP_ALIGN,
+				       auxstack_len);
+		if (!auxstack)
+			goto err_free_thread;
+
+#if CONFIG_LIBUKVMEM
+		ret = uk_vma_advise(uk_vas_get_active(),
+				   PAGE_ALIGN_DOWN((__vaddr_t)auxstack),
+				   PAGE_ALIGN_UP((__vaddr_t)auxstack +
+					  auxstack_len -
+					  PAGE_ALIGN_DOWN((__vaddr_t)auxstack)),
+				   UK_VMA_ADV_WILLNEED,
+				   UK_VMA_FLAG_UNINITIALIZED);
+		if (unlikely(ret))
+			goto err_free_thread;
+#endif /* CONFIG_LIBUKVMEM */
+
+		auxsp = ukarch_gen_sp(auxstack, auxstack_len);
+	}
+
 	_uk_thread_struct_init(t, auxsp, tlsp, is_uktls, ectx, name, priv,
 			       dtor);
 	t->_mem.t_a = a;
+	if (auxsp) {
+		t->_mem.auxstack = auxstack;
+		t->_mem.auxstack_a = a_auxstack;
+	}
 
 	/* Minimal context initialization where the stack pointer
 	 * is initialized
@@ -808,10 +839,13 @@ struct uk_thread *uk_thread_create_container2(struct uk_alloc *a,
 
 	ret = _uk_thread_call_inittab(t);
 	if (ret < 0)
-		goto err_free_thread;
+		goto err_free_auxstack;
 
 	return t;
 
+err_free_auxstack:
+	if (auxsp)
+		uk_free(t->_mem.auxstack_a, t->_mem.auxstack);
 err_free_thread:
 	uk_free(a, t);
 err_out:
