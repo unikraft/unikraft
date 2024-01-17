@@ -400,7 +400,7 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 			    (void *) cl_args->tls);
 		child = uk_thread_create_container2(s->a,
 						    (__uptr) cl_args->stack,
-						    0,
+						    s->a_auxstack, 0,
 						    (__uptr) cl_args->tls,
 						    true, /* TLS is an UKTLS */
 						    false, /* We want ECTX */
@@ -424,7 +424,7 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 		}
 		child = uk_thread_create_container(s->a,
 						   NULL, 0, /* Stack is given */
-						   NULL, 0,
+						   s->a_auxstack, 0,
 						   s->a_uktls,
 						   false, /* We want ECTX */
 						   (t->name) ? strdup(t->name)
