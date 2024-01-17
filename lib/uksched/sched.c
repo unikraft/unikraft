@@ -201,6 +201,7 @@ int uk_sched_start(struct uk_sched *s)
 {
 	struct uk_thread *main_thread;
 	uintptr_t tlsp;
+	uintptr_t auxsp;
 	int ret;
 
 	UK_ASSERT(s);
@@ -213,8 +214,9 @@ int uk_sched_start(struct uk_sched *s)
 	 *       an TLS that is derived from the Unikraft TLS template.
 	 */
 	tlsp = ukplat_tlsp_get();
+	auxsp = ukplat_lcpu_get_auxsp();
 	main_thread = uk_thread_create_bare(s->a,
-					    0x0, 0x0, 0x0,
+					    0x0, 0x0, auxsp,
 					    tlsp, !(!tlsp), false,
 					    "init", NULL, NULL);
 	if (!main_thread) {
@@ -231,9 +233,6 @@ int uk_sched_start(struct uk_sched *s)
 
 	/* Set main_thread as current scheduled thread */
 	ukplat_per_lcpu_current(__uk_sched_thread_current) = main_thread;
-
-	/* Set current LCPU's Kernel Stack pointer */
-	ukplat_lcpu_set_auxsp(main_thread->auxsp);
 
 	/* Add main to the scheduler's thread list */
 	UK_TAILQ_INSERT_TAIL(&s->thread_list, main_thread, thread_list);
