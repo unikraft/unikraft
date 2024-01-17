@@ -1,12 +1,6 @@
 name: shellcheck
 
 on:
-  push:
-    branches: [staging, stable]
-    paths:
-      - 'support/scripts/**'
-      - '.github/workflows/shellcheck.yaml'
-
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [staging]

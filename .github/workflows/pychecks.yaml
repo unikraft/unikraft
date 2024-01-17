@@ -1,12 +1,6 @@
 name: Python Checks
 
 on:
-  push:
-    branches: [staging, stable]
-    paths:
-      - 'support/scripts/**'
-      - '.github/workflows/pychecks.yaml'
-
   pull_request:
     types: [opened, synchronize, reopened]
     branches: [staging]
