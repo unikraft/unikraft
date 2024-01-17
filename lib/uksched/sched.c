@@ -406,7 +406,7 @@ void uk_sched_dumpk_threads(int klvl, struct uk_sched *s)
 		uk_printk(klvl,
 			  " + thread %p (%s), ctx: %p, "
 			  "execution time: %"__PRInsec".%06"__PRInsec"s, "
-			  "flags: %c%c%c%c\n",
+			  "flags: %c%c%c%c%c\n",
 			  t, t->name ? t->name : "<unnamed>",
 			  &t->ctx,
 			  ukarch_time_nsec_to_sec(t->exec_time),
@@ -414,6 +414,7 @@ void uk_sched_dumpk_threads(int klvl, struct uk_sched *s)
 			  (t->flags & UK_THREADF_RUNNABLE) ? 'R' : '-',
 			  (t->flags & UK_THREADF_EXITED)   ? 'D' : '-',
 			  (t->flags & UK_THREADF_ECTX)     ? 'E' : '-',
+			  (t->flags & UK_THREADF_AUXSP)    ? 'A' : '-',
 			  (t->flags & UK_THREADF_UKTLS)    ? 'T' : '-');
 	}
 }
