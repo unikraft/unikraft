@@ -61,6 +61,8 @@
 #define LIBVFSCORE_EXTRACT_DEV_INITRD0				"initrd0"
 #define LIBVFSCORE_EXTRACT_DEV_EMBEDDED				"embedded"
 
+#define LIBVFSCORE_UKOPT_MKMP					(0x1 << 0)
+
 struct vfscore_volume {
 	/* Volume source device */
 	const char *sdev;
@@ -73,8 +75,45 @@ struct vfscore_volume {
 	/* Mount options */
 	const char *opts;
 	/* Unikraft mount options, see vfscore_mount_volume() */
-	const char *ukopts;
+	unsigned int ukopts;
 };
+
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_UP
+static char *next_arg(char **argptr, int separator)
+{
+	char *nsep;
+	char *arg;
+
+	UK_ASSERT(argptr);
+
+	if (!*argptr || (*argptr)[0] == '\0') {
+		/* We likely got called again after we already
+		 * returned the last argument
+		 */
+		*argptr = NULL;
+		return NULL;
+	}
+
+	arg = *argptr;
+	nsep = strchr(*argptr, separator);
+	if (!nsep) {
+		/* No next separator, we hit the last argument */
+		*argptr = NULL;
+		goto out;
+	}
+
+	/* Split C string by overwriting the separator */
+	nsep[0] = '\0';
+	/* Move argptr to next argument */
+	*argptr = nsep + 1;
+
+out:
+	/* Return NULL for empty arguments */
+	if (*arg == '\0')
+		return NULL;
+	return arg;
+}
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_UP */
 
 /*
  * Compiled-in file system table: `fstab_ci`
@@ -99,9 +138,10 @@ const struct vfscore_volume __fstab_ci0 = {
 #ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_OPTS_ARG
 	.opts = CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_OPTS_ARG,
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_OPTS_ARG */
-#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_UKOPTS_ARG
-	.ukopts = CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_UKOPTS_ARG,
-#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_OPTS_ARG */
+	.ukopts = 0x0
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_UKOPTS_MKMP_ARG
+		  | LIBVFSCORE_UKOPT_MKMP
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_UKOPTS_MKMP_ARG */
 };
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI0 */
 
@@ -124,9 +164,10 @@ const struct vfscore_volume __fstab_ci1 = {
 #ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_OPTS_ARG
 	.opts = CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_OPTS_ARG,
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_OPTS_ARG */
-#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_UKOPTS_ARG
-	.ukopts = CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_UKOPTS_ARG,
-#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_OPTS_ARG */
+	.ukopts = 0x0
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_UKOPTS_MKMP_ARG
+		  | LIBVFSCORE_UKOPT_MKMP
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_UKOPTS_MKMP_ARG */
 };
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI1 */
 
@@ -149,9 +190,10 @@ const struct vfscore_volume __fstab_ci2 = {
 #ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_OPTS_ARG
 	.opts = CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_OPTS_ARG,
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_OPTS_ARG */
-#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_UKOPTS_ARG
-	.ukopts = CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_UKOPTS_ARG,
-#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_OPTS_ARG */
+	.ukopts = 0x0
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_UKOPTS_MKMP_ARG
+		  | LIBVFSCORE_UKOPT_MKMP
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_UKOPTS_MKMP_ARG */
 };
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI2 */
 
@@ -174,9 +216,10 @@ const struct vfscore_volume __fstab_ci3 = {
 #ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_OPTS_ARG
 	.opts = CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_OPTS_ARG,
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_OPTS_ARG */
-#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_UKOPTS_ARG
-	.ukopts = CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_UKOPTS_ARG,
-#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_OPTS_ARG */
+	.ukopts = 0x0
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_UKOPTS_MKMP_ARG
+		  | LIBVFSCORE_UKOPT_MKMP
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_UKOPTS_MKMP_ARG */
 };
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI3 */
 
@@ -221,9 +264,10 @@ const struct vfscore_volume __fstab_fb0 = {
 #ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_OPTS_ARG
 	.opts = CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_OPTS_ARG,
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_OPTS_ARG */
-#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_UKOPTS_ARG
-	.ukopts = CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_UKOPTS_ARG,
-#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_OPTS_ARG */
+	.ukopts = 0x0
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_UKOPTS_MKMP_ARG
+		  | LIBVFSCORE_UKOPT_MKMP
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_UKOPTS_MKMP_ARG */
 };
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB0 */
 
@@ -246,9 +290,10 @@ const struct vfscore_volume __fstab_fb1 = {
 #ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_OPTS_ARG
 	.opts = CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_OPTS_ARG,
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_OPTS_ARG */
-#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_UKOPTS_ARG
-	.ukopts = CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_UKOPTS_ARG,
-#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_OPTS_ARG */
+	.ukopts = 0x0
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_UKOPTS_MKMP_ARG
+		  | LIBVFSCORE_UKOPT_MKMP
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_UKOPTS_MKMP_ARG */
 };
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB1 */
 
@@ -271,9 +316,10 @@ const struct vfscore_volume __fstab_fb2 = {
 #ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_OPTS_ARG
 	.opts = CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_OPTS_ARG,
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_OPTS_ARG */
-#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_UKOPTS_ARG
-	.ukopts = CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_UKOPTS_ARG,
-#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_OPTS_ARG */
+	.ukopts = 0x0
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_UKOPTS_MKMP_ARG
+		  | LIBVFSCORE_UKOPT_MKMP
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_UKOPTS_MKMP_ARG */
 };
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB2 */
 
@@ -296,9 +342,10 @@ const struct vfscore_volume __fstab_fb3 = {
 #ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_OPTS_ARG
 	.opts = CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_OPTS_ARG,
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_OPTS_ARG */
-#ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_UKOPTS_ARG
-	.ukopts = CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_UKOPTS_ARG,
-#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_OPTS_ARG */
+	.ukopts = 0x0
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_UKOPTS_MKMP_ARG
+		  | LIBVFSCORE_UKOPT_MKMP
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_UKOPTS_MKMP_ARG */
 };
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB3 */
 
@@ -393,6 +440,7 @@ static int vfscore_ukopt_mkmp(char *path)
 	UK_ASSERT(path);
 	UK_ASSERT(path[0] == '/');
 
+	uk_pr_debug(" mkmp: Ensure mount path \"%s\" exists\n", path);
 	pos = path;
 	do {
 		prev_pos = pos;
@@ -437,65 +485,39 @@ static int vfscore_ukopt_mkmp(char *path)
 	return 0;
 }
 
-/**
- * vv->ukopts must follow the pattern below, each option separated by
- * the character defined through LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP (e.g. with
- * LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP = ','):
- *	[<ukopt1>,<ukopt2>,<ukopt3>,...,<ukoptN>]
- *
- * Currently implemented, Unikraft Mount options:
- * - mkmp	Make mount point. Ensures that the specified mount point
- *		exists. If it does not exist in the current vfs, the directory
- *		structure is created.
- */
-static int vfscore_volume_process_ukopts(const struct vfscore_volume *vv)
-{
-	const char *o_curr;
-	char *o_next;
-	int rc;
-
-	UK_ASSERT(vv);
-	UK_ASSERT(vv->path);
-
-	o_curr = (const char *) vv->ukopts;
-	while (o_curr) {
-		o_next = strchr(o_curr, LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP);
-		if (o_next) {
-			*o_next = '\0';
-			o_next++;
-		}
-
-		/* First check is so we do not run `mkmp` on `/` */
-		if (!strcmp(o_curr, "mkmp") && vv->path[1] != '\0') {
-			rc = vfscore_ukopt_mkmp(vv->path);
-			if (unlikely(rc)) {
-				uk_pr_err("Failed to process ukopt \"mkmp\": %d\n",
-					  rc);
-				return rc;
-			}
-		}
-
-		o_curr = o_next;
-	}
-
-	return 0;
-}
-
 static inline int vfscore_mount_volume(const struct vfscore_volume *vv)
 {
 	int rc;
 
 	UK_ASSERT(vv);
-	UK_ASSERT(vv->sdev);
-	UK_ASSERT(vv->path);
 
-	uk_pr_debug("vfs.fstab: Mounting: %s:%s:%s:%lo:%s:%s...\n",
-		    vv->sdev[0] == '\0' ? "none" : vv->sdev,
+	/*
+	 * Sanity checks
+	 */
+	/* Only absolute paths as mountpoint */
+	if (unlikely(!vv->path)) {
+		uk_pr_err("fstab: Entry without mountpoint\n");
+		return -EINVAL;
+	}
+	if (unlikely(vv->path[0] != '/')) {
+		uk_pr_err("fstab: Mountpoint \"%s\" is not absolute\n",
+			  vv->path);
+		return -EINVAL;
+	}
+	/* Drv are mandatory */
+	if (unlikely(!vv->drv || vv->drv[0] == '\0')) {
+		uk_pr_err("fstab: Entry without filesystem driver\n");
+		return -EINVAL;
+	}
+
+	uk_pr_debug("vfs.fstab: Mounting: %s:%s:%s:0x%lx:%s:0x%x...\n",
+		    vv->sdev == NULL ? "none" : vv->sdev,
 		    vv->path, vv->drv, vv->flags,
 		    vv->opts == NULL ? "" : vv->opts,
-		    vv->ukopts == NULL ? "" : vv->ukopts);
-	if (vv->ukopts) {
-		rc = vfscore_volume_process_ukopts(vv);
+		    vv->ukopts);
+
+	if (vv->ukopts & LIBVFSCORE_UKOPT_MKMP) {
+		rc = vfscore_ukopt_mkmp(vv->path);
 		if (unlikely(rc < 0))
 			return rc;
 	}
@@ -505,10 +527,49 @@ static inline int vfscore_mount_volume(const struct vfscore_volume *vv)
 		return vfscore_extract_volume(vv);
 	}
 #endif /* CONFIG_LIBUKCPIO */
-	return mount(vv->sdev, vv->path, vv->drv, vv->flags, vv->opts);
+	return mount(vv->sdev == NULL ? "" : vv->sdev,
+		     vv->path, vv->drv, vv->flags, vv->opts);
 }
 
 #ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_UP
+/**
+ * ukopts must follow the pattern below, each option separated by
+ * the character defined through LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP (e.g. with
+ * LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP = ','):
+ *	[<ukopt1>,<ukopt2>,<ukopt3>,...,<ukoptN>]
+ *
+ * Currently implemented, Unikraft Mount options:
+ * - mkmp	Make mount point. Ensures that the specified mount point
+ *		exists. If it does not exist in the current vfs, the directory
+ *		structure is created.
+ */
+static unsigned int vfscore_volume_parse_ukopts(char *ukopts)
+{
+	char *pos;
+	char *opt;
+	int ret = 0x0;
+
+	pos = ukopts;
+	for (;;) {
+		opt = next_arg(&pos, LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP);
+
+		if (!opt) {
+			if (!pos)
+				break; /* end of options */
+			continue; /* empty option */
+		}
+
+		if (!strcmp(opt, "mkmp")) {
+			ret |= LIBVFSCORE_UKOPT_MKMP;
+			continue;
+		}
+
+		uk_pr_warn("Ignoring unknown ukopt \"%s\"\n", opt);
+	}
+
+	return ret;
+}
+
 /**
  * Expected command-line argument format:
  *	vfs.fstab=[
@@ -519,62 +580,23 @@ static inline int vfscore_mount_volume(const struct vfscore_volume *vv)
  * These list elements are expected to be separated by whitespaces.
  * Mount options, flags and Unikraft mount options are optional.
  */
-static char *next_volume_arg(char **argptr)
-{
-	char *nsep;
-	char *arg;
-
-	UK_ASSERT(argptr);
-
-	if (!*argptr || (*argptr)[0] == '\0') {
-		/* We likely got called again after we already
-		 * returned the last argument
-		 */
-		*argptr = NULL;
-		return NULL;
-	}
-
-	arg = *argptr;
-	nsep = strchr(*argptr, LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP);
-	if (!nsep) {
-		/* No next separator, we hit the last argument */
-		*argptr = NULL;
-		goto out;
-	}
-
-	/* Split C string by overwriting the separator */
-	nsep[0] = '\0';
-	/* Move argptr to next argument */
-	*argptr = nsep + 1;
-
-out:
-	/* Return NULL for empty arguments */
-	if (*arg == '\0')
-		return NULL;
-	return arg;
-}
 
 static int vfscore_parse_volume(char *v, struct vfscore_volume *vv)
 {
 	const char *strflags;
 	char *pos;
+	char *ukopts;
 
 	UK_ASSERT(v);
 	UK_ASSERT(vv);
 
 	pos = v;
-	vv->sdev   = next_volume_arg(&pos);
-	vv->path   = next_volume_arg(&pos);
-	vv->drv    = next_volume_arg(&pos);
-	strflags   = next_volume_arg(&pos);
-	vv->opts   = next_volume_arg(&pos);
-	vv->ukopts = next_volume_arg(&pos);
-
-	/* path and drv are mandatory */
-	if (unlikely(!vv->path || !vv->drv)) {
-		uk_pr_err("vfs.fstab: Incomplete entry: Require mountpoint and filesystem driver\n");
-		return -EINVAL;
-	}
+	vv->sdev   = next_arg(&pos, LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP);
+	vv->path   = next_arg(&pos, LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP);
+	vv->drv    = next_arg(&pos, LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP);
+	strflags   = next_arg(&pos, LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP);
+	vv->opts   = next_arg(&pos, LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP);
+	ukopts     = next_arg(&pos, LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP);
 
 	/* Fill source device with empty string if missing */
 	if (!vv->sdev)
@@ -593,11 +615,16 @@ static int vfscore_parse_volume(char *v, struct vfscore_volume *vv)
 	else
 		vv->flags = 0;
 
-	uk_pr_debug("vfs.fstab: Parsed: %s:%s:%s:%lx:%s:%s\n",
-		    vv->sdev[0] == '\0' ? "none" : vv->sdev,
-		    vv->path, vv->drv, vv->flags,
+	/* Parse ukopts */
+	vv->ukopts = vfscore_volume_parse_ukopts(ukopts); /* handles NULL */
+
+	uk_pr_debug("vfs.fstab: Parsed: %s:%s:%s:0x%lx:%s:%0x\n",
+		    vv->sdev == NULL ? "none" : vv->sdev,
+		    vv->path == NULL ? "" : vv->path,
+		    vv->drv  == NULL ? "" : vv->drv,
+		    vv->flags,
 		    vv->opts == NULL ? "" : vv->opts,
-		    vv->ukopts == NULL ? "" : vv->ukopts);
+		    vv->ukopts);
 	return 0;
 }
 
