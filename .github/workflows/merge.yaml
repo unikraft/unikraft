@@ -37,7 +37,7 @@ jobs:
           GOVERN_COMMITTER_EMAIL: ${{ secrets.GOVERN_COMMITTER_EMAIL }}
           GOVERN_COMMITTER_NAME: ${{ secrets.GOVERN_COMMITTER_NAME }}
           GOVERN_NO_RENDER: true
-          GOVERN_LOG_LEVEL: warn
+          GOVERN_LOG_LEVEL: debug
           GOVERN_NO_CONFLICTS: true
           GOVERN_REVIEW_STATES: approved
           GOVERN_APPROVE_STATES: approved
