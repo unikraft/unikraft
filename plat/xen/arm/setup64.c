@@ -34,6 +34,7 @@
 #include <uk/plat/memory.h>
 #include <xen/memory.h>
 #include <uk/intctlr.h>
+#include <uk/intctlr/gic.h>
 #include <xen/hvm/params.h>
 #include <libfdt.h>
 #include <xen-arm/setup.h>
@@ -202,6 +203,28 @@ static inline void _get_cmdline(struct ukplat_bootinfo *bi)
 
 	bi->cmdline = (__u64)cmdline;
 	bi->cmdline_len = cmdline_len;
+}
+
+int uk_intctlr_plat_probe(void *in, void *out)
+{
+	struct uk_intctlr_plat_data *dout = (struct uk_intctlr_plat_data *)out;
+	struct uk_intctlr_plat_data *din = (struct uk_intctlr_plat_data *)in;
+
+	if (!in || !out)
+		return -EINVAL;
+
+#if defined(__arm__)
+	dout->dist_addr = to_virt((long)fdt64_ld(din->dist_addr));
+	dout->rdist_addr = to_virt((long)fdt64_ld(din->rdist_addr));
+#else
+	set_pgt_entry(&fixmap_pgtable[l2_pgt_idx(FIX_GIC_START)],
+		      ((din->dist_addr & L2_MASK) | BLOCK_DEV_ATTR | L2_BLOCK));
+	dout->dist_addr = (FIX_GIC_START + (din->dist_addr & L2_OFFSET));
+	dout->rdist_addr = (FIX_GIC_START + (din->rdist_addr & L2_OFFSET));
+#endif
+	/* Setting memory barrier to get access to mapped pages */
+	wmb();
+	return 0;
 }
 
 static int _init_mem(struct ukplat_bootinfo *const bi, paddr_t physical_offset)
