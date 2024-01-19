@@ -311,3 +311,9 @@ int uk_intctlr_register(struct uk_intctlr_desc *intctlr)
 
 	return 0;
 }
+
+int __weak uk_intctlr_plat_probe(void *in __unused,
+				 void *out __unused)
+{
+	return 0;
+}
