@@ -333,6 +333,7 @@ endif # LIBVFSCORE_AUTOMOUNT_CI
 menuconfig LIBVFSCORE_AUTOMOUNT_UP
 	bool "User-provided filesystem table (kernel parameter)"
 	select LIBUKLIBPARAM
+	select LIBUKARGPARSE
 	default n
 	help
 		These volumes are parsed from a command-line argument:

@@ -34,6 +34,7 @@
 
 #include <uk/argparse.h>
 #include <uk/assert.h>
+#include <string.h> /* strchr */
 
 
 static void left_shift(char *buf, __sz index, __sz maxlen)
@@ -138,4 +139,57 @@ int uk_argnparse(char *argb, __sz maxlen, char *argv[], int maxcount)
 
 out:
 	return argc;
+}
+
+__sz uk_nextarg_r(const char **argptr, int separator)
+{
+	const char *nsep;
+	const char *arg;
+	__sz arglen;
+
+	UK_ASSERT(argptr);
+
+	if (!*argptr || (*argptr)[0] == '\0') {
+		/* We likely got called again after we already
+		 * returned the last argument
+		 */
+		*argptr = __NULL;
+		return 0;
+	}
+
+	arg = *argptr;
+	nsep = strchr(*argptr, separator);
+	if (!nsep) {
+		/* No next separator, we hit the last argument */
+		*argptr = __NULL;
+
+		/* Rest of C-string is last argument */
+		return strlen(arg);
+	}
+
+	/* Compute the len of current argument */
+	arglen = (__sz)((__uptr)nsep - (__uptr)arg);
+
+	/* Skip separator on argptr for subsequent calls */
+	*argptr = nsep + 1;
+	return arglen;
+}
+
+char *uk_nextarg(char **argptr, int separator)
+{
+	__sz arglen;
+	char *arg;
+
+	UK_ASSERT(argptr);
+
+	arg = *argptr;
+	arglen = uk_nextarg_r((const char **)argptr, separator);
+
+	/* Return NULL if we are at the end of parsing */
+	if (arglen == 0 && *argptr == __NULL)
+		return __NULL;
+
+	/* Overwrite separator with terminating character */
+	arg[arglen] = '\0';
+	return arg;
 }

@@ -38,6 +38,9 @@
 #include <uk/netdev.h>
 #include <uk/print.h>
 #include <uk/libparam.h>
+#if CONFIG_LIBUKNETDEV_EINFO_LIBPARAM
+#include <uk/argparse.h>
+#endif /* CONFIG_LIBUKNETDEV_EINFO_LIBPARAM */
 
 #if CONFIG_LIBUKNETDEV_STATS
 #include "stats.h"
@@ -89,41 +92,6 @@ static struct uk_netdev_data *_alloc_data(struct uk_alloc *a,
 }
 
 #if CONFIG_LIBUKNETDEV_EINFO_LIBPARAM
-static char *pick_arg(char **argptr, int separator)
-{
-	char *nsep;
-	char *arg;
-
-	UK_ASSERT(argptr);
-
-	if (!*argptr || (*argptr)[0] == '\0') {
-		/* We likely got called after we already
-		 * returned the last available argument
-		 */
-		*argptr = NULL;
-		return NULL;
-	}
-
-	arg = *argptr;
-	nsep = strchr(*argptr, separator);
-	if (!nsep) {
-		/* No next separator, we hit the last argument */
-		*argptr = NULL;
-		goto exit;
-	}
-
-	/* Split C string by overwriting the separator */
-	nsep[0] = '\0';
-	/* Move argptr to next argument */
-	*argptr = nsep + 1;
-
-exit:
-	/* Return NULL for empty arguments */
-	if (*arg == '\0')
-		return NULL;
-	return arg;
-}
-
 static struct uk_netdev_einfo_overwrites *_alloc_einfo(struct uk_alloc *a,
 						       uint16_t netdev_id)
 {
@@ -139,20 +107,34 @@ static struct uk_netdev_einfo_overwrites *_alloc_einfo(struct uk_alloc *a,
 
 	/*
 	 * Parse IPv4 parameters
-	 * NOTE: `pick_arg` automatically returns NULL if an arguments is
-	 *       empty or does not exists.
+	 * NOTE: `uk_nextarg` automatically returns NULL if an arguments
+	 *       does not exists.
 	 */
-	_einfo->ip4.cidr     = pick_arg(&ipv4_conf[netdev_id], ':');
-	_einfo->ip4.gw       = pick_arg(&ipv4_conf[netdev_id], ':');
-	_einfo->ip4.dns0     = pick_arg(&ipv4_conf[netdev_id], ':');
-	_einfo->ip4.dns1     = pick_arg(&ipv4_conf[netdev_id], ':');
-	_einfo->ip4.hostname = pick_arg(&ipv4_conf[netdev_id], ':');
-	_einfo->ip4.domain   = pick_arg(&ipv4_conf[netdev_id], ':');
+	_einfo->ip4.cidr = uk_nextarg(&ipv4_conf[netdev_id], ':');
+	_einfo->ip4.gw = uk_nextarg(&ipv4_conf[netdev_id], ':');
+	_einfo->ip4.dns0 = uk_nextarg(&ipv4_conf[netdev_id], ':');
+	_einfo->ip4.dns1 = uk_nextarg(&ipv4_conf[netdev_id], ':');
+	_einfo->ip4.hostname = uk_nextarg(&ipv4_conf[netdev_id], ':');
+	_einfo->ip4.domain = uk_nextarg(&ipv4_conf[netdev_id], ':');
 	/*
 	 * NOTE: We do not throw an error if additional arguments are handed
 	 *       over (after domain). This will keep this parsing code
 	 *       future-proof.
 	 */
+
+	/* Filter out empty arguments */
+	if (_einfo->ip4.cidr && _einfo->ip4.cidr[0] == '\0')
+		_einfo->ip4.cidr = NULL;
+	if (_einfo->ip4.gw && _einfo->ip4.gw[0] == '\0')
+		_einfo->ip4.gw = NULL;
+	if (_einfo->ip4.dns0 && _einfo->ip4.dns0[0] == '\0')
+		_einfo->ip4.dns0 = NULL;
+	if (_einfo->ip4.dns1 && _einfo->ip4.dns1[0] == '\0')
+		_einfo->ip4.dns1 = NULL;
+	if (_einfo->ip4.hostname && _einfo->ip4.hostname[0] == '\0')
+		_einfo->ip4.hostname = NULL;
+	if (_einfo->ip4.domain && _einfo->ip4.domain[0] == '\0')
+		_einfo->ip4.domain = NULL;
 
 	if (_einfo->ip4.cidr)
 		uk_pr_debug("netdev%d: Overwrite einfo ip4.cidr: \"%s\"\n",

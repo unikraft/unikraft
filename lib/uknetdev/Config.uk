@@ -34,6 +34,7 @@ config LIBUKNETDEV_DISPATCHERTHREADS
 config LIBUKNETDEV_EINFO_LIBPARAM
 	bool "Netdev einfo with kernel parameters"
 	select LIBUKLIBPARAM
+	select LIBUKARGPARSE
 	help
 		Extended information field are used to pass IPv4 addresses
 		and network settings to network stacks. This option enables to
