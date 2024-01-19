@@ -8,3 +8,4 @@ uk_intctlr_irq_handle
 uk_intctlr_irq_register
 uk_intctlr_irq_unregister
 uk_intctlr_register
+uk_intctlr_plat_probe
