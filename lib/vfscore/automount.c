@@ -53,6 +53,9 @@
 #include <errno.h>
 #include <uk/config.h>
 #include <uk/arch/types.h>
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_UP
+#include <uk/argparse.h>
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_UP */
 
 #define LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP			':'
 #define LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP			','
@@ -77,43 +80,6 @@ struct vfscore_volume {
 	/* Unikraft mount options, see vfscore_mount_volume() */
 	unsigned int ukopts;
 };
-
-#if CONFIG_LIBVFSCORE_AUTOMOUNT_UP
-static char *next_arg(char **argptr, int separator)
-{
-	char *nsep;
-	char *arg;
-
-	UK_ASSERT(argptr);
-
-	if (!*argptr || (*argptr)[0] == '\0') {
-		/* We likely got called again after we already
-		 * returned the last argument
-		 */
-		*argptr = NULL;
-		return NULL;
-	}
-
-	arg = *argptr;
-	nsep = strchr(*argptr, separator);
-	if (!nsep) {
-		/* No next separator, we hit the last argument */
-		*argptr = NULL;
-		goto out;
-	}
-
-	/* Split C string by overwriting the separator */
-	nsep[0] = '\0';
-	/* Move argptr to next argument */
-	*argptr = nsep + 1;
-
-out:
-	/* Return NULL for empty arguments */
-	if (*arg == '\0')
-		return NULL;
-	return arg;
-}
-#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_UP */
 
 /*
  * Compiled-in file system table: `fstab_ci`
@@ -551,7 +517,7 @@ static unsigned int vfscore_volume_parse_ukopts(char *ukopts)
 
 	pos = ukopts;
 	for (;;) {
-		opt = next_arg(&pos, LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP);
+		opt = uk_nextarg(&pos, LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP);
 
 		if (!opt) {
 			if (!pos)
@@ -591,19 +557,19 @@ static int vfscore_parse_volume(char *v, struct vfscore_volume *vv)
 	UK_ASSERT(vv);
 
 	pos = v;
-	vv->sdev   = next_arg(&pos, LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP);
-	vv->path   = next_arg(&pos, LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP);
-	vv->drv    = next_arg(&pos, LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP);
-	strflags   = next_arg(&pos, LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP);
-	vv->opts   = next_arg(&pos, LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP);
-	ukopts     = next_arg(&pos, LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP);
+	vv->sdev = uk_nextarg(&pos, LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP);
+	vv->path = uk_nextarg(&pos, LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP);
+	vv->drv = uk_nextarg(&pos, LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP);
+	strflags = uk_nextarg(&pos, LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP);
+	vv->opts = uk_nextarg(&pos, LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP);
+	ukopts = uk_nextarg(&pos, LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP);
 
 	/* Fill source device with empty string if missing */
 	if (!vv->sdev)
 		vv->sdev = "";
 
 	/* Check that given path is absolute */
-	if (unlikely(vv->path[0] != '/')) {
+	if (unlikely(!vv->path || vv->path[0] != '/')) {
 		uk_pr_err("vfs.fstab: Mountpoint \"%s\" is not absolute\n",
 			  vv->path);
 		return -EINVAL;

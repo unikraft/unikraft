@@ -50,4 +50,61 @@ int uk_argnparse(char *argb, __sz maxlen, char *argv[], int maxcount);
 }
 #endif
 
+/**
+ * Argument extraction function that can be used to iterate over a C-string
+ * buffer ('\0'-terminated) that contains multiple C-string sub-arguments
+ * separated by a special character. One example is a colon-separated argument
+ * list. On each invocation, the next argument is returned.
+ * NOTE: This function modifies the input buffer by replacing a found separator
+ *       in the buffer with a terminating '\0'-character.
+ *
+ * @param argptr Reference to a pointer that points to the current parsing
+ *               offset within the C-string buffer (in- & output parameter,
+ *               required).
+ *               The parameter needs to be handed over on subsequent
+ *               calls. Before the first call, the pointer has to be initialized
+ *               with the C-string buffer address that shall be parsed.
+ *               The function modifies the pointer value (`*argptr`).
+ *               If `*argptr` points to `__NULL` after a function call, the end
+ *               of the C-string buffer was reached.
+ *               If `*argptr` points to `__NULL` for subsequent calls, the
+ *               function will return `__NULL` and `*argptr` keeps pointing to
+ *               `__NULL`.
+ * @param separator Separating character (examples: ':', ',')
+ * @return Reference to sub-C-string containing the argument (zero-copy,
+ *         sub-C-string buffer is part of the original buffer). On the last
+ *         argument of a buffer, `*argptr` will point to `__NULL`. Any
+ *         subsequent call, the function returns also `__NULL`.
+ *         Empty arguments consist of a '\0'-character only.
+ */
+char *uk_nextarg(char **argptr, int separator);
+
+/**
+ * Variant of `uk_nextarg()` that works for const buffers and is thread-safe.
+ * Instead of a reference to the C-string argument, the sizes of the currently
+ * found argument is returned. Such an argument starts with the reference value
+ * of `*argptr`, before the function is called.
+ *
+ * @param argptr Reference to a pointer pointing to the current parsing offset
+ *               within C-string buffer (input and output parameter, required).
+ *               The parameter needs to be handed over on subsequent
+ *               calls. Before the first call, the pointer has to be initialized
+ *               with the C-string buffer address that shall be parsed.
+ *               The function modifies the pointer value (`*argptr`).
+ *               If `*argptr` points to `__NULL` after a function call, the end
+ *               of the C-string buffer was reached.
+ *               If `*argptr` points to `__NULL` for subsequent calls, the
+ *               function will return `__NULL` and `*argptr` keeps pointing to
+ *               `__NULL`.
+ * @param separator Separating character (examples: ':', ',')
+ * @return Length of a sub-C-string containing a argument. If it is `0`, an
+ *         argument was empty or the end of the buffer to parse was already
+ *         reached by the previous function call. This case can be distinguished
+ *         with checking `*argptr` after a call. If `*argptr` does not point to
+ *         `__NULL` or points to `__NULL` while it was != `__NULL` when calling
+ *         the function, an argument was just empty. Otherwise, there are no
+ *         more arguments.
+ */
+__sz uk_nextarg_r(const char **argptr, int separator);
+
 #endif /* __UK_ARGPARSE__ */
