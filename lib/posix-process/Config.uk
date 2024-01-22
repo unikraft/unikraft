@@ -76,6 +76,34 @@ config LIBPOSIX_PROCESS_SIGNAL_TKILL
 	default y
 endif
 
+menuconfig LIBPOSIX_PROCESS_GRACEFUL_SHUTDOWN
+bool "Graceful shutdown"
+select LIBPOSIX_PROCESS_PIDS
+select LIBPOSIX_PROCESS_SIGNAL
+select LIBUKLOCK
+help
+	Signal processes on system shutdown, to give them
+	a chance to terminate gracefully. If timeout is
+	reached, processes are killed forecefully.
+
+if LIBPOSIX_PROCESS_GRACEFUL_SHUTDOWN
+config LIBPOSIX_PROCESS_GRACEFUL_SHUTDOWN_SIGNAL
+int "Process termination signal"
+default 15 if (ARCH_ARM_64 || ARCH_X86_64)
+help
+	Signal to send processes to gracefully terminate
+	before killing forcefully during system shutdown.
+	The default is SIGTERM.
+
+config LIBPOSIX_PROCESS_GRACEFUL_SHUTDOWN_TIMEOUT_MS
+int "Process termination timeout (ms)"
+depends on LIBUKBOOT_MAINTHREAD
+default 3000
+help
+	Time (ms) to wait for a process to gracefully terminate
+	before killing forcefully during system shutdown.
+endif
+
 config LIBPOSIX_PROCESS_CLONE
 	bool "Clone system call"
 	select LIBPOSIX_PROCESS_PIDS

@@ -57,6 +57,15 @@
 
 #include "process.h"
 
+#if CONFIG_LIBPOSIX_PROCESS_GRACEFUL_SHUTDOWN
+#include <uk/semaphore.h>
+
+#define GRACEFUL_SHUTDOWN_TIMEOUT_NSEC					\
+	(CONFIG_LIBPOSIX_PROCESS_GRACEFUL_SHUTDOWN_TIMEOUT_MS * 1000000UL)
+#define GRACEFUL_SHUTDOWN_SIGNAL					\
+	CONFIG_LIBPOSIX_PROCESS_GRACEFUL_SHUTDOWN_SIGNAL
+#endif /* CONFIG_LIBPOSIX_PROCESS_GRACEFUL_SHUTDOWN */
+
 /**
  * System global lists
  * NOTE: We pre-allocate PID/TID 0 which is reserved by the kernel.
@@ -668,6 +677,7 @@ void pprocess_exit(struct uk_thread *thread, enum posix_thread_state state,
 		pchild->parent = pprocess_init;
 		uk_list_add(&pchild->child_list_entry,
 			    &pprocess_init->children);
+
 		uk_pr_debug("pid %d reparented to init\n", pchild->pid);
 	}
 
@@ -712,6 +722,66 @@ void pprocess_exit(struct uk_thread *thread, enum posix_thread_state state,
 	if (pthread->thread == uk_thread_current())
 		uk_sched_yield();
 }
+
+#if CONFIG_LIBPOSIX_PROCESS_GRACEFUL_SHUTDOWN
+static bool try_graceful_shutdown(struct posix_process *pproc)
+{
+	__nsec timeout;
+
+	UK_ASSERT(pproc);
+
+	timeout = GRACEFUL_SHUTDOWN_TIMEOUT_NSEC;
+
+	uk_pr_info("pid %d sending termination signal\n", pproc->pid);
+	pprocess_signal_send(pproc, GRACEFUL_SHUTDOWN_SIGNAL, NULL);
+	uk_semaphore_down_to(&pproc->exit_semaphore, timeout);
+
+	return pproc->terminated;
+}
+#endif /* CONFIG_LIBPOSIX_PROCESS_GRACEFUL_SHUTDOWN */
+
+static void
+pprocess_system_shutdown(const struct uk_term_ctx *ctx __unused)
+{
+	struct posix_process *pproc_init, *pproc;
+	struct posix_thread *pthread;
+	int rc;
+
+	pproc_init = pid2pprocess(UK_PID_INIT);
+	UK_ASSERT(pproc_init);
+
+	while ((pproc = uk_list_first_entry_or_null(&pproc_init->children,
+						    struct posix_process,
+						    child_list_entry))) {
+		/* Skip zombies */
+		if (pproc->terminated)
+			continue;
+
+#if CONFIG_LIBPOSIX_PROCESS_GRACEFUL_SHUTDOWN
+		if (try_graceful_shutdown(pproc) == true) {
+			uk_pr_info("pid %d terminated gracefully\n",
+				   pproc->pid);
+			continue;
+		}
+		uk_pr_info("pid %d still running\n", pproc->pid);
+#endif /* CONFIG_LIBPOSIX_PROCESS_GRACEFUL_SHUTDOWN */
+
+		pthread = uk_list_first_entry_or_null(&pproc->threads,
+						      struct posix_thread,
+						      thread_list_entry);
+		UK_ASSERT(pthread);
+		pprocess_exit(pthread->thread, POSIX_THREAD_KILLED, 1);
+		uk_pr_info("pid %d killed\n", pproc->pid);
+	}
+
+	/* Now reap any children */
+	do {
+		rc = uk_posix_process_wait();
+	} while (rc != -ECHILD);
+}
+
+/* init last, term first */
+uk_late_initcall(0, pprocess_system_shutdown);
 
  /* NOTE: The man pages of _exit(2) say:
   *       "In glibc up to version 2.3, the _exit() wrapper function invoked
