@@ -6,7 +6,7 @@
 
 #define _GNU_SOURCE
 #include <uk/config.h>
-
+#include <stdbool.h>
 #include <string.h>
 #include <fcntl.h>
 
