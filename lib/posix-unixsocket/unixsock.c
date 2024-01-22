@@ -780,6 +780,10 @@ ssize_t unix_socket_sendmsg(posix_sock *file,
 	uk_file_wunlock(data->wpipe);
 	/* We ignore ancillary data for now */
 
+	/* 0-length datagrams will be silently lost; warn */
+	if (!ret && data->type != SOCK_STREAM)
+		uk_pr_warn("0-length datagram write; message will be lost\n");
+
 	if (!_SOCK_CONNECTION(data->type) && remote) {
 		uk_file_release(wpipe);
 		if (ret == -EPIPE)
