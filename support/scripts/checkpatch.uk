@@ -30,4 +30,7 @@ if [ -f "${_SELF_BASE}/../../.checkpatch.conf" ]; then
 	_CHECKPATCHCONF=$(cat "${_SELF_BASE}/../../.checkpatch.conf")
 fi
 
-exec "${_CHECKPATCHPL}" "${_CHECKPATCHCONF}" "$@"
+# We need to auto-split words to make sure arguments are passed correctly to
+# checkpatch. We disable this 'info' style message.
+# shellcheck disable=SC2086
+exec "${_CHECKPATCHPL}" ${_CHECKPATCHCONF} "$@"
