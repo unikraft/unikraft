@@ -24,6 +24,10 @@
 #include <uk/posix-fdtab-legacy.h>
 #endif /* CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM */
 
+#if CONFIG_LIBPOSIX_PROCESS_CLONE
+#include <uk/process.h>
+#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
+
 #define UK_FDTAB_SIZE CONFIG_LIBPOSIX_FDTAB_MAXFDS
 UK_CTASSERT(UK_FDTAB_SIZE <= UK_FD_MAX);
 
@@ -393,6 +397,7 @@ static void term_posix_fdtab(const struct uk_term_ctx *tctx __unused)
 static void fdtab_free(struct uk_fdtab *tab)
 {
 	fdtab_cleanup(tab, 1);
+	uk_free(tab->alloc, tab);
 }
 
 static int fdtab_thread_init(struct uk_thread *child,
@@ -419,6 +424,61 @@ static void fdtab_thread_term(struct uk_thread *child)
 
 UK_THREAD_INIT(fdtab_thread_init, fdtab_thread_term);
 
+#if CONFIG_LIBPOSIX_PROCESS_CLONE
+
+/**
+ * Duplicate the current fdtab and return a pointer to the copy.
+ *
+ * NOTE: This is a basic implementation that does not guarantee atomicity of the
+ * clone operation; we optimistically assume this will not break anything.
+ * Please revisit if this turns out to be false.
+ */
+static struct uk_fdtab *fdtab_duplicate(struct uk_fdtab *tab)
+{
+	struct uk_fdtab *ret = uk_malloc(tab->alloc, sizeof(*ret));
+
+	if (likely(ret)) {
+		ret->alloc = tab->alloc;
+		ret->fmap = (struct uk_fmap){
+			.bmap = {
+				.size = UK_FDTAB_SIZE,
+				.bitmap = (unsigned long *)ret->_bmap
+			},
+			.map = ret->_fdmap
+		};
+		uk_refcount_init(&ret->refcnt, 1);
+		for (int i = 0; i < UK_FDTAB_SIZE; i++) {
+			struct fdval v = _fdtab_get(tab, i);
+			const void *entry = NULL;
+
+			if (v.p)
+				entry = fdtab_encode(v.p, v.flags);
+			uk_fmap_set(&ret->fmap, i, entry);
+		}
+	}
+	return ret;
+}
+
+static int fdtab_clone(const struct clone_args *cl_args,
+		       size_t cl_args_len __unused,
+		       struct uk_thread *child,
+		       struct uk_thread *parent __unused)
+{
+	if (!(cl_args->flags & CLONE_FILES)) {
+		struct uk_fdtab *tab = uk_thread_uktls_var(child, active_fdtab);
+		struct uk_fdtab *newtab = fdtab_duplicate(tab);
+
+		if (unlikely(!newtab))
+			return -ENOMEM;
+		if (uk_refcount_release(&tab->refcnt))
+			fdtab_free(tab);
+		uk_thread_uktls_var(child, active_fdtab) = newtab;
+	}
+	return 0;
+}
+UK_POSIX_CLONE_HANDLER(CLONE_FILES, 0, fdtab_clone, 0);
+
+#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 
 /* Init fdtab as early as possible, to enable functions that rely on fds */
 uk_lib_initcall_prio(init_posix_fdtab, 0x0, UK_LIBPOSIX_FDTAB_INIT_PRIO);
