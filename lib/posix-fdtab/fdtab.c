@@ -88,12 +88,6 @@ static int init_posix_fdtab(struct uk_init_ctx *ictx __unused)
 	return 0;
 }
 
-/* TODO: Adapt when multiple processes are supported */
-static inline struct uk_fdtab *_active_tab(void)
-{
-	return active_fdtab;
-}
-
 /* Encode flags in entry pointer using the least significant bits */
 /* made available by the open file structure's alignment */
 struct fdval {
@@ -195,7 +189,6 @@ void file_rel(struct uk_fdtab *tab, void *p, int flags __maybe_unused)
 
 int uk_fdtab_open(const struct uk_file *f, unsigned int mode)
 {
-	struct uk_fdtab *tab;
 	struct uk_ofile *of;
 	int flags;
 	const void *entry;
@@ -203,27 +196,25 @@ int uk_fdtab_open(const struct uk_file *f, unsigned int mode)
 
 	UK_ASSERT(f);
 
-	tab = _active_tab();
-	of = ofile_new(tab, f, mode & ~O_CLOEXEC);
+	of = ofile_new(active_fdtab, f, mode & ~O_CLOEXEC);
 	if (!of)
 		return -ENOMEM;
 	uk_file_acquire(f);
 	/* Place the file in fdtab */
 	flags = (mode & O_CLOEXEC) ? UK_FDTAB_CLOEXEC : 0;
 	entry = fdtab_encode(of, flags);
-	fd = uk_fmap_put(&tab->fmap, entry, 0);
+	fd = uk_fmap_put(&active_fdtab->fmap, entry, 0);
 	if (fd >= UK_FDTAB_SIZE)
 		goto err_out;
 	return fd;
 err_out:
 	/* Release open file & file ref */
-	ofile_rel(tab, of);
+	ofile_rel(active_fdtab, of);
 	return -ENFILE;
 }
 
 int uk_fdtab_setflags(int fd, int flags)
 {
-	struct uk_fdtab *tab;
 	struct uk_fmap *fmap;
 	void *p;
 	struct fdval v;
@@ -232,8 +223,7 @@ int uk_fdtab_setflags(int fd, int flags)
 	if (flags & ~O_CLOEXEC)
 		return -EINVAL;
 
-	tab = _active_tab();
-	fmap = &tab->fmap;
+	fmap = &active_fdtab->fmap;
 
 	p = uk_fmap_critical_take(fmap, fd);
 	if (!p)
@@ -249,8 +239,7 @@ int uk_fdtab_setflags(int fd, int flags)
 
 int uk_fdtab_getflags(int fd)
 {
-	struct uk_fdtab *tab = _active_tab();
-	void *p = uk_fmap_lookup(&tab->fmap, fd);
+	void *p = uk_fmap_lookup(&active_fdtab->fmap, fd);
 	struct fdval v;
 	int ret;
 
@@ -268,13 +257,12 @@ int uk_fdtab_getflags(int fd)
 #if CONFIG_LIBVFSCORE
 int uk_fdtab_legacy_open(struct vfscore_file *vf)
 {
-	struct uk_fdtab *tab = _active_tab();
 	const void *entry;
 	int fd;
 
 	fhold(vf);
 	entry = fdtab_encode(vf, UK_FDTAB_VFSCORE);
-	fd = uk_fmap_put(&tab->fmap, entry, 0);
+	fd = uk_fmap_put(&active_fdtab->fmap, entry, 0);
 	if (fd >= UK_FDTAB_SIZE)
 		goto err_out;
 	vf->fd = fd;
@@ -286,8 +274,7 @@ err_out:
 
 struct vfscore_file *uk_fdtab_legacy_get(int fd)
 {
-	struct uk_fdtab *tab = _active_tab();
-	struct uk_fmap *fmap = &tab->fmap;
+	struct uk_fmap *fmap = &active_fdtab->fmap;
 	struct vfscore_file *vf = NULL;
 	void *p = uk_fmap_critical_take(fmap, fd);
 
@@ -306,15 +293,13 @@ struct vfscore_file *uk_fdtab_legacy_get(int fd)
 
 int uk_fdtab_shim_get(int fd, union uk_shim_file *out)
 {
-	struct uk_fdtab *tab;
 	struct uk_fmap *fmap;
 	void *p;
 
 	if (fd < 0)
 		return -1;
 
-	tab = _active_tab();
-	fmap = &tab->fmap;
+	fmap = &active_fdtab->fmap;
 
 	p = uk_fmap_critical_take(fmap, fd);
 	if (p) {
@@ -363,13 +348,12 @@ static struct fdval _fdtab_get(struct uk_fdtab *tab, int fd)
 
 struct uk_ofile *uk_fdtab_get(int fd)
 {
-	struct uk_fdtab *tab = _active_tab();
-	struct fdval v = _fdtab_get(tab, fd);
+	struct fdval v = _fdtab_get(active_fdtab, fd);
 
 #if CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM
 	/* Report legacy files as not present if called through new API */
 	if (v.p && v.flags & UK_FDTAB_VFSCORE) {
-		file_rel(tab, v.p, v.flags);
+		file_rel(active_fdtab, v.p, v.flags);
 		return NULL;
 	}
 #endif /* CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM */
@@ -379,7 +363,7 @@ struct uk_ofile *uk_fdtab_get(int fd)
 void uk_fdtab_ret(struct uk_ofile *of)
 {
 	UK_ASSERT(of);
-	ofile_rel(_active_tab(), of);
+	ofile_rel(active_fdtab, of);
 }
 
 static void fdtab_cleanup(struct uk_fdtab *tab, int all)
@@ -405,7 +389,7 @@ static void fdtab_cleanup(struct uk_fdtab *tab, int all)
 
 void uk_fdtab_cloexec(void)
 {
-	fdtab_cleanup(_active_tab(), 0);
+	fdtab_cleanup(active_fdtab, 0);
 }
 
 static int fdtab_handle_execve(void *data __unused)
@@ -550,23 +534,20 @@ uk_rootfs_initcall_prio(0x0, term_posix_fdtab, UK_PRIO_LATEST);
 
 int uk_sys_close(int fd)
 {
-	struct uk_fdtab *tab;
 	void *p;
 	struct fdval v;
 
-	tab = _active_tab();
-	p = uk_fmap_take(&tab->fmap, fd);
+	p = uk_fmap_take(&active_fdtab->fmap, fd);
 	if (!p)
 		return -EBADF;
 	v = fdtab_decode(p);
-	file_rel(tab, v.p, v.flags);
+	file_rel(active_fdtab, v.p, v.flags);
 	return 0;
 }
 
 int uk_sys_dup3(int oldfd, int newfd, int flags)
 {
 	int r __maybe_unused;
-	struct uk_fdtab *tab;
 	struct fdval dup;
 	void *prevp;
 	const void *newent;
@@ -579,8 +560,7 @@ int uk_sys_dup3(int oldfd, int newfd, int flags)
 	if (flags & ~O_CLOEXEC)
 		return -EINVAL;
 
-	tab = _active_tab();
-	dup = _fdtab_get(tab, oldfd);
+	dup = _fdtab_get(active_fdtab, oldfd);
 	if (!dup.p)
 		return -EBADF; /* oldfd not open */
 	dup.flags &= ~UK_FDTAB_CLOEXEC;
@@ -588,12 +568,12 @@ int uk_sys_dup3(int oldfd, int newfd, int flags)
 
 	prevp = NULL;
 	newent = fdtab_encode(dup.p, dup.flags);
-	r = uk_fmap_xchg(&tab->fmap, newfd, newent, &prevp);
+	r = uk_fmap_xchg(&active_fdtab->fmap, newfd, newent, &prevp);
 	UK_ASSERT(!r); /* newfd should be in range */
 	if (prevp) {
 		struct fdval prevv = fdtab_decode(prevp);
 
-		file_rel(tab, prevv.p, prevv.flags);
+		file_rel(active_fdtab, prevv.p, prevv.flags);
 	}
 	return newfd;
 }
@@ -601,7 +581,7 @@ int uk_sys_dup3(int oldfd, int newfd, int flags)
 int uk_sys_dup2(int oldfd, int newfd)
 {
 	if (oldfd == newfd)
-		if (uk_fmap_lookup(&(_active_tab())->fmap, oldfd))
+		if (uk_fmap_lookup(&active_fdtab->fmap, oldfd))
 			return newfd;
 		else
 			return -EBADF;
@@ -611,7 +591,6 @@ int uk_sys_dup2(int oldfd, int newfd)
 
 int uk_sys_dup_min(int oldfd, int min, int flags)
 {
-	struct uk_fdtab *tab;
 	struct fdval dup;
 	const void *newent;
 	int fd;
@@ -621,17 +600,16 @@ int uk_sys_dup_min(int oldfd, int min, int flags)
 	if (flags & ~O_CLOEXEC)
 		return -EINVAL;
 
-	tab = _active_tab();
-	dup = _fdtab_get(tab, oldfd);
+	dup = _fdtab_get(active_fdtab, oldfd);
 	if (!dup.p)
 		return -EBADF;
 	dup.flags &= ~UK_FDTAB_CLOEXEC;
 	dup.flags |= flags ? UK_FDTAB_CLOEXEC : 0;
 
 	newent = fdtab_encode(dup.p, dup.flags);
-	fd = uk_fmap_put(&tab->fmap, newent, min);
+	fd = uk_fmap_put(&active_fdtab->fmap, newent, min);
 	if (fd >= UK_FDTAB_SIZE) {
-		file_rel(tab, dup.p, dup.flags);
+		file_rel(active_fdtab, dup.p, dup.flags);
 		return -ENFILE;
 	}
 	return fd;
