@@ -366,6 +366,7 @@ int uk_fmap_xchg(const struct uk_fmap *m, int idx,
 {
 	void *got;
 
+	UK_ASSERT(p); /* Cannot exchange with NULL, use uk_fmap_take instead */
 	if (!_FMAP_INRANGE(m, idx))
 		return -1;
 
