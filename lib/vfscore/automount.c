@@ -57,8 +57,10 @@
 #include <uk/argparse.h>
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_UP */
 
+#define LIBVFSCORE_MOUNTOPTS_SEP				','
 #define LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP			':'
-#define LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP			','
+#define LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP \
+	LIBVFSCORE_MOUNTOPTS_SEP
 
 #define LIBVFSCORE_EXTRACT_DRV					"extract"
 #define LIBVFSCORE_EXTRACT_DEV_INITRD0				"initrd0"
@@ -80,6 +82,8 @@ struct vfscore_volume {
 	/* Unikraft mount options, see vfscore_mount_volume() */
 	unsigned int ukopts;
 };
+
+extern struct uk_list_head mount_list;
 
 /*
  * Compiled-in file system table: `fstab_ci`
@@ -346,10 +350,86 @@ extern const char vfscore_einitrd_start[];
 extern const char vfscore_einitrd_end;
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_EINITRD */
 
+#define LIBVFSCORE_EXTRACTOPT_MOUNT_RAMFS		(0x1 << 0)
+#define LIBVFSCORE_EXTRACTOPT_MOUNT_IFNOMOUNT		(0x1 << 1)
+#define LIBVFSCORE_EXTRACTOPT_FORMAT_AUTO		(0x1 << 2)
+
+static inline int vfscore_extract_parse_opts(const char *opts)
+{
+	const char *arg, *iter;
+	int optflags = 0x0;
+	char strbuf[64];
+	ssize_t match;
+	size_t cpylen;
+	size_t arglen;
+
+	for (iter = opts; iter; ) {
+		arg = iter;
+		arglen = uk_nextarg_r(&iter, LIBVFSCORE_MOUNTOPTS_SEP);
+
+		if (arglen == 0 && arg)
+			continue; /* just an empty arg */
+
+		/*
+		 * Option: "ramfs"
+		 * Values (ramfs=VAL):
+		 *    0 - Do not mount an underlying ramfs
+		 *    1 - Always mount an underlying ramfs
+		 *        (default if present without value)
+		 *    2 - Only mount underlying ramfs if no mount point exists
+		 */
+		match = uk_strnkeycmp(arg, arglen, "ramfs", "=");
+		if (match == 0) { /* only "ramfs" */
+			uk_pr_debug("fstab: Option for \"extract\": \"ramfs=1\" (always mount)\n");
+			optflags |= LIBVFSCORE_EXTRACTOPT_MOUNT_RAMFS;
+			optflags &= ~LIBVFSCORE_EXTRACTOPT_MOUNT_IFNOMOUNT;
+		} else if (match > 0) { /* "ramfs=N" */
+			int param;
+
+			cpylen = MIN(ARRAY_SIZE(strbuf) - 1,
+				     arglen - (match + 1));
+			strncpy(strbuf, arg + match + 1, cpylen);
+			strbuf[cpylen] = '\0';
+			param = atoi(strbuf);
+
+			switch (param) {
+			case 1:
+				uk_pr_debug("fstab: Option for \"extract\": \"ramfs=1\" (always mount)\n");
+				optflags |= LIBVFSCORE_EXTRACTOPT_MOUNT_RAMFS;
+				optflags &=
+					~LIBVFSCORE_EXTRACTOPT_MOUNT_IFNOMOUNT;
+				break;
+			case 2:
+				uk_pr_debug("fstab: Option for \"extract\": \"ramfs=2\" (mount if there is nothing else mounted)\n");
+				optflags |= LIBVFSCORE_EXTRACTOPT_MOUNT_RAMFS;
+				optflags |=
+					LIBVFSCORE_EXTRACTOPT_MOUNT_IFNOMOUNT;
+				break;
+			default: /* case 0: */
+				uk_pr_debug("fstab: Option for \"extract\": \"ramfs=0\" (do not mount)\n");
+				optflags &= ~LIBVFSCORE_EXTRACTOPT_MOUNT_RAMFS;
+				optflags &=
+					~LIBVFSCORE_EXTRACTOPT_MOUNT_IFNOMOUNT;
+				break;
+			}
+		} else {
+			cpylen = MIN(ARRAY_SIZE(strbuf) - 1, arglen);
+			strncpy(strbuf, arg, cpylen);
+			strbuf[cpylen] = '\0';
+			uk_pr_warn("fstab: Ignoring unknown option for \"extract\": \"%s\"\n",
+				   strbuf);
+		}
+	}
+
+	uk_pr_debug("Option flags for \"extract\": 0x%05x\n", optflags);
+	return optflags;
+}
+
 static int vfscore_extract_volume(const struct vfscore_volume *vv)
 {
 	const void *vbase = NULL;
 	size_t vlen = 0;
+	int opts;
 	int rc;
 
 	UK_ASSERT(vv);
@@ -384,6 +464,26 @@ static int vfscore_extract_volume(const struct vfscore_volume *vv)
 
 	if (unlikely(vlen == 0))
 		uk_pr_warn("Initrd \"%s\" seems to be empty.\n", vv->sdev);
+
+	/* parse mount options */
+	opts = vfscore_extract_parse_opts(vv->opts);
+
+	/*
+	 * Cases for mount a RamFS volume (see `vfscore_extract_parse_opts()`)
+	 * - ramfs=1: Always
+	 * - ramfs=2: Only if there is nothing else mounted
+	 */
+	if ((opts & LIBVFSCORE_EXTRACTOPT_MOUNT_RAMFS) &&
+	    (!(opts & LIBVFSCORE_EXTRACTOPT_MOUNT_IFNOMOUNT) ||
+	     uk_list_empty_careful(&mount_list))) {
+		uk_pr_info("Mounting 'ramfs' to %s...\n", vv->path);
+		rc = mount("", vv->path, "ramfs", 0x0, "");
+		if (unlikely(rc)) {
+			uk_pr_crit("Failed to mount ramfs to \"%s\": %d\n",
+				   vv->path, errno);
+			return -1;
+		}
+	}
 
 	uk_pr_info("Extracting initrd @ %p (%"__PRIsz" bytes, source: \"%s\") to %s...\n",
 		   vbase, vlen, vv->sdev, vv->path);
@@ -643,9 +743,6 @@ static int vfscore_automount_volumes(const struct vfscore_volume *vvs[],
 	return mounted;
 }
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI || CONFIG_LIBVFSCORE_AUTOMOUNT_FB */
-
-
-extern struct uk_list_head mount_list;
 
 static void vfscore_autoumount(const struct uk_term_ctx *tctx __unused)
 {
