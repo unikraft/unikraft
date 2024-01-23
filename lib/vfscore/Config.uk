@@ -3,6 +3,7 @@ menuconfig LIBVFSCORE
 	default n
 	select LIBNOLIBC if !HAVE_LIBC
 	select LIBUKDEBUG
+	select LIBUKATOMIC # needed by <uk/list.h>
 	select LIBUKLOCK
 	select LIBPOSIX_TIME
 	select LIBPOSIX_FDTAB
