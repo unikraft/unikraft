@@ -3,9 +3,11 @@
  * Binary system call handler (Linux ABI)
  *
  * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ *          Sergiu Moga <sergiu@unikraft.io>
  *
  * Copyright (c) 2020, NEC Laboratories Europe GmbH, NEC Corporation.
  *                     All rights reserved.
+ * Copyright (c) 2024, Unikraft GmbH. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -46,15 +48,6 @@
 
 void ukplat_syscall_handler(struct uk_syscall_ctx *usc)
 {
-#if CONFIG_LIBSYSCALL_SHIM_STRACE
-#if CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR
-	char prsyscallbuf[512]; /* ANSI color is pretty hungry */
-#else /* !CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR */
-	char prsyscallbuf[256];
-#endif /* !CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR */
-	int prsyscalllen;
-#endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
-
 	UK_ASSERT(usc);
 
 	/* Save extended register state */
@@ -78,24 +71,6 @@ void ukplat_syscall_handler(struct uk_syscall_ctx *usc)
 
 	usc->regs.rret0 = uk_syscall6_r_u(usc);
 
-#if CONFIG_LIBSYSCALL_SHIM_STRACE
-	prsyscalllen = uk_snprsyscall(prsyscallbuf, ARRAY_SIZE(prsyscallbuf),
-#if CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR
-		     UK_PRSYSCALL_FMTF_ANSICOLOR | UK_PRSYSCALL_FMTF_NEWLINE,
-#else /* !CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR */
-		     UK_PRSYSCALL_FMTF_NEWLINE,
-#endif /* !CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR */
-		     usc->regs.rsyscall, usc->regs.rret0, usc->regs.rarg0,
-		     usc->regs.rarg1, usc->regs.rarg2, usc->regs.rarg3,
-		     usc->regs.rarg4, usc->regs.rarg5);
-	/*
-	 * FIXME:
-	 * We directly use `ukplat_coutk()` until lib/ukdebug printing
-	 * allows us to generate shortened output (avoiding list of details).
-	 */
-	ukplat_coutk(prsyscallbuf, (__sz) prsyscalllen);
-#endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
-
 	/* Binary system call must always be first in the syscall callchain */
 	UK_ASSERT(uk_syscallchain_count == 1);
 
@@ -111,3 +86,51 @@ void ukplat_syscall_handler(struct uk_syscall_ctx *usc)
 	/* Restore extended register state */
 	ukarch_ectx_load((struct ukarch_ectx *)&usc->ectx);
 }
+
+#if CONFIG_LIBSYSCALL_SHIM_STRACE
+static int uk_binsyscall_strace(struct uk_sysrettab_ctx *sysret_ctx)
+{
+#if CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR
+	char prsyscallbuf[512]; /* ANSI color is pretty hungry */
+#else /* !CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR */
+	char prsyscallbuf[256];
+#endif /* !CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR */
+	int prsyscalllen;
+
+	UK_ASSERT(sysret_ctx);
+
+	/* Do we have any system call context to base our strace on? If not,
+	 * we were probably called by a native system call instead of a binary
+	 * one. We have separate dedicated debug messages for those, therefore
+	 * ignore.
+	 */
+	if (!sysret_ctx->usc)
+		return 0;
+
+	prsyscalllen = uk_snprsyscall(prsyscallbuf, ARRAY_SIZE(prsyscallbuf),
+#if CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR
+				      UK_PRSYSCALL_FMTF_ANSICOLOR |
+				      UK_PRSYSCALL_FMTF_NEWLINE,
+#else /* !CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR */
+				      UK_PRSYSCALL_FMTF_NEWLINE,
+#endif /* !CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR */
+				      sysret_ctx->usc->regs.rsyscall,
+				      sysret_ctx->usc->regs.rret0,
+				      sysret_ctx->usc->regs.rarg0,
+				      sysret_ctx->usc->regs.rarg1,
+				      sysret_ctx->usc->regs.rarg2,
+				      sysret_ctx->usc->regs.rarg3,
+				      sysret_ctx->usc->regs.rarg4,
+				      sysret_ctx->usc->regs.rarg5);
+	/*
+	 * FIXME:
+	 * We directly use `ukplat_coutk()` until lib/ukdebug printing
+	 * allows us to generate shortened output (avoiding list of details).
+	 */
+	ukplat_coutk(prsyscallbuf, (__sz)prsyscalllen);
+
+	return 0;
+}
+
+uk_sysretcall_prio(uk_binsyscall_strace, 0);
+#endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
