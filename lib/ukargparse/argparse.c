@@ -193,3 +193,49 @@ char *uk_nextarg(char **argptr, int separator)
 	arg[arglen] = '\0';
 	return arg;
 }
+
+__ssz uk_strnkeycmp(const char *str, __sz strlen, const char *key,
+		    const char separators[])
+{
+	const char *s;
+	__sz pos;
+
+	UK_ASSERT(str);
+	UK_ASSERT(key);
+
+	for (pos = 0; pos < strlen; ++pos) {
+		if (str[pos] == key[pos]) {
+			if (key[pos] == '\0')
+				return 0; /* match, no value */
+			continue;
+		}
+
+		/* str shorter than key? */
+		if (str[pos] == '\0')
+			goto no_match;
+
+		/* all chars of key matched so far? */
+		if (key[pos] != '\0')
+			goto no_match;
+
+		/* key matched, check if str at pos is a separator */
+		if (separators) {
+			for (s = separators; *s != '\0'; s++) {
+				if (str[pos] == *s)
+					return pos; /* match with value */
+			}
+		}
+
+		goto no_match;
+	}
+
+	/* We end up here if we went over all chars of str and had only
+	 * matches with the key without a '\0'-character or separator appearing.
+	 * Here, we check if we had a full match of the keyword.
+	 */
+	if (key[pos] == '\0')
+		return 0; /* match, no value */
+
+no_match:
+	return -1; /* no match */
+}
