@@ -6,6 +6,9 @@
 #include <uk/atomic.h>
 #if !__INTERRUPTSAFE__
 #include <uk/boot.h>
+#if CONFIG_LIBSYSCALL_SHIM
+#include <uk/sysrettab.h>
+#endif /* CONFIG_LIBSYSCALL_SHIM */
 #else /* __INTERRUPTSAFE__ */
 #include <uk/isr/boot.h>
 #include <uk/isr/semaphore.h>
@@ -55,6 +58,28 @@ int uk_boot_shutdown_req_isr(enum ukplat_gstate target)
 #endif /* __INTERRUPTSAFE__ */
 	return 0;
 }
+
+#if !__INTERRUPTSAFE__ && CONFIG_LIBSYSCALL_SHIM
+static int shutdown_sysret_handler(struct uk_sysrettab_ctx *sysret_ctx __unused)
+{
+	struct uk_thread *t;
+
+	if (likely(!uk_load_n(&shutdown_ctl.request.already_requested)))
+		return 0;
+
+	t = uk_thread_current();
+	UK_ASSERT(t);
+
+	uk_pr_info("Terminating thread %p on system call exit\n", t);
+	uk_thread_terminate(t);
+
+	UK_CRASH("Thread %p should have never returned\n", t);
+
+	return -EFAULT;
+}
+
+uk_sysretcall_prio(shutdown_sysret_handler, 9);
+#endif /* !__INTERRUPTSAFE__ && CONFIG_LIBSYSCALL_SHIM */
 
 #if __INTERRUPTSAFE__ && CONFIG_LIBUKBOOT_SHUTDOWNREQ_HANDLER
 static int shutdown_req_handler(void *data)

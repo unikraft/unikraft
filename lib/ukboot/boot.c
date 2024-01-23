@@ -103,6 +103,10 @@
 #include <uk/intctlr.h>
 #endif /* CONFIG_LIBUKINTCTLR */
 
+#if CONFIG_LIBSYSCALL_SHIM
+#include <uk/sysrettab.h>
+#endif /* CONFIG_LIBSYSCALL_SHIM */
+
 int main(int argc, char *argv[]) __weak;
 static inline int do_main(int argc, char *argv[]);
 
@@ -435,6 +439,22 @@ exit:
 	 *       step further after the last successfully initialized  entry
 	 */
 	init_entry--;
+
+#if CONFIG_LIBSYSCALL_SHIM
+	/**
+	 * NOTE: A crucial unintuitive step for making this work is the need
+	 * to make sure that if one of the termination functions' implementation
+	 * somehow ends up calling a native system call, it will not result in
+	 * the premature self-termination of the shutdown thread once that
+	 * system call is exited.
+	 * We do this by setting the value of shutdown thread's
+	 * `uk_syscallchain_count` to `1` early on. This way, we are guaranteed
+	 * to never execute the `.uk_sysrettab` routines on the shutdown thread,
+	 * simply because the aforementioned variable will always be more than
+	 * `1` on `.uk_sysrettab` iteration attempts.
+	 */
+	uk_syscallchain_count = 1;
+#endif /* CONFIG_LIBSYSCALL_SHIM */
 	uk_inittab_foreach_reverse2(init_entry, uk_inittab_start) {
 		UK_ASSERT(init_entry);
 
