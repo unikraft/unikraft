@@ -10,8 +10,11 @@
 #include <uk/alloc.h>
 #include <uk/assert.h>
 #include <uk/config.h>
+#include <uk/essentials.h>
 #include <uk/init.h>
+#include <uk/refcount.h>
 #include <uk/syscall.h>
+#include <uk/thread.h>
 
 #include <uk/posix-fdtab.h>
 
@@ -24,25 +27,29 @@
 #define UK_FDTAB_SIZE CONFIG_LIBPOSIX_FDTAB_MAXFDS
 UK_CTASSERT(UK_FDTAB_SIZE <= UK_FD_MAX);
 
-/* Static init fdtab */
-
-static char init_bmap[UK_BMAP_SZ(UK_FDTAB_SIZE)];
-static void *init_fdmap[UK_FDTAB_SIZE];
 
 struct uk_fdtab {
 	struct uk_alloc *alloc;
 	struct uk_fmap fmap;
+	__atomic refcnt;
+	char _bmap[UK_BMAP_SZ(UK_FDTAB_SIZE)];
+	void *_fdmap[UK_FDTAB_SIZE];
 };
+
 
 static struct uk_fdtab init_fdtab = {
 	.fmap = {
 		.bmap = {
 			.size = UK_FDTAB_SIZE,
-			.bitmap = (unsigned long *)init_bmap
+			.bitmap = (unsigned long *)init_fdtab._bmap
 		},
-		.map = init_fdmap
-	}
+		.map = init_fdtab._fdmap
+	},
+	.refcnt = UK_REFCOUNT_INITIALIZER(1)
 };
+
+static __uk_tls struct uk_fdtab *active_fdtab;
+
 
 static int init_posix_fdtab(struct uk_init_ctx *ictx __unused)
 {
@@ -55,8 +62,9 @@ static int init_posix_fdtab(struct uk_init_ctx *ictx __unused)
 /* TODO: Adapt when multiple processes are supported */
 static inline struct uk_fdtab *_active_tab(void)
 {
-	return &init_fdtab;
+	return active_fdtab;
 }
+
 
 /* Encode flags in entry pointer using the least significant bits */
 /* made available by the open file structure's alignment */
@@ -350,9 +358,8 @@ void uk_fdtab_ret(struct uk_ofile *of)
 	ofile_rel(_active_tab(), of);
 }
 
-static void fdtab_cleanup(int all)
+static void fdtab_cleanup(struct uk_fdtab *tab, int all)
 {
-	struct uk_fdtab *tab = _active_tab();
 	struct uk_fmap *fmap = &tab->fmap;
 
 	for (int i = 0; i < UK_FDTAB_SIZE; i++) {
@@ -374,14 +381,44 @@ static void fdtab_cleanup(int all)
 
 void uk_fdtab_cloexec(void)
 {
-	fdtab_cleanup(0);
+	fdtab_cleanup(_active_tab(), 0);
 }
 
-/* Cleanup all leftover open fds */
+/* Cleanup all leftover open fds in the initial fdtab */
 static void term_posix_fdtab(const struct uk_term_ctx *tctx __unused)
 {
-	fdtab_cleanup(1);
+	fdtab_cleanup(&init_fdtab, 1);
 }
+
+static void fdtab_free(struct uk_fdtab *tab)
+{
+	fdtab_cleanup(tab, 1);
+}
+
+static int fdtab_thread_init(struct uk_thread *child,
+			     struct uk_thread *parent)
+{
+	struct uk_fdtab *tab;
+
+	if (!parent)
+		tab = &init_fdtab;
+	else
+		tab = uk_thread_uktls_var(parent, active_fdtab);
+	uk_refcount_acquire(&tab->refcnt);
+	uk_thread_uktls_var(child, active_fdtab) = tab;
+	return 0;
+}
+
+static void fdtab_thread_term(struct uk_thread *child)
+{
+	struct uk_fdtab *tab = uk_thread_uktls_var(child, active_fdtab);
+
+	if (uk_refcount_release(&tab->refcnt))
+		fdtab_free(tab);
+}
+
+UK_THREAD_INIT(fdtab_thread_init, fdtab_thread_term);
+
 
 /* Init fdtab as early as possible, to enable functions that rely on fds */
 uk_lib_initcall_prio(init_posix_fdtab, 0x0, UK_LIBPOSIX_FDTAB_INIT_PRIO);
