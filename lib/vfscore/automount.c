@@ -53,9 +53,7 @@
 #include <errno.h>
 #include <uk/config.h>
 #include <uk/arch/types.h>
-#if CONFIG_LIBVFSCORE_AUTOMOUNT_UP
 #include <uk/argparse.h>
-#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_UP */
 
 #define LIBVFSCORE_MOUNTOPTS_SEP				','
 #define LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP			':'
@@ -67,6 +65,8 @@
 #define LIBVFSCORE_EXTRACT_DEV_EMBEDDED				"embedded"
 
 #define LIBVFSCORE_UKOPT_MKMP					(0x1 << 0)
+#define LIBVFSCORE_UKOPT_IFINITRD0				(0x1 << 1)
+#define LIBVFSCORE_UKOPT_IFNOINITRD0				(0x1 << 2)
 
 struct vfscore_volume {
 	/* Volume source device */
@@ -112,6 +112,12 @@ const struct vfscore_volume __fstab_ci0 = {
 #if CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_UKOPTS_MKMP_ARG
 		  | LIBVFSCORE_UKOPT_MKMP
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_UKOPTS_MKMP_ARG */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_UKOPTS_IFINITRD0_ARG
+		  | LIBVFSCORE_UKOPT_IFINITRD0
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_UKOPTS_IFINITRD0_ARG */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_UKOPTS_IFNOINITRD0_ARG
+		  | LIBVFSCORE_UKOPT_IFNOINITRD0
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI0_UKOPTS_IFNOINITRD0_ARG */
 };
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI0 */
 
@@ -138,6 +144,12 @@ const struct vfscore_volume __fstab_ci1 = {
 #if CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_UKOPTS_MKMP_ARG
 		  | LIBVFSCORE_UKOPT_MKMP
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_UKOPTS_MKMP_ARG */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_UKOPTS_IFINITRD0_ARG
+		  | LIBVFSCORE_UKOPT_IFINITRD0
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_UKOPTS_IFINITRD0_ARG */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_UKOPTS_IFNOINITRD0_ARG
+		  | LIBVFSCORE_UKOPT_IFNOINITRD0
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI1_UKOPTS_IFNOINITRD0_ARG */
 };
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI1 */
 
@@ -164,6 +176,12 @@ const struct vfscore_volume __fstab_ci2 = {
 #if CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_UKOPTS_MKMP_ARG
 		  | LIBVFSCORE_UKOPT_MKMP
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_UKOPTS_MKMP_ARG */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_UKOPTS_IFINITRD0_ARG
+		  | LIBVFSCORE_UKOPT_IFINITRD0
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_UKOPTS_IFINITRD0_ARG */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_UKOPTS_IFNOINITRD0_ARG
+		  | LIBVFSCORE_UKOPT_IFNOINITRD0
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI2_UKOPTS_IFNOINITRD0_ARG */
 };
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI2 */
 
@@ -190,6 +208,12 @@ const struct vfscore_volume __fstab_ci3 = {
 #if CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_UKOPTS_MKMP_ARG
 		  | LIBVFSCORE_UKOPT_MKMP
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_UKOPTS_MKMP_ARG */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_UKOPTS_IFINITRD0_ARG
+		  | LIBVFSCORE_UKOPT_IFINITRD0
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_UKOPTS_IFINITRD0_ARG */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_UKOPTS_IFNOINITRD0_ARG
+		  | LIBVFSCORE_UKOPT_IFNOINITRD0
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI3_UKOPTS_IFNOINITRD0_ARG */
 };
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI3 */
 
@@ -238,6 +262,12 @@ const struct vfscore_volume __fstab_fb0 = {
 #if CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_UKOPTS_MKMP_ARG
 		  | LIBVFSCORE_UKOPT_MKMP
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_UKOPTS_MKMP_ARG */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_UKOPTS_IFINITRD0_ARG
+		  | LIBVFSCORE_UKOPT_IFINITRD0
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_UKOPTS_IFINITRD0_ARG */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_UKOPTS_IFNOINITRD0_ARG
+		  | LIBVFSCORE_UKOPT_IFNOINITRD0
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB0_UKOPTS_IFNOINITRD0_ARG */
 };
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB0 */
 
@@ -264,6 +294,12 @@ const struct vfscore_volume __fstab_fb1 = {
 #if CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_UKOPTS_MKMP_ARG
 		  | LIBVFSCORE_UKOPT_MKMP
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_UKOPTS_MKMP_ARG */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_UKOPTS_IFINITRD0_ARG
+		  | LIBVFSCORE_UKOPT_IFINITRD0
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_UKOPTS_IFINITRD0_ARG */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_UKOPTS_IFNOINITRD0_ARG
+		  | LIBVFSCORE_UKOPT_IFNOINITRD0
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB1_UKOPTS_IFNOINITRD0_ARG */
 };
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB1 */
 
@@ -290,6 +326,12 @@ const struct vfscore_volume __fstab_fb2 = {
 #if CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_UKOPTS_MKMP_ARG
 		  | LIBVFSCORE_UKOPT_MKMP
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_UKOPTS_MKMP_ARG */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_UKOPTS_IFINITRD0_ARG
+		  | LIBVFSCORE_UKOPT_IFINITRD0
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_UKOPTS_IFINITRD0_ARG */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_UKOPTS_IFNOINITRD0_ARG
+		  | LIBVFSCORE_UKOPT_IFNOINITRD0
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB2_UKOPTS_IFNOINITRD0_ARG */
 };
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB2 */
 
@@ -316,6 +358,12 @@ const struct vfscore_volume __fstab_fb3 = {
 #if CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_UKOPTS_MKMP_ARG
 		  | LIBVFSCORE_UKOPT_MKMP
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_UKOPTS_MKMP_ARG */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_UKOPTS_IFINITRD0_ARG
+		  | LIBVFSCORE_UKOPT_IFINITRD0
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_UKOPTS_IFINITRD0_ARG */
+#if CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_UKOPTS_IFNOINITRD0_ARG
+		  | LIBVFSCORE_UKOPT_IFNOINITRD0
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB3_UKOPTS_IFNOINITRD0_ARG */
 };
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_FB3 */
 
@@ -343,6 +391,20 @@ UK_LIBPARAM_PARAM_ARR_ALIAS(fstab, &fstab_up, charp,
 			"Automount table: dev:path:fs[:flags[:opts[:ukopts]]]");
 
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_UP */
+
+static int vfscore_get_initrd0(struct ukplat_memregion_desc **out)
+{
+	struct ukplat_memregion_desc *initrd0;
+	struct ukplat_memregion_desc **itr;
+	int rc;
+
+	itr = out ? out : &initrd0;
+	rc = ukplat_memregion_find_initrd0(itr);
+	if (unlikely(rc < 0 || (*itr)->len == 0))
+		return -1;
+
+	return 0;
+}
 
 #if CONFIG_LIBUKCPIO
 #if CONFIG_LIBVFSCORE_AUTOMOUNT_EINITRD
@@ -394,19 +456,19 @@ static inline int vfscore_extract_parse_opts(const char *opts)
 
 			switch (param) {
 			case 1:
-				uk_pr_debug("fstab: Option for \"extract\": \"ramfs=1\" (always mount)\n");
+				uk_pr_debug("fstab: Option for \"extract\": \"ramfs=1\" (always mount underlying ramfs)\n");
 				optflags |= LIBVFSCORE_EXTRACTOPT_MOUNT_RAMFS;
 				optflags &=
 					~LIBVFSCORE_EXTRACTOPT_MOUNT_IFNOMOUNT;
 				break;
 			case 2:
-				uk_pr_debug("fstab: Option for \"extract\": \"ramfs=2\" (mount if there is nothing else mounted)\n");
+				uk_pr_debug("fstab: Option for \"extract\": \"ramfs=2\" (mount underlying ramfs if nothing else is mounted)\n");
 				optflags |= LIBVFSCORE_EXTRACTOPT_MOUNT_RAMFS;
 				optflags |=
 					LIBVFSCORE_EXTRACTOPT_MOUNT_IFNOMOUNT;
 				break;
 			default: /* case 0: */
-				uk_pr_debug("fstab: Option for \"extract\": \"ramfs=0\" (do not mount)\n");
+				uk_pr_debug("fstab: Option for \"extract\": \"ramfs=0\" (do not mount underlying ramfs)\n");
 				optflags &= ~LIBVFSCORE_EXTRACTOPT_MOUNT_RAMFS;
 				optflags &=
 					~LIBVFSCORE_EXTRACTOPT_MOUNT_IFNOMOUNT;
@@ -440,8 +502,8 @@ static int vfscore_extract_volume(const struct vfscore_volume *vv)
 	if (!strcmp(vv->sdev, LIBVFSCORE_EXTRACT_DEV_INITRD0)) {
 		struct ukplat_memregion_desc *initrd;
 
-		rc = ukplat_memregion_find_initrd0(&initrd);
-		if (unlikely(rc < 0 || initrd->len == 0)) {
+		rc = vfscore_get_initrd0(&initrd);
+		if (unlikely(rc < 0)) {
 			uk_pr_crit("Could not find an initrd!\n");
 			return -1;
 		}
@@ -551,6 +613,10 @@ static int vfscore_ukopt_mkmp(char *path)
 	return 0;
 }
 
+/*
+ * Returns >= on success, while 0 stands for nothing mounted and
+ *  1 for a volume actually mounted.
+ */
 static inline int vfscore_mount_volume(const struct vfscore_volume *vv)
 {
 	int rc;
@@ -576,6 +642,25 @@ static inline int vfscore_mount_volume(const struct vfscore_volume *vv)
 		return -EINVAL;
 	}
 
+	if (vv->ukopts & LIBVFSCORE_UKOPT_MKMP)
+		uk_pr_debug("fstab: Entry with ukopt: mkmp\n");
+	if (vv->ukopts & LIBVFSCORE_UKOPT_IFINITRD0)
+		uk_pr_debug("fstab: Entry with ukopt: ifinitrd0\n");
+	if (vv->ukopts & LIBVFSCORE_UKOPT_IFNOINITRD0)
+		uk_pr_debug("fstab: Entry with ukopt: ifnoinitrd0\n");
+
+	if (((vv->ukopts & LIBVFSCORE_UKOPT_IFINITRD0) &&
+	     (vfscore_get_initrd0(NULL) < 0)) ||
+	    ((vv->ukopts & LIBVFSCORE_UKOPT_IFNOINITRD0) &&
+	     (vfscore_get_initrd0(NULL) >= 0))) {
+		uk_pr_debug("vfs.fstab: Skipping: %s:%s:%s:0x%lx:%s:0x%x...\n",
+			    vv->sdev == NULL ? "none" : vv->sdev,
+			    vv->path, vv->drv, vv->flags,
+			    vv->opts == NULL ? "" : vv->opts,
+			    vv->ukopts);
+		return 0; /* Indicate that we did not mount anything */
+	}
+
 	uk_pr_debug("vfs.fstab: Mounting: %s:%s:%s:0x%lx:%s:0x%x...\n",
 		    vv->sdev == NULL ? "none" : vv->sdev,
 		    vv->path, vv->drv, vv->flags,
@@ -590,11 +675,16 @@ static inline int vfscore_mount_volume(const struct vfscore_volume *vv)
 
 #if CONFIG_LIBUKCPIO
 	if (!strcmp(vv->drv, LIBVFSCORE_EXTRACT_DRV)) {
-		return vfscore_extract_volume(vv);
-	}
+		rc = vfscore_extract_volume(vv);
+	} else
 #endif /* CONFIG_LIBUKCPIO */
-	return mount(vv->sdev == NULL ? "" : vv->sdev,
-		     vv->path, vv->drv, vv->flags, vv->opts);
+	{
+		rc = mount(vv->sdev == NULL ? "" : vv->sdev,
+			   vv->path, vv->drv, vv->flags, vv->opts);
+	}
+	if (rc >= 0)
+		return 1; /* Indicate that we mounted 1 volume */
+	return rc;
 }
 
 #ifdef CONFIG_LIBVFSCORE_AUTOMOUNT_UP
@@ -627,6 +717,14 @@ static unsigned int vfscore_volume_parse_ukopts(char *ukopts)
 
 		if (!strcmp(opt, "mkmp")) {
 			ret |= LIBVFSCORE_UKOPT_MKMP;
+			continue;
+		}
+		if (!strcmp(opt, "ifinitrd0")) {
+			ret |= LIBVFSCORE_UKOPT_IFINITRD0;
+			continue;
+		}
+		if (!strcmp(opt, "ifnoinitrd0")) {
+			ret |= LIBVFSCORE_UKOPT_IFNOINITRD0;
 			continue;
 		}
 
@@ -712,8 +810,8 @@ static int vfscore_automount_volumes_up(void)
 		rc = vfscore_mount_volume(&vv);
 		if (unlikely(rc < 0))
 			return rc;
-
-		mounted++;
+		if (rc >= 1)
+			mounted++;
 	}
 
 	return mounted;
@@ -736,8 +834,8 @@ static int vfscore_automount_volumes(const struct vfscore_volume *vvs[],
 		rc = vfscore_mount_volume(vvs[i]);
 		if (unlikely(rc < 0))
 			return rc;
-
-		mounted++;
+		if (rc >= 1)
+			mounted++;
 	}
 
 	return mounted;
@@ -780,7 +878,7 @@ static int vfscore_automount(struct uk_init_ctx *ictx __unused)
 		goto err_umount;
 	count += rc;
 	if (rc == 0)
-		uk_pr_debug(" Note: Table is empty.\n");
+		uk_pr_debug(" Note: Nothing mounted from user-provided table.\n");
 
 #if CONFIG_LIBVFSCORE_AUTOMOUNT_FB
 	if (rc == 0) {
