@@ -27,6 +27,10 @@
 #include <uk/posix-fdtab-legacy.h>
 #endif /* CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM */
 
+#if CONFIG_LIBPOSIX_PROCESS_CLONE
+#include <uk/process.h>
+#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
+
 #if CONFIG_LIBPOSIX_PROCESS_EXECVE
 #include <uk/event.h>
 #include <uk/prio.h>
@@ -503,6 +507,38 @@ static void fdtab_thread_term(struct uk_thread *child)
 
 UK_THREAD_INIT(fdtab_thread_init, fdtab_thread_term);
 
+#if CONFIG_LIBPOSIX_PROCESS_CLONE
+static int fdtab_clone(const struct clone_args *cl_args,
+		       size_t cl_args_len __unused,
+		       struct uk_thread *child,
+		       struct uk_thread *parent)
+{
+	struct uk_fdtab *tab = uk_thread_uktls_var(parent, active_fdtab);
+	struct uk_fdtab *newtab;
+
+	UK_ASSERT(tab); /* Do not call clone from raw threads */
+	if (cl_args->flags & CLONE_FILES) {
+		/* Inherit parent's fdtab */
+		/* As a compat stop-gap, the raw thread already inherited the
+		 * parent's fdtab ref; we don't need to do anything.
+		 *
+		 * TODO: move inheritance here once stopgap is removed.
+		 */
+		UK_ASSERT(uk_thread_uktls_var(child, active_fdtab) == tab);
+		return 0;
+	} else {
+		/* Duplicate parent's fdtab */
+		newtab = fdtab_duplicate(tab);
+		if (unlikely(!newtab))
+			return -ENOMEM;
+	}
+	uk_thread_uktls_var(child, active_fdtab) = newtab;
+	return 0;
+}
+
+UK_POSIX_CLONE_HANDLER(CLONE_FILES, 0, fdtab_clone, 0);
+
+#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 #endif /* CONFIG_LIBPOSIX_FDTAB_MULTITAB */
 
 /* Init fdtab as early as possible, to enable functions that rely on fds */

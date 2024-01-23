@@ -12,6 +12,7 @@ if LIBPOSIX_FDTAB
 	# Hidden, will autoselect when required
 	config LIBPOSIX_FDTAB_MULTITAB
 	bool
+	default y if LIBPOSIX_PROCESS_CLONE
 	select LIBUKSCHED
 
 	# Hidden, selected by core components when needed
