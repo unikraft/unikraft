@@ -17,6 +17,12 @@
 
 #include "fmap.h"
 
+#if CONFIG_LIBPOSIX_FDTAB_MULTITAB
+#include <uk/essentials.h>
+#include <uk/refcount.h>
+#include <uk/thread.h>
+#endif /* CONFIG_LIBPOSIX_FDTAB_MULTITAB */
+
 #if CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM
 #include <uk/posix-fdtab-legacy.h>
 #endif /* CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM */
@@ -29,38 +35,59 @@
 #define UK_FDTAB_SIZE CONFIG_LIBPOSIX_FDTAB_MAXFDS
 UK_CTASSERT(UK_FDTAB_SIZE <= UK_FD_MAX);
 
-/* Static init fdtab */
-
-static char init_bmap[UK_BMAP_SZ(UK_FDTAB_SIZE)];
-static void *init_fdmap[UK_FDTAB_SIZE];
 
 struct uk_fdtab {
 	struct uk_alloc *alloc;
 	struct uk_fmap fmap;
+#if CONFIG_LIBPOSIX_FDTAB_MULTITAB
+	__atomic refcnt;
+#endif /* CONFIG_LIBPOSIX_FDTAB_MULTITAB */
+	unsigned long _bmap[UK_BMAP_NELEM(UK_FDTAB_SIZE)];
+	void *_fdmap[UK_FDTAB_SIZE];
 };
 
 static struct uk_fdtab init_fdtab = {
 	.fmap = {
 		.bmap = {
 			.size = UK_FDTAB_SIZE,
-			.bitmap = (unsigned long *)init_bmap
+			.bitmap = init_fdtab._bmap
 		},
-		.map = init_fdmap
-	}
+		.map = init_fdtab._fdmap
+	},
+#if CONFIG_LIBPOSIX_FDTAB_MULTITAB
+	.refcnt = UK_REFCOUNT_INITIALIZER(1)
+#endif /* CONFIG_LIBPOSIX_FDTAB_MULTITAB */
 };
+
+#if CONFIG_LIBPOSIX_FDTAB_MULTITAB
+
+/* Every thread keeps its own fdtab reference */
+static __uk_tls struct uk_fdtab *active_fdtab;
+
+#else /* !CONFIG_LIBPOSIX_FDTAB_MULTITAB */
+
+/* All threads share the same static init fdtab */
+static struct uk_fdtab *const active_fdtab = &init_fdtab;
+
+#endif /* !CONFIG_LIBPOSIX_FDTAB_MULTITAB */
 
 static int init_posix_fdtab(struct uk_init_ctx *ictx __unused)
 {
 	init_fdtab.alloc = uk_alloc_get_default();
 	/* Consider skipping init for .map (static vars are inited to 0) */
 	uk_fmap_init(&init_fdtab.fmap);
+#if CONFIG_LIBPOSIX_FDTAB_MULTITAB
+	/* Ensure the init thread has a valid fdtab ref */
+	uk_refcount_acquire(&init_fdtab.refcnt);
+	active_fdtab = &init_fdtab;
+#endif /* CONFIG_LIBPOSIX_FDTAB_MULTITAB */
 	return 0;
 }
 
 /* TODO: Adapt when multiple processes are supported */
 static inline struct uk_fdtab *_active_tab(void)
 {
-	return &init_fdtab;
+	return active_fdtab;
 }
 
 /* Encode flags in entry pointer using the least significant bits */
@@ -351,9 +378,8 @@ void uk_fdtab_ret(struct uk_ofile *of)
 	ofile_rel(_active_tab(), of);
 }
 
-static void fdtab_cleanup(int all)
+static void fdtab_cleanup(struct uk_fdtab *tab, int all)
 {
-	struct uk_fdtab *tab = _active_tab();
 	struct uk_fmap *fmap = &tab->fmap;
 
 	for (int i = 0; i < UK_FDTAB_SIZE; i++) {
@@ -375,7 +401,7 @@ static void fdtab_cleanup(int all)
 
 void uk_fdtab_cloexec(void)
 {
-	fdtab_cleanup(0);
+	fdtab_cleanup(_active_tab(), 0);
 }
 
 static int fdtab_handle_execve(void *data __unused)
@@ -389,11 +415,95 @@ UK_EVENT_HANDLER_PRIO(POSIX_PROCESS_EXECVE_EVENT, fdtab_handle_execve,
 		      UK_PRIO_EARLIEST);
 #endif /* CONFIG_LIBPOSIX_PROCESS_EXECVE */
 
-/* Cleanup all leftover open fds */
+/* Cleanup all leftover open fds in the initial fdtab */
 static void term_posix_fdtab(const struct uk_term_ctx *tctx __unused)
 {
-	fdtab_cleanup(1);
+	fdtab_cleanup(&init_fdtab, 1);
 }
+
+#if CONFIG_LIBPOSIX_FDTAB_MULTITAB
+
+/* When using multi-fdtabs, the init thread has a ref to the init fdtab.
+ *
+ * Newly-created raw threads will start off with a copy of their parent's ref,
+ * as a compatibility stop-gap.
+ * It is the responsibility of other posix libs and their callbacks to init
+ * a new thread's fdtab ref, unsharing as necessary (e.g., clone handler either
+ * copying a ref or duplicating the entire fdtab).
+ */
+
+/**
+ * Duplicate the current fdtab and return a pointer to the copy.
+ *
+ * NOTE: This is a basic implementation that does not guarantee atomicity of the
+ * clone operation; we optimistically assume this will not break anything.
+ * Please revisit if this turns out to be false.
+ *
+ * @param tab fdtab to duplicate
+ *
+ * @return
+ *  != NULL: Success, pointer to copy
+ *  == NULL: Failed to allocate memory
+ */
+static struct uk_fdtab *fdtab_duplicate(struct uk_fdtab *tab)
+{
+	struct uk_fdtab *ret = uk_malloc(tab->alloc, sizeof(*ret));
+
+	if (unlikely(!ret))
+		return NULL;
+
+	ret->alloc = tab->alloc;
+	ret->fmap = (struct uk_fmap){
+		.bmap = {
+			.size = UK_FDTAB_SIZE,
+			.bitmap = (unsigned long *)ret->_bmap
+		},
+		.map = ret->_fdmap
+	};
+	uk_refcount_init(&ret->refcnt, 1);
+	for (int i = 0; i < UK_FDTAB_SIZE; i++) {
+		struct fdval v = _fdtab_get(tab, i);
+		const void *entry = NULL;
+
+		if (v.p)
+			entry = fdtab_encode(v.p, v.flags);
+		uk_fmap_set(&ret->fmap, i, entry);
+	}
+	return ret;
+}
+
+static void fdtab_free(struct uk_fdtab *tab)
+{
+	fdtab_cleanup(tab, 1);
+	uk_free(tab->alloc, tab);
+}
+
+static int fdtab_thread_init(struct uk_thread *child,
+			     struct uk_thread *parent)
+{
+	struct uk_fdtab *tab;
+
+	if (!parent)
+		tab = &init_fdtab;
+	else
+		tab = uk_thread_uktls_var(parent, active_fdtab);
+	uk_refcount_acquire(&tab->refcnt);
+	uk_thread_uktls_var(child, active_fdtab) = tab;
+	return 0;
+}
+
+static void fdtab_thread_term(struct uk_thread *child)
+{
+	struct uk_fdtab *tab = uk_thread_uktls_var(child, active_fdtab);
+
+	/* If a thread has acquired an fdtab ref over its life, release it */
+	if (tab && uk_refcount_release(&tab->refcnt))
+		fdtab_free(tab);
+}
+
+UK_THREAD_INIT(fdtab_thread_init, fdtab_thread_term);
+
+#endif /* CONFIG_LIBPOSIX_FDTAB_MULTITAB */
 
 /* Init fdtab as early as possible, to enable functions that rely on fds */
 uk_lib_initcall_prio(init_posix_fdtab, 0x0, UK_LIBPOSIX_FDTAB_INIT_PRIO);

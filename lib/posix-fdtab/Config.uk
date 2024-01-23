@@ -9,6 +9,11 @@ if LIBPOSIX_FDTAB
 	int "Maximum number of file descriptors"
 	default 1024
 
+	# Hidden, will autoselect when required
+	config LIBPOSIX_FDTAB_MULTITAB
+	bool
+	select LIBUKSCHED
+
 	# Hidden, selected by core components when needed
 	config LIBPOSIX_FDTAB_LEGACY_SHIM
 	bool
