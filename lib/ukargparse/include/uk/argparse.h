@@ -107,4 +107,36 @@ char *uk_nextarg(char **argptr, int separator);
  */
 __sz uk_nextarg_r(const char **argptr, int separator);
 
+/**
+ * Checks if the beginning of a C string matches a keyword. The function
+ * returns with success if either the entered C-string matches the
+ * keyword completely or the complete keyword precedes a specified separator.
+ * The function is a helper for commonly parsing key-value strings, like
+ * mount options in a filesystem table.
+ *
+ * The following example demonstrates when the function returns with a match.
+ * C string to check is "ramfs=2", this is checked against the keywords
+ * "ram", "ramfs", and "format" (separators is set to "="):
+ *
+ *   pos | 0   1   2   3   4   5   6   7 |
+ *   ====+===+===+===+===+===+===+===+===+=========================
+ *   str | r   a   m   f   s   =   2  \0 | input to compare against
+ *   ----+---+---+---+---+---+---+---+---+-------------------------
+ *   key | r   a   m  \0                 | no match
+ *   key | r   a   m   f   s  \0         | match at separator, returns 5
+ *   key | f   o   r   m   a   t  \0     | no match
+ *
+ * @param str C-string
+ * @param strlen Maximum length of `str`
+ * @param key `\0`-terminated C-string of key to compare to
+ * @param separators `\0`-terminated list of separating characters
+ *                   (examples: ':', ','), parameter is optional
+ * @return -1 if keyword is not matched (includes partial matches)
+ *         0 if keyword matches completely (no separator)
+ *         >0 if keyword matches, number indicates the offset in `str`
+ *            of separator after matched keyword
+ */
+__ssz uk_strnkeycmp(const char *str, __sz strlen, const char *key,
+		    const char separators[]);
+
 #endif /* __UK_ARGPARSE__ */
