@@ -67,7 +67,9 @@
 #include <uk/errptr.h>
 #include <errno.h>
 #include <stdarg.h>
+#include <stddef.h>
 #include <uk/print.h>
+#include <uk/sysrettab.h>
 #include "legacy_syscall.h"
 
 #ifdef __cplusplus
@@ -293,8 +295,14 @@ typedef long uk_syscall_arg_t;
 		long ret;						\
 									\
 		__UK_SYSCALL_PRINTD(x, rtype, ename, __VA_ARGS__);	\
+									\
+		uk_syscallchain_count++;				\
 		ret = (long) __##ename(					\
 			UK_ARG_MAPx(x, UK_S_ARG_CAST_ACTUAL, __VA_ARGS__)); \
+		uk_sysrettab_run(&(struct uk_sysrettab_ctx){		\
+						.usc = NULL,		\
+				 });					\
+		uk_syscallchain_count--;				\
 		return ret;						\
 	}								\
 	static inline rtype __##ename(UK_ARG_MAPx(x,			\
@@ -373,8 +381,14 @@ typedef long uk_syscall_arg_t;
 		long ret;						\
 									\
 		__UK_SYSCALL_PRINTD(x, rtype, rname, __VA_ARGS__);	\
+									\
+		uk_syscallchain_count++;				\
 		ret = (long) __##rname(					\
 			UK_ARG_MAPx(x, UK_S_ARG_CAST_ACTUAL, __VA_ARGS__)); \
+		uk_sysrettab_run(&(struct uk_sysrettab_ctx){		\
+						.usc = NULL,		\
+				 });					\
+		uk_syscallchain_count--;				\
 		return ret;						\
 	}								\
 	static inline rtype __##rname(UK_ARG_MAPx(x,			\
@@ -413,9 +427,15 @@ typedef long uk_syscall_arg_t;
 		usc = (struct uk_syscall_ctx *)_usc;			\
 		__UK_SYSCALL_USC_PRINTD(x, rtype, rname,		\
 					__VA_ARGS__);			\
+									\
+		uk_syscallchain_count++;				\
 		ret = (long) __##rname(UK_USC_CALLMAPx(x,		\
 						   UK_S_ARG_ACTUAL,	\
 						   __VA_ARGS__));	\
+		uk_sysrettab_run(&(struct uk_sysrettab_ctx){		\
+						.usc = NULL,		\
+				 });					\
+		uk_syscallchain_count--;				\
 		return ret;						\
 	}								\
 	static inline rtype __used __##rname(UK_USC_DECLMAPx(		\

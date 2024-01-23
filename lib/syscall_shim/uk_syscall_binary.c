@@ -34,6 +34,7 @@
  */
 
 #include <uk/syscall.h>
+#include <uk/sysrettab.h>
 #include <uk/plat/syscall.h>
 #include <uk/arch/ctx.h>
 #include <uk/assert.h>
@@ -62,6 +63,11 @@ void ukplat_syscall_handler(struct uk_syscall_ctx *usc)
 
 	ukarch_sysregs_switch_uk(&usc->sysregs);
 
+	uk_syscallchain_count++;
+
+	/* Binary system call must always be first in the syscall callchain */
+	UK_ASSERT(uk_syscallchain_count == 1);
+
 #if CONFIG_LIBSYSCALL_SHIM_DEBUG_HANDLER
 	_uk_printd(uk_libid_self(), __STR_BASENAME__, __LINE__,
 			"Binary system call request \"%s\" (%lu) at ip:%p (arg0=0x%lx, arg1=0x%lx, ...)\n",
@@ -89,6 +95,16 @@ void ukplat_syscall_handler(struct uk_syscall_ctx *usc)
 	 */
 	ukplat_coutk(prsyscallbuf, (__sz) prsyscalllen);
 #endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
+
+	/* Binary system call must always be first in the syscall callchain */
+	UK_ASSERT(uk_syscallchain_count == 1);
+
+	/**
+	 * Run sysret table
+	 */
+	uk_sysrettab_run(&(struct uk_sysrettab_ctx){ .usc = usc, });
+
+	uk_syscallchain_count--;
 
 	ukarch_sysregs_switch_ul(&usc->sysregs);
 
