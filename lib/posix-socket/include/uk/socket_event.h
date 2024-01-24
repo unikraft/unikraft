@@ -16,12 +16,11 @@
  * connection states and endpoints of sockets
  */
 
-enum uk_socket_event_type {
-	UK_SOCKET_EVENT_INVALID = 0,  /**< INVALID: Should never be emitted */
-	UK_SOCKET_EVENT_LISTEN,       /**< New listener for incom. connect. */
-	UK_SOCKET_EVENT_ACCEPT,       /**< Incoming connection accepted */
-	UK_SOCKET_EVENT_CONNECT,      /**< Connection to remote established */
-	UK_SOCKET_EVENT_CLOSE         /**< Connection or listener closed */
+enum uk_socket_state {
+	UK_SOCKET_STATE_CLOSE = 0,    /**< Connection or listener closed */
+	UK_SOCKET_STATE_LISTEN,       /**< Listener for incom. connections */
+	UK_SOCKET_STATE_ACCEPT,       /**< Incoming connection accepted */
+	UK_SOCKET_STATE_CONNECT,      /**< Connection to remote established */
 
 };
 
@@ -36,7 +35,7 @@ struct uk_socket_event {
 				       *   NOTE: Can be re-used for a new socket
 				       *         after CLOSE
 				       */
-	enum uk_socket_event_type event;
+	enum uk_socket_state state;
 	int family;
 	int type;
 	int protocol;
@@ -58,12 +57,14 @@ struct uk_socket_event {
  * @param family
  *   The socket family (e.g., AF_INET) to receive events for. Can be set
  *   to AF_UNSPEC to receive any socket event of any address family.
+ * @param event
+ *   The event to register for: CLOSE, LISTEN, ACCEPT, or CONNECT
  * @param recfn
  *   Event receiver function, must have the following singature:
  *   `void recvfn(const struct uk_socket_event *)`
  */
-#define __UK_SOCKET_EVENT_RECEIVER(afamily, arecvfn)			\
-	static int __uk_event ## arecvfn(void *data)			\
+#define __UK_SOCKET_EVENT_RECEIVER(afamily, event, arecvfn)		\
+	static int __uk_event ## event ## arecvfn(void *data)		\
 	{								\
 		const struct uk_socket_event *e =			\
 			(const struct uk_socket_event *) data;		\
@@ -75,13 +76,14 @@ struct uk_socket_event {
 		return UK_EVENT_HANDLED_CONT;				\
 	}								\
 									\
-	UK_EVENT_HANDLER(UK_POSIX_SOCKET_EVENT, __uk_event ## arecvfn)
+	UK_EVENT_HANDLER(UK_POSIX_SOCKET_EVENT_ ## event,		\
+			 __uk_event ## event ## arecvfn)
 
-#define _UK_SOCKET_EVENT_RECEIVER(family, recvfn) \
-	__UK_SOCKET_EVENT_RECEIVER(family, recvfn)
+#define _UK_SOCKET_EVENT_RECEIVER(family, event, recvfn) \
+	__UK_SOCKET_EVENT_RECEIVER(family, event, recvfn)
 
-#define UK_SOCKET_EVENT_RECEIVER(family, recvfn) \
-	_UK_SOCKET_EVENT_RECEIVER(family, recvfn)
+#define UK_SOCKET_EVENT_RECEIVER(family, event, recvfn) \
+	_UK_SOCKET_EVENT_RECEIVER(family, event, recvfn)
 
 #endif /* CONFIG_LIBPOSIX_SOCKET_EVENTS */
 #endif /* __UK_POSIX_SOCKET_EVENT_H__ */

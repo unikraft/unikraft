@@ -212,11 +212,11 @@ static void socket_release(const struct uk_file *sock, int what)
 		struct socket_alloc *al = __containerof(sock,
 							struct socket_alloc, f);
 
-		/* Raise only a UK_SOCKET_EVENT_CLOSE event if we ever raised an
-		 * event on this socket already
+		/* Raise a CLOSE event only if we ever raised an event on this
+		 * socket already
 		 */
 		if (uk_socket_event_has_raised(&al->evd))
-			uk_socket_event_raise(&al->evd, UK_SOCKET_EVENT_CLOSE);
+			uk_socket_event_raise(&al->evd, CLOSE);
 		uk_free(al->node.driver->allocator, al);
 	}
 }
@@ -354,7 +354,7 @@ int uk_sys_accept(const struct uk_file *sock, int blocking,
 	fd = uk_fdtab_open(&al->f, mode);
 	uk_file_release(&al->f);
 	if (fd > 0)
-		uk_socket_event_raise(&al->evd, UK_SOCKET_EVENT_ACCEPT);
+		uk_socket_event_raise(&al->evd, ACCEPT);
 	return fd;
 }
 
@@ -662,7 +662,7 @@ out:
 
 		al = __containerof(of->file, struct socket_alloc, f);
 		uk_socket_evd_raddr_set(&al->evd, addr, addr_len);
-		uk_socket_event_raise(&al->evd, UK_SOCKET_EVENT_CONNECT);
+		uk_socket_event_raise(&al->evd, CONNECT);
 		trace_posix_socket_connect_ret(ret);
 	}
 	return ret;
@@ -697,7 +697,7 @@ out:
 		struct socket_alloc *al __maybe_unused;
 
 		al = __containerof(of->file, struct socket_alloc, f);
-		uk_socket_event_raise(&al->evd, UK_SOCKET_EVENT_LISTEN);
+		uk_socket_event_raise(&al->evd, LISTEN);
 		trace_posix_socket_listen_ret(ret);
 	}
 	return ret;
@@ -922,11 +922,11 @@ int uk_socketpair_create(int family, int type, int protocol,
 	sv[1] = &al[1]->f;
 	posix_socket_socketpair_post(d, sv);
 	/* NOTE: If we fail later in `uk_sys_socketpair()`, release calls
-	 *       during error cleanup will cause raising `UK_SOCKET_EVENT_CLOSE`
-	 *       events immediately.
+	 *       during error cleanup will cause raising `CLOSE` events
+	 *       immediately.
 	 */
-	uk_socket_event_raise(&al[0]->evd, UK_SOCKET_EVENT_CONNECT);
-	uk_socket_event_raise(&al[1]->evd, UK_SOCKET_EVENT_CONNECT);
+	uk_socket_event_raise(&al[0]->evd, CONNECT);
+	uk_socket_event_raise(&al[1]->evd, CONNECT);
 	return 0;
 
 err_free:
