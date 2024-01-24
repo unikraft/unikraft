@@ -14,11 +14,14 @@
 #include <uk/assert.h>
 #include <uk/essentials.h>
 
+enum uk_socket_state;
+
 struct uk_socket_event_data {
 	uintptr_t id;
 	int family;
 	int type;
 	int protocol;
+	enum uk_socket_state state;
 	/* NOTE: We use `struct sockaddr_storage` instead of `struct sockaddr *`
 	 *       to have statically allocated memory of enough space to store
 	 *       any socket address without calling malloc.
@@ -43,6 +46,7 @@ static inline void uk_socket_evd_init(struct uk_socket_event_data *evd,
 	evd->family     = family;
 	evd->type       = type;
 	evd->protocol   = protocol;
+	evd->state      = UK_SOCKET_STATE_CLOSE;
 	evd->laddr_len  = 0;
 	evd->raddr_len  = 0;
 }
@@ -70,6 +74,7 @@ static inline void uk_socket_evd_init_from(struct uk_socket_event_data *evd,
 	evd->family     = from_evd->family;
 	evd->type       = from_evd->type;
 	evd->protocol   = from_evd->protocol;
+	evd->state      = UK_SOCKET_STATE_CLOSE;
 	evd->laddr_len  = 0;
 	evd->raddr_len  = 0;
 }
@@ -126,12 +131,13 @@ static inline void uk_socket_evd_raddr_set_from(struct uk_socket_event_data
 				from_evd->raddr_len);
 }
 
-static inline void uk_socket_event_raise(struct uk_socket_event_data *evd,
-					 enum uk_socket_event_type event)
+static inline void socket_event_raise(struct uk_socket_event_data *evd,
+				      enum uk_socket_state new_state,
+				      struct uk_event *evt)
 {
 	struct uk_socket_event emsg = {
 		.id        = evd->id,
-		.event     = event,
+		.state     = evd->state,
 		.family    = evd->family,
 		.type      = evd->type,
 		.protocol  = evd->protocol,
@@ -144,7 +150,10 @@ static inline void uk_socket_event_raise(struct uk_socket_event_data *evd,
 	};
 
 	evd->raise_cnt++;
-	uk_raise_event(UK_POSIX_SOCKET_EVENT, &emsg);
+	uk_raise_event_ptr(evt, &emsg);
+
+	/* Update the state to reflect the change */
+	evd->state = new_state;
 }
 
 static inline unsigned int uk_socket_event_raise_count(struct
@@ -156,7 +165,20 @@ static inline unsigned int uk_socket_event_raise_count(struct
 	return evd->raise_cnt;
 }
 
-UK_EVENT(UK_POSIX_SOCKET_EVENT);
+UK_EVENT(UK_POSIX_SOCKET_EVENT_CLOSE);
+UK_EVENT(UK_POSIX_SOCKET_EVENT_LISTEN);
+UK_EVENT(UK_POSIX_SOCKET_EVENT_ACCEPT);
+UK_EVENT(UK_POSIX_SOCKET_EVENT_CONNECT);
+
+#define __uk_socket_event_raise(evd, event)				\
+	socket_event_raise(evd, UK_SOCKET_STATE_ ## event,		\
+			   UK_EVENT_PTR(UK_POSIX_SOCKET_EVENT_ ## event))
+
+#define _uk_socket_event_raise(evd, event) \
+	__uk_socket_event_raise(evd, event)
+
+#define uk_socket_event_raise(evd, event) \
+	_uk_socket_event_raise(evd, event)
 
 #else /* !CONFIG_LIBPOSIX_SOCKET_EVENTS */
 
