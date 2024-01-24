@@ -27,7 +27,7 @@ fi
 
 _CHECKPATCHCONF=
 if [ -f "${_SELF_BASE}/../../.checkpatch.conf" ]; then
-	_CHECKPATCHCONF=$(cat "${_SELF_BASE}/../../.checkpatch.conf")
+	_CHECKPATCHCONF=($(cat "${_SELF_BASE}/../../.checkpatch.conf"))
 fi
 
-exec "${_CHECKPATCHPL}" "${_CHECKPATCHCONF}" "$@"
+exec "${_CHECKPATCHPL}" "${_CHECKPATCHCONF[@]}" "$@"
