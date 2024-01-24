@@ -139,6 +139,7 @@ jobs:
               CONFIG_LIBUKDEBUG_PRINTK_INFO: "y"
               CONFIG_LIBUKTEST_FAILFAST: "n"
               CONFIG_LIBUKTEST_LOG_STATS: "y"
+              CONFIG_OPTIMIZE_WARNISERROR: "y"
           targets:
           - platform: ${{ matrix.plat }}
             architecture: ${{ matrix.arch }}
@@ -188,6 +189,8 @@ jobs:
           name: helloworld
           unikraft:
             source: ../
+            kconfig:
+              CONFIG_OPTIMIZE_WARNISERROR: "y"
           targets:
           - platform: ${{ matrix.plat }}
             architecture: ${{ matrix.arch }}
