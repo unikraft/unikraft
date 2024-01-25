@@ -85,6 +85,7 @@ struct vfscore_volume {
 
 extern struct uk_list_head mount_list;
 
+#if CONFIG_LIBVFSCORE_AUTOMOUNT
 /*
  * Compiled-in file system table: `fstab_ci`
  */
@@ -841,14 +842,17 @@ static int vfscore_automount_volumes(const struct vfscore_volume *vvs[],
 	return mounted;
 }
 #endif /* CONFIG_LIBVFSCORE_AUTOMOUNT_CI || CONFIG_LIBVFSCORE_AUTOMOUNT_FB */
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT */
 
+#if CONFIG_LIBVFSCORE_AUTOMOUNT || CONFIG_LIBVFSCORE_AUTOUNMOUNT
 static void vfscore_autoumount(const struct uk_term_ctx *tctx __unused)
 {
 	struct mount *mp;
 	int rc;
 
-	uk_pr_debug("Unmounting filesystems...\n");
 	uk_list_for_each_entry_reverse(mp, &mount_list, mnt_list) {
+		uk_pr_info("Unmounting %s (%s)...\n", mp->m_path,
+			   mp->m_dev ? mp->m_dev : "none");
 		/* For now, flags = 0 is enough. */
 		rc = VFS_UNMOUNT(mp, 0);
 		if (unlikely(rc))
@@ -856,7 +860,9 @@ static void vfscore_autoumount(const struct uk_term_ctx *tctx __unused)
 				  mp->m_path, rc);
 	}
 }
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT || CONFIG_LIBVFSCORE_AUTOUNMOUNT */
 
+#if CONFIG_LIBVFSCORE_AUTOMOUNT
 static int vfscore_automount(struct uk_init_ctx *ictx __unused)
 {
 	int rc;
@@ -900,5 +906,10 @@ err_umount: __maybe_unused
 	vfscore_autoumount(NULL);
 	return rc;
 }
+#endif /* CONFIG_LIBVFSCORE_AUTOMOUNT */
 
+#if CONFIG_LIBVFSCORE_AUTOMOUNT && CONFIG_LIBVFSCORE_AUTOUNMOUNT
 uk_rootfs_initcall_prio(vfscore_automount, vfscore_autoumount, 4);
+#elif CONFIG_LIBVFSCORE_AUTOUNMOUNT
+uk_rootfs_initcall_prio(0x0, vfscore_autoumount, 4);
+#endif /* CONFIG_LIBVFSCORE_AUTOUNMOUNT */

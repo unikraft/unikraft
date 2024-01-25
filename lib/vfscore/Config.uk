@@ -768,6 +768,7 @@ endif # LIBVFSCORE_AUTOMOUNT_UP
 # Invisible option to announce that auto-mounting needs to be compiled
 config LIBVFSCORE_AUTOMOUNT
 bool
+select LIBVFSCORE_AUTOUNMOUNT
 default y if LIBVFSCORE_AUTOMOUNT_CI || LIBVFSCORE_AUTOMOUNT_UP
 
 # Invisible option to enable einitrd
@@ -785,4 +786,8 @@ if LIBVFSCORE_AUTOMOUNT_EINITRD
 		image and mounted under '/'.
 endif
 
+config LIBVFSCORE_AUTOUNMOUNT
+	bool "Unmount volumes during shutdown"
+	help
+		Automatically unmounts volumes during shutdown.
 endif
