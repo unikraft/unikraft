@@ -325,11 +325,6 @@ static int devfs_automount(struct uk_init_ctx *ictx __unused)
 	return 0;
 }
 
-static void devfs_autoumount(const struct uk_term_ctx *tctx __unused)
-{
-	UK_WARN_STUBBED();
-}
-
 /* after vfscore mounted '/' (priority 4): */
-uk_rootfs_initcall_prio(devfs_automount, devfs_autoumount, 5);
+uk_rootfs_initcall_prio(devfs_automount, 0x0, 5);
 #endif
