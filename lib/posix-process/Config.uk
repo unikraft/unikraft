@@ -58,6 +58,10 @@ config LIBPOSIX_PROCESS_SIGNAL_RTTGSIGQUEUEINFO
 	bool "rt_tgsigqueueinfo() syscall"
 	default y
 
+config LIBPOSIX_PROCESS_SIGNAL_RTSIGTIMEDWAIT
+	bool "rt_sigtimedwait() syscall"
+	default y
+
 config LIBPOSIX_PROCESS_SIGNAL_KILL
 	bool "kill() syscall"
 	default y
