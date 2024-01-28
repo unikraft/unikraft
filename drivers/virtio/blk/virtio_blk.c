@@ -117,9 +117,9 @@ struct uk_blkdev_queue {
 };
 
 struct virtio_blkdev_request {
+	struct virtio_blk_outhdr virtio_blk_outhdr;
 	struct uk_blkreq *req;
 	struct uk_list_head free_list_head;
-	struct virtio_blk_outhdr virtio_blk_outhdr;
 	__u8 status;
 };
 
@@ -308,9 +308,24 @@ static int virtio_blkdev_queue_enqueue(struct uk_blkdev_queue *queue,
 
 	virtio_blkdev_queue_cleanup_requests(queue);
 
-	virtio_blk_req = uk_malloc(a, sizeof(*virtio_blk_req));
-	if (!virtio_blk_req)
+	/* The header (first descriptor) of the virtio-blk request must always
+	 * come in one piece! By aligning to its size (16), we ensure that
+	 * it will be contained entirely in one page only, i.e. the
+	 * scatter-gather list will not process it as two segments, which
+	 * would result in two descriptors.
+	 *
+	 * E.g. If the address ends something like 0x...ff8 then the header
+	 * will span 0x...ff8 -> 0x...008 crossing the next page and resulting
+	 * in the scatter-gather list splitting it into two segments and
+	 * thus into two descriptors, which QEMU seems to not like.
+	 */
+	virtio_blk_req = uk_memalign(a, sizeof(struct virtio_blk_outhdr),
+				     sizeof(*virtio_blk_req));
+	if (unlikely(!virtio_blk_req))
 		return -ENOMEM;
+
+	UK_ASSERT(IS_ALIGNED((__uptr)&virtio_blk_req->virtio_blk_outhdr,
+			     sizeof(struct virtio_blk_outhdr)));
 
 	virtio_blk_req->req = req;
 	virtio_blk_req->virtio_blk_outhdr.sector = req->start_sector;
