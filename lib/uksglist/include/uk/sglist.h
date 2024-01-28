@@ -68,6 +68,36 @@ struct uk_sglist {
 	uint16_t    sg_maxseg; /* Maximum number of segment in the sg list */
 };
 
+/*
+ * Convenience macros to save the state of an sglist so it can be restored
+ * if an append attempt fails.  Since sglist's only grow we only need to
+ * save the current count of segments and the length of the ending segment.
+ * Earlier segments will not be changed by an append, and the only change
+ * that can occur to the ending segment is that it can be extended.
+ */
+struct uk_sgsave {
+	__u16 sg_nseg;
+	size_t ss_len;
+};
+
+#define UK_SGLIST_SAVE(sg, sgsave)					\
+	do {								\
+		(sgsave).sg_nseg = (sg)->sg_nseg;			\
+		if ((sgsave).sg_nseg > 0)				\
+			(sgsave).ss_len =				\
+			     (sg)->sg_segs[(sgsave).sg_nseg - 1].ss_len;\
+		else							\
+			(sgsave).ss_len = 0;				\
+	} while (0)
+
+#define UK_SGLIST_RESTORE(sg, sgsave)					\
+	do {								\
+		(sg)->sg_nseg = (sgsave).sg_nseg;			\
+		if ((sgsave).sg_nseg > 0)				\
+			(sg)->sg_segs[(sgsave).sg_nseg - 1].ss_len =	\
+							(sgsave).ss_len;\
+	} while (0)
+
 /**
  * Initialize the sg list.
  * @param sg
