@@ -7,6 +7,7 @@ uk_netbuf_free
 uk_netbuf_disconnect
 uk_netbuf_connect
 uk_netbuf_append
+uk_netbuf_sglist_append
 uk_netdev_drv_register
 uk_netdev_count
 uk_netdev_get

@@ -9,4 +9,3 @@ uk_sglist_length
 uk_sglist_split
 uk_sglist_join
 uk_sglist_slice
-uk_sglist_append_netbuf

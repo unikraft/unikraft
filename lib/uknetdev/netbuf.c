@@ -40,6 +40,33 @@
 #define NETBUF_ADDR_ALIGN_DOWN(x) ALIGN_DOWN((__uptr) (x), \
 					     NETBUF_ADDR_ALIGNMENT)
 
+#if CONFIG_LIBUKSGLIST
+int uk_netbuf_sglist_append(struct uk_sglist *sg, struct uk_netbuf *netbuf)
+{
+	struct uk_sgsave save;
+	struct uk_netbuf *nb;
+	int rc = 0;
+
+	UK_ASSERT(sg);
+	UK_ASSERT(netbuf);
+
+	if (sg->sg_maxseg == 0)
+		return -EINVAL;
+
+	UK_SGLIST_SAVE(sg, save);
+	UK_NETBUF_CHAIN_FOREACH(nb, netbuf) {
+		if (likely(nb->len > 0)) {
+			rc = uk_sglist_append(sg, nb->data, nb->len);
+			if (unlikely(rc)) {
+				UK_SGLIST_RESTORE(sg, save);
+				return rc;
+			}
+		}
+	}
+	return 0;
+}
+#endif /* CONFIG_LIBUKSGLIST */
+
 void uk_netbuf_init_indir(struct uk_netbuf *m,
 			  void *buf, size_t buflen, uint16_t headroom,
 			  void *priv, uk_netbuf_dtor_t dtor)

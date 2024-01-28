@@ -415,7 +415,7 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 	 *       the first netbuf of a queue. If this is not the case,
 	 *       (e.g., due to encapsulation of protocol headers with
 	 *        prepending netbufs) we need to replace the call
-	 *       to `uk_sglist_append_netbuf()`. However, a netbuf
+	 *       to `uk_netbuf_sglist_append()`. However, a netbuf
 	 *       chain can only once have set the PARTIAL_CSUM flag.
 	 */
 	memset(vhdr, 0, virtio_net_hdr_size(vndev));
@@ -455,7 +455,7 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 		goto err_remove_vhdr;
 	}
 	if (pkt->next) {
-		rc = uk_sglist_append_netbuf(&queue->sg, pkt->next);
+		rc = uk_netbuf_sglist_append(&queue->sg, pkt->next);
 		if (unlikely(rc != 0)) {
 			uk_pr_err("Failed to append to the sg list: %d\n", rc);
 			goto err_remove_vhdr;
