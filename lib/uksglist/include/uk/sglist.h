@@ -52,9 +52,6 @@ extern "C" {
 #ifdef CONFIG_LIBUKALLOC
 #include <uk/alloc.h>
 #endif /* CONFIG_LIBUKALLOC */
-#ifdef CONFIG_LIBUKNETDEV
-#include <uk/netbuf.h>
-#endif /* CONFIG_LIBUKNETDEV */
 
 struct uk_sglist_seg {
 	__paddr_t  ss_paddr; /* Physical address */
@@ -299,20 +296,6 @@ int uk_sglist_split(struct uk_sglist *original, struct uk_sglist **head,
 int uk_sglist_slice(struct uk_sglist *original, struct uk_sglist **slice,
 			struct uk_alloc *a, size_t offset, size_t length) __nonnull;
 #endif /* CONFIG_LIBUKALLOC */
-
-#ifdef CONFIG_LIBUKNETDEV
-/**
- * The function create a scatter gather list from the netbuf
- * @param sg
- *	A reference to the scatter gather list.
- * @param netbuf
- *	A reference to the netbuf
- * @return
- *	0, on successful creation of the scatter gather list
- *	-EINVAL, Invalid sg list.
- */
-int uk_sglist_append_netbuf(struct uk_sglist *sg, struct uk_netbuf *netbuf) __nonnull;
-#endif /* CONFIG_LIBUKNET */
 
 #ifdef __cplusplus
 }

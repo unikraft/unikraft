@@ -520,28 +520,3 @@ int uk_sglist_slice(struct uk_sglist *original, struct uk_sglist **slice,
 	return 0;
 }
 #endif /* CONFIG_LIBUKALLOC */
-
-#ifdef CONFIG_LIBUKNETDEV
-int uk_sglist_append_netbuf(struct uk_sglist *sg, struct uk_netbuf *netbuf)
-{
-	struct sgsave save;
-	struct uk_netbuf *nb;
-	int error;
-
-	if (sg->sg_maxseg == 0)
-		return -EINVAL;
-
-	error = 0;
-	SGLIST_SAVE(sg, save);
-	UK_NETBUF_CHAIN_FOREACH(nb, netbuf) {
-		if (likely(nb->len > 0)) {
-			error = uk_sglist_append(sg, nb->data, nb->len);
-			if (unlikely(error)) {
-				SGLIST_RESTORE(sg, save);
-				return error;
-			}
-		}
-	}
-	return 0;
-}
-#endif /* CONFIG_LIBUKNETDEV */
