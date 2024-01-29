@@ -3241,6 +3241,13 @@ sub process {
 			     "A patch subject line should describe the change not the tool that found it\n" . $herecurr);
 		}
 
+# Check if Unikraft subject format is used on commit message
+		if ($in_header_lines &&
+		    $line =~ /^Subject:[^:]+$/i) {
+			ERROR("UNIKRAFT_SUBJECT_FORMAT",
+			     "Patch subject line does not follow Unikraft scheme: '[Selector]/[Component]: [Short message]'\n" . $herecurr);
+		}
+
 # Check for Gerrit Change-Ids not in any patch context
 		if ($realfile eq '' && !$has_patch_separator && $line =~ /^\s*change-id:/i) {
 			if (ERROR("GERRIT_CHANGE_ID",
