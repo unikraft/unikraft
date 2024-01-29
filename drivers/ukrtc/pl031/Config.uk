@@ -2,3 +2,4 @@ config LIBUKRTC_PL031
     bool "Arm PrimeCell RTC (PL031)"
     default y if ARCH_ARM_64
     depends on ARCH_ARM_64
+    select LIBUKBUS_PLATFORM
