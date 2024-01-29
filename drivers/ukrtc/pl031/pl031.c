@@ -37,9 +37,8 @@
 #include <uk/ofw/fdt.h>
 #include <uk/intctlr.h>
 #include <uk/print.h>
-#include <arm/cpu.h>
-#include <rtc/rtc.h>
-#include <rtc/pl031.h>
+#include <uk/rtc/rtc.h>
+#include <uk/rtc/pl031.h>
 
 static __u64 pl031_base_addr;
 static int pl031_irq;

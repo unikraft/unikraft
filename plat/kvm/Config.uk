@@ -165,9 +165,4 @@ endif
 
 endmenu
 
-config RTC_PL031
-       bool "Arm platform RTC (PL031) driver"
-       default y if ARCH_ARM_64
-       depends on ARCH_ARM_64
-
 endif

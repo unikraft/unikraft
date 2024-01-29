@@ -7,7 +7,6 @@ $(eval $(call addplat_s,kvm,$(CONFIG_PLAT_KVM)))
 ## KVM platform library registration
 ##
 $(eval $(call addplatlib,kvm,libkvmplat))
-$(eval $(call addplatlib_s,kvm,libkvmpl031,$(CONFIG_RTC_PL031)))
 
 ##
 ## Platform library definitions
@@ -129,13 +128,3 @@ endif
 LIBKVMPLAT_SRCS-y		 += $(UK_PLAT_COMMON_BASE)/bootinfo.c|common
 LIBKVMPLAT_SRCS-$(CONFIG_LIBFDT) += $(UK_PLAT_COMMON_BASE)/bootinfo_fdt.c|common
 LIBKVMPLAT_SRCS-y		 += $(UK_PLAT_COMMON_BASE)/bootinfo.lds.S|common
-
-##
-## RTC-PL031 library definitions
-##
-LIBKVMPL031_CINCLUDES-y		+= -I$(LIBKVMPLAT_BASE)/include
-LIBKVMPL031_CINCLUDES-y		+= -I$(UK_PLAT_COMMON_BASE)/include
-LIBKVMPL031_CINCLUDES-y		+= -I$(UK_PLAT_DRIVERS_BASE)/include
-
-LIBKVMPL031_SRCS-y		+= $(UK_PLAT_DRIVERS_BASE)/rtc/pl031.c
-LIBKVMPL031_SRCS-y		+= $(UK_PLAT_DRIVERS_BASE)/rtc/rtc.c
