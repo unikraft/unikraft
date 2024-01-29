@@ -78,6 +78,7 @@ struct _gic_dev gicv2_drv = {
 
 static const char * const gic_device_list[] __maybe_unused = {
 	"arm,cortex-a15-gic",
+	"arm,gic-400",
 	NULL
 };
 
