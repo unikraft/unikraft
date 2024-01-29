@@ -3253,6 +3253,25 @@ sub process {
 			     "Patch subject line does not follow Unikraft scheme: '[Selector]/[Component]: [Short message]'\n" . $herecurr);
 		}
 
+# Check that the first line in the commit message has less than
+# 70 characters to comply with Github UI. This helps
+# avoid commit message subjects placed at the beginning
+# to overflow into the second line when viewing through
+# the Github UI.
+		if ($in_header_lines &&
+		    $line =~ /^Subject:.*$/i) {
+			my $commit_subject_line0 = $1 if
+				$lines[$linenr - 1] =~ /^Subject: \[.*\] (.*)$/;
+			my $commit_subject_line1 = $lines[$linenr];
+			my $commit_subject = $commit_subject_line0 .
+					     $commit_subject_line1;
+			if (length($commit_subject) > 70) {
+				WARN("COMMIT_SUBJECT_LONG_LINE",
+				     "Possible unwrapped commit subject (prefer a maximum 70 chars)\n" . $commit_subject);
+				$commit_log_long_line = 1;
+			}
+		}
+
 # Check for Gerrit Change-Ids not in any patch context
 		if ($realfile eq '' && !$has_patch_separator && $line =~ /^\s*change-id:/i) {
 			if (ERROR("GERRIT_CHANGE_ID",
