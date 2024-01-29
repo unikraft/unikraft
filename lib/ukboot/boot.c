@@ -344,9 +344,20 @@ void ukplat_entry(int argc, char *argv[])
 	auxstack = uk_memalign(uk_alloc_get_default(),
 			       UKPLAT_AUXSP_ALIGN, UKPLAT_AUXSP_LEN);
 	if (unlikely(!auxstack))
-		uk_pr_err("Failed to allocate the auxiliary stack\n");
+		UK_CRASH("Failed to allocate the auxiliary stack\n");
 	/* Activate auxiliary stack */
 	ukplat_lcpu_set_auxsp(ukarch_gen_sp(auxstack, UKPLAT_AUXSP_LEN));
+#if CONFIG_LIBUKVMEM
+	rc = uk_vma_advise(uk_vas_get_active(),
+			   PAGE_ALIGN_DOWN((__vaddr_t)auxstack),
+			   PAGE_ALIGN_UP((__vaddr_t)auxstack +
+				  UKPLAT_AUXSP_LEN -
+				  PAGE_ALIGN_DOWN((__vaddr_t)auxstack)),
+			   UK_VMA_ADV_WILLNEED,
+			   UK_VMA_FLAG_UNINITIALIZED);
+	if (unlikely(rc))
+		UK_CRASH("Could not setup physical memory\n");
+#endif /* CONFIG_LIBUKVMEM */
 #endif /* !CONFIG_LIBUKBOOT_NOALLOC */
 
 #if CONFIG_LIBUKINTCTLR
