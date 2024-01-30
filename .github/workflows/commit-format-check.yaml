@@ -10,18 +10,6 @@ jobs:
     name: Commit and PR Format Check
     runs-on: ubuntu-latest
     steps:
-      - name: Commit Lines Length Check
-        if: ${{ github.actor != 'dependabot' && github.actor != 'dependabot[bot]' }}
-        uses: gsactions/commit-message-checker@v2
-        with:
-          pattern: '((^(?=(?:.|\n)*(?:^|\n)\[\d\]: .{69,}(?:$|\n)(?:.|\n)*)(?:.|\n)*$)|(^(?!(?:.|\n)*(?:^|\n).{74,}(?:$|\n)(?:.|\n)*)(?:.|\n)*$))'
-          flags: ''
-          error: 'The maximum line length of 74 characters is exceeded.'
-          excludeDescription: 'true'
-          excludeTitle: 'true'
-          checkAllCommitMessages: 'true'
-          accessToken: ${{ secrets.GITHUB_TOKEN }}
-
       - name: Signed-off-by Check
         if: always()
         uses: gsactions/commit-message-checker@v2
