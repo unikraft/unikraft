@@ -265,6 +265,7 @@ struct uk_file *uk_socket_create(int family, int type, int protocol)
 
 	_socket_init(al, d, sock_data);
 	uk_socket_evd_init(&al->evd, family, type, protocol);
+	uk_socket_event_raise(&al->evd, CREATE);
 	return &al->f;
 }
 
@@ -353,7 +354,7 @@ int uk_sys_accept(const struct uk_file *sock, int blocking,
 		mode |= O_CLOEXEC;
 	fd = uk_fdtab_open(&al->f, mode);
 	uk_file_release(&al->f);
-	if (fd > 0)
+	if (fd >= 0)
 		uk_socket_event_raise(&al->evd, ACCEPT);
 	return fd;
 }
@@ -440,6 +441,7 @@ out:
 
 		al = __containerof(of->file, struct socket_alloc, f);
 		uk_socket_evd_laddr_set(&al->evd, addr, addr_len);
+		uk_socket_event_raise(&al->evd, BIND);
 		trace_posix_socket_bind_ret(ret);
 	}
 

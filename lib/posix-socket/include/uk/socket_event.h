@@ -17,7 +17,9 @@
  */
 
 enum uk_socket_state {
-	UK_SOCKET_STATE_CLOSE = 0,    /**< Connection or listener closed */
+	UK_SOCKET_STATE_CLOSE = 0,    /**< Socket closed */
+	UK_SOCKET_STATE_CREATE,       /**< New socket created */
+	UK_SOCKET_STATE_BIND,         /**< Socket bind to an address */
 	UK_SOCKET_STATE_LISTEN,       /**< Listener for incom. connections */
 	UK_SOCKET_STATE_ACCEPT,       /**< Incoming connection accepted */
 	UK_SOCKET_STATE_CONNECT,      /**< Connection to remote established */
@@ -58,7 +60,7 @@ struct uk_socket_event {
  *   The socket family (e.g., AF_INET) to receive events for. Can be set
  *   to AF_UNSPEC to receive any socket event of any address family.
  * @param event
- *   The event to register for: CLOSE, LISTEN, ACCEPT, or CONNECT
+ *   The event to register for: CLOSE, CREATE, BIND, LISTEN, ACCEPT, or CONNECT
  * @param recfn
  *   Event receiver function, must have the following singature:
  *   `void recvfn(const struct uk_socket_event *)`
