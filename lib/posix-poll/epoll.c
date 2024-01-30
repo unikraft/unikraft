@@ -562,8 +562,8 @@ int uk_sys_epoll_pwait2(const struct uk_file *epf, struct epoll_event *events,
 		}
 		uk_file_runlock(epf);
 
-		/* If lvlev, update pollin back in */
-		if (lvlev)
+		/* If lvlev or limited by maxevents, update pollin back in */
+		if (lvlev || nout == maxevents)
 			uk_file_event_set(epf, UKFD_POLLIN);
 
 		if (nout)
