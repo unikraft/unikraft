@@ -326,8 +326,8 @@ UK_LLSYSCALL_R_DEFINE(int, prlimit64, int, pid, unsigned int, resource,
 	 */
 	switch (resource) {
 	case RLIMIT_DATA:
-		break;
 	case RLIMIT_STACK:
+	case RLIMIT_AS:
 		break;
 #if CONFIG_LIBVFSCORE
 	case RLIMIT_NOFILE:
@@ -362,6 +362,10 @@ UK_LLSYSCALL_R_DEFINE(int, prlimit64, int, pid, unsigned int, resource,
 	case RLIMIT_STACK:
 		old_limit->rlim_cur = __STACK_SIZE;
 		old_limit->rlim_max = __STACK_SIZE;
+		break;
+	case RLIMIT_AS:
+		old_limit->rlim_cur = RLIM_INFINITY;
+		old_limit->rlim_max = RLIM_INFINITY;
 		break;
 
 #if CONFIG_LIBVFSCORE
