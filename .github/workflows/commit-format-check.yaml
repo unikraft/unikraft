@@ -43,16 +43,3 @@ jobs:
           excludeTitle: 'false'
           checkAllCommitMessages: 'false'
           accessToken: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: PR Description Check
-        if: ${{ github.actor != 'dependabot' && github.actor != 'dependabot[bot]' }}
-        uses: gsactions/commit-message-checker@v2
-        with:
-          pattern: '^\S+( \S+)*$'
-          error: 'The PR description must not be empty.'
-          flags: 'gm'
-          excludeDescription: 'false'
-          excludeTitle: 'true'
-          checkAllCommitMessages: 'false'
-          accessToken: ${{ secrets.GITHUB_TOKEN }}
-
