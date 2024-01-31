@@ -14,6 +14,8 @@
 
 #include "fdio-impl.h"
 
+/* Needed for IOCTL_CMD_ISTYPE */
+#include <vfscore/vnode.h>
 
 int uk_sys_ioctl(struct uk_ofile *of, int cmd, void *arg)
 {
@@ -38,6 +40,10 @@ int uk_sys_ioctl(struct uk_ofile *of, int cmd, void *arg)
 	r = uk_file_ctl(f, UKFILE_CTL_IOCTL, cmd, (uintptr_t)arg, 0, 0);
 	if (iolock)
 		uk_file_wunlock(f);
+
+	/* Universally return -ENOTTY for unimplemented TTY ioctls */
+	if (unlikely(r == -ENOSYS && IOCTL_CMD_ISTYPE(cmd, IOCTL_CMD_TYPE_TTY)))
+		return -ENOTTY;
 	return r;
 }
 
