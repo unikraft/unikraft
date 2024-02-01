@@ -829,8 +829,14 @@ char *strerror(int errnum)
 
 char *strcat(char *restrict dest, const char *restrict src)
 {
-	strcpy(dest + strlen(dest), src);
-	return dest;
+	char *tmp = dest;
+
+	while (*dest)
+		dest++;
+
+	while ((*dest++ = *src++) != '\0');
+
+	return tmp;
 }
 
 char *strncat(char *dest, const char *src, size_t n)
