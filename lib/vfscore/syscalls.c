@@ -1205,6 +1205,8 @@ sys_ftruncate(struct vfscore_file *fp, off_t length)
 int
 sys_fchdir(struct vfscore_file *fp, char *cwd)
 {
+	const char *mountpath;
+	size_t mountpath_len;
 	struct vnode *dvp;
 
 	if (!fp->f_dentry)
@@ -1216,7 +1218,14 @@ sys_fchdir(struct vfscore_file *fp, char *cwd)
 		vn_unlock(dvp);
 		return EBADF;
 	}
-	strlcpy(cwd, fp->f_dentry->d_mount->m_path, PATH_MAX);
+
+	/* Cut off the last trailing slash if there is one */
+	mountpath = fp->f_dentry->d_mount->m_path;
+	mountpath_len = strlen(mountpath);
+	if (mountpath_len == 0 || mountpath[mountpath_len - 1] != '/')
+		mountpath_len = PATH_MAX;
+
+	strlcpy(cwd, mountpath, mountpath_len);
 	strlcat(cwd, fp->f_dentry->d_path, PATH_MAX);
 	vn_unlock(dvp);
 	return 0;
