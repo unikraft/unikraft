@@ -474,6 +474,10 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 	/* Assign the child to the scheduler */
 	uk_sched_thread_add(s, child);
 
+#ifdef CONFIG_LIBPOSIX_PROCESS_CLONE_PREFER_CHILD
+	uk_sched_yield();
+#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE_PREFER_CHILD */
+
 	return ret;
 
 err_free_child:
