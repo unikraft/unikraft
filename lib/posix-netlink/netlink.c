@@ -242,6 +242,7 @@ static ssize_t nl_recvmsg(posix_sock *s, struct msghdr *msg,
 			  int flags __unused)
 {
 	struct uk_streambuf *nlbuf;
+	struct sockaddr_nl *nl_addr;
 	struct nl_ctx *nl_ctx = sock2nlctx(s);
 	size_t cpylen;
 
@@ -254,6 +255,16 @@ static ssize_t nl_recvmsg(posix_sock *s, struct msghdr *msg,
 			    nlbuf_data(nlbuf), nlbuf_len(nlbuf));
 	nlbuf_free(nlbuf);
 	uk_pr_debug("Message received\n");
+
+	/* Fill name structure */
+	if (msg->msg_name && msg->msg_namelen == sizeof(struct sockaddr_nl)) {
+		nl_addr = msg->msg_name;
+		nl_addr->nl_family = AF_NETLINK;
+		nl_addr->nl_pid = 0;
+		nl_addr->nl_pad = 0;
+		nl_addr->nl_groups = nl_ctx->nl_groups;
+	}
+
 	return (ssize_t)cpylen;
 }
 
