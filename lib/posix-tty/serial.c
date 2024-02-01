@@ -5,6 +5,7 @@
  */
 
 #include <termios.h>
+#include <string.h>
 #include <sys/ioctl.h>
 #include <sys/stat.h>
 
@@ -19,6 +20,36 @@ static const char SERIAL_VOLID[] = "serial_vol";
 
 /* EOT: End Of Transmission character; ^D */
 #define SERIAL_EOT 04
+
+#define SERIAL_TERMIOS_IFLAGS (IUTF8|ICRNL)
+#define SERIAL_TERMIOS_OFLAGS (0)
+#define SERIAL_TERMIOS_CFLAGS (CREAD|CS8|B38400)
+#define SERIAL_TERMIOS_LFLAGS (ICANON|ECHO)
+
+/* Linux only fills in 19 chars; bincompat might expect this */
+#define KNCCS 19
+
+/* Values taken from termios(3) from Linux man-pages 6.05 */
+static const char SERIAL_TERMIOS_CONTROL_CHARS[KNCCS] = {
+	[VDISCARD] = 017,
+	[VEOF] = SERIAL_EOT,
+	[VEOL] = 0,
+	[VEOL2] = 0,
+	[VERASE] = 0177,
+	[VINTR] = 003,
+	[VKILL] = 025,
+	[VLNEXT] = 026,
+	[VMIN] = 1,
+	[VQUIT] = 034,
+	[VREPRINT] = 022,
+	[VSTART] = 021,
+	[VSTOP] = 023,
+	[VSUSP] = 032,
+	[VSWTC] = 0,
+	[VTIME] = 0,
+	[VWERASE] = 027,
+};
+
 
 static ssize_t serial_read(const struct uk_file *f,
 			   const struct iovec *iov, int iovcnt,
@@ -105,6 +136,22 @@ static int serial_ctl(const struct uk_file *f, int fam, int req, uintptr_t arg1,
 	switch (fam) {
 	case UKFILE_CTL_IOCTL:
 		switch (req) {
+		case TCGETS:
+		{
+			struct termios *tc = (struct termios *)arg1;
+
+			tc->c_iflag = SERIAL_TERMIOS_IFLAGS;
+			tc->c_oflag = SERIAL_TERMIOS_OFLAGS;
+			tc->c_cflag = SERIAL_TERMIOS_CFLAGS;
+			tc->c_lflag = SERIAL_TERMIOS_LFLAGS;
+			memcpy(tc->c_cc, SERIAL_TERMIOS_CONTROL_CHARS, KNCCS);
+			return 0;
+		}
+		case TCSETS:
+		case TCSETSW:
+		case TCSETSF:
+			uk_pr_warn_once("Serial file settings stubbed\n");
+			return 0;
 		case TIOCGWINSZ:
 		{
 			struct winsize *winsz = (struct winsize *)arg1;
@@ -115,13 +162,35 @@ static int serial_ctl(const struct uk_file *f, int fam, int req, uintptr_t arg1,
 			};
 			return 0;
 		}
-			break;
+		/* Sending breaks not supported; no-op */
+		case TCSBRK:
+		case TCSBRKP:
+		case TIOCSBRK:
+		case TIOCCBRK:
+			return 0;
+		case TCXONC:
+			uk_pr_warn_once("Serial file flow control stubbed\n");
+			return 0;
+		/* Input & Output queues always empty */
+		case TIOCINQ:
+		case TIOCOUTQ:
+			*(int *)arg1 = 0;
+			return 0;
+		/* ... thus flushing is a no-op */
+		case TCFLSH:
+			return 0;
+		/* Exclusive mode ignored; no-op */
+		case TIOCEXCL:
+		case TIOCNXCL:
+			return 0;
+		case TIOCGEXCL:
+			*(int *)arg1 = 0;
+			return 0;
 		default:
 			return -EINVAL;
 		}
-		break;
 	default:
-		return -EINVAL;
+		return -ENOSYS;
 	}
 }
 
