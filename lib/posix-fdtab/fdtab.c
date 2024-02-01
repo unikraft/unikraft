@@ -125,7 +125,7 @@ static inline void ofile_rel(struct uk_fdtab *tab, struct uk_ofile *of)
 
 #if CONFIG_LIBPOSIX_FDTAB_LEGACY_SHIM
 
-static inline void file_acq(void *p, int flags)
+static inline void file_acq(void *p, int flags __maybe_unused)
 {
 #if CONFIG_LIBVFSCORE
 	if (flags & UK_FDTAB_VFSCORE)
@@ -134,7 +134,9 @@ static inline void file_acq(void *p, int flags)
 #endif /* CONFIG_LIBVFSCORE */
 		ofile_acq((struct uk_ofile *)p);
 }
-static inline void file_rel(struct uk_fdtab *tab, void *p, int flags)
+
+static inline
+void file_rel(struct uk_fdtab *tab, void *p, int flags __maybe_unused)
 {
 #if CONFIG_LIBVFSCORE
 	if (flags & UK_FDTAB_VFSCORE)
