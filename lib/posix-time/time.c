@@ -153,6 +153,7 @@ UK_SYSCALL_R_DEFINE(int, clock_getres, clockid_t, clk_id,
 	case CLOCK_MONOTONIC:
 	case CLOCK_MONOTONIC_COARSE:
 	case CLOCK_REALTIME:
+	case CLOCK_BOOTTIME:
 		if (tp) {
 			tp->tv_sec = 0;
 			tp->tv_nsec = UKPLAT_TIME_TICK_NSEC;
@@ -182,6 +183,7 @@ UK_SYSCALL_R_DEFINE(int, clock_gettime, clockid_t, clk_id, struct timespec*, tp)
 	switch (clk_id) {
 	case CLOCK_MONOTONIC:
 	case CLOCK_MONOTONIC_COARSE:
+	case CLOCK_BOOTTIME:
 		now = ukplat_monotonic_clock();
 		break;
 	case CLOCK_REALTIME:
