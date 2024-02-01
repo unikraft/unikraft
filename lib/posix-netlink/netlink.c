@@ -277,6 +277,9 @@ static ssize_t nl_recvfrom(posix_sock *s,
 	struct nl_ctx *nl_ctx = sock2nlctx(s);
 	size_t cpylen;
 
+	if (from && !fromlen)
+		return -EINVAL;
+
 	uk_pr_debug("Picking up packet from netlink mbox\n");
 	uk_mbox_recv(nl_ctx->nl_recvqueue, (void **)&nlbuf);
 	if (unlikely(!nlbuf))
@@ -287,12 +290,14 @@ static ssize_t nl_recvfrom(posix_sock *s,
 	nlbuf_free(nlbuf);
 	uk_pr_debug("Message received\n");
 
-	nl_addr = (struct sockaddr_nl *)from;
-	nl_addr->nl_family = AF_NETLINK;
-	nl_addr->nl_pid = 0;
-	nl_addr->nl_pad = 0;
-	nl_addr->nl_groups = nl_ctx->nl_groups;
-	*fromlen = sizeof(*nl_addr);
+	if (from) {
+		nl_addr = (struct sockaddr_nl *)from;
+		nl_addr->nl_family = AF_NETLINK;
+		nl_addr->nl_pid = 0;
+		nl_addr->nl_pad = 0;
+		nl_addr->nl_groups = nl_ctx->nl_groups;
+		*fromlen = sizeof(*nl_addr);
+	}
 
 	return (ssize_t)cpylen;
 }
