@@ -225,6 +225,12 @@ int uk_sys_clock_gettime(clockid_t clk_id, struct timespec *tp)
 	case CLOCK_REALTIME_COARSE:
 		now = ukplat_wall_clock();
 		break;
+#if CONFIG_HAVE_SCHED
+	case CLOCK_THREAD_CPUTIME_ID:
+		/* NOTE: exec_time does not account for current scheduled run */
+		now = uk_thread_current()->exec_time;
+		break;
+#endif /* CONFIG_HAVE_SCHED */
 	default:
 		error = EINVAL;
 		goto out_error;
