@@ -37,6 +37,7 @@
 #include <time.h>
 #include <unistd.h>
 #include <sys/time.h>
+#include <sys/times.h>
 #include <uk/plat/time.h>
 #include <uk/config.h>
 #include <uk/print.h>
@@ -273,9 +274,26 @@ UK_SYSCALL_R_DEFINE(int, clock_nanosleep, clockid_t, clockid, int, flags,
 	return uk_sys_clock_nanosleep(clockid, flags, request, remain);
 }
 
-UK_SYSCALL_R_DEFINE(int, times, struct tm *, buf)
+clock_t uk_sys_times(struct tms *buf)
 {
-	return -ENOTSUP;
+	/* NOTE: We assume all system time is used by the current process */
+	const clock_t utime = ukplat_monotonic_clock() /
+			      (UKARCH_NSEC_PER_SEC / CLOCKS_PER_SEC);
+
+	if (buf) {
+		/* We don't track time spent in the kernel */
+		buf->tms_stime = 0;
+		buf->tms_utime = utime;
+		/* We don't track time spent per-process; report zero */
+		buf->tms_cutime = 0;
+		buf->tms_cstime = 0;
+	}
+	return utime;
+}
+
+UK_SYSCALL_R_DEFINE(clock_t, times, struct tms *, buf)
+{
+	return uk_sys_times(buf);
 }
 
 UK_SYSCALL_R_DEFINE(int, setitimer, int, which,

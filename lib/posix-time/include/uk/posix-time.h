@@ -9,10 +9,12 @@
 
 #include <time.h>
 #include <sys/time.h>
+#include <sys/times.h>
 
 int uk_sys_nanosleep(const struct timespec *req, struct timespec *rem);
 
 time_t uk_sys_time(time_t *tloc);
+clock_t uk_sys_times(struct tms *buf);
 
 int uk_sys_gettimeofday(struct timeval *restrict tv, void *tz);
 int uk_sys_settimeofday(struct timeval *tv, void *tz);
