@@ -142,7 +142,6 @@ lxboot_init_mem(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 void lxboot_entry(struct lcpu *lcpu, struct lxboot_params *bp)
 {
 	struct ukplat_bootinfo *bi;
-	int rc;
 
 	bi = ukplat_bootinfo_get();
 	if (unlikely(!bi))
