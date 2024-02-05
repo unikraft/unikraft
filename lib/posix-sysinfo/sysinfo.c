@@ -184,13 +184,12 @@ UK_SYSCALL_R_DEFINE(int, sethostname, const char*, name, size_t, len)
 		return -EFAULT;
 	}
 
-	if (len > sizeof(utsname.nodename)) {
+	if (len + 1 > sizeof(utsname.nodename)) {
 		return -EINVAL;
 	}
 
-	strncpy(utsname.nodename, name, len);
-	if (len < sizeof(utsname.nodename))
-		utsname.nodename[len] = 0;
+	memcpy(utsname.nodename, name, len);
+	utsname.nodename[len] = '\0';
 	return 0;
 }
 
