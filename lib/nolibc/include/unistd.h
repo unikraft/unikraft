@@ -46,6 +46,8 @@ extern "C" {
 #define __NEED_off_t
 #define __NEED_useconds_t
 
+#include <nolibc-internal/shareddefs.h>
+
 /*
  * Sysconf name values
  */
@@ -60,9 +62,9 @@ extern "C" {
 #define _SC_NPROCESSORS_ONLN 84
 
 long sysconf(int);
+int gethostname(char *name, size_t len);
+int sethostname(const char *name, size_t len);
 #endif
-
-#include <nolibc-internal/shareddefs.h>
 
 #if CONFIG_HAVE_TIME
 unsigned int sleep(unsigned int seconds);
