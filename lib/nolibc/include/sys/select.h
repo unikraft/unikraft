@@ -53,7 +53,7 @@ typedef unsigned long __fd_mask;
  * be enough for most uses.
  */
 #ifndef FD_SETSIZE
-#define FD_SETSIZE 64
+#define FD_SETSIZE CONFIG_LIBNOLIBC_FD_SETSIZE
 #endif
 
 #define _NFDBITS (sizeof(__fd_mask) * 8) /* bits per mask */
