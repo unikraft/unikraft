@@ -20,4 +20,11 @@ if LIBNOLIBC
 		help
 			Provide implementation of syslog/openlog/closelog functions which use the
 			ukdebug facility.
+
+	config LIBNOLIBC_FD_SETSIZE
+		int "Maximum number of file descriptors in an fd_set"
+		range 64 32768
+		default 64
+		help
+			Determines the largest fd that can be passed to select().
 endif
