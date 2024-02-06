@@ -461,28 +461,6 @@ void uk_pollq_unregister(struct uk_pollq *q, struct uk_poll_chain *tick)
 }
 
 /**
- * Update the registration ticket `tick` with values from `ntick` atomically.
- *
- * `ntick` should first be initialized from `tick`, then have values updated.
- * Supplying a `tick` that is not registered with `q` or `ntick` with a `next`
- * field different from the one in `tick` is undefined behavior.
- *
- * @param q Target queue.
- * @param tick Update chaining ticket to update.
- * @param ntick New values for fields in `tick`.
- */
-static inline
-void uk_pollq_reregister(struct uk_pollq *q, struct uk_poll_chain *tick,
-			 const struct uk_poll_chain *ntick)
-{
-	UK_ASSERT(tick->next == ntick->next);
-	uk_rwlock_rlock(&q->proplock);
-	uk_or(&q->propmask, ntick->mask);
-	*tick = *ntick;
-	uk_rwlock_runlock(&q->proplock);
-}
-
-/**
  * Poll for events and/or register for propagation on `q`.
  *
  * @param q Target queue.
