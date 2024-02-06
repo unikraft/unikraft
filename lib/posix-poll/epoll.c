@@ -192,14 +192,30 @@ static struct epoll_entry **epoll_find(const struct uk_file *epf, int fd,
 	return p;
 }
 
+static void epoll_register(const struct uk_file *epf, struct epoll_entry *ent)
+{
+	const int edge = !!(ent->event.events & EPOLLET);
+	uk_pollevent ev;
+
+#if CONFIG_LIBVFSCORE
+	UK_ASSERT(!ent->legacy);
+#endif /* CONFIG_LIBVFSCORE */
+
+	ev = uk_pollq_poll_register(&ent->f->state->pollq, &ent->tick, 1);
+	if (ev) {
+		/* Need atomic OR since we're registered for updates */
+		(void)uk_or(&ent->revents, ev);
+		uk_pollq_set_n(&epf->state->pollq, UKFD_POLLIN,
+			       edge ? 1 : UK_POLLQ_NOTIFY_ALL);
+	}
+}
+
 static int epoll_add(const struct uk_file *epf, struct epoll_entry **tail,
 		     int fd, const struct uk_file *f,
 		     const struct epoll_event *event)
 {
-	const int edge = !!(event->events & EPOLLET);
 	struct epoll_alloc *al = __containerof(epf, struct epoll_alloc, f);
 	struct epoll_entry *ent;
-	uk_pollevent ev;
 
 	/* New entry */
 	ent = uk_malloc(al->alloc, sizeof(*ent));
@@ -224,13 +240,7 @@ static int epoll_add(const struct uk_file *epf, struct epoll_entry **tail,
 	};
 	*tail = ent;
 	/* Poll, register & update if needed */
-	ev = uk_pollq_poll_register(&f->state->pollq, &ent->tick, 1);
-	if (ev) {
-		/* Need atomic OR since we're registered for updates */
-		(void)uk_or(&ent->revents, ev);
-		uk_pollq_set_n(&epf->state->pollq, UKFD_POLLIN,
-			       edge ? 1 : UK_POLLQ_NOTIFY_ALL);
-	}
+	epoll_register(epf, ent);
 	return 0;
 }
 
@@ -279,21 +289,19 @@ static int epoll_add_legacy(const struct uk_file *epf,
 }
 #endif /* CONFIG_LIBVFSCORE */
 
-static void epoll_entry_mod(struct epoll_entry *ent,
+static void epoll_entry_mod(const struct uk_file *epf, struct epoll_entry *ent,
 			    const struct epoll_event *event)
 {
-	struct uk_poll_chain ntick;
-
 #if CONFIG_LIBVFSCORE
 	UK_ASSERT(!ent->legacy);
 #endif /* CONFIG_LIBVFSCORE */
-	ntick = ent->tick;
-	ntick.mask = events2mask(event->events);
 
-	uk_pollq_reregister(&ent->f->state->pollq, &ent->tick, &ntick);
-
+	uk_pollq_unregister(&ent->f->state->pollq, &ent->tick);
 	ent->event = *event;
+	ent->tick.mask = events2mask(event->events);
 	ent->revents = 0;
+	epoll_register(epf, ent);
+
 }
 
 #if CONFIG_LIBVFSCORE
@@ -468,7 +476,7 @@ int uk_sys_epoll_ctl(const struct uk_file *epf, int op, int fd,
 				epoll_entry_mod_legacy(*entp, event);
 			else
 #endif /* CONFIG_LIBVFSCORE */
-				epoll_entry_mod(*entp, event);
+				epoll_entry_mod(epf, *entp, event);
 		break;
 
 	case EPOLL_CTL_DEL:
