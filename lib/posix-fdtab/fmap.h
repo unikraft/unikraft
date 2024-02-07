@@ -19,8 +19,7 @@
 #include <uk/thread.h>
 
 /**
- * An entry containing the necessary data for defining the bitmap that will
- * tell us if a file descriptor is used or not.
+ * Bitmap telling if a file descriptor is used or not.
  */
 struct uk_bmap {
 	/* Lock-free bitmap, with ones representing a free index */
@@ -104,7 +103,7 @@ static inline int uk_bmap_free(const struct uk_bmap *bm, int idx)
  * @param idx
  *   Index to check
  * @return
- *   0 if `idx` is free, non-zero if it is not
+ *   0 if `idx` is free, non-zero otherwise
  */
 static inline int uk_bmap_isfree(const struct uk_bmap *bm, int idx)
 {
@@ -119,7 +118,7 @@ static inline int uk_bmap_isfree(const struct uk_bmap *bm, int idx)
  * @param bm
  *   Bitmap in which to search for the next free index
  * @param min
- *   Start value from which we search the next free index
+ *   Starting value from which to search the next free index
  * @return
  *   The allocated index or `>= bm->size` if map full.
  */
@@ -140,20 +139,12 @@ static inline int uk_bmap_request(const struct uk_bmap *bm, int min)
 }
 
 /**
- * An entry defining the mapping between the bitmap (which tells us whether a
- * file descriptor is free) and the map of pointers that contain references to
- * the file descriptor structures.
+ * Data structure mapping between integers and open file descriptions.
  */
 struct uk_fmap {
-	/**
-	 * Bitmap that gives us information about
-	 * which file descriptors are free
-	 */
+	/* Bitmap describing which file descriptors are free */
 	struct uk_bmap bmap;
-	/**
-	 * Map of pointers containing references to the
-	 * file descriptor structures
-	 */
+	/* Map of pointers to open file descriptions */
 	void *volatile *map;
 };
 
@@ -168,7 +159,7 @@ struct uk_fmap {
 #define UK_FMAP_SZ(s) ((s) * sizeof(void *))
 
 /**
- * Checks if the index given is in the range of the map's indices.
+ * Checks if the index given is in the range of the map.
  *
  * @param m
  *   fmap that gives us the maximum value that the index can have
@@ -363,9 +354,9 @@ int uk_fmap_critical_put(const struct uk_fmap *m, int idx, const void *p)
  * @param idx
  *   Index where we want to exchange the entries
  * @param p
- *	 Entry to be exchanged with
+ *   Entry to be exchanged with
  * @param prev
- *   Previous entry that has now been exchanged
+ *   Previous entry that has been replaced
  * @return
  *   0 on success, non-zero if `idx` out of range
  */

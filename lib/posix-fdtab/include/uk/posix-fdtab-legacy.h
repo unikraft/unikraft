@@ -16,11 +16,10 @@
 #include <vfscore/file.h>
 
 /**
- * Opens a vfscore_file structure and assigns it a new file descriptor number.
+ * Opens a legacy vfscore_file structure and assigns it a new file descriptor.
  *
  * @param vf
- *   Pointer to vfscore_file structure that contains information about the
- *   file, such as its file descriptor
+ *   Pointer to the vfscore_file to be opened; its fd field will be filled in
  * @return
  *   = 0, success
  *   < 0, failure
@@ -28,12 +27,14 @@
 int uk_fdtab_legacy_open(struct vfscore_file *vf);
 
 /**
- * Returns the vfscore_file structure with the given file descriptor number.
+ * Looks up a file descriptor and return the associated legacy vfscore_file.
+ *
+ * If the file descriptor maps to a different file type it is reported as free.
  *
  * @param fd
- *   File descriptor number for which to search
+ *   File descriptor to look up
  * @return
- *   Pointer to vfscore_file structure that has that file descriptor number
+ *   Pointer to the vfscore_file associated with fd
  */
 struct vfscore_file *uk_fdtab_legacy_get(int fd);
 

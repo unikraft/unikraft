@@ -21,9 +21,9 @@
  * The lifetime of `f` must cover the entirety of this function call.
  *
  * @param f
- *   File to be open
+ *   File to open
  * @param mode
- *   Mode in which to open the file
+ *   Mode flags to apply on the new open file description
  * @return
  *   The newly allocated file descriptor.
  */
@@ -35,7 +35,7 @@ int uk_fdtab_open(const struct uk_file *f, unsigned int mode);
  * Users should call uk_fdtab_ret when done with the open file reference.
  *
  * @param fd
- *   Descriptor for which to get the open file descriptor
+ *   File descriptor to look up
  * @return
  *   Open file reference or NULL if `fd` is not an open file descriptor.
  */
@@ -45,7 +45,7 @@ struct uk_ofile *uk_fdtab_get(int fd);
  * Returns a reference to an open file when done using it.
  *
  * @param of
- *   Open file descriptor to be returned
+ *   Reference to the open file description to be returned
  */
 void uk_fdtab_ret(struct uk_ofile *of);
 
@@ -53,9 +53,9 @@ void uk_fdtab_ret(struct uk_ofile *of);
  * Sets flags on file descriptor. Currently only supports O_CLOEXEC.
  *
  * @param fd
- *   File descriptor for which to set the flags
+ *   File descriptor on which to set the flags
  * @param flags
- *   Flags to set on that file descriptor
+ *   Flags to set on the file descriptor
  * @return
  *   0 if successful, < 0 if `fd` not mapped
  */
@@ -97,9 +97,9 @@ union uk_shim_file {
  * between vfscore_file and uk_ofile, writing the value in `*out`.
  *
  * @param fd
- *   File descriptor for which to get the open file descriptor
+ *   File descriptor to look up
  * @param out
- *   Open file description, either of type uk_ofile or of type vfscore_file
+ *   Open file description, of type either uk_ofile or vfscore_file
  * @return
  *   UK_SHIM_OFILE, if successful and `*out` is a uk_ofile
  *   UK_SHIM_LEGACY, if successful and `*out` is a vfscore_file
@@ -115,7 +115,7 @@ int uk_fdtab_shim_get(int fd, union uk_shim_file *out);
 /* Internal syscalls */
 
 /**
- * Closes the file with file descriptor fd.
+ * Closes a file descriptor.
  *
  * @param fd
  *   File descriptor to be closed
@@ -139,7 +139,7 @@ int uk_sys_dup(int oldfd);
 
 /**
  * Same as dup, but the caller can specify a minimum value for
- * the file descriptor to be assigned and some flags to be added to the new
+ * the file descriptor to be assigned and the flags to be set on the new
  * file descriptor.
  *
  * @param oldfd
@@ -155,14 +155,16 @@ int uk_sys_dup(int oldfd);
 int uk_sys_dup_min(int oldfd, int min, int flags);
 
 /**
- * Same as dup, but instead of using the lowest-numbered
- * unused file descriptor, it uses the file descriptor
- * number specified in newfd.
+ * Same as dup, but instead of using the lowest-numbered unused file descriptor,
+ * it uses the file descriptor specified in newfd.
+ *
+ * If newfd is already open it is silently closed.
+ * If newfd equals oldfd, this function does nothing.
  *
  * @param oldfd
  *   File descriptor associated with the open file description to be duplicated
  * @param newfd
- *   New file descriptor to point to the open file description
+ *   New file descriptor for the duplicated open file description
  * @return
  *   = 0, success
  *   < 0, failure
@@ -170,15 +172,17 @@ int uk_sys_dup_min(int oldfd, int min, int flags);
 int uk_sys_dup2(int oldfd, int newfd);
 
 /**
- * Same as dup2, but the caller can force the close-on-exec
- * flag to be set for the new file descriptor by specifying O_CLOEXEC in flags
+ * Same as dup2, except that:
+ * - The caller can force the close-on-exec flag to be set for the new file
+ *   descriptor by specifying O_CLOEXEC in flags.
+ * - If newfd equals oldfd, this function returns -EINVAL.
  *
  * @param oldfd
  *   File descriptor associated with the open file description to be duplicated
  * @param newfd
- *   New file descriptor to point to the open file description
+ *   New file descriptor for the duplicated open file description
  * @param flags
- *   Flags to be used when duplicating, currently only supports O_CLOEXEC
+ *   Flags to set on newfd, currently only supports O_CLOEXEC
  * @return
  *   = 0, success
  *   < 0, failure
