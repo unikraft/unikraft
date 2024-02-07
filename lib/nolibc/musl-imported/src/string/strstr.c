@@ -128,14 +128,14 @@ static char *twoway_strstr(const unsigned char *h, const unsigned char *n)
 	/* Search loop */
 	for (;;) {
 		/* Update incremental end-of-haystack pointer */
-		if (z - h < l) {
+		if (z - h < (long)l) {
 			/* Fast estimate for MAX(l, 63) */
 			__sz grow = l | 63;
 			const unsigned char *z2 = memchr(z, 0, grow);
 
 			if (z2) {
 				z = z2;
-				if (z - h < l)
+				if (z - h < (long)l)
 					return 0;
 			} else {
 				z += grow;
