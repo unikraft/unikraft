@@ -182,6 +182,7 @@ UK_SYSCALL_R_DEFINE(int, clock_gettime, clockid_t, clk_id, struct timespec*, tp)
 
 	switch (clk_id) {
 	case CLOCK_MONOTONIC:
+	case CLOCK_MONOTONIC_RAW:
 	case CLOCK_MONOTONIC_COARSE:
 	case CLOCK_BOOTTIME:
 		now = ukplat_monotonic_clock();
