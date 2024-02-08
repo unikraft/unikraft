@@ -250,6 +250,10 @@ struct uk_alloc *ukplat_memallocator_get(void);
  */
 void *ukplat_memregion_alloc(__sz size, int type, __u16 flags);
 
+void *stackmemory_aslr_palloc(__sz size);
+int uk_swrand_init(void);
+
+
 /**
  * Initializes the memory mapping based on the platform or architecture defined
  * unmapping memory region descriptor (named `bpt_unmap_mrd`). Based on this
