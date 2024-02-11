@@ -208,17 +208,18 @@ void *stackmemory_aslr_palloc(__sz size) {
 		/* Delete the old memory region to make space for the three new regions (before stack, stack, after stack) */
 		ukplat_memregion_list_delete(&ukplat_bootinfo_get()->mrds, __ukplat_memregion_foreach_i);
 
-		/* Insert the free region before the stack start address */
-		rc_b = ukplat_memregion_list_insert(&ukplat_bootinfo_get()->mrds,
-			&(struct ukplat_memregion_desc){
-				.vbase = PAGE_ALIGN_UP(tmp_pstart),
-				.pbase = PAGE_ALIGN_UP(tmp_pstart),
-				.len   = PAGE_ALIGN_UP(ASLR_offset),
-				.type  = UKPLAT_MEMRT_FREE,
-				.flags = UKPLAT_MEMRF_READ |
-					UKPLAT_MEMRF_WRITE |
-					UKPLAT_MEMRF_MAP,
-			});
+		/* Insert the free region before the stack start address if there is such a region*/
+		if (ASLR_offset != 0)
+			rc_b = ukplat_memregion_list_insert(&ukplat_bootinfo_get()->mrds,
+				&(struct ukplat_memregion_desc){
+					.vbase = PAGE_ALIGN_UP(tmp_pstart),
+					.pbase = PAGE_ALIGN_UP(tmp_pstart),
+					.len   = PAGE_ALIGN_UP(ASLR_offset),
+					.type  = UKPLAT_MEMRT_FREE,
+					.flags = UKPLAT_MEMRF_READ |
+						UKPLAT_MEMRF_WRITE |
+						UKPLAT_MEMRF_MAP,
+				});
 		if (unlikely(rc_b < 0)) {
 			/* Restore original region */
 			ukplat_memregion_list_insert(&ukplat_bootinfo_get()->mrds, &old_mrd);
