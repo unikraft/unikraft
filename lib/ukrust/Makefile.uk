@@ -23,27 +23,27 @@ LIBUKRUST_COMMON_FLAGS = --target=$(LIBUKRUST_BASE)/target.json --emit=dep-info,
 	-Dunsafe_op_in_unsafe_fn -Drust_2018_idioms \
 	--crate-type rlib
 
+LIBUKRUST_FLAGS = --target=$(LIBUKRUST_BASE)/target.json --emit=dep-info,obj,metadata --edition=2021 \
+	-Cpanic=abort -Cembed-bitcode=n -Clto=n -Crpath=n \
+	-Cforce-unwind-tables=n -Ccodegen-units=1 \
+	-Zbinary_dep_depinfo=y -Csymbol-mangling-version=v0 \
+	-Dunsafe_op_in_unsafe_fn -Drust_2018_idioms \
+	--crate-type staticlib
+
 # Generate rust bindings for the Unikraft API
-$(LIBUKRUST_BUILD)/bindings_generated.rs: $(LIBUKRUST_BASE)/ukrust_sys/bindings_helper.h
+$(LIBUKRUST_BUILD)/bindings_generated.rs: $(LIBUKRUST_BASE)/ukrust_sys/bindings_helper.h | preprocess
 	$(call build_cmd, BINDGEN, libukrust, $(notdir $@), \
 		bindgen -o $(LIBUKRUST_BUILD)/bindings_generated.rs --use-core --ctypes-prefix crate::c_types \
-		--with-derive-default --no-debug '.*' --size_t-is-usize \
+		--with-derive-default --no-debug '.*' \
 		$(LIBUKRUST_BASE)/ukrust_sys/bindings_helper.h -- $(CINCLUDES) \
 		$(CINCLUDES-y) -nobuiltininc -DMODULE -D__LIBNAME__=libukrust -D__BASENAME__=bindings_generated.rs)
 
 # Build the ukrust_sys crate, contains the bindings and other useful functions
-$(LIBUKRUST_BUILD)/ukrust_sys.o: $(LIBUKRUST_BASE)/ukrust_sys/lib.rs $(LIBUKRUST_BUILD)/core.o $(LIBUKRUST_BUILD)/compiler_builtins.o
-	$(call build_cmd, RUSTC, libukrust, $(notdir $@), \
-	$(RUSTC) $(LIBUKRUST_COMMON_FLAGS) --extern alloc  \
-		--out-dir $(LIBUKRUST_BUILD) -L $(LIBUKRUST_BUILD) -A dead_code \
-		-A unused_doc_comments --crate-name ukrust_sys $(LIBUKRUST_BASE)/ukrust_sys/lib.rs)
-
-
-$(LIBUKRUST_BUILD)/alloc.o: $(RUST_LIB_SRC)/alloc/src/lib.rs
+$(LIBUKRUST_BUILD)/ukrust_sys.o: $(LIBUKRUST_BASE)/ukrust_sys/lib.rs $(LIBUKRUST_BUILD)/core.o $(LIBUKRUST_BUILD)/compiler_builtins.o $(LIBUKRUST_BUILD)/bindings_generated.rs
 	$(call build_cmd, RUSTC, libukrust, $(notdir $@), \
 	$(RUSTC) $(LIBUKRUST_COMMON_FLAGS)  \
 		--out-dir $(LIBUKRUST_BUILD) -L $(LIBUKRUST_BUILD) -A dead_code \
-		-A unused_doc_comments --crate-name alloc $(RUST_LIB_SRC)/alloc/src/lib.rs)
+		-A unused_doc_comments --crate-name ukrust_sys $(LIBUKRUST_BASE)/ukrust_sys/lib.rs)
 
 $(LIBUKRUST_BUILD)/core.o: $(RUST_LIB_SRC)/core/src/lib.rs
 	$(call build_cmd, RUSTC, libukrust, $(notdir $@), \
@@ -58,11 +58,9 @@ $(LIBUKRUST_BUILD)/compiler_builtins.o: $(LIBUKRUST_BASE)/compiler_builtins.rs $
 		-A unused_doc_comments --crate-name compiler_builtins $(LIBUKRUST_BASE)/compiler_builtins.rs)
 
 # We build these objects first because they are standalone and may be used by any rust internal library
-UK_PREPARE-$(CONFIG_LIBUKRUST) += $(LIBUKRUST_BUILD)/bindings_generated.rs $(LIBUKRUST_BUILD)/ukrust_sys.o \
-		 $(LIBUKRUST_BUILD)/core.o $(LIBUKRUST_BUILD)/compiler_builtins.o
+# UK_PREPARE-$(CONFIG_LIBUKRUST) += $(LIBUKRUST_BUILD)/ukrust_sys.o \
+# 		 $(LIBUKRUST_BUILD)/core.o $(LIBUKRUST_BUILD)/compiler_builtins.o
 
-UK_PREPARE-$(CONFIG_LIBUKRUST) += $(LIBUKRUST_BUILD)/alloc.o
-LIBUKRUST_OBJS-y += $(LIBUKRUST_BUILD)/alloc.o
 
 LIBUKRUST_OBJS-y += $(LIBUKRUST_BUILD)/ukrust_sys.o
 LIBUKRUST_OBJS-y += $(LIBUKRUST_BUILD)/core.o
