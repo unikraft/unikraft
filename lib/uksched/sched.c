@@ -35,6 +35,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <sys/membarrier.h>
 #include <uk/plat/config.h>
 #include <uk/plat/time.h>
 #include <uk/alloc.h>
@@ -441,4 +442,51 @@ UK_SYSCALL_R_DEFINE(int, sched_setaffinity, int, pid, long, cpusetsize,
 {
 	UK_WARN_STUBBED();
 	return 0;
+}
+
+#define MEMBARRIER_SUPPORTED_CMDS (\
+	MEMBARRIER_CMD_GLOBAL | \
+	MEMBARRIER_CMD_GLOBAL_EXPEDITED | \
+	MEMBARRIER_CMD_REGISTER_GLOBAL_EXPEDITED | \
+	MEMBARRIER_CMD_PRIVATE_EXPEDITED | \
+	MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED | \
+	MEMBARRIER_CMD_PRIVATE_EXPEDITED_SYNC_CORE | \
+	MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED_SYNC_CORE)
+
+UK_LLSYSCALL_R_DEFINE(int, membarrier, int, cmd, unsigned int, flags,
+		      int __unused, cpu_id)
+{
+	/*
+	 * membarrier is intended as an optimized alternative to using SMP-safe
+	 * memory barriers in threads that might run in parallel.
+	 * In essence, it allows threads in the fast path to proceed without
+	 * barriers, while providing a safe option to trigger a barrier between
+	 * running threads on demand with the `membarrier` syscall.
+	 * Only threads actively executing on different cores are affected,
+	 * since sleeping threads are implicitly already "barriered".
+	 *
+	 * Without SMP support membarrier is a no-op, since only a single thread
+	 * -- the one calling membarrier -- can run at one time.
+	 * With SMP support, membarrier needs to force (a subset of) cores on
+	 * the system to execute memory barriers.
+	 */
+	if (unlikely(flags))
+		return -EINVAL;
+	switch (cmd) {
+	case MEMBARRIER_CMD_QUERY:
+		return MEMBARRIER_SUPPORTED_CMDS;
+	case MEMBARRIER_CMD_GLOBAL:
+	case MEMBARRIER_CMD_GLOBAL_EXPEDITED:
+	case MEMBARRIER_CMD_PRIVATE_EXPEDITED:
+	case MEMBARRIER_CMD_PRIVATE_EXPEDITED_SYNC_CORE:
+		/* TODO: implement real cross-core barrier when SMP supported */
+		return 0;
+	case MEMBARRIER_CMD_REGISTER_GLOBAL_EXPEDITED:
+	case MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED:
+	case MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED_SYNC_CORE:
+		/* Registrations not supported; no-op */
+		return 0;
+	default:
+		return -EINVAL;
+	}
 }
