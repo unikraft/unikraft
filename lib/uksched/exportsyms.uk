@@ -46,3 +46,5 @@ sched_getaffinity
 uk_syscall_e_sched_setaffinity
 uk_syscall_r_sched_setaffinity
 sched_setaffinity
+uk_syscall_e_membarrier
+uk_syscall_r_membarrier
