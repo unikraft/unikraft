@@ -271,8 +271,8 @@ struct uk_sched *uk_schedcoop_create(struct uk_alloc *a)
 	/* Create idle thread */
 	rc = uk_thread_init_fn1(&c->idle,
 				idle_thread_fn, (void *) c,
-				a, STACK_SIZE,
-				a, 0,  /* Default auxiliary stack size */
+				sa, STACK_SIZE,
+				auxsa, AUXSTACK_SIZE,
 				a, false,
 				NULL,
 				"idle",
