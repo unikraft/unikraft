@@ -323,20 +323,32 @@ ENTRY(lcpu_start64)
 #if (__AVX__ || CONFIG_HAVE_X86PKU)
 	/* Enable XSAVE feature */
 	LCPU_ENABLE_XSAVE fail
+#else /* !__AVX__ && !CONFIG_HAVE_X86PKU */
+	LCPU_ENABLE_XSAVE no_xsave
+no_xsave:
+#endif /* !__AVX__ && !CONFIG_HAVE_X86PKU */
+
 #if __AVX__
 	/* Enable AVX */
 	LCPU_ENABLE_AVX fail
-#endif /* __AVX__ */
-#endif /* __AVX__ || CONFIG_HAVE_X86PKU */
+#else /* !__AVX__ */
+	LCPU_ENABLE_AVX no_avx
+no_avx:
+#endif /* !__AVX__ */
 
 	/* Request extended CPU features */
 	movl	$7, %eax
 	xorl	%ecx, %ecx
 	cpuid
 
+#if __FSGSBASE__
 	/* Enable FS and GS base */
+	LCPU_ENABLE_FSGSBASE fail
+#else /* !__FSGSBASE__ */
 	LCPU_ENABLE_FSGSBASE no_fsgsbase
 no_fsgsbase:
+#endif /* !__FSGSBASE__ */
+
 #if CONFIG_HAVE_X86PKU
 	/* Enable memory protection keys (PKU) */
 	LCPU_ENABLE_PKU no_pku
