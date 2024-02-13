@@ -43,6 +43,10 @@
 #define UKARCH_SP_ALIGN		16
 #define UKARCH_SP_ALIGN_MASK	(UKARCH_SP_ALIGN - 1)
 
+/* Auxiliary stack pointer needs to be aligned to UKARCH_ECTX_ALIGN */
+#define UKARCH_AUXSP_ALIGN	UKARCH_ECTX_ALIGN
+#define UKARCH_AUXSP_ALIGN_MASK	(UKARCH_AUXSP_ALIGN - 1)
+
 #if !__ASSEMBLY__
 
 /*

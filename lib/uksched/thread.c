@@ -390,7 +390,7 @@ static int _uk_thread_struct_init_alloc(struct uk_thread *t,
 	int rc;
 
 	if (a_auxstack && auxstack_len) {
-		auxstack = uk_memalign(a_auxstack, UKPLAT_AUXSP_ALIGN,
+		auxstack = uk_memalign(a_auxstack, UKARCH_AUXSP_ALIGN,
 				       auxstack_len);
 		if (!auxstack) {
 			rc = -ENOMEM;
@@ -727,7 +727,7 @@ struct uk_thread *uk_thread_create_container(struct uk_alloc *a,
 						       ukarch_ectx_align());
 
 	stack_len = (!!stack_len) ? stack_len : STACK_SIZE;
-	auxstack_len = (!!auxstack_len) ? auxstack_len : UKPLAT_AUXSP_LEN;
+	auxstack_len = (!!auxstack_len) ? auxstack_len : AUXSTACK_SIZE;
 
 	if (_uk_thread_struct_init_alloc(t,
 					 a_stack, stack_len,
@@ -802,9 +802,9 @@ struct uk_thread *uk_thread_create_container2(struct uk_alloc *a,
 						       ukarch_ectx_align());
 
 	/* Allocate auxiliary stack */
-	auxstack_len = (!!auxstack_len) ? auxstack_len : UKPLAT_AUXSP_LEN;
+	auxstack_len = (!!auxstack_len) ? auxstack_len : AUXSTACK_SIZE;
 	if (a_auxstack && auxstack_len) {
-		auxstack = uk_memalign(a_auxstack, UKPLAT_AUXSP_ALIGN,
+		auxstack = uk_memalign(a_auxstack, UKARCH_AUXSP_ALIGN,
 				       auxstack_len);
 		if (!auxstack)
 			goto err_free_thread;

@@ -34,6 +34,7 @@
  */
 
 #include <uk/config.h>
+#include <uk/plat/config.h>
 
 #include <stddef.h>
 #include <stdio.h>
@@ -341,8 +342,8 @@ void ukplat_entry(int argc, char *argv[])
 	ukplat_tlsp_set(ukarch_tls_tlsp(tls));
 
 	/* Allocate auxiliary stack for this execution context */
-	auxstack = uk_memalign(uk_alloc_get_default(),
-			       UKPLAT_AUXSP_ALIGN, UKPLAT_AUXSP_LEN);
+	auxstack = uk_memalign(auxsa,
+			       UKARCH_AUXSP_ALIGN, AUXSTACK_SIZE);
 	if (unlikely(!auxstack))
 		UK_CRASH("Failed to allocate the auxiliary stack\n");
 	/* Activate auxiliary stack */
