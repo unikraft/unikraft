@@ -171,4 +171,23 @@ if LIBUKBOOT
 		This setting enables the init thread to initiate a shutdown
 		if it is requested by a driver on the shutdown_req event queue
 		(e.g., ACPI power button event).
+
+	config LIBUKBOOT_ALLOCSTACK
+	bool
+	default y if !LIBUKBOOT_NOALLOC
+	select LIBUKALLOCSTACK
+	depends on !LIBUKBOOT_NOALLOC
+
+if LIBUKBOOT_ALLOCSTACK
+		config LIBUKBOOT_ALLOCSTACK_PREMAP_ORDER
+		int "Minimal pre-mapped stack size"
+		default 1
+		depends on LIBUKVMEM
+		help
+			Indirectly configures the stack allocator pre-mapped size by
+			changing the stack size page order. Stack size is equal to
+			2 ^ order * page size (e.g. 4KB). Note that the last page
+			(or last page from top to bottom) will be the guard page.
+			Only change this if you know what you're doing.
+endif  # LIBUKBOOT_ALLOCSTACK
 endif

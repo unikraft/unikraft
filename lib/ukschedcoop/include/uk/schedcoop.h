@@ -44,7 +44,10 @@
 extern "C" {
 #endif
 
-struct uk_sched *uk_schedcoop_create(struct uk_alloc *a);
+struct uk_sched *uk_schedcoop_create(struct uk_alloc *a,
+				     struct uk_alloc *sa,
+				     struct uk_alloc *axusa,
+				     struct uk_alloc *tls_a);
 
 #ifdef __cplusplus
 }
