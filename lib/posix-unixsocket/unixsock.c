@@ -714,7 +714,7 @@ ssize_t unix_socket_recvfrom(posix_sock *file, void *restrict buf,
 	};
 	struct msghdr msg = {
 		.msg_name = from,
-		.msg_namelen = *fromlen,
+		.msg_namelen = fromlen ? *fromlen : 0,
 		.msg_iov = &iov,
 		.msg_iovlen = 1,
 		.msg_control = NULL,
@@ -723,7 +723,7 @@ ssize_t unix_socket_recvfrom(posix_sock *file, void *restrict buf,
 	};
 	ssize_t ret = unix_socket_recvmsg(file, &msg, flags);
 
-	if (ret >= 0)
+	if (fromlen && ret >= 0)
 		*fromlen = msg.msg_namelen;
 	return ret;
 }
