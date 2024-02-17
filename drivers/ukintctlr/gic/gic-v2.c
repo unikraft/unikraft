@@ -574,7 +574,6 @@ static int gicv2_do_probe(void)
 	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
 	int fdt_gic, r;
 	void *fdt;
-	struct uk_intctlr_plat_data in, out;
 
 	UK_ASSERT(bi);
 	fdt = (void *)bi->dtb;
@@ -599,15 +598,11 @@ static int gicv2_do_probe(void)
 		return r;
 	}
 
-	in.dist_addr = gicv2_drv.dist_mem_addr;
-	in.rdist_addr = gicv2_drv.cpuif_mem_addr;
-	r = uk_intctlr_plat_probe(&in, &out);
+	r = uk_intctlr_plat_probe(&gicv2_drv);
 	if (unlikely(r)) {
-		uk_pr_err("GICv3 initialization error");
+		uk_pr_err("GICv2 platform probe failed\n");
 		return r;
 	}
-	gicv2_drv.dist_mem_addr = out.dist_addr;
-	gicv2_drv.cpuif_mem_addr = out.rdist_addr;
 
 	return 0;
 }
