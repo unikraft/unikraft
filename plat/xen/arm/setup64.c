@@ -198,22 +198,22 @@ static inline void _get_cmdline(struct ukplat_bootinfo *bi)
 	bi->cmdline_len = cmdline_len;
 }
 
-int uk_intctlr_plat_probe(void *in, void *out)
+int uk_intctlr_plat_probe(void *arg)
 {
-	struct uk_intctlr_plat_data *dout = (struct uk_intctlr_plat_data *)out;
-	struct uk_intctlr_plat_data *din = (struct uk_intctlr_plat_data *)in;
+	struct _gic_dev *gic = (struct _gic_dev *)arg;
 
-	if (!in || !out)
-		return -EINVAL;
+	UK_ASSERT(gic);
 
 #if defined(__arm__)
-	dout->dist_addr = to_virt((long)fdt64_ld(din->dist_addr));
-	dout->rdist_addr = to_virt((long)fdt64_ld(din->rdist_addr));
+	gic->dist_mem_addr = to_virt((long)fdt64_ld(gic->dist_mem_addr));
+	gic->rdist_mem_addr = to_virt((long)fdt64_ld(gic->rdist_mem_addr));
 #else
 	set_pgt_entry(&fixmap_pgtable[l2_pgt_idx(FIX_GIC_START)],
-		      ((din->dist_addr & L2_MASK) | BLOCK_DEV_ATTR | L2_BLOCK));
-	dout->dist_addr = (FIX_GIC_START + (din->dist_addr & L2_OFFSET));
-	dout->rdist_addr = (FIX_GIC_START + (din->rdist_addr & L2_OFFSET));
+		      ((gic->dist_mem_addr & L2_MASK) |
+			BLOCK_DEV_ATTR | L2_BLOCK));
+	gic->dist_mem_addr = (FIX_GIC_START + (gic->dist_mem_addr & L2_OFFSET));
+	gic->rdist_mem_addr = (FIX_GIC_START + (gic->rdist_mem_addr &
+						L2_OFFSET));
 #endif
 	/* Setting memory barrier to get access to mapped pages */
 	wmb();
