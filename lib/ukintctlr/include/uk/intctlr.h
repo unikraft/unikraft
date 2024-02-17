@@ -192,12 +192,9 @@ int uk_intctlr_irq_fdt_xlat(const void *fdt, int nodeoffset, __u32 index,
  * For example some architectures with mmu support requires address
  * mapping to access registers.
  *
- * @param in pointer to the platform data that should be interpreted by
- * the driver
- * @param out result structure to that should be interpreted by
- * the driver
+ * @param pointer to driver data. These may be updated by the platform.
  */
-int uk_intctlr_plat_probe(void *in, void *out);
+int uk_intctlr_plat_probe(void *arg);
 
 #endif /* __ASSEMBLY__ */
 
