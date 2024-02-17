@@ -134,17 +134,6 @@ struct _gic_dev {
 	struct _gic_operations ops;
 };
 
-/** Platform specific initialization data */
-struct uk_intctlr_plat_data {
-#if defined(CONFIG_ARCH_ARM_64)
-	uint64_t dist_addr;
-	uint64_t rdist_addr;
-#elif defined(CONFIG_ARCH_ARM_32))
-	uint32_t dist_addr;
-	uint32_t rdist_addr;
-#endif /* CONFIG_ARCH_ARM_32 */
-};
-
 /**
  * Fetch data from an existing MADT's GICD table.
  *
