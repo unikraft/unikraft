@@ -37,6 +37,7 @@
 #ifndef __PLAT_KVM_X86_LCPU_HELPERS_S__
 #define __PLAT_KVM_X86_LCPU_HELPERS_S__
 
+#include <kvm-x86/serial_console.h>
 #include <uk/arch/lcpu.h>
 
 /**
@@ -150,4 +151,71 @@ ldmxcsr_rval_addr:
 	movq	%rdi, %rcx
 .endm
 
+/**
+ * Super basic enable macro for the widely available COM1 UART port. Can be run
+ * in any mode.
+ *
+ * @clobbers: RAX, RDX
+ */
+.macro LCPU_EARLY_COM1_INIT
+	/* Disable all IRQs */
+	xorl	%eax, %eax
+	movw	$COM1_INTR, %dx
+	outb	%al, (%dx)
+
+	/* Enable DLAB: Begin setting the baudrate divisor */
+	movb	$DLAB, %al
+	movw	$COM1_CTRL, %dx
+	outb	%al, (%dx)
+
+	/* Set low byte of the two byte divisor */
+	movb	$COM1_BAUDDIV_LO, %al
+	movw	$COM1_DIV_LO, %dx
+	outb	%al, (%dx)
+
+	/* Set high byte of the two byte divisor */
+	movb	$COM1_BAUDDIV_HI, %al
+	movw	$COM1_DIV_HI, %dx
+	outb	%al, (%dx)
+
+	/* 8 bits, no parity, one stop bit */
+	movb	$PROT, %al
+	movw	$COM1_CTRL, %dx
+	outb	%al, (%dx)
+.endm
+
+/**
+ * Super basic early printing to widely available COM1 UART port. Must be run
+ * in 64-bit mode of long mode at least so that we can use RIP-relative
+ * addressing.
+ *
+ * @param str: Address of C-string
+ * @clobbers: RAX, RDX, RSI
+ */
+.macro LCPU_EARLY_COM1_PRINT str:req
+	/* RSI = str */
+	leaq	\str(%rip), %rsi
+0:
+	/* TX queue must be empty */
+	movw	$COM1_STATUS, %dx
+	inb	(%dx), %al
+	andb	$0x20, %al
+	jz	0b
+
+	/* Fetch current character */
+	movb	0(%rsi), %al
+
+	/* Is it the NULL terminator? Then we are done printing the C-string. */
+	test	%al, %al
+	jz	1f
+
+	/* Send the current character out the COM1 data port */
+	movw	$COM1_DATA, %dx
+	outb	%al, (%dx)
+
+	/* Go to next character */
+	incq	%rsi
+	jmp	0b
+1:
+.endm
 #endif /* __PLAT_KVM_X86_LCPU_HELPERS_S__ */
