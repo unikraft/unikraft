@@ -50,6 +50,21 @@
 	 (size_t)virtio_net_hdr_size(_vndev))
 
 /**
+ * Currently there is a bug where if the net buffer (of size 2048) is split
+ * into more than one descriptor the VMM reports the vring as full and leading
+ * to us returning an error and wasting IRQs. The buffer would be split in
+ * multiple virtio descriptors if the scatter-gather list notices its span
+ * crosses more than one page (i.e. the buffer is not entirely contained in
+ * one page) since it is not guaranteed that the two virtually contiguous pages
+ * are also contiguous physically. To avoid having this happen make sure that
+ * the buffer is always contained in one page by having it aligned to half a
+ * page: if the buffer is half a page in size and it is also half a page aligned
+ * it is mathematically guaranteed to be entirely contained in one single
+ * page.
+ */
+#define VIRTIO_PKT_BUFFER_ALIGN			2048
+
+/**
  * When mergeable buffers are not negotiated, the virtio_net_hdr_padded struct
  * below is placed at the beginning of the netbuf data. Use 4 bytes of pad to
  * both keep the VirtIO header and the data non-contiguous and to keep the
@@ -1184,7 +1199,7 @@ static void virtio_net_info_get(struct uk_netdev *dev,
 	dev_info->max_mtu = vndev->max_mtu;
 	dev_info->nb_encap_tx = VTNET_HDR_SIZE_PADDED(vndev);
 	dev_info->nb_encap_rx = VTNET_HDR_SIZE_PADDED(vndev);
-	dev_info->ioalign = sizeof(void *); /* word size alignment */
+	dev_info->ioalign = VIRTIO_PKT_BUFFER_ALIGN;
 
 	dev_info->features = UK_NETDEV_F_RXQ_INTR
 		| (VIRTIO_FEATURE_HAS(vndev->vdev->features, VIRTIO_NET_F_CSUM)
