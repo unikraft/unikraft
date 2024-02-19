@@ -15,9 +15,6 @@ config LIBPOSIX_PROCESS_MAX_PID
 	range 1 32767
 	default 31
 
-config LIBPOSIX_PROCESS_INIT_PIDS
-	bool "Assign PID during boot"
-
 endif
 
 menuconfig LIBPOSIX_PROCESS_SIGNAL
