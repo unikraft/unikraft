@@ -86,66 +86,84 @@ static inline int uk_vma_map_anon(struct uk_vas *vas, __vaddr_t *vaddr,
 }
 
 /**
- * Stack -----------------------------------------------------------------------
- *
- * A stack VMA can be used as thread stack that   ┌────────────┐    Stack Base
+ * Stack ----------------------------------------------------------------------
+ *                                                ┌────────────┐
+ *                                                │ GUARD PAGE │
+ * A stack VMA can be used as a thread stack that ├────────────┤    Stack Base
  * automatically grows as needed. The stack       │/  /  /  /  │ │
- * behaves like regular anonymous memory with a   │  /STACK/  /│ │
- * guard page at the end to detect simple stack   │ /  /  /  / │ │
+ * behaves like regular anonymous memory with     │  /STACK/  /│ │
+ * guard pages at both ends to detect simple stack│ /  /  /  / │ │
  * overflows. Furthermore, it cannot be split     ├────────────┤ ▼  Stack Top
  * into multiple VMAs or merged with neighboring  │            │
  * ones. The stack has an initial size and        │            │
  * grows up to the full size of the VMA. Due to   │  RESERVED  │
- * the guard page the maximum actual stack size   │            │
- * is one page less than the VMA size. Memory is  │            │
+ * the guard pages the actual stack size          │            │
+ * is bigger than the desired VMA size. Memory is │            │
  * only consumed for the allocated parts. Stack   ├────────────┤
  * memory is not freed after having been          │ GUARD PAGE │
  * allocated on the first touch.                  └────────────┘
  *
- * Stack VMAs are never merged or split to keep the guard page intact.
+ * Stack VMAs are never merged or split to keep the guard pages intact.
  */
 extern const struct uk_vma_ops uk_vma_stack_ops;
 
 /* Stack flags */
 #define UK_VMA_STACK_GROWS_UP		(0x1UL << UK_VMA_MAP_EXTF_SHIFT)
 
+#define UK_VMA_STACK_TOP_GUARD_SIZE				\
+	(CONFIG_LIBUKVMEM_STACK_GUARD_PAGES_TOP * PAGE_SIZE)
+
+#define UK_VMA_STACK_BOTTOM_GUARD_SIZE				\
+	(CONFIG_LIBUKVMEM_STACK_GUARD_PAGES_BOTTOM * PAGE_SIZE)
+
+#define UK_VMA_STACK_GUARDS_SIZE				\
+	(UK_VMA_STACK_TOP_GUARD_SIZE + UK_VMA_STACK_BOTTOM_GUARD_SIZE)
+
 /**
  * Creates a new stack VMA. See uk_vma_map() for a description of the
  * parameters not listed here.
  *
- * @param initial_len
- *   Number of bytes pre-allocated for the stack. Note that one page will be
- *   reserved as guard page.
+ * NOTE: len does not include the total size of the guards.
+ *
+ * @param premapped_len
+ *   Number of bytes pre-allocated for the stack.
  */
 static inline int uk_vma_map_stack(struct uk_vas *vas, __vaddr_t *vaddr,
 				   __sz len, unsigned long flags,
-				   const char *name, __sz initial_len)
+				   const char *name, __sz premapped_len)
 {
-	int rc;
 	__vaddr_t va;
+	int rc;
 
-	UK_ASSERT(len >= 2 * PAGE_SIZE); /* one page + guard page */
-	UK_ASSERT(PAGE_ALIGNED(initial_len));
+	UK_ASSERT(PAGE_ALIGNED(premapped_len));
 	UK_ASSERT(UK_VMA_MAP_SIZE_TO_ORDER(flags) == 0);
 
 	flags |= UK_VMA_MAP_SIZE(PAGE_SHIFT);
 
 	/* Just populate the whole stack */
-	if (initial_len >= len - PAGE_SIZE)
+	if (premapped_len >= len) {
+		premapped_len = len;
 		flags |= UK_VMA_MAP_POPULATE;
+	}
 
-	rc = uk_vma_map(vas, vaddr, len, PAGE_ATTR_PROT_RW, flags, name,
+	rc = uk_vma_map(vas, vaddr, len + UK_VMA_STACK_GUARDS_SIZE,
+			PAGE_ATTR_PROT_RW, flags, name,
 			&uk_vma_stack_ops, __NULL);
-	if (rc || initial_len == 0 || (flags & UK_VMA_MAP_POPULATE))
+	if (unlikely(rc))
 		return rc;
 
 	UK_ASSERT(PAGE_ALIGNED(len));
 
+	*vaddr += UK_VMA_STACK_BOTTOM_GUARD_SIZE;
+
+	if (!premapped_len)
+		return 0;
+
 	va = *vaddr;
 	if (!(flags & UK_VMA_STACK_GROWS_UP))
-		va += len - initial_len;
+		va += len - premapped_len;
 
-	return uk_vma_advise(vas, va, initial_len, UK_VMA_ADV_WILLNEED, 0);
+	return uk_vma_advise(vas, va, premapped_len, UK_VMA_ADV_WILLNEED, 0);
 }
 
 /**
