@@ -115,6 +115,37 @@ __sz uk_nofault_memcpy(char *dst, const char *src, __sz len,
 	   (uk_nofault_memcpy((char *)(ptr), (const char *)&_v, sizeof(_v), 0)\
 		== sizeof(_v)); })
 
+/**
+ * Tries to read the value from a given pointer with on-demand paging disabled
+ *
+ * @param var
+ *   Variable to read the value into
+ * @param ptr
+ *   Memory address to read from
+ *
+ * @return
+ *   non-zero value on success, 0 otherwise
+ */
+#define uk_nofault_try_read_nopaging(v, ptr)				\
+	(uk_nofault_memcpy((char *)&(v), (const char *)(ptr), sizeof(v),\
+			   UK_NOFAULTF_NOPAGING) == sizeof(v))
+
+/**
+ * Tries to write a value to the given pointer with on-demand paging disabled
+ *
+ * @param value
+ *   Value that should be written
+ * @param ptr
+ *   Memory address to write to
+ *
+ * @return
+ *   non-zero value on success, 0 otherwise
+ */
+#define uk_nofault_try_write_nopaging(value, ptr)			\
+	({ typeof(value) _v = (value);					\
+	   (uk_nofault_memcpy((char *)(ptr), (const char *)&_v, sizeof(_v),\
+			      UK_NOFAULTF_NOPAGING) == sizeof(_v)); })
+
 #ifdef __cplusplus
 }
 #endif
