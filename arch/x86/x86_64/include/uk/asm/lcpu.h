@@ -146,12 +146,14 @@ static inline void ukarch_spinwait(void)
 #define X86_CPUID1_EDX_PAT      (1 << 16)
 #define X86_CPUID1_EDX_FXSR     (1 << 24)
 #define X86_CPUID1_EDX_SSE      (1 << 25)
-/* CPUID feature bits in EBX and ECX when EAX=7, ECX=0 */
+/* CPUID feature bits in EBX, ECX and EDX when EAX=7, ECX=0 */
 #define X86_CPUID7_EBX_FSGSBASE (1 << 0)
 #define X86_CPUID7_ECX_PKU	(1 << 3)
 #define X86_CPUID7_ECX_OSPKE	(1 << 4)
 #define X86_CPUID7_ECX_LA57		(1 << 16)
 #define X86_CPUID7_EBX_RDSEED		(1 << 18)
+#define X86_CPUID7_ECX_CET_SS		(1 << 7)
+#define X86_CPUID7_EDX_CET_IBT		(1 << 20)
 /* CPUID feature bits when EAX=0xd, ECX=1 */
 #define X86_CPUIDD1_EAX_XSAVEOPT (1<<0)
 /* CPUID 80000001H:EDX feature list */
