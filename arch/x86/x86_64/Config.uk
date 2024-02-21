@@ -96,4 +96,14 @@ config X86_64_HAVE_RANDOM
 	help
 	  Enable processor-generated randomness. This uses the RDRAND / RDSEED
 	  instructions provided by Intel's DRNG technology.
+
+config X86_64_CET_IBT
+	bool "CET Indirect Branch Tracker"
+	help
+	 Enable CET Indirect Branch Tracker
+
+config X86_64_CET_SS
+	bool "CET Shadow Stack"
+	help
+	 Enable CET Shadow Stack
 endmenu
