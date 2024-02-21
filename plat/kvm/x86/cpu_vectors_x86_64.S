@@ -178,6 +178,7 @@ TRAP_ENTRY alignment_check,  1
 TRAP_ENTRY machine_check,    0
 TRAP_ENTRY simd_error,       0
 TRAP_ENTRY virt_error,       0
+TRAP_ENTRY security_error,   1
 
 .set irqno, 0
 .rept IDT_NUM_ENTRIES-32
