@@ -217,7 +217,7 @@ void *unix_socket_create(struct posix_socket_driver *d,
 		if (type == SOCK_DGRAM) {
 			/* Create rpipe */
 			struct uk_file *pipes[2];
-			int r = uk_pipefile_create(pipes, O_DIRECT);
+			int r = uk_pipefile_create(pipes);
 			if (unlikely(r)) {
 				uk_free(d->allocator, data);
 				data = ERR2PTR(r);
@@ -280,7 +280,6 @@ int unix_socket_socketpair(struct posix_socket_driver *d,
 	int ret;
 	struct unix_sock_data *dat[2];
 	struct uk_file *pipes[2][2];
-	int flags;
 
 	if (unlikely(family != AF_UNIX))
 		return -EAFNOSUPPORT;
@@ -302,11 +301,10 @@ int unix_socket_socketpair(struct posix_socket_driver *d,
 		goto err_free0;
 	}
 
-	flags = type != SOCK_STREAM ? O_DIRECT : 0;
-	ret = uk_pipefile_create(pipes[0], flags);
+	ret = uk_pipefile_create(pipes[0]);
 	if (unlikely(ret))
 		goto err_free;
-	ret = uk_pipefile_create(pipes[1], flags);
+	ret = uk_pipefile_create(pipes[1]);
 	if (unlikely(ret))
 		goto err_release;
 
@@ -576,7 +574,6 @@ int unix_sock_connect_stream(posix_sock *file, posix_sock *target)
 	struct unix_sock_data *data = posix_sock_get_data(file);
 	struct unix_sock_data *td;
 	struct uk_file *pipes[2][2];
-	int flags;
 	struct unix_listenmsg *lmsg;
 
 	/* Wlock target sock */
@@ -604,11 +601,10 @@ int unix_sock_connect_stream(posix_sock *file, posix_sock *target)
 		goto err_out;
 	}
 	/* Create pipes */
-	flags = data->type != SOCK_STREAM ? O_DIRECT : 0;
-	err = uk_pipefile_create(pipes[0], flags);
+	err = uk_pipefile_create(pipes[0]);
 	if (unlikely(err))
 		goto err_out;
-	err = uk_pipefile_create(pipes[1], flags);
+	err = uk_pipefile_create(pipes[1]);
 	if (unlikely(err))
 		goto err_release;
 
@@ -843,7 +839,8 @@ ssize_t unix_socket_sendmsg(posix_sock *file,
 			: -ENOTCONN;
 
 	uk_file_wlock(wpipe);
-	ret = uk_file_write(wpipe, msg->msg_iov, msg->msg_iovlen, 0, 0);
+	ret = uk_file_write(wpipe, msg->msg_iov, msg->msg_iovlen, 0,
+			    data->type != SOCK_STREAM ? O_DIRECT : 0);
 	uk_file_wunlock(data->wpipe);
 	/* We ignore ancillary data for now */
 
