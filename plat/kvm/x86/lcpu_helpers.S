@@ -163,20 +163,32 @@ ldmxcsr_rval_addr:
 	xorq	%rcx, %rcx
 	cpuid
 
+#if CONFIG_X86_64_CET_IBT
 	testl $(X86_CPUID7_EDX_CET_IBT), %edx
+#if CONFIG_X86_64_CET_SS
 	jz no_ibt_support
 	jmp enable_ibt
+#else
+	jz \no_cet_label
+	jmp enable_ibt
+#endif
+#endif
 
+#if CONFIG_X86_64_CET_SS
 no_ibt_support:
 	testl	$(X86_CPUID7_ECX_CET_SS), %ecx
 	jz		\no_cet_label
 	jmp enable_cr4_cet
+#endif
 
+#if CONFIG_X86_64_CET_IBT
 enable_ibt:
 	movl $(MSR_IA32_S_CET), %ecx
 	movl $(X86_CET_ENDBR_EN | X86_CET_NO_TRACK_EN), %eax
 	xorl %edx, %edx
 	wrmsr
+#endif
+
 enable_cr4_cet:
 	movq	%cr4, %rax
 	orq		$(X86_CR4_CET), %rax
