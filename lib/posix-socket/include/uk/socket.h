@@ -42,6 +42,8 @@
 
 #include <sys/socket.h>
 
+#include <uk/config.h>
+
 struct posix_socket_driver;
 
 struct posix_socket_node {
@@ -69,11 +71,13 @@ const struct uk_file *uk_socket_accept(const struct uk_file *sock, int blocking,
 				       struct sockaddr *addr,
 				       socklen_t *addr_len, int flags);
 
+#if CONFIG_LIBPOSIX_FDTAB
 int uk_sys_socket(int family, int type, int protocol);
 
 int uk_sys_socketpair(int family, int type, int protocol, int sv[2]);
 
 int uk_sys_accept(const struct uk_file *sock, int blocking,
 		  struct sockaddr *addr, socklen_t *addr_len, int flags);
+#endif /* CONFIG_LIBPOSIX_FDTAB */
 
 #endif /* __UK_SOCKET__ */
