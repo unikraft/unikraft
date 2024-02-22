@@ -10,7 +10,7 @@
 #define __UK_POSIX_FDTAB_H__
 
 #include <uk/config.h>
-#include <uk/ofile.h>
+#include <uk/posix-fd.h>
 
 #define UK_LIBPOSIX_FDTAB_INIT_PRIO	UK_PRIO_EARLIEST
 #define UK_FD_MAX INT_MAX

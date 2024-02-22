@@ -12,7 +12,38 @@
 #include <fcntl.h>
 #include <sys/epoll.h>
 
-#include <uk/ofile.h>
+#include <uk/essentials.h>
+#include <uk/file.h>
+#include <uk/mutex.h>
+#include <uk/refcount.h>
+
+/* Open file description */
+struct uk_ofile {
+	const struct uk_file *file;
+	unsigned int mode;
+	__atomic refcnt;
+	off_t pos; /* Current file read/write offset position */
+	struct uk_mutex lock; /* Lock for modifying open file state */
+};
+
+/**
+ * Initialize an open file description with a refcount of 1.
+ *
+ * @param of Open file description to be initialized
+ * @param f File to reference
+ * @param mode Mode bits of open file description
+ */
+static inline
+void uk_ofile_init(struct uk_ofile *of,
+		   const struct uk_file *f, unsigned int mode)
+{
+	uk_refcount_init(&of->refcnt, 1);
+	uk_mutex_init(&of->lock);
+	of->file = f;
+	of->mode = mode;
+	of->pos = 0;
+}
+
 
 /* Mode bits from fcntl.h that open files are interested in */
 #define UKFD_MODE_MASK \

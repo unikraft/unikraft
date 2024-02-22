@@ -103,12 +103,14 @@ static inline struct fdval fdtab_decode(void *p)
 }
 
 /* struct uk_ofile allocation & refcounting */
-static inline struct uk_ofile *ofile_new(struct uk_fdtab *tab)
+static inline struct uk_ofile *ofile_new(struct uk_fdtab *tab,
+					 const struct uk_file *f,
+					 unsigned int mode)
 {
 	struct uk_ofile *of = uk_malloc(tab->alloc, sizeof(*of));
 
 	if (of)
-		uk_ofile_init(of);
+		uk_ofile_init(of, f, mode);
 	return of;
 }
 static inline void ofile_del(struct uk_fdtab *tab, struct uk_ofile *of)
@@ -171,16 +173,10 @@ int uk_fdtab_open(const struct uk_file *f, unsigned int mode)
 	UK_ASSERT(f);
 
 	tab = _active_tab();
-	of = ofile_new(tab);
+	of = ofile_new(tab, f, mode & ~O_CLOEXEC);
 	if (!of)
 		return -ENOMEM;
-	/* Take refs on file & ofile */
 	uk_file_acquire(f);
-	ofile_acq(of);
-	/* Prepare open file */
-	of->file = f;
-	of->pos = 0;
-	of->mode = mode & ~O_CLOEXEC;
 	/* Place the file in fdtab */
 	flags = (mode & O_CLOEXEC) ? UK_FDTAB_CLOEXEC : 0;
 	entry = fdtab_encode(of, flags);

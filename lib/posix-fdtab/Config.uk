@@ -2,6 +2,7 @@ menuconfig LIBPOSIX_FDTAB
 	bool "posix-fdtab: File descriptor table"
 	select LIBUKATOMIC
 	select LIBUKFILE
+	select LIBPOSIX_FD
 
 if LIBPOSIX_FDTAB
 	config LIBPOSIX_FDTAB_MAXFDS
@@ -11,6 +12,5 @@ if LIBPOSIX_FDTAB
 	# Hidden, selected by core components when needed
 	config LIBPOSIX_FDTAB_LEGACY_SHIM
 	bool
-	default n
 
 endif
