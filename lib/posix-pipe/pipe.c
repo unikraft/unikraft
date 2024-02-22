@@ -13,7 +13,11 @@
 #include <uk/file/nops.h>
 #include <uk/posix-fd.h>
 #include <uk/posix-pipe.h>
+
+#if CONFIG_LIBPOSIX_FDTAB
+#include <uk/posix-fdtab.h>
 #include <uk/syscall.h>
+#endif /* CONFIG_LIBPOSIX_FDTAB */
 
 
 #define PIPE_SIZE (1L << CONFIG_LIBPOSIX_PIPE_SIZE_ORDER)
@@ -400,6 +404,7 @@ int uk_pipefile_create(struct uk_file *pipes[2])
 	return 0;
 }
 
+#if CONFIG_LIBPOSIX_FDTAB
 /* Internal syscalls */
 
 #define _OPEN_FLAGS (O_CLOEXEC|O_NONBLOCK|O_DIRECT)
@@ -456,3 +461,4 @@ UK_SYSCALL_R_DEFINE(int, pipe2, int *, pipefd, int, flags)
 {
 	return uk_sys_pipe(pipefd, flags);
 }
+#endif /* CONFIG_LIBPOSIX_FDTAB */
