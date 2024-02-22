@@ -1,5 +1,4 @@
 config LIBPOSIX_EVENTFD
 	bool "posix-eventfd: Support for eventfd files"
 	select LIBPOSIX_FDIO
-	select LIBPOSIX_FDTAB
 	select LIBNOLIBC if !HAVE_LIBC
