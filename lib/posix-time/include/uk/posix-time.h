@@ -15,6 +15,7 @@ int uk_sys_nanosleep(const struct timespec *req, struct timespec *rem);
 time_t uk_sys_time(time_t *tloc);
 
 int uk_sys_gettimeofday(struct timeval *restrict tv, void *tz);
+int uk_sys_settimeofday(struct timeval *tv, void *tz);
 
 int uk_sys_clock_getres(clockid_t clockid, struct timespec *res);
 

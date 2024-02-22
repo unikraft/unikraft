@@ -161,6 +161,17 @@ UK_SYSCALL_R_DEFINE(int, gettimeofday, struct timeval *restrict, tv,
 	return uk_sys_gettimeofday(tv, tz);
 }
 
+int uk_sys_settimeofday(struct timeval *tv __unused, void *tz __unused)
+{
+	UK_WARN_STUBBED();
+	return 0;
+}
+
+UK_SYSCALL_R_DEFINE(int, settimeofday, struct timeval *, tv, void *, tz)
+{
+	return uk_sys_settimeofday(tv, tz);
+}
+
 int uk_sys_clock_getres(clockid_t clk_id, struct timespec *tp)
 {
 	int error;
