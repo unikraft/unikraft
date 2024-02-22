@@ -44,7 +44,6 @@
 #include <uk/socket.h>
 #include <uk/file.h>
 #include <uk/file/nops.h>
-#include <uk/posix-fdtab.h>
 #include <uk/posix-fd.h>
 #include <uk/errptr.h>
 #include <uk/print.h>
@@ -52,6 +51,10 @@
 #include <uk/syscall.h>
 #include <uk/essentials.h>
 #include <errno.h>
+
+#if CONFIG_LIBPOSIX_FDTAB
+#include <uk/posix-fdtab.h>
+#endif /* CONFIG_LIBPOSIX_FDTAB */
 
 #include "events.h"
 
@@ -73,7 +76,7 @@ struct socket_alloc {
 #endif /* CONFIG_LIBPOSIX_SOCKET_EVENTS */
 };
 
-
+#if CONFIG_LIBPOSIX_FDTAB
 static struct uk_ofile *socketfd_get(int fd)
 {
 	struct uk_ofile *of = uk_fdtab_get(fd);
@@ -86,7 +89,7 @@ static struct uk_ofile *socketfd_get(int fd)
 	}
 	return of;
 }
-
+#endif /* CONFIG_LIBPOSIX_FDTAB */
 
 static ssize_t
 socket_read(const struct uk_file *sock,
@@ -270,7 +273,7 @@ struct uk_file *uk_socket_create(int family, int type, int protocol)
 }
 
 /* Internal API & Syscalls */
-
+#if CONFIG_LIBPOSIX_FDTAB
 int uk_sys_socket(int family, int type, int protocol)
 {
 	int fd;
@@ -309,6 +312,7 @@ UK_SYSCALL_R_DEFINE(int, socket, int, family, int, type, int, protocol)
 
 	return ret;
 }
+#endif /* CONFIG_LIBPOSIX_FDTAB */
 
 const struct uk_file *uk_socket_accept(const struct uk_file *sock, int blocking,
 				       struct sockaddr *addr,
@@ -349,6 +353,7 @@ const struct uk_file *uk_socket_accept(const struct uk_file *sock, int blocking,
 	return &al->f;
 }
 
+#if CONFIG_LIBPOSIX_FDTAB
 int uk_sys_accept(const struct uk_file *sock, int blocking,
 		  struct sockaddr *addr, socklen_t *addr_len, int flags)
 {
@@ -908,6 +913,8 @@ ssize_t send(int sock, const void *buf, size_t len, int flags)
 }
 #endif /* UK_LIBC_SYSCALLS */
 
+#endif /* CONFIG_LIBPOSIX_FDTAB */
+
 
 int uk_socketpair_create(int family, int type, int protocol,
 			 const struct uk_file *sv[2])
@@ -952,6 +959,7 @@ err_free:
 	return ret;
 }
 
+#if CONFIG_LIBPOSIX_FDTAB
 int uk_sys_socketpair(int family, int type, int protocol, int sv[2])
 {
 	int ret;
@@ -1009,3 +1017,4 @@ UK_SYSCALL_R_DEFINE(int, socketpair, int, family, int, type, int, protocol,
 		trace_posix_socket_socketpair_ret(ret);
 	return ret;
 }
+#endif /* CONFIG_LIBPOSIX_FDTAB */
