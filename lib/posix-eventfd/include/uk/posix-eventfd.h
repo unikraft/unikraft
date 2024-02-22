@@ -13,6 +13,8 @@
 
 struct uk_file *uk_eventfile_create(unsigned int count, int flags);
 
+#if CONFIG_LIBPOSIX_FDTAB
 int uk_sys_eventfd(unsigned int count, int flags);
+#endif /* CONFIG_LIBPOSIX_FDTAB */
 
 #endif /* __UK_POSIX_EVENTFD_H__ */
