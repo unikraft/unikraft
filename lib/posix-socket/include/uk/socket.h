@@ -40,6 +40,8 @@
 #ifndef __UK_SOCKET__
 #define __UK_SOCKET__
 
+#include <sys/socket.h>
+
 struct posix_socket_driver;
 
 struct posix_socket_node {
@@ -57,5 +59,21 @@ struct posix_socket_node {
 #endif /* !CONFIG_LIBPOSIX_SOCKET_PRINT_ERRORS */
 
 #include <uk/socket_driver.h>
+
+struct uk_file *uk_socket_create(int family, int type, int protocol);
+
+int uk_socketpair_create(int family, int type, int protocol,
+			 const struct uk_file *sv[2]);
+
+const struct uk_file *uk_socket_accept(const struct uk_file *sock, int blocking,
+				       struct sockaddr *addr,
+				       socklen_t *addr_len, int flags);
+
+int uk_sys_socket(int family, int type, int protocol);
+
+int uk_sys_socketpair(int family, int type, int protocol, int sv[2]);
+
+int uk_sys_accept(const struct uk_file *sock, int blocking,
+		  struct sockaddr *addr, socklen_t *addr_len, int flags);
 
 #endif /* __UK_SOCKET__ */
