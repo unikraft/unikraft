@@ -13,12 +13,15 @@
 #include <uk/errptr.h>
 #include <uk/file/nops.h>
 #include <uk/posix-fd.h>
-#include <uk/posix-fdtab.h>
 #include <uk/posix-time.h>
 #include <uk/posix-timerfd.h>
 #include <uk/sched.h>
 #include <uk/timeutil.h>
+
+#if CONFIG_LIBPOSIX_FDTAB
+#include <uk/posix-fdtab.h>
 #include <uk/syscall.h>
+#endif /* CONFIG_LIBPOSIX_FDTAB */
 
 
 static const char TIMERFD_VOLID[] = "timerfd_vol";
@@ -358,6 +361,7 @@ int uk_sys_timerfd_gettime(const struct uk_file *f,
 	return 0;
 }
 
+#if CONFIG_LIBPOSIX_FDTAB
 /* Syscalls */
 
 UK_SYSCALL_R_DEFINE(int, timerfd_create, int, id, int, flags)
@@ -399,3 +403,4 @@ UK_SYSCALL_R_DEFINE(int, timerfd_gettime, int, fd,
 	uk_fdtab_ret(of);
 	return r;
 }
+#endif /* CONFIG_LIBPOSIX_FDTAB */
