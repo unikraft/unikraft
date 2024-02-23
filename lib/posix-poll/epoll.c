@@ -357,9 +357,11 @@ void eventpoll_notify_close(struct vfscore_file *fp)
 
 		UK_ASSERT(ent->legacy);
 		sf.vfile = ent->vf;
+		uk_file_wlock(leg->epf);
 		entp = epoll_find(leg->epf, ent->fd, 1, sf);
 		UK_ASSERT(*entp == ent);
 		epoll_entry_del(leg->epf, entp);
+		uk_file_wunlock(leg->epf);
 	}
 }
 #endif /* CONFIG_LIBVFSCORE */
