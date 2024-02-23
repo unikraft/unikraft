@@ -66,8 +66,6 @@ struct virtqueue {
 	virtqueue_callback_t vq_callback;
 	/* Next entry of the queue */
 	UK_TAILQ_ENTRY(struct virtqueue) next;
-	/* EVENT_IDX notification suppression is used */
-	__u8 uses_event_idx;
 	/* Private data structure used by the driver of the queue */
 	void *priv;
 };
@@ -137,17 +135,6 @@ int virtqueue_ring_interrupt(void *obj);
  *	The negotiated feature set.
  */
 __u64 virtqueue_feature_negotiate(__u64 feature_set);
-
-/**
- * Check if host notification is enabled.
- *
- * @param vq
- *	Reference to the virtqueue.
- * @return
- *	Returns 1, host needs notification on new descriptors.
- *		0, otherwise.
- */
-int virtqueue_notify_enabled(struct virtqueue *vq);
 
 /**
  * Remove the user buffer from the virtqueue.
@@ -272,22 +259,7 @@ int virtqueue_intr_enable(struct virtqueue *vq);
  * @param vq
  *      Reference to the virtual queue.
  */
-static inline void virtqueue_host_notify(struct virtqueue *vq)
-{
-	UK_ASSERT(vq);
-
-	/*
-	 * Before notifying the virtio backend on the host we should make sure
-	 * that the virtqueue index update operation happened. Note that this
-	 * function is declared as inline.
-	 */
-	mb();
-
-	if (vq->vq_notify_host && virtqueue_notify_enabled(vq)) {
-		uk_pr_debug("notify queue %d\n", vq->queue_id);
-		vq->vq_notify_host(vq->vdev, vq->queue_id);
-	}
-}
+void virtqueue_host_notify(struct virtqueue *vq);
 
 #ifdef __cplusplus
 }
