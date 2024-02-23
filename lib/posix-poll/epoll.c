@@ -380,7 +380,7 @@ struct uk_file *uk_epollfile_create(void)
 	al->alloc = a;
 	al->list = NULL;
 	al->fstate = UK_FILE_STATE_INIT_VALUE(al->fstate);
-	al->frefcnt = UK_FILE_REFCNT_INIT_VALUE;
+	al->frefcnt = UK_FILE_REFCNT_INIT_VALUE(al->frefcnt);
 	al->f = (struct uk_file){
 		.vol = EPOLL_VOLID,
 		.node = &al->list,
