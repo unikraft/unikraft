@@ -72,6 +72,10 @@ struct virtqueue_vring {
 	__u16 head_free_desc;
 	/* Index of the last used descriptor by the host */
 	__u16 last_used_desc_idx;
+	/* EVENT_IDX notification suppression is used */
+	__u8 uses_event_idx;
+	/* EVENT_IDX last notified idx */
+	__u16 last_notified_idx;
 	/* Cookie to identify driver buffer */
 	struct virtqueue_desc_info vq_info[];
 };
@@ -103,7 +107,7 @@ void virtqueue_intr_disable(struct virtqueue *vq)
 
 	vrq = to_virtqueue_vring(vq);
 
-	if (vq->uses_event_idx) {
+	if (vrq->uses_event_idx) {
 		vring_used_event(&vrq->vring) =
 			vrq->last_used_desc_idx - vrq->vring.num - 1;
 		return;
@@ -121,7 +125,7 @@ int virtqueue_intr_enable(struct virtqueue *vq)
 	vrq = to_virtqueue_vring(vq);
 	/* Check if there are no more packets enabled */
 	if (!virtqueue_hasdata(vq)) {
-		if (vq->uses_event_idx) {
+		if (vrq->uses_event_idx) {
 			/* TODO: This allows delaying the interrupts by a
 			 *       adjustable count of descriptors. This is could
 			 *       be useful for TXQ interrupts, which can be
@@ -199,26 +203,44 @@ static inline void virtqueue_detach_desc(struct virtqueue_vring *vrq,
 	vrq->head_free_desc = head_idx;
 }
 
-int virtqueue_notify_enabled(struct virtqueue *vq)
+static int virtqueue_notify_enabled(struct virtqueue *vq)
 {
 	struct virtqueue_vring *vrq;
 	__u16 old, new;
 
 	UK_ASSERT(vq);
 	vrq = to_virtqueue_vring(vq);
-	if (vq->uses_event_idx) {
+	if (vrq->uses_event_idx) {
 		new = vrq->vring.avail->idx;
-		/* TODO: Use the actually submitted count instead of assuming
-		 *       that a single descriptor was submitted. This would be
-		 *       more efficient when we would have batching implemented.
-		 */
-		old = new - 1;
+		old = vrq->last_notified_idx;
 
 		return vring_need_event(vring_avail_event(&vrq->vring),
 					new, old);
 	}
 
 	return ((vrq->vring.used->flags & VRING_USED_F_NO_NOTIFY) == 0);
+}
+
+void virtqueue_host_notify(struct virtqueue *vq)
+{
+	struct virtqueue_vring *vrq;
+
+	UK_ASSERT(vq);
+
+	vrq = to_virtqueue_vring(vq);
+
+	/*
+	 * Before notifying the virtio backend on the host we should make sure
+	 * that the virtqueue index update operation happened. Note that this
+	 * function is declared as inline.
+	 */
+	mb();
+
+	if (vq->vq_notify_host && virtqueue_notify_enabled(vq)) {
+		uk_pr_debug("notify queue %d\n", vq->queue_id);
+		vrq->last_notified_idx = vrq->vring.avail->idx;
+		vq->vq_notify_host(vq->vdev, vq->queue_id);
+	}
 }
 
 static inline int virtqueue_buffer_enqueue_segments(
@@ -475,14 +497,16 @@ struct virtqueue *virtqueue_create(__u16 queue_id, __u16 nr_descs, __u16 align,
 #endif /* !CONFIG_LIBUKVMEM */
 	memset(vrq->vring_mem, 0, ring_size);
 	virtqueue_vring_init(vrq, nr_descs, align);
+	vrq->uses_event_idx =
+		VIRTIO_FEATURE_HAS(vdev->features, VIRTIO_F_EVENT_IDX);
+	vrq->last_notified_idx = 0;
+
 
 	vq = &vrq->vq;
 	vq->queue_id = queue_id;
 	vq->vdev = vdev;
 	vq->vq_callback = callback;
 	vq->vq_notify_host = notify;
-	vq->uses_event_idx =
-	    VIRTIO_FEATURE_HAS(vdev->features, VIRTIO_F_EVENT_IDX);
 	return vq;
 
 err_freevq:
