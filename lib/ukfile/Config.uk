@@ -8,3 +8,6 @@ config LIBUKFILE
 # Hidden, selected by core components when required
 config LIBUKFILE_CHAINUPDATE
 	bool
+
+config LIBUKFILE_FINALIZERS
+	bool

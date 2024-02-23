@@ -13,9 +13,14 @@
 #include <sys/uio.h>
 
 #include <uk/rwlock.h>
-#include <uk/weak_refcount.h>
 #include <uk/file/pollqueue.h>
 #include <uk/file/statx.h>
+
+#if CONFIG_LIBUKFILE_FINALIZERS
+#include <uk/file/final.h>
+#else /* !CONFIG_LIBUKFILE_FINALIZERS */
+#include <uk/weak_refcount.h>
+#endif /* !CONFIG_LIBUKFILE_FINALIZERS */
 
 
 struct uk_file;
@@ -124,7 +129,31 @@ struct uk_file_state {
  * expose to consumers. Drivers may, however, need to allocate and initialize
  * this structure; we therefore provide a typedef and initializer.
  */
+#if CONFIG_LIBUKFILE_FINALIZERS
+typedef struct uk_file_finref uk_file_refcnt;
+
+#define UK_FILE_REFCNT_INITIALIZER(name) UK_FILE_FINREF_INITIALIZER((name), 1)
+#define UK_FILE_REFCNT_INIT_VALUE(name) UK_FILE_FINREF_INIT_VALUE((name), 1)
+
+#define uk_file_refcnt_acquire		uk_file_finref_acquire
+#define uk_file_refcnt_acquire_weak	uk_file_finref_acquire_weak
+#define uk_file_refcnt_release		uk_file_finref_release
+#define uk_file_refcnt_release_weak	uk_file_finref_release_weak
+
+#else /* !CONFIG_LIBUKFILE_FINALIZERS */
 typedef struct uk_swrefcount uk_file_refcnt;
+
+#define UK_FILE_REFCNT_INITIALIZER(name) UK_SWREFCOUNT_INITIALIZER(1, 1)
+#define UK_FILE_REFCNT_INIT_VALUE(name) UK_SWREFCOUNT_INIT_VALUE(1, 1)
+
+#define uk_file_refcnt_acquire		uk_swrefcount_acquire
+#define uk_file_refcnt_acquire_weak	uk_swrefcount_acquire_weak
+#define uk_file_refcnt_release		uk_swrefcount_release
+#define uk_file_refcnt_release_weak	uk_swrefcount_release_weak
+
+#endif /* !CONFIG_LIBUKFILE_FINALIZERS */
+/* Files always get created with one strong reference held */
+/* See above comment for file state on initializers vs initial values */
 
 struct uk_file {
 	/* Identity */
@@ -138,11 +167,6 @@ struct uk_file {
 	/* Destructor, never call directly */
 	uk_file_release_func _release;
 };
-
-/* Files always get created with one strong reference held */
-/* See above comment for file state on initializers vs initial values */
-#define UK_FILE_REFCNT_INITIALIZER UK_SWREFCOUNT_INITIALIZER(1, 1)
-#define UK_FILE_REFCNT_INIT_VALUE UK_SWREFCOUNT_INIT_VALUE(1, 1)
 
 /* Operations inlines */
 static inline
@@ -187,19 +211,19 @@ int uk_file_ctl(const struct uk_file *f, int fam, int req,
 static inline
 void uk_file_acquire(const struct uk_file *f)
 {
-	uk_swrefcount_acquire(f->refcnt);
+	uk_file_refcnt_acquire(f->refcnt);
 }
 
 static inline
 void uk_file_acquire_weak(const struct uk_file *f)
 {
-	uk_swrefcount_acquire_weak(f->refcnt);
+	uk_file_refcnt_acquire_weak(f->refcnt);
 }
 
 static inline
 void uk_file_release(const struct uk_file *f)
 {
-	int r = uk_swrefcount_release(f->refcnt);
+	int r = uk_file_refcnt_release(f->refcnt);
 
 	if (r)
 		f->_release(f, r);
@@ -208,11 +232,27 @@ void uk_file_release(const struct uk_file *f)
 static inline
 void uk_file_release_weak(const struct uk_file *f)
 {
-	int r = uk_swrefcount_release_weak(f->refcnt);
+	int r = uk_file_refcnt_release_weak(f->refcnt);
 
 	if (r)
 		f->_release(f, r);
 }
+
+#if CONFIG_LIBUKFILE_FINALIZERS
+static inline
+void uk_file_finalizer_register(const struct uk_file *f,
+				struct uk_file_finalize_cb *cb)
+{
+	uk_file_finref_register(f->refcnt, cb);
+}
+
+static inline
+void uk_file_finalizer_unregister(const struct uk_file *f,
+				  struct uk_file_finalize_cb *cb)
+{
+	uk_file_finref_unregister(f->refcnt, cb);
+}
+#endif /* CONFIG_LIBUKFILE_FINALIZERS */
 
 /* High-level I/O locking */
 
