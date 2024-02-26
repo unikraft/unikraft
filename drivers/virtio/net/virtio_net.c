@@ -582,8 +582,9 @@ static int virtio_netdev_rxq_dequeue(struct virtio_net_device *vndev,
 {
 	int ret;
 	int rc __maybe_unused = 0;
-	struct uk_netbuf *buf = NULL;
+	struct uk_netbuf *buf = NULL, *chain;
 	struct virtio_net_hdr *vhdr;
+	__u32 num_buffers = 1;
 	__u32 len;
 
 	UK_ASSERT(netbuf);
@@ -618,6 +619,8 @@ static int virtio_netdev_rxq_dequeue(struct virtio_net_device *vndev,
 		else
 			buf->csum_start += VTNET_HDR_SIZE_PADDED(vndev);
 	}
+	if (vndev->vdev->features & (1ULL << VIRTIO_NET_F_MRG_RXBUF))
+		num_buffers = vhdr->num_buffers;
 
 	/**
 	 * Removing the virtio header from the buffer and adjusting length.
@@ -638,6 +641,20 @@ static int virtio_netdev_rxq_dequeue(struct virtio_net_device *vndev,
 			buf, -((int16_t)VTNET_HDR_SIZE_PADDED(vndev)));
 	}
 	UK_ASSERT(rc == 1);
+
+	while (num_buffers > 1) {
+		ret = virtqueue_buffer_dequeue(rxq->vq, (void **) &chain, &len);
+		if (ret < 0) {
+			uk_pr_err("mergeable buffer indicated more buffers\n");
+			*netbuf = NULL;
+			return rxq->nb_desc;
+		}
+		UK_ASSERT(len <= chain->buflen);
+		chain->len = len;
+		uk_netbuf_append(buf, chain);
+		num_buffers--;
+	}
+
 	*netbuf = buf;
 
 	return ret;
@@ -1015,6 +1032,12 @@ static int virtio_netdev_probe(struct uk_netdev *n)
 	/* VirtIO modern */
 	if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_F_VERSION_1))
 		VIRTIO_FEATURE_SET(drv_features, VIRTIO_F_VERSION_1);
+
+	/**
+	 * Mergeable receive buffers
+	 */
+	if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_MRG_RXBUF))
+		VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_MRG_RXBUF);
 
 	/**
 	 * TCP Segmentation Offload
