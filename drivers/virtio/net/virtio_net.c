@@ -596,8 +596,12 @@ static int virtio_netdev_rxq_dequeue(struct virtio_net_device *vndev,
 		*netbuf = NULL;
 		return rxq->nb_desc;
 	}
-	if (unlikely((len < (__u32)virtio_net_hdr_size(vndev) + UK_ETH_HDR_UNTAGGED_LEN) ||
-		     len > VIRTIO_PKT_BUFFER_LEN(vndev))) {
+	if (unlikely(
+		(len < (__u32)virtio_net_hdr_size(vndev) +
+			UK_ETH_HDR_UNTAGGED_LEN) ||
+		(!(vndev->vdev->features & (1ULL << VIRTIO_NET_F_GUEST_TSO4) ||
+		   vndev->vdev->features & (1ULL << VIRTIO_NET_F_GUEST_TSO6))
+		  && (len > VIRTIO_PKT_BUFFER_LEN(vndev))))) {
 		uk_pr_err("Received invalid packet size: %"__PRIu32"\n", len);
 		return -EINVAL;
 	}
@@ -1096,6 +1100,32 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n,
 	host_features = virtio_feature_get(vndev->vdev);
 
 	/**
+	 * Large Receive Offload
+	 * NOTE: This allows the host to send packets larger than MTU. The
+	 *       network stack needs to be able to handle such packets.
+	 *       We only enable this if we have also support for mergeable RX
+	 *       buffers, otherwise we would have to either allocate huge
+	 *       buffers (wasting space for smaller buffers) or use many small
+	 *       descriptors (needing indirect descriptors and putting a large
+	 *       burden on the allocator).
+	 */
+	if (conf->lro) {
+		if (unlikely(!VIRTIO_FEATURE_HAS(vndev->vdev->features,
+						 VIRTIO_NET_F_GUEST_CSUM) ||
+			     !VIRTIO_FEATURE_HAS(vndev->vdev->features,
+						 VIRTIO_NET_F_MRG_RXBUF))) {
+			rc = -EINVAL;
+			goto err_negotiate_feature;
+		}
+		if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_GUEST_TSO4))
+			VIRTIO_FEATURE_SET(vndev->vdev->features,
+					   VIRTIO_NET_F_GUEST_TSO4);
+		if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_GUEST_TSO6))
+			VIRTIO_FEATURE_SET(vndev->vdev->features,
+					   VIRTIO_NET_F_GUEST_TSO6);
+	}
+
+	/**
 	 * Announce our enabled driver features back to the backend device
 	 */
 	virtio_feature_set(vndev->vdev);
@@ -1292,9 +1322,12 @@ static void virtio_net_info_get(struct uk_netdev *dev,
 				struct uk_netdev_info *dev_info)
 {
 	struct virtio_net_device *vndev;
+	__u64 host_features;
 
 	UK_ASSERT(dev && dev_info);
 	vndev = to_virtionetdev(dev);
+
+	host_features = virtio_feature_get(vndev->vdev);
 
 	dev_info->max_rx_queues = vndev->max_vqueue_pairs;
 	dev_info->max_tx_queues = vndev->max_vqueue_pairs;
@@ -1307,13 +1340,15 @@ static void virtio_net_info_get(struct uk_netdev *dev,
 	dev_info->ioalign = VIRTIO_PKT_BUFFER_ALIGN;
 
 	dev_info->features = UK_NETDEV_F_RXQ_INTR
-		| (VIRTIO_FEATURE_HAS(vndev->vdev->features, VIRTIO_NET_F_CSUM)
+		| (VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_CSUM)
 		   ? UK_NETDEV_F_PARTIAL_CSUM : 0)
-		| ((VIRTIO_FEATURE_HAS(vndev->vdev->features,
-				       VIRTIO_NET_F_HOST_TSO4)
-		    || VIRTIO_FEATURE_HAS(vndev->vdev->features,
-					  VIRTIO_NET_F_GSO))
-		   ? UK_NETDEV_F_TSO4 : 0);
+		| ((VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_HOST_TSO4)
+		    || VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_GSO))
+		   ? UK_NETDEV_F_TSO4 : 0)
+		| ((VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_GUEST_TSO4)
+		    || VIRTIO_FEATURE_HAS(host_features,
+					  VIRTIO_NET_F_GUEST_TSO6)
+		   ? UK_NETDEV_F_LRO : 0));
 }
 
 static int virtio_net_start(struct uk_netdev *n)
