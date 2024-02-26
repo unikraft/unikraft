@@ -147,6 +147,10 @@ struct uk_hwaddr {
 #define UK_NETDEV_F_TSO4_BIT		3
 #define UK_NETDEV_F_TSO4		(1UL << UK_NETDEV_F_TSO4_BIT)
 
+/* Indicates that the network device supports receiving packets with LRO. */
+#define UK_NETDEV_F_LRO_BIT		4
+#define UK_NETDEV_F_LRO			(1UL << UK_NETDEV_F_LRO_BIT)
+
 #define uk_netdev_rxintr_supported(feature)	\
 	(feature & (UK_NETDEV_F_RXQ_INTR))
 #define uk_netdev_txintr_supported(feature)	\
@@ -185,6 +189,7 @@ struct uk_netdev_queue_info {
 struct uk_netdev_conf {
 	uint16_t nb_rx_queues;
 	uint16_t nb_tx_queues;
+	uint8_t lro; /**< If true, allow LRO. UK_NETDEV_F_LRO must be set */
 };
 
 /**
