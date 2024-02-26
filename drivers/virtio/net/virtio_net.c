@@ -178,7 +178,9 @@ static int virtio_netdev_configure(struct uk_netdev *n,
 				   const struct uk_netdev_conf *conf);
 static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 				    const struct uk_netdev_conf *conf);
-static int virtio_netdev_feature_negotiate(struct uk_netdev *n);
+static int virtio_netdev_probe(struct uk_netdev *n);
+static int virtio_netdev_feature_negotiate(struct uk_netdev *n,
+					   const struct uk_netdev_conf *conf);
 static struct uk_netdev_tx_queue *virtio_netdev_tx_queue_setup(
 					struct uk_netdev *n, __u16 queue_id,
 					__u16 nb_desc,
@@ -908,12 +910,12 @@ static __u16 virtio_net_mtu_get(struct uk_netdev *n)
 	return d->mtu;
 }
 
-static int virtio_netdev_feature_negotiate(struct uk_netdev *n)
+static int virtio_netdev_probe(struct uk_netdev *n)
 {
-	__u64 host_features = 0;
-	__u64 drv_features  = 0;
-	int rc = 0;
 	struct virtio_net_device *vndev;
+	__u64 drv_features = 0;
+	__u64 host_features;
+	int rc;
 
 	UK_ASSERT(n);
 	vndev = to_virtionetdev(n);
@@ -998,10 +1000,35 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n)
 	if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_F_EVENT_IDX))
 		VIRTIO_FEATURE_SET(drv_features, VIRTIO_F_EVENT_IDX);
 
+	/* Store the preliminary result in the features field.
+	 * virtio_netdev_feature_negotiate will take care of sending the result
+	 * to the host depending on how the uknetdev client configured the
+	 * device.
+	 */
+	vndev->vdev->features = drv_features;
+
+	return 0;
+err_negotiate_feature:
+	virtio_dev_status_update(vndev->vdev, VIRTIO_CONFIG_STATUS_FAIL);
+	return rc;
+}
+
+static int virtio_netdev_feature_negotiate(struct uk_netdev *n,
+					   const struct uk_netdev_conf *conf)
+{
+	struct virtio_net_device *vndev;
+	__u64 host_features;
+	int rc;
+
+	UK_ASSERT(n);
+	UK_ASSERT(conf);
+	vndev = to_virtionetdev(n);
+
+	host_features = virtio_feature_get(vndev->vdev);
+
 	/**
 	 * Announce our enabled driver features back to the backend device
 	 */
-	vndev->vdev->features = drv_features;
 	virtio_feature_set(vndev->vdev);
 
 	/**
@@ -1013,11 +1040,11 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n)
 	 * Currently, unaligned read is supported in the underlying function.
 	 */
 	virtio_config_get(vndev->vdev,
-				   __offsetof(struct virtio_net_config, mac),
-				   &vndev->hw_addr.addr_bytes[0],
-				   UK_NETDEV_HWADDR_LEN, 1);
+			  __offsetof(struct virtio_net_config, mac),
+			  &vndev->hw_addr.addr_bytes[0],
+			  UK_NETDEV_HWADDR_LEN, 1);
 
-	if (VIRTIO_FEATURE_HAS(drv_features, VIRTIO_NET_F_MTU)) {
+	if (VIRTIO_FEATURE_HAS(vndev->vdev->features, VIRTIO_NET_F_MTU)) {
 		virtio_config_get(vndev->vdev,
 				  __offsetof(struct virtio_net_config, mac),
 				  &vndev->mtu, sizeof(vndev->mtu), 1);
@@ -1136,8 +1163,14 @@ static int virtio_netdev_configure(struct uk_netdev *n,
 	UK_ASSERT(conf);
 	vndev = to_virtionetdev(n);
 
+	rc = virtio_netdev_feature_negotiate(n, conf);
+	if (unlikely(rc < 0)) {
+		uk_pr_err("%p: Failed to negotiate features: %d\n", n, rc);
+		return rc;
+	}
+
 	rc = virtio_netdev_rxtx_alloc(vndev, conf);
-	if (rc < 0) {
+	if (unlikely(rc < 0)) {
 		uk_pr_err("%p: Failed to initialize rx and tx rings: %d\n",
 			  n, rc);
 	}
@@ -1247,7 +1280,7 @@ static int virtio_net_start(struct uk_netdev *n)
 }
 
 static const struct uk_netdev_ops virtio_netdev_ops = {
-	.probe = virtio_netdev_feature_negotiate,
+	.probe = virtio_netdev_probe,
 	.configure = virtio_netdev_configure,
 	.rxq_configure = virtio_netdev_rx_queue_setup,
 	.txq_configure = virtio_netdev_tx_queue_setup,
