@@ -165,6 +165,10 @@ struct virtio_net_device {
 	__u8 state;
 	/* RX promiscuous mode. */
 	__u8 promisc : 1;
+	/* Expected amount of descriptors per buffer */
+#define VIRTIO_NET_BUF_DESCR_COUNT_INLINE		1
+#define VIRTIO_NET_BUF_DESCR_COUNT_SEPARATE		2
+	__u8 buf_descr_count: 2;
 };
 
 /**
@@ -317,16 +321,17 @@ static int virtio_netdev_rx_fillup(struct virtio_net_device *vndev,
 	__u16 filled = 0;
 
 	/**
-	 * Fixed amount of memory is allocated to each received buffer. In
-	 * our case since we don't support jumbo frame or LRO yet we require
-	 * that the buffer feed to the ring descriptor is atleast
-	 * ethernet MTU + virtio net header.
-	 * Because we using 2 descriptor for a single netbuf, our effective
-	 * queue size is just the half.
+	 * The effective queue size depends on how we have to add the buffers
+	 * into the ring. For example modern virtio devices only need a single
+	 * descriptor for the virtio header + payload. However, depending on the
+	 * physical layout of the buffer, we can end up using more descriptors.
+	 * In this case we batch allocate too many buffers and have to free the
+	 * superfluous ones.
 	 */
-	nb_desc = ALIGN_DOWN(nb_desc, 2);
+	UK_ASSERT(POWER_OF_2(vndev->buf_descr_count));
+	nb_desc = ALIGN_DOWN(nb_desc, vndev->buf_descr_count);
 	while (filled < nb_desc) {
-		req = MIN(nb_desc / 2, RX_FILLUP_BATCHLEN);
+		req = MIN(nb_desc / vndev->buf_descr_count, RX_FILLUP_BATCHLEN);
 		cnt = rxq->alloc_rxpkts(rxq->alloc_rxpkts_argp, netbuf, req);
 		for (i = 0; i < cnt; i++) {
 			uk_pr_debug("Enqueue netbuf %"PRIu16"/%"PRIu16" (%p) to virtqueue %p...\n",
@@ -345,7 +350,13 @@ static int virtio_netdev_rx_fillup(struct virtio_net_device *vndev,
 				status |= UK_NETDEV_STATUS_UNDERRUN;
 				goto out;
 			}
-			filled += 2;
+			/* This count is not necessarily correct in the
+			 * presence of paging, but should be close enough as an
+			 * approximation.
+			 * TODO: Use indirect descriptors to ensure we are
+			 *       always below the specified count.
+			 */
+			filled += vndev->buf_descr_count;
 		}
 
 		if (unlikely(cnt < req)) {
@@ -358,7 +369,7 @@ static int virtio_netdev_rx_fillup(struct virtio_net_device *vndev,
 
 out:
 	uk_pr_debug("Programmed %"PRIu16" receive netbufs to receive virtqueue %p (status %x)\n",
-		    filled / 2, rxq, status);
+		    filled / vndev->buf_descr_count, rxq, status);
 
 	/**
 	 * Notify the host, when we submit new descriptor(s).
@@ -525,30 +536,41 @@ static int virtio_netdev_rxq_enqueue(struct virtio_net_device *vndev,
 		return -ENOSPC;
 	}
 
-	/**
-	 * Saving the buffer information before reserving the header space.
-	 */
-	buf_start = netbuf->data;
-	buf_len = netbuf->len;
-
-	/**
-	 * Retrieve the buffer header length.
-	 */
-	rc = uk_netbuf_header(netbuf, VTNET_HDR_SIZE_PADDED(vndev));
-	if (unlikely(rc != 1)) {
-		uk_pr_err("Failed to allocate space to prepend virtio header\n");
-		return -EINVAL;
-	}
-	rxhdr = netbuf->data;
-
+	/* Reset the scatter gather list */
 	sg = &rxq->sg;
 	uk_sglist_reset(sg);
 
-	/* Appending the header buffer to the sglist */
-	uk_sglist_append(sg, rxhdr, virtio_net_hdr_size(vndev));
+	if (vndev->buf_descr_count == VIRTIO_NET_BUF_DESCR_COUNT_INLINE) {
+		rc = uk_netbuf_header(netbuf, virtio_net_hdr_size(vndev));
+		if (unlikely(rc != 1)) {
+			uk_pr_err("Failed to allocate space to prepend virtio header\n");
+			return -EINVAL;
+		}
+		uk_sglist_append(sg, netbuf->data, netbuf->len);
+	} else {
+		/**
+		 * Saving the buffer information before reserving the header
+		 * space.
+		 */
+		buf_start = netbuf->data;
+		buf_len = netbuf->len;
 
-	/* Appending the data buffer to the sglist */
-	uk_sglist_append(sg, buf_start, buf_len);
+		/**
+		 * Retrieve the buffer header length.
+		 */
+		rc = uk_netbuf_header(netbuf, VTNET_HDR_SIZE_PADDED(vndev));
+		if (unlikely(rc != 1)) {
+			uk_pr_err("Failed to allocate space to prepend virtio header\n");
+			return -EINVAL;
+		}
+		rxhdr = netbuf->data;
+
+		/* Appending the header buffer to the sglist */
+		uk_sglist_append(sg, rxhdr, virtio_net_hdr_size(vndev));
+
+		/* Appending the data buffer to the sglist */
+		uk_sglist_append(sg, buf_start, buf_len);
+	}
 
 	rc = virtqueue_buffer_enqueue(rxq->vq, netbuf, sg, 0,
 				      sg->sg_nseg);
@@ -588,20 +610,34 @@ static int virtio_netdev_rxq_dequeue(struct virtio_net_device *vndev,
 	if (vhdr->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM) {
 		buf->flags |= UK_NETBUF_F_PARTIAL_CSUM;
 		buf->csum_offset = vhdr->csum_offset;
+		buf->csum_start = vhdr->csum_start;
 		/* NOTE: csum_start is without virtio header
 		 *       (uk_netbuf_header() will remove it again)
 		 */
-		buf->csum_start  = vhdr->csum_start + VTNET_HDR_SIZE_PADDED(vndev);
+		if (vndev->buf_descr_count == VIRTIO_NET_BUF_DESCR_COUNT_INLINE)
+			buf->csum_start += virtio_net_hdr_size(vndev);
+		else
+			buf->csum_start += VTNET_HDR_SIZE_PADDED(vndev);
 	}
 
 	/**
 	 * Removing the virtio header from the buffer and adjusting length.
-	 * We pad the rx buffer while enqueuing for alignment of the packet
-	 * data. We compensate for this by subtracting the padding to the
-	 * length on dequeue.
 	 */
-	buf->len = len + VTNET_HDR_SIZE_PADDED(vndev);
-	rc = uk_netbuf_header(buf, -((__s16)VTNET_HDR_SIZE_PADDED(vndev)));
+	if (vndev->buf_descr_count == VIRTIO_NET_BUF_DESCR_COUNT_INLINE) {
+		buf->len = len;
+		rc = uk_netbuf_header(buf,
+				      -((__s16)virtio_net_hdr_size(vndev)));
+	} else {
+		/* The length tracked by the virtio driver does include the
+		 * header but *not the padding*, therefore adjust the netbuf
+		 * size and add the padding.
+		 */
+		buf->len = len + (VTNET_HDR_SIZE_PADDED(vndev) -
+			   virtio_net_hdr_size(vndev));
+		/* Shift the position forward to remove the header */
+		rc = uk_netbuf_header(buf,
+				      -((__s16)VTNET_HDR_SIZE_PADDED(vndev)));
+	}
 	UK_ASSERT(rc == 1);
 	*netbuf = buf;
 
@@ -1007,6 +1043,16 @@ static int virtio_netdev_probe(struct uk_netdev *n)
 	 */
 	vndev->vdev->features = drv_features;
 
+	if ((vndev->vdev->features & (1ULL << VIRTIO_F_VERSION_1)) ||
+	    (vndev->vdev->features & (1ULL << VIRTIO_NET_F_MRG_RXBUF))) {
+		/* Do not use a separate (padded) header descriptor for modern
+		 * devices or when we can use mergeable buffers
+		 */
+		vndev->buf_descr_count = 1;
+	} else {
+		vndev->buf_descr_count = 2;
+	}
+
 	return 0;
 err_negotiate_feature:
 	virtio_dev_status_update(vndev->vdev, VIRTIO_CONFIG_STATUS_FAIL);
@@ -1231,7 +1277,10 @@ static void virtio_net_info_get(struct uk_netdev *dev,
 	dev_info->max_tx_queues = vndev->max_vqueue_pairs;
 	dev_info->max_mtu = vndev->max_mtu;
 	dev_info->nb_encap_tx = VTNET_HDR_SIZE_PADDED(vndev);
-	dev_info->nb_encap_rx = VTNET_HDR_SIZE_PADDED(vndev);
+	if (vndev->buf_descr_count == VIRTIO_NET_BUF_DESCR_COUNT_INLINE)
+		dev_info->nb_encap_rx = virtio_net_hdr_size(vndev);
+	else
+		dev_info->nb_encap_rx = VTNET_HDR_SIZE_PADDED(vndev);
 	dev_info->ioalign = VIRTIO_PKT_BUFFER_ALIGN;
 
 	dev_info->features = UK_NETDEV_F_RXQ_INTR
