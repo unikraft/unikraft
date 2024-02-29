@@ -47,7 +47,7 @@
 /* VIRTIO_PKT_BUFFER_LEN = VIRTIO_NET_HDR + ETH_HDR + ETH_PKT_PAYLOAD_LEN */
 #define VIRTIO_PKT_BUFFER_LEN(_vndev)				\
 	((UK_ETH_PAYLOAD_MAXLEN) + (UK_ETH_HDR_UNTAGGED_LEN) +	\
-	 (size_t)virtio_net_hdr_size(_vndev))
+	 (__sz)virtio_net_hdr_size(_vndev))
 
 /**
  * Currently there is a bug where if the net buffer (of size 2048) is split
@@ -71,7 +71,7 @@
  * frame's payload 4 byte aligned.
  */
 #define VTNET_HDR_SIZE_PADDED(_vndev)			\
-	(ALIGN_UP((size_t)virtio_net_hdr_size(_vndev), 4) + 4)
+	(ALIGN_UP((__sz)virtio_net_hdr_size(_vndev), 4) + 4)
 
 #define  VTNET_INTR_EN				UK_BIT(0)
 #define  VTNET_INTR_EN_MASK			0x01
@@ -98,15 +98,15 @@ struct uk_netdev_tx_queue {
 	/* The virtqueue reference */
 	struct virtqueue *vq;
 	/* The hw queue identifier */
-	uint16_t hwvq_id;
+	__u16 hwvq_id;
 	/* The user queue identifier */
-	uint16_t lqueue_id;
+	__u16 lqueue_id;
 	/* The nr. of descriptor limit */
-	uint16_t max_nb_desc;
+	__u16 max_nb_desc;
 	/* The nr. of descriptor user configured */
-	uint16_t nb_desc;
+	__u16 nb_desc;
 	/* The flag to interrupt on the transmit queue */
-	uint8_t intr_enabled;
+	__u8 intr_enabled;
 	/* Reference to the uk_netdev */
 	struct uk_netdev *ndev;
 	/* The scatter list and its associated fragements */
@@ -121,15 +121,15 @@ struct uk_netdev_rx_queue {
 	/* The virtqueue reference */
 	struct virtqueue *vq;
 	/* The virtqueue hw identifier */
-	uint16_t hwvq_id;
+	__u16 hwvq_id;
 	/* The libuknet queue identifier */
-	uint16_t lqueue_id;
+	__u16 lqueue_id;
 	/* The nr. of descriptor limit */
-	uint16_t max_nb_desc;
+	__u16 max_nb_desc;
 	/* The nr. of descriptor user configured */
-	uint16_t nb_desc;
+	__u16 nb_desc;
 	/* The flag to interrupt on the transmit queue */
-	uint8_t intr_enabled;
+	__u8 intr_enabled;
 	/* User-provided receive buffer allocation function */
 	uk_netdev_alloc_rxpkts alloc_rxpkts;
 	void *alloc_rxpkts_argp;
@@ -180,16 +180,16 @@ static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 				    const struct uk_netdev_conf *conf);
 static int virtio_netdev_feature_negotiate(struct uk_netdev *n);
 static struct uk_netdev_tx_queue *virtio_netdev_tx_queue_setup(
-					struct uk_netdev *n, uint16_t queue_id,
-					uint16_t nb_desc,
+					struct uk_netdev *n, __u16 queue_id,
+					__u16 nb_desc,
 					struct uk_netdev_txqueue_conf *conf);
 static int virtio_netdev_vqueue_setup(struct virtio_net_device *vndev,
-				      uint16_t queue_id, uint16_t nr_desc,
+				      __u16 queue_id, __u16 nr_desc,
 				      virtq_type_t queue_type,
 				      struct uk_alloc *a);
 static struct uk_netdev_rx_queue *virtio_netdev_rx_queue_setup(
 					struct uk_netdev *n,
-					uint16_t queue_id, uint16_t nb_desc,
+					__u16 queue_id, __u16 nb_desc,
 					struct uk_netdev_rxqueue_conf *conf);
 static int virtio_net_rx_intr_disable(struct uk_netdev *n,
 				      struct uk_netdev_rx_queue *queue);
@@ -236,9 +236,9 @@ static struct uk_alloc *a;
  * When communicating with legacy devices this becomes part of the
  * padding (see `VIRTIO_HDR_SIZE_PADDED`).
  */
-static inline uint16_t virtio_net_hdr_size(struct virtio_net_device *vndev)
+static inline __u16 virtio_net_hdr_size(struct virtio_net_device *vndev)
 {
-	uint16_t hdr_size;
+	__u16 hdr_size;
 
 	/* Legacy */
 	if (!(vndev->vdev->features & (1ULL << VIRTIO_F_VERSION_1))) {
@@ -375,9 +375,9 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 	struct virtio_net_hdr *vhdr;
 	int rc = 0;
 	int status = 0x0;
-	size_t total_len = 0;
+	__sz total_len = 0;
 	__u8  *buf_start;
-	size_t buf_len;
+	__sz buf_len;
 
 	UK_ASSERT(dev);
 	UK_ASSERT(pkt && queue);
@@ -493,7 +493,7 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 		/**
 		 * Remove header before exiting because we could not send
 		 */
-		uk_netbuf_header(pkt, -((int16_t)VTNET_HDR_SIZE_PADDED(vndev)));
+		uk_netbuf_header(pkt, -((__s16)VTNET_HDR_SIZE_PADDED(vndev)));
 	} else {
 		uk_pr_err("Failed to enqueue descriptors into the ring: %d\n",
 			  rc);
@@ -502,7 +502,7 @@ static int virtio_netdev_xmit(struct uk_netdev *dev,
 	return status;
 
 err_remove_vhdr:
-	uk_netbuf_header(pkt, -((int16_t)VTNET_HDR_SIZE_PADDED(vndev)));
+	uk_netbuf_header(pkt, -((__s16)VTNET_HDR_SIZE_PADDED(vndev)));
 err_exit:
 	UK_ASSERT(rc < 0);
 	return rc;
@@ -515,7 +515,7 @@ static int virtio_netdev_rxq_enqueue(struct virtio_net_device *vndev,
 	int rc = 0;
 	struct virtio_net_hdr *rxhdr;
 	__u8 *buf_start;
-	size_t buf_len = 0;
+	__sz buf_len = 0;
 	struct uk_sglist *sg;
 
 	if (virtqueue_is_full(rxq->vq)) {
@@ -599,7 +599,7 @@ static int virtio_netdev_rxq_dequeue(struct virtio_net_device *vndev,
 	 * length on dequeue.
 	 */
 	buf->len = len + VTNET_HDR_SIZE_PADDED(vndev);
-	rc = uk_netbuf_header(buf, -((int16_t)VTNET_HDR_SIZE_PADDED(vndev)));
+	rc = uk_netbuf_header(buf, -((__s16)VTNET_HDR_SIZE_PADDED(vndev)));
 	UK_ASSERT(rc == 1);
 	*netbuf = buf;
 
@@ -678,8 +678,8 @@ err_exit:
 }
 
 static struct uk_netdev_rx_queue *virtio_netdev_rx_queue_setup(
-				struct uk_netdev *n, uint16_t queue_id,
-				uint16_t nb_desc,
+				struct uk_netdev *n, __u16 queue_id,
+				__u16 nb_desc,
 				struct uk_netdev_rxqueue_conf *conf)
 {
 	struct virtio_net_device *vndev;
@@ -734,13 +734,13 @@ err_exit:
  *	Reference to the allocator.
  */
 static int virtio_netdev_vqueue_setup(struct virtio_net_device *vndev,
-		uint16_t queue_id, uint16_t nr_desc, virtq_type_t queue_type,
+		__u16 queue_id, __u16 nr_desc, virtq_type_t queue_type,
 		struct uk_alloc *a)
 {
 	int rc = 0;
 	int id = 0;
 	virtqueue_callback_t callback;
-	uint16_t max_desc, hwvq_id;
+	__u16 max_desc, hwvq_id;
 	struct virtqueue *vq;
 
 	if (queue_type == VNET_RX) {
@@ -796,8 +796,8 @@ static int virtio_netdev_vqueue_setup(struct virtio_net_device *vndev,
 }
 
 static struct uk_netdev_tx_queue *virtio_netdev_tx_queue_setup(
-				struct uk_netdev *n, uint16_t queue_id __unused,
-				uint16_t nb_desc __unused,
+				struct uk_netdev *n, __u16 queue_id __unused,
+				__u16 nb_desc __unused,
 				struct uk_netdev_txqueue_conf *conf __unused)
 {
 	struct uk_netdev_tx_queue *txq = NULL;
