@@ -95,15 +95,15 @@ struct uk_blkdev_queue {
 	struct virtqueue *vq;
 	/* The libukblkdev queue identifier */
 	/* It is also the virtqueue identifier */
-	uint16_t lqueue_id;
+	__u16 lqueue_id;
 	/* Allocator */
 	struct uk_alloc *a;
 	/* The nr. of descriptor limit */
-	uint16_t max_nb_desc;
+	__u16 max_nb_desc;
 	/* The nr. of descriptor user configured */
-	uint16_t nb_desc;
+	__u16 nb_desc;
 	/* The flag to interrupt on the queue */
-	uint8_t intr_enabled;
+	__u8 intr_enabled;
 	/* Reference to virtio_blk_device  */
 	struct virtio_blk_device *vbd;
 	/* The scatter list and its associated fragments */
@@ -120,7 +120,7 @@ struct virtio_blkdev_request {
 	struct uk_blkreq *req;
 	struct uk_list_head free_list_head;
 	struct virtio_blk_outhdr virtio_blk_outhdr;
-	uint8_t status;
+	__u8 status;
 };
 
 static int virtio_blkdev_request_set_sglist(struct uk_blkdev_queue *queue,
@@ -130,11 +130,11 @@ static int virtio_blkdev_request_set_sglist(struct uk_blkdev_queue *queue,
 {
 	struct virtio_blk_device *vbdev;
 	struct uk_blkreq *req;
-	size_t data_size = 0;
-	size_t segment_size;
-	size_t segment_max_size;
-	size_t idx;
-	uintptr_t start_data;
+	__sz data_size = 0;
+	__sz segment_size;
+	__sz segment_max_size;
+	__sz idx;
+	__uptr start_data;
 	int rc = 0;
 
 	UK_ASSERT(queue);
@@ -142,7 +142,7 @@ static int virtio_blkdev_request_set_sglist(struct uk_blkdev_queue *queue,
 
 	req = virtio_blk_req->req;
 	vbdev = queue->vbd;
-	start_data = (uintptr_t)req->aio_buf;
+	start_data = (__uptr)req->aio_buf;
 	data_size = req->nb_sectors * sector_size;
 	segment_max_size = vbdev->max_size_segment;
 
@@ -174,7 +174,7 @@ static int virtio_blkdev_request_set_sglist(struct uk_blkdev_queue *queue,
 		}
 
 	rc = uk_sglist_append(&queue->sg, &virtio_blk_req->status,
-			sizeof(uint8_t));
+			sizeof(__u8));
 	if (unlikely(rc != 0)) {
 		uk_pr_err("Failed to append to sg list %d\n", rc);
 		goto out;
@@ -496,9 +496,9 @@ static int virtio_blkdev_queue_intr_disable(struct uk_blkdev *dev __unused,
  * This function setup the vring infrastructure.
  */
 static int virtio_blkdev_vqueue_setup(struct uk_blkdev_queue *queue,
-		uint16_t nr_desc)
+		__u16 nr_desc)
 {
-	uint16_t max_desc;
+	__u16 max_desc;
 	struct virtqueue *vq;
 
 	UK_ASSERT(queue);
@@ -533,8 +533,8 @@ static int virtio_blkdev_vqueue_setup(struct uk_blkdev_queue *queue,
 }
 
 static struct uk_blkdev_queue *virtio_blkdev_queue_setup(struct uk_blkdev *dev,
-		uint16_t queue_id,
-		uint16_t nb_desc,
+		__u16 queue_id,
+		__u16 nb_desc,
 		const struct uk_blkdev_queue_conf *queue_conf)
 {
 	struct virtio_blk_device *vbdev;
@@ -603,7 +603,7 @@ static int virtio_blkdev_queue_release(struct uk_blkdev *dev,
 }
 
 static int virtio_blkdev_queue_info_get(struct uk_blkdev *dev,
-		uint16_t queue_id,
+		__u16 queue_id,
 		struct uk_blkdev_queue_info *qinfo)
 {
 	struct virtio_blk_device *vbdev = NULL;
@@ -633,7 +633,7 @@ static int virtio_blkdev_queues_alloc(struct virtio_blk_device *vbdev,
 				    const struct uk_blkdev_conf *conf)
 {
 	int rc = 0;
-	uint16_t i = 0;
+	__u16 i = 0;
 	int vq_avail = 0;
 	__u16 qdesc_size[conf->nb_queues];
 
@@ -714,7 +714,7 @@ static int virtio_blkdev_start(struct uk_blkdev *dev)
 static int virtio_blkdev_stop(struct uk_blkdev *dev)
 {
 	struct virtio_blk_device *d;
-	uint16_t q_id;
+	__u16 q_id;
 	int rc = 0;
 
 	UK_ASSERT(dev != NULL);
