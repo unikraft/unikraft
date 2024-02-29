@@ -60,7 +60,7 @@ struct virtio_9p_device {
 	/* Virtqueue reference. */
 	struct virtqueue *vq;
 	/* Hw queue identifier. */
-	uint16_t hwvq_id;
+	__u16 hwvq_id;
 	/* libuk9p associated device (NULL if the device is not in use). */
 	struct uk_9pdev *p9dev;
 	/* Scatter-gather list. */
@@ -133,7 +133,7 @@ static int virtio_9p_request(struct uk_9pdev *p9dev,
 	struct virtio_9p_device *dev;
 	int rc, host_notified = 0;
 	unsigned long flags;
-	size_t read_segs, write_segs;
+	__sz read_segs, write_segs;
 	bool failed = false;
 
 	UK_ASSERT(p9dev);
@@ -173,7 +173,7 @@ static int virtio_9p_request(struct uk_9pdev *p9dev,
 	}
 
 	if (req->recv.zc_buf) {
-		uint32_t recv_size = req->recv.size + req->recv.zc_size;
+		__u32 recv_size = req->recv.size + req->recv.zc_size;
 
 		rc = uk_sglist_append(&dev->sg, req->recv.zc_buf,
 				req->recv.zc_size);
@@ -184,7 +184,7 @@ static int virtio_9p_request(struct uk_9pdev *p9dev,
 
 		/* Make eure there is sufficient space for Rerror replies. */
 		if (recv_size < UK_9P_RERROR_MAXSIZE) {
-			uint32_t leftover = UK_9P_RERROR_MAXSIZE - recv_size;
+			__u32 leftover = UK_9P_RERROR_MAXSIZE - recv_size;
 
 			rc = uk_sglist_append(&dev->sg,
 					req->recv.buf + recv_size, leftover);
@@ -235,7 +235,7 @@ static int virtio_9p_recv(struct virtqueue *vq, void *priv)
 {
 	struct virtio_9p_device *dev;
 	struct uk_9preq *req = NULL;
-	uint32_t len;
+	__u32 len;
 	int rc = 0;
 	int handled = 0;
 
