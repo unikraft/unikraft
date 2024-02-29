@@ -127,14 +127,14 @@ static int vpci_legacy_notify(struct virtio_dev *vdev, __u16 queue_id)
 static int virtio_pci_handle(void *arg)
 {
 	struct virtio_pci_dev *d = (struct virtio_pci_dev *) arg;
-	uint8_t isr_status;
+	__u8 isr_status;
 	struct virtqueue *vq;
 	int rc = 0;
 
 	UK_ASSERT(arg);
 
 	/* Reading the isr status is used to acknowledge the interrupt */
-	isr_status = virtio_cread8((void *)(unsigned long)d->pci_isr_addr, 0);
+	isr_status = virtio_cread8((void *)d->pci_isr_addr, 0);
 
 	if (isr_status & VIRTIO_PCI_ISR_CONFIG) {
 		/* We don't support configuration interrupt on the device */
