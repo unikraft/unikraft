@@ -23,7 +23,7 @@
 
 #include <uk/essentials.h>
 
-#define UK_SYSCALL_USC_PROLOGUE_DEFINE(pname, fname, x, ...)		\
+#define UK_SYSCALL_EXECENV_PROLOGUE_DEFINE(pname, fname, x, ...)	\
 	long __used __noreturn __attribute__((optimize("O3")))		\
 	pname(UK_ARG_MAPx(x, UK_S_ARG_LONG_MAYBE_UNUSED, __VA_ARGS__))	\
 	{								\
@@ -48,8 +48,8 @@
 		" /* Switch to per-CPU auxiliary stack */\n\t"		\
 		"str	x0, [x0, #"STRINGIFY(LCPU_AUXSP_OFFSET)"]\n\t"	\
 		"/* Auxiliary stack is already ECTX aligned */\n\t"	\
-		"/* Make room for `struct uk_syscall_ctx` */\n\t"	\
-		"sub	x0, x0, #"STRINGIFY(UK_SYSCALL_CTX_SIZE)"\n\t"	\
+		"/* Make room for `struct ukarch_execenv` */\n\t"	\
+		"sub	x0, x0, #"STRINGIFY(UKARCH_EXECENV_SIZE)"\n\t"	\
 		"/* Swap x0 and (old) sp */\n\t"			\
 		"add	sp, sp, x0\n\t"					\
 		"sub	x0, sp, x0\n\t"					\
@@ -79,15 +79,15 @@
 		"mrs	x22, spsr_el1\n\t"				\
 		"mrs	x23, esr_el1\n\t"				\
 		"stp	x22, x23, [sp, #16 * 16]\n\t"			\
-		"/* ECTX at slot w.r.t. `struct uk_syscall_ctx` */\n\t"\
+		"/* ECTX at slot w.r.t. `struct ukarch_execenv` */\n\t"\
 		"mov	x0, sp\n\t"					\
 		"add	x0, x0, #("STRINGIFY(__REGS_SIZEOF +		\
-				     UKARCH_SYSREGS_SIZE)")\n\t"		\
+				     UKARCH_SYSCTX_SIZE)")\n\t"		\
 		"bl	ukarch_ectx_store\n\t"				\
-		"/* SYSREGS at slot w.r.t. `struct uk_syscall_ctx` */\n\t"\
+		"/* SYSCTX at slot w.r.t. `struct ukarch_execenv` */\n\t"\
 		"mov	x0, sp\n\t"					\
 		"add	x0, x0, #"STRINGIFY(__REGS_SIZEOF)"\n\t"	\
-		"bl	ukarch_sysregs_switch_uk\n\t"			\
+		"bl	ukarch_sysctx_store\n\t"			\
 		"mov	x0, sp\n\t"					\
 		"msr	daifclr, #2\n\t"				\
 		"bl	"STRINGIFY(fname)"\n\t"				\

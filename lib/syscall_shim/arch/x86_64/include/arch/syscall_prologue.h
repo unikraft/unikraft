@@ -23,7 +23,7 @@
 
 #include <uk/essentials.h>
 
-#define UK_SYSCALL_USC_PROLOGUE_DEFINE(pname, fname, x, ...)		\
+#define UK_SYSCALL_EXECENV_PROLOGUE_DEFINE(pname, fname, x, ...)	\
 	long __used __naked __noreturn					\
 	pname(UK_ARG_MAPx(x, UK_S_ARG_LONG_MAYBE_UNUSED, __VA_ARGS__))	\
 	{								\
@@ -34,8 +34,8 @@
 		"movq   %%rsp, %%r11\n\t"				\
 		"movq	%%gs:("STRINGIFY(LCPU_AUXSP_OFFSET)"), %%rsp\n\t"\
 		"/* Auxiliary stack is already ECTX aligned */\n\t"	\
-		"/* Make room for `struct uk_syscall_ctx` */\n\t"	\
-		"subq	$("STRINGIFY(UK_SYSCALL_CTX_SIZE -		\
+		"/* Make room for `struct UKARCH_EXECENV` */\n\t"	\
+		"subq	$("STRINGIFY(UKARCH_EXECENV_SIZE -		\
 				     __REGS_SIZEOF)"), %%rsp\n\t"	\
 		"/* Now build stack frame beginning with 5 pointers\n\t"\
 		" * in the classical iretq/`struct __regs` format\n\t"	\
@@ -81,15 +81,15 @@
 		"pushq	%%r14\n\t"					\
 		"pushq	%%r15\n\t"					\
 		"subq	$("STRINGIFY(__REGS_PAD_SIZE)"), %%rsp\n\t"	\
-		"/* ECTX at slot w.r.t. `struct uk_syscall_ctx` */\n\t"\
+		"/* ECTX at slot w.r.t. `struct UKARCH_EXECENV` */\n\t"\
 		"movq	%%rsp, %%rdi\n\t"				\
 		"addq	$("STRINGIFY(__REGS_SIZEOF +			\
-				     UKARCH_SYSREGS_SIZE)"), %%rdi\n\t"	\
+				     UKARCH_SYSCTX_SIZE)"), %%rdi\n\t"	\
 		"call	ukarch_ectx_store\n\t"				\
-		"/* SYSREGS at slot w.r.t. `struct uk_syscall_ctx` */\n\t"\
+		"/* SYSCTX at slot w.r.t. `struct UKARCH_EXECENV` */\n\t"\
 		"movq	%%rsp, %%rdi\n\t"				\
 		"addq	$("STRINGIFY(__REGS_SIZEOF)"), %%rdi\n\t"	\
-		"call	ukarch_sysregs_switch_uk\n\t"			\
+		"call	ukarch_sysctx_store\n\t"			\
 		"movq	%%rsp, %%rdi\n\t"				\
 		"sti\n\t"						\
 		"call	"STRINGIFY(fname)"\n\t"				\

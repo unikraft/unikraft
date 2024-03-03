@@ -34,6 +34,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <uk/arch/ctx.h>
 #include <uk/config.h>
 #include <uk/assert.h>
 #include <uk/print.h>
@@ -108,6 +109,18 @@ void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
 
 	/* just make the compiler happy about returning function */
 	__builtin_unreachable();
+}
+
+void lcpu_arch_set_auxsp(__uptr auxsp)
+{
+	struct lcpu *lcpu = lcpu_get_current();
+	struct ukarch_auxspcb *auxspcb;
+
+	UK_ASSERT(IS_LCPU_PTR(rdgsbase()));
+
+	lcpu->auxsp = auxsp;
+	auxspcb = ukarch_auxsp_get_cb(auxsp);
+	ukarch_sysctx_set_gs_base(&auxspcb->uksc, (__uptr)lcpu);
 }
 
 #if CONFIG_HAVE_SMP
