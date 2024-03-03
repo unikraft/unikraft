@@ -42,6 +42,7 @@
 #ifndef __UK_SCHED_IMPL_H__
 #define __UK_SCHED_IMPL_H__
 
+#include <uk/plat/common/lcpu.h>
 #include <uk/sched.h>
 
 #ifdef __cplusplus
@@ -108,7 +109,7 @@ void uk_sched_thread_switch(struct uk_thread *next)
 	if (next->ectx)
 		ukarch_ectx_load(next->ectx);
 
-	ukplat_lcpu_set_auxsp(next->auxsp);
+	lcpu_arch_set_auxsp(next->auxsp);
 
 	ukarch_ctx_switch(&prev->ctx, &next->ctx);
 }

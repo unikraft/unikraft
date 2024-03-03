@@ -12,9 +12,9 @@
  * needlessly contaminate the namespace of source files including this header
  */
 
-#define usc_arg0		rdi
-#define usc_arg1		rsi
-#define usc_arg2		rdx
-#define usc_arg3		r10
-#define usc_arg4		r8
-#define usc_arg5		r9
+#define execenv_arg0		rdi
+#define execenv_arg1		rsi
+#define execenv_arg2		rdx
+#define execenv_arg3		r10
+#define execenv_arg4		r8
+#define execenv_arg5		r9

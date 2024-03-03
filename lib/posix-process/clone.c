@@ -322,7 +322,7 @@ static void _clone_child_gc(struct uk_thread *t)
  *       to zero.
  */
 static int _clone(struct clone_args *cl_args, size_t cl_args_len,
-		  struct uk_syscall_ctx *usc)
+		  struct ukarch_execenv *execenv)
 {
 	struct uk_thread *child = NULL;
 	struct uk_thread *t;
@@ -384,13 +384,13 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 		uk_pr_debug(" child_tid: %p\n", (void *)cl_args->child_tid);
 	uk_pr_debug(" stack: %p\n", (void *)cl_args->stack);
 	uk_pr_debug(" tls: %p\n", (void *)cl_args->tls);
-	uk_pr_debug(" <return>: %p\n", (void *)usc->regs.rip);
+	uk_pr_debug(" <return>: %p\n", (void *)execenv->regs.rip);
 	uk_pr_debug(")\n");
 #endif /* UK_DEBUG */
 
 	if ((flags & CLONE_SETTLS)
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
-	    && (ukarch_sysregs_get_tlsp(&usc->sysregs) == 0x0)
+	    && (ukarch_sysctx_get_tlsp(&execenv->sysctx) == 0x0)
 #endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
 	) {
 		/* The caller already created a TLS for the child (for instance
@@ -417,7 +417,7 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 		 * places TLS variables and uses them effectively as TCB.
 		 */
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
-		if (ukarch_sysregs_get_tlsp(&usc->sysregs) != 0x0) {
+		if (ukarch_sysctx_get_tlsp(&execenv->sysctx) != 0x0) {
 			uk_pr_debug("Allocating an Unikraft TLS for the new child, parent called from context with custom TLS\n");
 		} else
 #endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
@@ -466,7 +466,7 @@ static int _clone(struct clone_args *cl_args, size_t cl_args_len,
 		    t, t->name ? child->name : "<unnamed>",
 		    child, child->name ? child->name : "<unnamed>", ret);
 
-	clone_setup_child_ctx(usc, child, (__uptr)cl_args->stack);
+	clone_setup_child_ctx(execenv, child, (__uptr)cl_args->stack);
 
 	uk_thread_set_runnable(child);
 
@@ -515,7 +515,7 @@ UK_LLSYSCALL_R_U_DEFINE(int, clone,
 		.tls         = (__u64) tlsp
 	};
 
-	return _clone(&cl_args, sizeof(cl_args), usc);
+	return _clone(&cl_args, sizeof(cl_args), execenv);
 }
 
 #if UK_LIBC_SYSCALLS

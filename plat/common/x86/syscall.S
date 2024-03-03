@@ -1,9 +1,11 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ *          Sergiu Moga <sergiu@unikraft.io>
  *
  * Copyright (c) 2019, NEC Laboratories Europe GmbH, NEC Corporation.
  *                     All rights reserved.
+ * Copyright (c) 2024, Unikraft GmbH. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,7 +38,7 @@
 #include <uk/asm.h>
 #include <uk/asm/cfi.h>
 #include <uk/plat/common/lcpu.h>
-#include <uk/syscall.h>
+#include <uk/arch/ctx.h>
 
 ENTRY(_ukplat_syscall)
 	.cfi_startproc simple
@@ -65,10 +67,22 @@ ENTRY(_ukplat_syscall)
 	 * in the Red Zone.
 	 */
 	movq	%gs:LCPU_AUXSP_OFFSET, %rsp
+
 	/* Describing the rsp relative to GS would make it necessary to emit
 	 * raw CFI. Instead of doing so, mark rsp as undefined temporarily
 	 */
 	.cfi_undefined rsp
+
+	subq	$(UKARCH_AUXSPCB_SIZE), %rsp
+	movq	UKARCH_AUXSPCB_OFFSETOF_CURR_FRAME(%rsp), %rsp
+
+	subq	$(UKARCH_EXECENV_END_ALIGN - 8), %rsp
+	.cfi_adjust_cfa_offset (UKARCH_EXECENV_END_ALIGN - 8)
+
+	pushq	%gs:LCPU_AUXSP_OFFSET
+	.cfi_adjust_cfa_offset 8
+
+	swapgs
 
 	/* NOTE: We should normally align the stack before doing this
 	 * subtraction because we must ensure that the `ectx` field
@@ -77,8 +91,8 @@ ENTRY(_ukplat_syscall)
 	 * auxiliary stack because it is allocated with this exact alignment
 	 * in mind.
 	 */
-	subq	$(UK_SYSCALL_CTX_SIZE - __REGS_SIZEOF), %rsp
-	.cfi_adjust_cfa_offset (UK_SYSCALL_CTX_SIZE - __REGS_SIZEOF)
+	subq	$(UKARCH_EXECENV_SIZE - __REGS_SIZEOF), %rsp
+	.cfi_adjust_cfa_offset (UKARCH_EXECENV_SIZE - __REGS_SIZEOF)
 
 	pushq_cfi	$(GDT_DESC_OFFSET(GDT_DESC_DATA))
 
@@ -188,7 +202,6 @@ ENTRY(_ukplat_syscall)
 	.cfi_def_cfa rsp, 0
 
 	/* Restore application's gs_base register */
-	swapgs
 
 	sti
 

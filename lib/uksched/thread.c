@@ -237,6 +237,8 @@ static void _uk_thread_struct_init(struct uk_thread *t,
 				   void *priv,
 				   uk_thread_dtor_t dtor)
 {
+	struct ukarch_auxspcb *auxspcb;
+
 	/* TLS pointer required if is_uktls is set */
 	UK_ASSERT(!is_uktls || tlsp);
 
@@ -252,6 +254,7 @@ static void _uk_thread_struct_init(struct uk_thread *t,
 	if (auxsp) {
 		t->flags |= UK_THREADF_AUXSP;
 		t->auxsp = auxsp;
+		ukarch_auxsp_init(auxsp);
 	}
 	if (tlsp && is_uktls) {
 		t->flags |= UK_THREADF_UKTLS;
@@ -260,6 +263,12 @@ static void _uk_thread_struct_init(struct uk_thread *t,
 	if (ectx) {
 		ukarch_ectx_init(t->ectx);
 		t->flags |= UK_THREADF_ECTX;
+	}
+
+	if (t->flags & UK_THREADF_UKTLS && t->flags & UK_THREADF_AUXSP) {
+		auxspcb = ukarch_auxsp_get_cb(auxsp);
+		UK_ASSERT(auxspcb);
+		ukarch_sysctx_set_tlsp(&auxspcb->uksc, t->uktlsp);
 	}
 
 	uk_pr_debug("uk_thread %p (%s): ctx:%p, ectx:%p, tlsp:%p\n",
