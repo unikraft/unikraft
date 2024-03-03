@@ -32,6 +32,10 @@
 #include <uk/plat/config.h>
 #include <uk/arch/ctx.h>
 
+#define TYPE_CRIT				0
+#define TYPE_TRAP				1
+#define TYPE_IRQ				2
+
 .macro EXCHANGE_SP_WITH_X0
 	add sp, sp, x0	// new_sp = sp + x0
 	sub x0, sp, x0	// new_x0 = new_sp - x0 = sp + x0 - x0 = sp
@@ -69,7 +73,7 @@
 	EXCHANGE_SP_WITH_X0
 .endm
 
-.macro SAVE_REGS, is_irq
+.macro SAVE_REGS, except_type
 	/* Use TPIDRRO_EL0 as scratch register. It is fine to do so because
 	 * it will always hold a value the application can't modify and we will
 	 * always be able to restore it to its desired known value anytime we
@@ -77,25 +81,33 @@
 	 */
 	msr     tpidrro_el0, x0
 
-	/* Fetch middle of `lcpu_irqntrap_sp`:
-	 *  CPU_EXCEPT_STACK_SIZE  CPU_EXCEPT_STACK_SIZE
-	 * <---------------------><--------------------->
-	 * |============================================|
-	 * |                     |                      |
-	 * |       trap stack    |        IRQ stack     |
-	 * |                     |                      |
-	 * |=============================================
-	 *                       ^
-	 *                     SP_EL0
+	/* Fetch `lcpu_except_stack` of LCPU:
+	 *  CPU_EXCEPT_STACK_SIZE  CPU_EXCEPT_STACK_SIZE  CPU_EXCEPT_STACK_SIZE
+	 *<--------------------><---------------------><-------------------->
+	 *|=================================================================|
+	 *|                     |                     |			    |
+	 *|	crit stack      |       trap stack    |        IRQ stack    |
+	 *|                     |                     |                     |
+	 *|=================================================================|
+	 * ^
+	 * SP_EL0/lcpu_except_stack
 	 */
 	mrs     x0, sp_el0
 
 	/* Make it so that SP contains SP_EL0 and x0 contains old SP */
 	EXCHANGE_SP_WITH_X0
 
-.if \is_irq != 0
-	/* If we are an IRQ, use the IRQ stack instead. */
+.if \except_type == TYPE_CRIT
+	/* If we are a crit, use the crit stack instead. */
 	add     sp, sp, #CPU_EXCEPT_STACK_SIZE
+.endif
+.if \except_type == TYPE_TRAP
+	/* If we are a trap, use the trap stack instead. */
+	add     sp, sp, #CPU_EXCEPT_STACK_SIZE * 2
+.endif
+.if \except_type == TYPE_IRQ
+	/* If we are an IRQ, use the IRQ stack instead. */
+	add     sp, sp, #CPU_EXCEPT_STACK_SIZE * 3
 .endif
 
 	/* Store old SP previously saved into x0 */
@@ -216,7 +228,7 @@
  */
 .align 6
 el1_sync:
-	SAVE_REGS 0
+	SAVE_REGS TYPE_TRAP
 	mov x0, sp
 	mrs x1, far_el1
 	bl trap_el1_sync
@@ -224,7 +236,7 @@ el1_sync:
 
 .align 6
 el1_irq:
-	SAVE_REGS 1
+	SAVE_REGS TYPE_IRQ
 	msr daifclr, #(8 | 4 | 1)
 	mov x0, sp
 	bl trap_el1_irq
@@ -239,7 +251,7 @@ el1_irq:
 #define el_invalid(name, reason, el)	\
 .align 6;				\
 name##_invalid:				\
-	SAVE_REGS 0;			\
+	SAVE_REGS TYPE_CRIT;		\
 	mov x0, sp;			\
 	mov x1, el;			\
 	mov x2, #(reason);		\

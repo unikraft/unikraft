@@ -46,15 +46,15 @@
 #define CPU_ID_MASK 0xff00ffffffUL
 
 /*
- *  CPU_EXCEPT_STACK_SIZE  CPU_EXCEPT_STACK_SIZE
- * <---------------------><--------------------->
- * |============================================|
- * |                     |                      |
- * |       trap stack    |        IRQ stack     |
- * |                     |                      |
- * |=============================================
- *                       ^
- *                     SP_EL0
+ *  CPU_EXCEPT_STACK_SIZE  CPU_EXCEPT_STACK_SIZE  CPU_EXCEPT_STACK_SIZE
+ *<--------------------><---------------------><-------------------->
+ *|=================================================================|
+ *|                     |                     |                     |
+ *|     crit stack      |       trap stack    |        IRQ stack    |
+ *|                     |                     |                     |
+ *|=================================================================|
+ * ^
+ * SP_EL0/lcpu_except_stack
  *
  * Why do we need separate stacks for IRQ and traps?
  * We could use a single stack for exceptions, but in that case when we have a
@@ -67,11 +67,13 @@
  * Why can one stack not corrupt the other/Why is trap stack before IRQ stack?
  * During a trap IRQs are disabled. So only the trap stack could potentially
  * corrupt the IRQ stack if they were the other way around. The ordering of the
- * stacks is made so that this cannot happen.
+ * stacks is made so that this cannot happen. Same thing goes for the crit
+ * stack as a crit exception may happen during a trap.
  *
  */
 static __align(UKARCH_SP_ALIGN)
-UKPLAT_PER_LCPU_ARRAY_DEFINE(__u8, lcpu_irqntrap_sp, CPU_EXCEPT_STACK_SIZE * 2);
+UKPLAT_PER_LCPU_ARRAY_DEFINE(__u8, lcpu_except_stack,
+			     CPU_EXCEPT_STACK_SIZE * 3);
 
 __lcpuid lcpu_arch_id(void)
 {
@@ -117,7 +119,7 @@ extern struct _gic_dev *gic;
 
 int lcpu_arch_init(struct lcpu *this_lcpu)
 {
-	__uptr irqntrap_sp;
+	__uptr except_sp;
 	int ret = 0;
 
 	/* Initialize the interrupt controller for non-bsp cores */
@@ -129,9 +131,9 @@ int lcpu_arch_init(struct lcpu *this_lcpu)
 
 	SYSREG_WRITE64(tpidr_el1, (__uptr)this_lcpu);
 
-	irqntrap_sp = (__uptr)&ukplat_per_lcpu_array_current(lcpu_irqntrap_sp,
-							CPU_EXCEPT_STACK_SIZE);
-	SYSREG_WRITE64(sp_el0, irqntrap_sp);
+	except_sp = (__uptr)&lcpu_except_stack[this_lcpu->idx *
+					       CPU_EXCEPT_STACK_SIZE * 3];
+	SYSREG_WRITE64(sp_el0, except_sp);
 
 	return ret;
 }
