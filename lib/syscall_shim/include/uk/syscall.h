@@ -36,30 +36,8 @@
 #define __UK_SYSCALL_H__
 
 #include <uk/arch/ctx.h>
-#include <arch/sysregs.h>
-#include <arch/regmap_usc.h>
+#include <arch/regmap_execenv.h>
 #include <arch/syscall_prologue.h>
-
-/* We must make sure that ECTX is aligned, so we make use of some padding,
- * whose size is equal to what we need to add to UKARCH_ECTX_SIZE
- * to make it aligned with UKARCH_ECTX_ALIGN
- */
-#define UK_SYSCALL_CTX_PAD_SIZE				\
-	(ALIGN_UP(UKARCH_ECTX_SIZE,		\
-		 UKARCH_ECTX_ALIGN) -		\
-	 UKARCH_ECTX_SIZE)
-/* If we make sure that the in-memory structure's end address is aligned to
- * the ECTX alignment, then subtracting from that end address a value that is
- * also a multiple of that alignment, guarantees that the resulted address
- * is also ECTX aligned.
- */
-#define UK_SYSCALL_CTX_END_ALIGN			\
-	UKARCH_ECTX_ALIGN
-#define UK_SYSCALL_CTX_SIZE				\
-	(UK_SYSCALL_CTX_PAD_SIZE +				\
-	 UKARCH_ECTX_SIZE +			\
-	 UKARCH_SYSREGS_SIZE +				\
-	 __REGS_SIZEOF)
 
 #if !__ASSEMBLY__
 #include <uk/config.h>
@@ -73,17 +51,6 @@
 #ifdef __cplusplus
 extern "C" {
 #endif
-
-struct uk_syscall_ctx {
-	struct __regs regs;
-	struct ukarch_sysregs sysregs;
-	__u8 ectx[UKARCH_ECTX_SIZE];
-	__u8 pad[UK_SYSCALL_CTX_PAD_SIZE];
-};
-
-UK_CTASSERT(sizeof(struct uk_syscall_ctx) == UK_SYSCALL_CTX_SIZE);
-UK_CTASSERT(IS_ALIGNED(UK_SYSCALL_CTX_PAD_SIZE + UKARCH_ECTX_SIZE,
-		       UKARCH_ECTX_ALIGN));
 
 /*
  * Whenever the hidden Config.uk option LIBSYSCALL_SHIM_NOWRAPPER
@@ -115,96 +82,96 @@ typedef long uk_syscall_arg_t;
 #define UK_ARG_MAP14(m, type, arg, ...) m(type, arg), UK_ARG_MAP12(m, __VA_ARGS__)
 #define UK_ARG_MAPx(nr_args, ...) UK_CONCAT(UK_ARG_MAP, nr_args)(__VA_ARGS__)
 
-#define UK_USC_CALLMAP0_0(...)
-#define UK_USC_CALLMAP2_2(m, type, arg) , (type)usc->regs.usc_arg0
+#define UK_EXECENV_CALLMAP0_0(...)
+#define UK_EXECENV_CALLMAP2_2(m, type, arg) , (type)execenv->regs.execenv_arg0
 
-#define UK_USC_CALLMAP2_4(m, type, arg) , (type)usc->regs.usc_arg1
-#define UK_USC_CALLMAP4_4(m, type, arg, ...)				\
-	, (type)usc->regs.usc_arg0 UK_USC_CALLMAP2_4(m, __VA_ARGS__)
+#define UK_EXECENV_CALLMAP2_4(m, type, arg) , (type)execenv->regs.execenv_arg1
+#define UK_EXECENV_CALLMAP4_4(m, type, arg, ...)				\
+	, (type)execenv->regs.execenv_arg0 UK_EXECENV_CALLMAP2_4(m, __VA_ARGS__)
 
-#define UK_USC_CALLMAP2_6(m, type, arg) , (type)usc->regs.usc_arg2
-#define UK_USC_CALLMAP4_6(m, type, arg, ...)				\
-	, (type)usc->regs.usc_arg1 UK_USC_CALLMAP2_6(m, __VA_ARGS__)
-#define UK_USC_CALLMAP6_6(m, type, arg, ...)				\
-	, (type)usc->regs.usc_arg0 UK_USC_CALLMAP4_6(m, __VA_ARGS__)
+#define UK_EXECENV_CALLMAP2_6(m, type, arg) , (type)execenv->regs.execenv_arg2
+#define UK_EXECENV_CALLMAP4_6(m, type, arg, ...)				\
+	, (type)execenv->regs.execenv_arg1 UK_EXECENV_CALLMAP2_6(m, __VA_ARGS__)
+#define UK_EXECENV_CALLMAP6_6(m, type, arg, ...)				\
+	, (type)execenv->regs.execenv_arg0 UK_EXECENV_CALLMAP4_6(m, __VA_ARGS__)
 
-#define UK_USC_CALLMAP2_8(m, type, arg) , (type)usc->regs.usc_arg3
-#define UK_USC_CALLMAP4_8(m, type, arg, ...)				\
-	, (type)usc->regs.usc_arg2 UK_USC_CALLMAP2_8(m, __VA_ARGS__)
-#define UK_USC_CALLMAP6_8(m, type, arg, ...)				\
-	, (type)usc->regs.usc_arg1 UK_USC_CALLMAP4_8(m, __VA_ARGS__)
-#define UK_USC_CALLMAP8_8(m, type, arg, ...)				\
-	, (type)usc->regs.usc_arg0 UK_USC_CALLMAP6_8(m, __VA_ARGS__)
+#define UK_EXECENV_CALLMAP2_8(m, type, arg) , (type)execenv->regs.execenv_arg3
+#define UK_EXECENV_CALLMAP4_8(m, type, arg, ...)				\
+	, (type)execenv->regs.execenv_arg2 UK_EXECENV_CALLMAP2_8(m, __VA_ARGS__)
+#define UK_EXECENV_CALLMAP6_8(m, type, arg, ...)				\
+	, (type)execenv->regs.execenv_arg1 UK_EXECENV_CALLMAP4_8(m, __VA_ARGS__)
+#define UK_EXECENV_CALLMAP8_8(m, type, arg, ...)				\
+	, (type)execenv->regs.execenv_arg0 UK_EXECENV_CALLMAP6_8(m, __VA_ARGS__)
 
-#define UK_USC_CALLMAP2_10(m, type, arg) , (type)usc->regs.usc_arg4
-#define UK_USC_CALLMAP4_10(m, type, arg, ...)				\
-	, (type)usc->regs.usc_arg3 UK_USC_CALLMAP2_10(m, __VA_ARGS__)
-#define UK_USC_CALLMAP6_10(m, type, arg, ...)				\
-	, (type)usc->regs.usc_arg2 UK_USC_CALLMAP4_10(m, __VA_ARGS__)
-#define UK_USC_CALLMAP8_10(m, type, arg, ...)				\
-	, (type)usc->regs.usc_arg1 UK_USC_CALLMAP6_10(m, __VA_ARGS__)
-#define UK_USC_CALLMAP10_10(m, type, arg, ...)				\
-	, (type)usc->regs.usc_arg0 UK_USC_CALLMAP8_10(m, __VA_ARGS__)
+#define UK_EXECENV_CALLMAP2_10(m, type, arg) , (type)execenv->regs.execenv_arg4
+#define UK_EXECENV_CALLMAP4_10(m, type, arg, ...)				\
+	, (type)execenv->regs.execenv_arg3 UK_EXECENV_CALLMAP2_10(m, __VA_ARGS__)
+#define UK_EXECENV_CALLMAP6_10(m, type, arg, ...)				\
+	, (type)execenv->regs.execenv_arg2 UK_EXECENV_CALLMAP4_10(m, __VA_ARGS__)
+#define UK_EXECENV_CALLMAP8_10(m, type, arg, ...)				\
+	, (type)execenv->regs.execenv_arg1 UK_EXECENV_CALLMAP6_10(m, __VA_ARGS__)
+#define UK_EXECENV_CALLMAP10_10(m, type, arg, ...)				\
+	, (type)execenv->regs.execenv_arg0 UK_EXECENV_CALLMAP8_10(m, __VA_ARGS__)
 
-#define UK_USC_CALLMAP2_12(m, type, arg) , (type)usc->regs.usc_arg5
-#define UK_USC_CALLMAP4_12(m, type, arg, ...)				\
-	, (type)usc->regs.usc_arg4 UK_USC_CALLMAP2_12(m, __VA_ARGS__)
-#define UK_USC_CALLMAP6_12(m, type, arg, ...)				\
-	, (type)usc->regs.usc_arg3 UK_USC_CALLMAP4_12(m, __VA_ARGS__)
-#define UK_USC_CALLMAP8_12(m, type, arg, ...)				\
-	, (type)usc->regs.usc_arg2 UK_USC_CALLMAP6_12(m, __VA_ARGS__)
-#define UK_USC_CALLMAP10_12(m, type, arg, ...)				\
-	, (type)usc->regs.usc_arg1 UK_USC_CALLMAP8_12(m, __VA_ARGS__)
-#define UK_USC_CALLMAP12_12(m, type, arg, ...)				\
-	, (type)usc->regs.usc_arg0 UK_USC_CALLMAP10_12(m, __VA_ARGS__)
-#define UK_USC_CALLMAPx(nr_args, ...)					\
-	usc UK_CONCAT(UK_CONCAT(UK_USC_CALLMAP, nr_args),		\
+#define UK_EXECENV_CALLMAP2_12(m, type, arg) , (type)execenv->regs.execenv_arg5
+#define UK_EXECENV_CALLMAP4_12(m, type, arg, ...)				\
+	, (type)execenv->regs.execenv_arg4 UK_EXECENV_CALLMAP2_12(m, __VA_ARGS__)
+#define UK_EXECENV_CALLMAP6_12(m, type, arg, ...)				\
+	, (type)execenv->regs.execenv_arg3 UK_EXECENV_CALLMAP4_12(m, __VA_ARGS__)
+#define UK_EXECENV_CALLMAP8_12(m, type, arg, ...)				\
+	, (type)execenv->regs.execenv_arg2 UK_EXECENV_CALLMAP6_12(m, __VA_ARGS__)
+#define UK_EXECENV_CALLMAP10_12(m, type, arg, ...)				\
+	, (type)execenv->regs.execenv_arg1 UK_EXECENV_CALLMAP8_12(m, __VA_ARGS__)
+#define UK_EXECENV_CALLMAP12_12(m, type, arg, ...)				\
+	, (type)execenv->regs.execenv_arg0 UK_EXECENV_CALLMAP10_12(m, __VA_ARGS__)
+#define UK_EXECENV_CALLMAPx(nr_args, ...)					\
+	execenv UK_CONCAT(UK_CONCAT(UK_EXECENV_CALLMAP, nr_args),		\
 		      _##nr_args)(__VA_ARGS__)
 
-#define UK_USC_EMAP0_0(...)
-#define UK_USC_EMAP2_2(m, type, arg) , (long)usc->regs.usc_arg0
+#define UK_EXECENV_EMAP0_0(...)
+#define UK_EXECENV_EMAP2_2(m, type, arg) , (long)execenv->regs.execenv_arg0
 
-#define UK_USC_EMAP2_4(m, type, arg) , (long)usc->regs.usc_arg1
-#define UK_USC_EMAP4_4(m, type, arg, ...)				\
-	, (long)usc->regs.usc_arg0 UK_USC_EMAP2_4(m, __VA_ARGS__)
+#define UK_EXECENV_EMAP2_4(m, type, arg) , (long)execenv->regs.execenv_arg1
+#define UK_EXECENV_EMAP4_4(m, type, arg, ...)				\
+	, (long)execenv->regs.execenv_arg0 UK_EXECENV_EMAP2_4(m, __VA_ARGS__)
 
-#define UK_USC_EMAP2_6(m, type, arg) , (long)usc->regs.usc_arg2
-#define UK_USC_EMAP4_6(m, type, arg, ...)				\
-	, (long)usc->regs.usc_arg1 UK_USC_EMAP2_6(m, __VA_ARGS__)
-#define UK_USC_EMAP6_6(m, type, arg, ...)				\
-	, (long)usc->regs.usc_arg0 UK_USC_EMAP4_6(m, __VA_ARGS__)
+#define UK_EXECENV_EMAP2_6(m, type, arg) , (long)execenv->regs.execenv_arg2
+#define UK_EXECENV_EMAP4_6(m, type, arg, ...)				\
+	, (long)execenv->regs.execenv_arg1 UK_EXECENV_EMAP2_6(m, __VA_ARGS__)
+#define UK_EXECENV_EMAP6_6(m, type, arg, ...)				\
+	, (long)execenv->regs.execenv_arg0 UK_EXECENV_EMAP4_6(m, __VA_ARGS__)
 
-#define UK_USC_EMAP2_8(m, type, arg) , (long)usc->regs.usc_arg3
-#define UK_USC_EMAP4_8(m, type, arg, ...)				\
-	, (long)usc->regs.usc_arg2 UK_USC_EMAP2_8(m, __VA_ARGS__)
-#define UK_USC_EMAP6_8(m, type, arg, ...)				\
-	, (long)usc->regs.usc_arg1 UK_USC_EMAP4_8(m, __VA_ARGS__)
-#define UK_USC_EMAP8_8(m, type, arg, ...)				\
-	, (long)usc->regs.usc_arg0 UK_USC_EMAP6_8(m, __VA_ARGS__)
+#define UK_EXECENV_EMAP2_8(m, type, arg) , (long)execenv->regs.execenv_arg3
+#define UK_EXECENV_EMAP4_8(m, type, arg, ...)				\
+	, (long)execenv->regs.execenv_arg2 UK_EXECENV_EMAP2_8(m, __VA_ARGS__)
+#define UK_EXECENV_EMAP6_8(m, type, arg, ...)				\
+	, (long)execenv->regs.execenv_arg1 UK_EXECENV_EMAP4_8(m, __VA_ARGS__)
+#define UK_EXECENV_EMAP8_8(m, type, arg, ...)				\
+	, (long)execenv->regs.execenv_arg0 UK_EXECENV_EMAP6_8(m, __VA_ARGS__)
 
-#define UK_USC_EMAP2_10(m, type, arg) , (long)usc->regs.usc_arg4
-#define UK_USC_EMAP4_10(m, type, arg, ...)				\
-	, (long)usc->regs.usc_arg3 UK_USC_EMAP2_10(m, __VA_ARGS__)
-#define UK_USC_EMAP6_10(m, type, arg, ...)				\
-	, (long)usc->regs.usc_arg2 UK_USC_EMAP4_10(m, __VA_ARGS__)
-#define UK_USC_EMAP8_10(m, type, arg, ...)				\
-	, (long)usc->regs.usc_arg1 UK_USC_EMAP6_10(m, __VA_ARGS__)
-#define UK_USC_EMAP10_10(m, type, arg, ...)				\
-	, (long)usc->regs.usc_arg0 UK_USC_EMAP8_10(m, __VA_ARGS__)
+#define UK_EXECENV_EMAP2_10(m, type, arg) , (long)execenv->regs.execenv_arg4
+#define UK_EXECENV_EMAP4_10(m, type, arg, ...)				\
+	, (long)execenv->regs.execenv_arg3 UK_EXECENV_EMAP2_10(m, __VA_ARGS__)
+#define UK_EXECENV_EMAP6_10(m, type, arg, ...)				\
+	, (long)execenv->regs.execenv_arg2 UK_EXECENV_EMAP4_10(m, __VA_ARGS__)
+#define UK_EXECENV_EMAP8_10(m, type, arg, ...)				\
+	, (long)execenv->regs.execenv_arg1 UK_EXECENV_EMAP6_10(m, __VA_ARGS__)
+#define UK_EXECENV_EMAP10_10(m, type, arg, ...)				\
+	, (long)execenv->regs.execenv_arg0 UK_EXECENV_EMAP8_10(m, __VA_ARGS__)
 
-#define UK_USC_EMAP2_12(m, type, arg) , (long)usc->regs.usc_arg5
-#define UK_USC_EMAP4_12(m, type, arg, ...)				\
-	, (long)usc->regs.usc_arg4 UK_USC_EMAP2_12(m, __VA_ARGS__)
-#define UK_USC_EMAP6_12(m, type, arg, ...)				\
-	, (long)usc->regs.usc_arg3 UK_USC_EMAP4_12(m, __VA_ARGS__)
-#define UK_USC_EMAP8_12(m, type, arg, ...)				\
-	, (long)usc->regs.usc_arg2 UK_USC_EMAP6_12(m, __VA_ARGS__)
-#define UK_USC_EMAP10_12(m, type, arg, ...)				\
-	, (long)usc->regs.usc_arg1 UK_USC_EMAP8_12(m, __VA_ARGS__)
-#define UK_USC_EMAP12_12(m, type, arg, ...)				\
-	, (long)usc->regs.usc_arg0 UK_USC_EMAP10_12(m, __VA_ARGS__)
-#define UK_USC_EMAPx(nr_args, ...)					\
-	(long)usc UK_CONCAT(UK_CONCAT(UK_USC_EMAP, nr_args),		\
+#define UK_EXECENV_EMAP2_12(m, type, arg) , (long)execenv->regs.execenv_arg5
+#define UK_EXECENV_EMAP4_12(m, type, arg, ...)				\
+	, (long)execenv->regs.execenv_arg4 UK_EXECENV_EMAP2_12(m, __VA_ARGS__)
+#define UK_EXECENV_EMAP6_12(m, type, arg, ...)				\
+	, (long)execenv->regs.execenv_arg3 UK_EXECENV_EMAP4_12(m, __VA_ARGS__)
+#define UK_EXECENV_EMAP8_12(m, type, arg, ...)				\
+	, (long)execenv->regs.execenv_arg2 UK_EXECENV_EMAP6_12(m, __VA_ARGS__)
+#define UK_EXECENV_EMAP10_12(m, type, arg, ...)				\
+	, (long)execenv->regs.execenv_arg1 UK_EXECENV_EMAP8_12(m, __VA_ARGS__)
+#define UK_EXECENV_EMAP12_12(m, type, arg, ...)				\
+	, (long)execenv->regs.execenv_arg0 UK_EXECENV_EMAP10_12(m, __VA_ARGS__)
+#define UK_EXECENV_EMAPx(nr_args, ...)					\
+	(long)execenv UK_CONCAT(UK_CONCAT(UK_EXECENV_EMAP, nr_args),		\
 		      _##nr_args)(__VA_ARGS__)
 
 /* Variant of UK_ARG_MAPx() but prepends a comma if nr_args > 0 */
@@ -224,12 +191,12 @@ typedef long uk_syscall_arg_t;
 #define UK_S_ARG_ACTUAL_MAYBE_UNUSED(type, arg) type arg __maybe_unused
 #define UK_S_ARG_CAST_LONG(type, arg)   (long) arg
 #define UK_S_ARG_CAST_ACTUAL(type, arg) (type) arg
-#define UK_S_USC_ARG_ACTUAL	struct uk_syscall_ctx *usc
-#define UK_S_USC_ARG_ACTUAL_MAYBE_UNUSED				\
-	struct uk_syscall_ctx *usc __maybe_unused
+#define UK_S_EXECENV_ARG_ACTUAL	struct ukarch_execenv *execenv
+#define UK_S_EXECENV_ARG_ACTUAL_MAYBE_UNUSED				\
+	struct ukarch_execenv *execenv __maybe_unused
 
-#define UK_USC_DECLMAPx(usc_arg, nr_args, ...)					\
-	usc_arg UK_ARG_EMAPx(nr_args, __VA_ARGS__)
+#define UK_EXECENV_DECLMAPx(execenv_arg, nr_args, ...)					\
+	execenv_arg UK_ARG_EMAPx(nr_args, __VA_ARGS__)
 
 #if CONFIG_LIBSYSCALL_SHIM_DEBUG_SYSCALLS || CONFIG_LIBUKDEBUG_PRINTD
 #define UK_ARG_FMT_MAP0(...)
@@ -251,16 +218,16 @@ typedef long uk_syscall_arg_t;
 		   "(" UK_ARG_FMT_MAPx(x, UK_S_ARG_FMT_LONGX, __VA_ARGS__) ")\n" \
 		   UK_ARG_EMAPx(x, UK_S_ARG_CAST_LONG, __VA_ARGS__) )
 
-#define __UK_SYSCALL_USC_PRINTD(x, rtype, fname, ...)			\
+#define __UK_SYSCALL_EXECENV_PRINTD(x, rtype, fname, ...)			\
 	uk_printd("\nInvoking context saving %s system call.\n",	\
 		  STRINGIFY(fname));					\
 	_uk_printd(uk_libid_self(), __STR_BASENAME__, __LINE__,		\
 		   "(" STRINGIFY(rtype) ") " STRINGIFY(fname)		\
-		   "( usc 0x%lx, " UK_ARG_FMT_MAPx(x, UK_S_ARG_FMT_LONGX, __VA_ARGS__) ")\n", \
-		   UK_USC_EMAPx(x, UK_S_ARG_CAST_LONG, __VA_ARGS__) )
+		   "( execenv 0x%lx, " UK_ARG_FMT_MAPx(x, UK_S_ARG_FMT_LONGX, __VA_ARGS__) ")\n", \
+		   UK_EXECENV_EMAPx(x, UK_S_ARG_CAST_LONG, __VA_ARGS__) )
 #else
 #define __UK_SYSCALL_PRINTD(...) do {} while(0)
-#define __UK_SYSCALL_USC_PRINTD(...) do {} while(0)
+#define __UK_SYSCALL_EXECENV_PRINTD(...) do {} while(0)
 #endif /* CONFIG_LIBSYSCALL_SHIM_DEBUG || CONFIG_LIBUKDEBUG_PRINTD */
 
 /* System call implementation that uses errno and returns -1 on errors */
@@ -390,45 +357,45 @@ typedef long uk_syscall_arg_t;
 			       __VA_ARGS__)
 
 #define __UK_LLSYSCALL_R_U_DEFINE(x, rtype, name, ename, rname, ...)\
-	long rname(long _usc);						\
-	long __used ename(long _usc)						\
+	long rname(long _execenv);						\
+	long __used ename(long _execenv)						\
 	{								\
 		long ret;						\
 									\
-		ret = rname(_usc);					\
+		ret = rname(_execenv);					\
 		if (ret < 0 && PTRISERR(ret)) {				\
 			errno = -(int) PTR2ERR(ret);			\
 			return -1;					\
 		}							\
 		return ret;						\
 	}								\
-	static inline rtype __##rname(UK_USC_DECLMAPx(UK_S_USC_ARG_ACTUAL,\
+	static inline rtype __##rname(UK_EXECENV_DECLMAPx(UK_S_EXECENV_ARG_ACTUAL,\
 						      x, UK_S_ARG_ACTUAL,\
 						      __VA_ARGS__));	\
-	long __used rname(long _usc)					\
+	long __used rname(long _execenv)					\
 	{								\
-		struct uk_syscall_ctx *usc;				\
+		struct ukarch_execenv *execenv;				\
 		long ret;						\
 									\
-		usc = (struct uk_syscall_ctx *)_usc;			\
-		__UK_SYSCALL_USC_PRINTD(x, rtype, rname,		\
+		execenv = (struct ukarch_execenv *)_execenv;			\
+		__UK_SYSCALL_EXECENV_PRINTD(x, rtype, rname,		\
 					__VA_ARGS__);			\
-		ret = (long) __##rname(UK_USC_CALLMAPx(x,		\
+		ret = (long) __##rname(UK_EXECENV_CALLMAPx(x,		\
 						   UK_S_ARG_ACTUAL,	\
 						   __VA_ARGS__));	\
 		return ret;						\
 	}								\
-	static inline rtype __used __##rname(UK_USC_DECLMAPx(		\
-					     UK_S_USC_ARG_ACTUAL_MAYBE_UNUSED,\
+	static inline rtype __used __##rname(UK_EXECENV_DECLMAPx(		\
+					     UK_S_EXECENV_ARG_ACTUAL_MAYBE_UNUSED,\
 					     x, UK_S_ARG_ACTUAL_MAYBE_UNUSED,\
 					     __VA_ARGS__))
 #define _UK_LLSYSCALL_R_U_DEFINE(...) __UK_LLSYSCALL_R_U_DEFINE(__VA_ARGS__)
 #define UK_LLSYSCALL_R_U_DEFINE(rtype, name, ...)			\
-	UK_SYSCALL_USC_PROLOGUE_DEFINE(__UK_NAME2SCALLE_FN(name),	\
+	UK_SYSCALL_EXECENV_PROLOGUE_DEFINE(__UK_NAME2SCALLE_FN(name),	\
 				       __UK_NAME2SCALLE_FN(u_##name),	\
 				       UK_NARGS(__VA_ARGS__),		\
 				       __VA_ARGS__)			\
-	UK_SYSCALL_USC_PROLOGUE_DEFINE(__UK_NAME2SCALLR_FN(name),	\
+	UK_SYSCALL_EXECENV_PROLOGUE_DEFINE(__UK_NAME2SCALLR_FN(name),	\
 				       __UK_NAME2SCALLR_FN(u_##name),	\
 				       UK_NARGS(__VA_ARGS__),		\
 				       __VA_ARGS__)			\
@@ -547,7 +514,7 @@ long uk_syscall6(long nr, long arg1, long arg2, long arg3,
 /* Raw system call, returns negative codes on errors */
 long uk_syscall_r(long nr, ...);
 long uk_vsyscall_r(long nr, va_list arg);
-long uk_syscall6_r_u(struct uk_syscall_ctx *usc);
+long uk_syscall6_r_u(struct ukarch_execenv *execenv);
 long uk_syscall6_r(long nr, long arg1, long arg2, long arg3,
 		   long arg4, long arg5, long arg6);
 

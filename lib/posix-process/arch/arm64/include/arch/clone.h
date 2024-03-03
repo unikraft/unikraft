@@ -13,7 +13,7 @@
 
 #if !__ASSEMBLY__
 
-void clone_setup_child_ctx(struct uk_syscall_ctx *pusc,
+void clone_setup_child_ctx(struct ukarch_execenv *pexecenv,
 			   struct uk_thread *child, __uptr sp);
 
 #endif /* !__ASSEMBLY__ */

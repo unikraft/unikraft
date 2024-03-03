@@ -30,7 +30,7 @@
 #include <uk/asm.h>
 #include <uk/plat/common/lcpu.h>
 #include <uk/plat/config.h>
-#include <uk/syscall.h>
+#include <uk/arch/ctx.h>
 
 .macro EXCHANGE_SP_WITH_X0
 	add sp, sp, x0	// new_sp = sp + x0
@@ -113,6 +113,10 @@
 	 */
 	mrs	x0, tpidr_el1
 	ldr	x0, [x0, #LCPU_AUXSP_OFFSET]
+	sub	x0, x0, #UKARCH_AUXSPCB_SIZE
+	ldr	x0, [x0, #UKARCH_AUXSPCB_OFFSETOF_CURR_FRAME]
+	sub	x0, x0, #UKARCH_EXECENV_END_ALIGN
+
 	/* NOTE: We should normally align the stack before doing this
 	 * subtraction because we must ensure that the `ectx` field
 	 * is aligned to the corresponding ECTX alignment.
@@ -120,13 +124,16 @@
 	 * auxiliary stack because it is allocated with this exact alignment
 	 * in mind.
 	 */
-	sub	x0, x0, #UK_SYSCALL_CTX_SIZE
+	sub	x0, x0, #UKARCH_EXECENV_SIZE
 
 	/* We now have in SP the trap stack and in x0 the auxiliary stack */
 	EXCHANGE_SP_WITH_X0  /* Switch them */
 	/* Restore old SP we stored before system call check */
 	ldr	x0, [x0, #-16]
 	str	x0, [sp, #__SP_OFFSET]  /* Store old SP in auxiliary stack */
+	mrs	x0, tpidr_el1
+	ldr	x0, [x0, #LCPU_AUXSP_OFFSET]
+	str	x0, [sp, #UKARCH_EXECENV_SIZE]
 	b	1f
 0:
 	sub	sp, sp, #__TRAP_STACK_SIZE

@@ -33,6 +33,7 @@
 
 #include <uk/config.h>
 #include <uk/arch/ctx.h>
+#include <uk/plat/lcpu.h>
 #if CONFIG_LIBUKDEBUG
 #include <uk/assert.h>
 #include <uk/print.h>

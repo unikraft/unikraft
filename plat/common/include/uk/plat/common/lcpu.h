@@ -39,6 +39,7 @@
 #define __PLAT_CMN_LCPU_H__
 
 #include <uk/config.h>
+#include <uk/plat/config.h>
 #ifndef __ASSEMBLY__
 #include <uk/essentials.h>
 #include <uk/arch/types.h>
@@ -62,10 +63,10 @@ struct lcpu_arch { };
 #endif /* !__ASSEMBLY__ */
 #endif /* !LCPU_ARCH_SIZE */
 
-#define IS_LCPU_PTR(ptr)                                               \
-	(IN_RANGE((__uptr)(ptr),                                        \
-		  (__uptr)lcpu_get(0),                                  \
-		  (__uptr)CONFIG_UKPLAT_LCPU_MAXCOUNT *                 \
+#define IS_LCPU_PTR(ptr)						\
+	(IN_RANGE((__uptr)(ptr),					\
+		  (__uptr)lcpu_get(0),					\
+		  (__uptr)CONFIG_UKPLAT_LCPU_MAXCOUNT *			\
 		  sizeof(struct lcpu)))
 
 /*
@@ -279,6 +280,11 @@ static inline int lcpu_current_is_bsp(void)
 }
 
 /**
+ * Return the auxstack pointer of the current LCPU.
+ */
+__uptr lcpu_get_auxsp(void);
+
+/**
  * Initialize a logical CPU. The function must be executed on the CPU
  * represented by the LCPU as early as possible after startup.
  *
@@ -357,6 +363,13 @@ __lcpuid lcpu_arch_id(void);
  * initialization to yield faster execution.
  */
 __lcpuidx lcpu_arch_idx(void);
+
+/**
+ * Set the auxstack pointer of the current LCPU.
+ *
+ * NOTE: Architecture specific.
+ */
+void lcpu_arch_set_auxsp(__uptr auxsp);
 
 /**
  * Initialize the architectural part of the LCPU. The function is

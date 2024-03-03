@@ -43,6 +43,8 @@ extern "C" {
 
 #ifdef CONFIG_HAVE_SYSCALL
 
+struct uk_syscall_ctx;
+
 /**
  * Called by platform library when a binary system call was trapped.
  * This function has to be provided by a non-platform library for

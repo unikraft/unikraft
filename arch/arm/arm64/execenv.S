@@ -4,21 +4,22 @@
  * You may not use this file except in compliance with the License.
  */
 
+#include <uk/arch/ctx.h>
 #include <uk/arch/lcpu.h>
 #include <uk/asm.h>
-#include <uk/syscall.h>
 
-ENTRY(uk_syscall_ctx_popall)
+ENTRY(ukarch_execenv_load)
 	/* Mask IRQ to make sure restore would not be interrupted by IRQ */
 	msr	daifset, #2
 
-	mov	x0, sp
-	add	x0, x0, #(__REGS_SIZEOF + UKARCH_SYSREGS_SIZE)
-	bl	ukarch_ectx_store
+	mov	sp, x0
 
+	add	x0, x0, #(__REGS_SIZEOF + UKARCH_SYSCTX_SIZE)
+	bl	ukarch_ectx_load
 	mov	x0, sp
+
 	add	x0, x0, #(__REGS_SIZEOF)
-	bl	ukarch_sysregs_switch_ul
+	bl	ukarch_sysctx_load
 
 	/* Restore pstate and exception status register */
 	ldp x22, x23, [sp, #16 * 16]
