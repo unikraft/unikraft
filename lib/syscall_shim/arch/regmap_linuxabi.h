@@ -13,30 +13,30 @@
  */
 
 #if (defined __X86_64__)
-#define rip		rcx
-#define rsyscall	orig_rax
-#define rarg0		rdi
-#define rarg1		rsi
-#define rarg2		rdx
-#define rarg3		r10
-#define rarg4		r8
-#define rarg5		r9
+#define __syscall_rip		rcx
+#define __syscall_rsyscall	orig_rax
+#define __syscall_rarg0		rdi
+#define __syscall_rarg1		rsi
+#define __syscall_rarg2		rdx
+#define __syscall_rarg3		r10
+#define __syscall_rarg4		r8
+#define __syscall_rarg5		r9
 
-#define rret0		rax
-#define rret1		rdx
+#define __syscall_rret0		rax
+#define __syscall_rret1		rdx
 
 #elif (defined __ARM_64__)
-#define rip		elr_el1
-#define rsyscall	x[8]
-#define rarg0		x[0]
-#define rarg1		x[1]
-#define rarg2		x[2]
-#define rarg3		x[3]
-#define rarg4		x[4]
-#define rarg5		x[5]
+#define __syscall_rip		elr_el1
+#define __syscall_rsyscall	x[8]
+#define __syscall_rarg0		x[0]
+#define __syscall_rarg1		x[1]
+#define __syscall_rarg2		x[2]
+#define __syscall_rarg3		x[3]
+#define __syscall_rarg4		x[4]
+#define __syscall_rarg5		x[5]
 
-#define rret0		x[0]
-#define rret1		x[1]
+#define __syscall_rret0		x[0]
+#define __syscall_rret1		x[1]
 
 #else
 #error "Missing register mappings for selected target architecture"

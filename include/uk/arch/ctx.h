@@ -1,9 +1,11 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ *          Sergiu Moga <sergiu@unikraft.io>
  *
  * Copyright (c) 2021, NEC Laboratories Europe GmbH, NEC Corporation.
  *                     All rights reserved.
+ * Copyright (c) 2024, Unikraft GmbH. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,6 +38,7 @@
 
 #include <uk/arch/types.h>
 #include <uk/asm/ctx.h>
+#include <uk/asm/sysctx.h>
 
 #ifndef __ASSEMBLY__
 #include <uk/config.h>
@@ -56,11 +59,153 @@
 #define UKARCH_CTX_OFFSETOF_SP 8
 #endif
 
-#ifndef __ASSEMBLY__
+/* We must make sure that ECTX is aligned, so we make use of some padding,
+ * whose size is equal to what we need to add to UKARCH_ECTX_SIZE
+ * to make it aligned with UKARCH_ECTX_ALIGN
+ */
+#define UKARCH_EXECENV_PAD_SIZE					\
+	(ALIGN_UP(UKARCH_ECTX_SIZE,				\
+		 UKARCH_ECTX_ALIGN) -				\
+	 UKARCH_ECTX_SIZE)
+
+/* If we make sure that the in-memory structure's end address is aligned to
+ * the ECTX alignment, then subtracting from that end address a value that is
+ * also a multiple of that alignment, guarantees that the resulted address
+ * is also ECTX aligned.
+ */
+#define UKARCH_EXECENV_END_ALIGN				\
+	UKARCH_ECTX_ALIGN
+#define UKARCH_EXECENV_SIZE					\
+	(UKARCH_EXECENV_PAD_SIZE +				\
+	 UKARCH_ECTX_SIZE +					\
+	 UKARCH_SYSCTX_SIZE +					\
+	 __REGS_SIZEOF)
+
+#define UKARCH_EXECENV_OFFSETOF_REGS				0x0
+#define UKARCH_EXECENV_OFFSETOF_SYSCTX				\
+	(UKARCH_EXECENV_OFFSETOF_REGS +	__REGS_SIZEOF)
+#define UKARCH_EXECENV_OFFSETOF_ECTX				\
+	(UKARCH_EXECENV_OFFSETOF_SYSCTX + UKARCH_SYSCTX_SIZE)
+
+/**
+ * Size of the current frame pointer Auxiliary Stack Pointer Control Block:
+ */
+#if (defined __PTR_IS_16)
+#define UKARCH_AUXSPCB_CURR_FP_SIZE				2
+#elif (defined __PTR_IS_32)
+#define UKARCH_AUXSPCB_CURR_FP_SIZE				4
+#elif (defined __PTR_IS_64)
+#define UKARCH_AUXSPCB_CURR_FP_SIZE				8
+#endif
+
+/**
+ * Size of the Auxiliary Stack Pointer Control Block
+ * - sizeof(__uptr) for the frame pointer field
+ * - sizeof(struct ukarch_sysctx) for the field representing the current
+ * thread's Kernel system context
+ */
+#define UKARCH_AUXSPCB_SIZE					\
+	(ALIGN_UP(UKARCH_AUXSPCB_CURR_FP_SIZE +			\
+		  UKARCH_SYSCTX_SIZE, UKARCH_AUXSP_ALIGN))
+
+/**
+ * Size of the padding required to ensure the size of the Auxiliary Stack
+ * Pointer Control Block is a multiple of the alignment required for the
+ * auxiliary stack pointer.
+ */
+#define UKARCH_AUXSPCB_PAD					\
+	(UKARCH_AUXSPCB_SIZE -					\
+	 (UKARCH_AUXSPCB_CURR_FP_SIZE + UKARCH_SYSCTX_SIZE))
+
+/**
+ * Offset to current frame pointer field.
+ */
+#define UKARCH_AUXSPCB_OFFSETOF_CURR_FP				0x0
+
+/**
+ * Offset to current Unikraft system context field.
+ */
+#define UKARCH_AUXSPCB_OFFSETOF_UKSYSCTX			\
+	(UKARCH_AUXSPCB_OFFSETOF_CURR_FP +			\
+	 UKARCH_AUXSPCB_CURR_FP_SIZE)
+
+#if !__ASSEMBLY__
 struct ukarch_ctx {
 	__uptr ip;	/**< instruction pointer */
 	__uptr sp;	/**< stack pointer */
 } __packed;
+
+struct ukarch_execenv {
+	/* General purpose/flags registers */
+	struct __regs regs;
+	/* System registers (e.g. TLS pointer) */
+	struct ukarch_sysctx sysctx;
+	/* Extended context (e.g. SIMD etc.) */
+	__u8 ectx[UKARCH_ECTX_SIZE];
+	/* Padding for end alignment */
+	__u8 pad[UKARCH_EXECENV_PAD_SIZE];
+};
+
+UK_CTASSERT(sizeof(struct ukarch_execenv) == UKARCH_EXECENV_SIZE);
+UK_CTASSERT(IS_ALIGNED(UKARCH_EXECENV_PAD_SIZE + UKARCH_ECTX_SIZE,
+		       UKARCH_ECTX_ALIGN));
+UK_CTASSERT(__offsetof(struct ukarch_execenv, regs) ==
+	    UKARCH_EXECENV_OFFSETOF_REGS);
+UK_CTASSERT(__offsetof(struct ukarch_execenv, sysctx) ==
+	    UKARCH_EXECENV_OFFSETOF_SYSCTX);
+UK_CTASSERT(__offsetof(struct ukarch_execenv, ectx) ==
+	    UKARCH_EXECENV_OFFSETOF_ECTX);
+
+/**
+ * Layout of the auxiliary stack and its embedded control block located at its
+ * end (towards higher address space).
+ *               ┌─────────────── auxsp
+ *               │
+ *    ┌──────────▼───────────┐  ▲ ▲                    │ auxsp
+ *    │ struct ukarch_auxspcb│  │ │                    │
+ *    │{                     │  │ │                    │
+ *┌───┼─────curr_fp          │  │ │                    │
+ *│   │     uksysctx         │  │ │UKARCH_AUXSPCB_SIZE │
+ *│   │[pad till auxsp align]│  │ │                    │
+ *│   │}                     │  │ │                    │
+ *│ ┌►│◄─────────────────────►  │ ▼                    │
+ *│ │ │   UKARCH_AUXSP_ALIGN │  │                      │
+ *│ │ │                      │  │                      │ STACK GROWTH
+ *│ │ │                      │  │ AUXSTACK_SIZE        │  DIRECTION
+ *│ │ │ curr_fp points       │  │                      │
+ *│ │ │ to a safe            │  │                      │
+ *└►│ │ usable frame in      │  │                      │
+ *  │ │ the auxstack         │  │                      │
+ *  │ │ (the area below the  │  │                      │
+ *  │ │  auxstack control    │  │                      │
+ *  │ │       block)         │  │                      │
+ *  │ │                      │  │                      │
+ *  │ │                      │  │                      │
+ *  │ │                      │  │                      │
+ *  │ │                      │  │                      │
+ *  └►└──────────────────────┘  ▼                      ▼ auxsp - AUXSTACK_SIZE
+ *    ◄─────────────────────►
+ *       UKARCH_AUXSP_ALIGN
+ */
+
+#define SP_IN_AUXSP(sp, auxsp)					\
+	(IN_RANGE((sp), (auxsp) - AUXSTACK_SIZE, AUXSTACK_SIZE))
+
+struct ukarch_auxspcb {
+	/* Current safe frame pointer inside the auxiliary stack area */
+	__uptr curr_fp;
+	/* Unikraft system registers (e.g. TLS pointer) */
+	struct ukarch_sysctx uksysctx;
+	/* Padding for end alignment, the auxiliary stack area begins after */
+	__u8 pad[UKARCH_AUXSPCB_PAD];
+};
+
+UK_CTASSERT(sizeof(struct ukarch_auxspcb) == UKARCH_AUXSPCB_SIZE);
+UK_CTASSERT(IS_ALIGNED(sizeof(struct ukarch_auxspcb), UKARCH_AUXSP_ALIGN));
+UK_CTASSERT(__offsetof(struct ukarch_auxspcb, curr_fp) ==
+	    UKARCH_AUXSPCB_OFFSETOF_CURR_FP);
+UK_CTASSERT(__offsetof(struct ukarch_auxspcb, uksysctx) ==
+	    UKARCH_AUXSPCB_OFFSETOF_UKSYSCTX);
 
 /*
  * Context functions are not allowed to return
@@ -195,6 +340,127 @@ void ukarch_ctx_init_entry2(struct ukarch_ctx *ctx,
 void ukarch_ctx_switch(struct ukarch_ctx *store, struct ukarch_ctx *load);
 
 /**
+ * Initialize an auxiliary stack pointer. This must be always called the
+ * first time you create an auxiliary stack pointer.
+ *
+ * @param auxsp
+ *   The auxiliary stack pointer to initialize. Must point to the high end of
+ *  the auxiliary stack.
+ *
+ * NOTE: Auxiliary stack pointer must have UKARCH_AUXSP_ALIGN alignment.
+ *
+ */
+static inline void ukarch_auxsp_init(__uptr auxsp)
+{
+	struct ukarch_auxspcb *auxspcb_ptr;
+
+	UK_ASSERT(auxsp);
+	UK_ASSERT(IS_ALIGNED(auxsp, UKARCH_AUXSP_ALIGN));
+
+	auxspcb_ptr = (struct ukarch_auxspcb *)(auxsp - sizeof(*auxspcb_ptr));
+	auxspcb_ptr->curr_fp = auxsp - sizeof(*auxspcb_ptr);
+	UK_ASSERT(IS_ALIGNED(auxspcb_ptr->curr_fp, UKARCH_AUXSP_ALIGN));
+}
+
+/**
+ * Get the control block of the auxiliary stack pointer.
+ *
+ * @param auxsp
+ *   The auxiliary stack pointer whose control block to set.
+ *  Must point to the high end of the auxiliary stack.
+ * @return
+ *   The control block of the auxiliary stack pointer
+ *
+ */
+static inline struct ukarch_auxspcb *ukarch_auxsp_get_cb(__uptr auxsp)
+{
+	struct ukarch_auxspcb *auxspcb_ptr;
+
+	UK_ASSERT(auxsp);
+	UK_ASSERT(IS_ALIGNED(auxsp, UKARCH_AUXSP_ALIGN));
+
+	auxspcb_ptr = (struct ukarch_auxspcb *)(auxsp - sizeof(*auxspcb_ptr));
+	UK_ASSERT(IS_ALIGNED(auxspcb_ptr->curr_fp, UKARCH_AUXSP_ALIGN));
+
+	return auxspcb_ptr;
+}
+
+/**
+ * Set the Unikraft TLS pointer of the control block of the auxiliary stack
+ * pointer.
+ *
+ * @param auxspcb
+ *   The auxiliary stack control block pointer whose Unikraft TLS pointer to
+ *  set.
+ * @param uktlsp
+ *   The TLS pointer to set in the control block of the auxstack pointer.
+ *
+ */
+static inline void ukarch_auxspcb_set_uktlsp(struct ukarch_auxspcb *auxspcb,
+					     __uptr uktlsp)
+{
+	UK_ASSERT(auxspcb);
+	UK_ASSERT(IS_ALIGNED((__uptr)auxspcb, UKARCH_AUXSP_ALIGN));
+	ukarch_sysctx_set_tlsp(&auxspcb->uksysctx, uktlsp);
+}
+
+/**
+ * Get the Unikraft TLS pointer of the auxiliary stack pointer.
+ *
+ * @param auxspcb
+ *   The auxiliary stack control block pointer whose Unikraft TLS pointer to
+ *  get.
+ * @return
+ *   The Unikraft TLS pointer of the auxiliary stack pointer
+ *
+ */
+static inline __uptr ukarch_auxspcb_get_uktlsp(struct ukarch_auxspcb *auxspcb)
+{
+	UK_ASSERT(auxspcb);
+	UK_ASSERT(IS_ALIGNED((__uptr)auxspcb, UKARCH_AUXSP_ALIGN));
+	return ukarch_sysctx_get_tlsp(&auxspcb->uksysctx);
+}
+
+/**
+ * Set the current frame pointer of the control block of the auxiliary stack
+ * pointer.
+ *
+ * @param auxspcb
+ *   The auxiliary stack control block pointer whose current frame pointer to
+ *  set.
+ * @param curr_fp
+ *   The current frame pointer to set in the control block of the auxstack
+ *  pointer.
+ *
+ */
+static inline void ukarch_auxspcb_set_curr_fp(struct ukarch_auxspcb *auxspcb,
+					      __uptr curr_fp)
+{
+	UK_ASSERT(auxspcb);
+	UK_ASSERT(IS_ALIGNED((__uptr)auxspcb, UKARCH_AUXSP_ALIGN));
+	UK_ASSERT(IS_ALIGNED(curr_fp, UKARCH_AUXSP_ALIGN));
+	auxspcb->curr_fp = curr_fp;
+}
+
+/**
+ * Get the current frame pointer of the control block of the auxiliary stack
+ * pointer.
+ *
+ * @param auxspcb
+ *   The auxiliary stack control block pointer whose current frame pointer to
+ *  get.
+ * @return
+ *   The current frame pointer of the auxiliary stack pointer
+ *
+ */
+static inline __uptr ukarch_auxspcb_get_curr_fp(struct ukarch_auxspcb *auxspcb)
+{
+	UK_ASSERT(auxspcb);
+	UK_ASSERT(IS_ALIGNED((__uptr)auxspcb, UKARCH_AUXSP_ALIGN));
+	return auxspcb->curr_fp;
+}
+
+/**
  * State of extended context, like additional CPU registers and units
  * (e.g., floating point, vector registers)
  * Note: The layout is architecture specific. The helpers `ukarch_ectx_size()`
@@ -248,6 +514,17 @@ void ukarch_ectx_store(struct ukarch_ectx *state);
  *   Reference to extended context to restore
  */
 void ukarch_ectx_load(struct ukarch_ectx *state);
+
+/**
+ * Loads a given execution environment on the currently executing CPU.
+ *
+ * NOTE: This function does not return, it overwrites the entire current
+ *       context.
+ *
+ * @param state
+ *   Reference to execution environment to load
+ */
+void ukarch_execenv_load(long state) __noreturn;
 
 #ifdef CONFIG_ARCH_X86_64
 /**

@@ -34,6 +34,7 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <uk/arch/ctx.h>
 #include <uk/config.h>
 #include <uk/assert.h>
 #include <uk/print.h>
