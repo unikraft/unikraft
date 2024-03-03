@@ -79,3 +79,13 @@ void ukplat_lcpu_irqs_handle_pending(void)
 {
 	// TODO
 }
+
+void ukplat_lcpu_set_auxsp(__uptr auxsp)
+{
+	lcpu_get_current()->auxsp = auxsp;
+}
+
+__uptr ukplat_lcpu_get_auxsp(void)
+{
+	return lcpu_get_current()->auxsp;
+}

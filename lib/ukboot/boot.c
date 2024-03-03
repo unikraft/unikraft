@@ -80,6 +80,7 @@
 #endif /* CONFIG_LIBUKBOOT_INITSCHEDCOOP */
 #include <uk/arch/lcpu.h>
 #include <uk/plat/bootstrap.h>
+#include <uk/plat/common/lcpu.h>
 #include <uk/plat/memory.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/time.h>
@@ -267,7 +268,10 @@ void ukplat_entry(int argc, char *argv[])
 	struct uk_alloc *a = NULL, *sa = NULL, *auxsa = NULL;
 #endif
 #if CONFIG_LIBUKBOOT_INITALLOC
+	struct ukarch_auxspcb *auxspcb;
+	__uptr auxsp, uktlsp;
 	void *tls = NULL;
+	void *auxstack;
 #endif
 #if CONFIG_LIBUKSCHED
 	struct uk_sched *s = NULL;
@@ -277,7 +281,6 @@ void ukplat_entry(int argc, char *argv[])
 #endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
 	uk_ctor_func_t *ctorfn;
 	struct uk_inittab_entry *init_entry;
-	void *auxstack;
 
 #if CONFIG_LIBUKBOOT_MAINTHREAD
 	/* Initialize shutdown control structure */
@@ -361,15 +364,22 @@ void ukplat_entry(int argc, char *argv[])
 	/* Copy from TLS master template */
 	ukarch_tls_area_init(tls);
 	/* Activate TLS */
-	ukplat_tlsp_set(ukarch_tls_tlsp(tls));
+	uktlsp = ukarch_tls_tlsp(tls);
+	ukplat_tlsp_set(uktlsp);
 
 	/* Allocate auxiliary stack for this execution context */
 	auxstack = uk_memalign(auxsa,
 			       UKARCH_AUXSP_ALIGN, AUXSTACK_SIZE);
 	if (unlikely(!auxstack))
 		UK_CRASH("Failed to allocate the auxiliary stack\n");
+
 	/* Activate auxiliary stack */
-	ukplat_lcpu_set_auxsp(ukarch_gen_sp(auxstack, AUXSTACK_SIZE));
+	auxsp = ukarch_gen_sp(auxstack, AUXSTACK_SIZE);
+	ukarch_auxsp_init(auxsp);
+	auxspcb = ukarch_auxsp_get_cb(auxsp);
+	UK_ASSERT(auxspcb);
+	ukarch_auxspcb_set_uktlsp(auxspcb, uktlsp);
+	ukplat_lcpu_set_auxsp(auxsp);
 #endif /* CONFIG_LIBUKBOOT_INITALLOC */
 
 #if CONFIG_LIBUKINTCTLR

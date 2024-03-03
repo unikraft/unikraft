@@ -7702,7 +7702,7 @@ sub process {
 # check for UK_(LL)SYSCALL_DEFINE(), raw implementation should be preferred
 		if ($line =~ /\bUK_(LL)?SYSCALL_DEFINE\s*\(/) {
 			WARN("NON_RAW_SYSCALL",
-			     "Prefer using raw system call definitions: 'UK_SYSCALL_R_DEFINE', 'UK_LLSYSCALL_R_DEFINE', 'UK_LLSYSCALL_R_U_DEFINE'\n" . $herecurr);
+			     "Prefer using raw system call definitions: 'UK_SYSCALL_R_DEFINE', 'UK_LLSYSCALL_R_DEFINE', 'UK_LLSYSCALL_R_E_DEFINE'\n" . $herecurr);
 		}
 	}
 

@@ -32,7 +32,9 @@
  */
 
 #include <stdint.h>
+#include <uk/arch/ctx.h>
 #include <uk/assert.h>
+#include <uk/plat/common/lcpu.h>
 #include <uk/plat/lcpu.h>
 #include <x86/irq.h>
 
@@ -85,4 +87,22 @@ int ukplat_lcpu_irqs_disabled(void)
 void ukplat_lcpu_irqs_handle_pending(void)
 {
 
+}
+
+void ukplat_lcpu_set_auxsp(__uptr auxsp)
+{
+	struct lcpu *lcpu = lcpu_get_current();
+	struct ukarch_auxspcb *auxspcb;
+
+	UK_ASSERT(IS_LCPU_PTR(rdgsbase()));
+
+	lcpu->auxsp = auxsp;
+	auxspcb = ukarch_auxsp_get_cb(auxsp);
+	ukarch_sysctx_set_gsbase(&auxspcb->uksysctx, (__uptr)lcpu);
+}
+
+__uptr ukplat_lcpu_get_auxsp(void)
+{
+	UK_ASSERT(IS_LCPU_PTR(lcpu_get_current()));
+	return lcpu_get_current()->auxsp;
 }
