@@ -98,6 +98,8 @@ int dup2(int oldfd, int newfd);
 int dup3(int oldfd, int newfd, int flags);
 int unlink(const char *pathname);
 off_t lseek(int fd, off_t offset, int whence);
+int chdir(const char *path);
+int fchdir(int fd);
 int rmdir(const char *pathname);
 #endif
 
