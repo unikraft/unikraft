@@ -263,7 +263,8 @@ __sz uk_streambuf_memcpy(struct uk_streambuf *sb, const void *src, __sz len);
  * NOTE: Instead of truncating, this function returns `__NULL` if there is not
  *       enough space left on the corresponding buffer.
  * HINT: With `uk_streambuf_reserve(sb, 1)`, the seek position can be moved
- *       further by one byte, afterwards.
+ *       further by one byte, afterwards (use 2 for
+ *       `UK_STREAMBUF_C_TERMSHIFT`).
  *
  * @param sb Streambuf object
  * @param len Number of bytes to reserve
