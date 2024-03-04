@@ -173,25 +173,6 @@ struct uk_pollq {
 #define UK_POLLQ_INITIALIZER(q) UK_POLLQ_EVENTS_INITIALIZER((q), 0)
 #define UK_POLLQ_INIT_VALUE(q) UK_POLLQ_EVENTS_INIT_VALUE((q), 0)
 
-/**
- * Initialize the fields of `q` to a valid empty state.
- */
-static inline
-void uk_pollq_init(struct uk_pollq *q)
-{
-	q->wait = NULL;
-	q->waitend = &q->wait;
-	q->events = 0;
-	q->waitmask = 0;
-	uk_rwlock_init(&q->waitlock);
-#if CONFIG_LIBUKFILE_CHAINUPDATE
-	q->prop = NULL;
-	q->propend = &q->prop;
-	q->propmask = 0;
-	uk_rwlock_init(&q->proplock);
-#endif /* CONFIG_LIBUKFILE_CHAINUPDATE */
-}
-
 /* Polling cancellation */
 
 /**
@@ -359,54 +340,6 @@ uk_pollevent uk_pollq_poll_until(struct uk_pollq *q, uk_pollevent req,
  */
 #define uk_pollq_poll(q, req) uk_pollq_poll_until(q, req, 0)
 
-/**
- * Poll for event rising edges in `req`, blocking until `deadline` or an edge.
- *
- * In contrast to normal poll, will not return immediately if events are set,
- * nor return which events were detected.
- * Use `uk_pollq_poll_immediate` to check the current set events, however events
- * may have been modified in the meantime, potentially leading to lost edges.
- * To correctly handle these missed edges, use update chaining.
- *
- * @param q Target queue.
- * @param req Events to poll for.
- * @param deadline Max number of nanoseconds to wait for, or 0 if forever
- *
- * @return
- *   1 if a rising edge was detected,
- *   0 if timed out
- */
-static inline
-int uk_pollq_edge_poll_until(struct uk_pollq *q, uk_pollevent req,
-			     __nsec deadline)
-{
-	uk_pollevent level = uk_pollq_poll_immediate(q, req);
-
-	/* Acquire lock & check for new events */
-	if (_pollq_lock(q, req, level))
-		return 1;
-	/* Wait for notification */
-	return _pollq_wait(q, req, deadline);
-}
-
-/**
- * Poll for event rising edges in `req`, blocking until a rising edge.
- *
- * In contrast to normal poll, will not return immediately if events are set,
- * nor return which events were detected.
- * Use `uk_pollq_poll_immediate` to check the current set events.
- * To correctly handle missed edges, use update chaining.
- *
- * @param q Target queue.
- * @param req Events to poll for.
- *
- * @return
- *   1 if a rising edge was detected,
- *   0 if timed out
- */
-#define uk_pollq_edge_poll(q, req) uk_pollq_edge_poll_until(q, req, 0)
-
-
 #if CONFIG_LIBUKFILE_CHAINUPDATE
 /* Propagation */
 
@@ -487,35 +420,6 @@ uk_pollevent uk_pollq_poll_register(struct uk_pollq *q,
 	/* Might need to register */
 	uk_rwlock_rlock(&q->proplock);
 	if ((ev = uk_pollq_poll_immediate(q, req)) && !force)
-		goto out;
-	_pollq_register(q, tick);
-out:
-	uk_rwlock_runlock(&q->proplock);
-	return ev;
-}
-
-/**
- * Poll for event rising edges and/or register for propagation on `q`.
- *
- * @param q Target queue.
- * @param tick Update chaining ticket to register, if needed.
- * @param force If 0, will immediately return without registering if any of the
- *   requested event rising edges are detected. If non-zero, always register.
- *
- * @return
- *   Detected rising edges of requested events.
- */
-static inline
-uk_pollevent uk_pollq_edge_poll_register(struct uk_pollq *q,
-					 struct uk_poll_chain *tick,
-					 int force)
-{
-	uk_pollevent ev;
-	uk_pollevent req = tick->mask;
-	uk_pollevent level = uk_pollq_poll_immediate(q, req);
-
-	uk_rwlock_rlock(&q->proplock);
-	if ((ev = uk_pollq_poll_immediate(q, req) & ~level) && !force)
 		goto out;
 	_pollq_register(q, tick);
 out:
