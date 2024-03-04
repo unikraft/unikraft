@@ -265,3 +265,236 @@ void ukarch_ctx_init_entry6(struct ukarch_ctx *ctx,
 		    ctx, entry, arg0, arg1, arg2, arg3, arg4, arg5,
 		    (void *)sp);
 }
+
+static void ehtrampo_ectx_and_sysctx_store(struct ukarch_execenv *ee)
+{
+	UK_ASSERT(ee);
+
+	ukplat_lcpu_enable_irq();
+
+	/* Save extended register state */
+	ukarch_ectx_sanitize((struct ukarch_ectx *)&ee->ectx);
+	ukarch_ectx_store((struct ukarch_ectx *)&ee->ectx);
+
+	ukarch_sysctx_store(&ee->sysctx);
+}
+
+void ukarch_ctx_init_ehtrampo0(struct ukarch_ctx *ctx,
+			       struct __regs *r,
+			       __uptr sp,
+			       ukarch_execenv_entry0 entry)
+{
+	struct ukarch_execenv *ee;
+
+	UK_ASSERT(ctx);
+	UK_ASSERT(r);
+	UK_ASSERT(sp);			/* a stack is needed */
+	UK_ASSERT(entry);		/* NULL as func will cause a crash */
+	UK_ASSERT(!(sp & UKARCH_SP_ALIGN_MASK)); /* sp properly aligned? */
+
+	/* We re-align the stack anyway just to be sure */
+	sp &= UKARCH_EXECENV_END_ALIGN - 1;
+	sp -= ALIGN_UP(sizeof(*ee), UKARCH_EXECENV_END_ALIGN);
+	ee = (struct ukarch_execenv *)sp;
+	ee->regs = *r;
+
+	sp = ukarch_rstack_push(sp, (long)ukarch_execenv_load);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)_ctx_arm_call1);
+
+	sp = ukarch_rstack_push(sp, (long)entry);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)_ctx_arm_call1);
+
+	sp = ukarch_rstack_push(sp,
+				(long)ehtrampo_ectx_and_sysctx_store);
+	sp = ukarch_rstack_push(sp, (long)ee);
+
+	ukarch_ctx_init_bare(ctx, sp, (long)_ctx_arm_call1);
+}
+
+void ukarch_ctx_init_ehtrampo1(struct ukarch_ctx *ctx,
+			       struct __regs *r,
+			       __uptr sp,
+			       ukarch_execenv_entry1 entry, long arg)
+{
+	struct ukarch_execenv *ee;
+
+	UK_ASSERT(ctx);
+	UK_ASSERT(r);
+	UK_ASSERT(sp);			/* a stack is needed */
+	UK_ASSERT(entry);		/* NULL as func will cause a crash */
+	UK_ASSERT(!(sp & UKARCH_SP_ALIGN_MASK)); /* sp properly aligned? */
+
+	/* We re-align the stack anyway just to be sure */
+	sp &= UKARCH_EXECENV_END_ALIGN - 1;
+	sp -= ALIGN_UP(sizeof(*ee), UKARCH_EXECENV_END_ALIGN);
+	ee = (struct ukarch_execenv *)sp;
+	ee->regs = *r;
+
+	sp = ukarch_rstack_push(sp, (long)ukarch_execenv_load);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)_ctx_arm_call1);
+
+	sp = ukarch_rstack_push(sp, (long)entry);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)arg);
+	sp = ukarch_rstack_push(sp, (long)_ctx_arm_call2);
+
+	sp = ukarch_rstack_push(sp,
+				(long)ehtrampo_ectx_and_sysctx_store);
+	sp = ukarch_rstack_push(sp, (long)ee);
+
+	ukarch_ctx_init_bare(ctx, sp, (long)_ctx_arm_call1);
+}
+void ukarch_ctx_init_ehtrampo2(struct ukarch_ctx *ctx,
+			       struct __regs *r,
+			       __uptr sp,
+			       ukarch_execenv_entry2 entry,
+			       long arg0, long arg1)
+{
+	struct ukarch_execenv *ee;
+
+	UK_ASSERT(ctx);
+	UK_ASSERT(r);
+	UK_ASSERT(sp);			/* a stack is needed */
+	UK_ASSERT(entry);		/* NULL as func will cause a crash */
+	UK_ASSERT(!(sp & UKARCH_SP_ALIGN_MASK)); /* sp properly aligned? */
+
+	/* We re-align the stack anyway just to be sure */
+	sp = ALIGN_DOWN(sp, UKARCH_EXECENV_END_ALIGN);
+	sp -= sizeof(*ee);
+	ee = (struct ukarch_execenv *)sp;
+	ee->regs = *r;
+
+	sp = ukarch_rstack_push(sp, (long)ukarch_execenv_load);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)_ctx_arm_call1);
+
+	sp = ukarch_rstack_push(sp, (long)entry);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)arg0);
+	sp = ukarch_rstack_push(sp, (long)arg1);
+	sp = ukarch_rstack_push(sp, (long)_ctx_arm_call3);
+
+	sp = ukarch_rstack_push(sp,
+				(long)ehtrampo_ectx_and_sysctx_store);
+	sp = ukarch_rstack_push(sp, (long)ee);
+
+	ukarch_ctx_init_bare(ctx, sp, (long)_ctx_arm_call1);
+}
+
+void ukarch_ctx_init_ehtrampo3(struct ukarch_ctx *ctx,
+			       struct __regs *r,
+			       __uptr sp,
+			       ukarch_execenv_entry3 entry,
+			       long arg0, long arg1, long arg2)
+{
+	struct ukarch_execenv *ee;
+
+	UK_ASSERT(ctx);
+	UK_ASSERT(r);
+	UK_ASSERT(sp);			/* a stack is needed */
+	UK_ASSERT(entry);		/* NULL as func will cause a crash */
+	UK_ASSERT(!(sp & UKARCH_SP_ALIGN_MASK)); /* sp properly aligned? */
+
+	/* We re-align the stack anyway just to be sure */
+	sp -= ALIGN_UP(sizeof(*ee), UKARCH_EXECENV_END_ALIGN);
+	ee = (struct ukarch_execenv *)sp;
+	ee->regs = *r;
+
+	sp = ukarch_rstack_push(sp, (long)ukarch_execenv_load);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)_ctx_arm_call1);
+
+	sp = ukarch_rstack_push(sp, (long)entry);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)arg0);
+	sp = ukarch_rstack_push(sp, (long)arg1);
+	sp = ukarch_rstack_push(sp, (long)arg2);
+	sp = ukarch_rstack_push(sp, (long)_ctx_arm_call4);
+
+	sp = ukarch_rstack_push(sp,
+				(long)ehtrampo_ectx_and_sysctx_store);
+	sp = ukarch_rstack_push(sp, (long)ee);
+
+	ukarch_ctx_init_bare(ctx, sp, (long)_ctx_arm_call1);
+}
+
+void ukarch_ctx_init_ehtrampo4(struct ukarch_ctx *ctx,
+			       struct __regs *r,
+			       __uptr sp,
+			       ukarch_execenv_entry4 entry,
+			       long arg0, long arg1, long arg2, long arg3)
+{
+	struct ukarch_execenv *ee;
+
+	UK_ASSERT(ctx);
+	UK_ASSERT(r);
+	UK_ASSERT(sp);			/* a stack is needed */
+	UK_ASSERT(entry);		/* NULL as func will cause a crash */
+	UK_ASSERT(!(sp & UKARCH_SP_ALIGN_MASK)); /* sp properly aligned? */
+
+	/* We re-align the stack anyway just to be sure */
+	sp -= ALIGN_UP(sizeof(*ee), UKARCH_EXECENV_END_ALIGN);
+	ee = (struct ukarch_execenv *)sp;
+	ee->regs = *r;
+
+	sp = ukarch_rstack_push(sp, (long)ukarch_execenv_load);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)_ctx_arm_call1);
+
+	sp = ukarch_rstack_push(sp, (long)entry);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)arg0);
+	sp = ukarch_rstack_push(sp, (long)arg1);
+	sp = ukarch_rstack_push(sp, (long)arg2);
+	sp = ukarch_rstack_push(sp, (long)arg3);
+	sp = ukarch_rstack_push(sp, (long)_ctx_arm_call5);
+
+	sp = ukarch_rstack_push(sp,
+				(long)ehtrampo_ectx_and_sysctx_store);
+	sp = ukarch_rstack_push(sp, (long)ee);
+
+	ukarch_ctx_init_bare(ctx, sp, (long)_ctx_arm_call1);
+}
+
+void ukarch_ctx_init_ehtrampo5(struct ukarch_ctx *ctx,
+			       struct __regs *r,
+			       __uptr sp,
+			       ukarch_execenv_entry5 entry,
+			       long arg0, long arg1, long arg2, long arg3,
+			       long arg4)
+{
+	struct ukarch_execenv *ee;
+
+	UK_ASSERT(ctx);
+	UK_ASSERT(r);
+	UK_ASSERT(sp);			/* a stack is needed */
+	UK_ASSERT(entry);		/* NULL as func will cause a crash */
+	UK_ASSERT(!(sp & UKARCH_SP_ALIGN_MASK)); /* sp properly aligned? */
+
+	/* We re-align the stack anyway just to be sure */
+	sp -= ALIGN_UP(sizeof(*ee), UKARCH_EXECENV_END_ALIGN);
+	ee = (struct ukarch_execenv *)sp;
+	ee->regs = *r;
+
+	sp = ukarch_rstack_push(sp, (long)ukarch_execenv_load);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)_ctx_arm_call1);
+
+	sp = ukarch_rstack_push(sp, (long)entry);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)arg0);
+	sp = ukarch_rstack_push(sp, (long)arg1);
+	sp = ukarch_rstack_push(sp, (long)arg2);
+	sp = ukarch_rstack_push(sp, (long)arg3);
+	sp = ukarch_rstack_push(sp, (long)arg4);
+	sp = ukarch_rstack_push(sp, (long)_ctx_arm_call6);
+
+	sp = ukarch_rstack_push(sp,
+				(long)ehtrampo_ectx_and_sysctx_store);
+	sp = ukarch_rstack_push(sp, (long)ee);
+
+	ukarch_ctx_init_bare(ctx, sp, (long)_ctx_arm_call1);
+}

@@ -139,6 +139,21 @@ typedef void (*ukarch_ctx_entry5)(long, long, long, long, long) __noreturn;
 typedef void (*ukarch_ctx_entry6)(long, long, long, long, long,
 				  long) __noreturn;
 
+
+/*
+ * (Full) Execution environment functions must return into environment restoring
+ * function.
+ */
+typedef void (*ukarch_execenv_entry0)(struct ukarch_execenv *);
+typedef void (*ukarch_execenv_entry1)(struct ukarch_execenv *, long);
+typedef void (*ukarch_execenv_entry2)(struct ukarch_execenv *, long, long);
+typedef void (*ukarch_execenv_entry3)(struct ukarch_execenv *,
+				      long, long, long);
+typedef void (*ukarch_execenv_entry4)(struct ukarch_execenv *,
+				      long, long, long, long);
+typedef void (*ukarch_execenv_entry5)(struct ukarch_execenv *,
+				      long, long, long, long, long);
+
 /**
  * Initializes a context struct with stack pointer and
  * instruction pointer. The standard register set is
@@ -264,6 +279,97 @@ void ukarch_ctx_init_entry6(struct ukarch_ctx *ctx,
 			    ukarch_ctx_entry6 entry,
 			    long arg0, long arg1, long arg2, long arg3,
 			    long arg4, long arg5);
+
+/**
+ * Initializes a context struct with stack pointer and
+ * entrance function to trampoline to from an exception handler
+ * to an I/O-able context. Other than IRQ's being enabled does not
+ * guarantee any register states on entry of the entrance function.
+ * The entrance functions will always have at least one argument
+ * (the first) that being a pointer to an execution environment
+ * saved on the stack that would allow, on exit from the entrance
+ * function, to fully return to the context described by the
+ * general purpose register arguments. Intuitively, when switching
+ * to the context returned in the first argument, the extended
+ * context (FPU, SIMD, etc) as well as the system context (TLS, etc.)
+ * are saved in the slot of the execution environment passed as
+ * argument to the entrance function.
+ *
+ * This function is most useful when wanting to go from an exception
+ * handler to an I/O-able context while being able to return to the
+ * place that the exception handler was supposed to return to.
+ *
+ * @param ctx
+ *   Reference to context to initialize
+ * @param sp
+ *   Stack pointer (required and must be aligned
+ *                  to `UKARCH_AUXSP_ALIGN`)
+ * @param r
+ *   Pointer to architecture specific general purpose registers saved on
+ *    exception handling entry
+ * @param entry
+ *   Entry function to execute (required). First argument must always be
+ *    the execution environment pointer
+ */
+void ukarch_ctx_init_ehtrampo0(struct ukarch_ctx *ctx,
+			       struct __regs *r,
+			       __uptr sp,
+			       ukarch_execenv_entry0 entry);
+
+/**
+ * Similar to `ukarch_ctx_init_ehtrampo0()` but with an entry function accepting
+ * one argument besides the first mandatory one (the pointer to the
+ * stack-saved execution environment).
+ */
+void ukarch_ctx_init_ehtrampo1(struct ukarch_ctx *ctx,
+			       struct __regs *r,
+			       __uptr sp,
+			       ukarch_execenv_entry1 entry, long arg);
+
+/**
+ * Similar to `ukarch_ctx_init_ehtrampo0()` but with an entry function accepting
+ * two arguments besides the first mandatory one (the pointer to the
+ * stack-saved execution environment).
+ */
+void ukarch_ctx_init_ehtrampo2(struct ukarch_ctx *ctx,
+			       struct __regs *r,
+			       __uptr sp,
+			       ukarch_execenv_entry2 entry,
+			       long arg0, long arg1);
+
+/**
+ * Similar to `ukarch_ctx_init_ehtrampo0()` but with an entry function accepting
+ * three arguments besides the first mandatory one (the pointer to the
+ * stack-saved execution environment).
+ */
+void ukarch_ctx_init_ehtrampo3(struct ukarch_ctx *ctx,
+			       struct __regs *r,
+			       __uptr sp,
+			       ukarch_execenv_entry3 entry,
+			       long arg0, long arg1, long arg2);
+
+/**
+ * Similar to `ukarch_ctx_init_ehtrampo0()` but with an entry function accepting
+ * four arguments besides the first mandatory one (the pointer to the
+ * stack-saved execution environment).
+ */
+void ukarch_ctx_init_ehtrampo4(struct ukarch_ctx *ctx,
+			       struct __regs *r,
+			       __uptr sp,
+			       ukarch_execenv_entry4 entry,
+			       long arg0, long arg1, long arg2, long arg3);
+
+/**
+ * Similar to `ukarch_ctx_init_ehtrampo0()` but with an entry function accepting
+ * five arguments besides the first mandatory one (the pointer to the
+ * stack-saved execution environment).
+ */
+void ukarch_ctx_init_ehtrampo5(struct ukarch_ctx *ctx,
+			       struct __regs *r,
+			       __uptr sp,
+			       ukarch_execenv_entry5 entry,
+			       long arg0, long arg1, long arg2, long arg3,
+			       long arg4);
 
 /**
  * Pushes a value to the stack of a remote context that should not be executed

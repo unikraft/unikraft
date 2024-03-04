@@ -286,3 +286,299 @@ void ukarch_ctx_init_entry6(struct ukarch_ctx *ctx,
 		    ctx, entry, arg0, arg1, arg2, arg3, arg4, arg5,
 		    (void *)sp);
 }
+
+static void ehtrampo_ectx_and_sysctx_store(struct ukarch_execenv *ee)
+{
+	UK_ASSERT(ee);
+
+	ukplat_lcpu_enable_irq();
+
+	/* Save extended register state */
+	ukarch_ectx_sanitize((struct ukarch_ectx *)&ee->ectx);
+	ukarch_ectx_store((struct ukarch_ectx *)&ee->ectx);
+
+	ukarch_sysctx_store(&ee->sysctx);
+}
+
+void ukarch_ctx_init_ehtrampo0(struct ukarch_ctx *ctx,
+			       struct __regs *r,
+			       __uptr sp,
+			       ukarch_execenv_entry0 entry)
+{
+	struct ukarch_execenv *ee;
+
+	UK_ASSERT(ctx);
+	UK_ASSERT(r);
+	UK_ASSERT(sp);			/* a stack is needed */
+	UK_ASSERT(entry);		/* NULL as func will cause a crash */
+	UK_ASSERT(!(sp & UKARCH_SP_ALIGN_MASK)); /* sp properly aligned? */
+
+	/* We re-align the stack anyway just to be sure */
+	sp &= UKARCH_EXECENV_END_ALIGN - 1;
+	sp -= ALIGN_UP(sizeof(*ee), UKARCH_EXECENV_END_ALIGN);
+	ee = (struct ukarch_execenv *)sp;
+	ee->regs = *r;
+
+	/* No need to push 0x0 here, ukarch_execenv_load() is hand-written
+	 * assembly.
+	 */
+	sp = ukarch_rstack_push(sp, (long)ukarch_execenv_load);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)_ctx_x86_call1);
+
+	/* Because we did not push 0x0 earlier, this will naturally end up on
+	 * an rsp + 8 being 16-byte aligned.
+	 */
+	sp = ukarch_rstack_push(sp, (long)entry);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)_ctx_x86_call1);
+
+	/* We were preceeded by even number of pushes so in order to enter
+	 * ehtrampo_ectx_and_sysctx_store() with rsp + 8 as 16-byte aligned,
+	 * we have to push something here that returns into the above return
+	 * chain.
+	 */
+	sp = ukarch_rstack_push(sp, (long)_ctx_x86_call0);
+	sp = ukarch_rstack_push(sp,
+				(long)ehtrampo_ectx_and_sysctx_store);
+	sp = ukarch_rstack_push(sp, (long)ee);
+
+	ukarch_ctx_init_bare(ctx, sp, (long)_ctx_x86_call1);
+}
+
+void ukarch_ctx_init_ehtrampo1(struct ukarch_ctx *ctx,
+			       struct __regs *r,
+			       __uptr sp,
+			       ukarch_execenv_entry1 entry, long arg)
+{
+	struct ukarch_execenv *ee;
+
+	UK_ASSERT(ctx);
+	UK_ASSERT(r);
+	UK_ASSERT(sp);			/* a stack is needed */
+	UK_ASSERT(entry);		/* NULL as func will cause a crash */
+	UK_ASSERT(!(sp & UKARCH_SP_ALIGN_MASK)); /* sp properly aligned? */
+
+	/* We re-align the stack anyway just to be sure */
+	sp &= UKARCH_EXECENV_END_ALIGN - 1;
+	sp -= ALIGN_UP(sizeof(*ee), UKARCH_EXECENV_END_ALIGN);
+	ee = (struct ukarch_execenv *)sp;
+	ee->regs = *r;
+
+	/* No need to push 0x0 here, ukarch_execenv_load() is hand-written
+	 * assembly.
+	 */
+	sp = ukarch_rstack_push(sp, (long)ukarch_execenv_load);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)_ctx_x86_call1);
+
+	/* Because we did not push 0x0 earlier, this will naturally end up on
+	 * an rsp + 8 being 16-byte aligned.
+	 */
+	sp = ukarch_rstack_push(sp, (long)entry);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)arg);
+	sp = ukarch_rstack_push(sp, (long)_ctx_x86_call2);
+
+	/* We are preceeded by an odd number of pushes, we will natually enter
+	 * ehtrampo_ectx_and_sysctx_store() with rsp + 8 as 16-byte aligned.
+	 */
+	sp = ukarch_rstack_push(sp,
+				(long)ehtrampo_ectx_and_sysctx_store);
+	sp = ukarch_rstack_push(sp, (long)ee);
+
+	ukarch_ctx_init_bare(ctx, sp, (long)_ctx_x86_call1);
+}
+void ukarch_ctx_init_ehtrampo2(struct ukarch_ctx *ctx,
+			       struct __regs *r,
+			       __uptr sp,
+			       ukarch_execenv_entry2 entry,
+			       long arg0, long arg1)
+{
+	struct ukarch_execenv *ee;
+
+	UK_ASSERT(ctx);
+	UK_ASSERT(r);
+	UK_ASSERT(sp);			/* a stack is needed */
+	UK_ASSERT(entry);		/* NULL as func will cause a crash */
+	UK_ASSERT(!(sp & UKARCH_SP_ALIGN_MASK)); /* sp properly aligned? */
+
+	/* We re-align the stack anyway just to be sure */
+	sp = ALIGN_DOWN(sp, UKARCH_EXECENV_END_ALIGN);
+	sp -= sizeof(*ee);
+	ee = (struct ukarch_execenv *)sp;
+	ee->regs = *r;
+
+	/* No need to push 0x0 here, ukarch_execenv_load() is hand-written
+	 * assembly.
+	 */
+	sp = ukarch_rstack_push(sp, (long)ukarch_execenv_load);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)_ctx_x86_call1);
+
+	/* Because we did not push 0x0 earlier, this will naturally end up on
+	 * an rsp + 8 being 16-byte aligned.
+	 */
+	sp = ukarch_rstack_push(sp, (long)entry);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)arg0);
+	sp = ukarch_rstack_push(sp, (long)arg1);
+	sp = ukarch_rstack_push(sp, (long)_ctx_x86_call3);
+
+	/* We were preceeded by even number of pushes so in order to enter
+	 * ehtrampo_ectx_and_sysctx_store() with rsp + 8 as 16-byte aligned,
+	 * we have to push something here that returns into the above return
+	 * chain.
+	 */
+	sp = ukarch_rstack_push(sp, (long)_ctx_x86_call0);
+	sp = ukarch_rstack_push(sp,
+				(long)ehtrampo_ectx_and_sysctx_store);
+	sp = ukarch_rstack_push(sp, (long)ee);
+
+	ukarch_ctx_init_bare(ctx, sp, (long)_ctx_x86_call1);
+}
+
+void ukarch_ctx_init_ehtrampo3(struct ukarch_ctx *ctx,
+			       struct __regs *r,
+			       __uptr sp,
+			       ukarch_execenv_entry3 entry,
+			       long arg0, long arg1, long arg2)
+{
+	struct ukarch_execenv *ee;
+
+	UK_ASSERT(ctx);
+	UK_ASSERT(r);
+	UK_ASSERT(sp);			/* a stack is needed */
+	UK_ASSERT(entry);		/* NULL as func will cause a crash */
+	UK_ASSERT(!(sp & UKARCH_SP_ALIGN_MASK)); /* sp properly aligned? */
+
+	/* We re-align the stack anyway just to be sure */
+	sp -= ALIGN_UP(sizeof(*ee), UKARCH_EXECENV_END_ALIGN);
+	ee = (struct ukarch_execenv *)sp;
+	ee->regs = *r;
+
+	/* No need to push 0x0 here, ukarch_execenv_load() is hand-written
+	 * assembly.
+	 */
+	sp = ukarch_rstack_push(sp, (long)ukarch_execenv_load);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)_ctx_x86_call1);
+
+	/* Because we did not push 0x0 earlier, this will naturally end up on
+	 * an rsp + 8 being 16-byte aligned.
+	 */
+	sp = ukarch_rstack_push(sp, (long)entry);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)arg0);
+	sp = ukarch_rstack_push(sp, (long)arg1);
+	sp = ukarch_rstack_push(sp, (long)arg2);
+	sp = ukarch_rstack_push(sp, (long)_ctx_x86_call4);
+
+	/* We are preceeded by an odd number of pushes, we will natually enter
+	 * ehtrampo_ectx_and_sysctx_store() with rsp + 8 as 16-byte aligned.
+	 */
+	sp = ukarch_rstack_push(sp,
+				(long)ehtrampo_ectx_and_sysctx_store);
+	sp = ukarch_rstack_push(sp, (long)ee);
+
+	ukarch_ctx_init_bare(ctx, sp, (long)_ctx_x86_call1);
+}
+
+void ukarch_ctx_init_ehtrampo4(struct ukarch_ctx *ctx,
+			       struct __regs *r,
+			       __uptr sp,
+			       ukarch_execenv_entry4 entry,
+			       long arg0, long arg1, long arg2, long arg3)
+{
+	struct ukarch_execenv *ee;
+
+	UK_ASSERT(ctx);
+	UK_ASSERT(r);
+	UK_ASSERT(sp);			/* a stack is needed */
+	UK_ASSERT(entry);		/* NULL as func will cause a crash */
+	UK_ASSERT(!(sp & UKARCH_SP_ALIGN_MASK)); /* sp properly aligned? */
+
+	/* We re-align the stack anyway just to be sure */
+	sp -= ALIGN_UP(sizeof(*ee), UKARCH_EXECENV_END_ALIGN);
+	ee = (struct ukarch_execenv *)sp;
+	ee->regs = *r;
+
+	/* No need to push 0x0 here, ukarch_execenv_load() is hand-written
+	 * assembly.
+	 */
+	sp = ukarch_rstack_push(sp, (long)ukarch_execenv_load);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)_ctx_x86_call1);
+
+	/* Because we did not push 0x0 earlier, this will naturally end up on
+	 * an rsp + 8 being 16-byte aligned.
+	 */
+	sp = ukarch_rstack_push(sp, (long)entry);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)arg0);
+	sp = ukarch_rstack_push(sp, (long)arg1);
+	sp = ukarch_rstack_push(sp, (long)arg2);
+	sp = ukarch_rstack_push(sp, (long)arg3);
+	sp = ukarch_rstack_push(sp, (long)_ctx_x86_call5);
+
+	/* We were preceeded by even number of pushes so in order to enter
+	 * ehtrampo_ectx_and_sysctx_store() with rsp + 8 as 16-byte aligned,
+	 * we have to push something here that returns into the above return
+	 * chain.
+	 */
+	sp = ukarch_rstack_push(sp, (long)_ctx_x86_call0);
+	sp = ukarch_rstack_push(sp,
+				(long)ehtrampo_ectx_and_sysctx_store);
+	sp = ukarch_rstack_push(sp, (long)ee);
+
+	ukarch_ctx_init_bare(ctx, sp, (long)_ctx_x86_call1);
+}
+
+void ukarch_ctx_init_ehtrampo5(struct ukarch_ctx *ctx,
+			       struct __regs *r,
+			       __uptr sp,
+			       ukarch_execenv_entry5 entry,
+			       long arg0, long arg1, long arg2, long arg3,
+			       long arg4)
+{
+	struct ukarch_execenv *ee;
+
+	UK_ASSERT(ctx);
+	UK_ASSERT(r);
+	UK_ASSERT(sp);			/* a stack is needed */
+	UK_ASSERT(entry);		/* NULL as func will cause a crash */
+	UK_ASSERT(!(sp & UKARCH_SP_ALIGN_MASK)); /* sp properly aligned? */
+
+	/* We re-align the stack anyway just to be sure */
+	sp -= ALIGN_UP(sizeof(*ee), UKARCH_EXECENV_END_ALIGN);
+	ee = (struct ukarch_execenv *)sp;
+	ee->regs = *r;
+
+	/* No need to push 0x0 here, ukarch_execenv_load() is hand-written
+	 * assembly.
+	 */
+	sp = ukarch_rstack_push(sp, (long)ukarch_execenv_load);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)_ctx_x86_call1);
+
+	/* Because we did not push 0x0 earlier, this will naturally end up on
+	 * an rsp + 8 being 16-byte aligned.
+	 */
+	sp = ukarch_rstack_push(sp, (long)entry);
+	sp = ukarch_rstack_push(sp, (long)ee);
+	sp = ukarch_rstack_push(sp, (long)arg0);
+	sp = ukarch_rstack_push(sp, (long)arg1);
+	sp = ukarch_rstack_push(sp, (long)arg2);
+	sp = ukarch_rstack_push(sp, (long)arg3);
+	sp = ukarch_rstack_push(sp, (long)arg4);
+	sp = ukarch_rstack_push(sp, (long)_ctx_x86_call6);
+
+	/* We are preceeded by an odd number of pushes, we will natually enter
+	 * ehtrampo_ectx_and_sysctx_store() with rsp + 8 as 16-byte aligned.
+	 */
+	sp = ukarch_rstack_push(sp,
+				(long)ehtrampo_ectx_and_sysctx_store);
+	sp = ukarch_rstack_push(sp, (long)ee);
+
+	ukarch_ctx_init_bare(ctx, sp, (long)_ctx_x86_call1);
+}
