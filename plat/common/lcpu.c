@@ -111,6 +111,11 @@ int __weak lcpu_arch_init(struct lcpu *this_lcpu __unused)
 {
 	return 0;
 }
+
+struct lcpu *__weak lcpu_get_current_in_except(void)
+{
+	return NULL;
+}
 #endif /* !CONFIG_HAVE_SMP */
 
 struct lcpu *lcpu_get(__lcpuidx idx)

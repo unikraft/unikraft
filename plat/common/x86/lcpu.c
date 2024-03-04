@@ -65,6 +65,13 @@ __lcpuid lcpu_arch_id(void)
 	return (ebx >> 24);
 }
 
+struct lcpu *lcpu_get_current_in_except(void)
+{
+	return lcpu_get((ukarch_read_sp() -
+			 traps_lcpu_get_except_stack_base()) /
+			(CPU_EXCEPT_STACK_SIZE * 3));
+}
+
 int lcpu_arch_init(struct lcpu *this_lcpu)
 {
 #ifdef CONFIG_HAVE_SMP

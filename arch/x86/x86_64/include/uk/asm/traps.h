@@ -44,7 +44,7 @@ struct ukarch_trap_ctx {
 	struct __regs *regs;
 	int trapnr;
 	int error_code;
-
+	struct lcpu *lcpu; /* The LCPU that faulted */
 	unsigned long fault_address; /* for page faults */
 };
 

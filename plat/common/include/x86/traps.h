@@ -98,7 +98,13 @@ void do_unhandled_trap(int trapnr, char *str, struct __regs *regs,
 UK_EVENT(event);							\
 static inline int _raise_event_##event(int trapnr, struct __regs *regs,	\
 		unsigned long error_code) {				\
-	struct ukarch_trap_ctx ctx = {regs, trapnr, error_code, 0};	\
+	struct ukarch_trap_ctx ctx = {					\
+		.regs = regs,						\
+		.trapnr = trapnr,					\
+		.error_code = error_code,				\
+		.lcpu = lcpu_get_current_in_except(),			\
+		.fault_address = 0,					\
+	};								\
 	return uk_raise_event(event, &ctx);				\
 }
 
@@ -130,6 +136,7 @@ void do_##name(struct __regs *regs, unsigned long error_code)		\
 
 void traps_table_init(void);
 void traps_lcpu_init(struct lcpu *current);
+__uptr traps_lcpu_get_except_stack_base(void);
 #endif /* !__ASSEMBLY__ */
 
 #endif /* __UKARCH_TRAPS_X86_64_H__ */

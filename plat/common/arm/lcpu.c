@@ -117,6 +117,12 @@ void lcpu_arch_set_auxsp(__uptr auxsp)
 void lcpu_start(struct lcpu *cpu);
 extern struct _gic_dev *gic;
 
+struct lcpu *lcpu_get_current_in_except(void)
+{
+	return lcpu_get((ukarch_read_sp() - (__uptr)&lcpu_except_stack) /
+			(CPU_EXCEPT_STACK_SIZE * 3));
+}
+
 int lcpu_arch_init(struct lcpu *this_lcpu)
 {
 	__uptr except_sp;

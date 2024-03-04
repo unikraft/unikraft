@@ -467,3 +467,8 @@ void traps_lcpu_init(struct lcpu *this_lcpu)
 	tss_init(this_lcpu->idx);
 	idt_init();
 }
+
+__uptr traps_lcpu_get_except_stack_base(void)
+{
+	return (__uptr)&lcpu_except_stack;
+}

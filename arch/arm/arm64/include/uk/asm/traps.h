@@ -45,7 +45,7 @@ struct ukarch_trap_ctx {
 	unsigned long esr;
 	int el;
 	int reason;
-
+	struct lcpu *lcpu; /* The LCPU that faulted */
 	unsigned long far;
 };
 
