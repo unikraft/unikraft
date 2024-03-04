@@ -372,6 +372,12 @@ void ukarch_ctx_init_ehtrampo5(struct ukarch_ctx *ctx,
 			       long arg4);
 
 /**
+ * Without saving or restoring anything, directly switch to stack pointer
+ * and jump to instruction pointer stored in the context structure.
+ */
+void ukarch_ctx_jump(struct ukarch_ctx *ctx) __noreturn;
+
+/**
  * Pushes a value to the stack of a remote context that should not be executed
  * at the moment. This macro reserves required space (including potential
  * architecture size requirements to ensure alignments) to store `value`'s

@@ -498,3 +498,18 @@ void ukarch_ctx_init_ehtrampo5(struct ukarch_ctx *ctx,
 
 	ukarch_ctx_init_bare(ctx, sp, (long)_ctx_arm_call1);
 }
+
+void ukarch_ctx_jump(struct ukarch_ctx *ctx)
+{
+	UK_ASSERT(ctx);
+
+	__asm__ __volatile__(
+		"mov	sp, %0\n"
+		"br	%1\n"
+		:
+		: "r" (ctx->sp), "r" (ctx->ip)
+		:
+	);
+
+	__builtin_unreachable();
+}
