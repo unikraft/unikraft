@@ -47,6 +47,10 @@ void _ctx_x86_clearregs(void);
 void _ctx_x86_call0(void);
 void _ctx_x86_call1(void);
 void _ctx_x86_call2(void);
+void _ctx_x86_call3(void);
+void _ctx_x86_call4(void);
+void _ctx_x86_call5(void);
+void _ctx_x86_call6(void);
 
 void ukarch_ctx_init(struct ukarch_ctx *ctx,
 		     __uptr sp, int keep_regs,
@@ -59,16 +63,16 @@ void ukarch_ctx_init(struct ukarch_ctx *ctx,
 	UK_ASSERT(ip);			/* NULL as IP will cause a crash */
 	UK_ASSERT(!keep_regs && sp);	/* a stack is needed when clearing */
 
-	_sp = ukarch_rstack_push(sp, (long) ip);
+	_sp = ukarch_rstack_push(sp, (long)ip);
 	if (keep_regs) {
-		ukarch_ctx_init_bare(ctx, _sp, (long) _ctx_x86_call0);
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_x86_call0);
 	} else {
-		_sp = ukarch_rstack_push(_sp, (long) _ctx_x86_call0);
-		ukarch_ctx_init_bare(ctx, _sp, (long) _ctx_x86_clearregs);
+		_sp = ukarch_rstack_push(_sp, (long)_ctx_x86_call0);
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_x86_clearregs);
 	}
 
 	uk_pr_debug("ukarch_ctx %p: start:%p sp:%p\n",
-		    ctx, (void *) ip, (void *) sp);
+		    ctx, (void *)ip, (void *)sp);
 }
 
 void ukarch_ctx_init_entry0(struct ukarch_ctx *ctx,
@@ -97,17 +101,17 @@ void ukarch_ctx_init_entry0(struct ukarch_ctx *ctx,
 	 *       do not require any alignments and will pass any sp offsets
 	 *       through.
 	 */
-	sp  = ukarch_rstack_push(sp, (__u64) 0x0);
-	_sp = ukarch_rstack_push(sp, (long) entry);
+	sp  = ukarch_rstack_push(sp, (__u64)0x0);
+	_sp = ukarch_rstack_push(sp, (long)entry);
 	if (keep_regs) {
-		ukarch_ctx_init_bare(ctx, _sp, (long) _ctx_x86_call0);
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_x86_call0);
 	} else {
-		_sp = ukarch_rstack_push(_sp, (long) _ctx_x86_call0);
-		ukarch_ctx_init_bare(ctx, _sp, (long) _ctx_x86_clearregs);
+		_sp = ukarch_rstack_push(_sp, (long)_ctx_x86_call0);
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_x86_clearregs);
 	}
 
 	uk_pr_debug("ukarch_ctx %p: entry:%p(), sp:%p\n",
-		    ctx, entry, (void *) sp);
+		    ctx, entry, (void *)sp);
 }
 
 void ukarch_ctx_init_entry1(struct ukarch_ctx *ctx,
@@ -121,18 +125,18 @@ void ukarch_ctx_init_entry1(struct ukarch_ctx *ctx,
 	UK_ASSERT(entry);		/* NULL as func will cause a crash */
 	UK_ASSERT(!(sp & UKARCH_SP_ALIGN_MASK)); /* sp properly aligned? */
 
-	sp  = ukarch_rstack_push(sp, (__u64) 0x0); /* SystemV call convention */
-	_sp = ukarch_rstack_push(sp, (long) entry);
+	sp  = ukarch_rstack_push(sp, (__u64)0x0); /* SystemV call convention */
+	_sp = ukarch_rstack_push(sp, (long)entry);
 	_sp = ukarch_rstack_push(_sp, arg);
 	if (keep_regs) {
-		ukarch_ctx_init_bare(ctx, _sp, (long) _ctx_x86_call1);
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_x86_call1);
 	} else {
-		_sp = ukarch_rstack_push(_sp, (long) _ctx_x86_call1);
-		ukarch_ctx_init_bare(ctx, _sp, (long) _ctx_x86_clearregs);
+		_sp = ukarch_rstack_push(_sp, (long)_ctx_x86_call1);
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_x86_clearregs);
 	}
 
 	uk_pr_debug("ukarch_ctx %p: entry:%p(%lx), sp:%p\n",
-		    ctx, entry, arg, (void *) sp);
+		    ctx, entry, arg, (void *)sp);
 }
 
 void ukarch_ctx_init_entry2(struct ukarch_ctx *ctx,
@@ -146,17 +150,139 @@ void ukarch_ctx_init_entry2(struct ukarch_ctx *ctx,
 	UK_ASSERT(entry);		/* NULL as func will cause a crash */
 	UK_ASSERT(!(sp & UKARCH_SP_ALIGN_MASK)); /* sp properly aligned? */
 
-	sp  = ukarch_rstack_push(sp, (__u64) 0x0); /* SystemV call convention */
-	_sp = ukarch_rstack_push(sp, (long) entry);
+	sp  = ukarch_rstack_push(sp, (__u64)0x0); /* SystemV call convention */
+	_sp = ukarch_rstack_push(sp, (long)entry);
 	_sp = ukarch_rstack_push(_sp, arg0);
 	_sp = ukarch_rstack_push(_sp, arg1);
 	if (keep_regs) {
-		ukarch_ctx_init_bare(ctx, _sp, (long) _ctx_x86_call2);
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_x86_call2);
 	} else {
-		_sp = ukarch_rstack_push(_sp, (long) _ctx_x86_call2);
-		ukarch_ctx_init_bare(ctx, _sp, (long) _ctx_x86_clearregs);
+		_sp = ukarch_rstack_push(_sp, (long)_ctx_x86_call2);
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_x86_clearregs);
 	}
 
 	uk_pr_debug("ukarch_ctx %p: entry:%p(%lx, %lx), sp:%p\n",
-		    ctx, entry, arg0, arg1, (void *) sp);
+		    ctx, entry, arg0, arg1, (void *)sp);
+}
+
+void ukarch_ctx_init_entry3(struct ukarch_ctx *ctx,
+			    __uptr sp, int keep_regs,
+			    ukarch_ctx_entry3 entry,
+			    long arg0, long arg1, long arg2)
+{
+	__uptr _sp;
+
+	UK_ASSERT(ctx);
+	UK_ASSERT(sp);			/* a stack is needed */
+	UK_ASSERT(entry);		/* NULL as func will cause a crash */
+	UK_ASSERT(!(sp & UKARCH_SP_ALIGN_MASK)); /* sp properly aligned? */
+
+	sp  = ukarch_rstack_push(sp, (__u64)0x0); /* SystemV call convention */
+	_sp = ukarch_rstack_push(sp, (long)entry);
+	_sp = ukarch_rstack_push(_sp, arg0);
+	_sp = ukarch_rstack_push(_sp, arg1);
+	_sp = ukarch_rstack_push(_sp, arg2);
+	if (keep_regs) {
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_x86_call3);
+	} else {
+		_sp = ukarch_rstack_push(_sp, (long)_ctx_x86_call3);
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_x86_clearregs);
+	}
+
+	uk_pr_debug("ukarch_ctx %p: entry:%p(%lx, %lx, %lx), sp:%p\n",
+		    ctx, entry, arg0, arg1, arg2, (void *) sp);
+}
+
+void ukarch_ctx_init_entry4(struct ukarch_ctx *ctx,
+			    __uptr sp, int keep_regs,
+			    ukarch_ctx_entry4 entry,
+			    long arg0, long arg1, long arg2, long arg3)
+{
+	__uptr _sp;
+
+	UK_ASSERT(ctx);
+	UK_ASSERT(sp);			/* a stack is needed */
+	UK_ASSERT(entry);		/* NULL as func will cause a crash */
+	UK_ASSERT(!(sp & UKARCH_SP_ALIGN_MASK)); /* sp properly aligned? */
+
+	sp  = ukarch_rstack_push(sp, (__u64)0x0); /* SystemV call convention */
+	_sp = ukarch_rstack_push(sp, (long)entry);
+	_sp = ukarch_rstack_push(_sp, arg0);
+	_sp = ukarch_rstack_push(_sp, arg1);
+	_sp = ukarch_rstack_push(_sp, arg2);
+	_sp = ukarch_rstack_push(_sp, arg3);
+	if (keep_regs) {
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_x86_call4);
+	} else {
+		_sp = ukarch_rstack_push(_sp, (long)_ctx_x86_call4);
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_x86_clearregs);
+	}
+
+	uk_pr_debug("ukarch_ctx %p: entry:%p(%lx, %lx, %lx, %lx), sp:%p\n",
+		    ctx, entry, arg0, arg1, arg2, arg3, (void *)sp);
+}
+
+void ukarch_ctx_init_entry5(struct ukarch_ctx *ctx,
+			    __uptr sp, int keep_regs,
+			    ukarch_ctx_entry5 entry,
+			    long arg0, long arg1, long arg2, long arg3,
+			    long arg4)
+{
+	__uptr _sp;
+
+	UK_ASSERT(ctx);
+	UK_ASSERT(sp);			/* a stack is needed */
+	UK_ASSERT(entry);		/* NULL as func will cause a crash */
+	UK_ASSERT(!(sp & UKARCH_SP_ALIGN_MASK)); /* sp properly aligned? */
+
+	sp  = ukarch_rstack_push(sp, (__u64)0x0); /* SystemV call convention */
+	_sp = ukarch_rstack_push(sp, (long)entry);
+	_sp = ukarch_rstack_push(_sp, arg0);
+	_sp = ukarch_rstack_push(_sp, arg1);
+	_sp = ukarch_rstack_push(_sp, arg2);
+	_sp = ukarch_rstack_push(_sp, arg3);
+	_sp = ukarch_rstack_push(_sp, arg4);
+	if (keep_regs) {
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_x86_call5);
+	} else {
+		_sp = ukarch_rstack_push(_sp, (long)_ctx_x86_call5);
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_x86_clearregs);
+	}
+
+	uk_pr_debug("ukarch_ctx %p: entry:%p(%lx, %lx, %lx, %lx, %lx), sp:%p\n",
+		    ctx, entry, arg0, arg1, arg2, arg3, arg4, (void *)sp);
+}
+
+void ukarch_ctx_init_entry6(struct ukarch_ctx *ctx,
+			    __uptr sp, int keep_regs,
+			    ukarch_ctx_entry6 entry,
+			    long arg0, long arg1, long arg2, long arg3,
+			    long arg4, long arg5)
+{
+	__uptr _sp;
+
+	UK_ASSERT(ctx);
+	UK_ASSERT(sp);			/* a stack is needed */
+	UK_ASSERT(entry);		/* NULL as func will cause a crash */
+	UK_ASSERT(!(sp & UKARCH_SP_ALIGN_MASK)); /* sp properly aligned? */
+
+	sp  = ukarch_rstack_push(sp, (__u64)0x0); /* SystemV call convention */
+	_sp = ukarch_rstack_push(sp, (long)entry);
+	_sp = ukarch_rstack_push(_sp, arg0);
+	_sp = ukarch_rstack_push(_sp, arg1);
+	_sp = ukarch_rstack_push(_sp, arg2);
+	_sp = ukarch_rstack_push(_sp, arg3);
+	_sp = ukarch_rstack_push(_sp, arg4);
+	_sp = ukarch_rstack_push(_sp, arg5);
+	if (keep_regs) {
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_x86_call6);
+	} else {
+		_sp = ukarch_rstack_push(_sp, (long)_ctx_x86_call6);
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_x86_clearregs);
+	}
+
+	uk_pr_debug("ukarch_ctx %p: entry:%p(%lx, %lx, %lx, %lx, %lx, %lx), "
+		    "sp:%p\n",
+		    ctx, entry, arg0, arg1, arg2, arg3, arg4, arg5,
+		    (void *)sp);
 }

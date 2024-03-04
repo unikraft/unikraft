@@ -133,6 +133,11 @@ UK_CTASSERT(IS_ALIGNED(UKARCH_EXECENV_PAD_SIZE + UKARCH_ECTX_SIZE,
 typedef void (*ukarch_ctx_entry0)(void) __noreturn;
 typedef void (*ukarch_ctx_entry1)(long) __noreturn;
 typedef void (*ukarch_ctx_entry2)(long, long) __noreturn;
+typedef void (*ukarch_ctx_entry3)(long, long, long) __noreturn;
+typedef void (*ukarch_ctx_entry4)(long, long, long, long) __noreturn;
+typedef void (*ukarch_ctx_entry5)(long, long, long, long, long) __noreturn;
+typedef void (*ukarch_ctx_entry6)(long, long, long, long, long,
+				  long) __noreturn;
 
 /**
  * Initializes a context struct with stack pointer and
@@ -222,6 +227,43 @@ void ukarch_ctx_init_entry1(struct ukarch_ctx *ctx,
 void ukarch_ctx_init_entry2(struct ukarch_ctx *ctx,
 			    __uptr sp, int keep_regs,
 			    ukarch_ctx_entry2 entry, long arg0, long arg1);
+/**
+ * Similar to `ukarch_ctx_init_entry0()` but with an entry function accepting
+ * three arguments.
+ */
+void ukarch_ctx_init_entry3(struct ukarch_ctx *ctx,
+			    __uptr sp, int keep_regs,
+			    ukarch_ctx_entry3 entry,
+			    long arg0, long arg1, long arg2);
+
+/**
+ * Similar to `ukarch_ctx_init_entry0()` but with an entry function accepting
+ * four arguments.
+ */
+void ukarch_ctx_init_entry4(struct ukarch_ctx *ctx,
+			    __uptr sp, int keep_regs,
+			    ukarch_ctx_entry4 entry,
+			    long arg0, long arg1, long arg2, long arg3);
+
+/**
+ * Similar to `ukarch_ctx_init_entry0()` but with an entry function accepting
+ * five arguments.
+ */
+void ukarch_ctx_init_entry5(struct ukarch_ctx *ctx,
+			    __uptr sp, int keep_regs,
+			    ukarch_ctx_entry5 entry,
+			    long arg0, long arg1, long arg2, long arg3,
+			    long arg4);
+
+/**
+ * Similar to `ukarch_ctx_init_entry0()` but with an entry function accepting
+ * six arguments.
+ */
+void ukarch_ctx_init_entry6(struct ukarch_ctx *ctx,
+			    __uptr sp, int keep_regs,
+			    ukarch_ctx_entry6 entry,
+			    long arg0, long arg1, long arg2, long arg3,
+			    long arg4, long arg5);
 
 /**
  * Pushes a value to the stack of a remote context that should not be executed
