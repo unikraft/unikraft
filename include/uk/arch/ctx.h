@@ -341,6 +341,15 @@ void ukarch_ctx_init_entry2(struct ukarch_ctx *ctx,
 void ukarch_ctx_switch(struct ukarch_ctx *store, struct ukarch_ctx *load);
 
 /**
+ * Without saving or restoring anything, directly switch to stack pointer
+ * and jump to instruction pointer stored in the context structure.
+ *
+ * @param ctx
+ *   Reference to context that shall be executed
+ */
+void ukarch_ctx_jump(struct ukarch_ctx *ctx) __noreturn;
+
+/**
  * Function that can be executed in a context where one can take
  * exceptions or yield the current thread.
  * After the function returns, execution will resume the state stored in

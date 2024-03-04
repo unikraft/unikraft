@@ -236,3 +236,18 @@ void ukarch_ctx_init_ehtrampo(struct ukarch_ctx *ctx,
 
 	ukarch_ctx_init_bare(ctx, sp, (long)_ctx_x86_call3);
 }
+
+void ukarch_ctx_jump(struct ukarch_ctx *ctx)
+{
+	UK_ASSERT(ctx);
+
+	__asm__ __volatile__(
+		"movq	%0, %%rsp\n"
+		"jmp	*%1\n"
+		:
+		: "r" (ctx->sp), "r" (ctx->ip)
+		:
+	);
+
+	__builtin_unreachable();
+}
