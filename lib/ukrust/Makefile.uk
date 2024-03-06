@@ -2,7 +2,7 @@ $(eval $(call addlib_s,libukrust,$(CONFIG_LIBUKRUST)))
 
 CINCLUDES-$(CONFIG_LIBUKRUST) += -I$(LIBUKRUST_BASE)/ukrust_sys
 
-RUSTCFLAGS-$(CONFIG_LIBUKRUST) += --extern ukrust_sys -L $(LIBUKRUST_BUILD)/ --extern alloc \
+RUSTCFLAGS-$(CONFIG_LIBUKRUST) += --extern ukrust_sys -L $(LIBUKRUST_BUILD)/ --extern alloc --extern core \
 		--target $(LIBUKRUST_BASE)/target.json \
 		-Zallow-features=allocator_api,bench_black_box,concat_idents,global_asm,try_reserve
 
@@ -16,19 +16,19 @@ RUST_LIB_SRC ?= $(RUSTC_SYSROOT)/lib/rustlib/src/rust/library
 endif
 
 # Common flags
-LIBUKRUST_COMMON_FLAGS = --target=$(LIBUKRUST_BASE)/target.json --emit=dep-info,obj,metadata --edition=2021 \
+LIBUKRUST_COMMON_FLAGS = --target=$(LIBUKRUST_BASE)/target.json --edition=2021 \
 	-Cpanic=abort -Cembed-bitcode=n -Clto=n -Crpath=n \
 	-Cforce-unwind-tables=n -Ccodegen-units=1 \
 	-Zbinary_dep_depinfo=y -Csymbol-mangling-version=v0 \
 	-Dunsafe_op_in_unsafe_fn -Drust_2018_idioms \
 	--crate-type rlib
 
-LIBUKRUST_FLAGS = --target=$(LIBUKRUST_BASE)/target.json --emit=dep-info,obj,metadata --edition=2021 \
+LIBUKRUST_FLAGS = --target=$(LIBUKRUST_BASE)/target.json --edition=2021 \
 	-Cpanic=abort -Cembed-bitcode=n -Clto=n -Crpath=n \
 	-Cforce-unwind-tables=n -Ccodegen-units=1 \
 	-Zbinary_dep_depinfo=y -Csymbol-mangling-version=v0 \
-	-Dunsafe_op_in_unsafe_fn -Drust_2018_idioms \
-	--crate-type staticlib
+	-Dunsafe_op_in_unsafe_fn \
+	--crate-type rlib
 
 # Generate rust bindings for the Unikraft API
 $(LIBUKRUST_BUILD)/bindings_generated.rs: $(LIBUKRUST_BASE)/ukrust_sys/bindings_helper.h | preprocess
@@ -39,31 +39,43 @@ $(LIBUKRUST_BUILD)/bindings_generated.rs: $(LIBUKRUST_BASE)/ukrust_sys/bindings_
 		$(CINCLUDES-y) -nobuiltininc -DMODULE -D__LIBNAME__=libukrust -D__BASENAME__=bindings_generated.rs)
 
 # Build the ukrust_sys crate, contains the bindings and other useful functions
-$(LIBUKRUST_BUILD)/ukrust_sys.o: $(LIBUKRUST_BASE)/ukrust_sys/lib.rs $(LIBUKRUST_BUILD)/core.o $(LIBUKRUST_BUILD)/compiler_builtins.o $(LIBUKRUST_BUILD)/bindings_generated.rs
+$(LIBUKRUST_BUILD)/ukrust_sys.o: $(LIBUKRUST_BASE)/ukrust_sys/lib.rs $(LIBUKRUST_BUILD)/compiler_builtins.o $(LIBUKRUST_BUILD)/core.o $(LIBUKRUST_BUILD)/alloc.o $(LIBUKRUST_BUILD)/bindings_generated.rs
 	$(call build_cmd, RUSTC, libukrust, $(notdir $@), \
-	$(RUSTC) $(LIBUKRUST_COMMON_FLAGS)  \
-		--out-dir $(LIBUKRUST_BUILD) -L $(LIBUKRUST_BUILD) -A dead_code \
+	$(RUSTC) $(LIBUKRUST_FLAGS)  \
+		--out-dir $(LIBUKRUST_BUILD) -L $(LIBUKRUST_BUILD) -A dead_code --extern alloc --extern core \
+		--emit=dep-info --emit=obj=$(LIBUKRUST_BUILD)/ukrust_sys.o --emit=metadata=$(LIBUKRUST_BUILD)/libukrust_sys.rmeta \
 		-A unused_doc_comments --crate-name ukrust_sys $(LIBUKRUST_BASE)/ukrust_sys/lib.rs)
 
 $(LIBUKRUST_BUILD)/core.o: $(RUST_LIB_SRC)/core/src/lib.rs
 	$(call build_cmd, RUSTC, libukrust, $(notdir $@), \
 	$(RUSTC) $(LIBUKRUST_COMMON_FLAGS) \
-		--out-dir $(LIBUKRUST_BUILD) -L $(LIBUKRUST_BUILD) -A dead_code \
+		--out-dir $(LIBUKRUST_BUILD) -A dead_code \
+		--emit=dep-info --emit=obj=$(LIBUKRUST_BUILD)/core.o --emit=metadata=$(LIBUKRUST_BUILD)/libcore.rmeta \
 		-A unused_doc_comments --crate-name core $(RUST_LIB_SRC)/core/src/lib.rs)
 
 $(LIBUKRUST_BUILD)/compiler_builtins.o: $(LIBUKRUST_BASE)/compiler_builtins.rs $(LIBUKRUST_BUILD)/core.o
 	$(call build_cmd, RUSTC, libukrust, $(notdir $@), \
 	$(RUSTC) $(LIBUKRUST_COMMON_FLAGS) \
-		--out-dir $(LIBUKRUST_BUILD) -L $(LIBUKRUST_BUILD) -A dead_code \
+		--out-dir $(LIBUKRUST_BUILD) -L $(LIBUKRUST_BUILD) --extern core -A dead_code \
+		--emit=dep-info --emit=obj=$(LIBUKRUST_BUILD)/compiler_builtins.o --emit=metadata=$(LIBUKRUST_BUILD)/libcompiler_builtins.rmeta \
 		-A unused_doc_comments --crate-name compiler_builtins $(LIBUKRUST_BASE)/compiler_builtins.rs)
+
+$(LIBUKRUST_BUILD)/alloc.o: $(RUST_LIB_SRC)/alloc/src/lib.rs
+	$(call build_cmd, RUSTC, libukrust, $(notdir $@), \
+	$(RUSTC) $(LIBUKRUST_COMMON_FLAGS)  \
+		--out-dir $(LIBUKRUST_BUILD) -L $(LIBUKRUST_BUILD) -A dead_code \
+		--emit=dep-info --emit=obj=$(LIBUKRUST_BUILD)/alloc.o --emit=metadata=$(LIBUKRUST_BUILD)/liballoc.rmeta \
+		-A unused_doc_comments --crate-name alloc $(RUST_LIB_SRC)/alloc/src/lib.rs)
 
 # We build these objects first because they are standalone and may be used by any rust internal library
 # UK_PREPARE-$(CONFIG_LIBUKRUST) += $(LIBUKRUST_BUILD)/ukrust_sys.o \
-# 		 $(LIBUKRUST_BUILD)/core.o $(LIBUKRUST_BUILD)/compiler_builtins.o
+# 		 $(LIBUKRUST_BUILD)/compiler_builtins.o \
+# 		 $(LIBUKRUST_BUILD)/alloc.o $(LIBUKRUST_BUILD)/core.o
 
 
 LIBUKRUST_OBJS-y += $(LIBUKRUST_BUILD)/ukrust_sys.o
 LIBUKRUST_OBJS-y += $(LIBUKRUST_BUILD)/core.o
 LIBUKRUST_OBJS-y += $(LIBUKRUST_BUILD)/compiler_builtins.o
+LIBUKRUST_OBJS-y += $(LIBUKRUST_BUILD)/alloc.o
 
 LIBUKRUST_SRCS-y += $(LIBUKRUST_BASE)/rust_glue.c
