@@ -230,7 +230,7 @@ void *unix_socket_create(struct posix_socket_driver *d,
 }
 
 static
-void unix_socket_poll(posix_sock *file)
+void unix_socket_poll_setup(posix_sock *file)
 {
 	struct unix_sock_data *data = posix_sock_get_data(file);
 	struct uk_pollq *sockq = &file->state->pollq;
@@ -628,7 +628,7 @@ int unix_sock_connect_stream(posix_sock *file, posix_sock *target)
 	data->remote = target;
 	data->flags |= UNIXSOCK_CONN;
 	/* Poll self (to register events & mark connected) */
-	unix_socket_poll(file);
+	unix_socket_poll_setup(file);
 
 	return 0;
 
@@ -1032,7 +1032,7 @@ static struct posix_socket_ops unix_posix_socket_ops = {
 	.write		= unix_socket_write,
 	.close		= unix_socket_close,
 	.ioctl		= unix_socket_ioctl,
-	.poll		= unix_socket_poll,
+	.poll_setup	= unix_socket_poll_setup,
 };
 
 POSIX_SOCKET_FAMILY_REGISTER(AF_UNIX, &unix_posix_socket_ops);
