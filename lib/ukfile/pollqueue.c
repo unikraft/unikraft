@@ -90,8 +90,13 @@ static void pollq_propagate(struct uk_pollq *q,
 
 uk_pollevent uk_pollq_clear(struct uk_pollq *q, uk_pollevent clr)
 {
-	uk_pollevent prev = uk_and(&q->events, ~clr);
+	uk_pollevent prev;
 
+#if CONFIG_LIBUKFILE_POLLED
+	UK_ASSERT(!q->poll);
+#endif /* CONFIG_LIBUKFILE_POLLED */
+
+	prev = uk_and(&q->events, ~clr);
 #if CONFIG_LIBUKFILE_CHAINUPDATE
 	pollq_propagate(q, UK_POLL_CHAINOP_CLEAR, clr);
 #endif /* CONFIG_LIBUKFILE_CHAINUPDATE */
@@ -110,7 +115,13 @@ uk_pollevent uk_pollq_set_n(struct uk_pollq *q, uk_pollevent set, int n)
 		return 0;
 #endif /* CONFIG_LIBUKFILE_CHAINUPDATE */
 
-	prev = uk_or(&q->events, set);
+#if CONFIG_LIBUKFILE_POLLED
+	if (q->poll)
+		prev = 0;
+	else
+#endif /* CONFIG_LIBUKFILE_POLLED */
+		prev = uk_or(&q->events, set);
+
 	pollq_notify_n(q, set, n);
 #if CONFIG_LIBUKFILE_CHAINUPDATE
 	pollq_propagate(q, UK_POLL_CHAINOP_SET, set);
@@ -120,9 +131,15 @@ uk_pollevent uk_pollq_set_n(struct uk_pollq *q, uk_pollevent set, int n)
 
 uk_pollevent uk_pollq_assign_n(struct uk_pollq *q, uk_pollevent val, int n)
 {
-	uk_pollevent prev = uk_exchange_n(&q->events, val);
-	uk_pollevent set = val & ~prev;
+	uk_pollevent prev;
+	uk_pollevent set;
 
+#if CONFIG_LIBUKFILE_POLLED
+	UK_ASSERT(!q->poll);
+#endif /* CONFIG_LIBUKFILE_POLLED */
+
+	prev = uk_exchange_n(&q->events, val);
+	set = val & ~prev;
 	if (set) {
 		pollq_notify_n(q, set, n);
 #if CONFIG_LIBUKFILE_CHAINUPDATE
