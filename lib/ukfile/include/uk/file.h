@@ -130,13 +130,34 @@ static inline void uk_file_state_wunlock(struct uk_file_state *st)
 }
 
 /*
+ * File state contains one crucial aspect of files: event handling.
+ *
+ * This can be done by drivers in two ways: managed and polled.
+ * Managed (the default) requires the driver to signal both rising and falling
+ * edges of events, leaving ukfile to manage everything else.
+ * Polled drivers, conversely, maintain events internally and provide a callback
+ * for retrieving their instantaneous levels, and are thus only required to
+ * signal rising edges of events.
+ * Polled drivers are configured via LIBUKFILE_POLLED.
+ */
+/*
  * We define initializers separate from an initial values.
  * The former can only be used in (static) variable initializations, while the
  * latter is meant for assigning to variables or as anonymous data structures.
  */
+#if CONFIG_LIBUKFILE_POLLED
+#define UK_FILE_POLLED_STATE_INITIALIZER(name, pollfunc) { \
+	.iolock = UK_RWLOCK_INITIALIZER((name).iolock, 0), \
+	.pollq = UK_POLLQ_EDGE_INITIALIZER((name).pollq, (pollfunc)) \
+}
+#define UK_FILE_POLLED_STATE_INIT_VALUE(name, pollfunc) \
+	((struct uk_file_state)UK_FILE_POLLED_STATE_INITIALIZER( \
+		(name), (pollfunc)))
+#endif /* CONFIG_LIBUKFILE_POLLED */
+
 #define UK_FILE_STATE_EVENTS_INITIALIZER(name, ev) { \
 	.iolock = UK_RWLOCK_INITIALIZER((name).iolock, 0), \
-	.pollq = UK_POLLQ_EVENTS_INITIALIZER((name).pollq, (ev)) \
+	.pollq = UK_POLLQ_LEVEL_EVENTS_INITIALIZER((name).pollq, (ev)) \
 }
 #define UK_FILE_STATE_EVENTS_INIT_VALUE(name, ev) \
 	((struct uk_file_state)UK_FILE_STATE_EVENTS_INITIALIZER((name), (ev)))
@@ -331,14 +352,14 @@ static inline void uk_file_wunlock(const struct uk_file *f)
 static inline
 uk_pollevent uk_file_poll_immediate(const struct uk_file *f, uk_pollevent req)
 {
-	return uk_pollq_poll_immediate(&f->state->pollq, req);
+	return uk_pollq_poll_level(&f->state->pollq, req, f);
 }
 
 static inline
 uk_pollevent uk_file_poll_until(const struct uk_file *f, uk_pollevent req,
 				__nsec deadline)
 {
-	return uk_pollq_poll_until(&f->state->pollq, req, deadline);
+	return uk_pollq_poll_until(&f->state->pollq, req, deadline, f);
 }
 
 static inline
