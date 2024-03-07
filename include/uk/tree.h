@@ -31,6 +31,7 @@
 #ifndef	__UK_TREE_H__
 #define	__UK_TREE_H__
 
+#include <uk/assert.h>
 #include <uk/essentials.h>
 
 /*
@@ -939,13 +940,7 @@ name##_RB_NEXT(struct type *elm)					\
 	return (elm);							\
 }
 
-#if defined(_KERNEL) && defined(DIAGNOSTIC)
-#define UK__RB_ORDER_CHECK(cmp, lo, hi) do {				\
-	KASSERT((cmp)(lo, hi) < 0, ("out of order insertion"));		\
-} while (0)
-#else
-#define UK__RB_ORDER_CHECK(cmp, lo, hi) do {} while (0)
-#endif
+#define UK__RB_ORDER_CHECK(cmp, lo, hi) UK_ASSERT((cmp)((lo), (hi)) < 0)
 
 #define UK_RB_GENERATE_INSERT_NEXT(name, type, field, cmp, attr)	\
 /* Inserts a node into the next position in the RB tree */		\
