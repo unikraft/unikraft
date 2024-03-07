@@ -408,12 +408,25 @@ typedef __uptr __may_alias _rb_uptr_ma;
 	UK_RB_SET_PARENT(elm, tmp, field);				\
 } while (/*CONSTCOND*/ 0)
 
+#define UK__RB_IDENTKEY(name, type)					\
+static struct type *							\
+name##_RB_IDENTKEY(struct type *a)					\
+{									\
+	return a;							\
+}
+
 /* Generates prototypes and inline functions */
 #define	UK_RB_PROTOTYPE(name, type, field, cmp)				\
 	UK_RB_PROTOTYPE_INTERNAL(name, type, field, cmp,)
 #define	UK_RB_PROTOTYPE_STATIC(name, type, field, cmp)			\
 	UK_RB_PROTOTYPE_INTERNAL(name, type, field, cmp, __unused static)
 #define UK_RB_PROTOTYPE_INTERNAL(name, type, field, cmp, attr)		\
+	UK_RB_KEY_PROTOTYPE_INTERNAL(name, type, field, cmp, , attr)
+#define UK_RB_KEY_PROTOTYPE(name, type, field, cmp, key)		\
+	UK_RB_KEY_PROTOTYPE_INTERNAL(name, type, field, cmp, key,)
+#define UK_RB_KEY_PROTOTYPE_STATIC(name, type, field, cmp, key)		\
+	UK_RB_KEY_PROTOTYPE_INTERNAL(name, type, field, cmp, key, __unused static)
+#define UK_RB_KEY_PROTOTYPE_INTERNAL(name, type, field, cmp, key, attr)	\
 	UK_RB_PROTOTYPE_RANK(name, type, attr)				\
 	UK_RB_PROTOTYPE_DO_INSERT_COLOR(name, type, attr);		\
 	UK_RB_PROTOTYPE_INSERT_COLOR(name, type, attr);			\
@@ -477,21 +490,28 @@ typedef __uptr __may_alias _rb_uptr_ma;
 #define	UK_RB_GENERATE_STATIC(name, type, field, cmp)			\
 	UK_RB_GENERATE_INTERNAL(name, type, field, cmp, __unused static)
 #define UK_RB_GENERATE_INTERNAL(name, type, field, cmp, attr)		\
+	UK__RB_IDENTKEY(name, type)					\
+	UK_RB_KEY_GENERATE_INTERNAL(name, type, field, cmp, name##_RB_IDENTKEY, attr)
+#define UK_RB_KEY_GENERATE(name, type, field, cmp, key)			\
+	UK_RB_KEY_GENERATE_INTERNAL(name, type, field, cmp, key,)
+#define UK_RB_KEY_GENERATE_STATIC(name, type, field, cmp, key)		\
+	UK_RB_KEY_GENERATE_INTERNAL(name, type, field, cmp, key, __unused static)
+#define UK_RB_KEY_GENERATE_INTERNAL(name, type, field, cmp, key, attr)	\
 	UK_RB_GENERATE_RANK(name, type, field, attr)			\
 	UK_RB_GENERATE_DO_INSERT_COLOR(name, type, field, attr)		\
 	UK_RB_GENERATE_INSERT_COLOR(name, type, field, attr)		\
 	UK_RB_GENERATE_REMOVE_COLOR(name, type, field, attr)		\
 	UK_RB_GENERATE_INSERT_FINISH(name, type, field, attr)		\
-	UK_RB_GENERATE_INSERT(name, type, field, cmp, attr)		\
+	UK_RB_GENERATE_INSERT(name, type, field, cmp, key, attr)	\
 	UK_RB_GENERATE_REMOVE(name, type, field, attr)			\
-	UK_RB_GENERATE_FIND(name, type, field, cmp, attr)		\
-	UK_RB_GENERATE_NFIND(name, type, field, cmp, attr)		\
+	UK_RB_GENERATE_FIND(name, type, field, cmp, key, attr)		\
+	UK_RB_GENERATE_NFIND(name, type, field, cmp, key, attr)		\
 	UK_RB_GENERATE_NEXT(name, type, field, attr)			\
-	UK_RB_GENERATE_INSERT_NEXT(name, type, field, cmp, attr)	\
+	UK_RB_GENERATE_INSERT_NEXT(name, type, field, cmp, key, attr)	\
 	UK_RB_GENERATE_PREV(name, type, field, attr)			\
-	UK_RB_GENERATE_INSERT_PREV(name, type, field, cmp, attr)	\
+	UK_RB_GENERATE_INSERT_PREV(name, type, field, cmp, key, attr)	\
 	UK_RB_GENERATE_MINMAX(name, type, field, attr)			\
-	UK_RB_GENERATE_REINSERT(name, type, field, cmp, attr)
+	UK_RB_GENERATE_REINSERT(name, type, field, cmp, key, attr)
 
 #ifdef UK__RB_DIAGNOSTIC
 #ifndef UK_RB_AUGMENT
@@ -859,7 +879,9 @@ name##_RB_INSERT_FINISH(struct name *head, struct type *parent,		\
 	return (__NULL);						\
 }
 
-#define UK_RB_GENERATE_INSERT(name, type, field, cmp, attr)		\
+#define UK__RB_CMPTYPE(cmp, key) __typeof(cmp((key)(__NULL), (key)(__NULL)))
+
+#define UK_RB_GENERATE_INSERT(name, type, field, cmp, key, attr)	\
 /* Inserts a node into the RB tree */					\
 attr struct type *							\
 name##_RB_INSERT(struct name *head, struct type *elm)			\
@@ -870,7 +892,8 @@ name##_RB_INSERT(struct name *head, struct type *elm)			\
 									\
 	while ((tmp = *tmpp) != __NULL) {				\
 		parent = tmp;						\
-		__typeof(cmp(__NULL, __NULL)) comp = (cmp)(elm, parent);\
+		UK__RB_CMPTYPE(cmp, key) comp;				\
+		comp = (cmp)((key)(elm), (key)(parent));		\
 		if (comp < 0)						\
 			tmpp = &UK_RB_LEFT(parent, field);		\
 		else if (comp > 0)					\
@@ -881,15 +904,15 @@ name##_RB_INSERT(struct name *head, struct type *elm)			\
 	return (name##_RB_INSERT_FINISH(head, parent, tmpp, elm));	\
 }
 
-#define UK_RB_GENERATE_FIND(name, type, field, cmp, attr)		\
+#define UK_RB_GENERATE_FIND(name, type, field, cmp, key, attr)		\
 /* Finds the node with the same key as elm */				\
 attr struct type *							\
-name##_RB_FIND(struct name *head, struct type *elm)			\
+name##_RB_FIND(struct name *head, __typeof(key(__NULL)) elm)		\
 {									\
 	struct type *tmp = UK_RB_ROOT(head);				\
-	__typeof(cmp(__NULL, __NULL)) comp;				\
+	UK__RB_CMPTYPE(cmp, key) comp;					\
 	while (tmp) {							\
-		comp = cmp(elm, tmp);					\
+		comp = cmp(elm, (key)(tmp));				\
 		if (comp < 0)						\
 			tmp = UK_RB_LEFT(tmp, field);			\
 		else if (comp > 0)					\
@@ -900,16 +923,16 @@ name##_RB_FIND(struct name *head, struct type *elm)			\
 	return (__NULL);						\
 }
 
-#define UK_RB_GENERATE_NFIND(name, type, field, cmp, attr)		\
+#define UK_RB_GENERATE_NFIND(name, type, field, cmp, key, attr)		\
 /* Finds the first node greater than or equal to the search key */	\
 attr struct type *							\
-name##_RB_NFIND(struct name *head, struct type *elm)			\
+name##_RB_NFIND(struct name *head, __typeof(key(__NULL)) elm)		\
 {									\
 	struct type *tmp = UK_RB_ROOT(head);				\
 	struct type *res = __NULL;					\
-	__typeof(cmp(__NULL, __NULL)) comp;				\
+	UK__RB_CMPTYPE(cmp, key) comp;					\
 	while (tmp) {							\
-		comp = cmp(elm, tmp);					\
+		comp = cmp(elm, (key)(tmp));				\
 		if (comp < 0) {						\
 			res = tmp;					\
 			tmp = UK_RB_LEFT(tmp, field);			\
@@ -940,9 +963,10 @@ name##_RB_NEXT(struct type *elm)					\
 	return (elm);							\
 }
 
-#define UK__RB_ORDER_CHECK(cmp, lo, hi) UK_ASSERT((cmp)((lo), (hi)) < 0)
+#define UK__RB_ORDER_CHECK(cmp, key, lo, hi)				\
+	UK_ASSERT((cmp)((key)(lo), (key)(hi)) < 0)
 
-#define UK_RB_GENERATE_INSERT_NEXT(name, type, field, cmp, attr)	\
+#define UK_RB_GENERATE_INSERT_NEXT(name, type, field, cmp, key, attr)	\
 /* Inserts a node into the next position in the RB tree */		\
 attr struct type *							\
 name##_RB_INSERT_NEXT(struct name *head,				\
@@ -951,9 +975,9 @@ name##_RB_INSERT_NEXT(struct name *head,				\
 	struct type *tmp;						\
 	struct type **tmpp = &UK_RB_RIGHT(elm, field);			\
 									\
-	UK__RB_ORDER_CHECK(cmp, elm, next);				\
+	UK__RB_ORDER_CHECK(cmp, key, elm, next);			\
 	if (name##_RB_NEXT(elm) != __NULL)				\
-		UK__RB_ORDER_CHECK(cmp, next, name##_RB_NEXT(elm));	\
+		UK__RB_ORDER_CHECK(cmp, key, next, name##_RB_NEXT(elm));\
 	while ((tmp = *tmpp) != __NULL) {				\
 		elm = tmp;						\
 		tmpp = &UK_RB_LEFT(elm, field);				\
@@ -979,7 +1003,7 @@ name##_RB_PREV(struct type *elm)					\
 	return (elm);							\
 }
 
-#define UK_RB_GENERATE_INSERT_PREV(name, type, field, cmp, attr)	\
+#define UK_RB_GENERATE_INSERT_PREV(name, type, field, cmp, key, attr)	\
 /* Inserts a node into the prev position in the RB tree */		\
 attr struct type *							\
 name##_RB_INSERT_PREV(struct name *head,				\
@@ -988,9 +1012,9 @@ name##_RB_INSERT_PREV(struct name *head,				\
 	struct type *tmp;						\
 	struct type **tmpp = &UK_RB_LEFT(elm, field);			\
 									\
-	UK__RB_ORDER_CHECK(cmp, prev, elm);				\
+	UK__RB_ORDER_CHECK(cmp, key, prev, elm);			\
 	if (name##_RB_PREV(elm) != __NULL)				\
-		UK__RB_ORDER_CHECK(cmp, name##_RB_PREV(elm), prev);	\
+		UK__RB_ORDER_CHECK(cmp, key, name##_RB_PREV(elm), prev);\
 	while ((tmp = *tmpp) != __NULL) {				\
 		elm = tmp;						\
 		tmpp = &UK_RB_RIGHT(elm, field);			\
@@ -1014,15 +1038,15 @@ name##_RB_MINMAX(struct name *head, int val)				\
 	return (parent);						\
 }
 
-#define	UK_RB_GENERATE_REINSERT(name, type, field, cmp, attr)		\
+#define	UK_RB_GENERATE_REINSERT(name, type, field, cmp, key, attr)	\
 attr struct type *							\
 name##_RB_REINSERT(struct name *head, struct type *elm)			\
 {									\
 	struct type *cmpelm;						\
 	if (((cmpelm = UK_RB_PREV(name, head, elm)) != __NULL &&	\
-	    cmp(cmpelm, elm) >= 0) ||					\
+	    cmp((key)(cmpelm), (key)(elm)) >= 0) ||			\
 	    ((cmpelm = UK_RB_NEXT(name, head, elm)) != __NULL &&	\
-	    cmp(elm, cmpelm) >= 0)) {					\
+	    cmp((key)(elm), (key)(cmpelm)) >= 0)) {			\
 		/* XXXLAS: Remove/insert is heavy handed. */		\
 		UK_RB_REMOVE(name, head, elm);				\
 		return (UK_RB_INSERT(name, head, elm));			\
