@@ -155,13 +155,15 @@ static void __noreturn _ukplat_entry2(void)
 	ukplat_lcpu_halt();
 }
 
-void __no_pauth _ukplat_entry(struct ukplat_bootinfo *bi)
+void __no_pauth _ukplat_entry(void)
 {
+	struct ukplat_bootinfo *bi;
 	void *bstack;
-	void *fdt;
 	int rc;
 
-	fdt = (void *)bi->dtb;
+	bi = ukplat_bootinfo_get();
+	if (unlikely(!bi))
+		UK_CRASH("Could not retrieve bootinfo\n");
 
 	kvm_console_init(fdt);
 
@@ -199,7 +201,6 @@ void __no_pauth _ukplat_entry(struct ukplat_bootinfo *bi)
 		UK_CRASH("Could not initialize MTE (%d)\n", rc);
 #endif /* CONFIG_HAVE_MEMTAG */
 
-
 #if defined(CONFIG_UKPLAT_ACPI)
 	rc = acpi_init();
 	if (unlikely(rc < 0))
@@ -219,7 +220,7 @@ void __no_pauth _ukplat_entry(struct ukplat_bootinfo *bi)
 #ifdef CONFIG_HAVE_SMP
 	rc = lcpu_mp_init(CONFIG_UKPLAT_LCPU_RUN_IRQ,
 			  CONFIG_UKPLAT_LCPU_WAKEUP_IRQ,
-			  fdt);
+			  (void *)bi->dtb);
 	if (unlikely(rc))
 		UK_CRASH("SMP initialization failed: %d.\n", rc);
 #endif /* CONFIG_HAVE_SMP */
