@@ -41,7 +41,7 @@
 #include <uk/essentials.h>
 #include <uk/assert.h>
 #include <uk/print.h>
-#include <string.h> /* memset */
+#include <uk/isr/string.h> /* memset_isr */
 #include <arm/cpu.h>
 
 __sz ukarch_ectx_size(void)
@@ -74,7 +74,7 @@ void ukarch_ectx_init(struct ukarch_ectx *state)
 	/* Initialize extregs area:
 	 * Zero out and then save a valid layout to it.
 	 */
-	memset(state, 0, sizeof(struct fpsimd_state));
+	memset_isr(state, 0, sizeof(struct fpsimd_state));
 	ukarch_ectx_store(state);
 }
 
