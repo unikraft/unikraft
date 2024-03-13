@@ -41,7 +41,7 @@
 #include <uk/assert.h>
 #include <uk/print.h>
 #include <uk/hexdump.h>
-#include <string.h> /* memset */
+#include <uk/isr/string.h> /* memset_isr */
 
 enum x86_save_method {
 	X86_SAVE_NONE = 0,
@@ -147,7 +147,7 @@ void ukarch_ectx_init(struct ukarch_ectx *state)
 	/* Initialize extregs area:
 	 * Zero out and then save a valid layout to it.
 	 */
-	memset(state, 0, ectx_size);
+	memset_isr(state, 0, ectx_size);
 	ukarch_ectx_store(state);
 }
 
@@ -212,7 +212,7 @@ void ukarch_ectx_assert_equal(struct ukarch_ectx *state)
 	current = (struct ukarch_ectx *)ALIGN_UP((__uptr)ectxbuf, ectx_align);
 	ukarch_ectx_init(current);
 
-	if (memcmp(current, state, ectx_size) != 0) {
+	if (memcmp_isr(current, state, ectx_size) != 0) {
 		uk_pr_crit("Modified ECTX detected!\n");
 		uk_pr_crit("Current:\n");
 		uk_hexdumpk(KLVL_CRIT, current, ectx_size,
