@@ -109,7 +109,7 @@ Unikraft is licensed under a BSD-3-Clause.  For more information, please refer t
 [unikraft-security]: https://unikraft.org/docs/features/security/
 [unikraft-green]: https://unikraft.org/docs/features/green/
 [unikraft-discord]: https://bit.ly/UnikraftDiscord
-[kraft]: https://github.com/unikraft/kraft/
+[kraft]: https://github.com/unikraft/kraftkit
 [github-issues]: https://github.com/unikraft/unikraft/issues
 [github-projects]: https://github.com/unikraft/unikraft/labels/kind/project
 [dockerhub-kraft]: https://hub.docker.com/r/unikraft/kraft
