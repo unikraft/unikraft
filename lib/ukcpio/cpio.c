@@ -58,6 +58,37 @@ int uk_syscall_r_utime(const char *, const struct utimbuf *);
 int uk_syscall_r_mkdir(const char *, mode_t);
 int uk_syscall_r_symlink(const char *, const char *);
 int uk_syscall_r_stat(const char *, struct stat *);
+int uk_syscall_r_unlinkat(int, const char *, int);
+int uk_syscall_r_rename(const char *, const char *);
+
+static int
+try_remove(const char *path)
+{
+	int r;
+
+	uk_pr_info("Trying to unlink %s\n", path);
+	r = uk_syscall_r_unlinkat(AT_FDCWD, path, 0);
+	if (!r || r == -ENOENT)
+		return 0;
+
+	uk_pr_info("Trying to rmdir %s\n", path);
+	r = uk_syscall_r_unlinkat(AT_FDCWD, path, AT_REMOVEDIR);
+	if (!r || r == -ENOENT) {
+		return 0;
+	} else {
+		char newpath[PATH_MAX];
+		char *newend = newpath + strlcpy(newpath, path, PATH_MAX);
+
+		if (newend - newpath + 2 > PATH_MAX) {
+			uk_pr_err("Cannot rename %s, path too long\n", path);
+			return -ENAMETOOLONG;
+		}
+		strcpy(newend, ".0");
+		uk_pr_info("Trying to rename %s to %s\n", path, newpath);
+		r = uk_syscall_r_rename(path, newpath);
+	}
+	return r;
+}
 
 static enum ukcpio_error
 extract_file(const char *path, const char *contents, size_t len,
@@ -70,7 +101,13 @@ extract_file(const char *path, const char *contents, size_t len,
 
 	uk_pr_info("Extracting %s (%zu bytes)\n", path, len);
 
-	fd = uk_syscall_r_open(path, O_CREAT | O_WRONLY | O_TRUNC, 0);
+	fd = uk_syscall_r_open(path, O_CREAT | O_WRONLY | O_EXCL, 0);
+	if (fd == -EEXIST) {
+		if ((err = try_remove(path)))
+			uk_pr_warn("Path cleanup failed: %s (%d)\n",
+				   strerror(-err), -err);
+		fd = uk_syscall_r_open(path, O_CREAT | O_WRONLY | O_TRUNC, 0);
+	}
 	if (fd < 0) {
 		uk_pr_err("%s: Failed to create file: %s (%d)\n",
 			  path, strerror(-fd), -fd);
@@ -128,8 +165,14 @@ extract_dir(const char *path, mode_t mode)
 			goto err_out;
 		}
 		if (!S_ISDIR(pstat.st_mode)) {
-			r = -EEXIST;
-			goto err_out;
+			/* Path exists but is not dir; remove & try again */
+			if (unlikely((r = try_remove(path))))
+				goto err_out;
+			r = uk_syscall_r_mkdir(path, mode);
+			if (unlikely(r))
+				goto err_out;
+			else
+				return UKCPIO_SUCCESS;
 		}
 
 		/* Directory already exists, set mode only */
@@ -161,12 +204,18 @@ extract_symlink(const char *path, const char *contents, size_t len)
 	target[len] = 0;
 
 	uk_pr_info("%s: Target is %s\n", path, target);
-	if ((r = uk_syscall_r_symlink(target, path))) {
-		uk_pr_err("%s: Failed to create symlink: %s (%d)\n",
-			  path, strerror(-r), -r);
-		return -UKCPIO_SYMLINK_FAILED;
+	r = uk_syscall_r_symlink(target, path);
+	if (r == -EEXIST) {
+		r = try_remove(path);
+		if (!r)
+			r = uk_syscall_r_symlink(target, path);
 	}
-	return UKCPIO_SUCCESS;
+	if (likely(!r))
+		return UKCPIO_SUCCESS;
+
+	uk_pr_err("%s: Failed to create symlink: %s (%d)\n",
+		  path, strerror(-r), -r);
+	return -UKCPIO_SYMLINK_FAILED;
 }
 
 /**
