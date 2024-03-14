@@ -48,91 +48,6 @@
 #include <unistd.h>
 #include <utime.h>
 
-/*
- * Currently only supports BSD new-style cpio archive format.
- */
-#define UKCPIO_MAGIC_NEWC "070701"
-#define UKCPIO_MAGIC_CRC  "070702"
-#define FILE_TYPE_MASK    0170000
-#define DIRECTORY_BITS    040000
-#define FILE_BITS         0100000
-#define SYMLINK_BITS      0120000
-
-#define IS_FILE_OF_TYPE(mode, bits) (((mode) & (FILE_TYPE_MASK)) == (bits))
-#define IS_FILE(mode) IS_FILE_OF_TYPE((mode), (FILE_BITS))
-#define IS_DIR(mode) IS_FILE_OF_TYPE((mode), (DIRECTORY_BITS))
-#define IS_SYMLINK(mode) IS_FILE_OF_TYPE((mode), (SYMLINK_BITS))
-
-struct cpio_header {
-	char magic[6];
-	char inode_num[8];
-	char mode[8];
-	char uid[8];
-	char gid[8];
-	char nlink[8];
-	char mtime[8];
-	char filesize[8];
-	char major[8];
-	char minor[8];
-	char ref_major[8];
-	char ref_minor[8];
-	char namesize[8];
-	char chksum[8];
-};
-
-static int
-valid_magic(const struct cpio_header *header)
-{
-	return memcmp(header->magic, UKCPIO_MAGIC_NEWC, 6) == 0
-		|| memcmp(header->magic, UKCPIO_MAGIC_CRC, 6) == 0;
-}
-
-/**
- * Function to convert len digits of hexadecimal string loc
- * to an integer.
- *
- * @param buf
- *  The string character buffer.
- * @param count
- *  The size of the buffer.
- * @return
- *   The converted unsigned integer value on success.  Returns 0 on error.
- */
-static unsigned int
-snhex_to_int(const char *buf, size_t count)
-{
-	unsigned int val = 0;
-	size_t i;
-
-	UK_ASSERT(buf);
-
-	for (i = 0; i < count; i++) {
-		val *= 16;
-		if (buf[i] >= '0' && buf[i] <= '9')
-			val += (buf[i] - '0');
-		else if (buf[i] >= 'A' && buf[i] <= 'F')
-			val += (buf[i] - 'A') + 10;
-		else if (buf[i] >= 'a' && buf[i] <= 'f')
-			val += (buf[i] - 'a') + 10;
-		else
-			return 0;
-	}
-	return val;
-}
-
-#define ALIGN_4(ptr)      ((void *)ALIGN_UP((uintptr_t)(ptr), 4))
-
-#define CPIO_U32FIELD(buf) \
-	((uint32_t) snhex_to_int((buf), 8))
-#define CPIO_FILENAME(header) \
-	((char *)header + sizeof(struct cpio_header))
-#define CPIO_DATA(header, fnlen) \
-	(char *)ALIGN_4((char *)(header) + sizeof(struct cpio_header) + fnlen)
-#define CPIO_NEXT(header, fnlen, fsize) \
-	(struct cpio_header *)ALIGN_4(CPIO_DATA(header, fnlen) + fsize)
-#define CPIO_ISLAST(header) \
-	(strcmp(CPIO_FILENAME(header), "TRAILER!!!") == 0)
-
 
 /* Raw filesystem syscalls; not provided by headers */
 int uk_syscall_r_open(const char *, int, mode_t);
@@ -269,30 +184,30 @@ extract_symlink(const char *path, const char *contents, size_t len)
  *  Returns 0 on success or one of ukcpio_error enum.
  */
 static enum ukcpio_error
-process_section(const struct cpio_header **headerp, char *fullpath,
+process_section(const struct uk_cpio_header **headerp, char *fullpath,
 		const char *eof, size_t prefixlen)
 {
-	const struct cpio_header *header = *headerp;
+	const struct uk_cpio_header *header = *headerp;
 
-	if ((char *)header >= eof || CPIO_FILENAME(header) > eof) {
+	if ((char *)header >= eof || UKCPIO_FILENAME(header) > eof) {
 		uk_pr_err("Truncated CPIO header at %p", header);
 		return -UKCPIO_INVALID_HEADER;
 	}
-	if (!valid_magic(header)) {
+	if (!ukcpio_valid_magic(header)) {
 		uk_pr_err("Bad magic number in CPIO header at %p\n", header);
 		return -UKCPIO_INVALID_HEADER;
 	}
 
-	if (CPIO_ISLAST(header)) {
+	if (UKCPIO_ISLAST(header)) {
 		*headerp = NULL;
 		return UKCPIO_SUCCESS;
 	} else {
-		uint32_t mode = CPIO_U32FIELD(header->mode);
-		uint32_t filesize = CPIO_U32FIELD(header->filesize);
-		uint32_t namesize = CPIO_U32FIELD(header->namesize);
-		uint32_t mtime = CPIO_U32FIELD(header->mtime);
-		const char *fname = CPIO_FILENAME(header);
-		const char *data = CPIO_DATA(header, namesize);
+		uint32_t mode = UKCPIO_U32FIELD(header->mode);
+		uint32_t filesize = UKCPIO_U32FIELD(header->filesize);
+		uint32_t namesize = UKCPIO_U32FIELD(header->namesize);
+		uint32_t mtime = UKCPIO_U32FIELD(header->mtime);
+		const char *fname = UKCPIO_FILENAME(header);
+		const char *data = UKCPIO_DATA(header, namesize);
 		enum ukcpio_error err;
 
 		if (fname + namesize > eof) {
@@ -315,18 +230,18 @@ process_section(const struct cpio_header **headerp, char *fullpath,
 		err = UKCPIO_SUCCESS;
 
 		/* Skip "." as dest is already there */
-		if (IS_DIR(mode) && strcmp(".", fname)) {
+		if (UKCPIO_IS_DIR(mode) && strcmp(".", fname)) {
 			err = extract_dir(fullpath, mode & 0777);
-		} else if (IS_FILE(mode)) {
+		} else if (UKCPIO_IS_FILE(mode)) {
 			err = extract_file(fullpath, data, filesize,
 					   mode & 0777, mtime);
-		} else if (IS_SYMLINK(mode)) {
+		} else if (UKCPIO_IS_SYMLINK(mode)) {
 			err = extract_symlink(fullpath, data, filesize);
 		} else {
 			uk_pr_warn("File %s unknown mode %o\n", fullpath, mode);
 		}
 
-		*headerp = CPIO_NEXT(header, namesize, filesize);
+		*headerp = UKCPIO_NEXT(header, namesize, filesize);
 		return err;
 	}
 }
@@ -335,7 +250,7 @@ enum ukcpio_error
 ukcpio_extract(const char *dest, const void *buf, size_t buflen)
 {
 	enum ukcpio_error error = UKCPIO_SUCCESS;
-	const struct cpio_header *header = (struct cpio_header *)(buf);
+	const struct uk_cpio_header *header = buf;
 	char pathbuf[PATH_MAX];
 	size_t destlen;
 
