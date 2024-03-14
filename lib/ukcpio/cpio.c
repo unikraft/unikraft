@@ -229,8 +229,7 @@ process_section(const struct uk_cpio_header **headerp, char *fullpath,
 
 		err = UKCPIO_SUCCESS;
 
-		/* Skip "." as dest is already there */
-		if (UKCPIO_IS_DIR(mode) && strcmp(".", fname)) {
+		if (UKCPIO_IS_DIR(mode)) {
 			err = extract_dir(fullpath, mode & 0777);
 		} else if (UKCPIO_IS_FILE(mode)) {
 			err = extract_file(fullpath, data, filesize,
