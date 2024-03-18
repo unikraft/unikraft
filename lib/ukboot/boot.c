@@ -103,6 +103,10 @@
 #include <uk/intctlr.h>
 #endif /* CONFIG_LIBUKINTCTLR */
 
+#ifdef CONFIG_RUNTIME_ASLR
+#include <uk/swrand.h>
+#endif /* CONFIG_RUNTIME_ASLR */
+
 int main(int argc, char *argv[]) __weak;
 static inline int do_main(int argc, char *argv[]);
 
@@ -130,7 +134,47 @@ static struct uk_alloc *heap_init()
 	struct ukplat_memregion_desc *md;
 #endif /* !CONFIG_LIBUKBOOT_HEAP_BASE */
 
-#ifdef CONFIG_LIBUKBOOT_HEAP_BASE
+#ifdef CONFIG_RUNTIME_ASLR
+	__paddr_t stack_addr;
+	ukplat_memregion_foreach(&md, UKPLAT_MEMRT_STACK, 0, 0) {
+		/* Find stack base memory address*/
+		stack_addr = md->vbase;
+		break;
+	}
+	ukplat_memregion_foreach(&md, UKPLAT_MEMRT_FREE, 0, 0) {
+		/* Put the heap immediately after the stack */
+		if (md->vbase < stack_addr)
+			continue;
+
+		uk_pr_debug("Trying %p-%p 0x%02x %s\n",
+			    (void *)md->vbase, (void *)(md->vbase + md->len),
+			    md->flags,
+#if CONFIG_UKPLAT_MEMRNAME
+			    md->name
+#else /* CONFIG_UKPLAT_MEMRNAME */
+			    ""
+#endif /* !CONFIG_UKPLAT_MEMRNAME */
+			    );
+
+		/* Generate a random starting point for the */
+		__paddr_t pstart, pend;
+		unsigned long ASLR_offset;
+		unsigned long len;
+
+		/* Randomize only half of the len to ensure that there is enough space left for the heap */
+		ASLR_offset = uk_swrand_randr() % (md->len / 2);
+
+		pstart = md->vbase + ASLR_offset;
+		len = md->len - ASLR_offset;
+
+		if (!a)
+			a = uk_alloc_init((void *)pstart, len);
+		else
+			uk_alloc_addmem(a, (void *)pstart, len);
+
+		break;
+	}
+#elif CONFIG_LIBUKBOOT_HEAP_BASE
 	UK_ASSERT(pt);
 
 	/* Paging is enabled. The available physical memory has already been

@@ -37,6 +37,7 @@
 #include <uk/plat/common/bootinfo.h>
 #include <uk/asm/limits.h>
 #include <uk/alloc.h>
+#include <x86/cpu.h>
 
 extern struct ukplat_memregion_desc bpt_unmap_mrd;
 
@@ -146,6 +147,159 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags)
 
 	return NULL;
 }
+
+
+#ifdef CONFIG_RUNTIME_ASLR
+#include <uk/swrand.h>
+#define PLATFORM_MAX_MEM_ADDR 0x100000000 /* 4 GiB */
+
+void *stackmemory_aslr_palloc(__sz size) {
+	struct ukplat_memregion_desc *mrd;
+	__paddr_t pstart, pend;
+	__paddr_t tmp_pstart, tmp_len;
+	__paddr_t mem_zone_addr;
+	int rc_b, rc_s, rc_a;
+	unsigned long ASLR_offset;
+	unsigned long max_size = 0;
+	struct ukplat_memregion_desc old_mrd;
+
+	size = PAGE_ALIGN_UP(size);
+
+	ukplat_memregion_foreach(&mrd, UKPLAT_MEMRT_FREE, 0, 0) {
+		// Skip regions lower than the current max one
+		if (mrd->len < max_size)
+			continue;
+
+		UK_ASSERT((mrd->flags & UKPLAT_MEMRF_PERMS) ==
+			  (UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE));
+
+		max_size = mrd->len;
+		mem_zone_addr = mrd->pbase;
+	}
+
+	ukplat_memregion_foreach(&mrd, UKPLAT_MEMRT_FREE, 0, 0) {
+		if (mrd->pbase != mem_zone_addr)
+			continue;
+
+		UK_ASSERT(mrd->pbase <= __U64_MAX - size);
+		pstart = PAGE_ALIGN_UP(mrd->pbase);
+		pend   = pstart + size;
+
+		if (pend > PLATFORM_MAX_MEM_ADDR ||
+		    pend > mrd->pbase + mrd->len)
+			continue;
+
+		UK_ASSERT((mrd->flags & UKPLAT_MEMRF_PERMS) ==
+			  (UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE));
+
+		old_mrd.vbase = mrd->vbase;
+		old_mrd.pbase = mrd->pbase;
+		old_mrd.len   = mrd->len;
+		old_mrd.type  = UKPLAT_MEMRT_FREE;
+		old_mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE | UKPLAT_MEMRF_MAP;
+
+		ASLR_offset = uk_swrand_randr() % (mrd->len / 2);
+		pstart = PAGE_ALIGN_UP(mrd->pbase + ASLR_offset);
+		pend = PAGE_ALIGN_UP(pstart + size);
+
+		tmp_pstart = mrd->pbase;
+		tmp_len = mrd->len;
+
+		/* Delete the old memory region to make space for the three new regions (before stack, stack, after stack) */
+		ukplat_memregion_list_delete(&ukplat_bootinfo_get()->mrds, __ukplat_memregion_foreach_i);
+
+		/* Insert the free region before the stack start address if there is such a region*/
+		if (ASLR_offset != 0)
+			rc_b = ukplat_memregion_list_insert(&ukplat_bootinfo_get()->mrds,
+				&(struct ukplat_memregion_desc){
+					.vbase = PAGE_ALIGN_UP(tmp_pstart),
+					.pbase = PAGE_ALIGN_UP(tmp_pstart),
+					.len   = PAGE_ALIGN_UP(ASLR_offset),
+					.type  = UKPLAT_MEMRT_FREE,
+					.flags = UKPLAT_MEMRF_READ |
+						UKPLAT_MEMRF_WRITE |
+						UKPLAT_MEMRF_MAP,
+				});
+		if (unlikely(rc_b < 0)) {
+			/* Restore original region */
+			ukplat_memregion_list_insert(&ukplat_bootinfo_get()->mrds, &old_mrd);
+
+			return NULL;
+		}
+
+		/* Insert the stack region */
+		rc_s = ukplat_memregion_list_insert(&ukplat_bootinfo_get()->mrds,
+			&(struct ukplat_memregion_desc){
+				.vbase = pstart,
+				.pbase = pstart,
+				.len   = size,
+				.type  = UKPLAT_MEMRT_STACK,
+				.flags = UKPLAT_MEMRF_READ |
+					 UKPLAT_MEMRF_WRITE |
+					 UKPLAT_MEMRF_MAP,
+			});
+		if (unlikely(rc_s < 0)) {
+			/* Delete previously inserted region */
+			ukplat_memregion_list_delete(&ukplat_bootinfo_get()->mrds, rc_b);
+
+			/* Restore original region */
+			ukplat_memregion_list_insert(&ukplat_bootinfo_get()->mrds, &old_mrd);
+
+			return NULL;
+		}
+
+		/* Adjust the len and start of the after the stack region */
+		tmp_len  = tmp_pstart + tmp_len - pend;
+		tmp_pstart = pend;
+
+		/* Insert the free region after the stack start address */
+		rc_a = ukplat_memregion_list_insert(&ukplat_bootinfo_get()->mrds,
+			&(struct ukplat_memregion_desc){
+				.vbase = PAGE_ALIGN_UP(tmp_pstart),
+				.pbase = PAGE_ALIGN_UP(tmp_pstart),
+				.len   = PAGE_ALIGN_UP(tmp_len),
+				.type  = UKPLAT_MEMRT_FREE,
+				.flags = UKPLAT_MEMRF_READ |
+					UKPLAT_MEMRF_WRITE |
+					UKPLAT_MEMRF_MAP,
+			});
+		if (unlikely(rc_a < 0)) {
+			/* Delete previously inserted region */
+			ukplat_memregion_list_delete(&ukplat_bootinfo_get()->mrds, rc_b);
+			ukplat_memregion_list_delete(&ukplat_bootinfo_get()->mrds, rc_s);
+
+			/* Restore original region */
+			ukplat_memregion_list_insert(&ukplat_bootinfo_get()->mrds, &old_mrd);
+
+			return NULL;
+		}
+
+		return (void *)pstart;
+	}
+
+	return NULL;
+}
+
+int uk_swrand_init(void)
+{
+	unsigned int i;
+#ifdef CONFIG_LIBUKSWRAND_CHACHA
+	unsigned int seedc = 10;
+	__u32 seedv[10];
+#else
+	unsigned int seedc = 2;
+	__u32 seedv[2];
+#endif
+	uk_pr_info("Initialize random number generator...\n");
+
+	for (i = 0; i < seedc; i++)
+		seedv[i] = rdtsc();
+
+	uk_swrand_init_r(&uk_swrand_def, seedc, seedv);
+
+	return seedc;
+}
+#endif
 
 /* We want a criteria based on which we decide which memory region to keep,
  * split or discard when coalescing.
