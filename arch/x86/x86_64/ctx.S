@@ -75,6 +75,48 @@ ENTRY(_ctx_x86_call2)
 	popq %rdi	/* load first argument from stack */
 	ret		/* jump to entrance function left on stack */
 
+ENTRY(_ctx_x86_call3)
+#if !__OMIT_FRAMEPOINTER__
+	xorq %rbp, %rbp /* reset frame pointer */
+#endif /* !__OMIT_FRAMEPOINTER__ */
+	popq %rdx	/* load third argument from stack */
+	popq %rsi	/* load second argument from stack */
+	popq %rdi	/* load first argument from stack */
+	ret		/* jump to entrance function left on stack */
+
+ENTRY(_ctx_x86_call4)
+#if !__OMIT_FRAMEPOINTER__
+	xorq %rbp, %rbp /* reset frame pointer */
+#endif /* !__OMIT_FRAMEPOINTER__ */
+	popq %rcx	/* load fourth argument from stack */
+	popq %rdx	/* load third argument from stack */
+	popq %rsi	/* load second argument from stack */
+	popq %rdi	/* load first argument from stack */
+	ret		/* jump to entrance function left on stack */
+
+ENTRY(_ctx_x86_call5)
+#if !__OMIT_FRAMEPOINTER__
+	xorq %rbp, %rbp /* reset frame pointer */
+#endif /* !__OMIT_FRAMEPOINTER__ */
+	popq %r8	/* load fifth argument from stack */
+	popq %rcx	/* load fourth argument from stack */
+	popq %rdx	/* load third argument from stack */
+	popq %rsi	/* load second argument from stack */
+	popq %rdi	/* load first argument from stack */
+	ret		/* jump to entrance function left on stack */
+
+ENTRY(_ctx_x86_call6)
+#if !__OMIT_FRAMEPOINTER__
+	xorq %rbp, %rbp /* reset frame pointer */
+#endif /* !__OMIT_FRAMEPOINTER__ */
+	popq %r9	/* load sixth argument from stack */
+	popq %r8	/* load fifth argument from stack */
+	popq %rcx	/* load fourth argument from stack */
+	popq %rdx	/* load third argument from stack */
+	popq %rsi	/* load second argument from stack */
+	popq %rdi	/* load first argument from stack */
+	ret		/* jump to entrance function left on stack */
+
 /*
  * Do a local context switch
  */

@@ -107,6 +107,11 @@ void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
 #define FDT_SIZE_CELLS_DEFAULT 0
 #define FDT_ADDR_CELLS_DEFAULT 2
 
+void lcpu_arch_set_auxsp(__uptr auxsp)
+{
+	lcpu_get_current()->auxsp = auxsp;
+}
+
 void lcpu_start(struct lcpu *cpu);
 extern struct _gic_dev *gic;
 

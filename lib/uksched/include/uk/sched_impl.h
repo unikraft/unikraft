@@ -42,6 +42,7 @@
 #ifndef __UK_SCHED_IMPL_H__
 #define __UK_SCHED_IMPL_H__
 
+#include <uk/plat/common/lcpu.h>
 #include <uk/sched.h>
 
 #ifdef __cplusplus
@@ -56,7 +57,7 @@ int uk_sched_register(struct uk_sched *s);
 		thread_add_func, thread_remove_func, \
 		thread_blocked_func, thread_woken_func, \
 		thread_woken_isr_func, idle_thread_func, \
-		def_allocator) \
+		sched_a, sched_a_stack, sched_a_auxstack, sched_a_uktls) \
 	do { \
 		(s)->sched_start      = start_func; \
 		(s)->yield            = yield_func; \
@@ -68,10 +69,10 @@ int uk_sched_register(struct uk_sched *s);
 		(s)->idle_thread      = idle_thread_func; \
 		uk_sched_register((s)); \
 		\
-		(s)->a = (def_allocator); \
-		(s)->a_stack = (def_allocator); \
-		(s)->a_auxstack = (def_allocator); \
-		(s)->a_uktls = (def_allocator); \
+		(s)->a = (sched_a); \
+		(s)->a_stack = (sched_a_stack); \
+		(s)->a_auxstack = (sched_a_auxstack); \
+		(s)->a_uktls = (sched_a_uktls); \
 		UK_TAILQ_INIT(&(s)->thread_list); \
 		UK_TAILQ_INIT(&(s)->exited_threads); \
 	} while (0)
@@ -108,7 +109,7 @@ void uk_sched_thread_switch(struct uk_thread *next)
 	if (next->ectx)
 		ukarch_ectx_load(next->ectx);
 
-	ukplat_lcpu_set_auxsp(next->auxsp);
+	lcpu_arch_set_auxsp(next->auxsp);
 
 	ukarch_ctx_switch(&prev->ctx, &next->ctx);
 }
