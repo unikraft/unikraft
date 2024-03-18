@@ -30,35 +30,55 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __UKARCH_TRAPS_H__
-#define __UKARCH_TRAPS_H__
+#include "crashdump.h"
+#include "outf.h"
 
-#ifndef __ASSEMBLY__
-#include <uk/arch/lcpu.h>
-#include <uk/event.h>
-#endif /* !__ASSEMBLY__ */
+#include <uk/nofault.h>
 
-#ifdef __cplusplus
-extern "C" {
-#endif
+void cdmp_arch_print_registers(struct out_dev *o, struct __regs *regs)
+{
+	int i;
 
-#include <uk/asm/traps.h>
+	outf(o, "SP:      0x%016lx\n", regs->sp);
+	outf(o, "ESR_EL1: 0x%016lx\n", regs->esr_el1);
+	outf(o, "ELR_EL1: 0x%016lx\n", regs->elr_el1);
+	outf(o, "LR:      0x%016lx\n", regs->lr);
+	outf(o, "PSTATE:  0x%016lx\n", regs->spsr_el1);
 
-#ifndef __ASSEMBLY__
-/**
- * Enable support for nested exception handling.
- */
-void ukarch_push_nested_exceptions(void);
-
-/**
- * Disable support for nested exception handling.
- */
-void ukarch_pop_nested_exceptions(void);
-
-#endif /* !__ASSEMBLY__ */
-
-#ifdef __cplusplus
+	for (i = 0; i < 30; i += 2) {
+		outf(o, "X%-2d: %016lx X%-2d: %016lx\n",
+		     i, regs->x[i], i + 1, regs->x[i + 1]);
+	}
 }
-#endif
 
-#endif /* __UKARCH_TRAPS_H__ */
+void cdmp_arch_print_stack(struct out_dev *o, struct __regs *regs)
+{
+	/* Nothing special to be done. Just call the generic version */
+	cdmp_gen_print_stack(o, regs->sp);
+}
+
+#if !__OMIT_FRAMEPOINTER__
+void cdmp_arch_print_call_trace(struct out_dev *o, struct __regs *regs)
+{
+	unsigned long fp = regs->x[29];
+	unsigned long *frame;
+	int depth_left = 32;
+	size_t probe_len = sizeof(unsigned long) * 2;
+
+	outf(o, "Call Trace:\n");
+
+	cdmp_gen_print_call_trace_entry(o, regs->pc);
+
+	while (((frame = (void*)fp)) && (depth_left-- > 0)) {
+		if (uk_nofault_probe_r(fp, probe_len, 0) != probe_len) {
+			outf(o, " Bad frame pointer\n");
+			break;
+		}
+
+		cdmp_gen_print_call_trace_entry(o, frame[1]);
+
+		/* Goto next frame */
+		fp = frame[0];
+	}
+}
+#endif /* !__OMIT_FRAMEPOINTER__ */

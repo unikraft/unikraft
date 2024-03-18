@@ -40,6 +40,7 @@ LIBLINUXUPLAT_SRCS-y              += $(LIBLINUXUPLAT_BASE)/time.c
 LIBLINUXUPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/lcpu.c|common
 LIBLINUXUPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/memory.c|common
 LIBLINUXUPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/tls.c|common
+LIBLINUXUPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/crash.c|common
 
 LIBLINUXUPLAT_SRCS-y                 += $(UK_PLAT_COMMON_BASE)/bootinfo.c|common
 LIBLINUXUPLAT_SRCS-$(CONFIG_LIBFDT)  += $(UK_PLAT_COMMON_BASE)/bootinfo_fdt.c|common

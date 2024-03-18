@@ -30,35 +30,63 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __UKARCH_TRAPS_H__
-#define __UKARCH_TRAPS_H__
+#ifndef __UKDEBUG_CRASHDUMP_H__
+#define __UKDEBUG_CRASHDUMP_H__
 
-#ifndef __ASSEMBLY__
 #include <uk/arch/lcpu.h>
-#include <uk/event.h>
-#endif /* !__ASSEMBLY__ */
+#include <uk/essentials.h>
+#include <uk/print.h>
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-#include <uk/asm/traps.h>
-
-#ifndef __ASSEMBLY__
-/**
- * Enable support for nested exception handling.
- */
-void ukarch_push_nested_exceptions(void);
+#if (defined UK_DEBUG) || CONFIG_LIBUKDEBUG_PRINTD
+/* Please use uk_crashdumpd() instead */
+void _uk_crashdumpd(__u16 libid, const char *srcname,
+		    unsigned int srcline, struct __regs *regs);
 
 /**
- * Disable support for nested exception handling.
+ * Prints a crash dump to debug output based on the registers in the register
+ * snapshot.
+ *
+ * @param regs Register snapshot
  */
-void ukarch_pop_nested_exceptions(void);
+#define uk_crashdumpd(regs)                                                    \
+	_uk_crashdumpd(uk_libid_self(), __STR_BASENAME__, __LINE__, (regs))
 
-#endif /* !__ASSEMBLY__ */
+#else /* (defined UK_DEBUG) || CONFIG_LIBUKDEBUG_PRINTD */
+static inline void uk_crashdumpd(struct __regs *regs __unused)
+{}
+#endif /* (defined UK_DEBUG) || CONFIG_LIBUKDEBUG_PRINTD */
+
+#if CONFIG_LIBUKDEBUG_PRINTK
+/* Please use uk_crashdumpk() instead */
+void _uk_crashdumpk(int lvl, __u16 libid, const char *srcname,
+		    unsigned int srcline, struct __regs *regs);
+
+/**
+ * Prints a crash dump to kernel output based on the registers in the register
+ * snapshot.
+ *
+ * @param lvl Debug level
+ * @param regs Register snapshot
+ */
+#define uk_crashdumpkr(lvl, regs)                                              \
+	do {                                                                   \
+		if ((lvl) <= KLVL_MAX)                                         \
+			_uk_crashdumpk((lvl), uk_libid_self(),                 \
+				       __STR_BASENAME__, __LINE__, (regs));    \
+	} while (0)
+
+#else /* CONFIG_LIBUKDEBUG_PRINTK */
+static inline void uk_crashdumpk(int lvl __unused,
+				 struct __regs *regs __unused)
+{}
+#endif /* CONFIG_LIBUKDEBUG_PRINTK */
 
 #ifdef __cplusplus
 }
 #endif
 
-#endif /* __UKARCH_TRAPS_H__ */
+#endif /* __UKDEBUG_CRASHDUMP_H__ */

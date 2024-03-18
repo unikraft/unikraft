@@ -32,12 +32,10 @@
 /* Ported from Mini-OS */
 
 #include <uk/arch/lcpu.h>
-#include <uk/plat/common/trace.h>
+#include <uk/assert.h>
 #include <x86/cpu.h>
 #include <x86/traps.h>
 #include <uk/print.h>
-#include <uk/assert.h>
-#include <uk/asmdump.h>
 
 /* A general word of caution when writing trap handlers. The platform trap
  * entry code is set up to properly save general-purpose registers (e.g., rsi,
@@ -81,13 +79,16 @@ DECLARE_TRAP_EC(security_error,  "control protection",   UKARCH_TRAP_SECURITY)
 void do_unhandled_trap(int trapnr, char *str, struct __regs *regs,
 		unsigned long error_code)
 {
+	struct uk_crash_description description;
+
 	uk_pr_crit("Unhandled Trap %d (%s), error code=0x%lx\n",
 		   trapnr, str, error_code);
-	uk_pr_info("Regs address %p\n", regs);
-	/* TODO revisit when UK_CRASH will also dump the registers */
-	dump_regs(regs);
-	uk_asmdumpk(KLVL_CRIT, (void *) regs->rip, 8);
-	UK_CRASH("Crashing\n");
+
+	description.reason = UKARCH_CRASH_REASON_UNHANDLED_TRAP;
+	description.arg1 = trapnr;
+	description.arg2 = (__u64)str;
+	description.arg3 = error_code;
+	UK_CRASH_EX(regs, &description);
 }
 
 void do_page_fault(struct __regs *regs, unsigned long error_code)
@@ -95,6 +96,7 @@ void do_page_fault(struct __regs *regs, unsigned long error_code)
 	int rc;
 	unsigned long vaddr = read_cr2();
 	struct ukarch_trap_ctx ctx = {regs, TRAP_page_fault, error_code, vaddr};
+	struct uk_crash_description description;
 
 	rc = uk_raise_event(UKARCH_TRAP_PAGE_FAULT, &ctx);
 	if (unlikely(rc < 0))
@@ -102,13 +104,11 @@ void do_page_fault(struct __regs *regs, unsigned long error_code)
 	else if (rc)
 		return;
 
-	dump_regs(regs);
-#if !__OMIT_FRAMEPOINTER__
-	stack_walk_for_frame(regs->rbp);
-#endif /* !__OMIT_FRAMEPOINTER__ */
-	uk_asmdumpk(KLVL_CRIT, (void *) regs->rip, 6);
-	dump_mem(regs->rsp);
-	dump_mem(regs->rbp);
-	dump_mem(regs->rip);
-	UK_CRASH("Crashing\n");
+	uk_pr_crit("Unhandled page fault vaddr=%#lx, error code=%#lx\n",
+		   vaddr, error_code);
+
+	description.reason = UKARCH_CRASH_REASON_PAGE_FAULT;
+	description.arg1 = vaddr;
+	description.arg2 = error_code;
+	UK_CRASH_EX(regs, &description);
 }

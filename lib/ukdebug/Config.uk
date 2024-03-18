@@ -31,6 +31,40 @@ config LIBUKDEBUG_PRINTK_CRIT
 	bool "Show critical messages only"
 endchoice
 
+menuconfig LIBUKDEBUG_CRASH_SCREEN
+	bool "Enable crash report"
+	default y
+	depends on LIBUKDEBUG_PRINTK
+	select LIBUKNOFAULT
+	help
+	  Output information on the kernel console if a crash occurred.
+
+if LIBUKDEBUG_CRASH_SCREEN
+config LIBUKDEBUG_CRASH_PRINT_REGISTERS
+	bool "Print registers"
+	default y
+	help
+	  Output a register dump to the kernel console on a crash.
+
+config LIBUKDEBUG_CRASH_PRINT_STACK
+	bool "Print stack"
+	default y
+	help
+	  Output a hexdump of the last words on the stack.
+
+config LIBUKDEBUG_CRASH_PRINT_STACK_WORDS
+	int "Number of stack words to print"
+	default 8
+	depends on LIBUKDEBUG_CRASH_PRINT_STACK
+
+config LIBUKDEBUG_CRASH_PRINT_CALL_TRACE
+	bool "Print call trace"
+	default y
+	help
+	  Output a call trace. Enable inclusion of symbol information to
+	  get function names (CONFIG_DEBUG_EMBED_SYMBOLS).
+endif
+
 config LIBUKDEBUG_PRINTD
 	bool "Enable debug messages globally (uk_printd)"
 	default n
@@ -120,4 +154,19 @@ config LIBUKDEBUG_ALL_TRACEPOINTS
 	bool "Enable all tracepoints at once"
 	default n
 endif
+
+choice
+	prompt "Crash action"
+	default LIBUKDEBUG_CRASH_ACTION_HALT
+	help
+	  The action to be performed in case of a crash.
+
+config LIBUKDEBUG_CRASH_ACTION_HALT
+	bool "Halt the system"
+
+config LIBUKDEBUG_CRASH_ACTION_REBOOT
+	bool "Reboot the system"
+
+endchoice
+
 endif
