@@ -171,10 +171,54 @@ UK_SYSCALL_DEFINE(int, munmap, void*, addr, size_t, len)
 	return 0;
 }
 
-UK_LLSYSCALL_R_DEFINE(int, mremap, void*, old_address, size_t, old_size,
+UK_LLSYSCALL_R_DEFINE(void *, mremap, void*, old_address, size_t, old_size,
 		size_t, new_size, int, flags, unsigned long, arg)
 {
-	return 0;
+	struct mmap_addr *tmp = mmap_addr, *prev = NULL;
+	int found = 0;
+
+	if (!new_size) {
+		errno = EINVAL;
+		return (void *) -1;
+	}
+
+	if (!old_address)
+		return 0;
+
+	while (tmp) {
+		if (old_address >= tmp->begin && old_address < tmp->end) {
+			found = 1;
+
+			if (old_address != tmp->begin) {
+				errno = EINVAL;
+				return (void *) -1;
+			}
+
+			/* We cannot release only some part of the allocation. */
+			if (old_size != (__uptr)tmp->end - (__uptr)tmp->begin) {
+				errno = EINVAL;
+				return (void *) -1;
+			}
+
+			/* Free the old region. */
+			if (!prev)
+				mmap_addr = tmp->next;
+			else
+				prev->next = tmp->next;
+
+			uk_free(uk_alloc_get_default(), tmp);
+			break;
+		}
+
+		tmp = tmp->next;
+	}
+
+	if (found == 0) {
+		errno = EFAULT;
+		return (void *) -1;
+	}
+
+	return mmap(NULL, new_size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
 }
 
 #if UK_LIBC_SYSCALLS
