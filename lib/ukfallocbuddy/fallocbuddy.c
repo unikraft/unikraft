@@ -74,6 +74,13 @@
 #define BFA_Lx_ALIGN_UP(addr, lvl)	ALIGN_UP(addr, BFA_Lx_SIZE(lvl))
 #define BFA_Lx_ALIGN_DOWN(addr, lvl)	ALIGN_DOWN(addr, BFA_Lx_SIZE(lvl))
 
+UK_LIST_HEAD(uk_falloc_head);
+
+#ifdef CONFIG_LIBUKFALLOC_STATS
+#include <uk/falloc_store.h>
+struct uk_falloc_stats_global uk_falloc_stats_global;
+#endif /* CONFIG_LIBUKFALLOC_STATS */
+
 static inline unsigned int bfa_order_to_lvl(unsigned int order)
 {
 	UK_ASSERT(order >= PAGE_SHIFT);
@@ -641,6 +648,9 @@ static inline void bfa_fl_add_tail(struct buddy_framealloc *bfa,
 
 	UK_ASSERT(mb->level < BFA_LEVELS);
 	bfa->fa.free_memory += BFA_Lx_SIZE(mb->level);
+#ifdef CONFIG_LIBUKFALLOC_STATS
+	uk_falloc_stats_global.free_memory += BFA_Lx_SIZE(mb->level);
+#endif /* CONFIG_LIBUKFALLOC_STATS */
 }
 
 static inline void bfa_fl_add(struct buddy_framealloc *bfa,
@@ -651,6 +661,9 @@ static inline void bfa_fl_add(struct buddy_framealloc *bfa,
 
 	UK_ASSERT(mb->level < BFA_LEVELS);
 	bfa->fa.free_memory += BFA_Lx_SIZE(mb->level);
+#ifdef CONFIG_LIBUKFALLOC_STATS
+	uk_falloc_stats_global.free_memory += BFA_Lx_SIZE(mb->level);
+#endif /* CONFIG_LIBUKFALLOC_STATS */
 }
 
 static inline void bfa_fl_del(struct buddy_framealloc *bfa,
@@ -663,6 +676,9 @@ static inline void bfa_fl_del(struct buddy_framealloc *bfa,
 	UK_ASSERT(mb->level < BFA_LEVELS);
 	UK_ASSERT(bfa->fa.free_memory >= BFA_Lx_SIZE(mb->level));
 	bfa->fa.free_memory -= BFA_Lx_SIZE(mb->level);
+#ifdef CONFIG_LIBUKFALLOC_STATS
+	uk_falloc_stats_global.free_memory -= BFA_Lx_SIZE(mb->level);
+#endif /* CONFIG_LIBUKFALLOC_STATS */
 
 #ifdef CONFIG_LIBUKFALLOCBUDDY_DEBUG
 	memset(mb, 0xCD, sizeof(struct bfa_memblock));
@@ -1450,6 +1466,10 @@ static int bfa_do_addmem(struct buddy_framealloc *bfa, void *metadata,
 	bfa_zone_add(bfa, zone);
 	bfa->fa.total_memory += len;
 
+#ifdef CONFIG_LIBUKFALLOC_STATS
+	uk_falloc_stats_global.total_memory += len;
+#endif /* CONFIG_LIBUKFALLOC_STATS */
+
 	/* Add memory as new free memory */
 	bfa_fl_addmem(bfa, zone, paddr, len, 1);
 
@@ -1474,6 +1494,7 @@ static int bfa_addmem(struct uk_falloc *fa, void *metadata, __paddr_t paddr,
 
 int uk_fallocbuddy_init(struct uk_falloc *fa)
 {
+	int res = 0;
 	struct buddy_framealloc *bfa = (struct buddy_framealloc *)fa;
 	unsigned int i;
 
@@ -1492,7 +1513,13 @@ int uk_fallocbuddy_init(struct uk_falloc *fa)
 
 	bfa->zones = __NULL;
 
-	return 0;
+	uk_list_add(&fa->list_head, &uk_falloc_head);
+
+#ifdef CONFIG_LIBUKFALLOC_STATS
+	res = uk_falloc_init_stats(fa);
+#endif /* CONFIG_LIBUKFALLOC_STATS */
+
+	return res;
 }
 
 __sz uk_fallocbuddy_size(void)

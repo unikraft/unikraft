@@ -5,4 +5,8 @@ menuconfig LIBUKFALLOC
 
 if LIBUKFALLOC
 
+config LIBUKFALLOC_STATS
+	bool "Collect frame allocator statistics"
+	default n
+
 endif

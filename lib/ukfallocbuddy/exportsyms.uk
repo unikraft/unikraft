@@ -1,3 +1,5 @@
+uk_falloc_head
 uk_fallocbuddy_init
 uk_fallocbuddy_size
+uk_falloc_stats_global
 uk_fallocbuddy_metadata_size
