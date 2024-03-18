@@ -34,6 +34,7 @@
  */
 
 #include <uk/config.h>
+#include <uk/plat/config.h>
 
 #include <stddef.h>
 #include <stdio.h>
@@ -64,6 +65,11 @@
 #include <uk/tinyalloc.h>
 #define uk_alloc_init uk_tinyalloc_init
 #endif
+#include <uk/allocstack.h>
+#if CONFIG_LIBUKBOOT_ALLOCSTACK_PREMAP_ORDER
+#define ALLOCSTACK_INITIAL_SIZE				\
+	(PAGE_SIZE * (1 << CONFIG_LIBUKBOOT_ALLOCSTACK_PREMAP_ORDER))
+#endif /* CONFIG_LIBUKBOOT_ALLOCSTACK_PREMAP_ORDER */
 #if CONFIG_LIBUKSCHED
 #include <uk/sched.h>
 #endif /* CONFIG_LIBUKSCHED */
@@ -72,6 +78,7 @@
 #endif /* CONFIG_LIBUKBOOT_INITSCHEDCOOP */
 #include <uk/arch/lcpu.h>
 #include <uk/plat/bootstrap.h>
+#include <uk/plat/common/lcpu.h>
 #include <uk/plat/memory.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/time.h>
@@ -260,10 +267,12 @@ void ukplat_entry(int argc, char *argv[])
 	struct uk_term_ctx tctx = { .target = UKPLAT_CRASH };
 	int rc = 0;
 #if CONFIG_LIBUKALLOC
-	struct uk_alloc *a = NULL;
+	struct uk_alloc *a = NULL, *sa = NULL, *auxsa = NULL;
 #endif
 #if !CONFIG_LIBUKBOOT_NOALLOC
+	__uptr auxsp, uktlsp;
 	void *tls = NULL;
+	void *auxstack;
 #endif
 #if CONFIG_LIBUKSCHED
 	struct uk_sched *s = NULL;
@@ -273,7 +282,6 @@ void ukplat_entry(int argc, char *argv[])
 #endif /* CONFIG_LIBUKBOOT_MAINTHREAD */
 	uk_ctor_func_t *ctorfn;
 	struct uk_inittab_entry *init_entry;
-	void *auxstack;
 
 #if CONFIG_LIBUKBOOT_MAINTHREAD
 	/* Initialize shutdown control structure */
@@ -328,6 +336,26 @@ void ukplat_entry(int argc, char *argv[])
 			UK_CRASH("Could not set the platform memory allocator\n");
 	}
 
+	sa = uk_allocstack_init(a
+#if CONFIG_LIBUKVMEM
+				, &kernel_vas, ALLOCSTACK_INITIAL_SIZE
+#endif /* CONFIG_LIBUKVMEM */
+			       );
+	if (unlikely(!sa))
+		UK_CRASH("Could not initialize stack allocator\n");
+
+	auxsa = uk_allocstack_init(a
+#if CONFIG_LIBUKVMEM
+				    /* The auxiliary stack must be always
+				     * fully mapped.
+				     */
+				    , &kernel_vas, AUXSTACK_SIZE
+#endif /* CONFIG_LIBUKVMEM */
+				   );
+	if (unlikely(!auxsa))
+		UK_CRASH("Could not initialize auxiliary stack allocator\n");
+
+
 	/* Allocate a TLS for this execution context */
 	tls = uk_memalign(a,
 			  ukarch_tls_area_align(),
@@ -338,26 +366,20 @@ void ukplat_entry(int argc, char *argv[])
 	/* Copy from TLS master template */
 	ukarch_tls_area_init(tls);
 	/* Activate TLS */
-	ukplat_tlsp_set(ukarch_tls_tlsp(tls));
+	uktlsp = ukarch_tls_tlsp(tls);
+	ukplat_tlsp_set(uktlsp);
 
 	/* Allocate auxiliary stack for this execution context */
-	auxstack = uk_memalign(uk_alloc_get_default(),
-			       UKPLAT_AUXSP_ALIGN, UKPLAT_AUXSP_LEN);
+	auxstack = uk_memalign(auxsa,
+			       UKARCH_AUXSP_ALIGN, AUXSTACK_SIZE);
 	if (unlikely(!auxstack))
 		UK_CRASH("Failed to allocate the auxiliary stack\n");
+
 	/* Activate auxiliary stack */
-	ukplat_lcpu_set_auxsp(ukarch_gen_sp(auxstack, UKPLAT_AUXSP_LEN));
-#if CONFIG_LIBUKVMEM
-	rc = uk_vma_advise(uk_vas_get_active(),
-			   PAGE_ALIGN_DOWN((__vaddr_t)auxstack),
-			   PAGE_ALIGN_UP((__vaddr_t)auxstack +
-				  UKPLAT_AUXSP_LEN -
-				  PAGE_ALIGN_DOWN((__vaddr_t)auxstack)),
-			   UK_VMA_ADV_WILLNEED,
-			   UK_VMA_FLAG_UNINITIALIZED);
-	if (unlikely(rc))
-		UK_CRASH("Could not setup physical memory\n");
-#endif /* CONFIG_LIBUKVMEM */
+	auxsp = ukarch_gen_sp(auxstack, AUXSTACK_SIZE);
+	ukarch_auxsp_init(auxsp);
+	ukarch_auxsp_set_uktlsp(auxsp, uktlsp);
+	lcpu_arch_set_auxsp(auxsp);
 #endif /* !CONFIG_LIBUKBOOT_NOALLOC */
 
 #if CONFIG_LIBUKINTCTLR
@@ -374,7 +396,7 @@ void ukplat_entry(int argc, char *argv[])
 #if !CONFIG_LIBUKBOOT_NOSCHED
 	uk_pr_info("Initialize scheduling...\n");
 #if CONFIG_LIBUKBOOT_INITSCHEDCOOP
-	s = uk_schedcoop_create(a);
+	s = uk_schedcoop_create(a, sa, auxsa, a);
 #endif
 	if (unlikely(!s))
 		UK_CRASH("Failed to initialize scheduling\n");

@@ -56,19 +56,33 @@
  *  ├──────────────────┤  │  │        .         │    │                  ▼ │ │
  *  │   tss  segment   ├──┘  │        .         │    └─┬──────────────────┘ │
  *  └──────────────────┘     └──────────────────┘      └────────────────────┘
+ *
+ *  CPU_EXCEPT_STACK_SIZE  CPU_EXCEPT_STACK_SIZE  CPU_EXCEPT_STACK_SIZE
+ *<--------------------><---------------------><-------------------->
+ *|=================================================================|
+ *|                     |                     |                     |
+ *|     crit stack      |       trap stack    |        IRQ stack    |
+ *|                     |                     |                     |
+ *|=================================================================|
+ * ^
+ * lcpu_except_stack
+ *
+ * Why can one stack not corrupt the other/Why is trap stack before IRQ stack?
+ * During a trap IRQs are disabled. So only the trap stack could potentially
+ * corrupt the IRQ stack if they were the other way around. The ordering of the
+ * stacks is made so that this cannot happen. Same thing goes for the crit
+ * stack as a crit exception may happen during a trap.
+ *
  */
-__align(UKARCH_SP_ALIGN) /* IST1 */
-char cpu_intr_stack[CONFIG_UKPLAT_LCPU_MAXCOUNT][CPU_EXCEPT_STACK_SIZE];
-__align(UKARCH_SP_ALIGN) /* IST2 */
-char cpu_trap_stack[CONFIG_UKPLAT_LCPU_MAXCOUNT][CPU_EXCEPT_STACK_SIZE];
-__align(UKARCH_SP_ALIGN) /* IST3 */
-char cpu_crit_stack[CONFIG_UKPLAT_LCPU_MAXCOUNT][CPU_EXCEPT_STACK_SIZE];
+static __align(UKARCH_SP_ALIGN) /* IST{1, 2, 3} */
+UKPLAT_PER_LCPU_ARRAY_DEFINE(__u8, lcpu_except_stack,
+			     3 * CPU_EXCEPT_STACK_SIZE);
 
 static __align(8)
-struct tss64 cpu_tss[CONFIG_UKPLAT_LCPU_MAXCOUNT];
+UKPLAT_PER_LCPU_DEFINE(struct tss64, cpu_tss);
 
 static __align(8)
-struct seg_desc32 cpu_gdt64[CONFIG_UKPLAT_LCPU_MAXCOUNT][GDT_NUM_ENTRIES];
+UKPLAT_PER_LCPU_ARRAY_DEFINE(struct seg_desc32, cpu_gdt64, GDT_NUM_ENTRIES);
 
 static void gdt_init(__lcpuidx idx)
 {
@@ -118,11 +132,11 @@ static void tss_init(__lcpuidx idx)
 	struct seg_desc64 *tss_desc;
 
 	cpu_tss[idx].ist[0] =
-		(__u64) &cpu_intr_stack[idx][sizeof(cpu_intr_stack[idx])];
+		(__u64)&lcpu_except_stack[idx][CPU_EXCEPT_STACK_SIZE * 3];
 	cpu_tss[idx].ist[1] =
-		(__u64) &cpu_trap_stack[idx][sizeof(cpu_trap_stack[idx])];
+		(__u64)&lcpu_except_stack[idx][CPU_EXCEPT_STACK_SIZE * 2];
 	cpu_tss[idx].ist[2] =
-		(__u64) &cpu_crit_stack[idx][sizeof(cpu_crit_stack[idx])];
+		(__u64)&lcpu_except_stack[idx][CPU_EXCEPT_STACK_SIZE];
 
 	tss_desc = (void *) &cpu_gdt64[idx][GDT_DESC_TSS_LO];
 	tss_desc->limit_lo	= sizeof(cpu_tss[idx]);
@@ -190,14 +204,14 @@ void traps_table_init(void)
 	idt_fillgate(TRAP_##name, ASM_TRAP_SYM(name), ist)
 
 	FILL_TRAP_GATE(divide_error,	2);
-	FILL_TRAP_GATE(debug,		3); /* runs on IST3 (cpu_crit_stack) */
-	FILL_TRAP_GATE(nmi,		3); /* runs on IST3 (cpu_crit_stack) */
-	FILL_TRAP_GATE(int3,		3); /* runs on IST3 (cpu_crit_stack) */
+	FILL_TRAP_GATE(debug,		3); /* on IST3 (lcpu_except_stack) */
+	FILL_TRAP_GATE(nmi,		3); /* on IST3 (lcpu_except_stack) */
+	FILL_TRAP_GATE(int3,		3); /* on IST3 (lcpu_except_stack) */
 	FILL_TRAP_GATE(overflow,	2);
 	FILL_TRAP_GATE(bounds,		2);
 	FILL_TRAP_GATE(invalid_op,	2);
 	FILL_TRAP_GATE(no_device,	2);
-	FILL_TRAP_GATE(double_fault,	3); /* runs on IST3 (cpu_crit_stack) */
+	FILL_TRAP_GATE(double_fault,	3); /* on IST3 (lcpu_except_stack) */
 
 	FILL_TRAP_GATE(invalid_tss,	2);
 	FILL_TRAP_GATE(no_segment,	2);
@@ -207,12 +221,12 @@ void traps_table_init(void)
 
 	FILL_TRAP_GATE(coproc_error,	2);
 	FILL_TRAP_GATE(alignment_check,	2);
-	FILL_TRAP_GATE(machine_check,	3); /* runs on IST3 (cpu_crit_stack) */
+	FILL_TRAP_GATE(machine_check,	3); /* on IST3 (lcpu_except_stack) */
 	FILL_TRAP_GATE(simd_error,	2);
 	FILL_TRAP_GATE(virt_error,	2);
 
 	/*
-	 * Load IRQ vectors. All IRQs run on IST1 (cpu_intr_stack).
+	 * Load IRQ vectors. All IRQs run on IST1 (lcpu_except_stack).
 	 */
 #define FILL_IRQ_GATE(num, ist)						\
 	extern void cpu_irq_##num(void);				\
@@ -452,4 +466,9 @@ void traps_lcpu_init(struct lcpu *this_lcpu)
 	gdt_init(this_lcpu->idx);
 	tss_init(this_lcpu->idx);
 	idt_init();
+}
+
+__uptr traps_lcpu_get_except_stack_base(void)
+{
+	return (__uptr)&lcpu_except_stack;
 }

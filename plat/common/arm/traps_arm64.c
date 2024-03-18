@@ -28,7 +28,7 @@
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <uk/intctlr/gic.h>
-#include <uk/syscall.h>
+#include <uk/plat/syscall.h>
 
 #ifdef CONFIG_ARM64_FEAT_MTE
 #include <arm/arm64/mte.h>
@@ -194,9 +194,17 @@ void invalid_trap_handler(struct __regs *regs, __u32 el, __u32 reason,
 
 void trap_el1_sync(struct __regs *regs, __u64 far)
 {
-	int rc;
-	struct ukarch_trap_ctx ctx = {regs, regs->esr_el1, 1, 0, far};
 	enum aarch64_trap trap = esr_to_trap(regs->esr_el1);
+	struct ukarch_trap_ctx ctx = {
+		.regs = regs,
+		.esr = regs->esr_el1,
+		.el = 1,
+		.reason = 0,
+		.lcpu = trap == AARCH64_TRAP_SYSCALL ? NULL :
+						   lcpu_get_current_in_except(),
+		.far = far,
+	};
+	int rc;
 
 	if (trap < AARCH64_TRAP_MAX) {
 		rc = uk_raise_event_ptr(_trap_table[trap].event, &ctx);
@@ -225,7 +233,7 @@ void trap_el1_irq(struct __regs *regs)
 
 #ifdef CONFIG_LIBSYSCALL_SHIM_HANDLER
 
-extern void ukplat_syscall_handler(struct uk_syscall_ctx *usr);
+extern void ukplat_syscall_handler(struct uk_syscall_ctx *usc);
 
 static int arm64_syscall_adapter(void *data)
 {

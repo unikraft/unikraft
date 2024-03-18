@@ -7,7 +7,6 @@
 #include <uk/assert.h>
 #include <uk/plat/common/cpu.h>
 #include <uk/thread.h>
-#include <x86/gsbase.h>
 #include <uk/syscall.h>
 
 void ukarch_sysregs_switch_uk(struct ukarch_sysregs *sysregs)

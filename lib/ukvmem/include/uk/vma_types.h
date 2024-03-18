@@ -109,32 +109,41 @@ extern const struct uk_vma_ops uk_vma_stack_ops;
 /* Stack flags */
 #define UK_VMA_STACK_GROWS_UP		(0x1UL << UK_VMA_MAP_EXTF_SHIFT)
 
+#define STACK_TOP_GUARD_SIZE				\
+	(CONFIG_LIBUKVMEM_STACK_GUARD_PAGES_TOP * PAGE_SIZE)
+
+#define STACK_BOTTOM_GUARD_SIZE				\
+	(CONFIG_LIBUKVMEM_STACK_GUARD_PAGES_BOTTOM * PAGE_SIZE)
+
+#define STACK_GUARDS_SIZE	(STACK_TOP_GUARD_SIZE + STACK_BOTTOM_GUARD_SIZE)
+
 /**
  * Creates a new stack VMA. See uk_vma_map() for a description of the
  * parameters not listed here.
  *
+ * NOTE: len does not include the total size of the guards.
+ *
  * @param initial_len
- *   Number of bytes pre-allocated for the stack. Note that one page will be
- *   reserved as guard page.
+ *   Number of bytes pre-allocated for the stack.
  */
 static inline int uk_vma_map_stack(struct uk_vas *vas, __vaddr_t *vaddr,
 				   __sz len, unsigned long flags,
 				   const char *name, __sz initial_len)
 {
-	int rc;
 	__vaddr_t va;
+	int rc;
 
-	UK_ASSERT(len >= 2 * PAGE_SIZE); /* one page + guard page */
 	UK_ASSERT(PAGE_ALIGNED(initial_len));
 	UK_ASSERT(UK_VMA_MAP_SIZE_TO_ORDER(flags) == 0);
 
 	flags |= UK_VMA_MAP_SIZE(PAGE_SHIFT);
 
 	/* Just populate the whole stack */
-	if (initial_len >= len - PAGE_SIZE)
+	if (initial_len >= len)
 		flags |= UK_VMA_MAP_POPULATE;
 
-	rc = uk_vma_map(vas, vaddr, len, PAGE_ATTR_PROT_RW, flags, name,
+	rc = uk_vma_map(vas, vaddr, len + STACK_GUARDS_SIZE,
+			PAGE_ATTR_PROT_RW, flags, name,
 			&uk_vma_stack_ops, __NULL);
 	if (rc || initial_len == 0 || (flags & UK_VMA_MAP_POPULATE))
 		return rc;
@@ -143,7 +152,9 @@ static inline int uk_vma_map_stack(struct uk_vas *vas, __vaddr_t *vaddr,
 
 	va = *vaddr;
 	if (!(flags & UK_VMA_STACK_GROWS_UP))
-		va += len - initial_len;
+		va += STACK_BOTTOM_GUARD_SIZE + len - initial_len;
+	else
+		va += STACK_BOTTOM_GUARD_SIZE;
 
 	return uk_vma_advise(vas, va, initial_len, UK_VMA_ADV_WILLNEED, 0);
 }

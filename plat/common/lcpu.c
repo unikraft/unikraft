@@ -105,9 +105,16 @@ __lcpuidx __weak lcpu_arch_idx(void)
 	return 0;
 }
 
+void __weak lcpu_arch_set_auxsp(__uptr auxsp __unused) { }
+
 int __weak lcpu_arch_init(struct lcpu *this_lcpu __unused)
 {
 	return 0;
+}
+
+struct lcpu *__weak lcpu_get_current_in_except(void)
+{
+	return NULL;
 }
 #endif /* !CONFIG_HAVE_SMP */
 
@@ -121,6 +128,13 @@ struct lcpu *lcpu_get(__lcpuidx idx)
 struct lcpu *lcpu_get_current(void)
 {
 	return lcpu_get(ukplat_lcpu_idx());
+}
+
+__uptr lcpu_get_auxsp(void)
+{
+	UK_ASSERT(IS_LCPU_PTR(lcpu_get_current()));
+
+	return lcpu_get_current()->auxsp;
 }
 
 int lcpu_init(struct lcpu *this_lcpu)
@@ -194,20 +208,6 @@ void ukplat_lcpu_halt_irq_until(__nsec until)
 	UK_ASSERT(ukplat_lcpu_irqs_disabled());
 
 	time_block_until(until);
-}
-
-__uptr ukplat_lcpu_get_auxsp(void)
-{
-	UK_ASSERT(IS_LCPU_PTR(lcpu_get_current()));
-
-	return lcpu_get_current()->auxsp;
-}
-
-void ukplat_lcpu_set_auxsp(__uptr auxsp)
-{
-	UK_ASSERT(IS_LCPU_PTR(lcpu_get_current()));
-
-	lcpu_get_current()->auxsp = auxsp;
 }
 
 #ifdef CONFIG_HAVE_SMP
