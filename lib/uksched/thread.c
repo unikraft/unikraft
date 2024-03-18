@@ -237,6 +237,8 @@ static void _uk_thread_struct_init(struct uk_thread *t,
 				   void *priv,
 				   uk_thread_dtor_t dtor)
 {
+	struct ukarch_auxspcb *auxspcb;
+
 	/* TLS pointer required if is_uktls is set */
 	UK_ASSERT(!is_uktls || tlsp);
 
@@ -252,6 +254,7 @@ static void _uk_thread_struct_init(struct uk_thread *t,
 	if (auxsp) {
 		t->flags |= UK_THREADF_AUXSP;
 		t->auxsp = auxsp;
+		ukarch_auxsp_init(auxsp);
 	}
 	if (tlsp && is_uktls) {
 		t->flags |= UK_THREADF_UKTLS;
@@ -260,6 +263,12 @@ static void _uk_thread_struct_init(struct uk_thread *t,
 	if (ectx) {
 		ukarch_ectx_init(t->ectx);
 		t->flags |= UK_THREADF_ECTX;
+	}
+
+	if (t->flags & UK_THREADF_UKTLS && t->flags & UK_THREADF_AUXSP) {
+		auxspcb = ukarch_auxsp_get_cb(auxsp);
+		UK_ASSERT(auxspcb);
+		ukarch_sysctx_set_tlsp(&auxspcb->uksc, t->uktlsp);
 	}
 
 	uk_pr_debug("uk_thread %p (%s): ctx:%p, ectx:%p, tlsp:%p\n",
@@ -390,24 +399,12 @@ static int _uk_thread_struct_init_alloc(struct uk_thread *t,
 	int rc;
 
 	if (a_auxstack && auxstack_len) {
-		auxstack = uk_memalign(a_auxstack, UKPLAT_AUXSP_ALIGN,
+		auxstack = uk_memalign(a_auxstack, UKARCH_AUXSP_ALIGN,
 				       auxstack_len);
 		if (!auxstack) {
 			rc = -ENOMEM;
 			goto err_out;
 		}
-
-#if CONFIG_LIBUKVMEM
-		rc = uk_vma_advise(uk_vas_get_active(),
-				   PAGE_ALIGN_DOWN((__vaddr_t)auxstack),
-				   PAGE_ALIGN_UP((__vaddr_t)auxstack +
-					  auxstack_len -
-					  PAGE_ALIGN_DOWN((__vaddr_t)auxstack)),
-				   UK_VMA_ADV_WILLNEED,
-				   UK_VMA_FLAG_UNINITIALIZED);
-		if (unlikely(rc))
-			goto err_out;
-#endif /* CONFIG_LIBUKVMEM */
 	}
 
 	if (a_stack && stack_len) {
@@ -727,7 +724,7 @@ struct uk_thread *uk_thread_create_container(struct uk_alloc *a,
 						       ukarch_ectx_align());
 
 	stack_len = (!!stack_len) ? stack_len : STACK_SIZE;
-	auxstack_len = (!!auxstack_len) ? auxstack_len : UKPLAT_AUXSP_LEN;
+	auxstack_len = (!!auxstack_len) ? auxstack_len : AUXSTACK_SIZE;
 
 	if (_uk_thread_struct_init_alloc(t,
 					 a_stack, stack_len,
@@ -802,24 +799,12 @@ struct uk_thread *uk_thread_create_container2(struct uk_alloc *a,
 						       ukarch_ectx_align());
 
 	/* Allocate auxiliary stack */
-	auxstack_len = (!!auxstack_len) ? auxstack_len : UKPLAT_AUXSP_LEN;
+	auxstack_len = (!!auxstack_len) ? auxstack_len : AUXSTACK_SIZE;
 	if (a_auxstack && auxstack_len) {
-		auxstack = uk_memalign(a_auxstack, UKPLAT_AUXSP_ALIGN,
+		auxstack = uk_memalign(a_auxstack, UKARCH_AUXSP_ALIGN,
 				       auxstack_len);
 		if (!auxstack)
 			goto err_free_thread;
-
-#if CONFIG_LIBUKVMEM
-		ret = uk_vma_advise(uk_vas_get_active(),
-				   PAGE_ALIGN_DOWN((__vaddr_t)auxstack),
-				   PAGE_ALIGN_UP((__vaddr_t)auxstack +
-					  auxstack_len -
-					  PAGE_ALIGN_DOWN((__vaddr_t)auxstack)),
-				   UK_VMA_ADV_WILLNEED,
-				   UK_VMA_FLAG_UNINITIALIZED);
-		if (unlikely(ret))
-			goto err_free_thread;
-#endif /* CONFIG_LIBUKVMEM */
 
 		auxsp = ukarch_gen_sp(auxstack, auxstack_len);
 	}

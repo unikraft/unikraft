@@ -71,6 +71,18 @@ config LIBUKVMEM_STACK_BASE
 	default 0x0000004000000000
 	depends on LIBUKVMEM_DEDICATED_STACK_BASE
 
+config LIBUKVMEM_STACK_GUARD_PAGES_TOP
+	int "Top guard pages count"
+	default 4
+	help
+		Number of guard pages for the top of the stack (high address)
+
+config LIBUKVMEM_STACK_GUARD_PAGES_BOTTOM
+	int "Bottom guard pages count"
+	default 4
+	help
+		Number of guard pages for the bottom of the stack (low address)
+
 config LIBUKVMEM_TEST
 	bool "Enable unit tests"
 	default n

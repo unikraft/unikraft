@@ -1,0 +1,22 @@
+menuconfig LIBUKALLOCSTACK
+	bool "ukallocstack: Generic stack allocator wrapper"
+	default n
+	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKDEBUG
+	select LIBUKALLOC
+	help
+		This is a generic stack allocating library that is registered
+		as a Unikraft allocator driver. It accepts a default allocator
+		that it will use.
+
+if LIBUKALLOCSTACK
+config LIBUKALLOCSTACK_PAGE_GUARDS
+	bool "Use page guards for the allocated stacks"
+	default y
+	depends on LIBUKVMEM
+	help
+		Instead of being a wrapper for the given allocator, use the
+		allocator only for the initial allocation of the stack
+		allocation structure and use ukvmem library's page guarded
+		stack VMA's instead when allocating.
+endif

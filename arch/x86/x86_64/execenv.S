@@ -4,24 +4,25 @@
  * You may not use this file except in compliance with the License.
  */
 
+#include <uk/arch/ctx.h>
 #include <uk/arch/lcpu.h>
 #include <uk/asm.h>
-#include <uk/syscall.h>
 
-/* Used to pop the contents of a `struct uk_syscall_ctx` off the stack */
-ENTRY(uk_syscall_ctx_popall)
+/* Used to pop the contents of a `struct ukarch_execenv` off the stack */
+ENTRY(ukarch_execenv_load)
 	/* Do all this with IRQ's disabled, as the final iretq should pop off
 	 * a proper rflags anyway.
 	 */
 	cli
 
-	movq	%rsp, %rdi
-	addq	$(__REGS_SIZEOF + UKARCH_SYSREGS_SIZE), %rdi
-	call	ukarch_ectx_load
+	movq	%rdi, %rsp
 
+	addq	$(__REGS_SIZEOF + UKARCH_SYSCTX_SIZE), %rdi
+	call	ukarch_ectx_load
 	movq	%rsp, %rdi
+
 	addq	$(__REGS_SIZEOF), %rdi
-	call	ukarch_sysregs_switch_ul
+	call	ukarch_sysctx_load
 
 	addq	$(__REGS_PAD_SIZE), %rsp
 
@@ -42,7 +43,5 @@ ENTRY(uk_syscall_ctx_popall)
 	popq	%rdi
 
 	addq	$(__REGS_PAD_SIZE), %rsp
-
-	swapgs
 
 	iretq

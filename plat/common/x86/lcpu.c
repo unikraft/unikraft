@@ -34,12 +34,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <uk/arch/ctx.h>
 #include <uk/config.h>
 #include <uk/assert.h>
 #include <uk/print.h>
 #include <x86/irq.h>
 #include <x86/cpu.h>
-#include <x86/gsbase.h>
 #include <x86/traps.h>
 #include <x86/delay.h>
 #include <uk/plat/common/acpi.h>
@@ -77,8 +77,8 @@ int lcpu_arch_init(struct lcpu *this_lcpu)
 
 	traps_lcpu_init(this_lcpu);
 
-	wrkgsbase((__uptr)this_lcpu);
-	wrgsbase((__uptr)this_lcpu);
+	wrgsbasefn((__uptr)this_lcpu);
+	wrkgsbasefn((__uptr)this_lcpu);
 
 	return 0;
 }
@@ -109,6 +109,18 @@ void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
 
 	/* just make the compiler happy about returning function */
 	__builtin_unreachable();
+}
+
+void lcpu_arch_set_auxsp(__uptr auxsp)
+{
+	struct lcpu *lcpu = lcpu_get_current();
+	struct ukarch_auxspcb *auxspcb;
+
+	UK_ASSERT(IS_LCPU_PTR(rdgsbase()));
+
+	lcpu->auxsp = auxsp;
+	auxspcb = ukarch_auxsp_get_cb(auxsp);
+	ukarch_sysctx_set_gs_base(&auxspcb->uksc, (__uptr)lcpu);
 }
 
 #if CONFIG_HAVE_SMP

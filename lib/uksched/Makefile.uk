@@ -4,6 +4,11 @@ $(eval $(call addlib_s,libuksched,$(CONFIG_LIBUKSCHED)))
 #       `LIBUKSCHED_THREAD_FLAGS-y`, `CFLAGS-y`, and `CXXFLAGS-y`
 #       by `Makefiles.rules`
 
+# FIXME: Remove this and make the library self contained
+LIBUKSCHED_ASINCLUDES-y  += -I$(UK_PLAT_COMMON_BASE)/include
+LIBUKSCHED_CINCLUDES-y   += -I$(UK_PLAT_COMMON_BASE)/include
+LIBUKSCHED_CXXINCLUDES-y += -I$(UK_PLAT_COMMON_BASE)/include
+
 CINCLUDES-$(CONFIG_LIBUKSCHED)     += -I$(LIBUKSCHED_BASE)/include
 CXXINCLUDES-$(CONFIG_LIBUKSCHED)   += -I$(LIBUKSCHED_BASE)/include
 
