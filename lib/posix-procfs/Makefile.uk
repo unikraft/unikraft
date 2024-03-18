@@ -1,0 +1,6 @@
+$(eval $(call addlib_s,libprocfs,$(CONFIG_LIBPROCFS)))
+
+LIBPROCFS_CFLAGS-$(call gcc_version_ge,8,0) += -Wno-cast-function-type
+
+LIBPROCFS_SRCS-y += $(LIBPROCFS_BASE)/procfs_vfsops.c
+LIBPROCFS_SRCS-y += $(LIBPROCFS_BASE)/procfs_vnops.c
