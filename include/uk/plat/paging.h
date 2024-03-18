@@ -85,7 +85,8 @@ struct uk_pagetable {
 	(((flag) >> PAGE_FLAG_SIZE_SHIFT) & PAGE_FLAG_SIZE_MASK)
 
 /* Page table clone flags */
-#define PAGE_FLAG_CLONE_NEW	0x01 /* Create an empty page table */
+#define PAGE_FLAG_CLONE_NEW		0x01 /* Create an empty page table */
+#define PAGE_FLAG_CLONE_INITIALIZED	0x02 /* PT is already initialized */
 
 /**
  * Returns the active page table (the one that defines the virtual address
@@ -166,6 +167,30 @@ int ukplat_pt_add_mem(struct uk_pagetable *pt, __paddr_t start, __sz len);
  */
 int ukplat_pt_clone(struct uk_pagetable *pt, struct uk_pagetable *pt_src,
 		    unsigned long flags);
+
+/**
+ * Initializes a new page table as a clone of an existing pagetable. The
+ * new pagetable is assigned physical address range for allocations and
+ * mappings.
+ *
+ * @param pt_dst
+ *   An uninitialized page table that will receive a clone of the source page
+ *   table
+ * @param pt_src
+ *   The source page table that will be cloned
+ * @param start
+ *   Start of the physical address range that will be available
+ *   for allocations of physical memory (e.g., mapping with __PADDR_ANY).
+ *   The function may reserve some memory in this area for own purposes. The
+ *   range must not be assigned to other page tables.
+ * @param len
+ *   The length (in bytes) of the physical address range
+ *
+ * @return
+ *   0 on success, a non-zero value otherwise
+ */
+int ukplat_pt_init_clone(struct uk_pagetable *pt_dst, struct uk_pagetable *pt_src,
+			 __paddr_t start, __sz len);
 
 /**
  * Frees the given page table by recursively releasing the page table hierarchy
