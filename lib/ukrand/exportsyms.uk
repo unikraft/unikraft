@@ -1,0 +1,8 @@
+getrandom
+uk_syscall_e_getrandom
+uk_syscall_r_getrandom
+uk_random_u32
+uk_random_u64
+uk_random_seed_u32
+uk_random_seed_u64
+uk_random_fill_buffer

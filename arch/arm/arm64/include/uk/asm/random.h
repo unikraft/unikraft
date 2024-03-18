@@ -33,6 +33,8 @@
 
 #ifdef CONFIG_ARM64_FEAT_RNG
 
+#include <uk/arch/lcpu.h>
+
 static inline int ukarch_random_init(void)
 {
 	__u64 reg;
@@ -50,6 +52,10 @@ static inline int ukarch_random_u64(__u64 *val)
 	__asm__ __volatile__("	mrs	%x0, RNDR\n" /* Get rand */
 			     "	mrs	%x1, NZCV\n" /* Get result */
 			     : "=r"(*val), "=r"(res));
+
+	if (unlikely(res != 0))
+		return -1;
+
 	return res;
 }
 
@@ -72,6 +78,10 @@ static inline int ukarch_random_seed_u64(__u64 *val)
 	__asm__ __volatile__("	mrs	%x0, RNDRRS\n" /* Get rand */
 			     "	mrs	%x1, NZCV\n"   /* Get result */
 			     : "=r"(*val), "=r"(res));
+
+	if (unlikely(res != 0))
+		return -1;
+
 	return res;
 }
 
