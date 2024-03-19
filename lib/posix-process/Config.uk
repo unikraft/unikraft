@@ -26,6 +26,10 @@ menuconfig LIBPOSIX_PROCESS_SIGNAL
 
 if LIBPOSIX_PROCESS_SIGNAL
 
+config LIBPOSIX_PROCESS_SIGNAL_ALARM
+	bool "alarm() syscall"
+	default y
+
 config LIBPOSIX_PROCESS_SIGNAL_PAUSE
 	bool "pause() syscall"
 	default y
