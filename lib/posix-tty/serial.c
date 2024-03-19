@@ -100,7 +100,7 @@ static ssize_t serial_read(const struct uk_file *f,
 		return -EAGAIN;
 }
 
-static ssize_t serial_write(const struct uk_file *f,
+static ssize_t serial_write(const struct uk_file *f __maybe_unused,
 			    const struct iovec *iov, int iovcnt,
 			    off_t off, long flags __unused)
 {
@@ -128,7 +128,8 @@ static ssize_t serial_write(const struct uk_file *f,
 	return total;
 }
 
-static int serial_ctl(const struct uk_file *f, int fam, int req, uintptr_t arg1,
+static int serial_ctl(const struct uk_file *f __maybe_unused,
+		      int fam, int req, uintptr_t arg1,
 		      uintptr_t arg2 __unused, uintptr_t arg3 __unused)
 {
 	UK_ASSERT(f->vol == SERIAL_VOLID);
@@ -197,7 +198,7 @@ static int serial_ctl(const struct uk_file *f, int fam, int req, uintptr_t arg1,
 #define SERIAL_STATX_MASK \
 	(UK_STATX_TYPE|UK_STATX_MODE|UK_STATX_NLINK|UK_STATX_INO|UK_STATX_SIZE)
 
-static int serial_getstat(const struct uk_file *f,
+static int serial_getstat(const struct uk_file *f __maybe_unused,
 			  unsigned int mask __unused, struct uk_statx *arg)
 {
 	UK_ASSERT(f->vol == SERIAL_VOLID);
