@@ -22,7 +22,7 @@ static const char VOID_VOLID[] = "void_vol";
 static const char ZERO_VOLID[] = "zero_vol";
 
 
-static ssize_t null_read(const struct uk_file *f,
+static ssize_t null_read(const struct uk_file *f __maybe_unused,
 			 const struct iovec *iov __unused, int iovcnt __unused,
 			 off_t off __unused, long flags __unused)
 {
@@ -30,7 +30,7 @@ static ssize_t null_read(const struct uk_file *f,
 	return 0;
 }
 
-static ssize_t void_read(const struct uk_file *f,
+static ssize_t void_read(const struct uk_file *f __maybe_unused,
 			 const struct iovec *iov __unused, int iovcnt __unused,
 			 off_t off __unused, long flags __unused)
 {
@@ -38,7 +38,7 @@ static ssize_t void_read(const struct uk_file *f,
 	return -EAGAIN;
 }
 
-static ssize_t zero_read(const struct uk_file *f,
+static ssize_t zero_read(const struct uk_file *f __maybe_unused,
 			 const struct iovec *iov, int iovcnt,
 			 off_t off __unused, long flags __unused)
 {
@@ -55,7 +55,7 @@ static ssize_t zero_read(const struct uk_file *f,
 	return total;
 }
 
-static ssize_t null_write(const struct uk_file *f __unused,
+static ssize_t null_write(const struct uk_file *f __maybe_unused,
 			  const struct iovec *iov, int iovcnt,
 			  off_t off __unused, long flags __unused)
 {
@@ -72,7 +72,7 @@ static ssize_t null_write(const struct uk_file *f __unused,
 #define PSEUDO_STATX_MASK \
 	(UK_STATX_TYPE|UK_STATX_MODE|UK_STATX_NLINK|UK_STATX_INO|UK_STATX_SIZE)
 
-static int pseudo_getstat(const struct uk_file *f,
+static int pseudo_getstat(const struct uk_file *f __maybe_unused,
 			  unsigned int mask __unused, struct uk_statx *arg)
 {
 	UK_ASSERT(f->vol == NULL_VOLID || f->vol == VOID_VOLID ||
