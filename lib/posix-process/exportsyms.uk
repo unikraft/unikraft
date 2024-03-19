@@ -1,3 +1,6 @@
+alarm
+uk_syscall_r_alarm
+uk_syscall_e_alarm
 execl
 execle
 execlp
