@@ -43,8 +43,11 @@
 extern "C" {
 #endif
 
+/* Kernel-side definition of sigset_t */
+typedef unsigned long uk_sigset_t;
+
 #define uk_sigemptyset(_ptr)		(*(_ptr) = 0)
-#define uk_sigfillset(_ptr)		(*(_ptr) = ~((__sigset_t)0))
+#define uk_sigfillset(_ptr)		(*(_ptr) = ~((uk_sigset_t)0))
 #define uk_sigaddset(_ptr, _signo)	(*(_ptr) |= (1UL << ((_signo) - 1)))
 #define uk_sigdelset(_ptr, _signo)	(*(_ptr) &= ~(1UL << ((_signo) - 1)))
 #define uk_sigcopyset(_ptr1, _ptr2)	(*(_ptr1) = *(_ptr2))
