@@ -22,8 +22,10 @@
 bpt_unmap_mrd:
 	.quad	0x0000000080000000		/* 1 GiB */
 	.quad	0x0000000080000000		/* 1 GiB */
+	.quad	0x0000000000000000		/* Page-aligned */
 	/* FIXME: Unmap to 1TiB */
 	.quad	(255 - 1) * 0x0000000080000000
+	.quad	(255 - 1) * 0x0000000000080000  /* Page count */
 	.short	0x0000000000000000
 	.short	0x0000000000000010		/* UKPLAT_MEMRF_UNMAP */
 	.space	36

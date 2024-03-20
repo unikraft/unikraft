@@ -69,6 +69,8 @@ void __weak enforce_w_xor_x(void)
 		if (d->type == UKPLAT_MEMRT_FREE)
 			continue;
 
+		UK_ASSERT_VALID_MRD(d);
+
 #ifdef CONFIG_ARCH_ARM_64
 		/* Skip RW regions. These will be protected by WXN */
 		if (d->flags & UKPLAT_MEMRF_WRITE)

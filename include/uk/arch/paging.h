@@ -364,6 +364,17 @@ int PAGE_Lx_IS(__pte_t pte, unsigned int lvl);
 #define _PT_PAGES(lvls, pages)		__PT_PAGES(lvls, pages)
 #define PT_PAGES(pages)			_PT_PAGES(PT_LEVELS, pages)
 
+/** PAGE_COUNT(len) macro
+ *
+ * Computes the total number of pages required to map an area of a given
+ * length.
+ *
+ * @param len length of the area to map
+ *
+ * @return number of pages required to map an area of a given length
+ */
+#define PAGE_COUNT(len)			DIV_ROUND_UP((len), PAGE_SIZE)
+
 /**
  * Tests if a certain range of virtual addresses is valid on the current
  * architecture. For example, most 64-bit architectures do not fully implement

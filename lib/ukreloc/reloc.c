@@ -124,6 +124,8 @@ void do_uk_reloc_kmrds(__paddr_t r_paddr, __vaddr_t r_vaddr)
 	 * since they contain the link-time addresses, relative to rt_baddr.
 	 */
 	ukplat_memregion_foreach(&mrdp, UKPLAT_MEMRT_KERNEL, 0, 0) {
+		UK_ASSERT_VALID_KERNEL_MRD(mrdp);
+
 		mrdp->pbase -= (__paddr_t)lt_baddr;
 		mrdp->pbase += r_paddr;
 		mrdp->vbase -= (__vaddr_t)lt_baddr;
