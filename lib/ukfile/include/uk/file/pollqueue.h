@@ -146,28 +146,32 @@ struct uk_pollq {
  * latter is meant for assigning to variables or as anonymous data structures.
  */
 #if CONFIG_LIBUKFILE_CHAINUPDATE
-#define UK_POLLQ_INITIALIZER(q) { \
+#define UK_POLLQ_EVENTS_INITIALIZER(q, ev) { \
 	.wait = NULL, \
 	.waitend = &(q).wait, \
 	.prop = NULL, \
 	.propend = &(q).prop, \
-	.events = 0, \
+	.events = (ev), \
 	.waitmask = 0, \
 	.propmask = 0, \
 	.proplock = UK_RWLOCK_INITIALIZER((q).proplock, 0), \
 	.waitlock = UK_RWLOCK_INITIALIZER((q).waitlock, 0), \
 }
 #else /* !CONFIG_LIBUKFILE_CHAINUPDATE */
-#define UK_POLLQ_INITIALIZER(q) { \
+#define UK_POLLQ_EVENTS_INITIALIZER(q, ev) { \
 	.wait = NULL, \
 	.waitend = &(q).wait, \
-	.events = 0, \
+	.events = (ev), \
 	.waitmask = 0, \
 	.waitlock = UK_RWLOCK_INITIALIZER((q).waitlock, 0), \
 }
 #endif /* !CONFIG_LIBUKFILE_CHAINUPDATE */
 
-#define UK_POLLQ_INIT_VALUE(q) ((struct uk_pollq)UK_POLLQ_INITIALIZER(q))
+#define UK_POLLQ_EVENTS_INIT_VALUE(q) \
+	((struct uk_pollq)UK_POLLQ_EVENTS_INITIALIZER(q))
+
+#define UK_POLLQ_INITIALIZER(q) UK_POLLQ_EVENTS_INITIALIZER((q), 0)
+#define UK_POLLQ_INIT_VALUE(q) UK_POLLQ_EVENTS_INIT_VALUE((q), 0)
 
 /**
  * Initialize the fields of `q` to a valid empty state.
