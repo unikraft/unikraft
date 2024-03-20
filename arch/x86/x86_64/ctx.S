@@ -28,10 +28,13 @@
 /* Some parts are derived from Mini-OS arch/x86/x86_64.S */
 
 #include <uk/arch/ctx.h>
+#include <uk/asm/cet.h>
 
 #define ENTRY(X) .globl X ; X :
 
 ENTRY(_ctx_x86_clearregs)
+	X86_CET_ENDBR
+
 	/* wipe argument and return registers */
 	xorq %rdi, %rdi
 	xorq %rsi, %rsi
@@ -55,12 +58,14 @@ ENTRY(_ctx_x86_clearregs)
 	ret		/* jump to entrance function left on stack */
 
 ENTRY(_ctx_x86_call0)
+	X86_CET_ENDBR
 #if !__OMIT_FRAMEPOINTER__
 	xorq %rbp, %rbp /* reset frame pointer */
 #endif /* !__OMIT_FRAMEPOINTER__ */
 	ret		/* jump to entrance function left on stack */
 
 ENTRY(_ctx_x86_call1)
+	X86_CET_ENDBR
 #if !__OMIT_FRAMEPOINTER__
 	xorq %rbp, %rbp /* reset frame pointer */
 #endif /* !__OMIT_FRAMEPOINTER__ */
@@ -68,6 +73,7 @@ ENTRY(_ctx_x86_call1)
 	ret		/* jump to entrance function left on stack */
 
 ENTRY(_ctx_x86_call2)
+	X86_CET_ENDBR
 #if !__OMIT_FRAMEPOINTER__
 	xorq %rbp, %rbp /* reset frame pointer */
 #endif /* !__OMIT_FRAMEPOINTER__ */
@@ -79,6 +85,7 @@ ENTRY(_ctx_x86_call2)
  * Do a local context switch
  */
 ENTRY(ukarch_ctx_switch)
+	X86_CET_ENDBR
 	pushq %rbp
 	pushq %rbx
 	pushq %r12

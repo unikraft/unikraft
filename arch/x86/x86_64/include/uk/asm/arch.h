@@ -51,6 +51,7 @@
 #define X86_CR4_FSGSBASE        (1 << 16)   /* enable FSGSBASE*/
 #define X86_CR4_OSXSAVE         (1 << 18)   /* enable XSAVE, extended states */
 #define X86_CR4_PKE             (1 << 22)   /* enable protection keys */
+#define X86_CR4_CET             (1 << 23)   /* enable CET */
 
 /*
  * Intel CPU features in EFER
@@ -85,6 +86,12 @@
 #define X86_MSR_SYSCALL_MASK	0xc0000084
 /* page attribute table configuration */
 #define X86_MSR_PAT		0x277
+/* supervisor-mode CET configuration */
+#define MSR_IA32_S_CET			0x000006a2
+/* ring-0 shadow stack pointer */
+#define MSR_IA32_PL0_SSP		0x000006a4
+/* interrupt shadow stack table */
+#define MSR_IA32_INT_SSP_TAB	0x000006a8
 
 /* MSR EFER bits */
 #define X86_EFER_SCE		(1 << 0)
@@ -95,3 +102,14 @@
 #define X86_EFER_LMSLE		(1 << 13)
 #define X86_EFER_FFXSR		(1 << 14)
 #define X86_EFER_TCE		(1 << 15)
+
+/* MSR CET bits */
+#define X86_CET_SHSTK_EN			(1 << 0)
+#define X86_CET_WRSS_EN				(1 << 1)
+#define X86_CET_ENDBR_EN			(1 << 2)
+#define X86_CET_LEG_IW_EN			(1 << 3)
+#define X86_CET_NO_TRACK_EN			(1 << 4)
+#define X86_CET_SUPPRESS_DISABLE	(1 << 5)
+#define X86_CET_RESERVED			((1 << 6) | (1 << 7) | (1 << 8) | (1 << 9))
+#define X86_CET_SUPPRESS			(1 << 10)
+#define X86_CET_WAIT_ENDBR			(1 << 11)

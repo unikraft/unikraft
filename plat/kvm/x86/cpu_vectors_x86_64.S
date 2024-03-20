@@ -28,6 +28,7 @@
 #include <uk/asm/cfi.h>
 #include <uk/intctlr.h>
 #include <kvm-x86/traps.h>
+#include <uk/asm/cet.h>
 
 .altmacro
 
@@ -71,6 +72,7 @@
 
 .macro TRAP_ENTRY trapname, has_ec
 ENTRY(ASM_TRAP_SYM(\trapname))
+	X86_CET_ENDBR
 	.cfi_startproc simple
 	.cfi_signal_frame
 	.cfi_def_cfa rsp, 0
@@ -120,6 +122,7 @@ ENTRY(ASM_TRAP_SYM(\trapname))
 
 .macro IRQ_ENTRY irqno
 ENTRY(cpu_irq_\irqno)
+	X86_CET_ENDBR
 	.cfi_startproc simple
 	.cfi_signal_frame
 	.cfi_def_cfa rsp, 8
@@ -178,6 +181,7 @@ TRAP_ENTRY alignment_check,  1
 TRAP_ENTRY machine_check,    0
 TRAP_ENTRY simd_error,       0
 TRAP_ENTRY virt_error,       0
+TRAP_ENTRY security_error,   1
 
 .set irqno, 0
 .rept IDT_NUM_ENTRIES-32

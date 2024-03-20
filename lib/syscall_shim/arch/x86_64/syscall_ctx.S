@@ -7,9 +7,12 @@
 #include <uk/arch/lcpu.h>
 #include <uk/asm.h>
 #include <uk/syscall.h>
+#include <uk/asm/cet.h>
 
 /* Used to pop the contents of a `struct uk_syscall_ctx` off the stack */
 ENTRY(uk_syscall_ctx_popall)
+	X86_CET_ENDBR
+
 	/* Do all this with IRQ's disabled, as the final iretq should pop off
 	 * a proper rflags anyway.
 	 */

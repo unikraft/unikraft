@@ -47,3 +47,21 @@ ARCHFLAGS-$(CONFIG_MARCH_X86_64_BTVER1)         += -march=btver1
 ISR_ARCHFLAGS-$(CONFIG_MARCH_X86_64_BTVER1)     += -march=btver1
 ARCHFLAGS-$(CONFIG_MARCH_X86_64_BTVER2)         += -march=btver2
 ISR_ARCHFLAGS-$(CONFIG_MARCH_X86_64_BTVER2)     += -march=btver2
+
+ifeq ($(CONFIG_X86_64_CET_IBT), y)		#if IBT
+ifeq ($(CONFIG_X86_64_CET_SS), y)     		#	if SS
+ARCHFLAGS += -fcf-protection=full		#		flags 	  += full
+ISR_ARCHFLAGS += -fcf-protection=full		#		isr_flags += full
+else						#	else
+ARCHFLAGS += -fcf-protection=branch		#		flags 	  += branch
+ISR_ARCHFLAGS += -fcf-protection=branch		#		isr_flags += branch
+endif						#	endif
+else						#else
+ifeq ($(CONFIG_X86_64_CET_SS), y)		#	if SS
+ARCHFLAGS += -fcf-protection=return		#		flags += return
+ISR_ARCHFLAGS += -fcf-protection=return		#		isr_flags += return
+else						#	else
+ARCHFLAGS += -fcf-protection=none		#		flags += none
+ISR_ARCHFLAGS += -fcf-protection=none		#		isr_flags += none
+endif						#	endif
+endif						#endif

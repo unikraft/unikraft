@@ -37,8 +37,10 @@
 #include <uk/asm/cfi.h>
 #include <uk/plat/common/lcpu.h>
 #include <uk/syscall.h>
+#include <uk/asm/cet.h>
 
 ENTRY(_ukplat_syscall)
+	X86_CET_ENDBR
 	.cfi_startproc simple
 	.cfi_def_cfa rsp, 0
 	.cfi_register rip, rcx
@@ -202,5 +204,5 @@ ENTRY(_ukplat_syscall)
 	 *     Proceedings of the 15th ACM SIGPLAN/SIGOPS International
 	 *     Conference on Virtual Execution Environments (VEE 2019))
 	 */
-	jmp *%rcx
+	X86_CET_ENDBR_NOTRACK jmp *%rcx
 	.cfi_endproc

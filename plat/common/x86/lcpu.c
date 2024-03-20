@@ -102,7 +102,11 @@ void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
 		"xorq	%%rbp, %%rbp\n"
 #endif /* __OMIT_FRAMEPOINTER__ */
 
+#if (CONFIG_X86_64_CET_IBT && (__CET__ & 1))
+		"notrack jmp	*%1\n"
+#else
 		"jmp	*%1\n"
+#endif /* CET IBT */
 		:
 		: "r"(sp), "r"(entry)
 		: /* clobbers not needed */);
