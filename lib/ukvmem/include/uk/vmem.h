@@ -39,6 +39,8 @@
 #include <uk/arch/paging.h>
 #include <uk/list.h>
 #include <uk/alloc.h>
+#include <uk/rwlock.h>
+#include <uk/spinlock.h>
 #ifdef CONFIG_HAVE_PAGING
 #include <uk/plat/paging.h>
 #endif /* CONFIG_HAVE_PAGING */
@@ -71,6 +73,10 @@ struct uk_vas {
 	/** VAS flags */
 #define UK_VAS_FLAG_NO_PAGING		0x1 /* On-demand paging disabled */
 	unsigned long flags;
+
+	struct uk_spinlock map_lock;
+
+	struct uk_rwlock vma_list_lock;
 };
 
 /**
