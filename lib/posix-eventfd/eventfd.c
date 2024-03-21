@@ -137,7 +137,7 @@ struct uk_file *uk_eventfile_create(unsigned int count, int flags)
 	al->alloc = a;
 	al->counter = count;
 	al->fstate = UK_FILE_STATE_INIT_VALUE(al->fstate);
-	al->frefcnt = UK_FILE_REFCNT_INIT_VALUE;
+	al->frefcnt = UK_FILE_REFCNT_INIT_VALUE(al->frefcnt);
 	al->f = (struct uk_file){
 		.vol = vol,
 		.node = &al->counter,
