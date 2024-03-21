@@ -489,19 +489,83 @@ int unix_socket_getsockname(posix_sock *file,
 }
 
 static
-int unix_socket_getsockopt(posix_sock *file __unused, int level __unused,
-			   int optname __unused, void *restrict optval __unused,
-			   socklen_t *restrict optlen __unused)
+int unix_socket_getsockopt(posix_sock *file, int level, int optname,
+			   void *restrict optval, socklen_t *restrict optlen)
 {
-	return -ENOSYS;
+	struct unix_sock_data *data = posix_sock_get_data(file);
+
+	switch (level) {
+	case SOL_SOCKET:
+	{
+		int val;
+
+		switch (optname) {
+		case SO_ACCEPTCONN:
+			val = !!(data->flags & UNIXSOCK_LISTEN);
+			break;
+		case SO_DOMAIN:
+			val = AF_UNIX;
+			break;
+		case SO_PEEK_OFF:
+			val = -1;
+			break;
+		case SO_TYPE:
+			val = data->type;
+			break;
+		/* no-op options; return 0 */
+		case SO_BROADCAST:
+		case SO_ERROR:
+		case SO_DONTROUTE:
+		case SO_KEEPALIVE:
+		case SO_LINGER:
+		case SO_PRIORITY:
+		case SO_PROTOCOL:
+		case SO_REUSEADDR:
+		case SO_REUSEPORT:
+		case SO_SELECT_ERR_QUEUE:
+		case SO_BUSY_POLL:
+			val = 0;
+			break;
+		default:
+			return -ENOPROTOOPT;
+		}
+
+		if (unlikely(*optlen < sizeof(val)))
+			return -EINVAL;
+		*optlen = sizeof(val);
+		*((int *)optval) = val;
+		return 0;
+	}
+	default:
+		return -ENOSYS;
+	}
 }
 
 static
-int unix_socket_setsockopt(posix_sock *file __unused, int level __unused,
-			   int optname __unused, const void *optval __unused,
+int unix_socket_setsockopt(posix_sock *file __unused, int level, int optname,
+			   const void *optval __unused,
 			   socklen_t optlen __unused)
 {
-	return -ENOSYS;
+	switch (level) {
+	case SOL_SOCKET:
+		switch (optname) {
+		/* silently ignore */
+		case SO_BROADCAST:
+		case SO_DONTROUTE:
+		case SO_KEEPALIVE:
+		case SO_LINGER:
+		case SO_PRIORITY:
+		case SO_REUSEADDR:
+		case SO_REUSEPORT:
+		case SO_SELECT_ERR_QUEUE:
+		case SO_BUSY_POLL:
+			return 0;
+		default:
+			return -ENOPROTOOPT;
+		}
+	default:
+		return -ENOSYS;
+	}
 }
 
 
