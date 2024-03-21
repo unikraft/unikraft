@@ -533,6 +533,10 @@ int uk_sys_epoll_pwait2(const struct uk_file *epf, struct epoll_event *events,
 		deadline = 0;
 	}
 
+#if CONFIG_LIBPOSIX_POLL_YIELD
+	uk_sched_yield();
+#endif /* CONFIG_LIBPOSIX_POLL_YIELD */
+
 	while (uk_file_poll_until(epf, UKFD_POLLIN, deadline)) {
 		int lvlev = 0;
 		int nout = 0;
