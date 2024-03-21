@@ -14,7 +14,7 @@
 
 /* File creation */
 
-int uk_pipefile_create(struct uk_file *pipes[2], int flags);
+int uk_pipefile_create(struct uk_file *pipes[2]);
 
 /* Internal syscalls */
 
