@@ -185,6 +185,23 @@ static inline void uk_fmap_init(const struct uk_fmap *m)
 }
 
 /**
+ * Sets the value at `idx` to `p`.
+ *
+ * WARNING: This function is not thread-safe, take care when calling.
+ */
+static inline void uk_fmap_set(const struct uk_fmap *m, int idx, const void *p)
+{
+	if (!_FMAP_INRANGE(m, idx))
+		return;
+
+	if (p)
+		uk_bmap_reserve(&m->bmap, idx);
+	else
+		uk_bmap_free(&m->bmap, idx);
+	m->map[idx] = (void *)p;
+}
+
+/**
  * Looks up and returns the entry at `idx`.
  *
  * WARNING: Use of this function is vulnerable to use-after-free race conditions
@@ -366,6 +383,7 @@ int uk_fmap_xchg(const struct uk_fmap *m, int idx,
 {
 	void *got;
 
+	UK_ASSERT(p); /* Cannot exchange with NULL, use uk_fmap_take instead */
 	if (!_FMAP_INRANGE(m, idx))
 		return -1;
 
