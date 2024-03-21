@@ -65,7 +65,7 @@ static void __spin_wait(__nsec nsec)
 }
 #endif
 
-UK_SYSCALL_R_DEFINE(int, nanosleep, const struct timespec*, req, struct timespec*, rem)
+int uk_sys_nanosleep(const struct timespec *req, struct timespec *rem)
 {
 	__nsec before, after, diff, nsec;
 
@@ -96,6 +96,12 @@ UK_SYSCALL_R_DEFINE(int, nanosleep, const struct timespec*, req, struct timespec
 	return 0;
 }
 
+UK_SYSCALL_R_DEFINE(int, nanosleep, const struct timespec*, req,
+		    struct timespec*, rem)
+{
+	return uk_sys_nanosleep(req, rem);
+}
+
 #if UK_LIBC_SYSCALLS
 int usleep(useconds_t usec)
 {
@@ -103,7 +109,7 @@ int usleep(useconds_t usec)
 
 	ts.tv_sec = (long int) (usec / 1000000);
 	ts.tv_nsec = (long int) ukarch_time_usec_to_nsec(usec % 1000000);
-	if (nanosleep(&ts, &ts))
+	if (uk_sys_nanosleep(&ts, &ts))
 		return -1;
 
 	return 0;
@@ -115,14 +121,14 @@ unsigned int sleep(unsigned int seconds)
 
 	ts.tv_sec = seconds;
 	ts.tv_nsec = 0;
-	if (nanosleep(&ts, &ts))
+	if (uk_sys_nanosleep(&ts, &ts))
 		return ts.tv_sec;
 
 	return 0;
 }
 #endif /* UK_LIBC_SYSCALLS */
 
-UK_SYSCALL_R_DEFINE(time_t, time, time_t *, tloc)
+time_t uk_sys_time(time_t *tloc)
 {
 	time_t secs = ukarch_time_nsec_to_sec(ukplat_wall_clock());
 
@@ -132,7 +138,12 @@ UK_SYSCALL_R_DEFINE(time_t, time, time_t *, tloc)
 	return secs;
 }
 
-UK_SYSCALL_R_DEFINE(int, gettimeofday, struct timeval *, tv, void *, tz)
+UK_SYSCALL_R_DEFINE(time_t, time, time_t *, tloc)
+{
+	return uk_sys_time(tloc);
+}
+
+int uk_sys_gettimeofday(struct timeval *restrict tv, void *tz __unused)
 {
 	__nsec now = ukplat_wall_clock();
 
@@ -144,8 +155,24 @@ UK_SYSCALL_R_DEFINE(int, gettimeofday, struct timeval *, tv, void *, tz)
 	return 0;
 }
 
-UK_SYSCALL_R_DEFINE(int, clock_getres, clockid_t, clk_id,
-		    struct timespec *, tp)
+UK_SYSCALL_R_DEFINE(int, gettimeofday, struct timeval *restrict, tv,
+		    void *, tz)
+{
+	return uk_sys_gettimeofday(tv, tz);
+}
+
+int uk_sys_settimeofday(struct timeval *tv __unused, void *tz __unused)
+{
+	UK_WARN_STUBBED();
+	return 0;
+}
+
+UK_SYSCALL_R_DEFINE(int, settimeofday, struct timeval *, tv, void *, tz)
+{
+	return uk_sys_settimeofday(tv, tz);
+}
+
+int uk_sys_clock_getres(clockid_t clk_id, struct timespec *tp)
 {
 	int error;
 
@@ -171,7 +198,13 @@ out_error:
 	return -error;
 }
 
-UK_SYSCALL_R_DEFINE(int, clock_gettime, clockid_t, clk_id, struct timespec*, tp)
+UK_SYSCALL_R_DEFINE(int, clock_getres, clockid_t, clk_id,
+		    struct timespec *, tp)
+{
+	return uk_sys_clock_getres(clk_id, tp);
+}
+
+int uk_sys_clock_gettime(clockid_t clk_id, struct timespec *tp)
 {
 	__nsec now;
 	int error;
@@ -205,9 +238,31 @@ out_error:
 	return -error;
 }
 
+UK_SYSCALL_R_DEFINE(int, clock_gettime, clockid_t, clk_id, struct timespec*, tp)
+{
+	return uk_sys_clock_gettime(clk_id, tp);
+}
+
+int uk_sys_clock_settime(clockid_t clk_id __unused,
+			 const struct timespec *tp __unused)
+{
+	UK_WARN_STUBBED();
+	return 0;
+}
+
 UK_SYSCALL_R_DEFINE(int, clock_settime, clockid_t, clk_id,
 		    const struct timespec *, tp)
 {
+	return uk_sys_clock_settime(clk_id, tp);
+}
+
+int uk_sys_clock_nanosleep(clockid_t clockid, int flags,
+			   const struct timespec *request,
+			   struct timespec *remain)
+{
+	if ((clockid == CLOCK_REALTIME) && !(flags & TIMER_ABSTIME))
+		return uk_sys_nanosleep(request, remain);
+
 	UK_WARN_STUBBED();
 	return 0;
 }
@@ -215,11 +270,7 @@ UK_SYSCALL_R_DEFINE(int, clock_settime, clockid_t, clk_id,
 UK_SYSCALL_R_DEFINE(int, clock_nanosleep, clockid_t, clockid, int, flags,
 		    const struct timespec *, request, struct timespec *, remain)
 {
-	if ((clockid == CLOCK_REALTIME) && !(flags & TIMER_ABSTIME))
-		return uk_syscall_r_nanosleep((long) request, (long) remain);
-
-	UK_WARN_STUBBED();
-	return 0;
+	return uk_sys_clock_nanosleep(clockid, flags, request, remain);
 }
 
 UK_SYSCALL_R_DEFINE(int, times, struct tm *, buf)
