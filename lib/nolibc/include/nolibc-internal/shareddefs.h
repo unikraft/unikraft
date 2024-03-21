@@ -225,3 +225,17 @@ typedef unsigned int u_int;
 typedef unsigned long u_long;
 #define __DEFINED_BSD_TYPES
 #endif
+
+#if (defined __NEED_pthread_t && !defined __DEFINED_pthread_t)
+#ifdef __cplusplus
+typedef unsigned long pthread_t;
+#else
+typedef struct __pthread * pthread_t;
+#endif
+#define __DEFINED_pthread_t
+#endif
+
+#if (defined __NEED_pthread_attr_t && !defined __DEFINED_pthread_attr_t)
+typedef struct { union { int __i[sizeof(long)==8?14:9]; volatile int __vi[sizeof(long)==8?14:9]; unsigned long __s[sizeof(long)==8?7:9]; } __u; } pthread_attr_t;
+#define __DEFINED_pthread_attr_t
+#endif

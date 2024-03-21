@@ -2,6 +2,7 @@
 
 #include <uk/essentials.h>
 #include <string.h>
+#define _GNU_SOURCE
 #include <signal.h>
 
 /*
