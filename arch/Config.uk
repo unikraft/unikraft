@@ -7,11 +7,14 @@ choice
 	  Select the target CPU architecture.
 
 config ARCH_X86_64
-       bool "x86 compatible (64 bits)"
+	bool "x86 compatible (64 bits)"
+	select LIBISRLIB
 config ARCH_ARM_64
-       bool "Armv8 compatible (64 bits)"
+	bool "Armv8 compatible (64 bits)"
+	select LIBISRLIB
 config ARCH_ARM_32
-       bool "Armv7 compatible (32 bits)"
+	bool "Armv7 compatible (32 bits)"
+	select LIBISRLIB
 
 endchoice
 
