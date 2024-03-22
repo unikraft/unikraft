@@ -869,23 +869,23 @@ endef
 #  process. There are no global scopes for AWKINCLUDES and AWKFLAGS available
 #  because it would not be meaningful.
 define preprule_awk =
-$(3): $(2) \
-      $$($(call vprefix_lib,$(1),AWKINCLUDES)) $$($(call vprefix_lib,$(1),AWKINCLUDES-y)) \
-      $$($(call vprefix_src,$(1),$(2),,AWKINCLUDES)) $$($(call vprefix_src,$(1),$(2),,AWKINCLUDES-y)) \
-      | prepare
-	$(call build_cmd,AWK,$(1),$(3),\
-		$(AWK) -f $(2) \
-		       $$($(call vprefix_lib,$(1),AWKFLAGS)) $$($(call vprefix_lib,$(1),AWKFLAGS-y)) \
-		       $$($(call vprefix_src,$(1),$(2),,AWKFLAGS)) $$($(call vprefix_src,$(1),$(2),,AWKFLAGS-y)) \
-		       $(4) \
-		       $$($(call vprefix_lib,$(1),AWKINCLUDES)) $$($(call vprefix_lib,$(1),AWKINCLUDES-y)) \
-		       $$($(call vprefix_src,$(1),$(2),,AWKINCLUDES)) $$($(call vprefix_src,$(1),$(2),,AWKINCLUDES-y)) \
-		       > $(3)
-	)
+# $(3): $(2) \
+#       $$($(call vprefix_lib,$(1),AWKINCLUDES)) $$($(call vprefix_lib,$(1),AWKINCLUDES-y)) \
+#       $$($(call vprefix_src,$(1),$(2),,AWKINCLUDES)) $$($(call vprefix_src,$(1),$(2),,AWKINCLUDES-y)) \
+#       | prepare
+# 	$(call build_cmd,AWK,$(1),$(3),\
+# 		$(AWK) -f $(2) \
+# 		       $$($(call vprefix_lib,$(1),AWKFLAGS)) $$($(call vprefix_lib,$(1),AWKFLAGS-y)) \
+# 		       $$($(call vprefix_src,$(1),$(2),,AWKFLAGS)) $$($(call vprefix_src,$(1),$(2),,AWKFLAGS-y)) \
+# 		       $(4) \
+# 		       $$($(call vprefix_lib,$(1),AWKINCLUDES)) $$($(call vprefix_lib,$(1),AWKINCLUDES-y)) \
+# 		       $$($(call vprefix_src,$(1),$(2),,AWKINCLUDES)) $$($(call vprefix_src,$(1),$(2),,AWKINCLUDES-y)) \
+# 		       > $(3)
+# 	)
 
-UK_SRCS-y += $(2)
-UK_PREPROCESS-y += $(3)
-$(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(3)))
+# UK_SRCS-y += $(2)
+# UK_PREPROCESS-y += $(3)
+# $(eval $(call vprefix_lib,$(1),CLEAN-y) += $(call build_clean,$(3)))
 endef
 
 # wrapper for preprule_*,

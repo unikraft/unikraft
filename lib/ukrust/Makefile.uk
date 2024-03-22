@@ -27,7 +27,7 @@ LIBUKRUST_COMMON_FLAGS = --target=$(LIBUKRUST_BASE)/target.json --emit=dep-info,
 $(LIBUKRUST_BUILD)/bindings_generated.rs: $(LIBUKRUST_BASE)/ukrust_sys/bindings_helper.h
 	$(call build_cmd, BINDGEN, libukrust, $(notdir $@), \
 		bindgen -o $(LIBUKRUST_BUILD)/bindings_generated.rs --use-core --ctypes-prefix crate::c_types \
-		--with-derive-default --no-debug '.*' --size_t-is-usize \
+		--with-derive-default --no-debug '.*' --no-size_t-is-usize \
 		$(LIBUKRUST_BASE)/ukrust_sys/bindings_helper.h -- $(CINCLUDES) \
 		$(CINCLUDES-y) -nobuiltininc -DMODULE -D__LIBNAME__=libukrust -D__BASENAME__=bindings_generated.rs)
 
