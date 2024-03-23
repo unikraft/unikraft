@@ -1,7 +1,0 @@
-This library just provides stubs for the signal-related functions and syscalls
-to allow applications to run that do not dependent on a working signal
-implementation.
-
-This library replaces the previous `uksignal` implementation that is no longer
-working with the new scheduling and thread APIs. A new implementation will be
-part of a future release.
