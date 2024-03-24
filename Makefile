@@ -380,11 +380,13 @@ EACHOLIB_LOCALS :=
 EACHOLIB_LOCALS-y :=
 
 # Pull in the user's configuration file
-ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
 ifneq ("$(wildcard $(UK_CONFIG))","")
+# Import the .config even if we do not expect it to be complete:
+# COMMON_CONFIG_ENV imports some values, savedefconfig uses UK_ARCH, ...
 $(call verbose_info,Including $(UK_CONFIG)...)
 -include $(UK_CONFIG)
-UK_HAVE_DOT_CONFIG := y
+ifeq ($(filter $(noconfig_targets),$(MAKECMDGOALS)),)
+UK_HAVE_COMPLETE_DOT_CONFIG := y
 endif
 endif
 
@@ -584,7 +586,7 @@ endif
 # Compiler and linker tools
 ################################################################################
 ifeq ($(sub_make_exec), 1)
-ifeq ($(UK_HAVE_DOT_CONFIG),y)
+ifeq ($(UK_HAVE_COMPLETE_DOT_CONFIG),y)
 # Hide troublesome environment variables from sub processes
 unexport CONFIG_CROSS_COMPILE
 unexport CONFIG_LLVM_TARGET_ARCH
@@ -840,7 +842,7 @@ clean: clean-libs
 		$(GDB_HELPER_LINKS) $(BUILD_DIR)/uk-gdb.py \
 		$(UK_CLEAN) $(UK_CLEAN-y))
 
-else # !($(UK_HAVE_DOT_CONFIG),y)
+else # !($(UK_HAVE_COMPLETE_DOT_CONFIG),y)
 
 
 $(filter %config,$(MAKECMDGOALS)): $(BUILD_DIR)/Makefile
@@ -1092,7 +1094,7 @@ print-vars:
 print-version:
 	@echo $(UK_FULLVERSION)
 
-ifeq ($(UK_HAVE_DOT_CONFIG),y)
+ifeq ($(UK_HAVE_COMPLETE_DOT_CONFIG),y)
 print-libs:
 	@echo 	$(foreach P,$(UK_PLATS) $(UK_PLATS-y),\
 		$(if $(call qstrip,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y)),\
