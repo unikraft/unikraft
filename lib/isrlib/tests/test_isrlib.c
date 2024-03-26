@@ -1,8 +1,17 @@
+/* SPDX-License-Identifier: BSD-3-Clause */
+/*
+ * Author: Ahmed Kamel <ahmed.farghaly981@eng-st.cu.edu.eg>
+ *
+ *  Copyright (c) 2024, Unikraft GmbH and The Unikraft Authors.
+ * Licensed under the BSD-3-Clause License (the "License").
+ * You may not use this file except in compliance with the License.
+ */
+
 #include <uk/test.h>
 #include <uk/isr/string.h>
 
-UK_TESTCASE(isrlib_testsuite, test_memset_isr){
-
+UK_TESTCASE(isrlib_testsuite, test_memset_isr)
+{
 	char array_1[5];
 	memset_isr(array_1, 'U', 5);
 	UK_TEST_EXPECT_BYTES_EQ(array_1, "UUUUU", 5);
@@ -75,7 +84,6 @@ UK_TESTCASE(isrlib_testsuite, test_memcpy_isr){
 		memset_isr must be used with strings only
 		same as memset_isr for safty
 	*/
-
 }
 
 UK_TESTCASE(isrlib_testsuite, test_strnlen_isr)
@@ -103,7 +111,6 @@ UK_TESTCASE(isrlib_testsuite, test_strnlen_isr)
 	*/ 
 
 	// ret = strnlen_isr(NULL, 1);
-
 }
 
 UK_TESTCASE(isrlib_testsuite, test_strlen_isr)
@@ -154,7 +161,6 @@ UK_TESTCASE(isrlib_testsuite, test_strcmp_isr)
 	*/ 
 
 	//ret = strcmp_isr(NULL, NULL);
-
 }
 
 UK_TESTCASE(isrlib_testsuite, test_strncmp_isr)
@@ -177,12 +183,10 @@ UK_TESTCASE(isrlib_testsuite, test_strncmp_isr)
 	*/ 
 
 	//ret = strncmp_isr(NULL, NULL, 1);
-
 }
 
 UK_TESTCASE(isrlib_testsuite, test_memrchr_isr)
 {
-
 	char array_0[12] = "Hello World";
 	char *ptr = (char*)memrchr_isr(array_0, 'o', 11);
 	UK_TEST_EXPECT_PTR_EQ(ptr, array_0 + 7);
@@ -272,7 +276,6 @@ UK_TESTCASE(isrlib_testsuite, test_memcmp_isr)
 		the following line case crash for accessing nullptr
 	*/ 
 	//ret = memcmp_isr(NULL, NULL, 5);
-
 }
 
 UK_TESTCASE(isrlib_testsuite, test_strncpy_isr)
@@ -291,7 +294,6 @@ UK_TESTCASE(isrlib_testsuite, test_strncpy_isr)
 		Threre is no type checking inside strncpy_isr
 		the following line case crash for accessing nullptr
 	*/ 
-
 }
 
 UK_TESTCASE(isrlib_testsuite, test_strcpy_isr)
