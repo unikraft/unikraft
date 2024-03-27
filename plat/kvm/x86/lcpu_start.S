@@ -2,11 +2,13 @@
 /*
  * Authors: Marc Rittinghaus <marc.rittinghaus@kit.edu>
  *          Cristian Vijelie <cristianvijelie@gmail.com>
+ *          Sergiu Moga <sergiu@unikraft.io>
  *
  * Copyright (c) 2022, Karlsruhe Institute of Technology (KIT)
  *                     All rights reserved.
  * Copyright (c) 2022, University POLITEHNICA of Bucharest.
  *                     All rights reserved.
+ * Copyright (c) 2024, Unikraft GmbH. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -391,7 +393,16 @@ jump_to_entry:
 	 */
 	jmp	*%rax
 
+.pushsection .rodata
+lcpu_start64_fail_msg:
+.string "\nCRIT: Failed to boot on unsupported CPU: An extension is missing.\n"
+.popsection
+
 fail:
+	/* Briefly initialize COM1 and print error message */
+	LCPU_EARLY_COM1_INIT
+	LCPU_EARLY_COM1_PRINT lcpu_start64_fail_msg
+
 	movl	$LCPU_STATE_HALTED, LCPU_STATE_OFFSET(%rbp)
 
 fail_loop:
