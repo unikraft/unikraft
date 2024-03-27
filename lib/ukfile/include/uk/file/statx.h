@@ -13,7 +13,7 @@
  * Linux-compatible `statx` structure for use in syscalls, along with
  * definitions of bit flags.
  *
- * Layout taken from statx(2) man page with paddings from musl v1.2.3.
+ * Layout taken from statx(2) man page cross-checked with musl v1.2.3.
  * Flag values taken from Linux headers v6.5.6 (include/uapi/linux/stat.h).
  */
 
@@ -44,7 +44,6 @@ struct uk_statx {
 	uint64_t stx_mnt_id;
 	uint32_t stx_dio_mem_align;
 	uint32_t stx_dio_offset_align;
-	uint64_t _spare[12];
 };
 
 /* Bits used in stx_mask */
