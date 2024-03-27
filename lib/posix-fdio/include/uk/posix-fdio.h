@@ -10,6 +10,7 @@
 #define __UK_POSIX_FDIO_H__
 
 #include <sys/stat.h>
+#include <sys/time.h>
 
 #include <uk/posix-fd.h>
 
@@ -66,6 +67,10 @@ int uk_sys_fstatx(struct uk_ofile *of, unsigned int mask,
 int uk_sys_fchmod(struct uk_ofile *of, mode_t mode);
 
 int uk_sys_fchown(struct uk_ofile *of, uid_t owner, gid_t group);
+
+int uk_sys_futimes(struct uk_ofile *of, const struct timeval *tv);
+
+int uk_sys_futimens(struct uk_ofile *of, const struct timespec *times);
 
 /* Control */
 
