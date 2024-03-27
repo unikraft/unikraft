@@ -13,6 +13,18 @@
 
 #include <uk/posix-fd.h>
 
+/* Utils */
+
+/**
+ * Copy info out of a struct statx and into a struct stat.
+ *
+ * Fields whose bits are present in `statxbuf->stx_mask` will be copied over,
+ * all others will be left untouched.
+ */
+void uk_fdio_statx_cpyout(struct stat *statbuf,
+			  const struct uk_statx *statxbuf);
+
+/* Internal syscalls */
 /* I/O */
 
 ssize_t uk_sys_preadv(struct uk_ofile *of, const struct iovec *iov, int iovcnt,

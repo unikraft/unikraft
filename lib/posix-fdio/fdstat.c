@@ -25,8 +25,7 @@ void timecpy(struct timespec *d, const struct uk_statx_timestamp *s)
 	d->tv_nsec = s->tv_nsec;
 }
 
-static inline
-void statx_cpyout(struct stat *s, const struct uk_statx *sx)
+void uk_fdio_statx_cpyout(struct stat *s, const struct uk_statx *sx)
 {
 	unsigned int mask = sx->stx_mask;
 
@@ -79,7 +78,7 @@ int uk_sys_fstat(struct uk_ofile *of, struct stat *statbuf)
 	r = uk_sys_fstatx(of, UK_STATX_BASIC_STATS, &statx);
 	if (unlikely(r))
 		return r;
-	statx_cpyout(statbuf, &statx);
+	uk_fdio_statx_cpyout(statbuf, &statx);
 	return 0;
 }
 
