@@ -195,9 +195,96 @@ jobs:
           - platform: ${{ matrix.plat }}
             architecture: ${{ matrix.arch }}
 
-  merge-stable:
+  catalog-tests:
     needs: [libc-test, self-test, helloworld]
-    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/staging' }}
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/staging' && github.repository_owner == 'unikraft' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check idle
+        run: |
+          set -xe;
+
+          # Check if there are any ongoing tests (only one repository dispatch exists so we can just check for the status)
+          # We need to check separately for each status because the API does not support multiple statuses
+          idle_queued=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 100 --status queued 2> /dev/null)
+          idle_in_progress=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 100 --status in_progress 2> /dev/null)
+          idle_requested=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 100 --status requested 2> /dev/null)
+          idle_waiting=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 100 --status waiting 2> /dev/null)
+          if [ -n "$idle_queued" ] || [ -n "$idle_in_progress" ] || [ -n "$idle_requested" ] || [ -n "$idle_waiting" ]; then
+            echo "There are idle tests, try again later:";
+            echo "Queued:";
+            jq "$idle_queued";
+            echo "In Progress:";
+            jq "$idle_in_progress";
+            echo "Requested:";
+            jq "$idle_requested";
+            echo "Waiting:";
+            jq "$idle_waiting";
+            exit 1;
+          fi
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_CATALOG_PAT }}
+
+      - name: Get the start time
+        id: start_time
+        run: echo "start=$(date -u +"%Y-%m-%dT%H:%M:%SZ")" >> "$GITHUB_OUTPUT"
+
+      - name: Repository Dispatch
+        uses: octokit/request-action@v2.x
+        with:
+          route: POST /repos/{owner}/{repo}/dispatches
+          owner: unikraft
+          repo: catalog
+          event_type: core_merge
+          client_payload: '{"id": "${{ github.run_id }}"}'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_CATALOG_PAT }}
+
+      - name: Fetch catalog results
+        run: |
+          set -xe;
+
+          sudo apt-get update;
+          sudo apt-get install -y jq;
+
+          today=$(date -u +"%Y-%m-%d");
+          stop=$(date -u +"%Y-%m-%dT%H:%M:%SZ");
+          start="${{ steps.start_time.outputs.start }}";
+
+          for _ in {1..60}; do
+            # If there are more than 100 tests, the list will be truncated
+            # TODO(craciunoiuc): Implement pagination or filter only for not concluded tests
+            joutput=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 100 --created "$today" --json displayTitle,conclusion,createdAt);
+
+            # Check all the tests if they are successful
+            # If there is a failure, the workflow will fail-fast
+            # Filter out tests that were created after $start and before stop and pick only the ones that have the displayTitle==core_merge
+            fail_output=$(echo "$joutput" | jq -r -c -M --arg start "$start" --arg stop "$stop" '.[] | select(.createdAt <= $stop) | select(.createdAt >= $start) | select(.displayTitle == "core_merge") | select(.conclusion == "failure")');
+            if [ -n "$fail_output" ]; then
+              echo "There are failed tests:";
+              jq "$fail_output";
+              exit 1;
+            fi
+
+            # If there are tests that are on-going still, we will wait for them to finish
+            # Filter out tests that were created after $start and before stop and pick only the ones that have the displayTitle==core_merge
+            ongoing_output=$(echo "$joutput" | jq -r -c -M --arg start "$start" --arg stop "$stop" '.[] | select(.createdAt <= $stop) | select(.createdAt >= $start) | select(.displayTitle == "core_merge") | select(.conclusion == "")')
+            if [ -z "$ongoing_output" ]; then
+              echo "All tests have finished successfully";
+              exit 0;
+            fi
+
+            sleep 30;
+          done
+          echo "Timeout waiting for tests to finish";
+          exit 1;
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_CATALOG_PAT }}
+
+
+  merge-stable:
+    needs: [catalog-tests]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/staging' && github.repository_owner == 'unikraft' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
