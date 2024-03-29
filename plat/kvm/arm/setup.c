@@ -27,7 +27,6 @@
 #include <uk/plat/common/acpi.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/common/lcpu.h>
-#include <kvm-arm64/uart.h>
 #include <uk/assert.h>
 #include <uk/intctlr.h>
 #include <arm/cpu.h>
@@ -164,8 +163,6 @@ void __no_pauth _ukplat_entry(void)
 	bi = ukplat_bootinfo_get();
 	if (unlikely(!bi))
 		UK_CRASH("Could not retrieve bootinfo\n");
-
-	kvm_console_init(fdt);
 
 	rc = cmdline_init(bi);
 	if (unlikely(rc < 0))
