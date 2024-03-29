@@ -1,4 +1,13 @@
-config LIBISRLIB
+menuconfig LIBISRLIB
     bool "isrlib: Interrupt-safe standard routines"
     default n
     select LIBNOLIBC if !HAVE_LIBC
+
+if LIBISRLIB
+
+config LIBISR_TEST
+	bool "Enable unit tests"
+	default n
+	select LIBUKTEST
+
+endif
