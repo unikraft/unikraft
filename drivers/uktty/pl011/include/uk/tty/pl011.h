@@ -34,6 +34,13 @@
 extern "C" {
 #endif
 
+/**
+ * Early driver init
+ *
+ * @return zero on success, negative value on error
+ */
+int pl011_early_init(void);
+
 #ifdef __cplusplus
 }
 #endif
