@@ -30,6 +30,10 @@
  * SUCH DAMAGE.
  */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <errno.h>
 
 #define _BSD_SOURCE

@@ -6,6 +6,10 @@
 
 /* Internal syscalls for file control operations */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <sys/ioctl.h>
 
 #include <uk/atomic.h>
