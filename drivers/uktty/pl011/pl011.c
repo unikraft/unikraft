@@ -77,14 +77,8 @@
  * use pl011_uart_initialized as an extra variable to check
  * whether the UART has been initialized.
  */
-
-#if defined(CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE)
-static __u8 pl011_uart_initialized = 1;
-static __u64 pl011_base = CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE;
-#else /* !CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE */
 static __u8 pl011_uart_initialized;
 static __u64 pl011_base;
-#endif /* !CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE */
 
 /* Macros to access PL011 Registers with base address */
 #define PL011_REG(r)		((__u16 *)(pl011_base + (r)))
@@ -110,6 +104,38 @@ static int init_pl011(void)
 
 	/* Just enable UART and data transmit/receive */
 	PL011_REG_WRITE(REG_UARTCR_OFFSET, CR_TXE | CR_UARTEN);
+
+	return 0;
+}
+
+int pl011_early_init(void)
+{
+#if CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE
+	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
+	struct ukplat_memregion_desc mrd = {0};
+	int rc;
+
+	UK_ASSERT(bi);
+
+	pl011_base = CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE;
+
+	/* From this point we can print */
+	pl011_uart_initialized = 1;
+
+	mrd.pbase = pl011_base;
+	mrd.vbase = pl011_base;
+	mrd.pg_off = 0;
+	mrd.pg_count = 1;
+	mrd.len = __PAGE_SIZE;
+	mrd.type = UKPLAT_MEMRT_DEVICE;
+	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE;
+
+	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
+	if (unlikely(rc < 0)) {
+		uk_pr_err("Could not insert mrd (%d)\n", rc);
+		return rc;
+	}
+#endif /* CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE */
 
 	return 0;
 }
