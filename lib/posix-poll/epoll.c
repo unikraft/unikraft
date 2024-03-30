@@ -4,6 +4,10 @@
  * You may not use this file except in compliance with the License.
  */
 
+#ifndef _GNU_SOURCE
+#define _GNU_SOURCE
+#endif
+
 #include <errno.h>
 
 #include <uk/atomic.h>
