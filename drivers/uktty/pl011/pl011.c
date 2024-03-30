@@ -19,9 +19,11 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 #include <libfdt.h>
-#include <uk/bitops.h>
-#include <uk/plat/console.h>
 #include <uk/assert.h>
+#include <uk/bitops.h>
+#include <uk/init.h>
+#include <uk/plat/common/bootinfo.h>
+#include <uk/plat/console.h>
 
 #if CONFIG_PAGING
 #include <uk/bus/platform.h>
@@ -112,15 +114,21 @@ static int init_pl011(void)
 	return 0;
 }
 
-int pl011_console_init(void *dtb)
+static int pl011_init(struct uk_init_ctx *ictx __unused)
 {
 	int offset, len, naddr, nsize;
+	struct ukplat_bootinfo *bi;
 	__sz size __maybe_unused;
 	const __u64 *regs;
+	const void *dtb;
 	__u64 reg_base;
 	__u64 reg_size;
 	int rc;
 
+	bi = ukplat_bootinfo_get();
+	UK_ASSERT(bi);
+
+	dtb = (void *)bi->dtb;
 	UK_ASSERT(dtb);
 
 	uk_pr_debug("Probing pl011\n");
@@ -241,3 +249,5 @@ int ukplat_cink(char *buf, unsigned int maxlen)
 
 	return (int)num;
 }
+
+uk_plat_initcall_prio(pl011_init, 0, UK_PRIO_EARLIEST);
