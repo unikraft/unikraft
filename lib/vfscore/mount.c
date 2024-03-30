@@ -161,7 +161,7 @@ UK_SYSCALL_R_DEFINE(int, mount, const char*, dev, const char*, dir,
 	/*
 	 * Create VFS mount entry.
 	 */
-	mp = calloc(1, sizeof(struct mount));
+	mp = calloc(1, sizeof(*mp));
 	if (!mp) {
 		error = ENOMEM;
 		goto err1;

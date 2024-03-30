@@ -69,7 +69,7 @@ struct dentry *
 dentry_alloc(struct dentry *parent_dp, struct vnode *vp, const char *path)
 {
 	struct mount *mp = vp->v_mount;
-	struct dentry *dp = (struct dentry*)calloc(sizeof(*dp), 1);
+	struct dentry *dp = calloc(1, sizeof(*dp));
 
 	if (!dp) {
 		return NULL;

@@ -192,7 +192,7 @@ sys_open(char *path, int flags, mode_t mode, struct vfscore_file **fpp)
 		}
 	}
 
-	fp = calloc(sizeof(struct vfscore_file), 1);
+	fp = calloc(1, sizeof(*fp));
 	if (!fp) {
 		error = ENOMEM;
 		goto out_unlock;
@@ -280,10 +280,10 @@ sys_read(struct vfscore_file *fp, const struct iovec *iov, size_t niov,
 	 *  zeros the iov_len fields when it reads from disk, so we
 	 *  have to copy iov. "
 	 */
-	copy_iov = calloc(sizeof(struct iovec), niov);
+	copy_iov = calloc(niov, sizeof(*copy_iov));
 	if (!copy_iov)
 		return ENOMEM;
-	memcpy(copy_iov, iov, sizeof(struct iovec)*niov);
+	memcpy(copy_iov, iov, sizeof(*copy_iov) * niov);
 
 	uio.uio_iov = copy_iov;
 	uio.uio_iovcnt = niov;
@@ -329,7 +329,7 @@ sys_write(struct vfscore_file *fp, const struct iovec *iov, size_t niov,
 	 *  iov_len fields when it writes to disk, so we have to copy iov.
 	 */
 	/* std::vector<iovec> copy_iov(iov, iov + niov); */
-	copy_iov = calloc(sizeof(struct iovec), niov);
+	copy_iov = calloc(niov, sizeof(*copy_iov));
 	if (!copy_iov)
 		return ENOMEM;
 	memcpy(copy_iov, iov, sizeof(struct iovec)*niov);
