@@ -8,6 +8,14 @@
 #include <uk/essentials.h>
 #include <uk/plat/common/bootinfo.h>
 
+#if CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE
+#include <uk/tty/pl011.h>
+#endif /* CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE */
+
+#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
+#include <uk/tty/ns16550.h>
+#endif /* CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
+
 /* KVM early init
  *
  * Initialize early devices and coalesce mrds.
@@ -16,6 +24,19 @@
 void ukplat_early_init(void)
 {
 	struct ukplat_bootinfo *bi;
+	int rc __maybe_unused = 0;
+
+#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
+	rc = ns16550_early_init();
+	if (unlikely(rc))
+		UK_CRASH("Could not initialize ns16550\n");
+#endif /* CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
+
+#if CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE
+	rc = pl011_early_init();
+	if (unlikely(rc))
+		UK_CRASH("Could not initialize pl011\n");
+#endif /* CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE */
 
 	bi = ukplat_bootinfo_get();
 	if (unlikely(!bi))
