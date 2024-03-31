@@ -32,6 +32,11 @@
 #include <uk/plat/console.h>
 #include <uk/assert.h>
 
+#if CONFIG_PAGING
+#include <uk/bus/platform.h>
+#include <uk/errptr.h>
+#endif /* CONFIG_PAGING */
+
 #define NS16550_THR_OFFSET	0x00U
 #define NS16550_RBR_OFFSET	0x00U
 #define NS16550_IER_OFFSET	0x01U
@@ -165,7 +170,16 @@ int ns16550_console_init(void *dtb)
 	reg_base = fdt64_to_cpu(regs[0]);
 	reg_size = ALIGN_UP(fdt64_to_cpu(regs[1]), __PAGE_SIZE);
 
+#if CONFIG_PAGING
+	/* Map device region */
+	ns16550_uart_base = uk_bus_pf_devmap(reg_base, reg_size);
+	if (unlikely(PTRISERR(ns16550_uart_base))) {
+		uk_pr_err("Could not map ns16550\n");
+		return PTR2ERR(ns16550_uart_base);
+	}
+#else /* !CONFIG_PAGING */
 	ns16550_uart_base = reg_base;
+#endif /* !CONFIG_PAGING */
 
 	regs = fdt_getprop(dtb, offset, "reg-shift", &len);
 	if (regs)
