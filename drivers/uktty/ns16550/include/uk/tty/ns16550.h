@@ -30,9 +30,4 @@
 #ifndef __UK_TTY_NS16550_H__
 #define __UK_TTY_NS16550_H__
 
-/**
- * Initialize the ns16550 console driver
- */
-int ns16550_console_init(void *dtb);
-
 #endif /* __UK_TTY_NS16550_H__ */
