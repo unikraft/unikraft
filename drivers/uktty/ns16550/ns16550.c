@@ -28,9 +28,10 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 #include <libfdt.h>
-#include <uk/config.h>
-#include <uk/plat/console.h>
 #include <uk/assert.h>
+#include <uk/config.h>
+#include <uk/init.h>
+#include <uk/plat/common/bootinfo.h>
 
 #if CONFIG_PAGING
 #include <uk/bus/platform.h>
@@ -131,14 +132,20 @@ static int init_ns16550(void)
 	return 0;
 }
 
-int ns16550_console_init(void *dtb)
+static int ns16550_init(struct uk_init_ctx *ictx __unused)
 {
 	int offset, len, naddr, nsize;
+	struct ukplat_bootinfo *bi;
 	const __u64 *regs;
+	const void *dtb;
 	__u64 reg_base;
 	__u64 reg_size;
 	int rc;
 
+	bi = ukplat_bootinfo_get();
+	UK_ASSERT(bi);
+
+	dtb = (void *)bi->dtb;
 	UK_ASSERT(dtb);
 
 	uk_pr_debug("Probing ns16550\n");
@@ -275,3 +282,5 @@ int ukplat_cink(char *buf, unsigned int maxlen)
 
 	return (int)num;
 }
+
+uk_plat_initcall_prio(ns16550_init, 0, UK_PRIO_EARLIEST);
