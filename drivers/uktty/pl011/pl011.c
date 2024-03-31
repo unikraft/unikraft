@@ -23,6 +23,11 @@
 #include <uk/plat/console.h>
 #include <uk/assert.h>
 
+#if CONFIG_PAGING
+#include <uk/bus/platform.h>
+#include <uk/errptr.h>
+#endif /* CONFIG_PAGING */
+
 /* PL011 UART registers and masks*/
 /* Data register */
 #define REG_UARTDR_OFFSET	0x00
@@ -110,6 +115,7 @@ static int init_pl011(void)
 int pl011_console_init(void *dtb)
 {
 	int offset, len, naddr, nsize;
+	__sz size __maybe_unused;
 	const __u64 *regs;
 	__u64 reg_base;
 	__u64 reg_size;
@@ -148,7 +154,16 @@ int pl011_console_init(void *dtb)
 
 	uk_pr_debug("pl011 @ 0x%lx - 0x%lx\n", reg_base, reg_base + reg_size);
 
+#if CONFIG_PAGING
+	/* Map device region */
+	pl011_base = uk_bus_pf_devmap(reg_base, reg_size);
+	if (unlikely(PTRISERR(pl011_base))) {
+		uk_pr_err("Could not map pl011\n");
+		return PTR2ERR(pl011_base);
+	}
+#else /* !CONFIG_PAGING */
 	pl011_base = reg_base;
+#endif /* !CONFIG_PAGING */
 
 	rc = init_pl011();
 	if (unlikely(rc)) {
