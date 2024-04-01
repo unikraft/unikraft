@@ -176,8 +176,6 @@ static void timerfd_release(const struct uk_file *f, int what)
 		uk_file_rlock(f);
 		uk_thread_terminate(d->upthread);
 		uk_file_runlock(f);
-		/* Collect thread */
-		uk_thread_release(d->upthread);
 	}
 	if (what & UK_FILE_RELEASE_OBJ) {
 		struct timerfd_alloc *al;
