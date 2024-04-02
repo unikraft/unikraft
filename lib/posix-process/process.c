@@ -510,6 +510,8 @@ pid_t ukthread2tid(struct uk_thread *thread)
 {
 	struct posix_thread *pthread;
 
+	UK_ASSERT(thread);
+
 	pthread = uk_thread_uktls_var(thread, pthread_self);
 	if (!pthread)
 		return -ENOTSUP;
@@ -520,6 +522,8 @@ pid_t ukthread2tid(struct uk_thread *thread)
 pid_t ukthread2pid(struct uk_thread *thread)
 {
 	struct posix_thread *pthread;
+
+	UK_ASSERT(thread);
 
 	pthread = uk_thread_uktls_var(thread, pthread_self);
 	if (!pthread)
