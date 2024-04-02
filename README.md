@@ -239,8 +239,9 @@ The creators of Unikraft have built [KraftCloud](https://kraft.cloud): a next ge
 Unikraft is open-source and licensed under `BSD-3-Clause` and the copyright of its
 authors.  If you would like to contribute:
 
-1. Read the Developer Certificate of Origin Version 1.1 (https://developercertificate.org/)
-2. Signing all commits to the Unikraft project.
+1. Read the [Developer Certificate of Origin Version 1.1](https://developercertificate.org/).
+1. Sign-off commits as described in the [Developer Certificate of Origin Version 1.1](https://developercertificate.org/).
+1. Grant copyright as detailed in the [license header](https://unikraft.org/docs/contributing/coding-conventions#license-header).
 
 This ensures that users, distributors, and other contributors can rely on all the software related to Unikraft being contributed under the terms of the License. No contributions will be accepted without following this process.
 
@@ -302,7 +303,7 @@ The Unikraft name, logo and its mascot are trademark of [Unikraft GmbH](https://
 [unikraft-discord]: https://bit.ly/UnikraftDiscord
 [unikraft-cli-install]: https://unikraft.org/docs/cli/install
 [unikraft-catalog]: https://github.com/unikraft/catalog
-[unikraft-catalog-example]: https://github.com/unikraft/catalog/tree/main/examples
+[unikraft-catalog-examples]: https://github.com/unikraft/catalog/tree/main/examples
 [unikraft-guides-advanced]: https://unikraft.org/guides/internals
 [unikraft-kraftfile-syntax]: https://unikraft.org/docs/cli/reference/kraftfile/latest
 [github-codespaces-catalog]: https://codespaces.new/unikraft/catalog
