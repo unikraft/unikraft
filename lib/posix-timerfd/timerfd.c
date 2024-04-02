@@ -166,11 +166,30 @@ static __noreturn void timerfd_updatefn(void *arg)
 	}
 }
 
+/* Use the priv field in `struct uk_thread` to store current
+ * `struct timerfd_node` and mark the pointer to update thread as NULL to avoid
+ * terminating it twice.
+ */
+static void timerfd_updatefn_dtor(struct uk_thread *t)
+{
+	struct timerfd_node *tn;
+
+	UK_ASSERT(t);
+	UK_ASSERT(t->priv);
+
+	tn = (struct timerfd_node *)t->priv;
+	tn->upthread = NULL;
+}
+
 static void timerfd_release(const struct uk_file *f, int what)
 {
+	struct timerfd_node *d;
+
+	UK_ASSERT(f);
 	UK_ASSERT(f->vol == TIMERFD_VOLID);
-	if (what & UK_FILE_RELEASE_RES) {
-		struct timerfd_node *d = (struct timerfd_node *)f->node;
+
+	d = (struct timerfd_node *)f->node;
+	if (d->upthread && (what & UK_FILE_RELEASE_RES)) {
 
 		/* Disarm */
 		uk_file_rlock(f);
@@ -233,16 +252,24 @@ struct uk_file *uk_timerfile_create(clockid_t id)
 		._release = timerfd_release
 	};
 
-	/* Create update thread */
-	ut = uk_sched_thread_create(
+	ut = uk_sched_thread_create_fn1(
 		uk_sched_current(),
 		timerfd_updatefn, &al->f,
-		"timerfd_update_thread"
-	);
+		0x0, 0x0, false, false,
+		"timerfd_update_thread",
+		NULL, &timerfd_updatefn_dtor);
 	if (unlikely(!ut)) {
 		uk_free(a, al);
 		return ERR2PTR(-ENODEV);
 	}
+	/* We store in `struct timerfd_node` a reference to this very thread
+	 * so that we can terminate it on a specific timer fd's release.
+	 * However this thread may be terminated by other process or
+	 * scheduling events, that are not timerfd aware.
+	 * So use this to mark this reference as NULL in such cases so that
+	 * we do not double terminate a thread.
+	 */
+	ut->priv = &al->node;
 	al->node.upthread = ut;
 
 	return &al->f;
