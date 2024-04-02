@@ -129,14 +129,14 @@ static struct posix_thread *pprocess_create_pthread(
 	a = pprocess->_a;
 
 	tid = find_and_reserve_tid();
-	if (tid < 0) {
-		err = EAGAIN;
+	if (unlikely(tid < 0)) {
+		err = -EAGAIN;
 		goto err_out;
 	}
 
 	pthread = uk_zalloc(a, sizeof(*pthread));
-	if (!pthread) {
-		err = ENOMEM;
+	if (unlikely(!pthread)) {
+		err = -ENOMEM;
 		goto err_free_tid;
 	}
 
@@ -156,7 +156,7 @@ static struct posix_thread *pprocess_create_pthread(
 err_free_tid:
 	release_tid(tid);
 err_out:
-	return ERR2PTR(-err);
+	return ERR2PTR(err);
 }
 
 /* Free thread that is part of a process
