@@ -569,6 +569,11 @@ static int vfscore_ukopt_mkmp(char *path)
 	UK_ASSERT(path);
 	UK_ASSERT(path[0] == '/');
 
+	if (path[1] == '\0') {
+		uk_pr_debug(" mkmp: Called on '/', nothing to pre-create\n");
+		return 0;
+	}
+
 	uk_pr_debug(" mkmp: Ensure mount path \"%s\" exists\n", path);
 	pos = path;
 	do {
@@ -620,6 +625,7 @@ static int vfscore_ukopt_mkmp(char *path)
  */
 static inline int vfscore_mount_volume(const struct vfscore_volume *vv)
 {
+	const char *path;
 	int rc;
 
 	UK_ASSERT(vv);
@@ -637,6 +643,11 @@ static inline int vfscore_mount_volume(const struct vfscore_volume *vv)
 			  vv->path);
 		return -EINVAL;
 	}
+
+	path = vv->path;
+	while (path[1] == '/')
+		path++;
+
 	/* Drv are mandatory */
 	if (unlikely(!vv->drv || vv->drv[0] == '\0')) {
 		uk_pr_err("fstab: Entry without filesystem driver\n");
@@ -669,7 +680,7 @@ static inline int vfscore_mount_volume(const struct vfscore_volume *vv)
 		    vv->ukopts);
 
 	if (vv->ukopts & LIBVFSCORE_UKOPT_MKMP) {
-		rc = vfscore_ukopt_mkmp(vv->path);
+		rc = vfscore_ukopt_mkmp(path);
 		if (unlikely(rc < 0))
 			return rc;
 	}
@@ -681,7 +692,7 @@ static inline int vfscore_mount_volume(const struct vfscore_volume *vv)
 #endif /* CONFIG_LIBUKCPIO */
 	{
 		rc = mount(vv->sdev == NULL ? "" : vv->sdev,
-			   vv->path, vv->drv, vv->flags, vv->opts);
+			   path, vv->drv, vv->flags, vv->opts);
 	}
 	if (rc >= 0)
 		return 1; /* Indicate that we mounted 1 volume */
