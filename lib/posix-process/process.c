@@ -110,6 +110,8 @@ static inline pid_t find_free_tid(void)
 	}
 	if (found == TIDMAP_SIZE) {
 		/* no free PID */
+		uk_pr_err("Could not allocate TID: Out of TIDs (configured max: %d)\n",
+			  CONFIG_LIBPOSIX_PROCESS_MAX_PID);
 		return -1;
 	}
 
@@ -461,7 +463,7 @@ UK_THREAD_INIT_PRIO(posix_thread_init, posix_thread_fini, UK_PRIO_EARLIEST);
 
 static inline struct posix_thread *tid2pthread(pid_t tid)
 {
-	if (tid >= CONFIG_LIBPOSIX_PROCESS_MAX_PID || tid < 0)
+	if ((__sz)tid >= ARRAY_SIZE(tid_thread) || tid < 0)
 		return NULL;
 	return tid_thread[tid];
 }
