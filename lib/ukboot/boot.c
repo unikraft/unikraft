@@ -462,10 +462,8 @@ exit:
 
 static inline int do_main(int argc, char *argv[])
 {
+	char **envp __maybe_unused;
 	uk_ctor_func_t *ctorfn;
-#if CONFIG_LIBPOSIX_ENVIRON
-	char **envp;
-#endif /* CONFIG_LIBPOSIX_ENVIRON */
 	int ret;
 
 	/*
