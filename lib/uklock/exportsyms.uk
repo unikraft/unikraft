@@ -10,3 +10,6 @@ uk_rwlock_runlock
 uk_rwlock_wunlock
 uk_rwlock_upgrade
 uk_rwlock_downgrade
+rcu_read_lock
+rcu_read_unlock
+synchronize_rcu
