@@ -20,12 +20,12 @@ if LIBPOSIX_PROCESS_PIDS
 		default n
 endif
 
-	config LIBPOSIX_PROCESS_CLONE
-	bool "Clone system call"
+config LIBPOSIX_PROCESS_CLONE
+	bool "clone() system call"
 	default n
 	select LIBPOSIX_PROCESS_PIDS
 
-	config LIBPOSIX_PROCESS_CLONE_PREFER_CHILD
+config LIBPOSIX_PROCESS_CLONE_PREFER_CHILD
 	bool "Prefer scheduling of child"
 	depends on LIBPOSIX_PROCESS_CLONE
 	help
@@ -34,7 +34,13 @@ endif
 		the new thread does progress while the clone caller is not
 		context switching.
 
-	config LIBPOSIX_PROCESS_DEBUG
+config LIBPOSIX_PROCESS_EXECVE
+	bool "execve() system call"
+	select LIBPOSIX_PROCESS_PIDS
+	select LIBUKBINFMT
+	select LIBVFSCORE
+
+config LIBPOSIX_PROCESS_DEBUG
 	bool "Enable debug messages"
 	default n
 endif

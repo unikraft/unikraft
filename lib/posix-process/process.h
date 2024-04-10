@@ -87,4 +87,6 @@ pid_t ukthread2tid(struct uk_thread *thread);
 pid_t ukthread2pid(struct uk_thread *thread);
 #endif /* CONFIG_LIBPOSIX_PROCESS_PIDS */
 
+void pprocess_kill_siblings(struct uk_thread *thread);
+
 #endif /* __PROCESS_H_INTERNAL__ */

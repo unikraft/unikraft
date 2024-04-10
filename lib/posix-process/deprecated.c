@@ -123,15 +123,6 @@ int execle(const char *path, const char *arg, ...
 	return -1;
 }
 
-UK_SYSCALL_R_DEFINE(int, execve, const char *, path,
-		    char *const *, argv, char *const *, envp)
-{
-	uk_pr_warn("%s(): path=%s\n", __func__, path);
-	exec_warn_argv(argv);
-	exec_warn_envp(envp);
-	return -ENOSYS;
-}
-
 int execv(const char *path, char *const argv[])
 {
 	uk_pr_warn("%s(): path=%s\n", __func__, path);

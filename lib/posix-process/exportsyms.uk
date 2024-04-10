@@ -4,7 +4,9 @@ execlp
 execv
 execve
 uk_syscall_r_execve
+uk_syscall_r_e_execve
 uk_syscall_e_execve
+uk_syscall_e_e_execve
 execvp
 execvpe
 getpgid
