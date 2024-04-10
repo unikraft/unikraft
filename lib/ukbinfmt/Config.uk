@@ -1,0 +1,5 @@
+menuconfig LIBUKBINFMT
+	bool "ukbinfmt: Register loaders for executables"
+	help
+		libukbinfmt provides a minimal framework to register loaders of
+		different types of executable files
