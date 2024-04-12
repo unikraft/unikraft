@@ -200,13 +200,17 @@ jobs:
         run: |
           set -e;
 
+          today=$(date -u +"%Y-%m-%d");
+
           # Check if there are any ongoing tests (only one repository dispatch exists so we can just check for the status)
           # We need to check separately for each status because the API does not support multiple statuses
-          idle_queued=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 100 --status queued 2> /dev/null)
-          idle_in_progress=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 100 --status in_progress 2> /dev/null)
-          idle_requested=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 100 --status requested 2> /dev/null)
-          idle_waiting=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 100 --status waiting 2> /dev/null)
+          idle_queued=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 200 --created "$today" --status queued 2> /dev/null)
+          idle_in_progress=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 200 --created "$today" --status in_progress 2> /dev/null)
+          idle_requested=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 200 --created "$today" --status requested 2> /dev/null)
+          idle_waiting=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 200 --created "$today" --status waiting 2> /dev/null)
           if [ -n "$idle_queued" ] || [ -n "$idle_in_progress" ] || [ -n "$idle_requested" ] || [ -n "$idle_waiting" ]; then
+            sudo apt-get update;
+            sudo apt-get install -y jq;
             echo "There are idle tests, try again later:";
             echo "Queued:";
             jq "$idle_queued";
