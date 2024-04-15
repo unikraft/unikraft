@@ -40,7 +40,13 @@ config LIBPOSIX_PROCESS_EXECVE
 	select LIBUKBINFMT
 	select LIBVFSCORE
 
+config LIBPOSIX_PROCESS_VFORK
+	bool "vfork() system call"
+	select LIBPOSIX_PROCESS_PIDS
+	select LIBPOSIX_PROCESS_CLONE
+
 config LIBPOSIX_PROCESS_DEBUG
 	bool "Enable debug messages"
 	default n
+
 endif

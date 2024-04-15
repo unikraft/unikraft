@@ -33,8 +33,16 @@
 #ifndef __PROCESS_H_INTERNAL__
 #define __PROCESS_H_INTERNAL__
 
+#define _GNU_SOURCE /* struct clone_args */
+
 #include <uk/config.h>
 #include <sys/types.h>
+
+#if CONFIG_LIBPOSIX_PROCESS_CLONE
+#include <sched.h>
+#include <uk/arch/ctx.h>
+#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
+
 #if CONFIG_LIBPOSIX_PROCESS_PIDS
 #include <uk/thread.h>
 #endif /* CONFIG_LIBPOSIX_PROCESS_PIDS */
@@ -88,5 +96,10 @@ pid_t ukthread2pid(struct uk_thread *thread);
 #endif /* CONFIG_LIBPOSIX_PROCESS_PIDS */
 
 void pprocess_kill_siblings(struct uk_thread *thread);
+
+#if CONFIG_LIBPOSIX_PROCESS_CLONE
+int uk_clone(struct clone_args *cl_args, size_t cl_args_len,
+	     struct ukarch_execenv *execenv);
+#endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 
 #endif /* __PROCESS_H_INTERNAL__ */
