@@ -1,0 +1,2 @@
+config LIBUKZEROPAGE
+	bool "ukzeropage: Singleton read-only zero page"
