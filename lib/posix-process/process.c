@@ -33,6 +33,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
 #include <uk/config.h>
 #include <sys/types.h>
 #include <stddef.h>
@@ -249,6 +250,8 @@ int uk_posix_process_create(struct uk_alloc *a,
 		if (uk_list_empty(&orig_pprocess->threads))
 			pprocess_release(orig_pprocess);
 	}
+
+	(*pthread)->parent = parent_pthread;
 
 	pprocess->parent = parent_pprocess;
 	if (parent_pprocess) {

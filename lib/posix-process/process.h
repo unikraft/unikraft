@@ -70,6 +70,7 @@ struct posix_process {
 struct posix_thread {
 	pid_t tid;
 	struct posix_process *process;
+	struct posix_thread *parent;
 	struct uk_list_head thread_list_entry;
 	struct uk_thread *thread;
 	struct uk_alloc *_a;
