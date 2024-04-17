@@ -76,8 +76,8 @@ UK_SYSCALL_R_DEFINE(ssize_t, preadv, int, fd, const struct iovec *, iov,
 #undef pread64
 #endif
 
-UK_LLSYSCALL_R_DEFINE(ssize_t, pread64, int, fd,
-		      void *, buf, size_t, count, off_t, offset)
+UK_SYSCALL_R_DEFINE(ssize_t, pread64, int, fd,
+		    void *, buf, size_t, count, off_t, offset)
 {
 	ssize_t r;
 	union uk_shim_file sf;
@@ -99,13 +99,7 @@ UK_LLSYSCALL_R_DEFINE(ssize_t, pread64, int, fd,
 }
 
 #if UK_LIBC_SYSCALLS
-ssize_t pread(int fd, void *buf, size_t count, off_t offset)
-{
-	return uk_syscall_e_pread64((long)fd, (long)buf,
-				    (long)count, (long)offset);
-}
-
-__alias(pread, pread64);
+__alias(pread64, pread);
 #endif /* UK_LIBC_SYSCALLS */
 
 UK_SYSCALL_R_DEFINE(ssize_t, readv, int, fd,
@@ -204,8 +198,8 @@ UK_SYSCALL_R_DEFINE(ssize_t, pwritev, int, fd, const struct iovec*, iov,
 #undef pwrite64
 #endif
 
-UK_LLSYSCALL_R_DEFINE(ssize_t, pwrite64, int, fd,
-		      const void *, buf, size_t, count, off_t, offset)
+UK_SYSCALL_R_DEFINE(ssize_t, pwrite64, int, fd,
+		    const void *, buf, size_t, count, off_t, offset)
 {
 	ssize_t r;
 	union uk_shim_file sf;
@@ -227,13 +221,7 @@ UK_LLSYSCALL_R_DEFINE(ssize_t, pwrite64, int, fd,
 }
 
 #if UK_LIBC_SYSCALLS
-ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset)
-{
-	return uk_syscall_e_pwrite64((long)fd, (long)buf,
-				     (long)count, (long)offset);
-}
-
-__alias(pwrite, pwrite64);
+__alias(pwrite64, pwrite);
 #endif /* UK_LIBC_SYSCALLS */
 
 UK_SYSCALL_R_DEFINE(ssize_t, writev, int, fd, const struct iovec *, iov,
@@ -430,7 +418,7 @@ int ioctl(int fd, unsigned long request, ...)
 	void *arg;
 
 	va_start(ap, request);
-	arg = va_arg(ap, void *);
+	arg = va_arg(ap, void*);
 	va_end(ap);
 
 	return uk_syscall_e_ioctl((long)fd, (long)request, (long)arg);
