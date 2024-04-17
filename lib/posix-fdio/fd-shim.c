@@ -3,7 +3,7 @@
  * Licensed under the BSD-3-Clause License (the "License").
  * You may not use this file except in compliance with the License.
  */
-
+#define _GNU_SOURCE
 /* Userspace shim syscalls that delegate to either posix-fdio or vfscore */
 
 #include <fcntl.h>
@@ -367,13 +367,39 @@ UK_LLSYSCALL_R_DEFINE(int, fcntl, int, fd,
 #if UK_LIBC_SYSCALLS
 int fcntl(int fd, int cmd, ...)
 {
-	int arg = 0;
+	intptr_t arg = 0;
 	va_list ap;
 
 	va_start(ap, cmd);
-	if (cmd == F_SETFD ||
-	    cmd == F_SETFL) {
+	switch (cmd) {
+	case F_DUPFD:
+	case F_DUPFD_CLOEXEC:
+	case F_SETFD:
+	case F_SETFL:
+	case F_SETOWN:
+	case F_SETSIG:
+	case F_SETLEASE:
+	case F_NOTIFY:
+	case F_SETPIPE_SZ:
+	case F_ADD_SEALS:
 		arg = va_arg(ap, int);
+		break;
+	case F_SETLK:
+	case F_SETLKW:
+	case F_GETLK:
+	case F_OFD_SETLK:
+	case F_OFD_SETLKW:
+	case F_OFD_GETLK:
+	case F_GETOWN_EX:
+	case F_SETOWN_EX:
+	case F_GET_RW_HINT:
+	case F_SET_RW_HINT:
+	case F_GET_FILE_RW_HINT:
+	case F_SET_FILE_RW_HINT:
+		arg = (intptr_t)va_arg(ap, void *);
+		break;
+	default:
+		break;
 	}
 	va_end(ap);
 
