@@ -98,6 +98,16 @@ UK_LLSYSCALL_R_DEFINE(ssize_t, pread64, int, fd,
 	return r;
 }
 
+#if UK_LIBC_SYSCALLS
+ssize_t pread(int fd, void *buf, size_t count, off_t offset)
+{
+	return uk_syscall_e_pread64((long)fd, (long)buf,
+				    (long)count, (long)offset);
+}
+
+__alias(pread, pread64);
+#endif /* UK_LIBC_SYSCALLS */
+
 UK_SYSCALL_R_DEFINE(ssize_t, readv, int, fd,
 		    const struct iovec *, iov, int, iovcnt)
 {
@@ -215,6 +225,16 @@ UK_LLSYSCALL_R_DEFINE(ssize_t, pwrite64, int, fd,
 	}
 	return r;
 }
+
+#if UK_LIBC_SYSCALLS
+ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset)
+{
+	return uk_syscall_e_pwrite64((long)fd, (long)buf,
+				     (long)count, (long)offset);
+}
+
+__alias(pwrite, pwrite64);
+#endif /* UK_LIBC_SYSCALLS */
 
 UK_SYSCALL_R_DEFINE(ssize_t, writev, int, fd, const struct iovec *, iov,
 		    int, iovcnt)
@@ -356,6 +376,23 @@ UK_LLSYSCALL_R_DEFINE(int, fcntl, int, fd,
 	}
 }
 
+#if UK_LIBC_SYSCALLS
+int fcntl(int fd, int cmd, ...)
+{
+	int arg = 0;
+	va_list ap;
+
+	va_start(ap, cmd);
+	if (cmd == F_SETFD ||
+	    cmd == F_SETFL) {
+		arg = va_arg(ap, int);
+	}
+	va_end(ap);
+
+	return uk_syscall_e_fcntl(fd, cmd, arg);
+}
+#endif /* UK_LIBC_SYSCALLS */
+
 UK_LLSYSCALL_R_DEFINE(int, ioctl, int, fd, unsigned int, request, void *, arg)
 {
 	int r;
@@ -385,3 +422,17 @@ UK_LLSYSCALL_R_DEFINE(int, ioctl, int, fd, unsigned int, request, void *, arg)
 	}
 	return r;
 }
+
+#if UK_LIBC_SYSCALLS
+int ioctl(int fd, unsigned long request, ...)
+{
+	va_list ap;
+	void *arg;
+
+	va_start(ap, request);
+	arg = va_arg(ap, void *);
+	va_end(ap);
+
+	return uk_syscall_e_ioctl((long)fd, (long)request, (long)arg);
+}
+#endif /* UK_LIBC_SYSCALLS */
