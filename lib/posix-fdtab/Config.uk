@@ -1,5 +1,6 @@
 menuconfig LIBPOSIX_FDTAB
 	bool "posix-fdtab: File descriptor table"
+	select LIBUKATOMIC
 	select LIBUKFILE
 
 if LIBPOSIX_FDTAB
