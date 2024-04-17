@@ -1,6 +1,7 @@
 menuconfig LIBPOSIX_PIPE
 	bool "posix-pipe: Support for pipes"
 	select LIBPOSIX_FDIO
+	select LIBUKATOMIC
 
 if LIBPOSIX_PIPE
 	config LIBPOSIX_PIPE_SIZE_ORDER
