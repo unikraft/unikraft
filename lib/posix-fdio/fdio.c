@@ -22,6 +22,22 @@
 
 #define _SHOULD_BLOCK(r, m) ((r) == -EAGAIN && _IS_BLOCKING((m)))
 
+/* RWF flags not supported by our libc's yet; defining them for bincompat */
+#ifndef RWF_NOWAIT
+#define RWF_NOWAIT	0x08
+#endif /* RWF_NOWAIT */
+
+#ifndef RWF_SYNC
+#define RWF_SYNC	0x04
+#endif /* RWF_SYNC */
+
+#ifndef RWF_DSYNC
+#define RWF_DSYNC	0x02
+#endif /* RWF_DSYNC */
+
+#ifndef RWF_APPEND
+#define RWF_APPEND	0x10
+#endif /* RWF_APPEND */
 
 static inline
 ssize_t fdio_get_eof(const struct uk_file *f)
@@ -133,7 +149,7 @@ ssize_t uk_sys_read(struct uk_ofile *of, void *buf, size_t count)
 }
 
 ssize_t uk_sys_preadv2(struct uk_ofile *of, const struct iovec *iov, int iovcnt,
-		       off_t offset, int flags __maybe_unused)
+		       off_t offset, int flags)
 {
 	ssize_t r;
 	off_t off;
@@ -144,12 +160,10 @@ ssize_t uk_sys_preadv2(struct uk_ofile *of, const struct iovec *iov, int iovcnt,
 	int use_pos;
 	int iolock;
 
-#if 0 /* RWF flags not supported by our libc's yet */
 	if (unlikely(flags & RWF_NOWAIT)) {
 		uk_pr_warn_once("STUB: preadv2 flag RWF_NOWAIT not supported");
 		return -EINVAL; /* Not supported */
 	}
-#endif
 
 	mode = of->mode;
 
@@ -306,7 +320,7 @@ ssize_t uk_sys_write(struct uk_ofile *of, const void *buf, size_t count)
 }
 
 ssize_t uk_sys_pwritev2(struct uk_ofile *of, const struct iovec *iov,
-			int iovcnt, off_t offset, int flags __maybe_unused)
+			int iovcnt, off_t offset, int flags)
 {
 	ssize_t r;
 	off_t off;
@@ -333,12 +347,10 @@ ssize_t uk_sys_pwritev2(struct uk_ofile *of, const struct iovec *iov,
 
 	off = seekable ? offset : 0;
 	xflags = mode & _WRITE_MODEMASK;
-#if 0 /* RWF flags not supported by our libc's yet */
 	if (flags & RWF_SYNC)
 		xflags |= O_SYNC;
 	if (flags & RWF_DSYNC)
 		xflags |= O_DSYNC;
-#endif
 	f = of->file;
 
 	for (;;) {
@@ -348,11 +360,9 @@ ssize_t uk_sys_pwritev2(struct uk_ofile *of, const struct iovec *iov,
 			uk_file_wlock(f);
 
 		if (seekable) {
-#if 0 /* RWF flags not supported by our libc's yet */
 			if (flags & RWF_APPEND)
 				off = fdio_get_eof(f);
 			else
-#endif
 				if (offset == -1) {
 					if (_IS_APPEND(mode))
 						off = fdio_get_eof(f);
