@@ -104,6 +104,26 @@ struct uk_file_state {
 	/* TODO */
 };
 
+static inline void uk_file_state_rlock(struct uk_file_state *st)
+{
+	uk_rwlock_rlock(&st->iolock);
+}
+
+static inline void uk_file_state_runlock(struct uk_file_state *st)
+{
+	uk_rwlock_runlock(&st->iolock);
+}
+
+static inline void uk_file_state_wlock(struct uk_file_state *st)
+{
+	uk_rwlock_wlock(&st->iolock);
+}
+
+static inline void uk_file_state_wunlock(struct uk_file_state *st)
+{
+	uk_rwlock_wunlock(&st->iolock);
+}
+
 /*
  * We define initializers separate from an initial values.
  * The former can only be used in (static) variable initializations, while the
@@ -218,22 +238,22 @@ void uk_file_release_weak(const struct uk_file *f)
 
 static inline void uk_file_rlock(const struct uk_file *f)
 {
-	uk_rwlock_rlock(&f->state->iolock);
+	uk_file_state_rlock(f->state);
 }
 
 static inline void uk_file_runlock(const struct uk_file *f)
 {
-	uk_rwlock_runlock(&f->state->iolock);
+	uk_file_state_runlock(f->state);
 }
 
 static inline void uk_file_wlock(const struct uk_file *f)
 {
-	uk_rwlock_wlock(&f->state->iolock);
+	uk_file_state_wlock(f->state);
 }
 
 static inline void uk_file_wunlock(const struct uk_file *f)
 {
-	uk_rwlock_wunlock(&f->state->iolock);
+	uk_file_state_wunlock(f->state);
 }
 
 /* Events & polling */
