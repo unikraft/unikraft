@@ -5,6 +5,7 @@ config LIBUKFILE
 	select LIBUKLOCK_MUTEX
 	select LIBUKLOCK_RWLOCK
 	select LIBUKSCHED
+	select LIBNOLIBC if !HAVE_LIBC
 
 # Hidden, selected by core components when required
 config LIBUKFILE_CHAINUPDATE
