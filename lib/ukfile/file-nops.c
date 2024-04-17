@@ -50,3 +50,9 @@ const struct uk_file_ops uk_file_nops = {
 	.setstat = uk_file_nop_setstat,
 	.ctl = uk_file_nop_ctl
 };
+
+void uk_file_static_release(const struct uk_file *f __maybe_unused,
+			    int what __unused)
+{
+	uk_pr_warn("Destructor called on static file: %p\n", f);
+}
