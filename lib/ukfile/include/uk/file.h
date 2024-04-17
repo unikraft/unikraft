@@ -137,6 +137,26 @@ static inline void uk_file_state_wunlock(struct uk_file_state *st)
 	((struct uk_file_state)UK_FILE_STATE_INITIALIZER(name))
 
 
+static inline
+uk_pollevent uk_file_state_event_clear(struct uk_file_state *st,
+				       uk_pollevent ev)
+{
+	return uk_pollq_clear(&st->pollq, ev);
+}
+
+static inline
+uk_pollevent uk_file_state_event_set(struct uk_file_state *st, uk_pollevent ev)
+{
+	return uk_pollq_set(&st->pollq, ev);
+}
+
+static inline
+uk_pollevent uk_file_state_event_assign(struct uk_file_state *st,
+					uk_pollevent ev)
+{
+	return uk_pollq_assign(&st->pollq, ev);
+}
+
 /*
  * Reference count type used by uk_file.
  *
@@ -280,19 +300,19 @@ uk_pollevent uk_file_poll(const struct uk_file *f, uk_pollevent req)
 static inline
 uk_pollevent uk_file_event_clear(const struct uk_file *f, uk_pollevent clr)
 {
-	return uk_pollq_clear(&f->state->pollq, clr);
+	return uk_file_state_event_clear(f->state, clr);
 }
 
 static inline
 uk_pollevent uk_file_event_set(const struct uk_file *f, uk_pollevent set)
 {
-	return uk_pollq_set(&f->state->pollq, set);
+	return uk_file_state_event_set(f->state, set);
 }
 
 static inline
 uk_pollevent uk_file_event_assign(const struct uk_file *f, uk_pollevent set)
 {
-	return uk_pollq_assign(&f->state->pollq, set);
+	return uk_file_state_event_assign(f->state, set);
 }
 
 #endif /* __UKFILE_FILE_H__ */
