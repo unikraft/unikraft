@@ -397,16 +397,6 @@ ssize_t vfscore_pread64(struct vfscore_file *fp,
 	return bytes;
 }
 
-#if UK_LIBC_SYSCALLS
-ssize_t pread(int fd, void *buf, size_t count, off_t offset)
-{
-	return uk_syscall_e_pread64((long) fd, (long) buf,
-				    (long) count, (long) offset);
-}
-
-LFS64(pread);
-#endif /* UK_LIBC_SYSCALLS */
-
 UK_TRACEPOINT(trace_vfs_readv, "%p %#x %#x", void *, const struct iovec*,
 	      int);
 UK_TRACEPOINT(trace_vfs_readv_ret, "%#x", ssize_t);
@@ -576,16 +566,6 @@ ssize_t vfscore_pwrite64(struct vfscore_file *fp, const void *buf,
 	return bytes;
 }
 
-#if UK_LIBC_SYSCALLS
-ssize_t pwrite(int fd, const void *buf, size_t count, off_t offset)
-{
-	return uk_syscall_e_pwrite64((long) fd, (long) buf,
-				     (long) count, (long) offset);
-}
-
-LFS64(pwrite);
-#endif /* UK_LIBC_SYSCALLS */
-
 UK_TRACEPOINT(trace_vfs_writev, "%p %#x %d", void *, const struct iovec*, int);
 UK_TRACEPOINT(trace_vfs_writev_ret, "%#x", ssize_t);
 UK_TRACEPOINT(trace_vfs_writev_err, "%d", int);
@@ -647,20 +627,6 @@ ssize_t vfscore_write(struct vfscore_file *fp, const void *buf, size_t count)
 		trace_vfs_write_ret(bytes);
 	return bytes;
 }
-
-#if UK_LIBC_SYSCALLS
-int ioctl(int fd, unsigned long int request, ...)
-{
-	va_list ap;
-	void *arg;
-
-	va_start(ap, request);
-	arg = va_arg(ap, void*);
-	va_end(ap);
-
-	return uk_syscall_e_ioctl((long) fd, (long) request, (long) arg);
-}
-#endif /* UK_LIBC_SYSCALLS */
 
 UK_TRACEPOINT(trace_vfs_fsync, "%d", int);
 UK_TRACEPOINT(trace_vfs_fsync_ret, "");
@@ -1998,23 +1964,6 @@ out_errno:
 	trace_vfs_fcntl_err(error);
 	return -error;
 }
-
-#if UK_LIBC_SYSCALLS
-int fcntl(int fd, int cmd, ...)
-{
-	int arg = 0;
-	va_list ap;
-
-	va_start(ap, cmd);
-	if (cmd == F_SETFD ||
-	    cmd == F_SETFL) {
-		arg = va_arg(ap, int);
-	}
-	va_end(ap);
-
-	return uk_syscall_e_fcntl(fd, cmd, arg);
-}
-#endif /* UK_LIBC_SYSCALLS */
 
 UK_TRACEPOINT(trace_vfs_access, "\"%s\" 0%0o", const char*, int);
 UK_TRACEPOINT(trace_vfs_access_ret, "");
