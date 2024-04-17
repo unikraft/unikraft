@@ -14,7 +14,6 @@
 #include <uk/posix-fd.h>
 #include <uk/posix-fdtab.h>
 #include <uk/posix-timerfd.h>
-#include <uk/mutex.h>
 #include <uk/sched.h>
 #include <uk/timeutil.h>
 #include <uk/syscall.h>
