@@ -94,6 +94,7 @@ config KVM_VMM_QEMU
 	bool "QEMU"
 	imply LIBUKTTY_PL011 if ARCH_ARM_64
 	imply LIBUKINTCTLR_GICV2 if ARCH_ARM_64
+	imply LIBUKRTC_PL031
 	select HAVE_PCI
 	select HAVE_MMIO
 
@@ -104,6 +105,7 @@ config KVM_VMM_FIRECRACKER
 	select VIRTIO_MMIO_LINUX_COMPAT_CMDLINE
 	imply LIBUKTTY_NS16550 if ARCH_ARM_64
 	imply LIBUKINTCTLR_GICV3 if ARCH_ARM_64
+	imply LIBUKRTC_PL031
 	depends on ARCH_X86_64 || ARCH_ARM_64
 
 endchoice
@@ -164,10 +166,5 @@ endif
 endif
 
 endmenu
-
-config RTC_PL031
-       bool "Arm platform RTC (PL031) driver"
-       default y if ARCH_ARM_64
-       depends on ARCH_ARM_64
 
 endif

@@ -38,8 +38,10 @@
 #include <uk/intctlr.h>
 #include <uk/print.h>
 #include <arm/cpu.h>
-#include <rtc/rtc.h>
-#include <rtc/pl031.h>
+#include <uk/rtc.h>
+#include <uk/pl031.h>
+#include <uk/bus/platform.h>
+#include <uk/plat/common/bootinfo.h>
 
 static __u64 pl031_base_addr;
 static int pl031_irq;
