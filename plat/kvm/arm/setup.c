@@ -28,9 +28,6 @@
 #include <uk/plat/lcpu.h>
 #include <uk/plat/common/lcpu.h>
 #include <kvm-arm64/uart.h>
-#ifdef CONFIG_RTC_PL031
-#include <rtc/pl031.h>
-#endif /* CONFIG_RTC_PL031 */
 #include <uk/assert.h>
 #include <uk/intctlr.h>
 #include <arm/cpu.h>
@@ -232,11 +229,6 @@ void __no_pauth _ukplat_entry(struct ukplat_bootinfo *bi)
 	rc = get_psci_method(bi);
 	if (unlikely(rc < 0))
 		UK_CRASH("Failed to get PSCI method: %d.\n", rc);
-
-#if CONFIG_RTC_PL031
-	/* Initialize RTC */
-	pl031_init_rtc(fdt);
-#endif /* CONFIG_RTC_PL031 */
 
 	/*
 	 * Switch away from the bootstrap stack as early as possible.
