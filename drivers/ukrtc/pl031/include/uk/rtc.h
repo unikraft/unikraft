@@ -32,8 +32,8 @@
  *
  */
 
-#ifndef __PLAT_DRV_RTC_H__
-#define __PLAT_DRV_RTC_H__
+#ifndef __UK_RTC_RTC_H__
+#define __UK_RTC_RTC_H__
 
 #include <uk/arch/types.h>
 
@@ -64,4 +64,4 @@ void rtc_raw_to_tm(__u32 raw, struct rtc_time *tm);
  */
 __u32 rtc_tm_to_raw(struct rtc_time *tm);
 
-#endif //__PLAT_DRV_RTC_H__
+#endif /* __UK_RTC_RTC_H__ */

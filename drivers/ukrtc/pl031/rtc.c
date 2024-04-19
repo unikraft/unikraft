@@ -33,7 +33,7 @@
  */
 
 #include <uk/essentials.h>
-#include <rtc/rtc.h>
+#include <uk/rtc.h>
 
 static const unsigned int days_per_mon[12] = {
 	31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31};

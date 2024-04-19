@@ -1,0 +1,14 @@
+pl031_read_time
+pl031_write_time
+pl031_write_alarm
+pl031_read_alarm
+pl031_enable
+pl031_disable
+pl031_get_status
+pl031_enable_intr
+pl031_disable_intr
+pl031_clear_intr
+pl031_register_alarm_handler
+pl031_init_rtc
+rtc_raw_to_tm
+rtc_tm_to_raw

@@ -31,13 +31,13 @@
  *
  */
 
-#ifndef __PLAT_DRV_RTC_PL031_H__
-#define __PLAT_DRV_RTC_PL031_H__
+#ifndef __UK_RTC_PL031_H__
+#define __UK_RTC_PL031_H__
 
 #define PL031_STATUS_ENABLED	1
 #define PL031_STATUS_DISABLED	0
 
-#include <rtc/rtc.h>
+#include <uk/rtc.h>
 
 /**
  * Read time from device and store in RTC structure.
@@ -118,4 +118,4 @@ int pl031_register_alarm_handler(int (*handler)(void *));
  */
 int pl031_init_rtc(void *dtb);
 
-#endif /* __PLAT_DRV_RTC_PL031_H__ */
+#endif /* __UK_RTC_PL031_H__ */
