@@ -51,6 +51,7 @@ static void *dtb;
 static const char *pf_device_compatible_list[] = {
 	"virtio,mmio",
 	"pci-host-ecam-generic",
+	"arm,pl031",
 	NULL
 };
 #endif /* CONFIG_LIBUKBUS_PLATFORM_FDT */
