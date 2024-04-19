@@ -45,6 +45,7 @@
 
 static __u64 pl031_base_addr;
 static int pl031_irq;
+static struct uk_alloc *a;
 
 /* FDT compatible property for PL031 device */
 #define PL031_COMPATIBLE	"arm,pl031"
@@ -201,3 +202,61 @@ int pl031_init_rtc(void *dtb)
 
 	return 0;
 }
+
+static int pl031_probe(struct pf_device *pfdev __unused)
+{
+	void *dtb;
+
+	dtb = (void *)ukplat_bootinfo_get()->dtb;
+
+	pl031_init_rtc(dtb);
+
+	return 0;
+}
+
+static int pl031_drv_init(struct uk_alloc *drv_allocator)
+{
+	/* driver initialization */
+	if (!drv_allocator)
+		return -EINVAL;
+
+	a = drv_allocator;
+
+	return 0;
+}
+
+static int pl031_add_dev(struct pf_device *pfdev __unused)
+{
+	return 0;
+}
+
+static const struct device_match_table pl031_match_table[];
+
+static int pl031_id_match_compatible(const char *compatible)
+{
+	for (int i = 0; pl031_match_table[i].compatible; i++)
+		if (strcmp(pl031_match_table[i].compatible, compatible) == 0)
+			return pl031_match_table[i].id->device_id;
+
+	return -1;
+}
+
+static struct pf_device_id pl031_ids = {
+		.device_id = PL031_RTC_ID
+};
+
+static struct pf_driver pl031_driver = {
+	.device_ids = &pl031_ids,
+	.init = pl031_drv_init,
+	.probe = pl031_probe,
+	.add_dev = pl031_add_dev,
+	.match = pl031_id_match_compatible
+};
+
+static const struct device_match_table pl031_match_table[] = {
+	{ .compatible = PL031_COMPATIBLE,
+	  .id = &pl031_ids },
+	{NULL}
+};
+
+PF_REGISTER_DRIVER(&pl031_driver);
