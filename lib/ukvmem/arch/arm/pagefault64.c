@@ -44,10 +44,10 @@ static int vmem_arch_pagefault(void *data)
 		vas = uk_vas_get_active();
 		if (unlikely(vas && !(vas->flags & UK_VAS_FLAG_NO_PAGING)))
 			uk_pr_crit("Cannot handle %s page fault at 0x%"
-				   __PRIvaddr" (ec: 0x%x): %s (%d).\n",
+				   __PRIvaddr" (ec: 0x%lx): %s (%d).\n",
 				   faultstr[faulttype &
 					    UK_VMA_FAULT_ACCESSTYPE],
-				   vaddr, ctx->error_code, strerror(-rc), -rc);
+				   vaddr, ctx->esr, strerror(-rc), -rc);
 
 		return UK_EVENT_NOT_HANDLED;
 	}
