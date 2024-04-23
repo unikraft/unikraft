@@ -2,11 +2,18 @@ labels:
   - name: kind/bug
     description: Something isn't working
     color: "#d73a4a"
+  - name: kind/build-warning
+    description: Issue or PR is related with a build warning
+    color: "#d93f0b"
 
   - name: kind/enhancement
-    description: Issues and PRs related to increasing functionality
+    description: New feature or request
     color: "#a2eeef"
 
+  - name: kind/hackathon
+    description: Hackathon challenge
+    color: "#d4c5f9"
+  
   - name: kind/maintenance
     description: Chores and meta-tasks
     color: "#a295d6"
@@ -24,5 +31,6 @@ labels:
     color: "#e99695"
 
   - name: kind/quick-fix
-    description: Issue or PR is related to a quick fix
+    description: Issue is a quick fix
     color: "#1daf6b"
+

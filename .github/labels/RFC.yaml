@@ -1,0 +1,4 @@
+labels:
+  - name: RFC
+    description: Request for Comments (do not review yet)
+    color: "#7239ec"

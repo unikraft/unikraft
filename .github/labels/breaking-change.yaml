@@ -1,0 +1,4 @@
+labels:
+  - name: breaking-change
+    description: PR or issue includes a backwards-incompatible changeset.
+    color: "#b60205"

@@ -2,6 +2,9 @@ labels:
   - name: bug/compile-time
     description: Bug occurs during compile-time
     color: "#ed5139"
+  - name: bug/fix
+    description: This PR fixes a bug
+    color: "#4bcc7a"
 
   - name: bug/link-time
     description: Bug occurs during link-time
@@ -11,6 +14,3 @@ labels:
     description: Bug occurs during runtime
     color: "#4d2a25"
 
-  - name: bug/fix
-    description: This PR fixes a bug
-    color: "#4bcc7a"

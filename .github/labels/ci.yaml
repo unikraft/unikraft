@@ -6,3 +6,4 @@ labels:
   - name: ci/wait
     description: Tell the CI system to wait before performing any action.
     color: "#e99695"
+

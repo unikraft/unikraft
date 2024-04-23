@@ -4,7 +4,8 @@ labels:
     color: "#d4c5f9"
 
   - name: needs/rebase
-    description: Indicates a PR cannot be merged because it has merge conflicts with HEAD
+    description: Indicates a PR cannot be merged because it has merge conflicts with
+      HEAD.
     color: "#2e20c1"
     apply_when:
       - needs_rebase

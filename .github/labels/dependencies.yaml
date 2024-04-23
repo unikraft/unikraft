@@ -1,0 +1,4 @@
+labels:
+  - name: dependencies
+    description: Pull requests that update a dependency file
+    color: "#0366d6"

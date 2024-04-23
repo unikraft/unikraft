@@ -1,0 +1,13 @@
+labels:
+  - name: size/large
+    description: Large PR, takes some time to review
+    color: "#83911f"
+
+  - name: size/medium
+    description: medium sized PR
+    color: "#ac98a1"
+
+  - name: size/small
+    description: Small PR, quick to review
+    color: "#d4c5f9"
+
