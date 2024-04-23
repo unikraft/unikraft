@@ -375,7 +375,7 @@ void ukplat_entry(int argc, char *argv[])
 #if !CONFIG_LIBUKBOOT_NOSCHED
 	uk_pr_info("Initialize scheduling...\n");
 #if CONFIG_LIBUKBOOT_INITSCHEDCOOP
-	s = uk_schedcoop_create(a);
+	s = uk_schedcoop_create(a, a, a, a);
 #endif
 	if (unlikely(!s))
 		UK_CRASH("Failed to initialize scheduling\n");
