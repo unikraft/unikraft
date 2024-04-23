@@ -255,7 +255,10 @@ static const struct uk_thread *schedcoop_idle_thread(struct uk_sched *s,
 	return &(c->idle);
 }
 
-struct uk_sched *uk_schedcoop_create(struct uk_alloc *a)
+struct uk_sched *uk_schedcoop_create(struct uk_alloc *a,
+				     struct uk_alloc *sa,
+				     struct uk_alloc *auxsa,
+				     struct uk_alloc *tls_a)
 {
 	struct schedcoop *c = NULL;
 	int rc;
@@ -292,7 +295,7 @@ struct uk_sched *uk_schedcoop_create(struct uk_alloc *a)
 			schedcoop_thread_woken_isr,
 			schedcoop_thread_woken_isr,
 			schedcoop_idle_thread,
-			a);
+			a, sa, auxsa, tls_a);
 
 	/* Add idle thread to the scheduler's thread list */
 	UK_TAILQ_INSERT_TAIL(&c->sched.thread_list, &c->idle, thread_list);
