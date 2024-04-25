@@ -45,7 +45,10 @@
 #include <uk/errptr.h>
 #include <errno.h>
 #include <stdarg.h>
+#include <stddef.h>
 #include <uk/print.h>
+#include <uk/sysexittab.h>
+#include <uk/sysentertab.h>
 #include "legacy_syscall.h"
 
 #ifdef __cplusplus
@@ -259,9 +262,22 @@ typedef long uk_syscall_arg_t;
 	{								\
 		long ret;						\
 									\
+		/* Mark system call entry */				\
+		uk_syscallchain_count++;				\
+		uk_sysentertab_run(&(struct uk_sysentertab_ctx){	\
+					.execenv = NULL,		\
+				   });					\
+									\
 		__UK_SYSCALL_PRINTD(x, rtype, ename, __VA_ARGS__);	\
 		ret = (long) __##ename(					\
 			UK_ARG_MAPx(x, UK_S_ARG_CAST_ACTUAL, __VA_ARGS__)); \
+									\
+		/* Mark system call exit */				\
+		uk_sysexittab_run(&(struct uk_sysexittab_ctx){		\
+					.execenv = NULL,		\
+				  });					\
+		uk_syscallchain_count--;				\
+									\
 		return ret;						\
 	}								\
 	static inline rtype __##ename(UK_ARG_MAPx(x,			\
@@ -339,9 +355,22 @@ typedef long uk_syscall_arg_t;
 	{								\
 		long ret;						\
 									\
+		/* Mark system call entry */				\
+		uk_syscallchain_count++;				\
+		uk_sysentertab_run(&(struct uk_sysentertab_ctx){	\
+					.execenv = NULL,		\
+				   });					\
+									\
 		__UK_SYSCALL_PRINTD(x, rtype, rname, __VA_ARGS__);	\
 		ret = (long) __##rname(					\
 			UK_ARG_MAPx(x, UK_S_ARG_CAST_ACTUAL, __VA_ARGS__)); \
+									\
+		/* Mark system call exit */				\
+		uk_sysexittab_run(&(struct uk_sysexittab_ctx){		\
+					.execenv = NULL,		\
+				  });					\
+		uk_syscallchain_count--;				\
+									\
 		return ret;						\
 	}								\
 	static inline rtype __##rname(UK_ARG_MAPx(x,			\
@@ -378,14 +407,28 @@ typedef long uk_syscall_arg_t;
 		long ret;						\
 									\
 		execenv = (struct ukarch_execenv *)_execenv;		\
+									\
+		/* Mark system call entry */				\
+		uk_syscallchain_count++;				\
+		uk_sysentertab_run(&(struct uk_sysentertab_ctx){	\
+					.execenv = execenv,		\
+				   });					\
+									\
 		__UK_SYSCALL_EXECENV_PRINTD(x, rtype, rname,		\
 					__VA_ARGS__);			\
 		ret = (long) __##rname(UK_EXECENV_CALLMAPx(x,		\
 						   UK_S_ARG_ACTUAL,	\
 						   __VA_ARGS__));	\
+									\
+		/* Mark system call exit */				\
+		uk_sysexittab_run(&(struct uk_sysexittab_ctx){		\
+					.execenv = execenv,		\
+				  });					\
+		uk_syscallchain_count--;				\
+									\
 		return ret;						\
 	}								\
-	static inline rtype __used __##rname(UK_EXECENV_DECLMAPx(		\
+	static inline rtype __used __##rname(UK_EXECENV_DECLMAPx(	\
 					     UK_S_EXECENV_ARG_ACTUAL_MAYBE_UNUSED,\
 					     x, UK_S_ARG_ACTUAL_MAYBE_UNUSED,\
 					     __VA_ARGS__))

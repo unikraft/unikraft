@@ -113,6 +113,12 @@ void ukplat_syscall_handler(struct uk_syscall_ctx *usc)
 		    execenv->regs.rarg1);
 #endif /* CONFIG_LIBSYSCALL_SHIM_DEBUG_HANDLER */
 
+	/* Mark system call entry */
+	uk_syscallchain_count++;
+	uk_sysentertab_run(&(struct uk_sysentertab_ctx){
+				.execenv = execenv,
+			   });
+
 	execenv->regs.rret0 = uk_syscall6_r_e(execenv);
 
 #if CONFIG_LIBSYSCALL_SHIM_STRACE
@@ -137,6 +143,12 @@ void ukplat_syscall_handler(struct uk_syscall_ctx *usc)
 	 */
 	ukplat_coutk(prsyscallbuf, (__sz) prsyscalllen);
 #endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
+
+	/* Mark system call exit */
+	uk_sysexittab_run(&(struct uk_sysexittab_ctx){
+				.execenv = execenv,
+			  });
+	uk_syscallchain_count--;
 
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
 	t->tlsp = ukarch_sysctx_get_tlsp(&execenv->sysctx);
