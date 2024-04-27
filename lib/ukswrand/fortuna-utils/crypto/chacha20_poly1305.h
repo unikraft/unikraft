@@ -32,6 +32,7 @@
 #define	__CRYPTO_CHACHA20_POLY1305_H__
 
 #include <sys/types.h>
+#include <stdbool.h>
 
 /* The Poly1305 tag is appended to the cipher text. */
 
