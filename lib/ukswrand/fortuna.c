@@ -60,7 +60,7 @@
 
 #include "fortuna-utils/chacha20/chacha.h"
 #include "fortuna-utils/rijndael/rijndael-api-fst.h"
-#include <crypto/sha2/sha256.h>
+#include "fortuna-utils/sha2/sha256.h"
 
 #include "hash.h"
 #include <dev/random/randomdev.h>
