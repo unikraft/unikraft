@@ -55,7 +55,7 @@
 #include <string.h>
 #include <uk/sched.h>
 
-#include "unit_test.h"
+// #include "unit_test.h"
 #endif /* _KERNEL */
 
 #include <crypto/chacha20/chacha.h>
