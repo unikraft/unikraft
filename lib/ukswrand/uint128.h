@@ -27,6 +27,8 @@
 #ifndef SYS_DEV_RANDOM_UINT128_H_INCLUDED
 #define	SYS_DEV_RANDOM_UINT128_H_INCLUDED
 
+// UINT64_MAX
+#include <stdint.h>
 #include <sys/endian.h>
 
 /* This whole thing is a crock :-(
