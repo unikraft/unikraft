@@ -62,7 +62,7 @@
 #include <crypto/rijndael/rijndael-api-fst.h>
 #include <crypto/sha2/sha256.h>
 
-#include "hash.h"
+#include <dev/random/hash.h>
 #include <dev/random/randomdev.h>
 #ifdef _KERNEL
 #include <dev/random/random_harvestq.h>

@@ -28,7 +28,7 @@
 #define	SYS_DEV_RANDOM_HASH_H_INCLUDED
 
 #include <crypto/chacha20/_chacha.h>
-#include <dev/random/uint128.h>
+#include "uint128.h"
 
 #ifndef _KERNEL
 #define	__read_frequently
