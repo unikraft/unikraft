@@ -31,7 +31,7 @@
 
 #include <sys/cdefs.h>
 #include <sys/_types.h>
-#include <machine/endian.h>
+// #include <machine/endian.h>
 
 #ifndef _UINT8_T_DECLARED
 typedef	__uint8_t	uint8_t;
