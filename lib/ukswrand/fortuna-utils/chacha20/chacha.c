@@ -8,6 +8,8 @@ Public domain.
 
 #include <sys/param.h>
 #include <sys/types.h>
+#include <stdint.h>
+#include <stddef.h>
 
 #include "chacha.h"
 
