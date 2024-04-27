@@ -23,4 +23,9 @@ LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/crypto/rijndael/rijndael
 LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/crypto/sha2/sha256c.c
 LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/crypto/sha2/sha512c.c
 
+LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/dev/random/fortuna.c
+LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/dev/random/hash.c
+LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/dev/random/random_harvestq.c
+LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/dev/random/randomdev.c
+
 UK_PROVIDED_SYSCALLS-$(CONFIG_LIBUKSWRAND) += getrandom-3
