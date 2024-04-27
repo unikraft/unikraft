@@ -29,6 +29,7 @@
 
 // UINT64_MAX
 #include <stdint.h>
+#include <stdbool.h>
 #include <sys/endian.h>
 
 /* This whole thing is a crock :-(
