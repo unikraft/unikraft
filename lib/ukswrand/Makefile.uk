@@ -11,5 +11,8 @@ LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/getrandom.c
 
 LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna.c
 LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/hash.c
+LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/chacha20_poly1305.c
+LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/chacha20/chacha-sw.c
+LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/chacha20/chacha.c
 
 UK_PROVIDED_SYSCALLS-$(CONFIG_LIBUKSWRAND) += getrandom-3
