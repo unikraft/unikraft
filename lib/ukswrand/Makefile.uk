@@ -20,6 +20,8 @@ LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/crypto/rijndael/rijndael
 # Skip the sha*_arm64 files for now
 LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/crypto/sha2/sha256c.c
 LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/crypto/sha2/sha512c.c
+LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/crypto/camellia/camellia.c
+LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/crypto/camellia/camellia-api.c
 
 LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/dev/random/fortuna.c
 LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/dev/random/hash.c
