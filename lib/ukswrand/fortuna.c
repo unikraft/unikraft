@@ -59,7 +59,7 @@
 #endif /* _KERNEL */
 
 #include "fortuna-utils/chacha20/chacha.h"
-#include <crypto/rijndael/rijndael-api-fst.h>
+#include "fortuna-utils/rijndael/rijndael-api-fst.h"
 #include <crypto/sha2/sha256.h>
 
 #include "hash.h"

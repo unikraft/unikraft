@@ -14,5 +14,8 @@ LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/hash.c
 LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/chacha20_poly1305.c
 LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/chacha20/chacha-sw.c
 LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/chacha20/chacha.c
+LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/rijndael/rijndael-alg-fst.c
+LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/rijndael/rijndael-api-fst.c
+LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/rijndael/rijndael-api.c
 
 UK_PROVIDED_SYSCALLS-$(CONFIG_LIBUKSWRAND) += getrandom-3
