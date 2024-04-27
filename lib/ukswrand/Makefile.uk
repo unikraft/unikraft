@@ -1,7 +1,9 @@
 $(eval $(call addlib_s,libukswrand,$(CONFIG_LIBUKSWRAND)))
 
 CINCLUDES-$(CONFIG_LIBUKSWRAND)	+= -I$(LIBUKSWRAND_BASE)/include
+CINCLUDES-$(CONFIG_LIBUKSWRAND)	+= -I$(LIBUKSWRAND_BASE)/fortuna-utils
 CXXINCLUDES-$(CONFIG_LIBUKSWRAND) += -I$(LIBUKSWRAND_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBUKSWRAND)	+= -I$(LIBUKSWRAND_BASE)/fortuna-utils
 
 LIBUKSWRAND_SRCS-$(CONFIG_LIBUKSWRAND_MWC) += $(LIBUKSWRAND_BASE)/mwc.c
 LIBUKSWRAND_SRCS-$(CONFIG_LIBUKSWRAND_CHACHA) += $(LIBUKSWRAND_BASE)/chacha.c
@@ -11,14 +13,14 @@ LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/getrandom.c
 
 LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna.c
 LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/hash.c
-LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/chacha20_poly1305.c
-LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/chacha20/chacha-sw.c
-LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/chacha20/chacha.c
-LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/rijndael/rijndael-alg-fst.c
-LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/rijndael/rijndael-api-fst.c
-LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/rijndael/rijndael-api.c
+LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/crypto/chacha20_poly1305.c
+LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/crypto/chacha20/chacha-sw.c
+LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/crypto/chacha20/chacha.c
+LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/crypto/rijndael/rijndael-alg-fst.c
+LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/crypto/rijndael/rijndael-api-fst.c
+LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/crypto/rijndael/rijndael-api.c
 # Skip the sha*_arm64 files for now
-LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/sha2/sha256c.c
-LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/sha2/sha512c.c
+LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/crypto/sha2/sha256c.c
+LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/crypto/sha2/sha512c.c
 
 UK_PROVIDED_SYSCALLS-$(CONFIG_LIBUKSWRAND) += getrandom-3

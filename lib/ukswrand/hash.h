@@ -27,7 +27,7 @@
 #ifndef SYS_DEV_RANDOM_HASH_H_INCLUDED
 #define	SYS_DEV_RANDOM_HASH_H_INCLUDED
 
-#include "fortuna-utils/chacha20/_chacha.h"
+#include <crypto/chacha20/_chacha.h>
 #include "uint128.h"
 
 #ifndef _KERNEL
