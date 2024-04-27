@@ -53,7 +53,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <threads.h>
+#include <uk/sched.h>
 
 #include "unit_test.h"
 #endif /* _KERNEL */
