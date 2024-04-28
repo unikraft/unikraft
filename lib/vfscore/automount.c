@@ -50,6 +50,9 @@
 #include <uk/plat/memory.h>
 #include <sys/stat.h>
 #include <vfscore/mount.h>
+#if CONFIG_LIBVFSCORE_AUTOMOUNT || CONFIG_LIBVFSCORE_AUTOUNMOUNT
+#include <devfs/device.h>
+#endif
 #include <errno.h>
 #include <uk/config.h>
 #include <uk/arch/types.h>
@@ -625,7 +628,7 @@ static int vfscore_ukopt_mkmp(char *path)
  */
 static inline int vfscore_mount_volume(const struct vfscore_volume *vv)
 {
-	const char *path;
+	char *path;
 	int rc;
 
 	UK_ASSERT(vv);
@@ -863,7 +866,7 @@ static void vfscore_autoumount(const struct uk_term_ctx *tctx __unused)
 
 	uk_list_for_each_entry_reverse(mp, &mount_list, mnt_list) {
 		uk_pr_info("Unmounting %s (%s)...\n", mp->m_path,
-			   mp->m_dev ? mp->m_dev : "none");
+			   mp->m_dev ? mp->m_dev->name : "none");
 		/* For now, flags = 0 is enough. */
 		rc = VFS_UNMOUNT(mp, 0);
 		if (unlikely(rc))
