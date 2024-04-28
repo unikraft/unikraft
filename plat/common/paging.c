@@ -559,7 +559,6 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 	UK_ASSERT(len > 0);
 	UK_ASSERT(PAGE_Lx_ALIGNED(len, to_lvl));
 	UK_ASSERT(PAGE_Lx_ALIGNED(vaddr, to_lvl));
-	UK_ASSERT(vaddr <= __VADDR_MAX - len);
 	UK_ASSERT(ukarch_vaddr_range_isvalid(vaddr, len));
 
 	if (paddr != __PADDR_ANY) {
@@ -872,6 +871,8 @@ int ukplat_page_mapx(struct uk_pagetable *pt, __vaddr_t vaddr,
 	UK_ASSERT(pt->pt_vbase != __VADDR_INV);
 	UK_ASSERT(pt->pt_pbase != __PADDR_INV);
 
+	UK_ASSERT(vaddr <= __VADDR_MAX - len);
+
 	return pg_page_mapx(pt, pt->pt_vbase, PT_LEVELS - 1, vaddr, paddr, len,
 			    attr, flags, PT_Lx_PTE_INVALID(PAGE_LEVEL),
 			    PAGE_LEVEL, mapx);
@@ -921,6 +922,9 @@ static int pg_page_split(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 	 * contiguous range of physical memory than the input page
 	 */
 	paddr = PT_Lx_PTE_PADDR(pte, level);
+
+	UK_ASSERT(vaddr <= __VADDR_MAX - PAGE_Lx_SIZE(level));
+
 	rc = pg_page_mapx(pt, new_pt_vaddr, level - 1, vaddr, paddr,
 			  PAGE_Lx_SIZE(level), attr, flags, pte, level, NULL);
 	if (unlikely(rc))
