@@ -463,7 +463,7 @@ exit:
 static inline int do_main(int argc, char *argv[])
 {
 	uk_ctor_func_t *ctorfn;
-#if CONFIG_LIBPOSIX_ENVIRON
+#if CONFIG_LIBPOSIX_ENVIRON && CONFIG_LIBUKDEBUG_PRINTK_INFO
 	char **envp;
 #endif /* CONFIG_LIBPOSIX_ENVIRON */
 	int ret;
