@@ -211,6 +211,8 @@ void traps_table_init(void)
 	FILL_TRAP_GATE(simd_error,	2);
 	FILL_TRAP_GATE(virt_error,	2);
 
+	FILL_TRAP_GATE(security_error, 2);
+
 	/*
 	 * Load IRQ vectors. All IRQs run on IST1 (cpu_intr_stack).
 	 */
