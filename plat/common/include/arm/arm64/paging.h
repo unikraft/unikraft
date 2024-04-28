@@ -65,7 +65,7 @@
  * for the frame allocators through this area.
  */
 #define DIRECTMAP_AREA_START	0x0000ff8000000000
-#define DIRECTMAP_AREA_END	0xffffffffffffffff
+#define DIRECTMAP_AREA_END	0x0000ffffffffffff
 #define DIRECTMAP_AREA_SIZE	(DIRECTMAP_AREA_END - DIRECTMAP_AREA_START + 1)
 
 static inline __vaddr_t
