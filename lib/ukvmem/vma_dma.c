@@ -7,12 +7,11 @@
 #include <stddef.h>
 #include <errno.h>
 
-#include "vmem.h"
-
 #include <uk/config.h>
 #include <uk/essentials.h>
 #include <uk/assert.h>
 #include <uk/alloc.h>
+#include <uk/vma_ops.h>
 #include <uk/arch/limits.h>
 #include <uk/arch/paging.h>
 #ifdef CONFIG_HAVE_PAGING
@@ -133,6 +132,6 @@ const struct uk_vma_ops uk_vma_dma_ops = {
 	.unmap		= vma_op_dma_unmap,
 	.split		= vma_op_dma_split,
 	.merge		= vma_op_dma_merge,
-	.set_attr	= vma_op_set_attr,	/* default */
+	.set_attr	= uk_vma_op_set_attr,	/* default */
 	.advise		= __NULL,
 };

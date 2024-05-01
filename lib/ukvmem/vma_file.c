@@ -7,11 +7,10 @@
 #include <stddef.h>
 #include <errno.h>
 
-#include "vmem.h"
-
 #include <uk/config.h>
 #include <uk/assert.h>
 #include <uk/falloc.h>
+#include <uk/vma_ops.h>
 #include <uk/arch/limits.h>
 #include <uk/arch/paging.h>
 #ifdef CONFIG_HAVE_PAGING
@@ -234,7 +233,7 @@ static int vma_op_file_set_attr(struct uk_vma *vma, unsigned long attr)
 		return -EPERM;
 
 	/* Default handler */
-	return vma_op_set_attr(vma, attr);
+	return uk_vma_op_set_attr(vma, attr);
 }
 
 /* We only support private mappings. Changes are not carried through to the
@@ -252,9 +251,9 @@ const struct uk_vma_ops uk_vma_file_ops = {
 	.new		= vma_op_file_new,
 	.destroy	= vma_op_file_destroy,
 	.fault		= vma_op_file_fault,
-	.unmap		= vma_op_unmap,		/* default */
+	.unmap		= uk_vma_op_unmap,	/* default */
 	.split		= vma_op_file_split,
 	.merge		= vma_op_file_merge,
 	.set_attr	= vma_op_file_set_attr,
-	.advise		= vma_op_advise,	/* default */
+	.advise		= uk_vma_op_advise,	/* default */
 };

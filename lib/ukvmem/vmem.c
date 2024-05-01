@@ -77,7 +77,7 @@ void uk_vas_destroy(struct uk_vas *vas)
 	struct uk_vma *vma, *next;
 
 	uk_list_for_each_entry_safe(vma, next, &vas->vma_list, vma_list) {
-		vmem_vma_unmap(vma, vma->start, vmem_vma_len(vma));
+		vmem_vma_unmap(vma, vma->start, uk_vma_len(vma));
 		vmem_vma_unlink_and_free(vma);
 	}
 
@@ -433,12 +433,17 @@ static int vmem_vma_split_vmas(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 	return 0;
 }
 
-int vma_op_deny()
+/* Argument list is empty to accept (and ignore) any number of args.
+ *
+ * Do not convert to `uk_vma_op_deny(void)` no matter how much your static code
+ * checker screams at you.
+ */
+int uk_vma_op_deny()
 {
 	return -EPERM;
 }
 
-int vma_op_unmap(struct uk_vma *vma, __vaddr_t vaddr, __sz len)
+int uk_vma_op_unmap(struct uk_vma *vma, __vaddr_t vaddr, __sz len)
 {
 	UK_ASSERT(vaddr >= vma->start);
 	UK_ASSERT(vaddr + len <= vma->end);
@@ -472,7 +477,7 @@ static void vmem_vma_unmap(struct uk_vma *vma, __vaddr_t vaddr, __sz len)
 
 static void vmem_vma_unmap_and_free(struct uk_vma *vma)
 {
-	vmem_vma_unmap(vma, vma->start, vmem_vma_len(vma));
+	vmem_vma_unmap(vma, vma->start, uk_vma_len(vma));
 	vmem_vma_destroy(vma);
 }
 
@@ -754,9 +759,9 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 	return 0;
 }
 
-int vma_op_set_attr(struct uk_vma *vma, unsigned long attr)
+int uk_vma_op_set_attr(struct uk_vma *vma, unsigned long attr)
 {
-	unsigned long pgs = vmem_vma_len(vma) / PAGE_SIZE;
+	unsigned long pgs = uk_vma_len(vma) / PAGE_SIZE;
 
 	return ukplat_page_set_attr(vma->vas->pt, vma->start, pgs, attr, 0);
 }
@@ -860,8 +865,8 @@ static int vmem_mapx_advise(struct uk_pagetable *pt,
 	return vmem_mapx_populate(pt, vaddr, pt_vaddr, level, pte, user);
 }
 
-int vma_op_advise(struct uk_vma *vma, __vaddr_t vaddr, __sz len,
-		  unsigned long advice)
+int uk_vma_op_advise(struct uk_vma *vma, __vaddr_t vaddr, __sz len,
+		     unsigned long advice)
 {
 	unsigned int lvl;
 	unsigned long flgs;
@@ -892,7 +897,7 @@ int vma_op_advise(struct uk_vma *vma, __vaddr_t vaddr, __sz len,
 		 * DONTNEED means we will actually free the physical memory and
 		 * not only swap it out.
 		 */
-		rc = vma_op_unmap(vma, vaddr, len);
+		rc = uk_vma_op_unmap(vma, vaddr, len);
 		if (unlikely(rc))
 			return rc;
 	}

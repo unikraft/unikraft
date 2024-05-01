@@ -7,10 +7,9 @@
 #include <stddef.h>
 #include <errno.h>
 
-#include "vmem.h"
-
 #include <uk/config.h>
 #include <uk/assert.h>
+#include <uk/vma_ops.h>
 #include <uk/arch/limits.h>
 #include <uk/arch/paging.h>
 #ifdef CONFIG_HAVE_PAGING
@@ -68,9 +67,9 @@ const struct uk_vma_ops uk_vma_anon_ops = {
 	.new		= __NULL,
 	.destroy	= __NULL,
 	.fault		= vma_op_anon_fault,
-	.unmap		= vma_op_unmap,		/* default */
+	.unmap		= uk_vma_op_unmap,	/* default */
 	.split		= __NULL,
 	.merge		= __NULL,
-	.set_attr	= vma_op_set_attr,	/* default */
-	.advise		= vma_op_advise,	/* default */
+	.set_attr	= uk_vma_op_set_attr,	/* default */
+	.advise		= uk_vma_op_advise,	/* default */
 };
