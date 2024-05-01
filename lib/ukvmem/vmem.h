@@ -73,22 +73,4 @@ vmem_len_to_pages(struct uk_vma *vma, __sz len, unsigned long *flags)
 #define VMA_SETATTR(vma, ...)	_VMA_OP(vma, set_attr, 0, __VA_ARGS__)
 #define VMA_ADVISE(vma, ...)	_VMA_OP(vma, advise, 0, __VA_ARGS__)
 
-/**
- * Returns the length of a VMA in bytes.
- */
-static inline __sz vmem_vma_len(struct uk_vma *vma)
-{
-	UK_ASSERT(vma->end > vma->start);
-
-	return vma->end - vma->start;
-}
-
-/* Default VMA op handlers */
-int vma_op_deny();
-
-int vma_op_unmap(struct uk_vma *vma, __vaddr_t vaddr, __sz len);
-int vma_op_set_attr(struct uk_vma *vma, unsigned long attr);
-int vma_op_advise(struct uk_vma *vma, __vaddr_t vaddr, __sz len,
-		  unsigned long advice);
-
 #endif /* __VMEM_H__ */
