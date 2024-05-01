@@ -181,13 +181,6 @@ static inline int uk_vma_map_stack(struct uk_vas *vas, __vaddr_t *vaddr,
  */
 extern const struct uk_vma_ops uk_vma_dma_ops;
 
-struct uk_vma_dma {
-	struct uk_vma base;
-
-	/** Physical base address of the mapped physical region */
-	__paddr_t paddr;
-};
-
 struct uk_vma_dma_args {
 	__paddr_t paddr;
 };
@@ -218,7 +211,6 @@ static inline int uk_vma_map_dma(struct uk_vas *vas, __vaddr_t *vaddr,
 }
 
 #ifdef CONFIG_LIBVFSCORE
-#include <vfscore/file.h>
 
 /**
  * File Mapping VMA ------------------------------------------------------------
@@ -238,16 +230,6 @@ extern const struct uk_vma_ops uk_vma_file_ops;
 
 /* File mapping flags */
 #define UK_VMA_FILE_SHARED		(0x1UL << UK_VMA_MAP_EXTF_SHIFT)
-
-struct uk_vma_file {
-	struct uk_vma base;
-
-	/** File mapped in this VMA */
-	struct vfscore_file *f;
-
-	/** Start offset describing what position in the file is mapped */
-	__off offset;
-};
 
 struct uk_vma_file_args {
 	int fd;

@@ -22,6 +22,16 @@
 #include <vfscore/uio.h>
 #include <uk/isr/string.h>
 
+struct uk_vma_file {
+	struct uk_vma base;
+
+	/** File mapped in this VMA */
+	struct vfscore_file *f;
+
+	/** Start offset describing what position in the file is mapped */
+	__off offset;
+};
+
 #ifdef CONFIG_LIBUKVMEM_FILE_BASE
 static __vaddr_t vma_op_file_get_base(struct uk_vas *vas __unused,
 				      void *data __unused,
