@@ -277,3 +277,4 @@ vfscore_lseek
 vfscore_fstat
 vfscore_fcntl
 vfscore_ioctl
+uk_vma_file_ops
