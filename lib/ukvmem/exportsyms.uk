@@ -11,7 +11,6 @@ uk_vma_advise
 
 uk_vma_anon_ops
 uk_vma_dma_ops
-uk_vma_file_ops
 uk_vma_rsvd_ops
 uk_vma_stack_ops
 

@@ -8,9 +8,6 @@ LIBUKVMEM_SRCS-y += $(LIBUKVMEM_BASE)/vma_rsvd.c|isr
 LIBUKVMEM_SRCS-y += $(LIBUKVMEM_BASE)/vma_anon.c|isr
 LIBUKVMEM_SRCS-y += $(LIBUKVMEM_BASE)/vma_stack.c|isr
 LIBUKVMEM_SRCS-y += $(LIBUKVMEM_BASE)/vma_dma.c|isr
-ifeq ($(CONFIG_LIBVFSCORE),y)
-LIBUKVMEM_SRCS-y += $(LIBUKVMEM_BASE)/vma_file.c|isr
-endif
 
 ifeq ($(CONFIG_HAVE_PAGING),y)
 LIBUKVMEM_SRCS-$(CONFIG_ARCH_X86_64) += \

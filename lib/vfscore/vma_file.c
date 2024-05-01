@@ -17,6 +17,7 @@
 #include <uk/plat/paging.h>
 #endif /* CONFIG_HAVE_PAGING */
 #include <vfscore/file.h>
+#include <vfscore/vma.h>
 #include <vfscore/vnode.h>
 #include <vfscore/uio.h>
 #include <uk/isr/string.h>
