@@ -19,6 +19,13 @@
 #include <uk/plat/paging.h>
 #endif /* CONFIG_HAVE_PAGING */
 
+struct uk_vma_dma {
+	struct uk_vma base;
+
+	/** Physical base address of the mapped physical region */
+	__paddr_t paddr;
+};
+
 #ifdef CONFIG_LIBUKVMEM_DMA_BASE
 static __vaddr_t vma_op_dma_get_base(struct uk_vas *vas __unused,
 				     void *data __unused,
