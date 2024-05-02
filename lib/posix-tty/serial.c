@@ -259,6 +259,7 @@ static int serial_getstat(const struct uk_file *f __maybe_unused,
 static const struct uk_file_ops serial_ops = {
 	.read = serial_read,
 	.write = serial_write,
+	.iomem = uk_file_nop_iomem,
 	.getstat = serial_getstat,
 	.setstat = uk_file_nop_setstat,
 	.ctl = serial_ctl,

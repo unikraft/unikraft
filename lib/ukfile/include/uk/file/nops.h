@@ -21,6 +21,10 @@ ssize_t uk_file_nop_write(const struct uk_file *f,
 			  const struct iovec *iov, int iovcnt,
 			  off_t off, long flags);
 
+ssize_t uk_file_nop_iomem(const struct uk_file *f, enum uk_file_iomem_op op,
+			  size_t off, size_t len,
+			  struct iovec *iov, int iovcnt);
+
 int uk_file_nop_getstat(const struct uk_file *f,
 			unsigned int mask, struct uk_statx *arg);
 

@@ -197,6 +197,7 @@ socket_getstat(const struct uk_file *sock,
 static const struct uk_file_ops socket_file_ops = {
 	.read = socket_read,
 	.write = socket_write,
+	.iomem = uk_file_nop_iomem,
 	.getstat = socket_getstat,
 	.setstat = uk_file_nop_setstat,
 	.ctl = socket_ctl

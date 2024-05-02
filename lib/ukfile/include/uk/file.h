@@ -27,6 +27,15 @@ struct uk_file;
 
 /* File operations, to be provided by drivers */
 
+/* Access to file data is exposed through two interfaces:
+ * - traditional I/O: driver provides familiar read/write functions that shuttle
+ *   data to and from caller-provided buffers. This model is simple and most
+ *   likely supported by all file types.
+ * - shared memory (iomem): driver provides direct access to its authoritative
+ *   copy of the file contents in memory, giving the caller unmediated access.
+ *   This requires special support and may not be implemented by all files.
+ */
+
 /* I/O functions are non-blocking & return -EAGAIN when unable to perform.
  * The behavior of concurrent calls to these functions is driver-dependent and
  * no general assumptions can be made about their ordering and/or interleaving.
@@ -34,10 +43,91 @@ struct uk_file;
  * as appropriate in order to provide the desired concurrency guarantees.
  */
 
-/* I/O */
+/* Traditional I/O; read/write */
 typedef ssize_t (*uk_file_io_func)(const struct uk_file *f,
 				   const struct iovec *iov, int iovcnt,
 				   off_t off, long flags);
+
+/* Memory mapping */
+enum uk_file_iomem_op {
+	UKFILE_IOMEM_BORROW,
+	UKFILE_IOMEM_RETRIEVE,
+	UKFILE_IOMEM_ACQUIRE,
+	UKFILE_IOMEM_RELEASE,
+	UKFILE_IOMEM_GIFT
+};
+
+/**
+ * Retrieve or manipulate memory backing the contents of file `f`.
+ *
+ * Operation is determined by `op`:
+ * - UKFILE_IOMEM_ACQUIRE: Acquire backing memory region(s) for file contents
+ *   starting at `off` going for `len` bytes.
+ *   - memory must be ACQUIREd before it can be RETRIEVEd
+ *   - `off` and `len` must be page-aligned
+ *   - `iov` and `iovcnt` are ignored
+ *   - may not be supported by all files
+ *
+ * - UKFILE_IOMEM_RELEASE: Release previously acquired memory region(s)
+ *   starting at `off` going for `len` bytes.
+ *   - must only be called on memory regions previously returned by ACQUIRE
+ *   - memory acquisitions must be released either in whole, or partially along
+ *     page boundaries; drivers are thus free to account for memory acquisitions
+ *     only at page granularity
+ *   - `iov` and `iovcnt` are ignored
+ *   - always succeeds
+ *
+ * - UKFILE_IOMEM_RETRIEVE: Retrieve previously ACQUIREd backing memory regions
+ *   for file contents starting at `off` going for `len` bytes.
+ *   - `off` & `len` must describe a buffer that has been successfully ACQUIREd
+ *   - iov[] is populated up to iovcnt with memory regions
+ *   - memory regions are valid for the lifetime of the file, or until RELEASEd
+ *   - multiple calls to RETRIEVE on the same contents are guaranteed to return
+ *     the same memory region(s) throughout the lifetime of an acquisition
+ *   - immutable files (e.g., from read-only filesystems) that support ACQUIRE
+ *     return -EROFS on RETRIEVE, providing the buffers via BORROW
+ *
+ * - UKFILE_IOMEM_BORROW: Similar to RETRIEVE, except the returned memory is
+ *   read-only and no guarantees are made about its lifetime.
+ *   - returned buffers may be NULL, representing sparse areas
+ *   - writing to the returned memory is undefined behavior
+ *   - unless the memory region has been previously ACQUIREd, buffers are only
+ *     valid until the next operation that changes file state; in this case
+ *     callers must ensure mutual exclusion
+ *   - unlike with RETRIEVE, this memory need not be ACQUIREd & RELEASEd
+ *   - may be more widely supported than ACQUIRE + RETRIEVE
+ *   - may be implemented more efficiently than ACQUIRE + RETRIEVE + RELEASE
+ *   - must not be provided for mutable files by drivers that handle I/O
+ *     synchronization internally and do not honor state->iolock
+ *
+ * - UKFILE_IOMEM_GIFT: Gift memory regions to the file to use as backing
+ *   starting at `off` going for `len` bytes.
+ *   - if `off+len` is larger than file size, `f` is enlarged to fit
+ *   - if `off` is after the end of file, the difference is left as a hole,
+ *     if supported by the file type, otherwise may error
+ *   - `len` must equal the total memory size described by `iov`
+ *   - the memory regions provided must be valid for the lifetime of the file or
+ *     until they are released with a call to ctl
+ *   - the caller must not touch these regions while they are in use
+ *   - the memory regions are not freed when no longer used, the caller remains
+ *     responsible for this
+ *   - may fail if any addresses or lengths are not page aligned
+ *
+ * No synchronization is performed by the file driver, callers should ensure
+ * mutual exclusion during the call (using e.g., file iolocks) as such:
+ * - ACQUIRE/RELEASE/GIFT: exclusive access
+ * - RETRIEVE/BORROW: lock out the above + file state change ops (e.g., write)
+ *
+ * @return
+ *  >= 0: (BORROW/RETRIEVE) number of iov entries written
+ *  >= 0: (ACQUIRE) number of bytes acquired
+ *  == 0: Success
+ *   < 0: negative errno; -ENODEV if operation not supported by file
+ */
+typedef ssize_t (*uk_file_iomem_func)(const struct uk_file *f,
+				      enum uk_file_iomem_op op,
+				      size_t off, size_t len,
+				      struct iovec *iov, int iovcnt);
 
 /* Info (stat-like & chXXX-like) */
 typedef int (*uk_file_getstat_func)(const struct uk_file *f,
@@ -93,6 +183,7 @@ typedef void (*uk_file_release_func)(const struct uk_file *f, int what);
 struct uk_file_ops {
 	uk_file_io_func read;
 	uk_file_io_func write;
+	uk_file_iomem_func iomem;
 	uk_file_getstat_func getstat;
 	uk_file_setstat_func setstat;
 	uk_file_ctl_func ctl;
@@ -231,6 +322,13 @@ ssize_t uk_file_write(const struct uk_file *f,
 		      off_t off, long flags)
 {
 	return f->ops->write(f, iov, iovcnt, off, flags);
+}
+
+static inline
+ssize_t uk_file_iomem(const struct uk_file *f, enum uk_file_iomem_op op,
+		      off_t off, size_t len, struct iovec *iov, int iovcnt)
+{
+	return f->ops->iomem(f, op, off, len, iov, iovcnt);
 }
 
 static inline

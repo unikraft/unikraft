@@ -311,6 +311,7 @@ out_full:
 static const struct uk_file_ops rpipe_ops = {
 	.read = pipe_read,
 	.write = uk_file_nop_write,
+	.iomem = uk_file_nop_iomem,
 	.getstat = uk_file_nop_getstat,
 	.setstat = uk_file_nop_setstat,
 	.ctl = uk_file_nop_ctl
@@ -319,6 +320,7 @@ static const struct uk_file_ops rpipe_ops = {
 static const struct uk_file_ops wpipe_ops = {
 	.read = uk_file_nop_read,
 	.write = pipe_write,
+	.iomem = uk_file_nop_iomem,
 	.getstat = uk_file_nop_getstat,
 	.setstat = uk_file_nop_setstat,
 	.ctl = uk_file_nop_ctl
