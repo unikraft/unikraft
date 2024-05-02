@@ -333,6 +333,7 @@ static int pipe_getstat(const struct uk_file *f, unsigned mask __unused,
 static const struct uk_file_ops rpipe_ops = {
 	.read = pipe_read,
 	.write = uk_file_nop_write,
+	.mem = uk_file_nop_mem,
 	.getstat = pipe_getstat,
 	.setstat = uk_file_nop_setstat,
 	.ctl = uk_file_nop_ctl
@@ -341,6 +342,7 @@ static const struct uk_file_ops rpipe_ops = {
 static const struct uk_file_ops wpipe_ops = {
 	.read = uk_file_nop_read,
 	.write = pipe_write,
+	.mem = uk_file_nop_mem,
 	.getstat = pipe_getstat,
 	.setstat = uk_file_nop_setstat,
 	.ctl = uk_file_nop_ctl

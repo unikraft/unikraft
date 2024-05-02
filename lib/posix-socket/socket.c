@@ -209,6 +209,7 @@ socket_getstat(const struct uk_file *sock,
 static const struct uk_file_ops socket_file_ops = {
 	.read = socket_read,
 	.write = socket_write,
+	.mem = uk_file_nop_mem,
 	.getstat = socket_getstat,
 	.setstat = uk_file_nop_setstat,
 	.ctl = socket_ctl

@@ -112,6 +112,7 @@ static ssize_t evfd_write(const struct uk_file *f,
 static const struct uk_file_ops evfd_ops = {
 	.read = evfd_read,
 	.write = evfd_write,
+	.mem = uk_file_nop_mem,
 	.getstat = uk_file_nop_getstat,
 	.setstat = uk_file_nop_setstat,
 	.ctl = uk_file_nop_ctl

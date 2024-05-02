@@ -187,6 +187,7 @@ static ssize_t signal_file_read(const struct uk_file *f,
 static const struct uk_file_ops signal_file_ops = {
 	.read = signal_file_read,
 	.write = uk_file_nop_write,
+	.mem = uk_file_nop_mem,
 	.getstat = uk_file_nop_getstat,
 	.setstat = uk_file_nop_setstat,
 	.ctl = uk_file_nop_ctl
