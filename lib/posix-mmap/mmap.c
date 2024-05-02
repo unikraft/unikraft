@@ -145,10 +145,6 @@ static int do_mmap(void **addr, size_t len, int prot, int flags, int fd,
 		if (unlikely(fd < 0))
 			return -EBADF;
 
-		/* Linux reports -ENODEV for stdout, stdin, stderr */
-		if (unlikely(fd < 3))
-			return -ENODEV;
-
 		file_args.fd     = fd;
 		file_args.offset = offset;
 
