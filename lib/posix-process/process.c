@@ -493,7 +493,7 @@ pid_t ukthread2tid(struct uk_thread *thread)
 	struct posix_thread *pthread;
 
 	pthread = uk_thread_uktls_var(thread, pthread_self);
-	if (!pthread)
+	if (unlikely(!pthread))
 		return -ENOTSUP;
 
 	return pthread->tid;
@@ -504,7 +504,7 @@ pid_t ukthread2pid(struct uk_thread *thread)
 	struct posix_thread *pthread;
 
 	pthread = uk_thread_uktls_var(thread, pthread_self);
-	if (!pthread)
+	if (unlikely(!pthread))
 		return -ENOTSUP;
 
 	UK_ASSERT(pthread->process);
@@ -514,7 +514,7 @@ pid_t ukthread2pid(struct uk_thread *thread)
 
 UK_SYSCALL_R_DEFINE(pid_t, getpid)
 {
-	if (!pthread_self)
+	if (unlikely(!pthread_self))
 		return -ENOTSUP;
 
 	UK_ASSERT(pthread_self->process);
@@ -523,7 +523,7 @@ UK_SYSCALL_R_DEFINE(pid_t, getpid)
 
 UK_SYSCALL_R_DEFINE(pid_t, gettid)
 {
-	if (!pthread_self)
+	if (unlikely(!pthread_self))
 		return -ENOTSUP;
 
 	return pthread_self->tid;
@@ -532,7 +532,7 @@ UK_SYSCALL_R_DEFINE(pid_t, gettid)
 /* PID of parent process  */
 UK_SYSCALL_R_DEFINE(pid_t, getppid)
 {
-	if (!pthread_self)
+	if (unlikely(!pthread_self))
 		return -ENOTSUP;
 
 	UK_ASSERT(pthread_self->process);
@@ -594,7 +594,7 @@ static int pprocess_parent_settid(const struct clone_args *cl_args,
 
 	UK_ASSERT(child_tid > 0);
 
-	if (!cl_args->parent_tid)
+	if (unlikely(!cl_args->parent_tid))
 		return -EINVAL;
 
 	*((pid_t *) cl_args->parent_tid) = child_tid;
@@ -612,7 +612,7 @@ static int pprocess_child_settid(const struct clone_args *cl_args,
 
 	UK_ASSERT(child_tid > 0);
 
-	if (!cl_args->child_tid)
+	if (unlikely(!cl_args->child_tid))
 		return -EINVAL;
 
 	*((pid_t *) cl_args->child_tid) = child_tid;

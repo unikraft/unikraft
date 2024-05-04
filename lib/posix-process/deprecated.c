@@ -401,7 +401,7 @@ UK_SYSCALL_R_DEFINE(int, setrlimit, int, resource, const struct rlimit *, rlim)
 UK_SYSCALL_R_DEFINE(int, getrusage, int, who,
 		    struct rusage *, usage)
 {
-	if (!usage)
+	if (unlikely(!usage))
 		return -EFAULT;
 
 	memset(usage, 0, sizeof(*usage));

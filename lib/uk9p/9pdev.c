@@ -69,7 +69,7 @@ static int _fid_mgmt_next_fid_locked(struct uk_9pdev_fid_mgmt *fid_mgmt,
 		uk_list_del(&result->_list);
 	} else {
 		result = uk_9pfid_alloc(dev);
-		if (!result)
+		if (unlikely(!result))
 			return -ENOMEM;
 		result->fid = fid_mgmt->next_fid++;
 	}

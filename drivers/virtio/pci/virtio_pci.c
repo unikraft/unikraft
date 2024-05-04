@@ -274,7 +274,7 @@ static int vpci_legacy_pci_config_get(struct virtio_dev *vdev, __u16 offset,
 	} else {
 		__u32 len_bytes;
 
-		if (__builtin_umul_overflow(len, type_len, &len_bytes))
+		if (unlikely(__builtin_umul_overflow(len, type_len, &len_bytes)))
 			return -EFAULT;
 
 		rc = virtio_cread_bytes_many(
@@ -371,7 +371,7 @@ static int virtio_pci_legacy_add_dev(struct pci_device *pci_dev,
 				     struct virtio_pci_dev *vpci_dev)
 {
 	/* Check the valid range of the virtio legacy device */
-	if (pci_dev->id.device_id < 0x1000 || pci_dev->id.device_id > 0x103f) {
+	if (unlikely(pci_dev->id.device_id < 0x1000 || pci_dev->id.device_id > 0x103f)) {
 		uk_pr_err("Invalid Virtio Devices %04x\n",
 			  pci_dev->id.device_id);
 		return -EINVAL;
@@ -401,7 +401,7 @@ static int virtio_pci_add_dev(struct pci_device *pci_dev)
 	UK_ASSERT(pci_dev != NULL);
 
 	vpci_dev = uk_malloc(a, sizeof(*vpci_dev));
-	if (!vpci_dev) {
+	if (unlikely(!vpci_dev)) {
 		uk_pr_err("Failed to allocate virtio-pci device\n");
 		return -ENOMEM;
 	}
@@ -438,7 +438,7 @@ free_pci_dev:
 static int virtio_pci_drv_init(struct uk_alloc *drv_allocator)
 {
 	/* driver initialization */
-	if (!drv_allocator)
+	if (unlikely(!drv_allocator))
 		return -EINVAL;
 
 	a = drv_allocator;

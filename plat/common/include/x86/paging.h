@@ -268,7 +268,7 @@ pgarch_init(void)
 
 	/* Check for availability of extended features */
 	ukarch_x86_cpuid(0x80000000, 0, &eax, &ebx, &ecx, &edx);
-	if (eax < 0x80000008)
+	if (unlikely(eax < 0x80000008))
 		return -ENOTSUP;
 
 	/* Check for 1GiB page support. We assume 64-bit and NX support */

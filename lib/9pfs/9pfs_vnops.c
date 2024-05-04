@@ -159,7 +159,7 @@ int uk_9pfs_allocate_vnode_data(struct vnode *vp, struct uk_9pfid *fid)
 	struct uk_9pfs_node_data *nd;
 
 	nd = malloc(sizeof(*nd));
-	if (nd == NULL)
+	if (unlikely(nd == NULL))
 		return -ENOMEM;
 
 	nd->fid = fid;

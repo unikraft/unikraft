@@ -526,7 +526,7 @@ int uk_sys_epoll_pwait2(const struct uk_file *epf, struct epoll_event *events,
 	if (timeout) {
 		__snsec tout = uk_time_spec_to_nsec(timeout);
 
-		if (tout < 0)
+		if (unlikely(tout < 0))
 			return -EINVAL;
 		deadline = ukplat_monotonic_clock() + tout;
 	} else {

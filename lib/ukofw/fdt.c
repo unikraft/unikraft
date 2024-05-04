@@ -98,7 +98,7 @@ int fdt_interrupt_cells(const void *fdt, int offset)
 	if (ret < 0)
 		return ret;
 
-	if ((val <= 0) || (val > FDT_MAX_NCELLS))
+	if (unlikely((val <= 0) || (val > FDT_MAX_NCELLS)))
 		return -FDT_ERR_BADNCELLS;
 
 	return val;
@@ -285,14 +285,14 @@ int fdt_get_address(const void *fdt, int nodeoffset, uint32_t index,
 	prop_size = prop_addr + sizeof(fdt32_t) * naddr;
 
 	/* The reg content must cover the reg term[index] at least */
-	if (len < (prop_addr + term_size))
+	if (unlikely(len < (prop_addr + term_size)))
 		return -FDT_ERR_NOSPACE;
 
 	*size = fdt_reg_read_number(regs + prop_size, nsize);
 	*addr = fdt_translate_address_by_ranges(fdt, nodeoffset,
 						regs + prop_addr);
 
-	if (*addr == FDT_BAD_ADDR)
+	if (unlikely(*addr == FDT_BAD_ADDR))
 		return -FDT_ERR_NOTFOUND;
 	return 0;
 }
@@ -346,12 +346,12 @@ int fdt_get_interrupt(const void *fdt, int nodeoffset,
 	UK_ASSERT(size && prop);
 
 	nintr = fdt_interrupt_cells(fdt, nodeoffset);
-	if (nintr < 0 || nintr >= FDT_MAX_NCELLS)
+	if (unlikely(nintr < 0 || nintr >= FDT_MAX_NCELLS))
 		return -FDT_ERR_BADNCELLS;
 
 	/* "interrupts-extended" is not supported */
 	regs = fdt_getprop(fdt, nodeoffset, "interrupts-extended", &len);
-	if (regs) {
+	if (unlikely(regs)) {
 		uk_pr_warn("interrupts multiple parents is not supported\n");
 		return -FDT_ERR_INTERNAL;
 	}
@@ -361,7 +361,7 @@ int fdt_get_interrupt(const void *fdt, int nodeoffset,
 	 */
 	regs = fdt_getprop(fdt, nodeoffset, "interrupts", &len);
 	term_size = sizeof(fdt32_t) * nintr;
-	if (regs == NULL || (uint32_t)len < term_size * (index + 1))
+	if (unlikely(regs == NULL || (uint32_t)len < term_size * (index + 1)))
 		return -FDT_ERR_NOTFOUND;
 
 	*size = nintr;

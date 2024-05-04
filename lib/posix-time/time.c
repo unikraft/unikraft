@@ -69,7 +69,7 @@ UK_SYSCALL_R_DEFINE(int, nanosleep, const struct timespec*, req, struct timespec
 {
 	__nsec before, after, diff, nsec;
 
-	if (!req || req->tv_nsec < 0 || req->tv_nsec > 999999999) {
+	if (unlikely(!req || req->tv_nsec < 0 || req->tv_nsec > 999999999)) {
 		return -EINVAL;
 	}
 
@@ -136,7 +136,7 @@ UK_SYSCALL_R_DEFINE(int, gettimeofday, struct timeval *, tv, void *, tz)
 {
 	__nsec now = ukplat_wall_clock();
 
-	if (!tv)
+	if (unlikely(!tv))
 		return -EINVAL;
 
 	tv->tv_sec = ukarch_time_nsec_to_sec(now);

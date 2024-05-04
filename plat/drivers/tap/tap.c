@@ -263,7 +263,7 @@ static int tap_netdev_recv(struct uk_netdev *dev,
 
 	tdev = to_tapnetdev(dev);
 
-	if (!queue->alloc_rxpkts)
+	if (unlikely(!queue->alloc_rxpkts))
 		return -EINVAL;
 
 
@@ -651,8 +651,8 @@ static int tap_netdev_configure(struct uk_netdev *n,
 	UK_ASSERT(n && conf);
 	tdev = to_tapnetdev(n);
 
-	if (conf->nb_rx_queues > tdev->max_qpairs
-	    || conf->nb_tx_queues > tdev->max_qpairs) {
+	if (unlikely(conf->nb_rx_queues > tdev->max_qpairs
+	    || conf->nb_tx_queues > tdev->max_qpairs)) {
 		uk_pr_err(DRIVER_NAME": rx-queue:%d, tx-queue:%d not supported",
 			  conf->nb_rx_queues, conf->nb_tx_queues);
 		return -ENOTSUP;
@@ -819,7 +819,7 @@ static int tap_drv_probe(void)
 	if (tap_dev_cnt > 0) {
 		tap_drv.bridge_ifs = uk_calloc(tap_drv.a, tap_dev_cnt,
 					       sizeof(char *));
-		if (!tap_drv.bridge_ifs) {
+		if (unlikely(!tap_drv.bridge_ifs)) {
 			uk_pr_err(DRIVER_NAME": Failed to allocate brigde_ifs\n");
 			return -ENOMEM;
 		}

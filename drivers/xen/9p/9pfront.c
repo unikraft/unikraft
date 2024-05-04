@@ -415,8 +415,8 @@ static int p9front_request(struct uk_9pdev *p9dev,
 	masked_prod = xen_9pfs_mask(prod, ring_size);
 	masked_cons = xen_9pfs_mask(cons, ring_size);
 
-	if (ring_size - xen_9pfs_queued(prod, cons, ring_size) <
-			req->xmit.size + req->xmit.zc_size) {
+	if (unlikely(ring_size - xen_9pfs_queued(prod, cons, ring_size) <
+			req->xmit.size + req->xmit.zc_size)) {
 		ukarch_spin_unlock(&ring->spinlock);
 		return -ENOSPC;
 	}
@@ -451,7 +451,7 @@ static struct uk_9pdev_trans p9front_trans = {
 
 static int p9front_drv_init(struct uk_alloc *drv_allocator)
 {
-	if (!drv_allocator)
+	if (unlikely(!drv_allocator))
 		return -EINVAL;
 
 	a = drv_allocator;

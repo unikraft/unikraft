@@ -472,7 +472,7 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 
 	min = round_pgup((uintptr_t)base);
 	max = round_pgdown((uintptr_t)base + (uintptr_t)len);
-	if (max < min) {
+	if (unlikely(max < min)) {
 		uk_pr_err("%"__PRIuptr": Failed to add memory region %"__PRIuptr"-%"__PRIuptr": Invalid range after applying page alignments\n",
 			  (uintptr_t) a, (uintptr_t) base,
 			  (uintptr_t) base + (uintptr_t) len);
@@ -484,8 +484,8 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 	/* We should have at least one page for bitmap tracking
 	 * and one page for data.
 	 */
-	if (range < round_pgup(sizeof(*memr) + BYTES_PER_MAPWORD) +
-			__PAGE_SIZE) {
+	if (unlikely(range < round_pgup(sizeof(*memr) + BYTES_PER_MAPWORD) +
+			__PAGE_SIZE)) {
 		uk_pr_err("%"__PRIuptr": Failed to add memory region %"__PRIuptr"-%"__PRIuptr": Not enough space after applying page alignments\n",
 			  (uintptr_t) a, (uintptr_t) base,
 			  (uintptr_t) base + (uintptr_t) len);

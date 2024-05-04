@@ -108,7 +108,7 @@ static int vma_op_dma_merge(struct uk_vma *vma, struct uk_vma *next)
 	UK_ASSERT(next->start > vma->start);
 
 	off = next->start - vma->start;
-	if (next_dma->paddr != vma_dma->paddr + off)
+	if (unlikely(next_dma->paddr != vma_dma->paddr + off))
 		return -EPERM;
 
 	return 0;

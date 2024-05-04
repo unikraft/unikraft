@@ -50,7 +50,7 @@ int vma_op_file_new(struct uk_vas *vas, __vaddr_t vaddr __unused,
 	 * to the underlying file while the mapping is established will not be
 	 * reflected in memory.
 	 */
-	if ((*flags & UK_VMA_FILE_SHARED) && (attr & PAGE_ATTR_PROT_WRITE))
+	if (unlikely((*flags & UK_VMA_FILE_SHARED) && (attr & PAGE_ATTR_PROT_WRITE)))
 		return -ENOTSUP;
 
 	/* Since we cannot do ISR-safe file accesses in the fault handler,
@@ -204,7 +204,7 @@ static int vma_op_file_merge(struct uk_vma *vma, struct uk_vma *next)
 	UK_ASSERT(next->start > vma->start);
 
 	/* Only merge if this is the same file... */
-	if (vma_file->f->f_dentry != next_file->f->f_dentry)
+	if (unlikely(vma_file->f->f_dentry != next_file->f->f_dentry))
 		return -EPERM;
 
 	/* ...and the VMAs map contiguous file ranges */
@@ -220,7 +220,7 @@ static int vma_op_file_merge(struct uk_vma *vma, struct uk_vma *next)
 static int vma_op_file_set_attr(struct uk_vma *vma, unsigned long attr)
 {
 	/* Writable shared mappings are not supported. */
-	if ((vma->flags & UK_VMA_FILE_SHARED) && (attr & PAGE_ATTR_PROT_WRITE))
+	if (unlikely((vma->flags & UK_VMA_FILE_SHARED) && (attr & PAGE_ATTR_PROT_WRITE)))
 		return -EPERM;
 
 	/* Default handler */

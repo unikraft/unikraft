@@ -99,7 +99,7 @@ enum xenbus_dev_type uk_xenbus_str_to_devtype(const char *devtypestr)
 
 int uk_xenbus_watch_wait_event(struct xenbus_watch *watch)
 {
-	if (watch == NULL)
+	if (unlikely(watch == NULL))
 		return -EINVAL;
 
 	while (1) {
@@ -122,7 +122,7 @@ int uk_xenbus_watch_wait_event(struct xenbus_watch *watch)
 
 int uk_xenbus_watch_notify_event(struct xenbus_watch *watch)
 {
-	if (watch == NULL)
+	if (unlikely(watch == NULL))
 		return -EINVAL;
 
 	ukarch_spin_lock(&watch->lock);
@@ -154,7 +154,7 @@ int uk_xenbus_switch_state(xenbus_transaction_t xbt,
 	int abort;
 	int err;
 
-	if (xendev == NULL)
+	if (unlikely(xendev == NULL))
 		return -EINVAL;
 
 	sprintf(state_path, "%s/state", xendev->nodename);

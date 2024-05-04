@@ -157,7 +157,7 @@ static int gcov_dump_info_file(void)
 
 	FILE *file = fopen(UKGCOV_OUTPUT_BINARY_FILENAME, "w");
 
-	if (unlikely(!file))
+	if (unlikely(unlikely(!file)))
 		return -ENOENT;
 
 	while (info != end) {

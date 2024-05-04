@@ -1606,7 +1606,7 @@ LFS64(__xstat);
 
 UK_SYSCALL_R_DEFINE(int, stat, const char*, pathname, struct stat*, st)
 {
-	if (!pathname) {
+	if (unlikely(!pathname)) {
 		return -EINVAL;
 	}
 	return __xstat_helper(1, pathname, st);
@@ -1672,7 +1672,7 @@ UK_SYSCALL_R_DEFINE(int, lstat, const char*, pathname, struct stat*, st)
 static int __fxstatat_helper(int ver __unused, int dirfd, const char *pathname,
 		struct stat *st, int flags)
 {
-	if (!pathname || !st)
+	if (unlikely(!pathname || !st))
 		return -EFAULT;
 	if (pathname[0] == '/' || dirfd == AT_FDCWD) {
 		return uk_syscall_r_stat((long) pathname, (long) st);

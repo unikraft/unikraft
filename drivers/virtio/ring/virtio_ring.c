@@ -340,7 +340,7 @@ int virtqueue_buffer_dequeue(struct virtqueue *vq, void **cookie, __u32 *len)
 	vrq = to_virtqueue_vring(vq);
 
 	/* No new descriptor since last dequeue operation */
-	if (!virtqueue_hasdata(vq))
+	if (unlikely(!virtqueue_hasdata(vq)))
 		return -ENOMSG;
 	used_idx = vrq->last_used_desc_idx++ & (vrq->vring.num - 1);
 	elem = &vrq->vring.used->ring[used_idx];
@@ -374,7 +374,7 @@ int virtqueue_buffer_enqueue(struct virtqueue *vq, void *cookie,
 		uk_pr_err("%"__PRIu32" invalid number of descriptor\n",
 			  total_desc);
 		return -EINVAL;
-	} else if (vrq->desc_avail < total_desc) {
+	} else if (unlikely(vrq->desc_avail < total_desc)) {
 		uk_pr_debug("Available descriptor:%"__PRIu16", Requested descriptor:%"__PRIu32"\n",
 			  vrq->desc_avail, total_desc);
 		return -ENOSPC;

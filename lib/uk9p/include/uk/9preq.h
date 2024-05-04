@@ -287,7 +287,7 @@ int uk_9preq_error(struct uk_9preq *req);
 static inline int uk_9preq_writebuf(struct uk_9preq *req, const void *buf,
 		uint32_t size)
 {
-	if (req->xmit.offset + size > req->xmit.size)
+	if (unlikely(req->xmit.offset + size > req->xmit.size))
 		return -ENOBUFS;
 
 	memcpy((char *)req->xmit.buf + req->xmit.offset, buf, size);
@@ -298,7 +298,7 @@ static inline int uk_9preq_writebuf(struct uk_9preq *req, const void *buf,
 static inline int uk_9preq_readbuf(struct uk_9preq *req, void *buf,
 		uint32_t size)
 {
-	if (req->recv.offset + size > req->recv.size)
+	if (unlikely(req->recv.offset + size > req->recv.size))
 		return -ENOBUFS;
 
 	memcpy(buf, (char *)req->recv.buf + req->recv.offset, size);
@@ -410,7 +410,7 @@ static inline int uk_9preq_readstr(struct uk_9preq *req, struct uk_9p_str *val)
 	/* Optimized string read, does not allocate memory. */
 	val->data = (char *)req->recv.buf + req->recv.offset;
 	req->recv.offset += val->size;
-	if (req->recv.offset > req->recv.size)
+	if (unlikely(req->recv.offset > req->recv.size))
 		return -ENOBUFS;
 
 	return 0;

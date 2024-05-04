@@ -50,7 +50,7 @@ int uk_netbuf_sglist_append(struct uk_sglist *sg, struct uk_netbuf *netbuf)
 	UK_ASSERT(sg);
 	UK_ASSERT(netbuf);
 
-	if (sg->sg_maxseg == 0)
+	if (unlikely(sg->sg_maxseg == 0))
 		return -EINVAL;
 
 	UK_SGLIST_SAVE(sg, save);

@@ -230,12 +230,12 @@ int lcpu_fn_enqueue(struct lcpu *lcpu, const struct ukplat_lcpu_func *fn)
 	old_fn = uk_load_n(&lcpu->fn.fn);
 
 	/* Check if the slot is empty */
-	if (old_fn != NULL)
+	if (unlikely(old_fn != NULL))
 		return -EAGAIN;
 
 	/* It is empty, try to store the function */
-	if (uk_compare_exchange_sync(&lcpu->fn.fn, old_fn,
-					 fn->fn) != fn->fn)
+	if (unlikely(uk_compare_exchange_sync(&lcpu->fn.fn, old_fn,
+					 fn->fn) != fn->fn))
 		return -EAGAIN;
 
 	/* We have acquired the slot! Also store the user argument.
@@ -591,7 +591,7 @@ int ukplat_lcpu_wait(const __lcpuidx lcpuidx[], unsigned int *num,
 			if (state == LCPU_STATE_IDLE)
 				break;
 
-			if (timeout && (ukplat_monotonic_clock() >= end))
+			if (unlikely(timeout && (ukplat_monotonic_clock() >= end)))
 				return -ETIMEDOUT; /* Timed out */
 		}
 	}

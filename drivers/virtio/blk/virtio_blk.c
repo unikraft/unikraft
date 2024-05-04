@@ -199,20 +199,20 @@ static int virtio_blkdev_request_write(struct uk_blkdev_queue *queue,
 	vbdev = queue->vbd;
 	cap = &vbdev->blkdev.capabilities;
 	req = virtio_blk_req->req;
-	if (req->operation == UK_BLKREQ_WRITE &&
-			cap->mode == O_RDONLY)
+	if (unlikely(req->operation == UK_BLKREQ_WRITE &&
+			cap->mode == O_RDONLY))
 		return -EPERM;
 
-	if (req->aio_buf == NULL)
+	if (unlikely(req->aio_buf == NULL))
 		return -EINVAL;
 
-	if (req->nb_sectors == 0)
+	if (unlikely(req->nb_sectors == 0))
 		return -EINVAL;
 
-	if (req->start_sector + req->nb_sectors > cap->sectors)
+	if (unlikely(req->start_sector + req->nb_sectors > cap->sectors))
 		return -EINVAL;
 
-	if (req->nb_sectors > cap->max_sectors_per_req)
+	if (unlikely(req->nb_sectors > cap->max_sectors_per_req))
 		return -EINVAL;
 
 	rc = virtio_blkdev_request_set_sglist(queue, virtio_blk_req,
@@ -247,7 +247,7 @@ static int virtio_blkdev_request_flush(struct uk_blkdev_queue *queue,
 	UK_ASSERT(virtio_blk_req);
 
 	vbdev = queue->vbd;
-	if (!vbdev->writeback)
+	if (unlikely(!vbdev->writeback))
 		return -ENOTSUP;
 
 	if (virtio_blk_req->virtio_blk_outhdr.sector) {
@@ -301,7 +301,7 @@ static int virtio_blkdev_queue_enqueue(struct uk_blkdev_queue *queue,
 	UK_ASSERT(queue);
 	UK_ASSERT(req);
 
-	if (virtqueue_is_full(queue->vq)) {
+	if (unlikely(virtqueue_is_full(queue->vq))) {
 		uk_pr_debug("The virtqueue is full\n");
 		return -ENOSPC;
 	}
@@ -652,7 +652,7 @@ static int virtio_blkdev_queues_alloc(struct virtio_blk_device *vbdev,
 	int vq_avail = 0;
 	__u16 qdesc_size[conf->nb_queues];
 
-	if (conf->nb_queues > vbdev->max_vqueue_pairs) {
+	if (unlikely(conf->nb_queues > vbdev->max_vqueue_pairs)) {
 		uk_pr_err("Queue number not supported: %"__PRIu16"\n",
 				conf->nb_queues);
 		return -ENOTSUP;
@@ -736,7 +736,7 @@ static int virtio_blkdev_stop(struct uk_blkdev *dev)
 
 	d = to_virtioblkdev(dev);
 	for (q_id = 0; q_id < d->nb_queues; ++q_id) {
-		if (virtqueue_hasdata(d->qs[q_id].vq)) {
+		if (unlikely(virtqueue_hasdata(d->qs[q_id].vq))) {
 			uk_pr_err("Queue:%"__PRIu16" has unconsumed responses\n",
 					q_id);
 			return -EBUSY;
@@ -923,7 +923,7 @@ static int virtio_blk_add_dev(struct virtio_dev *vdev)
 	UK_ASSERT(vdev != NULL);
 
 	vbdev = uk_calloc(a, 1, sizeof(*vbdev));
-	if (!vbdev)
+	if (unlikely(!vbdev))
 		return -ENOMEM;
 
 	vbdev->vdev = vdev;
@@ -959,7 +959,7 @@ err_out:
 static int virtio_blk_drv_init(struct uk_alloc *drv_allocator)
 {
 	/* driver initialization */
-	if (!drv_allocator)
+	if (unlikely(!drv_allocator))
 		return -EINVAL;
 
 	a = drv_allocator;

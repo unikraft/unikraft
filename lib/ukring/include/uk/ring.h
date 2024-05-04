@@ -92,7 +92,7 @@ uk_ring_enqueue(struct uk_ring *br, void *buf)
 
 		if (prod_next == cons_tail) {
 			rmb();
-			if (prod_head == br->br_prod_head && cons_tail == br->br_cons_tail) {
+			if (unlikely(prod_head == br->br_prod_head && cons_tail == br->br_cons_tail)) {
 				br->br_drops++;
 				critical_exit();
 				return -ENOBUFS;

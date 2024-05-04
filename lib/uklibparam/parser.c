@@ -322,7 +322,7 @@ static int write_value(struct uk_libparam_param *p, __uptr raw_value)
 	UK_ASSERT(p);
 	__sz widx = 0;
 
-	if (p->count == 0) {
+	if (unlikely(p->count == 0)) {
 		/* If count is equal to 0, we never have space */
 		return -ENOSPC;
 	} else if (p->count == 1) {
@@ -332,7 +332,7 @@ static int write_value(struct uk_libparam_param *p, __uptr raw_value)
 		/* Take next index within array bounds,
 		 * otherwise return -ENOSPC
 		 */
-		if (p->__widx >= p->count)
+		if (unlikely(p->__widx >= p->count))
 			return -ENOSPC;
 		widx = p->__widx++;
 	}
@@ -411,7 +411,7 @@ static int parse_value(struct parse_arg_ctx *ctx, char *value, __sz value_len)
 		break; /* Continue treating value as a number */
 
 	case _UK_LIBPARAM_PARAM_TYPE_charp:
-		if (!value) {
+		if (unlikely(!value)) {
 			uk_pr_warn("No value given to %s.%s (charp)\n",
 				   ctx->ld->prefix, ctx->p->name);
 			return -EINVAL;
@@ -557,7 +557,7 @@ static int parse_arg(struct parse_arg_ctx *ctx, char *strbuf, int scan_only)
 			__sz paramname_len;
 
 			paramname = strchr(libname, PARSE_PARAM_SEP);
-			if (!paramname) {
+			if (unlikely(!paramname)) {
 				uk_pr_debug(" Failed to determine library and parameter names (separator '%c' not found)\n",
 					    PARSE_PARAM_SEP);
 				return -EINVAL;
@@ -699,7 +699,7 @@ int uk_libparam_parse(int argc, char **argv, int flags)
 		}
 	}
 
-	if (c.hit_usage && (flags & UK_LIBPARAM_F_USAGE)) {
+	if (unlikely(c.hit_usage && (flags & UK_LIBPARAM_F_USAGE))) {
 		uk_usage();
 		return -EINTR;
 	}

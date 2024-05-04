@@ -180,7 +180,7 @@ int dialog_menu(const char *title, const char *prompt,
 do_resize:
 	height = getmaxy(stdscr);
 	width = getmaxx(stdscr);
-	if (height < MENUBOX_HEIGTH_MIN || width < MENUBOX_WIDTH_MIN)
+	if (unlikely(height < MENUBOX_HEIGTH_MIN || width < MENUBOX_WIDTH_MIN))
 		return -ERRDISPLAYTOOSMALL;
 
 	height -= 4;

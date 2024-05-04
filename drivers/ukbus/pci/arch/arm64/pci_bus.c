@@ -79,7 +79,7 @@ static int arch_pci_driver_add_device(struct pci_driver *drv,
 	UK_ASSERT(pha != NULL);
 
 	dev = (struct pci_device *) uk_calloc(pha, 1, sizeof(*dev));
-	if (!dev) {
+	if (unlikely(!dev)) {
 		uk_pr_err("PCI %02x:%02x.%02x: Failed to initialize: Out of memory!\n",
 			  (int) addr->bus,
 			  (int) addr->devid,

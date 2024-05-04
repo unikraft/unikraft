@@ -119,9 +119,9 @@ int dialog_checklist(const char *title, const char *prompt, int height,
 	}
 
 do_resize:
-	if (getmaxy(stdscr) < (height + CHECKLIST_HEIGTH_MIN))
+	if (unlikely((getmaxy(stdscr) < (height + CHECKLIST_HEIGTH_MIN)))
 		return -ERRDISPLAYTOOSMALL;
-	if (getmaxx(stdscr) < (width + CHECKLIST_WIDTH_MIN))
+	if (unlikely((getmaxx(stdscr) < (width + CHECKLIST_WIDTH_MIN)))
 		return -ERRDISPLAYTOOSMALL;
 
 	max_choice = MIN(list_height, item_count());

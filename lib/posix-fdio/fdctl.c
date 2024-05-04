@@ -99,11 +99,11 @@ int uk_sys_ftruncate(struct uk_ofile *of, off_t len)
 	int r;
 	int iolock;
 
-	if (len < 0)
+	if (unlikely(len < 0))
 		return -EINVAL;
 
 	mode = of->mode;
-	if (!_CAN_WRITE(mode))
+	if (unlikely(!_CAN_WRITE(mode)))
 		return -EINVAL;
 
 	iolock = _SHOULD_LOCK(mode);
@@ -123,7 +123,7 @@ int uk_sys_fallocate(struct uk_ofile *of, int mode, off_t offset, off_t len)
 	int r;
 	int iolock;
 
-	if (offset < 0 || len <= 0)
+	if (unlikely(offset < 0 || len <= 0))
 		return -EINVAL;
 
 	iolock = _SHOULD_LOCK(of->mode);

@@ -102,7 +102,7 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
 	struct uk_thread *current = uk_thread_current();
 	struct uk_futex f = {.uaddr = uaddr, .thread = current};
 
-	if (uk_load_n(uaddr) != val) {
+	if (unlikely(uk_load_n(uaddr) != val)) {
 		uk_pr_debug("FUTEX_WAIT: Condition not met (*uaddr != %"PRIu32", uaddr: %p)\n",
 			    val, uaddr);
 		return -EAGAIN;
@@ -139,7 +139,7 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
 	uk_list_for_each_safe(itr, tmp, &futex_list) {
 		f_tmp = uk_list_entry(itr, struct uk_futex, list_node);
 
-		if (f_tmp->uaddr == uaddr && f_tmp->thread == current) {
+		if (unlikely(f_tmp->uaddr == uaddr && f_tmp->thread == current)) {
 			/* Remove the thread from the futex list */
 			uk_list_del(&f_tmp->list_node);
 			uk_spin_unlock(&futex_list_lock);
@@ -231,7 +231,7 @@ static int futex_cmp_requeue(uint32_t *uaddr, uint32_t val, uint32_t val2,
 	int woken_uaddr1;
 	uint32_t waiters_uaddr2 = 0;
 
-	if (!((uint32_t)val3 == uk_load_n(uaddr)))
+	if (unlikely(!((uint32_t)val3 == uk_load_n(uaddr))))
 		return -EAGAIN;
 
 	/* Wake up val waiters on uaddr */
@@ -288,11 +288,11 @@ UK_LLSYSCALL_R_DEFINE(int, futex, uint32_t *, uaddr, int, futex_op,
  	int cmd = futex_op & FUTEX_CMD_MASK;
 
 	/* Reject invalid combinations of the realtime clock flag */
-	if (futex_op & FUTEX_CLOCK_REALTIME && !(
+	if (unlikely(futex_op & FUTEX_CLOCK_REALTIME && !(
 		cmd == FUTEX_WAIT ||
 		cmd == FUTEX_WAIT_BITSET ||
 		cmd == FUTEX_LOCK_PI2 ||
-		cmd == FUTEX_WAIT_REQUEUE_PI))
+		cmd == FUTEX_WAIT_REQUEUE_PI)))
 		return -ENOSYS;
 
 	/*
@@ -319,7 +319,7 @@ UK_LLSYSCALL_R_DEFINE(int, futex, uint32_t *, uaddr, int, futex_op,
 		 * all bits set. Some applications do this to use the absolute
 		 * timeout mode. We return ENOSYS for all non-supported calls.
 		 */
-		if (val3 != UINT32_MAX)
+		if (unlikely(val3 != UINT32_MAX))
 			return -ENOSYS;
 
 		if (timeout)

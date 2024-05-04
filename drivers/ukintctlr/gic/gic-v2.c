@@ -539,7 +539,7 @@ static int acpi_get_gicc(struct _gic_dev *g)
 			continue;
 
 		/* If GICv3/4 this field is 0 */
-		if (!m.gicc->paddr)
+		if (unlikely(!m.gicc->paddr))
 			return -ENOTSUP;
 
 		g->cpuif_mem_addr = m.gicc->paddr;
@@ -580,7 +580,7 @@ static int gicv2_do_probe(void)
 
 	/* Currently, we only support 1 GIC per system */
 	fdt_gic = fdt_node_offset_by_compatible_list(fdt, -1, gic_device_list);
-	if (fdt_gic < 0)
+	if (unlikely(fdt_gic < 0))
 		return -FDT_ERR_NOTFOUND; /* GICv2 not present */
 
 	/* Get address and size of the GIC's register regions */

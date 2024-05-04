@@ -223,7 +223,7 @@ static int netfront_rxq_enqueue(struct uk_netdev_rx_queue *rxq,
 	/* buffer must be page aligned */
 	UK_ASSERT(((unsigned long) netbuf->buf & ~PAGE_MASK) == 0);
 
-	if (RING_FULL(&rxq->ring)) {
+	if (unlikely(RING_FULL(&rxq->ring))) {
 		uk_pr_debug("rx queue is full\n");
 		return -ENOSPC;
 	}
@@ -904,7 +904,7 @@ err_out:
 static int netfront_drv_init(struct uk_alloc *allocator)
 {
 	/* driver initialization */
-	if (!allocator)
+	if (unlikely(!allocator))
 		return -EINVAL;
 
 	drv_allocator = allocator;

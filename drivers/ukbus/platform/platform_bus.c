@@ -163,7 +163,7 @@ static int pf_probe_fdt(void)
 
 		/* Alloc dev */
 		dev = (struct pf_device *) uk_calloc(pfh.a, 1, sizeof(*dev));
-		if (!dev) {
+		if (unlikely(!dev)) {
 			uk_pr_err("Platform : Failed to initialize: Out of memory!\n");
 			return -ENOMEM;
 		}

@@ -50,12 +50,12 @@ static inline int x2apic_enable(void)
 
 	/* Check for x2APIC support */
 	cpuid(1, 0, &eax, &ebx, &ecx, &edx);
-	if (!(ecx & X86_CPUID1_ECX_x2APIC))
+	if (unlikely(!(ecx & X86_CPUID1_ECX_x2APIC)))
 		return -ENOTSUP;
 
 	/* Check if APIC is active */
 	rdmsr(APIC_MSR_BASE, &eax, &edx);
-	if (!(eax & APIC_BASE_EN))
+	if (unlikely(!(eax & APIC_BASE_EN)))
 		return -ENOTSUP;
 
 	/* Switch to x2APIC mode */

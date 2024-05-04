@@ -51,7 +51,7 @@ static ssize_t evfd_read(const struct uk_file *f,
 	n = (evfd_node)f->node;
 	val = *n;
 	do {
-		if (!val)
+		if (unlikely(!val))
 			return -EAGAIN;
 		if (semaphore) {
 			next = val - 1;

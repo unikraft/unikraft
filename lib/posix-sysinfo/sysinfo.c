@@ -89,7 +89,7 @@ UK_SYSCALL_R_DEFINE(int, sysinfo, struct sysinfo *, info)
 	unsigned int mem_unit = 1;
 #endif /* CONFIG_HAVE_PAGING */
 
-	if (!info)
+	if (unlikely(!info))
 		return -EFAULT;
 
 	memset(info, 0, sizeof(*info));
@@ -172,7 +172,7 @@ int getpagesize(void)
 
 UK_SYSCALL_R_DEFINE(int, uname, struct utsname *, buf)
 {
-	if (buf == NULL)
+	if (unlikely(buf == NULL))
 		return -EFAULT;
 
 	memcpy(buf, &utsname, sizeof(struct utsname));
@@ -181,11 +181,11 @@ UK_SYSCALL_R_DEFINE(int, uname, struct utsname *, buf)
 
 UK_SYSCALL_R_DEFINE(int, sethostname, const char*, name, size_t, len)
 {
-	if (name == NULL) {
+	if (unlikely(name == NULL)) {
 		return -EFAULT;
 	}
 
-	if (len + 1 > sizeof(utsname.nodename)) {
+	if (unlikely(len + 1 > sizeof(utsname.nodename))) {
 		return -EINVAL;
 	}
 

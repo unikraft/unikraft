@@ -121,11 +121,11 @@ UK_SYSCALL_R_DEFINE(int, mount, const char*, dev, const char*, dir,
 
 	uk_pr_info("VFS: mounting %s at %s\n", fsname, dir);
 
-	if (!dir || *dir == '\0')
+	if (unlikely(!dir || *dir == '\0'))
 		return -ENOENT;
 
 	/* Find a file system. */
-	if (!(fs = fs_getfs(fsname)))
+	if (unlikely(!(fs = fs_getfs(fsname))))
 		return -ENODEV;  /* No such file system */
 
 	/* Open device. NULL can be specified as a device. */

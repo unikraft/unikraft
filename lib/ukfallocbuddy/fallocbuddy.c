@@ -414,7 +414,7 @@ static int bfa_zbit_free(struct bfa_zone *zone, __paddr_t paddr,
 	/* We did not find an allocation of same or larger size. If we started
 	 * to search from the lowest level, then there is no allocation.
 	 */
-	if (level == 0)
+	if (unlikely(level == 0))
 		return -ENOMEM;
 
 	/* See if the allocation is made up from smaller allocations. This

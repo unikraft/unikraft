@@ -164,13 +164,13 @@ static int vmem_vma_find_range(struct uk_vas *vas, __vaddr_t *vaddr, __sz *len,
 	 */
 	UK_ASSERT(vstart < vma_start->end);
 	if (vstart < vma_start->start) {
-		if (strict)
+		if (unlikely(strict))
 			return -ENOENT;
 
 		vstart = vma_start->start;
 	} else if (vstart > vma_start->start) {
 		algn_lvl = MAX(vma_start->page_lvl, PAGE_LEVEL);
-		if (!PAGE_Lx_ALIGNED(vstart, algn_lvl))
+		if (unlikely(!PAGE_Lx_ALIGNED(vstart, algn_lvl)))
 			return -EINVAL;
 	}
 
@@ -188,7 +188,7 @@ static int vmem_vma_find_range(struct uk_vas *vas, __vaddr_t *vaddr, __sz *len,
 			 * address range to contain holes between VMAs
 			 */
 			next = uk_list_next_entry(vma_end, vma_list);
-			if (strict && vma_end->end != next->start)
+			if (unlikely(strict && vma_end->end != next->start))
 				return -ENOENT;
 
 			vma_end = next;
@@ -198,13 +198,13 @@ static int vmem_vma_find_range(struct uk_vas *vas, __vaddr_t *vaddr, __sz *len,
 		 * vend to be properly aligned by the caller (via len).
 		 */
 		if (vend > vma_end->end) {
-			if (strict)
+			if (unlikely(strict))
 				return -ENOENT;
 
 			vend = vma_end->end;
 		} else if (vend < vma_end->end) {
 			algn_lvl = MAX(vma_end->page_lvl, PAGE_LEVEL);
-			if (!PAGE_Lx_ALIGNED(vend, algn_lvl))
+			if (unlikely(!PAGE_Lx_ALIGNED(vend, algn_lvl)))
 				return -EINVAL;
 		}
 	}
@@ -270,12 +270,12 @@ static int vmem_vma_do_try_merge_with_next(struct uk_vma *vma)
 
 	UK_ASSERT(vma);
 
-	if (vma->vma_list.next == &vma->vas->vma_list)
+	if (unlikely(vma->vma_list.next == &vma->vas->vma_list))
 		return -ENOENT;
 
 	next = uk_list_next_entry(vma, vma_list);
 
-	if (!vmem_vma_can_merge(vma, next))
+	if (unlikely(!vmem_vma_can_merge(vma, next)))
 		return -EPERM;
 
 	rc = VMA_MERGE(vma, next);
