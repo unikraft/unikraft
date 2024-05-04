@@ -119,3 +119,6 @@ config FPSIMD
 config UKPLAT_AUXSP_PAGE_ORDER
 	int "Maximum size allocated for the auxiliary stack"
 	default 4
+
+config HAVE_SHUTDOWN_DISPATCHER
+	bool
