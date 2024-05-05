@@ -17,10 +17,8 @@ static inline void INIT_LIST_HEAD_RCU(struct uk_list_head *list)
 	UK_WRITE_ONCE(list->next, list);
 	UK_WRITE_ONCE(list->prev, list);
 }
-
 #define list_next_rcu(list)	(*((struct uk_list_head **)(&(list)->next)))
 #define list_tail_rcu(head)	(*((struct uk_list_head **)(&(head)->prev)))
-
 
 static inline void __list_add_rcu(struct uk_list_head *new,
 		struct uk_list_head *prev, struct uk_list_head *next)
