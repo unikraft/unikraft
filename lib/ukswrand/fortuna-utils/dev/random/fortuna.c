@@ -585,7 +585,7 @@ random_fortuna_genbytes(uint8_t *buf, size_t bytecount,
 		 * While holding the global lock, limit PRF generation to
 		 * mitigate, but not eliminate, bullying symptoms.
 		 */
-		chunk_size = PAGE_SIZE;
+		chunk_size = __PAGE_SIZE;
 	} else {
 		/*
 		* 128-bit block ciphers like AES must be re-keyed at 1MB
