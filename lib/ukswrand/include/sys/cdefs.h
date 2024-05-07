@@ -907,4 +907,9 @@
 #define __align_down(x, y) __builtin_align_down(x, y)
 #define __is_aligned(x, y) __builtin_is_aligned(x, y)
 
+/**
+ * Add rounddown2() here for the moment.
+*/
+#define	rounddown2(x, y) __align_down(x, y) /* if y is power of two */
+
 #endif /* !_SYS_CDEFS_H_ */

@@ -28,6 +28,7 @@
  * SUCH DAMAGE.
  */
 
+#include <sys/cdefs.h>
 #include <sys/endian.h>
 #include <crypto/chacha20_poly1305.h>
 #include <opencrypto/xform_enc.h>
