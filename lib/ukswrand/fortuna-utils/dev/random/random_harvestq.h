@@ -27,6 +27,8 @@
 #ifndef SYS_DEV_RANDOM_RANDOM_HARVESTQ_H_INCLUDED
 #define	SYS_DEV_RANDOM_RANDOM_HARVESTQ_H_INCLUDED
 
+#include <stdint.h>
+
 #define	HARVESTSIZE	2	/* Max length in words of each harvested entropy unit */
 
 /* These are used to queue harvested packets of entropy. The entropy

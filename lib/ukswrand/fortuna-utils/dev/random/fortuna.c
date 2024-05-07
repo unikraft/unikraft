@@ -67,9 +67,7 @@
 
 #include <dev/random/hash.h>
 #include <dev/random/randomdev.h>
-#ifdef _KERNEL
 #include <dev/random/random_harvestq.h>
-#endif
 #include <dev/random/uint128.h>
 #include <dev/random/fortuna.h>
 
