@@ -28,6 +28,10 @@
 #ifndef _CAMELLIA_H
 #define _CAMELLIA_H
 
+#include <stdint.h>
+#define __NEED_BSD_TYPES
+#include <nolibc-internal/shareddefs.h>
+
 #define CAMELLIA_BLOCK_SIZE 16
 #define CAMELLIA_SUBKEYWORD 68 /* (34*8/4) */
 
