@@ -33,6 +33,7 @@
  */
 
 #include "stubs.h"
+#include <assert.h>
 #include <sys/param.h>
 #include <sys/limits.h>
 #include <uk/essentials.h>
