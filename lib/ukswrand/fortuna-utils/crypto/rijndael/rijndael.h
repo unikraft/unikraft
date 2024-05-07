@@ -29,6 +29,10 @@
 #ifndef __RIJNDAEL_H
 #define	__RIJNDAEL_H
 
+#include <stdint.h>
+#define __NEED_BSD_TYPES
+#include <nolibc-internal/shareddefs.h>
+
 #define RIJNDAEL_MAXKC	(256/32)
 #define RIJNDAEL_MAXKB	(256/8)
 #define RIJNDAEL_MAXNR	14
