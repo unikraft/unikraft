@@ -27,19 +27,25 @@
 #ifndef SYS_DEV_RANDOM_FORTUNA_H_INCLUDED
 #define	SYS_DEV_RANDOM_FORTUNA_H_INCLUDED
 
+#include <uk/mutex.h>
+
+typedef struct uk_mutex mtx_t;
+
+/* TODO: Check if _KERNEL should be defined */
 #ifdef _KERNEL
-typedef struct mtx mtx_t;
-#define	RANDOM_RESEED_INIT_LOCK(x)		mtx_init(&fortuna_state.fs_mtx, "reseed mutex", NULL, MTX_DEF)
-#define	RANDOM_RESEED_DEINIT_LOCK(x)		mtx_destroy(&fortuna_state.fs_mtx)
-#define	RANDOM_RESEED_LOCK(x)			mtx_lock(&fortuna_state.fs_mtx)
-#define	RANDOM_RESEED_UNLOCK(x)			mtx_unlock(&fortuna_state.fs_mtx)
-#define	RANDOM_RESEED_ASSERT_LOCK_OWNED(x)	mtx_assert(&fortuna_state.fs_mtx, MA_OWNED)
-#define	RANDOM_RESEED_ASSERT_LOCK_NOT_OWNED()	mtx_assert(&fortuna_state.fs_mtx, MA_NOTOWNED)
+#define	RANDOM_RESEED_INIT_LOCK(x)		UK_MUTEX_INITIALIZER(&fortuna_state.fs_mtx)
+/* Unikfrat does not have a deinit function */
+#define	RANDOM_RESEED_DEINIT_LOCK(x)		do { } while (0)
+#define	RANDOM_RESEED_LOCK(x)			uk_mutex_lock(&fortuna_state.fs_mtx)
+#define	RANDOM_RESEED_UNLOCK(x)			uk_mutex_unlock(&fortuna_state.fs_mtx)
+#define	RANDOM_RESEED_ASSERT_LOCK_OWNED(x)	fortuna_state.fs_mtx.lock_count > 0
+#define	RANDOM_RESEED_ASSERT_LOCK_NOT_OWNED()	fortuna_state.fs_mtx.lock_count == 0
 #else
-#define	RANDOM_RESEED_INIT_LOCK(x)		mtx_init(&fortuna_state.fs_mtx, mtx_plain)
-#define	RANDOM_RESEED_DEINIT_LOCK(x)		mtx_destroy(&fortuna_state.fs_mtx)
-#define	RANDOM_RESEED_LOCK(x)			mtx_lock(&fortuna_state.fs_mtx)
-#define	RANDOM_RESEED_UNLOCK(x)			mtx_unlock(&fortuna_state.fs_mtx)
+#define	RANDOM_RESEED_INIT_LOCK(x)		UK_MUTEX_INITIALIZER(&fortuna_state.fs_mtx)
+/* Unikfrat does not have a deinit function */
+#define	RANDOM_RESEED_DEINIT_LOCK(x)            do { } while (0)
+#define	RANDOM_RESEED_LOCK(x)			uk_mutex_lock(&fortuna_state.fs_mtx)
+#define	RANDOM_RESEED_UNLOCK(x)			uk_mutex_unlock(&fortuna_state.fs_mtx)
 #define	RANDOM_RESEED_ASSERT_LOCK_OWNED(x)
 #define	RANDOM_RESEED_ASSERT_LOCK_NOT_OWNED()
 #endif

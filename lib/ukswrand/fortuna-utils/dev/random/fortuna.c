@@ -106,6 +106,9 @@ SDT_PROBE_DEFINE2(random, fortuna, event_processor, debug, "u_int", "struct fs_p
  * This is the beastie that needs protecting. It contains all of the
  * state that we are excited about. Exactly one is instantiated.
  */
+#define __NEED_BSD_TYPES
+#include <nolibc-internal/shareddefs.h>
+
 static struct fortuna_state {
 	struct fs_pool {		/* P_i */
 		u_int fsp_length;	/* Only the first one is used by Fortuna */
