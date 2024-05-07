@@ -365,8 +365,12 @@ random_fortuna_process_event(struct harvest_event *event)
 	 * to incorporate that as soon as possible.  Override destingation pool
 	 * for immediate next use.
 	 */
+	/* TOOD: Check how to handle this. In the source code RANDOM_PURE_VMGENID is included from sys/random.h only
+	 * if _KERNEL is defined. Add the same check here too for the moment. */
+#ifdef _KERNEL
 	if (event->he_source == RANDOM_PURE_VMGENID)
 		pl = 0;
+#endif
 	/*
 	 * We ignore low entropy static/counter fields towards the end of the
 	 * he_event structure in order to increase measurable entropy when
