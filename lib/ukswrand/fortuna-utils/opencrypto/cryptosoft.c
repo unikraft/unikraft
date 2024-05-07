@@ -314,6 +314,8 @@ out:
 	return (err);
 }
 
+#include <uk/essentials.h>
+#define CTASSERT(x)	UK_CTASSERT(x)
 CTASSERT(INT_MAX <= (1ll<<39) - 256);	/* GCM: plain text < 2^39-256 */
 CTASSERT(INT_MAX <= (uint64_t)-1);	/* GCM: associated data <= 2^64-1 */
 

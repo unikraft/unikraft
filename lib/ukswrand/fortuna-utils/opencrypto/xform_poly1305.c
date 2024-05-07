@@ -5,6 +5,9 @@
 
 #include <sodium/crypto_onetimeauth_poly1305.h>
 
+#include <uk/essentials.h>
+#define CTASSERT(x)	UK_CTASSERT(x)
+
 struct poly1305_xform_ctx {
 	struct crypto_onetimeauth_poly1305_state state;
 };

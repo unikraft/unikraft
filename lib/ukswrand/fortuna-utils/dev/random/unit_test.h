@@ -80,7 +80,8 @@ struct harvest_event {
 
 struct sysctl_ctx_list;
 
-#define	CTASSERT(x)	_Static_assert(x, "compile-time assertion failed")
+#include <uk/essentials.h>
+#define CTASSERT(x)	UK_CTASSERT(x)
 #define	KASSERT(exp,msg) do {	\
 	if (!(exp)) {		\
 		printf msg;	\

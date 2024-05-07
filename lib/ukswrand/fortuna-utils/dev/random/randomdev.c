@@ -55,6 +55,9 @@
 #include <dev/random/randomdev.h>
 #include <dev/random/random_harvestq.h>
 
+#include <uk/essentials.h>
+#define CTASSERT(x)	UK_CTASSERT(x)
+
 #define	RANDOM_UNIT	0
 
 /*

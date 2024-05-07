@@ -35,6 +35,8 @@
 #include "stubs.h"
 #include <sys/param.h>
 #include <sys/limits.h>
+#include <uk/essentials.h>
+#define CTASSERT(x)	UK_CTASSERT(x)
 
 #ifdef _KERNEL
 #include <sys/fail.h>

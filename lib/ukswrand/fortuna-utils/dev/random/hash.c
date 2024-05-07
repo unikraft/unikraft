@@ -45,7 +45,8 @@
 #include <string.h>
 #include <threads.h>
 #define KASSERT(x, y)	assert(x)
-#define CTASSERT(x)	_Static_assert(x, "CTASSERT " #x)
+#include <uk/essentials.h>
+#define CTASSERT(x)	UK_CTASSERT(x)
 #endif /* _KERNEL */
 
 #define CHACHA_EMBED
