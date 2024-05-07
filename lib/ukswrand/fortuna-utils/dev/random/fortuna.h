@@ -33,7 +33,7 @@ typedef struct uk_mutex mtx_t;
 
 /* TODO: Check if _KERNEL should be defined */
 #ifdef _KERNEL
-#define	RANDOM_RESEED_INIT_LOCK(x)		UK_MUTEX_INITIALIZER(&fortuna_state.fs_mtx)
+#define	RANDOM_RESEED_INIT_LOCK(x)		uk_mutex_init(&fortuna_state.fs_mtx)
 /* Unikfrat does not have a deinit function */
 #define	RANDOM_RESEED_DEINIT_LOCK(x)		do { } while (0)
 #define	RANDOM_RESEED_LOCK(x)			uk_mutex_lock(&fortuna_state.fs_mtx)
@@ -41,7 +41,7 @@ typedef struct uk_mutex mtx_t;
 #define	RANDOM_RESEED_ASSERT_LOCK_OWNED(x)	fortuna_state.fs_mtx.lock_count > 0
 #define	RANDOM_RESEED_ASSERT_LOCK_NOT_OWNED()	fortuna_state.fs_mtx.lock_count == 0
 #else
-#define	RANDOM_RESEED_INIT_LOCK(x)		UK_MUTEX_INITIALIZER(&fortuna_state.fs_mtx)
+#define	RANDOM_RESEED_INIT_LOCK(x)		uk_mutex_init(&fortuna_state.fs_mtx)
 /* Unikfrat does not have a deinit function */
 #define	RANDOM_RESEED_DEINIT_LOCK(x)            do { } while (0)
 #define	RANDOM_RESEED_LOCK(x)			uk_mutex_lock(&fortuna_state.fs_mtx)
