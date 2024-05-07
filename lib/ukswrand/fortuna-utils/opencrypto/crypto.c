@@ -56,6 +56,7 @@
  * PURPOSE.
  */
 
+#include "stubs.h"
 #include "opt_ddb.h"
 
 #include <sys/param.h>

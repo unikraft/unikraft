@@ -26,6 +26,7 @@
  */
 #pragma once
 
+#include "stubs.h"
 #include <dev/random/fenestrasX/fx_priv.h>
 #define	blake2b_init	blake2b_init_ref
 #define	blake2b_update	blake2b_update_ref

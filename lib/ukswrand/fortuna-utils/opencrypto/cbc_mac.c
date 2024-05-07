@@ -22,6 +22,7 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include "stubs.h"
 #include <sys/types.h>
 #include <sys/systm.h>
 #include <sys/param.h>

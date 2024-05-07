@@ -25,6 +25,7 @@
  * SUCH DAMAGE.
  */
 
+#include "stubs.h"
 #include <sys/param.h>
 #include <sys/domainset.h>
 #include <sys/fail.h>

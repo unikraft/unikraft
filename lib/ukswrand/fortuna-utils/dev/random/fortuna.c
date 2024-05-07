@@ -32,6 +32,7 @@
  * and Kohno ("FS&K").
  */
 
+#include "stubs.h"
 #include <sys/param.h>
 #include <sys/limits.h>
 

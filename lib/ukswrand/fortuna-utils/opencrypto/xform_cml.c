@@ -47,6 +47,7 @@
  * PURPOSE.
  */
 
+#include "stubs.h"
 #include <sys/types.h>
 #include <crypto/camellia/camellia.h>
 #include <opencrypto/xform_enc.h>

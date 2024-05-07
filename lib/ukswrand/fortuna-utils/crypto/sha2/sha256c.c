@@ -24,6 +24,7 @@
  * SUCH DAMAGE.
  */
 
+#include "stubs.h"
 #include <sys/cdefs.h>
 #include <sys/endian.h>
 #include <sys/types.h>

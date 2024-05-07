@@ -25,6 +25,7 @@
  *
  */
 
+#include "stubs.h"
 #include <sys/cdefs.h>
 #ifdef _KERNEL
 #include <sys/param.h>

@@ -25,6 +25,7 @@
  * SUCH DAMAGE.
  */
 
+#include "stubs.h"
 #include <opencrypto/xform_auth.h>
 #include <opencrypto/xform_enc.h>
 

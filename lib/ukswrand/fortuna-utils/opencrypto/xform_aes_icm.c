@@ -47,6 +47,7 @@
  * PURPOSE.
  */
 
+#include "stubs.h"
 #include <sys/cdefs.h>
 #include <opencrypto/cbc_mac.h>
 #include <opencrypto/gmac.h>

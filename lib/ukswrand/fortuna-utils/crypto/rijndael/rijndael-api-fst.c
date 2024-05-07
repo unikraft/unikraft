@@ -15,6 +15,7 @@
  * This code is placed in the public domain.
  */
 
+#include "stubs.h"
 #include <sys/param.h>
 #ifdef _KERNEL
 #include <sys/systm.h>

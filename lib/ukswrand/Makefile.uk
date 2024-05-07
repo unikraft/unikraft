@@ -28,4 +28,6 @@ LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/dev/random/hash.c
 LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/dev/random/random_harvestq.c
 LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/dev/random/randomdev.c
 
+LIBUKSWRAND_SRCS-y += $(LIBUKSWRAND_BASE)/fortuna-utils/stubs.c
+
 UK_PROVIDED_SYSCALLS-$(CONFIG_LIBUKSWRAND) += getrandom-3
