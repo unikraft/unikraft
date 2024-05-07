@@ -908,8 +908,11 @@
 #define __is_aligned(x, y) __builtin_is_aligned(x, y)
 
 /**
- * Add rounddown2() here for the moment.
+ * Add rounddown functions here for the moment.
 */
+#ifndef rounddown
+#define rounddown(x, y) (((x) / (y)) * (y))
+#endif
 #define	rounddown2(x, y) __align_down(x, y) /* if y is power of two */
 
 #endif /* !_SYS_CDEFS_H_ */
