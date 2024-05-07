@@ -38,6 +38,7 @@
 #include <sys/limits.h>
 #include <uk/essentials.h>
 #define CTASSERT(x)	UK_CTASSERT(x)
+#define MPASS(x)	UK_ASSERT(x)
 
 #ifdef _KERNEL
 #include <sys/fail.h>
