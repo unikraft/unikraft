@@ -101,14 +101,18 @@ int uk_sys_fchmod(struct uk_ofile *of, mode_t mode)
 int uk_sys_fchown(struct uk_ofile *of, uid_t owner, gid_t group)
 {
 	int r;
+	unsigned int mask = 0;
 	const int iolock = _SHOULD_LOCK(of->mode);
 
+	if (owner != (uid_t)-1)
+		mask |= UK_STATX_UID;
+	if (group != (gid_t)-1)
+		mask |= UK_STATX_GID;
 	if (iolock)
 		uk_file_wlock(of->file);
-	r = uk_file_setstat(of->file, UK_STATX_UID|UK_STATX_GID,
-		&(const struct uk_statx){
-			.stx_uid = owner,
-			.stx_gid = group
+	r = uk_file_setstat(of->file, mask, &(const struct uk_statx){
+		.stx_uid = owner,
+		.stx_gid = group
 	});
 	if (iolock)
 		uk_file_wunlock(of->file);
