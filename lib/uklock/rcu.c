@@ -22,7 +22,7 @@ void synchronize_rcu(void) {
      uk_pr_debug("\n after synchronize rcu\n");
    }
 
-void check_crit_flags(lcpu_count) {
+void check_crit_flags(int lcpu_count) {
 
     bool result ;
     bool rcu_flags_temp[lcpu_count]; 
