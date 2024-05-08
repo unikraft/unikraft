@@ -45,7 +45,7 @@ extern UKPLAT_PER_LCPU_DEFINE(bool, rcu_flags);
         } \
     } while (0)
     
-void check_crit_flags(lcpu_count); 
+void check_crit_flags(int lcpu_count); 
 
 
 // Define RCU API functions
