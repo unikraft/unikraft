@@ -87,7 +87,7 @@ static struct driver drv_stdout = {
 };
 #endif /* CONFIG_LIBDEVFS_DEV_STDOUT */
 
-static int devfs_register_stdout(void)
+static int devfs_register_stdout(struct uk_init_ctx *ictx __unused)
 {
 	int rc;
 

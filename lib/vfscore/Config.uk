@@ -3,16 +3,16 @@ menuconfig LIBVFSCORE
 	default n
 	select LIBNOLIBC if !HAVE_LIBC
 	select LIBUKDEBUG
+	select LIBUKATOMIC # needed by <uk/list.h>
 	select LIBUKLOCK
 	select LIBPOSIX_TIME
+	select LIBPOSIX_FDTAB
+	select LIBPOSIX_FDTAB_LEGACY_SHIM
+	select LIBPOSIX_FDIO
+	select LIBPOSIX_POLL
+	select LIBPOSIX_PIPE
 
 if LIBVFSCORE
-config LIBVFSCORE_PIPE_SIZE_ORDER
-	int "Pipe size order"
-	default 16
-	help
-		The size of the internal buffer for anonymous pipes is 2^order.
-
 config LIBVFSCORE_NONLARGEFILE
 	bool "Non-largefile system calls"
 	default y if LIBSYSCALL_SHIM_HANDLER
@@ -26,122 +26,768 @@ config LIBVFSCORE_NONLARGEFILE
 		If lib/syscall_shim is enabled and this option is not selected, only
 		the 64-bit version of the system calls are registered.
 
-config LIBVFSCORE_AUTOMOUNT_ROOTFS
-bool "Automatically mount a root filesystem (/)"
-default n
-help
-	Automatically mounts '/' during boot. The parameters are
-	compiled-in and cannot be changed at runtime.
+menuconfig LIBVFSCORE_AUTOMOUNT_CI
+	bool "Compiled-in filesystem table (up to 4 entries, earliest prio)"
+	help
+		Mounts volumes from a filesystem table during boot.
 
-if LIBVFSCORE_AUTOMOUNT_ROOTFS
-	choice LIBVFSCORE_ROOTFS
-	prompt "Default root filesystem"
+if LIBVFSCORE_AUTOMOUNT_CI
+	choice LIBVFSCORE_AUTOMOUNT_CI_CONF
+	prompt "Configuration"
+	default LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
 
-		config LIBVFSCORE_ROOTFS_RAMFS
-		bool "RamFS"
-		select LIBRAMFS
+	config LIBVFSCORE_AUTOMOUNT_CI_RAMFS
+	bool "RamFS"
+	select LIBRAMFS
 
-		config LIBVFSCORE_ROOTFS_9PFS
-		bool "9PFS"
-		select LIBUK9P
-		select LIB9PFS
+	config LIBVFSCORE_AUTOMOUNT_CI_9PFS
+	bool "9PFS"
+	select LIBUK9P
+	select LIB9PFS
 
-		config LIBVFSCORE_ROOTFS_INITRD
-		bool "InitRD"
-		select LIBRAMFS
-		select LIBUKCPIO
+	config LIBVFSCORE_AUTOMOUNT_CI_INITRD
+	bool "InitRD (CPIO)"
+	select LIBRAMFS
+	select LIBUKCPIO
 
-		config LIBVFSCORE_ROOTFS_EINITRD
-		bool "Embedded InitRD"
-		select LIBRAMFS
-		select LIBUKCPIO
-		help
-			Embeds a CPIO initrd into the unikernel image.
+	config LIBVFSCORE_AUTOMOUNT_CI_EINITRD
+	bool "Embedded InitRD (CPIO)"
+	select LIBRAMFS
+	select LIBUKCPIO
+	help
+		Embeds a CPIO initrd into the unikernel image.
 
-		config LIBVFSCORE_ROOTFS_CUSTOM
-		bool "Custom argument"
-		help
-			Please set LIBVFSCORE_ROOTFS_CUSTOM_ARG
-			to a filesystem name that should be used
-			as default.
+	config LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+	bool "Custom"
+
 	endchoice
 
-	config LIBVFSCORE_ROOTFS_CUSTOM_ARG
-	string "Default custom root filesystem"
-	default ""
-	depends on LIBVFSCORE_ROOTFS_CUSTOM
-	help
-		Custom name of a filesystem to mount (e.g., ramfs,
-		9pfs). Make sure that the specified filesystem
-		is available for libvfscore.
+	if LIBVFSCORE_AUTOMOUNT_CI_9PFS
+		config LIBVFSCORE_AUTOMOUNT_CI_9PFS_TAG
+		string "9pfs tag"
+		default "fs0"
+	endif # LIBVFSCORE_AUTOMOUNT_CI_9PFS
 
-	# Hidden configuration option that gets automatically filled
-	# with the selected filesystem name
-	config LIBVFSCORE_ROOTFS
-	string
-	default "ramfs" if LIBVFSCORE_ROOTFS_RAMFS
-	default "9pfs" if LIBVFSCORE_ROOTFS_9PFS
-	default "initrd" if LIBVFSCORE_ROOTFS_INITRD
-	default "einitrd" if LIBVFSCORE_ROOTFS_EINITRD
-	default LIBVFSCORE_ROOTFS_CUSTOM_ARG if LIBVFSCORE_ROOTFS_CUSTOM
-	default ""
-
-	# The following options are hidden to RamFS, initrd, and einitrd
-	if !LIBVFSCORE_ROOTFS_RAMFS && !LIBVFSCORE_ROOTFS_INITRD && !LIBVFSCORE_ROOTFS_EINITRD
-		config LIBVFSCORE_ROOTDEV
-		string "Default root device"
-		default "fs0" if LIBVFSCORE_ROOTFS_9PFS
-		default ""
+	if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+		# *** Entry 0: ***
+		comment "Entry 0:"
+		config LIBVFSCORE_AUTOMOUNT_CI0_DEV
+		string "Device"
 		help
 			Device to mount the filesystem from (e.g., on 9PFS this
 			is the name of the shared filesystem). Depending on the
 			selected filesystem, this option may not be required.
 
-		config LIBVFSCORE_ROOTFLAGS
-		hex "Default root mount flags"
+		config LIBVFSCORE_AUTOMOUNT_CI0_MP
+		string "Mount point"
+		help
+			The path to mount the filesystem to.
+
+		config LIBVFSCORE_AUTOMOUNT_CI0_DRIVER
+		string "Filesystem"
+		help
+			Filesystem driver.
+
+		config LIBVFSCORE_AUTOMOUNT_CI0_FLAGS
+		hex "Flags"
 		default 0x0
 		help
 			Mount flags.
 
-		config LIBVFSCORE_ROOTOPTS
-		string "Default root mount options"
-		default ""
+		config LIBVFSCORE_AUTOMOUNT_CI0_OPTS
+		string "Options"
 		help
 			Usually a comma-separated list of additional mount
 			options that are directly interpreted by the target
 			filesystem.
-	endif
 
-	if LIBVFSCORE_ROOTFS_EINITRD
-		config LIBVFSCORE_ROOTFS_EINITRD_PATH
-		string "Path to initrd (fully qualified)"
-		default "$(UK_APP)/initrd.cpio"
-		help
-			Path of a CPIO initrd image to be embedded in the unikernel
-			image and mounted under '/'.
-	endif
-endif
+		menu "Entry options"
+		config LIBVFSCORE_AUTOMOUNT_CI0_UKOPTS_MKMP
+		bool "mkmp - Create mountpoint"
+		config LIBVFSCORE_AUTOMOUNT_CI0_UKOPTS_IFINITRD0
+		bool "ifinitrd0 - If 'initrd0' is present"
+		config LIBVFSCORE_AUTOMOUNT_CI0_UKOPTS_IFNOINITRD0
+		bool "ifnoinitrd0 - If 'initrd0' is absent"
+		endmenu
 
-config LIBVFSCORE_FSTAB
-	bool "Automatically mount list of volumes from kernel arguments"
+		# *** Entry 1: ***
+		if LIBVFSCORE_AUTOMOUNT_CI0
+			# *** Entry 1: ***
+			comment "Entry 1:"
+
+			config LIBVFSCORE_AUTOMOUNT_CI1_DEV
+			string "Device"
+
+			config LIBVFSCORE_AUTOMOUNT_CI1_MP
+			string "Mount point"
+
+			config LIBVFSCORE_AUTOMOUNT_CI1_DRIVER
+			string "Filesystem"
+
+			config LIBVFSCORE_AUTOMOUNT_CI1_FLAGS
+			hex "Flags"
+			default 0x0
+
+			config LIBVFSCORE_AUTOMOUNT_CI1_OPTS
+			string "Options"
+
+			menu "Entry options"
+			config LIBVFSCORE_AUTOMOUNT_CI1_UKOPTS_MKMP
+			bool "mkmp - Create mountpoint"
+			config LIBVFSCORE_AUTOMOUNT_CI1_UKOPTS_IFINITRD0
+			bool "ifinitrd0 - If 'initrd0' is present"
+			config LIBVFSCORE_AUTOMOUNT_CI1_UKOPTS_IFNOINITRD0
+			bool "ifnoinitrd0 - If 'initrd0' is absent"
+			endmenu
+		endif # LIBVFSCORE_AUTOMOUNT_CI0
+
+		# *** Entry 2: ***
+		if LIBVFSCORE_AUTOMOUNT_CI1
+			comment "Entry 2:"
+
+			config LIBVFSCORE_AUTOMOUNT_CI2_DEV
+			string "Device"
+
+			config LIBVFSCORE_AUTOMOUNT_CI2_MP
+			string "Mount point"
+
+			config LIBVFSCORE_AUTOMOUNT_CI2_DRIVER
+			string "Filesystem"
+
+			config LIBVFSCORE_AUTOMOUNT_CI2_FLAGS
+			hex "Flags"
+			default 0x0
+
+			config LIBVFSCORE_AUTOMOUNT_CI2_OPTS
+			string "Options"
+
+			menu "Entry options"
+			config LIBVFSCORE_AUTOMOUNT_CI2_UKOPTS_MKMP
+			bool "mkmp - Create mountpoint"
+			config LIBVFSCORE_AUTOMOUNT_CI2_UKOPTS_IFINITRD0
+			bool "ifinitrd0 - If 'initrd0' is present"
+			config LIBVFSCORE_AUTOMOUNT_CI2_UKOPTS_IFNOINITRD0
+			bool "ifnoinitrd0 - If 'initrd0' is absent"
+			endmenu
+		endif # LIBVFSCORE_AUTOMOUNT_CI1
+
+		# *** Entry 3: ***
+		if LIBVFSCORE_AUTOMOUNT_CI2
+			comment "Entry 3:"
+
+			config LIBVFSCORE_AUTOMOUNT_CI3_DEV
+			string "Device"
+
+			config LIBVFSCORE_AUTOMOUNT_CI3_MP
+			string "Mount point"
+
+			config LIBVFSCORE_AUTOMOUNT_CI3_DRIVER
+			string "Filesystem"
+
+			config LIBVFSCORE_AUTOMOUNT_CI3_FLAGS
+			hex "Flags"
+			default 0x0
+
+			config LIBVFSCORE_AUTOMOUNT_CI3_OPTS
+			string "Options"
+
+			menu "Entry options"
+			config LIBVFSCORE_AUTOMOUNT_CI3_UKOPTS_MKMP
+			bool "mkmp - Create mountpoint"
+			config LIBVFSCORE_AUTOMOUNT_CI3_UKOPTS_IFINITRD0
+			bool "ifinitrd0 - If 'initrd0' is present"
+			config LIBVFSCORE_AUTOMOUNT_CI3_UKOPTS_IFNOINITRD0
+			bool "ifnoinitrd0 - If 'initrd0' is absent"
+			endmenu
+		endif # LIBVFSCORE_AUTOMOUNT_CI2
+	endif # LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+
+	# Invisible options that indicate if an entry was set
+	config LIBVFSCORE_AUTOMOUNT_CI0
+	bool
+	default y if LIBVFSCORE_AUTOMOUNT_CI0_MP_ARG != ""
+
+	config LIBVFSCORE_AUTOMOUNT_CI1
+	bool
+	default y if LIBVFSCORE_AUTOMOUNT_CI1_MP_ARG != ""
+
+	config LIBVFSCORE_AUTOMOUNT_CI2
+	bool
+	default y if LIBVFSCORE_AUTOMOUNT_CI2_MP_ARG != ""
+
+	config LIBVFSCORE_AUTOMOUNT_CI3
+	bool
+	default y if LIBVFSCORE_AUTOMOUNT_CI3_MP_ARG != ""
+
+	# NOTE:
+	# In the following, we take over setting into invisible *_ARG depending
+	# on configuration. This is done to avoid conflicts of values set
+	# differently between configuration changes.
+	# We are making use here of invisible configurations that are not
+	# loaded from `.config`. We can use them to pick the actual values
+	# we want to have.
+
+	# *** Entry 0: ***
+	config LIBVFSCORE_AUTOMOUNT_CI0_DEV_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_CI0_DEV if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+	default LIBVFSCORE_AUTOMOUNT_CI_9PFS_TAG if LIBVFSCORE_AUTOMOUNT_CI_9PFS
+
+	config LIBVFSCORE_AUTOMOUNT_CI0_MP_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_CI0_MP if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+	default "/" if LIBVFSCORE_AUTOMOUNT_CI_RAMFS
+	default "/" if LIBVFSCORE_AUTOMOUNT_CI_INITRD
+	default "/" if LIBVFSCORE_AUTOMOUNT_CI_EINITRD
+	default "/" if LIBVFSCORE_AUTOMOUNT_CI_9PFS
+
+	config LIBVFSCORE_AUTOMOUNT_CI0_DRIVER_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_CI0_DRIVER if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+	default "ramfs" if LIBVFSCORE_AUTOMOUNT_CI_RAMFS
+	default "ramfs" if LIBVFSCORE_AUTOMOUNT_CI_INITRD
+	default "ramfs" if LIBVFSCORE_AUTOMOUNT_CI_EINITRD
+	default "9pfs" if LIBVFSCORE_AUTOMOUNT_CI_9PFS
+
+	config LIBVFSCORE_AUTOMOUNT_CI0_FLAGS_ARG
+	hex
+	default 0x0
+	default LIBVFSCORE_AUTOMOUNT_CI0_FLAGS if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_CI0_OPTS_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_CI0_OPTS if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_CI0_UKOPTS_MKMP_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_CI0_UKOPTS_MKMP if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+	config LIBVFSCORE_AUTOMOUNT_CI0_UKOPTS_IFINITRD0_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_CI0_UKOPTS_IFINITRD0 if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+	config LIBVFSCORE_AUTOMOUNT_CI0_UKOPTS_IFNOINITRD0_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_CI0_UKOPTS_IFNOINITRD0 if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+
+	# *** Entry 1: ***
+	config LIBVFSCORE_AUTOMOUNT_CI1_DEV_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_CI1_DEV if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+	default "initrd0" if LIBVFSCORE_AUTOMOUNT_CI_INITRD
+	default "embedded" if LIBVFSCORE_AUTOMOUNT_CI_EINITRD
+
+	config LIBVFSCORE_AUTOMOUNT_CI1_MP_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_CI1_MP if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+	default "/" if LIBVFSCORE_AUTOMOUNT_CI_INITRD
+	default "/" if LIBVFSCORE_AUTOMOUNT_CI_EINITRD
+
+	config LIBVFSCORE_AUTOMOUNT_CI1_DRIVER_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_CI1_DRIVER if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+	default "extract" if LIBVFSCORE_AUTOMOUNT_CI_INITRD
+	default "extract" if LIBVFSCORE_AUTOMOUNT_CI_EINITRD
+
+	config LIBVFSCORE_AUTOMOUNT_CI1_FLAGS_ARG
+	hex
+	default 0x0
+	default LIBVFSCORE_AUTOMOUNT_CI1_FLAGS if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_CI1_OPTS_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_CI1_OPTS if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_CI1_UKOPTS_MKMP_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_CI1_UKOPTS_MKMP if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+	config LIBVFSCORE_AUTOMOUNT_CI1_UKOPTS_IFINITRD0_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_CI1_UKOPTS_IFINITRD0 if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+	config LIBVFSCORE_AUTOMOUNT_CI1_UKOPTS_IFNOINITRD0_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_CI1_UKOPTS_IFNOINITRD0 if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+
+	# *** Entry 2: ***
+	config LIBVFSCORE_AUTOMOUNT_CI2_DEV_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_CI2_DEV if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_CI2_MP_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_CI2_MP if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_CI2_DRIVER_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_CI2_DRIVER if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_CI2_FLAGS_ARG
+	hex
+	default 0x0
+	default LIBVFSCORE_AUTOMOUNT_CI2_FLAGS if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_CI2_OPTS_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_CI2_OPTS if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_CI2_UKOPTS_MKMP_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_CI2_UKOPTS_MKMP if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+	config LIBVFSCORE_AUTOMOUNT_CI2_UKOPTS_IFINITRD0_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_CI2_UKOPTS_IFINITRD0 if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+	config LIBVFSCORE_AUTOMOUNT_CI2_UKOPTS_IFNOINITRD0_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_CI2_UKOPTS_IFNOINITRD0 if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+
+	# *** Entry 3: ***
+	config LIBVFSCORE_AUTOMOUNT_CI3_DEV_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_CI3_DEV if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_CI3_MP_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_CI3_MP if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_CI3_DRIVER_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_CI3_DRIVER if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_CI3_FLAGS_ARG
+	hex
+	default 0x0
+	default LIBVFSCORE_AUTOMOUNT_CI3_FLAGS if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_CI3_OPTS_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_CI3_OPTS if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_CI3_UKOPTS_MKMP_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_CI3_UKOPTS_MKMP if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+	config LIBVFSCORE_AUTOMOUNT_CI3_UKOPTS_IFINITRD0_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_CI3_UKOPTS_IFINITRD0 if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+	config LIBVFSCORE_AUTOMOUNT_CI3_UKOPTS_IFNOINITRD0_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_CI3_UKOPTS_IFNOINITRD0 if LIBVFSCORE_AUTOMOUNT_CI_CUSTOM
+endif # LIBVFSCORE_AUTOMOUNT_CI
+
+menuconfig LIBVFSCORE_AUTOMOUNT_UP
+	bool "User-provided filesystem table (kernel parameter)"
 	select LIBUKLIBPARAM
+	select LIBUKARGPARSE
 	default n
 	help
 		These volumes are parsed from a command-line argument:
 		vfs.fstab=[
-			"<src_dev>:<mntpoint>:<fsdriver>[:<flags>:<opts>]"
-			"<src_dev>:<mntpoint>:<fsdriver>[:<flags>:<opts>]"
+			"<dev>:<mntpoint>:<fsdriver>[:<flags>[:<opts>[:<ukopt>]]]"
+			"<dev>:<mntpoint>:<fsdriver>[:<flags>[:<opts>[:<ukopt>]]]"
 			...
 		]
 		The list elements are to be separated by whitespaces.
+if LIBVFSCORE_AUTOMOUNT_UP
+	config LIBVFSCORE_AUTOMOUNT_UP_SIZE
+		int "Maximum number of entries"
+		default 16
+		range 1 255
+		help
+			The maximum amount of automatically mounted volumes that are
+			passed through the vfs.fstab argument.
 
-if LIBVFSCORE_FSTAB
-config LIBVFSCORE_FSTAB_SIZE
-	int "Maximum automounted volumes"
-	default 64
+menuconfig LIBVFSCORE_AUTOMOUNT_FB
+	bool "Fall-back entries (compiled-in, if user-provided is empty)"
+
+if LIBVFSCORE_AUTOMOUNT_FB
+	choice LIBVFSCORE_AUTOMOUNT_FB_CONF
+	prompt "Configuration"
+	default LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_FB_RAMFS
+	bool "RamFS"
+	select LIBRAMFS
+
+	config LIBVFSCORE_AUTOMOUNT_FB_9PFS
+	bool "9PFS"
+	select LIBUK9P
+	select LIB9PFS
+
+	config LIBVFSCORE_AUTOMOUNT_FB_INITRD
+	bool "InitRD (CPIO)"
+	depends on !LIBVFSCORE_AUTOMOUNT_CI
+	select LIBRAMFS
+	select LIBUKCPIO
+
+	config LIBVFSCORE_AUTOMOUNT_FB_EINITRD
+	bool "Embedded InitRD (CPIO)"
+	depends on !LIBVFSCORE_AUTOMOUNT_CI
+	select LIBRAMFS
+	select LIBUKCPIO
+
+	config LIBVFSCORE_AUTOMOUNT_FB_INITRD_EXTRACT
+	bool "InitRD (CPIO, extract only)"
+	depends on LIBVFSCORE_AUTOMOUNT_CI
+	select LIBUKCPIO
+
+	config LIBVFSCORE_AUTOMOUNT_FB_EINITRD_EXTRACT
+	bool "Embedded InitRD (CPIO, extract only)"
+	depends on LIBVFSCORE_AUTOMOUNT_CI
+	select LIBUKCPIO
+
+	config LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+	bool "Custom"
+
+	endchoice
+
+	if LIBVFSCORE_AUTOMOUNT_FB_9PFS
+		config LIBVFSCORE_AUTOMOUNT_FB_9PFS_TAG
+		string "9pfs tag"
+		default "fs0"
+	endif # LIBVFSCORE_AUTOMOUNT_FB_9PFS
+
+	if LIBVFSCORE_AUTOMOUNT_CI && !LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+		config LIBVFSCORE_AUTOMOUNT_FB_MP
+		string "Mount point / target"
+		default "/"
+		help
+			The path to mount the filesystem to.
+	endif # LIBVFSCORE_AUTOMOUNT_CI && !LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+	if LIBVFSCORE_AUTOMOUNT_CI && !LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+		menu "Entry options"
+		config LIBVFSCORE_AUTOMOUNT_FB_UKOPTS_MKMP
+		bool "mkmp - Create mountpoint"
+		default y if LIBVFSCORE_AUTOMOUNT_FB_MP != "/"
+		config LIBVFSCORE_AUTOMOUNT_FB_UKOPTS_IFINITRD0
+		bool "ifinitrd0 - If 'initrd0' is present"
+		config LIBVFSCORE_AUTOMOUNT_FB_UKOPTS_IFNOINITRD0
+		bool "ifnoinitrd0 - If 'initrd0' is absent"
+		endmenu
+	endif # LIBVFSCORE_AUTOMOUNT_CI && !LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+	if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+		# *** Entry 0: ***
+		comment "Entry 0:"
+		config LIBVFSCORE_AUTOMOUNT_FB0_DEV
+		string "Device"
+		help
+			Device to mount the filesystem from (e.g., on 9PFS this
+			is the name of the shared filesystem). Depending on the
+			selected filesystem, this option may not be required.
+
+		config LIBVFSCORE_AUTOMOUNT_FB0_MP
+		string "Mount point"
+		help
+			The path to mount the filesystem to.
+
+		config LIBVFSCORE_AUTOMOUNT_FB0_DRIVER
+		string "Filesystem"
+		help
+			Filesystem driver.
+
+		config LIBVFSCORE_AUTOMOUNT_FB0_FLAGS
+		hex "Flags"
+		default 0x0
+		help
+			Mount flags.
+
+		config LIBVFSCORE_AUTOMOUNT_FB0_OPTS
+		string "Options"
+		help
+			Usually a comma-separated list of additional mount
+			options that are directly interpreted by the target
+			filesystem.
+
+		menu "Entry options"
+		config LIBVFSCORE_AUTOMOUNT_FB0_UKOPTS_MKMP
+		bool "mkmp - Create mountpoint"
+		config LIBVFSCORE_AUTOMOUNT_FB0_UKOPTS_IFINITRD0
+		bool "ifinitrd0 - If 'initrd0' is present"
+		config LIBVFSCORE_AUTOMOUNT_FB0_UKOPTS_IFNOINITRD0
+		bool "ifnoinitrd0 - If 'initrd0' is absent"
+		endmenu
+
+		# *** Entry 1: ***
+		if LIBVFSCORE_AUTOMOUNT_FB0
+			# *** Entry 1: ***
+			comment "Entry 1:"
+
+			config LIBVFSCORE_AUTOMOUNT_FB1_DEV
+			string "Device"
+
+			config LIBVFSCORE_AUTOMOUNT_FB1_MP
+			string "Mount point"
+
+			config LIBVFSCORE_AUTOMOUNT_FB1_DRIVER
+			string "Filesystem"
+
+			config LIBVFSCORE_AUTOMOUNT_FB1_FLAGS
+			hex "Flags"
+			default 0x0
+
+			config LIBVFSCORE_AUTOMOUNT_FB1_OPTS
+			string "Options"
+
+			menu "Entry options"
+			config LIBVFSCORE_AUTOMOUNT_FB1_UKOPTS_MKMP
+			bool "mkmp - Create mountpoint"
+			config LIBVFSCORE_AUTOMOUNT_FB1_UKOPTS_IFINITRD0
+			bool "ifinitrd0 - If 'initrd0' is present"
+			config LIBVFSCORE_AUTOMOUNT_FB1_UKOPTS_IFNOINITRD0
+			bool "ifnoinitrd0 - If 'initrd0' is absent"
+			endmenu
+		endif # LIBVFSCORE_AUTOMOUNT_FB0
+
+		# *** Entry 2: ***
+		if LIBVFSCORE_AUTOMOUNT_FB1
+			comment "Entry 2:"
+
+			config LIBVFSCORE_AUTOMOUNT_FB2_DEV
+			string "Device"
+
+			config LIBVFSCORE_AUTOMOUNT_FB2_MP
+			string "Mount point"
+
+			config LIBVFSCORE_AUTOMOUNT_FB2_DRIVER
+			string "Filesystem"
+
+			config LIBVFSCORE_AUTOMOUNT_FB2_FLAGS
+			hex "Flags"
+			default 0x0
+
+			config LIBVFSCORE_AUTOMOUNT_FB2_OPTS
+			string "Options"
+
+			menu "Entry options"
+			config LIBVFSCORE_AUTOMOUNT_FB2_UKOPTS_MKMP
+			bool "mkmp - Create mountpoint"
+			config LIBVFSCORE_AUTOMOUNT_FB2_UKOPTS_IFINITRD0
+			bool "ifinitrd0 - If 'initrd0' is present"
+			config LIBVFSCORE_AUTOMOUNT_FB2_UKOPTS_IFNOINITRD0
+			bool "ifnoinitrd0 - If 'initrd0' is absent"
+			endmenu
+		endif # LIBVFSCORE_AUTOMOUNT_FB1
+
+		# *** Entry 3: ***
+		if LIBVFSCORE_AUTOMOUNT_FB2
+			comment "Entry 3:"
+
+			config LIBVFSCORE_AUTOMOUNT_FB3_DEV
+			string "Device"
+
+			config LIBVFSCORE_AUTOMOUNT_FB3_MP
+			string "Mount point"
+
+			config LIBVFSCORE_AUTOMOUNT_FB3_DRIVER
+			string "Filesystem"
+
+			config LIBVFSCORE_AUTOMOUNT_FB3_FLAGS
+			hex "Flags"
+			default 0x0
+
+			config LIBVFSCORE_AUTOMOUNT_FB3_OPTS
+			string "Options"
+
+			menu "Entry options"
+			config LIBVFSCORE_AUTOMOUNT_FB3_UKOPTS_MKMP
+			bool "mkmp - Create mountpoint"
+			config LIBVFSCORE_AUTOMOUNT_FB3_UKOPTS_IFINITRD0
+			bool "ifinitrd0 - If 'initrd0' is present"
+			config LIBVFSCORE_AUTOMOUNT_FB3_UKOPTS_IFNOINITRD0
+			bool "ifnoinitrd0 - If 'initrd0' is absent"
+			endmenu
+		endif # LIBVFSCORE_AUTOMOUNT_FB2
+	endif # LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+	# Invisible options that indicate if an entry was set
+	config LIBVFSCORE_AUTOMOUNT_FB0
+	bool
+	default y if LIBVFSCORE_AUTOMOUNT_FB0_MP_ARG != ""
+
+	config LIBVFSCORE_AUTOMOUNT_FB1
+	bool
+	default y if LIBVFSCORE_AUTOMOUNT_FB1_MP_ARG != ""
+
+	config LIBVFSCORE_AUTOMOUNT_FB2
+	bool
+	default y if LIBVFSCORE_AUTOMOUNT_FB2_MP_ARG != ""
+
+	config LIBVFSCORE_AUTOMOUNT_FB3
+	bool
+	default y if LIBVFSCORE_AUTOMOUNT_FB3_MP_ARG != ""
+
+	# *** Entry 0: ***
+	config LIBVFSCORE_AUTOMOUNT_FB0_DEV_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_FB0_DEV if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+	default LIBVFSCORE_AUTOMOUNT_FB_9PFS_TAG if LIBVFSCORE_AUTOMOUNT_FB_9PFS
+	default "initrd0" if LIBVFSCORE_AUTOMOUNT_FB_INITRD_EXTRACT
+	default "embedded" if LIBVFSCORE_AUTOMOUNT_FB_EINITRD_EXTRACT
+
+	config LIBVFSCORE_AUTOMOUNT_FB0_MP_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_FB0_MP if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+	default LIBVFSCORE_AUTOMOUNT_FB_MP if LIBVFSCORE_AUTOMOUNT_CI && !LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_FB0_DRIVER_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_FB0_DRIVER if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+	default "ramfs" if LIBVFSCORE_AUTOMOUNT_FB_RAMFS
+	default "ramfs" if LIBVFSCORE_AUTOMOUNT_FB_INITRD
+	default "ramfs" if LIBVFSCORE_AUTOMOUNT_FB_EINITRD
+	default "extract" if LIBVFSCORE_AUTOMOUNT_FB_INITRD_EXTRACT
+	default "extract" if LIBVFSCORE_AUTOMOUNT_FB_EINITRD_EXTRACT
+	default "9pfs" if LIBVFSCORE_AUTOMOUNT_FB_9PFS
+
+	config LIBVFSCORE_AUTOMOUNT_FB0_FLAGS_ARG
+	hex
+	default 0x0
+	default LIBVFSCORE_AUTOMOUNT_FB0_FLAGS if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_FB0_OPTS_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_FB0_OPTS if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_FB0_UKOPTS_MKMP_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_FB0_UKOPTS_MKMP if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+	default LIBVFSCORE_AUTOMOUNT_FB_UKOPTS_MKMP if LIBVFSCORE_AUTOMOUNT_CI && !LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+	config LIBVFSCORE_AUTOMOUNT_FB0_UKOPTS_IFINITRD0_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_FB0_UKOPTS_IFINITRD0 if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+	default LIBVFSCORE_AUTOMOUNT_FB_UKOPTS_IFINITRD0 if LIBVFSCORE_AUTOMOUNT_CI && !LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+	config LIBVFSCORE_AUTOMOUNT_FB0_UKOPTS_IFNOINITRD0_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_FB0_UKOPTS_IFNOINITRD0 if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+	default LIBVFSCORE_AUTOMOUNT_FB_UKOPTS_IFNOINITRD0 if LIBVFSCORE_AUTOMOUNT_CI && !LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+	# *** Entry 1: ***
+	config LIBVFSCORE_AUTOMOUNT_FB1_DEV_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_FB1_DEV if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+	default "initrd0" if LIBVFSCORE_AUTOMOUNT_FB_INITRD
+	default "embedded" if LIBVFSCORE_AUTOMOUNT_FB_EINITRD
+
+	config LIBVFSCORE_AUTOMOUNT_FB1_MP_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_FB1_MP if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+	default LIBVFSCORE_AUTOMOUNT_FB_MP if LIBVFSCORE_AUTOMOUNT_FB_INITRD
+	default LIBVFSCORE_AUTOMOUNT_FB_MP if LIBVFSCORE_AUTOMOUNT_FB_EINITRD
+
+	config LIBVFSCORE_AUTOMOUNT_FB1_DRIVER_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_FB1_DRIVER if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+	default "extract" if LIBVFSCORE_AUTOMOUNT_FB_INITRD
+	default "extract" if LIBVFSCORE_AUTOMOUNT_FB_EINITRD
+
+	config LIBVFSCORE_AUTOMOUNT_FB1_FLAGS_ARG
+	hex
+	default 0x0
+	default LIBVFSCORE_AUTOMOUNT_FB1_FLAGS if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_FB1_OPTS_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_FB1_OPTS if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_FB1_UKOPTS_MKMP_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_FB1_UKOPTS_MKMP if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+	config LIBVFSCORE_AUTOMOUNT_FB1_UKOPTS_IFINITRD0_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_FB1_UKOPTS_IFINITRD0 if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+	config LIBVFSCORE_AUTOMOUNT_FB1_UKOPTS_IFNOINITRD0_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_FB1_UKOPTS_IFNOINITRD0 if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+	# *** Entry 2: ***
+	config LIBVFSCORE_AUTOMOUNT_FB2_DEV_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_FB2_DEV if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_FB2_MP_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_FB2_MP if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_FB2_DRIVER_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_FB2_DRIVER if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_FB2_FLAGS_ARG
+	hex
+	default 0x0
+	default LIBVFSCORE_AUTOMOUNT_FB2_FLAGS if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_FB2_OPTS_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_FB2_OPTS if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_FB2_UKOPTS_MKMP_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_FB2_UKOPTS_MKMP if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+	config LIBVFSCORE_AUTOMOUNT_FB2_UKOPTS_IFINITRD0_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_FB2_UKOPTS_IFINITRD0 if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+	config LIBVFSCORE_AUTOMOUNT_FB2_UKOPTS_IFNOINITRD0_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_FB2_UKOPTS_IFNOINITRD0 if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+	# *** Entry 3: ***
+	config LIBVFSCORE_AUTOMOUNT_FB3_DEV_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_FB3_DEV if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_FB3_MP_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_FB3_MP if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_FB3_DRIVER_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_FB3_DRIVER if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_FB3_FLAGS_ARG
+	hex
+	default 0x0
+	default LIBVFSCORE_AUTOMOUNT_FB3_FLAGS if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_FB3_OPTS_ARG
+	string
+	default LIBVFSCORE_AUTOMOUNT_FB3_OPTS if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+	config LIBVFSCORE_AUTOMOUNT_FB3_UKOPTS_MKMP_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_FB3_UKOPTS_MKMP if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+	config LIBVFSCORE_AUTOMOUNT_FB3_UKOPTS_IFINITRD0_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_FB3_UKOPTS_IFINITRD0 if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+	config LIBVFSCORE_AUTOMOUNT_FB3_UKOPTS_IFNOINITRD0_ARG
+	bool
+	default LIBVFSCORE_AUTOMOUNT_FB3_UKOPTS_IFNOINITRD0 if LIBVFSCORE_AUTOMOUNT_FB_CUSTOM
+
+endif # LIBVFSCORE_AUTOMOUNT_FB
+
+endif # LIBVFSCORE_AUTOMOUNT_UP
+
+# Invisible option to announce that auto-mounting needs to be compiled
+config LIBVFSCORE_AUTOMOUNT
+bool
+select LIBVFSCORE_AUTOUNMOUNT
+default y if LIBVFSCORE_AUTOMOUNT_CI || LIBVFSCORE_AUTOMOUNT_UP
+
+# Invisible option to enable einitrd
+config LIBVFSCORE_AUTOMOUNT_EINITRD
+bool
+default y if LIBVFSCORE_AUTOMOUNT_CI && LIBVFSCORE_AUTOMOUNT_CI_EINITRD
+default y if LIBVFSCORE_AUTOMOUNT_UP && LIBVFSCORE_AUTOMOUNT_FB && (LIBVFSCORE_AUTOMOUNT_FB_EINITRD || LIBVFSCORE_AUTOMOUNT_FB_EINITRD_EXTRACT)
+
+if LIBVFSCORE_AUTOMOUNT_EINITRD
+	config LIBVFSCORE_AUTOMOUNT_EINITRD_PATH
+	string "Path to embedded initrd (fully qualified)"
+	default "$(UK_APP)/initrd.cpio"
 	help
-		The maximum amount of automatically mounted volumes that are
-		passed through the vfs.fstab argument.
+		Path of a CPIO initrd image to be embedded in the unikernel
+		image and mounted under '/'.
 endif
 
+config LIBVFSCORE_AUTOUNMOUNT
+	bool "Unmount volumes during shutdown"
+	help
+		Automatically unmounts volumes during shutdown.
 endif

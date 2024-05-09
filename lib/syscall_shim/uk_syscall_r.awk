@@ -11,7 +11,6 @@ BEGIN {
 	for (i = 1; i < max_args; i++)
 		printf "a%d, ", i
 	printf "a%d;\n", max_args
-	print "\t__UK_SYSCALL_RETADDR_ENTRY();"
 	print "\tswitch (nr) {"
 }
 
@@ -40,7 +39,6 @@ END {
 	printf "\t\tuk_pr_debug(\"syscall \\\"%%s\\\" is not available\\n\", uk_syscall_name(nr));\n"
 	printf "\t\tret = -ENOSYS;\n"
 	printf "\t}\n"
-	printf "\t__UK_SYSCALL_RETADDR_CLEAR();\n"
 	printf "\treturn ret;\n"
 	printf "}\n"
 	printf "\n"
@@ -50,7 +48,6 @@ END {
 	printf "\tlong ret;\n"
 	printf "\tva_list ap;\n"
 	printf "\n"
-	printf "\t__UK_SYSCALL_RETADDR_ENTRY(); /* will be cleared by uk_vsyscall_r() */\n"
 	printf "\tva_start(ap, nr);\n"
 	printf "\tret = uk_vsyscall_r(nr, ap);\n"
 	printf "\tva_end(ap);\n"

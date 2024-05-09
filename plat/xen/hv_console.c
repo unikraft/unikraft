@@ -98,6 +98,11 @@
 #include <xen-arm/mm.h>
 #include <xen-arm/hypercall.h>
 #endif
+
+#if (defined __aarch64__)
+#include <xen-arm/setup.h>
+#endif
+
 #include <xen/io/console.h>
 #include <xen/io/protocols.h>
 #include <xen/io/ring.h>
@@ -114,6 +119,14 @@ void hv_console_prepare(void)
 }
 #endif
 
+#if defined(__aarch64__)
+void hv_console_prepare(void)
+{
+	console_ring =
+	    (struct xencons_interface *)HYPERVISOR_start_info->console.domU.mfn;
+	console_evtchn = HYPERVISOR_start_info->console.domU.evtchn;
+}
+#endif
 /*
  * hv_console_output operates in two modes: buffered and initialized.
  * The buffered mode is automatically activated after

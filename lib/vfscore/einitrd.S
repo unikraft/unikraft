@@ -7,7 +7,7 @@
 
 .balign 16
 vfscore_einitrd_start:
-.incbin CONFIG_LIBVFSCORE_ROOTFS_EINITRD_PATH
+.incbin CONFIG_LIBVFSCORE_AUTOMOUNT_EINITRD_PATH
 .balign 1
 vfscore_einitrd_end:
 .byte 0

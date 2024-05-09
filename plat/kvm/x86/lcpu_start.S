@@ -38,7 +38,6 @@
 #include <uk/asm.h>
 #include <uk/plat/common/lcpu.h>
 #include <uk/reloc.h>
-#include <x86/cpu_defs.h>
 #include <kvm-x86/traps.h>
 #include "lcpu_helpers.S"
 
@@ -308,6 +307,9 @@ ENTRY(lcpu_start64)
 
 	/* Compute pointer into CPU struct array and store it in RBP
 	 * We do not use the frame pointer, yet
+	 * TODO: We are leaking implementation details. `lcpus` is defined
+	 * with `UKPLAT_PER_LCPU_DEFINE`. Find a way to properly access
+	 * this `lcpus` here.
 	 */
 	leaq	lcpus(%rip), %rbp
 	addq	%rax, %rbp
@@ -321,20 +323,32 @@ ENTRY(lcpu_start64)
 #if (__AVX__ || CONFIG_HAVE_X86PKU)
 	/* Enable XSAVE feature */
 	LCPU_ENABLE_XSAVE fail
+#else /* !__AVX__ && !CONFIG_HAVE_X86PKU */
+	LCPU_ENABLE_XSAVE no_xsave
+no_xsave:
+#endif /* !__AVX__ && !CONFIG_HAVE_X86PKU */
+
 #if __AVX__
 	/* Enable AVX */
 	LCPU_ENABLE_AVX fail
-#endif /* __AVX__ */
-#endif /* __AVX__ || CONFIG_HAVE_X86PKU */
+#else /* !__AVX__ */
+	LCPU_ENABLE_AVX no_avx
+no_avx:
+#endif /* !__AVX__ */
 
 	/* Request extended CPU features */
 	movl	$7, %eax
 	xorl	%ecx, %ecx
 	cpuid
 
+#if __FSGSBASE__
 	/* Enable FS and GS base */
+	LCPU_ENABLE_FSGSBASE fail
+#else /* !__FSGSBASE__ */
 	LCPU_ENABLE_FSGSBASE no_fsgsbase
 no_fsgsbase:
+#endif /* !__FSGSBASE__ */
+
 #if CONFIG_HAVE_X86PKU
 	/* Enable memory protection keys (PKU) */
 	LCPU_ENABLE_PKU no_pku

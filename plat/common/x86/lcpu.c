@@ -39,6 +39,7 @@
 #include <uk/print.h>
 #include <x86/irq.h>
 #include <x86/cpu.h>
+#include <x86/gsbase.h>
 #include <x86/traps.h>
 #include <x86/delay.h>
 #include <uk/plat/common/acpi.h>
@@ -78,6 +79,9 @@ int lcpu_arch_init(struct lcpu *this_lcpu)
 
 	traps_lcpu_init(this_lcpu);
 
+	wrkgsbase((__uptr)this_lcpu);
+	wrgsbase((__uptr)this_lcpu);
+
 	return 0;
 }
 
@@ -110,6 +114,13 @@ void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
 }
 
 #if CONFIG_HAVE_SMP
+__lcpuidx lcpu_arch_idx(void)
+{
+	UK_ASSERT(IS_LCPU_PTR(rdgsbase()));
+
+	return rdgsbase32(LCPU_IDX_OFFSET);
+}
+
 IMPORT_START16_SYM(gdt32_ptr, 2, MOV);
 IMPORT_START16_SYM(gdt32, 4, DATA);
 IMPORT_START16_SYM(lcpu_start16, 2, MOV);

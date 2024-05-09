@@ -1,0 +1,7 @@
+config LIBPOSIX_TIMERFD
+	bool "posix-timerfd: Support for timerfd files"
+	select LIBPOSIX_FDIO
+	select LIBUKLOCK
+	select LIBUKLOCK_MUTEX
+	select LIBUKTIMECONV
+	select LIBUKSCHED

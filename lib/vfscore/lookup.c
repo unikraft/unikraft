@@ -142,6 +142,15 @@ namei_resolve(const char *path, struct dentry **dpp, char *realpath)
 		dp = dentry_lookup(mp, node);
 		if (dp) {
 			/* vnode is already active. */
+
+			/* If this dentry is a symlink then we should try to
+			 * return the final target. Otherwise the *_no_follow
+			 * variants of this function should've been called
+			 * instead.
+			 */
+			if (dp->d_vnode->v_type == VLNK)
+				goto dp_is_symlink;
+
 			*dpp = dp;
 			goto out;
 		}
@@ -210,6 +219,7 @@ namei_resolve(const char *path, struct dentry **dpp, char *realpath)
 			ddp = dp;
 
 			if (dp->d_vnode->v_type == VLNK) {
+dp_is_symlink:
 				error = namei_follow_link(dp, node, name, fp, mountpoint_len);
 				if (error) {
 					drele(dp);

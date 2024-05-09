@@ -45,15 +45,6 @@ config HAVE_SMP
 menu "Multiprocessor Configuration"
 	depends on HAVE_SMP
 
-config UKPLAT_LCPU_IDISIDX
-	bool "Assume sequential CPU IDs"
-	default n
-	help
-		The hardware assigns each CPU an ID, which typically encodes
-		the CPUs position in the processor topology. Many VMMs, however,
-		just use sequential numbers so internally mapping IDs to
-		indices in Unikraft is not necessary.
-
 config UKPLAT_LCPU_RUN_IRQ
 	int "Remote Function IRQ#"
 	default 5 if ARCH_ARM_64
@@ -124,3 +115,7 @@ config FPSIMD
 	depends on ARCH_ARM_64
 	help
 		Enable support FPU usage in application
+
+config UKPLAT_AUXSP_PAGE_ORDER
+	int "Maximum size allocated for the auxiliary stack"
+	default 4

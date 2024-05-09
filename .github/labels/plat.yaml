@@ -1,0 +1,84 @@
+labels:
+  - name: plat/common
+    description: Issues and PRs related to all platforms
+    color: "#1d76db"
+    apply_on_pr_match_paths:
+      - plat/common/**
+      - include/uk/plat/common/**
+
+  - name: plat/driver/tap
+    description: Issues and PRs related to the tap driver
+    color: "#750210"
+    apply_on_pr_match_paths:
+      - plat/drivers/tap/**
+      - plat/drivers/include/tap/**
+      - plat/linuxu/tap_io.c
+
+  - name: plat/driver/virtio
+    description: Issues and PRs related to virtio drivers
+    color: "#750210"
+    apply_on_pr_match_paths:
+      - plat/drivers/virtio/**
+      - plat/drivers/include/virtio/**
+
+  - name: plat/driver/ofw
+    description: Issues and PRs related to open firmware drivers
+    color: "#750210"
+    apply_on_pr_match_paths:
+      - plat/drivers/ofw/**
+      - plat/drivers/include/ofw/**
+
+  - name: plat/driver/gic
+    description: Issues and PRs related to the GIC driver
+    color: "#750210"
+    apply_on_pr_match_paths:
+      - plat/drivers/gic/**
+      - plat/drivers/include/gic/**
+
+  - name: plat/driver/pci
+    description: Issues and PRs related to PCI driver
+    color: "#750210"
+    apply_on_pr_match_paths:
+      - plat/common/include/pci/**
+
+  - name: plat/driver/9p
+    description: Issues and PRs related to 9p driver
+    color: "#750210"
+    apply_on_pr_match_paths:
+      - plat/*/include/9p/**
+
+  - name: plat/driver/net
+    description: Issues and PRs related to network driver
+    color: "#750210"
+    apply_on_pr_match_paths:
+      - plat/*/include/net/**
+
+  - name: plat/driver/blk
+    description: Issues and PRs related to block driver
+    color: "#750210"
+    apply_on_pr_match_paths:
+      - plat/*/include/blk/**
+
+  - name: plat/driver
+    description: Issues and PRs related to platform drivers
+    color: "#750210"
+    apply_on_pr_match_paths:
+      - plat/drivers/**
+
+  - name: plat/kvm
+    description: Issues and PRs related to KVM platform
+    color: "#1f8aa5"
+    apply_on_pr_match_paths:
+      - plat/kvm/**
+
+  - name: plat/linuxu
+    description: Issues and PRs related to Linux Userspace platform
+    color: "#bfdadc"
+    apply_on_pr_match_paths:
+      - plat/linux/**
+
+  - name: plat/xen
+    description: ssues and PRs related to the Xen platform
+    color: "#4da81f"
+    apply_on_pr_match_paths:
+      - plat/xen/**

@@ -109,9 +109,14 @@ typedef __u32 __lcpuidx;	/* Sequential index of logical CPU */
 typedef __u64 __lcpuid;		/* Physical ID of logical CPU */
 
 /**
- * Returns the hardware ID of the current logical CPU
+ * Returns the auxiliary stack pointer of the current logical CPU
  */
-__lcpuid ukplat_lcpu_id(void);
+__uptr ukplat_lcpu_get_auxsp(void);
+
+/**
+ * Sets the auxiliary stack pointer of the current logical cpu
+ */
+void ukplat_lcpu_set_auxsp(__uptr auxsp);
 
 #ifdef CONFIG_HAVE_SMP
 
@@ -130,6 +135,11 @@ struct ukplat_lcpu_func {
 	/* Optional user-supplied argument. */
 	void *user;
 };
+
+/**
+ * Returns the hardware ID of the current logical CPU
+ */
+__lcpuid ukplat_lcpu_id(void);
 
 /**
  * Returns the index of the current logical CPU
@@ -231,6 +241,7 @@ int ukplat_lcpu_run(const __lcpuidx lcpuidx[], unsigned int *num,
 int ukplat_lcpu_wakeup(const __lcpuidx lcpuidx[], unsigned int *num);
 
 #else /* CONFIG_HAVE_SMP */
+#define ukplat_lcpu_id()	(0)
 #define ukplat_lcpu_idx()	(0)
 #define ukplat_lcpu_count()	(1)
 #endif /* CONFIG_HAVE_SMP */

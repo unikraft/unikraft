@@ -41,6 +41,9 @@
 #include <uk/refcount.h>
 #include <uk/alloc.h>
 #include <uk/essentials.h>
+#if CONFIG_LIBUKSGLIST
+#include <uk/sglist.h>
+#endif /* CONFIG_LIBUKSGLIST */
 
 #ifdef __cplusplus
 extern "C" {
@@ -413,6 +416,21 @@ void uk_netbuf_connect(struct uk_netbuf *headtail,
  */
 void uk_netbuf_append(struct uk_netbuf *head,
 		      struct uk_netbuf *tail);
+
+#if CONFIG_LIBUKSGLIST
+/**
+ * This function appends a netbuf to a scatter gather list.
+ *
+ * @param sg
+ *	A reference to the scatter gather list.
+ * @param netbuf
+ *	A reference to the netbuf
+ * @return
+ *	0, on successful creation of the scatter gather list
+ *	-EINVAL, Invalid sg list.
+ */
+int uk_netbuf_sglist_append(struct uk_sglist *sg, struct uk_netbuf *netbuf);
+#endif /* CONFIG_LIBUKSGLIST */
 
 /**
  * Disconnects a netbuf from its chain. The chain will remain

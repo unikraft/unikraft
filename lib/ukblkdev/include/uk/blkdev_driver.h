@@ -102,7 +102,7 @@ static inline void uk_blkdev_drv_queue_event(struct uk_blkdev *dev,
  *	uk_blkreq structure
  */
 #define uk_blkreq_finished(req) \
-	(ukarch_store_n(&(req)->state.counter, UK_BLKREQ_FINISHED))
+	(uk_store_n(&(req)->state.counter, UK_BLKREQ_FINISHED))
 
 /**
  * Frees the data allocated for the Unikraft Block Device.

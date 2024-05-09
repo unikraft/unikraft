@@ -58,7 +58,7 @@
 
 #define PCI_CONF_READ(type, ret, a, s)					\
 	do {								\
-		uint32_t _conf_data;					\
+		__u32 _conf_data;					\
 		outl(PCI_CONFIG_ADDR, (a) | PCI_CONF_##s);		\
 		_conf_data = ((inl(PCI_CONFIG_DATA) >> PCI_CONF_##s##_SHFT) \
 			      & PCI_CONF_##s##_MASK);			\
@@ -127,7 +127,7 @@ static inline int pci_driver_add_device(struct pci_driver *drv,
 					struct pci_device_id *devid)
 {
 	struct pci_device *dev;
-	uint32_t config_addr;
+	__u32 config_addr;
 	int ret;
 
 	UK_ASSERT(drv != NULL);
@@ -152,8 +152,8 @@ static inline int pci_driver_add_device(struct pci_driver *drv,
 			| (addr->bus << PCI_BUS_SHIFT)
 			| (addr->devid << PCI_DEVICE_SHIFT);
 	dev->config_addr = config_addr;
-	PCI_CONF_READ(uint16_t, &dev->base, config_addr, IOBAR);
-	PCI_CONF_READ(uint8_t, &dev->irq, config_addr, IRQ);
+	PCI_CONF_READ(__u16, &dev->base, config_addr, IOBAR);
+	PCI_CONF_READ(__u8, &dev->irq, config_addr, IRQ);
 
 	ret = drv->add_dev(dev);
 	if (ret < 0) {
@@ -166,14 +166,14 @@ static inline int pci_driver_add_device(struct pci_driver *drv,
 	return 0;
 }
 
-static void probe_bus(uint32_t);
+static void probe_bus(__u32);
 
 /* Probe a function. Return 1 if the function does not exist in the device, 0
  * otherwise.
  */
-static int probe_function(uint32_t bus, uint32_t device, uint32_t function)
+static int probe_function(__u32 bus, __u32 device, __u32 function)
 {
-	uint32_t config_addr, config_data, secondary_bus;
+	__u32 config_addr, config_data, secondary_bus;
 	struct pci_address addr;
 	struct pci_device_id devid;
 	struct pci_driver *drv;
@@ -200,17 +200,17 @@ static int probe_function(uint32_t bus, uint32_t device, uint32_t function)
 	/* These I/O reads could be batched, but it practice this does not
 	 * appear to make the code more performant.
 	 */
-	PCI_CONF_READ(uint32_t, &devid.class_id,
+	PCI_CONF_READ(__u32, &devid.class_id,
 			config_addr, CLASS_ID);
-	PCI_CONF_READ(uint32_t, &devid.sub_class_id,
+	PCI_CONF_READ(__u32, &devid.sub_class_id,
 			config_addr, SUBCLASS_ID);
-	PCI_CONF_READ(uint16_t, &devid.vendor_id,
+	PCI_CONF_READ(__u16, &devid.vendor_id,
 			config_addr, VENDOR_ID);
-	PCI_CONF_READ(uint16_t, &devid.device_id,
+	PCI_CONF_READ(__u16, &devid.device_id,
 			config_addr, DEVICE_ID);
-	PCI_CONF_READ(uint16_t, &devid.subsystem_device_id,
+	PCI_CONF_READ(__u16, &devid.subsystem_device_id,
 			config_addr, SUBSYS_ID);
-	PCI_CONF_READ(uint16_t, &devid.subsystem_vendor_id,
+	PCI_CONF_READ(__u16, &devid.subsystem_vendor_id,
 			config_addr, SUBSYSVEN_ID);
 
 	uk_pr_info("PCI %02x:%02x.%02x (%04x %04x:%04x): ",
@@ -231,7 +231,7 @@ static int probe_function(uint32_t bus, uint32_t device, uint32_t function)
 
 	/* 0x06 = Bridge Device, 0x04 = PCI-to-PCI bridge */
 	if ((devid.class_id == 0x06) && (devid.sub_class_id == 0x04)) {
-		PCI_CONF_READ(uint32_t, &secondary_bus,
+		PCI_CONF_READ(__u32, &secondary_bus,
 				config_addr, SECONDARY_BUS);
 		probe_bus(secondary_bus);
 	}
@@ -242,16 +242,16 @@ static int probe_function(uint32_t bus, uint32_t device, uint32_t function)
 /* Recursive PCI enumeration: this function is called recursively by
  * probe_function upon discovering PCI-to-PCI bridges.
  */
-static void probe_bus(uint32_t bus)
+static void probe_bus(__u32 bus)
 {
-	uint32_t config_addr, device, header_type, function = 0;
+	__u32 config_addr, device, header_type, function = 0;
 
 	for (device = 0; device < PCI_MAX_DEVICES; ++device) {
 		if (!probe_function(bus, device, function))
 			continue;
 
 		config_addr = (PCI_ENABLE_BIT);
-		PCI_CONF_READ(uint32_t, &header_type,
+		PCI_CONF_READ(__u32, &header_type,
 				config_addr, HEADER_TYPE);
 
 		/* Is this a multi-function device? */
@@ -266,14 +266,14 @@ static void probe_bus(uint32_t bus)
 
 int arch_pci_probe(struct uk_alloc *pha)
 {
-	uint32_t config_addr, function, header_type, vendor_id;
+	__u32 config_addr, function, header_type, vendor_id;
 
 	uk_pr_debug("Probe PCI\n");
 
 	ph.a = pha;
 
 	config_addr = (PCI_ENABLE_BIT);
-	PCI_CONF_READ(uint32_t, &header_type,
+	PCI_CONF_READ(__u32, &header_type,
 			config_addr, HEADER_TYPE);
 
 	if ((header_type & PCI_HEADER_TYPE_MSB_MASK) == 0) {
@@ -285,7 +285,7 @@ int arch_pci_probe(struct uk_alloc *pha)
 			config_addr = (PCI_ENABLE_BIT) |
 					(function << PCI_FUNCTION_SHIFT);
 
-			PCI_CONF_READ(uint32_t, &vendor_id,
+			PCI_CONF_READ(__u32, &vendor_id,
 					config_addr, VENDOR_ID);
 
 			if (vendor_id == PCI_INVALID_ID)

@@ -51,13 +51,24 @@
 #include <vfscore/file.h>
 #endif
 
+/**
+ * The Unikraft `struct utsname` structure.
+ *
+ * * `sysname` is set to "Unikraft".
+ * * `nodename` is set to "unikraft".
+ * * `release` is set to * `5-{Unikraft Release Codename}` for glibc
+ *   compatibility (see the comments below).
+ * * `version` is set to the Unikraft full version.
+ * * `machine` is set to the current architecture.
+ */
 static struct utsname utsname = {
 	.sysname	= "Unikraft",
 	.nodename	= "unikraft",
-	/* glibc looks into the release field to check the kernel version:
-	 * We prepend '5-' in order to be "new enough" for it.
+	/* glibc and some other applications look into the release field to
+	 * check the kernel version: We prepend a proper kernel version in order
+	 * to be "new enough" for it.
 	 */
-	.release	= "5-" STRINGIFY(UK_CODENAME),
+	.release	= "5.15.148-" STRINGIFY(UK_CODENAME),
 	.version	= STRINGIFY(UK_FULLVERSION),
 #ifdef CONFIG_ARCH_X86_64
 	.machine	= "x86_64"
@@ -174,13 +185,12 @@ UK_SYSCALL_R_DEFINE(int, sethostname, const char*, name, size_t, len)
 		return -EFAULT;
 	}
 
-	if (len > sizeof(utsname.nodename)) {
+	if (len + 1 > sizeof(utsname.nodename)) {
 		return -EINVAL;
 	}
 
-	strncpy(utsname.nodename, name, len);
-	if (len < sizeof(utsname.nodename))
-		utsname.nodename[len] = 0;
+	memcpy(utsname.nodename, name, len);
+	utsname.nodename[len] = '\0';
 	return 0;
 }
 

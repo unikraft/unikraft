@@ -266,7 +266,7 @@ UK_SYSCALL_R_DEFINE(int, madvise, void *, addr, size_t, len, int, advice)
 		break;
 	}
 
-	rc = uk_vma_advise(vas, vaddr, len, vadvice,
+	rc = uk_vma_advise(vas, vaddr, PAGE_ALIGN_UP(len), vadvice,
 			   UK_VMA_FLAG_STRICT_VMA_CHECK);
 	if (unlikely(rc)) {
 		if (rc == -ENOENT)

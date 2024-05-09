@@ -88,6 +88,11 @@ typedef struct {
 #define __DEFINED_max_align_t
 #endif
 
+#if (defined __NEED_FILE && !defined __DEFINED_FILE)
+typedef struct _nolibc_file FILE;
+#define __DEFINED_FILE
+#endif
+
 #if defined(__NEED_useconds_t) && !defined(__DEFINED_useconds_t)
 typedef unsigned useconds_t;
 #define __DEFINED_useconds_t

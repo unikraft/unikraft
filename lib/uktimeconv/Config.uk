@@ -2,3 +2,4 @@ config LIBUKTIMECONV
        bool "uktimeconv: Time conversion functions"
        default n
        select LIBUKDEBUG
+       select LIBNOLIBC if !HAVE_LIBC

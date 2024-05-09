@@ -36,7 +36,7 @@
 #ifndef _LINUX_LIST_H_
 #define _LINUX_LIST_H_
 
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
 #include <stddef.h>
 
 #ifdef __cplusplus

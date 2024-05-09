@@ -1,20 +1,20 @@
 #!/bin/bash
-if [ $( uname ) = "Darwin" ]; then
-	CMD_READLINK=greadlink
-	CMD_DIRNAME=gdirname
+if [ "$(uname)" = "Darwin" ]; then
+	CMD_READLINK="greadlink"
+	CMD_DIRNAME="gdirname"
 else
-	CMD_READLINK=readlink
-	CMD_DIRNAME=dirname
+	CMD_READLINK="readlink"
+	CMD_DIRNAME="dirname"
 fi
 
-_SELF=$( "${CMD_READLINK}" -f "$0" )
-_SELF_BASE=$( "${CMD_DIRNAME}" "${_SELF}" )
+_SELF=$("${CMD_READLINK}" -f "$0")
+_SELF_BASE=$("${CMD_DIRNAME}" "${_SELF}")
 
 if [ -z "${_SELF}" ]; then
 	echo "Failed to detect fully qualified path of '$0'" 1>&2
 	exit 2
 fi
-if [ -z "${_SELF}" -a ! -d "${_SELF_BASE}" ]; then
+if [ -z "${_SELF}" ] && [ ! -d "${_SELF_BASE}" ]; then
 	echo "Failed to detect fully qualified base directory of '$0'" 1>&2
 	exit 2
 fi
@@ -27,7 +27,7 @@ fi
 
 _CHECKPATCHCONF=
 if [ -f "${_SELF_BASE}/../../.checkpatch.conf" ]; then
-	_CHECKPATCHCONF=$( cat "${_SELF_BASE}/../../.checkpatch.conf" )
+	_CHECKPATCHCONF=($(cat "${_SELF_BASE}/../../.checkpatch.conf"))
 fi
 
-exec "${_CHECKPATCHPL}" ${_CHECKPATCHCONF} "$@"
+exec "${_CHECKPATCHPL}" "${_CHECKPATCHCONF[@]}" "$@"

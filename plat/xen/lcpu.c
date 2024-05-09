@@ -37,6 +37,7 @@
 #elif (defined __ARM_32__) || (defined __ARM_64__)
 #include <xen-arm/os.h>
 #include <arm/cpu.h>
+#include <uk/plat/common/irq.h>
 #else
 #error "Unsupported architecture"
 #endif

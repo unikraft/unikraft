@@ -44,6 +44,17 @@ putchar
 fputs
 puts
 
+# file
+clearerr
+feof
+ferror
+fseek
+fopen
+fclose
+fdopen
+fread
+fwrite
+
 # stdlib
 abort
 exit
@@ -88,6 +99,9 @@ strlcat
 strerror_r
 strerror
 strncat
+
+# strstr
+strstr
 
 # strsignal
 strsignal

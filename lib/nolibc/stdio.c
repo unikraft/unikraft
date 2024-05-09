@@ -59,8 +59,14 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdarg.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 
 #include <uk/essentials.h>
+#include <uk/arch/lcpu.h>
 #include <uk/plat/console.h>
 
 /* 64 bits + 0-Byte at end */
@@ -542,3 +548,230 @@ int puts(const char *s)
 {
 	return fputs_internal(s, stdout, 1);
 }
+
+#if CONFIG_LIBVFSCORE
+struct _nolibc_file {
+	int fd;
+	int errno;
+	bool eof;
+	off_t offset;
+};
+
+void clearerr(FILE *stream)
+{
+	stream->eof = 0;
+	stream->errno = 0;
+}
+
+/* The following code is derived from musl libc */
+static int __fmodeflags(const char *mode, int *flags)
+{
+	if (!strchr("rwa", *mode)) {
+		errno = EINVAL;
+		return -1;
+	}
+	if (strchr(mode, '+'))
+		*flags = O_RDWR;
+	else if (*mode == 'r')
+		*flags = O_RDONLY;
+	else
+		*flags = O_WRONLY;
+	if (strchr(mode, 'x'))
+		*flags |= O_EXCL;
+	if (strchr(mode, 'e'))
+		*flags |= O_CLOEXEC;
+	if (*mode != 'r')
+		*flags |= O_CREAT;
+	if (*mode == 'w')
+		*flags |= O_TRUNC;
+	if (*mode == 'a')
+		*flags |= O_APPEND;
+
+	return 0;
+}
+
+FILE *fopen(const char *pathname, const char *mode)
+{
+	int flags;
+	int fd;
+	int ret;
+
+	ret = __fmodeflags(mode, &flags);
+
+	if (ret < 0)
+		return NULL;
+
+	fd = open(pathname, flags, 0666);
+
+	if (fd < 0)
+		return NULL;
+
+	return fdopen(fd, mode);
+}
+
+int feof(FILE *stream)
+{
+	return stream->eof;
+}
+
+int ferror(FILE *stream)
+{
+	return stream->errno;
+}
+
+int fclose(FILE *stream)
+{
+	int ret = close(stream->fd);
+
+	free(stream);
+	return ret;
+}
+
+FILE *fdopen(int fd, const char *mode __unused)
+{
+	FILE *f = (FILE *)malloc(sizeof(FILE));
+
+	if (!f)
+		return NULL;
+	f->fd = fd;
+	f->errno = 0;
+	f->eof = 0;
+	f->offset = 0;
+	return f;
+}
+
+int fseek(FILE *stream, long offset, int whence)
+{
+	off_t new_offset;
+
+	switch (whence) {
+	case SEEK_SET:
+	{
+		// Absolute offset from the beginning
+		if (unlikely(offset < 0)) {
+			stream->errno = 1;
+			return -1;
+		}
+		new_offset = offset;
+		break;
+	}
+
+	case SEEK_CUR:
+	{
+		// Offset from the current position
+		new_offset = stream->offset + offset;
+		if (unlikely(new_offset < 0)) {
+			stream->errno = 1;
+			return -1;
+		}
+		break;
+	}
+
+	case SEEK_END:
+	{
+		struct stat st;
+
+		if (unlikely(fstat(stream->fd, &st) != 0)) {
+			stream->errno = 1;
+			return -1;
+		}
+
+		new_offset = st.st_size + offset;
+		if (unlikely(new_offset < 0)) {
+			stream->errno = 1;
+			return -1;
+		}
+	}
+	break;
+
+	default:
+	{
+		// Invalid whence
+		stream->errno = 1;
+		return -1;
+	}
+	}
+
+	// Update the stream's offset
+	stream->offset = new_offset;
+	return 0;
+}
+
+size_t fread(void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+	if (unlikely(!stream))
+		return 0;
+
+	if (unlikely(!ptr || !size || !nmemb)) {
+		stream->errno = EINVAL;
+		return 0;
+	}
+
+	if (unlikely(stream->fd < 0)) {
+		stream->errno = EBADF;
+		return 0;
+	}
+
+	if (unlikely(SIZE_MAX / size < nmemb)) {
+		stream->errno = EOVERFLOW;
+		return 0;
+	}
+
+	size_t total = 0;
+
+	while (total < size * nmemb) {
+		ssize_t ret = pread(stream->fd,
+				((char *) ptr) + total,
+				size * nmemb - total, stream->offset);
+		if (ret > 0)
+			stream->offset += ret;  // Update the offset
+
+		if (ret < 0)
+			return total / size;
+		if (ret == 0) {
+			stream->eof = 1;
+			return total / size;
+		}
+		total += ret;
+	}
+
+	return total / size;
+}
+
+size_t fwrite(const void *ptr, size_t size, size_t nmemb, FILE *stream)
+{
+	if (unlikely(!stream))
+		return 0;
+
+	if (unlikely(!ptr || !size || !nmemb)) {
+		stream->errno = EINVAL;
+		return 0;
+	}
+
+	if (unlikely(stream->fd < 0)) {
+		stream->errno = EBADF;
+		return 0;
+	}
+
+	if (unlikely(SIZE_MAX / size < nmemb)) {
+		stream->errno = EOVERFLOW;
+		return 0;
+	}
+
+	size_t total = 0;
+
+	while (total < size * nmemb) {
+		ssize_t ret = pwrite(stream->fd,
+				((char *) ptr) + total,
+				size * nmemb - total, stream->offset);
+		if (ret > 0)
+			stream->offset += ret;  // Update the offset
+
+		if (ret < 0)
+			return total / size;
+		total += ret;
+	}
+
+	return total / size;
+}
+#endif /* CONFIG_LIBVFSCORE */

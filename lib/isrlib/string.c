@@ -152,22 +152,30 @@ size_t strnlen_isr(const char *str, size_t len)
 
 char *strncpy_isr(char *dst, const char *src, size_t len)
 {
-	size_t clen;
+	if (len != 0) {
+		char *d = dst;
+		const char *s = src;
 
-	clen = strnlen_isr(src, len);
-	memcpy_isr(dst, src, clen);
+		do {
+			if ((*d++ = *s++) == 0) {
+				/* NUL pad the remaining n-1 bytes */
+				while (--len != 0)
+					*d++ = 0;
+				break;
+			}
+		} while (--len != 0);
+	}
 
-	/* instead of filling up the rest of left space with zeros,
-	 * append a termination character if we did not copy one
-	 */
-	if (clen < len && dst[clen - 1] != '\0')
-		dst[clen] = '\0';
 	return dst;
 }
 
 char *strcpy_isr(char *dst, const char *src)
 {
-	return strncpy_isr(dst, src, SIZE_MAX);
+	char *save = dst;
+
+	for (; (*dst = *src) != '\0'; ++src, ++dst)
+		;
+	return save;
 }
 
 int strncmp_isr(const char *str1, const char *str2, size_t len)

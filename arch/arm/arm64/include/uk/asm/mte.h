@@ -67,9 +67,9 @@ static inline __u64 mte_insert_random_tag(__u64 addr)
 {
 	__u64 reg;
 
-	__asm__ __volatile__("gmi	%x0, %x1, xzr\n"
-			     "irg	%x1, %x1, %x0\n"
-			     : "=r"(reg) : "r" (addr));
+	__asm__ __volatile__("gmi	%0, %1, xzr\n"
+			     "irg	%1, %1, %0\n"
+			     : "=&r"(reg), "+r" (addr));
 	return addr;
 }
 
@@ -83,7 +83,7 @@ static inline __u64 mte_load_alloc(__u64 addr)
 {
 	__u64 tag;
 
-	__asm__ __volatile__ ("ldg	%x0, [%x1]\n"
+	__asm__ __volatile__ ("ldg	%0, [%1]\n"
 			      : "=&r" (tag) : "r"(addr));
 	return tag;
 }
@@ -96,7 +96,7 @@ static inline __u64 mte_load_alloc(__u64 addr)
  */
 static inline void mte_store_alloc(__u64 addr)
 {
-	__asm__ __volatile__ ("stg	%x0, [%x0]"
+	__asm__ __volatile__ ("stg	%0, [%0]\n"
 			      : : "r"(addr) : "memory");
 }
 

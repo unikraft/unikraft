@@ -45,7 +45,8 @@
 #include <uk/allocbbuddy.h>
 #include <uk/alloc_impl.h>
 #include <uk/arch/limits.h>
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
+#include <uk/bitops.h>
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <uk/page.h>
@@ -278,16 +279,16 @@ static inline unsigned long num_pages_to_order(unsigned long num_pages)
 {
 	UK_ASSERT(num_pages != 0);
 
-	/* ukarch_flsl has undefined behavior when called with zero */
+	/* uk_flsl has undefined behavior when called with zero */
 	if (num_pages == 1)
 		return 0;
 
-	/* ukarch_flsl(num_pages - 1) returns log of the previous power of two
-	 * of num_pages. ukarch_flsl is called with `num_pages - 1` and not
+	/* uk_flsl(num_pages - 1) returns log of the previous power of two
+	 * of num_pages. uk_flsl is called with `num_pages - 1` and not
 	 * `num_pages` to handle the case where num_pages is already a power
 	 * of two.
 	 */
-	return ukarch_flsl(num_pages - 1) + 1;
+	return uk_flsl(num_pages - 1) + 1;
 }
 
 /*********************

@@ -52,9 +52,6 @@ extern "C" {
 #ifdef CONFIG_LIBUKALLOC
 #include <uk/alloc.h>
 #endif /* CONFIG_LIBUKALLOC */
-#ifdef CONFIG_LIBUKNETDEV
-#include <uk/netbuf.h>
-#endif /* CONFIG_LIBUKNETDEV */
 
 struct uk_sglist_seg {
 	__paddr_t  ss_paddr; /* Physical address */
@@ -67,6 +64,36 @@ struct uk_sglist {
 	uint16_t    sg_nseg; /* Number of segment in the sg list */
 	uint16_t    sg_maxseg; /* Maximum number of segment in the sg list */
 };
+
+/*
+ * Convenience macros to save the state of an sglist so it can be restored
+ * if an append attempt fails.  Since sglist's only grow we only need to
+ * save the current count of segments and the length of the ending segment.
+ * Earlier segments will not be changed by an append, and the only change
+ * that can occur to the ending segment is that it can be extended.
+ */
+struct uk_sgsave {
+	__u16 sg_nseg;
+	size_t ss_len;
+};
+
+#define UK_SGLIST_SAVE(sg, sgsave)					\
+	do {								\
+		(sgsave).sg_nseg = (sg)->sg_nseg;			\
+		if ((sgsave).sg_nseg > 0)				\
+			(sgsave).ss_len =				\
+			     (sg)->sg_segs[(sgsave).sg_nseg - 1].ss_len;\
+		else							\
+			(sgsave).ss_len = 0;				\
+	} while (0)
+
+#define UK_SGLIST_RESTORE(sg, sgsave)					\
+	do {								\
+		(sg)->sg_nseg = (sgsave).sg_nseg;			\
+		if ((sgsave).sg_nseg > 0)				\
+			(sg)->sg_segs[(sgsave).sg_nseg - 1].ss_len =	\
+							(sgsave).ss_len;\
+	} while (0)
 
 /**
  * Initialize the sg list.
@@ -269,20 +296,6 @@ int uk_sglist_split(struct uk_sglist *original, struct uk_sglist **head,
 int uk_sglist_slice(struct uk_sglist *original, struct uk_sglist **slice,
 			struct uk_alloc *a, size_t offset, size_t length) __nonnull;
 #endif /* CONFIG_LIBUKALLOC */
-
-#ifdef CONFIG_LIBUKNETDEV
-/**
- * The function create a scatter gather list from the netbuf
- * @param sg
- *	A reference to the scatter gather list.
- * @param netbuf
- *	A reference to the netbuf
- * @return
- *	0, on successful creation of the scatter gather list
- *	-EINVAL, Invalid sg list.
- */
-int uk_sglist_append_netbuf(struct uk_sglist *sg, struct uk_netbuf *netbuf) __nonnull;
-#endif /* CONFIG_LIBUKNET */
 
 #ifdef __cplusplus
 }

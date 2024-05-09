@@ -30,6 +30,9 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+#include <uk/arch/lcpu.h>
+#include <uk/arch/ctx.h>
+#include <uk/plat/config.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/plat/common/acpi.h>
 #include <uk/plat/lcpu.h>
@@ -41,6 +44,34 @@
 #include <libfdt.h>
 
 #define CPU_ID_MASK 0xff00ffffffUL
+
+/*
+ *  CPU_EXCEPT_STACK_SIZE  CPU_EXCEPT_STACK_SIZE
+ * <---------------------><--------------------->
+ * |============================================|
+ * |                     |                      |
+ * |       trap stack    |        IRQ stack     |
+ * |                     |                      |
+ * |=============================================
+ *                       ^
+ *                     SP_EL0
+ *
+ * Why do we need separate stacks for IRQ and traps?
+ * We could use a single stack for exceptions, but in that case when we have a
+ * nested case (e.g. an IRQ triggers a synchronous exception) we would need to
+ * check at the interrupt vector entry whether we are coming from an exception
+ * (i.e. keep using the exception stack) or not (switch to the exception stack).
+ * This may be correct but it is a costlier operation than simply adding
+ * CPU_EXCEPT_STACK_SIZE, especially on an IRQ handler path.
+ *
+ * Why can one stack not corrupt the other/Why is trap stack before IRQ stack?
+ * During a trap IRQs are disabled. So only the trap stack could potentially
+ * corrupt the IRQ stack if they were the other way around. The ordering of the
+ * stacks is made so that this cannot happen.
+ *
+ */
+static __align(UKARCH_SP_ALIGN)
+UKPLAT_PER_LCPU_ARRAY_DEFINE(__u8, lcpu_irqntrap_sp, CPU_EXCEPT_STACK_SIZE * 2);
 
 __lcpuid lcpu_arch_id(void)
 {
@@ -55,6 +86,8 @@ __lcpuid lcpu_arch_id(void)
 void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
 {
 	__asm__ __volatile__ (
+		"mov	x29, xzr\n" /* reset frame pointer */
+		"mov	x30, xzr\n" /* reset link register */
 		"mov	sp, %0\n" /* set the sp  */
 		"br	%1\n"     /* branch to the entry function */
 		:
@@ -65,7 +98,6 @@ void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
 	__builtin_unreachable();
 }
 
-#ifdef CONFIG_HAVE_SMP
 /**
  * The number of cells for the size field should be 0 in cpu nodes.
  * The number of cells in the address field is set by default to 2 in cpu
@@ -76,11 +108,11 @@ void __noreturn lcpu_arch_jump_to(void *sp, ukplat_lcpu_entry_t entry)
 #define FDT_ADDR_CELLS_DEFAULT 2
 
 void lcpu_start(struct lcpu *cpu);
-static __paddr_t lcpu_start_paddr;
 extern struct _gic_dev *gic;
 
 int lcpu_arch_init(struct lcpu *this_lcpu)
 {
+	__uptr irqntrap_sp;
 	int ret = 0;
 
 	/* Initialize the interrupt controller for non-bsp cores */
@@ -90,7 +122,25 @@ int lcpu_arch_init(struct lcpu *this_lcpu)
 			return ret;
 	}
 
+	SYSREG_WRITE64(tpidr_el1, (__uptr)this_lcpu);
+
+	irqntrap_sp = (__uptr)&ukplat_per_lcpu_array_current(lcpu_irqntrap_sp,
+							CPU_EXCEPT_STACK_SIZE);
+	SYSREG_WRITE64(sp_el0, irqntrap_sp);
+
 	return ret;
+}
+
+#ifdef CONFIG_HAVE_SMP
+static __paddr_t lcpu_start_paddr;
+
+__lcpuidx lcpu_arch_idx(void)
+{
+	struct lcpu *this_lcpu = SYSREG_READ64(tpidr_el1);
+
+	UK_ASSERT(IS_LCPU_PTR(this_lcpu));
+
+	return this_lcpu->idx;
 }
 
 #ifdef CONFIG_UKPLAT_ACPI

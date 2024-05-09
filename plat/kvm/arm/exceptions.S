@@ -28,6 +28,9 @@
  */
 #include <uk/arch/lcpu.h>
 #include <uk/asm.h>
+#include <uk/plat/common/lcpu.h>
+#include <uk/plat/config.h>
+#include <uk/syscall.h>
 
 .macro EXCHANGE_SP_WITH_X0
 	add sp, sp, x0	// new_sp = sp + x0
@@ -66,95 +69,135 @@
 	EXCHANGE_SP_WITH_X0
 .endm
 
-.macro ENTER_TRAP, el
-	sub sp, sp, #__TRAP_STACK_SIZE
+.macro SAVE_REGS, is_irq
+	/* Use TPIDRRO_EL0 as scratch register. It is fine to do so because
+	 * it will always hold a value the application can't modify and we will
+	 * always be able to restore it to its desired known value anytime we
+	 * want. Thus, temporarily store x0.
+	 */
+	msr     tpidrro_el0, x0
 
-.if	\el != 0
-	/* Force align the stack, and save SP to __SP_OFFSET */
-	ALIGN_STACK
+	/* Fetch middle of `lcpu_irqntrap_sp`:
+	 *  CPU_EXCEPT_STACK_SIZE  CPU_EXCEPT_STACK_SIZE
+	 * <---------------------><--------------------->
+	 * |============================================|
+	 * |                     |                      |
+	 * |       trap stack    |        IRQ stack     |
+	 * |                     |                      |
+	 * |=============================================
+	 *                       ^
+	 *                     SP_EL0
+	 */
+	mrs     x0, sp_el0
+
+	/* Make it so that SP contains SP_EL0 and x0 contains old SP */
+	EXCHANGE_SP_WITH_X0
+
+.if \is_irq != 0
+	/* If we are an IRQ, use the IRQ stack instead. */
+	add     sp, sp, #CPU_EXCEPT_STACK_SIZE
 .endif
+
+	/* Store old SP previously saved into x0 */
+	str     x0, [sp, #-16]
+
+	/* Is this trap a system call? */
+	mrs	x0, esr_el1
+	and	x0, x0, #ESR_EC_MASK
+	orr	x0, xzr, x0, lsr #ESR_EC_SHIFT
+	cmp	x0, #ESR_EL1_EC_SVC64
+	bne	0f
+
+	/* If we are in a system call trap then switch to auxiliary stack
+	 * from the current lcpu pointer
+	 */
+	mrs	x0, tpidr_el1
+	ldr	x0, [x0, #LCPU_AUXSP_OFFSET]
+	/* NOTE: We should normally align the stack before doing this
+	 * subtraction because we must ensure that the `ectx` field
+	 * is aligned to the corresponding ECTX alignment.
+	 * However, this is guaranteed to already be the case for the
+	 * auxiliary stack because it is allocated with this exact alignment
+	 * in mind.
+	 */
+	sub	x0, x0, #UK_SYSCALL_CTX_SIZE
+
+	/* We now have in SP the trap stack and in x0 the auxiliary stack */
+	EXCHANGE_SP_WITH_X0  /* Switch them */
+	/* Restore old SP we stored before system call check */
+	ldr	x0, [x0, #-16]
+	str	x0, [sp, #__SP_OFFSET]  /* Store old SP in auxiliary stack */
+	b	1f
+0:
+	sub	sp, sp, #__TRAP_STACK_SIZE
+1:
+	/* Restore x0 */
+	mrs     x0, tpidrro_el0
 
 	/* Save general purpose registers */
-	stp x0, x1, [sp, #16 * 0]
-	stp x2, x3, [sp, #16 * 1]
-	stp x4, x5, [sp, #16 * 2]
-	stp x6, x7, [sp, #16 * 3]
-	stp x8, x9, [sp, #16 * 4]
-	stp x10, x11, [sp, #16 * 5]
-	stp x12, x13, [sp, #16 * 6]
-	stp x14, x15, [sp, #16 * 7]
-	stp x16, x17, [sp, #16 * 8]
-	stp x18, x19, [sp, #16 * 9]
-	stp x20, x21, [sp, #16 * 10]
-	stp x22, x23, [sp, #16 * 11]
-	stp x24, x25, [sp, #16 * 12]
-	stp x26, x27, [sp, #16 * 13]
-	stp x28, x29, [sp, #16 * 14]
+	stp	x0, x1, [sp, #16 * 0]
+	stp	x2, x3, [sp, #16 * 1]
+	stp	x4, x5, [sp, #16 * 2]
+	stp	x6, x7, [sp, #16 * 3]
+	stp	x8, x9, [sp, #16 * 4]
+	stp	x10, x11, [sp, #16 * 5]
+	stp	x12, x13, [sp, #16 * 6]
+	stp	x14, x15, [sp, #16 * 7]
+	stp	x16, x17, [sp, #16 * 8]
+	stp	x18, x19, [sp, #16 * 9]
+	stp	x20, x21, [sp, #16 * 10]
+	stp	x22, x23, [sp, #16 * 11]
+	stp	x24, x25, [sp, #16 * 12]
+	stp	x26, x27, [sp, #16 * 13]
+	stp	x28, x29, [sp, #16 * 14]
 
 	/* Save LR and exception PC */
-	mrs x21, elr_el1
-	stp x30, x21, [sp, #16 * 15]
+	mrs	x21, elr_el1
+	stp	x30, x21, [sp, #16 * 15]
 
 	/* Save pstate and exception status register */
-	mrs x22, spsr_el1
-	mrs x23, esr_el1
-	stp x22, x23, [sp, #16 * 16]
-
-.if \el == 0
-	/* Save stack pointer for lower level exception */
-	mrs x18, sp_el0
-	str x18, [sp, #__SP_EL0_OFFSET]
-.endif
-
+	mrs	x22, spsr_el1
+	mrs	x23, esr_el1
+	stp	x22, x23, [sp, #16 * 16]
 .endm
 
-.macro LEAVE_TRAP, el
+.macro RESTORE_REGS
 	/* Mask IRQ to make sure restore would not be interrupted by IRQ */
-	msr daifset, #2
+	msr	daifset, #2
 
 	/* Restore pstate and exception status register */
-	ldp x22, x23, [sp, #16 * 16]
-	msr spsr_el1, x22
-	msr esr_el1, x23
+	ldp	x22, x23, [sp, #16 * 16]
+	msr	spsr_el1, x22
+	msr	esr_el1, x23
 
 	/* Restore LR and exception PC */
-	ldp x30, x21, [sp, #16 * 15]
-	msr elr_el1, x21
+	ldp	x30, x21, [sp, #16 * 15]
+	msr	elr_el1, x21
 
 	/* Restore general purpose registers */
-	ldp x28, x29, [sp, #16 * 14]
-	ldp x26, x27, [sp, #16 * 13]
-	ldp x24, x25, [sp, #16 * 12]
-	ldp x22, x23, [sp, #16 * 11]
-	ldp x20, x21, [sp, #16 * 10]
+	ldp	x28, x29, [sp, #16 * 14]
+	ldp	x26, x27, [sp, #16 * 13]
+	ldp	x24, x25, [sp, #16 * 12]
+	ldp	x22, x23, [sp, #16 * 11]
+	ldp	x20, x21, [sp, #16 * 10]
 	/* Skip x18, x19 */
-	ldp x16, x17, [sp, #16 * 8]
-	ldp x14, x15, [sp, #16 * 7]
-	ldp x12, x13, [sp, #16 * 6]
-	ldp x10, x11, [sp, #16 * 5]
-	ldp x8, x9, [sp, #16 * 4]
-	ldp x6, x7, [sp, #16 * 3]
-	ldp x4, x5, [sp, #16 * 2]
-	ldp x2, x3, [sp, #16 * 1]
-	ldp x0, x1, [sp, #16 * 0]
+	ldp	x16, x17, [sp, #16 * 8]
+	ldp	x14, x15, [sp, #16 * 7]
+	ldp	x12, x13, [sp, #16 * 6]
+	ldp	x10, x11, [sp, #16 * 5]
+	ldp	x8, x9, [sp, #16 * 4]
+	ldp	x6, x7, [sp, #16 * 3]
+	ldp	x4, x5, [sp, #16 * 2]
+	ldp	x2, x3, [sp, #16 * 1]
+	ldp	x0, x1, [sp, #16 * 0]
 
-.if \el == 0
-	/* Restore stack pointer for exception from EL0 */
-	ldr x18, [sp, #__SP_EL0_OFFSET]
-	msr sp_el0, x18
-
-	/* Restore x18, x19 */
-	ldp x18, x19, [sp, #16 * 9]
-.else
 	/* Restore stack pointer for exception from EL1 */
-	ldr x18, [sp, #__SP_OFFSET]
-	mov x19, sp
-	mov sp, x18
+	ldr	x18, [sp, #__SP_OFFSET]
+	mov	x19, sp
+	mov	sp, x18
 
 	/* Restore x18, x19 */
-	ldp x18, x19, [x19, #16 * 9]
-.endif
-	add sp, sp, #__TRAP_STACK_SIZE
+	ldp	x18, x19, [x19, #16 * 9]
 
 	eret
 .endm
@@ -166,19 +209,19 @@
  */
 .align 6
 el1_sync:
-	ENTER_TRAP 1
+	SAVE_REGS 0
 	mov x0, sp
 	mrs x1, far_el1
 	bl trap_el1_sync
-	LEAVE_TRAP 1
+	RESTORE_REGS
 
 .align 6
 el1_irq:
-	ENTER_TRAP 1
+	SAVE_REGS 1
 	msr daifclr, #(8 | 4 | 1)
 	mov x0, sp
 	bl trap_el1_irq
-	LEAVE_TRAP 1
+	RESTORE_REGS
 
 /* Bad Abort numbers */
 #define BAD_SYNC  0
@@ -189,7 +232,7 @@ el1_irq:
 #define el_invalid(name, reason, el)	\
 .align 6;				\
 name##_invalid:				\
-	ENTER_TRAP  el;			\
+	SAVE_REGS 0;			\
 	mov x0, sp;			\
 	mov x1, el;			\
 	mov x2, #(reason);		\

@@ -32,10 +32,39 @@
 #error Do not include this header directly
 #endif
 
+#include <uk/asm/arch.h>
+
 #define CACHE_LINE_SIZE	64
+
+#define __REGS_OFFSETOF_PAD       0
+#define __REGS_OFFSETOF_R15       8
+#define __REGS_OFFSETOF_R14       16
+#define __REGS_OFFSETOF_R13       24
+#define __REGS_OFFSETOF_R12       32
+#define __REGS_OFFSETOF_RBP       40
+#define __REGS_OFFSETOF_RBX       48
+#define __REGS_OFFSETOF_R11       56
+#define __REGS_OFFSETOF_R10       64
+#define __REGS_OFFSETOF_R9        72
+#define __REGS_OFFSETOF_R8        80
+#define __REGS_OFFSETOF_RAX       88
+#define __REGS_OFFSETOF_RCX       96
+#define __REGS_OFFSETOF_RDX       104
+#define __REGS_OFFSETOF_RSI       112
+#define __REGS_OFFSETOF_RDI       120
+#define __REGS_OFFSETOF_ORIG_RAX  128
+#define __REGS_OFFSETOF_RIP       136
+#define __REGS_OFFSETOF_CS        144
+#define __REGS_OFFSETOF_EFLAGS    152
+#define __REGS_OFFSETOF_RSP       160
+#define __REGS_OFFSETOF_SS        168
+
+#define __REGS_PAD_SIZE           __REGS_OFFSETOF_R15
+#define __REGS_SIZEOF             176
 
 #ifndef __ASSEMBLY__
 #include <uk/arch/types.h>
+#include <uk/essentials.h>
 
 struct __regs {
 	unsigned long pad; /* 8 bytes to make struct size multiple of 16 */
@@ -65,33 +94,9 @@ struct __regs {
 	unsigned long ss;
 /* top of stack page */
 };
+
+UK_CTASSERT(sizeof(struct __regs) == __REGS_SIZEOF);
 #endif /* !__ASSEMBLY__ */
-
-#define __REGS_OFFSETOF_PAD       0
-#define __REGS_OFFSETOF_R15       8
-#define __REGS_OFFSETOF_R14       16
-#define __REGS_OFFSETOF_R13       24
-#define __REGS_OFFSETOF_R12       32
-#define __REGS_OFFSETOF_RBP       40
-#define __REGS_OFFSETOF_RBX       48
-#define __REGS_OFFSETOF_R11       56
-#define __REGS_OFFSETOF_R10       64
-#define __REGS_OFFSETOF_R9        72
-#define __REGS_OFFSETOF_R8        80
-#define __REGS_OFFSETOF_RAX       88
-#define __REGS_OFFSETOF_RCX       96
-#define __REGS_OFFSETOF_RDX       104
-#define __REGS_OFFSETOF_RSI       112
-#define __REGS_OFFSETOF_RDI       120
-#define __REGS_OFFSETOF_ORIG_RAX  128
-#define __REGS_OFFSETOF_RIP       136
-#define __REGS_OFFSETOF_CS        144
-#define __REGS_OFFSETOF_EFLAGS    152
-#define __REGS_OFFSETOF_RSP       160
-#define __REGS_OFFSETOF_SS        168
-
-#define __REGS_PAD_SIZE           __REGS_OFFSETOF_R15
-#define __REGS_SIZEOF             176
 
 /* sanity check */
 #if __REGS_SIZEOF & 0xf

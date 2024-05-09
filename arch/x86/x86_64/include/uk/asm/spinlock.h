@@ -32,7 +32,7 @@
 #error Do not include this header directly
 #endif
 
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
 
 struct __spinlock {
 	volatile int lock;

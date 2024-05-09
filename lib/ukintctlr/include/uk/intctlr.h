@@ -183,6 +183,19 @@ int uk_intctlr_irq_free(unsigned int *irqs, __sz count);
 int uk_intctlr_irq_fdt_xlat(const void *fdt, int nodeoffset, __u32 index,
 			    struct uk_intctlr_irq *irq);
 
+/**
+ * Platform-specific initialization function for interrupts
+ *
+ * If defined by the platform code then additional platform-specific
+ * initialization steps should be performed. Driver-provided data to be
+ * interpreted by the platform. This structure is defined by the driver.
+ * For example some architectures with mmu support requires address
+ * mapping to access registers.
+ *
+ * @param pointer to driver data. These may be updated by the platform.
+ */
+int uk_intctlr_plat_probe(void *arg);
+
 #endif /* __ASSEMBLY__ */
 
 #ifdef __cplusplus

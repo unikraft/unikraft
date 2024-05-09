@@ -45,6 +45,16 @@ int vfs_close(struct vfscore_file *fp)
 	int error;
 
 	vn_lock(vp);
+	/* This is called when there are no more strong references to this file
+	 * so also fsync it when that happens.
+	 *
+	 * NOTE: We do this because on umount not all of our filesystem drivers
+	 * may flush cached contents.
+	 */
+	error = VOP_FSYNC(vp, fp);
+	if (unlikely(error))
+		return error;
+
 	error = VOP_CLOSE(vp, fp);
 	vn_unlock(vp);
 

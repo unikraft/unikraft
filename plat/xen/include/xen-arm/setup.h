@@ -33,9 +33,15 @@
 #ifndef __SETUP_H__
 #define __SETUP_H__
 
+#define XEN_HAVE_PV_GUEST_ENTRY 1
+#include <xen/xen.h>
 #include <uk/plat/memory.h>
 
-extern const unsigned int _libxenplat_mrd_num;
-extern struct ukplat_memregion_desc _libxenplat_mrd[];
+union start_info_union {
+	start_info_t start_info;
+	char padding[512];
+};
+extern union start_info_union start_info_union;
+#define HYPERVISOR_start_info (&(start_info_union.start_info))
 
 #endif /* __SETUP_H__ */

@@ -34,6 +34,16 @@ config STACK_SIZE_PAGE_ORDER
 		order. Stack size is equal with 2^order * page size (e.g. 4KB).
 		Only change this if you know what you're doing.
 
+config CPU_EXCEPT_STACK_SIZE_PAGE_ORDER
+	int
+	prompt "Stack size page order CPU exceptions (traps and IRQs)"
+	default 4
+	help
+		Indirectly configures the CPU exception stack size by changing
+		the stack size page order. Stack size is equal with
+		2 ^ order * page size (e.g. 4KB).
+		Only change this if you know what you're doing.
+
 config HAVE_MEMTAG
 	bool
 	help

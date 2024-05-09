@@ -74,6 +74,8 @@ int strcasecmp(const char *s1, const char *s2);
 char *strerror_r(int errnum, char *buf, size_t buflen);
 char *strerror(int errnum);
 
+char *strstr(const char *h, const char *n);
+
 char *strsignal(int sig);
 
 void bcopy(const void *from, void *to, size_t len);

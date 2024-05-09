@@ -45,6 +45,10 @@
 #include <vfscore/vnode.h>
 #include <vfscore/mount.h>
 #include <errno.h>
+#include <uk/init.h>
+
+#include <uk/posix-fdtab-legacy.h>
+#include <uk/posix-fdtab.h>
 
 /*
  * When the syscall_shim library is not part of the build, there is warning
@@ -204,7 +208,7 @@ static struct vnops stdio_vnops = {
 static struct vnode stdio_vnode = {
 	.v_ino = 1,
 	.v_op = &stdio_vnops,
-	.v_lock = UK_MUTEX_INITIALIZER(stdio_vnode.v_lock),
+	.v_lock = UK_MUTEX_INITIALIZER_RECURSIVE(stdio_vnode.v_lock),
 	.v_refcnt = 1,
 	.v_link = UK_LIST_HEAD_INIT(stdio_vnode.v_link),
 	.v_names = UK_LIST_HEAD_INIT(stdio_vnode.v_names),
@@ -229,16 +233,15 @@ static struct vfscore_file  stdio_file = {
 	.f_ep = UK_LIST_HEAD_INIT(stdio_file.f_ep)
 };
 
-int init_stdio(void)
+static int init_stdio(struct uk_init_ctx *ictx __unused)
 {
 	int fd;
 
-	fd = vfscore_alloc_fd();
+	fd = uk_fdtab_legacy_open(&stdio_file);
 	if (fd != 0) {
-		uk_pr_crit("failed to allocate fd for stdin (fd=0)\n");
+		uk_pr_crit("failed to allocate fd for stdin (fd=%d)\n", fd);
 		return (fd < 0) ? fd : -EBADF;
 	}
-	vfscore_install_fd(0, &stdio_file);
 
 	fd = uk_syscall_r_dup3(0, 1, 0);
 	if (fd != 1) {
@@ -254,3 +257,5 @@ int init_stdio(void)
 
 	return 0;
 }
+
+uk_rootfs_initcall_prio(init_stdio, 0x0, UK_PRIO_LATEST);

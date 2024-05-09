@@ -11,6 +11,7 @@
 #include <uk/arch/types.h>
 #include <uk/print.h>
 #include <uk/config.h>
+#include <string.h>
 
 static int vmem_arch_pagefault(void *data)
 {
@@ -20,6 +21,7 @@ static int vmem_arch_pagefault(void *data)
 		"read", "write", "exec"
 	};
 	unsigned int faulttype;
+	struct uk_vas *vas;
 	int rc;
 
 	if (ctx->error_code & X86_PF_EC_WR)
@@ -35,11 +37,14 @@ static int vmem_arch_pagefault(void *data)
 		faulttype |= UK_VMA_FAULT_MISCONFIG;
 
 	rc = vmem_pagefault(vaddr, faulttype, ctx->regs);
-	if (unlikely(rc < 0)) {
-		uk_pr_debug("Cannot handle %s page fault at 0x%"__PRIvaddr
-			    " (ec: 0x%x): %d\n",
-			    faultstr[faulttype & UK_VMA_FAULT_ACCESSTYPE],
-			    vaddr, ctx->error_code, rc);
+	if (rc < 0) {
+		vas = uk_vas_get_active();
+		if (unlikely(vas && !(vas->flags & UK_VAS_FLAG_NO_PAGING)))
+			uk_pr_crit("Cannot handle %s page fault at 0x%"
+				   __PRIvaddr" (ec: 0x%x): %s (%d).\n",
+				   faultstr[faulttype &
+					    UK_VMA_FAULT_ACCESSTYPE],
+				   vaddr, ctx->error_code, strerror(-rc), -rc);
 
 		return UK_EVENT_NOT_HANDLED;
 	}

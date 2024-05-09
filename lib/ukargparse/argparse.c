@@ -34,6 +34,7 @@
 
 #include <uk/argparse.h>
 #include <uk/assert.h>
+#include <string.h> /* strchr */
 
 
 static void left_shift(char *buf, __sz index, __sz maxlen)
@@ -138,4 +139,103 @@ int uk_argnparse(char *argb, __sz maxlen, char *argv[], int maxcount)
 
 out:
 	return argc;
+}
+
+__sz uk_nextarg_r(const char **argptr, int separator)
+{
+	const char *nsep;
+	const char *arg;
+	__sz arglen;
+
+	UK_ASSERT(argptr);
+
+	if (!*argptr || (*argptr)[0] == '\0') {
+		/* We likely got called again after we already
+		 * returned the last argument
+		 */
+		*argptr = __NULL;
+		return 0;
+	}
+
+	arg = *argptr;
+	nsep = strchr(*argptr, separator);
+	if (!nsep) {
+		/* No next separator, we hit the last argument */
+		*argptr = __NULL;
+
+		/* Rest of C-string is last argument */
+		return strlen(arg);
+	}
+
+	/* Compute the len of current argument */
+	arglen = (__sz)((__uptr)nsep - (__uptr)arg);
+
+	/* Skip separator on argptr for subsequent calls */
+	*argptr = nsep + 1;
+	return arglen;
+}
+
+char *uk_nextarg(char **argptr, int separator)
+{
+	__sz arglen;
+	char *arg;
+
+	UK_ASSERT(argptr);
+
+	arg = *argptr;
+	arglen = uk_nextarg_r((const char **)argptr, separator);
+
+	/* Return NULL if we are at the end of parsing */
+	if (arglen == 0 && *argptr == __NULL)
+		return __NULL;
+
+	/* Overwrite separator with terminating character */
+	arg[arglen] = '\0';
+	return arg;
+}
+
+__ssz uk_strnkeycmp(const char *str, __sz strlen, const char *key,
+		    const char separators[])
+{
+	const char *s;
+	__sz pos;
+
+	UK_ASSERT(str);
+	UK_ASSERT(key);
+
+	for (pos = 0; pos < strlen; ++pos) {
+		if (str[pos] == key[pos]) {
+			if (key[pos] == '\0')
+				return 0; /* match, no value */
+			continue;
+		}
+
+		/* str shorter than key? */
+		if (str[pos] == '\0')
+			goto no_match;
+
+		/* all chars of key matched so far? */
+		if (key[pos] != '\0')
+			goto no_match;
+
+		/* key matched, check if str at pos is a separator */
+		if (separators) {
+			for (s = separators; *s != '\0'; s++) {
+				if (str[pos] == *s)
+					return pos; /* match with value */
+			}
+		}
+
+		goto no_match;
+	}
+
+	/* We end up here if we went over all chars of str and had only
+	 * matches with the key without a '\0'-character or separator appearing.
+	 * Here, we check if we had a full match of the keyword.
+	 */
+	if (key[pos] == '\0')
+		return 0; /* match, no value */
+
+no_match:
+	return -1; /* no match */
 }

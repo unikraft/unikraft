@@ -300,7 +300,7 @@ static struct vfscore_fs_type fs_devfs = {
 UK_FS_REGISTER(fs_devfs);
 
 #ifdef CONFIG_LIBDEVFS_AUTOMOUNT
-static int devfs_automount(void)
+static int devfs_automount(struct uk_init_ctx *ictx __unused)
 {
 	int ret;
 
@@ -326,5 +326,5 @@ static int devfs_automount(void)
 }
 
 /* after vfscore mounted '/' (priority 4): */
-uk_rootfs_initcall_prio(devfs_automount, 5);
+uk_rootfs_initcall_prio(devfs_automount, 0x0, 5);
 #endif

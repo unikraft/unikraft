@@ -25,6 +25,15 @@ endif
 	default n
 	select LIBPOSIX_PROCESS_PIDS
 
+	config LIBPOSIX_PROCESS_CLONE_PREFER_CHILD
+	bool "Prefer scheduling of child"
+	depends on LIBPOSIX_PROCESS_CLONE
+	help
+		If enabled, clone will context switch away from the clone
+		caller. This is necessary for some applications that assume that
+		the new thread does progress while the clone caller is not
+		context switching.
+
 	config LIBPOSIX_PROCESS_DEBUG
 	bool "Enable debug messages"
 	default n

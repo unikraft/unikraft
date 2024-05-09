@@ -37,7 +37,7 @@ extern "C" {
 #include <uk/arch/lcpu.h>
 
 #ifdef CONFIG_HAVE_SMP
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
 
 /* Unless you know what you are doing, use struct uk_spinlock instead. */
 typedef struct __ticketlock __ticketlock;

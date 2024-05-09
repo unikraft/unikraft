@@ -23,3 +23,9 @@ menu "Virtio"
 source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-virtio.uk' -r '$(KCONFIG_DRIV_BASE)/virtio' -l '$(KCONFIG_DRIV_BASE)/virtio' -e '$(KCONFIG_EXCLUDEDIRS)')"
 
 endmenu
+
+menu "Xen"
+
+source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-xen.uk' -r '$(KCONFIG_DRIV_BASE)/xen' -l '$(KCONFIG_DRIV_BASE)/xen' -e '$(KCONFIG_EXCLUDEDIRS)')"
+
+endmenu

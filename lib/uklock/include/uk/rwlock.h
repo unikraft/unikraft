@@ -54,6 +54,17 @@ void uk_rwlock_init_config(struct uk_rwlock *rwl, unsigned int config_flags);
 
 #define uk_rwlock_init(rwl) uk_rwlock_init_config(rwl, 0)
 
+#define UK_RWLOCK_INITIALIZER(name, flags) \
+	((struct uk_rwlock){ \
+		.nactive = 0, \
+		.npending_reads = 0, \
+		.npending_writes = 0, \
+		.config_flags = flags, \
+		.sl = UK_SPINLOCK_INITIALIZER(), \
+		.shared = UK_WAIT_QUEUE_INITIALIZER((name).shared), \
+		.exclusive = UK_WAIT_QUEUE_INITIALIZER((name).exclusive), \
+	})
+
 /**
  * Acquire the reader-writer lock for reading. Multiple readers can
  * acquire the lock at the same time

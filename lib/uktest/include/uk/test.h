@@ -468,11 +468,12 @@ uk_testsuite_run(struct uk_testsuite *suite);
  */
 #define UK_TESTSUITE_AT_INITCALL_PRIO(suite, initfn, class, prio)	\
 	_UK_TESTSUITE(suite, initfn);					\
-	static int _UK_TESTSUITE_RUN_NAME(suite)(void)			\
+	static int _UK_TESTSUITE_RUN_NAME(suite)(struct uk_init_ctx	\
+						      *__ictx __unused)	\
 	{								\
 		return uk_testsuite_run(&_UK_TESTSUITE_NAME(suite));	\
 	}								\
-	uk_initcall_class_prio(_UK_TESTSUITE_RUN_NAME(suite), class, prio)
+	uk_initcall_class_prio(_UK_TESTSUITE_RUN_NAME(suite), 0x0, class, prio)
 
 
 /**

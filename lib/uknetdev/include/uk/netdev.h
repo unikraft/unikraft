@@ -173,9 +173,9 @@ void uk_netdev_info_get(struct uk_netdev *dev,
  *   Extra configuration type selection (see enum definition).
  * @return
  *   - (NULL): if configuration unavailable or data type unsupported
- *   - (void *): Reference to configuration, format specified by *einfo*
+ *   - (const char *): Reference to configuration as C string
  */
-const void *uk_netdev_einfo_get(struct uk_netdev *dev,
+const char *uk_netdev_einfo_get(struct uk_netdev *dev,
 				enum uk_netdev_einfo_type einfo);
 
 /**
