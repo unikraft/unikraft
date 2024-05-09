@@ -39,6 +39,7 @@
 #include <sys/stat.h>
 #include <dirent.h>
 #include <sys/param.h>
+#include <sys/ioctl.h>
 
 #include <errno.h>
 #include <string.h>
@@ -529,6 +530,10 @@ ramfs_rename(struct vnode *dvp1, struct vnode *vp1, const char *name1 __unused,
 		if (np == NULL)
 			return ENOMEM;
 
+		/* Copy children structure */
+		np->rn_child = old_np->rn_child;
+		old_np->rn_child = NULL;
+
 		if (old_np->rn_buf) {
 			/* Copy file data */
 			np->rn_buf = old_np->rn_buf;
@@ -655,10 +660,37 @@ ramfs_inactive(struct vnode *vp)
 	return 0;
 }
 
+static int ramfs_ioctl(struct vnode *dvp __unused,
+			 struct vfscore_file *fp __unused,
+			 unsigned long com,
+			 void *data __unused)
+{
+	/**
+	 * HACK: In binary compatibility mode, Ruby tries to set O_ASYNC,
+	 * which Unikraft does not yet support. If the `ioctl` call returns
+	 * an error, Ruby stops working, even if it does not depend on the
+	 * O_ASYNC being properly set.
+	 *
+	 * Until proper support, just return 0 in case an `FIONBIO` ioctl
+	 * request is done, and ENOTSUP for all other cases.
+	 *
+	 * Setting `ioctl` to a nullop will not work, since it is used by
+	 * interpreted languages (e.g. python3) to check if it should start
+	 * the interpretor or just read a file.
+	 *
+	 * For every `ioctl` request related to a terminal, return ENOTTY.
+	 */
+	if (com == FIONBIO)
+		return 0;
+	if (IOCTL_CMD_ISTYPE(com, IOCTL_CMD_TYPE_TTY))
+		return ENOTTY;
+
+	return ENOTSUP;
+}
+
 #define ramfs_open      ((vnop_open_t)vfscore_vop_nullop)
 #define ramfs_close     ((vnop_close_t)vfscore_vop_nullop)
 #define ramfs_seek      ((vnop_seek_t)vfscore_vop_nullop)
-#define ramfs_ioctl     ((vnop_ioctl_t)vfscore_vop_einval)
 #define ramfs_fsync     ((vnop_fsync_t)vfscore_vop_nullop)
 #define ramfs_link      ((vnop_link_t)vfscore_vop_eperm)
 #define ramfs_fallocate ((vnop_fallocate_t)vfscore_vop_nullop)

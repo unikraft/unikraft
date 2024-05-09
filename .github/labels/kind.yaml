@@ -1,0 +1,28 @@
+labels:
+  - name: kind/bug
+    description: Something isn't working
+    color: "#d73a4a"
+
+  - name: kind/enhancement
+    description: Issues and PRs related to increasing functionality
+    color: "#a2eeef"
+
+  - name: kind/maintenance
+    description: Chores and meta-tasks
+    color: "#a295d6"
+
+  - name: kind/project
+    description: Issue is a substantial contribution
+    color: "#008672"
+
+  - name: kind/proposal
+    description: Issue discusses potential new feature or change
+    color: "#dd75c0"
+
+  - name: kind/question
+    description: Issue asks a question
+    color: "#e99695"
+
+  - name: kind/quick-fix
+    description: Issue or PR is related to a quick fix
+    color: "#1daf6b"

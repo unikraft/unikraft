@@ -31,28 +31,28 @@
 # OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
 # SUCH DAMAGE.
 #
-OSENV=$( uname )
+OSENV=$(uname)
 
 die()
 {
-    local STR="$*"
+	local STR="$*"
 
-    [ ! -z "$STR" ] && printf "%s\n" "$STR" 1>&2
-    exit 1
+	[ -n "$STR" ] && printf "%s\n" "$STR" 1>&2
+	exit 1
 }
 
 # Expands a numerical list
 # e.g., 2,4-7,0,1,2-3 -> 2 4 5 6 7 0 1 2 3
 _expand_num_list()
 {
-	local -a ARG=(${1//,/ })
-	for R in ${ARG[@]}; do
+	local -a ARG=("${1//,/ }")
+	for R in "${ARG[@]}"; do
 		if [[ $R =~ ^[[:digit:]]+$ ]]; then
 			echo "$R"
 		elif [[ $R =~ ^[[:digit:]]+-[[:digit:]]+$ ]]; then
-			local -a SEQ=(${R//-/ })
-			seq ${SEQ[0]} ${SEQ[1]}
-		elif [ ! -z "$R" ]; then
+			local -a SEQ=("${R//-/ }")
+			seq "${SEQ[0]}" "${SEQ[1]}"
+		elif [ -n "$R" ]; then
 			echo "Warning: unrecognized range specification: '$R'" 1>&2
 		fi
 	done
@@ -62,21 +62,21 @@ _expand_num_list()
 # e.g., 2,4-7,0,3 -> 0,1
 _cpus_nodes_list()
 {
-	local CPUS=($( _expand_num_list "$1" ))
+	local CPUS=("$(_expand_num_list "$1")")
 	local NODES=()
 	local N=
 	local M=
 	local F=1
 
-	for C in ${CPUS[@]}; do
-		N=$( cat "/sys/devices/system/cpu/cpu${C}/topology/physical_package_id" )
+	for C in "${CPUS[@]}"; do
+		N=$(cat "/sys/devices/system/cpu/cpu${C}/topology/physical_package_id")
 		[ -z "$N" ] && die "Failed to detect NUMA node for CPU $C"
 
 		# check if N is already in NODES list
 		# I know - this implementation is slow...
 		F=1
-		for M in ${NODES[@]}; do
-			if [ $M -eq $N ]; then
+		for M in "${NODES[@]}"; do
+			if [ "$M" -eq "$N" ]; then
 				F=0
 				break
 			fi
@@ -89,7 +89,7 @@ _cpus_nodes_list()
 
 	# print
 	F=1
-	for M in ${NODES[@]}; do
+	for M in "${NODES[@]}"; do
 		if [ $F -eq 1 ]; then
 			# first element of list
 			printf "%d" "$M"
@@ -131,21 +131,20 @@ qemu_mon_get_vcpu_tids()
 	local PARAM=
 	local -i I=0
 
-	RESULT=$( qemu_mon_cmd "$1" "info cpus" )
+	RESULT=$(qemu_mon_cmd "$1" "info cpus")
 	RET=$?
 	if [ $RET -ne 0 ]; then
-		return $?
+		return $RET
 	fi
 
-	for PARAM in $RESULT
-	do
+	for PARAM in $RESULT; do
 		if [[ $PARAM =~ ^thread_id= ]]; then
 			echo "$PARAM" | cut -d '=' -f 2
-			(( I++ ))
+			((I++))
 		fi
 	done
 
-	if [ $I -eq 0 ]; then
+	if [ "$I" -eq 0 ]; then
 		echo "Fatal: Could not detect virtual CPUs" 1>&2
 		return 1
 	fi
@@ -165,10 +164,10 @@ qemu_mon_pin_vcpus_to_cpus()
 	# QEMU Monitor socket
 	local MS=$1
 	# CPU pinnings
-	local CPUS=( $2 )
+	local CPUS=("$2")
 
 	local QTIDS
-	QTIDS=$( qemu_mon_get_vcpu_tids "${MS}" )
+	QTIDS=$(qemu_mon_get_vcpu_tids "${MS}")
 	if [ $? -ne 0 ]; then
 		echo "Fatal: Could not get thread IDs of virtual CPUs" 1>&2
 		return 1
@@ -176,129 +175,130 @@ qemu_mon_pin_vcpus_to_cpus()
 
 	local -i I=0
 	local -i J=0
-	for QTID in $QTIDS
-	do
+	for QTID in $QTIDS; do
 		if [ $J -ge ${#CPUS[@]} ]; then
 			J=0
 		fi
-	        printf "    Pin vCPU#%01d (TID:%01d) to host CPU#%01d\n" "$I" "$QTID" "${CPUS[$J]}" 1>&2
+		printf "    Pin vCPU#%01d (TID:%01d) to host CPU#%01d\n" "$I" "$QTID" "${CPUS[$J]}" 1>&2
 		taskset -pc "${CPUS[$J]}" "$QTID" > /dev/null
 		if [ $? -ne 0 ]; then
 			printf "Fatal: Could not change CPU affinity to CPU#%01d for PID %01d\n" "${CPUS[$J]}" "$QTID" 1>&2
 		fi
-		(( I++ ))
-		(( J++ ))
+		((I++))
+		((J++))
 	done
 }
 
 function load_pci_assign_mod()
 {
-    local PREFERRED=${1:-1}
+	local PREFERRED=${1:-1}
 
-    if [ "$PREFERRED" = "1" -a -d "/sys/bus/pci/drivers/vfio-pci" ]; then
-	    return 1 # vfio-pci already loaded
-    fi
-    if [ "$PREFERRED" = "1" -a ! -d "/sys/bus/pci/drivers/vfio-pci" ]; then
-	    modprobe vfio_pci
-	    sleep 1
-	    if [ -d "/sys/bus/pci/drivers/vfio-pci" ]; then
-		    return 1 # vfio-pci
-	    fi
+	if [ "$PREFERRED" = "1" ] && [ -d "/sys/bus/pci/drivers/vfio-pci" ]; then
+		return 1 # vfio-pci already loaded
+	fi
+	if [ "$PREFERRED" = "1" ] && [ ! -d "/sys/bus/pci/drivers/vfio-pci" ]; then
+		modprobe vfio_pci
+		sleep 1
+		if [ -d "/sys/bus/pci/drivers/vfio-pci" ]; then
+			return 1 # vfio-pci
+		fi
 
-	    # vfio-pci failed, try with pci-stub as next option
-	    PREFERRED=2
-    fi
+		# vfio-pci failed, try with pci-stub as next option
+		PREFERRED=2
+	fi
 
-    # try again with pci-stub
-    if [ "$PREFERRED" = "2" -a -d "/sys/bus/pci/drivers/pci-stub" ]; then
-	    return 2 # pci-stub already loaded
-    fi
-    if [ "$PREFERRED" = "2" -a ! -d "/sys/bus/pci/drivers/pci-stub" ]; then
-	    modprobe pci_stub
-	    sleep 1
-	    if [ -d "/sys/bus/pci/drivers/pci-stub" ]; then
-		    # enable  unsafe interrupt mapping
-		    if [ -f "/sys/module/kvm/parameters/allow_unsafe_assigned_interrupts" ]; then
-			    echo 1 > "/sys/module/kvm/parameters/allow_unsafe_assigned_interrupts"
-		    fi
-		    return 2 # pci-stub
-	    fi
-    fi
+	# try again with pci-stub
+	if [ "$PREFERRED" = "2" ] && [ -d "/sys/bus/pci/drivers/pci-stub" ]; then
+		return 2 # pci-stub already loaded
+	fi
+	if [ "$PREFERRED" = "2" ] && [ ! -d "/sys/bus/pci/drivers/pci-stub" ]; then
+		modprobe pci_stub
+		sleep 1
+		if [ -d "/sys/bus/pci/drivers/pci-stub" ]; then
+			# enable  unsafe interrupt mapping
+			if [ -f "/sys/module/kvm/parameters/allow_unsafe_assigned_interrupts" ]; then
+				echo 1 > "/sys/module/kvm/parameters/allow_unsafe_assigned_interrupts"
+			fi
+			return 2 # pci-stub
+		fi
+	fi
 
-    echo "Fatal: Could not load 'vfio-pci' and 'pci-stub' kernel module" 1>&2
-    return 0 # failure
+	echo "Fatal: Could not load 'vfio-pci' and 'pci-stub' kernel module" 1>&2
+	return 0 # failure
 }
 
 function release_pci()
 {
-    # http://www.linux-kvm.org/page/How_to_assign_devices_with_VT-d_in_KVM
-    local PCI_SLOT=$1
-    local METHOD=${2:-1}
-    local BINDTO=
+	# http://www.linux-kvm.org/page/How_to_assign_devices_with_VT-d_in_KVM
+	local PCI_SLOT=$1
+	local METHOD=${2:-1}
+	local BINDTO=
 
-    case ${METHOD} in
+	case ${METHOD} in
 	1)
-	    METHOD_STR="vfio-pci"
-	    BINDTO="/sys/bus/pci/drivers/vfio-pci"
-	    ;;
+		METHOD_STR="vfio-pci"
+		BINDTO="/sys/bus/pci/drivers/vfio-pci"
+		;;
 	*)
-	    METHOD_STR="pci-stub"
-	    BINDTO="/sys/bus/pci/drivers/pci-stub"
-	    ;;
-    esac
+		METHOD_STR="pci-stub"
+		BINDTO="/sys/bus/pci/drivers/pci-stub"
+		;;
+	esac
 
-    if [ -z "$PCI_SLOT" ]; then
-	    echo "Fatal: Missing PCI slot argument (format: 0000:00:00.0)" 1>&2
-	    return 1
-    fi
+	if [ -z "$PCI_SLOT" ]; then
+		echo "Fatal: Missing PCI slot argument (format: 0000:00:00.0)" 1>&2
+		return 1
+	fi
 
-    if [ ! -f "/sys/bus/pci/devices/$PCI_SLOT/vendor" -o ! -f "/sys/bus/pci/devices/$PCI_SLOT/device" ]; then
-	    echo "Fatal: Could not locate PCI device '$PCI_SLOT' (wrong ID format?: 0000:00:00.0)" 1>&2
-	    return 1
-    fi
-    local VENDOR_ID=$( cat "/sys/bus/pci/devices/$PCI_SLOT/vendor" )
-    local DEVICE_ID=$( cat "/sys/bus/pci/devices/$PCI_SLOT/device" )
-    local IOMMU_GROUP="n/a"
-    local IOMMU_NEIGHBORS=()
-    if [ -L "/sys/bus/pci/devices/$PCI_SLOT/iommu_group" ]; then
-	    IOMMU_GROUP=$( basename "$( readlink "/sys/bus/pci/devices/$PCI_SLOT/iommu_group" )" )
-	    IOMMU_NEIGHBORS=( $( find -H "/sys/bus/pci/devices/$PCI_SLOT/iommu_group/devices/" -maxdepth 1 -type l -exec basename {} \; ) )
-    fi
+	if [ ! -f "/sys/bus/pci/devices/$PCI_SLOT/vendor" ] || [ ! -f "/sys/bus/pci/devices/$PCI_SLOT/device" ]; then
+		echo "Fatal: Could not locate PCI device '$PCI_SLOT' (wrong ID format?: 0000:00:00.0)" 1>&2
+		return 1
+	fi
+	local VENDOR_ID=
+	local DEVICE_ID=
+	local IOMMU_GROUP="n/a"
+	local IOMMU_NEIGHBORS=()
+	VENDOR_ID=$(cat "/sys/bus/pci/devices/$PCI_SLOT/vendor")
+	DEVICE_ID=$(cat "/sys/bus/pci/devices/$PCI_SLOT/device")
+	if [ -L "/sys/bus/pci/devices/$PCI_SLOT/iommu_group" ]; then
+		IOMMU_GROUP=$(basename "$(readlink "/sys/bus/pci/devices/$PCI_SLOT/iommu_group")")
+		IOMMU_NEIGHBORS=("$(find -H "/sys/bus/pci/devices/$PCI_SLOT/iommu_group/devices/" -maxdepth 1 -type l -exec basename {} \;)")
+	fi
 
-    if [ ! -f "/sys/bus/pci/devices/$PCI_SLOT/driver/unbind" ]; then
-	    echo "Fatal: Could not locate unbind interface" 1>&2
-	    return 1
-    fi
-    if [ ! -f "$BINDTO/new_id" -o ! -f "$BINDTO/bind" ]; then
-	    echo "Fatal: Could not locate stub bind interface" 1>&2
-	    return 1
-    fi
+	if [ ! -f "/sys/bus/pci/devices/$PCI_SLOT/driver/unbind" ]; then
+		echo "Fatal: Could not locate unbind interface" 1>&2
+		return 1
+	fi
+	if [ ! -f "$BINDTO/new_id" ] || [ ! -f "$BINDTO/bind" ]; then
+		echo "Fatal: Could not locate stub bind interface" 1>&2
+		return 1
+	fi
 
-    # Re-bind device to stub
-    printf "%04x %04x\n" "$VENDOR_ID" "$DEVICE_ID" > "${BINDTO}/new_id"
-    if [ $? -ne 0 ]; then
-	    echo "Fatal: Could not register PCI device to stub" 1>&2
-	    return 1
-    fi
-    printf "%s\n" "$PCI_SLOT" > "/sys/bus/pci/devices/$PCI_SLOT/driver/unbind"
-    if [ $? -ne 0 ]; then
-	    echo "Fatal: Could not unbind PCI device" 1>&2
-	    return 1
-    fi
-    printf "%s\n" "$PCI_SLOT" > "${BINDTO}/bind"
-    if [ $? -ne 0 ]; then
-	    echo "Fatal: Could bind PCI device to stub" 1>&2
-	    return 1
-    fi
-    sleep 0.25
+	# Re-bind device to stub
+	printf "%04x %04x\n" "$VENDOR_ID" "$DEVICE_ID" > "${BINDTO}/new_id"
+	if [ $? -ne 0 ]; then
+		echo "Fatal: Could not register PCI device to stub" 1>&2
+		return 1
+	fi
+	printf "%s\n" "$PCI_SLOT" > "/sys/bus/pci/devices/$PCI_SLOT/driver/unbind"
+	if [ $? -ne 0 ]; then
+		echo "Fatal: Could not unbind PCI device" 1>&2
+		return 1
+	fi
+	printf "%s\n" "$PCI_SLOT" > "${BINDTO}/bind"
+	if [ $? -ne 0 ]; then
+		echo "Fatal: Could bind PCI device to stub" 1>&2
+		return 1
+	fi
+	sleep 0.25
 
-    echo "PCI device $PCI_SLOT (vendor_id='$VENDOR_ID'; device_id='$DEVICE_ID'; iommu_group='$IOMMU_GROUP') bound to '${METHOD_STR}'"
-    case ${METHOD} in
+	echo "PCI device $PCI_SLOT (vendor_id='$VENDOR_ID'; device_id='$DEVICE_ID'; iommu_group='$IOMMU_GROUP') bound to '${METHOD_STR}'"
+	case ${METHOD} in
 	1)
-	    echo "Note: Devices in IOMMU group ${IOMMU_GROUP}: ${IOMMU_NEIGHBORS[*]}"
-	    ;;
-    esac
-    return 0
+		echo "Note: Devices in IOMMU group ${IOMMU_GROUP}: ${IOMMU_NEIGHBORS[*]}"
+		;;
+	esac
+	return 0
 }
 
 # Print PCI slot numbers found by a given ID
@@ -314,14 +314,13 @@ function pci_slots_by_id()
 		return 1
 	fi
 
-	PCI_SLOTS=$( lspci -nd "$PCI_ID" | awk '{ print $1 }' )
+	PCI_SLOTS=$(lspci -nd "$PCI_ID" | awk '{ print $1 }')
 	if [ -z "$PCI_ID" ]; then
 		echo "Fatal: Could not evaluate systems PCI slots" 1>&2
 		return 1
 	fi
 
-	for PCI_SLOT in $PCI_SLOTS
-	do
+	for PCI_SLOT in $PCI_SLOTS; do
 		printf "%04x:%s\n" "$PCI_DOMAIN_NUM" "$PCI_SLOT"
 	done
 	return 0
@@ -329,38 +328,38 @@ function pci_slots_by_id()
 
 _ideid_2_bus()
 {
-    local IDEID=$1
-    local BUS=$(( IDEID / 2 ))
-    printf '%d' "$BUS"
+	local IDEID=$1
+	local BUS=$((IDEID / 2))
+	printf '%d' "$BUS"
 }
 
 _ideid_2_unit()
 {
-    local IDEID=$1
-    local UNIT=$(( IDEID % 2 ))
-    printf '%d' "$UNIT"
+	local IDEID=$1
+	local UNIT=$((IDEID % 2))
+	printf '%d' "$UNIT"
 }
 
 # 24bit base for mac addresses
-_NETDEV_HWADDR_BASE=$(( (($RANDOM % 256) * 65536) + (($RANDOM % 256) * 256) + ($RANDOM % 256) ))
+_NETDEV_HWADDR_BASE=$((((RANDOM % 256) * 65536) + ((RANDOM % 256) * 256) + (RANDOM % 256)))
 
 _netdev_hwaddr()
 {
-    local NICID=${1:-0}
-    local HWADDR=$(( ${_NETDEV_HWADDR_BASE} + ${NICID} ))
+	local NICID=${1:-0}
+	local HWADDR=$((_NETDEV_HWADDR_BASE + NICID))
 
-    printf '52:54:00:%02x:%02x:%02x' \
-	   $(( ($HWADDR / 65536) % 256 )) \
-	   $(( ($HWADDR / 256)   % 256 )) \
-	   $((  $HWADDR          % 256 ))
+	printf '52:54:00:%02x:%02x:%02x' \
+		$(((HWADDR / 65536) % 256)) \
+		$(((HWADDR / 256) % 256)) \
+		$((HWADDR % 256))
 }
 
 ##
 ## ARE WE ROOT?
 ##
 if [ "$OSENV" = "Linux" ]; then
-	if [ $( id -u ) != 0 ]; then
-		if [ -x $( which sudo ) ]; then
+	if [ "$(id -u)" != 0 ]; then
+		if [ -x "$(which sudo)" ]; then
 			echo "Trying to get root privileges..." 1>&2
 			exec sudo "$0" "$@"
 			exit 2
@@ -376,15 +375,15 @@ fi
 QEMU_BASE_ARGS=()
 QEMU_ARGS=()
 QEMU_PID=
-TEMP="/tmp/$( basename "$0" )-$$"
+TEMP="/tmp/$(basename "$0")-$$"
 if [ "$OSENV" = "Linux" ]; then
-SOCK_MONITOR="/run/$( basename "$0" )-$$_monitor.socket"
-SOCK_SERIAL="/run/$( basename "$0" )-$$_serial.socket"
-PIDFILE="/run/$( basename "$0" )-$$_qemu.pid"
+	SOCK_MONITOR="/run/$(basename "$0")-$$_monitor.socket"
+	SOCK_SERIAL="/run/$(basename "$0")-$$_serial.socket"
+	PIDFILE="/run/$(basename "$0")-$$_qemu.pid"
 else
-SOCK_MONITOR="${TEMP}/monitor.socket"
-SOCK_SERIAL="${TEMP}/serial.socket"
-PIDFILE="${TEMP}/qemu.pid"
+	SOCK_MONITOR="${TEMP}/monitor.socket"
+	SOCK_SERIAL="${TEMP}/serial.socket"
+	PIDFILE="${TEMP}/qemu.pid"
 fi
 
 ARG_MACHINETYPE="x86pc"
@@ -392,7 +391,7 @@ ARG_MEM=64
 ARG_CORES=1
 ARG_SOCKETS=1
 ARG_SMT=1
-ARG_GUESTNAME="$( uuidgen 2>/dev/null )"
+ARG_GUESTNAME="$(uuidgen 2> /dev/null)"
 ARG_KERNEL=
 ARG_INITRD=
 ARG_VCPUPIN=
@@ -401,7 +400,6 @@ ARG_VIDEOVNC_DISPLAY=":0"
 ARG_PCIUNBIND=()
 ARG_GDBPORT=8888
 ARG_TRACE=
-ARG_MCMD=()
 
 OPT_MCMDS=1
 OPT_BALLOON=1
@@ -427,11 +425,11 @@ IDEID=0
 SERIALID=0
 FSID=0
 
-if [ -z "$( which socat )" ]; then
+if [ -z "$(which socat)" ]; then
 	echo "Please install socat" 1>&2
 	exit 2
 fi
-if [ -z "$( which uuidgen )" ]; then
+if [ -z "$(which uuidgen)" ]; then
 	echo "Please install uuidgen" 1>&2
 	exit 2
 fi
@@ -444,8 +442,8 @@ fi
 sighandler_abort()
 {
 	# terminate detached QEMU process if it was created
-	if [ ${OPT_BACKGROUND} -ne 0 -a ! -z ${QEMU_PID} ]; then
-		kill -SIGTERM ${QEMU_PID} > /dev/null 2>&1
+	if [ ${OPT_BACKGROUND} -ne 0 ] && [ -n "${QEMU_PID}" ]; then
+		kill -SIGTERM "${QEMU_PID}" > /dev/null 2>&1
 	fi
 }
 
@@ -464,7 +462,6 @@ trap sighandler_exit exit
 trap sighandler_abort SIGHUP
 trap sighandler_abort SIGINT
 trap sighandler_abort SIGQUIT
-trap sighandler_abort SIGKILL
 trap sighandler_abort SIGTERM
 
 usage()
@@ -496,12 +493,12 @@ usage()
 	echo "  -N [PORT]                  Same as -n but forwards host port PORT"
 	echo "                             to the guest's SSH port (22)"
 	if [ "$OSENV" = "Linux" ]; then
-	echo "  -b [BRIDGE]                Attach a virtio-NIC to the existing Linux"
-	echo "                             bridge BRIDGE"
-	echo "  -V [IFACE]                 Assign host device IFACE directly as virtio-NIC to the guest"
-	echo "  -f [PCI-ID]                Directly assign PCI device PCI-ID (format: 0000:00:00.0)"
-	echo "                             Note: The PCI device will be unbind from the host"
-	echo "  -G [IOMMUGRP-ID]           Directly assign all PCI device of IOMMU group IOMMUGRP-ID"
+		echo "  -b [BRIDGE]                Attach a virtio-NIC to the existing Linux"
+		echo "                             bridge BRIDGE"
+		echo "  -V [IFACE]                 Assign host device IFACE directly as virtio-NIC to the guest"
+		echo "  -f [PCI-ID]                Directly assign PCI device PCI-ID (format: 0000:00:00.0)"
+		echo "                             Note: The PCI device will be unbind from the host"
+		echo "  -G [IOMMUGRP-ID]           Directly assign all PCI device of IOMMU group IOMMUGRP-ID"
 	fi
 	echo "  -d [IMAGE/DEVICE]          Attach a virtio storage device based on a raw IMAGE/DEVICE"
 	echo "  -q [IMAGE]                 Attach a virtio storage device based on a qcow2 IMAGE"
@@ -536,50 +533,50 @@ else
 fi
 
 while getopts "$SHORTOPTS" OPT; do
-        case ${OPT} in
+	case ${OPT} in
 	v)
 		OPT_VIDEOVNC=0
 		ARG_VIDEOVNC_PORT=${OPTARG}
-		ARG_VIDEOVNC_DISPLAY=":$(( ARG_VIDEOVNC_PORT - 5900 ))"
+		ARG_VIDEOVNC_DISPLAY=":$((ARG_VIDEOVNC_PORT - 5900))"
 		;;
 	n)
 		QEMU_ARGS+=("-netdev")
 		QEMU_ARGS+=("user,id=hostnet${NICID}")
 		QEMU_ARGS+=("-device")
-		QEMU_ARGS+=("virtio-net-pci,mac=$( _netdev_hwaddr ${NICID} ),netdev=hostnet${NICID},id=net${NICID}")
-		(( NICID++ ))
+		QEMU_ARGS+=("virtio-net-pci,mac=$(_netdev_hwaddr "${NICID}"),netdev=hostnet${NICID},id=net${NICID}")
+		((NICID++))
 		;;
 	N)
 		QEMU_ARGS+=("-netdev")
 		QEMU_ARGS+=("user,id=hostnet${NICID},hostfwd=tcp::${OPTARG}-:22")
 		QEMU_ARGS+=("-device")
-		QEMU_ARGS+=("virtio-net-pci,mac=$( _netdev_hwaddr ${NICID} ),netdev=hostnet${NICID},id=net${NICID}")
-		(( NICID++ ))
+		QEMU_ARGS+=("virtio-net-pci,mac=$(_netdev_hwaddr "${NICID}"),netdev=hostnet${NICID},id=net${NICID}")
+		((NICID++))
 		;;
 	b)
-		cat > ${TEMP}/ifup${NICID}.sh <<EOF
+		cat > "${TEMP}/ifup${NICID}.sh" << EOF
 #!/bin/sh
 dev=\$1
 ifconfig \$1 0.0.0.0 promisc up
 brctl addif ${OPTARG} \${dev}
 EOF
-		cat > ${TEMP}/ifdown${NICID}.sh <<EOF
+		cat > "${TEMP}/ifdown${NICID}.sh" << EOF
 #!/bin/sh
 dev=\$1
 brctl delif ${OPTARG} \${dev}
 ifconfig \$1 down
 EOF
-		chmod +x ${TEMP}/ifup${NICID}.sh
-		chmod +x ${TEMP}/ifdown${NICID}.sh
+		chmod +x "${TEMP}/ifup${NICID}.sh"
+		chmod +x "${TEMP}/ifdown${NICID}.sh"
 
 		QEMU_ARGS+=("-netdev")
 		QEMU_ARGS+=("tap,id=hnet${NICID},vhost=off,script=${TEMP}/ifup${NICID}.sh,downscript=${TEMP}/ifdown${NICID}.sh")
 		QEMU_ARGS+=("-device")
-		QEMU_ARGS+=("virtio-net-pci,mac=$( _netdev_hwaddr ${NICID} ),netdev=hnet${NICID},id=net${NICID}")
-		(( NICID++ ))
+		QEMU_ARGS+=("virtio-net-pci,mac=$(_netdev_hwaddr "${NICID}"),netdev=hnet${NICID},id=net${NICID}")
+		((NICID++))
 		;;
 	V)
-		cat > ${TEMP}/ifup${NICID}.sh <<EOF
+		cat > "${TEMP}/ifup${NICID}.sh" << EOF
 #!/bin/sh -e
 dev=\$1
 ifconfig ${OPTARG} 0.0.0.0 promisc up
@@ -589,7 +586,7 @@ brctl addif swire-${OPTARG} ${OPTARG}
 brctl addif swire-${OPTARG} \${dev}
 ifconfig swire-${OPTARG} 0.0.0.0 up
 EOF
-		cat > ${TEMP}/ifdown${NICID}.sh <<EOF
+		cat > "${TEMP}/ifdown${NICID}.sh" << EOF
 #!/bin/sh
 dev=\$1
 ifconfig swire-${OPTARG} down
@@ -599,37 +596,37 @@ brctl delbr swire-${OPTARG}
 ifconfig \$1 down
 ifconfig \$1 down
 EOF
-		chmod +x ${TEMP}/ifup${NICID}.sh
-		chmod +x ${TEMP}/ifdown${NICID}.sh
+		chmod +x "${TEMP}/ifup${NICID}.sh"
+		chmod +x "${TEMP}/ifdown${NICID}.sh"
 
 		QEMU_ARGS+=("-netdev")
 		QEMU_ARGS+=("tap,id=hnet${NICID},vhost=off,script=${TEMP}/ifup${NICID}.sh,downscript=${TEMP}/ifdown${NICID}.sh")
 		QEMU_ARGS+=("-device")
-		QEMU_ARGS+=("virtio-net-pci,mac=$( _netdev_hwaddr ${NICID} ),netdev=hnet${NICID},id=net${NICID}")
-		(( NICID++ ))
+		QEMU_ARGS+=("virtio-net-pci,mac=$(_netdev_hwaddr "${NICID}"),netdev=hnet${NICID},id=net${NICID}")
+		((NICID++))
 		;;
 	f)
 		OPT_PCIUNBIND=0
-		ARG_PCIUNBIND+=( "${OPTARG}" )
+		ARG_PCIUNBIND+=("${OPTARG}")
 		;;
-	G)
+	U)
 		OPT_PCIUNBIND=0
 		[ -d "/sys/kernel/iommu_groups/${OPTARG}/devices/" ] || die "Fatal: Could not detect devices of IOMMU group ${OPTARG}"
-		ARG_PCIUNBIND+=( $( find -H "/sys/kernel/iommu_groups/${OPTARG}/devices/" -maxdepth 1 -type l -exec basename {} \; ) )
+		ARG_PCIUNBIND+=("$(find -H "/sys/kernel/iommu_groups/${OPTARG}/devices/" -maxdepth 1 -type l -exec basename {} \;)")
 		;;
 	d)
 		QEMU_ARGS+=("-drive")
 		QEMU_ARGS+=("file=${OPTARG},if=none,id=hvirtio${VIRTIOID},format=raw")
 		QEMU_ARGS+=("-device")
 		QEMU_ARGS+=("virtio-blk-pci,scsi=off,drive=hvirtio${VIRTIOID},id=virtio${VIRTIOID}")
-		(( VIRTIOID++ ))
+		((VIRTIOID++))
 		;;
 	q)
 		QEMU_ARGS+=("-drive")
 		QEMU_ARGS+=("file=${OPTARG},if=none,id=hvirtio${VIRTIOID},format=qcow2")
 		QEMU_ARGS+=("-device")
 		QEMU_ARGS+=("virtio-blk-pci,scsi=off,drive=hvirtio${VIRTIOID},id=virtio${VIRTIOID}")
-		(( VIRTIOID++ ))
+		((VIRTIOID++))
 		;;
 	I)
 		QEMU_ARGS+=("-drive")
@@ -637,7 +634,7 @@ EOF
 		QEMU_ARGS+=("-device")
 		QEMU_ARGS+=("ide-cd,bus=ide.${IDEID},unit=0,drive=hide${IDEID},id=ide${IDEID}")
 		#QEMU_ARGS+=("ide-cd,bus=ide.$( _ideid_2_bus ${IDEID} ),unit=$( _ideid_2_unit ${IDEID} ),drive=hide${IDEID},id=ide${IDEID}")
-		(( IDEID++ ))
+		((IDEID++))
 		;;
 	S)
 		QEMU_ARGS+=("-chardev")
@@ -646,15 +643,15 @@ EOF
 		QEMU_ARGS+=("virtio-serial")
 		QEMU_ARGS+=("-device")
 		QEMU_ARGS+=("virtconsole,chardev=vserial${SERIALID}")
-		(( SERIALID++ ))
+		((SERIALID++))
 		;;
 	e)
 		QEMU_ARGS+=("-fsdev")
 		QEMU_ARGS+=("local,security_model=passthrough,id=hvirtio${VIRTIOID},path=${OPTARG}")
 		QEMU_ARGS+=("-device")
 		QEMU_ARGS+=("virtio-9p-pci,fsdev=hvirtio${VIRTIOID},mount_tag=fs${FSID}")
-		(( FSID++ ))
-		(( VIRTIOID++ ))
+		((FSID++))
+		((VIRTIOID++))
 		;;
 	l)
 		OPT_BALLOON=0
@@ -690,8 +687,8 @@ EOF
 		OPT_APPEND=0
 		;;
 	p)
-		ARG_VCPUPIN=$( _expand_num_list "${OPTARG}" )
-		if [ $? -ne 0 -o -z "${ARG_VCPUPIN}" ]; then
+		ARG_VCPUPIN=$(_expand_num_list "${OPTARG}")
+		if [ $? -ne 0 ] || [ -z "${ARG_VCPUPIN}" ]; then
 			echo "Could not parse CPU list (-c)" 1>&2
 			exit 1
 		fi
@@ -741,11 +738,11 @@ EOF
 		;;
 	esac
 done
-shift $(( OPTIND - 1 ))
+shift $((OPTIND - 1))
 
 # Sanity check: TTY available? socat will need it
 if [ $OPT_BACKGROUND -ne 0 ]; then
-	if [ ! -t 0 -o ! -t 1 ]; then
+	if [ ! -t 0 ] || [ ! -t 1 ]; then
 		echo "A TTY is required for foreground mode (see option -x)" 1>&2
 		exit 2
 	fi
@@ -753,85 +750,86 @@ fi
 
 QEMU_ACCEL=tcg
 if [ $OPT_HWACCEL -eq 0 ]; then
-	if [ $OSENV = Linux ]; then
+	if [ "$OSENV" = "Linux" ]; then
 		QEMU_ACCEL=kvm
 		QEMU_BASE_ARGS+=("-enable-kvm")
-	elif [ $OSENV = Darwin ]; then
+	elif [ "$OSENV" = "Darwin" ]; then
 		QEMU_ACCEL=hvf
 	fi
 fi
 case "$ARG_MACHINETYPE" in
-	"arm64v")
-		QEMU_BIN=${QEMU_BIN:-"$( which qemu-system-aarch64 )"}
+"arm64v")
+	QEMU_BIN=${QEMU_BIN:-"$(which qemu-system-aarch64)"}
 
-		QEMU_BASE_ARGS+=("-machine")
-		QEMU_BASE_ARGS+=("virt,accel=${QEMU_ACCEL}")
+	QEMU_BASE_ARGS+=("-machine")
+	QEMU_BASE_ARGS+=("virt,accel=${QEMU_ACCEL}")
 
-		if [ $OPT_HWACCEL -eq 0 ]; then
-			QEMU_BASE_ARGS+=("-cpu")
-			QEMU_BASE_ARGS+=("host")
-		else
-			QEMU_BASE_ARGS+=("-cpu")
-			QEMU_BASE_ARGS+=("cortex-a53")
-		fi
-		;;
-	"x86pc")
-		QEMU_BIN=${QEMU_BIN:-"$( which qemu-system-x86_64 )"}
+	if [ $OPT_HWACCEL -eq 0 ]; then
+		QEMU_BASE_ARGS+=("-cpu")
+		QEMU_BASE_ARGS+=("host")
+	else
+		QEMU_BASE_ARGS+=("-cpu")
+		QEMU_BASE_ARGS+=("cortex-a53")
+	fi
+	;;
+"x86pc")
+	QEMU_BIN=${QEMU_BIN:-"$(which qemu-system-x86_64)"}
 
-		# WORKAROUND: Unikraft currently only supports QEMUs PC model until 7.0
-		# See: https://github.com/unikraft/unikraft/issues/1040
-		"${QEMU_BIN}" -M \? | grep -qe '^pc-i440fx-7\.0[[:space:]]\?'
-		if [ $? -eq 0 ]; then
-			QEMU_X86MACH="pc-i440fx-7.0"
-		else
-			QEMU_X86MACH="pc"
-		fi
+	# WORKAROUND: Unikraft currently only supports QEMUs PC model until 7.0
+	# See: https://github.com/unikraft/unikraft/issues/1040
+	"${QEMU_BIN}" -M \? | grep -qe '^pc-i440fx-7\.0[[:space:]]\?'
+	if [ $? -eq 0 ]; then
+		QEMU_X86MACH="pc-i440fx-7.0"
+	else
+		QEMU_X86MACH="pc"
+	fi
 
-		QEMU_BASE_ARGS+=("-machine")
-		QEMU_BASE_ARGS+=("${QEMU_X86MACH},accel=${QEMU_ACCEL}")
+	QEMU_BASE_ARGS+=("-machine")
+	QEMU_BASE_ARGS+=("${QEMU_X86MACH},accel=${QEMU_ACCEL}")
 
-		if [ $OPT_HWACCEL -eq 0 ]; then
-			QEMU_BASE_ARGS+=("-cpu")
-			QEMU_BASE_ARGS+=("host,+x2apic,-pmu")
-		else
-			QEMU_BASE_ARGS+=("-cpu")
-			QEMU_BASE_ARGS+=("qemu64,-vmx,-svm,+x2apic,+pdpe1gb")
-		fi
-		;;
-	"x86q35")
-		QEMU_BIN=${QEMU_BIN:-"$( which qemu-system-x86_64 )"}
+	if [ $OPT_HWACCEL -eq 0 ]; then
+		QEMU_BASE_ARGS+=("-cpu")
+		QEMU_BASE_ARGS+=("host,+x2apic,-pmu")
+	else
+		QEMU_BASE_ARGS+=("-cpu")
+		QEMU_BASE_ARGS+=("qemu64,-vmx,-svm,+x2apic,+pdpe1gb")
+	fi
+	;;
+"x86q35")
+	QEMU_BIN=${QEMU_BIN:-"$(which qemu-system-x86_64)"}
 
-		QEMU_BASE_ARGS+=("-machine")
-		QEMU_BASE_ARGS+=("q35,accel=${QEMU_ACCEL}")
+	QEMU_BASE_ARGS+=("-machine")
+	QEMU_BASE_ARGS+=("q35,accel=${QEMU_ACCEL}")
 
-		if [ $OPT_HWACCEL -eq 0 ]; then
-			QEMU_BASE_ARGS+=("-cpu")
-			QEMU_BASE_ARGS+=("host,+x2apic,-pmu")
-		else
-			QEMU_BASE_ARGS+=("-cpu")
-			QEMU_BASE_ARGS+=("qemu64,-vmx,-svm,+x2apic,+pdpe1gb")
-		fi
-		;;
-	*)
-		echo "Unsupported machine type (-t)"
-		exit 1
+	if [ $OPT_HWACCEL -eq 0 ]; then
+		QEMU_BASE_ARGS+=("-cpu")
+		QEMU_BASE_ARGS+=("host,+x2apic,-pmu")
+	else
+		QEMU_BASE_ARGS+=("-cpu")
+		QEMU_BASE_ARGS+=("qemu64,-vmx,-svm,+x2apic,+pdpe1gb")
+	fi
+	;;
+*)
+	echo "Unsupported machine type (-t)"
+	exit 1
+	;;
 esac
-[ -z "${QEMU_BIN}" -o ! -x "${QEMU_BIN}" ] && die "QEMU executable not found"
+[ -z "${QEMU_BIN}" ] || [ ! -x "${QEMU_BIN}" ] && die "QEMU executable not found"
 
-if [ $IDEID -gt 5 ]; then
+if [ "$IDEID" -gt 5 ]; then
 	echo "At most 5 IDE devices supported" 1>&2
 	exit 1
 fi
-if [ $OPT_INITRD -eq 0 -a $OPT_KERNEL -ne 0 ]; then
+if [ $OPT_INITRD -eq 0 ] && [ $OPT_KERNEL -ne 0 ]; then
 	echo "An init-ramdisk requires a kernel (-k option missing)" 1>&2
 	exit 1
 fi
-if [ $OPT_APPEND -eq 0 -a $OPT_KERNEL -ne 0 ]; then
+if [ $OPT_APPEND -eq 0 ] && [ $OPT_KERNEL -ne 0 ]; then
 	echo "Kernel arguments require a kernel (-k option missing)" 1>&2
 	exit 1
 fi
 
-if [ $OPT_KERNEL -eq 0 -a $OPT_APPEND -ne 0 ]; then
+if [ $OPT_KERNEL -eq 0 ] && [ $OPT_APPEND -ne 0 ]; then
 	ARG_APPEND="console=ttyS0" # default append
 	OPT_APPEND=0
 fi
@@ -845,7 +843,7 @@ if [ $OPT_RNG -eq 0 ]; then
 	QEMU_ARGS+=("-device")
 	QEMU_ARGS+=("virtio-rng-pci,rng=hostrng0")
 fi
-if [ $NICID -eq 0 ]; then
+if [ "$NICID" -eq 0 ]; then
 	QEMU_ARGS+=("-net")
 	QEMU_ARGS+=("none")
 fi
@@ -881,34 +879,33 @@ fi
 
 if [ $OPT_PCIUNBIND -eq 0 ]; then
 	if [ $OPT_DRYRUN -ne 0 ]; then
-		load_pci_assign_mod
+		load_pci_assign_mod "1"
 		PCIASSIGN_MODE=$?
 	else
 		PCIASSIGN_MODE=1
 	fi
-	PCIASSIGN_MODE_STR=
 	case $PCIASSIGN_MODE in
-	    1)
+	1)
 		for P in "${ARG_PCIUNBIND[@]}"; do
-		    QEMU_ARGS+=("-device")
-		    QEMU_ARGS+=("vfio-pci,host=${P}")
+			QEMU_ARGS+=("-device")
+			QEMU_ARGS+=("vfio-pci,host=${P}")
 		done
 		;;
-	    2)
+	2)
 		for P in "${ARG_PCIUNBIND[@]}"; do
-		    QEMU_ARGS+=("-device")
-		    QEMU_ARGS+=("pci-assign,host=${P}")
+			QEMU_ARGS+=("-device")
+			QEMU_ARGS+=("pci-assign,host=${P}")
 		done
 		;;
-	    *)
+	*)
 		exit 1
 		;;
 	esac
 
 	if [ $OPT_DRYRUN -ne 0 ]; then
 		for P in "${ARG_PCIUNBIND[@]}"; do
-		    echo "Unbinding PCI device ${P}..."
-		    release_pci "$P" "$PCIASSIGN_MODE" || exit 1
+			echo "Unbinding PCI device ${P}..."
+			release_pci "$P" "$PCIASSIGN_MODE" || exit 1
 		done
 	fi
 fi
@@ -918,7 +915,7 @@ QEMU_ARGS+=("-serial")
 QEMU_ARGS+=("unix:${SOCK_SERIAL},server,nowait")
 
 # reboot behaviour
-if [ ${OPT_BACKGROUND} -ne 0 -o ${OPT_GDBPORT} -eq 0 ]; then
+if [ ${OPT_BACKGROUND} -ne 0 ] || [ ${OPT_GDBPORT} -eq 0 ]; then
 	QEMU_ARGS+=("-no-reboot")
 fi
 
@@ -966,7 +963,7 @@ if [ ${OPT_GDBPORT} -eq 0 ]; then
 	QEMU_BASE_ARGS+=("-no-shutdown")
 fi
 if [ $OPT_DRYRUN -eq 0 ]; then
-	echo $( which "${QEMU_BIN}" ) \
+	echo "$(which "${QEMU_BIN}")" \
 		"${QEMU_BASE_ARGS[@]}" \
 		"${QEMU_ARGS[@]}" \
 		"$@"
@@ -981,10 +978,10 @@ if [ $QEMU_RET -ne 0 ]; then
 	exit $QEMU_RET
 fi
 if [ ! -f "${PIDFILE}" ]; then
-	printf 'PIDfile ${PIDFILE} was not created' 1>&2
+	printf 'PIDfile %s was not created' "${PIDFILE}" 1>&2
 	exit 1
 fi
-QEMU_PID="$( cat "${PIDFILE}" )"
+QEMU_PID="$(cat "${PIDFILE}")"
 printf '**************************************************************************\n'
 printf ' QEMU:\n'
 printf '   Name:                  %s\n' "${ARG_GUESTNAME}"
@@ -993,14 +990,14 @@ printf '   Monitor socket:        %s\n' "${SOCK_MONITOR}"
 if [ ${OPT_BACKGROUND} -eq 0 ]; then
 	printf '   Serial socket:         %s\n' "${SOCK_SERIAL}"
 fi
-if [ {$OPT_VIDEOVNC} ]; then
+if [ -n "${OPT_VIDEOVNC}" ]; then
 	printf '   VNC listen:            %s\n' "${ARG_VIDEOVNC_PORT}"
 fi
 printf '\n'
 printf '   SMP configuration:     %s\n' "sockets=${ARG_SOCKETS},cores=${ARG_CORES},threads=${ARG_SMT}"
 printf '   Memory:                %d MB\n' "${ARG_MEM}"
 if [ ${OPT_VCPUPIN} -eq 0 ]; then
-	printf '   vCPU pin set:          %s\n' "$( echo "${ARG_VCPUPIN}" | tr '\n' ' ' )"
+	printf '   vCPU pin set:          %s\n' "$(echo "${ARG_VCPUPIN}" | tr '\n' ' ')"
 fi
 if [ ${OPT_KERNEL} -eq 0 ]; then
 	printf '   Kernel:                %s\n' "${ARG_KERNEL}"
@@ -1018,13 +1015,13 @@ if [ ${OPT_TRACE} -eq 0 ]; then
 	printf '   Log file:              %s\n' "${ARG_TRACE}"
 fi
 printf '\n'
-if [ ${OPT_GDBPORT} -eq 0 -a ${OPT_KERNEL} -eq 0 ]; then
+if [ ${OPT_GDBPORT} -eq 0 ] && [ ${OPT_KERNEL} -eq 0 ]; then
 	printf '   Hint:    Use '"\'"'gdb --eval-command="target remote :%s" %s'"\'"' to connect to the GDB server\n' "${ARG_GDBPORT}" "${ARG_KERNEL}"
 fi
-if [ ${NICID} -eq 0 ]; then
+if [ "${NICID}" -eq 0 ]; then
 	printf '   Warning: No networking for guest!\n'
 fi
-if [ ${OPT_BACKGROUND} -ne 0 -a ${OPT_CTRLC} -eq 0 ]; then
+if [ ${OPT_BACKGROUND} -ne 0 ] && [ ${OPT_CTRLC} -eq 0 ]; then
 	printf '   Warning: Guest will be terminated with CTRL+C!\n'
 fi
 printf '**************************************************************************\n'

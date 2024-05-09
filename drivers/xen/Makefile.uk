@@ -1,0 +1,12 @@
+################################################################################
+#
+# Driver registrations
+#
+################################################################################
+
+UK_DRIV_XEN_BASE := $(UK_DRIV_BASE)/xen
+
+$(eval $(call import_lib,$(UK_DRIV_XEN_BASE)/9p))
+$(eval $(call import_lib,$(UK_DRIV_XEN_BASE)/blk))
+$(eval $(call import_lib,$(UK_DRIV_XEN_BASE)/net))
+$(eval $(call import_lib,$(UK_DRIV_XEN_BASE)/xenbus))

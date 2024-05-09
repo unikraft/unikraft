@@ -251,6 +251,8 @@ typedef __u64 __paddr_t;
 #define __NULL ((void *) 0)
 #endif
 
+typedef char *caddr_t; /* core address */
+
 typedef struct {
 	__u32 counter;
 } __atomic;

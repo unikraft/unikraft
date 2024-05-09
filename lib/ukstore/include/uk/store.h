@@ -38,7 +38,8 @@
 #include <uk/alloc.h>
 #include <uk/config.h>
 #include <uk/assert.h>
-#include <uk/arch/atomic.h>
+#include <uk/list.h>
+#include <uk/atomic.h>
 #include <uk/libid.h>
 
 #endif /* CONFIG_LIBUKSTORE */

@@ -37,7 +37,7 @@
 #ifndef __PLAT_KVM_X86_LCPU_HELPERS_S__
 #define __PLAT_KVM_X86_LCPU_HELPERS_S__
 
-#include <x86/cpu_defs.h>
+#include <uk/arch/lcpu.h>
 
 /**
  * Enable the floating point unit (FPU) and Streaming SIMD Extensions (SSE).

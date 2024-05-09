@@ -24,6 +24,7 @@
  */
 /* Ported from Mini-OS */
 
+#include <arm/smccc.h>
 #include <string.h>
 #include <uk/plat/common/sections.h>
 #include <xen-arm/os.h>

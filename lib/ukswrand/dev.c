@@ -87,7 +87,7 @@ static struct driver drv_urandom = {
 	.name = DEV_URANDOM_NAME
 };
 
-static int devfs_register(void)
+static int devfs_register(struct uk_init_ctx *ictx __unused)
 {
 	int rc;
 

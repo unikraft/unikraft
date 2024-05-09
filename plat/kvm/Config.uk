@@ -6,10 +6,11 @@ menuconfig PLAT_KVM
 	select LIBUKALLOC
 	select LIBUKTIMECONV
 	select LIBNOLIBC if !HAVE_LIBC
-	select LIBFDT if ARCH_ARM_64
+	select HAVE_FDT if ARCH_ARM_64
+	imply LIBFDT if ARCH_ARM_64
+	imply LIBUKOFW if ARCH_ARM_64
 	select ELF64_TO_32 if ARCH_X86_64
 	select LIBUKRELOC if OPTIMIZE_PIE
-	select LIBUKOFW if ARCH_ARM_64
 	select HAVE_INTCTLR
 	select HAVE_APIC if ARCH_X86_64
 	select LIBUKINTCTLR_XPIC if ARCH_X86_64
@@ -58,10 +59,6 @@ endchoice
 
 if KVM_BOOT_PROTO_EFI_STUB
 
-config KVM_BOOT_PROTO_EFI_STUB_DEBUG
-	bool "Enable EFI stub crash messages"
-	default n
-
 config KVM_BOOT_PROTO_EFI_STUB_CMDLINE_FNAME
 	string "Name of the command line arguments file"
 	default "$(UK_NAME).cmdl"
@@ -95,6 +92,7 @@ choice
 
 config KVM_VMM_QEMU
 	bool "QEMU"
+	imply LIBUKTTY_PL011 if ARCH_ARM_64
 	imply LIBUKINTCTLR_GICV2 if ARCH_ARM_64
 	select HAVE_PCI
 	select HAVE_MMIO
@@ -104,6 +102,7 @@ config KVM_VMM_FIRECRACKER
 	select KVM_BOOT_PROTO_LXBOOT
 	select HAVE_MMIO
 	select VIRTIO_MMIO_LINUX_COMPAT_CMDLINE
+	imply LIBUKTTY_NS16550 if ARCH_ARM_64
 	imply LIBUKINTCTLR_GICV3 if ARCH_ARM_64
 	depends on ARCH_X86_64 || ARCH_ARM_64
 
@@ -141,21 +140,8 @@ config KVM_KERNEL_SERIAL_CONSOLE
 
 if (KVM_KERNEL_SERIAL_CONSOLE || KVM_DEBUG_SERIAL_CONSOLE)
 
-choice
-	prompt "Serial console driver"
-	depends on ARCH_ARM_64
-	default UART_PL011 if KVM_VMM_QEMU
-	default UART_NS16550 if KVM_VMM_FIRECRACKER
-
-config UART_PL011
-	bool "PrimeCell UART (PL011)"
-
-config UART_NS16550
-	bool "8250 / NS16550"
-endchoice
-
-menu "Serial console configuration"
 if ARCH_X86_64
+menu "Serial console configuration"
 choice
 	prompt "Baudrate"
 	default KVM_SERIAL_BAUD_115200
@@ -172,41 +158,9 @@ choice
 	config KVM_SERIAL_BAUD_19200
 		bool "19200"
 endchoice
+endmenu
 endif
 
-config EARLY_PRINT_PL011_UART_ADDR
-	hex "Early debug console pl011 serial address"
-	depends on UART_PL011
-	default 0x09000000
-	depends on (KVM_DEBUG_SERIAL_CONSOLE && ARCH_ARM_64)
-	help
-		Pl011 serial address used by early debug console.
-
-config EARLY_UART_NS16550
-	bool "Early console"
-	depends on UART_NS16550
-	default n
-
-config EARLY_UART_NS16550_BASE
-	hex "Early debug console ns16550 serial address"
-	depends on EARLY_UART_NS16550
-	help
-		NS16550 serial address used by early debug console.
-
-config UART_NS16550_REG_SHIFT
-	int "NS16550 serial register shift"
-	depends on UART_NS16550
-	default 0
-	help
-		NS16550 serial register shift.
-
-config UART_NS16550_REG_WIDTH
-	int "NS165500 serial register width"
-	depends on UART_NS16550
-	default 1
-	help
-		NS16550 serial register width.
-endmenu
 endif
 
 endmenu

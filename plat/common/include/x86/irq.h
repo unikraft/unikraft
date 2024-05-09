@@ -29,7 +29,7 @@
 #ifndef __PLAT_CMN_X86_IRQ_H__
 #define __PLAT_CMN_X86_IRQ_H__
 
-#include <x86/cpu_defs.h>
+#include <uk/arch/lcpu.h>
 
 #ifdef __X64_32__
 #define __SZ  "l"

@@ -62,6 +62,12 @@ struct lcpu_arch { };
 #endif /* !__ASSEMBLY__ */
 #endif /* !LCPU_ARCH_SIZE */
 
+#define IS_LCPU_PTR(ptr)                                               \
+	(IN_RANGE((__uptr)(ptr),                                        \
+		  (__uptr)lcpu_get(0),                                  \
+		  (__uptr)CONFIG_UKPLAT_LCPU_MAXCOUNT *                 \
+		  sizeof(struct lcpu)))
+
 /*
  * LCPU Startup Arguments
  */
@@ -91,7 +97,12 @@ UK_CTASSERT(sizeof(struct lcpu_sargs) == LCPU_SARGS_SIZE);
 #define LCPU_ENTRY_OFFSET		(LCPU_ID_OFFSET    + 0x08)
 #define LCPU_STACKP_OFFSET		(LCPU_ENTRY_OFFSET + 0x08)
 #define LCPU_ERR_OFFSET			(LCPU_ENTRY_OFFSET + 0x00)
-#define LCPU_ARCH_OFFSET		(LCPU_ENTRY_OFFSET + 0x10)
+/* TODO: See comment from syscall_prologue.h architecture specific files */
+#ifdef LCPU_AUXSP_OFFSET
+#undef LCPU_AUXSP_OFFSET
+#endif /* LCPU_AUXSP_OFFSET */
+#define LCPU_AUXSP_OFFSET		(LCPU_ENTRY_OFFSET + 0x10)
+#define LCPU_ARCH_OFFSET		(LCPU_ENTRY_OFFSET + 0x18)
 
 #ifdef CONFIG_HAVE_SMP
 #define LCPU_FUNC_SIZE			0x10
@@ -130,6 +141,9 @@ struct __align(CACHE_LINE_SIZE) lcpu {
 		int error_code;
 	};
 
+	/* Auxiliary stack pointer of the thread currently executing on LCPU */
+	__uptr auxsp;
+
 	/* Architecture-dependent part */
 	struct lcpu_arch arch;
 };
@@ -144,6 +158,7 @@ UK_CTASSERT(__offsetof(struct lcpu, id)            == LCPU_ID_OFFSET);
 UK_CTASSERT(__offsetof(struct lcpu, s_args.entry)  == LCPU_ENTRY_OFFSET);
 UK_CTASSERT(__offsetof(struct lcpu, s_args.stackp) == LCPU_STACKP_OFFSET);
 UK_CTASSERT(__offsetof(struct lcpu, error_code)    == LCPU_ERR_OFFSET);
+UK_CTASSERT(__offsetof(struct lcpu, auxsp)         == LCPU_AUXSP_OFFSET);
 UK_CTASSERT(__offsetof(struct lcpu, arch)          == LCPU_ARCH_OFFSET);
 
 UK_CTASSERT(sizeof(struct lcpu) == LCPU_SIZE);
@@ -334,6 +349,14 @@ int lcpu_fn_enqueue(struct lcpu *lcpu, const struct ukplat_lcpu_func *fn);
  * functions.
  */
 __lcpuid lcpu_arch_id(void);
+
+/**
+ * Return the index of the CPU executing this function. Needs to have had the
+ * architecture of the CPU already initialized. This method is meant to make
+ * use of architectural defined registers initialized during CPU architecture
+ * initialization to yield faster execution.
+ */
+__lcpuidx lcpu_arch_idx(void);
 
 /**
  * Initialize the architectural part of the LCPU. The function is

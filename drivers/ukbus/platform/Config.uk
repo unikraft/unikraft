@@ -4,6 +4,10 @@ config LIBUKBUS_PLATFORM
 	help
 		Platform bus for non-auto-discoverable devices
 
+if LIBUKBUS_PLATFORM
+
 config LIBUKBUS_PLATFORM_FDT
 	bool
 	default y if (LIBUKOFW && LIBFDT)
+
+endif

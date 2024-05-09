@@ -55,15 +55,15 @@ typedef __s64 __snsec;
 #define __SNSEC_MAX (__S64_MAX)
 #define __SNSEC_MIN (__S64_MIN)
 
-#define UKARCH_NSEC_PER_SEC ((__nsec)1000000000ULL)
+#define UKARCH_NSEC_PER_SEC ((__snsec)1000000000LL)
 
 #define ukarch_time_nsec_to_sec(ns)      ((ns) / UKARCH_NSEC_PER_SEC)
-#define ukarch_time_nsec_to_msec(ns)     ((ns) / 1000000UL)
-#define ukarch_time_nsec_to_usec(ns)     ((ns) / 1000UL)
-#define ukarch_time_subsec(ns)           ((ns) % ((__nsec)1000000000ULL))
+#define ukarch_time_nsec_to_msec(ns)     ((ns) / 1000000L)
+#define ukarch_time_nsec_to_usec(ns)     ((ns) / 1000L)
+#define ukarch_time_subsec(ns)           ((ns) % UKARCH_NSEC_PER_SEC)
 
 #define ukarch_time_sec_to_nsec(sec)     ((sec)  * UKARCH_NSEC_PER_SEC)
-#define ukarch_time_msec_to_nsec(msec)   ((msec) * 1000000UL)
-#define ukarch_time_usec_to_nsec(usec)   ((usec) * 1000UL)
+#define ukarch_time_msec_to_nsec(msec)   ((msec) * 1000000L)
+#define ukarch_time_usec_to_nsec(usec)   ((usec) * 1000L)
 
 #endif /* __UKARCH_TIME_H__ */

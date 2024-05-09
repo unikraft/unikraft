@@ -36,7 +36,7 @@
 
 #include <uk/arch/types.h>
 #include <uk/arch/limits.h>
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
 #include <uk/arch/lcpu.h>
 #include <uk/config.h>
 
@@ -56,6 +56,14 @@ extern "C" {
 	} while (0)
 #endif /* CONFIG_LIBUKDEBUG */
 
+/*
+ * We define initializers separate from an initial values.
+ * The former can only be used in (static) variable initializations, while the
+ * latter is meant for assigning to variables or as anonymous data structures.
+ */
+#define UK_REFCOUNT_INITIALIZER(val) { .counter = (val) }
+#define UK_REFCOUNT_INIT_VALUE(val) ((__atomic)UK_REFCOUNT_INITIALIZER(val))
+
 /**
  * Initialize the atomic reference.
  *
@@ -68,7 +76,7 @@ static inline void uk_refcount_init(__atomic *ref, __u32 value)
 {
 	__refcnt_assert(ref != __NULL);
 
-	ukarch_store_n(&ref->counter, value);
+	uk_store_n(&ref->counter, value);
 }
 
 /**
@@ -80,7 +88,7 @@ static inline void uk_refcount_acquire(__atomic *ref)
 {
 	__refcnt_assert((ref != __NULL) && (ref->counter < __U32_MAX));
 
-	ukarch_inc(&ref->counter);
+	uk_inc(&ref->counter);
 }
 
 /**
@@ -100,7 +108,7 @@ static inline int uk_refcount_release(__atomic *ref)
 	/* Compiler Fence */
 	barrier();
 
-	old = ukarch_fetch_add(&ref->counter, -1);
+	old = uk_fetch_add(&ref->counter, -1);
 	__refcnt_assert(old > 0);
 	if (old > 1)
 		return 0;
@@ -133,7 +141,7 @@ static inline int uk_refcount_acquire_if_not_zero(__atomic *ref)
 	for (;;) {
 		if (old == 0)
 			return 0;
-		if (ukarch_compare_exchange_sync(&ref->counter, old, (old + 1))
+		if (uk_compare_exchange_sync(&ref->counter, old, (old + 1))
 				== (old + 1))
 			return 1;
 	}
@@ -149,7 +157,7 @@ static inline __u32 uk_refcount_read(const __atomic *ref)
 {
 	__refcnt_assert(ref != __NULL);
 
-	return ukarch_load_n(&ref->counter);
+	return uk_load_n(&ref->counter);
 }
 
 
@@ -171,7 +179,7 @@ static inline int uk_refcount_release_if_not_last(__atomic *ref)
 	for (;;) {
 		if (old == 1)
 			return 0;
-		if (ukarch_compare_exchange_sync(&ref->counter, old, (old - 1))
+		if (uk_compare_exchange_sync(&ref->counter, old, (old - 1))
 				== (old - 1))
 			return 1;
 	}

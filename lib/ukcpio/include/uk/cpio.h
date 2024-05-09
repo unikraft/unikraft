@@ -69,7 +69,7 @@ enum ukcpio_error {
  *  Returns 0 on success or one of ukcpio_error enums.
  */
 enum ukcpio_error
-ukcpio_extract(const char *dest, void *buf, size_t buflen);
+ukcpio_extract(const char *dest, const void *buf, size_t buflen);
 
 #ifdef __cplusplus
 }

@@ -41,7 +41,7 @@
 #include <uk/bitops.h>
 #include <uk/print.h>
 #include <uk/ctors.h>
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
 #include <uk/blkdev.h>
 
 struct uk_blkdev_list uk_blkdev_list =

@@ -29,11 +29,16 @@
 
 #define __XEN_LATEST_INTERFACE_VERSION__ 0x00040900
 
+#define DO_EXPAND(VAL) (VAL##1)
+#define EXPAND(VAL) DO_EXPAND(VAL)
+
 #if defined(__XEN__) || defined(__XEN_TOOLS__)
 /* Xen is built with matching headers and implements the latest interface. */
 #define __XEN_INTERFACE_VERSION__ __XEN_LATEST_INTERFACE_VERSION__
-#elif !defined(__XEN_INTERFACE_VERSION__)
+#elif !defined(__XEN_INTERFACE_VERSION__) \
+	|| (EXPAND(__XEN_INTERFACE_VERSION__) == 1)
 /* Guests which do not specify a version get the legacy interface. */
+#undef __XEN_INTERFACE_VERSION__
 #define __XEN_INTERFACE_VERSION__ 0x00000000
 #endif
 

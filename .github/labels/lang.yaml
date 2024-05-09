@@ -1,0 +1,66 @@
+labels:
+  - name: lang/c
+    description: Issues or PRs which affect code written in C
+    color: "#bbbbbb"
+    apply_on_pr_match_paths:
+      - "**/*\\.c"
+
+  - name: lang/cpp
+    description: Issues or PRs which affect code written in C++
+    color: "#bbbbbb"
+    apply_on_pr_match_paths:
+      - "**/*\\.cpp"
+
+  - name: lang/d
+    description: Issues or PRs which affect code written in Dlang
+    color: "#9f2725"
+    apply_on_pr_match_paths:
+      - "**/*\\.d"
+
+  - name: lang/go
+    description: Issues or PRs which affect code written in Golang
+    color: "#58c7d6"
+    apply_on_pr_match_paths:
+      - "**/*\\.go"
+
+  - name: lang/javascript
+    description: Issues or PRs which affect code written in JavaScript
+    color: "#e1cf27"
+    apply_on_pr_match_paths:
+      - "**/*\\.js"
+
+  - name: lang/lua
+    description: Issues or PRs which affect code written in Lua
+    color: "#000069"
+    apply_on_pr_match_paths:
+      - "**/*\\.lua"
+
+  - name: lang/php
+    description: Issues or PRs which affect code written in PHP
+    color: "#60619d"
+    apply_on_pr_match_paths:
+      - "**/*\\.php"
+
+  - name: lang/python
+    description: Issues or PRs which affect code written in Python
+    color: "#2b5f95"
+    apply_on_pr_match_paths:
+      - "**/*\\.py"
+
+  - name: lang/ruby
+    description: Issues or PRs which affect code written in Ruby
+    color: "#a80007"
+    apply_on_pr_match_paths:
+      - "**/*\\.rb"
+
+  - name: lang/rust
+    description: Issues or PRs which affect code written in Rust
+    color: "#8a4521"
+    apply_on_pr_match_paths:
+      - "**/*\\.rs"
+
+  - name: lang/wamr
+    description: Issues or PRs which affect code written in WAMR
+    color: "#5130ec"
+    apply_on_pr_match_paths:
+      - "**/*\\.wamr"

@@ -31,7 +31,7 @@
 #define __PLAT_COMMON_X86_CPU_H__
 
 #include <uk/arch/types.h>
-#include <x86/cpu_defs.h>
+#include <uk/arch/lcpu.h>
 #include <stdint.h>
 #include <uk/assert.h>
 #include <uk/alloc.h>

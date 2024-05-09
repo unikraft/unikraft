@@ -35,6 +35,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <sys/membarrier.h>
 #include <uk/plat/config.h>
 #include <uk/plat/time.h>
 #include <uk/alloc.h>
@@ -66,6 +67,7 @@ int uk_sched_register(struct uk_sched *s)
 struct uk_thread *uk_sched_thread_create_fn0(struct uk_sched *s,
 					     uk_thread_fn0_t fn0,
 					     size_t stack_len,
+					     size_t auxstack_len,
 					     bool no_uktls,
 					     bool no_ectx,
 					     const char *name,
@@ -77,6 +79,7 @@ struct uk_thread *uk_sched_thread_create_fn0(struct uk_sched *s,
 
 	UK_ASSERT(s);
 	UK_ASSERT(s->a_stack);
+	UK_ASSERT(s->a_auxstack);
 
 	if (!no_uktls && !s->a_uktls)
 		goto err_out;
@@ -84,6 +87,7 @@ struct uk_thread *uk_sched_thread_create_fn0(struct uk_sched *s,
 	t = uk_thread_create_fn0(s->a,
 				 fn0,
 				 s->a_stack, stack_len,
+				 s->a_auxstack, auxstack_len,
 				 no_uktls ? NULL : s->a_uktls,
 				 no_ectx,
 				 name,
@@ -108,6 +112,7 @@ struct uk_thread *uk_sched_thread_create_fn1(struct uk_sched *s,
 					     uk_thread_fn1_t fn1,
 					     void *argp,
 					     size_t stack_len,
+					     size_t auxstack_len,
 					     bool no_uktls,
 					     bool no_ectx,
 					     const char *name,
@@ -119,6 +124,7 @@ struct uk_thread *uk_sched_thread_create_fn1(struct uk_sched *s,
 
 	UK_ASSERT(s);
 	UK_ASSERT(s->a_stack);
+	UK_ASSERT(s->a_auxstack);
 
 	if (!no_uktls && !s->a_uktls)
 		goto err_out;
@@ -126,6 +132,7 @@ struct uk_thread *uk_sched_thread_create_fn1(struct uk_sched *s,
 	t = uk_thread_create_fn1(s->a,
 				 fn1, argp,
 				 s->a_stack, stack_len,
+				 s->a_auxstack, auxstack_len,
 				 no_uktls ? NULL : s->a_uktls,
 				 no_ectx,
 				 name,
@@ -150,6 +157,7 @@ struct uk_thread *uk_sched_thread_create_fn2(struct uk_sched *s,
 					     uk_thread_fn2_t fn2,
 					     void *argp0, void *argp1,
 					     size_t stack_len,
+					     size_t auxstack_len,
 					     bool no_uktls,
 					     bool no_ectx,
 					     const char *name,
@@ -161,6 +169,7 @@ struct uk_thread *uk_sched_thread_create_fn2(struct uk_sched *s,
 
 	UK_ASSERT(s);
 	UK_ASSERT(s->a_stack);
+	UK_ASSERT(s->a_auxstack);
 
 	if (!no_uktls && !s->a_uktls)
 		goto err_out;
@@ -168,6 +177,7 @@ struct uk_thread *uk_sched_thread_create_fn2(struct uk_sched *s,
 	t = uk_thread_create_fn2(s->a,
 				 fn2, argp0, argp1,
 				 s->a_stack, stack_len,
+				 s->a_auxstack, auxstack_len,
 				 no_uktls ? NULL : s->a_uktls,
 				 no_ectx,
 				 name,
@@ -192,6 +202,7 @@ int uk_sched_start(struct uk_sched *s)
 {
 	struct uk_thread *main_thread;
 	uintptr_t tlsp;
+	uintptr_t auxsp;
 	int ret;
 
 	UK_ASSERT(s);
@@ -204,8 +215,10 @@ int uk_sched_start(struct uk_sched *s)
 	 *       an TLS that is derived from the Unikraft TLS template.
 	 */
 	tlsp = ukplat_tlsp_get();
+	auxsp = ukplat_lcpu_get_auxsp();
 	main_thread = uk_thread_create_bare(s->a,
-					    0x0, 0x0, tlsp, !(!tlsp), false,
+					    0x0, 0x0, auxsp,
+					    tlsp, !(!tlsp), false,
 					    "init", NULL, NULL);
 	if (!main_thread) {
 		ret = -ENOMEM;
@@ -393,7 +406,7 @@ void uk_sched_dumpk_threads(int klvl, struct uk_sched *s)
 		uk_printk(klvl,
 			  " + thread %p (%s), ctx: %p, "
 			  "execution time: %"__PRInsec".%06"__PRInsec"s, "
-			  "flags: %c%c%c%c\n",
+			  "flags: %c%c%c%c%c\n",
 			  t, t->name ? t->name : "<unnamed>",
 			  &t->ctx,
 			  ukarch_time_nsec_to_sec(t->exec_time),
@@ -401,6 +414,7 @@ void uk_sched_dumpk_threads(int klvl, struct uk_sched *s)
 			  (t->flags & UK_THREADF_RUNNABLE) ? 'R' : '-',
 			  (t->flags & UK_THREADF_EXITED)   ? 'D' : '-',
 			  (t->flags & UK_THREADF_ECTX)     ? 'E' : '-',
+			  (t->flags & UK_THREADF_AUXSP)    ? 'A' : '-',
 			  (t->flags & UK_THREADF_UKTLS)    ? 'T' : '-');
 	}
 }
@@ -428,4 +442,51 @@ UK_SYSCALL_R_DEFINE(int, sched_setaffinity, int, pid, long, cpusetsize,
 {
 	UK_WARN_STUBBED();
 	return 0;
+}
+
+#define MEMBARRIER_SUPPORTED_CMDS (\
+	MEMBARRIER_CMD_GLOBAL | \
+	MEMBARRIER_CMD_GLOBAL_EXPEDITED | \
+	MEMBARRIER_CMD_REGISTER_GLOBAL_EXPEDITED | \
+	MEMBARRIER_CMD_PRIVATE_EXPEDITED | \
+	MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED | \
+	MEMBARRIER_CMD_PRIVATE_EXPEDITED_SYNC_CORE | \
+	MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED_SYNC_CORE)
+
+UK_LLSYSCALL_R_DEFINE(int, membarrier, int, cmd, unsigned int, flags,
+		      int __unused, cpu_id)
+{
+	/*
+	 * membarrier is intended as an optimized alternative to using SMP-safe
+	 * memory barriers in threads that might run in parallel.
+	 * In essence, it allows threads in the fast path to proceed without
+	 * barriers, while providing a safe option to trigger a barrier between
+	 * running threads on demand with the `membarrier` syscall.
+	 * Only threads actively executing on different cores are affected,
+	 * since sleeping threads are implicitly already "barriered".
+	 *
+	 * Without SMP support membarrier is a no-op, since only a single thread
+	 * -- the one calling membarrier -- can run at one time.
+	 * With SMP support, membarrier needs to force (a subset of) cores on
+	 * the system to execute memory barriers.
+	 */
+	if (unlikely(flags))
+		return -EINVAL;
+	switch (cmd) {
+	case MEMBARRIER_CMD_QUERY:
+		return MEMBARRIER_SUPPORTED_CMDS;
+	case MEMBARRIER_CMD_GLOBAL:
+	case MEMBARRIER_CMD_GLOBAL_EXPEDITED:
+	case MEMBARRIER_CMD_PRIVATE_EXPEDITED:
+	case MEMBARRIER_CMD_PRIVATE_EXPEDITED_SYNC_CORE:
+		/* TODO: implement real cross-core barrier when SMP supported */
+		return 0;
+	case MEMBARRIER_CMD_REGISTER_GLOBAL_EXPEDITED:
+	case MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED:
+	case MEMBARRIER_CMD_REGISTER_PRIVATE_EXPEDITED_SYNC_CORE:
+		/* Registrations not supported; no-op */
+		return 0;
+	default:
+		return -EINVAL;
+	}
 }

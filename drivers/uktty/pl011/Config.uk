@@ -1,0 +1,14 @@
+menuconfig LIBUKTTY_PL011
+	bool "PrimeCell UART (PL011)"
+	depends on ARCH_ARM_64
+
+if LIBUKTTY_PL011
+menuconfig LIBUKTTY_PL011_EARLY_CONSOLE
+	bool "Early console"
+
+if LIBUKTTY_PL011_EARLY_CONSOLE
+config LIBUKTTY_PL011_EARLY_CONSOLE_BASE
+	hex "Early console base address"
+
+endif
+endif

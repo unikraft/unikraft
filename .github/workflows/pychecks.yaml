@@ -1,0 +1,27 @@
+name: Python Checks
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [staging]
+    paths:
+      - 'support/scripts/**'
+      - '.github/workflows/pychecks.yaml'
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: black
+        uses: psf/black@stable
+        with:
+          options: "--check --diff --line-length 80"
+          src: support/scripts
+
+      - name: ruff
+        uses: chartboost/ruff-action@v1
+        if: success() || failure()
+        with:
+          src: support/scripts

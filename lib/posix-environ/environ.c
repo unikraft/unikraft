@@ -3,8 +3,11 @@
  * Licensed under the BSD-3-Clause License (the "License").
  * You may not use this file except in compliance with the License.
  */
+#define _GNU_SOURCE
 #include <uk/libparam.h>
 #include <uk/essentials.h>
+#include <uk/init.h>
+#include <string.h>
 #include "environ.h"
 
 #define LIBPOSIX_ENVIRON_ENV_VAR(x)		e##x
@@ -183,3 +186,44 @@ char **__environ = __init_env;
 __weak_alias(__environ, ___environ);
 __weak_alias(__environ, _environ);
 __weak_alias(__environ, environ);
+
+/* Find the first occurrence of a variable within __init_env */
+static char **find_vnpos(const char *varname, size_t varname_len, char **end)
+{
+	char **i;
+
+	for (i = __init_env; *i && i != end; i++) {
+		if (!strncmp(varname, *i, varname_len) &&
+		    (varname_len[*i] == '=' || varname_len[*i] == '\0'))
+			return i;
+	}
+	return NULL;
+}
+
+/* Eliminate duplicates from __init_env */
+static int uniquify_env(struct uk_init_ctx *ictx __unused)
+{
+	char **rpos; /*< read position */
+	char **wpos; /*< write position */
+
+	for (rpos = __init_env, wpos = __init_env; *rpos; rpos++) {
+		size_t namelen;
+		char **opos; /*< overwrite position */
+
+		namelen = strchrnul(*rpos, '=') - *rpos;
+		opos = find_vnpos(*rpos, namelen, wpos);
+
+		if (opos) {
+			*opos = *rpos; /* replace an entry */
+		} else {
+			if (*wpos != *rpos)
+				*wpos = *rpos; /* append an entry */
+			wpos++;
+		}
+	}
+	*(wpos++) = NULL; /* NULL termination */
+
+	return 0;
+}
+
+uk_sys_initcall_prio(uniquify_env, 0x0, UK_PRIO_EARLIEST);

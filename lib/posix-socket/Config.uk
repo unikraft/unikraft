@@ -1,9 +1,9 @@
 menuconfig LIBPOSIX_SOCKET
 	bool "posix-socket: Abstraction for communication sockets"
-	default n
 	select LIBUKDEBUG
 	select LIBUKALLOC
-	select LIBVFSCORE
+	select LIBUKFILE
+	select LIBPOSIX_FDIO
 	help
 		This microlibrary allows other microlibraries to register a
 		socket family number, such as AF_INET, for their socket
@@ -19,6 +19,15 @@ if LIBPOSIX_SOCKET
 
 config LIBPOSIX_SOCKET_PRINT_ERRORS
 	bool "Print error messages"
-	default n
 
+config LIBPOSIX_SOCKET_EVENTS
+	bool "Socket events"
+	help
+		With socket events connection states and endpoints can be tracked
+		independently of the target address family. This happens in the
+		following situtations:
+		- LISTEN: The host listens for incoming connections
+		- ACCEPT: An incoming connection request is accepted
+		- CONNECT: A connection to a remote endpoint is established
+		- CLOSE: A connection or listener is closed
 endif

@@ -35,6 +35,7 @@ uk_thread_block_until
 uk_thread_block_timeout
 uk_thread_block
 uk_thread_wake
+uk_thread_wake_isr
 __uk_sched_thread_current
 uk_syscall_e_sched_yield
 uk_syscall_r_sched_yield
@@ -45,3 +46,5 @@ sched_getaffinity
 uk_syscall_e_sched_setaffinity
 uk_syscall_r_sched_setaffinity
 sched_setaffinity
+uk_syscall_e_membarrier
+uk_syscall_r_membarrier

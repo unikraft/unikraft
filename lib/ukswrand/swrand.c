@@ -73,7 +73,7 @@ ssize_t uk_swrand_fill_buffer(void *buf, size_t buflen)
 	return buflen;
 }
 
-static int _uk_swrand_init(void)
+static int _uk_swrand_init(struct uk_init_ctx *ictx __unused)
 {
 	unsigned int i;
 #ifdef CONFIG_LIBUKSWRAND_CHACHA
@@ -93,4 +93,4 @@ static int _uk_swrand_init(void)
 	return seedc;
 }
 
-uk_early_initcall(_uk_swrand_init);
+uk_early_initcall(_uk_swrand_init, 0x0);

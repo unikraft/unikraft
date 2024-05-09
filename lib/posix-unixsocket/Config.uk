@@ -1,0 +1,14 @@
+menuconfig LIBPOSIX_UNIXSOCKET
+	bool "posix-unixsocket: Support for AF_UNIX sockets"
+	select LIBPOSIX_SOCKET
+	select LIBPOSIX_PIPE
+	select LIBUKLOCK
+	select LIBUKLOCK_RWLOCK
+	select LIBUKFILE_CHAINUPDATE
+
+if LIBPOSIX_UNIXSOCKET
+	config LIBPOSIX_UNIXSOCKET_MAX_NAMELEN
+	int "Maximum length of bound unix socket pathnames"
+	default 128
+
+endif

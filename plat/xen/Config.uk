@@ -1,16 +1,23 @@
 menuconfig PLAT_XEN
        bool "Xen guest image"
        default n
-       depends on ((ARCH_X86_32 && !HAVE_SMP) || (ARCH_X86_64 && !HAVE_SMP) || (ARCH_ARM_32 && !HAVE_SMP))
-       depends on ((ARCH_X86_32 && !HAVE_SYSCALL) || (ARCH_X86_64 && !HAVE_SYSCALL) || (ARCH_ARM_32 && !HAVE_SYSCALL))
+       depends on ((ARCH_X86_32 && !HAVE_SMP) || (ARCH_X86_64 && !HAVE_SMP) || (ARCH_ARM_32 && !HAVE_SMP) || (ARCH_ARM_64 && !HAVE_SMP))
+       depends on ((ARCH_X86_32 && !HAVE_SYSCALL) || (ARCH_X86_64 && !HAVE_SYSCALL) || (ARCH_ARM_32 && !HAVE_SYSCALL) || (ARCH_ARM_64 && !HAVE_SYSCALL))
        depends on !HAVE_PAGING
        imply XEN_PV_BUILD_P2M
        select LIBUKDEBUG
        select LIBNOLIBC if !HAVE_LIBC
-       select LIBFDT if ARCH_ARM_32
+       select HAVE_FDT if ARCH_ARM_64
+       imply LIBFDT if (ARCH_ARM_32 || ARCH_ARM_64)
        select XEN_DBGEMERGENCY if ARCH_ARM_32
        select LIBUKRELOC if OPTIMIZE_PIE
-       help
+       imply LIBUKOFW if ARCH_ARM_64
+       select HAVE_INTCTLR
+       imply LIBUKINTCTLR_GICV3 if ARCH_ARM_64
+       imply LIBXEN_NETFRONT if LIBUKNETDEV
+       imply LIBXEN_9PFRONT if LIBUK9P
+       imply LIBXEN_BLKFRONT if LIBUKBLKDEV
+      help
                 Create a Unikraft image that runs as a Xen guest
 
 if (PLAT_XEN)
@@ -30,13 +37,13 @@ menu "Console Options"
 config XEN_KERNEL_HV_CONSOLE
 	bool "Hypervisor console for kernel prints"
 	default y
-	depends on ARCH_X86_64
+	depends on (ARCH_X86_64 || ARCH_ARM_64)
 	help
 		Send kernel messages to the hypervisor console.
 
 config XEN_KERNEL_EMG_CONSOLE
 	bool "Emergency console for kernel prints"
-	default y if ARCH_ARM_32
+	default y if (ARCH_ARM_32 || ARCH_ARM_64)
 	default n
 	help
 		Send kernel messages to the emergency console.
@@ -44,13 +51,13 @@ config XEN_KERNEL_EMG_CONSOLE
 config XEN_DEBUG_HV_CONSOLE
 	bool "Hypervisor console for debug prints"
 	default y
-	depends on ARCH_X86_64
+	depends on (ARCH_X86_64 || ARCH_ARM_64)
 	help
 		Send debug messages to the hypervisor console.
 
 config XEN_DEBUG_EMG_CONSOLE
 	bool "Emergency console for debug prints"
-	default y if ARCH_ARM_32
+	default y if (ARCH_ARM_32 || ARCH_ARM_64)
 	default n
         help
 		Send debug messages to the emergency console.
@@ -67,8 +74,8 @@ config XEN_PV_BUILD_P2M
 config XEN_GNTTAB
 	bool "Grant table support"
 	default y if XEN_PV
-	default n
-	depends on (ARCH_X86_64)
+	depends on (ARCH_X86_64 || ARCH_ARM_64)
+	select LIBXEN_XENBUS
 	select LIBUKALLOC
 	select LIBUKLOCK
 	select LIBUKLOCK_SEMAPHORE
@@ -76,78 +83,4 @@ config XEN_GNTTAB
 	help
 		Support grant table operations
 
-config XEN_XENBUS
-	bool "Xenbus/XenStore driver"
-	default y if XEN_PV
-	default n
-	depends on XEN_GNTTAB
-	select LIBUKALLOC
-	select LIBUKSCHED
-	select LIBUKBUS
-	help
-		Registers Xenbus as bus driver to libukbus and provides a
-		XenStore communication API for Xen drivers
-
-menu "Xenbus Drivers"
-	depends on XEN_XENBUS
-
-config XEN_NETFRONT
-	bool "Xenbus Netfront Driver"
-	default y if LIBUKNETDEV
-	default n
-	depends on LIBUKNETDEV
-	help
-		Driver for netfront devices
-
-menuconfig XEN_BLKFRONT
-	bool "Xenbus Blkfront Driver"
-	default y if LIBUKBLKDEV
-	default n
-	depends on LIBUKBLKDEV
-	help
-		Driver for block devices
-
-config XEN_BLKFRONT_GREFPOOL
-	bool "Enable grant reference pool for each queue"
-	default y
-	depends on XEN_BLKFRONT
-	select LIBUKSCHED
-	select LIBUKLOCK
-	select LIBUKLOCK_SEMAPHORE
-	help
-		Each read / write request needs a number of
-		grant references. In order to avoid the need
-		of allocating the grant refs at the beginning
-		of every operation and freeing them at the end
-		of it, we use the same grant references stored
-		in a queue. If at the moment of sending a
-		request, there are not enough grant refs in the
-		pool, we just allocate new ones, which are
-		freed at the moment of processing the response.
-
-menuconfig XEN_9PFRONT
-	bool "Xenbus 9pfront Driver"
-	default y if LIBUK9P
-	default n
-	depends on LIBUK9P
-	help
-		Driver for 9pfs devices
-
-config XEN_9PFRONT_NB_RINGS
-	int "Xen 9P ring number"
-	default 2
-	depends on XEN_9PFRONT
-	help
-		Number of rings to allocate.
-		Will be clamped to the maximum value allowed by the backend.
-
-config XEN_9PFRONT_RING_ORDER
-	int "Xen 9P ring order"
-	default 6
-	depends on XEN_9PFRONT
-	help
-		Ring order for xen 9P devices. Orders of 0, 1, 2, ..., 9 will
-		create rings of size 4K, 8K, 16K, ..., 2M respectively.
-		Will be clamped to the maximum value allowed by the backend.
-endmenu
 endif

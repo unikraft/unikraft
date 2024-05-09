@@ -35,6 +35,8 @@
 #define __UKARCH_CTX_H__
 
 #include <uk/arch/types.h>
+#include <uk/asm/ctx.h>
+
 #ifndef __ASSEMBLY__
 #include <uk/config.h>
 #if CONFIG_LIBUKDEBUG
@@ -43,7 +45,6 @@
 #define UK_ASSERT(...) do {} while (0)
 #endif /* !CONFIG_LIBUKDEBUG */
 #include <uk/essentials.h>
-#include <uk/asm/ctx.h>
 #endif /*!__ASSEMBLY__*/
 
 #define UKARCH_CTX_OFFSETOF_IP 0

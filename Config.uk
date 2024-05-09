@@ -172,7 +172,6 @@ config OPTIMIZE_SYMFILE
 
 config OPTIMIZE_COMPRESS
 	bool "Compress images"
-	default y
 	help
 		Create compressed images. Please note that not all platforms
 		support compressing.

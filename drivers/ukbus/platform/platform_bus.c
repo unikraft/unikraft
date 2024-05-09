@@ -30,7 +30,6 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <stdint.h>
 #include <string.h>
 #include <uk/print.h>
 #include <uk/plat/memory.h>
@@ -86,7 +85,7 @@ static inline struct pf_driver *pf_find_driver(const char *compatible)
 		if (!drv->match)
 			continue;
 
-		id.device_id = (uint16_t)drv->match(compatible);
+		id.device_id = (__u16)drv->match(compatible);
 		if (id.device_id >= PLATFORM_DEVICE_ID_START &&
 			id.device_id < PLATFORM_DEVICE_ID_END) {
 			if (pf_device_id_match(&id, drv->device_ids)) {

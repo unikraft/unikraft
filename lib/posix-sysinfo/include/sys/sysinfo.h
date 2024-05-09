@@ -33,6 +33,10 @@ extern "C" {
 
 #define SI_LOAD_SHIFT 16
 
+/**
+ * Structure used by the `sysinfo()` system call.
+ * Follows Linux conventions.
+ */
 struct sysinfo {
 	unsigned long uptime;
 	unsigned long loads[3];
@@ -49,7 +53,14 @@ struct sysinfo {
 	char _f[20-2*sizeof(unsigned long)-sizeof(unsigned int)];
 };
 
+/**
+ * Follows Linux conventions for the `sysinfo()` system call.
+ */
 int sysinfo (struct sysinfo *);
+
+/**
+ * Functions currently not implemented.
+ */
 int get_nprocs_conf (void);
 int get_nprocs (void);
 long get_phys_pages (void);

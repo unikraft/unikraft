@@ -1,0 +1,12 @@
+labels:
+  - name: good-first-issue
+    description: Good for newcomers
+    color: "#7057ff"
+
+  - name: patchwork-backlog
+    description: Migrated from patchwork.unikraft.org
+    color: "#bfd4f2"
+
+  - name: release-note
+    description: Issue or PR can aid in creating a release note
+    color: "#c2e0c6"

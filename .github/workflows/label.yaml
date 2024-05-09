@@ -1,0 +1,34 @@
+name: governctl
+
+on:
+  pull_request_target:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  label:
+    runs-on: ubuntu-latest
+    name: label
+    steps:
+      - name: Get Pull Request Number
+        run: echo "PR_NUMBER=$(echo ${{ github.event.number }} | sed 's/\//\\\//g')" >> "$GITHUB_ENV"
+        shell: bash
+
+      - name: Install governctl
+        run: |
+          set -xe
+          wget -q "https://github.com/unikraft/governance/releases/download/v${GOVERN_VERSION}/governance_${GOVERN_VERSION}_linux_amd64.deb"
+          sudo dpkg -i "governance_${GOVERN_VERSION}_linux_amd64.deb"
+        env:
+          GOVERN_VERSION: 0.1.9
+
+      - name: Label PR
+        run: governctl pr sync labels "unikraft/unikraft/${PR_NUMBER}" --labels-dir .github/labels
+        env:
+          GOVERN_GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GOVERN_GITHUB_USER: ${{ secrets.GH_CHECKPATCH_ACTOR }}
+          GOVERN_NO_RENDER: true
+          GOVERN_LOG_LEVEL: warn

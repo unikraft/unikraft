@@ -69,7 +69,7 @@ static struct uk_test_stats testassert_stats = {0};
 #endif /* !CONFIG_LIBUKDEBUG_ANSI_COLOR */
 
 static int
-uk_test_print_stats(void)
+uk_test_print_stats(struct uk_init_ctx *ictx __unused)
 {
 	int failed;
 
@@ -115,7 +115,7 @@ uk_test_print_stats(void)
 	return 0;
 }
 
-uk_late_initcall(uk_test_print_stats);
+uk_late_initcall(uk_test_print_stats, 0x0);
 #endif /* CONFIG_LIBUKTEST_LOG_STATS */
 
 static void

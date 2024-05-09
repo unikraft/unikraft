@@ -26,11 +26,15 @@
 #define _ARCH_MM_H_
 
 #include <uk/plat/common/sections.h>
+#include <uk/plat/memory.h>
 #ifndef __ASSEMBLY__
 #include <xen/xen.h>
 #if defined(__x86_64__)
 #include <xen/arch-x86_64.h>
 #define __CONST(x) x ## UL
+#elif defined(__aarch64__)
+#include <xen/arch-arm.h>
+#define __CONST(x) x##UL
 #else
 #error "Unsupported architecture"
 #endif
@@ -152,11 +156,6 @@ typedef unsigned long pgentry_t;
 /* flags for ioremap */
 #define IO_PROT (L1_PROT)
 #define IO_PROT_NOCACHE (L1_PROT | _PAGE_PCD)
-
-#include <uk/arch/limits.h>
-#define PAGE_SIZE       __PAGE_SIZE
-#define PAGE_SHIFT      __PAGE_SHIFT
-#define PAGE_MASK       __PAGE_MASK
 
 #define PFN_UP(x)	(((x) + PAGE_SIZE-1) >> L1_PAGETABLE_SHIFT)
 #define PFN_DOWN(x)	((x) >> L1_PAGETABLE_SHIFT)

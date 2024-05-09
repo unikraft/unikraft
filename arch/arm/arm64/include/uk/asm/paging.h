@@ -285,12 +285,13 @@ static inline int ukarch_pt_write_base(__paddr_t pt_paddr)
 
 static inline void ukarch_tlb_flush_entry(__vaddr_t vaddr)
 {
+	__u64 page_number = vaddr >> PAGE_SHIFT;
 	__asm__ __volatile__(
 		"	dsb	ishst\n"        /* wait for write complete */
 		"	tlbi	vaae1is, %x0\n" /* invalidate by vaddr */
 		"	dsb	ish\n"          /* wait for invalidate compl */
 		"	isb\n"                  /* sync context */
-		:: "r" (vaddr) : "memory");
+		:: "r" (page_number) : "memory");
 }
 
 static inline void ukarch_tlb_flush(void)

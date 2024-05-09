@@ -36,10 +36,6 @@
 #include <uk/syscall.h>
 #include <uk/plat/syscall.h>
 #include <uk/arch/ctx.h>
-#if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
-#include <uk/plat/tls.h>
-#include <uk/thread.h>
-#endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include "arch/regmap_linuxabi.h"
@@ -47,17 +43,8 @@
 #include <uk/plat/console.h> /* ukplat_coutk */
 #endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
 
-void ukplat_syscall_handler(struct __regs *r)
+void ukplat_syscall_handler(struct uk_syscall_ctx *usc)
 {
-#if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
-	struct uk_thread *self;
-	__uptr orig_tlsp;
-#endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
-	/* Place backup of extended register state on stack */
-	__sz ectx_align = ukarch_ectx_align();
-	__u8 ectxbuf[ukarch_ectx_size() + ectx_align];
-	struct ukarch_ectx *ectx = (struct ukarch_ectx *)
-					 ALIGN_UP((__uptr) ectxbuf, ectx_align);
 #if CONFIG_LIBSYSCALL_SHIM_STRACE
 #if CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR
 	char prsyscallbuf[512]; /* ANSI color is pretty hungry */
@@ -67,33 +54,24 @@ void ukplat_syscall_handler(struct __regs *r)
 	int prsyscalllen;
 #endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
 
-	UK_ASSERT(r);
+	UK_ASSERT(usc);
 
 	/* Save extended register state */
-	ukarch_ectx_sanitize(ectx);
-	ukarch_ectx_store(ectx);
+	ukarch_ectx_sanitize((struct ukarch_ectx *)&usc->ectx);
+	ukarch_ectx_store((struct ukarch_ectx *)&usc->ectx);
 
-#if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
-	/* Activate Unikraft TLS */
-	orig_tlsp = ukplat_tlsp_get();
-	self = uk_thread_current();
-	UK_ASSERT(self);
-	ukplat_tlsp_set(self->uktlsp);
-	_uk_syscall_ultlsp = orig_tlsp;
-#endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
-
-	/* uk_syscall6_r() will clear _uk_syscall_return_addr on return */
-	_uk_syscall_return_addr = r->rip;
+	ukarch_sysregs_switch_uk(&usc->sysregs);
 
 #if CONFIG_LIBSYSCALL_SHIM_DEBUG_HANDLER
 	_uk_printd(uk_libid_self(), __STR_BASENAME__, __LINE__,
 			"Binary system call request \"%s\" (%lu) at ip:%p (arg0=0x%lx, arg1=0x%lx, ...)\n",
-		    uk_syscall_name(r->rsyscall), r->rsyscall,
-		    (void *) r->rip, r->rarg0, r->rarg1);
+		    uk_syscall_name(usc->regs.rsyscall), usc->regs.rsyscall,
+		    (void *)usc->regs.rip, usc->regs.rarg0,
+		    usc->regs.rarg1);
 #endif /* CONFIG_LIBSYSCALL_SHIM_DEBUG_HANDLER */
-	r->rret0 = uk_syscall6_r(r->rsyscall,
-				 r->rarg0, r->rarg1, r->rarg2,
-				 r->rarg3, r->rarg4, r->rarg5);
+
+	usc->regs.rret0 = uk_syscall6_r_u(usc);
+
 #if CONFIG_LIBSYSCALL_SHIM_STRACE
 	prsyscalllen = uk_snprsyscall(prsyscallbuf, ARRAY_SIZE(prsyscallbuf),
 #if CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR
@@ -101,8 +79,9 @@ void ukplat_syscall_handler(struct __regs *r)
 #else /* !CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR */
 		     UK_PRSYSCALL_FMTF_NEWLINE,
 #endif /* !CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR */
-		     r->rsyscall, r->rret0, r->rarg0, r->rarg1, r->rarg2,
-		     r->rarg3, r->rarg4, r->rarg5);
+		     usc->regs.rsyscall, usc->regs.rret0, usc->regs.rarg0,
+		     usc->regs.rarg1, usc->regs.rarg2, usc->regs.rarg3,
+		     usc->regs.rarg4, usc->regs.rarg5);
 	/*
 	 * FIXME:
 	 * We directly use `ukplat_coutk()` until lib/ukdebug printing
@@ -111,20 +90,8 @@ void ukplat_syscall_handler(struct __regs *r)
 	ukplat_coutk(prsyscallbuf, (__sz) prsyscalllen);
 #endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
 
-#if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
-	uk_thread_uktls_var(self, _uk_syscall_ultlsp) = 0x0;
-
-	/* Restore original TLS only if it was _NOT_
-	 * changed by the system call handler
-	 */
-	if (likely(ukplat_tlsp_get() == self->uktlsp)) {
-		ukplat_tlsp_set(orig_tlsp);
-	} else {
-		uk_pr_debug("System call updated userland TLS pointer register to %p (before: %p)\n",
-			    (void *) orig_tlsp, (void *) ukplat_tlsp_get());
-	}
-#endif /* CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS */
+	ukarch_sysregs_switch_ul(&usc->sysregs);
 
 	/* Restore extended register state */
-	ukarch_ectx_load(ectx);
+	ukarch_ectx_load((struct ukarch_ectx *)&usc->ectx);
 }

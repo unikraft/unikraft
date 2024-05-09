@@ -55,6 +55,8 @@ SECTIONS
 
 	_etext = .;			/* End of text section */
 
+	. = ALIGN(__PAGE_SIZE);
+
 	_rodata = .;
 	.rodata : {
 		*(.rodata)

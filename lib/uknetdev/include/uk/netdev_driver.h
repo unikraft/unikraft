@@ -35,6 +35,10 @@
 #include <uk/netdev_core.h>
 #include <uk/assert.h>
 
+#if CONFIG_LIBUKNETDEV_DISPATCHERTHREADS
+#include <uk/isr/semaphore.h>
+#endif /* CONFIG_LIBUKNETDEV_DISPATCHERTHREADS */
+
 /**
  * Unikraft network driver API.
  *
@@ -85,12 +89,12 @@ static inline void uk_netdev_drv_rx_event(struct uk_netdev *dev,
 
 	rxq_handler = &dev->_data->rxq_handler[queue_id];
 
-#ifdef CONFIG_LIBUKNETDEV_DISPATCHERTHREADS
-	uk_semaphore_up(&rxq_handler->events);
-#else
+#if CONFIG_LIBUKNETDEV_DISPATCHERTHREADS
+	uk_semaphore_up_isr(&rxq_handler->events);
+#else /* !CONFIG_LIBUKNETDEV_DISPATCHERTHREADS */
 	if (rxq_handler->callback)
 		rxq_handler->callback(dev, queue_id, rxq_handler->cookie);
-#endif
+#endif /* !CONFIG_LIBUKNETDEV_DISPATCHERTHREADS */
 }
 
 #ifdef __cplusplus

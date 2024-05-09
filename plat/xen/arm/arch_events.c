@@ -29,6 +29,11 @@
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
+#include <uk/intctlr.h>
+#include <uk/plat/lcpu.h>
+
+//TODO read it from device tree
+#define EVENT_IRQ 31
 
 static void virq_debug(evtchn_port_t port __unused,
 		       struct __regs *regs __unused,
@@ -39,12 +44,28 @@ static void virq_debug(evtchn_port_t port __unused,
 
 static evtchn_port_t debug_port = -1;
 
+static int arch_events_irq_handler(void *args __unused)
+{
+	ukplat_lcpu_irqs_handle_pending();
+	return 1;
+}
+
 void arch_init_events(void)
 {
+	int rc;
+
 	debug_port = bind_virq(VIRQ_DEBUG, (evtchn_handler_t)virq_debug, 0);
 	if ((int) debug_port == -1)
 		UK_CRASH("Failed to initialize events\n");
 	unmask_evtchn(debug_port);
+
+	/* Register the events interrupt handlers */
+	rc = uk_intctlr_irq_register(EVENT_IRQ, arch_events_irq_handler, NULL);
+	if (unlikely(rc)) {
+		uk_pr_crit("Could not register handler for EVENTS IRQ %d\n",
+			   EVENT_IRQ);
+		return;
+	}
 }
 
 void arch_unbind_ports(void)

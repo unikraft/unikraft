@@ -35,7 +35,7 @@
 #endif
 
 #include <uk/essentials.h>
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
 
 struct __align(8) __spinlock {
 	volatile int lock;

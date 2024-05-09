@@ -1,0 +1,25 @@
+menuconfig LIBXEN_BLKFRONT
+	bool "Xenbus Blkfront Driver"
+	select LIBXEN_XENBUS
+	depends on PLAT_XEN
+	depends on LIBUKBLKDEV
+	help
+		Driver for block devices
+
+config LIBXEN_BLKFRONT_GREFPOOL
+	bool "Enable grant reference pool for each queue"
+	default y
+	depends on LIBXEN_BLKFRONT
+	select LIBUKSCHED
+	select LIBUKLOCK
+	select LIBUKLOCK_SEMAPHORE
+	help
+		Each read / write request needs a number of
+		grant references. In order to avoid the need
+		of allocating the grant refs at the beginning
+		of every operation and freeing them at the end
+		of it, we use the same grant references stored
+		in a queue. If at the moment of sending a
+		request, there are not enough grant refs in the
+		pool, we just allocate new ones, which are
+		freed at the moment of processing the response.

@@ -1,0 +1,45 @@
+name: Commits Formatting Check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches: [staging]
+
+jobs:
+  commit:
+    name: Commit and PR Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - name: Signed-off-by Check
+        if: always()
+        uses: gsactions/commit-message-checker@v2
+        with:
+          pattern: '^Signed-off-by: .+ \<.+\@.+\..+\>$'
+          error: 'Signed-off-by line is missing.'
+          excludeDescription: 'true'
+          excludeTitle: 'true'
+          checkAllCommitMessages: 'true'
+          accessToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: PR Title Check
+        if: always()
+        uses: gsactions/commit-message-checker@v2
+        with:
+          pattern: '^((([a-z0-9\/\.\-\_\*])+)|(\{([a-z0-9\/\.\-\_\*]+, )+[a-z0-9\/\.\-\_\*]+\})){1}: [A-Z0-9].*'
+          error: 'The PR title must follow the conventional commits format.'
+          excludeDescription: 'true'
+          excludeTitle: 'false'
+          checkAllCommitMessages: 'false'
+          accessToken: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: PR Title Check Length
+        if: ${{ github.actor != 'dependabot' && github.actor != 'dependabot[bot]' }}
+        uses: gsactions/commit-message-checker@v2
+        with:
+          pattern: '^(?!.{75,}).*'
+          flags: ''
+          error: 'The maximum line length of 75 characters is exceeded.'
+          excludeDescription: 'true'
+          excludeTitle: 'false'
+          checkAllCommitMessages: 'false'
+          accessToken: ${{ secrets.GITHUB_TOKEN }}

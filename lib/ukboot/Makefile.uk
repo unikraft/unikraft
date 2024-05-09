@@ -1,13 +1,17 @@
 $(eval $(call addlib_s,libukboot,$(CONFIG_LIBUKBOOT)))
 
 CINCLUDES-$(CONFIG_LIBUKBOOT)		+= -I$(LIBUKBOOT_BASE)/include
-CXXINCLUDES-$(CONFIG_LIBUKBOOT)	+= -I$(LIBUKBOOT_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBUKBOOT)		+= -I$(LIBUKBOOT_BASE)/include
+LIBUKBOOT_ASINCLUDES-y			+= -I$(UK_PLAT_COMMON_BASE)/include
+LIBUKBOOT_CINCLUDES-y			+= -I$(UK_PLAT_COMMON_BASE)/include
 
 LIBUKBOOT_SRCS-y += $(LIBUKBOOT_BASE)/boot.c
 LIBUKBOOT_SRCS-y += $(LIBUKBOOT_BASE)/version.c
 ifneq ($(CONFIG_LIBUKBOOT_BANNER_NONE),y)
 LIBUKBOOT_SRCS-y += $(LIBUKBOOT_BASE)/banner.c
 endif
+LIBUKBOOT_SRCS-$(CONFIG_LIBUKBOOT_MAINTHREAD) += $(LIBUKBOOT_BASE)/shutdown_req.c
+LIBUKBOOT_SRCS-$(CONFIG_LIBUKBOOT_MAINTHREAD) += $(LIBUKBOOT_BASE)/shutdown_req.c|isr
 
 # The main() is in the separate library to fool the LTO. Which is
 # trying to resolve the main() function call to whatever is available

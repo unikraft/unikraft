@@ -34,6 +34,7 @@
 #ifndef __UK_PROCESS_H__
 #define __UK_PROCESS_H__
 
+#include <arch/clone.h>
 #include <uk/config.h>
 #include <stdbool.h>
 #if CONFIG_LIBUKSCHED

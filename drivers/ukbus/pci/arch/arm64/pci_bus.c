@@ -115,8 +115,8 @@ int arch_pci_probe(struct uk_alloc *pha)
 	struct pci_address addr;
 	struct pci_device_id devid;
 	struct pci_driver *drv;
-	uint32_t bus;
-	uint8_t dev;
+	__u32 bus;
+	__u8 dev;
 	int irq, pin = 0;
 	__u64 base;
 	int found_pci_device = 0;

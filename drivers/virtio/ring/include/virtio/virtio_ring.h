@@ -164,7 +164,7 @@ typedef __virtio_le16 __may_alias __virtio_le16_ma;
 #define vring_avail_event(vr) \
 	(*(__virtio_le16_ma *)&(vr)->used->ring[(vr)->num])
 
-static inline void vring_init(struct vring *vr, unsigned int num, uint8_t *p,
+static inline void vring_init(struct vring *vr, unsigned int num, __u8 *p,
 			      unsigned long align)
 {
 	vr->num = num;
@@ -172,7 +172,7 @@ static inline void vring_init(struct vring *vr, unsigned int num, uint8_t *p,
 	vr->avail = (struct vring_avail *) (p +
 			num * sizeof(struct vring_desc));
 	vr->used = (void *)
-		(((unsigned long) &vr->avail->ring[num] + sizeof(uint16_t) +
+		(((unsigned long) &vr->avail->ring[num] + sizeof(__u16) +
 			align - 1) & ~(align - 1));
 }
 
@@ -181,19 +181,19 @@ static inline unsigned int vring_size(unsigned int num, unsigned long align)
 	int size;
 
 	size = num * sizeof(struct vring_desc);
-	size += sizeof(struct vring_avail) + (num * sizeof(uint16_t)) +
-		sizeof(uint16_t);
+	size += sizeof(struct vring_avail) + (num * sizeof(__u16)) +
+		sizeof(__u16);
 	size = (size + align - 1) & ~(align - 1);
 	size += sizeof(struct vring_used) +
-	    (num * sizeof(struct vring_used_elem)) + sizeof(uint16_t);
+	    (num * sizeof(struct vring_used_elem)) + sizeof(__u16);
 	return size;
 }
 
 static inline int vring_need_event(__u16 event_idx, __u16 new_idx,
 				   __u16 old_idx)
 {
-	return (uint16_t)(new_idx - event_idx - 1) <
-		(uint16_t)(new_idx - old_idx);
+	return (__u16)(new_idx - event_idx - 1) <
+		(__u16)(new_idx - old_idx);
 }
 
 #ifdef __cplusplus

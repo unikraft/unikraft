@@ -38,7 +38,7 @@
 #include <uk/config.h>
 #include <uk/assert.h>
 #include <uk/plat/lcpu.h>
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
 #include <uk/essentials.h>
 #include <uk/preempt.h>
 
@@ -52,14 +52,14 @@ struct uk_ring {
 	int               br_prod_size;
 	int               br_prod_mask;
 	uint64_t          br_drops;
-	volatile uint32_t br_cons_head __aligned(CACHE_LINE_SIZE);
+	volatile uint32_t br_cons_head __align(CACHE_LINE_SIZE);
 	volatile uint32_t br_cons_tail;
 	int               br_cons_size;
 	int               br_cons_mask;
 #ifdef DEBUG_BUFRING
 	struct uk_mutex  *br_lock;
 #endif
-	void             *br_ring[0] __aligned(CACHE_LINE_SIZE);
+	void             *br_ring[0] __align(CACHE_LINE_SIZE);
 };
 
 /*
@@ -99,7 +99,7 @@ uk_ring_enqueue(struct uk_ring *br, void *buf)
 			}
 			continue;
 		}
-	} while (!ukarch_compare_exchange_sync((uint32_t *) &br->br_prod_head,
+	} while (!uk_compare_exchange_sync((uint32_t *) &br->br_prod_head,
 			prod_head, prod_next));
 
 #ifdef DEBUG_BUFRING
@@ -115,7 +115,7 @@ uk_ring_enqueue(struct uk_ring *br, void *buf)
 	 */
 	while (br->br_prod_tail != prod_head)
 		ukarch_spinwait();
-	ukarch_store_n(&br->br_prod_tail, prod_next);
+	uk_store_n(&br->br_prod_tail, prod_next);
 	critical_exit();
 	return 0;
 }
@@ -139,7 +139,7 @@ uk_ring_dequeue_mc(struct uk_ring *br)
 			critical_exit();
 			return NULL;
 		}
-	} while (!ukarch_compare_exchange_sync((uint32_t *) &br->br_cons_head,
+	} while (!uk_compare_exchange_sync((uint32_t *) &br->br_cons_head,
 			cons_head, cons_next));
 
 	buf = br->br_ring[cons_head];
@@ -154,7 +154,7 @@ uk_ring_dequeue_mc(struct uk_ring *br)
 	while (br->br_cons_tail != cons_head)
 		ukarch_spinwait();
 
-	ukarch_store_n(&br->br_cons_tail, cons_next);
+	uk_store_n(&br->br_cons_tail, cons_next);
 	critical_exit();
 
 	return buf;
@@ -200,11 +200,11 @@ uk_ring_dequeue_sc(struct uk_ring *br)
 	 * <1> Load (on core 1) from br->br_ring[cons_head] can be reordered (speculative readed) by CPU.
 	 */
 #if defined(CONFIG_ARCH_ARM_32) || defined(CONFIG_ARCH_ARM_64)
-	cons_head = ukarch_load_n(&br->br_cons_head);
+	cons_head = uk_load_n(&br->br_cons_head);
 #else
 	cons_head = br->br_cons_head;
 #endif
-	prod_tail = ukarch_load_n(&br->br_prod_tail);
+	prod_tail = uk_load_n(&br->br_prod_tail);
 
 	cons_next = (cons_head + 1) & br->br_cons_mask;
 #ifdef PREFETCH_DEFINED
@@ -321,7 +321,7 @@ uk_ring_peek_clear_sc(struct uk_ring *br)
 	if (br->br_cons_head == br->br_prod_tail)
 		return NULL;
 
-#if defined(CONFIG_ARCH_ARM_32) || defined(CONFIG_ARCH_ARM_64)
+#if defined(CONFIG_ARCH_ARM_32)
 	/*
 	 * The barrier is required there on ARM and ARM64 to ensure, that
 	 * br->br_ring[br->br_cons_head] will not be fetched before the above
@@ -334,6 +334,8 @@ uk_ring_peek_clear_sc(struct uk_ring *br)
 	 */
 	#error "unsupported: atomic_thread_fence_acq()"
 	/* TODO atomic_thread_fence_acq(); */
+#elif defined(CONFIG_ARCH_ARM64)
+	dmb();
 #endif
 
 #ifdef DEBUG_BUFRING

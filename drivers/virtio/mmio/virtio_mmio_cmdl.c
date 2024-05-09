@@ -24,7 +24,7 @@ UK_LIBPARAM_PARAM_ARR_ALIAS(device, uk_libparam_devices, charp,
 			    MAX_DEV_CMDLINE, "virtio-mmio devices");
 
 /* Helper to parse numeric string with size suffix (eg "4K") into numeric */
-static char *parse_size(const char *size_str, size_t *sz)
+static char *parse_size(const char *size_str, __sz *sz)
 {
 	char *endptr;
 

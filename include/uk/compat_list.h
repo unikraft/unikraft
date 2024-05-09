@@ -169,7 +169,7 @@ struct UK__qm_trace {
 
 #ifdef UK_QUEUE_MACRO_DEBUG_TRASH
 #define	UK__TRASHIT(x)		do {(x) = (void *)-1;} while (0)
-#define	UK__QMD_IS_TRASHED(x)	((x) == (void *)(intptr_t)-1)
+#define	UK__QMD_IS_TRASHED(x)	((x) == (void *)(__sptr) - 1)
 #else	/* !UK_QUEUE_MACRO_DEBUG_TRASH */
 #define	UK__TRASHIT(x)
 #define	UK__QMD_IS_TRASHED(x)	0

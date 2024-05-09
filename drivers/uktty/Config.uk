@@ -1,0 +1,6 @@
+menu "Serial console"
+
+source "$(KCONFIG_DRIV_BASE)/uktty/pl011/Config.uk"
+source "$(KCONFIG_DRIV_BASE)/uktty/ns16550/Config.uk"
+
+endmenu

@@ -51,34 +51,8 @@
 #include <uk/vmem.h>
 #endif /* CONFIG_LIBUKVMEM*/
 
-/*
- * Convenience macros to save the state of an sglist so it can be restored
- * if an append attempt fails.  Since sglist's only grow we only need to
- * save the current count of segments and the length of the ending segment.
- * Earlier segments will not be changed by an append, and the only change
- * that can occur to the ending segment is that it can be extended.
- */
-struct sgsave {
-	__u16 sg_nseg;
-	size_t ss_len;
-};
-
 #define page_off(x)    ((unsigned long)(x) & (__PAGE_SIZE - 1))
 #define trunc_page(x)    ((unsigned long)(x) & (__PAGE_MASK))
-
-#define	SGLIST_SAVE(sg, sgsave) do {					\
-	(sgsave).sg_nseg = (sg)->sg_nseg;				\
-	if ((sgsave).sg_nseg > 0)					\
-		(sgsave).ss_len = (sg)->sg_segs[(sgsave).sg_nseg - 1].ss_len; \
-	else								\
-		(sgsave).ss_len = 0;					\
-} while (0)
-
-#define	SGLIST_RESTORE(sg, sgsave) do {					\
-	(sg)->sg_nseg = (sgsave).sg_nseg;				\
-	if ((sgsave).sg_nseg > 0)					\
-		(sg)->sg_segs[(sgsave).sg_nseg - 1].ss_len = (sgsave).ss_len; \
-} while (0)
 
 static inline int _sglist_append_range(struct uk_sglist *sg,
 			struct uk_sglist_seg **ssp, __paddr_t paddr,
@@ -202,7 +176,7 @@ int uk_sglist_count(void *buf, size_t len)
 
 int uk_sglist_append(struct uk_sglist *sg, void *buf, size_t len)
 {
-	struct sgsave save;
+	struct uk_sgsave save;
 	int error;
 
 	UK_ASSERT(sg);
@@ -210,10 +184,10 @@ int uk_sglist_append(struct uk_sglist *sg, void *buf, size_t len)
 	if (sg->sg_maxseg == 0)
 		return -EINVAL;
 
-	SGLIST_SAVE(sg, save);
+	UK_SGLIST_SAVE(sg, save);
 	error = _sglist_append_buf(sg, buf, len,  NULL);
 	if (error)
-		SGLIST_RESTORE(sg, save);
+		UK_SGLIST_RESTORE(sg, save);
 
 	return error;
 }
@@ -222,7 +196,7 @@ int uk_sglist_append_sglist(struct uk_sglist *sg,
 			const struct uk_sglist *source,
 			size_t offset, size_t length)
 {
-	struct sgsave save;
+	struct uk_sgsave save;
 	struct uk_sglist_seg *ss;
 	size_t seglen;
 	int error, i;
@@ -231,7 +205,7 @@ int uk_sglist_append_sglist(struct uk_sglist *sg,
 
 	if (sg->sg_maxseg == 0 || length == 0)
 		return -EINVAL;
-	SGLIST_SAVE(sg, save);
+	UK_SGLIST_SAVE(sg, save);
 	error = -EINVAL;
 	ss = &sg->sg_segs[sg->sg_nseg - 1];
 	for (i = 0; i < source->sg_nseg; i++) {
@@ -256,7 +230,7 @@ int uk_sglist_append_sglist(struct uk_sglist *sg,
 		error = -EINVAL;
 	}
 	if (error)
-		SGLIST_RESTORE(sg, save);
+		UK_SGLIST_RESTORE(sg, save);
 	return error;
 }
 
@@ -546,28 +520,3 @@ int uk_sglist_slice(struct uk_sglist *original, struct uk_sglist **slice,
 	return 0;
 }
 #endif /* CONFIG_LIBUKALLOC */
-
-#ifdef CONFIG_LIBUKNETDEV
-int uk_sglist_append_netbuf(struct uk_sglist *sg, struct uk_netbuf *netbuf)
-{
-	struct sgsave save;
-	struct uk_netbuf *nb;
-	int error;
-
-	if (sg->sg_maxseg == 0)
-		return -EINVAL;
-
-	error = 0;
-	SGLIST_SAVE(sg, save);
-	UK_NETBUF_CHAIN_FOREACH(nb, netbuf) {
-		if (likely(nb->len > 0)) {
-			error = uk_sglist_append(sg, nb->data, nb->len);
-			if (unlikely(error)) {
-				SGLIST_RESTORE(sg, save);
-				return error;
-			}
-		}
-	}
-	return 0;
-}
-#endif /* CONFIG_LIBUKNETDEV */

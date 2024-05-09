@@ -66,10 +66,6 @@ struct vfscore_file {
 #define FD_LOCK(fp)       uk_mutex_lock(&(fp->f_lock))
 #define FD_UNLOCK(fp)     uk_mutex_unlock(&(fp->f_lock))
 
-int vfscore_alloc_fd(void);
-int vfscore_reserve_fd(int fd);
-int vfscore_put_fd(int fd);
-int vfscore_install_fd(int fd, struct vfscore_file *file);
 struct vfscore_file *vfscore_get_file(int fd);
 void vfscore_put_file(struct vfscore_file *file);
 

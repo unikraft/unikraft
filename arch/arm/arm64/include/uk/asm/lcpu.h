@@ -34,6 +34,7 @@
 #include <uk/asm.h>
 #include <uk/asm/arch.h>
 #include <uk/config.h>
+#include <uk/essentials.h>
 
 #define CACHE_LINE_SIZE		64
 
@@ -166,20 +167,20 @@ static __attribute__((unused))
 unsigned char tcr_ips_bits[] = {32, 36, 40, 42, 44, 48, 52};
 #endif
 
-#ifdef __ASSEMBLY__
 /*
  * Stack size to save general purpose registers and essential system
  * registers. 8 * (30 + lr + elr_el1 + spsr_el1 + esr_el1) = 272.
- * From exceptions come from EL0, we have to save sp_el0. So the
- * TRAP_STACK_SIZE should be 272 + 8 = 280. But we enable the stack
- * alignment check, we will force align the stack for EL1 exceptions,
- * so we add a sp to save original stack pointer: 280 + 8 = 288
+ * We enable the stack alignment check, we will force align the stack for
+ * EL1 exceptions, so we add a sp to save original stack pointer: 272 + 8 = 280
+ * and then a padding of 8 bytes: 280 + 8 = 288 (288 % 16 == 0).
  *
  * TODO: We'd better to calculate this size automatically later.
  */
 #define __TRAP_STACK_SIZE	288
 #define __SP_OFFSET		272
-#define __SP_EL0_OFFSET		280
+
+#define __REGS_PAD_SIZE		8
+#define __REGS_SIZEOF		__TRAP_STACK_SIZE
 
 /*
  * In thread context switch, we will save the callee-saved registers
@@ -189,9 +190,9 @@ unsigned char tcr_ips_bits[] = {32, 36, 40, 42, 44, 48, 52};
  */
 #define __CALLEE_SAVED_SIZE    96
 
-#else
+#if !__ASSEMBLY__
 
-#include <stdint.h>
+#include <uk/arch/types.h>
 
 /*
  * Change this structure must update TRAP_STACK_SIZE at the same time.
@@ -199,26 +200,28 @@ unsigned char tcr_ips_bits[] = {32, 36, 40, 42, 44, 48, 52};
  */
 struct __regs {
 	/* Generic Purpose registers, from x0 ~ x29 */
-	uint64_t x[30];
+	__u64 x[30];
 
 	/* Link Register (x30) */
-	uint64_t lr;
+	__u64 lr;
 
 	/* Exception Link Register */
-	uint64_t elr_el1;
+	__u64 elr_el1;
 
 	/* Processor State Register */
-	uint64_t spsr_el1;
+	__u64 spsr_el1;
 
 	/* Exception Status Register */
-	uint64_t esr_el1;
+	__u64 esr_el1;
 
 	/* Stack Pointer */
-	uint64_t sp;
+	__u64 sp;
 
-	/* Stack Pointer from el0 */
-	uint64_t sp_el0;
+	/* Padding to make sure this structure is 16-byte aligned */
+	__u8 pad[__REGS_PAD_SIZE];
 };
+
+UK_CTASSERT(sizeof(struct __regs) == __REGS_SIZEOF);
 
 /*
  * Change this structure must update __CALLEE_SAVED_SIZE at the
@@ -226,14 +229,16 @@ struct __regs {
  */
 struct __callee_saved_regs {
 	/* Callee-saved registers, from x19 ~ x28 */
-	uint64_t callee[10];
+	__u64 callee[10];
 
 	/* Frame Point Register (x29) */
-	uint64_t fp;
+	__u64 fp;
 
 	/* Link Register (x30) */
-	uint64_t lr;
+	__u64 lr;
 };
+
+UK_CTASSERT(sizeof(struct __callee_saved_regs) == __CALLEE_SAVED_SIZE);
 
 /*
  * Instruction Synchronization Barrier flushes the pipeline in the
@@ -275,7 +280,7 @@ struct __callee_saved_regs {
 
 /* Macros to access system registers */
 #define SYSREG_READ(reg)					\
-({	uint64_t val;						\
+({	__u64 val;						\
 	__asm__ __volatile__("mrs %0, " __STRINGIFY(reg)	\
 			: "=r" (val));				\
 	val;							\
@@ -283,11 +288,11 @@ struct __callee_saved_regs {
 
 #define SYSREG_WRITE(reg, val)					\
 ({	__asm__ __volatile__("msr " __STRINGIFY(reg) ", %0"	\
-			: : "r" ((uint64_t)(val)));		\
+			: : "r" ((__u64)(val)));		\
 })
 
 #define SYSREG_READ32(reg)					\
-({	uint32_t val;						\
+({	__u64 val;						\
 	__asm__ __volatile__("mrs %0, " __STRINGIFY(reg)	\
 			: "=r" (val));				\
 	val;							\
@@ -295,7 +300,7 @@ struct __callee_saved_regs {
 
 #define SYSREG_WRITE32(reg, val)				\
 ({	__asm__ __volatile__("msr " __STRINGIFY(reg) ", %0"	\
-			: : "r" ((uint32_t)(val)));		\
+			: : "r" ((__u32)(val)));		\
 })
 
 #define SYSREG_READ64(reg)			SYSREG_READ(reg)
@@ -307,57 +312,57 @@ struct __callee_saved_regs {
  * addressing mode which will cause crash when running in hyper mode
  * unless they will be decoded by hypervisor.
  */
-static inline uint8_t ioreg_read8(const volatile uint8_t *address)
+static inline __u8 ioreg_read8(const volatile __u8 *address)
 {
-	uint8_t value;
+	__u8 value;
 
 	__asm__ __volatile__("ldrb %w0, [%1]" : "=r"(value) : "r"(address));
 	return value;
 }
 
-static inline uint16_t ioreg_read16(const volatile uint16_t *address)
+static inline __u16 ioreg_read16(const volatile __u16 *address)
 {
-	uint16_t value;
+	__u16 value;
 
 	__asm__ __volatile__("ldrh %w0, [%1]" : "=r"(value) : "r"(address));
 	return value;
 }
 
-static inline uint32_t ioreg_read32(const volatile uint32_t *address)
+static inline __u32 ioreg_read32(const volatile __u32 *address)
 {
-	uint32_t value;
+	__u32 value;
 
 	__asm__ __volatile__("ldr %w0, [%1]" : "=r"(value) : "r"(address));
 	return value;
 }
 
-static inline uint64_t ioreg_read64(const volatile uint64_t *address)
+static inline __u64 ioreg_read64(const volatile __u64 *address)
 {
-	uint64_t value;
+	__u64 value;
 
 	__asm__ __volatile__("ldr %0, [%1]" : "=r"(value) : "r"(address));
 	return value;
 }
 
-static inline void ioreg_write8(const volatile uint8_t *address, uint8_t value)
+static inline void ioreg_write8(const volatile __u8 *address, __u8 value)
 {
 	__asm__ __volatile__("strb %w0, [%1]" : : "rZ"(value), "r"(address));
 }
 
-static inline void ioreg_write16(const volatile uint16_t *address,
-				 uint16_t value)
+static inline void ioreg_write16(const volatile __u16 *address,
+				 __u16 value)
 {
 	__asm__ __volatile__("strh %w0, [%1]" : : "rZ"(value), "r"(address));
 }
 
-static inline void ioreg_write32(const volatile uint32_t *address,
-				 uint32_t value)
+static inline void ioreg_write32(const volatile __u32 *address,
+				 __u32 value)
 {
 	__asm__ __volatile__("str %w0, [%1]" : : "rZ"(value), "r"(address));
 }
 
-static inline void ioreg_write64(const volatile uint64_t *address,
-				 uint64_t value)
+static inline void ioreg_write64(const volatile __u64 *address,
+				 __u64 value)
 {
 	__asm__ __volatile__("str %0, [%1]" : : "rZ"(value), "r"(address));
 }
@@ -376,4 +381,4 @@ static inline void ukarch_spinwait(void)
 	/* Intelligent busy wait not supported on arm64. */
 }
 
-#endif /* __ASSEMBLY__ */
+#endif /* !__ASSEMBLY__ */

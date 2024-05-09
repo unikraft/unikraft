@@ -76,8 +76,6 @@ endif
 ##
 ## Architecture library definitions for arm64
 ##
-LIBKVMPLAT_SRCS-$(CONFIG_UART_NS16550) += $(UK_PLAT_DRIVERS_BASE)/uart/ns16550.c
-LIBKVMPLAT_SRCS-$(CONFIG_UART_PL011)   += $(UK_PLAT_DRIVERS_BASE)/uart/pl011.c
 ifeq ($(CONFIG_PAGING),y)
 LIBKVMPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/paging.c|isr
 endif

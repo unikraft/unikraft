@@ -152,22 +152,30 @@ size_t strnlen(const char *str, size_t len)
 
 char *strncpy(char *dst, const char *src, size_t len)
 {
-	size_t clen;
+	if (len != 0) {
+		char *d = dst;
+		const char *s = src;
 
-	clen = strnlen(src, len);
-	memcpy(dst, src, clen);
+		do {
+			if ((*d++ = *s++) == 0) {
+				/* NUL pad the remaining n-1 bytes */
+				while (--len != 0)
+					*d++ = 0;
+				break;
+			}
+		} while (--len != 0);
+	}
 
-	/* instead of filling up the rest of left space with zeros,
-	 * append a termination character if we did not copy one
-	 */
-	if (clen < len && dst[clen - 1] != '\0')
-		dst[clen] = '\0';
 	return dst;
 }
 
 char *strcpy(char *dst, const char *src)
 {
-	return strncpy(dst, src, SIZE_MAX);
+	char *save = dst;
+
+	for (; (*dst = *src) != '\0'; ++src, ++dst)
+		;
+	return save;
 }
 
 int strncmp(const char *str1, const char *str2, size_t len)
@@ -821,8 +829,14 @@ char *strerror(int errnum)
 
 char *strcat(char *restrict dest, const char *restrict src)
 {
-	strcpy(dest + strlen(dest), src);
-	return dest;
+	char *tmp = dest;
+
+	while (*dest)
+		dest++;
+
+	while ((*dest++ = *src++) != '\0');
+
+	return tmp;
 }
 
 char *strncat(char *dest, const char *src, size_t n)

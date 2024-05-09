@@ -24,6 +24,7 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 
+#include <uk/arch/ctx.h>
 #include <string.h>
 #include <uk/essentials.h>
 #include <uk/arch/lcpu.h>
@@ -56,12 +57,12 @@
  *  │   tss  segment   ├──┘  │        .         │    └─┬──────────────────┘ │
  *  └──────────────────┘     └──────────────────┘      └────────────────────┘
  */
-__align(STACK_SIZE) /* IST1 */
-char cpu_intr_stack[CONFIG_UKPLAT_LCPU_MAXCOUNT][STACK_SIZE];
-__align(STACK_SIZE) /* IST2 */
-char cpu_trap_stack[CONFIG_UKPLAT_LCPU_MAXCOUNT][STACK_SIZE];
-__align(STACK_SIZE) /* IST3 */
-char cpu_crit_stack[CONFIG_UKPLAT_LCPU_MAXCOUNT][STACK_SIZE];
+__align(UKARCH_SP_ALIGN) /* IST1 */
+char cpu_intr_stack[CONFIG_UKPLAT_LCPU_MAXCOUNT][CPU_EXCEPT_STACK_SIZE];
+__align(UKARCH_SP_ALIGN) /* IST2 */
+char cpu_trap_stack[CONFIG_UKPLAT_LCPU_MAXCOUNT][CPU_EXCEPT_STACK_SIZE];
+__align(UKARCH_SP_ALIGN) /* IST3 */
+char cpu_crit_stack[CONFIG_UKPLAT_LCPU_MAXCOUNT][CPU_EXCEPT_STACK_SIZE];
 
 static __align(8)
 struct tss64 cpu_tss[CONFIG_UKPLAT_LCPU_MAXCOUNT];

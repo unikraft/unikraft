@@ -28,6 +28,7 @@
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <uk/intctlr/gic.h>
+#include <uk/syscall.h>
 
 #ifdef CONFIG_ARM64_FEAT_MTE
 #include <arm/arm64/mte.h>
@@ -224,13 +225,13 @@ void trap_el1_irq(struct __regs *regs)
 
 #ifdef CONFIG_LIBSYSCALL_SHIM_HANDLER
 
-extern void ukplat_syscall_handler(struct __regs *r);
+extern void ukplat_syscall_handler(struct uk_syscall_ctx *usr);
 
 static int arm64_syscall_adapter(void *data)
 {
 	struct ukarch_trap_ctx *ctx = (struct ukarch_trap_ctx *)data;
 
-	ukplat_syscall_handler(ctx->regs);
+	ukplat_syscall_handler((struct uk_syscall_ctx *)ctx->regs);
 	return 1; /* Success */
 }
 

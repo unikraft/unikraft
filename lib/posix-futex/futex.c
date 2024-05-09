@@ -47,7 +47,7 @@
 
 #include <linux/futex.h>
 #include <uk/syscall.h>
-#include <uk/arch/atomic.h>
+#include <uk/atomic.h>
 #include <uk/thread.h>
 #include <uk/thread.h>
 #include <uk/list.h>
@@ -102,7 +102,7 @@ static int futex_wait(uint32_t *uaddr, uint32_t val, const __nsec *timeout)
 	struct uk_thread *current = uk_thread_current();
 	struct uk_futex f = {.uaddr = uaddr, .thread = current};
 
-	if (ukarch_load_n(uaddr) != val) {
+	if (uk_load_n(uaddr) != val) {
 		uk_pr_debug("FUTEX_WAIT: Condition not met (*uaddr != %"PRIu32", uaddr: %p)\n",
 			    val, uaddr);
 		return -EAGAIN;
@@ -231,7 +231,7 @@ static int futex_cmp_requeue(uint32_t *uaddr, uint32_t val, uint32_t val2,
 	int woken_uaddr1;
 	uint32_t waiters_uaddr2 = 0;
 
-	if (!((uint32_t)val3 == ukarch_load_n(uaddr)))
+	if (!((uint32_t)val3 == uk_load_n(uaddr)))
 		return -EAGAIN;
 
 	/* Wake up val waiters on uaddr */
@@ -382,14 +382,29 @@ UK_LLSYSCALL_R_DEFINE(pid_t, set_tid_address, pid_t *, tid_ref)
 	return self_tid;
 }
 
-/* Thread exit handler that clears child TID at the stored reference */
-static void pfutex_child_cleartid_term(struct uk_thread *child __unused)
+static void thread_exit_handler(struct uk_thread *child)
 {
+	struct uk_list_head *itr, *tmp;
+	struct uk_futex *f;
+
+	/* Clear child TID at the stored reference */
 	if (child_tid_clear_ref != NULL) {
 		*((pid_t *) child_tid_clear_ref) = 0;
 		futex_wake((uint32_t *) child_tid_clear_ref, 0);
 	}
+
+	/* Clear this thread's entries from the list */
+	uk_spin_lock(&futex_list_lock);
+	uk_list_for_each_safe(itr, tmp, &futex_list) {
+		f = uk_list_entry(itr, struct uk_futex, list_node);
+		if (f->thread == child) {
+			uk_list_del(&f->list_node);
+			break; /* a thread can wait on one futex */
+		}
+	}
+	uk_spin_unlock(&futex_list_lock);
 }
-UK_THREAD_INIT_PRIO(0x0, pfutex_child_cleartid_term, UK_PRIO_EARLIEST);
+
+UK_THREAD_INIT_PRIO(0x0, thread_exit_handler, UK_PRIO_EARLIEST);
 
 #endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
