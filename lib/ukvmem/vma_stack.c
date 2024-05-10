@@ -21,10 +21,26 @@
 #endif /* CONFIG_HAVE_PAGING */
 #include <uk/isr/string.h>
 
-static inline __vaddr_t guard_page_vaddr(struct uk_vma *vma)
+static bool in_top_guard_pages_range(struct uk_vma *vma, __vaddr_t vaddr)
 {
-	return (vma->flags & UK_VMA_STACK_GROWS_UP) ?
-			vma->end - PAGE_SIZE : vma->start;
+	UK_ASSERT(vma);
+	return IN_RANGE(vaddr,
+			vma->end - STACK_TOP_GUARD_SIZE, STACK_TOP_GUARD_SIZE);
+}
+
+static bool in_bottom_guard_pages_range(struct uk_vma *vma,
+					__vaddr_t vaddr)
+{
+	UK_ASSERT(vma);
+	return IN_RANGE(vaddr,
+			vma->start, STACK_BOTTOM_GUARD_SIZE);
+}
+
+static bool in_guard_pages_range(struct uk_vma *vma, __vaddr_t vaddr)
+{
+	UK_ASSERT(vma);
+	return in_top_guard_pages_range(vma, vaddr) ||
+	       in_bottom_guard_pages_range(vma, vaddr);
 }
 
 #ifdef CONFIG_LIBUKVMEM_STACK_BASE
@@ -51,12 +67,12 @@ static int vma_op_stack_fault(struct uk_vma *vma, struct uk_vm_fault *fault)
 	 * faults, we ignore the request to fault in the page. For actual
 	 * accesses we fail.
 	 */
-	if (fault->vbase == guard_page_vaddr(vma)) {
+	if (in_guard_pages_range(vma, fault->vbase)) {
 		if (likely(fault->type & UK_VMA_FAULT_SOFT))
 			   return UKPLAT_PAGE_MAPX_ESKIP;
 
-		uk_pr_crit("Guard page for stack VMA 0x%lx - 0x%lx hit!\n",
-			   vma->start, vma->end);
+		uk_pr_crit("Guard page 0x%lx of stack VMA 0x%lx - 0x%lx hit!\n",
+			   fault->vbase, vma->start, vma->end);
 
 		return -EFAULT;
 	}

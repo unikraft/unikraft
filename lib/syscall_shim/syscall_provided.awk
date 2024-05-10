@@ -21,9 +21,9 @@ BEGIN {
 	printf "#endif  /* LEGACY_SYS_%s */\n", $1
 	printf "#else\n";
 	if (substr($0, length($0)) == "u") {
-		printf "#define HAVE_uk_syscall_u_%s t\n", $1;
-		printf "UK_SYSCALL_E_PROTO(1, u_%s);\n", $1;
-		printf "UK_SYSCALL_R_PROTO(1, u_%s);\n", $1;
+		printf "#define HAVE_uk_syscall_e_%s t\n", $1;
+		printf "UK_SYSCALL_E_PROTO(1, e_%s);\n", $1;
+		printf "UK_SYSCALL_R_PROTO(1, e_%s);\n", $1;
 		printf "#define HAVE_uk_syscall_%s t\n", $1;
 		printf "UK_SYSCALL_E_PROTO(%s, %s);\n", $2 + 0, $1;
 		printf "UK_SYSCALL_R_PROTO(%s, %s);\n", $2 + 0, $1;

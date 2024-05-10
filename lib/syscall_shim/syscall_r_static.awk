@@ -20,7 +20,7 @@ BEGIN {
 			}
 			printf ") \\\n";
 
-			printf "\tuk_syscall_r_u_%s(", name;
+			printf "\tuk_syscall_r_e_%s(", name;
 
 			# hand-over given arguments
 			for (j = 1; j <= i && j <= args_nr; j++)

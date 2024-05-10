@@ -628,16 +628,21 @@ UK_TESTCASE(ukvmem, test_vma_stack)
 	len = probe_rw_nopage(va1, VMEM_STACKSIZE);
 	UK_TEST_EXPECT_SNUM_EQ(len, 2 * PAGE_SIZE);
 
-	/* Probe the guard page */
-	len = probe_r(va1 + VMEM_STACKSIZE - PAGE_SIZE, PAGE_SIZE);
+	/* Probe the top guard pages */
+	len = probe_r(va1 + VMEM_STACKSIZE, STACK_TOP_GUARD_SIZE);
+	UK_TEST_EXPECT_ZERO(len);
+
+	/* Probe the bottom guard pages */
+	len = probe_r(va1 - STACK_BOTTOM_GUARD_SIZE, STACK_BOTTOM_GUARD_SIZE);
 	UK_TEST_EXPECT_ZERO(len);
 
 	/* Probe the entire stack */
-	len = probe_r(va1, VMEM_STACKSIZE);
-	UK_TEST_EXPECT_SNUM_EQ(len, VMEM_STACKSIZE - PAGE_SIZE);
+	len = probe_r(va1 - STACK_BOTTOM_GUARD_SIZE,
+		      VMEM_STACKSIZE + STACK_GUARDS_SIZE);
+	UK_TEST_EXPECT_SNUM_EQ(len, VMEM_STACKSIZE);
 
-	rc = uk_vma_map_stack(vas, &va2, VMEM_STACKSIZE, VMEM_STACKSIZE,
-			      NULL, 0);
+	rc = uk_vma_map_stack(vas, &va2, VMEM_STACKSIZE, 0,
+			      NULL, VMEM_STACKSIZE);
 	UK_TEST_EXPECT_ZERO(rc);
 
 	UK_TEST_EXPECT_ZERO(chk_vas(vas, (struct vma_entry[]){
@@ -645,13 +650,18 @@ UK_TESTCASE(ukvmem, test_vma_stack)
 		{va2, va2 + VMEM_STACKSIZE, PROT_RW},
 	}, 2));
 
-	/* Probe the guard page */
-	len = probe_r(va2, PAGE_SIZE);
+	/* Probe the top guard pages */
+	len = probe_r(va2 + VMEM_STACKSIZE, STACK_TOP_GUARD_SIZE);
+	UK_TEST_EXPECT_ZERO(len);
+
+	/* Probe the bottom guard pages */
+	len = probe_r(va2 - STACK_BOTTOM_GUARD_SIZE, STACK_BOTTOM_GUARD_SIZE);
 	UK_TEST_EXPECT_ZERO(len);
 
 	/* Probe the entire stack */
-	len = probe_r(va2, VMEM_STACKSIZE);
-	UK_TEST_EXPECT_SNUM_EQ(len, VMEM_STACKSIZE - PAGE_SIZE);
+	len = probe_r(va2 - STACK_BOTTOM_GUARD_SIZE,
+		      VMEM_STACKSIZE + STACK_GUARDS_SIZE);
+	UK_TEST_EXPECT_SNUM_EQ(len, VMEM_STACKSIZE);
 
 	/* Try to unmap only some part of the stack */
 	rc = uk_vma_unmap(vas, va2, PAGE_SIZE * 2, 0);
@@ -662,7 +672,8 @@ UK_TESTCASE(ukvmem, test_vma_stack)
 	UK_TEST_EXPECT_SNUM_EQ(rc, -EPERM);
 
 	/* But we should be able to change attributes for the whole VMA */
-	rc = uk_vma_set_attr(vas, va2, VMEM_STACKSIZE, PROT_R, 0);
+	rc = uk_vma_set_attr(vas, va2 - STACK_BOTTOM_GUARD_SIZE,
+			     VMEM_STACKSIZE + STACK_GUARDS_SIZE, PROT_R, 0);
 	UK_TEST_EXPECT_ZERO(rc);
 
 	vas_clean(vas);

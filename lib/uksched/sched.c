@@ -36,6 +36,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <sys/membarrier.h>
+#include <uk/plat/common/lcpu.h>
 #include <uk/plat/config.h>
 #include <uk/plat/time.h>
 #include <uk/alloc.h>
@@ -215,7 +216,7 @@ int uk_sched_start(struct uk_sched *s)
 	 *       an TLS that is derived from the Unikraft TLS template.
 	 */
 	tlsp = ukplat_tlsp_get();
-	auxsp = ukplat_lcpu_get_auxsp();
+	auxsp = lcpu_get_auxsp();
 	main_thread = uk_thread_create_bare(s->a,
 					    0x0, 0x0, auxsp,
 					    tlsp, !(!tlsp), false,

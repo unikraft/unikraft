@@ -23,7 +23,21 @@
 
 #include <uk/essentials.h>
 
-#define UK_SYSCALL_USC_PROLOGUE_DEFINE(pname, fname, x, ...)		\
+/**
+ * Define a default value for SPSR_EL1, since we are not actually taking an
+ * exception. Most fields do not interest us yet and we ignore NZCF.
+ * Additionaly, we leave IRQ's unmasked as, normally, when a SVC call would
+ * happen in userspace, IRQ's would be enabled.
+ */
+#define SPSR_EL1_SVC64_DEFAULT_VALUE					\
+	((0b1 << 0) /* M[0] must be 1 for non-EL0 state */ |		\
+	 (0b0 << 1) /* M[1] must be 0 for AArch64 state */ |		\
+	 (0b01 << 2) /* M[3:2] (EL) must be 0b01 for EL1 */ |		\
+	 (0b0 << 4) /* M[4] = 0 for AArch64 state */ |			\
+	 (0b0 << 5) /* T32, does not matter */ |			\
+	 (0b1101 << 6) /* D, A, I, F, only IRQ's unmasked */)
+
+#define UK_SYSCALL_EXECENV_PROLOGUE_DEFINE(pname, fname, x, ...)	\
 	long __used __noreturn __attribute__((optimize("O3")))		\
 	pname(UK_ARG_MAPx(x, UK_S_ARG_LONG_MAYBE_UNUSED, __VA_ARGS__))	\
 	{								\
@@ -46,10 +60,13 @@
 		"/* Use `struct lcpu` pointer from TPIDR_EL1 */\n\t"	\
 		"mrs	x0, tpidr_el1\n\t"				\
 		" /* Switch to per-CPU auxiliary stack */\n\t"		\
-		"str	x0, [x0, #"STRINGIFY(LCPU_AUXSP_OFFSET)"]\n\t"	\
+		"ldr	x0, [x0, #"STRINGIFY(LCPU_AUXSP_OFFSET)"]\n\t"	\
+		"sub	x0, x0, #"STRINGIFY(UKARCH_AUXSPCB_SIZE)"\n\t"	\
+		"ldr	x0, [x0, #"					\
+			STRINGIFY(UKARCH_AUXSPCB_OFFSETOF_CURR_FP)"]\n\t"\
 		"/* Auxiliary stack is already ECTX aligned */\n\t"	\
-		"/* Make room for `struct uk_syscall_ctx` */\n\t"	\
-		"sub	x0, x0, #"STRINGIFY(UK_SYSCALL_CTX_SIZE)"\n\t"	\
+		"/* Make room for `struct ukarch_execenv` */\n\t"	\
+		"sub	x0, x0, #"STRINGIFY(UKARCH_EXECENV_SIZE)"\n\t"	\
 		"/* Swap x0 and (old) sp */\n\t"			\
 		"add	sp, sp, x0\n\t"					\
 		"sub	x0, sp, x0\n\t"					\
@@ -74,20 +91,36 @@
 		"stp	x24, x25, [sp, #16 * 12]\n\t"			\
 		"stp	x26, x27, [sp, #16 * 13]\n\t"			\
 		"stp	x28, x29, [sp, #16 * 14]\n\t"			\
-		"mrs	x21, elr_el1\n\t"				\
-		"stp	x30, x21, [sp, #16 * 15]\n\t"			\
-		"mrs	x22, spsr_el1\n\t"				\
-		"mrs	x23, esr_el1\n\t"				\
+		"/* Here we should push lr and elr_el1, however\n\t"	\
+		" * we are not in an actual exception, but instead\n\t"	\
+		" * we are trying to emulate a SVC with a function\n\t"	\
+		" * call which makes elr_el1 invalid and we instead\n\t"\
+		" * double push lr (x30).\n\t"				\
+		" */\n\t"						\
+		"stp	x30, x30, [sp, #16 * 15]\n\t"			\
+		"/* Just like above for elr_el1, spsr_el1 is also\n\t"	\
+		" * invalid. Therefore we use a sane default value\n\t"	\
+		" * which one would normally see in spsr_el1\n\t"	\
+		" * following a SVC.\n\t"				\
+		" */\n\t"						\
+		"mov	x22, #"STRINGIFY(SPSR_EL1_SVC64_DEFAULT_VALUE)"\n\t"\
+		"/* Same for esr_el1, make it look like a SVC\n\t"	\
+		" * happened.\n\t"					\
+		" */\n\t"						\
+		"mov	x23, xzr\n\t"					\
+		"add	x23, x23, #"STRINGIFY(ESR_EL1_EC_SVC64)"\n\t"	\
+		"orr	x23, xzr, x23, lsl #"STRINGIFY(ESR_EC_SHIFT)"\n\t"\
+		"orr	x23, x23, #"STRINGIFY(ESR_IL)"\n\t"		\
 		"stp	x22, x23, [sp, #16 * 16]\n\t"			\
-		"/* ECTX at slot w.r.t. `struct uk_syscall_ctx` */\n\t"\
+		"/* ECTX at slot w.r.t. `struct ukarch_execenv` */\n\t"	\
 		"mov	x0, sp\n\t"					\
 		"add	x0, x0, #("STRINGIFY(__REGS_SIZEOF +		\
-				     UKARCH_SYSREGS_SIZE)")\n\t"		\
+				     UKARCH_SYSCTX_SIZE)")\n\t"		\
 		"bl	ukarch_ectx_store\n\t"				\
-		"/* SYSREGS at slot w.r.t. `struct uk_syscall_ctx` */\n\t"\
+		"/* SYSCTX at slot w.r.t. `struct ukarch_execenv` */\n\t"\
 		"mov	x0, sp\n\t"					\
 		"add	x0, x0, #"STRINGIFY(__REGS_SIZEOF)"\n\t"	\
-		"bl	ukarch_sysregs_switch_uk\n\t"			\
+		"bl	ukarch_sysctx_store\n\t"			\
 		"mov	x0, sp\n\t"					\
 		"msr	daifclr, #2\n\t"				\
 		"bl	"STRINGIFY(fname)"\n\t"				\
