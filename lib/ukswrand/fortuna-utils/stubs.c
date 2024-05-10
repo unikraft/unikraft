@@ -3,11 +3,13 @@
 
 void explicit_bzero(void *p, size_t n)
 {
-    /* TODO: Replace this with the freebsd implementation */
     volatile unsigned char *vp = p;
     while (n--) {
         *vp++ = 0;
     }
+    /* Add a barrier to prevent the compiler from optimizing out the loop,
+	 * similar to the one in the original code. */
+	__asm__ __volatile__("" : : "r"(p) : "memory");
 }
 
 int
