@@ -213,6 +213,8 @@ random_kthread(void)
 	/* NOTREACHED */
 }
 /* This happens well after SI_SUB_RANDOM */
+/* TODO: The stub implementation of SYSINIT ignores random_proc_kp argument.
+   This should be handled separately when initializing the randomness library. */
 SYSINIT(random_device_h_proc, SI_SUB_KICK_SCHEDULER, SI_ORDER_ANY, kproc_start,
     &random_proc_kp);
 

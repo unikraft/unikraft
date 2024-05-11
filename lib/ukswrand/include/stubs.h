@@ -6,7 +6,7 @@
 #define __NEED_size_t
 #include <nolibc-internal/shareddefs.h>
 
-/* TODO: This should be replaced */
+/* Ignores the _data argument intended for _func. */
 #define	SYSINIT(uniq, subs, order, _func, _data)	\
 uk_early_initcall(_func, 0x0)
 
