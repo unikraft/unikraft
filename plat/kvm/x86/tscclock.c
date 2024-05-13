@@ -103,6 +103,9 @@ static __u64 rtc_epochoffset;
 static __u64 time_base;
 static __u64 tsc_base;
 
+/* Frequency of the TSC */
+static __u64 tsc_freq;
+
 /* Multiplier for converting TSC ticks to nsecs. (0.32) fixed point. */
 static __u32 tsc_mult;
 
@@ -197,6 +200,30 @@ static __u64 rtc_gettimeofday(void)
 	ukplat_lcpu_restore_irqf(flags);
 
 	return uktimeconv_bmkclock_to_nsec(&dt);
+}
+
+/**
+ * Convert a monotonic clock ticks (ns) to TSC cycles
+ */
+__u64 tscclock_ns_to_tsc_delta(__nsec ts)
+{
+	uint32_t gcd, factor, divisor;
+	uint64_t rem, sbintime;
+
+	/* Convert time delta into a (32.32) fixed-point number of seconds.
+	 * Calculation based on FreeBSD's nstosbt()
+	 */
+	gcd = 512; /* gcd(UKARCH_NSEC_PER_SEC, 1 << 32) */
+	factor = (1UL << 32) / gcd;
+	divisor = UKARCH_NSEC_PER_SEC / gcd;
+	rem = ts % divisor;
+	sbintime =
+	    ts / divisor * factor + (rem * factor + divisor - 1) / divisor;
+
+	/* sbintime (32.32) * tsc_freq (32.0)
+	 * = tsc (64.32) [(64.0) with mul64_32]
+	 */
+	return mul64_32(sbintime, tsc_freq);
 }
 
 /*
@@ -299,14 +326,20 @@ static void pvclock_init(unsigned int systemclock_msr,
 	} while (version != uk_load_n(&pvclock_state.wall_clock.version) ||
 		 (version & 1));
 
+	tsc_freq = (UKARCH_NSEC_PER_SEC << 32) / tsc_mult;
+	if (tsc_shift < 0)
+		tsc_freq <<= -tsc_shift;
+	else
+		tsc_freq >>= tsc_shift;
+
 	pvclock_state.system_clock_msr = systemclock_msr;
 	pvclock_state.wall_clock_msr = wallclock_msr;
 }
 
 void tscclock_pit_init(void)
 {
-	__u64 tsc_freq = 0, rtc_boot;
 	__u32 eax, ebx, ecx, edx;
+	__u64 rtc_boot;
 
 	/*
 	 * Read RTC "time at boot". This must be done just before tsc_base is
