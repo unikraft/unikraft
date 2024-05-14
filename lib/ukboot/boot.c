@@ -102,9 +102,9 @@
 #include <uk/errptr.h>
 #include "banner.h"
 
-#if CONFIG_LIBUKBOOT_NOSCHED
+#if !CONFIG_LIBUKBOOT_INITSCHED
 #include <uk/plat/common/lcpu.h>
-#endif /* CONFIG_LIBUKBOOT_NOSCHED */
+#endif /* !CONFIG_LIBUKBOOT_INITSCHED */
 
 #if CONFIG_LIBUKINTCTLR
 #include <uk/intctlr.h>
@@ -383,7 +383,7 @@ void ukplat_entry(int argc, char *argv[])
 	uk_pr_info("Initialize platform time...\n");
 	ukplat_time_init();
 
-#if !CONFIG_LIBUKBOOT_NOSCHED
+#if CONFIG_LIBUKBOOT_INITSCHED
 	uk_pr_info("Initialize scheduling...\n");
 #if CONFIG_LIBUKBOOT_INITSCHEDCOOP
 	s = uk_schedcoop_create(a, sa, auxsa, a);
@@ -391,7 +391,7 @@ void ukplat_entry(int argc, char *argv[])
 	if (unlikely(!s))
 		UK_CRASH("Failed to initialize scheduling\n");
 	uk_sched_start(s);
-#endif /* !CONFIG_LIBUKBOOT_NOSCHED */
+#endif /* CONFIG_LIBUKBOOT_INITSCHED */
 
 	ictx.cmdline.argc = argc;
 	ictx.cmdline.argv = argv;
