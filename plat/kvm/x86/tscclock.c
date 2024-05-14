@@ -60,8 +60,11 @@
 #include <uk/timeconv.h>
 #include <uk/print.h>
 #include <uk/assert.h>
+#include <uk/event.h>
+#include <uk/migration.h>
 #include <uk/bitops.h>
 #include <uk/atomic.h>
+#include <uk/preempt.h>
 
 #define TIMER_CNTR           0x40
 #define TIMER_MODE           0x43
@@ -418,6 +421,27 @@ static void pvclock_init(unsigned int systemclock_msr,
 	pvclock_state.system_clock_msr = systemclock_msr;
 	pvclock_state.wall_clock_msr = wallclock_msr;
 }
+
+static int tscclock_resync(void *arg __unused)
+{
+	if (pvclock_state.system_clock_msr && pvclock_state.wall_clock_msr) {
+		pvclock_init(pvclock_state.system_clock_msr,
+			     pvclock_state.wall_clock_msr);
+	} else {
+		__u64 rtc_current;
+
+		// Update time_base and get a current RTC timestamp
+		uk_preempt_disable();
+		ukplat_monotonic_clock();
+		rtc_current = rtc_gettimeofday();
+		uk_preempt_enable();
+
+		rtc_epochoffset = rtc_current - time_base;
+	}
+	return UK_EVENT_HANDLED_CONT;
+}
+
+UK_EVENT_HANDLER(UK_MIGRATION_EVENT, tscclock_resync);
 
 void tscclock_pit_init(void)
 {
