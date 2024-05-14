@@ -266,7 +266,7 @@ void ukplat_entry(int argc, char *argv[])
 #if CONFIG_LIBUKALLOC
 	struct uk_alloc *a = NULL, *sa = NULL, *auxsa = NULL;
 #endif
-#if !CONFIG_LIBUKBOOT_NOALLOC
+#if CONFIG_LIBUKBOOT_INITALLOC
 	void *tls = NULL;
 #endif
 #if CONFIG_LIBUKSCHED
@@ -320,7 +320,7 @@ void ukplat_entry(int argc, char *argv[])
 	}
 #endif /* CONFIG_LIBUKLIBPARAM */
 
-#if !CONFIG_LIBUKBOOT_NOALLOC
+#if CONFIG_LIBUKBOOT_INITALLOC
 	uk_pr_info("Initialize memory allocator...\n");
 
 	a = heap_init();
@@ -370,7 +370,7 @@ void ukplat_entry(int argc, char *argv[])
 		UK_CRASH("Failed to allocate the auxiliary stack\n");
 	/* Activate auxiliary stack */
 	ukplat_lcpu_set_auxsp(ukarch_gen_sp(auxstack, AUXSTACK_SIZE));
-#endif /* !CONFIG_LIBUKBOOT_NOALLOC */
+#endif /* CONFIG_LIBUKBOOT_INITALLOC */
 
 #if CONFIG_LIBUKINTCTLR
 	uk_pr_info("Initialize the IRQ subsystem...\n");

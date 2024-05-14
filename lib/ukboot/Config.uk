@@ -81,7 +81,14 @@ if LIBUKBOOT
 	bool
 	default n
 
-	choice LIBUKBOOT_INITALLOC
+	# Hidden option that indicates that allocator is initialized
+	# We do this here in order to allow specifying dependecies to
+	# the allocator choice
+	config LIBUKBOOT_INITALLOC
+	bool
+	default y if !LIBUKBOOT_INITNOALLOC
+
+	choice
 	prompt "Initialize memory allocator"
 	default LIBUKBOOT_INITBBUDDY
 
@@ -117,7 +124,7 @@ if LIBUKBOOT
 		depends on LIBTLSF_INCLUDED
 		select LIBTLSF
 
-		config LIBUKBOOT_NOALLOC
+		config LIBUKBOOT_INITNOALLOC
 		bool "None"
 
 	endchoice
@@ -126,21 +133,21 @@ if LIBUKBOOT
 	hex "Heap base address"
 	default 0x400000000
 	depends on HAVE_PAGING
-	depends on !LIBUKBOOT_NOALLOC
+	depends on LIBUKBOOT_INITALLOC
 
 	# Hidden configuration option that specifies that scheduling should be
 	# initialized. The check for !LIBUKBOOT_INITNOSCHED is not sufficient, as
-	# the option is also not available if LIBUKBOOT_NOALLOC is set. The
+	# the option is also not available if !LIBUKBOOT_INITALLOC is set. The
 	# reason is the dependency of the choice. This would incorrectly mean
 	# that a scheduler is being initialized.
 	config LIBUKBOOT_INITSCHED
 	bool
-	default y if !LIBUKBOOT_NOALLOC && !LIBUKBOOT_INITNOSCHED
+	default y if LIBUKBOOT_INITALLOC && !LIBUKBOOT_INITNOSCHED
 
 	choice
 	prompt "Initialize scheduler"
 	default LIBUKBOOT_INITSCHEDCOOP
-	depends on !LIBUKBOOT_NOALLOC
+	depends on LIBUKBOOT_INITALLOC
 
 		config LIBUKBOOT_INITSCHEDCOOP
 		bool "Cooperative scheduler"
@@ -155,7 +162,7 @@ if LIBUKBOOT
 
 	config LIBUKBOOT_MAINTHREAD
 	bool "Run application main in own thread"
-	depends on LIBUKBOOT_INITSCHED && !LIBUKBOOT_NOALLOC
+	depends on LIBUKBOOT_INITSCHED && LIBUKBOOT_INITALLOC
 	select LIBUKLOCK
 	select LIBUKLOCK_SEMAPHORE
 	help
@@ -183,9 +190,9 @@ if LIBUKBOOT
 
 	config LIBUKBOOT_ALLOCSTACK
 	bool
-	default y if !LIBUKBOOT_NOALLOC
+	default y if LIBUKBOOT_INITALLOC
 	select LIBUKALLOCSTACK
-	depends on !LIBUKBOOT_NOALLOC
+	depends on LIBUKBOOT_INITALLOC
 
 if LIBUKBOOT_ALLOCSTACK
 		config LIBUKBOOT_ALLOCSTACK_PREMAP_ORDER
