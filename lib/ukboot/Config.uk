@@ -128,7 +128,16 @@ if LIBUKBOOT
 	depends on HAVE_PAGING
 	depends on !LIBUKBOOT_NOALLOC
 
-	choice LIBUKBOOT_INITSCHED
+	# Hidden configuration option that specifies that scheduling should be
+	# initialized. The check for !LIBUKBOOT_INITNOSCHED is not sufficient, as
+	# the option is also not available if LIBUKBOOT_NOALLOC is set. The
+	# reason is the dependency of the choice. This would incorrectly mean
+	# that a scheduler is being initialized.
+	config LIBUKBOOT_INITSCHED
+	bool
+	default y if !LIBUKBOOT_NOALLOC && !LIBUKBOOT_INITNOSCHED
+
+	choice
 	prompt "Initialize scheduler"
 	default LIBUKBOOT_INITSCHEDCOOP
 	depends on !LIBUKBOOT_NOALLOC
@@ -139,14 +148,14 @@ if LIBUKBOOT
 		help
 		  Initialize ukschedcoop as cooperative scheduler on the boot CPU.
 
-		config LIBUKBOOT_NOSCHED
+		config LIBUKBOOT_INITNOSCHED
 		bool "None"
 
 	endchoice
 
 	config LIBUKBOOT_MAINTHREAD
 	bool "Run application main in own thread"
-	depends on !LIBUKBOOT_NOSCHED && !LIBUKBOOT_NOALLOC
+	depends on LIBUKBOOT_INITSCHED && !LIBUKBOOT_NOALLOC
 	select LIBUKLOCK
 	select LIBUKLOCK_SEMAPHORE
 	help
