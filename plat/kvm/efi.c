@@ -403,8 +403,6 @@ static void uk_efi_setup_bootinfo_mrds(struct ukplat_bootinfo *bi)
 			UK_CRASH("Failed to insert mrd\n");
 	}
 
-	ukplat_memregion_list_coalesce(&bi->mrds);
-
 #if defined(__X86_64__)
 	rc = ukplat_memregion_alloc_sipi_vect();
 	if (unlikely(rc))
