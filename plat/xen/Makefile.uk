@@ -55,6 +55,7 @@ LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/io.c
 LIBXENPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/lcpu.c|common
 LIBXENPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/memory.c|common
 LIBXENPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/tls.c|common
+LIBXENPLAT_SRCS-y              += $(UK_PLAT_COMMON_BASE)/migration.c|common
 
 LIBXENPLAT_SRCS-y                += $(UK_PLAT_COMMON_BASE)/bootinfo.c|common
 LIBXENPLAT_SRCS-$(CONFIG_LIBFDT) += $(UK_PLAT_COMMON_BASE)/bootinfo_fdt.c|common
