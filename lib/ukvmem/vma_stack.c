@@ -7,6 +7,7 @@
 #include <stddef.h>
 #include <string.h>
 #include <errno.h>
+#include <stdbool.h>
 
 #include "vmem.h"
 
