@@ -28,8 +28,9 @@
 #define PIC2_DATA					0xA1
 #define PIC2_DATA_DEFAULT_MASK				0x8E
 
-extern void lcpu_start64(void *, void *) __noreturn;
-extern void _ukplat_entry(void *, void *);
+void lcpu_start64(void *, void *) __noreturn;
+void _ukplat_entry(void *, void *);
+
 extern void *x86_bpt_pml4;
 
 static __u8 __align(16) uk_efi_bootstack[__PAGE_SIZE];
