@@ -147,11 +147,11 @@ struct ukplat_memregion_desc {
  */
 #define UK_ASSERT_VALID_MRD_FLAGS(mrd)					\
 	do {								\
-		__u16 flags_all = UKPLAT_MEMRF_READ    |		\
-				  UKPLAT_MEMRF_WRITE   |		\
-				  UKPLAT_MEMRF_EXECUTE |		\
-				  UKPLAT_MEMRF_UNMAP   |		\
-				  UKPLAT_MEMRF_MAP;			\
+		__u16 flags_all __maybe_unused = UKPLAT_MEMRF_READ    |	\
+						 UKPLAT_MEMRF_WRITE   |	\
+						 UKPLAT_MEMRF_EXECUTE |	\
+						 UKPLAT_MEMRF_UNMAP   |	\
+						 UKPLAT_MEMRF_MAP;	\
 									\
 		UK_ASSERT(((mrd)->flags & flags_all) == (mrd)->flags);	\
 	} while (0)
