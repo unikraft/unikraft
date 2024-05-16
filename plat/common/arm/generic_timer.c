@@ -34,7 +34,9 @@
 #include <uk/plat/time.h>
 #include <uk/plat/lcpu.h>
 #include <uk/bitops.h>
+#include <uk/init.h>
 #include <uk/plat/common/cpu.h>
+#include <uk/clock_event.h>
 #include <arm/time.h>
 
 static uint64_t boot_ticks;
@@ -251,6 +253,40 @@ void generic_timer_cpu_block_until(uint64_t until_ns)
 	}
 }
 
+int generic_timer_set_next_event(struct uk_clock_event *ce, __nsec at)
+{
+	uint64_t now_ns, now_ticks, until_ticks;
+
+	/* Record current ns */
+	now_ns = generic_timer_monotonic_ticks(&now_ticks);
+
+	if (now_ns < at) {
+		/* Calculate until_ticks for timer */
+		until_ticks = now_ticks + ns_to_ticks(at - now_ns);
+		generic_timer_update_compare(until_ticks);
+		generic_timer_enable();
+		generic_timer_unmask_irq();
+	} else {
+		if (ce->event_handler)
+			ce->event_handler(ce);
+	}
+
+	return 0;
+}
+
+int generic_timer_disable_ce(struct uk_clock_event *ce __unused)
+{
+	generic_timer_mask_irq();
+	return 0;
+}
+
+static struct uk_clock_event generic_timer_clock_event = {
+	.name = "generic_timer",
+	.priority = 100,
+	.set_next_event = generic_timer_set_next_event,
+	.disable = generic_timer_disable_ce,
+};
+
 int generic_timer_init(int fdt_timer)
 {
 	/* Get counter frequency from DTB or register (in Hz) */
@@ -281,6 +317,9 @@ int generic_timer_init(int fdt_timer)
 
 	max_convert_ticks = __MAX_CONVERT_SECS*counter_freq;
 
+	/* Register timer as clock event device */
+	uk_clock_event_register(&generic_timer_clock_event);
+
 	return 0;
 }
 
@@ -291,6 +330,10 @@ int generic_timer_irq_handler(void *arg __unused)
 	 * generic_timer_cpu_block_until, and then unmask the IRQ.
 	 */
 	generic_timer_mask_irq();
+
+	if (generic_timer_clock_event.event_handler)
+		generic_timer_clock_event.event_handler(
+			&generic_timer_clock_event);
 
 	/* Yes, we handled the irq. */
 	return 1;
