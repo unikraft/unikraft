@@ -864,8 +864,7 @@ static void vfscore_autoumount(const struct uk_term_ctx *tctx __unused)
 	int rc;
 
 	uk_list_for_each_entry_reverse(mp, &mount_list, mnt_list) {
-		uk_pr_info("Unmounting %s (%s)...\n", mp->m_path,
-			   mp->m_dev ? mp->m_dev : "none");
+		uk_pr_info("Unmounting %s (%p)...\n", mp->m_path, mp->m_dev);
 		/* For now, flags = 0 is enough. */
 		rc = VFS_UNMOUNT(mp, 0);
 		if (unlikely(rc))
