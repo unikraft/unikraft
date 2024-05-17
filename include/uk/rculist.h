@@ -1,5 +1,5 @@
-#ifndef _LINUX_RCULIST_H_
-#define _LINUX_RCULIST_H_
+#ifndef _RCULIST_H_
+#define _RCULIST_H_
 
 #include <uk/atomic.h>
 #include <uk/list.h>
@@ -99,4 +99,4 @@ static inline void list_splice_tail_init_rcu(struct uk_list_head *list,
 #endif
 
 
-#endif /* _LINUX_RCULIST_H_ */
+#endif /* _RCULIST_H_ */
