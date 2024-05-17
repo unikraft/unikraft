@@ -44,7 +44,7 @@ int uk_sys_ppoll(struct pollfd *fds, nfds_t nfds,
 
 	if (unlikely(!fds))
 		return -EFAULT;
-	if (timeout && uk_time_spec_to_nsec(timeout) < 0)
+	if (unlikely(timeout && uk_time_spec_to_nsec(timeout) < 0))
 		return -EINVAL;
 	if (unlikely(sigmask)) {
 		uk_pr_warn_once("STUB: ppoll no sigmask support\n");

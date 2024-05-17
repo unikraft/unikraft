@@ -94,7 +94,7 @@ int pci_generic_config_read(__u8 bus, __u8 devfn,
 	/* add rmb before io read */
 	rmb();
 	addr = pci_ecam_map_bus(bus, devfn, where);
-	if (!addr) {
+	if (unlikely(!addr)) {
 		*(int *)val = ~0;
 		return -1;
 	}
@@ -117,7 +117,7 @@ int pci_generic_config_write(__u8 bus, __u8 devfn,
 	void *addr;
 
 	addr = pci_ecam_map_bus(bus, devfn, where);
-	if (!addr)
+	if (unlikely(!addr))
 		return -1;
 
 	if (size == 1)
@@ -168,7 +168,7 @@ static int gen_pci_parser_range(struct pci_range_parser *parser, int offset)
 	parser->pna = fdt_address_cells(dtb, offset);
 	parser->np = parser->pna + na + ns;
 	parser->range = fdt_getprop(dtb, offset, "ranges", &rlen);
-	if (parser->range == NULL)
+	if (unlikely(parser->range == NULL))
 		return -ENOENT;
 
 	parser->end = parser->range + rlen / sizeof(fdt32_t);
@@ -482,7 +482,7 @@ error_exit:
 static int gen_pci_drv_init(struct uk_alloc *drv_allocator)
 {
 	/* driver initialization */
-	if (!drv_allocator)
+	if (unlikely(!drv_allocator))
 		return -EINVAL;
 
 	a = drv_allocator;

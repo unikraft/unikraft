@@ -59,13 +59,13 @@ int ukarch_memtag_init(void)
 			ID_AA64PFR1_EL1_MTE_SHIFT) &
 			ID_AA64PFR1_EL1_MTE_MASK;
 
-	if (mte_version < ARM64_FEAT_MTE2) {
+	if (unlikely(mte_version < ARM64_FEAT_MTE2)) {
 		uk_pr_err("FEAT_MTE2 is not implemented\n");
 		return -ENOTSUP;
 	}
 
 #if CONFIG_ARM64_FEAT_MTE_TCF_ASYMMETRIC
-	if (mte_version < ARM64_FEAT_MTE3) {
+	if (unlikely(mte_version < ARM64_FEAT_MTE3)) {
 		uk_pr_err("FEAT_MTE3 is not implemented\n");
 		return -ENOTSUP;
 	}

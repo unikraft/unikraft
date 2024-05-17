@@ -182,13 +182,13 @@ int ukplat_irq_register(unsigned long irq, irq_handler_func_t func, void *arg)
 	unsigned long flags;
 	int rc;
 
-	if (irq >= __MAX_IRQ)
+	if (unlikely(irq >= __MAX_IRQ))
 		return -EINVAL;
 
 	/* New handler */
 	flags = ukplat_lcpu_save_irqf();
 	h = allocate_handler(irq);
-	if (!h) {
+	if (unlikely(!h)) {
 		ukplat_lcpu_restore_irqf(flags);
 		return -EINVAL;
 	}

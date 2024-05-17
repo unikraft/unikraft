@@ -74,7 +74,7 @@ static inline int _sglist_append_range(struct uk_sglist *sg,
 	if (ss->ss_paddr + ss->ss_len == paddr)
 		ss->ss_len += len;
 	else {
-		if (sg->sg_nseg == sg->sg_maxseg)
+		if (unlikely(sg->sg_nseg == sg->sg_maxseg))
 			return -EFBIG;
 		ss++;
 		ss->ss_paddr = paddr;
@@ -181,7 +181,7 @@ int uk_sglist_append(struct uk_sglist *sg, void *buf, size_t len)
 
 	UK_ASSERT(sg);
 
-	if (sg->sg_maxseg == 0)
+	if (unlikely(sg->sg_maxseg == 0))
 		return -EINVAL;
 
 	UK_SGLIST_SAVE(sg, save);
@@ -203,7 +203,7 @@ int uk_sglist_append_sglist(struct uk_sglist *sg,
 
 	UK_ASSERT(sg);
 
-	if (sg->sg_maxseg == 0 || length == 0)
+	if (unlikely(sg->sg_maxseg == 0 || length == 0))
 		return -EINVAL;
 	UK_SGLIST_SAVE(sg, save);
 	error = -EINVAL;
@@ -268,7 +268,7 @@ int uk_sglist_join(struct uk_sglist *first, struct uk_sglist *second)
 		append = 1;
 
 	/* Make sure 'first' has enough room. */
-	if (first->sg_nseg + second->sg_nseg - append > first->sg_maxseg)
+	if (unlikely(first->sg_nseg + second->sg_nseg - append > first->sg_maxseg))
 		return -EFBIG;
 
 	/* Merge last in 'first' and first in 'second' if needed. */
@@ -367,7 +367,7 @@ int uk_sglist_split(struct uk_sglist *original, struct uk_sglist **head,
 	size_t space, split;
 	int count, i;
 
-	if (uk_refcount_read(&original->sg_refs) > 1)
+	if (unlikely(uk_refcount_read(&original->sg_refs) > 1))
 		return -EINVAL;
 
 	/* Figure out how big of a sglist '*head' has to hold. */
@@ -395,14 +395,14 @@ int uk_sglist_split(struct uk_sglist *original, struct uk_sglist **head,
 
 	if (*head == NULL) {
 		sg = uk_sglist_alloc(a, count);
-		if (sg == NULL)
+		if (unlikely(sg == NULL))
 			return -ENOMEM;
 		*head = sg;
 	} else {
 		sg = *head;
-		if (sg->sg_maxseg < count)
+		if (unlikely(sg->sg_maxseg < count))
 			return -EFBIG;
-		if (sg->sg_nseg != 0)
+		if (unlikely(sg->sg_nseg != 0))
 			return -EINVAL;
 	}
 
@@ -481,19 +481,19 @@ int uk_sglist_slice(struct uk_sglist *original, struct uk_sglist **slice,
 	}
 
 	/* If we never hit 'end', then 'length' ran off the end, so fail. */
-	if (space < end)
+	if (unlikely(space < end))
 		return -EINVAL;
 
 	if (*slice == NULL) {
 		sg = uk_sglist_alloc(a, count);
-		if (sg == NULL)
+		if (unlikely(sg == NULL))
 			return -ENOMEM;
 		*slice = sg;
 	} else {
 		sg = *slice;
-		if (sg->sg_maxseg < count)
+		if (unlikely(sg->sg_maxseg < count))
 			return -EFBIG;
-		if (sg->sg_nseg != 0)
+		if (unlikely(sg->sg_nseg != 0))
 			return -EINVAL;
 	}
 

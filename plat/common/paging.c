@@ -575,7 +575,7 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 				 * Otherwise, we bail out.
 				 */
 				if (PAGE_Lx_IS(pte, lvl)) {
-					if (!mapx)
+					if (unlikely(!mapx))
 						return -EEXIST;
 
 					rc = pg_page_split(pt, pt_vaddr, vaddr,
@@ -652,7 +652,7 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			 * the mapping function decide what we should do with
 			 * the existing mapping. Otherwise, bail out.
 			 */
-			if (!mapx)
+			if (unlikely(!mapx))
 				return -EEXIST;
 
 			paddr = PT_Lx_PTE_PADDR(pte, lvl);
@@ -976,8 +976,8 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			 * Descent, if allowed.
 			 */
 			if (!PAGE_Lx_IS(pte, lvl)) {
-				if ((flags & PAGE_FLAG_FORCE_SIZE) &&
-				    (lvl == to_lvl))
+				if (unlikely((flags & PAGE_FLAG_FORCE_SIZE) &&
+				    (lvl == to_lvl)))
 					return -EFAULT;
 
 				pt_vaddr = pgarch_pt_pte_to_vaddr(pt, pte, lvl);
@@ -1011,7 +1011,7 @@ static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			 * than the remaining len to unmap, or it is not
 			 * aligned to the current vaddr).
 			 */
-			if ((flags & PAGE_FLAG_FORCE_SIZE) && (lvl != to_lvl))
+			if (unlikely((flags & PAGE_FLAG_FORCE_SIZE) && (lvl != to_lvl)))
 				return -EFAULT;
 
 			if ((page_size > len) ||
@@ -1253,8 +1253,8 @@ static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			 * case descent, if allowed.
 			 */
 			if (!PAGE_Lx_IS(pte, lvl)) {
-				if ((flags & PAGE_FLAG_FORCE_SIZE) &&
-				    (lvl == to_lvl))
+				if (unlikely((flags & PAGE_FLAG_FORCE_SIZE) &&
+				    (lvl == to_lvl)))
 					return -EFAULT;
 
 				pt_vaddr = pgarch_pt_pte_to_vaddr(pt, pte, lvl);
@@ -1285,7 +1285,7 @@ static int pg_page_set_attr(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			 * than the remaining len to change, or it is not
 			 * aligned to the current vaddr).
 			 */
-			if ((flags & PAGE_FLAG_FORCE_SIZE) && (lvl != to_lvl))
+			if (unlikely((flags & PAGE_FLAG_FORCE_SIZE) && (lvl != to_lvl)))
 				return -EFAULT;
 
 			if ((page_size > len) ||

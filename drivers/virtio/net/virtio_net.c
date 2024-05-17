@@ -518,7 +518,7 @@ static int virtio_netdev_rxq_enqueue(struct virtio_net_device *vndev,
 	__sz buf_len = 0;
 	struct uk_sglist *sg;
 
-	if (virtqueue_is_full(rxq->vq)) {
+	if (unlikely(virtqueue_is_full(rxq->vq))) {
 		uk_pr_debug("The virtqueue is full\n");
 		return -ENOSPC;
 	}
@@ -1053,7 +1053,7 @@ static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 	int total_vqs = conf->nb_rx_queues + conf->nb_tx_queues;
 	__u16 qdesc_size[total_vqs];
 
-	if (conf->nb_rx_queues != 1 || conf->nb_tx_queues != 1) {
+	if (unlikely(conf->nb_rx_queues != 1 || conf->nb_tx_queues != 1)) {
 		uk_pr_err("Queue combination not supported: %"__PRIu16"/%"__PRIu16" rx/tx\n",
 			  conf->nb_rx_queues, conf->nb_tx_queues);
 
@@ -1307,7 +1307,7 @@ err_out:
 static int virtio_net_drv_init(struct uk_alloc *drv_allocator)
 {
 	/* driver initialization */
-	if (!drv_allocator)
+	if (unlikely(!drv_allocator))
 		return -EINVAL;
 
 	a = drv_allocator;

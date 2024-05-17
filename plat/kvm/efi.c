@@ -168,7 +168,7 @@ static int uk_efi_md_to_bi_mrd(struct uk_efi_mem_desc *const md,
 		 * has been found, dictated by whether uk_efi_mat_present != 0.
 		 * Otherwise, add these instead.
 		 */
-		if (uk_efi_mat_present)
+		if (unlikely(uk_efi_mat_present))
 			return -EEXIST;
 
 		mrd->type = UKPLAT_MEMRT_RESERVED;

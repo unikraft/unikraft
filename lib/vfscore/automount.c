@@ -56,17 +56,18 @@
 #include <uk/argparse.h>
 
 #define LIBVFSCORE_MOUNTOPTS_SEP				','
-#define LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP			':'
+#define LIBVFSCORE_FSTAB_VOLUME_ARGS_SEP		':'
 #define LIBVFSCORE_FSTAB_UKOPTS_ARGS_SEP \
 	LIBVFSCORE_MOUNTOPTS_SEP
 
 #define LIBVFSCORE_EXTRACT_DRV					"extract"
-#define LIBVFSCORE_EXTRACT_DEV_INITRD0				"initrd0"
-#define LIBVFSCORE_EXTRACT_DEV_EMBEDDED				"embedded"
+#define LIBVFSCORE_EXTRACT_DEV_INITRD0			"initrd0"
+#define LIBVFSCORE_EXTRACT_DEV_EMBEDDED			"embedded"
+#define LIBVFSCORE_INITRD_OPT_MKMP				"mkmp"
 
 #define LIBVFSCORE_UKOPT_MKMP					(0x1 << 0)
 #define LIBVFSCORE_UKOPT_IFINITRD0				(0x1 << 1)
-#define LIBVFSCORE_UKOPT_IFNOINITRD0				(0x1 << 2)
+#define LIBVFSCORE_UKOPT_IFNOINITRD0			(0x1 << 2)
 
 struct vfscore_volume {
 	/* Volume source device */
@@ -729,7 +730,7 @@ static unsigned int vfscore_volume_parse_ukopts(char *ukopts)
 			continue; /* empty option */
 		}
 
-		if (!strcmp(opt, "mkmp")) {
+		if (!strcmp(opt, LIBVFSCORE_INITRD_OPT_MKMP)) {
 			ret |= LIBVFSCORE_UKOPT_MKMP;
 			continue;
 		}

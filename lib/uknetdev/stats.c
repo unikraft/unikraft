@@ -150,7 +150,7 @@ int uk_netdev_stats_init(struct uk_netdev *dev)
 
 	/* Create stats object */
 	res = asprintf(&obj_name, "netdev%d", dev_id);
-	if (res == -1) {
+	if (unlikely(res == -1)) {
 		uk_pr_err("Could not allocate object name\n");
 		return -ENOMEM;
 	}

@@ -183,7 +183,7 @@ int uk_netdev_drv_register(struct uk_netdev *dev, struct uk_alloc *a,
 	UK_ASSERT(dev->tx_one);
 
 	dev->_data = _alloc_data(a, netdev_count, drv_name);
-	if (!dev->_data)
+	if (unlikely(!dev->_data))
 		return -ENOMEM;
 
 #if CONFIG_LIBUKNETDEV_EINFO_LIBPARAM
@@ -397,7 +397,7 @@ int uk_netdev_configure(struct uk_netdev *dev,
 		return -EINVAL;
 
 	uk_netdev_info_get(dev, &dev_info);
-	if (dev_conf->nb_rx_queues > dev_info.max_rx_queues)
+	if (unlikely(dev_conf->nb_rx_queues > dev_info.max_rx_queues))
 		return -EINVAL;
 	if (dev_conf->nb_tx_queues > dev_info.max_tx_queues)
 		return -EINVAL;
@@ -481,7 +481,7 @@ static int _create_event_handler(uk_netdev_queue_event_t callback,
 	h->dispatcher = uk_sched_thread_create(h->dispatcher_s,
 					       _dispatcher, h,
 					       h->dispatcher_name);
-	if (!h->dispatcher) {
+	if (unlikely(!h->dispatcher)) {
 		if (h->dispatcher_name)
 			free(h->dispatcher_name);
 		h->dispatcher_name = NULL;
@@ -529,11 +529,11 @@ int uk_netdev_rxq_configure(struct uk_netdev *dev, uint16_t queue_id,
 		  || !rx_conf->callback);
 #endif
 
-	if (dev->_data->state != UK_NETDEV_CONFIGURED)
+	if (unlikely(dev->_data->state != UK_NETDEV_CONFIGURED))
 		return -EINVAL;
 
 	/* Make sure that we are not initializing this queue a second time */
-	if (!PTRISERR(dev->_rx_queue[queue_id]))
+	if (unlikely(!PTRISERR(dev->_rx_queue[queue_id])))
 		return -EBUSY;
 
 	err = _create_event_handler(rx_conf->callback, rx_conf->callback_cookie,
@@ -572,11 +572,11 @@ int uk_netdev_txq_configure(struct uk_netdev *dev, uint16_t queue_id,
 	UK_ASSERT(tx_conf);
 	UK_ASSERT(queue_id < CONFIG_LIBUKNETDEV_MAXNBQUEUES);
 
-	if (dev->_data->state != UK_NETDEV_CONFIGURED)
+	if (unlikely(dev->_data->state != UK_NETDEV_CONFIGURED))
 		return -EINVAL;
 
 	/* Make sure that we are not initializing this queue a second time */
-	if (!PTRISERR(dev->_tx_queue[queue_id]))
+	if (unlikely(!PTRISERR(dev->_tx_queue[queue_id])))
 		return -EBUSY;
 
 	dev->_tx_queue[queue_id] = dev->ops->txq_configure(dev, queue_id,
@@ -598,7 +598,7 @@ int uk_netdev_start(struct uk_netdev *dev)
 	UK_ASSERT(dev->ops);
 	UK_ASSERT(dev->ops->start);
 
-	if (dev->_data->state != UK_NETDEV_CONFIGURED)
+	if (unlikely(dev->_data->state != UK_NETDEV_CONFIGURED))
 		return -EINVAL;
 
 	ret = dev->ops->start(dev);
@@ -624,7 +624,7 @@ int uk_netdev_hwaddr_set(struct uk_netdev *dev,
 	UK_ASSERT(dev->_data->state == UK_NETDEV_CONFIGURED
 		  || dev->_data->state == UK_NETDEV_RUNNING);
 
-	if (dev->ops->hwaddr_set == NULL)
+	if (unlikely(dev->ops->hwaddr_set == NULL))
 		return -ENOTSUP;
 
 	return dev->ops->hwaddr_set(dev, hwaddr);
@@ -710,7 +710,7 @@ int uk_netdev_mtu_set(struct uk_netdev *dev, uint16_t mtu)
 	UK_ASSERT(dev->_data->state == UK_NETDEV_CONFIGURED
 		  || dev->_data->state == UK_NETDEV_RUNNING);
 
-	if (dev->ops->mtu_set == NULL)
+	if (unlikely(dev->ops->mtu_set == NULL))
 		return -ENOTSUP;
 
 	return dev->ops->mtu_set(dev, mtu);

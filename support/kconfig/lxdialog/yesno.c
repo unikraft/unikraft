@@ -32,9 +32,9 @@ int dialog_yesno(const char *title, const char *prompt, int height, int width)
 	WINDOW *dialog;
 
 do_resize:
-	if (getmaxy(stdscr) < (height + YESNO_HEIGTH_MIN))
+	if (unlikely(getmaxy(stdscr) < (height + YESNO_HEIGTH_MIN)))
 		return -ERRDISPLAYTOOSMALL;
-	if (getmaxx(stdscr) < (width + YESNO_WIDTH_MIN))
+	if (unlikely(getmaxx(stdscr) < (width + YESNO_WIDTH_MIN)))
 		return -ERRDISPLAYTOOSMALL;
 
 	/* center dialog box on screen */

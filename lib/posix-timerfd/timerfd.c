@@ -143,7 +143,7 @@ static ssize_t timerfd_read(const struct uk_file *f,
 	d = (struct timerfd_node *)f->node;
 	uk_file_event_clear(f, UKFD_POLLIN);
 	v = uk_exchange_n(&d->val, 0);
-	if (!v)
+	if (unlikely(!v))
 		return -EAGAIN;
 	*(__u64 *)(iov[0].iov_base) = v;
 	return sizeof(v);

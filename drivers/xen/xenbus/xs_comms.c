@@ -279,10 +279,10 @@ static int xs_msg_write(struct xsd_sockmsg *xsd_req,
 	int rc;
 
 	req_size = sizeof(*xsd_req) + xsd_req->len;
-	if (req_size > XENSTORE_RING_SIZE)
+	if (unlikely(req_size > XENSTORE_RING_SIZE))
 		return -ENOSPC;
 
-	if (!xs_avail_space_for_write(req_size))
+	if (unlikely(!xs_avail_space_for_write(req_size)))
 		return -ENOSPC;
 
 	/* We must write requests after reading the consumer index. */
@@ -349,7 +349,7 @@ int xs_msg_reply(enum xsd_sockmsg_type msg_type, xenbus_transaction_t xbt,
 	struct xs_request *xs_req;
 	int err;
 
-	if (req_iovecs == NULL)
+	if (unlikely(req_iovecs == NULL))
 		return -EINVAL;
 
 	xs_req = xs_request_get();

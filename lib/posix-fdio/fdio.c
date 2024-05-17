@@ -208,7 +208,7 @@ ssize_t uk_sys_pwritev(struct uk_ofile *of, const struct iovec *iov, int iovcnt,
 
 	unsigned int mode = of->mode;
 
-	if (!_CAN_WRITE(mode))
+	if (unlikely(!_CAN_WRITE(mode)))
 		return -EINVAL;
 	if (unlikely(iovcnt < 0))
 		return -EINVAL;
@@ -251,7 +251,7 @@ ssize_t uk_sys_writev(struct uk_ofile *of, const struct iovec *iov, int iovcnt)
 
 	unsigned int mode = of->mode;
 
-	if (!_CAN_WRITE(mode))
+	if (unlikely(!_CAN_WRITE(mode)))
 		return -EINVAL;
 	if (unlikely(iovcnt < 0))
 		return -EINVAL;
@@ -318,7 +318,7 @@ ssize_t uk_sys_pwritev2(struct uk_ofile *of, const struct iovec *iov,
 
 	unsigned int mode = of->mode;
 
-	if (!_CAN_WRITE(mode))
+	if (unlikely(!_CAN_WRITE(mode)))
 		return -EINVAL;
 	if (unlikely(iovcnt < 0))
 		return -EINVAL;

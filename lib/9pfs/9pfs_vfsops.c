@@ -93,12 +93,12 @@ static int uk_9pfs_parse_option(struct uk_9pfs_mount_data *md,
 	} else if (strncmp(option, "uname=", 6) == 0) {
 		free(md->uname);
 		md->uname = strdup(option + 6);
-		if (!md->uname)
+		if (unlikely(!md->uname))
 			return -ENOMEM;
 	} else if (strncmp(option, "aname=", 6) == 0) {
 		free(md->aname);
 		md->aname = strdup(option + 6);
-		if (!md->aname)
+		if (unlikely(!md->aname))
 			return -ENOMEM;
 	}
 

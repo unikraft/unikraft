@@ -246,7 +246,7 @@ extract_symlink(const char *path, const char *contents, size_t len)
 	target[len] = 0;
 
 	uk_pr_info("%s: Target is %s\n", path, target);
-	if ((r = uk_syscall_r_symlink(target, path))) {
+	if (unlikely((r = uk_syscall_r_symlink(target, path)))) {
 		uk_pr_err("%s: Failed to create symlink: %s (%d)\n",
 			  path, strerror(-r), -r);
 		return -UKCPIO_SYMLINK_FAILED;
@@ -274,11 +274,11 @@ process_section(const struct cpio_header **headerp, char *fullpath,
 {
 	const struct cpio_header *header = *headerp;
 
-	if ((char *)header >= eof || CPIO_FILENAME(header) > eof) {
+	if (unlikely((char *)header >= eof || CPIO_FILENAME(header) > eof)) {
 		uk_pr_err("Truncated CPIO header at %p", header);
 		return -UKCPIO_INVALID_HEADER;
 	}
-	if (!valid_magic(header)) {
+	if (unlikely(!valid_magic(header))) {
 		uk_pr_err("Bad magic number in CPIO header at %p\n", header);
 		return -UKCPIO_INVALID_HEADER;
 	}
@@ -295,18 +295,18 @@ process_section(const struct cpio_header **headerp, char *fullpath,
 		const char *data = CPIO_DATA(header, namesize);
 		enum ukcpio_error err;
 
-		if (fname + namesize > eof) {
+		if (unlikely(fname + namesize > eof)) {
 			uk_pr_err("File name exceeds archive bounds at %p\n",
 				  header);
 			return -UKCPIO_MALFORMED_INPUT;
 		}
-		if (data + filesize > eof) {
+		if (unlikely(data + filesize > eof)) {
 			uk_pr_err("File exceeds archive bounds: %s\n", fname);
 			return -UKCPIO_MALFORMED_INPUT;
 		}
 
 		/* namesize includes trailing NUL */
-		if (prefixlen + namesize > PATH_MAX) {
+		if (unlikely(prefixlen + namesize > PATH_MAX)) {
 			uk_pr_err("Resulting path too long: %s\n", fname);
 			return -UKCPIO_MALFORMED_INPUT;
 		}
@@ -339,10 +339,10 @@ ukcpio_extract(const char *dest, const void *buf, size_t buflen)
 	char pathbuf[PATH_MAX];
 	size_t destlen;
 
-	if (dest == NULL)
+	if (unlikely(dest == NULL))
 		return -UKCPIO_NODEST;
 
-	if ((destlen = strlcpy(pathbuf, dest, PATH_MAX)) > PATH_MAX - 1)
+	if (unlikely((destlen = strlcpy(pathbuf, dest, PATH_MAX)) > PATH_MAX - 1))
 		return -UKCPIO_NODEST;
 	if (pathbuf[destlen-1] != '/') {
 		pathbuf[destlen++] = '/';

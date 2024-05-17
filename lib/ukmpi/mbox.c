@@ -56,7 +56,7 @@ int uk_mbox_post_try(struct uk_mbox *m, void *msg)
 {
 	UK_ASSERT(m);
 
-	if (!uk_semaphore_down_try(&m->writesem))
+	if (unlikely(!uk_semaphore_down_try(&m->writesem)))
 		return -ENOBUFS;
 	_do_mbox_post(m, msg);
 	return 0;
@@ -108,7 +108,7 @@ int uk_mbox_recv_try(struct uk_mbox *m, void **msg)
 
 	UK_ASSERT(m);
 
-	if (!uk_semaphore_down_try(&m->readsem))
+	if (unlikely(!uk_semaphore_down_try(&m->readsem)))
 		return -ENOMSG;
 
 	rmsg =  _do_mbox_recv(m);

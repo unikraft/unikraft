@@ -92,7 +92,7 @@ int uk_blkdev_drv_register(struct uk_blkdev *dev, struct uk_alloc *a,
 				&& !dev->dev_ops->queue_intr_disable));
 
 	dev->_data = _alloc_data(a, blkdev_count,  drv_name);
-	if (!dev->_data)
+	if (unlikely(!dev->_data))
 		return -ENOMEM;
 
 	UK_TAILQ_INSERT_TAIL(&uk_blkdev_list, dev, _list);
@@ -187,7 +187,7 @@ int uk_blkdev_configure(struct uk_blkdev *dev,
 		return rc;
 	}
 
-	if (conf->nb_queues > dev_info.max_queues)
+	if (unlikely(conf->nb_queues > dev_info.max_queues))
 		return -EINVAL;
 
 	rc = dev->dev_ops->dev_configure(dev, conf);
@@ -257,7 +257,7 @@ static int _create_event_handler(uk_blkdev_queue_event_t callback,
 				event_handler->dispatcher_s,
 				_dispatcher, (void *)event_handler,
 				event_handler->dispatcher_name);
-	if (event_handler->dispatcher == NULL) {
+	if (unlikely(event_handler->dispatcher == NULL)) {
 		if (event_handler->dispatcher_name) {
 			free(event_handler->dispatcher);
 			event_handler->dispatcher = NULL;
@@ -321,11 +321,11 @@ int uk_blkdev_queue_configure(struct uk_blkdev *dev, uint16_t queue_id,
 			|| !queue_conf->callback);
 #endif
 
-	if (dev->_data->state != UK_BLKDEV_CONFIGURED)
+	if (unlikely(dev->_data->state != UK_BLKDEV_CONFIGURED))
 		return -EINVAL;
 
 	/* Make sure that we are not initializing this queue a second time */
-	if (!PTRISERR(dev->_queue[queue_id]))
+	if (unlikely(!PTRISERR(dev->_queue[queue_id])))
 		return -EBUSY;
 
 	err = _create_event_handler(queue_conf->callback,

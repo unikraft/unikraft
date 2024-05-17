@@ -421,7 +421,7 @@ int unix_socket_bind(posix_sock *file,
 
 	/* Get name str + namelen */
 	UK_ASSERT(len >= 0);
-	if (!len) {
+	if (unlikely(!len)) {
 		/* STUB; no autobind yet */
 		uk_pr_warn("STUB: AF_UNIX autobind\n");
 		return -EINVAL;

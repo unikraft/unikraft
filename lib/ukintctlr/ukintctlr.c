@@ -94,7 +94,7 @@ int uk_intctlr_irq_register(unsigned int irq,
 
 	flags = ukplat_lcpu_save_irqf();
 	h = allocate_handler(irq);
-	if (!h) {
+	if (unlikely(!h)) {
 		ukplat_lcpu_restore_irqf(flags);
 		return -ENOMEM;
 	}
@@ -139,7 +139,7 @@ recheck:
 	ukplat_lcpu_restore_irqf(flags);
 
 	/* If `h` is set, then there was at least one instance found */
-	if (unlikely(!h)) {
+	if (unlikely(unlikely(!h))) {
 		uk_pr_crit("Invalid irq handler %p for irq %u ", func, irq);
 		return -ENOENT;
 	}
@@ -264,7 +264,7 @@ int uk_intctlr_irq_alloc(unsigned int *irqs, __sz count)
 	start = uk_bitmap_find_next_zero_area(irqs_allocated,
 					      ALLOCABLE_IRQ_COUNT, 0,
 					      count, 0);
-	if (start == ALLOCABLE_IRQ_COUNT)
+	if (unlikely(start == ALLOCABLE_IRQ_COUNT))
 		return -ENOSPC;
 
 	uk_bitmap_set(irqs_allocated, start, count);

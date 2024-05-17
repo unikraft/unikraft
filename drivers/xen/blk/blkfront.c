@@ -285,19 +285,19 @@ static int blkfront_request_write(struct blkfront_request *blkfront_req,
 	dev = blkfront_req->queue->dev;
 	cap = &dev->blkdev.capabilities;
 	sector_size = cap->ssize;
-	if (req->operation == UK_BLKREQ_WRITE && cap->mode == O_RDONLY)
+	if (unlikely(req->operation == UK_BLKREQ_WRITE && cap->mode == O_RDONLY))
 		return -EPERM;
 
-	if (req->aio_buf == NULL)
+	if (unlikely(req->aio_buf == NULL))
 		return -EINVAL;
 
-	if (req->nb_sectors == 0)
+	if (unlikely(req->nb_sectors == 0))
 		return -EINVAL;
 
-	if (req->start_sector + req->nb_sectors > cap->sectors)
+	if (unlikely(req->start_sector + req->nb_sectors > cap->sectors))
 		return -EINVAL;
 
-	if (req->nb_sectors > cap->max_sectors_per_req)
+	if (unlikely(req->nb_sectors > cap->max_sectors_per_req))
 		return -EINVAL;
 
 	blkif_request_init(ring_req, sector_size);
@@ -352,7 +352,7 @@ static int blkfront_queue_enqueue(struct uk_blkdev_queue *queue,
 	UK_ASSERT(req);
 
 	blkfront_req = uk_malloc(drv_allocator, sizeof(*blkfront_req));
-	if (!blkfront_req)
+	if (unlikely(!blkfront_req))
 		return -ENOMEM;
 
 	blkfront_req->req = req;
@@ -399,7 +399,7 @@ static int blkfront_submit_request(struct uk_blkdev *blkdev,
 	UK_ASSERT(req != NULL);
 	UK_ASSERT(queue != NULL);
 
-	if (RING_FULL(&queue->ring)) {
+	if (unlikely(RING_FULL(&queue->ring))) {
 		uk_pr_err("Queue %p is full\n", queue);
 		return -EBUSY;
 	}
@@ -567,7 +567,7 @@ static int blkfront_ring_init(struct uk_blkdev_queue *queue)
 	UK_ASSERT(queue);
 	dev = queue->dev;
 	sring = uk_palloc(queue->a, BLK_RING_PAGES_NUM);
-	if (!sring)
+	if (unlikely(!sring))
 		return -ENOMEM;
 
 	memset(sring, 0, PAGE_SIZE);
@@ -781,7 +781,7 @@ static int blkfront_queue_get_info(struct uk_blkdev *blkdev,
 	UK_ASSERT(qinfo);
 
 	dev = to_blkfront(blkdev);
-	if (queue_id >= dev->nb_queues) {
+	if (unlikely(queue_id >= dev->nb_queues)) {
 		uk_pr_err("Invalid queue identifier: %"__PRIu16"\n", queue_id);
 		return -EINVAL;
 	}
@@ -804,7 +804,7 @@ static int blkfront_configure(struct uk_blkdev *blkdev,
 	dev->nb_queues = conf->nb_queues;
 	dev->queues = uk_calloc(drv_allocator, dev->nb_queues,
 				sizeof(*dev->queues));
-	if (!dev->queues)
+	if (unlikely(!dev->queues))
 		return -ENOMEM;
 
 	err = blkfront_xb_write_nb_queues(dev);
@@ -849,7 +849,7 @@ static int blkfront_stop(struct uk_blkdev *blkdev)
 	UK_ASSERT(blkdev != NULL);
 	dev = to_blkfront(blkdev);
 	for (q_id = 0; q_id < dev->nb_queues; ++q_id) {
-		if (RING_HAS_UNCONSUMED_RESPONSES(&dev->queues[q_id].ring)) {
+		if (unlikely(RING_HAS_UNCONSUMED_RESPONSES(&dev->queues[q_id].ring))) {
 			uk_pr_err("Queue:%"PRIu16" has unconsumed responses\n",
 					q_id);
 			return -EBUSY;
@@ -915,7 +915,7 @@ static int blkfront_add_dev(struct xenbus_device *dev)
 	UK_ASSERT(dev != NULL);
 
 	d = uk_calloc(drv_allocator, 1, sizeof(struct blkfront_dev));
-	if (!d)
+	if (unlikely(!d))
 		return -ENOMEM;
 
 	d->xendev = dev;
@@ -952,7 +952,7 @@ err_xenbus:
 static int blkfront_drv_init(struct uk_alloc *allocator)
 {
 	/* driver initialization */
-	if (!allocator)
+	if (unlikely(!allocator))
 		return -EINVAL;
 
 	drv_allocator = allocator;

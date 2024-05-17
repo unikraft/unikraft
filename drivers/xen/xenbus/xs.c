@@ -102,7 +102,7 @@ int xs_write(xenbus_transaction_t xbt, const char *path, const char *node,
 	char *fullpath;
 	int err;
 
-	if (path == NULL || value == NULL)
+	if (unlikely(path == NULL || value == NULL))
 		return -EINVAL;
 
 	if (node != NULL) {
@@ -187,7 +187,7 @@ int xs_rm(xenbus_transaction_t xbt, const char *path)
 {
 	struct xs_iovec req;
 
-	if (path == NULL)
+	if (unlikely(path == NULL))
 		return -EINVAL;
 
 	req = XS_IOVEC_STR_NULL((char *) path);
@@ -227,7 +227,7 @@ out:
 
 int xs_perm_to_char(enum xs_perm perm, char *c)
 {
-	if (c == NULL || perm >= ARRAY_SIZE(xs_perm_tbl))
+	if (unlikely(c == NULL || perm >= ARRAY_SIZE(xs_perm_tbl)))
 		return -EINVAL;
 
 	*c = xs_perm_tbl[perm];
@@ -422,7 +422,7 @@ static int acl_find_entry_index(struct xs_acl *acl, domid_t domid)
 	struct xs_acl_entry *acle;
 	int i;
 
-	if (acl->ownerid == domid)
+	if (unlikely(acl->ownerid == domid))
 		/*
 		 * let's say the function isn't called correctly considering
 		 * that the owner domain has all the rights, all the time
@@ -435,7 +435,7 @@ static int acl_find_entry_index(struct xs_acl *acl, domid_t domid)
 			break;
 	}
 
-	if (i == acl->entries_num)
+	if (unlikely(i == acl->entries_num))
 		/* no entry found for domid */
 		return -ENOENT;
 
@@ -593,7 +593,7 @@ int xs_transaction_start(xenbus_transaction_t *xbt)
 	struct xs_iovec req, rep;
 	int err;
 
-	if (xbt == NULL)
+	if (unlikely(xbt == NULL))
 		return -EINVAL;
 
 	req = XS_IOVEC_STR_NULL("");
@@ -627,7 +627,7 @@ int xs_debug_msg(const char *msg)
 	struct xs_iovec req[3], rep;
 	int err;
 
-	if (msg == NULL)
+	if (unlikely(msg == NULL))
 		return -EINVAL;
 
 	req[0] = XS_IOVEC_STR_NULL("print");
@@ -649,7 +649,7 @@ int xs_read_integer(xenbus_transaction_t xbt, const char *path, int *value)
 {
 	char *value_str;
 
-	if (path == NULL || value == NULL)
+	if (unlikely(path == NULL || value == NULL))
 		return -EINVAL;
 
 	value_str = xs_read(xbt, path, NULL);
@@ -670,7 +670,7 @@ int xs_scanf(xenbus_transaction_t xbt, const char *dir, const char *node,
 	va_list args;
 	int err = 0;
 
-	if (fmt == NULL)
+	if (unlikely(fmt == NULL))
 		return -EINVAL;
 
 	val = xs_read(xbt, dir, node);
@@ -697,7 +697,7 @@ int xs_printf(xenbus_transaction_t xbt, const char *dir, const char *node,
 	va_list args;
 	int err = 0, _err;
 
-	if (fmt == NULL)
+	if (unlikely(fmt == NULL))
 		return -EINVAL;
 
 	va_start(args, fmt);

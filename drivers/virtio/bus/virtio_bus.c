@@ -137,7 +137,7 @@ int virtio_bus_register_device(struct virtio_dev *vdev)
 	UK_ASSERT(vdev);
 	/* Check for the dev with the driver list */
 	drv = find_match_drv(vdev);
-	if (!drv) {
+	if (unlikely(!drv)) {
 		uk_pr_err("Failed to find the driver for the virtio device %p (id:%"__PRIu16")\n",
 			  vdev, vdev->id.virtio_device_id);
 		return -EFAULT;

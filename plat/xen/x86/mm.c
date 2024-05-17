@@ -338,7 +338,7 @@ int do_map_frames(unsigned long va,
 	pgentry_t *pte = NULL;
 	unsigned long mapped = 0;
 
-	if (!mfns) {
+	if (unlikely((!mfns)) {
 		uk_pr_warn("do_map_frames: no mfns supplied\n");
 		return -EINVAL;
 	}
@@ -368,7 +368,7 @@ int do_map_frames(unsigned long va,
 		for (i = 0; i < batched; i++, va += PAGE_SIZE, pte++) {
 			if (!pte || !(va & L1_MASK))
 				pte = need_pte(va, a);
-			if (!pte)
+			if (unlikely(!pte))
 				return -ENOMEM;
 
 			mmu_updates[i].ptr =

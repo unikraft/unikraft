@@ -539,7 +539,7 @@ static int uk_posix_clone_checkvm(const struct clone_args *cl_args,
 				  struct uk_thread *child __unused,
 				  struct uk_thread *parent __unused)
 {
-	if (!(cl_args->flags & CLONE_VM)) {
+	if (unlikely(!(cl_args->flags & CLONE_VM))) {
 		uk_pr_warn("Cloning thread without CLONE_VM being set: Creating of new address spaces are currently not supported.\n");
 		return -ENOTSUP;
 	}

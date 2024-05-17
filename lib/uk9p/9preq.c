@@ -93,7 +93,7 @@ int uk_9preq_ready(struct uk_9preq *req, enum uk_9preq_zcdir zc_dir,
 
 	UK_ASSERT(req);
 
-	if (UK_READ_ONCE(req->state) != UK_9PREQ_INITIALIZED)
+	if (unlikely(UK_READ_ONCE(req->state) != UK_9PREQ_INITIALIZED))
 		return -EIO;
 
 	/* Save current offset as the size of the message. */
@@ -143,7 +143,7 @@ int uk_9preq_receive_cb(struct uk_9preq *req, uint32_t recv_size)
 	UK_ASSERT(req);
 
 	/* Check state and the existence of the header. */
-	if (UK_READ_ONCE(req->state) != UK_9PREQ_SENT)
+	if (unlikely(UK_READ_ONCE(req->state) != UK_9PREQ_SENT))
 		return -EIO;
 
 	if (recv_size < UK_9P_HEADER_SIZE) {
@@ -166,9 +166,9 @@ int uk_9preq_receive_cb(struct uk_9preq *req, uint32_t recv_size)
 	/* Check sanity of deserialized values. */
 	if (rc < 0)
 		return rc;
-	if (size > recv_size)
+	if (unlikely(size > recv_size))
 		return -EIO;
-	if (req->tag != tag)
+	if (unlikely(req->tag != tag))
 		return -EIO;
 
 	/* Fix the receive size for zero-copy requests. */
@@ -211,7 +211,7 @@ int uk_9preq_error(struct uk_9preq *req)
 	struct uk_9p_str error;
 	int rc = 0;
 
-	if (UK_READ_ONCE(req->state) != UK_9PREQ_RECEIVED)
+	if (unlikely(UK_READ_ONCE(req->state) != UK_9PREQ_RECEIVED))
 		return -EIO;
 	if (req->recv.type != UK_9P_RERROR && req->recv.type != UK_9P_RLERROR)
 		return 0;
@@ -234,7 +234,7 @@ int uk_9preq_error(struct uk_9preq *req)
 				errcode);
 	else
 		uk_pr_debug("RLERROR %d\n", errcode);
-	if (errcode == 0 || errcode >= 512)
+	if (unlikely(errcode == 0 || errcode >= 512))
 		return -EIO;
 
 	return -errcode;

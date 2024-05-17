@@ -556,7 +556,7 @@ free_vmdev:
 static int virtio_mmio_drv_init(struct uk_alloc *drv_allocator)
 {
 	/* driver initialization */
-	if (!drv_allocator)
+	if (unlikely(!drv_allocator))
 		return -EINVAL;
 
 	a = drv_allocator;

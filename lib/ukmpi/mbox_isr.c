@@ -9,7 +9,7 @@ int uk_mbox_recv_try_isr(struct uk_mbox *m, void **msg)
 
 	UK_ASSERT(m);
 
-	if (!uk_semaphore_down_try_isr(&m->readsem))
+	if (unlikely(!uk_semaphore_down_try_isr(&m->readsem)))
 		return -ENOMSG;
 
 	rmsg =  _do_mbox_recv(m);
@@ -22,7 +22,7 @@ int uk_mbox_post_try_isr(struct uk_mbox *m, void *msg)
 {
 	UK_ASSERT(m);
 
-	if (!uk_semaphore_down_try_isr(&m->writesem))
+	if (unlikely(!uk_semaphore_down_try_isr(&m->writesem)))
 		return -ENOBUFS;
 	_do_mbox_post(m, msg);
 	return 0;

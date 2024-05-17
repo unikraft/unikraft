@@ -167,7 +167,7 @@ int uk_fdtab_open(const struct uk_file *f, unsigned int mode)
 
 	tab = _active_tab();
 	of = ofile_new(tab);
-	if (!of)
+	if (unlikely(!of))
 		return -ENOMEM;
 	/* Take refs on file & ofile */
 	uk_file_acquire(f);
@@ -197,14 +197,14 @@ int uk_fdtab_setflags(int fd, int flags)
 	struct fdval v;
 	const void *newp;
 
-	if (flags & ~O_CLOEXEC)
+	if (unlikely(flags & ~O_CLOEXEC))
 		return -EINVAL;
 
 	tab = _active_tab();
 	fmap = &tab->fmap;
 
 	p = uk_fmap_critical_take(fmap, fd);
-	if (!p)
+	if (unlikely(!p))
 		return -EBADF;
 	v = fdtab_decode(p);
 	v.flags &= ~UK_FDTAB_CLOEXEC;
@@ -222,7 +222,7 @@ int uk_fdtab_getflags(int fd)
 	struct fdval v;
 	int ret;
 
-	if (!p)
+	if (unlikely(!p))
 		return -EBADF;
 
 	v = fdtab_decode(p);
@@ -398,7 +398,7 @@ int uk_sys_close(int fd)
 
 	tab = _active_tab();
 	p = uk_fmap_take(&tab->fmap, fd);
-	if (!p)
+	if (unlikely(!p))
 		return -EBADF;
 	v = fdtab_decode(p);
 	file_rel(tab, v.p, v.flags);
@@ -413,17 +413,17 @@ int uk_sys_dup3(int oldfd, int newfd, int flags)
 	void *prevp;
 	const void *newent;
 
-	if (oldfd == newfd)
+	if (unlikely(oldfd == newfd))
 		return -EINVAL;
-	if (oldfd < 0 || oldfd >= UK_FDTAB_SIZE ||
-	    newfd < 0 || newfd >= UK_FDTAB_SIZE)
+	if (unlikely(oldfd < 0 || oldfd >= UK_FDTAB_SIZE ||
+	    newfd < 0 || newfd >= UK_FDTAB_SIZE))
 		return -EBADF;
-	if (flags & ~O_CLOEXEC)
+	if (unlikely(flags & ~O_CLOEXEC))
 		return -EINVAL;
 
 	tab = _active_tab();
 	dup = _fdtab_get(tab, oldfd);
-	if (!dup.p)
+	if (unlikely(!dup.p))
 		return -EBADF; /* oldfd not open */
 	dup.flags &= ~UK_FDTAB_CLOEXEC;
 	dup.flags |= flags ? UK_FDTAB_CLOEXEC : 0;
@@ -458,21 +458,21 @@ int uk_sys_dup_min(int oldfd, int min, int flags)
 	const void *newent;
 	int fd;
 
-	if (oldfd < 0)
+	if (unlikely(oldfd < 0))
 		return -EBADF;
-	if (flags & ~O_CLOEXEC)
+	if (unlikely(flags & ~O_CLOEXEC))
 		return -EINVAL;
 
 	tab = _active_tab();
 	dup = _fdtab_get(tab, oldfd);
-	if (!dup.p)
+	if (unlikely(!dup.p))
 		return -EBADF;
 	dup.flags &= ~UK_FDTAB_CLOEXEC;
 	dup.flags |= flags ? UK_FDTAB_CLOEXEC : 0;
 
 	newent = fdtab_encode(dup.p, dup.flags);
 	fd = uk_fmap_put(&tab->fmap, newent, min);
-	if (fd >= UK_FDTAB_SIZE) {
+	if (unlikely(fd >= UK_FDTAB_SIZE)) {
 		file_rel(tab, dup.p, dup.flags);
 		return -ENFILE;
 	}
