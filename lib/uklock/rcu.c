@@ -26,10 +26,12 @@ void check_crit_flags(int lcpu_count) {
 
     bool result ;
     bool rcu_flags_temp[lcpu_count]; 
+    struct uk_sched *s;
+    s = uk_sched_current();
     COPY_ARRAY(rcu_flags,rcu_flags_temp,lcpu_count);
     LOGICAL_OR(rcu_flags_temp,lcpu_count,result);
-    
     while (result == true) { 
+	    s->yield(s);
      	   LOGICAL_OR(rcu_flags_temp,lcpu_count,result);
         } 
       return;
