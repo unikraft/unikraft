@@ -209,6 +209,8 @@ static struct pci_bus_handler ph __unused;
 #define PCI_FUNCTION_SHIFT          (8)
 #define PCI_ENABLE_BIT              (1u << 31)
 
+#define PCI_MAX_BARS                (6)
+
 #define PCI_CONF_CLASS_ID          (0x08)
 #define PCI_CONF_CLASS_ID_SHFT     (16)
 #define PCI_CONF_CLASS_ID_MASK     (0xFF00)
