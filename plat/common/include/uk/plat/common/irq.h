@@ -37,7 +37,7 @@
  * CPU were previously part of the ukplat_irq API. These are not managed
  * by the interrupt controller, so they need to be part of the lcpu
  * low-level API. As some platforms may have their own implementation of
- * these (linuxu, xen) keep them on a separate header.
+ * these (e.g., xen) keep them on a separate header.
  * TODO: Remove this comment after migrating lcpu into drivers.
  */
 #if defined(__X86_64__)
