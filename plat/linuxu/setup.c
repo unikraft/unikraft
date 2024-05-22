@@ -81,6 +81,8 @@ static void __linuxu_plat_heap_init(void)
 					.vbase = (__vaddr_t)pret,
 					.pbase = (__paddr_t)pret,
 					.len   = len,
+					.pg_off = 0,
+					.pg_count = PAGE_COUNT(len),
 					.type  = UKPLAT_MEMRT_FREE,
 					.flags = UKPLAT_MEMRF_READ |
 						 UKPLAT_MEMRF_WRITE |
