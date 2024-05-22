@@ -813,20 +813,25 @@ ssize_t unix_socket_sendmsg(posix_sock *file,
 		if (data->flags & UNIXSOCK_CONN) {
 			wpipe = data->wpipe;
 		} else {
+			const struct sockaddr_un *uaddr;
+			const char *rname;
+			size_t rlen;
+
 			if (unlikely(!msg->msg_name))
 				return -ENOTCONN;
+
 			/* Establish remote */
-			/* TODO: Lookup */
-			remote = NULL;
+			uaddr = (struct sockaddr_un *)msg->msg_name;
+			rname = uaddr->sun_path;
+			rlen = msg->msg_namelen -
+			       offsetof(struct sockaddr_un, sun_path);
+			remote = unix_addr_lookup(rname, rlen);
 
 			if (remote) {
 				wpipe = unix_sock_remotebpipe(file, remote);
-				if (unlikely(PTRISERR(wpipe))) {
-					if (PTR2ERR(wpipe) == -ENOENT)
-						wpipe = NULL;
-					else
-						return PTR2ERR(wpipe);
-				}
+				uk_file_release_weak(remote);
+				if (unlikely(PTRISERR(wpipe)))
+					wpipe = NULL;
 			} else {
 				wpipe = NULL;
 			}
@@ -836,7 +841,8 @@ ssize_t unix_socket_sendmsg(posix_sock *file,
 		return (data->flags & UNIXSOCK_CONN)
 			? (_SOCK_CONNECTION(data->type)
 				? -EPIPE : -ECONNREFUSED)
-			: -ENOTCONN;
+			: (msg->msg_name
+				? -ECONNREFUSED : -ENOTCONN);
 
 	uk_file_wlock(wpipe);
 	ret = uk_file_write(wpipe, msg->msg_iov, msg->msg_iovlen, 0,
