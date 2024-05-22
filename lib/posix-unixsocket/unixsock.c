@@ -841,7 +841,7 @@ ssize_t unix_socket_sendmsg(posix_sock *file,
 	uk_file_wlock(wpipe);
 	ret = uk_file_write(wpipe, msg->msg_iov, msg->msg_iovlen, 0,
 			    data->type != SOCK_STREAM ? O_DIRECT : 0);
-	uk_file_wunlock(data->wpipe);
+	uk_file_wunlock(wpipe);
 	/* We ignore ancillary data for now */
 
 	/* 0-length datagrams will be silently lost; warn */
