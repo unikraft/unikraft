@@ -62,7 +62,6 @@ body:
       options:
         - kvm
         - xen
-        - linuxu
   - type: textarea
     id: logs
     attributes:
