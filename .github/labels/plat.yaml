@@ -6,14 +6,6 @@ labels:
       - plat/common/**
       - include/uk/plat/common/**
 
-  - name: plat/driver/tap
-    description: Issues and PRs related to the tap driver
-    color: "#750210"
-    apply_on_pr_match_paths:
-      - plat/drivers/tap/**
-      - plat/drivers/include/tap/**
-      - plat/linuxu/tap_io.c
-
   - name: plat/driver/virtio
     description: Issues and PRs related to virtio drivers
     color: "#750210"
@@ -70,12 +62,6 @@ labels:
     color: "#1f8aa5"
     apply_on_pr_match_paths:
       - plat/kvm/**
-
-  - name: plat/linuxu
-    description: Issues and PRs related to Linux Userspace platform
-    color: "#bfdadc"
-    apply_on_pr_match_paths:
-      - plat/linux/**
 
   - name: plat/xen
     description: ssues and PRs related to the Xen platform
