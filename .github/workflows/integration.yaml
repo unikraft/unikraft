@@ -159,10 +159,6 @@ jobs:
           arch: x86_64
         - plat: fc
           arch: x86_64
-        - plat: linuxu
-          arch: x86_64
-        - plat: linuxu
-          arch: arm64
 
     steps:
     - uses: actions/checkout@v4
