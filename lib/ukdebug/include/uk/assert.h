@@ -38,9 +38,11 @@
 
 #include <uk/plat/bootstrap.h>
 #include <uk/arch/lcpu.h>
+#include <uk/arch/crash.h>
 #include <uk/essentials.h>
 #include <uk/print.h>
 #include <uk/config.h>
+#include <uk/crash.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -52,8 +54,7 @@ extern "C" {
 		if (unlikely(!(x))) {					\
 			uk_pr_crit("Assertion failure: %s\n",		\
 				   STRINGIFY(x));			\
-			/* TODO: stack trace */				\
-			ukplat_terminate(UKPLAT_CRASH);			\
+			ukarch_trigger_crash();				\
 		}							\
 	} while (0)
 
@@ -84,9 +85,57 @@ extern "C" {
 #define UK_CRASH(fmt, ...)						\
 	do {								\
 		uk_pr_crit((fmt), ##__VA_ARGS__);			\
-		/* TODO: stack trace */					\
-		ukplat_terminate(UKPLAT_CRASH);				\
+		ukarch_trigger_crash();					\
 	} while (0)
+
+enum ukarch_crash_reason {
+	UKARCH_CRASH_REASON_INVALID,
+	/**
+	 * The crash was caused by an explicit UK_CRASH
+	 */
+	UKARCH_CRASH_REASON_EXPLICIT,
+	/**
+	 * The crash was caused by an unhandled trap.
+	 */
+	UKARCH_CRASH_REASON_UNHANDLED_TRAP,
+	/**
+	 * The crash was caused by an unhandled page fault.
+	 */
+	UKARCH_CRASH_REASON_PAGE_FAULT,
+	/**
+	 * The crash was caused by something else.
+	 */
+	UKARCH_CRASH_REASON_OTHER,
+};
+
+struct uk_crash_description {
+	/**
+	 * Contains the crash reason.
+	 * The meaning of the following fields change depending on the reason.
+	 */
+	enum ukarch_crash_reason reason;
+	/**
+	 * For UKARCH_CRASH_REASON_UNHANDLED_TRAP:
+	 *   the architecture specific trap number
+	 * For UKARCH_CRASH_REASON_PAGE_FAULT:
+	 *   the virtual address which was attempted to access
+	 */
+	__u64 arg1;
+	/**
+	 * For UKARCH_CRASH_REASON_UNHANDLED_TRAP:
+	 *   pointer to human-readable string of the trap number
+	 * For UKARCH_CRASH_REASON_PAGE_FAULT:
+	 *   an architecture specific error code
+	 */
+	__u64 arg2;
+	/**
+	 * For UKARCH_CRASH_REASON_UNHANDLED_TRAP:
+	 *   error code of the trap
+	 */
+	__u64 arg3;
+};
+
+#define UK_CRASH_EX(regs, descr) _uk_crash(regs, descr)
 
 #ifdef __cplusplus
 }
