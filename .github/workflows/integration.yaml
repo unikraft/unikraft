@@ -202,7 +202,7 @@ jobs:
     steps:
       - name: Check idle
         run: |
-          set -xe;
+          set -e;
 
           # Check if there are any ongoing tests (only one repository dispatch exists so we can just check for the status)
           # We need to check separately for each status because the API does not support multiple statuses
@@ -242,7 +242,7 @@ jobs:
 
       - name: Fetch catalog results
         run: |
-          set -xe;
+          set -e;
 
           sudo apt-get update;
           sudo apt-get install -y jq;
@@ -294,7 +294,7 @@ jobs:
 
       - name: Merge stable
         run: |
-          set -xe;
+          set -e;
 
           git pull origin stable;
           git checkout --track origin/stable;
