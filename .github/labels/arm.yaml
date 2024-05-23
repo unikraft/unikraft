@@ -1,8 +1,12 @@
 labels:
   - name: arm/smcc
-    description: Secure Monitor Call Calling Convention on ARM
-    color: "#0BA2F3"
+    description:
+    color: "#ededed"
     apply_on_pr_match_paths:
       - include/uk/arch/arm/smccc.h
       - plat/common/arm/smccc.c
       - plat/common/arm/smccc_invoke.S
+      
+  - name: arm/smccc
+    description: Secure Monitor Call Calling Convention on ARM
+    color: "#0ba2f3"

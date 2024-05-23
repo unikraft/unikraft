@@ -1,12 +1,12 @@
 labels:
   - name: area/arch
-    description: Issues and PRs which affect architecture code
+    description: Unikraft Architecture
     color: "#7ec2f7"
     apply_on_pr_match_paths:
       - arch/**
 
   - name: area/docs
-    description: Issues and PRs which affect documentation
+    description: Documentation
     color: "#db4eb8"
     apply_on_pr_match_paths:
       - doc/**
@@ -19,40 +19,40 @@ labels:
       - exportsyms.uk
 
   - name: area/include
-    description: Issues and PRs which affect headers
+    description: Part of include/uk
     color: "#e99695"
     apply_on_pr_match_paths:
       - include/**
 
   - name: area/kconfig
-    description: Issues and PRs which affect KConfig code
+    description: Part of the Unikraft KConfig option system
     color: "#ed8ebd"
     apply_on_pr_match_paths:
       - Config.uk
 
   - name: area/lib
-    description: Issues and PRs which affect internal Unikraft libraries
-    color: "#ed8ebd"
+    description: Internal Unikraft Microlibrary
+    color: "#efbf67"
     match_repos:
       - unikraft
     apply_on_pr_match_paths:
       - lib/**
 
   - name: area/makefile
-    description: Issues and PRs which affect Makefile code
+    description: Part of the Unikraft Makefile build system
     color: "#ffe5c9"
     apply_on_pr_match_paths:
       - Makefile.uk
       - Makefile
 
   - name: area/plat
-    description: Issues and PRs which affect platform code
+    description: Unikraft Patform
     color: "#f2daa9"
     apply_on_pr_match_paths:
       - plat/**
 
   - name: area/support
-    description: Issues and PRs which affect support code
+    description: Support scripts, tools, services.
     color: "#bfd4f2"
     apply_on_pr_match_paths:
       - support/**

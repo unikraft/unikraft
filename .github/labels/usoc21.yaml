@@ -1,0 +1,17 @@
+labels:
+  - name: usoc21
+    description: Unikraft Summer of Code 2021
+    color: "#5319e7"
+
+  - name: usoc21/points/10
+    description: USoC21 10 points
+    color: "#73e6c6"
+
+  - name: usoc21/points/20
+    description: USoC21 20 points
+    color: "#73e6c6"
+
+  - name: usoc21/points/5
+    description: USoC21 5 points
+    color: "#73e6c6"
+

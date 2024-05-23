@@ -1,12 +1,20 @@
 labels:
   - name: lib/9pfs
-    description: Issues and PRs which affect the 9p filesystem
+    description: 9p client
     color: "#fbca04"
     apply_on_pr_match_paths:
       - lib/9pfs/**
 
+  - name: lib/allocbuddy
+    description: ''
+    color: "#fbca04"
+
+  - name: lib/argparse
+    description: ''
+    color: "#fbca04"
+
   - name: lib/devfs
-    description: Issues and PRs which affect the devfs file system
+    description: devfs file system
     color: "#fbca04"
     apply_on_pr_match_paths:
       - lib/devfs/**
@@ -18,16 +26,28 @@ labels:
       - lib/fdt/**
 
   - name: lib/isrlib
-    description: Issues and PRs which affect interrupt-safe standard routines
-    color: "#fbca04"
+    description:
+    color: "#ededed"
     apply_on_pr_match_paths:
       - lib/isrlib/**
 
   - name: lib/nolibc
-    description: Issues and PRs which affect the nolibc subset
+    description: Only neccessary subset of libc functionality
     color: "#fbca04"
     apply_on_pr_match_paths:
       - lib/nolibc/**
+
+  - name: lib/posix-environ
+    description: Library to manage environment variables with a POSIX compatible interface
+    color: "#fef2c0"
+
+  - name: lib/posix-event
+    description: POSIX event interface
+    color: "#fbca04"
+
+  - name: lib/posix-fdtab
+    description: Library to hande file descriptor table with a POSIX-compatible interface
+    color: "#fbca04"
 
   - name: lib/posix-libdl
     description: Issues and PRs which affect POSIX libdl library
@@ -35,17 +55,29 @@ labels:
     apply_on_pr_match_paths:
       - lib/posix-libdl/**
 
+  - name: lib/posix-mmap
+    description: ''
+    color: "#fbca04"
+
   - name: lib/posix-process
-    description: Issues and PRs which affect POSIX process-related functions
+    description: Information about system parameters
     color: "#fbca04"
     apply_on_pr_match_paths:
       - lib/posix-process/**
+
+  - name: lib/posix-socket
+    description: Abstraction for communication sockets
+    color: "#fbca04"
 
   - name: lib/posix-sysinfo
     description: Issues and PRs which affect information about system parameters
     color: "#fbca04"
     apply_on_pr_match_paths:
       - lib/posix-sysinfo/**
+
+  - name: lib/posix-time
+    description: Library to get time information with a POSIX compliant interface
+    color: "#fbca04"
 
   - name: lib/posix-user
     description: Issues and PRs which affect POSIX user-related functions
@@ -66,7 +98,7 @@ labels:
       - lib/syscall_shim/**
 
   - name: lib/ubsan
-    description: Issues and PRs which affect Undefined Behavior Sanitization
+    description: 'ubsan: Undefined Behavior Sanitization'
     color: "#fbca04"
     apply_on_pr_match_paths:
       - lib/ubsan/**
@@ -84,8 +116,8 @@ labels:
       - lib/ukalloc/**
 
   - name: lib/ukallocbbuddy
-    description: Issues and PRs which affect the abstraction for memory allocators
-    color: "#fbca04"
+    description:
+    color: "#ededed"
     apply_on_pr_match_paths:
       - lib/ukallocbbuddy/**
 
@@ -95,14 +127,8 @@ labels:
     apply_on_pr_match_paths:
       - lib/ukallocpool/**
 
-  - name: lib/ukallocregion
-    description: Issues and PRs which affect the region-based allocator
-    color: "#fbca04"
-    apply_on_pr_match_paths:
-      - lib/ukallocregion/**
-
   - name: lib/ukargparse
-    description: Issues and PRs which affect the simple argument parser
+    description: 'ukargparse: Simple argument parser'
     color: "#fbca04"
     apply_on_pr_match_paths:
       - lib/ukargparse/**
@@ -126,7 +152,7 @@ labels:
       - lib/ukbus/**
 
   - name: lib/ukcpio
-    description: Issues and PRs which affect CPIO archive extraction
+    description: 'ukcpio: CPIO archive extraction'
     color: "#fbca04"
     apply_on_pr_match_paths:
       - lib/ukcpio/**
@@ -136,6 +162,14 @@ labels:
     color: "#fbca04"
     apply_on_pr_match_paths:
       - lib/ukdebug/**
+
+  - name: lib/ukfile
+    description: ukfile Librry
+    color: "#CDF37D"
+
+  - name: lib/ukframealloc
+    description: ''
+    color: "#fbca04"
 
   - name: lib/uklibparam
     description: Issues and PRs which affect the library arguments parser
@@ -155,6 +189,10 @@ labels:
     apply_on_pr_match_paths:
       - lib/ukmmap/**
 
+  - name: lib/ukmmio
+    description: ''
+    color: "#fbca04"
+
   - name: lib/ukmpi
     description: Issues and PRs which affect the Message Passing Interface
     color: "#fbca04"
@@ -168,10 +206,18 @@ labels:
       - lib/uknetdev/**
 
   - name: lib/ukring
-    description: Issues and PRs which affect the ring buffer interface
-    color: "#fbca04"
+    description:
+    color: "#ededed"
     apply_on_pr_match_paths:
       - lib/ukring/**
+
+  - name: lib/ukring (deprecated)
+    description: ''
+    color: "#fef2c0"
+
+  - name: lib/ukrust
+    description: Rust support for internal libraries
+    color: "#fbca04"
 
   - name: lib/uksched
     description: Issues and PRs which affect the abstraction for schedulers
@@ -198,16 +244,28 @@ labels:
       - lib/uksignal/**
 
   - name: lib/uksp
-    description: Issues and PRs which affect the stack protector
-    color: "#fbca04"
+    description:
+    color: "#ededed"
     apply_on_pr_match_paths:
       - lib/uksp/**
+
+  - name: lib/ukstore
+    description: 'ukstore: Run-time configuration and monitoring'
+    color: "#fbca04"
 
   - name: lib/ukswrand
     description: Issues and PRs which affect the software random number generator
     color: "#fbca04"
     apply_on_pr_match_paths:
       - lib/ukswrand/**
+
+  - name: lib/uksysinfo
+    description: ''
+    color: "#fbca04"
+
+  - name: lib/uktest
+    description: 'uktest: Unikraft Test Suite'
+    color: "#fbca04"
 
   - name: lib/uktime
     description: Issues and PRs which affect time functions
@@ -222,7 +280,7 @@ labels:
       - lib/uktimeconv/**
 
   - name: lib/vfscore
-    description: Issues and PRs which affect VFS Core interface
+    description: VFS Core Interface
     color: "#fbca04"
     apply_on_pr_match_paths:
       - lib/vfscore/**

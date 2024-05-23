@@ -1,0 +1,4 @@
+labels:
+  - name: release-v1.0
+    description: Issue or PR is related to Unikraft v1.0 stable release.
+    color: "#bfd4f2"

@@ -1,0 +1,4 @@
+labels:
+  - name: merge
+    description: Label to trigger merge action
+    color: "#0e8a16"

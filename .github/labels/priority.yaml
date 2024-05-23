@@ -3,14 +3,15 @@ labels:
     description: Issues and PRs which have a high priority
     color: "#d93f0b"
 
+  - name: priority/low
+    description: Issues and PRs which have a very low priority
+    color: "#a1cbd2"
+
   - name: priority/medium
     description: Issues and PRs which have priority
     color: "#eb9e34"
 
-  - name: priority/low
-    description: Issues and PRs which have a very low priority
-    color: "#A1CBD2"
-
   - name: priority/nice-to-have
     description: Issues and PRs which have a very low priority
-    color: "#FD93AC"
+    color: "#fd93ac"
+

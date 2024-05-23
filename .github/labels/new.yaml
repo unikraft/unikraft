@@ -1,24 +1,25 @@
 labels:
   - name: new/library
-    description: Issues and PRs related to a new library
+    description: This PR or Issue intends to add a new library to Unikraft
     color: "#7bdb48"
 
   - name: new/metric
-    description: Issues and PRs related to a new metric
+    description: New metric
     color: "#7bdb48"
 
   - name: new/posix-function
-    description: Issues and PRs related to a new POSIX function
+    description: This PR or issue intends to add a new POSIX function to Unikraft
     color: "#7bdb48"
 
   - name: new/primitive
-    description: Issues and PRs related to a new primitive
+    description: New internal primitive
     color: "#7bdb48"
 
   - name: new/syscall
-    description: Issues and PRs related to a new syscall
+    description: New syscall or registration
     color: "#7bdb48"
 
   - name: new/test
-    description: Issues and PRs related to a new test
+    description: New test
     color: "#7bdb48"
+

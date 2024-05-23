@@ -1,27 +1,29 @@
 labels:
   - name: lifecycle/active
-    description: Indicates that an issue or PR is actively being worked on by a contributor
+    description: Indicates that an issue or PR is actively being worked on by a contributor.
     color: "#8ee234"
     apply_after: 0s
-    remove_after: 720h # 30 days
-    do_not_remove_if_labels_exist:
-      - lifecycle/frozen
-
-  - name: lifecycle/stale
-    description: Denotes an issue or PR has remained open with no activity and has become stale
-    color: "#795548"
-    apply_after: 720h # 30 days
-    remove_after: 4320h # 180 days
-    do_not_remove_if_labels_exist:
-      - lifecycle/frozen
-
-  - name: lifecycle/rotten
-    description: Denotes an issue or PR that has aged beyond stale and will be auto-closed
-    color: "#795548"
-    apply_after: 4320h # 180 days
+    remove_after: 720h
     do_not_remove_if_labels_exist:
       - lifecycle/frozen
 
   - name: lifecycle/frozen
-    description: Indicates that an issue or PR should not be auto-closed due to staleness
+    description: Indicates that an issue or PR should not be auto-closed due to staleness.
     color: "#b2fff6"
+
+  - name: lifecycle/rotten
+    description: Denotes an issue or PR that has aged beyond stale and will be auto-closed.
+    color: "#604460"
+    apply_after: 4320h
+    do_not_remove_if_labels_exist:
+      - lifecycle/frozen
+
+  - name: lifecycle/stale
+    description: Denotes an issue or PR has remained open with no activity and has
+      become stale.
+    color: "#795548"
+    apply_after: 720h
+    remove_after: 4320h
+    do_not_remove_if_labels_exist:
+      - lifecycle/frozen
+

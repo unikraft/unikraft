@@ -1,0 +1,4 @@
+labels:
+  - name: hotfix
+    description: Urgent fix requiring prioritized attention.
+    color: "#b60205"

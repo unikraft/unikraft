@@ -1,0 +1,5 @@
+labels:
+  - name: release-note
+    description: Denotes a PR that will be considered when it comes time to generate
+      release notes.
+    color: "#c2e0c6"

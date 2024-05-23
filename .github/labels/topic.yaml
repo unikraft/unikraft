@@ -1,60 +1,77 @@
 labels:
   - name: topic/booting
-    description: Issue or PR pertaining to the boot process
+    description: Topics pertaining to the boot process
     color: "#c5def5"
 
   - name: topic/build
-    description: Issue or PR pertaining to the build system
+    description: Topics to do with the build system
     color: "#c5def5"
 
   - name: topic/ci
-    description: Issue or PR pertaining to CI/CD
+    description: Topics on Continious Integration/Continious Delivery
     color: "#c5def5"
 
   - name: topic/concurrency
-    description: Issue or PR pertaining to concurrency
+    description: Topics to do with concurrency, locking
+    color: "#c5def5"
+
+  - name: topic/discussion
+    description: Discussion topics
     color: "#c5def5"
 
   - name: topic/irq
-    description: Issue or PR pertaining to IRQs
+    description: Topics on IRQ
     color: "#c5def5"
 
   - name: topic/metrics
-    description: Issue or PR pertaining to metrics
+    description: Topics to do with system monitoring
     color: "#c5def5"
 
   - name: topic/mm
-    description: Issue or PR pertaining to memory management
+    description: Topics pertaining to memory management
     color: "#c5def5"
 
   - name: topic/mpk
-    description: Issue or PR pertaining to Memory Protection Keys (MPKs)
+    description: Topics on Memory Protection Keys
+    color: "#c5def5"
+
+  - name: topic/muslpreview
+    description: Issue or PR is related to the transition from newlib to musl
+    color: "#c5def5"
+
+  - name: topic/net
+    description: Topic pertaining to networking
     color: "#c5def5"
 
   - name: topic/posix
-    description: Issue or PR pertaining to POSIX
+    description: Topics pertaining to POSIX standard
     color: "#c5def5"
 
   - name: topic/primitive
-    description: Issue or PR pertaining to Unikraft primitives
+    description: Topics on Unikraft primitives and essentials
     color: "#c5def5"
 
   - name: topic/scheduling
-    description: Issue or PR pertaining to scheduling
+    description: Topics pertaining to task scheduling
     color: "#c5def5"
 
   - name: topic/smp
-    description: Issue or PR pertaining to SMP
+    description: PR or issues related to SMP support.
     color: "#c5def5"
 
   - name: topic/syscall
-    description: Issue or PR pertaining to syscalls
+    description: Related to syscalls
+    color: "#c5def5"
+
+  - name: topic/testing
+    description: Topics on testing
     color: "#c5def5"
 
   - name: topic/threading
-    description: Issue or PR pertaining to threading
+    description: OS threading
     color: "#c5def5"
 
   - name: topic/tls
-    description: Issue or PR pertaining to Thread Local Storage (TLS)
+    description: Topics to do with Thread Level Speculation (TLS)
     color: "#c5def5"
+

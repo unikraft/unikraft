@@ -1,0 +1,4 @@
+labels:
+  - name: lgtm
+    description: Indicates that a PR is ready to be merged.
+    color: "#0e8a16"
