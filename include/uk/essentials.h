@@ -10,11 +10,51 @@
 #define __UK_ESSENTIALS_H__
 
 #include <uk/config.h>
-#include <uk/compiler.h>
 
 #if CONFIG_LIBNEWLIBC
 /* Needed for __STRINGIFY */
 #include <sys/param.h>
+#endif /* CONFIG_LIBNEWLIBC */
+
+/* Note: a has to be a power of 2 */
+#ifndef ALIGN_UP
+#define ALIGN_UP(v, a) (((v) + (a)-1) & ~((a)-1))
+#endif
+
+/* Note: a has to be a power of 2 */
+#ifndef ALIGN_DOWN
+#define ALIGN_DOWN(v, a) ((v) & ~((a)-1))
+#endif
+
+#ifndef STRINGIFY
+#ifndef __STRINGIFY
+#define __STRINGIFY(x) #x
+#endif
+#define STRINGIFY(x) __STRINGIFY(x)
+#endif
+
+#ifndef UK_CONCAT
+#define __UK_CONCAT_X(a, b) a##b
+#define UK_CONCAT(a, b) __UK_CONCAT_X(a, b)
+#endif
+
+#ifndef POWER_OF_2
+#define POWER_OF_2(v) ((0 != v) && (0 == (v & (v - 1))))
+#endif
+
+#ifndef DIV_ROUND_UP
+#define DIV_ROUND_UP(v, d) (((v) + (d)-1) / (d))
+#endif
+
+/* Note: a has to be a power of 2 */
+#ifndef IS_ALIGNED
+#define IS_ALIGNED(v, a) (((v) & ~((a)-1)) == (v))
+#endif
+
+#if !__ASSEMBLY__
+#include <uk/compiler.h>
+
+#if CONFIG_LIBNEWLIBC
 /* Needed for MIN, MAX */
 #include <inttypes.h>
 #endif
@@ -45,18 +85,6 @@ extern "C" {
 #define __align256b    __align32
 #define __align512b    __align64
 
-#ifndef STRINGIFY
-#ifndef __STRINGIFY
-#define __STRINGIFY(x) #x
-#endif
-#define STRINGIFY(x) __STRINGIFY(x)
-#endif
-
-#ifndef UK_CONCAT
-#define __UK_CONCAT_X(a, b) a##b
-#define UK_CONCAT(a, b) __UK_CONCAT_X(a, b)
-#endif
-
 #ifndef MIN
 #define MIN(a, b)                                                              \
 	({                                                                     \
@@ -85,29 +113,6 @@ extern "C" {
 #endif
 #ifndef MAX4
 #define MAX4(a, b, c, d) MAX(MAX((a), (b)), MAX((c), (d)))
-#endif
-
-#ifndef POWER_OF_2
-#define POWER_OF_2(v) ((0 != v) && (0 == (v & (v - 1))))
-#endif
-
-#ifndef DIV_ROUND_UP
-#define DIV_ROUND_UP(v, d) (((v) + (d)-1) / (d))
-#endif
-
-/* Note: a has to be a power of 2 */
-#ifndef ALIGN_UP
-#define ALIGN_UP(v, a) (((v) + (a)-1) & ~((a)-1))
-#endif
-
-/* Note: a has to be a power of 2 */
-#ifndef ALIGN_DOWN
-#define ALIGN_DOWN(v, a) ((v) & ~((a)-1))
-#endif
-
-/* Note: a has to be a power of 2 */
-#ifndef IS_ALIGNED
-#define IS_ALIGNED(v, a) (((v) & ~((a)-1)) == (v))
 #endif
 
 /**
@@ -177,5 +182,5 @@ extern "C" {
 #ifdef __cplusplus
 }
 #endif
-
+#endif /* !__ASSEMBLY__ */
 #endif /* __UK_ESSENTIALS_H__ */
