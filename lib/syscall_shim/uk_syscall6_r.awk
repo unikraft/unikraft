@@ -4,7 +4,7 @@ BEGIN {
 
 	print "#include <uk/print.h>"
 	print "#include <uk/syscall.h>"
-	print "#include \"arch/regmap_linuxabi.h\"\n"
+	print "#include <uk/bits/syscall_linuxabi.h>\n"
 
 	print "UK_SYSCALL_EXECENV_PROLOGUE_DEFINE(uk_syscall6_r, uk_syscall6_r_e,"
 	print "\t\t\t\t14, long, nr, long, arg1, long, arg2, long, arg3, long, arg4, long, arg5, long, arg6)";

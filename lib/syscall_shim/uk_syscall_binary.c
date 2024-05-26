@@ -41,7 +41,6 @@
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include <uk/thread.h>
-#include "arch/regmap_linuxabi.h"
 #if CONFIG_LIBSYSCALL_SHIM_STRACE
 #include <uk/plat/console.h> /* ukplat_coutk */
 #endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
