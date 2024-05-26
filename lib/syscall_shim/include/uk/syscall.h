@@ -45,7 +45,7 @@
 #include <errno.h>
 #include <stdarg.h>
 #include <uk/print.h>
-#include "legacy_syscall.h"
+#include <uk/legacy_syscall.h>
 #include <uk/bits/syscall_linuxabi.h>
 
 #ifdef __cplusplus
