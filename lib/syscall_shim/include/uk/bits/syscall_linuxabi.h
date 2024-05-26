@@ -1,4 +1,5 @@
-#ifndef _REGMAP_LINUXABI_H_
+#ifndef __LIBSYSCALL_SHIM_SYSCALL_LINUXABI_H__
+#define __LIBSYSCALL_SHIM_SYSCALL_LINUXABI_H__
 
 #include <uk/arch/lcpu.h>
 
@@ -40,7 +41,6 @@
 
 #else
 #error "Missing register mappings for selected target architecture"
-
 #endif
 
-#endif /* _REGMAP_LINUXABI_H_ */
+#endif /* __LIBSYSCALL_SHIM_SYSCALL_LINUXABI_H__ */
