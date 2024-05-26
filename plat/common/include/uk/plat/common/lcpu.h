@@ -39,16 +39,14 @@
 #define __PLAT_CMN_LCPU_H__
 
 #include <uk/config.h>
+#include <uk/essentials.h>
 #include <uk/plat/config.h>
 #ifndef __ASSEMBLY__
-#include <uk/essentials.h>
 #include <uk/arch/types.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/spinlock.h>
 #include <uk/list.h>
-#else /* !__ASSEMBLY__ */
-#define ALIGN_UP(v, a) (((v) + (a)-1) & ~((a)-1))
-#endif /* __ASSEMBLY__ */
+#endif /* !__ASSEMBLY__ */
 
 #if defined(__X86_64__)
 #include <x86/lcpu_defs.h>
