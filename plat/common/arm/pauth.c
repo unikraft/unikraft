@@ -84,5 +84,7 @@ int __no_pauth ukplat_pauth_init(void)
 	reg |= SCTLR_EL1_EnIA_BIT;
 	SYSREG_WRITE64(sctlr_el1, reg);
 
+	isb();
+
 	return 0;
 }
