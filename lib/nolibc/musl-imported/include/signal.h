@@ -129,6 +129,17 @@ struct sigevent {
 	int              sigev_notify;	/* Notification type */
 	int              sigev_signo;	/* Signal number */
 	union sigval     sigev_value;	/* Signal value */
+
+	void 		   (*sigev_notify_function)(union sigval); 
+		/* Function used for thread notification
+			      (SIGEV_THREAD) */
+	
+	void 			*sigev_notify_attributes;
+		/* Attributes for notification thread
+	  			  (SIGEV_THREAD) */
+	
+	pid_t 			 sigev_notify_thread_id;
+		/* ID of thread to signal (SIGEV_THREAD_ID) */
 };
 
 /* TODO: not used - defined just for v8 */

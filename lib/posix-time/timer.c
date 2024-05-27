@@ -33,8 +33,8 @@
 #include "uk/arch/lcpu.h"
 #include "uk/list.h"
 #include "uk/thread.h"
-#include <sys/time.h>
 
+#include <sys/time.h>
 #include <errno.h>
 #include <stdio.h>
 #include <time.h>
@@ -48,6 +48,7 @@
 #include <uk/plat/time.h>
 #include <uk/assert.h>
 
+
 struct uk_timer {
 	struct uk_list_head nodes;
 	struct uk_alloc *alloc;
@@ -56,6 +57,7 @@ struct uk_timer {
 	clockid_t clockid;
 	struct sigevent sigev;
 	struct itimerspec spec;
+	pid_t pid;
 };
 
 struct uk_timer *timer_list_head = NULL;
@@ -114,6 +116,29 @@ static void timer_disarm(struct uk_thread *thread)
 static void expire(struct uk_timer *timer)
 {
 	uk_printk(KLVL_CRIT, "expired\n");
+
+	switch(timer->sigev.sigev_notify) {
+		case SIGEV_NONE: 
+			break;
+		case SIGEV_SIGNAL: {
+			uk_syscall_r_kill(timer->pid, timer->sigev.sigev_signo);
+			break;
+		}
+		case SIGEV_THREAD: {
+
+			uk_sched_thread_create(
+			    uk_sched_current(),
+			    (void(*)(void*)) timer->sigev.sigev_notify_function,
+			    (void*) &timer->sigev.sigev_value, 
+				"Timer SIGEV_THREAD"
+		);
+
+			break;
+		}
+		default: {
+			break;
+		}
+	}
 }
 
 struct timer_status {
@@ -142,18 +167,18 @@ static inline struct timer_status next_delay(struct uk_timer *timer,
 			status.exp_cnt = 1 + time_since_first_exp / period;
 
 			if (status.exp_cnt - timer->exp_cnt > 1) {
-				status.overrun_cnt =
-				    status.exp_cnt - timer->exp_cnt;
+				status.overrun_cnt = status.exp_cnt - timer->exp_cnt;
 			}
 
-			status.next =
-			    timer->exp_cnt * period - time_since_first_exp;
+			status.next = timer->exp_cnt * period - time_since_first_exp;
 
 		} else {
+			/* No interval */
 			status.next = 0;
 		}
 
 	} else {
+		/* Wait until timer expires for the first time */
 		status.next = (__nsec) -time_since_first_exp;
 	}
 
@@ -226,42 +251,33 @@ UK_SYSCALL_R_DEFINE(int, timer_create, clockid_t, clockid,
 		    struct sigevent *__restrict, sevp, timer_t *__restrict,
 		    timerid)
 {
-
+	struct uk_timer *timer;
+	struct uk_alloc *alloc;
+	
 	/* Check clock id */
 	if (unlikely(uk_syscall_r_clock_getres(clockid, (uintptr_t)NULL)))
 		return -EINVAL;
 
-	/* Check Signal event valid */
+	alloc = uk_alloc_get_default();
+	timer = uk_malloc(alloc, sizeof(struct uk_timer *));
 
-	switch (sevp->sigev_notify) {
-	case SIGEV_NONE:
-	case SIGEV_SIGNAL: {
-		struct uk_timer *timer;
+	if (unlikely(!timer))
+		return -ENOMEM;
 
-		struct uk_alloc *a = uk_alloc_get_default();
-		timer = uk_malloc(a, sizeof(struct uk_timer *));
+	timer->alloc = alloc;
+	timer->exp_cnt = 0;
+	timer->thread = NULL;
+	timer->clockid = clockid;
+	timer->sigev = *sevp;
+	timer->pid = uk_syscall_r_getpid(); 
 
-		if (unlikely(!timer))
-			return -ENOMEM;
-
-		timer->alloc = a;
-		timer->sigev = *sevp;
-		timer->clockid = clockid;
-		timer->exp_cnt = 0;
-		timer->thread = NULL;
-
-		if (unlikely(__push_timer(timer))) {
-			return -ENOMEM;
-		}
-
-		*timerid = (timer_t *)timer;
-		return 0;
+	if (unlikely(__push_timer(timer))) {
+		return -ENOMEM;
 	}
 
-	/* Thread events not implemented yet */
-	default:
-		return -ENOTSUP;
-	}
+	*timerid = (timer_t *)timer;
+		
+	return 0;
 }
 
 UK_SYSCALL_R_DEFINE(int, timer_delete, timer_t, timerid)
