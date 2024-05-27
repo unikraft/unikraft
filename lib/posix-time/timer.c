@@ -31,6 +31,7 @@
  */
 #include "uk/alloc.h"
 #include "uk/arch/lcpu.h"
+#include "uk/list.h"
 #include "uk/thread.h"
 #include <sys/time.h>
 
@@ -59,10 +60,9 @@ struct uk_timer {
 
 struct uk_timer *timer_list_head = NULL;
 
-static inline 
-int __push_timer(struct uk_timer *timer)
+static inline int __push_timer(struct uk_timer *timer)
 {
-	if(timer_list_head == NULL) {
+	if (timer_list_head == NULL) {
 		timer_list_head = timer;
 
 	} else {
@@ -73,40 +73,28 @@ int __push_timer(struct uk_timer *timer)
 }
 
 /* Removes timer from timer data structure and frees the memory */
-static 
-int __delete_timer(struct uk_timer *head, timer_t timerid)
+static void __delete_timer(struct uk_timer *timer)
 {
-	
-	while (head != NULL) {
-		if (head == timerid) {
-			
-			if (head->nodes.prev == NULL) {
-				timer_list_head = NULL;
-			
-			} else {
-				uk_list_del(&head->nodes);
-			}
+	if(!timer->nodes.prev) {
+		timer_list_head = (struct uk_timer*) timer->nodes.next;
+		timer_list_head->nodes.prev = NULL;
 
-			uk_free(head->alloc, head);
-
-			return 0;
-		}
-
-		head = (struct uk_timer *) head->nodes.next;
+	} else {
+		uk_list_del(&timer->nodes);
 	}
 
-	return -EINVAL;	
+	uk_free(timer->alloc, timer);
 }
 
-static
-struct uk_timer* get_timer(timer_t timerid) {
-	struct uk_timer *timer = (struct uk_timer* ) timerid;
+static struct uk_timer *get_timer(timer_t timerid)
+{
+	struct uk_timer *timer = (struct uk_timer *)timerid;
 	struct uk_timer *head = timer_list_head;
 
 	/* Check if timerid points to valid list entry. Otherwise return NULL */
-	while(head != timer) {
-		if(head) {
-			head = (struct uk_timer* ) head->nodes.next;
+	while (head != timer) {
+		if (head) {
+			head = (struct uk_timer *)head->nodes.next;
 
 		} else {
 			return NULL;
@@ -116,20 +104,17 @@ struct uk_timer* get_timer(timer_t timerid) {
 	return timer;
 }
 
-static
-void timer_disarm(struct uk_thread *thread)
+static void timer_disarm(struct uk_thread *thread)
 {
 	uk_thread_terminate(thread);
 	uk_printk(KLVL_CRIT, "timer disairmed\n");
 }
 
-
 /* Called when timer expires */
-static 
-void expire(struct uk_timer *timer) {
+static void expire(struct uk_timer *timer)
+{
 	uk_printk(KLVL_CRIT, "expired\n");
 }
-
 
 struct timer_status {
 	__nsec next;
@@ -137,30 +122,32 @@ struct timer_status {
 	__u64 overrun_cnt;
 };
 
-
-/* Calculates the time to the time difference between current time and the next timer expiry. */
-static inline
-struct timer_status next_delay(struct uk_timer *timer,
-				       const struct timespec *now)
+/* Calculates the time to the time difference between current time and the next
+ * timer expiry. */
+static inline struct timer_status next_delay(struct uk_timer *timer,
+					     const struct timespec *now)
 {
 
-	__snsec time_since_first_exp = uk_time_spec_nsecdiff(&timer->spec.it_value, now);
+	__snsec time_since_first_exp =
+	    uk_time_spec_nsecdiff(&timer->spec.it_value, now);
 
 	struct timer_status status;
 	status.overrun_cnt = 0;
 	status.exp_cnt = 0;
-	
+
 	if (time_since_first_exp >= 0) {
 		__nsec period = uk_time_spec_to_nsec(&timer->spec.it_interval);
 
 		if (period) {
 			status.exp_cnt = 1 + time_since_first_exp / period;
 
-			if(status.exp_cnt - timer->exp_cnt > 1) {
-				status.overrun_cnt = status.exp_cnt - timer->exp_cnt;
+			if (status.exp_cnt - timer->exp_cnt > 1) {
+				status.overrun_cnt =
+				    status.exp_cnt - timer->exp_cnt;
 			}
 
-			status.next = timer->exp_cnt * period - time_since_first_exp;
+			status.next =
+			    timer->exp_cnt * period - time_since_first_exp;
 
 		} else {
 			status.next = 0;
@@ -173,8 +160,9 @@ struct timer_status next_delay(struct uk_timer *timer,
 	return status;
 }
 
-/* Calculates the deadline for the next timer expiry relative to CLOCK_MONOTONIC */
-static __nsec _get_next_deadline(struct uk_timer *timer, struct timespec *now) 
+/* Calculates the deadline for the next timer expiry relative to CLOCK_MONOTONIC
+ */
+static __nsec _get_next_deadline(struct uk_timer *timer, struct timespec *now)
 {
 	/* Clear & sleep if timer disarmed */
 	if (!timer->spec.it_value.tv_sec && !timer->spec.it_value.tv_nsec) {
@@ -187,12 +175,11 @@ static __nsec _get_next_deadline(struct uk_timer *timer, struct timespec *now)
 	struct timer_status status = next_delay(timer, now);
 	timer->exp_cnt = status.exp_cnt;
 
-	if(!status.next) {
+	if (!status.next) {
 
 		uk_printk(KLVL_CRIT, "n\n");
 		return 0;
 	}
-
 
 	uk_printk(KLVL_CRIT, "next %lu\n", status.next);
 	return ukplat_monotonic_clock() + status.next;
@@ -204,27 +191,28 @@ static __noreturn void __timer_update_thread(void *timerid)
 
 	struct uk_timer *timer = get_timer(timerid);
 
-	if(!timer) {
+	if (!timer) {
 		timer_disarm(uk_thread_current());
 	}
 
-	while(true) {		
-		
-		struct timespec now;
-		int err = uk_syscall_r_clock_gettime(timer->clockid, (uintptr_t)&now);
+	while (true) {
 
-		if(unlikely(err)) {
+		struct timespec now;
+		int err =
+		    uk_syscall_r_clock_gettime(timer->clockid, (uintptr_t)&now);
+
+		if (unlikely(err)) {
 			/* terminate on error */
 			timer_disarm(uk_thread_current());
 		}
-		
+
 		deadline = _get_next_deadline(timer, &now);
 		uk_printk(KLVL_CRIT, "deadline: %lu\n", deadline);
 
 		if (deadline) {
 			uk_thread_block_until(uk_thread_current(), deadline);
 			expire(timer);
-		
+
 		} else {
 			/* disarm */
 			timer_disarm(uk_thread_current());
@@ -266,21 +254,30 @@ UK_SYSCALL_R_DEFINE(int, timer_create, clockid_t, clockid,
 			return -ENOMEM;
 		}
 
-		*timerid = (timer_t *) timer;
+		*timerid = (timer_t *)timer;
 		return 0;
 	}
 
 	/* Thread events not implemented yet */
-	default: 
+	default:
 		return -ENOTSUP;
-	
 	}
 }
 
-
 UK_SYSCALL_R_DEFINE(int, timer_delete, timer_t, timerid)
 {
-	return -ENOTSUP;
+	struct uk_timer *timer = get_timer(timerid);
+	if (!timer) {
+		return -EINVAL;
+	}
+
+	if(timer->thread) {
+		timer_disarm(timer->thread);
+	}
+
+	__delete_timer(timer);
+	
+	return 0;
 }
 
 UK_SYSCALL_R_DEFINE(int, timer_settime, timer_t, timerid, int, flags,
@@ -292,9 +289,9 @@ UK_SYSCALL_R_DEFINE(int, timer_settime, timer_t, timerid, int, flags,
 		return -EINVAL;
 	}
 
-	const int disarm = !new_value->it_value.tv_sec &&
-			   !new_value->it_value.tv_nsec;
-	
+	const int disarm =
+	    !new_value->it_value.tv_sec && !new_value->it_value.tv_nsec;
+
 	/* Disarm timer if armed */
 	if (disarm && timer->thread != NULL) {
 		timer_disarm(timer->thread);
@@ -303,7 +300,7 @@ UK_SYSCALL_R_DEFINE(int, timer_settime, timer_t, timerid, int, flags,
 
 	/* Return EINVAL if timespec values out of range */
 	if (new_value->it_value.tv_sec < 0 || new_value->it_value.tv_nsec < 0
-	    |	new_value->it_value.tv_nsec > 999999999) {
+	    || new_value->it_value.tv_nsec > 999999999) {
 		return -EINVAL;
 	}
 
@@ -316,7 +313,7 @@ UK_SYSCALL_R_DEFINE(int, timer_settime, timer_t, timerid, int, flags,
 		struct timespec now;
 
 		int err = uk_syscall_r_clock_gettime(timer->clockid, (uintptr_t)&now);
-		if(unlikely(err)) {
+		if (unlikely(err)) {
 			return err;
 		}
 
@@ -342,12 +339,6 @@ UK_SYSCALL_R_DEFINE(int, timer_settime, timer_t, timerid, int, flags,
 UK_SYSCALL_R_DEFINE(int, timer_gettime, timer_t, timerid, struct itimerspec *,
 		    curr_value)
 {
-	UK_WARN_STUBBED();
-	return -ENOTSUP;
-}
-
-UK_SYSCALL_R_DEFINE(int, timer_getoverrun, timer_t, timerid)
-{	
 	struct uk_timer *timer = get_timer(timerid);
 	if (!timer) {
 		return -EINVAL;
@@ -356,7 +347,26 @@ UK_SYSCALL_R_DEFINE(int, timer_getoverrun, timer_t, timerid)
 	struct timespec now;
 
 	int err = uk_syscall_r_clock_gettime(timer->clockid, (uintptr_t)&now);
-	if(unlikely(err)) {
+	if (unlikely(err)) {
+		return err;
+	}
+
+	struct timer_status status = next_delay(timer, &now);
+
+	return status.next;
+}
+
+UK_SYSCALL_R_DEFINE(int, timer_getoverrun, timer_t, timerid)
+{
+	struct uk_timer *timer = get_timer(timerid);
+	if (!timer) {
+		return -EINVAL;
+	}
+
+	struct timespec now;
+
+	int err = uk_syscall_r_clock_gettime(timer->clockid, (uintptr_t)&now);
+	if (unlikely(err)) {
 		return err;
 	}
 
