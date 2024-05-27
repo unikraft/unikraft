@@ -119,7 +119,6 @@ int sigaddset(sigset_t *set, int signo);
 int sigdelset(sigset_t *set, int signo);
 int sigismember(const sigset_t *set, int signo);
 
-/* TODO: not used - defined just for newlib */
 union sigval {
 	int    sival_int;	/* Integer signal value */
 	void  *sival_ptr;	/* Pointer signal value */

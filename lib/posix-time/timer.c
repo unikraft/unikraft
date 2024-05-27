@@ -109,13 +109,12 @@ static struct uk_timer *get_timer(timer_t timerid)
 static void timer_disarm(struct uk_thread *thread)
 {
 	uk_thread_terminate(thread);
-	uk_printk(KLVL_CRIT, "timer disairmed\n");
 }
 
 /* Called when timer expires */
 static void expire(struct uk_timer *timer)
 {
-	uk_printk(KLVL_CRIT, "expired\n");
+	uk_printk(KLVL_CRIT, "Expired\n");
 
 	switch(timer->sigev.sigev_notify) {
 		case SIGEV_NONE: 
@@ -201,12 +200,9 @@ static __nsec _get_next_deadline(struct uk_timer *timer, struct timespec *now)
 	timer->exp_cnt = status.exp_cnt;
 
 	if (!status.next) {
-
-		uk_printk(KLVL_CRIT, "n\n");
 		return 0;
 	}
 
-	uk_printk(KLVL_CRIT, "next %lu\n", status.next);
 	return ukplat_monotonic_clock() + status.next;
 }
 
@@ -232,7 +228,6 @@ static __noreturn void __timer_update_thread(void *timerid)
 		}
 
 		deadline = _get_next_deadline(timer, &now);
-		uk_printk(KLVL_CRIT, "deadline: %lu\n", deadline);
 
 		if (deadline) {
 			uk_thread_block_until(uk_thread_current(), deadline);
