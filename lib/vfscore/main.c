@@ -1318,6 +1318,66 @@ UK_SYSCALL_R_DEFINE(int, rename, const char*, oldpath, const char*, newpath)
 	return -error;
 }
 
+UK_TRACEPOINT(trace_vfs_renameat, "\"%s\" \"%s\"", const char*, const char*);
+UK_TRACEPOINT(trace_vfs_renameat_ret, "");
+UK_TRACEPOINT(trace_vfs_renameat_err, "%d", int);
+
+UK_SYSCALL_R_DEFINE(int, renameat,
+	int, olddirfd, const char*, oldpath, int, newdirfd, const char*, newpath)
+{
+	char src[PATH_MAX];
+	char dest[PATH_MAX];
+
+	if (!(oldpath[0] == '/' || olddirfd == AT_FDCWD)) {
+		struct vfscore_file *fp;
+		struct vnode *vp;
+		int error = fget(olddirfd, &fp);
+
+		if (error)
+			return -error;
+
+		vp = fp->f_dentry->d_vnode;
+
+		vn_lock(vp);
+
+		/* build absolute path */
+		strlcpy(src, fp->f_dentry->d_mount->m_path, PATH_MAX);
+		strlcat(src, fp->f_dentry->d_path, PATH_MAX);
+		strlcat(src, "/", PATH_MAX);
+		strlcat(src, oldpath, PATH_MAX);
+
+		vn_unlock(vp);
+		fdrop(fp);
+	} else {
+		strlcpy(src, oldpath, PATH_MAX);
+	}
+
+	if (!(newpath[0] == '/' || newdirfd == AT_FDCWD)) {
+		struct vfscore_file *fp;
+		struct vnode *vp;
+		int error = fget(newdirfd, &fp);
+
+		if (error)
+			return -error;
+
+		vp = fp->f_dentry->d_vnode;
+		vn_lock(vp);
+
+		/* build absolute path */
+		strlcpy(dest, fp->f_dentry->d_mount->m_path, PATH_MAX);
+		strlcat(dest, fp->f_dentry->d_path, PATH_MAX);
+		strlcat(dest, "/", PATH_MAX);
+		strlcat(dest, newpath, PATH_MAX);
+
+		vn_unlock(vp);
+		fdrop(fp);
+	} else {
+		strlcpy(src, newpath, PATH_MAX);
+	}
+
+	return sys_rename(src, dest);
+}
+
 UK_TRACEPOINT(trace_vfs_chdir, "\"%s\"", const char*);
 UK_TRACEPOINT(trace_vfs_chdir_ret, "");
 UK_TRACEPOINT(trace_vfs_chdir_err, "%d", int);
