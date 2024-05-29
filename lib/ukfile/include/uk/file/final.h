@@ -54,20 +54,21 @@ void uk_file_finref_acquire_weak(struct uk_file_finref *r)
 static inline
 int uk_file_finref_release(struct uk_file_finref *r)
 {
-	int ret = uk_swrefcount_release(&r->cnt);
+	return uk_swrefcount_release(&r->cnt);
+}
 
-	if (ret | UK_SWREFCOUNT_LAST_STRONG) {
-		struct uk_file_finalize_cb *fin = r->fins;
+static inline
+void uk_file_finref_finalize(struct uk_file_finref *r)
+{
+	struct uk_file_finalize_cb *fin = r->fins;
 
-		while (fin) {
-			/* The call might free fin, read next before */
-			struct uk_file_finalize_cb *next = fin->next;
+	while (fin) {
+		/* The call might free fin, read next before */
+		struct uk_file_finalize_cb *next = fin->next;
 
-			fin->fin(fin->arg);
-			fin = next;
-		}
+		fin->fin(fin->arg);
+		fin = next;
 	}
-	return ret;
 }
 
 static inline
