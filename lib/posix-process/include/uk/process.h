@@ -37,6 +37,7 @@
 #include <arch/clone.h>
 #include <uk/config.h>
 #include <stdbool.h>
+#include <sys/types.h> /* For pid_t. FIXME: Introduces dependency to (no)libc */
 #if CONFIG_LIBUKSCHED
 #include <uk/thread.h>
 #endif
@@ -199,5 +200,25 @@ struct uk_posix_clonetab_entry {
 				 UK_PRIO_LATEST)
 
 #endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
+
+/**
+ * Kills the siblings of a given thread
+ *
+ * The thread and its parent process are preserved.
+ *
+ * @param thread to kill siblings of
+ */
+void uk_posix_process_kill_siblings(struct uk_thread *thread);
+
+/**
+ * Wait for process
+ *
+ * Waits for a child to terminate and reaps its process.
+ *
+ * @param status If not NULL, stores the child's exit status
+ * @return pid of terminated child or -ECHILD if the
+ *         process has no waitable children
+ */
+pid_t uk_posix_process_wait(void);
 
 #endif /* __UK_PROCESS_H__ */
