@@ -156,23 +156,7 @@ static int _init_mem(struct ukplat_bootinfo *const bi)
 	if (unlikely(rc < 0))
 		return rc;
 
-	mrd = (struct ukplat_memregion_desc) {
-		.pbase = __PADDR_MAX,
-		.vbase = VIRT_DEMAND_AREA,
-		.pg_off = 0,
-		.len   = DEMAND_MAP_PAGES * PAGE_SIZE,
-		.pg_count = DEMAND_MAP_PAGES,
-		.type  = UKPLAT_MEMRT_RESERVED,
-		.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP,
-	};
-#if CONFIG_UKPLAT_MEMRNAME
-	strncpy(mrd.name, "demand", sizeof(mrd.name) - 1);
-#endif
-	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
-	if (unlikely(rc < 0))
-		return rc;
-
-	_init_mem_demand_area((unsigned long)mrd.vbase, DEMAND_MAP_PAGES);
+	_init_mem_demand_area((unsigned long)VIRT_DEMAND_AREA, DEMAND_MAP_PAGES);
 
 	/* initrd */
 	mrd = (struct ukplat_memregion_desc){0};
