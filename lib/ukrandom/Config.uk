@@ -7,7 +7,7 @@ menuconfig LIBUKRANDOM
 if LIBUKRANDOM
 
 config LIBUKRANDOM_DEVFS
-	bool "Register random and urandom device to devfs"
+	bool "Register random, urandom, and hwrng device to devfs"
 	select LIBDEVFS
 	depends on LIBVFSCORE
 	default n

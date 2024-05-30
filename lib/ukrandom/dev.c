@@ -36,6 +36,7 @@
 #include <uk/ctors.h>
 #include <uk/print.h>
 #include <uk/random.h>
+#include <uk/arch/random.h>
 #include <uk/assert.h>
 #include <uk/config.h>
 #include <uk/essentials.h>
@@ -44,17 +45,45 @@
 
 #define DEV_RANDOM_NAME "random"
 #define DEV_URANDOM_NAME "urandom"
+#define DEV_HWRNG_NAME "hwrng"
+
+/* TODO: Move this to random.c once ukarch_random is implemented as a driver */
+__ssz uk_random_hwrng_fill_buffer(void *buf, __sz buflen)
+{
+	__sz step, chunk_size, i;
+	__u64 rd;
+	int ret;
+
+	step = sizeof(__u64);
+	chunk_size = buflen % step;
+
+	for (i = 0; i < buflen - chunk_size; i += step) {
+		ret = ukarch_random_seed_u64((__u64 *)((char *)buf + i));
+		if (unlikely(ret))
+			return ret;
+	}
+
+	/* fill the remaining bytes of the buffer */
+	if (chunk_size > 0) {
+		ret = ukarch_random_seed_u64(&rd);
+		if (unlikely(ret))
+			return ret;
+		memcpy((char *)buf + i, &rd, chunk_size);
+	}
+
+	return buflen;
+}
 
 static int dev_random_read(struct device *dev __unused, struct uio *uio,
 			   int flags __unused)
 {
-	size_t count;
+	__sz count;
 	char *buf;
 
 	buf = uio->uio_iov->iov_base;
 	count = uio->uio_iov->iov_len;
 
-	uk_swrand_fill_buffer(buf, count);
+	uk_random_fill_buffer(buf, count);
 
 	uio->uio_resid = 0;
 	return 0;
@@ -65,6 +94,21 @@ static int dev_random_write(struct device *dev __unused,
 			    int flags __unused)
 {
 	return EPERM;
+}
+
+static int dev_hwrng_read(struct device *dev __unused, struct uio *uio,
+			  int flags __unused)
+{
+	size_t count;
+	char *buf;
+	int ret;
+
+	buf = uio->uio_iov->iov_base;
+	count = uio->uio_iov->iov_len;
+
+	ret = uk_random_hwrng_fill_buffer(buf, count);
+	uio->uio_resid = count - ret;
+	return ret;
 }
 
 static struct devops random_devops = {
@@ -87,12 +131,26 @@ static struct driver drv_urandom = {
 	.name = DEV_URANDOM_NAME
 };
 
+static struct devops hwrng_devops = {
+	.open = dev_noop_open,
+	.close = dev_noop_close,
+	.read = dev_hwrng_read,
+	.write = dev_random_write,
+	.ioctl = dev_noop_ioctl,
+};
+
+static struct driver drv_hwrng = {
+	.devops = &hwrng_devops,
+	.devsz = 0,
+	.name = DEV_HWRNG_NAME
+};
+
 static int devfs_register(struct uk_init_ctx *ictx __unused)
 {
 	int rc;
 
-	uk_pr_info("Register '%s' and '%s' to devfs\n",
-		   DEV_URANDOM_NAME, DEV_RANDOM_NAME);
+	uk_pr_info("Register '%s', %s, and '%s' to devfs\n",
+		   DEV_URANDOM_NAME, DEV_RANDOM_NAME, DEV_HWRNG_NAME);
 
 	/* register /dev/urandom */
 	rc = device_create(&drv_urandom, DEV_URANDOM_NAME, D_CHR, NULL);
@@ -107,6 +165,14 @@ static int devfs_register(struct uk_init_ctx *ictx __unused)
 	if (unlikely(rc)) {
 		uk_pr_err("Failed to register '%s' to devfs: %d\n",
 			  DEV_RANDOM_NAME, rc);
+		return -rc;
+	}
+
+	/* register /dev/hwrng */
+	rc = device_create(&drv_hwrng, DEV_HWRNG_NAME, D_CHR, NULL);
+	if (unlikely(rc)) {
+		uk_pr_err("Failed to register '%s' to devfs: %d\n",
+			  DEV_HWRNG_NAME, rc);
 		return -rc;
 	}
 
