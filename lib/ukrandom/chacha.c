@@ -31,10 +31,11 @@
  */
 
 #include <string.h>
-#include <uk/random.h>
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <uk/ctors.h>
+#include <uk/random.h>
+#include <uk/arch/random.h>
 
 struct uk_swrand {
 	int k;
@@ -116,8 +117,8 @@ static inline __u32 _infvec_val(unsigned int c, const __u32 v[],
 	return v[pos % c];
 }
 
-void uk_swrand_init_r(struct uk_swrand *r, unsigned int seedc,
-		const __u32 seedv[])
+static void chacha_init(struct uk_swrand *r, unsigned int seedc,
+			const __u32 seedv[])
 {
 	__u32 i;
 
@@ -135,6 +136,29 @@ void uk_swrand_init_r(struct uk_swrand *r, unsigned int seedc,
 	_uk_iv_setup(r, iv);
 
 	r->k = 16;
+}
+
+int uk_swrand_init(void)
+{
+	unsigned int seedc = 10;
+	__u32 seedv[10];
+	unsigned int i;
+	int ret;
+
+	uk_pr_info("Initialize random number generator...\n");
+
+	for (i = 0; i < seedc; i++) {
+		ret = ukarch_random_seed_u32(&seedv[i]);
+		if (unlikely(ret)) {
+			uk_pr_err("Could not generate random seed\n");
+			return ret;
+		}
+	}
+
+	chacha_init(&uk_swrand_def, seedc, seedv);
+
+	/* The initialization of swrand never fails */
+	return 0;
 }
 
 __u32 uk_swrand_randr_r(struct uk_swrand *r)

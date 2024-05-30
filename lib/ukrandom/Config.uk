@@ -1,29 +1,10 @@
 menuconfig LIBUKRANDOM
 	bool "ukrandom: Random number generation"
 	select LIBUKDEBUG
+	depends on HAVE_RANDOM
 	default n
 
 if LIBUKRANDOM
-
-choice
-    prompt "Initial seed"
-    default LIBUKRANDOM_INITIALSEED_TIME
-
-config LIBUKRANDOM_INITIALSEED_TIME
-    bool "Platform timestamp"
-
-config LIBUKRANDOM_INITIALSEED_RDRAND
-    depends on ARCH_X86_64 && (MARCH_X86_64_COREI7AVXI)
-    bool "`rdrand` instruction"
-
-config LIBUKRANDOM_INITIALSEED_USECONSTANT
-    bool "Compiled-in constant"
-endchoice
-
-config LIBUKRANDOM_INITIALSEED_CONSTANT
-    int "Initial seed constant"
-    depends on LIBUKRANDOM_INITIALSEED_USECONSTANT
-    default 23
 
 config LIBUKRANDOM_DEVFS
 	bool "Register random and urandom device to devfs"
