@@ -34,7 +34,7 @@
 #define __UK_STACKPROTECTOR_H__
 
 #ifdef CONFIG_LIBUKSP_VALUE_RANDOM
-#include <uk/swrand.h>
+#include <uk/random.h>
 #endif
 #include <uk/config.h>
 

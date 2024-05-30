@@ -33,7 +33,7 @@
 #include <string.h>
 #include <sys/random.h>
 #include <uk/essentials.h>
-#include <uk/swrand.h>
+#include <uk/random.h>
 #include <uk/syscall.h>
 
 UK_SYSCALL_R_DEFINE(ssize_t, getrandom,

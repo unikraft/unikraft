@@ -62,7 +62,7 @@
 # These owners oversee the security-related components.
 /lib/ubsan		@unikraft/maintainers-security
 /lib/uksp		@unikraft/maintainers-security
-/lib/ukswrand		@unikraft/maintainers-security
+/lib/ukrandom		@unikraft/maintainers-security
 
 # These owners oversee the network-related components.
 /lib/uknetdev		@unikraft/maintainers-net

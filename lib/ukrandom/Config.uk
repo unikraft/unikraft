@@ -1,19 +1,19 @@
-menuconfig LIBUKSWRAND
-	bool "ukswrand: Software random number generator"
+menuconfig LIBUKRANDOM
+	bool "ukrandom: Random number generation"
 	select LIBUKDEBUG
 	default n
 
-if LIBUKSWRAND
+if LIBUKRANDOM
 choice
 	prompt "Algorithm"
-	default LIBUKSWRAND_CHACHA
+	default LIBUKRANDOM_CHACHA
 
-config LIBUKSWRAND_MWC
+config LIBUKRANDOM_MWC
 	bool "Multiply-with-carry"
 	help
 		Use multiply-with-carry algorithm
 
-config LIBUKSWRAND_CHACHA
+config LIBUKRANDOM_CHACHA
 	bool "ChaCha20"
 	help
 		Use ChaCha20 algorithm
@@ -21,25 +21,25 @@ endchoice
 
 choice
     prompt "Initial seed"
-    default LIBUKSWRAND_INITIALSEED_TIME
+    default LIBUKRANDOM_INITIALSEED_TIME
 
-config LIBUKSWRAND_INITIALSEED_TIME
+config LIBUKRANDOM_INITIALSEED_TIME
     bool "Platform timestamp"
 
-config LIBUKSWRAND_INITIALSEED_RDRAND
+config LIBUKRANDOM_INITIALSEED_RDRAND
     depends on ARCH_X86_64 && (MARCH_X86_64_COREI7AVXI)
     bool "`rdrand` instruction"
 
-config LIBUKSWRAND_INITIALSEED_USECONSTANT
+config LIBUKRANDOM_INITIALSEED_USECONSTANT
     bool "Compiled-in constant"
 endchoice
 
-config LIBUKSWRAND_INITIALSEED_CONSTANT
+config LIBUKRANDOM_INITIALSEED_CONSTANT
     int "Initial seed constant"
-    depends on LIBUKSWRAND_INITIALSEED_USECONSTANT
+    depends on LIBUKRANDOM_INITIALSEED_USECONSTANT
     default 23
 
-config LIBUKSWRAND_DEVFS
+config LIBUKRANDOM_DEVFS
 	bool "Register random and urandom device to devfs"
 	select LIBDEVFS
 	depends on LIBVFSCORE

@@ -31,7 +31,7 @@
  */
 
 #include <string.h>
-#include <uk/swrand.h>
+#include <uk/random.h>
 #include <uk/print.h>
 #include <uk/assert.h>
 #include <uk/ctors.h>

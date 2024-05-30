@@ -32,7 +32,7 @@
  */
 
 #include <string.h>
-#include <uk/swrand.h>
+#include <uk/random.h>
 #include <uk/assert.h>
 
 /* https://stackoverflow.com/questions/9492581/c-random-number-generation-pure-c-code-no-libraries-or-functions */
