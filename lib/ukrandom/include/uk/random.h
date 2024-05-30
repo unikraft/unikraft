@@ -44,14 +44,10 @@ extern "C" {
 #endif
 
 struct uk_swrand;
-
 extern struct uk_swrand uk_swrand_def;
 
-void uk_swrand_init_r(struct uk_swrand *r, unsigned int seedc,
-			const __u32 seedv[]);
 __u32 uk_swrand_randr_r(struct uk_swrand *r);
 
-__u32 uk_swrandr_gen_seed32(void);
 /* Uses the pre-initialized default generator  */
 /* TODO: Add assertion when we can test if we are in interrupt context */
 /* TODO: Revisit with multi-CPU support */
