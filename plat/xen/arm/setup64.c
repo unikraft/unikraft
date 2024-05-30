@@ -264,6 +264,8 @@ static int _init_mem(struct ukplat_bootinfo *const bi, paddr_t physical_offset)
 	    .vbase = vaddr,
 	    .pbase = (__paddr_t)vaddr,
 	    .len = (max_pfn_p - start_pfn_p) << PAGE_SHIFT,
+	    .pg_off = 0,
+	    .pg_count = (max_pfn_p - start_pfn_p),
 	    .type = UKPLAT_MEMRT_FREE,
 	    .flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE | UKPLAT_MEMRF_MAP,
 	};
@@ -279,6 +281,8 @@ static int _init_mem(struct ukplat_bootinfo *const bi, paddr_t physical_offset)
 	    .vbase = (__vaddr_t)HYPERVISOR_dtb,
 	    .pbase = (__paddr_t)HYPERVISOR_dtb,
 	    .len = fdt_size,
+	    .pg_off = 0,
+	    .pg_count = PAGE_COUNT(fdt_size),
 	    .type = UKPLAT_MEMRT_DEVICETREE,
 	    .flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP,
 	};
