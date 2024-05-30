@@ -1,6 +1,5 @@
 menuconfig LIBPOSIX_TTY
 	bool "posix-tty: Support for stdin/out/err"
-	select LIBPOSIX_FDTAB
 	select LIBPOSIX_FDIO
 
 if LIBPOSIX_TTY
@@ -9,7 +8,12 @@ if LIBPOSIX_TTY
 	bool "Provide file driver for the serial console"
 	select LIBUKCONSOLE
 
+	config LIBPOSIX_TTY_STDIO
+	bool "Open standard I/O files at boot (fd 0, 1, 2)"
+	select LIBPOSIX_FDTAB
+
 	choice LIBPOSIX_TTY_STDIN
+	depends on LIBPOSIX_TTY_STDIO
 	prompt "stdin:"
 
 		config LIBPOSIX_TTY_STDIN_NULL
@@ -25,6 +29,7 @@ if LIBPOSIX_TTY
 	endchoice
 
 	choice LIBPOSIX_TTY_STDOUT
+	depends on LIBPOSIX_TTY_STDIO
 	prompt "stdout/err:"
 
 		config LIBPOSIX_TTY_STDOUT_SERIAL
