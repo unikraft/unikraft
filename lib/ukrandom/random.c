@@ -62,7 +62,7 @@ ssize_t uk_swrand_fill_buffer(void *buf, size_t buflen)
 	chunk_size = buflen % step;
 
 	for (i = 0; i < buflen - chunk_size; i += step)
-		*(__u32 *)((char *) buf + i) = uk_swrand_randr();
+		*(__u32 *)((char *)buf + i) = uk_swrand_randr();
 
 	/* fill the remaining bytes of the buffer */
 	if (chunk_size > 0) {
@@ -75,14 +75,10 @@ ssize_t uk_swrand_fill_buffer(void *buf, size_t buflen)
 
 static int _uk_swrand_init(struct uk_init_ctx *ictx __unused)
 {
-	unsigned int i;
-#ifdef CONFIG_LIBUKRANDOM_CHACHA
 	unsigned int seedc = 10;
 	__u32 seedv[10];
-#else
-	unsigned int seedc = 2;
-	__u32 seedv[2];
-#endif
+	unsigned int i;
+
 	uk_pr_info("Initialize random number generator...\n");
 
 	for (i = 0; i < seedc; i++)

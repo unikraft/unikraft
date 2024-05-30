@@ -4,20 +4,6 @@ menuconfig LIBUKRANDOM
 	default n
 
 if LIBUKRANDOM
-choice
-	prompt "Algorithm"
-	default LIBUKRANDOM_CHACHA
-
-config LIBUKRANDOM_MWC
-	bool "Multiply-with-carry"
-	help
-		Use multiply-with-carry algorithm
-
-config LIBUKRANDOM_CHACHA
-	bool "ChaCha20"
-	help
-		Use ChaCha20 algorithm
-endchoice
 
 choice
     prompt "Initial seed"
