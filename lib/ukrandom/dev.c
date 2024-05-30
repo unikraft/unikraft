@@ -35,7 +35,7 @@
 #include <errno.h>
 #include <uk/ctors.h>
 #include <uk/print.h>
-#include <uk/swrand.h>
+#include <uk/random.h>
 #include <uk/assert.h>
 #include <uk/config.h>
 #include <uk/essentials.h>
