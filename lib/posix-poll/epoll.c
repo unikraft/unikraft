@@ -235,7 +235,8 @@ static void epoll_autodel(void *arg)
 	uk_file_wunlock(ent->epf);
 }
 
-static void epoll_register(const struct uk_file *epf, struct epoll_entry *ent)
+static void epoll_register(const struct uk_file *epf, struct epoll_entry *ent,
+			   int register_finalizer)
 {
 	const int edge = !!(ent->event.events & EPOLLET);
 	uk_pollevent ev;
@@ -245,7 +246,8 @@ static void epoll_register(const struct uk_file *epf, struct epoll_entry *ent)
 #endif /* CONFIG_LIBVFSCORE */
 
 	ev = uk_pollq_poll_register(&ent->f->state->pollq, &ent->tick, 1);
-	uk_file_finalizer_register(ent->f, &ent->fin);
+	if (register_finalizer)
+		uk_file_finalizer_register(ent->f, &ent->fin);
 	if (ev) {
 		/* Need atomic OR since we're registered for updates */
 		(void)uk_or(&ent->revents, ev);
@@ -289,7 +291,7 @@ static int epoll_add(const struct uk_file *epf, struct epoll_entry **tail,
 	};
 	*tail = ent;
 	/* Poll, register & update if needed */
-	epoll_register(epf, ent);
+	epoll_register(epf, ent, 1);
 	return 0;
 }
 
@@ -348,7 +350,7 @@ static void epoll_entry_mod(const struct uk_file *epf, struct epoll_entry *ent,
 	ent->event = *event;
 	ent->tick.mask = events2mask(event->events);
 	ent->revents = 0;
-	epoll_register(epf, ent);
+	epoll_register(epf, ent, 0);
 
 }
 
