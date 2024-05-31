@@ -1,40 +1,98 @@
 menuconfig LIBPOSIX_PROCESS
 	bool "posix-process: Process-related functions"
-	default n
 	select LIBNOLIBC if !HAVE_LIBC
 
 if LIBPOSIX_PROCESS
-	menuconfig LIBPOSIX_PROCESS_PIDS
-		bool "Process and thread IDs"
-		default n
-		select LIBUKSCHED
+
+menuconfig LIBPOSIX_PROCESS_PIDS
+	bool "Process and thread IDs"
+	select LIBUKSCHED
 
 if LIBPOSIX_PROCESS_PIDS
-		config LIBPOSIX_PROCESS_MAX_PID
-		int "Largest PID"
-		range 1 32767
-		default 31
 
-		config LIBPOSIX_PROCESS_INIT_PIDS
-		bool "Assign PID during boot"
-		default n
+config LIBPOSIX_PROCESS_MAX_PID
+	int "Largest PID"
+	range 1 32767
+	default 31
+
+config LIBPOSIX_PROCESS_INIT_PIDS
+	bool "Assign PID during boot"
+
 endif
 
-	config LIBPOSIX_PROCESS_CLONE
+menuconfig LIBPOSIX_PROCESS_SIGNAL
+	bool "POSIX signals"
+	select LIBUKLOCK
+
+if LIBPOSIX_PROCESS_SIGNAL
+
+config LIBPOSIX_PROCESS_SIGNAL_ALARM
+	bool "alarm() syscall"
+	default y
+
+config LIBPOSIX_PROCESS_SIGNAL_PAUSE
+	bool "pause() syscall"
+	default y
+
+config LIBPOSIX_PROCESS_SIGNAL_SIGALTSTACK
+	bool "sigaltstack() syscall"
+	default y
+
+config LIBPOSIX_PROCESS_SIGNAL_SIGPENDING
+	bool "rt_sigpending() syscall"
+	default y
+
+config LIBPOSIX_PROCESS_SIGNAL_SIGPROCMASK
+	bool "rt_sigprocmask() syscall"
+	default y
+
+config LIBPOSIX_PROCESS_SIGNAL_SIGSUSPEND
+	bool "rt_sigsuspend() syscall"
+	default y
+
+config LIBPOSIX_PROCESS_SIGNAL_SIGACTION
+	bool "rt_sigaction() syscall"
+	default y
+
+config LIBPOSIX_PROCESS_SIGNAL_RTSIGQUEUEINFO
+	bool "rt_sigqueueinfo() syscall"
+	default y
+
+config LIBPOSIX_PROCESS_SIGNAL_RTTGSIGQUEUEINFO
+	bool "rt_tgsigqueueinfo() syscall"
+	default y
+
+config LIBPOSIX_PROCESS_SIGNAL_RTSIGTIMEDWAIT
+	bool "rt_sigtimedwait() syscall"
+	default y
+
+config LIBPOSIX_PROCESS_SIGNAL_KILL
+	bool "kill() syscall"
+	default y
+
+config LIBPOSIX_PROCESS_SIGNAL_TGKILL
+	bool "tgkill() syscall"
+	default y
+
+config LIBPOSIX_PROCESS_SIGNAL_TKILL
+	bool "tkill() syscall"
+	default y
+endif
+
+config LIBPOSIX_PROCESS_CLONE
 	bool "Clone system call"
-	default n
 	select LIBPOSIX_PROCESS_PIDS
 
-	config LIBPOSIX_PROCESS_CLONE_PREFER_CHILD
-	bool "Prefer scheduling of child"
-	depends on LIBPOSIX_PROCESS_CLONE
-	help
-		If enabled, clone will context switch away from the clone
-		caller. This is necessary for some applications that assume that
-		the new thread does progress while the clone caller is not
-		context switching.
+config LIBPOSIX_PROCESS_CLONE_PREFER_CHILD
+bool "Prefer scheduling of child"
+depends on LIBPOSIX_PROCESS_CLONE
+help
+	If enabled, clone will context switch away from the clone
+	caller. This is necessary for some applications that assume that
+	the new thread does progress while the clone caller is not
+	context switching.
 
-	config LIBPOSIX_PROCESS_DEBUG
+config LIBPOSIX_PROCESS_DEBUG
 	bool "Enable debug messages"
-	default n
+
 endif

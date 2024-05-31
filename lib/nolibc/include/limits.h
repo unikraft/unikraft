@@ -66,6 +66,8 @@ extern "C" {
 
 #define IOV_MAX 1024
 
+#define _POSIX_SIGQUEUE_MAX	32
+
 #ifdef __cplusplus
 }
 #endif

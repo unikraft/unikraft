@@ -43,6 +43,10 @@
 #include <uk/plat/console.h> /* ukplat_coutk */
 #endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
 
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+void uk_signal_deliver(struct uk_syscall_ctx *usc);
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+
 void ukplat_syscall_handler(struct uk_syscall_ctx *usc)
 {
 #if CONFIG_LIBSYSCALL_SHIM_STRACE
@@ -89,6 +93,10 @@ void ukplat_syscall_handler(struct uk_syscall_ctx *usc)
 	 */
 	ukplat_coutk(prsyscallbuf, (__sz) prsyscalllen);
 #endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
+
+#if CONFIG_LIBPOSIX_PROCESS_SIGNAL
+	uk_signal_deliver(usc);
+#endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
 	ukarch_sysregs_switch_ul(&usc->sysregs);
 
