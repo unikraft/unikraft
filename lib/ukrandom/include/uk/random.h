@@ -50,12 +50,13 @@ extern struct uk_swrand uk_swrand_def;
 __u32 uk_swrand_randr_r(struct uk_swrand *r);
 
 /* Uses the pre-initialized default generator  */
-/* TODO: Add assertion when we can test if we are in interrupt context */
 /* TODO: Revisit with multi-CPU support */
 static inline __u32 uk_swrand_randr(void)
 {
 	unsigned long iflags;
 	__u32 ret;
+
+	UK_ASSERT(!ukplat_lcpu_irqs_disabled());
 
 	iflags = ukplat_lcpu_save_irqf();
 	ret = uk_swrand_randr_r(&uk_swrand_def);
