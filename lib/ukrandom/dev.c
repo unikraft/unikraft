@@ -99,7 +99,7 @@ static int dev_random_write(struct device *dev __unused,
 static int dev_hwrng_read(struct device *dev __unused, struct uio *uio,
 			  int flags __unused)
 {
-	size_t count;
+	__sz count;
 	char *buf;
 	int ret;
 

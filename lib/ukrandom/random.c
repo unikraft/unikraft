@@ -36,9 +36,9 @@
 
 int uk_swrand_init(void);
 
-ssize_t uk_swrand_fill_buffer(void *buf, size_t buflen)
+__ssz uk_swrand_fill_buffer(void *buf, size_t buflen)
 {
-	size_t step, chunk_size, i;
+	__sz step, chunk_size, i;
 	__u32 rd;
 
 	step = sizeof(__u32);
@@ -53,6 +53,9 @@ ssize_t uk_swrand_fill_buffer(void *buf, size_t buflen)
 		memcpy(buf + i, &rd, chunk_size);
 	}
 
+	/* buflen remains unchanged because the software RNG always succeeds.
+	 * It is returned for consistency with the hardware RNG.
+	 */
 	return buflen;
 }
 
