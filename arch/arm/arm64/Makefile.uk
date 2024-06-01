@@ -29,15 +29,23 @@ CXXINCLUDES += -I$(CONFIG_UK_BASE)/arch/arm/arm64/include
 ifeq ($(CONFIG_ARM64_FEAT_PAUTH),y)
 # Min GCC >= 9 to avoid dealing with deprecated
 # msign-return-address here and in macros
+ifeq ($(call have_gcc),y)
 $(call error_if_gcc_version_lt,9,0)
+else
+$(call error_if_clang_version_lt,14,0)
+endif
 ARCH_REV := armv8.3-a
 BRANCH_PROTECTION := pac-ret+leaf
 endif
 
 ifeq ($(CONFIG_ARM64_FEAT_BTI),y)
+ifeq ($(call have_gcc),y)
 # Min GCC >= 10, due to buggy GCC-9.
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=94697
 $(call error_if_gcc_version_lt,10,0)
+else
+$(call error_if_clang_version_lt,14,0)
+endif
 ARCH_REV := armv8.5-a
 ifeq ($(BRANCH_PROTECTION),)
 	BRANCH_PROTECTION := bti
@@ -47,15 +55,23 @@ endif
 endif
 
 ifeq ($(CONFIG_ARM64_FEAT_MTE),y)
+ifeq ($(call have_gcc),y)
 # MTE support introduced in GCC-10
 $(call error_if_gcc_version_lt,10,0)
+else
+$(call error_if_clang_version_lt,14,0)
+endif
 ARCH_REV := armv8.5-a
 ARCH_OPT := $(ARCH_OPT)+memtag
 endif
 
 ifeq ($(CONFIG_ARM64_FEAT_RNG),y)
+ifeq ($(call have_gcc),y)
 # FEAT_RNG support introduced in GCC-9
 $(call error_if_gcc_version_lt,9,0)
+else
+$(call error_if_clang_version_lt,14,0)
+endif
 ARCH_REV := armv8.5-a
 ARCH_OPT := $(ARCH_OPT)+rng
 endif
