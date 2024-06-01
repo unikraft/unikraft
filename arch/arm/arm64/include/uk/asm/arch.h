@@ -179,6 +179,10 @@
 #define ID_AA64ISAR1_EL1_APA_SHIFT		4
 #define ID_AA64ISAR1_EL1_APA_MASK		0xf
 
+/* ID_AA64ISAR2_EL1: AArch64 Instruction Set Attributes Register 2 */
+#define ID_AA64ISAR2_EL1_APA3_SHIFT		12
+#define ID_AA64ISAR2_EL1_APA3_MASK		0xf
+
 /* ID_AA64PFR1_EL1: AArch64 Processor Feature Register 1 */
 #define ID_AA64PFR1_EL1_NMI_SHIFT		_AC(32, UL)
 #define ID_AA64PFR1_EL1_NMI_MASK		_AC(0xf, UL)
