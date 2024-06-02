@@ -36,6 +36,7 @@
 #include <uk/ctors.h>
 #include <uk/random.h>
 #include <uk/arch/random.h>
+#include <uk/plat/lcpu.h>
 
 /*
  * ChaCha20 requires eight 32-bit integers for the key and two 32-bit integers
@@ -188,4 +189,20 @@ __u32 uk_swrand_randr_r(struct uk_swrand *r)
 
 		r->k = 0;
 	}
+}
+
+/* Uses the pre-initialized default generator  */
+/* TODO: Revisit with multi-CPU support */
+__u32 uk_swrand_randr(void)
+{
+	unsigned long iflags;
+	__u32 ret;
+
+	UK_ASSERT(!ukplat_lcpu_irqs_disabled());
+
+	iflags = ukplat_lcpu_save_irqf();
+	ret = uk_swrand_randr_r(&uk_swrand_def);
+	ukplat_lcpu_restore_irqf(iflags);
+
+	return ret;
 }

@@ -33,39 +33,19 @@
 #ifndef __UK_RANDOM_H__
 #define __UK_RANDOM_H__
 
-#include <sys/types.h>
-#include <uk/arch/types.h>
-#include <uk/plat/lcpu.h>
-#include <uk/assert.h>
-#include <uk/config.h>
-#include <uk/plat/time.h>
-
 #ifdef __cplusplus
 extern "C" {
 #endif
 
-struct uk_swrand;
-extern struct uk_swrand uk_swrand_def;
+#include <uk/arch/types.h>
 
-__u32 uk_swrand_randr_r(struct uk_swrand *r);
-
-/* Uses the pre-initialized default generator  */
-/* TODO: Revisit with multi-CPU support */
-static inline __u32 uk_swrand_randr(void)
-{
-	unsigned long iflags;
-	__u32 ret;
-
-	UK_ASSERT(!ukplat_lcpu_irqs_disabled());
-
-	iflags = ukplat_lcpu_save_irqf();
-	ret = uk_swrand_randr_r(&uk_swrand_def);
-	ukplat_lcpu_restore_irqf(iflags);
-
-	return ret;
-}
-
-__ssz uk_swrand_fill_buffer(void *buf, __sz buflen);
+/**
+ * Fills a buffer with random bytes.
+ *
+ * @param buf Pointer to the buffer to be filled.
+ * @param buflen Length of the buffer in bytes.
+ */
+void uk_random_fill_buffer(void *buf, __sz buflen);
 
 #ifdef __cplusplus
 }

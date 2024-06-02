@@ -40,5 +40,6 @@ UK_SYSCALL_R_DEFINE(ssize_t, getrandom,
 		    void *, buf, size_t, buflen,
 		    unsigned int, flags)
 {
-	return uk_swrand_fill_buffer(buf, buflen);
+	uk_random_fill_buffer(buf, buflen);
+	return buflen;
 }
