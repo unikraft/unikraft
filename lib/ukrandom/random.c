@@ -36,7 +36,9 @@
 
 int uk_swrand_init(void);
 
-__ssz uk_swrand_fill_buffer(void *buf, size_t buflen)
+__u32 uk_swrand_randr(void);
+
+void uk_random_fill_buffer(void *buf, size_t buflen)
 {
 	__sz step, chunk_size, i;
 	__u32 rd;
@@ -52,11 +54,6 @@ __ssz uk_swrand_fill_buffer(void *buf, size_t buflen)
 		rd = uk_swrand_randr();
 		memcpy(buf + i, &rd, chunk_size);
 	}
-
-	/* buflen remains unchanged because the software RNG always succeeds.
-	 * It is returned for consistency with the hardware RNG.
-	 */
-	return buflen;
 }
 
 static int uk_random_init(struct uk_init_ctx *ictx __unused)
