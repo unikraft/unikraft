@@ -1,6 +1,7 @@
 menuconfig LIBUKSWRAND
 	bool "ukswrand: Software random number generator"
 	select LIBUKDEBUG
+	select LIBUKLOCK
 	default n
 
 if LIBUKSWRAND

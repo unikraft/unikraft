@@ -67,6 +67,11 @@ extern "C" {
 
 #endif /* CONFIG_LIBNOLIBC_UKDEBUG_ASSERT */
 #endif /* NDEBUG */
+
+#ifndef KASSERT
+#define KASSERT(exp, msg) assert(exp)
+#endif /* KASSERT */
+
 #ifdef __cplusplus
 }
 #endif
