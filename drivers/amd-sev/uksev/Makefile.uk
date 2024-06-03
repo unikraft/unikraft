@@ -1,0 +1,20 @@
+$(eval $(call addlib_s,libuksev,$(CONFIG_LIBUKSEV)))
+
+CINCLUDES-$(CONFIG_LIBUKSEV)   += -I$(LIBUKSEV_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBUKSEV) += -I$(LIBUKSEV_BASE)/include
+
+LIBUKSEV_CINCLUDES-y += -I$(LIBUKSEV_BASE)/include
+LIBUKSEV_CINCLUDES-y += -I$(LIBKVMPLAT_BASE)/include
+
+LIBUKSEV_SRCS-y += $(LIBUKSEV_BASE)/sev.c|isr
+LIBUKSEV_SRCS-y += $(LIBUKSEV_BASE)/decoder.c|isr
+
+
+LIBUKSEV_CINCLUDES-y += -I$(CONFIG_UK_BASE)/plat/common/include
+
+LIBUKSEV_CFLAGS-y += -Wno-address-of-packed-member
+
+ifneq ($(filter y,$(CONFIG_LIBUKSEV_TEST) $(CONFIG_LIBUKTEST_ALL)),)
+LIBUKSEV_SRCS-y += $(LIBUKSEV_BASE)/tests/test_sev.c
+LIBUKSEV_SRCS-y += $(LIBUKSEV_BASE)/tests/test_decoder.c
+endif

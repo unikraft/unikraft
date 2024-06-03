@@ -124,6 +124,9 @@ void virtio_mmio_cwrite_bytes(const void *addr, const __u8 offset,
 	count  = len / type_len;
 	for (i = 0; i < count; i++) {
 		io_addr = ((unsigned long)addr) + offset + (i * type_len);
+		/* HELP: Somehow when you remove this print, uksev does not
+		 * emulate the write / interrupt is not triggered. */
+		uk_pr_info("\n");
 		switch (type_len) {
 		case 1:
 			writeb((__u8 *)io_addr, ((__u8 *)buf)[i * type_len]);
@@ -132,6 +135,7 @@ void virtio_mmio_cwrite_bytes(const void *addr, const __u8 offset,
 			writew((__u16 *)io_addr, ((__u16 *)buf)[i * type_len]);
 			break;
 		case 4:
+			/* uk_pr_info("Data: 0x%x\n", ((__u32  *)buf)[i * type_len]); */
 			writel((__u32 *)io_addr, ((__u32 *)buf)[i * type_len]);
 			break;
 		default:

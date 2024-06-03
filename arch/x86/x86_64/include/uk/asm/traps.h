@@ -66,3 +66,5 @@ struct ukarch_trap_ctx {
 #define UKARCH_TRAP_SECURITY		trap_security
 
 #define UKARCH_TRAP_X86_GP		trap_gp_fault
+
+#define UKARCH_TRAP_VC			trap_vmm_comm_exception

@@ -33,6 +33,11 @@
 #include <uk/essentials.h>
 #include <uk/print.h>
 
+#if CONFIG_LIBUKSEV
+#include <uk/sev.h>
+#include <uk/arch/paging.h>
+#endif
+
 /* Used to align netbuf's priv and data areas to `long long` data type */
 #define NETBUF_ADDR_ALIGNMENT (sizeof(long long))
 #define NETBUF_ADDR_ALIGN_UP(x)   ALIGN_UP((__uptr) (x), \
@@ -74,6 +79,16 @@ void uk_netbuf_init_indir(struct uk_netbuf *m,
 	UK_ASSERT(m);
 	UK_ASSERT(buf || (buf == NULL && buflen == 0));
 	UK_ASSERT(headroom <= buflen);
+
+#if CONFIG_LIBUKSEV
+	int rc;
+	rc = uk_sev_set_memory_shared(
+	    (__vaddr_t)buf,
+	    PAGE_ALIGN_UP((unsigned long)buflen) >> PAGE_SHIFT);
+	if (unlikely(rc)) {
+		UK_CRASH("Cannot set memory private: %d\n", rc);
+	}
+#endif
 
 	/* Reset pbuf, non-listed fields are automatically set to 0 */
 	*m = (struct uk_netbuf) {
@@ -130,6 +145,11 @@ struct uk_netbuf *uk_netbuf_alloc_buf(struct uk_alloc *a, size_t buflen,
 
 	UK_ASSERT(buflen > 0);
 	UK_ASSERT(headroom <= buflen);
+
+#if CONFIG_LIBUKSEV
+	/* We need network buffer to be page-sized */
+	buflen = PAGE_ALIGN_UP(buflen);
+#endif
 
 	alloc_len = NETBUF_ADDR_ALIGN_UP(buflen)
 		    + NETBUF_ADDR_ALIGN_UP(sizeof(*m) + privlen);
@@ -271,6 +291,13 @@ void uk_netbuf_free_single(struct uk_netbuf *m)
 			m->dtor(m);
 		if (a && b)
 			uk_free(a, b);
+
+#if CONFIG_LIBUKSEV
+		int rc = uk_sev_set_memory_private(m->buf, PAGE_ALIGN_UP(m->buflen)
+						      >> PAGE_SHIFT);
+		if (unlikely(rc))
+			UK_CRASH("Cannot set memory private: %d\n", rc);
+#endif
 	} else {
 		uk_pr_debug("Not freeing netbuf %p (next: %p): refcount greater than 1",
 			    m, m->next);

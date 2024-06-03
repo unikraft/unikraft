@@ -67,6 +67,7 @@ __lcpuid lcpu_arch_id(void)
 
 int lcpu_arch_init(struct lcpu *this_lcpu)
 {
+#if !CONFIG_LIBUKSEV
 #ifdef CONFIG_HAVE_SMP
 	int rc;
 
@@ -74,6 +75,7 @@ int lcpu_arch_init(struct lcpu *this_lcpu)
 	if (unlikely(rc))
 		return rc;
 #endif /* CONFIG_HAVE_SMP */
+#endif /* !CONFIG_LIBUKSEV */
 
 	traps_lcpu_init(this_lcpu);
 

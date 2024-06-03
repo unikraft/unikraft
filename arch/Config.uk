@@ -65,3 +65,8 @@ config HAVE_RANDOM
 	bool
 	help
 		Processor-generated randomness support.
+
+config HAVE_MEM_ENCRYPT
+	bool
+	help
+		Memory encryption support.

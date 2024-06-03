@@ -6,6 +6,7 @@
 
 UK_DRIV_BASE := $(CONFIG_UK_BASE)/drivers
 
+$(eval $(call import_lib,$(UK_DRIV_BASE)/amd-sev))
 $(eval $(call import_lib,$(UK_DRIV_BASE)/ukbus))
 $(eval $(call import_lib,$(UK_DRIV_BASE)/ukintctlr))
 $(eval $(call import_lib,$(UK_DRIV_BASE)/uktty))

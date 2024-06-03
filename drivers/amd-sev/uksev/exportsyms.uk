@@ -1,0 +1,10 @@
+uk_sev_mem_encrypt_init
+uk_sev_early_vc_handler_init
+uk_sev_setup_ghcb
+uk_sev_terminate
+do_vmm_comm_exception_no_ghcb
+uk_sev_ghcb_initialized
+uk_sev_cpu_features_check
+ghcb_initialized
+uk_sev_set_memory_private
+uk_sev_set_memory_shared

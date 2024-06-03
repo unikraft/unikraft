@@ -228,6 +228,19 @@ static void uk_efi_get_mmap_and_exit_bs(struct uk_efi_mem_desc **map,
 	uk_efi_status_t status;
 	__u8 retries = 0;
 	__u32 desc_ver;
+	__u8 retries = 0;
+
+uk_efi_get_mmap_retry:
+	if (retries) {
+		if (unlikely(retries > 1))
+			UK_EFI_CRASH("Failed to exit Boot Services second time\n");
+
+		/* Free the memory map previously allocated */
+		status = uk_efi_bs->free_pages(
+		    (uk_efi_paddr_t)*map, DIV_ROUND_UP(*map_sz, PAGE_SIZE));
+		if (unlikely(status != UK_EFI_SUCCESS))
+			UK_EFI_CRASH("Failed to free previous memory map\n");
+	}
 
 uk_efi_get_mmap_retry:
 	if (retries) {

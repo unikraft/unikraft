@@ -42,6 +42,10 @@
 #include <virtio/virtqueue.h>
 #include <virtio/virtio_net.h>
 
+#if CONFIG_LIBUKSEV
+#include <uk/arch/paging.h>
+#endif
+
 #define DRIVER_NAME	"virtio-net"
 
 /* VIRTIO_PKT_BUFFER_LEN = VIRTIO_NET_HDR + ETH_HDR + ETH_PKT_PAYLOAD_LEN */
@@ -1199,7 +1203,12 @@ static void virtio_net_info_get(struct uk_netdev *dev,
 	dev_info->max_mtu = vndev->max_mtu;
 	dev_info->nb_encap_tx = VTNET_HDR_SIZE_PADDED(vndev);
 	dev_info->nb_encap_rx = VTNET_HDR_SIZE_PADDED(vndev);
-	dev_info->ioalign = VIRTIO_PKT_BUFFER_ALIGN;
+#if CONFIG_LIBUKSEV
+	/* Page alignment is needed to mark packet data as shared pages */
+	dev_info->ioalign = PAGE_SIZE;
+#else
+  dev_info->ioalign = VIRTIO_PKT_BUFFER_ALIGN;
+#endif
 
 	dev_info->features = UK_NETDEV_F_RXQ_INTR
 		| (VIRTIO_FEATURE_HAS(vndev->vdev->features, VIRTIO_NET_F_CSUM)
