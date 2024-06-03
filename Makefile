@@ -679,7 +679,11 @@ GZIP		:= gzip
 TAR		:= tar
 UNZIP		:= unzip -qq -u
 GIT		:= git
-WGET		:= wget
+ifneq (,$(findstring Wget2,$(shell wget --version)))
+WGET := wget -q --force-progress --progress=bar
+else
+WGET := wget -q --show-progress --progress=bar
+endif
 PYTHON          := python3
 SHA1SUM		:= sha1sum -b
 SHA256SUM	:= sha256sum -b
