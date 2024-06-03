@@ -225,7 +225,17 @@ ENTRY(_ukplat_syscall)
 	 * Store execenv's stored ECTX which resides at offset:
 	 * sizeof(struct __regs) + sizeof(struct ukarch_sysctx) from beginning
 	 * of execenv.
+	 *
+	 * NOTE: Always sanitize the ECTX slot first to ensure that the XSAVE
+	 * header is not dirty.
 	 */
+	addq	$(__REGS_SIZEOF + UKARCH_SYSCTX_SIZE), %rdi
+	call	ukarch_ectx_sanitize
+	/**
+	 * After function calls, %rsp preserved value of execenv pointer so
+	 * restore that into %rdi.
+	 */
+	movq	%rsp, %rdi
 	addq	$(__REGS_SIZEOF + UKARCH_SYSCTX_SIZE), %rdi
 	call	ukarch_ectx_store
 
