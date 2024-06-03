@@ -527,7 +527,7 @@ endef
 define fetchas =
 $(BUILD_DIR)/$(1)/$(3):
 	$(call verbose_cmd,WGET,$(1)':' $(2), \
-	 $(WGET) -q --show-progress --progress=bar -O $(BUILD_DIR)/$(1)/$(3) $(2) || \
+	 $(WGET) -O $(BUILD_DIR)/$(1)/$(3) $(2) || \
 	 $(RM) $(BUILD_DIR)/$(1)/$(3))
 
 $(call _chksum_origin,$(1),$(BUILD_DIR)/$(1)/$(3),$(BUILD_DIR)/$(1)/.chksum)
@@ -541,8 +541,8 @@ endef
 define fetchas2 =
 $(BUILD_DIR)/$(1)/$(4):
 	$(call verbose_cmd,WGET,$(1)':' $(2) [retry-with: $(3)], \
-	 $(WGET) -q --show-progress --progress=bar -O $(BUILD_DIR)/$(1)/$(4) $(2) || \
-	 $(WGET) -q --show-progress --progress=bar -O $(BUILD_DIR)/$(1)/$(4) $(3) || \
+	 $(WGET) -O $(BUILD_DIR)/$(1)/$(4) $(2) || \
+	 $(WGET) -O $(BUILD_DIR)/$(1)/$(4) $(3) || \
 	 $(RM) $(BUILD_DIR)/$(1)/$(4))
 
 $(call _chksum_origin,$(1),$(BUILD_DIR)/$(1)/$(4),$(BUILD_DIR)/$(1)/.chksum)
