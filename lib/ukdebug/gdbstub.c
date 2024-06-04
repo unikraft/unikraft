@@ -17,6 +17,8 @@
 #include <uk/console.h>
 #include <uk/console/driver.h>
 #include <uk/libparam.h>
+#include <uk/init.h>
+#include <uk/prio.h>
 
 #if CONFIG_HAVE_PAGING
 #include <uk/plat/paging.h>
@@ -1094,6 +1096,11 @@ int gdb_dbg_trap(int errnr, struct __regs *regs)
 		return GDB_DBG_CONT;
 	}
 
+	if (!gdb_backing_console) {
+		ukplat_lcpu_restore_irqf(irqs);
+		return -ENODEV;
+	}
+
 	nest_cnt++;
 	r = gdb_main_loop(&g);
 	nest_cnt--;
@@ -1102,3 +1109,70 @@ int gdb_dbg_trap(int errnr, struct __regs *regs)
 
 	return r;
 }
+
+static int gdb_setup_backing_console(void)
+{
+	/* Ignore breakpoints if the backing console is not registered.
+	 * Maybe the backing console will be initialized later.
+	 */
+	if (gdb_backing_console_id >= uk_console_count()) {
+		uk_pr_warn("con%" __PRIu16 " not available\n",
+			   gdb_backing_console_id);
+		return -ENXIO;
+	}
+
+	gdb_backing_console = uk_console_get(gdb_backing_console_id);
+	UK_ASSERT(gdb_backing_console);
+
+	uk_console_init(&gdb_virt_console, "GDB virtual console",
+			&gdb_virt_ops, 0); /* Don't enable flags yet */
+	if (gdb_mode_is_shared()) {
+		uk_console_register(&gdb_virt_console);
+	} else if (gdb_mode_is_auto()) {
+		/* Must check before diabling the flags (see below) */
+		if (gdb_backing_console->flags)
+			uk_console_register(&gdb_virt_console);
+	}
+
+	/* If we didn't disable the STDOUT and STDIN flags, calls to
+	 * `uk_console_[out|in]` that happen outside of the gdb stub
+	 * could mess up the gdb communications. E.g., a call to
+	 * `uk_console_out` could write some bytes to the device that
+	 * look like garbage to the gdb host on the other end.
+	 * We assume here that the backing device is registered with
+	 * `ukconsole` exactly  once. This means we can also assume that
+	 * disabling the STDOUT and STDIN flags makes sure that the
+	 * underlying device is never used except explicitly stated with
+	 * `uk_console_[out|in]_with(gdb_backing_console, ...)`.
+	 */
+	gdb_backing_console->flags &= ~UK_CONSOLE_FLAG_STDOUT;
+	gdb_backing_console->flags &= ~UK_CONSOLE_FLAG_STDIN;
+
+	gdb_virt_console.flags |= UK_CONSOLE_FLAG_STDOUT;
+
+	return 0;
+}
+
+static int gdb_entry(struct uk_init_ctx *ctx __unused)
+{
+	/* This is the first time that the stub is entered. */
+	UK_ASSERT(!gdb_backing_console);
+
+	if (gdb_backing_console_id == GDB_BACKING_CONSOLE_NONE) {
+		uk_pr_info("GDB stub not configured\n");
+		return 0;
+	}
+
+	uk_pr_info("Waiting for debugger connection on con%" __PRIu16 "...\n",
+		   gdb_backing_console_id);
+
+	if (gdb_setup_backing_console() < 0)
+		uk_pr_warn("con%" __PRIu16 " does not exist or is not ready yet. Skipping wait for debugger ...\n",
+			   gdb_backing_console_id);
+	else
+		gdb_arch_brk();
+
+	return 0;
+}
+
+uk_plat_initcall_prio(gdb_entry, 0, UK_PRIO_LATEST);
