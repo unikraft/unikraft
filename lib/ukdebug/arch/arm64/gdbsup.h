@@ -58,4 +58,9 @@ __ssz gdb_arch_read_register(int regnr, struct __regs *regs,
 __ssz gdb_arch_write_register(int regnr, struct __regs *regs,
 			      void *buf, __sz buf_len);
 
+static inline void gdb_arch_brk(void)
+{
+	__asm__ __volatile__("brk #0" : : : "memory");
+}
+
 #endif /* __UKDEBUG_ARCH_GDBSUP_H__ */
