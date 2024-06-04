@@ -186,7 +186,7 @@ static inline void _get_cmdline(struct ukplat_bootinfo *bi)
 	}
 
 	cmdline = ukplat_memregion_alloc(cmdline_len, UKPLAT_MEMRT_CMDLINE,
-					 UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP);
+					 UKPLAT_MEMRF_READ);
 	if (!cmdline)
 		UK_CRASH("Could not allocate command-line memory");
 
@@ -267,7 +267,7 @@ static int _init_mem(struct ukplat_bootinfo *const bi, paddr_t physical_offset)
 	    .pg_off = 0,
 	    .pg_count = (max_pfn_p - start_pfn_p),
 	    .type = UKPLAT_MEMRT_FREE,
-	    .flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE | UKPLAT_MEMRF_MAP,
+	    .flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE,
 	};
 #if CONFIG_UKPLAT_MEMRNAME
 	memcpy(mrd.name, "heap", sizeof(mrd.name) - 1);
@@ -284,7 +284,7 @@ static int _init_mem(struct ukplat_bootinfo *const bi, paddr_t physical_offset)
 	    .pg_off = 0,
 	    .pg_count = PAGE_COUNT(fdt_size),
 	    .type = UKPLAT_MEMRT_DEVICETREE,
-	    .flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP,
+	    .flags = UKPLAT_MEMRF_READ,
 	};
 #if CONFIG_UKPLAT_MEMRNAME
 	memcpy(mrd.name, "dtb", sizeof(mrd.name) - 1);
