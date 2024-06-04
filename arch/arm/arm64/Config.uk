@@ -203,7 +203,7 @@ endif
 
 config ARM64_FEAT_RNG
 	bool "Armv8.5 Random Number Generator"
-	select HAVE_RANDOM
+	default y if HAVE_RANDOM
 	help
 	  This enables the hardware RNG functionality provided by the
 	  processor. The architecture specifies that this is implemented
