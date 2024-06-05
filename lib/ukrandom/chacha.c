@@ -157,8 +157,13 @@ int uk_swrand_init(void)
 
 	uk_pr_info("Initialize random number generator...\n");
 
+	/* It has been observed that in some x86_64 systems this loop
+	 * fails after a few iterations due to exhastion of conditioned
+	 * entropy (rdseed). Use RDRAND until we provide more flexible
+	 * options for RDSEED.
+	 */
 	for (i = 0; i < seedc; i++) {
-		ret = ukarch_random_seed_u32(&seedv[i]);
+		ret = ukarch_random_u32(&seedv[i]);
 		if (unlikely(ret)) {
 			uk_pr_err("Could not generate random seed\n");
 			return ret;
