@@ -235,3 +235,10 @@ config UK_NAME
 	default UK_DEFNAME
 	help
 	  Name to be used for final image
+
+# The following are selected by libraries that provide options to bypass security.
+config CONFIG_UK_TAINT_INSECURE_CSPRNG
+	bool
+
+comment "Notice: UNIKRAFT IS CONFIGURED WITH INSECURE RANDOM NUMBER GENERATOR"
+	depends on CONFIG_UK_TAINT_INSECURE_CSPRNG
