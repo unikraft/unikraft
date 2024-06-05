@@ -41,9 +41,6 @@
 #include <uk/print.h>
 #include <uk/syscall.h>
 #include <uk/arch/limits.h>
-#if CONFIG_LIBVFSCORE
-#include <vfscore/file.h>
-#endif
 
 #define UNIKRAFT_SID      0
 #define UNIKRAFT_PGID     0
@@ -329,7 +326,7 @@ UK_LLSYSCALL_R_DEFINE(int, prlimit64, int, pid, unsigned int, resource,
 	case RLIMIT_STACK:
 	case RLIMIT_AS:
 		break;
-#if CONFIG_LIBVFSCORE
+#if CONFIG_LIBPOSIX_FDTAB
 	case RLIMIT_NOFILE:
 		break;
 #endif
@@ -368,10 +365,10 @@ UK_LLSYSCALL_R_DEFINE(int, prlimit64, int, pid, unsigned int, resource,
 		old_limit->rlim_max = RLIM_INFINITY;
 		break;
 
-#if CONFIG_LIBVFSCORE
+#if CONFIG_LIBPOSIX_FDTAB
 	case RLIMIT_NOFILE:
-		old_limit->rlim_cur = FDTABLE_MAX_FILES;
-		old_limit->rlim_max = FDTABLE_MAX_FILES;
+		old_limit->rlim_cur = CONFIG_LIBPOSIX_FDTAB_MAXFDS;
+		old_limit->rlim_max = CONFIG_LIBPOSIX_FDTAB_MAXFDS;
 		break;
 #endif
 
