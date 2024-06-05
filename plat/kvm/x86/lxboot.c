@@ -127,7 +127,7 @@ lxboot_init_mem(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 			/* Free memory regions have
 			 * mrd.len == mrd.pg_count * PAGE_SIZE
 			 */
-			mrd.len = PAGE_ALIGN_UP(mrd.len);
+			mrd.len = PAGE_ALIGN_UP(mrd.len + mrd.pg_off);
 		} else {
 			mrd.type = UKPLAT_MEMRT_RESERVED;
 			mrd.flags = UKPLAT_MEMRF_READ;
