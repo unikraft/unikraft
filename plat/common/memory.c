@@ -256,9 +256,15 @@ static inline void overlapping_mrd_fixup(struct ukplat_memregion_list *list,
 					}, ridx + 1);
 
 			/* Drop the fraction of ml that overlaps with mr */
-			ml->len = (mr->pbase + mr->pg_off) -
-				  (ml->pbase + ml->pg_off);
-			ml->pg_count = PAGE_COUNT(ml->pg_off + ml->len);
+			if (ml->type == UKPLAT_MEMRT_FREE) {
+				ml->len = PAGE_ALIGN_DOWN(mr->pbase -
+							  ml->pbase);
+				ml->pg_count = PAGE_COUNT(ml->len);
+			} else {
+				ml->pg_count = PAGE_COUNT(ml->pg_off + ml->len);
+				ml->len = (mr->pbase + mr->pg_off) -
+					  (ml->pbase + ml->pg_off);
+			}
 		}
 	}
 }
