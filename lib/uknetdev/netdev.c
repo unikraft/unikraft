@@ -533,7 +533,7 @@ int uk_netdev_rxq_configure(struct uk_netdev *dev, uint16_t queue_id,
 		return -EINVAL;
 
 	/* Make sure that we are not initializing this queue a second time */
-	if (!PTRISERR(dev->_rx_queue[queue_id]))
+	if (dev->_rx_queue[queue_id] && !PTRISERR(dev->_rx_queue[queue_id]))
 		return -EBUSY;
 
 	err = _create_event_handler(rx_conf->callback, rx_conf->callback_cookie,
@@ -576,7 +576,7 @@ int uk_netdev_txq_configure(struct uk_netdev *dev, uint16_t queue_id,
 		return -EINVAL;
 
 	/* Make sure that we are not initializing this queue a second time */
-	if (!PTRISERR(dev->_tx_queue[queue_id]))
+	if (dev->_tx_queue[queue_id] && !PTRISERR(dev->_tx_queue[queue_id]))
 		return -EBUSY;
 
 	dev->_tx_queue[queue_id] = dev->ops->txq_configure(dev, queue_id,

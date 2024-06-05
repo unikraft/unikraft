@@ -47,7 +47,7 @@
  */
 #ifndef PTRISERR
 #define PTRISERR(ptr)					\
-	((__sptr)(ptr) <= 0				\
+	((__sptr)(ptr) < 0				\
 	 && (__sptr)(ptr) >= -(__sptr)(MAXERRNO))
 #endif
 
