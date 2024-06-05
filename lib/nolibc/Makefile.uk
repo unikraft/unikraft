@@ -33,6 +33,7 @@ LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/stdio.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/ctype.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/stdlib.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/string.c
+LIBNOLIBC_STRING_FLAGS-$(CONFIG_OPTIMIZE_PERF) += -O3
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/string/strsignal.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/string/strstr.c
 LIBNOLIBC_SRCS-y += $(LIBNOLIBC_BASE)/musl-imported/src/signal/psignal.c
