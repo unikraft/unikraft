@@ -233,11 +233,12 @@ static inline void overlapping_mrd_fixup(struct ukplat_memregion_list *list,
 		 * a new one if the left region is larger than the right region.
 		 */
 		} else {
-			__sz len = ml->pbase + ml->pg_count * PAGE_SIZE -
-				   mr->pbase - mr->pg_count * PAGE_SIZE;
+			__ssz len = ml->pbase + ml->pg_count * PAGE_SIZE -
+				    mr->pbase - mr->pg_count * PAGE_SIZE;
 			__uptr base = PAGE_ALIGN_UP(mr->pbase + mr->len);
 
-			if (RANGE_CONTAIN(ml->pbase, ml->pg_count * PAGE_SIZE,
+			if (len > 0 &&
+			    RANGE_CONTAIN(ml->pbase, ml->pg_count * PAGE_SIZE,
 					  mr->pbase, mr->pg_count * PAGE_SIZE))
 				/* len here is basically ml_end - mr_end. Thus,
 				 * len == 0 can happen only if mr is at the end
