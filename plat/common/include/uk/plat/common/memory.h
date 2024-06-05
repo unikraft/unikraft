@@ -116,9 +116,27 @@ ukplat_memregion_list_insert(struct ukplat_memregion_list *list,
 	return (int)i;
 }
 
+/*
+ * Expected memory map for the first 1MiB w.r.t. PC-AT systems compatibility
+ * 0x00000 – 0x9FFFF 640KB Main memory, DOS compatible. May contain the
+ *		     following memory subregions that we will not need after
+ *		     boot. If the EBDA is defined here, then 1KB starting
+ *		     at that address shall be treated as a reserved region
+ *	0x00000 - 0x003FF Legacy BIOS IVT, segmented pointers to software
+ *			  interrupt routines defined in the ROM BIOS
+ *	0x0040E - 0x0040F Optional EBDA segmented pointer (part of BDA's
+ *			  structure that occupies 40:00 -> 40:101 range)
+ *	0x9FC00 - 0xA0000 Default 1KB of EBDA if not defined in previous region
+ * 0xA0000 – 0xBFFFF 128KB Display buffer for video adapters and possible SMM
+ *		     Shadow Memory
+ * 0xC0000 – 0xDFFFF 128KB ROM BIOS for add-on cards (PCI XROMBARs)
+ * 0xE0000 – 0xFFFFF 128KB System ROM BIOS
+ */
 #if defined(__X86_64__)
-#define	X86_HI_MEM_START		0xA0000UL
-#define X86_HI_MEM_LEN			0x40000UL
+#define X86_VIDEO_MEM_START		0xA0000UL
+#define X86_VIDEO_MEM_LEN		0x20000UL
+#define X86_BIOS_XROM_START		0xC0000UL
+#define X86_BIOS_XROM_LEN		0x20000UL
 
 #define X86_BIOS_ROM_START		0xE0000UL
 #define X86_BIOS_ROM_LEN		0x20000UL
@@ -133,14 +151,39 @@ ukplat_memregion_list_insert_legacy_hi_mem(struct ukplat_memregion_list *list)
 	 */
 	rc = ukplat_memregion_list_insert(list,
 			&(struct ukplat_memregion_desc){
-				.pbase = X86_HI_MEM_START,
-				.vbase = X86_HI_MEM_START,
+				.pbase = X86_VIDEO_MEM_START,
+				.vbase = X86_VIDEO_MEM_LEN,
 				.pg_off = 0,
-				.len   = X86_HI_MEM_LEN,
-				.pg_count = PAGE_COUNT(X86_HI_MEM_LEN),
+				.len = X86_VIDEO_MEM_LEN,
+				.pg_count = PAGE_COUNT(X86_VIDEO_MEM_LEN),
 				.type  = UKPLAT_MEMRT_RESERVED,
+#if (CONFIG_KVM_DEBUG_VGA_CONSOLE || CONFIG_KVM_KERNEL_VGA_CONSOLE)
 				.flags = UKPLAT_MEMRF_READ  |
 					 UKPLAT_MEMRF_WRITE,
+#else /* !(CONFIG_KVM_DEBUG_VGA_CONSOLE || CONFIG_KVM_KERNEL_VGA_CONSOLE */
+				.flags = UKPLAT_MEMRF_READ,
+#endif /* !(CONFIG_KVM_DEBUG_VGA_CONSOLE || CONFIG_KVM_KERNEL_VGA_CONSOLE */
+			});
+	if (unlikely(rc < 0))
+		return rc;
+
+	/* Note that we are assigning UKPLAT_MEMRT_RESERVED to BIOS PCI ROM.
+	 * We usually have here the routines used by real-mode
+	 * bootloaders invoked through the BIOS IVT. Although this may not be
+	 * necessary anymore, we cannot assign UKPLAT_MEMRT_FREE either since
+	 * some BIOSes do set this as a RO segment in the corresponding chipset
+	 * registers, leaving this potentially unusable. Thus, just treat it
+	 * as a memory hole.
+	 */
+	rc = ukplat_memregion_list_insert(list,
+			&(struct ukplat_memregion_desc){
+				.pbase = X86_BIOS_ROM_START,
+				.vbase = X86_BIOS_ROM_START,
+				.pg_off = 0,
+				.len = X86_BIOS_ROM_LEN,
+				.pg_count = PAGE_COUNT(X86_BIOS_ROM_LEN),
+				.type  = UKPLAT_MEMRT_RESERVED,
+				.flags = UKPLAT_MEMRF_READ,
 			});
 	if (unlikely(rc < 0))
 		return rc;
