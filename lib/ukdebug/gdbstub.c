@@ -39,6 +39,17 @@ struct gdb_excpt_ctx {
 static char gdb_recv_buffer[GDB_BUF_SIZE];
 static char gdb_send_buffer[GDB_BUF_SIZE];
 
+#if !CONFIG_LIBUKDEBUG_GDBSTUB_ALWAYS_ACK
+/* By default, gdb and the stub send and receive acknowledgment packets, so
+ * ack mode is on. These packets are useful to request retransmition of data
+ * in case data is lost because of an unreliable connection, such as a serial
+ * line. When we're not using physical serial lines to talk to gdb, it's much
+ * faster to have ack mode disabled. That's why we ask gdb to disable ack
+ * mode as soon as the conneciton between gdb and the stub is established.
+ */
+static int gdb_ack_mode = 1;
+#endif /* !CONFIG_LIBUKDEBUG_GDBSTUB_ALWAYS_ACK */
+
 #define GDB_PACKET_RETRIES 5
 
 #define GDB_STR_A_LEN(str) str, (sizeof(str) - 1)
@@ -372,17 +383,36 @@ static __ssz gdb_recv(char *buf, __sz len)
 
 static int gdb_send_ack(void)
 {
+#if CONFIG_LIBUKDEBUG_GDBSTUB_ALWAYS_ACK
 	return gdb_dbg_putc('+');
+#else /* !CONFIG_LIBUKDEBUG_GDBSTUB_ALWAYS_ACK */
+	if (gdb_ack_mode)
+		return gdb_dbg_putc('+');
+
+	return 0;
+#endif /* !CONFIG_LIBUKDEBUG_GDBSTUB_ALWAYS_ACK */
 }
 
 static int gdb_send_nack(void)
 {
+#if CONFIG_LIBUKDEBUG_GDBSTUB_ALWAYS_ACK
 	return gdb_dbg_putc('-');
+#else /* !CONFIG_LIBUKDEBUG_GDBSTUB_ALWAYS_ACK */
+	if (gdb_ack_mode)
+		return gdb_dbg_putc('-');
+
+	return 0;
+#endif /* !CONFIG_LIBUKDEBUG_GDBSTUB_ALWAYS_ACK */
 }
 
 static int gdb_recv_ack(void)
 {
 	int r;
+
+#if !CONFIG_LIBUKDEBUG_GDBSTUB_ALWAYS_ACK
+	if (!gdb_ack_mode)
+		return 0;
+#endif /* !CONFIG_LIBUKDEBUG_GDBSTUB_ALWAYS_ACK */
 
 	r = gdb_dbg_getc();
 	if (unlikely(r < 0))
@@ -799,9 +829,16 @@ static int gdb_handle_multiletter_cmd(struct gdb_cmd_table_entry *table,
 static int gdb_handle_qsupported(char *buf __unused, __sz buf_len __unused,
 				 struct gdb_excpt_ctx *g __unused)
 {
+#if CONFIG_LIBUKDEBUG_GDBSTUB_ALWAYS_ACK
 #define GDB_SUPPORT_STR \
 	"PacketSize=" GDB_BUF_SIZE_HEX_STR \
 	";qXfer:features:read+"
+#else /* !CONFIG_LIBUKDEBUG_GDBSTUB_ALWAYS_ACK */
+#define GDB_SUPPORT_STR \
+	"PacketSize=" GDB_BUF_SIZE_HEX_STR \
+	";qXfer:features:read+" \
+	";QStartNoAckMode+"
+#endif /* !CONFIG_LIBUKDEBUG_GDBSTUB_ALWAYS_ACK */
 
 	GDB_CHECK(gdb_send_packet(GDB_STR_A_LEN(GDB_SUPPORT_STR)));
 
@@ -978,6 +1015,32 @@ static int gdb_handle_v_cmd(char *buf, __sz buf_len,
 		buf, buf_len, g);
 }
 
+#if !CONFIG_LIBUKDEBUG_GDBSTUB_ALWAYS_ACK
+/* QStartNoAckMode */
+static int gdb_handle_QStartNoAckMode(char *buf __unused, __sz buf_len __unused,
+				      struct gdb_excpt_ctx *g __unused)
+{
+	gdb_ack_mode = 0;
+	GDB_CHECK(gdb_send_packet(GDB_STR_A_LEN("OK")));
+
+	return 0;
+}
+
+static struct gdb_cmd_table_entry gdb_Q_cmd_table[] = {
+	{ gdb_handle_QStartNoAckMode, GDB_STR_A_LEN("StartNoAckMode") }
+};
+
+#define NUM_DBG_Q_CMDS (sizeof(gdb_Q_cmd_table) / \
+		sizeof(struct gdb_cmd_table_entry))
+
+static int gdb_handle_Q_cmd(char *buf, __sz buf_len,
+			    struct gdb_excpt_ctx *g)
+{
+	return gdb_handle_multiletter_cmd(gdb_Q_cmd_table, NUM_GDB_Q_CMDS,
+		buf, buf_len, g);
+}
+#endif /* !CONFIG_LIBUKDEBUG_GDBSTUB_ALWAYS_ACK */
+
 static struct gdb_cmd_table_entry gdb_cmd_table[] = {
 	{ gdb_handle_stop_reason, GDB_STR_A_LEN("?") },
 	{ gdb_handle_read_registers, GDB_STR_A_LEN("g") },
@@ -989,7 +1052,10 @@ static struct gdb_cmd_table_entry gdb_cmd_table[] = {
 	{ gdb_handle_step, GDB_STR_A_LEN("s") },
 	{ gdb_handle_step_sig, GDB_STR_A_LEN("S") },
 	{ gdb_handle_q_cmd, GDB_STR_A_LEN("q") },
-	{ gdb_handle_v_cmd, GDB_STR_A_LEN("v") }
+	{ gdb_handle_v_cmd, GDB_STR_A_LEN("v") },
+#if !CONFIG_LIBUKDEBUG_GDBSTUB_ALWAYS_ACK
+	{ gdb_handle_Q_cmd, GDB_STR_A_LEN("Q") }
+#endif /* !CONFIG_LIBUKDEBUG_GDBSTUB_ALWAYS_ACK */
 };
 
 #define NUM_GDB_CMDS (sizeof(gdb_cmd_table) / \

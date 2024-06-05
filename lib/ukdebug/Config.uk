@@ -137,4 +137,16 @@ config LIBUKDEBUG_GDBSTUB
         this ID will be used to communicate with GDB. If there is only
         one console device on the system, its ID is always 0.
 
+config LIBUKDEBUG_GDBSTUB_ALWAYS_ACK
+	bool "Always use acknowledgments"
+	depends on LIBUKDEBUG_GDBSTUB
+	help
+	The GDB host and the GDB stub use short acknowledgment packages
+	to, e.g., catch transmission errors on unreliable connections.
+	The downside of the acknowledgment packages is that they slow
+	down communications. The slow-down can become severe if lots of
+	output is sent to the GDB host when kernel output is transmitted
+	over the GDB connection. Refer to the GDB documentation for more
+	information.
+
 endif
