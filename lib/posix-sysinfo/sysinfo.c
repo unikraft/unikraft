@@ -46,11 +46,6 @@
 #include <uk/falloc.h>
 #endif /* CONFIG_HAVE_PAGING */
 
-#if CONFIG_LIBVFSCORE
-/* For FDTABLE_MAX_FILES. */
-#include <vfscore/file.h>
-#endif
-
 /**
  * The Unikraft `struct utsname` structure.
  *
@@ -152,9 +147,9 @@ long sysconf(int name)
 	}
 #endif /* CONFIG_HAVE_PAGING */
 
-#if CONFIG_LIBVFSCORE
+#if CONFIG_LIBPOSIX_FDTAB
 	if (name == _SC_OPEN_MAX)
-		return FDTABLE_MAX_FILES;
+		return CONFIG_LIBPOSIX_FDTAB_MAXFDS;
 #endif
 
 	return 0;
