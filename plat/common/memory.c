@@ -370,15 +370,6 @@ void ukplat_memregion_list_coalesce(struct ukplat_memregion_list *list)
 				 * and of different flags.
 				 */
 				UK_ASSERT(ml->flags == mr->flags);
-
-				/* We do not allow overlaps of memory regions
-				 * whose resource page offset into their region
-				 * is not equal to 0. Regions don't that meet
-				 * this condition are hand-inserted by us and
-				 * should not overlap.
-				 */
-				UK_ASSERT(!ml->pg_off);
-				UK_ASSERT(!mr->pg_off);
 				UK_ASSERT(PAGE_ALIGNED(ml->pbase));
 				UK_ASSERT(PAGE_ALIGNED(mr->pbase));
 
