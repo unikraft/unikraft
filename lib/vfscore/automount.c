@@ -564,9 +564,10 @@ static int vfscore_extract_volume(const struct vfscore_volume *vv)
 #endif /* CONFIG_LIBUKCPIO */
 
 /* Handle `mkmp` Unikraft Mount Option */
-static int vfscore_ukopt_mkmp(char *path)
+static int vfscore_ukopt_mkmp(const char *path)
 {
 	char *pos, *prev_pos;
+	char *tmp_path;
 	int rc;
 
 	UK_ASSERT(path);
@@ -578,7 +579,14 @@ static int vfscore_ukopt_mkmp(char *path)
 	}
 
 	uk_pr_debug(" mkmp: Ensure mount path \"%s\" exists\n", path);
-	pos = path;
+	tmp_path = strdup(path);
+	if (!tmp_path)
+	{
+		uk_pr_err("strdup failed with errno=%d\n", errno);
+		return -errno;
+	}
+
+	pos = tmp_path;
 	do {
 		prev_pos = pos;
 		pos = strchr(pos + 1, '/');
@@ -602,23 +610,24 @@ static int vfscore_ukopt_mkmp(char *path)
 			      (prev_pos[2] == '/' || prev_pos[2] == '\0')
 			     ))) {
 			uk_pr_err("'.' or '..' are not supported in mount paths.\n");
+			free(tmp_path);
 			return -EINVAL;
 		}
 
 		/* mkdir() with S_IRWXU */
 		rc = mkdir(path, 0700);
 		if (rc && errno != EEXIST)
+		{
+			free(tmp_path);
 			return -errno;
-
-		/* Restore current '/' */
-		if (pos)
-			*pos = '/';
+		}
 
 		/* Handle paths with multiple `/` */
 		while (pos && pos[1] == '/')
 			pos++;
 	} while (pos);
 
+	free(tmp_path);
 	return 0;
 }
 
@@ -628,7 +637,7 @@ static int vfscore_ukopt_mkmp(char *path)
  */
 static inline int vfscore_mount_volume(const struct vfscore_volume *vv)
 {
-	char *path;
+	const char *path;
 	int rc;
 
 	UK_ASSERT(vv);
