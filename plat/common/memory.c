@@ -81,15 +81,17 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags)
 		UK_ASSERT_VALID_FREE_MRD(mrd);
 		UK_ASSERT(mrd->pbase <= __U64_MAX - size);
 
-		pstart = ALIGN_UP(mrd->pbase, __PAGE_SIZE);
-		pend = pstart + size;
-
 		if ((mrd->flags & UKPLAT_MEMRF_PERMS) !=
 			    (UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE))
 			return NULL;
 
-		ostart = mrd->pbase;
 		olen = mrd->len;
+		if (olen < size)
+			continue;
+
+		ostart = mrd->pbase;
+		pstart = ALIGN_UP(mrd->pbase, __PAGE_SIZE);
+		pend = pstart + size;
 
 		/* If fragmenting this memory region leaves it with length 0,
 		 * then simply overwrite and return it instead.
