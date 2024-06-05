@@ -400,7 +400,8 @@ static inline int uk_netdev_rxq_intr_enable(struct uk_netdev *dev,
 	UK_ASSERT(dev->_data);
 	UK_ASSERT(dev->_data->state == UK_NETDEV_RUNNING);
 	UK_ASSERT(queue_id < CONFIG_LIBUKNETDEV_MAXNBQUEUES);
-	UK_ASSERT(!PTRISERR(dev->_rx_queue[queue_id]));
+	UK_ASSERT(dev->_rx_queue[queue_id] &&
+		  !PTRISERR(dev->_rx_queue[queue_id]));
 
 	if (unlikely(!dev->ops->rxq_intr_enable))
 		return -ENOTSUP;
@@ -428,7 +429,8 @@ static inline int uk_netdev_rxq_intr_disable(struct uk_netdev *dev,
 	UK_ASSERT(dev->_data);
 	UK_ASSERT(dev->_data->state == UK_NETDEV_RUNNING);
 	UK_ASSERT(queue_id < CONFIG_LIBUKNETDEV_MAXNBQUEUES);
-	UK_ASSERT(!PTRISERR(dev->_rx_queue[queue_id]));
+	UK_ASSERT(dev->_rx_queue[queue_id] &&
+		  !PTRISERR(dev->_rx_queue[queue_id]));
 
 	if (unlikely(!dev->ops->rxq_intr_disable))
 		return -ENOTSUP;
@@ -480,7 +482,8 @@ static inline int uk_netdev_rx_one(struct uk_netdev *dev, uint16_t queue_id,
 	UK_ASSERT(dev->rx_one);
 	UK_ASSERT(queue_id < CONFIG_LIBUKNETDEV_MAXNBQUEUES);
 	UK_ASSERT(dev->_data->state == UK_NETDEV_RUNNING);
-	UK_ASSERT(!PTRISERR(dev->_rx_queue[queue_id]));
+	UK_ASSERT(dev->_rx_queue[queue_id] &&
+		  !PTRISERR(dev->_rx_queue[queue_id]));
 	UK_ASSERT(pkt);
 
 
@@ -549,7 +552,8 @@ static inline int uk_netdev_tx_one(struct uk_netdev *dev, uint16_t queue_id,
 	UK_ASSERT(dev->tx_one);
 	UK_ASSERT(queue_id < CONFIG_LIBUKNETDEV_MAXNBQUEUES);
 	UK_ASSERT(dev->_data->state == UK_NETDEV_RUNNING);
-	UK_ASSERT(!PTRISERR(dev->_tx_queue[queue_id]));
+	UK_ASSERT(dev->_tx_queue[queue_id] &&
+		  !PTRISERR(dev->_tx_queue[queue_id]));
 	UK_ASSERT(pkt);
 
 	ret = dev->tx_one(dev, dev->_tx_queue[queue_id], pkt);

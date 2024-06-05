@@ -278,7 +278,7 @@ static inline int uk_blkdev_queue_intr_enable(struct uk_blkdev *dev,
 	UK_ASSERT(dev->dev_ops);
 	UK_ASSERT(dev->_data);
 	UK_ASSERT(queue_id < CONFIG_LIBUKBLKDEV_MAXNBQUEUES);
-	UK_ASSERT(!PTRISERR(dev->_queue[queue_id]));
+	UK_ASSERT(dev->_queue[queue_id] && !PTRISERR(dev->_queue[queue_id]));
 
 	if (unlikely(!dev->dev_ops->queue_intr_enable))
 		return -ENOTSUP;
@@ -306,7 +306,7 @@ static inline int uk_blkdev_queue_intr_disable(struct uk_blkdev *dev,
 	UK_ASSERT(dev->dev_ops);
 	UK_ASSERT(dev->_data);
 	UK_ASSERT(queue_id < CONFIG_LIBUKBLKDEV_MAXNBQUEUES);
-	UK_ASSERT(!PTRISERR(dev->_queue[queue_id]));
+	UK_ASSERT(dev->_queue[queue_id] && !PTRISERR(dev->_queue[queue_id]));
 
 	if (unlikely(!dev->dev_ops->queue_intr_disable))
 		return -ENOTSUP;

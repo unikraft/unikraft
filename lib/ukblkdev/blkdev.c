@@ -76,7 +76,7 @@ int uk_blkdev_drv_register(struct uk_blkdev *dev, struct uk_alloc *a,
 	UK_ASSERT(dev);
 
 	/* Data must be unallocated. */
-	UK_ASSERT(PTRISERR(dev->_data));
+	UK_ASSERT(!dev->_data);
 	/* Assert mandatory configuration. */
 	UK_ASSERT(dev->dev_ops);
 	UK_ASSERT(dev->dev_ops->dev_configure);
@@ -325,7 +325,7 @@ int uk_blkdev_queue_configure(struct uk_blkdev *dev, uint16_t queue_id,
 		return -EINVAL;
 
 	/* Make sure that we are not initializing this queue a second time */
-	if (!PTRISERR(dev->_queue[queue_id]))
+	if (dev->_queue[queue_id] && !PTRISERR(dev->_queue[queue_id]))
 		return -EBUSY;
 
 	err = _create_event_handler(queue_conf->callback,
@@ -389,7 +389,7 @@ int uk_blkdev_queue_submit_one(struct uk_blkdev *dev,
 	UK_ASSERT(dev->submit_one);
 	UK_ASSERT(queue_id < CONFIG_LIBUKBLKDEV_MAXNBQUEUES);
 	UK_ASSERT(dev->_data->state == UK_BLKDEV_RUNNING);
-	UK_ASSERT(!PTRISERR(dev->_queue[queue_id]));
+	UK_ASSERT(dev->_queue[queue_id] && !PTRISERR(dev->_queue[queue_id]));
 	UK_ASSERT(req != NULL);
 
 	return dev->submit_one(dev, dev->_queue[queue_id], req);
@@ -403,7 +403,7 @@ int uk_blkdev_queue_finish_reqs(struct uk_blkdev *dev,
 	UK_ASSERT(dev->_data);
 	UK_ASSERT(queue_id < CONFIG_LIBUKBLKDEV_MAXNBQUEUES);
 	UK_ASSERT(dev->_data->state == UK_BLKDEV_RUNNING);
-	UK_ASSERT(!PTRISERR(dev->_queue[queue_id]));
+	UK_ASSERT(dev->_queue[queue_id] && !PTRISERR(dev->_queue[queue_id]));
 
 	return dev->finish_reqs(dev, dev->_queue[queue_id]);
 }
@@ -446,7 +446,7 @@ int uk_blkdev_sync_io(struct uk_blkdev *dev,
 	UK_ASSERT(dev->_data);
 	UK_ASSERT(dev->submit_one);
 	UK_ASSERT(dev->_data->state == UK_BLKDEV_RUNNING);
-	UK_ASSERT(!PTRISERR(dev->_queue[queue_id]));
+	UK_ASSERT(dev->_queue[queue_id] && !PTRISERR(dev->_queue[queue_id]));
 
 	req = &sync_io_req.req;
 	uk_blkreq_init(req, operation, start_sector, nb_sectors, buf,
@@ -500,7 +500,7 @@ int uk_blkdev_queue_unconfigure(struct uk_blkdev *dev, uint16_t queue_id)
 	UK_ASSERT(dev->dev_ops->queue_unconfigure);
 	UK_ASSERT(queue_id < CONFIG_LIBUKBLKDEV_MAXNBQUEUES);
 	UK_ASSERT(dev->_data->state == UK_BLKDEV_CONFIGURED);
-	UK_ASSERT(!PTRISERR(dev->_queue[queue_id]));
+	UK_ASSERT(dev->_queue[queue_id] && !PTRISERR(dev->_queue[queue_id]));
 
 	rc = dev->dev_ops->queue_unconfigure(dev, dev->_queue[queue_id]);
 	if (rc)
@@ -549,7 +549,7 @@ int uk_blkdev_unconfigure(struct uk_blkdev *dev)
 	UK_ASSERT(dev->dev_ops->dev_unconfigure);
 	UK_ASSERT(dev->_data->state == UK_BLKDEV_CONFIGURED);
 	for (q_id = 0; q_id < CONFIG_LIBUKBLKDEV_MAXNBQUEUES; ++q_id)
-		UK_ASSERT(PTRISERR(dev->_queue[q_id]));
+		UK_ASSERT(!dev->_queue[q_id] || PTRISERR(dev->_queue[q_id]));
 
 	rc = dev->dev_ops->dev_unconfigure(dev);
 	if (rc)
