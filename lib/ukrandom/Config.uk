@@ -6,6 +6,21 @@ menuconfig LIBUKRANDOM
 
 if LIBUKRANDOM
 
+config LIBUKRANDOM_SEED_INSECURE
+	bool "Use a fixed seed (INSECURE)"
+	select CONFIG_UK_TAINT_INSECURE_CSPRNG
+	help
+		Seed the CSPRNG with a fixed value. Enabling this option will make the
+		output of the RNG to be trivially predictable, which compromises the
+		security of the system.
+
+		This option is available for trying out Unikraft on legacy systems that
+		do not feature a TRNG.
+
+		Select this if you know what you're doing.
+
+		DO NOT USE IN PRODUCTION SYSTEMS
+
 config LIBUKRANDOM_DEVFS
 	bool "Register random, urandom, and hwrng device to devfs"
 	select LIBDEVFS

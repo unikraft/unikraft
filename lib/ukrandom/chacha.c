@@ -47,7 +47,8 @@
  *
  * TODO: bring the nonce-size in-line with the RFC.
  */
-#define CHACHA_SEED_LENGTH 10
+#define CHACHA_SEED_LENGTH		10
+#define CHACHA_SEED_INSECURE		0xdeadb0b0
 
 struct uk_swrand {
 	int k;
@@ -156,6 +157,12 @@ int uk_swrand_init(void)
 	int ret;
 
 	uk_pr_info("Initialize random number generator...\n");
+#if CONFIG_LIBUKRANDOM_SEED_INSECURE
+	uk_pr_err("*******************************************\n");
+	uk_pr_err("* This configuration uses an insecure RNG *\n");
+	uk_pr_err("*         DO NOT USE IN PRODUCTION        *\n");
+	uk_pr_err("*******************************************\n");
+#endif /* CONFIG_LIBUKRANDOM_SEED_INSECURE */
 
 	/* It has been observed that in some x86_64 systems this loop
 	 * fails after a few iterations due to exhastion of conditioned
@@ -163,11 +170,15 @@ int uk_swrand_init(void)
 	 * options for RDSEED.
 	 */
 	for (i = 0; i < seedc; i++) {
+#if CONFIG_LIBUKRANDOM_SEED_INSECURE
+		seedv[i] = CHACHA_SEED_INSECURE;
+#else /* !CONFIG_LIBUKRANDOM_SEED_INSECURE */
 		ret = ukarch_random_u32(&seedv[i]);
 		if (unlikely(ret)) {
 			uk_pr_err("Could not generate random seed\n");
 			return ret;
 		}
+#endif /* !CONFIG_LIBUKRANDOM_SEED_INSECURE */
 	}
 
 	chacha_init(&uk_swrand_def, seedc, seedv);
