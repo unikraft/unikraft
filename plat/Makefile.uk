@@ -4,4 +4,3 @@ UK_PLAT_DRIVERS_BASE:= $(UK_PLAT_BASE)/drivers
 
 $(eval $(call import_lib,$(UK_PLAT_BASE)/xen))
 $(eval $(call import_lib,$(UK_PLAT_BASE)/kvm))
-$(eval $(call import_lib,$(UK_PLAT_BASE)/linuxu))

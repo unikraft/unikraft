@@ -9,10 +9,12 @@
 #include <uk/plat/lcpu.h>
 #include <uk/plat/common/sections.h>
 
-extern void clean_and_invalidate_dcache_range(unsigned long, unsigned long);
-extern void _ukplat_entry(void *) __noreturn;
+void clean_and_invalidate_dcache_range(unsigned long, unsigned long);
+void _ukplat_entry(void) __noreturn;
+void ukplat_early_init(void);
+void start_mmu(void);
+
 extern __paddr_t vector_table;
-extern void start_mmu(void);
 
 static __u8 __align(16) uk_efi_bootstack[__PAGE_SIZE];
 
@@ -43,5 +45,6 @@ void __noreturn uk_efi_jmp_to_kern(void)
 
 	start_mmu();
 	uk_efi_set_sp_el1(uk_efi_bootstack + __PAGE_SIZE);
-	_ukplat_entry(ukplat_bootinfo_get());
+	ukplat_early_init();
+	_ukplat_entry();
 }

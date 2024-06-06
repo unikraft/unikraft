@@ -34,7 +34,7 @@
 #define __UK_STACKPROTECTOR_H__
 
 #ifdef CONFIG_LIBUKSP_VALUE_RANDOM
-#include <uk/swrand.h>
+#include <uk/random.h>
 #endif
 #include <uk/config.h>
 
@@ -54,7 +54,7 @@ static inline void uk_stack_chk_guard_setup(void)
 #ifdef CONFIG_LIBUKSP_VALUE_RANDOM
 	unsigned long guard;
 
-	uk_swrand_fill_buffer(&guard, sizeof(guard));
+	uk_random_fill_buffer(&guard, sizeof(guard));
 	guard &= ~0xFFul; /* Use least significant byte as null terminator */
 
 	(*DECONST(unsigned long *, &__stack_chk_guard)) = guard;

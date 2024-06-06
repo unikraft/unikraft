@@ -56,6 +56,11 @@
 #include <uk/intctlr/limits.h>
 #include <uk/ofw/fdt.h>
 
+#if CONFIG_PAGING
+#include <uk/bus/platform.h>
+#include <uk/errptr.h>
+#endif /* CONFIG_PAGING */
+
 #define GIC_MAX_IRQ	UK_INTCTLR_MAX_IRQ
 
 #define GIC_RDIST_REG(gdev, r)					\
@@ -692,6 +697,33 @@ static int gicv3_do_probe(void)
 }
 #endif /* !CONFIG_UKPLAT_ACPI */
 
+#if CONFIG_PAGING
+static int gicv3_map(void)
+{
+	__vaddr_t vbase;
+
+	vbase = uk_bus_pf_devmap(gicv3_drv.dist_mem_addr,
+				 gicv3_drv.dist_mem_size);
+	if (unlikely(PTRISERR(vbase))) {
+		uk_pr_err("Could not map GIC dist (%d)\n", PTR2ERR(vbase));
+		return PTR2ERR(vbase);
+	}
+
+	gicv3_drv.dist_mem_addr = vbase;
+
+	vbase = uk_bus_pf_devmap(gicv3_drv.rdist_mem_addr,
+				 gicv3_drv.rdist_mem_size);
+	if (unlikely(PTRISERR(vbase))) {
+		uk_pr_err("Could not map GIC rdist (%d)\n", PTR2ERR(vbase));
+		return PTR2ERR(vbase);
+	}
+
+	gicv3_drv.rdist_mem_addr = vbase;
+
+	return 0;
+}
+#endif /* CONFIG_PAGING */
+
 /**
  * Probe device tree for GICv3
  * NOTE: First time must not be called from multiple CPUs in parallel
@@ -724,6 +756,14 @@ int gicv3_probe(struct _gic_dev **dev)
 		*dev = NULL;
 		return rc;
 	}
+
+#if CONFIG_PAGING
+	rc = gicv3_map();
+	if (unlikely(rc)) {
+		uk_pr_err("Could not map device (%d)\n", rc);
+		return rc;
+	}
+#endif /* CONFIG_PAGING */
 
 	uk_pr_info("Found GICv3 on:\n");
 	uk_pr_info("\tDistributor  : 0x%lx - 0x%lx\n",	gicv3_drv.dist_mem_addr,

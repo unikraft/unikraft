@@ -28,9 +28,19 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 #include <libfdt.h>
-#include <uk/config.h>
-#include <uk/plat/console.h>
 #include <uk/assert.h>
+#include <uk/config.h>
+#include <uk/init.h>
+#include <uk/plat/common/bootinfo.h>
+
+#if CONFIG_PAGING
+#include <uk/bus/platform.h>
+#include <uk/errptr.h>
+#endif /* CONFIG_PAGING */
+
+#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
+#include <uk/plat/common/bootinfo.h>
+#endif /* CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
 
 #define NS16550_THR_OFFSET	0x00U
 #define NS16550_RBR_OFFSET	0x00U
@@ -56,13 +66,8 @@
  * use ns16550_uart_initialized as an extra variable to check
  * whether the UART has been initialized.
  */
-#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE
-static __u8 ns16550_uart_initialized = 1;
-static __u64 ns16550_uart_base = CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE;
-#else /* !CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE */
 static __u8 ns16550_uart_initialized;
 static __u64 ns16550_uart_base;
-#endif /* !CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE */
 
 /* The register shift. Default is 0 (device-tree spec v0.4 Sect. 4.2.2) */
 static __u32 ns16550_reg_shift = CONFIG_LIBUKTTY_NS16550_REG_SHIFT;
@@ -112,11 +117,8 @@ static void ns16550_reg_write(__u32 reg, __u32 value)
 	}
 }
 
-static void init_ns16550(__u64 base)
+static int init_ns16550(void)
 {
-	ns16550_uart_base = base;
-	ns16550_uart_initialized = 1;
-
 	/* Disable all interrupts */
 	ns16550_reg_write(NS16550_IER_OFFSET,
 			  ns16550_reg_read(NS16550_FCR_OFFSET) &
@@ -126,35 +128,96 @@ static void init_ns16550(__u64 base)
 	ns16550_reg_write(NS16550_FCR_OFFSET,
 			  ns16550_reg_read(NS16550_FCR_OFFSET) &
 					 ~(NS16550_FCR_FIFO_EN));
+	return 0;
 }
 
-void ns16550_console_init(const void *dtb)
+int ns16550_early_init(void)
+{
+#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
+	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
+	struct ukplat_memregion_desc mrd = {0};
+	int rc;
+
+	UK_ASSERT(bi);
+
+	ns16550_uart_base = CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE;
+
+	/* From this point we can print */
+	ns16550_uart_initialized = 1;
+
+	mrd.pbase = ns16550_uart_base;
+	mrd.vbase = ns16550_uart_base;
+	mrd.pg_off = 0;
+	mrd.pg_count = 1;
+	mrd.len = 0x1000;
+	mrd.type = UKPLAT_MEMRT_DEVICE;
+	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE;
+
+	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
+	if (unlikely(rc < 0)) {
+		uk_pr_err("Could not insert mrd (%d)\n", rc);
+		return rc;
+	}
+#endif /* !CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
+
+	return 0;
+}
+
+static int ns16550_init(struct uk_init_ctx *ictx __unused)
 {
 	int offset, len, naddr, nsize;
+	struct ukplat_bootinfo *bi;
 	const __u64 *regs;
-	__u64 reg_uart_base;
+	const void *dtb;
+	__u64 reg_base;
+	__u64 reg_size;
+	int rc;
 
-	uk_pr_info("Serial initializing\n");
+	bi = ukplat_bootinfo_get();
+	UK_ASSERT(bi);
+
+	dtb = (void *)bi->dtb;
+	UK_ASSERT(dtb);
+
+	uk_pr_debug("Probing ns16550\n");
 
 	if (unlikely((offset = fdt_node_offset_by_compatible(dtb, -1, "ns16550")) < 0 &&
 		     (offset = fdt_node_offset_by_compatible(dtb, -1, "ns16550a")) < 0)) {
-		UK_CRASH("No console UART found!\n");
+		uk_pr_err("ns16550 not found in fdt\n");
+		return -ENODEV;
 	}
 
 	naddr = fdt_address_cells(dtb, offset);
-	if (unlikely(naddr < 0 || naddr >= FDT_MAX_NCELLS))
-		UK_CRASH("Could not find proper address cells!\n");
+	if (unlikely(naddr < 0 || naddr >= FDT_MAX_NCELLS)) {
+		uk_pr_err("Invalid address-cells\n");
+		return -EINVAL;
+	}
 
 	nsize = fdt_size_cells(dtb, offset);
-	if (unlikely(nsize < 0 || nsize >= FDT_MAX_NCELLS))
-		UK_CRASH("Could not find proper size cells!\n");
+	if (unlikely(nsize < 0 || nsize >= FDT_MAX_NCELLS)) {
+		uk_pr_err("Invalid size-cells\n");
+		return -EINVAL;
+	}
 
 	regs = fdt_getprop(dtb, offset, "reg", &len);
-	if (unlikely(!regs || (len < (int)sizeof(fdt32_t) * (naddr + nsize))))
-		UK_CRASH("Bad 'reg' property: %p %d\n", regs, len);
+	if (unlikely(!regs || (len < (int)sizeof(fdt32_t) * (naddr + nsize)))) {
+		uk_pr_err("Invalid 'reg' property: %p %d\n", regs, len);
+		return -EINVAL;
+	}
 
-	reg_uart_base = fdt64_to_cpu(regs[0]);
-	uk_pr_info("Found NS16550 UART on: 0x%lx\n", reg_uart_base);
+	reg_base = fdt64_to_cpu(regs[0]);
+	reg_size = ALIGN_UP(fdt64_to_cpu(regs[1]), __PAGE_SIZE);
+
+#if CONFIG_PAGING
+	/* Map device region */
+	ns16550_uart_base = uk_bus_pf_devmap(reg_base, reg_size);
+	if (unlikely(PTRISERR(ns16550_uart_base))) {
+		uk_pr_err("Could not map ns16550\n");
+		return PTR2ERR(ns16550_uart_base);
+	}
+#else /* !CONFIG_PAGING */
+	ns16550_uart_base = reg_base;
+#endif /* !CONFIG_PAGING */
 
 	regs = fdt_getprop(dtb, offset, "reg-shift", &len);
 	if (regs)
@@ -164,14 +227,18 @@ void ns16550_console_init(const void *dtb)
 	if (regs)
 		ns16550_reg_width = fdt32_to_cpu(regs[0]);
 
-	init_ns16550(reg_uart_base);
+	uk_pr_debug("ns16550 @ 0x%lx - 0x%lx\n", reg_base, reg_base + reg_size);
 
-	uk_pr_info("NS16550 UART initialized\n");
-}
+	rc = init_ns16550();
+	if (unlikely(rc)) {
+		uk_pr_err("Could not initialize ns16550\n");
+		return rc;
+	}
 
-int ukplat_coutd(const char *str, unsigned int len)
-{
-	return ukplat_coutk(str, len);
+	ns16550_uart_initialized = 1;
+	uk_pr_info("tty: ns16550\n");
+
+	return 0;
 }
 
 static void _putc(char a)
@@ -229,6 +296,11 @@ int ukplat_coutk(const char *buf, unsigned int len)
 	return len;
 }
 
+int ukplat_coutd(const char *str, unsigned int len)
+{
+	return ukplat_coutk(str, len);
+}
+
 int ukplat_cink(char *buf, unsigned int maxlen)
 {
 	int ret;
@@ -241,3 +313,5 @@ int ukplat_cink(char *buf, unsigned int maxlen)
 
 	return (int)num;
 }
+
+uk_plat_initcall_prio(ns16550_init, 0, UK_PRIO_EARLIEST);

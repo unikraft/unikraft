@@ -81,3 +81,13 @@ int ukplat_lcpu_irqs_disabled(void)
 {
 	return irqs_disabled();
 }
+
+void ukplat_lcpu_set_auxsp(__uptr auxsp)
+{
+	lcpu_get_current()->auxsp = auxsp;
+}
+
+__uptr ukplat_lcpu_get_auxsp(void)
+{
+	return lcpu_get_current()->auxsp;
+}

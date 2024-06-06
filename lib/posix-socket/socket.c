@@ -230,7 +230,7 @@ static void _socket_init(struct socket_alloc *al,
 		.driver = d
 	};
 	al->fstate = UK_FILE_STATE_INIT_VALUE(al->fstate);
-	al->fref = UK_FILE_REFCNT_INIT_VALUE;
+	al->fref = UK_FILE_REFCNT_INIT_VALUE(al->fref);
 	al->f = (struct uk_file){
 		.vol = POSIX_SOCKET_VOLID,
 		.node = &al->node,
@@ -310,20 +310,18 @@ UK_SYSCALL_R_DEFINE(int, socket, int, family, int, type, int, protocol)
 	return ret;
 }
 
-
-int uk_sys_accept(const struct uk_file *sock, int blocking,
-		  struct sockaddr *addr, socklen_t *addr_len, int flags)
+const struct uk_file *uk_socket_accept(const struct uk_file *sock, int blocking,
+				       struct sockaddr *addr,
+				       socklen_t *addr_len, int flags)
 {
-	int fd;
 	void *new_data;
 	struct socket_alloc *al;
 	struct socket_alloc *al_listener __maybe_unused;
-	unsigned int mode = SOCKET_MODE;
 	struct posix_socket_node *n = (struct posix_socket_node *)sock->node;
 
 	al = uk_malloc(n->driver->allocator, sizeof(*al));
 	if (unlikely(!al))
-		return -ENOMEM;
+		return ERR2PTR(-ENOMEM);
 
 	for (;;) {
 		uk_file_rlock(sock);
@@ -336,7 +334,7 @@ int uk_sys_accept(const struct uk_file *sock, int blocking,
 	}
 	if (unlikely(PTRISERR(new_data))) {
 		uk_free(n->driver->allocator, al);
-		return PTR2ERR(new_data);
+		return new_data;
 	}
 
 	_socket_init(al, n->driver, new_data);
@@ -348,12 +346,29 @@ int uk_sys_accept(const struct uk_file *sock, int blocking,
 	uk_socket_evd_raddr_set(&al->evd, addr, (addr_len ? *addr_len : 0));
 #endif /* CONFIG_LIBPOSIX_SOCKET_EVENTS */
 
+	return &al->f;
+}
+
+int uk_sys_accept(const struct uk_file *sock, int blocking,
+		  struct sockaddr *addr, socklen_t *addr_len, int flags)
+{
+	int fd;
+	const struct uk_file *sockfile;
+	unsigned int mode = SOCKET_MODE;
+	struct socket_alloc *al __maybe_unused;
+
+	al = __containerof(sock, struct socket_alloc, f);
+
+	sockfile = uk_socket_accept(sock, blocking, addr, addr_len, flags);
+	if (unlikely(PTRISERR(sockfile)))
+		return PTR2ERR(sockfile);
+
 	if (flags & SOCK_NONBLOCK)
 		mode |= O_NONBLOCK;
 	if (flags & SOCK_CLOEXEC)
 		mode |= O_CLOEXEC;
-	fd = uk_fdtab_open(&al->f, mode);
-	uk_file_release(&al->f);
+	fd = uk_fdtab_open(sockfile, mode);
+	uk_file_release(sockfile);
 	if (fd >= 0)
 		uk_socket_event_raise(&al->evd, ACCEPT);
 	return fd;

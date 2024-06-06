@@ -30,4 +30,7 @@ int uk_file_nop_setstat(const struct uk_file *f,
 int uk_file_nop_ctl(const struct uk_file *f, int fam, int req,
 		    uintptr_t arg1, uintptr_t arg2, uintptr_t arg3);
 
+/* Destructor for static files; prints warning & does nothing */
+void uk_file_static_release(const struct uk_file *f, int what);
+
 #endif /* __UKFILE_FILE_NOPS_H__ */

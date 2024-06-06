@@ -3,9 +3,15 @@
 BasedOnStyle: LLVM
 IndentWidth: 8
 UseTab: Always
+AlignAfterOpenBracket: Align
 BreakBeforeBraces: Linux
-BreakBeforeBinaryOperators: NonAssignment
+BreakBeforeBinaryOperators: None
+ColumnLimit: 80
 AllowShortFunctionsOnASingleLine: Empty
 AllowShortIfStatementsOnASingleLine: false
 IndentCaseLabels: false
+IndentGotoLabels: false
+RemoveBracesLLVM: true
 SortIncludes: false
+SpaceBeforeParens: ControlStatements
+TabWidth: 8

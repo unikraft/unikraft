@@ -203,11 +203,11 @@ labels:
     apply_on_pr_match_paths:
       - lib/uksp/**
 
-  - name: lib/ukswrand
-    description: Issues and PRs which affect the software random number generator
+  - name: lib/ukrandom
+    description: Issues and PRs which affect the random number generator
     color: "#fbca04"
     apply_on_pr_match_paths:
-      - lib/ukswrand/**
+      - lib/ukrandom/**
 
   - name: lib/uktime
     description: Issues and PRs which affect time functions

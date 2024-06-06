@@ -34,7 +34,6 @@ static const char EPOLL_VOLID[] = "epoll_vol";
 #if CONFIG_LIBVFSCORE
 struct epoll_legacy {
 	struct eventpoll_cb ecb;
-	const struct uk_file *epf;
 	unsigned int mask;
 	unsigned int revents;
 	struct uk_list_head f_link;
@@ -43,6 +42,7 @@ struct epoll_legacy {
 
 struct epoll_entry {
 	struct epoll_entry *next;
+	const struct uk_file *epf;
 #if CONFIG_LIBVFSCORE
 	int legacy;
 #endif /* CONFIG_LIBVFSCORE */
@@ -58,6 +58,7 @@ struct epoll_entry {
 		struct {
 			struct uk_poll_chain tick;
 			uk_pollevent revents;
+			struct uk_file_finalize_cb fin;
 		};
 #if CONFIG_LIBVFSCORE
 		struct epoll_legacy legacy_cb;
@@ -67,7 +68,6 @@ struct epoll_entry {
 #define IS_EDGEPOLL(ent) (!!((ent)->event.events & EPOLLET))
 #define IS_ONESHOT(ent)  (!!((ent)->event.events & EPOLLONESHOT))
 
-
 struct epoll_alloc {
 	struct uk_alloc *alloc;
 	struct uk_file f;
@@ -76,6 +76,10 @@ struct epoll_alloc {
 	struct epoll_entry *list;
 };
 
+union epoll_shim_file {
+	const struct uk_file *file;
+	struct vfscore_file *vfile;
+};
 
 static void epoll_unregister_entry(struct epoll_entry *ent)
 {
@@ -87,6 +91,7 @@ static void epoll_unregister_entry(struct epoll_entry *ent)
 	} else
 #endif /* CONFIG_LIBVFSCORE */
 	{
+		uk_file_finalizer_unregister(ent->f, &ent->fin);
 		uk_pollq_unregister(&ent->f->state->pollq, &ent->tick);
 		uk_file_release_weak(ent->f);
 	}
@@ -125,6 +130,8 @@ static int vfs_poll(struct vfscore_file *vfd, unsigned int *revents,
 
 static int vfs_poll_register(struct vfscore_file *vfd, struct epoll_legacy *leg)
 {
+	struct epoll_entry *ent = __containerof(leg,
+						struct epoll_entry, legacy_cb);
 	int ret = vfs_poll(vfd, &leg->revents, &leg->ecb);
 
 	if (unlikely(ret))
@@ -133,7 +140,7 @@ static int vfs_poll_register(struct vfscore_file *vfd, struct epoll_legacy *leg)
 	uk_list_add_tail(&leg->f_link, &vfd->f_ep);
 	(void)uk_and(&leg->revents, leg->mask);
 	if (leg->revents)
-		uk_file_event_set(leg->epf, UKFD_POLLIN);
+		uk_file_event_set(ent->epf, UKFD_POLLIN);
 	return 0;
 }
 #endif /* CONFIG_LIBVFSCORE */
@@ -163,14 +170,24 @@ static void epoll_release(const struct uk_file *epf, int what)
 	}
 }
 
+static void epoll_entry_del(const struct uk_file *epf, struct epoll_entry **p)
+{
+	struct epoll_alloc *al = __containerof(epf, struct epoll_alloc, f);
+	struct epoll_entry *ent = *p;
+
+	*p = ent->next;
+	epoll_unregister_entry(ent);
+	uk_free(al->alloc, ent);
+}
+
 /* CTL ops */
 
 #if CONFIG_LIBVFSCORE
 static struct epoll_entry **epoll_find(const struct uk_file *epf, int fd,
-				       int legacy, union uk_shim_file sf)
+				       int legacy, union epoll_shim_file sf)
 #else /* !CONFIG_LIBVFSCORE */
 static struct epoll_entry **epoll_find(const struct uk_file *epf, int fd,
-				       union uk_shim_file sf)
+				       union epoll_shim_file sf)
 #endif
 {
 	struct epoll_entry **p = (struct epoll_entry **)epf->node;
@@ -182,9 +199,9 @@ static struct epoll_entry **epoll_find(const struct uk_file *epf, int fd,
 #if CONFIG_LIBVFSCORE
 			if ((legacy == ent->legacy) &&
 			    ((legacy && ent->vf == sf.vfile) ||
-			     (!legacy && ent->f == sf.ofile->file)))
+			     (!legacy && ent->f == sf.file)))
 #else /* !CONFIG_LIBVFSCORE */
-			if (ent->f == sf.ofile->file)
+			if (ent->f == sf.file)
 #endif /* !CONFIG_LIBVFSCORE */
 				break;
 		p = &(*p)->next;
@@ -192,7 +209,34 @@ static struct epoll_entry **epoll_find(const struct uk_file *epf, int fd,
 	return p;
 }
 
-static void epoll_register(const struct uk_file *epf, struct epoll_entry *ent)
+static void epoll_autodel(void *arg)
+{
+	struct epoll_entry *ent = arg;
+	union epoll_shim_file sf;
+	struct epoll_entry **entp;
+
+#if CONFIG_LIBVFSCORE
+	UK_ASSERT(!ent->legacy);
+#endif /* CONFIG_LIBVFSCORE */
+
+	sf.file = ent->f;
+	uk_file_wlock(ent->epf);
+
+#if CONFIG_LIBVFSCORE
+	entp = epoll_find(ent->epf, ent->fd, 0, sf);
+#else /* !CONFIG_LIBVFSCORE */
+	entp = epoll_find(ent->epf, ent->fd, sf);
+#endif /* !CONFIG_LIBVFSCORE */
+
+	if (entp) {
+		uk_pr_info("Removing closed file fd:%d (@%p)\n", ent->fd, ent);
+		epoll_entry_del(ent->epf, entp);
+	}
+	uk_file_wunlock(ent->epf);
+}
+
+static void epoll_register(const struct uk_file *epf, struct epoll_entry *ent,
+			   int register_finalizer)
 {
 	const int edge = !!(ent->event.events & EPOLLET);
 	uk_pollevent ev;
@@ -202,6 +246,8 @@ static void epoll_register(const struct uk_file *epf, struct epoll_entry *ent)
 #endif /* CONFIG_LIBVFSCORE */
 
 	ev = uk_pollq_poll_register(&ent->f->state->pollq, &ent->tick, 1);
+	if (register_finalizer)
+		uk_file_finalizer_register(ent->f, &ent->fin);
 	if (ev) {
 		/* Need atomic OR since we're registered for updates */
 		(void)uk_or(&ent->revents, ev);
@@ -225,6 +271,7 @@ static int epoll_add(const struct uk_file *epf, struct epoll_entry **tail,
 	uk_file_acquire_weak(f);
 	*ent = (struct epoll_entry){
 		.next = NULL,
+		.epf = epf,
 #if CONFIG_LIBVFSCORE
 		.legacy = 0,
 #endif /* CONFIG_LIBVFSCORE */
@@ -236,11 +283,15 @@ static int epoll_add(const struct uk_file *epf, struct epoll_entry **tail,
 			epoll_event_callback,
 			&epf->state->pollq
 		),
-		.revents = 0
+		.revents = 0,
+		.fin = {
+			.fin = epoll_autodel,
+			.arg = ent
+		}
 	};
 	*tail = ent;
 	/* Poll, register & update if needed */
-	epoll_register(epf, ent);
+	epoll_register(epf, ent, 1);
 	return 0;
 }
 
@@ -267,7 +318,6 @@ static int epoll_add_legacy(const struct uk_file *epf,
 		.event = *event,
 		.legacy_cb = {
 			.ecb = { .unregister = NULL, .data = NULL },
-			.epf = epf,
 			.mask = events2mask(event->events),
 			.revents = 0
 		}
@@ -300,7 +350,7 @@ static void epoll_entry_mod(const struct uk_file *epf, struct epoll_entry *ent,
 	ent->event = *event;
 	ent->tick.mask = events2mask(event->events);
 	ent->revents = 0;
-	epoll_register(epf, ent);
+	epoll_register(epf, ent, 0);
 
 }
 
@@ -314,30 +364,20 @@ static void epoll_entry_mod_legacy(struct epoll_entry *ent,
 	ent->event = *event;
 	vfs_poll_register(ent->vf, &ent->legacy_cb);
 }
-#endif /* CONFIG_LIBVFSCORE */
 
-static void epoll_entry_del(const struct uk_file *epf, struct epoll_entry **p)
-{
-	struct epoll_alloc *al = __containerof(epf, struct epoll_alloc, f);
-	struct epoll_entry *ent = *p;
-
-	*p = ent->next;
-	epoll_unregister_entry(ent);
-	uk_free(al->alloc, ent);
-}
-
-#if CONFIG_LIBVFSCORE
 /* vfscore shim callbacks */
 
 /* Called by vfscore drivers to signal events to epoll */
 void eventpoll_signal(struct eventpoll_cb *ecb, unsigned int revents)
 {
 	struct epoll_legacy *leg = __containerof(ecb, struct epoll_legacy, ecb);
+	struct epoll_entry *ent = __containerof(leg,
+						struct epoll_entry, legacy_cb);
 
 	revents &= leg->mask;
 	if (revents) {
 		(void)uk_or(&leg->revents, revents);
-		uk_file_event_set(leg->epf, UKFD_POLLIN);
+		uk_file_event_set(ent->epf, UKFD_POLLIN);
 	}
 }
 
@@ -352,16 +392,16 @@ void eventpoll_notify_close(struct vfscore_file *fp)
 			itr, struct epoll_legacy, f_link);
 		struct epoll_entry *ent = __containerof(
 			leg, struct epoll_entry, legacy_cb);
-		union uk_shim_file sf;
+		union epoll_shim_file sf;
 		struct epoll_entry **entp;
 
 		UK_ASSERT(ent->legacy);
 		sf.vfile = ent->vf;
-		uk_file_wlock(leg->epf);
-		entp = epoll_find(leg->epf, ent->fd, 1, sf);
+		uk_file_wlock(ent->epf);
+		entp = epoll_find(ent->epf, ent->fd, 1, sf);
 		UK_ASSERT(*entp == ent);
-		epoll_entry_del(leg->epf, entp);
-		uk_file_wunlock(leg->epf);
+		epoll_entry_del(ent->epf, entp);
+		uk_file_wunlock(ent->epf);
 	}
 }
 #endif /* CONFIG_LIBVFSCORE */
@@ -380,7 +420,7 @@ struct uk_file *uk_epollfile_create(void)
 	al->alloc = a;
 	al->list = NULL;
 	al->fstate = UK_FILE_STATE_INIT_VALUE(al->fstate);
-	al->frefcnt = UK_FILE_REFCNT_INIT_VALUE;
+	al->frefcnt = UK_FILE_REFCNT_INIT_VALUE(al->frefcnt);
 	al->f = (struct uk_file){
 		.vol = EPOLL_VOLID,
 		.node = &al->list,
@@ -422,6 +462,7 @@ int uk_sys_epoll_ctl(const struct uk_file *epf, int op, int fd,
 {
 	int ret = 0;
 	union uk_shim_file sf;
+	union epoll_shim_file esf;
 	struct epoll_entry **entp;
 #if CONFIG_LIBVFSCORE
 	int legacy;
@@ -435,19 +476,24 @@ int uk_sys_epoll_ctl(const struct uk_file *epf, int op, int fd,
 	if (unlikely(legacy < 0))
 		return -EBADF;
 	legacy = legacy == UK_SHIM_LEGACY;
+	if (legacy)
+		esf.vfile = sf.vfile;
+	else
+		esf.file = sf.ofile->file;
 #else /* !CONFIG_LIBVFSCORE */
 	ret = uk_fdtab_shim_get(fd, &sf);
 	if (unlikely(ret < 0))
 		return -EBADF;
 	UK_ASSERT(ret == UK_SHIM_OFILE);
+	esf.file = sf.ofile->file;
 #endif /* !CONFIG_LIBVFSCORE */
 
 	uk_file_wlock(epf);
 
 #if CONFIG_LIBVFSCORE
-	entp = epoll_find(epf, fd, legacy, sf);
+	entp = epoll_find(epf, fd, legacy, esf);
 #else /* !CONFIG_LIBVFSCORE */
-	entp = epoll_find(epf, fd, sf);
+	entp = epoll_find(epf, fd, esf);
 #endif /* !CONFIG_LIBVFSCORE */
 
 	switch (op) {
@@ -460,11 +506,10 @@ int uk_sys_epoll_ctl(const struct uk_file *epf, int op, int fd,
 #if CONFIG_LIBVFSCORE
 			if (legacy)
 				ret = epoll_add_legacy(epf, entp,
-						       fd, sf.vfile, event);
+						       fd, esf.vfile, event);
 			else
 #endif /* CONFIG_LIBVFSCORE */
-				ret = epoll_add(epf, entp,
-						fd, sf.ofile->file, event);
+				ret = epoll_add(epf, entp, fd, esf.file, event);
 		break;
 
 	case EPOLL_CTL_MOD:
@@ -532,6 +577,10 @@ int uk_sys_epoll_pwait2(const struct uk_file *epf, struct epoll_event *events,
 	} else {
 		deadline = 0;
 	}
+
+#if CONFIG_LIBPOSIX_POLL_YIELD
+	uk_sched_yield();
+#endif /* CONFIG_LIBPOSIX_POLL_YIELD */
 
 	while (uk_file_poll_until(epf, UKFD_POLLIN, deadline)) {
 		int lvlev = 0;

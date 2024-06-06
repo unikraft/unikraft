@@ -37,6 +37,9 @@
 #include <uk/essentials.h>
 #include <uk/arch/types.h>
 #include <uk/alloc.h>
+#include <uk/arch/paging.h>
+#include <uk/arch/types.h>
+#include <uk/essentials.h>
 #include <uk/config.h>
 #include <uk/arch/ctx.h>
 #include <uk/arch/paging.h>
@@ -58,6 +61,7 @@ extern "C" {
 #define UKPLAT_MEMRT_CMDLINE		0x0010	/* Command line */
 #define UKPLAT_MEMRT_DEVICETREE		0x0020	/* Device tree */
 #define UKPLAT_MEMRT_STACK		0x0040	/* Thread stack */
+#define UKPLAT_MEMRT_DEVICE		0x0080	/* Device region */
 
 /* Memory region flags */
 #define UKPLAT_MEMRF_ALL		0xffff
@@ -67,26 +71,20 @@ extern "C" {
 #define UKPLAT_MEMRF_WRITE		0x0002	/* Region is writable */
 #define UKPLAT_MEMRF_EXECUTE		0x0004	/* Region is executable */
 
-#define UKPLAT_MEMRF_UNMAP		0x0010	/* Must be unmapped at boot */
-#define UKPLAT_MEMRF_MAP		0x0020	/* Must be mapped at boot */
-
-#define UKPLAT_AUXSP_ALIGN					\
-	UKARCH_ECTX_ALIGN
-#define UKPLAT_AUXSP_LEN					\
-	ALIGN_UP((PAGE_SIZE *					\
-		  (1 << CONFIG_UKPLAT_AUXSP_PAGE_ORDER)),	\
-		  UKPLAT_AUXSP_ALIGN)
-
 /**
  * Descriptor of a memory region
  */
 struct ukplat_memregion_desc {
-	/** Physical base address */
+	/** Physical page-aligned base address of the region */
 	__paddr_t pbase;
-	/** Virtual base address */
+	/** Virtual page-aligned base address of the region */
 	__vaddr_t vbase;
-	/** Length in bytes */
+	/** Offset where the resource starts in the region's first page */
+	__off pg_off;
+	/** Length in bytes of the resource inside this region */
 	__sz len;
+	/** Number of pages the end-to-end aligned region occupies */
+	__sz pg_count;
 	/** Memory region type (see UKPLAT_MEMRT_*) */
 	__u16 type;
 	/** Memory region flags (see UKPLAT_MEMRF_*) */
@@ -96,6 +94,125 @@ struct ukplat_memregion_desc {
 	char name[36];
 #endif /* CONFIG_UKPLAT_MEMRNAME */
 } __packed __align(__SIZEOF_LONG__);
+
+/** UK_ASSERT_VALID_MRD_TYPE(mrd) macro
+ *
+ * Ensure a given memory region descriptor has one of the following defined
+ * types only:
+ *	UKPLAT_MEMRT_FREE		Uninitialized memory
+ *	UKPLAT_MEMRT_RESERVED		In use by platform
+ *	UKPLAT_MEMRT_KERNEL		Kernel binary segment
+ *	UKPLAT_MEMRT_INITRD		Initramdisk
+ *	UKPLAT_MEMRT_CMDLINE		Command line
+ *	UKPLAT_MEMRT_DEVICETREE		Device tree
+ *	UKPLAT_MEMRT_STACK		Thread stack
+ *	UKPLAT_MEMRT_DEVICE		Device
+ * @param mrd pointer to the memory region descriptor whose type to validate
+ */
+#define UK_ASSERT_VALID_MRD_TYPE(mrd)					\
+	do {								\
+		switch ((mrd)->type) {					\
+		case UKPLAT_MEMRT_FREE:					\
+			__fallthrough;					\
+		case UKPLAT_MEMRT_RESERVED:				\
+			__fallthrough;					\
+		case UKPLAT_MEMRT_KERNEL:				\
+			__fallthrough;					\
+		case UKPLAT_MEMRT_INITRD:				\
+			__fallthrough;					\
+		case UKPLAT_MEMRT_CMDLINE:				\
+			__fallthrough;					\
+		case UKPLAT_MEMRT_DEVICETREE:				\
+			__fallthrough;					\
+		case UKPLAT_MEMRT_STACK:				\
+			__fallthrough;					\
+		case UKPLAT_MEMRT_DEVICE:				\
+			break;						\
+		default:						\
+			UK_CRASH("Invalid mrd type: %hu\n",		\
+				 (mrd)->type);				\
+		}							\
+	} while (0)
+
+/** UK_ASSERT_VALID_MRD_FLAGS(mrd) macro
+ *
+ * Ensure a given memory region descriptor has one of the following defined
+ * flags only:
+ *	UKPLAT_MEMRF_READ		Region is readable
+ *	UKPLAT_MEMRF_WRITE		Region is writable
+ *	UKPLAT_MEMRF_EXECUTE		Region is executable
+ *	UKPLAT_MEMRF_UNMAP		Must be unmapped at boot
+ *	UKPLAT_MEMRF_MAP		Must be mapped at boot
+ *
+ * @param mrd pointer to the memory region descriptor whose type to validate
+ */
+#define UK_ASSERT_VALID_MRD_FLAGS(mrd)					\
+	do {								\
+		__u16 flags_all __maybe_unused = UKPLAT_MEMRF_READ    |	\
+						 UKPLAT_MEMRF_WRITE   |	\
+						 UKPLAT_MEMRF_EXECUTE;	\
+									\
+		UK_ASSERT(((mrd)->flags & flags_all) == (mrd)->flags);	\
+	} while (0)
+
+/** UK_ASSERT_VALID_MRD(mrd) macro
+ *
+ * Ensure memory region descriptor general correctness:
+ * - must be of only one valid type as per UK_ASSERT_VALID_MRD_TYPE
+ * - must only have valid flags as per UK_ASSERT_VALID_MRD_FLAGS
+ * - memory region is not empty or of length 0
+ * - virtual/physical base addresses are page-aligned
+ * - resource in-page offset must be in the range [0, PAGE_SIZE)
+ *
+ * @param mrd pointer to the free memory region descriptor to validate
+ */
+#define UK_ASSERT_VALID_MRD(mrd)					\
+	do {								\
+		UK_ASSERT_VALID_MRD_TYPE((mrd));			\
+		UK_ASSERT_VALID_MRD_FLAGS((mrd));			\
+		UK_ASSERT(PAGE_ALIGNED((mrd)->vbase));			\
+		UK_ASSERT(PAGE_ALIGNED((mrd)->pbase));			\
+		UK_ASSERT((mrd)->pg_off >= 0 &&				\
+			  (mrd)->pg_off < (__off)PAGE_SIZE);		\
+	} while (0)
+
+/** UK_ASSERT_VALID_FREE_MRD(mrd) macro
+ *
+ * Ensure free memory region descriptor particular correctness:
+ * - must meet the criteria of a general valid memory region descriptor
+ * - virtual/physical base addresses are equal
+ * - region is aligned end-to-end, therefore length is multiple of
+ * PAGE_SIZE times region's page count and the resource's
+ * in-page offset must be 0
+ *
+ * @param mrd pointer to the free memory region descriptor to validate
+ */
+#define UK_ASSERT_VALID_FREE_MRD(mrd)					\
+	do {								\
+		UK_ASSERT_VALID_MRD((mrd));				\
+		UK_ASSERT((mrd)->type == UKPLAT_MEMRT_FREE);		\
+		UK_ASSERT((mrd)->vbase == (mrd)->pbase);		\
+		UK_ASSERT((mrd)->pg_count * PAGE_SIZE == (mrd)->len);	\
+		UK_ASSERT(!(mrd)->pg_off);				\
+	} while (0)
+
+/** UK_ASSERT_VALID_KERNEL_MRD(mrd) macro
+ *
+ * Ensure kernel memory region descriptor particular correctness:
+ * - must meet the criteria of a general valid memory region descriptor
+ * - region is aligned end-to-end, therefore length is multiple of
+ * PAGE_SIZE times region's page count and the resource's
+ * in-page offset must be 0
+ *
+ * @param mrd pointer to the kernel memory region descriptor to validate
+ */
+#define UK_ASSERT_VALID_KERNEL_MRD(mrd)					\
+	do {								\
+		UK_ASSERT_VALID_MRD((mrd));				\
+		UK_ASSERT((mrd)->type == UKPLAT_MEMRT_KERNEL);		\
+		UK_ASSERT((mrd)->pg_count * PAGE_SIZE == (mrd)->len);	\
+		UK_ASSERT(!(mrd)->pg_off);				\
+	} while (0)
 
 /**
  * Check whether the memory region descriptor overlaps with [pstart, pend) in
@@ -264,84 +381,6 @@ void *ukplat_memregion_alloc(__sz size, int type, __u16 flags);
  *   0 on success, not 0 otherwise.
  */
 int ukplat_mem_init(void);
-
-/* Allocates and returns an auxiliary stack that can be used in emergency cases
- * such as when switching system call stacks. The size is that given by
- * (1 << CONFIG_AUXSP_PAGE_ORDER) * PAGE_SIZE.
- *
- * @param a
- *   The allocator to use for the auxiliary stack
- * @param vas
- *   The virtual address space to use for the mapping of the auxiliary stack.
- *   This should be used in conjunction with CONFIG_LIBUKVMEM to ensure that
- *   accesses to the auxiliary stack do not generate page faults in more
- *   fragile system states.
- * @param auxsp_len
- *   The custom length of the auxiliary stack. If 0, then
- *   CONFIG_UKPLAT_AUXSP_PAGE_ORDER is used instead as the default length.
- *
- * @return
- *   Pointer to the allocated auxiliary stack
- */
-static inline __uptr ukplat_auxsp_alloc(struct uk_alloc __maybe_unused *a,
-#if CONFIG_LIBUKVMEM
-					struct uk_vas __maybe_unused *vas,
-#endif /* CONFIG_LIBUKVMEM */
-					__sz auxsp_len)
-{
-	__vaddr_t auxsp;
-
-	/**
-	 * Why does the auxiliary stack have to be end-to-end aligned to ECTX
-	 * alignment?
-	 * Because we may want to be able to save the ECTX on it during
-	 * more fragile states of execution and on architectures such as x86
-	 * this is done through specialized instructions that require start
-	 * of the save area to be aligned to a variable alignment dependent
-	 * on what the CPU supports (see comment from x86 UKARCH_ECTX_SIZE).
-	 * Therefore, the allocation returned address must have the same
-	 * alignment as well because when we add to it the auxiliary stack
-	 * length the resulted stack pointer should on its own be ECTX aligned.
-	 */
-	if (!auxsp_len)
-		auxsp_len = UKPLAT_AUXSP_LEN;
-
-#if CONFIG_LIBUKVMEM
-	int rc;
-
-	/* Have the whole stack always backed by physical memory */
-	auxsp = __VADDR_ANY;
-	/* Allocation through uk_vma_map_stack() will result in a page-aligned
-	 * address which is more than enough to be ECTX aligned.
-	 */
-	rc = uk_vma_map_stack(vas,
-			      &auxsp,
-			      auxsp_len,
-			      UK_VMA_MAP_POPULATE,
-			      NULL,
-			      0);
-	if (unlikely(rc)) {
-		uk_pr_err("Failed to map auxiliary stack\n");
-		return 0;
-	}
-#else /* !CONFIG_LIBUKVMEM */
-	/* Again, make sure that allocation resulted start address is ECTX
-	 * aligned.
-	 */
-	auxsp = (__vaddr_t)uk_memalign(a, UKARCH_ECTX_ALIGN,
-				       auxsp_len);
-	if (unlikely(!auxsp)) {
-		uk_pr_err("Failed to allocate auxiliary stack\n");
-		return 0;
-	}
-#endif /* !CONFIG_LIBUKVMEM */
-
-	/* If auxsp resulted from the previous allocations is ECTX aligned
-	 * and auxsp_len is ECTX aligned, then the function call below will
-	 * result in an ECTX aligned stack pointer.
-	 */
-	return (__uptr)ukarch_gen_sp((__uptr)auxsp, auxsp_len);
-}
 
 #ifdef __cplusplus
 }

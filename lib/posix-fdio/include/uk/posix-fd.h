@@ -15,7 +15,8 @@
 #include <uk/ofile.h>
 
 /* Mode bits from fcntl.h that open files are interested in */
-#define UKFD_MODE_MASK (O_WRONLY|O_RDWR|O_NONBLOCK|O_APPEND|O_SYNC|O_DSYNC)
+#define UKFD_MODE_MASK \
+	(O_WRONLY|O_RDWR|O_NONBLOCK|O_APPEND|O_DIRECT|O_SYNC|O_DSYNC)
 
 /* Unikraft-specific mode bits, chosen to not overlap with any O_* flags */
 /* Open file is not seekable (e.g. for pipes, sockets & FIFOs) */

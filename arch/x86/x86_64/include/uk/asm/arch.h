@@ -11,6 +11,7 @@
 #endif
 
 #include <uk/asm/apic.h>
+#include <uk/asm/fsgsbase.h>
 #include <uk/asm/pic.h>
 
 /* EFLAGS register */

@@ -512,7 +512,9 @@ static int vfscore_extract_volume(const struct vfscore_volume *vv)
 			return -1;
 		}
 
-		vbase = (void *)initrd->vbase;
+		UK_ASSERT_VALID_MRD(initrd);
+
+		vbase = (void *)initrd->vbase + initrd->pg_off;
 		vlen = initrd->len;
 	}
 #if CONFIG_LIBVFSCORE_AUTOMOUNT_EINITRD

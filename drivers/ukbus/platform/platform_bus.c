@@ -51,6 +51,7 @@ static void *dtb;
 static const char *pf_device_compatible_list[] = {
 	"virtio,mmio",
 	"pci-host-ecam-generic",
+	"arm,pl031",
 	NULL
 };
 #endif /* CONFIG_LIBUKBUS_PLATFORM_FDT */
@@ -238,7 +239,8 @@ static int pf_init(struct uk_alloc *a)
 __vaddr_t uk_bus_pf_devmap(__paddr_t base, __sz size)
 {
 	struct uk_pagetable *pt;
-	__vaddr_t vaddr, paddr;
+	__vaddr_t vaddr, va;
+	__paddr_t paddr, pa;
 	unsigned long attr;
 	unsigned long pages;
 	int rc;
@@ -258,17 +260,25 @@ __vaddr_t uk_bus_pf_devmap(__paddr_t base, __sz size)
 	/* We can't use uk_vma_map_dma here as the vmem API is initialized
 	 * way too late for the interrupt controller which is required for
 	 * bringing up secondary cores.
+	 *
+	 * Notice that we handle each page independently, as ukplat_page_map()
+	 * would return EEXIST even if part of a multi-pgae region is mapped,
+	 * causing the subsequent ukplat_page_set_attr() to fail.
 	 */
-	rc = ukplat_page_map(pt, vaddr, paddr, pages, attr, 0);
-	if (!rc)
-		goto out;
+	for (__sz i = 0; i < pages; i++) {
+		va = vaddr + i * PAGE_SIZE;
+		pa = paddr + i * PAGE_SIZE;
+		rc = ukplat_page_map(pt, va, pa, 1, attr, 0);
+		if (!rc)
+			continue;
 
-	if (rc == -EEXIST)
-		rc = ukplat_page_set_attr(pt, vaddr, pages, attr, 0);
+		if (rc == -EEXIST)
+			rc = ukplat_page_set_attr(pt, va, 1, attr, 0);
 
-	if (unlikely(rc))
-		return (__vaddr_t)ERR2PTR(rc);
-out:
+		if (unlikely(rc))
+			return (__vaddr_t)ERR2PTR(rc);
+	}
+
 	return (__vaddr_t)base;
 }
 #endif /* CONFIG_PAGING */

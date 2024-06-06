@@ -25,8 +25,8 @@ jobs:
         if: always()
         uses: gsactions/commit-message-checker@v2
         with:
-          pattern: '^((([a-z0-9\/\.\-\_\*])+)|(\{([a-z0-9\/\.\-\_\*]+, )+[a-z0-9\/\.\-\_\*]+\})){1}: [A-Z0-9].*'
-          error: 'The PR title must follow the conventional commits format.'
+          pattern: '^((([a-zA-Z0-9\/\.\-\_\*])+)|(\{([a-zA-Z0-9\/\.\-\_\*]+, )+[a-zA-Z0-9\/\.\-\_\*]+\})){1}: [A-Z0-9].*'
+          error: 'The PR title and commits must follow Unikraft conventions, see: https://unikraft.org/docs/contributing/unikraft#commit-message-format'
           excludeDescription: 'true'
           excludeTitle: 'false'
           checkAllCommitMessages: 'false'

@@ -31,8 +31,10 @@
 #define __UK_TTY_NS16550_H__
 
 /**
- * Initialize the ns16550 console driver
+ * Early driver init
+ *
+ * @return zero on success, negative value on error
  */
-void ns16550_console_init(void *dtb);
+int ns16550_early_init(void);
 
 #endif /* __UK_TTY_NS16550_H__ */

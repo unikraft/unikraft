@@ -28,8 +28,9 @@
 #define PIC2_DATA					0xA1
 #define PIC2_DATA_DEFAULT_MASK				0x8E
 
-extern void lcpu_start64(void *, void *) __noreturn;
-extern void _ukplat_entry(void *, void *);
+void lcpu_start64(void *, void *) __noreturn;
+void _ukplat_entry(void *, void *);
+
 extern void *x86_bpt_pml4;
 
 static __u8 __align(16) uk_efi_bootstack[__PAGE_SIZE];
@@ -89,5 +90,8 @@ void __noreturn uk_efi_jmp_to_kern()
 	unmask_8259_pic();
 	lapic_timer_disable();
 	pic_8259_elcr2_level_irq10_11();
+
+	ukplat_memregion_list_coalesce(&bi->mrds);
+
 	lcpu_start64(&uk_efi_boot_startup_args, bi);
 }

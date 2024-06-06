@@ -3,7 +3,7 @@
  * Licensed under the BSD-3-Clause License (the "License").
  * You may not use this file except in compliance with the License.
  */
-
+#define _GNU_SOURCE
 /* Userspace shim syscalls that delegate to either posix-fdio or vfscore */
 
 #include <fcntl.h>
@@ -76,8 +76,8 @@ UK_SYSCALL_R_DEFINE(ssize_t, preadv, int, fd, const struct iovec *, iov,
 #undef pread64
 #endif
 
-UK_LLSYSCALL_R_DEFINE(ssize_t, pread64, int, fd,
-		      void *, buf, size_t, count, off_t, offset)
+UK_SYSCALL_R_DEFINE(ssize_t, pread64, int, fd,
+		    void *, buf, size_t, count, off_t, offset)
 {
 	ssize_t r;
 	union uk_shim_file sf;
@@ -97,6 +97,10 @@ UK_LLSYSCALL_R_DEFINE(ssize_t, pread64, int, fd,
 	}
 	return r;
 }
+
+#if UK_LIBC_SYSCALLS
+__alias(pread64, pread);
+#endif /* UK_LIBC_SYSCALLS */
 
 UK_SYSCALL_R_DEFINE(ssize_t, readv, int, fd,
 		    const struct iovec *, iov, int, iovcnt)
@@ -194,8 +198,8 @@ UK_SYSCALL_R_DEFINE(ssize_t, pwritev, int, fd, const struct iovec*, iov,
 #undef pwrite64
 #endif
 
-UK_LLSYSCALL_R_DEFINE(ssize_t, pwrite64, int, fd,
-		      const void *, buf, size_t, count, off_t, offset)
+UK_SYSCALL_R_DEFINE(ssize_t, pwrite64, int, fd,
+		    const void *, buf, size_t, count, off_t, offset)
 {
 	ssize_t r;
 	union uk_shim_file sf;
@@ -215,6 +219,10 @@ UK_LLSYSCALL_R_DEFINE(ssize_t, pwrite64, int, fd,
 	}
 	return r;
 }
+
+#if UK_LIBC_SYSCALLS
+__alias(pwrite64, pwrite);
+#endif /* UK_LIBC_SYSCALLS */
 
 UK_SYSCALL_R_DEFINE(ssize_t, writev, int, fd, const struct iovec *, iov,
 		    int, iovcnt)
@@ -356,6 +364,49 @@ UK_LLSYSCALL_R_DEFINE(int, fcntl, int, fd,
 	}
 }
 
+#if UK_LIBC_SYSCALLS
+int fcntl(int fd, int cmd, ...)
+{
+	intptr_t arg = 0;
+	va_list ap;
+
+	va_start(ap, cmd);
+	switch (cmd) {
+	case F_DUPFD:
+	case F_DUPFD_CLOEXEC:
+	case F_SETFD:
+	case F_SETFL:
+	case F_SETOWN:
+	case F_SETSIG:
+	case F_SETLEASE:
+	case F_NOTIFY:
+	case F_SETPIPE_SZ:
+	case F_ADD_SEALS:
+		arg = va_arg(ap, int);
+		break;
+	case F_SETLK:
+	case F_SETLKW:
+	case F_GETLK:
+	case F_OFD_SETLK:
+	case F_OFD_SETLKW:
+	case F_OFD_GETLK:
+	case F_GETOWN_EX:
+	case F_SETOWN_EX:
+	case F_GET_RW_HINT:
+	case F_SET_RW_HINT:
+	case F_GET_FILE_RW_HINT:
+	case F_SET_FILE_RW_HINT:
+		arg = (intptr_t)va_arg(ap, void *);
+		break;
+	default:
+		break;
+	}
+	va_end(ap);
+
+	return uk_syscall_e_fcntl(fd, cmd, arg);
+}
+#endif /* UK_LIBC_SYSCALLS */
+
 UK_LLSYSCALL_R_DEFINE(int, ioctl, int, fd, unsigned int, request, void *, arg)
 {
 	int r;
@@ -385,3 +436,17 @@ UK_LLSYSCALL_R_DEFINE(int, ioctl, int, fd, unsigned int, request, void *, arg)
 	}
 	return r;
 }
+
+#if UK_LIBC_SYSCALLS
+int ioctl(int fd, unsigned long request, ...)
+{
+	va_list ap;
+	void *arg;
+
+	va_start(ap, request);
+	arg = va_arg(ap, void*);
+	va_end(ap);
+
+	return uk_syscall_e_ioctl((long)fd, (long)request, (long)arg);
+}
+#endif /* UK_LIBC_SYSCALLS */

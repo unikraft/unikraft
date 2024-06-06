@@ -45,8 +45,7 @@ static inline int cmdline_init(struct ukplat_bootinfo *bi)
 	 */
 	cmdline = ukplat_memregion_alloc(cmdline_len + 1, UKPLAT_MEMRT_KERNEL,
 					 UKPLAT_MEMRF_READ |
-					 UKPLAT_MEMRF_WRITE |
-					 UKPLAT_MEMRF_MAP);
+					 UKPLAT_MEMRF_WRITE);
 	if (unlikely(!cmdline))
 		return -ENOMEM;
 
@@ -98,8 +97,7 @@ void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi)
 	/* Allocate boot stack */
 	bstack = ukplat_memregion_alloc(__STACK_SIZE, UKPLAT_MEMRT_STACK,
 					UKPLAT_MEMRF_READ |
-					UKPLAT_MEMRF_WRITE |
-					UKPLAT_MEMRF_MAP);
+					UKPLAT_MEMRF_WRITE);
 	if (unlikely(!bstack))
 		UK_CRASH("Boot stack alloc failed\n");
 

@@ -92,7 +92,7 @@ menu "Processor Features"
 
 config X86_64_HAVE_RANDOM
 	bool "Processor-generated randomness"
-	select HAVE_RANDOM
+	default y if HAVE_RANDOM
 	help
 	  Enable processor-generated randomness. This uses the RDRAND / RDSEED
 	  instructions provided by Intel's DRNG technology.

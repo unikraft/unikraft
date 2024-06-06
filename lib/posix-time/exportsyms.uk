@@ -1,3 +1,11 @@
+uk_sys_nanosleep
+uk_sys_time
+uk_sys_gettimeofday
+uk_sys_settimeofday
+uk_sys_clock_getres
+uk_sys_clock_gettime
+uk_sys_clock_settime
+uk_sys_clock_nanosleep
 clock_getres
 uk_syscall_e_clock_getres
 uk_syscall_r_clock_getres
@@ -13,6 +21,9 @@ uk_syscall_r_clock_nanosleep
 gettimeofday
 uk_syscall_e_gettimeofday
 uk_syscall_r_gettimeofday
+settimeofday
+uk_syscall_e_settimeofday
+uk_syscall_r_settimeofday
 nanosleep
 uk_syscall_e_nanosleep
 uk_syscall_r_nanosleep

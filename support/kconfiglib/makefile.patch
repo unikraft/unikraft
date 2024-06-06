@@ -15,7 +15,7 @@ index 3f327e21f60e..8b7dd1292005 100644
  
 +PHONY += scriptconfig iscriptconfig kmenuconfig guiconfig dumpvarsconfig
 +
-+PYTHONCMD ?= python
++PYTHONCMD ?= python3
 +kpython := PYTHONPATH=$(srctree)/Kconfiglib:$$PYTHONPATH $(PYTHONCMD)
 +
 +ifneq ($(filter scriptconfig,$(MAKECMDGOALS)),)

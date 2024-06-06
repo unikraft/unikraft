@@ -69,6 +69,16 @@ struct ukarch_pagetable {
 #define PT_PTES_PER_LEVEL		512
 #define PT_LEVEL_SHIFT			9
 
+#define PAGE_LARGE_LEVEL		1
+#define PAGE_LARGE_SHIFT		21
+#define PAGE_LARGE_SIZE			0x200000UL
+#define PAGE_LARGE_MASK			(~(PAGE_LARGE_SIZE - 1))
+
+#define PAGE_HUGE_LEVEL			2
+#define PAGE_HUGE_SHIFT			30
+#define PAGE_HUGE_SIZE			0x40000000UL
+#define PAGE_HUGE_MASK			(~(PAGE_HUGE_SIZE - 1))
+
 /* We use plain values here so we do not create dependencies on external helper
  * macros, which would forbid us to use the macros in functions defined further
  * down in this header.

@@ -47,9 +47,6 @@
 # These owners oversee the Xen platform.
 /plat/xen		@unikraft/maintainers-plat-xen
 
-# These owners oversee the linuxu platform.
-/plat/linuxu/		@unikraft/maintainers-plat-linuxu
-
 # These owners oversee the scheduler-related components.
 /lib/posix-process	@unikraft/maintainers-sched
 /lib/uklock		@unikraft/maintainers-sched
@@ -65,7 +62,7 @@
 # These owners oversee the security-related components.
 /lib/ubsan		@unikraft/maintainers-security
 /lib/uksp		@unikraft/maintainers-security
-/lib/ukswrand		@unikraft/maintainers-security
+/lib/ukrandom		@unikraft/maintainers-security
 
 # These owners oversee the network-related components.
 /lib/uknetdev		@unikraft/maintainers-net

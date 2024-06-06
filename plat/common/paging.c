@@ -69,6 +69,12 @@ static inline void pg_pt_free(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 static int pg_page_split(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			 __vaddr_t vaddr, unsigned int level);
 
+static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
+			unsigned int level, __vaddr_t vaddr, __paddr_t paddr,
+			__sz len, unsigned long attr, unsigned long flags,
+			__pte_t template, unsigned int template_level,
+			struct ukplat_page_mapx *mapx);
+
 static int pg_page_unmap(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			 unsigned int level, __vaddr_t vaddr, __sz len,
 			 unsigned long flags);
@@ -278,16 +284,37 @@ int ukplat_pt_init(struct uk_pagetable *pt, __paddr_t start, __sz len)
 	if (unlikely(rc))
 		return rc;
 
-	/* We create the new page table from the page table hierarchy that is
-	 * currently configured in hardware. To that end we just set the root
-	 * address. Note that it is not a problem that the page tables have not
-	 * been allocated by the frame allocator. Unmapping pages that do not
-	 * stem from the memory allocator silently fails and is ignored.
+	/* Allocate a new top-level page table */
+	rc = pg_pt_alloc(pt, &pt->pt_vbase, &pt->pt_pbase, PT_LEVELS - 1);
+	if (unlikely(rc))
+		return rc;
+
+	/* FIXME: The direct-mapped page table is an architecture-specific
+	 * abstraction, so it should be mapped by the pgarch_ API. What
+	 * currently prevents us from doing so is that upon pgarch_pt_init()
+	 * we haven't yet allocated a top-level pagetable.
+	 *
+	 * Options:
+	 * 1. Move both the allocation of the top-level page table to
+	 *    pgarch_pt_init() and make it a requriement that it is
+	 *    initialized by that function. Move mapping of the direct
+	 *    mapped region into pgarch_pt_init(). Requires that the
+	 *    pgarch layer has access to pg_pt_alloc() and pg_pt_map().
+	 *
+	 * 2. Create a pgarch_pt_post_init() and move mapping of the
+	 *    direct-mapped region there. It also requires mapping
+	 *    capabilities from pgarch.
 	 */
-	pt->pt_pbase = ukarch_pt_read_base();
-	pt->pt_vbase = pgarch_pt_map(pt, pt->pt_pbase, PT_LEVELS - 1);
-	if (unlikely(pt->pt_vbase == __VADDR_INV))
-		return -ENOMEM;
+	rc = pg_page_mapx(pt, pt->pt_vbase, PT_LEVELS - 1,
+			  DIRECTMAP_AREA_START, /* vaddr */
+			  0x00000000, /* paddr */
+			  DIRECTMAP_AREA_SIZE, /* len */
+			  PAGE_ATTR_PROT_READ | PAGE_ATTR_PROT_WRITE, /* attr */
+			  0, /* flags */
+			  PT_Lx_PTE_INVALID(PAGE_LEVEL),
+			  PAGE_LEVEL, NULL);
+	if (unlikely(rc))
+		return rc;
 
 #ifdef CONFIG_PAGING_STATS
 	/* If we have stats active, we need to discover all mappings etc. We
@@ -532,7 +559,6 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 	UK_ASSERT(len > 0);
 	UK_ASSERT(PAGE_Lx_ALIGNED(len, to_lvl));
 	UK_ASSERT(PAGE_Lx_ALIGNED(vaddr, to_lvl));
-	UK_ASSERT(vaddr <= __VADDR_MAX - len);
 	UK_ASSERT(ukarch_vaddr_range_isvalid(vaddr, len));
 
 	if (paddr != __PADDR_ANY) {
@@ -556,6 +582,7 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 
 	pte_idx = PT_Lx_IDX(vaddr, lvl);
 	page_size = PAGE_Lx_SIZE(lvl);
+
 	do {
 		/* This loop is responsible for walking the page table down
 		 * until we reach the desired level. If there is a page table
@@ -566,7 +593,6 @@ static int pg_page_mapx(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 			rc = ukarch_pte_read(pt_vaddr, lvl, pte_idx, &pte);
 			if (unlikely(rc))
 				return rc;
-
 			if (PT_Lx_PTE_PRESENT(pte, lvl)) {
 				/* If there is already a larger page mapped
 				 * at this address and we have a mapx, we
@@ -845,6 +871,8 @@ int ukplat_page_mapx(struct uk_pagetable *pt, __vaddr_t vaddr,
 	UK_ASSERT(pt->pt_vbase != __VADDR_INV);
 	UK_ASSERT(pt->pt_pbase != __PADDR_INV);
 
+	UK_ASSERT(vaddr <= __VADDR_MAX - len);
+
 	return pg_page_mapx(pt, pt->pt_vbase, PT_LEVELS - 1, vaddr, paddr, len,
 			    attr, flags, PT_Lx_PTE_INVALID(PAGE_LEVEL),
 			    PAGE_LEVEL, mapx);
@@ -894,6 +922,9 @@ static int pg_page_split(struct uk_pagetable *pt, __vaddr_t pt_vaddr,
 	 * contiguous range of physical memory than the input page
 	 */
 	paddr = PT_Lx_PTE_PADDR(pte, level);
+
+	UK_ASSERT(vaddr <= __VADDR_MAX - PAGE_Lx_SIZE(level));
+
 	rc = pg_page_mapx(pt, new_pt_vaddr, level - 1, vaddr, paddr,
 			  PAGE_Lx_SIZE(level), attr, flags, pte, level, NULL);
 	if (unlikely(rc))
@@ -1436,15 +1467,10 @@ static inline unsigned long bootinfo_to_page_attr(__u16 flags)
 	return prot;
 }
 
-extern struct ukplat_memregion_desc bpt_unmap_mrd;
-
 int ukplat_paging_init(void)
 {
 	struct ukplat_memregion_desc *mrd;
 	unsigned long prot;
-	__vaddr_t vaddr;
-	__paddr_t paddr;
-	__sz len;
 	int rc;
 
 	/* Initialize the frame allocator with the free physical memory
@@ -1453,22 +1479,20 @@ int ukplat_paging_init(void)
 	 */
 	rc = -ENOMEM; /* In case there is no region */
 	ukplat_memregion_foreach(&mrd, UKPLAT_MEMRT_FREE, 0, 0) {
-		UK_ASSERT(mrd->vbase == mrd->pbase);
-		UK_ASSERT(!(mrd->pbase & ~PAGE_MASK));
-		UK_ASSERT(mrd->len);
-		UK_ASSERT(!(mrd->len & ~PAGE_MASK));
+		UK_ASSERT_VALID_FREE_MRD(mrd);
 
 		/* Not mapped */
 		mrd->vbase = __U64_MAX;
 		mrd->flags &= ~UKPLAT_MEMRF_PERMS;
 
 		if (!kernel_pt.fa) {
-			rc = ukplat_pt_init(&kernel_pt, mrd->pbase, mrd->len);
+			rc = ukplat_pt_init(&kernel_pt, mrd->pbase,
+					    mrd->pg_count * PAGE_SIZE);
 			if (unlikely(rc))
 				kernel_pt.fa = NULL;
 		} else {
 			rc = ukplat_pt_add_mem(&kernel_pt, mrd->pbase,
-					       mrd->len);
+					       mrd->pg_count * PAGE_SIZE);
 		}
 
 		/* We do not fail if we cannot add this memory region to the
@@ -1488,40 +1512,18 @@ int ukplat_paging_init(void)
 	if (unlikely(!kernel_pt.fa))
 		return rc;
 
-	/* Perform unmappings */
-	ukplat_memregion_foreach(&mrd, 0, UKPLAT_MEMRF_UNMAP,
-				 UKPLAT_MEMRF_UNMAP) {
-		UK_ASSERT(mrd->vbase != __U64_MAX);
-
-		vaddr = PAGE_ALIGN_DOWN(mrd->vbase);
-		len   = PAGE_ALIGN_UP(mrd->len + (mrd->vbase - vaddr));
-
-		rc = ukplat_page_unmap(&kernel_pt, vaddr,
-				       len >> PAGE_SHIFT,
-				       PAGE_FLAG_KEEP_FRAMES);
-		if (unlikely(rc))
-			return rc;
-	}
-
 	/* Perform mappings */
-	ukplat_memregion_foreach(&mrd, 0, UKPLAT_MEMRF_MAP,
-				 UKPLAT_MEMRF_MAP) {
-		UK_ASSERT(mrd->vbase != __U64_MAX);
-
-		vaddr = PAGE_ALIGN_DOWN(mrd->vbase);
-		paddr = PAGE_ALIGN_DOWN(mrd->pbase);
-		len   = PAGE_ALIGN_UP(mrd->len + (mrd->vbase - vaddr));
-
-#if defined(CONFIG_ARCH_ARM_64)
-		if (!RANGE_CONTAIN(bpt_unmap_mrd.pbase, bpt_unmap_mrd.len,
-				   paddr, len))
+	ukplat_memregion_foreach(&mrd, 0, 0, 0) {
+		/* Free mem is managed by falloc */
+		if (mrd->type == UKPLAT_MEMRT_FREE)
 			continue;
-#endif
+
+		UK_ASSERT_VALID_MRD(mrd);
 
 		prot  = bootinfo_to_page_attr(mrd->flags);
 
-		rc = ukplat_page_map(&kernel_pt, vaddr, paddr,
-				     len >> PAGE_SHIFT, prot, 0);
+		rc = ukplat_page_map(&kernel_pt, mrd->vbase, mrd->pbase,
+				     mrd->pg_count, prot, 0);
 		if (unlikely(rc))
 			return rc;
 	}

@@ -1,9 +1,11 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ *          Sergiu Moga <sergiu@unikraft.io>
  *
  * Copyright (c) 2019, NEC Laboratories Europe GmbH, NEC Corporation.
  *                     All rights reserved.
+ * Copyright (c) 2024, Unikraft GmbH. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -36,7 +38,7 @@
 #include <uk/asm.h>
 #include <uk/asm/cfi.h>
 #include <uk/plat/common/lcpu.h>
-#include <uk/syscall.h>
+#include <uk/arch/ctx.h>
 
 ENTRY(_ukplat_syscall)
 	.cfi_startproc simple
@@ -65,10 +67,95 @@ ENTRY(_ukplat_syscall)
 	 * in the Red Zone.
 	 */
 	movq	%gs:LCPU_AUXSP_OFFSET, %rsp
+
 	/* Describing the rsp relative to GS would make it necessary to emit
 	 * raw CFI. Instead of doing so, mark rsp as undefined temporarily
 	 */
 	.cfi_undefined rsp
+
+	subq	$(UKARCH_AUXSPCB_SIZE), %rsp
+	movq	UKARCH_AUXSPCB_OFFSETOF_CURR_FP(%rsp), %rsp
+
+	/* We subtract 8 bytes less here so that we have room for the pushed
+	 * auxsp.
+	 * Afterwards, the current stack pointer is pointing to the current
+	 * frame within the auxiliary stack. Subtract UKARCH_EXECENV_END_ALIGN
+	 * to make room for the 8-byte auxsp pointer, since the layout is
+	 * struct uk_syscall_ctx {
+	 *	struct ukarch_execenv execenv;
+	 *	__uptr auxsp;  <-- make room for these
+	 *     ..... space left unused because of alignment subtraction ....
+	 * };
+	 * We cannot just simply push or subtract 8 bytes because we break
+	 * the alignment required by EXECENV, so we must subtract more.
+	 * This leads to some wasted bytes but it's fine because they are not
+	 * permanent and it is mandatory that we maintain alignment. This
+	 * is an optimization so that we do not have to fetch `auxsp` in the
+	 * syscall C entry as well (which usually involves reading some
+	 * system register). The final stack layout for entering the syscall
+	 * C handler should look like the following:
+	 *
+	 *               lcpu->auxsp (AUXSP aligned)
+	 *                  +-------------+ ^
+	 *                  |             | | EXECENV_END_ALIGN
+	 *                ^ |<----------->| |             ^
+	 *         8 bytes| |pushed auxsp | |             |
+	 *                v |-------------| v             |
+	 *                ^ |  struct     | ^             |
+	 *                | |  __regs     | |__REGS_SIZEOF|
+	 *                | |-------------| v             |
+	 *                | |  struct     | ^             |uk_syscall_ctx
+	 *      struct    | |ukarch_sysctx| |SYSCTX_SIZE  |
+	 *  ukarch_execenv| |-------------| v             |
+	 *                | |             | ^             |
+	 *                | |  struct     | |             |
+	 *                | | ukarch_ectx | |ECTX_SIZE    |
+	 *                | |             | |             |
+	 *                | |             | |             |
+	 *                | |             | |             |
+	 *                v +-------------+ v             v
+	 *                       stack
+	 *                       pointer
+	 *
+	 * Where ukarch_sysctx/ukarch_ectx/__regs is filled in the following,
+	 * after making room for it.
+	 */
+
+	/* Create the room */
+	/* The subtraction we need to make so that we can push the 8-byte auxsp.
+	 * This is an inconvenient operation as it ends up wasting a few bytes,
+	 * the subtraction being bigger than 8 bytes to comply with required
+	 * alignment. But it is a trade-off worth doing to avoid having to
+	 * read the GS_BASE MSR again in the syscall entry, by storing what
+	 * we need now, while we are still swapgs'd.
+	 *
+	 * NOTE: It is 8 byte less than the actual required subtraction. This is
+	 * so we can right afterwards push the auxsp's value, thus subtracting
+	 * 8 bytes yet again from the stack pointer.
+	 */
+	subq	$(UKARCH_EXECENV_END_ALIGN - 8), %rsp
+	.cfi_adjust_cfa_offset (UKARCH_EXECENV_END_ALIGN - 8)
+
+	/* Push out auxsp for faster access later. */
+	pushq	%gs:LCPU_AUXSP_OFFSET
+	.cfi_adjust_cfa_offset 8
+
+	/**
+	 * We are done getting what we needed from KERNEL_GS_BASE, swap back.
+	 * We do this immediately so that we avoid confusions like:
+	 * - I am in an exception handler, was I in a syscall or application
+	 * code when it happened? What is the value of KERNEL_GS_BASE/GS_BASE
+	 * - I am returning from clone(), should I do swapgs? Was this an
+	 * internal clone() call?
+	 * ...
+	 *
+	 * By doing this we will always know:
+	 * - Were we interrupted/trapped from Unikraft/syscall code? Then
+	 * GS_BASE == lcpu
+	 * - Were we interrupted/trapped from application code? Then we don't
+	 * know GS_BASE so we need to get lcpu from KERNEL_GS_BASE.
+	 */
+	swapgs
 
 	/* NOTE: We should normally align the stack before doing this
 	 * subtraction because we must ensure that the `ectx` field
@@ -77,44 +164,28 @@ ENTRY(_ukplat_syscall)
 	 * auxiliary stack because it is allocated with this exact alignment
 	 * in mind.
 	 */
-	subq	$(UK_SYSCALL_CTX_SIZE - __REGS_SIZEOF), %rsp
-	.cfi_adjust_cfa_offset (UK_SYSCALL_CTX_SIZE - __REGS_SIZEOF)
+	subq	$(UKARCH_EXECENV_SIZE - __REGS_SIZEOF), %rsp
+	.cfi_adjust_cfa_offset (UKARCH_EXECENV_SIZE - __REGS_SIZEOF)
 
 	pushq_cfi	$(GDT_DESC_OFFSET(GDT_DESC_DATA))
 
-	/* Store application's stack pointer at the top of current thread's
-	 * auxiliary stack. We have to do this because we obviously can't
-	 * rely on the scratch register being maintained between thread switches
-	 */
 	pushq_reg_cfi r11
 	.cfi_rel_offset rsp, 0
 
-	/* We are now in a state where the stack looks like this:
-	 *	--------------- <-- auxsp (i.e. lcpu_get_current()->auxsp,
-	 *	| app's saved |	           i.e. uk_thread_current()->auxsp)
-	 *	|     %ss     |
-	 *	---------------
-	 *	| app's saved |
-	 *	|     %rsp    |
-	 *	--------------- <-- (auxsp - 16) i.e. (**current %rsp**)
-	 *	|             |
-	 *	|             |
-	 *            ...
-	 *	|             |
-	 *	--------------- <-- (auxsp -
-	 *			     (PAGE_SIZE *
-	 *			      (1 << CONFIG_UKPLAT_AUXSP_PAGE_ORDER)))
-	 *	  END OF AUXSP
-	 */
-
 	/*
 	 * Push arguments in the order of 'struct __regs' to the stack.
-	 * We are going to handover a refernce to this stack area as
+	 * We are going to handover a reference to this stack area as
 	 * `struct __regs *` argument to the system call handler.
 	 */
 	/* We now have %ss and %rsp on the frame, finish classic trap frame */
+	/* Push EFLAGS register. Additionally, since we pushed it with IRQs
+	 * disabled, it won't have the corresponding bit flag set, making it
+	 * look like the caller of the syscall had IRQs off, which no sane
+	 * application would do, therefore manually set the flag.
+	 */
 	pushfq			/* eflags */
 	.cfi_adjust_cfa_offset 8
+	orq	$X86_EFLAGS_IF, 0(%rsp)
 
 	pushq_cfi	$(GDT_DESC_OFFSET(GDT_DESC_CODE))	/* cs */
 	pushq_reg_cfi rcx	/* rcx contains the next rip on syscall exit */
@@ -145,10 +216,42 @@ ENTRY(_ukplat_syscall)
 	/*
 	 * Handle call
 	 * NOTE: Handler function is going to modify saved registers state
-	 * NOTE: Stack pointer as "struct __regs *" argument
+	 * NOTE: Stack pointer as "struct uk_syscall_ctx *" argument
 	 *       (calling convention: 1st arg on %rdi)
 	 */
 	movq %rsp, %rdi
+
+	/**
+	 * Store execenv's stored ECTX which resides at offset:
+	 * sizeof(struct __regs) + sizeof(struct ukarch_sysctx) from beginning
+	 * of execenv.
+	 *
+	 * NOTE: Always sanitize the ECTX slot first to ensure that the XSAVE
+	 * header is not dirty.
+	 */
+	addq	$(__REGS_SIZEOF + UKARCH_SYSCTX_SIZE), %rdi
+	call	ukarch_ectx_sanitize
+	/**
+	 * After function calls, %rsp preserved value of execenv pointer so
+	 * restore that into %rdi.
+	 */
+	movq	%rsp, %rdi
+	addq	$(__REGS_SIZEOF + UKARCH_SYSCTX_SIZE), %rdi
+	call	ukarch_ectx_store
+
+	/**
+	 * After function calls, %rsp preserved value of execenv pointer so
+	 * restore that into %rdi.
+	 */
+	movq	%rsp, %rdi
+
+	/**
+	 * Store execenv's system context which resides at offset:
+	 * sizeof(struct __regs) from beginning of execenv.
+	 */
+	addq	$(__REGS_SIZEOF), %rdi
+	call	ukarch_sysctx_store
+	movq	%rsp, %rdi
 
 	/*
 	 * Make sure the stack is aligned to 16-bytes. We store the original
@@ -165,6 +268,35 @@ ENTRY(_ukplat_syscall)
 	.cfi_def_cfa_register rsp
 
 	cli
+
+	/**
+	 * Assign pointer to execution environment to load (first argument).
+	 * We do this because it will be easy to keep track of it as, unlike
+	 * %rdi, we do not have to store/restore %rsp across function calls.
+	 */
+	movq	%rsp, %rdi
+
+	/**
+	 * Load execenv's stored ECTX which resides at offset:
+	 * sizeof(struct __regs) + sizeof(struct ukarch_sysctx) from beginning
+	 * of execenv.
+	 */
+	addq	$(__REGS_SIZEOF + UKARCH_SYSCTX_SIZE), %rdi
+	call	ukarch_ectx_load
+
+	/**
+	 * As stated previously, after function calls, %rsp preserved value of
+	 * execenv pointer so restore that into %rdi.
+	 */
+	movq	%rsp, %rdi
+
+	/**
+	 * Load execenv's stored system context which resides at offset:
+	 * sizeof(struct __regs) from beginning of execenv.
+	 */
+	addq	$(__REGS_SIZEOF), %rdi
+	call	ukarch_sysctx_load
+
 	/* Load the updated state back to registers */
 	addq $(__REGS_PAD_SIZE), %rsp
 	.cfi_adjust_cfa_offset -__REGS_PAD_SIZE
@@ -188,9 +320,6 @@ ENTRY(_ukplat_syscall)
 	movq	32(%rsp), %rsp
 	.cfi_restore rsp
 	.cfi_def_cfa rsp, 0
-
-	/* Restore application's gs_base register */
-	swapgs
 
 	sti
 

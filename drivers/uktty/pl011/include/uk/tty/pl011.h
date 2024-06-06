@@ -35,9 +35,11 @@ extern "C" {
 #endif
 
 /**
- * Initialize the pl011 console driver
+ * Early driver init
+ *
+ * @return zero on success, negative value on error
  */
-void pl011_console_init(void *dtb);
+int pl011_early_init(void);
 
 #ifdef __cplusplus
 }

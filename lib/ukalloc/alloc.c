@@ -189,7 +189,7 @@ void uk_free_ifpages(struct uk_alloc *a, void *ptr)
 		return;
 
 #ifdef CONFIG_HAVE_MEMTAG
-	metadata = uk_get_metadata((void *)((uint64_t)ptr & ~MTE_TAG_MASK));
+	metadata = uk_get_metadata((void *)((__u64)ptr & ~MTE_TAG_MASK));
 	size = metadata->size;
 #else
 	metadata = uk_get_metadata(ptr);

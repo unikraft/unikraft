@@ -1,6 +1,7 @@
 menuconfig LIBPOSIX_PIPE
 	bool "posix-pipe: Support for pipes"
 	select LIBPOSIX_FDIO
+	select LIBUKATOMIC
 
 if LIBPOSIX_PIPE
 	config LIBPOSIX_PIPE_SIZE_ORDER
@@ -8,5 +9,14 @@ if LIBPOSIX_PIPE
 	default 16
 	help
 		Pipe buffer size will be 2^(order) bytes.
+
+	config LIBPOSIX_PIPE_PACKET
+	bool "Support packet-mode (O_DIRECT) pipes"
+	default y
+
+	config LIBPOSIX_PIPE_MAX_PACKETS
+	int "Max number of pending packets per pipe"
+	default 64
+	depends on LIBPOSIX_PIPE_PACKET
 
 endif

@@ -159,10 +159,6 @@ jobs:
           arch: x86_64
         - plat: fc
           arch: x86_64
-        - plat: linuxu
-          arch: x86_64
-        - plat: linuxu
-          arch: arm64
 
     steps:
     - uses: actions/checkout@v4
@@ -202,15 +198,19 @@ jobs:
     steps:
       - name: Check idle
         run: |
-          set -xe;
+          set -e;
+
+          today=$(date -u +"%Y-%m-%d");
 
           # Check if there are any ongoing tests (only one repository dispatch exists so we can just check for the status)
           # We need to check separately for each status because the API does not support multiple statuses
-          idle_queued=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 100 --status queued 2> /dev/null)
-          idle_in_progress=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 100 --status in_progress 2> /dev/null)
-          idle_requested=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 100 --status requested 2> /dev/null)
-          idle_waiting=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 100 --status waiting 2> /dev/null)
+          idle_queued=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 200 --created "$today" --status queued 2> /dev/null)
+          idle_in_progress=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 200 --created "$today" --status in_progress 2> /dev/null)
+          idle_requested=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 200 --created "$today" --status requested 2> /dev/null)
+          idle_waiting=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 200 --created "$today" --status waiting 2> /dev/null)
           if [ -n "$idle_queued" ] || [ -n "$idle_in_progress" ] || [ -n "$idle_requested" ] || [ -n "$idle_waiting" ]; then
+            sudo apt-get update;
+            sudo apt-get install -y jq;
             echo "There are idle tests, try again later:";
             echo "Queued:";
             jq "$idle_queued";
@@ -242,7 +242,7 @@ jobs:
 
       - name: Fetch catalog results
         run: |
-          set -xe;
+          set -e;
 
           sudo apt-get update;
           sudo apt-get install -y jq;
@@ -254,7 +254,7 @@ jobs:
           for _ in {1..60}; do
             # If there are more than 100 tests, the list will be truncated
             # TODO(craciunoiuc): Implement pagination or filter only for not concluded tests
-            joutput=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 100 --created "$today" --json displayTitle,conclusion,createdAt);
+            joutput=$(gh run list --repo unikraft/catalog --event repository_dispatch --limit 100 --created "$today" --json name,url,displayTitle,conclusion,createdAt);
 
             # Check all the tests if they are successful
             # If there is a failure, the workflow will fail-fast
@@ -262,7 +262,15 @@ jobs:
             fail_output=$(echo "$joutput" | jq -r -c -M --arg start "$start" --arg stop "$stop" '.[] | select(.createdAt <= $stop) | select(.createdAt >= $start) | select(.displayTitle == "core_merge") | select(.conclusion == "failure")');
             if [ -n "$fail_output" ]; then
               echo "There are failed tests:";
-              jq "$fail_output";
+              echo "$fail_output" | while read -r i; do
+                name=$(echo "$i" | jq -r -c -M '.name');
+                url=$(echo "$i" | jq -r -c -M '.url');
+                echo "❌ $name";
+                echo "   $url";
+                echo "";
+              done
+              echo "Inspect the whole test suite at:"
+              echo "https://github.com/unikraft/catalog?tab=readme-ov-file#library"
               exit 1;
             fi
 
@@ -270,7 +278,7 @@ jobs:
             # Filter out tests that were created after $start and before stop and pick only the ones that have the displayTitle==core_merge
             ongoing_output=$(echo "$joutput" | jq -r -c -M --arg start "$start" --arg stop "$stop" '.[] | select(.createdAt <= $stop) | select(.createdAt >= $start) | select(.displayTitle == "core_merge") | select(.conclusion == "")')
             if [ -z "$ongoing_output" ]; then
-              echo "All tests have finished successfully";
+              echo "✅ All tests have finished successfully";
               exit 0;
             fi
 
@@ -294,7 +302,7 @@ jobs:
 
       - name: Merge stable
         run: |
-          set -xe;
+          set -e;
 
           git pull origin stable;
           git checkout --track origin/stable;

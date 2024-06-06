@@ -63,9 +63,9 @@ static inline int ukarch_random_u64(__u64 *val)
 			: "=r" (*val), "=qm" (res)
 		);
 		if (likely(res))
-			break;
+			return 0;
 	}
-	return !res;
+	return -EIO;
 }
 
 static inline int ukarch_random_u32(__u32 *val)
@@ -80,9 +80,9 @@ static inline int ukarch_random_u32(__u32 *val)
 			: "=r" (*val), "=qm" (res)
 		);
 		if (likely(res))
-			break;
+			return 0;
 	}
-	return !res;
+	return -EIO;
 }
 
 static inline int ukarch_random_seed_u64(__u64 *val)
@@ -90,11 +90,15 @@ static inline int ukarch_random_seed_u64(__u64 *val)
 	unsigned char res;
 
 	__asm__ __volatile__(
-		"	rdseed	%0\n" /* get rand */
+		"	rdseed	%0\n" /* get seed */
 		"	setc	%1\n" /* get result */
 		: "=r" (*val), "=qm" (res)
 	);
-	return !res;
+
+	if (likely(res))
+		return 0;
+
+	return -EIO;
 }
 
 static inline int ukarch_random_seed_u32(__u32 *val)
@@ -106,5 +110,9 @@ static inline int ukarch_random_seed_u32(__u32 *val)
 		"	setc	%1\n" /* get result */
 		: "=r" (*val), "=qm" (res)
 	);
-	return !res;
+
+	if (likely(res))
+		return 0;
+
+	return -EIO;
 }

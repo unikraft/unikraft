@@ -39,11 +39,13 @@ lxboot_init_cmdline(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 	if (cmdline_size == 0)
 		return;
 
-	mrd.pbase = cmdline_addr;
-	mrd.vbase = cmdline_addr;
-	mrd.len   = cmdline_size;
-	mrd.type  = UKPLAT_MEMRT_CMDLINE;
-	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
+	mrd.pbase = PAGE_ALIGN_DOWN(cmdline_addr);
+	mrd.vbase = mrd.pbase;
+	mrd.pg_off = cmdline_addr - mrd.pbase;
+	mrd.len = cmdline_size;
+	mrd.pg_count = PAGE_COUNT(mrd.pg_off + mrd.len);
+	mrd.type = UKPLAT_MEMRT_CMDLINE;
+	mrd.flags = UKPLAT_MEMRF_READ;
 #ifdef CONFIG_UKPLAT_MEMRNAME
 	memcpy(mrd.name, "cmdline", sizeof("cmdline"));
 #endif /* CONFIG_UKPLAT_MEMRNAME */
@@ -75,11 +77,13 @@ lxboot_init_initrd(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 	if (initrd_addr == 0 || initrd_size == 0)
 		return;
 
-	mrd.type  = UKPLAT_MEMRT_INITRD;
-	mrd.flags = UKPLAT_MEMRF_MAP | UKPLAT_MEMRF_READ;
-	mrd.vbase = initrd_addr;
-	mrd.pbase = initrd_addr;
-	mrd.len   = initrd_size;
+	mrd.pbase = PAGE_ALIGN_DOWN(initrd_addr);
+	mrd.vbase = mrd.pbase;
+	mrd.pg_off = initrd_addr - mrd.pbase;
+	mrd.len = initrd_size;
+	mrd.type = UKPLAT_MEMRT_INITRD;
+	mrd.pg_count = PAGE_COUNT(mrd.pg_off + initrd_size);
+	mrd.flags = UKPLAT_MEMRF_READ;
 #ifdef CONFIG_UKPLAT_MEMRNAME
 	memcpy(mrd.name, "initrd", sizeof("initrd"));
 #endif /* CONFIG_UKPLAT_MEMRNAME */
@@ -110,17 +114,23 @@ lxboot_init_mem(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 		if (end <= start)
 			continue;
 
-		mrd.pbase = start;
-		mrd.vbase = start; /* 1:1 mapping */
+		mrd.pbase = PAGE_ALIGN_DOWN(start);
+		mrd.vbase = mrd.pbase; /* 1:1 mapping */
+		mrd.pg_off = start - mrd.pbase;
 		mrd.len = end - start;
+		mrd.pg_count = PAGE_COUNT(mrd.pg_off + mrd.len);
 
 		if (entry->type == LXBOOT_E820_TYPE_RAM) {
 			mrd.type = UKPLAT_MEMRT_FREE;
 			mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE;
 
+			/* Free memory regions have
+			 * mrd.len == mrd.pg_count * PAGE_SIZE
+			 */
+			mrd.len = PAGE_ALIGN_UP(mrd.len + mrd.pg_off);
 		} else {
 			mrd.type = UKPLAT_MEMRT_RESERVED;
-			mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP;
+			mrd.flags = UKPLAT_MEMRF_READ;
 
 			/* We assume that reserved regions cannot
 			 * overlap with loaded modules.

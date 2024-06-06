@@ -191,6 +191,9 @@ static int vmem_vma_find_range(struct uk_vas *vas, __vaddr_t *vaddr, __sz *len,
 			if (strict && vma_end->end != next->start)
 				return -ENOENT;
 
+			if (vend <= next->start)
+				break;
+
 			vma_end = next;
 		}
 

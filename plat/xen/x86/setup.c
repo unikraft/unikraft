@@ -140,12 +140,13 @@ static int _init_mem(struct ukplat_bootinfo *const bi)
 	/* Fill out mrd array */
 	/* heap */
 	mrd = (struct ukplat_memregion_desc) {
-		.vbase = (__vaddr_t)to_virt(start_pfn << PAGE_SHIFT),
 		.pbase = start_pfn << PAGE_SHIFT,
-		.len   = (max_pfn - start_pfn) << PAGE_SHIFT,
-		.type  = UKPLAT_MEMRT_FREE,
-		.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE |
-			 UKPLAT_MEMRF_MAP,
+		.vbase = (__vaddr_t)to_virt(start_pfn << PAGE_SHIFT),
+		.pg_off = 0,
+		.len = (max_pfn - start_pfn) << PAGE_SHIFT,
+		.pg_count = max_pfn - start_pfn,
+		.type = UKPLAT_MEMRT_FREE,
+		.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE,
 	};
 #if CONFIG_UKPLAT_MEMRNAME
 	strncpy(mrd.name, "heap", sizeof(mrd.name) - 1);
@@ -154,36 +155,21 @@ static int _init_mem(struct ukplat_bootinfo *const bi)
 	if (unlikely(rc < 0))
 		return rc;
 
-	mrd = (struct ukplat_memregion_desc) {
-		.vbase = VIRT_DEMAND_AREA,
-		.pbase = __PADDR_MAX,
-		.len   = DEMAND_MAP_PAGES * PAGE_SIZE,
-		.type  = UKPLAT_MEMRT_RESERVED,
-		.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP,
-	};
-#if CONFIG_UKPLAT_MEMRNAME
-	strncpy(mrd.name, "demand", sizeof(mrd.name) - 1);
-#endif
-	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
-	if (unlikely(rc < 0))
-		return rc;
-
-	_init_mem_demand_area((unsigned long)mrd.vbase, DEMAND_MAP_PAGES);
+	_init_mem_demand_area((unsigned long)VIRT_DEMAND_AREA, DEMAND_MAP_PAGES);
 
 	/* initrd */
 	mrd = (struct ukplat_memregion_desc){0};
 	if (HYPERVISOR_start_info->mod_len) {
-		if (HYPERVISOR_start_info->flags & SIF_MOD_START_PFN) {
-			mrd.pbase = HYPERVISOR_start_info->mod_start;
+		mrd.pbase = PAGE_ALIGN_DOWN(HYPERVISOR_start_info->mod_start);
+		if (HYPERVISOR_start_info->flags & SIF_MOD_START_PFN)
 			mrd.vbase = (__vaddr_t)to_virt(mrd.pbase);
-		} else {
-			mrd.pbase = HYPERVISOR_start_info->mod_start;
+		else
 			mrd.vbase = mrd.pbase;
-		}
+		mrd.pg_off = HYPERVISOR_start_info->mod_start - mrd.pbase;
 		mrd.len = (size_t)HYPERVISOR_start_info->mod_len;
+		mrd.pg_count = PAGE_COUNT(mrd.len + mrd.pg_off);
 		mrd.type = UKPLAT_MEMRT_INITRD;
-		mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE |
-			    UKPLAT_MEMRF_MAP;
+		mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE;
 #if CONFIG_UKPLAT_MEMRNAME
 		strncpy(mrd.name, "initrd", sizeof(mrd.name) - 1);
 #endif
@@ -207,7 +193,7 @@ static void _libxenplat_x86bootinfo_setup_cmdl(struct ukplat_bootinfo *bi)
 		cmdline_len = sizeof(CONFIG_UK_NAME) - 1;
 
 	cmdline = ukplat_memregion_alloc(cmdline_len, UKPLAT_MEMRT_CMDLINE,
-					 UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP);
+					 UKPLAT_MEMRF_READ);
 	if (unlikely(!cmdline))
 		UK_CRASH("Could not allocate command-line memory");
 
@@ -222,7 +208,7 @@ static void _libxenplat_x86bootinfo_setup_cmdl(struct ukplat_bootinfo *bi)
 	 * from the original cmdline obtained above
 	 */
 	cmdline = ukplat_memregion_alloc(cmdline_len, UKPLAT_MEMRT_KERNEL,
-					 UKPLAT_MEMRF_READ | UKPLAT_MEMRF_MAP);
+					 UKPLAT_MEMRF_READ);
 	if (unlikely(!cmdline))
 		UK_CRASH("Could not allocate scratch command-line memory");
 

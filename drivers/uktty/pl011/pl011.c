@@ -19,9 +19,16 @@
  * CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
  */
 #include <libfdt.h>
-#include <uk/bitops.h>
-#include <uk/plat/console.h>
 #include <uk/assert.h>
+#include <uk/bitops.h>
+#include <uk/init.h>
+#include <uk/plat/common/bootinfo.h>
+#include <uk/plat/console.h>
+
+#if CONFIG_PAGING
+#include <uk/bus/platform.h>
+#include <uk/errptr.h>
+#endif /* CONFIG_PAGING */
 
 /* PL011 UART registers and masks*/
 /* Data register */
@@ -65,29 +72,21 @@
 /*
  * PL011 UART base address
  * As we are using the PA = VA mapping, some SoC would set PA 0
- * as a valid address, so we can't use pl011_uart_bas == 0 to
+ * as a valid address, so we can't use pl011_base == 0 to
  * indicate PL011 hasn't been initialized. In this case, we
  * use pl011_uart_initialized as an extra variable to check
  * whether the UART has been initialized.
  */
-
-#if defined(CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE)
-static __u8 pl011_uart_initialized = 1;
-static __u64 pl011_uart_bas = CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE;
-#else /* !CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE */
 static __u8 pl011_uart_initialized;
-static __u64 pl011_uart_bas;
-#endif /* !CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE */
+static __u64 pl011_base;
 
 /* Macros to access PL011 Registers with base address */
-#define PL011_REG(r)		((__u16 *)(pl011_uart_bas + (r)))
+#define PL011_REG(r)		((__u16 *)(pl011_base + (r)))
 #define PL011_REG_READ(r)	ioreg_read16(PL011_REG(r))
 #define PL011_REG_WRITE(r, v)	ioreg_write16(PL011_REG(r), v)
 
-static void init_pl011(__u64 bas)
+static int init_pl011(void)
 {
-	pl011_uart_bas = bas;
-
 	/* Mask all interrupts */
 	PL011_REG_WRITE(REG_UARTIMSC_OFFSET,
 			PL011_REG_READ(REG_UARTIMSC_OFFSET) & 0xf800);
@@ -105,39 +104,111 @@ static void init_pl011(__u64 bas)
 
 	/* Just enable UART and data transmit/receive */
 	PL011_REG_WRITE(REG_UARTCR_OFFSET, CR_TXE | CR_UARTEN);
+
+	return 0;
 }
 
-void pl011_console_init(const void *dtb)
+int pl011_early_init(void)
+{
+#if CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE
+	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
+	struct ukplat_memregion_desc mrd = {0};
+	int rc;
+
+	UK_ASSERT(bi);
+
+	pl011_base = CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE;
+
+	/* From this point we can print */
+	pl011_uart_initialized = 1;
+
+	mrd.pbase = pl011_base;
+	mrd.vbase = pl011_base;
+	mrd.pg_off = 0;
+	mrd.pg_count = 1;
+	mrd.len = __PAGE_SIZE;
+	mrd.type = UKPLAT_MEMRT_DEVICE;
+	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE;
+
+	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
+	if (unlikely(rc < 0)) {
+		uk_pr_err("Could not insert mrd (%d)\n", rc);
+		return rc;
+	}
+#endif /* CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE */
+
+	return 0;
+}
+
+static int pl011_init(struct uk_init_ctx *ictx __unused)
 {
 	int offset, len, naddr, nsize;
+	struct ukplat_bootinfo *bi;
+	__sz size __maybe_unused;
 	const __u64 *regs;
-	__u64 reg_uart_bas;
+	const void *dtb;
+	__u64 reg_base;
+	__u64 reg_size;
+	int rc;
 
-	uk_pr_info("Serial initializing\n");
+	bi = ukplat_bootinfo_get();
+	UK_ASSERT(bi);
+
+	dtb = (void *)bi->dtb;
+	UK_ASSERT(dtb);
+
+	uk_pr_debug("Probing pl011\n");
 
 	offset = fdt_node_offset_by_compatible(dtb, -1, "arm,pl011");
-	if (unlikely(offset < 0))
-		UK_CRASH("No console UART found!\n");
+	if (unlikely(offset < 0)) {
+		uk_pr_err("pl011 not found in fdt\n");
+		return -ENODEV;
+	}
 
 	naddr = fdt_address_cells(dtb, offset);
-	if (unlikely(naddr < 0 || naddr >= FDT_MAX_NCELLS))
-		UK_CRASH("Could not find proper address cells!\n");
+	if (unlikely(naddr < 0 || naddr >= FDT_MAX_NCELLS)) {
+		uk_pr_err("Invalid address-cells\n");
+		return -EINVAL;
+	}
 
 	nsize = fdt_size_cells(dtb, offset);
-	if (unlikely(nsize < 0 || nsize >= FDT_MAX_NCELLS))
-		UK_CRASH("Could not find proper size cells!\n");
+	if (unlikely(nsize < 0 || nsize >= FDT_MAX_NCELLS)) {
+		uk_pr_err("Invalid size-cells\n");
+		return -EINVAL;
+	}
 
 	regs = fdt_getprop(dtb, offset, "reg", &len);
-	if (unlikely(!regs || (len < (int)sizeof(fdt32_t) * (naddr + nsize))))
-		UK_CRASH("Bad 'reg' property: %p %d\n", regs, len);
+	if (unlikely(!regs || (len < (int)sizeof(fdt32_t) * (naddr + nsize)))) {
+		uk_pr_err("Invalid 'reg' property: %p %d\n", regs, len);
+		return -EINVAL;
+	}
 
-	reg_uart_bas = fdt64_to_cpu(regs[0]);
-	uk_pr_info("Found PL011 UART on: 0x%lx\n", reg_uart_bas);
+	reg_base = fdt64_to_cpu(regs[0]);
+	reg_size = ALIGN_UP(fdt64_to_cpu(regs[1]), __PAGE_SIZE);
 
-	init_pl011(reg_uart_bas);
+	uk_pr_debug("pl011 @ 0x%lx - 0x%lx\n", reg_base, reg_base + reg_size);
 
-	uk_pr_info("PL011 UART initialized\n");
+#if CONFIG_PAGING
+	/* Map device region */
+	pl011_base = uk_bus_pf_devmap(reg_base, reg_size);
+	if (unlikely(PTRISERR(pl011_base))) {
+		uk_pr_err("Could not map pl011\n");
+		return PTR2ERR(pl011_base);
+	}
+#else /* !CONFIG_PAGING */
+	pl011_base = reg_base;
+#endif /* !CONFIG_PAGING */
+
+	rc = init_pl011();
+	if (unlikely(rc)) {
+		uk_pr_err("Could not initialize pl011\n");
+		return rc;
+	}
+
 	pl011_uart_initialized = 1;
+	uk_pr_info("tty: pl011\n");
+
+	return 0;
 }
 
 int ukplat_coutd(const char *str, __u32 len)
@@ -204,3 +275,5 @@ int ukplat_cink(char *buf, unsigned int maxlen)
 
 	return (int)num;
 }
+
+uk_plat_initcall_prio(pl011_init, 0, UK_PRIO_EARLIEST);

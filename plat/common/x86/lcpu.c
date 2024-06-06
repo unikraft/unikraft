@@ -34,12 +34,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <uk/arch/ctx.h>
 #include <uk/config.h>
 #include <uk/assert.h>
 #include <uk/print.h>
 #include <x86/irq.h>
 #include <x86/cpu.h>
-#include <x86/gsbase.h>
 #include <x86/traps.h>
 #include <x86/delay.h>
 #include <uk/plat/common/acpi.h>
@@ -77,8 +77,8 @@ int lcpu_arch_init(struct lcpu *this_lcpu)
 
 	traps_lcpu_init(this_lcpu);
 
-	wrkgsbase((__uptr)this_lcpu);
 	wrgsbase((__uptr)this_lcpu);
+	wrkgsbase((__uptr)this_lcpu);
 
 	return 0;
 }

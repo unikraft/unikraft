@@ -1,4 +1,4 @@
-ns16550_console_init
+ns16550_early_init
 ukplat_cink
 ukplat_coutd
 ukplat_coutk

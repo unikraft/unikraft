@@ -1,7 +1,20 @@
-config LIBPOSIX_POLL
+menuconfig LIBPOSIX_POLL
 	bool "posix-poll: Support for file polling"
 	select LIBPOSIX_FDIO
 	select LIBPOSIX_FDTAB
+	select LIBUKATOMIC
 	select LIBUKTIMECONV
 	select LIBUKFILE_CHAINUPDATE
+	select LIBUKFILE_FINALIZERS
 	select LIBNOLIBC if !HAVE_LIBC
+
+if LIBPOSIX_POLL
+	config LIBPOSIX_POLL_YIELD
+		bool "Always yield execution on wait"
+		help
+			Always yield execution at the beginning of wait functions, ensuring that other
+			threads can make progress even if there are pending events available.
+			This can improve compatibility with some applications that assume
+			starvation-free scheduling, and would otherwise live-lock.
+
+endif

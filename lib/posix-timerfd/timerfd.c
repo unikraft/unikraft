@@ -10,11 +10,12 @@
 #include <uk/plat/time.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
+#include <uk/errptr.h>
 #include <uk/file/nops.h>
 #include <uk/posix-fd.h>
 #include <uk/posix-fdtab.h>
+#include <uk/posix-time.h>
 #include <uk/posix-timerfd.h>
-#include <uk/mutex.h>
 #include <uk/sched.h>
 #include <uk/timeutil.h>
 #include <uk/syscall.h>
@@ -90,7 +91,7 @@ static __nsec _timerfd_update(const struct uk_file *f)
 	}
 
 	/* Get time & decide value & deadline */
-	uk_syscall_r_clock_gettime(d->clkid, (uintptr_t)&t);
+	uk_sys_clock_gettime(d->clkid, &t);
 	now = ukplat_monotonic_clock();
 	st = _timerfd_valnext(&set, &t);
 	deadline = now + st.next;
@@ -221,7 +222,7 @@ struct uk_file *uk_timerfile_create(clockid_t id)
 	struct uk_thread *ut;
 
 	/* Check clock id */
-	if (unlikely(uk_syscall_r_clock_getres(id, (uintptr_t)NULL)))
+	if (unlikely(uk_sys_clock_getres(id, NULL)))
 		return ERR2PTR(-EINVAL);
 
 	/* Alloc stuff */
@@ -242,7 +243,7 @@ struct uk_file *uk_timerfile_create(clockid_t id)
 		.upthread = NULL
 	};
 	al->fstate = UK_FILE_STATE_INIT_VALUE(al->fstate);
-	al->frefcnt = UK_FILE_REFCNT_INIT_VALUE;
+	al->frefcnt = UK_FILE_REFCNT_INIT_VALUE(al->frefcnt);
 	al->f = (struct uk_file){
 		.vol = TIMERFD_VOLID,
 		.node = &al->node,
@@ -321,7 +322,7 @@ int uk_sys_timerfd_settime(const struct uk_file *f, int flags,
 	} else {
 		struct timespec t;
 
-		uk_syscall_r_clock_gettime(d->clkid, (uintptr_t)&t);
+		uk_sys_clock_gettime(d->clkid, &t);
 		absset.it_interval = new_value->it_interval;
 		absset.it_value = uk_time_spec_sum(&new_value->it_value, &t);
 		set = &absset;
@@ -347,7 +348,7 @@ int uk_sys_timerfd_gettime(const struct uk_file *f,
 
 	d = f->node;
 	uk_file_rlock(f);
-	uk_syscall_r_clock_gettime(d->clkid, (uintptr_t)&t);
+	uk_sys_clock_gettime(d->clkid, &t);
 	set = d->set;
 	st = _timerfd_valnext(&set, &t);
 	uk_file_runlock(f);

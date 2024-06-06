@@ -27,10 +27,6 @@
 #include <uk/plat/common/acpi.h>
 #include <uk/plat/lcpu.h>
 #include <uk/plat/common/lcpu.h>
-#include <kvm-arm64/uart.h>
-#ifdef CONFIG_RTC_PL031
-#include <rtc/pl031.h>
-#endif /* CONFIG_RTC_PL031 */
 #include <uk/assert.h>
 #include <uk/intctlr.h>
 #include <arm/cpu.h>
@@ -141,8 +137,7 @@ static inline int cmdline_init(struct ukplat_bootinfo *bi)
 	 */
 	cmdline = ukplat_memregion_alloc(cmdline_len + 1, UKPLAT_MEMRT_KERNEL,
 					 UKPLAT_MEMRF_READ |
-					 UKPLAT_MEMRF_WRITE |
-					 UKPLAT_MEMRF_MAP);
+					 UKPLAT_MEMRF_WRITE);
 	if (unlikely(!cmdline))
 		return -ENOMEM;
 
@@ -159,15 +154,15 @@ static void __noreturn _ukplat_entry2(void)
 	ukplat_lcpu_halt();
 }
 
-void __no_pauth _ukplat_entry(struct ukplat_bootinfo *bi)
+void __no_pauth _ukplat_entry(void)
 {
+	struct ukplat_bootinfo *bi;
 	void *bstack;
-	void *fdt;
 	int rc;
 
-	fdt = (void *)bi->dtb;
-
-	kvm_console_init(fdt);
+	bi = ukplat_bootinfo_get();
+	if (unlikely(!bi))
+		UK_CRASH("Could not retrieve bootinfo\n");
 
 	rc = cmdline_init(bi);
 	if (unlikely(rc < 0))
@@ -176,8 +171,7 @@ void __no_pauth _ukplat_entry(struct ukplat_bootinfo *bi)
 	/* Allocate boot stack */
 	bstack = ukplat_memregion_alloc(__STACK_SIZE, UKPLAT_MEMRT_STACK,
 					UKPLAT_MEMRF_READ |
-					UKPLAT_MEMRF_WRITE |
-					UKPLAT_MEMRF_MAP);
+					UKPLAT_MEMRF_WRITE);
 	if (unlikely(!bstack))
 		UK_CRASH("Boot stack alloc failed\n");
 	bstack = (void *)((__uptr)bstack + __STACK_SIZE);
@@ -204,7 +198,6 @@ void __no_pauth _ukplat_entry(struct ukplat_bootinfo *bi)
 		UK_CRASH("Could not initialize MTE (%d)\n", rc);
 #endif /* CONFIG_HAVE_MEMTAG */
 
-
 #if defined(CONFIG_UKPLAT_ACPI)
 	rc = acpi_init();
 	if (unlikely(rc < 0))
@@ -224,7 +217,7 @@ void __no_pauth _ukplat_entry(struct ukplat_bootinfo *bi)
 #ifdef CONFIG_HAVE_SMP
 	rc = lcpu_mp_init(CONFIG_UKPLAT_LCPU_RUN_IRQ,
 			  CONFIG_UKPLAT_LCPU_WAKEUP_IRQ,
-			  fdt);
+			  (void *)bi->dtb);
 	if (unlikely(rc))
 		UK_CRASH("SMP initialization failed: %d.\n", rc);
 #endif /* CONFIG_HAVE_SMP */
@@ -232,11 +225,6 @@ void __no_pauth _ukplat_entry(struct ukplat_bootinfo *bi)
 	rc = get_psci_method(bi);
 	if (unlikely(rc < 0))
 		UK_CRASH("Failed to get PSCI method: %d.\n", rc);
-
-#if CONFIG_RTC_PL031
-	/* Initialize RTC */
-	pl031_init_rtc(fdt);
-#endif /* CONFIG_RTC_PL031 */
 
 	/*
 	 * Switch away from the bootstrap stack as early as possible.

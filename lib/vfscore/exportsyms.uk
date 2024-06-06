@@ -210,6 +210,9 @@ euidaccess
 rename
 uk_syscall_e_rename
 uk_syscall_r_rename
+renameat
+uk_syscall_e_renameat
+uk_syscall_r_renameat
 __xmknod
 __xstat
 __xstat64

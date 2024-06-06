@@ -52,3 +52,8 @@ uk_syscall_r_sendto
 socketpair
 uk_syscall_e_socketpair
 uk_syscall_r_socketpair
+uk_socket_create
+uk_socketpair_create
+uk_socket_accept
+uk_sys_socket
+uk_sys_socketpair

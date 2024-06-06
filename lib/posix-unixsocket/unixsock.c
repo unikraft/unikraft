@@ -217,7 +217,7 @@ void *unix_socket_create(struct posix_socket_driver *d,
 		if (type == SOCK_DGRAM) {
 			/* Create rpipe */
 			struct uk_file *pipes[2];
-			int r = uk_pipefile_create(pipes, O_DIRECT);
+			int r = uk_pipefile_create(pipes);
 			if (unlikely(r)) {
 				uk_free(d->allocator, data);
 				data = ERR2PTR(r);
@@ -280,7 +280,6 @@ int unix_socket_socketpair(struct posix_socket_driver *d,
 	int ret;
 	struct unix_sock_data *dat[2];
 	struct uk_file *pipes[2][2];
-	int flags;
 
 	if (unlikely(family != AF_UNIX))
 		return -EAFNOSUPPORT;
@@ -302,11 +301,10 @@ int unix_socket_socketpair(struct posix_socket_driver *d,
 		goto err_free0;
 	}
 
-	flags = type != SOCK_STREAM ? O_DIRECT : 0;
-	ret = uk_pipefile_create(pipes[0], flags);
+	ret = uk_pipefile_create(pipes[0]);
 	if (unlikely(ret))
 		goto err_free;
-	ret = uk_pipefile_create(pipes[1], flags);
+	ret = uk_pipefile_create(pipes[1]);
 	if (unlikely(ret))
 		goto err_release;
 
@@ -489,19 +487,83 @@ int unix_socket_getsockname(posix_sock *file,
 }
 
 static
-int unix_socket_getsockopt(posix_sock *file __unused, int level __unused,
-			   int optname __unused, void *restrict optval __unused,
-			   socklen_t *restrict optlen __unused)
+int unix_socket_getsockopt(posix_sock *file, int level, int optname,
+			   void *restrict optval, socklen_t *restrict optlen)
 {
-	return -ENOSYS;
+	struct unix_sock_data *data = posix_sock_get_data(file);
+
+	switch (level) {
+	case SOL_SOCKET:
+	{
+		int val;
+
+		switch (optname) {
+		case SO_ACCEPTCONN:
+			val = !!(data->flags & UNIXSOCK_LISTEN);
+			break;
+		case SO_DOMAIN:
+			val = AF_UNIX;
+			break;
+		case SO_PEEK_OFF:
+			val = -1;
+			break;
+		case SO_TYPE:
+			val = data->type;
+			break;
+		/* no-op options; return 0 */
+		case SO_BROADCAST:
+		case SO_ERROR:
+		case SO_DONTROUTE:
+		case SO_KEEPALIVE:
+		case SO_LINGER:
+		case SO_PRIORITY:
+		case SO_PROTOCOL:
+		case SO_REUSEADDR:
+		case SO_REUSEPORT:
+		case SO_SELECT_ERR_QUEUE:
+		case SO_BUSY_POLL:
+			val = 0;
+			break;
+		default:
+			return -ENOPROTOOPT;
+		}
+
+		if (unlikely(*optlen < sizeof(val)))
+			return -EINVAL;
+		*optlen = sizeof(val);
+		*((int *)optval) = val;
+		return 0;
+	}
+	default:
+		return -ENOSYS;
+	}
 }
 
 static
-int unix_socket_setsockopt(posix_sock *file __unused, int level __unused,
-			   int optname __unused, const void *optval __unused,
+int unix_socket_setsockopt(posix_sock *file __unused, int level, int optname,
+			   const void *optval __unused,
 			   socklen_t optlen __unused)
 {
-	return -ENOSYS;
+	switch (level) {
+	case SOL_SOCKET:
+		switch (optname) {
+		/* silently ignore */
+		case SO_BROADCAST:
+		case SO_DONTROUTE:
+		case SO_KEEPALIVE:
+		case SO_LINGER:
+		case SO_PRIORITY:
+		case SO_REUSEADDR:
+		case SO_REUSEPORT:
+		case SO_SELECT_ERR_QUEUE:
+		case SO_BUSY_POLL:
+			return 0;
+		default:
+			return -ENOPROTOOPT;
+		}
+	default:
+		return -ENOSYS;
+	}
 }
 
 
@@ -512,7 +574,6 @@ int unix_sock_connect_stream(posix_sock *file, posix_sock *target)
 	struct unix_sock_data *data = posix_sock_get_data(file);
 	struct unix_sock_data *td;
 	struct uk_file *pipes[2][2];
-	int flags;
 	struct unix_listenmsg *lmsg;
 
 	/* Wlock target sock */
@@ -540,11 +601,10 @@ int unix_sock_connect_stream(posix_sock *file, posix_sock *target)
 		goto err_out;
 	}
 	/* Create pipes */
-	flags = data->type != SOCK_STREAM ? O_DIRECT : 0;
-	err = uk_pipefile_create(pipes[0], flags);
+	err = uk_pipefile_create(pipes[0]);
 	if (unlikely(err))
 		goto err_out;
-	err = uk_pipefile_create(pipes[1], flags);
+	err = uk_pipefile_create(pipes[1]);
 	if (unlikely(err))
 		goto err_release;
 
@@ -753,20 +813,25 @@ ssize_t unix_socket_sendmsg(posix_sock *file,
 		if (data->flags & UNIXSOCK_CONN) {
 			wpipe = data->wpipe;
 		} else {
+			const struct sockaddr_un *uaddr;
+			const char *rname;
+			size_t rlen;
+
 			if (unlikely(!msg->msg_name))
 				return -ENOTCONN;
+
 			/* Establish remote */
-			/* TODO: Lookup */
-			remote = NULL;
+			uaddr = (struct sockaddr_un *)msg->msg_name;
+			rname = uaddr->sun_path;
+			rlen = msg->msg_namelen -
+			       offsetof(struct sockaddr_un, sun_path);
+			remote = unix_addr_lookup(rname, rlen);
 
 			if (remote) {
 				wpipe = unix_sock_remotebpipe(file, remote);
-				if (unlikely(PTRISERR(wpipe))) {
-					if (PTR2ERR(wpipe) == -ENOENT)
-						wpipe = NULL;
-					else
-						return PTR2ERR(wpipe);
-				}
+				uk_file_release_weak(remote);
+				if (unlikely(PTRISERR(wpipe)))
+					wpipe = NULL;
 			} else {
 				wpipe = NULL;
 			}
@@ -776,12 +841,18 @@ ssize_t unix_socket_sendmsg(posix_sock *file,
 		return (data->flags & UNIXSOCK_CONN)
 			? (_SOCK_CONNECTION(data->type)
 				? -EPIPE : -ECONNREFUSED)
-			: -ENOTCONN;
+			: (msg->msg_name
+				? -ECONNREFUSED : -ENOTCONN);
 
 	uk_file_wlock(wpipe);
-	ret = uk_file_write(wpipe, msg->msg_iov, msg->msg_iovlen, 0, 0);
-	uk_file_wunlock(data->wpipe);
+	ret = uk_file_write(wpipe, msg->msg_iov, msg->msg_iovlen, 0,
+			    data->type != SOCK_STREAM ? O_DIRECT : 0);
+	uk_file_wunlock(wpipe);
 	/* We ignore ancillary data for now */
+
+	/* 0-length datagrams will be silently lost; warn */
+	if (!ret && data->type != SOCK_STREAM)
+		uk_pr_warn("0-length datagram write; message will be lost\n");
 
 	if (!_SOCK_CONNECTION(data->type) && remote) {
 		uk_file_release(wpipe);
