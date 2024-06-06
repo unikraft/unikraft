@@ -8,7 +8,7 @@
 
 <div align="center">
 
-[![](https://img.shields.io/badge/version-v0.16.3%20(Telesto)-%23EC591A)][unikraft-latest]
+[![](https://img.shields.io/badge/version-v0.17.0%20(Calypso)-%23EC591A)][unikraft-latest]
 [![](https://img.shields.io/static/v1?label=license&message=BSD-3&color=%23385177)][unikraft-license]
 [![](https://img.shields.io/discord/762976922531528725.svg?label=discord&logo=discord&logoColor=ffffff&color=7389D8&labelColor=6A7EC2)][unikraft-discord]
 [![](https://img.shields.io/github/contributors/unikraft/unikraft)](https://github.com/unikraft/unikraft/graphs/contributors)
@@ -292,7 +292,7 @@ The Unikraft name, logo and its mascot are trademark of [Unikraft GmbH](https://
 [unikraft-community]: https://unikraft.org/community
 [unikraft-contributing]: https://unikraft.org/docs/contributing/
 [unikraft-license]: https://github.com/unikraft/unikraft/blob/staging/COPYING.md
-[unikraft-latest]: https://github.com/unikraft/unikraft/tree/RELEASE-0.16.3
+[unikraft-latest]: https://github.com/unikraft/unikraft/tree/RELEASE-0.17.0
 [unikraft-gettingstarted]: http://unikraft.org/docs/getting-started
 [unikraft-concepts]: https://unikraft.org/docs/concepts/
 [unikraft-posix-compatibility]: https://unikraft.org/docs/features/posix-compatibility
