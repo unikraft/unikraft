@@ -152,7 +152,7 @@ ukplat_memregion_list_insert_legacy_hi_mem(struct ukplat_memregion_list *list)
 	rc = ukplat_memregion_list_insert(list,
 			&(struct ukplat_memregion_desc){
 				.pbase = X86_VIDEO_MEM_START,
-				.vbase = X86_VIDEO_MEM_LEN,
+				.vbase = X86_VIDEO_MEM_START,
 				.pg_off = 0,
 				.len = X86_VIDEO_MEM_LEN,
 				.pg_count = PAGE_COUNT(X86_VIDEO_MEM_LEN),
