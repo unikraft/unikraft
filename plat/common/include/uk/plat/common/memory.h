@@ -200,7 +200,8 @@ ukplat_memregion_alloc_sipi_vect(void)
 							  UKPLAT_MEMRT_RESERVED,
 							  UKPLAT_MEMRF_READ  |
 							  UKPLAT_MEMRF_WRITE);
-	if (unlikely(!x86_start16_addr || x86_start16_addr >= X86_HI_MEM_START))
+	if (unlikely(!x86_start16_addr ||
+		     x86_start16_addr >= X86_VIDEO_MEM_START))
 		return -ENOMEM;
 
 	return 0;
