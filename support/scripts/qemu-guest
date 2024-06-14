@@ -792,7 +792,7 @@ case "$ARG_MACHINETYPE" in
 		QEMU_BASE_ARGS+=("host,+x2apic,-pmu")
 	else
 		QEMU_BASE_ARGS+=("-cpu")
-		QEMU_BASE_ARGS+=("qemu64,-vmx,-svm,+x2apic,+pdpe1gb")
+		QEMU_BASE_ARGS+=("qemu64,-vmx,-svm,+x2apic,+pdpe1gb,+rdrand,+rdseed")
 	fi
 	;;
 "x86q35")
@@ -806,7 +806,7 @@ case "$ARG_MACHINETYPE" in
 		QEMU_BASE_ARGS+=("host,+x2apic,-pmu")
 	else
 		QEMU_BASE_ARGS+=("-cpu")
-		QEMU_BASE_ARGS+=("qemu64,-vmx,-svm,+x2apic,+pdpe1gb")
+		QEMU_BASE_ARGS+=("qemu64,-vmx,-svm,+x2apic,+pdpe1gb,+rdrand,+rdseed")
 	fi
 	;;
 *)
