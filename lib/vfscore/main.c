@@ -1372,7 +1372,7 @@ UK_SYSCALL_R_DEFINE(int, renameat,
 		vn_unlock(vp);
 		fdrop(fp);
 	} else {
-		strlcpy(src, newpath, PATH_MAX);
+		strlcpy(dest, newpath, PATH_MAX);
 	}
 
 	return sys_rename(src, dest);
