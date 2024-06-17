@@ -111,6 +111,11 @@
 #include <uk/intctlr.h>
 #endif /* CONFIG_LIBUKINTCTLR */
 
+#ifdef CONFIG_RUNTIME_ASLR
+#include <uk/random.h>
+#include <uk/plat/common/bootinfo.h>
+#endif /* CONFIG_RUNTIME_ASLR */
+
 int main(int argc, char *argv[]) __weak;
 static inline int do_main(int argc, char *argv[]);
 
@@ -126,6 +131,7 @@ static struct uk_vas kernel_vas;
 static struct uk_alloc *heap_init()
 {
 	struct uk_alloc *a = NULL;
+	struct ukplat_memregion_desc *mrd;
 #ifdef CONFIG_LIBUKBOOT_HEAP_BASE
 	struct uk_pagetable *pt = ukplat_pt_get_active();
 	__sz free_pages, alloc_pages;
@@ -134,8 +140,6 @@ static struct uk_alloc *heap_init()
 	__vaddr_t vaddr;
 #endif /* CONFIG_LIBUKVMEM */
 	int rc;
-#else /* CONFIG_LIBUKBOOT_HEAP_BASE */
-	struct ukplat_memregion_desc *md;
 #endif /* !CONFIG_LIBUKBOOT_HEAP_BASE */
 
 #ifdef CONFIG_LIBUKBOOT_HEAP_BASE
@@ -145,7 +149,24 @@ static struct uk_alloc *heap_init()
 	 * added to the frame allocator. No heap area has been mapped. We will
 	 * do so at the configured heap base.
 	 */
+#if CONFIG_RUNTIME_ASLR
+	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
+	int last_idx = (int)(bi->mrds.count) - 1;
+
+	ukplat_memregion_get(last_idx, &mrd);
+
+	unsigned long lower_limit = mrd->vbase + mrd->len;
+	unsigned long upper_limit = 0x400000000000;
+
+	unsigned long rand_value[2];
+	uk_random_fill_buffer(&rand_value, sizeof(rand_value));
+
+	heap_base = (rand_value[0] << 32) | rand_value[1];
+	heap_base = PAGE_ALIGN_UP(lower_limit) + \
+				PAGE_ALIGN_UP(heap_base % (upper_limit - lower_limit));
+#else
 	heap_base = CONFIG_LIBUKBOOT_HEAP_BASE;
+#endif /* CONFIG_RUNTIME_ASLR */
 
 #ifdef CONFIG_LIBUKVMEM
 #define HEAP_INITIAL_PAGES		16
@@ -212,23 +233,97 @@ static struct uk_alloc *heap_init()
 	 * again with the next region. As soon we have an allocator, we simply
 	 * add every subsequent region to it.
 	 */
-	ukplat_memregion_foreach(&md, UKPLAT_MEMRT_FREE, 0, 0) {
-		UK_ASSERT_VALID_FREE_MRD(md);
+	unsigned long len;
+	__paddr_t vstart;
 
+#ifdef CONFIG_RUNTIME_ASLR
+	unsigned long aslr_offset;
+	__paddr_t heap_addr;
+	int randomized_base = 0;
+	long total_len = 0;
+	long selected_region, tmp = 0;
+
+	/* Count the size for all free regions */
+	ukplat_memregion_foreach(&mrd, UKPLAT_MEMRT_FREE, 0, 0) {
+		UK_ASSERT_VALID_FREE_MRD(mrd);
+
+		total_len += mrd->len;
+	}
+
+	/* Choose randomly which region will be used */
+	uk_random_fill_buffer(&selected_region, sizeof(selected_region));
+	selected_region = selected_region % total_len;
+
+	/* Randomize the heap base and add all the following regions
+	 * to the allocator
+	 */
+	ukplat_memregion_foreach(&mrd, UKPLAT_MEMRT_FREE, 0, 0) {
+		UK_ASSERT_VALID_FREE_MRD(mrd);
+
+		tmp += mrd->len;
+
+		/* Keep looping for the selected region */
+		if (selected_region > tmp)
+			continue;
+
+		if (randomized_base == 0) {
+			uk_random_fill_buffer(&aslr_offset, sizeof(aslr_offset));
+			aslr_offset = PAGE_ALIGN_DOWN(aslr_offset % mrd->len);
+
+			heap_addr = PAGE_ALIGN_DOWN(mrd->pbase + aslr_offset);
+			len = mrd->len - aslr_offset;
+
+			vstart = heap_addr;
+			randomized_base = 1;
+		} else {
+			vstart = mrd->vbase;
+			len = mrd->len;
+		}
+
+		if (!a)
+			a = uk_alloc_init((void *)vstart, len);
+		else
+			uk_alloc_addmem(a, (void *)vstart, len);
+	}
+#endif /* CONFIG_RUNTIME_ASLR */
+	ukplat_memregion_foreach(&mrd, UKPLAT_MEMRT_FREE, 0, 0) {
+		UK_ASSERT_VALID_FREE_MRD(mrd);
+
+#ifdef CONFIG_RUNTIME_ASLR
+		/* The regions bigger that heap_addr are already added */
+		if (mrd->vbase > heap_addr)
+			break;
+
+		/* For the region from which the heap base is, take only
+		 * the address up to the ASLR offset, so we won't have
+		 * overlapping regions in the allocator
+		 */
+		if (mrd->vbase < heap_addr && (mrd->vbase + mrd->len) > heap_addr && \
+		    aslr_offset != 0) {
+			vstart = mrd->vbase;
+			len = aslr_offset;
+		} else {
+			vstart = mrd->vbase;
+			len = mrd->len;
+		}
+#else /* CONFIG_RUNTIME_ASLR */
+		vstart = mrd->vbase;
+		len = mrd->len;
+#endif /* CONFIG_RUNTIME_ASLR */
 		uk_pr_debug("Trying %p-%p 0x%02x %s\n",
-			    (void *)md->vbase, (void *)(md->vbase + md->len),
-			    md->flags,
+			    (void *)mrd->vbase, (void *)(mrd->vbase + mrd->len),
+			    mrd->flags,
 #if CONFIG_UKPLAT_MEMRNAME
-			    md->name
+			    mrd->name
 #else /* CONFIG_UKPLAT_MEMRNAME */
 			    ""
 #endif /* !CONFIG_UKPLAT_MEMRNAME */
 			    );
 
 		if (!a)
-			a = uk_alloc_init((void *)md->vbase, md->len);
+			a = uk_alloc_init((void *)vstart, len);
 		else
-			uk_alloc_addmem(a, (void *)md->vbase, md->len);
+			uk_alloc_addmem(a, (void *)vstart, len);
 	}
 #endif /* !CONFIG_LIBUKBOOT_HEAP_BASE */
 
