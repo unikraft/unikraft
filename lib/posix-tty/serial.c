@@ -12,7 +12,7 @@
 #include <uk/assert.h>
 #include <uk/file.h>
 #include <uk/file/nops.h>
-#include <uk/plat/console.h>
+#include <uk/console.h>
 #include <uk/posix-fd.h>
 #include <uk/posix-serialfile.h>
 
@@ -73,7 +73,7 @@ static ssize_t serial_read(const struct uk_file *f,
 		if (unlikely(!buf && len))
 			return -EFAULT;
 
-		bytes_read = ukplat_cink(buf, len);
+		bytes_read = uk_console_in(buf, len);
 		if (!bytes_read)
 			break;
 		if (unlikely(bytes_read < 0))
@@ -86,7 +86,7 @@ static ssize_t serial_read(const struct uk_file *f,
 			*last = '\n';
 
 		/* Echo the input to the console (NOT stdout!) */
-		ukplat_coutk(buf, bytes_read);
+		uk_console_out(buf, bytes_read);
 
 		if (*last == '\n')
 			break;
@@ -118,7 +118,7 @@ static ssize_t serial_write(const struct uk_file *f __maybe_unused,
 		if (unlikely(!buf && len))
 			return  -EFAULT;
 
-		bytes_written = ukplat_coutk(buf, len);
+		bytes_written = uk_console_out(buf, len);
 		if (unlikely(bytes_written < 0))
 			return bytes_written;
 
