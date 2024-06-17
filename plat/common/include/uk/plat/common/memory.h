@@ -133,8 +133,6 @@ ukplat_memregion_list_insert(struct ukplat_memregion_list *list,
  * 0xE0000 – 0xFFFFF 128KB System ROM BIOS
  */
 #if defined(__X86_64__)
-#define X86_VIDEO_MEM_START		0xA0000UL
-#define X86_VIDEO_MEM_LEN		0x20000UL
 #define X86_BIOS_XROM_START		0xC0000UL
 #define X86_BIOS_XROM_LEN		0x20000UL
 
@@ -145,27 +143,6 @@ static inline int
 ukplat_memregion_list_insert_legacy_hi_mem(struct ukplat_memregion_list *list)
 {
 	int rc;
-
-	/* Note that we are mapping it as writable as well to cope with the
-	 * potential existence of the VGA framebuffer/SMM shadow memory.
-	 */
-	rc = ukplat_memregion_list_insert(list,
-			&(struct ukplat_memregion_desc){
-				.pbase = X86_VIDEO_MEM_START,
-				.vbase = X86_VIDEO_MEM_START,
-				.pg_off = 0,
-				.len = X86_VIDEO_MEM_LEN,
-				.pg_count = PAGE_COUNT(X86_VIDEO_MEM_LEN),
-				.type  = UKPLAT_MEMRT_RESERVED,
-#if (CONFIG_KVM_DEBUG_VGA_CONSOLE || CONFIG_KVM_KERNEL_VGA_CONSOLE)
-				.flags = UKPLAT_MEMRF_READ  |
-					 UKPLAT_MEMRF_WRITE,
-#else /* !(CONFIG_KVM_DEBUG_VGA_CONSOLE || CONFIG_KVM_KERNEL_VGA_CONSOLE */
-				.flags = UKPLAT_MEMRF_READ,
-#endif /* !(CONFIG_KVM_DEBUG_VGA_CONSOLE || CONFIG_KVM_KERNEL_VGA_CONSOLE */
-			});
-	if (unlikely(rc < 0))
-		return rc;
 
 	/* Note that we are assigning UKPLAT_MEMRT_RESERVED to BIOS PCI ROM.
 	 * We usually have here the routines used by real-mode
