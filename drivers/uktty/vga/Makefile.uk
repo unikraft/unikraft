@@ -1,0 +1,3 @@
+$(eval $(call addlib_s,libuktty_vga,$(CONFIG_LIBUKTTY_VGA)))
+
+LIBUKTTY_VGA_SRCS-y += $(LIBUKTTY_VGA_BASE)/vga.c|isr
