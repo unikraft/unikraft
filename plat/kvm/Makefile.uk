@@ -25,6 +25,9 @@ LIBKVMPLAT_CXXFLAGS            += -DKVMPLAT -DUK_USE_SECTION_SEGMENTS
 ## Default Linker script
 ifeq ($(CONFIG_ARCH_X86_64),y)
 UK_PLAT_KVM_DEF_LDS            := $(CONFIG_UK_BASE)/plat/kvm/x86/link64.lds.S
+ifeq ($(CONFIG_LINK_ASLR),y)
+UK_PLAT_KVM_DEF_LDS_ASLR := $(BUILD_DIR)/libkvmplat/link64_ASLR.lds
+endif
 else
 ifeq ($(CONFIG_ARCH_ARM_64),y)
 UK_PLAT_KVM_DEF_LDS            := $(CONFIG_UK_BASE)/plat/kvm/arm/link64.lds.S

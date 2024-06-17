@@ -171,4 +171,22 @@ endif
 
 endmenu
 
+menu "Memory security"
+
+config LINK_ASLR
+	bool "Libraries ASLR activation"
+	default n
+	select RANDOMIZE_BASE_ADDRESS
+	help
+		Activates the ASLR, it consists in modifying the lib addresses during linking time in order
+		to have different microlibs memory layouts.
+
+config RUNTIME_ASLR
+	bool "Heap/stack ASLR activation"
+	default n
+	select LIBUKSWRAND
+	help
+		Activates the ASLR, it consists in modifying the heap/stack addresses when booting the kernel.
+endmenu
+
 endif
