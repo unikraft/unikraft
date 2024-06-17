@@ -47,6 +47,13 @@ extern "C" {
  */
 void uk_random_fill_buffer(void *buf, __sz buflen);
 
+#ifdef CONFIG_RUNTIME_ASLR
+/**
+ * Early random init function used for ASLR
+ */
+void ASLR_early_uk_random_init(void);
+#endif
+
 #ifdef __cplusplus
 }
 #endif

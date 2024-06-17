@@ -69,4 +69,11 @@ static int uk_random_init(struct uk_init_ctx *ictx __unused)
 	return uk_swrand_init();
 }
 
+#ifdef CONFIG_RUNTIME_ASLR
+void ASLR_early_uk_random_init(void)
+{
+	uk_random_init(0x0);
+}
+#else /* CONFIG_RUNTIME_ASLR */
 uk_early_initcall(uk_random_init, 0);
+#endif
