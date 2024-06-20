@@ -49,6 +49,10 @@
 #include <uk/thread.h>
 #endif
 
+#if CONFIG_LIBUKCONSOLE
+#include <uk/console.h>
+#endif /* CONFIG_LIBUKCONSOLE */
+
 #if CONFIG_LIBUKDEBUG_ANSI_COLOR
 #define LVLC_RESET	UK_ANSI_MOD_RESET
 #define LVLC_TS		UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_GREEN)
@@ -93,27 +97,46 @@
 /* special level for printk redirection, used internally only */
 #define KLVL_DEBUG (-1)
 
-typedef int (*_ukplat_cout_t)(const char *, unsigned int);
+typedef __ssz (*cout_func)(const char *buf, __sz len);
 
 struct _vprint_console {
-	_ukplat_cout_t cout;
+	cout_func cout;
 	int newline;
 	int prevlvl;
 };
 
 /* Console state for kernel output */
 #if CONFIG_LIBUKDEBUG_REDIR_PRINTD || CONFIG_LIBUKDEBUG_PRINTK
-static struct _vprint_console kern  = { .cout = ukplat_coutk,
-					.newline = 1,
-					.prevlvl = INT_MIN };
+static struct _vprint_console kern  = {
+#if CONFIG_LIBUKCONSOLE
+	.cout = uk_console_out,
+#else
+	.cout = NULL,
+#endif /* CONFIG_LIBUKCONSOLE */
+	.newline = 1,
+	.prevlvl = INT_MIN
+};
 #endif
 
 /* Console state for debug output */
 #if !CONFIG_LIBUKDEBUG_REDIR_PRINTD
-static struct _vprint_console debug = { .cout = ukplat_coutd,
-					.newline = 1,
-					.prevlvl = INT_MIN };
+static struct _vprint_console debug = {
+#if CONFIG_LIBUKCONSOLE
+	.cout = uk_console_out,
+#else
+	.cout = NULL,
+#endif /* CONFIG_LIBUKCONSOLE */
+	.newline = 1,
+	.prevlvl = INT_MIN
+};
 #endif
+
+static inline void _vprint_cout(struct _vprint_console *cons,
+				const char *buf, __sz len)
+{
+	if (cons->cout)
+		cons->cout(buf, len);
+}
 
 #if CONFIG_LIBUKDEBUG_PRINT_TIME
 static void _print_timestamp(struct _vprint_console *cons)
@@ -128,7 +151,7 @@ static void _print_timestamp(struct _vprint_console *cons)
 	len = __uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_TS
 			    "[%5" __PRInsec ".%06" __PRInsec "] ",
 			    sec, rem_usec);
-	cons->cout((char *)buf, len);
+	_vprint_cout(cons, (char *)buf, len);
 }
 #endif
 
@@ -151,7 +174,7 @@ static void _print_thread(struct _vprint_console *cons)
 		len = __uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_THREAD
 				    "<<n/a>> ");
 	}
-	cons->cout((char *)buf, len);
+	_vprint_cout(cons, (char *)buf, len);
 }
 #endif /* CONFIG_LIBUKDEBUG_PRINT_THREAD */
 
@@ -163,7 +186,7 @@ static void _print_caller(struct _vprint_console *cons, __uptr ra, __uptr fa)
 
 	len = __uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_CALLER
 			    "{r:%p,f:%p} ", (void *) ra, (void *) fa);
-	cons->cout((char *)buf, len);
+	_vprint_cout(cons, (char *)buf, len);
 }
 #endif /* CONFIG_LIBUKDEBUG_PRINT_CALLER */
 
@@ -217,7 +240,7 @@ static void _vprint(struct _vprint_console *cons,
 			/* level changed without closing with '\n',
 			 * enforce printing '\n', before the new message header
 			 */
-			cons->cout("\n", 1);
+			_vprint_cout(cons, "\n", 1);
 		}
 		cons->prevlvl = lvl;
 		cons->newline = 1; /* enforce printing the message header */
@@ -230,7 +253,8 @@ static void _vprint(struct _vprint_console *cons,
 #if CONFIG_LIBUKDEBUG_PRINT_TIME
 			_print_timestamp(cons);
 #endif
-			cons->cout(DECONST(char *, msghdr), strlen(msghdr));
+			_vprint_cout(cons, DECONST(char *, msghdr),
+				     strlen(msghdr));
 #if CONFIG_LIBUKDEBUG_PRINT_THREAD
 			_print_thread(cons);
 #endif
@@ -238,25 +262,26 @@ static void _vprint(struct _vprint_console *cons,
 			_print_caller(cons, retaddr, frameaddr);
 #endif
 			if (libname) {
-				cons->cout(LVLC_RESET LVLC_LIBNAME "[",
-					   strlen(LVLC_RESET LVLC_LIBNAME) + 1);
-				cons->cout(DECONST(char *, libname),
-					   strlen(libname));
-				cons->cout("] ", 2);
+				_vprint_cout(cons, LVLC_RESET LVLC_LIBNAME "[",
+					     strlen(LVLC_RESET LVLC_LIBNAME) + 1);
+				_vprint_cout(cons, DECONST(char *, libname),
+					     strlen(libname));
+				_vprint_cout(cons, "] ", 2);
 			}
 #if CONFIG_LIBUKDEBUG_PRINT_SRCNAME
 			if (srcname) {
 				char lnobuf[6];
 
-				cons->cout(LVLC_RESET LVLC_SRCNAME "<",
-					   strlen(LVLC_RESET LVLC_SRCNAME) + 1);
-				cons->cout(DECONST(char *, srcname),
-					   strlen(srcname));
-				cons->cout(" @ ", 3);
-				cons->cout(lnobuf,
-					   __uk_snprintf(lnobuf, sizeof(lnobuf),
-							 "%4u", srcline));
-				cons->cout("> ", 2);
+				_vprint_cout(cons, LVLC_RESET LVLC_SRCNAME "<",
+					     strlen(LVLC_RESET LVLC_SRCNAME) + 1);
+				_vprint_cout(cons, DECONST(char *, srcname),
+					     strlen(srcname));
+				_vprint_cout(cons, " @ ", 3);
+				_vprint_cout(cons, lnobuf,
+					     __uk_snprintf(lnobuf,
+							   sizeof(lnobuf),
+							   "%4u", srcline));
+				_vprint_cout(cons, "> ", 2);
 			}
 #endif
 			cons->newline = 0;
@@ -273,18 +298,18 @@ static void _vprint(struct _vprint_console *cons,
 		/* Message body */
 		switch (lvl) {
 		case KLVL_CRIT:
-			cons->cout(LVLC_RESET LVLC_CRIT_MSG,
-				   strlen(LVLC_RESET LVLC_CRIT_MSG));
+			_vprint_cout(cons, LVLC_RESET LVLC_CRIT_MSG,
+				     strlen(LVLC_RESET LVLC_CRIT_MSG));
 			break;
 		case KLVL_ERR:
-			cons->cout(LVLC_RESET LVLC_ERROR_MSG,
-				   strlen(LVLC_RESET LVLC_ERROR_MSG));
+			_vprint_cout(cons, LVLC_RESET LVLC_ERROR_MSG,
+				     strlen(LVLC_RESET LVLC_ERROR_MSG));
 			break;
 		default:
-			cons->cout(LVLC_RESET, strlen(LVLC_RESET));
+			_vprint_cout(cons, LVLC_RESET, strlen(LVLC_RESET));
 		}
-		cons->cout((char *)lptr, llen);
-		cons->cout(LVLC_RESET, strlen(LVLC_RESET));
+		_vprint_cout(cons, (char *)lptr, llen);
+		_vprint_cout(cons, LVLC_RESET, strlen(LVLC_RESET));
 
 		len -= llen;
 		lptr = nlptr + 1;
