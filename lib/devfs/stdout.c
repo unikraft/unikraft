@@ -39,14 +39,14 @@
 #include <uk/print.h>
 #include <vfscore/uio.h>
 #include <devfs/device.h>
-#include <uk/plat/console.h>
+#include <uk/console.h>
 
 #ifdef CONFIG_LIBDEVFS_DEV_STDOUT
 #define DEV_STDOUT_NAME "stdout"
 
 static int __write_fn(void *dst __unused, void *src, size_t *cnt)
 {
-	int ret = ukplat_coutk(src, *cnt);
+	int ret = uk_console_out(src, *cnt);
 
 	if (ret < 0)
 		/* TODO: remove -1 when vfscore switches to negative
