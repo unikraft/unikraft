@@ -28,5 +28,6 @@ if LIBDEVFS
 	config LIBDEVFS_DEV_STDOUT
 		bool "Register stdout device"
 		default y if LIBDEVFS_AUTOMOUNT
+		select LIBUKCONSOLE
 		default n
 endif
