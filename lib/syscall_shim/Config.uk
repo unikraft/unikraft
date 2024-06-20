@@ -66,6 +66,7 @@ if LIBSYSCALL_SHIM
 		depends on LIBSYSCALL_SHIM_HANDLER
 			bool "'strace'-like messages for binary system calls"
 			default n
+			select LIBUKDEBUG if !LIBUKCONSOLE
 			help
 				Emits a `strace`-like message as soon as a binary system call request
 				was finished handling. The result/return code of the system call is

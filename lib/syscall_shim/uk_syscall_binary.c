@@ -42,7 +42,11 @@
 #include <uk/essentials.h>
 #include <uk/thread.h>
 #if CONFIG_LIBSYSCALL_SHIM_STRACE
-#include <uk/plat/console.h> /* ukplat_coutk */
+#if CONFIG_LIBUKCONSOLE
+#include <uk/console.h>
+#else /* !CONFIG_LIBUKCONSOLE */
+#include <uk/print.h>
+#endif /* !CONFIG_LIBUKCONSOLE */
 #endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
 
 /**
@@ -72,7 +76,7 @@ void ukplat_syscall_handler(struct uk_syscall_ctx *usc)
 #else /* !CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR */
 	char prsyscallbuf[256];
 #endif /* !CONFIG_LIBSYSCALL_SHIM_STRACE_ANSI_COLOR */
-	int prsyscalllen;
+	int prsyscalllen __maybe_unused;
 #endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
 	struct ukarch_auxspcb *auxspcb;
 	struct ukarch_execenv *execenv;
@@ -131,10 +135,16 @@ void ukplat_syscall_handler(struct uk_syscall_ctx *usc)
 		     execenv->regs.__syscall_rarg5);
 	/*
 	 * FIXME:
-	 * We directly use `ukplat_coutk()` until lib/ukdebug printing
-	 * allows us to generate shortened output (avoiding list of details).
+	 * Replace the call to `uk_pr_info` with a call to the kernel printing
+	 * library once that exists. We also don't want to print all the meta
+	 * data that `uk_pr_info` includes. Note also that right now, debug
+	 * print calls also turn into a no-op if `ukconsole` is not available.
 	 */
-	ukplat_coutk(prsyscallbuf, (__sz) prsyscalllen);
+#if CONFIG_LIBUKCONSOLE
+	uk_console_out(prsyscallbuf, (__sz) prsyscalllen);
+#else /* !CONFIG_LIBUKCONSOLE */
+	uk_pr_info(prsyscallbuf);
+#endif /* !CONFIG_LIBUKCONSOLE */
 #endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
 
 #if CONFIG_LIBSYSCALL_SHIM_HANDLER_ULTLS
