@@ -36,28 +36,11 @@
 
 #include <errno.h>
 
-#ifndef __XEN_CONSOLE_IMPL__
-#error Do not include this header directly, use <common/console.h> instead.
-#endif /* !__XEN_CONSOLE_IMPL__*/
-
-#if (CONFIG_XEN_KERNEL_EMG_CONSOLE || CONFIG_XEN_DEBUG_EMG_CONSOLE)
+#if CONFIG_LIBXEN_CONSOLE_EMG
 int emg_console_output(const char *str, unsigned int len);
-#endif /* (CONFIG_XEN_KERNEL_EMG_CONSOLE || CONFIG_XEN_DEBUG_EMG_CONSOLE) */
-
-#if CONFIG_XEN_KERNEL_EMG_CONSOLE
-#define emg_console_output_k(str, len) \
-	emg_console_output((str), (len))
-#else
-#define emg_console_output_k(str, len) \
+#else /* !CONFIG_LIBXEN_CONSOLE_EMG */
+#define emg_console_output(str, len) \
 	(-ENOTSUP)
-#endif /* CONFIG_XEN_KERNEL_EMG_CONSOLE */
-
-#if CONFIG_XEN_DEBUG_EMG_CONSOLE
-#define emg_console_output_d(str, len) \
-	emg_console_output((str), (len))
-#else
-#define emg_console_output_d(str, len) \
-	(-ENOTSUP)
-#endif /* CONFIG_XEN_DEBUG_EMG_CONSOLE */
+#endif /* !CONFIG_LIBXEN_CONSOLE_EMG */
 
 #endif /* __XEN_EMG_CONSOLE_H__ */

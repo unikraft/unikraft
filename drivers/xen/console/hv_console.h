@@ -36,41 +36,23 @@
 
 #include <errno.h>
 
-#ifndef __XEN_CONSOLE_IMPL__
-#error Do not include this header directly, use <common/console.h> instead
-#endif /* !__XEN_CONSOLE_IMPL__*/
-
-#if (CONFIG_XEN_KERNEL_HV_CONSOLE || CONFIG_XEN_DEBUG_HV_CONSOLE)
+#if CONFIG_LIBXEN_CONSOLE_HV
 void hv_console_prepare(void);
 void hv_console_init(void);
 int hv_console_output(const char *str, unsigned int len);
 void hv_console_flush(void);
 int hv_console_input(char *str, unsigned int maxlen);
-#else /* (CONFIG_XEN_KERNEL_HV_CONSOLE || CONFIG_XEN_DEBUG_HV_CONSOLE) */
-#define hv_console_prepare()			\
+#else /* !CONFIG_LIBXEN_CONSOLE_HV */
+#define hv_console_prepare() \
 	do {} while (0)
 #define hv_console_init() \
 	do {} while (0)
+#define hv_console_output(str, len) \
+	(-ENOTSUP)
 #define hv_console_flush() \
 	do {} while (0)
-#define hv_console_input(str, maxlen) \
+#define hv_console_input(str, len) \
 	(-ENOTSUP)
-#endif /* (CONFIG_XEN_KERNEL_HV_CONSOLE || CONFIG_XEN_DEBUG_HV_CONSOLE) */
-
-#if CONFIG_XEN_KERNEL_HV_CONSOLE
-#define hv_console_output_k(str, len) \
-	hv_console_output((str), (len))
-#else
-#define hv_console_output_k(str, len) \
-	(-ENOTSUP)
-#endif /* CONFIG_XEN_KERNEL_HV_CONSOLE */
-
-#if CONFIG_XEN_DEBUG_HV_CONSOLE
-#define hv_console_output_d(str, len) \
-	hv_console_output((str), (len))
-#else
-#define hv_console_output_d(str, len) \
-	(-ENOTSUP)
-#endif /* CONFIG_XEN_DEBUG_HV_CONSOLE */
+#endif /* !CONFIG_LIBXEN_CONSOLE_HV */
 
 #endif /* __XEN_HV_CONSOLE_H__ */

@@ -32,13 +32,15 @@
  */
 
 #include <uk/config.h>
-#include <uk/plat/console.h>
 #include <string.h>
 #include <uk/arch/lcpu.h>
+#include <uk/arch/types.h>
 #include <uk/essentials.h>
+#include <uk/console.h>
+#include <uk/arch/limits.h>
+#include <uk/assert.h>
 #include <errno.h>
 
-#define __XEN_CONSOLE_IMPL__
 #include "hv_console.h"
 #include "emg_console.h"
 
@@ -62,36 +64,38 @@ void flush_console(void)
 	hv_console_flush();
 }
 
+__ssz console_out(struct uk_console *dev __unused, const char *str, __sz len)
+{
+	int ret, ret2;
+
+	UK_ASSERT(len <= __I_MAX);
+
+	if (unlikely(len == 0))
+		len = strnlen(str, len);
+
+	ret  = emg_console_output(str, len);
+	ret2 = hv_console_output(str, len);
+	return returncode(ret, ret2);
+}
+
+__ssz console_in(struct uk_console *dev __unused, char *str __maybe_unused,
+		 __sz maxlen __maybe_unused)
+{
+	UK_ASSERT(maxlen <= __I_MAX);
+	return hv_console_input(str, maxlen);
+}
+
+static struct uk_console_ops console_ops = {
+	.out = console_out,
+	.in = console_in
+};
+
+static struct uk_console console_dev = UK_CONSOLE("Xen", &console_ops,
+						  UK_CONSOLE_FLAG_STDOUT |
+						  UK_CONSOLE_FLAG_STDIN);
+
 void init_console(void)
 {
 	hv_console_init();
-}
-
-int ukplat_coutd(const char *str, unsigned int len)
-{
-	int ret, ret2;
-
-	if (unlikely(len == 0))
-		len = strnlen(str, len);
-
-	ret  = emg_console_output_d(str, len);
-	ret2 = hv_console_output_d(str, len);
-	return returncode(ret, ret2);
-}
-
-int ukplat_coutk(const char *str, unsigned int len)
-{
-	int ret, ret2;
-
-	if (unlikely(len == 0))
-		len = strnlen(str, len);
-
-	ret  = emg_console_output_k(str, len);
-	ret2 = hv_console_output_k(str, len);
-	return returncode(ret, ret2);
-}
-
-int ukplat_cink(char *str __maybe_unused, unsigned int maxlen __maybe_unused)
-{
-	return hv_console_input(str, maxlen);
+	uk_console_register(&console_dev);
 }

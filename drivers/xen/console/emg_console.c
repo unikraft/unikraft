@@ -74,7 +74,6 @@
 #include <uk/essentials.h>
 #include <common/hypervisor.h>
 
-#define __XEN_CONSOLE_IMPL__
 #include "emg_console.h"
 
 int emg_console_output(const char *str, unsigned int len)

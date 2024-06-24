@@ -1,4 +1,4 @@
-config LIBXEN_CONSOLE
+menuconfig LIBXEN_CONSOLE
 	bool "Xen console drivers"
 	select LIBUKCONSOLE
 	select LIBNOLIBC
@@ -6,3 +6,18 @@ config LIBXEN_CONSOLE
 	help
 		Drivers for the normal Xen console and
 		the emergency console
+
+if LIBXEN_CONSOLE
+config LIBXEN_CONSOLE_HV
+	bool "Enable the hypervisor console"
+	default y
+	depends on (ARCH_ARM_64 || ARCH_X86_64)
+	help
+		Send messages to the emergency console.
+
+config LIBXEN_CONSOLE_EMG
+	bool "Enable the emergency console"
+	default y if (ARCH_ARM_32 || ARCH_ARM_64)
+	help
+		Send messages to the emergency console.
+endif
