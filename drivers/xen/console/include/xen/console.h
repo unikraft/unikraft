@@ -31,20 +31,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __CONSOLE_H__
-#define __CONSOLE_H__
-
-/* keeps buffering console message
- * (on PV: start_info need to be loaded)
- */
-void prepare_console(void);
-
-/* initializes the console, sends out buffered messages
- * (event system has to be initialized)
- */
-void init_console(void);
-
+#ifndef __XEN_CONSOLE_H__
+#define __XEN_CONSOLE_H__
 
 void flush_console(void);
 
-#endif /* __CONSOLE_H__ */
+#endif /* __XEN_CONSOLE_H__ */

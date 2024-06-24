@@ -78,9 +78,10 @@
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include <uk/config.h>
-
-#define __XEN_CONSOLE_IMPL__
-#include "hv_console.h"
+#include <uk/console/driver.h>
+#include <uk/boot/earlytab.h>
+#include <uk/prio.h>
+#include <uk/plat/common/bootinfo.h>
 
 #include <common/events.h>
 #include <common/hypervisor.h>
@@ -111,22 +112,6 @@ static struct xencons_interface *console_ring;
 static uint32_t console_evtchn;
 static int console_ready;
 
-#ifdef CONFIG_PARAVIRT
-void hv_console_prepare(void)
-{
-	console_ring = mfn_to_virt(HYPERVISOR_start_info->console.domU.mfn);
-	console_evtchn = HYPERVISOR_start_info->console.domU.evtchn;
-}
-#endif
-
-#if defined(__aarch64__)
-void hv_console_prepare(void)
-{
-	console_ring =
-	    (struct xencons_interface *)HYPERVISOR_start_info->console.domU.mfn;
-	console_evtchn = HYPERVISOR_start_info->console.domU.evtchn;
-}
-#endif
 /*
  * hv_console_output operates in two modes: buffered and initialized.
  * The buffered mode is automatically activated after
@@ -142,7 +127,7 @@ void hv_console_prepare(void)
  * wait for the backend to make us space again. Of course this is slow: do not
  * print so much! ;-)
  */
-int hv_console_output(const char *str, unsigned int len)
+static int hv_console_output(const char *str, unsigned int len)
 {
 	unsigned int sent = 0;
 	XENCONS_RING_IDX cons, prod;
@@ -190,7 +175,7 @@ retry:
 	return sent;
 }
 
-void hv_console_flush(void)
+void flush_console(void)
 {
 	struct xencons_interface *intf;
 
@@ -205,7 +190,7 @@ void hv_console_flush(void)
 		barrier();
 }
 
-int hv_console_input(char *str, unsigned int maxlen)
+static int hv_console_input(char *str, unsigned int maxlen)
 {
 	int read = 0;
 	XENCONS_RING_IDX cons, prod;
@@ -236,7 +221,7 @@ static void hv_console_event(evtchn_port_t port __unused,
 	/* NOT IMPLEMENTED YET */
 }
 
-void hv_console_init(void)
+static int hv_console_init(struct ukplat_bootinfo *bi __unused)
 {
 	int err;
 
@@ -254,4 +239,60 @@ void hv_console_init(void)
 	console_ready = 1; /* enable notification of backend */
 	/* flush queued output */
 	notify_remote_via_evtchn(console_evtchn);
+	return 0;
 }
+
+static __ssz console_out(struct uk_console *dev __unused, const char *str,
+			 __sz len)
+{
+	UK_ASSERT(len <= __I_MAX);
+
+	if (unlikely(len == 0))
+		len = strnlen(str, len);
+
+	return hv_console_output(str, len);
+}
+
+static __ssz console_in(struct uk_console *dev __unused,
+			char *str __maybe_unused, __sz maxlen __maybe_unused)
+{
+	UK_ASSERT(maxlen <= __I_MAX);
+	return hv_console_input(str, maxlen);
+}
+
+static struct uk_console_ops console_ops = {
+	.out = console_out,
+	.in = console_in
+};
+
+static struct uk_console console_dev;
+
+#ifdef CONFIG_PARAVIRT
+static int hv_console_prepare(struct ukplat_bootinfo *bi __unused)
+{
+	console_ring = mfn_to_virt(HYPERVISOR_start_info->console.domU.mfn);
+	console_evtchn = HYPERVISOR_start_info->console.domU.evtchn;
+	uk_console_init(&console_dev, "Xen", &console_ops,
+			UK_CONSOLE_FLAG_STDOUT | UK_CONSOLE_FLAG_STDIN);
+	uk_console_register(&console_dev);
+	return 0;
+}
+#endif
+
+#if defined(__aarch64__)
+static int hv_console_prepare(struct ukplat_bootinfo *bi __unused)
+{
+	console_ring =
+	    (struct xencons_interface *)HYPERVISOR_start_info->console.domU.mfn;
+	console_evtchn = HYPERVISOR_start_info->console.domU.evtchn;
+	uk_console_init(&console_dev, "Xen", &console_ops,
+			UK_CONSOLE_FLAG_STDOUT | UK_CONSOLE_FLAG_STDIN);
+	uk_console_register(&console_dev);
+	return 0;
+}
+#endif
+
+UK_BOOT_EARLYTAB_ENTRY(hv_console_prepare, UK_PRIO_AFTER(UK_PRIO_EARLIEST));
+
+/* NOTE: `init_events()` should be called before calling `hv_console_init`. */
+UK_BOOT_EARLYTAB_ENTRY(hv_console_init, UK_PRIO_LATEST);

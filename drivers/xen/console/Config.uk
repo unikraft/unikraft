@@ -1,0 +1,7 @@
+menuconfig LIBXEN_CONSOLE
+	bool "Hypervisor console"
+	select LIBUKCONSOLE
+	select LIBNOLIBC
+	depends on PLAT_XEN
+	help
+		Driver for the Xen hypervisor console
