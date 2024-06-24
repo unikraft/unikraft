@@ -80,7 +80,7 @@
 #include <x86/traps.h>
 
 #include <xen/xen.h>
-#include <common/console.h>
+#include <xen/console.h>
 #include <common/events.h>
 #ifdef __X86_64__
 #include <xen-x86/hypercall64.h>
@@ -212,9 +212,6 @@ void _libxenplat_x86entry(void *start_info)
 
 	_init_traps();
 	HYPERVISOR_start_info = (start_info_t *)start_info;
-	prepare_console(); /* enables buffering for console */
-
-	uk_pr_info("Entering from Xen (x86, PV)...\n");
 
 	_init_shared_info(); /* remaps shared info */
 
@@ -225,11 +222,11 @@ void _libxenplat_x86entry(void *start_info)
 	uk_pr_info("   shared_info: %p\n", HYPERVISOR_shared_info);
 	uk_pr_info("hypercall_page: %p\n", hypercall_page);
 
-	init_console();
-
 	_libxenplat_x86bootinfo_setup(bi);
 
 	uk_boot_early_init(bi);
+
+	uk_pr_info("Entering from Xen (x86, PV)...\n");
 
 #if CONFIG_HAVE_X86PKU
 	_check_ospke();

@@ -38,7 +38,7 @@
 #include <errno.h>
 
 #include <xen/xen.h>
-#include <common/console.h>
+#include <xen/console.h>
 
 #if defined __X86_32__
 #include <xen-x86/hypercall32.h>
