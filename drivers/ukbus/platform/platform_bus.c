@@ -239,10 +239,10 @@ static int pf_init(struct uk_alloc *a)
 __vaddr_t uk_bus_pf_devmap(__paddr_t base, __sz size)
 {
 	struct uk_pagetable *pt;
-	__vaddr_t vaddr, va;
-	__paddr_t paddr, pa;
-	unsigned long attr;
 	unsigned long pages;
+	unsigned long attr;
+	__vaddr_t vaddr;
+	__paddr_t paddr;
 	int rc;
 
 	attr = PAGE_ATTR_PROT_RW;
@@ -261,22 +261,33 @@ __vaddr_t uk_bus_pf_devmap(__paddr_t base, __sz size)
 	 * way too late for the interrupt controller which is required for
 	 * bringing up secondary cores.
 	 *
-	 * Notice that we handle each page independently, as ukplat_page_map()
-	 * would return EEXIST even if part of a multi-pgae region is mapped,
-	 * causing the subsequent ukplat_page_set_attr() to fail.
+	 * Notice that updating the attributes of an already mapped region
+	 * can potentialy fail, as ukplat_page_map() will also return EEXIST
+	 * for a partially mapped region too. Addressing this problem by
+	 * remapping a region page-by-page is too slow for devices with large
+	 * regions like PCI.
 	 */
-	for (__sz i = 0; i < pages; i++) {
-		va = vaddr + i * PAGE_SIZE;
-		pa = paddr + i * PAGE_SIZE;
-		rc = ukplat_page_map(pt, va, pa, 1, attr, 0);
-		if (!rc)
-			continue;
+	rc = ukplat_page_map(pt, vaddr, paddr, pages, attr, 0);
+	if (unlikely(rc && rc != -EEXIST)) {
+		uk_pr_err("Could not map MMIO Region at 0x%lx - 0x%lx (%d)\n",
+			  base, base + size, rc);
+		return rc;
+	}
 
-		if (rc == -EEXIST)
-			rc = ukplat_page_set_attr(pt, va, 1, attr, 0);
+	if (rc == -EEXIST) {
+		rc = ukplat_page_unmap(pt, vaddr, pages, 0);
+		if (unlikely(rc)) {
+			uk_pr_err("Could not unmap MMIO Region at 0x%lx - 0x%lx (%d)\n",
+				  base, base + size, rc);
+			return rc;
+		}
 
-		if (unlikely(rc))
-			return (__vaddr_t)ERR2PTR(rc);
+		rc = ukplat_page_map(pt, vaddr, paddr, pages, attr, 0);
+		if (unlikely(rc)) {
+			uk_pr_err("Could not map MMIO Region at 0x%lx - 0x%lx (%d)\n",
+				  base, base + size, rc);
+			return rc;
+		}
 	}
 
 	return (__vaddr_t)base;
