@@ -29,7 +29,7 @@
 #include <xen-arm/os.h>
 #include <xen-arm/mm.h>
 #include <common/events.h>
-#include <common/console.h>
+#include <xen/console.h>
 #include <xen/xen.h>
 #include <uk/boot.h>
 #include <uk/plat/memory.h>
@@ -322,9 +322,6 @@ void _libxenplat_armentry(void *dtb_pointer, paddr_t physical_offset)
 
 	_get_cmdline(bi);
 
-	/* Do early init */
-	uk_boot_early_init(bi);
-
 	/* Map shared_info page */
 	xatp.domid = DOMID_SELF;
 	xatp.idx = 0;
@@ -341,6 +338,9 @@ void _libxenplat_armentry(void *dtb_pointer, paddr_t physical_offset)
 
 	/* Set up events. */
 	init_events();
+
+	/* Do early init */
+	uk_boot_early_init(bi);
 
 	/* Initialize logical boot CPU */
 	r = lcpu_init(lcpu_get_bsp());
