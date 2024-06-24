@@ -32,6 +32,7 @@
 
 #include <stdbool.h>
 #include <uk/bus/platform.h>
+#include <uk/errptr.h>
 #include <uk/list.h>
 #include <uk/alloc.h>
 #include <uk/print.h>
@@ -406,6 +407,7 @@ static int gen_pci_probe(struct pf_device *pfdev __unused)
 	__u64 reg_size;
 	struct pci_range range;
 	struct pci_range_parser parser;
+	__vaddr_t vaddr __maybe_unused;
 	const char *comp;
 	int err;
 
@@ -432,10 +434,21 @@ static int gen_pci_probe(struct pf_device *pfdev __unused)
 		reg_size = reg_size << 32 | fdt32_to_cpu(prop[3]);
 	}
 
+#if CONFIG_PAGING
+	vaddr = uk_bus_pf_devmap(reg_base, reg_size);
+	if (unlikely(PTRISERR(vaddr))) {
+		uk_pr_err("Could not map MMIO region at 0x%lx - 0x%lx (%d)\n",
+			  reg_base, reg_base + reg_size, PTR2ERR(vaddr));
+		return PTR2ERR(vaddr);
+	}
+	pcw.config_base = vaddr;
+#else /* !CONFIG_PAGING */
 	pcw.config_base = reg_base;
+#endif /* !CONFIG_PAGING */
+
 	pcw.config_space_size = reg_size;
-	uk_pr_info("generic pci config base(0x%lx),size(0x%lx)\n",
-				reg_base, reg_size);
+	uk_pr_info("generic pci config base(0x%lx), size(0x%lx)\n",
+		   reg_base, reg_size);
 
 	/* 2.Get the bus range of pci controller */
 	prop = fdt_getprop(dtb, gen_pci_fdt, "bus-range", &prop_len);

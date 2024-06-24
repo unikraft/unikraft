@@ -51,6 +51,7 @@
  */
 
 #include <string.h>
+#include <uk/errptr.h>
 #include <uk/print.h>
 #include <uk/plat/common/cpu.h>
 #include <uk/bus/pci.h>
@@ -90,6 +91,15 @@ static int arch_pci_driver_add_device(struct pci_driver *drv,
 	memcpy(&dev->id, devid, sizeof(dev->id));
 	memcpy(&dev->addr, addr,  sizeof(dev->addr));
 	dev->drv = drv;
+
+#if CONFIG_PAGING
+	/* TODO Properly query the BAR size */
+	base = uk_bus_pf_devmap(base, __PAGE_SIZE);
+	if (unlikely(PTRISERR(base))) {
+		uk_pr_err("Could not map device (%d)\n", PTR2ERR(base));
+		return PTR2ERR(base);
+	}
+#endif /* CONFIG_PAGING */
 
 	dev->base = base;
 	dev->irq = irq;
