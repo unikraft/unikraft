@@ -1,0 +1,8 @@
+config LIBXEN_CONSOLE
+	bool "Xen console drivers"
+	select LIBUKCONSOLE
+	select LIBNOLIBC
+	depends on PLAT_XEN
+	help
+		Drivers for the normal Xen console and
+		the emergency console

@@ -35,37 +35,6 @@ config XEN_PV
 	default n if XEN_HVMLITE
 	default y
 
-menu "Console Options"
-
-config XEN_KERNEL_HV_CONSOLE
-	bool "Hypervisor console for kernel prints"
-	default y
-	depends on (ARCH_X86_64 || ARCH_ARM_64)
-	help
-		Send kernel messages to the hypervisor console.
-
-config XEN_KERNEL_EMG_CONSOLE
-	bool "Emergency console for kernel prints"
-	default y if (ARCH_ARM_32 || ARCH_ARM_64)
-	default n
-	help
-		Send kernel messages to the emergency console.
-
-config XEN_DEBUG_HV_CONSOLE
-	bool "Hypervisor console for debug prints"
-	default y
-	depends on (ARCH_X86_64 || ARCH_ARM_64)
-	help
-		Send debug messages to the hypervisor console.
-
-config XEN_DEBUG_EMG_CONSOLE
-	bool "Emergency console for debug prints"
-	default y if (ARCH_ARM_32 || ARCH_ARM_64)
-	default n
-        help
-		Send debug messages to the emergency console.
-endmenu
-
 config XEN_PV_BUILD_P2M
 	bool "Create p2m table"
 	depends on (ARCH_X86_64 && XEN_PV)
