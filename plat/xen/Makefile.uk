@@ -101,13 +101,6 @@ LIBXENPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(UK_PLAT_COMMON_BASE)/arm/lcpu_start.S
 endif
 
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/lcpu.c
-LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/console.c
-ifeq ($(findstring y,$(CONFIG_XEN_KERNEL_HV_CONSOLE) $(CONFIG_XEN_DEBUG_HV_CONSOLE)),y)
-LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/hv_console.c
-endif
-ifeq ($(findstring y,$(CONFIG_XEN_KERNEL_EMG_CONSOLE) $(CONFIG_XEN_DEBUG_EMG_CONSOLE)),y)
-LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/emg_console.c
-endif
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/shutdown.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/events.c
 
