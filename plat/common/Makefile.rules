@@ -1,5 +1,5 @@
 define build_multiboot =
-	@$(SCRIPTS_DIR)/multiboot.py $(1)
+	$(call build_cmd,MULTIBT,,$(1).multiboot,$(SCRIPTS_DIR)/multiboot.py $(1))
 endef
 
 BINFO_FLAGS := -a $(CONFIG_UK_ARCH)
@@ -15,7 +15,7 @@ define build_bootinfo =
 endef
 
 define build_efi =
-	@$(SCRIPTS_DIR)/mkefi.py $(1)
+	$(call build_cmd,MKEFI,,$(1).efi,$(SCRIPTS_DIR)/mkefi.py $(1))
 endef
 
 define build_linux =
