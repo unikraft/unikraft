@@ -48,45 +48,18 @@
 #include <uk/plat/time.h>
 #include <uk/assert.h>
 
-
 struct uk_timer {
 	struct uk_list_head nodes;
 	struct uk_alloc *alloc;
-	__u64 exp_cnt;
 	struct uk_thread *thread; /* timer thread, NULL if disarmed */
-	clockid_t clockid;
 	struct sigevent sigev;
 	struct itimerspec spec;
+	__u64 exp_cnt;
+	clockid_t clockid;
 	pid_t pid;
 };
 
-struct uk_timer *timer_list_head = NULL;
-
-static inline int __push_timer(struct uk_timer *timer)
-{
-	if (timer_list_head == NULL) {
-		timer_list_head = timer;
-
-	} else {
-		uk_list_add(&timer->nodes, &timer_list_head->nodes);
-	}
-
-	return 0;
-}
-
-/* Removes timer from timer data structure and frees the memory */
-static void __delete_timer(struct uk_timer *timer)
-{
-	if(!timer->nodes.prev) {
-		timer_list_head = (struct uk_timer*) timer->nodes.next;
-		timer_list_head->nodes.prev = NULL;
-
-	} else {
-		uk_list_del(&timer->nodes);
-	}
-
-	uk_free(timer->alloc, timer);
-}
+static UK_LIST_HEAD(timer_list_head);
 
 static struct uk_timer *get_timer(timer_t timerid)
 {
@@ -116,27 +89,25 @@ static void expire(struct uk_timer *timer)
 {
 	uk_printk(KLVL_CRIT, "Expired\n");
 
-	switch(timer->sigev.sigev_notify) {
-		case SIGEV_NONE: 
-			break;
-		case SIGEV_SIGNAL: {
-			uk_syscall_r_kill(timer->pid, timer->sigev.sigev_signo);
-			break;
-		}
-		case SIGEV_THREAD: {
+	switch (timer->sigev.sigev_notify) {
+	case SIGEV_NONE:
+		break;
+	case SIGEV_SIGNAL: {
+		uk_syscall_r_kill(timer->pid, timer->sigev.sigev_signo);
+		break;
+	}
+	case SIGEV_THREAD: {
+		uk_sched_thread_create(
+			uk_sched_current(),
+			(void(*)(void *))timer->sigev.sigev_notify_function,
+			(void*)&timer->sigev.sigev_value,
+			"Timer SIGEV_THREAD");
 
-			uk_sched_thread_create(
-			    uk_sched_current(),
-			    (void(*)(void*)) timer->sigev.sigev_notify_function,
-			    (void*) &timer->sigev.sigev_value, 
-				"Timer SIGEV_THREAD"
-		);
-
-			break;
-		}
-		default: {
-			break;
-		}
+		break;
+	}
+	default: {
+		break;
+	}
 	}
 }
 
@@ -147,11 +118,11 @@ struct timer_status {
 };
 
 /* Calculates the time to the time difference between current time and the next
- * timer expiry. */
+ * timer expiry. 
+ */
 static inline struct timer_status next_delay(struct uk_timer *timer,
 					     const struct timespec *now)
 {
-
 	__snsec time_since_first_exp =
 	    uk_time_spec_nsecdiff(&timer->spec.it_value, now);
 
@@ -260,15 +231,13 @@ UK_SYSCALL_R_DEFINE(int, timer_create, clockid_t, clockid,
 		return -ENOMEM;
 
 	timer->alloc = alloc;
-	timer->exp_cnt = 0;
 	timer->thread = NULL;
-	timer->clockid = clockid;
 	timer->sigev = *sevp;
+	timer->exp_cnt = 0;
+	timer->clockid = clockid;
 	timer->pid = uk_syscall_r_getpid(); 
 
-	if (unlikely(__push_timer(timer))) {
-		return -ENOMEM;
-	}
+	uk_list_add(&timer->nodes, &timer_list_head);
 
 	*timerid = (timer_t *)timer;
 		
@@ -286,8 +255,9 @@ UK_SYSCALL_R_DEFINE(int, timer_delete, timer_t, timerid)
 		timer_disarm(timer->thread);
 	}
 
-	__delete_timer(timer);
-	
+	uk_list_del(&timer->nodes);
+	uk_free(timer->alloc, timer);
+
 	return 0;
 }
 
