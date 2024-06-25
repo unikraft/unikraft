@@ -68,12 +68,10 @@ static struct uk_timer *get_timer(timer_t timerid)
 
 	/* Check if timerid points to valid list entry. Otherwise return NULL */
 	while (head != timer) {
-		if (head) {
+		if (head)
 			head = (struct uk_timer *)head->nodes.next;
-
-		} else {
+		else
 			return NULL;
-		}
 	}
 
 	return timer;
@@ -97,10 +95,9 @@ static void expire(struct uk_timer *timer)
 		break;
 	}
 	case SIGEV_THREAD: {
-		uk_sched_thread_create(
-			uk_sched_current(),
+		uk_sched_thread_create(uk_sched_current(),
 			(void(*)(void *))timer->sigev.sigev_notify_function,
-			(void*)&timer->sigev.sigev_value,
+			(void *)&timer->sigev.sigev_value,
 			"Timer SIGEV_THREAD");
 
 		break;
@@ -118,7 +115,7 @@ struct timer_status {
 };
 
 /* Calculates the time to the time difference between current time and the next
- * timer expiry. 
+ * timer expiry.
  */
 static inline struct timer_status next_delay(struct uk_timer *timer,
 					     const struct timespec *now)
@@ -127,6 +124,7 @@ static inline struct timer_status next_delay(struct uk_timer *timer,
 	    uk_time_spec_nsecdiff(&timer->spec.it_value, now);
 
 	struct timer_status status;
+
 	status.overrun_cnt = 0;
 	status.exp_cnt = 0;
 
@@ -136,11 +134,12 @@ static inline struct timer_status next_delay(struct uk_timer *timer,
 		if (period) {
 			status.exp_cnt = 1 + time_since_first_exp / period;
 
-			if (status.exp_cnt - timer->exp_cnt > 1) {
-				status.overrun_cnt = status.exp_cnt - timer->exp_cnt;
-			}
+			if (status.exp_cnt - timer->exp_cnt > 1)
+				status.overrun_cnt =
+					status.exp_cnt - timer->exp_cnt;
 
-			status.next = timer->exp_cnt * period - time_since_first_exp;
+			status.next =
+			    timer->exp_cnt * period - time_since_first_exp;
 
 		} else {
 			/* No interval */
@@ -149,7 +148,7 @@ static inline struct timer_status next_delay(struct uk_timer *timer,
 
 	} else {
 		/* Wait until timer expires for the first time */
-		status.next = (__nsec) -time_since_first_exp;
+		status.next = (__nsec)-time_since_first_exp;
 	}
 
 	return status;
@@ -161,18 +160,18 @@ static __nsec _get_next_deadline(struct uk_timer *timer, struct timespec *now)
 {
 	/* Clear & sleep if timer disarmed */
 	if (!timer->spec.it_value.tv_sec && !timer->spec.it_value.tv_nsec) {
-		if (timer->exp_cnt) {
+		if (timer->exp_cnt)
 			timer->exp_cnt = 0;
-		}
+
 		return 0;
 	}
 
 	struct timer_status status = next_delay(timer, now);
+
 	timer->exp_cnt = status.exp_cnt;
 
-	if (!status.next) {
+	if (!status.next)
 		return 0;
-	}
 
 	return ukplat_monotonic_clock() + status.next;
 }
@@ -183,20 +182,17 @@ static __noreturn void __timer_update_thread(void *timerid)
 
 	struct uk_timer *timer = get_timer(timerid);
 
-	if (!timer) {
+	if (!timer)
 		timer_disarm(uk_thread_current());
-	}
 
 	while (true) {
-
 		struct timespec now;
 		int err =
 		    uk_syscall_r_clock_gettime(timer->clockid, (uintptr_t)&now);
 
-		if (unlikely(err)) {
+		if (unlikely(err))
 			/* terminate on error */
 			timer_disarm(uk_thread_current());
-		}
 
 		deadline = _get_next_deadline(timer, &now);
 
@@ -219,7 +215,7 @@ UK_SYSCALL_R_DEFINE(int, timer_create, clockid_t, clockid,
 {
 	struct uk_timer *timer;
 	struct uk_alloc *alloc;
-	
+
 	/* Check clock id */
 	if (unlikely(uk_syscall_r_clock_getres(clockid, (uintptr_t)NULL)))
 		return -EINVAL;
@@ -235,25 +231,24 @@ UK_SYSCALL_R_DEFINE(int, timer_create, clockid_t, clockid,
 	timer->sigev = *sevp;
 	timer->exp_cnt = 0;
 	timer->clockid = clockid;
-	timer->pid = uk_syscall_r_getpid(); 
+	timer->pid = uk_syscall_r_getpid();
 
 	uk_list_add(&timer->nodes, &timer_list_head);
 
 	*timerid = (timer_t *)timer;
-		
+
 	return 0;
 }
 
 UK_SYSCALL_R_DEFINE(int, timer_delete, timer_t, timerid)
 {
 	struct uk_timer *timer = get_timer(timerid);
-	if (!timer) {
-		return -EINVAL;
-	}
 
-	if(timer->thread) {
+	if (!timer)
+		return -EINVAL;
+
+	if (timer->thread)
 		timer_disarm(timer->thread);
-	}
 
 	uk_list_del(&timer->nodes);
 	uk_free(timer->alloc, timer);
@@ -266,24 +261,23 @@ UK_SYSCALL_R_DEFINE(int, timer_settime, timer_t, timerid, int, flags,
 		    struct itimerspec *__restrict, old_value)
 {
 	struct uk_timer *timer = get_timer(timerid);
-	if (!timer) {
+
+	if (!timer)
 		return -EINVAL;
-	}
 
 	const int disarm =
 	    !new_value->it_value.tv_sec && !new_value->it_value.tv_nsec;
 
 	/* Disarm timer if armed */
-	if (disarm && timer->thread != NULL) {
+	if (disarm && timer->thread) {
 		timer_disarm(timer->thread);
 		return 0;
 	}
 
 	/* Return EINVAL if timespec values out of range */
-	if (new_value->it_value.tv_sec < 0 || new_value->it_value.tv_nsec < 0
-	    || new_value->it_value.tv_nsec > 999999999) {
+	if (new_value->it_value.tv_sec < 0 || new_value->it_value.tv_nsec < 0 ||
+	    new_value->it_value.tv_nsec > 999999999)
 		return -EINVAL;
-	}
 
 	if (old_value) {
 		old_value->it_value = timer->spec.it_value;
@@ -292,13 +286,15 @@ UK_SYSCALL_R_DEFINE(int, timer_settime, timer_t, timerid, int, flags,
 
 	if (!(flags & TIMER_ABSTIME)) {
 		struct timespec now;
+		int err =
+		    uk_syscall_r_clock_gettime(timer->clockid, (uintptr_t)&now);
 
-		int err = uk_syscall_r_clock_gettime(timer->clockid, (uintptr_t)&now);
-		if (unlikely(err)) {
+		if (unlikely(err))
 			return err;
-		}
 
-		timer->spec.it_value = uk_time_spec_sum(&new_value->it_value, &now);
+		timer->spec.it_value =
+		    uk_time_spec_sum(&new_value->it_value, &now);
+
 		timer->spec.it_interval = new_value->it_interval;
 
 	} else {
@@ -306,13 +302,12 @@ UK_SYSCALL_R_DEFINE(int, timer_settime, timer_t, timerid, int, flags,
 		timer->spec.it_interval = new_value->it_interval;
 	}
 
-	struct uk_thread *ut = uk_sched_thread_create_fn1(
-	    uk_sched_current(), __timer_update_thread, timer, 0x0, 0x0, false,
+	struct uk_thread *ut = uk_sched_thread_create_fn1(uk_sched_current(),
+	 __timer_update_thread, timer, 0x0, 0x0, false,
 	    false, "timer_update_thread", NULL, NULL);
 
-	if (unlikely(!ut)) {
+	if (unlikely(!ut))
 		return -ENODEV;
-	}
 
 	return 0;
 }
@@ -321,16 +316,16 @@ UK_SYSCALL_R_DEFINE(int, timer_gettime, timer_t, timerid, struct itimerspec *,
 		    curr_value)
 {
 	struct uk_timer *timer = get_timer(timerid);
-	if (!timer) {
+
+	if (!timer)
 		return -EINVAL;
-	}
 
 	struct timespec now;
 
 	int err = uk_syscall_r_clock_gettime(timer->clockid, (uintptr_t)&now);
-	if (unlikely(err)) {
+
+	if (unlikely(err))
 		return err;
-	}
 
 	struct timer_status status = next_delay(timer, &now);
 
@@ -340,16 +335,16 @@ UK_SYSCALL_R_DEFINE(int, timer_gettime, timer_t, timerid, struct itimerspec *,
 UK_SYSCALL_R_DEFINE(int, timer_getoverrun, timer_t, timerid)
 {
 	struct uk_timer *timer = get_timer(timerid);
-	if (!timer) {
+
+	if (!timer)
 		return -EINVAL;
-	}
 
 	struct timespec now;
 
 	int err = uk_syscall_r_clock_gettime(timer->clockid, (uintptr_t)&now);
-	if (unlikely(err)) {
+
+	if (unlikely(err))
 		return err;
-	}
 
 	struct timer_status status = next_delay(timer, &now);
 
