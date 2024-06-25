@@ -67,7 +67,9 @@
 
 #include <uk/essentials.h>
 #include <uk/arch/lcpu.h>
-#include <uk/plat/console.h>
+#if CONFIG_LIBUKCONSOLE
+#include <uk/console.h>
+#endif /* CONFIG_LIBUKCONSOLE */
 
 /* 64 bits + 0-Byte at end */
 #define MAXNBUF 65
@@ -434,7 +436,8 @@ int sprintf(char *str, const char *fmt, ...)
 	return ret;
 }
 
-int vfprintf(FILE *fp, const char *fmt, va_list ap)
+int vfprintf(FILE *fp __maybe_unused, const char *fmt __maybe_unused,
+	     va_list ap __maybe_unused)
 {
 	int ret;
 	char buf[1024];
@@ -446,10 +449,12 @@ int vfprintf(FILE *fp, const char *fmt, va_list ap)
 	/* we do not support device handling for now, we
 	 * just send the buffer content to the kernel console
 	 */
-	if (fp == stdout)
-		ret = ukplat_coutk(buf, ret);
-	else if (fp == stderr)
-		ret = ukplat_coutd(buf, ret);
+	if (fp == stdout || fp == stderr)
+#if CONFIG_LIBUKCONSOLE
+		ret = uk_console_out(buf, ret);
+#else /* !CONFIG_LIBUKCONSOLE */
+		ret = strlen(buf);
+#endif /* !CONFIG_LIBUKCONSOLE */
 	else
 		return 0;
 
@@ -491,20 +496,21 @@ int fflush(FILE *fp __unused)
 	return 0;
 }
 
-int fputc(int _c, FILE *fp)
+int fputc(int _c __maybe_unused, FILE *fp __maybe_unused)
 {
+#if CONFIG_LIBUKCONSOLE
 	int ret = 0;
 	unsigned char c = _c;
 
-	if (fp == stdout)
-		ret = ukplat_coutk((char *)&c, 1);
-	else if (fp == stderr)
-		ret = ukplat_coutd((char *)&c, 1);
+	if (fp == stdout || fp == stderr)
+		ret = uk_console_out((char *)&c, 1);
 
 	if (ret == 1)
 		return _c;
 
 	return EOF;
+#endif /* CONFIG_LIBUKCONSOLE */
+	return _c;
 }
 
 int putchar(int c)
@@ -513,30 +519,31 @@ int putchar(int c)
 }
 
 static int
-fputs_internal(const char *restrict s, FILE *restrict stream, int newline)
+fputs_internal(const char *restrict s __maybe_unused,
+	       FILE *restrict stream __maybe_unused,
+	       int newline __maybe_unused)
 {
+#if CONFIG_LIBUKCONSOLE
 	int ret;
 	size_t len;
 
 	len = strlen(s);
 
-	if (stream == stdout)
-		ret = ukplat_coutk(s, len);
-	else if (stream == stderr)
-		ret = ukplat_coutd(s, len);
+	if (stream == stdout || stream == stderr)
+		ret = uk_console_out(s, len);
 	else
 		return EOF;
 
-	/* If ukplat_cout{d,k} weren't able to write all characters, assume that
-	 * an error happened and there is no point in retrying.
+	/* If uk_console_out wasn't able to write all characters, assume
+	 * that an error happened and there is no point in retrying.
 	 */
 	if ((size_t)ret != len)
 		return EOF;
 
 	if (newline)
 		return fputc('\n', stream);
-	else
-		return 1;
+#endif /* !CONFIG_LIBUKCONSOLE */
+	return 1;
 }
 
 int fputs(const char *restrict s, FILE *restrict stream)
