@@ -14,6 +14,8 @@
 #include <uk/arch/limits.h>
 #include <uk/isr/string.h>
 #include <uk/nofault.h>
+#include <uk/console.h>
+#include <uk/libparam.h>
 
 #if CONFIG_HAVE_PAGING
 #include <uk/plat/paging.h>
@@ -57,14 +59,44 @@ struct gdb_cmd_table_entry {
 extern const char __gdb_target_xml_start[];
 extern const char __gdb_target_xml_end[];
 
-int gdb_dbg_putc(char b __unused)
+/* This console device is used to communicate with the gdb host over a serial
+ * connection. For that reason, we call it the "backing" console device (it
+ * backs the connection). It's chosen to be the device with the ID found in
+ * `gdb_backing_console_id`. That ID can be set using the kernel command line.
+ */
+static struct uk_console *gdb_backing_console;
+
+#define GDB_BACKING_CONSOLE_NONE	((__u16)(-1))
+static __u16 gdb_backing_console_id = GDB_BACKING_CONSOLE_NONE;
+UK_LIBPARAM_PARAM_ALIAS(gdbcon, &gdb_backing_console_id, __u16,
+			"gdb backing console ID");
+
+int gdb_dbg_putc(char b)
 {
-	return -ENOTSUP;
+	int rc;
+
+	if (unlikely(!gdb_backing_console))
+		return -ENODEV;
+
+	rc = uk_console_out_direct(gdb_backing_console, &b, 1);
+	if (unlikely(rc != 1))
+		return -EIO;
+
+	return 0;
 }
 
 int gdb_dbg_getc(void)
 {
-	return -ENOTSUP;
+	char b;
+
+	if (unlikely(!gdb_backing_console))
+		return -ENODEV;
+
+	/* Busy loop until we read one byte */
+	while (uk_console_in_direct(gdb_backing_console, &b, 1) < 1)
+		;
+
+	return b;
 }
 
 static int gdb_starts_with(const char *buf, __sz buf_len,
@@ -289,12 +321,7 @@ static __ssz gdb_write_memory(unsigned long addr, __sz len,
 
 static __ssz gdb_send(const char *buf, __sz len)
 {
-	__sz l = len;
-
-	while (l--)
-		GDB_CHECK(gdb_dbg_putc(*buf++));
-
-	return len;
+	return uk_console_out_direct(gdb_backing_console, buf, len);
 }
 
 static __ssz gdb_recv(char *buf, __sz len)
