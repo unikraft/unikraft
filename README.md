@@ -58,7 +58,7 @@
    - Built for performance, Unikraft minimizes overheads and leverages platform-specific optimizations, ensuring applications achieve peak performance levels.
 
 - **Flexible Architecture Support** 💻
-   - With support for multiple hardware architectures including x86, ARM, (and soon [RISC-V](#)), Unikraft offers flexibility in deployment across diverse hardware platforms.
+   - With support for multiple hardware architectures including x86, ARM, (and soon [RISC-V](https://riscv.org/)), Unikraft offers flexibility in deployment across diverse hardware platforms.
 
 - **Broad Language and Application Support** 📚
 
