@@ -60,16 +60,16 @@ void ukarch_ctx_init(struct ukarch_ctx *ctx,
 	UK_ASSERT(ip);			/* IP == NULL would cause a crash */
 	UK_ASSERT(!keep_regs && sp);	/* stack is needed for clearing regs */
 
-	_sp = ukarch_rstack_push(sp, (long) ip);
+	_sp = ukarch_rstack_push(sp, (long)ip);
 	if (keep_regs) {
-		ukarch_ctx_init_bare(ctx, _sp, (long) _ctx_arm_call0);
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_arm_call0);
 	} else {
-		_sp = ukarch_rstack_push(_sp, (long) _ctx_arm_call0);
-		ukarch_ctx_init_bare(ctx, _sp, (long) _ctx_arm_clearregs);
+		_sp = ukarch_rstack_push(_sp, (long)_ctx_arm_call0);
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_arm_clearregs);
 	}
 
 	uk_pr_debug("ukarch_ctx %p: start:%p sp:%p\n",
-		    ctx, (void *) ip, (void *) sp);
+		    ctx, (void *)ip, (void *)sp);
 }
 
 void ukarch_ctx_init_entry0(struct ukarch_ctx *ctx,
@@ -85,14 +85,14 @@ void ukarch_ctx_init_entry0(struct ukarch_ctx *ctx,
 
 	_sp = ukarch_rstack_push(sp, (long) entry);
 	if (keep_regs) {
-		ukarch_ctx_init_bare(ctx, _sp, (long) _ctx_arm_call0);
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_arm_call0);
 	} else {
-		_sp = ukarch_rstack_push(_sp, (long) _ctx_arm_call0);
-		ukarch_ctx_init_bare(ctx, _sp, (long) _ctx_arm_clearregs);
+		_sp = ukarch_rstack_push(_sp, (long)_ctx_arm_call0);
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_arm_clearregs);
 	}
 
 	uk_pr_debug("ukarch_ctx %p: entry:%p(), sp:%p\n",
-		    ctx, entry, (void *) sp);
+		    ctx, entry, (void *)sp);
 }
 
 void ukarch_ctx_init_entry1(struct ukarch_ctx *ctx,
@@ -106,17 +106,17 @@ void ukarch_ctx_init_entry1(struct ukarch_ctx *ctx,
 	UK_ASSERT(entry);		/* NULL as func will cause a crash */
 	UK_ASSERT(!(sp & UKARCH_SP_ALIGN_MASK)); /* sp properly aligned? */
 
-	_sp = ukarch_rstack_push(sp, (long) entry);
+	_sp = ukarch_rstack_push(sp, (long)entry);
 	_sp = ukarch_rstack_push(_sp, arg);
 	if (keep_regs) {
-		ukarch_ctx_init_bare(ctx, _sp, (long) _ctx_arm_call1);
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_arm_call1);
 	} else {
-		_sp = ukarch_rstack_push(_sp, (long) _ctx_arm_call1);
-		ukarch_ctx_init_bare(ctx, _sp, (long) _ctx_arm_clearregs);
+		_sp = ukarch_rstack_push(_sp, (long)_ctx_arm_call1);
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_arm_clearregs);
 	}
 
 	uk_pr_debug("ukarch_ctx %p: entry:%p(%lx), sp:%p\n",
-		    ctx, entry, arg, (void *) sp);
+		    ctx, entry, arg, (void *)sp);
 }
 
 void ukarch_ctx_init_entry2(struct ukarch_ctx *ctx,
@@ -130,16 +130,16 @@ void ukarch_ctx_init_entry2(struct ukarch_ctx *ctx,
 	UK_ASSERT(entry);		/* NULL as func will cause a crash */
 	UK_ASSERT(!(sp & UKARCH_SP_ALIGN_MASK)); /* sp properly aligned? */
 
-	_sp = ukarch_rstack_push(sp, (long) entry);
+	_sp = ukarch_rstack_push(sp, (long)entry);
 	_sp = ukarch_rstack_push(_sp, arg0);
 	_sp = ukarch_rstack_push(_sp, arg1);
 	if (keep_regs) {
-		ukarch_ctx_init_bare(ctx, _sp, (long) _ctx_arm_call2);
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_arm_call2);
 	} else {
-		_sp = ukarch_rstack_push(_sp, (long) _ctx_arm_call2);
-		ukarch_ctx_init_bare(ctx, _sp, (long) _ctx_arm_clearregs);
+		_sp = ukarch_rstack_push(_sp, (long)_ctx_arm_call2);
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_arm_clearregs);
 	}
 
 	uk_pr_debug("ukarch_ctx %p: entry:%p(%lx, %lx), sp:%p\n",
-		    ctx, entry, arg0, arg1, (void *) sp);
+		    ctx, entry, arg0, arg1, (void *)sp);
 }
