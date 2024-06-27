@@ -144,7 +144,7 @@ static void ns16550_reg_write(__u64 base, __u32 reg, __u32 value)
 	}
 }
 
-static void _putc(__u64 base, char a)
+static void ns16550_putc(__u64 base, char a)
 {
 	/* Wait until TX FIFO becomes empty */
 	while (!(ns16550_reg_read(base, NS16550_LSR_OFFSET) &
@@ -156,13 +156,6 @@ static void _putc(__u64 base, char a)
 			  ns16550_reg_read(base, NS16550_LCR_OFFSET) &
 			  ~(NS16550_LCR_DLAB));
 	ns16550_reg_write(base, NS16550_THR_OFFSET, a & 0xff);
-}
-
-static void ns16550_putc(__u64 base, char a)
-{
-	if (a == '\n')
-		_putc(base, '\r');
-	_putc(base, a);
 }
 
 /* Try to get data from ns16550 UART without blocking */

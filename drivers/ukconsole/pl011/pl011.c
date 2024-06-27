@@ -101,20 +101,13 @@ UK_LIBPARAM_PARAM_ALIAS(base, &earlycon.base, __u64, "pl011 base");
 #define PL011_REG_READ(base, r)		ioreg_read16(PL011_REG(base, r))
 #define PL011_REG_WRITE(base, r, v)	ioreg_write16(PL011_REG(base, r), v)
 
-static void pl011_write(__u64 base, char a)
+static void pl011_putc(__u64 base, char a)
 {
 	/* Wait until TX FIFO becomes empty */
 	while (PL011_REG_READ(base, REG_UARTFR_OFFSET) & FR_TXFF)
 		;
 
 	PL011_REG_WRITE(base, REG_UARTDR_OFFSET, a & 0xff);
-}
-
-static void pl011_putc(__u64 base, char a)
-{
-	if (a == '\n')
-		pl011_write(base, '\r');
-	pl011_write(base, a);
 }
 
 /* Try to get data from pl011 UART without blocking */

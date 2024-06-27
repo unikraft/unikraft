@@ -192,12 +192,8 @@ __ssz com_out(struct uk_console *dev, const char *buf, __sz len)
 
 	com_dev = __containerof(dev, struct com_device, dev);
 
-	while (leftover--) {
-		if (*buf == '\n')
-			com_write(com_dev->port, '\r');
-		com_write(com_dev->port, *buf);
-		buf++;
-	}
+	while (leftover--)
+		com_write(com_dev->port, *buf++);
 
 	return len;
 }
