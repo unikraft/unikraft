@@ -67,8 +67,46 @@
 
 #include <uk/essentials.h>
 #include <uk/arch/lcpu.h>
+
 #if CONFIG_LIBUKCONSOLE
 #include <uk/console.h>
+
+/* TODO: Some consoles require both a newline and a carriage return to
+ * go to the start of the next line. This kind of behavior should be in
+ * a single place in posix-tty. We keep this workaround until we have feature
+ * in posix-tty that handles newline characters correctly.
+ */
+static inline __ssz _console_out(const char *buf, __sz len)
+{
+	const char *next_nl = NULL;
+	__sz l = len;
+	__sz off = 0;
+	__ssz rc = 0;
+
+	if (unlikely(!len))
+		return 0;
+	if (unlikely(!buf))
+		return -EINVAL;
+
+	while (l > 0) {
+		next_nl = memchr(buf, '\n', l);
+		if (next_nl) {
+			off = next_nl - buf;
+			if ((rc = uk_console_out(buf, off)) < 0)
+				return rc;
+			if ((rc = uk_console_out("\r\n", 2)) < 0)
+				return rc;
+			buf = next_nl + 1;
+			l -= off + 1;
+		} else {
+			if ((rc = uk_console_out(buf, l)) < 0)
+				return rc;
+			break;
+		}
+	}
+
+	return len;
+}
 #endif /* CONFIG_LIBUKCONSOLE */
 
 /* 64 bits + 0-Byte at end */
@@ -451,7 +489,7 @@ int vfprintf(FILE *fp __maybe_unused, const char *fmt __maybe_unused,
 	 */
 	if (fp == stdout || fp == stderr)
 #if CONFIG_LIBUKCONSOLE
-		ret = uk_console_out(buf, ret);
+		ret = _console_out(buf, ret);
 #else /* !CONFIG_LIBUKCONSOLE */
 		ret = strlen(buf);
 #endif /* !CONFIG_LIBUKCONSOLE */
@@ -503,7 +541,7 @@ int fputc(int _c __maybe_unused, FILE *fp __maybe_unused)
 	unsigned char c = _c;
 
 	if (fp == stdout || fp == stderr)
-		ret = uk_console_out((char *)&c, 1);
+		ret = _console_out((char *)&c, 1);
 
 	if (ret == 1)
 		return _c;
@@ -530,11 +568,11 @@ fputs_internal(const char *restrict s __maybe_unused,
 	len = strlen(s);
 
 	if (stream == stdout || stream == stderr)
-		ret = uk_console_out(s, len);
+		ret = _console_out(s, len);
 	else
 		return EOF;
 
-	/* If uk_console_out wasn't able to write all characters, assume
+	/* If _console_out wasn't able to write all characters, assume
 	 * that an error happened and there is no point in retrying.
 	 */
 	if ((size_t)ret != len)

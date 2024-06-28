@@ -51,6 +51,7 @@
 
 #if CONFIG_LIBUKCONSOLE
 #include <uk/console.h>
+#include <errno.h>
 #endif /* CONFIG_LIBUKCONSOLE */
 
 #if CONFIG_LIBUKDEBUG_ANSI_COLOR
@@ -105,11 +106,50 @@ struct _vprint_console {
 	int prevlvl;
 };
 
+#if CONFIG_LIBUKCONSOLE
+/* TODO: Some consoles require both a newline and a carriage return to
+ * go to the start of the next line. This kind of behavior should be in
+ * a single place in posix-tty. We keep this workaround until we have feature
+ * in posix-tty that handles newline characters correctly.
+ */
+static inline __ssz _console_out(const char *buf, __sz len)
+{
+	const char *next_nl = NULL;
+	__sz l = len;
+	__sz off = 0;
+	__ssz rc = 0;
+
+	if (unlikely(!len))
+		return 0;
+	if (unlikely(!buf))
+		return -EINVAL;
+
+	while (l > 0) {
+		next_nl = memchr(buf, '\n', l);
+		if (next_nl) {
+			off = next_nl - buf;
+			if ((rc = uk_console_out(buf, off)) < 0)
+				return rc;
+			if ((rc = uk_console_out("\r\n", 2)) < 0)
+				return rc;
+			buf = next_nl + 1;
+			l -= off + 1;
+		} else {
+			if ((rc = uk_console_out(buf, l)) < 0)
+				return rc;
+			break;
+		}
+	}
+
+	return len;
+}
+#endif /* CONFIG_LIBUKCONSOLE */
+
 /* Console state for kernel output */
 #if CONFIG_LIBUKDEBUG_REDIR_PRINTD || CONFIG_LIBUKDEBUG_PRINTK
 static struct _vprint_console kern  = {
 #if CONFIG_LIBUKCONSOLE
-	.cout = uk_console_out,
+	.cout = _console_out,
 #else
 	.cout = NULL,
 #endif /* CONFIG_LIBUKCONSOLE */
@@ -122,7 +162,7 @@ static struct _vprint_console kern  = {
 #if !CONFIG_LIBUKDEBUG_REDIR_PRINTD
 static struct _vprint_console debug = {
 #if CONFIG_LIBUKCONSOLE
-	.cout = uk_console_out,
+	.cout = _console_out,
 #else
 	.cout = NULL,
 #endif /* CONFIG_LIBUKCONSOLE */

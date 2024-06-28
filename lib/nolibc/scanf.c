@@ -11,6 +11,44 @@
 
 #if CONFIG_LIBUKCONSOLE
 #include <uk/console.h>
+#include <string.h>
+
+/* TODO: Some consoles require both a newline and a carriage return to
+ * go to the start of the next line. This kind of behavior should be in
+ * a single place in posix-tty. We keep this workaround until we have feature
+ * in posix-tty that handles newline characters correctly.
+ */
+static inline __ssz _console_out(const char *buf, __sz len)
+{
+	const char *next_nl = NULL;
+	__sz l = len;
+	__sz off = 0;
+	__ssz rc = 0;
+
+	if (unlikely(!len))
+		return 0;
+	if (unlikely(!buf))
+		return -EINVAL;
+
+	while (l > 0) {
+		next_nl = memchr(buf, '\n', l);
+		if (next_nl) {
+			off = next_nl - buf;
+			if ((rc = uk_console_out(buf, off)) < 0)
+				return rc;
+			if ((rc = uk_console_out("\r\n", 2)) < 0)
+				return rc;
+			buf = next_nl + 1;
+			l -= off + 1;
+		} else {
+			if ((rc = uk_console_out(buf, l)) < 0)
+				return rc;
+			break;
+		}
+	}
+
+	return len;
+}
 #endif /* CONFIG_LIBUKCONSOLE */
 
 static int
@@ -45,14 +83,14 @@ uk_scanf(void *buffer __maybe_unused, size_t *cnt)
 			/* DELETE control character */
 			if (buf - 1 != buffer) {
 				/* If this is not the first byte */
-				uk_console_out("\b \b", 3);
+				_console_out("\b \b", 3);
 				buf -= 1;
 				if (bytes_total > 0)
 					bytes_total--;
 			}
 			buf -= 1;
 		} else {
-			uk_console_out(buf - bytes_read, bytes_read);
+			_console_out(buf - bytes_read, bytes_read);
 			bytes_total += bytes_read;
 		}
 
