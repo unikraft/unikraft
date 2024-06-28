@@ -1277,11 +1277,18 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 		break;
 	}
 
+	/* TODO: Some consoles require both a newline and a carriage return to
+	 * go to the start of the next line. There should be a dedicated TTY
+	 * layer to take care of this. Once that layer exists, stop printing
+	 * a CRLF sequence if `UK_PRSYSCALL_FMTF_NEWLINE` is set and print a
+	 * single newline character instead.
+	 */
+
 	/* Try to fix the line ending if content got truncated */
 	if (uk_streambuf_istruncated(sb)) {
 		/* reserve an extra byte for the newline ending if configured */
 		__sz needed_len = 3
-				 + ((fmtf & UK_PRSYSCALL_FMTF_NEWLINE) ? 1 : 0);
+				 + ((fmtf & UK_PRSYSCALL_FMTF_NEWLINE) ? 2 : 0);
 		if (uk_streambuf_buflen(sb) > needed_len + 1) {
 			sb->seek = uk_streambuf_seek(sb) - needed_len;
 			uk_streambuf_strcpy(sb, "...");
@@ -1289,7 +1296,7 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 	}
 
 	if (fmtf & UK_PRSYSCALL_FMTF_NEWLINE)
-		uk_streambuf_strcpy(sb, "\n");
+		uk_streambuf_strcpy(sb, "\r\n");
 }
 
 int uk_snprsyscall(char *buf, __sz maxlen, int fmtf, long syscall_num,
