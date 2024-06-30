@@ -113,6 +113,7 @@
 	/* Store old SP previously saved into x0 */
 	str     x0, [sp, #-16]
 
+.if \except_type == TYPE_TRAP
 	/* Is this trap a system call? */
 	mrs	x0, esr_el1
 	and	x0, x0, #ESR_EC_MASK
@@ -192,6 +193,7 @@
 	ldr	x0, [x0, #LCPU_AUXSP_OFFSET]
 	str	x0, [sp, #UKARCH_EXECENV_SIZE]
 	b	1f
+.endif
 0:
 	sub	sp, sp, #__TRAP_STACK_SIZE
 1:
