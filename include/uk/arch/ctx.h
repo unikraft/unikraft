@@ -341,6 +341,50 @@ void ukarch_ctx_init_entry2(struct ukarch_ctx *ctx,
 void ukarch_ctx_switch(struct ukarch_ctx *store, struct ukarch_ctx *load);
 
 /**
+ * Function that can be executed in a context where one can take
+ * exceptions or yield the current thread.
+ * After the function returns, execution will resume the state stored in
+ * the execenv argument.
+ *
+ * @param execenv
+ *   Pointer to the execution environment that the function will return to
+ * @param arg
+ *   Custom user-defined argument
+ */
+typedef void (*ukarch_ehtrampo_entry)(struct ukarch_execenv *execenv, long arg);
+
+/**
+ * Initializes a context that allows jumping from an exception handling
+ * context to a caller-defined function in a context where one can take
+ * exceptions or yield the current thread.
+ * Returning from the caller-defined function resumes execution from
+ * the place that the exception handler would resume from.
+ *
+ * After calling ukarch_ehtrampo_init() use ukarch_ctx_jmp() to jump to
+ * the target context.
+ *
+ * NOTE: This function may return with a tainted extended context.
+ *
+ * @param ctx
+ *   Reference to context to initialize
+ * @param sp
+ *   Stack pointer (required and must be aligned to `UKARCH_EXECENV_END_ALIGN`)
+ *  The stack must have enough space to store both an entire execution
+ *  environment context as well as run the user provided entry function
+ * @param r
+ *   Pointer to architecture specific general purpose registers saved on
+ *  exception handling entry
+ * @param entry
+ *   Entry function to execute (required).
+ * @param arg
+ *   The argument `entry` callback will receive
+ */
+void ukarch_ctx_init_ehtrampo(struct ukarch_ctx *ctx,
+			      struct __regs *r,
+			      __uptr sp,
+			      ukarch_ehtrampo_entry entry, long arg);
+
+/**
  * Initialize an auxiliary stack pointer. This must be always called the
  * first time you create an auxiliary stack pointer.
  *
