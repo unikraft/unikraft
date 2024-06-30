@@ -48,6 +48,7 @@ void _ctx_arm_clearregs(void);
 void _ctx_arm_call0(void);
 void _ctx_arm_call1(void);
 void _ctx_arm_call2(void);
+void _ctx_arm_call3(void);
 
 void ukarch_ctx_init(struct ukarch_ctx *ctx,
 		     __uptr sp, int keep_regs,
@@ -142,4 +143,31 @@ void ukarch_ctx_init_entry2(struct ukarch_ctx *ctx,
 
 	uk_pr_debug("ukarch_ctx %p: entry:%p(%lx, %lx), sp:%p\n",
 		    ctx, entry, arg0, arg1, (void *)sp);
+}
+
+void ukarch_ctx_init_entry3(struct ukarch_ctx *ctx,
+			    __uptr sp, int keep_regs,
+			    ukarch_ctx_entry3 entry,
+			    long arg0, long arg1, long arg2)
+{
+	__uptr _sp;
+
+	UK_ASSERT(ctx);
+	UK_ASSERT(sp);			/* a stack is needed */
+	UK_ASSERT(entry);		/* NULL as func will cause a crash */
+	UK_ASSERT(!(sp & UKARCH_SP_ALIGN_MASK)); /* sp properly aligned? */
+
+	_sp = ukarch_rstack_push(sp, (long)entry);
+	_sp = ukarch_rstack_push(_sp, arg0);
+	_sp = ukarch_rstack_push(_sp, arg1);
+	_sp = ukarch_rstack_push(_sp, arg2);
+	if (keep_regs) {
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_arm_call3);
+	} else {
+		_sp = ukarch_rstack_push(_sp, (long)_ctx_arm_call3);
+		ukarch_ctx_init_bare(ctx, _sp, (long)_ctx_arm_clearregs);
+	}
+
+	uk_pr_debug("ukarch_ctx %p: entry:%p(%lx, %lx, %lx), sp:%p\n",
+		    ctx, entry, arg0, arg1, arg2, (void *)sp);
 }

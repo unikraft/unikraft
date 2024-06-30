@@ -75,6 +75,15 @@ ENTRY(_ctx_x86_call2)
 	popq %rdi	/* load first argument from stack */
 	ret		/* jump to entrance function left on stack */
 
+ENTRY(_ctx_x86_call3)
+#if !__OMIT_FRAMEPOINTER__
+	xorq %rbp, %rbp /* reset frame pointer */
+#endif /* !__OMIT_FRAMEPOINTER__ */
+	popq %rdx	/* load third argument from stack */
+	popq %rsi	/* load second argument from stack */
+	popq %rdi	/* load first argument from stack */
+	ret		/* jump to entrance function left on stack */
+
 /*
  * Do a local context switch
  */

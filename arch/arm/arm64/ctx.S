@@ -105,6 +105,17 @@ ENTRY(_ctx_arm_call2)
 	ldr x30, [sp], #16
 	ret
 
+ENTRY(_ctx_arm_call3)
+#if !__OMIT_FRAMEPOINTER__
+	mov x29, xzr /* reset frame pointer */
+#endif /* !__OMIT_FRAMEPOINTER__ */
+	ldr x2, [sp], #16
+	ldr x1, [sp], #16
+	ldr x0, [sp], #16
+	/* jump to entrance function left on stack */
+	ldr x30, [sp], #16
+	ret
+
 /*
  * Switch context on the current LCPU.
  */

@@ -213,6 +213,7 @@ UK_CTASSERT(__offsetof(struct ukarch_auxspcb, uksysctx) ==
 typedef void (*ukarch_ctx_entry0)(void) __noreturn;
 typedef void (*ukarch_ctx_entry1)(long) __noreturn;
 typedef void (*ukarch_ctx_entry2)(long, long) __noreturn;
+typedef void (*ukarch_ctx_entry3)(long, long, long) __noreturn;
 
 /**
  * Initializes a context struct with stack pointer and
