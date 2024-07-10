@@ -44,7 +44,9 @@
 
 #define NS16550_THR_OFFSET	0x00U
 #define NS16550_RBR_OFFSET	0x00U
+#define NS16550_DLL_OFFSET	0x00U
 #define NS16550_IER_OFFSET	0x01U
+#define NS16550_DLM_OFFSET	0x00U
 #define NS16550_IIR_OFFSET	0x02U
 #define NS16550_FCR_OFFSET	0x02U
 #define NS16550_LCR_OFFSET	0x03U
@@ -52,7 +54,18 @@
 #define NS16550_LSR_OFFSET	0x05U
 #define NS16550_MSR_OFFSET	0x06U
 
+#define NS16550_LCR_WL		0x03U
+#define NS16550_LCR_STOP	0x04U
+#define NS16550_LCR_PARITY	0x38U
+#define NS16550_LCR_BREAK	0x40U
 #define NS16550_LCR_DLAB	0x80U
+
+#define NS16550_LCR_8N1		0x03U
+
+/* Assume 1.8432MHz clock */
+#define NS16550_DLL_115200	0x01U
+#define NS16550_DLM_115200	0x00U
+
 #define NS16550_IIR_NO_INT	0x01U
 #define NS16550_FCR_FIFO_EN	0x01U
 #define NS16550_LSR_RX_EMPTY	0x01U
@@ -119,6 +132,13 @@ static void ns16550_reg_write(__u32 reg, __u32 value)
 
 static int init_ns16550(void)
 {
+	__u32 lcr;
+
+	/* Clear DLAB to access IER, FCR, LCR */
+	ns16550_reg_write(NS16550_LCR_OFFSET,
+			  ns16550_reg_read(NS16550_LCR_OFFSET) &
+			  ~(NS16550_LCR_DLAB));
+
 	/* Disable all interrupts */
 	ns16550_reg_write(NS16550_IER_OFFSET,
 			  ns16550_reg_read(NS16550_FCR_OFFSET) &
@@ -128,6 +148,22 @@ static int init_ns16550(void)
 	ns16550_reg_write(NS16550_FCR_OFFSET,
 			  ns16550_reg_read(NS16550_FCR_OFFSET) &
 					 ~(NS16550_FCR_FIFO_EN));
+
+	/* Set line control parameters (8n1) */
+	lcr = ns16550_reg_read(NS16550_LCR_OFFSET) |
+	      ~(NS16550_LCR_WL | NS16550_LCR_STOP | NS16550_LCR_PARITY);
+	lcr |= NS16550_LCR_8N1;
+	ns16550_reg_write(NS16550_LCR_OFFSET, lcr);
+
+	/* Set DLAB to access DLL / DLM */
+	ns16550_reg_write(NS16550_LCR_OFFSET,
+			  ns16550_reg_read(NS16550_LCR_OFFSET) &
+			  ~(NS16550_LCR_DLAB));
+
+	/* Set baud (115200) */
+	ns16550_reg_write(NS16550_DLL_OFFSET, NS16550_DLL_115200);
+	ns16550_reg_write(NS16550_DLM_OFFSET, NS16550_DLM_115200);
+
 	return 0;
 }
 
