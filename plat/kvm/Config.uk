@@ -97,6 +97,7 @@ config KVM_VMM_QEMU
 	bool "QEMU"
 	imply LIBUKTTY_PL011 if ARCH_ARM_64
 	imply LIBUKTTY_PL011_EARLY_CONSOLE if ARCH_ARM_64
+	imply LIBUKTTY_COM if ARCH_X86_64
 	imply LIBUKINTCTLR_GICV2 if ARCH_ARM_64
 	imply LIBUKRTC_PL031
 	select HAVE_PCI
@@ -111,67 +112,10 @@ config KVM_VMM_FIRECRACKER
 	select VIRTIO_MMIO_LINUX_COMPAT_CMDLINE
 	imply LIBUKTTY_NS16550 if ARCH_ARM_64
 	imply LIBUKTTY_NS16550_EARLY_CONSOLE if ARCH_ARM_64
+	imply LIBUKTTY_COM if ARCH_X86_64
 	imply LIBUKINTCTLR_GICV3 if ARCH_ARM_64
 	imply LIBUKRTC_PL031
 	depends on ARCH_X86_64 || ARCH_ARM_64
 
 endchoice
-
-menu "Console Options"
-
-config KVM_KERNEL_VGA_CONSOLE
-        bool "VGA console for the kernel prints"
-        default y
-        depends on  ARCH_X86_64
-        help
-          Choose VGA console for the kernel printing
-
-config KVM_DEBUG_SERIAL_CONSOLE
-        bool "Serial console for the debug prints"
-        default y
-        depends on (ARCH_X86_64 || ARCH_ARM_64)
-        help
-          Choose serial console for the debug printing
-
-config KVM_DEBUG_VGA_CONSOLE
-        bool "VGA console for the debug prints"
-        default y
-        depends on ARCH_X86_64
-        help
-          Choose VGA console for the debug printing
-
-config KVM_KERNEL_SERIAL_CONSOLE
-        bool "Serial console for the kernel prints"
-        default y
-        depends on (ARCH_X86_64 || ARCH_ARM_64)
-        help
-          Choose serial console for the kernel printing
-
-if (KVM_KERNEL_SERIAL_CONSOLE || KVM_DEBUG_SERIAL_CONSOLE)
-
-if ARCH_X86_64
-menu "Serial console configuration"
-choice
-	prompt "Baudrate"
-	default KVM_SERIAL_BAUD_115200
-
-	config KVM_SERIAL_BAUD_115200
-		bool "115200"
-
-	config KVM_SERIAL_BAUD_57600
-		bool "57600"
-
-	config KVM_SERIAL_BAUD_38400
-		bool "38400"
-
-	config KVM_SERIAL_BAUD_19200
-		bool "19200"
-endchoice
-endmenu
-endif
-
-endif
-
-endmenu
-
 endif

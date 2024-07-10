@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: BSD-3-Clause */
+/* SPDX-License-Identifier: BSD-3-Clause and MIT */
 /*
  * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
  *
@@ -31,33 +31,71 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __XEN_EMG_CONSOLE_H__
-#define __XEN_EMG_CONSOLE_H__
-
+#include <uk/config.h>
+#include <string.h>
+#include <uk/arch/lcpu.h>
+#include <uk/arch/types.h>
+#include <uk/essentials.h>
+#include <uk/console.h>
+#include <uk/arch/limits.h>
+#include <uk/assert.h>
 #include <errno.h>
 
-#ifndef __XEN_CONSOLE_IMPL__
-#error Do not include this header directly, use <common/console.h> instead.
-#endif /* !__XEN_CONSOLE_IMPL__*/
+#include "hv_console.h"
+#include "emg_console.h"
 
-#if (CONFIG_XEN_KERNEL_EMG_CONSOLE || CONFIG_XEN_DEBUG_EMG_CONSOLE)
-int emg_console_output(const char *str, unsigned int len);
-#endif /* (CONFIG_XEN_KERNEL_EMG_CONSOLE || CONFIG_XEN_DEBUG_EMG_CONSOLE) */
+/*
+ * Return the "best case" of the two return codes ret and ret2.
+ */
+static inline int returncode(int ret, int ret2)
+{
+	if (ret < 0)
+		return (ret2 != -ENOTSUP) ? ret2 : ret;
+	return MAX((ret), (ret2));
+}
 
-#if CONFIG_XEN_KERNEL_EMG_CONSOLE
-#define emg_console_output_k(str, len) \
-	emg_console_output((str), (len))
-#else
-#define emg_console_output_k(str, len) \
-	(-ENOTSUP)
-#endif /* CONFIG_XEN_KERNEL_EMG_CONSOLE */
+void prepare_console(void)
+{
+	hv_console_prepare();
+}
 
-#if CONFIG_XEN_DEBUG_EMG_CONSOLE
-#define emg_console_output_d(str, len) \
-	emg_console_output((str), (len))
-#else
-#define emg_console_output_d(str, len) \
-	(-ENOTSUP)
-#endif /* CONFIG_XEN_DEBUG_EMG_CONSOLE */
+void flush_console(void)
+{
+	hv_console_flush();
+}
 
-#endif /* __XEN_EMG_CONSOLE_H__ */
+__ssz console_out(struct uk_console *dev __unused, const char *str, __sz len)
+{
+	int ret, ret2;
+
+	UK_ASSERT(len <= __I_MAX);
+
+	if (unlikely(len == 0))
+		len = strnlen(str, len);
+
+	ret  = emg_console_output(str, len);
+	ret2 = hv_console_output(str, len);
+	return returncode(ret, ret2);
+}
+
+__ssz console_in(struct uk_console *dev __unused, char *str __maybe_unused,
+		 __sz maxlen __maybe_unused)
+{
+	UK_ASSERT(maxlen <= __I_MAX);
+	return hv_console_input(str, maxlen);
+}
+
+static struct uk_console_ops console_ops = {
+	.out = console_out,
+	.in = console_in
+};
+
+static struct uk_console console_dev = UK_CONSOLE("Xen", &console_ops,
+						  UK_CONSOLE_FLAG_STDOUT |
+						  UK_CONSOLE_FLAG_STDIN);
+
+void init_console(void)
+{
+	hv_console_init();
+	uk_console_register(&console_dev);
+}

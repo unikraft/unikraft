@@ -6,5 +6,7 @@
 
 UK_DRIV_TTY_BASE := $(UK_DRIV_BASE)/uktty
 
+$(eval $(call import_lib,$(UK_DRIV_TTY_BASE)/com))
 $(eval $(call import_lib,$(UK_DRIV_TTY_BASE)/ns16550))
 $(eval $(call import_lib,$(UK_DRIV_TTY_BASE)/pl011))
+$(eval $(call import_lib,$(UK_DRIV_TTY_BASE)/vga))

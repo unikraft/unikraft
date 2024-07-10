@@ -80,7 +80,7 @@
 #include <x86/traps.h>
 
 #include <xen/xen.h>
-#include <common/console.h>
+#include <uk/console/console.h>
 #include <common/events.h>
 #ifdef __X86_64__
 #include <xen-x86/hypercall64.h>

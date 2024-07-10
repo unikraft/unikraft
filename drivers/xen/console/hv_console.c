@@ -79,7 +79,6 @@
 #include <uk/essentials.h>
 #include <uk/config.h>
 
-#define __XEN_CONSOLE_IMPL__
 #include "hv_console.h"
 
 #include <common/events.h>

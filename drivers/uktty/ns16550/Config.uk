@@ -2,6 +2,7 @@ menuconfig LIBUKTTY_NS16550
 	bool "NS16550 / 8250"
 	depends on ARCH_ARM_64
 	select LIBUKOFW
+	select LIBUKCONSOLE
 
 if LIBUKTTY_NS16550
 
