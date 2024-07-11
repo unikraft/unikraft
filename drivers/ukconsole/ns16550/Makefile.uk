@@ -1,8 +1,6 @@
 $(eval $(call addplatlib_s,kvm,libukconsole_ns16550,$(CONFIG_LIBUKCONSOLE_NS16550)))
 $(eval $(call addlib_paramprefix,libukconsole_ns16550,ns16550))
 
-CINCLUDES-y += -I$(LIBUKCONSOLE_NS16550_BASE)/include
-
 # TODO Remove as soon as plat dependencies go away
 LIBUKCONSOLE_NS16550_CINCLUDES-y += -I$(UK_PLAT_COMMON_BASE)/include
 
