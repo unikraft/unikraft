@@ -10,3 +10,4 @@ fdt_node_offset_idx_by_compatible_list
 fdt_node_check_compatible_list
 fdt_prop_read_bool
 fdt_translate_address_by_ranges
+fdt_chosen_stdout_path

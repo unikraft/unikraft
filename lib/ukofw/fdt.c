@@ -33,6 +33,7 @@
 #include <libfdt_env.h>
 #include <fdt.h>
 #include <libfdt.h>
+#include <string.h>
 
 #include <uk/ofw/fdt.h>
 #include <uk/print.h>
@@ -390,4 +391,40 @@ bool fdt_prop_read_bool(const void *fdt, int start_offset,
 	const struct fdt_property *prop = fdt_getprop(fdt, start_offset, propname, NULL);
 
 	return prop ? true : false;
+}
+
+int fdt_chosen_stdout_path(const void *fdt, int *offs, char **opt)
+{
+	const char *prop;
+	int prop_len, len;
+	int nchosen;
+	char *p;
+
+	UK_ASSERT(fdt);
+	UK_ASSERT(offs);
+	UK_ASSERT(opt);
+
+	nchosen = fdt_path_offset((void *)fdt, "/chosen");
+	if (unlikely(nchosen < 0)) {
+		uk_pr_err("Could not find 'chosen' node (%d)\n", nchosen);
+		return -FDT_ERR_NOTFOUND;
+	}
+
+	prop = fdt_getprop((void *)fdt, nchosen, "stdout-path",
+			   &prop_len);
+	if (unlikely(!prop || prop_len <= 0)) {
+		uk_pr_warn("Could not find 'stdout-path' property\n");
+		return -FDT_ERR_NOTFOUND;
+	}
+
+	p = strchr(prop, ':');
+
+	*opt = p ? p + 1 : NULL;
+	len =  p ? (p - prop) : prop_len - 1;
+
+	*offs = fdt_path_offset_namelen(fdt, prop, len);
+	if (unlikely(*offs <= 0))
+		return -FDT_ERR_BADSTATE;
+
+	return 0;
 }

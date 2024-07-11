@@ -246,4 +246,16 @@ bool fdt_prop_read_bool(const void *fdt, int start_offset,
  */
 uint64_t fdt_translate_address_by_ranges(const void *fdt,
 				int node_offset, const fdt32_t *regs);
+
+/**
+ * Get dtb node pointed by /chosen/stdout-path
+ *
+ * @fdt: pointer to device-tree blob
+ * @offs[out]: pointer to node pointed by stdout-path.
+ * @opt[out]: console options specified in stdout-path. Set to NULL
+ *            if no console options specified.
+ * @return zero on success, negatibe value on failure
+ */
+int fdt_chosen_stdout_path(const void *fdt, int *offs, char **opt);
+
 #endif /* __UK_OFW_FDT_H__ */
