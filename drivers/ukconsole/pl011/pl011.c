@@ -25,7 +25,13 @@
 #include <uk/libparam.h>
 #include <uk/ofw/fdt.h>
 #include <uk/plat/common/bootinfo.h>
-#include <uk/plat/console.h>
+#include <uk/console/driver.h>
+#include <uk/compiler.h>
+#include <uk/errptr.h>
+
+#if CONFIG_LIBUKALLOC
+#include <uk/alloc.h>
+#endif /* CONFIG_LIBUKALLOC */
 
 #if CONFIG_PAGING
 #include <uk/bus/platform.h>
@@ -79,43 +85,107 @@ static const char * const fdt_compatible[] = {
 	"arm,pl011", NULL
 };
 
-/*
- * PL011 UART base address
- * As we are using the PA = VA mapping, some SoC would set PA 0
- * as a valid address, so we can't use pl011_base == 0 to
- * indicate PL011 hasn't been initialized. In this case, we
- * use pl011_uart_initialized as an extra variable to check
- * whether the UART has been initialized.
- */
-static __u8 pl011_uart_initialized;
-static __u64 pl011_base;
+struct pl011_device {
+	struct uk_console dev;
+	__u64 base, size;
+};
 
-UK_LIBPARAM_PARAM_ALIAS(base, &pl011_base, __u64, "pl011 base");
+#if CONFIG_LIBUKCONSOLE_PL011_EARLY_CONSOLE
+static struct pl011_device earlycon;
+
+UK_LIBPARAM_PARAM_ALIAS(base, &earlycon.base, __u64, "pl011 base");
+#endif /* CONFIG_LIBUKCONSOLE_PL011_EARLY_CONSOLE */
 
 /* Macros to access PL011 Registers with base address */
-#define PL011_REG(r)		((__u16 *)(pl011_base + (r)))
-#define PL011_REG_READ(r)	ioreg_read16(PL011_REG(r))
-#define PL011_REG_WRITE(r, v)	ioreg_write16(PL011_REG(r), v)
+#define PL011_REG(base, r)		((__u16 *)((base) + (r)))
+#define PL011_REG_READ(base, r)		ioreg_read16(PL011_REG(base, r))
+#define PL011_REG_WRITE(base, r, v)	ioreg_write16(PL011_REG(base, r), v)
 
-static int pl011_setup(void)
+static void pl011_write(__u64 base, char a)
+{
+	/* Wait until TX FIFO becomes empty */
+	while (PL011_REG_READ(base, REG_UARTFR_OFFSET) & FR_TXFF)
+		;
+
+	PL011_REG_WRITE(base, REG_UARTDR_OFFSET, a & 0xff);
+}
+
+static void pl011_putc(__u64 base, char a)
+{
+	if (a == '\n')
+		pl011_write(base, '\r');
+	pl011_write(base, a);
+}
+
+/* Try to get data from pl011 UART without blocking */
+static int pl011_getc(__u64 base)
+{
+	/* If RX FIFO is empty, return -1 immediately */
+	if (PL011_REG_READ(base, REG_UARTFR_OFFSET) & FR_RXFE)
+		return -1;
+
+	return (int)(PL011_REG_READ(base, REG_UARTDR_OFFSET) & 0xff);
+}
+
+static __ssz pl011_out(struct uk_console *dev, const char *buf, __sz len)
+{
+	struct pl011_device *pl011_dev;
+	__sz l = len;
+
+	UK_ASSERT(dev);
+	UK_ASSERT(buf);
+
+	pl011_dev = __containerof(dev, struct pl011_device, dev);
+
+	while (l--)
+		pl011_putc(pl011_dev->base, *buf++);
+
+	return len;
+}
+
+static __ssz pl011_in(struct uk_console *dev, char *buf, __sz len)
+{
+	int rc;
+	struct pl011_device *pl011_dev;
+
+	UK_ASSERT(dev);
+	UK_ASSERT(buf);
+
+	pl011_dev = __containerof(dev, struct pl011_device, dev);
+
+	for (__sz i = 0; i < len; i++) {
+		if ((rc = pl011_getc(pl011_dev->base)) < 0)
+			return i;
+		buf[i] = (char)rc;
+	}
+
+	return len;
+}
+
+static struct uk_console_ops pl011_ops = {
+	.out = pl011_out,
+	.in = pl011_in
+};
+
+static int pl011_setup(__u64 base)
 {
 	/* Mask all interrupts */
-	PL011_REG_WRITE(REG_UARTIMSC_OFFSET,
-			PL011_REG_READ(REG_UARTIMSC_OFFSET) & 0xf800);
+	PL011_REG_WRITE(base, REG_UARTIMSC_OFFSET,
+			PL011_REG_READ(base, REG_UARTIMSC_OFFSET) & 0xf800);
 
 	/* Clear all interrupts */
-	PL011_REG_WRITE(REG_UARTICR_OFFSET, 0x07ff);
+	PL011_REG_WRITE(base, REG_UARTICR_OFFSET, 0x07ff);
 
 	/* Disable UART for configuration */
-	PL011_REG_WRITE(REG_UARTCR_OFFSET, 0);
+	PL011_REG_WRITE(base, REG_UARTCR_OFFSET, 0);
 
 	/* Select 8-bits data transmit and receive */
-	PL011_REG_WRITE(REG_UARTLCR_H_OFFSET,
-			(PL011_REG_READ(REG_UARTLCR_H_OFFSET) & 0xff00) |
+	PL011_REG_WRITE(base, REG_UARTLCR_H_OFFSET,
+			(PL011_REG_READ(base, REG_UARTLCR_H_OFFSET) & 0xff00) |
 			 LCR_H_WLEN8);
 
 	/* Just enable UART and data transmit/receive */
-	PL011_REG_WRITE(REG_UARTCR_OFFSET, CR_TXE | CR_UARTEN);
+	PL011_REG_WRITE(base, REG_UARTCR_OFFSET, CR_TXE | CR_UARTEN);
 
 	return 0;
 }
@@ -143,7 +213,8 @@ static inline int config_fdt_chosen_stdout(const void *dtb)
 	if (unlikely(rc)) /* could not parse node */
 		return rc;
 
-	pl011_base = base;
+	earlycon.base = base;
+	earlycon.size = size;
 
 	return 0;
 }
@@ -158,7 +229,7 @@ static int early_init(struct ukplat_bootinfo *bi)
 	/* If the base is not set by the cmdline, try
 	 * the dtb chosen/stdout-path.
 	 */
-	if (!pl011_base) {
+	if (!earlycon.base) {
 		rc = config_fdt_chosen_stdout((void *)bi->dtb);
 		if (unlikely(rc < 0 && rc != -FDT_ERR_NOTFOUND))  {
 			uk_pr_err("Could not parse fdt (%d)", rc);
@@ -169,19 +240,21 @@ static int early_init(struct ukplat_bootinfo *bi)
 	/* Do not return an error if no config is detected, as
 	 * another console driver may be enabled in Kconfig.
 	 */
-	if (!pl011_base)
+	if (!earlycon.base)
 		return 0;
 
 	/* Configure the port */
-	rc = pl011_setup();
+	rc = pl011_setup(earlycon.base);
 	if (unlikely(rc))
 		return rc;
 
-	/* From this point we can print */
-	pl011_uart_initialized = 1;
+	uk_console_init(&earlycon.dev, "PL011",  &pl011_ops,
+			UK_CONSOLE_FLAG_STDOUT | UK_CONSOLE_FLAG_STDIN);
+	uk_console_register(&earlycon.dev);
 
-	mrd.pbase = pl011_base;
-	mrd.vbase = pl011_base;
+	/* Add an mrd to keep the device mapped past init */
+	mrd.pbase = earlycon.base;
+	mrd.vbase = earlycon.base;
 	mrd.pg_off = 0;
 	mrd.pg_count = 1;
 	mrd.len = __PAGE_SIZE;
@@ -198,120 +271,126 @@ static int early_init(struct ukplat_bootinfo *bi)
 }
 #endif /* CONFIG_LIBUKCONSOLE_PL011_EARLY_CONSOLE */
 
-static int init(struct uk_init_ctx *ictx __unused)
+#if CONFIG_LIBUKALLOC
+static int fdt_get_device(struct pl011_device *dev, const void *dtb,
+			  int *offset)
 {
-	struct ukplat_bootinfo *bi;
-	__sz size __maybe_unused;
-	__u64 reg_base;
-	__u64 reg_size;
-	int offset;
+	__u64 reg_base, reg_size;
 	int rc;
 
-	bi = ukplat_bootinfo_get();
-	UK_ASSERT(bi);
+	UK_ASSERT(dev);
+	UK_ASSERT(dtb);
+	UK_ASSERT(offset);
 
-	/* Pick the 1st device in the dtb */
-	offset = fdt_node_offset_by_compatible_list((void *)bi->dtb, -1,
-						    fdt_compatible);
-	if (unlikely(offset < 0)) {
-		uk_pr_err("pl011 not found in fdt\n");
-		return -ENODEV;
-	}
+	*offset = fdt_node_offset_by_compatible_list(dtb, *offset,
+						     fdt_compatible);
+	if (unlikely(*offset < 0))
+		return -ENOENT;
 
-	rc = fdt_get_address((void *)bi->dtb, offset, 0, &reg_base, &reg_size);
+	rc = fdt_get_address(dtb, *offset, 0, &reg_base, &reg_size);
 	if (unlikely(rc)) {
 		uk_pr_err("Could not parse fdt node\n");
-		return rc;
+		return -EINVAL;
 	}
 
 	uk_pr_debug("pl011 @ 0x%lx - 0x%lx\n", reg_base, reg_base + reg_size);
 
-#if CONFIG_PAGING
-	/* Map device region */
-	pl011_base = uk_bus_pf_devmap(reg_base, reg_size);
-	if (unlikely(PTRISERR(pl011_base))) {
-		uk_pr_err("Could not map pl011\n");
-		return PTR2ERR(pl011_base);
-	}
-#else /* !CONFIG_PAGING */
-	pl011_base = reg_base;
-#endif /* !CONFIG_PAGING */
-
-	rc = pl011_setup();
-	if (unlikely(rc)) {
-		uk_pr_err("Could not initialize pl011\n");
-		return rc;
-	}
-
-	pl011_uart_initialized = 1;
-	uk_pr_info("console: pl011\n");
+	uk_console_init(&dev->dev, "PL011", &pl011_ops, 0);
+	dev->base = reg_base;
+	dev->size = reg_size;
 
 	return 0;
 }
 
-int ukplat_coutd(const char *str, __u32 len)
+static int register_device(struct pl011_device *dev, struct uk_alloc *a)
 {
-	return ukplat_coutk(str, len);
-}
+	struct pl011_device *console_dev;
 
-static void pl011_write(char a)
-{
-	/*
-	 * Avoid using the UART before base address initialized,
-	 * or CONFIG_LIBUKCONSOLE_PL011_EARLY_CONSOLE is not enabled.
-	 */
-	if (!pl011_uart_initialized)
-		return;
+	UK_ASSERT(dev);
+	UK_ASSERT(a);
 
-	/* Wait until TX FIFO becomes empty */
-	while (PL011_REG_READ(REG_UARTFR_OFFSET) & FR_TXFF)
-		;
-
-	PL011_REG_WRITE(REG_UARTDR_OFFSET, a & 0xff);
-}
-
-static void pl011_putc(char a)
-{
-	if (a == '\n')
-		pl011_write('\r');
-	pl011_write(a);
-}
-
-/* Try to get data from pl011 UART without blocking */
-static int pl011_getc(void)
-{
-	/*
-	 * Avoid using the UART before base address initialized,
-	 * or CONFIG_LIBUKCONSOLE_PL011_EARLY_CONSOLE is not enabled.
-	 */
-	if (!pl011_uart_initialized)
-		return -1;
-
-	/* If RX FIFO is empty, return -1 immediately */
-	if (PL011_REG_READ(REG_UARTFR_OFFSET) & FR_RXFE)
-		return -1;
-
-	return (int)(PL011_REG_READ(REG_UARTDR_OFFSET) & 0xff);
-}
-
-int ukplat_coutk(const char *buf, unsigned int len)
-{
-	for (unsigned int i = 0; i < len; i++)
-		pl011_putc(buf[i]);
-	return len;
-}
-
-int ukplat_cink(char *buf, unsigned int maxlen)
-{
-	int ret;
-	unsigned int num = 0;
-
-	while (num < maxlen && (ret = pl011_getc()) >= 0) {
-		*(buf++) = (char)ret;
-		num++;
+	console_dev = uk_malloc(a, sizeof(*console_dev));
+	if (unlikely(!console_dev)) {
+		uk_pr_err("Could not allocate pl011 device\n");
+		return -ENOMEM;
 	}
 
-	return (int)num;
+	console_dev->dev = dev->dev;
+	console_dev->base = dev->base;
+	console_dev->size = dev->size;
+
+	uk_console_register(&console_dev->dev);
+	uk_pr_info("con%"__PRIu16": pl011 @ %p\n", console_dev->dev.id,
+		   &console_dev->base);
+
+	return 0;
+}
+#endif /* CONFIG_LIBUKALLOC */
+
+static int init(struct uk_init_ctx *ictx __unused)
+{
+#if CONFIG_LIBUKALLOC
+	struct ukplat_bootinfo *bi;
+	const void *dtb;
+	int offset = -1;
+	int rc;
+	struct pl011_device dev;
+	struct uk_alloc *a;
+
+	bi = ukplat_bootinfo_get();
+	UK_ASSERT(bi);
+
+	dtb = (void *)bi->dtb;
+	UK_ASSERT(dtb);
+
+	a = uk_alloc_get_default();
+	UK_ASSERT(a);
+
+	uk_pr_debug("Probing pl011\n");
+
+	while (1) {
+		rc = fdt_get_device(&dev, dtb, &offset);
+		if (unlikely(offset == -FDT_ERR_NOTFOUND))
+			break; /* No more devices */
+
+		if (unlikely(rc < 0)) {
+			uk_pr_err("Could not get pl011 device\n");
+			return rc;
+		}
+
+#if CONFIG_PAGING
+		/* Map device region */
+		dev.base = uk_bus_pf_devmap(dev.base, dev.size);
+		if (unlikely(PTRISERR(dev.base))) {
+			uk_pr_err("Could not map pl011\n");
+			return PTR2ERR(dev.base);
+		}
+#endif /* !CONFIG_PAGING */
+
+#if CONFIG_LIBUKCONSOLE_PL011_EARLY_CONSOLE
+		/* `ukconsole` mandates that there is only a single
+		 * `struct uk_console` registered per device.
+		 */
+		if (dev.base == earlycon.base) {
+			uk_pr_info("Skipping pl011 device\n");
+			continue;
+		}
+#endif /* CONFIG_LIBUKCONSOLE_PL011_EARLY_CONSOLE */
+
+		rc = pl011_setup(dev.base);
+		if (unlikely(rc)) {
+			uk_pr_err("Could not initialize pl011\n");
+			return rc;
+		}
+
+		rc = register_device(&dev, a);
+		if (unlikely(rc < 0))
+			return rc;
+	}
+
+#endif /* CONFIG_LIBUKALLOC */
+
+	return 0;
 }
 
 #if CONFIG_LIBUKCONSOLE_PL011_EARLY_CONSOLE

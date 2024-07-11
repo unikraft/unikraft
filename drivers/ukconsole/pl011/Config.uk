@@ -2,6 +2,7 @@ menuconfig LIBUKCONSOLE_PL011
 	bool "PrimeCell UART (PL011)"
 	depends on ARCH_ARM_64
 	select LIBUKOFW
+	select LIBUKCONSOLE
 
 if LIBUKCONSOLE_PL011
 
