@@ -136,6 +136,5 @@ ENTRY(_libkvmplat_entry)
 #endif
 	bl	ukplat_bootinfo_fdt_setup
 	bl	ukplat_early_init
-	bl	ukplat_bootinfo_fdt_post_setup
 	b	_ukplat_entry
 END(_libkvmplat_entry)
