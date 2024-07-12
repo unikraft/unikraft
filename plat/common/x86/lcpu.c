@@ -191,6 +191,7 @@ int lcpu_arch_mp_init(void *arg __unused)
 	struct lcpu *lcpu;
 	__lcpuid cpu_id;
 	__sz off, len;
+	int rc;
 
 	uk_pr_info("Bootstrapping processor has the ID %ld\n", bsp_cpu_id);
 
@@ -241,6 +242,13 @@ int lcpu_arch_mp_init(void *arg __unused)
 		}
 	}
 	UK_ASSERT(bsp_found);
+
+	/* Allocate an mrd for the SIPI vector */
+	rc = ukplat_memregion_alloc_sipi_vect();
+	if (unlikely(rc)) {
+		uk_pr_err("Could not allocate mrd for the SIPI vector(%d)", rc);
+		return rc;
+	}
 
 	/* Copy AP startup code to target address in first 1MiB */
 	UK_ASSERT(x86_start16_addr < 0x100000);
