@@ -45,6 +45,6 @@ void __noreturn uk_efi_jmp_to_kern(void)
 
 	start_mmu();
 	uk_efi_set_sp_el1(uk_efi_bootstack + __PAGE_SIZE);
-	ukplat_early_init();
+
 	_ukplat_entry();
 }

@@ -3,6 +3,7 @@ menuconfig PLAT_KVM
 	default n
 	depends on (ARCH_X86_64 || ARCH_ARM_64)
 	select LIBUKDEBUG
+	select LIBUKBOOT
 	select LIBUKALLOC
 	select LIBUKTIMECONV
 	select LIBNOLIBC if !HAVE_LIBC
