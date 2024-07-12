@@ -85,38 +85,23 @@ end_mrd:
 		ukplat_bootinfo_crash("Could not add free memory descriptor");
 }
 
-static void fdt_bootinfo_cmdl_mrd(struct ukplat_bootinfo *bi)
+static void fdt_bootinfo_cmdl_init(struct ukplat_bootinfo *bi, void *fdtp)
 {
 	const void *fdt_cmdl;
 	int fdt_cmdl_len;
-	__sz cmdl_len;
 	int nchosen;
-	char *cmdl;
 
-	nchosen = fdt_path_offset((void *)bi->dtb, "/chosen");
+	nchosen = fdt_path_offset((void *)fdtp, "/chosen");
 	if (unlikely(nchosen < 0))
 		return;
 
-	fdt_cmdl = fdt_getprop((void *)bi->dtb, nchosen, "bootargs",
+	fdt_cmdl = fdt_getprop((void *)fdtp, nchosen, "bootargs",
 			       &fdt_cmdl_len);
 	if (unlikely(!fdt_cmdl || fdt_cmdl_len <= 0))
 		return;
 
-	cmdl = ukplat_memregion_alloc(fdt_cmdl_len + sizeof(CONFIG_UK_NAME) + 1,
-				      UKPLAT_MEMRT_CMDLINE,
-				      UKPLAT_MEMRF_READ);
-	if (unlikely(!cmdl))
-		ukplat_bootinfo_crash("Command-line alloc failed\n");
-
-	cmdl_len = sizeof(CONFIG_UK_NAME);
-	strncpy(cmdl, CONFIG_UK_NAME, cmdl_len);
-	cmdl[cmdl_len - 1] = ' ';
-	strncpy(cmdl + cmdl_len, fdt_cmdl, fdt_cmdl_len);
-	cmdl_len += fdt_cmdl_len;
-	cmdl[cmdl_len] = '\0';
-
-	bi->cmdline = (__u64)cmdl;
-	bi->cmdline_len = (__u64)cmdl_len;
+	bi->cmdline = (__u64)fdt_cmdl;
+	bi->cmdline_len = (__u64)fdt_cmdl_len;
 }
 
 /* Ideally the initrd nodes would use #address-cells, yet these nodes are not
@@ -199,21 +184,7 @@ void ukplat_bootinfo_fdt_setup(void *fdtp)
 	fdt_bootinfo_mem_mrd(bi, fdtp);
 	fdt_bootinfo_initrd_mrd(bi, fdtp);
 
+	fdt_bootinfo_cmdl_init(bi, fdtp);
+
 	bi->dtb = (__u64)fdtp;
-}
-
-/* We use this after coalescing/sorted because this calls
- * `ukplat_memregion_alloc()` which would be unsafe to do so before
- * knowing that the memory region descriptor list has been coalesced
- * and sorted.
- */
-void ukplat_bootinfo_fdt_post_setup(void)
-{
-	struct ukplat_bootinfo *bi;
-
-	bi = ukplat_bootinfo_get();
-	if (unlikely(!bi))
-		ukplat_bootinfo_crash("Invalid bootinfo");
-
-	fdt_bootinfo_cmdl_mrd(bi);
 }
