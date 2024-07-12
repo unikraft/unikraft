@@ -155,9 +155,5 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 
 	ukplat_memregion_list_coalesce(&bi->mrds);
 
-	rc = ukplat_memregion_alloc_sipi_vect();
-	if (unlikely(rc))
-		multiboot_crash("Could not insert SIPI vector region", rc);
-
 	_ukplat_entry(lcpu, bi);
 }

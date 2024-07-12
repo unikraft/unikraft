@@ -402,12 +402,6 @@ static void uk_efi_setup_bootinfo_mrds(struct ukplat_bootinfo *bi)
 		if (unlikely(rc < 0))
 			UK_CRASH("Failed to insert mrd\n");
 	}
-
-#if defined(__X86_64__)
-	rc = ukplat_memregion_alloc_sipi_vect();
-	if (unlikely(rc))
-		UK_CRASH("Failed to insert SIPI vector region\n");
-#endif
 }
 
 static struct uk_efi_ld_img_hndl *uk_efi_get_uk_img_hndl(void)
