@@ -135,6 +135,5 @@ ENTRY(_libkvmplat_entry)
 	ur_ldr  x0, _dtb /* dtb in x0 */
 #endif
 	bl	ukplat_bootinfo_fdt_setup
-	bl	ukplat_early_init
 	b	_ukplat_entry
 END(_libkvmplat_entry)

@@ -28,6 +28,7 @@
 #include <uk/plat/lcpu.h>
 #include <uk/plat/common/lcpu.h>
 #include <uk/assert.h>
+#include <uk/boot.h>
 #include <uk/intctlr.h>
 #include <arm/cpu.h>
 #include <arm/arm64/cpu.h>
@@ -116,44 +117,9 @@ enomethod:
 }
 #endif
 
-static char *cmdline;
-static __sz cmdline_len;
-
-static inline int cmdline_init(struct ukplat_bootinfo *bi)
-{
-	char *cmdl;
-
-	if (bi->cmdline_len) {
-		cmdl = (char *)bi->cmdline;
-		cmdline_len = bi->cmdline_len;
-	} else {
-		cmdl = CONFIG_UK_NAME;
-		cmdline_len = sizeof(CONFIG_UK_NAME) - 1;
-	}
-
-	/* This is not the original command-line, but one that will be thrashed
-	 * by `ukplat_entry_argp` to obtain argc/argv. So mark it as a kernel
-	 * resource instead.
-	 */
-	cmdline = ukplat_memregion_alloc(cmdline_len + 1, UKPLAT_MEMRT_KERNEL,
-					 UKPLAT_MEMRF_READ |
-					 UKPLAT_MEMRF_WRITE);
-	if (unlikely(!cmdline))
-		return -ENOMEM;
-
-	memcpy(cmdline, cmdl, cmdline_len);
-	cmdline[cmdline_len] = 0;
-
-	return 0;
-}
-
-static void __noreturn _ukplat_entry2(void)
-{
-	ukplat_entry_argp(NULL, cmdline, cmdline_len);
-
-	ukplat_lcpu_halt();
-}
-
+/* At this point we expect that the C runtime is configured and that
+ * bootcode has enabled all CPU features used by compiled code.
+ */
 void __no_pauth _ukplat_entry(void)
 {
 	struct ukplat_bootinfo *bi;
@@ -164,9 +130,7 @@ void __no_pauth _ukplat_entry(void)
 	if (unlikely(!bi))
 		UK_CRASH("Could not retrieve bootinfo\n");
 
-	rc = cmdline_init(bi);
-	if (unlikely(rc < 0))
-		UK_CRASH("Failed to initialize command-line\n");
+	uk_boot_early_init(bi);
 
 	/* Allocate boot stack */
 	bstack = ukplat_memregion_alloc(__STACK_SIZE, UKPLAT_MEMRT_STACK,
@@ -175,7 +139,6 @@ void __no_pauth _ukplat_entry(void)
 	if (unlikely(!bstack))
 		UK_CRASH("Boot stack alloc failed\n");
 	bstack = (void *)((__uptr)bstack + __STACK_SIZE);
-
 
 	/* Initialize paging */
 	rc = ukplat_mem_init();
@@ -231,5 +194,6 @@ void __no_pauth _ukplat_entry(void)
 	 */
 	uk_pr_info("Switch from bootstrap stack to stack @%p\n", bstack);
 
-	lcpu_arch_jump_to(bstack, _ukplat_entry2);
+	lcpu_arch_jump_to(bstack, uk_boot_entry);
+	ukplat_lcpu_halt();
 }

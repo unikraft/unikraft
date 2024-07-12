@@ -91,7 +91,5 @@ void __noreturn uk_efi_jmp_to_kern()
 	lapic_timer_disable();
 	pic_8259_elcr2_level_irq10_11();
 
-	ukplat_memregion_list_coalesce(&bi->mrds);
-
 	lcpu_start64(&uk_efi_boot_startup_args, bi);
 }
