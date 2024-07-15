@@ -6,6 +6,7 @@ menuconfig PLAT_XEN
        depends on !HAVE_PAGING
        imply XEN_PV_BUILD_P2M
        select LIBUKDEBUG
+       select LIBUKBOOT
        select LIBNOLIBC if !HAVE_LIBC
        select HAVE_FDT if ARCH_ARM_64
        imply LIBFDT if (ARCH_ARM_32 || ARCH_ARM_64)
