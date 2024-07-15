@@ -159,7 +159,6 @@ static inline int get_mrd_prio(struct ukplat_memregion_desc *const m)
 	case UKPLAT_MEMRT_FREE:
 		return MRD_PRIO_FREE;
 	case UKPLAT_MEMRT_INITRD:
-	case UKPLAT_MEMRT_CMDLINE:
 	case UKPLAT_MEMRT_STACK:
 	case UKPLAT_MEMRT_DEVICETREE:
 	case UKPLAT_MEMRT_DEVICE:

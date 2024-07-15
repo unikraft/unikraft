@@ -84,9 +84,6 @@ void ukplat_bootinfo_print(void)
 		case UKPLAT_MEMRT_INITRD:
 			type = "ramd";
 			break;
-		case UKPLAT_MEMRT_CMDLINE:
-			type = "cmdl";
-			break;
 		case UKPLAT_MEMRT_DEVICETREE:
 			type = "dtb ";
 			break;

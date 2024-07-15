@@ -388,9 +388,6 @@ ukplat_memregion_print_desc(struct ukplat_memregion_desc *mrd)
 	case UKPLAT_MEMRT_INITRD:
 		type = "ramd";
 		break;
-	case UKPLAT_MEMRT_CMDLINE:
-		type = "cmdl";
-		break;
 	case UKPLAT_MEMRT_DEVICETREE:
 		type = "dtb ";
 		break;
