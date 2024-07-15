@@ -47,8 +47,8 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 	struct ukplat_memregion_desc mrd = {0};
 	multiboot_memory_map_t *m;
 	multiboot_module_t *mods;
-	__sz offset, cmdline_len;
 	__paddr_t start, end;
+	__sz offset;
 	__u32 i;
 	int rc;
 
@@ -68,24 +68,9 @@ void multiboot_entry(struct lcpu *lcpu, struct multiboot_info *mi)
 		multiboot_crash("Could not insert legacy memory region", rc);
 
 	/* Add the cmdline */
-	if (mi->flags & MULTIBOOT_INFO_CMDLINE) {
-		if (mi->cmdline) {
-			cmdline_len = strlen((const char *)(__uptr)mi->cmdline);
-
-			/* 1:1 mapping */
-			mrd.pbase = PAGE_ALIGN_DOWN(mi->cmdline);
-			mrd.vbase = mrd.pbase;
-			mrd.pg_off = mi->cmdline - mrd.pbase;
-			mrd.len = cmdline_len;
-			mrd.pg_count = PAGE_COUNT(mrd.pg_off + cmdline_len);
-			mrd.type = UKPLAT_MEMRT_CMDLINE;
-			mrd.flags = UKPLAT_MEMRF_READ;
-
-			mrd_insert(bi, &mrd);
-
-			bi->cmdline = mi->cmdline;
-			bi->cmdline_len = cmdline_len;
-		}
+	if ((mi->flags & MULTIBOOT_INFO_CMDLINE) && mi->cmdline) {
+		bi->cmdline = mi->cmdline;
+		bi->cmdline_len = strlen((const char *)(__uptr)mi->cmdline);
 	}
 
 	/* Copy boot loader */
