@@ -31,6 +31,8 @@
 #include <uk/assert.h>
 #include <uk/config.h>
 #include <uk/init.h>
+#include <uk/libparam.h>
+#include <uk/ofw/fdt.h>
 #include <uk/plat/common/bootinfo.h>
 
 #if CONFIG_PAGING
@@ -71,6 +73,10 @@
 #define NS16550_LSR_RX_EMPTY	0x01U
 #define NS16550_LSR_TX_EMPTY	0x40U
 
+static const char * const fdt_compatible[] = {
+	"ns16550", "ns16550a", NULL
+};
+
 /*
  * NS16550 UART base address
  * As we are using the PA = VA mapping, some SoC would set PA 0
@@ -81,6 +87,8 @@
  */
 static __u8 ns16550_uart_initialized;
 static __u64 ns16550_uart_base;
+
+UK_LIBPARAM_PARAM_ALIAS(base, &ns16550_uart_base, __u64, "ns16550 base");
 
 /* The register shift. Default is 0 (device-tree spec v0.4 Sect. 4.2.2) */
 static __u32 ns16550_reg_shift = CONFIG_LIBUKTTY_NS16550_REG_SHIFT;
@@ -168,6 +176,33 @@ static int init_ns16550(void)
 }
 
 #if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
+static inline int config_fdt_chosen_stdout(const void *dtb)
+{
+	__u64 base, size;
+	char *opt;
+	int offs;
+	int rc;
+
+	UK_ASSERT(dtb);
+
+	/* Check if chosen/stdout-path is set to this device */
+	rc = fdt_chosen_stdout_path(dtb, &offs, &opt);
+	if (unlikely(rc)) /* no stdout-path or bad dtb */
+		return rc;
+
+	rc = fdt_node_check_compatible_list(dtb, offs, fdt_compatible);
+	if (unlikely(rc))
+		return rc; /* no compat match or bad dtb */
+
+	rc = fdt_get_address(dtb, offs, 0, &base, &size);
+	if (unlikely(rc)) /* could not parse node */
+		return rc;
+
+	ns16550_uart_base = base;
+
+	return 0;
+}
+
 static int early_init(struct ukplat_bootinfo *bi)
 {
 	struct ukplat_memregion_desc mrd = {0};
@@ -175,7 +210,27 @@ static int early_init(struct ukplat_bootinfo *bi)
 
 	UK_ASSERT(bi);
 
-	ns16550_uart_base = CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE;
+	/* If the base is not set by the cmdline, try
+	 * the dtb chosen/stdout-path.
+	 */
+	if (!ns16550_uart_base) {
+		rc = config_fdt_chosen_stdout((void *)bi->dtb);
+		if (unlikely(rc < 0 && rc != -FDT_ERR_NOTFOUND)) {
+			uk_pr_err("Could not parse fdt (%d)", rc);
+			return -EINVAL;
+		}
+	}
+
+#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE
+	if (!ns16550_uart_base && CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE)
+		ns16550_uart_base = CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE;
+#endif /* CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE */
+
+	/* Do not return an error if no config is detected, as
+	 * another console driver may be enabled in Kconfig.
+	 */
+	if (!ns16550_uart_base)
+		return 0;
 
 	/* Configure the port */
 	rc = init_ns16550();
@@ -207,10 +262,10 @@ static int early_init(struct ukplat_bootinfo *bi)
 
 static int init(struct uk_init_ctx *ictx __unused)
 {
-	int offset, len, naddr, nsize;
 	struct ukplat_bootinfo *bi;
 	const __u64 *regs;
 	const void *dtb;
+	int offset, len;
 	__u64 reg_base;
 	__u64 reg_size;
 	int rc;
@@ -223,32 +278,19 @@ static int init(struct uk_init_ctx *ictx __unused)
 
 	uk_pr_debug("Probing ns16550\n");
 
-	if (unlikely((offset = fdt_node_offset_by_compatible(dtb, -1, "ns16550")) < 0 &&
-		     (offset = fdt_node_offset_by_compatible(dtb, -1, "ns16550a")) < 0)) {
+	/* Pick the 1st device in the dtb */
+	offset = fdt_node_offset_by_compatible_list((void *)bi->dtb, -1,
+						    fdt_compatible);
+	if (unlikely((offset < 0))) {
 		uk_pr_err("ns16550 not found in fdt\n");
 		return -ENODEV;
 	}
 
-	naddr = fdt_address_cells(dtb, offset);
-	if (unlikely(naddr < 0 || naddr >= FDT_MAX_NCELLS)) {
-		uk_pr_err("Invalid address-cells\n");
-		return -EINVAL;
+	rc = fdt_get_address((void *)bi->dtb, offset, 0, &reg_base, &reg_size);
+	if (unlikely(rc)) {
+		uk_pr_err("Could not parse fdt node\n");
+		return rc;
 	}
-
-	nsize = fdt_size_cells(dtb, offset);
-	if (unlikely(nsize < 0 || nsize >= FDT_MAX_NCELLS)) {
-		uk_pr_err("Invalid size-cells\n");
-		return -EINVAL;
-	}
-
-	regs = fdt_getprop(dtb, offset, "reg", &len);
-	if (unlikely(!regs || (len < (int)sizeof(fdt32_t) * (naddr + nsize)))) {
-		uk_pr_err("Invalid 'reg' property: %p %d\n", regs, len);
-		return -EINVAL;
-	}
-
-	reg_base = fdt64_to_cpu(regs[0]);
-	reg_size = ALIGN_UP(fdt64_to_cpu(regs[1]), __PAGE_SIZE);
 
 #if CONFIG_PAGING
 	/* Map device region */
