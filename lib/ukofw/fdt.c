@@ -337,6 +337,20 @@ int fdt_node_offset_idx_by_compatible_list(const void *fdt, int startoffset,
 	return -FDT_ERR_NOTFOUND;
 }
 
+int fdt_node_check_compatible_list(const void *fdt, int offset,
+				   const char * const compatibles[])
+{
+	int rc;
+
+	for (int i = 0; compatibles[i]; i++) {
+		rc = fdt_node_check_compatible(fdt, offset, compatibles[i]);
+		if (rc <= 0) /* success or fdt error */
+			return rc;
+	}
+
+	return 1; /* not found */
+}
+
 int fdt_get_interrupt(const void *fdt, int nodeoffset,
 			uint32_t index, int *size, fdt32_t **prop)
 {

@@ -188,6 +188,23 @@ int fdt_node_offset_idx_by_compatible_list(const void *fdt, int startoffset,
 				const char * const compatibles[], int *index);
 
 /**
+ * fdt_node_check_compatible_list - checks whether a node's 'compatible'
+ *                                  property matches a given list of
+ *                                  strings.
+ *
+ * @fdt:         pointer to the device tree blob
+ * @offset:      node offset
+ * @compatibles: a list of 'compatible' strings to match, should be
+ *               terminated with NULL.
+ * @return
+ *	0, match
+ *	1, no match
+ *	-FDT_ERR see by libfdt's fdt_node_check_compatible()
+ */
+int fdt_node_check_compatible_list(const void *fdt, int offset,
+				   const char * const compatibles[]);
+
+/**
  * fdt_get_interrupt - retrieve device interrupt of a given index
  * @fdt: pointer to the device tree blob
  * @nodeoffset: offset of the node to find the address for
