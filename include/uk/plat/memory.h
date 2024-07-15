@@ -58,10 +58,9 @@ extern "C" {
 #define UKPLAT_MEMRT_RESERVED		0x0002	/* In use by platform */
 #define UKPLAT_MEMRT_KERNEL		0x0004	/* Kernel binary segment */
 #define UKPLAT_MEMRT_INITRD		0x0008	/* Initramdisk */
-#define UKPLAT_MEMRT_CMDLINE		0x0010	/* Command line */
-#define UKPLAT_MEMRT_DEVICETREE		0x0020	/* Device tree */
-#define UKPLAT_MEMRT_STACK		0x0040	/* Thread stack */
-#define UKPLAT_MEMRT_DEVICE		0x0080	/* Device region */
+#define UKPLAT_MEMRT_DEVICETREE		0x0010	/* Device tree */
+#define UKPLAT_MEMRT_STACK		0x0020	/* Thread stack */
+#define UKPLAT_MEMRT_DEVICE		0x0040	/* Device region */
 
 /* Memory region flags */
 #define UKPLAT_MEMRF_ALL		0xffff
@@ -103,7 +102,6 @@ struct ukplat_memregion_desc {
  *	UKPLAT_MEMRT_RESERVED		In use by platform
  *	UKPLAT_MEMRT_KERNEL		Kernel binary segment
  *	UKPLAT_MEMRT_INITRD		Initramdisk
- *	UKPLAT_MEMRT_CMDLINE		Command line
  *	UKPLAT_MEMRT_DEVICETREE		Device tree
  *	UKPLAT_MEMRT_STACK		Thread stack
  *	UKPLAT_MEMRT_DEVICE		Device
@@ -119,8 +117,6 @@ struct ukplat_memregion_desc {
 		case UKPLAT_MEMRT_KERNEL:				\
 			__fallthrough;					\
 		case UKPLAT_MEMRT_INITRD:				\
-			__fallthrough;					\
-		case UKPLAT_MEMRT_CMDLINE:				\
 			__fallthrough;					\
 		case UKPLAT_MEMRT_DEVICETREE:				\
 			__fallthrough;					\
