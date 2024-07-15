@@ -71,6 +71,7 @@
 #include <uk/config.h>
 #include <uk/print.h>
 #include <uk/assert.h>
+#include <uk/boot.h>
 #include <uk/plat/config.h>
 #include <uk/plat/console.h>
 #include <uk/plat/bootstrap.h>
@@ -183,63 +184,32 @@ static int _init_mem(struct ukplat_bootinfo *const bi)
 	return 0;
 }
 
-static char *cmdline;
-static __sz cmdline_len;
-
-static void _libxenplat_x86bootinfo_setup_cmdl(struct ukplat_bootinfo *bi)
-{
-	cmdline_len = strlen((char *)HYPERVISOR_start_info->cmd_line);
-	if (!cmdline_len)
-		cmdline_len = sizeof(CONFIG_UK_NAME) - 1;
-
-	cmdline = ukplat_memregion_alloc(cmdline_len, UKPLAT_MEMRT_CMDLINE,
-					 UKPLAT_MEMRF_READ);
-	if (unlikely(!cmdline))
-		UK_CRASH("Could not allocate command-line memory");
-
-	strncpy(cmdline, (const char *)HYPERVISOR_start_info->cmd_line,
-		cmdline_len);
-	cmdline[cmdline_len] = '\0';
-
-	bi->cmdline = (__u64)cmdline;
-	bi->cmdline_len = cmdline_len;
-
-	/* Tag this scratch cmdline as a kernel resource, to distinguish it
-	 * from the original cmdline obtained above
-	 */
-	cmdline = ukplat_memregion_alloc(cmdline_len, UKPLAT_MEMRT_KERNEL,
-					 UKPLAT_MEMRF_READ);
-	if (unlikely(!cmdline))
-		UK_CRASH("Could not allocate scratch command-line memory");
-
-	strncpy(cmdline, (const char *)HYPERVISOR_start_info->cmd_line,
-		cmdline_len);
-	cmdline[cmdline_len] = '\0';
-}
-
-static void _libxenplat_x86bootinfo_setup(void)
+static void _libxenplat_x86bootinfo_setup(struct ukplat_bootinfo *bi)
 {
 	const char bl[] = "Xen";
 	const char bp[] = "PVH";
+
+	UK_ASSERT(bi);
+
+	memcpy(bi->bootloader, bl, sizeof(bl));
+	memcpy(bi->bootprotocol, bp, sizeof(bp));
+
+	if (_init_mem(bi) < 0)
+		UK_CRASH("Failed to initialize memory\n");
+
+	bi->cmdline_len = strlen((char *)HYPERVISOR_start_info->cmd_line);
+	bi->cmdline = (__u64)HYPERVISOR_start_info->cmd_line;
+}
+
+void _libxenplat_x86entry(void *start_info) __noreturn;
+void _libxenplat_x86entry(void *start_info)
+{
 	struct ukplat_bootinfo *bi;
 
 	bi = ukplat_bootinfo_get();
 	if (unlikely(!bi))
 		UK_CRASH("Failed to get bootinfo\n");
 
-	memcpy(bi->bootloader, bl, sizeof(bl));
-
-	memcpy(bi->bootprotocol, bp, sizeof(bp));
-
-	if (_init_mem(bi) < 0)
-		UK_CRASH("Failed to initialize memory\n");
-
-	_libxenplat_x86bootinfo_setup_cmdl(bi);
-}
-
-void _libxenplat_x86entry(void *start_info) __noreturn;
-void _libxenplat_x86entry(void *start_info)
-{
 	_init_traps();
 	HYPERVISOR_start_info = (start_info_t *)start_info;
 	prepare_console(); /* enables buffering for console */
@@ -257,11 +227,13 @@ void _libxenplat_x86entry(void *start_info)
 
 	init_console();
 
-	_libxenplat_x86bootinfo_setup();
+	_libxenplat_x86bootinfo_setup(bi);
+
+	uk_boot_early_init(bi);
 
 #if CONFIG_HAVE_X86PKU
 	_check_ospke();
 #endif /* CONFIG_HAVE_X86PKU */
 
-	ukplat_entry_argp(CONFIG_UK_NAME, cmdline, cmdline_len);
+	uk_boot_entry();
 }
