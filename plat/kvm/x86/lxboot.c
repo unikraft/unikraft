@@ -22,10 +22,8 @@ void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi);
 static void
 lxboot_init_cmdline(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 {
-	struct ukplat_memregion_desc mrd = {0};
 	__u64 cmdline_addr;
 	__sz cmdline_size;
-	int rc;
 
 	cmdline_addr = bp->ext_cmd_line_ptr;
 	cmdline_addr <<= 32;
@@ -38,21 +36,6 @@ lxboot_init_cmdline(struct ukplat_bootinfo *bi, struct lxboot_params *bp)
 
 	if (cmdline_size == 0)
 		return;
-
-	mrd.pbase = PAGE_ALIGN_DOWN(cmdline_addr);
-	mrd.vbase = mrd.pbase;
-	mrd.pg_off = cmdline_addr - mrd.pbase;
-	mrd.len = cmdline_size;
-	mrd.pg_count = PAGE_COUNT(mrd.pg_off + mrd.len);
-	mrd.type = UKPLAT_MEMRT_CMDLINE;
-	mrd.flags = UKPLAT_MEMRF_READ;
-#ifdef CONFIG_UKPLAT_MEMRNAME
-	memcpy(mrd.name, "cmdline", sizeof("cmdline"));
-#endif /* CONFIG_UKPLAT_MEMRNAME */
-
-	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
-	if (unlikely(rc < 0))
-		lxboot_crash(rc, "Unable to add ram mapping");
 
 	bi->cmdline = cmdline_addr;
 	bi->cmdline_len = cmdline_size;

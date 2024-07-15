@@ -506,12 +506,10 @@ static void uk_efi_read_file(uk_efi_hndl_t dev_h, const char *file_name,
 
 static void uk_efi_setup_bootinfo_cmdl(struct ukplat_bootinfo *bi)
 {
-	struct ukplat_memregion_desc mrd = {0};
 	struct uk_efi_ld_img_hndl *uk_img_hndl;
 	uk_efi_status_t status;
 	char *cmdl = NULL;
 	__sz len;
-	int rc;
 
 	uk_img_hndl = uk_efi_get_uk_img_hndl();
 
@@ -545,17 +543,6 @@ static void uk_efi_setup_bootinfo_cmdl(struct ukplat_bootinfo *bi)
 
 	if (!cmdl)
 		return;
-
-	mrd.pbase = (__paddr_t)cmdl;
-	mrd.vbase = (__vaddr_t)cmdl;
-	mrd.pg_off = 0;
-	mrd.len = len;
-	mrd.pg_count = PAGE_COUNT(len);
-	mrd.type = UKPLAT_MEMRT_CMDLINE;
-	mrd.flags = UKPLAT_MEMRF_READ;
-	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
-	if (unlikely(rc < 0))
-		UK_EFI_CRASH("Failed to insert cmdl mrd\n");
 
 	bi->cmdline = (__u64)cmdl;
 	bi->cmdline_len = len;
