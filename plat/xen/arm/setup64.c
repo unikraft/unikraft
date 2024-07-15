@@ -31,6 +31,7 @@
 #include <common/events.h>
 #include <common/console.h>
 #include <xen/xen.h>
+#include <uk/boot.h>
 #include <uk/plat/memory.h>
 #include <xen/memory.h>
 #include <uk/intctlr.h>
@@ -167,35 +168,23 @@ static void *map_fdt(paddr_t device_tree)
 
 static inline void _get_cmdline(struct ukplat_bootinfo *bi)
 {
+	const char *fdtcmdline;
 	int fdtchosen, len;
-	const char *fdtcmdline, *cmdl;
-	char *cmdline;
-	__sz cmdline_len;
 
-	cmdl = CONFIG_UK_NAME;
-	cmdline_len = sizeof(CONFIG_UK_NAME) - 1;
+	UK_ASSERT(bi);
+
+	bi->cmdline = CONFIG_UK_NAME;
+	bi->cmdline_len = sizeof(CONFIG_UK_NAME) - 1;
 
 	fdtchosen = fdt_path_offset(HYPERVISOR_dtb, "/chosen");
 	if (fdtchosen) {
 		fdtcmdline = fdt_getprop(HYPERVISOR_dtb, fdtchosen, "bootargs",
 					 &len);
 		if (fdtcmdline) {
-			cmdl = fdtcmdline;
-			cmdline_len = len;
+			bi->cmdline = fdtcmdline;
+			bi->cmdline_len = len;
 		}
 	}
-
-	cmdline = ukplat_memregion_alloc(cmdline_len, UKPLAT_MEMRT_CMDLINE,
-					 UKPLAT_MEMRF_READ);
-	if (!cmdline)
-		UK_CRASH("Could not allocate command-line memory");
-
-	memcpy(cmdline, cmdl, cmdline_len);
-	/* ensure null termination */
-	cmdline[cmdline_len] = '\0';
-
-	bi->cmdline = (__u64)cmdline;
-	bi->cmdline_len = cmdline_len;
 }
 
 int uk_intctlr_plat_probe(void *arg)
@@ -331,6 +320,11 @@ void _libxenplat_armentry(void *dtb_pointer, paddr_t physical_offset)
 
 	_init_mem(bi, physical_offset); /* relocates dtb */
 
+	_get_cmdline(bi);
+
+	/* Do early init */
+	uk_boot_early_init(bi);
+
 	/* Map shared_info page */
 	xatp.domid = DOMID_SELF;
 	xatp.idx = 0;
@@ -367,7 +361,6 @@ void _libxenplat_armentry(void *dtb_pointer, paddr_t physical_offset)
 	prepare_console();
 	/* Init console */
 	init_console();
-	_get_cmdline(bi);
 
-	ukplat_entry_argp(CONFIG_UK_NAME, (char *)bi->cmdline, bi->cmdline_len);
+	uk_boot_entry();
 }
