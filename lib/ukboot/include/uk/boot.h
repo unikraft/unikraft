@@ -19,13 +19,24 @@ extern "C" {
 /**
  * Executes the early_init boot stage
  *
- * Once platform code is updated to register
- * via earlytab, this function will be called
- * directly by uk_boot_entry()
+ * Once platform code is updated to register via earlytab,
+ * this function will be called directly by uk_boot_entry()
  *
  * @param bi pointer to the bootinfo structure
  */
 void uk_boot_early_init(struct ukplat_bootinfo *bi);
+
+/**
+ * Unikraft boot entry
+ *
+ * This function is called directly by platform libraries for
+ * bootstrapping. Before calling this function a platform must
+ * have called uk_boot_early_init().
+ *
+ * TODO: Once all platform code registers to earlytab this
+ *       function will be invoked directly by the bootcode.
+ */
+void uk_boot_entry(void) __noreturn;
 
 /**
  * Requests the "init" thread to perform a shutdown

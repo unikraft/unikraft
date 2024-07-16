@@ -238,8 +238,7 @@ static struct uk_alloc *heap_init()
 extern char **environ;
 #endif /* CONFIG_LIBPOSIX_ENVIRON */
 
-/* defined in <uk/plat.h> */
-void ukplat_entry(void)
+void uk_boot_entry(void)
 {
 	struct uk_init_ctx ictx = { 0 };
 	/* NOTE: Default target is crash for failed initialization (inittab) */
