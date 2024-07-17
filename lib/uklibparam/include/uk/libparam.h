@@ -66,11 +66,10 @@ extern C {
  * A library parameter descriptor (struct uk_libparam_desc) is referencing to
  * the section's base address for iteration.
  */
-#define UK_LIBPARAM_PARAMSECTION_NAMEPREFIX   uk_libparam_params_
 #define UK_LIBPARAM_PARAM_NAMEPREFIX          __uk_libparam_param_
+#define UK_LIBPARAM_PDATA_NAMEPREFIX          __uk_libparam_pdata_
 
-#define UK_LIBPARAM_PARAMSECTION_NAME       \
-	UK_LIBPARAM_CONCAT(UK_LIBPARAM_PARAMSECTION_NAMEPREFIX, __LIBNAME__)
+#define UK_LIBPARAM_PARAMSECTION_NAME       uk_libparam_params
 #define UK_LIBPARAM_PARAMSECTION_STARTSYM   \
 	UK_LIBPARAM_CONCAT(UK_LIBPARAM_PARAMSECTION_NAME, _start)
 #define UK_LIBPARAM_PARAMSECTION_ENDSYM     \
@@ -109,7 +108,15 @@ enum  uk_libparam_param_type {
 /*
  * Library parameter descriptor
  */
+
+struct uk_libparam_pdata { /* Non-const members of `struct uk_libparam_param` */
+	/* Internally used by parser for array parameters */
+	__sz __widx;
+};
+
 struct uk_libparam_param {
+	/* Library prefix */
+	const char * const prefix;
 	const char * const name;
 	const char * const desc;
 	const enum uk_libparam_param_type type;
@@ -117,67 +124,9 @@ struct uk_libparam_param {
 	const __sz count;
 	/* Reference to corresponding variable */
 	void * const addr;
-
-	/* Internally used by parser for array parameters */
-	__sz __widx;
+	/* Non-const members */
+	struct uk_libparam_pdata *pdata;
 };
-
-/*
- * Library descriptor
- */
-struct uk_libparam_libdesc {
-	/* Library prefix */
-	const char *prefix;
-	/* Section header of parameter reference array */
-	struct uk_libparam_param **params;
-	/* Number of parameters */
-	__sz params_len;
-	/* Next libdesc entry */
-	struct uk_list_head next;
-};
-
-/* -------------------------------------------------------------------------- */
-/* Library registration                                                       */
-
-/* The following code declares a library descriptor as soon as this header
- * is included: This makes an explicit registration to libuklibparam
- * unnecessary.
- * FIXME: This allows using of library parameters only in one source file of a
- *        library. A solution could be to create a file in uklibparam that
- *        declares an array of structs, one struct per library. Ideally the
- *        fields are filled out at compile/link time. This can be done as soon
- *        as a library is available that can export the list of included
- *        libraries of a build.
- * NOTE: Double declaration within one source file is avoided by the header's
- *       include guards.
- */
-#define UK_LIBPARAM_LIBDESC \
-	UK_LIBPARAM_CONCAT(UK_LIBPARAM_PARAMSECTION_NAME, _libdesc)
-#define UK_LIBPARAM_LIBDESC_CTOR \
-	UK_LIBPARAM_CONCAT(UK_LIBPARAM_PARAMSECTION_NAME, _ctor)
-
-static struct uk_libparam_libdesc UK_LIBPARAM_LIBDESC = {
-	.prefix = STRINGIFY(UK_LIBPARAM_LIBPREFIX)
-
-	/* Rest of fields are initialized with 0 automatically */
-};
-
-void _uk_libparam_libsec_register(struct uk_libparam_libdesc *ld);
-
-static void UK_LIBPARAM_LIBDESC_CTOR(void)
-{
-	UK_LIBPARAM_LIBDESC.params_len =
-		(__sz)((__uptr) &UK_LIBPARAM_PARAMSECTION_ENDSYM -
-		       (__uptr) UK_LIBPARAM_PARAMSECTION_STARTSYM) /
-		      sizeof(void *);
-
-	if (UK_LIBPARAM_LIBDESC.params_len > 0) {
-		UK_LIBPARAM_LIBDESC.params = (struct uk_libparam_param **)
-					     UK_LIBPARAM_PARAMSECTION_STARTSYM;
-		_uk_libparam_libsec_register(&UK_LIBPARAM_LIBDESC);
-	}
-}
-UK_CTOR_PRIO(UK_LIBPARAM_LIBDESC_CTOR, 0);
 
 /* -------------------------------------------------------------------------- */
 /* Parameter registration                                                     */
@@ -185,20 +134,23 @@ UK_CTOR_PRIO(UK_LIBPARAM_LIBDESC_CTOR, 0);
 #define __UK_LIBPARAM_PARAM_NAME(varname)				\
 	UK_LIBPARAM_CONCAT(UK_LIBPARAM_PARAM_NAMEPREFIX, varname)
 
-#define __UK_LIBPARAM_PARAM_DEFINE(arg_var, arg_addr, arg_type, arg_count, \
+#define __UK_LIBPARAM_DATA_NAME(varname)				\
+	UK_LIBPARAM_CONCAT(UK_LIBPARAM_PDATA_NAMEPREFIX, varname)
+
+#define __UK_LIBPARAM_PARAM_DEFINE(arg_var, arg_addr, arg_type, arg_count,\
 				   arg_desc)				\
-	static struct uk_libparam_param __UK_LIBPARAM_PARAM_NAME(arg_var) = { \
-		.name  = STRINGIFY(arg_var),				\
-		.desc  = arg_desc,					\
-		.type  = _UK_LIBPARAM_PARAM_TYPE_##arg_type,		\
-		.count = arg_count,					\
-		.addr  = arg_addr					\
-	};								\
-									\
-	static __section("." STRINGIFY(UK_LIBPARAM_PARAMSECTION_NAME))	\
-	       __used struct uk_libparam_param * const			\
-	       UK_LIBPARAM_CONCAT(__UK_LIBPARAM_PARAM_NAME(arg_var), _ptr) = \
-		&__UK_LIBPARAM_PARAM_NAME(arg_var)
+	static struct uk_libparam_pdata __UK_LIBPARAM_DATA_NAME(arg_var);\
+	static const struct uk_libparam_param				\
+	__used __section("." STRINGIFY(UK_LIBPARAM_PARAMSECTION_NAME))	\
+	__align(8) __UK_LIBPARAM_PARAM_NAME(arg_var) = {		\
+		.prefix = STRINGIFY(UK_LIBPARAM_LIBPREFIX),		\
+		.name   = STRINGIFY(arg_var),				\
+		.desc   = arg_desc,					\
+		.type   = _UK_LIBPARAM_PARAM_TYPE_##arg_type,		\
+		.count  = arg_count,					\
+		.addr   = arg_addr,					\
+		.pdata  = &__UK_LIBPARAM_DATA_NAME(arg_var)		\
+	}
 
 #define _UK_LIBPARAM_PARAM_DEFINE(name, var, type, count, desc) \
 	__UK_LIBPARAM_PARAM_DEFINE(name, var, type, count, desc)
