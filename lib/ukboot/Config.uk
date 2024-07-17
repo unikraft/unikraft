@@ -73,6 +73,10 @@ if LIBUKBOOT
 		  UTF-8 and ANSI colors
 	endchoice
 
+	config LIBUKBOOT_CMDLINE_MAX_LEN
+	int "Maxiumum command line length"
+	default 4096
+
 	config LIBUKBOOT_MAXNBARGS
 	int "Maximum number of arguments (max. size of argv)"
 	default 60

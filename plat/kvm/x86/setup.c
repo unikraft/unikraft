@@ -108,9 +108,6 @@ void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi)
 	if (unlikely(rc))
 		UK_CRASH("Mem init failed: %d\n", rc);
 
-	/* Print boot information */
-	ukplat_bootinfo_print();
-
 #if defined(CONFIG_HAVE_SMP) && defined(CONFIG_UKPLAT_ACPI)
 	rc = acpi_init();
 	if (likely(rc == 0)) {
