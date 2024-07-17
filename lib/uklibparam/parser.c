@@ -31,6 +31,7 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
 #include <uk/config.h>
 #include <uk/libparam.h>
 #include <ctype.h>
@@ -43,19 +44,12 @@
 #include <uk/version.h>
 #include <uk/essentials.h>
 
-static UK_LIST_HEAD(ld_head);
-
 #define PARSE_PARAM_SEP    '.'
 #define PARSE_VALUE_SEP    '='
 #define PARSE_LIST_START   '['
 #define PARSE_LIST_END     ']'
 #define PARSE_STOP         "--"
 #define PARSE_USAGE        "help"
-
-void _uk_libparam_libsec_register(struct uk_libparam_libdesc *ld)
-{
-	uk_list_add_tail(&ld->next, &ld_head);
-}
 
 static const char *str_param_type(enum uk_libparam_param_type pt)
 {
@@ -88,18 +82,16 @@ static const char *str_param_type(enum uk_libparam_param_type pt)
 	return "<?>";
 }
 
-#define UK_LIBPARAM_FOREACH_LIBDESC(ld_iter) \
-	uk_list_for_each_entry((ld_iter), &ld_head, next)
-#define UK_LIBPARAM_FOREACH_PARAMIDX(ld, p_iter) \
-	for ((p_iter) = 0; (p_iter) < (ld)->params_len; (p_iter)++)
-#define UK_LIBPARAM_PARAM_GET(libdesc, idx) \
-	(((idx) >= (libdesc)->params_len) ? __NULL : ((libdesc)->params)[idx])
+#define UK_LIBPARAM_FOREACH_PARAM(itr)				\
+	for ((itr) = (struct uk_libparam_param *)		\
+			UK_LIBPARAM_PARAMSECTION_STARTSYM;	\
+	     (itr) < (struct uk_libparam_param *)		\
+			&UK_LIBPARAM_PARAMSECTION_ENDSYM;	\
+	     (itr)++)
 
 static void uk_usage(void)
 {
-	struct uk_libparam_libdesc *ld;
 	struct uk_libparam_param *p;
-	__sz p_i;
 
 	/*
 	 * FIXME: Use a console print variant without context prefix
@@ -112,21 +104,16 @@ static void uk_usage(void)
 		   "%12s                   Print this help summary\n\n",
 		   PARSE_USAGE);
 	uk_pr_info("Available parameters:\n");
-	UK_LIBPARAM_FOREACH_LIBDESC(ld) {
-		UK_LIBPARAM_FOREACH_PARAMIDX(ld, p_i) {
-			p = UK_LIBPARAM_PARAM_GET(ld, p_i);
-			UK_ASSERT(p);
 
-			if (p->count == 0)
-				continue;
-			uk_pr_info("%12s.%-18s%s (",
-				   ld->prefix, p->name,
-				   p->desc ? p->desc : p->name);
-			if (p->count > 1)
-				uk_pr_info("array[%"__PRIsz"] of ",
-				p->count);
-			uk_pr_info("%s)\n", str_param_type(p->type));
-		}
+	UK_LIBPARAM_FOREACH_PARAM(p) {
+		UK_ASSERT(p);
+		if (p->count == 0)
+			continue;
+		uk_pr_info("%12s.%-18s%s (", p->prefix, p->name,
+			   p->desc ? p->desc : p->name);
+		if (p->count > 1)
+			uk_pr_info("array[%" __PRIsz "] of ", p->count);
+		uk_pr_info("%s)\n", str_param_type(p->type));
 	}
 	uk_pr_info("\n"
 		   "Numbers can be passed in decimal, octal (\"0\" as prefix), or hexadecimal (\"0x\" as prefix).\n");
@@ -152,40 +139,23 @@ struct parse_arg_ctx {
 	int hit_usage;
 	enum parse_arg_state state;
 
-	struct uk_libparam_libdesc *ld;
 	struct uk_libparam_param *p;
 };
 
-static struct uk_libparam_libdesc *find_libdesc(const char *libname,
-						__sz libname_len)
-{
-	struct uk_libparam_libdesc *ld_iter;
-
-	UK_LIBPARAM_FOREACH_LIBDESC(ld_iter) {
-		/*
-		 * We want an exact match, because libname might not
-		 * be zero terminated, we need to compare library name and the
-		 * lengths separately.
-		 */
-		if ((strncmp(ld_iter->prefix, libname, libname_len) == 0)
-		    && (ld_iter->prefix[libname_len] == '\0'))
-			return ld_iter;
-	}
-	return NULL;
-}
-
-static struct uk_libparam_param *find_libparam(struct uk_libparam_libdesc *ld,
+static struct uk_libparam_param *find_libparam(const char *libname,
+					       __sz libname_len,
 					       const char *paramname,
 					       __sz paramname_len)
 {
 	struct uk_libparam_param *p;
-	__sz i;
 
-	UK_ASSERT(ld);
+	UK_ASSERT(libname);
+	UK_ASSERT(paramname);
 
-	UK_LIBPARAM_FOREACH_PARAMIDX(ld, i) {
-		p = UK_LIBPARAM_PARAM_GET(ld, i);
-
+	UK_LIBPARAM_FOREACH_PARAM(p) {
+		UK_ASSERT(p);
+		if (strncmp(p->prefix, libname, libname_len))
+			continue;
 		/*
 		 * We look for an exact match, because `paramname` might not
 		 * be zero terminated. First, we need to compare strings and
@@ -332,9 +302,9 @@ static int write_value(struct uk_libparam_param *p, __uptr raw_value)
 		/* Take next index within array bounds,
 		 * otherwise return -ENOSPC
 		 */
-		if (p->__widx >= p->count)
+		if (p->pdata->__widx >= p->count)
 			return -ENOSPC;
-		widx = p->__widx++;
+		widx = p->pdata->__widx++;
 	}
 
 	switch (p->type) {
@@ -386,7 +356,6 @@ static int parse_value(struct parse_arg_ctx *ctx, char *value, __sz value_len)
 	__ssz len;
 
 	UK_ASSERT(ctx);
-	UK_ASSERT(ctx->ld);
 	UK_ASSERT(ctx->p);
 
 	/* Handle special string cases for boolean and charp */
@@ -413,7 +382,7 @@ static int parse_value(struct parse_arg_ctx *ctx, char *value, __sz value_len)
 	case _UK_LIBPARAM_PARAM_TYPE_charp:
 		if (!value) {
 			uk_pr_warn("No value given to %s.%s (charp)\n",
-				   ctx->ld->prefix, ctx->p->name);
+				   ctx->p->prefix, ctx->p->name);
 			return -EINVAL;
 		}
 
@@ -503,17 +472,17 @@ static int parse_value(struct parse_arg_ctx *ctx, char *value, __sz value_len)
 
 novalue:
 	uk_pr_err("Parameter %s.%s requires a %s value\n",
-		  ctx->ld->prefix, ctx->p->name, str_param_type(ctx->p->type));
+		  ctx->p->prefix, ctx->p->name, str_param_type(ctx->p->type));
 	return -EINVAL;
 
 outofrange:
 	uk_pr_err("Parameter %s.%s (%s): Given number is out of range\n",
-		  ctx->ld->prefix, ctx->p->name, str_param_type(ctx->p->type));
+		  ctx->p->prefix, ctx->p->name, str_param_type(ctx->p->type));
 	return -ERANGE;
 
 malformed:
 	uk_pr_err("Parameter %s.%s (%s): Given number is malformed\n",
-		  ctx->ld->prefix, ctx->p->name, str_param_type(ctx->p->type));
+		  ctx->p->prefix, ctx->p->name, str_param_type(ctx->p->type));
 	return -EINVAL;
 }
 
@@ -597,12 +566,19 @@ static int parse_arg(struct parse_arg_ctx *ctx, char *strbuf, int scan_only)
 			 *       not allowed characters, or empty strings).
 			 */
 			if (!scan_only) {
-				ctx->ld = find_libdesc(libname, libname_len);
-				if (ctx->ld)
-					ctx->p = find_libparam(ctx->ld,
-							       paramname,
-							       paramname_len);
-				if (!ctx->ld || !ctx->p) {
+				/*
+				 * TODO: This can become expensive if the number
+				 *       of parameters for a library becomes
+				 *       high: The library name is repeatedly
+				 *       checked for a match for each library
+				 *       parameter (O(n2)). However, the impact
+				 *       in practice has yet to be assessed.
+				 */
+				ctx->p = find_libparam(libname,
+						       libname_len,
+						       paramname,
+						       paramname_len);
+				if (unlikely(!ctx->p)) {
 					uk_pr_warn("Parameter %.*s.%.*s: Unknown or invalid\n",
 						(int) libname_len, libname,
 						(int) paramname_len, paramname);
@@ -664,16 +640,11 @@ parse_list:
 
 static inline void __reset_p_widx(void)
 {
-	struct uk_libparam_libdesc *ld;
 	struct uk_libparam_param *p;
-	__sz p_i;
 
-	UK_LIBPARAM_FOREACH_LIBDESC(ld) {
-		UK_LIBPARAM_FOREACH_PARAMIDX(ld, p_i) {
-			p = UK_LIBPARAM_PARAM_GET(ld, p_i);
-			UK_ASSERT(p);
-			p->__widx = 0;
-		}
+	UK_LIBPARAM_FOREACH_PARAM(p) {
+		UK_ASSERT(p);
+		p->pdata->__widx = 0;
 	}
 }
 
