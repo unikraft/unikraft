@@ -88,10 +88,6 @@
 #include <uk/print.h>
 #include <uk/ctors.h>
 #include <uk/init.h>
-#include <uk/argparse.h>
-#ifdef CONFIG_LIBUKLIBPARAM
-#include <uk/libparam.h>
-#endif /* CONFIG_LIBUKLIBPARAM */
 #ifdef CONFIG_LIBUKSP
 #include <uk/sp.h>
 #endif
@@ -110,6 +106,9 @@
 #if CONFIG_LIBUKINTCTLR
 #include <uk/intctlr.h>
 #endif /* CONFIG_LIBUKINTCTLR */
+
+extern char **boot_argv;
+extern int boot_argc;
 
 int main(int argc, char *argv[]) __weak;
 static inline int do_main(int argc, char *argv[]);
@@ -235,30 +234,12 @@ static struct uk_alloc *heap_init()
 	return a;
 }
 
-/* defined in <uk/plat.h> */
-void ukplat_entry_argp(char *arg0, char *argb, __sz argb_len)
-{
-	static char *argv[CONFIG_LIBUKBOOT_MAXNBARGS];
-	int argc = 0;
-
-	if (arg0) {
-		argv[0] = arg0;
-		argc += 1;
-	}
-	if (argb && argb_len) {
-		argc += uk_argnparse(argb, argb_len, arg0 ? &argv[1] : &argv[0],
-				     arg0 ? (CONFIG_LIBUKBOOT_MAXNBARGS - 1)
-					  : CONFIG_LIBUKBOOT_MAXNBARGS);
-	}
-	ukplat_entry(argc, argv);
-}
-
 #if CONFIG_LIBPOSIX_ENVIRON
 extern char **environ;
 #endif /* CONFIG_LIBPOSIX_ENVIRON */
 
 /* defined in <uk/plat.h> */
-void ukplat_entry(int argc, char *argv[])
+void ukplat_entry(void)
 {
 	struct uk_init_ctx ictx = { 0 };
 	/* NOTE: Default target is crash for failed initialization (inittab) */
@@ -282,6 +263,12 @@ void ukplat_entry(int argc, char *argv[])
 	uk_ctor_func_t *ctorfn;
 	struct uk_inittab_entry *init_entry;
 
+	/* Make sure uk_early_init has been called to process
+	 * the cmdline. We should expect at minimum one arg,
+	 * CONFIG_UK_NAME.
+	 */
+	UK_ASSERT(boot_argc);
+
 #if CONFIG_LIBUKBOOT_MAINTHREAD
 	/* Initialize shutdown control structure */
 	uk_boot_shutdown_ctl_init();
@@ -294,34 +281,6 @@ void ukplat_entry(int argc, char *argv[])
 		uk_pr_debug("Call constructor: %p())...\n", *ctorfn);
 		(*ctorfn)();
 	}
-
-#ifdef CONFIG_LIBUKLIBPARAM
-	/*
-	 * First, we scan if we can find the stop sequence in the kernel
-	 * cmdline. If not, we assume that there are no uklibparam arguments in
-	 * the command line.
-	 * NOTE: argv[0] contains the kernel/program name that we need to
-	 *       hide from the parser.
-	 */
-	rc = uk_libparam_parse(argc - 1, &argv[1], UK_LIBPARAM_F_SCAN);
-	if (rc > 0 && rc < (argc - 1)) {
-		/* In this case, we did successfully scan for uklibparam
-		 * arguments and stop sequence is at rc < (argc - 1).
-		 */
-		/* Run a second pass for parsing */
-		rc = uk_libparam_parse(argc - 1, &argv[1], UK_LIBPARAM_F_USAGE);
-		if (rc < 0) /* go down on errors (including USAGE) */
-			ukplat_halt();
-
-		/* Drop uklibparam parameters from argv but keep argv[0].
-		 * We are going to replace the stop sequence with argv[0].
-		 */
-		rc += 1; /* include argv[0]; we use rc as idx to stop seq */
-		argc -= rc;
-		argv[rc] = argv[0];
-		argv = &argv[rc];
-	}
-#endif /* CONFIG_LIBUKLIBPARAM */
 
 #if CONFIG_LIBUKBOOT_INITALLOC
 	uk_pr_info("Initialize memory allocator...\n");
@@ -403,8 +362,8 @@ void ukplat_entry(int argc, char *argv[])
 	uk_sched_start(s);
 #endif /* CONFIG_LIBUKBOOT_INITSCHED */
 
-	ictx.cmdline.argc = argc;
-	ictx.cmdline.argv = argv;
+	ictx.cmdline.argc = boot_argc;
+	ictx.cmdline.argv = boot_argv;
 
 	/* Enable interrupts before starting the application */
 	ukplat_lcpu_enable_irq();
@@ -443,7 +402,8 @@ void ukplat_entry(int argc, char *argv[])
 
 #else /* CONFIG_LIBUKBOOT_MAINTHREAD */
 	m = uk_sched_thread_create_fn2(s, main_thread,
-				       (void *)((long)argc), (void *)argv,
+				       (void *)((long)ictx.cmdline.argc),
+				       (void *)ictx.cmdline.argv,
 				       0x0 /* default stack size */,
 				       0x0 /* default auxiliary stack size */,
 				       false, false,

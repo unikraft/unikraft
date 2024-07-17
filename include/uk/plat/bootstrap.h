@@ -50,19 +50,7 @@ extern "C" {
  * @param argc Number of arguments
  * @param argv Array to '\0'-terminated arguments
  */
-void ukplat_entry(int argc, char *argv[]) __noreturn;
-
-/**
- * Called by platform library during initialization
- * This function has to be provided by a non-platform library for bootstrapping
- * It is intended to do the argument parsing only and then call ukplat_entry()
- * @param arg0     Optional buffer for first argument (argv[0]), can be __NULL
- *                 Arguments found on argb will be placed on argv[1] onwards
- * @param argb     Buffer of arguments, can be __NULL
- * @param argb_len Length of arg buffer (set to __SZ_MAX, when argb should be
- *                 handled as zero-terminated)
- */
-void ukplat_entry_argp(char *arg0, char *argb, __sz argb_len) __noreturn;
+void ukplat_entry(void) __noreturn;
 
 enum ukplat_gstate {
 	UKPLAT_HALT,

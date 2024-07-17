@@ -9,11 +9,23 @@
 #include <uk/config.h>
 #include <errno.h>
 #include <uk/plat/bootstrap.h>
+#include <uk/plat/common/bootinfo.h>
 
 #if !__ASSEMBLY__
 #ifdef __cplusplus
 extern "C" {
 #endif
+
+/**
+ * Executes the early_init boot stage
+ *
+ * Once platform code is updated to register
+ * via earlytab, this function will be called
+ * directly by uk_boot_entry()
+ *
+ * @param bi pointer to the bootinfo structure
+ */
+void uk_boot_early_init(struct ukplat_bootinfo *bi);
 
 /**
  * Requests the "init" thread to perform a shutdown
