@@ -30,6 +30,10 @@
 #include <uk/errptr.h>
 #endif /* CONFIG_PAGING */
 
+#if CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE
+#include <uk/boot/earlytab.h>
+#endif /* CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE */
+
 /* PL011 UART registers and masks*/
 /* Data register */
 #define REG_UARTDR_OFFSET	0x00
@@ -108,10 +112,9 @@ static int init_pl011(void)
 	return 0;
 }
 
-int pl011_early_init(void)
-{
 #if CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE
-	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
+static int early_init(struct ukplat_bootinfo *bi)
+{
 	struct ukplat_memregion_desc mrd = {0};
 	int rc;
 
@@ -135,12 +138,12 @@ int pl011_early_init(void)
 		uk_pr_err("Could not insert mrd (%d)\n", rc);
 		return rc;
 	}
-#endif /* CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE */
 
 	return 0;
 }
+#endif /* CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE */
 
-static int pl011_init(struct uk_init_ctx *ictx __unused)
+static int init(struct uk_init_ctx *ictx __unused)
 {
 	int offset, len, naddr, nsize;
 	struct ukplat_bootinfo *bi;
@@ -276,4 +279,9 @@ int ukplat_cink(char *buf, unsigned int maxlen)
 	return (int)num;
 }
 
-uk_plat_initcall_prio(pl011_init, 0, UK_PRIO_EARLIEST);
+#if CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE
+UK_BOOT_EARLYTAB_ENTRY(early_init, UK_PRIO_AFTER(UK_PRIO_EARLIEST));
+#endif /* CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE */
+
+/* UK_PRIO_EARLIEST reserved for cmdline */
+uk_plat_initcall_prio(init, 0, UK_PRIO_AFTER(UK_PRIO_EARLIEST));
