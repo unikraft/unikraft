@@ -141,6 +141,13 @@ static int early_init(struct ukplat_bootinfo *bi)
 
 	ns16550_uart_base = CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE;
 
+	/* Configure the port */
+	rc = init_ns16550();
+	if (unlikely(rc)) {
+		uk_pr_err("Could not initialize ns16550 (%d)\n", rc);
+		return rc;
+	}
+
 	/* From this point we can print */
 	ns16550_uart_initialized = 1;
 
