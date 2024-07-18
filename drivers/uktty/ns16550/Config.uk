@@ -6,6 +6,7 @@ menuconfig LIBUKTTY_NS16550
 if LIBUKTTY_NS16550
 menuconfig LIBUKTTY_NS16550_EARLY_CONSOLE
 	bool "Early console"
+	select LIBUKBOOT
 	default n
 
 if LIBUKTTY_NS16550_EARLY_CONSOLE

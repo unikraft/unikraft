@@ -39,7 +39,7 @@
 #endif /* CONFIG_PAGING */
 
 #if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
-#include <uk/plat/common/bootinfo.h>
+#include <uk/boot/earlytab.h>
 #endif /* CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
 
 #define NS16550_THR_OFFSET	0x00U
@@ -131,10 +131,9 @@ static int init_ns16550(void)
 	return 0;
 }
 
-int ns16550_early_init(void)
-{
 #if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
-	struct ukplat_bootinfo *bi = ukplat_bootinfo_get();
+static int early_init(struct ukplat_bootinfo *bi)
+{
 	struct ukplat_memregion_desc mrd = {0};
 	int rc;
 
@@ -158,12 +157,12 @@ int ns16550_early_init(void)
 		uk_pr_err("Could not insert mrd (%d)\n", rc);
 		return rc;
 	}
-#endif /* !CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
 
 	return 0;
 }
+#endif /* !CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
 
-static int ns16550_init(struct uk_init_ctx *ictx __unused)
+static int init(struct uk_init_ctx *ictx __unused)
 {
 	int offset, len, naddr, nsize;
 	struct ukplat_bootinfo *bi;
@@ -314,4 +313,9 @@ int ukplat_cink(char *buf, unsigned int maxlen)
 	return (int)num;
 }
 
-uk_plat_initcall_prio(ns16550_init, 0, UK_PRIO_EARLIEST);
+#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
+UK_BOOT_EARLYTAB_ENTRY(early_init, UK_PRIO_AFTER(UK_PRIO_EARLIEST));
+#endif /* !config_libuktty_ns16550_early_console */
+
+/* UK_PRIO_EARLIEST reserved for cmdline */
+uk_plat_initcall_prio(init, 0, UK_PRIO_AFTER(UK_PRIO_EARLIEST));
