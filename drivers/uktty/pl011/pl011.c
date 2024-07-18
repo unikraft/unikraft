@@ -22,6 +22,8 @@
 #include <uk/assert.h>
 #include <uk/bitops.h>
 #include <uk/init.h>
+#include <uk/libparam.h>
+#include <uk/ofw/fdt.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/plat/console.h>
 
@@ -73,6 +75,10 @@
 /* Interrupt clear register */
 #define REG_UARTICR_OFFSET	0x44
 
+static const char * const fdt_compatible[] = {
+	"arm,pl011", NULL
+};
+
 /*
  * PL011 UART base address
  * As we are using the PA = VA mapping, some SoC would set PA 0
@@ -84,12 +90,14 @@
 static __u8 pl011_uart_initialized;
 static __u64 pl011_base;
 
+UK_LIBPARAM_PARAM_ALIAS(base, &pl011_base, __u64, "pl011 base");
+
 /* Macros to access PL011 Registers with base address */
 #define PL011_REG(r)		((__u16 *)(pl011_base + (r)))
 #define PL011_REG_READ(r)	ioreg_read16(PL011_REG(r))
 #define PL011_REG_WRITE(r, v)	ioreg_write16(PL011_REG(r), v)
 
-static int init_pl011(void)
+static int pl011_setup(void)
 {
 	/* Mask all interrupts */
 	PL011_REG_WRITE(REG_UARTIMSC_OFFSET,
@@ -113,6 +121,33 @@ static int init_pl011(void)
 }
 
 #if CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE
+static inline int config_fdt_chosen_stdout(const void *dtb)
+{
+	__u64 base, size;
+	char *opt;
+	int offs;
+	int rc;
+
+	UK_ASSERT(dtb);
+
+	/* Check if chosen/stdout-path is set to this device */
+	rc = fdt_chosen_stdout_path(dtb, &offs, &opt);
+	if (unlikely(rc)) /* no stdout-path or bad dtb */
+		return rc;
+
+	rc = fdt_node_check_compatible_list(dtb, offs, fdt_compatible);
+	if (unlikely(rc))
+		return rc; /* no compat match or bad dtb */
+
+	rc = fdt_get_address(dtb, offs, 0, &base, &size);
+	if (unlikely(rc)) /* could not parse node */
+		return rc;
+
+	pl011_base = base;
+
+	return 0;
+}
+
 static int early_init(struct ukplat_bootinfo *bi)
 {
 	struct ukplat_memregion_desc mrd = {0};
@@ -120,14 +155,34 @@ static int early_init(struct ukplat_bootinfo *bi)
 
 	UK_ASSERT(bi);
 
-	pl011_base = CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE;
+	/* If the base is not set by the cmdline, try
+	 * the dtb chosen/stdout-path.
+	 */
+	if (!pl011_base) {
+		rc = config_fdt_chosen_stdout((void *)bi->dtb);
+		if (unlikely(rc < 0 && rc != -FDT_ERR_NOTFOUND))  {
+			uk_pr_err("Could not parse fdt (%d)", rc);
+			return -EINVAL;
+		}
+	}
+
+#if CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE
+	if (!pl011_base && CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE) {
+		pl011_base = CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE;
+		return 0;
+	}
+#endif /* CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE */
+
+	/* Do not return an error if no config is detected, as
+	 * another console driver may be enabled in Kconfig.
+	 */
+	if (!pl011_base)
+		return 0;
 
 	/* Configure the port */
-	rc = init_pl011();
-	if (unlikely(rc)) {
-		uk_pr_err("Could not initialize pl011 (%d)\n", rc);
+	rc = pl011_setup();
+	if (unlikely(rc))
 		return rc;
-	}
 
 	/* From this point we can print */
 	pl011_uart_initialized = 1;
@@ -152,49 +207,29 @@ static int early_init(struct ukplat_bootinfo *bi)
 
 static int init(struct uk_init_ctx *ictx __unused)
 {
-	int offset, len, naddr, nsize;
 	struct ukplat_bootinfo *bi;
 	__sz size __maybe_unused;
-	const __u64 *regs;
-	const void *dtb;
 	__u64 reg_base;
 	__u64 reg_size;
+	int offset;
 	int rc;
 
 	bi = ukplat_bootinfo_get();
 	UK_ASSERT(bi);
 
-	dtb = (void *)bi->dtb;
-	UK_ASSERT(dtb);
-
-	uk_pr_debug("Probing pl011\n");
-
-	offset = fdt_node_offset_by_compatible(dtb, -1, "arm,pl011");
+	/* Pick the 1st device in the dtb */
+	offset = fdt_node_offset_by_compatible_list((void *)bi->dtb, -1,
+						    fdt_compatible);
 	if (unlikely(offset < 0)) {
 		uk_pr_err("pl011 not found in fdt\n");
 		return -ENODEV;
 	}
 
-	naddr = fdt_address_cells(dtb, offset);
-	if (unlikely(naddr < 0 || naddr >= FDT_MAX_NCELLS)) {
-		uk_pr_err("Invalid address-cells\n");
-		return -EINVAL;
+	rc = fdt_get_address((void *)bi->dtb, offset, 0, &reg_base, &reg_size);
+	if (unlikely(rc)) {
+		uk_pr_err("Could not parse fdt node\n");
+		return rc;
 	}
-
-	nsize = fdt_size_cells(dtb, offset);
-	if (unlikely(nsize < 0 || nsize >= FDT_MAX_NCELLS)) {
-		uk_pr_err("Invalid size-cells\n");
-		return -EINVAL;
-	}
-
-	regs = fdt_getprop(dtb, offset, "reg", &len);
-	if (unlikely(!regs || (len < (int)sizeof(fdt32_t) * (naddr + nsize)))) {
-		uk_pr_err("Invalid 'reg' property: %p %d\n", regs, len);
-		return -EINVAL;
-	}
-
-	reg_base = fdt64_to_cpu(regs[0]);
-	reg_size = ALIGN_UP(fdt64_to_cpu(regs[1]), __PAGE_SIZE);
 
 	uk_pr_debug("pl011 @ 0x%lx - 0x%lx\n", reg_base, reg_base + reg_size);
 
@@ -209,7 +244,7 @@ static int init(struct uk_init_ctx *ictx __unused)
 	pl011_base = reg_base;
 #endif /* !CONFIG_PAGING */
 
-	rc = init_pl011();
+	rc = pl011_setup();
 	if (unlikely(rc)) {
 		uk_pr_err("Could not initialize pl011\n");
 		return rc;

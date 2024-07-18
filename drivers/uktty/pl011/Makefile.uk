@@ -1,4 +1,5 @@
 $(eval $(call addlib_s,libuktty_pl011,$(CONFIG_LIBUKTTY_PL011)))
+$(eval $(call addlib_paramprefix,libuktty_pl011,pl011))
 
 CINCLUDES-$(CONFIG_LIBUKTTY_PL011)   += -I$(LIBUKTTY_PL011_BASE)/include
 CXXINCLUDES-$(CONFIG_LIBUKTTY_PL011) += -I$(LIBUKTTY_PL011_BASE)/include
