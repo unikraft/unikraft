@@ -122,6 +122,13 @@ static int early_init(struct ukplat_bootinfo *bi)
 
 	pl011_base = CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE;
 
+	/* Configure the port */
+	rc = init_pl011();
+	if (unlikely(rc)) {
+		uk_pr_err("Could not initialize pl011 (%d)\n", rc);
+		return rc;
+	}
+
 	/* From this point we can print */
 	pl011_uart_initialized = 1;
 
