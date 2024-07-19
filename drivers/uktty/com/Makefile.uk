@@ -1,0 +1,5 @@
+$(eval $(call addlib_s,libuktty_com,$(CONFIG_LIBUKTTY_COM)))
+$(eval $(call addlib_paramprefix,libuktty_com,com))
+
+LIBUKTTY_COM_CINCLUDES-y += -I$(UK_PLAT_COMMON_BASE)/include
+LIBUKTTY_COM_SRCS-y += $(LIBUKTTY_COM_BASE)/com.c
