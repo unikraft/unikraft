@@ -31,7 +31,10 @@
 #include <string.h>
 #include <x86/cpu.h>
 #include <x86/irq.h>
-#include <kvm-x86/vga_console.h>
+#include <uk/console/driver.h>
+#include <uk/prio.h>
+#include <uk/boot/earlytab.h>
+#include <uk/plat/common/bootinfo.h>
 
 #include <uk/essentials.h>
 
@@ -69,6 +72,9 @@ static inline uint16_t vga_entry(unsigned char uc, uint8_t color)
 #define VGA_WIDTH     80
 #define VGA_HEIGHT    25
 #define VGA_FB_BASE   0xb8000
+#define X86_VIDEO_MEM_START	0xA0000UL
+#define X86_VIDEO_MEM_LEN	0x20000UL
+
 
 static size_t terminal_row;
 static size_t terminal_column;
@@ -86,41 +92,6 @@ static void clear_terminal(void)
 			terminal_buffer[index] = vga_entry(' ', terminal_color);
 		}
 	}
-}
-
-void _libkvmplat_init_vga_console(void)
-{
-	unsigned long irq_flags;
-
-	terminal_row = 0;
-	terminal_column = 0;
-	terminal_color = vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
-
-	local_irq_save(irq_flags);
-	/* Location of the address and data registers is variable and denoted
-	 * by the least significant bit in the Input/Output register located
-	 * at 0x3cc. For our emulated color display, they should always be
-	 * 0x3d{4,5}, but better safe than sorry, so let's check at init time.
-	 */
-	if (inb(0x3cc) & 0x1) {
-		areg = 0x3d4;
-		dreg = 0x3d5;
-	} else {
-		areg = 0x3b4;
-		dreg = 0x3b5;
-	}
-
-	/* Initialize cursor appearance. Setting CURSOR_START (0x0a) to 0x0e
-	 * and CURSOR_END (0x0b) to 0x0f enables the cursor and produces
-	 * a blinking underscore.
-	 */
-	outb(areg, 0x0a);
-	outb(dreg, 0x0e);
-	outb(areg, 0x0b);
-	outb(dreg, 0x0f);
-	local_irq_restore(irq_flags);
-
-	clear_terminal();
 }
 
 static void terminal_putentryat(char c, uint8_t color, size_t x, size_t y)
@@ -157,7 +128,7 @@ static void vga_update_cursor(void)
 	local_irq_restore(irq_flags);
 }
 
-void _libkvmplat_vga_putc(char c)
+static void vga_putc(char c)
 {
 #define NEWLINE()                           \
 	do {                                \
@@ -229,3 +200,72 @@ void _libkvmplat_vga_putc(char c)
 
 	vga_update_cursor();
 }
+
+static __ssz vga_console_out(struct uk_console *dev __unused,
+			     const char *buf, __sz len)
+{
+	for (__sz i = 0; i < len; i++)
+		vga_putc(buf[i]);
+	return len;
+}
+
+static struct uk_console_ops vga_ops = { .out = vga_console_out };
+
+static struct uk_console vga_dev;
+
+static int vga_init(struct ukplat_bootinfo *bi)
+{
+	unsigned long irq_flags;
+	struct ukplat_memregion_desc mrd = {0};
+	int rc;
+
+	terminal_row = 0;
+	terminal_column = 0;
+	terminal_color = vga_entry_color(VGA_COLOR_LIGHT_GREY, VGA_COLOR_BLACK);
+
+	local_irq_save(irq_flags);
+	/* Location of the address and data registers is variable and denoted
+	 * by the least significant bit in the Input/Output register located
+	 * at 0x3cc. For our emulated color display, they should always be
+	 * 0x3d{4,5}, but better safe than sorry, so let's check at init time.
+	 */
+	if (inb(0x3cc) & 0x1) {
+		areg = 0x3d4;
+		dreg = 0x3d5;
+	} else {
+		areg = 0x3b4;
+		dreg = 0x3b5;
+	}
+
+	/* Initialize cursor appearance. Setting CURSOR_START (0x0a) to 0x0e
+	 * and CURSOR_END (0x0b) to 0x0f enables the cursor and produces
+	 * a blinking underscore.
+	 */
+	outb(areg, 0x0a);
+	outb(dreg, 0x0e);
+	outb(areg, 0x0b);
+	outb(dreg, 0x0f);
+	local_irq_restore(irq_flags);
+
+	clear_terminal();
+
+	uk_console_init(&vga_dev, "VGA", &vga_ops, UK_CONSOLE_FLAG_STDOUT);
+	uk_console_register(&vga_dev);
+
+	mrd.pbase = X86_VIDEO_MEM_START;
+	mrd.vbase = X86_VIDEO_MEM_START;
+	mrd.pg_off = 0;
+	mrd.len = X86_VIDEO_MEM_LEN;
+	mrd.pg_count = PAGE_COUNT(X86_VIDEO_MEM_LEN);
+	mrd.type = UKPLAT_MEMRT_RESERVED;
+	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE;
+	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
+	if (unlikely(rc < 0)) {
+		uk_pr_err("Could not insert mrd (%d)\n", rc);
+		return rc;
+	}
+
+	return 0;
+}
+
+UK_BOOT_EARLYTAB_ENTRY(vga_init, UK_PRIO_AFTER(UK_PRIO_EARLIEST));
