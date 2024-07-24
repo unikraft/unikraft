@@ -223,6 +223,26 @@ struct __regs {
 
 UK_CTASSERT(sizeof(struct __regs) == __REGS_SIZEOF);
 
+static inline __uptr ukarch_regs_get_sp(struct __regs *r)
+{
+	return r->sp;
+}
+
+static inline void ukarch_regs_set_sp(__uptr sp, struct __regs *r)
+{
+	r->sp = sp;
+}
+
+static inline __uptr ukarch_regs_get_pc(struct __regs *r)
+{
+	return r->elr_el1;
+}
+
+static inline void ukarch_regs_set_pc(__uptr pc, struct __regs *r)
+{
+	r->elr_el1 = pc;
+}
+
 /*
  * Change this structure must update __CALLEE_SAVED_SIZE at the
  * same time.
