@@ -96,6 +96,27 @@ struct __regs {
 };
 
 UK_CTASSERT(sizeof(struct __regs) == __REGS_SIZEOF);
+
+static inline __uptr ukarch_regs_get_sp(struct __regs *r)
+{
+	return r->rsp;
+}
+
+static inline void ukarch_regs_set_sp(__uptr sp, struct __regs *r)
+{
+	r->rsp = sp;
+}
+
+static inline __uptr ukarch_regs_get_pc(struct __regs *r)
+{
+	return r->rip;
+}
+
+static inline void ukarch_regs_set_pc(__uptr pc, struct __regs *r)
+{
+	r->rip = pc;
+}
+
 #endif /* !__ASSEMBLY__ */
 
 /* sanity check */
