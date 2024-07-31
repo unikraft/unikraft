@@ -6,6 +6,7 @@
 
 #include <stdio.h>
 #include <stdarg.h>
+#include <errno.h>
 
 #include <uk/plat/console.h>
 
@@ -16,7 +17,14 @@ uk_scanf(void *buffer,  size_t *cnt)
 	size_t bytes_total = 0, count;
 	char *buf = buffer;
 
-	count = *cnt;
+	/* Need at least two bytes: one for user input and one for
+	 * the NULL termination. The byte for user input is required,
+	 * otherwise we run into an endless loop on `ukplat_cink`.
+	 */
+	if (*cnt <= 1)
+		return -EINVAL;
+
+	count = *cnt - 1;
 
 	do {
 		while ((bytes_read = ukplat_cink(buf,
@@ -46,6 +54,7 @@ uk_scanf(void *buffer,  size_t *cnt)
 	} while (bytes_total < count &&
 	((bytes_total == 0) || (*(buf - 1) != '\n' && *(buf - 1) != '\0')));
 
+	((char *)buffer)[bytes_total] = '\0';
 	*cnt = bytes_total;
 
 	return 0;
