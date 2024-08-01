@@ -4,7 +4,8 @@ menuconfig LIBUKTTY_PL011
 	select LIBUKOFW
 
 if LIBUKTTY_PL011
-menuconfig LIBUKTTY_PL011_EARLY_CONSOLE
+
+config LIBUKTTY_PL011_EARLY_CONSOLE
 	bool "Early console"
 	select LIBUKBOOT
 	help
@@ -12,10 +13,4 @@ menuconfig LIBUKTTY_PL011_EARLY_CONSOLE
 		default console. Override by setting `pl011.base`
 		at the cmdline, if LIBUKLIBPARAM is enabled.
 
-if LIBUKTTY_PL011_EARLY_CONSOLE
-config LIBUKTTY_PL011_EARLY_CONSOLE_BASE
-	hex "Early console base address"
-	default 0
-
-endif
 endif
