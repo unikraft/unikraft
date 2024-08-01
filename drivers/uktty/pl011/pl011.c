@@ -166,13 +166,6 @@ static int early_init(struct ukplat_bootinfo *bi)
 		}
 	}
 
-#if CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE
-	if (!pl011_base && CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE) {
-		pl011_base = CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE;
-		return 0;
-	}
-#endif /* CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE_BASE */
-
 	/* Do not return an error if no config is detected, as
 	 * another console driver may be enabled in Kconfig.
 	 */
