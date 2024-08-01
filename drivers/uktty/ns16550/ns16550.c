@@ -91,10 +91,10 @@ static __u64 ns16550_uart_base;
 UK_LIBPARAM_PARAM_ALIAS(base, &ns16550_uart_base, __u64, "ns16550 base");
 
 /* The register shift. Default is 0 (device-tree spec v0.4 Sect. 4.2.2) */
-static __u32 ns16550_reg_shift = CONFIG_LIBUKTTY_NS16550_REG_SHIFT;
+static __u32 ns16550_reg_shift;
 
 /* The register width. Default is 1 (8-bit register width) */
-static __u32 ns16550_reg_width = CONFIG_LIBUKTTY_NS16550_REG_WIDTH;
+static __u32 ns16550_reg_width = 1;
 
 /* Macros to access ns16550 registers with base address and reg shift */
 #define NS16550_REG(r) (ns16550_uart_base + (r << ns16550_reg_shift))
@@ -221,11 +221,6 @@ static int early_init(struct ukplat_bootinfo *bi)
 		}
 	}
 
-#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE
-	if (!ns16550_uart_base && CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE)
-		ns16550_uart_base = CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE;
-#endif /* CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE */
-
 	/* Do not return an error if no config is detected, as
 	 * another console driver may be enabled in Kconfig.
 	 */
@@ -340,10 +335,7 @@ static void _putc(char a)
 
 static void ns16550_putc(char a)
 {
-	/*
-	 * Avoid using the UART before base address initialized, or
-	 * if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE is not enabled.
-	 */
+	/* Avoid using the UART before base address initialized */
 	if (!ns16550_uart_initialized)
 		return;
 
@@ -355,10 +347,7 @@ static void ns16550_putc(char a)
 /* Try to get data from ns16550 UART without blocking */
 static int ns16550_getc(void)
 {
-	/*
-	 * Avoid using the UART before base address initialized, or
-	 * if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE_BASE is not enabled.
-	 */
+	/* Avoid using the UART before base address initialized */
 	if (!ns16550_uart_initialized)
 		return -1;
 
