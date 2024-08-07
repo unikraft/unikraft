@@ -166,8 +166,8 @@ config ARM64_FEAT_PAUTH
 
 menuconfig ARM64_FEAT_MTE
 	bool "Armv8.5 Memory Tagging Extensions"
-	select HAVE_ARM64_FEAT_RNG
 	select HAVE_MEMTAG
+	select LIBUKRANDOM
 	select PAGING
 	help
 	  Protects against memory safety violations by restricting
