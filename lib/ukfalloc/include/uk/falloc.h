@@ -39,6 +39,11 @@
 #include <uk/essentials.h>
 #include <uk/assert.h>
 
+#ifdef CONFIG_LIBUKFALLOC_STATS
+#include <uk/list.h>
+#include <uk/store.h>
+#endif /* CONFIG_LIBUKFALLOC_STATS */
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -128,6 +133,11 @@ struct uk_falloc {
 
 	/** The total amount of memory managed by the allocator in bytes */
 	__sz total_memory;
+
+#ifdef CONFIG_LIBUKFALLOC_STATS
+	struct uk_list_head store_obj_list;
+	struct uk_store_object *stats;
+#endif /* CONFIG_LIBUKFALLOC_STATS */
 };
 
 /**
