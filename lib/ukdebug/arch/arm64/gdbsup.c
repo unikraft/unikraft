@@ -175,3 +175,10 @@ __ssz gdb_arch_write_register(int regnr, struct __regs *regs,
 
 	return -EINVAL;
 }
+
+void invalidate_icache_range(__sz addr, __sz len);
+
+void gdb_arch_invalidate_cache(__sz addr, __sz len)
+{
+	invalidate_icache_range(addr, len);
+}

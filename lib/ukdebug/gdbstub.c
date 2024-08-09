@@ -317,12 +317,12 @@ static __ssz gdb_read_memory(unsigned long addr, __sz len,
 static __ssz gdb_write_memory(unsigned long addr, __sz len,
 			      void *buf, __sz buf_len)
 {
+	__sz rc = 0;
 #if CONFIG_HAVE_PAGING
 	__paddr_t paddr = 0;
 	__vaddr_t kmap_vaddr = 0;
 	struct uk_pagetable *pt = __NULL;
 	unsigned long n_pages = 0;
-	__sz rc = 0;
 
 	len = MIN(len, buf_len);
 	n_pages = round_pgup(len) / __PAGE_SIZE;
@@ -332,8 +332,10 @@ static __ssz gdb_write_memory(unsigned long addr, __sz len,
 		/* Paging isn't initialized. We don't need the kmap detour to
 		 * work around permissions.
 		 */
-		return uk_nofault_memcpy((void *)addr, buf, len,
-					 UK_NOFAULTF_NOPAGING);
+		rc = uk_nofault_memcpy((void *)addr, buf, len,
+				       UK_NOFAULTF_NOPAGING);
+		gdb_arch_invalidate_cache(addr, len);
+		return rc;
 	}
 
 	paddr = ukplat_virt_to_phys((void *)addr);
@@ -350,13 +352,16 @@ static __ssz gdb_write_memory(unsigned long addr, __sz len,
 	 */
 	rc = uk_nofault_memcpy((void *)kmap_vaddr, buf, len,
 			       UK_NOFAULTF_NOPAGING);
+	gdb_arch_invalidate_cache(addr, len);
 
 	ukplat_page_kunmap(pt, kmap_vaddr, n_pages, 0);
 
 	return rc;
 #else /* !CONFIG_HAVE_PAGING */
-	return uk_nofault_memcpy((void *)addr, buf, MIN(len, buf_len),
-				 UK_NOFAULTF_NOPAGING);
+	rc = uk_nofault_memcpy((void *)addr, buf, MIN(len, buf_len),
+			       UK_NOFAULTF_NOPAGING);
+	gdb_arch_invalidate_cache(addr, len);
+	return rc;
 #endif /* !CONFIG_HAVE_PAGING */
 }
 

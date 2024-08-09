@@ -184,3 +184,7 @@ __ssz gdb_arch_write_register(int regnr, struct __regs *regs,
 
 	return -EINVAL;
 }
+
+void gdb_arch_invalidate_cache(__sz addr __unused, __sz len __unused)
+{
+}

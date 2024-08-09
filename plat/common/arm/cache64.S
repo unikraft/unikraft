@@ -99,3 +99,34 @@ ENTRY(invalidate_dcache_range)
 	dsb	sy
 	ret
 END(invalidate_dcache_range)
+
+ENTRY(invalidate_icache_range)
+	/* Get information about the caches from CTR_EL0 */
+	mrs	x4, ctr_el0
+	mov	x2, #CTR_BYTES_PER_WORD
+
+	/* Get minimum I cache line size */
+	and x3, x4, #CTR_IMINLINE_MASK
+	lsl	x3, x2, x3
+
+	/* Align the start address to line size */
+	sub	x4, x3, #1
+	and	x2, x0, x4
+	add	x1, x1, x2
+	bic	x0, x0, x4
+1:
+	/* Invalidate I cache a clean D cache */
+	ic ivau, x0
+	dc cvac, x0
+	dsb nsh
+
+	/* Move to next line and reduce size */
+	add x0, x0, x3
+	subs x1, x1, x3
+
+	/* Check if all range has been invalidated */
+	b.hi 1b
+	isb
+	dsb sy
+	ret
+END(invalidate_icache_range)
