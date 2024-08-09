@@ -67,6 +67,7 @@ __ssz gdb_arch_read_register(int regnr, struct __regs *regs,
 			     void *buf, __sz buf_len);
 __ssz gdb_arch_write_register(int regnr, struct __regs *regs,
 			      void *buf, __sz buf_len);
+void gdb_arch_invalidate_cache(__sz addr, __sz len);
 
 static inline void gdb_arch_brk(void)
 {
