@@ -24,6 +24,10 @@
 #include <uk/plat/common/sections.h>
 #include <uk/plat/common/bootinfo.h>
 
+#ifdef CONFIG_RUNTIME_ASLR
+#include <uk/random.h>
+#endif
+
 static char *cmdline;
 static __sz cmdline_len;
 
@@ -95,9 +99,16 @@ void _ukplat_entry(struct lcpu *lcpu, struct ukplat_bootinfo *bi)
 		UK_CRASH("Cmdline init failed: %d\n", rc);
 
 	/* Allocate boot stack */
+	#ifdef CONFIG_RUNTIME_ASLR
+	ASLR_early_uk_random_init();
+
+	bstack = stackmemory_aslr_palloc(__STACK_SIZE);
+	#else /* CONFIG_RUNTIME_ASLR */
 	bstack = ukplat_memregion_alloc(__STACK_SIZE, UKPLAT_MEMRT_STACK,
 					UKPLAT_MEMRF_READ |
 					UKPLAT_MEMRF_WRITE);
+	#endif /* CONFIG_RUNTIME_ASLR */
+
 	if (unlikely(!bstack))
 		UK_CRASH("Boot stack alloc failed\n");
 

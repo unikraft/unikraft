@@ -819,7 +819,15 @@ $(BUILD_DIR)/uk-gdb.py: $(SCRIPTS_DIR)/uk-gdb.py
 
 gdb_helpers: $(GDB_HELPER_LINKS) $(BUILD_DIR)/uk-gdb.py
 
-all: images gdb_helpers
+ifeq ($(CONFIG_RANDOMIZE_BASE_ADDRESS),y)
+randomize-base-address:
+	$(eval BASE_ADDRESS := $(shell $(SCRIPTS_DIR)/ASLR/base_address.py --file_path $(CONFIG_UK_BASE)/plat/kvm/x86/multiboot.S))
+else
+randomize-base-address:
+
+endif
+
+all: randomize-base-address images gdb_helpers
 ################################################################################
 # Cleanup rules
 ################################################################################

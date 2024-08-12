@@ -120,6 +120,12 @@ config OPTIMIZE_PIE
 		space by a loader. Some loaders even assume that kernel entrance is
 		relocatable (e.g., EFI).
 
+config RANDOMIZE_BASE_ADDRESS
+	bool "Randomize Base Address"
+	default n
+	help
+		Randomizez the base address of the executable.
+
 choice
 	prompt "Debug information level"
 	default DEBUG_SYMBOLS_LVL3

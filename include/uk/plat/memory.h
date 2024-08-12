@@ -368,6 +368,17 @@ struct uk_alloc *ukplat_memallocator_get(void);
 void *ukplat_memregion_alloc(__sz size, int type, __u16 flags);
 
 /**
+ * Loops through all the free memory regions and randomly choses a place
+ * to allocate the stack.
+ * @param size
+ *   The size to allocate. Will be rounded up to next multiple of page size.
+ *
+ * @return
+ *   A pointer to the allocated stack on success, NULL otherwise.
+ */
+void *stackmemory_aslr_palloc(__sz size);
+
+/**
  * Initializes the memory mapping based on the platform or architecture defined
  * unmapping memory region descriptor (named `bpt_unmap_mrd`). Based on this
  * descriptor, the function surrounds the kernel image with the unmappings,

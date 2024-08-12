@@ -47,6 +47,54 @@ KVM_LD_SCRIPT_FLAGS := $(addprefix -Wl$(comma)-dT$(comma),\
 KVM_LD_SCRIPT_FLAGS += $(addprefix -Wl$(comma)-T$(comma),\
 			$(KVM_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y))
 
+KVM_LD_SCRIPT_FLAGS_ASLR := $(addprefix -Wl$(comma)-dT$(comma),\
+			 $(UK_PLAT_KVM_DEF_LDS_ASLR))
+KVM_LD_SCRIPT_FLAGS_ASLR += $(addprefix -Wl$(comma)-T$(comma),\
+			$(KVM_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y))
+
+ASLR_LIBS += $(foreach P,$(UK_PLATS) $(UK_PLATS-y),\
+		$(if $(call qstrip,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y)),\
+		$(foreach L,$($(call uc,$(P))_LIBS) $($(call uc,$(P))_LIBS-y), \
+		$(if $(call qstrip,$($(call vprefix_lib,$(L),SRCS)) $($(call vprefix_lib,$(L),SRCS-y))), \
+		$(L) \
+		)))) \
+		$(UK_LIBS) $(UK_LIBS-y)
+
+ASLR_args += --file_path=$(UK_PLAT_KVM_DEF_LDS) \
+	--lib_list="$(ASLR_LIBS)" --output_path=$(UK_PLAT_KVM_DEF_LDS_ASLR) --base_addr=$(BASE_ADDRESS)
+
+ifeq (y,$(CONFIG_LINK_ASLR))
+$(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
+		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y)
+
+	$(call build_cmd,ASLR,,ASLR,\
+		$(SCRIPTS_DIR)/ASLR/ASLR.py \
+			$(ASLR_args))
+
+	$(call build_cmd,LD,,$(KVM_IMAGE).ld.o,\
+	       $(LD) -r $(LIBLDFLAGS) $(LIBLDFLAGS-y) \
+			$(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
+			$(KVM_OLIBS) $(KVM_OLIBS-y) \
+			$(UK_OLIBS) $(UK_OLIBS-y) \
+			-Wl$(comma)--start-group \
+			$(KVM_ALIBS) $(KVM_ALIBS-y) \
+			$(UK_ALIBS) $(UK_ALIBS-y) \
+			$(KVM_LINK_LIBGCC_FLAG) \
+			-Wl$(comma)--end-group \
+			-o $(KVM_IMAGE).ld.o)
+
+	$(call build_cmd,OBJCOPY,,$(KVM_IMAGE).o,\
+		$(OBJCOPY) -w \
+			$(KVM_IMAGE).ld.o $(KVM_IMAGE).o)
+
+	$(call build_cmd,LD,,$@,\
+	       $(LD) $(LDFLAGS) $(LDFLAGS-y) \
+		     $(KVM_LDFLAGS) $(KVM_LDFLAGS-y) \
+		     $(KVM_LD_SCRIPT_FLAGS_ASLR)\
+		     -L$(BUILD_DIR) \
+		     -o $@)
+	$(call build_bootinfo,$@)
+else
 $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 		    $(UK_ALIBS) $(UK_ALIBS-y) $(UK_OLIBS) $(UK_OLIBS-y) \
 		    $(KVM_LD_SCRIPT-y) $(EXTRA_LD_SCRIPT-y) \
@@ -64,6 +112,8 @@ $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 			$(LDFLAGS) $(LDFLAGS-y) \
 			$(KVM_LD_SCRIPT_FLAGS) \
 			-o $@)
+endif
+
 ifeq ($(CONFIG_OPTIMIZE_PIE),y)
 	$(call build_uk_reloc,$@)
 endif

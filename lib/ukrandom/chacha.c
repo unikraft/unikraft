@@ -214,7 +214,9 @@ __u32 uk_swrand_randr(void)
 	unsigned long iflags;
 	__u32 ret;
 
+	#ifndef CONFIG_RUNTIME_ASLR
 	UK_ASSERT(!ukplat_lcpu_irqs_disabled());
+	#endif
 
 	iflags = ukplat_lcpu_save_irqf();
 	ret = uk_swrand_randr_r(&uk_swrand_def);
