@@ -98,6 +98,13 @@ struct uk_sched {
 	struct uk_alloc *a_auxstack; /**< default allocator for aux stacks */
 	struct uk_alloc *a_uktls; /**< default allocator for TLS+ectx */
 	struct uk_sched *next;
+#if CONFIG_LIBUKSCHED_STATS
+	__nsec start_time;
+	unsigned long sched_count;
+	unsigned long yield_count;
+	unsigned long next_count;
+	unsigned long idle_count;
+#endif /* CONFIG_LIBUKSCHED_STATS */
 };
 
 /* wrapper functions over scheduler callbacks */
@@ -110,6 +117,9 @@ static inline void uk_sched_yield(void)
 
 	s = current->sched;
 	UK_ASSERT(s);
+#if CONFIG_LIBUKSCHED_STATS
+	s->yield_count++;
+#endif /* CONFIG_LIBUKSCHED_STATS */
 	s->yield(s);
 }
 
