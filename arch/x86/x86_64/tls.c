@@ -40,7 +40,7 @@
 
 #include <string.h>
 #include <uk/print.h>
-#include <uk/hexdump.h>
+#include <uk/print/hexdump.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include <uk/arch/types.h>
@@ -201,5 +201,5 @@ void ukarch_tls_area_init(void *tls_area)
 	ukarch_tls_tcb_init((void *) ukarch_tls_tlsp(tls_area));
 #endif /* CONFIG_UKARCH_TLS_HAVE_TCB */
 
-	uk_hexdumpCd(tls_area, ukarch_tls_area_size());
+	uk_hexdumpCk(UK_PRINT_KLVL_DEBUG, tls_area, ukarch_tls_area_size());
 }
