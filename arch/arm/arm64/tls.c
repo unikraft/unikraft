@@ -42,19 +42,17 @@
 #endif /* CONFIG_LIBCONTEXT_CLEAR_TBSS */
 
 #include <string.h>
-#include <uk/print.h>
-#include <uk/hexdump.h>
-#include <uk/assert.h>
-#include <uk/essentials.h>
+
 #include <uk/arch/types.h>
 #include <uk/arch/tls.h>
+#include <uk/essentials.h>
+#include <uk/print.h>
+#include <uk/print/hexdump.h>
 
 #if CONFIG_LIBUKDEBUG
 #include <uk/assert.h>
-#include <uk/print.h>
 #else /* !CONFIG_LIBUKDEBUG */
 #define UK_ASSERT(..) do {} while (0)
-#define uk_pr_debug(..) do {} while (0)
 #endif /* !CONFIG_LIBUKDEBUG */
 
 /*
@@ -284,6 +282,6 @@ void ukarch_tls_area_init(void *tls_area)
 
 	UK_ASSERT(ukarch_tls_area_size() ==
 		  (__sz) (writepos - (__u8 *) tls_area));
-	uk_hexdumpCd(tls_area, ukarch_tls_area_size());
+	uk_hexdumpCk(UK_PRINT_KLVL_DEBUG, tls_area, ukarch_tls_area_size());
 }
 
