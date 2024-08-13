@@ -42,7 +42,7 @@
 
 #if CONFIG_LIBUKDEBUG
 #include <uk/print.h>
-#include <uk/hexdump.h>
+#include <uk/print/hexdump.h>
 #include <uk/trace.h>
 #include <uk/assert.h>
 #endif
