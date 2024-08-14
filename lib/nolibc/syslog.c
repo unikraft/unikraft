@@ -39,16 +39,14 @@
 static int log_facility = LOG_USER;
 
 static const int level_map[] = {
-	KLVL_CRIT, /* LOG_EMERG */
-	KLVL_CRIT, /* LOG_ALERT */
-	KLVL_CRIT, /* LOG_CRIT */
-	KLVL_ERR,  /* LOG_ERR */
-	KLVL_WARN, /* LOG_WARNING */
-	KLVL_INFO, /* LOG_NOTICE */
-	KLVL_INFO, /* LOG_INFO */
-
-	/* This one maps to a different macro on unikraft */
-	/* KLVL_INFO, */ /* LOG_DEBUG */
+	UK_PRINT_KLVL_CRIT, /* LOG_EMERG */
+	UK_PRINT_KLVL_CRIT, /* LOG_ALERT */
+	UK_PRINT_KLVL_CRIT, /* LOG_CRIT */
+	UK_PRINT_KLVL_ERR,  /* LOG_ERR */
+	UK_PRINT_KLVL_WARN, /* LOG_WARNING */
+	UK_PRINT_KLVL_INFO, /* LOG_NOTICE */
+	UK_PRINT_KLVL_INFO, /* LOG_INFO */
+	UK_PRINT_KLVL_DEBUG, /* LOG_DEBUG */
 };
 
 static const char *facility_to_str(int facility)
@@ -127,14 +125,9 @@ void vsyslog(int priority, const char *format, va_list ap)
 	priority &= LOG_PRIMASK;
 
 	/* Forward call */
-	if (priority == LOG_DEBUG) {
-		uk_printd("[%s] ", facility_to_str(facility));
-		uk_printd(format, ap);
-	} else {
-		priority = MAX(priority, 0);
-		priority = MIN(priority, (int)ARRAY_SIZE(level_map));
-		uk_printk(level_map[priority], "[%s] ",
-			  facility_to_str(facility));
-		uk_printk(level_map[priority], format, ap);
-	}
+	priority = MAX(priority, 0);
+	priority = MIN(priority, (int)ARRAY_SIZE(level_map));
+	uk_printk(level_map[priority], "[%s] ",
+		  facility_to_str(facility));
+	uk_printk(level_map[priority], format, ap);
 }
