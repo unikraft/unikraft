@@ -8,7 +8,7 @@
 #include <uk/test.h>
 #include <uk/streambuf.h>
 #include <uk/essentials.h>
-#include <uk/hexdump.h>
+#include <uk/print/hexdump.h>
 
 UK_TESTCASE(ukstreambuf, streambuf_init)
 {
