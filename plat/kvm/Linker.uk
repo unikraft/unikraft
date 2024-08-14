@@ -1,5 +1,5 @@
 ifeq (x86_64,$(CONFIG_UK_ARCH))
-ifeq ($(CONFIG_KVM_BOOT_PROTO_MULTIBOOT),y)
+ifeq ($(findstring y,$(CONFIG_KVM_BOOT_PROTO_MULTIBOOT) $(CONFIG_KVM_BOOT_PROTO_MULTIBOOT2)),y)
 KVM_LDFLAGS-y += -Wl,-m,elf_x86_64
 KVM_LDFLAGS-y += -Wl,--entry=_multiboot_entry
 else ifeq ($(CONFIG_KVM_BOOT_PROTO_LXBOOT),y)
@@ -79,6 +79,9 @@ $(KVM_IMAGE): $(KVM_IMAGE).dbg
 	$(call build_bootinfo,$@)
 ifeq ($(CONFIG_KVM_BOOT_PROTO_MULTIBOOT),y)
 	$(call build_multiboot,$@)
+endif
+ifeq ($(CONFIG_KVM_BOOT_PROTO_MULTIBOOT2),y)
+	$(call build_multiboot2,$@)
 endif
 ifeq ($(CONFIG_KVM_BOOT_PROTO_EFI_STUB),y)
 	$(call build_efi,$@)

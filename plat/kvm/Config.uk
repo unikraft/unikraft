@@ -36,6 +36,12 @@ config KVM_BOOT_PROTO_MULTIBOOT
 	help
 		Multiboot Boot Protocol Version 1
 
+config KVM_BOOT_PROTO_MULTIBOOT2
+	bool "Multiboot2"
+	depends on ARCH_X86_64
+	help
+		Multiboot Boot Protocol Version 2
+
 config KVM_BOOT_PROTO_LXBOOT
 	bool "Lxboot"
 	depends on KVM_VMM_FIRECRACKER || (KVM_VMM_QEMU && ARCH_ARM_64)
