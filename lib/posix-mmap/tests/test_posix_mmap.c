@@ -15,7 +15,7 @@
 #include <uk/vmem.h>
 
 #define pr_info(fmt, ...)						\
-	_uk_printk(KLVL_INFO, __NULL, __NULL, 0x0, fmt, ##__VA_ARGS__)
+	_uk_printk(UK_PRINT_KLVL_INFO, __NULL, __NULL, 0x0, fmt, ##__VA_ARGS__)
 
 #define pm_bug_on(cond)							\
 	do {								\
