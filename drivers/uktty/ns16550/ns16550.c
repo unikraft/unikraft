@@ -27,7 +27,6 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include "uk/arch/lcpu.h"
 #include <libfdt.h>
 #include <uk/assert.h>
 #include <uk/config.h>
@@ -38,6 +37,8 @@
 #include <uk/console.h>
 #include <uk/compiler.h>
 #include <uk/errptr.h>
+
+#include "ns16550.h"
 
 #if CONFIG_LIBUKALLOC
 #include <uk/alloc.h>
@@ -85,129 +86,76 @@ static const char * const fdt_compatible[] = {
 	"ns16550", "ns16550a", NULL
 };
 
-struct ns16550_device {
-	struct uk_console dev;
-	__u64 base, size;
-};
-
 #if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
 static struct ns16550_device earlycon;
 
 UK_LIBPARAM_PARAM_ALIAS(base, &earlycon.base, __u64, "ns15550 base");
 #endif /* CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
 
-/* The register shift. Default is 0 (device-tree spec v0.4 Sect. 4.2.2) */
-static __u32 ns16550_reg_shift;
-
-/* The register width. Default is 1 (8-bit register width) */
-static __u32 ns16550_reg_width = 1;
-
-/* Macros to access ns16550 registers with base address and reg shift */
-#define NS16550_REG(base, r) ((base) + ((r) << ns16550_reg_shift))
-
-static __u32 ns16550_reg_read(__u64 base, __u32 reg)
-{
-	__u32 ret;
-
-	switch (ns16550_reg_width) {
-	case 1:
-		ret = ioreg_read8((__u8 *)NS16550_REG(base, reg)) & 0xff;
-		break;
-	case 2:
-		ret = ioreg_read16((__u16 *)NS16550_REG(base, reg)) & 0xffff;
-		break;
-	case 4:
-		ret = ioreg_read32((__u32 *)NS16550_REG(base, reg));
-		break;
-	default:
-		UK_CRASH("Invalid register width: %d\n", ns16550_reg_width);
-	}
-	return ret;
-}
-
-static void ns16550_reg_write(__u64 base, __u32 reg, __u32 value)
-{
-	switch (ns16550_reg_width) {
-	case 1:
-		ioreg_write8((__u8 *)NS16550_REG(base, reg),
-			     (__u8)(value & 0xff));
-		break;
-	case 2:
-		ioreg_write16((__u16 *)NS16550_REG(base, reg),
-			      (__u16)(value & 0xffff));
-		break;
-	case 4:
-		ioreg_write32((__u32 *)NS16550_REG(base, reg), value);
-		break;
-	default:
-		UK_CRASH("Invalid register width: %d\n", ns16550_reg_width);
-	}
-}
-
-static void _putc(__u64 base, char a)
+static void _putc(struct ns16550_device *dev, char a)
 {
 	/* Wait until TX FIFO becomes empty */
-	while (!(ns16550_reg_read(base, NS16550_LSR_OFFSET) &
+	while (!(ns16550_io_read(dev, NS16550_LSR_OFFSET) &
 		 NS16550_LSR_TX_EMPTY))
 		;
 
 	/* Reset DLAB and write to THR */
-	ns16550_reg_write(base, NS16550_LCR_OFFSET,
-			  ns16550_reg_read(base, NS16550_LCR_OFFSET) &
-			  ~(NS16550_LCR_DLAB));
-	ns16550_reg_write(base, NS16550_THR_OFFSET, a & 0xff);
+	ns16550_io_write(dev, NS16550_LCR_OFFSET,
+			 ns16550_io_read(dev, NS16550_LCR_OFFSET) &
+			 ~(NS16550_LCR_DLAB));
+	ns16550_io_write(dev, NS16550_THR_OFFSET, a & 0xff);
 }
 
-static void ns16550_putc(__u64 base, char a)
+static void ns16550_putc(struct ns16550_device *dev, char a)
 {
 	if (a == '\n')
-		_putc(base, '\r');
-	_putc(base, a);
+		_putc(dev, '\r');
+	_putc(dev, a);
 }
 
 /* Try to get data from ns16550 UART without blocking */
-static int ns16550_getc(__u64 base)
+static int ns16550_getc(struct ns16550_device *dev)
 {
 	/* If RX FIFO is empty, return -1 immediately */
-	if (!(ns16550_reg_read(base, NS16550_LSR_OFFSET) &
+	if (!(ns16550_io_read(dev, NS16550_LSR_OFFSET) &
 	      NS16550_LSR_RX_EMPTY))
 		return -1;
 
 	/* Reset DLAB and read from RBR */
-	ns16550_reg_write(base, NS16550_LCR_OFFSET,
-			  ns16550_reg_read(base, NS16550_LCR_OFFSET) &
-			  ~(NS16550_LCR_DLAB));
-	return (int)(ns16550_reg_read(base, NS16550_RBR_OFFSET) & 0xff);
+	ns16550_io_write(dev, NS16550_LCR_OFFSET,
+			 ns16550_io_read(dev, NS16550_LCR_OFFSET) &
+			 ~(NS16550_LCR_DLAB));
+	return (int)(ns16550_io_read(dev, NS16550_RBR_OFFSET) & 0xff);
 }
 
-static __ssz ns16550_out(struct uk_console *dev, const char *buf, __sz len)
+static __ssz ns16550_out(struct uk_console *con, const char *buf, __sz len)
 {
 	struct ns16550_device *ns16550_dev;
 	__sz l = len;
 
-	UK_ASSERT(dev);
+	UK_ASSERT(con);
 	UK_ASSERT(buf);
 
-	ns16550_dev = __containerof(dev, struct ns16550_device, dev);
+	ns16550_dev = __containerof(con, struct ns16550_device, con);
 
 	while (l--)
-		ns16550_putc(ns16550_dev->base, *buf++);
+		ns16550_putc(ns16550_dev, *buf++);
 
 	return len;
 }
 
-static __ssz ns16550_in(struct uk_console *dev, char *buf, __sz len)
+static __ssz ns16550_in(struct uk_console *con, char *buf, __sz len)
 {
 	struct ns16550_device *ns16550_dev;
 	int rc;
 
-	UK_ASSERT(dev);
+	UK_ASSERT(con);
 	UK_ASSERT(buf);
 
-	ns16550_dev = __containerof(dev, struct ns16550_device, dev);
+	ns16550_dev = __containerof(con, struct ns16550_device, con);
 
 	for (__sz i = 0; i < len; i++) {
-		if ((rc = ns16550_getc(ns16550_dev->base)) < 0)
+		if ((rc = ns16550_getc(ns16550_dev)) < 0)
 			return i;
 		buf[i] = (char)rc;
 	}
@@ -220,39 +168,41 @@ static struct uk_console_ops ns16550_ops = {
 	.in = ns16550_in
 };
 
-static int init_ns16550(__u64 base)
+static int init_ns16550(struct ns16550_device *dev)
 {
 	__u32 lcr;
 
+	UK_ASSERT(dev);
+
 	/* Clear DLAB to access IER, FCR, LCR */
-	ns16550_reg_write(base, NS16550_LCR_OFFSET,
-			  ns16550_reg_read(base, NS16550_LCR_OFFSET) &
-			  ~(NS16550_LCR_DLAB));
+	ns16550_io_write(dev, NS16550_LCR_OFFSET,
+			 ns16550_io_read(dev, NS16550_LCR_OFFSET) &
+			 ~(NS16550_LCR_DLAB));
 
 	/* Disable all interrupts */
-	ns16550_reg_write(base, NS16550_IER_OFFSET,
-			  ns16550_reg_read(base, NS16550_FCR_OFFSET) &
-			  ~(NS16550_IIR_NO_INT));
+	ns16550_io_write(dev, NS16550_IER_OFFSET,
+			 ns16550_io_read(dev, NS16550_FCR_OFFSET) &
+			 ~(NS16550_IIR_NO_INT));
 
 	/* Disable FIFOs */
-	ns16550_reg_write(base, NS16550_FCR_OFFSET,
-			  ns16550_reg_read(base, NS16550_FCR_OFFSET) &
-			  ~(NS16550_FCR_FIFO_EN));
+	ns16550_io_write(dev, NS16550_FCR_OFFSET,
+			 ns16550_io_read(dev, NS16550_FCR_OFFSET) &
+			 ~(NS16550_FCR_FIFO_EN));
 
 	/* Set line control parameters (8n1) */
-	lcr = ns16550_reg_read(base, NS16550_LCR_OFFSET) |
+	lcr = ns16550_io_read(dev, NS16550_LCR_OFFSET) |
 	      ~(NS16550_LCR_WL | NS16550_LCR_STOP | NS16550_LCR_PARITY);
 	lcr |= NS16550_LCR_8N1;
-	ns16550_reg_write(base, NS16550_LCR_OFFSET, lcr);
+	ns16550_io_write(dev, NS16550_LCR_OFFSET, lcr);
 
 	/* Set DLAB to access DLL / DLM */
-	ns16550_reg_write(base, NS16550_LCR_OFFSET,
-			  ns16550_reg_read(base, NS16550_LCR_OFFSET) &
-			  ~(NS16550_LCR_DLAB));
+	ns16550_io_write(dev, NS16550_LCR_OFFSET,
+			 ns16550_io_read(dev, NS16550_LCR_OFFSET) &
+			 ~(NS16550_LCR_DLAB));
 
 	/* Set baud (115200) */
-	ns16550_reg_write(base, NS16550_DLL_OFFSET, NS16550_DLL_115200);
-	ns16550_reg_write(base, NS16550_DLM_OFFSET, NS16550_DLM_115200);
+	ns16550_io_write(dev, NS16550_DLL_OFFSET, NS16550_DLL_115200);
+	ns16550_io_write(dev, NS16550_DLM_OFFSET, NS16550_DLM_115200);
 
 	return 0;
 }
