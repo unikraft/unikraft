@@ -200,7 +200,7 @@
 
 /* Custom print method. */
 #define uk_test_printf(fmt, ...)					\
-	_uk_printk(KLVL_INFO, UKLIBID_NONE, __NULL, 0x0,		\
+	_uk_printk(UK_PRINT_KLVL_NONE, UKLIBID_NONE, __NULL, 0x0,	\
 	"\t" fmt, ##__VA_ARGS__)
 
 
