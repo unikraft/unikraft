@@ -54,12 +54,6 @@ void _uk_hexdumpk(int pflags, __u16 libid, const char *srcname,
 				     ((size_t)(data)), (flags),                \
 				     (grps_per_line), STRINGIFY(data) ": ");   \
 	} while (0)
-#else /* CONFIG_LIBUKPRINT_PRINTK */
-static inline void uk_hexdumpk(int pflags __unused, const void *data __unused,
-			       size_t len __unused, int flags __unused,
-			       unsigned int grps_per_line __unused)
-{}
-#endif /* CONFIG_LIBUKPRINT_PRINTK */
 
 /**
  * Plots an hexdump for a given data region to a file descriptor
@@ -96,6 +90,13 @@ int uk_hexdumpf(FILE *fp, const void *data, size_t len, size_t addr0, int flags,
 int uk_hexdumpsn(char *str, size_t size, const void *data, size_t len,
 		 size_t addr0, int flags, unsigned int grps_per_line,
 		 const char *line_prefix);
+
+#else /* !CONFIG_LIBUKPRINT_PRINTK */
+static inline void uk_hexdumpk(int pflags __unused, const void *data __unused,
+			       size_t len __unused, int flags __unused,
+			       unsigned int grps_per_line __unused)
+{}
+#endif /* !CONFIG_LIBUKPRINT_PRINTK */
 
 /**
  * Plots an hexdump for a given data region to a string buffer of unlimited size

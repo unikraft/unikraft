@@ -112,6 +112,21 @@ void _uk_printk(int flags, __u16 libid, const char *srcname,
 		}                                                              \
 	} while (0)
 #else /* !(CONFIG_LIBUKPRINT_PRINTK) */
+static inline void _uk_vprintk(int flags __unused, __u16 libid __unused,
+			       const char *srcname __unused,
+			       unsigned int srcline __unused,
+			       const char *fmt __unused, va_list ap __unused)
+{}
+
+static inline void _uk_printk(int flags, __u16 libid, const char *srcname,
+			      unsigned int srcline, const char *fmt, ...)
+			      __printf(5, 6);
+static inline void _uk_printk(int flags __unused, __u16 libid __unused,
+			      const char *srcname __unused,
+			      unsigned int srcline __unused,
+			      const char *fmt __unused, ...)
+{}
+
 static inline void uk_vprintk(int flags __unused, const char *fmt __unused,
 			      va_list ap __unused)
 {}
