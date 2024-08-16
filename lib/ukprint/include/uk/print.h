@@ -9,10 +9,12 @@
 #define __UK_PRINT_H__
 
 #include <stdarg.h>
-#include <uk/libid.h>
+
 #include <uk/arch/lcpu.h>
-#include <uk/essentials.h>
+#include <uk/bitops.h>
 #include <uk/config.h>
+#include <uk/essentials.h>
+#include <uk/libid.h>
 
 #ifdef __cplusplus
 extern "C" {
@@ -24,14 +26,18 @@ extern "C" {
 #define __STR_BASENAME__ (NULL)
 #endif
 
-/*
- * KERNEL CONSOLE
- */
-#define UK_PRINT_KLVL_DEBUG	4
-#define UK_PRINT_KLVL_INFO	3
-#define UK_PRINT_KLVL_WARN	2
-#define UK_PRINT_KLVL_ERR	1
-#define UK_PRINT_KLVL_CRIT	0
+/* Flags */
+#define UK_PRINT_KLVL_DEBUG	5
+#define UK_PRINT_KLVL_INFO	4
+#define UK_PRINT_KLVL_WARN	3
+#define UK_PRINT_KLVL_ERR	2
+#define UK_PRINT_KLVL_CRIT	1
+#define UK_PRINT_KLVL_NONE	0 /* print always */
+
+#define UK_PRINT_RAW		UK_BIT(16) /* no meta */
+
+#define UK_PRINT_KLVL_MASK	0xff
+#define UK_PRINT_RAW_MASK	UK_PRINT_RAW
 
 #if CONFIG_LIBUKPRINT_PRINTK_DEBUG
 #define UK_PRINT_KLVL_MAX UK_PRINT_KLVL_DEBUG
@@ -52,33 +58,33 @@ extern "C" {
  * in the function calls only if the configured debug level
  * requires it
  */
-void _uk_vprintk(int lvl, __u16 libid, const char *srcname,
+void _uk_vprintk(int flags, __u16 libid, const char *srcname,
 		 unsigned int srcline, const char *fmt, va_list ap);
-void _uk_printk(int lvl, __u16 libid, const char *srcname,
+void _uk_printk(int flags, __u16 libid, const char *srcname,
 		unsigned int srcline, const char *fmt, ...) __printf(5, 6);
 
 #if defined UK_DEBUG
-#define UK_PRINTK_EN(_lvl)				\
-	(((_lvl) <= UK_PRINT_KLVL_MAX) ||		\
-	 ((_lvl) == UK_PRINT_KLVL_DEBUG))
+#define UK_PRINTK_EN(_flags)						\
+	((((_flags) & UK_PRINT_KLVL_MASK) <= UK_PRINT_KLVL_MAX) ||	\
+	 (((_flags) & UK_PRINT_KLVL_MASK) == UK_PRINT_KLVL_DEBUG))
 #else /* !defined UK_DEBUG */
-#define UK_PRINTK_EN(_lvl)				\
-	(((_lvl) <= UK_PRINT_KLVL_MAX))
+#define UK_PRINTK_EN(_flags)				\
+	(((_flags) & UK_PRINT_KLVL_MASK) <= UK_PRINT_KLVL_MAX)
 #endif /* !defined UK_DEBUG */
 
-#define uk_vprintk(lvl, fmt, ap)                                               \
+#define uk_vprintk(flags, fmt, ap)                                             \
 	do {                                                                   \
-		if (UK_PRINTK_EN(lvl))                                         \
-			_uk_vprintk((lvl), uk_libid_self(), __STR_BASENAME__,  \
+		if (UK_PRINTK_EN(flags))                                       \
+			_uk_vprintk((flags), uk_libid_self(), __STR_BASENAME__,\
 				    __LINE__, (fmt), ap);                      \
 	} while (0)
 
-#define uk_vprintk_once(lvl, fmt, ap)                                          \
+#define uk_vprintk_once(flags, fmt, ap)                                        \
 	do {                                                                   \
-		if (UK_PRINTK_EN(lvl)) {                                       \
+		if (UK_PRINTK_EN(flags)) {                                     \
 			static int __x;                                        \
 			if (unlikely(!__x)) {                                  \
-				_uk_vprintk((lvl), uk_libid_self(),            \
+				_uk_vprintk((flags), uk_libid_self(),          \
 					    __STR_BASENAME__,                  \
 					    __LINE__, (fmt), ap);              \
 				__x = 1;                                       \
@@ -86,19 +92,19 @@ void _uk_printk(int lvl, __u16 libid, const char *srcname,
 		}                                                              \
 	} while (0)
 
-#define uk_printk(lvl, fmt, ...)                                               \
+#define uk_printk(flags, fmt, ...)                                             \
 	do {                                                                   \
-		if (UK_PRINTK_EN(lvl))                                         \
-			_uk_printk((lvl), uk_libid_self(), __STR_BASENAME__,   \
+		if (UK_PRINTK_EN(flags))                                       \
+			_uk_printk((flags), uk_libid_self(), __STR_BASENAME__, \
 				   __LINE__, (fmt), ##__VA_ARGS__);            \
 	} while (0)
 
-#define uk_printk_once(lvl, fmt, ...)                                          \
+#define uk_printk_once(flags, fmt, ...)                                        \
 	do {                                                                   \
-		if (UK_PRINTK_EN(lvl)) {                                       \
+		if (UK_PRINTK_EN(flags)) {                                     \
 			static int __x;                                        \
 			if (unlikely(!__x)) {                                  \
-				_uk_printk((lvl), uk_libid_self(),             \
+				_uk_printk((flags), uk_libid_self(),           \
 					   __STR_BASENAME__,                   \
 					   __LINE__, (fmt), ##__VA_ARGS__);    \
 				__x = 1;                                       \
@@ -106,20 +112,20 @@ void _uk_printk(int lvl, __u16 libid, const char *srcname,
 		}                                                              \
 	} while (0)
 #else /* !(CONFIG_LIBUKPRINT_PRINTK) */
-static inline void uk_vprintk(int lvl __unused, const char *fmt __unused,
+static inline void uk_vprintk(int flags __unused, const char *fmt __unused,
 			      va_list ap __unused)
 {}
 
-static inline void uk_printk(int lvl, const char *fmt, ...) __printf(2, 3);
-static inline void uk_printk(int lvl __unused, const char *fmt __unused, ...)
+static inline void uk_printk(int flags, const char *fmt, ...) __printf(2, 3);
+static inline void uk_printk(int flags __unused, const char *fmt __unused, ...)
 {}
 
-static inline void uk_vprintk_once(int lvl __unused, const char *fmt __unused,
+static inline void uk_vprintk_once(int flags __unused, const char *fmt __unused,
 				   va_list ap __unused)
 {}
 
-static inline void uk_printk_once(int lvl, const char *fmt, ...) __printf(2, 3);
-static inline void uk_printk_once(int lvl __unused,
+static inline void uk_printk_once(int flags, const char *fmt, ...) __printf(2, 3);
+static inline void uk_printk_once(int flags __unused,
 				  const char *fmt __unused, ...)
 {}
 #endif /* !(CONFIG_LIBUKPRINT_PRINTK) */

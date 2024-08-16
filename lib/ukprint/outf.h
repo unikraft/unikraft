@@ -27,7 +27,7 @@ struct out_dev {
 	union {
 		/* OUTDEV_KERN */
 		struct {
-			int lvl; /* OUTDEV_KERN only */
+			int flags; /* OUTDEV_KERN only */
 			__u16 libid;
 			const char *srcname;
 			unsigned int srcline;
@@ -65,10 +65,10 @@ int outf(struct out_dev *dev, const char *fmt, ...);
 	} while (0)
 
 #if CONFIG_LIBUKPRINT_PRINTK
-#define out_dev_init_kern(dev, lvl, libid, srcname, srcline)	\
+#define out_dev_init_kern(dev, flgs, libid, srcname, srcline)	\
 	do {							\
 		(dev)->type          = OUTDEV_KERN;		\
-		(dev)->uk_pr.lvl     = (lvl);			\
+		(dev)->uk_pr.flags   = (flgs);			\
 		(dev)->uk_pr.libid   = (libid);			\
 		(dev)->uk_pr.srcname = (srcname);		\
 		(dev)->uk_pr.srcline = (srcline);		\

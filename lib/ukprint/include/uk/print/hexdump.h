@@ -28,7 +28,7 @@ extern "C" {
 
 #if CONFIG_LIBUKPRINT_PRINTK
 /* Please use uk_hexdumpk() instead */
-void _uk_hexdumpk(int lvl, __u16 libid, const char *srcname,
+void _uk_hexdumpk(int pflags, __u16 libid, const char *srcname,
 		  unsigned int srcline, const void *data, size_t len,
 		  size_t addr0, int flags, unsigned int grps_per_line,
 		  const char *line_prefix);
@@ -37,7 +37,7 @@ void _uk_hexdumpk(int lvl, __u16 libid, const char *srcname,
  * Plots an hexdump for a given data region to kernel output
  * The absolute address is plotted when UK_HXDF_ADDR is set
  *
- * @param lvl Debug level
+ * @param pflags Print flags
  * @param data Start of data region to plot
  * @param len Length of data region (number of bytes)
  * @param flags Format flags, see UK_HXDF_*
@@ -45,16 +45,17 @@ void _uk_hexdumpk(int lvl, __u16 libid, const char *srcname,
  *        Number of groups (UK_HXDF_GRP*) shown per line
  * @return Returns the number of printed characters to output fp
  */
-#define uk_hexdumpk(lvl, data, len, flags, grps_per_line)                      \
+#define uk_hexdumpk(pflags, data, len, flags, grps_per_line)                   \
 	do {                                                                   \
-		if ((lvl) <= UK_PRINT_KLVL_MAX)                                \
-			_uk_hexdumpk((lvl), uk_libid_self(), __STR_BASENAME__, \
-				     __LINE__, (data), (len),                  \
+		if (((pflags) & UK_PRINT_KLVL_MASK) <= UK_PRINT_KLVL_MAX)      \
+			_uk_hexdumpk((pflags), uk_libid_self(),                \
+				     __STR_BASENAME__, __LINE__,               \
+				     (data), (len),                            \
 				     ((size_t)(data)), (flags),                \
 				     (grps_per_line), STRINGIFY(data) ": ");   \
 	} while (0)
 #else /* CONFIG_LIBUKPRINT_PRINTK */
-static inline void uk_hexdumpk(int lvl __unused, const void *data __unused,
+static inline void uk_hexdumpk(int pflags __unused, const void *data __unused,
 			       size_t len __unused, int flags __unused,
 			       unsigned int grps_per_line __unused)
 {}
@@ -136,8 +137,8 @@ int uk_hexdumpsn(char *str, size_t size, const void *data, size_t len,
  * as the hexdump Unix command using -C parameter: hexdump -C
  */
 
-#define uk_hexdumpCk(lvl, data, len)                                           \
-	uk_hexdumpk((lvl), (data), (len),                                      \
+#define uk_hexdumpCk(pflags, data, len)                                        \
+	uk_hexdumpk((pflags), (data), (len),                                   \
 		    (UK_HXDF_ADDR | UK_HXDF_ASCIISEC | UK_HXDF_GRPQWORD        \
 		     | UK_HXDF_COMPRESS),                                      \
 		    2)

@@ -1,6 +1,7 @@
 menuconfig LIBUKPRINT
 	bool "ukprint: Printing and logging facilities"
 	select LIBNOLIBC if !HAVE_LIBC
+	select LIBUKBITOPS
 	default y
 
 if LIBUKPRINT

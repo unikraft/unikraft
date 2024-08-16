@@ -36,7 +36,7 @@ int outf(struct out_dev *dev, const char *fmt, ...)
 		break;
 #if CONFIG_LIBUKPRINT_PRINTK
 	case OUTDEV_KERN:
-		_uk_vprintk(dev->uk_pr.lvl, dev->uk_pr.libid,
+		_uk_vprintk(dev->uk_pr.flags, dev->uk_pr.libid,
 			    dev->uk_pr.srcname, dev->uk_pr.srcline,
 			    fmt, ap);
 		break;

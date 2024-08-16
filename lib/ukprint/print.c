@@ -186,7 +186,7 @@ static void print_caller(struct vprint_console *cons, __uptr ra, __uptr fa)
 #endif /* CONFIG_LIBUKPRINT_PRINT_CALLER */
 
 static void vprint(struct vprint_console *cons,
-		   int lvl, __u16 libid,
+		   int flags, __u16 libid,
 #if CONFIG_LIBUKPRINT_PRINT_SRCNAME
 		   const char *srcname,
 		   unsigned int srcline,
@@ -203,6 +203,8 @@ static void vprint(struct vprint_console *cons,
 	const char *lptr = NULL;
 	const char *nlptr = NULL;
 	const char *libname = uk_libname(libid);
+	int lvl = flags & UK_PRINT_KLVL_MASK;
+	int raw = flags & UK_PRINT_RAW_MASK;
 
 	/*
 	 * Note: We reset the console colors earlier in order to exclude
@@ -224,9 +226,9 @@ static void vprint(struct vprint_console *cons,
 	case UK_PRINT_KLVL_INFO:
 		msghdr = LVLC_RESET LVLC_INFO  "Info:" LVLC_RESET " ";
 		break;
-	default:
-		/* unknown type: ignore */
-		return;
+	default: /* KLVL_NONE: no header */
+		msghdr = "";
+		break;
 	}
 
 	if (lvl != cons->prevlvl) {
@@ -244,7 +246,7 @@ static void vprint(struct vprint_console *cons,
 	len = uk_vsnprintf(lbuf, BUFLEN, fmt, ap);
 	lptr = lbuf;
 	while (len > 0) {
-		if (cons->newline) {
+		if (cons->newline && !raw) {
 #if CONFIG_LIBUKPRINT_PRINT_TIME
 			print_timestamp(cons);
 #endif
