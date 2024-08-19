@@ -5,7 +5,6 @@
  * You may not use this file except in compliance with the License.
  */
 
-#include "gdbsup.h"
 #include "../../gdbstub.h"
 
 #include <uk/arch/traps.h>
