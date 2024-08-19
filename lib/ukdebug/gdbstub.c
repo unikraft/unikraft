@@ -818,6 +818,76 @@ static int gdb_handle_q_cmd(char *buf, __sz buf_len,
 		buf, buf_len, g);
 }
 
+/* vCont[;action[:thread-id]]... */
+static int gdb_handle_vCont(char *buf, __sz buf_len,
+			    struct gdb_excpt_ctx *g __unused)
+{
+	char *buf_end = buf + buf_len;
+	int rc = 0;
+
+	/* NOTE: We don't support the thread-related features of the gdb remote
+	 * protocol. That's why we make the implicit assumption that there is
+	 * only one thread. And we don't accept any values in the thread-id
+	 * field other than 0 (any thread) or -1 (all threads). Together this
+	 * means we only accept a single action and optional thread-id field.
+	 * Whatever the thread-id field's value (omitted, 0 or -1), then
+	 * behavior is the same: apply the action to the current thread of
+	 * execution.
+	 */
+
+	if (gdb_consume_str(&buf, &buf_len, GDB_STR_A_LEN(";c"))) {
+		rc = GDB_DBG_CONT;
+	} else if (gdb_consume_str(&buf, &buf_len, GDB_STR_A_LEN(";C"))) {
+		gdb_hex2ulong(buf, buf_len, &buf); /* Ignore the signal */
+		rc = GDB_DBG_CONT;
+	} else if (gdb_consume_str(&buf, &buf_len, GDB_STR_A_LEN(";s"))) {
+		rc = GDB_DBG_STEP;
+	} else if (gdb_consume_str(&buf, &buf_len, GDB_STR_A_LEN(";S"))) {
+		gdb_hex2ulong(buf, buf_len, &buf); /* Ignore the signal */
+		rc = GDB_DBG_STEP;
+	} else {
+		/* Either no action was specified (which is considered an error)
+		 * or the action is not supported (also an error because the
+		 * response to vCont? tells the host which packets are supported
+		 */
+		GDB_CHECK(gdb_send_error_packet(EINVAL));
+		return 0;
+	}
+
+	if (buf == buf_end ||
+	    gdb_consume_str(&buf, &buf_len, GDB_STR_A_LEN(":0")) ||
+	    gdb_consume_str(&buf, &buf_len, GDB_STR_A_LEN(":-1"))) {
+		return rc;
+	}
+
+	GDB_CHECK(gdb_send_error_packet(EINVAL));
+	return 0;
+}
+
+/* vCont? */
+static int gdb_handle_vCont_ask(char *buf __unused, __sz buf_len __unused,
+				struct gdb_excpt_ctx *g __unused)
+{
+	GDB_CHECK(gdb_send_packet(GDB_STR_A_LEN("vCont;c;C;s;S")));
+
+	return 0;
+}
+
+static struct gdb_cmd_table_entry gdb_v_cmd_table[] = {
+	{ gdb_handle_vCont_ask, GDB_STR_A_LEN("Cont?") },
+	{ gdb_handle_vCont, GDB_STR_A_LEN("Cont") },
+};
+
+#define NUM_GDB_V_CMDS (sizeof(gdb_v_cmd_table) / \
+		sizeof(struct gdb_cmd_table_entry))
+
+static int gdb_handle_v_cmd(char *buf, __sz buf_len,
+			    struct gdb_excpt_ctx *g)
+{
+	return gdb_handle_multiletter_cmd(gdb_v_cmd_table, NUM_GDB_V_CMDS,
+		buf, buf_len, g);
+}
+
 static struct gdb_cmd_table_entry gdb_cmd_table[] = {
 	{ gdb_handle_stop_reason, GDB_STR_A_LEN("?") },
 	{ gdb_handle_read_registers, GDB_STR_A_LEN("g") },
@@ -829,6 +899,7 @@ static struct gdb_cmd_table_entry gdb_cmd_table[] = {
 	{ gdb_handle_step, GDB_STR_A_LEN("s") },
 	{ gdb_handle_step_sig, GDB_STR_A_LEN("S") },
 	{ gdb_handle_q_cmd, GDB_STR_A_LEN("q") },
+	{ gdb_handle_v_cmd, GDB_STR_A_LEN("v") }
 };
 
 #define NUM_GDB_CMDS (sizeof(gdb_cmd_table) / \
