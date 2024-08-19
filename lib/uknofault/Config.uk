@@ -21,6 +21,6 @@ config LIBUKNOFAULT_TEST
 	bool "Enable tests"
 	default n
 	select LIBUKTEST
-	select PAGING
+	depends on PAGING
 
 endif
