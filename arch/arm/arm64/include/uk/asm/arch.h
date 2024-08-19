@@ -258,6 +258,10 @@
 #define ID_AA64MMFR2_EL1_CNP_SHIFT		_AC(0, U)
 #define ID_AA64MMFR2_EL1_CNP_MASK		_AC(0xf, ULL)
 
+/* MDSCR_EL1: Monitor Debug System Control Register */
+#define MDSCR_EL1_SS			UK_BIT(0)
+#define MDSCR_EL1_KDE			UK_BIT(13)
+
 /* RGSR_EL1: Random Allocation Tag Seed Register */
 #define RGSR_EL1_SEED_SHIFT		_AC(8, U)
 #define RGSR_EL1_SEED_MASK		_AC(0xffff, UL)
@@ -304,6 +308,10 @@
 #define SCTLR_EL1_ATA0_BIT		(_AC(1, UL) << 42)
 #define SCTLR_EL1_ATA_BIT		(_AC(1, UL) << 43)
 #define SCTLR_EL1_DSSBS_BIT		(_AC(1, UL) << 44)
+
+/* SPSR: Saved Program Status Register */
+#define SPSR_EL1_SS			UK_BIT(21)
+#define SPSR_EL1_D			UK_BIT(9)
 
 /* TCR_EL1 - Translation Control Register */
 #define TCR_EL1_DS_SHIFT		59
