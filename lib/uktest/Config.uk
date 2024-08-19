@@ -1,8 +1,8 @@
 menuconfig LIBUKTEST
 	bool "uktest: Unikraft Test Suite"
 	default n
-	select LIBNOLIBC if !HAVE_LIBC
-	select LIBUKDEBUG
+	depends on (HAVE_LIBC || LIBNOLIBC)
+	depends on LIBUKDEBUG
 	select LIBUKDEBUG_PRINTK
 
 if LIBUKTEST
