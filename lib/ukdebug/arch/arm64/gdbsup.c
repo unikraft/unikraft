@@ -5,12 +5,13 @@
  * You may not use this file except in compliance with the License.
  */
 
+#include "gdbsup.h"
 #include "../../gdbstub.h"
 
 #include <uk/arch/traps.h>
-#include <uk/arch/lcpu.h>
 #include <uk/essentials.h>
 #include <uk/nofault.h>
+#include <uk/isr/string.h>
 #include <uk/bitops.h>
 #include <uk/compiler.h>
 
@@ -109,3 +110,68 @@ static int gdb_arch_debug_handler(void *data)
 }
 
 UK_EVENT_HANDLER(UKARCH_TRAP_DEBUG, gdb_arch_debug_handler);
+
+/* This table maps struct __regs to the gdb register file */
+static struct {
+	unsigned int offset;
+	unsigned int length;
+} gdb_register_map[] = {
+	{__offsetof(struct __regs, lr), 8},
+	{__offsetof(struct __regs, sp), 8},
+	{__offsetof(struct __regs, elr_el1), 8},
+	{__offsetof(struct __regs, spsr_el1), 8}
+};
+
+#define GDB_REGISTER_MAP_COUNT ARRAY_SIZE(gdb_register_map)
+
+__ssz gdb_arch_read_register(int regnr, struct __regs *regs,
+			     void *buf, __sz buf_len __maybe_unused)
+{
+	if (regnr < 30) { /* x0-x29 */
+		UK_ASSERT(buf_len >= sizeof(unsigned long));
+		*((unsigned long *)buf) = regs->x[regnr];
+
+		return sizeof(unsigned long);
+	}
+
+	regnr -= 30;
+
+	if ((__sz)regnr < GDB_REGISTER_MAP_COUNT) {
+		UK_ASSERT(buf_len >= gdb_register_map[regnr].length);
+
+		memcpy_isr(buf,
+			   (char *)regs + gdb_register_map[regnr].offset,
+			   gdb_register_map[regnr].length);
+
+		return gdb_register_map[regnr].length;
+	}
+
+	return -EINVAL;
+}
+
+__ssz gdb_arch_write_register(int regnr, struct __regs *regs,
+			      void *buf, __sz buf_len)
+{
+	if (regnr < 30) { /* x0-x29 */
+		if (buf_len < sizeof(unsigned long))
+			return -EINVAL;
+
+		regs->x[regnr] = *((unsigned long *)buf);
+
+		return sizeof(unsigned long);
+	}
+
+	regnr -= 30;
+
+	if ((__sz)regnr < GDB_REGISTER_MAP_COUNT) {
+		if (buf_len < gdb_register_map[regnr].length)
+			return -EINVAL;
+
+		memcpy_isr((char *)regs + gdb_register_map[regnr].offset,
+			   buf, gdb_register_map[regnr].length);
+
+		return gdb_register_map[regnr].length;
+	}
+
+	return -EINVAL;
+}
