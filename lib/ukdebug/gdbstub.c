@@ -5,21 +5,43 @@
  * You may not use this file except in compliance with the License.
  */
 
+#include "gdbstub.h"
+#include <uk/plat/lcpu.h>
+
 #include <uk/assert.h>
 #include <uk/essentials.h>
 #include <uk/arch/limits.h>
+#include <uk/isr/string.h>
 
 #include <errno.h>
 #include <stddef.h>
 
+struct gdb_excpt_ctx {
+	struct __regs *regs;
+	int errnr;
+};
+
+#define GDB_BUF_SIZE 2048
+static char gdb_recv_buffer[GDB_BUF_SIZE];
+
 #define GDB_PACKET_RETRIES 5
 
+#define GDB_STR_A_LEN(str) str, (sizeof(str) - 1)
 #define GDB_CHECK(expr)				\
 	do {					\
 		__ssz __r = (expr);		\
 		if (unlikely(__r < 0))		\
 			return (int)__r;	\
 	} while (0)
+
+typedef int (*gdb_cmd_handler_func)(char *buf, __sz buf_len,
+	struct gdb_excpt_ctx *g);
+
+struct gdb_cmd_table_entry {
+	gdb_cmd_handler_func f;
+	const char *cmd;
+	__sz cmd_len;
+};
 
 int gdb_dbg_putc(char b __unused)
 {
@@ -29,6 +51,15 @@ int gdb_dbg_putc(char b __unused)
 int gdb_dbg_getc(void)
 {
 	return -ENOTSUP;
+}
+
+static int gdb_starts_with(const char *buf, __sz buf_len,
+			   const char *prefix, __sz prefix_len)
+{
+	if (unlikely(buf_len < prefix_len))
+		return 0;
+
+	return (memcmp_isr(buf, prefix, prefix_len) == 0);
 }
 
 static char gdb_checksum(const char *buf, __sz len)
@@ -267,4 +298,106 @@ static __ssz gdb_recv_packet(char *buf, __sz len)
 
 	/* We ran out of space */
 	return -ENOMEM;
+}
+
+/* ? */
+static int gdb_handle_stop_reason(char *buf __unused, __sz buf_len __unused,
+				  struct gdb_excpt_ctx *g)
+{
+	GDB_CHECK(gdb_send_signal_packet(g->errnr));
+
+	return 0;
+}
+
+static struct gdb_cmd_table_entry gdb_cmd_table[] = {
+	{ gdb_handle_stop_reason, GDB_STR_A_LEN("?") }
+};
+
+#define NUM_GDB_CMDS (sizeof(gdb_cmd_table) / \
+		sizeof(struct gdb_cmd_table_entry))
+
+static int gdb_main_loop(struct gdb_excpt_ctx *g)
+{
+	__ssz r;
+	__sz i, l;
+
+	GDB_CHECK(gdb_send_signal_packet(g->errnr));
+
+	do {
+		r = gdb_recv_packet(gdb_recv_buffer, sizeof(gdb_recv_buffer));
+		if (unlikely(r < 0)) {
+			break;
+		} else if (r == 0) {
+			/* We received an empty packet */
+			continue;
+		}
+
+		for (i = 0; i < NUM_GDB_CMDS; i++) {
+			l = gdb_cmd_table[i].cmd_len;
+
+			if (!gdb_starts_with(gdb_recv_buffer, r,
+					     gdb_cmd_table[i].cmd, l)) {
+				continue;
+			}
+
+			r = gdb_cmd_table[i].f(gdb_recv_buffer + l, r - l,
+				g);
+
+			break;
+		}
+
+		if (i == NUM_GDB_CMDS) {
+			/* Send empty packet to signal GDB that
+			 * we do not support the command
+			 */
+			GDB_CHECK(gdb_send_empty_packet());
+
+			r = 0;	/* Ignore unsupported commands */
+		}
+	} while (r == 0);
+
+	UK_ASSERT(r < 0 || r == GDB_DBG_CONT || r == GDB_DBG_STEP);
+
+	return (int)r;
+}
+
+int gdb_dbg_trap(int errnr, struct __regs *regs)
+{
+	struct gdb_excpt_ctx g = {regs, errnr};
+	static int nest_cnt;
+	unsigned long irqs;
+	int r;
+
+	/* TODO: SMP support
+	 * If we have SMP support, we must freeze all other CPUs here and
+	 * resume them before returning. However, it might be that another
+	 * CPU tries to enter the debugger at the same time. We therefore
+	 * need to protect the debugger with a spinlock and try to lock it.
+	 * If the current CPU does not get the lock, a different CPU is
+	 * already in the debugger. The unsuccessful CPU has to wait for the
+	 * lock to become available, but also remain responsive to the freeze
+	 * that the first CPU initiates.
+	 *
+	 * Until we have SMP support, it is safe to just disable interrupts.
+	 * We might re-enter nevertheless, for example, due to an UK_ASSERT
+	 * in the debugger code itself or if we set a breakpoint in code
+	 * called by the debugger.
+	 */
+#ifdef UKPLAT_LCPU_MULTICORE
+#warning The GDB stub does not support multicore systems
+#endif
+
+	irqs = ukplat_lcpu_save_irqf();
+	if (nest_cnt > 0) {
+		ukplat_lcpu_restore_irqf(irqs);
+		return GDB_DBG_CONT;
+	}
+
+	nest_cnt++;
+	r = gdb_main_loop(&g);
+	nest_cnt--;
+
+	ukplat_lcpu_restore_irqf(irqs);
+
+	return r;
 }
