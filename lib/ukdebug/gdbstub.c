@@ -6,6 +6,7 @@
  */
 
 #include "gdbstub.h"
+#include <gdbsup.h>
 #include <uk/plat/lcpu.h>
 
 #include <uk/assert.h>
@@ -407,6 +408,69 @@ static int gdb_handle_stop_reason(char *buf __unused, __sz buf_len __unused,
 	return 0;
 }
 
+/* g */
+static int gdb_handle_read_registers(char *buf __unused, __sz buf_len __unused,
+				     struct gdb_excpt_ctx *g)
+{
+	char *tmp = gdb_recv_buffer; /* Use receive buffer as temporary space */
+	__ssz r;
+	int i;
+
+	for (i = 0; i < GDB_REGS_NUM; i++) {
+		r = gdb_arch_read_register(i, g->regs, tmp,
+					   sizeof(gdb_recv_buffer) - (tmp - gdb_recv_buffer));
+		if (r < 0) {
+			/* Send Enn. */
+			GDB_CHECK(gdb_send_error_packet(-r));
+			return 0;
+		}
+
+		tmp += r;
+	}
+
+	r = gdb_mem2hex(gdb_send_buffer, sizeof(gdb_send_buffer),
+			gdb_recv_buffer, tmp - gdb_recv_buffer);
+
+	UK_ASSERT(r >= 0);
+
+	GDB_CHECK(gdb_send_packet(gdb_send_buffer, r));
+
+	return 0;
+}
+
+/* G */
+static int gdb_handle_write_registers(char *buf, __sz buf_len,
+				      struct gdb_excpt_ctx *g)
+{
+	char *tmp = gdb_send_buffer; /* Use send buffer as temporary space */
+	__ssz r, l;
+	int i;
+
+	l = gdb_hex2mem(gdb_send_buffer, sizeof(gdb_send_buffer),
+			buf, buf_len);
+	if (l < 0) {
+		/* Send Enn. */
+		GDB_CHECK(gdb_send_error_packet(-l));
+		return 0;
+	}
+
+	for (i = 0; i < GDB_REGS_NUM; i++) {
+		r = gdb_arch_write_register(i, g->regs, tmp, l);
+		if (r < 0) {
+			/* Send Enn. */
+			GDB_CHECK(gdb_send_error_packet(-r));
+			return 0;
+		}
+
+		tmp += r;
+		l -= r;
+	}
+
+	GDB_CHECK(gdb_send_packet(GDB_STR_A_LEN("OK")));
+
+	return 0;
+}
+
 /* m addr,length*/
 static int gdb_handle_read_memory(char *buf, __sz buf_len,
 				  struct gdb_excpt_ctx *g __unused)
@@ -579,6 +643,8 @@ static int gdb_handle_step_sig(char *buf, __sz buf_len,
 
 static struct gdb_cmd_table_entry gdb_cmd_table[] = {
 	{ gdb_handle_stop_reason, GDB_STR_A_LEN("?") },
+	{ gdb_handle_read_registers, GDB_STR_A_LEN("g") },
+	{ gdb_handle_write_registers, GDB_STR_A_LEN("G") },
 	{ gdb_handle_read_memory, GDB_STR_A_LEN("m") },
 	{ gdb_handle_write_memory, GDB_STR_A_LEN("M") },
 	{ gdb_handle_continue, GDB_STR_A_LEN("c") },
