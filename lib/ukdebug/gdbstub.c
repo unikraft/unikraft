@@ -30,6 +30,7 @@ struct gdb_excpt_ctx {
 };
 
 #define GDB_BUF_SIZE 2048
+#define GDB_BUF_SIZE_HEX_STR "800"
 static char gdb_recv_buffer[GDB_BUF_SIZE];
 static char gdb_send_buffer[GDB_BUF_SIZE];
 
@@ -52,6 +53,10 @@ struct gdb_cmd_table_entry {
 	__sz cmd_len;
 };
 
+/* Linked to architecture-specfic target.xml description */
+extern const char __gdb_target_xml_start[];
+extern const char __gdb_target_xml_end[];
+
 int gdb_dbg_putc(char b __unused)
 {
 	return -ENOTSUP;
@@ -69,6 +74,18 @@ static int gdb_starts_with(const char *buf, __sz buf_len,
 		return 0;
 
 	return (memcmp_isr(buf, prefix, prefix_len) == 0);
+}
+
+static int gdb_consume_str(char **buf, __sz *buf_len,
+			   const char *prefix, __sz prefix_len)
+{
+	if (!gdb_starts_with(*buf, *buf_len, prefix, prefix_len))
+		return 0;
+
+	*buf += prefix_len;
+	*buf_len -= prefix_len;
+
+	return 1;
 }
 
 static char gdb_checksum(const char *buf, __sz len)
@@ -184,6 +201,37 @@ static __ssz gdb_hex2mem(char *mem, __sz mem_len, const char *hex, __sz hex_len)
 	}
 
 	return hex_len / 2;
+}
+
+static __ssz gdb_mem2bin(char *bin, __sz bin_len, const char *mem, __sz mem_len)
+{
+	__sz rem_len = bin_len;
+
+	while (mem_len--) {
+		switch (*mem) {
+		/* The following characters must be escaped */
+		case '}':
+		case '#':
+		case '$':
+		case '*':
+			if (rem_len < 2)
+				return bin_len - rem_len;
+			*bin++ = '}';
+			*bin++ = *mem++ ^ 0x20;
+
+			rem_len -= 2;
+			break;
+		default:
+			if (rem_len < 1)
+				return bin_len - rem_len;
+			*bin++ = *mem++;
+
+			rem_len--;
+			break;
+		}
+	}
+
+	return bin_len - rem_len;
 }
 
 static __ssz gdb_read_memory(unsigned long addr, __sz len,
@@ -641,6 +689,135 @@ static int gdb_handle_step_sig(char *buf, __sz buf_len,
 			r : GDB_DBG_STEP);
 }
 
+static int gdb_handle_multiletter_cmd(struct gdb_cmd_table_entry *table,
+				      __sz table_entries, char *buf,
+				      __sz buf_len, struct gdb_excpt_ctx *g)
+{
+	__sz i, l, max_len_idx = 0, max_len = 0;
+
+	for (i = 0; i < table_entries; i++) {
+		l = table[i].cmd_len;
+
+		if (l > buf_len)
+			continue;
+
+		if (memcmp_isr(buf, table[i].cmd, l) != 0)
+			continue;
+
+		if (l > max_len) {
+			max_len = l;
+			max_len_idx = i;
+		}
+	}
+
+	if (max_len > 0 && max_len <= buf_len) {
+		/* If the remaining length if zero, prefer passing a NULL
+		 * pointer over passing a pointer to garbage data.
+		 */
+		buf = max_len == buf_len ? NULL : buf + max_len;
+		return table[max_len_idx].f(buf, buf_len - max_len, g);
+	}
+
+	/* Send empty packet to signal GDB that
+	 * we do not support the command
+	 */
+	GDB_CHECK(gdb_send_empty_packet());
+
+	return 0;
+}
+
+/* qSupported[:gdbfeature [;gdbfeature]... ] */
+static int gdb_handle_qsupported(char *buf __unused, __sz buf_len __unused,
+				 struct gdb_excpt_ctx *g __unused)
+{
+#define GDB_SUPPORT_STR \
+	"PacketSize=" GDB_BUF_SIZE_HEX_STR \
+	";qXfer:features:read+"
+
+	GDB_CHECK(gdb_send_packet(GDB_STR_A_LEN(GDB_SUPPORT_STR)));
+
+	return 0;
+}
+
+static int gdb_qXfer_mem(const char *mem, __sz mem_len, __sz offset,
+			 __sz length)
+{
+	__ssz r;
+
+	if (offset >= mem_len) {
+		/* Send l. No more data to be read */
+		GDB_CHECK(gdb_send_packet(GDB_STR_A_LEN("l")));
+	} else {
+		length = MIN(length, mem_len - offset);
+		length = MIN(length, sizeof(gdb_send_buffer) - 1);
+
+		gdb_send_buffer[0] = 'm'; /* There is more data */
+
+		r = gdb_mem2bin(gdb_send_buffer + 1,
+				sizeof(gdb_send_buffer) - 1,
+				mem + offset, length);
+
+		UK_ASSERT(r > 0);
+
+		GDB_CHECK(gdb_send_packet(gdb_send_buffer, r + 1));
+	}
+
+	return 0;
+}
+
+/* qXfer:object:read:annex:offset,length */
+static int gdb_handle_qXfer(char *buf, __sz buf_len,
+			    struct gdb_excpt_ctx *g __unused)
+{
+	unsigned long offset, length;
+	char *buf_end = buf + buf_len;
+
+	if (!gdb_consume_str(&buf, &buf_len, GDB_STR_A_LEN(":features:read"))) {
+		/* Send empty packet. Unsupported object requested */
+		GDB_CHECK(gdb_send_empty_packet());
+		return 0;
+	}
+
+	if (!gdb_consume_str(&buf, &buf_len, GDB_STR_A_LEN(":target.xml:"))) {
+		/* Send E00. Annex invalid */
+		GDB_CHECK(gdb_send_error_packet(0x00));
+		return 0;
+	}
+
+	offset = gdb_hex2ulong(buf, buf_end - buf, &buf);
+	if ((buf >= buf_end) || (*buf++ != ',')) {
+		/* Send E00. Request malformed */
+		GDB_CHECK(gdb_send_error_packet(0x00));
+		return 0;
+	}
+
+	length = gdb_hex2ulong(buf, buf_end - buf, &buf);
+	if (buf != buf_end) {
+		/* Send E00. Request malformed */
+		GDB_CHECK(gdb_send_error_packet(0x00));
+		return 0;
+	}
+
+	return gdb_qXfer_mem(__gdb_target_xml_start,
+		__gdb_target_xml_end - __gdb_target_xml_start,
+		offset, length);
+}
+
+static struct gdb_cmd_table_entry gdb_q_cmd_table[] = {
+	{ gdb_handle_qsupported, GDB_STR_A_LEN("Supported") },
+	{ gdb_handle_qXfer, GDB_STR_A_LEN("Xfer") }
+};
+
+#define NUM_GDB_Q_CMDS (sizeof(gdb_q_cmd_table) / \
+		sizeof(struct gdb_cmd_table_entry))
+
+static int gdb_handle_q_cmd(char *buf, __sz buf_len,
+			    struct gdb_excpt_ctx *g)
+{
+	return gdb_handle_multiletter_cmd(gdb_q_cmd_table, NUM_GDB_Q_CMDS,
+		buf, buf_len, g);
+}
+
 static struct gdb_cmd_table_entry gdb_cmd_table[] = {
 	{ gdb_handle_stop_reason, GDB_STR_A_LEN("?") },
 	{ gdb_handle_read_registers, GDB_STR_A_LEN("g") },
@@ -650,7 +827,8 @@ static struct gdb_cmd_table_entry gdb_cmd_table[] = {
 	{ gdb_handle_continue, GDB_STR_A_LEN("c") },
 	{ gdb_handle_continue_sig, GDB_STR_A_LEN("C") },
 	{ gdb_handle_step, GDB_STR_A_LEN("s") },
-	{ gdb_handle_step_sig, GDB_STR_A_LEN("S") }
+	{ gdb_handle_step_sig, GDB_STR_A_LEN("S") },
+	{ gdb_handle_q_cmd, GDB_STR_A_LEN("q") },
 };
 
 #define NUM_GDB_CMDS (sizeof(gdb_cmd_table) / \
