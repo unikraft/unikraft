@@ -110,6 +110,43 @@ static int gdb_hex2int(char hex)
 	return -EINVAL;
 }
 
+static unsigned long gdb_hex2ulong(const char *buf, __sz buf_len, char **endptr)
+{
+	unsigned long val = 0;
+	int i;
+
+	/* Skip any whitespace */
+	while ((buf_len > 0) && (*buf == ' ')) {
+		buf++;
+		buf_len--;
+	}
+
+	/* Skip hex prefix if present */
+	if ((buf_len >= 2) && (*buf == '0') &&
+	    ((*(buf + 1) == 'x') || (*(buf + 1) == 'X'))) {
+		buf += 2;
+		buf_len -= 2;
+	}
+
+	/* Parse hexadecimal integer */
+	while ((buf_len > 0) && (val < __UL_MAX)) {
+		i = gdb_hex2int(*buf);
+		if (i < 0)
+			break;
+
+		val <<= 4;
+		val |= i;
+
+		buf++;
+		buf_len--;
+	}
+
+	if (endptr)
+		*endptr = DECONST(char *, buf);
+
+	return val;
+}
+
 static __ssz gdb_hex2mem(char *mem, __sz mem_len, const char *hex, __sz hex_len)
 {
 	__sz l = hex_len;
@@ -309,8 +346,102 @@ static int gdb_handle_stop_reason(char *buf __unused, __sz buf_len __unused,
 	return 0;
 }
 
+/* c/s [addr] */
+static int gdb_handle_step_cont(char *buf, __sz buf_len,
+				struct gdb_excpt_ctx *g)
+{
+	unsigned long addr;
+	char *buf_end = buf + buf_len;
+
+	if (buf != buf_end) {
+		addr = gdb_hex2ulong(buf, buf_len, &buf);
+		if (buf != buf_end) {
+			/* Send E22. EINVAL */
+			GDB_CHECK(gdb_send_error_packet(EINVAL));
+			return 0;
+		}
+
+		ukarch_regs_set_pc(addr, g->regs);
+	}
+
+	return 1;
+}
+
+/* C/S sig[;addr] */
+static int gdb_handle_step_cont_sig(char *buf, __sz buf_len,
+				    struct gdb_excpt_ctx *g)
+{
+	unsigned long addr;
+	char *buf_end = buf + buf_len;
+
+	/* Just ignore the signal */
+	gdb_hex2ulong(buf, buf_end - buf, &buf);
+	if (buf != buf_end) {
+		if (unlikely(*buf++ != ';')) {
+			/* Send E22. EINVAL */
+			GDB_CHECK(gdb_send_error_packet(EINVAL));
+			return 0;
+		}
+
+		addr = gdb_hex2ulong(buf, buf_len, &buf);
+		if (unlikely(buf != buf_end)) {
+			/* Send E22. EINVAL */
+			GDB_CHECK(gdb_send_error_packet(EINVAL));
+			return 0;
+		}
+
+		ukarch_regs_set_pc(addr, g->regs);
+	}
+
+	return 1;
+}
+
+/* c[addr] */
+static int gdb_handle_continue(char *buf, __sz buf_len,
+			       struct gdb_excpt_ctx *g)
+{
+	int r;
+
+	return (((r = gdb_handle_step_cont(buf, buf_len, g)) <= 0) ?
+			r : GDB_DBG_CONT);
+}
+
+/* C sig[;addr] */
+static int gdb_handle_continue_sig(char *buf, __sz buf_len,
+				   struct gdb_excpt_ctx *g)
+{
+	int r;
+
+	return (((r = gdb_handle_step_cont_sig(buf, buf_len, g)) <= 0) ?
+			r : GDB_DBG_CONT);
+}
+
+/* s[addr] */
+static int gdb_handle_step(char *buf, __sz buf_len,
+			   struct gdb_excpt_ctx *g)
+{
+	int r;
+
+	return (((r = gdb_handle_step_cont(buf, buf_len, g)) <= 0) ?
+			r : GDB_DBG_STEP);
+}
+
+/* S sig[;addr] */
+static int gdb_handle_step_sig(char *buf, __sz buf_len,
+			       struct gdb_excpt_ctx *g)
+{
+	int r;
+
+	return (((r = gdb_handle_step_cont_sig(buf, buf_len, g)) <= 0) ?
+			r : GDB_DBG_STEP);
+}
+
 static struct gdb_cmd_table_entry gdb_cmd_table[] = {
-	{ gdb_handle_stop_reason, GDB_STR_A_LEN("?") }
+	{ gdb_handle_stop_reason, GDB_STR_A_LEN("?") },
+	{ gdb_handle_continue, GDB_STR_A_LEN("c") },
+	{ gdb_handle_continue_sig, GDB_STR_A_LEN("C") },
+	{ gdb_handle_step, GDB_STR_A_LEN("s") },
+	{ gdb_handle_step_sig, GDB_STR_A_LEN("S") }
 };
 
 #define NUM_GDB_CMDS (sizeof(gdb_cmd_table) / \
