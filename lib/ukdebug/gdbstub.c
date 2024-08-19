@@ -12,6 +12,13 @@
 #include <uk/essentials.h>
 #include <uk/arch/limits.h>
 #include <uk/isr/string.h>
+#include <uk/nofault.h>
+
+#if CONFIG_HAVE_PAGING
+#include <uk/plat/paging.h>
+#include <uk/plat/io.h>
+#include <uk/page.h>
+#endif /* CONFIG_HAVE_PAGING */
 
 #include <errno.h>
 #include <stddef.h>
@@ -23,6 +30,7 @@ struct gdb_excpt_ctx {
 
 #define GDB_BUF_SIZE 2048
 static char gdb_recv_buffer[GDB_BUF_SIZE];
+static char gdb_send_buffer[GDB_BUF_SIZE];
 
 #define GDB_PACKET_RETRIES 5
 
@@ -175,6 +183,59 @@ static __ssz gdb_hex2mem(char *mem, __sz mem_len, const char *hex, __sz hex_len)
 	}
 
 	return hex_len / 2;
+}
+
+static __ssz gdb_read_memory(unsigned long addr, __sz len,
+			     void *buf, __sz buf_len)
+{
+	return uk_nofault_memcpy(buf, (void *)addr, MIN(len, buf_len),
+				 UK_NOFAULTF_NOPAGING);
+}
+
+static __ssz gdb_write_memory(unsigned long addr, __sz len,
+			      void *buf, __sz buf_len)
+{
+#if CONFIG_HAVE_PAGING
+	__paddr_t paddr = 0;
+	__vaddr_t kmap_vaddr = 0;
+	struct uk_pagetable *pt = __NULL;
+	unsigned long n_pages = 0;
+	__sz rc = 0;
+
+	len = MIN(len, buf_len);
+	n_pages = round_pgup(len) / __PAGE_SIZE;
+
+	pt = ukplat_pt_get_active();
+	if (!pt) {
+		/* Paging isn't initialized. We don't need the kmap detour to
+		 * work around permissions.
+		 */
+		return uk_nofault_memcpy((void *)addr, buf, len,
+					 UK_NOFAULTF_NOPAGING);
+	}
+
+	paddr = ukplat_virt_to_phys((void *)addr);
+	if (unlikely(paddr == __PADDR_INV))
+		return 0;
+
+	kmap_vaddr = ukplat_page_kmap(pt, paddr, n_pages, 0);
+	if (unlikely(kmap_vaddr == __VADDR_INV))
+		return 0;
+
+	/* We use the virtual address from kmap because it grants us write
+	 * access to physical pages that are marked read-only under the
+	 * original virtual address.
+	 */
+	rc = uk_nofault_memcpy((void *)kmap_vaddr, buf, len,
+			       UK_NOFAULTF_NOPAGING);
+
+	ukplat_page_kunmap(pt, kmap_vaddr, n_pages, 0);
+
+	return rc;
+#else /* !CONFIG_HAVE_PAGING */
+	return uk_nofault_memcpy((void *)addr, buf, MIN(len, buf_len),
+				 UK_NOFAULTF_NOPAGING);
+#endif /* !CONFIG_HAVE_PAGING */
 }
 
 static __ssz gdb_send(const char *buf, __sz len)
@@ -346,6 +407,86 @@ static int gdb_handle_stop_reason(char *buf __unused, __sz buf_len __unused,
 	return 0;
 }
 
+/* m addr,length*/
+static int gdb_handle_read_memory(char *buf, __sz buf_len,
+				  struct gdb_excpt_ctx *g __unused)
+{
+	unsigned long addr, length;
+	char *buf_end = buf + buf_len;
+	__ssz r;
+
+	addr = gdb_hex2ulong(buf, buf_end - buf, &buf);
+	if ((buf == buf_end) || (*buf++ != ',')) {
+		/* Send E22. EINVAL */
+		GDB_CHECK(gdb_send_error_packet(EINVAL));
+		return 0;
+	}
+
+	length = gdb_hex2ulong(buf, buf_end - buf, &buf);
+	if (buf != buf_end) {
+		/* Send E22. EINVAL */
+		GDB_CHECK(gdb_send_error_packet(EINVAL));
+		return 0;
+	}
+
+	r = gdb_read_memory(addr, length, gdb_recv_buffer,
+				 sizeof(gdb_recv_buffer) / 2);
+	if (unlikely(r < 0)) {
+		/* Send Enn. */
+		GDB_CHECK(gdb_send_error_packet(-r));
+		return 0;
+	}
+
+	r = gdb_mem2hex(gdb_send_buffer, sizeof(gdb_send_buffer),
+			gdb_recv_buffer, r);
+
+	GDB_CHECK(gdb_send_packet(gdb_send_buffer, r));
+
+	return 0;
+}
+
+/* M addr,length*/
+static int gdb_handle_write_memory(char *buf, __sz buf_len,
+				   struct gdb_excpt_ctx *g __unused)
+{
+	unsigned long addr, length;
+	char *buf_end = buf + buf_len;
+	__ssz r;
+
+	addr = gdb_hex2ulong(buf, buf_end - buf, &buf);
+	if ((buf == buf_end) || (*buf++ != ',')) {
+		/* Send E22. EINVAL */
+		GDB_CHECK(gdb_send_error_packet(EINVAL));
+		return 0;
+	}
+
+	length = gdb_hex2ulong(buf, buf_end - buf, &buf);
+	if ((buf == buf_end) || (*buf++ != ':')) {
+		/* Send E22. EINVAL */
+		GDB_CHECK(gdb_send_error_packet(EINVAL));
+		return 0;
+	}
+
+	r = gdb_hex2mem(gdb_send_buffer, sizeof(gdb_send_buffer),
+			buf, buf_end - buf);
+	if (unlikely(r < 0)) {
+		/* Send Enn. */
+		GDB_CHECK(gdb_send_error_packet(-r));
+		return 0;
+	}
+
+	r = gdb_write_memory(addr, length, gdb_send_buffer, r);
+	if (unlikely(r < 0)) {
+		/* Send Enn. */
+		GDB_CHECK(gdb_send_error_packet(-r));
+		return 0;
+	}
+
+	GDB_CHECK(gdb_send_packet(GDB_STR_A_LEN("OK")));
+
+	return 0;
+}
+
 /* c/s [addr] */
 static int gdb_handle_step_cont(char *buf, __sz buf_len,
 				struct gdb_excpt_ctx *g)
@@ -438,6 +579,8 @@ static int gdb_handle_step_sig(char *buf, __sz buf_len,
 
 static struct gdb_cmd_table_entry gdb_cmd_table[] = {
 	{ gdb_handle_stop_reason, GDB_STR_A_LEN("?") },
+	{ gdb_handle_read_memory, GDB_STR_A_LEN("m") },
+	{ gdb_handle_write_memory, GDB_STR_A_LEN("M") },
 	{ gdb_handle_continue, GDB_STR_A_LEN("c") },
 	{ gdb_handle_continue_sig, GDB_STR_A_LEN("C") },
 	{ gdb_handle_step, GDB_STR_A_LEN("s") },
