@@ -2,7 +2,6 @@ ifeq (x86_64,$(CONFIG_UK_ARCH))
 ifeq ($(CONFIG_KVM_BOOT_PROTO_MULTIBOOT),y)
 KVM_LDFLAGS-y += -Wl,-m,elf_x86_64
 KVM_LDFLAGS-y += -Wl,--entry=_multiboot_entry
-ELF64_TO_32 = y
 else ifeq ($(CONFIG_KVM_BOOT_PROTO_LXBOOT),y)
 KVM_LDFLAGS-y += -Wl,--entry=_lxboot_entry
 else ifeq ($(CONFIG_KVM_BOOT_PROTO_EFI_STUB),y)
@@ -78,7 +77,7 @@ $(KVM_IMAGE): $(KVM_IMAGE).dbg
 				"Empty loadable segment detected|section.*lma.*adjusted to.*" || \
 				true; })
 	$(call build_bootinfo,$@)
-ifeq ($(ELF64_TO_32),y)
+ifeq ($(CONFIG_KVM_BOOT_PROTO_MULTIBOOT),y)
 	$(call build_multiboot,$@)
 endif
 ifeq ($(CONFIG_KVM_BOOT_PROTO_EFI_STUB),y)
