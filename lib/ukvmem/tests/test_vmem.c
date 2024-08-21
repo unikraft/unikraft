@@ -639,7 +639,7 @@ UK_TESTCASE(ukvmem, test_vma_stack)
 
 	/* Probe the entire stack */
 	len = probe_r(va1 - UK_VMA_STACK_BOTTOM_GUARD_SIZE,
-		      VMEM_STACKSIZE + STACK_GUARDS_SIZE);
+		      VMEM_STACKSIZE + UK_VMA_STACK_GUARDS_SIZE);
 	UK_TEST_EXPECT_SNUM_EQ(len, VMEM_STACKSIZE);
 
 	rc = uk_vma_map_stack(vas, &va2, VMEM_STACKSIZE, 0,
@@ -662,7 +662,7 @@ UK_TESTCASE(ukvmem, test_vma_stack)
 
 	/* Probe the entire stack */
 	len = probe_r(va2 - UK_VMA_STACK_BOTTOM_GUARD_SIZE,
-		      VMEM_STACKSIZE + STACK_GUARDS_SIZE);
+		      VMEM_STACKSIZE + UK_VMA_STACK_GUARDS_SIZE);
 	UK_TEST_EXPECT_SNUM_EQ(len, VMEM_STACKSIZE);
 
 	/* Try to unmap only some part of the stack */
@@ -675,7 +675,7 @@ UK_TESTCASE(ukvmem, test_vma_stack)
 
 	/* But we should be able to change attributes for the whole VMA */
 	rc = uk_vma_set_attr(vas, va2 - UK_VMA_STACK_BOTTOM_GUARD_SIZE,
-			     VMEM_STACKSIZE + STACK_GUARDS_SIZE, PROT_R, 0);
+			     VMEM_STACKSIZE + UK_VMA_STACK_GUARDS_SIZE, PROT_R, 0);
 	UK_TEST_EXPECT_ZERO(rc);
 
 	vas_clean(vas);
