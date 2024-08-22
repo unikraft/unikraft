@@ -1,7 +1,8 @@
 menuconfig LIBUKTTY_NS16550
 	bool "NS16550 / 8250"
-	depends on ARCH_ARM_64
-	select LIBUKOFW
+	depends on ARCH_ARM_64 || ARCH_X86_64
+	select LIBUKBOOT
+	select LIBUKOFW if ARCH_ARM_64
 	select LIBUKCONSOLE
 
 if LIBUKTTY_NS16550
@@ -13,5 +14,52 @@ config LIBUKTTY_NS16550_EARLY_CONSOLE
 		Uses the fdt's `/chosen/stdout-path` to derive the
 		default console. Override by setting `ns16550.base`
 		at the cmdline, if LIBUKLIBPARAM is enabled.
+
+if ARCH_X86_64
+menuconfig LIBUKTTY_NS16550_COM1
+	bool "Enable COM1 (0x3f8)"
+	default y
+
+menuconfig LIBUKTTY_NS16550_COM2
+	bool "Enable COM2 (0x2f8)"
+
+menuconfig LIBUKTTY_NS16550_COM3
+	bool "Enable COM3 (0x3e8)"
+
+menuconfig LIBUKTTY_NS16550_COM4
+	bool "Enable COM4 (0x2e8)"
+
+if LIBUKTTY_NS16550_EARLY_CONSOLE
+choice
+    prompt "Early COM default"
+    default LIBUKTTY_NS16550_EARLY_NONE
+    help
+        Configure a default port for the early console. This port is
+        used if there is no port found on the kernel command line.
+
+config LIBUKTTY_NS16550_COM1_EARLY
+    bool "COM1"
+    select LIBUKTTY_NS16550_COM1
+
+config LIBUKTTY_NS16550_COM2_EARLY
+    bool "COM2"
+    select LIBUKTTY_NS16550_COM2
+
+config LIBUKTTY_NS16550_COM3_EARLY
+    bool "COM3"
+    select LIBUKTTY_NS16550_COM3
+
+config LIBUKTTY_NS16550_COM4_EARLY
+    bool "COM4"
+    select LIBUKTTY_NS16550_COM4
+
+config LIBUKTTY_NS16550_EARLY_NONE
+    bool "None"
+
+endchoice
+
+endif
+
+endif
 
 endif
