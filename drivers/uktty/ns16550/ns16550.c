@@ -27,12 +27,10 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#include <libfdt.h>
 #include <uk/assert.h>
 #include <uk/config.h>
 #include <uk/init.h>
 #include <uk/libparam.h>
-#include <uk/ofw/fdt.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/console.h>
 #include <uk/compiler.h>
@@ -81,10 +79,6 @@
 #define NS16550_FCR_FIFO_EN	0x01U
 #define NS16550_LSR_RX_EMPTY	0x01U
 #define NS16550_LSR_TX_EMPTY	0x40U
-
-static const char * const fdt_compatible[] = {
-	"ns16550", "ns16550a", NULL
-};
 
 #if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
 static struct ns16550_device earlycon;
@@ -208,34 +202,6 @@ static int init_ns16550(struct ns16550_device *dev)
 }
 
 #if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
-static inline int config_fdt_chosen_stdout(const void *dtb)
-{
-	__u64 base, size;
-	char *opt;
-	int offs;
-	int rc;
-
-	UK_ASSERT(dtb);
-
-	/* Check if chosen/stdout-path is set to this device */
-	rc = fdt_chosen_stdout_path(dtb, &offs, &opt);
-	if (unlikely(rc)) /* no stdout-path or bad dtb */
-		return rc;
-
-	rc = fdt_node_check_compatible_list(dtb, offs, fdt_compatible);
-	if (unlikely(rc))
-		return rc; /* no compat match or bad dtb */
-
-	rc = fdt_get_address(dtb, offs, 0, &base, &size);
-	if (unlikely(rc)) /* could not parse node */
-		return rc;
-
-	earlycon.base = base;
-	earlycon.size = size;
-
-	return 0;
-}
-
 static int early_init(struct ukplat_bootinfo *bi)
 {
 	struct ukplat_memregion_desc mrd = {0};
@@ -291,36 +257,6 @@ static int early_init(struct ukplat_bootinfo *bi)
 #endif /* !CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
 
 #if CONFIG_LIBUKALLOC
-static int fdt_get_device(struct ns16550_device *dev, const void *dtb,
-			  int *offset)
-{
-	__u64 reg_base, reg_size;
-	int rc;
-
-	UK_ASSERT(dev);
-	UK_ASSERT(dtb);
-	UK_ASSERT(offset);
-
-	*offset = fdt_node_offset_by_compatible_list(dtb, *offset,
-						     fdt_compatible);
-	if (unlikely(*offset < 0))
-		return -ENOENT;
-
-	rc = fdt_get_address(dtb, *offset, 0, &reg_base, &reg_size);
-	if (unlikely(rc)) {
-		uk_pr_err("Could not parse fdt node\n");
-		return -EINVAL;
-	}
-
-	uk_pr_debug("ns16550 @ 0x%lx - 0x%lx\n", reg_base, reg_base + reg_size);
-
-	dev->dev = UK_CONSOLE("NS16550", &ns16550_ops, 0);
-	dev->base = reg_base;
-	dev->size = reg_size;
-
-	return 0;
-}
-
 static int register_device(struct ns16550_device *dev, struct uk_alloc *a)
 {
 	struct ns16550_device *console_dev;
