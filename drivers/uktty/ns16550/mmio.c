@@ -10,10 +10,30 @@
 #include <uk/assert.h>
 #include <libfdt.h>
 #include <uk/ofw/fdt.h>
+#include <uk/config.h>
+#include <uk/libparam.h>
 
 static const char * const fdt_compatible[] = {
 	"ns16550", "ns16550a", NULL
 };
+
+#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
+static struct ns16550_device earlycon = {
+	.con = {0},
+	.reg_shift = REG_SHIFT_DEFAULT,
+	.reg_width = REG_WIDTH_DEFAULT,
+	.io = {
+		.mmio = {
+			.base = 0,
+			/* Default in case it's not set in early init */
+			.size = 0x1000,
+		}
+	},
+};
+
+UK_LIBPARAM_PARAM_ALIAS(base, &earlycon.io.mmio.base, __u64,
+			"ns15550 MMIO base");
+#endif /* CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
 
 #define NS16550_REG(dev, r) ((dev)->io.mmio.base + ((r) << (dev)->reg_shift))
 
@@ -137,3 +157,56 @@ static int fdt_get_device(struct ns16550_device *dev, const void *dtb,
 	return 0;
 }
 #endif /* CONFIG_LIBUKALLOC */
+
+#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
+int ns16550_early_init(struct ukplat_bootinfo *bi)
+{
+	struct ukplat_memregion_desc mrd = {0};
+	int rc;
+
+	UK_ASSERT(bi);
+
+	/* If the base address is not set by the cmdline, try
+	 * the dtb chosen/stdout-path.
+	 */
+	if (!earlycon.io.mmio.base) {
+		rc = config_fdt_chosen_stdout(&earlycon, (void *)bi->dtb);
+		if (unlikely(rc < 0 && rc != -FDT_ERR_NOTFOUND)) {
+			uk_pr_err("Could not parse fdt (%d)", rc);
+			return -EINVAL;
+		}
+	}
+
+	/* Do not return an error if no config is detected, as
+	 * another console driver may be enabled in Kconfig.
+	 */
+	if (!earlycon.io.mmio.base)
+		return 0;
+
+	/* Configure the port */
+	rc = ns16550_configure(&earlycon);
+	if (unlikely(rc)) {
+		uk_pr_err("Could not initialize ns16550 (%d)\n", rc);
+		return rc;
+	}
+
+	ns16550_register_console(&earlycon, UK_CONSOLE_FLAG_STDOUT |
+					    UK_CONSOLE_FLAG_STDIN);
+
+	mrd.pbase = earlycon.io.mmio.base;
+	mrd.vbase = earlycon.io.mmio.base;
+	mrd.pg_off = 0;
+	mrd.pg_count = earlycon.io.mmio.base / PAGE_SIZE;
+	mrd.len = earlycon.io.mmio.size;
+	mrd.type = UKPLAT_MEMRT_DEVICE;
+	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE;
+
+	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
+	if (unlikely(rc < 0)) {
+		uk_pr_err("Could not insert mrd (%d)\n", rc);
+		return rc;
+	}
+
+	return 0;
+}
+#endif /* !CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */

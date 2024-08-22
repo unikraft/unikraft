@@ -9,6 +9,8 @@
 
 #include <uk/arch/types.h>
 #include <uk/console.h>
+#include <uk/init.h>
+#include <uk/plat/common/bootinfo.h>
 
 union ns16550_io {
 	struct {
@@ -34,5 +36,10 @@ struct ns16550_device {
 
 __u32 ns16550_io_read(struct ns16550_device *dev, __u32 reg);
 void ns16550_io_write(struct ns16550_device *dev, __u32 reg, __u32 value);
+
+int ns16550_configure(struct ns16550_device *dev);
+void ns16550_register(struct ns16550_device *dev, int flags);
+
+int ns16550_early_init(struct ukplat_bootinfo *bi);
 
 #endif /* __UKTTY_NS16550_IO_H__ */

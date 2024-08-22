@@ -29,9 +29,6 @@
  */
 #include <uk/assert.h>
 #include <uk/config.h>
-#include <uk/init.h>
-#include <uk/libparam.h>
-#include <uk/plat/common/bootinfo.h>
 #include <uk/console.h>
 #include <uk/compiler.h>
 #include <uk/errptr.h>
@@ -79,12 +76,6 @@
 #define NS16550_FCR_FIFO_EN	0x01U
 #define NS16550_LSR_RX_EMPTY	0x01U
 #define NS16550_LSR_TX_EMPTY	0x40U
-
-#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
-static struct ns16550_device earlycon;
-
-UK_LIBPARAM_PARAM_ALIAS(base, &earlycon.base, __u64, "ns15550 base");
-#endif /* CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
 
 static void _putc(struct ns16550_device *dev, char a)
 {
@@ -162,7 +153,16 @@ static struct uk_console_ops ns16550_ops = {
 	.in = ns16550_in
 };
 
-static int init_ns16550(struct ns16550_device *dev)
+void ns16550_register_console(struct ns16550_device *dev, int flags)
+{
+	UK_ASSERT(dev);
+
+	// The ops aren't visible outside of this file.
+	dev->con = UK_CONSOLE("NS16550", &ns16550_ops, flags);
+	uk_console_register(&dev->con);
+}
+
+int ns16550_configure(struct ns16550_device *dev)
 {
 	__u32 lcr;
 
@@ -200,61 +200,6 @@ static int init_ns16550(struct ns16550_device *dev)
 
 	return 0;
 }
-
-#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
-static int early_init(struct ukplat_bootinfo *bi)
-{
-	struct ukplat_memregion_desc mrd = {0};
-	int rc;
-
-	UK_ASSERT(bi);
-
-	/* If the base is not set by the cmdline, try
-	 * the dtb chosen/stdout-path.
-	 */
-	if (!earlycon.base) {
-		rc = config_fdt_chosen_stdout((void *)bi->dtb);
-		if (unlikely(rc < 0 && rc != -FDT_ERR_NOTFOUND)) {
-			uk_pr_err("Could not parse fdt (%d)", rc);
-			return -EINVAL;
-		}
-	}
-
-	/* Do not return an error if no config is detected, as
-	 * another console driver may be enabled in Kconfig.
-	 */
-	if (!earlycon.base)
-		return 0;
-
-	/* Configure the port */
-	rc = init_ns16550(earlycon.base);
-	if (unlikely(rc)) {
-		uk_pr_err("Could not initialize ns16550 (%d)\n", rc);
-		return rc;
-	}
-
-	earlycon.dev = UK_CONSOLE("NS16550", &ns16550_ops,
-				  UK_CONSOLE_FLAG_STDOUT |
-				  UK_CONSOLE_FLAG_STDIN);
-	uk_console_register(&earlycon.dev);
-
-	mrd.pbase = earlycon.base;
-	mrd.vbase = earlycon.base;
-	mrd.pg_off = 0;
-	mrd.pg_count = 1;
-	mrd.len = 0x1000;
-	mrd.type = UKPLAT_MEMRT_DEVICE;
-	mrd.flags = UKPLAT_MEMRF_READ | UKPLAT_MEMRF_WRITE;
-
-	rc = ukplat_memregion_list_insert(&bi->mrds, &mrd);
-	if (unlikely(rc < 0)) {
-		uk_pr_err("Could not insert mrd (%d)\n", rc);
-		return rc;
-	}
-
-	return 0;
-}
-#endif /* !CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
 
 #if CONFIG_LIBUKALLOC
 static int register_device(struct ns16550_device *dev, struct uk_alloc *a)
@@ -356,8 +301,8 @@ static int init(struct uk_init_ctx *ictx __unused)
 }
 
 #if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
-UK_BOOT_EARLYTAB_ENTRY(early_init, UK_PRIO_AFTER(UK_PRIO_EARLIEST));
-#endif /* !config_libuktty_ns16550_early_console */
+UK_BOOT_EARLYTAB_ENTRY(ns16550_early_init, UK_PRIO_AFTER(UK_PRIO_EARLIEST));
+#endif /* !CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
 
 /* UK_PRIO_EARLIEST reserved for cmdline */
 uk_plat_initcall_prio(init, 0, UK_PRIO_AFTER(UK_PRIO_EARLIEST));
