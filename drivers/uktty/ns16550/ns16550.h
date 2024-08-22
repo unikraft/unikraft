@@ -41,5 +41,6 @@ int ns16550_configure(struct ns16550_device *dev);
 void ns16550_register(struct ns16550_device *dev, int flags);
 
 int ns16550_early_init(struct ukplat_bootinfo *bi);
+int ns16550_late_init(struct uk_init_ctx *ictx);
 
 #endif /* __UKTTY_NS16550_IO_H__ */

@@ -35,15 +35,6 @@
 
 #include "ns16550.h"
 
-#if CONFIG_LIBUKALLOC
-#include <uk/alloc.h>
-#endif /* CONFIG_LIBUKALLOC */
-
-#if CONFIG_PAGING
-#include <uk/bus/platform.h>
-#include <uk/errptr.h>
-#endif /* CONFIG_PAGING */
-
 #if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
 #include <uk/boot/earlytab.h>
 #endif /* CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
@@ -201,108 +192,9 @@ int ns16550_configure(struct ns16550_device *dev)
 	return 0;
 }
 
-#if CONFIG_LIBUKALLOC
-static int register_device(struct ns16550_device *dev, struct uk_alloc *a)
-{
-	struct ns16550_device *console_dev;
-
-	UK_ASSERT(dev);
-	UK_ASSERT(a);
-
-	console_dev = uk_malloc(a, sizeof(*console_dev));
-	if (unlikely(!console_dev)) {
-		uk_pr_err("Could not allocate ns16550 device\n");
-		return -ENOMEM;
-	}
-
-	console_dev->dev = dev->dev;
-	console_dev->base = dev->base;
-	console_dev->size = dev->size;
-
-	uk_console_register(&console_dev->dev);
-	uk_pr_info("tty: ns16550 (%p)\n", &console_dev->base);
-
-	return 0;
-}
-#endif /* CONFIG_LIBUKALLOC */
-
-static int init(struct uk_init_ctx *ictx __unused)
-{
-#if CONFIG_LIBUKALLOC
-	struct ukplat_bootinfo *bi;
-	const __u64 *regs;
-	const void *dtb;
-	int offset = -1, len;
-	int rc;
-	struct uk_alloc *a;
-	struct ns16550_device dev;
-
-	bi = ukplat_bootinfo_get();
-	UK_ASSERT(bi);
-
-	dtb = (void *)bi->dtb;
-	UK_ASSERT(dtb);
-
-	a = uk_alloc_get_default();
-	UK_ASSERT(a);
-
-	uk_pr_debug("Probing ns16550\n");
-
-	while (1) {
-		rc = fdt_get_device(&dev, dtb, &offset);
-		if (unlikely(offset == -FDT_ERR_NOTFOUND))
-			break; /* No more devices */
-
-		if (unlikely(rc < 0)) {
-			uk_pr_err("Could not get ns16550 device\n");
-			return rc;
-		}
-
-#if CONFIG_PAGING
-		/* Map device region */
-		dev.base = uk_bus_pf_devmap(dev.base, dev.size);
-		if (unlikely(PTRISERR(dev.base))) {
-			uk_pr_err("Could not map ns16550\n");
-			return PTR2ERR(dev.base);
-		}
-#endif /* !CONFIG_PAGING */
-
-#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
-		/* `ukconsole` mandates that there is only a single
-		 * `struct uk_console` registered per device.
-		 */
-		if (dev.base == earlycon.base) {
-			uk_pr_info("Skipping ns16550 device\n");
-			continue;
-		}
-#endif /* CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
-
-		regs = fdt_getprop(dtb, offset, "reg-shift", &len);
-		if (regs)
-			ns16550_reg_shift = fdt32_to_cpu(regs[0]);
-
-		regs = fdt_getprop(dtb, offset, "reg-io-width", &len);
-		if (regs)
-			ns16550_reg_width = fdt32_to_cpu(regs[0]);
-
-		rc = init_ns16550(dev.base);
-		if (unlikely(rc)) {
-			uk_pr_err("Could not initialize ns16550\n");
-			return rc;
-		}
-
-		rc = register_device(&dev, a);
-		if (unlikely(rc < 0))
-			return rc;
-	}
-#endif /* CONFIG_LIBUKALLOC */
-
-	return 0;
-}
-
 #if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
 UK_BOOT_EARLYTAB_ENTRY(ns16550_early_init, UK_PRIO_AFTER(UK_PRIO_EARLIEST));
 #endif /* !CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
 
 /* UK_PRIO_EARLIEST reserved for cmdline */
-uk_plat_initcall_prio(init, 0, UK_PRIO_AFTER(UK_PRIO_EARLIEST));
+uk_plat_initcall_prio(ns16550_late_init, 0, UK_PRIO_AFTER(UK_PRIO_EARLIEST));

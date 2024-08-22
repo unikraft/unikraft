@@ -13,6 +13,15 @@
 #include <uk/config.h>
 #include <uk/libparam.h>
 
+#if CONFIG_LIBUKALLOC
+#include <uk/alloc.h>
+#endif /* CONFIG_LIBUKALLOC */
+
+#if CONFIG_PAGING
+#include <uk/bus/platform.h>
+#include <uk/errptr.h>
+#endif /* CONFIG_PAGING */
+
 static const char * const fdt_compatible[] = {
 	"ns16550", "ns16550a", NULL
 };
@@ -210,3 +219,93 @@ int ns16550_early_init(struct ukplat_bootinfo *bi)
 	return 0;
 }
 #endif /* !CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
+
+#if CONFIG_LIBUKALLOC
+static int register_device(struct ns16550_device dev, struct uk_alloc *a)
+{
+	struct ns16550_device *console_dev;
+
+	UK_ASSERT(a);
+
+	console_dev = uk_malloc(a, sizeof(*console_dev));
+	if (unlikely(!console_dev)) {
+		uk_pr_err("Could not allocate ns16550 device\n");
+		return -ENOMEM;
+	}
+
+	console_dev->con = dev.con;
+	console_dev->io.mmio.base = dev.io.mmio.base;
+	console_dev->io.mmio.size = dev.io.mmio.size;
+
+	ns16550_register_console(&console_dev->con, 0);
+	uk_pr_info("tty: ns16550 (%p)\n", &console_dev->io.mmio.base);
+
+	return 0;
+}
+#endif /* CONFIG_LIBUKALLOC */
+
+int ns16550_late_init(struct uk_init_ctx *ictx __unused)
+{
+#if CONFIG_LIBUKALLOC
+	struct ukplat_bootinfo *bi;
+	const void *dtb;
+	int offset = -1;
+	int rc;
+	struct uk_alloc *a;
+	struct ns16550_device dev;
+
+	bi = ukplat_bootinfo_get();
+	UK_ASSERT(bi);
+
+	dtb = (void *)bi->dtb;
+	UK_ASSERT(dtb);
+
+	a = uk_alloc_get_default();
+	UK_ASSERT(a);
+
+	uk_pr_debug("Probing ns16550\n");
+
+	while (1) {
+		rc = fdt_get_device(&dev, dtb, &offset);
+		if (unlikely(offset == -FDT_ERR_NOTFOUND))
+			break; /* No more devices */
+
+		if (unlikely(rc < 0)) {
+			uk_pr_err("Could not get ns16550 device\n");
+			return rc;
+		}
+
+#if CONFIG_PAGING
+		/* Map device region */
+		dev.io.mmio.base = uk_bus_pf_devmap(dev.io.mmio.base,
+						    dev.io.mmio.size);
+		if (unlikely(PTRISERR(dev.io.mmio.base))) {
+			uk_pr_err("Could not map ns16550\n");
+			return PTR2ERR(dev.io.mmio.base);
+		}
+#endif /* !CONFIG_PAGING */
+
+#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
+		/* `ukconsole` mandates that there is only a single
+		 * `struct uk_console` registered per device.
+		 */
+		if (dev.io.mmio.base == earlycon.io.mmio.base) {
+			uk_pr_info("Skipping ns16550 device\n");
+			continue;
+		}
+#endif /* CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
+
+		rc = ns16550_configure(&dev);
+		if (unlikely(rc)) {
+			uk_pr_err("Could not initialize ns16550\n");
+			return rc;
+		}
+
+		rc = register_device(dev, a);
+		if (unlikely(rc < 0))
+			return rc;
+	}
+#endif /* CONFIG_LIBUKALLOC */
+
+	return 0;
+}
