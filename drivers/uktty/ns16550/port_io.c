@@ -148,3 +148,57 @@ int ns16550_early_init(struct ukplat_bootinfo *bi __unused)
 	return 0;
 }
 #endif /* CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
+
+#if CONFIG_LIBUKALLOC
+__maybe_unused
+static int com_init_port(struct uk_alloc *a, __u16 port)
+{
+	struct ns16550_device *dev = uk_malloc(a, sizeof(*dev));
+
+	if (!dev)
+		return -ENOMEM;
+
+	dev->io.port_io.port = port;
+	dev->reg_shift = REG_SHIFT_DEFAULT;
+	dev->reg_width = REG_WIDTH_DEFAULT;
+
+	ns16550_configure(dev);
+	ns16550_register(dev, 0);
+
+	return 0;
+}
+#endif /* CONFIG_LIBUKALLOC */
+
+int ns16550_late_init(struct uk_init_ctx *ictx __unused)
+{
+	int rc __maybe_unused = 0;
+#if CONFIG_LIBUKALLOC
+	struct uk_alloc *a = uk_alloc_get_default();
+
+	UK_ASSERT(a);
+
+#if CONFIG_LIBUKTTY_NS16550_COM1 && !CONFIG_LIBUKTTY_NS16550_COM1_EARLY
+	rc = com_init_port(a, COM1_PORT);
+	if (unlikely(rc < 0))
+		return rc;
+#endif /* CONFIG_LIBUKTTY_NS16550_COM1 && !CONFIG_LIBUKTTY_NS16550_COM1_EARLY */
+#if CONFIG_LIBUKTTY_NS16550_COM2 && !CONFIG_LIBUKTTY_NS16550_COM2_EARLY
+	rc = com_init_port(a, COM2_PORT);
+	if (unlikely(rc < 0))
+		return rc;
+#endif /* CONFIG_LIBUKTTY_NS16550_COM2 && !CONFIG_LIBUKTTY_NS16550_COM2_EARLY */
+#if CONFIG_LIBUKTTY_NS16550_COM3 && !CONFIG_LIBUKTTY_NS16550_COM3_EARLY
+	rc = com_init_port(a, COM3_PORT);
+	if (unlikely(rc < 0))
+		return rc;
+#endif /* CONFIG_LIBUKTTY_NS16550_COM3 && !CONFIG_LIBUKTTY_NS16550_COM3_EARLY */
+#if CONFIG_LIBUKTTY_NS16550_COM4 && !CONFIG_LIBUKTTY_NS16550_COM4_EARLY
+	rc = com_init_port(a, COM4_PORT);
+	if (unlikely(rc < 0))
+		return rc;
+#endif /* CONFIG_LIBUKTTY_NS16550_COM4 && !CONFIG_LIBUKTTY_NS16550_COM4_EARLY */
+
+#endif /* CONFIG_LIBUKALLOC */
+
+	return 0;
+}
