@@ -715,4 +715,64 @@ struct uk_efi_simple_fs_proto {
 				    struct uk_efi_file_proto **root);
 };
 
+#define UK_EFI_GRAPHICS_OUTPUT_PROTOCOL_GUID				\
+	(&(struct uk_efi_guid){						\
+		.b0_3 = 0x9042a9de,					\
+		.b4_5 = 0x23dc,						\
+		.b6_7 = 0x4a38,						\
+		.b8_15 = {0x96, 0xfb, 0x7a, 0xde,			\
+			  0xd0, 0x80, 0x51, 0x6a},			\
+	})
+struct uk_efi_graphics_output_blt_pixel {
+	__u8 blue;
+	__u8 green;
+	__u8 red;
+	__u8 reserved;
+};
+
+struct uk_efi_pixel_bitmask {
+	__u32 red_mask;
+	__u32 green_mask;
+	__u32 blue_mask;
+	__u32 reserved_mask;
+};
+
+struct uk_efi_graphics_output_mode_information {
+	__u32 version;
+	__u32 horizontal_resolution;
+	__u32 vertical_resolution;
+	enum uk_efi_graphics_pixel_format pixel_format;
+	struct uk_efi_pixel_bitmask pixel_info;
+	__u32 pixels_per_scanline;
+};
+
+struct uk_efi_graphics_output_proto_mode {
+	__u32 max_mode;
+	__u32 mode;
+	struct uk_efi_graphics_output_mode_information *info;
+	uk_efi_uintn_t size_of_info;
+	uk_efi_paddr_t frame_buffer_base;
+	uk_efi_uintn_t frame_buffer_size;
+};
+
+struct uk_efi_graphics_output_proto {
+	uk_efi_status_t
+	(__uk_efi_api *query_mode)(struct uk_efi_graphics_output_proto *this,
+				   __u32 mode_num, uk_efi_uintn_t *info_sz,
+				   struct uk_efi_graphics_output_mode_information **info);
+	uk_efi_status_t
+	(__uk_efi_api *set_mode)(struct uk_efi_graphics_output_proto *this,
+				 __u32 mode_num);
+	uk_efi_status_t
+	(__uk_efi_api *blt)(struct uk_efi_graphics_output_proto *this,
+			    struct uk_efi_graphics_output_blt_pixel *blt_buffer,
+			    enum uk_efi_graphics_output_blt_operation blt_operation,
+			    uk_efi_uintn_t src_x, uk_efi_uintn_t src_y,
+			    uk_efi_uintn_t dest_x, uk_efi_uintn_t dest_y,
+			    uk_efi_uintn_t width, uk_efi_uintn_t height,
+			    uk_efi_uintn_t delta);
+
+	struct uk_efi_graphics_output_proto_mode *mode;
+};
+
 #endif /* __PLAT_CMN_EFI_H__ */
