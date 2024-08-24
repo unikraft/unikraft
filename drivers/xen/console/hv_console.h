@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: BSD-3-Clause and MIT */
+/* SPDX-License-Identifier: BSD-3-Clause */
 /*
  * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
  *
@@ -31,67 +31,28 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include <uk/config.h>
-#include <uk/plat/console.h>
-#include <string.h>
-#include <uk/arch/lcpu.h>
-#include <uk/essentials.h>
+#ifndef __XEN_HV_CONSOLE_H__
+#define __XEN_HV_CONSOLE_H__
+
 #include <errno.h>
 
-#define __XEN_CONSOLE_IMPL__
-#include "hv_console.h"
-#include "emg_console.h"
+#if CONFIG_LIBXEN_CONSOLE_HV
+void hv_console_prepare(void);
+void hv_console_init(void);
+int hv_console_output(const char *str, unsigned int len);
+void hv_console_flush(void);
+int hv_console_input(char *str, unsigned int maxlen);
+#else /* !CONFIG_LIBXEN_CONSOLE_HV */
+#define hv_console_prepare() \
+	do {} while (0)
+#define hv_console_init() \
+	do {} while (0)
+#define hv_console_output(str, len) \
+	(-ENOTSUP)
+#define hv_console_flush() \
+	do {} while (0)
+#define hv_console_input(str, len) \
+	(-ENOTSUP)
+#endif /* !CONFIG_LIBXEN_CONSOLE_HV */
 
-/*
- * Return the "best case" of the two return codes ret and ret2.
- */
-static inline int returncode(int ret, int ret2)
-{
-	if (ret < 0)
-		return (ret2 != -ENOTSUP) ? ret2 : ret;
-	return MAX((ret), (ret2));
-}
-
-void prepare_console(void)
-{
-	hv_console_prepare();
-}
-
-void flush_console(void)
-{
-	hv_console_flush();
-}
-
-void init_console(void)
-{
-	hv_console_init();
-}
-
-int ukplat_coutd(const char *str, unsigned int len)
-{
-	int ret, ret2;
-
-	if (unlikely(len == 0))
-		len = strnlen(str, len);
-
-	ret  = emg_console_output_d(str, len);
-	ret2 = hv_console_output_d(str, len);
-	return returncode(ret, ret2);
-}
-
-int ukplat_coutk(const char *str, unsigned int len)
-{
-	int ret, ret2;
-
-	if (unlikely(len == 0))
-		len = strnlen(str, len);
-
-	ret  = emg_console_output_k(str, len);
-	ret2 = hv_console_output_k(str, len);
-	return returncode(ret, ret2);
-}
-
-int ukplat_cink(char *str __maybe_unused, unsigned int maxlen __maybe_unused)
-{
-	return hv_console_input(str, maxlen);
-}
+#endif /* __XEN_HV_CONSOLE_H__ */

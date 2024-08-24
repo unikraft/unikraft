@@ -1,0 +1,10 @@
+$(eval $(call addlib_s,libuktty_gop,$(CONFIG_LIBUKTTY_GOP)))
+
+LIBUKTTY_GOP_CINCLUDES-y	+= -I$(LIBKVMPLAT_BASE)/include
+LIBUKTTY_GOP_CINCLUDES-y	+= -I$(LIBUKTTY_GOP_BASE)/include
+LIBUKTTY_GOP_SRCS-y		+= $(LIBUKTTY_GOP_BASE)/gop.c
+LIBUKTTY_GOP_SRCS-y		+= $(LIBUKTTY_GOP_BASE)/font.c
+LIBUKTTY_GOP_SRCS-y		+= $(LIBUKTTY_GOP_BASE)/format.c
+
+# TODO: Remove when there is no longer a need to call gop_init manually
+CINCLUDES-$(CONFIG_LIBUKTTY_GOP) += -I$(LIBUKTTY_GOP_BASE)/include

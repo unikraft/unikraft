@@ -1,6 +1,9 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Copyright (c) 2021 OpenSynergy GmbH
+ * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
+ *
+ * Copyright (c) 2019, NEC Laboratories Europe GmbH, NEC Corporation.
+ *                     All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,14 +30,17 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef __UK_TTY_NS16550_H__
-#define __UK_TTY_NS16550_H__
 
-/**
- * Early driver init
- *
- * @return zero on success, negative value on error
- */
-int ns16550_early_init(void);
+#ifndef __XEN_EMG_CONSOLE_H__
+#define __XEN_EMG_CONSOLE_H__
 
-#endif /* __UK_TTY_NS16550_H__ */
+#include <errno.h>
+
+#if CONFIG_LIBXEN_CONSOLE_EMG
+int emg_console_output(const char *str, unsigned int len);
+#else /* !CONFIG_LIBXEN_CONSOLE_EMG */
+#define emg_console_output(str, len) \
+	(-ENOTSUP)
+#endif /* !CONFIG_LIBXEN_CONSOLE_EMG */
+
+#endif /* __XEN_EMG_CONSOLE_H__ */

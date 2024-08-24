@@ -1,6 +1,9 @@
 menu "Serial console"
 
+source "$(KCONFIG_DRIV_BASE)/uktty/com/Config.uk"
 source "$(KCONFIG_DRIV_BASE)/uktty/pl011/Config.uk"
 source "$(KCONFIG_DRIV_BASE)/uktty/ns16550/Config.uk"
+source "$(KCONFIG_DRIV_BASE)/uktty/vga/Config.uk"
+source "$(KCONFIG_DRIV_BASE)/uktty/gop/Config.uk"
 
 endmenu

@@ -49,9 +49,4 @@
 #define DLAB 0x80
 #define PROT 0x03 /* 8N1 (8 bits, no parity, one stop bit) */
 
-#if !__ASSEMBLY__
-void _libkvmplat_init_serial_console(void);
-void _libkvmplat_serial_putc(char a);
-int  _libkvmplat_serial_getc(void);
-#endif /* !__ASSEMBLY__ */
 #endif /* __KVM_SERIAL_CONSOLE__ */

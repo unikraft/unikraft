@@ -4,15 +4,19 @@
  * You may not use this file except in compliance with the License.
  */
 
+#include <uk/essentials.h>
 #include <stdio.h>
 #include <stdarg.h>
 #include <errno.h>
 
-#include <uk/plat/console.h>
+#if CONFIG_LIBUKCONSOLE
+#include <uk/console.h>
+#endif /* CONFIG_LIBUKCONSOLE */
 
 static int
-uk_scanf(void *buffer,  size_t *cnt)
+uk_scanf(void *buffer __maybe_unused, size_t *cnt)
 {
+#if CONFIG_LIBUKCONSOLE
 	int bytes_read;
 	size_t bytes_total = 0, count;
 	char *buf = buffer;
@@ -27,9 +31,10 @@ uk_scanf(void *buffer,  size_t *cnt)
 	count = *cnt - 1;
 
 	do {
-		while ((bytes_read = ukplat_cink(buf,
-			count - bytes_total)) <= 0)
-			;
+		do {
+			bytes_read = uk_console_in(buf,
+						   count - bytes_total);
+		} while (bytes_read <= 0);
 
 		buf = buf + bytes_read;
 		*(buf - 1) = *(buf - 1) == '\r' ?
@@ -40,14 +45,14 @@ uk_scanf(void *buffer,  size_t *cnt)
 			/* DELETE control character */
 			if (buf - 1 != buffer) {
 				/* If this is not the first byte */
-				ukplat_coutk("\b \b", 3);
+				uk_console_out("\b \b", 3);
 				buf -= 1;
 				if (bytes_total > 0)
 					bytes_total--;
 			}
 			buf -= 1;
 		} else {
-			ukplat_coutk(buf - bytes_read, bytes_read);
+			uk_console_out(buf - bytes_read, bytes_read);
 			bytes_total += bytes_read;
 		}
 
@@ -58,6 +63,10 @@ uk_scanf(void *buffer,  size_t *cnt)
 	*cnt = bytes_total;
 
 	return 0;
+#else /* !CONFIG_LIBUKCONSOLE */
+	*cnt = 0;
+	return EOF;
+#endif /* !CONFIG_LIBUKCONSOLE */
 }
 
 int

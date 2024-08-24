@@ -1,0 +1,6 @@
+$(eval $(call addlib_s,libuktty_vga,$(CONFIG_LIBUKTTY_VGA)))
+
+# TODO: Remove as soon as plat dependencies go away
+LIBUKTTY_VGA_CINCLUDES-y += -I$(UK_PLAT_COMMON_BASE)/include
+
+LIBUKTTY_VGA_SRCS-y += $(LIBUKTTY_VGA_BASE)/vga.c

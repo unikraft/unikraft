@@ -18,8 +18,6 @@
 #include <uk/essentials.h>
 #include <uk/intctlr.h>
 
-#include <kvm/console.h>
-
 #include <uk/plat/lcpu.h>
 #include <uk/plat/common/lcpu.h>
 #include <uk/plat/common/sections.h>
