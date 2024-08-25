@@ -160,6 +160,34 @@ static struct uk_alloc *heap_init()
 	 * mappings and then create the VMA on top. Afterwards, we add the
 	 * remainder of the VMA to the allocator.
 	 */
+#ifdef CONFIG_LIBUKBOOT_INITMIMALLOC
+	rc = ukplat_page_map(pt, heap_base, __PADDR_ANY,
+			     HEAP_INITIAL_PAGES, PAGE_ATTR_PROT_RW, 0);
+	if (unlikely(rc))
+		return NULL;
+
+	free_pages  = pt->fa->free_memory >> PAGE_SHIFT;
+	alloc_pages = free_pages - PT_PAGES(free_pages);
+	a = uk_alloc_init((void *)heap_base, (alloc_pages - HEAP_INITIAL_PAGES) << PAGE_SHIFT);
+	if (unlikely(!a))
+		return NULL;
+
+	rc = uk_vas_init(&kernel_vas, pt, a);
+	if (unlikely(rc))
+		return NULL;
+
+	rc = uk_vas_set_active(&kernel_vas);
+	if (unlikely(rc))
+		return NULL;
+
+	vaddr = heap_base;
+	rc = uk_vma_map_anon(&kernel_vas, &vaddr,
+			     (alloc_pages + HEAP_INITIAL_PAGES) << PAGE_SHIFT,
+			     PAGE_ATTR_PROT_RW, UK_VMA_MAP_UNINITIALIZED,
+			     "heap");
+	if (unlikely(rc))
+		return NULL;
+#else /* CONFIG_LIBUKBOOT_INITMIMALLOC */
 	rc = ukplat_page_map(pt, heap_base, __PADDR_ANY,
 			     HEAP_INITIAL_PAGES, PAGE_ATTR_PROT_RW, 0);
 	if (unlikely(rc))
@@ -192,6 +220,7 @@ static struct uk_alloc *heap_init()
 			     (alloc_pages - HEAP_INITIAL_PAGES) << PAGE_SHIFT);
 	if (unlikely(rc))
 		return NULL;
+#endif /* !CONFIG_LIBUKBOOT_INITMIMALLOC */
 #else /* CONFIG_LIBUKVMEM */
 	free_pages  = pt->fa->free_memory >> PAGE_SHIFT;
 	alloc_pages = free_pages - PT_PAGES(free_pages);
