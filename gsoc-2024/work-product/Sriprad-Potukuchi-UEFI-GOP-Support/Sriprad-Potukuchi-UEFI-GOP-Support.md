@@ -49,10 +49,10 @@ My work with the GOP driver can be upstreamed as soon as the `ukconsole` PR is m
 
 ## Blog Posts
 
-- [Part 1](https://github.com/unikraft/unikraft/pull/430): Initializing GOP and implementing a proof of concept.
-- [Part 2](https://github.com/unikraft/unikraft/pull/441): Parsing and rendering a bitmap font.
-- [Part 3](https://github.com/unikraft/unikraft/pull/450): Arbitrary bitmap font support and migrating to `ukconsole`.
-- [Part 4](https://github.com/unikraft/unikraft/pull/454): Coloring logs with ANSI escape codes.
+- [Part 1](https://github.com/unikraft/docs/pull/430): Initializing GOP and implementing a proof of concept.
+- [Part 2](https://github.com/unikraft/docs/pull/441): Parsing and rendering a bitmap font.
+- [Part 3](https://github.com/unikraft/docs/pull/450): Arbitrary bitmap font support and migrating to `ukconsole`.
+- [Part 4](https://github.com/unikraft/docs/pull/454): Coloring logs with ANSI escape codes.
 
 ## Current Status
 
