@@ -803,9 +803,30 @@ static int gdb_handle_qXfer(char *buf, __sz buf_len,
 		offset, length);
 }
 
+/* qAttached */
+static int gdb_handle_qAttached(char *buf __unused, __sz buf_len,
+				struct gdb_excpt_ctx *g __unused)
+{
+	/* NOTE: If multiprocess extensions are enabled, there's an additional
+	 * :pid field at the end of the qAttached packet. Since multiprocess
+	 * extensions are not currently supported, we just check that this field
+	 * is not present.
+	 */
+	if (buf_len) {
+		GDB_CHECK(gdb_send_error_packet(EINVAL));
+		return 0;
+	}
+
+	/* We attached to an existing process */
+	GDB_CHECK(gdb_send_packet(GDB_STR_A_LEN("1")));
+
+	return 0;
+}
+
 static struct gdb_cmd_table_entry gdb_q_cmd_table[] = {
 	{ gdb_handle_qsupported, GDB_STR_A_LEN("Supported") },
-	{ gdb_handle_qXfer, GDB_STR_A_LEN("Xfer") }
+	{ gdb_handle_qXfer, GDB_STR_A_LEN("Xfer") },
+	{ gdb_handle_qAttached, GDB_STR_A_LEN("Attached") }
 };
 
 #define NUM_GDB_Q_CMDS (sizeof(gdb_q_cmd_table) / \
