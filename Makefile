@@ -155,6 +155,20 @@ $(if $(BUILD_DIR),, $(error could not create directory "$(_O)"))
 BUILD_DIR := $(realpath $(patsubst %/,%,$(patsubst %.,%,$(BUILD_DIR))))
 override O := $(BUILD_DIR)
 
+# parameter F: FETCH_BASE ###
+ifneq ("$(origin F)", "command line")
+_F := $(BUILD_DIR)
+else
+ifeq ("$(filter /%,$(F))", "")
+$(error Path to fetch directory (F) is not absolute)
+endif
+_F := $(realpath $(dir $(F)))/$(notdir $(F))
+endif
+FETCH_BASE := $(shell mkdir -p $(_F) && cd $(_F) >/dev/null && pwd)
+$(if $(FETCH_BASE),, $(error could not create directory "$(_F)"))
+FETCH_BASE := $(realpath $(patsubst %/,%,$(patsubst %.,%,$(FETCH_BASE))))
+override F := $(FETCH_BASE)
+
 # parameter C: UK_CONFIG ###
 # Use C variable if set on the command line, otherwise use $(A)/.config;
 ifneq ("$(origin C)", "command line")
@@ -222,6 +236,7 @@ $(call verbose_info,* External platforms: [ $(EPLAT_DIR) ])
 $(call verbose_info,* External libraries: [ $(ELIB_DIR) ])
 $(call verbose_info,* Import excludes:    [ $(IMPORT_EXCLUDEDIRS) ])
 $(call verbose_info,* Build output:       $(BUILD_DIR))
+$(call verbose_info,* Fetch base:         $(FETCH_BASE))
 
 build_dir_make  := 0
 ifneq ($(BUILD_DIR),$(UK_BASE))
@@ -1218,6 +1233,7 @@ endif
 	@echo '                           2 => like 1 and warn about undefined build variables'
 	@echo '  C=[PATH]               - path to .config configuration file'
 	@echo '  O=[PATH]               - path to build output (will be created if it does not exist)'
+	@echo '  F=[PATH]               - path to store fetched files (will be created if it does not exist)'
 	@echo '  A=[PATH]               - path to Unikraft application'
 	@echo '  N=[NAME]               - use NAME as image name instead the one found in the configuration'
 	@echo '                           (note: the name in the configuration file is not overwritten)'

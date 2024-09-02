@@ -525,13 +525,14 @@ endef
 # (without path!) is specified
 # fetchas $1:libname,$2:url,$3:target_fname(no_path!)
 define fetchas =
-$(BUILD_DIR)/$(1)/$(3):
+$(FETCH_BASE)/$(1)/$(3):
 	$(call verbose_cmd,WGET,$(1)':' $(2), \
-	 $(WGET) -q --show-progress --progress=bar -O $(BUILD_DIR)/$(1)/$(3) $(2) || \
-	 $(RM) $(BUILD_DIR)/$(1)/$(3))
+	 mkdir -p $(FETCH_BASE)/$(1) && \
+	 $(WGET) -q --show-progress --progress=bar -O $(FETCH_BASE)/$(1)/$(3) $(2) || \
+	 $(RM) $(FETCH_BASE)/$(1)/$(3))
 
-$(call _chksum_origin,$(1),$(BUILD_DIR)/$(1)/$(3),$(BUILD_DIR)/$(1)/.chksum)
-$(call unarchive,$(1),$(BUILD_DIR)/$(1)/$(3),$(BUILD_DIR)/$(1)/.chksum)
+$(call _chksum_origin,$(1),$(FETCH_BASE)/$(1)/$(3),$(BUILD_DIR)/$(1)/.chksum)
+$(call unarchive,$(1),$(FETCH_BASE)/$(1)/$(3),$(BUILD_DIR)/$(1)/.chksum)
 
 UK_FETCH-y += $(BUILD_DIR)/$(1)/.chksum
 endef
@@ -541,12 +542,13 @@ endef
 define fetchas2 =
 $(BUILD_DIR)/$(1)/$(4):
 	$(call verbose_cmd,WGET,$(1)':' $(2) [retry-with: $(3)], \
-	 $(WGET) -q --show-progress --progress=bar -O $(BUILD_DIR)/$(1)/$(4) $(2) || \
-	 $(WGET) -q --show-progress --progress=bar -O $(BUILD_DIR)/$(1)/$(4) $(3) || \
-	 $(RM) $(BUILD_DIR)/$(1)/$(4))
+	 mkdir -p $(FETCH_BASE)/$(1) && \
+	 $(WGET) -q --show-progress --progress=bar -O $(FETCH_BASE)/$(1)/$(4) $(2) || \
+	 $(WGET) -q --show-progress --progress=bar -O $(FETCH_BASE)/$(1)/$(4) $(3) || \
+	 $(RM) $(FETCH_BASE)/$(1)/$(4))
 
-$(call _chksum_origin,$(1),$(BUILD_DIR)/$(1)/$(4),$(BUILD_DIR)/$(1)/.chksum)
-$(call unarchive,$(1),$(BUILD_DIR)/$(1)/$(4),$(BUILD_DIR)/$(1)/.chksum)
+$(call _chksum_origin,$(1),$(FETCH_BASE)/$(1)/$(4),$(BUILD_DIR)/$(1)/.chksum)
+$(call unarchive,$(1),$(FETCH_BASE)/$(1)/$(4),$(BUILD_DIR)/$(1)/.chksum)
 
 UK_FETCH-y += $(BUILD_DIR)/$(1)/.chksum
 endef
