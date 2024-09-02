@@ -45,4 +45,11 @@ if LIBUKLOCK
 		default y
 		help
 			Enable reader-writer based synchronization
+			
+	config LIBUKLOCK_RCU
+		bool "Rcu mechanism"
+		select LIBUKSCHED
+		default y
+		help
+			Enable rcu based synchronization
 endif
