@@ -157,6 +157,31 @@ endchoice
 comment "Hint: Keep frame pointers to ease debugging"
 	depends on !OPTIMIZE_NOOMITFP && !DEBUG_SYMBOLS_LVL0
 
+config COVERAGE
+	bool "Collect coverage information"
+	default n
+	help
+		Add instrumentation tokens at build time to collect coverage
+		information. This is usually in the form of counters each
+		time a basic block (BB) is encountered in the control flow
+		graph (CFG).
+
+if COVERAGE
+	choice
+		prompt "Coverage tool"
+		default COVERAGE_TOOL_GCOV
+		help
+			Choose coverage mechanism.
+
+		config COVERAGE_TOOL_GCOV
+			bool "gcov"
+			help
+				Enable Gcov-based coverage collection.
+        	select LIBGCC
+			select LIBGCOV
+	endchoice
+endif
+
 config OPTIMIZE_WARNISERROR
 	bool "Treat warnings as errors"
 	default n
@@ -211,7 +236,6 @@ config CROSS_COMPILE
 		default make runs in this build directory.  You don't
 		need to set this unless you want the configured build
 		directory to select the cross-compiler automatically.
-
 
 config LLVM_TARGET_ARCH
 	string "Custom cross-compiler LLVM target (optional)"
