@@ -15,6 +15,7 @@
 #include <uk/isr/string.h>
 #include <uk/nofault.h>
 #include <uk/console.h>
+#include <uk/console/driver.h>
 #include <uk/libparam.h>
 
 #if CONFIG_HAVE_PAGING
@@ -70,6 +71,33 @@ static struct uk_console *gdb_backing_console;
 static __u16 gdb_backing_console_id = GDB_BACKING_CONSOLE_NONE;
 UK_LIBPARAM_PARAM_ALIAS(gdbcon, &gdb_backing_console_id, __u16,
 			"gdb backing console ID");
+
+/* This is a tristate value controlling the behavior of the gdb stub's virtual
+ * console. The virtual console implements a console device for `ukconsole`.
+ * This console device is called "virtual" because it's not a driver for a
+ * real console device. The virtual console sends all console output to the
+ * gdb host using the 'O' packet. The backing console is used to transmit this
+ * packet like any other. With the virtual console, the backing console can be
+ * used for kernel console output and for gdb communication at the same time.
+ *
+ * The value of this tristate is interpreted as follows:
+ * - (> 0): always register the virtual console
+ * - (0): never register the virtual console
+ * - (< 0): register the virtual console if the backing console has flags set
+ */
+static int gdb_virt_console_mode = -1;
+UK_LIBPARAM_PARAM_ALIAS(gdbmode, &gdb_virt_console_mode, int,
+			"-1=auto, 0=not shared 1=shared");
+
+static inline __bool gdb_mode_is_shared(void)
+{
+	return gdb_virt_console_mode > 0;
+}
+
+static inline __bool gdb_mode_is_auto(void)
+{
+	return gdb_virt_console_mode < 0;
+}
 
 int gdb_dbg_putc(char b)
 {
@@ -402,6 +430,18 @@ static __ssz gdb_send_signal_packet(int errnr)
 	gdb_byte2hex(buf + 1, sizeof(buf) - 1, errnr);
 
 	return gdb_send_packet(buf, sizeof(buf));
+}
+
+/* O XX... */
+static __ssz gdb_send_message_packet(const char *str, __sz len)
+{
+	UK_ASSERT(str);
+
+	gdb_send_buffer[0] = 'O';
+	len = gdb_mem2hex(gdb_send_buffer + 1, sizeof(gdb_send_buffer) - 1,
+			  str, len);
+
+	return gdb_send_packet(gdb_send_buffer, len + 1);
 }
 
 /* E nn */
@@ -997,6 +1037,30 @@ static int gdb_main_loop(struct gdb_excpt_ctx *g)
 
 	return (int)r;
 }
+
+static __ssz gdb_virt_out(struct uk_console *dev __unused, const char *str,
+			  __sz len)
+{
+	unsigned long irqs;
+
+	if (str) {
+		/* TODO: SMP Support */
+		/* TODO: We only disable IRQs here for extra safety. E.g.,
+		 * because some functions print from interrupt handlers.
+		 * This shouldn't happen, but it's better to be safe than
+		 * sorry on this.
+		 */
+		irqs = ukplat_lcpu_save_irqf();
+		gdb_send_message_packet(str, len);
+		ukplat_lcpu_restore_irqf(irqs);
+	}
+
+	return len;
+}
+
+static struct uk_console_ops gdb_virt_ops = { .out = gdb_virt_out };
+
+static struct uk_console gdb_virt_console;
 
 int gdb_dbg_trap(int errnr, struct __regs *regs)
 {
