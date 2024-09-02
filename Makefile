@@ -797,10 +797,10 @@ $(UK_CONFIG_OUT): $(UK_CONFIG)
 	$(call verbose_cmd,CP,config, \
 		cmp -s $^ $@; if [ $$? -ne 0 ]; then cp $^ $@; fi)
 
-prepare: $(KCONFIG_AUTOHEADER) $(UK_CONFIG_OUT) $(UK_PREPARE) $(UK_PREPARE-y)
-prepare: $(UK_FIXDEP) | fetch
+prepare: $(KCONFIG_AUTOHEADER) $(UK_CONFIG_OUT) $(UK_PREPARE) fetch $(UK_PREPARE-y)
+prepare: $(UK_FIXDEP)
 
-preprocess: $(UK_PREPROCESS) $(UK_PREPROCESS-y) | prepare
+preprocess: $(UK_PREPROCESS) prepare $(UK_PREPROCESS-y)
 
 objs: $(UK_OBJS) $(UK_OBJS-y)
 
