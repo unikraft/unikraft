@@ -270,7 +270,7 @@ el1_sync:
 .align 6
 el1_irq:
 	SAVE_REGS 1
-	msr daifclr, #(8 | 4 | 1)
+	msr daifclr, #4 /* Unmask SError */
 	mov x0, sp
 	bl trap_el1_irq
 	RESTORE_REGS
