@@ -778,7 +778,7 @@ static void netfront_info_get(struct uk_netdev *n,
 	dev_info->features = UK_NETDEV_F_RXQ_INTR | UK_NETDEV_F_PARTIAL_CSUM;
 }
 
-static const void *netfront_einfo_get(struct uk_netdev *n,
+static const char *netfront_einfo_get(struct uk_netdev *n,
 		enum uk_netdev_einfo_type einfo_type)
 {
 	struct netfront_dev *nfdev;
