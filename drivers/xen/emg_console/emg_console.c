@@ -71,18 +71,43 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include <uk/essentials.h>
+#include <uk/console/driver.h>
 #include <common/hypervisor.h>
+#include <uk/boot/earlytab.h>
+#include <uk/prio.h>
+#include <uk/plat/common/bootinfo.h>
 
-#define __XEN_CONSOLE_IMPL__
-#include "emg_console.h"
-
-int emg_console_output(const char *str, unsigned int len)
+static __ssz console_out(struct uk_console *dev __unused, const char *str,
+			 __sz len)
 {
 	int rc;
 
 	rc = HYPERVISOR_console_io(CONSOLEIO_write, len, DECONST(char *, str));
 	if (unlikely(rc < 0))
 		return rc;
+
 	return len;
 }
+
+static __ssz console_in(struct uk_console *dev __unused, char *str __unused,
+			__sz len __unused)
+{
+	return 0;
+}
+
+static struct uk_console_ops console_ops = {
+	.out = console_out,
+	.in = console_in
+};
+
+static struct uk_console console_dev;
+
+static int init_console(struct ukplat_bootinfo *bi __unused)
+{
+	uk_console_init(&console_dev, "Emergency console", &console_ops,
+			UK_CONSOLE_FLAG_STDOUT);
+	uk_console_register(&console_dev);
+	return 0;
+}
+
+UK_BOOT_EARLYTAB_ENTRY(init_console, UK_PRIO_AFTER(UK_PRIO_EARLIEST));
