@@ -10,6 +10,12 @@ source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)
 
 endmenu
 
+menu "Serial console"
+
+source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-console.uk' -r '$(KCONFIG_DRIV_BASE)/ukconsole' -l '$(KCONFIG_DRIV_BASE)/ukconsole' -e '$(KCONFIG_EXCLUDEDIRS)')"
+
+endmenu
+
 menu "Virtio"
 
 source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-virtio.uk' -r '$(KCONFIG_DRIV_BASE)/virtio' -l '$(KCONFIG_DRIV_BASE)/virtio' -e '$(KCONFIG_EXCLUDEDIRS)')"
