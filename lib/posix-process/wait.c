@@ -37,7 +37,6 @@
 #include <uk/syscall.h>
 #include <errno.h>
 #include <stddef.h>
-#include "process.h"
 
 /* FIXME: Provide with sys/wait.h */
 struct rusage;

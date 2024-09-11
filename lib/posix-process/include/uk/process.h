@@ -200,4 +200,13 @@ struct uk_posix_clonetab_entry {
 
 #endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 
+#if CONFIG_LIBPOSIX_PROCESS_EXECVE
+
+/* Data delivered to the handlers of the POSIX_PROCESS_EXECVE_EVENT */
+struct posix_process_execve_event_data {
+	struct uk_thread *thread;
+};
+
+#endif /* CONFIG_LIBPOSIX_PROCESS_EXECVE */
+
 #endif /* __UK_PROCESS_H__ */

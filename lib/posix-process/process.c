@@ -33,14 +33,13 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
 #include <uk/config.h>
 #include <sys/types.h>
 #include <stddef.h>
 #include <errno.h>
 #include <uk/config.h>
 #include <uk/syscall.h>
-
-#define TIDMAP_SIZE (CONFIG_LIBPOSIX_PROCESS_MAX_PID + 1)
 
 #if CONFIG_LIBPOSIX_PROCESS_PIDS
 #include <uk/bitmap.h>
@@ -56,30 +55,6 @@
 #endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 
 #include "process.h"
-
-/**
- * Internal structures
- */
-struct posix_process {
-	pid_t pid;
-	struct posix_process *parent;
-	struct uk_list_head children; /* child processes */
-	struct uk_list_head child_list_entry;
-	struct uk_list_head threads;
-	struct uk_alloc *_a;
-
-	/* TODO: Mutex */
-};
-
-struct posix_thread {
-	pid_t tid;
-	struct posix_process *process;
-	struct uk_list_head thread_list_entry;
-	struct uk_thread *thread;
-	struct uk_alloc *_a;
-
-	/* TODO: Mutex */
-};
 
 /**
  * System global lists
@@ -276,6 +251,8 @@ int uk_posix_process_create(struct uk_alloc *a,
 			pprocess_release(orig_pprocess);
 	}
 
+	(*pthread)->parent = parent_pthread;
+
 	pprocess->parent = parent_pprocess;
 	if (parent_pprocess) {
 		uk_list_add_tail(&pprocess->child_list_entry,
@@ -326,6 +303,45 @@ static void pprocess_release(struct posix_process *pprocess)
 	uk_pr_debug("Process PID %d released\n",
 		    pprocess->pid);
 	uk_free(pprocess->_a, pprocess);
+}
+
+void pprocess_kill_siblings(struct uk_thread *thread)
+{
+	struct posix_thread *pthread, *pthreadn;
+	struct posix_thread *this_thread;
+	struct posix_process *pprocess;
+	pid_t this_tid;
+
+	this_tid = ukthread2tid(thread);
+	this_thread = tid2pthread(this_tid);
+
+	pprocess = this_thread->process;
+	UK_ASSERT(pprocess);
+
+	/* Kill all remaining threads of the process */
+	uk_list_for_each_entry_safe(pthread, pthreadn,
+				    &pprocess->threads, thread_list_entry) {
+		if (pthread->tid == this_tid)
+			continue;
+
+		/* If this thread is already exited it may
+		 * be waiting to be garbage-collected.
+		 */
+		if (uk_thread_is_exited(pthread->thread))
+			continue;
+
+		uk_pr_debug("Terminating siblings of tid: %d (pid: %d): Killing TID %d: thread %p (%s)...\n",
+			    this_thread->tid, pprocess->pid,
+			    pthread->tid, pthread->thread,
+			    pthread->thread->name);
+
+		/* Terminating the thread will lead to calling
+		 * `posix_thread_fini()` which will clean-up the related
+		 * pthread resources and pprocess resources on the last
+		 * thread
+		 */
+		uk_sched_thread_terminate(pthread->thread);
+	}
 }
 
 static void pprocess_kill(struct posix_process *pprocess)
@@ -461,14 +477,14 @@ static void posix_thread_fini(struct uk_thread *child)
 
 UK_THREAD_INIT_PRIO(posix_thread_init, posix_thread_fini, UK_PRIO_EARLIEST);
 
-static inline struct posix_thread *tid2pthread(pid_t tid)
+struct posix_thread *tid2pthread(pid_t tid)
 {
 	if ((__sz)tid >= ARRAY_SIZE(tid_thread) || tid < 0)
 		return NULL;
 	return tid_thread[tid];
 }
 
-static inline struct posix_process *tid2pprocess(pid_t tid)
+struct posix_process *tid2pprocess(pid_t tid)
 {
 	struct posix_thread *pthread;
 
