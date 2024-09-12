@@ -4,7 +4,7 @@
 #
 ################################################################################
 
-UK_DRIV_TTY_BASE := $(UK_DRIV_BASE)/uktty
+UK_DRIV_CONSOLE_BASE := $(UK_DRIV_BASE)/ukconsole
 
-$(eval $(call import_lib,$(UK_DRIV_TTY_BASE)/ns16550))
-$(eval $(call import_lib,$(UK_DRIV_TTY_BASE)/pl011))
+$(eval $(call import_lib,$(UK_DRIV_CONSOLE_BASE)/ns16550))
+$(eval $(call import_lib,$(UK_DRIV_CONSOLE_BASE)/pl011))

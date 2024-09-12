@@ -40,9 +40,9 @@
 #include <uk/errptr.h>
 #endif /* CONFIG_PAGING */
 
-#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
+#if CONFIG_LIBUKCONSOLE_NS16550_EARLY_CONSOLE
 #include <uk/boot/earlytab.h>
-#endif /* CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
+#endif /* CONFIG_LIBUKCONSOLE_NS16550_EARLY_CONSOLE */
 
 #define NS16550_THR_OFFSET	0x00U
 #define NS16550_RBR_OFFSET	0x00U
@@ -175,7 +175,7 @@ static int init_ns16550(void)
 	return 0;
 }
 
-#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
+#if CONFIG_LIBUKCONSOLE_NS16550_EARLY_CONSOLE
 static inline int config_fdt_chosen_stdout(const void *dtb)
 {
 	__u64 base, size;
@@ -253,7 +253,7 @@ static int early_init(struct ukplat_bootinfo *bi)
 
 	return 0;
 }
-#endif /* !CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE */
+#endif /* !CONFIG_LIBUKCONSOLE_NS16550_EARLY_CONSOLE */
 
 static int init(struct uk_init_ctx *ictx __unused)
 {
@@ -315,7 +315,7 @@ static int init(struct uk_init_ctx *ictx __unused)
 	}
 
 	ns16550_uart_initialized = 1;
-	uk_pr_info("tty: ns16550\n");
+	uk_pr_info("console: ns16550\n");
 
 	return 0;
 }
@@ -387,9 +387,9 @@ int ukplat_cink(char *buf, unsigned int maxlen)
 	return (int)num;
 }
 
-#if CONFIG_LIBUKTTY_NS16550_EARLY_CONSOLE
+#if CONFIG_LIBUKCONSOLE_NS16550_EARLY_CONSOLE
 UK_BOOT_EARLYTAB_ENTRY(early_init, UK_PRIO_AFTER(UK_PRIO_EARLIEST));
-#endif /* !config_libuktty_ns16550_early_console */
+#endif /* !config_libukconsole_ns16550_early_console */
 
 /* UK_PRIO_EARLIEST reserved for cmdline */
 uk_plat_initcall_prio(init, 0, UK_PRIO_AFTER(UK_PRIO_EARLIEST));
