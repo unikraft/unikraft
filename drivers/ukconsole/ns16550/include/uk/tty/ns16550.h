@@ -27,8 +27,8 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef __UK_TTY_NS16550_H__
-#define __UK_TTY_NS16550_H__
+#ifndef __UK_CONSOLE_NS16550_H__
+#define __UK_CONSOLE_NS16550_H__
 
 /**
  * Early driver init
@@ -37,4 +37,4 @@
  */
 int ns16550_early_init(void);
 
-#endif /* __UK_TTY_NS16550_H__ */
+#endif /* __UK_CONSOLE_NS16550_H__ */

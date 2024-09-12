@@ -32,9 +32,9 @@
 #include <uk/errptr.h>
 #endif /* CONFIG_PAGING */
 
-#if CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE
+#if CONFIG_LIBUKCONSOLE_PL011_EARLY_CONSOLE
 #include <uk/boot/earlytab.h>
-#endif /* CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE */
+#endif /* CONFIG_LIBUKCONSOLE_PL011_EARLY_CONSOLE */
 
 /* PL011 UART registers and masks*/
 /* Data register */
@@ -120,7 +120,7 @@ static int pl011_setup(void)
 	return 0;
 }
 
-#if CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE
+#if CONFIG_LIBUKCONSOLE_PL011_EARLY_CONSOLE
 static inline int config_fdt_chosen_stdout(const void *dtb)
 {
 	__u64 base, size;
@@ -196,7 +196,7 @@ static int early_init(struct ukplat_bootinfo *bi)
 
 	return 0;
 }
-#endif /* CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE */
+#endif /* CONFIG_LIBUKCONSOLE_PL011_EARLY_CONSOLE */
 
 static int init(struct uk_init_ctx *ictx __unused)
 {
@@ -244,7 +244,7 @@ static int init(struct uk_init_ctx *ictx __unused)
 	}
 
 	pl011_uart_initialized = 1;
-	uk_pr_info("tty: pl011\n");
+	uk_pr_info("console: pl011\n");
 
 	return 0;
 }
@@ -258,7 +258,7 @@ static void pl011_write(char a)
 {
 	/*
 	 * Avoid using the UART before base address initialized,
-	 * or CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE is not enabled.
+	 * or CONFIG_LIBUKCONSOLE_PL011_EARLY_CONSOLE is not enabled.
 	 */
 	if (!pl011_uart_initialized)
 		return;
@@ -282,7 +282,7 @@ static int pl011_getc(void)
 {
 	/*
 	 * Avoid using the UART before base address initialized,
-	 * or CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE is not enabled.
+	 * or CONFIG_LIBUKCONSOLE_PL011_EARLY_CONSOLE is not enabled.
 	 */
 	if (!pl011_uart_initialized)
 		return -1;
@@ -314,9 +314,9 @@ int ukplat_cink(char *buf, unsigned int maxlen)
 	return (int)num;
 }
 
-#if CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE
+#if CONFIG_LIBUKCONSOLE_PL011_EARLY_CONSOLE
 UK_BOOT_EARLYTAB_ENTRY(early_init, UK_PRIO_AFTER(UK_PRIO_EARLIEST));
-#endif /* CONFIG_LIBUKTTY_PL011_EARLY_CONSOLE */
+#endif /* CONFIG_LIBUKCONSOLE_PL011_EARLY_CONSOLE */
 
 /* UK_PRIO_EARLIEST reserved for cmdline */
 uk_plat_initcall_prio(init, 0, UK_PRIO_AFTER(UK_PRIO_EARLIEST));
