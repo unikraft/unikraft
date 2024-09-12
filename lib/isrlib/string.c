@@ -60,12 +60,11 @@
 
 #include <uk/isr/string.h>
 #include <uk/arch/types.h>
-#include <stdint.h>
-#include <limits.h>
+#include <uk/arch/limits.h>
 
-void *memcpy_isr(void *dst, const void *src, size_t len)
+void *memcpy_isr(void *dst, const void *src, __sz len)
 {
-	size_t p;
+	__sz p;
 
 	for (p = 0; p < len; ++p)
 		*((__u8 *)(((__uptr)dst) + p)) = *((__u8 *)(((__uptr)src) + p));
@@ -73,7 +72,7 @@ void *memcpy_isr(void *dst, const void *src, size_t len)
 	return dst;
 }
 
-void *memset_isr(void *ptr, int val, size_t len)
+void *memset_isr(void *ptr, int val, __sz len)
 {
 	__u8 *p = (__u8 *) ptr;
 
@@ -83,18 +82,18 @@ void *memset_isr(void *ptr, int val, size_t len)
 	return ptr;
 }
 
-void *memchr_isr(const void *ptr, int val, size_t len)
+void *memchr_isr(const void *ptr, int val, __sz len)
 {
-	uintptr_t o = 0;
+	__uptr o = 0;
 
-	for (o = 0; o < (uintptr_t)len; ++o)
-		if (*((const uint8_t *)(((uintptr_t)ptr) + o)) == (uint8_t)val)
-			return (void *)((uintptr_t)ptr + o);
+	for (o = 0; o < (__uptr)len; ++o)
+		if (*((const __u8 *)(((__uptr)ptr) + o)) == (__u8)val)
+			return (void *)((__uptr)ptr + o);
 
-	return NULL; /* did not find val */
+	return __NULL; /* did not find val */
 }
 
-void *memrchr_isr(const void *m, int c, size_t n)
+void *memrchr_isr(const void *m, int c, __sz n)
 {
 	const unsigned char *s = m;
 
@@ -105,14 +104,14 @@ void *memrchr_isr(const void *m, int c, size_t n)
 	return 0;
 }
 
-void *memmove_isr(void *dst, const void *src, size_t len)
+void *memmove_isr(void *dst, const void *src, __sz len)
 {
-	uint8_t *d = dst;
-	const uint8_t *s = src;
+	__u8 *d = dst;
+	const __u8 *s = src;
 
-	if ((intptr_t)src == (intptr_t)dst) {
+	if ((__sptr)src == (__sptr)dst) {
 		return dst;
-	} else if ((intptr_t)src > (intptr_t)dst) {
+	} else if ((__sptr)src > (__sptr)dst) {
 		for (; len > 0; --len)
 			*(d++) = *(s++);
 	} else {
@@ -126,7 +125,7 @@ void *memmove_isr(void *dst, const void *src, size_t len)
 	return dst;
 }
 
-int memcmp_isr(const void *ptr1, const void *ptr2, size_t len)
+int memcmp_isr(const void *ptr1, const void *ptr2, __sz len)
 {
 	const unsigned char *c1 = (const unsigned char *)ptr1;
 	const unsigned char *c2 = (const unsigned char *)ptr2;
@@ -139,18 +138,18 @@ int memcmp_isr(const void *ptr1, const void *ptr2, size_t len)
 	return 0;
 }
 
-size_t strlen_isr(const char *str)
+__sz strlen_isr(const char *str)
 {
-	return strnlen_isr(str, SIZE_MAX);
+	return strnlen_isr(str, __SZ_MAX);
 }
 
-size_t strnlen_isr(const char *str, size_t len)
+__sz strnlen_isr(const char *str, __sz len)
 {
 	const char *p = memchr_isr(str, 0, len);
-	return p ? (size_t) (p - str) : len;
+	return p ? (__sz) (p - str) : len;
 }
 
-char *strncpy_isr(char *dst, const char *src, size_t len)
+char *strncpy_isr(char *dst, const char *src, __sz len)
 {
 	if (len != 0) {
 		char *d = dst;
@@ -178,7 +177,7 @@ char *strcpy_isr(char *dst, const char *src)
 	return save;
 }
 
-int strncmp_isr(const char *str1, const char *str2, size_t len)
+int strncmp_isr(const char *str1, const char *str2, __sz len)
 {
 	const char *c1 = (const char *)str1;
 	const char *c2 = (const char *)str2;
@@ -203,23 +202,23 @@ int strcmp_isr(const char *str1, const char *str2)
 }
 
 /* The following code is taken from musl libc */
-#define ALIGN (sizeof(size_t))
-#define ONES ((size_t) -1 / UCHAR_MAX)
-#define HIGHS (ONES * (UCHAR_MAX / 2 + 1))
+#define ALIGN (sizeof(__sz))
+#define ONES ((__sz) -1 / __UC_MAX)
+#define HIGHS (ONES * (__UC_MAX / 2 + 1))
 #define HASZERO(x) (((x) - ONES) & ~(x) & HIGHS)
 #define BITOP(a, b, op) \
-		((a)[(size_t)(b) / (8*sizeof *(a))] op \
-		(size_t)1 << ((size_t)(b) % (8 * sizeof *(a))))
+		((a)[(__sz)(b) / (8*sizeof *(a))] op \
+		(__sz)1 << ((__sz)(b) % (8 * sizeof *(a))))
 
 char *strchrnul_isr(const char *s, int c)
 {
-	size_t *w, k;
+	__sz *w, k;
 
 	c = (unsigned char)c;
 	if (!c)
 		return (char *)s + strlen_isr(s);
 
-	for (; (uintptr_t)s % ALIGN; s++)
+	for (; (__uptr)s % ALIGN; s++)
 		if (!*s || *(unsigned char *)s == c)
 			return (char *)s;
 	k = ONES * c;
@@ -241,10 +240,10 @@ char *strrchr_isr(const char *s, int c)
 	return memrchr_isr(s, c, strlen_isr(s) + 1);
 }
 
-size_t strcspn_isr(const char *s, const char *c)
+__sz strcspn_isr(const char *s, const char *c)
 {
 	const char *a = s;
-	size_t byteset[32 / sizeof(size_t)];
+	__sz byteset[32 / sizeof(__sz)];
 
 	if (!c[0] || !c[1])
 		return strchrnul_isr(s, *c)-a;
@@ -257,10 +256,10 @@ size_t strcspn_isr(const char *s, const char *c)
 	return s-a;
 }
 
-size_t strspn_isr(const char *s, const char *c)
+__sz strspn_isr(const char *s, const char *c)
 {
 	const char *a = s;
-	size_t byteset[32 / sizeof(size_t)] = { 0 };
+	__sz byteset[32 / sizeof(__sz)] = { 0 };
 
 	if (!c[0])
 		return 0;
@@ -280,7 +279,7 @@ size_t strspn_isr(const char *s, const char *c)
 char *strtok_isr(char *restrict s, const char *restrict sep, char **restrict p)
 {
 	if (!s && !(s = *p))
-		return NULL;
+		return __NULL;
 	s += strspn_isr(s, sep);
 	if (!*s)
 		return *p = 0;
@@ -294,25 +293,25 @@ char *strtok_isr(char *restrict s, const char *restrict sep, char **restrict p)
 
 /* strlcpy has different ALIGN */
 #undef ALIGN
-#define ALIGN (sizeof(size_t)-1)
-size_t strlcpy_isr(char *d, const char *s, size_t n)
+#define ALIGN (sizeof(__sz)-1)
+__sz strlcpy_isr(char *d, const char *s, __sz n)
 {
 	char *d0 = d;
-	size_t *wd;
-	const size_t *ws;
+	__sz *wd;
+	const __sz *ws;
 
 	if (!n--)
 		goto finish;
 
-	if (((uintptr_t)s & ALIGN) == ((uintptr_t)d & ALIGN)) {
-		for (; ((uintptr_t) s & ALIGN) && n && (*d = *s);
+	if (((__uptr)s & ALIGN) == ((__uptr)d & ALIGN)) {
+		for (; ((__uptr) s & ALIGN) && n && (*d = *s);
 		     n--, s++, d++)
 			;
 
 		if (n && *s) {
 			wd = (void *)d; ws = (const void *)s;
-			for (; n >= sizeof(size_t) && !HASZERO(*ws);
-			     n -= sizeof(size_t), ws++, wd++)
+			for (; n >= sizeof(__sz) && !HASZERO(*ws);
+			     n -= sizeof(__sz), ws++, wd++)
 				*wd = *ws;
 
 			d = (void *)wd; s = (const void *)ws;
@@ -326,9 +325,9 @@ finish:
 	return d-d0 + strlen_isr(s);
 }
 
-size_t strlcat_isr(char *d, const char *s, size_t n)
+__sz strlcat_isr(char *d, const char *s, __sz n)
 {
-	size_t l = strnlen_isr(d, n);
+	__sz l = strnlen_isr(d, n);
 	if (l == n)
 		return l + strlen_isr(s);
 	return l + strlcpy_isr(d+l, s, n-l);

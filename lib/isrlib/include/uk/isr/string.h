@@ -41,28 +41,28 @@
 extern "C" {
 #endif
 
-#include <stddef.h>
+#include <uk/arch/types.h>
 
-void *memcpy_isr(void *dst, const void *src, size_t len);
-void *memset_isr(void *ptr, int val, size_t len);
-void *memchr_isr(const void *ptr, int val, size_t len);
-void *memrchr_isr(const void *m, int c, size_t n);
-int memcmp_isr(const void *ptr1, const void *ptr2, size_t len);
-void *memmove_isr(void *dst, const void *src, size_t len);
+void *memcpy_isr(void *dst, const void *src, __sz len);
+void *memset_isr(void *ptr, int val, __sz len);
+void *memchr_isr(const void *ptr, int val, __sz len);
+void *memrchr_isr(const void *m, int c, __sz n);
+int memcmp_isr(const void *ptr1, const void *ptr2, __sz len);
+void *memmove_isr(void *dst, const void *src, __sz len);
 
-char *strncpy_isr(char *dst, const char *src, size_t len);
+char *strncpy_isr(char *dst, const char *src, __sz len);
 char *strcpy_isr(char *dst, const char *src);
-size_t strlcpy_isr(char *d, const char *s, size_t n);
-size_t strlcat_isr(char *d, const char *s, size_t n);
-size_t strnlen_isr(const char *str, size_t maxlen);
-size_t strlen_isr(const char *str);
+__sz strlcpy_isr(char *d, const char *s, __sz n);
+__sz strlcat_isr(char *d, const char *s, __sz n);
+__sz strnlen_isr(const char *str, __sz maxlen);
+__sz strlen_isr(const char *str);
 char *strchrnul_isr(const char *s, int c);
 char *strchr_isr(const char *str, int c);
 char *strrchr_isr(const char *s, int c);
-int strncmp_isr(const char *str1, const char *str2, size_t len);
+int strncmp_isr(const char *str1, const char *str2, __sz len);
 int strcmp_isr(const char *str1, const char *str2);
-size_t strcspn_isr(const char *s, const char *c);
-size_t strspn_isr(const char *s, const char *c);
+__sz strcspn_isr(const char *s, const char *c);
+__sz strspn_isr(const char *s, const char *c);
 char *strtok_isr(char *restrict s, const char *restrict sep, char **restrict p);
 
 #ifdef __cplusplus
