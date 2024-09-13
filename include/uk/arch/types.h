@@ -257,6 +257,10 @@ typedef struct {
 	__u32 counter;
 } __atomic;
 
+typedef _Bool __bool;
+#define __true (1)
+#define __false (0)
+
 #else /* __ASSEMBLY__ */
 
 #if (defined __C_IS_8)
