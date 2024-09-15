@@ -1,7 +1,7 @@
 menuconfig LIBXEN_CONSOLE
 	bool "Hypervisor console"
 	select LIBUKCONSOLE
-	select LIBNOLIBC
+	select LIBNOLIBC if !HAVE_LIBC
 	depends on PLAT_XEN
 	help
 		Driver for the Xen hypervisor console
