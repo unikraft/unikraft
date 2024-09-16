@@ -19,6 +19,6 @@ define build_efi =
 endef
 
 define build_linux =
-	$(call build_cmd,OBJCOPY,,$(1).bin, $(OBJCOPY) -O binary $(1))
-	$(call build_cmd,MKLINUX,,$(1).img, $(SCRIPTS_DIR)/mklinux.py $(1) $(2))
+    $(call build_cmd,OBJCOPY,,$(1).bin, $(OBJCOPY) -O binary $(1))
+    $(call build_cmd,MKLINUX,,$(1).img, $(SCRIPTS_DIR)/mklinux_$(CONFIG_UK_ARCH).py $(1) $(2))
 endef
