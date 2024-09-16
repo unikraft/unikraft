@@ -339,9 +339,6 @@ void _libxenplat_armentry(void *dtb_pointer, paddr_t physical_offset)
 	/* Set up events. */
 	init_events();
 
-	/* Do early init */
-	uk_boot_early_init(bi);
-
 	/* Initialize logical boot CPU */
 	r = lcpu_init(lcpu_get_bsp());
 	if (unlikely(r))
@@ -358,9 +355,8 @@ void _libxenplat_armentry(void *dtb_pointer, paddr_t physical_offset)
 	get_console();
 	get_xenbus();
 
-	prepare_console();
-	/* Init console */
-	init_console();
+	/* Do early init */
+	uk_boot_early_init(bi);
 
 	uk_boot_entry();
 }
