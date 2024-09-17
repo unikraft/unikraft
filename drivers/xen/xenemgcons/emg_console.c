@@ -104,7 +104,7 @@ static struct uk_console console_dev;
 
 static int init_console(struct ukplat_bootinfo *bi __unused)
 {
-	uk_console_init(&console_dev, "Emergency console", &console_ops,
+	uk_console_init(&console_dev, "XenEmgConsole", &console_ops,
 			UK_CONSOLE_FLAG_STDOUT);
 	uk_console_register(&console_dev);
 	return 0;
