@@ -1,0 +1,8 @@
+$(eval $(call addlib_s,lib9pfront,$(CONFIG_LIB9PFRONT)))
+
+# FIXME: Extra includes should be removed
+LIB9PFRONT_CFLAGS-y         += $(LIBXENPLAT_CFLAGS-y)
+LIB9PFRONT_CINCLUDES-y      += $(LIBXENPLAT_CINCLUDES-y)
+LIB9PFRONT_CINCLUDES-y      += $(LIBXENBUS_CINCLUDES-y)
+LIB9PFRONT_SRCS-y           += $(LIB9PFRONT_BASE)/9pfront.c
+LIB9PFRONT_SRCS-y           += $(LIB9PFRONT_BASE)/9pfront_xs.c
