@@ -1,0 +1,10 @@
+# NOTE: The headers expect that at least the compile flag
+#       __XEN_INTERFACE_VERSION__ is configured. Additionally,
+#       the following options influence the compiled Xen interface:
+#        - XEN_HAVE_PV_GUEST_ENTRY
+#        - XEN_HAVE_PV_UPCALL_MASK
+#       These settings should be globally set and depend on the
+#       target image type and CPU architecture (e.g., PV/x86, PVH/Arm).
+
+ASINCLUDES-$(CONFIG_LIBXENHEADERS) += -I$(IMPORT_BASE)/include
+CINCLUDES-$(CONFIG_LIBXENHEADERS)  += -I$(IMPORT_BASE)/include

@@ -1,0 +1,4 @@
+config LIBXENHEADERS
+	# Invisible support headers library for Xen drivers
+	bool
+	select LIBNOLIBC if !HAVE_LIBC
