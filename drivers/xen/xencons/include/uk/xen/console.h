@@ -31,9 +31,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __XEN_CONSOLE_H__
-#define __XEN_CONSOLE_H__
+#ifndef __LIBXENCONS_H__
+#define __LIBXENCONS_H__
 
-void flush_console(void);
+void xencons_flush(void);
 
-#endif /* __XEN_CONSOLE_H__ */
+#endif /* __LIBXENCONS_H__ */

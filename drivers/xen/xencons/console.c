@@ -175,7 +175,7 @@ retry:
 	return sent;
 }
 
-void flush_console(void)
+void xencons_flush(void)
 {
 	struct xencons_interface *intf;
 
@@ -272,7 +272,7 @@ static int hv_console_prepare(struct ukplat_bootinfo *bi __unused)
 {
 	console_ring = mfn_to_virt(HYPERVISOR_start_info->console.domU.mfn);
 	console_evtchn = HYPERVISOR_start_info->console.domU.evtchn;
-	uk_console_init(&console_dev, "Xen", &console_ops,
+	uk_console_init(&console_dev, "XenConsole", &console_ops,
 			UK_CONSOLE_FLAG_STDOUT | UK_CONSOLE_FLAG_STDIN);
 	uk_console_register(&console_dev);
 	return 0;
@@ -285,7 +285,7 @@ static int hv_console_prepare(struct ukplat_bootinfo *bi __unused)
 	console_ring =
 	    (struct xencons_interface *)HYPERVISOR_start_info->console.domU.mfn;
 	console_evtchn = HYPERVISOR_start_info->console.domU.evtchn;
-	uk_console_init(&console_dev, "Xen", &console_ops,
+	uk_console_init(&console_dev, "XenConsole", &console_ops,
 			UK_CONSOLE_FLAG_STDOUT | UK_CONSOLE_FLAG_STDIN);
 	uk_console_register(&console_dev);
 	return 0;

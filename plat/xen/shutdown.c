@@ -38,7 +38,9 @@
 #include <errno.h>
 
 #include <xen/xen.h>
-#include <xen/console.h>
+#if CONFIG_LIBXENCONS
+#include <uk/xen/console.h>
+#endif /* CONFIG_LIBXENCONS */
 
 #if defined __X86_32__
 #include <xen-x86/hypercall32.h>
@@ -64,7 +66,9 @@ void ukplat_terminate(enum ukplat_gstate request)
 		break;
 	}
 
-	flush_console();
+#if CONFIG_LIBXENCONS
+	xencons_flush();
+#endif /* CONFIG_LIBXENCONS */
 
 	for (;;) {
 		struct sched_shutdown sched_shutdown = { .reason = reason };

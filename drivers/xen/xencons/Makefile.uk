@@ -1,0 +1,9 @@
+$(eval $(call addlib_s,libxencons,$(CONFIG_LIBXENCONS)))
+
+CINCLUDES-$(CONFIG_LIBXENCONS)   += -I$(LIBXENCONS_BASE)/include
+
+# FIXME: Extra includes should be removed
+LIBXENCONS_CFLAGS-y        += $(LIBXENPLAT_CFLAGS-y)
+LIBXENCONS_CINCLUDES-y     += $(LIBXENPLAT_CINCLUDES-y)
+LIBXENCONS_CINCLUDES-y     += $(LIBXENBUS_CINCLUDES-y)
+LIBXENCONS_SRCS-y          += $(LIBXENCONS_BASE)/console.c|isr
