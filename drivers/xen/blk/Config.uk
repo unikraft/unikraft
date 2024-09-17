@@ -1,6 +1,6 @@
 menuconfig LIBXEN_BLKFRONT
 	bool "Xenbus Blkfront Driver"
-	select LIBXEN_XENBUS
+	select LIBXENBUS
 	select LIBXENAPI
 	depends on PLAT_XEN
 	depends on LIBUKBLKDEV
