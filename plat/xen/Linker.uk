@@ -40,7 +40,7 @@ $(XEN_DEBUG_IMAGE): $(XEN_ALIBS) $(XEN_ALIBS-y) $(XEN_OLIBS) $(XEN_OLIBS-y) \
 			-Wl$(comma)--end-group \
 			-o $(XEN_IMAGE).ld.o)
 	$(call build_cmd,OBJCOPY,,$(XEN_IMAGE).o,\
-		$(OBJCOPY) -w -G xenos_* -G _libxenplat_zimageboot \
+		$(OBJCOPY) -w -G xenos_* -G _libxenplat_zimageboot -G _libxenplat_start \
 			$(XEN_IMAGE).ld.o $(XEN_IMAGE).o)
 	$(call build_cmd,LD,,$@,\
 	       $(LD) $(LDFLAGS) $(LDFLAGS-y) $(XEN_LDFLAGS) $(XEN_LDFLAGS-y) \
