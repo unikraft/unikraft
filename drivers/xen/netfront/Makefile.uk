@@ -1,0 +1,8 @@
+$(eval $(call addlib_s,libnetfront,$(CONFIG_LIBNETFRONT)))
+
+# FIXME: Extra includes should be removed
+LIBNETFRONT_CFLAGS-y        += $(LIBXENPLAT_CFLAGS-y)
+LIBNETFRONT_CINCLUDES-y     += $(LIBXENPLAT_CINCLUDES-y)
+LIBNETFRONT_CINCLUDES-y     += $(LIBXENBUS_CINCLUDES-y)
+LIBNETFRONT_SRCS-y          += $(LIBNETFRONT_BASE)/netfront.c
+LIBNETFRONT_SRCS-y          += $(LIBNETFRONT_BASE)/netfront_xs.c
