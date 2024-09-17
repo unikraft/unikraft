@@ -31,9 +31,9 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __XEN_CONSOLE_H__
-#define __XEN_CONSOLE_H__
+#ifndef __XEN_CONSFRONT_H__
+#define __XEN_CONSFRONT_H__
 
-void flush_console(void);
+void xen_consfront_flush(void);
 
-#endif /* __XEN_CONSOLE_H__ */
+#endif /* __XEN_CONSFRONT_H__ */

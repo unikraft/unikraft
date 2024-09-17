@@ -29,7 +29,7 @@
 #include <xen-arm/os.h>
 #include <xen-arm/mm.h>
 #include <common/events.h>
-#include <xen/console.h>
+#include <uk/xen/console.h>
 #include <xen/xen.h>
 #include <uk/boot.h>
 #include <uk/plat/memory.h>

@@ -175,7 +175,7 @@ retry:
 	return sent;
 }
 
-void flush_console(void)
+void xen_consfront_flush(void)
 {
 	struct xencons_interface *intf;
 

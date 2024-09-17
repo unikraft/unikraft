@@ -20,7 +20,7 @@ menuconfig PLAT_XEN
        imply LIBNETFRONT if LIBUKNETDEV
        imply LIB9PFRONT if LIBUK9P
        imply LIBBLKFRONT if LIBUKBLKDEV
-       imply LIBXEN_CONSOLE
+       imply LIBCONSFRONT if LIBUKCONSOLE
        imply LIBUKRANDOM if HAVE_RANDOM
        help
                 Create a Unikraft image that runs as a Xen guest

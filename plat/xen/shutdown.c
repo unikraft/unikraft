@@ -38,7 +38,7 @@
 #include <errno.h>
 
 #include <xen/xen.h>
-#include <xen/console.h>
+#include <uk/xen/console.h>
 
 #if defined __X86_32__
 #include <xen-x86/hypercall32.h>
@@ -64,7 +64,7 @@ void ukplat_terminate(enum ukplat_gstate request)
 		break;
 	}
 
-	flush_console();
+	xen_consfront_flush();
 
 	for (;;) {
 		struct sched_shutdown sched_shutdown = { .reason = reason };
