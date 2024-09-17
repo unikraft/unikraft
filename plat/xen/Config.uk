@@ -11,7 +11,6 @@ menuconfig PLAT_XEN
        select LIBNOLIBC if !HAVE_LIBC
        select HAVE_FDT if ARCH_ARM_64
        imply LIBFDT if (ARCH_ARM_32 || ARCH_ARM_64)
-       select XEN_DBGEMERGENCY if ARCH_ARM_32
        select LIBUKRELOC if OPTIMIZE_PIE
        imply LIBUKOFW if ARCH_ARM_64
        select HAVE_INTCTLR

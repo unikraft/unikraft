@@ -1,0 +1,6 @@
+$(eval $(call addlib_s,libxenemgcon,$(CONFIG_LIBXENEMGCON)))
+
+LIBXENEMGCON_CFLAGS-y        += $(LIBXENPLAT_CFLAGS-y)
+LIBXENEMGCON_CINCLUDES-y     += $(LIBXENPLAT_CINCLUDES-y)
+
+LIBXENEMGCON_SRCS-y          += $(LIBXENEMGCON_BASE)/emg_console.c|isr
