@@ -78,7 +78,7 @@ static int blkfront_request_set_grefs(struct blkfront_request *blkfront_req)
 	int grefi = 0, grefj;
 	int err = 0;
 
-#if CONFIG_LIBXEN_BLKFRONT_GREFPOOL
+#if CONFIG_LIBBLKFRONT_GREFPOOL
 	struct uk_blkdev_queue *queue;
 	struct blkfront_grefs_pool *grefs_pool;
 	int rc = 0;
@@ -87,7 +87,7 @@ static int blkfront_request_set_grefs(struct blkfront_request *blkfront_req)
 	UK_ASSERT(blkfront_req != NULL);
 	nb_segments = blkfront_req->nb_segments;
 
-#if CONFIG_LIBXEN_BLKFRONT_GREFPOOL
+#if CONFIG_LIBBLKFRONT_GREFPOOL
 	queue = blkfront_req->queue;
 	grefs_pool = &queue->ref_pool;
 	uk_semaphore_down(&grefs_pool->sem);
@@ -108,7 +108,7 @@ static int blkfront_request_set_grefs(struct blkfront_request *blkfront_req)
 			goto err;
 		}
 
-#if CONFIG_LIBXEN_BLKFRONT_GREFPOOL
+#if CONFIG_LIBBLKFRONT_GREFPOOL
 		ref_elem->reusable_gref = false;
 #endif
 		blkfront_req->gref[grefi] = ref_elem;
@@ -120,7 +120,7 @@ err:
 	/* Free all the elements from 0 index to where the error happens */
 	for (grefj = 0; grefj < grefi; ++grefj) {
 		ref_elem = blkfront_req->gref[grefj];
-#if CONFIG_LIBXEN_BLKFRONT_GREFPOOL
+#if CONFIG_LIBBLKFRONT_GREFPOOL
 		if (ref_elem->reusable_gref) {
 			rc = gnttab_end_access(ref_elem->ref);
 			UK_ASSERT(rc);
@@ -142,7 +142,7 @@ static void blkfront_request_reset_grefs(struct blkfront_request *req)
 	struct blkfront_gref *gref_elem;
 	uint16_t nb_segments;
 	int rc;
-#if CONFIG_LIBXEN_BLKFRONT_GREFPOOL
+#if CONFIG_LIBBLKFRONT_GREFPOOL
 	struct uk_blkdev_queue *queue;
 	struct blkfront_grefs_pool *grefs_pool;
 #endif
@@ -150,7 +150,7 @@ static void blkfront_request_reset_grefs(struct blkfront_request *req)
 	UK_ASSERT(req);
 	nb_segments = req->nb_segments;
 
-#if CONFIG_LIBXEN_BLKFRONT_GREFPOOL
+#if CONFIG_LIBBLKFRONT_GREFPOOL
 	queue = req->queue;
 	grefs_pool = &queue->ref_pool;
 	uk_semaphore_down(&grefs_pool->sem);
@@ -192,7 +192,7 @@ static void blkfront_request_map_grefs(struct blkif_request *ring_req,
 	uintptr_t data;
 	uintptr_t start_sector;
 	struct blkfront_gref *ref_elem;
-#if CONFIG_LIBXEN_BLKFRONT_GREFPOOL
+#if CONFIG_LIBBLKFRONT_GREFPOOL
 	int rc;
 #endif
 
@@ -207,7 +207,7 @@ static void blkfront_request_map_grefs(struct blkif_request *ring_req,
 		data = start_sector + gref_index * PAGE_SIZE;
 		ref_elem = blkfront_req->gref[gref_index];
 
-#if CONFIG_LIBXEN_BLKFRONT_GREFPOOL
+#if CONFIG_LIBBLKFRONT_GREFPOOL
 		if (ref_elem->reusable_gref) {
 			rc = gnttab_update_grant(ref_elem->ref, otherend_id,
 				virtual_to_mfn(data), ring_req->operation);
@@ -594,7 +594,7 @@ static void blkfront_ring_fini(struct uk_blkdev_queue *queue)
 		uk_pfree(queue->a, queue->ring.sring, BLK_RING_PAGES_NUM);
 }
 
-#if CONFIG_LIBXEN_BLKFRONT_GREFPOOL
+#if CONFIG_LIBBLKFRONT_GREFPOOL
 static void blkfront_queue_gref_pool_release(struct uk_blkdev_queue *queue)
 {
 	struct blkfront_grefs_pool *grefs_pool;
@@ -704,7 +704,7 @@ static struct uk_blkdev_queue *blkfront_queue_setup(struct uk_blkdev *blkdev,
 		goto err_out;
 	}
 
-#if CONFIG_LIBXEN_BLKFRONT_GREFPOOL
+#if CONFIG_LIBBLKFRONT_GREFPOOL
 	err = blkfront_queue_gref_pool_setup(queue);
 	if (err)
 		goto err_out;
@@ -727,7 +727,7 @@ static int blkfront_queue_release(struct uk_blkdev *blkdev,
 	unbind_evtchn(queue->evtchn);
 	blkfront_ring_fini(queue);
 
-#if CONFIG_LIBXEN_BLKFRONT_GREFPOOL
+#if CONFIG_LIBBLKFRONT_GREFPOOL
 	blkfront_queue_gref_pool_release(queue);
 #endif
 
