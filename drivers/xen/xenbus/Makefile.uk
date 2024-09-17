@@ -1,4 +1,4 @@
-$(eval $(call addlib_s,libxenbus,$(CONFIG_LIBXEN_XENBUS)))
+$(eval $(call addlib_s,libxenbus,$(CONFIG_LIBXENBUS)))
 
 LIBXENBUS_CINCLUDES-y          += -I$(LIBXENBUS_BASE)/include
 LIBXENBUS_CINCLUDES-y          += $(LIBXENPLAT_CINCLUDES-y)

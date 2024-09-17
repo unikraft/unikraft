@@ -1,6 +1,5 @@
-config LIBXEN_XENBUS
-	bool "Xenbus/XenStore driver"
-	default y if XEN_PV
+config LIBXENBUS
+	bool "xenbus: Xenbus/XenStore"
 	depends on PLAT_XEN
 	select LIBXENHEADERS
 	select LIBUKALLOC
