@@ -1,0 +1,8 @@
+$(eval $(call addlib_s,libblkfront,$(CONFIG_LIBBLKFRONT)))
+
+# FIXME: Extra includes should be removed
+LIBBLKFRONT_CFLAGS-y         += $(LIBXENPLAT_CFLAGS-y)
+LIBBLKFRONT_CINCLUDES-y      += $(LIBXENPLAT_CINCLUDES-y)
+LIBBLKFRONT_CINCLUDES-y      += $(LIBXENBUS_CINCLUDES-y)
+LIBBLKFRONT_SRCS-y           += $(LIBBLKFRONT_BASE)/blkfront.c
+LIBBLKFRONT_SRCS-y           += $(LIBBLKFRONT_BASE)/blkfront_xs.c
