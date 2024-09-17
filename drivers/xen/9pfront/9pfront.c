@@ -479,9 +479,9 @@ static int p9front_add_dev(struct xenbus_device *xendev)
 	uk_pr_info("Initialized 9pfront dev: tag=%s,maxrings=%d,maxorder=%d\n",
 		p9fdev->tag, p9fdev->nb_max_rings, p9fdev->max_ring_page_order);
 
-	p9fdev->nb_rings = MIN(CONFIG_LIBXEN_9PFRONT_NB_RINGS,
+	p9fdev->nb_rings = MIN(CONFIG_LIB9PFRONT_NB_RINGS,
 				p9fdev->nb_max_rings);
-	p9fdev->ring_order = MIN(CONFIG_LIBXEN_9PFRONT_RING_ORDER,
+	p9fdev->ring_order = MIN(CONFIG_LIB9PFRONT_RING_ORDER,
 				p9fdev->max_ring_page_order);
 
 	rc = p9front_allocate_dev_rings(p9fdev);
