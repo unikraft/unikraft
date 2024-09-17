@@ -1,5 +1,6 @@
 menuconfig LIBXEN_CONSOLE
 	bool "Hypervisor console"
+	select LIBXENAPI
 	select LIBUKCONSOLE
 	select LIBNOLIBC if !HAVE_LIBC
 	depends on PLAT_XEN

@@ -5,6 +5,7 @@ menuconfig PLAT_XEN
        depends on ((ARCH_X86_32 && !HAVE_SYSCALL) || (ARCH_X86_64 && !HAVE_SYSCALL) || (ARCH_ARM_32 && !HAVE_SYSCALL) || (ARCH_ARM_64 && !HAVE_SYSCALL))
        depends on !HAVE_PAGING
        imply XEN_PV_BUILD_P2M
+       select LIBXENAPI
        select LIBUKDEBUG
        select LIBUKBOOT
        select LIBNOLIBC if !HAVE_LIBC

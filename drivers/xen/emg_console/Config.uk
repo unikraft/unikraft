@@ -1,5 +1,6 @@
 menuconfig LIBXEN_EMG_CONSOLE
 	bool "Emergency console"
+	select LIBXENAPI
 	select LIBUKCONSOLE
 	depends on PLAT_XEN
 	help

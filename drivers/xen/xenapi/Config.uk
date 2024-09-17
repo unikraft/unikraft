@@ -1,0 +1,5 @@
+config LIBXENAPI
+	bool "Xen API headers"
+	select LIBNOLIBC if !HAVE_LIBC
+	help
+		Public Xen API headers
