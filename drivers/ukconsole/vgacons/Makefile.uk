@@ -1,0 +1,6 @@
+$(eval $(call addlib_s,libvgacons,$(CONFIG_LIBVGACONS)))
+
+# TODO: Remove as soon as plat dependencies go away
+LIBVGACONS_CINCLUDES-y += -I$(UK_PLAT_COMMON_BASE)/include
+
+LIBVGACONS_SRCS-y += $(LIBVGACONS_BASE)/vga.c

@@ -1,4 +1,4 @@
-config LIBUKCONSOLE_VGA
+config LIBVGACONS
 	bool "VGA console driver"
 	depends on ARCH_X86_64
 	depends on LIBUKCONSOLE
