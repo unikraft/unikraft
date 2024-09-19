@@ -1,12 +1,12 @@
-menuconfig LIBUKCONSOLE_PL011
+menuconfig LIBPL011
 	bool "PrimeCell UART (PL011)"
 	depends on ARCH_ARM_64
 	depends on LIBUKCONSOLE
 	select LIBUKOFW
 
-if LIBUKCONSOLE_PL011
+if LIBPL011
 
-config LIBUKCONSOLE_PL011_EARLY_CONSOLE
+config LIBPL011_EARLY_CONSOLE
 	bool "Early console"
 	select LIBUKBOOT
 	help
