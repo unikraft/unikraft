@@ -48,9 +48,9 @@
 #include <uk/errptr.h>
 #endif /* CONFIG_PAGING */
 
-#if CONFIG_LIBUKCONSOLE_NS16550_EARLY_CONSOLE
+#if CONFIG_LIBNS16550_EARLY_CONSOLE
 #include <uk/boot/earlytab.h>
-#endif /* CONFIG_LIBUKCONSOLE_NS16550_EARLY_CONSOLE */
+#endif /* CONFIG_LIBNS16550_EARLY_CONSOLE */
 
 #define NS16550_THR_OFFSET	0x00U
 #define NS16550_RBR_OFFSET	0x00U
@@ -90,11 +90,11 @@ struct ns16550_device {
 	__u64 base, size;
 };
 
-#if CONFIG_LIBUKCONSOLE_NS16550_EARLY_CONSOLE
+#if CONFIG_LIBNS16550_EARLY_CONSOLE
 static struct ns16550_device earlycon;
 
 UK_LIBPARAM_PARAM_ALIAS(base, &earlycon.base, __u64, "ns15550 base");
-#endif /* CONFIG_LIBUKCONSOLE_NS16550_EARLY_CONSOLE */
+#endif /* CONFIG_LIBNS16550_EARLY_CONSOLE */
 
 /* The register shift. Default is 0 (device-tree spec v0.4 Sect. 4.2.2) */
 static __u32 ns16550_reg_shift;
@@ -250,7 +250,7 @@ static int init_ns16550(__u64 base)
 	return 0;
 }
 
-#if CONFIG_LIBUKCONSOLE_NS16550_EARLY_CONSOLE
+#if CONFIG_LIBNS16550_EARLY_CONSOLE
 static inline int config_fdt_chosen_stdout(const void *dtb)
 {
 	__u64 base, size;
@@ -310,7 +310,7 @@ static int early_init(struct ukplat_bootinfo *bi)
 		return rc;
 	}
 
-	uk_console_init(&earlycon.dev, "NS16550", &ns16550_ops,
+	uk_console_init(&earlycon.dev, "ns16550", &ns16550_ops,
 			UK_CONSOLE_FLAG_STDOUT | UK_CONSOLE_FLAG_STDIN);
 	uk_console_register(&earlycon.dev);
 
@@ -330,7 +330,7 @@ static int early_init(struct ukplat_bootinfo *bi)
 
 	return 0;
 }
-#endif /* !CONFIG_LIBUKCONSOLE_NS16550_EARLY_CONSOLE */
+#endif /* !CONFIG_LIBNS16550_EARLY_CONSOLE */
 
 #if CONFIG_LIBUKALLOC
 static int fdt_get_device(struct ns16550_device *dev, const void *dtb,
@@ -356,7 +356,7 @@ static int fdt_get_device(struct ns16550_device *dev, const void *dtb,
 
 	uk_pr_debug("ns16550 @ 0x%lx - 0x%lx\n", reg_base, reg_base + reg_size);
 
-	uk_console_init(&dev->dev, "NS16550", &ns16550_ops, 0);
+	uk_console_init(&dev->dev, "ns16550", &ns16550_ops, 0);
 	dev->base = reg_base;
 	dev->size = reg_size;
 
@@ -429,7 +429,7 @@ static int init(struct uk_init_ctx *ictx __unused)
 		}
 #endif /* !CONFIG_PAGING */
 
-#if CONFIG_LIBUKCONSOLE_NS16550_EARLY_CONSOLE
+#if CONFIG_LIBNS16550_EARLY_CONSOLE
 		/* `ukconsole` mandates that there is only a single
 		 * `struct uk_console` registered per device.
 		 */
@@ -437,7 +437,7 @@ static int init(struct uk_init_ctx *ictx __unused)
 			uk_pr_info("Skipping ns16550 device\n");
 			continue;
 		}
-#endif /* CONFIG_LIBUKCONSOLE_NS16550_EARLY_CONSOLE */
+#endif /* CONFIG_LIBNS16550_EARLY_CONSOLE */
 
 		regs = fdt_getprop(dtb, offset, "reg-shift", &len);
 		if (regs)
@@ -462,9 +462,9 @@ static int init(struct uk_init_ctx *ictx __unused)
 	return 0;
 }
 
-#if CONFIG_LIBUKCONSOLE_NS16550_EARLY_CONSOLE
+#if CONFIG_LIBNS16550_EARLY_CONSOLE
 UK_BOOT_EARLYTAB_ENTRY(early_init, UK_PRIO_AFTER(UK_PRIO_EARLIEST));
-#endif /* CONFIG_LIBUKCONSOLE_NS16550_EARLY_CONSOLE */
+#endif /* CONFIG_LIBNS16550_EARLY_CONSOLE */
 
 /* UK_PRIO_EARLIEST reserved for cmdline */
 uk_plat_initcall_prio(init, 0, UK_PRIO_AFTER(UK_PRIO_EARLIEST));
