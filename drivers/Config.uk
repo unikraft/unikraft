@@ -27,3 +27,9 @@ menu "Xen"
 source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-xen.uk' -r '$(KCONFIG_DRIV_BASE)/xen' -l '$(KCONFIG_DRIV_BASE)/xen' -e '$(KCONFIG_EXCLUDEDIRS)')"
 
 endmenu
+
+# Invisible option for full IBM PC/AT compatible machines
+config HAVE_IBMPC
+	bool
+	select HAVE_IBMPC_NS16550
+	select HAVE_IBMPC_VGA
