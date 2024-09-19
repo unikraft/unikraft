@@ -1,6 +1,0 @@
-$(eval $(call addlib_s,libukconsole_vga,$(CONFIG_LIBUKCONSOLE_VGA)))
-
-# TODO: Remove as soon as plat dependencies go away
-LIBUKCONSOLE_VGA_CINCLUDES-y += -I$(UK_PLAT_COMMON_BASE)/include
-
-LIBUKCONSOLE_VGA_SRCS-y += $(LIBUKCONSOLE_VGA_BASE)/vga.c
