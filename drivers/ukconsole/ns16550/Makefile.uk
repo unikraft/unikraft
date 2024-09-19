@@ -1,11 +1,11 @@
-$(eval $(call addplatlib_s,kvm,libukconsole_ns16550,$(CONFIG_LIBUKCONSOLE_NS16550)))
-$(eval $(call addlib_paramprefix,libukconsole_ns16550,ns16550))
+$(eval $(call addlib_s,libns16550,$(CONFIG_LIBNS16550)))
+$(eval $(call addlib_paramprefix,libns16550,ns16550))
 
-# TODO Remove as soon as plat dependencies go away
-LIBUKCONSOLE_NS16550_CINCLUDES-y += -I$(UK_PLAT_COMMON_BASE)/include
+# TODO: Remove as soon as plat dependencies go away
+LIBNS16550_CINCLUDES-y += -I$(UK_PLAT_COMMON_BASE)/include
 
-# FIXME Remove as soon as bootinfo is moved out of plat/
-LIBUKCONSOLE_NS16550_CINCLUDES-y += -I$(UK_PLAT_COMMON_BASE)/include
+# FIXME: Remove as soon as bootinfo is moved out of plat/
+LIBNS16550_CINCLUDES-y += -I$(UK_PLAT_COMMON_BASE)/include
 
-LIBUKCONSOLE_NS16550_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBUKCONSOLE_NS16550_BASE)/ns16550.c|isr
-LIBUKCONSOLE_NS16550_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBUKCONSOLE_NS16550_BASE)/com.c|isr
+LIBNS16550_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBNS16550_BASE)/ns16550.c|isr
+LIBNS16550_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBNS16550_BASE)/com.c|isr
