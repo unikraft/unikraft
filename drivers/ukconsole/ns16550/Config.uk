@@ -1,13 +1,17 @@
+# Port-IO mode for IBM PC/AT compatible machines
+config HAVE_IBMPC_NS16550
+	bool
+	depends on ARCH_X86_64
+
 menuconfig LIBNS16550
 	bool "NS16550 / 8250"
-	depends on (ARCH_ARM_64 || ARCH_X86_64)
-	depends on (!PLAT_XEN && ARCH_X86_64)
+	depends on (HAVE_FDT || HAVE_IBMPC_NS16550)
 	depends on LIBUKCONSOLE
 	select LIBUKOFW if ARCH_ARM_64
 
 if LIBNS16550
 
-if ARCH_ARM_64
+if !HAVE_IBMPC_NS16550
 config LIBNS16550_EARLY_CONSOLE
 	bool "Early console"
 	select LIBUKBOOT
@@ -15,9 +19,10 @@ config LIBNS16550_EARLY_CONSOLE
 		Uses the fdt's `/chosen/stdout-path` to derive the
 		default console. Override by setting `ns16550.base`
 		at the cmdline, if LIBUKLIBPARAM is enabled.
-endif # ARCH_ARM_64
 
-if ARCH_X86_64
+endif # !HAVE_IBMPC_NS16550
+
+if HAVE_IBMPC_NS16550
 config LIBNS16550_COM_AVAIL
     bool
 
@@ -144,6 +149,6 @@ config LIBNS16550_COM4_EARLY
 endchoice
 endif # LIBNS16550_EARLY_CONSOLE
 
-endif # ARCH_X86_64
+endif # HAVE_IBMPC_NS16550
 
 endif # LIBNS16550
