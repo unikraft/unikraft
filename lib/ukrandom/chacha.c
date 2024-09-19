@@ -35,7 +35,7 @@
 #include <uk/assert.h>
 #include <uk/ctors.h>
 #include <uk/random.h>
-#include <uk/arch/random.h>
+#include <uk/random/driver.h>
 #include <uk/plat/lcpu.h>
 
 /*
@@ -149,12 +149,14 @@ static void chacha_init(struct uk_swrand *r, unsigned int seedc,
 	r->k = 16;
 }
 
-int uk_swrand_init(void)
+int uk_swrand_init(struct uk_random_driver **drv)
 {
 	unsigned int seedc = CHACHA_SEED_LENGTH;
 	__u32 seedv[CHACHA_SEED_LENGTH];
 	unsigned int i;
 	int ret;
+
+	UK_ASSERT(drv && *drv);
 
 	uk_pr_info("Initialize random number generator...\n");
 #if CONFIG_LIBUKRANDOM_SEED_INSECURE
@@ -164,26 +166,21 @@ int uk_swrand_init(void)
 	uk_pr_err("*******************************************\n");
 #endif /* CONFIG_LIBUKRANDOM_SEED_INSECURE */
 
-	/* It has been observed that in some x86_64 systems this loop
-	 * fails after a few iterations due to exhastion of conditioned
-	 * entropy (rdseed). Use RDRAND until we provide more flexible
-	 * options for RDSEED.
-	 */
-	for (i = 0; i < seedc; i++) {
 #if CONFIG_LIBUKRANDOM_SEED_INSECURE
+	for (i = 0; i < seedc; i++)
 		seedv[i] = CHACHA_SEED_INSECURE;
 #else /* !CONFIG_LIBUKRANDOM_SEED_INSECURE */
-		ret = ukarch_random_u32(&seedv[i]);
-		if (unlikely(ret)) {
-			uk_pr_err("Could not generate random seed\n");
-			return ret;
-		}
-#endif /* !CONFIG_LIBUKRANDOM_SEED_INSECURE */
+	ret = (*drv)->ops->seed_bytes_fb((__u8 *)seedv, seedc);
+	if (unlikely(ret)) {
+		uk_pr_err("Could not generate random seed\n");
+		return ret;
 	}
+#endif /* !CONFIG_LIBUKRANDOM_SEED_INSECURE */
+
+	uk_pr_info("Entropy source: %s\n", (*drv)->name);
 
 	chacha_init(&uk_swrand_def, seedc, seedv);
 
-	/* The initialization of swrand never fails */
 	return 0;
 }
 
