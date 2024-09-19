@@ -13,7 +13,7 @@ menuconfig PLAT_XEN
        imply LIBFDT if (ARCH_ARM_32 || ARCH_ARM_64)
        select LIBUKRELOC if OPTIMIZE_PIE
        imply LIBUKOFW if ARCH_ARM_64
-       select HAVE_INTCTLR
+       select HAVE_INTCTLR if ARCH_ARM_64
        select HAVE_RANDOM
        imply LIBUKINTCTLR_GICV3 if ARCH_ARM_64
        imply LIBNETFRONT if LIBUKNETDEV
