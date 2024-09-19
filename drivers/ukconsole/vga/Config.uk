@@ -1,5 +1,5 @@
 config LIBUKCONSOLE_VGA
 	bool "VGA console driver"
 	depends on ARCH_X86_64
-	select LIBUKCONSOLE
+	depends on LIBUKCONSOLE
 	select LIBNOLIBC if !HAVE_LIBC
