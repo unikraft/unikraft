@@ -20,7 +20,12 @@
 int uk_swrand_fdt_init(void *fdt, struct uk_random_driver **drv);
 
 /* Initialize the CSPRNG. The CSPRNG is seeded with randomness
- * provided by an RNG device.
+ * provided by the kernel's cmdline.
+ */
+int uk_swrand_cmdline_init(struct uk_random_driver **drv);
+
+/* Initialize the software CSPRNG using a seed provided
+ * by the driver of the RNG device.
  */
 int uk_swrand_init(struct uk_random_driver **drv);
 

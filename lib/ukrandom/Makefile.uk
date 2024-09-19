@@ -1,4 +1,5 @@
 $(eval $(call addlib_s,libukrandom,$(CONFIG_LIBUKRANDOM)))
+$(eval $(call addlib_paramprefix,libukrandom,random))
 
 CINCLUDES-$(CONFIG_LIBUKRANDOM)	+= -I$(LIBUKRANDOM_BASE)/include
 CXXINCLUDES-$(CONFIG_LIBUKRANDOM) += -I$(LIBUKRANDOM_BASE)/include

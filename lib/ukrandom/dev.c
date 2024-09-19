@@ -36,12 +36,14 @@
 #include <uk/ctors.h>
 #include <uk/print.h>
 #include <uk/random.h>
-#include <uk/arch/random.h>
+#include <uk/random/driver.h>
 #include <uk/assert.h>
 #include <uk/config.h>
 #include <uk/essentials.h>
 #include <vfscore/uio.h>
 #include <devfs/device.h>
+
+#include "swrand.h"
 
 #define DEV_RANDOM_NAME "random"
 #define DEV_URANDOM_NAME "urandom"
@@ -174,6 +176,12 @@ static int devfs_register(struct uk_init_ctx *ictx __unused)
 	}
 
 	/* register /dev/hwrng */
+#if CONFIG_LIBUKRANDOM_CMDLINE_SEED
+	/* Skip if there is no hardware device */
+	if (driver == (void *)UK_SWRAND_DRIVER_NONE)
+		return 0;
+#endif /* CONFIG_LIBUKRANDOM_CMDLINE_SEED */
+
 	rc = device_create(&drv_hwrng, DEV_HWRNG_NAME, D_CHR, NULL);
 	if (unlikely(rc)) {
 		uk_pr_err("Failed to register '%s' to devfs: %d\n",

@@ -30,10 +30,13 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <errno.h>
 #include <string.h>
-#include <uk/print.h>
+
 #include <uk/assert.h>
 #include <uk/ctors.h>
+#include <uk/libparam.h>
+#include <uk/print.h>
 #include <uk/random.h>
 #include <uk/random/driver.h>
 #include <uk/plat/lcpu.h>
@@ -48,7 +51,8 @@
  */
 
 #define CHACHA_SEED_LENGTH		8 /* 256 bit key */
-#define CHACHA_SEED_INSECURE		0xdeadb0b0
+
+#include "swrand.h"
 
 struct uk_swrand {
 	int k;
@@ -56,6 +60,18 @@ struct uk_swrand {
 };
 
 struct uk_swrand uk_swrand_def;
+
+#if CONFIG_LIBUKRANDOM_CMDLINE_SEED
+
+#define CHACHA_SEED_NOINIT						\
+	{0xdeadb0b0, 0xdeadb0b0, 0xdeadb0b0, 0xdeadb0b0,		\
+	 0xdeadb0b0, 0xdeadb0b0, 0xdeadb0b0, 0xdeadb0b0}
+
+static __u32 seedv_cmdl[CHACHA_SEED_LENGTH] = CHACHA_SEED_NOINIT;
+
+UK_LIBPARAM_PARAM_ARR_ALIAS(seed, seedv_cmdl, __u32, CHACHA_SEED_LENGTH,
+			    "ChaCha20 256-bit key");
+#endif /* CONFIG_LIBUKRANDOM_CMDLINE_SEED */
 
 /* This value isn't important, as long as it's sufficiently asymmetric */
 static const char sigma[16] = "expand 32-byte k";
@@ -179,6 +195,32 @@ int uk_swrand_fdt_init(void *fdt, struct uk_random_driver **drv)
 }
 #endif /* CONFIG_LIBUKRANDOM_DTB_SEED */
 
+#if CONFIG_LIBUKRANDOM_CMDLINE_SEED
+int uk_swrand_cmdline_init(struct uk_random_driver **drv)
+{
+	__u32 seedv[CHACHA_SEED_LENGTH] = CHACHA_SEED_NOINIT;
+	unsigned int seedc = CHACHA_SEED_LENGTH;
+
+	/* FIXME This could theoretically (but extremely rarely)
+	 *       cause a false positive if the loader passes
+	 *       CHACHA_SEED_NOINIT, yet libukparam does not provide
+	 *       a way to tell whether a param has been set other
+	 *       than checking against its value.
+	 */
+	if (!memcmp(seedv, seedv_cmdl, seedc))
+		return -ENOTSUP;
+
+	uk_pr_warn("The CSPRNG is initialized from the cmdline\n");
+
+	 /* prevent drivers from registering */
+	*drv = (void *)UK_SWRAND_DRIVER_NONE;
+
+	chacha_init(&uk_swrand_def, seedv_cmdl);
+
+	return 0;
+}
+#endif /* CONFIG_LIBUKRANDOM_CMDLINE_SEED */
+
 int uk_swrand_init(struct uk_random_driver **drv)
 {
 	unsigned int seedc = CHACHA_SEED_LENGTH;
@@ -186,26 +228,19 @@ int uk_swrand_init(struct uk_random_driver **drv)
 	unsigned int i __maybe_unused;
 	int ret;
 
-	UK_ASSERT(drv && *drv);
+	uk_pr_info("Initializing the random number generator...\n");
 
-	uk_pr_info("Initialize random number generator...\n");
-#if CONFIG_LIBUKRANDOM_SEED_INSECURE
-	uk_pr_err("*******************************************\n");
-	uk_pr_err("* This configuration uses an insecure RNG *\n");
-	uk_pr_err("*         DO NOT USE IN PRODUCTION        *\n");
-	uk_pr_err("*******************************************\n");
-#endif /* CONFIG_LIBUKRANDOM_SEED_INSECURE */
+	if (!*drv) {
+		uk_pr_err("Could not initialize: No entropy source available\n");
+		return -ENODEV;
+	}
 
-#if CONFIG_LIBUKRANDOM_SEED_INSECURE
-	for (i = 0; i < seedc; i++)
-		seedv[i] = CHACHA_SEED_INSECURE;
-#else /* !CONFIG_LIBUKRANDOM_SEED_INSECURE */
 	ret = (*drv)->ops->seed_bytes_fb((__u8 *)seedv, seedc);
 	if (unlikely(ret)) {
-		uk_pr_err("Could not generate random seed\n");
+		uk_pr_err("Could not initialize: Failed to collect entropy (%d)\n",
+			  ret);
 		return ret;
 	}
-#endif /* !CONFIG_LIBUKRANDOM_SEED_INSECURE */
 
 	uk_pr_info("Entropy source: %s\n", (*drv)->name);
 

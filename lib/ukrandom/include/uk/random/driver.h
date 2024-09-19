@@ -9,6 +9,7 @@
 
 #include <uk/arch/types.h>
 #include <uk/essentials.h>
+#include <uk/prio.h>
 
 #ifdef __cplusplus
 extern "C" {
