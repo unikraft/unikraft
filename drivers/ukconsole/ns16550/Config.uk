@@ -1,8 +1,8 @@
 menuconfig LIBUKCONSOLE_NS16550
 	bool "NS16550 / 8250"
 	depends on (ARCH_ARM_64 || ARCH_X86_64)
+	depends on LIBUKCONSOLE
 	select LIBUKOFW if ARCH_ARM_64
-	select LIBUKCONSOLE
 
 if LIBUKCONSOLE_NS16550
 
