@@ -2,7 +2,7 @@ config LIBXENCONS
 	bool "xencons: Xen hypervisor console"
 	select LIBXENHEADERS
 	select LIBNOLIBC if !HAVE_LIBC
+	depends on HAVE_XENBUS
 	depends on LIBUKCONSOLE
-	depends on PLAT_XEN
 	help
 		Driver for the Xen hypervisor console

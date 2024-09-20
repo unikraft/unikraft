@@ -2,7 +2,6 @@ config LIBXENEMGCONS
 	bool "xenemgcons: Xen emergency console"
 	select LIBXENHEADERS
 	depends on LIBUKCONSOLE
-	depends on PLAT_XEN
 	help
 		Driver for the Xen emergency console. This console is
 		based on a single hypercall.

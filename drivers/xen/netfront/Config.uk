@@ -3,7 +3,7 @@ config LIBNETFRONT
 	select LIBXENHEADERS
 	select LIBXENBUS
 	depends on XEN_GNTTAB
-	depends on PLAT_XEN
+	depends on HAVE_XENBUS
 	depends on LIBUKNETDEV
 	help
 		Driver for netfront devices

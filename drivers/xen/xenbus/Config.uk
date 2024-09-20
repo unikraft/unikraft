@@ -1,6 +1,9 @@
+config HAVE_XENBUS
+	bool
+
 config LIBXENBUS
 	bool "xenbus: Xenbus/XenStore"
-	depends on PLAT_XEN
+	depends on HAVE_XENBUS
 	select LIBXENHEADERS
 	select LIBUKALLOC
 	select LIBUKSCHED
