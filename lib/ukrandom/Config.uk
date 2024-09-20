@@ -1,6 +1,7 @@
 menuconfig LIBUKRANDOM
 	bool "ukrandom: Random number generation"
 	select LIBUKDEBUG
+	select LIBUKLOCK
 	help
 		Provides cryptographically secure random numbers via
 		a software CSRNG. Requires enabling a hardware RNG,

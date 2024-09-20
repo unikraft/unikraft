@@ -40,6 +40,7 @@
 #include <uk/random.h>
 #include <uk/random/driver.h>
 #include <uk/plat/lcpu.h>
+#include <uk/spinlock.h>
 
 #if CONFIG_LIBUKRANDOM_DTB_SEED
 #include <uk/ofw/fdt.h>
@@ -60,6 +61,7 @@ struct uk_swrand {
 };
 
 struct uk_swrand uk_swrand_def;
+uk_spinlock swrand_lock = UK_SPINLOCK_INITIALIZER();
 
 #if CONFIG_LIBUKRANDOM_CMDLINE_SEED
 
@@ -249,7 +251,7 @@ int uk_swrand_init(struct uk_random_driver **drv)
 	return 0;
 }
 
-__u32 uk_swrand_randr_r(struct uk_swrand *r)
+static __u32 uk_swrand_randr_r(struct uk_swrand *r)
 {
 	__u32 res;
 
@@ -269,18 +271,13 @@ __u32 uk_swrand_randr_r(struct uk_swrand *r)
 	}
 }
 
-/* Uses the pre-initialized default generator  */
-/* TODO: Revisit with multi-CPU support */
 __u32 uk_swrand_randr(void)
 {
-	unsigned long iflags;
 	__u32 ret;
 
-	UK_ASSERT(!ukplat_lcpu_irqs_disabled());
-
-	iflags = ukplat_lcpu_save_irqf();
+	uk_spin_lock(&swrand_lock);
 	ret = uk_swrand_randr_r(&uk_swrand_def);
-	ukplat_lcpu_restore_irqf(iflags);
+	uk_spin_unlock(&swrand_lock);
 
 	return ret;
 }
