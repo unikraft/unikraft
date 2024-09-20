@@ -754,9 +754,8 @@ ifeq ($(call have_gcc),y)
 $(call error_if_gcc_version_lt,7,0)
 endif
 
-ifeq ($(call qstrip,$(UK_PLATS) $(UK_PLATS-y)),)
-$(warning You did not choose any target platform.)
-$(error Please choose at least one target platform in the configuration!)
+ifneq ($(words $(call qstrip,$(UK_PLATS) $(UK_PLATS-y))),1)
+$(error Select exactly one target platform in the configuration!)
 endif
 ifneq ($(CONFIG_HAVE_BOOTENTRY),y)
 $(error You did not select a library that handles bootstrapping! (e.g., ukboot))
