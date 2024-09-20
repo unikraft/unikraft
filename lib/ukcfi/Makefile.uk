@@ -1,0 +1,10 @@
+$(eval $(call addlib_s,libukcfi,$(CONFIG_LIBUKCFI)))
+
+LIBUKCFI_SRCS-$(CONFIG_LIBUKCFI_PAUTH) += $(LIBUKCFI_BASE)/pauth.c
+
+CINCLUDES-$(CONFIG_LIBUKCFI_PAUTH)  += -I$(LIBUKCFI_BASE)/include
+CXXNCLUDES-$(CONFIG_LIBUKCFI_PAUTH) += -I$(LIBUKCFI_BASE)/include
+
+# TODO Remove as soon as plat dependencies go away
+LIBUKCFI_CINCLUDES-$(CONFIG_LIBUKCFI_PAUTH) += -I$(UK_PLAT_COMMON_BASE)/include
+

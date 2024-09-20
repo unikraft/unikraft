@@ -4,15 +4,19 @@
  * You may not use this file except in compliance with the License.
  */
 
-#include <arm/arm64/cpu.h>
-#include <arm/arm64/pauth.h>
-
 #include <errno.h>
 
+#include <uk/arch/lcpu.h>
 #include <uk/arch/types.h>
 #include <uk/assert.h>
+#include <uk/cfi.h>
 #include <uk/essentials.h>
+#include <uk/prio.h>
 #include <uk/random.h>
+
+#if CONFIG_LIBUKBOOT
+#include <uk/boot/earlytab.h>
+#endif /* CONFIG_LIBUKBOOT */
 
 /* Check if pointer authentication is available.
  *
@@ -38,7 +42,7 @@ static inline __bool pauth_supported(void)
 	return __false;
 }
 
-int __no_pauth ukplat_pauth_init(void)
+static int __no_pauth pauth_init(struct ukplat_bootinfo *bi __unused)
 {
 	__u64 key_hi, key_lo;
 	__u64 reg;
@@ -73,3 +77,7 @@ int __no_pauth ukplat_pauth_init(void)
 
 	return 0;
 }
+
+#if CONFIG_LIBUKBOOT
+UK_BOOT_EARLYTAB_ENTRY(pauth_init, UK_PRIO_AFTER(4));
+#endif /* CONFIG_LIBUKBOOT */
