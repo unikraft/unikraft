@@ -26,7 +26,7 @@ CXXINCLUDES += -I$(CONFIG_UK_BASE)/arch/arm/arm64/include
 # Define these in the order of arch revision, to allow march
 # to be overwritten to the highest version required by the
 # selected extensions.
-ifeq ($(CONFIG_ARM64_FEAT_PAUTH),y)
+ifeq ($(CONFIG_HAVE_ARM64_FEAT_PAUTH),y)
 # Min GCC >= 9 to avoid dealing with deprecated
 # msign-return-address here and in macros
 ifeq ($(call have_gcc),y)
@@ -38,7 +38,7 @@ ARCH_REV := armv8.3-a
 BRANCH_PROTECTION := pac-ret+leaf
 endif
 
-ifeq ($(CONFIG_ARM64_FEAT_BTI),y)
+ifeq ($(CONFIG_HAVE_ARM64_FEAT_BTI),y)
 ifeq ($(call have_gcc),y)
 # Min GCC >= 10, due to buggy GCC-9.
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=94697
