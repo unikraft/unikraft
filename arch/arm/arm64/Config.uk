@@ -151,14 +151,14 @@ menu "Armv8-A Extensions"
 
 config ARM64_FEAT_PAUTH
 	bool "Armv8.3 Pointer Authentication"
-	select HAVE_ARM64_FEAT_RNG
+	select LIBUKRANDOM
 	help
 	  Enable signing and authentication of pointers. This
 	  provides protections against classes of attacks that
 	  rely on memory corruption, such as stack smashing and
 	  ROP.
 
-	config ARM64_FEAT_BTI
+config ARM64_FEAT_BTI
 	bool "Armv8.5 Branch Target Identification"
 	help
 		BTI protects against JOP-like attacks by placing and

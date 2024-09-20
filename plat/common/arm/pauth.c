@@ -1,69 +1,25 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*
- * Copyright (c) 2021, Michalis Pappas <mpappas@fastmail.fm>.
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+/* Copyright (c) 2022, Unikraft GmbH and The Unikraft Authors.
+ * Licensed under the BSD-3-Clause License (the "License").
+ * You may not use this file except in compliance with the License.
  */
+
 #include <arm/arm64/cpu.h>
 #include <arm/arm64/pauth.h>
+
 #include <errno.h>
-#include <stdbool.h>
+
 #include <uk/arch/types.h>
 #include <uk/assert.h>
 #include <uk/essentials.h>
-
-#ifdef CONFIG_HAVE_RANDOM
-#include <uk/arch/random.h>
-#endif /* CONFIG_HAVE_RANDOM */
-
-static inline
-void ukplat_pauth_gen_key(__u64 *key_hi, __u64 *key_lo)
-{
-	int ret;
-
-	ret = ukarch_random_init();
-	if (unlikely(ret))
-		UK_CRASH("Arch random not available (%d)\n", ret);
-
-	ret = ukarch_random_u64(key_lo);
-	if (unlikely(ret))
-		UK_CRASH("Could not generate PAuth key\n");
-
-	ret = ukarch_random_u64(key_hi);
-	if (unlikely(ret))
-		UK_CRASH("Could not generate PAuth key\n");
-}
+#include <uk/random.h>
 
 /* Check if pointer authentication is available.
  *
  * This checks whether either QARMA or an IMPLEMENTATION DEFINED
  * algorithm is used.
  */
-static inline bool pauth_supported(void)
+static inline __bool pauth_supported(void)
 {
 	__u64 apa3, apa, api;
 	__u64 reg;
@@ -72,27 +28,40 @@ static inline bool pauth_supported(void)
 	apa = (reg >> ID_AA64ISAR1_EL1_APA_SHIFT) & ID_AA64ISAR1_EL1_APA_MASK;
 	api = (reg >> ID_AA64ISAR1_EL1_API_SHIFT) & ID_AA64ISAR1_EL1_API_MASK;
 	if (apa || api)
-		return true;
+		return __true;
 
 	reg = SYSREG_READ(ID_AA64ISAR2_EL1);
 	apa3 = (reg >> ID_AA64ISAR2_EL1_APA3_SHIFT) & ID_AA64ISAR2_EL1_APA3_MASK;
 	if (apa3)
-		return true;
+		return __true;
 
-	return false;
+	return __false;
 }
 
 int __no_pauth ukplat_pauth_init(void)
 {
 	__u64 key_hi, key_lo;
 	__u64 reg;
+	int rc;
 
-	if (unlikely(!pauth_supported()))
+	if (unlikely(!pauth_supported())) {
+		uk_pr_err("The CPU does not implement FEAT_PAUTH\n");
 		return -ENOTSUP;
+	}
 
 	/* Program instruction Key A */
-	ukplat_pauth_gen_key(&key_hi, &key_lo);
+	rc = uk_random_fill_buffer(&key_hi, sizeof(key_hi));
+	if (unlikely(rc)) {
+		uk_pr_err("Could not generate APIAKey (%d)\n", rc);
+		return rc;
+	}
 	SYSREG_WRITE64(APIAKeyHi_EL1, key_hi);
+
+	rc = uk_random_fill_buffer(&key_lo, sizeof(key_lo));
+	if (unlikely(rc)) {
+		uk_pr_err("Could not generate APIAKey (%d)\n", rc);
+		return rc;
+	}
 	SYSREG_WRITE64(APIAKeyLo_EL1, key_lo);
 
 	/* Enable pointer authentication */
