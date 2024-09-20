@@ -2,7 +2,7 @@ menuconfig LIB9PFRONT
 	bool "9pfront"
 	select LIBXENBUS
 	select LIBXENAPI
-	depends on PLAT_XEN
+	depends on HAVE_XENBUS
 	depends on LIBUK9P
 	help
 		Xen driver for 9pfs volumes

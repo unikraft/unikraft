@@ -2,7 +2,6 @@ config LIBXENEMGCON
 	bool "Emergency console"
 	select LIBXENAPI
 	depends on LIBUKCONSOLE
-	depends on PLAT_XEN
 	help
 		Driver for the Xen emergency console. This console is
 		based on a single hypercall.

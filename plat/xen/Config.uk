@@ -4,6 +4,7 @@ menuconfig PLAT_XEN
        depends on ((ARCH_X86_32 && !HAVE_SMP) || (ARCH_X86_64 && !HAVE_SMP) || (ARCH_ARM_32 && !HAVE_SMP) || (ARCH_ARM_64 && !HAVE_SMP))
        depends on ((ARCH_X86_32 && !HAVE_SYSCALL) || (ARCH_X86_64 && !HAVE_SYSCALL) || (ARCH_ARM_32 && !HAVE_SYSCALL) || (ARCH_ARM_64 && !HAVE_SYSCALL))
        depends on !HAVE_PAGING
+       select HAVE_XENBUS
        imply XEN_PV_BUILD_P2M
        select LIBXENAPI
        select LIBUKDEBUG

@@ -2,7 +2,7 @@ config LIBNETFRONT
 	bool "netfront"
 	select LIBXENAPI
 	select LIBXENBUS
-	depends on PLAT_XEN
+	depends on HAVE_XENBUS
 	depends on LIBUKNETDEV
 	help
 		Driver for netfront devices

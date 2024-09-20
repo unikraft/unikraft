@@ -2,7 +2,7 @@ menuconfig LIBBLKFRONT
 	bool "blkfront"
 	select LIBXENAPI
 	select LIBXENBUS
-	depends on PLAT_XEN
+	depends on HAVE_XENBUS
 	depends on LIBUKBLKDEV
 	help
 		Xen driver for block devices

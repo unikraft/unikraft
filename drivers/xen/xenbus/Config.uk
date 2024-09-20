@@ -1,6 +1,9 @@
+config HAVE_XENBUS
+	bool
+
 config LIBXENBUS
 	bool "Xenbus/XenStore driver"
-	depends on PLAT_XEN
+	depends on HAVE_XENBUS
 	select LIBXENAPI
 	select LIBUKALLOC
 	select LIBUKSCHED
