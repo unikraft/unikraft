@@ -257,9 +257,15 @@ typedef struct {
 	__u32 counter;
 } __atomic;
 
+#ifdef __cplusplus
+typedef bool __bool;
+#define __true (true)
+#define __false (false)
+#else
 typedef _Bool __bool;
 #define __true (1)
 #define __false (0)
+#endif /* __cplusplus */
 
 #else /* __ASSEMBLY__ */
 
