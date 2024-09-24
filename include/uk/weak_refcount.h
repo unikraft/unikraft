@@ -75,6 +75,26 @@ int uk_swrefcount_release_weak(struct uk_swrefcount *sw)
 }
 
 /**
+ * Try to acquire a strong reference on `sw` with only a weak reference held.
+ *
+ * May fail if no other strong references exist.
+ *
+ * @return
+ *  0: Failed to acquire a strong reference
+ *  1: Successfully acquired a strong reference
+ */
+static inline
+int uk_swrefcount_try_acquire(struct uk_swrefcount *sw)
+{
+	uk_swrefcount_acquire_weak(sw);
+	if (!uk_refcount_acquire_if_not_zero(&sw->strong)) {
+		uk_swrefcount_release_weak(sw);
+		return 0;
+	}
+	return 1;
+}
+
+/**
  * Release a strong reference on `sw` and return whether it was the last.
  *
  * @return
@@ -89,7 +109,11 @@ int uk_swrefcount_release(struct uk_swrefcount *sw)
 
 	if (uk_refcount_release(&sw->strong))
 		ret |= UK_SWREFCOUNT_LAST_STRONG;
-	return ret | uk_swrefcount_release_weak(sw);
+	if (uk_swrefcount_release_weak(sw)) {
+		UK_ASSERT(ret); /* There cannot be more strong than total ref */
+		ret |= UK_SWREFCOUNT_LAST_REF;
+	}
+	return ret;
 }
 
 #endif /* __UK_WEAK_REFCOUNT_H__ */
