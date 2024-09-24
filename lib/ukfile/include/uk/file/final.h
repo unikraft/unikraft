@@ -52,6 +52,12 @@ void uk_file_finref_acquire_weak(struct uk_file_finref *r)
 }
 
 static inline
+int uk_file_finref_try_acquire(struct uk_file_finref *r)
+{
+	return uk_swrefcount_try_acquire(&r->cnt);
+}
+
+static inline
 int uk_file_finref_release(struct uk_file_finref *r)
 {
 	return uk_swrefcount_release(&r->cnt);

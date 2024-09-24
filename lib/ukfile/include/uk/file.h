@@ -183,6 +183,7 @@ typedef struct uk_file_finref uk_file_refcnt;
 
 #define uk_file_refcnt_acquire		uk_file_finref_acquire
 #define uk_file_refcnt_acquire_weak	uk_file_finref_acquire_weak
+#define uk_file_refcnt_try_acquire	uk_file_finref_try_acquire
 #define uk_file_refcnt_release		uk_file_finref_release
 #define uk_file_refcnt_release_weak	uk_file_finref_release_weak
 
@@ -196,6 +197,7 @@ typedef struct uk_swrefcount uk_file_refcnt;
 
 #define uk_file_refcnt_acquire		uk_swrefcount_acquire
 #define uk_file_refcnt_acquire_weak	uk_swrefcount_acquire_weak
+#define uk_file_refcnt_try_acquire	uk_swrefcount_try_acquire
 #define uk_file_refcnt_release		uk_swrefcount_release
 #define uk_file_refcnt_release_weak	uk_swrefcount_release_weak
 
@@ -266,6 +268,12 @@ static inline
 void uk_file_acquire_weak(const struct uk_file *f)
 {
 	uk_file_refcnt_acquire_weak(f->refcnt);
+}
+
+static inline
+int uk_file_try_acquire(const struct uk_file *f)
+{
+	return uk_file_refcnt_try_acquire(f->refcnt);
 }
 
 static inline
