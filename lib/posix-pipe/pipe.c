@@ -38,6 +38,12 @@
 
 static const char PIPE_VOLID[] = "pipe_vol";
 
+#define PIPE_R_FNAME "pipe:read"
+#define PIPE_R_FNAME_LEN (sizeof(PIPE_R_FNAME) - 1)
+
+#define PIPE_W_FNAME "pipe:write"
+#define PIPE_W_FNAME_LEN (sizeof(PIPE_W_FNAME) - 1)
+
 typedef __u32 pipeidx;
 
 struct pipe_msg {
@@ -428,13 +434,15 @@ int uk_sys_pipe(int pipefd[2], int flags)
 		return r;
 
 	oflags = (flags & _OPEN_FLAGS) | UKFD_O_NOSEEK;
-	r = uk_fdtab_open(pipes[0], O_RDONLY|oflags);
+	r = uk_fdtab_open_named(pipes[0], O_RDONLY | oflags,
+				PIPE_R_FNAME, PIPE_R_FNAME_LEN);
 	if (unlikely(r < 0))
 		goto err_free;
 
 	rpipe = r;
 
-	r = uk_fdtab_open(pipes[1], O_WRONLY|oflags);
+	r = uk_fdtab_open_named(pipes[1], O_WRONLY | oflags,
+				PIPE_W_FNAME, PIPE_W_FNAME_LEN);
 	if (unlikely(r < 0))
 		goto err_close;
 
