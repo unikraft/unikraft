@@ -61,6 +61,15 @@
 
 static const char POSIX_SOCKET_VOLID[] = "posix_socket_vol";
 
+#define POSIX_SOCKET_FNAME "socket"
+#define POSIX_SOCKET_FNAME_LEN (sizeof(POSIX_SOCKET_FNAME) - 1)
+
+#define POSIX_SOCKET_ACCT_FNAME "socket:accepted"
+#define POSIX_SOCKET_ACCT_FNAME_LEN (sizeof(POSIX_SOCKET_ACCT_FNAME) - 1)
+
+#define POSIX_SOCKET_PAIR_FNAME "socket:pair"
+#define POSIX_SOCKET_PAIR_FNAME_LEN (sizeof(POSIX_SOCKET_PAIR_FNAME) - 1)
+
 #define SOCKET_MODE (O_RDWR|UKFD_O_NOSEEK|UKFD_O_NOIOLOCK)
 
 #define _ERR_BLOCK(r) ((r) == -EAGAIN || (r) == -EWOULDBLOCK)
@@ -293,7 +302,8 @@ int uk_sys_socket(int family, int type, int protocol)
 		mode |= O_NONBLOCK;
 	if (type & SOCK_CLOEXEC)
 		mode |= O_CLOEXEC;
-	fd = uk_fdtab_open(sock, mode);
+	fd = uk_fdtab_open_named(sock, mode, POSIX_SOCKET_FNAME,
+				 POSIX_SOCKET_FNAME_LEN);
 	uk_file_release(sock);
 	return fd;
 }
@@ -378,7 +388,8 @@ int uk_sys_accept(const struct uk_file *sock, int blocking,
 		mode |= O_NONBLOCK;
 	if (flags & SOCK_CLOEXEC)
 		mode |= O_CLOEXEC;
-	fd = uk_fdtab_open(sockfile, mode);
+	fd = uk_fdtab_open_named(sockfile, mode, POSIX_SOCKET_ACCT_FNAME,
+				 POSIX_SOCKET_ACCT_FNAME_LEN);
 	uk_file_release(sockfile);
 	if (fd >= 0)
 		uk_socket_event_raise(&al->evd, ACCEPT);
@@ -981,12 +992,14 @@ int uk_sys_socketpair(int family, int type, int protocol, int sv[2])
 	if (type & SOCK_CLOEXEC)
 		mode |= O_CLOEXEC;
 
-	ret = uk_fdtab_open(socks[0], mode);
+	ret = uk_fdtab_open_named(socks[0], mode, POSIX_SOCKET_PAIR_FNAME,
+				  POSIX_SOCKET_PAIR_FNAME_LEN);
 	if (unlikely(ret < 0))
 		goto out;
 	sv[0] = ret;
 
-	ret = uk_fdtab_open(socks[1], mode);
+	ret = uk_fdtab_open_named(socks[1], mode, POSIX_SOCKET_PAIR_FNAME,
+				  POSIX_SOCKET_PAIR_FNAME_LEN);
 	if (unlikely(ret < 0)) {
 		uk_sys_close(sv[0]);
 		goto out;
