@@ -44,6 +44,36 @@ void uk_ofile_init(struct uk_ofile *of,
 	of->pos = 0;
 }
 
+/**
+ * Acquire a reference on open file description `of`.
+ *
+ * @param of Open file description
+ */
+static inline
+void uk_ofile_acquire(struct uk_ofile *of)
+{
+	uk_refcount_acquire(&of->refcnt);
+}
+
+/**
+ * Release a reference held on open file description `of`.
+ *
+ * Do not call directly unless you are prepared to handle cleanup after the last
+ * reference is dropped. Instead use the release function provided by the lib
+ * where you got the open file reference from.
+ *
+ * @param of Open file description
+ *
+ * @return
+ *  == 0: There are remaining references held
+ *  != 0: The last reference has just been released
+ */
+static inline
+int uk_ofile_release(struct uk_ofile *of)
+{
+	return uk_refcount_release(&of->refcnt);
+}
+
 
 /* Mode bits from fcntl.h that open files are interested in */
 #define UKFD_MODE_MASK \

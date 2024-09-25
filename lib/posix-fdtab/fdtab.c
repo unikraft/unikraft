@@ -145,11 +145,11 @@ static inline void ofile_del(struct uk_fdtab *tab, struct uk_ofile *of)
 
 static inline void ofile_acq(struct uk_ofile *of)
 {
-	uk_refcount_acquire(&of->refcnt);
+	uk_ofile_acquire(of);
 }
 static inline void ofile_rel(struct uk_fdtab *tab, struct uk_ofile *of)
 {
-	if (uk_refcount_release(&of->refcnt)) {
+	if (uk_ofile_release(of)) {
 		uk_file_release(of->file);
 		ofile_del(tab, of);
 	}
