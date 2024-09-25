@@ -6,6 +6,7 @@
 
 #include <errno.h>
 #include <fcntl.h>
+#include <string.h>
 
 #include <uk/alloc.h>
 #include <uk/assert.h>
@@ -130,12 +131,17 @@ static inline struct fdval fdtab_decode(void *p)
 /* struct uk_ofile allocation & refcounting */
 static inline struct uk_ofile *ofile_new(struct uk_fdtab *tab,
 					 const struct uk_file *f,
-					 unsigned int mode)
+					 unsigned int mode,
+					 size_t len)
 {
-	struct uk_ofile *of = uk_malloc(tab->alloc, sizeof(*of));
+	struct uk_ofile *of;
 
-	if (of)
+	of = uk_malloc(tab->alloc, UKFD_OFILE_SIZE(len));
+	if (of) {
+		if (len)
+			mode |= UKFD_O_NAMED;
 		uk_ofile_init(of, f, mode);
+	}
 	return of;
 }
 static inline void ofile_del(struct uk_fdtab *tab, struct uk_ofile *of)
@@ -187,30 +193,57 @@ void file_rel(struct uk_fdtab *tab, void *p, int flags __maybe_unused)
 
 /* Ops */
 
-int uk_fdtab_open(const struct uk_file *f, unsigned int mode)
+struct uk_ofile *uk_fdtab_new_desc(const struct uk_file *f, unsigned int mode,
+				   size_t len)
 {
 	struct uk_ofile *of;
-	int flags;
-	const void *entry;
+
+	of = ofile_new(active_fdtab, f, mode & ~O_CLOEXEC, len);
+	if (of)
+		uk_file_acquire(f);
+	return of;
+}
+
+int uk_fdtab_open_desc(struct uk_ofile *of, unsigned int mode)
+{
+	int fd;
+	const void *entry = fdtab_encode(of,
+		(mode & O_CLOEXEC) ? UK_FDTAB_CLOEXEC : 0);
+
+	fd = uk_fmap_put(&active_fdtab->fmap, entry, 0);
+	if (unlikely(fd >= UK_FDTAB_SIZE))
+		return -ENFILE;
+	return fd;
+}
+
+int uk_fdtab_open_named(const struct uk_file *f, unsigned int mode,
+			const char *name, size_t len)
+{
+	struct uk_ofile *of;
 	int fd;
 
 	UK_ASSERT(f);
+	if (!name)
+		len = 0;
 
-	of = ofile_new(active_fdtab, f, mode & ~O_CLOEXEC);
-	if (!of)
+	of = uk_fdtab_new_desc(f, mode, len);
+	if (unlikely(!of))
 		return -ENOMEM;
-	uk_file_acquire(f);
+	if (len) {
+		memcpy(of->name, name, len);
+		of->name[len] = 0;
+	}
+
 	/* Place the file in fdtab */
-	flags = (mode & O_CLOEXEC) ? UK_FDTAB_CLOEXEC : 0;
-	entry = fdtab_encode(of, flags);
-	fd = uk_fmap_put(&active_fdtab->fmap, entry, 0);
-	if (fd >= UK_FDTAB_SIZE)
-		goto err_out;
+	fd = uk_fdtab_open_desc(of, mode);
+	if (unlikely(fd < 0))
+		ofile_rel(active_fdtab, of);
 	return fd;
-err_out:
-	/* Release open file & file ref */
-	ofile_rel(active_fdtab, of);
-	return -ENFILE;
+}
+
+int uk_fdtab_open(const struct uk_file *f, unsigned int mode)
+{
+	return uk_fdtab_open_named(f, mode, NULL, 0);
 }
 
 int uk_fdtab_setflags(int fd, int flags)

@@ -30,6 +30,68 @@
 int uk_fdtab_open(const struct uk_file *f, unsigned int mode);
 
 /**
+ * Open the file `f` with `mode` and `name` of length `len` and associate it
+ * with a file descriptor.
+ *
+ * The lifetime of `f` must cover the entirety of this function call.
+ *
+ * @param f
+ *   File to open
+ * @param mode
+ *   Mode flags to apply on the new open file description
+ * @param name
+ *   If not NULL, a copy will become the new open file description's name
+ * @param len
+ *   If name is supplied, the length of the string contained in name
+ * @return
+ *   The newly allocated file descriptor.
+ */
+int uk_fdtab_open_named(const struct uk_file *f, unsigned int mode,
+			const char *name, size_t len);
+
+/**
+ * Create a new open file description for file `f` with `mode` and optional
+ * name, without associating it with a file descriptor.
+ *
+ * The caller is responsible for filling in the .name field of returned open
+ * file descriptions before use.
+ * The returned open file description must be released with `uk_fdtab_ret` when
+ * caller is finished with it.
+ * Open file descriptions created in this way may be used as-is, or later
+ * associated with an fd with `uk_fdtab_open_desc`.
+ *
+ * @param f
+ *   File to open
+ * @param mode
+ *   Mode flags to apply on the new open file description
+ * @param len
+ *   If > 0, allocate space for a file name of length `len` (excluding NUL)
+ * @return
+ *   The new open file description, or NULL if no memory is available
+ */
+struct uk_ofile *uk_fdtab_new_desc(const struct uk_file *f, unsigned int mode,
+				   size_t len);
+
+/**
+ * Associate a file descriptor to an existing open file description.
+ *
+ * This call consumes the `of` reference. The caller MUST NOT use or release
+ * `of` after this call returns successfully.
+ * In case of error, the reference is left untouched.
+ * The open file description must have been opened by this fdtab, through either
+ * `uk_fdtab_new_desc` or `uk_fdtab_open*`.
+ *
+ * @param of
+ *   Open file description to associate fd with
+ * @param mode
+ *   If contains O_CLOEXEC, the opened fd will be close-on-exec
+ * @return
+ *   >= 0: The newly allocated file descriptor
+ *   <  0: Negative errno
+ */
+int uk_fdtab_open_desc(struct uk_ofile *of, unsigned int mode);
+
+/**
  * Gets the open file description associated with descriptor `fd`.
  *
  * Users should call uk_fdtab_ret when done with the open file reference.
