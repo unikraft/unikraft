@@ -394,7 +394,8 @@ void *unix_socket_accept4(posix_sock *file,
 	acc->remote = data->listen.q[i].remote;
 	acc->flags |= UNIXSOCK_CONN;
 
-	unix_sock_remotename(acc->remote, addr, addr_len);
+	if (addr)
+		unix_sock_remotename(acc->remote, addr, addr_len);
 	return acc;
 }
 
