@@ -26,6 +26,8 @@
 
 static const char TIMERFD_VOLID[] = "timerfd_vol";
 
+#define TIMERFD_FNAME "timerfd"
+#define TIMERFD_FNAME_LEN (sizeof(TIMERFD_FNAME) - 1)
 
 struct timerfd_node {
 	struct itimerspec set;
@@ -299,7 +301,8 @@ int uk_sys_timerfd_create(clockid_t id, int flags)
 		mode |= O_NONBLOCK;
 	if (flags & TFD_CLOEXEC)
 		mode |= O_CLOEXEC;
-	ret = uk_fdtab_open(timerf, mode);
+	ret = uk_fdtab_open_named(timerf, mode, TIMERFD_FNAME,
+				  TIMERFD_FNAME_LEN);
 	uk_file_release(timerf);
 	return ret;
 }
