@@ -29,6 +29,9 @@
 
 static const char EPOLL_VOLID[] = "epoll_vol";
 
+#define EPOLL_FNAME "epollfd"
+#define EPOLL_FNAME_LEN (sizeof(EPOLL_FNAME) - 1)
+
 #define EPOLL_EVENTS \
 	(UKFD_POLLIN|UKFD_POLLOUT|EPOLLRDHUP|EPOLLPRI|UKFD_POLL_ALWAYS)
 #define EPOLL_OPTS (EPOLLET|EPOLLONESHOT|EPOLLWAKEUP|EPOLLEXCLUSIVE)
@@ -457,7 +460,7 @@ int uk_sys_epoll_create(int flags)
 	if (flags & EPOLL_CLOEXEC)
 		mode |= O_CLOEXEC;
 
-	ret = uk_fdtab_open(f, mode);
+	ret = uk_fdtab_open_named(f, mode, EPOLL_FNAME, EPOLL_FNAME_LEN);
 	uk_file_release(f);
 	return ret;
 }
