@@ -24,7 +24,14 @@ struct uk_ofile {
 	__atomic refcnt;
 	size_t pos; /* Current file read/write offset position */
 	struct uk_mutex lock; /* Lock for modifying open file state */
+	char name[]; /* Name of open file description; driver dependent */
+	/* Filesystem-backed files should be named after the path they were
+	 * opened with. Pseudo-files should be named something descriptive.
+	 */
 };
+
+/* Allocation size of a named uk_ofile with a name of length `namelen` */
+#define UKFD_OFILE_SIZE(namelen) (sizeof(struct uk_ofile) + (namelen) + 1)
 
 /**
  * Initialize an open file description with a refcount of 1.
@@ -84,6 +91,24 @@ int uk_ofile_release(struct uk_ofile *of)
 #define UKFD_O_NOSEEK   010
 /* File I/O should not use the file locks (e.g. if driver handles them) */
 #define UKFD_O_NOIOLOCK 020
+
+/* INTERNAL. Open file description has .name field allocated */
+#define UKFD_O_NAMED 040
+
+/**
+ * Retrieve the name of open file description `of`, or `fallback` if anonymous.
+ *
+ * @param of Open file description
+ * @param fallback Name to return if `of` is anonymous
+ *
+ * @return
+ *  Name of `of` (NUL-terminated string) or `fallback` if `of` is anonymous
+ */
+static inline
+const char *uk_ofile_name(const struct uk_ofile *of, const char *fallback)
+{
+	return (of->mode & UKFD_O_NAMED) ? of->name : fallback;
+}
 
 /* Event sets */
 #define UKFD_POLL_ALWAYS (EPOLLERR|EPOLLHUP)
