@@ -21,6 +21,9 @@
 static const char EVENTFD_VOLID[] = "eventfd_vol";
 static const char EVENTFD_SEM_VOLID[] = "eventfd_semaphore_vol";
 
+#define EVENTFD_FNAME "eventfd"
+#define EVENTFD_FNAME_LEN (sizeof(EVENTFD_FNAME) - 1)
+
 #define _IS_EVFVOL(v) ((v) == EVENTFD_VOLID || (v) == EVENTFD_SEM_VOLID)
 
 typedef volatile uint64_t *evfd_node;
@@ -171,7 +174,7 @@ int uk_sys_eventfd(unsigned int count, int flags)
 		mode |= O_NONBLOCK;
 	if (flags & EFD_CLOEXEC)
 		mode |= O_CLOEXEC;
-	ret = uk_fdtab_open(evf, mode);
+	ret = uk_fdtab_open_named(evf, mode, EVENTFD_FNAME, EVENTFD_FNAME_LEN);
 	uk_file_release(evf);
 	return ret;
 }
