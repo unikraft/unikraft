@@ -249,7 +249,7 @@ static int vga_init(struct ukplat_bootinfo *bi)
 
 	clear_terminal();
 
-	uk_console_init(&vga_dev, "VGA", &vga_ops, UK_CONSOLE_FLAG_STDOUT);
+	uk_console_init(&vga_dev, "vgacons", &vga_ops, UK_CONSOLE_FLAG_STDOUT);
 	uk_console_register(&vga_dev);
 
 	mrd.pbase = X86_VIDEO_MEM_START;

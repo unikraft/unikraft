@@ -1,0 +1,9 @@
+$(eval $(call addlib_s,libconsfront,$(CONFIG_LIBCONSFRONT)))
+
+CINCLUDES-$(CONFIG_LIBCONSFRONT)   += -I$(LIBCONSFRONT_BASE)/include
+
+# FIXME: Extra includes should be removed
+LIBCONSFRONT_CFLAGS-y        += $(LIBXENPLAT_CFLAGS-y)
+LIBCONSFRONT_CINCLUDES-y     += $(LIBXENPLAT_CINCLUDES-y)
+LIBCONSFRONT_CINCLUDES-y     += $(LIBXENBUS_CINCLUDES-y)
+LIBCONSFRONT_SRCS-y          += $(LIBCONSFRONT_BASE)/console.c|isr

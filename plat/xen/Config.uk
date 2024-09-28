@@ -4,22 +4,23 @@ menuconfig PLAT_XEN
        depends on ((ARCH_X86_32 && !HAVE_SMP) || (ARCH_X86_64 && !HAVE_SMP) || (ARCH_ARM_32 && !HAVE_SMP) || (ARCH_ARM_64 && !HAVE_SMP))
        depends on ((ARCH_X86_32 && !HAVE_SYSCALL) || (ARCH_X86_64 && !HAVE_SYSCALL) || (ARCH_ARM_32 && !HAVE_SYSCALL) || (ARCH_ARM_64 && !HAVE_SYSCALL))
        depends on !HAVE_PAGING
+       select HAVE_XENBUS
        imply XEN_PV_BUILD_P2M
+       select LIBXENAPI
        select LIBUKDEBUG
        select LIBUKBOOT
        select LIBNOLIBC if !HAVE_LIBC
        select HAVE_FDT if ARCH_ARM_64
        imply LIBFDT if (ARCH_ARM_32 || ARCH_ARM_64)
-       select XEN_DBGEMERGENCY if ARCH_ARM_32
        select LIBUKRELOC if OPTIMIZE_PIE
        imply LIBUKOFW if ARCH_ARM_64
-       select HAVE_INTCTLR
+       select HAVE_INTCTLR if ARCH_ARM_64
        select HAVE_RANDOM
        imply LIBUKINTCTLR_GICV3 if ARCH_ARM_64
-       imply LIBXEN_NETFRONT if LIBUKNETDEV
-       imply LIBXEN_9PFRONT if LIBUK9P
-       imply LIBXEN_BLKFRONT if LIBUKBLKDEV
-       imply LIBXEN_CONSOLE
+       imply LIBNETFRONT if LIBUKNETDEV
+       imply LIB9PFRONT if LIBUK9P
+       imply LIBBLKFRONT if LIBUKBLKDEV
+       imply LIBCONSFRONT if LIBUKCONSOLE
        imply LIBUKRANDOM if HAVE_RANDOM
        help
                 Create a Unikraft image that runs as a Xen guest
@@ -48,7 +49,7 @@ config XEN_GNTTAB
 	bool "Grant table support"
 	default y if XEN_PV
 	depends on (ARCH_X86_64 || ARCH_ARM_64)
-	select LIBXEN_XENBUS
+	select LIBXENBUS
 	select LIBUKALLOC
 	select LIBUKLOCK
 	select LIBUKLOCK_SEMAPHORE

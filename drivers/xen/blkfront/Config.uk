@@ -1,15 +1,16 @@
-menuconfig LIBXEN_BLKFRONT
-	bool "Xenbus Blkfront Driver"
-	select LIBXEN_XENBUS
-	depends on PLAT_XEN
+menuconfig LIBBLKFRONT
+	bool "blkfront"
+	select LIBXENAPI
+	select LIBXENBUS
+	depends on HAVE_XENBUS
 	depends on LIBUKBLKDEV
 	help
-		Driver for block devices
+		Xen driver for block devices
 
-config LIBXEN_BLKFRONT_GREFPOOL
-	bool "Enable grant reference pool for each queue"
+if LIBBLKFRONT
+config LIBBLKFRONT_GREFPOOL
+	bool "Grant reference pool for each queue"
 	default y
-	depends on LIBXEN_BLKFRONT
 	select LIBUKSCHED
 	select LIBUKLOCK
 	select LIBUKLOCK_SEMAPHORE
@@ -23,3 +24,4 @@ config LIBXEN_BLKFRONT_GREFPOOL
 		request, there are not enough grant refs in the
 		pool, we just allocate new ones, which are
 		freed at the moment of processing the response.
+endif

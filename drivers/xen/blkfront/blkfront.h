@@ -40,7 +40,7 @@
  * implementation.
  */
 #include <uk/blkdev.h>
-#if CONFIG_LIBXEN_BLKFRONT_GREFPOOL
+#if CONFIG_LIBBLKFRONT_GREFPOOL
 #include <uk/list.h>
 #include <uk/semaphore.h>
 #include <stdbool.h>
@@ -52,7 +52,7 @@
 
 #define BLK_RING_PAGES_NUM 1
 
-#if CONFIG_LIBXEN_BLKFRONT_GREFPOOL
+#if CONFIG_LIBBLKFRONT_GREFPOOL
 /**
  * Structure used to describe a list of blkfront_gref elements.
  */
@@ -76,7 +76,7 @@ struct blkfront_grefs_pool {
 struct blkfront_gref {
 	/* Grant ref number. */
 	grant_ref_t ref;
-#if CONFIG_LIBXEN_BLKFRONT_GREFPOOL
+#if CONFIG_LIBBLKFRONT_GREFPOOL
 	/* Entry for pool. */
 	UK_STAILQ_ENTRY(struct blkfront_gref) _list;
 	/* It is True if it was pulled from the pool.
@@ -118,7 +118,7 @@ struct uk_blkdev_queue {
 	int intr_enabled;
 	/* Reference to the Blkfront Device */
 	struct blkfront_dev *dev;
-#if CONFIG_LIBXEN_BLKFRONT_GREFPOOL
+#if CONFIG_LIBBLKFRONT_GREFPOOL
 	/* Grant refs pool. */
 	struct blkfront_grefs_pool ref_pool;
 #endif

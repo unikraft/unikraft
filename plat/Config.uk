@@ -115,3 +115,12 @@ config FPSIMD
 	depends on ARCH_ARM_64
 	help
 		Enable support FPU usage in application
+
+# FIXME: Temporary workaround to display a warning when more than one platform
+#        is selected. Note that the check does not take external platforms into
+#        account and may not display the warning even though more than one
+#        platform is selected.
+#        This warning will be removed once we have restructured the menu to
+#        only allow a single platform (including external platforms).
+comment "Warning: Selecting multiple platforms is unsupported!"
+	depends on PLAT_KVM && PLAT_XEN

@@ -1,0 +1,8 @@
+config LIBCONSFRONT
+	bool "consfront"
+	select LIBXENAPI
+	select LIBNOLIBC if !HAVE_LIBC
+	depends on HAVE_XENBUS
+	depends on LIBUKCONSOLE
+	help
+		Driver for the Xen hypervisor console

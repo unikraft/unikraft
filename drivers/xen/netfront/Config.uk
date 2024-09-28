@@ -1,0 +1,8 @@
+config LIBNETFRONT
+	bool "netfront"
+	select LIBXENAPI
+	select LIBXENBUS
+	depends on HAVE_XENBUS
+	depends on LIBUKNETDEV
+	help
+		Driver for netfront devices

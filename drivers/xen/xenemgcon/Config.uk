@@ -1,0 +1,10 @@
+config LIBXENEMGCON
+	bool "Emergency console"
+	select LIBXENAPI
+	depends on LIBUKCONSOLE
+	help
+		Driver for the Xen emergency console. This console is
+		based on a single hypercall.
+		In order to see output, make sure you use a Xen version
+		that is compiled with debug mode and set guest_loglvl
+		accordingly. Read Xen documentation for more information.
