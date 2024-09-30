@@ -244,7 +244,9 @@ jobs:
 
           today=$(date -u +"%Y-%m-%d");
           stop=$(date -u +"%Y-%m-%dT%H:%M:%SZ");
-          start="${{ steps.start_time.outputs.start }}";
+          start=${{ steps.start_time.outputs.start }};
+
+          echo "♻️ Running all catalog tests";
 
           for _ in {1..60}; do
             # If there are more than 100 tests, the list will be truncated
