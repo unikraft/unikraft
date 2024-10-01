@@ -21,6 +21,10 @@ config LIBUKRANDOM_SEED_INSECURE
 
 		DO NOT USE IN PRODUCTION SYSTEMS
 
+config LIBUKRANDOM_GETRANDOM
+	bool "getrandom() system call"
+	depends on LIBSYSCALL_SHIM
+
 config LIBUKRANDOM_DEVFS
 	bool "Register random, urandom, and hwrng device to devfs"
 	select LIBDEVFS
