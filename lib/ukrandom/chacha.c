@@ -38,16 +38,12 @@
 #include <uk/random/driver.h>
 #include <uk/plat/lcpu.h>
 
-/*
- * ChaCha20 requires eight 32-bit integers for the key and two 32-bit integers
- * for the nonce, hence the seed length is 10.
- * RFC7539 specifies three 32-bit integers for the nonce, but the reference
- * implementation uses only two:
- * http://cr.yp.to/streamciphers/timings/estreambench/submissions/salsa20/chacha8/ref/chacha.c
- *
- * TODO: bring the nonce-size in-line with the RFC.
+/* This implements the original version of ChaCha20 as presented
+ * in http://cr.yp.to/chacha/chacha-20080128.pdf. For the differences
+ * with the IRTF version see RFC-8439 Sect. 2.3.
  */
-#define CHACHA_SEED_LENGTH		10
+
+#define CHACHA_SEED_LENGTH		8 /* 256 bit key */
 #define CHACHA_SEED_INSECURE		0xdeadb0b0
 
 struct uk_swrand {
@@ -130,8 +126,7 @@ static inline __u32 infvec_val(unsigned int c, const __u32 v[],
 	return v[pos % c];
 }
 
-static void chacha_init(struct uk_swrand *r, unsigned int seedc,
-			const __u32 seedv[])
+static void chacha_init(struct uk_swrand *r, const __u32 seedv[])
 {
 	UK_ASSERT(r);
 	/* Initialize chacha */
@@ -140,8 +135,12 @@ static void chacha_init(struct uk_swrand *r, unsigned int seedc,
 	for (i = 0; i < 8; i++)
 		k[i] = infvec_val(CHACHA_SEED_LENGTH, seedv, i);
 
-	iv[0] = infvec_val(seedc, seedv, i);
-	iv[1] = infvec_val(seedc, seedv, i + 1);
+	/* Unlike encryption, the nonce value is not important on RNG
+	 * as the original ChaCha20 can generate up to 2**64 blocks
+	 * i.e. 1ZiB of random data with the same (key, nonce) pair.
+	 */
+	iv[0] = 0;
+	iv[1] = 0;
 
 	uk_key_setup(r, k);
 	uk_iv_setup(r, iv);
@@ -153,7 +152,7 @@ int uk_swrand_init(struct uk_random_driver **drv)
 {
 	unsigned int seedc = CHACHA_SEED_LENGTH;
 	__u32 seedv[CHACHA_SEED_LENGTH];
-	unsigned int i;
+	unsigned int i __maybe_unused;
 	int ret;
 
 	UK_ASSERT(drv && *drv);
@@ -179,7 +178,7 @@ int uk_swrand_init(struct uk_random_driver **drv)
 
 	uk_pr_info("Entropy source: %s\n", (*drv)->name);
 
-	chacha_init(&uk_swrand_def, seedc, seedv);
+	chacha_init(&uk_swrand_def, seedv);
 
 	return 0;
 }
