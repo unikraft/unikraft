@@ -21,6 +21,18 @@ config LIBUKRANDOM_SEED_INSECURE
 
 		DO NOT USE IN PRODUCTION SYSTEMS
 
+config LIBUKRANDOM_DTB_SEED
+	bool "Obtain seed from the device-tree"
+	depends on LIBUKOFW
+	select LIBUKBOOT
+	default y
+	help
+		Selecting this option will cause libukrandom to obtain its
+		seed from the fdt, if the `/chosen/rng-seed` node is present
+		and populated with a 256-bit key formatted as an array of
+		32-bit words. In that case any hardware RNG driver enabled
+		will be ignored.
+
 config LIBUKRANDOM_GETRANDOM
 	bool "getrandom() system call"
 	depends on LIBSYSCALL_SHIM

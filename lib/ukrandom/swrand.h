@@ -9,7 +9,19 @@
 
 #include <uk/random/driver.h>
 
-/* Initialize the software CSPRNG */
+/* Invalid pointer to differentiate between not initialized
+ * libukrandom and initialized without an underlying driver.
+ */
+#define UK_SWRAND_DRIVER_NONE	0xb0b0cafe
+
+/* Initialize the CSPRNG. The CSPRNG is seeded with randomness
+ * provided by the dtb's `/chosen/rng-seed` node.
+ */
+int uk_swrand_fdt_init(void *fdt, struct uk_random_driver **drv);
+
+/* Initialize the CSPRNG. The CSPRNG is seeded with randomness
+ * provided by an RNG device.
+ */
 int uk_swrand_init(struct uk_random_driver **drv);
 
 /* Get a 32-bit random number */

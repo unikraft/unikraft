@@ -38,6 +38,10 @@
 #include <uk/random/driver.h>
 #include <uk/plat/lcpu.h>
 
+#if CONFIG_LIBUKRANDOM_DTB_SEED
+#include <uk/ofw/fdt.h>
+#endif /* CONFIG_LIBUKRANDOM_DTB_SEED */
+
 /* This implements the original version of ChaCha20 as presented
  * in http://cr.yp.to/chacha/chacha-20080128.pdf. For the differences
  * with the IRTF version see RFC-8439 Sect. 2.3.
@@ -147,6 +151,33 @@ static void chacha_init(struct uk_swrand *r, const __u32 seedv[])
 
 	r->k = 16;
 }
+
+#if CONFIG_LIBUKRANDOM_DTB_SEED
+int uk_swrand_fdt_init(void *fdt, struct uk_random_driver **drv)
+{
+	__u32 *seedv;
+	__sz seedc;
+	int rc;
+
+	rc = fdt_chosen_rng_seed(fdt, &seedv, &seedc);
+	if (unlikely(rc))
+		return -ENOTSUP;
+
+	if (unlikely(seedc < CHACHA_SEED_LENGTH)) {
+		uk_pr_err("/chosen/rng-seed does not provide enough randomness\n");
+		return -ENOTSUP;
+	}
+
+	uk_pr_warn("The CSPRNG is initialized from the dtb\n");
+
+	 /* prevent drivers from registering */
+	*drv = (void *)UK_SWRAND_DRIVER_NONE;
+
+	chacha_init(&uk_swrand_def, seedv);
+
+	return rc;
+}
+#endif /* CONFIG_LIBUKRANDOM_DTB_SEED */
 
 int uk_swrand_init(struct uk_random_driver **drv)
 {

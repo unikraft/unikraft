@@ -37,6 +37,12 @@
 #include <uk/random.h>
 #include <uk/random/driver.h>
 
+#if CONFIG_LIBUKRANDOM_DTB_SEED
+#include <uk/boot/earlytab.h>
+#include <uk/plat/common/bootinfo.h>
+#include <uk/prio.h>
+#endif /* CONFIG_LIBUKRANDOM_DTB_SEED */
+
 #include "swrand.h"
 
 struct uk_random_driver *driver;
@@ -75,3 +81,12 @@ int uk_random_init(struct uk_random_driver *drv)
 
 	return uk_swrand_init(&driver);
 }
+
+#if CONFIG_LIBUKRANDOM_DTB_SEED
+int uk_random_early_init(struct ukplat_bootinfo __maybe_unused *bi)
+{
+	return uk_swrand_fdt_init((void *)bi->dtb, &driver);
+}
+
+UK_BOOT_EARLYTAB_ENTRY(uk_random_early_init, UK_PRIO_AFTER(2));
+#endif /* CONFIG_LIBUKRANDOM_DTB_SEED */
