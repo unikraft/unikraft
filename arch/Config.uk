@@ -60,8 +60,3 @@ config HAVE_MEMTAG
 	bool
 	help
 	  Memory tagging support.
-
-config HAVE_RANDOM
-	bool
-	help
-		Processor-generated randomness support.

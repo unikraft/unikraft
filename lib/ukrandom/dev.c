@@ -36,40 +36,31 @@
 #include <uk/ctors.h>
 #include <uk/print.h>
 #include <uk/random.h>
-#include <uk/arch/random.h>
+#include <uk/random/driver.h>
 #include <uk/assert.h>
 #include <uk/config.h>
 #include <uk/essentials.h>
 #include <vfscore/uio.h>
 #include <devfs/device.h>
 
+#include "swrand.h"
+
 #define DEV_RANDOM_NAME "random"
 #define DEV_URANDOM_NAME "urandom"
 #define DEV_HWRNG_NAME "hwrng"
 
-/* TODO: Move this to random.c once ukarch_random is implemented as a driver */
-__ssz uk_random_hwrng_fill_buffer(void *buf, __sz buflen)
+extern struct uk_random_driver *driver;
+
+static __ssz uk_random_hwrng_fill_buffer(void *buf, __sz buflen)
 {
-	__sz step, chunk_size, i;
-	__u64 rd;
 	int ret;
 
-	step = sizeof(__u64);
-	chunk_size = buflen % step;
+	UK_ASSERT(driver);
+	UK_ASSERT(buf);
 
-	for (i = 0; i < buflen - chunk_size; i += step) {
-		ret = ukarch_random_seed_u64((__u64 *)((char *)buf + i));
-		if (unlikely(ret))
-			return ret;
-	}
-
-	/* fill the remaining bytes of the buffer */
-	if (chunk_size > 0) {
-		ret = ukarch_random_seed_u64(&rd);
-		if (unlikely(ret))
-			return ret;
-		memcpy((char *)buf + i, &rd, chunk_size);
-	}
+	ret = driver->ops->random_bytes((__u8 *)buf, buflen);
+	if (unlikely(ret))
+		return ret;
 
 	return buflen;
 }
@@ -79,13 +70,17 @@ static int dev_random_read(struct device *dev __unused, struct uio *uio,
 {
 	__sz count;
 	char *buf;
+	int ret;
 
 	buf = uio->uio_iov->iov_base;
 	count = uio->uio_iov->iov_len;
 
-	uk_random_fill_buffer(buf, count);
+	ret = uk_random_fill_buffer(buf, count);
+	if (unlikely(ret))
+		return rc;
 
 	uio->uio_resid = 0;
+
 	return 0;
 }
 
@@ -107,8 +102,12 @@ static int dev_hwrng_read(struct device *dev __unused, struct uio *uio,
 	count = uio->uio_iov->iov_len;
 
 	ret = uk_random_hwrng_fill_buffer(buf, count);
+	if (unlikely(ret))
+		return ret;
+
 	uio->uio_resid = count - ret;
-	return ret;
+
+	return 0;
 }
 
 static struct devops random_devops = {
@@ -169,6 +168,12 @@ static int devfs_register(struct uk_init_ctx *ictx __unused)
 	}
 
 	/* register /dev/hwrng */
+#if CONFIG_LIBUKRANDOM_CMDLINE_SEED
+	/* Skip if there is no hardware device */
+	if (driver == (void *)UK_SWRAND_DRIVER_NONE)
+		return 0;
+#endif /* CONFIG_LIBUKRANDOM_CMDLINE_SEED */
+
 	rc = device_create(&drv_hwrng, DEV_HWRNG_NAME, D_CHR, NULL);
 	if (unlikely(rc)) {
 		uk_pr_err("Failed to register '%s' to devfs: %d\n",

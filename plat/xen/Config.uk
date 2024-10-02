@@ -14,7 +14,6 @@ menuconfig PLAT_XEN
        select LIBUKRELOC if OPTIMIZE_PIE
        imply LIBUKOFW if ARCH_ARM_64
        select HAVE_INTCTLR
-       select HAVE_RANDOM
        imply LIBUKINTCTLR_GICV3 if ARCH_ARM_64
        imply LIBXEN_NETFRONT if LIBUKNETDEV
        imply LIBXEN_9PFRONT if LIBUK9P
