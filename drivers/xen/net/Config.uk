@@ -1,6 +1,7 @@
 config LIBXEN_NETFRONT
 	bool "Xenbus Netfront Driver"
 	select LIBXEN_XENBUS
+	select XEN_GNTTAB
 	depends on PLAT_XEN
 	depends on LIBUKNETDEV
 	help

@@ -46,7 +46,6 @@ config XEN_PV_BUILD_P2M
 
 config XEN_GNTTAB
 	bool "Grant table support"
-	default y if XEN_PV
 	depends on (ARCH_X86_64 || ARCH_ARM_64)
 	select LIBXEN_XENBUS
 	select LIBUKALLOC
