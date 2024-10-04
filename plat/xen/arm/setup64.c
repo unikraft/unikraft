@@ -173,7 +173,7 @@ static inline void _get_cmdline(struct ukplat_bootinfo *bi)
 
 	UK_ASSERT(bi);
 
-	bi->cmdline = CONFIG_UK_NAME;
+	bi->cmdline = (__uptr)CONFIG_UK_NAME;
 	bi->cmdline_len = sizeof(CONFIG_UK_NAME) - 1;
 
 	fdtchosen = fdt_path_offset(HYPERVISOR_dtb, "/chosen");
@@ -181,7 +181,7 @@ static inline void _get_cmdline(struct ukplat_bootinfo *bi)
 		fdtcmdline = fdt_getprop(HYPERVISOR_dtb, fdtchosen, "bootargs",
 					 &len);
 		if (fdtcmdline) {
-			bi->cmdline = fdtcmdline;
+			bi->cmdline = (__uptr)fdtcmdline;
 			bi->cmdline_len = len;
 		}
 	}
