@@ -83,7 +83,7 @@ static inline __u32 uk_rotl32(__u32 v, int c)
 	return (v << c) | (v >> (32 - c));
 }
 
-static inline void uk_quarterround(__u32 x[16], int a, int b, int c, int d)
+void uk_quarterround(__u32 x[16], int a, int b, int c, int d)
 {
 	x[a] = x[a] + x[b];
 	x[d] = uk_rotl32(x[d] ^ x[a], 16);
@@ -98,8 +98,7 @@ static inline void uk_quarterround(__u32 x[16], int a, int b, int c, int d)
 	x[b] = uk_rotl32(x[b] ^ x[c], 7);
 }
 
-static inline void
-uk_salsa20_wordtobyte(__u32 output[16], const __u32 input[16])
+void uk_salsa20_wordtobyte(__u32 output[16], const __u32 input[16])
 {
 	__u32 i;
 
@@ -121,7 +120,7 @@ uk_salsa20_wordtobyte(__u32 output[16], const __u32 input[16])
 		output[i] += input[i];
 }
 
-static inline void uk_key_setup(struct uk_swrand *r, __u32 k[8])
+void uk_key_setup(struct uk_swrand *r, __u32 k[8])
 {
 	int i;
 
@@ -132,7 +131,7 @@ static inline void uk_key_setup(struct uk_swrand *r, __u32 k[8])
 		r->input[i] = ((__u32 *)sigma)[i];
 }
 
-static inline void uk_iv_setup(struct uk_swrand *r, __u32 iv[2])
+void uk_iv_setup(struct uk_swrand *r, __u32 iv[2])
 {
 	r->input[12] = 0;
 	r->input[13] = 0;

@@ -48,4 +48,8 @@ config LIBUKRANDOM_DEVFS
 		LIBUKRANDOM_CMDLINE_PARAM is selected, /dev/hwrng is not
 		registered.
 
+config LIBUKRANDOM_TEST
+	bool "Enable unit tests"
+	select LIBUKTEST
+
 endif
