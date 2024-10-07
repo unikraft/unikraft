@@ -88,7 +88,7 @@ uk_salsa20_wordtobyte(__u32 output[16], const __u32 input[16])
 	for (i = 0; i < 16; i++)
 		output[i] = input[i];
 
-	for (i = 8; i > 0; i -= 2) {
+	for (i = 20; i > 0; i -= 2) {
 		uk_quarterround(output, 0, 4, 8, 12);
 		uk_quarterround(output, 1, 5, 9, 13);
 		uk_quarterround(output, 2, 6, 10, 14);
