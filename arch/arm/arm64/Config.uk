@@ -11,6 +11,7 @@ choice
 		select HAVE_ARM64_FEAT_RNG
 		select HAVE_ARM64_FEAT_PAUTH
 		select HAVE_ARM64_FEAT_BTI
+		select HAVE_ARM64_FEAT_MTE
 		help
 			Do not compile for a specific CPU. This allows choosing
 			individual architecture extensions or features.
@@ -20,6 +21,7 @@ choice
 		select HAVE_ARM64_FEAT_RNG
 		select HAVE_ARM64_FEAT_PAUTH
 		select HAVE_ARM64_FEAT_BTI
+		select HAVE_ARM64_FEAT_MTE
 		help
 			Compile and optimize for the host CPU. Please note that this
 			option will fail in case of cross-compilation.
@@ -154,49 +156,6 @@ choice
 			Compile and optimize for Neoverse V1 CPUs.
 endchoice
 
-menu "Armv8-A Extensions"
-	depends on MCPU_ARM64_NONE
-
-menuconfig ARM64_FEAT_MTE
-	bool "Armv8.5 Memory Tagging Extensions"
-	select HAVE_ARM64_FEAT_RNG
-	select HAVE_MEMTAG
-	select PAGING
-	help
-	  Protects against memory safety violations by restricting
-	  access to tagged memory regions.
-
-if ARM64_FEAT_MTE
-choice ARM64_FEAT_MTE_TCF
-	prompt "Tag Check Fault Reporting"
-	default ARM64_FEAT_MTE_TCF_ASYNC
-
-config ARM64_FEAT_MTE_TCF_SYNC
-	bool "Synchronous"
-	help
-	  This option causes TCFs to trigger a Data Abort.
-	  Choose this option for high precision, at the
-	  cost of less performance.
-
-config ARM64_FEAT_MTE_TCF_ASYNC
-	bool "Asynchronous"
-	help
-	  This option causes TCFs to be accumulated and
-	  reported asynchronously.
-	  Choose this option for high performance at
-	  the cost of reduced precision.
-
-config ARM64_FEAT_MTE_TCF_ASYMMETRIC
-	bool "Asymmetric"
-	help
-	  This option causes synchronous TCF reporting on
-	  reads and asynchronous TCF reporting on writes.
-
-endchoice
-endif
-
-endmenu
-
 config HAVE_ARM64_FEAT_RNG
 	bool
 
@@ -204,6 +163,9 @@ config HAVE_ARM64_FEAT_PAUTH
 	bool
 
 config HAVE_ARM64_FEAT_BTI
+	bool
+
+config HAVE_ARM64_FEAT_MTE
 	bool
 
 config ARM64_ERRATUM_858921

@@ -39,9 +39,9 @@
 #include <uk/plat/common/w_xor_x.h>
 #endif /* CONFIG_ENFORCE_W_XOR_X && CONFIG_PAGING */
 
-#ifdef CONFIG_HAVE_MEMTAG
-#include <uk/arch/memtag.h>
-#endif /* CONFIG_HAVE_MEMTAG */
+#ifdef CONFIG_LIBUKMEMTAG
+#include <uk/memtag.h>
+#endif /* CONFIG_LIBUKMEMTAG */
 
 smccc_conduit_fn_t smccc_psci_call;
 
@@ -145,11 +145,11 @@ void _ukplat_entry(void)
 	enforce_w_xor_x();
 #endif /* CONFIG_ENFORCE_W_XOR_X && CONFIG_PAGING */
 
-#ifdef CONFIG_HAVE_MEMTAG
-	rc = ukarch_memtag_init();
+#ifdef CONFIG_LIBUKMEMTAG
+	rc = uk_memtag_init();
 	if (unlikely(rc))
 		UK_CRASH("Could not initialize MTE (%d)\n", rc);
-#endif /* CONFIG_HAVE_MEMTAG */
+#endif /* CONFIG_LIBUKMEMTAG */
 
 #if defined(CONFIG_UKPLAT_ACPI)
 	rc = acpi_init();

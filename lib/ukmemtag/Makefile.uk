@@ -1,0 +1,12 @@
+$(eval $(call addlib_s,libukmemtag,$(CONFIG_LIBUKMEMTAG)))
+
+CINCLUDES-y  += -I$(LIBUKMEMTAG_BASE)/include
+CXXNCLUDES-y += -I$(LIBUKMEMTAG_BASE)/include
+
+CINCLUDES-y  += -I$(LIBUKMEMTAG_BASE)/arch/$(CONFIG_UK_ARCH)/include
+CXXNCLUDES-y += -I$(LIBUKMEMTAG_BASE)/arch/$(CONFIG_UK_ARCH)/include
+
+# TODO Remove as soon as plat dependencies go away
+LIBUKMEMTAG_CINCLUDES-y += -I$(UK_PLAT_COMMON_BASE)/include
+
+LIBUKMEMTAG_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBUKMEMTAG_BASE)/arch/arm64/mte.c

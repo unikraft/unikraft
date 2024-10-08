@@ -54,7 +54,7 @@ else
 endif
 endif
 
-ifeq ($(CONFIG_ARM64_FEAT_MTE),y)
+ifeq ($(CONFIG_HAVE_ARM64_FEAT_MTE),y)
 ifeq ($(call have_gcc),y)
 # MTE support introduced in GCC-10
 $(call error_if_gcc_version_lt,10,0)
@@ -327,6 +327,3 @@ endif
 ARCHFLAGS     += -mcpu=neoverse-v1 -mtune=neoverse-v1
 ISR_ARCHFLAGS += -mcpu=neoverse-v1 -mtune=neoverse-v1
 endif
-
-$(eval $(call addlib,libarm64arch))
-LIBARM64ARCH_SRCS-$(CONFIG_ARM64_FEAT_MTE) += $(CONFIG_UK_BASE)/arch/arm/arm64/memtag.c

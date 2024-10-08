@@ -309,6 +309,12 @@
 #define SCTLR_EL1_ATA_BIT		(_AC(1, UL) << 43)
 #define SCTLR_EL1_DSSBS_BIT		(_AC(1, UL) << 44)
 
+/* SCTLR_EL1.TCF values */
+#define SCTLR_EL1_TCF_IGNORE		_AC(0, UL)
+#define SCTLR_EL1_TCF_SYNC		_AC(1, UL)
+#define SCTLR_EL1_TCF_ASYNC		_AC(2, UL)
+#define SCTLR_EL1_TCF_ASYMMETRIC	_AC(3, UL)
+
 /* SPSR: Saved Program Status Register */
 #define SPSR_EL1_SS			UK_BIT(21)
 #define SPSR_EL1_D			UK_BIT(9)
