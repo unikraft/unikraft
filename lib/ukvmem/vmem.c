@@ -69,6 +69,9 @@ int uk_vas_init(struct uk_vas *vas, struct uk_pagetable *pt __maybe_unused,
 
 	UK_INIT_LIST_HEAD(&vas->vma_list);
 
+	uk_spin_init(&vas->map_lock);
+	uk_rwlock_init(&vas->vma_list_lock);
+
 	return 0;
 }
 
@@ -102,7 +105,9 @@ static void vmem_vma_unlink_and_free(struct uk_vma *vma)
 	UK_ASSERT(vma);
 	UK_ASSERT(!uk_list_empty(&vma->vma_list));
 
+	uk_rwlock_wlock(&vma->vas->vma_list_lock);
 	uk_list_del(&vma->vma_list);
+	uk_rwlock_wunlock(&vma->vas->vma_list_lock);
 	vmem_vma_destroy(vma);
 }
 
@@ -116,10 +121,14 @@ static struct uk_vma *vmem_vma_find(struct uk_vas *vas, __vaddr_t vaddr,
 	UK_ASSERT(vas);
 	UK_ASSERT(vaddr <= __VADDR_MAX - len);
 
+	uk_rwlock_rlock(&vas->vma_list_lock);
 	uk_list_for_each_entry(vma, &vas->vma_list, vma_list) {
-		if ((vend > vma->start) && (vstart < vma->end))
+		if ((vend > vma->start) && (vstart < vma->end)) {
+			uk_rwlock_runlock(&vas->vma_list_lock);
 			return vma;
+		}
 	}
+	uk_rwlock_runlock(&vas->vma_list_lock);
 
 	return __NULL;
 }
@@ -180,6 +189,7 @@ static int vmem_vma_find_range(struct uk_vas *vas, __vaddr_t *vaddr, __sz *len,
 	/* Find the end VMA */
 	vma_end = vma_start;
 	if (likely(vl > 0)) {
+		uk_rwlock_rlock(&vas->vma_list_lock);
 		while (vma_end->vma_list.next != &vas->vma_list) {
 			if (vend > vma_end->start && vend <= vma_end->end)
 				break;
@@ -188,14 +198,17 @@ static int vmem_vma_find_range(struct uk_vas *vas, __vaddr_t *vaddr, __sz *len,
 			 * address range to contain holes between VMAs
 			 */
 			next = uk_list_next_entry(vma_end, vma_list);
-			if (strict && vma_end->end != next->start)
+			if (strict && vma_end->end != next->start) {
+				uk_rwlock_runlock(&vas->vma_list_lock);
 				return -ENOENT;
+			}
 
 			if (vend <= next->start)
 				break;
 
 			vma_end = next;
 		}
+		uk_rwlock_runlock(&vas->vma_list_lock);
 
 		/* Adjust vend to make sure it is within the VMA. We expect
 		 * vend to be properly aligned by the caller (via len).
@@ -238,18 +251,25 @@ static void vmem_vma_insert(struct uk_vas *vas, struct uk_vma *vma)
 	UK_ASSERT(!vmem_vma_find(vas, vma->start, vma->end - vma->start));
 
 	prev = &vas->vma_list;
+	uk_rwlock_rlock(&vas->vma_list_lock);
 	uk_list_for_each_entry(cur, &vas->vma_list, vma_list) {
 		if (vma->start < cur->end) {
 			UK_ASSERT(vma->end <= cur->start);
 
+			uk_rwlock_upgrade(&vas->vma_list_lock);
 			uk_list_add(&vma->vma_list, prev);
+			uk_rwlock_downgrade(&vas->vma_list_lock);
+			uk_rwlock_runlock(&vas->vma_list_lock);
 			return;
 		}
 
 		prev = &cur->vma_list;
 	}
 
+	uk_rwlock_upgrade(&vas->vma_list_lock);
 	uk_list_add_tail(&vma->vma_list, &vas->vma_list);
+	uk_rwlock_downgrade(&vas->vma_list_lock);
+	uk_rwlock_runlock(&vas->vma_list_lock);
 }
 
 static inline int vmem_vma_can_merge(struct uk_vma *vma, struct uk_vma *next)
@@ -355,7 +375,9 @@ static int vmem_vma_split(struct uk_vma *vma, __vaddr_t vaddr,
 
 	vma->end	= vaddr;
 
+	uk_rwlock_wlock(&vma->vas->vma_list_lock);
 	uk_list_add(&v->vma_list, &vma->vma_list);
+	uk_rwlock_wunlock(&vma->vas->vma_list_lock);
 
 	*new_vma = v;
 	return 0;
@@ -507,6 +529,7 @@ int uk_vma_unmap(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 
 	rc = vmem_vma_split_vmas(vas, vaddr, len, __NULL,
 				 &vma_start, &vma_end, strict);
+
 	if (unlikely(rc)) {
 		if (rc == -ENOENT && !strict)
 			return 0;
@@ -515,8 +538,10 @@ int uk_vma_unmap(struct uk_vas *vas, __vaddr_t vaddr, __sz len,
 	}
 
 	/* Unlink all VMAs starting from vma_start to vma_end */
+	uk_rwlock_wlock(&vas->vma_list_lock);
 	vma_start->vma_list.prev->next = vma_end->vma_list.next;
 	vma_end->vma_list.next->prev   = vma_start->vma_list.prev;
+	uk_rwlock_wunlock(&vas->vma_list_lock);
 
 	vmem_vma_unmap_and_free_vmas(vma_start, vma_end);
 
@@ -535,20 +560,28 @@ static __vaddr_t vmem_first_fit(struct uk_vas *vas, __vaddr_t base, __sz align,
 	 * to be careful not to overflow. Checks are thus always active and not
 	 * just asserts.
 	 */
+	uk_rwlock_rlock(&vas->vma_list_lock);
 	uk_list_for_each_entry(cur, &vas->vma_list, vma_list) {
-		if (unlikely(vaddr > __VADDR_MAX - align))
+		if (unlikely(vaddr > __VADDR_MAX - align)) {
+			uk_rwlock_runlock(&vas->vma_list_lock);
 			return __VADDR_INV;
+		}
 
 		vaddr = ALIGN_UP(vaddr, align);
 
-		if (unlikely(vaddr > __VADDR_MAX - len))
+		if (unlikely(vaddr > __VADDR_MAX - len)) {
+			uk_rwlock_runlock(&vas->vma_list_lock);
 			return __VADDR_INV;
+		}
 
-		if (vaddr + len <= cur->start)
+		if (vaddr + len <= cur->start) {
+			uk_rwlock_runlock(&vas->vma_list_lock);
 			return vaddr;
+		}
 
 		vaddr = MAX(cur->end, base);
 	}
+	uk_rwlock_runlock(&vas->vma_list_lock);
 
 	if (unlikely(vaddr > __VADDR_MAX - align))
 		return __VADDR_INV;
@@ -625,6 +658,7 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 		return -EINVAL;
 
 	va = *vaddr;
+	uk_spin_lock(&vas->map_lock);
 	if (va == __VADDR_ANY) {
 		/* Select the first virtual address range starting at the
 		 * mapping base that can accommodate the requested VMA.
@@ -633,11 +667,15 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 					 vas->vma_base;
 
 		va = vmem_first_fit(vas, base, PAGE_Lx_SIZE(algn_lvl), len);
-		if (unlikely(va == __VADDR_INV))
+		if (unlikely(va == __VADDR_INV)) {
+			uk_spin_unlock(&vas->map_lock);
 			return -ENOMEM;
+		}
 	} else {
-		if (unlikely(!PAGE_Lx_ALIGNED(va, algn_lvl)))
+		if (unlikely(!PAGE_Lx_ALIGNED(va, algn_lvl))) {
+			uk_spin_unlock(&vas->map_lock);
 			return -EINVAL;
+		}
 
 		/* The caller specified an exact address to map to. We only
 		 * allow this if the mapping does not collide with other
@@ -645,14 +683,18 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 		 * flag is provided by unmapping everything in the range first.
 		 */
 		if ((vma_start = vmem_vma_find(vas, va, len))) {
-			if (unlikely(!(flags & UK_VMA_MAP_REPLACE)))
+			if (unlikely(!(flags & UK_VMA_MAP_REPLACE))) {
+				uk_spin_unlock(&vas->map_lock);
 				return -EEXIST;
+			}
 
 			strict = (flags & UK_VMA_FLAG_STRICT_VMA_CHECK);
 			rc = vmem_vma_split_vmas(vas, va, len, __NULL,
 						 &vma_start, &vma_end, strict);
-			if (unlikely(rc))
+			if (unlikely(rc)) {
+				uk_spin_unlock(&vas->map_lock);
 				return rc;
+			}
 
 			/* It could be that during the split operation we
 			 * recognized that len must be aligned to a larger
@@ -673,12 +715,16 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 		UK_ASSERT(ops->split);
 
 		rc = ops->new(vas, va, len, args, attr, &flags, &vma);
-		if (unlikely(rc))
+		if (unlikely(rc)) {
+			uk_spin_unlock(&vas->map_lock);
 			return rc;
+		}
 	} else {
 		vma = uk_malloc(vas->a, sizeof(struct uk_vma));
-		if (unlikely(!vma))
+		if (unlikely(!vma)) {
+			uk_spin_unlock(&vas->map_lock);
 			return -ENOMEM;
+		}
 
 		vma->name = __NULL;
 	}
@@ -693,8 +739,11 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 		UK_ASSERT(vma_end);
 
 		/* Unlink all VMAs starting from vma_start to vma_end */
+
+		uk_rwlock_wlock(&vas->vma_list_lock);
 		vma_start->vma_list.prev->next = vma_end->vma_list.next;
 		vma_end->vma_list.next->prev   = vma_start->vma_list.prev;
+		uk_rwlock_wunlock(&vas->vma_list_lock);
 
 		vmem_vma_unmap_and_free_vmas(vma_start, vma_end);
 	}
@@ -742,13 +791,15 @@ int uk_vma_map(struct uk_vas *vas, __vaddr_t *vaddr, __sz len,
 			 * will be empty!
 			 */
 			vmem_vma_destroy(vma);
-
+			uk_spin_unlock(&vas->map_lock);
 			return rc;
 		}
 	}
 
 	vmem_vma_insert(vas, vma);
 	vmem_vma_try_merge(vma);
+
+	uk_spin_unlock(&vas->map_lock);
 
 	*vaddr = va;
 	return 0;
