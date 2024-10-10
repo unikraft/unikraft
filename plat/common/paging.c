@@ -131,11 +131,13 @@ static int pg_pt_clone(struct uk_pagetable *pt_dst, struct uk_pagetable *pt_src,
 	UK_ASSERT(pt_src->pt_vbase != __VADDR_INV);
 	UK_ASSERT(pt_src->pt_pbase != __PADDR_INV);
 
-	if (pt_dst != pt_src)
-		memset(pt_dst, 0, sizeof(struct uk_pagetable));
+	if (!(flags & PAGE_FLAG_CLONE_INITIALIZED)) {
+		/* Use the same frame allocator for the new page table */
+		if (pt_dst != pt_src)
+			memset(pt_dst, 0, sizeof(struct uk_pagetable));
 
-	/* Use the same frame allocator for the new page table */
-	pt_dst->fa = pt_src->fa;
+		pt_dst->fa = pt_src->fa;
+	}
 
 	pt_vaddr_scache[lvl] = pt_svaddr = pt_src->pt_vbase;
 
@@ -246,6 +248,20 @@ EXIT_FREE:
 	pg_pt_free(pt_dst, pt_vaddr_dcache[PT_LEVELS - 1], PT_LEVELS - 1);
 
 	return rc;
+}
+
+int ukplat_pt_init_clone(struct uk_pagetable *pt_dst, struct uk_pagetable *pt_src,
+			 __paddr_t start, __sz len)
+{
+	int rc;
+
+	memset(pt_dst, 0, sizeof(struct uk_pagetable));
+
+	rc = pgarch_pt_init(pt_dst, start, len);
+	if (unlikely(rc))
+		return rc;
+
+	return pg_pt_clone(pt_dst, pt_src, PAGE_FLAG_CLONE_INITIALIZED);
 }
 
 int ukplat_pt_init(struct uk_pagetable *pt, __paddr_t start, __sz len)
