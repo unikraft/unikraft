@@ -1,8 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Jia He <justin.he@arm.com>
+ * Authors: Marco Schlumpp <marco@unikraft.io>
  *
- * Copyright (c) 2020, Arm Ltd. All rights reserved.
+ * Copyright (c) 2022, Unikraft GmbH. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,68 +30,49 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __UK_BUS_PCI_ECAM_H__
-#define __UK_BUS_PCI_ECAM_H__
+#ifndef __UKPLAT_COMMON_PCI_MSIX_H__
+#define __UKPLAT_COMMON_PCI_MSIX_H__
 
-#include <uk/arch/types.h>
-#include <uk/list.h>
+#include <stddef.h>
+#include <stdint.h>
+
 #include <uk/bus/pci.h>
-#include <uk/bus/platform.h>
-#include <libfdt.h>
 
-struct fdt_phandle_args;
-extern struct pci_config_window pcw;
-extern int gen_pci_irq_parse(const fdt32_t *addr, struct fdt_phandle_args *out_irq);
+#define PCI_CONF_MSIX_MTAB 0x4
 
-/*
- * struct to hold bus shift of the config window
- * for a PCI controller.
- */
-struct pci_ecam_ops {
-	unsigned int			bus_shift;
+/* MXC register */
+#define PCI_CONF_MSIX_TBL_SIZE 		0x0
+#define PCI_CONF_MSIX_TBL_SIZE_SHFT 	16
+#define PCI_CONF_MSIX_TBL_SIZE_MASK 	(0x7FFU)
+
+#define PCI_CONF_MSIX_ENABLE 		0x0
+#define PCI_CONF_MSIX_ENABLE_SHFT 	31
+#define PCI_CONF_MSIX_ENABLE_MASK 	(0x1U)
+
+/* MTAB register */
+#define PCI_CONF_MSIX_TABLE_BAR		0x4
+#define PCI_CONF_MSIX_TABLE_BAR_SHFT	0
+#define PCI_CONF_MSIX_TABLE_BAR_MASK	(0x7U)
+
+#define PCI_CONF_MSIX_TABLE_OFFSET	0x4
+#define PCI_CONF_MSIX_TABLE_OFFSET_SHFT	0
+#define PCI_CONF_MSIX_TABLE_OFFSET_MASK	(0xFFFFFFF8U)
+
+struct pci_msix_table_entry {
+	uint32_t addr_low;
+	uint32_t addr_high;
+	uint32_t msg_data;
+	uint32_t vector_control;
 };
 
-/*
- * struct to hold the mappings of a config space window. This
- * is expected to be used for PCI controllers that
- * use ECAM.
- */
-struct bus_range {
-	__u8			bus_start;
-	__u8			bus_end;
-};
+size_t pci_msix_table_size(struct pci_device *dev);
+uint8_t pci_msix_table_bar(struct pci_device *dev);
+uint32_t pci_msix_table_offset(struct pci_device *dev);
 
-struct pci_config_window {
-	__paddr_t		config_base;
-	__u64			config_space_size;
-	struct bus_range br;
-	struct pci_ecam_ops		*ops;
-	__paddr_t		pci_device_base;
-	__u64			pci_device_limit;
-};
+int pci_msix_enable(struct pci_device *dev, unsigned int *irqs, uint16_t count);
+int pci_msix_disable(struct pci_device *dev, unsigned int *irqs, uint16_t count);
 
-struct fdt_phandle_args {
-	int np;
-	int args_count;
-	__u32 args[16];
-};
+void ukplat_pci_msix_setup_table_entry(struct pci_msix_table_entry *entry,
+				       unsigned int vector);
 
-/*
- * IO resources have these defined flags.
- *
- * PCI devices expose these flags to userspace in the "resource" sysfs file,
- * so don't move them.
- */
-#define IORESOURCE_BITS		0x000000ff	/* Bus-specific bits */
-
-#define IORESOURCE_TYPE_BITS	0x00001f00	/* Resource type */
-#define IORESOURCE_IO		0x00000100	/* PCI/ISA I/O ports */
-#define IORESOURCE_MEM		0x00000200
-#define IORESOURCE_REG		0x00000300	/* Register offsets */
-#define IORESOURCE_IRQ		0x00000400
-#define IORESOURCE_DMA		0x00000800
-#define IORESOURCE_BUS		0x00001000
-
-extern struct pf_driver gen_pci_driver;
-
-#endif /* __UK_BUS_PCI_ECAM_H__ */
+#endif /* __UKPLAT_COMMON_PCI_MSIX_H__ */
