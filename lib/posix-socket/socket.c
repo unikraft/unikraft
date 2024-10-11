@@ -229,7 +229,13 @@ static void _socket_init(struct socket_alloc *al,
 		.sock_data = sock_data,
 		.driver = d
 	};
-	al->fstate = UK_FILE_STATE_INIT_VALUE(al->fstate);
+#if CONFIG_LIBPOSIX_SOCKET_POLLED
+	if (d->ops->poll)
+		al->fstate = UK_FILE_POLLED_STATE_INIT_VALUE(al->fstate,
+							     d->ops->poll);
+	else
+#endif /* CONFIG_LIBPOSIX_SOCKET_POLLED */
+		al->fstate = UK_FILE_STATE_INIT_VALUE(al->fstate);
 	al->fref = UK_FILE_REFCNT_INIT_VALUE(al->fref);
 	al->f = (struct uk_file){
 		.vol = POSIX_SOCKET_VOLID,
@@ -239,7 +245,7 @@ static void _socket_init(struct socket_alloc *al,
 		.state = &al->fstate,
 		._release = socket_release
 	};
-	posix_socket_poll(&al->f);
+	posix_socket_poll_setup(&al->f);
 }
 
 

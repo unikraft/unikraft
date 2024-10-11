@@ -30,4 +30,10 @@ config LIBPOSIX_SOCKET_EVENTS
 		- ACCEPT: An incoming connection request is accepted
 		- CONNECT: A connection to a remote endpoint is established
 		- CLOSE: A connection or listener is closed
+
+# Hidden; enabled by components when required
+config LIBPOSIX_SOCKET_POLLED
+	bool
+	select LIBUKFILE_POLLED
+
 endif

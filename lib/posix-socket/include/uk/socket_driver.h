@@ -435,15 +435,35 @@ typedef int (*posix_socket_ioctl_func_t)(posix_sock *sock,
 		int request, void *argp);
 
 /**
- * Poll the socket, updating `sock` with the currently set events.
+ * (OPTIONAL) Retrieve the events in `mask` on socket `sock`.
+ *
+ * Enabled with LIBPOSIX_SOCKET_POLLED.
+ *
+ * Drivers need not provide this callback.
+ * If the driver does not provide the poll callback, it is responsible for
+ * notifying the rising and falling edges of events in line with I/O operations
+ * using the `posix_socket_event_*` functions.
+ * If the driver provides the poll callback it must only notify rising edges
+ * of events using `posix_socket_event_set`.
+ *
+ * @param sock Reference to the socket
+ * @param mask Bitmask of events to be retrieved
+ *
+ * @return Bitwise AND of events on `sock` and those in `mask`
+ */
+typedef unsigned int (*posix_socket_poll_func_t)(posix_sock *sock,
+						 unsigned int mask);
+
+/**
  * This is guaranteed to be called exactly once on initialization,
  * allowing the driver to set up any data structures required by callbacks.
- * The driver from that point responsible for updating the events on every
- * operation using the `posix_socket_event_*` functions.
+ * If the driver does not provide the poll callback, it must update the socket
+ * state with the current events.
+ * After this function returns, the driver is responsible for notifying events.
  *
  * @param sock Reference to the socket
  */
-typedef void (*posix_socket_poll_func_t)(posix_sock *sock);
+typedef void (*posix_socket_poll_setup_func_t)(posix_sock *sock);
 
 /**
  * A structure containing the functions exported by a Unikraft socket driver
@@ -473,7 +493,10 @@ struct posix_socket_ops {
 	posix_socket_read_func_t	read;
 	posix_socket_close_func_t	close;
 	posix_socket_ioctl_func_t	ioctl;
+#if CONFIG_LIBPOSIX_SOCKET_POLLED
 	posix_socket_poll_func_t	poll;
+#endif /* CONFIG_LIBPOSIX_SOCKET_POLLED */
+	posix_socket_poll_setup_func_t	poll_setup;
 };
 
 static inline void *
@@ -676,13 +699,26 @@ posix_socket_ioctl(posix_sock *sock, int request, void *argp)
 	return d->ops->ioctl(sock, request, argp);
 }
 
-static inline void
-posix_socket_poll(posix_sock *sock)
+#if CONFIG_LIBPOSIX_SOCKET_POLLED
+static inline unsigned int
+posix_socket_poll(posix_sock *sock, unsigned int mask)
 {
 	struct posix_socket_driver *d = posix_sock_get_driver(sock);
 
-	UK_ASSERT(d->ops->poll);
-	d->ops->poll(sock);
+	if (d->ops->poll)
+		return d->ops->poll(sock, mask);
+	else
+		return 0;
+}
+#endif /* CONFIG_LIBPOSIX_SOCKET_POLLED */
+
+static inline void
+posix_socket_poll_setup(posix_sock *sock)
+{
+	struct posix_socket_driver *d = posix_sock_get_driver(sock);
+
+	UK_ASSERT(d->ops->poll_setup);
+	d->ops->poll_setup(sock);
 }
 
 /**

@@ -249,7 +249,8 @@ static void epoll_register(const struct uk_file *epf, struct epoll_entry *ent,
 	UK_ASSERT(!ent->legacy);
 #endif /* CONFIG_LIBVFSCORE */
 
-	ev = uk_pollq_poll_register(&ent->f->state->pollq, &ent->tick, 1);
+	ev = uk_pollq_poll_register(&ent->f->state->pollq, &ent->tick, 1,
+				    ent->f);
 	if (register_finalizer)
 		uk_file_finalizer_register(ent->f, &ent->fin);
 	if (ev) {
