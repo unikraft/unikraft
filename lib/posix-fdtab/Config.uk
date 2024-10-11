@@ -2,6 +2,7 @@ menuconfig LIBPOSIX_FDTAB
 	bool "posix-fdtab: File descriptor table"
 	select LIBUKATOMIC
 	select LIBUKFILE
+	select LIBUKSCHED
 
 if LIBPOSIX_FDTAB
 	config LIBPOSIX_FDTAB_MAXFDS
