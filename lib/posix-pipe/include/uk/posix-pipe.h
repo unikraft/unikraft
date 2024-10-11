@@ -10,14 +10,13 @@
 #define __UKPOSIX_PIPE_H__
 
 #include <uk/file.h>
-#include <uk/posix-fdtab.h>
 
 /* File creation */
-
 int uk_pipefile_create(struct uk_file *pipes[2]);
 
 /* Internal syscalls */
-
+#if CONFIG_LIBPOSIX_FDTAB
 int uk_sys_pipe(int pipefd[2], int flags);
+#endif /* CONFIG_LIBPOSIX_FDTAB */
 
 #endif /* __UKPOSIX_PIPE_H__ */

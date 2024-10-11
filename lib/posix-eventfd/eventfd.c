@@ -11,8 +11,11 @@
 #include <uk/file/nops.h>
 #include <uk/posix-eventfd.h>
 #include <uk/posix-fd.h>
+
+#if CONFIG_LIBPOSIX_FDTAB
 #include <uk/posix-fdtab.h>
 #include <uk/syscall.h>
+#endif /* CONFIG_LIBPOSIX_FDTAB */
 
 
 static const char EVENTFD_VOLID[] = "eventfd_vol";
@@ -153,6 +156,7 @@ struct uk_file *uk_eventfile_create(unsigned int count, int flags)
 	return &al->f;
 }
 
+#if CONFIG_LIBPOSIX_FDTAB
 int uk_sys_eventfd(unsigned int count, int flags)
 {
 	int ret;
@@ -182,3 +186,4 @@ UK_SYSCALL_R_DEFINE(int, eventfd2, unsigned int, count, int, flags)
 {
 	return uk_sys_eventfd(count, flags);
 }
+#endif /* CONFIG_LIBPOSIX_FDTAB */

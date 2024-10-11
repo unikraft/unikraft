@@ -9,13 +9,16 @@
 
 #include <sys/timerfd.h>
 
+#include <uk/file.h>
+
 /* File creation */
 
 struct uk_file *uk_timerfile_create(clockid_t id);
 
 /* Internal Syscalls */
-
+#if CONFIG_LIBPOSIX_FDTAB
 int uk_sys_timerfd_create(clockid_t id, int flags);
+#endif /* CONFIG_LIBPOSIX_FDTAB */
 
 int uk_sys_timerfd_settime(const struct uk_file *f, int flags,
 			   const struct itimerspec *new_value,
