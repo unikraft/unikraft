@@ -165,6 +165,10 @@ struct virtio_net_device {
 	__u8 state;
 	/* RX promiscuous mode. */
 	__u8 promisc : 1;
+	/* Expected amount of descriptors per buffer */
+#define VIRTIO_NET_BUF_DESCR_COUNT_INLINE		1
+#define VIRTIO_NET_BUF_DESCR_COUNT_SEPARATE		2
+	__u8 buf_descr_count: 2;
 };
 
 /**
@@ -178,7 +182,9 @@ static int virtio_netdev_configure(struct uk_netdev *n,
 				   const struct uk_netdev_conf *conf);
 static int virtio_netdev_rxtx_alloc(struct virtio_net_device *vndev,
 				    const struct uk_netdev_conf *conf);
-static int virtio_netdev_feature_negotiate(struct uk_netdev *n);
+static int virtio_netdev_probe(struct uk_netdev *n);
+static int virtio_netdev_feature_negotiate(struct uk_netdev *n,
+					   const struct uk_netdev_conf *conf);
 static struct uk_netdev_tx_queue *virtio_netdev_tx_queue_setup(
 					struct uk_netdev *n, __u16 queue_id,
 					__u16 nb_desc,
@@ -315,16 +321,17 @@ static int virtio_netdev_rx_fillup(struct virtio_net_device *vndev,
 	__u16 filled = 0;
 
 	/**
-	 * Fixed amount of memory is allocated to each received buffer. In
-	 * our case since we don't support jumbo frame or LRO yet we require
-	 * that the buffer feed to the ring descriptor is atleast
-	 * ethernet MTU + virtio net header.
-	 * Because we using 2 descriptor for a single netbuf, our effective
-	 * queue size is just the half.
+	 * The effective queue size depends on how we have to add the buffers
+	 * into the ring. For example modern virtio devices only need a single
+	 * descriptor for the virtio header + payload. However, depending on the
+	 * physical layout of the buffer, we can end up using more descriptors.
+	 * In this case we batch allocate too many buffers and have to free the
+	 * superfluous ones.
 	 */
-	nb_desc = ALIGN_DOWN(nb_desc, 2);
+	UK_ASSERT(POWER_OF_2(vndev->buf_descr_count));
+	nb_desc = ALIGN_DOWN(nb_desc, vndev->buf_descr_count);
 	while (filled < nb_desc) {
-		req = MIN(nb_desc / 2, RX_FILLUP_BATCHLEN);
+		req = MIN(nb_desc / vndev->buf_descr_count, RX_FILLUP_BATCHLEN);
 		cnt = rxq->alloc_rxpkts(rxq->alloc_rxpkts_argp, netbuf, req);
 		for (i = 0; i < cnt; i++) {
 			uk_pr_debug("Enqueue netbuf %"PRIu16"/%"PRIu16" (%p) to virtqueue %p...\n",
@@ -343,7 +350,13 @@ static int virtio_netdev_rx_fillup(struct virtio_net_device *vndev,
 				status |= UK_NETDEV_STATUS_UNDERRUN;
 				goto out;
 			}
-			filled += 2;
+			/* This count is not necessarily correct in the
+			 * presence of paging, but should be close enough as an
+			 * approximation.
+			 * TODO: Use indirect descriptors to ensure we are
+			 *       always below the specified count.
+			 */
+			filled += vndev->buf_descr_count;
 		}
 
 		if (unlikely(cnt < req)) {
@@ -356,7 +369,7 @@ static int virtio_netdev_rx_fillup(struct virtio_net_device *vndev,
 
 out:
 	uk_pr_debug("Programmed %"PRIu16" receive netbufs to receive virtqueue %p (status %x)\n",
-		    filled / 2, rxq, status);
+		    filled / vndev->buf_descr_count, rxq, status);
 
 	/**
 	 * Notify the host, when we submit new descriptor(s).
@@ -523,30 +536,41 @@ static int virtio_netdev_rxq_enqueue(struct virtio_net_device *vndev,
 		return -ENOSPC;
 	}
 
-	/**
-	 * Saving the buffer information before reserving the header space.
-	 */
-	buf_start = netbuf->data;
-	buf_len = netbuf->len;
-
-	/**
-	 * Retrieve the buffer header length.
-	 */
-	rc = uk_netbuf_header(netbuf, VTNET_HDR_SIZE_PADDED(vndev));
-	if (unlikely(rc != 1)) {
-		uk_pr_err("Failed to allocate space to prepend virtio header\n");
-		return -EINVAL;
-	}
-	rxhdr = netbuf->data;
-
+	/* Reset the scatter gather list */
 	sg = &rxq->sg;
 	uk_sglist_reset(sg);
 
-	/* Appending the header buffer to the sglist */
-	uk_sglist_append(sg, rxhdr, virtio_net_hdr_size(vndev));
+	if (vndev->buf_descr_count == VIRTIO_NET_BUF_DESCR_COUNT_INLINE) {
+		rc = uk_netbuf_header(netbuf, virtio_net_hdr_size(vndev));
+		if (unlikely(rc != 1)) {
+			uk_pr_err("Failed to allocate space to prepend virtio header\n");
+			return -EINVAL;
+		}
+		uk_sglist_append(sg, netbuf->data, netbuf->len);
+	} else {
+		/**
+		 * Saving the buffer information before reserving the header
+		 * space.
+		 */
+		buf_start = netbuf->data;
+		buf_len = netbuf->len;
 
-	/* Appending the data buffer to the sglist */
-	uk_sglist_append(sg, buf_start, buf_len);
+		/**
+		 * Retrieve the buffer header length.
+		 */
+		rc = uk_netbuf_header(netbuf, VTNET_HDR_SIZE_PADDED(vndev));
+		if (unlikely(rc != 1)) {
+			uk_pr_err("Failed to allocate space to prepend virtio header\n");
+			return -EINVAL;
+		}
+		rxhdr = netbuf->data;
+
+		/* Appending the header buffer to the sglist */
+		uk_sglist_append(sg, rxhdr, virtio_net_hdr_size(vndev));
+
+		/* Appending the data buffer to the sglist */
+		uk_sglist_append(sg, buf_start, buf_len);
+	}
 
 	rc = virtqueue_buffer_enqueue(rxq->vq, netbuf, sg, 0,
 				      sg->sg_nseg);
@@ -559,8 +583,9 @@ static int virtio_netdev_rxq_dequeue(struct virtio_net_device *vndev,
 {
 	int ret;
 	int rc __maybe_unused = 0;
-	struct uk_netbuf *buf = NULL;
+	struct uk_netbuf *buf = NULL, *chain;
 	struct virtio_net_hdr *vhdr;
+	__u32 num_buffers = 1;
 	__u32 len;
 
 	UK_ASSERT(netbuf);
@@ -571,8 +596,12 @@ static int virtio_netdev_rxq_dequeue(struct virtio_net_device *vndev,
 		*netbuf = NULL;
 		return rxq->nb_desc;
 	}
-	if (unlikely((len < (__u32)virtio_net_hdr_size(vndev) + UK_ETH_HDR_UNTAGGED_LEN) ||
-		     len > VIRTIO_PKT_BUFFER_LEN(vndev))) {
+	if (unlikely(
+		(len < (__u32)virtio_net_hdr_size(vndev) +
+			UK_ETH_HDR_UNTAGGED_LEN) ||
+		(!(vndev->vdev->features & (1ULL << VIRTIO_NET_F_GUEST_TSO4) ||
+		   vndev->vdev->features & (1ULL << VIRTIO_NET_F_GUEST_TSO6))
+		  && (len > VIRTIO_PKT_BUFFER_LEN(vndev))))) {
 		uk_pr_err("Received invalid packet size: %"__PRIu32"\n", len);
 		return -EINVAL;
 	}
@@ -586,21 +615,51 @@ static int virtio_netdev_rxq_dequeue(struct virtio_net_device *vndev,
 	if (vhdr->flags & VIRTIO_NET_HDR_F_NEEDS_CSUM) {
 		buf->flags |= UK_NETBUF_F_PARTIAL_CSUM;
 		buf->csum_offset = vhdr->csum_offset;
+		buf->csum_start = vhdr->csum_start;
 		/* NOTE: csum_start is without virtio header
 		 *       (uk_netbuf_header() will remove it again)
 		 */
-		buf->csum_start  = vhdr->csum_start + VTNET_HDR_SIZE_PADDED(vndev);
+		if (vndev->buf_descr_count == VIRTIO_NET_BUF_DESCR_COUNT_INLINE)
+			buf->csum_start += virtio_net_hdr_size(vndev);
+		else
+			buf->csum_start += VTNET_HDR_SIZE_PADDED(vndev);
 	}
+	if (vndev->vdev->features & (1ULL << VIRTIO_NET_F_MRG_RXBUF))
+		num_buffers = vhdr->num_buffers;
 
 	/**
 	 * Removing the virtio header from the buffer and adjusting length.
-	 * We pad the rx buffer while enqueuing for alignment of the packet
-	 * data. We compensate for this by subtracting the padding to the
-	 * length on dequeue.
 	 */
-	buf->len = len + VTNET_HDR_SIZE_PADDED(vndev);
-	rc = uk_netbuf_header(buf, -((__s16)VTNET_HDR_SIZE_PADDED(vndev)));
+	if (vndev->buf_descr_count == VIRTIO_NET_BUF_DESCR_COUNT_INLINE) {
+		buf->len = len;
+		rc = uk_netbuf_header(buf,
+				      -((__s16)virtio_net_hdr_size(vndev)));
+	} else {
+		/* The length tracked by the virtio driver does include the
+		 * header but *not the padding*, therefore adjust the netbuf
+		 * size and add the padding.
+		 */
+		buf->len = len + (VTNET_HDR_SIZE_PADDED(vndev) -
+			   virtio_net_hdr_size(vndev));
+		/* Shift the position forward to remove the header */
+		rc = uk_netbuf_header(buf,
+				      -((__s16)VTNET_HDR_SIZE_PADDED(vndev)));
+	}
 	UK_ASSERT(rc == 1);
+
+	while (num_buffers > 1) {
+		ret = virtqueue_buffer_dequeue(rxq->vq, (void **)&chain, &len);
+		if (unlikely(ret < 0)) {
+			uk_pr_err("mergeable buffer indicated more buffers\n");
+			*netbuf = NULL;
+			return rxq->nb_desc;
+		}
+		UK_ASSERT(len <= chain->buflen);
+		chain->len = len;
+		uk_netbuf_append(buf, chain);
+		num_buffers--;
+	}
+
 	*netbuf = buf;
 
 	return ret;
@@ -908,12 +967,12 @@ static __u16 virtio_net_mtu_get(struct uk_netdev *n)
 	return d->mtu;
 }
 
-static int virtio_netdev_feature_negotiate(struct uk_netdev *n)
+static int virtio_netdev_probe(struct uk_netdev *n)
 {
-	__u64 host_features = 0;
-	__u64 drv_features  = 0;
-	int rc = 0;
 	struct virtio_net_device *vndev;
+	__u64 drv_features = 0;
+	__u64 host_features;
+	int rc;
 
 	UK_ASSERT(n);
 	vndev = to_virtionetdev(n);
@@ -980,6 +1039,12 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n)
 		VIRTIO_FEATURE_SET(drv_features, VIRTIO_F_VERSION_1);
 
 	/**
+	 * Mergeable receive buffers
+	 */
+	if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_MRG_RXBUF))
+		VIRTIO_FEATURE_SET(drv_features, VIRTIO_NET_F_MRG_RXBUF);
+
+	/**
 	 * TCP Segmentation Offload
 	 * NOTE: This enables sending and receiving of packets marked with
 	 *       VIRTIO_NET_HDR_GSO_TCPV4
@@ -998,10 +1063,71 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n)
 	if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_F_EVENT_IDX))
 		VIRTIO_FEATURE_SET(drv_features, VIRTIO_F_EVENT_IDX);
 
+	/* Store the preliminary result in the features field.
+	 * virtio_netdev_feature_negotiate will take care of sending the result
+	 * to the host depending on how the uknetdev client configured the
+	 * device.
+	 */
+	vndev->vdev->features = drv_features;
+
+	if ((vndev->vdev->features & (1ULL << VIRTIO_F_VERSION_1)) ||
+	    (vndev->vdev->features & (1ULL << VIRTIO_NET_F_MRG_RXBUF))) {
+		/* Do not use a separate (padded) header descriptor for modern
+		 * devices or when we can use mergeable buffers
+		 */
+		vndev->buf_descr_count = 1;
+	} else {
+		vndev->buf_descr_count = 2;
+	}
+
+	return 0;
+err_negotiate_feature:
+	virtio_dev_status_update(vndev->vdev, VIRTIO_CONFIG_STATUS_FAIL);
+	return rc;
+}
+
+static int virtio_netdev_feature_negotiate(struct uk_netdev *n,
+					   const struct uk_netdev_conf *conf)
+{
+	struct virtio_net_device *vndev;
+	__u64 host_features;
+	int rc;
+
+	UK_ASSERT(n);
+	UK_ASSERT(conf);
+	vndev = to_virtionetdev(n);
+
+	host_features = virtio_feature_get(vndev->vdev);
+
+	/**
+	 * Large Receive Offload
+	 * NOTE: This allows the host to send packets larger than MTU. The
+	 *       network stack needs to be able to handle such packets.
+	 *       We only enable this if we have also support for mergeable RX
+	 *       buffers, otherwise we would have to either allocate huge
+	 *       buffers (wasting space for smaller buffers) or use many small
+	 *       descriptors (needing indirect descriptors and putting a large
+	 *       burden on the allocator).
+	 */
+	if (conf->lro) {
+		if (unlikely(!VIRTIO_FEATURE_HAS(vndev->vdev->features,
+						 VIRTIO_NET_F_GUEST_CSUM) ||
+			     !VIRTIO_FEATURE_HAS(vndev->vdev->features,
+						 VIRTIO_NET_F_MRG_RXBUF))) {
+			rc = -EINVAL;
+			goto err_negotiate_feature;
+		}
+		if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_GUEST_TSO4))
+			VIRTIO_FEATURE_SET(vndev->vdev->features,
+					   VIRTIO_NET_F_GUEST_TSO4);
+		if (VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_GUEST_TSO6))
+			VIRTIO_FEATURE_SET(vndev->vdev->features,
+					   VIRTIO_NET_F_GUEST_TSO6);
+	}
+
 	/**
 	 * Announce our enabled driver features back to the backend device
 	 */
-	vndev->vdev->features = drv_features;
 	virtio_feature_set(vndev->vdev);
 
 	/**
@@ -1013,11 +1139,11 @@ static int virtio_netdev_feature_negotiate(struct uk_netdev *n)
 	 * Currently, unaligned read is supported in the underlying function.
 	 */
 	virtio_config_get(vndev->vdev,
-				   __offsetof(struct virtio_net_config, mac),
-				   &vndev->hw_addr.addr_bytes[0],
-				   UK_NETDEV_HWADDR_LEN, 1);
+			  __offsetof(struct virtio_net_config, mac),
+			  &vndev->hw_addr.addr_bytes[0],
+			  UK_NETDEV_HWADDR_LEN, 1);
 
-	if (VIRTIO_FEATURE_HAS(drv_features, VIRTIO_NET_F_MTU)) {
+	if (VIRTIO_FEATURE_HAS(vndev->vdev->features, VIRTIO_NET_F_MTU)) {
 		virtio_config_get(vndev->vdev,
 				  __offsetof(struct virtio_net_config, mac),
 				  &vndev->mtu, sizeof(vndev->mtu), 1);
@@ -1136,8 +1262,14 @@ static int virtio_netdev_configure(struct uk_netdev *n,
 	UK_ASSERT(conf);
 	vndev = to_virtionetdev(n);
 
+	rc = virtio_netdev_feature_negotiate(n, conf);
+	if (unlikely(rc < 0)) {
+		uk_pr_err("%p: Failed to negotiate features: %d\n", n, rc);
+		return rc;
+	}
+
 	rc = virtio_netdev_rxtx_alloc(vndev, conf);
-	if (rc < 0) {
+	if (unlikely(rc < 0)) {
 		uk_pr_err("%p: Failed to initialize rx and tx rings: %d\n",
 			  n, rc);
 	}
@@ -1190,25 +1322,33 @@ static void virtio_net_info_get(struct uk_netdev *dev,
 				struct uk_netdev_info *dev_info)
 {
 	struct virtio_net_device *vndev;
+	__u64 host_features;
 
 	UK_ASSERT(dev && dev_info);
 	vndev = to_virtionetdev(dev);
+
+	host_features = virtio_feature_get(vndev->vdev);
 
 	dev_info->max_rx_queues = vndev->max_vqueue_pairs;
 	dev_info->max_tx_queues = vndev->max_vqueue_pairs;
 	dev_info->max_mtu = vndev->max_mtu;
 	dev_info->nb_encap_tx = VTNET_HDR_SIZE_PADDED(vndev);
-	dev_info->nb_encap_rx = VTNET_HDR_SIZE_PADDED(vndev);
+	if (vndev->buf_descr_count == VIRTIO_NET_BUF_DESCR_COUNT_INLINE)
+		dev_info->nb_encap_rx = virtio_net_hdr_size(vndev);
+	else
+		dev_info->nb_encap_rx = VTNET_HDR_SIZE_PADDED(vndev);
 	dev_info->ioalign = VIRTIO_PKT_BUFFER_ALIGN;
 
 	dev_info->features = UK_NETDEV_F_RXQ_INTR
-		| (VIRTIO_FEATURE_HAS(vndev->vdev->features, VIRTIO_NET_F_CSUM)
+		| (VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_CSUM)
 		   ? UK_NETDEV_F_PARTIAL_CSUM : 0)
-		| ((VIRTIO_FEATURE_HAS(vndev->vdev->features,
-				       VIRTIO_NET_F_HOST_TSO4)
-		    || VIRTIO_FEATURE_HAS(vndev->vdev->features,
-					  VIRTIO_NET_F_GSO))
-		   ? UK_NETDEV_F_TSO4 : 0);
+		| ((VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_HOST_TSO4)
+		    || VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_GSO))
+		   ? UK_NETDEV_F_TSO4 : 0)
+		| ((VIRTIO_FEATURE_HAS(host_features, VIRTIO_NET_F_GUEST_TSO4)
+		    || VIRTIO_FEATURE_HAS(host_features,
+					  VIRTIO_NET_F_GUEST_TSO6)
+		   ? UK_NETDEV_F_LRO : 0));
 }
 
 static int virtio_net_start(struct uk_netdev *n)
@@ -1247,7 +1387,7 @@ static int virtio_net_start(struct uk_netdev *n)
 }
 
 static const struct uk_netdev_ops virtio_netdev_ops = {
-	.probe = virtio_netdev_feature_negotiate,
+	.probe = virtio_netdev_probe,
 	.configure = virtio_netdev_configure,
 	.rxq_configure = virtio_netdev_rx_queue_setup,
 	.txq_configure = virtio_netdev_tx_queue_setup,
