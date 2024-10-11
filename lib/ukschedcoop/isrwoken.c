@@ -11,10 +11,9 @@ void schedcoop_thread_woken_isr(struct uk_sched *s, struct uk_thread *t)
 
 	UK_ASSERT(ukplat_lcpu_irqs_disabled());
 
-	if (t->wakeup_time > 0)
-		UK_TAILQ_REMOVE(&c->sleep_queue, t, queue);
 	if (uk_thread_is_queueable(t) && uk_thread_is_runnable(t)) {
 		UK_TAILQ_INSERT_TAIL(&c->run_queue, t, queue);
 		uk_thread_clear_queueable(t);
+		UK_WRITE_ONCE(c->have_pending_events, 1);
 	}
 }

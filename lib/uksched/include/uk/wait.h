@@ -113,7 +113,10 @@ do { \
 				break; \
 			} \
 			uk_waitq_add(wq, &__wait); \
-			__current->wakeup_time = deadline; \
+			if (deadline) { \
+				__current->sleep_timer.expiry = deadline; \
+				uktimer_hr_add(&__current->sleep_timer); \
+			} \
 			uk_thread_set_blocked(__current); \
 			uk_sched_thread_blocked(__current); \
 			ukplat_spin_unlock_irqrestore(&((wq)->sl), flags); \
@@ -148,7 +151,10 @@ do { \
 	__current = uk_thread_current(); \
 	ukplat_spin_lock_irqsave(&((wq)->sl), flags); \
 	uk_waitq_add(wq, &__wait); \
-	__current->wakeup_time = deadline; \
+	if (deadline) { \
+		__current->sleep_timer.expiry = deadline; \
+		uktimer_hr_add(&__current->sleep_timer); \
+	} \
 	uk_thread_set_blocked(__current); \
 	uk_sched_thread_blocked(__current); \
 	ukplat_spin_unlock_irqrestore(&((wq)->sl), flags); \

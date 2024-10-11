@@ -3,3 +3,4 @@ config LIBUKSCHEDCOOP
 	default y
 	select LIBNOLIBC if !HAVE_LIBC
 	select LIBUKSCHED
+	select LIBUKTIMER

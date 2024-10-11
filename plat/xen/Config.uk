@@ -12,6 +12,7 @@ menuconfig PLAT_XEN
        imply LIBFDT if (ARCH_ARM_32 || ARCH_ARM_64)
        select XEN_DBGEMERGENCY if ARCH_ARM_32
        select LIBUKRELOC if OPTIMIZE_PIE
+       select LIBUKCLOCKEVENT
        imply LIBUKOFW if ARCH_ARM_64
        select HAVE_INTCTLR
        select HAVE_RANDOM
