@@ -688,6 +688,8 @@ UK_TESTCASE(ukvmem, test_vma_stack)
 #include <stdlib.h>
 #include <unistd.h>
 
+#include <vfscore/vma.h>
+
 /**
  * Tests file mappings
  */

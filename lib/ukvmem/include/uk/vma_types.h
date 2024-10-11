@@ -181,13 +181,6 @@ static inline int uk_vma_map_stack(struct uk_vas *vas, __vaddr_t *vaddr,
  */
 extern const struct uk_vma_ops uk_vma_dma_ops;
 
-struct uk_vma_dma {
-	struct uk_vma base;
-
-	/** Physical base address of the mapped physical region */
-	__paddr_t paddr;
-};
-
 struct uk_vma_dma_args {
 	__paddr_t paddr;
 };
@@ -217,71 +210,8 @@ static inline int uk_vma_map_dma(struct uk_vas *vas, __vaddr_t *vaddr,
 			  &uk_vma_dma_ops, &args);
 }
 
-#ifdef CONFIG_LIBVFSCORE
-#include <vfscore/file.h>
-
-/**
- * File Mapping VMA ------------------------------------------------------------
- *
- * A file mapping can be used to map the contents of a file into memory. File
- * mappings use the file name as VMA name. The file will be kept open for the
- * lifetime of the mapping.
- *
- * Note that the current file mapping implementation only allows private
- * mappings and will return -ENOTSUP for shared mappings. Accordingly,
- * modifications are not synched back to the file. Similarly, changes to the
- * file via regular read() and write() operations are not visible in the
- * mapping. Instead, the whole file contents is loaded into memory when the
- * mapping is established.
- */
-extern const struct uk_vma_ops uk_vma_file_ops;
-
-/* File mapping flags */
-#define UK_VMA_FILE_SHARED		(0x1UL << UK_VMA_MAP_EXTF_SHIFT)
-
-struct uk_vma_file {
-	struct uk_vma base;
-
-	/** File mapped in this VMA */
-	struct vfscore_file *f;
-
-	/** Start offset describing what position in the file is mapped */
-	__off offset;
-};
-
-struct uk_vma_file_args {
-	int fd;
-	__off offset;
-};
-
-/**
- * Creates a new file mapping. See uk_vma_map() for a description of the
- * parameters not listed here.
- *
- * @param fd
- *   File descriptor of the file to map into memory. The file descriptor must
- *   have been opened with sufficient permissions to allow for all operations
- *   permitted by the VMA's attributes.
- * @param offset
- *   Offset within the file to map in the VMA. Must be aligned to the page size.
- */
-static inline int uk_vma_map_file(struct uk_vas *vas, __vaddr_t *vaddr,
-				  __sz len, unsigned long attr,
-				  unsigned long flags, int fd, __off offset)
-{
-	struct uk_vma_file_args args = {
-		.fd = fd,
-		.offset = offset,
-	};
-
-	UK_ASSERT(fd >= 0);
-	UK_ASSERT(offset >= 0);
-	UK_ASSERT(PAGE_ALIGNED(offset));
-
-	return uk_vma_map(vas, vaddr, len, attr, flags, __NULL,
-			  &uk_vma_file_ops, &args);
-}
-#endif /* CONFIG_LIBVFSCORE */
+/* Common flags for any file-like VMA implementations */
+#define UK_VMA_FILE_SHARED	(1ULL << UK_VMA_MAP_EXTF_SHIFT)
 
 #ifdef __cplusplus
 }

@@ -9,11 +9,10 @@
 #include <errno.h>
 #include <stdbool.h>
 
-#include "vmem.h"
-
 #include <uk/config.h>
 #include <uk/essentials.h>
 #include <uk/assert.h>
+#include <uk/vma_ops.h>
 #include <uk/arch/limits.h>
 #include <uk/arch/paging.h>
 #ifdef CONFIG_HAVE_PAGING
@@ -108,9 +107,9 @@ const struct uk_vma_ops uk_vma_stack_ops = {
 	.new		= __NULL,
 	.destroy	= __NULL,
 	.fault		= vma_op_stack_fault,
-	.unmap		= vma_op_unmap,		/* default */
-	.split		= vma_op_deny,		/* deny */
-	.merge		= vma_op_deny,		/* deny */
-	.set_attr	= vma_op_set_attr,	/* default */
-	.advise		= vma_op_advise,	/* default */
+	.unmap		= uk_vma_op_unmap,	/* default */
+	.split		= uk_vma_op_deny,	/* deny */
+	.merge		= uk_vma_op_deny,	/* deny */
+	.set_attr	= uk_vma_op_set_attr,	/* default */
+	.advise		= uk_vma_op_advise,	/* default */
 };

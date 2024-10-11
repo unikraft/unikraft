@@ -16,6 +16,10 @@
 #include <uk/arch/lcpu.h>
 #include <uk/vmem.h>
 
+#if CONFIG_LIBVFSCORE
+#include <vfscore/vma.h>
+#endif /* CONFIG_LIBVFSCORE */
+
 #ifndef MAP_UNINITIALIZED
 #define MAP_UNINITIALIZED 0x4000000
 #endif /* !MAP_UNINITIALIZED */
