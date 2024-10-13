@@ -15,7 +15,7 @@ usage()
 	echo "  -k                         Path to the Unikraft kernel image"
 	echo "  -c                         Kernel command-line parameters file (optional)"
 	echo "  -i                         Path to initrd cpio file (optional)"
-	echo "  -b                         Bootloader: grub (GRUB), ukefi (Unikraft EFI stub)"
+	echo "  -b                         Bootloader: grubmb (GRUB with Multiboot), grubmb2 (GRUB with Multiboot2), ukefi (Unikraft EFI stub)"
 	echo "  -a                         Architecture: X64 (x86_64), AA64 (Aarch64)"
 	echo "  -d                         Path to Devicetree Blob (optional, for ukefi only!)"
 	echo "  -o                         Path to output file"
@@ -38,7 +38,7 @@ sighandler_exit()
 	fi
 }
 
-mkgrubiso()
+mkukmbiso()
 {
 	# configure grub
 	mkdir -p "${BUILDDIR}/boot/grub"
@@ -67,6 +67,41 @@ EOF
 
 	# build grub image
 	GRUB_INSTALL_MSGS=$(grub-mkrescue -o "${OPTOUTPUT}" --install-modules="multiboot" --fonts="" --themes="" --locales="" "${BUILDDIR}/" 2>&1)
+	if [ ${?} != 0 ]; then
+		printf '%s\n' "${GRUB_INSTALL_MSGS}" 1>&2
+		exit 1
+	fi
+}
+
+mkukmb2iso()
+{
+	# configure grub
+	mkdir -p "${BUILDDIR}/boot/grub"
+
+	if [ -n "${OPTINITRD}" ]; then
+		GRUB_CFG_INITRD="module2 /boot/${OPTINITRDNAME}"
+		cp "${OPTINITRD}" "${BUILDDIR}/boot/${OPTINITRDNAME}" || exit 1
+	fi
+	cp "${OPTKERNELIMG}" "${BUILDDIR}/boot/" || exit 1
+
+	MBCMDL=
+	if [ -n "${OPTCMDLINE}" ]; then
+		MBCMDL=$(tr '\n' ' ' < "${OPTCMDLINE}")
+	fi
+
+	cat > "${BUILDDIR}/boot/grub/grub.cfg" << EOF
+set default=0
+set timeout=0
+
+menuentry "${OPTKERNELNAME}" {
+	multiboot2 /boot/${OPTKERNELNAME} /${OPTKERNELNAME} ${MBCMDL}
+	${GRUB_CFG_INITRD}
+	boot
+}
+EOF
+
+	# build grub image
+	GRUB_INSTALL_MSGS=$(grub-mkrescue -o "${OPTOUTPUT}" --install-modules="multiboot2" --fonts="" --themes="" --locales="" "${BUILDDIR}/" 2>&1)
 	if [ ${?} != 0 ]; then
 		printf '%s\n' "${GRUB_INSTALL_MSGS}" 1>&2
 		exit 1
@@ -237,8 +272,11 @@ OPTINITRDNAME="${OPTINITRD##*/}"
 case "${OPTFORMAT}" in
 iso)
 	case "${OPTBOOTLOADER}" in
-	grub)
-		mkgrubiso
+	grubmb)
+		mkukmbiso
+		;;
+	grubmb2)
+		mkukmb2iso
 		;;
 	ukefi)
 		mkukefiiso
