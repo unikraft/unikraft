@@ -21,6 +21,20 @@ lcpu_boot_startup_args:
 	.quad	0
 	.quad	0
 
+.code32
+.section .text.32.boot
+ENTRY(_lxboot_entry32)
+    cli
+    hlt
+END(_lxboot_entry32)
+
+.code16
+.section .text.16.boot
+ENTRY(_lxboot_entry16)
+    cli
+    hlt
+END(_lxboot_entry16)
+
 /**
  * 64-bit Linux Boot Protocol entry function
  *

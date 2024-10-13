@@ -5,13 +5,13 @@ KVM_LDFLAGS-y += -Wl,--entry=_multiboot_entry
 ELF64_TO_32 = y
 else ifeq ($(CONFIG_KVM_BOOT_PROTO_LXBOOT),y)
 KVM_LDFLAGS-y += -Wl,--entry=_lxboot_entry
+LINUX_HDR := y
 else ifeq ($(CONFIG_KVM_BOOT_PROTO_EFI_STUB),y)
 KVM_LDFLAGS-y += -Wl,--entry=uk_efi_entry64
 KVM_LDFLAGS-y += -Wl,-m,elf_x86_64
 endif
 else ifeq (arm64,$(CONFIG_UK_ARCH))
 ifeq ($(CONFIG_KVM_BOOT_PROTO_LXBOOT),y)
-LINUX_HDR_ARM64 := y
 endif
 ifeq ($(CONFIG_KVM_BOOT_PROTO_EFI_STUB),y)
 KVM_LDFLAGS-y += -Wl,--entry=uk_efi_entry64
@@ -84,7 +84,7 @@ endif
 ifeq ($(CONFIG_KVM_BOOT_PROTO_EFI_STUB),y)
 	$(call build_efi,$@)
 endif
-ifeq ($(LINUX_HDR_ARM64),y)
+ifeq ($(LINUX_HDR),y)
 	$(call build_linux,$@,$<)
 endif
 
