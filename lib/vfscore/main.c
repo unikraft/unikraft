@@ -2061,37 +2061,44 @@ UK_SYSCALL_R_DEFINE(int, access, const char*, pathname, int, mode)
 
 UK_SYSCALL_R_DEFINE(int, faccessat, int, dirfd, const char*, pathname, int, mode, int, flags)
 {
-	if (flags & AT_SYMLINK_NOFOLLOW) {
-		UK_CRASH("UNIMPLEMENTED: faccessat() with AT_SYMLINK_NOFOLLOW");
-	}
-
-	if (pathname[0] == '/' || dirfd == AT_FDCWD) {
-		return uk_syscall_r_access((long) pathname, (long) mode);
-	}
-
-	struct vfscore_file *fp;
-	int error = fget(dirfd, &fp);
-	if (error) {
-		goto out_error;
-	}
-
-	struct vnode *vp = fp->f_dentry->d_vnode;
-	vn_lock(vp);
-
 	char p[PATH_MAX];
+	struct vfscore_file *fp;
+	int error;
 
-	/* build absolute path */
-	strlcpy(p, fp->f_dentry->d_mount->m_path, PATH_MAX);
-	strlcat(p, fp->f_dentry->d_path, PATH_MAX);
-	strlcat(p, "/", PATH_MAX);
-	strlcat(p, pathname, PATH_MAX);
+	if (pathname[0] == '/' ||
+	    dirfd == AT_FDCWD) {	/* Full path inside pathname */
+		strlcpy(p, pathname, PATH_MAX);
+	} else { /* Create Relative Path */
+		error = fget(dirfd, &fp);
+		if (error)
+			goto out_error;
 
-	vn_unlock(vp);
-	fdrop(fp);
+		struct vnode *vp = fp->f_dentry->d_vnode;
 
-	error = uk_syscall_r_access((long) p, (long) mode);
+		vn_lock(vp);
 
-	out_error:
+		/* build absolute path */
+		strlcpy(p, fp->f_dentry->d_mount->m_path, PATH_MAX);
+		strlcat(p, fp->f_dentry->d_path, PATH_MAX);
+		strlcat(p, "/", PATH_MAX);
+		strlcat(p, pathname, PATH_MAX);
+
+		vn_unlock(vp);
+		fdrop(fp);
+	}
+
+	if (flags & AT_SYMLINK_NOFOLLOW) {
+		struct stat st;
+
+		error = uk_syscall_r_lstat((long)p, (long)&st);
+		/* Check if the file is an actual symlink */
+		if (error == 0 && S_ISLNK(st.st_mode))
+			UK_CRASH("UNIMPLEMENTED: faccessat() with AT_SYMLINK_NOFOLLOW\n");
+	}
+
+	error = uk_syscall_r_access((long)p, (long)mode);
+
+out_error:
 	return error;
 }
 
