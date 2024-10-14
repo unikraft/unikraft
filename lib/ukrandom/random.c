@@ -27,21 +27,33 @@
  * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  * POSSIBILITY OF SUCH DAMAGE.
  */
+
+#include <errno.h>
 #include <string.h>
-#include <uk/random.h>
+#include <uk/assert.h>
 #include <uk/config.h>
-#include <uk/print.h>
 #include <uk/init.h>
-#include <uk/arch/random.h>
+#include <uk/print.h>
+#include <uk/random.h>
+#include <uk/random/driver.h>
 
-int uk_swrand_init(void);
+#if CONFIG_LIBUKRANDOM_DTB_SEED || CONFIG_LIBUKRANDOM_CMDLINE_SEED
+#include <uk/boot/earlytab.h>
+#include <uk/plat/common/bootinfo.h>
+#include <uk/prio.h>
+#endif /* CONFIG_LIBUKRANDOM_DTB_SEED || CONFIG_LIBUKRANDOM_CMDLINE_SEED */
 
-__u32 uk_swrand_randr(void);
+#include "swrand.h"
 
-void uk_random_fill_buffer(void *buf, size_t buflen)
+struct uk_random_driver *driver;
+
+int __check_result uk_random_fill_buffer(void *buf, size_t buflen)
 {
 	__sz step, chunk_size, i;
 	__u32 rd;
+
+	if (!driver)
+		return -ENODEV;
 
 	step = sizeof(__u32);
 	chunk_size = buflen % step;
@@ -54,19 +66,39 @@ void uk_random_fill_buffer(void *buf, size_t buflen)
 		rd = uk_swrand_randr();
 		memcpy(buf + i, &rd, chunk_size);
 	}
+
+	return 0;
 }
 
-static int uk_random_init(struct uk_init_ctx *ictx __unused)
+int uk_random_init(struct uk_random_driver *drv)
 {
-	int res;
+	UK_ASSERT(drv);
 
-	res = ukarch_random_init();
-	if (unlikely(res)) {
-		uk_pr_err("Could not initialize the HWRNG (%d)\n", res);
-		return res;
-	}
+	if (driver) /* initialized */
+		return 0;
 
-	return uk_swrand_init();
+	driver = drv;
+
+	return uk_swrand_init(&driver);
 }
 
-uk_early_initcall(uk_random_init, 0);
+#if CONFIG_LIBUKRANDOM_DTB_SEED || CONFIG_LIBUKRANDOM_CMDLINE_SEED
+int uk_random_early_init(struct ukplat_bootinfo __maybe_unused *bi)
+{
+#if CONFIG_LIBUKRANDOM_CMDLINE_SEED
+	int rc;
+
+	rc = uk_swrand_cmdline_init(&driver);
+	if (!rc)
+		return rc;
+#endif /* CONFIG_LIBUKRANDOM_CMDLINE_SEED */
+
+#if CONFIG_LIBUKRANDOM_DTB_SEED
+	uk_swrand_fdt_init((void *)bi->dtb, &driver);
+#endif /* CONFIG_LIBUKRANDOM_DTB_SEED */
+
+	return 0;
+}
+
+UK_BOOT_EARLYTAB_ENTRY(uk_random_early_init, UK_PRIO_AFTER(2));
+#endif /* CONFIG_LIBUKRANDOM_DTB_SEED */

@@ -88,12 +88,3 @@ config MARCH_X86_64_BTVER2
 		CPUs based on AMD Family 16h cores with x86-64 instruction set support. This includes MOVBE, F16C, BMI, AVX, PCL_MUL, AES, SSE4.2, SSE4.1, CX16, ABM, SSE4A, SSSE3, SSE3, SSE2, SSE, MMX and 64-bit instruction set extensions.
 endchoice
 
-menu "Processor Features"
-
-config X86_64_HAVE_RANDOM
-	bool "Processor-generated randomness"
-	default y if HAVE_RANDOM
-	help
-	  Enable processor-generated randomness. This uses the RDRAND / RDSEED
-	  instructions provided by Intel's DRNG technology.
-endmenu

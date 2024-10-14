@@ -1,0 +1,11 @@
+menuconfig LIBUKRANDOM_LCPU
+	bool "CPU generated randomness"
+	depends on (ARCH_X86_64 || (ARCH_ARM_64))
+	select HAVE_ARM64_FEAT_RNG if ARCH_ARM_64
+	select LIBUKBOOT
+	help
+		Provides CPU generated randomness. This is normally implemented
+		by dedicated instructions such as RDRAND / RDSEED in x86_64, or
+		RNDR / RNDRRS in arm64. On arm64 this requires a CPU that implements
+		FEAT_RNG, which was introduced in armv8.5-a.
+

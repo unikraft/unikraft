@@ -65,7 +65,7 @@ ARCH_REV := armv8.5-a
 ARCH_OPT := $(ARCH_OPT)+memtag
 endif
 
-ifeq ($(CONFIG_ARM64_FEAT_RNG),y)
+ifeq ($(CONFIG_HAVE_ARM64_FEAT_RNG),y)
 ifeq ($(call have_gcc),y)
 # FEAT_RNG support introduced in GCC-9
 $(call error_if_gcc_version_lt,9,0)
