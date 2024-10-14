@@ -141,6 +141,14 @@ _uk_test_compute_assert_stats(struct uk_testcase *esac,
 		case UK_TEST_ASSERT_FAIL:
 			out->fail++;
 			break;
+		case UK_TEST_ASSERT_OMITTED_FAIL:
+#ifdef CONFIG_LIBUKTEST_STRICT_MODE
+			out->fail++;
+			break;
+#endif
+		case UK_TEST_ASSERT_OMITTED_SUCCESS:
+			out->success++;
+			break;
 		}
 	}
 }
