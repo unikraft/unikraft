@@ -1,6 +1,7 @@
 menuconfig LIBXEN_9PFRONT
 	bool "Xenbus 9pfront Driver"
 	select LIBXEN_XENBUS
+	select XEN_GNTTAB
 	depends on PLAT_XEN
 	depends on LIBUK9P
 	help
