@@ -5,4 +5,12 @@ menuconfig LIBUKFALLOC
 
 if LIBUKFALLOC
 
+config LIBUKFALLOC_STATS
+	bool
+	select LIBUKLIBID
+	select LIBUKLOCK
+	select LIBUKSTORE
+	help
+		Invisible option selected by frame allocator libraries
+
 endif

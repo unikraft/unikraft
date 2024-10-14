@@ -23,7 +23,11 @@ config LIBUKFALLOCBUDDY_DEBUG
 		frame allocator.
 
 config LIBUKFALLOCBUDDY_STATS
-	bool "Collect frame allocation statistics"
-	default n
+	bool "Frame allocator statistics"
+	select LIBUKFALLOC_STATS
+	select LIBUKLOCK
+	help
+		Collect per-allocator and system memory statistics. These are
+		exported by the ukfalloc's store API.
 
 endif
