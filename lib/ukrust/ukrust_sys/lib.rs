@@ -46,7 +46,8 @@ pub mod bindings;
 pub mod c_types;
 
 #[alloc_error_handler]
-pub fn alloc_error(_layout: core::alloc::Layout) -> ! {
+#[no_mangle]
+fn on_oom(_layout: core::alloc::Layout) -> ! {
     panic!("Alloc error");
 }
 
@@ -55,7 +56,8 @@ extern "C" {
 }
 
 #[panic_handler]
-fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
+#[no_mangle]
+pub fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
     unsafe {
         __ukrust_sys_crash();
     }
@@ -63,5 +65,9 @@ fn panic(_info: &core::panic::PanicInfo<'_>) -> ! {
 
 #[lang = "eh_personality"]
 #[no_mangle]
-pub extern fn rust_eh_personality() {
+pub extern fn rust_eh_personality() {}
+
+#[no_mangle]
+unsafe extern "C" fn _Unwind_Resume() {
 }
+
