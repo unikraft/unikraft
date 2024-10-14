@@ -240,7 +240,13 @@ static int arm64_syscall_adapter(void *data)
 	/* Save system context state */
 	ukarch_sysctx_store(&execenv->sysctx);
 
+	/* Enable IRQs */
+	ukplat_lcpu_enable_irq();
+
 	ukplat_syscall_handler((struct uk_syscall_ctx *)execenv);
+
+	/* Disable IRQs */
+	ukplat_lcpu_disable_irq();
 
 	/* Restore system context state */
 	ukarch_sysctx_load(&execenv->sysctx);

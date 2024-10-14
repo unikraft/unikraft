@@ -30,6 +30,7 @@ extern "C" {
  * is different.
  */
 
+#ifdef CONFIG_ARCH_X86_64
 struct stat {
 	dev_t st_dev;
 	ino_t st_ino;
@@ -49,6 +50,28 @@ struct stat {
 	struct timespec st_ctim;
 	long unused[3];
 };
+#else		/* ARM64 */
+struct stat {
+	dev_t st_dev;
+	ino_t st_ino;
+	unsigned int st_nlink;
+
+	mode_t st_mode;
+	uid_t st_uid;
+	gid_t st_gid;
+	dev_t st_rdev;
+	dev_t __pad1;
+	long st_size;
+	int st_blksize;
+	int __pad2;
+	long st_blocks;
+
+	struct timespec st_atim;
+	struct timespec st_mtim;
+	struct timespec st_ctim;
+	int __glibc_reserved[2];
+};
+#endif
 
 #define st_atime st_atim.tv_sec
 #define st_mtime st_mtim.tv_sec
