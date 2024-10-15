@@ -39,13 +39,9 @@
 #include <uk/plat/common/w_xor_x.h>
 #endif /* CONFIG_ENFORCE_W_XOR_X && CONFIG_PAGING */
 
-#ifdef CONFIG_ARM64_FEAT_PAUTH
-#include <arm/arm64/pauth.h>
-#endif /* CONFIG_ARM64_FEAT_PAUTH */
-
-#ifdef CONFIG_HAVE_MEMTAG
-#include <uk/arch/memtag.h>
-#endif /* CONFIG_HAVE_MEMTAG */
+#ifdef CONFIG_LIBUKMEMTAG
+#include <uk/memtag.h>
+#endif /* CONFIG_LIBUKMEMTAG */
 
 smccc_conduit_fn_t smccc_psci_call;
 
@@ -120,7 +116,7 @@ enomethod:
 /* At this point we expect that the C runtime is configured and that
  * bootcode has enabled all CPU features used by compiled code.
  */
-void __no_pauth _ukplat_entry(void)
+void _ukplat_entry(void)
 {
 	struct ukplat_bootinfo *bi;
 	void *bstack;
@@ -149,17 +145,11 @@ void __no_pauth _ukplat_entry(void)
 	enforce_w_xor_x();
 #endif /* CONFIG_ENFORCE_W_XOR_X && CONFIG_PAGING */
 
-#ifdef CONFIG_ARM64_FEAT_PAUTH
-	rc = ukplat_pauth_init();
-	if (unlikely(rc))
-		UK_CRASH("Could not initialize PAuth (%d)\n", rc);
-#endif /* CONFIG_ARM64_FEAT_PAUTH */
-
-#ifdef CONFIG_HAVE_MEMTAG
-	rc = ukarch_memtag_init();
+#ifdef CONFIG_LIBUKMEMTAG
+	rc = uk_memtag_init();
 	if (unlikely(rc))
 		UK_CRASH("Could not initialize MTE (%d)\n", rc);
-#endif /* CONFIG_HAVE_MEMTAG */
+#endif /* CONFIG_LIBUKMEMTAG */
 
 #if defined(CONFIG_UKPLAT_ACPI)
 	rc = acpi_init();

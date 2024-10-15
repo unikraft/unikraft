@@ -43,8 +43,8 @@
 #include <uk/arch/lcpu.h>
 #include <uk/arch/paging.h>
 
-#if CONFIG_HAVE_MEMTAG
-#include <uk/arch/memtag.h>
+#if CONFIG_LIBUKMEMTAG
+#include <uk/memtag.h>
 #endif
 
 #define size_to_num_pages(size) \
@@ -70,11 +70,11 @@ int uk_alloc_register(struct uk_alloc *a)
 	return 0;
 }
 
-#ifdef CONFIG_HAVE_MEMTAG
-#define __align_metadata_ifpages __align(MEMTAG_GRANULE)
+#ifdef CONFIG_LIBUKMEMTAG
+#define __align_metadata_ifpages __align(UK_MEMTAG_GRANULE)
 #else
 #define __align_metadata_ifpages
-#endif /* CONFIG_HAVE_MEMTAG */
+#endif /* CONFIG_LIBUKMEMTAG */
 struct metadata_ifpages {
 	__sz		size;      /* user size */
 	unsigned long	num_pages; /* alloc pages */
@@ -146,9 +146,9 @@ void *uk_malloc_ifpages(struct uk_alloc *a, __sz size)
 	__uptr intptr;
 	unsigned long num_pages;
 	struct metadata_ifpages *metadata;
-#ifdef CONFIG_HAVE_MEMTAG
-	size = MEMTAG_ALIGN(size);
-#endif /* CONFIG_HAVE_MEMTAG */
+#ifdef CONFIG_LIBUKMEMTAG
+	size = UK_MEMTAG_ALIGN(size);
+#endif /* CONFIG_LIBUKMEMTAG */
 	__sz realsize = METADATA_IFPAGES_SIZE_POW2 + size;
 
 	UK_ASSERT(a);
@@ -167,41 +167,40 @@ void *uk_malloc_ifpages(struct uk_alloc *a, __sz size)
 	metadata->num_pages = num_pages;
 	metadata->base = (void *) intptr;
 
-#ifdef CONFIG_HAVE_MEMTAG
-	return ukarch_memtag_region(
-		(void *)(intptr + METADATA_IFPAGES_SIZE_POW2),
-		size
-	);
+#ifdef CONFIG_LIBUKMEMTAG
+	return uk_memtag_tag_region((void *)(intptr +
+					     METADATA_IFPAGES_SIZE_POW2),
+					     size);
 #else
 	return (void *)(intptr + METADATA_IFPAGES_SIZE_POW2);
-#endif /* CONFIG_HAVE_MEMTAG */
+#endif /* CONFIG_LIBUKMEMTAG */
 }
 
 void uk_free_ifpages(struct uk_alloc *a, void *ptr)
 {
 	struct metadata_ifpages *metadata;
-#ifdef CONFIG_HAVE_MEMTAG
+#ifdef CONFIG_LIBUKMEMTAG
 	__sz size;
-#endif /* CONFIG_HAVE_MEMTAG */
+#endif /* CONFIG_LIBUKMEMTAG */
 
 	UK_ASSERT(a);
 	if (!ptr)
 		return;
 
-#ifdef CONFIG_HAVE_MEMTAG
+#ifdef CONFIG_LIBUKMEMTAG
 	metadata = uk_get_metadata((void *)((__u64)ptr & ~MTE_TAG_MASK));
 	size = metadata->size;
 #else
 	metadata = uk_get_metadata(ptr);
-#endif /* CONFIG_HAVE_MEMTAG */
+#endif /* CONFIG_LIBUKMEMTAG */
 
 	UK_ASSERT(metadata->base != __NULL);
 	UK_ASSERT(metadata->num_pages != 0);
 	uk_pfree(a, metadata->base, metadata->num_pages);
 
-#ifdef CONFIG_HAVE_MEMTAG
-	ukarch_memtag_region(ptr, size);
-#endif /* CONFIG_HAVE_MEMTAG */
+#ifdef CONFIG_LIBUKMEMTAG
+	uk_memtag_tag_region(ptr, size);
+#endif /* CONFIG_LIBUKMEMTAG */
 }
 
 void *uk_realloc_ifpages(struct uk_alloc *a, void *ptr, __sz size)
@@ -282,9 +281,9 @@ int uk_posix_memalign_ifpages(struct uk_alloc *a,
 		padding = sizeof(*metadata);
 	}
 
-#ifdef CONFIG_HAVE_MEMTAG
-	size = MEMTAG_ALIGN(size);
-#endif /* CONFIG_HAVE_MEMTAG */
+#ifdef CONFIG_LIBUKMEMTAG
+	size = UK_MEMTAG_ALIGN(size);
+#endif /* CONFIG_LIBUKMEMTAG */
 
 	/* In addition to metadata space, allocate `align` more bytes in
 	 * order to be sure to find an aligned pointer preceding `size` bytes.
@@ -313,9 +312,9 @@ int uk_posix_memalign_ifpages(struct uk_alloc *a,
 	metadata->num_pages = num_pages;
 	metadata->base = (void *) intptr;
 
-#ifdef CONFIG_HAVE_MEMTAG
-	ukarch_memtag_region(*memptr, size);
-#endif /* CONFIG_HAVE_MEMTAG */
+#ifdef CONFIG_LIBUKMEMTAG
+	uk_memtag_tag_region(*memptr, size);
+#endif /* CONFIG_LIBUKMEMTAG */
 	return 0;
 }
 

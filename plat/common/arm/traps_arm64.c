@@ -31,9 +31,9 @@
 #include <uk/intctlr/gic.h>
 #include <uk/plat/syscall.h>
 
-#ifdef CONFIG_ARM64_FEAT_MTE
-#include <arm/arm64/mte.h>
-#endif /* CONFIG_ARM64_FEAT_MTE */
+#ifdef CONFIG_LIBUKMEMTAG
+#include <uk/memtag.h>
+#endif /* CONFIG_LIBUKMEMTAG */
 
 /** GIC driver to call interrupt handler */
 extern struct _gic_dev *gic;
@@ -216,10 +216,10 @@ void trap_el1_irq(struct __regs *regs)
 {
 	UK_ASSERT(gic);
 
-#ifdef CONFIG_ARM64_FEAT_MTE
-	if (unlikely(mte_async_fault()))
+#ifdef CONFIG_LIBUKMEMTAG
+	if (unlikely(uk_memtag_async_fault()))
 		UK_CRASH("EL1 async tag check fault\n");
-#endif /* CONFIG_ARM64_FEAT_MTE */
+#endif /* CONFIG_LIBUKMEMTAG */
 
 	gic->ops.handle_irq(regs);
 }

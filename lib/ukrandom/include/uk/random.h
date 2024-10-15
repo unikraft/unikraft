@@ -38,14 +38,16 @@ extern "C" {
 #endif
 
 #include <uk/arch/types.h>
+#include <uk/compiler.h>
 
 /**
  * Fills a buffer with random bytes.
  *
  * @param buf Pointer to the buffer to be filled.
  * @param buflen Length of the buffer in bytes.
+ * @return zero on success, negative value on error.
  */
-void uk_random_fill_buffer(void *buf, __sz buflen);
+int __check_result uk_random_fill_buffer(void *buf, __sz buflen);
 
 #ifdef __cplusplus
 }

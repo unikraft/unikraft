@@ -26,7 +26,7 @@ CXXINCLUDES += -I$(CONFIG_UK_BASE)/arch/arm/arm64/include
 # Define these in the order of arch revision, to allow march
 # to be overwritten to the highest version required by the
 # selected extensions.
-ifeq ($(CONFIG_ARM64_FEAT_PAUTH),y)
+ifeq ($(CONFIG_HAVE_ARM64_FEAT_PAUTH),y)
 # Min GCC >= 9 to avoid dealing with deprecated
 # msign-return-address here and in macros
 ifeq ($(call have_gcc),y)
@@ -38,7 +38,7 @@ ARCH_REV := armv8.3-a
 BRANCH_PROTECTION := pac-ret+leaf
 endif
 
-ifeq ($(CONFIG_ARM64_FEAT_BTI),y)
+ifeq ($(CONFIG_HAVE_ARM64_FEAT_BTI),y)
 ifeq ($(call have_gcc),y)
 # Min GCC >= 10, due to buggy GCC-9.
 # https://gcc.gnu.org/bugzilla/show_bug.cgi?id=94697
@@ -54,7 +54,7 @@ else
 endif
 endif
 
-ifeq ($(CONFIG_ARM64_FEAT_MTE),y)
+ifeq ($(CONFIG_HAVE_ARM64_FEAT_MTE),y)
 ifeq ($(call have_gcc),y)
 # MTE support introduced in GCC-10
 $(call error_if_gcc_version_lt,10,0)
@@ -65,7 +65,7 @@ ARCH_REV := armv8.5-a
 ARCH_OPT := $(ARCH_OPT)+memtag
 endif
 
-ifeq ($(CONFIG_ARM64_FEAT_RNG),y)
+ifeq ($(CONFIG_HAVE_ARM64_FEAT_RNG),y)
 ifeq ($(call have_gcc),y)
 # FEAT_RNG support introduced in GCC-9
 $(call error_if_gcc_version_lt,9,0)
@@ -327,6 +327,3 @@ endif
 ARCHFLAGS     += -mcpu=neoverse-v1 -mtune=neoverse-v1
 ISR_ARCHFLAGS += -mcpu=neoverse-v1 -mtune=neoverse-v1
 endif
-
-$(eval $(call addlib,libarm64arch))
-LIBARM64ARCH_SRCS-$(CONFIG_ARM64_FEAT_MTE) += $(CONFIG_UK_BASE)/arch/arm/arm64/memtag.c
