@@ -258,4 +258,6 @@ uint64_t fdt_translate_address_by_ranges(const void *fdt,
  */
 int fdt_chosen_stdout_path(const void *fdt, int *offs, char **opt);
 
+int fdt_chosen_rng_seed(const void *fdt, uint32_t **seed, size_t *seed_len);
+
 #endif /* __UK_OFW_FDT_H__ */

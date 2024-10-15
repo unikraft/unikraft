@@ -428,3 +428,32 @@ int fdt_chosen_stdout_path(const void *fdt, int *offs, char **opt)
 
 	return 0;
 }
+
+int fdt_chosen_rng_seed(const void *fdt, uint32_t **seed, size_t *seed_len)
+{
+	const char *prop;
+	int prop_len;
+	int nchosen;
+
+	UK_ASSERT(fdt);
+	UK_ASSERT(seed);
+	UK_ASSERT(seed_len);
+
+	nchosen = fdt_path_offset((void *)fdt, "/chosen");
+	if (unlikely(nchosen < 0)) {
+		uk_pr_err("Could not find 'chosen' node (%d)\n", nchosen);
+		return -FDT_ERR_NOTFOUND;
+	}
+
+	prop = fdt_getprop((void *)fdt, nchosen, "rng-seed",
+			   &prop_len);
+	if (unlikely(!prop || prop_len <= 0)) {
+		uk_pr_warn("Could not find 'rng-seed' property\n");
+		return -FDT_ERR_NOTFOUND;
+	}
+
+	*seed = (uint32_t *)prop;
+	*seed_len = prop_len / sizeof(fdt32_t);
+
+	return 0;
+}

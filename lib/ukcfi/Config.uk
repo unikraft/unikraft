@@ -1,0 +1,27 @@
+menuconfig LIBUKCFI
+	bool "ukcfi: Control-flow Integrity"
+	depends on ARCH_ARM_64
+	select LIBUKBOOT
+
+if LIBUKCFI
+
+config LIBUKCFI_PAUTH
+	bool "Pointer Authentication"
+	depends on HAVE_ARM64_FEAT_PAUTH
+	default y
+	select LIBUKRANDOM
+	help
+		Enable signing and authentication of pointers. This
+		provides protections against classes of attacks that
+		rely on memory corruption, such as stack smashing and
+		ROP.
+
+config LIBUKCFI_BTI
+	bool "Branch Target Identification"
+	depends on HAVE_ARM64_FEAT_BTI
+	default y
+	help
+		BTI protects against JOP-like attacks by placing and
+		verifying landing pads on branch targets.
+
+endif

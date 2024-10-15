@@ -33,7 +33,7 @@
 #include <stddef.h>
 #include <uk/arch/memtag.h>
 #include <uk/arch/lcpu.h>
-#include <uk/arch/random.h>
+#include <uk/random.h>
 
 void *ukarch_memtag_region(void *ptr, __sz size)
 {
@@ -58,7 +58,6 @@ int ukarch_memtag_init(void)
 	mte_version = (SYSREG_READ(ID_AA64PFR1_EL1) >>
 			ID_AA64PFR1_EL1_MTE_SHIFT) &
 			ID_AA64PFR1_EL1_MTE_MASK;
-
 	if (mte_version < ARM64_FEAT_MTE2) {
 		uk_pr_err("FEAT_MTE2 is not implemented\n");
 		return -ENOTSUP;
@@ -72,11 +71,11 @@ int ukarch_memtag_init(void)
 #endif
 
 	/* Set seed for RGSR_EL1 */
-	if (ukarch_random_init())
-		UK_CRASH("Arch random not available\n");
-
-	if (ukarch_random_seed_u64(&seed))
-		UK_CRASH("Could not generate MTE seed\n");
+	rc = uk_random_fill_buffer(&seed, sizeof(seed));
+	if (unlikely(rc)) {
+		uk_pr_err("Could not generate MTE key (%d)\n", rc);
+		return rc;
+	}
 
 #if CONFIG_ARM64_FEAT_MTE_TCF_ASYNC
 	SYSREG_WRITE(SCTLR_EL1, (SYSREG_READ(SCTLR_EL1) |
