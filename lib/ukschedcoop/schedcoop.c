@@ -105,6 +105,9 @@ static void schedcoop_schedule(struct uk_sched *s)
 		 */
 		c->idle_return_time = min_wakeup_time;
 		next = &c->idle;
+#if CONFIG_LIBUKSCHED_STATS
+		s->idle_count++;
+#endif /* CONFIG_LIBUKSCHED_STATS */
 	}
 
 	if (next != prev) {
@@ -117,13 +120,24 @@ static void schedcoop_schedule(struct uk_sched *s)
 		uk_thread_clear_queueable(next);
 	}
 
+#if CONFIG_LIBUKSCHED_STATS
+	s->sched_count++;
+#endif /* CONFIG_LIBUKSCHED_STATS */
+
 	ukplat_lcpu_restore_irqf(flags);
 
 	/* Interrupting the switch is equivalent to having the next thread
 	 * interrupted at the return instruction. And therefore at safe point.
 	 */
-	if (prev != next)
+	if (prev != next) {
+#ifdef CONFIG_LIBUKSCHED_STATS
+		if (next != &c->idle) {
+			UK_ASSERT(prev->sched);
+			prev->sched->next_count++;
+		}
+#endif /* CONFIG_LIBUKSCHED_STATS */
 		uk_sched_thread_switch(next);
+	}
 }
 
 static int schedcoop_thread_add(struct uk_sched *s, struct uk_thread *t)

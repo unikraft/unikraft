@@ -245,6 +245,11 @@ int uk_sched_start(struct uk_sched *s)
 	if (ret < 0)
 		goto err_unset_thread_current;
 	s->is_started = true;
+
+#if CONFIG_LIBUKSCHED_STATS
+	s->start_time = (__u64)ukplat_monotonic_clock();
+#endif /* CONFIG_LIBUKSCHED_STATS */
+
 	return 0;
 
 err_unset_thread_current:

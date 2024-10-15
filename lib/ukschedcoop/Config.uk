@@ -1,5 +1,14 @@
-config LIBUKSCHEDCOOP
+menuconfig LIBUKSCHEDCOOP
 	bool "ukschedcoop: Cooperative Round-Robin scheduler"
 	default y
 	select LIBNOLIBC if !HAVE_LIBC
 	select LIBUKSCHED
+
+if LIBUKSCHEDCOOP
+
+config LIBUKSCHEDCOOP_STATS
+	bool "Scheduler statistics"
+	select LIBUKSTORE # resolve circular dependency of LIBUKSCHED_STATS
+	select LIBUKSCHED_STATS
+
+endif

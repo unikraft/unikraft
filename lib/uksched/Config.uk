@@ -7,12 +7,16 @@ menuconfig LIBUKSCHED
 	select HAVE_SCHED
 
 if LIBUKSCHED
-	# Invisible symbol to enable TCB initialization
-	config LIBUKSCHED_TCB_INIT
-		bool
-		default n
 
-	config LIBUKSCHED_DEBUG
-		bool "Enable debug messages"
-		default n
+# Invisible symbol to enable TCB initialization
+config LIBUKSCHED_TCB_INIT
+	bool
+
+config LIBUKSCHED_DEBUG
+	bool "Enable debug messages"
+
+config LIBUKSCHED_STATS
+	bool
+	depends on LIBUKSTORE # circular dependency
+
 endif
