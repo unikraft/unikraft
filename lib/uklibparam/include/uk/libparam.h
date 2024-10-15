@@ -66,8 +66,16 @@ extern C {
  * A library parameter descriptor (struct uk_libparam_desc) is referencing to
  * the section's base address for iteration.
  */
-#define UK_LIBPARAM_PARAM_NAMEPREFIX          __uk_libparam_param_
-#define UK_LIBPARAM_PDATA_NAMEPREFIX          __uk_libparam_pdata_
+#define _UK_LIBPARAM_PARAM_NAMEPREFIX	    __uk_libparam_param_
+#define UK_LIBPARAM_PARAM_NAMEPREFIX					    \
+	UK_LIBPARAM_CONCAT(UK_LIBPARAM_CONCAT(_UK_LIBPARAM_PARAM_NAMEPREFIX,\
+					      UK_LIBPARAM_LIBPREFIX), _)
+
+#define _UK_LIBPARAM_PDATA_NAMEPREFIX					    \
+	__uk_libparam_pdata_
+#define UK_LIBPARAM_PDATA_NAMEPREFIX					    \
+	UK_LIBPARAM_CONCAT(UK_LIBPARAM_CONCAT(_UK_LIBPARAM_PDATA_NAMEPREFIX,\
+					      UK_LIBPARAM_LIBPREFIX), _)
 
 #define UK_LIBPARAM_PARAMSECTION_NAME       uk_libparam_params
 #define UK_LIBPARAM_PARAMSECTION_STARTSYM   \
