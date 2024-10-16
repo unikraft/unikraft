@@ -65,6 +65,63 @@
 		*(ret) = (type) _conf_data;				\
 	} while (0)
 
+int pci_generic_config_read(__u8 bus, __u8 devfn,
+			    int where, int size, void *val)
+{
+	outl(PCI_CONFIG_ADDR, (PCI_ENABLE_BIT)		|
+			      (bus << PCI_BUS_SHIFT)	|
+			      (devfn << PCI_DEVICE_SHIFT)|
+			      (where & ~0x03));
+
+	switch (size) {
+	case 8:
+		*(__u8 *)val = inb(PCI_CONFIG_DATA + (where & 0x03));
+
+		break;
+	case 16:
+		*(__u16 *)val = inw(PCI_CONFIG_DATA + (where & 0x03));
+
+		break;
+	case 32:
+		*(__u16 *)val = inl(PCI_CONFIG_DATA + (where & 0x03));
+
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+int pci_generic_config_write(__u8 bus, __u8 devfn,
+			     int where, int size, __u32 val)
+
+{
+	outl(PCI_CONFIG_ADDR, (PCI_ENABLE_BIT)		|
+			      (bus << PCI_BUS_SHIFT)	|
+			      (devfn << PCI_DEVICE_SHIFT)|
+			      (where & ~0x03));
+
+	switch (size) {
+	case 8:
+		outb(PCI_CONFIG_DATA + (where & 0x03), val);
+
+		break;
+	case 16:
+		outw(PCI_CONFIG_DATA + (where & 0x03), val);
+
+		break;
+	case 32:
+		outl(PCI_CONFIG_DATA + (where & 0x03), val);
+
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
 static inline int pci_driver_add_device(struct pci_driver *drv,
 					struct pci_address *addr,
 					struct pci_device_id *devid)
@@ -94,6 +151,7 @@ static inline int pci_driver_add_device(struct pci_driver *drv,
 	config_addr = (PCI_ENABLE_BIT)
 			| (addr->bus << PCI_BUS_SHIFT)
 			| (addr->devid << PCI_DEVICE_SHIFT);
+	dev->config_addr = config_addr;
 	PCI_CONF_READ(__u16, &dev->base, config_addr, IOBAR);
 	PCI_CONF_READ(__u8, &dev->irq, config_addr, IRQ);
 
@@ -238,4 +296,123 @@ int arch_pci_probe(struct uk_alloc *pha)
 	}
 
 	return 0;
+}
+
+
+int arch_pci_find_next_cap(struct pci_device *pci_dev, uint16_t vndr_id,
+			   uint8_t curr_cap, uint8_t *cap);
+/**
+ * @brief Finds the first capability with the given vendor ID.
+ *
+ * First checks if capabilites are enabled for the @p pci_dev device.
+ * Then looks for the first capability register in the capability linked list
+ * of this device that matches the given @p vndr_id vendor ID.
+ * Returns its offset from the beginning of the device configuration space.
+ *
+ * @param pci_dev pci device whose capabilities are being detected
+ * @param vndr_id vendor ID
+ * @param[out] cap address (offset) of the first found capability register
+ * @return int 0 if found, -1 if none found
+ */
+int arch_pci_find_cap(struct pci_device *pci_dev,
+		      uint16_t target_cap_vndr, uint8_t *cap)
+{
+	uint8_t hdr_type, cap_vndr, nxt_cap, cap_ptr_offset;
+	uint16_t status = 0;
+
+	UK_ASSERT(pci_dev);
+
+	/* Check if capabilities are enabled */
+	PCI_CONF_READ_HEADER(uint16_t, &status, pci_dev->config_addr, STATUS);
+	if (!(status & PCI_CONF_CAP_STATUS_BIT))
+		return -1;
+
+	/* Depending on the header type, the capability pointer is found at
+	 * different offsets
+	 */
+	PCI_CONF_READ_HEADER(uint8_t, &hdr_type, pci_dev->config_addr, HEADER_TYPE);
+	switch (hdr_type & PCI_CONF_HEADER_TYPE_HEADER_TYPE_MASK) {
+	case PCI_CONF_HEADER_TYPE_STANDARD:
+	case PCI_CONF_HEADER_TYPE_PCI_TO_PCI:
+		cap_ptr_offset = PCI_CONF_CAP_POINTER;
+		break;
+	case PCI_CONF_HEADER_TYPE_CARDBUS_BRIDGE:
+		cap_ptr_offset = PCI_CONF_CARDBUS_BRIDGE_CAP_LIST_PTR;
+		break;
+	default:
+		return -1;
+	}
+
+	PCI_CONF_READ_OFFSET(uint8_t, &nxt_cap,
+			     pci_dev->config_addr, cap_ptr_offset,
+			     PCI_CONF_CAP_POINTER_SHFT, PCI_CONF_CAP_POINTER_MASK);
+	if (nxt_cap == 0 || nxt_cap == PCI_HEADER_END)
+		return -1;
+
+	PCI_CONF_READ_OFFSET(uint8_t, &cap_vndr,
+			     pci_dev->config_addr, nxt_cap,
+			     PCI_CAP_VENDOR_ID_SHIFT,
+			     PCI_CAP_VENDOR_ID_MASK);
+	if (cap_vndr == target_cap_vndr) {
+		goto cap_exit;
+	}
+	if(0 == arch_pci_find_next_cap(pci_dev, target_cap_vndr,
+					nxt_cap, &nxt_cap)) {
+		goto cap_exit;
+	}
+
+	return -1;
+
+cap_exit:
+	if (cap != NULL)
+		*cap = nxt_cap;
+	return 0;
+}
+
+/**
+ * @brief Finds the next capability with the given vendor ID.
+ *
+ * Looks for the capability that comes after the @p curr_cap capability
+ * in the capability linked list of the device @p pci_dev and
+ * matches the given @p vndr_id vendor ID.
+ * Through @p cap, returns found capability's offset from the beginning of the
+ * device configuration space.
+ *
+ * @param pci_dev pci device whose capabilities are being detected
+ * @param vndr_id vendor ID
+ * @param curr_cap current capability. List traversal begins after this one.
+ * Cannot be 0.
+ * @param[out] cap address (offset) of the first found capability register
+ * @return int 0 if found, -1 if none found
+ */
+int arch_pci_find_next_cap(struct pci_device *pci_dev, uint16_t target_vndr,
+			   uint8_t curr_cap, uint8_t *cap)
+{
+	uint8_t vndr, nxt_cap;
+
+	UK_ASSERT(pci_dev);
+	UK_ASSERT(curr_cap != 0);
+
+	PCI_CONF_READ_OFFSET(uint8_t, &nxt_cap, pci_dev->config_addr,
+			     curr_cap, PCI_CAP_NEXT_SHIFT, PCI_CAP_NEXT_MASK);
+	if (nxt_cap == 0 || nxt_cap == PCI_HEADER_END)
+		return -1;
+
+	do {
+		PCI_CONF_READ_OFFSET(uint8_t, &vndr,
+				     pci_dev->config_addr, nxt_cap,
+				     PCI_CAP_VENDOR_ID_SHIFT,
+				     PCI_CAP_VENDOR_ID_MASK);
+		if (vndr == target_vndr) {
+			if (cap != NULL)
+				*cap = nxt_cap;
+			return 0;
+		}
+		PCI_CONF_READ_OFFSET(uint8_t, &nxt_cap,
+				     pci_dev->config_addr, nxt_cap,
+				     PCI_CAP_NEXT_SHIFT,
+				     PCI_CAP_NEXT_MASK);
+	} while (nxt_cap != 0 && nxt_cap != PCI_HEADER_END);
+
+	return -1;
 }
