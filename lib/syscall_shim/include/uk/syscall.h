@@ -248,7 +248,7 @@ typedef long uk_syscall_arg_t;
 #define UK_EXECENV_DECLMAPx(__syscall_rarg, nr_args, ...)			\
 	__syscall_rarg UK_ARG_EMAPx(nr_args, __VA_ARGS__)
 
-#if CONFIG_LIBSYSCALL_SHIM_DEBUG_SYSCALLS || CONFIG_LIBUKDEBUG_PRINTD
+#if CONFIG_LIBSYSCALL_SHIM_DEBUG_SYSCALLS
 #define UK_ARG_FMT_MAP0(...)
 #define UK_ARG_FMT_MAP2(m, type, arg) m(type, arg)
 #define UK_ARG_FMT_MAP4(m, type, arg, ...) m(type, arg) ", " UK_ARG_FMT_MAP2(m, __VA_ARGS__)
@@ -263,15 +263,18 @@ typedef long uk_syscall_arg_t;
 #define UK_S_ARG_FMT_LONGX(type, arg)  "(" STRINGIFY(type) ") 0x%lx"
 
 #define __UK_SYSCALL_PRINTD(x, rtype, fname, ...)			\
-	_uk_printd(uk_libid_self(), __STR_BASENAME__, __LINE__,		\
+	_uk_printk(UK_PRINT_KLVL_DEBUG | UK_PRINT_RAW,			\
+		   uk_libid_self(), __STR_BASENAME__, __LINE__,		\
 		   "(" STRINGIFY(rtype) ") " STRINGIFY(fname)		\
 		   "(" UK_ARG_FMT_MAPx(x, UK_S_ARG_FMT_LONGX, __VA_ARGS__) ")\n" \
 		   UK_ARG_EMAPx(x, UK_S_ARG_CAST_LONG, __VA_ARGS__) )
 
-#define __UK_SYSCALL_EXECENV_PRINTD(execenv, x, rtype, fname, ...)	\
-	uk_printd("\nInvoking context saving %s system call.\n",	\
+#define __UK_SYSCALL_EXECENV_PRINTD(x, rtype, fname, ...)		\
+	uk_printk(UK_PRINT_KLVL_DEBUG | UK_PRINT_RAW,			\
+		  "\nInvoking context saving %s system call.\n",	\
 		  STRINGIFY(fname));					\
-	_uk_printd(uk_libid_self(), __STR_BASENAME__, __LINE__,		\
+	_uk_printk(UK_PRINT_KLVL_DEBUG | UK_PRINT_RAW,			\
+		   uk_libid_self(), __STR_BASENAME__, __LINE__,		\
 		   "(" STRINGIFY(rtype) ") " STRINGIFY(fname)		\
 		   "( execenv 0x%lx, " UK_ARG_FMT_MAPx(x,		\
 						       UK_S_ARG_FMT_LONGX,\
@@ -280,7 +283,7 @@ typedef long uk_syscall_arg_t;
 #else
 #define __UK_SYSCALL_PRINTD(...) do {} while(0)
 #define __UK_SYSCALL_EXECENV_PRINTD(...) do {} while(0)
-#endif /* CONFIG_LIBSYSCALL_SHIM_DEBUG || CONFIG_LIBUKDEBUG_PRINTD */
+#endif /* CONFIG_LIBSYSCALL_SHIM_DEBUG */
 
 /* System call implementation that uses errno and returns -1 on errors */
 /* TODO: `void` as return type is currently not supported.

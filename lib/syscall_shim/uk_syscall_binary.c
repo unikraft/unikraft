@@ -43,11 +43,7 @@
 #include <uk/prio.h>
 #include <uk/thread.h>
 #if CONFIG_LIBSYSCALL_SHIM_STRACE
-#if CONFIG_LIBUKCONSOLE
-#include <uk/console.h>
-#else /* !CONFIG_LIBUKCONSOLE */
 #include <uk/print.h>
-#endif /* !CONFIG_LIBUKCONSOLE */
 #endif /* CONFIG_LIBSYSCALL_SHIM_STRACE */
 
 /**
@@ -132,7 +128,8 @@ static void binary_syscall_debug_handler(struct uk_syscall_enter_ctx *enter_ctx)
 
 	execenv = enter_ctx->execenv;
 
-	_uk_printd(uk_libid_self(), __STR_BASENAME__, __LINE__,
+	_uk_printk(UK_PRINT_KLVL_DEBUG,
+		   uk_libid_self(), __STR_BASENAME__, __LINE__,
 		   "Binary system call request \"%s\" (%lu) at ip:%p (arg0=0x%lx, arg1=0x%lx, ...)\n",
 		   uk_syscall_name(execenv->regs.__syscall_rsyscall),
 		   execenv->regs.__syscall_rsyscall,
@@ -176,18 +173,7 @@ static void binary_syscall_strace(struct uk_syscall_exit_ctx *exit_ctx)
 		     execenv->regs.__syscall_rarg3,
 		     execenv->regs.__syscall_rarg4,
 		     execenv->regs.__syscall_rarg5);
-	/*
-	 * FIXME:
-	 * Replace the call to `uk_pr_info` with a call to the kernel printing
-	 * library once that exists. We also don't want to print all the meta
-	 * data that `uk_pr_info` includes. Note also that right now, debug
-	 * print calls also turn into a no-op if `ukconsole` is not available.
-	 */
-#if CONFIG_LIBUKCONSOLE
-	uk_console_out(prsyscallbuf, (__sz)prsyscalllen);
-#else /* !CONFIG_LIBUKCONSOLE */
-	uk_pr_info(prsyscallbuf);
-#endif /* !CONFIG_LIBUKCONSOLE */
+	uk_printk(UK_PRINT_RAW, "%s", prsyscallbuf);
 }
 
 uk_syscall_exittab_prio(binary_syscall_strace, UK_PRIO_LATEST);
