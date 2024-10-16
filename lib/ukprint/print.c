@@ -67,8 +67,6 @@
 #endif /* !CONFIG_LIBUKPRINT_ANSI_COLOR */
 
 #define BUFLEN 192
-/* special level for printk redirection, used internally only */
-#define UK_PRINT_KLVL_DEBUG (-1)
 
 typedef __ssz (*cout_func)(const char *buf, __sz len);
 
@@ -118,7 +116,6 @@ static inline __ssz console_out(const char *buf, __sz len)
 #endif /* CONFIG_LIBUKCONSOLE */
 
 /* Console state for kernel output */
-#if CONFIG_LIBUKPRINT_REDIR_PRINTD || CONFIG_LIBUKPRINT_PRINTK
 static struct vprint_console kern  = {
 #if CONFIG_LIBUKCONSOLE
 	.cout = console_out,
@@ -128,20 +125,6 @@ static struct vprint_console kern  = {
 	.newline = 1,
 	.prevlvl = INT_MIN
 };
-#endif
-
-/* Console state for debug output */
-#if !CONFIG_LIBUKPRINT_REDIR_PRINTD
-static struct vprint_console debug = {
-#if CONFIG_LIBUKCONSOLE
-	.cout = console_out,
-#else
-	.cout = NULL,
-#endif /* CONFIG_LIBUKCONSOLE */
-	.newline = 1,
-	.prevlvl = INT_MIN
-};
-#endif
 
 static inline void vprint_cout(struct vprint_console *cons,
 			       const char *buf, __sz len)
@@ -327,12 +310,6 @@ static void vprint(struct vprint_console *cons,
 	}
 }
 
-/*
- * DEBUG PRINTING ENTRY
- *  uk_printd() and uk_vprintd are always compiled in.
- *  We rely on OPTIMIZE_DEADELIM: These symbols are automatically
- *  removed from the final image when there was no usage.
- */
 #if CONFIG_LIBUKPRINT_PRINT_SRCNAME
 #define _VPRINT_ARGS_SRCNAME(srcname, srcline)	\
 	(srcname), (srcline),
@@ -348,67 +325,16 @@ static void vprint(struct vprint_console *cons,
 #define _VPRINT_ARGS_CALLER()
 #endif /* CONFIG_LIBUKPRINT_PRINT_CALLER */
 
-void _uk_vprintd(__u16 libid, const char *srcname __maybe_unused,
-		 unsigned int srcline __maybe_unused, const char *fmt,
-		 va_list ap)
-{
-
-#if CONFIG_LIBUKPRINT_REDIR_PRINTD
-	vprint(&kern,  UK_PRINT_KLVL_DEBUG, libid,
-	       _VPRINT_ARGS_SRCNAME(srcname, srcline)
-	       _VPRINT_ARGS_CALLER()
-	       fmt, ap);
-#else
-	vprint(&debug, UK_PRINT_KLVL_DEBUG, libid,
-	       _VPRINT_ARGS_SRCNAME(srcname, srcline)
-	       _VPRINT_ARGS_CALLER()
-	       fmt, ap);
-#endif /* !CONFIG_LIBUKPRINT_REDIR_PRINTD */
-}
-
-void _uk_printd(__u16 libid, const char *srcname __maybe_unused,
-		unsigned int srcline __maybe_unused, const char *fmt, ...)
-{
-	va_list ap;
-
-	va_start(ap, fmt);
-#if CONFIG_LIBUKPRINT_REDIR_PRINTD
-	vprint(&kern,  UK_PRINT_KLVL_DEBUG, libid,
-	       _VPRINT_ARGS_SRCNAME(srcname, srcline)
-	       _VPRINT_ARGS_CALLER()
-	       fmt, ap);
-#else
-	vprint(&debug, UK_PRINT_KLVL_DEBUG, libid,
-	       _VPRINT_ARGS_SRCNAME(srcname, srcline)
-	       _VPRINT_ARGS_CALLER()
-	       fmt, ap);
-#endif /* !CONFIG_LIBUKPRINT_REDIR_PRINTD */
-	va_end(ap);
-}
-
-/*
- * KERNEL PRINT ENTRY
- *  Different to uk_printd(), we have a global switch that disables kernel
- *  messages. We compile these entry points only in when the kernel console is
- *  enabled.
- */
 #if CONFIG_LIBUKPRINT_PRINTK
 void _uk_vprintk(int lvl, __u16 libid,
 		 const char *srcname __maybe_unused,
 		 unsigned int srcline __maybe_unused,
 		 const char *fmt, va_list ap)
 {
-#if CONFIG_LIBUKPRINT_REDIR_PRINTK
-	vprint(&debug, lvl, libid,
-	       _VPRINT_ARGS_SRCNAME(srcname, srcline)
-	       _VPRINT_ARGS_CALLER()
-	       fmt, ap);
-#else
 	vprint(&kern,  lvl, libid,
 	       _VPRINT_ARGS_SRCNAME(srcname, srcline)
 	       _VPRINT_ARGS_CALLER()
 	       fmt, ap);
-#endif /* !CONFIG_LIBUKPRINT_REDIR_PRINTK */
 }
 
 void _uk_printk(int lvl, __u16 libid,
@@ -419,17 +345,12 @@ void _uk_printk(int lvl, __u16 libid,
 	va_list ap;
 
 	va_start(ap, fmt);
-#if CONFIG_LIBUKPRINT_REDIR_PRINTK
-	vprint(&debug, lvl, libid,
-	       _VPRINT_ARGS_SRCNAME(srcname, srcline)
-	       _VPRINT_ARGS_CALLER()
-	       fmt, ap);
-#else
+
 	vprint(&kern,  lvl, libid,
 	       _VPRINT_ARGS_SRCNAME(srcname, srcline)
 	       _VPRINT_ARGS_CALLER()
 	       fmt, ap);
-#endif /* !CONFIG_LIBUKPRINT_REDIR_PRINTK */
+
 	va_end(ap);
 }
 #endif /* CONFIG_LIBUKPRINT_PRINTK */

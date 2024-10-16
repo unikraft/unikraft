@@ -26,53 +26,6 @@ extern "C" {
 
 #define UK_HXDF_COMPRESS (64) /* suppress repeated lines */
 
-/*
- * HEXDUMP ON DEBUG CONSOLE
- */
-#ifdef __IN_LIBUKPRINT__
-/*
- * This redefinition of CONFIG_LIBUKPRINT_PRINTD is doing the trick to
- * switch on the correct declaration of uk_hexdumpd() when we are compiling
- * this library and have the global debug switch CONFIG_LIBUKPRINT_PRINTD
- * not enabled.
- */
-#if !defined CONFIG_LIBUKPRINT_PRINTD || !CONFIG_LIBUKPRINT_PRINTD
-#undef CONFIG_LIBUKPRINT_PRINTD
-#define CONFIG_LIBUKPRINT_PRINTD 1
-#endif
-#endif /* __IN_LIBUKPRINT__ */
-
-#if (defined UK_DEBUG) || CONFIG_LIBUKPRINT_PRINTD
-/* Please use uk_hexdumpd() instead */
-void _uk_hexdumpd(__u16 libid, const char *srcname,
-		  unsigned int srcline, const void *data, size_t len,
-		  size_t addr0, int flags, unsigned int grps_per_line,
-		  const char *line_prefix);
-
-/**
- * Plots an hexdump for a given data region to kernel output
- * The absolute address is plotted when UK_HXDF_ADDR is set
- *
- * @param lvl Debug level
- * @param data Start of data region to plot
- * @param len Length of data region (number of bytes)
- * @param flags Format flags, see UK_HXDF_*
- * @param grps_per_line Defines the number of bytes shown per line:
- *        Number of groups (UK_HXDF_GRP*) shown per line
- * @return Returns the number of printed characters to output fp
- */
-#define uk_hexdumpd(data, len, flags, grps_per_line)			\
-	_uk_hexdumpd(uk_libid_self(), __STR_BASENAME__,			\
-		     __LINE__, (data), (len),				\
-		     ((size_t)(data)), (flags),				\
-		     (grps_per_line), STRINGIFY(data) ": ")
-#else /* (defined UK_DEBUG) || CONFIG_LIBUKPRINT_PRINTD */
-static inline void uk_hexdumpd(const void *data __unused, size_t len __unused,
-			       int flags __unused,
-			       unsigned int grps_per_line __unused)
-{}
-#endif /* (defined UK_DEBUG) || CONFIG_LIBUKPRINT_PRINTD */
-
 #if CONFIG_LIBUKPRINT_PRINTK
 /* Please use uk_hexdumpk() instead */
 void _uk_hexdumpk(int lvl, __u16 libid, const char *srcname,
@@ -182,10 +135,6 @@ int uk_hexdumpsn(char *str, size_t size, const void *data, size_t len,
  * Shortcuts for all hexdump variants ahead. The shortcuts use a similar style
  * as the hexdump Unix command using -C parameter: hexdump -C
  */
-#define uk_hexdumpCd(data, len)                                                \
-	uk_hexdumpd((data), (len), (UK_HXDF_ADDR | UK_HXDF_ASCIISEC            \
-				    | UK_HXDF_GRPQWORD | UK_HXDF_COMPRESS),    \
-		    2)
 
 #define uk_hexdumpCk(lvl, data, len)                                           \
 	uk_hexdumpk((lvl), (data), (len),                                      \

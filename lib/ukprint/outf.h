@@ -19,14 +19,13 @@ enum out_dev_type {
 #if CONFIG_LIBUKPRINT_PRINTK
 	OUTDEV_KERN,
 #endif
-	OUTDEV_DEBUG,
 };
 
 struct out_dev {
 	enum out_dev_type type;
 
 	union {
-		/* OUTDEV_KERN, OUTDEV_DEBUG */
+		/* OUTDEV_KERN */
 		struct {
 			int lvl; /* OUTDEV_KERN only */
 			__u16 libid;
@@ -75,13 +74,5 @@ int outf(struct out_dev *dev, const char *fmt, ...);
 		(dev)->uk_pr.srcline = (srcline);		\
 	} while (0)
 #endif
-
-#define out_dev_init_debug(dev, libid, srcname, srcline)	\
-	do {							\
-		(dev)->type          = OUTDEV_DEBUG;		\
-		(dev)->uk_pr.libid   = (libid);			\
-		(dev)->uk_pr.srcname = (srcname);		\
-		(dev)->uk_pr.srcline = (srcline);		\
-	} while (0)
 
 #endif /* __UK_PRINT_OUTF_H__ */
