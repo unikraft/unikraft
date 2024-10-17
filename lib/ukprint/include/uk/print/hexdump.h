@@ -1,40 +1,12 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*
- * Hexdump-like routines
- *
- * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
- *
- *
+/* Copyright (c) 2024, Unikraft GmbH and The Unikraft Authors.
  * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * Licensed under the BSD-3-Clause License (the "License").
+ * You may not use this file except in compliance with the License.
  */
 
-#ifndef __UKDEBUG_HEXDUMP_H__
-#define __UKDEBUG_HEXDUMP_H__
+#ifndef __UK_PRINT_HEXDUMP_H__
+#define __UK_PRINT_HEXDUMP_H__
 
 #include <stdio.h>
 #include <uk/arch/types.h>
@@ -57,20 +29,20 @@ extern "C" {
 /*
  * HEXDUMP ON DEBUG CONSOLE
  */
-#ifdef __IN_LIBUKDEBUG__
+#ifdef __IN_LIBUKPRINT__
 /*
- * This redefinition of CONFIG_LIBUKDEBUG_PRINTD is doing the trick to
+ * This redefinition of CONFIG_LIBUKPRINT_PRINTD is doing the trick to
  * switch on the correct declaration of uk_hexdumpd() when we are compiling
- * this library and have the global debug switch CONFIG_LIBUKDEBUG_PRINTD
+ * this library and have the global debug switch CONFIG_LIBUKPRINT_PRINTD
  * not enabled.
  */
-#if !defined CONFIG_LIBUKDEBUG_PRINTD || !CONFIG_LIBUKDEBUG_PRINTD
-#undef CONFIG_LIBUKDEBUG_PRINTD
-#define CONFIG_LIBUKDEBUG_PRINTD 1
+#if !defined CONFIG_LIBUKPRINT_PRINTD || !CONFIG_LIBUKPRINT_PRINTD
+#undef CONFIG_LIBUKPRINT_PRINTD
+#define CONFIG_LIBUKPRINT_PRINTD 1
 #endif
-#endif /* __IN_LIBUKDEBUG__ */
+#endif /* __IN_LIBUKPRINT__ */
 
-#if (defined UK_DEBUG) || CONFIG_LIBUKDEBUG_PRINTD
+#if (defined UK_DEBUG) || CONFIG_LIBUKPRINT_PRINTD
 /* Please use uk_hexdumpd() instead */
 void _uk_hexdumpd(__u16 libid, const char *srcname,
 		  unsigned int srcline, const void *data, size_t len,
@@ -94,14 +66,14 @@ void _uk_hexdumpd(__u16 libid, const char *srcname,
 		     __LINE__, (data), (len),				\
 		     ((size_t)(data)), (flags),				\
 		     (grps_per_line), STRINGIFY(data) ": ")
-#else /* (defined UK_DEBUG) || CONFIG_LIBUKDEBUG_PRINTD */
+#else /* (defined UK_DEBUG) || CONFIG_LIBUKPRINT_PRINTD */
 static inline void uk_hexdumpd(const void *data __unused, size_t len __unused,
 			       int flags __unused,
 			       unsigned int grps_per_line __unused)
 {}
-#endif /* (defined UK_DEBUG) || CONFIG_LIBUKDEBUG_PRINTD */
+#endif /* (defined UK_DEBUG) || CONFIG_LIBUKPRINT_PRINTD */
 
-#if CONFIG_LIBUKDEBUG_PRINTK
+#if CONFIG_LIBUKPRINT_PRINTK
 /* Please use uk_hexdumpk() instead */
 void _uk_hexdumpk(int lvl, __u16 libid, const char *srcname,
 		  unsigned int srcline, const void *data, size_t len,
@@ -122,18 +94,18 @@ void _uk_hexdumpk(int lvl, __u16 libid, const char *srcname,
  */
 #define uk_hexdumpk(lvl, data, len, flags, grps_per_line)                      \
 	do {                                                                   \
-		if ((lvl) <= KLVL_MAX)                                         \
+		if ((lvl) <= UK_PRINT_KLVL_MAX)                                \
 			_uk_hexdumpk((lvl), uk_libid_self(), __STR_BASENAME__, \
 				     __LINE__, (data), (len),                  \
 				     ((size_t)(data)), (flags),                \
 				     (grps_per_line), STRINGIFY(data) ": ");   \
 	} while (0)
-#else /* CONFIG_LIBUKDEBUG_PRINTK */
+#else /* CONFIG_LIBUKPRINT_PRINTK */
 static inline void uk_hexdumpk(int lvl __unused, const void *data __unused,
 			       size_t len __unused, int flags __unused,
 			       unsigned int grps_per_line __unused)
 {}
-#endif /* CONFIG_LIBUKDEBUG_PRINTK */
+#endif /* CONFIG_LIBUKPRINT_PRINTK */
 
 /**
  * Plots an hexdump for a given data region to a file descriptor
@@ -249,4 +221,4 @@ int uk_hexdumpsn(char *str, size_t size, const void *data, size_t len,
 }
 #endif
 
-#endif /* __UKDEBUG_HEXDUMP_H__ */
+#endif /* __UK_PRINT_HEXDUMP_H__ */

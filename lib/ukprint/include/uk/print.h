@@ -1,40 +1,12 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*
- * Debug printing routines
- *
- * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
- *
- *
+/* Copyright (c) 2024, Unikraft GmbH and The Unikraft Authors.
  * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * Licensed under the BSD-3-Clause License (the "License").
+ * You may not use this file except in compliance with the License.
  */
 
-#ifndef __UKDEBUG_PRINT_H__
-#define __UKDEBUG_PRINT_H__
+#ifndef __UK_PRINT_H__
+#define __UK_PRINT_H__
 
 #include <stdarg.h>
 #include <uk/libid.h>
@@ -55,28 +27,24 @@ extern "C" {
 /*
  * DEBUG PRINTING
  */
-/* Internal debug print functions that are sometimes used
- * by other libraries with an own debug print switch
- * (e.g., hexdump, syscall_shim)
- */
 void _uk_vprintd(__u16 libid, const char *srcname,
 		 unsigned int srcline, const char *fmt, va_list ap);
 void _uk_printd(__u16 libid, const char *srcname,
 		unsigned int srcline, const char *fmt, ...) __printf(4, 5);
 
-#ifdef __IN_LIBUKDEBUG__
+#ifdef __IN_LIBUKPRINT__
 /*
- * This redefinition of CONFIG_LIBUKDEBUG_PRINTD is doing the trick to avoid
+ * This redefinition of CONFIG_LIBUKPRINT_PRINTD is doing the trick to avoid
  * multiple declarations of uk_{v}printd() when we are compiling this library
- * and have the global debug switch CONFIG_LIBUKDEBUG_PRINTD not enabled.
+ * and have the global debug switch CONFIG_LIBUKPRINT_PRINTD not enabled.
  */
-#if !defined CONFIG_LIBUKDEBUG_PRINTD || !CONFIG_LIBUKDEBUG_PRINTD
-#undef CONFIG_LIBUKDEBUG_PRINTD
-#define CONFIG_LIBUKDEBUG_PRINTD 1
+#if !defined CONFIG_LIBUKPRINT_PRINTD || !CONFIG_LIBUKPRINT_PRINTD
+#undef CONFIG_LIBUKPRINT_PRINTD
+#define CONFIG_LIBUKPRINT_PRINTD 1
 #endif
-#endif /* __IN_LIBUKDEBUG__ */
+#endif /* __IN_LIBUKPRINT__ */
 
-#if defined UK_DEBUG || CONFIG_LIBUKDEBUG_PRINTD
+#if defined UK_DEBUG || CONFIG_LIBUKPRINT_PRINTD
 #define uk_vprintd(fmt, ap)						\
 	do {								\
 		_uk_vprintd(uk_libid_self(), __STR_BASENAME__,		\
@@ -128,24 +96,24 @@ static inline void uk_printd_once(const char *fmt __unused, ...)
 /*
  * KERNEL CONSOLE
  */
-#define KLVL_INFO  (3)
-#define KLVL_WARN  (2)
-#define KLVL_ERR   (1)
-#define KLVL_CRIT  (0)
+#define UK_PRINT_KLVL_INFO	3
+#define UK_PRINT_KLVL_WARN	2
+#define UK_PRINT_KLVL_ERR	1
+#define UK_PRINT_KLVL_CRIT	0
 
-#if CONFIG_LIBUKDEBUG_PRINTK_CRIT
-#define KLVL_MAX KLVL_CRIT
-#elif CONFIG_LIBUKDEBUG_PRINTK_ERR
-#define KLVL_MAX KLVL_ERR
-#elif CONFIG_LIBUKDEBUG_PRINTK_WARN
-#define KLVL_MAX KLVL_WARN
-#elif CONFIG_LIBUKDEBUG_PRINTK_INFO
-#define KLVL_MAX KLVL_INFO
+#if CONFIG_LIBUKPRINT_PRINTK_CRIT
+#define UK_PRINT_KLVL_MAX UK_PRINT_KLVL_CRIT
+#elif CONFIG_LIBUKPRINT_PRINTK_ERR
+#define UK_PRINT_KLVL_MAX UK_PRINT_KLVL_ERR
+#elif CONFIG_LIBUKPRINT_PRINTK_WARN
+#define UK_PRINT_KLVL_MAX UK_PRINT_KLVL_WARN
+#elif CONFIG_LIBUKPRINT_PRINTK_INFO
+#define UK_PRINT_KLVL_MAX UK_PRINT_KLVL_INFO
 #else
-#define KLVL_MAX KLVL_ERR /* default level */
+#define UK_PRINT_KLVL_MAX UK_PRINT_KLVL_ERR /* default level */
 #endif
 
-#if CONFIG_LIBUKDEBUG_PRINTK
+#if CONFIG_LIBUKPRINT_PRINTK
 /* please use the uk_printd(), uk_vprintd() macros because
  * they compile in the function calls only if the configured
  * debug level requires it
@@ -157,14 +125,14 @@ void _uk_printk(int lvl, __u16 libid, const char *srcname,
 
 #define uk_vprintk(lvl, fmt, ap)                                               \
 	do {                                                                   \
-		if ((lvl) <= KLVL_MAX)                                         \
+		if ((lvl) <= UK_PRINT_KLVL_MAX)                                \
 			_uk_vprintk((lvl), uk_libid_self(), __STR_BASENAME__,  \
 				    __LINE__, (fmt), ap);                      \
 	} while (0)
 
 #define uk_vprintk_once(lvl, fmt, ap)                                          \
 	do {                                                                   \
-		if ((lvl) <= KLVL_MAX) {                                       \
+		if ((lvl) <= UK_PRINT_KLVL_MAX) {                              \
 			static int __x;                                        \
 			if (unlikely(!__x)) {                                  \
 				_uk_vprintk((lvl), uk_libid_self(),            \
@@ -177,14 +145,14 @@ void _uk_printk(int lvl, __u16 libid, const char *srcname,
 
 #define uk_printk(lvl, fmt, ...)                                               \
 	do {                                                                   \
-		if ((lvl) <= KLVL_MAX)                                         \
+		if ((lvl) <= UK_PRINT_KLVL_MAX)                                \
 			_uk_printk((lvl), uk_libid_self(), __STR_BASENAME__,   \
 				   __LINE__, (fmt), ##__VA_ARGS__);            \
 	} while (0)
 
 #define uk_printk_once(lvl, fmt, ...)                                          \
 	do {                                                                   \
-		if ((lvl) <= KLVL_MAX) {                                       \
+		if ((lvl) <= UK_PRINT_KLVL_MAX) {                              \
 			static int __x;                                        \
 			if (unlikely(!__x)) {                                  \
 				_uk_printk((lvl), uk_libid_self(),             \
@@ -196,7 +164,7 @@ void _uk_printk(int lvl, __u16 libid, const char *srcname,
 	} while (0)
 #else
 static inline void uk_vprintk(int lvl __unused, const char *fmt __unused,
-				va_list ap __unused)
+			      va_list ap __unused)
 {}
 
 static inline void uk_printk(int lvl, const char *fmt, ...) __printf(2, 3);
@@ -211,7 +179,7 @@ static inline void uk_printk_once(int lvl, const char *fmt, ...) __printf(2, 3);
 static inline void uk_printk_once(int lvl __unused,
 				  const char *fmt __unused, ...)
 {}
-#endif /* CONFIG_LIBUKDEBUG_PRINTK */
+#endif /* CONFIG_LIBUKPRINT_PRINTK */
 
 /*
  * Convenience wrapper for uk_printk() and uk_printd()
@@ -219,18 +187,30 @@ static inline void uk_printk_once(int lvl __unused,
  */
 #define uk_pr_debug(fmt, ...) uk_printd((fmt), ##__VA_ARGS__)
 #define uk_pr_debug_once(fmt, ...) uk_printd_once((fmt), ##__VA_ARGS__)
-#define uk_pr_info(fmt, ...)  uk_printk(KLVL_INFO,  (fmt), ##__VA_ARGS__)
-#define uk_pr_info_once(fmt, ...)  uk_printk_once(KLVL_INFO, (fmt), \
-						  ##__VA_ARGS__)
-#define uk_pr_warn(fmt, ...)  uk_printk(KLVL_WARN,  (fmt), ##__VA_ARGS__)
-#define uk_pr_warn_once(fmt, ...)  uk_printk_once(KLVL_WARN, (fmt), \
-						  ##__VA_ARGS__)
-#define uk_pr_err(fmt, ...)   uk_printk(KLVL_ERR,   (fmt), ##__VA_ARGS__)
-#define uk_pr_err_once(fmt, ...)   uk_printk_once(KLVL_ERR,  (fmt), \
-						  ##__VA_ARGS__)
-#define uk_pr_crit(fmt, ...)  uk_printk(KLVL_CRIT,  (fmt), ##__VA_ARGS__)
-#define uk_pr_crit_once(fmt, ...)  uk_printk_once(KLVL_CRIT, (fmt), \
-						  ##__VA_ARGS__)
+
+#define uk_pr_info(fmt, ...)					\
+	uk_printk(UK_PRINT_KLVL_INFO, (fmt), ##__VA_ARGS__)
+
+#define uk_pr_info_once(fmt, ...)				\
+	uk_printk_once(UK_PRINT_KLVL_INFO, (fmt), ##__VA_ARGS__)
+
+#define uk_pr_warn(fmt, ...)					\
+	uk_printk(UK_PRINT_KLVL_WARN, (fmt), ##__VA_ARGS__)
+
+#define uk_pr_warn_once(fmt, ...)				\
+	uk_printk_once(UK_PRINT_KLVL_WARN, (fmt), ##__VA_ARGS__)
+
+#define uk_pr_err(fmt, ...)					\
+	uk_printk(UK_PRINT_KLVL_ERR, (fmt), ##__VA_ARGS__)
+
+#define uk_pr_err_once(fmt, ...)				\
+	uk_printk_once(UK_PRINT_KLVL_ERR, (fmt), ##__VA_ARGS__)
+
+#define uk_pr_crit(fmt, ...)					\
+	uk_printk(UK_PRINT_KLVL_CRIT, (fmt), ##__VA_ARGS__)
+
+#define uk_pr_crit_once(fmt, ...)				\
+	uk_printk_once(UK_PRINT_KLVL_CRIT, (fmt), ##__VA_ARGS__)
 
 /* Warning for stubbed functions */
 #define UK_WARN_STUBBED() \
@@ -246,4 +226,4 @@ static inline void uk_printk_once(int lvl __unused,
 }
 #endif
 
-#endif /* __UKDEBUG_PRINT_H__ */
+#endif /* __UK_PRINT_H__ */

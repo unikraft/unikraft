@@ -1,36 +1,8 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*
- * Debug printing routines
- *
- * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
- *
- *
+/* Copyright (c) 2024, Unikraft GmbH and The Unikraft Authors.
  * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * Licensed under the BSD-3-Clause License (the "License").
+ * You may not use this file except in compliance with the License.
  */
 
 #include "snprintf.h"
@@ -45,7 +17,7 @@
 #include <uk/print.h>
 #include <uk/errptr.h>
 #include <uk/arch/lcpu.h>
-#if CONFIG_LIBUKDEBUG_PRINT_THREAD
+#if CONFIG_LIBUKPRINT_PRINT_THREAD
 #include <uk/thread.h>
 #endif
 
@@ -54,7 +26,7 @@
 #include <errno.h>
 #endif /* CONFIG_LIBUKCONSOLE */
 
-#if CONFIG_LIBUKDEBUG_ANSI_COLOR
+#if CONFIG_LIBUKPRINT_ANSI_COLOR
 #define LVLC_RESET	UK_ANSI_MOD_RESET
 #define LVLC_TS		UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_GREEN)
 #define LVLC_CALLER	UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_RED)
@@ -92,15 +64,15 @@
 #define LVLC_ERROR_MSG	""
 #define LVLC_CRIT	""
 #define LVLC_CRIT_MSG	""
-#endif /* !CONFIG_LIBUKDEBUG_ANSI_COLOR */
+#endif /* !CONFIG_LIBUKPRINT_ANSI_COLOR */
 
 #define BUFLEN 192
 /* special level for printk redirection, used internally only */
-#define KLVL_DEBUG (-1)
+#define UK_PRINT_KLVL_DEBUG (-1)
 
 typedef __ssz (*cout_func)(const char *buf, __sz len);
 
-struct _vprint_console {
+struct vprint_console {
 	cout_func cout;
 	int newline;
 	int prevlvl;
@@ -112,7 +84,7 @@ struct _vprint_console {
  * a single place in posix-tty. We keep this workaround until we have feature
  * in posix-tty that handles newline characters correctly.
  */
-static inline __ssz _console_out(const char *buf, __sz len)
+static inline __ssz console_out(const char *buf, __sz len)
 {
 	const char *next_nl = NULL;
 	__sz l = len;
@@ -146,10 +118,10 @@ static inline __ssz _console_out(const char *buf, __sz len)
 #endif /* CONFIG_LIBUKCONSOLE */
 
 /* Console state for kernel output */
-#if CONFIG_LIBUKDEBUG_REDIR_PRINTD || CONFIG_LIBUKDEBUG_PRINTK
-static struct _vprint_console kern  = {
+#if CONFIG_LIBUKPRINT_REDIR_PRINTD || CONFIG_LIBUKPRINT_PRINTK
+static struct vprint_console kern  = {
 #if CONFIG_LIBUKCONSOLE
-	.cout = _console_out,
+	.cout = console_out,
 #else
 	.cout = NULL,
 #endif /* CONFIG_LIBUKCONSOLE */
@@ -159,10 +131,10 @@ static struct _vprint_console kern  = {
 #endif
 
 /* Console state for debug output */
-#if !CONFIG_LIBUKDEBUG_REDIR_PRINTD
-static struct _vprint_console debug = {
+#if !CONFIG_LIBUKPRINT_REDIR_PRINTD
+static struct vprint_console debug = {
 #if CONFIG_LIBUKCONSOLE
-	.cout = _console_out,
+	.cout = console_out,
 #else
 	.cout = NULL,
 #endif /* CONFIG_LIBUKCONSOLE */
@@ -171,15 +143,15 @@ static struct _vprint_console debug = {
 };
 #endif
 
-static inline void _vprint_cout(struct _vprint_console *cons,
-				const char *buf, __sz len)
+static inline void vprint_cout(struct vprint_console *cons,
+			       const char *buf, __sz len)
 {
 	if (cons->cout)
 		cons->cout(buf, len);
 }
 
-#if CONFIG_LIBUKDEBUG_PRINT_TIME
-static void _print_timestamp(struct _vprint_console *cons)
+#if CONFIG_LIBUKPRINT_PRINT_TIME
+static void print_timestamp(struct vprint_console *cons)
 {
 	char buf[BUFLEN];
 	int len;
@@ -188,15 +160,15 @@ static void _print_timestamp(struct _vprint_console *cons)
 	__nsec rem_usec = ukarch_time_subsec(nansec);
 
 	rem_usec = ukarch_time_nsec_to_usec(rem_usec);
-	len = __uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_TS
-			    "[%5" __PRInsec ".%06" __PRInsec "] ",
-			    sec, rem_usec);
-	_vprint_cout(cons, (char *)buf, len);
+	len = uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_TS
+			  "[%5" __PRInsec ".%06" __PRInsec "] ",
+			  sec, rem_usec);
+	vprint_cout(cons, (char *)buf, len);
 }
 #endif
 
-#if CONFIG_LIBUKDEBUG_PRINT_THREAD
-static void _print_thread(struct _vprint_console *cons)
+#if CONFIG_LIBUKPRINT_PRINT_THREAD
+static void print_thread(struct vprint_console *cons)
 {
 	struct uk_thread *t = uk_thread_current();
 	char buf[BUFLEN];
@@ -204,43 +176,43 @@ static void _print_thread(struct _vprint_console *cons)
 
 	if (t) {
 		if (t->name) {
-			len = __uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_THREAD
-					    "<%s> ", t->name);
+			len = uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_THREAD
+					  "<%s> ", t->name);
 		} else {
-			len = __uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_THREAD
-					    "<%p> ", (void *) t);
+			len = uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_THREAD
+					  "<%p> ", (void *)t);
 		}
 	} else {
-		len = __uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_THREAD
-				    "<<n/a>> ");
+		len = uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_THREAD
+				  "<<n/a>> ");
 	}
-	_vprint_cout(cons, (char *)buf, len);
+	vprint_cout(cons, (char *)buf, len);
 }
-#endif /* CONFIG_LIBUKDEBUG_PRINT_THREAD */
+#endif /* CONFIG_LIBUKPRINT_PRINT_THREAD */
 
-#if CONFIG_LIBUKDEBUG_PRINT_CALLER
-static void _print_caller(struct _vprint_console *cons, __uptr ra, __uptr fa)
+#if CONFIG_LIBUKPRINT_PRINT_CALLER
+static void print_caller(struct vprint_console *cons, __uptr ra, __uptr fa)
 {
 	char buf[BUFLEN];
 	int len;
 
-	len = __uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_CALLER
-			    "{r:%p,f:%p} ", (void *) ra, (void *) fa);
-	_vprint_cout(cons, (char *)buf, len);
+	len = uk_snprintf(buf, BUFLEN, LVLC_RESET LVLC_CALLER
+			  "{r:%p,f:%p} ", (void *)ra, (void *)fa);
+	vprint_cout(cons, (char *)buf, len);
 }
-#endif /* CONFIG_LIBUKDEBUG_PRINT_CALLER */
+#endif /* CONFIG_LIBUKPRINT_PRINT_CALLER */
 
-static void _vprint(struct _vprint_console *cons,
-		    int lvl, __u16 libid,
-#if CONFIG_LIBUKDEBUG_PRINT_SRCNAME
-		    const char *srcname,
-		    unsigned int srcline,
-#endif /* CONFIG_LIBUKDEBUG_PRINT_SRCNAME */
-#if CONFIG_LIBUKDEBUG_PRINT_CALLER
-		    __uptr retaddr,
-		    __uptr frameaddr,
-#endif /* CONFIG_LIBUKDEBUG_PRINT_CALLER */
-		    const char *fmt, va_list ap)
+static void vprint(struct vprint_console *cons,
+		   int lvl, __u16 libid,
+#if CONFIG_LIBUKPRINT_PRINT_SRCNAME
+		   const char *srcname,
+		   unsigned int srcline,
+#endif /* CONFIG_LIBUKPRINT_PRINT_SRCNAME */
+#if CONFIG_LIBUKPRINT_PRINT_CALLER
+		   __uptr retaddr,
+		   __uptr frameaddr,
+#endif /* CONFIG_LIBUKPRINT_PRINT_CALLER */
+		   const char *fmt, va_list ap)
 {
 	char lbuf[BUFLEN];
 	int len, llen;
@@ -254,19 +226,19 @@ static void _vprint(struct _vprint_console *cons,
 	 *       background colors for trailing white spaces.
 	 */
 	switch (lvl) {
-	case KLVL_DEBUG:
+	case UK_PRINT_KLVL_DEBUG:
 		msghdr = LVLC_RESET LVLC_DEBUG "dbg:" LVLC_RESET "  ";
 		break;
-	case KLVL_CRIT:
+	case UK_PRINT_KLVL_CRIT:
 		msghdr = LVLC_RESET LVLC_CRIT  "CRIT:" LVLC_RESET " ";
 		break;
-	case KLVL_ERR:
+	case UK_PRINT_KLVL_ERR:
 		msghdr = LVLC_RESET LVLC_ERROR "ERR:" LVLC_RESET "  ";
 		break;
-	case KLVL_WARN:
+	case UK_PRINT_KLVL_WARN:
 		msghdr = LVLC_RESET LVLC_WARN  "Warn:" LVLC_RESET " ";
 		break;
-	case KLVL_INFO:
+	case UK_PRINT_KLVL_INFO:
 		msghdr = LVLC_RESET LVLC_INFO  "Info:" LVLC_RESET " ";
 		break;
 	default:
@@ -280,48 +252,47 @@ static void _vprint(struct _vprint_console *cons,
 			/* level changed without closing with '\n',
 			 * enforce printing '\n', before the new message header
 			 */
-			_vprint_cout(cons, "\n", 1);
+			vprint_cout(cons, "\n", 1);
 		}
 		cons->prevlvl = lvl;
 		cons->newline = 1; /* enforce printing the message header */
 	}
 
-	len = __uk_vsnprintf(lbuf, BUFLEN, fmt, ap);
+	len = uk_vsnprintf(lbuf, BUFLEN, fmt, ap);
 	lptr = lbuf;
 	while (len > 0) {
 		if (cons->newline) {
-#if CONFIG_LIBUKDEBUG_PRINT_TIME
-			_print_timestamp(cons);
+#if CONFIG_LIBUKPRINT_PRINT_TIME
+			print_timestamp(cons);
 #endif
-			_vprint_cout(cons, DECONST(char *, msghdr),
-				     strlen(msghdr));
-#if CONFIG_LIBUKDEBUG_PRINT_THREAD
-			_print_thread(cons);
+			vprint_cout(cons, DECONST(char *, msghdr),
+				    strlen(msghdr));
+#if CONFIG_LIBUKPRINT_PRINT_THREAD
+			print_thread(cons);
 #endif
-#if CONFIG_LIBUKDEBUG_PRINT_CALLER
-			_print_caller(cons, retaddr, frameaddr);
+#if CONFIG_LIBUKPRINT_PRINT_CALLER
+			print_caller(cons, retaddr, frameaddr);
 #endif
 			if (libname) {
-				_vprint_cout(cons, LVLC_RESET LVLC_LIBNAME "[",
-					     strlen(LVLC_RESET LVLC_LIBNAME) + 1);
-				_vprint_cout(cons, DECONST(char *, libname),
-					     strlen(libname));
-				_vprint_cout(cons, "] ", 2);
+				vprint_cout(cons, LVLC_RESET LVLC_LIBNAME "[",
+					    strlen(LVLC_RESET LVLC_LIBNAME) + 1);
+				vprint_cout(cons, DECONST(char *, libname),
+					    strlen(libname));
+				vprint_cout(cons, "] ", 2);
 			}
-#if CONFIG_LIBUKDEBUG_PRINT_SRCNAME
+#if CONFIG_LIBUKPRINT_PRINT_SRCNAME
 			if (srcname) {
 				char lnobuf[6];
 
-				_vprint_cout(cons, LVLC_RESET LVLC_SRCNAME "<",
-					     strlen(LVLC_RESET LVLC_SRCNAME) + 1);
-				_vprint_cout(cons, DECONST(char *, srcname),
-					     strlen(srcname));
-				_vprint_cout(cons, " @ ", 3);
-				_vprint_cout(cons, lnobuf,
-					     __uk_snprintf(lnobuf,
-							   sizeof(lnobuf),
-							   "%4u", srcline));
-				_vprint_cout(cons, "> ", 2);
+				vprint_cout(cons, LVLC_RESET LVLC_SRCNAME "<",
+					    strlen(LVLC_RESET LVLC_SRCNAME) + 1);
+				vprint_cout(cons, DECONST(char *, srcname),
+					    strlen(srcname));
+				vprint_cout(cons, " @ ", 3);
+				vprint_cout(cons, lnobuf,
+					    uk_snprintf(lnobuf, sizeof(lnobuf),
+							"%4u", srcline));
+				vprint_cout(cons, "> ", 2);
 			}
 #endif
 			cons->newline = 0;
@@ -337,19 +308,19 @@ static void _vprint(struct _vprint_console *cons,
 
 		/* Message body */
 		switch (lvl) {
-		case KLVL_CRIT:
-			_vprint_cout(cons, LVLC_RESET LVLC_CRIT_MSG,
-				     strlen(LVLC_RESET LVLC_CRIT_MSG));
+		case UK_PRINT_KLVL_CRIT:
+			vprint_cout(cons, LVLC_RESET LVLC_CRIT_MSG,
+				    strlen(LVLC_RESET LVLC_CRIT_MSG));
 			break;
-		case KLVL_ERR:
-			_vprint_cout(cons, LVLC_RESET LVLC_ERROR_MSG,
-				     strlen(LVLC_RESET LVLC_ERROR_MSG));
+		case UK_PRINT_KLVL_ERR:
+			vprint_cout(cons, LVLC_RESET LVLC_ERROR_MSG,
+				    strlen(LVLC_RESET LVLC_ERROR_MSG));
 			break;
 		default:
-			_vprint_cout(cons, LVLC_RESET, strlen(LVLC_RESET));
+			vprint_cout(cons, LVLC_RESET, strlen(LVLC_RESET));
 		}
-		_vprint_cout(cons, (char *)lptr, llen);
-		_vprint_cout(cons, LVLC_RESET, strlen(LVLC_RESET));
+		vprint_cout(cons, (char *)lptr, llen);
+		vprint_cout(cons, LVLC_RESET, strlen(LVLC_RESET));
 
 		len -= llen;
 		lptr = nlptr + 1;
@@ -362,37 +333,37 @@ static void _vprint(struct _vprint_console *cons,
  *  We rely on OPTIMIZE_DEADELIM: These symbols are automatically
  *  removed from the final image when there was no usage.
  */
-#if CONFIG_LIBUKDEBUG_PRINT_SRCNAME
+#if CONFIG_LIBUKPRINT_PRINT_SRCNAME
 #define _VPRINT_ARGS_SRCNAME(srcname, srcline)	\
 	(srcname), (srcline),
 #else
 #define _VPRINT_ARGS_SRCNAME(srcname, srcline)
-#endif /* CONFIG_LIBUKDEBUG_PRINT_SRCNAME */
+#endif /* CONFIG_LIBUKPRINT_PRINT_SRCNAME */
 
-#if CONFIG_LIBUKDEBUG_PRINT_CALLER
+#if CONFIG_LIBUKPRINT_PRINT_CALLER
 #define _VPRINT_ARGS_CALLER()			\
 	__return_addr(0),			\
 	__frame_addr(0),
 #else
 #define _VPRINT_ARGS_CALLER()
-#endif /* CONFIG_LIBUKDEBUG_PRINT_CALLER */
+#endif /* CONFIG_LIBUKPRINT_PRINT_CALLER */
 
 void _uk_vprintd(__u16 libid, const char *srcname __maybe_unused,
 		 unsigned int srcline __maybe_unused, const char *fmt,
 		 va_list ap)
 {
 
-#if CONFIG_LIBUKDEBUG_REDIR_PRINTD
-	_vprint(&kern,  KLVL_DEBUG, libid,
-		_VPRINT_ARGS_SRCNAME(srcname, srcline)
-		_VPRINT_ARGS_CALLER()
-		fmt, ap);
+#if CONFIG_LIBUKPRINT_REDIR_PRINTD
+	vprint(&kern,  UK_PRINT_KLVL_DEBUG, libid,
+	       _VPRINT_ARGS_SRCNAME(srcname, srcline)
+	       _VPRINT_ARGS_CALLER()
+	       fmt, ap);
 #else
-	_vprint(&debug, KLVL_DEBUG, libid,
-		_VPRINT_ARGS_SRCNAME(srcname, srcline)
-		_VPRINT_ARGS_CALLER()
-		fmt, ap);
-#endif /* !CONFIG_LIBUKDEBUG_REDIR_PRINTD */
+	vprint(&debug, UK_PRINT_KLVL_DEBUG, libid,
+	       _VPRINT_ARGS_SRCNAME(srcname, srcline)
+	       _VPRINT_ARGS_CALLER()
+	       fmt, ap);
+#endif /* !CONFIG_LIBUKPRINT_REDIR_PRINTD */
 }
 
 void _uk_printd(__u16 libid, const char *srcname __maybe_unused,
@@ -401,17 +372,17 @@ void _uk_printd(__u16 libid, const char *srcname __maybe_unused,
 	va_list ap;
 
 	va_start(ap, fmt);
-#if CONFIG_LIBUKDEBUG_REDIR_PRINTD
-	_vprint(&kern,  KLVL_DEBUG, libid,
-		_VPRINT_ARGS_SRCNAME(srcname, srcline)
-		_VPRINT_ARGS_CALLER()
-		fmt, ap);
+#if CONFIG_LIBUKPRINT_REDIR_PRINTD
+	vprint(&kern,  UK_PRINT_KLVL_DEBUG, libid,
+	       _VPRINT_ARGS_SRCNAME(srcname, srcline)
+	       _VPRINT_ARGS_CALLER()
+	       fmt, ap);
 #else
-	_vprint(&debug, KLVL_DEBUG, libid,
-		_VPRINT_ARGS_SRCNAME(srcname, srcline)
-		_VPRINT_ARGS_CALLER()
-		fmt, ap);
-#endif /* !CONFIG_LIBUKDEBUG_REDIR_PRINTD */
+	vprint(&debug, UK_PRINT_KLVL_DEBUG, libid,
+	       _VPRINT_ARGS_SRCNAME(srcname, srcline)
+	       _VPRINT_ARGS_CALLER()
+	       fmt, ap);
+#endif /* !CONFIG_LIBUKPRINT_REDIR_PRINTD */
 	va_end(ap);
 }
 
@@ -421,23 +392,23 @@ void _uk_printd(__u16 libid, const char *srcname __maybe_unused,
  *  messages. We compile these entry points only in when the kernel console is
  *  enabled.
  */
-#if CONFIG_LIBUKDEBUG_PRINTK
+#if CONFIG_LIBUKPRINT_PRINTK
 void _uk_vprintk(int lvl, __u16 libid,
 		 const char *srcname __maybe_unused,
 		 unsigned int srcline __maybe_unused,
 		 const char *fmt, va_list ap)
 {
-#if CONFIG_LIBUKDEBUG_REDIR_PRINTK
-	_vprint(&debug, lvl, libid,
-		_VPRINT_ARGS_SRCNAME(srcname, srcline)
-		_VPRINT_ARGS_CALLER()
-		fmt, ap);
+#if CONFIG_LIBUKPRINT_REDIR_PRINTK
+	vprint(&debug, lvl, libid,
+	       _VPRINT_ARGS_SRCNAME(srcname, srcline)
+	       _VPRINT_ARGS_CALLER()
+	       fmt, ap);
 #else
-	_vprint(&kern,  lvl, libid,
-		_VPRINT_ARGS_SRCNAME(srcname, srcline)
-		_VPRINT_ARGS_CALLER()
-		fmt, ap);
-#endif /* !CONFIG_LIBUKDEBUG_REDIR_PRINTK */
+	vprint(&kern,  lvl, libid,
+	       _VPRINT_ARGS_SRCNAME(srcname, srcline)
+	       _VPRINT_ARGS_CALLER()
+	       fmt, ap);
+#endif /* !CONFIG_LIBUKPRINT_REDIR_PRINTK */
 }
 
 void _uk_printk(int lvl, __u16 libid,
@@ -448,17 +419,17 @@ void _uk_printk(int lvl, __u16 libid,
 	va_list ap;
 
 	va_start(ap, fmt);
-#if CONFIG_LIBUKDEBUG_REDIR_PRINTK
-	_vprint(&debug, lvl, libid,
-		_VPRINT_ARGS_SRCNAME(srcname, srcline)
-		_VPRINT_ARGS_CALLER()
-		fmt, ap);
+#if CONFIG_LIBUKPRINT_REDIR_PRINTK
+	vprint(&debug, lvl, libid,
+	       _VPRINT_ARGS_SRCNAME(srcname, srcline)
+	       _VPRINT_ARGS_CALLER()
+	       fmt, ap);
 #else
-	_vprint(&kern,  lvl, libid,
-		_VPRINT_ARGS_SRCNAME(srcname, srcline)
-		_VPRINT_ARGS_CALLER()
-		fmt, ap);
-#endif /* !CONFIG_LIBUKDEBUG_REDIR_PRINTK */
+	vprint(&kern,  lvl, libid,
+	       _VPRINT_ARGS_SRCNAME(srcname, srcline)
+	       _VPRINT_ARGS_CALLER()
+	       fmt, ap);
+#endif /* !CONFIG_LIBUKPRINT_REDIR_PRINTK */
 	va_end(ap);
 }
-#endif /* CONFIG_LIBUKDEBUG_PRINTD */
+#endif /* CONFIG_LIBUKPRINT_PRINTK */
