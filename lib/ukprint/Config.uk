@@ -6,34 +6,13 @@ menuconfig LIBUKPRINT
 
 if LIBUKPRINT
 
-config LIBUKPRINT_PRINTK
-	bool "Enable kernel messages (uk_printk)"
+menuconfig LIBUKPRINT_PRINTK
+	bool "Kernel messages (uk_printk)"
 	default y
 	help
 		Enables kernel message console.
 
-choice
-	prompt "Kernel message level"
-	default LIBUKPRINT_PRINTK_ERR
-	depends on LIBUKPRINT_PRINTK
-	help
-		Set the level of detail of kernel messages
-
-config LIBUKPRINT_PRINTK_DEBUG
-	bool "Show all types of messages"
-
-config LIBUKPRINT_PRINTK_INFO
-	bool "Show critical, error, warning, and info messages"
-
-config LIBUKPRINT_PRINTK_WARN
-	bool "Show critical, error, and warning messages"
-
-config LIBUKPRINT_PRINTK_ERR
-	bool "Show critical and error messages (default)"
-
-config LIBUKPRINT_PRINTK_CRIT
-	bool "Show critical messages only"
-endchoice
+if LIBUKPRINT_PRINTK
 
 config LIBUKPRINT_PRINT_TIME
 	bool "Show timestamp in messages"
@@ -68,5 +47,49 @@ config LIBUKPRINT_ANSI_COLOR
 		Use ANSI control sequences to colorize console output.
 		Before activating this option, please make sure that
 		your console output/display supports ANSI.
+
+choice
+	prompt "Verbosity"
+	default LIBUKPRINT_KLVL_ERR
+	help
+		Set the verbosity of kernel messages
+
+config LIBUKPRINT_KLVL_DEBUG
+	bool "Debug"
+
+config LIBUKPRINT_KLVL_INFO
+	bool "Info"
+
+config LIBUKPRINT_KLVL_WARN
+	bool "Warn"
+
+config LIBUKPRINT_KLVL_ERR
+	bool "Error (default)"
+
+config LIBUKPRINT_KLVL_CRIT
+	bool "Critical"
+endchoice
+endif
+
+menuconfig LIBUKPRINT_LOGBUF
+	bool "Kernel log buffer (dmesg)"
+	select LIBUKLOCK
+	help
+		Applications can print the logbuffer to the console by calling
+		uk_print_dmesg()
+
+if LIBUKPRINT_LOGBUF
+
+config LIBUKPRINT_LOGBUF_SIZE
+	int "Log buffer max message length (chars)"
+	default 10240
+
+endif
+
+config LIBUKPRINT_TEST
+	bool "Enable unit tests"
+	depends on LIBUKRANDOM
+	depends on LIBUKPRINT_LOGBUF
+	select LIBUKTEST
 
 endif
