@@ -54,6 +54,14 @@ choice
 	help
 		Set the verbosity of kernel messages
 
+config LIBUKPRINT_PRINTK_UKSTORE
+	bool "Control verbosity via ukstore"
+	select LIBUKSTORE
+	help
+		Allows configuring the console verbosity at runtime via ukstore.
+		The maximum verbosity is still bound to the highest verbosity
+		level configured at compile time.
+
 config LIBUKPRINT_KLVL_DEBUG
 	bool "Debug"
 

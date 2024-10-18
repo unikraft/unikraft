@@ -26,6 +26,8 @@
 
 #include "print.h"
 
+unsigned int uk_print_console_lvl = UK_PRINT_KLVL_MAX;
+
 #if CONFIG_LIBUKPRINT_ANSI_COLOR
 #define LVLC_RESET	UK_ANSI_MOD_RESET
 #define LVLC_TS		UK_ANSI_MOD_COLORFG(UK_ANSI_COLOR_GREEN)
@@ -195,6 +197,11 @@ void uk_print_console_write(struct uk_print_msg *msg)
 	int lvl = msg->flags & UK_PRINT_KLVL_MASK;
 	int raw = msg->flags & UK_PRINT_RAW_MASK;
 	struct vprint_console *cons = &kconsole;
+
+#if CONFIG_LIBUKPRINT_PRINTK_UKSTORE
+	if (lvl > (int)uk_print_console_lvl)
+		return;
+#endif /* CONFIG_LIBUKPRINT_PRINTK_UKSTORE */
 
 	/*
 	 * Note: We reset the console colors earlier in order to exclude
