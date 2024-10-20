@@ -1,7 +1,8 @@
 ifeq (x86_64,$(CONFIG_UK_ARCH))
 XEN_LDFLAGS-y += -Wl,-m,elf_x86_64
 else ifeq (arm64,$(CONFIG_UK_ARCH))
-XEN_LINK_LIBGCC_FLAG := -lgcc
+XEN_LDFLAGS-y += -Wl,-m,aarch64elf
+XEN_LDLIBS-y += -lgcc
 endif
 
 ##
@@ -39,8 +40,8 @@ $(XEN_DEBUG_IMAGE): $(XEN_ALIBS) $(XEN_ALIBS-y) $(XEN_OLIBS) $(XEN_OLIBS-y) \
 			-Wl$(comma)--start-group \
 			$(XEN_ALIBS) $(XEN_ALIBS-y) \
 			$(UK_ALIBS) $(UK_ALIBS-y) \
-			$(XEN_LINK_LIBGCC_FLAG) \
 			-Wl$(comma)--end-group \
+			$(XEN_LDLIBS) $(XEN_LDLIBS-y) \
 			-o $(XEN_IMAGE).ld.o)
 	$(call build_cmd,OBJCOPY,,$(XEN_IMAGE).o,\
 		$(OBJCOPY) -w -G xenos_* -G _libxenplat_zimageboot \

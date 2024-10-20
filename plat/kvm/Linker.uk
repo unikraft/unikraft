@@ -16,11 +16,11 @@ endif
 ifeq ($(CONFIG_KVM_BOOT_PROTO_EFI_STUB),y)
 KVM_LDFLAGS-y += -Wl,--entry=uk_efi_entry64
 KVM_LDFLAGS-y += -Wl,-m,aarch64elf
-KVM_LINK_LIBGCC_FLAG := -lgcc
+KVM_LDLIBS-y += -lgcc
 else
 KVM_LDFLAGS-y += -Wl,--entry=_libkvmplat_entry
 KVM_LDFLAGS-y += -Wl,-m,aarch64elf
-KVM_LINK_LIBGCC_FLAG := -lgcc
+KVM_LDLIBS-y += -lgcc
 endif
 endif
 
@@ -59,8 +59,8 @@ $(KVM_DEBUG_IMAGE): $(KVM_ALIBS) $(KVM_ALIBS-y) $(KVM_OLIBS) $(KVM_OLIBS-y) \
 			-Wl$(comma)--start-group \
 			$(KVM_ALIBS) $(KVM_ALIBS-y) \
 			$(UK_ALIBS) $(UK_ALIBS-y) \
-			$(KVM_LINK_LIBGCC_FLAG) \
 			-Wl$(comma)--end-group \
+			$(KVM_LDLIBS) $(KVM_LDLIBS-y) \
 			$(LDFLAGS) $(LDFLAGS-y) \
 			$(KVM_LD_SCRIPT_FLAGS) \
 			-o $@)
