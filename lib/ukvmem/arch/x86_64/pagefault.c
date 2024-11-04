@@ -45,7 +45,7 @@ static int vmem_arch_pagefault(void *data)
 				    faultstr[faulttype &
 					    UK_VMA_FAULT_ACCESSTYPE],
 				    vaddr, ctx->error_code, strerror(-rc), -rc);
-
+		ctx->handler_err = rc;
 		return UK_EVENT_NOT_HANDLED;
 	}
 
