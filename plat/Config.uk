@@ -127,3 +127,6 @@ comment "Warning: Selecting multiple platforms is unsupported!"
 
 config HAVE_SHUTDOWN_DISPATCHER
 	bool
+
+config HAVE_REBOOT
+	bool
