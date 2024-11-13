@@ -242,6 +242,9 @@ jobs:
         run: |
           set -e;
 
+          # Wait for all tests to start
+          sleep 30;
+
           today=$(date -u +"%Y-%m-%d");
           stop=$(date -u +"%Y-%m-%dT%H:%M:%SZ");
           start="${{ steps.start_time.outputs.start }}";
