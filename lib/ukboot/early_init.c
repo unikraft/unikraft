@@ -8,12 +8,13 @@
 #include <uk/assert.h>
 #include <uk/boot/earlytab.h>
 #include <uk/essentials.h>
+#include <uk/libparam.h>
 #include <uk/plat/common/bootinfo.h>
 #include <uk/prio.h>
 
-#if CONFIG_LIBUKLIBPARAM
-#include <uk/libparam.h>
-#endif /* CONFIG_LIBUKLIBPARAM */
+#if CONFIG_LIBUKCFI_PAUTH
+#include <uk/cfi.h>
+#endif /* CONFIG_LIBUKCFI_PAUTH */
 
 /* Mutable version of the cmdline. This is tokenized by uk_argnparse().
  * Keep this as a global as `argv` points to tokens in this string.
@@ -105,7 +106,11 @@ static int uk_boot_early_init_mrd_coalesce(struct ukplat_bootinfo *bi)
 	return 0;
 }
 
+#if CONFIG_LIBUKCFI_PAUTH
+void __no_pauth uk_boot_early_init(struct ukplat_bootinfo *bi)
+#else /* CONFIG_LIBUKCFI_PAUTH */
 void uk_boot_early_init(struct ukplat_bootinfo *bi)
+#endif /* CONFIG_LIBUKCFI_PAUTH */
 {
 	struct uk_boot_earlytab_entry *entry;
 	int rc;

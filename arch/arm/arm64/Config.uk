@@ -8,12 +8,18 @@ choice
 
 	config MCPU_ARM64_NONE
 		bool "None"
+		select HAVE_ARM64_FEAT_RNG
+		select HAVE_ARM64_FEAT_PAUTH
+		select HAVE_ARM64_FEAT_BTI
 		help
 			Do not compile for a specific CPU. This allows choosing
 			individual architecture extensions or features.
 
 	config MCPU_ARM64_NATIVE
 		bool "Auto-detect host CPU"
+		select HAVE_ARM64_FEAT_RNG
+		select HAVE_ARM64_FEAT_PAUTH
+		select HAVE_ARM64_FEAT_BTI
 		help
 			Compile and optimize for the host CPU. Please note that this
 			option will fail in case of cross-compilation.
@@ -136,6 +142,9 @@ choice
 
 	config MCPU_ARM64_NEOVERSE_N2
 		bool "Neoverse N2"
+		select HAVE_ARM64_FEAT_RNG
+		select HAVE_ARM64_FEAT_PAUTH
+		select HAVE_ARM64_FEAT_BTI
 		help
 			Compile and optimize for Neoverse N2 CPUs.
 
@@ -148,24 +157,9 @@ endchoice
 menu "Armv8-A Extensions"
 	depends on MCPU_ARM64_NONE
 
-config ARM64_FEAT_PAUTH
-	bool "Armv8.3 Pointer Authentication"
-	select ARM64_FEAT_RNG
-	help
-	  Enable signing and authentication of pointers. This
-	  provides protections against classes of attacks that
-	  rely on memory corruption, such as stack smashing and
-	  ROP.
-
-	config ARM64_FEAT_BTI
-	bool "Armv8.5 Branch Target Identification"
-	help
-		BTI protects against JOP-like attacks by placing and
-		verifying landing pads on branch targets.
-
 menuconfig ARM64_FEAT_MTE
 	bool "Armv8.5 Memory Tagging Extensions"
-	select ARM64_FEAT_RNG
+	select HAVE_ARM64_FEAT_RNG
 	select HAVE_MEMTAG
 	select PAGING
 	help
@@ -201,15 +195,16 @@ config ARM64_FEAT_MTE_TCF_ASYMMETRIC
 endchoice
 endif
 
-config ARM64_FEAT_RNG
-	bool "Armv8.5 Random Number Generator"
-	default y if HAVE_RANDOM
-	help
-	  This enables the hardware RNG functionality provided by the
-	  processor. The architecture specifies that this is implemented
-	  by a Deterministic Random Bit Generator (DRBG) that is seeded
-	  from a TRNG.
 endmenu
+
+config HAVE_ARM64_FEAT_RNG
+	bool
+
+config HAVE_ARM64_FEAT_PAUTH
+	bool
+
+config HAVE_ARM64_FEAT_BTI
+	bool
 
 config ARM64_ERRATUM_858921
 	bool "Workaround for Cortex-A73 erratum 858921"
