@@ -1220,21 +1220,39 @@ static void pr_syscall(struct uk_streambuf *sb, int fmtf,
 
 #ifdef HAVE_uk_syscall_clone
 	case SYS_clone:
+		do {
+			unsigned long pt_tid_parent_ref;
+			unsigned long pt_tid_child_ref;
+			unsigned long flags;
+
+			flags = (unsigned long)va_arg(args, long);
+
+			if (flags & CLONE_PARENT_SETTID)
+				pt_tid_parent_ref = PT_VADDR | PT_REF;
+			else
+				pt_tid_parent_ref = PT_VADDR;
+
+			if (flags & CLONE_CHILD_SETTID)
+				pt_tid_child_ref = PT_VADDR | PT_REF;
+			else
+				pt_tid_child_ref = PT_VADDR;
+
 #if CONFIG_ARCH_X86_64
-		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc >= 0,
-			    PT_CLONEFLAGS,
-			    PT_VADDR, /* sp */
-			    PT_TID | PT_REF, /* ref to parent tid */
-			    PT_TID | PT_REF, /* ref to child tid */
-			    PT_VADDR /* tlsp */);
+			VPR_SYSCALL(sb, fmtf, syscall_num, args, rc >= 0,
+				    PT_CLONEFLAGS,
+				    PT_VADDR, /* sp */
+				    pt_tid_parent_ref, /* ref to parent tid */
+				    pt_tid_child_ref,  /* ref to child tid */
+				    PT_VADDR /* tlsp */);
 #else /* !CONFIG_ARCH_X86_64 */
-		VPR_SYSCALL(sb, fmtf, syscall_num, args, rc >= 0,
-			    PT_CLONEFLAGS,
-			    PT_VADDR, /* sp */
-			    PT_TID | PT_REF, /* ref to parent tid */
-			    PT_VADDR, /* tlsp */
-			    PT_TID | PT_REF /* ref to child tid */);
+			VPR_SYSCALL(sb, fmtf, syscall_num, args, rc >= 0,
+				    PT_CLONEFLAGS,
+				    PT_VADDR, /* sp */
+				    pt_tid_parent_ref, /* ref to parent tid */
+				    PT_VADDR, /* tlsp */
+				    pt_tid_child_ref); /* ref to child tid */
 #endif /* !CONFIG_ARCH_X86_64 */
+		} while (0);
 		PR_SYSRET(sb, fmtf, PT_TID, rc);
 		break;
 #endif /* HAVE_uk_syscall_clone */
