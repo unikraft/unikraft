@@ -706,7 +706,7 @@ static int ramfs_ioctl(struct vnode *dvp __unused,
 #define ramfs_seek      ((vnop_seek_t)vfscore_vop_nullop)
 #define ramfs_fsync     ((vnop_fsync_t)vfscore_vop_nullop)
 #define ramfs_link      ((vnop_link_t)vfscore_vop_eperm)
-#define ramfs_fallocate ((vnop_fallocate_t)vfscore_vop_nullop)
+#define ramfs_fallocate ((vnop_fallocate_t)vfscore_vop_einval)
 #define ramfs_poll      ((vnop_poll_t)vfscore_vop_einval)
 
 /*
