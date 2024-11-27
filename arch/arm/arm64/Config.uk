@@ -8,12 +8,20 @@ choice
 
 	config MCPU_ARM64_NONE
 		bool "None"
+		select HAVE_ARM64_FEAT_RNG
+		select HAVE_ARM64_FEAT_PAUTH
+		select HAVE_ARM64_FEAT_BTI
+		select HAVE_ARM64_FEAT_MTE
 		help
 			Do not compile for a specific CPU. This allows choosing
 			individual architecture extensions or features.
 
 	config MCPU_ARM64_NATIVE
 		bool "Auto-detect host CPU"
+		select HAVE_ARM64_FEAT_RNG
+		select HAVE_ARM64_FEAT_PAUTH
+		select HAVE_ARM64_FEAT_BTI
+		select HAVE_ARM64_FEAT_MTE
 		help
 			Compile and optimize for the host CPU. Please note that this
 			option will fail in case of cross-compilation.
@@ -136,6 +144,9 @@ choice
 
 	config MCPU_ARM64_NEOVERSE_N2
 		bool "Neoverse N2"
+		select HAVE_ARM64_FEAT_RNG
+		select HAVE_ARM64_FEAT_PAUTH
+		select HAVE_ARM64_FEAT_BTI
 		help
 			Compile and optimize for Neoverse N2 CPUs.
 
@@ -145,71 +156,17 @@ choice
 			Compile and optimize for Neoverse V1 CPUs.
 endchoice
 
-menu "Armv8-A Extensions"
-	depends on MCPU_ARM64_NONE
+config HAVE_ARM64_FEAT_RNG
+	bool
 
-config ARM64_FEAT_PAUTH
-	bool "Armv8.3 Pointer Authentication"
-	select ARM64_FEAT_RNG
-	help
-	  Enable signing and authentication of pointers. This
-	  provides protections against classes of attacks that
-	  rely on memory corruption, such as stack smashing and
-	  ROP.
+config HAVE_ARM64_FEAT_PAUTH
+	bool
 
-	config ARM64_FEAT_BTI
-	bool "Armv8.5 Branch Target Identification"
-	help
-		BTI protects against JOP-like attacks by placing and
-		verifying landing pads on branch targets.
+config HAVE_ARM64_FEAT_BTI
+	bool
 
-menuconfig ARM64_FEAT_MTE
-	bool "Armv8.5 Memory Tagging Extensions"
-	select ARM64_FEAT_RNG
-	select HAVE_MEMTAG
-	select PAGING
-	help
-	  Protects against memory safety violations by restricting
-	  access to tagged memory regions.
-
-if ARM64_FEAT_MTE
-choice ARM64_FEAT_MTE_TCF
-	prompt "Tag Check Fault Reporting"
-	default ARM64_FEAT_MTE_TCF_ASYNC
-
-config ARM64_FEAT_MTE_TCF_SYNC
-	bool "Synchronous"
-	help
-	  This option causes TCFs to trigger a Data Abort.
-	  Choose this option for high precision, at the
-	  cost of less performance.
-
-config ARM64_FEAT_MTE_TCF_ASYNC
-	bool "Asynchronous"
-	help
-	  This option causes TCFs to be accumulated and
-	  reported asynchronously.
-	  Choose this option for high performance at
-	  the cost of reduced precision.
-
-config ARM64_FEAT_MTE_TCF_ASYMMETRIC
-	bool "Asymmetric"
-	help
-	  This option causes synchronous TCF reporting on
-	  reads and asynchronous TCF reporting on writes.
-
-endchoice
-endif
-
-config ARM64_FEAT_RNG
-	bool "Armv8.5 Random Number Generator"
-	default y if HAVE_RANDOM
-	help
-	  This enables the hardware RNG functionality provided by the
-	  processor. The architecture specifies that this is implemented
-	  by a Deterministic Random Bit Generator (DRBG) that is seeded
-	  from a TRNG.
-endmenu
+config HAVE_ARM64_FEAT_MTE
+	bool
 
 config ARM64_ERRATUM_858921
 	bool "Workaround for Cortex-A73 erratum 858921"

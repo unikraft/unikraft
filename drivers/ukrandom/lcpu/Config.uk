@@ -1,0 +1,9 @@
+menuconfig LIBUKRANDOM_LCPU
+	bool "CPU generated randomness"
+	depends on (ARCH_X86_64 || (ARCH_ARM_64 && HAVE_ARM64_FEAT_RNG))
+	select LIBUKBOOT
+	help
+		Provides CPU generated randomness. This is normally implemented
+		by dedicated instructions such as RDRAND / RDSEED in x86_64, or
+		RNDR / RNDRRS in arm64.
+

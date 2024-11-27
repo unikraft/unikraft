@@ -1,29 +1,23 @@
 menu "Bus drivers"
-
 source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-bus.uk' -r '$(KCONFIG_DRIV_BASE)/ukbus' -l '$(KCONFIG_DRIV_BASE)/ukbus' -e '$(KCONFIG_EXCLUDEDIRS)')"
-
 endmenu
 
 menu "Interrupt controller"
-
 source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-intctlr.uk' -r '$(KCONFIG_DRIV_BASE)/ukintctlr' -l '$(KCONFIG_DRIV_BASE)/ukintctlr' -e '$(KCONFIG_EXCLUDEDIRS)')"
+endmenu
 
+menu "Random Number Generator"
+source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-random.uk' -r '$(KCONFIG_DRIV_BASE)/ukrandom' -l '$(KCONFIG_DRIV_BASE)/ukrandom' -e '$(KCONFIG_EXCLUDEDIRS)')"
 endmenu
 
 menu "Serial console"
-
 source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-console.uk' -r '$(KCONFIG_DRIV_BASE)/ukconsole' -l '$(KCONFIG_DRIV_BASE)/ukconsole' -e '$(KCONFIG_EXCLUDEDIRS)')"
-
 endmenu
 
 menu "Virtio"
-
 source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-virtio.uk' -r '$(KCONFIG_DRIV_BASE)/virtio' -l '$(KCONFIG_DRIV_BASE)/virtio' -e '$(KCONFIG_EXCLUDEDIRS)')"
-
 endmenu
 
 menu "Xen"
-
 source "$(shell,$(UK_BASE)/support/build/config-submenu.sh -q -o '$(KCONFIG_DIR)/drivers-xen.uk' -r '$(KCONFIG_DRIV_BASE)/xen' -l '$(KCONFIG_DRIV_BASE)/xen' -e '$(KCONFIG_EXCLUDEDIRS)')"
-
 endmenu

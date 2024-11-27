@@ -35,12 +35,12 @@
 #ifdef CONFIG_ARCH_ARM_64
 .macro smccc conduit
 
-#if CONFIG_ARM64_FEAT_PAUTH
+#if CONFIG_HAVE_ARM64_PAUTH
 	/* Also covers the case when both PAuth and BTI
 	 * are enalbled (ARM DDI 0487H.a Sect. D5.4.4)
 	 */
 	paciasp
-#elif CONFIG_ARM64_FEAT_BTI
+#elif CONFIG_HAVE_ARM64_BTI
 	bti jc
 #endif
 	str x19, [sp, #-16]!

@@ -1,0 +1,38 @@
+menuconfig LIBUKMEMTAG
+	bool "ukmemtag: Memory Tagging (EXPERIMENTAL)"
+	depends on (ARCH_ARM_64 && HAVE_ARM64_FEAT_MTE)
+	select LIBUKRANDOM
+	select PAGING
+	help
+		Protects against memory safety violations by restricting
+		access to tagged memory regions.
+
+if LIBUKMEMTAG
+choice LIBUKMEMTAG_TCF
+	prompt "Tag Check Fault Reporting"
+	default LIBUKMEMTAG_TCF_ASYNC
+
+config LIBUKMEMTAG_TCF_SYNC
+	bool "Synchronous"
+	help
+		This option causes TCFs to trigger a Data Abort.
+		Choose this option for high precision, at the
+		cost of less performance.
+
+config LIBUKMEMTAG_TCF_ASYNC
+	bool "Asynchronous"
+	help
+		This option causes TCFs to be accumulated and
+		reported asynchronously.
+		Choose this option for high performance at
+		the cost of reduced precision.
+
+config LIBUKMEMTAG_TCF_ASYMMETRIC
+	bool "Asymmetric"
+	help
+		This option causes synchronous TCF reporting on
+		reads and asynchronous TCF reporting on writes.
+		Requires MTEv3 or higher.
+
+endchoice
+endif
