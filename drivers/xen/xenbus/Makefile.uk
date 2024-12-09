@@ -1,6 +1,6 @@
 $(eval $(call addlib_s,libxenbus,$(CONFIG_LIBXENBUS)))
 
-LIBXENBUS_CINCLUDES-y          += -I$(LIBXENBUS_BASE)/include
+CINCLUDES-$(CONFIG_LIBXENBUS)  += -I$(LIBXENBUS_BASE)/include
 LIBXENBUS_CINCLUDES-y          += $(LIBXENPLAT_CINCLUDES-y)
 
 LIBXENBUS_CFLAGS-y             += $(LIBXENPLAT_CFLAGS-y)

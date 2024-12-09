@@ -30,8 +30,8 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef __XENBUS_H__
-#define __XENBUS_H__
+#ifndef __UK_XENBUS_H__
+#define __UK_XENBUS_H__
 
 #include <uk/arch/spinlock.h>
 #include <uk/bus.h>
@@ -153,4 +153,4 @@ void *uk_xb_malloc(size_t size);
 void *uk_xb_calloc(size_t nmemb, size_t size);
 void  uk_xb_free(void *ptr);
 
-#endif /* __XENBUS_H__ */
+#endif /* __UK_XENBUS_H__ */

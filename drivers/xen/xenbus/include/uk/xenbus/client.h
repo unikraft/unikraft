@@ -34,8 +34,8 @@
  * Ported from Mini-OS xenbus.c
  */
 
-#ifndef __XENBUS_CLIENT_H__
-#define __XENBUS_CLIENT_H__
+#ifndef __UK_XENBUS_CLIENT_H__
+#define __UK_XENBUS_CLIENT_H__
 
 #include <uk/xenbus/xenbus.h>
 
@@ -119,4 +119,4 @@ int uk_xenbus_switch_state(xenbus_transaction_t xbt,
 int uk_xenbus_wait_for_state_change(const char *path, XenbusState *state,
 	struct xenbus_watch *watch);
 
-#endif /* __XENBUS_CLIENT_H__ */
+#endif /* __UK_XENBUS_CLIENT_H__ */

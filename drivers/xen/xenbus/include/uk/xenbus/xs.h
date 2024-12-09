@@ -37,8 +37,8 @@
  * data is allocated with 'malloc'/'calloc'.
  */
 
-#ifndef __XS_H__
-#define __XS_H__
+#ifndef __UK_XS_H__
+#define __UK_XS_H__
 
 #include <uk/xenbus/xenbus.h>
 
@@ -296,4 +296,4 @@ int xs_printf(xenbus_transaction_t xbt, const char *dir, const char *node,
  */
 domid_t xs_get_self_id(void);
 
-#endif /* __XS_H__ */
+#endif /* __UK_XS_H__ */
