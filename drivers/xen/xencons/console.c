@@ -267,7 +267,7 @@ static struct uk_console_ops console_ops = {
 
 static struct uk_console console_dev;
 
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
 static int hv_console_prepare(struct ukplat_bootinfo *bi __unused)
 {
 	console_ring = mfn_to_virt(HYPERVISOR_start_info->console.domU.mfn);

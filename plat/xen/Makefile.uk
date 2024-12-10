@@ -14,17 +14,26 @@ $(eval $(call addplatlib_s,xen,libxenpvcalls,$(CONFIG_XEN_PVCALLS)))
 ##
 ## Xen platform compilation settings
 ##
-LIBXENPLAT_ASFLAGS-y     += -DXENPLAT -D__XEN_INTERFACE_VERSION__=$(XEN_INTERFACE_VERSION)
-LIBXENPLAT_CFLAGS-y      += -DXENPLAT -D__XEN_INTERFACE_VERSION__=$(XEN_INTERFACE_VERSION)
-LIBXENPLAT_CXXFLAGS-y    += -DXENPLAT -D__XEN_INTERFACE_VERSION__=$(XEN_INTERFACE_VERSION)
+# TODO: For now, we set the Xen interface options here. These options are
+#       picked up by `libxenheaders` and thereby have an influence on the
+#       Xen drivers (e.g., XenBus, netfront).
+#       With the re-structuring of the Xen platform library, we should find a
+#       a better place for this: probably with a Xen boot/entry driver.
+ASFLAGS-$(CONFIG_PLAT_XEN)  += -D__XEN_INTERFACE_VERSION__=$(XEN_INTERFACE_VERSION)
+CFLAGS-$(CONFIG_PLAT_XEN)   += -D__XEN_INTERFACE_VERSION__=$(XEN_INTERFACE_VERSION)
+CXXFLAGS-$(CONFIG_PLAT_XEN) += -D__XEN_INTERFACE_VERSION__=$(XEN_INTERFACE_VERSION)
+ifeq ($(CONFIG_ARCH_ARM_64), y)
+CFLAGS-$(CONFIG_PLAT_XEN)   += -DXEN_HAVE_PV_GUEST_ENTRY
+endif
+
+LIBXENPLAT_ASFLAGS-y     += -DXENPLAT
+LIBXENPLAT_CFLAGS-y      += -DXENPLAT
+LIBXENPLAT_CXXFLAGS-y    += -DXENPLAT
 
 LIBXENPLAT_ASFLAGS-y     += -DUK_USE_SECTION_SEGMENTS
 LIBXENPLAT_CFLAGS-y      += -DUK_USE_SECTION_SEGMENTS
 LIBXENPLAT_CXXFLAGS-y    += -DUK_USE_SECTION_SEGMENTS
 
-ifeq ($(CONFIG_ARCH_ARM_64), y)
-LIBXENPLAT_CFLAGS-y        += -DXEN_HAVE_PV_GUEST_ENTRY
-endif
 ##
 ## Default Linker script
 ifeq ($(CONFIG_ARCH_X86_64),y)
@@ -42,11 +51,16 @@ endif
 ##
 ## Platform library definitions
 ##
-LIBXENPLAT_ASINCLUDES-y        += -I$(LIBXENPLAT_BASE)/include
-LIBXENPLAT_ASINCLUDES-y        += -I$(UK_PLAT_COMMON_BASE)/include
-LIBXENPLAT_CINCLUDES-y         += -I$(LIBXENPLAT_BASE)/include
-LIBXENPLAT_CINCLUDES-y         += -I$(UK_PLAT_COMMON_BASE)/include
-LIBXENPLAT_CINCLUDES-y         += -I$(UK_PLAT_DRIVERS_BASE)/include
+# TODO: We intend to decompose(re-arch) the `libxenplat` library into
+#       individual driver libraries (e.g., CPU, memory). With this in place
+#       we aim a cleaner organization of these headers.
+# NOTE: We globally export these header includes because they are currently
+#       forming the API of `libxenplat`.
+ASINCLUDES-$(CONFIG_PLAT_XEN)        += -I$(LIBXENPLAT_BASE)/include
+ASINCLUDES-$(CONFIG_PLAT_XEN)        += -I$(UK_PLAT_COMMON_BASE)/include
+CINCLUDES-$(CONFIG_PLAT_XEN)         += -I$(LIBXENPLAT_BASE)/include
+CINCLUDES-$(CONFIG_PLAT_XEN)         += -I$(UK_PLAT_COMMON_BASE)/include
+CINCLUDES-$(CONFIG_PLAT_XEN)         += -I$(UK_PLAT_DRIVERS_BASE)/include
 
 LIBXENPLAT_SRCS-y              += $(UK_PLAT_XEN_DEF_LDS)
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/hypervisor.c
@@ -70,8 +84,10 @@ LIBXENPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBXENPLAT_BASE)/x86/arch_events.c
 LIBXENPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBXENPLAT_BASE)/x86/arch_time.c
 
 ifneq ($(CONFIG_XEN_HVMLITE),y)
-LIBXENPLAT_ASFLAGS-y           += -DCONFIG_PARAVIRT
-LIBXENPLAT_CFLAGS-y            += -DCONFIG_PARAVIRT
+# NOTE: Compile flag needed for being able to correctly use `libxenplat`
+#       headers: xen-x86/irq.h, xen-x86/mm.h
+ASFLAGS-$(CONFIG_PLAT_XEN)            += -DXEN_PARAVIRT
+CFLAGS-$(CONFIG_PLAT_XEN)             += -DXEN_PARAVIRT
 LIBXENPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBXENPLAT_BASE)/x86/cpu_pv.c
 else
 LIBXENPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(UK_PLAT_COMMON_BASE)/x86/cpu_native.c

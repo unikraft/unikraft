@@ -35,7 +35,7 @@ DECLARE_TRAP_EC(coproc_seg_overrun, "coprocessor segment overrun", NULL)
 DECLARE_TRAP   (spurious_int,       "spurious interrupt bug",      NULL)
 
 
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
 
 #define TRAP_TABLE_ENTRY(trapname, pl) \
 	{ TRAP_##trapname, pl, __KERNEL_CS, (unsigned long) ASM_TRAP_SYM(trapname) }

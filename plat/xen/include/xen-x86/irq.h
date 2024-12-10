@@ -30,7 +30,7 @@
 #ifndef PLAT_XEN_INCLUDE_XEN_X86_IRQ_H_
 #define PLAT_XEN_INCLUDE_XEN_X86_IRQ_H_
 
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
 
 #include <common/hypervisor.h>
 #include <xen-x86/smp.h>

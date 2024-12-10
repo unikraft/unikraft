@@ -234,7 +234,7 @@ static inline int ukarch_vaddr_range_isvalid(__vaddr_t start, __sz len)
 	 X86_PAT_ENTRY(6, X86_PAT_UCM) |			\
 	 X86_PAT_ENTRY(7, X86_PAT_UC))
 
-#ifndef CONFIG_PARAVIRT
+#ifndef XEN_PARAVIRT
 #ifndef __ASSEMBLY__
 static inline int ukarch_pte_read(__vaddr_t pt_vaddr, unsigned int lvl,
 				  unsigned int idx, __pte_t *pte)
@@ -291,4 +291,4 @@ static inline void ukarch_tlb_flush(void)
 	ukarch_pt_write_base(ukarch_pt_read_base());
 }
 #endif /* !__ASSEMBLY__ */
-#endif /* !CONFIG_PARAVIRT */
+#endif /* !XEN_PARAVIRT */

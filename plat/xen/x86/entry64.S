@@ -45,7 +45,7 @@
 4:.align 4                                ; \
     .popsection
 
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
 ELFNOTE(Xen, XEN_ELFNOTE_GUEST_OS, .asciz "Unikraft")
 ELFNOTE(Xen, XEN_ELFNOTE_LOADER, .asciz "generic")
 ELFNOTE(Xen, XEN_ELFNOTE_HYPERCALL_PAGE, _WORD hypercall_page)
@@ -183,7 +183,7 @@ KERNEL_CS_MASK = 0xfc
 
 /* Macros */
 .macro SAVE_PARAVIRT
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
 	pop %rcx
 	pop %r11 /* rsp points to the error code */
 #endif
@@ -255,7 +255,7 @@ ENTRY(ASM_TRAP_SYM(\trapname))
 .endm
 
 .macro HYPERVISOR_IRET
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
 	testl $NMI_MASK,2*8(%rsp)
 	jnz   2f
 
@@ -265,7 +265,7 @@ ENTRY(ASM_TRAP_SYM(\trapname))
 #endif
 	iretq
 
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
 2:	/* Slow iret via hypervisor. */
 	andl  $~NMI_MASK, 16(%rsp)
 	pushq $0
@@ -288,7 +288,7 @@ error_entry:
 	jmp error_exit
 
 
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
 /*
  * Xen event (virtual interrupt) entry point.
  */
@@ -392,7 +392,7 @@ critical_region_fixup:
 #endif
 
 ENTRY(asm_failsafe_callback)
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
         popq  %rcx
         popq  %r11
 #endif

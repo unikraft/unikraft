@@ -43,7 +43,7 @@
 #define CONST(x) x
 #endif
 
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
 #include <xen-x86/mm_pv.h>
 #endif
 
@@ -171,7 +171,7 @@ typedef unsigned long paddr_t;
 typedef unsigned long maddr_t;
 
 extern pgentry_t *pt_base;
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
 extern unsigned long *phys_to_machine_mapping;
 #endif
 

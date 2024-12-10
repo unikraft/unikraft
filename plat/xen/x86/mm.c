@@ -46,7 +46,7 @@
 #include <uk/print.h>
 #include <uk/assert.h>
 
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
 #include <xen-x86/mm_pv.h>
 unsigned long *phys_to_machine_mapping;
 #endif
@@ -72,7 +72,7 @@ static void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn,
 {
     pgentry_t *tab;
     unsigned long pt_page = (unsigned long)pfn_to_virt(*pt_pfn);
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
     mmu_update_t mmu_updates[1];
     int rc;
 #endif
@@ -87,7 +87,7 @@ static void new_pt_frame(unsigned long *pt_pfn, unsigned long prev_l_mfn,
 
     UK_ASSERT(level >= 1 && level <= PAGETABLE_LEVELS);
 
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
     /* Make PFN a page table page */
     tab = pt_base;
 #if defined(__x86_64__)
@@ -126,7 +126,7 @@ void _init_mem_build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
     pgentry_t *tab = pt_base, page;
     unsigned long pt_mfn = pfn_to_mfn(virt_to_pfn(pt_base));
     unsigned long offset;
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
     static mmu_update_t mmu_updates[L1_PAGETABLE_ENTRIES + 1];
     int count = 0;
     int rc;
@@ -136,7 +136,7 @@ void _init_mem_build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
        mapped, start the loop at the very beginning. */
     pfn_to_map = *start_pfn;
 
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
     if ( *max_pfn >= virt_to_pfn(HYPERVISOR_VIRT_START) )
     {
 	    uk_pr_warn("Trying to use Xen virtual space. "
@@ -179,7 +179,7 @@ void _init_mem_build_pagetable(unsigned long *start_pfn, unsigned long *max_pfn)
         pt_mfn = pte_to_mfn(page);
         tab = to_virt(mfn_to_pfn(pt_mfn) << PAGE_SHIFT);
         offset = l2_table_offset(start_address);
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
         /* Need new L1 pt frame */
         if ( !(tab[offset] & _PAGE_PRESENT) )
             new_pt_frame(&pt_pfn, pt_mfn, offset, L1_FRAME);
@@ -350,7 +350,7 @@ int do_map_frames(unsigned long va,
 		memset(err, 0, n * sizeof(int));
 
 	while (mapped < n) {
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
 		unsigned long i;
 		int rc;
 		unsigned long batched;
@@ -480,7 +480,7 @@ void *map_frames_ex(const unsigned long *mfns, unsigned long n,
 #define UNMAP_BATCH ((STACK_SIZE / 4) / sizeof(multicall_entry_t))
 int unmap_frames(unsigned long va, unsigned long num_frames)
 {
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
 	unsigned long i, n = UNMAP_BATCH;
 	multicall_entry_t call[n];
 	int ret;
@@ -492,7 +492,7 @@ int unmap_frames(unsigned long va, unsigned long num_frames)
 		    (void *) va, num_frames);
 
 	while (num_frames) {
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
 		if (n > num_frames)
 			n = num_frames;
 
@@ -543,7 +543,7 @@ void _init_mem_set_readonly(void *text, void *etext)
     unsigned long mfn;
     unsigned long offset;
     unsigned long page_size = PAGE_SIZE;
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
     static mmu_update_t mmu_updates[L1_PAGETABLE_ENTRIES + 1];
     int count = 0;
     int rc;
@@ -579,7 +579,7 @@ void _init_mem_set_readonly(void *text, void *etext)
 
         if ( start_address != (unsigned long)&_libxenplat_shared_info )
         {
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
             mmu_updates[count].ptr = 
                 ((pgentry_t)mfn << PAGE_SHIFT) + sizeof(pgentry_t) * offset;
             mmu_updates[count].val = tab[offset] & ~_PAGE_RW;
@@ -591,7 +591,7 @@ void _init_mem_set_readonly(void *text, void *etext)
 
         start_address += page_size;
 
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
         if ( count == L1_PAGETABLE_ENTRIES || 
              start_address + page_size > end_address )
         {
@@ -603,7 +603,7 @@ void _init_mem_set_readonly(void *text, void *etext)
 #endif
     }
 
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
     {
         mmuext_op_t op = {
             .cmd = MMUEXT_TLB_FLUSH_ALL,
@@ -619,7 +619,7 @@ void _init_mem_set_readonly(void *text, void *etext)
  */
 void _init_mem_clear_bootstrap(void)
 {
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
     pte_t nullpte = { };
     int rc;
 #endif
@@ -629,7 +629,7 @@ void _init_mem_clear_bootstrap(void)
     /* Use first page as the CoW zero page */
 	memset((void *)__TEXT, 0, PAGE_SIZE);
 	mfn_zero = virt_to_mfn(__TEXT);
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
     if ( (rc = HYPERVISOR_update_va_mapping(0, nullpte, UVMF_INVLPG)) )
 	    uk_pr_err("Unable to unmap NULL page. rc=%d\n", rc);
 #endif
@@ -711,7 +711,7 @@ void arch_mm_init(struct uk_alloc *a)
 
 void _init_mem_prepare(unsigned long *start_pfn, unsigned long *max_pfn)
 {
-#ifdef CONFIG_PARAVIRT
+#ifdef XEN_PARAVIRT
     phys_to_machine_mapping = (unsigned long *)HYPERVISOR_start_info->mfn_list;
     pt_base = (pgentry_t *)HYPERVISOR_start_info->pt_base;
     *start_pfn = PFN_UP(to_phys(pt_base)) + HYPERVISOR_start_info->nr_pt_frames;
