@@ -1,5 +1,6 @@
 menuconfig LIBUKCONSOLE
 	bool "ukconsole: generic console driver interface"
+	default y
 
 if LIBUKCONSOLE
 config LIBUKCONSOLE_TEST
