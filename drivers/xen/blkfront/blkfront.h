@@ -47,7 +47,7 @@
 #endif
 
 #include <xen/io/blkif.h>
-#include <common/gnttab.h>
+#include <uk/xen/gnttab.h>
 #include <common/events.h>
 
 #define BLK_RING_PAGES_NUM 1

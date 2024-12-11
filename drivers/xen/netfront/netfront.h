@@ -38,7 +38,7 @@
 #include <uk/netbuf.h>
 #include <uk/semaphore.h>
 #include <xen/io/netif.h>
-#include <common/gnttab.h>
+#include <uk/xen/gnttab.h>
 #include <common/events.h>
 #if defined(__aarch64__)
 #include <xen-arm/mm.h>

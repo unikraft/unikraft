@@ -44,16 +44,4 @@ config XEN_PV_BUILD_P2M
 		Create and initialize physical to machine (p2m) table on a PV
 		xen host
 
-config XEN_GNTTAB
-	bool "Grant table support"
-	default y if (XEN_PV || ARCH_ARM_64)
-	depends on (ARCH_X86_64 || ARCH_ARM_64)
-	select LIBXENBUS
-	select LIBUKALLOC
-	select LIBUKLOCK
-	select LIBUKLOCK_SEMAPHORE
-	select LIBUKSCHED
-	help
-		Support grant table operations
-
 endif

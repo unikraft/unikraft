@@ -43,7 +43,7 @@
 #endif
 #include <xen/io/9pfs.h>
 #include <common/events.h>
-#include <common/gnttab.h>
+#include <uk/xen/gnttab.h>
 
 struct p9front_dev_ring {
 	/* Backpointer to the p9front device. */

@@ -122,9 +122,3 @@ endif
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/lcpu.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/shutdown.c
 LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/events.c
-
-ifeq ($(CONFIG_XEN_GNTTAB),y)
-LIBXENPLAT_SRCS-y              += $(LIBXENPLAT_BASE)/gnttab.c
-LIBXENPLAT_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBXENPLAT_BASE)/x86/gnttab.c|x86
-LIBXENPLAT_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBXENPLAT_BASE)/arm/gnttab.c|arm64
-endif

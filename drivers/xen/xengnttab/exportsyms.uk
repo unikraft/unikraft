@@ -1,0 +1,10 @@
+gnttab_init
+gnttab_fini
+gnttab_alloc_and_grant
+gnttab_grant_access
+gnttab_grant_transfer
+gnttab_update_grant
+gnttab_end_transfer
+gnttab_end_access
+gnttabop_error
+gnttab_arch_init

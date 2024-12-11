@@ -31,9 +31,12 @@
  * POSSIBILITY OF SUCH DAMAGE.
  */
 
+#include <uk/config.h>
 #include <stdint.h>
 
-#include <common/gnttab.h>
+#if CONFIG_LIBXENGNTTAB
+#include <uk/xen/gnttab.h>
+#endif /* CONFIG_LIBXENGNTTAB */
 #if (defined __X86_32__) || (defined __X86_64__)
 #include <xen-x86/setup.h>
 #include <xen-x86/mm_pv.h>
@@ -50,7 +53,8 @@ void mm_init(void)
 int _ukplat_mem_mappings_init(void)
 {
 	mm_init();
-#ifdef CONFIG_XEN_GNTTAB
+#ifdef CONFIG_LIBXENGNTTAB
+	/* TODO: Move `gnttab_init()` to (early) ctortab */
 	gnttab_init();
 #endif
 	return 0;

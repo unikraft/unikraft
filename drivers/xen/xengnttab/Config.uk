@@ -1,0 +1,11 @@
+config LIBXENGNTTAB
+	bool "xengnttab: Xen Grant Table"
+	select LIBXENHEADERS
+	select LIBXENBUS
+	select LIBUKALLOC
+	select LIBUKLOCK
+	select LIBUKLOCK_SEMAPHORE
+	depends on (ARCH_X86_64 || ARCH_ARM_64)
+	depends on HAVE_XENBUS
+	help
+		Support grant table operations

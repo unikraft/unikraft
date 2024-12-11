@@ -2,6 +2,7 @@ menuconfig LIB9PFRONT
 	bool "9pfront: Xen 9pfs volumes"
 	select LIBXENBUS
 	select LIBXENHEADERS
+	select LIBXENGNTTAB
 	depends on HAVE_XENBUS
 	depends on LIBUK9P
 	help

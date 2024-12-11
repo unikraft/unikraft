@@ -2,6 +2,7 @@ menuconfig LIBBLKFRONT
 	bool "blkfront: Xen block devices"
 	select LIBXENHEADERS
 	select LIBXENBUS
+	select LIBXENGNTTAB
 	depends on HAVE_XENBUS
 	depends on LIBUKBLKDEV
 	help

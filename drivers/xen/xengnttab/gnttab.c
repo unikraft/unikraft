@@ -25,7 +25,7 @@
 #include <uk/atomic.h>
 #include <uk/plat/lcpu.h>
 #include <uk/semaphore.h>
-#include <common/gnttab.h>
+#include <uk/xen/gnttab.h>
 #if defined(__i386__) || defined(__x86_64__)
 #include <xen-x86/mm.h>
 

@@ -1,0 +1,7 @@
+$(eval $(call addlib_s,libxengnttab,$(CONFIG_LIBXENGNTTAB)))
+
+CINCLUDES-$(CONFIG_LIBXENGNTTAB)        += -I$(LIBXENGNTTAB_BASE)/include
+
+LIBXENGNTTAB_SRCS-y                     += $(LIBXENGNTTAB_BASE)/gnttab.c
+LIBXENGNTTAB_SRCS-$(CONFIG_ARCH_X86_64) += $(LIBXENGNTTAB_BASE)/arch/x86_64/gnttab.c|x86_64
+LIBXENGNTTAB_SRCS-$(CONFIG_ARCH_ARM_64) += $(LIBXENGNTTAB_BASE)/arch/arm64/gnttab.c|arm64
