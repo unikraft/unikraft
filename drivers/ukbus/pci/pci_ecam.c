@@ -350,10 +350,16 @@ int gen_pci_irq_parse(const fdt32_t *addr, struct fdt_phandle_args *out_irq)
 			prop = fdt_getprop(dtb, newpar, "#address-cells",
 					   &plen);
 			if (prop == NULL) {
-				uk_pr_info(" -> parent lacks #address-cells!\n");
+#ifdef CONFIG_DTB_INTERRUPT_ADDRESS_CELLS_ERRATA
+				uk_pr_info(" -> parent lacks #address-cells, assume 0 cells\n");
+				newaddrsize = 0;
+#else
+				uk_pr_info(" -> parent lacks #address-cells! abort parsing...\n");
 				goto fail;
+#endif
+			} else {
+				newaddrsize = fdt32_to_cpu(prop[0]);
 			}
-			newaddrsize = fdt32_to_cpu(prop[0]);
 
 			uk_pr_debug(" -> newintsize=%d, newaddrsize=%d\n",
 			    newintsize, newaddrsize);
