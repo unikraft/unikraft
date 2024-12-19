@@ -60,19 +60,19 @@
 		"/* Use `struct lcpu` pointer from TPIDR_EL1 */\n\t"	\
 		"mrs	x0, tpidr_el1\n\t"				\
 		" /* Switch to per-CPU auxiliary stack */\n\t"		\
-		"ldr	x0, [x0, #"STRINGIFY(LCPU_AUXSP_OFFSET)"]\n\t"	\
-		"sub	x0, x0, #"STRINGIFY(UKARCH_AUXSPCB_SIZE)"\n\t"	\
+		"ldr	x0, [x0, #" STRINGIFY(LCPU_AUXSP_OFFSET) "]\n\t"\
+		"sub	x0, x0, #" STRINGIFY(UKARCH_AUXSPCB_SIZE) "\n\t"\
 		"ldr	x0, [x0, #"					\
-			STRINGIFY(UKARCH_AUXSPCB_OFFSETOF_CURR_FP)"]\n\t"\
+			STRINGIFY(UKARCH_AUXSPCB_OFFSETOF_CURR_FP) "]\n\t"\
 		"/* Auxiliary stack is already ECTX aligned */\n\t"	\
 		"/* Make room for `struct ukarch_execenv` */\n\t"	\
-		"sub	x0, x0, #"STRINGIFY(UKARCH_EXECENV_SIZE)"\n\t"	\
+		"sub	x0, x0, #" STRINGIFY(UKARCH_EXECENV_SIZE) "\n\t"\
 		"/* Swap x0 and (old) sp */\n\t"			\
 		"add	sp, sp, x0\n\t"					\
 		"sub	x0, sp, x0\n\t"					\
 		"sub	sp, sp, x0\n\t"					\
 		"/* Now store old sp w.r.t. `struct __regs` */\n\t"	\
-		"str	x0, [sp, #"STRINGIFY(__SP_OFFSET)"]\n\t"	\
+		"str	x0, [sp, #" STRINGIFY(__SP_OFFSET) "]\n\t"	\
 		"/* Restore x0 from scratch register TPIDRRO_EL0 */\n\t"\
 		"mrs	x0, tpidrro_el0\n\t"				\
 		"/* Now just store the rest of `struct __regs` */\n\t"	\
@@ -104,27 +104,27 @@
 		" * following a SVC.\n\t"				\
 		" */\n\t"						\
 		"mov	x22, #"						\
-			STRINGIFY(UK_SYSCALL_PROLOGUE_SPSR_EL1_SVC64_DEFAULT_VALUE)"\n\t"\
+			STRINGIFY(UK_SYSCALL_PROLOGUE_SPSR_EL1_SVC64_DEFAULT_VALUE) "\n\t"\
 		"/* Same for esr_el1, make it look like a SVC\n\t"	\
 		" * happened.\n\t"					\
 		" */\n\t"						\
 		"mov	x23, xzr\n\t"					\
-		"add	x23, x23, #"STRINGIFY(ESR_EL1_EC_SVC64)"\n\t"	\
-		"orr	x23, xzr, x23, lsl #"STRINGIFY(ESR_EC_SHIFT)"\n\t"\
-		"orr	x23, x23, #"STRINGIFY(ESR_IL)"\n\t"		\
+		"add	x23, x23, #" STRINGIFY(ESR_EL1_EC_SVC64) "\n\t"	\
+		"orr	x23, xzr, x23, lsl #" STRINGIFY(ESR_EC_SHIFT) "\n\t"\
+		"orr	x23, x23, #" STRINGIFY(ESR_IL) "\n\t"		\
 		"stp	x22, x23, [sp, #16 * 16]\n\t"			\
 		"/* ECTX at slot w.r.t. `struct ukarch_execenv` */\n\t"	\
 		"mov	x0, sp\n\t"					\
-		"add	x0, x0, #("STRINGIFY(__REGS_SIZEOF +		\
-				     UKARCH_SYSCTX_SIZE)")\n\t"		\
+		"add	x0, x0, #(" STRINGIFY(__REGS_SIZEOF +		\
+				     UKARCH_SYSCTX_SIZE) ")\n\t"	\
 		"bl	ukarch_ectx_store\n\t"				\
 		"/* SYSCTX at slot w.r.t. `struct ukarch_execenv` */\n\t"\
 		"mov	x0, sp\n\t"					\
-		"add	x0, x0, #"STRINGIFY(__REGS_SIZEOF)"\n\t"	\
+		"add	x0, x0, #" STRINGIFY(__REGS_SIZEOF) "\n\t"	\
 		"bl	ukarch_sysctx_store\n\t"			\
 		"mov	x0, sp\n\t"					\
 		"msr	daifclr, #2\n\t"				\
-		"bl	"STRINGIFY(fname)"\n\t"				\
+		"bl	" STRINGIFY(fname) "\n\t"			\
 		"/* Only restore callee preserved regs (ABI) */\n\t"	\
 		"ldr	x30, [sp, #16 * 15]\n\t"			\
 		"ldp	x28, x29, [sp, #16 * 14]\t\n"			\
@@ -134,7 +134,7 @@
 		"ldp	x20, x21, [sp, #16 * 10]\t\n"			\
 		"ldp	x18, x19, [sp, #16 * 9]\t\n"			\
 		"/* Restore rsp from where it was stored */\n\t"	\
-		"ldr	x9, [sp, #"STRINGIFY(__SP_OFFSET)"]\n\t"	\
+		"ldr	x9, [sp, #" STRINGIFY(__SP_OFFSET) "]\n\t"	\
 		"mov	sp, x9\n\t"					\
 		"ret\n\t"						\
 		::							\

@@ -32,11 +32,11 @@
 		"/* Switch to the per-CPU auxiliary stack */\n\t"	\
 		"/* AMD64 SysV ABI: r11 is scratch register */\n\t"	\
 		"movq   %%rsp, %%r11\n\t"				\
-		"movq	%%gs:("STRINGIFY(LCPU_AUXSP_OFFSET)"), %%rsp\n\t"\
+		"movq	%%gs:(" STRINGIFY(LCPU_AUXSP_OFFSET) "), %%rsp\n\t"\
 		"/* Auxiliary stack is already ECTX aligned */\n\t"	\
 		"/* Make room for `struct UKARCH_EXECENV` */\n\t"	\
-		"subq	$("STRINGIFY(UKARCH_EXECENV_SIZE -		\
-				     __REGS_SIZEOF)"), %%rsp\n\t"	\
+		"subq	$(" STRINGIFY(UKARCH_EXECENV_SIZE -		\
+				     __REGS_SIZEOF)" ), %%rsp\n\t"	\
 		"/* Now build stack frame beginning with 5 pointers\n\t"\
 		" * in the classical iretq/`struct __regs` format\n\t"	\
 		" */\n\t"						\
@@ -56,7 +56,7 @@
 		" * manually set the flag.\n\t"				\
 		" */\n\t"						\
 		"pushfq\n\t"						\
-		"orq	$("STRINGIFY(X86_EFLAGS_IF)"), 0(%%rsp)\n\t"	\
+		"orq	$(" STRINGIFY(X86_EFLAGS_IF) "), 0(%%rsp)\n\t"	\
 		"/* Push code segment, GDT code segment selector:\n\t"	\
 		" * [15: 3]: Selector Index - first GDT entry\n\t"	\
 		" * [ 2: 2]: Table Indicator - GDT, table 0\n\t"	\
@@ -87,20 +87,20 @@
 		"pushq	%%r13\n\t"					\
 		"pushq	%%r14\n\t"					\
 		"pushq	%%r15\n\t"					\
-		"subq	$("STRINGIFY(__REGS_PAD_SIZE)"), %%rsp\n\t"	\
-		"/* ECTX at slot w.r.t. `struct UKARCH_EXECENV` */\n\t"\
+		"subq	$(" STRINGIFY(__REGS_PAD_SIZE) "), %%rsp\n\t"	\
+		"/* ECTX at slot w.r.t. `struct UKARCH_EXECENV` */\n\t" \
 		"movq	%%rsp, %%rdi\n\t"				\
-		"addq	$("STRINGIFY(__REGS_SIZEOF +			\
-				     UKARCH_SYSCTX_SIZE)"), %%rdi\n\t"	\
+		"addq	$(" STRINGIFY(__REGS_SIZEOF +			\
+				     UKARCH_SYSCTX_SIZE) "), %%rdi\n\t"	\
 		"call	ukarch_ectx_store\n\t"				\
 		"/* SYSCTX at slot w.r.t. `struct UKARCH_EXECENV` */\n\t"\
 		"movq	%%rsp, %%rdi\n\t"				\
-		"addq	$("STRINGIFY(__REGS_SIZEOF)"), %%rdi\n\t"	\
+		"addq	$(" STRINGIFY(__REGS_SIZEOF) "), %%rdi\n\t"	\
 		"call	ukarch_sysctx_store\n\t"			\
 		"movq	%%rsp, %%rdi\n\t"				\
 		"sti\n\t"						\
-		"call	"STRINGIFY(fname)"\n\t"				\
-		"addq	$("STRINGIFY(__REGS_PAD_SIZE)"), %%rsp\n\t"	\
+		"call	" STRINGIFY(fname) "\n\t"			\
+		"addq	$(" STRINGIFY(__REGS_PAD_SIZE) "), %%rsp\n\t"	\
 		"/* Only restore callee preserved regs (ABI) */\n\t"	\
 		"popq	%%r15\n\t"					\
 		"popq	%%r14\n\t"					\
