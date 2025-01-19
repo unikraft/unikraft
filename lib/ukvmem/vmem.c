@@ -966,6 +966,10 @@ static inline int vmem_largest_level(__vaddr_t vaddr, __sz len,
 static inline int vmem_access_allowed(unsigned long attr,
 				      unsigned int faulttype)
 {
+	if (faulttype & UK_VMA_FAULT_SS_ACCESS) {
+		return (attr & X86_PTE_DIRTY) && !(attr & PAGE_ATTR_PROT_WRITE);
+	}
+
 	switch (faulttype & UK_VMA_FAULT_ACCESSTYPE) {
 	case UK_VMA_FAULT_READ:
 		return (attr & PAGE_ATTR_PROT_READ);

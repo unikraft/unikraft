@@ -29,6 +29,9 @@ static int vmem_arch_pagefault(void *data)
 	else
 		faulttype = UK_VMA_FAULT_READ;
 
+	if (ctx->error_code & X86_PF_EC_SS)
+		faulttype |= UK_VMA_FAULT_SS_ACCESS;
+
 	if (!(ctx->error_code & X86_PF_EC_P))
 		faulttype |= UK_VMA_FAULT_NONPRESENT;
 	else if (ctx->error_code & X86_PF_EC_RSVD)

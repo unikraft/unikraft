@@ -163,6 +163,8 @@ struct uk_vm_fault {
 #define UK_VMA_FAULT_WRITE		0x01 /* Attempted write access */
 #define UK_VMA_FAULT_EXEC		0x02 /* Attempted instruction fetch */
 
+#define UK_VMA_FAULT_SS_ACCESS  (1 << 6) /* Attempted shadow stack access */
+
 #define UK_VMA_FAULT_NONPRESENT		0x04 /* Page not present */
 #define UK_VMA_FAULT_MISCONFIG		0x08 /* Misconfiguration in PT */
 
