@@ -307,8 +307,10 @@ int uk_sys_timerfd_settime(const struct uk_file *f, int flags,
 	struct timerfd_node *d;
 	const struct itimerspec *set;
 	struct itimerspec absset;
+	struct timespec t;
 	const int disarm = !new_value->it_value.tv_sec &&
 			   !new_value->it_value.tv_nsec;
+	const int abstime = !!(flags & TFD_TIMER_ABSTIME);
 
 	if (unlikely(flags & ~TFD_TIMER_ABSTIME))
 		return -EINVAL;
@@ -317,18 +319,22 @@ int uk_sys_timerfd_settime(const struct uk_file *f, int flags,
 
 	d = f->node;
 	uk_file_wlock(f);
-	if (disarm || flags & TFD_TIMER_ABSTIME) {
+	if (old_value || !(disarm || abstime))
+		uk_sys_clock_gettime(d->clkid, &t);
+
+	if (disarm || abstime) {
 		set = new_value;
 	} else {
-		struct timespec t;
-
-		uk_sys_clock_gettime(d->clkid, &t);
 		absset.it_interval = new_value->it_interval;
 		absset.it_value = uk_time_spec_sum(&new_value->it_value, &t);
 		set = &absset;
 	}
-	if (old_value)
-		*old_value = d->set;
+	if (old_value) {
+		struct timerfd_status st = _timerfd_valnext(&d->set, &t);
+
+		old_value->it_interval = d->set.it_interval;
+		old_value->it_value = uk_time_spec_from_nsec(st.next);
+	}
 	_timerfd_set(d, set);
 	(void)_timerfd_update(f);
 	uk_file_wunlock(f);
