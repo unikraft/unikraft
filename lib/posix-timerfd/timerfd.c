@@ -306,6 +306,18 @@ int uk_sys_timerfd_create(clockid_t id, int flags)
 
 #endif /* CONFIG_LIBPOSIX_FDTAB */
 
+/**
+ * Return non-zero if `val` contains either negative or non-canonical times.
+ */
+static inline
+int timerfd_check_settime(const struct itimerspec *val)
+{
+	return !uk_time_spec_canonical(&val->it_value) ||
+	       !uk_time_spec_canonical(&val->it_interval) ||
+	       !uk_time_spec_positive(&val->it_value) ||
+	       !uk_time_spec_positive(&val->it_interval);
+}
+
 int uk_sys_timerfd_settime(const struct uk_file *f, int flags,
 			   const struct itimerspec *new_value,
 			   struct itimerspec *old_value)
@@ -319,6 +331,8 @@ int uk_sys_timerfd_settime(const struct uk_file *f, int flags,
 	if (unlikely(flags & ~TFD_TIMER_ABSTIME))
 		return -EINVAL;
 	if (unlikely(f->vol != TIMERFD_VOLID))
+		return -EINVAL;
+	if (unlikely(timerfd_check_settime(new_value)))
 		return -EINVAL;
 
 	d = f->node;
