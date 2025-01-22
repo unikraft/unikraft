@@ -27,6 +27,7 @@ static const char TIMERFD_VOLID[] = "timerfd_vol";
 struct timerfd_node {
 	struct itimerspec set;
 	__u64 val;
+	__u64 total;
 	clockid_t clkid;
 	struct uk_thread *upthread;
 };
@@ -97,12 +98,11 @@ static __nsec _timerfd_update(const struct uk_file *f)
 	deadline = now + st.next;
 
 	/* Update val & events */
-	if (st.exp != d->val) {
-		d->val = st.exp;
-		if (st.exp)
-			uk_file_event_set(f, UKFD_POLLIN);
-		else
-			uk_file_event_clear(f, UKFD_POLLIN);
+	UK_ASSERT(st.exp >= d->total);
+	if (st.exp > d->total) {
+		d->val += st.exp - d->total;
+		d->total = st.exp;
+		uk_file_event_set(f, UKFD_POLLIN);
 	}
 	return deadline;
 }
@@ -119,6 +119,7 @@ static void _timerfd_set(struct timerfd_node *d, const struct itimerspec *set)
 		/* Arm */
 		d->set.it_value = set->it_value;
 		d->set.it_interval = set->it_interval;
+		d->total = 0;
 		uk_thread_wake(d->upthread);
 	}
 }
