@@ -5,6 +5,7 @@
  * (C) 2003 - Rolf Neugebauer - Intel Research Cambridge
  * (C) 2005 - Grzegorz Milos - Intel Research Cambridge
  * (C) 2017 - Simon Kuenzer - NEC Europe Ltd.
+ * (C) 2025 - Unikraft GmbH and The Unikraft Authors
  ****************************************************************************
  *
  *        File: mm.c
@@ -12,8 +13,10 @@
  *     Changes: Grzegorz Milos
  *     Changes: Simon Kuenzer <simon.kuenzer@neclab.eu>
  *     Changes: Nour-eddine Taleb <contact@noureddine.xyz>
+ *     Changes: Andrei Tatar <ttr@unikraft.io>
  *
- *        Date: Aug 2003, changes Aug 2005, changes Oct 2017, changes Dec 2022
+ *        Date: Aug 2003, changes Aug 2005, changes Oct 2017, changes Dec 2022,
+ *              changes Feb/Jul 2025
  *
  * Environment: Unikraft
  * Description: buddy page allocator from Xen.
@@ -49,24 +52,20 @@
 #include <uk/bitops/bitscan.h>
 #include <uk/print.h>
 #include <uk/assert.h>
+#include <uk/list.h>
 #include <uk/page.h>
 
-typedef struct chunk_head_st chunk_head_t;
-typedef struct chunk_tail_st chunk_tail_t;
-
-struct chunk_head_st {
-	chunk_head_t *next;
-	chunk_head_t **pprev;
-	unsigned int level;
+struct chunk_head {
+	struct uk_hlist_node link;
+	unsigned int page_order;
 };
 
-struct chunk_tail_st {
-	unsigned int level;
-};
+#define CHUNK_END(buf, ord) \
+	((void *)(((char *)(buf)) + (1ULL << ((ord) + __PAGE_SHIFT))))
 
 /* Linked lists of free chunks of different powers-of-two in size. */
 #define FREELIST_SIZE ((sizeof(void *) << 3) - __PAGE_SHIFT)
-#define FREELIST_EMPTY(_l) ((_l)->next == NULL)
+#define FREELIST_EMPTY(_l) uk_hlist_empty((_l))
 #define FREELIST_ALIGNED(ptr, lvl) \
 	!((uintptr_t)(ptr) & ((1ULL << ((lvl) + __PAGE_SHIFT)) - 1))
 
@@ -81,8 +80,7 @@ struct uk_bbpalloc_memr {
 
 struct uk_bbpalloc {
 	unsigned long nr_free_pages;
-	chunk_head_t *free_head[FREELIST_SIZE];
-	chunk_head_t free_tail[FREELIST_SIZE];
+	struct uk_hlist_head free_head[FREELIST_SIZE];
 	struct uk_bbpalloc_memr *memr_head;
 };
 
@@ -99,42 +97,36 @@ struct uk_bbpalloc {
 
 #define _FREESAN_LOCFMT "\t@ %p (free_head[%zu](%p) + %zu): "
 
-#define _FREESAN_HEAD(head) \
-do { \
-	size_t off = 0; \
-	for (chunk_head_t *c = head; c; c = c->next, off++) { \
-		if (c->next != NULL && c->level != i) { \
-			uk_pr_err("Bad page level" _FREESAN_LOCFMT \
-			          "got %u, expected %zu\n", \
-			          c, i, head, off, c->level, i); \
-		} \
-		if (_FREESAN_BAD_CHUNKPTR(c->pprev)) { \
-			uk_pr_err("Bad pprev pointer" _FREESAN_LOCFMT "%p\n", \
-			          c, i, head, off, c->pprev); \
-		} else if (*c->pprev != c) { \
-			uk_pr_err("Bad backward link" _FREESAN_LOCFMT \
-			          "got %p, expected %p\n", \
-			          c, i, head, off, *c->pprev, c); \
-		} \
-		if (_FREESAN_BAD_CHUNKPTR(c->next)) { \
-			uk_pr_err("Bad next pointer" _FREESAN_LOCFMT "%p\n", \
-			          c, i, head, off, c->next); \
-			break; \
-		} else if (!FREELIST_ALIGNED(c->next, i) && \
-		           c->next->next != NULL) { \
-			uk_pr_err("Unaligned next page" _FREESAN_LOCFMT \
-			          "%p not aligned to %zx boundary\n", \
-			          c, i, head, off, c->next, \
-			          (size_t)1 << (__PAGE_SHIFT + i)); \
-		} \
-	} \
+#define _FREESAN_HEAD(head, ord)					\
+do {									\
+	size_t off = 0;							\
+	struct chunk_head *c;						\
+									\
+	uk_hlist_for_each_entry(c, (head), link) {			\
+		if (_FREESAN_BAD_CHUNKPTR(c)) {				\
+			uk_pr_err("Invalid chunk pointer" _FREESAN_LOCFMT "\n",\
+				  c, (ord), (head), off);		\
+			break;						\
+		}							\
+		if (!FREELIST_ALIGNED(c, (ord)))			\
+			uk_pr_err("Unaligned chunk" _FREESAN_LOCFMT	\
+				  "%p not aligned to %llx boundary\n",	\
+				  c, (ord), (head), off, c, BBUDDY_LEN((ord)));\
+		if (c->page_order != (ord))				\
+			uk_pr_err("Bad page level" _FREESAN_LOCFMT	\
+				  "got %u, expected %zu\n",		\
+				  c, (ord), (head), off, c->page_order, (ord));\
+		if (c->link.pprev && (*c->link.pprev)->next != &c->link) \
+			uk_pr_err("Bad backlink" _FREESAN_LOCFMT	\
+				  "got %p, expected %p\n",		\
+				  c, (ord), (head), off,		\
+				  (*c->link.pprev)->next, &c->link);	\
+	}								\
 } while (0)
 
-#define freelist_sanitycheck(free_head) \
-for (size_t i = 0; i < FREELIST_SIZE; i++) { \
-	UK_ASSERT((free_head)[i] != NULL); \
-	_FREESAN_HEAD((free_head)[i]); \
-}
+#define freelist_sanitycheck(free_head)					\
+for (size_t i = 0; i < FREELIST_SIZE; i++)				\
+	_FREESAN_HEAD(&(free_head)[i], i)
 
 #else /* !CONFIG_LIBUKALLOCBBUDDY_FREELIST_SANITY */
 
@@ -274,12 +266,25 @@ static void map_free(struct uk_bbpalloc *b, uintptr_t first_page,
 	b->nr_free_pages += nr_pages;
 }
 
+/* Number of pages covered by page order `ord` */
+#define BBUDDY_PAGES(ord) (1ULL << (ord))
+
+/* Bit corresponding to page order `ord`; identical to size of chunk at `ord` */
+#define BBUDDY_LEN(ord) (BBUDDY_PAGES((ord)) << __PAGE_SHIFT)
+
+/* Address of buddy page of `ptr` at page order `ord` */
+#define BBUDDY_BUDDY_ADDR(ptr, ord) \
+	((void *)(((uintptr_t)(ptr)) ^ BBUDDY_LEN(ord)))
+
+/* Non-zero if `ptr` would be the head buddy in page order `ord` */
+#define BBUDDY_ISHEAD(ptr, ord) (!(((uintptr_t)(ptr)) & BBUDDY_LEN(ord)))
+
 /* return log of the next power of two of passed number */
 static inline unsigned long num_pages_to_order(unsigned long num_pages)
 {
 	UK_ASSERT(num_pages != 0);
 
-	/* uk_flsl has undefined behavior when called with zero */
+	/* uk_mssbl has undefined behavior when called with zero */
 	if (num_pages == 1)
 		return 0;
 
@@ -291,135 +296,210 @@ static inline unsigned long num_pages_to_order(unsigned long num_pages)
 	return uk_mssbl(num_pages - 1) + 1;
 }
 
+/* return the highest page order that `ptr` is aligned to, up to maxord */
+static inline unsigned long ptr_order(void *ptr, unsigned long maxord)
+{
+	unsigned long v = (uintptr_t)ptr;
+
+	UK_ASSERT(IS_ALIGNED(v, __PAGE_SIZE));
+	v >>= __PAGE_SHIFT;
+	if (!v)
+		return maxord; /* page 0 is aligned to any order */
+	return MIN(uk_lssbl(v), maxord);
+}
+
+/* return the highest power of two less than or equal to num_pages */
+static inline unsigned long npages_order(unsigned long num_pages)
+{
+	UK_ASSERT(num_pages);
+	return uk_mssbl(num_pages);
+}
+
 /*********************
  * BINARY BUDDY PAGE ALLOCATOR
  */
+
+/**
+ * INTERNAL. Trim chunk `ch` of page order `ord` down to `num_pages` pages.
+ *
+ * Page-order-sized chunks are trimmed off the end of `ch` and placed back into
+ * their respective freelists as needed.
+ */
+static inline void bbuddy_trim(struct uk_bbpalloc *b, struct chunk_head *ch,
+			       size_t ord, unsigned long num_pages)
+{
+	size_t spare_pages;
+	size_t spare_ord;
+	size_t spare_len;
+	char *spare_end;
+	struct chunk_head *spare_ch;
+
+	UK_ASSERT(ch->page_order == ord);
+
+	spare_pages = BBUDDY_PAGES(ord) - num_pages;
+	spare_end = CHUNK_END(ch, ord);
+	while (spare_pages) {
+		spare_ord = npages_order(spare_pages);
+		spare_len = BBUDDY_LEN(spare_ord);
+		spare_ch = (struct chunk_head *)(spare_end - spare_len);
+
+		UK_ASSERT(spare_ord < FREELIST_SIZE);
+		UK_ASSERT(BBUDDY_PAGES(spare_ord) <= spare_pages);
+
+		/* Populate chunk & link in */
+		spare_ch->page_order = spare_ord;
+		uk_hlist_add_head(&spare_ch->link, &b->free_head[spare_ord]);
+
+		spare_pages -= BBUDDY_PAGES(spare_ord);
+		spare_end -= BBUDDY_LEN(spare_ord);
+	}
+}
+
 static void *bbuddy_palloc(struct uk_alloc *a, unsigned long num_pages)
 {
-	struct uk_bbpalloc *b;
-	size_t i;
-	chunk_head_t *alloc_ch, *spare_ch;
-	chunk_tail_t *spare_ct;
+	struct uk_bbpalloc *const b = (struct uk_bbpalloc *)&a->priv;
+	struct chunk_head *alloc_ch;
+	size_t ord;
 
-	UK_ASSERT(a != NULL);
-	b = (struct uk_bbpalloc *)&a->priv;
-
+	UK_ASSERT(a);
+	UK_ASSERT(num_pages);
 	freelist_sanitycheck(b->free_head);
 
-	size_t order = (size_t)num_pages_to_order(num_pages);
+	ord = num_pages_to_order(num_pages);
+	/* Find the smallest order of free memory that satisfies the request */
+	while (ord < FREELIST_SIZE && FREELIST_EMPTY(&b->free_head[ord]))
+		ord++;
+	/* We use >= as ord may have been set arbitrarily high by num_pages */
+	if (ord >= FREELIST_SIZE)
+		goto err_nomem;
 
-	/* Find smallest order which can satisfy the request. */
-	for (i = order; i < FREELIST_SIZE; i++) {
-		if (!FREELIST_EMPTY(b->free_head[i]))
-			break;
-	}
-	if (i >= FREELIST_SIZE)
-		goto no_memory;
+	/* Grab & unlink a chunk */
+	alloc_ch = uk_hlist_entry(b->free_head[ord].first, struct chunk_head,
+				  link);
+	uk_hlist_del(&alloc_ch->link);
+	UK_ASSERT(FREELIST_ALIGNED(alloc_ch, ord));
 
-	/* Unlink a chunk. */
-	alloc_ch = b->free_head[i];
-	b->free_head[i] = alloc_ch->next;
-	alloc_ch->next->pprev = alloc_ch->pprev;
+	/* Trim off any extra pages off the end */
+	bbuddy_trim(b, alloc_ch, ord, num_pages);
 
-	/* We may have to break the chunk a number of times. */
-	while (i != order) {
-		/* Split into two equal parts. */
-		i--;
-		spare_ch = (chunk_head_t *)((char *)alloc_ch
-					    + (1UL << (i + __PAGE_SHIFT)));
-		spare_ct = (chunk_tail_t *)((char *)spare_ch
-					    + (1UL << (i + __PAGE_SHIFT))) - 1;
-
-		/* Create new header for spare chunk. */
-		spare_ch->level = i;
-		spare_ch->next = b->free_head[i];
-		spare_ch->pprev = &b->free_head[i];
-		spare_ct->level = i;
-
-		/* Link in the spare chunk. */
-		spare_ch->next->pprev = &spare_ch->next;
-		b->free_head[i] = spare_ch;
-	}
-	UK_ASSERT(FREELIST_ALIGNED(alloc_ch, order));
-	map_alloc(b, (uintptr_t)alloc_ch, 1UL << order);
+	/* Mark as in use and return */
+	map_alloc(b, (uintptr_t)alloc_ch, num_pages);
 
 	uk_alloc_stats_count_palloc(a, (void *) alloc_ch, num_pages);
 	freelist_sanitycheck(b->free_head);
-	return ((void *)alloc_ch);
 
-no_memory:
-	uk_pr_warn("%"__PRIuptr": Cannot handle palloc request of order %"__PRIsz": Out of memory\n",
-		   (uintptr_t)a, order);
+	return (void *)alloc_ch;
+
+err_nomem:
+	uk_pr_warn("%p: Cannot handle palloc request of %lu: Out of memory\n",
+		   a, num_pages);
 
 	uk_alloc_stats_count_penomem(a, num_pages);
 	errno = ENOMEM;
 	return NULL;
 }
 
+/**
+ * INTERNAL. Maximally merge chunk `*chp` of order `ord` with any free buddies,
+ * updating its value along the way.
+ *
+ * `*chp` must be marked as "allocated" in bbuddy's bookkeeping.
+ *
+ * The merge process for a given to-be-freed chunk is:
+ * 1. calculate ch's buddy's starting page address using BBUDDY_BUDDY_ADDR
+ * 2. check in the bitmap whether that page is allocated or free
+ *   - if allocated, we know buddy cannot be free, so we stop
+ *   - if free, we know it has to be a chunk head (see below), and thus has
+ *     valid metadata
+ * 3. read chunk_head from starting page to determine buddy's actual size/order
+ *   - if it matches our own, we can merge and move onto a higher order
+ *   - if it differs, we stop
+ *
+ * Generally speaking, a page marked free in the bitmap is a chunk head of order
+ * ord if-and-only-if:
+ * (a) the page is aligned to that particular order (all bits < ord are 0), AND
+ * (b) the page is not part of a chunk of larger order
+ *
+ * In the particular care of bbuddy_merge(ch):
+ * (a) is guaranteed because ch is aligned to ord, and thus its candidate buddy
+ * must necessarily be aligned too.
+ * (b) is guaranteed to never happen, as buddy would need ch to already be free
+ * in order to form a larger order chunk
+ *
+ * @return Order of `*ch` after merging
+ */
+static inline size_t bbuddy_merge(struct uk_bbpalloc *b,
+				  struct chunk_head **chp, size_t ord)
+{
+	struct chunk_head *ch = *chp;
+	struct chunk_head *buddy;
+
+	/* After successfully merging with our first buddy, we may be able to
+	 * merge again with a higher-order buddy, and so on, up to max order.
+	 */
+	while (ord < FREELIST_SIZE - 1) {
+		/* It is safe to deref this only if marked free in bitmap */
+		buddy = BBUDDY_BUDDY_ADDR(ch, ord);
+
+		/* Stop if buddy is not free or of wrong order */
+		if (allocated_in_map(b, (uintptr_t)buddy) ||
+		    buddy->page_order != ord)
+			break;
+
+		if (BBUDDY_ISHEAD(buddy, ord))
+			/* buddy is predecessor; merge downwards */
+			ch = buddy;
+		/* else: ch is already correct base, increase ord to merge up */
+
+		/* Unlink buddy from freelist & continue to next order */
+		uk_hlist_del(&buddy->link);
+		ord++;
+	}
+	*chp = ch;
+	return ord;
+}
+
 static void bbuddy_pfree(struct uk_alloc *a, void *obj, unsigned long num_pages)
 {
-	struct uk_bbpalloc *b;
-	chunk_head_t *freed_ch, *to_merge_ch;
-	chunk_tail_t *freed_ct;
-	unsigned long mask;
+	struct uk_bbpalloc *const b = (struct uk_bbpalloc *)&a->priv;
+	char *base = obj;
+	size_t freed_pages;
+	size_t ord;
+	struct chunk_head *ch;
 
-	UK_ASSERT(a != NULL);
+	UK_ASSERT(a);
+	UK_ASSERT(obj);
+	UK_ASSERT(num_pages);
+	UK_ASSERT(IS_ALIGNED((uintptr_t)obj, __PAGE_SIZE));
 
 	uk_alloc_stats_count_pfree(a, obj, num_pages);
-	b = (struct uk_bbpalloc *)&a->priv;
-
 	freelist_sanitycheck(b->free_head);
 
-	size_t order = (size_t)num_pages_to_order(num_pages);
+	/* Since obj can span an arbitrary page range, we may need to return it
+	 * in multiple page-order-sized chunks. At each iteration we pick the
+	 * largest chunk size permitted by alignment, attempt to merge it with
+	 * any free buddies, then link it into the appropriate freelist.
+	 */
+	do {
+		ord = ptr_order(base, npages_order(num_pages));
+		freed_pages = BBUDDY_PAGES(ord);
+		ch = (struct chunk_head *)base;
 
-	/* if the object is not page aligned it was clearly not from us */
-	UK_ASSERT((((uintptr_t)obj) & (__PAGE_SIZE - 1)) == 0);
+		UK_ASSERT(ord < FREELIST_SIZE);
+		UK_ASSERT(freed_pages <= num_pages);
 
-	/* First free the chunk */
-	map_free(b, (uintptr_t)obj, 1UL << order);
+		ord = bbuddy_merge(b, &ch, ord);
 
-	/* Create free chunk */
-	freed_ch = (chunk_head_t *)obj;
-	freed_ct = (chunk_tail_t *)((char *)obj
-				    + (1UL << (order + __PAGE_SHIFT))) - 1;
+		/* Populate chunk (must be done before marking free) */
+		ch->page_order = ord;
+		/* Mark pages as free (must be done before linking in) */
+		map_free(b, (uintptr_t)base, freed_pages);
+		/* Link into freelist */
+		uk_hlist_add_head(&ch->link, &b->free_head[ord]);
 
-	/* Now, possibly we can conseal chunks together */
-	while (order < FREELIST_SIZE) {
-		mask = 1UL << (order + __PAGE_SHIFT);
-		if ((unsigned long)freed_ch & mask) {
-			to_merge_ch = (chunk_head_t *)((char *)freed_ch - mask);
-			if (allocated_in_map(b, (uintptr_t)to_merge_ch)
-			    || to_merge_ch->level != order)
-				break;
-
-			/* Merge with predecessor */
-			freed_ch = to_merge_ch;
-		} else {
-			to_merge_ch = (chunk_head_t *)((char *)freed_ch + mask);
-			if (allocated_in_map(b, (uintptr_t)to_merge_ch)
-			    || to_merge_ch->level != order)
-				break;
-
-			/* Merge with successor */
-			freed_ct =
-			    (chunk_tail_t *)((char *)to_merge_ch + mask) - 1;
-		}
-
-		/* We are commited to merging, unlink the chunk */
-		*(to_merge_ch->pprev) = to_merge_ch->next;
-		to_merge_ch->next->pprev = to_merge_ch->pprev;
-
-		order++;
-	}
-
-	/* Link the new chunk */
-	freed_ch->level = order;
-	freed_ch->next = b->free_head[order];
-	freed_ch->pprev = &b->free_head[order];
-	freed_ct->level = order;
-
-	freed_ch->next->pprev = &freed_ch->next;
-	b->free_head[order] = freed_ch;
+		num_pages -= freed_pages;
+		base += freed_pages * __PAGE_SIZE;
+	} while (num_pages);
 
 	freelist_sanitycheck(b->free_head);
 }
@@ -435,7 +515,7 @@ static long bbuddy_pmaxalloc(struct uk_alloc *a)
 	/* Find biggest order that has still elements available */
 	order = FREELIST_SIZE;
 	for (i = 0; i < FREELIST_SIZE; i++) {
-		if (!FREELIST_EMPTY(b->free_head[i]))
+		if (!FREELIST_EMPTY(&b->free_head[i]))
 			order = i;
 	}
 	if (order == FREELIST_SIZE)
@@ -460,8 +540,7 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 	struct uk_bbpalloc_memr *memr;
 	size_t memr_size;
 	unsigned long i;
-	chunk_head_t *ch;
-	chunk_tail_t *ct;
+	struct chunk_head *ch;
 	uintptr_t min, max, range;
 
 	UK_ASSERT(a != NULL);
@@ -540,17 +619,12 @@ static int bbuddy_addmem(struct uk_alloc *a, void *base, size_t len)
 			    (uintptr_t)a, min, (uintptr_t)(min + (1UL << i)),
 			    (i - __PAGE_SHIFT));
 
-		ch = (chunk_head_t *)min;
+		ch = (struct chunk_head *)min;
 		min += 1UL << i;
 		range -= 1UL << i;
-		ct = (chunk_tail_t *)min - 1;
 		i -= __PAGE_SHIFT;
-		ch->level = i;
-		ch->next = b->free_head[i];
-		ch->pprev = &b->free_head[i];
-		ch->next->pprev = &ch->next;
-		b->free_head[i] = ch;
-		ct->level = i;
+		ch->page_order = i;
+		uk_hlist_add_head(&ch->link, &b->free_head[i]);
 	}
 
 	freelist_sanitycheck(b->free_head);
@@ -587,11 +661,8 @@ struct uk_alloc *uk_allocbbuddy_init(void *base, size_t len)
 	memset(a, 0, metalen);
 	b = (struct uk_bbpalloc *)&a->priv;
 
-	for (i = 0; i < FREELIST_SIZE; i++) {
-		b->free_head[i] = &b->free_tail[i];
-		b->free_tail[i].pprev = &b->free_head[i];
-		b->free_tail[i].next = NULL;
-	}
+	for (i = 0; i < FREELIST_SIZE; i++)
+		UK_INIT_HLIST_HEAD(&b->free_head[i]);
 	b->memr_head = NULL;
 
 	/* initialize and register allocator interface */
@@ -599,11 +670,10 @@ struct uk_alloc *uk_allocbbuddy_init(void *base, size_t len)
 			     bbuddy_pmaxalloc, bbuddy_pavailmem,
 			     bbuddy_addmem);
 
-	if (max > min) {
+	if (max > min)
 		/* add left memory - ignore return value */
 		bbuddy_addmem(a, (void *)(min),
 				 (size_t)(max - min));
-	}
 
 	return a;
 }
