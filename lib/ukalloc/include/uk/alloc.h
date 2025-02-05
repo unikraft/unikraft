@@ -4,6 +4,7 @@
  *          Florian Schmidt <florian.schmidt@neclab.eu>
  *
  * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
+ * Copyright (c) 2025, Unikraft GmbH and The Unikraft Authors.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -145,6 +146,16 @@ static inline void *uk_do_malloc(struct uk_alloc *a, __sz size)
 	return a->malloc(a, size);
 }
 
+/**
+ * Allocate an object of `size` bytes.
+ *
+ * @param a Allocator
+ * @param size Number of bytes to allocate
+ *
+ * @return
+ *  != __NULL: Pointer to new allocation
+ *  == __NULL: Failure
+ */
 static inline void *uk_malloc(struct uk_alloc *a, __sz size)
 {
 	if (unlikely(!a)) {
@@ -161,6 +172,17 @@ static inline void *uk_do_calloc(struct uk_alloc *a,
 	return a->calloc(a, nmemb, size);
 }
 
+/**
+ * Allocate an array of `nmemb` each of `size` bytes and zero out its memory.
+ *
+ * @param a Allocator
+ * @param nmemb Number of items in array
+ * @param size Size of each item in bytes
+ *
+ * @return
+ *  != __NULL: Pointer to new allocation
+ *  == __NULL: Failure
+ */
 static inline void *uk_calloc(struct uk_alloc *a,
 			      __sz nmemb, __sz size)
 {
@@ -181,6 +203,22 @@ static inline void *uk_do_realloc(struct uk_alloc *a,
 	return a->realloc(a, ptr, size);
 }
 
+/**
+ * Resize the object allocation at `ptr` to `size` while keeping its contents.
+ *
+ * This call may copy data over to satisfy the request.
+ *
+ * The value of `ptr` should no longer be used after this call completes
+ * successfully.
+ *
+ * @param a Allocator
+ * @param ptr Existing allocation
+ * @param size New size of allocation in bytes
+ *
+ * @return
+ *  != __NULL: Success, address of resized allocation
+ *  == __NULL: Failure
+ */
 static inline void *uk_realloc(struct uk_alloc *a, void *ptr, __sz size)
 {
 	if (unlikely(!a)) {
@@ -197,10 +235,24 @@ static inline int uk_do_posix_memalign(struct uk_alloc *a, void **memptr,
 	return a->posix_memalign(a, memptr, align, size);
 }
 
+/**
+ * Allocate an object of `size` bytes at an address multiple of `align` and
+ * place its resulting address into `*memptr`.
+ *
+ * @param a Allocator
+ * @param[out] memptr Pointer to new allocation; set to __NULL on failure
+ * @param align Requested allocation alignment
+ * @param size Number of bytes to allocate
+ *
+ * @return
+ *  == 0: Success
+ *  != 0: Positive(!) error code
+ */
 static inline int uk_posix_memalign(struct uk_alloc *a, void **memptr,
 				    __sz align, __sz size)
 {
 	if (unlikely(!a)) {
+		/* TODO: ensure memptr is left alone on err (POSIX.1-2008 TC2)*/
 		*memptr = __NULL;
 		return ENOMEM;
 	}
@@ -214,6 +266,17 @@ static inline void *uk_do_memalign(struct uk_alloc *a,
 	return a->memalign(a, align, size);
 }
 
+/**
+ * Allocate an object of `size` bytes at an address multiple of `align`.
+ *
+ * @param a Allocator
+ * @param align Requested allocation alignment
+ * @param size Number of bytes to allocate
+ *
+ * @return
+ *  != __NULL: Pointer to new allocation
+ *  == __NULL: Failure
+ */
 static inline void *uk_memalign(struct uk_alloc *a,
 				__sz align, __sz size)
 {
@@ -228,6 +291,16 @@ static inline void uk_do_free(struct uk_alloc *a, void *ptr)
 	a->free(a, ptr);
 }
 
+/**
+ * Free the object allocation at `ptr`.
+ *
+ * If `ptr` is __NULL do nothing.
+ * `ptr` must either be __NULL or have been obtained from an object allocation
+ * function (malloc-like) of the same allocator `a`.
+ *
+ * @param a Allocator
+ * @param ptr Pointer of object to free
+ */
 static inline void uk_free(struct uk_alloc *a, void *ptr)
 {
 	uk_do_free(a, ptr);
@@ -239,6 +312,16 @@ static inline void *uk_do_palloc(struct uk_alloc *a, unsigned long num_pages)
 	return a->palloc(a, num_pages);
 }
 
+/**
+ * Allocate `num_pages` raw contiguous pages of memory.
+ *
+ * @param a Allocator
+ * @param num_pages Number of pages to allocate
+ *
+ * @return
+ *  != __NULL: Pointer to the beginning of the first allocated page
+ *  == __NULL: Failure
+ */
 static inline void *uk_palloc(struct uk_alloc *a, unsigned long num_pages)
 {
 	if (unlikely(!a || !a->palloc))
@@ -253,6 +336,20 @@ static inline void uk_do_pfree(struct uk_alloc *a, void *ptr,
 	a->pfree(a, ptr, num_pages);
 }
 
+/**
+ * Free `num_pages` previously allocated raw pages starting at `ptr`.
+ *
+ * `ptr` must be page-aligned; `num_pages` must be non-zero.
+ *
+ * The entire region described by `ptr` + `num_pages` must have been previously
+ * allocated (in whole or piecemeal) by `palloc` on the same allocator `a`.
+ * Pages obtained in a single `palloc` call may be freed through any combination
+ * of `pfree` calls, as long as each page gets freed exactly once.
+ *
+ * @param a Allocator
+ * @param ptr Start of region to free
+ * @param num_pages Number of pages to free
+ */
 static inline void uk_pfree(struct uk_alloc *a, void *ptr,
 			    unsigned long num_pages)
 {
