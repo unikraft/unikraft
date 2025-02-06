@@ -324,6 +324,53 @@ UK_SYSCALL_R_DEFINE(int, fstat, int, fd, struct stat *, statbuf)
 
 /* Ctl */
 
+UK_SYSCALL_R_DEFINE(int, fsync, int, fd)
+{
+	int r;
+	union uk_shim_file sf;
+
+	switch (uk_fdtab_shim_get(fd, &sf)) {
+	case UK_SHIM_OFILE:
+		r = uk_sys_fsync(sf.ofile);
+		uk_fdtab_ret(sf.ofile);
+		break;
+#if CONFIG_LIBVFSCORE
+	case UK_SHIM_LEGACY:
+		/* vfscore_fsync returns positive error codes */
+		r = -vfscore_fsync(sf.vfile);
+		fdrop(sf.vfile);
+		break;
+#endif /* CONFIG_LIBVFSCORE */
+	default:
+		r = -EBADF;
+	}
+	return r;
+}
+
+UK_SYSCALL_R_DEFINE(int, fdatasync, int, fd)
+{
+	int r;
+	union uk_shim_file sf;
+
+	switch (uk_fdtab_shim_get(fd, &sf)) {
+	case UK_SHIM_OFILE:
+		r = uk_sys_fdatasync(sf.ofile);
+		uk_fdtab_ret(sf.ofile);
+		break;
+#if CONFIG_LIBVFSCORE
+	case UK_SHIM_LEGACY:
+		/* vfscore has no separate fdatasync; use fsync */
+		/* vfscore_fsync returns positive error codes */
+		r = -vfscore_fsync(sf.vfile);
+		fdrop(sf.vfile);
+		break;
+#endif /* CONFIG_LIBVFSCORE */
+	default:
+		r = -EBADF;
+	}
+	return r;
+}
+
 UK_LLSYSCALL_R_DEFINE(int, fcntl, int, fd,
 		      unsigned int, cmd, unsigned long, arg)
 {

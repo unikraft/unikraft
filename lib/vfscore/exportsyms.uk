@@ -31,9 +31,6 @@ uk_syscall_r_mkdir
 mkdirat
 uk_syscall_e_mkdirat
 uk_syscall_r_mkdirat
-fsync
-uk_syscall_e_fsync
-uk_syscall_r_fsync
 fstat
 fstat64
 uk_syscall_e_fstat
@@ -144,9 +141,6 @@ preadv64
 ioctl
 uk_syscall_e_ioctl
 uk_syscall_r_ioctl
-fdatasync
-uk_syscall_e_fdatasync
-uk_syscall_r_fdatasync
 fdopendir
 dirfd
 rewinddir
@@ -274,6 +268,7 @@ vfscore_pwrite64
 vfscore_writev
 vfscore_write
 vfscore_lseek
+vfscore_fsync
 vfscore_fstat
 vfscore_fcntl
 vfscore_ioctl

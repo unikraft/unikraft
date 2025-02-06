@@ -431,7 +431,7 @@ exit:
 }
 
 int
-sys_fsync(struct vfscore_file *fp)
+vfscore_fsync(struct vfscore_file *fp)
 {
 	struct vnode *vp;
 	int error;

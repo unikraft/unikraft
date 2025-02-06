@@ -164,19 +164,6 @@ int sys_read(struct vfscore_file *fp, const struct iovec *iov, size_t niov,
 int sys_write(struct vfscore_file *fp, const struct iovec *iov, size_t niov,
 		off_t offset, size_t *count);
 
-
-/**
- * Synchronizes the in-core data referred by vfscore_file to the backing
- * store device.
- *
- * @param fp
- *	Pointer to the vfscore_file structure
- * @return
- *	- (0):  Completed successfully
- *	- (<0): Negative value with error code
- */
-int sys_fsync(struct vfscore_file *fp);
-
 /**
  * Gets the next directory entry in the directory stream.
  *

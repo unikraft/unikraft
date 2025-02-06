@@ -30,6 +30,8 @@ int vfscore_lseek(struct vfscore_file *fp, off_t off, int type, off_t *origin);
 
 int vfscore_fstat(struct vfscore_file *fp, struct stat *st);
 
+int vfscore_fsync(struct vfscore_file *fp);
+
 int vfscore_fcntl(struct vfscore_file *fp, unsigned int cmd, unsigned long arg);
 int vfscore_ioctl(struct vfscore_file *fp, unsigned long request, void *buf);
 

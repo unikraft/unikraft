@@ -628,39 +628,6 @@ ssize_t vfscore_write(struct vfscore_file *fp, const void *buf, size_t count)
 	return bytes;
 }
 
-UK_TRACEPOINT(trace_vfs_fsync, "%d", int);
-UK_TRACEPOINT(trace_vfs_fsync_ret, "");
-UK_TRACEPOINT(trace_vfs_fsync_err, "%d", int);
-
-UK_SYSCALL_R_DEFINE(int, fsync, int, fd)
-{
-	struct vfscore_file *fp;
-	int error;
-
-	trace_vfs_fsync(fd);
-	error = fget(fd, &fp);
-	if (error)
-		goto out_error;
-
-	error = sys_fsync(fp);
-	fdrop(fp);
-
-	if (error)
-		goto out_error;
-	trace_vfs_fsync_ret();
-	return 0;
-
-	out_error:
-	trace_vfs_fsync_err(error);
-	return -error;
-}
-
-UK_SYSCALL_R_DEFINE(int, fdatasync, int, fd)
-{
-	// TODO: See if we can do less than fsync().
-	return fsync(fd);
-}
-
 static int __fxstatat_helper(int ver __unused, int dirfd, const char *pathname,
 		struct stat *st, int flags);
 
