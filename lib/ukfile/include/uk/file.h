@@ -37,7 +37,7 @@ struct uk_file;
 /* I/O */
 typedef ssize_t (*uk_file_io_func)(const struct uk_file *f,
 				   const struct iovec *iov, int iovcnt,
-				   off_t off, long flags);
+				   size_t off, long flags);
 
 /* Info (stat-like & chXXX-like) */
 typedef int (*uk_file_getstat_func)(const struct uk_file *f,
@@ -220,7 +220,7 @@ struct uk_file {
 static inline
 ssize_t uk_file_read(const struct uk_file *f,
 		     const struct iovec *iov, int iovcnt,
-		     off_t off, long flags)
+		     size_t off, long flags)
 {
 	return f->ops->read(f, iov, iovcnt, off, flags);
 }
@@ -228,7 +228,7 @@ ssize_t uk_file_read(const struct uk_file *f,
 static inline
 ssize_t uk_file_write(const struct uk_file *f,
 		      const struct iovec *iov, int iovcnt,
-		      off_t off, long flags)
+		      size_t off, long flags)
 {
 	return f->ops->write(f, iov, iovcnt, off, flags);
 }

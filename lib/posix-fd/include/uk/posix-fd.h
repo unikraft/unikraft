@@ -22,7 +22,7 @@ struct uk_ofile {
 	const struct uk_file *file;
 	unsigned int mode;
 	__atomic refcnt;
-	off_t pos; /* Current file read/write offset position */
+	size_t pos; /* Current file read/write offset position */
 	struct uk_mutex lock; /* Lock for modifying open file state */
 };
 

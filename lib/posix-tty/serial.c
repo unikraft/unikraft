@@ -89,13 +89,13 @@ static inline __ssz _console_out(const char *buf, __sz len)
 
 static ssize_t serial_read(const struct uk_file *f,
 			   const struct iovec *iov, int iovcnt,
-			   off_t off, long flags __unused)
+			   size_t off, long flags __unused)
 {
 	ssize_t total = 0;
 
 	UK_ASSERT(f->vol == SERIAL_VOLID);
-	if (unlikely(off != 0))
-		return -EINVAL;
+	if (unlikely(off))
+		return -ESPIPE;
 
 	if (!uk_file_poll_immediate(f, UKFD_POLLIN))
 		return 0;
@@ -138,13 +138,13 @@ static ssize_t serial_read(const struct uk_file *f,
 
 static ssize_t serial_write(const struct uk_file *f __maybe_unused,
 			    const struct iovec *iov, int iovcnt,
-			    off_t off, long flags __unused)
+			    size_t off, long flags __unused)
 {
 	ssize_t total = 0;
 
 	UK_ASSERT(f->vol == SERIAL_VOLID);
-	if (unlikely(off != 0))
-		return -EINVAL;
+	if (unlikely(off))
+		return -ESPIPE;
 
 	for (int i = 0; i < iovcnt; i++) {
 		char *buf = iov[i].iov_base;

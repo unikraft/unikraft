@@ -36,7 +36,7 @@ struct evfd_alloc {
 
 static ssize_t evfd_read(const struct uk_file *f,
 			 const struct iovec *iov, int iovcnt,
-			 off_t off, long flags __unused)
+			 size_t off, long flags __unused)
 {
 	int semaphore;
 	evfd_node n;
@@ -76,7 +76,7 @@ static ssize_t evfd_read(const struct uk_file *f,
 
 static ssize_t evfd_write(const struct uk_file *f,
 			  const struct iovec *iov, int iovcnt,
-			  off_t off, long flags __unused)
+			  size_t off, long flags __unused)
 {
 	uint64_t add;
 	evfd_node n;

@@ -143,7 +143,7 @@ static ssize_t _iovsz(const struct iovec *iov, int iovcnt)
 
 static ssize_t pipe_read(const struct uk_file *f,
 			 const struct iovec *iov, int iovcnt,
-			 off_t off, long flags __unused)
+			 size_t off, long flags __unused)
 {
 	ssize_t toread;
 	struct pipe_node *d;
@@ -231,7 +231,7 @@ static ssize_t pipe_read(const struct uk_file *f,
 
 static ssize_t pipe_write(const struct uk_file *f,
 			  const struct iovec *iov, int iovcnt,
-			  off_t off, long flags)
+			  size_t off, long flags)
 {
 	struct pipe_node *d;
 	struct pipe_msg *tail;

@@ -96,7 +96,7 @@ ssize_t uk_sys_readv(struct uk_ofile *of, const struct iovec *iov, int iovcnt)
 {
 	ssize_t r;
 	long flags;
-	off_t off;
+	size_t off;
 	const struct uk_file *f;
 	int seekable;
 	int iolock;
@@ -152,7 +152,7 @@ ssize_t uk_sys_preadv2(struct uk_ofile *of, const struct iovec *iov, int iovcnt,
 		       off_t offset, int flags)
 {
 	ssize_t r;
-	off_t off;
+	size_t off;
 	long xflags;
 	const struct uk_file *f;
 	unsigned int mode;
@@ -386,8 +386,10 @@ ssize_t uk_sys_pwritev2(struct uk_ofile *of, const struct iovec *iov,
 	}
 
 	if (use_pos) {
-		if (r >= 0)
+		if (r >= 0) {
+			UK_ASSERT(off >= 0);
 			of->pos = off + r;
+		}
 		_of_unlock(of);
 	}
 

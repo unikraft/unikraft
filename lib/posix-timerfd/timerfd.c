@@ -130,14 +130,14 @@ static void _timerfd_set(struct timerfd_node *d, const struct itimerspec *set)
 
 static ssize_t timerfd_read(const struct uk_file *f,
 			    const struct iovec *iov, int iovcnt,
-			    off_t off, long flags __unused)
+			    size_t off, long flags __unused)
 {
 	struct timerfd_node *d;
 	__u64 v;
 
 	if (unlikely(f->vol != TIMERFD_VOLID))
 		return -EINVAL;
-	if (unlikely(off != 0))
+	if (unlikely(off))
 		return -EINVAL;
 	if (unlikely(!iovcnt || iov[0].iov_len < sizeof(__u64)))
 		return -EINVAL;
