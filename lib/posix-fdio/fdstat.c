@@ -7,6 +7,7 @@
 /* Internal syscalls for manipulating file metadata */
 
 #include <string.h>
+#include <sys/sysmacros.h>
 
 #include <uk/posix-fdio.h>
 #include <uk/posix-time.h>
@@ -20,12 +21,6 @@
 })
 
 static inline
-dev_t nums2dev(__u32 major, __u32 minor)
-{
-	return ((dev_t)major << 32) | minor;
-}
-
-static inline
 void timecpy(struct timespec *d, const struct uk_statx_timestamp *s)
 {
 	d->tv_sec = s->tv_sec;
@@ -37,8 +32,8 @@ void uk_fdio_statx_cpyout(struct stat *s, const struct uk_statx *sx)
 	unsigned int mask = sx->stx_mask;
 
 	memset(s, 0, sizeof(*s));
-	s->st_dev = nums2dev(sx->stx_dev_major, sx->stx_dev_minor);
-	s->st_rdev = nums2dev(sx->stx_rdev_major, sx->stx_rdev_minor);
+	s->st_dev = makedev(sx->stx_dev_major, sx->stx_dev_minor);
+	s->st_rdev = makedev(sx->stx_rdev_major, sx->stx_rdev_minor);
 	s->st_blksize = sx->stx_blksize;
 	if (mask & UK_STATX_INO)
 		s->st_ino = sx->stx_ino;
