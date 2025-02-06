@@ -29,6 +29,7 @@ ssize_t vfscore_write(struct vfscore_file *fp, const void *buf, size_t count);
 int vfscore_lseek(struct vfscore_file *fp, off_t off, int type, off_t *origin);
 
 int vfscore_fstat(struct vfscore_file *fp, struct stat *st);
+int vfscore_fchmod(struct vfscore_file *fp, mode_t mode);
 
 int vfscore_fsync(struct vfscore_file *fp);
 

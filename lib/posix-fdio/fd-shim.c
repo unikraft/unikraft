@@ -322,6 +322,52 @@ UK_SYSCALL_R_DEFINE(int, fstat, int, fd, struct stat *, statbuf)
 	return r;
 }
 
+UK_SYSCALL_R_DEFINE(int, fchmod, int, fd, mode_t, mode)
+{
+	int r;
+	union uk_shim_file sf;
+
+	switch (uk_fdtab_shim_get(fd, &sf)) {
+	case UK_SHIM_OFILE:
+		r = uk_sys_fchmod(sf.ofile, mode);
+		uk_fdtab_ret(sf.ofile);
+		break;
+#if CONFIG_LIBVFSCORE
+	case UK_SHIM_LEGACY:
+		/* vfscore_fchmod returns positive error codes */
+		r = -vfscore_fchmod(sf.vfile, mode);
+		fdrop(sf.vfile);
+		break;
+#endif /* CONFIG_LIBVFSCORE */
+	default:
+		r = -EBADF;
+	}
+	return r;
+}
+
+UK_SYSCALL_R_DEFINE(int, fchown, int, fd, uid_t, owner, gid_t, group)
+{
+	int r;
+	union uk_shim_file sf;
+
+	switch (uk_fdtab_shim_get(fd, &sf)) {
+	case UK_SHIM_OFILE:
+		r = uk_sys_fchown(sf.ofile, owner, group);
+		uk_fdtab_ret(sf.ofile);
+		break;
+#if CONFIG_LIBVFSCORE
+	case UK_SHIM_LEGACY:
+		/* vfscore does not support fchown; stub out */
+		fdrop(sf.vfile);
+		r = 0;
+		break;
+#endif /* CONFIG_LIBVFSCORE */
+	default:
+		r = -EBADF;
+	}
+	return r;
+}
+
 /* Ctl */
 
 UK_SYSCALL_R_DEFINE(int, fsync, int, fd)

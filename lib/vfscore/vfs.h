@@ -518,19 +518,6 @@ void sync(void);
 int	sys_chmod(const char *path, mode_t mode);
 
 /**
- * Changes mode of the file specified by the open file descriptor fd.
- *
- * @param fd
- *	An open file descriptor
- * @param mode
- *	The new file mode
- * @return
- *	- (0):  Completed successfully
- *	- (<0): Negative value with error code
- */
-int sys_fchmod(int fd, mode_t mode);
-
-/**
  * Converts to full path from the cwd of task and path.
  *
  * @param t

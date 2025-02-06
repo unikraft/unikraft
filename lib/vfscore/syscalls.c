@@ -1570,11 +1570,8 @@ sys_chmod(const char *path, mode_t mode)
 }
 
 int
-sys_fchmod(int fd, mode_t mode)
+vfscore_fchmod(struct vfscore_file *f, mode_t mode)
 {
-	struct vfscore_file *f = vfscore_get_file(fd);
-	if (!f)
-		return EBADF;
 	// Posix is ambivalent on what fchmod() should do on an fd that does not
 	// refer to a real file. It suggests an implementation may (but not must)
 	// fail EINVAL on a pipe, can behave in an "unspecified" manner on a
@@ -1586,6 +1583,6 @@ sys_fchmod(int fd, mode_t mode)
 	if (f->f_dentry->d_mount->m_flags & MNT_RDONLY) {
 		return EROFS;
 	} else {
-		return vn_setmode(f->f_dentry->d_vnode, mode);
+		return vn_setmode(f->f_dentry->d_vnode, mode & UK_ALLPERMS);
 	}
 }

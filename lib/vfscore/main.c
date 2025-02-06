@@ -2363,32 +2363,6 @@ out_error:
 	return -error;
 }
 
-UK_TRACEPOINT(trace_vfs_fchmod, "\"%d\" 0%0o", int, mode_t);
-UK_TRACEPOINT(trace_vfs_fchmod_ret, "");
-
-UK_SYSCALL_R_DEFINE(int, fchmod, int, fd, mode_t, mode)
-{
-	trace_vfs_fchmod(fd, mode);
-	int error = sys_fchmod(fd, mode & UK_ALLPERMS);
-	trace_vfs_fchmod_ret();
-	if (error) {
-		return -error;
-	}
-
-	return 0;
-}
-
-UK_TRACEPOINT(trace_vfs_fchown, "\"%d\" %d %d", int, uid_t, gid_t);
-UK_TRACEPOINT(trace_vfs_fchown_ret, "");
-
-UK_SYSCALL_R_DEFINE(int, fchown, int, fd, uid_t, owner, gid_t, group)
-{
-	trace_vfs_fchown(fd, owner, group);
-	UK_WARN_STUBBED();
-	trace_vfs_fchown_ret();
-	return 0;
-}
-
 UK_SYSCALL_R_DEFINE(int, chown, const char*, path, uid_t, owner, gid_t, group)
 {
 	UK_WARN_STUBBED();

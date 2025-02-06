@@ -48,12 +48,6 @@ uk_syscall_r_stat
 chmod
 uk_syscall_e_chmod
 uk_syscall_r_chmod
-fchmod
-uk_syscall_e_fchmod
-uk_syscall_r_fchmod
-fchown
-uk_syscall_e_fchown
-uk_syscall_r_fchown
 dup
 uk_syscall_e_dup
 uk_syscall_r_dup
@@ -264,5 +258,6 @@ vfscore_fsync
 vfscore_ftruncate
 vfscore_fallocate
 vfscore_fstat
+vfscore_fchmod
 vfscore_fcntl
 vfscore_ioctl
