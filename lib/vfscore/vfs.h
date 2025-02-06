@@ -416,20 +416,6 @@ int sys_fstatfs(struct vfscore_file *fp, struct statfs *buf);
 int sys_truncate(char *path, off_t length);
 
 /**
- * Similar to the sys_truncate() function, but it takes a vfscore_file
- * instead of path.
- *
- * @param fp
- *	Pointer to the vfscore_file
- * @param length
- *	The new size (in bytes) of the file to which fp is referring to
- * @return
- *	- (0):  Completed successfully
- *	- (<0): Negative value with error code
- */
-int sys_ftruncate(struct vfscore_file *fp, off_t length);
-
-/**
  * Store at most bufsize bytes from the content to which the symlink
  * at path is pointing in the char array buf. The number of bytes written
  * in buf is stored in size.
@@ -507,32 +493,6 @@ int sys_utimensat(int dirfd, const char *pathname,
  *	- (<0): Negative value with error code
  */
 int sys_futimens(int fd, const struct timespec times[2]);
-
-/**
- * Manipulates the file space for the file referred by fd, starting
- * at offset and continuing for len bytes.
- *
- * @param fp
- *	Pointer to a vfscore_file structure
- * @param mode
- *	Specifies how to manipulates the space. The mode can have the
- *	the following values:
- *		* 0 - allocates len bytes starting from offset.
- *		* FALLOC_FL_KEEP_SIZE - the file size will not change even
- *			if offset + len is greater than the file size.
- *		* FALLOC_FL_PUNCH_HOLE - deallocates len bytes starting at
- *			offset and creates a hole in the file. This flag should
- *			always come together with FALLOC_FL_KEEP_SIZE, otherwise
- *			the sys_futimens call will fail.
- * @param offset
- *	Starting byte from which this operation will apply
- * @param len
- *	Number of bytes for which this operation will apply
- * @return
- *	- (0):  Completed successfully
- *	- (<0): Negative value with error code
- */
-int sys_fallocate(struct vfscore_file *fp, int mode, loff_t offset, loff_t len);
 
 /**
  * This function is not used at this point.

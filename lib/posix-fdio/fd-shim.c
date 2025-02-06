@@ -371,6 +371,76 @@ UK_SYSCALL_R_DEFINE(int, fdatasync, int, fd)
 	return r;
 }
 
+UK_SYSCALL_R_DEFINE(int, ftruncate, int, fd, off_t, len)
+{
+	int r;
+	union uk_shim_file sf;
+
+	switch (uk_fdtab_shim_get(fd, &sf)) {
+	case UK_SHIM_OFILE:
+		r = uk_sys_ftruncate(sf.ofile, len);
+		uk_fdtab_ret(sf.ofile);
+		break;
+#if CONFIG_LIBVFSCORE
+	case UK_SHIM_LEGACY:
+		/* vfscore_fallocate returns positive error codes */
+		r = -vfscore_ftruncate(sf.vfile, len);
+		fdrop(sf.vfile);
+		break;
+#endif /* CONFIG_LIBVFSCORE */
+	default:
+		r = -EBADF;
+	}
+	return r;
+}
+
+UK_SYSCALL_R_DEFINE(int, fallocate, int, fd, int, mode, off_t, off, off_t, len)
+{
+	int r;
+	union uk_shim_file sf;
+
+	switch (uk_fdtab_shim_get(fd, &sf)) {
+	case UK_SHIM_OFILE:
+		r = uk_sys_fallocate(sf.ofile, mode, off, len);
+		uk_fdtab_ret(sf.ofile);
+		break;
+#if CONFIG_LIBVFSCORE
+	case UK_SHIM_LEGACY:
+		/* vfscore_fallocate returns positive error codes */
+		r = -vfscore_fallocate(sf.vfile, mode, off, len);
+		fdrop(sf.vfile);
+		break;
+#endif /* CONFIG_LIBVFSCORE */
+	default:
+		r = -EBADF;
+	}
+	return r;
+}
+
+UK_SYSCALL_R_DEFINE(int, fadvise64,
+		    int, fd, off_t, off, off_t, len, int, advice)
+{
+	int r;
+	union uk_shim_file sf;
+
+	switch (uk_fdtab_shim_get(fd, &sf)) {
+	case UK_SHIM_OFILE:
+		r = uk_sys_fadvise(sf.ofile, off, len, advice);
+		uk_fdtab_ret(sf.ofile);
+		break;
+#if CONFIG_LIBVFSCORE
+	case UK_SHIM_LEGACY:
+		/* vfscore does not support fadvise; stub out */
+		fdrop(sf.vfile);
+		r = 0;
+		break;
+#endif /* CONFIG_LIBVFSCORE */
+	default:
+		r = -EBADF;
+	}
+	return r;
+}
+
 UK_LLSYSCALL_R_DEFINE(int, fcntl, int, fd,
 		      unsigned int, cmd, unsigned long, arg)
 {

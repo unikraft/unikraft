@@ -1186,7 +1186,7 @@ sys_truncate(char *path, off_t length)
 }
 
 int
-sys_ftruncate(struct vfscore_file *fp, off_t length)
+vfscore_ftruncate(struct vfscore_file *fp, off_t length)
 {
 	struct vnode *vp;
 	int error;
@@ -1508,7 +1508,7 @@ sys_futimens(int fd, const struct timespec times[2])
 }
 
 int
-sys_fallocate(struct vfscore_file *fp, int mode, off_t offset, off_t len)
+vfscore_fallocate(struct vfscore_file *fp, int mode, off_t offset, off_t len)
 {
 	int error;
 	struct vnode *vp;

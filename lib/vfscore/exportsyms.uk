@@ -41,10 +41,6 @@ uk_syscall_r_flock
 fhold
 fdrop
 fget
-ftruncate
-ftruncate64
-uk_syscall_e_ftruncate
-uk_syscall_r_ftruncate
 stat
 stat64
 uk_syscall_e_stat
@@ -168,10 +164,6 @@ uk_syscall_r_faccessat
 readlink
 uk_syscall_e_readlink
 uk_syscall_r_readlink
-fallocate
-fallocate64
-uk_syscall_e_fallocate
-uk_syscall_r_fallocate
 lseek
 lseek64
 uk_syscall_e_lseek
@@ -269,6 +261,8 @@ vfscore_writev
 vfscore_write
 vfscore_lseek
 vfscore_fsync
+vfscore_ftruncate
+vfscore_fallocate
 vfscore_fstat
 vfscore_fcntl
 vfscore_ioctl

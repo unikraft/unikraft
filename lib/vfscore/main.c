@@ -2146,39 +2146,6 @@ UK_SYSCALL_R_DEFINE(int, truncate, const char*, pathname, off_t, length)
 
 LFS64(truncate);
 
-UK_TRACEPOINT(trace_vfs_ftruncate, "%d %#x", int, off_t);
-UK_TRACEPOINT(trace_vfs_ftruncate_ret, "");
-UK_TRACEPOINT(trace_vfs_ftruncate_err, "%d", int);
-
-UK_SYSCALL_R_DEFINE(int, ftruncate, int, fd, off_t, length)
-{
-	trace_vfs_ftruncate(fd, length);
-	struct vfscore_file *fp;
-	int error;
-
-	error = fget(fd, &fp);
-	if (error)
-		goto out_error;
-
-	error = sys_ftruncate(fp, length);
-	fdrop(fp);
-
-	if (error)
-		goto out_error;
-	trace_vfs_ftruncate_ret();
-	return 0;
-
-	out_error:
-	trace_vfs_ftruncate_err(error);
-	return -error;
-}
-
-#ifdef ftruncate64
-#undef ftruncate64
-#endif
-
-LFS64(ftruncate);
-
 UK_SYSCALL_DEFINE(ssize_t, readlink, const char *, pathname, char *, buf, size_t, bufsize)
 {
 	struct task *t = main_task;
@@ -2208,39 +2175,6 @@ UK_SYSCALL_DEFINE(ssize_t, readlink, const char *, pathname, char *, buf, size_t
 	errno = error;
 	return -1;
 }
-
-UK_TRACEPOINT(trace_vfs_fallocate, "%d %d %#x %#x", int, int, loff_t, loff_t);
-UK_TRACEPOINT(trace_vfs_fallocate_ret, "");
-UK_TRACEPOINT(trace_vfs_fallocate_err, "%d", int);
-
-UK_SYSCALL_R_DEFINE(int, fallocate, int, fd, int, mode, loff_t, offset, loff_t, len)
-{
-	struct vfscore_file *fp;
-	int error;
-
-	trace_vfs_fallocate(fd, mode, offset, len);
-	error = fget(fd, &fp);
-	if (error)
-		goto out_error;
-
-	error = sys_fallocate(fp, mode, offset, len);
-	fdrop(fp);
-
-	if (error)
-		goto out_error;
-	trace_vfs_fallocate_ret();
-	return 0;
-
-	out_error:
-	trace_vfs_fallocate_err(error);
-	return -error;
-}
-
-#ifdef fallocate64
-#undef fallocate64
-#endif
-
-LFS64(fallocate);
 
 UK_TRACEPOINT(trace_vfs_utimes, "\"%s\"", const char*);
 UK_TRACEPOINT(trace_vfs_utimes_ret, "");
