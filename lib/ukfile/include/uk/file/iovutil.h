@@ -24,11 +24,11 @@
  * @return Number of bytes zeroed
  */
 static inline
-size_t uk_iov_zero(const struct iovec *iov, int iovcnt, size_t len,
-		   int *iovip, size_t *curp)
+size_t uk_iov_zero(const struct iovec *iov, size_t iovcnt, size_t len,
+		   size_t *iovip, size_t *curp)
 {
 	size_t ret = 0;
-	int i = *iovip;
+	size_t i = *iovip;
 	size_t cur = *curp;
 
 	UK_ASSERT(i < iovcnt);
@@ -74,11 +74,11 @@ size_t uk_iov_zero(const struct iovec *iov, int iovcnt, size_t len,
  * @return Number of bytes copied
  */
 static inline
-size_t uk_iov_scatter(const struct iovec *iov, int iovcnt, const char *buf,
-		      size_t len, int *iovip, size_t *curp)
+size_t uk_iov_scatter(const struct iovec *iov, size_t iovcnt, const char *buf,
+		      size_t len, size_t *iovip, size_t *curp)
 {
 	size_t ret = 0;
-	int i = *iovip;
+	size_t i = *iovip;
 	size_t cur = *curp;
 
 	UK_ASSERT(i < iovcnt);
@@ -126,11 +126,11 @@ size_t uk_iov_scatter(const struct iovec *iov, int iovcnt, const char *buf,
  * @return Number of bytes copied
  */
 static inline
-size_t uk_iov_gather(char *buf, const struct iovec *iov, int iovcnt,
-		     size_t len, int *iovip, size_t *curp)
+size_t uk_iov_gather(char *buf, const struct iovec *iov, size_t iovcnt,
+		     size_t len, size_t *iovip, size_t *curp)
 {
 	size_t ret = 0;
-	int i = *iovip;
+	size_t i = *iovip;
 	size_t cur = *curp;
 
 	UK_ASSERT(i < iovcnt);

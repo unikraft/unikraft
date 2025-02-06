@@ -398,7 +398,7 @@ typedef void (*posix_socket_socketpair_post_func_t)(
  * @return The number of bytes written on success, -errno otherwise
  */
 typedef ssize_t (*posix_socket_write_func_t)(posix_sock *sock,
-		const struct iovec *iov, int iovcnt);
+		const struct iovec *iov, size_t iovcnt);
 
 /**
  * Read from a socket file descriptor.
@@ -411,7 +411,7 @@ typedef ssize_t (*posix_socket_write_func_t)(posix_sock *sock,
  * @return The number of bytes read on success, -errno otherwise
  */
 typedef ssize_t (*posix_socket_read_func_t)(posix_sock *sock,
-		const struct iovec *iov, int iovcnt);
+		const struct iovec *iov, size_t iovcnt);
 
 /**
  * Close the socket.
@@ -640,7 +640,7 @@ posix_socket_socketpair_post(struct posix_socket_driver *d,
 
 static inline ssize_t
 posix_socket_write(posix_sock *sock, const struct iovec *iov,
-		   int iovcnt)
+		   size_t iovcnt)
 {
 	struct posix_socket_driver *d = posix_sock_get_driver(sock);
 
@@ -650,7 +650,7 @@ posix_socket_write(posix_sock *sock, const struct iovec *iov,
 
 static inline ssize_t
 posix_socket_read(posix_sock *sock, const struct iovec *iov,
-		  int iovcnt)
+		  size_t iovcnt)
 {
 	struct posix_socket_driver *d = posix_sock_get_driver(sock);
 

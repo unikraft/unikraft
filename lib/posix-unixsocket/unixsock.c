@@ -887,7 +887,7 @@ ssize_t unix_socket_sendto(posix_sock *file, const void *buf,
 
 static
 ssize_t unix_socket_read(posix_sock *file,
-			 const struct iovec *iov, int iovcnt)
+			 const struct iovec *iov, size_t iovcnt)
 {
 	struct msghdr msg = {
 		.msg_name = NULL,
@@ -903,7 +903,7 @@ ssize_t unix_socket_read(posix_sock *file,
 
 static
 ssize_t unix_socket_write(posix_sock *file,
-			  const struct iovec *iov, int iovcnt)
+			  const struct iovec *iov, size_t iovcnt)
 {
 	struct msghdr msg = {
 		.msg_name = NULL,

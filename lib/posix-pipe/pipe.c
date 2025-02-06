@@ -127,11 +127,11 @@ static void pipebuf_iovwrite(char *buf, pipeidx head,
 		_pipebuf_write(buf, head, (const char *)iov[i].iov_base, n);
 }
 
-static ssize_t _iovsz(const struct iovec *iov, int iovcnt)
+static ssize_t _iovsz(const struct iovec *iov, size_t iovcnt)
 {
 	size_t ret = 0;
 
-	for (int i = 0; i < iovcnt; i++)
+	for (size_t i = 0; i < iovcnt; i++)
 		if (iov[i].iov_len) {
 			if (likely(iov[i].iov_base))
 				ret += iov[i].iov_len;
@@ -142,7 +142,7 @@ static ssize_t _iovsz(const struct iovec *iov, int iovcnt)
 }
 
 static ssize_t pipe_read(const struct uk_file *f,
-			 const struct iovec *iov, int iovcnt,
+			 const struct iovec *iov, size_t iovcnt,
 			 size_t off, long flags __unused)
 {
 	ssize_t toread;
@@ -230,7 +230,7 @@ static ssize_t pipe_read(const struct uk_file *f,
 }
 
 static ssize_t pipe_write(const struct uk_file *f,
-			  const struct iovec *iov, int iovcnt,
+			  const struct iovec *iov, size_t iovcnt,
 			  size_t off, long flags)
 {
 	struct pipe_node *d;

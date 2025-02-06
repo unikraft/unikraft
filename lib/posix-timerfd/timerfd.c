@@ -129,7 +129,7 @@ static void _timerfd_set(struct timerfd_node *d, const struct itimerspec *set)
 /* Ops */
 
 static ssize_t timerfd_read(const struct uk_file *f,
-			    const struct iovec *iov, int iovcnt,
+			    const struct iovec *iov, size_t iovcnt,
 			    size_t off, long flags __unused)
 {
 	struct timerfd_node *d;

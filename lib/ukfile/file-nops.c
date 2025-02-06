@@ -10,14 +10,16 @@
 
 
 ssize_t uk_file_nop_read(const struct uk_file *f __unused,
-			 const struct iovec *iov __unused, int iovcnt __unused,
+			 const struct iovec *iov __unused,
+			 size_t iovcnt __unused,
 			 size_t off __unused, long flags __unused)
 {
 	return -ENOSYS;
 }
 
 ssize_t uk_file_nop_write(const struct uk_file *f __unused,
-			  const struct iovec *iov __unused, int iovcnt __unused,
+			  const struct iovec *iov __unused,
+			  size_t iovcnt __unused,
 			  size_t off __unused, long flags __unused)
 {
 	return -ENOSYS;
