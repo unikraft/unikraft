@@ -60,6 +60,7 @@ extern "C" {
 #define _SC_AVPHYS_PAGES     86
 #define _SC_NPROCESSORS_CONF 83
 #define _SC_NPROCESSORS_ONLN 84
+#define _SC_THREAD_PRIORITY_SCHEDULING 79
 
 long sysconf(int);
 int gethostname(char *name, size_t len);

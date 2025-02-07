@@ -449,6 +449,31 @@ UK_SYSCALL_R_DEFINE(int, sched_setaffinity, int, pid, long, cpusetsize,
 	return 0;
 }
 
+UK_SYSCALL_R_DEFINE(int, sched_getparam, int, pid, unsigned long*, param)
+{
+	UK_WARN_STUBBED();
+	return 0;
+}
+
+UK_SYSCALL_R_DEFINE(int, sched_setparam, int, pid, unsigned long*, param)
+{
+	UK_WARN_STUBBED();
+	return 0;
+}
+
+UK_SYSCALL_R_DEFINE(int, sched_getscheduler, int, pid)
+{
+	UK_WARN_STUBBED();
+	return 0;
+}
+
+UK_SYSCALL_R_DEFINE(int, sched_setscheduler, int, pid, int, policy,
+						unsigned long*, param)
+{
+	UK_WARN_STUBBED();
+	return 0;
+}
+
 #define MEMBARRIER_SUPPORTED_CMDS (\
 	MEMBARRIER_CMD_GLOBAL | \
 	MEMBARRIER_CMD_GLOBAL_EXPEDITED | \

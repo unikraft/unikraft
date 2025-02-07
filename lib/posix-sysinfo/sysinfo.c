@@ -126,6 +126,14 @@ long sysconf(int name)
 	if (name == _SC_PAGESIZE)
 		return __PAGE_SIZE;
 
+	/* Some programs (e.g. libzmq) make use of priority scheduling when
+	 * available, but Unikraft doesn't currently support it. If the program
+	 * checks for presence of priority scheduling functionality, we can
+	 * work around that by returning -1 here.
+	 */
+	if (name == _SC_THREAD_PRIORITY_SCHEDULING)
+		return -1;
+
 #ifdef CONFIG_LIBPOSIX_USER
 	if (name == _SC_GETPW_R_SIZE_MAX)
 		return -1;
