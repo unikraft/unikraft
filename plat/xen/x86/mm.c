@@ -54,6 +54,20 @@ unsigned long mfn_zero;
 pgentry_t *pt_base;
 
 /*
+ * Page allocations in this source file can benefit from a dedicated page alloc.
+ *
+ * If palloc is not available, we can make do with a memalign since all our
+ * allocations and frees are matched 1-to-1.
+ */
+static inline void *page_alloc(struct uk_alloc *a, unsigned long num_pages)
+{
+	if (a->palloc)
+		return uk_palloc(a, num_pages);
+	else
+		return uk_memalign(a, PAGE_SIZE, num_pages * PAGE_SIZE);
+}
+
+/*
  * Make pt_pfn a new 'level' page table frame and hook it into the page
  * table at offset in previous level MFN (pref_l_mfn). pt_pfn is a guest
  * PFN.
@@ -269,7 +283,7 @@ static pgentry_t *need_pte(unsigned long va, struct uk_alloc *a)
 #if defined(__x86_64__)
 	offset = l4_table_offset(va);
 	if (!(tab[offset] & _PAGE_PRESENT)) {
-		pt_pfn = virt_to_pfn(uk_palloc(a, 1));
+		pt_pfn = virt_to_pfn(page_alloc(a, 1));
 		if (!pt_pfn)
 			return NULL;
 		new_pt_frame(&pt_pfn, pt_mfn, offset, L3_FRAME);
@@ -281,7 +295,7 @@ static pgentry_t *need_pte(unsigned long va, struct uk_alloc *a)
 #endif
 	offset = l3_table_offset(va);
 	if (!(tab[offset] & _PAGE_PRESENT)) {
-		pt_pfn = virt_to_pfn(uk_palloc(a, 1));
+		pt_pfn = virt_to_pfn(page_alloc(a, 1));
 		if (!pt_pfn)
 			return NULL;
 		new_pt_frame(&pt_pfn, pt_mfn, offset, L2_FRAME);
@@ -292,7 +306,7 @@ static pgentry_t *need_pte(unsigned long va, struct uk_alloc *a)
 	tab = mfn_to_virt(pt_mfn);
 	offset = l2_table_offset(va);
 	if (!(tab[offset] & _PAGE_PRESENT)) {
-		pt_pfn = virt_to_pfn(uk_palloc(a, 1));
+		pt_pfn = virt_to_pfn(page_alloc(a, 1));
 		if (!pt_pfn)
 			return NULL;
 		new_pt_frame(&pt_pfn, pt_mfn, offset, L1_FRAME);
@@ -650,12 +664,12 @@ void _arch_init_p2m(struct uk_alloc *a)
 	if (((max_pfn - 1) >> L3_P2M_SHIFT) > 0)
 		UK_CRASH("Error: Too many pfns.\n");
 
-	l3_list = uk_palloc(a, 1);
+	l3_list = page_alloc(a, 1);
 	if (l3_list == NULL)
 		UK_CRASH("Error: Cannot allocate l3_list.\n");
 	for (pfn = 0; pfn < max_pfn; pfn += P2M_ENTRIES) {
 		if (!(pfn % (P2M_ENTRIES * P2M_ENTRIES))) {
-			l2_list = uk_palloc(a, 1);
+			l2_list = page_alloc(a, 1);
 			if (l2_list == NULL)
 				UK_CRASH("Error: Cannot allocate l2_list.\n");
 			l3_list[L3_P2M_IDX(pfn)] = virt_to_mfn(l2_list);
