@@ -495,33 +495,6 @@ int uk_posix_memalign_ifmalloc(struct uk_alloc *a,
 
 #endif
 
-void uk_pfree_compat(struct uk_alloc *a, void *ptr,
-		     unsigned long num_pages __unused)
-{
-	UK_ASSERT(a);
-
-	/* if the object is not page aligned it was clearly not from us */
-	UK_ASSERT(page_off(ptr) == 0);
-
-	uk_free(a, ptr);
-}
-
-void *uk_palloc_compat(struct uk_alloc *a, unsigned long num_pages)
-{
-	void *ptr;
-
-	UK_ASSERT(a);
-
-	/* check for overflow */
-	if (num_pages > (~(__sz)0)/__PAGE_SIZE)
-		return __NULL;
-
-	if (uk_posix_memalign(a, &ptr, __PAGE_SIZE, num_pages * __PAGE_SIZE))
-		return __NULL;
-
-	return ptr;
-}
-
 void *uk_realloc_compat(struct uk_alloc *a, void *ptr, __sz size)
 {
 	void *retptr;

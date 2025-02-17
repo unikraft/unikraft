@@ -76,8 +76,6 @@ void uk_free_ifmalloc(struct uk_alloc *a, void *ptr);
 void *uk_calloc_compat(struct uk_alloc *a, __sz num, __sz len);
 void *uk_realloc_compat(struct uk_alloc *a, void *ptr, __sz size);
 void *uk_memalign_compat(struct uk_alloc *a, __sz align, __sz len);
-void *uk_palloc_compat(struct uk_alloc *a, unsigned long num_pages);
-void uk_pfree_compat(struct uk_alloc *a, void *ptr, unsigned long num_pages);
 long uk_alloc_pavailmem_compat(struct uk_alloc *a);
 long uk_alloc_pmaxalloc_compat(struct uk_alloc *a);
 
@@ -215,8 +213,8 @@ static inline void _uk_alloc_stats_count_free(struct uk_alloc_stats *stats,
 		(a)->posix_memalign = (posix_memalign_f);		\
 		(a)->memalign       = (memalign_f);			\
 		(a)->free           = (free_f);				\
-		(a)->palloc         = uk_palloc_compat;			\
-		(a)->pfree          = uk_pfree_compat;			\
+		(a)->palloc         = NULL;				\
+		(a)->pfree          = NULL;				\
 		(a)->availmem       = (availmem_f);			\
 		(a)->pavailmem      = (availmem_f != NULL)		\
 				      ? uk_alloc_pavailmem_compat : NULL; \
@@ -241,8 +239,8 @@ static inline void _uk_alloc_stats_count_free(struct uk_alloc_stats *stats,
 		(a)->malloc_backend = (malloc_f);			\
 		(a)->free_backend   = (free_f);				\
 		(a)->free           = uk_free_ifmalloc;			\
-		(a)->palloc         = uk_palloc_compat;			\
-		(a)->pfree          = uk_pfree_compat;			\
+		(a)->palloc         = NULL;				\
+		(a)->pfree          = NULL;				\
 		(a)->availmem       = (availmem_f);			\
 		(a)->pavailmem      = (availmem_f != NULL)		\
 				      ? uk_alloc_pavailmem_compat : NULL; \
