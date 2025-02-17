@@ -33,13 +33,11 @@
 #ifndef __PROCESS_H_INTERNAL__
 #define __PROCESS_H_INTERNAL__
 
-#define _GNU_SOURCE /* struct clone_args */
-
 #include <uk/config.h>
 #include <sys/types.h>
 
 #if CONFIG_LIBPOSIX_PROCESS_CLONE
-#include <sched.h>
+#include <linux/sched.h>
 #include <uk/arch/ctx.h>
 #endif /* CONFIG_LIBPOSIX_PROCESS_CLONE */
 
