@@ -67,6 +67,28 @@
 
 static struct uk_alloc *drv_allocator;
 
+/*
+ * Page allocations in this source file can benefit from a dedicated page alloc.
+ *
+ * If palloc is not available, we can make do with a memalign since all our
+ * allocations and frees are matched 1-to-1.
+ */
+static inline void *page_alloc(struct uk_alloc *a, unsigned long num_pages)
+{
+	if (a->palloc)
+		return uk_palloc(a, num_pages);
+	else
+		return uk_memalign(a, PAGE_SIZE, num_pages * PAGE_SIZE);
+}
+
+static inline void page_free(struct uk_alloc *a, void *ptr,
+			     unsigned long num_pages)
+{
+	if (a->palloc)
+		uk_pfree(a, ptr, num_pages);
+	else
+		uk_free(a, ptr);
+}
 
 static uint16_t xennet_rxidx(RING_IDX idx)
 {
@@ -456,7 +478,7 @@ static struct uk_netdev_tx_queue *netfront_txq_setup(struct uk_netdev *n,
 	txq->lqueue_id = queue_id;
 
 	/* Setup shared ring */
-	sring = uk_palloc(conf->a, 1);
+	sring = page_alloc(conf->a, 1);
 	if (!sring)
 		return ERR2PTR(-ENOMEM);
 	memset(sring, 0, PAGE_SIZE);
@@ -475,7 +497,7 @@ static struct uk_netdev_tx_queue *netfront_txq_setup(struct uk_netdev *n,
 		if (rc) {
 			uk_pr_err("Error creating event channel: %d\n", rc);
 			gnttab_end_access(txq->ring_ref);
-			uk_pfree(conf->a, sring, 1);
+			page_free(conf->a, sring, 1);
 			return ERR2PTR(rc);
 		}
 	} else
@@ -535,7 +557,7 @@ static struct uk_netdev_rx_queue *netfront_rxq_setup(struct uk_netdev *n,
 	rxq->lqueue_id = queue_id;
 
 	/* Setup shared ring */
-	sring = uk_palloc(conf->a, 1);
+	sring = page_alloc(conf->a, 1);
 	if (!sring)
 		return ERR2PTR(-ENOMEM);
 	memset(sring, 0, PAGE_SIZE);
@@ -554,7 +576,7 @@ static struct uk_netdev_rx_queue *netfront_rxq_setup(struct uk_netdev *n,
 		if (rc) {
 			uk_pr_err("Error creating event channel: %d\n", rc);
 			gnttab_end_access(rxq->ring_ref);
-			uk_pfree(conf->a, sring, 1);
+			page_free(conf->a, sring, 1);
 			return ERR2PTR(rc);
 		}
 	} else {

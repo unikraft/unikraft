@@ -43,6 +43,19 @@
 #define NR_GRANT_ENTRIES \
 	(NR_GRANT_FRAMES * PAGE_SIZE / sizeof(grant_entry_v1_t))
 
+/*
+ * Page allocations in this source file can benefit from a dedicated page alloc.
+ *
+ * If palloc is not available, we can make do with a memalign.
+ */
+static inline void *page_alloc(struct uk_alloc *a, unsigned long num_pages)
+{
+	if (a->palloc)
+		return uk_palloc(a, num_pages);
+	else
+		return uk_memalign(a, PAGE_SIZE, num_pages * PAGE_SIZE);
+}
+
 static struct gnttab {
 	int initialized;
 	struct uk_semaphore sem;
@@ -228,7 +241,7 @@ grant_ref_t gnttab_alloc_and_grant(void **map, struct uk_alloc *a)
 	UK_ASSERT(map != NULL);
 	UK_ASSERT(a != NULL);
 
-	page = uk_palloc(a, 1);
+	page = page_alloc(a, 1);
 	if (page == NULL)
 		return GRANT_INVALID_REF;
 

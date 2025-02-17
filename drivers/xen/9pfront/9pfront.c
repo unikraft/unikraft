@@ -64,6 +64,29 @@ static struct uk_alloc *a;
 static UK_LIST_HEAD(p9front_device_list);
 static __spinlock p9front_device_list_lock;
 
+/*
+ * Page allocations in this source file can benefit from a dedicated page alloc.
+ *
+ * If palloc is not available, we can make do with a memalign since all our
+ * allocations and frees are matched 1-to-1.
+ */
+static inline void *page_alloc(struct uk_alloc *a, unsigned long num_pages)
+{
+	if (a->palloc)
+		return uk_palloc(a, num_pages);
+	else
+		return uk_memalign(a, PAGE_SIZE, num_pages * PAGE_SIZE);
+}
+
+static inline void page_free(struct uk_alloc *a, void *ptr,
+			     unsigned long num_pages)
+{
+	if (a->palloc)
+		uk_pfree(a, ptr, num_pages);
+	else
+		uk_free(a, ptr);
+}
+
 struct p9front_header {
 	uint32_t size;
 	uint8_t type;
@@ -194,10 +217,10 @@ static void p9front_free_dev_ring(struct p9front_dev *p9fdev, int idx)
 	unbind_evtchn(ring->evtchn);
 	for (i = 0; i < (1 << p9fdev->ring_order); i++)
 		gnttab_end_access(ring->intf->ref[i]);
-	uk_pfree(a, ring->data.in,
-		 1ul << (p9fdev->ring_order + XEN_PAGE_SHIFT - PAGE_SHIFT));
+	page_free(a, ring->data.in,
+		  1ul << (p9fdev->ring_order + XEN_PAGE_SHIFT - PAGE_SHIFT));
 	gnttab_end_access(ring->ref);
-	uk_pfree(a, ring->intf, 1);
+	page_free(a, ring->intf, 1);
 	ring->initialized = false;
 }
 
@@ -231,7 +254,7 @@ static int p9front_allocate_dev_ring(struct p9front_dev *p9fdev, int idx)
 	ring->dev = p9fdev;
 
 	/* Allocate ring intf page. */
-	ring->intf = uk_palloc(a, 1);
+	ring->intf = page_alloc(a, 1);
 	if (!ring->intf) {
 		rc = -ENOMEM;
 		goto out;
@@ -244,8 +267,8 @@ static int p9front_allocate_dev_ring(struct p9front_dev *p9fdev, int idx)
 	UK_ASSERT(ring->ref != GRANT_INVALID_REF);
 
 	/* Allocate memory for the data. */
-	data_bytes = uk_palloc(a, 1ul << (p9fdev->ring_order +
-					  XEN_PAGE_SHIFT - PAGE_SHIFT));
+	data_bytes = page_alloc(a, 1ul << (p9fdev->ring_order +
+					   XEN_PAGE_SHIFT - PAGE_SHIFT));
 	if (!data_bytes) {
 		rc = -ENOMEM;
 		goto out_free_intf;
@@ -302,11 +325,11 @@ out_free_thread:
 out_free_grants:
 	for (i = 0; i < (1 << p9fdev->ring_order); i++)
 		gnttab_end_access(ring->intf->ref[i]);
-	uk_pfree(a, data_bytes,
-		 1ul << (p9fdev->ring_order + XEN_PAGE_SHIFT - PAGE_SHIFT));
+	page_free(a, data_bytes,
+		  1ul << (p9fdev->ring_order + XEN_PAGE_SHIFT - PAGE_SHIFT));
 out_free_intf:
 	gnttab_end_access(ring->ref);
-	uk_pfree(a, ring->intf, 1);
+	page_free(a, ring->intf, 1);
 out:
 	return rc;
 }

@@ -69,6 +69,29 @@
 
 static struct uk_alloc *drv_allocator;
 
+/*
+ * Page allocations in this source file can benefit from a dedicated page alloc.
+ *
+ * If palloc is not available, we can make do with a memalign since all our
+ * allocations and frees are matched 1-to-1.
+ */
+static inline void *page_alloc(struct uk_alloc *a, unsigned long num_pages)
+{
+	if (a->palloc)
+		return uk_palloc(a, num_pages);
+	else
+		return uk_memalign(a, PAGE_SIZE, num_pages * PAGE_SIZE);
+}
+
+static inline void page_free(struct uk_alloc *a, void *ptr,
+			     unsigned long num_pages)
+{
+	if (a->palloc)
+		uk_pfree(a, ptr, num_pages);
+	else
+		uk_free(a, ptr);
+}
+
 /* This function gets from pool gref_elems or allocates new ones
  */
 static int blkfront_request_set_grefs(struct blkfront_request *blkfront_req)
@@ -566,7 +589,7 @@ static int blkfront_ring_init(struct uk_blkdev_queue *queue)
 
 	UK_ASSERT(queue);
 	dev = queue->dev;
-	sring = uk_palloc(queue->a, BLK_RING_PAGES_NUM);
+	sring = page_alloc(queue->a, BLK_RING_PAGES_NUM);
 	if (!sring)
 		return -ENOMEM;
 
@@ -591,7 +614,7 @@ static void blkfront_ring_fini(struct uk_blkdev_queue *queue)
 	}
 
 	if (queue->ring.sring != NULL)
-		uk_pfree(queue->a, queue->ring.sring, BLK_RING_PAGES_NUM);
+		page_free(queue->a, queue->ring.sring, BLK_RING_PAGES_NUM);
 }
 
 #if CONFIG_LIBBLKFRONT_GREFPOOL
