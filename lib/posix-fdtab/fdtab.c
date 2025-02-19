@@ -392,13 +392,13 @@ void uk_fdtab_cloexec(void)
 	fdtab_cleanup(active_fdtab, 0);
 }
 
+#if CONFIG_LIBPOSIX_PROCESS_EXECVE
 static int fdtab_handle_execve(void *data __unused)
 {
 	uk_fdtab_cloexec();
-	return 0;
+	return UK_EVENT_HANDLED_CONT;
 }
 
-#if CONFIG_LIBPOSIX_PROCESS_EXECVE
 UK_EVENT_HANDLER_PRIO(POSIX_PROCESS_EXECVE_EVENT, fdtab_handle_execve,
 		      UK_PRIO_EARLIEST);
 #endif /* CONFIG_LIBPOSIX_PROCESS_EXECVE */
