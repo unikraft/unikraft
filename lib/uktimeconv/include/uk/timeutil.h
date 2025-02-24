@@ -39,6 +39,24 @@
 	.tv_usec = ukarch_time_nsec_to_usec((ts)->tv_nsec) \
 })
 
+/**
+ * Return non-zero if `t` is canonical (nanoseconds in [0, 999999999] range).
+ */
+static inline
+int uk_time_spec_canonical(const struct timespec *t)
+{
+	return t->tv_nsec >= 0 && t->tv_nsec < 1000000000;
+}
+
+/**
+ * Return non-zero if canonical `t` represents zero or positive time.
+ */
+static inline
+int uk_time_spec_positive(const struct timespec *t)
+{
+	return t->tv_sec >= 0;
+}
+
 static inline
 __snsec uk_time_spec_nsecdiff(const struct timespec *t1,
 			      const struct timespec *t2)
