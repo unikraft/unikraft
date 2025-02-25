@@ -39,15 +39,17 @@
 #include <errno.h>
 
 #include <uk/assert.h>
+#include <uk/compat_list.h>
 #include <uk/print.h>
 #include <uk/cpio.h>
 #include <uk/essentials.h>
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <uk/allocregion.h>
+#include <uk/arch/limits.h>
 #include <unistd.h>
 #include <utime.h>
-
 
 /* Raw filesystem syscalls; not provided by headers */
 int uk_syscall_do_open(const char *, int, mode_t);
@@ -57,9 +59,76 @@ int uk_syscall_do_chmod(const char *, mode_t);
 int uk_syscall_do_utime(const char *, const struct utimbuf *);
 int uk_syscall_do_mkdir(const char *, mode_t);
 int uk_syscall_do_symlink(const char *, const char *);
+int uk_syscall_do_link(const char *, const char *);
 int uk_syscall_do_stat(const char *, struct stat *);
 int uk_syscall_do_unlinkat(int, const char *, int);
 int uk_syscall_do_rename(const char *, const char *);
+
+struct cpio_ilist_elm {
+	uint32_t ino;
+	UK_SLIST_ENTRY(struct cpio_ilist_elm) next;
+	char path[];
+};
+
+struct cpio_ilist {
+	struct uk_allocregion *ar;
+	UK_SLIST_HEAD(ilist_head, struct cpio_ilist_elm) elms;
+};
+
+static inline
+struct cpio_ilist_elm *cpio_ilist_elm_create(struct cpio_ilist *ilist,
+					     uint32_t ino,
+					     const char *path,
+					     size_t pathlen)
+{
+	struct cpio_ilist_elm *elm;
+
+	elm = uk_allocregion_bump(ilist->ar, sizeof(*elm) + pathlen);
+	if (unlikely(!elm))
+		return NULL;
+
+	elm->ino = ino;
+	/* Includes terminating null byte */
+	memcpy(elm->path, path, pathlen);
+
+	return elm;
+}
+
+static inline
+struct cpio_ilist_elm *cpio_ilist_elm_upto(struct cpio_ilist *ilist,
+					   uint64_t ino)
+{
+	struct cpio_ilist_elm *elm, *next_elm;
+
+	if (UK_SLIST_EMPTY(&ilist->elms) ||
+	    UK_SLIST_FIRST(&ilist->elms)->ino > ino)
+		return NULL;
+
+	/* Search in the ascendingly sorted list */
+	UK_SLIST_FOREACH_SAFE(elm, &ilist->elms, next, next_elm) {
+		/*
+		 * If we already encountered this multi-hardlink inode
+		 * just return it.
+		 */
+		if (elm->ino == ino)
+			break;
+
+		/*
+		 * If we have reached the last element
+		 * OR
+		 * If current element's inode is not the one we are looking for
+		 * and the next element's inode is bigger, then we haven't
+		 * encountered the inode we are looking for and this is the
+		 * first time we are seeing it so return current element to be
+		 * able to insert right after it and maintain the list
+		 * ascendingly sorted.
+		 */
+		if (!next_elm || next_elm->ino > ino)
+			break;
+	}
+
+	return elm;
+}
 
 static int
 try_rm_nonempty_dir(const char *path)
@@ -249,7 +318,8 @@ extract_symlink(const char *path, const char *contents, size_t len)
 }
 
 static enum ukcpio_error
-extract_section(const struct uk_cpio_header **headerp, char *fullpath,
+extract_section(struct cpio_ilist *ilist,
+		const struct uk_cpio_header **headerp, char *fullpath,
 		const char *eof, size_t prefixlen)
 {
 	const struct uk_cpio_header *header = *headerp;
@@ -257,9 +327,13 @@ extract_section(const struct uk_cpio_header **headerp, char *fullpath,
 	uint32_t filesize = UKCPIO_U32FIELD(header->filesize);
 	uint32_t namesize = UKCPIO_U32FIELD(header->namesize);
 	uint32_t mtime = UKCPIO_U32FIELD(header->mtime);
+	uint32_t nlink = UKCPIO_U32FIELD(header->nlink);
 	const char *fname = UKCPIO_FILENAME(header);
 	const char *data = UKCPIO_DATA(header, namesize);
+	struct cpio_ilist_elm *elm, *new_elm;
 	enum ukcpio_error err;
+	uint32_t ino;
+	int rc;
 
 	if (unlikely(fname + namesize > eof)) {
 		uk_pr_err("File name exceeds archive bounds at %p\n", header);
@@ -276,6 +350,54 @@ extract_section(const struct uk_cpio_header **headerp, char *fullpath,
 		return -UKCPIO_MALFORMED_INPUT;
 	}
 	memcpy(fullpath + prefixlen, fname, namesize);
+
+	if (nlink > 1 && strcmp(".", fname)) {
+		ino = UKCPIO_U32FIELD(header->inode_num);
+		uk_pr_info("%s inode %u has more than 1 link (%u)\n",
+			   fname, ino, nlink);
+		elm = cpio_ilist_elm_upto(ilist, ino);
+		/*
+		 * If the list already contains an element with this inode
+		 * just link this current entry to it.
+		 */
+		if (elm && elm->ino == ino) {
+			uk_pr_info("Inode %u has already been linked by %s, creating new hardlink at %s\n",
+				   ino, elm->path, fullpath);
+			rc = uk_syscall_do_link(elm->path, fullpath);
+			if (unlikely(rc)) {
+				uk_pr_err("Failed to create new hard link %s (from %s).\n",
+					  fullpath, elm->path);
+				return -UKCPIO_LINK_FAILED;
+			}
+
+			*headerp = UKCPIO_NEXT(header, namesize, filesize);
+			return UKCPIO_SUCCESS;
+		}
+
+		/*
+		 * There is no element with current entry's inode and found
+		 * element's inode is smaller so create the new inode list
+		 * element to insert.
+		 */
+		new_elm = cpio_ilist_elm_create(ilist, ino, fullpath,
+						prefixlen + namesize);
+		if (unlikely(!new_elm)) {
+			uk_pr_err("Failed to create new ilist elm.\n");
+			return -UKCPIO_NOMEM;
+		}
+
+		/*
+		 * If the list is empty or the new inode is the new smallest
+		 * inode, insert right after the head.
+		 * Otherwise, insert right after the element already in the
+		 * list whose inode is smaller to keep the list sorted
+		 * ascendingly.
+		 */
+		if (!elm)
+			UK_SLIST_INSERT_HEAD(&ilist->elms, new_elm, next);
+		else
+			UK_SLIST_INSERT_AFTER(elm, new_elm, next);
+	}
 
 	err = UKCPIO_SUCCESS;
 
@@ -308,7 +430,8 @@ extract_section(const struct uk_cpio_header **headerp, char *fullpath,
  *  Returns 0 on success or one of ukcpio_error enum.
  */
 static enum ukcpio_error
-process_section(const struct uk_cpio_header **headerp, char *fullpath,
+process_section(struct cpio_ilist *ilist,
+		const struct uk_cpio_header **headerp, char *fullpath,
 		const char *eof, size_t prefixlen)
 {
 	const struct uk_cpio_header *header = *headerp;
@@ -326,16 +449,21 @@ process_section(const struct uk_cpio_header **headerp, char *fullpath,
 		*headerp = NULL;
 		return UKCPIO_SUCCESS;
 	}
-	return extract_section(headerp, fullpath, eof, prefixlen);
+	return extract_section(ilist, headerp, fullpath, eof, prefixlen);
 }
 
 enum ukcpio_error
 ukcpio_extract(const char *dest, const void *buf, size_t buflen)
 {
+	struct cpio_ilist ilist = {
+		.elms = UK_SLIST_HEAD_INITIALIZER(&ilist.elms),
+	};
 	enum ukcpio_error error = UKCPIO_SUCCESS;
 	const struct uk_cpio_header *header = buf;
+	size_t max_alloc, destlen;
 	char pathbuf[PATH_MAX];
-	size_t destlen;
+	struct uk_alloc *a;
+	void *region_base;
 
 	if (dest == NULL)
 		return -UKCPIO_NODEST;
@@ -348,9 +476,38 @@ ukcpio_extract(const char *dest, const void *buf, size_t buflen)
 		pathbuf[destlen] = 0;
 	}
 
+	a = uk_alloc_get_default();
+
+	/*
+	 * Since we cannot know how many CPIO entries with nlink > 1 are in
+	 * a CPIO archive, just initialize the region allocator based on the
+	 * minimum between the biggest possible contiguous allocation of the
+	 * current default allocator and the maximum possible count of CPIO
+	 * entries that could fit in the given buffer.
+	 */
+	max_alloc = MIN((size_t)uk_alloc_maxalloc(a),
+			buflen / sizeof(struct uk_cpio_header) *
+			sizeof(struct cpio_ilist_elm));
+	region_base = uk_malloc(a, max_alloc);
+	if (unlikely(!region_base)) {
+		uk_pr_err("Failed to allocate CPIO inode list.\n");
+		return -UKCPIO_NOMEM;
+	}
+
+	ilist.ar = uk_allocregion_init(region_base, max_alloc);
+	if (unlikely(!ilist.ar)) {
+		uk_pr_err("Failed to initialize region allocator.\n");
+		uk_free(a, region_base);
+		return -UKCPIO_NOMEM;
+	}
+
 	while (header && error == UKCPIO_SUCCESS) {
-		error = process_section(&header, pathbuf,
+		error = process_section(&ilist,
+					&header, pathbuf,
 					(char *)header + buflen, destlen);
 	}
+
+	uk_free(a, region_base);
+
 	return error;
 }

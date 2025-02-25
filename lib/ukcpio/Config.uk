@@ -8,4 +8,5 @@ config LIBUKCPIO
 	depends on HAVE_VFS
 	select LIBNOLIBC if !HAVE_LIBC
 	select LIBSYSCALL_SHIM
+	select LIBUKALLOCREGION
 	default n
