@@ -1,0 +1,10 @@
+# Common boilerplate ops
+uk_fs_common_nop_sync
+uk_fs_common_nop_rebind
+uk_fs_common_nop_graft
+uk_fs_common_rofs_create
+uk_fs_common_rofs_unlink
+uk_fs_common_rofs_rename
+
+# Driver lookup
+uk_fs_driver

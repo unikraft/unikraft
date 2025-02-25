@@ -226,12 +226,20 @@ typedef struct uk_swrefcount uk_file_refcnt;
 /* Files always get created with one strong reference held */
 /* See above comment for file state on initializers vs initial values */
 
+#if CONFIG_LIBUKFS
+struct uk_fs_ops;
+#endif /* CONFIG_LIBUKFS */
+
 struct uk_file {
 	/* Identity */
-	const void *vol; /* Volume instance; needed to check file kind */
+	const void *vol; /* Driver-specific volume state */
 	void *node; /* Driver-specific inode data */
 	/* Ops table */
 	const struct uk_file_ops *ops;
+#if CONFIG_LIBUKFS
+	/* Filesystem ops table; must be NULL for non-filesystem files */
+	const struct uk_fs_ops *fsops;
+#endif /* CONFIG_LIBUKFS */
 	/* Mutable state (refcounting, poll events & locks) */
 	uk_file_refcnt *refcnt;
 	struct uk_file_state *state;

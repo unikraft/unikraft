@@ -1,0 +1,9 @@
+$(eval $(call addlib_s,libukfs,$(CONFIG_LIBUKFS)))
+
+CINCLUDES-$(CONFIG_LIBUKFS) += -I$(LIBUKFS_BASE)/include
+CXXINCLUDES-$(CONFIG_LIBUKFS) += -I$(LIBUKFS_BASE)/include
+
+LIBUKFS_SRCS-y += $(LIBUKFS_BASE)/common-ops.c
+LIBUKFS_SRCS-y += $(LIBUKFS_BASE)/drivers.c
+
+LIBUKFS_SRCS-y += $(LIBUKFS_BASE)/driver-list.ld

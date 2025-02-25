@@ -1,0 +1,17 @@
+config LIBUKFS
+	bool "ukfs: Common support for filesystems"
+	select LIBUKFILE
+	select LIBUKATOMIC
+	select LIBUKLOCK
+	select LIBUKLOCK_RWLOCK
+
+if LIBUKFS
+
+# Hidden, selected by higher levels if required
+
+# Whether permissions are checked at the filesystem level
+# if enabled, `uk_fs_checkperm` must be provided by another component
+config LIBUKFS_PERMISSIONS
+	bool
+
+endif
