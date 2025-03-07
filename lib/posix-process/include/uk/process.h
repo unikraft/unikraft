@@ -235,4 +235,16 @@ struct posix_process_execve_event_data {
 
 #endif /* CONFIG_LIBPOSIX_PROCESS_EXECVE */
 
+/* Data delivered to the handlers of POSIX_PROCESS_EXIT_EVENT.
+ * This event is triggered upon both pthread and pprocess exit.
+ * - pthread exit: all fields are populated.
+ * - process exit: thread is set to NULL and the value of
+ *   tid is undefined.
+ */
+struct posix_process_exit_event_data {
+	struct uk_thread *thread;
+	pid_t pid;
+	pid_t tid;
+};
+
 #endif /* __UK_PROCESS_H__ */

@@ -36,7 +36,7 @@ static void __noreturn execve_ctx_switch(long arg0, long arg1)
 	this_thread = uk_thread_current();
 	UK_ASSERT(this_thread);
 
-	pthread = tid2pthread(ukthread2tid(this_thread)); /* FIXME */
+	pthread = uk_pthread_current();
 	UK_ASSERT(pthread);
 
 	pthread_parent = pthread->parent;
@@ -69,10 +69,16 @@ switch_ctx:
 /* Prepare process for executing new context. For a complete list see
  * "Effect on process attributes" in execve(2).
  */
-static int pprocess_cleanup(struct uk_thread *thread __maybe_unused)
+static int pprocess_cleanup(struct posix_process *pprocess)
 {
-	/* Kill this thread's siblings */
-	pprocess_kill_siblings(thread);
+	struct posix_thread *pt, *ptn;
+
+	/* Kill all threads of this process except current */
+	uk_pprocess_foreach_pthread(pprocess, pt, ptn) {
+		if (pt->thread == uk_thread_current())
+			continue;
+		pprocess_exit_pthread(pt, POSIX_THREAD_EXITED, 0);
+	}
 
 	return 0;
 }
@@ -169,7 +175,7 @@ UK_SYSCALL_R_E_DEFINE(int, execve, const char *, pathname,
 		uk_pr_err("execve event error (%d)\n", rc);
 		goto err_free_stack_new;
 	}
-	pprocess_cleanup(this_thread);
+	pprocess_cleanup(uk_pprocess_current());
 
 	/* Prepare switch to the new context.
 	 *

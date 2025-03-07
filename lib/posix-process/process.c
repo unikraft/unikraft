@@ -1,37 +1,11 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
 /*
- * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
- *          Felipe Huici <felipe.huici@neclab.eu>
- *          Costin Lupu <costin.lupu@cs.pub.ro>
- *
  * Copyright (c) 2017, NEC Europe Ltd., NEC Corporation. All rights reserved.
  * Copyright (c) 2022, NEC Laboratories Europe GmbH, NEC Corporation.
  *                     All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (c) 2024, Unikraft GmbH and The Unikraft Authors.
+ * Licensed under the BSD-3-Clause License (the "License").
+ * You may not use this file except in compliance with the License.
  */
 
 #include <uk/config.h>
@@ -194,13 +168,17 @@ err_out:
 }
 
 /* Free thread that is part of a process
- * NOTE: The process is not free'd here when its thread list
+ * NOTE: The process is not released here when its thread list
  *       becomes empty.
  */
-static void pprocess_release_pthread(struct posix_thread *pthread)
+void pprocess_release_pthread(struct posix_thread *pthread)
 {
 	UK_ASSERT(pthread);
 	UK_ASSERT(pthread->_a);
+	UK_ASSERT(pthread->process);
+
+	uk_pr_debug("pid %d: Release tid %d\n",
+		    pthread->process->pid, pthread->tid);
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	pprocess_signal_tdesc_free(pthread);
@@ -233,7 +211,6 @@ int uk_posix_process_create_pthread(struct uk_thread *thread)
 
 	return 0;
 }
-static void pprocess_release(struct posix_process *pprocess);
 
 /* Create a new posix process for a given thread */
 int pprocess_create(struct uk_alloc *a,
@@ -274,6 +251,8 @@ int pprocess_create(struct uk_alloc *a,
 	UK_INIT_LIST_HEAD(&pprocess->threads);
 	UK_INIT_LIST_HEAD(&pprocess->children);
 
+	pprocess->state = POSIX_PROCESS_RUNNING;
+
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	ret = pprocess_signal_pdesc_alloc(pprocess);
 	if (unlikely(ret)) {
@@ -290,6 +269,9 @@ int pprocess_create(struct uk_alloc *a,
 		goto err_free_pprocess;
 	}
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+
+	uk_semaphore_init(&pprocess->wait_semaphore, 0);
+	uk_semaphore_init(&pprocess->exit_semaphore, 0);
 
 	/* Check if we have a pthread structure already for this thread
 	 * or if we need to allocate one
@@ -361,131 +343,33 @@ err_out:
 	return ret;
 }
 
-/* Releases pprocess memory and re-links its child to the parent
- * NOTE: All related threads must be removed already from this pprocess
+/* Releases pprocess memory and other resources.
+ * NOTE: All pthreads must be removed already
+ *       from this pprocess. All chilren must
+ *       be already reparented.
  */
-static void pprocess_release(struct posix_process *pprocess)
+void pprocess_release(struct posix_process *pprocess)
 {
-	struct posix_process *pchild, *pchildn;
+	pid_t pid;
 
+	UK_ASSERT(pprocess);
 	UK_ASSERT(uk_list_empty(&pprocess->threads));
+	UK_ASSERT(uk_list_empty(&pprocess->children));
 
-	uk_list_for_each_entry_safe(pchild, pchildn,
-				    &pprocess->children,
-				    child_list_entry) {
-		/* check for violation of the tree structure */
-		UK_ASSERT(pchild != pprocess);
-
-		uk_list_del(&pchild->child_list_entry);
-		if (pprocess->parent) {
-			pchild->parent = pprocess->parent;
-			uk_list_add(&pchild->child_list_entry,
-				    &pprocess->parent->children);
-			uk_pr_debug("Process PID %d re-assigned to parent PID %d\n",
-				    pchild->pid, pprocess->parent->pid);
-		} else {
-			/* There is no parent, disconnect */
-			pchild->parent = NULL;
-			uk_pr_debug("Process PID %d loses its parent\n",
-				    pchild->pid);
-		}
-	}
+	/* Unlink this process from its parent */
+	if (pprocess->parent)
+		uk_list_del(&pprocess->child_list_entry);
 
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	pprocess_signal_pdesc_free(pprocess);
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
 
-	pid_process[pprocess->pid] = NULL;
+	pid = pprocess->pid;
 
-	uk_pr_debug("Process PID %d released\n",
-		    pprocess->pid);
+	pid_process[pid] = NULL;
 	uk_free(pprocess->_a, pprocess);
-}
 
-void pprocess_kill_siblings(struct uk_thread *thread)
-{
-	struct posix_thread *pthread, *pthreadn;
-	struct posix_thread *this_thread;
-	struct posix_process *pprocess;
-	pid_t this_tid;
-
-	this_tid = ukthread2tid(thread);
-	this_thread = tid2pthread(this_tid);
-
-	pprocess = this_thread->process;
-	UK_ASSERT(pprocess);
-
-	/* Kill all remaining threads of the process */
-	uk_list_for_each_entry_safe(pthread, pthreadn,
-				    &pprocess->threads, thread_list_entry) {
-		if (pthread->tid == this_tid)
-			continue;
-
-		/* If this thread is already exited it may
-		 * be waiting to be garbage-collected.
-		 */
-		if (uk_thread_is_exited(pthread->thread))
-			continue;
-
-		uk_pr_debug("Terminating siblings of tid: %d (pid: %d): Killing TID %d: thread %p (%s)...\n",
-			    this_thread->tid, pprocess->pid,
-			    pthread->tid, pthread->thread,
-			    pthread->thread->name);
-
-		/* Terminating the thread will lead to calling
-		 * `posix_thread_fini()` which will clean-up the related
-		 * pthread resources and pprocess resources on the last
-		 * thread
-		 */
-		uk_sched_thread_terminate(pthread->thread);
-	}
-}
-
-void pprocess_kill(struct posix_process *pprocess)
-{
-	struct posix_thread *pthread, *pthreadn, *pthread_self = NULL;
-
-	/* Kill all remaining threads of the process */
-	uk_list_for_each_entry_safe(pthread, pthreadn,
-				    &pprocess->threads, thread_list_entry) {
-		/* Double-check that this thread is part of this process */
-		UK_ASSERT(pthread->process == pprocess);
-
-		if (pthread->thread == uk_thread_current()) {
-			/* Self-destruct this thread as last work of this
-			 * function. The reason is that nothing of this
-			 * function is executed anymore as soon as the
-			 * thread killed itself.
-			 */
-			pthread_self = pthread;
-			continue;
-		}
-		if (uk_thread_is_exited(pthread->thread)) {
-			/* Thread already exited, might wait for getting
-			 * garbage collected.
-			 */
-			continue;
-		}
-
-		uk_pr_debug("Terminating PID %d: Killing TID %d: thread %p (%s)...\n",
-			    pprocess->pid, pthread->tid,
-			    pthread->thread, pthread->thread->name);
-
-		/* Terminating the thread will lead to calling
-		 * `posix_thread_fini()` which will clean-up the related
-		 * pthread resources and pprocess resources on the last
-		 * thread
-		 */
-		uk_sched_thread_terminate(pthread->thread);
-	}
-
-	if (pthread_self) {
-		uk_pr_debug("Terminating PID %d: Self-killing TID %d...\n",
-			    pprocess->pid, pthread_self->tid);
-		uk_sched_thread_terminate(uk_thread_current());
-
-		/* NOTE: Nothing will be executed from here on */
-	}
+	uk_pr_debug("pid %d released\n", pid);
 }
 
 static int posix_process_init(struct uk_init_ctx *ictx)
@@ -513,25 +397,29 @@ static int posix_process_init(struct uk_init_ctx *ictx)
 uk_late_initcall(posix_process_init, 0x0);
 
 /* Thread release: Release TID and posix_thread */
-static void posix_thread_fini(struct uk_thread *child)
+static void posix_thread_fini(struct uk_thread *thread)
 {
 	struct posix_process *pprocess;
+	struct posix_thread *pthread;
 
-	if (!pthread_self)
+	pthread = uk_thread_uktls_var(thread, pthread_self);
+
+	if (!pthread)
 		return; /* no posix thread was assigned */
 
-	pprocess = pthread_self->process;
-
+	pprocess = pthread->process;
 	UK_ASSERT(pprocess);
 
-	uk_pr_debug("thread %p (%s): Releasing thread with TID: %d (PID: %d)\n",
-		    child, child->name, (int) pthread_self->tid,
-		    (int) pprocess->pid);
-	pprocess_release_pthread(pthread_self);
+	/* Perform thread termination and relase the thread */
+	pprocess_exit_pthread(pthread_self, POSIX_THREAD_EXITED, 0);
 
-	/* Release process if it became empty of threads */
-	if (uk_list_empty(&pprocess->threads))
-		pprocess_release(pprocess);
+	/* If last thread, also release the process */
+	if  (uk_list_empty(&pprocess->threads)) {
+		pprocess_exit(pprocess, POSIX_PROCESS_EXITED, 0);
+		/* UK_PID_INIT cannot be waited, release here */
+		if (pprocess->pid == UK_PID_INIT)
+			pprocess_release(pprocess);
+	}
 }
 
 UK_THREAD_INIT_PRIO(0, posix_thread_fini, UK_PRIO_EARLIEST);
@@ -632,49 +520,6 @@ pid_t uk_sys_getppid(void)
 
 	return pthread_self->process->parent->pid;
 }
-
- /* NOTE: The man pages of _exit(2) say:
-  *       "In glibc up to version 2.3, the _exit() wrapper function invoked
-  *        the kernel system call of the same name.  Since glibc 2.3, the
-  *        wrapper function invokes exit_group(2), in order to terminate all
-  *        of the threads in a process.
-  *        The raw _exit() system call terminates only the calling thread,
-  *        and actions such as reparenting child processes or sending
-  *        SIGCHLD to the parent process are performed only if this is the
-  *        last thread in the thread group."
-  */
-UK_LLSYSCALL_R_DEFINE(int, exit, int, status)
-{
-	uk_sched_thread_exit(); /* won't return */
-	UK_CRASH("sys_exit() unexpectedly returned\n");
-	return -EFAULT;
-}
-
-static int pprocess_exit(int status __unused)
-{
-	pprocess_kill(uk_pprocess_current()); /* won't return */
-	UK_CRASH("sys_exit_group() unexpectedly returned\n");
-	return -EFAULT;
-}
-
-UK_LLSYSCALL_R_DEFINE(int, exit_group, int, status)
-{
-	return pprocess_exit(status);
-}
-
-#if UK_LIBC_SYSCALLS
-__noreturn void exit(int status)
-{
-	pprocess_exit(status);
-	UK_CRASH("sys_exit_group() unexpectedly returned\n");
-}
-
-__noreturn void exit_group(int status)
-{
-	pprocess_exit(status);
-	UK_CRASH("sys_exit_group() unexpectedly returned\n");
-}
-#endif /* UK_LIBC_SYSCALLS */
 
 /* Store child PID at given location for parent */
 static int pprocess_parent_settid(const struct clone_args *cl_args,

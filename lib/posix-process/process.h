@@ -1,34 +1,9 @@
 /* SPDX-License-Identifier: BSD-3-Clause */
-/*
- * Authors: Simon Kuenzer <simon.kuenzer@neclab.eu>
- *
- * Copyright (c) 2022, NEC Laboratories Europe GmbH, NEC Corporation.
+/* Copyright (c) 2022, NEC Laboratories Europe GmbH, NEC Corporation.
  *                     All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. Neither the name of the copyright holder nor the names of its
- *    contributors may be used to endorse or promote products derived from
- *    this software without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE
- * LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR
- * CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF
- * SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS
- * INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN
- * CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
- * ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- * POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (c) 2024, Unikraft GmbH and The Unikraft Authors.
+ * Licensed under the BSD-3-Clause License (the "License").
+ * You may not use this file except in compliance with the License.
  */
 #ifndef __PROCESS_H_INTERNAL__
 #define __PROCESS_H_INTERNAL__
@@ -39,10 +14,13 @@
 #if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 #include <linux/sched.h>
 #include <uk/arch/ctx.h>
+#include <uk/semaphore.h>
 #include <uk/thread.h>
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 
 extern struct uk_thread *pprocess_thread_main;
+
+extern int pprocess_exit_status;
 
 #if CONFIG_LIBPOSIX_PROCESS_MULTITHREADING
 
@@ -64,6 +42,12 @@ enum posix_thread_state {
 	POSIX_THREAD_KILLED,         /* terminated by signal */
 };
 
+enum posix_process_state {
+	POSIX_PROCESS_RUNNING,        /* not terminated */
+	POSIX_PROCESS_EXITED,         /* terminated normally */
+	POSIX_PROCESS_KILLED,         /* terminated by signal */
+};
+
 struct posix_process {
 	pid_t pid;
 	struct posix_process *parent;
@@ -74,6 +58,10 @@ struct posix_process {
 #if CONFIG_LIBPOSIX_PROCESS_SIGNAL
 	struct uk_signal_pdesc *signal;
 #endif /* CONFIG_LIBPOSIX_PROCESS_SIGNAL */
+	struct uk_semaphore wait_semaphore;
+	struct uk_semaphore exit_semaphore;
+	enum posix_process_state state;
+	int exit_status;
 
 	/* TODO: Mutex */
 };
@@ -120,9 +108,64 @@ struct posix_process *tid2pprocess(pid_t tid);
 pid_t ukthread2tid(struct uk_thread *thread);
 pid_t ukthread2pid(struct uk_thread *thread);
 
-void pprocess_kill(struct posix_process *pprocess);
+/**
+ * INTERNAL. Exit and release a pthread
+ *
+ * Performs termination tasks and raises the POSIX_PROCESS_EXIT_EVENT.
+ * Unlike processes, pthreads are released upon exit. Besides the pthread,
+ * this function terminates the underlying uk_thread, unless called on
+ * uk_thread_current()'s pthread. In this last case, the caller should
+ * take care of terminating the underlying uk_thread, as needed.
+ *
+ * @param pthread      The terminating thread.
+ * @param state	       The terminating thread's state. Must be either
+ *                     POSIX_THREAD_STATE_EXITED if terminated volunatrily, or
+ *                     POSIX_THREAD_STATE_KILLED if terminated by signal.
+ * @param exit_status  The exit status of the terminating thread.
+ */
+void pprocess_exit_pthread(struct posix_thread *pthread,
+			   enum posix_thread_state state,
+			   int exit_status);
+/**
+ * INTERNAL. Exit process
+ *
+ * Performs process termination tasks and raises POSIX_PROCESS_EXIT_EVENT.
+ * Does not release the process. Upon completion, if the process has not been
+ * reaped by an existing wait, the process becomes a zombie and its resources
+ * remain allocated until reaped by a subsequent call to wait().
+ *
+ * Notice: It's the caller's responsibility to terminate the current uk_thread
+ *         upon return, if the calling thread is a member of the terminating
+ *         process.
+ *
+ * @param pprocess     The terminating process.
+ * @param state        The new process state. Must be either
+ *                     POSIX_PROCESS_STATE_EXITED if terminated volunatrily, or
+ *                     POSIX_PROCESS_STATE_KILLED if terminated by signal.
+ * @param exit_status  The exit status of the terminating process.
+ */
+void pprocess_exit(struct posix_process *process,
+		   enum posix_process_state state,
+		   int exit_status);
 
-void pprocess_kill_siblings(struct uk_thread *thread);
+/**
+ * INTERNAL. Release pthread
+ *
+ * Releases thread resources.
+ *
+ * @param pthread The thread to release.
+ */
+void pprocess_release_pthread(struct posix_thread *pthread);
+
+/**
+ * INTERNAL. Release process
+ *
+ * Releases process resources and removes from process table.
+ * Requires that all pthreads are already terminated.
+ *
+ * @param pprocess  The process to release.
+ */
+void pprocess_release(struct posix_process *pprocess);
 
 /**
  * INTERNAL. Create pthread
