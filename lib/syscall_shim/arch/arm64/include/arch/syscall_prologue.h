@@ -38,10 +38,11 @@
 	 (0b1101 << 6) /* D, A, I, F, only IRQ's unmasked */)
 
 #define UK_SYSCALL_EXECENV_PROLOGUE_DEFINE(pname, fname, x, ...)	\
-	long __used __noreturn __attribute__((optimize("O3")))		\
-	pname(UK_ARG_MAPx(x, UK_S_ARG_LONG_MAYBE_UNUSED, __VA_ARGS__))	\
-	{								\
-		__asm__ __volatile__(					\
+	long __used							\
+	pname(UK_ARG_MAPx(x, UK_S_ARG_LONG_MAYBE_UNUSED, __VA_ARGS__));	\
+	__asm__ (							\
+		".global " STRINGIFY(pname) "\n\t"			\
+		"" STRINGIFY(pname) ":\n\t"				\
 		"/* No IRQ's during register saving please */\n\t"	\
 		"msr	daifset, #2\n\t"				\
 		"/* Use TPIDRRO_EL0 as a scratch register. This\n\t"	\
@@ -137,8 +138,6 @@
 		"ldr	x9, [sp, #" STRINGIFY(__SP_OFFSET) "]\n\t"	\
 		"mov	sp, x9\n\t"					\
 		"ret\n\t"						\
-		::							\
-		);							\
-	}
+	);
 
 #endif /* !__ASSEMBLY__ */
