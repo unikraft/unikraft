@@ -34,6 +34,7 @@
 #ifndef __UNISTD_H__
 #define __UNISTD_H__
 
+#include <stdint.h>
 #include <uk/config.h>
 
 #ifdef __cplusplus
@@ -85,6 +86,8 @@ int execvpe(const char *file, char *const argv[],
 int execve(const char *filename, char *const argv[],
 		char *const envp[]);
 pid_t vfork(void);
+int brk(void *addr);
+void *sbrk(intptr_t increment);
 #endif
 
 #if CONFIG_LIBVFSCORE
