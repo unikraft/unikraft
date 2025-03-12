@@ -568,7 +568,7 @@ static int vfscore_extract_volume(const struct vfscore_volume *vv)
 #endif /* CONFIG_LIBUKCPIO */
 
 /* Handle `mkmp` Unikraft Mount Option */
-static int vfscore_ukopt_mkmp(char *path)
+static int vfscore_ukopt_mkmp(const char *path)
 {
 	char *pos, *prev_pos;
 	int rc;
