@@ -496,6 +496,7 @@ void pprocess_release(struct posix_process *pprocess)
 	pid = pprocess->pid;
 
 	pid_process[pid] = NULL;
+
 	uk_free(pprocess->_a, pprocess);
 
 	uk_pr_debug("pid %d released\n", pid);

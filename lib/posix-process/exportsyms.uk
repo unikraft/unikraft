@@ -1,4 +1,6 @@
 alarm
+brk
+sbrk
 execl
 execle
 execlp
@@ -39,6 +41,8 @@ uk_sys_gettid
 gettid
 exit
 exit_group
+brk
+sbrk
 clone
 vfork
 kill

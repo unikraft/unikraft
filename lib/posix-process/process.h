@@ -17,6 +17,9 @@
 #include <uk/process.h>
 #include <uk/semaphore.h>
 #include <uk/thread.h>
+#if CONFIG_LIBPOSIX_PROCESS_BRK
+#include <uk/mutex.h>
+#endif /* CONFIG_LIBPOSIX_PROCESS_BRK */
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
 
 extern struct uk_thread *pprocess_thread_main;
@@ -69,6 +72,13 @@ struct posix_process {
 	enum posix_process_state state;
 	__u64 exit_signal;
 	int exit_status;
+#if CONFIG_LIBPOSIX_PROCESS_BRK
+	struct {
+		struct uk_mutex mtx;
+		void *base;
+		__sz pos;
+	} brk_ctx;
+#endif /* CONFIG_LIBPOSIX_PROCESS_BRK */
 
 	/* TODO: Mutex */
 };
@@ -245,5 +255,4 @@ void pprocess_raise_ptexit_event(struct posix_process_ptexit_event_data *data);
 void pprocess_raise_ppexit_event(struct posix_process_ppexit_event_data *data);
 
 #endif /* CONFIG_LIBPOSIX_PROCESS_MULTITHREADING */
-
 #endif /* __PROCESS_H_INTERNAL__ */

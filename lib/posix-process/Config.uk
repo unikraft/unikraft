@@ -14,6 +14,43 @@ config LIBPOSIX_PROCESS_MAX_PID
 	range 1 32767
 	default 31
 
+menuconfig LIBPOSIX_PROCESS_BRK
+	bool "brk() system call and sbrk() libc function"
+	select LIBUKALLOC
+
+if LIBPOSIX_PROCESS_BRK
+
+config LIBPOSIX_PROCESS_BRK_PAGE_ORDER
+	int "Heap size for brk (page order)"
+	default 9
+	help
+		Indirectly configures the brk heap size by changing the page
+		order. Heap size is equal with 2^order * page size (e.g. 4KB).
+
+config LIBPOSIX_PROCESS_BRK_INC_MEMZERO
+	bool "Zero memory upon brk increments"
+	default y
+	help
+		Whenever a brk increment happens, zero the incremented memory.
+		This ensures compatibility with some libcs.
+
+if LIBPOSIX_PROCESS_BRK_INC_MEMZERO
+
+config LIBPOSIX_PROCESS_BRK_DEC_DONTNEED
+	bool "Free up whole pages upon brk decrement"
+	depends on LIBUKVMEM
+	help
+		Whenever a brk decrement happens, the pages left behind get
+		released. This is POSIX-compliant as POSIX specifies that the
+		pages upon re-increment have undefined values but it is not
+		Linux-compatible as the pages do not get released and thus
+		reincremented pages would keep previous data (although some
+		libcs can do manual zeroing).
+
+endif
+
+endif
+
 config LIBPOSIX_PROCESS_CLONE_PREFER_CHILD
 	bool "Prefer scheduling of child"
 	help
