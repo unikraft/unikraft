@@ -1,0 +1,16 @@
+menuconfig LIBUKSPARSEBUF
+	bool "uksparsebuf: Sparse page buffers"
+	select LIBUKALLOC
+
+if LIBUKSPARSEBUF
+
+choice LIBUKSPARSEBUF_IMPL
+	prompt "Implementation"
+	default LIBUKSPARSEBUF_IMPL_RBTREE
+
+config LIBUKSPARSEBUF_IMPL_RBTREE
+	bool "Rank-balanced tree"
+
+endchoice
+
+endif

@@ -1,0 +1,12 @@
+# Public API
+uk_sparsebuf_insert
+uk_sparsebuf_collapse
+uk_sparsebuf_fill
+uk_sparsebuf_ref_release
+uk_sparsebuf_scoop
+uk_sparsebuf_clear
+uk_sparsebuf_assign
+
+# Internal functions, called from public inlines
+uk_sparsebuf_rb_next
+uk_sparsebuf_rb_find
