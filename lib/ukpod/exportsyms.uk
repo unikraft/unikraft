@@ -1,0 +1,15 @@
+# Anonymous memory helpers
+uk_pod_anon_pagein
+uk_pod_anon_writeback
+uk_pod_anon_pageout
+uk_pod_anon_ops
+
+# Eager PoD API
+uk_pod_eager_alloc
+uk_pod_eager_free
+uk_pod_eager_writeback
+uk_pod_eager_drop
+
+# Default PoD contexts & init
+uk_pod_eager_init_ctx
+uk_pod_default_init

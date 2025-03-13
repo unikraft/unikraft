@@ -1,0 +1,45 @@
+menuconfig LIBUKPOD
+	bool "ukpod: Pages-on-Demand"
+
+if LIBUKPOD
+
+config LIBUKPOD_DEFAULT
+	bool "Provide system default backend"
+
+choice LIBUKPOD_DEFAULT_BACKEND
+	prompt "Default Backend"
+	depends on LIBUKPOD_DEFAULT
+	default LIBUKPOD_DEFAULT_EAGER
+
+config LIBUKPOD_DEFAULT_EAGER
+	bool "Eager page allocator"
+	select LIBUKPOD_EAGER
+	help
+		Fallback implementation that eagerly allocates RAM.
+
+config LIBUKPOD_DEFAULT_EXTERNAL
+	bool "External backend"
+	help
+		Have an external library provide the system backend.
+
+endchoice
+
+# Hidden, used by Makefile
+config LIBUKPOD_DEFAULT_INTERNAL
+	bool
+	default y if LIBUKPOD_DEFAULT && !LIBUKPOD_DEFAULT_EXTERNAL
+
+comment "Internal Backends"
+
+config LIBUKPOD_EAGER
+	bool "Eager-paged"
+	select LIBUKALLOC
+	help
+		Fallback implementation that eagerly allocates RAM.
+
+comment "Misc"
+
+config LIBUKPOD_ANON
+	bool "Anonymous memory page I/O utilities"
+
+endif
