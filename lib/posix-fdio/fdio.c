@@ -417,12 +417,17 @@ off_t uk_sys_lseek(struct uk_ofile *of, off_t offset, int whence)
 	_of_lock(of);
 	if (whence == SEEK_END) {
 		const struct uk_file *f = of->file;
+		ssize_t eof;
 
 		if (iolock)
 			uk_file_rlock(f);
-		offset = fdio_get_eof(f);
+		eof = fdio_get_eof(f);
 		if (iolock)
 			uk_file_runlock(f);
+		if (eof >= 0)
+			offset += eof;
+		else
+			offset = eof;
 	} else if (whence == SEEK_CUR) {
 		offset += of->pos;
 	}
